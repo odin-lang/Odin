@@ -21,9 +21,11 @@ AFONT_WEIGHT_MAX         :: 1000
 
 AFont :: struct {}
 
-AFAMILY_VARIANT_DEFAULT :: 0
-AFAMILY_VARIANT_COMPACT :: 1
-AFAMILY_VARIANT_ELEGANT :: 2
+AFamilyVariant :: enum i32 {
+	DEFAULT = 0,
+	COMPACT = 1,
+	ELEGANT = 2,
+}
 
 AFontMatcher        :: struct {}
 ASystemFontIterator :: struct {}
@@ -43,7 +45,7 @@ foreign libandroid {
 	AFontMatcher_destroy          :: proc(matcher: ^AFontMatcher) ---
 	AFontMatcher_setStyle         :: proc(matcher: ^AFontMatcher, weight: u16, italic: bool) ---
 	AFontMatcher_setLocales       :: proc(matcher: ^AFontMatcher, languageTags: cstring) ---
-	AFontMatcher_setFamilyVariant :: proc(matcher: ^AFontMatcher, familyVariant: u32) ---
+	AFontMatcher_setFamilyVariant :: proc(matcher: ^AFontMatcher, familyVariant: AFamilyVariant) ---
 	AFontMatcher_match            :: proc(matcher: ^AFontMatcher, familyName: cstring, text: ^u16, textLength: u32, runLengthOut: ^u32) -> ^AFont ---
 	ASystemFontIterator_open      :: proc() -> ^ASystemFontIterator ---
 	ASystemFontIterator_close     :: proc(iterator: ^ASystemFontIterator) ---

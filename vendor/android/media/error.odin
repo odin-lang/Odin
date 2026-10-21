@@ -5,34 +5,34 @@ package android_media
 
 import "core:c"
 
-media_status_t :: c.int
-
-AMEDIA_OK                               :: 0
-AMEDIACODEC_ERROR_INSUFFICIENT_RESOURCE :: 1100
-AMEDIACODEC_ERROR_RECLAIMED             :: 1101
-AMEDIA_ERROR_BASE                       :: -10000
-AMEDIA_ERROR_UNKNOWN                    :: -10000
-AMEDIA_ERROR_MALFORMED                  :: -10001
-AMEDIA_ERROR_UNSUPPORTED                :: -10002
-AMEDIA_ERROR_INVALID_OBJECT             :: -10003
-AMEDIA_ERROR_INVALID_PARAMETER          :: -10004
-AMEDIA_ERROR_INVALID_OPERATION          :: -10005
-AMEDIA_ERROR_END_OF_STREAM              :: -10006
-AMEDIA_ERROR_IO                         :: -10007
-AMEDIA_ERROR_WOULD_BLOCK                :: -10008
-AMEDIA_DRM_ERROR_BASE                   :: -20000
-AMEDIA_DRM_NOT_PROVISIONED              :: -20001
-AMEDIA_DRM_RESOURCE_BUSY                :: -20002
-AMEDIA_DRM_DEVICE_REVOKED               :: -20003
-AMEDIA_DRM_SHORT_BUFFER                 :: -20004
-AMEDIA_DRM_SESSION_NOT_OPENED           :: -20005
-AMEDIA_DRM_TAMPER_DETECTED              :: -20006
-AMEDIA_DRM_VERIFY_FAILED                :: -20007
-AMEDIA_DRM_NEED_KEY                     :: -20008
-AMEDIA_DRM_LICENSE_EXPIRED              :: -20009
-AMEDIA_IMGREADER_ERROR_BASE             :: -30000
-AMEDIA_IMGREADER_NO_BUFFER_AVAILABLE    :: -30001
-AMEDIA_IMGREADER_MAX_IMAGES_ACQUIRED    :: -30002
-AMEDIA_IMGREADER_CANNOT_LOCK_IMAGE      :: -30003
-AMEDIA_IMGREADER_CANNOT_UNLOCK_IMAGE    :: -30004
-AMEDIA_IMGREADER_IMAGE_NOT_LOCKED       :: -30005
+media_status_t :: enum c.int {
+	OK                                      = 0,
+	AMEDIACODEC_ERROR_INSUFFICIENT_RESOURCE = 1100,
+	AMEDIACODEC_ERROR_RECLAIMED             = 1101,
+	ERROR_BASE                              = -10000,
+	ERROR_UNKNOWN                           = -10000,
+	ERROR_MALFORMED                         = -10001,
+	ERROR_UNSUPPORTED                       = -10002,
+	ERROR_INVALID_OBJECT                    = -10003,
+	ERROR_INVALID_PARAMETER                 = -10004,
+	ERROR_INVALID_OPERATION                 = -10005,
+	ERROR_END_OF_STREAM                     = -10006,
+	ERROR_IO                                = -10007,
+	ERROR_WOULD_BLOCK                       = -10008,
+	DRM_ERROR_BASE                          = -20000,
+	DRM_NOT_PROVISIONED                     = -20001,
+	DRM_RESOURCE_BUSY                       = -20002,
+	DRM_DEVICE_REVOKED                      = -20003,
+	DRM_SHORT_BUFFER                        = -20004,
+	DRM_SESSION_NOT_OPENED                  = -20005,
+	DRM_TAMPER_DETECTED                     = -20006,
+	DRM_VERIFY_FAILED                       = -20007,
+	DRM_NEED_KEY                            = -20008,
+	DRM_LICENSE_EXPIRED                     = -20009,
+	IMGREADER_ERROR_BASE                    = -30000,
+	IMGREADER_NO_BUFFER_AVAILABLE           = -30001,
+	IMGREADER_MAX_IMAGES_ACQUIRED           = -30002,
+	IMGREADER_CANNOT_LOCK_IMAGE             = -30003,
+	IMGREADER_CANNOT_UNLOCK_IMAGE           = -30004,
+	IMGREADER_IMAGE_NOT_LOCKED              = -30005,
+}

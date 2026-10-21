@@ -8,85 +8,112 @@ import "core:c"
 foreign import libandroid "system:android"
 foreign import libnativewindow "system:nativewindow"
 
-AHardwareBuffer_Format :: c.int
+AHardwareBuffer_Format :: enum c.int {
+	R8G8B8A8_UNORM     = 1,
+	R8G8B8X8_UNORM     = 2,
+	R8G8B8_UNORM       = 3,
+	R5G6B5_UNORM       = 4,
+	R16G16B16A16_FLOAT = 0x16,
+	R10G10B10A2_UNORM  = 0x2b,
+	BLOB               = 0x21,
+	D16_UNORM          = 0x30,
+	D24_UNORM          = 0x31,
+	D24_UNORM_S8_UINT  = 0x32,
+	D32_FLOAT          = 0x33,
+	D32_FLOAT_S8_UINT  = 0x34,
+	S8_UINT            = 0x35,
+	Y8Cb8Cr8_420       = 0x23,
+	YCbCr_P010         = 0x36,
+	YCbCr_P210         = 0x3c,
+	R8_UNORM           = 0x38,
+	R16_UINT           = 0x39,
+	R16G16_UINT        = 0x3a,
+	R10G10B10A10_UNORM = 0x3b,
+	R12_UINT           = 0x3d,
+	R14_UINT           = 0x3e,
+	R12G12_UINT        = 0x3f,
+	R14G14_UINT        = 0x40,
+	R12G12B12A12_UINT  = 0x41,
+	R14G14B14A14_UINT  = 0x42,
+	B10G10R10A2_UNORM  = 0x43,
+	B10G10R10X2_UNORM  = 0x44,
+}
 
-AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM     :: 1
-AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM     :: 2
-AHARDWAREBUFFER_FORMAT_R8G8B8_UNORM       :: 3
-AHARDWAREBUFFER_FORMAT_R5G6B5_UNORM       :: 4
-AHARDWAREBUFFER_FORMAT_R16G16B16A16_FLOAT :: 0x16
-AHARDWAREBUFFER_FORMAT_R10G10B10A2_UNORM  :: 0x2b
-AHARDWAREBUFFER_FORMAT_BLOB               :: 0x21
-AHARDWAREBUFFER_FORMAT_D16_UNORM          :: 0x30
-AHARDWAREBUFFER_FORMAT_D24_UNORM          :: 0x31
-AHARDWAREBUFFER_FORMAT_D24_UNORM_S8_UINT  :: 0x32
-AHARDWAREBUFFER_FORMAT_D32_FLOAT          :: 0x33
-AHARDWAREBUFFER_FORMAT_D32_FLOAT_S8_UINT  :: 0x34
-AHARDWAREBUFFER_FORMAT_S8_UINT            :: 0x35
-AHARDWAREBUFFER_FORMAT_Y8Cb8Cr8_420       :: 0x23
-AHARDWAREBUFFER_FORMAT_YCbCr_P010         :: 0x36
-AHARDWAREBUFFER_FORMAT_YCbCr_P210         :: 0x3c
-AHARDWAREBUFFER_FORMAT_R8_UNORM           :: 0x38
-AHARDWAREBUFFER_FORMAT_R16_UINT           :: 0x39
-AHARDWAREBUFFER_FORMAT_R16G16_UINT        :: 0x3a
-AHARDWAREBUFFER_FORMAT_R10G10B10A10_UNORM :: 0x3b
-AHARDWAREBUFFER_FORMAT_R12_UINT           :: 0x3d
-AHARDWAREBUFFER_FORMAT_R14_UINT           :: 0x3e
-AHARDWAREBUFFER_FORMAT_R12G12_UINT        :: 0x3f
-AHARDWAREBUFFER_FORMAT_R14G14_UINT        :: 0x40
-AHARDWAREBUFFER_FORMAT_R12G12B12A12_UINT  :: 0x41
-AHARDWAREBUFFER_FORMAT_R14G14B14A14_UINT  :: 0x42
-AHARDWAREBUFFER_FORMAT_B10G10R10A2_UNORM  :: 0x43
-AHARDWAREBUFFER_FORMAT_B10G10R10X2_UNORM  :: 0x44
+AHardwareBuffer_CpuUsage :: enum u64 {
+	NEVER  = 0,
+	RARELY = 2,
+	OFTEN  = 3,
+}
 
-AHardwareBuffer_UsageFlags :: i64
+AHardwareBuffer_UsageFlags :: bit_field u64 {
+	cpu_read:            AHardwareBuffer_CpuUsage | 4,
+	cpu_write:           AHardwareBuffer_CpuUsage | 4,
+	gpu_sampled_image:   bool                     | 1,
+	gpu_framebuffer:     bool                     | 1,
+	_:                   u8                       | 1,
+	composer_overlay:    bool                     | 1,
+	_:                   u8                       | 2,
+	protected_content:   bool                     | 1,
+	_:                   u8                       | 1,
+	video_encode:        bool                     | 1,
+	_:                   u8                       | 6,
+	sensor_direct_data:  bool                     | 1,
+	gpu_data_buffer:     bool                     | 1,
+	gpu_cube_map:        bool                     | 1,
+	gpu_mipmap_complete: bool                     | 1,
+	_:                   u8                       | 1,
+	vendor_0_3:          u8                       | 4,
+	front_buffer:        bool                     | 1,
+	_:                   u16                      | 15,
+	vendor_4_19:         u16                      | 16,
+}
 
-AHARDWAREBUFFER_USAGE_CPU_READ_NEVER      :: 0
-AHARDWAREBUFFER_USAGE_CPU_READ_RARELY     :: 2
-AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN      :: 3
-AHARDWAREBUFFER_USAGE_CPU_READ_MASK       :: 0xF
-AHARDWAREBUFFER_USAGE_CPU_WRITE_NEVER     :: 0x0
-AHARDWAREBUFFER_USAGE_CPU_WRITE_RARELY    :: 0x20
-AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN     :: 0x30
-AHARDWAREBUFFER_USAGE_CPU_WRITE_MASK      :: 0xf0
-AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE   :: 0x100
-AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER     :: 0x200
-AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT    :: 512
-AHARDWAREBUFFER_USAGE_COMPOSER_OVERLAY    :: 0x800
-AHARDWAREBUFFER_USAGE_PROTECTED_CONTENT   :: 0x4000
-AHARDWAREBUFFER_USAGE_VIDEO_ENCODE        :: 0x10000
-AHARDWAREBUFFER_USAGE_SENSOR_DIRECT_DATA  :: 0x800000
-AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER     :: 0x1000000
-AHARDWAREBUFFER_USAGE_GPU_CUBE_MAP        :: 0x2000000
-AHARDWAREBUFFER_USAGE_GPU_MIPMAP_COMPLETE :: 0x4000000
-AHARDWAREBUFFER_USAGE_FRONT_BUFFER        :: 0x100000000
-AHARDWAREBUFFER_USAGE_VENDOR_0            :: 0x10000000
-AHARDWAREBUFFER_USAGE_VENDOR_1            :: 0x20000000
-AHARDWAREBUFFER_USAGE_VENDOR_2            :: 0x40000000
-AHARDWAREBUFFER_USAGE_VENDOR_3            :: 0x80000000
-AHARDWAREBUFFER_USAGE_VENDOR_4            :: 0x1000000000000
-AHARDWAREBUFFER_USAGE_VENDOR_5            :: 0x2000000000000
-AHARDWAREBUFFER_USAGE_VENDOR_6            :: 0x4000000000000
-AHARDWAREBUFFER_USAGE_VENDOR_7            :: 0x8000000000000
-AHARDWAREBUFFER_USAGE_VENDOR_8            :: 0x10000000000000
-AHARDWAREBUFFER_USAGE_VENDOR_9            :: 0x20000000000000
-AHARDWAREBUFFER_USAGE_VENDOR_10           :: 0x40000000000000
-AHARDWAREBUFFER_USAGE_VENDOR_11           :: 0x80000000000000
-AHARDWAREBUFFER_USAGE_VENDOR_12           :: 0x100000000000000
-AHARDWAREBUFFER_USAGE_VENDOR_13           :: 0x200000000000000
-AHARDWAREBUFFER_USAGE_VENDOR_14           :: 0x400000000000000
-AHARDWAREBUFFER_USAGE_VENDOR_15           :: 0x800000000000000
-AHARDWAREBUFFER_USAGE_VENDOR_16           :: 0x1000000000000000
-AHARDWAREBUFFER_USAGE_VENDOR_17           :: 0x2000000000000000
-AHARDWAREBUFFER_USAGE_VENDOR_18           :: 0x4000000000000000
-AHARDWAREBUFFER_USAGE_VENDOR_19           :: 0x8000000000000000
+AHARDWAREBUFFER_USAGE_CPU_READ_NEVER      :: AHardwareBuffer_UsageFlags{}
+AHARDWAREBUFFER_USAGE_CPU_READ_RARELY     :: AHardwareBuffer_UsageFlags{cpu_read = .RARELY}
+AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN      :: AHardwareBuffer_UsageFlags{cpu_read = .OFTEN}
+AHARDWAREBUFFER_USAGE_CPU_READ_MASK       :: AHardwareBuffer_UsageFlags{cpu_read = AHardwareBuffer_CpuUsage(0xf)}
+AHARDWAREBUFFER_USAGE_CPU_WRITE_NEVER     :: AHardwareBuffer_UsageFlags{}
+AHARDWAREBUFFER_USAGE_CPU_WRITE_RARELY    :: AHardwareBuffer_UsageFlags{cpu_write = .RARELY}
+AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN     :: AHardwareBuffer_UsageFlags{cpu_write = .OFTEN}
+AHARDWAREBUFFER_USAGE_CPU_WRITE_MASK      :: AHardwareBuffer_UsageFlags{cpu_write = AHardwareBuffer_CpuUsage(0xf)}
+AHARDWAREBUFFER_USAGE_GPU_SAMPLED_IMAGE   :: AHardwareBuffer_UsageFlags{gpu_sampled_image = true}
+AHARDWAREBUFFER_USAGE_GPU_FRAMEBUFFER     :: AHardwareBuffer_UsageFlags{gpu_framebuffer = true}
+AHARDWAREBUFFER_USAGE_GPU_COLOR_OUTPUT    :: AHardwareBuffer_UsageFlags{gpu_framebuffer = true}
+AHARDWAREBUFFER_USAGE_COMPOSER_OVERLAY    :: AHardwareBuffer_UsageFlags{composer_overlay = true}
+AHARDWAREBUFFER_USAGE_PROTECTED_CONTENT   :: AHardwareBuffer_UsageFlags{protected_content = true}
+AHARDWAREBUFFER_USAGE_VIDEO_ENCODE        :: AHardwareBuffer_UsageFlags{video_encode = true}
+AHARDWAREBUFFER_USAGE_SENSOR_DIRECT_DATA  :: AHardwareBuffer_UsageFlags{sensor_direct_data = true}
+AHARDWAREBUFFER_USAGE_GPU_DATA_BUFFER     :: AHardwareBuffer_UsageFlags{gpu_data_buffer = true}
+AHARDWAREBUFFER_USAGE_GPU_CUBE_MAP        :: AHardwareBuffer_UsageFlags{gpu_cube_map = true}
+AHARDWAREBUFFER_USAGE_GPU_MIPMAP_COMPLETE :: AHardwareBuffer_UsageFlags{gpu_mipmap_complete = true}
+AHARDWAREBUFFER_USAGE_FRONT_BUFFER        :: AHardwareBuffer_UsageFlags{front_buffer = true}
+AHARDWAREBUFFER_USAGE_VENDOR_0            :: AHardwareBuffer_UsageFlags{vendor_0_3 = 0x1}
+AHARDWAREBUFFER_USAGE_VENDOR_1            :: AHardwareBuffer_UsageFlags{vendor_0_3 = 0x2}
+AHARDWAREBUFFER_USAGE_VENDOR_2            :: AHardwareBuffer_UsageFlags{vendor_0_3 = 0x4}
+AHARDWAREBUFFER_USAGE_VENDOR_3            :: AHardwareBuffer_UsageFlags{vendor_0_3 = 0x8}
+AHARDWAREBUFFER_USAGE_VENDOR_4            :: AHardwareBuffer_UsageFlags{vendor_4_19 = 0x1}
+AHARDWAREBUFFER_USAGE_VENDOR_5            :: AHardwareBuffer_UsageFlags{vendor_4_19 = 0x2}
+AHARDWAREBUFFER_USAGE_VENDOR_6            :: AHardwareBuffer_UsageFlags{vendor_4_19 = 0x4}
+AHARDWAREBUFFER_USAGE_VENDOR_7            :: AHardwareBuffer_UsageFlags{vendor_4_19 = 0x8}
+AHARDWAREBUFFER_USAGE_VENDOR_8            :: AHardwareBuffer_UsageFlags{vendor_4_19 = 0x10}
+AHARDWAREBUFFER_USAGE_VENDOR_9            :: AHardwareBuffer_UsageFlags{vendor_4_19 = 0x20}
+AHARDWAREBUFFER_USAGE_VENDOR_10           :: AHardwareBuffer_UsageFlags{vendor_4_19 = 0x40}
+AHARDWAREBUFFER_USAGE_VENDOR_11           :: AHardwareBuffer_UsageFlags{vendor_4_19 = 0x80}
+AHARDWAREBUFFER_USAGE_VENDOR_12           :: AHardwareBuffer_UsageFlags{vendor_4_19 = 0x100}
+AHARDWAREBUFFER_USAGE_VENDOR_13           :: AHardwareBuffer_UsageFlags{vendor_4_19 = 0x200}
+AHARDWAREBUFFER_USAGE_VENDOR_14           :: AHardwareBuffer_UsageFlags{vendor_4_19 = 0x400}
+AHARDWAREBUFFER_USAGE_VENDOR_15           :: AHardwareBuffer_UsageFlags{vendor_4_19 = 0x800}
+AHARDWAREBUFFER_USAGE_VENDOR_16           :: AHardwareBuffer_UsageFlags{vendor_4_19 = 0x1000}
+AHARDWAREBUFFER_USAGE_VENDOR_17           :: AHardwareBuffer_UsageFlags{vendor_4_19 = 0x2000}
+AHARDWAREBUFFER_USAGE_VENDOR_18           :: AHardwareBuffer_UsageFlags{vendor_4_19 = 0x4000}
+AHARDWAREBUFFER_USAGE_VENDOR_19           :: AHardwareBuffer_UsageFlags{vendor_4_19 = 0x8000}
 
 AHardwareBuffer_Desc :: struct {
 	width:  u32,
 	height: u32,
 	layers: u32,
-	format: u32,
-	usage:  u64,
+	format: AHardwareBuffer_Format,
+	usage:  AHardwareBuffer_UsageFlags,
 	stride: u32,
 	rfu0:   u32,
 	rfu1:   u64,
@@ -117,12 +144,12 @@ foreign libnativewindow {
 	AHardwareBuffer_acquire                  :: proc(buffer: ^AHardwareBuffer) ---
 	AHardwareBuffer_release                  :: proc(buffer: ^AHardwareBuffer) ---
 	AHardwareBuffer_describe                 :: proc(buffer: ^AHardwareBuffer, outDesc: ^AHardwareBuffer_Desc) ---
-	AHardwareBuffer_lock                     :: proc(buffer: ^AHardwareBuffer, usage: u64, fence: i32, rect: ^ARect, outVirtualAddress: ^rawptr) -> c.int ---
+	AHardwareBuffer_lock                     :: proc(buffer: ^AHardwareBuffer, usage: AHardwareBuffer_UsageFlags, fence: i32, rect: ^ARect, outVirtualAddress: ^rawptr) -> c.int ---
 	AHardwareBuffer_unlock                   :: proc(buffer: ^AHardwareBuffer, fence: ^i32) -> c.int ---
 	AHardwareBuffer_sendHandleToUnixSocket   :: proc(buffer: ^AHardwareBuffer, socketFd: c.int) -> c.int ---
 	AHardwareBuffer_recvHandleFromUnixSocket :: proc(socketFd: c.int, outBuffer: ^^AHardwareBuffer) -> c.int ---
-	AHardwareBuffer_lockPlanes               :: proc(buffer: ^AHardwareBuffer, usage: u64, fence: i32, rect: ^ARect, outPlanes: ^AHardwareBuffer_Planes) -> c.int ---
+	AHardwareBuffer_lockPlanes               :: proc(buffer: ^AHardwareBuffer, usage: AHardwareBuffer_UsageFlags, fence: i32, rect: ^ARect, outPlanes: ^AHardwareBuffer_Planes) -> c.int ---
 	AHardwareBuffer_isSupported              :: proc(desc: ^AHardwareBuffer_Desc) -> c.int ---
-	AHardwareBuffer_lockAndGetInfo           :: proc(buffer: ^AHardwareBuffer, usage: u64, fence: i32, rect: ^ARect, outVirtualAddress: ^rawptr, outBytesPerPixel: ^i32, outBytesPerStride: ^i32) -> c.int ---
+	AHardwareBuffer_lockAndGetInfo           :: proc(buffer: ^AHardwareBuffer, usage: AHardwareBuffer_UsageFlags, fence: i32, rect: ^ARect, outVirtualAddress: ^rawptr, outBytesPerPixel: ^i32, outBytesPerStride: ^i32) -> c.int ---
 	AHardwareBuffer_getId                    :: proc(buffer: ^AHardwareBuffer, outId: ^u64) -> c.int --- // API level 31
 }

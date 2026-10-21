@@ -7,14 +7,18 @@ import "core:c"
 
 foreign import libandroid "system:android"
 
-PERMISSION_MANAGER_PERMISSION_GRANTED :: 0
-PERMISSION_MANAGER_PERMISSION_DENIED  :: -1
+APermissionManagerPermission :: enum i32 {
+	GRANTED = 0,
+	DENIED  = -1,
+}
 
-PERMISSION_MANAGER_STATUS_OK                  :: 0
-PERMISSION_MANAGER_STATUS_ERROR_UNKNOWN       :: -1
-PERMISSION_MANAGER_STATUS_SERVICE_UNAVAILABLE :: -2
+APermissionManagerStatus :: enum i32 {
+	OK                  = 0,
+	ERROR_UNKNOWN       = -1,
+	SERVICE_UNAVAILABLE = -2,
+}
 
 @(default_calling_convention="c")
 foreign libandroid {
-	APermissionManager_checkPermission :: proc(permission: cstring, pid: c.int, uid: u32, outResult: ^i32) -> i32 --- // API level 31
+	APermissionManager_checkPermission :: proc(permission: cstring, pid: c.int, uid: u32, outResult: ^APermissionManagerPermission) -> APermissionManagerStatus --- // API level 31
 }

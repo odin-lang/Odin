@@ -24,16 +24,24 @@ BatteryState_getCapacity :: proc "contextless" (self: ^BatteryState) -> (result:
 	return jni_env->CallFloatMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-BatteryState_getStatus :: proc "contextless" (self: ^BatteryState) -> (result: i32, exception: ^Throwable) {
+BatteryState_getStatus :: proc "contextless" (self: ^BatteryState) -> (result: BatteryState_Status, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &BatteryState__class, "getStatus", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return BatteryState_Status(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 BatteryState_isPresent :: proc "contextless" (self: ^BatteryState) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &BatteryState__class, "isPresent", "()Z", false) or_return
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
+}
+
+BatteryState_Status :: enum i32 {
+	CHARGING     = 2,
+	DISCHARGING  = 3,
+	FULL         = 5,
+	NOT_CHARGING = 4,
+	UNKNOWN      = 1,
 }
 
 // class android.hardware.Camera
@@ -402,16 +410,16 @@ Camera_CameraInfo_set_canDisableShutterSound :: proc "contextless" (self: ^Camer
 	return jni_take(jni_env)
 }
 
-Camera_CameraInfo_get_facing :: proc "contextless" (self: ^Camera_CameraInfo) -> (result: i32, exception: ^Throwable) {
+Camera_CameraInfo_get_facing :: proc "contextless" (self: ^Camera_CameraInfo) -> (result: Camera_CameraInfo_Facing, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Camera_CameraInfo__class, "facing", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return Camera_CameraInfo_Facing(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-Camera_CameraInfo_set_facing :: proc "contextless" (self: ^Camera_CameraInfo, value: i32) -> (exception: ^Throwable) {
+Camera_CameraInfo_set_facing :: proc "contextless" (self: ^Camera_CameraInfo, value: Camera_CameraInfo_Facing) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Camera_CameraInfo__class, "facing", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
@@ -432,6 +440,11 @@ Camera_CameraInfo_new :: proc "contextless" () -> (result: ^Camera_CameraInfo, e
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Camera_CameraInfo__class, "<init>", "()V", false) or_return
 	return (^Camera_CameraInfo)(jni_env->NewObjectA(jni_class, jni_id, nil)), jni_take(jni_env)
+}
+
+Camera_CameraInfo_Facing :: enum i32 {
+	BACK  = 0,
+	FRONT = 1,
 }
 
 // interface android.hardware.Camera.ErrorCallback
@@ -792,10 +805,10 @@ Camera_Parameters_getMinExposureCompensation :: proc "contextless" (self: ^Camer
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-Camera_Parameters_getPictureFormat :: proc "contextless" (self: ^Camera_Parameters) -> (result: i32, exception: ^Throwable) {
+Camera_Parameters_getPictureFormat :: proc "contextless" (self: ^Camera_Parameters) -> (result: ImageFormat_Format, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Camera_Parameters__class, "getPictureFormat", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return ImageFormat_Format(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Camera_Parameters_getPictureSize :: proc "contextless" (self: ^Camera_Parameters) -> (result: ^Camera_Size, exception: ^Throwable) {
@@ -810,10 +823,10 @@ Camera_Parameters_getPreferredPreviewSizeForVideo :: proc "contextless" (self: ^
 	return (^Camera_Size)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Camera_Parameters_getPreviewFormat :: proc "contextless" (self: ^Camera_Parameters) -> (result: i32, exception: ^Throwable) {
+Camera_Parameters_getPreviewFormat :: proc "contextless" (self: ^Camera_Parameters) -> (result: ImageFormat_Format, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Camera_Parameters__class, "getPreviewFormat", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return ImageFormat_Format(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Camera_Parameters_getPreviewFpsRange :: proc "contextless" (self: ^Camera_Parameters, range: ^IntArray) -> (exception: ^Throwable) {
@@ -1164,10 +1177,10 @@ Camera_Parameters_setMeteringAreas :: proc "contextless" (self: ^Camera_Paramete
 	return jni_take(jni_env)
 }
 
-Camera_Parameters_setPictureFormat :: proc "contextless" (self: ^Camera_Parameters, pixel_format: i32) -> (exception: ^Throwable) {
+Camera_Parameters_setPictureFormat :: proc "contextless" (self: ^Camera_Parameters, pixel_format: ImageFormat_Format) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Camera_Parameters__class, "setPictureFormat", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = pixel_format}}
+	jni_args := [?]android.jvalue{{i = i32(pixel_format)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1180,10 +1193,10 @@ Camera_Parameters_setPictureSize :: proc "contextless" (self: ^Camera_Parameters
 	return jni_take(jni_env)
 }
 
-Camera_Parameters_setPreviewFormat :: proc "contextless" (self: ^Camera_Parameters, pixel_format: i32) -> (exception: ^Throwable) {
+Camera_Parameters_setPreviewFormat :: proc "contextless" (self: ^Camera_Parameters, pixel_format: ImageFormat_Format) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Camera_Parameters__class, "setPreviewFormat", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = pixel_format}}
+	jni_args := [?]android.jvalue{{i = i32(pixel_format)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1479,33 +1492,122 @@ DataSpace_TRANSFER_SRGB                      :: 8388608
 DataSpace_TRANSFER_ST2084                    :: 29360128
 DataSpace_TRANSFER_UNSPECIFIED               :: 0
 
-DataSpace_getRange :: proc "contextless" (dataSpace: i32) -> (result: i32, exception: ^Throwable) {
+DataSpace_getRange :: proc "contextless" (dataSpace: DataSpace_Field) -> (result: DataSpace_Field, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &DataSpace__class, "getRange", "(I)I", true) or_return
-	jni_args := [?]android.jvalue{{i = dataSpace}}
-	return jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{i = transmute(i32)dataSpace}}
+	return transmute(DataSpace_Field)(jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-DataSpace_getStandard :: proc "contextless" (dataSpace: i32) -> (result: i32, exception: ^Throwable) {
+DataSpace_getStandard :: proc "contextless" (dataSpace: DataSpace_Field) -> (result: DataSpace_Field, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &DataSpace__class, "getStandard", "(I)I", true) or_return
-	jni_args := [?]android.jvalue{{i = dataSpace}}
-	return jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{i = transmute(i32)dataSpace}}
+	return transmute(DataSpace_Field)(jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-DataSpace_getTransfer :: proc "contextless" (dataSpace: i32) -> (result: i32, exception: ^Throwable) {
+DataSpace_getTransfer :: proc "contextless" (dataSpace: DataSpace_Field) -> (result: DataSpace_Field, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &DataSpace__class, "getTransfer", "(I)I", true) or_return
-	jni_args := [?]android.jvalue{{i = dataSpace}}
-	return jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{i = transmute(i32)dataSpace}}
+	return transmute(DataSpace_Field)(jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-DataSpace_pack :: proc "contextless" (standard: i32, transfer: i32, range: i32) -> (result: i32, exception: ^Throwable) {
+DataSpace_pack :: proc "contextless" (standard: DataSpace_Field, transfer: DataSpace_Field, range: DataSpace_Field) -> (result: DataSpace_Field, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &DataSpace__class, "pack", "(III)I", true) or_return
-	jni_args := [?]android.jvalue{{i = standard}, {i = transfer}, {i = range}}
-	return jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{i = transmute(i32)standard}, {i = transmute(i32)transfer}, {i = transmute(i32)range}}
+	return transmute(DataSpace_Field)(jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
+
+DataSpace_Standard :: enum u32 {
+	UNSPECIFIED               = 0,
+	BT709                     = 1,
+	BT601_625                 = 2,
+	BT601_625_UNADJUSTED      = 3,
+	BT601_525                 = 4,
+	BT601_525_UNADJUSTED      = 5,
+	BT2020                    = 6,
+	BT2020_CONSTANT_LUMINANCE = 7,
+	BT470M                    = 8,
+	FILM                      = 9,
+	DCI_P3                    = 0xa,
+	ADOBE_RGB                 = 0xb,
+}
+
+DataSpace_Transfer :: enum u32 {
+	UNSPECIFIED = 0,
+	LINEAR      = 1,
+	SRGB        = 2,
+	SMPTE_170M  = 3,
+	GAMMA2_2    = 4,
+	GAMMA2_6    = 5,
+	GAMMA2_8    = 6,
+	ST2084      = 7,
+	HLG         = 8,
+}
+
+DataSpace_Range :: enum u32 {
+	UNSPECIFIED = 0,
+	FULL        = 1,
+	LIMITED     = 2,
+	EXTENDED    = 3,
+}
+
+DataSpace_Field :: bit_field i32 {
+	other:    u16                | 16,
+	standard: DataSpace_Standard | 6,
+	transfer: DataSpace_Transfer | 5,
+	range:    DataSpace_Range    | 3,
+	_:        u8                 | 2,
+}
+
+DataSpace_Field_ADOBE_RGB                          :: DataSpace_Field{standard = .ADOBE_RGB, transfer = .GAMMA2_2, range = .FULL}
+DataSpace_Field_BT2020                             :: DataSpace_Field{standard = .BT2020, transfer = .SMPTE_170M, range = .FULL}
+DataSpace_Field_BT2020_HLG                         :: DataSpace_Field{standard = .BT2020, transfer = .HLG, range = .FULL}
+DataSpace_Field_BT2020_PQ                          :: DataSpace_Field{standard = .BT2020, transfer = .ST2084, range = .FULL}
+DataSpace_Field_BT601_525                          :: DataSpace_Field{standard = .BT601_525, transfer = .SMPTE_170M, range = .LIMITED}
+DataSpace_Field_BT601_625                          :: DataSpace_Field{standard = .BT601_625, transfer = .SMPTE_170M, range = .LIMITED}
+DataSpace_Field_BT709                              :: DataSpace_Field{standard = .BT709, transfer = .SMPTE_170M, range = .LIMITED}
+DataSpace_Field_DCI_P3                             :: DataSpace_Field{standard = .DCI_P3, transfer = .GAMMA2_6, range = .FULL}
+DataSpace_Field_DEPTH                              :: DataSpace_Field{other = 0x1000}
+DataSpace_Field_DISPLAY_BT2020                     :: DataSpace_Field{standard = .BT2020, transfer = .SRGB, range = .FULL}
+DataSpace_Field_DISPLAY_P3                         :: DataSpace_Field{standard = .DCI_P3, transfer = .SRGB, range = .FULL}
+DataSpace_Field_DYNAMIC_DEPTH                      :: DataSpace_Field{other = 0x1002}
+DataSpace_Field_HEIF                               :: DataSpace_Field{other = 0x1004}
+DataSpace_Field_HEIF_ULTRAHDR                      :: DataSpace_Field{other = 0x1006}
+DataSpace_Field_JFIF                               :: DataSpace_Field{standard = .BT601_625, transfer = .SMPTE_170M, range = .FULL}
+DataSpace_Field_JPEG_R                             :: DataSpace_Field{other = 0x1005}
+DataSpace_Field_SCRGB                              :: DataSpace_Field{standard = .BT709, transfer = .SRGB, range = .EXTENDED}
+DataSpace_Field_SCRGB_LINEAR                       :: DataSpace_Field{standard = .BT709, transfer = .LINEAR, range = .EXTENDED}
+DataSpace_Field_SRGB                               :: DataSpace_Field{standard = .BT709, transfer = .SRGB, range = .FULL}
+DataSpace_Field_SRGB_LINEAR                        :: DataSpace_Field{standard = .BT709, transfer = .LINEAR, range = .FULL}
+DataSpace_Field_UNKNOWN                            :: DataSpace_Field{}
+DataSpace_Field_RANGE_EXTENDED                     :: DataSpace_Field{range = .EXTENDED}
+DataSpace_Field_RANGE_FULL                         :: DataSpace_Field{range = .FULL}
+DataSpace_Field_RANGE_LIMITED                      :: DataSpace_Field{range = .LIMITED}
+DataSpace_Field_RANGE_UNSPECIFIED                  :: DataSpace_Field{}
+DataSpace_Field_STANDARD_ADOBE_RGB                 :: DataSpace_Field{standard = .ADOBE_RGB}
+DataSpace_Field_STANDARD_BT2020                    :: DataSpace_Field{standard = .BT2020}
+DataSpace_Field_STANDARD_BT2020_CONSTANT_LUMINANCE :: DataSpace_Field{standard = .BT2020_CONSTANT_LUMINANCE}
+DataSpace_Field_STANDARD_BT470M                    :: DataSpace_Field{standard = .BT470M}
+DataSpace_Field_STANDARD_BT601_525                 :: DataSpace_Field{standard = .BT601_525}
+DataSpace_Field_STANDARD_BT601_525_UNADJUSTED      :: DataSpace_Field{standard = .BT601_525_UNADJUSTED}
+DataSpace_Field_STANDARD_BT601_625                 :: DataSpace_Field{standard = .BT601_625}
+DataSpace_Field_STANDARD_BT601_625_UNADJUSTED      :: DataSpace_Field{standard = .BT601_625_UNADJUSTED}
+DataSpace_Field_STANDARD_BT709                     :: DataSpace_Field{standard = .BT709}
+DataSpace_Field_STANDARD_DCI_P3                    :: DataSpace_Field{standard = .DCI_P3}
+DataSpace_Field_STANDARD_FILM                      :: DataSpace_Field{standard = .FILM}
+DataSpace_Field_STANDARD_UNSPECIFIED               :: DataSpace_Field{}
+DataSpace_Field_TRANSFER_GAMMA2_2                  :: DataSpace_Field{transfer = .GAMMA2_2}
+DataSpace_Field_TRANSFER_GAMMA2_6                  :: DataSpace_Field{transfer = .GAMMA2_6}
+DataSpace_Field_TRANSFER_GAMMA2_8                  :: DataSpace_Field{transfer = .GAMMA2_8}
+DataSpace_Field_TRANSFER_HLG                       :: DataSpace_Field{transfer = .HLG}
+DataSpace_Field_TRANSFER_LINEAR                    :: DataSpace_Field{transfer = .LINEAR}
+DataSpace_Field_TRANSFER_SMPTE_170M                :: DataSpace_Field{transfer = .SMPTE_170M}
+DataSpace_Field_TRANSFER_SRGB                      :: DataSpace_Field{transfer = .SRGB}
+DataSpace_Field_TRANSFER_ST2084                    :: DataSpace_Field{transfer = .ST2084}
+DataSpace_Field_TRANSFER_UNSPECIFIED               :: DataSpace_Field{}
 
 // class android.hardware.DisplayLuts // API level 36
 DisplayLuts :: struct #raw_union {
@@ -1556,10 +1658,10 @@ DisplayLuts_Entry :: struct #raw_union {
 @(private)
 DisplayLuts_Entry__class := Cached_Class{name = "android/hardware/DisplayLuts$Entry"}
 
-DisplayLuts_Entry_new :: proc "contextless" (buffer: ^FloatArray, dimension: i32, samplingKey: i32) -> (result: ^DisplayLuts_Entry, exception: ^Throwable) {
+DisplayLuts_Entry_new :: proc "contextless" (buffer: ^FloatArray, dimension: LutProperties_Dimension, samplingKey: LutProperties_SamplingKey) -> (result: ^DisplayLuts_Entry, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &DisplayLuts_Entry__class, "<init>", "([FII)V", false) or_return
-	jni_args := [?]android.jvalue{{l = buffer}, {i = dimension}, {i = samplingKey}}
+	jni_args := [?]android.jvalue{{l = buffer}, {i = i32(dimension)}, {i = i32(samplingKey)}}
 	return (^DisplayLuts_Entry)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -1710,23 +1812,23 @@ HardwareBuffer_close :: proc "contextless" (self: ^HardwareBuffer) -> (exception
 	return jni_take(jni_env)
 }
 
-HardwareBuffer_create :: proc "contextless" (width: i32, height: i32, format: i32, layers: i32, usage: i64) -> (result: ^HardwareBuffer, exception: ^Throwable) {
+HardwareBuffer_create :: proc "contextless" (width: i32, height: i32, format: HardwareBuffer_Format, layers: i32, usage: HardwareBuffer_Usage) -> (result: ^HardwareBuffer, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &HardwareBuffer__class, "create", "(IIIIJ)Landroid/hardware/HardwareBuffer;", true) or_return
-	jni_args := [?]android.jvalue{{i = width}, {i = height}, {i = format}, {i = layers}, {j = usage}}
+	jni_args := [?]android.jvalue{{i = width}, {i = height}, {i = i32(format)}, {i = layers}, {j = transmute(i64)usage}}
 	return (^HardwareBuffer)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-HardwareBuffer_describeContents :: proc "contextless" (self: ^HardwareBuffer) -> (result: i32, exception: ^Throwable) {
+HardwareBuffer_describeContents :: proc "contextless" (self: ^HardwareBuffer) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &HardwareBuffer__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-HardwareBuffer_getFormat :: proc "contextless" (self: ^HardwareBuffer) -> (result: i32, exception: ^Throwable) {
+HardwareBuffer_getFormat :: proc "contextless" (self: ^HardwareBuffer) -> (result: HardwareBuffer_Format, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &HardwareBuffer__class, "getFormat", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return HardwareBuffer_Format(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 HardwareBuffer_getHeight :: proc "contextless" (self: ^HardwareBuffer) -> (result: i32, exception: ^Throwable) {
@@ -1747,10 +1849,10 @@ HardwareBuffer_getLayers :: proc "contextless" (self: ^HardwareBuffer) -> (resul
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-HardwareBuffer_getUsage :: proc "contextless" (self: ^HardwareBuffer) -> (result: i64, exception: ^Throwable) {
+HardwareBuffer_getUsage :: proc "contextless" (self: ^HardwareBuffer) -> (result: HardwareBuffer_Usage, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &HardwareBuffer__class, "getUsage", "()J", false) or_return
-	return jni_env->CallLongMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(HardwareBuffer_Usage)(jni_env->CallLongMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 HardwareBuffer_getWidth :: proc "contextless" (self: ^HardwareBuffer) -> (result: i32, exception: ^Throwable) {
@@ -1765,19 +1867,92 @@ HardwareBuffer_isClosed :: proc "contextless" (self: ^HardwareBuffer) -> (result
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-HardwareBuffer_isSupported :: proc "contextless" (width: i32, height: i32, format: i32, layers: i32, usage: i64) -> (result: bool, exception: ^Throwable) {
+HardwareBuffer_isSupported :: proc "contextless" (width: i32, height: i32, format: HardwareBuffer_Format, layers: i32, usage: HardwareBuffer_Usage) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &HardwareBuffer__class, "isSupported", "(IIIIJ)Z", true) or_return
-	jni_args := [?]android.jvalue{{i = width}, {i = height}, {i = format}, {i = layers}, {j = usage}}
+	jni_args := [?]android.jvalue{{i = width}, {i = height}, {i = i32(format)}, {i = layers}, {j = transmute(i64)usage}}
 	return jni_env->CallStaticBooleanMethodA(jni_class, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-HardwareBuffer_writeToParcel :: proc "contextless" (self: ^HardwareBuffer, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+HardwareBuffer_writeToParcel :: proc "contextless" (self: ^HardwareBuffer, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &HardwareBuffer__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+HardwareBuffer_CpuUsage :: enum u64 {
+	NEVER  = 0,
+	RARELY = 2,
+	OFTEN  = 3,
+}
+
+HardwareBuffer_Usage :: bit_field i64 {
+	cpu_read:            HardwareBuffer_CpuUsage | 4,
+	cpu_write:           HardwareBuffer_CpuUsage | 4,
+	gpu_sampled_image:   bool                    | 1,
+	gpu_color_output:    bool                    | 1,
+	_:                   u8                      | 1,
+	composer_overlay:    bool                    | 1,
+	_:                   u8                      | 2,
+	protected_content:   bool                    | 1,
+	_:                   u8                      | 1,
+	video_encode:        bool                    | 1,
+	_:                   u8                      | 6,
+	sensor_direct_data:  bool                    | 1,
+	gpu_data_buffer:     bool                    | 1,
+	gpu_cube_map:        bool                    | 1,
+	gpu_mipmap_complete: bool                    | 1,
+	_:                   u8                      | 5,
+	front_buffer:        bool                    | 1,
+	_:                   u32                     | 31,
+}
+
+HardwareBuffer_Usage_COMPOSER_OVERLAY    :: HardwareBuffer_Usage{composer_overlay = true}
+HardwareBuffer_Usage_CPU_READ_OFTEN      :: HardwareBuffer_Usage{cpu_read = .OFTEN}
+HardwareBuffer_Usage_CPU_READ_RARELY     :: HardwareBuffer_Usage{cpu_read = .RARELY}
+HardwareBuffer_Usage_CPU_WRITE_OFTEN     :: HardwareBuffer_Usage{cpu_write = .OFTEN}
+HardwareBuffer_Usage_CPU_WRITE_RARELY    :: HardwareBuffer_Usage{cpu_write = .RARELY}
+HardwareBuffer_Usage_FRONT_BUFFER        :: HardwareBuffer_Usage{front_buffer = true}
+HardwareBuffer_Usage_GPU_COLOR_OUTPUT    :: HardwareBuffer_Usage{gpu_color_output = true}
+HardwareBuffer_Usage_GPU_CUBE_MAP        :: HardwareBuffer_Usage{gpu_cube_map = true}
+HardwareBuffer_Usage_GPU_DATA_BUFFER     :: HardwareBuffer_Usage{gpu_data_buffer = true}
+HardwareBuffer_Usage_GPU_MIPMAP_COMPLETE :: HardwareBuffer_Usage{gpu_mipmap_complete = true}
+HardwareBuffer_Usage_GPU_SAMPLED_IMAGE   :: HardwareBuffer_Usage{gpu_sampled_image = true}
+HardwareBuffer_Usage_PROTECTED_CONTENT   :: HardwareBuffer_Usage{protected_content = true}
+HardwareBuffer_Usage_SENSOR_DIRECT_DATA  :: HardwareBuffer_Usage{sensor_direct_data = true}
+HardwareBuffer_Usage_VIDEO_ENCODE        :: HardwareBuffer_Usage{video_encode = true}
+
+HardwareBuffer_Format :: enum i32 {
+	BGRA_1010102  = 67,
+	BGRX_1010102  = 68,
+	BLOB          = 33,
+	DS_24UI8      = 50,
+	DS_FP32UI8    = 52,
+	D_16          = 48,
+	D_24          = 49,
+	D_FP32        = 51,
+	RGBA_10101010 = 59,
+	RGBA_1010102  = 43,
+	RGBA_12121212 = 65,
+	RGBA_14141414 = 66,
+	RGBA_8888     = 1,
+	RGBA_FP16     = 22,
+	RGBX_8888     = 2,
+	RGB_565       = 4,
+	RGB_888       = 3,
+	RG_1212       = 63,
+	RG_1414       = 64,
+	RG_1616       = 58,
+	R_12          = 61,
+	R_14          = 62,
+	R_16          = 57,
+	R_8           = 56,
+	S_UI8         = 53,
+	YCBCR_420_888 = 35,
+	YCBCR_P010    = 54,
+	YCBCR_P210    = 60,
 }
 
 // class android.hardware.LutProperties // API level 36
@@ -1801,10 +1976,10 @@ LutProperties_equals :: proc "contextless" (self: ^LutProperties, obj: ^Object) 
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-LutProperties_getDimension :: proc "contextless" (self: ^LutProperties) -> (result: i32, exception: ^Throwable) {
+LutProperties_getDimension :: proc "contextless" (self: ^LutProperties) -> (result: LutProperties_Dimension, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &LutProperties__class, "getDimension", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return LutProperties_Dimension(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 LutProperties_getSamplingKeys :: proc "contextless" (self: ^LutProperties) -> (result: ^IntArray, exception: ^Throwable) {
@@ -1831,6 +2006,17 @@ LutProperties_toString :: proc "contextless" (self: ^LutProperties) -> (result: 
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
+LutProperties_Dimension :: enum i32 {
+	ONE_DIMENSION   = 1,
+	THREE_DIMENSION = 3,
+}
+
+LutProperties_SamplingKey :: enum i32 {
+	CIE_Y   = 2,
+	MAX_RGB = 1,
+	RGB     = 0,
+}
+
 // class android.hardware.OverlayProperties // API level 35
 OverlayProperties :: struct #raw_union {
 	using Object: Object,
@@ -1846,10 +2032,10 @@ OverlayProperties_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_C
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-OverlayProperties_describeContents :: proc "contextless" (self: ^OverlayProperties) -> (result: i32, exception: ^Throwable) {
+OverlayProperties_describeContents :: proc "contextless" (self: ^OverlayProperties) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &OverlayProperties__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 OverlayProperties_getLutProperties :: proc "contextless" (self: ^OverlayProperties) -> (result: ^Array(LutProperties), exception: ^Throwable) { // API level 36
@@ -1858,10 +2044,10 @@ OverlayProperties_getLutProperties :: proc "contextless" (self: ^OverlayProperti
 	return (^Array(LutProperties))(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-OverlayProperties_isCombinationSupported :: proc "contextless" (self: ^OverlayProperties, dataspace: i32, format: i32) -> (result: bool, exception: ^Throwable) {
+OverlayProperties_isCombinationSupported :: proc "contextless" (self: ^OverlayProperties, dataspace: DataSpace_Field, format: HardwareBuffer_Format) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &OverlayProperties__class, "isCombinationSupported", "(II)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = dataspace}, {i = format}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)dataspace}, {i = i32(format)}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -1871,10 +2057,10 @@ OverlayProperties_isMixedColorSpacesSupported :: proc "contextless" (self: ^Over
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-OverlayProperties_writeToParcel :: proc "contextless" (self: ^OverlayProperties, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+OverlayProperties_writeToParcel :: proc "contextless" (self: ^OverlayProperties, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &OverlayProperties__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1974,10 +2160,10 @@ Sensor_getFifoReservedEventCount :: proc "contextless" (self: ^Sensor) -> (resul
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-Sensor_getHighestDirectReportRateLevel :: proc "contextless" (self: ^Sensor) -> (result: i32, exception: ^Throwable) {
+Sensor_getHighestDirectReportRateLevel :: proc "contextless" (self: ^Sensor) -> (result: SensorDirectChannel_Rate, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Sensor__class, "getHighestDirectReportRateLevel", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return SensorDirectChannel_Rate(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Sensor_getId :: proc "contextless" (self: ^Sensor) -> (result: i32, exception: ^Throwable) {
@@ -2016,10 +2202,10 @@ Sensor_getPower :: proc "contextless" (self: ^Sensor) -> (result: f32, exception
 	return jni_env->CallFloatMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-Sensor_getReportingMode :: proc "contextless" (self: ^Sensor) -> (result: i32, exception: ^Throwable) {
+Sensor_getReportingMode :: proc "contextless" (self: ^Sensor) -> (result: Sensor_ReportingMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Sensor__class, "getReportingMode", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return Sensor_ReportingMode(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Sensor_getResolution :: proc "contextless" (self: ^Sensor) -> (result: f32, exception: ^Throwable) {
@@ -2034,10 +2220,10 @@ Sensor_getStringType :: proc "contextless" (self: ^Sensor) -> (result: ^String, 
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Sensor_getType :: proc "contextless" (self: ^Sensor) -> (result: i32, exception: ^Throwable) {
+Sensor_getType :: proc "contextless" (self: ^Sensor) -> (result: Sensor_Type, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Sensor__class, "getType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return Sensor_Type(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Sensor_getVendor :: proc "contextless" (self: ^Sensor) -> (result: ^String, exception: ^Throwable) {
@@ -2058,10 +2244,10 @@ Sensor_isAdditionalInfoSupported :: proc "contextless" (self: ^Sensor) -> (resul
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-Sensor_isDirectChannelTypeSupported :: proc "contextless" (self: ^Sensor, sharedMemType: i32) -> (result: bool, exception: ^Throwable) {
+Sensor_isDirectChannelTypeSupported :: proc "contextless" (self: ^Sensor, sharedMemType: SensorDirectChannel_TypeFlags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Sensor__class, "isDirectChannelTypeSupported", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = sharedMemType}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)sharedMemType}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -2081,6 +2267,52 @@ Sensor_toString :: proc "contextless" (self: ^Sensor) -> (result: ^String, excep
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Sensor__class, "toString", "()Ljava/lang/String;", false) or_return
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
+}
+
+Sensor_Type :: enum i32 {
+	ACCELEROMETER                           = 1,
+	ACCELEROMETER_LIMITED_AXES              = 38,
+	ACCELEROMETER_LIMITED_AXES_UNCALIBRATED = 40,
+	ACCELEROMETER_UNCALIBRATED              = 35,
+	ALL                                     = -1,
+	AMBIENT_TEMPERATURE                     = 13,
+	DEVICE_PRIVATE_BASE                     = 65536,
+	GAME_ROTATION_VECTOR                    = 15,
+	GEOMAGNETIC_ROTATION_VECTOR             = 20,
+	GRAVITY                                 = 9,
+	GYROSCOPE                               = 4,
+	GYROSCOPE_LIMITED_AXES                  = 39,
+	GYROSCOPE_LIMITED_AXES_UNCALIBRATED     = 41,
+	GYROSCOPE_UNCALIBRATED                  = 16,
+	HEADING                                 = 42,
+	HEAD_TRACKER                            = 37,
+	HEART_BEAT                              = 31,
+	HEART_RATE                              = 21,
+	HINGE_ANGLE                             = 36,
+	LIGHT                                   = 5,
+	LINEAR_ACCELERATION                     = 10,
+	LOW_LATENCY_OFFBODY_DETECT              = 34,
+	MAGNETIC_FIELD                          = 2,
+	MAGNETIC_FIELD_UNCALIBRATED             = 14,
+	MOTION_DETECT                           = 30,
+	ORIENTATION                             = 3,
+	POSE_6DOF                               = 28,
+	PRESSURE                                = 6,
+	PROXIMITY                               = 8,
+	RELATIVE_HUMIDITY                       = 12,
+	ROTATION_VECTOR                         = 11,
+	SIGNIFICANT_MOTION                      = 17,
+	STATIONARY_DETECT                       = 29,
+	STEP_COUNTER                            = 19,
+	STEP_DETECTOR                           = 18,
+	TEMPERATURE                             = 7,
+}
+
+Sensor_ReportingMode :: enum i32 {
+	CONTINUOUS      = 0,
+	ONE_SHOT        = 2,
+	ON_CHANGE       = 1,
+	SPECIAL_TRIGGER = 3,
 }
 
 // class android.hardware.SensorAdditionalInfo
@@ -2123,10 +2355,20 @@ SensorAdditionalInfo_get_serial :: proc "contextless" (self: ^SensorAdditionalIn
 	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
 }
 
-SensorAdditionalInfo_get_type :: proc "contextless" (self: ^SensorAdditionalInfo) -> (result: i32, exception: ^Throwable) {
+SensorAdditionalInfo_get_type :: proc "contextless" (self: ^SensorAdditionalInfo) -> (result: SensorAdditionalInfo_Type, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &SensorAdditionalInfo__class, "type", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return SensorAdditionalInfo_Type(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
+}
+
+SensorAdditionalInfo_Type :: enum i32 {
+	FRAME_BEGIN          = 0,
+	FRAME_END            = 1,
+	INTERNAL_TEMPERATURE = 65537,
+	SAMPLING             = 65540,
+	SENSOR_PLACEMENT     = 65539,
+	UNTRACKED_DELAY      = 65536,
+	VEC3_CALIBRATION     = 65538,
 }
 
 // class android.hardware.SensorDirectChannel
@@ -2154,10 +2396,10 @@ SensorDirectChannel_close :: proc "contextless" (self: ^SensorDirectChannel) -> 
 	return jni_take(jni_env)
 }
 
-SensorDirectChannel_configure :: proc "contextless" (self: ^SensorDirectChannel, sensor: ^Sensor, rateLevel: i32) -> (result: i32, exception: ^Throwable) {
+SensorDirectChannel_configure :: proc "contextless" (self: ^SensorDirectChannel, sensor: ^Sensor, rateLevel: SensorDirectChannel_Rate) -> (result: i32, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SensorDirectChannel__class, "configure", "(Landroid/hardware/Sensor;I)I", false) or_return
-	jni_args := [?]android.jvalue{{l = sensor}, {i = rateLevel}}
+	jni_args := [?]android.jvalue{{l = sensor}, {i = i32(rateLevel)}}
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
@@ -2166,6 +2408,19 @@ SensorDirectChannel_isOpen :: proc "contextless" (self: ^SensorDirectChannel) ->
 	jni_env, _, jni_id := jni_method(&jni_cache, &SensorDirectChannel__class, "isOpen", "()Z", false) or_return
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
+
+SensorDirectChannel_Rate :: enum i32 {
+	FAST      = 2,
+	NORMAL    = 1,
+	STOP      = 0,
+	VERY_FAST = 3,
+}
+
+SensorDirectChannel_TypeFlag :: enum u32 {
+	HARDWARE_BUFFER = 1,
+	MEMORY_FILE     = 0,
+}
+SensorDirectChannel_TypeFlags :: distinct bit_set[SensorDirectChannel_TypeFlag; u32]
 
 // class android.hardware.SensorEvent
 SensorEvent :: struct #raw_union {
@@ -2454,17 +2709,17 @@ SensorManager_getAngleChange :: proc "contextless" (angleChange: ^FloatArray, R:
 	return jni_take(jni_env)
 }
 
-SensorManager_getDefaultSensor_int :: proc "contextless" (self: ^SensorManager, type: i32) -> (result: ^Sensor, exception: ^Throwable) {
+SensorManager_getDefaultSensor_int :: proc "contextless" (self: ^SensorManager, type: Sensor_Type) -> (result: ^Sensor, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SensorManager__class, "getDefaultSensor", "(I)Landroid/hardware/Sensor;", false) or_return
-	jni_args := [?]android.jvalue{{i = type}}
+	jni_args := [?]android.jvalue{{i = i32(type)}}
 	return (^Sensor)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-SensorManager_getDefaultSensor_int_bool :: proc "contextless" (self: ^SensorManager, type: i32, wakeUp: bool) -> (result: ^Sensor, exception: ^Throwable) {
+SensorManager_getDefaultSensor_int_bool :: proc "contextless" (self: ^SensorManager, type: Sensor_Type, wakeUp: bool) -> (result: ^Sensor, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SensorManager__class, "getDefaultSensor", "(IZ)Landroid/hardware/Sensor;", false) or_return
-	jni_args := [?]android.jvalue{{i = type}, {z = android.jboolean(wakeUp)}}
+	jni_args := [?]android.jvalue{{i = i32(type)}, {z = android.jboolean(wakeUp)}}
 	return (^Sensor)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -2473,10 +2728,10 @@ SensorManager_getDefaultSensor :: proc{
 	SensorManager_getDefaultSensor_int_bool,
 }
 
-SensorManager_getDynamicSensorList :: proc "contextless" (self: ^SensorManager, type: i32) -> (result: ^List, exception: ^Throwable) {
+SensorManager_getDynamicSensorList :: proc "contextless" (self: ^SensorManager, type: Sensor_Type) -> (result: ^List, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SensorManager__class, "getDynamicSensorList", "(I)Ljava/util/List;", false) or_return
-	jni_args := [?]android.jvalue{{i = type}}
+	jni_args := [?]android.jvalue{{i = i32(type)}}
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -2517,10 +2772,10 @@ SensorManager_getRotationMatrixFromVector :: proc "contextless" (R: ^FloatArray,
 	return jni_take(jni_env)
 }
 
-SensorManager_getSensorList :: proc "contextless" (self: ^SensorManager, type: i32) -> (result: ^List, exception: ^Throwable) {
+SensorManager_getSensorList :: proc "contextless" (self: ^SensorManager, type: Sensor_Type) -> (result: ^List, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SensorManager__class, "getSensorList", "(I)Ljava/util/List;", false) or_return
-	jni_args := [?]android.jvalue{{i = type}}
+	jni_args := [?]android.jvalue{{i = i32(type)}}
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -2608,10 +2863,10 @@ SensorManager_registerListener :: proc{
 	SensorManager_registerListener_SensorListener_int_int,
 }
 
-SensorManager_remapCoordinateSystem :: proc "contextless" (inR: ^FloatArray, X: i32, Y: i32, outR: ^FloatArray) -> (result: bool, exception: ^Throwable) {
+SensorManager_remapCoordinateSystem :: proc "contextless" (inR: ^FloatArray, X: SensorManager_Axis, Y: SensorManager_Axis, outR: ^FloatArray) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &SensorManager__class, "remapCoordinateSystem", "([FII[F)Z", true) or_return
-	jni_args := [?]android.jvalue{{l = inR}, {i = X}, {i = Y}, {l = outR}}
+	jni_args := [?]android.jvalue{{l = inR}, {i = i32(X)}, {i = i32(Y)}, {l = outR}}
 	return jni_env->CallStaticBooleanMethodA(jni_class, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -2669,6 +2924,15 @@ SensorManager_unregisterListener :: proc{
 	SensorManager_unregisterListener_SensorListener_int,
 }
 
+SensorManager_Axis :: enum i32 {
+	MINUS_X = 129,
+	MINUS_Y = 130,
+	MINUS_Z = 131,
+	X       = 1,
+	Y       = 2,
+	Z       = 3,
+}
+
 // class android.hardware.SensorManager.DynamicSensorCallback
 SensorManager_DynamicSensorCallback :: struct #raw_union {
 	using Object: Object,
@@ -2704,23 +2968,28 @@ SensorPrivacyManager__class := Cached_Class{name = "android/hardware/SensorPriva
 SensorPrivacyManager_TOGGLE_TYPE_HARDWARE :: 2 // API level 33
 SensorPrivacyManager_TOGGLE_TYPE_SOFTWARE :: 1 // API level 33
 
-SensorPrivacyManager_supportsSensorToggle_int :: proc "contextless" (self: ^SensorPrivacyManager, sensor: i32) -> (result: bool, exception: ^Throwable) {
+SensorPrivacyManager_supportsSensorToggle_int :: proc "contextless" (self: ^SensorPrivacyManager, sensor: SensorPrivacyManager_Sensors_Sensor) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SensorPrivacyManager__class, "supportsSensorToggle", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = sensor}}
+	jni_args := [?]android.jvalue{{i = i32(sensor)}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-SensorPrivacyManager_supportsSensorToggle_int_int :: proc "contextless" (self: ^SensorPrivacyManager, toggleType: i32, sensor: i32) -> (result: bool, exception: ^Throwable) { // API level 33
+SensorPrivacyManager_supportsSensorToggle_int_int :: proc "contextless" (self: ^SensorPrivacyManager, toggleType: SensorPrivacyManager_ToggleType, sensor: SensorPrivacyManager_Sensors_Sensor) -> (result: bool, exception: ^Throwable) { // API level 33
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SensorPrivacyManager__class, "supportsSensorToggle", "(II)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = toggleType}, {i = sensor}}
+	jni_args := [?]android.jvalue{{i = i32(toggleType)}, {i = i32(sensor)}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
 SensorPrivacyManager_supportsSensorToggle :: proc{
 	SensorPrivacyManager_supportsSensorToggle_int,
 	SensorPrivacyManager_supportsSensorToggle_int_int,
+}
+
+SensorPrivacyManager_ToggleType :: enum i32 {
+	HARDWARE = 2,
+	SOFTWARE = 1,
 }
 
 // class android.hardware.SensorPrivacyManager.Sensors // API level 31
@@ -2733,6 +3002,11 @@ SensorPrivacyManager_Sensors__class := Cached_Class{name = "android/hardware/Sen
 
 SensorPrivacyManager_Sensors_CAMERA     :: 2
 SensorPrivacyManager_Sensors_MICROPHONE :: 1
+
+SensorPrivacyManager_Sensors_Sensor :: enum i32 {
+	CAMERA     = 2,
+	MICROPHONE = 1,
+}
 
 // class android.hardware.SyncFence // API level 33
 SyncFence :: struct #raw_union {
@@ -2780,10 +3054,10 @@ SyncFence_close :: proc "contextless" (self: ^SyncFence) -> (exception: ^Throwab
 	return jni_take(jni_env)
 }
 
-SyncFence_describeContents :: proc "contextless" (self: ^SyncFence) -> (result: i32, exception: ^Throwable) {
+SyncFence_describeContents :: proc "contextless" (self: ^SyncFence) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SyncFence__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 SyncFence_getSignalTime :: proc "contextless" (self: ^SyncFence) -> (result: i64, exception: ^Throwable) {
@@ -2798,10 +3072,10 @@ SyncFence_isValid :: proc "contextless" (self: ^SyncFence) -> (result: bool, exc
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-SyncFence_writeToParcel :: proc "contextless" (self: ^SyncFence, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+SyncFence_writeToParcel :: proc "contextless" (self: ^SyncFence, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SyncFence__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }

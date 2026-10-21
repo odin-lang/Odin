@@ -10,16 +10,17 @@ foreign import libandroid "system:android"
 
 net_handle_t :: u64
 
-ResNsendFlags :: u32
+ResNsendFlag :: enum u32 {
+	NO_RETRY        = 0,
+	NO_CACHE_STORE  = 1,
+	NO_CACHE_LOOKUP = 2,
+}
+ResNsendFlags :: distinct bit_set[ResNsendFlag; u32]
 
-ANDROID_RESOLV_NO_RETRY        :: 0x1
-ANDROID_RESOLV_NO_CACHE_STORE  :: 0x2
-ANDROID_RESOLV_NO_CACHE_LOOKUP :: 0x4
-
-NetworkBlockedReason :: i32
-
-ANDROID_NETWORK_BLOCKED_REASON_NONE :: 0
-ANDROID_NETWORK_BLOCKED_REASON_LNP  :: 1
+NetworkBlockedReason :: enum i32 {
+	NONE = 0,
+	LNP  = 1,
+}
 
 NETWORK_UNSPECIFIED :: 0
 
@@ -31,8 +32,8 @@ foreign libandroid {
 	android_setprocdns              :: proc(network: net_handle_t) -> c.int --- // API level 31
 	android_getprocdns              :: proc(network: ^net_handle_t) -> c.int --- // API level 31
 	android_getaddrinfofornetwork   :: proc(network: net_handle_t, node: cstring, service: cstring, hints: ^posix.addrinfo, res: ^^posix.addrinfo) -> c.int ---
-	android_res_nquery              :: proc(network: net_handle_t, dname: cstring, ns_class: c.int, ns_type: c.int, flags: u32) -> c.int ---
-	android_res_nsend               :: proc(network: net_handle_t, msg: ^u8, msglen: c.size_t, flags: u32) -> c.int ---
+	android_res_nquery              :: proc(network: net_handle_t, dname: cstring, ns_class: c.int, ns_type: c.int, flags: ResNsendFlags) -> c.int ---
+	android_res_nsend               :: proc(network: net_handle_t, msg: ^u8, msglen: c.size_t, flags: ResNsendFlags) -> c.int ---
 	android_res_nresult             :: proc(fd: c.int, rcode: ^c.int, answer: ^u8, anslen: c.size_t) -> c.int ---
 	android_res_cancel              :: proc(nsend_fd: c.int) ---
 	android_tag_socket_with_uid     :: proc(sockfd: c.int, tag: u32, uid: u32) -> c.int --- // API level 33

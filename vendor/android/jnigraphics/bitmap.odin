@@ -8,43 +8,54 @@ import "core:sys/android"
 
 foreign import libjnigraphics "system:jnigraphics"
 
-ANDROID_BITMAP_RESULT_SUCCESS           :: 0
-ANDROID_BITMAP_RESULT_BAD_PARAMETER     :: -1
-ANDROID_BITMAP_RESULT_JNI_EXCEPTION     :: -2
-ANDROID_BITMAP_RESULT_ALLOCATION_FAILED :: -3
+AndroidBitmapResult :: enum i32 {
+	SUCCESS           = 0,
+	BAD_PARAMETER     = -1,
+	JNI_EXCEPTION     = -2,
+	ALLOCATION_FAILED = -3,
+}
 
-AndroidBitmapFormat :: c.int
+AndroidBitmapFormat :: enum c.int {
+	NONE         = 0,
+	RGBA_8888    = 1,
+	RGB_565      = 4,
+	RGBA_4444    = 7,
+	A_8          = 8,
+	RGBA_F16     = 9,
+	RGBA_1010102 = 10,
+}
 
-ANDROID_BITMAP_FORMAT_NONE         :: 0
-ANDROID_BITMAP_FORMAT_RGBA_8888    :: 1
-ANDROID_BITMAP_FORMAT_RGB_565      :: 4
-ANDROID_BITMAP_FORMAT_RGBA_4444    :: 7
-ANDROID_BITMAP_FORMAT_A_8          :: 8
-ANDROID_BITMAP_FORMAT_RGBA_F16     :: 9
-ANDROID_BITMAP_FORMAT_RGBA_1010102 :: 10
+ANDROID_BITMAP_FLAGS_ALPHA_SHIFT :: 0
 
-ANDROID_BITMAP_FLAGS_ALPHA_PREMUL   :: 0
-ANDROID_BITMAP_FLAGS_ALPHA_OPAQUE   :: 1
-ANDROID_BITMAP_FLAGS_ALPHA_UNPREMUL :: 2
-ANDROID_BITMAP_FLAGS_ALPHA_MASK     :: 0x3
-ANDROID_BITMAP_FLAGS_ALPHA_SHIFT    :: 0
+AndroidBitmapAlpha :: enum u32 {
+	PREMUL   = 0,
+	OPAQUE   = 1,
+	UNPREMUL = 2,
+}
 
-ANDROID_BITMAP_FLAGS_IS_HARDWARE :: -2147483648
+AndroidBitmapFlags :: bit_field u32 {
+	alpha:       AndroidBitmapAlpha | 2,
+	_:           u32                | 29,
+	is_hardware: bool               | 1,
+}
+
+ANDROID_BITMAP_FLAGS_ALPHA_MASK  :: AndroidBitmapFlags{alpha = AndroidBitmapAlpha(0x3)}
+ANDROID_BITMAP_FLAGS_IS_HARDWARE :: AndroidBitmapFlags{is_hardware = true}
 
 AndroidBitmapInfo :: struct {
 	width:  u32,
 	height: u32,
 	stride: u32,
-	format: i32,
-	flags:  u32,
+	format: AndroidBitmapFormat,
+	flags:  AndroidBitmapFlags,
 }
 
-AndroidBitmapCompressFormat :: c.int
-
-ANDROID_BITMAP_COMPRESS_FORMAT_JPEG          :: 0
-ANDROID_BITMAP_COMPRESS_FORMAT_PNG           :: 1
-ANDROID_BITMAP_COMPRESS_FORMAT_WEBP_LOSSY    :: 3
-ANDROID_BITMAP_COMPRESS_FORMAT_WEBP_LOSSLESS :: 4
+AndroidBitmapCompressFormat :: enum c.int {
+	JPEG          = 0,
+	PNG           = 1,
+	WEBP_LOSSY    = 3,
+	WEBP_LOSSLESS = 4,
+}
 
 AndroidBitmap_CompressWriteFunc :: proc "c" (userContext: rawptr, data: rawptr, size: c.size_t) -> bool
 AHardwareBuffer                 :: android.AHardwareBuffer
@@ -53,10 +64,10 @@ ANDROID_BITMAP_RESUT_SUCCESS :: 0
 
 @(default_calling_convention="c")
 foreign libjnigraphics {
-	AndroidBitmap_getInfo           :: proc(env: ^android.JNIEnv, jbitmap: android.jobject, info: ^AndroidBitmapInfo) -> c.int ---
-	AndroidBitmap_getDataSpace      :: proc(env: ^android.JNIEnv, jbitmap: android.jobject) -> i32 ---
-	AndroidBitmap_lockPixels        :: proc(env: ^android.JNIEnv, jbitmap: android.jobject, addrPtr: ^rawptr) -> c.int ---
-	AndroidBitmap_unlockPixels      :: proc(env: ^android.JNIEnv, jbitmap: android.jobject) -> c.int ---
-	AndroidBitmap_compress          :: proc(info: ^AndroidBitmapInfo, dataspace: i32, pixels: rawptr, format: i32, quality: i32, userContext: rawptr, fn: AndroidBitmap_CompressWriteFunc) -> c.int --- // API level 30
-	AndroidBitmap_getHardwareBuffer :: proc(env: ^android.JNIEnv, bitmap: android.jobject, outBuffer: ^^AHardwareBuffer) -> c.int --- // API level 30
+	AndroidBitmap_getInfo           :: proc(env: ^android.JNIEnv, jbitmap: android.jobject, info: ^AndroidBitmapInfo) -> AndroidBitmapResult ---
+	AndroidBitmap_getDataSpace      :: proc(env: ^android.JNIEnv, jbitmap: android.jobject) -> android.ADataSpace ---
+	AndroidBitmap_lockPixels        :: proc(env: ^android.JNIEnv, jbitmap: android.jobject, addrPtr: ^rawptr) -> AndroidBitmapResult ---
+	AndroidBitmap_unlockPixels      :: proc(env: ^android.JNIEnv, jbitmap: android.jobject) -> AndroidBitmapResult ---
+	AndroidBitmap_compress          :: proc(info: ^AndroidBitmapInfo, dataspace: android.ADataSpace, pixels: rawptr, format: AndroidBitmapCompressFormat, quality: i32, userContext: rawptr, fn: AndroidBitmap_CompressWriteFunc) -> AndroidBitmapResult --- // API level 30
+	AndroidBitmap_getHardwareBuffer :: proc(env: ^android.JNIEnv, bitmap: android.jobject, outBuffer: ^^AHardwareBuffer) -> AndroidBitmapResult --- // API level 30
 }

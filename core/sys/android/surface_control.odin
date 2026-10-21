@@ -13,16 +13,16 @@ ASurfaceTransaction_OnComplete      :: proc "c" (context_: rawptr, stats: ^ASurf
 ASurfaceTransaction_OnCommit        :: proc "c" (context_: rawptr, stats: ^ASurfaceTransactionStats)
 ASurfaceTransaction_OnBufferRelease :: proc "c" (context_: rawptr, release_fence_fd: c.int)
 
-ASurfaceTransactionVisibility :: i8
+ASurfaceTransactionVisibility :: enum i8 {
+	HIDE = 0,
+	SHOW = 1,
+}
 
-ASURFACE_TRANSACTION_VISIBILITY_HIDE :: 0
-ASURFACE_TRANSACTION_VISIBILITY_SHOW :: 1
-
-ASurfaceTransactionTransparency :: i8
-
-ASURFACE_TRANSACTION_TRANSPARENCY_TRANSPARENT :: 0
-ASURFACE_TRANSACTION_TRANSPARENCY_TRANSLUCENT :: 1
-ASURFACE_TRANSACTION_TRANSPARENCY_OPAQUE      :: 2
+ASurfaceTransactionTransparency :: enum i8 {
+	TRANSPARENT = 0,
+	TRANSLUCENT = 1,
+	OPAQUE      = 2,
+}
 
 AInputReceiver_onMotionEvent :: proc "c" (context_: rawptr, motionEvent: ^AInputEvent) -> bool
 AInputReceiver_onKeyEvent    :: proc "c" (context_: rawptr, keyEvent: ^AInputEvent) -> bool
@@ -52,10 +52,10 @@ foreign libandroid {
 	ASurfaceTransaction_setBuffer                      :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, buffer: ^AHardwareBuffer, acquire_fence_fd: c.int) ---
 	ASurfaceTransaction_setBufferWithRelease           :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, buffer: ^AHardwareBuffer, acquire_fence_fd: c.int, context_: rawptr, func: ASurfaceTransaction_OnBufferRelease) --- // API level 36
 	ASurfaceTransaction_setColor                       :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, r: f32, g: f32, b: f32, alpha: f32, dataspace: ADataSpace) ---
-	ASurfaceTransaction_setGeometry                    :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, source: ^ARect, destination: ^ARect, transform: i32) ---
+	ASurfaceTransaction_setGeometry                    :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, source: ^ARect, destination: ^ARect, transform: ANativeWindowTransform) ---
 	ASurfaceTransaction_setCrop                        :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, crop: ^ARect) --- // API level 31
 	ASurfaceTransaction_setPosition                    :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, x: i32, y: i32) --- // API level 31
-	ASurfaceTransaction_setBufferTransform             :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, transform: i32) --- // API level 31
+	ASurfaceTransaction_setBufferTransform             :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, transform: ANativeWindowTransform) --- // API level 31
 	ASurfaceTransaction_setScale                       :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, xScale: f32, yScale: f32) --- // API level 31
 	ASurfaceTransaction_setBufferTransparency          :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, transparency: ASurfaceTransactionTransparency) ---
 	ASurfaceTransaction_setDamageRegion                :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, rects: ^ARect, count: u32) ---
@@ -67,8 +67,8 @@ foreign libandroid {
 	ASurfaceTransaction_setExtendedRangeBrightness     :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, currentBufferRatio: f32, desiredRatio: f32) --- // API level 34
 	ASurfaceTransaction_setDesiredHdrHeadroom          :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, desiredHeadroom: f32) --- // API level 35
 	ASurfaceTransaction_setLuts                        :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, luts: ^ADisplayLuts) --- // API level 36
-	ASurfaceTransaction_setFrameRate                   :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, frameRate: f32, compatibility: i8) --- // API level 30
-	ASurfaceTransaction_setFrameRateWithChangeStrategy :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, frameRate: f32, compatibility: i8, changeFrameRateStrategy: i8) --- // API level 31
+	ASurfaceTransaction_setFrameRate                   :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, frameRate: f32, compatibility: ANativeWindow_FrameRateCompatibility) --- // API level 30
+	ASurfaceTransaction_setFrameRateWithChangeStrategy :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, frameRate: f32, compatibility: ANativeWindow_FrameRateCompatibility, changeFrameRateStrategy: ANativeWindow_ChangeFrameRateStrategy) --- // API level 31
 	ASurfaceTransaction_clearFrameRate                 :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl) --- // API level 34
 	ASurfaceTransaction_setEnableBackPressure          :: proc(transaction: ^ASurfaceTransaction, surface_control: ^ASurfaceControl, enableBackPressure: bool) --- // API level 31
 	ASurfaceTransaction_setFrameTimeline               :: proc(transaction: ^ASurfaceTransaction, vsyncId: AVsyncId) --- // API level 33

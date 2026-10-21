@@ -9,30 +9,36 @@ foreign import libandroid "system:android"
 
 ALooper :: struct {}
 
-ALOOPER_PREPARE_ALLOW_NON_CALLBACKS :: 0x1
+ALooperPrepareOption :: enum u32 {
+	ALLOW_NON_CALLBACKS = 0,
+}
+ALooperPrepareOptions :: distinct bit_set[ALooperPrepareOption; u32]
 
 ALOOPER_POLL_WAKE     :: -1
 ALOOPER_POLL_CALLBACK :: -2
 ALOOPER_POLL_TIMEOUT  :: -3
 ALOOPER_POLL_ERROR    :: -4
 
-ALOOPER_EVENT_INPUT   :: 0x1
-ALOOPER_EVENT_OUTPUT  :: 0x2
-ALOOPER_EVENT_ERROR   :: 0x4
-ALOOPER_EVENT_HANGUP  :: 0x8
-ALOOPER_EVENT_INVALID :: 0x10
+ALooperEvent :: enum u32 {
+	INPUT   = 0,
+	OUTPUT  = 1,
+	ERROR   = 2,
+	HANGUP  = 3,
+	INVALID = 4,
+}
+ALooperEvents :: distinct bit_set[ALooperEvent; u32]
 
-ALooper_callbackFunc :: proc "c" (fd: c.int, events: c.int, data: rawptr) -> c.int
+ALooper_callbackFunc :: proc "c" (fd: c.int, events: ALooperEvents, data: rawptr) -> c.int
 
 @(default_calling_convention="c")
 foreign libandroid {
 	ALooper_forThread :: proc() -> ^ALooper ---
-	ALooper_prepare   :: proc(opts: c.int) -> ^ALooper ---
+	ALooper_prepare   :: proc(opts: ALooperPrepareOptions) -> ^ALooper ---
 	ALooper_acquire   :: proc(looper: ^ALooper) ---
 	ALooper_release   :: proc(looper: ^ALooper) ---
 	ALooper_pollOnce  :: proc(timeoutMillis: c.int, outFd: ^c.int, outEvents: ^c.int, outData: ^rawptr) -> c.int ---
 	ALooper_pollAll   :: proc(timeoutMillis: c.int, outFd: ^c.int, outEvents: ^c.int, outData: ^rawptr) -> c.int ---
 	ALooper_wake      :: proc(looper: ^ALooper) ---
-	ALooper_addFd     :: proc(looper: ^ALooper, fd: c.int, ident: c.int, events: c.int, callback: ALooper_callbackFunc, data: rawptr) -> c.int ---
+	ALooper_addFd     :: proc(looper: ^ALooper, fd: c.int, ident: c.int, events: ALooperEvents, callback: ALooper_callbackFunc, data: rawptr) -> c.int ---
 	ALooper_removeFd  :: proc(looper: ^ALooper, fd: c.int) -> c.int ---
 }

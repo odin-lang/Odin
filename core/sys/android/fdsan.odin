@@ -7,31 +7,31 @@ import "core:c"
 
 foreign import libc "system:c"
 
-android_fdsan_owner_type :: c.int
+android_fdsan_owner_type :: enum c.int {
+	GENERIC_00           = 0,
+	GENERIC_FF           = 255,
+	FILE                 = 1,
+	DIR                  = 2,
+	UNIQUE_FD            = 3,
+	SQLITE               = 4,
+	FILEINPUTSTREAM      = 5,
+	FILEOUTPUTSTREAM     = 6,
+	RANDOMACCESSFILE     = 7,
+	PARCELFILEDESCRIPTOR = 8,
+	ART_FDFILE           = 9,
+	DATAGRAMSOCKETIMPL   = 10,
+	SOCKETIMPL           = 11,
+	ZIPARCHIVE           = 12,
+	NATIVE_HANDLE        = 13,
+	PARCEL               = 14,
+}
 
-ANDROID_FDSAN_OWNER_TYPE_GENERIC_00           :: 0
-ANDROID_FDSAN_OWNER_TYPE_GENERIC_FF           :: 255
-ANDROID_FDSAN_OWNER_TYPE_FILE                 :: 1
-ANDROID_FDSAN_OWNER_TYPE_DIR                  :: 2
-ANDROID_FDSAN_OWNER_TYPE_UNIQUE_FD            :: 3
-ANDROID_FDSAN_OWNER_TYPE_SQLITE               :: 4
-ANDROID_FDSAN_OWNER_TYPE_FILEINPUTSTREAM      :: 5
-ANDROID_FDSAN_OWNER_TYPE_FILEOUTPUTSTREAM     :: 6
-ANDROID_FDSAN_OWNER_TYPE_RANDOMACCESSFILE     :: 7
-ANDROID_FDSAN_OWNER_TYPE_PARCELFILEDESCRIPTOR :: 8
-ANDROID_FDSAN_OWNER_TYPE_ART_FDFILE           :: 9
-ANDROID_FDSAN_OWNER_TYPE_DATAGRAMSOCKETIMPL   :: 10
-ANDROID_FDSAN_OWNER_TYPE_SOCKETIMPL           :: 11
-ANDROID_FDSAN_OWNER_TYPE_ZIPARCHIVE           :: 12
-ANDROID_FDSAN_OWNER_TYPE_NATIVE_HANDLE        :: 13
-ANDROID_FDSAN_OWNER_TYPE_PARCEL               :: 14
-
-android_fdsan_error_level :: c.int
-
-ANDROID_FDSAN_ERROR_LEVEL_DISABLED    :: 0
-ANDROID_FDSAN_ERROR_LEVEL_WARN_ONCE   :: 1
-ANDROID_FDSAN_ERROR_LEVEL_WARN_ALWAYS :: 2
-ANDROID_FDSAN_ERROR_LEVEL_FATAL       :: 3
+android_fdsan_error_level :: enum c.int {
+	DISABLED    = 0,
+	WARN_ONCE   = 1,
+	WARN_ALWAYS = 2,
+	FATAL       = 3,
+}
 
 @(default_calling_convention="c")
 foreign libc {

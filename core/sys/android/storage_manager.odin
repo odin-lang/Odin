@@ -13,16 +13,18 @@ AOBBINFO_OVERLAY :: 0x0001
 
 AStorageManager :: struct {}
 
-AOBB_STATE_MOUNTED                 :: 1
-AOBB_STATE_UNMOUNTED               :: 2
-AOBB_STATE_ERROR_INTERNAL          :: 20
-AOBB_STATE_ERROR_COULD_NOT_MOUNT   :: 21
-AOBB_STATE_ERROR_COULD_NOT_UNMOUNT :: 22
-AOBB_STATE_ERROR_NOT_MOUNTED       :: 23
-AOBB_STATE_ERROR_ALREADY_MOUNTED   :: 24
-AOBB_STATE_ERROR_PERMISSION_DENIED :: 25
+AObbState :: enum i32 {
+	MOUNTED                 = 1,
+	UNMOUNTED               = 2,
+	ERROR_INTERNAL          = 20,
+	ERROR_COULD_NOT_MOUNT   = 21,
+	ERROR_COULD_NOT_UNMOUNT = 22,
+	ERROR_NOT_MOUNTED       = 23,
+	ERROR_ALREADY_MOUNTED   = 24,
+	ERROR_PERMISSION_DENIED = 25,
+}
 
-AStorageManager_obbCallbackFunc :: proc "c" (filename: cstring, state: i32, data: rawptr)
+AStorageManager_obbCallbackFunc :: proc "c" (filename: cstring, state: AObbState, data: rawptr)
 
 @(default_calling_convention="c")
 foreign libandroid {

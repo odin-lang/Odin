@@ -8,18 +8,20 @@ import "core:sys/android"
 
 foreign import libjnigraphics "system:jnigraphics"
 
-ANDROID_IMAGE_DECODER_SUCCESS            :: 0
-ANDROID_IMAGE_DECODER_INCOMPLETE         :: -1
-ANDROID_IMAGE_DECODER_ERROR              :: -2
-ANDROID_IMAGE_DECODER_INVALID_CONVERSION :: -3
-ANDROID_IMAGE_DECODER_INVALID_SCALE      :: -4
-ANDROID_IMAGE_DECODER_BAD_PARAMETER      :: -5
-ANDROID_IMAGE_DECODER_INVALID_INPUT      :: -6
-ANDROID_IMAGE_DECODER_SEEK_ERROR         :: -7
-ANDROID_IMAGE_DECODER_INTERNAL_ERROR     :: -8
-ANDROID_IMAGE_DECODER_UNSUPPORTED_FORMAT :: -9
-ANDROID_IMAGE_DECODER_FINISHED           :: -10
-ANDROID_IMAGE_DECODER_INVALID_STATE      :: -11
+AImageDecoderResult :: enum i32 {
+	SUCCESS            = 0,
+	INCOMPLETE         = -1,
+	ERROR              = -2,
+	INVALID_CONVERSION = -3,
+	INVALID_SCALE      = -4,
+	BAD_PARAMETER      = -5,
+	INVALID_INPUT      = -6,
+	SEEK_ERROR         = -7,
+	INTERNAL_ERROR     = -8,
+	UNSUPPORTED_FORMAT = -9,
+	FINISHED           = -10,
+	INVALID_STATE      = -11,
+}
 
 AImageDecoder           :: struct {}
 AImageDecoderHeaderInfo :: struct {}
@@ -28,46 +30,50 @@ ANDROID_IMAGE_DECODER_INFINITE :: 2147483647
 
 AImageDecoderFrameInfo :: struct {}
 
-ANDROID_IMAGE_DECODER_DISPOSE_OP_NONE       :: 1
-ANDROID_IMAGE_DECODER_DISPOSE_OP_BACKGROUND :: 2
-ANDROID_IMAGE_DECODER_DISPOSE_OP_PREVIOUS   :: 3
+AImageDecoderDisposeOp :: enum i32 {
+	NONE       = 1,
+	BACKGROUND = 2,
+	PREVIOUS   = 3,
+}
 
-ANDROID_IMAGE_DECODER_BLEND_OP_SRC      :: 1
-ANDROID_IMAGE_DECODER_BLEND_OP_SRC_OVER :: 2
+AImageDecoderBlendOp :: enum i32 {
+	SRC      = 1,
+	SRC_OVER = 2,
+}
 
 @(default_calling_convention="c")
 foreign libjnigraphics {
 	AImageDecoder_resultToString                     :: proc(_0: c.int) -> cstring --- // API level 31
-	AImageDecoder_createFromAAsset                   :: proc(asset: ^android.AAsset, outDecoder: ^^AImageDecoder) -> c.int --- // API level 30
-	AImageDecoder_createFromFd                       :: proc(fd: c.int, outDecoder: ^^AImageDecoder) -> c.int --- // API level 30
-	AImageDecoder_createFromBuffer                   :: proc(buffer: rawptr, length: c.size_t, outDecoder: ^^AImageDecoder) -> c.int --- // API level 30
+	AImageDecoder_createFromAAsset                   :: proc(asset: ^android.AAsset, outDecoder: ^^AImageDecoder) -> AImageDecoderResult --- // API level 30
+	AImageDecoder_createFromFd                       :: proc(fd: c.int, outDecoder: ^^AImageDecoder) -> AImageDecoderResult --- // API level 30
+	AImageDecoder_createFromBuffer                   :: proc(buffer: rawptr, length: c.size_t, outDecoder: ^^AImageDecoder) -> AImageDecoderResult --- // API level 30
 	AImageDecoder_delete                             :: proc(decoder: ^AImageDecoder) --- // API level 30
-	AImageDecoder_setAndroidBitmapFormat             :: proc(decoder: ^AImageDecoder, format: i32) -> c.int --- // API level 30
-	AImageDecoder_setUnpremultipliedRequired         :: proc(decoder: ^AImageDecoder, unpremultipliedRequired: bool) -> c.int --- // API level 30
-	AImageDecoder_setDataSpace                       :: proc(decoder: ^AImageDecoder, dataspace: i32) -> c.int --- // API level 30
-	AImageDecoder_setTargetSize                      :: proc(decoder: ^AImageDecoder, width: i32, height: i32) -> c.int --- // API level 30
-	AImageDecoder_computeSampledSize                 :: proc(decoder: ^AImageDecoder, sampleSize: c.int, width: ^i32, height: ^i32) -> c.int --- // API level 30
-	AImageDecoder_setCrop                            :: proc(decoder: ^AImageDecoder, crop: android.ARect) -> c.int --- // API level 30
+	AImageDecoder_setAndroidBitmapFormat             :: proc(decoder: ^AImageDecoder, format: AndroidBitmapFormat) -> AImageDecoderResult --- // API level 30
+	AImageDecoder_setUnpremultipliedRequired         :: proc(decoder: ^AImageDecoder, unpremultipliedRequired: bool) -> AImageDecoderResult --- // API level 30
+	AImageDecoder_setDataSpace                       :: proc(decoder: ^AImageDecoder, dataspace: android.ADataSpace) -> AImageDecoderResult --- // API level 30
+	AImageDecoder_setTargetSize                      :: proc(decoder: ^AImageDecoder, width: i32, height: i32) -> AImageDecoderResult --- // API level 30
+	AImageDecoder_computeSampledSize                 :: proc(decoder: ^AImageDecoder, sampleSize: c.int, width: ^i32, height: ^i32) -> AImageDecoderResult --- // API level 30
+	AImageDecoder_setCrop                            :: proc(decoder: ^AImageDecoder, crop: android.ARect) -> AImageDecoderResult --- // API level 30
 	AImageDecoder_getHeaderInfo                      :: proc(decoder: ^AImageDecoder) -> ^AImageDecoderHeaderInfo --- // API level 30
 	AImageDecoderHeaderInfo_getWidth                 :: proc(_0: ^AImageDecoderHeaderInfo) -> i32 --- // API level 30
 	AImageDecoderHeaderInfo_getHeight                :: proc(_0: ^AImageDecoderHeaderInfo) -> i32 --- // API level 30
 	AImageDecoderHeaderInfo_getMimeType              :: proc(_0: ^AImageDecoderHeaderInfo) -> cstring --- // API level 30
-	AImageDecoderHeaderInfo_getAndroidBitmapFormat   :: proc(_0: ^AImageDecoderHeaderInfo) -> i32 --- // API level 30
-	AImageDecoderHeaderInfo_getAlphaFlags            :: proc(_0: ^AImageDecoderHeaderInfo) -> c.int --- // API level 30
-	AImageDecoderHeaderInfo_getDataSpace             :: proc(_0: ^AImageDecoderHeaderInfo) -> i32 --- // API level 30
+	AImageDecoderHeaderInfo_getAndroidBitmapFormat   :: proc(_0: ^AImageDecoderHeaderInfo) -> AndroidBitmapFormat --- // API level 30
+	AImageDecoderHeaderInfo_getAlphaFlags            :: proc(_0: ^AImageDecoderHeaderInfo) -> AndroidBitmapAlpha --- // API level 30
+	AImageDecoderHeaderInfo_getDataSpace             :: proc(_0: ^AImageDecoderHeaderInfo) -> android.ADataSpace --- // API level 30
 	AImageDecoder_getMinimumStride                   :: proc(decoder: ^AImageDecoder) -> c.size_t --- // API level 30
-	AImageDecoder_decodeImage                        :: proc(decoder: ^AImageDecoder, pixels: rawptr, stride: c.size_t, size: c.size_t) -> c.int --- // API level 30
+	AImageDecoder_decodeImage                        :: proc(decoder: ^AImageDecoder, pixels: rawptr, stride: c.size_t, size: c.size_t) -> AImageDecoderResult --- // API level 30
 	AImageDecoder_isAnimated                         :: proc(decoder: ^AImageDecoder) -> bool --- // API level 31
 	AImageDecoder_getRepeatCount                     :: proc(decoder: ^AImageDecoder) -> i32 --- // API level 31
-	AImageDecoder_advanceFrame                       :: proc(decoder: ^AImageDecoder) -> c.int --- // API level 31
-	AImageDecoder_rewind                             :: proc(decoder: ^AImageDecoder) -> c.int --- // API level 31
+	AImageDecoder_advanceFrame                       :: proc(decoder: ^AImageDecoder) -> AImageDecoderResult --- // API level 31
+	AImageDecoder_rewind                             :: proc(decoder: ^AImageDecoder) -> AImageDecoderResult --- // API level 31
 	AImageDecoderFrameInfo_create                    :: proc() -> ^AImageDecoderFrameInfo --- // API level 31
 	AImageDecoderFrameInfo_delete                    :: proc(info: ^AImageDecoderFrameInfo) --- // API level 31
-	AImageDecoder_getFrameInfo                       :: proc(decoder: ^AImageDecoder, info: ^AImageDecoderFrameInfo) -> c.int --- // API level 31
+	AImageDecoder_getFrameInfo                       :: proc(decoder: ^AImageDecoder, info: ^AImageDecoderFrameInfo) -> AImageDecoderResult --- // API level 31
 	AImageDecoderFrameInfo_getDuration               :: proc(info: ^AImageDecoderFrameInfo) -> i64 --- // API level 31
 	AImageDecoderFrameInfo_getFrameRect              :: proc(info: ^AImageDecoderFrameInfo) -> android.ARect --- // API level 31
 	AImageDecoderFrameInfo_hasAlphaWithinBounds      :: proc(info: ^AImageDecoderFrameInfo) -> bool --- // API level 31
-	AImageDecoderFrameInfo_getDisposeOp              :: proc(info: ^AImageDecoderFrameInfo) -> i32 --- // API level 31
-	AImageDecoderFrameInfo_getBlendOp                :: proc(info: ^AImageDecoderFrameInfo) -> i32 --- // API level 31
+	AImageDecoderFrameInfo_getDisposeOp              :: proc(info: ^AImageDecoderFrameInfo) -> AImageDecoderDisposeOp --- // API level 31
+	AImageDecoderFrameInfo_getBlendOp                :: proc(info: ^AImageDecoderFrameInfo) -> AImageDecoderBlendOp --- // API level 31
 	AImageDecoder_setInternallyHandleDisposePrevious :: proc(decoder: ^AImageDecoder, handleInternally: bool) --- // API level 31
 }

@@ -12,176 +12,234 @@ AKEY_STATE_UP      :: 0
 AKEY_STATE_DOWN    :: 1
 AKEY_STATE_VIRTUAL :: 2
 
-AMETA_NONE           :: 0
-AMETA_ALT_ON         :: 0x02
-AMETA_ALT_LEFT_ON    :: 0x10
-AMETA_ALT_RIGHT_ON   :: 0x20
-AMETA_SHIFT_ON       :: 0x01
-AMETA_SHIFT_LEFT_ON  :: 0x40
-AMETA_SHIFT_RIGHT_ON :: 0x80
-AMETA_SYM_ON         :: 0x04
-AMETA_FUNCTION_ON    :: 0x08
-AMETA_CTRL_ON        :: 0x1000
-AMETA_CTRL_LEFT_ON   :: 0x2000
-AMETA_CTRL_RIGHT_ON  :: 0x4000
-AMETA_META_ON        :: 0x10000
-AMETA_META_LEFT_ON   :: 0x20000
-AMETA_META_RIGHT_ON  :: 0x40000
-AMETA_CAPS_LOCK_ON   :: 0x100000
-AMETA_NUM_LOCK_ON    :: 0x200000
-AMETA_SCROLL_LOCK_ON :: 0x400000
+AMetaStateFlag :: enum u32 {
+	ALT_ON         = 1,
+	ALT_LEFT_ON    = 4,
+	ALT_RIGHT_ON   = 5,
+	SHIFT_ON       = 0,
+	SHIFT_LEFT_ON  = 6,
+	SHIFT_RIGHT_ON = 7,
+	SYM_ON         = 2,
+	FUNCTION_ON    = 3,
+	CTRL_ON        = 12,
+	CTRL_LEFT_ON   = 13,
+	CTRL_RIGHT_ON  = 14,
+	META_ON        = 16,
+	META_LEFT_ON   = 17,
+	META_RIGHT_ON  = 18,
+	CAPS_LOCK_ON   = 20,
+	NUM_LOCK_ON    = 21,
+	SCROLL_LOCK_ON = 22,
+}
+AMetaState :: distinct bit_set[AMetaStateFlag; u32]
+
+AMETA_NONE :: AMetaState{}
 
 AInputEvent :: struct {}
 
-AINPUT_EVENT_TYPE_KEY        :: 1
-AINPUT_EVENT_TYPE_MOTION     :: 2
-AINPUT_EVENT_TYPE_FOCUS      :: 3
-AINPUT_EVENT_TYPE_CAPTURE    :: 4
-AINPUT_EVENT_TYPE_DRAG       :: 5
-AINPUT_EVENT_TYPE_TOUCH_MODE :: 6
+AInputEventType :: enum i32 {
+	KEY        = 1,
+	MOTION     = 2,
+	FOCUS      = 3,
+	CAPTURE    = 4,
+	DRAG       = 5,
+	TOUCH_MODE = 6,
+}
 
-AKEY_EVENT_ACTION_DOWN     :: 0
-AKEY_EVENT_ACTION_UP       :: 1
-AKEY_EVENT_ACTION_MULTIPLE :: 2
+AKeyEventAction :: enum i32 {
+	DOWN     = 0,
+	UP       = 1,
+	MULTIPLE = 2,
+}
 
-AKEY_EVENT_FLAG_WOKE_HERE           :: 0x1
-AKEY_EVENT_FLAG_SOFT_KEYBOARD       :: 0x2
-AKEY_EVENT_FLAG_KEEP_TOUCH_MODE     :: 0x4
-AKEY_EVENT_FLAG_FROM_SYSTEM         :: 0x8
-AKEY_EVENT_FLAG_EDITOR_ACTION       :: 0x10
-AKEY_EVENT_FLAG_CANCELED            :: 0x20
-AKEY_EVENT_FLAG_VIRTUAL_HARD_KEY    :: 0x40
-AKEY_EVENT_FLAG_LONG_PRESS          :: 0x80
-AKEY_EVENT_FLAG_CANCELED_LONG_PRESS :: 0x100
-AKEY_EVENT_FLAG_TRACKING            :: 0x200
-AKEY_EVENT_FLAG_FALLBACK            :: 0x400
+AKeyEventFlag :: enum u32 {
+	WOKE_HERE           = 0,
+	SOFT_KEYBOARD       = 1,
+	KEEP_TOUCH_MODE     = 2,
+	FROM_SYSTEM         = 3,
+	EDITOR_ACTION       = 4,
+	CANCELED            = 5,
+	VIRTUAL_HARD_KEY    = 6,
+	LONG_PRESS          = 7,
+	CANCELED_LONG_PRESS = 8,
+	TRACKING            = 9,
+	FALLBACK            = 10,
+}
+AKeyEventFlags :: distinct bit_set[AKeyEventFlag; u32]
 
-AMOTION_EVENT_ACTION_MASK               :: 0xff
-AMOTION_EVENT_ACTION_POINTER_INDEX_MASK :: 0xff00
-AMOTION_EVENT_ACTION_DOWN               :: 0
-AMOTION_EVENT_ACTION_UP                 :: 1
-AMOTION_EVENT_ACTION_MOVE               :: 2
-AMOTION_EVENT_ACTION_CANCEL             :: 3
-AMOTION_EVENT_ACTION_OUTSIDE            :: 4
-AMOTION_EVENT_ACTION_POINTER_DOWN       :: 5
-AMOTION_EVENT_ACTION_POINTER_UP         :: 6
-AMOTION_EVENT_ACTION_HOVER_MOVE         :: 7
-AMOTION_EVENT_ACTION_SCROLL             :: 8
-AMOTION_EVENT_ACTION_HOVER_ENTER        :: 9
-AMOTION_EVENT_ACTION_HOVER_EXIT         :: 10
-AMOTION_EVENT_ACTION_BUTTON_PRESS       :: 11
-AMOTION_EVENT_ACTION_BUTTON_RELEASE     :: 12
+AMotionEventAction :: enum u32 {
+	DOWN           = 0,
+	UP             = 1,
+	MOVE           = 2,
+	CANCEL         = 3,
+	OUTSIDE        = 4,
+	POINTER_DOWN   = 5,
+	POINTER_UP     = 6,
+	HOVER_MOVE     = 7,
+	SCROLL         = 8,
+	HOVER_ENTER    = 9,
+	HOVER_EXIT     = 10,
+	BUTTON_PRESS   = 11,
+	BUTTON_RELEASE = 12,
+}
 
-AMOTION_EVENT_FLAG_WINDOW_IS_OBSCURED :: 0x1
+AMotionEventPackedAction :: bit_field i32 {
+	action:        AMotionEventAction | 8,
+	pointer_index: u8                 | 8,
+	_:             u16                | 16,
+}
 
-AMOTION_EVENT_EDGE_FLAG_NONE   :: 0
-AMOTION_EVENT_EDGE_FLAG_TOP    :: 0x01
-AMOTION_EVENT_EDGE_FLAG_BOTTOM :: 0x02
-AMOTION_EVENT_EDGE_FLAG_LEFT   :: 0x04
-AMOTION_EVENT_EDGE_FLAG_RIGHT  :: 0x08
+AMOTION_EVENT_ACTION_MASK               :: AMotionEventPackedAction{action = AMotionEventAction(0xff)}
+AMOTION_EVENT_ACTION_POINTER_INDEX_MASK :: AMotionEventPackedAction{pointer_index = 0xff}
 
-AMOTION_EVENT_AXIS_X                          :: 0
-AMOTION_EVENT_AXIS_Y                          :: 1
-AMOTION_EVENT_AXIS_PRESSURE                   :: 2
-AMOTION_EVENT_AXIS_SIZE                       :: 3
-AMOTION_EVENT_AXIS_TOUCH_MAJOR                :: 4
-AMOTION_EVENT_AXIS_TOUCH_MINOR                :: 5
-AMOTION_EVENT_AXIS_TOOL_MAJOR                 :: 6
-AMOTION_EVENT_AXIS_TOOL_MINOR                 :: 7
-AMOTION_EVENT_AXIS_ORIENTATION                :: 8
-AMOTION_EVENT_AXIS_VSCROLL                    :: 9
-AMOTION_EVENT_AXIS_HSCROLL                    :: 10
-AMOTION_EVENT_AXIS_Z                          :: 11
-AMOTION_EVENT_AXIS_RX                         :: 12
-AMOTION_EVENT_AXIS_RY                         :: 13
-AMOTION_EVENT_AXIS_RZ                         :: 14
-AMOTION_EVENT_AXIS_HAT_X                      :: 15
-AMOTION_EVENT_AXIS_HAT_Y                      :: 16
-AMOTION_EVENT_AXIS_LTRIGGER                   :: 17
-AMOTION_EVENT_AXIS_RTRIGGER                   :: 18
-AMOTION_EVENT_AXIS_THROTTLE                   :: 19
-AMOTION_EVENT_AXIS_RUDDER                     :: 20
-AMOTION_EVENT_AXIS_WHEEL                      :: 21
-AMOTION_EVENT_AXIS_GAS                        :: 22
-AMOTION_EVENT_AXIS_BRAKE                      :: 23
-AMOTION_EVENT_AXIS_DISTANCE                   :: 24
-AMOTION_EVENT_AXIS_TILT                       :: 25
-AMOTION_EVENT_AXIS_SCROLL                     :: 26
-AMOTION_EVENT_AXIS_RELATIVE_X                 :: 27
-AMOTION_EVENT_AXIS_RELATIVE_Y                 :: 28
-AMOTION_EVENT_AXIS_GENERIC_1                  :: 32
-AMOTION_EVENT_AXIS_GENERIC_2                  :: 33
-AMOTION_EVENT_AXIS_GENERIC_3                  :: 34
-AMOTION_EVENT_AXIS_GENERIC_4                  :: 35
-AMOTION_EVENT_AXIS_GENERIC_5                  :: 36
-AMOTION_EVENT_AXIS_GENERIC_6                  :: 37
-AMOTION_EVENT_AXIS_GENERIC_7                  :: 38
-AMOTION_EVENT_AXIS_GENERIC_8                  :: 39
-AMOTION_EVENT_AXIS_GENERIC_9                  :: 40
-AMOTION_EVENT_AXIS_GENERIC_10                 :: 41
-AMOTION_EVENT_AXIS_GENERIC_11                 :: 42
-AMOTION_EVENT_AXIS_GENERIC_12                 :: 43
-AMOTION_EVENT_AXIS_GENERIC_13                 :: 44
-AMOTION_EVENT_AXIS_GENERIC_14                 :: 45
-AMOTION_EVENT_AXIS_GENERIC_15                 :: 46
-AMOTION_EVENT_AXIS_GENERIC_16                 :: 47
-AMOTION_EVENT_AXIS_GESTURE_X_OFFSET           :: 48
-AMOTION_EVENT_AXIS_GESTURE_Y_OFFSET           :: 49
-AMOTION_EVENT_AXIS_GESTURE_SCROLL_X_DISTANCE  :: 50
-AMOTION_EVENT_AXIS_GESTURE_SCROLL_Y_DISTANCE  :: 51
-AMOTION_EVENT_AXIS_GESTURE_PINCH_SCALE_FACTOR :: 52
-AMOTION_EVENT_AXIS_GESTURE_SWIPE_FINGER_COUNT :: 53
-AMOTION_EVENT_MAXIMUM_VALID_AXIS_VALUE        :: 53
+AMotionEventFlag :: enum u32 {
+	WINDOW_IS_OBSCURED = 0,
+}
+AMotionEventFlags :: distinct bit_set[AMotionEventFlag; u32]
 
-AMOTION_EVENT_BUTTON_PRIMARY          :: 0x1
-AMOTION_EVENT_BUTTON_SECONDARY        :: 0x2
-AMOTION_EVENT_BUTTON_TERTIARY         :: 0x4
-AMOTION_EVENT_BUTTON_BACK             :: 0x8
-AMOTION_EVENT_BUTTON_FORWARD          :: 0x10
-AMOTION_EVENT_BUTTON_STYLUS_PRIMARY   :: 0x20
-AMOTION_EVENT_BUTTON_STYLUS_SECONDARY :: 0x40
+AMotionEventEdgeFlag :: enum u32 {
+	TOP    = 0,
+	BOTTOM = 1,
+	LEFT   = 2,
+	RIGHT  = 3,
+}
+AMotionEventEdgeFlags :: distinct bit_set[AMotionEventEdgeFlag; u32]
 
-AMOTION_EVENT_TOOL_TYPE_UNKNOWN :: 0
-AMOTION_EVENT_TOOL_TYPE_FINGER  :: 1
-AMOTION_EVENT_TOOL_TYPE_STYLUS  :: 2
-AMOTION_EVENT_TOOL_TYPE_MOUSE   :: 3
-AMOTION_EVENT_TOOL_TYPE_ERASER  :: 4
-AMOTION_EVENT_TOOL_TYPE_PALM    :: 5
+AMOTION_EVENT_EDGE_FLAG_NONE :: AMotionEventEdgeFlags{}
 
-AMotionClassification :: u32
+AMOTION_EVENT_MAXIMUM_VALID_AXIS_VALUE :: 53
 
-AMOTION_EVENT_CLASSIFICATION_NONE               :: 0
-AMOTION_EVENT_CLASSIFICATION_AMBIGUOUS_GESTURE  :: 1
-AMOTION_EVENT_CLASSIFICATION_DEEP_PRESS         :: 2
-AMOTION_EVENT_CLASSIFICATION_TWO_FINGER_SWIPE   :: 3
-AMOTION_EVENT_CLASSIFICATION_MULTI_FINGER_SWIPE :: 4
-AMOTION_EVENT_CLASSIFICATION_PINCH              :: 5
+AMotionEventAxis :: enum i32 {
+	X                          = 0,
+	Y                          = 1,
+	PRESSURE                   = 2,
+	SIZE                       = 3,
+	TOUCH_MAJOR                = 4,
+	TOUCH_MINOR                = 5,
+	TOOL_MAJOR                 = 6,
+	TOOL_MINOR                 = 7,
+	ORIENTATION                = 8,
+	VSCROLL                    = 9,
+	HSCROLL                    = 10,
+	Z                          = 11,
+	RX                         = 12,
+	RY                         = 13,
+	RZ                         = 14,
+	HAT_X                      = 15,
+	HAT_Y                      = 16,
+	LTRIGGER                   = 17,
+	RTRIGGER                   = 18,
+	THROTTLE                   = 19,
+	RUDDER                     = 20,
+	WHEEL                      = 21,
+	GAS                        = 22,
+	BRAKE                      = 23,
+	DISTANCE                   = 24,
+	TILT                       = 25,
+	SCROLL                     = 26,
+	RELATIVE_X                 = 27,
+	RELATIVE_Y                 = 28,
+	GENERIC_1                  = 32,
+	GENERIC_2                  = 33,
+	GENERIC_3                  = 34,
+	GENERIC_4                  = 35,
+	GENERIC_5                  = 36,
+	GENERIC_6                  = 37,
+	GENERIC_7                  = 38,
+	GENERIC_8                  = 39,
+	GENERIC_9                  = 40,
+	GENERIC_10                 = 41,
+	GENERIC_11                 = 42,
+	GENERIC_12                 = 43,
+	GENERIC_13                 = 44,
+	GENERIC_14                 = 45,
+	GENERIC_15                 = 46,
+	GENERIC_16                 = 47,
+	GESTURE_X_OFFSET           = 48,
+	GESTURE_Y_OFFSET           = 49,
+	GESTURE_SCROLL_X_DISTANCE  = 50,
+	GESTURE_SCROLL_Y_DISTANCE  = 51,
+	GESTURE_PINCH_SCALE_FACTOR = 52,
+	GESTURE_SWIPE_FINGER_COUNT = 53,
+}
 
-AINPUT_SOURCE_CLASS_MASK       :: 0x000000ff
-AINPUT_SOURCE_CLASS_NONE       :: 0x00000000
-AINPUT_SOURCE_CLASS_BUTTON     :: 0x00000001
-AINPUT_SOURCE_CLASS_POINTER    :: 0x00000002
-AINPUT_SOURCE_CLASS_NAVIGATION :: 0x00000004
-AINPUT_SOURCE_CLASS_POSITION   :: 0x00000008
-AINPUT_SOURCE_CLASS_JOYSTICK   :: 0x00000010
+AMotionEventButton :: enum u32 {
+	PRIMARY          = 0,
+	SECONDARY        = 1,
+	TERTIARY         = 2,
+	BACK             = 3,
+	FORWARD          = 4,
+	STYLUS_PRIMARY   = 5,
+	STYLUS_SECONDARY = 6,
+}
+AMotionEventButtons :: distinct bit_set[AMotionEventButton; u32]
 
-AINPUT_SOURCE_UNKNOWN          :: 0x00000000
-AINPUT_SOURCE_KEYBOARD         :: 0x101
-AINPUT_SOURCE_DPAD             :: 0x201
-AINPUT_SOURCE_GAMEPAD          :: 0x401
-AINPUT_SOURCE_TOUCHSCREEN      :: 0x1002
-AINPUT_SOURCE_MOUSE            :: 0x2002
-AINPUT_SOURCE_STYLUS           :: 0x4002
-AINPUT_SOURCE_BLUETOOTH_STYLUS :: 0xc002
-AINPUT_SOURCE_TRACKBALL        :: 0x10004
-AINPUT_SOURCE_MOUSE_RELATIVE   :: 0x20004
-AINPUT_SOURCE_TOUCHPAD         :: 0x100008
-AINPUT_SOURCE_TOUCH_NAVIGATION :: 0x200000
-AINPUT_SOURCE_JOYSTICK         :: 0x1000010
-AINPUT_SOURCE_HDMI             :: 0x2000001
-AINPUT_SOURCE_SENSOR           :: 0x4000000
-AINPUT_SOURCE_ROTARY_ENCODER   :: 0x400000
-AINPUT_SOURCE_ANY              :: 0xffffff00
+AMotionEventToolType :: enum i32 {
+	UNKNOWN = 0,
+	FINGER  = 1,
+	STYLUS  = 2,
+	MOUSE   = 3,
+	ERASER  = 4,
+	PALM    = 5,
+}
+
+AMotionClassification :: enum u32 {
+	NONE               = 0,
+	AMBIGUOUS_GESTURE  = 1,
+	DEEP_PRESS         = 2,
+	TWO_FINGER_SWIPE   = 3,
+	MULTI_FINGER_SWIPE = 4,
+	PINCH              = 5,
+}
+
+AInputSource :: enum u32 {
+	CLASS_BUTTON     = 0,
+	CLASS_POINTER    = 1,
+	CLASS_NAVIGATION = 2,
+	CLASS_POSITION   = 3,
+	CLASS_JOYSTICK   = 4,
+	KEYBOARD         = 8,
+	DPAD             = 9,
+	GAMEPAD          = 10,
+	TOUCHSCREEN      = 12,
+	MOUSE            = 13,
+	STYLUS           = 14,
+	BLUETOOTH_STYLUS = 15,
+	TRACKBALL        = 16,
+	MOUSE_RELATIVE   = 17,
+	TOUCHPAD         = 20,
+	TOUCH_NAVIGATION = 21,
+	ROTARY_ENCODER   = 22,
+	JOYSTICK         = 24,
+	HDMI             = 25,
+	SENSOR           = 26,
+}
+AInputSources :: distinct bit_set[AInputSource; u32]
+
+AINPUT_SOURCE_CLASS_MASK       :: transmute(AInputSources)u32(0xff)
+AINPUT_SOURCE_CLASS_NONE       :: AInputSources{}
+AINPUT_SOURCE_CLASS_BUTTON     :: AInputSources{.CLASS_BUTTON}
+AINPUT_SOURCE_CLASS_POINTER    :: AInputSources{.CLASS_POINTER}
+AINPUT_SOURCE_CLASS_NAVIGATION :: AInputSources{.CLASS_NAVIGATION}
+AINPUT_SOURCE_CLASS_POSITION   :: AInputSources{.CLASS_POSITION}
+AINPUT_SOURCE_CLASS_JOYSTICK   :: AInputSources{.CLASS_JOYSTICK}
+AINPUT_SOURCE_UNKNOWN          :: AInputSources{}
+AINPUT_SOURCE_KEYBOARD         :: AInputSources{.CLASS_BUTTON, .KEYBOARD}
+AINPUT_SOURCE_DPAD             :: AInputSources{.CLASS_BUTTON, .DPAD}
+AINPUT_SOURCE_GAMEPAD          :: AInputSources{.CLASS_BUTTON, .GAMEPAD}
+AINPUT_SOURCE_TOUCHSCREEN      :: AInputSources{.CLASS_POINTER, .TOUCHSCREEN}
+AINPUT_SOURCE_MOUSE            :: AInputSources{.CLASS_POINTER, .MOUSE}
+AINPUT_SOURCE_STYLUS           :: AInputSources{.CLASS_POINTER, .STYLUS}
+AINPUT_SOURCE_BLUETOOTH_STYLUS :: AInputSources{.CLASS_POINTER, .STYLUS, .BLUETOOTH_STYLUS}
+AINPUT_SOURCE_TRACKBALL        :: AInputSources{.CLASS_NAVIGATION, .TRACKBALL}
+AINPUT_SOURCE_MOUSE_RELATIVE   :: AInputSources{.CLASS_NAVIGATION, .MOUSE_RELATIVE}
+AINPUT_SOURCE_TOUCHPAD         :: AInputSources{.CLASS_POSITION, .TOUCHPAD}
+AINPUT_SOURCE_TOUCH_NAVIGATION :: AInputSources{.TOUCH_NAVIGATION}
+AINPUT_SOURCE_JOYSTICK         :: AInputSources{.CLASS_JOYSTICK, .JOYSTICK}
+AINPUT_SOURCE_HDMI             :: AInputSources{.CLASS_BUTTON, .HDMI}
+AINPUT_SOURCE_SENSOR           :: AInputSources{.SENSOR}
+AINPUT_SOURCE_ROTARY_ENCODER   :: AInputSources{.ROTARY_ENCODER}
+AINPUT_SOURCE_ANY              :: transmute(AInputSources)u32(0xffffff00)
 
 AINPUT_KEYBOARD_TYPE_NONE           :: 0
 AINPUT_KEYBOARD_TYPE_NON_ALPHABETIC :: 1
@@ -204,24 +262,24 @@ AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT :: 8
 
 @(default_calling_convention="c")
 foreign libandroid {
-	AInputEvent_getType                   :: proc(event: ^AInputEvent) -> i32 ---
+	AInputEvent_getType                   :: proc(event: ^AInputEvent) -> AInputEventType ---
 	AInputEvent_getDeviceId               :: proc(event: ^AInputEvent) -> i32 ---
-	AInputEvent_getSource                 :: proc(event: ^AInputEvent) -> i32 ---
+	AInputEvent_getSource                 :: proc(event: ^AInputEvent) -> AInputSources ---
 	AInputEvent_release                   :: proc(event: ^AInputEvent) --- // API level 31
-	AKeyEvent_getAction                   :: proc(key_event: ^AInputEvent) -> i32 ---
-	AKeyEvent_getFlags                    :: proc(key_event: ^AInputEvent) -> i32 ---
-	AKeyEvent_getKeyCode                  :: proc(key_event: ^AInputEvent) -> i32 ---
+	AKeyEvent_getAction                   :: proc(key_event: ^AInputEvent) -> AKeyEventAction ---
+	AKeyEvent_getFlags                    :: proc(key_event: ^AInputEvent) -> AKeyEventFlags ---
+	AKeyEvent_getKeyCode                  :: proc(key_event: ^AInputEvent) -> AKeyCode ---
 	AKeyEvent_getScanCode                 :: proc(key_event: ^AInputEvent) -> i32 ---
-	AKeyEvent_getMetaState                :: proc(key_event: ^AInputEvent) -> i32 ---
+	AKeyEvent_getMetaState                :: proc(key_event: ^AInputEvent) -> AMetaState ---
 	AKeyEvent_getRepeatCount              :: proc(key_event: ^AInputEvent) -> i32 ---
 	AKeyEvent_getDownTime                 :: proc(key_event: ^AInputEvent) -> i64 ---
 	AKeyEvent_getEventTime                :: proc(key_event: ^AInputEvent) -> i64 ---
 	AKeyEvent_fromJava                    :: proc(env: ^JNIEnv, keyEvent: jobject) -> ^AInputEvent --- // API level 31
-	AMotionEvent_getAction                :: proc(motion_event: ^AInputEvent) -> i32 ---
-	AMotionEvent_getFlags                 :: proc(motion_event: ^AInputEvent) -> i32 ---
-	AMotionEvent_getMetaState             :: proc(motion_event: ^AInputEvent) -> i32 ---
-	AMotionEvent_getButtonState           :: proc(motion_event: ^AInputEvent) -> i32 ---
-	AMotionEvent_getEdgeFlags             :: proc(motion_event: ^AInputEvent) -> i32 ---
+	AMotionEvent_getAction                :: proc(motion_event: ^AInputEvent) -> AMotionEventPackedAction ---
+	AMotionEvent_getFlags                 :: proc(motion_event: ^AInputEvent) -> AMotionEventFlags ---
+	AMotionEvent_getMetaState             :: proc(motion_event: ^AInputEvent) -> AMetaState ---
+	AMotionEvent_getButtonState           :: proc(motion_event: ^AInputEvent) -> AMotionEventButtons ---
+	AMotionEvent_getEdgeFlags             :: proc(motion_event: ^AInputEvent) -> AMotionEventEdgeFlags ---
 	AMotionEvent_getDownTime              :: proc(motion_event: ^AInputEvent) -> i64 ---
 	AMotionEvent_getEventTime             :: proc(motion_event: ^AInputEvent) -> i64 ---
 	AMotionEvent_getXOffset               :: proc(motion_event: ^AInputEvent) -> f32 ---
@@ -230,7 +288,7 @@ foreign libandroid {
 	AMotionEvent_getYPrecision            :: proc(motion_event: ^AInputEvent) -> f32 ---
 	AMotionEvent_getPointerCount          :: proc(motion_event: ^AInputEvent) -> c.size_t ---
 	AMotionEvent_getPointerId             :: proc(motion_event: ^AInputEvent, pointer_index: c.size_t) -> i32 ---
-	AMotionEvent_getToolType              :: proc(motion_event: ^AInputEvent, pointer_index: c.size_t) -> i32 ---
+	AMotionEvent_getToolType              :: proc(motion_event: ^AInputEvent, pointer_index: c.size_t) -> AMotionEventToolType ---
 	AMotionEvent_getRawX                  :: proc(motion_event: ^AInputEvent, pointer_index: c.size_t) -> f32 ---
 	AMotionEvent_getRawY                  :: proc(motion_event: ^AInputEvent, pointer_index: c.size_t) -> f32 ---
 	AMotionEvent_getX                     :: proc(motion_event: ^AInputEvent, pointer_index: c.size_t) -> f32 ---
@@ -242,7 +300,7 @@ foreign libandroid {
 	AMotionEvent_getToolMajor             :: proc(motion_event: ^AInputEvent, pointer_index: c.size_t) -> f32 ---
 	AMotionEvent_getToolMinor             :: proc(motion_event: ^AInputEvent, pointer_index: c.size_t) -> f32 ---
 	AMotionEvent_getOrientation           :: proc(motion_event: ^AInputEvent, pointer_index: c.size_t) -> f32 ---
-	AMotionEvent_getAxisValue             :: proc(motion_event: ^AInputEvent, axis: i32, pointer_index: c.size_t) -> f32 ---
+	AMotionEvent_getAxisValue             :: proc(motion_event: ^AInputEvent, axis: AMotionEventAxis, pointer_index: c.size_t) -> f32 ---
 	AMotionEvent_getHistorySize           :: proc(motion_event: ^AInputEvent) -> c.size_t ---
 	AMotionEvent_getHistoricalEventTime   :: proc(motion_event: ^AInputEvent, history_index: c.size_t) -> i64 ---
 	AMotionEvent_getHistoricalRawX        :: proc(motion_event: ^AInputEvent, pointer_index: c.size_t, history_index: c.size_t) -> f32 ---
@@ -256,9 +314,9 @@ foreign libandroid {
 	AMotionEvent_getHistoricalToolMajor   :: proc(motion_event: ^AInputEvent, pointer_index: c.size_t, history_index: c.size_t) -> f32 ---
 	AMotionEvent_getHistoricalToolMinor   :: proc(motion_event: ^AInputEvent, pointer_index: c.size_t, history_index: c.size_t) -> f32 ---
 	AMotionEvent_getHistoricalOrientation :: proc(motion_event: ^AInputEvent, pointer_index: c.size_t, history_index: c.size_t) -> f32 ---
-	AMotionEvent_getHistoricalAxisValue   :: proc(motion_event: ^AInputEvent, axis: i32, pointer_index: c.size_t, history_index: c.size_t) -> f32 ---
-	AMotionEvent_getActionButton          :: proc(motion_event: ^AInputEvent) -> i32 --- // API level 33
-	AMotionEvent_getClassification        :: proc(motion_event: ^AInputEvent) -> i32 --- // API level 33
+	AMotionEvent_getHistoricalAxisValue   :: proc(motion_event: ^AInputEvent, axis: AMotionEventAxis, pointer_index: c.size_t, history_index: c.size_t) -> f32 ---
+	AMotionEvent_getActionButton          :: proc(motion_event: ^AInputEvent) -> AMotionEventButtons --- // API level 33
+	AMotionEvent_getClassification        :: proc(motion_event: ^AInputEvent) -> AMotionClassification --- // API level 33
 	AMotionEvent_fromJava                 :: proc(env: ^JNIEnv, motionEvent: jobject) -> ^AInputEvent --- // API level 31
 	AInputEvent_toJava                    :: proc(env: ^JNIEnv, aInputEvent: ^AInputEvent) -> jobject --- // API level 35
 	AInputQueue_attachLooper              :: proc(queue: ^AInputQueue, looper: ^ALooper, ident: c.int, callback: ALooper_callbackFunc, data: rawptr) ---

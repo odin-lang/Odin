@@ -48,12 +48,12 @@ jvalue :: struct #raw_union {
 	l: jobject,
 }
 
-jobjectRefType :: c.int
-
-JNIInvalidRefType    :: 0
-JNILocalRefType      :: 1
-JNIGlobalRefType     :: 2
-JNIWeakGlobalRefType :: 3
+jobjectRefType :: enum c.int {
+	JNIInvalidRefType    = 0,
+	JNILocalRefType      = 1,
+	JNIGlobalRefType     = 2,
+	JNIWeakGlobalRefType = 3,
+}
 
 JNINativeMethod :: struct {
 	name:      cstring,

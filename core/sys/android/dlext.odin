@@ -7,21 +7,25 @@ import "core:c"
 
 foreign import libdl "system:dl"
 
-ANDROID_DLEXT_RESERVED_ADDRESS           :: 0x1
-ANDROID_DLEXT_RESERVED_ADDRESS_HINT      :: 0x2
-ANDROID_DLEXT_WRITE_RELRO                :: 0x4
-ANDROID_DLEXT_USE_RELRO                  :: 0x8
-ANDROID_DLEXT_USE_LIBRARY_FD             :: 0x10
-ANDROID_DLEXT_USE_LIBRARY_FD_OFFSET      :: 0x20
-ANDROID_DLEXT_FORCE_LOAD                 :: 0x40
-ANDROID_DLEXT_USE_NAMESPACE              :: 0x200
-ANDROID_DLEXT_RESERVED_ADDRESS_RECURSIVE :: 0x400
-ANDROID_DLEXT_VALID_FLAG_BITS            :: 0x67f
+AndroidDlextFlag :: enum u64 {
+	RESERVED_ADDRESS           = 0,
+	RESERVED_ADDRESS_HINT      = 1,
+	WRITE_RELRO                = 2,
+	USE_RELRO                  = 3,
+	USE_LIBRARY_FD             = 4,
+	USE_LIBRARY_FD_OFFSET      = 5,
+	FORCE_LOAD                 = 6,
+	USE_NAMESPACE              = 9,
+	RESERVED_ADDRESS_RECURSIVE = 10,
+}
+AndroidDlextFlags :: distinct bit_set[AndroidDlextFlag; u64]
+
+ANDROID_DLEXT_VALID_FLAG_BITS :: AndroidDlextFlags{.RESERVED_ADDRESS, .RESERVED_ADDRESS_HINT, .WRITE_RELRO, .USE_RELRO, .USE_LIBRARY_FD, .USE_LIBRARY_FD_OFFSET, .FORCE_LOAD, .USE_NAMESPACE, .RESERVED_ADDRESS_RECURSIVE}
 
 android_namespace_t :: struct {}
 
 android_dlextinfo :: struct {
-	flags:             u64,
+	flags:             AndroidDlextFlags,
 	reserved_addr:     rawptr,
 	reserved_size:     c.size_t,
 	relro_fd:          c.int,

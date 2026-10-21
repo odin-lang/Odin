@@ -19,10 +19,10 @@ CaptivePortal_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creat
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-CaptivePortal_describeContents :: proc "contextless" (self: ^CaptivePortal) -> (result: i32, exception: ^Throwable) {
+CaptivePortal_describeContents :: proc "contextless" (self: ^CaptivePortal) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &CaptivePortal__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 CaptivePortal_ignoreNetwork :: proc "contextless" (self: ^CaptivePortal) -> (exception: ^Throwable) {
@@ -39,10 +39,10 @@ CaptivePortal_reportCaptivePortalDismissed :: proc "contextless" (self: ^Captive
 	return jni_take(jni_env)
 }
 
-CaptivePortal_writeToParcel :: proc "contextless" (self: ^CaptivePortal, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+CaptivePortal_writeToParcel :: proc "contextless" (self: ^CaptivePortal, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &CaptivePortal__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -138,10 +138,10 @@ ConnectivityDiagnosticsManager_ConnectivityReport_new :: proc "contextless" (net
 	return (^ConnectivityDiagnosticsManager_ConnectivityReport)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ConnectivityDiagnosticsManager_ConnectivityReport_describeContents :: proc "contextless" (self: ^ConnectivityDiagnosticsManager_ConnectivityReport) -> (result: i32, exception: ^Throwable) {
+ConnectivityDiagnosticsManager_ConnectivityReport_describeContents :: proc "contextless" (self: ^ConnectivityDiagnosticsManager_ConnectivityReport) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ConnectivityDiagnosticsManager_ConnectivityReport__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ConnectivityDiagnosticsManager_ConnectivityReport_equals :: proc "contextless" (self: ^ConnectivityDiagnosticsManager_ConnectivityReport, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -187,10 +187,10 @@ ConnectivityDiagnosticsManager_ConnectivityReport_hashCode :: proc "contextless"
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-ConnectivityDiagnosticsManager_ConnectivityReport_writeToParcel :: proc "contextless" (self: ^ConnectivityDiagnosticsManager_ConnectivityReport, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+ConnectivityDiagnosticsManager_ConnectivityReport_writeToParcel :: proc "contextless" (self: ^ConnectivityDiagnosticsManager_ConnectivityReport, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ConnectivityDiagnosticsManager_ConnectivityReport__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -216,17 +216,17 @@ ConnectivityDiagnosticsManager_DataStallReport_get_CREATOR :: proc "contextless"
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-ConnectivityDiagnosticsManager_DataStallReport_new :: proc "contextless" (network: ^Network, reportTimestamp: i64, detectionMethod: i32, linkProperties: ^LinkProperties, networkCapabilities: ^NetworkCapabilities, stallDetails: ^PersistableBundle) -> (result: ^ConnectivityDiagnosticsManager_DataStallReport, exception: ^Throwable) {
+ConnectivityDiagnosticsManager_DataStallReport_new :: proc "contextless" (network: ^Network, reportTimestamp: i64, detectionMethod: ConnectivityDiagnosticsManager_DataStallReport_DetectionMethod, linkProperties: ^LinkProperties, networkCapabilities: ^NetworkCapabilities, stallDetails: ^PersistableBundle) -> (result: ^ConnectivityDiagnosticsManager_DataStallReport, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &ConnectivityDiagnosticsManager_DataStallReport__class, "<init>", "(Landroid/net/Network;JILandroid/net/LinkProperties;Landroid/net/NetworkCapabilities;Landroid/os/PersistableBundle;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = network}, {j = reportTimestamp}, {i = detectionMethod}, {l = linkProperties}, {l = networkCapabilities}, {l = stallDetails}}
+	jni_args := [?]android.jvalue{{l = network}, {j = reportTimestamp}, {i = i32(detectionMethod)}, {l = linkProperties}, {l = networkCapabilities}, {l = stallDetails}}
 	return (^ConnectivityDiagnosticsManager_DataStallReport)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ConnectivityDiagnosticsManager_DataStallReport_describeContents :: proc "contextless" (self: ^ConnectivityDiagnosticsManager_DataStallReport) -> (result: i32, exception: ^Throwable) {
+ConnectivityDiagnosticsManager_DataStallReport_describeContents :: proc "contextless" (self: ^ConnectivityDiagnosticsManager_DataStallReport) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ConnectivityDiagnosticsManager_DataStallReport__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ConnectivityDiagnosticsManager_DataStallReport_equals :: proc "contextless" (self: ^ConnectivityDiagnosticsManager_DataStallReport, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -278,12 +278,17 @@ ConnectivityDiagnosticsManager_DataStallReport_hashCode :: proc "contextless" (s
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-ConnectivityDiagnosticsManager_DataStallReport_writeToParcel :: proc "contextless" (self: ^ConnectivityDiagnosticsManager_DataStallReport, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+ConnectivityDiagnosticsManager_DataStallReport_writeToParcel :: proc "contextless" (self: ^ConnectivityDiagnosticsManager_DataStallReport, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ConnectivityDiagnosticsManager_DataStallReport__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+ConnectivityDiagnosticsManager_DataStallReport_DetectionMethod :: enum i32 {
+	DNS_EVENTS  = 1,
+	TCP_METRICS = 2,
 }
 
 // class android.net.ConnectivityManager
@@ -406,11 +411,11 @@ ConnectivityManager_getLinkProperties :: proc "contextless" (self: ^Connectivity
 	return (^LinkProperties)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ConnectivityManager_getMultipathPreference :: proc "contextless" (self: ^ConnectivityManager, network: ^Network) -> (result: i32, exception: ^Throwable) {
+ConnectivityManager_getMultipathPreference :: proc "contextless" (self: ^ConnectivityManager, network: ^Network) -> (result: ConnectivityManager_MultipathPreferenceFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ConnectivityManager__class, "getMultipathPreference", "(Landroid/net/Network;)I", false) or_return
 	jni_args := [?]android.jvalue{{l = network}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return transmute(ConnectivityManager_MultipathPreferenceFlags)(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 ConnectivityManager_getNetworkCapabilities :: proc "contextless" (self: ^ConnectivityManager, network: ^Network) -> (result: ^NetworkCapabilities, exception: ^Throwable) {
@@ -427,10 +432,10 @@ ConnectivityManager_getNetworkInfo_Network :: proc "contextless" (self: ^Connect
 	return (^NetworkInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ConnectivityManager_getNetworkInfo_int :: proc "contextless" (self: ^ConnectivityManager, networkType: i32) -> (result: ^NetworkInfo, exception: ^Throwable) {
+ConnectivityManager_getNetworkInfo_int :: proc "contextless" (self: ^ConnectivityManager, networkType: ConnectivityManager_Type) -> (result: ^NetworkInfo, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ConnectivityManager__class, "getNetworkInfo", "(I)Landroid/net/NetworkInfo;", false) or_return
-	jni_args := [?]android.jvalue{{i = networkType}}
+	jni_args := [?]android.jvalue{{i = i32(networkType)}}
 	return (^NetworkInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -457,10 +462,10 @@ ConnectivityManager_getProcessDefaultNetwork :: proc "contextless" () -> (result
 	return (^Network)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, nil)), jni_take(jni_env)
 }
 
-ConnectivityManager_getRestrictBackgroundStatus :: proc "contextless" (self: ^ConnectivityManager) -> (result: i32, exception: ^Throwable) {
+ConnectivityManager_getRestrictBackgroundStatus :: proc "contextless" (self: ^ConnectivityManager) -> (result: ConnectivityManager_RestrictBackgroundStatus, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ConnectivityManager__class, "getRestrictBackgroundStatus", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return ConnectivityManager_RestrictBackgroundStatus(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ConnectivityManager_isActiveNetworkMetered :: proc "contextless" (self: ^ConnectivityManager) -> (result: bool, exception: ^Throwable) {
@@ -475,10 +480,10 @@ ConnectivityManager_isDefaultNetworkActive :: proc "contextless" (self: ^Connect
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-ConnectivityManager_isNetworkTypeValid :: proc "contextless" (networkType: i32) -> (result: bool, exception: ^Throwable) {
+ConnectivityManager_isNetworkTypeValid :: proc "contextless" (networkType: ConnectivityManager_Type) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &ConnectivityManager__class, "isNetworkTypeValid", "(I)Z", true) or_return
-	jni_args := [?]android.jvalue{{i = networkType}}
+	jni_args := [?]android.jvalue{{i = i32(networkType)}}
 	return jni_env->CallStaticBooleanMethodA(jni_class, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -672,6 +677,33 @@ ConnectivityManager_unregisterNetworkCallback :: proc{
 	ConnectivityManager_unregisterNetworkCallback_ConnectivityManager_NetworkCallback,
 }
 
+ConnectivityManager_Type :: enum i32 {
+	BLUETOOTH    = 7,
+	DUMMY        = 8,
+	ETHERNET     = 9,
+	MOBILE       = 0,
+	MOBILE_DUN   = 4,
+	MOBILE_HIPRI = 5,
+	MOBILE_MMS   = 2,
+	MOBILE_SUPL  = 3,
+	VPN          = 17,
+	WIFI         = 1,
+	WIMAX        = 6,
+}
+
+ConnectivityManager_MultipathPreferenceFlag :: enum u32 {
+	HANDOVER    = 0,
+	PERFORMANCE = 2,
+	RELIABILITY = 1,
+}
+ConnectivityManager_MultipathPreferenceFlags :: distinct bit_set[ConnectivityManager_MultipathPreferenceFlag; u32]
+
+ConnectivityManager_RestrictBackgroundStatus :: enum i32 {
+	DISABLED    = 1,
+	ENABLED     = 3,
+	WHITELISTED = 2,
+}
+
 // class android.net.ConnectivityManager.NetworkCallback
 ConnectivityManager_NetworkCallback :: struct #raw_union {
 	using Object: Object,
@@ -688,10 +720,10 @@ ConnectivityManager_NetworkCallback_new_void :: proc "contextless" () -> (result
 	return (^ConnectivityManager_NetworkCallback)(jni_env->NewObjectA(jni_class, jni_id, nil)), jni_take(jni_env)
 }
 
-ConnectivityManager_NetworkCallback_new_int :: proc "contextless" (flags: i32) -> (result: ^ConnectivityManager_NetworkCallback, exception: ^Throwable) { // API level 31
+ConnectivityManager_NetworkCallback_new_int :: proc "contextless" (flags: ConnectivityManager_NetworkCallback_Flags) -> (result: ^ConnectivityManager_NetworkCallback, exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &ConnectivityManager_NetworkCallback__class, "<init>", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	return (^ConnectivityManager_NetworkCallback)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -762,6 +794,11 @@ ConnectivityManager_NetworkCallback_onUnavailable :: proc "contextless" (self: ^
 	jni_env->CallVoidMethodA(self, jni_id, nil)
 	return jni_take(jni_env)
 }
+
+ConnectivityManager_NetworkCallback_Flag :: enum u32 {
+	FLAG_INCLUDE_LOCATION_INFO = 0,
+}
+ConnectivityManager_NetworkCallback_Flags :: distinct bit_set[ConnectivityManager_NetworkCallback_Flag; u32]
 
 // interface android.net.ConnectivityManager.OnNetworkActiveListener
 ConnectivityManager_OnNetworkActiveListener :: struct #raw_union {
@@ -923,10 +960,10 @@ DhcpInfo_new :: proc "contextless" () -> (result: ^DhcpInfo, exception: ^Throwab
 	return (^DhcpInfo)(jni_env->NewObjectA(jni_class, jni_id, nil)), jni_take(jni_env)
 }
 
-DhcpInfo_describeContents :: proc "contextless" (self: ^DhcpInfo) -> (result: i32, exception: ^Throwable) {
+DhcpInfo_describeContents :: proc "contextless" (self: ^DhcpInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DhcpInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 DhcpInfo_toString :: proc "contextless" (self: ^DhcpInfo) -> (result: ^String, exception: ^Throwable) {
@@ -935,10 +972,10 @@ DhcpInfo_toString :: proc "contextless" (self: ^DhcpInfo) -> (result: ^String, e
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-DhcpInfo_writeToParcel :: proc "contextless" (self: ^DhcpInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+DhcpInfo_writeToParcel :: proc "contextless" (self: ^DhcpInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DhcpInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -978,26 +1015,26 @@ DnsResolver_getInstance :: proc "contextless" () -> (result: ^DnsResolver, excep
 	return (^DnsResolver)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, nil)), jni_take(jni_env)
 }
 
-DnsResolver_query_Network_String_int_int_Executor_CancellationSignal_DnsResolver_Callback :: proc "contextless" (self: ^DnsResolver, network: ^Network, domain: ^String, nsType: i32, flags: i32, executor: ^Executor, cancellationSignal: ^CancellationSignal, callback: ^DnsResolver_Callback) -> (exception: ^Throwable) {
+DnsResolver_query_Network_String_int_int_Executor_CancellationSignal_DnsResolver_Callback :: proc "contextless" (self: ^DnsResolver, network: ^Network, domain: ^String, nsType: DnsResolver_Type, flags: DnsResolver_Flag, executor: ^Executor, cancellationSignal: ^CancellationSignal, callback: ^DnsResolver_Callback) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DnsResolver__class, "query", "(Landroid/net/Network;Ljava/lang/String;IILjava/util/concurrent/Executor;Landroid/os/CancellationSignal;Landroid/net/DnsResolver$Callback;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = network}, {l = domain}, {i = nsType}, {i = flags}, {l = executor}, {l = cancellationSignal}, {l = callback}}
+	jni_args := [?]android.jvalue{{l = network}, {l = domain}, {i = i32(nsType)}, {i = i32(flags)}, {l = executor}, {l = cancellationSignal}, {l = callback}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-DnsResolver_query_Network_String_int_Executor_CancellationSignal_DnsResolver_Callback :: proc "contextless" (self: ^DnsResolver, network: ^Network, domain: ^String, flags: i32, executor: ^Executor, cancellationSignal: ^CancellationSignal, callback: ^DnsResolver_Callback) -> (exception: ^Throwable) {
+DnsResolver_query_Network_String_int_Executor_CancellationSignal_DnsResolver_Callback :: proc "contextless" (self: ^DnsResolver, network: ^Network, domain: ^String, flags: DnsResolver_Flag, executor: ^Executor, cancellationSignal: ^CancellationSignal, callback: ^DnsResolver_Callback) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DnsResolver__class, "query", "(Landroid/net/Network;Ljava/lang/String;ILjava/util/concurrent/Executor;Landroid/os/CancellationSignal;Landroid/net/DnsResolver$Callback;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = network}, {l = domain}, {i = flags}, {l = executor}, {l = cancellationSignal}, {l = callback}}
+	jni_args := [?]android.jvalue{{l = network}, {l = domain}, {i = i32(flags)}, {l = executor}, {l = cancellationSignal}, {l = callback}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-DnsResolver_query_Network_String_int_Executor_int_CancellationSignal_DnsResolver_Callback :: proc "contextless" (self: ^DnsResolver, network: ^Network, domain: ^String, flags: i32, executor: ^Executor, httpsTimeoutMillis: i32, cancellationSignal: ^CancellationSignal, callback: ^DnsResolver_Callback) -> (exception: ^Throwable) { // API level 37
+DnsResolver_query_Network_String_int_Executor_int_CancellationSignal_DnsResolver_Callback :: proc "contextless" (self: ^DnsResolver, network: ^Network, domain: ^String, flags: DnsResolver_Flag, executor: ^Executor, httpsTimeoutMillis: i32, cancellationSignal: ^CancellationSignal, callback: ^DnsResolver_Callback) -> (exception: ^Throwable) { // API level 37
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DnsResolver__class, "query", "(Landroid/net/Network;Ljava/lang/String;ILjava/util/concurrent/Executor;ILandroid/os/CancellationSignal;Landroid/net/DnsResolver$Callback;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = network}, {l = domain}, {i = flags}, {l = executor}, {i = httpsTimeoutMillis}, {l = cancellationSignal}, {l = callback}}
+	jni_args := [?]android.jvalue{{l = network}, {l = domain}, {i = i32(flags)}, {l = executor}, {i = httpsTimeoutMillis}, {l = cancellationSignal}, {l = callback}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1008,18 +1045,18 @@ DnsResolver_query :: proc{
 	DnsResolver_query_Network_String_int_Executor_int_CancellationSignal_DnsResolver_Callback,
 }
 
-DnsResolver_rawQuery_Network_ByteArray_int_Executor_CancellationSignal_DnsResolver_Callback :: proc "contextless" (self: ^DnsResolver, network: ^Network, query: ^ByteArray, flags: i32, executor: ^Executor, cancellationSignal: ^CancellationSignal, callback: ^DnsResolver_Callback) -> (exception: ^Throwable) {
+DnsResolver_rawQuery_Network_ByteArray_int_Executor_CancellationSignal_DnsResolver_Callback :: proc "contextless" (self: ^DnsResolver, network: ^Network, query: ^ByteArray, flags: DnsResolver_Flag, executor: ^Executor, cancellationSignal: ^CancellationSignal, callback: ^DnsResolver_Callback) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DnsResolver__class, "rawQuery", "(Landroid/net/Network;[BILjava/util/concurrent/Executor;Landroid/os/CancellationSignal;Landroid/net/DnsResolver$Callback;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = network}, {l = query}, {i = flags}, {l = executor}, {l = cancellationSignal}, {l = callback}}
+	jni_args := [?]android.jvalue{{l = network}, {l = query}, {i = i32(flags)}, {l = executor}, {l = cancellationSignal}, {l = callback}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-DnsResolver_rawQuery_Network_String_int_int_int_Executor_CancellationSignal_DnsResolver_Callback :: proc "contextless" (self: ^DnsResolver, network: ^Network, domain: ^String, nsClass: i32, nsType: i32, flags: i32, executor: ^Executor, cancellationSignal: ^CancellationSignal, callback: ^DnsResolver_Callback) -> (exception: ^Throwable) {
+DnsResolver_rawQuery_Network_String_int_int_int_Executor_CancellationSignal_DnsResolver_Callback :: proc "contextless" (self: ^DnsResolver, network: ^Network, domain: ^String, nsClass: DnsResolver_NsClass, nsType: DnsResolver_Type, flags: DnsResolver_Flag, executor: ^Executor, cancellationSignal: ^CancellationSignal, callback: ^DnsResolver_Callback) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DnsResolver__class, "rawQuery", "(Landroid/net/Network;Ljava/lang/String;IIILjava/util/concurrent/Executor;Landroid/os/CancellationSignal;Landroid/net/DnsResolver$Callback;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = network}, {l = domain}, {i = nsClass}, {i = nsType}, {i = flags}, {l = executor}, {l = cancellationSignal}, {l = callback}}
+	jni_args := [?]android.jvalue{{l = network}, {l = domain}, {i = i32(nsClass)}, {i = i32(nsType)}, {i = i32(flags)}, {l = executor}, {l = cancellationSignal}, {l = callback}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1027,6 +1064,28 @@ DnsResolver_rawQuery_Network_String_int_int_int_Executor_CancellationSignal_DnsR
 DnsResolver_rawQuery :: proc{
 	DnsResolver_rawQuery_Network_ByteArray_int_Executor_CancellationSignal_DnsResolver_Callback,
 	DnsResolver_rawQuery_Network_String_int_int_int_Executor_CancellationSignal_DnsResolver_Callback,
+}
+
+DnsResolver_Type :: enum i32 {
+	A     = 1,
+	AAAA  = 28,
+	HTTPS = 65,
+}
+
+DnsResolver_Flag :: enum i32 {
+	EMPTY           = 0,
+	NO_CACHE_LOOKUP = 4,
+	NO_CACHE_STORE  = 2,
+	NO_RETRY        = 1,
+}
+
+DnsResolver_NsClass :: enum i32 {
+	CLASS_IN = 1,
+}
+
+DnsResolver_Error :: enum i32 {
+	PARSE  = 0,
+	SYSTEM = 1,
 }
 
 // interface android.net.DnsResolver.Callback
@@ -1061,16 +1120,16 @@ DnsResolver_DnsException :: struct #raw_union {
 @(private)
 DnsResolver_DnsException__class := Cached_Class{name = "android/net/DnsResolver$DnsException"}
 
-DnsResolver_DnsException_get_code :: proc "contextless" (self: ^DnsResolver_DnsException) -> (result: i32, exception: ^Throwable) {
+DnsResolver_DnsException_get_code :: proc "contextless" (self: ^DnsResolver_DnsException) -> (result: DnsResolver_Error, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &DnsResolver_DnsException__class, "code", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return DnsResolver_Error(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-DnsResolver_DnsException_new :: proc "contextless" (code: i32, cause: ^Throwable) -> (result: ^DnsResolver_DnsException, exception: ^Throwable) { // API level 33
+DnsResolver_DnsException_new :: proc "contextless" (code: DnsResolver_Error, cause: ^Throwable) -> (result: ^DnsResolver_DnsException, exception: ^Throwable) { // API level 33
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &DnsResolver_DnsException__class, "<init>", "(ILjava/lang/Throwable;)V", false) or_return
-	jni_args := [?]android.jvalue{{i = code}, {l = cause}}
+	jni_args := [?]android.jvalue{{i = i32(code)}, {l = cause}}
 	return (^DnsResolver_DnsException)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -1103,10 +1162,10 @@ EthernetNetworkSpecifier_canBeSatisfiedBy :: proc "contextless" (self: ^Ethernet
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-EthernetNetworkSpecifier_describeContents :: proc "contextless" (self: ^EthernetNetworkSpecifier) -> (result: i32, exception: ^Throwable) {
+EthernetNetworkSpecifier_describeContents :: proc "contextless" (self: ^EthernetNetworkSpecifier) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &EthernetNetworkSpecifier__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 EthernetNetworkSpecifier_equals :: proc "contextless" (self: ^EthernetNetworkSpecifier, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -1134,10 +1193,10 @@ EthernetNetworkSpecifier_toString :: proc "contextless" (self: ^EthernetNetworkS
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-EthernetNetworkSpecifier_writeToParcel :: proc "contextless" (self: ^EthernetNetworkSpecifier, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+EthernetNetworkSpecifier_writeToParcel :: proc "contextless" (self: ^EthernetNetworkSpecifier, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &EthernetNetworkSpecifier__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1419,10 +1478,10 @@ IpConfiguration_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Cre
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-IpConfiguration_describeContents :: proc "contextless" (self: ^IpConfiguration) -> (result: i32, exception: ^Throwable) {
+IpConfiguration_describeContents :: proc "contextless" (self: ^IpConfiguration) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &IpConfiguration__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 IpConfiguration_equals :: proc "contextless" (self: ^IpConfiguration, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -1456,10 +1515,10 @@ IpConfiguration_toString :: proc "contextless" (self: ^IpConfiguration) -> (resu
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-IpConfiguration_writeToParcel :: proc "contextless" (self: ^IpConfiguration, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+IpConfiguration_writeToParcel :: proc "contextless" (self: ^IpConfiguration, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &IpConfiguration__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1527,10 +1586,10 @@ IpPrefix_contains :: proc "contextless" (self: ^IpPrefix, address: ^InetAddress)
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-IpPrefix_describeContents :: proc "contextless" (self: ^IpPrefix) -> (result: i32, exception: ^Throwable) {
+IpPrefix_describeContents :: proc "contextless" (self: ^IpPrefix) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &IpPrefix__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 IpPrefix_equals :: proc "contextless" (self: ^IpPrefix, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -1570,10 +1629,10 @@ IpPrefix_toString :: proc "contextless" (self: ^IpPrefix) -> (result: ^String, e
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-IpPrefix_writeToParcel :: proc "contextless" (self: ^IpPrefix, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+IpPrefix_writeToParcel :: proc "contextless" (self: ^IpPrefix, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &IpPrefix__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1624,10 +1683,10 @@ IpSecAlgorithm_new :: proc{
 	IpSecAlgorithm_new_String_ByteArray_int,
 }
 
-IpSecAlgorithm_describeContents :: proc "contextless" (self: ^IpSecAlgorithm) -> (result: i32, exception: ^Throwable) {
+IpSecAlgorithm_describeContents :: proc "contextless" (self: ^IpSecAlgorithm) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &IpSecAlgorithm__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 IpSecAlgorithm_getKey :: proc "contextless" (self: ^IpSecAlgorithm) -> (result: ^ByteArray, exception: ^Throwable) {
@@ -1660,10 +1719,10 @@ IpSecAlgorithm_toString :: proc "contextless" (self: ^IpSecAlgorithm) -> (result
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-IpSecAlgorithm_writeToParcel :: proc "contextless" (self: ^IpSecAlgorithm, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+IpSecAlgorithm_writeToParcel :: proc "contextless" (self: ^IpSecAlgorithm, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &IpSecAlgorithm__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1698,26 +1757,26 @@ IpSecManager_allocateSecurityParameterIndex :: proc{
 	IpSecManager_allocateSecurityParameterIndex_InetAddress_int,
 }
 
-IpSecManager_applyTransportModeTransform_FileDescriptor_int_IpSecTransform :: proc "contextless" (self: ^IpSecManager, socket: ^FileDescriptor, direction: i32, transform: ^IpSecTransform) -> (exception: ^Throwable) {
+IpSecManager_applyTransportModeTransform_FileDescriptor_int_IpSecTransform :: proc "contextless" (self: ^IpSecManager, socket: ^FileDescriptor, direction: IpSecManager_Direction, transform: ^IpSecTransform) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &IpSecManager__class, "applyTransportModeTransform", "(Ljava/io/FileDescriptor;ILandroid/net/IpSecTransform;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = socket}, {i = direction}, {l = transform}}
+	jni_args := [?]android.jvalue{{l = socket}, {i = i32(direction)}, {l = transform}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-IpSecManager_applyTransportModeTransform_DatagramSocket_int_IpSecTransform :: proc "contextless" (self: ^IpSecManager, socket: ^DatagramSocket, direction: i32, transform: ^IpSecTransform) -> (exception: ^Throwable) {
+IpSecManager_applyTransportModeTransform_DatagramSocket_int_IpSecTransform :: proc "contextless" (self: ^IpSecManager, socket: ^DatagramSocket, direction: IpSecManager_Direction, transform: ^IpSecTransform) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &IpSecManager__class, "applyTransportModeTransform", "(Ljava/net/DatagramSocket;ILandroid/net/IpSecTransform;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = socket}, {i = direction}, {l = transform}}
+	jni_args := [?]android.jvalue{{l = socket}, {i = i32(direction)}, {l = transform}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-IpSecManager_applyTransportModeTransform_Socket_int_IpSecTransform :: proc "contextless" (self: ^IpSecManager, socket: ^Socket, direction: i32, transform: ^IpSecTransform) -> (exception: ^Throwable) {
+IpSecManager_applyTransportModeTransform_Socket_int_IpSecTransform :: proc "contextless" (self: ^IpSecManager, socket: ^Socket, direction: IpSecManager_Direction, transform: ^IpSecTransform) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &IpSecManager__class, "applyTransportModeTransform", "(Ljava/net/Socket;ILandroid/net/IpSecTransform;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = socket}, {i = direction}, {l = transform}}
+	jni_args := [?]android.jvalue{{l = socket}, {i = i32(direction)}, {l = transform}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1774,6 +1833,11 @@ IpSecManager_removeTransportModeTransforms :: proc{
 	IpSecManager_removeTransportModeTransforms_FileDescriptor,
 	IpSecManager_removeTransportModeTransforms_DatagramSocket,
 	IpSecManager_removeTransportModeTransforms_Socket,
+}
+
+IpSecManager_Direction :: enum i32 {
+	IN  = 0,
+	OUT = 1,
 }
 
 // class android.net.IpSecManager.ResourceUnavailableException
@@ -1962,10 +2026,10 @@ IpSecTransformState_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-IpSecTransformState_describeContents :: proc "contextless" (self: ^IpSecTransformState) -> (result: i32, exception: ^Throwable) {
+IpSecTransformState_describeContents :: proc "contextless" (self: ^IpSecTransformState) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &IpSecTransformState__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 IpSecTransformState_getByteCount :: proc "contextless" (self: ^IpSecTransformState) -> (result: i64, exception: ^Throwable) {
@@ -2004,10 +2068,10 @@ IpSecTransformState_getTxHighestSequenceNumber :: proc "contextless" (self: ^IpS
 	return jni_env->CallLongMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-IpSecTransformState_writeToParcel :: proc "contextless" (self: ^IpSecTransformState, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+IpSecTransformState_writeToParcel :: proc "contextless" (self: ^IpSecTransformState, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &IpSecTransformState__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -2104,10 +2168,10 @@ L2capNetworkSpecifier_canBeSatisfiedBy :: proc "contextless" (self: ^L2capNetwor
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-L2capNetworkSpecifier_describeContents :: proc "contextless" (self: ^L2capNetworkSpecifier) -> (result: i32, exception: ^Throwable) {
+L2capNetworkSpecifier_describeContents :: proc "contextless" (self: ^L2capNetworkSpecifier) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &L2capNetworkSpecifier__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 L2capNetworkSpecifier_equals :: proc "contextless" (self: ^L2capNetworkSpecifier, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -2117,10 +2181,10 @@ L2capNetworkSpecifier_equals :: proc "contextless" (self: ^L2capNetworkSpecifier
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-L2capNetworkSpecifier_getHeaderCompression :: proc "contextless" (self: ^L2capNetworkSpecifier) -> (result: i32, exception: ^Throwable) {
+L2capNetworkSpecifier_getHeaderCompression :: proc "contextless" (self: ^L2capNetworkSpecifier) -> (result: L2capNetworkSpecifier_HeaderCompression, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &L2capNetworkSpecifier__class, "getHeaderCompression", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return L2capNetworkSpecifier_HeaderCompression(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 L2capNetworkSpecifier_getPsm :: proc "contextless" (self: ^L2capNetworkSpecifier) -> (result: i32, exception: ^Throwable) {
@@ -2135,10 +2199,10 @@ L2capNetworkSpecifier_getRemoteAddress :: proc "contextless" (self: ^L2capNetwor
 	return (^MacAddress)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-L2capNetworkSpecifier_getRole :: proc "contextless" (self: ^L2capNetworkSpecifier) -> (result: i32, exception: ^Throwable) {
+L2capNetworkSpecifier_getRole :: proc "contextless" (self: ^L2capNetworkSpecifier) -> (result: L2capNetworkSpecifier_Role, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &L2capNetworkSpecifier__class, "getRole", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return L2capNetworkSpecifier_Role(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 L2capNetworkSpecifier_hashCode :: proc "contextless" (self: ^L2capNetworkSpecifier) -> (result: i32, exception: ^Throwable) {
@@ -2159,12 +2223,24 @@ L2capNetworkSpecifier_toString :: proc "contextless" (self: ^L2capNetworkSpecifi
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-L2capNetworkSpecifier_writeToParcel :: proc "contextless" (self: ^L2capNetworkSpecifier, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+L2capNetworkSpecifier_writeToParcel :: proc "contextless" (self: ^L2capNetworkSpecifier, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &L2capNetworkSpecifier__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+L2capNetworkSpecifier_HeaderCompression :: enum i32 {
+	_6LOWPAN = 2,
+	ANY      = 0,
+	NONE     = 1,
+}
+
+L2capNetworkSpecifier_Role :: enum i32 {
+	ANY    = 0,
+	CLIENT = 1,
+	SERVER = 2,
 }
 
 // class android.net.L2capNetworkSpecifier.Builder // API level 36
@@ -2187,10 +2263,10 @@ L2capNetworkSpecifier_Builder_build :: proc "contextless" (self: ^L2capNetworkSp
 	return (^L2capNetworkSpecifier)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-L2capNetworkSpecifier_Builder_setHeaderCompression :: proc "contextless" (self: ^L2capNetworkSpecifier_Builder, headerCompression: i32) -> (result: ^L2capNetworkSpecifier_Builder, exception: ^Throwable) {
+L2capNetworkSpecifier_Builder_setHeaderCompression :: proc "contextless" (self: ^L2capNetworkSpecifier_Builder, headerCompression: L2capNetworkSpecifier_HeaderCompression) -> (result: ^L2capNetworkSpecifier_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &L2capNetworkSpecifier_Builder__class, "setHeaderCompression", "(I)Landroid/net/L2capNetworkSpecifier$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = headerCompression}}
+	jni_args := [?]android.jvalue{{i = i32(headerCompression)}}
 	return (^L2capNetworkSpecifier_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -2208,10 +2284,10 @@ L2capNetworkSpecifier_Builder_setRemoteAddress :: proc "contextless" (self: ^L2c
 	return (^L2capNetworkSpecifier_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-L2capNetworkSpecifier_Builder_setRole :: proc "contextless" (self: ^L2capNetworkSpecifier_Builder, role: i32) -> (result: ^L2capNetworkSpecifier_Builder, exception: ^Throwable) {
+L2capNetworkSpecifier_Builder_setRole :: proc "contextless" (self: ^L2capNetworkSpecifier_Builder, role: L2capNetworkSpecifier_Role) -> (result: ^L2capNetworkSpecifier_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &L2capNetworkSpecifier_Builder__class, "setRole", "(I)Landroid/net/L2capNetworkSpecifier$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = role}}
+	jni_args := [?]android.jvalue{{i = i32(role)}}
 	return (^L2capNetworkSpecifier_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -2230,10 +2306,10 @@ LinkAddress_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creator
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-LinkAddress_describeContents :: proc "contextless" (self: ^LinkAddress) -> (result: i32, exception: ^Throwable) {
+LinkAddress_describeContents :: proc "contextless" (self: ^LinkAddress) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &LinkAddress__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 LinkAddress_equals :: proc "contextless" (self: ^LinkAddress, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -2279,10 +2355,10 @@ LinkAddress_toString :: proc "contextless" (self: ^LinkAddress) -> (result: ^Str
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-LinkAddress_writeToParcel :: proc "contextless" (self: ^LinkAddress, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+LinkAddress_writeToParcel :: proc "contextless" (self: ^LinkAddress, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &LinkAddress__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -2322,10 +2398,10 @@ LinkProperties_clear :: proc "contextless" (self: ^LinkProperties) -> (exception
 	return jni_take(jni_env)
 }
 
-LinkProperties_describeContents :: proc "contextless" (self: ^LinkProperties) -> (result: i32, exception: ^Throwable) {
+LinkProperties_describeContents :: proc "contextless" (self: ^LinkProperties) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &LinkProperties__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 LinkProperties_equals :: proc "contextless" (self: ^LinkProperties, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -2483,10 +2559,10 @@ LinkProperties_toString :: proc "contextless" (self: ^LinkProperties) -> (result
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-LinkProperties_writeToParcel :: proc "contextless" (self: ^LinkProperties, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+LinkProperties_writeToParcel :: proc "contextless" (self: ^LinkProperties, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &LinkProperties__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -2565,10 +2641,10 @@ LocalSocket_new_void :: proc "contextless" () -> (result: ^LocalSocket, exceptio
 	return (^LocalSocket)(jni_env->NewObjectA(jni_class, jni_id, nil)), jni_take(jni_env)
 }
 
-LocalSocket_new_int :: proc "contextless" (sockType: i32) -> (result: ^LocalSocket, exception: ^Throwable) {
+LocalSocket_new_int :: proc "contextless" (sockType: LocalSocket_Type) -> (result: ^LocalSocket, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &LocalSocket__class, "<init>", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = sockType}}
+	jni_args := [?]android.jvalue{{i = i32(sockType)}}
 	return (^LocalSocket)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -2755,6 +2831,12 @@ LocalSocket_toString :: proc "contextless" (self: ^LocalSocket) -> (result: ^Str
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
+LocalSocket_Type :: enum i32 {
+	DGRAM     = 1,
+	SEQPACKET = 3,
+	STREAM    = 2,
+}
+
 // class android.net.LocalSocketAddress
 LocalSocketAddress :: struct #raw_union {
 	using Object: Object,
@@ -2858,10 +2940,10 @@ MacAddress_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creator,
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-MacAddress_describeContents :: proc "contextless" (self: ^MacAddress) -> (result: i32, exception: ^Throwable) {
+MacAddress_describeContents :: proc "contextless" (self: ^MacAddress) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MacAddress__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 MacAddress_equals :: proc "contextless" (self: ^MacAddress, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -2885,10 +2967,10 @@ MacAddress_fromString :: proc "contextless" (addr: ^String) -> (result: ^MacAddr
 	return (^MacAddress)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-MacAddress_getAddressType :: proc "contextless" (self: ^MacAddress) -> (result: i32, exception: ^Throwable) {
+MacAddress_getAddressType :: proc "contextless" (self: ^MacAddress) -> (result: MacAddress_Type, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MacAddress__class, "getAddressType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return MacAddress_Type(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 MacAddress_getLinkLocalIpv6FromEui48Mac :: proc "contextless" (self: ^MacAddress) -> (result: ^Inet6Address, exception: ^Throwable) { // API level 30
@@ -2934,12 +3016,18 @@ MacAddress_toString :: proc "contextless" (self: ^MacAddress) -> (result: ^Strin
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-MacAddress_writeToParcel :: proc "contextless" (self: ^MacAddress, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+MacAddress_writeToParcel :: proc "contextless" (self: ^MacAddress, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MacAddress__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+MacAddress_Type :: enum i32 {
+	BROADCAST = 3,
+	MULTICAST = 2,
+	UNICAST   = 1,
 }
 
 // class android.net.MailTo
@@ -3047,10 +3135,10 @@ Network_bindSocket :: proc{
 	Network_bindSocket_Socket,
 }
 
-Network_describeContents :: proc "contextless" (self: ^Network) -> (result: i32, exception: ^Throwable) {
+Network_describeContents :: proc "contextless" (self: ^Network) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Network__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Network_equals :: proc "contextless" (self: ^Network, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -3124,10 +3212,10 @@ Network_toString :: proc "contextless" (self: ^Network) -> (result: ^String, exc
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Network_writeToParcel :: proc "contextless" (self: ^Network, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+Network_writeToParcel :: proc "contextless" (self: ^Network, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Network__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -3214,10 +3302,10 @@ NetworkCapabilities_new :: proc{
 	NetworkCapabilities_new_NetworkCapabilities,
 }
 
-NetworkCapabilities_describeContents :: proc "contextless" (self: ^NetworkCapabilities) -> (result: i32, exception: ^Throwable) {
+NetworkCapabilities_describeContents :: proc "contextless" (self: ^NetworkCapabilities) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &NetworkCapabilities__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 NetworkCapabilities_equals :: proc "contextless" (self: ^NetworkCapabilities, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -3281,24 +3369,24 @@ NetworkCapabilities_getTransportInfo :: proc "contextless" (self: ^NetworkCapabi
 	return (^TransportInfo)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-NetworkCapabilities_hasCapability :: proc "contextless" (self: ^NetworkCapabilities, capability: i32) -> (result: bool, exception: ^Throwable) {
+NetworkCapabilities_hasCapability :: proc "contextless" (self: ^NetworkCapabilities, capability: NetworkCapabilities_NetCapability) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &NetworkCapabilities__class, "hasCapability", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = capability}}
+	jni_args := [?]android.jvalue{{i = i32(capability)}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-NetworkCapabilities_hasEnterpriseId :: proc "contextless" (self: ^NetworkCapabilities, enterpriseId: i32) -> (result: bool, exception: ^Throwable) { // API level 33
+NetworkCapabilities_hasEnterpriseId :: proc "contextless" (self: ^NetworkCapabilities, enterpriseId: NetworkCapabilities_NetEnterpriseId) -> (result: bool, exception: ^Throwable) { // API level 33
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &NetworkCapabilities__class, "hasEnterpriseId", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = enterpriseId}}
+	jni_args := [?]android.jvalue{{i = i32(enterpriseId)}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-NetworkCapabilities_hasTransport :: proc "contextless" (self: ^NetworkCapabilities, transportType: i32) -> (result: bool, exception: ^Throwable) {
+NetworkCapabilities_hasTransport :: proc "contextless" (self: ^NetworkCapabilities, transportType: NetworkCapabilities_Transport) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &NetworkCapabilities__class, "hasTransport", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = transportType}}
+	jni_args := [?]android.jvalue{{i = i32(transportType)}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -3314,12 +3402,68 @@ NetworkCapabilities_toString :: proc "contextless" (self: ^NetworkCapabilities) 
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-NetworkCapabilities_writeToParcel :: proc "contextless" (self: ^NetworkCapabilities, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+NetworkCapabilities_writeToParcel :: proc "contextless" (self: ^NetworkCapabilities, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &NetworkCapabilities__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+NetworkCapabilities_NetCapability :: enum i32 {
+	CAPTIVE_PORTAL                    = 17,
+	CBS                               = 5,
+	DUN                               = 2,
+	EIMS                              = 10,
+	ENTERPRISE                        = 29,
+	FOREGROUND                        = 19,
+	FOTA                              = 3,
+	HEAD_UNIT                         = 32,
+	IA                                = 7,
+	IMS                               = 4,
+	INTERNET                          = 12,
+	LOCAL_NETWORK                     = 36,
+	MCX                               = 23,
+	MMS                               = 0,
+	MMTEL                             = 33,
+	NOT_BANDWIDTH_CONSTRAINED         = 37,
+	NOT_CONGESTED                     = 20,
+	NOT_METERED                       = 11,
+	NOT_RESTRICTED                    = 13,
+	NOT_ROAMING                       = 18,
+	NOT_SUSPENDED                     = 21,
+	NOT_VPN                           = 15,
+	PRIORITIZE_BANDWIDTH              = 35,
+	PRIORITIZE_LATENCY                = 34,
+	PRIORITIZE_UNIFIED_COMMUNICATIONS = 38,
+	RCS                               = 8,
+	SUPL                              = 1,
+	TEMPORARILY_NOT_METERED           = 25,
+	TRUSTED                           = 14,
+	VALIDATED                         = 16,
+	WIFI_P2P                          = 6,
+	XCAP                              = 9,
+}
+
+NetworkCapabilities_NetEnterpriseId :: enum i32 {
+	_1 = 1,
+	_2 = 2,
+	_3 = 3,
+	_4 = 4,
+	_5 = 5,
+}
+
+NetworkCapabilities_Transport :: enum i32 {
+	BLUETOOTH  = 2,
+	CELLULAR   = 0,
+	ETHERNET   = 3,
+	LOWPAN     = 6,
+	SATELLITE  = 10,
+	THREAD     = 9,
+	USB        = 8,
+	VPN        = 4,
+	WIFI       = 1,
+	WIFI_AWARE = 5,
 }
 
 // class android.net.NetworkInfo
@@ -3337,17 +3481,17 @@ NetworkInfo_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creator
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-NetworkInfo_new :: proc "contextless" (type: i32, subtype: i32, typeName: ^String, subtypeName: ^String) -> (result: ^NetworkInfo, exception: ^Throwable) { // API level 30
+NetworkInfo_new :: proc "contextless" (type: ConnectivityManager_Type, subtype: i32, typeName: ^String, subtypeName: ^String) -> (result: ^NetworkInfo, exception: ^Throwable) { // API level 30
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &NetworkInfo__class, "<init>", "(IILjava/lang/String;Ljava/lang/String;)V", false) or_return
-	jni_args := [?]android.jvalue{{i = type}, {i = subtype}, {l = typeName}, {l = subtypeName}}
+	jni_args := [?]android.jvalue{{i = i32(type)}, {i = subtype}, {l = typeName}, {l = subtypeName}}
 	return (^NetworkInfo)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-NetworkInfo_describeContents :: proc "contextless" (self: ^NetworkInfo) -> (result: i32, exception: ^Throwable) {
+NetworkInfo_describeContents :: proc "contextless" (self: ^NetworkInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &NetworkInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 NetworkInfo_getDetailedState :: proc "contextless" (self: ^NetworkInfo) -> (result: ^NetworkInfo_DetailedState, exception: ^Throwable) {
@@ -3386,10 +3530,10 @@ NetworkInfo_getSubtypeName :: proc "contextless" (self: ^NetworkInfo) -> (result
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-NetworkInfo_getType :: proc "contextless" (self: ^NetworkInfo) -> (result: i32, exception: ^Throwable) {
+NetworkInfo_getType :: proc "contextless" (self: ^NetworkInfo) -> (result: ConnectivityManager_Type, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &NetworkInfo__class, "getType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return ConnectivityManager_Type(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 NetworkInfo_getTypeName :: proc "contextless" (self: ^NetworkInfo) -> (result: ^String, exception: ^Throwable) {
@@ -3442,10 +3586,10 @@ NetworkInfo_toString :: proc "contextless" (self: ^NetworkInfo) -> (result: ^Str
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-NetworkInfo_writeToParcel :: proc "contextless" (self: ^NetworkInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+NetworkInfo_writeToParcel :: proc "contextless" (self: ^NetworkInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &NetworkInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -3628,10 +3772,10 @@ NetworkRequest_canBeSatisfiedBy :: proc "contextless" (self: ^NetworkRequest, nc
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-NetworkRequest_describeContents :: proc "contextless" (self: ^NetworkRequest) -> (result: i32, exception: ^Throwable) {
+NetworkRequest_describeContents :: proc "contextless" (self: ^NetworkRequest) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &NetworkRequest__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 NetworkRequest_equals :: proc "contextless" (self: ^NetworkRequest, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -3665,17 +3809,17 @@ NetworkRequest_getTransportTypes :: proc "contextless" (self: ^NetworkRequest) -
 	return (^IntArray)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-NetworkRequest_hasCapability :: proc "contextless" (self: ^NetworkRequest, capability: i32) -> (result: bool, exception: ^Throwable) {
+NetworkRequest_hasCapability :: proc "contextless" (self: ^NetworkRequest, capability: NetworkCapabilities_NetCapability) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &NetworkRequest__class, "hasCapability", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = capability}}
+	jni_args := [?]android.jvalue{{i = i32(capability)}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-NetworkRequest_hasTransport :: proc "contextless" (self: ^NetworkRequest, transportType: i32) -> (result: bool, exception: ^Throwable) {
+NetworkRequest_hasTransport :: proc "contextless" (self: ^NetworkRequest, transportType: NetworkCapabilities_Transport) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &NetworkRequest__class, "hasTransport", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = transportType}}
+	jni_args := [?]android.jvalue{{i = i32(transportType)}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -3691,10 +3835,10 @@ NetworkRequest_toString :: proc "contextless" (self: ^NetworkRequest) -> (result
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-NetworkRequest_writeToParcel :: proc "contextless" (self: ^NetworkRequest, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+NetworkRequest_writeToParcel :: proc "contextless" (self: ^NetworkRequest, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &NetworkRequest__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -3725,17 +3869,17 @@ NetworkRequest_Builder_new :: proc{
 	NetworkRequest_Builder_new_NetworkRequest,
 }
 
-NetworkRequest_Builder_addCapability :: proc "contextless" (self: ^NetworkRequest_Builder, capability: i32) -> (result: ^NetworkRequest_Builder, exception: ^Throwable) {
+NetworkRequest_Builder_addCapability :: proc "contextless" (self: ^NetworkRequest_Builder, capability: NetworkCapabilities_NetCapability) -> (result: ^NetworkRequest_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &NetworkRequest_Builder__class, "addCapability", "(I)Landroid/net/NetworkRequest$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = capability}}
+	jni_args := [?]android.jvalue{{i = i32(capability)}}
 	return (^NetworkRequest_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-NetworkRequest_Builder_addTransportType :: proc "contextless" (self: ^NetworkRequest_Builder, transportType: i32) -> (result: ^NetworkRequest_Builder, exception: ^Throwable) {
+NetworkRequest_Builder_addTransportType :: proc "contextless" (self: ^NetworkRequest_Builder, transportType: NetworkCapabilities_Transport) -> (result: ^NetworkRequest_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &NetworkRequest_Builder__class, "addTransportType", "(I)Landroid/net/NetworkRequest$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = transportType}}
+	jni_args := [?]android.jvalue{{i = i32(transportType)}}
 	return (^NetworkRequest_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -3751,17 +3895,17 @@ NetworkRequest_Builder_clearCapabilities :: proc "contextless" (self: ^NetworkRe
 	return (^NetworkRequest_Builder)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-NetworkRequest_Builder_removeCapability :: proc "contextless" (self: ^NetworkRequest_Builder, capability: i32) -> (result: ^NetworkRequest_Builder, exception: ^Throwable) {
+NetworkRequest_Builder_removeCapability :: proc "contextless" (self: ^NetworkRequest_Builder, capability: NetworkCapabilities_NetCapability) -> (result: ^NetworkRequest_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &NetworkRequest_Builder__class, "removeCapability", "(I)Landroid/net/NetworkRequest$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = capability}}
+	jni_args := [?]android.jvalue{{i = i32(capability)}}
 	return (^NetworkRequest_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-NetworkRequest_Builder_removeTransportType :: proc "contextless" (self: ^NetworkRequest_Builder, transportType: i32) -> (result: ^NetworkRequest_Builder, exception: ^Throwable) {
+NetworkRequest_Builder_removeTransportType :: proc "contextless" (self: ^NetworkRequest_Builder, transportType: NetworkCapabilities_Transport) -> (result: ^NetworkRequest_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &NetworkRequest_Builder__class, "removeTransportType", "(I)Landroid/net/NetworkRequest$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = transportType}}
+	jni_args := [?]android.jvalue{{i = i32(transportType)}}
 	return (^NetworkRequest_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -3864,10 +4008,10 @@ PlatformVpnProfile_areLocalRoutesExcluded :: proc "contextless" (self: ^Platform
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-PlatformVpnProfile_getType :: proc "contextless" (self: ^PlatformVpnProfile) -> (result: i32, exception: ^Throwable) {
+PlatformVpnProfile_getType :: proc "contextless" (self: ^PlatformVpnProfile) -> (result: PlatformVpnProfile_TypeIkev2Ipsec, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PlatformVpnProfile__class, "getType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return PlatformVpnProfile_TypeIkev2Ipsec(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 PlatformVpnProfile_getTypeString :: proc "contextless" (self: ^PlatformVpnProfile) -> (result: ^String, exception: ^Throwable) {
@@ -3880,6 +4024,12 @@ PlatformVpnProfile_isInternetValidationRequired :: proc "contextless" (self: ^Pl
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PlatformVpnProfile__class, "isInternetValidationRequired", "()Z", false) or_return
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
+}
+
+PlatformVpnProfile_TypeIkev2Ipsec :: enum i32 {
+	PSK       = 7,
+	RSA       = 8,
+	USER_PASS = 6,
 }
 
 // class android.net.Proxy
@@ -3984,10 +4134,10 @@ ProxyInfo_buildPacProxy :: proc{
 	ProxyInfo_buildPacProxy_Uri_int,
 }
 
-ProxyInfo_describeContents :: proc "contextless" (self: ^ProxyInfo) -> (result: i32, exception: ^Throwable) {
+ProxyInfo_describeContents :: proc "contextless" (self: ^ProxyInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ProxyInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ProxyInfo_equals :: proc "contextless" (self: ^ProxyInfo, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -4039,10 +4189,10 @@ ProxyInfo_toString :: proc "contextless" (self: ^ProxyInfo) -> (result: ^String,
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ProxyInfo_writeToParcel :: proc "contextless" (self: ^ProxyInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+ProxyInfo_writeToParcel :: proc "contextless" (self: ^ProxyInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ProxyInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4066,10 +4216,10 @@ RouteInfo_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creator, 
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-RouteInfo_describeContents :: proc "contextless" (self: ^RouteInfo) -> (result: i32, exception: ^Throwable) {
+RouteInfo_describeContents :: proc "contextless" (self: ^RouteInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &RouteInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 RouteInfo_equals :: proc "contextless" (self: ^RouteInfo, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -4097,10 +4247,10 @@ RouteInfo_getInterface :: proc "contextless" (self: ^RouteInfo) -> (result: ^Str
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-RouteInfo_getType :: proc "contextless" (self: ^RouteInfo) -> (result: i32, exception: ^Throwable) { // API level 33
+RouteInfo_getType :: proc "contextless" (self: ^RouteInfo) -> (result: RouteInfo_Rtn, exception: ^Throwable) { // API level 33
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &RouteInfo__class, "getType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return RouteInfo_Rtn(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 RouteInfo_hasGateway :: proc "contextless" (self: ^RouteInfo) -> (result: bool, exception: ^Throwable) {
@@ -4134,12 +4284,18 @@ RouteInfo_toString :: proc "contextless" (self: ^RouteInfo) -> (result: ^String,
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-RouteInfo_writeToParcel :: proc "contextless" (self: ^RouteInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+RouteInfo_writeToParcel :: proc "contextless" (self: ^RouteInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &RouteInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+RouteInfo_Rtn :: enum i32 {
+	THROW       = 9,
+	UNICAST     = 1,
+	UNREACHABLE = 7,
 }
 
 // class android.net.SSLCertificateSocketFactory
@@ -4361,6 +4517,16 @@ SocketKeepalive_stop :: proc "contextless" (self: ^SocketKeepalive) -> (exceptio
 	return jni_take(jni_env)
 }
 
+SocketKeepalive_Error :: enum i32 {
+	INVALID_INTERVAL   = -24,
+	INVALID_IP_ADDRESS = -21,
+	INVALID_LENGTH     = -23,
+	INVALID_NETWORK    = -20,
+	INVALID_PORT       = -22,
+	INVALID_SOCKET     = -25,
+	SOCKET_NOT_IDLE    = -26,
+}
+
 // class android.net.SocketKeepalive.Callback
 SocketKeepalive_Callback :: struct #raw_union {
 	using Object: Object,
@@ -4382,10 +4548,10 @@ SocketKeepalive_Callback_onDataReceived :: proc "contextless" (self: ^SocketKeep
 	return jni_take(jni_env)
 }
 
-SocketKeepalive_Callback_onError :: proc "contextless" (self: ^SocketKeepalive_Callback, error: i32) -> (exception: ^Throwable) {
+SocketKeepalive_Callback_onError :: proc "contextless" (self: ^SocketKeepalive_Callback, error: SocketKeepalive_Error) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SocketKeepalive_Callback__class, "onError", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = error}}
+	jni_args := [?]android.jvalue{{i = i32(error)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4419,10 +4585,10 @@ StaticIpConfiguration_get_CREATOR :: proc "contextless" () -> (result: ^Parcelab
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-StaticIpConfiguration_describeContents :: proc "contextless" (self: ^StaticIpConfiguration) -> (result: i32, exception: ^Throwable) {
+StaticIpConfiguration_describeContents :: proc "contextless" (self: ^StaticIpConfiguration) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &StaticIpConfiguration__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 StaticIpConfiguration_equals :: proc "contextless" (self: ^StaticIpConfiguration, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -4468,10 +4634,10 @@ StaticIpConfiguration_toString :: proc "contextless" (self: ^StaticIpConfigurati
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-StaticIpConfiguration_writeToParcel :: proc "contextless" (self: ^StaticIpConfiguration, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+StaticIpConfiguration_writeToParcel :: proc "contextless" (self: ^StaticIpConfiguration, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &StaticIpConfiguration__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4539,10 +4705,10 @@ TelephonyNetworkSpecifier_get_CREATOR :: proc "contextless" () -> (result: ^Parc
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-TelephonyNetworkSpecifier_describeContents :: proc "contextless" (self: ^TelephonyNetworkSpecifier) -> (result: i32, exception: ^Throwable) {
+TelephonyNetworkSpecifier_describeContents :: proc "contextless" (self: ^TelephonyNetworkSpecifier) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TelephonyNetworkSpecifier__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 TelephonyNetworkSpecifier_equals :: proc "contextless" (self: ^TelephonyNetworkSpecifier, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -4570,10 +4736,10 @@ TelephonyNetworkSpecifier_toString :: proc "contextless" (self: ^TelephonyNetwor
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-TelephonyNetworkSpecifier_writeToParcel :: proc "contextless" (self: ^TelephonyNetworkSpecifier, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+TelephonyNetworkSpecifier_writeToParcel :: proc "contextless" (self: ^TelephonyNetworkSpecifier, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TelephonyNetworkSpecifier__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4620,17 +4786,17 @@ TetheringInterface_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-TetheringInterface_new_int_String :: proc "contextless" (type: i32, iface: ^String) -> (result: ^TetheringInterface, exception: ^Throwable) {
+TetheringInterface_new_int_String :: proc "contextless" (type: TetheringManager_Type, iface: ^String) -> (result: ^TetheringInterface, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &TetheringInterface__class, "<init>", "(ILjava/lang/String;)V", false) or_return
-	jni_args := [?]android.jvalue{{i = type}, {l = iface}}
+	jni_args := [?]android.jvalue{{i = i32(type)}, {l = iface}}
 	return (^TetheringInterface)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-TetheringInterface_new_int_String_SoftApConfiguration :: proc "contextless" (type: i32, iface: ^String, softApConfig: ^SoftApConfiguration) -> (result: ^TetheringInterface, exception: ^Throwable) {
+TetheringInterface_new_int_String_SoftApConfiguration :: proc "contextless" (type: TetheringManager_Type, iface: ^String, softApConfig: ^SoftApConfiguration) -> (result: ^TetheringInterface, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &TetheringInterface__class, "<init>", "(ILjava/lang/String;Landroid/net/wifi/SoftApConfiguration;)V", false) or_return
-	jni_args := [?]android.jvalue{{i = type}, {l = iface}, {l = softApConfig}}
+	jni_args := [?]android.jvalue{{i = i32(type)}, {l = iface}, {l = softApConfig}}
 	return (^TetheringInterface)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4639,10 +4805,10 @@ TetheringInterface_new :: proc{
 	TetheringInterface_new_int_String_SoftApConfiguration,
 }
 
-TetheringInterface_describeContents :: proc "contextless" (self: ^TetheringInterface) -> (result: i32, exception: ^Throwable) {
+TetheringInterface_describeContents :: proc "contextless" (self: ^TetheringInterface) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TetheringInterface__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 TetheringInterface_equals :: proc "contextless" (self: ^TetheringInterface, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -4664,10 +4830,10 @@ TetheringInterface_getSoftApConfiguration :: proc "contextless" (self: ^Tetherin
 	return (^SoftApConfiguration)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-TetheringInterface_getType :: proc "contextless" (self: ^TetheringInterface) -> (result: i32, exception: ^Throwable) {
+TetheringInterface_getType :: proc "contextless" (self: ^TetheringInterface) -> (result: TetheringManager_Type, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TetheringInterface__class, "getType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return TetheringManager_Type(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 TetheringInterface_hashCode :: proc "contextless" (self: ^TetheringInterface) -> (result: i32, exception: ^Throwable) {
@@ -4682,10 +4848,10 @@ TetheringInterface_toString :: proc "contextless" (self: ^TetheringInterface) ->
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-TetheringInterface_writeToParcel :: proc "contextless" (self: ^TetheringInterface, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+TetheringInterface_writeToParcel :: proc "contextless" (self: ^TetheringInterface, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TetheringInterface__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4752,6 +4918,21 @@ TetheringManager_unregisterTetheringEventCallback :: proc "contextless" (self: ^
 	return jni_take(jni_env)
 }
 
+TetheringManager_Type :: enum i32 {
+	TETHERING_WIFI = 0,
+}
+
+TetheringManager_TetherError :: enum i32 {
+	DUPLICATE_REQUEST              = 18,
+	INTERNAL_ERROR                 = 5,
+	NO_CHANGE_TETHERING_PERMISSION = 14,
+	NO_ERROR                       = 0,
+	SERVICE_UNAVAIL                = 2,
+	UNKNOWN_REQUEST                = 17,
+	UNKNOWN_TYPE                   = 16,
+	UNSUPPORTED                    = 3,
+}
+
 // interface android.net.TetheringManager.StartTetheringCallback // API level 36
 TetheringManager_StartTetheringCallback :: struct #raw_union {
 	using Object: Object,
@@ -4760,10 +4941,10 @@ TetheringManager_StartTetheringCallback :: struct #raw_union {
 @(private)
 TetheringManager_StartTetheringCallback__class := Cached_Class{name = "android/net/TetheringManager$StartTetheringCallback"}
 
-TetheringManager_StartTetheringCallback_onTetheringFailed :: proc "contextless" (self: ^TetheringManager_StartTetheringCallback, error: i32) -> (exception: ^Throwable) {
+TetheringManager_StartTetheringCallback_onTetheringFailed :: proc "contextless" (self: ^TetheringManager_StartTetheringCallback, error: TetheringManager_TetherError) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TetheringManager_StartTetheringCallback__class, "onTetheringFailed", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = error}}
+	jni_args := [?]android.jvalue{{i = i32(error)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4783,10 +4964,10 @@ TetheringManager_StopTetheringCallback :: struct #raw_union {
 @(private)
 TetheringManager_StopTetheringCallback__class := Cached_Class{name = "android/net/TetheringManager$StopTetheringCallback"}
 
-TetheringManager_StopTetheringCallback_onStopTetheringFailed :: proc "contextless" (self: ^TetheringManager_StopTetheringCallback, error: i32) -> (exception: ^Throwable) {
+TetheringManager_StopTetheringCallback_onStopTetheringFailed :: proc "contextless" (self: ^TetheringManager_StopTetheringCallback, error: TetheringManager_TetherError) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TetheringManager_StopTetheringCallback__class, "onStopTetheringFailed", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = error}}
+	jni_args := [?]android.jvalue{{i = i32(error)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4829,10 +5010,10 @@ TetheringManager_TetheringRequest_get_CREATOR :: proc "contextless" () -> (resul
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-TetheringManager_TetheringRequest_describeContents :: proc "contextless" (self: ^TetheringManager_TetheringRequest) -> (result: i32, exception: ^Throwable) {
+TetheringManager_TetheringRequest_describeContents :: proc "contextless" (self: ^TetheringManager_TetheringRequest) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TetheringManager_TetheringRequest__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 TetheringManager_TetheringRequest_equals :: proc "contextless" (self: ^TetheringManager_TetheringRequest, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -4860,10 +5041,10 @@ TetheringManager_TetheringRequest_toString :: proc "contextless" (self: ^Tetheri
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-TetheringManager_TetheringRequest_writeToParcel :: proc "contextless" (self: ^TetheringManager_TetheringRequest, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+TetheringManager_TetheringRequest_writeToParcel :: proc "contextless" (self: ^TetheringManager_TetheringRequest, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TetheringManager_TetheringRequest__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4876,10 +5057,10 @@ TetheringManager_TetheringRequest_Builder :: struct #raw_union {
 @(private)
 TetheringManager_TetheringRequest_Builder__class := Cached_Class{name = "android/net/TetheringManager$TetheringRequest$Builder"}
 
-TetheringManager_TetheringRequest_Builder_new :: proc "contextless" (type: i32) -> (result: ^TetheringManager_TetheringRequest_Builder, exception: ^Throwable) {
+TetheringManager_TetheringRequest_Builder_new :: proc "contextless" (type: TetheringManager_Type) -> (result: ^TetheringManager_TetheringRequest_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &TetheringManager_TetheringRequest_Builder__class, "<init>", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = type}}
+	jni_args := [?]android.jvalue{{i = i32(type)}}
 	return (^TetheringManager_TetheringRequest_Builder)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -5994,17 +6175,17 @@ VpnProfileState_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Cre
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-VpnProfileState_new :: proc "contextless" (state: i32, sessionKey: ^String, alwaysOn: bool, lockdown: bool) -> (result: ^VpnProfileState, exception: ^Throwable) {
+VpnProfileState_new :: proc "contextless" (state: VpnProfileState_State, sessionKey: ^String, alwaysOn: bool, lockdown: bool) -> (result: ^VpnProfileState, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &VpnProfileState__class, "<init>", "(ILjava/lang/String;ZZ)V", false) or_return
-	jni_args := [?]android.jvalue{{i = state}, {l = sessionKey}, {z = android.jboolean(alwaysOn)}, {z = android.jboolean(lockdown)}}
+	jni_args := [?]android.jvalue{{i = i32(state)}, {l = sessionKey}, {z = android.jboolean(alwaysOn)}, {z = android.jboolean(lockdown)}}
 	return (^VpnProfileState)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-VpnProfileState_describeContents :: proc "contextless" (self: ^VpnProfileState) -> (result: i32, exception: ^Throwable) {
+VpnProfileState_describeContents :: proc "contextless" (self: ^VpnProfileState) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VpnProfileState__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 VpnProfileState_equals :: proc "contextless" (self: ^VpnProfileState, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -6020,10 +6201,10 @@ VpnProfileState_getSessionId :: proc "contextless" (self: ^VpnProfileState) -> (
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-VpnProfileState_getState :: proc "contextless" (self: ^VpnProfileState) -> (result: i32, exception: ^Throwable) {
+VpnProfileState_getState :: proc "contextless" (self: ^VpnProfileState) -> (result: VpnProfileState_State, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VpnProfileState__class, "getState", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return VpnProfileState_State(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 VpnProfileState_hashCode :: proc "contextless" (self: ^VpnProfileState) -> (result: i32, exception: ^Throwable) {
@@ -6050,12 +6231,19 @@ VpnProfileState_toString :: proc "contextless" (self: ^VpnProfileState) -> (resu
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-VpnProfileState_writeToParcel :: proc "contextless" (self: ^VpnProfileState, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+VpnProfileState_writeToParcel :: proc "contextless" (self: ^VpnProfileState, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VpnProfileState__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+VpnProfileState_State :: enum i32 {
+	CONNECTED    = 2,
+	CONNECTING   = 1,
+	DISCONNECTED = 0,
+	FAILED       = 3,
 }
 
 // class android.net.VpnService

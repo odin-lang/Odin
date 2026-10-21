@@ -8,11 +8,11 @@ ANativeWindow_clearFrameRate :: proc "contextless" (window: ^ANativeWindow) -> i
 	return ANativeWindow_setFrameRateWithChangeStrategy(
 		window,
 		0,
-		ANATIVEWINDOW_FRAME_RATE_COMPATIBILITY_DEFAULT,
-		ANATIVEWINDOW_CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS,
+		.DEFAULT,
+		.ONLY_IF_SEAMLESS,
 	)
 }
 
 __android_log_id_is_valid :: proc "contextless" (log_id: log_id_t) -> bool {
-	return LOG_ID_MIN <= log_id && log_id < LOG_ID_MAX
+	return .MIN <= log_id && log_id < .MAX
 }

@@ -9,19 +9,19 @@ foreign import libandroid "system:android"
 
 ANpuBuffer :: struct {}
 
-ANpuBuffer_Priority :: i32
+ANpuBuffer_Priority :: enum i32 {
+	MIN     = 0,
+	DEFAULT = 500,
+	MAX     = 1000,
+}
 
-ANPUBUFFER_PRIORITY_MIN     :: 0
-ANPUBUFFER_PRIORITY_DEFAULT :: 500
-ANPUBUFFER_PRIORITY_MAX     :: 1000
-
-ANpuBuffer_Type :: i8
-
-ANPUBUFFER_TYPE_UNKNOWN          :: 0
-ANPUBUFFER_TYPE_MODEL_EXECUTABLE :: 1
-ANPUBUFFER_TYPE_MODEL_WEIGHTS    :: 2
-ANPUBUFFER_TYPE_CACHE            :: 3
-ANPUBUFFER_TYPE_AUXILIARY        :: 4
+ANpuBuffer_Type :: enum i8 {
+	UNKNOWN          = 0,
+	MODEL_EXECUTABLE = 1,
+	MODEL_WEIGHTS    = 2,
+	CACHE            = 3,
+	AUXILIARY        = 4,
+}
 
 ANpuManager_AllocRequest    :: struct {}
 ANpuManager_AllocCallback   :: proc "c" (cookie: rawptr, errorNum: c.int, buf: ^ANpuBuffer)
@@ -37,7 +37,7 @@ foreign libandroid {
 	ANpuManager_AllocRequest_setDeviceNumber      :: proc(request: ^ANpuManager_AllocRequest, deviceNumber: i32) --- // API level 37
 	ANpuManager_AllocRequest_setBufferType        :: proc(request: ^ANpuManager_AllocRequest, bufferType: ANpuBuffer_Type) --- // API level 37
 	ANpuManager_AllocRequest_setSize              :: proc(request: ^ANpuManager_AllocRequest, size: i64) --- // API level 37
-	ANpuManager_AllocRequest_setBufferPriority    :: proc(request: ^ANpuManager_AllocRequest, bufferPriority: i32) --- // API level 37
+	ANpuManager_AllocRequest_setBufferPriority    :: proc(request: ^ANpuManager_AllocRequest, bufferPriority: ANpuBuffer_Priority) --- // API level 37
 	ANpuManager_AllocRequest_setFileSegmentToLoad :: proc(request: ^ANpuManager_AllocRequest, fdToOwn: c.int, fileOffset: i64, segmentLength: i64, bufferOffset: i64) --- // API level 37
 	ANpuManager_AllocRequest_setProtectionFlags   :: proc(request: ^ANpuManager_AllocRequest, prot: i32) --- // API level 37
 	ANpuManager_AllocRequest_setOnAlloc           :: proc(request: ^ANpuManager_AllocRequest, onAlloc: ANpuManager_AllocCallback) --- // API level 37
@@ -47,6 +47,6 @@ foreign libandroid {
 	ANpuBuffer_free                               :: proc(buffers: ^^ANpuBuffer, buffersLen: c.size_t) -> c.int --- // API level 37
 	ANpuBuffer_map                                :: proc(buf: ^ANpuBuffer, addr: rawptr, length: c.size_t, prot: c.int, flags: c.int, offset: c.long) -> rawptr --- // API level 37
 	ANpuBuffer_unmap                              :: proc(buf: ^ANpuBuffer, addr: rawptr, length: c.size_t) -> c.int --- // API level 37
-	ANpuBuffer_setPriority                        :: proc(buf: ^ANpuBuffer, newBufferPriority: i32) -> c.int --- // API level 37
+	ANpuBuffer_setPriority                        :: proc(buf: ^ANpuBuffer, newBufferPriority: ANpuBuffer_Priority) -> c.int --- // API level 37
 	ANpuBuffer_loadAsync                          :: proc(buf: ^ANpuBuffer, fdToOwn: c.int, fileOffset: i64, segmentLength: i64, bufferOffset: i64, onLoad: ANpuManager_LoadCallback) --- // API level 37
 }

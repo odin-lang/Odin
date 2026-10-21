@@ -9,61 +9,61 @@ foreign import libicu "system:icu"
 
 UCollator :: struct {}
 
-UCollationResult :: i32
+UCollationResult :: enum i32 {
+	EQUAL   = 0,
+	GREATER = 1,
+	LESS    = -1,
+}
 
-UCOL_EQUAL   :: 0
-UCOL_GREATER :: 1
-UCOL_LESS    :: -1
+UColAttributeValue :: enum i32 {
+	DEFAULT           = -1,
+	PRIMARY           = 0,
+	SECONDARY         = 1,
+	TERTIARY          = 2,
+	DEFAULT_STRENGTH  = 2,
+	CE_STRENGTH_LIMIT = 3,
+	QUATERNARY        = 3,
+	IDENTICAL         = 15,
+	STRENGTH_LIMIT    = 16,
+	OFF               = 16,
+	ON                = 17,
+	SHIFTED           = 20,
+	NON_IGNORABLE     = 21,
+	LOWER_FIRST       = 24,
+	UPPER_FIRST       = 25,
+}
 
-UColAttributeValue :: i32
-
-UCOL_DEFAULT           :: -1
-UCOL_PRIMARY           :: 0
-UCOL_SECONDARY         :: 1
-UCOL_TERTIARY          :: 2
-UCOL_DEFAULT_STRENGTH  :: 2
-UCOL_CE_STRENGTH_LIMIT :: 3
-UCOL_QUATERNARY        :: 3
-UCOL_IDENTICAL         :: 15
-UCOL_STRENGTH_LIMIT    :: 16
-UCOL_OFF               :: 16
-UCOL_ON                :: 17
-UCOL_SHIFTED           :: 20
-UCOL_NON_IGNORABLE     :: 21
-UCOL_LOWER_FIRST       :: 24
-UCOL_UPPER_FIRST       :: 25
-
-UColReorderCode :: i32
-
-UCOL_REORDER_CODE_DEFAULT     :: -1
-UCOL_REORDER_CODE_NONE        :: 103
-UCOL_REORDER_CODE_OTHERS      :: 103
-UCOL_REORDER_CODE_SPACE       :: 0x1000
-UCOL_REORDER_CODE_FIRST       :: 4096
-UCOL_REORDER_CODE_PUNCTUATION :: 0x1001
-UCOL_REORDER_CODE_SYMBOL      :: 0x1002
-UCOL_REORDER_CODE_CURRENCY    :: 0x1003
-UCOL_REORDER_CODE_DIGIT       :: 0x1004
+UColReorderCode :: enum i32 {
+	DEFAULT     = -1,
+	NONE        = 103,
+	OTHERS      = 103,
+	SPACE       = 0x1000,
+	FIRST       = 4096,
+	PUNCTUATION = 0x1001,
+	SYMBOL      = 0x1002,
+	CURRENCY    = 0x1003,
+	DIGIT       = 0x1004,
+}
 
 UCollationStrength :: UColAttributeValue
 
-UColAttribute :: i32
+UColAttribute :: enum i32 {
+	FRENCH_COLLATION   = 0,
+	ALTERNATE_HANDLING = 1,
+	CASE_FIRST         = 2,
+	CASE_LEVEL         = 3,
+	NORMALIZATION_MODE = 4,
+	DECOMPOSITION_MODE = 4,
+	STRENGTH           = 5,
+	NUMERIC_COLLATION  = 7,
+	ATTRIBUTE_COUNT    = 8,
+}
 
-UCOL_FRENCH_COLLATION   :: 0
-UCOL_ALTERNATE_HANDLING :: 1
-UCOL_CASE_FIRST         :: 2
-UCOL_CASE_LEVEL         :: 3
-UCOL_NORMALIZATION_MODE :: 4
-UCOL_DECOMPOSITION_MODE :: 4
-UCOL_STRENGTH           :: 5
-UCOL_NUMERIC_COLLATION  :: 7
-UCOL_ATTRIBUTE_COUNT    :: 8
-
-UColBoundMode :: i32
-
-UCOL_BOUND_LOWER      :: 0
-UCOL_BOUND_UPPER      :: 1
-UCOL_BOUND_UPPER_LONG :: 2
+UColBoundMode :: enum i32 {
+	LOWER      = 0,
+	UPPER      = 1,
+	UPPER_LONG = 2,
+}
 
 @(default_calling_convention="c")
 foreign libicu {

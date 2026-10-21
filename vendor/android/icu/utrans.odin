@@ -9,10 +9,10 @@ foreign import libicu "system:icu"
 
 UTransliterator :: rawptr
 
-UTransDirection :: c.int
-
-UTRANS_FORWARD :: 0
-UTRANS_REVERSE :: 1
+UTransDirection :: enum c.int {
+	FORWARD = 0,
+	REVERSE = 1,
+}
 
 UTransPosition :: struct {
 	contextStart: i32,

@@ -7,39 +7,39 @@ import "core:c"
 
 foreign import libicu "system:icu"
 
-UBreakIteratorType :: c.int
+UBreakIteratorType :: enum c.int {
+	CHARACTER = 0,
+	WORD      = 1,
+	LINE      = 2,
+	SENTENCE  = 3,
+}
 
-UBRK_CHARACTER :: 0
-UBRK_WORD      :: 1
-UBRK_LINE      :: 2
-UBRK_SENTENCE  :: 3
+UWordBreak :: enum c.int {
+	NONE         = 0,
+	NONE_LIMIT   = 100,
+	NUMBER       = 100,
+	NUMBER_LIMIT = 200,
+	LETTER       = 200,
+	LETTER_LIMIT = 300,
+	KANA         = 300,
+	KANA_LIMIT   = 400,
+	IDEO         = 400,
+	IDEO_LIMIT   = 500,
+}
 
-UWordBreak :: c.int
+ULineBreakTag :: enum c.int {
+	SOFT       = 0,
+	SOFT_LIMIT = 100,
+	HARD       = 100,
+	HARD_LIMIT = 200,
+}
 
-UBRK_WORD_NONE         :: 0
-UBRK_WORD_NONE_LIMIT   :: 100
-UBRK_WORD_NUMBER       :: 100
-UBRK_WORD_NUMBER_LIMIT :: 200
-UBRK_WORD_LETTER       :: 200
-UBRK_WORD_LETTER_LIMIT :: 300
-UBRK_WORD_KANA         :: 300
-UBRK_WORD_KANA_LIMIT   :: 400
-UBRK_WORD_IDEO         :: 400
-UBRK_WORD_IDEO_LIMIT   :: 500
-
-ULineBreakTag :: c.int
-
-UBRK_LINE_SOFT       :: 0
-UBRK_LINE_SOFT_LIMIT :: 100
-UBRK_LINE_HARD       :: 100
-UBRK_LINE_HARD_LIMIT :: 200
-
-USentenceBreakTag :: c.int
-
-UBRK_SENTENCE_TERM       :: 0
-UBRK_SENTENCE_TERM_LIMIT :: 100
-UBRK_SENTENCE_SEP        :: 100
-UBRK_SENTENCE_SEP_LIMIT  :: 200
+USentenceBreakTag :: enum c.int {
+	TERM       = 0,
+	TERM_LIMIT = 100,
+	SEP        = 100,
+	SEP_LIMIT  = 200,
+}
 
 UBRK_DONE :: -1
 

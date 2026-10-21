@@ -41,17 +41,23 @@ ANativeActivityCallbacks :: struct {
 
 ANativeActivity_createFunc :: proc "c" (activity: ^ANativeActivity, savedState: rawptr, savedStateSize: c.size_t)
 
-ANATIVEACTIVITY_SHOW_SOFT_INPUT_IMPLICIT :: 0x0001
-ANATIVEACTIVITY_SHOW_SOFT_INPUT_FORCED   :: 0x0002
+ANativeActivityShowSoftInputFlag :: enum u32 {
+	IMPLICIT = 0,
+	FORCED   = 1,
+}
+ANativeActivityShowSoftInputFlags :: distinct bit_set[ANativeActivityShowSoftInputFlag; u32]
 
-ANATIVEACTIVITY_HIDE_SOFT_INPUT_IMPLICIT_ONLY :: 0x0001
-ANATIVEACTIVITY_HIDE_SOFT_INPUT_NOT_ALWAYS    :: 0x0002
+ANativeActivityHideSoftInputFlag :: enum u32 {
+	IMPLICIT_ONLY = 0,
+	NOT_ALWAYS    = 1,
+}
+ANativeActivityHideSoftInputFlags :: distinct bit_set[ANativeActivityHideSoftInputFlag; u32]
 
 @(default_calling_convention="c")
 foreign libandroid {
 	ANativeActivity_finish          :: proc(activity: ^ANativeActivity) ---
 	ANativeActivity_setWindowFormat :: proc(activity: ^ANativeActivity, format: i32) ---
-	ANativeActivity_setWindowFlags  :: proc(activity: ^ANativeActivity, addFlags: u32, removeFlags: u32) ---
-	ANativeActivity_showSoftInput   :: proc(activity: ^ANativeActivity, flags: u32) ---
-	ANativeActivity_hideSoftInput   :: proc(activity: ^ANativeActivity, flags: u32) ---
+	ANativeActivity_setWindowFlags  :: proc(activity: ^ANativeActivity, addFlags: AWindowFlags, removeFlags: AWindowFlags) ---
+	ANativeActivity_showSoftInput   :: proc(activity: ^ANativeActivity, flags: ANativeActivityShowSoftInputFlags) ---
+	ANativeActivity_hideSoftInput   :: proc(activity: ^ANativeActivity, flags: ANativeActivityHideSoftInputFlags) ---
 }

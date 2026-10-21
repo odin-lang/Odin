@@ -187,10 +187,10 @@ Bitmap_createScaledBitmap :: proc "contextless" (src: ^Bitmap, dstWidth: i32, ds
 	return (^Bitmap)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Bitmap_describeContents :: proc "contextless" (self: ^Bitmap) -> (result: i32, exception: ^Throwable) {
+Bitmap_describeContents :: proc "contextless" (self: ^Bitmap) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Bitmap__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Bitmap_eraseColor_int :: proc "contextless" (self: ^Bitmap, c: i32) -> (exception: ^Throwable) {
@@ -540,10 +540,10 @@ Bitmap_wrapHardwareBuffer :: proc "contextless" (hardwareBuffer: ^HardwareBuffer
 	return (^Bitmap)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Bitmap_writeToParcel :: proc "contextless" (self: ^Bitmap, p: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+Bitmap_writeToParcel :: proc "contextless" (self: ^Bitmap, p: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Bitmap__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = p}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = p}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1211,10 +1211,10 @@ BitmapShader_new :: proc "contextless" (bitmap: ^Bitmap, tileX: ^Shader_TileMode
 	return (^BitmapShader)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-BitmapShader_getFilterMode :: proc "contextless" (self: ^BitmapShader) -> (result: i32, exception: ^Throwable) { // API level 33
+BitmapShader_getFilterMode :: proc "contextless" (self: ^BitmapShader) -> (result: BitmapShader_FilterMode, exception: ^Throwable) { // API level 33
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &BitmapShader__class, "getFilterMode", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return BitmapShader_FilterMode(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 BitmapShader_getMaxAnisotropy :: proc "contextless" (self: ^BitmapShader) -> (result: i32, exception: ^Throwable) { // API level 34
@@ -1223,10 +1223,10 @@ BitmapShader_getMaxAnisotropy :: proc "contextless" (self: ^BitmapShader) -> (re
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-BitmapShader_setFilterMode :: proc "contextless" (self: ^BitmapShader, mode: i32) -> (exception: ^Throwable) { // API level 33
+BitmapShader_setFilterMode :: proc "contextless" (self: ^BitmapShader, mode: BitmapShader_FilterMode) -> (exception: ^Throwable) { // API level 33
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &BitmapShader__class, "setFilterMode", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = mode}}
+	jni_args := [?]android.jvalue{{i = i32(mode)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1245,6 +1245,12 @@ BitmapShader_setOverrideGainmap :: proc "contextless" (self: ^BitmapShader, over
 	jni_args := [?]android.jvalue{{l = overrideGainmap}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+BitmapShader_FilterMode :: enum i32 {
+	DEFAULT = 0,
+	LINEAR  = 2,
+	NEAREST = 1,
 }
 
 // class android.graphics.BlendMode
@@ -3649,16 +3655,16 @@ ColorSpace_getComponentCount :: proc "contextless" (self: ^ColorSpace) -> (resul
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-ColorSpace_getDataSpace :: proc "contextless" (self: ^ColorSpace) -> (result: i32, exception: ^Throwable) { // API level 33
+ColorSpace_getDataSpace :: proc "contextless" (self: ^ColorSpace) -> (result: DataSpace_Field, exception: ^Throwable) { // API level 33
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ColorSpace__class, "getDataSpace", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(DataSpace_Field)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ColorSpace_getFromDataSpace :: proc "contextless" (dataSpace: i32) -> (result: ^ColorSpace, exception: ^Throwable) { // API level 33
+ColorSpace_getFromDataSpace :: proc "contextless" (dataSpace: DataSpace_Field) -> (result: ^ColorSpace, exception: ^Throwable) { // API level 33
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &ColorSpace__class, "getFromDataSpace", "(I)Landroid/graphics/ColorSpace;", true) or_return
-	jni_args := [?]android.jvalue{{i = dataSpace}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)dataSpace}}
 	return (^ColorSpace)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4548,10 +4554,10 @@ Gainmap_new :: proc{
 	Gainmap_new_Gainmap_Bitmap,
 }
 
-Gainmap_describeContents :: proc "contextless" (self: ^Gainmap) -> (result: i32, exception: ^Throwable) {
+Gainmap_describeContents :: proc "contextless" (self: ^Gainmap) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Gainmap__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Gainmap_getAlternativeImagePrimaries :: proc "contextless" (self: ^Gainmap) -> (result: ^ColorSpace, exception: ^Throwable) { // API level 36
@@ -4584,10 +4590,10 @@ Gainmap_getGainmapContents :: proc "contextless" (self: ^Gainmap) -> (result: ^B
 	return (^Bitmap)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Gainmap_getGainmapDirection :: proc "contextless" (self: ^Gainmap) -> (result: i32, exception: ^Throwable) { // API level 36
+Gainmap_getGainmapDirection :: proc "contextless" (self: ^Gainmap) -> (result: Gainmap_GainmapDirection, exception: ^Throwable) { // API level 36
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Gainmap__class, "getGainmapDirection", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return Gainmap_GainmapDirection(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Gainmap_getGamma :: proc "contextless" (self: ^Gainmap) -> (result: ^FloatArray, exception: ^Throwable) {
@@ -4654,10 +4660,10 @@ Gainmap_setGainmapContents :: proc "contextless" (self: ^Gainmap, bitmap: ^Bitma
 	return jni_take(jni_env)
 }
 
-Gainmap_setGainmapDirection :: proc "contextless" (self: ^Gainmap, direction: i32) -> (exception: ^Throwable) { // API level 36
+Gainmap_setGainmapDirection :: proc "contextless" (self: ^Gainmap, direction: Gainmap_GainmapDirection) -> (exception: ^Throwable) { // API level 36
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Gainmap__class, "setGainmapDirection", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = direction}}
+	jni_args := [?]android.jvalue{{i = i32(direction)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4694,12 +4700,17 @@ Gainmap_setRatioMin :: proc "contextless" (self: ^Gainmap, r: f32, g: f32, b: f3
 	return jni_take(jni_env)
 }
 
-Gainmap_writeToParcel :: proc "contextless" (self: ^Gainmap, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+Gainmap_writeToParcel :: proc "contextless" (self: ^Gainmap, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Gainmap__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+Gainmap_GainmapDirection :: enum i32 {
+	HDR_TO_SDR = 1,
+	SDR_TO_HDR = 0,
 }
 
 // class android.graphics.HardwareBufferRenderer // API level 34
@@ -4777,10 +4788,10 @@ HardwareBufferRenderer_RenderRequest_draw :: proc "contextless" (self: ^Hardware
 	return jni_take(jni_env)
 }
 
-HardwareBufferRenderer_RenderRequest_setBufferTransform :: proc "contextless" (self: ^HardwareBufferRenderer_RenderRequest, bufferTransform: i32) -> (result: ^HardwareBufferRenderer_RenderRequest, exception: ^Throwable) {
+HardwareBufferRenderer_RenderRequest_setBufferTransform :: proc "contextless" (self: ^HardwareBufferRenderer_RenderRequest, bufferTransform: SurfaceControl_BufferTransform) -> (result: ^HardwareBufferRenderer_RenderRequest, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &HardwareBufferRenderer_RenderRequest__class, "setBufferTransform", "(I)Landroid/graphics/HardwareBufferRenderer$RenderRequest;", false) or_return
-	jni_args := [?]android.jvalue{{i = bufferTransform}}
+	jni_args := [?]android.jvalue{{i = i32(bufferTransform)}}
 	return (^HardwareBufferRenderer_RenderRequest)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4808,10 +4819,15 @@ HardwareBufferRenderer_RenderResult_getFence :: proc "contextless" (self: ^Hardw
 	return (^SyncFence)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-HardwareBufferRenderer_RenderResult_getStatus :: proc "contextless" (self: ^HardwareBufferRenderer_RenderResult) -> (result: i32, exception: ^Throwable) {
+HardwareBufferRenderer_RenderResult_getStatus :: proc "contextless" (self: ^HardwareBufferRenderer_RenderResult) -> (result: HardwareBufferRenderer_RenderResult_Status, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &HardwareBufferRenderer_RenderResult__class, "getStatus", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return HardwareBufferRenderer_RenderResult_Status(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
+}
+
+HardwareBufferRenderer_RenderResult_Status :: enum i32 {
+	ERROR_UNKNOWN = 1,
+	SUCCESS       = 0,
 }
 
 // class android.graphics.HardwareRenderer
@@ -4943,6 +4959,14 @@ HardwareRenderer_stop :: proc "contextless" (self: ^HardwareRenderer) -> (except
 	return jni_take(jni_env)
 }
 
+HardwareRenderer_Sync :: enum i32 {
+	CONTEXT_IS_STOPPED           = 4,
+	FRAME_DROPPED                = 8,
+	LOST_SURFACE_REWARD_IF_FOUND = 2,
+	OK                           = 0,
+	REDRAW_REQUESTED             = 1,
+}
+
 // class android.graphics.HardwareRenderer.FrameRenderRequest
 HardwareRenderer_FrameRenderRequest :: struct #raw_union {
 	using Object: Object,
@@ -4972,10 +4996,10 @@ HardwareRenderer_FrameRenderRequest_setWaitForPresent :: proc "contextless" (sel
 	return (^HardwareRenderer_FrameRenderRequest)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-HardwareRenderer_FrameRenderRequest_syncAndDraw :: proc "contextless" (self: ^HardwareRenderer_FrameRenderRequest) -> (result: i32, exception: ^Throwable) {
+HardwareRenderer_FrameRenderRequest_syncAndDraw :: proc "contextless" (self: ^HardwareRenderer_FrameRenderRequest) -> (result: HardwareRenderer_Sync, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &HardwareRenderer_FrameRenderRequest__class, "syncAndDraw", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return HardwareRenderer_Sync(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 // class android.graphics.ImageDecoder
@@ -5112,10 +5136,10 @@ ImageDecoder_getAllocationLimit :: proc "contextless" (self: ^ImageDecoder) -> (
 	return jni_env->CallLongMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-ImageDecoder_getAllocator :: proc "contextless" (self: ^ImageDecoder) -> (result: i32, exception: ^Throwable) {
+ImageDecoder_getAllocator :: proc "contextless" (self: ^ImageDecoder) -> (result: ImageDecoder_Allocator, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ImageDecoder__class, "getAllocator", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return ImageDecoder_Allocator(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ImageDecoder_getCrop :: proc "contextless" (self: ^ImageDecoder) -> (result: ^Rect, exception: ^Throwable) {
@@ -5136,10 +5160,10 @@ ImageDecoder_getDefaultThreadListener :: proc "contextless" () -> (result: ^Imag
 	return (^ImageDecoder_OnHeaderDecodedListener)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, nil)), jni_take(jni_env)
 }
 
-ImageDecoder_getMemorySizePolicy :: proc "contextless" (self: ^ImageDecoder) -> (result: i32, exception: ^Throwable) {
+ImageDecoder_getMemorySizePolicy :: proc "contextless" (self: ^ImageDecoder) -> (result: ImageDecoder_MemoryPolicy, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ImageDecoder__class, "getMemorySizePolicy", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return ImageDecoder_MemoryPolicy(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ImageDecoder_getOnPartialImageListener :: proc "contextless" (self: ^ImageDecoder) -> (result: ^ImageDecoder_OnPartialImageListener, exception: ^Throwable) {
@@ -5187,10 +5211,10 @@ ImageDecoder_setAllocationLimit :: proc "contextless" (self: ^ImageDecoder, limi
 	return jni_take(jni_env)
 }
 
-ImageDecoder_setAllocator :: proc "contextless" (self: ^ImageDecoder, allocator: i32) -> (exception: ^Throwable) {
+ImageDecoder_setAllocator :: proc "contextless" (self: ^ImageDecoder, allocator: ImageDecoder_Allocator) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ImageDecoder__class, "setAllocator", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = allocator}}
+	jni_args := [?]android.jvalue{{i = i32(allocator)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -5227,10 +5251,10 @@ ImageDecoder_setDefaultThreadListener :: proc "contextless" (listener: ^ImageDec
 	return jni_take(jni_env)
 }
 
-ImageDecoder_setMemorySizePolicy :: proc "contextless" (self: ^ImageDecoder, policy: i32) -> (exception: ^Throwable) {
+ImageDecoder_setMemorySizePolicy :: proc "contextless" (self: ^ImageDecoder, policy: ImageDecoder_MemoryPolicy) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ImageDecoder__class, "setMemorySizePolicy", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = policy}}
+	jni_args := [?]android.jvalue{{i = i32(policy)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -5291,6 +5315,18 @@ ImageDecoder_setUnpremultipliedRequired :: proc "contextless" (self: ^ImageDecod
 	return jni_take(jni_env)
 }
 
+ImageDecoder_Allocator :: enum i32 {
+	DEFAULT       = 0,
+	HARDWARE      = 3,
+	SHARED_MEMORY = 2,
+	SOFTWARE      = 1,
+}
+
+ImageDecoder_MemoryPolicy :: enum i32 {
+	DEFAULT = 1,
+	LOW_RAM = 0,
+}
+
 // class android.graphics.ImageDecoder.DecodeException
 ImageDecoder_DecodeException :: struct #raw_union {
 	using IOException: IOException,
@@ -5304,16 +5340,23 @@ ImageDecoder_DecodeException_SOURCE_EXCEPTION          :: 1
 ImageDecoder_DecodeException_SOURCE_INCOMPLETE         :: 2
 ImageDecoder_DecodeException_SOURCE_MALFORMED_DATA     :: 3
 
-ImageDecoder_DecodeException_getError :: proc "contextless" (self: ^ImageDecoder_DecodeException) -> (result: i32, exception: ^Throwable) {
+ImageDecoder_DecodeException_getError :: proc "contextless" (self: ^ImageDecoder_DecodeException) -> (result: ImageDecoder_DecodeException_Error, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ImageDecoder_DecodeException__class, "getError", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return ImageDecoder_DecodeException_Error(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ImageDecoder_DecodeException_getSource :: proc "contextless" (self: ^ImageDecoder_DecodeException) -> (result: ^ImageDecoder_Source, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ImageDecoder_DecodeException__class, "getSource", "()Landroid/graphics/ImageDecoder$Source;", false) or_return
 	return (^ImageDecoder_Source)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
+}
+
+ImageDecoder_DecodeException_Error :: enum i32 {
+	GAINMAP_EXTRACTION_FAILED = 4,
+	SOURCE_EXCEPTION          = 1,
+	SOURCE_INCOMPLETE         = 2,
+	SOURCE_MALFORMED_DATA     = 3,
 }
 
 // class android.graphics.ImageDecoder.ImageInfo
@@ -5429,11 +5472,41 @@ ImageFormat_new :: proc "contextless" () -> (result: ^ImageFormat, exception: ^T
 	return (^ImageFormat)(jni_env->NewObjectA(jni_class, jni_id, nil)), jni_take(jni_env)
 }
 
-ImageFormat_getBitsPerPixel :: proc "contextless" (format: i32) -> (result: i32, exception: ^Throwable) {
+ImageFormat_getBitsPerPixel :: proc "contextless" (format: ImageFormat_Format) -> (result: i32, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &ImageFormat__class, "getBitsPerPixel", "(I)I", true) or_return
-	jni_args := [?]android.jvalue{{i = format}}
+	jni_args := [?]android.jvalue{{i = i32(format)}}
 	return jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
+}
+
+ImageFormat_Format :: enum i32 {
+	DEPTH16           = 1144402265,
+	DEPTH_JPEG        = 1768253795,
+	DEPTH_POINT_CLOUD = 257,
+	FLEX_RGBA_8888    = 42,
+	FLEX_RGB_888      = 41,
+	HEIC              = 1212500294,
+	HEIC_ULTRAHDR     = 4102,
+	JPEG              = 256,
+	JPEG_R            = 4101,
+	NV16              = 16,
+	NV21              = 17,
+	PRIVATE           = 34,
+	RAW10             = 37,
+	RAW12             = 38,
+	RAW14             = 44,
+	RAW_PRIVATE       = 36,
+	RAW_SENSOR        = 32,
+	RGB_565           = 4,
+	UNKNOWN           = 0,
+	Y8                = 538982489,
+	YCBCR_P010        = 54,
+	YCBCR_P210        = 60,
+	YUV_420_888       = 35,
+	YUV_422_888       = 39,
+	YUV_444_888       = 40,
+	YUY2              = 20,
+	YV12              = 842094169,
 }
 
 // class android.graphics.Insets
@@ -5488,10 +5561,10 @@ Insets_add :: proc "contextless" (a: ^Insets, b: ^Insets) -> (result: ^Insets, e
 	return (^Insets)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Insets_describeContents :: proc "contextless" (self: ^Insets) -> (result: i32, exception: ^Throwable) {
+Insets_describeContents :: proc "contextless" (self: ^Insets) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Insets__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Insets_equals :: proc "contextless" (self: ^Insets, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -5553,10 +5626,10 @@ Insets_toString :: proc "contextless" (self: ^Insets) -> (result: ^String, excep
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Insets_writeToParcel :: proc "contextless" (self: ^Insets, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+Insets_writeToParcel :: proc "contextless" (self: ^Insets, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Insets__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -6463,17 +6536,17 @@ Mesh__class := Cached_Class{name = "android/graphics/Mesh"}
 Mesh_TRIANGLES      :: 0
 Mesh_TRIANGLE_STRIP :: 1
 
-Mesh_new_MeshSpecification_int_Buffer_int_RectF :: proc "contextless" (meshSpec: ^MeshSpecification, mode: i32, vertexBuffer: ^Buffer, vertexCount: i32, bounds: ^RectF) -> (result: ^Mesh, exception: ^Throwable) {
+Mesh_new_MeshSpecification_int_Buffer_int_RectF :: proc "contextless" (meshSpec: ^MeshSpecification, mode: Mesh_Mode, vertexBuffer: ^Buffer, vertexCount: i32, bounds: ^RectF) -> (result: ^Mesh, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Mesh__class, "<init>", "(Landroid/graphics/MeshSpecification;ILjava/nio/Buffer;ILandroid/graphics/RectF;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = meshSpec}, {i = mode}, {l = vertexBuffer}, {i = vertexCount}, {l = bounds}}
+	jni_args := [?]android.jvalue{{l = meshSpec}, {i = i32(mode)}, {l = vertexBuffer}, {i = vertexCount}, {l = bounds}}
 	return (^Mesh)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Mesh_new_MeshSpecification_int_Buffer_int_ShortBuffer_RectF :: proc "contextless" (meshSpec: ^MeshSpecification, mode: i32, vertexBuffer: ^Buffer, vertexCount: i32, indexBuffer: ^ShortBuffer, bounds: ^RectF) -> (result: ^Mesh, exception: ^Throwable) {
+Mesh_new_MeshSpecification_int_Buffer_int_ShortBuffer_RectF :: proc "contextless" (meshSpec: ^MeshSpecification, mode: Mesh_Mode, vertexBuffer: ^Buffer, vertexCount: i32, indexBuffer: ^ShortBuffer, bounds: ^RectF) -> (result: ^Mesh, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Mesh__class, "<init>", "(Landroid/graphics/MeshSpecification;ILjava/nio/Buffer;ILjava/nio/ShortBuffer;Landroid/graphics/RectF;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = meshSpec}, {i = mode}, {l = vertexBuffer}, {i = vertexCount}, {l = indexBuffer}, {l = bounds}}
+	jni_args := [?]android.jvalue{{l = meshSpec}, {i = i32(mode)}, {l = vertexBuffer}, {i = vertexCount}, {l = indexBuffer}, {l = bounds}}
 	return (^Mesh)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6608,6 +6681,11 @@ Mesh_setIntUniform :: proc{
 	Mesh_setIntUniform_String_IntArray,
 }
 
+Mesh_Mode :: enum i32 {
+	TRIANGLES      = 0,
+	TRIANGLE_STRIP = 1,
+}
+
 // class android.graphics.MeshSpecification // API level 34
 MeshSpecification :: struct #raw_union {
 	using Object: Object,
@@ -6640,10 +6718,10 @@ MeshSpecification_make_MeshSpecification_AttributeArray_int_MeshSpecification_Va
 	return (^MeshSpecification)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-MeshSpecification_make_MeshSpecification_AttributeArray_int_MeshSpecification_VaryingArray_String_String_ColorSpace_int :: proc "contextless" (attributes: ^Array(MeshSpecification_Attribute), vertexStride: i32, varyings: ^Array(MeshSpecification_Varying), vertexShader: ^String, fragmentShader: ^String, colorSpace: ^ColorSpace, alphaType: i32) -> (result: ^MeshSpecification, exception: ^Throwable) {
+MeshSpecification_make_MeshSpecification_AttributeArray_int_MeshSpecification_VaryingArray_String_String_ColorSpace_int :: proc "contextless" (attributes: ^Array(MeshSpecification_Attribute), vertexStride: i32, varyings: ^Array(MeshSpecification_Varying), vertexShader: ^String, fragmentShader: ^String, colorSpace: ^ColorSpace, alphaType: MeshSpecification_AlphaType) -> (result: ^MeshSpecification, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &MeshSpecification__class, "make", "([Landroid/graphics/MeshSpecification$Attribute;I[Landroid/graphics/MeshSpecification$Varying;Ljava/lang/String;Ljava/lang/String;Landroid/graphics/ColorSpace;I)Landroid/graphics/MeshSpecification;", true) or_return
-	jni_args := [?]android.jvalue{{l = attributes}, {i = vertexStride}, {l = varyings}, {l = vertexShader}, {l = fragmentShader}, {l = colorSpace}, {i = alphaType}}
+	jni_args := [?]android.jvalue{{l = attributes}, {i = vertexStride}, {l = varyings}, {l = vertexShader}, {l = fragmentShader}, {l = colorSpace}, {i = i32(alphaType)}}
 	return (^MeshSpecification)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6651,6 +6729,21 @@ MeshSpecification_make :: proc{
 	MeshSpecification_make_MeshSpecification_AttributeArray_int_MeshSpecification_VaryingArray_String_String,
 	MeshSpecification_make_MeshSpecification_AttributeArray_int_MeshSpecification_VaryingArray_String_String_ColorSpace,
 	MeshSpecification_make_MeshSpecification_AttributeArray_int_MeshSpecification_VaryingArray_String_String_ColorSpace_int,
+}
+
+MeshSpecification_AlphaType :: enum i32 {
+	OPAQUE          = 1,
+	PREMULTIPLIED   = 2,
+	UNKNOWN         = 0,
+	UNPREMULTIPLIED = 3,
+}
+
+MeshSpecification_Type :: enum i32 {
+	FLOAT  = 0,
+	FLOAT2 = 1,
+	FLOAT3 = 2,
+	FLOAT4 = 3,
+	UBYTE4 = 4,
 }
 
 // class android.graphics.MeshSpecification.Attribute // API level 34
@@ -6661,10 +6754,10 @@ MeshSpecification_Attribute :: struct #raw_union {
 @(private)
 MeshSpecification_Attribute__class := Cached_Class{name = "android/graphics/MeshSpecification$Attribute"}
 
-MeshSpecification_Attribute_new :: proc "contextless" (type: i32, offset: i32, name: ^String) -> (result: ^MeshSpecification_Attribute, exception: ^Throwable) {
+MeshSpecification_Attribute_new :: proc "contextless" (type: MeshSpecification_Type, offset: i32, name: ^String) -> (result: ^MeshSpecification_Attribute, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &MeshSpecification_Attribute__class, "<init>", "(IILjava/lang/String;)V", false) or_return
-	jni_args := [?]android.jvalue{{i = type}, {i = offset}, {l = name}}
+	jni_args := [?]android.jvalue{{i = i32(type)}, {i = offset}, {l = name}}
 	return (^MeshSpecification_Attribute)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6680,10 +6773,10 @@ MeshSpecification_Attribute_getOffset :: proc "contextless" (self: ^MeshSpecific
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-MeshSpecification_Attribute_getType :: proc "contextless" (self: ^MeshSpecification_Attribute) -> (result: i32, exception: ^Throwable) {
+MeshSpecification_Attribute_getType :: proc "contextless" (self: ^MeshSpecification_Attribute) -> (result: MeshSpecification_Type, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MeshSpecification_Attribute__class, "getType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return MeshSpecification_Type(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 MeshSpecification_Attribute_toString :: proc "contextless" (self: ^MeshSpecification_Attribute) -> (result: ^String, exception: ^Throwable) {
@@ -6700,10 +6793,10 @@ MeshSpecification_Varying :: struct #raw_union {
 @(private)
 MeshSpecification_Varying__class := Cached_Class{name = "android/graphics/MeshSpecification$Varying"}
 
-MeshSpecification_Varying_new :: proc "contextless" (type: i32, name: ^String) -> (result: ^MeshSpecification_Varying, exception: ^Throwable) {
+MeshSpecification_Varying_new :: proc "contextless" (type: MeshSpecification_Type, name: ^String) -> (result: ^MeshSpecification_Varying, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &MeshSpecification_Varying__class, "<init>", "(ILjava/lang/String;)V", false) or_return
-	jni_args := [?]android.jvalue{{i = type}, {l = name}}
+	jni_args := [?]android.jvalue{{i = i32(type)}, {l = name}}
 	return (^MeshSpecification_Varying)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6713,10 +6806,10 @@ MeshSpecification_Varying_getName :: proc "contextless" (self: ^MeshSpecificatio
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-MeshSpecification_Varying_getType :: proc "contextless" (self: ^MeshSpecification_Varying) -> (result: i32, exception: ^Throwable) {
+MeshSpecification_Varying_getType :: proc "contextless" (self: ^MeshSpecification_Varying) -> (result: MeshSpecification_Type, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MeshSpecification_Varying__class, "getType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return MeshSpecification_Type(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 MeshSpecification_Varying_toString :: proc "contextless" (self: ^MeshSpecification_Varying) -> (result: ^String, exception: ^Throwable) {
@@ -7160,10 +7253,10 @@ Paint_new_Paint :: proc "contextless" (paint: ^Paint) -> (result: ^Paint, except
 	return (^Paint)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Paint_new_int :: proc "contextless" (flags: i32) -> (result: ^Paint, exception: ^Throwable) {
+Paint_new_int :: proc "contextless" (flags: Paint_Flags) -> (result: ^Paint, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Paint__class, "<init>", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	return (^Paint)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -7256,10 +7349,10 @@ Paint_getColorLong :: proc "contextless" (self: ^Paint) -> (result: i64, excepti
 	return jni_env->CallLongMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-Paint_getEndHyphenEdit :: proc "contextless" (self: ^Paint) -> (result: i32, exception: ^Throwable) {
+Paint_getEndHyphenEdit :: proc "contextless" (self: ^Paint) -> (result: Paint_EndHyphenEdit, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Paint__class, "getEndHyphenEdit", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return Paint_EndHyphenEdit(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Paint_getFillPath :: proc "contextless" (self: ^Paint, src: ^Path, dst: ^Path) -> (result: bool, exception: ^Throwable) {
@@ -7269,10 +7362,10 @@ Paint_getFillPath :: proc "contextless" (self: ^Paint, src: ^Path, dst: ^Path) -
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-Paint_getFlags :: proc "contextless" (self: ^Paint) -> (result: i32, exception: ^Throwable) {
+Paint_getFlags :: proc "contextless" (self: ^Paint) -> (result: Paint_Flags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Paint__class, "getFlags", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Paint_Flags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Paint_getFontFeatureSettings :: proc "contextless" (self: ^Paint) -> (result: ^String, exception: ^Throwable) {
@@ -7486,10 +7579,10 @@ Paint_getShadowLayerRadius :: proc "contextless" (self: ^Paint) -> (result: f32,
 	return jni_env->CallFloatMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-Paint_getStartHyphenEdit :: proc "contextless" (self: ^Paint) -> (result: i32, exception: ^Throwable) {
+Paint_getStartHyphenEdit :: proc "contextless" (self: ^Paint) -> (result: Paint_StartHyphenEdit, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Paint__class, "getStartHyphenEdit", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return Paint_StartHyphenEdit(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Paint_getStrikeThruPosition :: proc "contextless" (self: ^Paint) -> (result: f32, exception: ^Throwable) {
@@ -7610,17 +7703,17 @@ Paint_getTextRunAdvances :: proc "contextless" (self: ^Paint, chars: ^CharArray,
 	return jni_env->CallFloatMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-Paint_getTextRunCursor_CharArray_int_int_bool_int_int :: proc "contextless" (self: ^Paint, text: ^CharArray, contextStart: i32, contextLength: i32, isRtl: bool, offset: i32, cursorOpt: i32) -> (result: i32, exception: ^Throwable) {
+Paint_getTextRunCursor_CharArray_int_int_bool_int_int :: proc "contextless" (self: ^Paint, text: ^CharArray, contextStart: i32, contextLength: i32, isRtl: bool, offset: i32, cursorOpt: Paint_Cursor) -> (result: i32, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Paint__class, "getTextRunCursor", "([CIIZII)I", false) or_return
-	jni_args := [?]android.jvalue{{l = text}, {i = contextStart}, {i = contextLength}, {z = android.jboolean(isRtl)}, {i = offset}, {i = cursorOpt}}
+	jni_args := [?]android.jvalue{{l = text}, {i = contextStart}, {i = contextLength}, {z = android.jboolean(isRtl)}, {i = offset}, {i = i32(cursorOpt)}}
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-Paint_getTextRunCursor_CharSequence_int_int_bool_int_int :: proc "contextless" (self: ^Paint, text: ^CharSequence, contextStart: i32, contextEnd: i32, isRtl: bool, offset: i32, cursorOpt: i32) -> (result: i32, exception: ^Throwable) {
+Paint_getTextRunCursor_CharSequence_int_int_bool_int_int :: proc "contextless" (self: ^Paint, text: ^CharSequence, contextStart: i32, contextEnd: i32, isRtl: bool, offset: i32, cursorOpt: Paint_Cursor) -> (result: i32, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Paint__class, "getTextRunCursor", "(Ljava/lang/CharSequence;IIZII)I", false) or_return
-	jni_args := [?]android.jvalue{{l = text}, {i = contextStart}, {i = contextEnd}, {z = android.jboolean(isRtl)}, {i = offset}, {i = cursorOpt}}
+	jni_args := [?]android.jvalue{{l = text}, {i = contextStart}, {i = contextEnd}, {z = android.jboolean(isRtl)}, {i = offset}, {i = i32(cursorOpt)}}
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
@@ -7899,10 +7992,10 @@ Paint_setElegantTextHeight :: proc "contextless" (self: ^Paint, elegant: bool) -
 	return jni_take(jni_env)
 }
 
-Paint_setEndHyphenEdit :: proc "contextless" (self: ^Paint, endHyphen: i32) -> (exception: ^Throwable) {
+Paint_setEndHyphenEdit :: proc "contextless" (self: ^Paint, endHyphen: Paint_EndHyphenEdit) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Paint__class, "setEndHyphenEdit", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = endHyphen}}
+	jni_args := [?]android.jvalue{{i = i32(endHyphen)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -7923,10 +8016,10 @@ Paint_setFilterBitmap :: proc "contextless" (self: ^Paint, filter: bool) -> (exc
 	return jni_take(jni_env)
 }
 
-Paint_setFlags :: proc "contextless" (self: ^Paint, flags: i32) -> (exception: ^Throwable) {
+Paint_setFlags :: proc "contextless" (self: ^Paint, flags: Paint_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Paint__class, "setFlags", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -7954,10 +8047,10 @@ Paint_setFontVariationSettings :: proc "contextless" (self: ^Paint, fontVariatio
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-Paint_setHinting :: proc "contextless" (self: ^Paint, mode: i32) -> (exception: ^Throwable) {
+Paint_setHinting :: proc "contextless" (self: ^Paint, mode: Paint_Hinting) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Paint__class, "setHinting", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = mode}}
+	jni_args := [?]android.jvalue{{i = i32(mode)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -8020,10 +8113,10 @@ Paint_setShadowLayer :: proc{
 	Paint_setShadowLayer_float_float_float_long,
 }
 
-Paint_setStartHyphenEdit :: proc "contextless" (self: ^Paint, startHyphen: i32) -> (exception: ^Throwable) {
+Paint_setStartHyphenEdit :: proc "contextless" (self: ^Paint, startHyphen: Paint_StartHyphenEdit) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Paint__class, "setStartHyphenEdit", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = startHyphen}}
+	jni_args := [?]android.jvalue{{i = i32(startHyphen)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -8160,6 +8253,49 @@ Paint_setXfermode :: proc "contextless" (self: ^Paint, xfermode: ^Xfermode) -> (
 	jni_env, _, jni_id := jni_method(&jni_cache, &Paint__class, "setXfermode", "(Landroid/graphics/Xfermode;)Landroid/graphics/Xfermode;", false) or_return
 	jni_args := [?]android.jvalue{{l = xfermode}}
 	return (^Xfermode)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
+}
+
+Paint_Hinting :: enum i32 {
+	OFF = 0,
+	ON  = 1,
+}
+
+Paint_EndHyphenEdit :: enum i32 {
+	INSERT_ARMENIAN_HYPHEN = 3,
+	INSERT_HYPHEN          = 2,
+	INSERT_MAQAF           = 4,
+	INSERT_UCAS_HYPHEN     = 5,
+	INSERT_ZWJ_AND_HYPHEN  = 6,
+	NO_EDIT                = 0,
+	REPLACE_WITH_HYPHEN    = 1,
+}
+
+Paint_Flag :: enum u32 {
+	ANTI_ALIAS_FLAG           = 0,
+	DITHER_FLAG               = 2,
+	EMBEDDED_BITMAP_TEXT_FLAG = 10,
+	FAKE_BOLD_TEXT_FLAG       = 5,
+	FILTER_BITMAP_FLAG        = 1,
+	LINEAR_TEXT_FLAG          = 6,
+	STRIKE_THRU_TEXT_FLAG     = 4,
+	SUBPIXEL_TEXT_FLAG        = 7,
+	TEXT_RUN_FLAG_LEFT_EDGE   = 13,
+	TEXT_RUN_FLAG_RIGHT_EDGE  = 14,
+	UNDERLINE_TEXT_FLAG       = 3,
+}
+Paint_Flags :: distinct bit_set[Paint_Flag; u32]
+
+Paint_StartHyphenEdit :: enum i32 {
+	INSERT_HYPHEN = 1,
+	INSERT_ZWJ    = 2,
+	NO_EDIT       = 0,
+}
+
+Paint_Cursor :: enum i32 {
+	AFTER        = 0,
+	AT_OR_AFTER  = 1,
+	AT_OR_BEFORE = 3,
+	BEFORE       = 2,
 }
 
 // class android.graphics.Paint.Align
@@ -8572,10 +8708,10 @@ ParcelableColorSpace_new :: proc "contextless" (colorSpace: ^ColorSpace) -> (res
 	return (^ParcelableColorSpace)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ParcelableColorSpace_describeContents :: proc "contextless" (self: ^ParcelableColorSpace) -> (result: i32, exception: ^Throwable) {
+ParcelableColorSpace_describeContents :: proc "contextless" (self: ^ParcelableColorSpace) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ParcelableColorSpace__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ParcelableColorSpace_equals :: proc "contextless" (self: ^ParcelableColorSpace, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -8604,10 +8740,10 @@ ParcelableColorSpace_isParcelable :: proc "contextless" (colorSpace: ^ColorSpace
 	return jni_env->CallStaticBooleanMethodA(jni_class, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-ParcelableColorSpace_writeToParcel :: proc "contextless" (self: ^ParcelableColorSpace, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+ParcelableColorSpace_writeToParcel :: proc "contextless" (self: ^ParcelableColorSpace, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ParcelableColorSpace__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -9320,11 +9456,11 @@ PathIterator_next_void :: proc "contextless" (self: ^PathIterator) -> (result: ^
 	return (^PathIterator_Segment)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PathIterator_next_FloatArray_int :: proc "contextless" (self: ^PathIterator, points: ^FloatArray, offset: i32) -> (result: i32, exception: ^Throwable) {
+PathIterator_next_FloatArray_int :: proc "contextless" (self: ^PathIterator, points: ^FloatArray, offset: i32) -> (result: PathIterator_Verb, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PathIterator__class, "next", "([FI)I", false) or_return
 	jni_args := [?]android.jvalue{{l = points}, {i = offset}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return PathIterator_Verb(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 PathIterator_next :: proc{
@@ -9332,10 +9468,20 @@ PathIterator_next :: proc{
 	PathIterator_next_FloatArray_int,
 }
 
-PathIterator_peek :: proc "contextless" (self: ^PathIterator) -> (result: i32, exception: ^Throwable) {
+PathIterator_peek :: proc "contextless" (self: ^PathIterator) -> (result: PathIterator_Verb, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PathIterator__class, "peek", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return PathIterator_Verb(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
+}
+
+PathIterator_Verb :: enum i32 {
+	CLOSE = 5,
+	CONIC = 3,
+	CUBIC = 4,
+	DONE  = 6,
+	LINE  = 1,
+	MOVE  = 0,
+	QUAD  = 2,
 }
 
 // class android.graphics.PathIterator.Segment // API level 34
@@ -9358,10 +9504,10 @@ PathIterator_Segment_getPoints :: proc "contextless" (self: ^PathIterator_Segmen
 	return (^FloatArray)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PathIterator_Segment_getVerb :: proc "contextless" (self: ^PathIterator_Segment) -> (result: i32, exception: ^Throwable) {
+PathIterator_Segment_getVerb :: proc "contextless" (self: ^PathIterator_Segment) -> (result: PathIterator_Verb, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PathIterator_Segment__class, "getVerb", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return PathIterator_Verb(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 // class android.graphics.PathMeasure
@@ -9399,10 +9545,10 @@ PathMeasure_getLength :: proc "contextless" (self: ^PathMeasure) -> (result: f32
 	return jni_env->CallFloatMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-PathMeasure_getMatrix :: proc "contextless" (self: ^PathMeasure, distance: f32, matrix_: ^Matrix, flags: i32) -> (result: bool, exception: ^Throwable) {
+PathMeasure_getMatrix :: proc "contextless" (self: ^PathMeasure, distance: f32, matrix_: ^Matrix, flags: PathMeasure_MatrixFlags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PathMeasure__class, "getMatrix", "(FLandroid/graphics/Matrix;I)Z", false) or_return
-	jni_args := [?]android.jvalue{{f = distance}, {l = matrix_}, {i = flags}}
+	jni_args := [?]android.jvalue{{f = distance}, {l = matrix_}, {i = transmute(i32)flags}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -9439,6 +9585,12 @@ PathMeasure_setPath :: proc "contextless" (self: ^PathMeasure, path: ^Path, forc
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+PathMeasure_MatrixFlag :: enum u32 {
+	POSITION_MATRIX_FLAG = 0,
+	TANGENT_MATRIX_FLAG  = 1,
+}
+PathMeasure_MatrixFlags :: distinct bit_set[PathMeasure_MatrixFlag; u32]
 
 // class android.graphics.Picture
 Picture :: struct #raw_union {
@@ -9567,19 +9719,42 @@ PixelFormat_new :: proc "contextless" () -> (result: ^PixelFormat, exception: ^T
 	return (^PixelFormat)(jni_env->NewObjectA(jni_class, jni_id, nil)), jni_take(jni_env)
 }
 
-PixelFormat_formatHasAlpha :: proc "contextless" (format: i32) -> (result: bool, exception: ^Throwable) {
+PixelFormat_formatHasAlpha :: proc "contextless" (format: PixelFormat_Format) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &PixelFormat__class, "formatHasAlpha", "(I)Z", true) or_return
-	jni_args := [?]android.jvalue{{i = format}}
+	jni_args := [?]android.jvalue{{i = i32(format)}}
 	return jni_env->CallStaticBooleanMethodA(jni_class, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-PixelFormat_getPixelFormatInfo :: proc "contextless" (format: i32, info: ^PixelFormat) -> (exception: ^Throwable) {
+PixelFormat_getPixelFormatInfo :: proc "contextless" (format: PixelFormat_Format, info: ^PixelFormat) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &PixelFormat__class, "getPixelFormatInfo", "(ILandroid/graphics/PixelFormat;)V", true) or_return
-	jni_args := [?]android.jvalue{{i = format}, {l = info}}
+	jni_args := [?]android.jvalue{{i = i32(format)}, {l = info}}
 	jni_env->CallStaticVoidMethodA(jni_class, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+PixelFormat_Format :: enum i32 {
+	A_8          = 8,
+	JPEG         = 256,
+	LA_88        = 10,
+	L_8          = 9,
+	OPAQUE       = -1,
+	RGBA_1010102 = 43,
+	RGBA_4444    = 7,
+	RGBA_5551    = 6,
+	RGBA_8888    = 1,
+	RGBA_F16     = 22,
+	RGBX_8888    = 2,
+	RGB_332      = 11,
+	RGB_565      = 4,
+	RGB_888      = 3,
+	TRANSLUCENT  = -3,
+	TRANSPARENT  = -2,
+	UNKNOWN      = 0,
+	YCbCr_420_SP = 17,
+	YCbCr_422_I  = 20,
+	YCbCr_422_SP = 16,
 }
 
 // class android.graphics.Point
@@ -9649,10 +9824,10 @@ Point_new :: proc{
 	Point_new_int_int,
 }
 
-Point_describeContents :: proc "contextless" (self: ^Point) -> (result: i32, exception: ^Throwable) {
+Point_describeContents :: proc "contextless" (self: ^Point) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Point__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Point_equals_int_int :: proc "contextless" (self: ^Point, x: i32, y: i32) -> (result: bool, exception: ^Throwable) {
@@ -9717,10 +9892,10 @@ Point_toString :: proc "contextless" (self: ^Point) -> (result: ^String, excepti
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Point_writeToParcel :: proc "contextless" (self: ^Point, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+Point_writeToParcel :: proc "contextless" (self: ^Point, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Point__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -9800,10 +9975,10 @@ PointF_new :: proc{
 	PointF_new_float_float,
 }
 
-PointF_describeContents :: proc "contextless" (self: ^PointF) -> (result: i32, exception: ^Throwable) {
+PointF_describeContents :: proc "contextless" (self: ^PointF) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PointF__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 PointF_equals_float_float :: proc "contextless" (self: ^PointF, x: f32, y: f32) -> (result: bool, exception: ^Throwable) {
@@ -9899,10 +10074,10 @@ PointF_toString :: proc "contextless" (self: ^PointF) -> (result: ^String, excep
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PointF_writeToParcel :: proc "contextless" (self: ^PointF, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+PointF_writeToParcel :: proc "contextless" (self: ^PointF, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PointF__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -10101,11 +10276,11 @@ PostProcessor :: struct #raw_union {
 @(private)
 PostProcessor__class := Cached_Class{name = "android/graphics/PostProcessor"}
 
-PostProcessor_onPostProcess :: proc "contextless" (self: ^PostProcessor, canvas: ^Canvas) -> (result: i32, exception: ^Throwable) {
+PostProcessor_onPostProcess :: proc "contextless" (self: ^PostProcessor, canvas: ^Canvas) -> (result: PixelFormat_Format, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PostProcessor__class, "onPostProcess", "(Landroid/graphics/Canvas;)I", false) or_return
 	jni_args := [?]android.jvalue{{l = canvas}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return PixelFormat_Format(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 // class android.graphics.RadialGradient
@@ -10883,10 +11058,10 @@ Rect_contains :: proc{
 	Rect_contains_int_int_int_int,
 }
 
-Rect_describeContents :: proc "contextless" (self: ^Rect) -> (result: i32, exception: ^Throwable) {
+Rect_describeContents :: proc "contextless" (self: ^Rect) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Rect__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Rect_equals :: proc "contextless" (self: ^Rect, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -11121,10 +11296,10 @@ Rect_width :: proc "contextless" (self: ^Rect) -> (result: i32, exception: ^Thro
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-Rect_writeToParcel :: proc "contextless" (self: ^Rect, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+Rect_writeToParcel :: proc "contextless" (self: ^Rect, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Rect__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -11269,10 +11444,10 @@ RectF_contains :: proc{
 	RectF_contains_float_float_float_float,
 }
 
-RectF_describeContents :: proc "contextless" (self: ^RectF) -> (result: i32, exception: ^Throwable) {
+RectF_describeContents :: proc "contextless" (self: ^RectF) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &RectF__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 RectF_equals :: proc "contextless" (self: ^RectF, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -11485,10 +11660,10 @@ RectF_width :: proc "contextless" (self: ^RectF) -> (result: f32, exception: ^Th
 	return jni_env->CallFloatMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-RectF_writeToParcel :: proc "contextless" (self: ^RectF, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+RectF_writeToParcel :: proc "contextless" (self: ^RectF, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &RectF__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -11549,10 +11724,10 @@ Region_contains :: proc "contextless" (self: ^Region, x: i32, y: i32) -> (result
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-Region_describeContents :: proc "contextless" (self: ^Region) -> (result: i32, exception: ^Throwable) {
+Region_describeContents :: proc "contextless" (self: ^Region) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Region__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Region_equals :: proc "contextless" (self: ^Region, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -11780,10 +11955,10 @@ Region_union :: proc "contextless" (self: ^Region, r: ^Rect) -> (result: bool, e
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-Region_writeToParcel :: proc "contextless" (self: ^Region, p: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+Region_writeToParcel :: proc "contextless" (self: ^Region, p: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Region__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = p}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = p}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -13105,10 +13280,10 @@ SurfaceTexture_detachFromGLContext :: proc "contextless" (self: ^SurfaceTexture)
 	return jni_take(jni_env)
 }
 
-SurfaceTexture_getDataSpace :: proc "contextless" (self: ^SurfaceTexture) -> (result: i32, exception: ^Throwable) { // API level 33
+SurfaceTexture_getDataSpace :: proc "contextless" (self: ^SurfaceTexture) -> (result: DataSpace_Field, exception: ^Throwable) { // API level 33
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurfaceTexture__class, "getDataSpace", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(DataSpace_Field)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 SurfaceTexture_getTimestamp :: proc "contextless" (self: ^SurfaceTexture) -> (result: i64, exception: ^Throwable) {
@@ -13309,10 +13484,10 @@ Typeface_get_SERIF :: proc "contextless" () -> (result: ^Typeface, exception: ^T
 	return (^Typeface)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-Typeface_create_Typeface_int :: proc "contextless" (family: ^Typeface, style: i32) -> (result: ^Typeface, exception: ^Throwable) {
+Typeface_create_Typeface_int :: proc "contextless" (family: ^Typeface, style: Typeface_Style) -> (result: ^Typeface, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Typeface__class, "create", "(Landroid/graphics/Typeface;I)Landroid/graphics/Typeface;", true) or_return
-	jni_args := [?]android.jvalue{{l = family}, {i = style}}
+	jni_args := [?]android.jvalue{{l = family}, {i = i32(style)}}
 	return (^Typeface)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -13323,10 +13498,10 @@ Typeface_create_Typeface_int_bool :: proc "contextless" (family: ^Typeface, weig
 	return (^Typeface)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Typeface_create_String_int :: proc "contextless" (familyName: ^String, style: i32) -> (result: ^Typeface, exception: ^Throwable) {
+Typeface_create_String_int :: proc "contextless" (familyName: ^String, style: Typeface_Style) -> (result: ^Typeface, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Typeface__class, "create", "(Ljava/lang/String;I)Landroid/graphics/Typeface;", true) or_return
-	jni_args := [?]android.jvalue{{l = familyName}, {i = style}}
+	jni_args := [?]android.jvalue{{l = familyName}, {i = i32(style)}}
 	return (^Typeface)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -13362,10 +13537,10 @@ Typeface_createFromFile :: proc{
 	Typeface_createFromFile_String,
 }
 
-Typeface_defaultFromStyle :: proc "contextless" (style: i32) -> (result: ^Typeface, exception: ^Throwable) {
+Typeface_defaultFromStyle :: proc "contextless" (style: Typeface_Style) -> (result: ^Typeface, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Typeface__class, "defaultFromStyle", "(I)Landroid/graphics/Typeface;", true) or_return
-	jni_args := [?]android.jvalue{{i = style}}
+	jni_args := [?]android.jvalue{{i = i32(style)}}
 	return (^Typeface)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -13376,10 +13551,10 @@ Typeface_equals :: proc "contextless" (self: ^Typeface, o: ^Object) -> (result: 
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-Typeface_getStyle :: proc "contextless" (self: ^Typeface) -> (result: i32, exception: ^Throwable) {
+Typeface_getStyle :: proc "contextless" (self: ^Typeface) -> (result: Typeface_Style, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Typeface__class, "getStyle", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return Typeface_Style(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Typeface_getSystemFontFamilyName :: proc "contextless" (self: ^Typeface) -> (result: ^String, exception: ^Throwable) { // API level 34
@@ -13410,6 +13585,13 @@ Typeface_isItalic :: proc "contextless" (self: ^Typeface) -> (result: bool, exce
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Typeface__class, "isItalic", "()Z", false) or_return
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
+}
+
+Typeface_Style :: enum i32 {
+	BOLD        = 1,
+	BOLD_ITALIC = 3,
+	ITALIC      = 2,
+	NORMAL      = 0,
 }
 
 // class android.graphics.Typeface.Builder
@@ -13578,17 +13760,17 @@ YuvImage :: struct #raw_union {
 @(private)
 YuvImage__class := Cached_Class{name = "android/graphics/YuvImage"}
 
-YuvImage_new_ByteArray_int_int_int_IntArray :: proc "contextless" (yuv: ^ByteArray, format: i32, width: i32, height: i32, strides: ^IntArray) -> (result: ^YuvImage, exception: ^Throwable) {
+YuvImage_new_ByteArray_int_int_int_IntArray :: proc "contextless" (yuv: ^ByteArray, format: ImageFormat_Format, width: i32, height: i32, strides: ^IntArray) -> (result: ^YuvImage, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &YuvImage__class, "<init>", "([BIII[I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = yuv}, {i = format}, {i = width}, {i = height}, {l = strides}}
+	jni_args := [?]android.jvalue{{l = yuv}, {i = i32(format)}, {i = width}, {i = height}, {l = strides}}
 	return (^YuvImage)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-YuvImage_new_ByteArray_int_int_int_IntArray_ColorSpace :: proc "contextless" (yuv: ^ByteArray, format: i32, width: i32, height: i32, strides: ^IntArray, colorSpace: ^ColorSpace) -> (result: ^YuvImage, exception: ^Throwable) { // API level 34
+YuvImage_new_ByteArray_int_int_int_IntArray_ColorSpace :: proc "contextless" (yuv: ^ByteArray, format: ImageFormat_Format, width: i32, height: i32, strides: ^IntArray, colorSpace: ^ColorSpace) -> (result: ^YuvImage, exception: ^Throwable) { // API level 34
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &YuvImage__class, "<init>", "([BIII[ILandroid/graphics/ColorSpace;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = yuv}, {i = format}, {i = width}, {i = height}, {l = strides}, {l = colorSpace}}
+	jni_args := [?]android.jvalue{{l = yuv}, {i = i32(format)}, {i = width}, {i = height}, {l = strides}, {l = colorSpace}}
 	return (^YuvImage)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -13641,8 +13823,8 @@ YuvImage_getYuvData :: proc "contextless" (self: ^YuvImage) -> (result: ^ByteArr
 	return (^ByteArray)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-YuvImage_getYuvFormat :: proc "contextless" (self: ^YuvImage) -> (result: i32, exception: ^Throwable) {
+YuvImage_getYuvFormat :: proc "contextless" (self: ^YuvImage) -> (result: ImageFormat_Format, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &YuvImage__class, "getYuvFormat", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return ImageFormat_Format(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }

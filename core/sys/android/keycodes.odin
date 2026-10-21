@@ -3,344 +3,346 @@
 #+build linux
 package android
 
-AKEYCODE_UNKNOWN                       :: 0
-AKEYCODE_SOFT_LEFT                     :: 1
-AKEYCODE_SOFT_RIGHT                    :: 2
-AKEYCODE_HOME                          :: 3
-AKEYCODE_BACK                          :: 4
-AKEYCODE_CALL                          :: 5
-AKEYCODE_ENDCALL                       :: 6
-AKEYCODE_0                             :: 7
-AKEYCODE_1                             :: 8
-AKEYCODE_2                             :: 9
-AKEYCODE_3                             :: 10
-AKEYCODE_4                             :: 11
-AKEYCODE_5                             :: 12
-AKEYCODE_6                             :: 13
-AKEYCODE_7                             :: 14
-AKEYCODE_8                             :: 15
-AKEYCODE_9                             :: 16
-AKEYCODE_STAR                          :: 17
-AKEYCODE_POUND                         :: 18
-AKEYCODE_DPAD_UP                       :: 19
-AKEYCODE_DPAD_DOWN                     :: 20
-AKEYCODE_DPAD_LEFT                     :: 21
-AKEYCODE_DPAD_RIGHT                    :: 22
-AKEYCODE_DPAD_CENTER                   :: 23
-AKEYCODE_VOLUME_UP                     :: 24
-AKEYCODE_VOLUME_DOWN                   :: 25
-AKEYCODE_POWER                         :: 26
-AKEYCODE_CAMERA                        :: 27
-AKEYCODE_CLEAR                         :: 28
-AKEYCODE_A                             :: 29
-AKEYCODE_B                             :: 30
-AKEYCODE_C                             :: 31
-AKEYCODE_D                             :: 32
-AKEYCODE_E                             :: 33
-AKEYCODE_F                             :: 34
-AKEYCODE_G                             :: 35
-AKEYCODE_H                             :: 36
-AKEYCODE_I                             :: 37
-AKEYCODE_J                             :: 38
-AKEYCODE_K                             :: 39
-AKEYCODE_L                             :: 40
-AKEYCODE_M                             :: 41
-AKEYCODE_N                             :: 42
-AKEYCODE_O                             :: 43
-AKEYCODE_P                             :: 44
-AKEYCODE_Q                             :: 45
-AKEYCODE_R                             :: 46
-AKEYCODE_S                             :: 47
-AKEYCODE_T                             :: 48
-AKEYCODE_U                             :: 49
-AKEYCODE_V                             :: 50
-AKEYCODE_W                             :: 51
-AKEYCODE_X                             :: 52
-AKEYCODE_Y                             :: 53
-AKEYCODE_Z                             :: 54
-AKEYCODE_COMMA                         :: 55
-AKEYCODE_PERIOD                        :: 56
-AKEYCODE_ALT_LEFT                      :: 57
-AKEYCODE_ALT_RIGHT                     :: 58
-AKEYCODE_SHIFT_LEFT                    :: 59
-AKEYCODE_SHIFT_RIGHT                   :: 60
-AKEYCODE_TAB                           :: 61
-AKEYCODE_SPACE                         :: 62
-AKEYCODE_SYM                           :: 63
-AKEYCODE_EXPLORER                      :: 64
-AKEYCODE_ENVELOPE                      :: 65
-AKEYCODE_ENTER                         :: 66
-AKEYCODE_DEL                           :: 67
-AKEYCODE_GRAVE                         :: 68
-AKEYCODE_MINUS                         :: 69
-AKEYCODE_EQUALS                        :: 70
-AKEYCODE_LEFT_BRACKET                  :: 71
-AKEYCODE_RIGHT_BRACKET                 :: 72
-AKEYCODE_BACKSLASH                     :: 73
-AKEYCODE_SEMICOLON                     :: 74
-AKEYCODE_APOSTROPHE                    :: 75
-AKEYCODE_SLASH                         :: 76
-AKEYCODE_AT                            :: 77
-AKEYCODE_NUM                           :: 78
-AKEYCODE_HEADSETHOOK                   :: 79
-AKEYCODE_FOCUS                         :: 80
-AKEYCODE_PLUS                          :: 81
-AKEYCODE_MENU                          :: 82
-AKEYCODE_NOTIFICATION                  :: 83
-AKEYCODE_SEARCH                        :: 84
-AKEYCODE_MEDIA_PLAY_PAUSE              :: 85
-AKEYCODE_MEDIA_STOP                    :: 86
-AKEYCODE_MEDIA_NEXT                    :: 87
-AKEYCODE_MEDIA_PREVIOUS                :: 88
-AKEYCODE_MEDIA_REWIND                  :: 89
-AKEYCODE_MEDIA_FAST_FORWARD            :: 90
-AKEYCODE_MUTE                          :: 91
-AKEYCODE_PAGE_UP                       :: 92
-AKEYCODE_PAGE_DOWN                     :: 93
-AKEYCODE_PICTSYMBOLS                   :: 94
-AKEYCODE_SWITCH_CHARSET                :: 95
-AKEYCODE_BUTTON_A                      :: 96
-AKEYCODE_BUTTON_B                      :: 97
-AKEYCODE_BUTTON_C                      :: 98
-AKEYCODE_BUTTON_X                      :: 99
-AKEYCODE_BUTTON_Y                      :: 100
-AKEYCODE_BUTTON_Z                      :: 101
-AKEYCODE_BUTTON_L1                     :: 102
-AKEYCODE_BUTTON_R1                     :: 103
-AKEYCODE_BUTTON_L2                     :: 104
-AKEYCODE_BUTTON_R2                     :: 105
-AKEYCODE_BUTTON_THUMBL                 :: 106
-AKEYCODE_BUTTON_THUMBR                 :: 107
-AKEYCODE_BUTTON_START                  :: 108
-AKEYCODE_BUTTON_SELECT                 :: 109
-AKEYCODE_BUTTON_MODE                   :: 110
-AKEYCODE_ESCAPE                        :: 111
-AKEYCODE_FORWARD_DEL                   :: 112
-AKEYCODE_CTRL_LEFT                     :: 113
-AKEYCODE_CTRL_RIGHT                    :: 114
-AKEYCODE_CAPS_LOCK                     :: 115
-AKEYCODE_SCROLL_LOCK                   :: 116
-AKEYCODE_META_LEFT                     :: 117
-AKEYCODE_META_RIGHT                    :: 118
-AKEYCODE_FUNCTION                      :: 119
-AKEYCODE_SYSRQ                         :: 120
-AKEYCODE_BREAK                         :: 121
-AKEYCODE_MOVE_HOME                     :: 122
-AKEYCODE_MOVE_END                      :: 123
-AKEYCODE_INSERT                        :: 124
-AKEYCODE_FORWARD                       :: 125
-AKEYCODE_MEDIA_PLAY                    :: 126
-AKEYCODE_MEDIA_PAUSE                   :: 127
-AKEYCODE_MEDIA_CLOSE                   :: 128
-AKEYCODE_MEDIA_EJECT                   :: 129
-AKEYCODE_MEDIA_RECORD                  :: 130
-AKEYCODE_F1                            :: 131
-AKEYCODE_F2                            :: 132
-AKEYCODE_F3                            :: 133
-AKEYCODE_F4                            :: 134
-AKEYCODE_F5                            :: 135
-AKEYCODE_F6                            :: 136
-AKEYCODE_F7                            :: 137
-AKEYCODE_F8                            :: 138
-AKEYCODE_F9                            :: 139
-AKEYCODE_F10                           :: 140
-AKEYCODE_F11                           :: 141
-AKEYCODE_F12                           :: 142
-AKEYCODE_NUM_LOCK                      :: 143
-AKEYCODE_NUMPAD_0                      :: 144
-AKEYCODE_NUMPAD_1                      :: 145
-AKEYCODE_NUMPAD_2                      :: 146
-AKEYCODE_NUMPAD_3                      :: 147
-AKEYCODE_NUMPAD_4                      :: 148
-AKEYCODE_NUMPAD_5                      :: 149
-AKEYCODE_NUMPAD_6                      :: 150
-AKEYCODE_NUMPAD_7                      :: 151
-AKEYCODE_NUMPAD_8                      :: 152
-AKEYCODE_NUMPAD_9                      :: 153
-AKEYCODE_NUMPAD_DIVIDE                 :: 154
-AKEYCODE_NUMPAD_MULTIPLY               :: 155
-AKEYCODE_NUMPAD_SUBTRACT               :: 156
-AKEYCODE_NUMPAD_ADD                    :: 157
-AKEYCODE_NUMPAD_DOT                    :: 158
-AKEYCODE_NUMPAD_COMMA                  :: 159
-AKEYCODE_NUMPAD_ENTER                  :: 160
-AKEYCODE_NUMPAD_EQUALS                 :: 161
-AKEYCODE_NUMPAD_LEFT_PAREN             :: 162
-AKEYCODE_NUMPAD_RIGHT_PAREN            :: 163
-AKEYCODE_VOLUME_MUTE                   :: 164
-AKEYCODE_INFO                          :: 165
-AKEYCODE_CHANNEL_UP                    :: 166
-AKEYCODE_CHANNEL_DOWN                  :: 167
-AKEYCODE_ZOOM_IN                       :: 168
-AKEYCODE_ZOOM_OUT                      :: 169
-AKEYCODE_TV                            :: 170
-AKEYCODE_WINDOW                        :: 171
-AKEYCODE_GUIDE                         :: 172
-AKEYCODE_DVR                           :: 173
-AKEYCODE_BOOKMARK                      :: 174
-AKEYCODE_CAPTIONS                      :: 175
-AKEYCODE_SETTINGS                      :: 176
-AKEYCODE_TV_POWER                      :: 177
-AKEYCODE_TV_INPUT                      :: 178
-AKEYCODE_STB_POWER                     :: 179
-AKEYCODE_STB_INPUT                     :: 180
-AKEYCODE_AVR_POWER                     :: 181
-AKEYCODE_AVR_INPUT                     :: 182
-AKEYCODE_PROG_RED                      :: 183
-AKEYCODE_PROG_GREEN                    :: 184
-AKEYCODE_PROG_YELLOW                   :: 185
-AKEYCODE_PROG_BLUE                     :: 186
-AKEYCODE_APP_SWITCH                    :: 187
-AKEYCODE_BUTTON_1                      :: 188
-AKEYCODE_BUTTON_2                      :: 189
-AKEYCODE_BUTTON_3                      :: 190
-AKEYCODE_BUTTON_4                      :: 191
-AKEYCODE_BUTTON_5                      :: 192
-AKEYCODE_BUTTON_6                      :: 193
-AKEYCODE_BUTTON_7                      :: 194
-AKEYCODE_BUTTON_8                      :: 195
-AKEYCODE_BUTTON_9                      :: 196
-AKEYCODE_BUTTON_10                     :: 197
-AKEYCODE_BUTTON_11                     :: 198
-AKEYCODE_BUTTON_12                     :: 199
-AKEYCODE_BUTTON_13                     :: 200
-AKEYCODE_BUTTON_14                     :: 201
-AKEYCODE_BUTTON_15                     :: 202
-AKEYCODE_BUTTON_16                     :: 203
-AKEYCODE_LANGUAGE_SWITCH               :: 204
-AKEYCODE_MANNER_MODE                   :: 205
-AKEYCODE_3D_MODE                       :: 206
-AKEYCODE_CONTACTS                      :: 207
-AKEYCODE_CALENDAR                      :: 208
-AKEYCODE_MUSIC                         :: 209
-AKEYCODE_CALCULATOR                    :: 210
-AKEYCODE_ZENKAKU_HANKAKU               :: 211
-AKEYCODE_EISU                          :: 212
-AKEYCODE_MUHENKAN                      :: 213
-AKEYCODE_HENKAN                        :: 214
-AKEYCODE_KATAKANA_HIRAGANA             :: 215
-AKEYCODE_YEN                           :: 216
-AKEYCODE_RO                            :: 217
-AKEYCODE_KANA                          :: 218
-AKEYCODE_ASSIST                        :: 219
-AKEYCODE_BRIGHTNESS_DOWN               :: 220
-AKEYCODE_BRIGHTNESS_UP                 :: 221
-AKEYCODE_MEDIA_AUDIO_TRACK             :: 222
-AKEYCODE_SLEEP                         :: 223
-AKEYCODE_WAKEUP                        :: 224
-AKEYCODE_PAIRING                       :: 225
-AKEYCODE_MEDIA_TOP_MENU                :: 226
-AKEYCODE_11                            :: 227
-AKEYCODE_12                            :: 228
-AKEYCODE_LAST_CHANNEL                  :: 229
-AKEYCODE_TV_DATA_SERVICE               :: 230
-AKEYCODE_VOICE_ASSIST                  :: 231
-AKEYCODE_TV_RADIO_SERVICE              :: 232
-AKEYCODE_TV_TELETEXT                   :: 233
-AKEYCODE_TV_NUMBER_ENTRY               :: 234
-AKEYCODE_TV_TERRESTRIAL_ANALOG         :: 235
-AKEYCODE_TV_TERRESTRIAL_DIGITAL        :: 236
-AKEYCODE_TV_SATELLITE                  :: 237
-AKEYCODE_TV_SATELLITE_BS               :: 238
-AKEYCODE_TV_SATELLITE_CS               :: 239
-AKEYCODE_TV_SATELLITE_SERVICE          :: 240
-AKEYCODE_TV_NETWORK                    :: 241
-AKEYCODE_TV_ANTENNA_CABLE              :: 242
-AKEYCODE_TV_INPUT_HDMI_1               :: 243
-AKEYCODE_TV_INPUT_HDMI_2               :: 244
-AKEYCODE_TV_INPUT_HDMI_3               :: 245
-AKEYCODE_TV_INPUT_HDMI_4               :: 246
-AKEYCODE_TV_INPUT_COMPOSITE_1          :: 247
-AKEYCODE_TV_INPUT_COMPOSITE_2          :: 248
-AKEYCODE_TV_INPUT_COMPONENT_1          :: 249
-AKEYCODE_TV_INPUT_COMPONENT_2          :: 250
-AKEYCODE_TV_INPUT_VGA_1                :: 251
-AKEYCODE_TV_AUDIO_DESCRIPTION          :: 252
-AKEYCODE_TV_AUDIO_DESCRIPTION_MIX_UP   :: 253
-AKEYCODE_TV_AUDIO_DESCRIPTION_MIX_DOWN :: 254
-AKEYCODE_TV_ZOOM_MODE                  :: 255
-AKEYCODE_TV_CONTENTS_MENU              :: 256
-AKEYCODE_TV_MEDIA_CONTEXT_MENU         :: 257
-AKEYCODE_TV_TIMER_PROGRAMMING          :: 258
-AKEYCODE_HELP                          :: 259
-AKEYCODE_NAVIGATE_PREVIOUS             :: 260
-AKEYCODE_NAVIGATE_NEXT                 :: 261
-AKEYCODE_NAVIGATE_IN                   :: 262
-AKEYCODE_NAVIGATE_OUT                  :: 263
-AKEYCODE_STEM_PRIMARY                  :: 264
-AKEYCODE_STEM_1                        :: 265
-AKEYCODE_STEM_2                        :: 266
-AKEYCODE_STEM_3                        :: 267
-AKEYCODE_DPAD_UP_LEFT                  :: 268
-AKEYCODE_DPAD_DOWN_LEFT                :: 269
-AKEYCODE_DPAD_UP_RIGHT                 :: 270
-AKEYCODE_DPAD_DOWN_RIGHT               :: 271
-AKEYCODE_MEDIA_SKIP_FORWARD            :: 272
-AKEYCODE_MEDIA_SKIP_BACKWARD           :: 273
-AKEYCODE_MEDIA_STEP_FORWARD            :: 274
-AKEYCODE_MEDIA_STEP_BACKWARD           :: 275
-AKEYCODE_SOFT_SLEEP                    :: 276
-AKEYCODE_CUT                           :: 277
-AKEYCODE_COPY                          :: 278
-AKEYCODE_PASTE                         :: 279
-AKEYCODE_SYSTEM_NAVIGATION_UP          :: 280
-AKEYCODE_SYSTEM_NAVIGATION_DOWN        :: 281
-AKEYCODE_SYSTEM_NAVIGATION_LEFT        :: 282
-AKEYCODE_SYSTEM_NAVIGATION_RIGHT       :: 283
-AKEYCODE_ALL_APPS                      :: 284
-AKEYCODE_REFRESH                       :: 285
-AKEYCODE_THUMBS_UP                     :: 286
-AKEYCODE_THUMBS_DOWN                   :: 287
-AKEYCODE_PROFILE_SWITCH                :: 288
-AKEYCODE_VIDEO_APP_1                   :: 289
-AKEYCODE_VIDEO_APP_2                   :: 290
-AKEYCODE_VIDEO_APP_3                   :: 291
-AKEYCODE_VIDEO_APP_4                   :: 292
-AKEYCODE_VIDEO_APP_5                   :: 293
-AKEYCODE_VIDEO_APP_6                   :: 294
-AKEYCODE_VIDEO_APP_7                   :: 295
-AKEYCODE_VIDEO_APP_8                   :: 296
-AKEYCODE_FEATURED_APP_1                :: 297
-AKEYCODE_FEATURED_APP_2                :: 298
-AKEYCODE_FEATURED_APP_3                :: 299
-AKEYCODE_FEATURED_APP_4                :: 300
-AKEYCODE_DEMO_APP_1                    :: 301
-AKEYCODE_DEMO_APP_2                    :: 302
-AKEYCODE_DEMO_APP_3                    :: 303
-AKEYCODE_DEMO_APP_4                    :: 304
-AKEYCODE_KEYBOARD_BACKLIGHT_DOWN       :: 305
-AKEYCODE_KEYBOARD_BACKLIGHT_UP         :: 306
-AKEYCODE_KEYBOARD_BACKLIGHT_TOGGLE     :: 307
-AKEYCODE_STYLUS_BUTTON_PRIMARY         :: 308
-AKEYCODE_STYLUS_BUTTON_SECONDARY       :: 309
-AKEYCODE_STYLUS_BUTTON_TERTIARY        :: 310
-AKEYCODE_STYLUS_BUTTON_TAIL            :: 311
-AKEYCODE_RECENT_APPS                   :: 312
-AKEYCODE_MACRO_1                       :: 313
-AKEYCODE_MACRO_2                       :: 314
-AKEYCODE_MACRO_3                       :: 315
-AKEYCODE_MACRO_4                       :: 316
-AKEYCODE_EMOJI_PICKER                  :: 317
-AKEYCODE_SCREENSHOT                    :: 318
-AKEYCODE_DICTATE                       :: 319
-AKEYCODE_NEW                           :: 320
-AKEYCODE_CLOSE                         :: 321
-AKEYCODE_DO_NOT_DISTURB                :: 322
-AKEYCODE_PRINT                         :: 323
-AKEYCODE_LOCK                          :: 324
-AKEYCODE_FULLSCREEN                    :: 325
-AKEYCODE_F13                           :: 326
-AKEYCODE_F14                           :: 327
-AKEYCODE_F15                           :: 328
-AKEYCODE_F16                           :: 329
-AKEYCODE_F17                           :: 330
-AKEYCODE_F18                           :: 331
-AKEYCODE_F19                           :: 332
-AKEYCODE_F20                           :: 333
-AKEYCODE_F21                           :: 334
-AKEYCODE_F22                           :: 335
-AKEYCODE_F23                           :: 336
-AKEYCODE_F24                           :: 337
-AKEYCODE_ACCESSIBILITY                 :: 338
-AKEYCODE_CONTEXTUAL_SEARCH             :: 339
-AKEYCODE_CONTEXTUAL_INSERT             :: 340
+AKeyCode :: enum i32 {
+	UNKNOWN                       = 0,
+	SOFT_LEFT                     = 1,
+	SOFT_RIGHT                    = 2,
+	HOME                          = 3,
+	BACK                          = 4,
+	CALL                          = 5,
+	ENDCALL                       = 6,
+	NUM0                          = 7,
+	NUM1                          = 8,
+	NUM2                          = 9,
+	NUM3                          = 10,
+	NUM4                          = 11,
+	NUM5                          = 12,
+	NUM6                          = 13,
+	NUM7                          = 14,
+	NUM8                          = 15,
+	NUM9                          = 16,
+	STAR                          = 17,
+	POUND                         = 18,
+	DPAD_UP                       = 19,
+	DPAD_DOWN                     = 20,
+	DPAD_LEFT                     = 21,
+	DPAD_RIGHT                    = 22,
+	DPAD_CENTER                   = 23,
+	VOLUME_UP                     = 24,
+	VOLUME_DOWN                   = 25,
+	POWER                         = 26,
+	CAMERA                        = 27,
+	CLEAR                         = 28,
+	A                             = 29,
+	B                             = 30,
+	C                             = 31,
+	D                             = 32,
+	E                             = 33,
+	F                             = 34,
+	G                             = 35,
+	H                             = 36,
+	I                             = 37,
+	J                             = 38,
+	K                             = 39,
+	L                             = 40,
+	M                             = 41,
+	N                             = 42,
+	O                             = 43,
+	P                             = 44,
+	Q                             = 45,
+	R                             = 46,
+	S                             = 47,
+	T                             = 48,
+	U                             = 49,
+	V                             = 50,
+	W                             = 51,
+	X                             = 52,
+	Y                             = 53,
+	Z                             = 54,
+	COMMA                         = 55,
+	PERIOD                        = 56,
+	ALT_LEFT                      = 57,
+	ALT_RIGHT                     = 58,
+	SHIFT_LEFT                    = 59,
+	SHIFT_RIGHT                   = 60,
+	TAB                           = 61,
+	SPACE                         = 62,
+	SYM                           = 63,
+	EXPLORER                      = 64,
+	ENVELOPE                      = 65,
+	ENTER                         = 66,
+	DEL                           = 67,
+	GRAVE                         = 68,
+	MINUS                         = 69,
+	EQUALS                        = 70,
+	LEFT_BRACKET                  = 71,
+	RIGHT_BRACKET                 = 72,
+	BACKSLASH                     = 73,
+	SEMICOLON                     = 74,
+	APOSTROPHE                    = 75,
+	SLASH                         = 76,
+	AT                            = 77,
+	NUM                           = 78,
+	HEADSETHOOK                   = 79,
+	FOCUS                         = 80,
+	PLUS                          = 81,
+	MENU                          = 82,
+	NOTIFICATION                  = 83,
+	SEARCH                        = 84,
+	MEDIA_PLAY_PAUSE              = 85,
+	MEDIA_STOP                    = 86,
+	MEDIA_NEXT                    = 87,
+	MEDIA_PREVIOUS                = 88,
+	MEDIA_REWIND                  = 89,
+	MEDIA_FAST_FORWARD            = 90,
+	MUTE                          = 91,
+	PAGE_UP                       = 92,
+	PAGE_DOWN                     = 93,
+	PICTSYMBOLS                   = 94,
+	SWITCH_CHARSET                = 95,
+	BUTTON_A                      = 96,
+	BUTTON_B                      = 97,
+	BUTTON_C                      = 98,
+	BUTTON_X                      = 99,
+	BUTTON_Y                      = 100,
+	BUTTON_Z                      = 101,
+	BUTTON_L1                     = 102,
+	BUTTON_R1                     = 103,
+	BUTTON_L2                     = 104,
+	BUTTON_R2                     = 105,
+	BUTTON_THUMBL                 = 106,
+	BUTTON_THUMBR                 = 107,
+	BUTTON_START                  = 108,
+	BUTTON_SELECT                 = 109,
+	BUTTON_MODE                   = 110,
+	ESCAPE                        = 111,
+	FORWARD_DEL                   = 112,
+	CTRL_LEFT                     = 113,
+	CTRL_RIGHT                    = 114,
+	CAPS_LOCK                     = 115,
+	SCROLL_LOCK                   = 116,
+	META_LEFT                     = 117,
+	META_RIGHT                    = 118,
+	FUNCTION                      = 119,
+	SYSRQ                         = 120,
+	BREAK                         = 121,
+	MOVE_HOME                     = 122,
+	MOVE_END                      = 123,
+	INSERT                        = 124,
+	FORWARD                       = 125,
+	MEDIA_PLAY                    = 126,
+	MEDIA_PAUSE                   = 127,
+	MEDIA_CLOSE                   = 128,
+	MEDIA_EJECT                   = 129,
+	MEDIA_RECORD                  = 130,
+	F1                            = 131,
+	F2                            = 132,
+	F3                            = 133,
+	F4                            = 134,
+	F5                            = 135,
+	F6                            = 136,
+	F7                            = 137,
+	F8                            = 138,
+	F9                            = 139,
+	F10                           = 140,
+	F11                           = 141,
+	F12                           = 142,
+	NUM_LOCK                      = 143,
+	NUMPAD_0                      = 144,
+	NUMPAD_1                      = 145,
+	NUMPAD_2                      = 146,
+	NUMPAD_3                      = 147,
+	NUMPAD_4                      = 148,
+	NUMPAD_5                      = 149,
+	NUMPAD_6                      = 150,
+	NUMPAD_7                      = 151,
+	NUMPAD_8                      = 152,
+	NUMPAD_9                      = 153,
+	NUMPAD_DIVIDE                 = 154,
+	NUMPAD_MULTIPLY               = 155,
+	NUMPAD_SUBTRACT               = 156,
+	NUMPAD_ADD                    = 157,
+	NUMPAD_DOT                    = 158,
+	NUMPAD_COMMA                  = 159,
+	NUMPAD_ENTER                  = 160,
+	NUMPAD_EQUALS                 = 161,
+	NUMPAD_LEFT_PAREN             = 162,
+	NUMPAD_RIGHT_PAREN            = 163,
+	VOLUME_MUTE                   = 164,
+	INFO                          = 165,
+	CHANNEL_UP                    = 166,
+	CHANNEL_DOWN                  = 167,
+	ZOOM_IN                       = 168,
+	ZOOM_OUT                      = 169,
+	TV                            = 170,
+	WINDOW                        = 171,
+	GUIDE                         = 172,
+	DVR                           = 173,
+	BOOKMARK                      = 174,
+	CAPTIONS                      = 175,
+	SETTINGS                      = 176,
+	TV_POWER                      = 177,
+	TV_INPUT                      = 178,
+	STB_POWER                     = 179,
+	STB_INPUT                     = 180,
+	AVR_POWER                     = 181,
+	AVR_INPUT                     = 182,
+	PROG_RED                      = 183,
+	PROG_GREEN                    = 184,
+	PROG_YELLOW                   = 185,
+	PROG_BLUE                     = 186,
+	APP_SWITCH                    = 187,
+	BUTTON_1                      = 188,
+	BUTTON_2                      = 189,
+	BUTTON_3                      = 190,
+	BUTTON_4                      = 191,
+	BUTTON_5                      = 192,
+	BUTTON_6                      = 193,
+	BUTTON_7                      = 194,
+	BUTTON_8                      = 195,
+	BUTTON_9                      = 196,
+	BUTTON_10                     = 197,
+	BUTTON_11                     = 198,
+	BUTTON_12                     = 199,
+	BUTTON_13                     = 200,
+	BUTTON_14                     = 201,
+	BUTTON_15                     = 202,
+	BUTTON_16                     = 203,
+	LANGUAGE_SWITCH               = 204,
+	MANNER_MODE                   = 205,
+	_3D_MODE                      = 206,
+	CONTACTS                      = 207,
+	CALENDAR                      = 208,
+	MUSIC                         = 209,
+	CALCULATOR                    = 210,
+	ZENKAKU_HANKAKU               = 211,
+	EISU                          = 212,
+	MUHENKAN                      = 213,
+	HENKAN                        = 214,
+	KATAKANA_HIRAGANA             = 215,
+	YEN                           = 216,
+	RO                            = 217,
+	KANA                          = 218,
+	ASSIST                        = 219,
+	BRIGHTNESS_DOWN               = 220,
+	BRIGHTNESS_UP                 = 221,
+	MEDIA_AUDIO_TRACK             = 222,
+	SLEEP                         = 223,
+	WAKEUP                        = 224,
+	PAIRING                       = 225,
+	MEDIA_TOP_MENU                = 226,
+	NUM11                         = 227,
+	NUM12                         = 228,
+	LAST_CHANNEL                  = 229,
+	TV_DATA_SERVICE               = 230,
+	VOICE_ASSIST                  = 231,
+	TV_RADIO_SERVICE              = 232,
+	TV_TELETEXT                   = 233,
+	TV_NUMBER_ENTRY               = 234,
+	TV_TERRESTRIAL_ANALOG         = 235,
+	TV_TERRESTRIAL_DIGITAL        = 236,
+	TV_SATELLITE                  = 237,
+	TV_SATELLITE_BS               = 238,
+	TV_SATELLITE_CS               = 239,
+	TV_SATELLITE_SERVICE          = 240,
+	TV_NETWORK                    = 241,
+	TV_ANTENNA_CABLE              = 242,
+	TV_INPUT_HDMI_1               = 243,
+	TV_INPUT_HDMI_2               = 244,
+	TV_INPUT_HDMI_3               = 245,
+	TV_INPUT_HDMI_4               = 246,
+	TV_INPUT_COMPOSITE_1          = 247,
+	TV_INPUT_COMPOSITE_2          = 248,
+	TV_INPUT_COMPONENT_1          = 249,
+	TV_INPUT_COMPONENT_2          = 250,
+	TV_INPUT_VGA_1                = 251,
+	TV_AUDIO_DESCRIPTION          = 252,
+	TV_AUDIO_DESCRIPTION_MIX_UP   = 253,
+	TV_AUDIO_DESCRIPTION_MIX_DOWN = 254,
+	TV_ZOOM_MODE                  = 255,
+	TV_CONTENTS_MENU              = 256,
+	TV_MEDIA_CONTEXT_MENU         = 257,
+	TV_TIMER_PROGRAMMING          = 258,
+	HELP                          = 259,
+	NAVIGATE_PREVIOUS             = 260,
+	NAVIGATE_NEXT                 = 261,
+	NAVIGATE_IN                   = 262,
+	NAVIGATE_OUT                  = 263,
+	STEM_PRIMARY                  = 264,
+	STEM_1                        = 265,
+	STEM_2                        = 266,
+	STEM_3                        = 267,
+	DPAD_UP_LEFT                  = 268,
+	DPAD_DOWN_LEFT                = 269,
+	DPAD_UP_RIGHT                 = 270,
+	DPAD_DOWN_RIGHT               = 271,
+	MEDIA_SKIP_FORWARD            = 272,
+	MEDIA_SKIP_BACKWARD           = 273,
+	MEDIA_STEP_FORWARD            = 274,
+	MEDIA_STEP_BACKWARD           = 275,
+	SOFT_SLEEP                    = 276,
+	CUT                           = 277,
+	COPY                          = 278,
+	PASTE                         = 279,
+	SYSTEM_NAVIGATION_UP          = 280,
+	SYSTEM_NAVIGATION_DOWN        = 281,
+	SYSTEM_NAVIGATION_LEFT        = 282,
+	SYSTEM_NAVIGATION_RIGHT       = 283,
+	ALL_APPS                      = 284,
+	REFRESH                       = 285,
+	THUMBS_UP                     = 286,
+	THUMBS_DOWN                   = 287,
+	PROFILE_SWITCH                = 288,
+	VIDEO_APP_1                   = 289,
+	VIDEO_APP_2                   = 290,
+	VIDEO_APP_3                   = 291,
+	VIDEO_APP_4                   = 292,
+	VIDEO_APP_5                   = 293,
+	VIDEO_APP_6                   = 294,
+	VIDEO_APP_7                   = 295,
+	VIDEO_APP_8                   = 296,
+	FEATURED_APP_1                = 297,
+	FEATURED_APP_2                = 298,
+	FEATURED_APP_3                = 299,
+	FEATURED_APP_4                = 300,
+	DEMO_APP_1                    = 301,
+	DEMO_APP_2                    = 302,
+	DEMO_APP_3                    = 303,
+	DEMO_APP_4                    = 304,
+	KEYBOARD_BACKLIGHT_DOWN       = 305,
+	KEYBOARD_BACKLIGHT_UP         = 306,
+	KEYBOARD_BACKLIGHT_TOGGLE     = 307,
+	STYLUS_BUTTON_PRIMARY         = 308,
+	STYLUS_BUTTON_SECONDARY       = 309,
+	STYLUS_BUTTON_TERTIARY        = 310,
+	STYLUS_BUTTON_TAIL            = 311,
+	RECENT_APPS                   = 312,
+	MACRO_1                       = 313,
+	MACRO_2                       = 314,
+	MACRO_3                       = 315,
+	MACRO_4                       = 316,
+	EMOJI_PICKER                  = 317,
+	SCREENSHOT                    = 318,
+	DICTATE                       = 319,
+	NEW                           = 320,
+	CLOSE                         = 321,
+	DO_NOT_DISTURB                = 322,
+	PRINT                         = 323,
+	LOCK                          = 324,
+	FULLSCREEN                    = 325,
+	F13                           = 326,
+	F14                           = 327,
+	F15                           = 328,
+	F16                           = 329,
+	F17                           = 330,
+	F18                           = 331,
+	F19                           = 332,
+	F20                           = 333,
+	F21                           = 334,
+	F22                           = 335,
+	F23                           = 336,
+	F24                           = 337,
+	ACCESSIBILITY                 = 338,
+	CONTEXTUAL_SEARCH             = 339,
+	CONTEXTUAL_INSERT             = 340,
+}

@@ -34,7 +34,7 @@ redirect_stdio_to_logcat :: proc "contextless" (tag: string = "Odin") -> bool {
 			for i in 0..<n {
 				if buf[i] == '\n' {
 					buf[i] = 0
-					__android_log_write(ANDROID_LOG_INFO, tag, cstring(&buf[start]))
+					__android_log_write(.INFO, tag, cstring(&buf[start]))
 					start = i+1
 				}
 			}
@@ -42,7 +42,7 @@ redirect_stdio_to_logcat :: proc "contextless" (tag: string = "Odin") -> bool {
 			// A line longer than the buffer is written in pieces.
 			if start == 0 && n == len(buf)-1 {
 				buf[n] = 0
-				__android_log_write(ANDROID_LOG_INFO, tag, cstring(&buf[0]))
+				__android_log_write(.INFO, tag, cstring(&buf[0]))
 				n = 0
 				continue
 			}

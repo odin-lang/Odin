@@ -25,7 +25,7 @@ AImageReader_BufferRemovedListener :: struct {
 
 @(default_calling_convention="c")
 foreign libmediandk {
-	AImageReader_new                             :: proc(width: i32, height: i32, format: i32, maxImages: i32, reader: ^^AImageReader) -> media_status_t ---
+	AImageReader_new                             :: proc(width: i32, height: i32, format: AIMAGE_FORMATS, maxImages: i32, reader: ^^AImageReader) -> media_status_t ---
 	AImageReader_delete                          :: proc(reader: ^AImageReader) ---
 	AImageReader_getWindow                       :: proc(reader: ^AImageReader, window: ^^ANativeWindow) -> media_status_t ---
 	AImageReader_getWidth                        :: proc(reader: ^AImageReader, width: ^i32) -> media_status_t ---
@@ -35,12 +35,12 @@ foreign libmediandk {
 	AImageReader_acquireNextImage                :: proc(reader: ^AImageReader, image: ^^AImage) -> media_status_t ---
 	AImageReader_acquireLatestImage              :: proc(reader: ^AImageReader, image: ^^AImage) -> media_status_t ---
 	AImageReader_setImageListener                :: proc(reader: ^AImageReader, listener: ^AImageReader_ImageListener) -> media_status_t ---
-	AImageReader_newWithUsage                    :: proc(width: i32, height: i32, format: i32, usage: u64, maxImages: i32, reader: ^^AImageReader) -> media_status_t ---
-	AImageReader_newWithDataSpace                :: proc(width: i32, height: i32, usage: u64, maxImages: i32, hardwareBufferFormat: u32, dataSpace: i32, reader: ^^AImageReader) -> media_status_t --- // API level 34
+	AImageReader_newWithUsage                    :: proc(width: i32, height: i32, format: AIMAGE_FORMATS, usage: android.AHardwareBuffer_UsageFlags, maxImages: i32, reader: ^^AImageReader) -> media_status_t ---
+	AImageReader_newWithDataSpace                :: proc(width: i32, height: i32, usage: android.AHardwareBuffer_UsageFlags, maxImages: i32, hardwareBufferFormat: android.AHardwareBuffer_Format, dataSpace: android.ADataSpace, reader: ^^AImageReader) -> media_status_t --- // API level 34
 	AImageReader_acquireNextImageAsync           :: proc(reader: ^AImageReader, image: ^^AImage, acquireFenceFd: ^c.int) -> media_status_t ---
 	AImageReader_acquireLatestImageAsync         :: proc(reader: ^AImageReader, image: ^^AImage, acquireFenceFd: ^c.int) -> media_status_t ---
 	AImageReader_setBufferRemovedListener        :: proc(reader: ^AImageReader, listener: ^AImageReader_BufferRemovedListener) -> media_status_t ---
 	AImageReader_setDefaultBufferSize            :: proc(reader: ^AImageReader, width: i32, height: i32) -> media_status_t --- // API level 37
 	AImageReader_setDefaultBufferDataSpace       :: proc(reader: ^AImageReader, dataSpace: i32) -> media_status_t --- // API level 37
-	AImageReader_setDefaultAHardwareBufferFormat :: proc(reader: ^AImageReader, format: i32) -> media_status_t --- // API level 37
+	AImageReader_setDefaultAHardwareBufferFormat :: proc(reader: ^AImageReader, format: android.AHardwareBuffer_Format) -> media_status_t --- // API level 37
 }

@@ -11,15 +11,17 @@ AAssetManager :: struct {}
 AAssetDir     :: struct {}
 AAsset        :: struct {}
 
-AASSET_MODE_UNKNOWN   :: 0
-AASSET_MODE_RANDOM    :: 1
-AASSET_MODE_STREAMING :: 2
-AASSET_MODE_BUFFER    :: 3
+AAssetMode :: enum i32 {
+	UNKNOWN   = 0,
+	RANDOM    = 1,
+	STREAMING = 2,
+	BUFFER    = 3,
+}
 
 @(default_calling_convention="c")
 foreign libandroid {
 	AAssetManager_openDir       :: proc(mgr: ^AAssetManager, dirName: cstring) -> ^AAssetDir ---
-	AAssetManager_open          :: proc(mgr: ^AAssetManager, filename: cstring, mode: c.int) -> ^AAsset ---
+	AAssetManager_open          :: proc(mgr: ^AAssetManager, filename: cstring, mode: AAssetMode) -> ^AAsset ---
 	AAssetDir_getNextFileName   :: proc(assetDir: ^AAssetDir) -> cstring ---
 	AAssetDir_rewind            :: proc(assetDir: ^AAssetDir) ---
 	AAssetDir_close             :: proc(assetDir: ^AAssetDir) ---

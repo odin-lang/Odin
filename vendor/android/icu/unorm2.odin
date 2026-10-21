@@ -7,18 +7,18 @@ import "core:c"
 
 foreign import libicu "system:icu"
 
-UNormalization2Mode :: c.int
+UNormalization2Mode :: enum c.int {
+	COMPOSE            = 0,
+	DECOMPOSE          = 1,
+	FCD                = 2,
+	COMPOSE_CONTIGUOUS = 3,
+}
 
-UNORM2_COMPOSE            :: 0
-UNORM2_DECOMPOSE          :: 1
-UNORM2_FCD                :: 2
-UNORM2_COMPOSE_CONTIGUOUS :: 3
-
-UNormalizationCheckResult :: c.int
-
-UNORM_NO    :: 0
-UNORM_YES   :: 1
-UNORM_MAYBE :: 2
+UNormalizationCheckResult :: enum c.int {
+	NO    = 0,
+	YES   = 1,
+	MAYBE = 2,
+}
 
 UNormalizer2 :: struct {}
 

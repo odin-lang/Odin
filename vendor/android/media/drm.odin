@@ -20,40 +20,40 @@ AMediaDrmKeySetId   :: AMediaDrmByteArray
 AMediaDrmSecureStop :: AMediaDrmByteArray
 AMediaDrmKeyId      :: AMediaDrmByteArray
 
-AMediaDrmEventType :: c.int
+AMediaDrmEventType :: enum c.int {
+	PROVISION_REQUIRED = 1,
+	KEY_REQUIRED       = 2,
+	KEY_EXPIRED        = 3,
+	VENDOR_DEFINED     = 4,
+	SESSION_RECLAIMED  = 5,
+}
 
-EVENT_PROVISION_REQUIRED :: 1
-EVENT_KEY_REQUIRED       :: 2
-EVENT_KEY_EXPIRED        :: 3
-EVENT_VENDOR_DEFINED     :: 4
-EVENT_SESSION_RECLAIMED  :: 5
+AMediaDrmKeyType :: enum c.int {
+	STREAMING = 1,
+	OFFLINE   = 2,
+	RELEASE   = 3,
+}
 
-AMediaDrmKeyType :: c.int
-
-KEY_TYPE_STREAMING :: 1
-KEY_TYPE_OFFLINE   :: 2
-KEY_TYPE_RELEASE   :: 3
-
-AMediaDrmKeyRequestType :: i32
-
-KEY_REQUEST_TYPE_INITIAL :: 0
-KEY_REQUEST_TYPE_RENEWAL :: 1
-KEY_REQUEST_TYPE_RELEASE :: 2
-KEY_REQUEST_TYPE_NONE    :: 3
-KEY_REQUEST_TYPE_UPDATE  :: 4
+AMediaDrmKeyRequestType :: enum i32 {
+	INITIAL = 0,
+	RENEWAL = 1,
+	RELEASE = 2,
+	NONE    = 3,
+	UPDATE  = 4,
+}
 
 AMediaDrmKeyValue :: struct {
 	mKey:   cstring,
 	mValue: cstring,
 }
 
-AMediaDrmKeyStatusType :: c.int
-
-KEY_STATUS_TYPE_USABLE           :: 0
-KEY_STATUS_TYPE_EXPIRED          :: 1
-KEY_STATUS_TYPE_OUTPUTNOTALLOWED :: 2
-KEY_STATUS_TYPE_STATUSPENDING    :: 3
-KEY_STATUS_TYPE_INTERNALERROR    :: 4
+AMediaDrmKeyStatusType :: enum c.int {
+	USABLE           = 0,
+	EXPIRED          = 1,
+	OUTPUTNOTALLOWED = 2,
+	STATUSPENDING    = 3,
+	INTERNALERROR    = 4,
+}
 
 AMediaDrmKeyStatus :: struct {
 	keyId:   AMediaDrmKeyId,

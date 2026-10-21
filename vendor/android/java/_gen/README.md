@@ -18,6 +18,7 @@ Last generated from platform `android-37.2`.
 | `android.jar`           | Every class, field, method, and constant.           |
 | `android-stubs-src.jar` | Parameter names, which the class files do not keep. |
 | `data/api-versions.xml` | The API level each class and member appeared in.    |
+| `data/annotations.zip`  | The constants `@IntDef` and `@LongDef` allow.       |
 
 ## What it does
 
@@ -33,6 +34,12 @@ Last generated from platform `android-37.2`.
 - Methods are `Class_method`. Overloads become a procedure group of members named by their parameter types (`TextView_setText_int`).
   - Constructors are `Class_new`, fields `Class_get_name` and `Class_set_name`, and `static final` constants `Class_NAME`.
   - Overloads Odin cannot tell apart stay out of the group, but can still be called by name.
+- Integer parameters, results, and fields that take constants are typed: `View_setVisibility(view, .GONE)`, `Window_addFlags(window, {.KEEP_SCREEN_ON})`.
+  - The ones `@IntDef` and `@LongDef` annotate, including through an overridden method. Groups sharing a constant are one type, named `<Owner>_<Thing>` after the class owning most of its constants: `NAVIGATION_MODE_` gives `ActionBar_NavigationMode`, and a bit_set gets `Flags` (`Context_BindFlags`).
+  - `table.py`, the reviewed table, adds types for unannotated slots (`KeyEvent_KeyCode`), bit_fields (`Gravity_Field`), and names where the derived one is wrong.
+  - Members drop their shared prefix. A member that would start with a digit gets `_` (`._90`), or `NUM` on a key code (`.NUM0`).
+  - A bit_set's single bits are its element enum's members. A member of no bits or several bits is a typed constant (`MenuItem_ShowAsAction_NEVER`), and so is every named value of a bit_field (`Gravity_Field_CENTER`).
+  - The flat constants stay, for the slots no type covers.
 - Every wrapper returns the exception it threw as its last result, cleared, so no exception is left pending.
 - Classes, methods, and fields are looked up on first use and cached, the classes as global references.
 - Members newer than Odin's minimum API level (29) get an `// API level N` comment, as do classes.

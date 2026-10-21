@@ -146,7 +146,7 @@ set_saved_state :: proc "contextless" (app: ^android_app, data: []byte) {
 android_app_read_cmd :: proc "contextless" (app: ^android_app) -> i8 {
 	cmd: i8
 	if posix.read(app.msgread, (^byte)(&cmd), 1) != 1 {
-		android.__android_log_write(android.ANDROID_LOG_ERROR, "native_app_glue", "no data on the command pipe")
+		android.__android_log_write(.ERROR, "native_app_glue", "no data on the command pipe")
 		return -1
 	}
 	if cmd == APP_CMD_SAVE_STATE {
@@ -219,16 +219,14 @@ ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedS
 	defer free_all(context.temp_allocator)
 
 	write_cmd :: proc "contextless" (app: ^android_app, cmd: i8) {
-
 		cmd := cmd
 		if posix.write(app.msgwrite, (^byte)(&cmd), 1) != 1 {
-			android.__android_log_write(android.ANDROID_LOG_ERROR, "native_app_glue", "could not write to the command pipe")
+			android.__android_log_write(.ERROR, "native_app_glue", "could not write to the command pipe")
 		}
 	}
 
 	// Send `cmd` and wait until the app thread has acted on it.
 	set_activity_state :: proc "contextless" (app: ^android_app, cmd: i8) {
-
 		sync.mutex_lock(&app.mutex)
 		write_cmd(app, cmd)
 		for app.activityState != i32(cmd) {
@@ -238,7 +236,6 @@ ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedS
 	}
 
 	set_window :: proc "contextless" (app: ^android_app, window: ^android.ANativeWindow) {
-
 		sync.mutex_lock(&app.mutex)
 		if app.pendingWindow != nil {
 			write_cmd(app, APP_CMD_TERM_WINDOW)
@@ -254,7 +251,6 @@ ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedS
 	}
 
 	set_input :: proc "contextless" (app: ^android_app, queue: ^android.AInputQueue) {
-
 		sync.mutex_lock(&app.mutex)
 		app.pendingInputQueue = queue
 		write_cmd(app, APP_CMD_INPUT_CHANGED)
@@ -270,9 +266,7 @@ ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedS
 
 	// The thread `android_main` runs on.
 	app_thread :: proc(app: ^android_app) {
-
 		process_cmd :: proc(app: ^android_app, source: ^android_poll_source) {
-
 			cmd := android_app_read_cmd(app)
 			android_app_pre_exec_cmd(app, cmd)
 			if app.onAppCmd != nil {
@@ -302,8 +296,8 @@ ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedS
 		app.cmdPollSource   = {LOOPER_ID_MAIN,  app, process_cmd}
 		app.inputPollSource = {LOOPER_ID_INPUT, app, process_input}
 
-		app.looper = android.ALooper_prepare(android.ALOOPER_PREPARE_ALLOW_NON_CALLBACKS)
-		android.ALooper_addFd(app.looper, c.int(app.msgread), LOOPER_ID_MAIN, android.ALOOPER_EVENT_INPUT, nil, &app.cmdPollSource)
+		app.looper = android.ALooper_prepare({.ALLOW_NON_CALLBACKS})
+		android.ALooper_addFd(app.looper, c.int(app.msgread), LOOPER_ID_MAIN, {.INPUT}, nil, &app.cmdPollSource)
 
 		sync.mutex_lock(&app.mutex)
 		app.running = true
@@ -340,7 +334,6 @@ ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedS
 		set_activity_state(to_app(activity), APP_CMD_STOP)
 	}
 	callbacks.onSaveInstanceState = proc "c" (activity: ^android.ANativeActivity, outSize: ^c.size_t) -> rawptr {
-
 		app := to_app(activity)
 
 		sync.mutex_lock(&app.mutex)
@@ -360,7 +353,6 @@ ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedS
 		return state
 	}
 	callbacks.onDestroy = proc "c" (activity: ^android.ANativeActivity) {
-
 		context = runtime.default_context()
 		app := to_app(activity)
 
@@ -379,7 +371,6 @@ ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedS
 		write_cmd(to_app(activity), APP_CMD_CONFIG_CHANGED)
 	}
 	callbacks.onContentRectChanged = proc "c" (activity: ^android.ANativeActivity, rect: ^android.ARect) {
-
 		app := to_app(activity)
 		sync.mutex_lock(&app.mutex)
 		app.contentRect = rect^
@@ -434,7 +425,7 @@ ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedS
 
 	fds: [2]posix.FD
 	if posix.pipe(&fds) != .OK {
-		android.__android_log_write(android.ANDROID_LOG_ERROR, "native_app_glue", "could not create the command pipe")
+		android.__android_log_write(.ERROR, "native_app_glue", "could not create the command pipe")
 		free(app, runtime.heap_allocator())
 		return
 	}

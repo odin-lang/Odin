@@ -15,7 +15,7 @@ Last generated from NDK r30 (30.0.16248370).
 
 - Every header in a target's list becomes one Odin file. Small related headers share one.
   - A header with nothing to bind (only function-like macros) produces no file.
-- Names stay exactly as in C (`ALooper_pollOnce`, `AKEYCODE_BACK`, `JNIEnv`).
+- Names stay exactly as in C (`ALooper_pollOnce`, `ANativeWindow`, `JNIEnv`), apart from the members of enums below.
   - A record that shares its name with a procedure gets `_t`, as in `core:sys/posix` (`sync_file_info_t`).
 - clang evaluates every enum constant and object-like macro. The source spelling is kept when it is a plain literal.
 - The NDK's stub libraries decide each function's `foreign import` and the API level it appeared in.
@@ -27,6 +27,17 @@ Last generated from NDK r30 (30.0.16248370).
   - `JNIEnv :: struct { using functions: ^JNINativeInterface }`, so `env->FindClass(name)` works on a `^JNIEnv`. `JavaVM` is the same.
   - OpenSL ES and OpenMAX AL interfaces, e.g. `SLObjectItf :: ^struct { using itf: ^SLObjectItf_ }`, so `object->Realize(SL_BOOLEAN_FALSE)` works.
 - Every generated file starts with a marker line. Only marked files are overwritten or deleted.
+
+## Enums, bit_sets, and bit_fields
+
+C enums become Odin types, and so do the anonymous constants `table.py`, the reviewed table, groups:
+
+- A named C enum (`media_status_t`), or an anonymous enum right before an integer typedef (`aaudio_format_t`), is an `enum` of that name.
+- `table.py` adds new types for anonymous enums and `#define` families (`AKeyCode`, `AInputSources`), bit_sets and bit_fields (`ADataSpace`, `AHardwareBuffer_UsageFlags`), and the slots each type takes: `AKeyEvent_getKeyCode` returns an `AKeyCode`.
+- Members drop their shared prefix (`.OK`, `.PCM_I16`). A member that would start with a digit gets `_` (`._12KEY`), or `NUM` on a key code (`.NUM0`).
+- A bit_set's single bits are its element enum's members (`ALooperEvents` over `ALooperEvent`). A member of no bits or several bits keeps its C name as a typed constant (`AMETA_NONE :: AMetaState{}`), and so does every named value of a bit_field.
+- The C constants that become members go. The rest stay.
+- A slot takes a type of exactly its width. A rule that does not fit its slot, or matches nothing, is an error.
 
 Not generated:
 
@@ -68,7 +79,7 @@ A header whose functions live outside its target's libraries is an error. Such a
 
 `--verify` checks every generated package against clang on all four Android ABIs (arm64, x86_64, armv7, x86):
 
-- the size and alignment of every type, the offset of every field, and the value of every constant;
+- the size and alignment of every type, the offset of every field, and the value of every constant, enum member, bit_set element, and typed constant;
 - that every procedure and variable links against the newest stub libraries.
 
 Run it after every regeneration.

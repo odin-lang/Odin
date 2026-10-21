@@ -9,31 +9,31 @@ foreign import libicu "system:icu"
 
 UBiDiLevel :: u8
 
-UBiDiDirection :: c.int
-
-UBIDI_LTR     :: 0
-UBIDI_RTL     :: 1
-UBIDI_MIXED   :: 2
-UBIDI_NEUTRAL :: 3
+UBiDiDirection :: enum c.int {
+	LTR     = 0,
+	RTL     = 1,
+	MIXED   = 2,
+	NEUTRAL = 3,
+}
 
 UBiDi :: struct {}
 
-UBiDiReorderingMode :: c.int
+UBiDiReorderingMode :: enum c.int {
+	DEFAULT                     = 0,
+	NUMBERS_SPECIAL             = 1,
+	GROUP_NUMBERS_WITH_R        = 2,
+	RUNS_ONLY                   = 3,
+	INVERSE_NUMBERS_AS_L        = 4,
+	INVERSE_LIKE_DIRECT         = 5,
+	INVERSE_FOR_NUMBERS_SPECIAL = 6,
+}
 
-UBIDI_REORDER_DEFAULT                     :: 0
-UBIDI_REORDER_NUMBERS_SPECIAL             :: 1
-UBIDI_REORDER_GROUP_NUMBERS_WITH_R        :: 2
-UBIDI_REORDER_RUNS_ONLY                   :: 3
-UBIDI_REORDER_INVERSE_NUMBERS_AS_L        :: 4
-UBIDI_REORDER_INVERSE_LIKE_DIRECT         :: 5
-UBIDI_REORDER_INVERSE_FOR_NUMBERS_SPECIAL :: 6
-
-UBiDiReorderingOption :: c.int
-
-UBIDI_OPTION_DEFAULT         :: 0
-UBIDI_OPTION_INSERT_MARKS    :: 1
-UBIDI_OPTION_REMOVE_CONTROLS :: 2
-UBIDI_OPTION_STREAMING       :: 4
+UBiDiReorderingOption :: enum c.int {
+	DEFAULT         = 0,
+	INSERT_MARKS    = 1,
+	REMOVE_CONTROLS = 2,
+	STREAMING       = 4,
+}
 
 UBiDiClassCallback :: proc "c" (context_: rawptr, c: UChar32) -> UCharDirection
 

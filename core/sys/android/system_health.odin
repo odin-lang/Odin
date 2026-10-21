@@ -10,15 +10,15 @@ foreign import libandroid "system:android"
 ACpuHeadroomParams :: struct {}
 AGpuHeadroomParams :: struct {}
 
-ACpuHeadroomCalculationType :: i32
+ACpuHeadroomCalculationType :: enum i32 {
+	MIN     = 0,
+	AVERAGE = 1,
+}
 
-ACPU_HEADROOM_CALCULATION_TYPE_MIN     :: 0
-ACPU_HEADROOM_CALCULATION_TYPE_AVERAGE :: 1
-
-AGpuHeadroomCalculationType :: i32
-
-AGPU_HEADROOM_CALCULATION_TYPE_MIN     :: 0
-AGPU_HEADROOM_CALCULATION_TYPE_AVERAGE :: 1
+AGpuHeadroomCalculationType :: enum i32 {
+	MIN     = 0,
+	AVERAGE = 1,
+}
 
 @(default_calling_convention="c")
 foreign libandroid {

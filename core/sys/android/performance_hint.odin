@@ -13,14 +13,14 @@ AWorkDuration           :: struct {}
 ASurfaceControl         :: struct {}
 ASessionCreationConfig  :: struct {}
 
-APerformanceHintFeature :: i32
-
-APERF_HINT_SESSIONS          :: 0
-APERF_HINT_POWER_EFFICIENCY  :: 1
-APERF_HINT_SURFACE_BINDING   :: 2
-APERF_HINT_GRAPHICS_PIPELINE :: 3
-APERF_HINT_AUTO_CPU          :: 4
-APERF_HINT_AUTO_GPU          :: 5
+APerformanceHintFeature :: enum i32 {
+	SESSIONS          = 0,
+	POWER_EFFICIENCY  = 1,
+	SURFACE_BINDING   = 2,
+	GRAPHICS_PIPELINE = 3,
+	AUTO_CPU          = 4,
+	AUTO_GPU          = 5,
+}
 
 @(default_calling_convention="c")
 foreign libandroid {

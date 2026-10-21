@@ -90,68 +90,68 @@ ActivityInfo_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creato
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-ActivityInfo_get_colorMode :: proc "contextless" (self: ^ActivityInfo) -> (result: i32, exception: ^Throwable) {
+ActivityInfo_get_colorMode :: proc "contextless" (self: ^ActivityInfo) -> (result: ActivityInfo_ColorMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ActivityInfo__class, "colorMode", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return ActivityInfo_ColorMode(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-ActivityInfo_set_colorMode :: proc "contextless" (self: ^ActivityInfo, value: i32) -> (exception: ^Throwable) {
+ActivityInfo_set_colorMode :: proc "contextless" (self: ^ActivityInfo, value: ActivityInfo_ColorMode) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ActivityInfo__class, "colorMode", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
-ActivityInfo_get_configChanges :: proc "contextless" (self: ^ActivityInfo) -> (result: i32, exception: ^Throwable) {
+ActivityInfo_get_configChanges :: proc "contextless" (self: ^ActivityInfo) -> (result: ActivityInfo_ConfigFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ActivityInfo__class, "configChanges", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(ActivityInfo_ConfigFlags)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-ActivityInfo_set_configChanges :: proc "contextless" (self: ^ActivityInfo, value: i32) -> (exception: ^Throwable) {
+ActivityInfo_set_configChanges :: proc "contextless" (self: ^ActivityInfo, value: ActivityInfo_ConfigFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ActivityInfo__class, "configChanges", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
-ActivityInfo_get_documentLaunchMode :: proc "contextless" (self: ^ActivityInfo) -> (result: i32, exception: ^Throwable) {
+ActivityInfo_get_documentLaunchMode :: proc "contextless" (self: ^ActivityInfo) -> (result: ActivityInfo_DocumentLaunchMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ActivityInfo__class, "documentLaunchMode", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return ActivityInfo_DocumentLaunchMode(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-ActivityInfo_set_documentLaunchMode :: proc "contextless" (self: ^ActivityInfo, value: i32) -> (exception: ^Throwable) {
+ActivityInfo_set_documentLaunchMode :: proc "contextless" (self: ^ActivityInfo, value: ActivityInfo_DocumentLaunchMode) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ActivityInfo__class, "documentLaunchMode", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
-ActivityInfo_get_flags :: proc "contextless" (self: ^ActivityInfo) -> (result: i32, exception: ^Throwable) {
+ActivityInfo_get_flags :: proc "contextless" (self: ^ActivityInfo) -> (result: ActivityInfo_Flags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ActivityInfo__class, "flags", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(ActivityInfo_Flags)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-ActivityInfo_set_flags :: proc "contextless" (self: ^ActivityInfo, value: i32) -> (exception: ^Throwable) {
+ActivityInfo_set_flags :: proc "contextless" (self: ^ActivityInfo, value: ActivityInfo_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ActivityInfo__class, "flags", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
-ActivityInfo_get_launchMode :: proc "contextless" (self: ^ActivityInfo) -> (result: i32, exception: ^Throwable) {
+ActivityInfo_get_launchMode :: proc "contextless" (self: ^ActivityInfo) -> (result: ActivityInfo_Launch, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ActivityInfo__class, "launchMode", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return ActivityInfo_Launch(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-ActivityInfo_set_launchMode :: proc "contextless" (self: ^ActivityInfo, value: i32) -> (exception: ^Throwable) {
+ActivityInfo_set_launchMode :: proc "contextless" (self: ^ActivityInfo, value: ActivityInfo_Launch) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ActivityInfo__class, "launchMode", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
@@ -194,16 +194,16 @@ ActivityInfo_set_permission :: proc "contextless" (self: ^ActivityInfo, value: ^
 	return jni_take(jni_env)
 }
 
-ActivityInfo_get_persistableMode :: proc "contextless" (self: ^ActivityInfo) -> (result: i32, exception: ^Throwable) {
+ActivityInfo_get_persistableMode :: proc "contextless" (self: ^ActivityInfo) -> (result: ActivityInfo_PersistableMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ActivityInfo__class, "persistableMode", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return ActivityInfo_PersistableMode(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-ActivityInfo_set_persistableMode :: proc "contextless" (self: ^ActivityInfo, value: i32) -> (exception: ^Throwable) {
+ActivityInfo_set_persistableMode :: proc "contextless" (self: ^ActivityInfo, value: ActivityInfo_PersistableMode) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ActivityInfo__class, "persistableMode", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
@@ -220,29 +220,29 @@ ActivityInfo_set_requiredDisplayCategory :: proc "contextless" (self: ^ActivityI
 	return jni_take(jni_env)
 }
 
-ActivityInfo_get_screenOrientation :: proc "contextless" (self: ^ActivityInfo) -> (result: i32, exception: ^Throwable) {
+ActivityInfo_get_screenOrientation :: proc "contextless" (self: ^ActivityInfo) -> (result: ActivityInfo_ScreenOrientation, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ActivityInfo__class, "screenOrientation", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return ActivityInfo_ScreenOrientation(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-ActivityInfo_set_screenOrientation :: proc "contextless" (self: ^ActivityInfo, value: i32) -> (exception: ^Throwable) {
+ActivityInfo_set_screenOrientation :: proc "contextless" (self: ^ActivityInfo, value: ActivityInfo_ScreenOrientation) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ActivityInfo__class, "screenOrientation", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
-ActivityInfo_get_softInputMode :: proc "contextless" (self: ^ActivityInfo) -> (result: i32, exception: ^Throwable) {
+ActivityInfo_get_softInputMode :: proc "contextless" (self: ^ActivityInfo) -> (result: WindowManager_LayoutParams_SoftInputMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ActivityInfo__class, "softInputMode", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(WindowManager_LayoutParams_SoftInputMode)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-ActivityInfo_set_softInputMode :: proc "contextless" (self: ^ActivityInfo, value: i32) -> (exception: ^Throwable) {
+ActivityInfo_set_softInputMode :: proc "contextless" (self: ^ActivityInfo, value: WindowManager_LayoutParams_SoftInputMode) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ActivityInfo__class, "softInputMode", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
@@ -285,16 +285,16 @@ ActivityInfo_set_theme :: proc "contextless" (self: ^ActivityInfo, value: i32) -
 	return jni_take(jni_env)
 }
 
-ActivityInfo_get_uiOptions :: proc "contextless" (self: ^ActivityInfo) -> (result: i32, exception: ^Throwable) {
+ActivityInfo_get_uiOptions :: proc "contextless" (self: ^ActivityInfo) -> (result: ActivityInfo_UiOptions, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ActivityInfo__class, "uiOptions", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(ActivityInfo_UiOptions)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-ActivityInfo_set_uiOptions :: proc "contextless" (self: ^ActivityInfo, value: i32) -> (exception: ^Throwable) {
+ActivityInfo_set_uiOptions :: proc "contextless" (self: ^ActivityInfo, value: ActivityInfo_UiOptions) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ActivityInfo__class, "uiOptions", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
@@ -329,10 +329,10 @@ ActivityInfo_new :: proc{
 	ActivityInfo_new_ActivityInfo,
 }
 
-ActivityInfo_describeContents :: proc "contextless" (self: ^ActivityInfo) -> (result: i32, exception: ^Throwable) {
+ActivityInfo_describeContents :: proc "contextless" (self: ^ActivityInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ActivityInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ActivityInfo_dump :: proc "contextless" (self: ^ActivityInfo, pw: ^Printer, prefix: ^String) -> (exception: ^Throwable) {
@@ -361,13 +361,110 @@ ActivityInfo_toString :: proc "contextless" (self: ^ActivityInfo) -> (result: ^S
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ActivityInfo_writeToParcel :: proc "contextless" (self: ^ActivityInfo, dest: ^Parcel, parcelableFlags: i32) -> (exception: ^Throwable) {
+ActivityInfo_writeToParcel :: proc "contextless" (self: ^ActivityInfo, dest: ^Parcel, parcelableFlags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ActivityInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = parcelableFlags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)parcelableFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+ActivityInfo_Flag :: enum u32 {
+	ALLOW_TASK_REPARENTING             = 6,
+	ALLOW_UNTRUSTED_ACTIVITY_EMBEDDING = 28,
+	ALWAYS_RETAIN_TASK_STATE           = 3,
+	AUTO_REMOVE_FROM_RECENTS           = 13,
+	CLEAR_TASK_ON_LAUNCH               = 2,
+	ENABLE_VR_MODE                     = 15,
+	EXCLUDE_FROM_RECENTS               = 5,
+	FINISH_ON_CLOSE_SYSTEM_DIALOGS     = 8,
+	FINISH_ON_TASK_LAUNCH              = 1,
+	HARDWARE_ACCELERATED               = 9,
+	IMMERSIVE                          = 11,
+	MULTIPROCESS                       = 0,
+	NO_HISTORY                         = 7,
+	PREFER_MINIMAL_POST_PROCESSING     = 25,
+	RELINQUISH_TASK_IDENTITY           = 12,
+	RESUME_WHILE_PAUSING               = 14,
+	SINGLE_USER                        = 30,
+	STATE_NOT_NEEDED                   = 4,
+}
+ActivityInfo_Flags :: distinct bit_set[ActivityInfo_Flag; u32]
+
+ActivityInfo_DocumentLaunchMode :: enum i32 {
+	ALWAYS        = 2,
+	INTO_EXISTING = 1,
+	NEVER         = 3,
+	NONE          = 0,
+}
+
+ActivityInfo_PersistableMode :: enum i32 {
+	ACROSS_REBOOTS = 2,
+	NEVER          = 1,
+	ROOT_ONLY      = 0,
+}
+
+ActivityInfo_UiOption :: enum u32 {
+	SPLIT_ACTION_BAR_WHEN_NARROW = 0,
+}
+ActivityInfo_UiOptions :: distinct bit_set[ActivityInfo_UiOption; u32]
+
+ActivityInfo_ScreenOrientation :: enum i32 {
+	BEHIND            = 3,
+	FULL_SENSOR       = 10,
+	FULL_USER         = 13,
+	LANDSCAPE         = 0,
+	LOCKED            = 14,
+	NOSENSOR          = 5,
+	PORTRAIT          = 1,
+	REVERSE_LANDSCAPE = 8,
+	REVERSE_PORTRAIT  = 9,
+	SENSOR            = 4,
+	SENSOR_LANDSCAPE  = 6,
+	SENSOR_PORTRAIT   = 7,
+	UNSPECIFIED       = -1,
+	USER              = 2,
+	USER_LANDSCAPE    = 11,
+	USER_PORTRAIT     = 12,
+}
+
+ActivityInfo_ColorMode :: enum i32 {
+	DEFAULT          = 0,
+	HDR              = 2,
+	WIDE_COLOR_GAMUT = 1,
+}
+
+ActivityInfo_Launch :: enum i32 {
+	MULTIPLE                 = 0,
+	SINGLE_INSTANCE          = 3,
+	SINGLE_INSTANCE_PER_TASK = 4,
+	SINGLE_TASK              = 2,
+	SINGLE_TOP               = 1,
+}
+
+ActivityInfo_ConfigFlag :: enum u32 {
+	ASSETS_PATHS           = 31,
+	COLOR_MODE             = 14,
+	DENSITY                = 12,
+	FONT_SCALE             = 30,
+	FONT_WEIGHT_ADJUSTMENT = 28,
+	GRAMMATICAL_GENDER     = 15,
+	KEYBOARD               = 4,
+	KEYBOARD_HIDDEN        = 5,
+	LAYOUT_DIRECTION       = 13,
+	LOCALE                 = 2,
+	MCC                    = 0,
+	MNC                    = 1,
+	NAVIGATION             = 6,
+	ORIENTATION            = 7,
+	RESOURCES_UNUSED       = 27,
+	SCREEN_LAYOUT          = 8,
+	SCREEN_SIZE            = 10,
+	SMALLEST_SCREEN_SIZE   = 11,
+	TOUCHSCREEN            = 3,
+	UI_MODE                = 9,
+}
+ActivityInfo_ConfigFlags :: distinct bit_set[ActivityInfo_ConfigFlag; u32]
 
 // class android.content.pm.ActivityInfo.WindowLayout
 ActivityInfo_WindowLayout :: struct #raw_union {
@@ -377,10 +474,10 @@ ActivityInfo_WindowLayout :: struct #raw_union {
 @(private)
 ActivityInfo_WindowLayout__class := Cached_Class{name = "android/content/pm/ActivityInfo$WindowLayout"}
 
-ActivityInfo_WindowLayout_get_gravity :: proc "contextless" (self: ^ActivityInfo_WindowLayout) -> (result: i32, exception: ^Throwable) {
+ActivityInfo_WindowLayout_get_gravity :: proc "contextless" (self: ^ActivityInfo_WindowLayout) -> (result: Gravity_Field, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ActivityInfo_WindowLayout__class, "gravity", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(Gravity_Field)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
 ActivityInfo_WindowLayout_get_height :: proc "contextless" (self: ^ActivityInfo_WindowLayout) -> (result: i32, exception: ^Throwable) {
@@ -419,10 +516,10 @@ ActivityInfo_WindowLayout_get_widthFraction :: proc "contextless" (self: ^Activi
 	return jni_env->GetFloatField(self, jni_id), jni_take(jni_env)
 }
 
-ActivityInfo_WindowLayout_new :: proc "contextless" (width: i32, widthFraction: f32, height: i32, heightFraction: f32, gravity: i32, minWidth: i32, minHeight: i32) -> (result: ^ActivityInfo_WindowLayout, exception: ^Throwable) {
+ActivityInfo_WindowLayout_new :: proc "contextless" (width: i32, widthFraction: f32, height: i32, heightFraction: f32, gravity: Gravity_Field, minWidth: i32, minHeight: i32) -> (result: ^ActivityInfo_WindowLayout, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &ActivityInfo_WindowLayout__class, "<init>", "(IFIFIII)V", false) or_return
-	jni_args := [?]android.jvalue{{i = width}, {f = widthFraction}, {i = height}, {f = heightFraction}, {i = gravity}, {i = minWidth}, {i = minHeight}}
+	jni_args := [?]android.jvalue{{i = width}, {f = widthFraction}, {i = height}, {f = heightFraction}, {i = transmute(i32)gravity}, {i = minWidth}, {i = minHeight}}
 	return (^ActivityInfo_WindowLayout)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -441,10 +538,10 @@ ApkChecksum_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creator
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-ApkChecksum_describeContents :: proc "contextless" (self: ^ApkChecksum) -> (result: i32, exception: ^Throwable) {
+ApkChecksum_describeContents :: proc "contextless" (self: ^ApkChecksum) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ApkChecksum__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ApkChecksum_getInstallerCertificate :: proc "contextless" (self: ^ApkChecksum) -> (result: ^Certificate, exception: ^Throwable) {
@@ -465,10 +562,10 @@ ApkChecksum_getSplitName :: proc "contextless" (self: ^ApkChecksum) -> (result: 
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ApkChecksum_getType :: proc "contextless" (self: ^ApkChecksum) -> (result: i32, exception: ^Throwable) {
+ApkChecksum_getType :: proc "contextless" (self: ^ApkChecksum) -> (result: Checksum_TypeFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ApkChecksum__class, "getType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Checksum_TypeFlags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ApkChecksum_getValue :: proc "contextless" (self: ^ApkChecksum) -> (result: ^ByteArray, exception: ^Throwable) {
@@ -483,10 +580,10 @@ ApkChecksum_toString :: proc "contextless" (self: ^ApkChecksum) -> (result: ^Str
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ApkChecksum_writeToParcel :: proc "contextless" (self: ^ApkChecksum, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+ApkChecksum_writeToParcel :: proc "contextless" (self: ^ApkChecksum, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ApkChecksum__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -588,16 +685,16 @@ ApplicationInfo_set_backupAgentName :: proc "contextless" (self: ^ApplicationInf
 	return jni_take(jni_env)
 }
 
-ApplicationInfo_get_category :: proc "contextless" (self: ^ApplicationInfo) -> (result: i32, exception: ^Throwable) {
+ApplicationInfo_get_category :: proc "contextless" (self: ^ApplicationInfo) -> (result: ApplicationInfo_Category, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ApplicationInfo__class, "category", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return ApplicationInfo_Category(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-ApplicationInfo_set_category :: proc "contextless" (self: ^ApplicationInfo, value: i32) -> (exception: ^Throwable) {
+ApplicationInfo_set_category :: proc "contextless" (self: ^ApplicationInfo, value: ApplicationInfo_Category) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ApplicationInfo__class, "category", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
@@ -705,16 +802,16 @@ ApplicationInfo_set_enabled :: proc "contextless" (self: ^ApplicationInfo, value
 	return jni_take(jni_env)
 }
 
-ApplicationInfo_get_flags :: proc "contextless" (self: ^ApplicationInfo) -> (result: i32, exception: ^Throwable) {
+ApplicationInfo_get_flags :: proc "contextless" (self: ^ApplicationInfo) -> (result: ApplicationInfo_Flags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ApplicationInfo__class, "flags", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(ApplicationInfo_Flags)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-ApplicationInfo_set_flags :: proc "contextless" (self: ^ApplicationInfo, value: i32) -> (exception: ^Throwable) {
+ApplicationInfo_set_flags :: proc "contextless" (self: ^ApplicationInfo, value: ApplicationInfo_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ApplicationInfo__class, "flags", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
@@ -965,16 +1062,16 @@ ApplicationInfo_set_theme :: proc "contextless" (self: ^ApplicationInfo, value: 
 	return jni_take(jni_env)
 }
 
-ApplicationInfo_get_uiOptions :: proc "contextless" (self: ^ApplicationInfo) -> (result: i32, exception: ^Throwable) {
+ApplicationInfo_get_uiOptions :: proc "contextless" (self: ^ApplicationInfo) -> (result: ActivityInfo_UiOptions, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ApplicationInfo__class, "uiOptions", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(ActivityInfo_UiOptions)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-ApplicationInfo_set_uiOptions :: proc "contextless" (self: ^ApplicationInfo, value: i32) -> (exception: ^Throwable) {
+ApplicationInfo_set_uiOptions :: proc "contextless" (self: ^ApplicationInfo, value: ActivityInfo_UiOptions) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ApplicationInfo__class, "uiOptions", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
@@ -1015,10 +1112,10 @@ ApplicationInfo_areAttributionsUserVisible :: proc "contextless" (self: ^Applica
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-ApplicationInfo_describeContents :: proc "contextless" (self: ^ApplicationInfo) -> (result: i32, exception: ^Throwable) {
+ApplicationInfo_describeContents :: proc "contextless" (self: ^ApplicationInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ApplicationInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ApplicationInfo_dump :: proc "contextless" (self: ^ApplicationInfo, pw: ^Printer, prefix: ^String) -> (exception: ^Throwable) {
@@ -1029,17 +1126,17 @@ ApplicationInfo_dump :: proc "contextless" (self: ^ApplicationInfo, pw: ^Printer
 	return jni_take(jni_env)
 }
 
-ApplicationInfo_getCategoryTitle :: proc "contextless" (context_: ^Context, category: i32) -> (result: ^CharSequence, exception: ^Throwable) {
+ApplicationInfo_getCategoryTitle :: proc "contextless" (context_: ^Context, category: ApplicationInfo_Category) -> (result: ^CharSequence, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &ApplicationInfo__class, "getCategoryTitle", "(Landroid/content/Context;I)Ljava/lang/CharSequence;", true) or_return
-	jni_args := [?]android.jvalue{{l = context_}, {i = category}}
+	jni_args := [?]android.jvalue{{l = context_}, {i = i32(category)}}
 	return (^CharSequence)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ApplicationInfo_getGwpAsanMode :: proc "contextless" (self: ^ApplicationInfo) -> (result: i32, exception: ^Throwable) { // API level 30
+ApplicationInfo_getGwpAsanMode :: proc "contextless" (self: ^ApplicationInfo) -> (result: ApplicationInfo_GwpAsan, exception: ^Throwable) { // API level 30
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ApplicationInfo__class, "getGwpAsanMode", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return ApplicationInfo_GwpAsan(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ApplicationInfo_getKnownActivityEmbeddingCerts :: proc "contextless" (self: ^ApplicationInfo) -> (result: ^Set, exception: ^Throwable) { // API level 33
@@ -1048,22 +1145,22 @@ ApplicationInfo_getKnownActivityEmbeddingCerts :: proc "contextless" (self: ^App
 	return (^Set)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ApplicationInfo_getMemtagMode :: proc "contextless" (self: ^ApplicationInfo) -> (result: i32, exception: ^Throwable) { // API level 31
+ApplicationInfo_getMemtagMode :: proc "contextless" (self: ^ApplicationInfo) -> (result: ApplicationInfo_Memtag, exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ApplicationInfo__class, "getMemtagMode", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return ApplicationInfo_Memtag(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ApplicationInfo_getNativeHeapZeroInitialized :: proc "contextless" (self: ^ApplicationInfo) -> (result: i32, exception: ^Throwable) { // API level 31
+ApplicationInfo_getNativeHeapZeroInitialized :: proc "contextless" (self: ^ApplicationInfo) -> (result: ApplicationInfo_Zeroinit, exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ApplicationInfo__class, "getNativeHeapZeroInitialized", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return ApplicationInfo_Zeroinit(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ApplicationInfo_getRequestRawExternalStorageAccess :: proc "contextless" (self: ^ApplicationInfo) -> (result: i32, exception: ^Throwable) { // API level 31
+ApplicationInfo_getRequestRawExternalStorageAccess :: proc "contextless" (self: ^ApplicationInfo) -> (result: ApplicationInfo_RawExternalStorageAccess, exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ApplicationInfo__class, "getRequestRawExternalStorageAccess", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return ApplicationInfo_RawExternalStorageAccess(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ApplicationInfo_isProfileable :: proc "contextless" (self: ^ApplicationInfo) -> (result: bool, exception: ^Throwable) { // API level 31
@@ -1103,12 +1200,86 @@ ApplicationInfo_toString :: proc "contextless" (self: ^ApplicationInfo) -> (resu
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ApplicationInfo_writeToParcel :: proc "contextless" (self: ^ApplicationInfo, dest: ^Parcel, parcelableFlags: i32) -> (exception: ^Throwable) {
+ApplicationInfo_writeToParcel :: proc "contextless" (self: ^ApplicationInfo, dest: ^Parcel, parcelableFlags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ApplicationInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = parcelableFlags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)parcelableFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+ApplicationInfo_Flag :: enum u32 {
+	ALLOW_BACKUP              = 15,
+	ALLOW_CLEAR_USER_DATA     = 6,
+	ALLOW_TASK_REPARENTING    = 5,
+	DEBUGGABLE                = 1,
+	EXTERNAL_STORAGE          = 18,
+	EXTRACT_NATIVE_LIBS       = 28,
+	FACTORY_TEST              = 4,
+	FULL_BACKUP_ONLY          = 26,
+	HARDWARE_ACCELERATED      = 29,
+	HAS_CODE                  = 2,
+	INSTALLED                 = 23,
+	IS_DATA_ONLY              = 24,
+	IS_GAME                   = 25,
+	KILL_AFTER_RESTORE        = 16,
+	LARGE_HEAP                = 20,
+	MULTIARCH                 = 31,
+	PERSISTENT                = 3,
+	RESIZEABLE_FOR_SCREENS    = 12,
+	RESTORE_ANY_VERSION       = 17,
+	STOPPED                   = 21,
+	SUPPORTS_LARGE_SCREENS    = 11,
+	SUPPORTS_NORMAL_SCREENS   = 10,
+	SUPPORTS_RTL              = 22,
+	SUPPORTS_SCREEN_DENSITIES = 13,
+	SUPPORTS_SMALL_SCREENS    = 9,
+	SUPPORTS_XLARGE_SCREENS   = 19,
+	SUSPENDED                 = 30,
+	SYSTEM                    = 0,
+	TEST_ONLY                 = 8,
+	UPDATED_SYSTEM_APP        = 7,
+	USES_CLEARTEXT_TRAFFIC    = 27,
+	VM_SAFE_MODE              = 14,
+}
+ApplicationInfo_Flags :: distinct bit_set[ApplicationInfo_Flag; u32]
+
+ApplicationInfo_Category :: enum i32 {
+	ACCESSIBILITY = 8,
+	AUDIO         = 1,
+	GAME          = 0,
+	IMAGE         = 3,
+	MAPS          = 6,
+	NEWS          = 5,
+	PRODUCTIVITY  = 7,
+	SOCIAL        = 4,
+	UNDEFINED     = -1,
+	VIDEO         = 2,
+}
+
+ApplicationInfo_GwpAsan :: enum i32 {
+	ALWAYS  = 1,
+	DEFAULT = -1,
+	NEVER   = 0,
+}
+
+ApplicationInfo_Memtag :: enum i32 {
+	ASYNC   = 1,
+	DEFAULT = -1,
+	OFF     = 0,
+	SYNC    = 2,
+}
+
+ApplicationInfo_Zeroinit :: enum i32 {
+	DEFAULT  = -1,
+	DISABLED = 0,
+	ENABLED  = 1,
+}
+
+ApplicationInfo_RawExternalStorageAccess :: enum i32 {
+	DEFAULT       = 0,
+	NOT_REQUESTED = 2,
+	REQUESTED     = 1,
 }
 
 // class android.content.pm.ApplicationInfo.DisplayNameComparator
@@ -1348,10 +1519,10 @@ Attribution_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creator
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-Attribution_describeContents :: proc "contextless" (self: ^Attribution) -> (result: i32, exception: ^Throwable) {
+Attribution_describeContents :: proc "contextless" (self: ^Attribution) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Attribution__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Attribution_getLabel :: proc "contextless" (self: ^Attribution) -> (result: i32, exception: ^Throwable) {
@@ -1366,10 +1537,10 @@ Attribution_getTag :: proc "contextless" (self: ^Attribution) -> (result: ^Strin
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Attribution_writeToParcel :: proc "contextless" (self: ^Attribution, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+Attribution_writeToParcel :: proc "contextless" (self: ^Attribution, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Attribution__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1389,10 +1560,10 @@ Capability_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creator,
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-Capability_describeContents :: proc "contextless" (self: ^Capability) -> (result: i32, exception: ^Throwable) {
+Capability_describeContents :: proc "contextless" (self: ^Capability) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Capability__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Capability_equals :: proc "contextless" (self: ^Capability, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -1414,10 +1585,10 @@ Capability_hashCode :: proc "contextless" (self: ^Capability) -> (result: i32, e
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-Capability_writeToParcel :: proc "contextless" (self: ^Capability, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+Capability_writeToParcel :: proc "contextless" (self: ^Capability, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Capability__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1458,10 +1629,10 @@ CapabilityParams_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Cr
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-CapabilityParams_describeContents :: proc "contextless" (self: ^CapabilityParams) -> (result: i32, exception: ^Throwable) {
+CapabilityParams_describeContents :: proc "contextless" (self: ^CapabilityParams) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &CapabilityParams__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 CapabilityParams_equals :: proc "contextless" (self: ^CapabilityParams, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -1495,10 +1666,10 @@ CapabilityParams_hashCode :: proc "contextless" (self: ^CapabilityParams) -> (re
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-CapabilityParams_writeToParcel :: proc "contextless" (self: ^CapabilityParams, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+CapabilityParams_writeToParcel :: proc "contextless" (self: ^CapabilityParams, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &CapabilityParams__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1553,10 +1724,10 @@ ChangedPackages_new :: proc "contextless" (sequenceNumber: i32, packageNames: ^L
 	return (^ChangedPackages)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ChangedPackages_describeContents :: proc "contextless" (self: ^ChangedPackages) -> (result: i32, exception: ^Throwable) {
+ChangedPackages_describeContents :: proc "contextless" (self: ^ChangedPackages) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ChangedPackages__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ChangedPackages_getPackageNames :: proc "contextless" (self: ^ChangedPackages) -> (result: ^List, exception: ^Throwable) {
@@ -1571,10 +1742,10 @@ ChangedPackages_getSequenceNumber :: proc "contextless" (self: ^ChangedPackages)
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-ChangedPackages_writeToParcel :: proc "contextless" (self: ^ChangedPackages, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+ChangedPackages_writeToParcel :: proc "contextless" (self: ^ChangedPackages, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ChangedPackages__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1602,23 +1773,23 @@ Checksum_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creator, e
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-Checksum_new :: proc "contextless" (type: i32, value: ^ByteArray) -> (result: ^Checksum, exception: ^Throwable) {
+Checksum_new :: proc "contextless" (type: Checksum_TypeFlags, value: ^ByteArray) -> (result: ^Checksum, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Checksum__class, "<init>", "(I[B)V", false) or_return
-	jni_args := [?]android.jvalue{{i = type}, {l = value}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)type}, {l = value}}
 	return (^Checksum)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Checksum_describeContents :: proc "contextless" (self: ^Checksum) -> (result: i32, exception: ^Throwable) {
+Checksum_describeContents :: proc "contextless" (self: ^Checksum) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Checksum__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Checksum_getType :: proc "contextless" (self: ^Checksum) -> (result: i32, exception: ^Throwable) {
+Checksum_getType :: proc "contextless" (self: ^Checksum) -> (result: Checksum_TypeFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Checksum__class, "getType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Checksum_TypeFlags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Checksum_getValue :: proc "contextless" (self: ^Checksum) -> (result: ^ByteArray, exception: ^Throwable) {
@@ -1627,13 +1798,24 @@ Checksum_getValue :: proc "contextless" (self: ^Checksum) -> (result: ^ByteArray
 	return (^ByteArray)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Checksum_writeToParcel :: proc "contextless" (self: ^Checksum, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+Checksum_writeToParcel :: proc "contextless" (self: ^Checksum, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Checksum__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+Checksum_TypeFlag :: enum u32 {
+	PARTIAL_MERKLE_ROOT_1M_SHA256 = 5,
+	PARTIAL_MERKLE_ROOT_1M_SHA512 = 6,
+	WHOLE_MD5                     = 1,
+	WHOLE_MERKLE_ROOT_4K_SHA256   = 0,
+	WHOLE_SHA1                    = 2,
+	WHOLE_SHA256                  = 3,
+	WHOLE_SHA512                  = 4,
+}
+Checksum_TypeFlags :: distinct bit_set[Checksum_TypeFlag; u32]
 
 // class android.content.pm.ComponentInfo
 ComponentInfo :: struct #raw_union {
@@ -1829,55 +2011,55 @@ ConfigurationInfo_set_reqGlEsVersion :: proc "contextless" (self: ^Configuration
 	return jni_take(jni_env)
 }
 
-ConfigurationInfo_get_reqInputFeatures :: proc "contextless" (self: ^ConfigurationInfo) -> (result: i32, exception: ^Throwable) {
+ConfigurationInfo_get_reqInputFeatures :: proc "contextless" (self: ^ConfigurationInfo) -> (result: ConfigurationInfo_InputFeatures, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ConfigurationInfo__class, "reqInputFeatures", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(ConfigurationInfo_InputFeatures)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-ConfigurationInfo_set_reqInputFeatures :: proc "contextless" (self: ^ConfigurationInfo, value: i32) -> (exception: ^Throwable) {
+ConfigurationInfo_set_reqInputFeatures :: proc "contextless" (self: ^ConfigurationInfo, value: ConfigurationInfo_InputFeatures) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ConfigurationInfo__class, "reqInputFeatures", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
-ConfigurationInfo_get_reqKeyboardType :: proc "contextless" (self: ^ConfigurationInfo) -> (result: i32, exception: ^Throwable) {
+ConfigurationInfo_get_reqKeyboardType :: proc "contextless" (self: ^ConfigurationInfo) -> (result: Configuration_Keyboard, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ConfigurationInfo__class, "reqKeyboardType", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return Configuration_Keyboard(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-ConfigurationInfo_set_reqKeyboardType :: proc "contextless" (self: ^ConfigurationInfo, value: i32) -> (exception: ^Throwable) {
+ConfigurationInfo_set_reqKeyboardType :: proc "contextless" (self: ^ConfigurationInfo, value: Configuration_Keyboard) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ConfigurationInfo__class, "reqKeyboardType", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
-ConfigurationInfo_get_reqNavigation :: proc "contextless" (self: ^ConfigurationInfo) -> (result: i32, exception: ^Throwable) {
+ConfigurationInfo_get_reqNavigation :: proc "contextless" (self: ^ConfigurationInfo) -> (result: Configuration_Navigation, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ConfigurationInfo__class, "reqNavigation", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return Configuration_Navigation(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-ConfigurationInfo_set_reqNavigation :: proc "contextless" (self: ^ConfigurationInfo, value: i32) -> (exception: ^Throwable) {
+ConfigurationInfo_set_reqNavigation :: proc "contextless" (self: ^ConfigurationInfo, value: Configuration_Navigation) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ConfigurationInfo__class, "reqNavigation", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
-ConfigurationInfo_get_reqTouchScreen :: proc "contextless" (self: ^ConfigurationInfo) -> (result: i32, exception: ^Throwable) {
+ConfigurationInfo_get_reqTouchScreen :: proc "contextless" (self: ^ConfigurationInfo) -> (result: Configuration_Touchscreen, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ConfigurationInfo__class, "reqTouchScreen", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return Configuration_Touchscreen(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-ConfigurationInfo_set_reqTouchScreen :: proc "contextless" (self: ^ConfigurationInfo, value: i32) -> (exception: ^Throwable) {
+ConfigurationInfo_set_reqTouchScreen :: proc "contextless" (self: ^ConfigurationInfo, value: Configuration_Touchscreen) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ConfigurationInfo__class, "reqTouchScreen", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
@@ -1899,10 +2081,10 @@ ConfigurationInfo_new :: proc{
 	ConfigurationInfo_new_ConfigurationInfo,
 }
 
-ConfigurationInfo_describeContents :: proc "contextless" (self: ^ConfigurationInfo) -> (result: i32, exception: ^Throwable) {
+ConfigurationInfo_describeContents :: proc "contextless" (self: ^ConfigurationInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ConfigurationInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ConfigurationInfo_getGlEsVersion :: proc "contextless" (self: ^ConfigurationInfo) -> (result: ^String, exception: ^Throwable) {
@@ -1917,13 +2099,19 @@ ConfigurationInfo_toString :: proc "contextless" (self: ^ConfigurationInfo) -> (
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ConfigurationInfo_writeToParcel :: proc "contextless" (self: ^ConfigurationInfo, dest: ^Parcel, parcelableFlags: i32) -> (exception: ^Throwable) {
+ConfigurationInfo_writeToParcel :: proc "contextless" (self: ^ConfigurationInfo, dest: ^Parcel, parcelableFlags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ConfigurationInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = parcelableFlags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)parcelableFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+ConfigurationInfo_InputFeature :: enum u32 {
+	FIVE_WAY_NAV  = 1,
+	HARD_KEYBOARD = 0,
+}
+ConfigurationInfo_InputFeatures :: distinct bit_set[ConfigurationInfo_InputFeature; u32]
 
 // class android.content.pm.CrossProfileApps
 CrossProfileApps :: struct #raw_union {
@@ -2075,16 +2263,16 @@ FeatureGroupInfo_new :: proc{
 	FeatureGroupInfo_new_FeatureGroupInfo,
 }
 
-FeatureGroupInfo_describeContents :: proc "contextless" (self: ^FeatureGroupInfo) -> (result: i32, exception: ^Throwable) {
+FeatureGroupInfo_describeContents :: proc "contextless" (self: ^FeatureGroupInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &FeatureGroupInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-FeatureGroupInfo_writeToParcel :: proc "contextless" (self: ^FeatureGroupInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+FeatureGroupInfo_writeToParcel :: proc "contextless" (self: ^FeatureGroupInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &FeatureGroupInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -2107,16 +2295,16 @@ FeatureInfo_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creator
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-FeatureInfo_get_flags :: proc "contextless" (self: ^FeatureInfo) -> (result: i32, exception: ^Throwable) {
+FeatureInfo_get_flags :: proc "contextless" (self: ^FeatureInfo) -> (result: FeatureInfo_Flags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &FeatureInfo__class, "flags", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(FeatureInfo_Flags)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-FeatureInfo_set_flags :: proc "contextless" (self: ^FeatureInfo, value: i32) -> (exception: ^Throwable) {
+FeatureInfo_set_flags :: proc "contextless" (self: ^FeatureInfo, value: FeatureInfo_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &FeatureInfo__class, "flags", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
@@ -2177,10 +2365,10 @@ FeatureInfo_new :: proc{
 	FeatureInfo_new_FeatureInfo,
 }
 
-FeatureInfo_describeContents :: proc "contextless" (self: ^FeatureInfo) -> (result: i32, exception: ^Throwable) {
+FeatureInfo_describeContents :: proc "contextless" (self: ^FeatureInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &FeatureInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 FeatureInfo_getGlEsVersion :: proc "contextless" (self: ^FeatureInfo) -> (result: ^String, exception: ^Throwable) {
@@ -2195,13 +2383,18 @@ FeatureInfo_toString :: proc "contextless" (self: ^FeatureInfo) -> (result: ^Str
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-FeatureInfo_writeToParcel :: proc "contextless" (self: ^FeatureInfo, dest: ^Parcel, parcelableFlags: i32) -> (exception: ^Throwable) {
+FeatureInfo_writeToParcel :: proc "contextless" (self: ^FeatureInfo, dest: ^Parcel, parcelableFlags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &FeatureInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = parcelableFlags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)parcelableFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+FeatureInfo_Flag :: enum u32 {
+	REQUIRED = 0,
+}
+FeatureInfo_Flags :: distinct bit_set[FeatureInfo_Flag; u32]
 
 // class android.content.pm.InstallSourceInfo // API level 30
 InstallSourceInfo :: struct #raw_union {
@@ -2218,10 +2411,10 @@ InstallSourceInfo_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_C
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-InstallSourceInfo_describeContents :: proc "contextless" (self: ^InstallSourceInfo) -> (result: i32, exception: ^Throwable) {
+InstallSourceInfo_describeContents :: proc "contextless" (self: ^InstallSourceInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InstallSourceInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 InstallSourceInfo_getInitiatingPackageName :: proc "contextless" (self: ^InstallSourceInfo) -> (result: ^String, exception: ^Throwable) {
@@ -2248,10 +2441,10 @@ InstallSourceInfo_getOriginatingPackageName :: proc "contextless" (self: ^Instal
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-InstallSourceInfo_getPackageSource :: proc "contextless" (self: ^InstallSourceInfo) -> (result: i32, exception: ^Throwable) { // API level 33
+InstallSourceInfo_getPackageSource :: proc "contextless" (self: ^InstallSourceInfo) -> (result: PackageInstaller_PackageSource, exception: ^Throwable) { // API level 33
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InstallSourceInfo__class, "getPackageSource", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return PackageInstaller_PackageSource(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 InstallSourceInfo_getUpdateOwnerPackageName :: proc "contextless" (self: ^InstallSourceInfo) -> (result: ^String, exception: ^Throwable) { // API level 34
@@ -2260,10 +2453,10 @@ InstallSourceInfo_getUpdateOwnerPackageName :: proc "contextless" (self: ^Instal
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-InstallSourceInfo_writeToParcel :: proc "contextless" (self: ^InstallSourceInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+InstallSourceInfo_writeToParcel :: proc "contextless" (self: ^InstallSourceInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InstallSourceInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -2431,10 +2624,10 @@ InstrumentationInfo_new :: proc{
 	InstrumentationInfo_new_InstrumentationInfo,
 }
 
-InstrumentationInfo_describeContents :: proc "contextless" (self: ^InstrumentationInfo) -> (result: i32, exception: ^Throwable) {
+InstrumentationInfo_describeContents :: proc "contextless" (self: ^InstrumentationInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InstrumentationInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 InstrumentationInfo_toString :: proc "contextless" (self: ^InstrumentationInfo) -> (result: ^String, exception: ^Throwable) {
@@ -2443,10 +2636,10 @@ InstrumentationInfo_toString :: proc "contextless" (self: ^InstrumentationInfo) 
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-InstrumentationInfo_writeToParcel :: proc "contextless" (self: ^InstrumentationInfo, dest: ^Parcel, parcelableFlags: i32) -> (exception: ^Throwable) {
+InstrumentationInfo_writeToParcel :: proc "contextless" (self: ^InstrumentationInfo, dest: ^Parcel, parcelableFlags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InstrumentationInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = parcelableFlags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)parcelableFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -2546,10 +2739,10 @@ LabeledIntent_readFromParcel :: proc "contextless" (self: ^LabeledIntent, in_: ^
 	return jni_take(jni_env)
 }
 
-LabeledIntent_writeToParcel :: proc "contextless" (self: ^LabeledIntent, dest: ^Parcel, parcelableFlags: i32) -> (exception: ^Throwable) {
+LabeledIntent_writeToParcel :: proc "contextless" (self: ^LabeledIntent, dest: ^Parcel, parcelableFlags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &LabeledIntent__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = parcelableFlags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)parcelableFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -2656,10 +2849,10 @@ LauncherApps_getAppMarketActivityIntent :: proc "contextless" (self: ^LauncherAp
 	return (^IntentSender)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-LauncherApps_getApplicationInfo :: proc "contextless" (self: ^LauncherApps, packageName: ^String, flags: i32, user: ^UserHandle) -> (result: ^ApplicationInfo, exception: ^Throwable) {
+LauncherApps_getApplicationInfo :: proc "contextless" (self: ^LauncherApps, packageName: ^String, flags: PackageManager_InfoFlags, user: ^UserHandle) -> (result: ^ApplicationInfo, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &LauncherApps__class, "getApplicationInfo", "(Ljava/lang/String;ILandroid/os/UserHandle;)Landroid/content/pm/ApplicationInfo;", false) or_return
-	jni_args := [?]android.jvalue{{l = packageName}, {i = flags}, {l = user}}
+	jni_args := [?]android.jvalue{{l = packageName}, {i = transmute(i32)flags}, {l = user}}
 	return (^ApplicationInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -3052,10 +3245,10 @@ LauncherApps_PinItemRequest_accept :: proc{
 	LauncherApps_PinItemRequest_accept_Bundle,
 }
 
-LauncherApps_PinItemRequest_describeContents :: proc "contextless" (self: ^LauncherApps_PinItemRequest) -> (result: i32, exception: ^Throwable) {
+LauncherApps_PinItemRequest_describeContents :: proc "contextless" (self: ^LauncherApps_PinItemRequest) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &LauncherApps_PinItemRequest__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 LauncherApps_PinItemRequest_getAppWidgetProviderInfo :: proc "contextless" (self: ^LauncherApps_PinItemRequest, context_: ^Context) -> (result: ^AppWidgetProviderInfo, exception: ^Throwable) {
@@ -3071,10 +3264,10 @@ LauncherApps_PinItemRequest_getExtras :: proc "contextless" (self: ^LauncherApps
 	return (^Bundle)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-LauncherApps_PinItemRequest_getRequestType :: proc "contextless" (self: ^LauncherApps_PinItemRequest) -> (result: i32, exception: ^Throwable) {
+LauncherApps_PinItemRequest_getRequestType :: proc "contextless" (self: ^LauncherApps_PinItemRequest) -> (result: LauncherApps_PinItemRequest_RequestType, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &LauncherApps_PinItemRequest__class, "getRequestType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return LauncherApps_PinItemRequest_RequestType(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 LauncherApps_PinItemRequest_getShortcutInfo :: proc "contextless" (self: ^LauncherApps_PinItemRequest) -> (result: ^ShortcutInfo, exception: ^Throwable) {
@@ -3089,12 +3282,17 @@ LauncherApps_PinItemRequest_isValid :: proc "contextless" (self: ^LauncherApps_P
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-LauncherApps_PinItemRequest_writeToParcel :: proc "contextless" (self: ^LauncherApps_PinItemRequest, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+LauncherApps_PinItemRequest_writeToParcel :: proc "contextless" (self: ^LauncherApps_PinItemRequest, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &LauncherApps_PinItemRequest__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+LauncherApps_PinItemRequest_RequestType :: enum i32 {
+	APPWIDGET = 2,
+	SHORTCUT  = 1,
 }
 
 // class android.content.pm.LauncherApps.ShortcutQuery
@@ -3146,10 +3344,10 @@ LauncherApps_ShortcutQuery_setPackage :: proc "contextless" (self: ^LauncherApps
 	return (^LauncherApps_ShortcutQuery)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-LauncherApps_ShortcutQuery_setQueryFlags :: proc "contextless" (self: ^LauncherApps_ShortcutQuery, queryFlags: i32) -> (result: ^LauncherApps_ShortcutQuery, exception: ^Throwable) {
+LauncherApps_ShortcutQuery_setQueryFlags :: proc "contextless" (self: ^LauncherApps_ShortcutQuery, queryFlags: LauncherApps_ShortcutQuery_Flags) -> (result: ^LauncherApps_ShortcutQuery, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &LauncherApps_ShortcutQuery__class, "setQueryFlags", "(I)Landroid/content/pm/LauncherApps$ShortcutQuery;", false) or_return
-	jni_args := [?]android.jvalue{{i = queryFlags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)queryFlags}}
 	return (^LauncherApps_ShortcutQuery)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -3159,6 +3357,16 @@ LauncherApps_ShortcutQuery_setShortcutIds :: proc "contextless" (self: ^Launcher
 	jni_args := [?]android.jvalue{{l = shortcutIds}}
 	return (^LauncherApps_ShortcutQuery)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
+
+LauncherApps_ShortcutQuery_Flag :: enum u32 {
+	GET_KEY_FIELDS_ONLY          = 2,
+	MATCH_CACHED                 = 4,
+	MATCH_DYNAMIC                = 0,
+	MATCH_MANIFEST               = 3,
+	MATCH_PINNED                 = 1,
+	MATCH_PINNED_BY_ANY_LAUNCHER = 10,
+}
+LauncherApps_ShortcutQuery_Flags :: distinct bit_set[LauncherApps_ShortcutQuery_Flag; u32]
 
 // class android.content.pm.LauncherUserInfo // API level 35
 LauncherUserInfo :: struct #raw_union {
@@ -3177,10 +3385,10 @@ LauncherUserInfo_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Cr
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-LauncherUserInfo_describeContents :: proc "contextless" (self: ^LauncherUserInfo) -> (result: i32, exception: ^Throwable) {
+LauncherUserInfo_describeContents :: proc "contextless" (self: ^LauncherUserInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &LauncherUserInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 LauncherUserInfo_getUserConfig :: proc "contextless" (self: ^LauncherUserInfo) -> (result: ^Bundle, exception: ^Throwable) { // API level 36
@@ -3201,10 +3409,10 @@ LauncherUserInfo_getUserType :: proc "contextless" (self: ^LauncherUserInfo) -> 
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-LauncherUserInfo_writeToParcel :: proc "contextless" (self: ^LauncherUserInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+LauncherUserInfo_writeToParcel :: proc "contextless" (self: ^LauncherUserInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &LauncherUserInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -3232,10 +3440,10 @@ MemoryBudgetInfo_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Cr
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-MemoryBudgetInfo_describeContents :: proc "contextless" (self: ^MemoryBudgetInfo) -> (result: i32, exception: ^Throwable) {
+MemoryBudgetInfo_describeContents :: proc "contextless" (self: ^MemoryBudgetInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MemoryBudgetInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 MemoryBudgetInfo_equals :: proc "contextless" (self: ^MemoryBudgetInfo, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -3257,10 +3465,10 @@ MemoryBudgetInfo_getAdditionalMbPerDensity :: proc "contextless" (self: ^MemoryB
 	return jni_env->CallLongMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-MemoryBudgetInfo_getFeature :: proc "contextless" (self: ^MemoryBudgetInfo) -> (result: i32, exception: ^Throwable) {
+MemoryBudgetInfo_getFeature :: proc "contextless" (self: ^MemoryBudgetInfo) -> (result: MemoryBudgetInfo_Feature, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MemoryBudgetInfo__class, "getFeature", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return MemoryBudgetInfo_Feature(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 MemoryBudgetInfo_getMaxMb :: proc "contextless" (self: ^MemoryBudgetInfo) -> (result: i64, exception: ^Throwable) {
@@ -3269,10 +3477,10 @@ MemoryBudgetInfo_getMaxMb :: proc "contextless" (self: ^MemoryBudgetInfo) -> (re
 	return jni_env->CallLongMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-MemoryBudgetInfo_getState :: proc "contextless" (self: ^MemoryBudgetInfo) -> (result: i32, exception: ^Throwable) {
+MemoryBudgetInfo_getState :: proc "contextless" (self: ^MemoryBudgetInfo) -> (result: MemoryBudgetInfo_State, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MemoryBudgetInfo__class, "getState", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return MemoryBudgetInfo_State(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 MemoryBudgetInfo_hashCode :: proc "contextless" (self: ^MemoryBudgetInfo) -> (result: i32, exception: ^Throwable) {
@@ -3287,12 +3495,25 @@ MemoryBudgetInfo_toString :: proc "contextless" (self: ^MemoryBudgetInfo) -> (re
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-MemoryBudgetInfo_writeToParcel :: proc "contextless" (self: ^MemoryBudgetInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+MemoryBudgetInfo_writeToParcel :: proc "contextless" (self: ^MemoryBudgetInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MemoryBudgetInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+MemoryBudgetInfo_Feature :: enum i32 {
+	AUTOMOTIVE  = 1,
+	LEANBACK    = 2,
+	UNSPECIFIED = 0,
+	WATCH       = 3,
+}
+
+MemoryBudgetInfo_State :: enum i32 {
+	BACKGROUND  = 300,
+	FOREGROUND  = 100,
+	PERCEPTIBLE = 200,
 }
 
 // class android.content.pm.ModuleInfo
@@ -3310,10 +3531,10 @@ ModuleInfo_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creator,
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-ModuleInfo_describeContents :: proc "contextless" (self: ^ModuleInfo) -> (result: i32, exception: ^Throwable) {
+ModuleInfo_describeContents :: proc "contextless" (self: ^ModuleInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ModuleInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ModuleInfo_equals :: proc "contextless" (self: ^ModuleInfo, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -3353,10 +3574,10 @@ ModuleInfo_toString :: proc "contextless" (self: ^ModuleInfo) -> (result: ^Strin
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ModuleInfo_writeToParcel :: proc "contextless" (self: ^ModuleInfo, dest: ^Parcel, parcelableFlags: i32) -> (exception: ^Throwable) {
+ModuleInfo_writeToParcel :: proc "contextless" (self: ^ModuleInfo, dest: ^Parcel, parcelableFlags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ModuleInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = parcelableFlags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)parcelableFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -3755,10 +3976,10 @@ PackageInfo_new :: proc "contextless" () -> (result: ^PackageInfo, exception: ^T
 	return (^PackageInfo)(jni_env->NewObjectA(jni_class, jni_id, nil)), jni_take(jni_env)
 }
 
-PackageInfo_describeContents :: proc "contextless" (self: ^PackageInfo) -> (result: i32, exception: ^Throwable) {
+PackageInfo_describeContents :: proc "contextless" (self: ^PackageInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 PackageInfo_getApexPackageName :: proc "contextless" (self: ^PackageInfo) -> (result: ^String, exception: ^Throwable) { // API level 35
@@ -3799,10 +4020,10 @@ PackageInfo_toString :: proc "contextless" (self: ^PackageInfo) -> (result: ^Str
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PackageInfo_writeToParcel :: proc "contextless" (self: ^PackageInfo, dest: ^Parcel, parcelableFlags: i32) -> (exception: ^Throwable) {
+PackageInfo_writeToParcel :: proc "contextless" (self: ^PackageInfo, dest: ^Parcel, parcelableFlags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = parcelableFlags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)parcelableFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -3935,10 +4156,10 @@ PackageInstaller_getStagedSessions :: proc "contextless" (self: ^PackageInstalle
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PackageInstaller_installExistingPackage :: proc "contextless" (self: ^PackageInstaller, packageName: ^String, installReason: i32, statusReceiver: ^IntentSender) -> (exception: ^Throwable) {
+PackageInstaller_installExistingPackage :: proc "contextless" (self: ^PackageInstaller, packageName: ^String, installReason: PackageManager_InstallReason, statusReceiver: ^IntentSender) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller__class, "installExistingPackage", "(Ljava/lang/String;ILandroid/content/IntentSender;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = packageName}, {i = installReason}, {l = statusReceiver}}
+	jni_args := [?]android.jvalue{{l = packageName}, {i = i32(installReason)}, {l = statusReceiver}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -3987,10 +4208,10 @@ PackageInstaller_reportUnarchivalState :: proc "contextless" (self: ^PackageInst
 	return jni_take(jni_env)
 }
 
-PackageInstaller_reportUnarchivalStatus :: proc "contextless" (self: ^PackageInstaller, unarchiveId: i32, status: i32, requiredStorageBytes: i64, userActionIntent: ^PendingIntent) -> (exception: ^Throwable) { // API level 35
+PackageInstaller_reportUnarchivalStatus :: proc "contextless" (self: ^PackageInstaller, unarchiveId: i32, status: PackageInstaller_Unarchival, requiredStorageBytes: i64, userActionIntent: ^PendingIntent) -> (exception: ^Throwable) { // API level 35
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller__class, "reportUnarchivalStatus", "(IIJLandroid/app/PendingIntent;)V", false) or_return
-	jni_args := [?]android.jvalue{{i = unarchiveId}, {i = status}, {j = requiredStorageBytes}, {l = userActionIntent}}
+	jni_args := [?]android.jvalue{{i = unarchiveId}, {i = i32(status)}, {j = requiredStorageBytes}, {l = userActionIntent}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4081,6 +4302,24 @@ PackageInstaller_waitForInstallConstraints :: proc "contextless" (self: ^Package
 	return jni_take(jni_env)
 }
 
+PackageInstaller_PackageSource :: enum i32 {
+	DOWNLOADED_FILE = 4,
+	LOCAL_FILE      = 3,
+	OTHER           = 1,
+	STORE           = 2,
+	UNSPECIFIED     = 0,
+}
+
+PackageInstaller_Unarchival :: enum i32 {
+	ERROR_INSTALLER_DISABLED    = 4,
+	ERROR_INSTALLER_UNINSTALLED = 5,
+	ERROR_INSUFFICIENT_STORAGE  = 2,
+	ERROR_NO_CONNECTIVITY       = 3,
+	ERROR_USER_ACTION_NEEDED    = 1,
+	GENERIC_ERROR               = 100,
+	OK                          = 0,
+}
+
 // class android.content.pm.PackageInstaller.InstallConstraints // API level 34
 PackageInstaller_InstallConstraints :: struct #raw_union {
 	using Object: Object,
@@ -4102,10 +4341,10 @@ PackageInstaller_InstallConstraints_get_GENTLE_UPDATE :: proc "contextless" () -
 	return (^PackageInstaller_InstallConstraints)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-PackageInstaller_InstallConstraints_describeContents :: proc "contextless" (self: ^PackageInstaller_InstallConstraints) -> (result: i32, exception: ^Throwable) {
+PackageInstaller_InstallConstraints_describeContents :: proc "contextless" (self: ^PackageInstaller_InstallConstraints) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller_InstallConstraints__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 PackageInstaller_InstallConstraints_equals :: proc "contextless" (self: ^PackageInstaller_InstallConstraints, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -4151,10 +4390,10 @@ PackageInstaller_InstallConstraints_isNotInCallRequired :: proc "contextless" (s
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-PackageInstaller_InstallConstraints_writeToParcel :: proc "contextless" (self: ^PackageInstaller_InstallConstraints, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+PackageInstaller_InstallConstraints_writeToParcel :: proc "contextless" (self: ^PackageInstaller_InstallConstraints, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller_InstallConstraints__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4230,16 +4469,16 @@ PackageInstaller_InstallConstraintsResult_areAllConstraintsSatisfied :: proc "co
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-PackageInstaller_InstallConstraintsResult_describeContents :: proc "contextless" (self: ^PackageInstaller_InstallConstraintsResult) -> (result: i32, exception: ^Throwable) {
+PackageInstaller_InstallConstraintsResult_describeContents :: proc "contextless" (self: ^PackageInstaller_InstallConstraintsResult) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller_InstallConstraintsResult__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PackageInstaller_InstallConstraintsResult_writeToParcel :: proc "contextless" (self: ^PackageInstaller_InstallConstraintsResult, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+PackageInstaller_InstallConstraintsResult_writeToParcel :: proc "contextless" (self: ^PackageInstaller_InstallConstraintsResult, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller_InstallConstraintsResult__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4259,10 +4498,10 @@ PackageInstaller_PreapprovalDetails_get_CREATOR :: proc "contextless" () -> (res
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-PackageInstaller_PreapprovalDetails_describeContents :: proc "contextless" (self: ^PackageInstaller_PreapprovalDetails) -> (result: i32, exception: ^Throwable) {
+PackageInstaller_PreapprovalDetails_describeContents :: proc "contextless" (self: ^PackageInstaller_PreapprovalDetails) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller_PreapprovalDetails__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 PackageInstaller_PreapprovalDetails_getIcon :: proc "contextless" (self: ^PackageInstaller_PreapprovalDetails) -> (result: ^Bitmap, exception: ^Throwable) {
@@ -4295,10 +4534,10 @@ PackageInstaller_PreapprovalDetails_toString :: proc "contextless" (self: ^Packa
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PackageInstaller_PreapprovalDetails_writeToParcel :: proc "contextless" (self: ^PackageInstaller_PreapprovalDetails, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+PackageInstaller_PreapprovalDetails_writeToParcel :: proc "contextless" (self: ^PackageInstaller_PreapprovalDetails, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller_PreapprovalDetails__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4477,10 +4716,10 @@ PackageInstaller_Session_removeSplit :: proc "contextless" (self: ^PackageInstal
 	return jni_take(jni_env)
 }
 
-PackageInstaller_Session_requestChecksums :: proc "contextless" (self: ^PackageInstaller_Session, name: ^String, required: i32, trustedInstallers: ^List, executor: ^Executor, onChecksumsReadyListener: ^PackageManager_OnChecksumsReadyListener) -> (exception: ^Throwable) { // API level 33
+PackageInstaller_Session_requestChecksums :: proc "contextless" (self: ^PackageInstaller_Session, name: ^String, required: Checksum_TypeFlags, trustedInstallers: ^List, executor: ^Executor, onChecksumsReadyListener: ^PackageManager_OnChecksumsReadyListener) -> (exception: ^Throwable) { // API level 33
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller_Session__class, "requestChecksums", "(Ljava/lang/String;ILjava/util/List;Ljava/util/concurrent/Executor;Landroid/content/pm/PackageManager$OnChecksumsReadyListener;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = name}, {i = required}, {l = trustedInstallers}, {l = executor}, {l = onChecksumsReadyListener}}
+	jni_args := [?]android.jvalue{{l = name}, {i = transmute(i32)required}, {l = trustedInstallers}, {l = executor}, {l = onChecksumsReadyListener}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4606,10 +4845,10 @@ PackageInstaller_SessionInfo_createDetailsIntent :: proc "contextless" (self: ^P
 	return (^Intent)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PackageInstaller_SessionInfo_describeContents :: proc "contextless" (self: ^PackageInstaller_SessionInfo) -> (result: i32, exception: ^Throwable) {
+PackageInstaller_SessionInfo_describeContents :: proc "contextless" (self: ^PackageInstaller_SessionInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller_SessionInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 PackageInstaller_SessionInfo_getAppIcon :: proc "contextless" (self: ^PackageInstaller_SessionInfo) -> (result: ^Bitmap, exception: ^Throwable) {
@@ -4654,10 +4893,10 @@ PackageInstaller_SessionInfo_getInstallLocation :: proc "contextless" (self: ^Pa
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-PackageInstaller_SessionInfo_getInstallReason :: proc "contextless" (self: ^PackageInstaller_SessionInfo) -> (result: i32, exception: ^Throwable) {
+PackageInstaller_SessionInfo_getInstallReason :: proc "contextless" (self: ^PackageInstaller_SessionInfo) -> (result: PackageManager_InstallReason, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller_SessionInfo__class, "getInstallReason", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return PackageManager_InstallReason(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 PackageInstaller_SessionInfo_getInstallerAttributionTag :: proc "contextless" (self: ^PackageInstaller_SessionInfo) -> (result: ^String, exception: ^Throwable) { // API level 31
@@ -4678,10 +4917,10 @@ PackageInstaller_SessionInfo_getInstallerUid :: proc "contextless" (self: ^Packa
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-PackageInstaller_SessionInfo_getMode :: proc "contextless" (self: ^PackageInstaller_SessionInfo) -> (result: i32, exception: ^Throwable) {
+PackageInstaller_SessionInfo_getMode :: proc "contextless" (self: ^PackageInstaller_SessionInfo) -> (result: PackageInstaller_SessionParams_Mode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller_SessionInfo__class, "getMode", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return PackageInstaller_SessionParams_Mode(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 PackageInstaller_SessionInfo_getOriginatingUid :: proc "contextless" (self: ^PackageInstaller_SessionInfo) -> (result: i32, exception: ^Throwable) {
@@ -4696,10 +4935,10 @@ PackageInstaller_SessionInfo_getOriginatingUri :: proc "contextless" (self: ^Pac
 	return (^Uri)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PackageInstaller_SessionInfo_getPackageSource :: proc "contextless" (self: ^PackageInstaller_SessionInfo) -> (result: i32, exception: ^Throwable) { // API level 33
+PackageInstaller_SessionInfo_getPackageSource :: proc "contextless" (self: ^PackageInstaller_SessionInfo) -> (result: PackageInstaller_PackageSource, exception: ^Throwable) { // API level 33
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller_SessionInfo__class, "getPackageSource", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return PackageInstaller_PackageSource(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 PackageInstaller_SessionInfo_getParentSessionId :: proc "contextless" (self: ^PackageInstaller_SessionInfo) -> (result: i32, exception: ^Throwable) {
@@ -4720,10 +4959,10 @@ PackageInstaller_SessionInfo_getReferrerUri :: proc "contextless" (self: ^Packag
 	return (^Uri)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PackageInstaller_SessionInfo_getRequireUserAction :: proc "contextless" (self: ^PackageInstaller_SessionInfo) -> (result: i32, exception: ^Throwable) { // API level 31
+PackageInstaller_SessionInfo_getRequireUserAction :: proc "contextless" (self: ^PackageInstaller_SessionInfo) -> (result: PackageInstaller_SessionParams_UserAction, exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller_SessionInfo__class, "getRequireUserAction", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return PackageInstaller_SessionParams_UserAction(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 PackageInstaller_SessionInfo_getSessionId :: proc "contextless" (self: ^PackageInstaller_SessionInfo) -> (result: i32, exception: ^Throwable) {
@@ -4738,10 +4977,10 @@ PackageInstaller_SessionInfo_getSize :: proc "contextless" (self: ^PackageInstal
 	return jni_env->CallLongMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-PackageInstaller_SessionInfo_getStagedSessionErrorCode :: proc "contextless" (self: ^PackageInstaller_SessionInfo) -> (result: i32, exception: ^Throwable) {
+PackageInstaller_SessionInfo_getStagedSessionErrorCode :: proc "contextless" (self: ^PackageInstaller_SessionInfo) -> (result: PackageInstaller_SessionInfo_SessionError, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller_SessionInfo__class, "getStagedSessionErrorCode", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return PackageInstaller_SessionInfo_SessionError(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 PackageInstaller_SessionInfo_getStagedSessionErrorMessage :: proc "contextless" (self: ^PackageInstaller_SessionInfo) -> (result: ^String, exception: ^Throwable) {
@@ -4852,12 +5091,20 @@ PackageInstaller_SessionInfo_isUnarchival :: proc "contextless" (self: ^PackageI
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-PackageInstaller_SessionInfo_writeToParcel :: proc "contextless" (self: ^PackageInstaller_SessionInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+PackageInstaller_SessionInfo_writeToParcel :: proc "contextless" (self: ^PackageInstaller_SessionInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller_SessionInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+PackageInstaller_SessionInfo_SessionError :: enum i32 {
+	ACTIVATION_FAILED   = 2,
+	CONFLICT            = 4,
+	NO_ERROR            = 0,
+	UNKNOWN_ERROR       = 3,
+	VERIFICATION_FAILED = 1,
 }
 
 // class android.content.pm.PackageInstaller.SessionParams
@@ -4890,17 +5137,17 @@ PackageInstaller_SessionParams_get_RESTRICTED_PERMISSIONS_ALL :: proc "contextle
 	return (^Set)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-PackageInstaller_SessionParams_new :: proc "contextless" (mode: i32) -> (result: ^PackageInstaller_SessionParams, exception: ^Throwable) {
+PackageInstaller_SessionParams_new :: proc "contextless" (mode: PackageInstaller_SessionParams_Mode) -> (result: ^PackageInstaller_SessionParams, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &PackageInstaller_SessionParams__class, "<init>", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = mode}}
+	jni_args := [?]android.jvalue{{i = i32(mode)}}
 	return (^PackageInstaller_SessionParams)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageInstaller_SessionParams_describeContents :: proc "contextless" (self: ^PackageInstaller_SessionParams) -> (result: i32, exception: ^Throwable) {
+PackageInstaller_SessionParams_describeContents :: proc "contextless" (self: ^PackageInstaller_SessionParams) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller_SessionParams__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 PackageInstaller_SessionParams_setAppIcon :: proc "contextless" (self: ^PackageInstaller_SessionParams, appIcon: ^Bitmap) -> (exception: ^Throwable) {
@@ -4974,18 +5221,18 @@ PackageInstaller_SessionParams_setInstallLocation :: proc "contextless" (self: ^
 	return jni_take(jni_env)
 }
 
-PackageInstaller_SessionParams_setInstallReason :: proc "contextless" (self: ^PackageInstaller_SessionParams, installReason: i32) -> (exception: ^Throwable) {
+PackageInstaller_SessionParams_setInstallReason :: proc "contextless" (self: ^PackageInstaller_SessionParams, installReason: PackageManager_InstallReason) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller_SessionParams__class, "setInstallReason", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = installReason}}
+	jni_args := [?]android.jvalue{{i = i32(installReason)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-PackageInstaller_SessionParams_setInstallScenario :: proc "contextless" (self: ^PackageInstaller_SessionParams, installScenario: i32) -> (exception: ^Throwable) { // API level 31
+PackageInstaller_SessionParams_setInstallScenario :: proc "contextless" (self: ^PackageInstaller_SessionParams, installScenario: PackageManager_InstallScenario) -> (exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller_SessionParams__class, "setInstallScenario", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = installScenario}}
+	jni_args := [?]android.jvalue{{i = i32(installScenario)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -5021,18 +5268,18 @@ PackageInstaller_SessionParams_setOriginatingUri :: proc "contextless" (self: ^P
 	return jni_take(jni_env)
 }
 
-PackageInstaller_SessionParams_setPackageSource :: proc "contextless" (self: ^PackageInstaller_SessionParams, packageSource: i32) -> (exception: ^Throwable) { // API level 33
+PackageInstaller_SessionParams_setPackageSource :: proc "contextless" (self: ^PackageInstaller_SessionParams, packageSource: PackageInstaller_PackageSource) -> (exception: ^Throwable) { // API level 33
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller_SessionParams__class, "setPackageSource", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = packageSource}}
+	jni_args := [?]android.jvalue{{i = i32(packageSource)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-PackageInstaller_SessionParams_setPermissionState :: proc "contextless" (self: ^PackageInstaller_SessionParams, permissionName: ^String, state: i32) -> (result: ^PackageInstaller_SessionParams, exception: ^Throwable) { // API level 34
+PackageInstaller_SessionParams_setPermissionState :: proc "contextless" (self: ^PackageInstaller_SessionParams, permissionName: ^String, state: PackageInstaller_SessionParams_PermissionState) -> (result: ^PackageInstaller_SessionParams, exception: ^Throwable) { // API level 34
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller_SessionParams__class, "setPermissionState", "(Ljava/lang/String;I)Landroid/content/pm/PackageInstaller$SessionParams;", false) or_return
-	jni_args := [?]android.jvalue{{l = permissionName}, {i = state}}
+	jni_args := [?]android.jvalue{{l = permissionName}, {i = i32(state)}}
 	return (^PackageInstaller_SessionParams)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -5052,10 +5299,10 @@ PackageInstaller_SessionParams_setRequestUpdateOwnership :: proc "contextless" (
 	return jni_take(jni_env)
 }
 
-PackageInstaller_SessionParams_setRequireUserAction :: proc "contextless" (self: ^PackageInstaller_SessionParams, requireUserAction: i32) -> (exception: ^Throwable) { // API level 31
+PackageInstaller_SessionParams_setRequireUserAction :: proc "contextless" (self: ^PackageInstaller_SessionParams, requireUserAction: PackageInstaller_SessionParams_UserAction) -> (exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller_SessionParams__class, "setRequireUserAction", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = requireUserAction}}
+	jni_args := [?]android.jvalue{{i = i32(requireUserAction)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -5084,12 +5331,29 @@ PackageInstaller_SessionParams_setWhitelistedRestrictedPermissions :: proc "cont
 	return jni_take(jni_env)
 }
 
-PackageInstaller_SessionParams_writeToParcel :: proc "contextless" (self: ^PackageInstaller_SessionParams, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+PackageInstaller_SessionParams_writeToParcel :: proc "contextless" (self: ^PackageInstaller_SessionParams, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageInstaller_SessionParams__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+PackageInstaller_SessionParams_Mode :: enum i32 {
+	FULL_INSTALL     = 1,
+	INHERIT_EXISTING = 2,
+}
+
+PackageInstaller_SessionParams_UserAction :: enum i32 {
+	NOT_REQUIRED = 2,
+	REQUIRED     = 1,
+	UNSPECIFIED  = 0,
+}
+
+PackageInstaller_SessionParams_PermissionState :: enum i32 {
+	DEFAULT = 0,
+	DENIED  = 2,
+	GRANTED = 1,
 }
 
 // class android.content.pm.PackageInstaller.UnarchivalState // API level 35
@@ -5625,10 +5889,10 @@ PackageManager_addPreferredActivity :: proc "contextless" (self: ^PackageManager
 	return jni_take(jni_env)
 }
 
-PackageManager_addWhitelistedRestrictedPermission :: proc "contextless" (self: ^PackageManager, packageName: ^String, permName: ^String, whitelistFlags: i32) -> (result: bool, exception: ^Throwable) {
+PackageManager_addWhitelistedRestrictedPermission :: proc "contextless" (self: ^PackageManager, packageName: ^String, permName: ^String, whitelistFlags: PackageManager_PermissionWhitelistFlags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "addWhitelistedRestrictedPermission", "(Ljava/lang/String;Ljava/lang/String;I)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = packageName}, {l = permName}, {i = whitelistFlags}}
+	jni_args := [?]android.jvalue{{l = packageName}, {l = permName}, {i = transmute(i32)whitelistFlags}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -5664,25 +5928,25 @@ PackageManager_canonicalToCurrentPackageNames :: proc "contextless" (self: ^Pack
 	return (^Array(String))(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_checkPermission :: proc "contextless" (self: ^PackageManager, permName: ^String, packageName: ^String) -> (result: i32, exception: ^Throwable) {
+PackageManager_checkPermission :: proc "contextless" (self: ^PackageManager, permName: ^String, packageName: ^String) -> (result: PackageManager_Permission, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "checkPermission", "(Ljava/lang/String;Ljava/lang/String;)I", false) or_return
 	jni_args := [?]android.jvalue{{l = permName}, {l = packageName}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return PackageManager_Permission(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_checkSignatures_int_int :: proc "contextless" (self: ^PackageManager, uid1: i32, uid2: i32) -> (result: i32, exception: ^Throwable) {
+PackageManager_checkSignatures_int_int :: proc "contextless" (self: ^PackageManager, uid1: i32, uid2: i32) -> (result: PackageManager_Signature, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "checkSignatures", "(II)I", false) or_return
 	jni_args := [?]android.jvalue{{i = uid1}, {i = uid2}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return PackageManager_Signature(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_checkSignatures_String_String :: proc "contextless" (self: ^PackageManager, packageName1: ^String, packageName2: ^String) -> (result: i32, exception: ^Throwable) {
+PackageManager_checkSignatures_String_String :: proc "contextless" (self: ^PackageManager, packageName1: ^String, packageName2: ^String) -> (result: PackageManager_Signature, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "checkSignatures", "(Ljava/lang/String;Ljava/lang/String;)I", false) or_return
 	jni_args := [?]android.jvalue{{l = packageName1}, {l = packageName2}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return PackageManager_Signature(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 PackageManager_checkSignatures :: proc{
@@ -5765,10 +6029,10 @@ PackageManager_getActivityInfo_ComponentName_PackageManager_ComponentInfoFlags :
 	return (^ActivityInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_getActivityInfo_ComponentName_int :: proc "contextless" (self: ^PackageManager, component: ^ComponentName, flags: i32) -> (result: ^ActivityInfo, exception: ^Throwable) {
+PackageManager_getActivityInfo_ComponentName_int :: proc "contextless" (self: ^PackageManager, component: ^ComponentName, flags: PackageManager_InfoFlags) -> (result: ^ActivityInfo, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getActivityInfo", "(Landroid/content/ComponentName;I)Landroid/content/pm/ActivityInfo;", false) or_return
-	jni_args := [?]android.jvalue{{l = component}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = component}, {i = transmute(i32)flags}}
 	return (^ActivityInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -5796,10 +6060,10 @@ PackageManager_getActivityLogo :: proc{
 	PackageManager_getActivityLogo_Intent,
 }
 
-PackageManager_getAllPermissionGroups :: proc "contextless" (self: ^PackageManager, flags: i32) -> (result: ^List, exception: ^Throwable) {
+PackageManager_getAllPermissionGroups :: proc "contextless" (self: ^PackageManager, flags: PackageManager_InfoFlags) -> (result: ^List, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getAllPermissionGroups", "(I)Ljava/util/List;", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -5829,11 +6093,11 @@ PackageManager_getApplicationBanner :: proc{
 	PackageManager_getApplicationBanner_String,
 }
 
-PackageManager_getApplicationEnabledSetting :: proc "contextless" (self: ^PackageManager, packageName: ^String) -> (result: i32, exception: ^Throwable) {
+PackageManager_getApplicationEnabledSetting :: proc "contextless" (self: ^PackageManager, packageName: ^String) -> (result: PackageManager_ComponentEnabledState, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getApplicationEnabledSetting", "(Ljava/lang/String;)I", false) or_return
 	jni_args := [?]android.jvalue{{l = packageName}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return PackageManager_ComponentEnabledState(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 PackageManager_getApplicationIcon_ApplicationInfo :: proc "contextless" (self: ^PackageManager, info: ^ApplicationInfo) -> (result: ^Drawable, exception: ^Throwable) {
@@ -5862,10 +6126,10 @@ PackageManager_getApplicationInfo_String_PackageManager_ApplicationInfoFlags :: 
 	return (^ApplicationInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_getApplicationInfo_String_int :: proc "contextless" (self: ^PackageManager, packageName: ^String, flags: i32) -> (result: ^ApplicationInfo, exception: ^Throwable) {
+PackageManager_getApplicationInfo_String_int :: proc "contextless" (self: ^PackageManager, packageName: ^String, flags: PackageManager_InfoFlags) -> (result: ^ApplicationInfo, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getApplicationInfo", "(Ljava/lang/String;I)Landroid/content/pm/ApplicationInfo;", false) or_return
-	jni_args := [?]android.jvalue{{l = packageName}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = packageName}, {i = transmute(i32)flags}}
 	return (^ApplicationInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -5920,11 +6184,11 @@ PackageManager_getChangedPackages :: proc "contextless" (self: ^PackageManager, 
 	return (^ChangedPackages)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_getComponentEnabledSetting :: proc "contextless" (self: ^PackageManager, componentName: ^ComponentName) -> (result: i32, exception: ^Throwable) {
+PackageManager_getComponentEnabledSetting :: proc "contextless" (self: ^PackageManager, componentName: ^ComponentName) -> (result: PackageManager_ComponentEnabledState, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getComponentEnabledSetting", "(Landroid/content/ComponentName;)I", false) or_return
 	jni_args := [?]android.jvalue{{l = componentName}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return PackageManager_ComponentEnabledState(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 PackageManager_getDefaultActivityIcon :: proc "contextless" (self: ^PackageManager) -> (result: ^Drawable, exception: ^Throwable) {
@@ -5969,10 +6233,10 @@ PackageManager_getInstalledApplications_PackageManager_ApplicationInfoFlags :: p
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_getInstalledApplications_int :: proc "contextless" (self: ^PackageManager, flags: i32) -> (result: ^List, exception: ^Throwable) {
+PackageManager_getInstalledApplications_int :: proc "contextless" (self: ^PackageManager, flags: PackageManager_InfoFlags) -> (result: ^List, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getInstalledApplications", "(I)Ljava/util/List;", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -5981,10 +6245,10 @@ PackageManager_getInstalledApplications :: proc{
 	PackageManager_getInstalledApplications_int,
 }
 
-PackageManager_getInstalledModules :: proc "contextless" (self: ^PackageManager, flags: i32) -> (result: ^List, exception: ^Throwable) {
+PackageManager_getInstalledModules :: proc "contextless" (self: ^PackageManager, flags: PackageManager_InfoFlags) -> (result: ^List, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getInstalledModules", "(I)Ljava/util/List;", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -5995,10 +6259,10 @@ PackageManager_getInstalledPackages_PackageManager_PackageInfoFlags :: proc "con
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_getInstalledPackages_int :: proc "contextless" (self: ^PackageManager, flags: i32) -> (result: ^List, exception: ^Throwable) {
+PackageManager_getInstalledPackages_int :: proc "contextless" (self: ^PackageManager, flags: PackageManager_InfoFlags) -> (result: ^List, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getInstalledPackages", "(I)Ljava/util/List;", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6026,10 +6290,10 @@ PackageManager_getInstantAppCookieMaxBytes :: proc "contextless" (self: ^Package
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-PackageManager_getInstrumentationInfo :: proc "contextless" (self: ^PackageManager, className: ^ComponentName, flags: i32) -> (result: ^InstrumentationInfo, exception: ^Throwable) {
+PackageManager_getInstrumentationInfo :: proc "contextless" (self: ^PackageManager, className: ^ComponentName, flags: PackageManager_InfoFlags) -> (result: ^InstrumentationInfo, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getInstrumentationInfo", "(Landroid/content/ComponentName;I)Landroid/content/pm/InstrumentationInfo;", false) or_return
-	jni_args := [?]android.jvalue{{l = className}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = className}, {i = transmute(i32)flags}}
 	return (^InstrumentationInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6089,10 +6353,10 @@ PackageManager_getPackageArchiveInfo_String_PackageManager_PackageInfoFlags :: p
 	return (^PackageInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_getPackageArchiveInfo_String_int :: proc "contextless" (self: ^PackageManager, archiveFilePath: ^String, flags: i32) -> (result: ^PackageInfo, exception: ^Throwable) {
+PackageManager_getPackageArchiveInfo_String_int :: proc "contextless" (self: ^PackageManager, archiveFilePath: ^String, flags: PackageManager_InfoFlags) -> (result: ^PackageInfo, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getPackageArchiveInfo", "(Ljava/lang/String;I)Landroid/content/pm/PackageInfo;", false) or_return
-	jni_args := [?]android.jvalue{{l = archiveFilePath}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = archiveFilePath}, {i = transmute(i32)flags}}
 	return (^PackageInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6115,10 +6379,10 @@ PackageManager_getPackageGids_String_PackageManager_PackageInfoFlags :: proc "co
 	return (^IntArray)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_getPackageGids_String_int :: proc "contextless" (self: ^PackageManager, packageName: ^String, flags: i32) -> (result: ^IntArray, exception: ^Throwable) {
+PackageManager_getPackageGids_String_int :: proc "contextless" (self: ^PackageManager, packageName: ^String, flags: PackageManager_InfoFlags) -> (result: ^IntArray, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getPackageGids", "(Ljava/lang/String;I)[I", false) or_return
-	jni_args := [?]android.jvalue{{l = packageName}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = packageName}, {i = transmute(i32)flags}}
 	return (^IntArray)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6135,10 +6399,10 @@ PackageManager_getPackageInfo_VersionedPackage_PackageManager_PackageInfoFlags :
 	return (^PackageInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_getPackageInfo_VersionedPackage_int :: proc "contextless" (self: ^PackageManager, versionedPackage: ^VersionedPackage, flags: i32) -> (result: ^PackageInfo, exception: ^Throwable) {
+PackageManager_getPackageInfo_VersionedPackage_int :: proc "contextless" (self: ^PackageManager, versionedPackage: ^VersionedPackage, flags: PackageManager_InfoFlags) -> (result: ^PackageInfo, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getPackageInfo", "(Landroid/content/pm/VersionedPackage;I)Landroid/content/pm/PackageInfo;", false) or_return
-	jni_args := [?]android.jvalue{{l = versionedPackage}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = versionedPackage}, {i = transmute(i32)flags}}
 	return (^PackageInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6149,10 +6413,10 @@ PackageManager_getPackageInfo_String_PackageManager_PackageInfoFlags :: proc "co
 	return (^PackageInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_getPackageInfo_String_int :: proc "contextless" (self: ^PackageManager, packageName: ^String, flags: i32) -> (result: ^PackageInfo, exception: ^Throwable) {
+PackageManager_getPackageInfo_String_int :: proc "contextless" (self: ^PackageManager, packageName: ^String, flags: PackageManager_InfoFlags) -> (result: ^PackageInfo, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getPackageInfo", "(Ljava/lang/String;I)Landroid/content/pm/PackageInfo;", false) or_return
-	jni_args := [?]android.jvalue{{l = packageName}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = packageName}, {i = transmute(i32)flags}}
 	return (^PackageInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6176,10 +6440,10 @@ PackageManager_getPackageUid_String_PackageManager_PackageInfoFlags :: proc "con
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-PackageManager_getPackageUid_String_int :: proc "contextless" (self: ^PackageManager, packageName: ^String, flags: i32) -> (result: i32, exception: ^Throwable) {
+PackageManager_getPackageUid_String_int :: proc "contextless" (self: ^PackageManager, packageName: ^String, flags: PackageManager_InfoFlags) -> (result: i32, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getPackageUid", "(Ljava/lang/String;I)I", false) or_return
-	jni_args := [?]android.jvalue{{l = packageName}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = packageName}, {i = transmute(i32)flags}}
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
@@ -6202,10 +6466,10 @@ PackageManager_getPackagesHoldingPermissions_StringArray_PackageManager_PackageI
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_getPackagesHoldingPermissions_StringArray_int :: proc "contextless" (self: ^PackageManager, permissions: ^Array(String), flags: i32) -> (result: ^List, exception: ^Throwable) {
+PackageManager_getPackagesHoldingPermissions_StringArray_int :: proc "contextless" (self: ^PackageManager, permissions: ^Array(String), flags: PackageManager_InfoFlags) -> (result: ^List, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getPackagesHoldingPermissions", "([Ljava/lang/String;I)Ljava/util/List;", false) or_return
-	jni_args := [?]android.jvalue{{l = permissions}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = permissions}, {i = transmute(i32)flags}}
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6214,17 +6478,17 @@ PackageManager_getPackagesHoldingPermissions :: proc{
 	PackageManager_getPackagesHoldingPermissions_StringArray_int,
 }
 
-PackageManager_getPermissionGroupInfo :: proc "contextless" (self: ^PackageManager, groupName: ^String, flags: i32) -> (result: ^PermissionGroupInfo, exception: ^Throwable) {
+PackageManager_getPermissionGroupInfo :: proc "contextless" (self: ^PackageManager, groupName: ^String, flags: PackageManager_InfoFlags) -> (result: ^PermissionGroupInfo, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getPermissionGroupInfo", "(Ljava/lang/String;I)Landroid/content/pm/PermissionGroupInfo;", false) or_return
-	jni_args := [?]android.jvalue{{l = groupName}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = groupName}, {i = transmute(i32)flags}}
 	return (^PermissionGroupInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_getPermissionInfo :: proc "contextless" (self: ^PackageManager, permName: ^String, flags: i32) -> (result: ^PermissionInfo, exception: ^Throwable) {
+PackageManager_getPermissionInfo :: proc "contextless" (self: ^PackageManager, permName: ^String, flags: PackageManager_InfoFlags) -> (result: ^PermissionInfo, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getPermissionInfo", "(Ljava/lang/String;I)Landroid/content/pm/PermissionInfo;", false) or_return
-	jni_args := [?]android.jvalue{{l = permName}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = permName}, {i = transmute(i32)flags}}
 	return (^PermissionInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6243,10 +6507,10 @@ PackageManager_getPreferredActivities :: proc "contextless" (self: ^PackageManag
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-PackageManager_getPreferredPackages :: proc "contextless" (self: ^PackageManager, flags: i32) -> (result: ^List, exception: ^Throwable) {
+PackageManager_getPreferredPackages :: proc "contextless" (self: ^PackageManager, flags: PackageManager_InfoFlags) -> (result: ^List, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getPreferredPackages", "(I)Ljava/util/List;", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6276,10 +6540,10 @@ PackageManager_getProviderInfo_ComponentName_PackageManager_ComponentInfoFlags :
 	return (^ProviderInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_getProviderInfo_ComponentName_int :: proc "contextless" (self: ^PackageManager, component: ^ComponentName, flags: i32) -> (result: ^ProviderInfo, exception: ^Throwable) {
+PackageManager_getProviderInfo_ComponentName_int :: proc "contextless" (self: ^PackageManager, component: ^ComponentName, flags: PackageManager_InfoFlags) -> (result: ^ProviderInfo, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getProviderInfo", "(Landroid/content/ComponentName;I)Landroid/content/pm/ProviderInfo;", false) or_return
-	jni_args := [?]android.jvalue{{l = component}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = component}, {i = transmute(i32)flags}}
 	return (^ProviderInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6295,10 +6559,10 @@ PackageManager_getReceiverInfo_ComponentName_PackageManager_ComponentInfoFlags :
 	return (^ActivityInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_getReceiverInfo_ComponentName_int :: proc "contextless" (self: ^PackageManager, component: ^ComponentName, flags: i32) -> (result: ^ActivityInfo, exception: ^Throwable) {
+PackageManager_getReceiverInfo_ComponentName_int :: proc "contextless" (self: ^PackageManager, component: ^ComponentName, flags: PackageManager_InfoFlags) -> (result: ^ActivityInfo, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getReceiverInfo", "(Landroid/content/ComponentName;I)Landroid/content/pm/ActivityInfo;", false) or_return
-	jni_args := [?]android.jvalue{{l = component}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = component}, {i = transmute(i32)flags}}
 	return (^ActivityInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6348,10 +6612,10 @@ PackageManager_getServiceInfo_ComponentName_PackageManager_ComponentInfoFlags ::
 	return (^ServiceInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_getServiceInfo_ComponentName_int :: proc "contextless" (self: ^PackageManager, component: ^ComponentName, flags: i32) -> (result: ^ServiceInfo, exception: ^Throwable) {
+PackageManager_getServiceInfo_ComponentName_int :: proc "contextless" (self: ^PackageManager, component: ^ComponentName, flags: PackageManager_InfoFlags) -> (result: ^ServiceInfo, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getServiceInfo", "(Landroid/content/ComponentName;I)Landroid/content/pm/ServiceInfo;", false) or_return
-	jni_args := [?]android.jvalue{{l = component}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = component}, {i = transmute(i32)flags}}
 	return (^ServiceInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6367,10 +6631,10 @@ PackageManager_getSharedLibraries_PackageManager_PackageInfoFlags :: proc "conte
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_getSharedLibraries_int :: proc "contextless" (self: ^PackageManager, flags: i32) -> (result: ^List, exception: ^Throwable) {
+PackageManager_getSharedLibraries_int :: proc "contextless" (self: ^PackageManager, flags: PackageManager_InfoFlags) -> (result: ^List, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getSharedLibraries", "(I)Ljava/util/List;", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6439,17 +6703,17 @@ PackageManager_getUserBadgedLabel :: proc "contextless" (self: ^PackageManager, 
 	return (^CharSequence)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_getVerifiedSigningInfo :: proc "contextless" (path: ^String, minAppSigningSchemeVersion: i32) -> (result: ^SigningInfo, exception: ^Throwable) { // API level 36
+PackageManager_getVerifiedSigningInfo :: proc "contextless" (path: ^String, minAppSigningSchemeVersion: SigningInfo_Version) -> (result: ^SigningInfo, exception: ^Throwable) { // API level 36
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &PackageManager__class, "getVerifiedSigningInfo", "(Ljava/lang/String;I)Landroid/content/pm/SigningInfo;", true) or_return
-	jni_args := [?]android.jvalue{{l = path}, {i = minAppSigningSchemeVersion}}
+	jni_args := [?]android.jvalue{{l = path}, {i = i32(minAppSigningSchemeVersion)}}
 	return (^SigningInfo)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_getWhitelistedRestrictedPermissions :: proc "contextless" (self: ^PackageManager, packageName: ^String, whitelistFlag: i32) -> (result: ^Set, exception: ^Throwable) {
+PackageManager_getWhitelistedRestrictedPermissions :: proc "contextless" (self: ^PackageManager, packageName: ^String, whitelistFlag: PackageManager_PermissionWhitelistFlags) -> (result: ^Set, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "getWhitelistedRestrictedPermissions", "(Ljava/lang/String;I)Ljava/util/Set;", false) or_return
-	jni_args := [?]android.jvalue{{l = packageName}, {i = whitelistFlag}}
+	jni_args := [?]android.jvalue{{l = packageName}, {i = transmute(i32)whitelistFlag}}
 	return (^Set)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6460,17 +6724,17 @@ PackageManager_getXml :: proc "contextless" (self: ^PackageManager, packageName:
 	return (^XmlResourceParser)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_hasSigningCertificate_int_ByteArray_int :: proc "contextless" (self: ^PackageManager, uid: i32, certificate: ^ByteArray, type: i32) -> (result: bool, exception: ^Throwable) {
+PackageManager_hasSigningCertificate_int_ByteArray_int :: proc "contextless" (self: ^PackageManager, uid: i32, certificate: ^ByteArray, type: PackageManager_CertInput) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "hasSigningCertificate", "(I[BI)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = uid}, {l = certificate}, {i = type}}
+	jni_args := [?]android.jvalue{{i = uid}, {l = certificate}, {i = i32(type)}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-PackageManager_hasSigningCertificate_String_ByteArray_int :: proc "contextless" (self: ^PackageManager, packageName: ^String, certificate: ^ByteArray, type: i32) -> (result: bool, exception: ^Throwable) {
+PackageManager_hasSigningCertificate_String_ByteArray_int :: proc "contextless" (self: ^PackageManager, packageName: ^String, certificate: ^ByteArray, type: PackageManager_CertInput) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "hasSigningCertificate", "(Ljava/lang/String;[BI)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = packageName}, {l = certificate}, {i = type}}
+	jni_args := [?]android.jvalue{{l = packageName}, {l = certificate}, {i = i32(type)}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -6632,10 +6896,10 @@ PackageManager_queryBroadcastReceivers_Intent_PackageManager_ResolveInfoFlags ::
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_queryBroadcastReceivers_Intent_int :: proc "contextless" (self: ^PackageManager, intent: ^Intent, flags: i32) -> (result: ^List, exception: ^Throwable) {
+PackageManager_queryBroadcastReceivers_Intent_int :: proc "contextless" (self: ^PackageManager, intent: ^Intent, flags: PackageManager_InfoFlags) -> (result: ^List, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "queryBroadcastReceivers", "(Landroid/content/Intent;I)Ljava/util/List;", false) or_return
-	jni_args := [?]android.jvalue{{l = intent}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = intent}, {i = transmute(i32)flags}}
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6651,10 +6915,10 @@ PackageManager_queryContentProviders_String_int_PackageManager_ComponentInfoFlag
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_queryContentProviders_String_int_int :: proc "contextless" (self: ^PackageManager, processName: ^String, uid: i32, flags: i32) -> (result: ^List, exception: ^Throwable) {
+PackageManager_queryContentProviders_String_int_int :: proc "contextless" (self: ^PackageManager, processName: ^String, uid: i32, flags: PackageManager_InfoFlags) -> (result: ^List, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "queryContentProviders", "(Ljava/lang/String;II)Ljava/util/List;", false) or_return
-	jni_args := [?]android.jvalue{{l = processName}, {i = uid}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = processName}, {i = uid}, {i = transmute(i32)flags}}
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6663,10 +6927,10 @@ PackageManager_queryContentProviders :: proc{
 	PackageManager_queryContentProviders_String_int_int,
 }
 
-PackageManager_queryInstrumentation :: proc "contextless" (self: ^PackageManager, targetPackage: ^String, flags: i32) -> (result: ^List, exception: ^Throwable) {
+PackageManager_queryInstrumentation :: proc "contextless" (self: ^PackageManager, targetPackage: ^String, flags: PackageManager_InfoFlags) -> (result: ^List, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "queryInstrumentation", "(Ljava/lang/String;I)Ljava/util/List;", false) or_return
-	jni_args := [?]android.jvalue{{l = targetPackage}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = targetPackage}, {i = transmute(i32)flags}}
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6677,10 +6941,10 @@ PackageManager_queryIntentActivities_Intent_PackageManager_ResolveInfoFlags :: p
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_queryIntentActivities_Intent_int :: proc "contextless" (self: ^PackageManager, intent: ^Intent, flags: i32) -> (result: ^List, exception: ^Throwable) {
+PackageManager_queryIntentActivities_Intent_int :: proc "contextless" (self: ^PackageManager, intent: ^Intent, flags: PackageManager_InfoFlags) -> (result: ^List, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "queryIntentActivities", "(Landroid/content/Intent;I)Ljava/util/List;", false) or_return
-	jni_args := [?]android.jvalue{{l = intent}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = intent}, {i = transmute(i32)flags}}
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6689,10 +6953,10 @@ PackageManager_queryIntentActivities :: proc{
 	PackageManager_queryIntentActivities_Intent_int,
 }
 
-PackageManager_queryIntentActivityOptions_ComponentName_IntentArray_Intent_int :: proc "contextless" (self: ^PackageManager, caller: ^ComponentName, specifics: ^Array(Intent), intent: ^Intent, flags: i32) -> (result: ^List, exception: ^Throwable) {
+PackageManager_queryIntentActivityOptions_ComponentName_IntentArray_Intent_int :: proc "contextless" (self: ^PackageManager, caller: ^ComponentName, specifics: ^Array(Intent), intent: ^Intent, flags: PackageManager_InfoFlags) -> (result: ^List, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "queryIntentActivityOptions", "(Landroid/content/ComponentName;[Landroid/content/Intent;Landroid/content/Intent;I)Ljava/util/List;", false) or_return
-	jni_args := [?]android.jvalue{{l = caller}, {l = specifics}, {l = intent}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = caller}, {l = specifics}, {l = intent}, {i = transmute(i32)flags}}
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6715,10 +6979,10 @@ PackageManager_queryIntentContentProviders_Intent_PackageManager_ResolveInfoFlag
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_queryIntentContentProviders_Intent_int :: proc "contextless" (self: ^PackageManager, intent: ^Intent, flags: i32) -> (result: ^List, exception: ^Throwable) {
+PackageManager_queryIntentContentProviders_Intent_int :: proc "contextless" (self: ^PackageManager, intent: ^Intent, flags: PackageManager_InfoFlags) -> (result: ^List, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "queryIntentContentProviders", "(Landroid/content/Intent;I)Ljava/util/List;", false) or_return
-	jni_args := [?]android.jvalue{{l = intent}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = intent}, {i = transmute(i32)flags}}
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6734,10 +6998,10 @@ PackageManager_queryIntentServices_Intent_PackageManager_ResolveInfoFlags :: pro
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_queryIntentServices_Intent_int :: proc "contextless" (self: ^PackageManager, intent: ^Intent, flags: i32) -> (result: ^List, exception: ^Throwable) {
+PackageManager_queryIntentServices_Intent_int :: proc "contextless" (self: ^PackageManager, intent: ^Intent, flags: PackageManager_InfoFlags) -> (result: ^List, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "queryIntentServices", "(Landroid/content/Intent;I)Ljava/util/List;", false) or_return
-	jni_args := [?]android.jvalue{{l = intent}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = intent}, {i = transmute(i32)flags}}
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6746,10 +7010,10 @@ PackageManager_queryIntentServices :: proc{
 	PackageManager_queryIntentServices_Intent_int,
 }
 
-PackageManager_queryPermissionsByGroup :: proc "contextless" (self: ^PackageManager, permissionGroup: ^String, flags: i32) -> (result: ^List, exception: ^Throwable) {
+PackageManager_queryPermissionsByGroup :: proc "contextless" (self: ^PackageManager, permissionGroup: ^String, flags: PackageManager_InfoFlags) -> (result: ^List, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "queryPermissionsByGroup", "(Ljava/lang/String;I)Ljava/util/List;", false) or_return
-	jni_args := [?]android.jvalue{{l = permissionGroup}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = permissionGroup}, {i = transmute(i32)flags}}
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6798,17 +7062,17 @@ PackageManager_removePermission :: proc "contextless" (self: ^PackageManager, pe
 	return jni_take(jni_env)
 }
 
-PackageManager_removeWhitelistedRestrictedPermission :: proc "contextless" (self: ^PackageManager, packageName: ^String, permName: ^String, whitelistFlags: i32) -> (result: bool, exception: ^Throwable) {
+PackageManager_removeWhitelistedRestrictedPermission :: proc "contextless" (self: ^PackageManager, packageName: ^String, permName: ^String, whitelistFlags: PackageManager_PermissionWhitelistFlags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "removeWhitelistedRestrictedPermission", "(Ljava/lang/String;Ljava/lang/String;I)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = packageName}, {l = permName}, {i = whitelistFlags}}
+	jni_args := [?]android.jvalue{{l = packageName}, {l = permName}, {i = transmute(i32)whitelistFlags}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-PackageManager_requestChecksums :: proc "contextless" (self: ^PackageManager, packageName: ^String, includeSplits: bool, required: i32, trustedInstallers: ^List, onChecksumsReadyListener: ^PackageManager_OnChecksumsReadyListener) -> (exception: ^Throwable) { // API level 31
+PackageManager_requestChecksums :: proc "contextless" (self: ^PackageManager, packageName: ^String, includeSplits: bool, required: Checksum_TypeFlags, trustedInstallers: ^List, onChecksumsReadyListener: ^PackageManager_OnChecksumsReadyListener) -> (exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "requestChecksums", "(Ljava/lang/String;ZILjava/util/List;Landroid/content/pm/PackageManager$OnChecksumsReadyListener;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = packageName}, {z = android.jboolean(includeSplits)}, {i = required}, {l = trustedInstallers}, {l = onChecksumsReadyListener}}
+	jni_args := [?]android.jvalue{{l = packageName}, {z = android.jboolean(includeSplits)}, {i = transmute(i32)required}, {l = trustedInstallers}, {l = onChecksumsReadyListener}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -6820,10 +7084,10 @@ PackageManager_resolveActivity_Intent_PackageManager_ResolveInfoFlags :: proc "c
 	return (^ResolveInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_resolveActivity_Intent_int :: proc "contextless" (self: ^PackageManager, intent: ^Intent, flags: i32) -> (result: ^ResolveInfo, exception: ^Throwable) {
+PackageManager_resolveActivity_Intent_int :: proc "contextless" (self: ^PackageManager, intent: ^Intent, flags: PackageManager_InfoFlags) -> (result: ^ResolveInfo, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "resolveActivity", "(Landroid/content/Intent;I)Landroid/content/pm/ResolveInfo;", false) or_return
-	jni_args := [?]android.jvalue{{l = intent}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = intent}, {i = transmute(i32)flags}}
 	return (^ResolveInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6839,10 +7103,10 @@ PackageManager_resolveContentProvider_String_PackageManager_ComponentInfoFlags :
 	return (^ProviderInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_resolveContentProvider_String_int :: proc "contextless" (self: ^PackageManager, authority: ^String, flags: i32) -> (result: ^ProviderInfo, exception: ^Throwable) {
+PackageManager_resolveContentProvider_String_int :: proc "contextless" (self: ^PackageManager, authority: ^String, flags: PackageManager_InfoFlags) -> (result: ^ProviderInfo, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "resolveContentProvider", "(Ljava/lang/String;I)Landroid/content/pm/ProviderInfo;", false) or_return
-	jni_args := [?]android.jvalue{{l = authority}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = authority}, {i = transmute(i32)flags}}
 	return (^ProviderInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6858,10 +7122,10 @@ PackageManager_resolveService_Intent_PackageManager_ResolveInfoFlags :: proc "co
 	return (^ResolveInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_resolveService_Intent_int :: proc "contextless" (self: ^PackageManager, intent: ^Intent, flags: i32) -> (result: ^ResolveInfo, exception: ^Throwable) {
+PackageManager_resolveService_Intent_int :: proc "contextless" (self: ^PackageManager, intent: ^Intent, flags: PackageManager_InfoFlags) -> (result: ^ResolveInfo, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "resolveService", "(Landroid/content/Intent;I)Landroid/content/pm/ResolveInfo;", false) or_return
-	jni_args := [?]android.jvalue{{l = intent}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = intent}, {i = transmute(i32)flags}}
 	return (^ResolveInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6870,18 +7134,18 @@ PackageManager_resolveService :: proc{
 	PackageManager_resolveService_Intent_int,
 }
 
-PackageManager_setApplicationCategoryHint :: proc "contextless" (self: ^PackageManager, packageName: ^String, categoryHint: i32) -> (exception: ^Throwable) {
+PackageManager_setApplicationCategoryHint :: proc "contextless" (self: ^PackageManager, packageName: ^String, categoryHint: ApplicationInfo_Category) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "setApplicationCategoryHint", "(Ljava/lang/String;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = packageName}, {i = categoryHint}}
+	jni_args := [?]android.jvalue{{l = packageName}, {i = i32(categoryHint)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-PackageManager_setApplicationEnabledSetting :: proc "contextless" (self: ^PackageManager, packageName: ^String, newState: i32, flags: i32) -> (exception: ^Throwable) {
+PackageManager_setApplicationEnabledSetting :: proc "contextless" (self: ^PackageManager, packageName: ^String, newState: PackageManager_ComponentEnabledState, flags: PackageManager_ApplicationEnabledSettingFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "setApplicationEnabledSetting", "(Ljava/lang/String;II)V", false) or_return
-	jni_args := [?]android.jvalue{{l = packageName}, {i = newState}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = packageName}, {i = i32(newState)}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -6893,10 +7157,10 @@ PackageManager_setAutoRevokeWhitelisted :: proc "contextless" (self: ^PackageMan
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-PackageManager_setComponentEnabledSetting :: proc "contextless" (self: ^PackageManager, componentName: ^ComponentName, newState: i32, flags: i32) -> (exception: ^Throwable) {
+PackageManager_setComponentEnabledSetting :: proc "contextless" (self: ^PackageManager, componentName: ^ComponentName, newState: PackageManager_ComponentEnabledState, flags: PackageManager_ApplicationEnabledSettingFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "setComponentEnabledSetting", "(Landroid/content/ComponentName;II)V", false) or_return
-	jni_args := [?]android.jvalue{{l = componentName}, {i = newState}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = componentName}, {i = i32(newState)}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -6933,13 +7197,141 @@ PackageManager_updateInstantAppCookie :: proc "contextless" (self: ^PackageManag
 	return jni_take(jni_env)
 }
 
-PackageManager_verifyPendingInstall :: proc "contextless" (self: ^PackageManager, id: i32, verificationCode: i32) -> (exception: ^Throwable) {
+PackageManager_verifyPendingInstall :: proc "contextless" (self: ^PackageManager, id: i32, verificationCode: PackageManager_Verification) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager__class, "verifyPendingInstall", "(II)V", false) or_return
-	jni_args := [?]android.jvalue{{i = id}, {i = verificationCode}}
+	jni_args := [?]android.jvalue{{i = id}, {i = i32(verificationCode)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+PackageManager_InfoFlag :: enum u32 {
+	GET_ACTIVITIES                       = 0,
+	GET_ATTRIBUTIONS                     = 31,
+	GET_CONFIGURATIONS                   = 14,
+	GET_DISABLED_COMPONENTS              = 9,
+	GET_DISABLED_UNTIL_USED_COMPONENTS   = 15,
+	GET_GIDS                             = 8,
+	GET_INSTRUMENTATION                  = 4,
+	GET_INTENT_FILTERS                   = 5,
+	GET_META_DATA                        = 7,
+	GET_PERMISSIONS                      = 12,
+	GET_PROVIDERS                        = 3,
+	GET_RECEIVERS                        = 1,
+	GET_RESOLVED_FILTER                  = 6,
+	GET_SERVICES                         = 2,
+	GET_SHARED_LIBRARY_FILES             = 10,
+	GET_SIGNATURES                       = 6,
+	GET_SIGNING_CERTIFICATES             = 27,
+	GET_UNINSTALLED_PACKAGES             = 13,
+	GET_URI_PERMISSION_PATTERNS          = 11,
+	MATCH_ALL                            = 17,
+	MATCH_APEX                           = 30,
+	MATCH_DEFAULT_ONLY                   = 16,
+	MATCH_DIRECT_BOOT_AUTO               = 28,
+	MATCH_DIRECT_BOOT_AWARE              = 19,
+	MATCH_DIRECT_BOOT_UNAWARE            = 18,
+	MATCH_DISABLED_COMPONENTS            = 9,
+	MATCH_DISABLED_UNTIL_USED_COMPONENTS = 15,
+	MATCH_SYSTEM_ONLY                    = 20,
+	MATCH_UNINSTALLED_PACKAGES           = 13,
+}
+PackageManager_InfoFlags :: distinct bit_set[PackageManager_InfoFlag; u32]
+
+PackageManager_Verification :: enum i32 {
+	ALLOW  = 1,
+	REJECT = -1,
+}
+
+PackageManager_Permission :: enum i32 {
+	DENIED  = -1,
+	GRANTED = 0,
+}
+
+PackageManager_InstallReason :: enum i32 {
+	DEVICE_RESTORE = 2,
+	DEVICE_SETUP   = 3,
+	POLICY         = 1,
+	UNKNOWN        = 0,
+	USER           = 4,
+}
+
+PackageManager_InstallScenario :: enum i32 {
+	BULK           = 2,
+	BULK_SECONDARY = 3,
+	DEFAULT        = 0,
+	FAST           = 1,
+}
+
+PackageManager_PermissionWhitelistFlag :: enum u32 {
+	INSTALLER = 1,
+	SYSTEM    = 0,
+	UPGRADE   = 2,
+}
+PackageManager_PermissionWhitelistFlags :: distinct bit_set[PackageManager_PermissionWhitelistFlag; u32]
+
+PackageManager_Signature :: enum i32 {
+	FIRST_NOT_SIGNED  = -1,
+	MATCH             = 0,
+	NEITHER_SIGNED    = 1,
+	NO_MATCH          = -3,
+	SECOND_NOT_SIGNED = -2,
+	UNKNOWN_PACKAGE   = -4,
+}
+
+PackageManager_ComponentEnabledState :: enum i32 {
+	DEFAULT             = 0,
+	DISABLED            = 2,
+	DISABLED_UNTIL_USED = 4,
+	DISABLED_USER       = 3,
+	ENABLED             = 1,
+}
+
+PackageManager_CertInput :: enum i32 {
+	RAW_X509 = 0,
+	SHA256   = 1,
+}
+
+PackageManager_ApplicationEnabledSettingFlag :: enum u32 {
+	DONT_KILL_APP = 0,
+	SYNCHRONOUS   = 1,
+}
+PackageManager_ApplicationEnabledSettingFlags :: distinct bit_set[PackageManager_ApplicationEnabledSettingFlag; u32]
+
+PackageManager_InfoFlags64Flag :: enum u64 {
+	GET_ACTIVITIES                       = 0,
+	GET_APP_LOCK_INFO                    = 35,
+	GET_ATTRIBUTIONS_LONG                = 31,
+	GET_CONFIGURATIONS                   = 14,
+	GET_DISABLED_COMPONENTS              = 9,
+	GET_DISABLED_UNTIL_USED_COMPONENTS   = 15,
+	GET_GIDS                             = 8,
+	GET_INSTRUMENTATION                  = 4,
+	GET_INTENT_FILTERS                   = 5,
+	GET_META_DATA                        = 7,
+	GET_PERMISSIONS                      = 12,
+	GET_PROVIDERS                        = 3,
+	GET_RECEIVERS                        = 1,
+	GET_RESOLVED_FILTER                  = 6,
+	GET_SERVICES                         = 2,
+	GET_SHARED_LIBRARY_FILES             = 10,
+	GET_SIGNATURES                       = 6,
+	GET_SIGNING_CERTIFICATES             = 27,
+	GET_UNINSTALLED_PACKAGES             = 13,
+	GET_URI_PERMISSION_PATTERNS          = 11,
+	MATCH_ALL                            = 17,
+	MATCH_APEX                           = 30,
+	MATCH_ARCHIVED_PACKAGES              = 32,
+	MATCH_DEFAULT_ONLY                   = 16,
+	MATCH_DIRECT_BOOT_AUTO               = 28,
+	MATCH_DIRECT_BOOT_AWARE              = 19,
+	MATCH_DIRECT_BOOT_UNAWARE            = 18,
+	MATCH_DISABLED_COMPONENTS            = 9,
+	MATCH_DISABLED_UNTIL_USED_COMPONENTS = 15,
+	MATCH_SYSTEM_ONLY                    = 20,
+	MATCH_UNINSTALLED_PACKAGES           = 13,
+}
+PackageManager_InfoFlags64 :: distinct bit_set[PackageManager_InfoFlags64Flag; u64]
 
 // class android.content.pm.PackageManager.ApplicationInfoFlags // API level 33
 PackageManager_ApplicationInfoFlags :: struct #raw_union {
@@ -6955,10 +7347,10 @@ PackageManager_ApplicationInfoFlags_getValue :: proc "contextless" (self: ^Packa
 	return jni_env->CallLongMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-PackageManager_ApplicationInfoFlags_of :: proc "contextless" (value: i64) -> (result: ^PackageManager_ApplicationInfoFlags, exception: ^Throwable) {
+PackageManager_ApplicationInfoFlags_of :: proc "contextless" (value: PackageManager_InfoFlags64) -> (result: ^PackageManager_ApplicationInfoFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &PackageManager_ApplicationInfoFlags__class, "of", "(J)Landroid/content/pm/PackageManager$ApplicationInfoFlags;", true) or_return
-	jni_args := [?]android.jvalue{{j = value}}
+	jni_args := [?]android.jvalue{{j = transmute(i64)value}}
 	return (^PackageManager_ApplicationInfoFlags)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6977,17 +7369,17 @@ PackageManager_ComponentEnabledSetting_get_CREATOR :: proc "contextless" () -> (
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-PackageManager_ComponentEnabledSetting_new :: proc "contextless" (componentName: ^ComponentName, newState: i32, flags: i32) -> (result: ^PackageManager_ComponentEnabledSetting, exception: ^Throwable) {
+PackageManager_ComponentEnabledSetting_new :: proc "contextless" (componentName: ^ComponentName, newState: PackageManager_ComponentEnabledState, flags: PackageManager_ApplicationEnabledSettingFlags) -> (result: ^PackageManager_ComponentEnabledSetting, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &PackageManager_ComponentEnabledSetting__class, "<init>", "(Landroid/content/ComponentName;II)V", false) or_return
-	jni_args := [?]android.jvalue{{l = componentName}, {i = newState}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = componentName}, {i = i32(newState)}, {i = transmute(i32)flags}}
 	return (^PackageManager_ComponentEnabledSetting)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PackageManager_ComponentEnabledSetting_describeContents :: proc "contextless" (self: ^PackageManager_ComponentEnabledSetting) -> (result: i32, exception: ^Throwable) {
+PackageManager_ComponentEnabledSetting_describeContents :: proc "contextless" (self: ^PackageManager_ComponentEnabledSetting) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager_ComponentEnabledSetting__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 PackageManager_ComponentEnabledSetting_getComponentName :: proc "contextless" (self: ^PackageManager_ComponentEnabledSetting) -> (result: ^ComponentName, exception: ^Throwable) {
@@ -6996,22 +7388,22 @@ PackageManager_ComponentEnabledSetting_getComponentName :: proc "contextless" (s
 	return (^ComponentName)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PackageManager_ComponentEnabledSetting_getEnabledFlags :: proc "contextless" (self: ^PackageManager_ComponentEnabledSetting) -> (result: i32, exception: ^Throwable) {
+PackageManager_ComponentEnabledSetting_getEnabledFlags :: proc "contextless" (self: ^PackageManager_ComponentEnabledSetting) -> (result: PackageManager_ApplicationEnabledSettingFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager_ComponentEnabledSetting__class, "getEnabledFlags", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(PackageManager_ApplicationEnabledSettingFlags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PackageManager_ComponentEnabledSetting_getEnabledState :: proc "contextless" (self: ^PackageManager_ComponentEnabledSetting) -> (result: i32, exception: ^Throwable) {
+PackageManager_ComponentEnabledSetting_getEnabledState :: proc "contextless" (self: ^PackageManager_ComponentEnabledSetting) -> (result: PackageManager_ComponentEnabledState, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager_ComponentEnabledSetting__class, "getEnabledState", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return PackageManager_ComponentEnabledState(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PackageManager_ComponentEnabledSetting_writeToParcel :: proc "contextless" (self: ^PackageManager_ComponentEnabledSetting, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+PackageManager_ComponentEnabledSetting_writeToParcel :: proc "contextless" (self: ^PackageManager_ComponentEnabledSetting, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager_ComponentEnabledSetting__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -7030,10 +7422,10 @@ PackageManager_ComponentInfoFlags_getValue :: proc "contextless" (self: ^Package
 	return jni_env->CallLongMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-PackageManager_ComponentInfoFlags_of :: proc "contextless" (value: i64) -> (result: ^PackageManager_ComponentInfoFlags, exception: ^Throwable) {
+PackageManager_ComponentInfoFlags_of :: proc "contextless" (value: PackageManager_InfoFlags64) -> (result: ^PackageManager_ComponentInfoFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &PackageManager_ComponentInfoFlags__class, "of", "(J)Landroid/content/pm/PackageManager$ComponentInfoFlags;", true) or_return
-	jni_args := [?]android.jvalue{{j = value}}
+	jni_args := [?]android.jvalue{{j = transmute(i64)value}}
 	return (^PackageManager_ComponentInfoFlags)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -7093,10 +7485,10 @@ PackageManager_PackageInfoFlags_getValue :: proc "contextless" (self: ^PackageMa
 	return jni_env->CallLongMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-PackageManager_PackageInfoFlags_of :: proc "contextless" (value: i64) -> (result: ^PackageManager_PackageInfoFlags, exception: ^Throwable) {
+PackageManager_PackageInfoFlags_of :: proc "contextless" (value: PackageManager_InfoFlags64) -> (result: ^PackageManager_PackageInfoFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &PackageManager_PackageInfoFlags__class, "of", "(J)Landroid/content/pm/PackageManager$PackageInfoFlags;", true) or_return
-	jni_args := [?]android.jvalue{{j = value}}
+	jni_args := [?]android.jvalue{{j = transmute(i64)value}}
 	return (^PackageManager_PackageInfoFlags)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -7115,10 +7507,10 @@ PackageManager_Property_get_CREATOR :: proc "contextless" () -> (result: ^Parcel
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-PackageManager_Property_describeContents :: proc "contextless" (self: ^PackageManager_Property) -> (result: i32, exception: ^Throwable) {
+PackageManager_Property_describeContents :: proc "contextless" (self: ^PackageManager_Property) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager_Property__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 PackageManager_Property_equals :: proc "contextless" (self: ^PackageManager_Property, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -7212,10 +7604,10 @@ PackageManager_Property_isString :: proc "contextless" (self: ^PackageManager_Pr
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-PackageManager_Property_writeToParcel :: proc "contextless" (self: ^PackageManager_Property, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+PackageManager_Property_writeToParcel :: proc "contextless" (self: ^PackageManager_Property, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageManager_Property__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -7234,10 +7626,10 @@ PackageManager_ResolveInfoFlags_getValue :: proc "contextless" (self: ^PackageMa
 	return jni_env->CallLongMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-PackageManager_ResolveInfoFlags_of :: proc "contextless" (value: i64) -> (result: ^PackageManager_ResolveInfoFlags, exception: ^Throwable) {
+PackageManager_ResolveInfoFlags_of :: proc "contextless" (value: PackageManager_InfoFlags64) -> (result: ^PackageManager_ResolveInfoFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &PackageManager_ResolveInfoFlags__class, "of", "(J)Landroid/content/pm/PackageManager$ResolveInfoFlags;", true) or_return
-	jni_args := [?]android.jvalue{{j = value}}
+	jni_args := [?]android.jvalue{{j = transmute(i64)value}}
 	return (^PackageManager_ResolveInfoFlags)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -7400,10 +7792,10 @@ PackageStats_new :: proc{
 	PackageStats_new_String,
 }
 
-PackageStats_describeContents :: proc "contextless" (self: ^PackageStats) -> (result: i32, exception: ^Throwable) {
+PackageStats_describeContents :: proc "contextless" (self: ^PackageStats) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageStats__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 PackageStats_equals :: proc "contextless" (self: ^PackageStats, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -7425,10 +7817,10 @@ PackageStats_toString :: proc "contextless" (self: ^PackageStats) -> (result: ^S
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PackageStats_writeToParcel :: proc "contextless" (self: ^PackageStats, dest: ^Parcel, parcelableFlags: i32) -> (exception: ^Throwable) {
+PackageStats_writeToParcel :: proc "contextless" (self: ^PackageStats, dest: ^Parcel, parcelableFlags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PackageStats__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = parcelableFlags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)parcelableFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -7454,10 +7846,10 @@ PathPermission_new_Parcel :: proc "contextless" (src: ^Parcel) -> (result: ^Path
 	return (^PathPermission)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PathPermission_new_String_int_String_String :: proc "contextless" (pattern: ^String, type: i32, readPermission: ^String, writePermission: ^String) -> (result: ^PathPermission, exception: ^Throwable) {
+PathPermission_new_String_int_String_String :: proc "contextless" (pattern: ^String, type: PatternMatcher_Pattern, readPermission: ^String, writePermission: ^String) -> (result: ^PathPermission, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &PathPermission__class, "<init>", "(Ljava/lang/String;ILjava/lang/String;Ljava/lang/String;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = pattern}, {i = type}, {l = readPermission}, {l = writePermission}}
+	jni_args := [?]android.jvalue{{l = pattern}, {i = i32(type)}, {l = readPermission}, {l = writePermission}}
 	return (^PathPermission)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -7478,10 +7870,10 @@ PathPermission_getWritePermission :: proc "contextless" (self: ^PathPermission) 
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PathPermission_writeToParcel :: proc "contextless" (self: ^PathPermission, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+PathPermission_writeToParcel :: proc "contextless" (self: ^PathPermission, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PathPermission__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -7516,16 +7908,16 @@ PermissionGroupInfo_set_descriptionRes :: proc "contextless" (self: ^PermissionG
 	return jni_take(jni_env)
 }
 
-PermissionGroupInfo_get_flags :: proc "contextless" (self: ^PermissionGroupInfo) -> (result: i32, exception: ^Throwable) {
+PermissionGroupInfo_get_flags :: proc "contextless" (self: ^PermissionGroupInfo) -> (result: PermissionGroupInfo_Flags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &PermissionGroupInfo__class, "flags", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(PermissionGroupInfo_Flags)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-PermissionGroupInfo_set_flags :: proc "contextless" (self: ^PermissionGroupInfo, value: i32) -> (exception: ^Throwable) {
+PermissionGroupInfo_set_flags :: proc "contextless" (self: ^PermissionGroupInfo, value: PermissionGroupInfo_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &PermissionGroupInfo__class, "flags", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
@@ -7573,10 +7965,10 @@ PermissionGroupInfo_new :: proc{
 	PermissionGroupInfo_new_PermissionGroupInfo,
 }
 
-PermissionGroupInfo_describeContents :: proc "contextless" (self: ^PermissionGroupInfo) -> (result: i32, exception: ^Throwable) {
+PermissionGroupInfo_describeContents :: proc "contextless" (self: ^PermissionGroupInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PermissionGroupInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 PermissionGroupInfo_loadDescription :: proc "contextless" (self: ^PermissionGroupInfo, pm: ^PackageManager) -> (result: ^CharSequence, exception: ^Throwable) {
@@ -7592,13 +7984,18 @@ PermissionGroupInfo_toString :: proc "contextless" (self: ^PermissionGroupInfo) 
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PermissionGroupInfo_writeToParcel :: proc "contextless" (self: ^PermissionGroupInfo, dest: ^Parcel, parcelableFlags: i32) -> (exception: ^Throwable) {
+PermissionGroupInfo_writeToParcel :: proc "contextless" (self: ^PermissionGroupInfo, dest: ^Parcel, parcelableFlags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PermissionGroupInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = parcelableFlags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)parcelableFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+PermissionGroupInfo_Flag :: enum u32 {
+	FLAG_PERSONAL_INFO = 0,
+}
+PermissionGroupInfo_Flags :: distinct bit_set[PermissionGroupInfo_Flag; u32]
 
 // class android.content.pm.PermissionInfo
 PermissionInfo :: struct #raw_union {
@@ -7653,16 +8050,16 @@ PermissionInfo_set_descriptionRes :: proc "contextless" (self: ^PermissionInfo, 
 	return jni_take(jni_env)
 }
 
-PermissionInfo_get_flags :: proc "contextless" (self: ^PermissionInfo) -> (result: i32, exception: ^Throwable) {
+PermissionInfo_get_flags :: proc "contextless" (self: ^PermissionInfo) -> (result: PermissionInfo_Flags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &PermissionInfo__class, "flags", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(PermissionInfo_Flags)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-PermissionInfo_set_flags :: proc "contextless" (self: ^PermissionInfo, value: i32) -> (exception: ^Throwable) {
+PermissionInfo_set_flags :: proc "contextless" (self: ^PermissionInfo, value: PermissionInfo_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &PermissionInfo__class, "flags", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
@@ -7692,16 +8089,16 @@ PermissionInfo_set_nonLocalizedDescription :: proc "contextless" (self: ^Permiss
 	return jni_take(jni_env)
 }
 
-PermissionInfo_get_protectionLevel :: proc "contextless" (self: ^PermissionInfo) -> (result: i32, exception: ^Throwable) {
+PermissionInfo_get_protectionLevel :: proc "contextless" (self: ^PermissionInfo) -> (result: PermissionInfo_ProtectionLevel, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &PermissionInfo__class, "protectionLevel", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(PermissionInfo_ProtectionLevel)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-PermissionInfo_set_protectionLevel :: proc "contextless" (self: ^PermissionInfo, value: i32) -> (exception: ^Throwable) {
+PermissionInfo_set_protectionLevel :: proc "contextless" (self: ^PermissionInfo, value: PermissionInfo_ProtectionLevel) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &PermissionInfo__class, "protectionLevel", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
@@ -7723,22 +8120,22 @@ PermissionInfo_new :: proc{
 	PermissionInfo_new_PermissionInfo,
 }
 
-PermissionInfo_describeContents :: proc "contextless" (self: ^PermissionInfo) -> (result: i32, exception: ^Throwable) {
+PermissionInfo_describeContents :: proc "contextless" (self: ^PermissionInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PermissionInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PermissionInfo_getProtection :: proc "contextless" (self: ^PermissionInfo) -> (result: i32, exception: ^Throwable) {
+PermissionInfo_getProtection :: proc "contextless" (self: ^PermissionInfo) -> (result: PermissionInfo_Protection, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PermissionInfo__class, "getProtection", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return PermissionInfo_Protection(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PermissionInfo_getProtectionFlags :: proc "contextless" (self: ^PermissionInfo) -> (result: i32, exception: ^Throwable) {
+PermissionInfo_getProtectionFlags :: proc "contextless" (self: ^PermissionInfo) -> (result: PermissionInfo_ProtectionLevel, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PermissionInfo__class, "getProtectionFlags", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(PermissionInfo_ProtectionLevel)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 PermissionInfo_loadDescription :: proc "contextless" (self: ^PermissionInfo, pm: ^PackageManager) -> (result: ^CharSequence, exception: ^Throwable) {
@@ -7754,13 +8151,64 @@ PermissionInfo_toString :: proc "contextless" (self: ^PermissionInfo) -> (result
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PermissionInfo_writeToParcel :: proc "contextless" (self: ^PermissionInfo, dest: ^Parcel, parcelableFlags: i32) -> (exception: ^Throwable) {
+PermissionInfo_writeToParcel :: proc "contextless" (self: ^PermissionInfo, dest: ^Parcel, parcelableFlags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PermissionInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = parcelableFlags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)parcelableFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+PermissionInfo_Protection :: enum u32 {
+	NORMAL              = 0,
+	DANGEROUS           = 1,
+	SIGNATURE           = 2,
+	SIGNATURE_OR_SYSTEM = 3,
+	INTERNAL            = 4,
+}
+
+PermissionInfo_ProtectionLevel :: bit_field i32 {
+	base:         PermissionInfo_Protection | 4,
+	privileged:   bool                      | 1,
+	development:  bool                      | 1,
+	appop:        bool                      | 1,
+	pre23:        bool                      | 1,
+	installer:    bool                      | 1,
+	verifier:     bool                      | 1,
+	preinstalled: bool                      | 1,
+	setup:        bool                      | 1,
+	instant:      bool                      | 1,
+	runtime_only: bool                      | 1,
+	_:            u32                       | 18,
+}
+
+PermissionInfo_ProtectionLevel_DANGEROUS           :: PermissionInfo_ProtectionLevel{base = .DANGEROUS}
+PermissionInfo_ProtectionLevel_FLAG_APPOP          :: PermissionInfo_ProtectionLevel{appop = true}
+PermissionInfo_ProtectionLevel_FLAG_DEVELOPMENT    :: PermissionInfo_ProtectionLevel{development = true}
+PermissionInfo_ProtectionLevel_FLAG_INSTALLER      :: PermissionInfo_ProtectionLevel{installer = true}
+PermissionInfo_ProtectionLevel_FLAG_INSTANT        :: PermissionInfo_ProtectionLevel{instant = true}
+PermissionInfo_ProtectionLevel_FLAG_PRE23          :: PermissionInfo_ProtectionLevel{pre23 = true}
+PermissionInfo_ProtectionLevel_FLAG_PREINSTALLED   :: PermissionInfo_ProtectionLevel{preinstalled = true}
+PermissionInfo_ProtectionLevel_FLAG_PRIVILEGED     :: PermissionInfo_ProtectionLevel{privileged = true}
+PermissionInfo_ProtectionLevel_FLAG_RUNTIME_ONLY   :: PermissionInfo_ProtectionLevel{runtime_only = true}
+PermissionInfo_ProtectionLevel_FLAG_SETUP          :: PermissionInfo_ProtectionLevel{setup = true}
+PermissionInfo_ProtectionLevel_FLAG_SYSTEM         :: PermissionInfo_ProtectionLevel{privileged = true}
+PermissionInfo_ProtectionLevel_FLAG_VERIFIER       :: PermissionInfo_ProtectionLevel{verifier = true}
+PermissionInfo_ProtectionLevel_INTERNAL            :: PermissionInfo_ProtectionLevel{base = .INTERNAL}
+PermissionInfo_ProtectionLevel_MASK_BASE           :: PermissionInfo_ProtectionLevel{base = PermissionInfo_Protection(0xf)}
+PermissionInfo_ProtectionLevel_NORMAL              :: PermissionInfo_ProtectionLevel{}
+PermissionInfo_ProtectionLevel_SIGNATURE           :: PermissionInfo_ProtectionLevel{base = .SIGNATURE}
+PermissionInfo_ProtectionLevel_SIGNATURE_OR_SYSTEM :: PermissionInfo_ProtectionLevel{base = .SIGNATURE_OR_SYSTEM}
+
+PermissionInfo_Flag :: enum u32 {
+	ALLOWED_IN_PRIVATE_COMPUTE_CORE = 5,
+	COSTS_MONEY                     = 0,
+	HARD_RESTRICTED                 = 2,
+	IMMUTABLY_RESTRICTED            = 4,
+	INSTALLED                       = 30,
+	SOFT_RESTRICTED                 = 3,
+}
+PermissionInfo_Flags :: distinct bit_set[PermissionInfo_Flag; u32]
 
 // class android.content.pm.ProviderInfo
 ProviderInfo :: struct #raw_union {
@@ -7792,16 +8240,16 @@ ProviderInfo_set_authority :: proc "contextless" (self: ^ProviderInfo, value: ^S
 	return jni_take(jni_env)
 }
 
-ProviderInfo_get_flags :: proc "contextless" (self: ^ProviderInfo) -> (result: i32, exception: ^Throwable) {
+ProviderInfo_get_flags :: proc "contextless" (self: ^ProviderInfo) -> (result: ProviderInfo_Flags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ProviderInfo__class, "flags", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(ProviderInfo_Flags)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-ProviderInfo_set_flags :: proc "contextless" (self: ^ProviderInfo, value: i32) -> (exception: ^Throwable) {
+ProviderInfo_set_flags :: proc "contextless" (self: ^ProviderInfo, value: ProviderInfo_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ProviderInfo__class, "flags", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
@@ -7940,10 +8388,10 @@ ProviderInfo_new :: proc{
 	ProviderInfo_new_ProviderInfo,
 }
 
-ProviderInfo_describeContents :: proc "contextless" (self: ^ProviderInfo) -> (result: i32, exception: ^Throwable) {
+ProviderInfo_describeContents :: proc "contextless" (self: ^ProviderInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ProviderInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ProviderInfo_dump :: proc "contextless" (self: ^ProviderInfo, pw: ^Printer, prefix: ^String) -> (exception: ^Throwable) {
@@ -7960,13 +8408,18 @@ ProviderInfo_toString :: proc "contextless" (self: ^ProviderInfo) -> (result: ^S
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ProviderInfo_writeToParcel :: proc "contextless" (self: ^ProviderInfo, out: ^Parcel, parcelableFlags: i32) -> (exception: ^Throwable) {
+ProviderInfo_writeToParcel :: proc "contextless" (self: ^ProviderInfo, out: ^Parcel, parcelableFlags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ProviderInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = parcelableFlags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)parcelableFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+ProviderInfo_Flag :: enum u32 {
+	SINGLE_USER = 30,
+}
+ProviderInfo_Flags :: distinct bit_set[ProviderInfo_Flag; u32]
 
 // class android.content.pm.ResolveInfo
 ResolveInfo :: struct #raw_union {
@@ -8183,10 +8636,10 @@ ResolveInfo_new :: proc{
 	ResolveInfo_new_ResolveInfo,
 }
 
-ResolveInfo_describeContents :: proc "contextless" (self: ^ResolveInfo) -> (result: i32, exception: ^Throwable) {
+ResolveInfo_describeContents :: proc "contextless" (self: ^ResolveInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ResolveInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ResolveInfo_dump :: proc "contextless" (self: ^ResolveInfo, pw: ^Printer, prefix: ^String) -> (exception: ^Throwable) {
@@ -8229,10 +8682,10 @@ ResolveInfo_toString :: proc "contextless" (self: ^ResolveInfo) -> (result: ^Str
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ResolveInfo_writeToParcel :: proc "contextless" (self: ^ResolveInfo, dest: ^Parcel, parcelableFlags: i32) -> (exception: ^Throwable) {
+ResolveInfo_writeToParcel :: proc "contextless" (self: ^ResolveInfo, dest: ^Parcel, parcelableFlags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ResolveInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = parcelableFlags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)parcelableFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -8299,16 +8752,16 @@ ServiceInfo_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creator
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-ServiceInfo_get_flags :: proc "contextless" (self: ^ServiceInfo) -> (result: i32, exception: ^Throwable) {
+ServiceInfo_get_flags :: proc "contextless" (self: ^ServiceInfo) -> (result: ServiceInfo_Flags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ServiceInfo__class, "flags", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(ServiceInfo_Flags)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-ServiceInfo_set_flags :: proc "contextless" (self: ^ServiceInfo, value: i32) -> (exception: ^Throwable) {
+ServiceInfo_set_flags :: proc "contextless" (self: ^ServiceInfo, value: ServiceInfo_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ServiceInfo__class, "flags", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
@@ -8343,10 +8796,10 @@ ServiceInfo_new :: proc{
 	ServiceInfo_new_ServiceInfo,
 }
 
-ServiceInfo_describeContents :: proc "contextless" (self: ^ServiceInfo) -> (result: i32, exception: ^Throwable) {
+ServiceInfo_describeContents :: proc "contextless" (self: ^ServiceInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ServiceInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ServiceInfo_dump :: proc "contextless" (self: ^ServiceInfo, pw: ^Printer, prefix: ^String) -> (exception: ^Throwable) {
@@ -8357,10 +8810,10 @@ ServiceInfo_dump :: proc "contextless" (self: ^ServiceInfo, pw: ^Printer, prefix
 	return jni_take(jni_env)
 }
 
-ServiceInfo_getForegroundServiceType :: proc "contextless" (self: ^ServiceInfo) -> (result: i32, exception: ^Throwable) {
+ServiceInfo_getForegroundServiceType :: proc "contextless" (self: ^ServiceInfo) -> (result: ServiceInfo_ForegroundServiceTypeFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ServiceInfo__class, "getForegroundServiceType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(ServiceInfo_ForegroundServiceTypeFlags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ServiceInfo_toString :: proc "contextless" (self: ^ServiceInfo) -> (result: ^String, exception: ^Throwable) {
@@ -8369,13 +8822,45 @@ ServiceInfo_toString :: proc "contextless" (self: ^ServiceInfo) -> (result: ^Str
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ServiceInfo_writeToParcel :: proc "contextless" (self: ^ServiceInfo, dest: ^Parcel, parcelableFlags: i32) -> (exception: ^Throwable) {
+ServiceInfo_writeToParcel :: proc "contextless" (self: ^ServiceInfo, dest: ^Parcel, parcelableFlags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ServiceInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = parcelableFlags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)parcelableFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+ServiceInfo_Flag :: enum u32 {
+	ALLOW_SHARED_ISOLATED_PROCESS = 4,
+	EXTERNAL_SERVICE              = 2,
+	ISOLATED_PROCESS              = 1,
+	NATIVE_SERVICE                = 5,
+	SINGLE_USER                   = 30,
+	STOP_WITH_TASK                = 0,
+	USE_APP_ZYGOTE                = 3,
+}
+ServiceInfo_Flags :: distinct bit_set[ServiceInfo_Flag; u32]
+
+ServiceInfo_ForegroundServiceTypeFlag :: enum u32 {
+	CAMERA           = 6,
+	CONNECTED_DEVICE = 4,
+	DATA_SYNC        = 0,
+	HEALTH           = 8,
+	LOCATION         = 3,
+	MEDIA_PLAYBACK   = 1,
+	MEDIA_PROCESSING = 13,
+	MEDIA_PROJECTION = 5,
+	MICROPHONE       = 7,
+	PHONE_CALL       = 2,
+	REMOTE_MESSAGING = 9,
+	SHORT_SERVICE    = 11,
+	SPECIAL_USE      = 30,
+	SYSTEM_EXEMPTED  = 10,
+}
+ServiceInfo_ForegroundServiceTypeFlags :: distinct bit_set[ServiceInfo_ForegroundServiceTypeFlag; u32]
+
+ServiceInfo_ForegroundServiceTypeFlags_MANIFEST :: transmute(ServiceInfo_ForegroundServiceTypeFlags)u32(0xffffffff)
+ServiceInfo_ForegroundServiceTypeFlags_NONE     :: ServiceInfo_ForegroundServiceTypeFlags{}
 
 // class android.content.pm.SharedLibraryInfo
 SharedLibraryInfo :: struct #raw_union {
@@ -8398,10 +8883,10 @@ SharedLibraryInfo_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_C
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-SharedLibraryInfo_describeContents :: proc "contextless" (self: ^SharedLibraryInfo) -> (result: i32, exception: ^Throwable) {
+SharedLibraryInfo_describeContents :: proc "contextless" (self: ^SharedLibraryInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SharedLibraryInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 SharedLibraryInfo_getCertDigests :: proc "contextless" (self: ^SharedLibraryInfo) -> (result: ^List, exception: ^Throwable) { // API level 36
@@ -8434,10 +8919,10 @@ SharedLibraryInfo_getName :: proc "contextless" (self: ^SharedLibraryInfo) -> (r
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-SharedLibraryInfo_getType :: proc "contextless" (self: ^SharedLibraryInfo) -> (result: i32, exception: ^Throwable) {
+SharedLibraryInfo_getType :: proc "contextless" (self: ^SharedLibraryInfo) -> (result: SharedLibraryInfo_TypeFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SharedLibraryInfo__class, "getType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(SharedLibraryInfo_TypeFlags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 SharedLibraryInfo_getVersion :: proc "contextless" (self: ^SharedLibraryInfo) -> (result: i32, exception: ^Throwable) {
@@ -8452,13 +8937,22 @@ SharedLibraryInfo_toString :: proc "contextless" (self: ^SharedLibraryInfo) -> (
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-SharedLibraryInfo_writeToParcel :: proc "contextless" (self: ^SharedLibraryInfo, parcel: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+SharedLibraryInfo_writeToParcel :: proc "contextless" (self: ^SharedLibraryInfo, parcel: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SharedLibraryInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = parcel}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = parcel}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+SharedLibraryInfo_TypeFlag :: enum u32 {
+	DYNAMIC = 0,
+	STATIC  = 1,
+}
+SharedLibraryInfo_TypeFlags :: distinct bit_set[SharedLibraryInfo_TypeFlag; u32]
+
+SharedLibraryInfo_TypeFlags_BUILTIN     :: SharedLibraryInfo_TypeFlags{}
+SharedLibraryInfo_TypeFlags_SDK_PACKAGE :: SharedLibraryInfo_TypeFlags{.DYNAMIC, .STATIC}
 
 // class android.content.pm.ShortcutInfo
 ShortcutInfo :: struct #raw_union {
@@ -8493,10 +8987,10 @@ ShortcutInfo_createFromGenericDocument :: proc "contextless" (context_: ^Context
 	return (^ShortcutInfo)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ShortcutInfo_describeContents :: proc "contextless" (self: ^ShortcutInfo) -> (result: i32, exception: ^Throwable) {
+ShortcutInfo_describeContents :: proc "contextless" (self: ^ShortcutInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ShortcutInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ShortcutInfo_getActivity :: proc "contextless" (self: ^ShortcutInfo) -> (result: ^ComponentName, exception: ^Throwable) {
@@ -8530,16 +9024,16 @@ ShortcutInfo_getDisabledMessage :: proc "contextless" (self: ^ShortcutInfo) -> (
 	return (^CharSequence)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ShortcutInfo_getDisabledReason :: proc "contextless" (self: ^ShortcutInfo) -> (result: i32, exception: ^Throwable) {
+ShortcutInfo_getDisabledReason :: proc "contextless" (self: ^ShortcutInfo) -> (result: ShortcutInfo_DisabledReason, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ShortcutInfo__class, "getDisabledReason", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return ShortcutInfo_DisabledReason(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ShortcutInfo_getExcludedFromSurfaces :: proc "contextless" (self: ^ShortcutInfo) -> (result: i32, exception: ^Throwable) { // API level 33
+ShortcutInfo_getExcludedFromSurfaces :: proc "contextless" (self: ^ShortcutInfo) -> (result: ShortcutInfo_ExcludedFromSurfaces, exception: ^Throwable) { // API level 33
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ShortcutInfo__class, "getExcludedFromSurfaces", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(ShortcutInfo_ExcludedFromSurfaces)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ShortcutInfo_getExtras :: proc "contextless" (self: ^ShortcutInfo) -> (result: ^PersistableBundle, exception: ^Throwable) {
@@ -8638,10 +9132,10 @@ ShortcutInfo_isEnabled :: proc "contextless" (self: ^ShortcutInfo) -> (result: b
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-ShortcutInfo_isExcludedFromSurfaces :: proc "contextless" (self: ^ShortcutInfo, surface: i32) -> (result: bool, exception: ^Throwable) { // API level 33
+ShortcutInfo_isExcludedFromSurfaces :: proc "contextless" (self: ^ShortcutInfo, surface: ShortcutInfo_ExcludedFromSurfaces) -> (result: bool, exception: ^Throwable) { // API level 33
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ShortcutInfo__class, "isExcludedFromSurfaces", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = surface}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)surface}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -8663,13 +9157,29 @@ ShortcutInfo_toString :: proc "contextless" (self: ^ShortcutInfo) -> (result: ^S
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ShortcutInfo_writeToParcel :: proc "contextless" (self: ^ShortcutInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+ShortcutInfo_writeToParcel :: proc "contextless" (self: ^ShortcutInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ShortcutInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+ShortcutInfo_DisabledReason :: enum i32 {
+	APP_CHANGED          = 2,
+	BACKUP_NOT_SUPPORTED = 101,
+	BY_APP               = 1,
+	NOT_DISABLED         = 0,
+	OTHER_RESTORE_ISSUE  = 103,
+	SIGNATURE_MISMATCH   = 102,
+	UNKNOWN              = 3,
+	VERSION_LOWER        = 100,
+}
+
+ShortcutInfo_ExcludedFromSurface :: enum u32 {
+	SURFACE_LAUNCHER = 0,
+}
+ShortcutInfo_ExcludedFromSurfaces :: distinct bit_set[ShortcutInfo_ExcludedFromSurface; u32]
 
 // class android.content.pm.ShortcutInfo.Builder
 ShortcutInfo_Builder :: struct #raw_union {
@@ -8903,10 +9413,10 @@ ShortcutManager_getPinnedShortcuts :: proc "contextless" (self: ^ShortcutManager
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ShortcutManager_getShortcuts :: proc "contextless" (self: ^ShortcutManager, matchFlags: i32) -> (result: ^List, exception: ^Throwable) { // API level 30
+ShortcutManager_getShortcuts :: proc "contextless" (self: ^ShortcutManager, matchFlags: ShortcutManager_MatchFlags) -> (result: ^List, exception: ^Throwable) { // API level 30
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ShortcutManager__class, "getShortcuts", "(I)Ljava/util/List;", false) or_return
-	jni_args := [?]android.jvalue{{i = matchFlags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)matchFlags}}
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -8982,6 +9492,14 @@ ShortcutManager_updateShortcuts :: proc "contextless" (self: ^ShortcutManager, s
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
+ShortcutManager_MatchFlag :: enum u32 {
+	CACHED   = 3,
+	DYNAMIC  = 1,
+	MANIFEST = 0,
+	PINNED   = 2,
+}
+ShortcutManager_MatchFlags :: distinct bit_set[ShortcutManager_MatchFlag; u32]
+
 // class android.content.pm.Signature
 Signature :: struct #raw_union {
 	using Object: Object,
@@ -9016,10 +9534,10 @@ Signature_new :: proc{
 	Signature_new_String,
 }
 
-Signature_describeContents :: proc "contextless" (self: ^Signature) -> (result: i32, exception: ^Throwable) {
+Signature_describeContents :: proc "contextless" (self: ^Signature) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Signature__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Signature_equals :: proc "contextless" (self: ^Signature, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -9065,10 +9583,10 @@ Signature_toCharsString :: proc "contextless" (self: ^Signature) -> (result: ^St
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Signature_writeToParcel :: proc "contextless" (self: ^Signature, dest: ^Parcel, parcelableFlags: i32) -> (exception: ^Throwable) {
+Signature_writeToParcel :: proc "contextless" (self: ^Signature, dest: ^Parcel, parcelableFlags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Signature__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = parcelableFlags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)parcelableFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -9119,10 +9637,10 @@ SigningInfo_new :: proc{
 	SigningInfo_new_int_Collection_Collection_Collection,
 }
 
-SigningInfo_describeContents :: proc "contextless" (self: ^SigningInfo) -> (result: i32, exception: ^Throwable) {
+SigningInfo_describeContents :: proc "contextless" (self: ^SigningInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SigningInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 SigningInfo_getApkContentsSigners :: proc "contextless" (self: ^SigningInfo) -> (result: ^Array(Signature), exception: ^Throwable) {
@@ -9168,12 +9686,19 @@ SigningInfo_signersMatchExactly :: proc "contextless" (self: ^SigningInfo, other
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-SigningInfo_writeToParcel :: proc "contextless" (self: ^SigningInfo, dest: ^Parcel, parcelableFlags: i32) -> (exception: ^Throwable) {
+SigningInfo_writeToParcel :: proc "contextless" (self: ^SigningInfo, dest: ^Parcel, parcelableFlags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SigningInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = parcelableFlags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)parcelableFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+SigningInfo_Version :: enum i32 {
+	JAR              = 1,
+	SIGNING_BLOCK_V2 = 2,
+	SIGNING_BLOCK_V3 = 3,
+	SIGNING_BLOCK_V4 = 4,
 }
 
 // class android.content.pm.SigningInfoException // API level 36
@@ -9224,10 +9749,10 @@ VersionedPackage_new :: proc{
 	VersionedPackage_new_String_long,
 }
 
-VersionedPackage_describeContents :: proc "contextless" (self: ^VersionedPackage) -> (result: i32, exception: ^Throwable) {
+VersionedPackage_describeContents :: proc "contextless" (self: ^VersionedPackage) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VersionedPackage__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 VersionedPackage_equals :: proc "contextless" (self: ^VersionedPackage, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -9267,10 +9792,10 @@ VersionedPackage_toString :: proc "contextless" (self: ^VersionedPackage) -> (re
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-VersionedPackage_writeToParcel :: proc "contextless" (self: ^VersionedPackage, parcel: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+VersionedPackage_writeToParcel :: proc "contextless" (self: ^VersionedPackage, parcel: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VersionedPackage__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = parcel}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = parcel}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }

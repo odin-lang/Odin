@@ -7,16 +7,16 @@ import "core:c"
 
 foreign import libandroid "system:android"
 
-AThermalStatus :: c.int
-
-ATHERMAL_STATUS_ERROR     :: -1
-ATHERMAL_STATUS_NONE      :: 0
-ATHERMAL_STATUS_LIGHT     :: 1
-ATHERMAL_STATUS_MODERATE  :: 2
-ATHERMAL_STATUS_SEVERE    :: 3
-ATHERMAL_STATUS_CRITICAL  :: 4
-ATHERMAL_STATUS_EMERGENCY :: 5
-ATHERMAL_STATUS_SHUTDOWN  :: 6
+AThermalStatus :: enum c.int {
+	ERROR     = -1,
+	NONE      = 0,
+	LIGHT     = 1,
+	MODERATE  = 2,
+	SEVERE    = 3,
+	CRITICAL  = 4,
+	EMERGENCY = 5,
+	SHUTDOWN  = 6,
+}
 
 AThermalManager         :: struct {}
 AThermal_StatusCallback :: proc "c" (data: rawptr, status: AThermalStatus)

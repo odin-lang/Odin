@@ -843,24 +843,24 @@ android_util_Base64_NO_PADDING :: 1
 android_util_Base64_NO_WRAP    :: 2
 android_util_Base64_URL_SAFE   :: 8
 
-android_util_Base64_decode_ByteArray_int :: proc "contextless" (input: ^ByteArray, flags: i32) -> (result: ^ByteArray, exception: ^Throwable) {
+android_util_Base64_decode_ByteArray_int :: proc "contextless" (input: ^ByteArray, flags: android_util_Base64_Flags) -> (result: ^ByteArray, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &android_util_Base64__class, "decode", "([BI)[B", true) or_return
-	jni_args := [?]android.jvalue{{l = input}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = input}, {i = transmute(i32)flags}}
 	return (^ByteArray)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-android_util_Base64_decode_ByteArray_int_int_int :: proc "contextless" (input: ^ByteArray, offset: i32, len: i32, flags: i32) -> (result: ^ByteArray, exception: ^Throwable) {
+android_util_Base64_decode_ByteArray_int_int_int :: proc "contextless" (input: ^ByteArray, offset: i32, len: i32, flags: android_util_Base64_Flags) -> (result: ^ByteArray, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &android_util_Base64__class, "decode", "([BIII)[B", true) or_return
-	jni_args := [?]android.jvalue{{l = input}, {i = offset}, {i = len}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = input}, {i = offset}, {i = len}, {i = transmute(i32)flags}}
 	return (^ByteArray)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-android_util_Base64_decode_String_int :: proc "contextless" (str: ^String, flags: i32) -> (result: ^ByteArray, exception: ^Throwable) {
+android_util_Base64_decode_String_int :: proc "contextless" (str: ^String, flags: android_util_Base64_Flags) -> (result: ^ByteArray, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &android_util_Base64__class, "decode", "(Ljava/lang/String;I)[B", true) or_return
-	jni_args := [?]android.jvalue{{l = str}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = str}, {i = transmute(i32)flags}}
 	return (^ByteArray)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -870,17 +870,17 @@ android_util_Base64_decode :: proc{
 	android_util_Base64_decode_String_int,
 }
 
-android_util_Base64_encode_ByteArray_int :: proc "contextless" (input: ^ByteArray, flags: i32) -> (result: ^ByteArray, exception: ^Throwable) {
+android_util_Base64_encode_ByteArray_int :: proc "contextless" (input: ^ByteArray, flags: android_util_Base64_Flags) -> (result: ^ByteArray, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &android_util_Base64__class, "encode", "([BI)[B", true) or_return
-	jni_args := [?]android.jvalue{{l = input}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = input}, {i = transmute(i32)flags}}
 	return (^ByteArray)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-android_util_Base64_encode_ByteArray_int_int_int :: proc "contextless" (input: ^ByteArray, offset: i32, len: i32, flags: i32) -> (result: ^ByteArray, exception: ^Throwable) {
+android_util_Base64_encode_ByteArray_int_int_int :: proc "contextless" (input: ^ByteArray, offset: i32, len: i32, flags: android_util_Base64_Flags) -> (result: ^ByteArray, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &android_util_Base64__class, "encode", "([BIII)[B", true) or_return
-	jni_args := [?]android.jvalue{{l = input}, {i = offset}, {i = len}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = input}, {i = offset}, {i = len}, {i = transmute(i32)flags}}
 	return (^ByteArray)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -889,17 +889,17 @@ android_util_Base64_encode :: proc{
 	android_util_Base64_encode_ByteArray_int_int_int,
 }
 
-android_util_Base64_encodeToString_ByteArray_int :: proc "contextless" (input: ^ByteArray, flags: i32) -> (result: ^String, exception: ^Throwable) {
+android_util_Base64_encodeToString_ByteArray_int :: proc "contextless" (input: ^ByteArray, flags: android_util_Base64_Flags) -> (result: ^String, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &android_util_Base64__class, "encodeToString", "([BI)Ljava/lang/String;", true) or_return
-	jni_args := [?]android.jvalue{{l = input}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = input}, {i = transmute(i32)flags}}
 	return (^String)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-android_util_Base64_encodeToString_ByteArray_int_int_int :: proc "contextless" (input: ^ByteArray, offset: i32, len: i32, flags: i32) -> (result: ^String, exception: ^Throwable) {
+android_util_Base64_encodeToString_ByteArray_int_int_int :: proc "contextless" (input: ^ByteArray, offset: i32, len: i32, flags: android_util_Base64_Flags) -> (result: ^String, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &android_util_Base64__class, "encodeToString", "([BIII)Ljava/lang/String;", true) or_return
-	jni_args := [?]android.jvalue{{l = input}, {i = offset}, {i = len}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = input}, {i = offset}, {i = len}, {i = transmute(i32)flags}}
 	return (^String)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -907,6 +907,17 @@ android_util_Base64_encodeToString :: proc{
 	android_util_Base64_encodeToString_ByteArray_int,
 	android_util_Base64_encodeToString_ByteArray_int_int_int,
 }
+
+android_util_Base64_Flag :: enum u32 {
+	CRLF       = 2,
+	NO_CLOSE   = 4,
+	NO_PADDING = 0,
+	NO_WRAP    = 1,
+	URL_SAFE   = 3,
+}
+android_util_Base64_Flags :: distinct bit_set[android_util_Base64_Flag; u32]
+
+android_util_Base64_Flags_DEFAULT :: android_util_Base64_Flags{}
 
 // class android.util.Base64DataException
 Base64DataException :: struct #raw_union {
@@ -931,10 +942,10 @@ Base64InputStream :: struct #raw_union {
 @(private)
 Base64InputStream__class := Cached_Class{name = "android/util/Base64InputStream"}
 
-Base64InputStream_new :: proc "contextless" (in_: ^InputStream, flags: i32) -> (result: ^Base64InputStream, exception: ^Throwable) {
+Base64InputStream_new :: proc "contextless" (in_: ^InputStream, flags: android_util_Base64_Flags) -> (result: ^Base64InputStream, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Base64InputStream__class, "<init>", "(Ljava/io/InputStream;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = in_}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = in_}, {i = transmute(i32)flags}}
 	return (^Base64InputStream)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -1005,10 +1016,10 @@ Base64OutputStream :: struct #raw_union {
 @(private)
 Base64OutputStream__class := Cached_Class{name = "android/util/Base64OutputStream"}
 
-Base64OutputStream_new :: proc "contextless" (out: ^OutputStream, flags: i32) -> (result: ^Base64OutputStream, exception: ^Throwable) {
+Base64OutputStream_new :: proc "contextless" (out: ^OutputStream, flags: android_util_Base64_Flags) -> (result: ^Base64OutputStream, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Base64OutputStream__class, "<init>", "(Ljava/io/OutputStream;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	return (^Base64OutputStream)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -1158,16 +1169,16 @@ DisplayMetrics_set_density :: proc "contextless" (self: ^DisplayMetrics, value: 
 	return jni_take(jni_env)
 }
 
-DisplayMetrics_get_densityDpi :: proc "contextless" (self: ^DisplayMetrics) -> (result: i32, exception: ^Throwable) {
+DisplayMetrics_get_densityDpi :: proc "contextless" (self: ^DisplayMetrics) -> (result: DisplayMetrics_Density, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &DisplayMetrics__class, "densityDpi", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return DisplayMetrics_Density(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-DisplayMetrics_set_densityDpi :: proc "contextless" (self: ^DisplayMetrics, value: i32) -> (exception: ^Throwable) {
+DisplayMetrics_set_densityDpi :: proc "contextless" (self: ^DisplayMetrics, value: DisplayMetrics_Density) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &DisplayMetrics__class, "densityDpi", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
@@ -1286,6 +1297,33 @@ DisplayMetrics_toString :: proc "contextless" (self: ^DisplayMetrics) -> (result
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DisplayMetrics__class, "toString", "()Ljava/lang/String;", false) or_return
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
+}
+
+DisplayMetrics_Density :: enum i32 {
+	_140    = 140,
+	_180    = 180,
+	_200    = 200,
+	_220    = 220,
+	_260    = 260,
+	_280    = 280,
+	_300    = 300,
+	_340    = 340,
+	_360    = 360,
+	_390    = 390,
+	_400    = 400,
+	_420    = 420,
+	_440    = 440,
+	_450    = 450,
+	_520    = 520,
+	_560    = 560,
+	_600    = 600,
+	HIGH    = 240,
+	LOW     = 120,
+	MEDIUM  = 160,
+	TV      = 213,
+	XHIGH   = 320,
+	XXHIGH  = 480,
+	XXXHIGH = 640,
 }
 
 // interface android.util.Dumpable // API level 33
@@ -2406,17 +2444,17 @@ Log_i :: proc{
 	Log_i_String_String_Throwable,
 }
 
-Log_isLoggable :: proc "contextless" (tag: ^String, level: i32) -> (result: bool, exception: ^Throwable) {
+Log_isLoggable :: proc "contextless" (tag: ^String, level: Log_Loggable) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Log__class, "isLoggable", "(Ljava/lang/String;I)Z", true) or_return
-	jni_args := [?]android.jvalue{{l = tag}, {i = level}}
+	jni_args := [?]android.jvalue{{l = tag}, {i = i32(level)}}
 	return jni_env->CallStaticBooleanMethodA(jni_class, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-Log_println :: proc "contextless" (priority: i32, tag: ^String, msg: ^String) -> (result: i32, exception: ^Throwable) {
+Log_println :: proc "contextless" (priority: Log_Loggable, tag: ^String, msg: ^String) -> (result: i32, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Log__class, "println", "(ILjava/lang/String;Ljava/lang/String;)I", true) or_return
-	jni_args := [?]android.jvalue{{i = priority}, {l = tag}, {l = msg}}
+	jni_args := [?]android.jvalue{{i = i32(priority)}, {l = tag}, {l = msg}}
 	return jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
@@ -2493,6 +2531,15 @@ Log_wtf :: proc{
 	Log_wtf_String_Throwable,
 }
 
+Log_Loggable :: enum i32 {
+	ASSERT  = 7,
+	DEBUG   = 3,
+	ERROR   = 6,
+	INFO    = 4,
+	VERBOSE = 2,
+	WARN    = 5,
+}
+
 // class android.util.LogPrinter
 LogPrinter :: struct #raw_union {
 	using Object: Object,
@@ -2502,10 +2549,10 @@ LogPrinter :: struct #raw_union {
 @(private)
 LogPrinter__class := Cached_Class{name = "android/util/LogPrinter"}
 
-LogPrinter_new :: proc "contextless" (priority: i32, tag: ^String) -> (result: ^LogPrinter, exception: ^Throwable) {
+LogPrinter_new :: proc "contextless" (priority: Log_Loggable, tag: ^String) -> (result: ^LogPrinter, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &LogPrinter__class, "<init>", "(ILjava/lang/String;)V", false) or_return
-	jni_args := [?]android.jvalue{{i = priority}, {l = tag}}
+	jni_args := [?]android.jvalue{{i = i32(priority)}, {l = tag}}
 	return (^LogPrinter)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -3716,10 +3763,10 @@ SizeF_new :: proc "contextless" (width: f32, height: f32) -> (result: ^SizeF, ex
 	return (^SizeF)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-SizeF_describeContents :: proc "contextless" (self: ^SizeF) -> (result: i32, exception: ^Throwable) {
+SizeF_describeContents :: proc "contextless" (self: ^SizeF) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SizeF__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 SizeF_equals :: proc "contextless" (self: ^SizeF, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -3760,10 +3807,10 @@ SizeF_toString :: proc "contextless" (self: ^SizeF) -> (result: ^String, excepti
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-SizeF_writeToParcel :: proc "contextless" (self: ^SizeF, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+SizeF_writeToParcel :: proc "contextless" (self: ^SizeF, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SizeF__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4676,16 +4723,16 @@ TypedValue_set_assetCookie :: proc "contextless" (self: ^TypedValue, value: i32)
 	return jni_take(jni_env)
 }
 
-TypedValue_get_changingConfigurations :: proc "contextless" (self: ^TypedValue) -> (result: i32, exception: ^Throwable) {
+TypedValue_get_changingConfigurations :: proc "contextless" (self: ^TypedValue) -> (result: ActivityInfo_ConfigFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &TypedValue__class, "changingConfigurations", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(ActivityInfo_ConfigFlags)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-TypedValue_set_changingConfigurations :: proc "contextless" (self: ^TypedValue, value: i32) -> (exception: ^Throwable) {
+TypedValue_set_changingConfigurations :: proc "contextless" (self: ^TypedValue, value: ActivityInfo_ConfigFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &TypedValue__class, "changingConfigurations", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
@@ -4754,16 +4801,16 @@ TypedValue_set_string :: proc "contextless" (self: ^TypedValue, value: ^CharSequ
 	return jni_take(jni_env)
 }
 
-TypedValue_get_type :: proc "contextless" (self: ^TypedValue) -> (result: i32, exception: ^Throwable) {
+TypedValue_get_type :: proc "contextless" (self: ^TypedValue) -> (result: TypedValue_Type, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &TypedValue__class, "type", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return TypedValue_Type(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-TypedValue_set_type :: proc "contextless" (self: ^TypedValue, value: i32) -> (exception: ^Throwable) {
+TypedValue_set_type :: proc "contextless" (self: ^TypedValue, value: TypedValue_Type) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &TypedValue__class, "type", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
@@ -4773,10 +4820,10 @@ TypedValue_new :: proc "contextless" () -> (result: ^TypedValue, exception: ^Thr
 	return (^TypedValue)(jni_env->NewObjectA(jni_class, jni_id, nil)), jni_take(jni_env)
 }
 
-TypedValue_applyDimension :: proc "contextless" (unit: i32, value: f32, metrics: ^DisplayMetrics) -> (result: f32, exception: ^Throwable) {
+TypedValue_applyDimension :: proc "contextless" (unit: TypedValue_ComplexUnit, value: f32, metrics: ^DisplayMetrics) -> (result: f32, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &TypedValue__class, "applyDimension", "(IFLandroid/util/DisplayMetrics;)F", true) or_return
-	jni_args := [?]android.jvalue{{i = unit}, {f = value}, {l = metrics}}
+	jni_args := [?]android.jvalue{{i = i32(unit)}, {f = value}, {l = metrics}}
 	return jni_env->CallStaticFloatMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
@@ -4786,10 +4833,10 @@ TypedValue_coerceToString_void :: proc "contextless" (self: ^TypedValue) -> (res
 	return (^CharSequence)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-TypedValue_coerceToString_int_int :: proc "contextless" (type: i32, data: i32) -> (result: ^String, exception: ^Throwable) {
+TypedValue_coerceToString_int_int :: proc "contextless" (type: TypedValue_Type, data: i32) -> (result: ^String, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &TypedValue__class, "coerceToString", "(II)Ljava/lang/String;", true) or_return
-	jni_args := [?]android.jvalue{{i = type}, {i = data}}
+	jni_args := [?]android.jvalue{{i = i32(type)}, {i = data}}
 	return (^String)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4833,31 +4880,31 @@ TypedValue_complexToFraction :: proc "contextless" (data: i32, base: f32, pbase:
 	return jni_env->CallStaticFloatMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-TypedValue_convertDimensionToPixels :: proc "contextless" (unitToConvertFrom: i32, value: f32, metrics: ^DisplayMetrics) -> (result: f32, exception: ^Throwable) { // API level 34
+TypedValue_convertDimensionToPixels :: proc "contextless" (unitToConvertFrom: TypedValue_ComplexUnit, value: f32, metrics: ^DisplayMetrics) -> (result: f32, exception: ^Throwable) { // API level 34
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &TypedValue__class, "convertDimensionToPixels", "(IFLandroid/util/DisplayMetrics;)F", true) or_return
-	jni_args := [?]android.jvalue{{i = unitToConvertFrom}, {f = value}, {l = metrics}}
+	jni_args := [?]android.jvalue{{i = i32(unitToConvertFrom)}, {f = value}, {l = metrics}}
 	return jni_env->CallStaticFloatMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-TypedValue_convertPixelsToDimension :: proc "contextless" (unitToConvertTo: i32, pixelValue: f32, metrics: ^DisplayMetrics) -> (result: f32, exception: ^Throwable) { // API level 34
+TypedValue_convertPixelsToDimension :: proc "contextless" (unitToConvertTo: TypedValue_ComplexUnit, pixelValue: f32, metrics: ^DisplayMetrics) -> (result: f32, exception: ^Throwable) { // API level 34
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &TypedValue__class, "convertPixelsToDimension", "(IFLandroid/util/DisplayMetrics;)F", true) or_return
-	jni_args := [?]android.jvalue{{i = unitToConvertTo}, {f = pixelValue}, {l = metrics}}
+	jni_args := [?]android.jvalue{{i = i32(unitToConvertTo)}, {f = pixelValue}, {l = metrics}}
 	return jni_env->CallStaticFloatMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-TypedValue_deriveDimension :: proc "contextless" (unitToConvertTo: i32, pixelValue: f32, metrics: ^DisplayMetrics) -> (result: f32, exception: ^Throwable) { // API level 34
+TypedValue_deriveDimension :: proc "contextless" (unitToConvertTo: TypedValue_ComplexUnit, pixelValue: f32, metrics: ^DisplayMetrics) -> (result: f32, exception: ^Throwable) { // API level 34
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &TypedValue__class, "deriveDimension", "(IFLandroid/util/DisplayMetrics;)F", true) or_return
-	jni_args := [?]android.jvalue{{i = unitToConvertTo}, {f = pixelValue}, {l = metrics}}
+	jni_args := [?]android.jvalue{{i = i32(unitToConvertTo)}, {f = pixelValue}, {l = metrics}}
 	return jni_env->CallStaticFloatMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-TypedValue_getComplexUnit :: proc "contextless" (self: ^TypedValue) -> (result: i32, exception: ^Throwable) {
+TypedValue_getComplexUnit :: proc "contextless" (self: ^TypedValue) -> (result: TypedValue_ComplexUnit, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TypedValue__class, "getComplexUnit", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return TypedValue_ComplexUnit(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 TypedValue_getDimension :: proc "contextless" (self: ^TypedValue, metrics: ^DisplayMetrics) -> (result: f32, exception: ^Throwable) {
@@ -4898,6 +4945,36 @@ TypedValue_toString :: proc "contextless" (self: ^TypedValue) -> (result: ^Strin
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TypedValue__class, "toString", "()Ljava/lang/String;", false) or_return
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
+}
+
+TypedValue_Type :: enum i32 {
+	ATTRIBUTE       = 2,
+	DIMENSION       = 5,
+	FIRST_COLOR_INT = 28,
+	FIRST_INT       = 16,
+	FLOAT           = 4,
+	FRACTION        = 6,
+	INT_BOOLEAN     = 18,
+	INT_COLOR_ARGB4 = 30,
+	INT_COLOR_ARGB8 = 28,
+	INT_COLOR_RGB4  = 31,
+	INT_COLOR_RGB8  = 29,
+	INT_DEC         = 16,
+	INT_HEX         = 17,
+	LAST_COLOR_INT  = 31,
+	LAST_INT        = 31,
+	NULL            = 0,
+	REFERENCE       = 1,
+	STRING          = 3,
+}
+
+TypedValue_ComplexUnit :: enum i32 {
+	DIP = 1,
+	IN  = 4,
+	MM  = 5,
+	PT  = 3,
+	PX  = 0,
+	SP  = 2,
 }
 
 // class android.util.Xml

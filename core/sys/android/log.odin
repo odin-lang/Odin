@@ -8,36 +8,36 @@ import "core:sys/posix"
 
 foreign import liblog "system:log"
 
-android_LogPriority :: c.int
+android_LogPriority :: enum c.int {
+	UNKNOWN = 0,
+	DEFAULT = 1,
+	VERBOSE = 2,
+	DEBUG   = 3,
+	INFO    = 4,
+	WARN    = 5,
+	ERROR   = 6,
+	FATAL   = 7,
+	SILENT  = 8,
+}
 
-ANDROID_LOG_UNKNOWN :: 0
-ANDROID_LOG_DEFAULT :: 1
-ANDROID_LOG_VERBOSE :: 2
-ANDROID_LOG_DEBUG   :: 3
-ANDROID_LOG_INFO    :: 4
-ANDROID_LOG_WARN    :: 5
-ANDROID_LOG_ERROR   :: 6
-ANDROID_LOG_FATAL   :: 7
-ANDROID_LOG_SILENT  :: 8
-
-log_id_t :: c.int
-
-LOG_ID_MIN      :: 0
-LOG_ID_MAIN     :: 0
-LOG_ID_RADIO    :: 1
-LOG_ID_EVENTS   :: 2
-LOG_ID_SYSTEM   :: 3
-LOG_ID_CRASH    :: 4
-LOG_ID_STATS    :: 5
-LOG_ID_SECURITY :: 6
-LOG_ID_KERNEL   :: 7
-LOG_ID_MAX      :: 8
-LOG_ID_DEFAULT  :: 0x7FFFFFFF
+log_id_t :: enum c.int {
+	MIN      = 0,
+	MAIN     = 0,
+	RADIO    = 1,
+	EVENTS   = 2,
+	SYSTEM   = 3,
+	CRASH    = 4,
+	STATS    = 5,
+	SECURITY = 6,
+	KERNEL   = 7,
+	MAX      = 8,
+	DEFAULT  = 0x7FFFFFFF,
+}
 
 __android_log_message :: struct {
 	struct_size: c.size_t,
-	buffer_id:   i32,
-	priority:    i32,
+	buffer_id:   log_id_t,
+	priority:    android_LogPriority,
 	tag:         cstring,
 	file:        cstring,
 	line:        u32,
@@ -49,11 +49,11 @@ __android_aborter_function :: proc "c" (abort_message: cstring)
 
 @(default_calling_convention="c")
 foreign liblog {
-	__android_log_write                      :: proc(prio: c.int, tag: cstring, text: cstring) -> c.int ---
-	__android_log_buf_write                  :: proc(log_id: c.int, prio: c.int, tag: cstring, text: cstring) -> c.int ---
-	__android_log_print                      :: proc(prio: c.int, tag: cstring, fmt: cstring, #c_vararg args: ..any) -> c.int ---
-	__android_log_buf_print                  :: proc(log_id: c.int, prio: c.int, tag: cstring, fmt: cstring, #c_vararg args: ..any) -> c.int ---
-	__android_log_vprint                     :: proc(prio: c.int, tag: cstring, fmt: cstring, ap: va_list_arg) -> c.int ---
+	__android_log_write                      :: proc(prio: android_LogPriority, tag: cstring, text: cstring) -> c.int ---
+	__android_log_buf_write                  :: proc(log_id: log_id_t, prio: android_LogPriority, tag: cstring, text: cstring) -> c.int ---
+	__android_log_print                      :: proc(prio: android_LogPriority, tag: cstring, fmt: cstring, #c_vararg args: ..any) -> c.int ---
+	__android_log_buf_print                  :: proc(log_id: log_id_t, prio: android_LogPriority, tag: cstring, fmt: cstring, #c_vararg args: ..any) -> c.int ---
+	__android_log_vprint                     :: proc(prio: android_LogPriority, tag: cstring, fmt: cstring, ap: va_list_arg) -> c.int ---
 	__android_log_assert                     :: proc(cond: cstring, tag: cstring, fmt: cstring, #c_vararg args: ..any) -> ! ---
 	__android_log_write_log_message          :: proc(log_message: ^__android_log_message) --- // API level 30
 	__android_log_set_logger                 :: proc(logger: __android_logger_function) --- // API level 30
@@ -63,9 +63,9 @@ foreign liblog {
 	__android_log_set_aborter                :: proc(aborter: __android_aborter_function) --- // API level 30
 	__android_log_call_aborter               :: proc(abort_message: cstring) --- // API level 30
 	__android_log_default_aborter            :: proc(abort_message: cstring) -> ! --- // API level 30
-	__android_log_is_loggable                :: proc(prio: c.int, tag: cstring, default_prio: c.int) -> c.int ---
-	__android_log_is_loggable_len            :: proc(prio: c.int, tag: cstring, len: c.size_t, default_prio: c.int) -> c.int ---
-	__android_log_set_minimum_priority       :: proc(priority: i32) -> i32 --- // API level 30
-	__android_log_get_minimum_priority       :: proc() -> i32 --- // API level 30
+	__android_log_is_loggable                :: proc(prio: android_LogPriority, tag: cstring, default_prio: android_LogPriority) -> c.int ---
+	__android_log_is_loggable_len            :: proc(prio: android_LogPriority, tag: cstring, len: c.size_t, default_prio: android_LogPriority) -> c.int ---
+	__android_log_set_minimum_priority       :: proc(priority: android_LogPriority) -> android_LogPriority --- // API level 30
+	__android_log_get_minimum_priority       :: proc() -> android_LogPriority --- // API level 30
 	__android_log_set_default_tag            :: proc(tag: cstring) --- // API level 30
 }

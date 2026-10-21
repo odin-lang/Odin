@@ -14,12 +14,15 @@ Java methods are procedures named `Class_method`; overloads form a procedure gro
 are named by their parameter types, e.g. `TextView_setText_int`. Constructors are `Class_new`, fields
 are `Class_get_name` and `Class_set_name`, and constants are `Class_NAME`.
 
+Integers that take constants are enums, bit_sets and bit_fields: `View_setVisibility(view, .GONE)`,
+`Gravity_Field{horizontal = .CENTER}`.
+
 Every wrapper returns the exception it threw as its last result, or nil. It is cleared, so nothing is
 left pending:
 
 	keep_screen_on :: proc(activity: ^java.Activity) -> (exception: ^java.Throwable) {
 		window := java.Activity_getWindow(activity) or_return
-		return java.Window_addFlags(window, java.WindowManager_LayoutParams_FLAG_KEEP_SCREEN_ON)
+		return java.Window_addFlags(window, {.KEEP_SCREEN_ON})
 	}
 
 The wrappers use the calling thread's JNIEnv from `android.jni_env`, attaching the thread on first use.

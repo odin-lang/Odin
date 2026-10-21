@@ -10,26 +10,26 @@ foreign import libmediandk "system:mediandk"
 
 AImage :: struct {}
 
-AIMAGE_FORMATS :: c.int
-
-AIMAGE_FORMAT_RGBA_8888         :: 0x1
-AIMAGE_FORMAT_RGBX_8888         :: 0x2
-AIMAGE_FORMAT_RGB_888           :: 0x3
-AIMAGE_FORMAT_RGB_565           :: 0x4
-AIMAGE_FORMAT_RGBA_FP16         :: 0x16
-AIMAGE_FORMAT_YUV_420_888       :: 0x23
-AIMAGE_FORMAT_JPEG              :: 0x100
-AIMAGE_FORMAT_RAW16             :: 0x20
-AIMAGE_FORMAT_RAW_PRIVATE       :: 0x24
-AIMAGE_FORMAT_RAW10             :: 0x25
-AIMAGE_FORMAT_RAW12             :: 0x26
-AIMAGE_FORMAT_RAW14             :: 0x2C
-AIMAGE_FORMAT_DEPTH16           :: 0x44363159
-AIMAGE_FORMAT_DEPTH_POINT_CLOUD :: 0x101
-AIMAGE_FORMAT_PRIVATE           :: 0x22
-AIMAGE_FORMAT_Y8                :: 0x20203859
-AIMAGE_FORMAT_HEIC              :: 0x48454946
-AIMAGE_FORMAT_DEPTH_JPEG        :: 0x69656963
+AIMAGE_FORMATS :: enum c.int {
+	RGBA_8888         = 0x1,
+	RGBX_8888         = 0x2,
+	RGB_888           = 0x3,
+	RGB_565           = 0x4,
+	RGBA_FP16         = 0x16,
+	YUV_420_888       = 0x23,
+	JPEG              = 0x100,
+	RAW16             = 0x20,
+	RAW_PRIVATE       = 0x24,
+	RAW10             = 0x25,
+	RAW12             = 0x26,
+	RAW14             = 0x2C,
+	DEPTH16           = 0x44363159,
+	DEPTH_POINT_CLOUD = 0x101,
+	PRIVATE           = 0x22,
+	Y8                = 0x20203859,
+	HEIC              = 0x48454946,
+	DEPTH_JPEG        = 0x69656963,
+}
 
 AImageCropRect :: struct {
 	left:   i32,
@@ -43,7 +43,7 @@ foreign libmediandk {
 	AImage_delete              :: proc(image: ^AImage) ---
 	AImage_getWidth            :: proc(image: ^AImage, width: ^i32) -> media_status_t ---
 	AImage_getHeight           :: proc(image: ^AImage, height: ^i32) -> media_status_t ---
-	AImage_getFormat           :: proc(image: ^AImage, format: ^i32) -> media_status_t ---
+	AImage_getFormat           :: proc(image: ^AImage, format: ^AIMAGE_FORMATS) -> media_status_t ---
 	AImage_getCropRect         :: proc(image: ^AImage, rect: ^AImageCropRect) -> media_status_t ---
 	AImage_getTimestamp        :: proc(image: ^AImage, timestampNs: ^i64) -> media_status_t ---
 	AImage_getNumberOfPlanes   :: proc(image: ^AImage, numPlanes: ^i32) -> media_status_t ---

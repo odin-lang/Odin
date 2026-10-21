@@ -61,10 +61,10 @@ AssetFileDescriptor_createOutputStream :: proc "contextless" (self: ^AssetFileDe
 	return (^FileOutputStream)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-AssetFileDescriptor_describeContents :: proc "contextless" (self: ^AssetFileDescriptor) -> (result: i32, exception: ^Throwable) {
+AssetFileDescriptor_describeContents :: proc "contextless" (self: ^AssetFileDescriptor) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &AssetFileDescriptor__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 AssetFileDescriptor_getDeclaredLength :: proc "contextless" (self: ^AssetFileDescriptor) -> (result: i64, exception: ^Throwable) {
@@ -109,10 +109,10 @@ AssetFileDescriptor_toString :: proc "contextless" (self: ^AssetFileDescriptor) 
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-AssetFileDescriptor_writeToParcel :: proc "contextless" (self: ^AssetFileDescriptor, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+AssetFileDescriptor_writeToParcel :: proc "contextless" (self: ^AssetFileDescriptor, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &AssetFileDescriptor__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -291,10 +291,10 @@ AssetManager_open_String :: proc "contextless" (self: ^AssetManager, fileName: ^
 	return (^InputStream)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-AssetManager_open_String_int :: proc "contextless" (self: ^AssetManager, fileName: ^String, accessMode: i32) -> (result: ^InputStream, exception: ^Throwable) {
+AssetManager_open_String_int :: proc "contextless" (self: ^AssetManager, fileName: ^String, accessMode: AssetManager_Access) -> (result: ^InputStream, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &AssetManager__class, "open", "(Ljava/lang/String;I)Ljava/io/InputStream;", false) or_return
-	jni_args := [?]android.jvalue{{l = fileName}, {i = accessMode}}
+	jni_args := [?]android.jvalue{{l = fileName}, {i = i32(accessMode)}}
 	return (^InputStream)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -346,6 +346,13 @@ AssetManager_openXmlResourceParser_String :: proc "contextless" (self: ^AssetMan
 AssetManager_openXmlResourceParser :: proc{
 	AssetManager_openXmlResourceParser_int_String,
 	AssetManager_openXmlResourceParser_String,
+}
+
+AssetManager_Access :: enum i32 {
+	BUFFER    = 3,
+	RANDOM    = 1,
+	STREAMING = 2,
+	UNKNOWN   = 0,
 }
 
 // class android.content.res.AssetManager.AssetInputStream
@@ -464,16 +471,16 @@ ColorStateList_createFromXml :: proc{
 	ColorStateList_createFromXml_Resources_XmlPullParser_Resources_Theme,
 }
 
-ColorStateList_describeContents :: proc "contextless" (self: ^ColorStateList) -> (result: i32, exception: ^Throwable) {
+ColorStateList_describeContents :: proc "contextless" (self: ^ColorStateList) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ColorStateList__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ColorStateList_getChangingConfigurations :: proc "contextless" (self: ^ColorStateList) -> (result: i32, exception: ^Throwable) {
+ColorStateList_getChangingConfigurations :: proc "contextless" (self: ^ColorStateList) -> (result: ActivityInfo_ConfigFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ColorStateList__class, "getChangingConfigurations", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(ActivityInfo_ConfigFlags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ColorStateList_getColorForState :: proc "contextless" (self: ^ColorStateList, stateSet: ^IntArray, defaultColor: i32) -> (result: i32, exception: ^Throwable) {
@@ -528,10 +535,10 @@ ColorStateList_withLStar :: proc "contextless" (self: ^ColorStateList, lStar: f3
 	return (^ColorStateList)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ColorStateList_writeToParcel :: proc "contextless" (self: ^ColorStateList, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+ColorStateList_writeToParcel :: proc "contextless" (self: ^ColorStateList, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ColorStateList__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -632,16 +639,16 @@ Configuration_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creat
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-Configuration_get_colorMode :: proc "contextless" (self: ^Configuration) -> (result: i32, exception: ^Throwable) {
+Configuration_get_colorMode :: proc "contextless" (self: ^Configuration) -> (result: Configuration_ColorMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Configuration__class, "colorMode", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(Configuration_ColorMode)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-Configuration_set_colorMode :: proc "contextless" (self: ^Configuration, value: i32) -> (exception: ^Throwable) {
+Configuration_set_colorMode :: proc "contextless" (self: ^Configuration, value: Configuration_ColorMode) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Configuration__class, "colorMode", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
@@ -684,42 +691,42 @@ Configuration_set_fontWeightAdjustment :: proc "contextless" (self: ^Configurati
 	return jni_take(jni_env)
 }
 
-Configuration_get_hardKeyboardHidden :: proc "contextless" (self: ^Configuration) -> (result: i32, exception: ^Throwable) {
+Configuration_get_hardKeyboardHidden :: proc "contextless" (self: ^Configuration) -> (result: Configuration_HardKeyboardHidden, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Configuration__class, "hardKeyboardHidden", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return Configuration_HardKeyboardHidden(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-Configuration_set_hardKeyboardHidden :: proc "contextless" (self: ^Configuration, value: i32) -> (exception: ^Throwable) {
+Configuration_set_hardKeyboardHidden :: proc "contextless" (self: ^Configuration, value: Configuration_HardKeyboardHidden) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Configuration__class, "hardKeyboardHidden", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
-Configuration_get_keyboard :: proc "contextless" (self: ^Configuration) -> (result: i32, exception: ^Throwable) {
+Configuration_get_keyboard :: proc "contextless" (self: ^Configuration) -> (result: Configuration_Keyboard, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Configuration__class, "keyboard", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return Configuration_Keyboard(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-Configuration_set_keyboard :: proc "contextless" (self: ^Configuration, value: i32) -> (exception: ^Throwable) {
+Configuration_set_keyboard :: proc "contextless" (self: ^Configuration, value: Configuration_Keyboard) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Configuration__class, "keyboard", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
-Configuration_get_keyboardHidden :: proc "contextless" (self: ^Configuration) -> (result: i32, exception: ^Throwable) {
+Configuration_get_keyboardHidden :: proc "contextless" (self: ^Configuration) -> (result: Configuration_KeyboardHidden, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Configuration__class, "keyboardHidden", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return Configuration_KeyboardHidden(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-Configuration_set_keyboardHidden :: proc "contextless" (self: ^Configuration, value: i32) -> (exception: ^Throwable) {
+Configuration_set_keyboardHidden :: proc "contextless" (self: ^Configuration, value: Configuration_KeyboardHidden) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Configuration__class, "keyboardHidden", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
@@ -762,42 +769,42 @@ Configuration_set_mnc :: proc "contextless" (self: ^Configuration, value: i32) -
 	return jni_take(jni_env)
 }
 
-Configuration_get_navigation :: proc "contextless" (self: ^Configuration) -> (result: i32, exception: ^Throwable) {
+Configuration_get_navigation :: proc "contextless" (self: ^Configuration) -> (result: Configuration_Navigation, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Configuration__class, "navigation", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return Configuration_Navigation(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-Configuration_set_navigation :: proc "contextless" (self: ^Configuration, value: i32) -> (exception: ^Throwable) {
+Configuration_set_navigation :: proc "contextless" (self: ^Configuration, value: Configuration_Navigation) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Configuration__class, "navigation", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
-Configuration_get_navigationHidden :: proc "contextless" (self: ^Configuration) -> (result: i32, exception: ^Throwable) {
+Configuration_get_navigationHidden :: proc "contextless" (self: ^Configuration) -> (result: Configuration_NavigationHidden, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Configuration__class, "navigationHidden", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return Configuration_NavigationHidden(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-Configuration_set_navigationHidden :: proc "contextless" (self: ^Configuration, value: i32) -> (exception: ^Throwable) {
+Configuration_set_navigationHidden :: proc "contextless" (self: ^Configuration, value: Configuration_NavigationHidden) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Configuration__class, "navigationHidden", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
-Configuration_get_orientation :: proc "contextless" (self: ^Configuration) -> (result: i32, exception: ^Throwable) {
+Configuration_get_orientation :: proc "contextless" (self: ^Configuration) -> (result: Configuration_Orientation, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Configuration__class, "orientation", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return Configuration_Orientation(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-Configuration_set_orientation :: proc "contextless" (self: ^Configuration, value: i32) -> (exception: ^Throwable) {
+Configuration_set_orientation :: proc "contextless" (self: ^Configuration, value: Configuration_Orientation) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Configuration__class, "orientation", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
@@ -814,16 +821,16 @@ Configuration_set_screenHeightDp :: proc "contextless" (self: ^Configuration, va
 	return jni_take(jni_env)
 }
 
-Configuration_get_screenLayout :: proc "contextless" (self: ^Configuration) -> (result: i32, exception: ^Throwable) {
+Configuration_get_screenLayout :: proc "contextless" (self: ^Configuration) -> (result: Configuration_ScreenLayout, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Configuration__class, "screenLayout", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(Configuration_ScreenLayout)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-Configuration_set_screenLayout :: proc "contextless" (self: ^Configuration, value: i32) -> (exception: ^Throwable) {
+Configuration_set_screenLayout :: proc "contextless" (self: ^Configuration, value: Configuration_ScreenLayout) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Configuration__class, "screenLayout", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
@@ -853,29 +860,29 @@ Configuration_set_smallestScreenWidthDp :: proc "contextless" (self: ^Configurat
 	return jni_take(jni_env)
 }
 
-Configuration_get_touchscreen :: proc "contextless" (self: ^Configuration) -> (result: i32, exception: ^Throwable) {
+Configuration_get_touchscreen :: proc "contextless" (self: ^Configuration) -> (result: Configuration_Touchscreen, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Configuration__class, "touchscreen", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return Configuration_Touchscreen(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-Configuration_set_touchscreen :: proc "contextless" (self: ^Configuration, value: i32) -> (exception: ^Throwable) {
+Configuration_set_touchscreen :: proc "contextless" (self: ^Configuration, value: Configuration_Touchscreen) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Configuration__class, "touchscreen", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
-Configuration_get_uiMode :: proc "contextless" (self: ^Configuration) -> (result: i32, exception: ^Throwable) {
+Configuration_get_uiMode :: proc "contextless" (self: ^Configuration) -> (result: Configuration_UiMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Configuration__class, "uiMode", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(Configuration_UiMode)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-Configuration_set_uiMode :: proc "contextless" (self: ^Configuration, value: i32) -> (exception: ^Throwable) {
+Configuration_set_uiMode :: proc "contextless" (self: ^Configuration, value: Configuration_UiMode) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &Configuration__class, "uiMode", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
@@ -904,17 +911,17 @@ Configuration_compareTo :: proc "contextless" (self: ^Configuration, that: ^Conf
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-Configuration_describeContents :: proc "contextless" (self: ^Configuration) -> (result: i32, exception: ^Throwable) {
+Configuration_describeContents :: proc "contextless" (self: ^Configuration) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Configuration__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Configuration_diff :: proc "contextless" (self: ^Configuration, delta: ^Configuration) -> (result: i32, exception: ^Throwable) {
+Configuration_diff :: proc "contextless" (self: ^Configuration, delta: ^Configuration) -> (result: ActivityInfo_ConfigFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Configuration__class, "diff", "(Landroid/content/res/Configuration;)I", false) or_return
 	jni_args := [?]android.jvalue{{l = delta}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return transmute(ActivityInfo_ConfigFlags)(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 Configuration_equals_Configuration :: proc "contextless" (self: ^Configuration, that: ^Configuration) -> (result: bool, exception: ^Throwable) {
@@ -943,16 +950,16 @@ Configuration_generateDelta :: proc "contextless" (base: ^Configuration, change:
 	return (^Configuration)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Configuration_getGrammaticalGender :: proc "contextless" (self: ^Configuration) -> (result: i32, exception: ^Throwable) { // API level 34
+Configuration_getGrammaticalGender :: proc "contextless" (self: ^Configuration) -> (result: Configuration_GrammaticalGender, exception: ^Throwable) { // API level 34
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Configuration__class, "getGrammaticalGender", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return Configuration_GrammaticalGender(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Configuration_getLayoutDirection :: proc "contextless" (self: ^Configuration) -> (result: i32, exception: ^Throwable) {
+Configuration_getLayoutDirection :: proc "contextless" (self: ^Configuration) -> (result: View_LayoutDirection, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Configuration__class, "getLayoutDirection", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_LayoutDirection(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Configuration_getLocales :: proc "contextless" (self: ^Configuration) -> (result: ^LocaleList, exception: ^Throwable) {
@@ -998,10 +1005,10 @@ Configuration_isScreenWideColorGamut :: proc "contextless" (self: ^Configuration
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-Configuration_needNewResources :: proc "contextless" (configChanges: i32, interestingChanges: i32) -> (result: bool, exception: ^Throwable) {
+Configuration_needNewResources :: proc "contextless" (configChanges: ActivityInfo_ConfigFlags, interestingChanges: ActivityInfo_ConfigFlags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Configuration__class, "needNewResources", "(II)Z", true) or_return
-	jni_args := [?]android.jvalue{{i = configChanges}, {i = interestingChanges}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)configChanges}, {i = transmute(i32)interestingChanges}}
 	return jni_env->CallStaticBooleanMethodA(jni_class, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -1058,19 +1065,192 @@ Configuration_toString :: proc "contextless" (self: ^Configuration) -> (result: 
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Configuration_updateFrom :: proc "contextless" (self: ^Configuration, delta: ^Configuration) -> (result: i32, exception: ^Throwable) {
+Configuration_updateFrom :: proc "contextless" (self: ^Configuration, delta: ^Configuration) -> (result: ActivityInfo_ConfigFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Configuration__class, "updateFrom", "(Landroid/content/res/Configuration;)I", false) or_return
 	jni_args := [?]android.jvalue{{l = delta}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return transmute(ActivityInfo_ConfigFlags)(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Configuration_writeToParcel :: proc "contextless" (self: ^Configuration, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+Configuration_writeToParcel :: proc "contextless" (self: ^Configuration, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Configuration__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+Configuration_Keyboard :: enum i32 {
+	_12KEY    = 3,
+	NOKEYS    = 1,
+	QWERTY    = 2,
+	UNDEFINED = 0,
+}
+
+Configuration_KeyboardHidden :: enum i32 {
+	NO        = 1,
+	UNDEFINED = 0,
+	YES       = 2,
+}
+
+Configuration_HardKeyboardHidden :: enum i32 {
+	NO        = 1,
+	UNDEFINED = 0,
+	YES       = 2,
+}
+
+Configuration_Navigation :: enum i32 {
+	DPAD      = 2,
+	NONAV     = 1,
+	TRACKBALL = 3,
+	UNDEFINED = 0,
+	WHEEL     = 4,
+}
+
+Configuration_NavigationHidden :: enum i32 {
+	NO        = 1,
+	UNDEFINED = 0,
+	YES       = 2,
+}
+
+Configuration_Touchscreen :: enum i32 {
+	FINGER    = 3,
+	NOTOUCH   = 1,
+	STYLUS    = 2,
+	UNDEFINED = 0,
+}
+
+Configuration_UiModeType :: enum u32 {
+	APPLIANCE  = 5,
+	CAR        = 3,
+	DESK       = 2,
+	NORMAL     = 1,
+	TELEVISION = 4,
+	UNDEFINED  = 0,
+	VR_HEADSET = 7,
+	WATCH      = 6,
+}
+
+Configuration_UiModeNight :: enum u32 {
+	UNDEFINED = 0,
+	NO        = 1,
+	YES       = 2,
+}
+
+Configuration_UiMode :: bit_field i32 {
+	type:  Configuration_UiModeType  | 4,
+	night: Configuration_UiModeNight | 2,
+	_:     u32                       | 26,
+}
+
+Configuration_UiMode_NIGHT_MASK      :: Configuration_UiMode{night = Configuration_UiModeNight(0x3)}
+Configuration_UiMode_NIGHT_NO        :: Configuration_UiMode{night = .NO}
+Configuration_UiMode_NIGHT_UNDEFINED :: Configuration_UiMode{}
+Configuration_UiMode_NIGHT_YES       :: Configuration_UiMode{night = .YES}
+Configuration_UiMode_TYPE_APPLIANCE  :: Configuration_UiMode{type = .APPLIANCE}
+Configuration_UiMode_TYPE_CAR        :: Configuration_UiMode{type = .CAR}
+Configuration_UiMode_TYPE_DESK       :: Configuration_UiMode{type = .DESK}
+Configuration_UiMode_TYPE_MASK       :: Configuration_UiMode{type = Configuration_UiModeType(0xf)}
+Configuration_UiMode_TYPE_NORMAL     :: Configuration_UiMode{type = .NORMAL}
+Configuration_UiMode_TYPE_TELEVISION :: Configuration_UiMode{type = .TELEVISION}
+Configuration_UiMode_TYPE_UNDEFINED  :: Configuration_UiMode{}
+Configuration_UiMode_TYPE_VR_HEADSET :: Configuration_UiMode{type = .VR_HEADSET}
+Configuration_UiMode_TYPE_WATCH      :: Configuration_UiMode{type = .WATCH}
+
+Configuration_ScreenLayoutSize :: enum u32 {
+	UNDEFINED = 0,
+	SMALL     = 1,
+	NORMAL    = 2,
+	LARGE     = 3,
+	XLARGE    = 4,
+}
+
+Configuration_ScreenLayoutLong :: enum u32 {
+	UNDEFINED = 0,
+	NO        = 1,
+	YES       = 2,
+}
+
+Configuration_ScreenLayoutDir :: enum u32 {
+	UNDEFINED = 0,
+	LTR       = 1,
+	RTL       = 2,
+}
+
+Configuration_ScreenLayoutRound :: enum u32 {
+	UNDEFINED = 0,
+	NO        = 1,
+	YES       = 2,
+}
+
+Configuration_ScreenLayout :: bit_field i32 {
+	size:       Configuration_ScreenLayoutSize  | 4,
+	long:       Configuration_ScreenLayoutLong  | 2,
+	layout_dir: Configuration_ScreenLayoutDir   | 2,
+	round:      Configuration_ScreenLayoutRound | 2,
+	_:          u32                             | 22,
+}
+
+Configuration_ScreenLayout_LAYOUTDIR_LTR       :: Configuration_ScreenLayout{layout_dir = .LTR}
+Configuration_ScreenLayout_LAYOUTDIR_MASK      :: Configuration_ScreenLayout{layout_dir = Configuration_ScreenLayoutDir(0x3)}
+Configuration_ScreenLayout_LAYOUTDIR_RTL       :: Configuration_ScreenLayout{layout_dir = .RTL}
+Configuration_ScreenLayout_LAYOUTDIR_UNDEFINED :: Configuration_ScreenLayout{}
+Configuration_ScreenLayout_LONG_MASK           :: Configuration_ScreenLayout{long = Configuration_ScreenLayoutLong(0x3)}
+Configuration_ScreenLayout_LONG_NO             :: Configuration_ScreenLayout{long = .NO}
+Configuration_ScreenLayout_LONG_UNDEFINED      :: Configuration_ScreenLayout{}
+Configuration_ScreenLayout_LONG_YES            :: Configuration_ScreenLayout{long = .YES}
+Configuration_ScreenLayout_ROUND_MASK          :: Configuration_ScreenLayout{round = Configuration_ScreenLayoutRound(0x3)}
+Configuration_ScreenLayout_ROUND_NO            :: Configuration_ScreenLayout{round = .NO}
+Configuration_ScreenLayout_ROUND_UNDEFINED     :: Configuration_ScreenLayout{}
+Configuration_ScreenLayout_ROUND_YES           :: Configuration_ScreenLayout{round = .YES}
+Configuration_ScreenLayout_SIZE_LARGE          :: Configuration_ScreenLayout{size = .LARGE}
+Configuration_ScreenLayout_SIZE_MASK           :: Configuration_ScreenLayout{size = Configuration_ScreenLayoutSize(0xf)}
+Configuration_ScreenLayout_SIZE_NORMAL         :: Configuration_ScreenLayout{size = .NORMAL}
+Configuration_ScreenLayout_SIZE_SMALL          :: Configuration_ScreenLayout{size = .SMALL}
+Configuration_ScreenLayout_SIZE_UNDEFINED      :: Configuration_ScreenLayout{}
+Configuration_ScreenLayout_SIZE_XLARGE         :: Configuration_ScreenLayout{size = .XLARGE}
+Configuration_ScreenLayout_UNDEFINED           :: Configuration_ScreenLayout{}
+
+Configuration_ColorModeWideColorGamut :: enum u32 {
+	UNDEFINED = 0,
+	NO        = 1,
+	YES       = 2,
+}
+
+Configuration_ColorModeHdr :: enum u32 {
+	UNDEFINED = 0,
+	NO        = 1,
+	YES       = 2,
+}
+
+Configuration_ColorMode :: bit_field i32 {
+	wide_color_gamut: Configuration_ColorModeWideColorGamut | 2,
+	hdr:              Configuration_ColorModeHdr            | 2,
+	_:                u32                                   | 28,
+}
+
+Configuration_ColorMode_HDR_MASK                   :: Configuration_ColorMode{hdr = Configuration_ColorModeHdr(0x3)}
+Configuration_ColorMode_HDR_NO                     :: Configuration_ColorMode{hdr = .NO}
+Configuration_ColorMode_HDR_UNDEFINED              :: Configuration_ColorMode{}
+Configuration_ColorMode_HDR_YES                    :: Configuration_ColorMode{hdr = .YES}
+Configuration_ColorMode_UNDEFINED                  :: Configuration_ColorMode{}
+Configuration_ColorMode_WIDE_COLOR_GAMUT_MASK      :: Configuration_ColorMode{wide_color_gamut = Configuration_ColorModeWideColorGamut(0x3)}
+Configuration_ColorMode_WIDE_COLOR_GAMUT_NO        :: Configuration_ColorMode{wide_color_gamut = .NO}
+Configuration_ColorMode_WIDE_COLOR_GAMUT_UNDEFINED :: Configuration_ColorMode{}
+Configuration_ColorMode_WIDE_COLOR_GAMUT_YES       :: Configuration_ColorMode{wide_color_gamut = .YES}
+
+Configuration_GrammaticalGender :: enum i32 {
+	FEMININE      = 2,
+	MASCULINE     = 3,
+	NEUTRAL       = 1,
+	NOT_SPECIFIED = 0,
+}
+
+Configuration_Orientation :: enum i32 {
+	LANDSCAPE = 2,
+	PORTRAIT  = 1,
+	SQUARE    = 3,
+	UNDEFINED = 0,
 }
 
 // interface android.content.res.FontScaleConverter // API level 35
@@ -1139,16 +1319,16 @@ ObbInfo_set_filename :: proc "contextless" (self: ^ObbInfo, value: ^String) -> (
 	return jni_take(jni_env)
 }
 
-ObbInfo_get_flags :: proc "contextless" (self: ^ObbInfo) -> (result: i32, exception: ^Throwable) {
+ObbInfo_get_flags :: proc "contextless" (self: ^ObbInfo) -> (result: ObbInfo_Flags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ObbInfo__class, "flags", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(ObbInfo_Flags)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-ObbInfo_set_flags :: proc "contextless" (self: ^ObbInfo, value: i32) -> (exception: ^Throwable) {
+ObbInfo_set_flags :: proc "contextless" (self: ^ObbInfo, value: ObbInfo_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ObbInfo__class, "flags", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
@@ -1178,10 +1358,10 @@ ObbInfo_set_version :: proc "contextless" (self: ^ObbInfo, value: i32) -> (excep
 	return jni_take(jni_env)
 }
 
-ObbInfo_describeContents :: proc "contextless" (self: ^ObbInfo) -> (result: i32, exception: ^Throwable) {
+ObbInfo_describeContents :: proc "contextless" (self: ^ObbInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ObbInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ObbInfo_toString :: proc "contextless" (self: ^ObbInfo) -> (result: ^String, exception: ^Throwable) {
@@ -1190,13 +1370,18 @@ ObbInfo_toString :: proc "contextless" (self: ^ObbInfo) -> (result: ^String, exc
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ObbInfo_writeToParcel :: proc "contextless" (self: ^ObbInfo, dest: ^Parcel, parcelableFlags: i32) -> (exception: ^Throwable) {
+ObbInfo_writeToParcel :: proc "contextless" (self: ^ObbInfo, dest: ^Parcel, parcelableFlags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ObbInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = parcelableFlags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)parcelableFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+ObbInfo_Flag :: enum u32 {
+	OVERLAY = 0,
+}
+ObbInfo_Flags :: distinct bit_set[ObbInfo_Flag; u32]
 
 // class android.content.res.ObbScanner
 ObbScanner :: struct #raw_union {
@@ -1728,10 +1913,10 @@ Resources_Theme_applyStyle :: proc "contextless" (self: ^Resources_Theme, resId:
 	return jni_take(jni_env)
 }
 
-Resources_Theme_dump :: proc "contextless" (self: ^Resources_Theme, priority: i32, tag: ^String, prefix: ^String) -> (exception: ^Throwable) {
+Resources_Theme_dump :: proc "contextless" (self: ^Resources_Theme, priority: Log_Loggable, tag: ^String, prefix: ^String) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Resources_Theme__class, "dump", "(ILjava/lang/String;Ljava/lang/String;)V", false) or_return
-	jni_args := [?]android.jvalue{{i = priority}, {l = tag}, {l = prefix}}
+	jni_args := [?]android.jvalue{{i = i32(priority)}, {l = tag}, {l = prefix}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1750,10 +1935,10 @@ Resources_Theme_getAttributeResolutionStack :: proc "contextless" (self: ^Resour
 	return (^IntArray)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Resources_Theme_getChangingConfigurations :: proc "contextless" (self: ^Resources_Theme) -> (result: i32, exception: ^Throwable) {
+Resources_Theme_getChangingConfigurations :: proc "contextless" (self: ^Resources_Theme) -> (result: ActivityInfo_ConfigFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Resources_Theme__class, "getChangingConfigurations", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(ActivityInfo_ConfigFlags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Resources_Theme_getDrawable :: proc "contextless" (self: ^Resources_Theme, id: i32) -> (result: ^Drawable, exception: ^Throwable) {
@@ -1860,10 +2045,10 @@ TypedArray_getBoolean :: proc "contextless" (self: ^TypedArray, index: i32, defV
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-TypedArray_getChangingConfigurations :: proc "contextless" (self: ^TypedArray) -> (result: i32, exception: ^Throwable) {
+TypedArray_getChangingConfigurations :: proc "contextless" (self: ^TypedArray) -> (result: ActivityInfo_ConfigFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TypedArray__class, "getChangingConfigurations", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(ActivityInfo_ConfigFlags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 TypedArray_getColor :: proc "contextless" (self: ^TypedArray, index: i32, defValue: i32) -> (result: i32, exception: ^Throwable) {
@@ -2029,11 +2214,11 @@ TypedArray_getTextArray :: proc "contextless" (self: ^TypedArray, index: i32) ->
 	return (^Array(CharSequence))(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-TypedArray_getType :: proc "contextless" (self: ^TypedArray, index: i32) -> (result: i32, exception: ^Throwable) {
+TypedArray_getType :: proc "contextless" (self: ^TypedArray, index: i32) -> (result: TypedValue_Type, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TypedArray__class, "getType", "(I)I", false) or_return
 	jni_args := [?]android.jvalue{{i = index}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return TypedValue_Type(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 TypedArray_getValue :: proc "contextless" (self: ^TypedArray, index: i32, outValue: ^TypedValue) -> (result: bool, exception: ^Throwable) {

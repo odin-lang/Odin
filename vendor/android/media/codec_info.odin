@@ -23,25 +23,25 @@ ADoubleRange :: struct {
 	mUpper: f64,
 }
 
-AMediaCodecKind :: i32
+AMediaCodecKind :: enum i32 {
+	INVALID = 0,
+	DECODER = 1,
+	ENCODER = 2,
+}
 
-AMediaCodecKind_INVALID :: 0
-AMediaCodecKind_DECODER :: 1
-AMediaCodecKind_ENCODER :: 2
+AMediaCodecType :: enum i32 {
+	INVALID_CODEC_INFO          = 0,
+	SOFTWARE_ONLY               = 1,
+	HARDWARE_ACCELERATED        = 2,
+	SOFTWARE_WITH_DEVICE_ACCESS = 3,
+}
 
-AMediaCodecType :: i32
-
-AMediaCodecType_INVALID_CODEC_INFO          :: 0
-AMediaCodecType_SOFTWARE_ONLY               :: 1
-AMediaCodecType_HARDWARE_ACCELERATED        :: 2
-AMediaCodecType_SOFTWARE_WITH_DEVICE_ACCESS :: 3
-
-ABitrateMode :: i32
-
-ABITRATE_MODE_CQ     :: 0
-ABITRATE_MODE_VBR    :: 1
-ABITRATE_MODE_CBR    :: 2
-ABITRATE_MODE_CBR_FD :: 3
+ABitrateMode :: enum i32 {
+	CQ     = 0,
+	VBR    = 1,
+	CBR    = 2,
+	CBR_FD = 3,
+}
 
 @(default_calling_convention="c")
 foreign libmediandk {

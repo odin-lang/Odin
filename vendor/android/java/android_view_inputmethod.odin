@@ -26,10 +26,10 @@ BaseInputConnection_beginBatchEdit :: proc "contextless" (self: ^BaseInputConnec
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-BaseInputConnection_clearMetaKeyStates :: proc "contextless" (self: ^BaseInputConnection, states: i32) -> (result: bool, exception: ^Throwable) {
+BaseInputConnection_clearMetaKeyStates :: proc "contextless" (self: ^BaseInputConnection, states: KeyEvent_MetaState) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &BaseInputConnection__class, "clearMetaKeyStates", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = states}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)states}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -47,10 +47,10 @@ BaseInputConnection_commitCompletion :: proc "contextless" (self: ^BaseInputConn
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-BaseInputConnection_commitContent :: proc "contextless" (self: ^BaseInputConnection, inputContentInfo: ^InputContentInfo, flags: i32, opts: ^Bundle) -> (result: bool, exception: ^Throwable) {
+BaseInputConnection_commitContent :: proc "contextless" (self: ^BaseInputConnection, inputContentInfo: ^InputContentInfo, flags: InputConnection_InputContentFlags, opts: ^Bundle) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &BaseInputConnection__class, "commitContent", "(Landroid/view/inputmethod/InputContentInfo;ILandroid/os/Bundle;)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = inputContentInfo}, {i = flags}, {l = opts}}
+	jni_args := [?]android.jvalue{{l = inputContentInfo}, {i = transmute(i32)flags}, {l = opts}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -108,11 +108,11 @@ BaseInputConnection_getComposingSpanStart :: proc "contextless" (text: ^Spannabl
 	return jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-BaseInputConnection_getCursorCapsMode :: proc "contextless" (self: ^BaseInputConnection, reqModes: i32) -> (result: i32, exception: ^Throwable) {
+BaseInputConnection_getCursorCapsMode :: proc "contextless" (self: ^BaseInputConnection, reqModes: TextUtils_CapMode) -> (result: TextUtils_CapMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &BaseInputConnection__class, "getCursorCapsMode", "(I)I", false) or_return
-	jni_args := [?]android.jvalue{{i = reqModes}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{i = transmute(i32)reqModes}}
+	return transmute(TextUtils_CapMode)(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 BaseInputConnection_getEditable :: proc "contextless" (self: ^BaseInputConnection) -> (result: ^Editable, exception: ^Throwable) {
@@ -121,10 +121,10 @@ BaseInputConnection_getEditable :: proc "contextless" (self: ^BaseInputConnectio
 	return (^Editable)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-BaseInputConnection_getExtractedText :: proc "contextless" (self: ^BaseInputConnection, request: ^ExtractedTextRequest, flags: i32) -> (result: ^ExtractedText, exception: ^Throwable) {
+BaseInputConnection_getExtractedText :: proc "contextless" (self: ^BaseInputConnection, request: ^ExtractedTextRequest, flags: InputConnection_GetExtractedTextFlags) -> (result: ^ExtractedText, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &BaseInputConnection__class, "getExtractedText", "(Landroid/view/inputmethod/ExtractedTextRequest;I)Landroid/view/inputmethod/ExtractedText;", false) or_return
-	jni_args := [?]android.jvalue{{l = request}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = request}, {i = transmute(i32)flags}}
 	return (^ExtractedText)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -134,31 +134,31 @@ BaseInputConnection_getHandler :: proc "contextless" (self: ^BaseInputConnection
 	return (^Handler)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-BaseInputConnection_getSelectedText :: proc "contextless" (self: ^BaseInputConnection, flags: i32) -> (result: ^CharSequence, exception: ^Throwable) {
+BaseInputConnection_getSelectedText :: proc "contextless" (self: ^BaseInputConnection, flags: InputConnection_SurroundingTextFlags) -> (result: ^CharSequence, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &BaseInputConnection__class, "getSelectedText", "(I)Ljava/lang/CharSequence;", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	return (^CharSequence)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-BaseInputConnection_getSurroundingText :: proc "contextless" (self: ^BaseInputConnection, beforeLength: i32, afterLength: i32, flags: i32) -> (result: ^SurroundingText, exception: ^Throwable) {
+BaseInputConnection_getSurroundingText :: proc "contextless" (self: ^BaseInputConnection, beforeLength: i32, afterLength: i32, flags: InputConnection_SurroundingTextFlags) -> (result: ^SurroundingText, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &BaseInputConnection__class, "getSurroundingText", "(III)Landroid/view/inputmethod/SurroundingText;", false) or_return
-	jni_args := [?]android.jvalue{{i = beforeLength}, {i = afterLength}, {i = flags}}
+	jni_args := [?]android.jvalue{{i = beforeLength}, {i = afterLength}, {i = transmute(i32)flags}}
 	return (^SurroundingText)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-BaseInputConnection_getTextAfterCursor :: proc "contextless" (self: ^BaseInputConnection, length: i32, flags: i32) -> (result: ^CharSequence, exception: ^Throwable) {
+BaseInputConnection_getTextAfterCursor :: proc "contextless" (self: ^BaseInputConnection, length: i32, flags: InputConnection_SurroundingTextFlags) -> (result: ^CharSequence, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &BaseInputConnection__class, "getTextAfterCursor", "(II)Ljava/lang/CharSequence;", false) or_return
-	jni_args := [?]android.jvalue{{i = length}, {i = flags}}
+	jni_args := [?]android.jvalue{{i = length}, {i = transmute(i32)flags}}
 	return (^CharSequence)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-BaseInputConnection_getTextBeforeCursor :: proc "contextless" (self: ^BaseInputConnection, length: i32, flags: i32) -> (result: ^CharSequence, exception: ^Throwable) {
+BaseInputConnection_getTextBeforeCursor :: proc "contextless" (self: ^BaseInputConnection, length: i32, flags: InputConnection_SurroundingTextFlags) -> (result: ^CharSequence, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &BaseInputConnection__class, "getTextBeforeCursor", "(II)Ljava/lang/CharSequence;", false) or_return
-	jni_args := [?]android.jvalue{{i = length}, {i = flags}}
+	jni_args := [?]android.jvalue{{i = length}, {i = transmute(i32)flags}}
 	return (^CharSequence)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -205,10 +205,10 @@ BaseInputConnection_reportFullscreenMode :: proc "contextless" (self: ^BaseInput
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-BaseInputConnection_requestCursorUpdates :: proc "contextless" (self: ^BaseInputConnection, cursorUpdateMode: i32) -> (result: bool, exception: ^Throwable) {
+BaseInputConnection_requestCursorUpdates :: proc "contextless" (self: ^BaseInputConnection, cursorUpdateMode: InputConnection_CursorUpdateFlags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &BaseInputConnection__class, "requestCursorUpdates", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = cursorUpdateMode}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)cursorUpdateMode}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -288,10 +288,10 @@ CompletionInfo_new :: proc{
 	CompletionInfo_new_long_int_CharSequence_CharSequence,
 }
 
-CompletionInfo_describeContents :: proc "contextless" (self: ^CompletionInfo) -> (result: i32, exception: ^Throwable) {
+CompletionInfo_describeContents :: proc "contextless" (self: ^CompletionInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &CompletionInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 CompletionInfo_getId :: proc "contextless" (self: ^CompletionInfo) -> (result: i64, exception: ^Throwable) {
@@ -324,10 +324,10 @@ CompletionInfo_toString :: proc "contextless" (self: ^CompletionInfo) -> (result
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-CompletionInfo_writeToParcel :: proc "contextless" (self: ^CompletionInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+CompletionInfo_writeToParcel :: proc "contextless" (self: ^CompletionInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &CompletionInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -344,10 +344,10 @@ ConnectionlessHandwritingCallback_CONNECTIONLESS_HANDWRITING_ERROR_NO_TEXT_RECOG
 ConnectionlessHandwritingCallback_CONNECTIONLESS_HANDWRITING_ERROR_OTHER              :: 2
 ConnectionlessHandwritingCallback_CONNECTIONLESS_HANDWRITING_ERROR_UNSUPPORTED        :: 1
 
-ConnectionlessHandwritingCallback_onError :: proc "contextless" (self: ^ConnectionlessHandwritingCallback, errorCode: i32) -> (exception: ^Throwable) {
+ConnectionlessHandwritingCallback_onError :: proc "contextless" (self: ^ConnectionlessHandwritingCallback, errorCode: ConnectionlessHandwritingCallback_ConnectionlessHandwritingError) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ConnectionlessHandwritingCallback__class, "onError", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = errorCode}}
+	jni_args := [?]android.jvalue{{i = i32(errorCode)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -358,6 +358,12 @@ ConnectionlessHandwritingCallback_onResult :: proc "contextless" (self: ^Connect
 	jni_args := [?]android.jvalue{{l = text}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+ConnectionlessHandwritingCallback_ConnectionlessHandwritingError :: enum i32 {
+	NO_TEXT_RECOGNIZED = 0,
+	OTHER              = 2,
+	UNSUPPORTED        = 1,
 }
 
 // class android.view.inputmethod.CorrectionInfo
@@ -382,10 +388,10 @@ CorrectionInfo_new :: proc "contextless" (offset: i32, oldText: ^CharSequence, n
 	return (^CorrectionInfo)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-CorrectionInfo_describeContents :: proc "contextless" (self: ^CorrectionInfo) -> (result: i32, exception: ^Throwable) {
+CorrectionInfo_describeContents :: proc "contextless" (self: ^CorrectionInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &CorrectionInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 CorrectionInfo_getNewText :: proc "contextless" (self: ^CorrectionInfo) -> (result: ^CharSequence, exception: ^Throwable) {
@@ -412,10 +418,10 @@ CorrectionInfo_toString :: proc "contextless" (self: ^CorrectionInfo) -> (result
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-CorrectionInfo_writeToParcel :: proc "contextless" (self: ^CorrectionInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+CorrectionInfo_writeToParcel :: proc "contextless" (self: ^CorrectionInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &CorrectionInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -446,10 +452,10 @@ CursorAnchorInfo_new :: proc "contextless" (source: ^Parcel) -> (result: ^Cursor
 	return (^CursorAnchorInfo)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-CursorAnchorInfo_describeContents :: proc "contextless" (self: ^CursorAnchorInfo) -> (result: i32, exception: ^Throwable) {
+CursorAnchorInfo_describeContents :: proc "contextless" (self: ^CursorAnchorInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &CursorAnchorInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 CursorAnchorInfo_equals :: proc "contextless" (self: ^CursorAnchorInfo, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -466,11 +472,11 @@ CursorAnchorInfo_getCharacterBounds :: proc "contextless" (self: ^CursorAnchorIn
 	return (^RectF)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-CursorAnchorInfo_getCharacterBoundsFlags :: proc "contextless" (self: ^CursorAnchorInfo, index: i32) -> (result: i32, exception: ^Throwable) {
+CursorAnchorInfo_getCharacterBoundsFlags :: proc "contextless" (self: ^CursorAnchorInfo, index: i32) -> (result: CursorAnchorInfo_Flags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &CursorAnchorInfo__class, "getCharacterBoundsFlags", "(I)I", false) or_return
 	jni_args := [?]android.jvalue{{i = index}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return transmute(CursorAnchorInfo_Flags)(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 CursorAnchorInfo_getComposingText :: proc "contextless" (self: ^CursorAnchorInfo) -> (result: ^CharSequence, exception: ^Throwable) {
@@ -503,10 +509,10 @@ CursorAnchorInfo_getInsertionMarkerBottom :: proc "contextless" (self: ^CursorAn
 	return jni_env->CallFloatMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-CursorAnchorInfo_getInsertionMarkerFlags :: proc "contextless" (self: ^CursorAnchorInfo) -> (result: i32, exception: ^Throwable) {
+CursorAnchorInfo_getInsertionMarkerFlags :: proc "contextless" (self: ^CursorAnchorInfo) -> (result: CursorAnchorInfo_Flags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &CursorAnchorInfo__class, "getInsertionMarkerFlags", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(CursorAnchorInfo_Flags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 CursorAnchorInfo_getInsertionMarkerHorizontal :: proc "contextless" (self: ^CursorAnchorInfo) -> (result: f32, exception: ^Throwable) {
@@ -563,13 +569,20 @@ CursorAnchorInfo_toString :: proc "contextless" (self: ^CursorAnchorInfo) -> (re
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-CursorAnchorInfo_writeToParcel :: proc "contextless" (self: ^CursorAnchorInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+CursorAnchorInfo_writeToParcel :: proc "contextless" (self: ^CursorAnchorInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &CursorAnchorInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+CursorAnchorInfo_Flag :: enum u32 {
+	HAS_INVISIBLE_REGION = 1,
+	HAS_VISIBLE_REGION   = 0,
+	IS_RTL               = 2,
+}
+CursorAnchorInfo_Flags :: distinct bit_set[CursorAnchorInfo_Flag; u32]
 
 // class android.view.inputmethod.CursorAnchorInfo.Builder
 CursorAnchorInfo_Builder :: struct #raw_union {
@@ -585,10 +598,10 @@ CursorAnchorInfo_Builder_new :: proc "contextless" () -> (result: ^CursorAnchorI
 	return (^CursorAnchorInfo_Builder)(jni_env->NewObjectA(jni_class, jni_id, nil)), jni_take(jni_env)
 }
 
-CursorAnchorInfo_Builder_addCharacterBounds :: proc "contextless" (self: ^CursorAnchorInfo_Builder, index: i32, left: f32, top: f32, right: f32, bottom: f32, flags: i32) -> (result: ^CursorAnchorInfo_Builder, exception: ^Throwable) {
+CursorAnchorInfo_Builder_addCharacterBounds :: proc "contextless" (self: ^CursorAnchorInfo_Builder, index: i32, left: f32, top: f32, right: f32, bottom: f32, flags: CursorAnchorInfo_Flags) -> (result: ^CursorAnchorInfo_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &CursorAnchorInfo_Builder__class, "addCharacterBounds", "(IFFFFI)Landroid/view/inputmethod/CursorAnchorInfo$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = index}, {f = left}, {f = top}, {f = right}, {f = bottom}, {i = flags}}
+	jni_args := [?]android.jvalue{{i = index}, {f = left}, {f = top}, {f = right}, {f = bottom}, {i = transmute(i32)flags}}
 	return (^CursorAnchorInfo_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -632,10 +645,10 @@ CursorAnchorInfo_Builder_setEditorBoundsInfo :: proc "contextless" (self: ^Curso
 	return (^CursorAnchorInfo_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-CursorAnchorInfo_Builder_setInsertionMarkerLocation :: proc "contextless" (self: ^CursorAnchorInfo_Builder, horizontalPosition: f32, lineTop: f32, lineBaseline: f32, lineBottom: f32, flags: i32) -> (result: ^CursorAnchorInfo_Builder, exception: ^Throwable) {
+CursorAnchorInfo_Builder_setInsertionMarkerLocation :: proc "contextless" (self: ^CursorAnchorInfo_Builder, horizontalPosition: f32, lineTop: f32, lineBaseline: f32, lineBottom: f32, flags: CursorAnchorInfo_Flags) -> (result: ^CursorAnchorInfo_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &CursorAnchorInfo_Builder__class, "setInsertionMarkerLocation", "(FFFFI)Landroid/view/inputmethod/CursorAnchorInfo$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{f = horizontalPosition}, {f = lineTop}, {f = lineBaseline}, {f = lineBottom}, {i = flags}}
+	jni_args := [?]android.jvalue{{f = horizontalPosition}, {f = lineTop}, {f = lineBaseline}, {f = lineBottom}, {i = transmute(i32)flags}}
 	return (^CursorAnchorInfo_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -675,10 +688,10 @@ DeleteGesture_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creat
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-DeleteGesture_describeContents :: proc "contextless" (self: ^DeleteGesture) -> (result: i32, exception: ^Throwable) {
+DeleteGesture_describeContents :: proc "contextless" (self: ^DeleteGesture) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DeleteGesture__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 DeleteGesture_equals :: proc "contextless" (self: ^DeleteGesture, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -694,10 +707,10 @@ DeleteGesture_getDeletionArea :: proc "contextless" (self: ^DeleteGesture) -> (r
 	return (^RectF)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-DeleteGesture_getGranularity :: proc "contextless" (self: ^DeleteGesture) -> (result: i32, exception: ^Throwable) {
+DeleteGesture_getGranularity :: proc "contextless" (self: ^DeleteGesture) -> (result: HandwritingGesture_Granularity, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DeleteGesture__class, "getGranularity", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return HandwritingGesture_Granularity(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 DeleteGesture_hashCode :: proc "contextless" (self: ^DeleteGesture) -> (result: i32, exception: ^Throwable) {
@@ -706,10 +719,10 @@ DeleteGesture_hashCode :: proc "contextless" (self: ^DeleteGesture) -> (result: 
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-DeleteGesture_writeToParcel :: proc "contextless" (self: ^DeleteGesture, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+DeleteGesture_writeToParcel :: proc "contextless" (self: ^DeleteGesture, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DeleteGesture__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -748,10 +761,10 @@ DeleteGesture_Builder_setFallbackText :: proc "contextless" (self: ^DeleteGestur
 	return (^DeleteGesture_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-DeleteGesture_Builder_setGranularity :: proc "contextless" (self: ^DeleteGesture_Builder, granularity: i32) -> (result: ^DeleteGesture_Builder, exception: ^Throwable) {
+DeleteGesture_Builder_setGranularity :: proc "contextless" (self: ^DeleteGesture_Builder, granularity: HandwritingGesture_Granularity) -> (result: ^DeleteGesture_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DeleteGesture_Builder__class, "setGranularity", "(I)Landroid/view/inputmethod/DeleteGesture$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = granularity}}
+	jni_args := [?]android.jvalue{{i = i32(granularity)}}
 	return (^DeleteGesture_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -770,10 +783,10 @@ DeleteRangeGesture_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-DeleteRangeGesture_describeContents :: proc "contextless" (self: ^DeleteRangeGesture) -> (result: i32, exception: ^Throwable) {
+DeleteRangeGesture_describeContents :: proc "contextless" (self: ^DeleteRangeGesture) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DeleteRangeGesture__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 DeleteRangeGesture_equals :: proc "contextless" (self: ^DeleteRangeGesture, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -795,10 +808,10 @@ DeleteRangeGesture_getDeletionStartArea :: proc "contextless" (self: ^DeleteRang
 	return (^RectF)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-DeleteRangeGesture_getGranularity :: proc "contextless" (self: ^DeleteRangeGesture) -> (result: i32, exception: ^Throwable) {
+DeleteRangeGesture_getGranularity :: proc "contextless" (self: ^DeleteRangeGesture) -> (result: HandwritingGesture_Granularity, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DeleteRangeGesture__class, "getGranularity", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return HandwritingGesture_Granularity(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 DeleteRangeGesture_hashCode :: proc "contextless" (self: ^DeleteRangeGesture) -> (result: i32, exception: ^Throwable) {
@@ -807,10 +820,10 @@ DeleteRangeGesture_hashCode :: proc "contextless" (self: ^DeleteRangeGesture) ->
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-DeleteRangeGesture_writeToParcel :: proc "contextless" (self: ^DeleteRangeGesture, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+DeleteRangeGesture_writeToParcel :: proc "contextless" (self: ^DeleteRangeGesture, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DeleteRangeGesture__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -856,10 +869,10 @@ DeleteRangeGesture_Builder_setFallbackText :: proc "contextless" (self: ^DeleteR
 	return (^DeleteRangeGesture_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-DeleteRangeGesture_Builder_setGranularity :: proc "contextless" (self: ^DeleteRangeGesture_Builder, granularity: i32) -> (result: ^DeleteRangeGesture_Builder, exception: ^Throwable) {
+DeleteRangeGesture_Builder_setGranularity :: proc "contextless" (self: ^DeleteRangeGesture_Builder, granularity: HandwritingGesture_Granularity) -> (result: ^DeleteRangeGesture_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DeleteRangeGesture_Builder__class, "setGranularity", "(I)Landroid/view/inputmethod/DeleteRangeGesture$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = granularity}}
+	jni_args := [?]android.jvalue{{i = i32(granularity)}}
 	return (^DeleteRangeGesture_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -878,10 +891,10 @@ EditorBoundsInfo_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Cr
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-EditorBoundsInfo_describeContents :: proc "contextless" (self: ^EditorBoundsInfo) -> (result: i32, exception: ^Throwable) {
+EditorBoundsInfo_describeContents :: proc "contextless" (self: ^EditorBoundsInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &EditorBoundsInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 EditorBoundsInfo_equals :: proc "contextless" (self: ^EditorBoundsInfo, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -915,10 +928,10 @@ EditorBoundsInfo_toString :: proc "contextless" (self: ^EditorBoundsInfo) -> (re
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-EditorBoundsInfo_writeToParcel :: proc "contextless" (self: ^EditorBoundsInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+EditorBoundsInfo_writeToParcel :: proc "contextless" (self: ^EditorBoundsInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &EditorBoundsInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1096,29 +1109,29 @@ EditorInfo_set_hintText :: proc "contextless" (self: ^EditorInfo, value: ^CharSe
 	return jni_take(jni_env)
 }
 
-EditorInfo_get_imeOptions :: proc "contextless" (self: ^EditorInfo) -> (result: i32, exception: ^Throwable) {
+EditorInfo_get_imeOptions :: proc "contextless" (self: ^EditorInfo) -> (result: EditorInfo_ImeOptions, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &EditorInfo__class, "imeOptions", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(EditorInfo_ImeOptions)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-EditorInfo_set_imeOptions :: proc "contextless" (self: ^EditorInfo, value: i32) -> (exception: ^Throwable) {
+EditorInfo_set_imeOptions :: proc "contextless" (self: ^EditorInfo, value: EditorInfo_ImeOptions) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &EditorInfo__class, "imeOptions", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
-EditorInfo_get_initialCapsMode :: proc "contextless" (self: ^EditorInfo) -> (result: i32, exception: ^Throwable) {
+EditorInfo_get_initialCapsMode :: proc "contextless" (self: ^EditorInfo) -> (result: TextUtils_CapMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &EditorInfo__class, "initialCapsMode", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(TextUtils_CapMode)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-EditorInfo_set_initialCapsMode :: proc "contextless" (self: ^EditorInfo, value: i32) -> (exception: ^Throwable) {
+EditorInfo_set_initialCapsMode :: proc "contextless" (self: ^EditorInfo, value: TextUtils_CapMode) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &EditorInfo__class, "initialCapsMode", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
@@ -1206,10 +1219,10 @@ EditorInfo_new :: proc "contextless" () -> (result: ^EditorInfo, exception: ^Thr
 	return (^EditorInfo)(jni_env->NewObjectA(jni_class, jni_id, nil)), jni_take(jni_env)
 }
 
-EditorInfo_describeContents :: proc "contextless" (self: ^EditorInfo) -> (result: i32, exception: ^Throwable) {
+EditorInfo_describeContents :: proc "contextless" (self: ^EditorInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &EditorInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 EditorInfo_dump :: proc "contextless" (self: ^EditorInfo, pw: ^Printer, prefix: ^String) -> (exception: ^Throwable) {
@@ -1226,38 +1239,38 @@ EditorInfo_getAutofillId :: proc "contextless" (self: ^EditorInfo) -> (result: ^
 	return (^AutofillId)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-EditorInfo_getInitialSelectedText :: proc "contextless" (self: ^EditorInfo, flags: i32) -> (result: ^CharSequence, exception: ^Throwable) { // API level 30
+EditorInfo_getInitialSelectedText :: proc "contextless" (self: ^EditorInfo, flags: InputConnection_SurroundingTextFlags) -> (result: ^CharSequence, exception: ^Throwable) { // API level 30
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &EditorInfo__class, "getInitialSelectedText", "(I)Ljava/lang/CharSequence;", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	return (^CharSequence)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-EditorInfo_getInitialSurroundingText :: proc "contextless" (self: ^EditorInfo, beforeLength: i32, afterLength: i32, flags: i32) -> (result: ^SurroundingText, exception: ^Throwable) { // API level 31
+EditorInfo_getInitialSurroundingText :: proc "contextless" (self: ^EditorInfo, beforeLength: i32, afterLength: i32, flags: InputConnection_SurroundingTextFlags) -> (result: ^SurroundingText, exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &EditorInfo__class, "getInitialSurroundingText", "(III)Landroid/view/inputmethod/SurroundingText;", false) or_return
-	jni_args := [?]android.jvalue{{i = beforeLength}, {i = afterLength}, {i = flags}}
+	jni_args := [?]android.jvalue{{i = beforeLength}, {i = afterLength}, {i = transmute(i32)flags}}
 	return (^SurroundingText)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-EditorInfo_getInitialTextAfterCursor :: proc "contextless" (self: ^EditorInfo, length: i32, flags: i32) -> (result: ^CharSequence, exception: ^Throwable) { // API level 30
+EditorInfo_getInitialTextAfterCursor :: proc "contextless" (self: ^EditorInfo, length: i32, flags: InputConnection_SurroundingTextFlags) -> (result: ^CharSequence, exception: ^Throwable) { // API level 30
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &EditorInfo__class, "getInitialTextAfterCursor", "(II)Ljava/lang/CharSequence;", false) or_return
-	jni_args := [?]android.jvalue{{i = length}, {i = flags}}
+	jni_args := [?]android.jvalue{{i = length}, {i = transmute(i32)flags}}
 	return (^CharSequence)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-EditorInfo_getInitialTextBeforeCursor :: proc "contextless" (self: ^EditorInfo, length: i32, flags: i32) -> (result: ^CharSequence, exception: ^Throwable) { // API level 30
+EditorInfo_getInitialTextBeforeCursor :: proc "contextless" (self: ^EditorInfo, length: i32, flags: InputConnection_SurroundingTextFlags) -> (result: ^CharSequence, exception: ^Throwable) { // API level 30
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &EditorInfo__class, "getInitialTextBeforeCursor", "(II)Ljava/lang/CharSequence;", false) or_return
-	jni_args := [?]android.jvalue{{i = length}, {i = flags}}
+	jni_args := [?]android.jvalue{{i = length}, {i = transmute(i32)flags}}
 	return (^CharSequence)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-EditorInfo_getInitialToolType :: proc "contextless" (self: ^EditorInfo) -> (result: i32, exception: ^Throwable) { // API level 34
+EditorInfo_getInitialToolType :: proc "contextless" (self: ^EditorInfo) -> (result: MotionEvent_ToolType, exception: ^Throwable) { // API level 34
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &EditorInfo__class, "getInitialToolType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return MotionEvent_ToolType(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 EditorInfo_getSupportedHandwritingGesturePreviews :: proc "contextless" (self: ^EditorInfo) -> (result: ^Set, exception: ^Throwable) { // API level 34
@@ -1316,10 +1329,10 @@ EditorInfo_setInitialSurroundingText :: proc "contextless" (self: ^EditorInfo, s
 	return jni_take(jni_env)
 }
 
-EditorInfo_setInitialToolType :: proc "contextless" (self: ^EditorInfo, toolType: i32) -> (exception: ^Throwable) { // API level 34
+EditorInfo_setInitialToolType :: proc "contextless" (self: ^EditorInfo, toolType: MotionEvent_ToolType) -> (exception: ^Throwable) { // API level 34
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &EditorInfo__class, "setInitialToolType", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = toolType}}
+	jni_args := [?]android.jvalue{{i = i32(toolType)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1356,13 +1369,56 @@ EditorInfo_setWritingToolsEnabled :: proc "contextless" (self: ^EditorInfo, enab
 	return jni_take(jni_env)
 }
 
-EditorInfo_writeToParcel :: proc "contextless" (self: ^EditorInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+EditorInfo_writeToParcel :: proc "contextless" (self: ^EditorInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &EditorInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+EditorInfo_ImeAction :: enum u32 {
+	UNSPECIFIED = 0,
+	NONE        = 1,
+	GO          = 2,
+	SEARCH      = 3,
+	SEND        = 4,
+	NEXT        = 5,
+	DONE        = 6,
+	PREVIOUS    = 7,
+}
+
+EditorInfo_ImeOptions :: bit_field i32 {
+	action:                   EditorInfo_ImeAction | 8,
+	_:                        u16                  | 16,
+	no_personalized_learning: bool                 | 1,
+	no_fullscreen:            bool                 | 1,
+	navigate_previous:        bool                 | 1,
+	navigate_next:            bool                 | 1,
+	no_extract_ui:            bool                 | 1,
+	no_accessory_action:      bool                 | 1,
+	no_enter_action:          bool                 | 1,
+	force_ascii:              bool                 | 1,
+}
+
+EditorInfo_ImeOptions_ACTION_DONE                   :: EditorInfo_ImeOptions{action = .DONE}
+EditorInfo_ImeOptions_ACTION_GO                     :: EditorInfo_ImeOptions{action = .GO}
+EditorInfo_ImeOptions_ACTION_NEXT                   :: EditorInfo_ImeOptions{action = .NEXT}
+EditorInfo_ImeOptions_ACTION_NONE                   :: EditorInfo_ImeOptions{action = .NONE}
+EditorInfo_ImeOptions_ACTION_PREVIOUS               :: EditorInfo_ImeOptions{action = .PREVIOUS}
+EditorInfo_ImeOptions_ACTION_SEARCH                 :: EditorInfo_ImeOptions{action = .SEARCH}
+EditorInfo_ImeOptions_ACTION_SEND                   :: EditorInfo_ImeOptions{action = .SEND}
+EditorInfo_ImeOptions_ACTION_UNSPECIFIED            :: EditorInfo_ImeOptions{}
+EditorInfo_ImeOptions_FLAG_FORCE_ASCII              :: EditorInfo_ImeOptions{force_ascii = true}
+EditorInfo_ImeOptions_FLAG_NAVIGATE_NEXT            :: EditorInfo_ImeOptions{navigate_next = true}
+EditorInfo_ImeOptions_FLAG_NAVIGATE_PREVIOUS        :: EditorInfo_ImeOptions{navigate_previous = true}
+EditorInfo_ImeOptions_FLAG_NO_ACCESSORY_ACTION      :: EditorInfo_ImeOptions{no_accessory_action = true}
+EditorInfo_ImeOptions_FLAG_NO_ENTER_ACTION          :: EditorInfo_ImeOptions{no_enter_action = true}
+EditorInfo_ImeOptions_FLAG_NO_EXTRACT_UI            :: EditorInfo_ImeOptions{no_extract_ui = true}
+EditorInfo_ImeOptions_FLAG_NO_FULLSCREEN            :: EditorInfo_ImeOptions{no_fullscreen = true}
+EditorInfo_ImeOptions_FLAG_NO_PERSONALIZED_LEARNING :: EditorInfo_ImeOptions{no_personalized_learning = true}
+EditorInfo_ImeOptions_MASK_ACTION                   :: EditorInfo_ImeOptions{action = EditorInfo_ImeAction(0xff)}
+EditorInfo_ImeOptions_NULL                          :: EditorInfo_ImeOptions{}
 
 // class android.view.inputmethod.ExtractedText
 ExtractedText :: struct #raw_union {
@@ -1382,16 +1438,16 @@ ExtractedText_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creat
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-ExtractedText_get_flags :: proc "contextless" (self: ^ExtractedText) -> (result: i32, exception: ^Throwable) {
+ExtractedText_get_flags :: proc "contextless" (self: ^ExtractedText) -> (result: ExtractedText_Flags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ExtractedText__class, "flags", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(ExtractedText_Flags)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-ExtractedText_set_flags :: proc "contextless" (self: ^ExtractedText, value: i32) -> (exception: ^Throwable) {
+ExtractedText_set_flags :: proc "contextless" (self: ^ExtractedText, value: ExtractedText_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ExtractedText__class, "flags", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
@@ -1492,19 +1548,25 @@ ExtractedText_new :: proc "contextless" () -> (result: ^ExtractedText, exception
 	return (^ExtractedText)(jni_env->NewObjectA(jni_class, jni_id, nil)), jni_take(jni_env)
 }
 
-ExtractedText_describeContents :: proc "contextless" (self: ^ExtractedText) -> (result: i32, exception: ^Throwable) {
+ExtractedText_describeContents :: proc "contextless" (self: ^ExtractedText) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ExtractedText__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ExtractedText_writeToParcel :: proc "contextless" (self: ^ExtractedText, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+ExtractedText_writeToParcel :: proc "contextless" (self: ^ExtractedText, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ExtractedText__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+ExtractedText_Flag :: enum u32 {
+	SELECTING   = 1,
+	SINGLE_LINE = 0,
+}
+ExtractedText_Flags :: distinct bit_set[ExtractedText_Flag; u32]
 
 // class android.view.inputmethod.ExtractedTextRequest
 ExtractedTextRequest :: struct #raw_union {
@@ -1521,16 +1583,16 @@ ExtractedTextRequest_get_CREATOR :: proc "contextless" () -> (result: ^Parcelabl
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-ExtractedTextRequest_get_flags :: proc "contextless" (self: ^ExtractedTextRequest) -> (result: i32, exception: ^Throwable) {
+ExtractedTextRequest_get_flags :: proc "contextless" (self: ^ExtractedTextRequest) -> (result: InputConnection_SurroundingTextFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ExtractedTextRequest__class, "flags", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(InputConnection_SurroundingTextFlags)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-ExtractedTextRequest_set_flags :: proc "contextless" (self: ^ExtractedTextRequest, value: i32) -> (exception: ^Throwable) {
+ExtractedTextRequest_set_flags :: proc "contextless" (self: ^ExtractedTextRequest, value: InputConnection_SurroundingTextFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &ExtractedTextRequest__class, "flags", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
@@ -1579,16 +1641,16 @@ ExtractedTextRequest_new :: proc "contextless" () -> (result: ^ExtractedTextRequ
 	return (^ExtractedTextRequest)(jni_env->NewObjectA(jni_class, jni_id, nil)), jni_take(jni_env)
 }
 
-ExtractedTextRequest_describeContents :: proc "contextless" (self: ^ExtractedTextRequest) -> (result: i32, exception: ^Throwable) {
+ExtractedTextRequest_describeContents :: proc "contextless" (self: ^ExtractedTextRequest) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ExtractedTextRequest__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ExtractedTextRequest_writeToParcel :: proc "contextless" (self: ^ExtractedTextRequest, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+ExtractedTextRequest_writeToParcel :: proc "contextless" (self: ^ExtractedTextRequest, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ExtractedTextRequest__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1610,6 +1672,11 @@ HandwritingGesture_getFallbackText :: proc "contextless" (self: ^HandwritingGest
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
+HandwritingGesture_Granularity :: enum i32 {
+	CHARACTER = 2,
+	WORD      = 1,
+}
+
 // class android.view.inputmethod.InlineSuggestion // API level 30
 InlineSuggestion :: struct #raw_union {
 	using Object: Object,
@@ -1625,10 +1692,10 @@ InlineSuggestion_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Cr
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-InlineSuggestion_describeContents :: proc "contextless" (self: ^InlineSuggestion) -> (result: i32, exception: ^Throwable) {
+InlineSuggestion_describeContents :: proc "contextless" (self: ^InlineSuggestion) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InlineSuggestion__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 InlineSuggestion_equals :: proc "contextless" (self: ^InlineSuggestion, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -1664,10 +1731,10 @@ InlineSuggestion_toString :: proc "contextless" (self: ^InlineSuggestion) -> (re
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-InlineSuggestion_writeToParcel :: proc "contextless" (self: ^InlineSuggestion, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+InlineSuggestion_writeToParcel :: proc "contextless" (self: ^InlineSuggestion, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InlineSuggestion__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1692,10 +1759,10 @@ InlineSuggestionInfo_get_CREATOR :: proc "contextless" () -> (result: ^Parcelabl
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-InlineSuggestionInfo_describeContents :: proc "contextless" (self: ^InlineSuggestionInfo) -> (result: i32, exception: ^Throwable) {
+InlineSuggestionInfo_describeContents :: proc "contextless" (self: ^InlineSuggestionInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InlineSuggestionInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 InlineSuggestionInfo_equals :: proc "contextless" (self: ^InlineSuggestionInfo, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -1747,10 +1814,10 @@ InlineSuggestionInfo_toString :: proc "contextless" (self: ^InlineSuggestionInfo
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-InlineSuggestionInfo_writeToParcel :: proc "contextless" (self: ^InlineSuggestionInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+InlineSuggestionInfo_writeToParcel :: proc "contextless" (self: ^InlineSuggestionInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InlineSuggestionInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1772,10 +1839,10 @@ InlineSuggestionsRequest_get_CREATOR :: proc "contextless" () -> (result: ^Parce
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-InlineSuggestionsRequest_describeContents :: proc "contextless" (self: ^InlineSuggestionsRequest) -> (result: i32, exception: ^Throwable) {
+InlineSuggestionsRequest_describeContents :: proc "contextless" (self: ^InlineSuggestionsRequest) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InlineSuggestionsRequest__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 InlineSuggestionsRequest_equals :: proc "contextless" (self: ^InlineSuggestionsRequest, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -1833,10 +1900,10 @@ InlineSuggestionsRequest_toString :: proc "contextless" (self: ^InlineSuggestion
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-InlineSuggestionsRequest_writeToParcel :: proc "contextless" (self: ^InlineSuggestionsRequest, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+InlineSuggestionsRequest_writeToParcel :: proc "contextless" (self: ^InlineSuggestionsRequest, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InlineSuggestionsRequest__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1919,10 +1986,10 @@ InlineSuggestionsResponse_get_CREATOR :: proc "contextless" () -> (result: ^Parc
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-InlineSuggestionsResponse_describeContents :: proc "contextless" (self: ^InlineSuggestionsResponse) -> (result: i32, exception: ^Throwable) {
+InlineSuggestionsResponse_describeContents :: proc "contextless" (self: ^InlineSuggestionsResponse) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InlineSuggestionsResponse__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 InlineSuggestionsResponse_equals :: proc "contextless" (self: ^InlineSuggestionsResponse, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -1950,10 +2017,10 @@ InlineSuggestionsResponse_toString :: proc "contextless" (self: ^InlineSuggestio
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-InlineSuggestionsResponse_writeToParcel :: proc "contextless" (self: ^InlineSuggestionsResponse, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+InlineSuggestionsResponse_writeToParcel :: proc "contextless" (self: ^InlineSuggestionsResponse, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InlineSuggestionsResponse__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1992,10 +2059,10 @@ InputBinding_new :: proc{
 	InputBinding_new_InputConnection_InputBinding,
 }
 
-InputBinding_describeContents :: proc "contextless" (self: ^InputBinding) -> (result: i32, exception: ^Throwable) {
+InputBinding_describeContents :: proc "contextless" (self: ^InputBinding) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputBinding__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 InputBinding_getConnection :: proc "contextless" (self: ^InputBinding) -> (result: ^InputConnection, exception: ^Throwable) {
@@ -2028,10 +2095,10 @@ InputBinding_toString :: proc "contextless" (self: ^InputBinding) -> (result: ^S
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-InputBinding_writeToParcel :: proc "contextless" (self: ^InputBinding, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+InputBinding_writeToParcel :: proc "contextless" (self: ^InputBinding, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputBinding__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -2067,10 +2134,10 @@ InputConnection_beginBatchEdit :: proc "contextless" (self: ^InputConnection) ->
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-InputConnection_clearMetaKeyStates :: proc "contextless" (self: ^InputConnection, states: i32) -> (result: bool, exception: ^Throwable) {
+InputConnection_clearMetaKeyStates :: proc "contextless" (self: ^InputConnection, states: KeyEvent_MetaState) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputConnection__class, "clearMetaKeyStates", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = states}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)states}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -2088,10 +2155,10 @@ InputConnection_commitCompletion :: proc "contextless" (self: ^InputConnection, 
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-InputConnection_commitContent :: proc "contextless" (self: ^InputConnection, inputContentInfo: ^InputContentInfo, flags: i32, opts: ^Bundle) -> (result: bool, exception: ^Throwable) {
+InputConnection_commitContent :: proc "contextless" (self: ^InputConnection, inputContentInfo: ^InputContentInfo, flags: InputConnection_InputContentFlags, opts: ^Bundle) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputConnection__class, "commitContent", "(Landroid/view/inputmethod/InputContentInfo;ILandroid/os/Bundle;)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = inputContentInfo}, {i = flags}, {l = opts}}
+	jni_args := [?]android.jvalue{{l = inputContentInfo}, {i = transmute(i32)flags}, {l = opts}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -2147,17 +2214,17 @@ InputConnection_finishComposingText :: proc "contextless" (self: ^InputConnectio
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-InputConnection_getCursorCapsMode :: proc "contextless" (self: ^InputConnection, reqModes: i32) -> (result: i32, exception: ^Throwable) {
+InputConnection_getCursorCapsMode :: proc "contextless" (self: ^InputConnection, reqModes: TextUtils_CapMode) -> (result: TextUtils_CapMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputConnection__class, "getCursorCapsMode", "(I)I", false) or_return
-	jni_args := [?]android.jvalue{{i = reqModes}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{i = transmute(i32)reqModes}}
+	return transmute(TextUtils_CapMode)(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-InputConnection_getExtractedText :: proc "contextless" (self: ^InputConnection, request: ^ExtractedTextRequest, flags: i32) -> (result: ^ExtractedText, exception: ^Throwable) {
+InputConnection_getExtractedText :: proc "contextless" (self: ^InputConnection, request: ^ExtractedTextRequest, flags: InputConnection_GetExtractedTextFlags) -> (result: ^ExtractedText, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputConnection__class, "getExtractedText", "(Landroid/view/inputmethod/ExtractedTextRequest;I)Landroid/view/inputmethod/ExtractedText;", false) or_return
-	jni_args := [?]android.jvalue{{l = request}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = request}, {i = transmute(i32)flags}}
 	return (^ExtractedText)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -2167,31 +2234,31 @@ InputConnection_getHandler :: proc "contextless" (self: ^InputConnection) -> (re
 	return (^Handler)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-InputConnection_getSelectedText :: proc "contextless" (self: ^InputConnection, flags: i32) -> (result: ^CharSequence, exception: ^Throwable) {
+InputConnection_getSelectedText :: proc "contextless" (self: ^InputConnection, flags: InputConnection_SurroundingTextFlags) -> (result: ^CharSequence, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputConnection__class, "getSelectedText", "(I)Ljava/lang/CharSequence;", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	return (^CharSequence)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-InputConnection_getSurroundingText :: proc "contextless" (self: ^InputConnection, beforeLength: i32, afterLength: i32, flags: i32) -> (result: ^SurroundingText, exception: ^Throwable) { // API level 31
+InputConnection_getSurroundingText :: proc "contextless" (self: ^InputConnection, beforeLength: i32, afterLength: i32, flags: InputConnection_SurroundingTextFlags) -> (result: ^SurroundingText, exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputConnection__class, "getSurroundingText", "(III)Landroid/view/inputmethod/SurroundingText;", false) or_return
-	jni_args := [?]android.jvalue{{i = beforeLength}, {i = afterLength}, {i = flags}}
+	jni_args := [?]android.jvalue{{i = beforeLength}, {i = afterLength}, {i = transmute(i32)flags}}
 	return (^SurroundingText)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-InputConnection_getTextAfterCursor :: proc "contextless" (self: ^InputConnection, n: i32, flags: i32) -> (result: ^CharSequence, exception: ^Throwable) {
+InputConnection_getTextAfterCursor :: proc "contextless" (self: ^InputConnection, n: i32, flags: InputConnection_SurroundingTextFlags) -> (result: ^CharSequence, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputConnection__class, "getTextAfterCursor", "(II)Ljava/lang/CharSequence;", false) or_return
-	jni_args := [?]android.jvalue{{i = n}, {i = flags}}
+	jni_args := [?]android.jvalue{{i = n}, {i = transmute(i32)flags}}
 	return (^CharSequence)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-InputConnection_getTextBeforeCursor :: proc "contextless" (self: ^InputConnection, n: i32, flags: i32) -> (result: ^CharSequence, exception: ^Throwable) {
+InputConnection_getTextBeforeCursor :: proc "contextless" (self: ^InputConnection, n: i32, flags: InputConnection_SurroundingTextFlags) -> (result: ^CharSequence, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputConnection__class, "getTextBeforeCursor", "(II)Ljava/lang/CharSequence;", false) or_return
-	jni_args := [?]android.jvalue{{i = n}, {i = flags}}
+	jni_args := [?]android.jvalue{{i = n}, {i = transmute(i32)flags}}
 	return (^CharSequence)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -2251,17 +2318,17 @@ InputConnection_reportFullscreenMode :: proc "contextless" (self: ^InputConnecti
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-InputConnection_requestCursorUpdates_int :: proc "contextless" (self: ^InputConnection, cursorUpdateMode: i32) -> (result: bool, exception: ^Throwable) {
+InputConnection_requestCursorUpdates_int :: proc "contextless" (self: ^InputConnection, cursorUpdateMode: InputConnection_CursorUpdateFlags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputConnection__class, "requestCursorUpdates", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = cursorUpdateMode}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)cursorUpdateMode}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-InputConnection_requestCursorUpdates_int_int :: proc "contextless" (self: ^InputConnection, cursorUpdateMode: i32, cursorUpdateFilter: i32) -> (result: bool, exception: ^Throwable) { // API level 33
+InputConnection_requestCursorUpdates_int_int :: proc "contextless" (self: ^InputConnection, cursorUpdateMode: InputConnection_CursorUpdateFlags, cursorUpdateFilter: InputConnection_CursorUpdateFilterFlags) -> (result: bool, exception: ^Throwable) { // API level 33
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputConnection__class, "requestCursorUpdates", "(II)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = cursorUpdateMode}, {i = cursorUpdateFilter}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)cursorUpdateMode}, {i = transmute(i32)cursorUpdateFilter}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -2343,6 +2410,36 @@ InputConnection_takeSnapshot :: proc "contextless" (self: ^InputConnection) -> (
 	return (^TextSnapshot)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
+InputConnection_GetExtractedTextFlag :: enum u32 {
+	GET_EXTRACTED_TEXT_MONITOR = 0,
+}
+InputConnection_GetExtractedTextFlags :: distinct bit_set[InputConnection_GetExtractedTextFlag; u32]
+
+InputConnection_InputContentFlag :: enum u32 {
+	GRANT_READ_URI_PERMISSION = 0,
+}
+InputConnection_InputContentFlags :: distinct bit_set[InputConnection_InputContentFlag; u32]
+
+InputConnection_SurroundingTextFlag :: enum u32 {
+	GET_TEXT_WITH_STYLES = 0,
+}
+InputConnection_SurroundingTextFlags :: distinct bit_set[InputConnection_SurroundingTextFlag; u32]
+
+InputConnection_CursorUpdateFlag :: enum u32 {
+	IMMEDIATE = 0,
+	MONITOR   = 1,
+}
+InputConnection_CursorUpdateFlags :: distinct bit_set[InputConnection_CursorUpdateFlag; u32]
+
+InputConnection_CursorUpdateFilterFlag :: enum u32 {
+	CHARACTER_BOUNDS    = 3,
+	EDITOR_BOUNDS       = 2,
+	INSERTION_MARKER    = 4,
+	TEXT_APPEARANCE     = 6,
+	VISIBLE_LINE_BOUNDS = 5,
+}
+InputConnection_CursorUpdateFilterFlags :: distinct bit_set[InputConnection_CursorUpdateFilterFlag; u32]
+
 // class android.view.inputmethod.InputConnectionWrapper
 InputConnectionWrapper :: struct #raw_union {
 	using Object:    Object,
@@ -2365,10 +2462,10 @@ InputConnectionWrapper_beginBatchEdit :: proc "contextless" (self: ^InputConnect
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-InputConnectionWrapper_clearMetaKeyStates :: proc "contextless" (self: ^InputConnectionWrapper, states: i32) -> (result: bool, exception: ^Throwable) {
+InputConnectionWrapper_clearMetaKeyStates :: proc "contextless" (self: ^InputConnectionWrapper, states: KeyEvent_MetaState) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputConnectionWrapper__class, "clearMetaKeyStates", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = states}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)states}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -2386,10 +2483,10 @@ InputConnectionWrapper_commitCompletion :: proc "contextless" (self: ^InputConne
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-InputConnectionWrapper_commitContent :: proc "contextless" (self: ^InputConnectionWrapper, inputContentInfo: ^InputContentInfo, flags: i32, opts: ^Bundle) -> (result: bool, exception: ^Throwable) {
+InputConnectionWrapper_commitContent :: proc "contextless" (self: ^InputConnectionWrapper, inputContentInfo: ^InputContentInfo, flags: InputConnection_InputContentFlags, opts: ^Bundle) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputConnectionWrapper__class, "commitContent", "(Landroid/view/inputmethod/InputContentInfo;ILandroid/os/Bundle;)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = inputContentInfo}, {i = flags}, {l = opts}}
+	jni_args := [?]android.jvalue{{l = inputContentInfo}, {i = transmute(i32)flags}, {l = opts}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -2445,17 +2542,17 @@ InputConnectionWrapper_finishComposingText :: proc "contextless" (self: ^InputCo
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-InputConnectionWrapper_getCursorCapsMode :: proc "contextless" (self: ^InputConnectionWrapper, reqModes: i32) -> (result: i32, exception: ^Throwable) {
+InputConnectionWrapper_getCursorCapsMode :: proc "contextless" (self: ^InputConnectionWrapper, reqModes: TextUtils_CapMode) -> (result: TextUtils_CapMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputConnectionWrapper__class, "getCursorCapsMode", "(I)I", false) or_return
-	jni_args := [?]android.jvalue{{i = reqModes}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{i = transmute(i32)reqModes}}
+	return transmute(TextUtils_CapMode)(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-InputConnectionWrapper_getExtractedText :: proc "contextless" (self: ^InputConnectionWrapper, request: ^ExtractedTextRequest, flags: i32) -> (result: ^ExtractedText, exception: ^Throwable) {
+InputConnectionWrapper_getExtractedText :: proc "contextless" (self: ^InputConnectionWrapper, request: ^ExtractedTextRequest, flags: InputConnection_GetExtractedTextFlags) -> (result: ^ExtractedText, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputConnectionWrapper__class, "getExtractedText", "(Landroid/view/inputmethod/ExtractedTextRequest;I)Landroid/view/inputmethod/ExtractedText;", false) or_return
-	jni_args := [?]android.jvalue{{l = request}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = request}, {i = transmute(i32)flags}}
 	return (^ExtractedText)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -2465,31 +2562,31 @@ InputConnectionWrapper_getHandler :: proc "contextless" (self: ^InputConnectionW
 	return (^Handler)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-InputConnectionWrapper_getSelectedText :: proc "contextless" (self: ^InputConnectionWrapper, flags: i32) -> (result: ^CharSequence, exception: ^Throwable) {
+InputConnectionWrapper_getSelectedText :: proc "contextless" (self: ^InputConnectionWrapper, flags: InputConnection_SurroundingTextFlags) -> (result: ^CharSequence, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputConnectionWrapper__class, "getSelectedText", "(I)Ljava/lang/CharSequence;", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	return (^CharSequence)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-InputConnectionWrapper_getSurroundingText :: proc "contextless" (self: ^InputConnectionWrapper, beforeLength: i32, afterLength: i32, flags: i32) -> (result: ^SurroundingText, exception: ^Throwable) {
+InputConnectionWrapper_getSurroundingText :: proc "contextless" (self: ^InputConnectionWrapper, beforeLength: i32, afterLength: i32, flags: InputConnection_SurroundingTextFlags) -> (result: ^SurroundingText, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputConnectionWrapper__class, "getSurroundingText", "(III)Landroid/view/inputmethod/SurroundingText;", false) or_return
-	jni_args := [?]android.jvalue{{i = beforeLength}, {i = afterLength}, {i = flags}}
+	jni_args := [?]android.jvalue{{i = beforeLength}, {i = afterLength}, {i = transmute(i32)flags}}
 	return (^SurroundingText)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-InputConnectionWrapper_getTextAfterCursor :: proc "contextless" (self: ^InputConnectionWrapper, n: i32, flags: i32) -> (result: ^CharSequence, exception: ^Throwable) {
+InputConnectionWrapper_getTextAfterCursor :: proc "contextless" (self: ^InputConnectionWrapper, n: i32, flags: InputConnection_SurroundingTextFlags) -> (result: ^CharSequence, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputConnectionWrapper__class, "getTextAfterCursor", "(II)Ljava/lang/CharSequence;", false) or_return
-	jni_args := [?]android.jvalue{{i = n}, {i = flags}}
+	jni_args := [?]android.jvalue{{i = n}, {i = transmute(i32)flags}}
 	return (^CharSequence)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-InputConnectionWrapper_getTextBeforeCursor :: proc "contextless" (self: ^InputConnectionWrapper, n: i32, flags: i32) -> (result: ^CharSequence, exception: ^Throwable) {
+InputConnectionWrapper_getTextBeforeCursor :: proc "contextless" (self: ^InputConnectionWrapper, n: i32, flags: InputConnection_SurroundingTextFlags) -> (result: ^CharSequence, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputConnectionWrapper__class, "getTextBeforeCursor", "(II)Ljava/lang/CharSequence;", false) or_return
-	jni_args := [?]android.jvalue{{i = n}, {i = flags}}
+	jni_args := [?]android.jvalue{{i = n}, {i = transmute(i32)flags}}
 	return (^CharSequence)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -2549,17 +2646,17 @@ InputConnectionWrapper_reportFullscreenMode :: proc "contextless" (self: ^InputC
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-InputConnectionWrapper_requestCursorUpdates_int :: proc "contextless" (self: ^InputConnectionWrapper, cursorUpdateMode: i32) -> (result: bool, exception: ^Throwable) {
+InputConnectionWrapper_requestCursorUpdates_int :: proc "contextless" (self: ^InputConnectionWrapper, cursorUpdateMode: InputConnection_CursorUpdateFlags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputConnectionWrapper__class, "requestCursorUpdates", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = cursorUpdateMode}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)cursorUpdateMode}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-InputConnectionWrapper_requestCursorUpdates_int_int :: proc "contextless" (self: ^InputConnectionWrapper, cursorUpdateMode: i32, cursorUpdateFilter: i32) -> (result: bool, exception: ^Throwable) {
+InputConnectionWrapper_requestCursorUpdates_int_int :: proc "contextless" (self: ^InputConnectionWrapper, cursorUpdateMode: InputConnection_CursorUpdateFlags, cursorUpdateFilter: InputConnection_CursorUpdateFilterFlags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputConnectionWrapper__class, "requestCursorUpdates", "(II)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = cursorUpdateMode}, {i = cursorUpdateFilter}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)cursorUpdateMode}, {i = transmute(i32)cursorUpdateFilter}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -2683,10 +2780,10 @@ InputContentInfo_new :: proc{
 	InputContentInfo_new_Uri_ClipDescription_Uri,
 }
 
-InputContentInfo_describeContents :: proc "contextless" (self: ^InputContentInfo) -> (result: i32, exception: ^Throwable) {
+InputContentInfo_describeContents :: proc "contextless" (self: ^InputContentInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputContentInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 InputContentInfo_getContentUri :: proc "contextless" (self: ^InputContentInfo) -> (result: ^Uri, exception: ^Throwable) {
@@ -2721,10 +2818,10 @@ InputContentInfo_requestPermission :: proc "contextless" (self: ^InputContentInf
 	return jni_take(jni_env)
 }
 
-InputContentInfo_writeToParcel :: proc "contextless" (self: ^InputContentInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+InputContentInfo_writeToParcel :: proc "contextless" (self: ^InputContentInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputContentInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -2806,10 +2903,10 @@ InputMethod_setSessionEnabled :: proc "contextless" (self: ^InputMethod, session
 	return jni_take(jni_env)
 }
 
-InputMethod_showSoftInput :: proc "contextless" (self: ^InputMethod, flags: i32, resultReceiver: ^ResultReceiver) -> (exception: ^Throwable) {
+InputMethod_showSoftInput :: proc "contextless" (self: ^InputMethod, flags: InputMethod_ShowFlags, resultReceiver: ^ResultReceiver) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputMethod__class, "showSoftInput", "(ILandroid/os/ResultReceiver;)V", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}, {l = resultReceiver}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}, {l = resultReceiver}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -2828,6 +2925,12 @@ InputMethod_unbindInput :: proc "contextless" (self: ^InputMethod) -> (exception
 	jni_env->CallVoidMethodA(self, jni_id, nil)
 	return jni_take(jni_env)
 }
+
+InputMethod_ShowFlag :: enum u32 {
+	EXPLICIT = 0,
+	FORCED   = 1,
+}
+InputMethod_ShowFlags :: distinct bit_set[InputMethod_ShowFlag; u32]
 
 // interface android.view.inputmethod.InputMethod.SessionCallback
 InputMethod_SessionCallback :: struct #raw_union {
@@ -2894,10 +2997,10 @@ InputMethodInfo_createStylusHandwritingSettingsActivityIntent :: proc "contextle
 	return (^Intent)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-InputMethodInfo_describeContents :: proc "contextless" (self: ^InputMethodInfo) -> (result: i32, exception: ^Throwable) {
+InputMethodInfo_describeContents :: proc "contextless" (self: ^InputMethodInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputMethodInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 InputMethodInfo_dump :: proc "contextless" (self: ^InputMethodInfo, pw: ^Printer, prefix: ^String) -> (exception: ^Throwable) {
@@ -2921,10 +3024,10 @@ InputMethodInfo_getComponent :: proc "contextless" (self: ^InputMethodInfo) -> (
 	return (^ComponentName)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-InputMethodInfo_getConfigChanges :: proc "contextless" (self: ^InputMethodInfo) -> (result: i32, exception: ^Throwable) { // API level 31
+InputMethodInfo_getConfigChanges :: proc "contextless" (self: ^InputMethodInfo) -> (result: ActivityInfo_ConfigFlags, exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputMethodInfo__class, "getConfigChanges", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(ActivityInfo_ConfigFlags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 InputMethodInfo_getId :: proc "contextless" (self: ^InputMethodInfo) -> (result: ^String, exception: ^Throwable) {
@@ -3026,10 +3129,10 @@ InputMethodInfo_toString :: proc "contextless" (self: ^InputMethodInfo) -> (resu
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-InputMethodInfo_writeToParcel :: proc "contextless" (self: ^InputMethodInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+InputMethodInfo_writeToParcel :: proc "contextless" (self: ^InputMethodInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputMethodInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -3066,10 +3169,10 @@ InputMethodManager_acceptStylusHandwritingDelegation_View_String :: proc "contex
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-InputMethodManager_acceptStylusHandwritingDelegation_View_String_int_Executor_Consumer :: proc "contextless" (self: ^InputMethodManager, delegateView: ^View, delegatorPackageName: ^String, flags: i32, executor: ^Executor, callback: ^Consumer) -> (exception: ^Throwable) { // API level 35
+InputMethodManager_acceptStylusHandwritingDelegation_View_String_int_Executor_Consumer :: proc "contextless" (self: ^InputMethodManager, delegateView: ^View, delegatorPackageName: ^String, flags: InputMethodManager_HandwritingDelegateFlags, executor: ^Executor, callback: ^Consumer) -> (exception: ^Throwable) { // API level 35
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputMethodManager__class, "acceptStylusHandwritingDelegation", "(Landroid/view/View;Ljava/lang/String;ILjava/util/concurrent/Executor;Ljava/util/function/Consumer;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = delegateView}, {l = delegatorPackageName}, {i = flags}, {l = executor}, {l = callback}}
+	jni_args := [?]android.jvalue{{l = delegateView}, {l = delegatorPackageName}, {i = transmute(i32)flags}, {l = executor}, {l = callback}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -3162,25 +3265,25 @@ InputMethodManager_getShortcutInputMethodsAndSubtypes :: proc "contextless" (sel
 	return (^Map)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-InputMethodManager_hideSoftInputFromInputMethod :: proc "contextless" (self: ^InputMethodManager, token: ^IBinder, flags: i32) -> (exception: ^Throwable) {
+InputMethodManager_hideSoftInputFromInputMethod :: proc "contextless" (self: ^InputMethodManager, token: ^IBinder, flags: InputMethodManager_HideFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputMethodManager__class, "hideSoftInputFromInputMethod", "(Landroid/os/IBinder;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = token}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = token}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-InputMethodManager_hideSoftInputFromWindow_IBinder_int :: proc "contextless" (self: ^InputMethodManager, windowToken: ^IBinder, flags: i32) -> (result: bool, exception: ^Throwable) {
+InputMethodManager_hideSoftInputFromWindow_IBinder_int :: proc "contextless" (self: ^InputMethodManager, windowToken: ^IBinder, flags: InputMethodManager_HideFlags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputMethodManager__class, "hideSoftInputFromWindow", "(Landroid/os/IBinder;I)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = windowToken}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = windowToken}, {i = transmute(i32)flags}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-InputMethodManager_hideSoftInputFromWindow_IBinder_int_ResultReceiver :: proc "contextless" (self: ^InputMethodManager, windowToken: ^IBinder, flags: i32, resultReceiver: ^ResultReceiver) -> (result: bool, exception: ^Throwable) {
+InputMethodManager_hideSoftInputFromWindow_IBinder_int_ResultReceiver :: proc "contextless" (self: ^InputMethodManager, windowToken: ^IBinder, flags: InputMethodManager_HideFlags, resultReceiver: ^ResultReceiver) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputMethodManager__class, "hideSoftInputFromWindow", "(Landroid/os/IBinder;ILandroid/os/ResultReceiver;)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = windowToken}, {i = flags}, {l = resultReceiver}}
+	jni_args := [?]android.jvalue{{l = windowToken}, {i = transmute(i32)flags}, {l = resultReceiver}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -3374,17 +3477,17 @@ InputMethodManager_showInputMethodPicker :: proc "contextless" (self: ^InputMeth
 	return jni_take(jni_env)
 }
 
-InputMethodManager_showSoftInput_View_int :: proc "contextless" (self: ^InputMethodManager, view: ^View, flags: i32) -> (result: bool, exception: ^Throwable) {
+InputMethodManager_showSoftInput_View_int :: proc "contextless" (self: ^InputMethodManager, view: ^View, flags: InputMethodManager_ShowFlags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputMethodManager__class, "showSoftInput", "(Landroid/view/View;I)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = view}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = view}, {i = transmute(i32)flags}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-InputMethodManager_showSoftInput_View_int_ResultReceiver :: proc "contextless" (self: ^InputMethodManager, view: ^View, flags: i32, resultReceiver: ^ResultReceiver) -> (result: bool, exception: ^Throwable) {
+InputMethodManager_showSoftInput_View_int_ResultReceiver :: proc "contextless" (self: ^InputMethodManager, view: ^View, flags: InputMethodManager_ShowFlags, resultReceiver: ^ResultReceiver) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputMethodManager__class, "showSoftInput", "(Landroid/view/View;ILandroid/os/ResultReceiver;)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = view}, {i = flags}, {l = resultReceiver}}
+	jni_args := [?]android.jvalue{{l = view}, {i = transmute(i32)flags}, {l = resultReceiver}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -3393,10 +3496,10 @@ InputMethodManager_showSoftInput :: proc{
 	InputMethodManager_showSoftInput_View_int_ResultReceiver,
 }
 
-InputMethodManager_showSoftInputFromInputMethod :: proc "contextless" (self: ^InputMethodManager, token: ^IBinder, flags: i32) -> (exception: ^Throwable) {
+InputMethodManager_showSoftInputFromInputMethod :: proc "contextless" (self: ^InputMethodManager, token: ^IBinder, flags: InputMethodManager_ShowFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputMethodManager__class, "showSoftInputFromInputMethod", "(Landroid/os/IBinder;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = token}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = token}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -3460,18 +3563,18 @@ InputMethodManager_switchToNextInputMethod :: proc "contextless" (self: ^InputMe
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-InputMethodManager_toggleSoftInput :: proc "contextless" (self: ^InputMethodManager, showFlags: i32, hideFlags: i32) -> (exception: ^Throwable) {
+InputMethodManager_toggleSoftInput :: proc "contextless" (self: ^InputMethodManager, showFlags: InputMethodManager_ShowFlags, hideFlags: InputMethodManager_HideFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputMethodManager__class, "toggleSoftInput", "(II)V", false) or_return
-	jni_args := [?]android.jvalue{{i = showFlags}, {i = hideFlags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)showFlags}, {i = transmute(i32)hideFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-InputMethodManager_toggleSoftInputFromWindow :: proc "contextless" (self: ^InputMethodManager, windowToken: ^IBinder, showFlags: i32, hideFlags: i32) -> (exception: ^Throwable) {
+InputMethodManager_toggleSoftInputFromWindow :: proc "contextless" (self: ^InputMethodManager, windowToken: ^IBinder, showFlags: InputMethodManager_ShowFlags, hideFlags: InputMethodManager_HideFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputMethodManager__class, "toggleSoftInputFromWindow", "(Landroid/os/IBinder;II)V", false) or_return
-	jni_args := [?]android.jvalue{{l = windowToken}, {i = showFlags}, {i = hideFlags}}
+	jni_args := [?]android.jvalue{{l = windowToken}, {i = transmute(i32)showFlags}, {i = transmute(i32)hideFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -3515,6 +3618,23 @@ InputMethodManager_viewClicked :: proc "contextless" (self: ^InputMethodManager,
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+InputMethodManager_HandwritingDelegateFlag :: enum u32 {
+	HANDWRITING_DELEGATE_FLAG_HOME_DELEGATOR_ALLOWED = 0,
+}
+InputMethodManager_HandwritingDelegateFlags :: distinct bit_set[InputMethodManager_HandwritingDelegateFlag; u32]
+
+InputMethodManager_HideFlag :: enum u32 {
+	IMPLICIT_ONLY = 0,
+	NOT_ALWAYS    = 1,
+}
+InputMethodManager_HideFlags :: distinct bit_set[InputMethodManager_HideFlag; u32]
+
+InputMethodManager_ShowFlag :: enum u32 {
+	FORCED   = 1,
+	IMPLICIT = 0,
+}
+InputMethodManager_ShowFlags :: distinct bit_set[InputMethodManager_ShowFlag; u32]
 
 // interface android.view.inputmethod.InputMethodSession
 InputMethodSession :: struct #raw_union {
@@ -3571,10 +3691,10 @@ InputMethodSession_finishInput :: proc "contextless" (self: ^InputMethodSession)
 	return jni_take(jni_env)
 }
 
-InputMethodSession_toggleSoftInput :: proc "contextless" (self: ^InputMethodSession, showFlags: i32, hideFlags: i32) -> (exception: ^Throwable) {
+InputMethodSession_toggleSoftInput :: proc "contextless" (self: ^InputMethodSession, showFlags: InputMethodManager_ShowFlags, hideFlags: InputMethodManager_HideFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputMethodSession__class, "toggleSoftInput", "(II)V", false) or_return
-	jni_args := [?]android.jvalue{{i = showFlags}, {i = hideFlags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)showFlags}, {i = transmute(i32)hideFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -3676,10 +3796,10 @@ InputMethodSubtype_containsExtraValueKey :: proc "contextless" (self: ^InputMeth
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-InputMethodSubtype_describeContents :: proc "contextless" (self: ^InputMethodSubtype) -> (result: i32, exception: ^Throwable) {
+InputMethodSubtype_describeContents :: proc "contextless" (self: ^InputMethodSubtype) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputMethodSubtype__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 InputMethodSubtype_equals :: proc "contextless" (self: ^InputMethodSubtype, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -3806,10 +3926,10 @@ InputMethodSubtype_overridesImplicitlyEnabledSubtype :: proc "contextless" (self
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-InputMethodSubtype_writeToParcel :: proc "contextless" (self: ^InputMethodSubtype, dest: ^Parcel, parcelableFlags: i32) -> (exception: ^Throwable) {
+InputMethodSubtype_writeToParcel :: proc "contextless" (self: ^InputMethodSubtype, dest: ^Parcel, parcelableFlags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputMethodSubtype__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = parcelableFlags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)parcelableFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -3954,10 +4074,10 @@ InsertGesture_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creat
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-InsertGesture_describeContents :: proc "contextless" (self: ^InsertGesture) -> (result: i32, exception: ^Throwable) {
+InsertGesture_describeContents :: proc "contextless" (self: ^InsertGesture) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InsertGesture__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 InsertGesture_equals :: proc "contextless" (self: ^InsertGesture, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -3985,10 +4105,10 @@ InsertGesture_hashCode :: proc "contextless" (self: ^InsertGesture) -> (result: 
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-InsertGesture_writeToParcel :: proc "contextless" (self: ^InsertGesture, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+InsertGesture_writeToParcel :: proc "contextless" (self: ^InsertGesture, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InsertGesture__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4049,10 +4169,10 @@ InsertModeGesture_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_C
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-InsertModeGesture_describeContents :: proc "contextless" (self: ^InsertModeGesture) -> (result: i32, exception: ^Throwable) {
+InsertModeGesture_describeContents :: proc "contextless" (self: ^InsertModeGesture) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InsertModeGesture__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 InsertModeGesture_equals :: proc "contextless" (self: ^InsertModeGesture, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -4080,10 +4200,10 @@ InsertModeGesture_hashCode :: proc "contextless" (self: ^InsertModeGesture) -> (
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-InsertModeGesture_writeToParcel :: proc "contextless" (self: ^InsertModeGesture, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+InsertModeGesture_writeToParcel :: proc "contextless" (self: ^InsertModeGesture, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InsertModeGesture__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4144,10 +4264,10 @@ JoinOrSplitGesture_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-JoinOrSplitGesture_describeContents :: proc "contextless" (self: ^JoinOrSplitGesture) -> (result: i32, exception: ^Throwable) {
+JoinOrSplitGesture_describeContents :: proc "contextless" (self: ^JoinOrSplitGesture) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &JoinOrSplitGesture__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 JoinOrSplitGesture_equals :: proc "contextless" (self: ^JoinOrSplitGesture, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -4169,10 +4289,10 @@ JoinOrSplitGesture_hashCode :: proc "contextless" (self: ^JoinOrSplitGesture) ->
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-JoinOrSplitGesture_writeToParcel :: proc "contextless" (self: ^JoinOrSplitGesture, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+JoinOrSplitGesture_writeToParcel :: proc "contextless" (self: ^JoinOrSplitGesture, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &JoinOrSplitGesture__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4234,10 +4354,10 @@ RemoveSpaceGesture_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-RemoveSpaceGesture_describeContents :: proc "contextless" (self: ^RemoveSpaceGesture) -> (result: i32, exception: ^Throwable) {
+RemoveSpaceGesture_describeContents :: proc "contextless" (self: ^RemoveSpaceGesture) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &RemoveSpaceGesture__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 RemoveSpaceGesture_equals :: proc "contextless" (self: ^RemoveSpaceGesture, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -4265,10 +4385,10 @@ RemoveSpaceGesture_hashCode :: proc "contextless" (self: ^RemoveSpaceGesture) ->
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-RemoveSpaceGesture_writeToParcel :: proc "contextless" (self: ^RemoveSpaceGesture, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+RemoveSpaceGesture_writeToParcel :: proc "contextless" (self: ^RemoveSpaceGesture, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &RemoveSpaceGesture__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4322,10 +4442,10 @@ SelectGesture_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creat
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-SelectGesture_describeContents :: proc "contextless" (self: ^SelectGesture) -> (result: i32, exception: ^Throwable) {
+SelectGesture_describeContents :: proc "contextless" (self: ^SelectGesture) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SelectGesture__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 SelectGesture_equals :: proc "contextless" (self: ^SelectGesture, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -4335,10 +4455,10 @@ SelectGesture_equals :: proc "contextless" (self: ^SelectGesture, o: ^Object) ->
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-SelectGesture_getGranularity :: proc "contextless" (self: ^SelectGesture) -> (result: i32, exception: ^Throwable) {
+SelectGesture_getGranularity :: proc "contextless" (self: ^SelectGesture) -> (result: HandwritingGesture_Granularity, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SelectGesture__class, "getGranularity", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return HandwritingGesture_Granularity(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 SelectGesture_getSelectionArea :: proc "contextless" (self: ^SelectGesture) -> (result: ^RectF, exception: ^Throwable) {
@@ -4353,10 +4473,10 @@ SelectGesture_hashCode :: proc "contextless" (self: ^SelectGesture) -> (result: 
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-SelectGesture_writeToParcel :: proc "contextless" (self: ^SelectGesture, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+SelectGesture_writeToParcel :: proc "contextless" (self: ^SelectGesture, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SelectGesture__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4388,10 +4508,10 @@ SelectGesture_Builder_setFallbackText :: proc "contextless" (self: ^SelectGestur
 	return (^SelectGesture_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-SelectGesture_Builder_setGranularity :: proc "contextless" (self: ^SelectGesture_Builder, granularity: i32) -> (result: ^SelectGesture_Builder, exception: ^Throwable) {
+SelectGesture_Builder_setGranularity :: proc "contextless" (self: ^SelectGesture_Builder, granularity: HandwritingGesture_Granularity) -> (result: ^SelectGesture_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SelectGesture_Builder__class, "setGranularity", "(I)Landroid/view/inputmethod/SelectGesture$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = granularity}}
+	jni_args := [?]android.jvalue{{i = i32(granularity)}}
 	return (^SelectGesture_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4417,10 +4537,10 @@ SelectRangeGesture_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-SelectRangeGesture_describeContents :: proc "contextless" (self: ^SelectRangeGesture) -> (result: i32, exception: ^Throwable) {
+SelectRangeGesture_describeContents :: proc "contextless" (self: ^SelectRangeGesture) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SelectRangeGesture__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 SelectRangeGesture_equals :: proc "contextless" (self: ^SelectRangeGesture, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -4430,10 +4550,10 @@ SelectRangeGesture_equals :: proc "contextless" (self: ^SelectRangeGesture, o: ^
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-SelectRangeGesture_getGranularity :: proc "contextless" (self: ^SelectRangeGesture) -> (result: i32, exception: ^Throwable) {
+SelectRangeGesture_getGranularity :: proc "contextless" (self: ^SelectRangeGesture) -> (result: HandwritingGesture_Granularity, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SelectRangeGesture__class, "getGranularity", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return HandwritingGesture_Granularity(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 SelectRangeGesture_getSelectionEndArea :: proc "contextless" (self: ^SelectRangeGesture) -> (result: ^RectF, exception: ^Throwable) {
@@ -4454,10 +4574,10 @@ SelectRangeGesture_hashCode :: proc "contextless" (self: ^SelectRangeGesture) ->
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-SelectRangeGesture_writeToParcel :: proc "contextless" (self: ^SelectRangeGesture, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+SelectRangeGesture_writeToParcel :: proc "contextless" (self: ^SelectRangeGesture, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SelectRangeGesture__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4489,10 +4609,10 @@ SelectRangeGesture_Builder_setFallbackText :: proc "contextless" (self: ^SelectR
 	return (^SelectRangeGesture_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-SelectRangeGesture_Builder_setGranularity :: proc "contextless" (self: ^SelectRangeGesture_Builder, granularity: i32) -> (result: ^SelectRangeGesture_Builder, exception: ^Throwable) {
+SelectRangeGesture_Builder_setGranularity :: proc "contextless" (self: ^SelectRangeGesture_Builder, granularity: HandwritingGesture_Granularity) -> (result: ^SelectRangeGesture_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SelectRangeGesture_Builder__class, "setGranularity", "(I)Landroid/view/inputmethod/SelectRangeGesture$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = granularity}}
+	jni_args := [?]android.jvalue{{i = i32(granularity)}}
 	return (^SelectRangeGesture_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4532,10 +4652,10 @@ SurroundingText_new :: proc "contextless" (text: ^CharSequence, selectionStart: 
 	return (^SurroundingText)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-SurroundingText_describeContents :: proc "contextless" (self: ^SurroundingText) -> (result: i32, exception: ^Throwable) {
+SurroundingText_describeContents :: proc "contextless" (self: ^SurroundingText) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurroundingText__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 SurroundingText_getOffset :: proc "contextless" (self: ^SurroundingText) -> (result: i32, exception: ^Throwable) {
@@ -4562,10 +4682,10 @@ SurroundingText_getText :: proc "contextless" (self: ^SurroundingText) -> (resul
 	return (^CharSequence)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-SurroundingText_writeToParcel :: proc "contextless" (self: ^SurroundingText, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+SurroundingText_writeToParcel :: proc "contextless" (self: ^SurroundingText, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurroundingText__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4585,10 +4705,10 @@ TextAppearanceInfo_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-TextAppearanceInfo_describeContents :: proc "contextless" (self: ^TextAppearanceInfo) -> (result: i32, exception: ^Throwable) {
+TextAppearanceInfo_describeContents :: proc "contextless" (self: ^TextAppearanceInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TextAppearanceInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 TextAppearanceInfo_equals :: proc "contextless" (self: ^TextAppearanceInfo, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -4628,16 +4748,16 @@ TextAppearanceInfo_getLetterSpacing :: proc "contextless" (self: ^TextAppearance
 	return jni_env->CallFloatMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-TextAppearanceInfo_getLineBreakStyle :: proc "contextless" (self: ^TextAppearanceInfo) -> (result: i32, exception: ^Throwable) {
+TextAppearanceInfo_getLineBreakStyle :: proc "contextless" (self: ^TextAppearanceInfo) -> (result: LineBreakConfig_LineBreakStyle, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TextAppearanceInfo__class, "getLineBreakStyle", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return LineBreakConfig_LineBreakStyle(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-TextAppearanceInfo_getLineBreakWordStyle :: proc "contextless" (self: ^TextAppearanceInfo) -> (result: i32, exception: ^Throwable) {
+TextAppearanceInfo_getLineBreakWordStyle :: proc "contextless" (self: ^TextAppearanceInfo) -> (result: LineBreakConfig_LineBreakWordStyle, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TextAppearanceInfo__class, "getLineBreakWordStyle", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return LineBreakConfig_LineBreakWordStyle(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 TextAppearanceInfo_getLinkTextColor :: proc "contextless" (self: ^TextAppearanceInfo) -> (result: i32, exception: ^Throwable) {
@@ -4706,10 +4826,10 @@ TextAppearanceInfo_getTextSize :: proc "contextless" (self: ^TextAppearanceInfo)
 	return jni_env->CallFloatMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-TextAppearanceInfo_getTextStyle :: proc "contextless" (self: ^TextAppearanceInfo) -> (result: i32, exception: ^Throwable) {
+TextAppearanceInfo_getTextStyle :: proc "contextless" (self: ^TextAppearanceInfo) -> (result: Typeface_Style, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TextAppearanceInfo__class, "getTextStyle", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return Typeface_Style(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 TextAppearanceInfo_hashCode :: proc "contextless" (self: ^TextAppearanceInfo) -> (result: i32, exception: ^Throwable) {
@@ -4742,12 +4862,29 @@ TextAppearanceInfo_toString :: proc "contextless" (self: ^TextAppearanceInfo) ->
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-TextAppearanceInfo_writeToParcel :: proc "contextless" (self: ^TextAppearanceInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+TextAppearanceInfo_writeToParcel :: proc "contextless" (self: ^TextAppearanceInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TextAppearanceInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+LineBreakConfig_LineBreakStyle :: enum i32 {
+	AUTO        = 5,
+	LOOSE       = 1,
+	NONE        = 0,
+	NORMAL      = 2,
+	NO_BREAK    = 4,
+	STRICT      = 3,
+	UNSPECIFIED = -1,
+}
+
+LineBreakConfig_LineBreakWordStyle :: enum i32 {
+	AUTO        = 2,
+	NONE        = 0,
+	PHRASE      = 1,
+	UNSPECIFIED = -1,
 }
 
 // class android.view.inputmethod.TextAppearanceInfo.Builder // API level 34
@@ -4826,17 +4963,17 @@ TextAppearanceInfo_Builder_setLetterSpacing :: proc "contextless" (self: ^TextAp
 	return (^TextAppearanceInfo_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-TextAppearanceInfo_Builder_setLineBreakStyle :: proc "contextless" (self: ^TextAppearanceInfo_Builder, lineBreakStyle: i32) -> (result: ^TextAppearanceInfo_Builder, exception: ^Throwable) {
+TextAppearanceInfo_Builder_setLineBreakStyle :: proc "contextless" (self: ^TextAppearanceInfo_Builder, lineBreakStyle: LineBreakConfig_LineBreakStyle) -> (result: ^TextAppearanceInfo_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TextAppearanceInfo_Builder__class, "setLineBreakStyle", "(I)Landroid/view/inputmethod/TextAppearanceInfo$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = lineBreakStyle}}
+	jni_args := [?]android.jvalue{{i = i32(lineBreakStyle)}}
 	return (^TextAppearanceInfo_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-TextAppearanceInfo_Builder_setLineBreakWordStyle :: proc "contextless" (self: ^TextAppearanceInfo_Builder, lineBreakWordStyle: i32) -> (result: ^TextAppearanceInfo_Builder, exception: ^Throwable) {
+TextAppearanceInfo_Builder_setLineBreakWordStyle :: proc "contextless" (self: ^TextAppearanceInfo_Builder, lineBreakWordStyle: LineBreakConfig_LineBreakWordStyle) -> (result: ^TextAppearanceInfo_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TextAppearanceInfo_Builder__class, "setLineBreakWordStyle", "(I)Landroid/view/inputmethod/TextAppearanceInfo$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = lineBreakWordStyle}}
+	jni_args := [?]android.jvalue{{i = i32(lineBreakWordStyle)}}
 	return (^TextAppearanceInfo_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4917,10 +5054,10 @@ TextAppearanceInfo_Builder_setTextSize :: proc "contextless" (self: ^TextAppeara
 	return (^TextAppearanceInfo_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-TextAppearanceInfo_Builder_setTextStyle :: proc "contextless" (self: ^TextAppearanceInfo_Builder, textStyle: i32) -> (result: ^TextAppearanceInfo_Builder, exception: ^Throwable) {
+TextAppearanceInfo_Builder_setTextStyle :: proc "contextless" (self: ^TextAppearanceInfo_Builder, textStyle: Typeface_Style) -> (result: ^TextAppearanceInfo_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TextAppearanceInfo_Builder__class, "setTextStyle", "(I)Landroid/view/inputmethod/TextAppearanceInfo$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = textStyle}}
+	jni_args := [?]android.jvalue{{i = i32(textStyle)}}
 	return (^TextAppearanceInfo_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4939,10 +5076,10 @@ TextAttribute_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creat
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-TextAttribute_describeContents :: proc "contextless" (self: ^TextAttribute) -> (result: i32, exception: ^Throwable) {
+TextAttribute_describeContents :: proc "contextless" (self: ^TextAttribute) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TextAttribute__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 TextAttribute_getExtras :: proc "contextless" (self: ^TextAttribute) -> (result: ^PersistableBundle, exception: ^Throwable) {
@@ -4963,10 +5100,10 @@ TextAttribute_isTextSuggestionSelected :: proc "contextless" (self: ^TextAttribu
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-TextAttribute_writeToParcel :: proc "contextless" (self: ^TextAttribute, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+TextAttribute_writeToParcel :: proc "contextless" (self: ^TextAttribute, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TextAttribute__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -5032,10 +5169,10 @@ TextBoundsInfo_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Crea
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-TextBoundsInfo_describeContents :: proc "contextless" (self: ^TextBoundsInfo) -> (result: i32, exception: ^Throwable) {
+TextBoundsInfo_describeContents :: proc "contextless" (self: ^TextBoundsInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TextBoundsInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 TextBoundsInfo_getCharacterBidiLevel :: proc "contextless" (self: ^TextBoundsInfo, index: i32) -> (result: i32, exception: ^Throwable) {
@@ -5053,11 +5190,11 @@ TextBoundsInfo_getCharacterBounds :: proc "contextless" (self: ^TextBoundsInfo, 
 	return jni_take(jni_env)
 }
 
-TextBoundsInfo_getCharacterFlags :: proc "contextless" (self: ^TextBoundsInfo, index: i32) -> (result: i32, exception: ^Throwable) {
+TextBoundsInfo_getCharacterFlags :: proc "contextless" (self: ^TextBoundsInfo, index: i32) -> (result: TextBoundsInfo_Flags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TextBoundsInfo__class, "getCharacterFlags", "(I)I", false) or_return
 	jni_args := [?]android.jvalue{{i = index}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return transmute(TextBoundsInfo_Flags)(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 TextBoundsInfo_getEndIndex :: proc "contextless" (self: ^TextBoundsInfo) -> (result: i32, exception: ^Throwable) {
@@ -5112,13 +5249,21 @@ TextBoundsInfo_getWordSegmentFinder :: proc "contextless" (self: ^TextBoundsInfo
 	return (^SegmentFinder)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-TextBoundsInfo_writeToParcel :: proc "contextless" (self: ^TextBoundsInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+TextBoundsInfo_writeToParcel :: proc "contextless" (self: ^TextBoundsInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TextBoundsInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+TextBoundsInfo_Flag :: enum u32 {
+	CHARACTER_LINEFEED    = 1,
+	CHARACTER_PUNCTUATION = 2,
+	CHARACTER_WHITESPACE  = 0,
+	LINE_IS_RTL           = 3,
+}
+TextBoundsInfo_Flags :: distinct bit_set[TextBoundsInfo_Flag; u32]
 
 // class android.view.inputmethod.TextBoundsInfo.Builder // API level 34
 TextBoundsInfo_Builder :: struct #raw_union {
@@ -5216,17 +5361,17 @@ TextBoundsInfoResult_CODE_FAILED      :: 2
 TextBoundsInfoResult_CODE_SUCCESS     :: 1
 TextBoundsInfoResult_CODE_UNSUPPORTED :: 0
 
-TextBoundsInfoResult_new_int :: proc "contextless" (resultCode: i32) -> (result: ^TextBoundsInfoResult, exception: ^Throwable) {
+TextBoundsInfoResult_new_int :: proc "contextless" (resultCode: TextBoundsInfoResult_Code) -> (result: ^TextBoundsInfoResult, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &TextBoundsInfoResult__class, "<init>", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = resultCode}}
+	jni_args := [?]android.jvalue{{i = i32(resultCode)}}
 	return (^TextBoundsInfoResult)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-TextBoundsInfoResult_new_int_TextBoundsInfo :: proc "contextless" (resultCode: i32, textBoundsInfo: ^TextBoundsInfo) -> (result: ^TextBoundsInfoResult, exception: ^Throwable) {
+TextBoundsInfoResult_new_int_TextBoundsInfo :: proc "contextless" (resultCode: TextBoundsInfoResult_Code, textBoundsInfo: ^TextBoundsInfo) -> (result: ^TextBoundsInfoResult, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &TextBoundsInfoResult__class, "<init>", "(ILandroid/view/inputmethod/TextBoundsInfo;)V", false) or_return
-	jni_args := [?]android.jvalue{{i = resultCode}, {l = textBoundsInfo}}
+	jni_args := [?]android.jvalue{{i = i32(resultCode)}, {l = textBoundsInfo}}
 	return (^TextBoundsInfoResult)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -5235,16 +5380,23 @@ TextBoundsInfoResult_new :: proc{
 	TextBoundsInfoResult_new_int_TextBoundsInfo,
 }
 
-TextBoundsInfoResult_getResultCode :: proc "contextless" (self: ^TextBoundsInfoResult) -> (result: i32, exception: ^Throwable) {
+TextBoundsInfoResult_getResultCode :: proc "contextless" (self: ^TextBoundsInfoResult) -> (result: TextBoundsInfoResult_Code, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TextBoundsInfoResult__class, "getResultCode", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return TextBoundsInfoResult_Code(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 TextBoundsInfoResult_getTextBoundsInfo :: proc "contextless" (self: ^TextBoundsInfoResult) -> (result: ^TextBoundsInfo, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TextBoundsInfoResult__class, "getTextBoundsInfo", "()Landroid/view/inputmethod/TextBoundsInfo;", false) or_return
 	return (^TextBoundsInfo)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
+}
+
+TextBoundsInfoResult_Code :: enum i32 {
+	CANCELLED   = 3,
+	FAILED      = 2,
+	SUCCESS     = 1,
+	UNSUPPORTED = 0,
 }
 
 // class android.view.inputmethod.TextSnapshot // API level 33
@@ -5255,10 +5407,10 @@ TextSnapshot :: struct #raw_union {
 @(private)
 TextSnapshot__class := Cached_Class{name = "android/view/inputmethod/TextSnapshot"}
 
-TextSnapshot_new :: proc "contextless" (surroundingText: ^SurroundingText, compositionStart: i32, compositionEnd: i32, cursorCapsMode: i32) -> (result: ^TextSnapshot, exception: ^Throwable) {
+TextSnapshot_new :: proc "contextless" (surroundingText: ^SurroundingText, compositionStart: i32, compositionEnd: i32, cursorCapsMode: TextUtils_CapMode) -> (result: ^TextSnapshot, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &TextSnapshot__class, "<init>", "(Landroid/view/inputmethod/SurroundingText;III)V", false) or_return
-	jni_args := [?]android.jvalue{{l = surroundingText}, {i = compositionStart}, {i = compositionEnd}, {i = cursorCapsMode}}
+	jni_args := [?]android.jvalue{{l = surroundingText}, {i = compositionStart}, {i = compositionEnd}, {i = transmute(i32)cursorCapsMode}}
 	return (^TextSnapshot)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -5274,10 +5426,10 @@ TextSnapshot_getCompositionStart :: proc "contextless" (self: ^TextSnapshot) -> 
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-TextSnapshot_getCursorCapsMode :: proc "contextless" (self: ^TextSnapshot) -> (result: i32, exception: ^Throwable) {
+TextSnapshot_getCursorCapsMode :: proc "contextless" (self: ^TextSnapshot) -> (result: TextUtils_CapMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TextSnapshot__class, "getCursorCapsMode", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(TextUtils_CapMode)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 TextSnapshot_getSelectionEnd :: proc "contextless" (self: ^TextSnapshot) -> (result: i32, exception: ^Throwable) {

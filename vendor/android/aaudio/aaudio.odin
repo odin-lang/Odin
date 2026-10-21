@@ -7,256 +7,259 @@ import "core:c"
 
 foreign import libaaudio "system:aaudio"
 
-AAUDIO_DIRECTION_OUTPUT :: 0
-AAUDIO_DIRECTION_INPUT  :: 1
+aaudio_direction_t :: enum i32 {
+	OUTPUT = 0,
+	INPUT  = 1,
+}
 
-aaudio_direction_t :: i32
+aaudio_format_t :: enum i32 {
+	INVALID        = -1,
+	UNSPECIFIED    = 0,
+	PCM_I16        = 1,
+	PCM_FLOAT      = 2,
+	PCM_I24_PACKED = 3,
+	PCM_I32        = 4,
+	IEC61937       = 5,
+	MP3            = 6,
+	AAC_LC         = 7,
+	AAC_HE_V1      = 8,
+	AAC_HE_V2      = 9,
+	AAC_ELD        = 10,
+	AAC_XHE        = 11,
+	OPUS           = 12,
+}
 
-AAUDIO_FORMAT_INVALID        :: -1
-AAUDIO_FORMAT_UNSPECIFIED    :: 0
-AAUDIO_FORMAT_PCM_I16        :: 1
-AAUDIO_FORMAT_PCM_FLOAT      :: 2
-AAUDIO_FORMAT_PCM_I24_PACKED :: 3
-AAUDIO_FORMAT_PCM_I32        :: 4
-AAUDIO_FORMAT_IEC61937       :: 5
-AAUDIO_FORMAT_MP3            :: 6
-AAUDIO_FORMAT_AAC_LC         :: 7
-AAUDIO_FORMAT_AAC_HE_V1      :: 8
-AAUDIO_FORMAT_AAC_HE_V2      :: 9
-AAUDIO_FORMAT_AAC_ELD        :: 10
-AAUDIO_FORMAT_AAC_XHE        :: 11
-AAUDIO_FORMAT_OPUS           :: 12
+aaudio_result_t :: enum i32 {
+	OK                     = 0,
+	ERROR_BASE             = -900,
+	ERROR_DISCONNECTED     = -899,
+	ERROR_ILLEGAL_ARGUMENT = -898,
+	ERROR_INTERNAL         = -896,
+	ERROR_INVALID_STATE    = -895,
+	ERROR_INVALID_HANDLE   = -892,
+	ERROR_UNIMPLEMENTED    = -890,
+	ERROR_UNAVAILABLE      = -889,
+	ERROR_NO_FREE_HANDLES  = -888,
+	ERROR_NO_MEMORY        = -887,
+	ERROR_NULL             = -886,
+	ERROR_TIMEOUT          = -885,
+	ERROR_WOULD_BLOCK      = -884,
+	ERROR_INVALID_FORMAT   = -883,
+	ERROR_OUT_OF_RANGE     = -882,
+	ERROR_NO_SERVICE       = -881,
+	ERROR_INVALID_RATE     = -880,
+}
 
-aaudio_format_t :: i32
+aaudio_stream_state_t :: enum i32 {
+	UNINITIALIZED = 0,
+	UNKNOWN       = 1,
+	OPEN          = 2,
+	STARTING      = 3,
+	STARTED       = 4,
+	PAUSING       = 5,
+	PAUSED        = 6,
+	FLUSHING      = 7,
+	FLUSHED       = 8,
+	STOPPING      = 9,
+	STOPPED       = 10,
+	CLOSING       = 11,
+	CLOSED        = 12,
+	DISCONNECTED  = 13,
+}
 
-AAUDIO_OK                     :: 0
-AAUDIO_ERROR_BASE             :: -900
-AAUDIO_ERROR_DISCONNECTED     :: -899
-AAUDIO_ERROR_ILLEGAL_ARGUMENT :: -898
-AAUDIO_ERROR_INTERNAL         :: -896
-AAUDIO_ERROR_INVALID_STATE    :: -895
-AAUDIO_ERROR_INVALID_HANDLE   :: -892
-AAUDIO_ERROR_UNIMPLEMENTED    :: -890
-AAUDIO_ERROR_UNAVAILABLE      :: -889
-AAUDIO_ERROR_NO_FREE_HANDLES  :: -888
-AAUDIO_ERROR_NO_MEMORY        :: -887
-AAUDIO_ERROR_NULL             :: -886
-AAUDIO_ERROR_TIMEOUT          :: -885
-AAUDIO_ERROR_WOULD_BLOCK      :: -884
-AAUDIO_ERROR_INVALID_FORMAT   :: -883
-AAUDIO_ERROR_OUT_OF_RANGE     :: -882
-AAUDIO_ERROR_NO_SERVICE       :: -881
-AAUDIO_ERROR_INVALID_RATE     :: -880
+aaudio_sharing_mode_t :: enum i32 {
+	EXCLUSIVE = 0,
+	SHARED    = 1,
+}
 
-aaudio_result_t :: i32
+aaudio_performance_mode_t :: enum i32 {
+	NONE                   = 10,
+	POWER_SAVING           = 11,
+	LOW_LATENCY            = 12,
+	POWER_SAVING_OFFLOADED = 13,
+}
 
-AAUDIO_STREAM_STATE_UNINITIALIZED :: 0
-AAUDIO_STREAM_STATE_UNKNOWN       :: 1
-AAUDIO_STREAM_STATE_OPEN          :: 2
-AAUDIO_STREAM_STATE_STARTING      :: 3
-AAUDIO_STREAM_STATE_STARTED       :: 4
-AAUDIO_STREAM_STATE_PAUSING       :: 5
-AAUDIO_STREAM_STATE_PAUSED        :: 6
-AAUDIO_STREAM_STATE_FLUSHING      :: 7
-AAUDIO_STREAM_STATE_FLUSHED       :: 8
-AAUDIO_STREAM_STATE_STOPPING      :: 9
-AAUDIO_STREAM_STATE_STOPPED       :: 10
-AAUDIO_STREAM_STATE_CLOSING       :: 11
-AAUDIO_STREAM_STATE_CLOSED        :: 12
-AAUDIO_STREAM_STATE_DISCONNECTED  :: 13
+aaudio_usage_t :: enum i32 {
+	USAGE_MEDIA                          = 1,
+	USAGE_VOICE_COMMUNICATION            = 2,
+	USAGE_VOICE_COMMUNICATION_SIGNALLING = 3,
+	USAGE_ALARM                          = 4,
+	USAGE_NOTIFICATION                   = 5,
+	USAGE_NOTIFICATION_RINGTONE          = 6,
+	USAGE_NOTIFICATION_EVENT             = 10,
+	USAGE_ASSISTANCE_ACCESSIBILITY       = 11,
+	USAGE_ASSISTANCE_NAVIGATION_GUIDANCE = 12,
+	USAGE_ASSISTANCE_SONIFICATION        = 13,
+	USAGE_GAME                           = 14,
+	USAGE_ASSISTANT                      = 16,
+	SYSTEM_USAGE_EMERGENCY               = 1000,
+	SYSTEM_USAGE_SAFETY                  = 1001,
+	SYSTEM_USAGE_VEHICLE_STATUS          = 1002,
+	SYSTEM_USAGE_ANNOUNCEMENT            = 1003,
+}
 
-aaudio_stream_state_t :: i32
+aaudio_content_type_t :: enum i32 {
+	SPEECH       = 1,
+	MUSIC        = 2,
+	MOVIE        = 3,
+	SONIFICATION = 4,
+}
 
-AAUDIO_SHARING_MODE_EXCLUSIVE :: 0
-AAUDIO_SHARING_MODE_SHARED    :: 1
+aaudio_spatialization_behavior_t :: enum i32 {
+	AUTO  = 1,
+	NEVER = 2,
+}
 
-aaudio_sharing_mode_t :: i32
+aaudio_input_preset_t :: enum i32 {
+	GENERIC               = 1,
+	CAMCORDER             = 5,
+	VOICE_RECOGNITION     = 6,
+	VOICE_COMMUNICATION   = 7,
+	UNPROCESSED           = 9,
+	VOICE_PERFORMANCE     = 10,
+	SYSTEM_ECHO_REFERENCE = 1997,
+	SYSTEM_HOTWORD        = 1999,
+}
 
-AAUDIO_PERFORMANCE_MODE_NONE                   :: 10
-AAUDIO_PERFORMANCE_MODE_POWER_SAVING           :: 11
-AAUDIO_PERFORMANCE_MODE_LOW_LATENCY            :: 12
-AAUDIO_PERFORMANCE_MODE_POWER_SAVING_OFFLOADED :: 13
-
-aaudio_performance_mode_t :: i32
-
-AAUDIO_USAGE_MEDIA                          :: 1
-AAUDIO_USAGE_VOICE_COMMUNICATION            :: 2
-AAUDIO_USAGE_VOICE_COMMUNICATION_SIGNALLING :: 3
-AAUDIO_USAGE_ALARM                          :: 4
-AAUDIO_USAGE_NOTIFICATION                   :: 5
-AAUDIO_USAGE_NOTIFICATION_RINGTONE          :: 6
-AAUDIO_USAGE_NOTIFICATION_EVENT             :: 10
-AAUDIO_USAGE_ASSISTANCE_ACCESSIBILITY       :: 11
-AAUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE :: 12
-AAUDIO_USAGE_ASSISTANCE_SONIFICATION        :: 13
-AAUDIO_USAGE_GAME                           :: 14
-AAUDIO_USAGE_ASSISTANT                      :: 16
-AAUDIO_SYSTEM_USAGE_EMERGENCY               :: 1000
-AAUDIO_SYSTEM_USAGE_SAFETY                  :: 1001
-AAUDIO_SYSTEM_USAGE_VEHICLE_STATUS          :: 1002
-AAUDIO_SYSTEM_USAGE_ANNOUNCEMENT            :: 1003
-
-aaudio_usage_t :: i32
-
-AAUDIO_CONTENT_TYPE_SPEECH       :: 1
-AAUDIO_CONTENT_TYPE_MUSIC        :: 2
-AAUDIO_CONTENT_TYPE_MOVIE        :: 3
-AAUDIO_CONTENT_TYPE_SONIFICATION :: 4
-
-aaudio_content_type_t :: i32
-
-AAUDIO_SPATIALIZATION_BEHAVIOR_AUTO  :: 1
-AAUDIO_SPATIALIZATION_BEHAVIOR_NEVER :: 2
-
-aaudio_spatialization_behavior_t :: i32
-
-AAUDIO_INPUT_PRESET_GENERIC               :: 1
-AAUDIO_INPUT_PRESET_CAMCORDER             :: 5
-AAUDIO_INPUT_PRESET_VOICE_RECOGNITION     :: 6
-AAUDIO_INPUT_PRESET_VOICE_COMMUNICATION   :: 7
-AAUDIO_INPUT_PRESET_UNPROCESSED           :: 9
-AAUDIO_INPUT_PRESET_VOICE_PERFORMANCE     :: 10
-AAUDIO_INPUT_PRESET_SYSTEM_ECHO_REFERENCE :: 1997
-AAUDIO_INPUT_PRESET_SYSTEM_HOTWORD        :: 1999
-
-aaudio_input_preset_t :: i32
-
-AAUDIO_ALLOW_CAPTURE_BY_ALL    :: 1
-AAUDIO_ALLOW_CAPTURE_BY_SYSTEM :: 2
-AAUDIO_ALLOW_CAPTURE_BY_NONE   :: 3
-
-aaudio_allowed_capture_policy_t :: i32
+aaudio_allowed_capture_policy_t :: enum i32 {
+	ALL    = 1,
+	SYSTEM = 2,
+	NONE   = 3,
+}
 
 AAUDIO_SESSION_ID_NONE     :: -1
 AAUDIO_SESSION_ID_ALLOCATE :: 0
 
 aaudio_session_id_t :: i32
 
-AAUDIO_CHANNEL_INVALID               :: -1
-AAUDIO_CHANNEL_FRONT_LEFT            :: 0x1
-AAUDIO_CHANNEL_FRONT_RIGHT           :: 0x2
-AAUDIO_CHANNEL_FRONT_CENTER          :: 0x4
-AAUDIO_CHANNEL_LOW_FREQUENCY         :: 0x8
-AAUDIO_CHANNEL_BACK_LEFT             :: 0x10
-AAUDIO_CHANNEL_BACK_RIGHT            :: 0x20
-AAUDIO_CHANNEL_FRONT_LEFT_OF_CENTER  :: 0x40
-AAUDIO_CHANNEL_FRONT_RIGHT_OF_CENTER :: 0x80
-AAUDIO_CHANNEL_BACK_CENTER           :: 0x100
-AAUDIO_CHANNEL_SIDE_LEFT             :: 0x200
-AAUDIO_CHANNEL_SIDE_RIGHT            :: 0x400
-AAUDIO_CHANNEL_TOP_CENTER            :: 0x800
-AAUDIO_CHANNEL_TOP_FRONT_LEFT        :: 0x1000
-AAUDIO_CHANNEL_TOP_FRONT_CENTER      :: 0x2000
-AAUDIO_CHANNEL_TOP_FRONT_RIGHT       :: 0x4000
-AAUDIO_CHANNEL_TOP_BACK_LEFT         :: 0x8000
-AAUDIO_CHANNEL_TOP_BACK_CENTER       :: 0x10000
-AAUDIO_CHANNEL_TOP_BACK_RIGHT        :: 0x20000
-AAUDIO_CHANNEL_TOP_SIDE_LEFT         :: 0x40000
-AAUDIO_CHANNEL_TOP_SIDE_RIGHT        :: 0x80000
-AAUDIO_CHANNEL_BOTTOM_FRONT_LEFT     :: 0x100000
-AAUDIO_CHANNEL_BOTTOM_FRONT_CENTER   :: 0x200000
-AAUDIO_CHANNEL_BOTTOM_FRONT_RIGHT    :: 0x400000
-AAUDIO_CHANNEL_LOW_FREQUENCY_2       :: 0x800000
-AAUDIO_CHANNEL_FRONT_WIDE_LEFT       :: 0x1000000
-AAUDIO_CHANNEL_FRONT_WIDE_RIGHT      :: 0x2000000
-AAUDIO_CHANNEL_MONO                  :: 1
-AAUDIO_CHANNEL_STEREO                :: 0x3
-AAUDIO_CHANNEL_2POINT1               :: 0xb
-AAUDIO_CHANNEL_TRI                   :: 0x7
-AAUDIO_CHANNEL_TRI_BACK              :: 0x103
-AAUDIO_CHANNEL_3POINT1               :: 0xf
-AAUDIO_CHANNEL_2POINT0POINT2         :: 0xc0003
-AAUDIO_CHANNEL_2POINT1POINT2         :: 0xc000b
-AAUDIO_CHANNEL_3POINT0POINT2         :: 0xc0007
-AAUDIO_CHANNEL_3POINT1POINT2         :: 0xc000f
-AAUDIO_CHANNEL_QUAD                  :: 0x33
-AAUDIO_CHANNEL_QUAD_SIDE             :: 0x603
-AAUDIO_CHANNEL_SURROUND              :: 0x107
-AAUDIO_CHANNEL_PENTA                 :: 0x37
-AAUDIO_CHANNEL_5POINT1               :: 0x3f
-AAUDIO_CHANNEL_5POINT1_SIDE          :: 0x60f
-AAUDIO_CHANNEL_6POINT1               :: 0x13f
-AAUDIO_CHANNEL_7POINT1               :: 0x63f
-AAUDIO_CHANNEL_5POINT1POINT2         :: 0xc003f
-AAUDIO_CHANNEL_5POINT1POINT4         :: 0x2d03f
-AAUDIO_CHANNEL_7POINT1POINT2         :: 0xc063f
-AAUDIO_CHANNEL_7POINT1POINT4         :: 0x2d63f
-AAUDIO_CHANNEL_13POINT0              :: 0x72f607
-AAUDIO_CHANNEL_9POINT1POINT4         :: 0x302d63f
-AAUDIO_CHANNEL_9POINT1POINT6         :: 0x30ed63f
-AAUDIO_CHANNEL_FRONT_BACK            :: 0x104
+aaudio_channel_t :: enum u32 {
+	FRONT_LEFT            = 0,
+	FRONT_RIGHT           = 1,
+	FRONT_CENTER          = 2,
+	LOW_FREQUENCY         = 3,
+	BACK_LEFT             = 4,
+	BACK_RIGHT            = 5,
+	FRONT_LEFT_OF_CENTER  = 6,
+	FRONT_RIGHT_OF_CENTER = 7,
+	BACK_CENTER           = 8,
+	SIDE_LEFT             = 9,
+	SIDE_RIGHT            = 10,
+	TOP_CENTER            = 11,
+	TOP_FRONT_LEFT        = 12,
+	TOP_FRONT_CENTER      = 13,
+	TOP_FRONT_RIGHT       = 14,
+	TOP_BACK_LEFT         = 15,
+	TOP_BACK_CENTER       = 16,
+	TOP_BACK_RIGHT        = 17,
+	TOP_SIDE_LEFT         = 18,
+	TOP_SIDE_RIGHT        = 19,
+	BOTTOM_FRONT_LEFT     = 20,
+	BOTTOM_FRONT_CENTER   = 21,
+	BOTTOM_FRONT_RIGHT    = 22,
+	LOW_FREQUENCY_2       = 23,
+	FRONT_WIDE_LEFT       = 24,
+	FRONT_WIDE_RIGHT      = 25,
+	MONO                  = 0,
+}
+aaudio_channel_mask_t :: distinct bit_set[aaudio_channel_t; u32]
 
-aaudio_channel_mask_t :: u32
+AAUDIO_CHANNEL_INVALID       :: transmute(aaudio_channel_mask_t)u32(0xffffffff)
+AAUDIO_CHANNEL_STEREO        :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT}
+AAUDIO_CHANNEL_2POINT1       :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .LOW_FREQUENCY}
+AAUDIO_CHANNEL_TRI           :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .FRONT_CENTER}
+AAUDIO_CHANNEL_TRI_BACK      :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .BACK_CENTER}
+AAUDIO_CHANNEL_3POINT1       :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .FRONT_CENTER, .LOW_FREQUENCY}
+AAUDIO_CHANNEL_2POINT0POINT2 :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .TOP_SIDE_LEFT, .TOP_SIDE_RIGHT}
+AAUDIO_CHANNEL_2POINT1POINT2 :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .LOW_FREQUENCY, .TOP_SIDE_LEFT, .TOP_SIDE_RIGHT}
+AAUDIO_CHANNEL_3POINT0POINT2 :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .FRONT_CENTER, .TOP_SIDE_LEFT, .TOP_SIDE_RIGHT}
+AAUDIO_CHANNEL_3POINT1POINT2 :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .FRONT_CENTER, .LOW_FREQUENCY, .TOP_SIDE_LEFT, .TOP_SIDE_RIGHT}
+AAUDIO_CHANNEL_QUAD          :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .BACK_LEFT, .BACK_RIGHT}
+AAUDIO_CHANNEL_QUAD_SIDE     :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .SIDE_LEFT, .SIDE_RIGHT}
+AAUDIO_CHANNEL_SURROUND      :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .FRONT_CENTER, .BACK_CENTER}
+AAUDIO_CHANNEL_PENTA         :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .FRONT_CENTER, .BACK_LEFT, .BACK_RIGHT}
+AAUDIO_CHANNEL_5POINT1       :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .FRONT_CENTER, .LOW_FREQUENCY, .BACK_LEFT, .BACK_RIGHT}
+AAUDIO_CHANNEL_5POINT1_SIDE  :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .FRONT_CENTER, .LOW_FREQUENCY, .SIDE_LEFT, .SIDE_RIGHT}
+AAUDIO_CHANNEL_6POINT1       :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .FRONT_CENTER, .LOW_FREQUENCY, .BACK_LEFT, .BACK_RIGHT, .BACK_CENTER}
+AAUDIO_CHANNEL_7POINT1       :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .FRONT_CENTER, .LOW_FREQUENCY, .BACK_LEFT, .BACK_RIGHT, .SIDE_LEFT, .SIDE_RIGHT}
+AAUDIO_CHANNEL_5POINT1POINT2 :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .FRONT_CENTER, .LOW_FREQUENCY, .BACK_LEFT, .BACK_RIGHT, .TOP_SIDE_LEFT, .TOP_SIDE_RIGHT}
+AAUDIO_CHANNEL_5POINT1POINT4 :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .FRONT_CENTER, .LOW_FREQUENCY, .BACK_LEFT, .BACK_RIGHT, .TOP_FRONT_LEFT, .TOP_FRONT_RIGHT, .TOP_BACK_LEFT, .TOP_BACK_RIGHT}
+AAUDIO_CHANNEL_7POINT1POINT2 :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .FRONT_CENTER, .LOW_FREQUENCY, .BACK_LEFT, .BACK_RIGHT, .SIDE_LEFT, .SIDE_RIGHT, .TOP_SIDE_LEFT, .TOP_SIDE_RIGHT}
+AAUDIO_CHANNEL_7POINT1POINT4 :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .FRONT_CENTER, .LOW_FREQUENCY, .BACK_LEFT, .BACK_RIGHT, .SIDE_LEFT, .SIDE_RIGHT, .TOP_FRONT_LEFT, .TOP_FRONT_RIGHT, .TOP_BACK_LEFT, .TOP_BACK_RIGHT}
+AAUDIO_CHANNEL_13POINT0      :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .FRONT_CENTER, .SIDE_LEFT, .SIDE_RIGHT, .TOP_FRONT_LEFT, .TOP_FRONT_CENTER, .TOP_FRONT_RIGHT, .TOP_BACK_LEFT, .TOP_BACK_RIGHT, .BOTTOM_FRONT_LEFT, .BOTTOM_FRONT_CENTER, .BOTTOM_FRONT_RIGHT}
+AAUDIO_CHANNEL_9POINT1POINT4 :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .FRONT_CENTER, .LOW_FREQUENCY, .BACK_LEFT, .BACK_RIGHT, .SIDE_LEFT, .SIDE_RIGHT, .TOP_FRONT_LEFT, .TOP_FRONT_RIGHT, .TOP_BACK_LEFT, .TOP_BACK_RIGHT, .FRONT_WIDE_LEFT, .FRONT_WIDE_RIGHT}
+AAUDIO_CHANNEL_9POINT1POINT6 :: aaudio_channel_mask_t{.FRONT_LEFT, .FRONT_RIGHT, .FRONT_CENTER, .LOW_FREQUENCY, .BACK_LEFT, .BACK_RIGHT, .SIDE_LEFT, .SIDE_RIGHT, .TOP_FRONT_LEFT, .TOP_FRONT_RIGHT, .TOP_BACK_LEFT, .TOP_BACK_RIGHT, .TOP_SIDE_LEFT, .TOP_SIDE_RIGHT, .FRONT_WIDE_LEFT, .FRONT_WIDE_RIGHT}
+AAUDIO_CHANNEL_FRONT_BACK    :: aaudio_channel_mask_t{.FRONT_CENTER, .BACK_CENTER}
 
-AAudio_DeviceType :: i32
+AAudio_DeviceType :: enum i32 {
+	BUILTIN_EARPIECE      = 1,
+	BUILTIN_SPEAKER       = 2,
+	WIRED_HEADSET         = 3,
+	WIRED_HEADPHONES      = 4,
+	LINE_ANALOG           = 5,
+	LINE_DIGITAL          = 6,
+	BLUETOOTH_SCO         = 7,
+	BLUETOOTH_A2DP        = 8,
+	HDMI                  = 9,
+	HDMI_ARC              = 10,
+	USB_DEVICE            = 11,
+	USB_ACCESSORY         = 12,
+	DOCK                  = 13,
+	FM                    = 14,
+	BUILTIN_MIC           = 15,
+	FM_TUNER              = 16,
+	TV_TUNER              = 17,
+	TELEPHONY             = 18,
+	AUX_LINE              = 19,
+	IP                    = 20,
+	BUS                   = 21,
+	USB_HEADSET           = 22,
+	HEARING_AID           = 23,
+	BUILTIN_SPEAKER_SAFE  = 24,
+	REMOTE_SUBMIX         = 25,
+	BLE_HEADSET           = 26,
+	BLE_SPEAKER           = 27,
+	HDMI_EARC             = 29,
+	BLE_BROADCAST         = 30,
+	DOCK_ANALOG           = 31,
+	BLE_HEARING_AID       = 32,
+	BLE_CENTRAL           = 33,
+	BLE_CENTRAL_BROADCAST = 34,
+}
 
-AAUDIO_DEVICE_BUILTIN_EARPIECE      :: 1
-AAUDIO_DEVICE_BUILTIN_SPEAKER       :: 2
-AAUDIO_DEVICE_WIRED_HEADSET         :: 3
-AAUDIO_DEVICE_WIRED_HEADPHONES      :: 4
-AAUDIO_DEVICE_LINE_ANALOG           :: 5
-AAUDIO_DEVICE_LINE_DIGITAL          :: 6
-AAUDIO_DEVICE_BLUETOOTH_SCO         :: 7
-AAUDIO_DEVICE_BLUETOOTH_A2DP        :: 8
-AAUDIO_DEVICE_HDMI                  :: 9
-AAUDIO_DEVICE_HDMI_ARC              :: 10
-AAUDIO_DEVICE_USB_DEVICE            :: 11
-AAUDIO_DEVICE_USB_ACCESSORY         :: 12
-AAUDIO_DEVICE_DOCK                  :: 13
-AAUDIO_DEVICE_FM                    :: 14
-AAUDIO_DEVICE_BUILTIN_MIC           :: 15
-AAUDIO_DEVICE_FM_TUNER              :: 16
-AAUDIO_DEVICE_TV_TUNER              :: 17
-AAUDIO_DEVICE_TELEPHONY             :: 18
-AAUDIO_DEVICE_AUX_LINE              :: 19
-AAUDIO_DEVICE_IP                    :: 20
-AAUDIO_DEVICE_BUS                   :: 21
-AAUDIO_DEVICE_USB_HEADSET           :: 22
-AAUDIO_DEVICE_HEARING_AID           :: 23
-AAUDIO_DEVICE_BUILTIN_SPEAKER_SAFE  :: 24
-AAUDIO_DEVICE_REMOTE_SUBMIX         :: 25
-AAUDIO_DEVICE_BLE_HEADSET           :: 26
-AAUDIO_DEVICE_BLE_SPEAKER           :: 27
-AAUDIO_DEVICE_HDMI_EARC             :: 29
-AAUDIO_DEVICE_BLE_BROADCAST         :: 30
-AAUDIO_DEVICE_DOCK_ANALOG           :: 31
-AAUDIO_DEVICE_BLE_HEARING_AID       :: 32
-AAUDIO_DEVICE_BLE_CENTRAL           :: 33
-AAUDIO_DEVICE_BLE_CENTRAL_BROADCAST :: 34
-
-AAudio_FlushFromFrameSupport :: i32
-
-AAUDIO_FLUSH_FROM_FRAME_UNSUPPORTED :: 0
-AAUDIO_FLUSH_FROM_FRAME_SUPPORTED   :: 0x1
+AAudio_FlushFromFrameSupport :: enum i32 {
+	UNSUPPORTED = 0,
+	SUPPORTED   = 0x1,
+}
 
 AAudioStream        :: struct {}
 AAudioStreamBuilder :: struct {}
 
-AAUDIO_CALLBACK_RESULT_CONTINUE :: 0
-AAUDIO_CALLBACK_RESULT_STOP     :: 1
+aaudio_data_callback_result_t :: enum i32 {
+	CONTINUE = 0,
+	STOP     = 1,
+}
 
-aaudio_data_callback_result_t        :: i32
 AAudioStream_dataCallback            :: proc "c" (stream: ^AAudioStream, userData: rawptr, audioData: rawptr, numFrames: i32) -> aaudio_data_callback_result_t
 AAudioStream_partialDataCallback     :: proc "c" (stream: ^AAudioStream, userData: rawptr, audioData: rawptr, numFrames: i32) -> i32
 AAudioStream_errorCallback           :: proc "c" (stream: ^AAudioStream, userData: rawptr, error: aaudio_result_t)
 AAudioStream_presentationEndCallback :: proc "c" (stream: ^AAudioStream, userData: rawptr)
 AAudioStream_routingChangedCallback  :: proc "c" (stream: ^AAudioStream, userData: rawptr, deviceIds: ^i32, numDevices: i32)
 
-AAudio_FlushFromAccuracy :: i32
+AAudio_FlushFromAccuracy :: enum i32 {
+	ACCURACY_UNDEFINED = 0,
+	FRAME_ACCURATE     = 1,
+}
 
-AAUDIO_FLUSH_FROM_ACCURACY_UNDEFINED :: 0
-AAUDIO_FLUSH_FROM_FRAME_ACCURATE     :: 1
+AAudio_FallbackMode :: enum i32 {
+	DEFAULT = 0,
+	MUTE    = 1,
+	FAIL    = 2,
+}
 
-AAudio_FallbackMode :: i32
-
-AAUDIO_FALLBACK_MODE_DEFAULT :: 0
-AAUDIO_FALLBACK_MODE_MUTE    :: 1
-AAUDIO_FALLBACK_MODE_FAIL    :: 2
-
-AAudio_StretchMode :: i32
-
-AAUDIO_STRETCH_MODE_DEFAULT :: 0
-AAUDIO_STRETCH_MODE_VOICE   :: 1
+AAudio_StretchMode :: enum i32 {
+	DEFAULT = 0,
+	VOICE   = 1,
+}
 
 AAudioPlaybackParameters :: struct {
 	fallbackMode: AAudio_FallbackMode,
@@ -265,11 +268,11 @@ AAudioPlaybackParameters :: struct {
 	speed:        f32,
 }
 
-AAUDIO_POLICY_NEVER  :: 1
-AAUDIO_POLICY_AUTO   :: 2
-AAUDIO_POLICY_ALWAYS :: 3
-
-aaudio_policy_t :: i32
+aaudio_policy_t :: enum i32 {
+	NEVER  = 1,
+	AUTO   = 2,
+	ALWAYS = 3,
+}
 
 AAUDIO_UNSPECIFIED         :: 0
 AAUDIO_SYSTEM_USAGE_OFFSET :: 1000

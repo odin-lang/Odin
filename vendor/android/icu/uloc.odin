@@ -7,30 +7,30 @@ import "core:c"
 
 foreign import libicu "system:icu"
 
-ULocDataLocaleType :: c.int
+ULocDataLocaleType :: enum c.int {
+	ACTUAL_LOCALE = 0,
+	VALID_LOCALE  = 1,
+}
 
-ULOC_ACTUAL_LOCALE :: 0
-ULOC_VALID_LOCALE  :: 1
+ULocAvailableType :: enum c.int {
+	DEFAULT             = 0,
+	ONLY_LEGACY_ALIASES = 1,
+	WITH_LEGACY_ALIASES = 2,
+}
 
-ULocAvailableType :: c.int
+ULayoutType :: enum c.int {
+	LTR     = 0,
+	RTL     = 1,
+	TTB     = 2,
+	BTT     = 3,
+	UNKNOWN = 4,
+}
 
-ULOC_AVAILABLE_DEFAULT             :: 0
-ULOC_AVAILABLE_ONLY_LEGACY_ALIASES :: 1
-ULOC_AVAILABLE_WITH_LEGACY_ALIASES :: 2
-
-ULayoutType :: c.int
-
-ULOC_LAYOUT_LTR     :: 0
-ULOC_LAYOUT_RTL     :: 1
-ULOC_LAYOUT_TTB     :: 2
-ULOC_LAYOUT_BTT     :: 3
-ULOC_LAYOUT_UNKNOWN :: 4
-
-UAcceptResult :: c.int
-
-ULOC_ACCEPT_FAILED   :: 0
-ULOC_ACCEPT_VALID    :: 1
-ULOC_ACCEPT_FALLBACK :: 2
+UAcceptResult :: enum c.int {
+	FAILED   = 0,
+	VALID    = 1,
+	FALLBACK = 2,
+}
 
 ULOC_CHINESE                        :: "zh"
 ULOC_ENGLISH                        :: "en"

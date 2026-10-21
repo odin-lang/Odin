@@ -9,11 +9,11 @@ foreign import libmediandk "system:mediandk"
 
 AMediaExtractor :: struct {}
 
-SeekMode :: c.int
-
-AMEDIAEXTRACTOR_SEEK_PREVIOUS_SYNC :: 0
-AMEDIAEXTRACTOR_SEEK_NEXT_SYNC     :: 1
-AMEDIAEXTRACTOR_SEEK_CLOSEST_SYNC  :: 2
+SeekMode :: enum c.int {
+	PREVIOUS_SYNC = 0,
+	NEXT_SYNC     = 1,
+	CLOSEST_SYNC  = 2,
+}
 
 PsshEntry :: struct {
 	uuid:    AMediaUUID,
@@ -26,8 +26,11 @@ PsshInfo :: struct {
 	entries:    [0]PsshEntry,
 }
 
-AMEDIAEXTRACTOR_SAMPLE_FLAG_SYNC      :: 1
-AMEDIAEXTRACTOR_SAMPLE_FLAG_ENCRYPTED :: 2
+AMediaExtractorSampleFlag :: enum u32 {
+	SYNC      = 0,
+	ENCRYPTED = 1,
+}
+AMediaExtractorSampleFlags :: distinct bit_set[AMediaExtractorSampleFlag; u32]
 
 @(default_calling_convention="c")
 foreign libmediandk {
@@ -41,7 +44,7 @@ foreign libmediandk {
 	AMediaExtractor_selectTrack         :: proc(_0: ^AMediaExtractor, idx: c.size_t) -> media_status_t ---
 	AMediaExtractor_unselectTrack       :: proc(_0: ^AMediaExtractor, idx: c.size_t) -> media_status_t ---
 	AMediaExtractor_readSampleData      :: proc(_0: ^AMediaExtractor, buffer: ^u8, capacity: c.size_t) -> c.ssize_t ---
-	AMediaExtractor_getSampleFlags      :: proc(_0: ^AMediaExtractor) -> u32 ---
+	AMediaExtractor_getSampleFlags      :: proc(_0: ^AMediaExtractor) -> AMediaExtractorSampleFlags ---
 	AMediaExtractor_getSampleTrackIndex :: proc(_0: ^AMediaExtractor) -> c.int ---
 	AMediaExtractor_getSampleTime       :: proc(_0: ^AMediaExtractor) -> i64 ---
 	AMediaExtractor_advance             :: proc(_0: ^AMediaExtractor) -> bool ---

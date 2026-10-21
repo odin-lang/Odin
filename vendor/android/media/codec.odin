@@ -15,22 +15,29 @@ AMediaCodecBufferInfo :: struct {
 	offset:             i32,
 	size:               i32,
 	presentationTimeUs: i64,
-	flags:              u32,
+	flags:              AMediaCodecBufferFlags,
 }
 
 AMediaCodecCryptoInfo :: struct {}
 
-AMEDIACODEC_BUFFER_FLAG_KEY_FRAME     :: 1
-AMEDIACODEC_BUFFER_FLAG_CODEC_CONFIG  :: 2
-AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM :: 4
-AMEDIACODEC_BUFFER_FLAG_PARTIAL_FRAME :: 8
-AMEDIACODEC_BUFFER_FLAG_MUXER_DATA    :: 16
-AMEDIACODEC_BUFFER_FLAG_DECODE_ONLY   :: 32
+AMediaCodecBufferFlag :: enum u32 {
+	KEY_FRAME     = 0,
+	CODEC_CONFIG  = 1,
+	END_OF_STREAM = 2,
+	PARTIAL_FRAME = 3,
+	MUXER_DATA    = 4,
+	DECODE_ONLY   = 5,
+}
+AMediaCodecBufferFlags :: distinct bit_set[AMediaCodecBufferFlag; u32]
 
-AMEDIACODEC_CONFIGURE_FLAG_ENCODE       :: 1
 AMEDIACODEC_INFO_OUTPUT_BUFFERS_CHANGED :: -3
 AMEDIACODEC_INFO_OUTPUT_FORMAT_CHANGED  :: -2
 AMEDIACODEC_INFO_TRY_AGAIN_LATER        :: -1
+
+AMediaCodecConfigureFlag :: enum u32 {
+	ENCODE = 0,
+}
+AMediaCodecConfigureFlags :: distinct bit_set[AMediaCodecConfigureFlag; u32]
 
 AMediaCodecOnAsyncInputAvailable  :: proc "c" (codec: ^AMediaCodec, userdata: rawptr, index: i32)
 AMediaCodecOnAsyncOutputAvailable :: proc "c" (codec: ^AMediaCodec, userdata: rawptr, index: i32, bufferInfo: ^AMediaCodecBufferInfo)
@@ -46,12 +53,12 @@ AMediaCodecOnAsyncNotifyCallback :: struct {
 
 AMediaCodecOnFrameRendered :: proc "c" (codec: ^AMediaCodec, userdata: rawptr, mediaTimeUs: i64, systemNano: i64)
 
-cryptoinfo_mode_t :: c.int
-
-AMEDIACODECRYPTOINFO_MODE_CLEAR   :: 0
-AMEDIACODECRYPTOINFO_MODE_AES_CTR :: 1
-AMEDIACODECRYPTOINFO_MODE_AES_WV  :: 2
-AMEDIACODECRYPTOINFO_MODE_AES_CBC :: 3
+cryptoinfo_mode_t :: enum c.int {
+	CLEAR   = 0,
+	AES_CTR = 1,
+	AES_WV  = 2,
+	AES_CBC = 3,
+}
 
 cryptoinfo_pattern_t :: struct {
 	encryptBlocks: i32,
@@ -72,15 +79,15 @@ foreign libmediandk {
 	AMediaCodec_createDecoderByType          :: proc(mime_type: cstring) -> ^AMediaCodec ---
 	AMediaCodec_createEncoderByType          :: proc(mime_type: cstring) -> ^AMediaCodec ---
 	AMediaCodec_delete                       :: proc(_0: ^AMediaCodec) -> media_status_t ---
-	AMediaCodec_configure                    :: proc(_0: ^AMediaCodec, format: ^AMediaFormat, surface: ^ANativeWindow, crypto: ^AMediaCrypto, flags: u32) -> media_status_t ---
+	AMediaCodec_configure                    :: proc(_0: ^AMediaCodec, format: ^AMediaFormat, surface: ^ANativeWindow, crypto: ^AMediaCrypto, flags: AMediaCodecConfigureFlags) -> media_status_t ---
 	AMediaCodec_start                        :: proc(_0: ^AMediaCodec) -> media_status_t ---
 	AMediaCodec_stop                         :: proc(_0: ^AMediaCodec) -> media_status_t ---
 	AMediaCodec_flush                        :: proc(_0: ^AMediaCodec) -> media_status_t ---
 	AMediaCodec_getInputBuffer               :: proc(_0: ^AMediaCodec, idx: c.size_t, out_size: ^c.size_t) -> ^u8 ---
 	AMediaCodec_getOutputBuffer              :: proc(_0: ^AMediaCodec, idx: c.size_t, out_size: ^c.size_t) -> ^u8 ---
 	AMediaCodec_dequeueInputBuffer           :: proc(_0: ^AMediaCodec, timeoutUs: i64) -> c.ssize_t ---
-	AMediaCodec_queueInputBuffer             :: proc(_0: ^AMediaCodec, idx: c.size_t, offset: c.long, size: c.size_t, time: u64, flags: u32) -> media_status_t ---
-	AMediaCodec_queueSecureInputBuffer       :: proc(_0: ^AMediaCodec, idx: c.size_t, offset: c.long, _3: ^AMediaCodecCryptoInfo, time: u64, flags: u32) -> media_status_t ---
+	AMediaCodec_queueInputBuffer             :: proc(_0: ^AMediaCodec, idx: c.size_t, offset: c.long, size: c.size_t, time: u64, flags: AMediaCodecBufferFlags) -> media_status_t ---
+	AMediaCodec_queueSecureInputBuffer       :: proc(_0: ^AMediaCodec, idx: c.size_t, offset: c.long, _3: ^AMediaCodecCryptoInfo, time: u64, flags: AMediaCodecBufferFlags) -> media_status_t ---
 	AMediaCodec_dequeueOutputBuffer          :: proc(_0: ^AMediaCodec, info: ^AMediaCodecBufferInfo, timeoutUs: i64) -> c.ssize_t ---
 	AMediaCodec_getOutputFormat              :: proc(_0: ^AMediaCodec) -> ^AMediaFormat ---
 	AMediaCodec_releaseOutputBuffer          :: proc(_0: ^AMediaCodec, idx: c.size_t, render: bool) -> media_status_t ---

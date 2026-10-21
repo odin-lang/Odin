@@ -13,23 +13,25 @@ AMidiDevice     :: struct {}
 AMidiInputPort  :: struct {}
 AMidiOutputPort :: struct {}
 
-AMIDI_OPCODE_DATA  :: 1
-AMIDI_OPCODE_FLUSH :: 2
+AMidiOpcode :: enum i32 {
+	DATA  = 1,
+	FLUSH = 2,
+}
 
 AMIDI_DEVICE_TYPE_USB       :: 1
 AMIDI_DEVICE_TYPE_VIRTUAL   :: 2
 AMIDI_DEVICE_TYPE_BLUETOOTH :: 3
 
-AMidiDevice_Protocol :: i32
-
-AMIDI_DEVICE_PROTOCOL_UMP_USE_MIDI_CI                      :: 0
-AMIDI_DEVICE_PROTOCOL_UMP_MIDI_1_0_UP_TO_64_BITS           :: 1
-AMIDI_DEVICE_PROTOCOL_UMP_MIDI_1_0_UP_TO_64_BITS_AND_JRTS  :: 2
-AMIDI_DEVICE_PROTOCOL_UMP_MIDI_1_0_UP_TO_128_BITS          :: 3
-AMIDI_DEVICE_PROTOCOL_UMP_MIDI_1_0_UP_TO_128_BITS_AND_JRTS :: 4
-AMIDI_DEVICE_PROTOCOL_UMP_MIDI_2_0                         :: 17
-AMIDI_DEVICE_PROTOCOL_UMP_MIDI_2_0_AND_JRTS                :: 18
-AMIDI_DEVICE_PROTOCOL_UNKNOWN                              :: -1
+AMidiDevice_Protocol :: enum i32 {
+	UMP_USE_MIDI_CI                      = 0,
+	UMP_MIDI_1_0_UP_TO_64_BITS           = 1,
+	UMP_MIDI_1_0_UP_TO_64_BITS_AND_JRTS  = 2,
+	UMP_MIDI_1_0_UP_TO_128_BITS          = 3,
+	UMP_MIDI_1_0_UP_TO_128_BITS_AND_JRTS = 4,
+	UMP_MIDI_2_0                         = 17,
+	UMP_MIDI_2_0_AND_JRTS                = 18,
+	UNKNOWN                              = -1,
+}
 
 @(default_calling_convention="c")
 foreign libamidi {
@@ -41,7 +43,7 @@ foreign libamidi {
 	AMidiDevice_getDefaultProtocol   :: proc(device: ^AMidiDevice) -> AMidiDevice_Protocol --- // API level 33
 	AMidiOutputPort_open             :: proc(device: ^AMidiDevice, portNumber: i32, outOutputPortPtr: ^^AMidiOutputPort) -> android_media.media_status_t ---
 	AMidiOutputPort_close            :: proc(outputPort: ^AMidiOutputPort) ---
-	AMidiOutputPort_receive          :: proc(outputPort: ^AMidiOutputPort, opcodePtr: ^i32, buffer: ^u8, maxBytes: c.size_t, numBytesReceivedPtr: ^c.size_t, outTimestampPtr: ^i64) -> c.ssize_t ---
+	AMidiOutputPort_receive          :: proc(outputPort: ^AMidiOutputPort, opcodePtr: ^AMidiOpcode, buffer: ^u8, maxBytes: c.size_t, numBytesReceivedPtr: ^c.size_t, outTimestampPtr: ^i64) -> c.ssize_t ---
 	AMidiInputPort_open              :: proc(device: ^AMidiDevice, portNumber: i32, outInputPortPtr: ^^AMidiInputPort) -> android_media.media_status_t ---
 	AMidiInputPort_send              :: proc(inputPort: ^AMidiInputPort, buffer: ^u8, numBytes: c.size_t) -> c.ssize_t ---
 	AMidiInputPort_sendWithTimestamp :: proc(inputPort: ^AMidiInputPort, buffer: ^u8, numBytes: c.size_t, timestamp: i64) -> c.ssize_t ---

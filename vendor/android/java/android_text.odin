@@ -142,10 +142,10 @@ Annotation_new :: proc{
 	Annotation_new_String_String,
 }
 
-Annotation_describeContents :: proc "contextless" (self: ^Annotation) -> (result: i32, exception: ^Throwable) {
+Annotation_describeContents :: proc "contextless" (self: ^Annotation) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Annotation__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Annotation_getKey :: proc "contextless" (self: ^Annotation) -> (result: ^String, exception: ^Throwable) {
@@ -166,10 +166,10 @@ Annotation_getValue :: proc "contextless" (self: ^Annotation) -> (result: ^Strin
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Annotation_writeToParcel :: proc "contextless" (self: ^Annotation, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+Annotation_writeToParcel :: proc "contextless" (self: ^Annotation, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Annotation__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -527,11 +527,11 @@ BoringLayout_getLineWidth :: proc "contextless" (self: ^BoringLayout, line: i32)
 	return jni_env->CallFloatMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-BoringLayout_getParagraphDirection :: proc "contextless" (self: ^BoringLayout, line: i32) -> (result: i32, exception: ^Throwable) {
+BoringLayout_getParagraphDirection :: proc "contextless" (self: ^BoringLayout, line: i32) -> (result: Layout_Direction, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &BoringLayout__class, "getParagraphDirection", "(I)I", false) or_return
 	jni_args := [?]android.jvalue{{i = line}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return Layout_Direction(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 BoringLayout_getTopPadding :: proc "contextless" (self: ^BoringLayout) -> (result: i32, exception: ^Throwable) {
@@ -802,11 +802,11 @@ DynamicLayout_getLineTop :: proc "contextless" (self: ^DynamicLayout, line: i32)
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-DynamicLayout_getParagraphDirection :: proc "contextless" (self: ^DynamicLayout, line: i32) -> (result: i32, exception: ^Throwable) {
+DynamicLayout_getParagraphDirection :: proc "contextless" (self: ^DynamicLayout, line: i32) -> (result: Layout_Direction, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DynamicLayout__class, "getParagraphDirection", "(I)I", false) or_return
 	jni_args := [?]android.jvalue{{i = line}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return Layout_Direction(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 DynamicLayout_getTopPadding :: proc "contextless" (self: ^DynamicLayout) -> (result: i32, exception: ^Throwable) {
@@ -843,10 +843,10 @@ DynamicLayout_Builder_setAlignment :: proc "contextless" (self: ^DynamicLayout_B
 	return (^DynamicLayout_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-DynamicLayout_Builder_setBreakStrategy :: proc "contextless" (self: ^DynamicLayout_Builder, breakStrategy: i32) -> (result: ^DynamicLayout_Builder, exception: ^Throwable) {
+DynamicLayout_Builder_setBreakStrategy :: proc "contextless" (self: ^DynamicLayout_Builder, breakStrategy: LineBreaker_BreakStrategy) -> (result: ^DynamicLayout_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DynamicLayout_Builder__class, "setBreakStrategy", "(I)Landroid/text/DynamicLayout$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = breakStrategy}}
+	jni_args := [?]android.jvalue{{i = i32(breakStrategy)}}
 	return (^DynamicLayout_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -871,10 +871,10 @@ DynamicLayout_Builder_setEllipsizedWidth :: proc "contextless" (self: ^DynamicLa
 	return (^DynamicLayout_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-DynamicLayout_Builder_setHyphenationFrequency :: proc "contextless" (self: ^DynamicLayout_Builder, hyphenationFrequency: i32) -> (result: ^DynamicLayout_Builder, exception: ^Throwable) {
+DynamicLayout_Builder_setHyphenationFrequency :: proc "contextless" (self: ^DynamicLayout_Builder, hyphenationFrequency: Layout_HyphenationFrequency) -> (result: ^DynamicLayout_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DynamicLayout_Builder__class, "setHyphenationFrequency", "(I)Landroid/text/DynamicLayout$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = hyphenationFrequency}}
+	jni_args := [?]android.jvalue{{i = i32(hyphenationFrequency)}}
 	return (^DynamicLayout_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -885,10 +885,10 @@ DynamicLayout_Builder_setIncludePad :: proc "contextless" (self: ^DynamicLayout_
 	return (^DynamicLayout_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-DynamicLayout_Builder_setJustificationMode :: proc "contextless" (self: ^DynamicLayout_Builder, justificationMode: i32) -> (result: ^DynamicLayout_Builder, exception: ^Throwable) {
+DynamicLayout_Builder_setJustificationMode :: proc "contextless" (self: ^DynamicLayout_Builder, justificationMode: LineBreaker_JustificationMode) -> (result: ^DynamicLayout_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DynamicLayout_Builder__class, "setJustificationMode", "(I)Landroid/text/DynamicLayout$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = justificationMode}}
+	jni_args := [?]android.jvalue{{i = i32(justificationMode)}}
 	return (^DynamicLayout_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -939,6 +939,18 @@ DynamicLayout_Builder_setUseLineSpacingFromFallbacks :: proc "contextless" (self
 	jni_env, _, jni_id := jni_method(&jni_cache, &DynamicLayout_Builder__class, "setUseLineSpacingFromFallbacks", "(Z)Landroid/text/DynamicLayout$Builder;", false) or_return
 	jni_args := [?]android.jvalue{{z = android.jboolean(useLineSpacingFromFallbacks)}}
 	return (^DynamicLayout_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
+}
+
+LineBreaker_BreakStrategy :: enum i32 {
+	BALANCED     = 2,
+	HIGH_QUALITY = 1,
+	SIMPLE       = 0,
+}
+
+LineBreaker_JustificationMode :: enum i32 {
+	INTER_CHARACTER = 2,
+	INTER_WORD      = 1,
+	NONE            = 0,
 }
 
 // interface android.text.Editable
@@ -1256,17 +1268,17 @@ Html_fromHtml_String_Html_ImageGetter_Html_TagHandler :: proc "contextless" (sou
 	return (^Spanned)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Html_fromHtml_String_int :: proc "contextless" (source: ^String, flags: i32) -> (result: ^Spanned, exception: ^Throwable) {
+Html_fromHtml_String_int :: proc "contextless" (source: ^String, flags: Html_FromHtmlFlags) -> (result: ^Spanned, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Html__class, "fromHtml", "(Ljava/lang/String;I)Landroid/text/Spanned;", true) or_return
-	jni_args := [?]android.jvalue{{l = source}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = source}, {i = transmute(i32)flags}}
 	return (^Spanned)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Html_fromHtml_String_int_Html_ImageGetter_Html_TagHandler :: proc "contextless" (source: ^String, flags: i32, imageGetter: ^Html_ImageGetter, tagHandler: ^Html_TagHandler) -> (result: ^Spanned, exception: ^Throwable) {
+Html_fromHtml_String_int_Html_ImageGetter_Html_TagHandler :: proc "contextless" (source: ^String, flags: Html_FromHtmlFlags, imageGetter: ^Html_ImageGetter, tagHandler: ^Html_TagHandler) -> (result: ^Spanned, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Html__class, "fromHtml", "(Ljava/lang/String;ILandroid/text/Html$ImageGetter;Landroid/text/Html$TagHandler;)Landroid/text/Spanned;", true) or_return
-	jni_args := [?]android.jvalue{{l = source}, {i = flags}, {l = imageGetter}, {l = tagHandler}}
+	jni_args := [?]android.jvalue{{l = source}, {i = transmute(i32)flags}, {l = imageGetter}, {l = tagHandler}}
 	return (^Spanned)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -1284,16 +1296,35 @@ Html_toHtml_Spanned :: proc "contextless" (text: ^Spanned) -> (result: ^String, 
 	return (^String)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Html_toHtml_Spanned_int :: proc "contextless" (text: ^Spanned, option: i32) -> (result: ^String, exception: ^Throwable) {
+Html_toHtml_Spanned_int :: proc "contextless" (text: ^Spanned, option: Html_ToHtmlOption) -> (result: ^String, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Html__class, "toHtml", "(Landroid/text/Spanned;I)Ljava/lang/String;", true) or_return
-	jni_args := [?]android.jvalue{{l = text}, {i = option}}
+	jni_args := [?]android.jvalue{{l = text}, {i = i32(option)}}
 	return (^String)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 Html_toHtml :: proc{
 	Html_toHtml_Spanned,
 	Html_toHtml_Spanned_int,
+}
+
+Html_FromHtmlFlag :: enum u32 {
+	OPTION_USE_CSS_COLORS           = 8,
+	SEPARATOR_LINE_BREAK_BLOCKQUOTE = 5,
+	SEPARATOR_LINE_BREAK_DIV        = 4,
+	SEPARATOR_LINE_BREAK_HEADING    = 1,
+	SEPARATOR_LINE_BREAK_LIST       = 3,
+	SEPARATOR_LINE_BREAK_LIST_ITEM  = 2,
+	SEPARATOR_LINE_BREAK_PARAGRAPH  = 0,
+}
+Html_FromHtmlFlags :: distinct bit_set[Html_FromHtmlFlag; u32]
+
+Html_FromHtmlFlags_MODE_COMPACT :: Html_FromHtmlFlags{.SEPARATOR_LINE_BREAK_PARAGRAPH, .SEPARATOR_LINE_BREAK_HEADING, .SEPARATOR_LINE_BREAK_LIST_ITEM, .SEPARATOR_LINE_BREAK_LIST, .SEPARATOR_LINE_BREAK_DIV, .SEPARATOR_LINE_BREAK_BLOCKQUOTE}
+Html_FromHtmlFlags_MODE_LEGACY  :: Html_FromHtmlFlags{}
+
+Html_ToHtmlOption :: enum i32 {
+	CONSECUTIVE = 0,
+	INDIVIDUAL  = 1,
 }
 
 // interface android.text.Html.ImageGetter
@@ -1568,10 +1599,10 @@ Layout_getBottomPadding :: proc "contextless" (self: ^Layout) -> (result: i32, e
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-Layout_getBreakStrategy :: proc "contextless" (self: ^Layout) -> (result: i32, exception: ^Throwable) { // API level 35
+Layout_getBreakStrategy :: proc "contextless" (self: ^Layout) -> (result: LineBreaker_BreakStrategy, exception: ^Throwable) { // API level 35
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Layout__class, "getBreakStrategy", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return LineBreaker_BreakStrategy(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Layout_getCursorPath :: proc "contextless" (self: ^Layout, point: i32, dest: ^Path, editingBuffer: ^CharSequence) -> (exception: ^Throwable) {
@@ -1633,16 +1664,16 @@ Layout_getHeight :: proc "contextless" (self: ^Layout) -> (result: i32, exceptio
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-Layout_getHyphenationFrequency :: proc "contextless" (self: ^Layout) -> (result: i32, exception: ^Throwable) { // API level 35
+Layout_getHyphenationFrequency :: proc "contextless" (self: ^Layout) -> (result: Layout_HyphenationFrequency, exception: ^Throwable) { // API level 35
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Layout__class, "getHyphenationFrequency", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return Layout_HyphenationFrequency(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Layout_getJustificationMode :: proc "contextless" (self: ^Layout) -> (result: i32, exception: ^Throwable) { // API level 35
+Layout_getJustificationMode :: proc "contextless" (self: ^Layout) -> (result: LineBreaker_JustificationMode, exception: ^Throwable) { // API level 35
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Layout__class, "getJustificationMode", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return LineBreaker_JustificationMode(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Layout_getLeftIndents :: proc "contextless" (self: ^Layout) -> (result: ^IntArray, exception: ^Throwable) { // API level 35
@@ -1859,11 +1890,11 @@ Layout_getParagraphAlignment :: proc "contextless" (self: ^Layout, line: i32) ->
 	return (^Layout_Alignment)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Layout_getParagraphDirection :: proc "contextless" (self: ^Layout, line: i32) -> (result: i32, exception: ^Throwable) {
+Layout_getParagraphDirection :: proc "contextless" (self: ^Layout, line: i32) -> (result: Layout_Direction, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Layout__class, "getParagraphDirection", "(I)I", false) or_return
 	jni_args := [?]android.jvalue{{i = line}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return Layout_Direction(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 Layout_getParagraphLeft :: proc "contextless" (self: ^Layout, line: i32) -> (result: i32, exception: ^Throwable) {
@@ -1990,6 +2021,19 @@ Layout_isRtlCharAt :: proc "contextless" (self: ^Layout, offset: i32) -> (result
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
+Layout_Direction :: enum i32 {
+	LEFT_TO_RIGHT = 1,
+	RIGHT_TO_LEFT = -1,
+}
+
+Layout_HyphenationFrequency :: enum i32 {
+	FULL        = 2,
+	FULL_FAST   = 4,
+	NONE        = 0,
+	NORMAL      = 1,
+	NORMAL_FAST = 3,
+}
+
 // class android.text.Layout.Alignment
 Layout_Alignment :: struct #raw_union {
 	using Enum: Enum,
@@ -2057,10 +2101,10 @@ Layout_Builder_setAlignment :: proc "contextless" (self: ^Layout_Builder, alignm
 	return (^Layout_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Layout_Builder_setBreakStrategy :: proc "contextless" (self: ^Layout_Builder, breakStrategy: i32) -> (result: ^Layout_Builder, exception: ^Throwable) {
+Layout_Builder_setBreakStrategy :: proc "contextless" (self: ^Layout_Builder, breakStrategy: LineBreaker_BreakStrategy) -> (result: ^Layout_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Layout_Builder__class, "setBreakStrategy", "(I)Landroid/text/Layout$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = breakStrategy}}
+	jni_args := [?]android.jvalue{{i = i32(breakStrategy)}}
 	return (^Layout_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -2092,17 +2136,17 @@ Layout_Builder_setFontPaddingIncluded :: proc "contextless" (self: ^Layout_Build
 	return (^Layout_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Layout_Builder_setHyphenationFrequency :: proc "contextless" (self: ^Layout_Builder, hyphenationFrequency: i32) -> (result: ^Layout_Builder, exception: ^Throwable) {
+Layout_Builder_setHyphenationFrequency :: proc "contextless" (self: ^Layout_Builder, hyphenationFrequency: Layout_HyphenationFrequency) -> (result: ^Layout_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Layout_Builder__class, "setHyphenationFrequency", "(I)Landroid/text/Layout$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = hyphenationFrequency}}
+	jni_args := [?]android.jvalue{{i = i32(hyphenationFrequency)}}
 	return (^Layout_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Layout_Builder_setJustificationMode :: proc "contextless" (self: ^Layout_Builder, justificationMode: i32) -> (result: ^Layout_Builder, exception: ^Throwable) {
+Layout_Builder_setJustificationMode :: proc "contextless" (self: ^Layout_Builder, justificationMode: LineBreaker_JustificationMode) -> (result: ^Layout_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Layout_Builder__class, "setJustificationMode", "(I)Landroid/text/Layout$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = justificationMode}}
+	jni_args := [?]android.jvalue{{i = i32(justificationMode)}}
 	return (^Layout_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -2454,11 +2498,11 @@ PrecomputedText_getSpanEnd :: proc "contextless" (self: ^PrecomputedText, tag: ^
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-PrecomputedText_getSpanFlags :: proc "contextless" (self: ^PrecomputedText, tag: ^Object) -> (result: i32, exception: ^Throwable) {
+PrecomputedText_getSpanFlags :: proc "contextless" (self: ^PrecomputedText, tag: ^Object) -> (result: Spanned_SpanFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PrecomputedText__class, "getSpanFlags", "(Ljava/lang/Object;)I", false) or_return
 	jni_args := [?]android.jvalue{{l = tag}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return transmute(Spanned_SpanFlags)(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 PrecomputedText_getSpanStart :: proc "contextless" (self: ^PrecomputedText, tag: ^Object) -> (result: i32, exception: ^Throwable) {
@@ -2503,10 +2547,10 @@ PrecomputedText_removeSpan :: proc "contextless" (self: ^PrecomputedText, what: 
 	return jni_take(jni_env)
 }
 
-PrecomputedText_setSpan :: proc "contextless" (self: ^PrecomputedText, what: ^Object, start: i32, end: i32, flags: i32) -> (exception: ^Throwable) {
+PrecomputedText_setSpan :: proc "contextless" (self: ^PrecomputedText, what: ^Object, start: i32, end: i32, flags: Spanned_SpanFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PrecomputedText__class, "setSpan", "(Ljava/lang/Object;III)V", false) or_return
-	jni_args := [?]android.jvalue{{l = what}, {i = start}, {i = end}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = what}, {i = start}, {i = end}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -2539,16 +2583,16 @@ PrecomputedText_Params_equals :: proc "contextless" (self: ^PrecomputedText_Para
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-PrecomputedText_Params_getBreakStrategy :: proc "contextless" (self: ^PrecomputedText_Params) -> (result: i32, exception: ^Throwable) {
+PrecomputedText_Params_getBreakStrategy :: proc "contextless" (self: ^PrecomputedText_Params) -> (result: LineBreaker_BreakStrategy, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PrecomputedText_Params__class, "getBreakStrategy", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return LineBreaker_BreakStrategy(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PrecomputedText_Params_getHyphenationFrequency :: proc "contextless" (self: ^PrecomputedText_Params) -> (result: i32, exception: ^Throwable) {
+PrecomputedText_Params_getHyphenationFrequency :: proc "contextless" (self: ^PrecomputedText_Params) -> (result: Layout_HyphenationFrequency, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PrecomputedText_Params__class, "getHyphenationFrequency", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return Layout_HyphenationFrequency(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 PrecomputedText_Params_getLineBreakConfig :: proc "contextless" (self: ^PrecomputedText_Params) -> (result: ^LineBreakConfig, exception: ^Throwable) { // API level 33
@@ -2614,17 +2658,17 @@ PrecomputedText_Params_Builder_build :: proc "contextless" (self: ^PrecomputedTe
 	return (^PrecomputedText_Params)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PrecomputedText_Params_Builder_setBreakStrategy :: proc "contextless" (self: ^PrecomputedText_Params_Builder, strategy: i32) -> (result: ^PrecomputedText_Params_Builder, exception: ^Throwable) {
+PrecomputedText_Params_Builder_setBreakStrategy :: proc "contextless" (self: ^PrecomputedText_Params_Builder, strategy: LineBreaker_BreakStrategy) -> (result: ^PrecomputedText_Params_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PrecomputedText_Params_Builder__class, "setBreakStrategy", "(I)Landroid/text/PrecomputedText$Params$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = strategy}}
+	jni_args := [?]android.jvalue{{i = i32(strategy)}}
 	return (^PrecomputedText_Params_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PrecomputedText_Params_Builder_setHyphenationFrequency :: proc "contextless" (self: ^PrecomputedText_Params_Builder, frequency: i32) -> (result: ^PrecomputedText_Params_Builder, exception: ^Throwable) {
+PrecomputedText_Params_Builder_setHyphenationFrequency :: proc "contextless" (self: ^PrecomputedText_Params_Builder, frequency: Layout_HyphenationFrequency) -> (result: ^PrecomputedText_Params_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PrecomputedText_Params_Builder__class, "setHyphenationFrequency", "(I)Landroid/text/PrecomputedText$Params$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = frequency}}
+	jni_args := [?]android.jvalue{{i = i32(frequency)}}
 	return (^PrecomputedText_Params_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -3003,10 +3047,10 @@ Spannable_removeSpan :: proc "contextless" (self: ^Spannable, what: ^Object) -> 
 	return jni_take(jni_env)
 }
 
-Spannable_setSpan :: proc "contextless" (self: ^Spannable, what: ^Object, start: i32, end: i32, flags: i32) -> (exception: ^Throwable) {
+Spannable_setSpan :: proc "contextless" (self: ^Spannable, what: ^Object, start: i32, end: i32, flags: Spanned_SpanFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Spannable__class, "setSpan", "(Ljava/lang/Object;III)V", false) or_return
-	jni_args := [?]android.jvalue{{l = what}, {i = start}, {i = end}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = what}, {i = start}, {i = end}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -3086,11 +3130,11 @@ SpannableString_getSpanEnd :: proc "contextless" (self: ^SpannableString, what: 
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-SpannableString_getSpanFlags :: proc "contextless" (self: ^SpannableString, what: ^Object) -> (result: i32, exception: ^Throwable) {
+SpannableString_getSpanFlags :: proc "contextless" (self: ^SpannableString, what: ^Object) -> (result: Spanned_SpanFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SpannableString__class, "getSpanFlags", "(Ljava/lang/Object;)I", false) or_return
 	jni_args := [?]android.jvalue{{l = what}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return transmute(Spanned_SpanFlags)(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 SpannableString_getSpanStart :: proc "contextless" (self: ^SpannableString, what: ^Object) -> (result: i32, exception: ^Throwable) {
@@ -3134,10 +3178,10 @@ SpannableString_removeSpan :: proc "contextless" (self: ^SpannableString, what: 
 	return jni_take(jni_env)
 }
 
-SpannableString_setSpan :: proc "contextless" (self: ^SpannableString, what: ^Object, start: i32, end: i32, flags: i32) -> (exception: ^Throwable) {
+SpannableString_setSpan :: proc "contextless" (self: ^SpannableString, what: ^Object, start: i32, end: i32, flags: Spanned_SpanFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SpannableString__class, "setSpan", "(Ljava/lang/Object;III)V", false) or_return
-	jni_args := [?]android.jvalue{{l = what}, {i = start}, {i = end}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = what}, {i = start}, {i = end}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -3223,10 +3267,10 @@ SpannableStringBuilder_append_CharSequence_int_int :: proc "contextless" (self: 
 	return (^SpannableStringBuilder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-SpannableStringBuilder_append_CharSequence_Object_int :: proc "contextless" (self: ^SpannableStringBuilder, text: ^CharSequence, what: ^Object, flags: i32) -> (result: ^SpannableStringBuilder, exception: ^Throwable) {
+SpannableStringBuilder_append_CharSequence_Object_int :: proc "contextless" (self: ^SpannableStringBuilder, text: ^CharSequence, what: ^Object, flags: Spanned_SpanFlags) -> (result: ^SpannableStringBuilder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SpannableStringBuilder__class, "append", "(Ljava/lang/CharSequence;Ljava/lang/Object;I)Landroid/text/SpannableStringBuilder;", false) or_return
-	jni_args := [?]android.jvalue{{l = text}, {l = what}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = text}, {l = what}, {i = transmute(i32)flags}}
 	return (^SpannableStringBuilder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -3293,11 +3337,11 @@ SpannableStringBuilder_getSpanEnd :: proc "contextless" (self: ^SpannableStringB
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-SpannableStringBuilder_getSpanFlags :: proc "contextless" (self: ^SpannableStringBuilder, what: ^Object) -> (result: i32, exception: ^Throwable) {
+SpannableStringBuilder_getSpanFlags :: proc "contextless" (self: ^SpannableStringBuilder, what: ^Object) -> (result: Spanned_SpanFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SpannableStringBuilder__class, "getSpanFlags", "(Ljava/lang/Object;)I", false) or_return
 	jni_args := [?]android.jvalue{{l = what}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return transmute(Spanned_SpanFlags)(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 SpannableStringBuilder_getSpanStart :: proc "contextless" (self: ^SpannableStringBuilder, what: ^Object) -> (result: i32, exception: ^Throwable) {
@@ -3400,10 +3444,10 @@ SpannableStringBuilder_setFilters :: proc "contextless" (self: ^SpannableStringB
 	return jni_take(jni_env)
 }
 
-SpannableStringBuilder_setSpan :: proc "contextless" (self: ^SpannableStringBuilder, what: ^Object, start: i32, end: i32, flags: i32) -> (exception: ^Throwable) {
+SpannableStringBuilder_setSpan :: proc "contextless" (self: ^SpannableStringBuilder, what: ^Object, start: i32, end: i32, flags: Spanned_SpanFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SpannableStringBuilder__class, "setSpan", "(Ljava/lang/Object;III)V", false) or_return
-	jni_args := [?]android.jvalue{{l = what}, {i = start}, {i = end}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = what}, {i = start}, {i = end}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -3460,11 +3504,11 @@ Spanned_getSpanEnd :: proc "contextless" (self: ^Spanned, tag: ^Object) -> (resu
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-Spanned_getSpanFlags :: proc "contextless" (self: ^Spanned, tag: ^Object) -> (result: i32, exception: ^Throwable) {
+Spanned_getSpanFlags :: proc "contextless" (self: ^Spanned, tag: ^Object) -> (result: Spanned_SpanFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Spanned__class, "getSpanFlags", "(Ljava/lang/Object;)I", false) or_return
 	jni_args := [?]android.jvalue{{l = tag}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return transmute(Spanned_SpanFlags)(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 Spanned_getSpanStart :: proc "contextless" (self: ^Spanned, tag: ^Object) -> (result: i32, exception: ^Throwable) {
@@ -3487,6 +3531,40 @@ Spanned_nextSpanTransition :: proc "contextless" (self: ^Spanned, start: i32, li
 	jni_args := [?]android.jvalue{{i = start}, {i = limit}, {l = type}}
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
+
+Spanned_SpanPoint :: enum u32 {
+	NONE      = 0,
+	MARK      = 1,
+	POINT     = 2,
+	PARAGRAPH = 3,
+}
+
+Spanned_SpanFlags :: bit_field i32 {
+	end:          Spanned_SpanPoint | 2,
+	_:            u8                | 2,
+	start:        Spanned_SpanPoint | 2,
+	_:            u8                | 2,
+	composing:    bool              | 1,
+	intermediate: bool              | 1,
+	_:            u8                | 6,
+	priority:     u8                | 8,
+	user:         u8                | 8,
+}
+
+Spanned_SpanFlags_COMPOSING           :: Spanned_SpanFlags{composing = true}
+Spanned_SpanFlags_EXCLUSIVE_EXCLUSIVE :: Spanned_SpanFlags{end = .MARK, start = .POINT}
+Spanned_SpanFlags_EXCLUSIVE_INCLUSIVE :: Spanned_SpanFlags{end = .POINT, start = .POINT}
+Spanned_SpanFlags_INCLUSIVE_EXCLUSIVE :: Spanned_SpanFlags{end = .MARK, start = .MARK}
+Spanned_SpanFlags_INCLUSIVE_INCLUSIVE :: Spanned_SpanFlags{end = .POINT, start = .MARK}
+Spanned_SpanFlags_INTERMEDIATE        :: Spanned_SpanFlags{intermediate = true}
+Spanned_SpanFlags_MARK_MARK           :: Spanned_SpanFlags{end = .MARK, start = .MARK}
+Spanned_SpanFlags_MARK_POINT          :: Spanned_SpanFlags{end = .POINT, start = .MARK}
+Spanned_SpanFlags_PARAGRAPH           :: Spanned_SpanFlags{end = .PARAGRAPH, start = .PARAGRAPH}
+Spanned_SpanFlags_POINT_MARK          :: Spanned_SpanFlags{end = .MARK, start = .POINT}
+Spanned_SpanFlags_POINT_MARK_MASK     :: Spanned_SpanFlags{end = .PARAGRAPH, start = .PARAGRAPH}
+Spanned_SpanFlags_POINT_POINT         :: Spanned_SpanFlags{end = .POINT, start = .POINT}
+Spanned_SpanFlags_PRIORITY            :: Spanned_SpanFlags{priority = 0xff}
+Spanned_SpanFlags_USER                :: Spanned_SpanFlags{user = 0xff}
 
 // class android.text.SpannedString
 SpannedString :: struct #raw_union {
@@ -3535,11 +3613,11 @@ SpannedString_getSpanEnd :: proc "contextless" (self: ^SpannedString, what: ^Obj
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-SpannedString_getSpanFlags :: proc "contextless" (self: ^SpannedString, what: ^Object) -> (result: i32, exception: ^Throwable) {
+SpannedString_getSpanFlags :: proc "contextless" (self: ^SpannedString, what: ^Object) -> (result: Spanned_SpanFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SpannedString__class, "getSpanFlags", "(Ljava/lang/Object;)I", false) or_return
 	jni_args := [?]android.jvalue{{l = what}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return transmute(Spanned_SpanFlags)(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 SpannedString_getSpanStart :: proc "contextless" (self: ^SpannedString, what: ^Object) -> (result: i32, exception: ^Throwable) {
@@ -3704,11 +3782,11 @@ StaticLayout_getLineTop :: proc "contextless" (self: ^StaticLayout, line: i32) -
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-StaticLayout_getParagraphDirection :: proc "contextless" (self: ^StaticLayout, line: i32) -> (result: i32, exception: ^Throwable) {
+StaticLayout_getParagraphDirection :: proc "contextless" (self: ^StaticLayout, line: i32) -> (result: Layout_Direction, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &StaticLayout__class, "getParagraphDirection", "(I)I", false) or_return
 	jni_args := [?]android.jvalue{{i = line}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return Layout_Direction(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 StaticLayout_getTopPadding :: proc "contextless" (self: ^StaticLayout) -> (result: i32, exception: ^Throwable) {
@@ -3745,10 +3823,10 @@ StaticLayout_Builder_setAlignment :: proc "contextless" (self: ^StaticLayout_Bui
 	return (^StaticLayout_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-StaticLayout_Builder_setBreakStrategy :: proc "contextless" (self: ^StaticLayout_Builder, breakStrategy: i32) -> (result: ^StaticLayout_Builder, exception: ^Throwable) {
+StaticLayout_Builder_setBreakStrategy :: proc "contextless" (self: ^StaticLayout_Builder, breakStrategy: LineBreaker_BreakStrategy) -> (result: ^StaticLayout_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &StaticLayout_Builder__class, "setBreakStrategy", "(I)Landroid/text/StaticLayout$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = breakStrategy}}
+	jni_args := [?]android.jvalue{{i = i32(breakStrategy)}}
 	return (^StaticLayout_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -3766,10 +3844,10 @@ StaticLayout_Builder_setEllipsizedWidth :: proc "contextless" (self: ^StaticLayo
 	return (^StaticLayout_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-StaticLayout_Builder_setHyphenationFrequency :: proc "contextless" (self: ^StaticLayout_Builder, hyphenationFrequency: i32) -> (result: ^StaticLayout_Builder, exception: ^Throwable) {
+StaticLayout_Builder_setHyphenationFrequency :: proc "contextless" (self: ^StaticLayout_Builder, hyphenationFrequency: Layout_HyphenationFrequency) -> (result: ^StaticLayout_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &StaticLayout_Builder__class, "setHyphenationFrequency", "(I)Landroid/text/StaticLayout$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = hyphenationFrequency}}
+	jni_args := [?]android.jvalue{{i = i32(hyphenationFrequency)}}
 	return (^StaticLayout_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -3787,10 +3865,10 @@ StaticLayout_Builder_setIndents :: proc "contextless" (self: ^StaticLayout_Build
 	return (^StaticLayout_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-StaticLayout_Builder_setJustificationMode :: proc "contextless" (self: ^StaticLayout_Builder, justificationMode: i32) -> (result: ^StaticLayout_Builder, exception: ^Throwable) {
+StaticLayout_Builder_setJustificationMode :: proc "contextless" (self: ^StaticLayout_Builder, justificationMode: LineBreaker_JustificationMode) -> (result: ^StaticLayout_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &StaticLayout_Builder__class, "setJustificationMode", "(I)Landroid/text/StaticLayout$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = justificationMode}}
+	jni_args := [?]android.jvalue{{i = i32(justificationMode)}}
 	return (^StaticLayout_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4046,10 +4124,10 @@ TextPaint_new_Paint :: proc "contextless" (p: ^Paint) -> (result: ^TextPaint, ex
 	return (^TextPaint)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-TextPaint_new_int :: proc "contextless" (flags: i32) -> (result: ^TextPaint, exception: ^Throwable) {
+TextPaint_new_int :: proc "contextless" (flags: Paint_Flags) -> (result: ^TextPaint, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &TextPaint__class, "<init>", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	return (^TextPaint)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4189,11 +4267,11 @@ TextUtils_expandTemplate :: proc "contextless" (template: ^CharSequence, values:
 	return (^CharSequence)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-TextUtils_getCapsMode :: proc "contextless" (cs: ^CharSequence, off: i32, reqModes: i32) -> (result: i32, exception: ^Throwable) {
+TextUtils_getCapsMode :: proc "contextless" (cs: ^CharSequence, off: i32, reqModes: TextUtils_CapMode) -> (result: TextUtils_CapMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &TextUtils__class, "getCapsMode", "(Ljava/lang/CharSequence;II)I", true) or_return
-	jni_args := [?]android.jvalue{{l = cs}, {i = off}, {i = reqModes}}
-	return jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{l = cs}, {i = off}, {i = transmute(i32)reqModes}}
+	return transmute(TextUtils_CapMode)(jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 TextUtils_getChars :: proc "contextless" (s: ^CharSequence, start: i32, end: i32, dest: ^CharArray, destoff: i32) -> (exception: ^Throwable) {
@@ -4204,11 +4282,11 @@ TextUtils_getChars :: proc "contextless" (s: ^CharSequence, start: i32, end: i32
 	return jni_take(jni_env)
 }
 
-TextUtils_getLayoutDirectionFromLocale :: proc "contextless" (locale: ^Locale) -> (result: i32, exception: ^Throwable) {
+TextUtils_getLayoutDirectionFromLocale :: proc "contextless" (locale: ^Locale) -> (result: View_LayoutDirection, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &TextUtils__class, "getLayoutDirectionFromLocale", "(Ljava/util/Locale;)I", true) or_return
 	jni_args := [?]android.jvalue{{l = locale}}
-	return jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
+	return View_LayoutDirection(jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 TextUtils_getOffsetAfter :: proc "contextless" (text: ^CharSequence, offset: i32) -> (result: i32, exception: ^Throwable) {
@@ -4383,10 +4461,10 @@ TextUtils_listEllipsize :: proc "contextless" (context_: ^Context, elements: ^Li
 	return (^CharSequence)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-TextUtils_makeSafeForPresentation :: proc "contextless" (unclean: ^String, maxCharactersToConsider: i32, ellipsizeDip: f32, flags: i32) -> (result: ^CharSequence, exception: ^Throwable) {
+TextUtils_makeSafeForPresentation :: proc "contextless" (unclean: ^String, maxCharactersToConsider: i32, ellipsizeDip: f32, flags: TextUtils_SafeStringFlags) -> (result: ^CharSequence, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &TextUtils__class, "makeSafeForPresentation", "(Ljava/lang/String;IFI)Ljava/lang/CharSequence;", true) or_return
-	jni_args := [?]android.jvalue{{l = unclean}, {i = maxCharactersToConsider}, {f = ellipsizeDip}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = unclean}, {i = maxCharactersToConsider}, {f = ellipsizeDip}, {i = transmute(i32)flags}}
 	return (^CharSequence)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4444,6 +4522,20 @@ TextUtils_writeToParcel :: proc "contextless" (cs: ^CharSequence, p: ^Parcel, pa
 	jni_env->CallStaticVoidMethodA(jni_class, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+TextUtils_CapModeFlag :: enum u32 {
+	CHARACTERS = 12,
+	SENTENCES  = 14,
+	WORDS      = 13,
+}
+TextUtils_CapMode :: distinct bit_set[TextUtils_CapModeFlag; u32]
+
+TextUtils_SafeStringFlag :: enum u32 {
+	FIRST_LINE  = 2,
+	SINGLE_LINE = 1,
+	TRIM        = 0,
+}
+TextUtils_SafeStringFlags :: distinct bit_set[TextUtils_SafeStringFlag; u32]
 
 // interface android.text.TextUtils.EllipsizeCallback
 TextUtils_EllipsizeCallback :: struct #raw_union {

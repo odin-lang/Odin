@@ -9,14 +9,6 @@ foreign import libandroid "system:android"
 
 AConfiguration :: struct {}
 
-ACONFIGURATION_ORIENTATION_ANY              :: 0x0000
-ACONFIGURATION_ORIENTATION_PORT             :: 0x0001
-ACONFIGURATION_ORIENTATION_LAND             :: 0x0002
-ACONFIGURATION_ORIENTATION_SQUARE           :: 0x0003
-ACONFIGURATION_TOUCHSCREEN_ANY              :: 0x0000
-ACONFIGURATION_TOUCHSCREEN_NOTOUCH          :: 0x0001
-ACONFIGURATION_TOUCHSCREEN_STYLUS           :: 0x0002
-ACONFIGURATION_TOUCHSCREEN_FINGER           :: 0x0003
 ACONFIGURATION_DENSITY_DEFAULT              :: 0
 ACONFIGURATION_DENSITY_LOW                  :: 120
 ACONFIGURATION_DENSITY_MEDIUM               :: 160
@@ -27,79 +19,136 @@ ACONFIGURATION_DENSITY_XXHIGH               :: 480
 ACONFIGURATION_DENSITY_XXXHIGH              :: 640
 ACONFIGURATION_DENSITY_ANY                  :: 0xfffe
 ACONFIGURATION_DENSITY_NONE                 :: 0xffff
-ACONFIGURATION_KEYBOARD_ANY                 :: 0x0000
-ACONFIGURATION_KEYBOARD_NOKEYS              :: 0x0001
-ACONFIGURATION_KEYBOARD_QWERTY              :: 0x0002
-ACONFIGURATION_KEYBOARD_12KEY               :: 0x0003
-ACONFIGURATION_NAVIGATION_ANY               :: 0x0000
-ACONFIGURATION_NAVIGATION_NONAV             :: 0x0001
-ACONFIGURATION_NAVIGATION_DPAD              :: 0x0002
-ACONFIGURATION_NAVIGATION_TRACKBALL         :: 0x0003
-ACONFIGURATION_NAVIGATION_WHEEL             :: 0x0004
-ACONFIGURATION_KEYSHIDDEN_ANY               :: 0x0000
-ACONFIGURATION_KEYSHIDDEN_NO                :: 0x0001
-ACONFIGURATION_KEYSHIDDEN_YES               :: 0x0002
-ACONFIGURATION_KEYSHIDDEN_SOFT              :: 0x0003
-ACONFIGURATION_NAVHIDDEN_ANY                :: 0x0000
-ACONFIGURATION_NAVHIDDEN_NO                 :: 0x0001
-ACONFIGURATION_NAVHIDDEN_YES                :: 0x0002
-ACONFIGURATION_SCREENSIZE_ANY               :: 0x00
-ACONFIGURATION_SCREENSIZE_SMALL             :: 0x01
-ACONFIGURATION_SCREENSIZE_NORMAL            :: 0x02
-ACONFIGURATION_SCREENSIZE_LARGE             :: 0x03
-ACONFIGURATION_SCREENSIZE_XLARGE            :: 0x04
-ACONFIGURATION_SCREENLONG_ANY               :: 0x00
-ACONFIGURATION_SCREENLONG_NO                :: 0x1
-ACONFIGURATION_SCREENLONG_YES               :: 0x2
-ACONFIGURATION_SCREENROUND_ANY              :: 0x00
-ACONFIGURATION_SCREENROUND_NO               :: 0x1
-ACONFIGURATION_SCREENROUND_YES              :: 0x2
-ACONFIGURATION_WIDE_COLOR_GAMUT_ANY         :: 0x00
-ACONFIGURATION_WIDE_COLOR_GAMUT_NO          :: 0x1
-ACONFIGURATION_WIDE_COLOR_GAMUT_YES         :: 0x2
-ACONFIGURATION_HDR_ANY                      :: 0x00
-ACONFIGURATION_HDR_NO                       :: 0x1
-ACONFIGURATION_HDR_YES                      :: 0x2
-ACONFIGURATION_UI_MODE_TYPE_ANY             :: 0x00
-ACONFIGURATION_UI_MODE_TYPE_NORMAL          :: 0x01
-ACONFIGURATION_UI_MODE_TYPE_DESK            :: 0x02
-ACONFIGURATION_UI_MODE_TYPE_CAR             :: 0x03
-ACONFIGURATION_UI_MODE_TYPE_TELEVISION      :: 0x04
-ACONFIGURATION_UI_MODE_TYPE_APPLIANCE       :: 0x05
-ACONFIGURATION_UI_MODE_TYPE_WATCH           :: 0x06
-ACONFIGURATION_UI_MODE_TYPE_VR_HEADSET      :: 0x07
-ACONFIGURATION_UI_MODE_NIGHT_ANY            :: 0x00
-ACONFIGURATION_UI_MODE_NIGHT_NO             :: 0x1
-ACONFIGURATION_UI_MODE_NIGHT_YES            :: 0x2
 ACONFIGURATION_SCREEN_WIDTH_DP_ANY          :: 0x0000
 ACONFIGURATION_SCREEN_HEIGHT_DP_ANY         :: 0x0000
 ACONFIGURATION_SMALLEST_SCREEN_WIDTH_DP_ANY :: 0x0000
-ACONFIGURATION_LAYOUTDIR_ANY                :: 0x00
-ACONFIGURATION_LAYOUTDIR_LTR                :: 0x01
-ACONFIGURATION_LAYOUTDIR_RTL                :: 0x02
-ACONFIGURATION_MCC                          :: 0x0001
-ACONFIGURATION_MNC                          :: 0x0002
-ACONFIGURATION_LOCALE                       :: 0x0004
-ACONFIGURATION_TOUCHSCREEN                  :: 0x0008
-ACONFIGURATION_KEYBOARD                     :: 0x0010
-ACONFIGURATION_KEYBOARD_HIDDEN              :: 0x0020
-ACONFIGURATION_NAVIGATION                   :: 0x0040
-ACONFIGURATION_ORIENTATION                  :: 0x0080
-ACONFIGURATION_DENSITY                      :: 0x0100
-ACONFIGURATION_SCREEN_SIZE                  :: 0x0200
-ACONFIGURATION_VERSION                      :: 0x0400
-ACONFIGURATION_SCREEN_LAYOUT                :: 0x0800
-ACONFIGURATION_UI_MODE                      :: 0x1000
-ACONFIGURATION_SMALLEST_SCREEN_SIZE         :: 0x2000
-ACONFIGURATION_LAYOUTDIR                    :: 0x4000
-ACONFIGURATION_SCREEN_ROUND                 :: 0x8000
-ACONFIGURATION_COLOR_MODE                   :: 0x10000
-ACONFIGURATION_GRAMMATICAL_GENDER           :: 0x20000
 ACONFIGURATION_MNC_ZERO                     :: 0xffff
-ACONFIGURATION_GRAMMATICAL_GENDER_ANY       :: 0
-ACONFIGURATION_GRAMMATICAL_GENDER_NEUTER    :: 1
-ACONFIGURATION_GRAMMATICAL_GENDER_FEMININE  :: 2
-ACONFIGURATION_GRAMMATICAL_GENDER_MASCULINE :: 3
+
+AConfigurationOrientation :: enum i32 {
+	ANY    = 0x0000,
+	PORT   = 0x0001,
+	LAND   = 0x0002,
+	SQUARE = 0x0003,
+}
+
+AConfigurationTouchscreen :: enum i32 {
+	ANY     = 0x0000,
+	NOTOUCH = 0x0001,
+	STYLUS  = 0x0002,
+	FINGER  = 0x0003,
+}
+
+AConfigurationKeyboard :: enum i32 {
+	ANY    = 0x0000,
+	NOKEYS = 0x0001,
+	QWERTY = 0x0002,
+	_12KEY = 0x0003,
+	HIDDEN = 0x0020,
+}
+
+AConfigurationNavigation :: enum i32 {
+	ANY       = 0x0000,
+	NONAV     = 0x0001,
+	DPAD      = 0x0002,
+	TRACKBALL = 0x0003,
+	WHEEL     = 0x0004,
+}
+
+AConfigurationKeysHidden :: enum i32 {
+	ANY  = 0x0000,
+	NO   = 0x0001,
+	YES  = 0x0002,
+	SOFT = 0x0003,
+}
+
+AConfigurationNavHidden :: enum i32 {
+	ANY = 0x0000,
+	NO  = 0x0001,
+	YES = 0x0002,
+}
+
+AConfigurationScreenSize :: enum i32 {
+	ANY    = 0x00,
+	SMALL  = 0x01,
+	NORMAL = 0x02,
+	LARGE  = 0x03,
+	XLARGE = 0x04,
+}
+
+AConfigurationScreenLong :: enum i32 {
+	ANY = 0x00,
+	NO  = 0x1,
+	YES = 0x2,
+}
+
+AConfigurationScreenRound :: enum i32 {
+	ANY = 0x00,
+	NO  = 0x1,
+	YES = 0x2,
+}
+
+AConfigurationWideColorGamut :: enum i32 {
+	ANY = 0x00,
+	NO  = 0x1,
+	YES = 0x2,
+}
+
+AConfigurationHdr :: enum i32 {
+	ANY = 0x00,
+	NO  = 0x1,
+	YES = 0x2,
+}
+
+AConfigurationUiModeType :: enum i32 {
+	ANY        = 0x00,
+	NORMAL     = 0x01,
+	DESK       = 0x02,
+	CAR        = 0x03,
+	TELEVISION = 0x04,
+	APPLIANCE  = 0x05,
+	WATCH      = 0x06,
+	VR_HEADSET = 0x07,
+}
+
+AConfigurationUiModeNight :: enum i32 {
+	ANY = 0x00,
+	NO  = 0x1,
+	YES = 0x2,
+}
+
+AConfigurationLayoutDir :: enum i32 {
+	ANY = 0x00,
+	LTR = 0x01,
+	RTL = 0x02,
+}
+
+AConfigurationGrammaticalGender :: enum i32 {
+	ANY       = 0,
+	NEUTER    = 1,
+	FEMININE  = 2,
+	MASCULINE = 3,
+}
+
+AConfigurationChange :: enum u32 {
+	MCC                  = 0,
+	MNC                  = 1,
+	LOCALE               = 2,
+	TOUCHSCREEN          = 3,
+	KEYBOARD             = 4,
+	NAVIGATION           = 6,
+	ORIENTATION          = 7,
+	DENSITY              = 8,
+	SCREEN_SIZE          = 9,
+	VERSION              = 10,
+	SCREEN_LAYOUT        = 11,
+	UI_MODE              = 12,
+	SMALLEST_SCREEN_SIZE = 13,
+	LAYOUTDIR            = 14,
+	SCREEN_ROUND         = 15,
+	COLOR_MODE           = 16,
+	GRAMMATICAL_GENDER   = 17,
+}
+AConfigurationChanges :: distinct bit_set[AConfigurationChange; u32]
 
 @(default_calling_convention="c")
 foreign libandroid {
@@ -115,42 +164,42 @@ foreign libandroid {
 	AConfiguration_setLanguage              :: proc(config: ^AConfiguration, language: cstring) ---
 	AConfiguration_getCountry               :: proc(config: ^AConfiguration, outCountry: [^]c.char) ---
 	AConfiguration_setCountry               :: proc(config: ^AConfiguration, country: cstring) ---
-	AConfiguration_getOrientation           :: proc(config: ^AConfiguration) -> i32 ---
-	AConfiguration_setOrientation           :: proc(config: ^AConfiguration, orientation: i32) ---
-	AConfiguration_getTouchscreen           :: proc(config: ^AConfiguration) -> i32 ---
-	AConfiguration_setTouchscreen           :: proc(config: ^AConfiguration, touchscreen: i32) ---
+	AConfiguration_getOrientation           :: proc(config: ^AConfiguration) -> AConfigurationOrientation ---
+	AConfiguration_setOrientation           :: proc(config: ^AConfiguration, orientation: AConfigurationOrientation) ---
+	AConfiguration_getTouchscreen           :: proc(config: ^AConfiguration) -> AConfigurationTouchscreen ---
+	AConfiguration_setTouchscreen           :: proc(config: ^AConfiguration, touchscreen: AConfigurationTouchscreen) ---
 	AConfiguration_getDensity               :: proc(config: ^AConfiguration) -> i32 ---
 	AConfiguration_setDensity               :: proc(config: ^AConfiguration, density: i32) ---
-	AConfiguration_getKeyboard              :: proc(config: ^AConfiguration) -> i32 ---
-	AConfiguration_setKeyboard              :: proc(config: ^AConfiguration, keyboard: i32) ---
-	AConfiguration_getNavigation            :: proc(config: ^AConfiguration) -> i32 ---
-	AConfiguration_setNavigation            :: proc(config: ^AConfiguration, navigation: i32) ---
-	AConfiguration_getKeysHidden            :: proc(config: ^AConfiguration) -> i32 ---
-	AConfiguration_setKeysHidden            :: proc(config: ^AConfiguration, keysHidden: i32) ---
-	AConfiguration_getNavHidden             :: proc(config: ^AConfiguration) -> i32 ---
-	AConfiguration_setNavHidden             :: proc(config: ^AConfiguration, navHidden: i32) ---
+	AConfiguration_getKeyboard              :: proc(config: ^AConfiguration) -> AConfigurationKeyboard ---
+	AConfiguration_setKeyboard              :: proc(config: ^AConfiguration, keyboard: AConfigurationKeyboard) ---
+	AConfiguration_getNavigation            :: proc(config: ^AConfiguration) -> AConfigurationNavigation ---
+	AConfiguration_setNavigation            :: proc(config: ^AConfiguration, navigation: AConfigurationNavigation) ---
+	AConfiguration_getKeysHidden            :: proc(config: ^AConfiguration) -> AConfigurationKeysHidden ---
+	AConfiguration_setKeysHidden            :: proc(config: ^AConfiguration, keysHidden: AConfigurationKeysHidden) ---
+	AConfiguration_getNavHidden             :: proc(config: ^AConfiguration) -> AConfigurationNavHidden ---
+	AConfiguration_setNavHidden             :: proc(config: ^AConfiguration, navHidden: AConfigurationNavHidden) ---
 	AConfiguration_getSdkVersion            :: proc(config: ^AConfiguration) -> i32 ---
 	AConfiguration_setSdkVersion            :: proc(config: ^AConfiguration, sdkVersion: i32) ---
-	AConfiguration_getScreenSize            :: proc(config: ^AConfiguration) -> i32 ---
-	AConfiguration_setScreenSize            :: proc(config: ^AConfiguration, screenSize: i32) ---
-	AConfiguration_getScreenLong            :: proc(config: ^AConfiguration) -> i32 ---
-	AConfiguration_setScreenLong            :: proc(config: ^AConfiguration, screenLong: i32) ---
-	AConfiguration_getScreenRound           :: proc(config: ^AConfiguration) -> i32 --- // API level 30
-	AConfiguration_getUiModeType            :: proc(config: ^AConfiguration) -> i32 ---
-	AConfiguration_setUiModeType            :: proc(config: ^AConfiguration, uiModeType: i32) ---
-	AConfiguration_getUiModeNight           :: proc(config: ^AConfiguration) -> i32 ---
-	AConfiguration_setUiModeNight           :: proc(config: ^AConfiguration, uiModeNight: i32) ---
+	AConfiguration_getScreenSize            :: proc(config: ^AConfiguration) -> AConfigurationScreenSize ---
+	AConfiguration_setScreenSize            :: proc(config: ^AConfiguration, screenSize: AConfigurationScreenSize) ---
+	AConfiguration_getScreenLong            :: proc(config: ^AConfiguration) -> AConfigurationScreenLong ---
+	AConfiguration_setScreenLong            :: proc(config: ^AConfiguration, screenLong: AConfigurationScreenLong) ---
+	AConfiguration_getScreenRound           :: proc(config: ^AConfiguration) -> AConfigurationScreenRound --- // API level 30
+	AConfiguration_getUiModeType            :: proc(config: ^AConfiguration) -> AConfigurationUiModeType ---
+	AConfiguration_setUiModeType            :: proc(config: ^AConfiguration, uiModeType: AConfigurationUiModeType) ---
+	AConfiguration_getUiModeNight           :: proc(config: ^AConfiguration) -> AConfigurationUiModeNight ---
+	AConfiguration_setUiModeNight           :: proc(config: ^AConfiguration, uiModeNight: AConfigurationUiModeNight) ---
 	AConfiguration_getScreenWidthDp         :: proc(config: ^AConfiguration) -> i32 ---
 	AConfiguration_setScreenWidthDp         :: proc(config: ^AConfiguration, value: i32) ---
 	AConfiguration_getScreenHeightDp        :: proc(config: ^AConfiguration) -> i32 ---
 	AConfiguration_setScreenHeightDp        :: proc(config: ^AConfiguration, value: i32) ---
 	AConfiguration_getSmallestScreenWidthDp :: proc(config: ^AConfiguration) -> i32 ---
 	AConfiguration_setSmallestScreenWidthDp :: proc(config: ^AConfiguration, value: i32) ---
-	AConfiguration_getLayoutDirection       :: proc(config: ^AConfiguration) -> i32 ---
-	AConfiguration_setLayoutDirection       :: proc(config: ^AConfiguration, value: i32) ---
-	AConfiguration_getGrammaticalGender     :: proc(config: ^AConfiguration) -> i32 --- // API level 34
-	AConfiguration_setGrammaticalGender     :: proc(config: ^AConfiguration, value: i32) --- // API level 34
-	AConfiguration_diff                     :: proc(config1: ^AConfiguration, config2: ^AConfiguration) -> i32 ---
+	AConfiguration_getLayoutDirection       :: proc(config: ^AConfiguration) -> AConfigurationLayoutDir ---
+	AConfiguration_setLayoutDirection       :: proc(config: ^AConfiguration, value: AConfigurationLayoutDir) ---
+	AConfiguration_getGrammaticalGender     :: proc(config: ^AConfiguration) -> AConfigurationGrammaticalGender --- // API level 34
+	AConfiguration_setGrammaticalGender     :: proc(config: ^AConfiguration, value: AConfigurationGrammaticalGender) --- // API level 34
+	AConfiguration_diff                     :: proc(config1: ^AConfiguration, config2: ^AConfiguration) -> AConfigurationChanges ---
 	AConfiguration_match                    :: proc(base: ^AConfiguration, requested: ^AConfiguration) -> i32 ---
 	AConfiguration_isBetterThan             :: proc(base: ^AConfiguration, test: ^AConfiguration, requested: ^AConfiguration) -> i32 ---
 }

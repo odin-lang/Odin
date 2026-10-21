@@ -7,10 +7,10 @@ import "core:c"
 
 UCPMap :: struct {}
 
-UCPMapRangeOption :: c.int
-
-UCPMAP_RANGE_NORMAL                :: 0
-UCPMAP_RANGE_FIXED_LEAD_SURROGATES :: 1
-UCPMAP_RANGE_FIXED_ALL_SURROGATES  :: 2
+UCPMapRangeOption :: enum c.int {
+	NORMAL                = 0,
+	FIXED_LEAD_SURROGATES = 1,
+	FIXED_ALL_SURROGATES  = 2,
+}
 
 UCPMapValueFilter :: proc "c" (context_: rawptr, value: u32) -> u32

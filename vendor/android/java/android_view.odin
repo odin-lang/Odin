@@ -25,10 +25,10 @@ AbsSavedState_get_EMPTY_STATE :: proc "contextless" () -> (result: ^AbsSavedStat
 	return (^AbsSavedState)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-AbsSavedState_describeContents :: proc "contextless" (self: ^AbsSavedState) -> (result: i32, exception: ^Throwable) {
+AbsSavedState_describeContents :: proc "contextless" (self: ^AbsSavedState) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &AbsSavedState__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 AbsSavedState_getSuperState :: proc "contextless" (self: ^AbsSavedState) -> (result: ^Parcelable, exception: ^Throwable) {
@@ -37,10 +37,10 @@ AbsSavedState_getSuperState :: proc "contextless" (self: ^AbsSavedState) -> (res
 	return (^Parcelable)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-AbsSavedState_writeToParcel :: proc "contextless" (self: ^AbsSavedState, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+AbsSavedState_writeToParcel :: proc "contextless" (self: ^AbsSavedState, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &AbsSavedState__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -113,10 +113,10 @@ ActionMode_getTitleOptionalHint :: proc "contextless" (self: ^ActionMode) -> (re
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-ActionMode_getType :: proc "contextless" (self: ^ActionMode) -> (result: i32, exception: ^Throwable) {
+ActionMode_getType :: proc "contextless" (self: ^ActionMode) -> (result: ActionMode_Type, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ActionMode__class, "getType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return ActionMode_Type(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ActionMode_hide :: proc "contextless" (self: ^ActionMode, duration: i64) -> (exception: ^Throwable) {
@@ -229,12 +229,17 @@ ActionMode_setTitleOptionalHint :: proc "contextless" (self: ^ActionMode, titleO
 	return jni_take(jni_env)
 }
 
-ActionMode_setType :: proc "contextless" (self: ^ActionMode, type: i32) -> (exception: ^Throwable) {
+ActionMode_setType :: proc "contextless" (self: ^ActionMode, type: ActionMode_Type) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ActionMode__class, "setType", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = type}}
+	jni_args := [?]android.jvalue{{i = i32(type)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+ActionMode_Type :: enum i32 {
+	FLOATING = 1,
+	PRIMARY  = 0,
 }
 
 // interface android.view.ActionMode.Callback
@@ -416,10 +421,10 @@ AttachedSurfaceControl_createMirror :: proc "contextless" (self: ^AttachedSurfac
 	return (^SurfaceControl)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-AttachedSurfaceControl_getBufferTransformHint :: proc "contextless" (self: ^AttachedSurfaceControl) -> (result: i32, exception: ^Throwable) { // API level 32
+AttachedSurfaceControl_getBufferTransformHint :: proc "contextless" (self: ^AttachedSurfaceControl) -> (result: SurfaceControl_BufferTransform, exception: ^Throwable) { // API level 32
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &AttachedSurfaceControl__class, "getBufferTransformHint", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return SurfaceControl_BufferTransform(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 AttachedSurfaceControl_getInputTransferToken :: proc "contextless" (self: ^AttachedSurfaceControl) -> (result: ^InputTransferToken, exception: ^Throwable) { // API level 35
@@ -467,10 +472,10 @@ AttachedSurfaceControl_OnBufferTransformHintChangedListener :: struct #raw_union
 @(private)
 AttachedSurfaceControl_OnBufferTransformHintChangedListener__class := Cached_Class{name = "android/view/AttachedSurfaceControl$OnBufferTransformHintChangedListener"}
 
-AttachedSurfaceControl_OnBufferTransformHintChangedListener_onBufferTransformHintChanged :: proc "contextless" (self: ^AttachedSurfaceControl_OnBufferTransformHintChangedListener, hint: i32) -> (exception: ^Throwable) {
+AttachedSurfaceControl_OnBufferTransformHintChangedListener_onBufferTransformHintChanged :: proc "contextless" (self: ^AttachedSurfaceControl_OnBufferTransformHintChangedListener, hint: SurfaceControl_BufferTransform) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &AttachedSurfaceControl_OnBufferTransformHintChangedListener__class, "onBufferTransformHintChanged", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = hint}}
+	jni_args := [?]android.jvalue{{i = i32(hint)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -713,10 +718,10 @@ ContentInfo_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creator
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-ContentInfo_describeContents :: proc "contextless" (self: ^ContentInfo) -> (result: i32, exception: ^Throwable) {
+ContentInfo_describeContents :: proc "contextless" (self: ^ContentInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContentInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ContentInfo_getClip :: proc "contextless" (self: ^ContentInfo) -> (result: ^ClipData, exception: ^Throwable) {
@@ -731,10 +736,10 @@ ContentInfo_getExtras :: proc "contextless" (self: ^ContentInfo) -> (result: ^Bu
 	return (^Bundle)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ContentInfo_getFlags :: proc "contextless" (self: ^ContentInfo) -> (result: i32, exception: ^Throwable) {
+ContentInfo_getFlags :: proc "contextless" (self: ^ContentInfo) -> (result: ContentInfo_Flags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContentInfo__class, "getFlags", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(ContentInfo_Flags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ContentInfo_getLinkUri :: proc "contextless" (self: ^ContentInfo) -> (result: ^Uri, exception: ^Throwable) {
@@ -743,10 +748,10 @@ ContentInfo_getLinkUri :: proc "contextless" (self: ^ContentInfo) -> (result: ^U
 	return (^Uri)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ContentInfo_getSource :: proc "contextless" (self: ^ContentInfo) -> (result: i32, exception: ^Throwable) {
+ContentInfo_getSource :: proc "contextless" (self: ^ContentInfo) -> (result: ContentInfo_Source, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContentInfo__class, "getSource", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return ContentInfo_Source(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ContentInfo_toString :: proc "contextless" (self: ^ContentInfo) -> (result: ^String, exception: ^Throwable) {
@@ -755,12 +760,26 @@ ContentInfo_toString :: proc "contextless" (self: ^ContentInfo) -> (result: ^Str
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ContentInfo_writeToParcel :: proc "contextless" (self: ^ContentInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+ContentInfo_writeToParcel :: proc "contextless" (self: ^ContentInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContentInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+ContentInfo_Flag :: enum u32 {
+	FLAG_CONVERT_TO_PLAIN_TEXT = 0,
+}
+ContentInfo_Flags :: distinct bit_set[ContentInfo_Flag; u32]
+
+ContentInfo_Source :: enum i32 {
+	APP           = 0,
+	AUTOFILL      = 4,
+	CLIPBOARD     = 1,
+	DRAG_AND_DROP = 3,
+	INPUT_METHOD  = 2,
+	PROCESS_TEXT  = 5,
 }
 
 // class android.view.ContentInfo.Builder // API level 31
@@ -771,10 +790,10 @@ ContentInfo_Builder :: struct #raw_union {
 @(private)
 ContentInfo_Builder__class := Cached_Class{name = "android/view/ContentInfo$Builder"}
 
-ContentInfo_Builder_new_ClipData_int :: proc "contextless" (clip: ^ClipData, source: i32) -> (result: ^ContentInfo_Builder, exception: ^Throwable) {
+ContentInfo_Builder_new_ClipData_int :: proc "contextless" (clip: ^ClipData, source: ContentInfo_Source) -> (result: ^ContentInfo_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &ContentInfo_Builder__class, "<init>", "(Landroid/content/ClipData;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = clip}, {i = source}}
+	jni_args := [?]android.jvalue{{l = clip}, {i = i32(source)}}
 	return (^ContentInfo_Builder)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -810,10 +829,10 @@ ContentInfo_Builder_setExtras :: proc "contextless" (self: ^ContentInfo_Builder,
 	return (^ContentInfo_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContentInfo_Builder_setFlags :: proc "contextless" (self: ^ContentInfo_Builder, flags: i32) -> (result: ^ContentInfo_Builder, exception: ^Throwable) {
+ContentInfo_Builder_setFlags :: proc "contextless" (self: ^ContentInfo_Builder, flags: ContentInfo_Flags) -> (result: ^ContentInfo_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContentInfo_Builder__class, "setFlags", "(I)Landroid/view/ContentInfo$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	return (^ContentInfo_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -824,10 +843,10 @@ ContentInfo_Builder_setLinkUri :: proc "contextless" (self: ^ContentInfo_Builder
 	return (^ContentInfo_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContentInfo_Builder_setSource :: proc "contextless" (self: ^ContentInfo_Builder, source: i32) -> (result: ^ContentInfo_Builder, exception: ^Throwable) {
+ContentInfo_Builder_setSource :: proc "contextless" (self: ^ContentInfo_Builder, source: ContentInfo_Source) -> (result: ^ContentInfo_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContentInfo_Builder__class, "setSource", "(I)Landroid/view/ContentInfo$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = source}}
+	jni_args := [?]android.jvalue{{i = i32(source)}}
 	return (^ContentInfo_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -1044,10 +1063,10 @@ Display_getDisplayId :: proc "contextless" (self: ^Display) -> (result: i32, exc
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-Display_getFlags :: proc "contextless" (self: ^Display) -> (result: i32, exception: ^Throwable) {
+Display_getFlags :: proc "contextless" (self: ^Display) -> (result: Display_Flags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Display__class, "getFlags", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Display_Flags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Display_getFrameRateVelocityMapping :: proc "contextless" (self: ^Display) -> (result: ^List, exception: ^Throwable) { // API level 37
@@ -1100,10 +1119,10 @@ Display_getName :: proc "contextless" (self: ^Display) -> (result: ^String, exce
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Display_getOrientation :: proc "contextless" (self: ^Display) -> (result: i32, exception: ^Throwable) {
+Display_getOrientation :: proc "contextless" (self: ^Display) -> (result: Surface_Rotation, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Display__class, "getOrientation", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return Surface_Rotation(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Display_getOverlaySupport :: proc "contextless" (self: ^Display) -> (result: ^OverlayProperties, exception: ^Throwable) { // API level 35
@@ -1112,10 +1131,10 @@ Display_getOverlaySupport :: proc "contextless" (self: ^Display) -> (result: ^Ov
 	return (^OverlayProperties)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Display_getPixelFormat :: proc "contextless" (self: ^Display) -> (result: i32, exception: ^Throwable) {
+Display_getPixelFormat :: proc "contextless" (self: ^Display) -> (result: PixelFormat_Format, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Display__class, "getPixelFormat", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return PixelFormat_Format(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Display_getPreferredWideGamutColorSpace :: proc "contextless" (self: ^Display) -> (result: ^ColorSpace, exception: ^Throwable) {
@@ -1160,16 +1179,16 @@ Display_getRefreshRate :: proc "contextless" (self: ^Display) -> (result: f32, e
 	return jni_env->CallFloatMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-Display_getRotation :: proc "contextless" (self: ^Display) -> (result: i32, exception: ^Throwable) {
+Display_getRotation :: proc "contextless" (self: ^Display) -> (result: Surface_Rotation, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Display__class, "getRotation", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return Surface_Rotation(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Display_getRoundedCorner :: proc "contextless" (self: ^Display, position: i32) -> (result: ^RoundedCorner, exception: ^Throwable) { // API level 31
+Display_getRoundedCorner :: proc "contextless" (self: ^Display, position: RoundedCorner_Position) -> (result: ^RoundedCorner, exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Display__class, "getRoundedCorner", "(I)Landroid/view/RoundedCorner;", false) or_return
-	jni_args := [?]android.jvalue{{i = position}}
+	jni_args := [?]android.jvalue{{i = i32(position)}}
 	return (^RoundedCorner)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -1187,16 +1206,16 @@ Display_getSize :: proc "contextless" (self: ^Display, outSize: ^Point) -> (exce
 	return jni_take(jni_env)
 }
 
-Display_getState :: proc "contextless" (self: ^Display) -> (result: i32, exception: ^Throwable) {
+Display_getState :: proc "contextless" (self: ^Display) -> (result: Display_State, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Display__class, "getState", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return Display_State(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Display_getSuggestedFrameRate :: proc "contextless" (self: ^Display, category: i32) -> (result: f32, exception: ^Throwable) { // API level 36
+Display_getSuggestedFrameRate :: proc "contextless" (self: ^Display, category: Display_FrameRateCategory) -> (result: f32, exception: ^Throwable) { // API level 36
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Display__class, "getSuggestedFrameRate", "(I)F", false) or_return
-	jni_args := [?]android.jvalue{{i = category}}
+	jni_args := [?]android.jvalue{{i = i32(category)}}
 	return jni_env->CallFloatMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
@@ -1282,6 +1301,30 @@ Display_unregisterHdrSdrRatioChangedListener :: proc "contextless" (self: ^Displ
 	return jni_take(jni_env)
 }
 
+Display_Flag :: enum u32 {
+	PRESENTATION               = 3,
+	PRIVATE                    = 2,
+	ROUND                      = 4,
+	SECURE                     = 1,
+	SUPPORTS_PROTECTED_BUFFERS = 0,
+}
+Display_Flags :: distinct bit_set[Display_Flag; u32]
+
+Display_State :: enum i32 {
+	DOZE         = 3,
+	DOZE_SUSPEND = 4,
+	OFF          = 1,
+	ON           = 2,
+	ON_SUSPEND   = 6,
+	UNKNOWN      = 0,
+	VR           = 5,
+}
+
+Display_FrameRateCategory :: enum i32 {
+	HIGH   = 1,
+	NORMAL = 0,
+}
+
 // class android.view.Display.HdrCapabilities
 Display_HdrCapabilities :: struct #raw_union {
 	using Object: Object,
@@ -1305,10 +1348,10 @@ Display_HdrCapabilities_get_CREATOR :: proc "contextless" () -> (result: ^Parcel
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-Display_HdrCapabilities_describeContents :: proc "contextless" (self: ^Display_HdrCapabilities) -> (result: i32, exception: ^Throwable) {
+Display_HdrCapabilities_describeContents :: proc "contextless" (self: ^Display_HdrCapabilities) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Display_HdrCapabilities__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Display_HdrCapabilities_equals :: proc "contextless" (self: ^Display_HdrCapabilities, other: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -1354,10 +1397,10 @@ Display_HdrCapabilities_toString :: proc "contextless" (self: ^Display_HdrCapabi
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Display_HdrCapabilities_writeToParcel :: proc "contextless" (self: ^Display_HdrCapabilities, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+Display_HdrCapabilities_writeToParcel :: proc "contextless" (self: ^Display_HdrCapabilities, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Display_HdrCapabilities__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1377,10 +1420,10 @@ Display_Mode_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creato
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-Display_Mode_describeContents :: proc "contextless" (self: ^Display_Mode) -> (result: i32, exception: ^Throwable) {
+Display_Mode_describeContents :: proc "contextless" (self: ^Display_Mode) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Display_Mode__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Display_Mode_equals :: proc "contextless" (self: ^Display_Mode, other: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -1438,10 +1481,10 @@ Display_Mode_toString :: proc "contextless" (self: ^Display_Mode) -> (result: ^S
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Display_Mode_writeToParcel :: proc "contextless" (self: ^Display_Mode, out: ^Parcel, parcelableFlags: i32) -> (exception: ^Throwable) {
+Display_Mode_writeToParcel :: proc "contextless" (self: ^Display_Mode, out: ^Parcel, parcelableFlags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Display_Mode__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = parcelableFlags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)parcelableFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1650,10 +1693,10 @@ DisplayShape_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creato
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-DisplayShape_describeContents :: proc "contextless" (self: ^DisplayShape) -> (result: i32, exception: ^Throwable) {
+DisplayShape_describeContents :: proc "contextless" (self: ^DisplayShape) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DisplayShape__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 DisplayShape_equals :: proc "contextless" (self: ^DisplayShape, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -1681,10 +1724,10 @@ DisplayShape_toString :: proc "contextless" (self: ^DisplayShape) -> (result: ^S
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-DisplayShape_writeToParcel :: proc "contextless" (self: ^DisplayShape, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+DisplayShape_writeToParcel :: proc "contextless" (self: ^DisplayShape, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DisplayShape__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1704,10 +1747,10 @@ DragAndDropPermissions_get_CREATOR :: proc "contextless" () -> (result: ^Parcela
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-DragAndDropPermissions_describeContents :: proc "contextless" (self: ^DragAndDropPermissions) -> (result: i32, exception: ^Throwable) {
+DragAndDropPermissions_describeContents :: proc "contextless" (self: ^DragAndDropPermissions) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DragAndDropPermissions__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 DragAndDropPermissions_release :: proc "contextless" (self: ^DragAndDropPermissions) -> (exception: ^Throwable) {
@@ -1717,10 +1760,10 @@ DragAndDropPermissions_release :: proc "contextless" (self: ^DragAndDropPermissi
 	return jni_take(jni_env)
 }
 
-DragAndDropPermissions_writeToParcel :: proc "contextless" (self: ^DragAndDropPermissions, destination: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+DragAndDropPermissions_writeToParcel :: proc "contextless" (self: ^DragAndDropPermissions, destination: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DragAndDropPermissions__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = destination}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = destination}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1747,16 +1790,16 @@ DragEvent_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creator, 
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-DragEvent_describeContents :: proc "contextless" (self: ^DragEvent) -> (result: i32, exception: ^Throwable) {
+DragEvent_describeContents :: proc "contextless" (self: ^DragEvent) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DragEvent__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-DragEvent_getAction :: proc "contextless" (self: ^DragEvent) -> (result: i32, exception: ^Throwable) {
+DragEvent_getAction :: proc "contextless" (self: ^DragEvent) -> (result: DragEvent_Action, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DragEvent__class, "getAction", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return DragEvent_Action(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 DragEvent_getClipData :: proc "contextless" (self: ^DragEvent) -> (result: ^ClipData, exception: ^Throwable) {
@@ -1801,12 +1844,21 @@ DragEvent_toString :: proc "contextless" (self: ^DragEvent) -> (result: ^String,
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-DragEvent_writeToParcel :: proc "contextless" (self: ^DragEvent, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+DragEvent_writeToParcel :: proc "contextless" (self: ^DragEvent, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DragEvent__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+DragEvent_Action :: enum i32 {
+	DRAG_ENDED    = 4,
+	DRAG_ENTERED  = 5,
+	DRAG_EXITED   = 6,
+	DRAG_LOCATION = 2,
+	DRAG_STARTED  = 1,
+	DROP          = 3,
 }
 
 // class android.view.FocusFinder
@@ -1817,31 +1869,31 @@ FocusFinder :: struct #raw_union {
 @(private)
 FocusFinder__class := Cached_Class{name = "android/view/FocusFinder"}
 
-FocusFinder_findNearestTouchable :: proc "contextless" (self: ^FocusFinder, root: ^ViewGroup, x: i32, y: i32, direction: i32, deltas: ^IntArray) -> (result: ^View, exception: ^Throwable) {
+FocusFinder_findNearestTouchable :: proc "contextless" (self: ^FocusFinder, root: ^ViewGroup, x: i32, y: i32, direction: View_Focus, deltas: ^IntArray) -> (result: ^View, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &FocusFinder__class, "findNearestTouchable", "(Landroid/view/ViewGroup;III[I)Landroid/view/View;", false) or_return
-	jni_args := [?]android.jvalue{{l = root}, {i = x}, {i = y}, {i = direction}, {l = deltas}}
+	jni_args := [?]android.jvalue{{l = root}, {i = x}, {i = y}, {i = i32(direction)}, {l = deltas}}
 	return (^View)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-FocusFinder_findNextFocus :: proc "contextless" (self: ^FocusFinder, root: ^ViewGroup, focused: ^View, direction: i32) -> (result: ^View, exception: ^Throwable) {
+FocusFinder_findNextFocus :: proc "contextless" (self: ^FocusFinder, root: ^ViewGroup, focused: ^View, direction: View_Focus) -> (result: ^View, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &FocusFinder__class, "findNextFocus", "(Landroid/view/ViewGroup;Landroid/view/View;I)Landroid/view/View;", false) or_return
-	jni_args := [?]android.jvalue{{l = root}, {l = focused}, {i = direction}}
+	jni_args := [?]android.jvalue{{l = root}, {l = focused}, {i = i32(direction)}}
 	return (^View)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-FocusFinder_findNextFocusFromRect :: proc "contextless" (self: ^FocusFinder, root: ^ViewGroup, focusedRect: ^Rect, direction: i32) -> (result: ^View, exception: ^Throwable) {
+FocusFinder_findNextFocusFromRect :: proc "contextless" (self: ^FocusFinder, root: ^ViewGroup, focusedRect: ^Rect, direction: View_Focus) -> (result: ^View, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &FocusFinder__class, "findNextFocusFromRect", "(Landroid/view/ViewGroup;Landroid/graphics/Rect;I)Landroid/view/View;", false) or_return
-	jni_args := [?]android.jvalue{{l = root}, {l = focusedRect}, {i = direction}}
+	jni_args := [?]android.jvalue{{l = root}, {l = focusedRect}, {i = i32(direction)}}
 	return (^View)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-FocusFinder_findNextKeyboardNavigationCluster :: proc "contextless" (self: ^FocusFinder, root: ^View, currentCluster: ^View, direction: i32) -> (result: ^View, exception: ^Throwable) {
+FocusFinder_findNextKeyboardNavigationCluster :: proc "contextless" (self: ^FocusFinder, root: ^View, currentCluster: ^View, direction: View_Focus) -> (result: ^View, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &FocusFinder__class, "findNextKeyboardNavigationCluster", "(Landroid/view/View;Landroid/view/View;I)Landroid/view/View;", false) or_return
-	jni_args := [?]android.jvalue{{l = root}, {l = currentCluster}, {i = direction}}
+	jni_args := [?]android.jvalue{{l = root}, {l = currentCluster}, {i = i32(direction)}}
 	return (^View)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -1882,11 +1934,28 @@ FrameMetrics_new :: proc "contextless" (other: ^FrameMetrics) -> (result: ^Frame
 	return (^FrameMetrics)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-FrameMetrics_getMetric :: proc "contextless" (self: ^FrameMetrics, id: i32) -> (result: i64, exception: ^Throwable) {
+FrameMetrics_getMetric :: proc "contextless" (self: ^FrameMetrics, id: FrameMetrics_Metric) -> (result: i64, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &FrameMetrics__class, "getMetric", "(I)J", false) or_return
-	jni_args := [?]android.jvalue{{i = id}}
+	jni_args := [?]android.jvalue{{i = i32(id)}}
 	return jni_env->CallLongMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+}
+
+FrameMetrics_Metric :: enum i32 {
+	ANIMATION_DURATION       = 2,
+	COMMAND_ISSUE_DURATION   = 6,
+	DEADLINE                 = 13,
+	DRAW_DURATION            = 4,
+	FIRST_DRAW_FRAME         = 9,
+	GPU_DURATION             = 12,
+	INPUT_HANDLING_DURATION  = 1,
+	INTENDED_VSYNC_TIMESTAMP = 10,
+	LAYOUT_MEASURE_DURATION  = 3,
+	SWAP_BUFFERS_DURATION    = 7,
+	SYNC_DURATION            = 5,
+	TOTAL_DURATION           = 8,
+	UNKNOWN_DELAY_DURATION   = 0,
+	VSYNC_TIMESTAMP          = 11,
 }
 
 // class android.view.FrameRateVelocityPoint // API level 37
@@ -1911,10 +1980,10 @@ FrameRateVelocityPoint_new :: proc "contextless" (framePerSecond: f32, dpPerSeco
 	return (^FrameRateVelocityPoint)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-FrameRateVelocityPoint_describeContents :: proc "contextless" (self: ^FrameRateVelocityPoint) -> (result: i32, exception: ^Throwable) {
+FrameRateVelocityPoint_describeContents :: proc "contextless" (self: ^FrameRateVelocityPoint) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &FrameRateVelocityPoint__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 FrameRateVelocityPoint_equals :: proc "contextless" (self: ^FrameRateVelocityPoint, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -1942,10 +2011,10 @@ FrameRateVelocityPoint_hashCode :: proc "contextless" (self: ^FrameRateVelocityP
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-FrameRateVelocityPoint_writeToParcel :: proc "contextless" (self: ^FrameRateVelocityPoint, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+FrameRateVelocityPoint_writeToParcel :: proc "contextless" (self: ^FrameRateVelocityPoint, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &FrameRateVelocityPoint__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -2313,34 +2382,34 @@ Gravity_new :: proc "contextless" () -> (result: ^Gravity, exception: ^Throwable
 	return (^Gravity)(jni_env->NewObjectA(jni_class, jni_id, nil)), jni_take(jni_env)
 }
 
-Gravity_apply_int_int_int_Rect_Rect :: proc "contextless" (gravity: i32, w: i32, h: i32, container: ^Rect, outRect: ^Rect) -> (exception: ^Throwable) {
+Gravity_apply_int_int_int_Rect_Rect :: proc "contextless" (gravity: Gravity_Field, w: i32, h: i32, container: ^Rect, outRect: ^Rect) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Gravity__class, "apply", "(IIILandroid/graphics/Rect;Landroid/graphics/Rect;)V", true) or_return
-	jni_args := [?]android.jvalue{{i = gravity}, {i = w}, {i = h}, {l = container}, {l = outRect}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)gravity}, {i = w}, {i = h}, {l = container}, {l = outRect}}
 	jni_env->CallStaticVoidMethodA(jni_class, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-Gravity_apply_int_int_int_Rect_Rect_int :: proc "contextless" (gravity: i32, w: i32, h: i32, container: ^Rect, outRect: ^Rect, layoutDirection: i32) -> (exception: ^Throwable) {
+Gravity_apply_int_int_int_Rect_Rect_int :: proc "contextless" (gravity: Gravity_Field, w: i32, h: i32, container: ^Rect, outRect: ^Rect, layoutDirection: View_LayoutDirection) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Gravity__class, "apply", "(IIILandroid/graphics/Rect;Landroid/graphics/Rect;I)V", true) or_return
-	jni_args := [?]android.jvalue{{i = gravity}, {i = w}, {i = h}, {l = container}, {l = outRect}, {i = layoutDirection}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)gravity}, {i = w}, {i = h}, {l = container}, {l = outRect}, {i = i32(layoutDirection)}}
 	jni_env->CallStaticVoidMethodA(jni_class, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-Gravity_apply_int_int_int_Rect_int_int_Rect :: proc "contextless" (gravity: i32, w: i32, h: i32, container: ^Rect, xAdj: i32, yAdj: i32, outRect: ^Rect) -> (exception: ^Throwable) {
+Gravity_apply_int_int_int_Rect_int_int_Rect :: proc "contextless" (gravity: Gravity_Field, w: i32, h: i32, container: ^Rect, xAdj: i32, yAdj: i32, outRect: ^Rect) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Gravity__class, "apply", "(IIILandroid/graphics/Rect;IILandroid/graphics/Rect;)V", true) or_return
-	jni_args := [?]android.jvalue{{i = gravity}, {i = w}, {i = h}, {l = container}, {i = xAdj}, {i = yAdj}, {l = outRect}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)gravity}, {i = w}, {i = h}, {l = container}, {i = xAdj}, {i = yAdj}, {l = outRect}}
 	jni_env->CallStaticVoidMethodA(jni_class, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-Gravity_apply_int_int_int_Rect_int_int_Rect_int :: proc "contextless" (gravity: i32, w: i32, h: i32, container: ^Rect, xAdj: i32, yAdj: i32, outRect: ^Rect, layoutDirection: i32) -> (exception: ^Throwable) {
+Gravity_apply_int_int_int_Rect_int_int_Rect_int :: proc "contextless" (gravity: Gravity_Field, w: i32, h: i32, container: ^Rect, xAdj: i32, yAdj: i32, outRect: ^Rect, layoutDirection: View_LayoutDirection) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Gravity__class, "apply", "(IIILandroid/graphics/Rect;IILandroid/graphics/Rect;I)V", true) or_return
-	jni_args := [?]android.jvalue{{i = gravity}, {i = w}, {i = h}, {l = container}, {i = xAdj}, {i = yAdj}, {l = outRect}, {i = layoutDirection}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)gravity}, {i = w}, {i = h}, {l = container}, {i = xAdj}, {i = yAdj}, {l = outRect}, {i = i32(layoutDirection)}}
 	jni_env->CallStaticVoidMethodA(jni_class, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -2352,18 +2421,18 @@ Gravity_apply :: proc{
 	Gravity_apply_int_int_int_Rect_int_int_Rect_int,
 }
 
-Gravity_applyDisplay_int_Rect_Rect :: proc "contextless" (gravity: i32, display: ^Rect, inoutObj: ^Rect) -> (exception: ^Throwable) {
+Gravity_applyDisplay_int_Rect_Rect :: proc "contextless" (gravity: Gravity_Field, display: ^Rect, inoutObj: ^Rect) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Gravity__class, "applyDisplay", "(ILandroid/graphics/Rect;Landroid/graphics/Rect;)V", true) or_return
-	jni_args := [?]android.jvalue{{i = gravity}, {l = display}, {l = inoutObj}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)gravity}, {l = display}, {l = inoutObj}}
 	jni_env->CallStaticVoidMethodA(jni_class, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-Gravity_applyDisplay_int_Rect_Rect_int :: proc "contextless" (gravity: i32, display: ^Rect, inoutObj: ^Rect, layoutDirection: i32) -> (exception: ^Throwable) {
+Gravity_applyDisplay_int_Rect_Rect_int :: proc "contextless" (gravity: Gravity_Field, display: ^Rect, inoutObj: ^Rect, layoutDirection: View_LayoutDirection) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Gravity__class, "applyDisplay", "(ILandroid/graphics/Rect;Landroid/graphics/Rect;I)V", true) or_return
-	jni_args := [?]android.jvalue{{i = gravity}, {l = display}, {l = inoutObj}, {i = layoutDirection}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)gravity}, {l = display}, {l = inoutObj}, {i = i32(layoutDirection)}}
 	jni_env->CallStaticVoidMethodA(jni_class, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -2373,26 +2442,77 @@ Gravity_applyDisplay :: proc{
 	Gravity_applyDisplay_int_Rect_Rect_int,
 }
 
-Gravity_getAbsoluteGravity :: proc "contextless" (gravity: i32, layoutDirection: i32) -> (result: i32, exception: ^Throwable) {
+Gravity_getAbsoluteGravity :: proc "contextless" (gravity: Gravity_Field, layoutDirection: View_LayoutDirection) -> (result: Gravity_Field, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Gravity__class, "getAbsoluteGravity", "(II)I", true) or_return
-	jni_args := [?]android.jvalue{{i = gravity}, {i = layoutDirection}}
-	return jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{i = transmute(i32)gravity}, {i = i32(layoutDirection)}}
+	return transmute(Gravity_Field)(jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Gravity_isHorizontal :: proc "contextless" (gravity: i32) -> (result: bool, exception: ^Throwable) {
+Gravity_isHorizontal :: proc "contextless" (gravity: Gravity_Field) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Gravity__class, "isHorizontal", "(I)Z", true) or_return
-	jni_args := [?]android.jvalue{{i = gravity}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)gravity}}
 	return jni_env->CallStaticBooleanMethodA(jni_class, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-Gravity_isVertical :: proc "contextless" (gravity: i32) -> (result: bool, exception: ^Throwable) {
+Gravity_isVertical :: proc "contextless" (gravity: Gravity_Field) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Gravity__class, "isVertical", "(I)Z", true) or_return
-	jni_args := [?]android.jvalue{{i = gravity}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)gravity}}
 	return jni_env->CallStaticBooleanMethodA(jni_class, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
+
+Gravity_Horizontal :: enum u32 {
+	NONE   = 0,
+	CENTER = 1,
+	LEFT   = 3,
+	RIGHT  = 5,
+	FILL   = 7,
+}
+
+Gravity_Vertical :: enum u32 {
+	NONE   = 0,
+	CENTER = 1,
+	TOP    = 3,
+	BOTTOM = 5,
+	FILL   = 7,
+}
+
+Gravity_Field :: bit_field i32 {
+	horizontal:              Gravity_Horizontal | 3,
+	clip_horizontal:         bool               | 1,
+	vertical:                Gravity_Vertical   | 3,
+	clip_vertical:           bool               | 1,
+	_:                       u16                | 15,
+	relative:                bool               | 1,
+	display_clip_horizontal: bool               | 1,
+	_:                       u8                 | 3,
+	display_clip_vertical:   bool               | 1,
+	_:                       u8                 | 3,
+}
+
+Gravity_Field_BOTTOM                           :: Gravity_Field{vertical = .BOTTOM}
+Gravity_Field_CENTER                           :: Gravity_Field{horizontal = .CENTER, vertical = .CENTER}
+Gravity_Field_CENTER_HORIZONTAL                :: Gravity_Field{horizontal = .CENTER}
+Gravity_Field_CENTER_VERTICAL                  :: Gravity_Field{vertical = .CENTER}
+Gravity_Field_CLIP_HORIZONTAL                  :: Gravity_Field{clip_horizontal = true}
+Gravity_Field_CLIP_VERTICAL                    :: Gravity_Field{clip_vertical = true}
+Gravity_Field_DISPLAY_CLIP_HORIZONTAL          :: Gravity_Field{display_clip_horizontal = true}
+Gravity_Field_DISPLAY_CLIP_VERTICAL            :: Gravity_Field{display_clip_vertical = true}
+Gravity_Field_END                              :: Gravity_Field{horizontal = .RIGHT, relative = true}
+Gravity_Field_FILL                             :: Gravity_Field{horizontal = .FILL, vertical = .FILL}
+Gravity_Field_FILL_HORIZONTAL                  :: Gravity_Field{horizontal = .FILL}
+Gravity_Field_FILL_VERTICAL                    :: Gravity_Field{vertical = .FILL}
+Gravity_Field_HORIZONTAL_GRAVITY_MASK          :: Gravity_Field{horizontal = .FILL}
+Gravity_Field_LEFT                             :: Gravity_Field{horizontal = .LEFT}
+Gravity_Field_NO_GRAVITY                       :: Gravity_Field{}
+Gravity_Field_RELATIVE_HORIZONTAL_GRAVITY_MASK :: Gravity_Field{horizontal = .FILL, relative = true}
+Gravity_Field_RELATIVE_LAYOUT_DIRECTION        :: Gravity_Field{relative = true}
+Gravity_Field_RIGHT                            :: Gravity_Field{horizontal = .RIGHT}
+Gravity_Field_START                            :: Gravity_Field{horizontal = .LEFT, relative = true}
+Gravity_Field_TOP                              :: Gravity_Field{vertical = .TOP}
+Gravity_Field_VERTICAL_GRAVITY_MASK            :: Gravity_Field{vertical = .FILL}
 
 // class android.view.HapticFeedbackConstants
 HapticFeedbackConstants :: struct #raw_union {
@@ -2425,6 +2545,36 @@ HapticFeedbackConstants_TOGGLE_OFF                   :: 22 // API level 34
 HapticFeedbackConstants_TOGGLE_ON                    :: 21 // API level 34
 HapticFeedbackConstants_VIRTUAL_KEY                  :: 1
 HapticFeedbackConstants_VIRTUAL_KEY_RELEASE          :: 8
+
+HapticFeedbackConstants_Feedback :: enum i32 {
+	CLOCK_TICK                   = 4,
+	CONFIRM                      = 16,
+	CONTEXT_CLICK                = 6,
+	DRAG_START                   = 25,
+	GESTURE_END                  = 13,
+	GESTURE_START                = 12,
+	GESTURE_THRESHOLD_ACTIVATE   = 23,
+	GESTURE_THRESHOLD_DEACTIVATE = 24,
+	KEYBOARD_PRESS               = 3,
+	KEYBOARD_RELEASE             = 7,
+	KEYBOARD_TAP                 = 3,
+	LONG_PRESS                   = 0,
+	NO_HAPTICS                   = -1,
+	REJECT                       = 17,
+	SEGMENT_FREQUENT_TICK        = 27,
+	SEGMENT_TICK                 = 26,
+	TEXT_HANDLE_MOVE             = 9,
+	TOGGLE_OFF                   = 22,
+	TOGGLE_ON                    = 21,
+	VIRTUAL_KEY                  = 1,
+	VIRTUAL_KEY_RELEASE          = 8,
+}
+
+HapticFeedbackConstants_Flag :: enum u32 {
+	GLOBAL_SETTING = 1,
+	VIEW_SETTING   = 0,
+}
+HapticFeedbackConstants_Flags :: distinct bit_set[HapticFeedbackConstants_Flag; u32]
 
 // class android.view.InflateException
 InflateException :: struct #raw_union {
@@ -2520,10 +2670,10 @@ InputDevice_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creator
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-InputDevice_describeContents :: proc "contextless" (self: ^InputDevice) -> (result: i32, exception: ^Throwable) {
+InputDevice_describeContents :: proc "contextless" (self: ^InputDevice) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputDevice__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 InputDevice_getAssociatedDisplayId :: proc "contextless" (self: ^InputDevice) -> (result: i32, exception: ^Throwable) { // API level 37
@@ -2575,17 +2725,17 @@ InputDevice_getKeyCharacterMap :: proc "contextless" (self: ^InputDevice) -> (re
 	return (^KeyCharacterMap)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-InputDevice_getKeyCodeForKeyLocation :: proc "contextless" (self: ^InputDevice, locationKeyCode: i32) -> (result: i32, exception: ^Throwable) { // API level 33
+InputDevice_getKeyCodeForKeyLocation :: proc "contextless" (self: ^InputDevice, locationKeyCode: KeyEvent_KeyCode) -> (result: KeyEvent_KeyCode, exception: ^Throwable) { // API level 33
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputDevice__class, "getKeyCodeForKeyLocation", "(I)I", false) or_return
-	jni_args := [?]android.jvalue{{i = locationKeyCode}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{i = i32(locationKeyCode)}}
+	return KeyEvent_KeyCode(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-InputDevice_getKeyboardType :: proc "contextless" (self: ^InputDevice) -> (result: i32, exception: ^Throwable) {
+InputDevice_getKeyboardType :: proc "contextless" (self: ^InputDevice) -> (result: InputDevice_KeyboardType, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputDevice__class, "getKeyboardType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return InputDevice_KeyboardType(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 InputDevice_getLightsManager :: proc "contextless" (self: ^InputDevice) -> (result: ^LightsManager, exception: ^Throwable) { // API level 31
@@ -2594,17 +2744,17 @@ InputDevice_getLightsManager :: proc "contextless" (self: ^InputDevice) -> (resu
 	return (^LightsManager)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-InputDevice_getMotionRange_int :: proc "contextless" (self: ^InputDevice, axis: i32) -> (result: ^InputDevice_MotionRange, exception: ^Throwable) {
+InputDevice_getMotionRange_int :: proc "contextless" (self: ^InputDevice, axis: MotionEvent_Axis) -> (result: ^InputDevice_MotionRange, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputDevice__class, "getMotionRange", "(I)Landroid/view/InputDevice$MotionRange;", false) or_return
-	jni_args := [?]android.jvalue{{i = axis}}
+	jni_args := [?]android.jvalue{{i = i32(axis)}}
 	return (^InputDevice_MotionRange)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-InputDevice_getMotionRange_int_int :: proc "contextless" (self: ^InputDevice, axis: i32, source: i32) -> (result: ^InputDevice_MotionRange, exception: ^Throwable) {
+InputDevice_getMotionRange_int_int :: proc "contextless" (self: ^InputDevice, axis: MotionEvent_Axis, source: InputDevice_Sources) -> (result: ^InputDevice_MotionRange, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputDevice__class, "getMotionRange", "(II)Landroid/view/InputDevice$MotionRange;", false) or_return
-	jni_args := [?]android.jvalue{{i = axis}, {i = source}}
+	jni_args := [?]android.jvalue{{i = i32(axis)}, {i = transmute(i32)source}}
 	return (^InputDevice_MotionRange)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -2637,10 +2787,10 @@ InputDevice_getSensorManager :: proc "contextless" (self: ^InputDevice) -> (resu
 	return (^SensorManager)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-InputDevice_getSources :: proc "contextless" (self: ^InputDevice) -> (result: i32, exception: ^Throwable) {
+InputDevice_getSources :: proc "contextless" (self: ^InputDevice) -> (result: InputDevice_Sources, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputDevice__class, "getSources", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(InputDevice_Sources)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 InputDevice_getVendorId :: proc "contextless" (self: ^InputDevice) -> (result: i32, exception: ^Throwable) {
@@ -2692,10 +2842,10 @@ InputDevice_isVirtual :: proc "contextless" (self: ^InputDevice) -> (result: boo
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-InputDevice_supportsSource :: proc "contextless" (self: ^InputDevice, source: i32) -> (result: bool, exception: ^Throwable) {
+InputDevice_supportsSource :: proc "contextless" (self: ^InputDevice, source: InputDevice_Sources) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputDevice__class, "supportsSource", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = source}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)source}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -2705,12 +2855,67 @@ InputDevice_toString :: proc "contextless" (self: ^InputDevice) -> (result: ^Str
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-InputDevice_writeToParcel :: proc "contextless" (self: ^InputDevice, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+InputDevice_writeToParcel :: proc "contextless" (self: ^InputDevice, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputDevice__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+InputDevice_Source :: enum u32 {
+	CLASS_BUTTON     = 0,
+	CLASS_POINTER    = 1,
+	CLASS_TRACKBALL  = 2,
+	CLASS_POSITION   = 3,
+	CLASS_JOYSTICK   = 4,
+	KEYBOARD         = 8,
+	DPAD             = 9,
+	GAMEPAD          = 10,
+	TOUCHSCREEN      = 12,
+	MOUSE            = 13,
+	STYLUS           = 14,
+	BLUETOOTH_STYLUS = 15,
+	TRACKBALL        = 16,
+	MOUSE_RELATIVE   = 17,
+	TOUCHPAD         = 20,
+	TOUCH_NAVIGATION = 21,
+	ROTARY_ENCODER   = 22,
+	JOYSTICK         = 24,
+	HDMI             = 25,
+	SENSOR           = 26,
+}
+InputDevice_Sources :: distinct bit_set[InputDevice_Source; u32]
+
+InputDevice_Sources_ANY              :: transmute(InputDevice_Sources)u32(0xffffff00)
+InputDevice_Sources_BLUETOOTH_STYLUS :: InputDevice_Sources{.CLASS_POINTER, .STYLUS, .BLUETOOTH_STYLUS}
+InputDevice_Sources_CLASS_BUTTON     :: InputDevice_Sources{.CLASS_BUTTON}
+InputDevice_Sources_CLASS_JOYSTICK   :: InputDevice_Sources{.CLASS_JOYSTICK}
+InputDevice_Sources_CLASS_MASK       :: transmute(InputDevice_Sources)u32(0xff)
+InputDevice_Sources_CLASS_NONE       :: InputDevice_Sources{}
+InputDevice_Sources_CLASS_POINTER    :: InputDevice_Sources{.CLASS_POINTER}
+InputDevice_Sources_CLASS_POSITION   :: InputDevice_Sources{.CLASS_POSITION}
+InputDevice_Sources_CLASS_TRACKBALL  :: InputDevice_Sources{.CLASS_TRACKBALL}
+InputDevice_Sources_DPAD             :: InputDevice_Sources{.CLASS_BUTTON, .DPAD}
+InputDevice_Sources_GAMEPAD          :: InputDevice_Sources{.CLASS_BUTTON, .GAMEPAD}
+InputDevice_Sources_HDMI             :: InputDevice_Sources{.CLASS_BUTTON, .HDMI}
+InputDevice_Sources_JOYSTICK         :: InputDevice_Sources{.CLASS_JOYSTICK, .JOYSTICK}
+InputDevice_Sources_KEYBOARD         :: InputDevice_Sources{.CLASS_BUTTON, .KEYBOARD}
+InputDevice_Sources_MOUSE            :: InputDevice_Sources{.CLASS_POINTER, .MOUSE}
+InputDevice_Sources_MOUSE_RELATIVE   :: InputDevice_Sources{.CLASS_TRACKBALL, .MOUSE_RELATIVE}
+InputDevice_Sources_ROTARY_ENCODER   :: InputDevice_Sources{.ROTARY_ENCODER}
+InputDevice_Sources_SENSOR           :: InputDevice_Sources{.SENSOR}
+InputDevice_Sources_STYLUS           :: InputDevice_Sources{.CLASS_POINTER, .STYLUS}
+InputDevice_Sources_TOUCHPAD         :: InputDevice_Sources{.CLASS_POSITION, .TOUCHPAD}
+InputDevice_Sources_TOUCHSCREEN      :: InputDevice_Sources{.CLASS_POINTER, .TOUCHSCREEN}
+InputDevice_Sources_TOUCH_NAVIGATION :: InputDevice_Sources{.TOUCH_NAVIGATION}
+InputDevice_Sources_TRACKBALL        :: InputDevice_Sources{.CLASS_TRACKBALL, .TRACKBALL}
+InputDevice_Sources_UNKNOWN          :: InputDevice_Sources{}
+
+InputDevice_KeyboardType :: enum i32 {
+	ALPHABETIC     = 2,
+	NONE           = 0,
+	NON_ALPHABETIC = 1,
 }
 
 // class android.view.InputDevice.MotionRange
@@ -2721,10 +2926,10 @@ InputDevice_MotionRange :: struct #raw_union {
 @(private)
 InputDevice_MotionRange__class := Cached_Class{name = "android/view/InputDevice$MotionRange"}
 
-InputDevice_MotionRange_getAxis :: proc "contextless" (self: ^InputDevice_MotionRange) -> (result: i32, exception: ^Throwable) {
+InputDevice_MotionRange_getAxis :: proc "contextless" (self: ^InputDevice_MotionRange) -> (result: MotionEvent_Axis, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputDevice_MotionRange__class, "getAxis", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return MotionEvent_Axis(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 InputDevice_MotionRange_getFlat :: proc "contextless" (self: ^InputDevice_MotionRange) -> (result: f32, exception: ^Throwable) {
@@ -2763,16 +2968,16 @@ InputDevice_MotionRange_getResolution :: proc "contextless" (self: ^InputDevice_
 	return jni_env->CallFloatMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-InputDevice_MotionRange_getSource :: proc "contextless" (self: ^InputDevice_MotionRange) -> (result: i32, exception: ^Throwable) {
+InputDevice_MotionRange_getSource :: proc "contextless" (self: ^InputDevice_MotionRange) -> (result: InputDevice_Sources, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputDevice_MotionRange__class, "getSource", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(InputDevice_Sources)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-InputDevice_MotionRange_isFromSource :: proc "contextless" (self: ^InputDevice_MotionRange, source: i32) -> (result: bool, exception: ^Throwable) {
+InputDevice_MotionRange_isFromSource :: proc "contextless" (self: ^InputDevice_MotionRange, source: InputDevice_Sources) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputDevice_MotionRange__class, "isFromSource", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = source}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)source}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -2784,10 +2989,10 @@ InputDevice_ViewBehavior :: struct #raw_union {
 @(private)
 InputDevice_ViewBehavior__class := Cached_Class{name = "android/view/InputDevice$ViewBehavior"}
 
-InputDevice_ViewBehavior_getPrimaryDirectionalMotionAxis :: proc "contextless" (self: ^InputDevice_ViewBehavior) -> (result: i32, exception: ^Throwable) { // API level 37
+InputDevice_ViewBehavior_getPrimaryDirectionalMotionAxis :: proc "contextless" (self: ^InputDevice_ViewBehavior) -> (result: MotionEvent_Axis, exception: ^Throwable) { // API level 37
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputDevice_ViewBehavior__class, "getPrimaryDirectionalMotionAxis", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return MotionEvent_Axis(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 InputDevice_ViewBehavior_hasPrimaryDirectionalMotionAxis :: proc "contextless" (self: ^InputDevice_ViewBehavior) -> (result: bool, exception: ^Throwable) { // API level 37
@@ -2796,10 +3001,10 @@ InputDevice_ViewBehavior_hasPrimaryDirectionalMotionAxis :: proc "contextless" (
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-InputDevice_ViewBehavior_shouldSmoothScroll :: proc "contextless" (self: ^InputDevice_ViewBehavior, axis: i32, source: i32) -> (result: bool, exception: ^Throwable) {
+InputDevice_ViewBehavior_shouldSmoothScroll :: proc "contextless" (self: ^InputDevice_ViewBehavior, axis: MotionEvent_Axis, source: InputDevice_Sources) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputDevice_ViewBehavior__class, "shouldSmoothScroll", "(II)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = axis}, {i = source}}
+	jni_args := [?]android.jvalue{{i = i32(axis)}, {i = transmute(i32)source}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -2818,10 +3023,10 @@ InputEvent_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creator,
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-InputEvent_describeContents :: proc "contextless" (self: ^InputEvent) -> (result: i32, exception: ^Throwable) {
+InputEvent_describeContents :: proc "contextless" (self: ^InputEvent) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputEvent__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 InputEvent_getDevice :: proc "contextless" (self: ^InputEvent) -> (result: ^InputDevice, exception: ^Throwable) {
@@ -2842,16 +3047,16 @@ InputEvent_getEventTime :: proc "contextless" (self: ^InputEvent) -> (result: i6
 	return jni_env->CallLongMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-InputEvent_getSource :: proc "contextless" (self: ^InputEvent) -> (result: i32, exception: ^Throwable) {
+InputEvent_getSource :: proc "contextless" (self: ^InputEvent) -> (result: InputDevice_Sources, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputEvent__class, "getSource", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(InputDevice_Sources)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-InputEvent_isFromSource :: proc "contextless" (self: ^InputEvent, source: i32) -> (result: bool, exception: ^Throwable) {
+InputEvent_isFromSource :: proc "contextless" (self: ^InputEvent, source: InputDevice_Sources) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &InputEvent__class, "isFromSource", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = source}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)source}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -2916,16 +3121,16 @@ KeyCharacterMap_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Cre
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-KeyCharacterMap_describeContents :: proc "contextless" (self: ^KeyCharacterMap) -> (result: i32, exception: ^Throwable) {
+KeyCharacterMap_describeContents :: proc "contextless" (self: ^KeyCharacterMap) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyCharacterMap__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-KeyCharacterMap_deviceHasKey :: proc "contextless" (keyCode: i32) -> (result: bool, exception: ^Throwable) {
+KeyCharacterMap_deviceHasKey :: proc "contextless" (keyCode: KeyEvent_KeyCode) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyCharacterMap__class, "deviceHasKey", "(I)Z", true) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}}
 	return jni_env->CallStaticBooleanMethodA(jni_class, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -2943,10 +3148,10 @@ KeyCharacterMap_equals :: proc "contextless" (self: ^KeyCharacterMap, obj: ^Obje
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-KeyCharacterMap_get :: proc "contextless" (self: ^KeyCharacterMap, keyCode: i32, metaState: i32) -> (result: i32, exception: ^Throwable) {
+KeyCharacterMap_get :: proc "contextless" (self: ^KeyCharacterMap, keyCode: KeyEvent_KeyCode, metaState: KeyEvent_MetaState) -> (result: i32, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyCharacterMap__class, "get", "(II)I", false) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}, {i = metaState}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}, {i = transmute(i32)metaState}}
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
@@ -2957,10 +3162,10 @@ KeyCharacterMap_getDeadChar :: proc "contextless" (accent: i32, c: i32) -> (resu
 	return jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-KeyCharacterMap_getDisplayLabel :: proc "contextless" (self: ^KeyCharacterMap, keyCode: i32) -> (result: u16, exception: ^Throwable) {
+KeyCharacterMap_getDisplayLabel :: proc "contextless" (self: ^KeyCharacterMap, keyCode: KeyEvent_KeyCode) -> (result: u16, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyCharacterMap__class, "getDisplayLabel", "(I)C", false) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}}
 	return jni_env->CallCharMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
@@ -2971,30 +3176,30 @@ KeyCharacterMap_getEvents :: proc "contextless" (self: ^KeyCharacterMap, chars: 
 	return (^Array(KeyEvent))(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-KeyCharacterMap_getKeyData :: proc "contextless" (self: ^KeyCharacterMap, keyCode: i32, results: ^KeyCharacterMap_KeyData) -> (result: bool, exception: ^Throwable) {
+KeyCharacterMap_getKeyData :: proc "contextless" (self: ^KeyCharacterMap, keyCode: KeyEvent_KeyCode, results: ^KeyCharacterMap_KeyData) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyCharacterMap__class, "getKeyData", "(ILandroid/view/KeyCharacterMap$KeyData;)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}, {l = results}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}, {l = results}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-KeyCharacterMap_getKeyboardType :: proc "contextless" (self: ^KeyCharacterMap) -> (result: i32, exception: ^Throwable) {
+KeyCharacterMap_getKeyboardType :: proc "contextless" (self: ^KeyCharacterMap) -> (result: KeyCharacterMap_KeyboardType, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyCharacterMap__class, "getKeyboardType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return KeyCharacterMap_KeyboardType(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-KeyCharacterMap_getMatch_int_CharArray :: proc "contextless" (self: ^KeyCharacterMap, keyCode: i32, chars: ^CharArray) -> (result: u16, exception: ^Throwable) {
+KeyCharacterMap_getMatch_int_CharArray :: proc "contextless" (self: ^KeyCharacterMap, keyCode: KeyEvent_KeyCode, chars: ^CharArray) -> (result: u16, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyCharacterMap__class, "getMatch", "(I[C)C", false) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}, {l = chars}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}, {l = chars}}
 	return jni_env->CallCharMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-KeyCharacterMap_getMatch_int_CharArray_int :: proc "contextless" (self: ^KeyCharacterMap, keyCode: i32, chars: ^CharArray, metaState: i32) -> (result: u16, exception: ^Throwable) {
+KeyCharacterMap_getMatch_int_CharArray_int :: proc "contextless" (self: ^KeyCharacterMap, keyCode: KeyEvent_KeyCode, chars: ^CharArray, metaState: KeyEvent_MetaState) -> (result: u16, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyCharacterMap__class, "getMatch", "(I[CI)C", false) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}, {l = chars}, {i = metaState}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}, {l = chars}, {i = transmute(i32)metaState}}
 	return jni_env->CallCharMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
@@ -3003,23 +3208,23 @@ KeyCharacterMap_getMatch :: proc{
 	KeyCharacterMap_getMatch_int_CharArray_int,
 }
 
-KeyCharacterMap_getModifierBehavior :: proc "contextless" (self: ^KeyCharacterMap) -> (result: i32, exception: ^Throwable) {
+KeyCharacterMap_getModifierBehavior :: proc "contextless" (self: ^KeyCharacterMap) -> (result: KeyCharacterMap_ModifierBehavior, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyCharacterMap__class, "getModifierBehavior", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return KeyCharacterMap_ModifierBehavior(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-KeyCharacterMap_getNumber :: proc "contextless" (self: ^KeyCharacterMap, keyCode: i32) -> (result: u16, exception: ^Throwable) {
+KeyCharacterMap_getNumber :: proc "contextless" (self: ^KeyCharacterMap, keyCode: KeyEvent_KeyCode) -> (result: u16, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyCharacterMap__class, "getNumber", "(I)C", false) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}}
 	return jni_env->CallCharMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-KeyCharacterMap_isPrintingKey :: proc "contextless" (self: ^KeyCharacterMap, keyCode: i32) -> (result: bool, exception: ^Throwable) {
+KeyCharacterMap_isPrintingKey :: proc "contextless" (self: ^KeyCharacterMap, keyCode: KeyEvent_KeyCode) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyCharacterMap__class, "isPrintingKey", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -3030,12 +3235,25 @@ KeyCharacterMap_load :: proc "contextless" (deviceId: i32) -> (result: ^KeyChara
 	return (^KeyCharacterMap)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-KeyCharacterMap_writeToParcel :: proc "contextless" (self: ^KeyCharacterMap, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+KeyCharacterMap_writeToParcel :: proc "contextless" (self: ^KeyCharacterMap, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyCharacterMap__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+KeyCharacterMap_KeyboardType :: enum i32 {
+	ALPHA            = 3,
+	FULL             = 4,
+	NUMERIC          = 1,
+	PREDICTIVE       = 2,
+	SPECIAL_FUNCTION = 5,
+}
+
+KeyCharacterMap_ModifierBehavior :: enum i32 {
+	CHORDED            = 0,
+	CHORDED_OR_TOGGLED = 1,
 }
 
 // class android.view.KeyCharacterMap.KeyData
@@ -3515,52 +3733,52 @@ KeyEvent_new_KeyEvent_long_int :: proc "contextless" (origEvent: ^KeyEvent, even
 	return (^KeyEvent)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-KeyEvent_new_int_int :: proc "contextless" (action: i32, code: i32) -> (result: ^KeyEvent, exception: ^Throwable) {
+KeyEvent_new_int_int :: proc "contextless" (action: KeyEvent_Action, code: KeyEvent_KeyCode) -> (result: ^KeyEvent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyEvent__class, "<init>", "(II)V", false) or_return
-	jni_args := [?]android.jvalue{{i = action}, {i = code}}
+	jni_args := [?]android.jvalue{{i = i32(action)}, {i = i32(code)}}
 	return (^KeyEvent)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-KeyEvent_new_long_String_int_int :: proc "contextless" (time: i64, characters: ^String, deviceId: i32, flags: i32) -> (result: ^KeyEvent, exception: ^Throwable) {
+KeyEvent_new_long_String_int_int :: proc "contextless" (time: i64, characters: ^String, deviceId: i32, flags: KeyEvent_Flags) -> (result: ^KeyEvent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyEvent__class, "<init>", "(JLjava/lang/String;II)V", false) or_return
-	jni_args := [?]android.jvalue{{j = time}, {l = characters}, {i = deviceId}, {i = flags}}
+	jni_args := [?]android.jvalue{{j = time}, {l = characters}, {i = deviceId}, {i = transmute(i32)flags}}
 	return (^KeyEvent)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-KeyEvent_new_long_long_int_int_int :: proc "contextless" (downTime: i64, eventTime: i64, action: i32, code: i32, repeat: i32) -> (result: ^KeyEvent, exception: ^Throwable) {
+KeyEvent_new_long_long_int_int_int :: proc "contextless" (downTime: i64, eventTime: i64, action: KeyEvent_Action, code: KeyEvent_KeyCode, repeat: i32) -> (result: ^KeyEvent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyEvent__class, "<init>", "(JJIII)V", false) or_return
-	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = action}, {i = code}, {i = repeat}}
+	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = i32(action)}, {i = i32(code)}, {i = repeat}}
 	return (^KeyEvent)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-KeyEvent_new_long_long_int_int_int_int :: proc "contextless" (downTime: i64, eventTime: i64, action: i32, code: i32, repeat: i32, metaState: i32) -> (result: ^KeyEvent, exception: ^Throwable) {
+KeyEvent_new_long_long_int_int_int_int :: proc "contextless" (downTime: i64, eventTime: i64, action: KeyEvent_Action, code: KeyEvent_KeyCode, repeat: i32, metaState: KeyEvent_MetaState) -> (result: ^KeyEvent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyEvent__class, "<init>", "(JJIIII)V", false) or_return
-	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = action}, {i = code}, {i = repeat}, {i = metaState}}
+	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = i32(action)}, {i = i32(code)}, {i = repeat}, {i = transmute(i32)metaState}}
 	return (^KeyEvent)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-KeyEvent_new_long_long_int_int_int_int_int_int :: proc "contextless" (downTime: i64, eventTime: i64, action: i32, code: i32, repeat: i32, metaState: i32, deviceId: i32, scancode: i32) -> (result: ^KeyEvent, exception: ^Throwable) {
+KeyEvent_new_long_long_int_int_int_int_int_int :: proc "contextless" (downTime: i64, eventTime: i64, action: KeyEvent_Action, code: KeyEvent_KeyCode, repeat: i32, metaState: KeyEvent_MetaState, deviceId: i32, scancode: i32) -> (result: ^KeyEvent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyEvent__class, "<init>", "(JJIIIIII)V", false) or_return
-	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = action}, {i = code}, {i = repeat}, {i = metaState}, {i = deviceId}, {i = scancode}}
+	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = i32(action)}, {i = i32(code)}, {i = repeat}, {i = transmute(i32)metaState}, {i = deviceId}, {i = scancode}}
 	return (^KeyEvent)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-KeyEvent_new_long_long_int_int_int_int_int_int_int :: proc "contextless" (downTime: i64, eventTime: i64, action: i32, code: i32, repeat: i32, metaState: i32, deviceId: i32, scancode: i32, flags: i32) -> (result: ^KeyEvent, exception: ^Throwable) {
+KeyEvent_new_long_long_int_int_int_int_int_int_int :: proc "contextless" (downTime: i64, eventTime: i64, action: KeyEvent_Action, code: KeyEvent_KeyCode, repeat: i32, metaState: KeyEvent_MetaState, deviceId: i32, scancode: i32, flags: KeyEvent_Flags) -> (result: ^KeyEvent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyEvent__class, "<init>", "(JJIIIIIII)V", false) or_return
-	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = action}, {i = code}, {i = repeat}, {i = metaState}, {i = deviceId}, {i = scancode}, {i = flags}}
+	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = i32(action)}, {i = i32(code)}, {i = repeat}, {i = transmute(i32)metaState}, {i = deviceId}, {i = scancode}, {i = transmute(i32)flags}}
 	return (^KeyEvent)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-KeyEvent_new_long_long_int_int_int_int_int_int_int_int :: proc "contextless" (downTime: i64, eventTime: i64, action: i32, code: i32, repeat: i32, metaState: i32, deviceId: i32, scancode: i32, flags: i32, source: i32) -> (result: ^KeyEvent, exception: ^Throwable) {
+KeyEvent_new_long_long_int_int_int_int_int_int_int_int :: proc "contextless" (downTime: i64, eventTime: i64, action: KeyEvent_Action, code: KeyEvent_KeyCode, repeat: i32, metaState: KeyEvent_MetaState, deviceId: i32, scancode: i32, flags: KeyEvent_Flags, source: InputDevice_Sources) -> (result: ^KeyEvent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyEvent__class, "<init>", "(JJIIIIIIII)V", false) or_return
-	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = action}, {i = code}, {i = repeat}, {i = metaState}, {i = deviceId}, {i = scancode}, {i = flags}, {i = source}}
+	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = i32(action)}, {i = i32(code)}, {i = repeat}, {i = transmute(i32)metaState}, {i = deviceId}, {i = scancode}, {i = transmute(i32)flags}, {i = transmute(i32)source}}
 	return (^KeyEvent)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -3576,17 +3794,17 @@ KeyEvent_new :: proc{
 	KeyEvent_new_long_long_int_int_int_int_int_int_int_int,
 }
 
-KeyEvent_changeAction :: proc "contextless" (event: ^KeyEvent, action: i32) -> (result: ^KeyEvent, exception: ^Throwable) {
+KeyEvent_changeAction :: proc "contextless" (event: ^KeyEvent, action: KeyEvent_Action) -> (result: ^KeyEvent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyEvent__class, "changeAction", "(Landroid/view/KeyEvent;I)Landroid/view/KeyEvent;", true) or_return
-	jni_args := [?]android.jvalue{{l = event}, {i = action}}
+	jni_args := [?]android.jvalue{{l = event}, {i = i32(action)}}
 	return (^KeyEvent)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-KeyEvent_changeFlags :: proc "contextless" (event: ^KeyEvent, flags: i32) -> (result: ^KeyEvent, exception: ^Throwable) {
+KeyEvent_changeFlags :: proc "contextless" (event: ^KeyEvent, flags: KeyEvent_Flags) -> (result: ^KeyEvent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyEvent__class, "changeFlags", "(Landroid/view/KeyEvent;I)Landroid/view/KeyEvent;", true) or_return
-	jni_args := [?]android.jvalue{{l = event}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = event}, {i = transmute(i32)flags}}
 	return (^KeyEvent)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -3597,10 +3815,10 @@ KeyEvent_changeTimeRepeat_KeyEvent_long_int :: proc "contextless" (event: ^KeyEv
 	return (^KeyEvent)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-KeyEvent_changeTimeRepeat_KeyEvent_long_int_int :: proc "contextless" (event: ^KeyEvent, eventTime: i64, newRepeat: i32, newFlags: i32) -> (result: ^KeyEvent, exception: ^Throwable) {
+KeyEvent_changeTimeRepeat_KeyEvent_long_int_int :: proc "contextless" (event: ^KeyEvent, eventTime: i64, newRepeat: i32, newFlags: KeyEvent_Flags) -> (result: ^KeyEvent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyEvent__class, "changeTimeRepeat", "(Landroid/view/KeyEvent;JII)Landroid/view/KeyEvent;", true) or_return
-	jni_args := [?]android.jvalue{{l = event}, {j = eventTime}, {i = newRepeat}, {i = newFlags}}
+	jni_args := [?]android.jvalue{{l = event}, {j = eventTime}, {i = newRepeat}, {i = transmute(i32)newFlags}}
 	return (^KeyEvent)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -3628,10 +3846,10 @@ KeyEvent_dispatch :: proc{
 	KeyEvent_dispatch_KeyEvent_Callback_KeyEvent_DispatcherState_Object,
 }
 
-KeyEvent_getAction :: proc "contextless" (self: ^KeyEvent) -> (result: i32, exception: ^Throwable) {
+KeyEvent_getAction :: proc "contextless" (self: ^KeyEvent) -> (result: KeyEvent_Action, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyEvent__class, "getAction", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return KeyEvent_Action(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 KeyEvent_getCharacters :: proc "contextless" (self: ^KeyEvent) -> (result: ^String, exception: ^Throwable) {
@@ -3671,10 +3889,10 @@ KeyEvent_getEventTime :: proc "contextless" (self: ^KeyEvent) -> (result: i64, e
 	return jni_env->CallLongMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-KeyEvent_getFlags :: proc "contextless" (self: ^KeyEvent) -> (result: i32, exception: ^Throwable) {
+KeyEvent_getFlags :: proc "contextless" (self: ^KeyEvent) -> (result: KeyEvent_Flags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyEvent__class, "getFlags", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(KeyEvent_Flags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 KeyEvent_getKeyCharacterMap :: proc "contextless" (self: ^KeyEvent) -> (result: ^KeyCharacterMap, exception: ^Throwable) {
@@ -3683,10 +3901,10 @@ KeyEvent_getKeyCharacterMap :: proc "contextless" (self: ^KeyEvent) -> (result: 
 	return (^KeyCharacterMap)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-KeyEvent_getKeyCode :: proc "contextless" (self: ^KeyEvent) -> (result: i32, exception: ^Throwable) {
+KeyEvent_getKeyCode :: proc "contextless" (self: ^KeyEvent) -> (result: KeyEvent_KeyCode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyEvent__class, "getKeyCode", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return KeyEvent_KeyCode(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 KeyEvent_getKeyData :: proc "contextless" (self: ^KeyEvent, results: ^KeyCharacterMap_KeyData) -> (result: bool, exception: ^Throwable) {
@@ -3703,10 +3921,10 @@ KeyEvent_getMatch_CharArray :: proc "contextless" (self: ^KeyEvent, chars: ^Char
 	return jni_env->CallCharMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-KeyEvent_getMatch_CharArray_int :: proc "contextless" (self: ^KeyEvent, chars: ^CharArray, metaState: i32) -> (result: u16, exception: ^Throwable) {
+KeyEvent_getMatch_CharArray_int :: proc "contextless" (self: ^KeyEvent, chars: ^CharArray, metaState: KeyEvent_MetaState) -> (result: u16, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyEvent__class, "getMatch", "([CI)C", false) or_return
-	jni_args := [?]android.jvalue{{l = chars}, {i = metaState}}
+	jni_args := [?]android.jvalue{{l = chars}, {i = transmute(i32)metaState}}
 	return jni_env->CallCharMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
@@ -3721,22 +3939,22 @@ KeyEvent_getMaxKeyCode :: proc "contextless" () -> (result: i32, exception: ^Thr
 	return jni_env->CallStaticIntMethodA(jni_class, jni_id, nil), jni_take(jni_env)
 }
 
-KeyEvent_getMetaState :: proc "contextless" (self: ^KeyEvent) -> (result: i32, exception: ^Throwable) {
+KeyEvent_getMetaState :: proc "contextless" (self: ^KeyEvent) -> (result: KeyEvent_MetaState, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyEvent__class, "getMetaState", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(KeyEvent_MetaState)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-KeyEvent_getModifierMetaStateMask :: proc "contextless" () -> (result: i32, exception: ^Throwable) {
+KeyEvent_getModifierMetaStateMask :: proc "contextless" () -> (result: KeyEvent_MetaState, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyEvent__class, "getModifierMetaStateMask", "()I", true) or_return
-	return jni_env->CallStaticIntMethodA(jni_class, jni_id, nil), jni_take(jni_env)
+	return transmute(KeyEvent_MetaState)(jni_env->CallStaticIntMethodA(jni_class, jni_id, nil)), jni_take(jni_env)
 }
 
-KeyEvent_getModifiers :: proc "contextless" (self: ^KeyEvent) -> (result: i32, exception: ^Throwable) {
+KeyEvent_getModifiers :: proc "contextless" (self: ^KeyEvent) -> (result: KeyEvent_MetaState, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyEvent__class, "getModifiers", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(KeyEvent_MetaState)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 KeyEvent_getNumber :: proc "contextless" (self: ^KeyEvent) -> (result: u16, exception: ^Throwable) {
@@ -3757,10 +3975,10 @@ KeyEvent_getScanCode :: proc "contextless" (self: ^KeyEvent) -> (result: i32, ex
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-KeyEvent_getSource :: proc "contextless" (self: ^KeyEvent) -> (result: i32, exception: ^Throwable) {
+KeyEvent_getSource :: proc "contextless" (self: ^KeyEvent) -> (result: InputDevice_Sources, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyEvent__class, "getSource", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(InputDevice_Sources)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 KeyEvent_getUnicodeChar_void :: proc "contextless" (self: ^KeyEvent) -> (result: i32, exception: ^Throwable) {
@@ -3769,10 +3987,10 @@ KeyEvent_getUnicodeChar_void :: proc "contextless" (self: ^KeyEvent) -> (result:
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-KeyEvent_getUnicodeChar_int :: proc "contextless" (self: ^KeyEvent, metaState: i32) -> (result: i32, exception: ^Throwable) {
+KeyEvent_getUnicodeChar_int :: proc "contextless" (self: ^KeyEvent, metaState: KeyEvent_MetaState) -> (result: i32, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyEvent__class, "getUnicodeChar", "(I)I", false) or_return
-	jni_args := [?]android.jvalue{{i = metaState}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)metaState}}
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
@@ -3781,10 +3999,10 @@ KeyEvent_getUnicodeChar :: proc{
 	KeyEvent_getUnicodeChar_int,
 }
 
-KeyEvent_hasModifiers :: proc "contextless" (self: ^KeyEvent, modifiers: i32) -> (result: bool, exception: ^Throwable) {
+KeyEvent_hasModifiers :: proc "contextless" (self: ^KeyEvent, modifiers: KeyEvent_MetaState) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyEvent__class, "hasModifiers", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = modifiers}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)modifiers}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -3824,10 +4042,10 @@ KeyEvent_isFunctionPressed :: proc "contextless" (self: ^KeyEvent) -> (result: b
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-KeyEvent_isGamepadButton :: proc "contextless" (keyCode: i32) -> (result: bool, exception: ^Throwable) {
+KeyEvent_isGamepadButton :: proc "contextless" (keyCode: KeyEvent_KeyCode) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyEvent__class, "isGamepadButton", "(I)Z", true) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}}
 	return jni_env->CallStaticBooleanMethodA(jni_class, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -3837,10 +4055,10 @@ KeyEvent_isLongPress :: proc "contextless" (self: ^KeyEvent) -> (result: bool, e
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-KeyEvent_isMediaSessionKey :: proc "contextless" (keyCode: i32) -> (result: bool, exception: ^Throwable) { // API level 31
+KeyEvent_isMediaSessionKey :: proc "contextless" (keyCode: KeyEvent_KeyCode) -> (result: bool, exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyEvent__class, "isMediaSessionKey", "(I)Z", true) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}}
 	return jni_env->CallStaticBooleanMethodA(jni_class, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -3850,10 +4068,10 @@ KeyEvent_isMetaPressed :: proc "contextless" (self: ^KeyEvent) -> (result: bool,
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-KeyEvent_isModifierKey :: proc "contextless" (keyCode: i32) -> (result: bool, exception: ^Throwable) {
+KeyEvent_isModifierKey :: proc "contextless" (keyCode: KeyEvent_KeyCode) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyEvent__class, "isModifierKey", "(I)Z", true) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}}
 	return jni_env->CallStaticBooleanMethodA(jni_class, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -3899,45 +4117,45 @@ KeyEvent_isTracking :: proc "contextless" (self: ^KeyEvent) -> (result: bool, ex
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-KeyEvent_keyCodeFromString :: proc "contextless" (symbolicName: ^String) -> (result: i32, exception: ^Throwable) {
+KeyEvent_keyCodeFromString :: proc "contextless" (symbolicName: ^String) -> (result: KeyEvent_KeyCode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyEvent__class, "keyCodeFromString", "(Ljava/lang/String;)I", true) or_return
 	jni_args := [?]android.jvalue{{l = symbolicName}}
-	return jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
+	return KeyEvent_KeyCode(jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-KeyEvent_keyCodeToString :: proc "contextless" (keyCode: i32) -> (result: ^String, exception: ^Throwable) {
+KeyEvent_keyCodeToString :: proc "contextless" (keyCode: KeyEvent_KeyCode) -> (result: ^String, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyEvent__class, "keyCodeToString", "(I)Ljava/lang/String;", true) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}}
 	return (^String)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-KeyEvent_metaStateHasModifiers :: proc "contextless" (metaState: i32, modifiers: i32) -> (result: bool, exception: ^Throwable) {
+KeyEvent_metaStateHasModifiers :: proc "contextless" (metaState: KeyEvent_MetaState, modifiers: KeyEvent_MetaState) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyEvent__class, "metaStateHasModifiers", "(II)Z", true) or_return
-	jni_args := [?]android.jvalue{{i = metaState}, {i = modifiers}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)metaState}, {i = transmute(i32)modifiers}}
 	return jni_env->CallStaticBooleanMethodA(jni_class, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-KeyEvent_metaStateHasNoModifiers :: proc "contextless" (metaState: i32) -> (result: bool, exception: ^Throwable) {
+KeyEvent_metaStateHasNoModifiers :: proc "contextless" (metaState: KeyEvent_MetaState) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyEvent__class, "metaStateHasNoModifiers", "(I)Z", true) or_return
-	jni_args := [?]android.jvalue{{i = metaState}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)metaState}}
 	return jni_env->CallStaticBooleanMethodA(jni_class, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-KeyEvent_normalizeMetaState :: proc "contextless" (metaState: i32) -> (result: i32, exception: ^Throwable) {
+KeyEvent_normalizeMetaState :: proc "contextless" (metaState: KeyEvent_MetaState) -> (result: KeyEvent_MetaState, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyEvent__class, "normalizeMetaState", "(I)I", true) or_return
-	jni_args := [?]android.jvalue{{i = metaState}}
-	return jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{i = transmute(i32)metaState}}
+	return transmute(KeyEvent_MetaState)(jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-KeyEvent_setSource :: proc "contextless" (self: ^KeyEvent, source: i32) -> (exception: ^Throwable) {
+KeyEvent_setSource :: proc "contextless" (self: ^KeyEvent, source: InputDevice_Sources) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyEvent__class, "setSource", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = source}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)source}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -3955,13 +4173,405 @@ KeyEvent_toString :: proc "contextless" (self: ^KeyEvent) -> (result: ^String, e
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-KeyEvent_writeToParcel :: proc "contextless" (self: ^KeyEvent, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+KeyEvent_writeToParcel :: proc "contextless" (self: ^KeyEvent, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyEvent__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+KeyEvent_KeyCode :: enum i32 {
+	NUM0                          = 7,
+	NUM1                          = 8,
+	NUM11                         = 227,
+	NUM12                         = 228,
+	NUM2                          = 9,
+	NUM3                          = 10,
+	_3D_MODE                      = 206,
+	NUM4                          = 11,
+	NUM5                          = 12,
+	NUM6                          = 13,
+	NUM7                          = 14,
+	NUM8                          = 15,
+	NUM9                          = 16,
+	A                             = 29,
+	ACCESSIBILITY                 = 338,
+	ALL_APPS                      = 284,
+	ALT_LEFT                      = 57,
+	ALT_RIGHT                     = 58,
+	APOSTROPHE                    = 75,
+	APP_SWITCH                    = 187,
+	ASSIST                        = 219,
+	AT                            = 77,
+	AVR_INPUT                     = 182,
+	AVR_POWER                     = 181,
+	B                             = 30,
+	BACK                          = 4,
+	BACKSLASH                     = 73,
+	BOOKMARK                      = 174,
+	BREAK                         = 121,
+	BRIGHTNESS_DOWN               = 220,
+	BRIGHTNESS_UP                 = 221,
+	BUTTON_1                      = 188,
+	BUTTON_10                     = 197,
+	BUTTON_11                     = 198,
+	BUTTON_12                     = 199,
+	BUTTON_13                     = 200,
+	BUTTON_14                     = 201,
+	BUTTON_15                     = 202,
+	BUTTON_16                     = 203,
+	BUTTON_2                      = 189,
+	BUTTON_3                      = 190,
+	BUTTON_4                      = 191,
+	BUTTON_5                      = 192,
+	BUTTON_6                      = 193,
+	BUTTON_7                      = 194,
+	BUTTON_8                      = 195,
+	BUTTON_9                      = 196,
+	BUTTON_A                      = 96,
+	BUTTON_B                      = 97,
+	BUTTON_C                      = 98,
+	BUTTON_L1                     = 102,
+	BUTTON_L2                     = 104,
+	BUTTON_MODE                   = 110,
+	BUTTON_R1                     = 103,
+	BUTTON_R2                     = 105,
+	BUTTON_SELECT                 = 109,
+	BUTTON_START                  = 108,
+	BUTTON_THUMBL                 = 106,
+	BUTTON_THUMBR                 = 107,
+	BUTTON_X                      = 99,
+	BUTTON_Y                      = 100,
+	BUTTON_Z                      = 101,
+	C                             = 31,
+	CALCULATOR                    = 210,
+	CALENDAR                      = 208,
+	CALL                          = 5,
+	CAMERA                        = 27,
+	CAPS_LOCK                     = 115,
+	CAPTIONS                      = 175,
+	CHANNEL_DOWN                  = 167,
+	CHANNEL_UP                    = 166,
+	CLEAR                         = 28,
+	CLOSE                         = 321,
+	COMMA                         = 55,
+	CONTACTS                      = 207,
+	CONTEXTUAL_INSERT             = 340,
+	CONTEXTUAL_QUERY              = 341,
+	CONTEXTUAL_SEARCH             = 339,
+	COPY                          = 278,
+	CTRL_LEFT                     = 113,
+	CTRL_RIGHT                    = 114,
+	CUT                           = 277,
+	D                             = 32,
+	DEL                           = 67,
+	DEMO_APP_1                    = 301,
+	DEMO_APP_2                    = 302,
+	DEMO_APP_3                    = 303,
+	DEMO_APP_4                    = 304,
+	DICTATE                       = 319,
+	DO_NOT_DISTURB                = 322,
+	DPAD_CENTER                   = 23,
+	DPAD_DOWN                     = 20,
+	DPAD_DOWN_LEFT                = 269,
+	DPAD_DOWN_RIGHT               = 271,
+	DPAD_LEFT                     = 21,
+	DPAD_RIGHT                    = 22,
+	DPAD_UP                       = 19,
+	DPAD_UP_LEFT                  = 268,
+	DPAD_UP_RIGHT                 = 270,
+	DVR                           = 173,
+	E                             = 33,
+	EISU                          = 212,
+	EMOJI_PICKER                  = 317,
+	ENDCALL                       = 6,
+	ENTER                         = 66,
+	ENVELOPE                      = 65,
+	EQUALS                        = 70,
+	ESCAPE                        = 111,
+	EXPLORER                      = 64,
+	F                             = 34,
+	F1                            = 131,
+	F10                           = 140,
+	F11                           = 141,
+	F12                           = 142,
+	F13                           = 326,
+	F14                           = 327,
+	F15                           = 328,
+	F16                           = 329,
+	F17                           = 330,
+	F18                           = 331,
+	F19                           = 332,
+	F2                            = 132,
+	F20                           = 333,
+	F21                           = 334,
+	F22                           = 335,
+	F23                           = 336,
+	F24                           = 337,
+	F3                            = 133,
+	F4                            = 134,
+	F5                            = 135,
+	F6                            = 136,
+	F7                            = 137,
+	F8                            = 138,
+	F9                            = 139,
+	FEATURED_APP_1                = 297,
+	FEATURED_APP_2                = 298,
+	FEATURED_APP_3                = 299,
+	FEATURED_APP_4                = 300,
+	FOCUS                         = 80,
+	FORWARD                       = 125,
+	FORWARD_DEL                   = 112,
+	FULLSCREEN                    = 325,
+	FUNCTION                      = 119,
+	G                             = 35,
+	GRAVE                         = 68,
+	GUIDE                         = 172,
+	H                             = 36,
+	HEADSETHOOK                   = 79,
+	HELP                          = 259,
+	HENKAN                        = 214,
+	HOME                          = 3,
+	I                             = 37,
+	INFO                          = 165,
+	INSERT                        = 124,
+	J                             = 38,
+	K                             = 39,
+	KANA                          = 218,
+	KATAKANA_HIRAGANA             = 215,
+	KEYBOARD_BACKLIGHT_DOWN       = 305,
+	KEYBOARD_BACKLIGHT_TOGGLE     = 307,
+	KEYBOARD_BACKLIGHT_UP         = 306,
+	L                             = 40,
+	LANGUAGE_SWITCH               = 204,
+	LAST_CHANNEL                  = 229,
+	LEFT_BRACKET                  = 71,
+	LOCK                          = 324,
+	M                             = 41,
+	MACRO_1                       = 313,
+	MACRO_2                       = 314,
+	MACRO_3                       = 315,
+	MACRO_4                       = 316,
+	MANNER_MODE                   = 205,
+	MEDIA_AUDIO_TRACK             = 222,
+	MEDIA_CLOSE                   = 128,
+	MEDIA_EJECT                   = 129,
+	MEDIA_FAST_FORWARD            = 90,
+	MEDIA_NEXT                    = 87,
+	MEDIA_PAUSE                   = 127,
+	MEDIA_PLAY                    = 126,
+	MEDIA_PLAY_PAUSE              = 85,
+	MEDIA_PREVIOUS                = 88,
+	MEDIA_RECORD                  = 130,
+	MEDIA_REWIND                  = 89,
+	MEDIA_SKIP_BACKWARD           = 273,
+	MEDIA_SKIP_FORWARD            = 272,
+	MEDIA_STEP_BACKWARD           = 275,
+	MEDIA_STEP_FORWARD            = 274,
+	MEDIA_STOP                    = 86,
+	MEDIA_TOP_MENU                = 226,
+	MENU                          = 82,
+	META_LEFT                     = 117,
+	META_RIGHT                    = 118,
+	MINUS                         = 69,
+	MOVE_END                      = 123,
+	MOVE_HOME                     = 122,
+	MUHENKAN                      = 213,
+	MUSIC                         = 209,
+	MUTE                          = 91,
+	N                             = 42,
+	NAVIGATE_IN                   = 262,
+	NAVIGATE_NEXT                 = 261,
+	NAVIGATE_OUT                  = 263,
+	NAVIGATE_PREVIOUS             = 260,
+	NEW                           = 320,
+	NOTIFICATION                  = 83,
+	NUM                           = 78,
+	NUMPAD_0                      = 144,
+	NUMPAD_1                      = 145,
+	NUMPAD_2                      = 146,
+	NUMPAD_3                      = 147,
+	NUMPAD_4                      = 148,
+	NUMPAD_5                      = 149,
+	NUMPAD_6                      = 150,
+	NUMPAD_7                      = 151,
+	NUMPAD_8                      = 152,
+	NUMPAD_9                      = 153,
+	NUMPAD_ADD                    = 157,
+	NUMPAD_COMMA                  = 159,
+	NUMPAD_DIVIDE                 = 154,
+	NUMPAD_DOT                    = 158,
+	NUMPAD_ENTER                  = 160,
+	NUMPAD_EQUALS                 = 161,
+	NUMPAD_LEFT_PAREN             = 162,
+	NUMPAD_MULTIPLY               = 155,
+	NUMPAD_RIGHT_PAREN            = 163,
+	NUMPAD_SUBTRACT               = 156,
+	NUM_LOCK                      = 143,
+	O                             = 43,
+	P                             = 44,
+	PAGE_DOWN                     = 93,
+	PAGE_UP                       = 92,
+	PAIRING                       = 225,
+	PASTE                         = 279,
+	PERIOD                        = 56,
+	PICTSYMBOLS                   = 94,
+	PLUS                          = 81,
+	POUND                         = 18,
+	POWER                         = 26,
+	PRINT                         = 323,
+	PROFILE_SWITCH                = 288,
+	PROG_BLUE                     = 186,
+	PROG_GREEN                    = 184,
+	PROG_RED                      = 183,
+	PROG_YELLOW                   = 185,
+	Q                             = 45,
+	R                             = 46,
+	RECENT_APPS                   = 312,
+	REFRESH                       = 285,
+	RIGHT_BRACKET                 = 72,
+	RO                            = 217,
+	S                             = 47,
+	SCREENSHOT                    = 318,
+	SCROLL_LOCK                   = 116,
+	SEARCH                        = 84,
+	SEMICOLON                     = 74,
+	SETTINGS                      = 176,
+	SHIFT_LEFT                    = 59,
+	SHIFT_RIGHT                   = 60,
+	SLASH                         = 76,
+	SLEEP                         = 223,
+	SOFT_LEFT                     = 1,
+	SOFT_RIGHT                    = 2,
+	SOFT_SLEEP                    = 276,
+	SPACE                         = 62,
+	STAR                          = 17,
+	STB_INPUT                     = 180,
+	STB_POWER                     = 179,
+	STEM_1                        = 265,
+	STEM_2                        = 266,
+	STEM_3                        = 267,
+	STEM_PRIMARY                  = 264,
+	STYLUS_BUTTON_PRIMARY         = 308,
+	STYLUS_BUTTON_SECONDARY       = 309,
+	STYLUS_BUTTON_TAIL            = 311,
+	STYLUS_BUTTON_TERTIARY        = 310,
+	SWITCH_CHARSET                = 95,
+	SYM                           = 63,
+	SYSRQ                         = 120,
+	SYSTEM_NAVIGATION_DOWN        = 281,
+	SYSTEM_NAVIGATION_LEFT        = 282,
+	SYSTEM_NAVIGATION_RIGHT       = 283,
+	SYSTEM_NAVIGATION_UP          = 280,
+	T                             = 48,
+	TAB                           = 61,
+	THUMBS_DOWN                   = 287,
+	THUMBS_UP                     = 286,
+	TV                            = 170,
+	TV_ANTENNA_CABLE              = 242,
+	TV_AUDIO_DESCRIPTION          = 252,
+	TV_AUDIO_DESCRIPTION_MIX_DOWN = 254,
+	TV_AUDIO_DESCRIPTION_MIX_UP   = 253,
+	TV_CONTENTS_MENU              = 256,
+	TV_DATA_SERVICE               = 230,
+	TV_INPUT                      = 178,
+	TV_INPUT_COMPONENT_1          = 249,
+	TV_INPUT_COMPONENT_2          = 250,
+	TV_INPUT_COMPOSITE_1          = 247,
+	TV_INPUT_COMPOSITE_2          = 248,
+	TV_INPUT_HDMI_1               = 243,
+	TV_INPUT_HDMI_2               = 244,
+	TV_INPUT_HDMI_3               = 245,
+	TV_INPUT_HDMI_4               = 246,
+	TV_INPUT_VGA_1                = 251,
+	TV_MEDIA_CONTEXT_MENU         = 257,
+	TV_NETWORK                    = 241,
+	TV_NUMBER_ENTRY               = 234,
+	TV_POWER                      = 177,
+	TV_RADIO_SERVICE              = 232,
+	TV_SATELLITE                  = 237,
+	TV_SATELLITE_BS               = 238,
+	TV_SATELLITE_CS               = 239,
+	TV_SATELLITE_SERVICE          = 240,
+	TV_TELETEXT                   = 233,
+	TV_TERRESTRIAL_ANALOG         = 235,
+	TV_TERRESTRIAL_DIGITAL        = 236,
+	TV_TIMER_PROGRAMMING          = 258,
+	TV_ZOOM_MODE                  = 255,
+	U                             = 49,
+	UNKNOWN                       = 0,
+	V                             = 50,
+	VIDEO_APP_1                   = 289,
+	VIDEO_APP_2                   = 290,
+	VIDEO_APP_3                   = 291,
+	VIDEO_APP_4                   = 292,
+	VIDEO_APP_5                   = 293,
+	VIDEO_APP_6                   = 294,
+	VIDEO_APP_7                   = 295,
+	VIDEO_APP_8                   = 296,
+	VOICE_ASSIST                  = 231,
+	VOLUME_DOWN                   = 25,
+	VOLUME_MUTE                   = 164,
+	VOLUME_UP                     = 24,
+	W                             = 51,
+	WAKEUP                        = 224,
+	WINDOW                        = 171,
+	X                             = 52,
+	Y                             = 53,
+	YEN                           = 216,
+	Z                             = 54,
+	ZENKAKU_HANKAKU               = 211,
+	ZOOM_IN                       = 168,
+	ZOOM_OUT                      = 169,
+}
+
+KeyEvent_Action :: enum i32 {
+	DOWN     = 0,
+	MULTIPLE = 2,
+	UP       = 1,
+}
+
+KeyEvent_MetaStateFlag :: enum u32 {
+	ALT_LEFT_ON    = 4,
+	ALT_ON         = 1,
+	ALT_RIGHT_ON   = 5,
+	CAPS_LOCK_ON   = 20,
+	CTRL_LEFT_ON   = 13,
+	CTRL_ON        = 12,
+	CTRL_RIGHT_ON  = 14,
+	FUNCTION_ON    = 3,
+	META_LEFT_ON   = 17,
+	META_ON        = 16,
+	META_RIGHT_ON  = 18,
+	NUM_LOCK_ON    = 21,
+	SCROLL_LOCK_ON = 22,
+	SHIFT_LEFT_ON  = 6,
+	SHIFT_ON       = 0,
+	SHIFT_RIGHT_ON = 7,
+	SYM_ON         = 2,
+}
+KeyEvent_MetaState :: distinct bit_set[KeyEvent_MetaStateFlag; u32]
+
+KeyEvent_MetaState_ALT_MASK   :: KeyEvent_MetaState{.ALT_ON, .ALT_LEFT_ON, .ALT_RIGHT_ON}
+KeyEvent_MetaState_CTRL_MASK  :: KeyEvent_MetaState{.CTRL_ON, .CTRL_LEFT_ON, .CTRL_RIGHT_ON}
+KeyEvent_MetaState_META_MASK  :: KeyEvent_MetaState{.META_ON, .META_LEFT_ON, .META_RIGHT_ON}
+KeyEvent_MetaState_SHIFT_MASK :: KeyEvent_MetaState{.SHIFT_ON, .SHIFT_LEFT_ON, .SHIFT_RIGHT_ON}
+
+KeyEvent_Flag :: enum u32 {
+	CANCELED            = 5,
+	CANCELED_LONG_PRESS = 8,
+	EDITOR_ACTION       = 4,
+	FALLBACK            = 10,
+	FROM_SYSTEM         = 3,
+	KEEP_TOUCH_MODE     = 2,
+	LONG_PRESS          = 7,
+	SOFT_KEYBOARD       = 1,
+	TRACKING            = 9,
+	VIRTUAL_HARD_KEY    = 6,
+	WOKE_HERE           = 0,
+}
+KeyEvent_Flags :: distinct bit_set[KeyEvent_Flag; u32]
 
 // interface android.view.KeyEvent.Callback
 KeyEvent_Callback :: struct #raw_union {
@@ -3971,31 +4581,31 @@ KeyEvent_Callback :: struct #raw_union {
 @(private)
 KeyEvent_Callback__class := Cached_Class{name = "android/view/KeyEvent$Callback"}
 
-KeyEvent_Callback_onKeyDown :: proc "contextless" (self: ^KeyEvent_Callback, keyCode: i32, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
+KeyEvent_Callback_onKeyDown :: proc "contextless" (self: ^KeyEvent_Callback, keyCode: KeyEvent_KeyCode, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyEvent_Callback__class, "onKeyDown", "(ILandroid/view/KeyEvent;)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}, {l = event}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}, {l = event}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-KeyEvent_Callback_onKeyLongPress :: proc "contextless" (self: ^KeyEvent_Callback, keyCode: i32, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
+KeyEvent_Callback_onKeyLongPress :: proc "contextless" (self: ^KeyEvent_Callback, keyCode: KeyEvent_KeyCode, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyEvent_Callback__class, "onKeyLongPress", "(ILandroid/view/KeyEvent;)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}, {l = event}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}, {l = event}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-KeyEvent_Callback_onKeyMultiple :: proc "contextless" (self: ^KeyEvent_Callback, keyCode: i32, count: i32, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
+KeyEvent_Callback_onKeyMultiple :: proc "contextless" (self: ^KeyEvent_Callback, keyCode: KeyEvent_KeyCode, count: i32, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyEvent_Callback__class, "onKeyMultiple", "(IILandroid/view/KeyEvent;)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}, {i = count}, {l = event}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}, {i = count}, {l = event}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-KeyEvent_Callback_onKeyUp :: proc "contextless" (self: ^KeyEvent_Callback, keyCode: i32, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
+KeyEvent_Callback_onKeyUp :: proc "contextless" (self: ^KeyEvent_Callback, keyCode: KeyEvent_KeyCode, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyEvent_Callback__class, "onKeyUp", "(ILandroid/view/KeyEvent;)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}, {l = event}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}, {l = event}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -4106,10 +4716,10 @@ KeyboardShortcutGroup_addItem :: proc "contextless" (self: ^KeyboardShortcutGrou
 	return jni_take(jni_env)
 }
 
-KeyboardShortcutGroup_describeContents :: proc "contextless" (self: ^KeyboardShortcutGroup) -> (result: i32, exception: ^Throwable) {
+KeyboardShortcutGroup_describeContents :: proc "contextless" (self: ^KeyboardShortcutGroup) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyboardShortcutGroup__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 KeyboardShortcutGroup_getItems :: proc "contextless" (self: ^KeyboardShortcutGroup) -> (result: ^List, exception: ^Throwable) {
@@ -4124,10 +4734,10 @@ KeyboardShortcutGroup_getLabel :: proc "contextless" (self: ^KeyboardShortcutGro
 	return (^CharSequence)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-KeyboardShortcutGroup_writeToParcel :: proc "contextless" (self: ^KeyboardShortcutGroup, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+KeyboardShortcutGroup_writeToParcel :: proc "contextless" (self: ^KeyboardShortcutGroup, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyboardShortcutGroup__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4147,17 +4757,17 @@ KeyboardShortcutInfo_get_CREATOR :: proc "contextless" () -> (result: ^Parcelabl
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-KeyboardShortcutInfo_new_CharSequence_char_int :: proc "contextless" (label: ^CharSequence, baseCharacter: u16, modifiers: i32) -> (result: ^KeyboardShortcutInfo, exception: ^Throwable) {
+KeyboardShortcutInfo_new_CharSequence_char_int :: proc "contextless" (label: ^CharSequence, baseCharacter: u16, modifiers: KeyEvent_MetaState) -> (result: ^KeyboardShortcutInfo, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyboardShortcutInfo__class, "<init>", "(Ljava/lang/CharSequence;CI)V", false) or_return
-	jni_args := [?]android.jvalue{{l = label}, {c = baseCharacter}, {i = modifiers}}
+	jni_args := [?]android.jvalue{{l = label}, {c = baseCharacter}, {i = transmute(i32)modifiers}}
 	return (^KeyboardShortcutInfo)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-KeyboardShortcutInfo_new_CharSequence_int_int :: proc "contextless" (label: ^CharSequence, keycode: i32, modifiers: i32) -> (result: ^KeyboardShortcutInfo, exception: ^Throwable) {
+KeyboardShortcutInfo_new_CharSequence_int_int :: proc "contextless" (label: ^CharSequence, keycode: KeyEvent_KeyCode, modifiers: KeyEvent_MetaState) -> (result: ^KeyboardShortcutInfo, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &KeyboardShortcutInfo__class, "<init>", "(Ljava/lang/CharSequence;II)V", false) or_return
-	jni_args := [?]android.jvalue{{l = label}, {i = keycode}, {i = modifiers}}
+	jni_args := [?]android.jvalue{{l = label}, {i = i32(keycode)}, {i = transmute(i32)modifiers}}
 	return (^KeyboardShortcutInfo)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4166,10 +4776,10 @@ KeyboardShortcutInfo_new :: proc{
 	KeyboardShortcutInfo_new_CharSequence_int_int,
 }
 
-KeyboardShortcutInfo_describeContents :: proc "contextless" (self: ^KeyboardShortcutInfo) -> (result: i32, exception: ^Throwable) {
+KeyboardShortcutInfo_describeContents :: proc "contextless" (self: ^KeyboardShortcutInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyboardShortcutInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 KeyboardShortcutInfo_getBaseCharacter :: proc "contextless" (self: ^KeyboardShortcutInfo) -> (result: u16, exception: ^Throwable) {
@@ -4178,10 +4788,10 @@ KeyboardShortcutInfo_getBaseCharacter :: proc "contextless" (self: ^KeyboardShor
 	return jni_env->CallCharMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-KeyboardShortcutInfo_getKeycode :: proc "contextless" (self: ^KeyboardShortcutInfo) -> (result: i32, exception: ^Throwable) {
+KeyboardShortcutInfo_getKeycode :: proc "contextless" (self: ^KeyboardShortcutInfo) -> (result: KeyEvent_KeyCode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyboardShortcutInfo__class, "getKeycode", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return KeyEvent_KeyCode(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 KeyboardShortcutInfo_getLabel :: proc "contextless" (self: ^KeyboardShortcutInfo) -> (result: ^CharSequence, exception: ^Throwable) {
@@ -4190,16 +4800,16 @@ KeyboardShortcutInfo_getLabel :: proc "contextless" (self: ^KeyboardShortcutInfo
 	return (^CharSequence)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-KeyboardShortcutInfo_getModifiers :: proc "contextless" (self: ^KeyboardShortcutInfo) -> (result: i32, exception: ^Throwable) {
+KeyboardShortcutInfo_getModifiers :: proc "contextless" (self: ^KeyboardShortcutInfo) -> (result: KeyEvent_MetaState, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyboardShortcutInfo__class, "getModifiers", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(KeyEvent_MetaState)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-KeyboardShortcutInfo_writeToParcel :: proc "contextless" (self: ^KeyboardShortcutInfo, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+KeyboardShortcutInfo_writeToParcel :: proc "contextless" (self: ^KeyboardShortcutInfo, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &KeyboardShortcutInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4434,10 +5044,10 @@ Menu_add :: proc{
 	Menu_add_CharSequence,
 }
 
-Menu_addIntentOptions :: proc "contextless" (self: ^Menu, groupId: i32, itemId: i32, order: i32, caller: ^ComponentName, specifics: ^Array(Intent), intent: ^Intent, flags: i32, outSpecificItems: ^Array(MenuItem)) -> (result: i32, exception: ^Throwable) {
+Menu_addIntentOptions :: proc "contextless" (self: ^Menu, groupId: i32, itemId: i32, order: i32, caller: ^ComponentName, specifics: ^Array(Intent), intent: ^Intent, flags: Menu_Flags, outSpecificItems: ^Array(MenuItem)) -> (result: i32, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Menu__class, "addIntentOptions", "(IIILandroid/content/ComponentName;[Landroid/content/Intent;Landroid/content/Intent;I[Landroid/view/MenuItem;)I", false) or_return
-	jni_args := [?]android.jvalue{{i = groupId}, {i = itemId}, {i = order}, {l = caller}, {l = specifics}, {l = intent}, {i = flags}, {l = outSpecificItems}}
+	jni_args := [?]android.jvalue{{i = groupId}, {i = itemId}, {i = order}, {l = caller}, {l = specifics}, {l = intent}, {i = transmute(i32)flags}, {l = outSpecificItems}}
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
@@ -4510,24 +5120,24 @@ Menu_hasVisibleItems :: proc "contextless" (self: ^Menu) -> (result: bool, excep
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-Menu_isShortcutKey :: proc "contextless" (self: ^Menu, keyCode: i32, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
+Menu_isShortcutKey :: proc "contextless" (self: ^Menu, keyCode: KeyEvent_KeyCode, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Menu__class, "isShortcutKey", "(ILandroid/view/KeyEvent;)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}, {l = event}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}, {l = event}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-Menu_performIdentifierAction :: proc "contextless" (self: ^Menu, id: i32, flags: i32) -> (result: bool, exception: ^Throwable) {
+Menu_performIdentifierAction :: proc "contextless" (self: ^Menu, id: i32, flags: Menu_Flags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Menu__class, "performIdentifierAction", "(II)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = id}, {i = flags}}
+	jni_args := [?]android.jvalue{{i = id}, {i = transmute(i32)flags}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-Menu_performShortcut :: proc "contextless" (self: ^Menu, keyCode: i32, event: ^KeyEvent, flags: i32) -> (result: bool, exception: ^Throwable) {
+Menu_performShortcut :: proc "contextless" (self: ^Menu, keyCode: KeyEvent_KeyCode, event: ^KeyEvent, flags: Menu_Flags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Menu__class, "performShortcut", "(ILandroid/view/KeyEvent;I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}, {l = event}, {i = flags}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}, {l = event}, {i = transmute(i32)flags}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -4593,6 +5203,13 @@ Menu_size :: proc "contextless" (self: ^Menu) -> (result: i32, exception: ^Throw
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
+Menu_Flag :: enum u32 {
+	ALWAYS_PERFORM_CLOSE = 1,
+	APPEND_TO_GROUP      = 0,
+	PERFORM_NO_CLOSE     = 0,
+}
+Menu_Flags :: distinct bit_set[Menu_Flag; u32]
+
 // class android.view.MenuInflater
 MenuInflater :: struct #raw_union {
 	using Object: Object,
@@ -4654,10 +5271,10 @@ MenuItem_getActionView :: proc "contextless" (self: ^MenuItem) -> (result: ^View
 	return (^View)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-MenuItem_getAlphabeticModifiers :: proc "contextless" (self: ^MenuItem) -> (result: i32, exception: ^Throwable) {
+MenuItem_getAlphabeticModifiers :: proc "contextless" (self: ^MenuItem) -> (result: KeyEvent_MetaState, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MenuItem__class, "getAlphabeticModifiers", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(KeyEvent_MetaState)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 MenuItem_getAlphabeticShortcut :: proc "contextless" (self: ^MenuItem) -> (result: u16, exception: ^Throwable) {
@@ -4720,10 +5337,10 @@ MenuItem_getMenuInfo :: proc "contextless" (self: ^MenuItem) -> (result: ^Contex
 	return (^ContextMenu_ContextMenuInfo)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-MenuItem_getNumericModifiers :: proc "contextless" (self: ^MenuItem) -> (result: i32, exception: ^Throwable) {
+MenuItem_getNumericModifiers :: proc "contextless" (self: ^MenuItem) -> (result: KeyEvent_MetaState, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MenuItem__class, "getNumericModifiers", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(KeyEvent_MetaState)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 MenuItem_getNumericShortcut :: proc "contextless" (self: ^MenuItem) -> (result: u16, exception: ^Throwable) {
@@ -4831,10 +5448,10 @@ MenuItem_setAlphabeticShortcut_char :: proc "contextless" (self: ^MenuItem, alph
 	return (^MenuItem)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-MenuItem_setAlphabeticShortcut_char_int :: proc "contextless" (self: ^MenuItem, alphaChar: u16, alphaModifiers: i32) -> (result: ^MenuItem, exception: ^Throwable) {
+MenuItem_setAlphabeticShortcut_char_int :: proc "contextless" (self: ^MenuItem, alphaChar: u16, alphaModifiers: KeyEvent_MetaState) -> (result: ^MenuItem, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MenuItem__class, "setAlphabeticShortcut", "(CI)Landroid/view/MenuItem;", false) or_return
-	jni_args := [?]android.jvalue{{c = alphaChar}, {i = alphaModifiers}}
+	jni_args := [?]android.jvalue{{c = alphaChar}, {i = transmute(i32)alphaModifiers}}
 	return (^MenuItem)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4925,10 +5542,10 @@ MenuItem_setNumericShortcut_char :: proc "contextless" (self: ^MenuItem, numeric
 	return (^MenuItem)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-MenuItem_setNumericShortcut_char_int :: proc "contextless" (self: ^MenuItem, numericChar: u16, numericModifiers: i32) -> (result: ^MenuItem, exception: ^Throwable) {
+MenuItem_setNumericShortcut_char_int :: proc "contextless" (self: ^MenuItem, numericChar: u16, numericModifiers: KeyEvent_MetaState) -> (result: ^MenuItem, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MenuItem__class, "setNumericShortcut", "(CI)Landroid/view/MenuItem;", false) or_return
-	jni_args := [?]android.jvalue{{c = numericChar}, {i = numericModifiers}}
+	jni_args := [?]android.jvalue{{c = numericChar}, {i = transmute(i32)numericModifiers}}
 	return (^MenuItem)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4958,10 +5575,10 @@ MenuItem_setShortcut_char_char :: proc "contextless" (self: ^MenuItem, numericCh
 	return (^MenuItem)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-MenuItem_setShortcut_char_char_int_int :: proc "contextless" (self: ^MenuItem, numericChar: u16, alphaChar: u16, numericModifiers: i32, alphaModifiers: i32) -> (result: ^MenuItem, exception: ^Throwable) {
+MenuItem_setShortcut_char_char_int_int :: proc "contextless" (self: ^MenuItem, numericChar: u16, alphaChar: u16, numericModifiers: KeyEvent_MetaState, alphaModifiers: KeyEvent_MetaState) -> (result: ^MenuItem, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MenuItem__class, "setShortcut", "(CCII)Landroid/view/MenuItem;", false) or_return
-	jni_args := [?]android.jvalue{{c = numericChar}, {c = alphaChar}, {i = numericModifiers}, {i = alphaModifiers}}
+	jni_args := [?]android.jvalue{{c = numericChar}, {c = alphaChar}, {i = transmute(i32)numericModifiers}, {i = transmute(i32)alphaModifiers}}
 	return (^MenuItem)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4970,18 +5587,18 @@ MenuItem_setShortcut :: proc{
 	MenuItem_setShortcut_char_char_int_int,
 }
 
-MenuItem_setShowAsAction :: proc "contextless" (self: ^MenuItem, actionEnum: i32) -> (exception: ^Throwable) {
+MenuItem_setShowAsAction :: proc "contextless" (self: ^MenuItem, actionEnum: MenuItem_ShowAsAction) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MenuItem__class, "setShowAsAction", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = actionEnum}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)actionEnum}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-MenuItem_setShowAsActionFlags :: proc "contextless" (self: ^MenuItem, actionEnum: i32) -> (result: ^MenuItem, exception: ^Throwable) {
+MenuItem_setShowAsActionFlags :: proc "contextless" (self: ^MenuItem, actionEnum: MenuItem_ShowAsAction) -> (result: ^MenuItem, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MenuItem__class, "setShowAsActionFlags", "(I)Landroid/view/MenuItem;", false) or_return
-	jni_args := [?]android.jvalue{{i = actionEnum}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)actionEnum}}
 	return (^MenuItem)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -5024,6 +5641,16 @@ MenuItem_setVisible :: proc "contextless" (self: ^MenuItem, visible: bool) -> (r
 	jni_args := [?]android.jvalue{{z = android.jboolean(visible)}}
 	return (^MenuItem)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
+
+MenuItem_ShowAsActionFlag :: enum u32 {
+	ALWAYS               = 1,
+	COLLAPSE_ACTION_VIEW = 3,
+	IF_ROOM              = 0,
+	WITH_TEXT            = 2,
+}
+MenuItem_ShowAsAction :: distinct bit_set[MenuItem_ShowAsActionFlag; u32]
+
+MenuItem_ShowAsAction_NEVER :: MenuItem_ShowAsAction{}
 
 // interface android.view.MenuItem.OnActionExpandListener
 MenuItem_OnActionExpandListener :: struct #raw_union {
@@ -5176,25 +5803,25 @@ MotionEvent_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creator
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-MotionEvent_actionToString :: proc "contextless" (action: i32) -> (result: ^String, exception: ^Throwable) {
+MotionEvent_actionToString :: proc "contextless" (action: MotionEvent_PackedAction) -> (result: ^String, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &MotionEvent__class, "actionToString", "(I)Ljava/lang/String;", true) or_return
-	jni_args := [?]android.jvalue{{i = action}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)action}}
 	return (^String)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-MotionEvent_addBatch_long_MotionEvent_PointerCoordsArray_int :: proc "contextless" (self: ^MotionEvent, eventTime: i64, pointerCoords: ^Array(MotionEvent_PointerCoords), metaState: i32) -> (exception: ^Throwable) {
+MotionEvent_addBatch_long_MotionEvent_PointerCoordsArray_int :: proc "contextless" (self: ^MotionEvent, eventTime: i64, pointerCoords: ^Array(MotionEvent_PointerCoords), metaState: KeyEvent_MetaState) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent__class, "addBatch", "(J[Landroid/view/MotionEvent$PointerCoords;I)V", false) or_return
-	jni_args := [?]android.jvalue{{j = eventTime}, {l = pointerCoords}, {i = metaState}}
+	jni_args := [?]android.jvalue{{j = eventTime}, {l = pointerCoords}, {i = transmute(i32)metaState}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-MotionEvent_addBatch_long_float_float_float_float_int :: proc "contextless" (self: ^MotionEvent, eventTime: i64, x: f32, y: f32, pressure: f32, size: f32, metaState: i32) -> (exception: ^Throwable) {
+MotionEvent_addBatch_long_float_float_float_float_int :: proc "contextless" (self: ^MotionEvent, eventTime: i64, x: f32, y: f32, pressure: f32, size: f32, metaState: KeyEvent_MetaState) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent__class, "addBatch", "(JFFFFI)V", false) or_return
-	jni_args := [?]android.jvalue{{j = eventTime}, {f = x}, {f = y}, {f = pressure}, {f = size}, {i = metaState}}
+	jni_args := [?]android.jvalue{{j = eventTime}, {f = x}, {f = y}, {f = pressure}, {f = size}, {i = transmute(i32)metaState}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -5204,17 +5831,17 @@ MotionEvent_addBatch :: proc{
 	MotionEvent_addBatch_long_float_float_float_float_int,
 }
 
-MotionEvent_axisFromString :: proc "contextless" (symbolicName: ^String) -> (result: i32, exception: ^Throwable) {
+MotionEvent_axisFromString :: proc "contextless" (symbolicName: ^String) -> (result: MotionEvent_Axis, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &MotionEvent__class, "axisFromString", "(Ljava/lang/String;)I", true) or_return
 	jni_args := [?]android.jvalue{{l = symbolicName}}
-	return jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
+	return MotionEvent_Axis(jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-MotionEvent_axisToString :: proc "contextless" (axis: i32) -> (result: ^String, exception: ^Throwable) {
+MotionEvent_axisToString :: proc "contextless" (axis: MotionEvent_Axis) -> (result: ^String, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &MotionEvent__class, "axisToString", "(I)Ljava/lang/String;", true) or_return
-	jni_args := [?]android.jvalue{{i = axis}}
+	jni_args := [?]android.jvalue{{i = i32(axis)}}
 	return (^String)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -5225,16 +5852,16 @@ MotionEvent_findPointerIndex :: proc "contextless" (self: ^MotionEvent, pointerI
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-MotionEvent_getAction :: proc "contextless" (self: ^MotionEvent) -> (result: i32, exception: ^Throwable) {
+MotionEvent_getAction :: proc "contextless" (self: ^MotionEvent) -> (result: MotionEvent_PackedAction, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent__class, "getAction", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(MotionEvent_PackedAction)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-MotionEvent_getActionButton :: proc "contextless" (self: ^MotionEvent) -> (result: i32, exception: ^Throwable) {
+MotionEvent_getActionButton :: proc "contextless" (self: ^MotionEvent) -> (result: MotionEvent_Buttons, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent__class, "getActionButton", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(MotionEvent_Buttons)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 MotionEvent_getActionIndex :: proc "contextless" (self: ^MotionEvent) -> (result: i32, exception: ^Throwable) {
@@ -5243,23 +5870,23 @@ MotionEvent_getActionIndex :: proc "contextless" (self: ^MotionEvent) -> (result
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-MotionEvent_getActionMasked :: proc "contextless" (self: ^MotionEvent) -> (result: i32, exception: ^Throwable) {
+MotionEvent_getActionMasked :: proc "contextless" (self: ^MotionEvent) -> (result: MotionEvent_Action, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent__class, "getActionMasked", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return MotionEvent_Action(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-MotionEvent_getAxisValue_int :: proc "contextless" (self: ^MotionEvent, axis: i32) -> (result: f32, exception: ^Throwable) {
+MotionEvent_getAxisValue_int :: proc "contextless" (self: ^MotionEvent, axis: MotionEvent_Axis) -> (result: f32, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent__class, "getAxisValue", "(I)F", false) or_return
-	jni_args := [?]android.jvalue{{i = axis}}
+	jni_args := [?]android.jvalue{{i = i32(axis)}}
 	return jni_env->CallFloatMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-MotionEvent_getAxisValue_int_int :: proc "contextless" (self: ^MotionEvent, axis: i32, pointerIndex: i32) -> (result: f32, exception: ^Throwable) {
+MotionEvent_getAxisValue_int_int :: proc "contextless" (self: ^MotionEvent, axis: MotionEvent_Axis, pointerIndex: i32) -> (result: f32, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent__class, "getAxisValue", "(II)F", false) or_return
-	jni_args := [?]android.jvalue{{i = axis}, {i = pointerIndex}}
+	jni_args := [?]android.jvalue{{i = i32(axis)}, {i = pointerIndex}}
 	return jni_env->CallFloatMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
@@ -5268,16 +5895,16 @@ MotionEvent_getAxisValue :: proc{
 	MotionEvent_getAxisValue_int_int,
 }
 
-MotionEvent_getButtonState :: proc "contextless" (self: ^MotionEvent) -> (result: i32, exception: ^Throwable) {
+MotionEvent_getButtonState :: proc "contextless" (self: ^MotionEvent) -> (result: MotionEvent_Buttons, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent__class, "getButtonState", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(MotionEvent_Buttons)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-MotionEvent_getClassification :: proc "contextless" (self: ^MotionEvent) -> (result: i32, exception: ^Throwable) {
+MotionEvent_getClassification :: proc "contextless" (self: ^MotionEvent) -> (result: MotionEvent_Classification, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent__class, "getClassification", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return MotionEvent_Classification(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 MotionEvent_getDeviceId :: proc "contextless" (self: ^MotionEvent) -> (result: i32, exception: ^Throwable) {
@@ -5292,10 +5919,10 @@ MotionEvent_getDownTime :: proc "contextless" (self: ^MotionEvent) -> (result: i
 	return jni_env->CallLongMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-MotionEvent_getEdgeFlags :: proc "contextless" (self: ^MotionEvent) -> (result: i32, exception: ^Throwable) {
+MotionEvent_getEdgeFlags :: proc "contextless" (self: ^MotionEvent) -> (result: MotionEvent_EdgeFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent__class, "getEdgeFlags", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(MotionEvent_EdgeFlags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 MotionEvent_getEventTime :: proc "contextless" (self: ^MotionEvent) -> (result: i64, exception: ^Throwable) {
@@ -5310,23 +5937,23 @@ MotionEvent_getEventTimeNanos :: proc "contextless" (self: ^MotionEvent) -> (res
 	return jni_env->CallLongMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-MotionEvent_getFlags :: proc "contextless" (self: ^MotionEvent) -> (result: i32, exception: ^Throwable) {
+MotionEvent_getFlags :: proc "contextless" (self: ^MotionEvent) -> (result: MotionEvent_Flags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent__class, "getFlags", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(MotionEvent_Flags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-MotionEvent_getHistoricalAxisValue_int_int :: proc "contextless" (self: ^MotionEvent, axis: i32, pos: i32) -> (result: f32, exception: ^Throwable) {
+MotionEvent_getHistoricalAxisValue_int_int :: proc "contextless" (self: ^MotionEvent, axis: MotionEvent_Axis, pos: i32) -> (result: f32, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent__class, "getHistoricalAxisValue", "(II)F", false) or_return
-	jni_args := [?]android.jvalue{{i = axis}, {i = pos}}
+	jni_args := [?]android.jvalue{{i = i32(axis)}, {i = pos}}
 	return jni_env->CallFloatMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-MotionEvent_getHistoricalAxisValue_int_int_int :: proc "contextless" (self: ^MotionEvent, axis: i32, pointerIndex: i32, pos: i32) -> (result: f32, exception: ^Throwable) {
+MotionEvent_getHistoricalAxisValue_int_int_int :: proc "contextless" (self: ^MotionEvent, axis: MotionEvent_Axis, pointerIndex: i32, pos: i32) -> (result: f32, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent__class, "getHistoricalAxisValue", "(III)F", false) or_return
-	jni_args := [?]android.jvalue{{i = axis}, {i = pointerIndex}, {i = pos}}
+	jni_args := [?]android.jvalue{{i = i32(axis)}, {i = pointerIndex}, {i = pos}}
 	return jni_env->CallFloatMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
@@ -5534,10 +6161,10 @@ MotionEvent_getHistorySize :: proc "contextless" (self: ^MotionEvent) -> (result
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-MotionEvent_getMetaState :: proc "contextless" (self: ^MotionEvent) -> (result: i32, exception: ^Throwable) {
+MotionEvent_getMetaState :: proc "contextless" (self: ^MotionEvent) -> (result: KeyEvent_MetaState, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent__class, "getMetaState", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(KeyEvent_MetaState)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 MotionEvent_getOrientation_void :: proc "contextless" (self: ^MotionEvent) -> (result: f32, exception: ^Throwable) {
@@ -5659,10 +6286,10 @@ MotionEvent_getSize :: proc{
 	MotionEvent_getSize_int,
 }
 
-MotionEvent_getSource :: proc "contextless" (self: ^MotionEvent) -> (result: i32, exception: ^Throwable) {
+MotionEvent_getSource :: proc "contextless" (self: ^MotionEvent) -> (result: InputDevice_Sources, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent__class, "getSource", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(InputDevice_Sources)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 MotionEvent_getToolMajor_void :: proc "contextless" (self: ^MotionEvent) -> (result: f32, exception: ^Throwable) {
@@ -5701,11 +6328,11 @@ MotionEvent_getToolMinor :: proc{
 	MotionEvent_getToolMinor_int,
 }
 
-MotionEvent_getToolType :: proc "contextless" (self: ^MotionEvent, pointerIndex: i32) -> (result: i32, exception: ^Throwable) {
+MotionEvent_getToolType :: proc "contextless" (self: ^MotionEvent, pointerIndex: i32) -> (result: MotionEvent_ToolType, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent__class, "getToolType", "(I)I", false) or_return
 	jni_args := [?]android.jvalue{{i = pointerIndex}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return MotionEvent_ToolType(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 MotionEvent_getTouchMajor_void :: proc "contextless" (self: ^MotionEvent) -> (result: f32, exception: ^Throwable) {
@@ -5792,10 +6419,10 @@ MotionEvent_getYPrecision :: proc "contextless" (self: ^MotionEvent) -> (result:
 	return jni_env->CallFloatMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-MotionEvent_isButtonPressed :: proc "contextless" (self: ^MotionEvent, button: i32) -> (result: bool, exception: ^Throwable) {
+MotionEvent_isButtonPressed :: proc "contextless" (self: ^MotionEvent, button: MotionEvent_Buttons) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent__class, "isButtonPressed", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = button}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)button}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -5806,45 +6433,45 @@ MotionEvent_obtain_MotionEvent :: proc "contextless" (other: ^MotionEvent) -> (r
 	return (^MotionEvent)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-MotionEvent_obtain_long_long_int_float_float_float_float_int_float_float_int_int :: proc "contextless" (downTime: i64, eventTime: i64, action: i32, x: f32, y: f32, pressure: f32, size: f32, metaState: i32, xPrecision: f32, yPrecision: f32, deviceId: i32, edgeFlags: i32) -> (result: ^MotionEvent, exception: ^Throwable) {
+MotionEvent_obtain_long_long_int_float_float_float_float_int_float_float_int_int :: proc "contextless" (downTime: i64, eventTime: i64, action: MotionEvent_PackedAction, x: f32, y: f32, pressure: f32, size: f32, metaState: KeyEvent_MetaState, xPrecision: f32, yPrecision: f32, deviceId: i32, edgeFlags: MotionEvent_EdgeFlags) -> (result: ^MotionEvent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &MotionEvent__class, "obtain", "(JJIFFFFIFFII)Landroid/view/MotionEvent;", true) or_return
-	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = action}, {f = x}, {f = y}, {f = pressure}, {f = size}, {i = metaState}, {f = xPrecision}, {f = yPrecision}, {i = deviceId}, {i = edgeFlags}}
+	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = transmute(i32)action}, {f = x}, {f = y}, {f = pressure}, {f = size}, {i = transmute(i32)metaState}, {f = xPrecision}, {f = yPrecision}, {i = deviceId}, {i = transmute(i32)edgeFlags}}
 	return (^MotionEvent)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-MotionEvent_obtain_long_long_int_float_float_int :: proc "contextless" (downTime: i64, eventTime: i64, action: i32, x: f32, y: f32, metaState: i32) -> (result: ^MotionEvent, exception: ^Throwable) {
+MotionEvent_obtain_long_long_int_float_float_int :: proc "contextless" (downTime: i64, eventTime: i64, action: MotionEvent_PackedAction, x: f32, y: f32, metaState: KeyEvent_MetaState) -> (result: ^MotionEvent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &MotionEvent__class, "obtain", "(JJIFFI)Landroid/view/MotionEvent;", true) or_return
-	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = action}, {f = x}, {f = y}, {i = metaState}}
+	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = transmute(i32)action}, {f = x}, {f = y}, {i = transmute(i32)metaState}}
 	return (^MotionEvent)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-MotionEvent_obtain_long_long_int_int_MotionEvent_PointerPropertiesArray_MotionEvent_PointerCoordsArray_int_int_float_float_int_int_int_int :: proc "contextless" (downTime: i64, eventTime: i64, action: i32, pointerCount: i32, pointerProperties: ^Array(MotionEvent_PointerProperties), pointerCoords: ^Array(MotionEvent_PointerCoords), metaState: i32, buttonState: i32, xPrecision: f32, yPrecision: f32, deviceId: i32, edgeFlags: i32, source: i32, flags: i32) -> (result: ^MotionEvent, exception: ^Throwable) {
+MotionEvent_obtain_long_long_int_int_MotionEvent_PointerPropertiesArray_MotionEvent_PointerCoordsArray_int_int_float_float_int_int_int_int :: proc "contextless" (downTime: i64, eventTime: i64, action: MotionEvent_PackedAction, pointerCount: i32, pointerProperties: ^Array(MotionEvent_PointerProperties), pointerCoords: ^Array(MotionEvent_PointerCoords), metaState: KeyEvent_MetaState, buttonState: MotionEvent_Buttons, xPrecision: f32, yPrecision: f32, deviceId: i32, edgeFlags: MotionEvent_EdgeFlags, source: InputDevice_Sources, flags: MotionEvent_Flags) -> (result: ^MotionEvent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &MotionEvent__class, "obtain", "(JJII[Landroid/view/MotionEvent$PointerProperties;[Landroid/view/MotionEvent$PointerCoords;IIFFIIII)Landroid/view/MotionEvent;", true) or_return
-	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = action}, {i = pointerCount}, {l = pointerProperties}, {l = pointerCoords}, {i = metaState}, {i = buttonState}, {f = xPrecision}, {f = yPrecision}, {i = deviceId}, {i = edgeFlags}, {i = source}, {i = flags}}
+	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = transmute(i32)action}, {i = pointerCount}, {l = pointerProperties}, {l = pointerCoords}, {i = transmute(i32)metaState}, {i = transmute(i32)buttonState}, {f = xPrecision}, {f = yPrecision}, {i = deviceId}, {i = transmute(i32)edgeFlags}, {i = transmute(i32)source}, {i = transmute(i32)flags}}
 	return (^MotionEvent)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-MotionEvent_obtain_long_long_int_int_MotionEvent_PointerPropertiesArray_MotionEvent_PointerCoordsArray_int_int_float_float_int_int_int_int_int_int :: proc "contextless" (downTime: i64, eventTime: i64, action: i32, pointerCount: i32, pointerProperties: ^Array(MotionEvent_PointerProperties), pointerCoords: ^Array(MotionEvent_PointerCoords), metaState: i32, buttonState: i32, xPrecision: f32, yPrecision: f32, deviceId: i32, edgeFlags: i32, source: i32, displayId: i32, flags: i32, classification: i32) -> (result: ^MotionEvent, exception: ^Throwable) { // API level 34
+MotionEvent_obtain_long_long_int_int_MotionEvent_PointerPropertiesArray_MotionEvent_PointerCoordsArray_int_int_float_float_int_int_int_int_int_int :: proc "contextless" (downTime: i64, eventTime: i64, action: MotionEvent_PackedAction, pointerCount: i32, pointerProperties: ^Array(MotionEvent_PointerProperties), pointerCoords: ^Array(MotionEvent_PointerCoords), metaState: KeyEvent_MetaState, buttonState: MotionEvent_Buttons, xPrecision: f32, yPrecision: f32, deviceId: i32, edgeFlags: MotionEvent_EdgeFlags, source: InputDevice_Sources, displayId: i32, flags: MotionEvent_Flags, classification: MotionEvent_Classification) -> (result: ^MotionEvent, exception: ^Throwable) { // API level 34
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &MotionEvent__class, "obtain", "(JJII[Landroid/view/MotionEvent$PointerProperties;[Landroid/view/MotionEvent$PointerCoords;IIFFIIIIII)Landroid/view/MotionEvent;", true) or_return
-	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = action}, {i = pointerCount}, {l = pointerProperties}, {l = pointerCoords}, {i = metaState}, {i = buttonState}, {f = xPrecision}, {f = yPrecision}, {i = deviceId}, {i = edgeFlags}, {i = source}, {i = displayId}, {i = flags}, {i = classification}}
+	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = transmute(i32)action}, {i = pointerCount}, {l = pointerProperties}, {l = pointerCoords}, {i = transmute(i32)metaState}, {i = transmute(i32)buttonState}, {f = xPrecision}, {f = yPrecision}, {i = deviceId}, {i = transmute(i32)edgeFlags}, {i = transmute(i32)source}, {i = displayId}, {i = transmute(i32)flags}, {i = i32(classification)}}
 	return (^MotionEvent)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-MotionEvent_obtain_long_long_int_int_float_float_float_float_int_float_float_int_int :: proc "contextless" (downTime: i64, eventTime: i64, action: i32, pointerCount: i32, x: f32, y: f32, pressure: f32, size: f32, metaState: i32, xPrecision: f32, yPrecision: f32, deviceId: i32, edgeFlags: i32) -> (result: ^MotionEvent, exception: ^Throwable) {
+MotionEvent_obtain_long_long_int_int_float_float_float_float_int_float_float_int_int :: proc "contextless" (downTime: i64, eventTime: i64, action: MotionEvent_PackedAction, pointerCount: i32, x: f32, y: f32, pressure: f32, size: f32, metaState: KeyEvent_MetaState, xPrecision: f32, yPrecision: f32, deviceId: i32, edgeFlags: MotionEvent_EdgeFlags) -> (result: ^MotionEvent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &MotionEvent__class, "obtain", "(JJIIFFFFIFFII)Landroid/view/MotionEvent;", true) or_return
-	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = action}, {i = pointerCount}, {f = x}, {f = y}, {f = pressure}, {f = size}, {i = metaState}, {f = xPrecision}, {f = yPrecision}, {i = deviceId}, {i = edgeFlags}}
+	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = transmute(i32)action}, {i = pointerCount}, {f = x}, {f = y}, {f = pressure}, {f = size}, {i = transmute(i32)metaState}, {f = xPrecision}, {f = yPrecision}, {i = deviceId}, {i = transmute(i32)edgeFlags}}
 	return (^MotionEvent)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-MotionEvent_obtain_long_long_int_int_IntArray_MotionEvent_PointerCoordsArray_int_float_float_int_int_int_int :: proc "contextless" (downTime: i64, eventTime: i64, action: i32, pointerCount: i32, pointerIds: ^IntArray, pointerCoords: ^Array(MotionEvent_PointerCoords), metaState: i32, xPrecision: f32, yPrecision: f32, deviceId: i32, edgeFlags: i32, source: i32, flags: i32) -> (result: ^MotionEvent, exception: ^Throwable) {
+MotionEvent_obtain_long_long_int_int_IntArray_MotionEvent_PointerCoordsArray_int_float_float_int_int_int_int :: proc "contextless" (downTime: i64, eventTime: i64, action: MotionEvent_PackedAction, pointerCount: i32, pointerIds: ^IntArray, pointerCoords: ^Array(MotionEvent_PointerCoords), metaState: KeyEvent_MetaState, xPrecision: f32, yPrecision: f32, deviceId: i32, edgeFlags: MotionEvent_EdgeFlags, source: InputDevice_Sources, flags: MotionEvent_Flags) -> (result: ^MotionEvent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &MotionEvent__class, "obtain", "(JJII[I[Landroid/view/MotionEvent$PointerCoords;IFFIIII)Landroid/view/MotionEvent;", true) or_return
-	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = action}, {i = pointerCount}, {l = pointerIds}, {l = pointerCoords}, {i = metaState}, {f = xPrecision}, {f = yPrecision}, {i = deviceId}, {i = edgeFlags}, {i = source}, {i = flags}}
+	jni_args := [?]android.jvalue{{j = downTime}, {j = eventTime}, {i = transmute(i32)action}, {i = pointerCount}, {l = pointerIds}, {l = pointerCoords}, {i = transmute(i32)metaState}, {f = xPrecision}, {f = yPrecision}, {i = deviceId}, {i = transmute(i32)edgeFlags}, {i = transmute(i32)source}, {i = transmute(i32)flags}}
 	return (^MotionEvent)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -5880,18 +6507,18 @@ MotionEvent_recycle :: proc "contextless" (self: ^MotionEvent) -> (exception: ^T
 	return jni_take(jni_env)
 }
 
-MotionEvent_setAction :: proc "contextless" (self: ^MotionEvent, action: i32) -> (exception: ^Throwable) {
+MotionEvent_setAction :: proc "contextless" (self: ^MotionEvent, action: MotionEvent_PackedAction) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent__class, "setAction", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = action}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)action}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-MotionEvent_setEdgeFlags :: proc "contextless" (self: ^MotionEvent, flags: i32) -> (exception: ^Throwable) {
+MotionEvent_setEdgeFlags :: proc "contextless" (self: ^MotionEvent, flags: MotionEvent_EdgeFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent__class, "setEdgeFlags", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -5904,10 +6531,10 @@ MotionEvent_setLocation :: proc "contextless" (self: ^MotionEvent, x: f32, y: f3
 	return jni_take(jni_env)
 }
 
-MotionEvent_setSource :: proc "contextless" (self: ^MotionEvent, source: i32) -> (exception: ^Throwable) {
+MotionEvent_setSource :: proc "contextless" (self: ^MotionEvent, source: InputDevice_Sources) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent__class, "setSource", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = source}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)source}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -5926,12 +6553,139 @@ MotionEvent_transform :: proc "contextless" (self: ^MotionEvent, matrix_: ^Matri
 	return jni_take(jni_env)
 }
 
-MotionEvent_writeToParcel :: proc "contextless" (self: ^MotionEvent, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+MotionEvent_writeToParcel :: proc "contextless" (self: ^MotionEvent, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+MotionEvent_Action :: enum u32 {
+	BUTTON_PRESS   = 11,
+	BUTTON_RELEASE = 12,
+	CANCEL         = 3,
+	DOWN           = 0,
+	HOVER_ENTER    = 9,
+	HOVER_EXIT     = 10,
+	HOVER_MOVE     = 7,
+	MOVE           = 2,
+	OUTSIDE        = 4,
+	POINTER_DOWN   = 5,
+	POINTER_UP     = 6,
+	SCROLL         = 8,
+	UP             = 1,
+}
+
+MotionEvent_Button :: enum u32 {
+	BACK             = 3,
+	FORWARD          = 4,
+	PRIMARY          = 0,
+	SECONDARY        = 1,
+	STYLUS_PRIMARY   = 5,
+	STYLUS_SECONDARY = 6,
+	TERTIARY         = 2,
+}
+MotionEvent_Buttons :: distinct bit_set[MotionEvent_Button; u32]
+
+MotionEvent_EdgeFlag :: enum u32 {
+	BOTTOM = 1,
+	LEFT   = 2,
+	RIGHT  = 3,
+	TOP    = 0,
+}
+MotionEvent_EdgeFlags :: distinct bit_set[MotionEvent_EdgeFlag; u32]
+
+MotionEvent_Flag :: enum u32 {
+	CANCELED                     = 5,
+	WINDOW_IS_OBSCURED           = 0,
+	WINDOW_IS_PARTIALLY_OBSCURED = 1,
+}
+MotionEvent_Flags :: distinct bit_set[MotionEvent_Flag; u32]
+
+MotionEvent_PackedAction :: bit_field i32 {
+	action:        MotionEvent_Action | 8,
+	pointer_index: u8                 | 8,
+	_:             u16                | 16,
+}
+
+MotionEvent_PackedAction_MASK               :: MotionEvent_PackedAction{action = MotionEvent_Action(0xff)}
+MotionEvent_PackedAction_POINTER_1_DOWN     :: MotionEvent_PackedAction{action = .POINTER_DOWN}
+MotionEvent_PackedAction_POINTER_1_UP       :: MotionEvent_PackedAction{action = .POINTER_UP}
+MotionEvent_PackedAction_POINTER_2_DOWN     :: MotionEvent_PackedAction{action = .POINTER_DOWN, pointer_index = 0x1}
+MotionEvent_PackedAction_POINTER_2_UP       :: MotionEvent_PackedAction{action = .POINTER_UP, pointer_index = 0x1}
+MotionEvent_PackedAction_POINTER_3_DOWN     :: MotionEvent_PackedAction{action = .POINTER_DOWN, pointer_index = 0x2}
+MotionEvent_PackedAction_POINTER_3_UP       :: MotionEvent_PackedAction{action = .POINTER_UP, pointer_index = 0x2}
+MotionEvent_PackedAction_POINTER_ID_MASK    :: MotionEvent_PackedAction{pointer_index = 0xff}
+MotionEvent_PackedAction_POINTER_INDEX_MASK :: MotionEvent_PackedAction{pointer_index = 0xff}
+
+MotionEvent_Axis :: enum i32 {
+	BRAKE                      = 23,
+	DISTANCE                   = 24,
+	GAS                        = 22,
+	GENERIC_1                  = 32,
+	GENERIC_10                 = 41,
+	GENERIC_11                 = 42,
+	GENERIC_12                 = 43,
+	GENERIC_13                 = 44,
+	GENERIC_14                 = 45,
+	GENERIC_15                 = 46,
+	GENERIC_16                 = 47,
+	GENERIC_2                  = 33,
+	GENERIC_3                  = 34,
+	GENERIC_4                  = 35,
+	GENERIC_5                  = 36,
+	GENERIC_6                  = 37,
+	GENERIC_7                  = 38,
+	GENERIC_8                  = 39,
+	GENERIC_9                  = 40,
+	GESTURE_PINCH_SCALE_FACTOR = 52,
+	GESTURE_SCROLL_X_DISTANCE  = 50,
+	GESTURE_SCROLL_Y_DISTANCE  = 51,
+	GESTURE_X_OFFSET           = 48,
+	GESTURE_Y_OFFSET           = 49,
+	HAT_X                      = 15,
+	HAT_Y                      = 16,
+	HSCROLL                    = 10,
+	LTRIGGER                   = 17,
+	ORIENTATION                = 8,
+	PRESSURE                   = 2,
+	RELATIVE_X                 = 27,
+	RELATIVE_Y                 = 28,
+	RTRIGGER                   = 18,
+	RUDDER                     = 20,
+	RX                         = 12,
+	RY                         = 13,
+	RZ                         = 14,
+	SCROLL                     = 26,
+	SIZE                       = 3,
+	THROTTLE                   = 19,
+	TILT                       = 25,
+	TOOL_MAJOR                 = 6,
+	TOOL_MINOR                 = 7,
+	TOUCH_MAJOR                = 4,
+	TOUCH_MINOR                = 5,
+	VSCROLL                    = 9,
+	WHEEL                      = 21,
+	X                          = 0,
+	Y                          = 1,
+	Z                          = 11,
+}
+
+MotionEvent_Classification :: enum i32 {
+	AMBIGUOUS_GESTURE = 1,
+	DEEP_PRESS        = 2,
+	NONE              = 0,
+	PINCH             = 5,
+	TWO_FINGER_SWIPE  = 3,
+}
+
+MotionEvent_ToolType :: enum i32 {
+	ERASER  = 4,
+	FINGER  = 1,
+	MOUSE   = 3,
+	STYLUS  = 2,
+	UNKNOWN = 0,
 }
 
 // class android.view.MotionEvent.PointerCoords
@@ -6092,10 +6846,10 @@ MotionEvent_PointerCoords_copyFrom :: proc "contextless" (self: ^MotionEvent_Poi
 	return jni_take(jni_env)
 }
 
-MotionEvent_PointerCoords_getAxisValue :: proc "contextless" (self: ^MotionEvent_PointerCoords, axis: i32) -> (result: f32, exception: ^Throwable) {
+MotionEvent_PointerCoords_getAxisValue :: proc "contextless" (self: ^MotionEvent_PointerCoords, axis: MotionEvent_Axis) -> (result: f32, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent_PointerCoords__class, "getAxisValue", "(I)F", false) or_return
-	jni_args := [?]android.jvalue{{i = axis}}
+	jni_args := [?]android.jvalue{{i = i32(axis)}}
 	return jni_env->CallFloatMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
@@ -6105,10 +6859,10 @@ MotionEvent_PointerCoords_isResampled :: proc "contextless" (self: ^MotionEvent_
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-MotionEvent_PointerCoords_setAxisValue :: proc "contextless" (self: ^MotionEvent_PointerCoords, axis: i32, value: f32) -> (exception: ^Throwable) {
+MotionEvent_PointerCoords_setAxisValue :: proc "contextless" (self: ^MotionEvent_PointerCoords, axis: MotionEvent_Axis, value: f32) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionEvent_PointerCoords__class, "setAxisValue", "(IF)V", false) or_return
-	jni_args := [?]android.jvalue{{i = axis}, {f = value}}
+	jni_args := [?]android.jvalue{{i = i32(axis)}, {f = value}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -6134,16 +6888,16 @@ MotionEvent_PointerProperties_set_id :: proc "contextless" (self: ^MotionEvent_P
 	return jni_take(jni_env)
 }
 
-MotionEvent_PointerProperties_get_toolType :: proc "contextless" (self: ^MotionEvent_PointerProperties) -> (result: i32, exception: ^Throwable) {
+MotionEvent_PointerProperties_get_toolType :: proc "contextless" (self: ^MotionEvent_PointerProperties) -> (result: MotionEvent_ToolType, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &MotionEvent_PointerProperties__class, "toolType", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return MotionEvent_ToolType(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-MotionEvent_PointerProperties_set_toolType :: proc "contextless" (self: ^MotionEvent_PointerProperties, value: i32) -> (exception: ^Throwable) {
+MotionEvent_PointerProperties_set_toolType :: proc "contextless" (self: ^MotionEvent_PointerProperties, value: MotionEvent_ToolType) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &MotionEvent_PointerProperties__class, "toolType", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
@@ -6208,10 +6962,10 @@ MotionPredictor_new :: proc "contextless" (context_: ^Context) -> (result: ^Moti
 	return (^MotionPredictor)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-MotionPredictor_isPredictionAvailable :: proc "contextless" (self: ^MotionPredictor, deviceId: i32, source: i32) -> (result: bool, exception: ^Throwable) {
+MotionPredictor_isPredictionAvailable :: proc "contextless" (self: ^MotionPredictor, deviceId: i32, source: InputDevice_Sources) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &MotionPredictor__class, "isPredictionAvailable", "(II)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = deviceId}, {i = source}}
+	jni_args := [?]android.jvalue{{i = deviceId}, {i = transmute(i32)source}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -6413,6 +7167,15 @@ PixelCopy_request :: proc{
 	PixelCopy_request_Window_Rect_Bitmap_PixelCopy_OnPixelCopyFinishedListener_Handler,
 }
 
+PixelCopy_CopyResult :: enum i32 {
+	ERROR_DESTINATION_INVALID = 5,
+	ERROR_SOURCE_INVALID      = 4,
+	ERROR_SOURCE_NO_DATA      = 3,
+	ERROR_TIMEOUT             = 2,
+	ERROR_UNKNOWN             = 1,
+	SUCCESS                   = 0,
+}
+
 // interface android.view.PixelCopy.OnPixelCopyFinishedListener
 PixelCopy_OnPixelCopyFinishedListener :: struct #raw_union {
 	using Object: Object,
@@ -6421,10 +7184,10 @@ PixelCopy_OnPixelCopyFinishedListener :: struct #raw_union {
 @(private)
 PixelCopy_OnPixelCopyFinishedListener__class := Cached_Class{name = "android/view/PixelCopy$OnPixelCopyFinishedListener"}
 
-PixelCopy_OnPixelCopyFinishedListener_onPixelCopyFinished :: proc "contextless" (self: ^PixelCopy_OnPixelCopyFinishedListener, copyResult: i32) -> (exception: ^Throwable) {
+PixelCopy_OnPixelCopyFinishedListener_onPixelCopyFinished :: proc "contextless" (self: ^PixelCopy_OnPixelCopyFinishedListener, copyResult: PixelCopy_CopyResult) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PixelCopy_OnPixelCopyFinishedListener__class, "onPixelCopyFinished", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = copyResult}}
+	jni_args := [?]android.jvalue{{i = i32(copyResult)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -6529,10 +7292,10 @@ PixelCopy_Result_getBitmap :: proc "contextless" (self: ^PixelCopy_Result) -> (r
 	return (^Bitmap)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PixelCopy_Result_getStatus :: proc "contextless" (self: ^PixelCopy_Result) -> (result: i32, exception: ^Throwable) {
+PixelCopy_Result_getStatus :: proc "contextless" (self: ^PixelCopy_Result) -> (result: PixelCopy_CopyResult, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PixelCopy_Result__class, "getStatus", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return PixelCopy_CopyResult(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 // class android.view.PointerIcon
@@ -6582,10 +7345,10 @@ PointerIcon_create :: proc "contextless" (bitmap: ^Bitmap, hotSpotX: f32, hotSpo
 	return (^PointerIcon)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PointerIcon_describeContents :: proc "contextless" (self: ^PointerIcon) -> (result: i32, exception: ^Throwable) {
+PointerIcon_describeContents :: proc "contextless" (self: ^PointerIcon) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PointerIcon__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 PointerIcon_equals :: proc "contextless" (self: ^PointerIcon, other: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -6595,10 +7358,10 @@ PointerIcon_equals :: proc "contextless" (self: ^PointerIcon, other: ^Object) ->
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-PointerIcon_getSystemIcon :: proc "contextless" (context_: ^Context, type: i32) -> (result: ^PointerIcon, exception: ^Throwable) {
+PointerIcon_getSystemIcon :: proc "contextless" (context_: ^Context, type: PointerIcon_Type) -> (result: ^PointerIcon, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &PointerIcon__class, "getSystemIcon", "(Landroid/content/Context;I)Landroid/view/PointerIcon;", true) or_return
-	jni_args := [?]android.jvalue{{l = context_}, {i = type}}
+	jni_args := [?]android.jvalue{{l = context_}, {i = i32(type)}}
 	return (^PointerIcon)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -6615,12 +7378,39 @@ PointerIcon_toString :: proc "contextless" (self: ^PointerIcon) -> (result: ^Str
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PointerIcon_writeToParcel :: proc "contextless" (self: ^PointerIcon, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+PointerIcon_writeToParcel :: proc "contextless" (self: ^PointerIcon, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PointerIcon__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+PointerIcon_Type :: enum i32 {
+	ALIAS                           = 1010,
+	ALL_SCROLL                      = 1013,
+	ARROW                           = 1000,
+	CELL                            = 1006,
+	CONTEXT_MENU                    = 1001,
+	COPY                            = 1011,
+	CROSSHAIR                       = 1007,
+	DEFAULT                         = 1000,
+	GRAB                            = 1020,
+	GRABBING                        = 1021,
+	HAND                            = 1002,
+	HANDWRITING                     = 1022,
+	HELP                            = 1003,
+	HORIZONTAL_DOUBLE_ARROW         = 1014,
+	NO_DROP                         = 1012,
+	NULL                            = 0,
+	TEXT                            = 1008,
+	TOP_LEFT_DIAGONAL_DOUBLE_ARROW  = 1017,
+	TOP_RIGHT_DIAGONAL_DOUBLE_ARROW = 1016,
+	VERTICAL_DOUBLE_ARROW           = 1015,
+	VERTICAL_TEXT                   = 1009,
+	WAIT                            = 1004,
+	ZOOM_IN                         = 1018,
+	ZOOM_OUT                        = 1019,
 }
 
 // class android.view.RoundedCorner // API level 31
@@ -6643,17 +7433,17 @@ RoundedCorner_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creat
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-RoundedCorner_new :: proc "contextless" (position: i32, radius: i32, centerX: i32, centerY: i32) -> (result: ^RoundedCorner, exception: ^Throwable) {
+RoundedCorner_new :: proc "contextless" (position: RoundedCorner_Position, radius: i32, centerX: i32, centerY: i32) -> (result: ^RoundedCorner, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &RoundedCorner__class, "<init>", "(IIII)V", false) or_return
-	jni_args := [?]android.jvalue{{i = position}, {i = radius}, {i = centerX}, {i = centerY}}
+	jni_args := [?]android.jvalue{{i = i32(position)}, {i = radius}, {i = centerX}, {i = centerY}}
 	return (^RoundedCorner)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-RoundedCorner_describeContents :: proc "contextless" (self: ^RoundedCorner) -> (result: i32, exception: ^Throwable) {
+RoundedCorner_describeContents :: proc "contextless" (self: ^RoundedCorner) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &RoundedCorner__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 RoundedCorner_equals :: proc "contextless" (self: ^RoundedCorner, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -6669,10 +7459,10 @@ RoundedCorner_getCenter :: proc "contextless" (self: ^RoundedCorner) -> (result:
 	return (^Point)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-RoundedCorner_getPosition :: proc "contextless" (self: ^RoundedCorner) -> (result: i32, exception: ^Throwable) {
+RoundedCorner_getPosition :: proc "contextless" (self: ^RoundedCorner) -> (result: RoundedCorner_Position, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &RoundedCorner__class, "getPosition", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return RoundedCorner_Position(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 RoundedCorner_getRadius :: proc "contextless" (self: ^RoundedCorner) -> (result: i32, exception: ^Throwable) {
@@ -6693,12 +7483,19 @@ RoundedCorner_toString :: proc "contextless" (self: ^RoundedCorner) -> (result: 
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-RoundedCorner_writeToParcel :: proc "contextless" (self: ^RoundedCorner, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+RoundedCorner_writeToParcel :: proc "contextless" (self: ^RoundedCorner, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &RoundedCorner__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+RoundedCorner_Position :: enum i32 {
+	BOTTOM_LEFT  = 3,
+	BOTTOM_RIGHT = 2,
+	TOP_LEFT     = 0,
+	TOP_RIGHT    = 1,
 }
 
 // class android.view.RoundedRectBlurRegion // API level 37
@@ -7075,10 +7872,10 @@ ScrollCaptureTarget_getContainingView :: proc "contextless" (self: ^ScrollCaptur
 	return (^View)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ScrollCaptureTarget_getHint :: proc "contextless" (self: ^ScrollCaptureTarget) -> (result: i32, exception: ^Throwable) {
+ScrollCaptureTarget_getHint :: proc "contextless" (self: ^ScrollCaptureTarget) -> (result: View_ScrollCaptureHintFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ScrollCaptureTarget__class, "getHint", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(View_ScrollCaptureHintFlags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ScrollCaptureTarget_getLocalVisibleRect :: proc "contextless" (self: ^ScrollCaptureTarget) -> (result: ^Rect, exception: ^Throwable) {
@@ -7135,26 +7932,26 @@ ScrollFeedbackProvider_createProvider :: proc "contextless" (view: ^View) -> (re
 	return (^ScrollFeedbackProvider)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ScrollFeedbackProvider_onScrollLimit :: proc "contextless" (self: ^ScrollFeedbackProvider, inputDeviceId: i32, source: i32, axis: i32, isStart: bool) -> (exception: ^Throwable) {
+ScrollFeedbackProvider_onScrollLimit :: proc "contextless" (self: ^ScrollFeedbackProvider, inputDeviceId: i32, source: InputDevice_Sources, axis: MotionEvent_Axis, isStart: bool) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ScrollFeedbackProvider__class, "onScrollLimit", "(IIIZ)V", false) or_return
-	jni_args := [?]android.jvalue{{i = inputDeviceId}, {i = source}, {i = axis}, {z = android.jboolean(isStart)}}
+	jni_args := [?]android.jvalue{{i = inputDeviceId}, {i = transmute(i32)source}, {i = i32(axis)}, {z = android.jboolean(isStart)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-ScrollFeedbackProvider_onScrollProgress :: proc "contextless" (self: ^ScrollFeedbackProvider, inputDeviceId: i32, source: i32, axis: i32, deltaInPixels: i32) -> (exception: ^Throwable) {
+ScrollFeedbackProvider_onScrollProgress :: proc "contextless" (self: ^ScrollFeedbackProvider, inputDeviceId: i32, source: InputDevice_Sources, axis: MotionEvent_Axis, deltaInPixels: i32) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ScrollFeedbackProvider__class, "onScrollProgress", "(IIII)V", false) or_return
-	jni_args := [?]android.jvalue{{i = inputDeviceId}, {i = source}, {i = axis}, {i = deltaInPixels}}
+	jni_args := [?]android.jvalue{{i = inputDeviceId}, {i = transmute(i32)source}, {i = i32(axis)}, {i = deltaInPixels}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-ScrollFeedbackProvider_onSnapToItem :: proc "contextless" (self: ^ScrollFeedbackProvider, inputDeviceId: i32, source: i32, axis: i32) -> (exception: ^Throwable) {
+ScrollFeedbackProvider_onSnapToItem :: proc "contextless" (self: ^ScrollFeedbackProvider, inputDeviceId: i32, source: InputDevice_Sources, axis: MotionEvent_Axis) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ScrollFeedbackProvider__class, "onSnapToItem", "(III)V", false) or_return
-	jni_args := [?]android.jvalue{{i = inputDeviceId}, {i = source}, {i = axis}}
+	jni_args := [?]android.jvalue{{i = inputDeviceId}, {i = transmute(i32)source}, {i = i32(axis)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -7198,18 +7995,30 @@ SoundEffectConstants_NAVIGATION_REPEAT_UP    :: 6 // API level 31
 SoundEffectConstants_NAVIGATION_RIGHT        :: 3
 SoundEffectConstants_NAVIGATION_UP           :: 2
 
-SoundEffectConstants_getConstantForFocusDirection :: proc "contextless" (direction: i32, repeating: bool) -> (result: i32, exception: ^Throwable) { // API level 31
+SoundEffectConstants_getConstantForFocusDirection :: proc "contextless" (direction: View_Focus, repeating: bool) -> (result: SoundEffectConstants_ConstantForFocusDirection, exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &SoundEffectConstants__class, "getConstantForFocusDirection", "(IZ)I", true) or_return
-	jni_args := [?]android.jvalue{{i = direction}, {z = android.jboolean(repeating)}}
-	return jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{i = i32(direction)}, {z = android.jboolean(repeating)}}
+	return SoundEffectConstants_ConstantForFocusDirection(jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-SoundEffectConstants_getContantForFocusDirection :: proc "contextless" (direction: i32) -> (result: i32, exception: ^Throwable) {
+SoundEffectConstants_getContantForFocusDirection :: proc "contextless" (direction: View_Focus) -> (result: SoundEffectConstants_ConstantForFocusDirection, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &SoundEffectConstants__class, "getContantForFocusDirection", "(I)I", true) or_return
-	jni_args := [?]android.jvalue{{i = direction}}
-	return jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{i = i32(direction)}}
+	return SoundEffectConstants_ConstantForFocusDirection(jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
+}
+
+SoundEffectConstants_ConstantForFocusDirection :: enum i32 {
+	CLICK                   = 0,
+	NAVIGATION_DOWN         = 4,
+	NAVIGATION_LEFT         = 1,
+	NAVIGATION_REPEAT_DOWN  = 8,
+	NAVIGATION_REPEAT_LEFT  = 5,
+	NAVIGATION_REPEAT_RIGHT = 7,
+	NAVIGATION_REPEAT_UP    = 6,
+	NAVIGATION_RIGHT        = 3,
+	NAVIGATION_UP           = 2,
 }
 
 // interface android.view.SubMenu
@@ -7348,10 +8157,10 @@ Surface_clearFrameRate :: proc "contextless" (self: ^Surface) -> (exception: ^Th
 	return jni_take(jni_env)
 }
 
-Surface_describeContents :: proc "contextless" (self: ^Surface) -> (result: i32, exception: ^Throwable) {
+Surface_describeContents :: proc "contextless" (self: ^Surface) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Surface__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Surface_isProducerThrottlingEnabled :: proc "contextless" (self: ^Surface) -> (result: bool, exception: ^Throwable) { // API level 37
@@ -7394,18 +8203,18 @@ Surface_release :: proc "contextless" (self: ^Surface) -> (exception: ^Throwable
 	return jni_take(jni_env)
 }
 
-Surface_setFrameRate_float_int :: proc "contextless" (self: ^Surface, frameRate: f32, compatibility: i32) -> (exception: ^Throwable) { // API level 30
+Surface_setFrameRate_float_int :: proc "contextless" (self: ^Surface, frameRate: f32, compatibility: Surface_FrameRateCompatibility) -> (exception: ^Throwable) { // API level 30
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Surface__class, "setFrameRate", "(FI)V", false) or_return
-	jni_args := [?]android.jvalue{{f = frameRate}, {i = compatibility}}
+	jni_args := [?]android.jvalue{{f = frameRate}, {i = i32(compatibility)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-Surface_setFrameRate_float_int_int :: proc "contextless" (self: ^Surface, frameRate: f32, compatibility: i32, changeFrameRateStrategy: i32) -> (exception: ^Throwable) { // API level 31
+Surface_setFrameRate_float_int_int :: proc "contextless" (self: ^Surface, frameRate: f32, compatibility: Surface_FrameRateCompatibility, changeFrameRateStrategy: Surface_ChangeFrameRate) -> (exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Surface__class, "setFrameRate", "(FII)V", false) or_return
-	jni_args := [?]android.jvalue{{f = frameRate}, {i = compatibility}, {i = changeFrameRateStrategy}}
+	jni_args := [?]android.jvalue{{f = frameRate}, {i = i32(compatibility)}, {i = i32(changeFrameRateStrategy)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -7445,12 +8254,30 @@ Surface_unlockCanvasAndPost :: proc "contextless" (self: ^Surface, canvas: ^Canv
 	return jni_take(jni_env)
 }
 
-Surface_writeToParcel :: proc "contextless" (self: ^Surface, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+Surface_writeToParcel :: proc "contextless" (self: ^Surface, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Surface__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+Surface_Rotation :: enum i32 {
+	_0   = 0,
+	_180 = 2,
+	_270 = 3,
+	_90  = 1,
+}
+
+Surface_FrameRateCompatibility :: enum i32 {
+	AT_LEAST     = 2,
+	DEFAULT      = 0,
+	FIXED_SOURCE = 1,
+}
+
+Surface_ChangeFrameRate :: enum i32 {
+	ALWAYS           = 1,
+	ONLY_IF_SEAMLESS = 0,
 }
 
 // class android.view.Surface.OutOfResourcesException
@@ -7503,10 +8330,10 @@ SurfaceControl_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Crea
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-SurfaceControl_describeContents :: proc "contextless" (self: ^SurfaceControl) -> (result: i32, exception: ^Throwable) {
+SurfaceControl_describeContents :: proc "contextless" (self: ^SurfaceControl) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurfaceControl__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 SurfaceControl_isValid :: proc "contextless" (self: ^SurfaceControl) -> (result: bool, exception: ^Throwable) {
@@ -7543,12 +8370,23 @@ SurfaceControl_toString :: proc "contextless" (self: ^SurfaceControl) -> (result
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-SurfaceControl_writeToParcel :: proc "contextless" (self: ^SurfaceControl, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+SurfaceControl_writeToParcel :: proc "contextless" (self: ^SurfaceControl, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurfaceControl__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+SurfaceControl_BufferTransform :: enum i32 {
+	IDENTITY                    = 0,
+	MIRROR_HORIZONTAL           = 1,
+	MIRROR_HORIZONTAL_ROTATE_90 = 5,
+	MIRROR_VERTICAL             = 2,
+	MIRROR_VERTICAL_ROTATE_90   = 6,
+	ROTATE_180                  = 3,
+	ROTATE_270                  = 7,
+	ROTATE_90                   = 4,
 }
 
 // class android.view.SurfaceControl.Builder
@@ -7578,10 +8416,10 @@ SurfaceControl_Builder_setBufferSize :: proc "contextless" (self: ^SurfaceContro
 	return (^SurfaceControl_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-SurfaceControl_Builder_setFormat :: proc "contextless" (self: ^SurfaceControl_Builder, format: i32) -> (result: ^SurfaceControl_Builder, exception: ^Throwable) {
+SurfaceControl_Builder_setFormat :: proc "contextless" (self: ^SurfaceControl_Builder, format: PixelFormat_Format) -> (result: ^SurfaceControl_Builder, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurfaceControl_Builder__class, "setFormat", "(I)Landroid/view/SurfaceControl$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = format}}
+	jni_args := [?]android.jvalue{{i = i32(format)}}
 	return (^SurfaceControl_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -7640,10 +8478,10 @@ SurfaceControl_JankData_getDesiredPresentTimeNanos :: proc "contextless" (self: 
 	return jni_env->CallLongMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-SurfaceControl_JankData_getJankType :: proc "contextless" (self: ^SurfaceControl_JankData) -> (result: i32, exception: ^Throwable) {
+SurfaceControl_JankData_getJankType :: proc "contextless" (self: ^SurfaceControl_JankData) -> (result: SurfaceControl_JankData_JankFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurfaceControl_JankData__class, "getJankType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(SurfaceControl_JankData_JankFlags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 SurfaceControl_JankData_getPresentTimeNanos :: proc "contextless" (self: ^SurfaceControl_JankData) -> (result: i64, exception: ^Throwable) { // API level 37
@@ -7669,6 +8507,15 @@ SurfaceControl_JankData_toString :: proc "contextless" (self: ^SurfaceControl_Ja
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurfaceControl_JankData__class, "toString", "()Ljava/lang/String;", false) or_return
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
+
+SurfaceControl_JankData_JankFlag :: enum u32 {
+	APPLICATION = 1,
+	COMPOSER    = 0,
+	OTHER       = 2,
+}
+SurfaceControl_JankData_JankFlags :: distinct bit_set[SurfaceControl_JankData_JankFlag; u32]
+
+SurfaceControl_JankData_JankFlags_NONE :: SurfaceControl_JankData_JankFlags{}
 
 // interface android.view.SurfaceControl.OnJankDataListener // API level 36
 SurfaceControl_OnJankDataListener :: struct #raw_union {
@@ -7774,10 +8621,10 @@ SurfaceControl_Transaction_close :: proc "contextless" (self: ^SurfaceControl_Tr
 	return jni_take(jni_env)
 }
 
-SurfaceControl_Transaction_describeContents :: proc "contextless" (self: ^SurfaceControl_Transaction) -> (result: i32, exception: ^Throwable) {
+SurfaceControl_Transaction_describeContents :: proc "contextless" (self: ^SurfaceControl_Transaction) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurfaceControl_Transaction__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 SurfaceControl_Transaction_merge :: proc "contextless" (self: ^SurfaceControl_Transaction, other: ^SurfaceControl_Transaction) -> (result: ^SurfaceControl_Transaction, exception: ^Throwable) {
@@ -7835,10 +8682,10 @@ SurfaceControl_Transaction_setBufferSize :: proc "contextless" (self: ^SurfaceCo
 	return (^SurfaceControl_Transaction)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-SurfaceControl_Transaction_setBufferTransform :: proc "contextless" (self: ^SurfaceControl_Transaction, sc: ^SurfaceControl, transform: i32) -> (result: ^SurfaceControl_Transaction, exception: ^Throwable) { // API level 33
+SurfaceControl_Transaction_setBufferTransform :: proc "contextless" (self: ^SurfaceControl_Transaction, sc: ^SurfaceControl, transform: SurfaceControl_BufferTransform) -> (result: ^SurfaceControl_Transaction, exception: ^Throwable) { // API level 33
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurfaceControl_Transaction__class, "setBufferTransform", "(Landroid/view/SurfaceControl;I)Landroid/view/SurfaceControl$Transaction;", false) or_return
-	jni_args := [?]android.jvalue{{l = sc}, {i = transform}}
+	jni_args := [?]android.jvalue{{l = sc}, {i = i32(transform)}}
 	return (^SurfaceControl_Transaction)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -7863,10 +8710,10 @@ SurfaceControl_Transaction_setDamageRegion :: proc "contextless" (self: ^Surface
 	return (^SurfaceControl_Transaction)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-SurfaceControl_Transaction_setDataSpace :: proc "contextless" (self: ^SurfaceControl_Transaction, sc: ^SurfaceControl, dataspace: i32) -> (result: ^SurfaceControl_Transaction, exception: ^Throwable) { // API level 33
+SurfaceControl_Transaction_setDataSpace :: proc "contextless" (self: ^SurfaceControl_Transaction, sc: ^SurfaceControl, dataspace: DataSpace_Field) -> (result: ^SurfaceControl_Transaction, exception: ^Throwable) { // API level 33
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurfaceControl_Transaction__class, "setDataSpace", "(Landroid/view/SurfaceControl;I)Landroid/view/SurfaceControl$Transaction;", false) or_return
-	jni_args := [?]android.jvalue{{l = sc}, {i = dataspace}}
+	jni_args := [?]android.jvalue{{l = sc}, {i = transmute(i32)dataspace}}
 	return (^SurfaceControl_Transaction)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -7891,17 +8738,17 @@ SurfaceControl_Transaction_setExtendedRangeBrightness :: proc "contextless" (sel
 	return (^SurfaceControl_Transaction)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-SurfaceControl_Transaction_setFrameRate_SurfaceControl_float_int :: proc "contextless" (self: ^SurfaceControl_Transaction, sc: ^SurfaceControl, frameRate: f32, compatibility: i32) -> (result: ^SurfaceControl_Transaction, exception: ^Throwable) { // API level 30
+SurfaceControl_Transaction_setFrameRate_SurfaceControl_float_int :: proc "contextless" (self: ^SurfaceControl_Transaction, sc: ^SurfaceControl, frameRate: f32, compatibility: Surface_FrameRateCompatibility) -> (result: ^SurfaceControl_Transaction, exception: ^Throwable) { // API level 30
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurfaceControl_Transaction__class, "setFrameRate", "(Landroid/view/SurfaceControl;FI)Landroid/view/SurfaceControl$Transaction;", false) or_return
-	jni_args := [?]android.jvalue{{l = sc}, {f = frameRate}, {i = compatibility}}
+	jni_args := [?]android.jvalue{{l = sc}, {f = frameRate}, {i = i32(compatibility)}}
 	return (^SurfaceControl_Transaction)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-SurfaceControl_Transaction_setFrameRate_SurfaceControl_float_int_int :: proc "contextless" (self: ^SurfaceControl_Transaction, sc: ^SurfaceControl, frameRate: f32, compatibility: i32, changeFrameRateStrategy: i32) -> (result: ^SurfaceControl_Transaction, exception: ^Throwable) { // API level 31
+SurfaceControl_Transaction_setFrameRate_SurfaceControl_float_int_int :: proc "contextless" (self: ^SurfaceControl_Transaction, sc: ^SurfaceControl, frameRate: f32, compatibility: Surface_FrameRateCompatibility, changeFrameRateStrategy: Surface_ChangeFrameRate) -> (result: ^SurfaceControl_Transaction, exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurfaceControl_Transaction__class, "setFrameRate", "(Landroid/view/SurfaceControl;FII)Landroid/view/SurfaceControl$Transaction;", false) or_return
-	jni_args := [?]android.jvalue{{l = sc}, {f = frameRate}, {i = compatibility}, {i = changeFrameRateStrategy}}
+	jni_args := [?]android.jvalue{{l = sc}, {f = frameRate}, {i = i32(compatibility)}, {i = i32(changeFrameRateStrategy)}}
 	return (^SurfaceControl_Transaction)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -7917,10 +8764,10 @@ SurfaceControl_Transaction_setFrameTimeline :: proc "contextless" (self: ^Surfac
 	return (^SurfaceControl_Transaction)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-SurfaceControl_Transaction_setGeometry :: proc "contextless" (self: ^SurfaceControl_Transaction, sc: ^SurfaceControl, sourceCrop: ^Rect, destFrame: ^Rect, orientation: i32) -> (result: ^SurfaceControl_Transaction, exception: ^Throwable) {
+SurfaceControl_Transaction_setGeometry :: proc "contextless" (self: ^SurfaceControl_Transaction, sc: ^SurfaceControl, sourceCrop: ^Rect, destFrame: ^Rect, orientation: Surface_Rotation) -> (result: ^SurfaceControl_Transaction, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurfaceControl_Transaction__class, "setGeometry", "(Landroid/view/SurfaceControl;Landroid/graphics/Rect;Landroid/graphics/Rect;I)Landroid/view/SurfaceControl$Transaction;", false) or_return
-	jni_args := [?]android.jvalue{{l = sc}, {l = sourceCrop}, {l = destFrame}, {i = orientation}}
+	jni_args := [?]android.jvalue{{l = sc}, {l = sourceCrop}, {l = destFrame}, {i = i32(orientation)}}
 	return (^SurfaceControl_Transaction)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -7973,10 +8820,10 @@ SurfaceControl_Transaction_setVisibility :: proc "contextless" (self: ^SurfaceCo
 	return (^SurfaceControl_Transaction)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-SurfaceControl_Transaction_writeToParcel :: proc "contextless" (self: ^SurfaceControl_Transaction, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+SurfaceControl_Transaction_writeToParcel :: proc "contextless" (self: ^SurfaceControl_Transaction, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurfaceControl_Transaction__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -8215,10 +9062,10 @@ SurfaceControlViewHost_SurfacePackage_new :: proc "contextless" (other: ^Surface
 	return (^SurfaceControlViewHost_SurfacePackage)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-SurfaceControlViewHost_SurfacePackage_describeContents :: proc "contextless" (self: ^SurfaceControlViewHost_SurfacePackage) -> (result: i32, exception: ^Throwable) {
+SurfaceControlViewHost_SurfacePackage_describeContents :: proc "contextless" (self: ^SurfaceControlViewHost_SurfacePackage) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurfaceControlViewHost_SurfacePackage__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 SurfaceControlViewHost_SurfacePackage_getInputTransferToken :: proc "contextless" (self: ^SurfaceControlViewHost_SurfacePackage) -> (result: ^InputTransferToken, exception: ^Throwable) { // API level 35
@@ -8261,10 +9108,10 @@ SurfaceControlViewHost_SurfacePackage_toString :: proc "contextless" (self: ^Sur
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-SurfaceControlViewHost_SurfacePackage_writeToParcel :: proc "contextless" (self: ^SurfaceControlViewHost_SurfacePackage, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+SurfaceControlViewHost_SurfacePackage_writeToParcel :: proc "contextless" (self: ^SurfaceControlViewHost_SurfacePackage, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurfaceControlViewHost_SurfacePackage__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -8348,10 +9195,10 @@ SurfaceHolder_setFixedSize :: proc "contextless" (self: ^SurfaceHolder, width: i
 	return jni_take(jni_env)
 }
 
-SurfaceHolder_setFormat :: proc "contextless" (self: ^SurfaceHolder, format: i32) -> (exception: ^Throwable) {
+SurfaceHolder_setFormat :: proc "contextless" (self: ^SurfaceHolder, format: PixelFormat_Format) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurfaceHolder__class, "setFormat", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = format}}
+	jni_args := [?]android.jvalue{{i = i32(format)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -8371,10 +9218,10 @@ SurfaceHolder_setSizeFromLayout :: proc "contextless" (self: ^SurfaceHolder) -> 
 	return jni_take(jni_env)
 }
 
-SurfaceHolder_setType :: proc "contextless" (self: ^SurfaceHolder, type: i32) -> (exception: ^Throwable) {
+SurfaceHolder_setType :: proc "contextless" (self: ^SurfaceHolder, type: SurfaceHolder_Type) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurfaceHolder__class, "setType", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = type}}
+	jni_args := [?]android.jvalue{{i = i32(type)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -8385,6 +9232,13 @@ SurfaceHolder_unlockCanvasAndPost :: proc "contextless" (self: ^SurfaceHolder, c
 	jni_args := [?]android.jvalue{{l = canvas}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+SurfaceHolder_Type :: enum i32 {
+	GPU          = 2,
+	HARDWARE     = 1,
+	NORMAL       = 0,
+	PUSH_BUFFERS = 3,
 }
 
 // class android.view.SurfaceHolder.BadSurfaceTypeException
@@ -8421,10 +9275,10 @@ SurfaceHolder_Callback :: struct #raw_union {
 @(private)
 SurfaceHolder_Callback__class := Cached_Class{name = "android/view/SurfaceHolder$Callback"}
 
-SurfaceHolder_Callback_surfaceChanged :: proc "contextless" (self: ^SurfaceHolder_Callback, holder: ^SurfaceHolder, format: i32, width: i32, height: i32) -> (exception: ^Throwable) {
+SurfaceHolder_Callback_surfaceChanged :: proc "contextless" (self: ^SurfaceHolder_Callback, holder: ^SurfaceHolder, format: PixelFormat_Format, width: i32, height: i32) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurfaceHolder_Callback__class, "surfaceChanged", "(Landroid/view/SurfaceHolder;III)V", false) or_return
-	jni_args := [?]android.jvalue{{l = holder}, {i = format}, {i = width}, {i = height}}
+	jni_args := [?]android.jvalue{{l = holder}, {i = i32(format)}, {i = width}, {i = height}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -8663,18 +9517,18 @@ SurfaceView_setSecure :: proc "contextless" (self: ^SurfaceView, isSecure: bool)
 	return jni_take(jni_env)
 }
 
-SurfaceView_setSurfaceLifecycle :: proc "contextless" (self: ^SurfaceView, lifecycleStrategy: i32) -> (exception: ^Throwable) { // API level 34
+SurfaceView_setSurfaceLifecycle :: proc "contextless" (self: ^SurfaceView, lifecycleStrategy: SurfaceView_SurfaceLifecycle) -> (exception: ^Throwable) { // API level 34
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurfaceView__class, "setSurfaceLifecycle", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = lifecycleStrategy}}
+	jni_args := [?]android.jvalue{{i = i32(lifecycleStrategy)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-SurfaceView_setVisibility :: proc "contextless" (self: ^SurfaceView, visibility: i32) -> (exception: ^Throwable) {
+SurfaceView_setVisibility :: proc "contextless" (self: ^SurfaceView, visibility: View_Visibility) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SurfaceView__class, "setVisibility", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = visibility}}
+	jni_args := [?]android.jvalue{{i = i32(visibility)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -8693,6 +9547,12 @@ SurfaceView_setZOrderOnTop :: proc "contextless" (self: ^SurfaceView, onTop: boo
 	jni_args := [?]android.jvalue{{z = android.jboolean(onTop)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+SurfaceView_SurfaceLifecycle :: enum i32 {
+	DEFAULT            = 0,
+	FOLLOWS_ATTACHMENT = 2,
+	FOLLOWS_VISIBILITY = 1,
 }
 
 // class android.view.TextureView
@@ -8785,10 +9645,10 @@ TextureView_getBitmap :: proc{
 	TextureView_getBitmap_int_int,
 }
 
-TextureView_getLayerType :: proc "contextless" (self: ^TextureView) -> (result: i32, exception: ^Throwable) {
+TextureView_getLayerType :: proc "contextless" (self: ^TextureView) -> (result: View_LayerType, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TextureView__class, "getLayerType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_LayerType(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 TextureView_getSurfaceTexture :: proc "contextless" (self: ^TextureView) -> (result: ^SurfaceTexture, exception: ^Throwable) {
@@ -8864,10 +9724,10 @@ TextureView_setLayerPaint :: proc "contextless" (self: ^TextureView, paint: ^Pai
 	return jni_take(jni_env)
 }
 
-TextureView_setLayerType :: proc "contextless" (self: ^TextureView, layerType: i32, paint: ^Paint) -> (exception: ^Throwable) {
+TextureView_setLayerType :: proc "contextless" (self: ^TextureView, layerType: View_LayerType, paint: ^Paint) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &TextureView__class, "setLayerType", "(ILandroid/graphics/Paint;)V", false) or_return
-	jni_args := [?]android.jvalue{{i = layerType}, {l = paint}}
+	jni_args := [?]android.jvalue{{i = i32(layerType)}, {l = paint}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -9035,17 +9895,17 @@ VelocityTracker_computeCurrentVelocity :: proc{
 	VelocityTracker_computeCurrentVelocity_int_float,
 }
 
-VelocityTracker_getAxisVelocity_int :: proc "contextless" (self: ^VelocityTracker, axis: i32) -> (result: f32, exception: ^Throwable) { // API level 34
+VelocityTracker_getAxisVelocity_int :: proc "contextless" (self: ^VelocityTracker, axis: MotionEvent_Axis) -> (result: f32, exception: ^Throwable) { // API level 34
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VelocityTracker__class, "getAxisVelocity", "(I)F", false) or_return
-	jni_args := [?]android.jvalue{{i = axis}}
+	jni_args := [?]android.jvalue{{i = i32(axis)}}
 	return jni_env->CallFloatMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-VelocityTracker_getAxisVelocity_int_int :: proc "contextless" (self: ^VelocityTracker, axis: i32, id: i32) -> (result: f32, exception: ^Throwable) { // API level 34
+VelocityTracker_getAxisVelocity_int_int :: proc "contextless" (self: ^VelocityTracker, axis: MotionEvent_Axis, id: i32) -> (result: f32, exception: ^Throwable) { // API level 34
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VelocityTracker__class, "getAxisVelocity", "(II)F", false) or_return
-	jni_args := [?]android.jvalue{{i = axis}, {i = id}}
+	jni_args := [?]android.jvalue{{i = i32(axis)}, {i = id}}
 	return jni_env->CallFloatMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
@@ -9090,10 +9950,10 @@ VelocityTracker_getYVelocity :: proc{
 	VelocityTracker_getYVelocity_int,
 }
 
-VelocityTracker_isAxisSupported :: proc "contextless" (self: ^VelocityTracker, axis: i32) -> (result: bool, exception: ^Throwable) { // API level 34
+VelocityTracker_isAxisSupported :: proc "contextless" (self: ^VelocityTracker, axis: MotionEvent_Axis) -> (result: bool, exception: ^Throwable) { // API level 34
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VelocityTracker__class, "isAxisSupported", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = axis}}
+	jni_args := [?]android.jvalue{{i = i32(axis)}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -9125,10 +9985,10 @@ VerifiedInputEvent_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-VerifiedInputEvent_describeContents :: proc "contextless" (self: ^VerifiedInputEvent) -> (result: i32, exception: ^Throwable) {
+VerifiedInputEvent_describeContents :: proc "contextless" (self: ^VerifiedInputEvent) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VerifiedInputEvent__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 VerifiedInputEvent_equals :: proc "contextless" (self: ^VerifiedInputEvent, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -9156,10 +10016,10 @@ VerifiedInputEvent_getEventTimeNanos :: proc "contextless" (self: ^VerifiedInput
 	return jni_env->CallLongMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-VerifiedInputEvent_getSource :: proc "contextless" (self: ^VerifiedInputEvent) -> (result: i32, exception: ^Throwable) {
+VerifiedInputEvent_getSource :: proc "contextless" (self: ^VerifiedInputEvent) -> (result: InputDevice_Sources, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VerifiedInputEvent__class, "getSource", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(InputDevice_Sources)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 VerifiedInputEvent_hashCode :: proc "contextless" (self: ^VerifiedInputEvent) -> (result: i32, exception: ^Throwable) {
@@ -9168,10 +10028,10 @@ VerifiedInputEvent_hashCode :: proc "contextless" (self: ^VerifiedInputEvent) ->
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-VerifiedInputEvent_writeToParcel :: proc "contextless" (self: ^VerifiedInputEvent, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+VerifiedInputEvent_writeToParcel :: proc "contextless" (self: ^VerifiedInputEvent, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VerifiedInputEvent__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -9190,10 +10050,10 @@ VerifiedKeyEvent_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Cr
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-VerifiedKeyEvent_describeContents :: proc "contextless" (self: ^VerifiedKeyEvent) -> (result: i32, exception: ^Throwable) {
+VerifiedKeyEvent_describeContents :: proc "contextless" (self: ^VerifiedKeyEvent) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VerifiedKeyEvent__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 VerifiedKeyEvent_equals :: proc "contextless" (self: ^VerifiedKeyEvent, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -9203,10 +10063,10 @@ VerifiedKeyEvent_equals :: proc "contextless" (self: ^VerifiedKeyEvent, o: ^Obje
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-VerifiedKeyEvent_getAction :: proc "contextless" (self: ^VerifiedKeyEvent) -> (result: i32, exception: ^Throwable) {
+VerifiedKeyEvent_getAction :: proc "contextless" (self: ^VerifiedKeyEvent) -> (result: KeyEvent_Action, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VerifiedKeyEvent__class, "getAction", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return KeyEvent_Action(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 VerifiedKeyEvent_getDownTimeNanos :: proc "contextless" (self: ^VerifiedKeyEvent) -> (result: i64, exception: ^Throwable) {
@@ -9215,23 +10075,23 @@ VerifiedKeyEvent_getDownTimeNanos :: proc "contextless" (self: ^VerifiedKeyEvent
 	return jni_env->CallLongMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-VerifiedKeyEvent_getFlag :: proc "contextless" (self: ^VerifiedKeyEvent, flag: i32) -> (result: ^Boolean, exception: ^Throwable) {
+VerifiedKeyEvent_getFlag :: proc "contextless" (self: ^VerifiedKeyEvent, flag: KeyEvent_Flags) -> (result: ^Boolean, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VerifiedKeyEvent__class, "getFlag", "(I)Ljava/lang/Boolean;", false) or_return
-	jni_args := [?]android.jvalue{{i = flag}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flag}}
 	return (^Boolean)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-VerifiedKeyEvent_getKeyCode :: proc "contextless" (self: ^VerifiedKeyEvent) -> (result: i32, exception: ^Throwable) {
+VerifiedKeyEvent_getKeyCode :: proc "contextless" (self: ^VerifiedKeyEvent) -> (result: KeyEvent_KeyCode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VerifiedKeyEvent__class, "getKeyCode", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return KeyEvent_KeyCode(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-VerifiedKeyEvent_getMetaState :: proc "contextless" (self: ^VerifiedKeyEvent) -> (result: i32, exception: ^Throwable) {
+VerifiedKeyEvent_getMetaState :: proc "contextless" (self: ^VerifiedKeyEvent) -> (result: KeyEvent_MetaState, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VerifiedKeyEvent__class, "getMetaState", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(KeyEvent_MetaState)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 VerifiedKeyEvent_getRepeatCount :: proc "contextless" (self: ^VerifiedKeyEvent) -> (result: i32, exception: ^Throwable) {
@@ -9252,10 +10112,10 @@ VerifiedKeyEvent_hashCode :: proc "contextless" (self: ^VerifiedKeyEvent) -> (re
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-VerifiedKeyEvent_writeToParcel :: proc "contextless" (self: ^VerifiedKeyEvent, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+VerifiedKeyEvent_writeToParcel :: proc "contextless" (self: ^VerifiedKeyEvent, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VerifiedKeyEvent__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -9274,10 +10134,10 @@ VerifiedMotionEvent_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-VerifiedMotionEvent_describeContents :: proc "contextless" (self: ^VerifiedMotionEvent) -> (result: i32, exception: ^Throwable) {
+VerifiedMotionEvent_describeContents :: proc "contextless" (self: ^VerifiedMotionEvent) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VerifiedMotionEvent__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 VerifiedMotionEvent_equals :: proc "contextless" (self: ^VerifiedMotionEvent, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -9287,16 +10147,16 @@ VerifiedMotionEvent_equals :: proc "contextless" (self: ^VerifiedMotionEvent, o:
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-VerifiedMotionEvent_getActionMasked :: proc "contextless" (self: ^VerifiedMotionEvent) -> (result: i32, exception: ^Throwable) {
+VerifiedMotionEvent_getActionMasked :: proc "contextless" (self: ^VerifiedMotionEvent) -> (result: MotionEvent_Action, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VerifiedMotionEvent__class, "getActionMasked", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return MotionEvent_Action(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-VerifiedMotionEvent_getButtonState :: proc "contextless" (self: ^VerifiedMotionEvent) -> (result: i32, exception: ^Throwable) {
+VerifiedMotionEvent_getButtonState :: proc "contextless" (self: ^VerifiedMotionEvent) -> (result: MotionEvent_Buttons, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VerifiedMotionEvent__class, "getButtonState", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(MotionEvent_Buttons)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 VerifiedMotionEvent_getDownTimeNanos :: proc "contextless" (self: ^VerifiedMotionEvent) -> (result: i64, exception: ^Throwable) {
@@ -9305,17 +10165,17 @@ VerifiedMotionEvent_getDownTimeNanos :: proc "contextless" (self: ^VerifiedMotio
 	return jni_env->CallLongMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-VerifiedMotionEvent_getFlag :: proc "contextless" (self: ^VerifiedMotionEvent, flag: i32) -> (result: ^Boolean, exception: ^Throwable) {
+VerifiedMotionEvent_getFlag :: proc "contextless" (self: ^VerifiedMotionEvent, flag: MotionEvent_Flags) -> (result: ^Boolean, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VerifiedMotionEvent__class, "getFlag", "(I)Ljava/lang/Boolean;", false) or_return
-	jni_args := [?]android.jvalue{{i = flag}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flag}}
 	return (^Boolean)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-VerifiedMotionEvent_getMetaState :: proc "contextless" (self: ^VerifiedMotionEvent) -> (result: i32, exception: ^Throwable) {
+VerifiedMotionEvent_getMetaState :: proc "contextless" (self: ^VerifiedMotionEvent) -> (result: KeyEvent_MetaState, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VerifiedMotionEvent__class, "getMetaState", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(KeyEvent_MetaState)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 VerifiedMotionEvent_getRawX :: proc "contextless" (self: ^VerifiedMotionEvent) -> (result: f32, exception: ^Throwable) {
@@ -9336,10 +10196,10 @@ VerifiedMotionEvent_hashCode :: proc "contextless" (self: ^VerifiedMotionEvent) 
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-VerifiedMotionEvent_writeToParcel :: proc "contextless" (self: ^VerifiedMotionEvent, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+VerifiedMotionEvent_writeToParcel :: proc "contextless" (self: ^VerifiedMotionEvent, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &VerifiedMotionEvent__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -9653,18 +10513,18 @@ View_addExtraDataToAccessibilityNodeInfo :: proc "contextless" (self: ^View, inf
 	return jni_take(jni_env)
 }
 
-View_addFocusables_ArrayList_int :: proc "contextless" (self: ^View, views: ^ArrayList, direction: i32) -> (exception: ^Throwable) {
+View_addFocusables_ArrayList_int :: proc "contextless" (self: ^View, views: ^ArrayList, direction: View_Focus) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "addFocusables", "(Ljava/util/ArrayList;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = views}, {i = direction}}
+	jni_args := [?]android.jvalue{{l = views}, {i = i32(direction)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-View_addFocusables_ArrayList_int_int :: proc "contextless" (self: ^View, views: ^ArrayList, direction: i32, focusableMode: i32) -> (exception: ^Throwable) {
+View_addFocusables_ArrayList_int_int :: proc "contextless" (self: ^View, views: ^ArrayList, direction: View_Focus, focusableMode: View_FocusablesFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "addFocusables", "(Ljava/util/ArrayList;II)V", false) or_return
-	jni_args := [?]android.jvalue{{l = views}, {i = direction}, {i = focusableMode}}
+	jni_args := [?]android.jvalue{{l = views}, {i = i32(direction)}, {i = transmute(i32)focusableMode}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -9674,10 +10534,10 @@ View_addFocusables :: proc{
 	View_addFocusables_ArrayList_int_int,
 }
 
-View_addKeyboardNavigationClusters :: proc "contextless" (self: ^View, views: ^Collection, direction: i32) -> (exception: ^Throwable) {
+View_addKeyboardNavigationClusters :: proc "contextless" (self: ^View, views: ^Collection, direction: View_Focus) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "addKeyboardNavigationClusters", "(Ljava/util/Collection;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = views}, {i = direction}}
+	jni_args := [?]android.jvalue{{l = views}, {i = i32(direction)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -9949,10 +10809,10 @@ View_dispatchCreateViewTranslationRequest :: proc "contextless" (self: ^View, vi
 	return jni_take(jni_env)
 }
 
-View_dispatchDisplayHint :: proc "contextless" (self: ^View, hint: i32) -> (exception: ^Throwable) {
+View_dispatchDisplayHint :: proc "contextless" (self: ^View, hint: View_Visibility) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "dispatchDisplayHint", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = hint}}
+	jni_args := [?]android.jvalue{{i = i32(hint)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -10057,10 +10917,10 @@ View_dispatchPopulateAccessibilityEvent :: proc "contextless" (self: ^View, even
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-View_dispatchProvideAutofillStructure :: proc "contextless" (self: ^View, structure: ^ViewStructure, flags: i32) -> (exception: ^Throwable) {
+View_dispatchProvideAutofillStructure :: proc "contextless" (self: ^View, structure: ^ViewStructure, flags: View_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "dispatchProvideAutofillStructure", "(Landroid/view/ViewStructure;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = structure}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = structure}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -10088,10 +10948,10 @@ View_dispatchStartTemporaryDetach :: proc "contextless" (self: ^View) -> (except
 	return jni_take(jni_env)
 }
 
-View_dispatchSystemUiVisibilityChanged :: proc "contextless" (self: ^View, visibility: i32) -> (exception: ^Throwable) {
+View_dispatchSystemUiVisibilityChanged :: proc "contextless" (self: ^View, visibility: View_SystemUiFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "dispatchSystemUiVisibilityChanged", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = visibility}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)visibility}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -10110,10 +10970,10 @@ View_dispatchTrackballEvent :: proc "contextless" (self: ^View, event: ^MotionEv
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-View_dispatchUnhandledMove :: proc "contextless" (self: ^View, focused: ^View, direction: i32) -> (result: bool, exception: ^Throwable) {
+View_dispatchUnhandledMove :: proc "contextless" (self: ^View, focused: ^View, direction: View_Focus) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "dispatchUnhandledMove", "(Landroid/view/View;I)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = focused}, {i = direction}}
+	jni_args := [?]android.jvalue{{l = focused}, {i = i32(direction)}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -10155,18 +11015,18 @@ View_dispatchWindowInsetsAnimationStart :: proc "contextless" (self: ^View, anim
 	return (^WindowInsetsAnimation_Bounds)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-View_dispatchWindowSystemUiVisiblityChanged :: proc "contextless" (self: ^View, visible: i32) -> (exception: ^Throwable) {
+View_dispatchWindowSystemUiVisiblityChanged :: proc "contextless" (self: ^View, visible: View_SystemUiFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "dispatchWindowSystemUiVisiblityChanged", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = visible}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)visible}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-View_dispatchWindowVisibilityChanged :: proc "contextless" (self: ^View, visibility: i32) -> (exception: ^Throwable) {
+View_dispatchWindowVisibilityChanged :: proc "contextless" (self: ^View, visibility: View_Visibility) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "dispatchWindowVisibilityChanged", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = visibility}}
+	jni_args := [?]android.jvalue{{i = i32(visibility)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -10213,18 +11073,18 @@ View_findViewWithTag :: proc "contextless" (self: ^View, tag: ^Object) -> (resul
 	return (^View)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-View_findViewsWithText :: proc "contextless" (self: ^View, outViews: ^ArrayList, searched: ^CharSequence, flags: i32) -> (exception: ^Throwable) {
+View_findViewsWithText :: proc "contextless" (self: ^View, outViews: ^ArrayList, searched: ^CharSequence, flags: View_FindViewsWithFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "findViewsWithText", "(Ljava/util/ArrayList;Ljava/lang/CharSequence;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = outViews}, {l = searched}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = outViews}, {l = searched}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-View_focusSearch :: proc "contextless" (self: ^View, direction: i32) -> (result: ^View, exception: ^Throwable) {
+View_focusSearch :: proc "contextless" (self: ^View, direction: View_Focus) -> (result: ^View, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "focusSearch", "(I)Landroid/view/View;", false) or_return
-	jni_args := [?]android.jvalue{{i = direction}}
+	jni_args := [?]android.jvalue{{i = i32(direction)}}
 	return (^View)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -10276,10 +11136,10 @@ View_getAccessibilityDelegate :: proc "contextless" (self: ^View) -> (result: ^V
 	return (^View_AccessibilityDelegate)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-View_getAccessibilityLiveRegion :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) {
+View_getAccessibilityLiveRegion :: proc "contextless" (self: ^View) -> (result: View_AccessibilityLiveRegion, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getAccessibilityLiveRegion", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_AccessibilityLiveRegion(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 View_getAccessibilityNodeProvider :: proc "contextless" (self: ^View) -> (result: ^AccessibilityNodeProvider, exception: ^Throwable) {
@@ -10367,10 +11227,10 @@ View_getAutofillId :: proc "contextless" (self: ^View) -> (result: ^AutofillId, 
 	return (^AutofillId)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-View_getAutofillType :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) {
+View_getAutofillType :: proc "contextless" (self: ^View) -> (result: View_AutofillType, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getAutofillType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_AutofillType(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 View_getAutofillValue :: proc "contextless" (self: ^View) -> (result: ^AutofillValue, exception: ^Throwable) {
@@ -10457,10 +11317,10 @@ View_getContentDescription :: proc "contextless" (self: ^View) -> (result: ^Char
 	return (^CharSequence)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-View_getContentSensitivity :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) { // API level 35
+View_getContentSensitivity :: proc "contextless" (self: ^View) -> (result: View_ContentSensitivity, exception: ^Throwable) { // API level 35
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getContentSensitivity", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_ContentSensitivity(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 View_getContext :: proc "contextless" (self: ^View) -> (result: ^Context, exception: ^Throwable) {
@@ -10518,10 +11378,10 @@ View_getDrawingCacheBackgroundColor :: proc "contextless" (self: ^View) -> (resu
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-View_getDrawingCacheQuality :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) {
+View_getDrawingCacheQuality :: proc "contextless" (self: ^View) -> (result: View_DrawingCacheQuality, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getDrawingCacheQuality", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_DrawingCacheQuality(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 View_getDrawingRect :: proc "contextless" (self: ^View, outRect: ^Rect) -> (exception: ^Throwable) {
@@ -10562,16 +11422,16 @@ View_getFitsSystemWindows :: proc "contextless" (self: ^View) -> (result: bool, 
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-View_getFocusable :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) {
+View_getFocusable :: proc "contextless" (self: ^View) -> (result: View_Focusable, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getFocusable", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_Focusable(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-View_getFocusables :: proc "contextless" (self: ^View, direction: i32) -> (result: ^ArrayList, exception: ^Throwable) {
+View_getFocusables :: proc "contextless" (self: ^View, direction: View_Focus) -> (result: ^ArrayList, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getFocusables", "(I)Ljava/util/ArrayList;", false) or_return
-	jni_args := [?]android.jvalue{{i = direction}}
+	jni_args := [?]android.jvalue{{i = i32(direction)}}
 	return (^ArrayList)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -10589,10 +11449,10 @@ View_getForeground :: proc "contextless" (self: ^View) -> (result: ^Drawable, ex
 	return (^Drawable)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-View_getForegroundGravity :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) {
+View_getForegroundGravity :: proc "contextless" (self: ^View) -> (result: Gravity_Field, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getForegroundGravity", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Gravity_Field)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 View_getForegroundTintBlendMode :: proc "contextless" (self: ^View) -> (result: ^BlendMode, exception: ^Throwable) {
@@ -10668,10 +11528,10 @@ View_getHandwritingBoundsOffsetTop :: proc "contextless" (self: ^View) -> (resul
 	return jni_env->CallFloatMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-View_getHandwritingDelegateFlags :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) { // API level 35
+View_getHandwritingDelegateFlags :: proc "contextless" (self: ^View) -> (result: InputMethodManager_HandwritingDelegateFlags, exception: ^Throwable) { // API level 35
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getHandwritingDelegateFlags", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(InputMethodManager_HandwritingDelegateFlags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 View_getHandwritingDelegatorCallback :: proc "contextless" (self: ^View) -> (result: ^Runnable, exception: ^Throwable) { // API level 34
@@ -10724,22 +11584,22 @@ View_getId :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Thro
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-View_getImportantForAccessibility :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) {
+View_getImportantForAccessibility :: proc "contextless" (self: ^View) -> (result: View_ImportantForAccessibility, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getImportantForAccessibility", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_ImportantForAccessibility(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-View_getImportantForAutofill :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) {
+View_getImportantForAutofill :: proc "contextless" (self: ^View) -> (result: View_ImportantForAutofill, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getImportantForAutofill", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_ImportantForAutofill(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-View_getImportantForContentCapture :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) { // API level 30
+View_getImportantForContentCapture :: proc "contextless" (self: ^View) -> (result: View_ImportantForContentCapture, exception: ^Throwable) { // API level 30
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getImportantForContentCapture", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_ImportantForContentCapture(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 View_getKeepScreenOn :: proc "contextless" (self: ^View) -> (result: bool, exception: ^Throwable) {
@@ -10760,16 +11620,16 @@ View_getLabelFor :: proc "contextless" (self: ^View) -> (result: i32, exception:
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-View_getLayerType :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) {
+View_getLayerType :: proc "contextless" (self: ^View) -> (result: View_LayerType, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getLayerType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_LayerType(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-View_getLayoutDirection :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) {
+View_getLayoutDirection :: proc "contextless" (self: ^View) -> (result: View_LayoutDirection, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getLayoutDirection", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_LayoutDirection(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 View_getLayoutParams :: proc "contextless" (self: ^View) -> (result: ^ViewGroup_LayoutParams, exception: ^Throwable) {
@@ -10923,10 +11783,10 @@ View_getOutlineSpotShadowColor :: proc "contextless" (self: ^View) -> (result: i
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-View_getOverScrollMode :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) {
+View_getOverScrollMode :: proc "contextless" (self: ^View) -> (result: View_OverScrollMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getOverScrollMode", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_OverScrollMode(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 View_getOverlay :: proc "contextless" (self: ^View) -> (result: ^ViewOverlay, exception: ^Throwable) {
@@ -11115,22 +11975,22 @@ View_getScrollBarSize :: proc "contextless" (self: ^View) -> (result: i32, excep
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-View_getScrollBarStyle :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) {
+View_getScrollBarStyle :: proc "contextless" (self: ^View) -> (result: View_Scrollbars, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getScrollBarStyle", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_Scrollbars(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-View_getScrollCaptureHint :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) { // API level 31
+View_getScrollCaptureHint :: proc "contextless" (self: ^View) -> (result: View_ScrollCaptureHintFlags, exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getScrollCaptureHint", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(View_ScrollCaptureHintFlags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-View_getScrollIndicators :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) {
+View_getScrollIndicators :: proc "contextless" (self: ^View) -> (result: View_ScrollIndicatorFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getScrollIndicators", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(View_ScrollIndicatorFlags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 View_getScrollX :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) {
@@ -11181,10 +12041,10 @@ View_getSystemGestureExclusionRects :: proc "contextless" (self: ^View) -> (resu
 	return (^List)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-View_getSystemUiVisibility :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) {
+View_getSystemUiVisibility :: proc "contextless" (self: ^View) -> (result: View_SystemUiFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getSystemUiVisibility", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(View_SystemUiFlags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 View_getTag_void :: proc "contextless" (self: ^View) -> (result: ^Object, exception: ^Throwable) {
@@ -11205,16 +12065,16 @@ View_getTag :: proc{
 	View_getTag_int,
 }
 
-View_getTextAlignment :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) {
+View_getTextAlignment :: proc "contextless" (self: ^View) -> (result: View_TextAlignment, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getTextAlignment", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_TextAlignment(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-View_getTextDirection :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) {
+View_getTextDirection :: proc "contextless" (self: ^View) -> (result: View_TextDirection, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getTextDirection", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_TextDirection(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 View_getTooltipText :: proc "contextless" (self: ^View) -> (result: ^CharSequence, exception: ^Throwable) {
@@ -11319,10 +12179,10 @@ View_getViewTreeObserver :: proc "contextless" (self: ^View) -> (result: ^ViewTr
 	return (^ViewTreeObserver)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-View_getVisibility :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) {
+View_getVisibility :: proc "contextless" (self: ^View) -> (result: View_Visibility, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getVisibility", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_Visibility(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 View_getWidth :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) {
@@ -11343,10 +12203,10 @@ View_getWindowInsetsController :: proc "contextless" (self: ^View) -> (result: ^
 	return (^WindowInsetsController)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-View_getWindowSystemUiVisibility :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) {
+View_getWindowSystemUiVisibility :: proc "contextless" (self: ^View) -> (result: View_SystemUiFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getWindowSystemUiVisibility", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(View_SystemUiFlags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 View_getWindowToken :: proc "contextless" (self: ^View) -> (result: ^IBinder, exception: ^Throwable) {
@@ -11355,10 +12215,10 @@ View_getWindowToken :: proc "contextless" (self: ^View) -> (result: ^IBinder, ex
 	return (^IBinder)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-View_getWindowVisibility :: proc "contextless" (self: ^View) -> (result: i32, exception: ^Throwable) {
+View_getWindowVisibility :: proc "contextless" (self: ^View) -> (result: View_Visibility, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "getWindowVisibility", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_Visibility(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 View_getWindowVisibleDisplayFrame :: proc "contextless" (self: ^View, outRect: ^Rect) -> (exception: ^Throwable) {
@@ -11854,10 +12714,10 @@ View_jumpDrawablesToCurrentState :: proc "contextless" (self: ^View) -> (excepti
 	return jni_take(jni_env)
 }
 
-View_keyboardNavigationClusterSearch :: proc "contextless" (self: ^View, currentCluster: ^View, direction: i32) -> (result: ^View, exception: ^Throwable) {
+View_keyboardNavigationClusterSearch :: proc "contextless" (self: ^View, currentCluster: ^View, direction: View_Focus) -> (result: ^View, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "keyboardNavigationClusterSearch", "(Landroid/view/View;I)Landroid/view/View;", false) or_return
-	jni_args := [?]android.jvalue{{l = currentCluster}, {i = direction}}
+	jni_args := [?]android.jvalue{{l = currentCluster}, {i = i32(direction)}}
 	return (^View)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -12010,45 +12870,45 @@ View_onInitializeAccessibilityNodeInfo :: proc "contextless" (self: ^View, info:
 	return jni_take(jni_env)
 }
 
-View_onKeyDown :: proc "contextless" (self: ^View, keyCode: i32, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
+View_onKeyDown :: proc "contextless" (self: ^View, keyCode: KeyEvent_KeyCode, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "onKeyDown", "(ILandroid/view/KeyEvent;)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}, {l = event}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}, {l = event}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-View_onKeyLongPress :: proc "contextless" (self: ^View, keyCode: i32, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
+View_onKeyLongPress :: proc "contextless" (self: ^View, keyCode: KeyEvent_KeyCode, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "onKeyLongPress", "(ILandroid/view/KeyEvent;)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}, {l = event}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}, {l = event}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-View_onKeyMultiple :: proc "contextless" (self: ^View, keyCode: i32, repeatCount: i32, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
+View_onKeyMultiple :: proc "contextless" (self: ^View, keyCode: KeyEvent_KeyCode, repeatCount: i32, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "onKeyMultiple", "(IILandroid/view/KeyEvent;)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}, {i = repeatCount}, {l = event}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}, {i = repeatCount}, {l = event}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-View_onKeyPreIme :: proc "contextless" (self: ^View, keyCode: i32, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
+View_onKeyPreIme :: proc "contextless" (self: ^View, keyCode: KeyEvent_KeyCode, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "onKeyPreIme", "(ILandroid/view/KeyEvent;)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}, {l = event}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}, {l = event}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-View_onKeyShortcut :: proc "contextless" (self: ^View, keyCode: i32, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
+View_onKeyShortcut :: proc "contextless" (self: ^View, keyCode: KeyEvent_KeyCode, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "onKeyShortcut", "(ILandroid/view/KeyEvent;)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}, {l = event}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}, {l = event}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-View_onKeyUp :: proc "contextless" (self: ^View, keyCode: i32, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
+View_onKeyUp :: proc "contextless" (self: ^View, keyCode: KeyEvent_KeyCode, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "onKeyUp", "(ILandroid/view/KeyEvent;)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}, {l = event}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}, {l = event}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -12068,18 +12928,18 @@ View_onPopulateAccessibilityEvent :: proc "contextless" (self: ^View, event: ^Ac
 	return jni_take(jni_env)
 }
 
-View_onProvideAutofillStructure :: proc "contextless" (self: ^View, structure: ^ViewStructure, flags: i32) -> (exception: ^Throwable) {
+View_onProvideAutofillStructure :: proc "contextless" (self: ^View, structure: ^ViewStructure, flags: View_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "onProvideAutofillStructure", "(Landroid/view/ViewStructure;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = structure}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = structure}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-View_onProvideAutofillVirtualStructure :: proc "contextless" (self: ^View, structure: ^ViewStructure, flags: i32) -> (exception: ^Throwable) {
+View_onProvideAutofillVirtualStructure :: proc "contextless" (self: ^View, structure: ^ViewStructure, flags: View_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "onProvideAutofillVirtualStructure", "(Landroid/view/ViewStructure;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = structure}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = structure}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -12130,18 +12990,18 @@ View_onResolvePointerIcon :: proc "contextless" (self: ^View, event: ^MotionEven
 	return (^PointerIcon)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-View_onRtlPropertiesChanged :: proc "contextless" (self: ^View, layoutDirection: i32) -> (exception: ^Throwable) {
+View_onRtlPropertiesChanged :: proc "contextless" (self: ^View, layoutDirection: View_LayoutDirection) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "onRtlPropertiesChanged", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = layoutDirection}}
+	jni_args := [?]android.jvalue{{i = i32(layoutDirection)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-View_onScreenStateChanged :: proc "contextless" (self: ^View, screenState: i32) -> (exception: ^Throwable) {
+View_onScreenStateChanged :: proc "contextless" (self: ^View, screenState: View_ScreenState) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "onScreenStateChanged", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = screenState}}
+	jni_args := [?]android.jvalue{{i = i32(screenState)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -12207,10 +13067,10 @@ View_onWindowFocusChanged :: proc "contextless" (self: ^View, hasWindowFocus: bo
 	return jni_take(jni_env)
 }
 
-View_onWindowSystemUiVisibilityChanged :: proc "contextless" (self: ^View, visible: i32) -> (exception: ^Throwable) {
+View_onWindowSystemUiVisibilityChanged :: proc "contextless" (self: ^View, visible: View_SystemUiFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "onWindowSystemUiVisibilityChanged", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = visible}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)visible}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -12253,17 +13113,17 @@ View_performHapticFeedback_HapticFeedbackRequest :: proc "contextless" (self: ^V
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-View_performHapticFeedback_int :: proc "contextless" (self: ^View, feedbackConstant: i32) -> (result: bool, exception: ^Throwable) {
+View_performHapticFeedback_int :: proc "contextless" (self: ^View, feedbackConstant: HapticFeedbackConstants_Feedback) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "performHapticFeedback", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = feedbackConstant}}
+	jni_args := [?]android.jvalue{{i = i32(feedbackConstant)}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-View_performHapticFeedback_int_int :: proc "contextless" (self: ^View, feedbackConstant: i32, flags: i32) -> (result: bool, exception: ^Throwable) {
+View_performHapticFeedback_int_int :: proc "contextless" (self: ^View, feedbackConstant: HapticFeedbackConstants_Feedback, flags: HapticFeedbackConstants_Flags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "performHapticFeedback", "(II)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = feedbackConstant}, {i = flags}}
+	jni_args := [?]android.jvalue{{i = i32(feedbackConstant)}, {i = transmute(i32)flags}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -12298,10 +13158,10 @@ View_performReceiveContent :: proc "contextless" (self: ^View, payload: ^Content
 	return (^ContentInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-View_playSoundEffect :: proc "contextless" (self: ^View, soundConstant: i32) -> (exception: ^Throwable) {
+View_playSoundEffect :: proc "contextless" (self: ^View, soundConstant: SoundEffectConstants_ConstantForFocusDirection) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "playSoundEffect", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = soundConstant}}
+	jni_args := [?]android.jvalue{{i = i32(soundConstant)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -12478,17 +13338,17 @@ View_requestFocus_void :: proc "contextless" (self: ^View) -> (result: bool, exc
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-View_requestFocus_int :: proc "contextless" (self: ^View, direction: i32) -> (result: bool, exception: ^Throwable) {
+View_requestFocus_int :: proc "contextless" (self: ^View, direction: View_Focus) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "requestFocus", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = direction}}
+	jni_args := [?]android.jvalue{{i = i32(direction)}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-View_requestFocus_int_Rect :: proc "contextless" (self: ^View, direction: i32, previouslyFocusedRect: ^Rect) -> (result: bool, exception: ^Throwable) {
+View_requestFocus_int_Rect :: proc "contextless" (self: ^View, direction: View_Focus, previouslyFocusedRect: ^Rect) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "requestFocus", "(ILandroid/graphics/Rect;)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = direction}, {l = previouslyFocusedRect}}
+	jni_args := [?]android.jvalue{{i = i32(direction)}, {l = previouslyFocusedRect}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -12518,10 +13378,10 @@ View_requestPointerCapture_void :: proc "contextless" (self: ^View) -> (exceptio
 	return jni_take(jni_env)
 }
 
-View_requestPointerCapture_int :: proc "contextless" (self: ^View, mode: i32) -> (exception: ^Throwable) { // API level 37
+View_requestPointerCapture_int :: proc "contextless" (self: ^View, mode: View_PointerCaptureMode) -> (exception: ^Throwable) { // API level 37
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "requestPointerCapture", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = mode}}
+	jni_args := [?]android.jvalue{{i = i32(mode)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -12545,10 +13405,10 @@ View_requestRectangleOnScreen_Rect_bool :: proc "contextless" (self: ^View, rect
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-View_requestRectangleOnScreen_Rect_bool_int :: proc "contextless" (self: ^View, rectangle: ^Rect, immediate: bool, source: i32) -> (result: bool, exception: ^Throwable) { // API level 36
+View_requestRectangleOnScreen_Rect_bool_int :: proc "contextless" (self: ^View, rectangle: ^Rect, immediate: bool, source: View_RectangleOnScreenRequestSource) -> (result: bool, exception: ^Throwable) { // API level 36
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "requestRectangleOnScreen", "(Landroid/graphics/Rect;ZI)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = rectangle}, {z = android.jboolean(immediate)}, {i = source}}
+	jni_args := [?]android.jvalue{{l = rectangle}, {z = android.jboolean(immediate)}, {i = i32(source)}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -12566,10 +13426,10 @@ View_requestUnbufferedDispatch_MotionEvent :: proc "contextless" (self: ^View, e
 	return jni_take(jni_env)
 }
 
-View_requestUnbufferedDispatch_int :: proc "contextless" (self: ^View, source: i32) -> (exception: ^Throwable) { // API level 30
+View_requestUnbufferedDispatch_int :: proc "contextless" (self: ^View, source: InputDevice_Sources) -> (exception: ^Throwable) { // API level 30
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "requestUnbufferedDispatch", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = source}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)source}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -12677,10 +13537,10 @@ View_sendAccessibilityEventUnchecked :: proc "contextless" (self: ^View, event: 
 	return jni_take(jni_env)
 }
 
-View_setAccessibilityDataSensitive :: proc "contextless" (self: ^View, accessibilityDataSensitive: i32) -> (exception: ^Throwable) { // API level 34
+View_setAccessibilityDataSensitive :: proc "contextless" (self: ^View, accessibilityDataSensitive: View_AccessibilityDataSensitive) -> (exception: ^Throwable) { // API level 34
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setAccessibilityDataSensitive", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = accessibilityDataSensitive}}
+	jni_args := [?]android.jvalue{{i = i32(accessibilityDataSensitive)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -12701,10 +13561,10 @@ View_setAccessibilityHeading :: proc "contextless" (self: ^View, isHeading: bool
 	return jni_take(jni_env)
 }
 
-View_setAccessibilityLiveRegion :: proc "contextless" (self: ^View, mode: i32) -> (exception: ^Throwable) {
+View_setAccessibilityLiveRegion :: proc "contextless" (self: ^View, mode: View_AccessibilityLiveRegion) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setAccessibilityLiveRegion", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = mode}}
+	jni_args := [?]android.jvalue{{i = i32(mode)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -12933,10 +13793,10 @@ View_setContentDescription :: proc "contextless" (self: ^View, contentDescriptio
 	return jni_take(jni_env)
 }
 
-View_setContentSensitivity :: proc "contextless" (self: ^View, mode: i32) -> (exception: ^Throwable) { // API level 35
+View_setContentSensitivity :: proc "contextless" (self: ^View, mode: View_ContentSensitivity) -> (exception: ^Throwable) { // API level 35
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setContentSensitivity", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = mode}}
+	jni_args := [?]android.jvalue{{i = i32(mode)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -12973,10 +13833,10 @@ View_setDrawingCacheEnabled :: proc "contextless" (self: ^View, enabled: bool) -
 	return jni_take(jni_env)
 }
 
-View_setDrawingCacheQuality :: proc "contextless" (self: ^View, quality: i32) -> (exception: ^Throwable) {
+View_setDrawingCacheQuality :: proc "contextless" (self: ^View, quality: View_DrawingCacheQuality) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setDrawingCacheQuality", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = quality}}
+	jni_args := [?]android.jvalue{{i = i32(quality)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -13037,10 +13897,10 @@ View_setFocusable_bool :: proc "contextless" (self: ^View, focusable: bool) -> (
 	return jni_take(jni_env)
 }
 
-View_setFocusable_int :: proc "contextless" (self: ^View, focusable: i32) -> (exception: ^Throwable) {
+View_setFocusable_int :: proc "contextless" (self: ^View, focusable: View_Focusable) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setFocusable", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = focusable}}
+	jni_args := [?]android.jvalue{{i = i32(focusable)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -13082,10 +13942,10 @@ View_setForeground :: proc "contextless" (self: ^View, foreground: ^Drawable) ->
 	return jni_take(jni_env)
 }
 
-View_setForegroundGravity :: proc "contextless" (self: ^View, gravity: i32) -> (exception: ^Throwable) {
+View_setForegroundGravity :: proc "contextless" (self: ^View, gravity: Gravity_Field) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setForegroundGravity", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = gravity}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)gravity}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -13130,10 +13990,10 @@ View_setHandwritingBoundsOffsets :: proc "contextless" (self: ^View, offsetLeft:
 	return jni_take(jni_env)
 }
 
-View_setHandwritingDelegateFlags :: proc "contextless" (self: ^View, flags: i32) -> (exception: ^Throwable) { // API level 35
+View_setHandwritingDelegateFlags :: proc "contextless" (self: ^View, flags: InputMethodManager_HandwritingDelegateFlags) -> (exception: ^Throwable) { // API level 35
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setHandwritingDelegateFlags", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -13210,26 +14070,26 @@ View_setId :: proc "contextless" (self: ^View, id: i32) -> (exception: ^Throwabl
 	return jni_take(jni_env)
 }
 
-View_setImportantForAccessibility :: proc "contextless" (self: ^View, mode: i32) -> (exception: ^Throwable) {
+View_setImportantForAccessibility :: proc "contextless" (self: ^View, mode: View_ImportantForAccessibility) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setImportantForAccessibility", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = mode}}
+	jni_args := [?]android.jvalue{{i = i32(mode)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-View_setImportantForAutofill :: proc "contextless" (self: ^View, mode: i32) -> (exception: ^Throwable) {
+View_setImportantForAutofill :: proc "contextless" (self: ^View, mode: View_ImportantForAutofill) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setImportantForAutofill", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = mode}}
+	jni_args := [?]android.jvalue{{i = i32(mode)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-View_setImportantForContentCapture :: proc "contextless" (self: ^View, mode: i32) -> (exception: ^Throwable) { // API level 30
+View_setImportantForContentCapture :: proc "contextless" (self: ^View, mode: View_ImportantForContentCapture) -> (exception: ^Throwable) { // API level 30
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setImportantForContentCapture", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = mode}}
+	jni_args := [?]android.jvalue{{i = i32(mode)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -13282,18 +14142,18 @@ View_setLayerPaint :: proc "contextless" (self: ^View, paint: ^Paint) -> (except
 	return jni_take(jni_env)
 }
 
-View_setLayerType :: proc "contextless" (self: ^View, layerType: i32, paint: ^Paint) -> (exception: ^Throwable) {
+View_setLayerType :: proc "contextless" (self: ^View, layerType: View_LayerType, paint: ^Paint) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setLayerType", "(ILandroid/graphics/Paint;)V", false) or_return
-	jni_args := [?]android.jvalue{{i = layerType}, {l = paint}}
+	jni_args := [?]android.jvalue{{i = i32(layerType)}, {l = paint}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-View_setLayoutDirection :: proc "contextless" (self: ^View, layoutDirection: i32) -> (exception: ^Throwable) {
+View_setLayoutDirection :: proc "contextless" (self: ^View, layoutDirection: View_LayoutDirection) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setLayoutDirection", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = layoutDirection}}
+	jni_args := [?]android.jvalue{{i = i32(layoutDirection)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -13546,10 +14406,10 @@ View_setOutlineSpotShadowColor :: proc "contextless" (self: ^View, color: i32) -
 	return jni_take(jni_env)
 }
 
-View_setOverScrollMode :: proc "contextless" (self: ^View, overScrollMode: i32) -> (exception: ^Throwable) {
+View_setOverScrollMode :: proc "contextless" (self: ^View, overScrollMode: View_OverScrollMode) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setOverScrollMode", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = overScrollMode}}
+	jni_args := [?]android.jvalue{{i = i32(overScrollMode)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -13746,10 +14606,10 @@ View_setScrollBarSize :: proc "contextless" (self: ^View, scrollBarSize: i32) ->
 	return jni_take(jni_env)
 }
 
-View_setScrollBarStyle :: proc "contextless" (self: ^View, style: i32) -> (exception: ^Throwable) {
+View_setScrollBarStyle :: proc "contextless" (self: ^View, style: View_Scrollbars) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setScrollBarStyle", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = style}}
+	jni_args := [?]android.jvalue{{i = i32(style)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -13762,10 +14622,10 @@ View_setScrollCaptureCallback :: proc "contextless" (self: ^View, callback: ^Scr
 	return jni_take(jni_env)
 }
 
-View_setScrollCaptureHint :: proc "contextless" (self: ^View, hint: i32) -> (exception: ^Throwable) { // API level 31
+View_setScrollCaptureHint :: proc "contextless" (self: ^View, hint: View_ScrollCaptureHintFlags) -> (exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setScrollCaptureHint", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = hint}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)hint}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -13778,18 +14638,18 @@ View_setScrollContainer :: proc "contextless" (self: ^View, isScrollContainer: b
 	return jni_take(jni_env)
 }
 
-View_setScrollIndicators_int :: proc "contextless" (self: ^View, indicators: i32) -> (exception: ^Throwable) {
+View_setScrollIndicators_int :: proc "contextless" (self: ^View, indicators: View_ScrollIndicatorFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setScrollIndicators", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = indicators}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)indicators}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-View_setScrollIndicators_int_int :: proc "contextless" (self: ^View, indicators: i32, mask: i32) -> (exception: ^Throwable) {
+View_setScrollIndicators_int_int :: proc "contextless" (self: ^View, indicators: View_ScrollIndicatorFlags, mask: View_ScrollIndicatorFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setScrollIndicators", "(II)V", false) or_return
-	jni_args := [?]android.jvalue{{i = indicators}, {i = mask}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)indicators}, {i = transmute(i32)mask}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -13871,10 +14731,10 @@ View_setSystemGestureExclusionRects :: proc "contextless" (self: ^View, rects: ^
 	return jni_take(jni_env)
 }
 
-View_setSystemUiVisibility :: proc "contextless" (self: ^View, visibility: i32) -> (exception: ^Throwable) {
+View_setSystemUiVisibility :: proc "contextless" (self: ^View, visibility: View_SystemUiFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setSystemUiVisibility", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = visibility}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)visibility}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -13900,18 +14760,18 @@ View_setTag :: proc{
 	View_setTag_Object,
 }
 
-View_setTextAlignment :: proc "contextless" (self: ^View, textAlignment: i32) -> (exception: ^Throwable) {
+View_setTextAlignment :: proc "contextless" (self: ^View, textAlignment: View_TextAlignment) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setTextAlignment", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = textAlignment}}
+	jni_args := [?]android.jvalue{{i = i32(textAlignment)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-View_setTextDirection :: proc "contextless" (self: ^View, textDirection: i32) -> (exception: ^Throwable) {
+View_setTextDirection :: proc "contextless" (self: ^View, textDirection: View_TextDirection) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setTextDirection", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = textDirection}}
+	jni_args := [?]android.jvalue{{i = i32(textDirection)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -13956,10 +14816,10 @@ View_setTransitionName :: proc "contextless" (self: ^View, transitionName: ^Stri
 	return jni_take(jni_env)
 }
 
-View_setTransitionVisibility :: proc "contextless" (self: ^View, visibility: i32) -> (exception: ^Throwable) {
+View_setTransitionVisibility :: proc "contextless" (self: ^View, visibility: View_Visibility) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setTransitionVisibility", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = visibility}}
+	jni_args := [?]android.jvalue{{i = i32(visibility)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -14036,10 +14896,10 @@ View_setViewTranslationCallback :: proc "contextless" (self: ^View, callback: ^V
 	return jni_take(jni_env)
 }
 
-View_setVisibility :: proc "contextless" (self: ^View, visibility: i32) -> (exception: ^Throwable) {
+View_setVisibility :: proc "contextless" (self: ^View, visibility: View_Visibility) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "setVisibility", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = visibility}}
+	jni_args := [?]android.jvalue{{i = i32(visibility)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -14117,10 +14977,10 @@ View_startActionMode_ActionMode_Callback :: proc "contextless" (self: ^View, cal
 	return (^ActionMode)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-View_startActionMode_ActionMode_Callback_int :: proc "contextless" (self: ^View, callback: ^ActionMode_Callback, type: i32) -> (result: ^ActionMode, exception: ^Throwable) {
+View_startActionMode_ActionMode_Callback_int :: proc "contextless" (self: ^View, callback: ^ActionMode_Callback, type: ActionMode_Type) -> (result: ^ActionMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "startActionMode", "(Landroid/view/ActionMode$Callback;I)Landroid/view/ActionMode;", false) or_return
-	jni_args := [?]android.jvalue{{l = callback}, {i = type}}
+	jni_args := [?]android.jvalue{{l = callback}, {i = i32(type)}}
 	return (^ActionMode)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -14137,17 +14997,17 @@ View_startAnimation :: proc "contextless" (self: ^View, animation: ^Animation) -
 	return jni_take(jni_env)
 }
 
-View_startDrag :: proc "contextless" (self: ^View, data: ^ClipData, shadowBuilder: ^View_DragShadowBuilder, myLocalState: ^Object, flags: i32) -> (result: bool, exception: ^Throwable) {
+View_startDrag :: proc "contextless" (self: ^View, data: ^ClipData, shadowBuilder: ^View_DragShadowBuilder, myLocalState: ^Object, flags: View_DragFlags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "startDrag", "(Landroid/content/ClipData;Landroid/view/View$DragShadowBuilder;Ljava/lang/Object;I)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = data}, {l = shadowBuilder}, {l = myLocalState}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = data}, {l = shadowBuilder}, {l = myLocalState}, {i = transmute(i32)flags}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-View_startDragAndDrop :: proc "contextless" (self: ^View, data: ^ClipData, shadowBuilder: ^View_DragShadowBuilder, myLocalState: ^Object, flags: i32) -> (result: bool, exception: ^Throwable) {
+View_startDragAndDrop :: proc "contextless" (self: ^View, data: ^ClipData, shadowBuilder: ^View_DragShadowBuilder, myLocalState: ^Object, flags: View_DragFlags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "startDragAndDrop", "(Landroid/content/ClipData;Landroid/view/View$DragShadowBuilder;Ljava/lang/Object;I)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = data}, {l = shadowBuilder}, {l = myLocalState}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = data}, {l = shadowBuilder}, {l = myLocalState}, {i = transmute(i32)flags}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -14234,6 +15094,214 @@ View_willNotDraw :: proc "contextless" (self: ^View) -> (result: bool, exception
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View__class, "willNotDraw", "()Z", false) or_return
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
+}
+
+View_SystemUiFlag :: enum u32 {
+	FULLSCREEN             = 2,
+	HIDE_NAVIGATION        = 1,
+	IMMERSIVE              = 11,
+	IMMERSIVE_STICKY       = 12,
+	LAYOUT_FULLSCREEN      = 10,
+	LAYOUT_HIDE_NAVIGATION = 9,
+	LAYOUT_STABLE          = 8,
+	LIGHT_NAVIGATION_BAR   = 4,
+	LIGHT_STATUS_BAR       = 13,
+	LOW_PROFILE            = 0,
+}
+View_SystemUiFlags :: distinct bit_set[View_SystemUiFlag; u32]
+
+View_SystemUiFlags_VISIBLE :: View_SystemUiFlags{}
+
+View_ImportantForAccessibility :: enum i32 {
+	AUTO                = 0,
+	NO                  = 2,
+	NO_HIDE_DESCENDANTS = 4,
+	YES                 = 1,
+}
+
+View_AccessibilityLiveRegion :: enum i32 {
+	ASSERTIVE = 2,
+	NONE      = 0,
+	POLITE    = 1,
+}
+
+View_OverScrollMode :: enum i32 {
+	ALWAYS             = 0,
+	IF_CONTENT_SCROLLS = 1,
+	NEVER              = 2,
+}
+
+View_TextDirection :: enum i32 {
+	ANY_RTL          = 2,
+	FIRST_STRONG     = 1,
+	FIRST_STRONG_LTR = 6,
+	FIRST_STRONG_RTL = 7,
+	INHERIT          = 0,
+	LOCALE           = 5,
+	LTR              = 3,
+	RTL              = 4,
+}
+
+View_DragFlag :: enum u32 {
+	ACCESSIBILITY_ACTION                  = 10,
+	GLOBAL                                = 8,
+	GLOBAL_PERSISTABLE_URI_PERMISSION     = 6,
+	GLOBAL_PREFIX_URI_PERMISSION          = 7,
+	GLOBAL_SAME_APPLICATION               = 12,
+	GLOBAL_URI_READ                       = 0,
+	GLOBAL_URI_WRITE                      = 1,
+	HIDE_CALLING_TASK_ON_DRAG_START       = 14,
+	OPAQUE                                = 9,
+	START_INTENT_SENDER_ON_UNHANDLED_DRAG = 13,
+}
+View_DragFlags :: distinct bit_set[View_DragFlag; u32]
+
+View_ScreenState :: enum i32 {
+	OFF = 0,
+	ON  = 1,
+}
+
+View_Visibility :: enum i32 {
+	GONE      = 8,
+	INVISIBLE = 4,
+	VISIBLE   = 0,
+}
+
+View_Focus :: enum i32 {
+	BACKWARD = 1,
+	DOWN     = 130,
+	FORWARD  = 2,
+	LEFT     = 17,
+	RIGHT    = 66,
+	UP       = 33,
+}
+
+View_ScrollCaptureHintFlag :: enum u32 {
+	EXCLUDE             = 0,
+	EXCLUDE_DESCENDANTS = 2,
+	INCLUDE             = 1,
+}
+View_ScrollCaptureHintFlags :: distinct bit_set[View_ScrollCaptureHintFlag; u32]
+
+View_ScrollCaptureHintFlags_AUTO :: View_ScrollCaptureHintFlags{}
+
+View_LayerType :: enum i32 {
+	HARDWARE = 2,
+	NONE     = 0,
+	SOFTWARE = 1,
+}
+
+View_FocusablesFlag :: enum u32 {
+	TOUCH_MODE = 0,
+}
+View_FocusablesFlags :: distinct bit_set[View_FocusablesFlag; u32]
+
+View_FocusablesFlags_ALL :: View_FocusablesFlags{}
+
+View_Flag :: enum u32 {
+	AUTOFILL_FLAG_INCLUDE_NOT_IMPORTANT_VIEWS = 0,
+}
+View_Flags :: distinct bit_set[View_Flag; u32]
+
+View_FindViewsWithFlag :: enum u32 {
+	CONTENT_DESCRIPTION = 1,
+	TEXT                = 0,
+}
+View_FindViewsWithFlags :: distinct bit_set[View_FindViewsWithFlag; u32]
+
+View_AutofillType :: enum i32 {
+	DATE   = 4,
+	LIST   = 3,
+	NONE   = 0,
+	TEXT   = 1,
+	TOGGLE = 2,
+}
+
+View_ContentSensitivity :: enum i32 {
+	AUTO          = 0,
+	NOT_SENSITIVE = 2,
+	SENSITIVE     = 1,
+}
+
+View_DrawingCacheQuality :: enum i32 {
+	AUTO = 0,
+	HIGH = 1048576,
+	LOW  = 524288,
+}
+
+View_Focusable :: enum i32 {
+	FOCUSABLE      = 1,
+	FOCUSABLE_AUTO = 16,
+	NOT_FOCUSABLE  = 0,
+}
+
+View_ImportantForAutofill :: enum i32 {
+	AUTO                    = 0,
+	NO                      = 2,
+	NO_EXCLUDE_DESCENDANTS  = 8,
+	YES                     = 1,
+	YES_EXCLUDE_DESCENDANTS = 4,
+}
+
+View_ImportantForContentCapture :: enum i32 {
+	AUTO                    = 0,
+	NO                      = 2,
+	NO_EXCLUDE_DESCENDANTS  = 8,
+	YES                     = 1,
+	YES_EXCLUDE_DESCENDANTS = 4,
+}
+
+View_LayoutDirection :: enum i32 {
+	INHERIT = 2,
+	LOCALE  = 3,
+	LTR     = 0,
+	RTL     = 1,
+}
+
+View_Scrollbars :: enum i32 {
+	INSIDE_INSET    = 16777216,
+	INSIDE_OVERLAY  = 0,
+	OUTSIDE_INSET   = 50331648,
+	OUTSIDE_OVERLAY = 33554432,
+}
+
+View_ScrollIndicatorFlag :: enum u32 {
+	BOTTOM = 1,
+	END    = 5,
+	LEFT   = 2,
+	RIGHT  = 3,
+	START  = 4,
+	TOP    = 0,
+}
+View_ScrollIndicatorFlags :: distinct bit_set[View_ScrollIndicatorFlag; u32]
+
+View_TextAlignment :: enum i32 {
+	CENTER     = 4,
+	GRAVITY    = 1,
+	INHERIT    = 0,
+	TEXT_END   = 3,
+	TEXT_START = 2,
+	VIEW_END   = 6,
+	VIEW_START = 5,
+}
+
+View_PointerCaptureMode :: enum i32 {
+	ABSOLUTE   = 1,
+	RELATIVE   = 2,
+	UNCAPTURED = 0,
+}
+
+View_RectangleOnScreenRequestSource :: enum i32 {
+	INPUT_FOCUS = 3,
+	SCROLL_ONLY = 1,
+	TEXT_CURSOR = 2,
+	UNDEFINED   = 0,
+}
+
+View_AccessibilityDataSensitive :: enum i32 {
+	AUTO = 0,
+	NO   = 2,
+	YES  = 1,
 }
 
 // class android.view.View.AccessibilityDelegate
@@ -14367,10 +15435,10 @@ View_BaseSavedState_new :: proc{
 	View_BaseSavedState_new_Parcelable,
 }
 
-View_BaseSavedState_writeToParcel :: proc "contextless" (self: ^View_BaseSavedState, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+View_BaseSavedState_writeToParcel :: proc "contextless" (self: ^View_BaseSavedState, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View_BaseSavedState__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -14456,11 +15524,11 @@ View_MeasureSpec_new :: proc "contextless" () -> (result: ^View_MeasureSpec, exc
 	return (^View_MeasureSpec)(jni_env->NewObjectA(jni_class, jni_id, nil)), jni_take(jni_env)
 }
 
-View_MeasureSpec_getMode :: proc "contextless" (measureSpec: i32) -> (result: i32, exception: ^Throwable) {
+View_MeasureSpec_getMode :: proc "contextless" (measureSpec: i32) -> (result: View_MeasureSpec_Mode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &View_MeasureSpec__class, "getMode", "(I)I", true) or_return
 	jni_args := [?]android.jvalue{{i = measureSpec}}
-	return jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
+	return View_MeasureSpec_Mode(jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 View_MeasureSpec_getSize :: proc "contextless" (measureSpec: i32) -> (result: i32, exception: ^Throwable) {
@@ -14470,10 +15538,10 @@ View_MeasureSpec_getSize :: proc "contextless" (measureSpec: i32) -> (result: i3
 	return jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
-View_MeasureSpec_makeMeasureSpec :: proc "contextless" (size: i32, mode: i32) -> (result: i32, exception: ^Throwable) {
+View_MeasureSpec_makeMeasureSpec :: proc "contextless" (size: i32, mode: View_MeasureSpec_Mode) -> (result: i32, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &View_MeasureSpec__class, "makeMeasureSpec", "(II)I", true) or_return
-	jni_args := [?]android.jvalue{{i = size}, {i = mode}}
+	jni_args := [?]android.jvalue{{i = size}, {i = i32(mode)}}
 	return jni_env->CallStaticIntMethodA(jni_class, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
@@ -14482,6 +15550,12 @@ View_MeasureSpec_toString :: proc "contextless" (measureSpec: i32) -> (result: ^
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &View_MeasureSpec__class, "toString", "(I)Ljava/lang/String;", true) or_return
 	jni_args := [?]android.jvalue{{i = measureSpec}}
 	return (^String)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
+}
+
+View_MeasureSpec_Mode :: enum i32 {
+	AT_MOST     = -2147483648,
+	EXACTLY     = 1073741824,
+	UNSPECIFIED = 0,
 }
 
 // interface android.view.View.OnApplyWindowInsetsListener
@@ -14654,10 +15728,10 @@ View_OnKeyListener :: struct #raw_union {
 @(private)
 View_OnKeyListener__class := Cached_Class{name = "android/view/View$OnKeyListener"}
 
-View_OnKeyListener_onKey :: proc "contextless" (self: ^View_OnKeyListener, v: ^View, keyCode: i32, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
+View_OnKeyListener_onKey :: proc "contextless" (self: ^View_OnKeyListener, v: ^View, keyCode: KeyEvent_KeyCode, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View_OnKeyListener__class, "onKey", "(Landroid/view/View;ILandroid/view/KeyEvent;)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = v}, {i = keyCode}, {l = event}}
+	jni_args := [?]android.jvalue{{l = v}, {i = i32(keyCode)}, {l = event}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -14723,10 +15797,10 @@ View_OnSystemUiVisibilityChangeListener :: struct #raw_union {
 @(private)
 View_OnSystemUiVisibilityChangeListener__class := Cached_Class{name = "android/view/View$OnSystemUiVisibilityChangeListener"}
 
-View_OnSystemUiVisibilityChangeListener_onSystemUiVisibilityChange :: proc "contextless" (self: ^View_OnSystemUiVisibilityChangeListener, visibility: i32) -> (exception: ^Throwable) {
+View_OnSystemUiVisibilityChangeListener_onSystemUiVisibilityChange :: proc "contextless" (self: ^View_OnSystemUiVisibilityChangeListener, visibility: View_SystemUiFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &View_OnSystemUiVisibilityChangeListener__class, "onSystemUiVisibilityChange", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = visibility}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)visibility}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -14833,10 +15907,10 @@ ViewConfiguration_getFadingEdgeLength :: proc "contextless" () -> (result: i32, 
 	return jni_env->CallStaticIntMethodA(jni_class, jni_id, nil), jni_take(jni_env)
 }
 
-ViewConfiguration_getFocusTraversalThreshold :: proc "contextless" (self: ^ViewConfiguration, inputDeviceId: i32, axis: i32, source: i32) -> (result: i32, exception: ^Throwable) { // API level 37
+ViewConfiguration_getFocusTraversalThreshold :: proc "contextless" (self: ^ViewConfiguration, inputDeviceId: i32, axis: MotionEvent_Axis, source: InputDevice_Sources) -> (result: i32, exception: ^Throwable) { // API level 37
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewConfiguration__class, "getFocusTraversalThreshold", "(III)I", false) or_return
-	jni_args := [?]android.jvalue{{i = inputDeviceId}, {i = axis}, {i = source}}
+	jni_args := [?]android.jvalue{{i = inputDeviceId}, {i = i32(axis)}, {i = transmute(i32)source}}
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
@@ -14972,10 +16046,10 @@ ViewConfiguration_getScaledMaximumFlingVelocity_void :: proc "contextless" (self
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-ViewConfiguration_getScaledMaximumFlingVelocity_int_int_int :: proc "contextless" (self: ^ViewConfiguration, inputDeviceId: i32, axis: i32, source: i32) -> (result: i32, exception: ^Throwable) { // API level 34
+ViewConfiguration_getScaledMaximumFlingVelocity_int_int_int :: proc "contextless" (self: ^ViewConfiguration, inputDeviceId: i32, axis: MotionEvent_Axis, source: InputDevice_Sources) -> (result: i32, exception: ^Throwable) { // API level 34
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewConfiguration__class, "getScaledMaximumFlingVelocity", "(III)I", false) or_return
-	jni_args := [?]android.jvalue{{i = inputDeviceId}, {i = axis}, {i = source}}
+	jni_args := [?]android.jvalue{{i = inputDeviceId}, {i = i32(axis)}, {i = transmute(i32)source}}
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
@@ -14990,10 +16064,10 @@ ViewConfiguration_getScaledMinimumFlingVelocity_void :: proc "contextless" (self
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-ViewConfiguration_getScaledMinimumFlingVelocity_int_int_int :: proc "contextless" (self: ^ViewConfiguration, inputDeviceId: i32, axis: i32, source: i32) -> (result: i32, exception: ^Throwable) { // API level 34
+ViewConfiguration_getScaledMinimumFlingVelocity_int_int_int :: proc "contextless" (self: ^ViewConfiguration, inputDeviceId: i32, axis: MotionEvent_Axis, source: InputDevice_Sources) -> (result: i32, exception: ^Throwable) { // API level 34
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewConfiguration__class, "getScaledMinimumFlingVelocity", "(III)I", false) or_return
-	jni_args := [?]android.jvalue{{i = inputDeviceId}, {i = axis}, {i = source}}
+	jni_args := [?]android.jvalue{{i = inputDeviceId}, {i = i32(axis)}, {i = transmute(i32)source}}
 	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
 }
 
@@ -15122,10 +16196,10 @@ ViewConfiguration_hasPermanentMenuKey :: proc "contextless" (self: ^ViewConfigur
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-ViewConfiguration_isFocusNavigationEnabled :: proc "contextless" (self: ^ViewConfiguration, inputDeviceId: i32, axis: i32, source: i32) -> (result: bool, exception: ^Throwable) { // API level 37
+ViewConfiguration_isFocusNavigationEnabled :: proc "contextless" (self: ^ViewConfiguration, inputDeviceId: i32, axis: MotionEvent_Axis, source: InputDevice_Sources) -> (result: bool, exception: ^Throwable) { // API level 37
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewConfiguration__class, "isFocusNavigationEnabled", "(III)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = inputDeviceId}, {i = axis}, {i = source}}
+	jni_args := [?]android.jvalue{{i = inputDeviceId}, {i = i32(axis)}, {i = transmute(i32)source}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -15501,18 +16575,18 @@ ViewGroup_addExtraDataToAccessibilityNodeInfo :: proc "contextless" (self: ^View
 	return jni_take(jni_env)
 }
 
-ViewGroup_addFocusables :: proc "contextless" (self: ^ViewGroup, views: ^ArrayList, direction: i32, focusableMode: i32) -> (exception: ^Throwable) {
+ViewGroup_addFocusables :: proc "contextless" (self: ^ViewGroup, views: ^ArrayList, direction: View_Focus, focusableMode: View_FocusablesFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewGroup__class, "addFocusables", "(Ljava/util/ArrayList;II)V", false) or_return
-	jni_args := [?]android.jvalue{{l = views}, {i = direction}, {i = focusableMode}}
+	jni_args := [?]android.jvalue{{l = views}, {i = i32(direction)}, {i = transmute(i32)focusableMode}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-ViewGroup_addKeyboardNavigationClusters :: proc "contextless" (self: ^ViewGroup, views: ^Collection, direction: i32) -> (exception: ^Throwable) {
+ViewGroup_addKeyboardNavigationClusters :: proc "contextless" (self: ^ViewGroup, views: ^Collection, direction: View_Focus) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewGroup__class, "addKeyboardNavigationClusters", "(Ljava/util/Collection;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = views}, {i = direction}}
+	jni_args := [?]android.jvalue{{l = views}, {i = i32(direction)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -15655,10 +16729,10 @@ ViewGroup_dispatchCreateViewTranslationRequest :: proc "contextless" (self: ^Vie
 	return jni_take(jni_env)
 }
 
-ViewGroup_dispatchDisplayHint :: proc "contextless" (self: ^ViewGroup, hint: i32) -> (exception: ^Throwable) {
+ViewGroup_dispatchDisplayHint :: proc "contextless" (self: ^ViewGroup, hint: View_Visibility) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewGroup__class, "dispatchDisplayHint", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = hint}}
+	jni_args := [?]android.jvalue{{i = i32(hint)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -15714,10 +16788,10 @@ ViewGroup_dispatchPointerCaptureChanged :: proc "contextless" (self: ^ViewGroup,
 	return jni_take(jni_env)
 }
 
-ViewGroup_dispatchProvideAutofillStructure :: proc "contextless" (self: ^ViewGroup, structure: ^ViewStructure, flags: i32) -> (exception: ^Throwable) {
+ViewGroup_dispatchProvideAutofillStructure :: proc "contextless" (self: ^ViewGroup, structure: ^ViewStructure, flags: View_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewGroup__class, "dispatchProvideAutofillStructure", "(Landroid/view/ViewStructure;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = structure}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = structure}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -15761,10 +16835,10 @@ ViewGroup_dispatchStartTemporaryDetach :: proc "contextless" (self: ^ViewGroup) 
 	return jni_take(jni_env)
 }
 
-ViewGroup_dispatchSystemUiVisibilityChanged :: proc "contextless" (self: ^ViewGroup, visible: i32) -> (exception: ^Throwable) {
+ViewGroup_dispatchSystemUiVisibilityChanged :: proc "contextless" (self: ^ViewGroup, visible: View_SystemUiFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewGroup__class, "dispatchSystemUiVisibilityChanged", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = visible}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)visible}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -15783,10 +16857,10 @@ ViewGroup_dispatchTrackballEvent :: proc "contextless" (self: ^ViewGroup, event:
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-ViewGroup_dispatchUnhandledMove :: proc "contextless" (self: ^ViewGroup, focused: ^View, direction: i32) -> (result: bool, exception: ^Throwable) {
+ViewGroup_dispatchUnhandledMove :: proc "contextless" (self: ^ViewGroup, focused: ^View, direction: View_Focus) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewGroup__class, "dispatchUnhandledMove", "(Landroid/view/View;I)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = focused}, {i = direction}}
+	jni_args := [?]android.jvalue{{l = focused}, {i = i32(direction)}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -15828,18 +16902,18 @@ ViewGroup_dispatchWindowInsetsAnimationStart :: proc "contextless" (self: ^ViewG
 	return (^WindowInsetsAnimation_Bounds)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ViewGroup_dispatchWindowSystemUiVisiblityChanged :: proc "contextless" (self: ^ViewGroup, visible: i32) -> (exception: ^Throwable) {
+ViewGroup_dispatchWindowSystemUiVisiblityChanged :: proc "contextless" (self: ^ViewGroup, visible: View_SystemUiFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewGroup__class, "dispatchWindowSystemUiVisiblityChanged", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = visible}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)visible}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-ViewGroup_dispatchWindowVisibilityChanged :: proc "contextless" (self: ^ViewGroup, visibility: i32) -> (exception: ^Throwable) {
+ViewGroup_dispatchWindowVisibilityChanged :: proc "contextless" (self: ^ViewGroup, visibility: View_Visibility) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewGroup__class, "dispatchWindowVisibilityChanged", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = visibility}}
+	jni_args := [?]android.jvalue{{i = i32(visibility)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -15865,18 +16939,18 @@ ViewGroup_findOnBackInvokedDispatcherForChild :: proc "contextless" (self: ^View
 	return (^OnBackInvokedDispatcher)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ViewGroup_findViewsWithText :: proc "contextless" (self: ^ViewGroup, outViews: ^ArrayList, text: ^CharSequence, flags: i32) -> (exception: ^Throwable) {
+ViewGroup_findViewsWithText :: proc "contextless" (self: ^ViewGroup, outViews: ^ArrayList, text: ^CharSequence, flags: View_FindViewsWithFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewGroup__class, "findViewsWithText", "(Ljava/util/ArrayList;Ljava/lang/CharSequence;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = outViews}, {l = text}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = outViews}, {l = text}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-ViewGroup_focusSearch :: proc "contextless" (self: ^ViewGroup, focused: ^View, direction: i32) -> (result: ^View, exception: ^Throwable) {
+ViewGroup_focusSearch :: proc "contextless" (self: ^ViewGroup, focused: ^View, direction: View_Focus) -> (result: ^View, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewGroup__class, "focusSearch", "(Landroid/view/View;I)Landroid/view/View;", false) or_return
-	jni_args := [?]android.jvalue{{l = focused}, {i = direction}}
+	jni_args := [?]android.jvalue{{l = focused}, {i = i32(direction)}}
 	return (^View)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -15978,10 +17052,10 @@ ViewGroup_getLayoutAnimationListener :: proc "contextless" (self: ^ViewGroup) ->
 	return (^Animation_AnimationListener)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ViewGroup_getLayoutMode :: proc "contextless" (self: ^ViewGroup) -> (result: i32, exception: ^Throwable) {
+ViewGroup_getLayoutMode :: proc "contextless" (self: ^ViewGroup) -> (result: ViewGroup_LayoutMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewGroup__class, "getLayoutMode", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return ViewGroup_LayoutMode(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ViewGroup_getLayoutTransition :: proc "contextless" (self: ^ViewGroup) -> (result: ^LayoutTransition, exception: ^Throwable) {
@@ -16322,10 +17396,10 @@ ViewGroup_requestDisallowInterceptTouchEvent :: proc "contextless" (self: ^ViewG
 	return jni_take(jni_env)
 }
 
-ViewGroup_requestFocus :: proc "contextless" (self: ^ViewGroup, direction: i32, previouslyFocusedRect: ^Rect) -> (result: bool, exception: ^Throwable) {
+ViewGroup_requestFocus :: proc "contextless" (self: ^ViewGroup, direction: View_Focus, previouslyFocusedRect: ^Rect) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewGroup__class, "requestFocus", "(ILandroid/graphics/Rect;)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = direction}, {l = previouslyFocusedRect}}
+	jni_args := [?]android.jvalue{{i = i32(direction)}, {l = previouslyFocusedRect}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -16421,10 +17495,10 @@ ViewGroup_setLayoutAnimationListener :: proc "contextless" (self: ^ViewGroup, an
 	return jni_take(jni_env)
 }
 
-ViewGroup_setLayoutMode :: proc "contextless" (self: ^ViewGroup, layoutMode: i32) -> (exception: ^Throwable) {
+ViewGroup_setLayoutMode :: proc "contextless" (self: ^ViewGroup, layoutMode: ViewGroup_LayoutMode) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewGroup__class, "setLayoutMode", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = layoutMode}}
+	jni_args := [?]android.jvalue{{i = i32(layoutMode)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -16525,10 +17599,10 @@ ViewGroup_startActionModeForChild_View_ActionMode_Callback :: proc "contextless"
 	return (^ActionMode)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ViewGroup_startActionModeForChild_View_ActionMode_Callback_int :: proc "contextless" (self: ^ViewGroup, originalView: ^View, callback: ^ActionMode_Callback, type: i32) -> (result: ^ActionMode, exception: ^Throwable) {
+ViewGroup_startActionModeForChild_View_ActionMode_Callback_int :: proc "contextless" (self: ^ViewGroup, originalView: ^View, callback: ^ActionMode_Callback, type: ActionMode_Type) -> (result: ^ActionMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewGroup__class, "startActionModeForChild", "(Landroid/view/View;Landroid/view/ActionMode$Callback;I)Landroid/view/ActionMode;", false) or_return
-	jni_args := [?]android.jvalue{{l = originalView}, {l = callback}, {i = type}}
+	jni_args := [?]android.jvalue{{l = originalView}, {l = callback}, {i = i32(type)}}
 	return (^ActionMode)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -16566,6 +17640,11 @@ ViewGroup_updateViewLayout :: proc "contextless" (self: ^ViewGroup, view: ^View,
 	jni_args := [?]android.jvalue{{l = view}, {l = params}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+ViewGroup_LayoutMode :: enum i32 {
+	CLIP_BOUNDS    = 0,
+	OPTICAL_BOUNDS = 1,
 }
 
 // class android.view.ViewGroup.LayoutParams
@@ -16646,10 +17725,10 @@ ViewGroup_LayoutParams_new :: proc{
 	ViewGroup_LayoutParams_new_int_int,
 }
 
-ViewGroup_LayoutParams_resolveLayoutDirection :: proc "contextless" (self: ^ViewGroup_LayoutParams, layoutDirection: i32) -> (exception: ^Throwable) {
+ViewGroup_LayoutParams_resolveLayoutDirection :: proc "contextless" (self: ^ViewGroup_LayoutParams, layoutDirection: View_LayoutDirection) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewGroup_LayoutParams__class, "resolveLayoutDirection", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = layoutDirection}}
+	jni_args := [?]android.jvalue{{i = i32(layoutDirection)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -16749,10 +17828,10 @@ ViewGroup_MarginLayoutParams_new :: proc{
 	ViewGroup_MarginLayoutParams_new_int_int,
 }
 
-ViewGroup_MarginLayoutParams_getLayoutDirection :: proc "contextless" (self: ^ViewGroup_MarginLayoutParams) -> (result: i32, exception: ^Throwable) {
+ViewGroup_MarginLayoutParams_getLayoutDirection :: proc "contextless" (self: ^ViewGroup_MarginLayoutParams) -> (result: View_LayoutDirection, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewGroup_MarginLayoutParams__class, "getLayoutDirection", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_LayoutDirection(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ViewGroup_MarginLayoutParams_getMarginEnd :: proc "contextless" (self: ^ViewGroup_MarginLayoutParams) -> (result: i32, exception: ^Throwable) {
@@ -16773,18 +17852,18 @@ ViewGroup_MarginLayoutParams_isMarginRelative :: proc "contextless" (self: ^View
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-ViewGroup_MarginLayoutParams_resolveLayoutDirection :: proc "contextless" (self: ^ViewGroup_MarginLayoutParams, layoutDirection: i32) -> (exception: ^Throwable) {
+ViewGroup_MarginLayoutParams_resolveLayoutDirection :: proc "contextless" (self: ^ViewGroup_MarginLayoutParams, layoutDirection: View_LayoutDirection) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewGroup_MarginLayoutParams__class, "resolveLayoutDirection", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = layoutDirection}}
+	jni_args := [?]android.jvalue{{i = i32(layoutDirection)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-ViewGroup_MarginLayoutParams_setLayoutDirection :: proc "contextless" (self: ^ViewGroup_MarginLayoutParams, layoutDirection: i32) -> (exception: ^Throwable) {
+ViewGroup_MarginLayoutParams_setLayoutDirection :: proc "contextless" (self: ^ViewGroup_MarginLayoutParams, layoutDirection: View_LayoutDirection) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewGroup_MarginLayoutParams__class, "setLayoutDirection", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = layoutDirection}}
+	jni_args := [?]android.jvalue{{i = i32(layoutDirection)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -17031,10 +18110,10 @@ ViewParent_findOnBackInvokedDispatcherForChild :: proc "contextless" (self: ^Vie
 	return (^OnBackInvokedDispatcher)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ViewParent_focusSearch :: proc "contextless" (self: ^ViewParent, v: ^View, direction: i32) -> (result: ^View, exception: ^Throwable) {
+ViewParent_focusSearch :: proc "contextless" (self: ^ViewParent, v: ^View, direction: View_Focus) -> (result: ^View, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewParent__class, "focusSearch", "(Landroid/view/View;I)Landroid/view/View;", false) or_return
-	jni_args := [?]android.jvalue{{l = v}, {i = direction}}
+	jni_args := [?]android.jvalue{{l = v}, {i = i32(direction)}}
 	return (^View)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -17053,10 +18132,10 @@ ViewParent_getChildVisibleRect :: proc "contextless" (self: ^ViewParent, child: 
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-ViewParent_getLayoutDirection :: proc "contextless" (self: ^ViewParent) -> (result: i32, exception: ^Throwable) {
+ViewParent_getLayoutDirection :: proc "contextless" (self: ^ViewParent) -> (result: View_LayoutDirection, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewParent__class, "getLayoutDirection", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_LayoutDirection(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ViewParent_getParent :: proc "contextless" (self: ^ViewParent) -> (result: ^ViewParent, exception: ^Throwable) {
@@ -17071,16 +18150,16 @@ ViewParent_getParentForAccessibility :: proc "contextless" (self: ^ViewParent) -
 	return (^ViewParent)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ViewParent_getTextAlignment :: proc "contextless" (self: ^ViewParent) -> (result: i32, exception: ^Throwable) {
+ViewParent_getTextAlignment :: proc "contextless" (self: ^ViewParent) -> (result: View_TextAlignment, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewParent__class, "getTextAlignment", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_TextAlignment(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ViewParent_getTextDirection :: proc "contextless" (self: ^ViewParent) -> (result: i32, exception: ^Throwable) {
+ViewParent_getTextDirection :: proc "contextless" (self: ^ViewParent) -> (result: View_TextDirection, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewParent__class, "getTextDirection", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return View_TextDirection(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ViewParent_invalidateChild :: proc "contextless" (self: ^ViewParent, child: ^View, r: ^Rect) -> (exception: ^Throwable) {
@@ -17122,10 +18201,10 @@ ViewParent_isTextDirectionResolved :: proc "contextless" (self: ^ViewParent) -> 
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-ViewParent_keyboardNavigationClusterSearch :: proc "contextless" (self: ^ViewParent, currentCluster: ^View, direction: i32) -> (result: ^View, exception: ^Throwable) {
+ViewParent_keyboardNavigationClusterSearch :: proc "contextless" (self: ^ViewParent, currentCluster: ^View, direction: View_Focus) -> (result: ^View, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewParent__class, "keyboardNavigationClusterSearch", "(Landroid/view/View;I)Landroid/view/View;", false) or_return
-	jni_args := [?]android.jvalue{{l = currentCluster}, {i = direction}}
+	jni_args := [?]android.jvalue{{l = currentCluster}, {i = i32(direction)}}
 	return (^View)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -17228,10 +18307,10 @@ ViewParent_requestChildRectangleOnScreen_View_Rect_bool :: proc "contextless" (s
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-ViewParent_requestChildRectangleOnScreen_View_Rect_bool_int :: proc "contextless" (self: ^ViewParent, child: ^View, rectangle: ^Rect, immediate: bool, source: i32) -> (result: bool, exception: ^Throwable) { // API level 36
+ViewParent_requestChildRectangleOnScreen_View_Rect_bool_int :: proc "contextless" (self: ^ViewParent, child: ^View, rectangle: ^Rect, immediate: bool, source: View_RectangleOnScreenRequestSource) -> (result: bool, exception: ^Throwable) { // API level 36
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewParent__class, "requestChildRectangleOnScreen", "(Landroid/view/View;Landroid/graphics/Rect;ZI)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = child}, {l = rectangle}, {z = android.jboolean(immediate)}, {i = source}}
+	jni_args := [?]android.jvalue{{l = child}, {l = rectangle}, {z = android.jboolean(immediate)}, {i = i32(source)}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -17303,10 +18382,10 @@ ViewParent_startActionModeForChild_View_ActionMode_Callback :: proc "contextless
 	return (^ActionMode)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ViewParent_startActionModeForChild_View_ActionMode_Callback_int :: proc "contextless" (self: ^ViewParent, originalView: ^View, callback: ^ActionMode_Callback, type: i32) -> (result: ^ActionMode, exception: ^Throwable) {
+ViewParent_startActionModeForChild_View_ActionMode_Callback_int :: proc "contextless" (self: ^ViewParent, originalView: ^View, callback: ^ActionMode_Callback, type: ActionMode_Type) -> (result: ^ActionMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewParent__class, "startActionModeForChild", "(Landroid/view/View;Landroid/view/ActionMode$Callback;I)Landroid/view/ActionMode;", false) or_return
-	jni_args := [?]android.jvalue{{l = originalView}, {l = callback}, {i = type}}
+	jni_args := [?]android.jvalue{{l = originalView}, {l = callback}, {i = i32(type)}}
 	return (^ActionMode)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -17752,10 +18831,10 @@ ViewStructure_setAutofillOptions :: proc "contextless" (self: ^ViewStructure, op
 	return jni_take(jni_env)
 }
 
-ViewStructure_setAutofillType :: proc "contextless" (self: ^ViewStructure, type: i32) -> (exception: ^Throwable) {
+ViewStructure_setAutofillType :: proc "contextless" (self: ^ViewStructure, type: View_AutofillType) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewStructure__class, "setAutofillType", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = type}}
+	jni_args := [?]android.jvalue{{i = i32(type)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -17904,10 +18983,10 @@ ViewStructure_setId :: proc "contextless" (self: ^ViewStructure, id: i32, packag
 	return jni_take(jni_env)
 }
 
-ViewStructure_setImportantForAutofill :: proc "contextless" (self: ^ViewStructure, mode: i32) -> (exception: ^Throwable) {
+ViewStructure_setImportantForAutofill :: proc "contextless" (self: ^ViewStructure, mode: View_ImportantForAutofill) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewStructure__class, "setImportantForAutofill", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = mode}}
+	jni_args := [?]android.jvalue{{i = i32(mode)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -18045,10 +19124,10 @@ ViewStructure_setTransformation :: proc "contextless" (self: ^ViewStructure, mat
 	return jni_take(jni_env)
 }
 
-ViewStructure_setVisibility :: proc "contextless" (self: ^ViewStructure, visibility: i32) -> (exception: ^Throwable) {
+ViewStructure_setVisibility :: proc "contextless" (self: ^ViewStructure, visibility: View_Visibility) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewStructure__class, "setVisibility", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = visibility}}
+	jni_args := [?]android.jvalue{{i = i32(visibility)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -18217,10 +19296,10 @@ ViewStub_setOnInflateListener :: proc "contextless" (self: ^ViewStub, inflateLis
 	return jni_take(jni_env)
 }
 
-ViewStub_setVisibility :: proc "contextless" (self: ^ViewStub, visibility: i32) -> (exception: ^Throwable) {
+ViewStub_setVisibility :: proc "contextless" (self: ^ViewStub, visibility: View_Visibility) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewStub__class, "setVisibility", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = visibility}}
+	jni_args := [?]android.jvalue{{i = i32(visibility)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -18618,10 +19697,10 @@ ViewTreeObserver_OnWindowVisibilityChangeListener :: struct #raw_union {
 @(private)
 ViewTreeObserver_OnWindowVisibilityChangeListener__class := Cached_Class{name = "android/view/ViewTreeObserver$OnWindowVisibilityChangeListener"}
 
-ViewTreeObserver_OnWindowVisibilityChangeListener_onWindowVisibilityChanged :: proc "contextless" (self: ^ViewTreeObserver_OnWindowVisibilityChangeListener, visibility: i32) -> (exception: ^Throwable) {
+ViewTreeObserver_OnWindowVisibilityChangeListener_onWindowVisibilityChanged :: proc "contextless" (self: ^ViewTreeObserver_OnWindowVisibilityChangeListener, visibility: View_Visibility) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ViewTreeObserver_OnWindowVisibilityChangeListener__class, "onWindowVisibilityChanged", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = visibility}}
+	jni_args := [?]android.jvalue{{i = i32(visibility)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -18695,10 +19774,10 @@ Window_addContentView :: proc "contextless" (self: ^Window, view: ^View, params:
 	return jni_take(jni_env)
 }
 
-Window_addFlags :: proc "contextless" (self: ^Window, flags: i32) -> (exception: ^Throwable) {
+Window_addFlags :: proc "contextless" (self: ^Window, flags: WindowManager_LayoutParams_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "addFlags", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -18711,10 +19790,10 @@ Window_addOnFrameMetricsAvailableListener :: proc "contextless" (self: ^Window, 
 	return jni_take(jni_env)
 }
 
-Window_clearFlags :: proc "contextless" (self: ^Window, flags: i32) -> (exception: ^Throwable) {
+Window_clearFlags :: proc "contextless" (self: ^Window, flags: WindowManager_LayoutParams_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "clearFlags", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -18726,10 +19805,10 @@ Window_closeAllPanels :: proc "contextless" (self: ^Window) -> (exception: ^Thro
 	return jni_take(jni_env)
 }
 
-Window_closePanel :: proc "contextless" (self: ^Window, featureId: i32) -> (exception: ^Throwable) {
+Window_closePanel :: proc "contextless" (self: ^Window, featureId: Window_Feature) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "closePanel", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = featureId}}
+	jni_args := [?]android.jvalue{{i = i32(featureId)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -18765,10 +19844,10 @@ Window_getCallback :: proc "contextless" (self: ^Window) -> (result: ^Window_Cal
 	return (^Window_Callback)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Window_getColorMode :: proc "contextless" (self: ^Window) -> (result: i32, exception: ^Throwable) {
+Window_getColorMode :: proc "contextless" (self: ^Window) -> (result: ActivityInfo_ColorMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "getColorMode", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return ActivityInfo_ColorMode(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Window_getContainer :: proc "contextless" (self: ^Window) -> (result: ^Window, exception: ^Throwable) {
@@ -18964,10 +20043,10 @@ Window_hasChildren :: proc "contextless" (self: ^Window) -> (result: bool, excep
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-Window_hasFeature :: proc "contextless" (self: ^Window, feature: i32) -> (result: bool, exception: ^Throwable) {
+Window_hasFeature :: proc "contextless" (self: ^Window, feature: Window_Feature) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "hasFeature", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = feature}}
+	jni_args := [?]android.jvalue{{i = i32(feature)}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -18979,10 +20058,10 @@ Window_injectInputEvent :: proc "contextless" (self: ^Window, event: ^InputEvent
 	return jni_take(jni_env)
 }
 
-Window_invalidatePanelMenu :: proc "contextless" (self: ^Window, featureId: i32) -> (exception: ^Throwable) {
+Window_invalidatePanelMenu :: proc "contextless" (self: ^Window, featureId: Window_Feature) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "invalidatePanelMenu", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = featureId}}
+	jni_args := [?]android.jvalue{{i = i32(featureId)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -19011,10 +20090,10 @@ Window_isNavigationBarContrastEnforced :: proc "contextless" (self: ^Window) -> 
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-Window_isShortcutKey :: proc "contextless" (self: ^Window, keyCode: i32, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
+Window_isShortcutKey :: proc "contextless" (self: ^Window, keyCode: KeyEvent_KeyCode, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "isShortcutKey", "(ILandroid/view/KeyEvent;)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = keyCode}, {l = event}}
+	jni_args := [?]android.jvalue{{i = i32(keyCode)}, {l = event}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -19045,10 +20124,10 @@ Window_onConfigurationChanged :: proc "contextless" (self: ^Window, newConfig: ^
 	return jni_take(jni_env)
 }
 
-Window_openPanel :: proc "contextless" (self: ^Window, featureId: i32, event: ^KeyEvent) -> (exception: ^Throwable) {
+Window_openPanel :: proc "contextless" (self: ^Window, featureId: Window_Feature, event: ^KeyEvent) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "openPanel", "(ILandroid/view/KeyEvent;)V", false) or_return
-	jni_args := [?]android.jvalue{{i = featureId}, {l = event}}
+	jni_args := [?]android.jvalue{{i = i32(featureId)}, {l = event}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -19059,24 +20138,24 @@ Window_peekDecorView :: proc "contextless" (self: ^Window) -> (result: ^View, ex
 	return (^View)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Window_performContextMenuIdentifierAction :: proc "contextless" (self: ^Window, id: i32, flags: i32) -> (result: bool, exception: ^Throwable) {
+Window_performContextMenuIdentifierAction :: proc "contextless" (self: ^Window, id: i32, flags: Menu_Flags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "performContextMenuIdentifierAction", "(II)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = id}, {i = flags}}
+	jni_args := [?]android.jvalue{{i = id}, {i = transmute(i32)flags}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-Window_performPanelIdentifierAction :: proc "contextless" (self: ^Window, featureId: i32, id: i32, flags: i32) -> (result: bool, exception: ^Throwable) {
+Window_performPanelIdentifierAction :: proc "contextless" (self: ^Window, featureId: Window_Feature, id: i32, flags: Menu_Flags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "performPanelIdentifierAction", "(III)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = featureId}, {i = id}, {i = flags}}
+	jni_args := [?]android.jvalue{{i = i32(featureId)}, {i = id}, {i = transmute(i32)flags}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-Window_performPanelShortcut :: proc "contextless" (self: ^Window, featureId: i32, keyCode: i32, event: ^KeyEvent, flags: i32) -> (result: bool, exception: ^Throwable) {
+Window_performPanelShortcut :: proc "contextless" (self: ^Window, featureId: Window_Feature, keyCode: KeyEvent_KeyCode, event: ^KeyEvent, flags: Menu_Flags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "performPanelShortcut", "(IILandroid/view/KeyEvent;I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = featureId}, {i = keyCode}, {l = event}, {i = flags}}
+	jni_args := [?]android.jvalue{{i = i32(featureId)}, {i = i32(keyCode)}, {l = event}, {i = transmute(i32)flags}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -19096,10 +20175,10 @@ Window_removeOnFrameMetricsAvailableListener :: proc "contextless" (self: ^Windo
 	return jni_take(jni_env)
 }
 
-Window_requestFeature :: proc "contextless" (self: ^Window, featureId: i32) -> (result: bool, exception: ^Throwable) {
+Window_requestFeature :: proc "contextless" (self: ^Window, featureId: Window_Feature) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "requestFeature", "(I)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = featureId}}
+	jni_args := [?]android.jvalue{{i = i32(featureId)}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -19180,18 +20259,18 @@ Window_setCallback :: proc "contextless" (self: ^Window, callback: ^Window_Callb
 	return jni_take(jni_env)
 }
 
-Window_setChildDrawable :: proc "contextless" (self: ^Window, featureId: i32, drawable: ^Drawable) -> (exception: ^Throwable) {
+Window_setChildDrawable :: proc "contextless" (self: ^Window, featureId: Window_Feature, drawable: ^Drawable) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "setChildDrawable", "(ILandroid/graphics/drawable/Drawable;)V", false) or_return
-	jni_args := [?]android.jvalue{{i = featureId}, {l = drawable}}
+	jni_args := [?]android.jvalue{{i = i32(featureId)}, {l = drawable}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-Window_setChildInt :: proc "contextless" (self: ^Window, featureId: i32, value: i32) -> (exception: ^Throwable) {
+Window_setChildInt :: proc "contextless" (self: ^Window, featureId: Window_Feature, value: i32) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "setChildInt", "(II)V", false) or_return
-	jni_args := [?]android.jvalue{{i = featureId}, {i = value}}
+	jni_args := [?]android.jvalue{{i = i32(featureId)}, {i = value}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -19204,10 +20283,10 @@ Window_setClipToOutline :: proc "contextless" (self: ^Window, clipToOutline: boo
 	return jni_take(jni_env)
 }
 
-Window_setColorMode :: proc "contextless" (self: ^Window, colorMode: i32) -> (exception: ^Throwable) {
+Window_setColorMode :: proc "contextless" (self: ^Window, colorMode: ActivityInfo_ColorMode) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "setColorMode", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = colorMode}}
+	jni_args := [?]android.jvalue{{i = i32(colorMode)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -19314,58 +20393,58 @@ Window_setExitTransition :: proc "contextless" (self: ^Window, transition: ^Tran
 	return jni_take(jni_env)
 }
 
-Window_setFeatureDrawable :: proc "contextless" (self: ^Window, featureId: i32, drawable: ^Drawable) -> (exception: ^Throwable) {
+Window_setFeatureDrawable :: proc "contextless" (self: ^Window, featureId: Window_Feature, drawable: ^Drawable) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "setFeatureDrawable", "(ILandroid/graphics/drawable/Drawable;)V", false) or_return
-	jni_args := [?]android.jvalue{{i = featureId}, {l = drawable}}
+	jni_args := [?]android.jvalue{{i = i32(featureId)}, {l = drawable}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-Window_setFeatureDrawableAlpha :: proc "contextless" (self: ^Window, featureId: i32, alpha: i32) -> (exception: ^Throwable) {
+Window_setFeatureDrawableAlpha :: proc "contextless" (self: ^Window, featureId: Window_Feature, alpha: i32) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "setFeatureDrawableAlpha", "(II)V", false) or_return
-	jni_args := [?]android.jvalue{{i = featureId}, {i = alpha}}
+	jni_args := [?]android.jvalue{{i = i32(featureId)}, {i = alpha}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-Window_setFeatureDrawableResource :: proc "contextless" (self: ^Window, featureId: i32, resId: i32) -> (exception: ^Throwable) {
+Window_setFeatureDrawableResource :: proc "contextless" (self: ^Window, featureId: Window_Feature, resId: i32) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "setFeatureDrawableResource", "(II)V", false) or_return
-	jni_args := [?]android.jvalue{{i = featureId}, {i = resId}}
+	jni_args := [?]android.jvalue{{i = i32(featureId)}, {i = resId}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-Window_setFeatureDrawableUri :: proc "contextless" (self: ^Window, featureId: i32, uri: ^Uri) -> (exception: ^Throwable) {
+Window_setFeatureDrawableUri :: proc "contextless" (self: ^Window, featureId: Window_Feature, uri: ^Uri) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "setFeatureDrawableUri", "(ILandroid/net/Uri;)V", false) or_return
-	jni_args := [?]android.jvalue{{i = featureId}, {l = uri}}
+	jni_args := [?]android.jvalue{{i = i32(featureId)}, {l = uri}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-Window_setFeatureInt :: proc "contextless" (self: ^Window, featureId: i32, value: i32) -> (exception: ^Throwable) {
+Window_setFeatureInt :: proc "contextless" (self: ^Window, featureId: Window_Feature, value: i32) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "setFeatureInt", "(II)V", false) or_return
-	jni_args := [?]android.jvalue{{i = featureId}, {i = value}}
+	jni_args := [?]android.jvalue{{i = i32(featureId)}, {i = value}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-Window_setFlags :: proc "contextless" (self: ^Window, flags: i32, mask: i32) -> (exception: ^Throwable) {
+Window_setFlags :: proc "contextless" (self: ^Window, flags: WindowManager_LayoutParams_Flags, mask: WindowManager_LayoutParams_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "setFlags", "(II)V", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}, {i = mask}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}, {i = transmute(i32)mask}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-Window_setFormat :: proc "contextless" (self: ^Window, format: i32) -> (exception: ^Throwable) {
+Window_setFormat :: proc "contextless" (self: ^Window, format: PixelFormat_Format) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "setFormat", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = format}}
+	jni_args := [?]android.jvalue{{i = i32(format)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -19386,10 +20465,10 @@ Window_setFrameRatePowerSavingsBalanced :: proc "contextless" (self: ^Window, en
 	return jni_take(jni_env)
 }
 
-Window_setGravity :: proc "contextless" (self: ^Window, gravity: i32) -> (exception: ^Throwable) {
+Window_setGravity :: proc "contextless" (self: ^Window, gravity: Gravity_Field) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "setGravity", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = gravity}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)gravity}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -19546,10 +20625,10 @@ Window_setSharedElementsUseOverlay :: proc "contextless" (self: ^Window, sharedE
 	return jni_take(jni_env)
 }
 
-Window_setSoftInputMode :: proc "contextless" (self: ^Window, mode: i32) -> (exception: ^Throwable) {
+Window_setSoftInputMode :: proc "contextless" (self: ^Window, mode: WindowManager_LayoutParams_SoftInputMode) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "setSoftInputMode", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = mode}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)mode}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -19618,26 +20697,26 @@ Window_setTransitionManager :: proc "contextless" (self: ^Window, tm: ^Transitio
 	return jni_take(jni_env)
 }
 
-Window_setType :: proc "contextless" (self: ^Window, type: i32) -> (exception: ^Throwable) {
+Window_setType :: proc "contextless" (self: ^Window, type: WindowManager_LayoutParams_Type) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "setType", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = type}}
+	jni_args := [?]android.jvalue{{i = i32(type)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-Window_setUiOptions_int :: proc "contextless" (self: ^Window, uiOptions: i32) -> (exception: ^Throwable) {
+Window_setUiOptions_int :: proc "contextless" (self: ^Window, uiOptions: ActivityInfo_UiOptions) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "setUiOptions", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = uiOptions}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)uiOptions}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-Window_setUiOptions_int_int :: proc "contextless" (self: ^Window, uiOptions: i32, mask: i32) -> (exception: ^Throwable) {
+Window_setUiOptions_int_int :: proc "contextless" (self: ^Window, uiOptions: ActivityInfo_UiOptions, mask: i32) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "setUiOptions", "(II)V", false) or_return
-	jni_args := [?]android.jvalue{{i = uiOptions}, {i = mask}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)uiOptions}, {i = mask}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -19743,10 +20822,10 @@ Window_takeSurface :: proc "contextless" (self: ^Window, callback: ^SurfaceHolde
 	return jni_take(jni_env)
 }
 
-Window_togglePanel :: proc "contextless" (self: ^Window, featureId: i32, event: ^KeyEvent) -> (exception: ^Throwable) {
+Window_togglePanel :: proc "contextless" (self: ^Window, featureId: Window_Feature, event: ^KeyEvent) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window__class, "togglePanel", "(ILandroid/view/KeyEvent;)V", false) or_return
-	jni_args := [?]android.jvalue{{i = featureId}, {l = event}}
+	jni_args := [?]android.jvalue{{i = i32(featureId)}, {l = event}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -19757,6 +20836,23 @@ Window_unregisterScrollCaptureCallback :: proc "contextless" (self: ^Window, cal
 	jni_args := [?]android.jvalue{{l = callback}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+Window_Feature :: enum i32 {
+	ACTION_BAR             = 8,
+	ACTION_BAR_OVERLAY     = 9,
+	ACTION_MODE_OVERLAY    = 10,
+	ACTIVITY_TRANSITIONS   = 13,
+	CONTENT_TRANSITIONS    = 12,
+	CONTEXT_MENU           = 6,
+	CUSTOM_TITLE           = 7,
+	INDETERMINATE_PROGRESS = 5,
+	LEFT_ICON              = 3,
+	NO_TITLE               = 1,
+	OPTIONS_PANEL          = 0,
+	PROGRESS               = 2,
+	RIGHT_ICON             = 4,
+	SWIPE_TO_DISMISS       = 11,
 }
 
 // interface android.view.Window.Callback
@@ -19839,17 +20935,17 @@ Window_Callback_onContentChanged :: proc "contextless" (self: ^Window_Callback) 
 	return jni_take(jni_env)
 }
 
-Window_Callback_onCreatePanelMenu :: proc "contextless" (self: ^Window_Callback, featureId: i32, menu: ^Menu) -> (result: bool, exception: ^Throwable) {
+Window_Callback_onCreatePanelMenu :: proc "contextless" (self: ^Window_Callback, featureId: Window_Feature, menu: ^Menu) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window_Callback__class, "onCreatePanelMenu", "(ILandroid/view/Menu;)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = featureId}, {l = menu}}
+	jni_args := [?]android.jvalue{{i = i32(featureId)}, {l = menu}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-Window_Callback_onCreatePanelView :: proc "contextless" (self: ^Window_Callback, featureId: i32) -> (result: ^View, exception: ^Throwable) {
+Window_Callback_onCreatePanelView :: proc "contextless" (self: ^Window_Callback, featureId: Window_Feature) -> (result: ^View, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window_Callback__class, "onCreatePanelView", "(I)Landroid/view/View;", false) or_return
-	jni_args := [?]android.jvalue{{i = featureId}}
+	jni_args := [?]android.jvalue{{i = i32(featureId)}}
 	return (^View)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -19860,24 +20956,24 @@ Window_Callback_onDetachedFromWindow :: proc "contextless" (self: ^Window_Callba
 	return jni_take(jni_env)
 }
 
-Window_Callback_onMenuItemSelected :: proc "contextless" (self: ^Window_Callback, featureId: i32, item: ^MenuItem) -> (result: bool, exception: ^Throwable) {
+Window_Callback_onMenuItemSelected :: proc "contextless" (self: ^Window_Callback, featureId: Window_Feature, item: ^MenuItem) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window_Callback__class, "onMenuItemSelected", "(ILandroid/view/MenuItem;)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = featureId}, {l = item}}
+	jni_args := [?]android.jvalue{{i = i32(featureId)}, {l = item}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-Window_Callback_onMenuOpened :: proc "contextless" (self: ^Window_Callback, featureId: i32, menu: ^Menu) -> (result: bool, exception: ^Throwable) {
+Window_Callback_onMenuOpened :: proc "contextless" (self: ^Window_Callback, featureId: Window_Feature, menu: ^Menu) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window_Callback__class, "onMenuOpened", "(ILandroid/view/Menu;)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = featureId}, {l = menu}}
+	jni_args := [?]android.jvalue{{i = i32(featureId)}, {l = menu}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-Window_Callback_onPanelClosed :: proc "contextless" (self: ^Window_Callback, featureId: i32, menu: ^Menu) -> (exception: ^Throwable) {
+Window_Callback_onPanelClosed :: proc "contextless" (self: ^Window_Callback, featureId: Window_Feature, menu: ^Menu) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window_Callback__class, "onPanelClosed", "(ILandroid/view/Menu;)V", false) or_return
-	jni_args := [?]android.jvalue{{i = featureId}, {l = menu}}
+	jni_args := [?]android.jvalue{{i = i32(featureId)}, {l = menu}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -19890,10 +20986,10 @@ Window_Callback_onPointerCaptureChanged :: proc "contextless" (self: ^Window_Cal
 	return jni_take(jni_env)
 }
 
-Window_Callback_onPreparePanel :: proc "contextless" (self: ^Window_Callback, featureId: i32, view: ^View, menu: ^Menu) -> (result: bool, exception: ^Throwable) {
+Window_Callback_onPreparePanel :: proc "contextless" (self: ^Window_Callback, featureId: Window_Feature, view: ^View, menu: ^Menu) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window_Callback__class, "onPreparePanel", "(ILandroid/view/View;Landroid/view/Menu;)Z", false) or_return
-	jni_args := [?]android.jvalue{{i = featureId}, {l = view}, {l = menu}}
+	jni_args := [?]android.jvalue{{i = i32(featureId)}, {l = view}, {l = menu}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -19946,10 +21042,10 @@ Window_Callback_onWindowStartingActionMode_ActionMode_Callback :: proc "contextl
 	return (^ActionMode)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Window_Callback_onWindowStartingActionMode_ActionMode_Callback_int :: proc "contextless" (self: ^Window_Callback, callback: ^ActionMode_Callback, type: i32) -> (result: ^ActionMode, exception: ^Throwable) {
+Window_Callback_onWindowStartingActionMode_ActionMode_Callback_int :: proc "contextless" (self: ^Window_Callback, callback: ^ActionMode_Callback, type: ActionMode_Type) -> (result: ^ActionMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Window_Callback__class, "onWindowStartingActionMode", "(Landroid/view/ActionMode$Callback;I)Landroid/view/ActionMode;", false) or_return
-	jni_args := [?]android.jvalue{{l = callback}, {i = type}}
+	jni_args := [?]android.jvalue{{l = callback}, {i = i32(type)}}
 	return (^ActionMode)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -20005,10 +21101,10 @@ WindowAnimationFrameStats_get_CREATOR :: proc "contextless" () -> (result: ^Parc
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-WindowAnimationFrameStats_describeContents :: proc "contextless" (self: ^WindowAnimationFrameStats) -> (result: i32, exception: ^Throwable) {
+WindowAnimationFrameStats_describeContents :: proc "contextless" (self: ^WindowAnimationFrameStats) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowAnimationFrameStats__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 WindowAnimationFrameStats_toString :: proc "contextless" (self: ^WindowAnimationFrameStats) -> (result: ^String, exception: ^Throwable) {
@@ -20017,10 +21113,10 @@ WindowAnimationFrameStats_toString :: proc "contextless" (self: ^WindowAnimation
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-WindowAnimationFrameStats_writeToParcel :: proc "contextless" (self: ^WindowAnimationFrameStats, parcel: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+WindowAnimationFrameStats_writeToParcel :: proc "contextless" (self: ^WindowAnimationFrameStats, parcel: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowAnimationFrameStats__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = parcel}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = parcel}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -20040,10 +21136,10 @@ WindowContentFrameStats_get_CREATOR :: proc "contextless" () -> (result: ^Parcel
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-WindowContentFrameStats_describeContents :: proc "contextless" (self: ^WindowContentFrameStats) -> (result: i32, exception: ^Throwable) {
+WindowContentFrameStats_describeContents :: proc "contextless" (self: ^WindowContentFrameStats) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowContentFrameStats__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 WindowContentFrameStats_getFramePostedTimeNano :: proc "contextless" (self: ^WindowContentFrameStats, index: i32) -> (result: i64, exception: ^Throwable) {
@@ -20066,10 +21162,10 @@ WindowContentFrameStats_toString :: proc "contextless" (self: ^WindowContentFram
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-WindowContentFrameStats_writeToParcel :: proc "contextless" (self: ^WindowContentFrameStats, parcel: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+WindowContentFrameStats_writeToParcel :: proc "contextless" (self: ^WindowContentFrameStats, parcel: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowContentFrameStats__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = parcel}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = parcel}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -20089,10 +21185,10 @@ WindowId_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creator, e
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-WindowId_describeContents :: proc "contextless" (self: ^WindowId) -> (result: i32, exception: ^Throwable) {
+WindowId_describeContents :: proc "contextless" (self: ^WindowId) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowId__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 WindowId_equals :: proc "contextless" (self: ^WindowId, otherObj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -20136,10 +21232,10 @@ WindowId_unregisterFocusObserver :: proc "contextless" (self: ^WindowId, observe
 	return jni_take(jni_env)
 }
 
-WindowId_writeToParcel :: proc "contextless" (self: ^WindowId, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+WindowId_writeToParcel :: proc "contextless" (self: ^WindowId, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowId__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -20272,10 +21368,10 @@ WindowInsets_getPrivacyIndicatorBounds :: proc "contextless" (self: ^WindowInset
 	return (^Rect)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-WindowInsets_getRoundedCorner :: proc "contextless" (self: ^WindowInsets, position: i32) -> (result: ^RoundedCorner, exception: ^Throwable) { // API level 31
+WindowInsets_getRoundedCorner :: proc "contextless" (self: ^WindowInsets, position: RoundedCorner_Position) -> (result: ^RoundedCorner, exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowInsets__class, "getRoundedCorner", "(I)Landroid/view/RoundedCorner;", false) or_return
-	jni_args := [?]android.jvalue{{i = position}}
+	jni_args := [?]android.jvalue{{i = i32(position)}}
 	return (^RoundedCorner)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -20533,10 +21629,10 @@ WindowInsets_Builder_setPrivacyIndicatorBounds :: proc "contextless" (self: ^Win
 	return (^WindowInsets_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-WindowInsets_Builder_setRoundedCorner :: proc "contextless" (self: ^WindowInsets_Builder, position: i32, roundedCorner: ^RoundedCorner) -> (result: ^WindowInsets_Builder, exception: ^Throwable) { // API level 31
+WindowInsets_Builder_setRoundedCorner :: proc "contextless" (self: ^WindowInsets_Builder, position: RoundedCorner_Position, roundedCorner: ^RoundedCorner) -> (result: ^WindowInsets_Builder, exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowInsets_Builder__class, "setRoundedCorner", "(ILandroid/view/RoundedCorner;)Landroid/view/WindowInsets$Builder;", false) or_return
-	jni_args := [?]android.jvalue{{i = position}, {l = roundedCorner}}
+	jni_args := [?]android.jvalue{{i = i32(position)}, {l = roundedCorner}}
 	return (^WindowInsets_Builder)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -20588,11 +21684,19 @@ WindowInsets_Side_LEFT   :: 1
 WindowInsets_Side_RIGHT  :: 4
 WindowInsets_Side_TOP    :: 2
 
-WindowInsets_Side_all :: proc "contextless" () -> (result: i32, exception: ^Throwable) {
+WindowInsets_Side_all :: proc "contextless" () -> (result: WindowInsets_Side_FitInsetsSides, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &WindowInsets_Side__class, "all", "()I", true) or_return
-	return jni_env->CallStaticIntMethodA(jni_class, jni_id, nil), jni_take(jni_env)
+	return transmute(WindowInsets_Side_FitInsetsSides)(jni_env->CallStaticIntMethodA(jni_class, jni_id, nil)), jni_take(jni_env)
 }
+
+WindowInsets_Side_FitInsetsSide :: enum u32 {
+	BOTTOM = 3,
+	LEFT   = 0,
+	RIGHT  = 2,
+	TOP    = 1,
+}
+WindowInsets_Side_FitInsetsSides :: distinct bit_set[WindowInsets_Side_FitInsetsSide; u32]
 
 // class android.view.WindowInsets.Type // API level 30
 WindowInsets_Type :: struct #raw_union {
@@ -20780,10 +21884,10 @@ WindowInsetsAnimation_Callback__class := Cached_Class{name = "android/view/Windo
 WindowInsetsAnimation_Callback_DISPATCH_MODE_CONTINUE_ON_SUBTREE :: 1
 WindowInsetsAnimation_Callback_DISPATCH_MODE_STOP                :: 0
 
-WindowInsetsAnimation_Callback_getDispatchMode :: proc "contextless" (self: ^WindowInsetsAnimation_Callback) -> (result: i32, exception: ^Throwable) {
+WindowInsetsAnimation_Callback_getDispatchMode :: proc "contextless" (self: ^WindowInsetsAnimation_Callback) -> (result: WindowInsetsAnimation_Callback_DispatchMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowInsetsAnimation_Callback__class, "getDispatchMode", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return WindowInsetsAnimation_Callback_DispatchMode(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 WindowInsetsAnimation_Callback_onEnd :: proc "contextless" (self: ^WindowInsetsAnimation_Callback, animation: ^WindowInsetsAnimation) -> (exception: ^Throwable) {
@@ -20814,6 +21918,11 @@ WindowInsetsAnimation_Callback_onStart :: proc "contextless" (self: ^WindowInset
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowInsetsAnimation_Callback__class, "onStart", "(Landroid/view/WindowInsetsAnimation;Landroid/view/WindowInsetsAnimation$Bounds;)Landroid/view/WindowInsetsAnimation$Bounds;", false) or_return
 	jni_args := [?]android.jvalue{{l = animation}, {l = bounds}}
 	return (^WindowInsetsAnimation_Bounds)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
+}
+
+WindowInsetsAnimation_Callback_DispatchMode :: enum i32 {
+	CONTINUE_ON_SUBTREE = 1,
+	STOP                = 0,
 }
 
 // interface android.view.WindowInsetsAnimationControlListener // API level 30
@@ -20959,16 +22068,16 @@ WindowInsetsController_controlWindowInsetsAnimation :: proc "contextless" (self:
 	return jni_take(jni_env)
 }
 
-WindowInsetsController_getSystemBarsAppearance :: proc "contextless" (self: ^WindowInsetsController) -> (result: i32, exception: ^Throwable) {
+WindowInsetsController_getSystemBarsAppearance :: proc "contextless" (self: ^WindowInsetsController) -> (result: WindowInsetsController_AppearanceFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowInsetsController__class, "getSystemBarsAppearance", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(WindowInsetsController_AppearanceFlags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-WindowInsetsController_getSystemBarsBehavior :: proc "contextless" (self: ^WindowInsetsController) -> (result: i32, exception: ^Throwable) {
+WindowInsetsController_getSystemBarsBehavior :: proc "contextless" (self: ^WindowInsetsController) -> (result: WindowInsetsController_Behavior, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowInsetsController__class, "getSystemBarsBehavior", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return WindowInsetsController_Behavior(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 WindowInsetsController_hide :: proc "contextless" (self: ^WindowInsetsController, types: i32) -> (exception: ^Throwable) {
@@ -20987,18 +22096,18 @@ WindowInsetsController_removeOnControllableInsetsChangedListener :: proc "contex
 	return jni_take(jni_env)
 }
 
-WindowInsetsController_setSystemBarsAppearance :: proc "contextless" (self: ^WindowInsetsController, appearance: i32, mask: i32) -> (exception: ^Throwable) {
+WindowInsetsController_setSystemBarsAppearance :: proc "contextless" (self: ^WindowInsetsController, appearance: WindowInsetsController_AppearanceFlags, mask: WindowInsetsController_AppearanceFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowInsetsController__class, "setSystemBarsAppearance", "(II)V", false) or_return
-	jni_args := [?]android.jvalue{{i = appearance}, {i = mask}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)appearance}, {i = transmute(i32)mask}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-WindowInsetsController_setSystemBarsBehavior :: proc "contextless" (self: ^WindowInsetsController, behavior: i32) -> (exception: ^Throwable) {
+WindowInsetsController_setSystemBarsBehavior :: proc "contextless" (self: ^WindowInsetsController, behavior: WindowInsetsController_Behavior) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowInsetsController__class, "setSystemBarsBehavior", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = behavior}}
+	jni_args := [?]android.jvalue{{i = i32(behavior)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -21009,6 +22118,19 @@ WindowInsetsController_show :: proc "contextless" (self: ^WindowInsetsController
 	jni_args := [?]android.jvalue{{i = types}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+WindowInsetsController_AppearanceFlag :: enum u32 {
+	LIGHT_CAPTION_BARS                 = 8,
+	LIGHT_NAVIGATION_BARS              = 4,
+	LIGHT_STATUS_BARS                  = 3,
+	TRANSPARENT_CAPTION_BAR_BACKGROUND = 7,
+}
+WindowInsetsController_AppearanceFlags :: distinct bit_set[WindowInsetsController_AppearanceFlag; u32]
+
+WindowInsetsController_Behavior :: enum i32 {
+	DEFAULT                      = 1,
+	SHOW_TRANSIENT_BARS_BY_SWIPE = 2,
 }
 
 // interface android.view.WindowInsetsController.OnControllableInsetsChangedListener // API level 30
@@ -21109,11 +22231,11 @@ WindowManager_getDefaultDisplay :: proc "contextless" (self: ^WindowManager) -> 
 	return (^Display)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-WindowManager_getDisplayEngagementMode :: proc "contextless" (self: ^WindowManager, displayId: i32) -> (result: i32, exception: ^Throwable) { // API level 37
+WindowManager_getDisplayEngagementMode :: proc "contextless" (self: ^WindowManager, displayId: i32) -> (result: WindowManager_EngagementModeFlags, exception: ^Throwable) { // API level 37
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowManager__class, "getDisplayEngagementMode", "(I)I", false) or_return
 	jni_args := [?]android.jvalue{{i = displayId}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return transmute(WindowManager_EngagementModeFlags)(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 WindowManager_getMaximumWindowMetrics :: proc "contextless" (self: ^WindowManager) -> (result: ^WindowMetrics, exception: ^Throwable) { // API level 30
@@ -21190,10 +22312,10 @@ WindowManager_removeViewImmediate :: proc "contextless" (self: ^WindowManager, v
 	return jni_take(jni_env)
 }
 
-WindowManager_requestEngagementControlState :: proc "contextless" (self: ^WindowManager, engagementControlFlags: i32) -> (exception: ^Throwable) { // API level 37
+WindowManager_requestEngagementControlState :: proc "contextless" (self: ^WindowManager, engagementControlFlags: WindowManager_EngagementControlFlags) -> (exception: ^Throwable) { // API level 37
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowManager__class, "requestEngagementControlState", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = engagementControlFlags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)engagementControlFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -21228,6 +22350,17 @@ WindowManager_unregisterTrustedPresentationListener :: proc "contextless" (self:
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+WindowManager_EngagementModeFlag :: enum u32 {
+	AUDIO_ON   = 1,
+	VISUALS_ON = 0,
+}
+WindowManager_EngagementModeFlags :: distinct bit_set[WindowManager_EngagementModeFlag; u32]
+
+WindowManager_EngagementControlFlag :: enum u32 {
+	ENGAGEMENT_CONTROL_FLAG_SUSTAIN_VISUALS = 0,
+}
+WindowManager_EngagementControlFlags :: distinct bit_set[WindowManager_EngagementControlFlag; u32]
 
 // class android.view.WindowManager.BadTokenException
 WindowManager_BadTokenException :: struct #raw_union {
@@ -21269,10 +22402,10 @@ WindowManager_DisplayEngagementModeState_getDisplayId :: proc "contextless" (sel
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-WindowManager_DisplayEngagementModeState_getEngagementModeFlags :: proc "contextless" (self: ^WindowManager_DisplayEngagementModeState) -> (result: i32, exception: ^Throwable) {
+WindowManager_DisplayEngagementModeState_getEngagementModeFlags :: proc "contextless" (self: ^WindowManager_DisplayEngagementModeState) -> (result: WindowManager_EngagementModeFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowManager_DisplayEngagementModeState__class, "getEngagementModeFlags", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(WindowManager_EngagementModeFlags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 // class android.view.WindowManager.InvalidDisplayException
@@ -21472,42 +22605,42 @@ WindowManager_LayoutParams_set_dimColor :: proc "contextless" (self: ^WindowMana
 	return jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_get_flags :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: i32, exception: ^Throwable) {
+WindowManager_LayoutParams_get_flags :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: WindowManager_LayoutParams_Flags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &WindowManager_LayoutParams__class, "flags", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(WindowManager_LayoutParams_Flags)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_set_flags :: proc "contextless" (self: ^WindowManager_LayoutParams, value: i32) -> (exception: ^Throwable) {
+WindowManager_LayoutParams_set_flags :: proc "contextless" (self: ^WindowManager_LayoutParams, value: WindowManager_LayoutParams_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &WindowManager_LayoutParams__class, "flags", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_get_format :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: i32, exception: ^Throwable) {
+WindowManager_LayoutParams_get_format :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: PixelFormat_Format, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &WindowManager_LayoutParams__class, "format", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return PixelFormat_Format(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_set_format :: proc "contextless" (self: ^WindowManager_LayoutParams, value: i32) -> (exception: ^Throwable) {
+WindowManager_LayoutParams_set_format :: proc "contextless" (self: ^WindowManager_LayoutParams, value: PixelFormat_Format) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &WindowManager_LayoutParams__class, "format", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_get_gravity :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: i32, exception: ^Throwable) {
+WindowManager_LayoutParams_get_gravity :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: Gravity_Field, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &WindowManager_LayoutParams__class, "gravity", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(Gravity_Field)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_set_gravity :: proc "contextless" (self: ^WindowManager_LayoutParams, value: i32) -> (exception: ^Throwable) {
+WindowManager_LayoutParams_set_gravity :: proc "contextless" (self: ^WindowManager_LayoutParams, value: Gravity_Field) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &WindowManager_LayoutParams__class, "gravity", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
@@ -21537,16 +22670,16 @@ WindowManager_LayoutParams_set_horizontalWeight :: proc "contextless" (self: ^Wi
 	return jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_get_layoutInDisplayCutoutMode :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: i32, exception: ^Throwable) {
+WindowManager_LayoutParams_get_layoutInDisplayCutoutMode :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: WindowManager_LayoutParams_LayoutInDisplayCutoutMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &WindowManager_LayoutParams__class, "layoutInDisplayCutoutMode", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return WindowManager_LayoutParams_LayoutInDisplayCutoutMode(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_set_layoutInDisplayCutoutMode :: proc "contextless" (self: ^WindowManager_LayoutParams, value: i32) -> (exception: ^Throwable) {
+WindowManager_LayoutParams_set_layoutInDisplayCutoutMode :: proc "contextless" (self: ^WindowManager_LayoutParams, value: WindowManager_LayoutParams_LayoutInDisplayCutoutMode) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &WindowManager_LayoutParams__class, "layoutInDisplayCutoutMode", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
@@ -21615,16 +22748,16 @@ WindowManager_LayoutParams_set_preferredRefreshRate :: proc "contextless" (self:
 	return jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_get_rotationAnimation :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: i32, exception: ^Throwable) {
+WindowManager_LayoutParams_get_rotationAnimation :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: WindowManager_LayoutParams_RotationAnimation, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &WindowManager_LayoutParams__class, "rotationAnimation", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return WindowManager_LayoutParams_RotationAnimation(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_set_rotationAnimation :: proc "contextless" (self: ^WindowManager_LayoutParams, value: i32) -> (exception: ^Throwable) {
+WindowManager_LayoutParams_set_rotationAnimation :: proc "contextless" (self: ^WindowManager_LayoutParams, value: WindowManager_LayoutParams_RotationAnimation) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &WindowManager_LayoutParams__class, "rotationAnimation", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
@@ -21641,55 +22774,55 @@ WindowManager_LayoutParams_set_screenBrightness :: proc "contextless" (self: ^Wi
 	return jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_get_screenBrightnessUnit :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: i32, exception: ^Throwable) { // API level 37
+WindowManager_LayoutParams_get_screenBrightnessUnit :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: DisplayManager_BrightnessUnit, exception: ^Throwable) { // API level 37
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &WindowManager_LayoutParams__class, "screenBrightnessUnit", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return DisplayManager_BrightnessUnit(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_set_screenBrightnessUnit :: proc "contextless" (self: ^WindowManager_LayoutParams, value: i32) -> (exception: ^Throwable) { // API level 37
+WindowManager_LayoutParams_set_screenBrightnessUnit :: proc "contextless" (self: ^WindowManager_LayoutParams, value: DisplayManager_BrightnessUnit) -> (exception: ^Throwable) { // API level 37
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &WindowManager_LayoutParams__class, "screenBrightnessUnit", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_get_screenOrientation :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: i32, exception: ^Throwable) {
+WindowManager_LayoutParams_get_screenOrientation :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: ActivityInfo_ScreenOrientation, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &WindowManager_LayoutParams__class, "screenOrientation", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return ActivityInfo_ScreenOrientation(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_set_screenOrientation :: proc "contextless" (self: ^WindowManager_LayoutParams, value: i32) -> (exception: ^Throwable) {
+WindowManager_LayoutParams_set_screenOrientation :: proc "contextless" (self: ^WindowManager_LayoutParams, value: ActivityInfo_ScreenOrientation) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &WindowManager_LayoutParams__class, "screenOrientation", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_get_softInputMode :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: i32, exception: ^Throwable) {
+WindowManager_LayoutParams_get_softInputMode :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: WindowManager_LayoutParams_SoftInputMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &WindowManager_LayoutParams__class, "softInputMode", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(WindowManager_LayoutParams_SoftInputMode)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_set_softInputMode :: proc "contextless" (self: ^WindowManager_LayoutParams, value: i32) -> (exception: ^Throwable) {
+WindowManager_LayoutParams_set_softInputMode :: proc "contextless" (self: ^WindowManager_LayoutParams, value: WindowManager_LayoutParams_SoftInputMode) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &WindowManager_LayoutParams__class, "softInputMode", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_get_systemUiVisibility :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: i32, exception: ^Throwable) {
+WindowManager_LayoutParams_get_systemUiVisibility :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: View_SystemUiFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &WindowManager_LayoutParams__class, "systemUiVisibility", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return transmute(View_SystemUiFlags)(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_set_systemUiVisibility :: proc "contextless" (self: ^WindowManager_LayoutParams, value: i32) -> (exception: ^Throwable) {
+WindowManager_LayoutParams_set_systemUiVisibility :: proc "contextless" (self: ^WindowManager_LayoutParams, value: View_SystemUiFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &WindowManager_LayoutParams__class, "systemUiVisibility", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, transmute(i32)value)
 	return jni_take(jni_env)
 }
 
@@ -21706,16 +22839,16 @@ WindowManager_LayoutParams_set_token :: proc "contextless" (self: ^WindowManager
 	return jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_get_type :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: i32, exception: ^Throwable) {
+WindowManager_LayoutParams_get_type :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: WindowManager_LayoutParams_Type, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &WindowManager_LayoutParams__class, "type", "I", false) or_return
-	return jni_env->GetIntField(self, jni_id), jni_take(jni_env)
+	return WindowManager_LayoutParams_Type(jni_env->GetIntField(self, jni_id)), jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_set_type :: proc "contextless" (self: ^WindowManager_LayoutParams, value: i32) -> (exception: ^Throwable) {
+WindowManager_LayoutParams_set_type :: proc "contextless" (self: ^WindowManager_LayoutParams, value: WindowManager_LayoutParams_Type) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Field
 	jni_env, _, jni_id := jni_field(&jni_cache, &WindowManager_LayoutParams__class, "type", "I", false) or_return
-	jni_env->SetIntField(self, jni_id, value)
+	jni_env->SetIntField(self, jni_id, i32(value))
 	return jni_take(jni_env)
 }
 
@@ -21797,38 +22930,38 @@ WindowManager_LayoutParams_new_Parcel :: proc "contextless" (in_: ^Parcel) -> (r
 	return (^WindowManager_LayoutParams)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_new_int :: proc "contextless" (_type: i32) -> (result: ^WindowManager_LayoutParams, exception: ^Throwable) {
+WindowManager_LayoutParams_new_int :: proc "contextless" (_type: WindowManager_LayoutParams_Type) -> (result: ^WindowManager_LayoutParams, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &WindowManager_LayoutParams__class, "<init>", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = _type}}
+	jni_args := [?]android.jvalue{{i = i32(_type)}}
 	return (^WindowManager_LayoutParams)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_new_int_int :: proc "contextless" (_type: i32, _flags: i32) -> (result: ^WindowManager_LayoutParams, exception: ^Throwable) {
+WindowManager_LayoutParams_new_int_int :: proc "contextless" (_type: WindowManager_LayoutParams_Type, _flags: WindowManager_LayoutParams_Flags) -> (result: ^WindowManager_LayoutParams, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &WindowManager_LayoutParams__class, "<init>", "(II)V", false) or_return
-	jni_args := [?]android.jvalue{{i = _type}, {i = _flags}}
+	jni_args := [?]android.jvalue{{i = i32(_type)}, {i = transmute(i32)_flags}}
 	return (^WindowManager_LayoutParams)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_new_int_int_int :: proc "contextless" (_type: i32, _flags: i32, _format: i32) -> (result: ^WindowManager_LayoutParams, exception: ^Throwable) {
+WindowManager_LayoutParams_new_int_int_int :: proc "contextless" (_type: WindowManager_LayoutParams_Type, _flags: WindowManager_LayoutParams_Flags, _format: PixelFormat_Format) -> (result: ^WindowManager_LayoutParams, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &WindowManager_LayoutParams__class, "<init>", "(III)V", false) or_return
-	jni_args := [?]android.jvalue{{i = _type}, {i = _flags}, {i = _format}}
+	jni_args := [?]android.jvalue{{i = i32(_type)}, {i = transmute(i32)_flags}, {i = i32(_format)}}
 	return (^WindowManager_LayoutParams)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_new_int_int_int_int_int :: proc "contextless" (w: i32, h: i32, _type: i32, _flags: i32, _format: i32) -> (result: ^WindowManager_LayoutParams, exception: ^Throwable) {
+WindowManager_LayoutParams_new_int_int_int_int_int :: proc "contextless" (w: i32, h: i32, _type: WindowManager_LayoutParams_Type, _flags: WindowManager_LayoutParams_Flags, _format: PixelFormat_Format) -> (result: ^WindowManager_LayoutParams, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &WindowManager_LayoutParams__class, "<init>", "(IIIII)V", false) or_return
-	jni_args := [?]android.jvalue{{i = w}, {i = h}, {i = _type}, {i = _flags}, {i = _format}}
+	jni_args := [?]android.jvalue{{i = w}, {i = h}, {i = i32(_type)}, {i = transmute(i32)_flags}, {i = i32(_format)}}
 	return (^WindowManager_LayoutParams)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_new_int_int_int_int_int_int_int :: proc "contextless" (w: i32, h: i32, xpos: i32, ypos: i32, _type: i32, _flags: i32, _format: i32) -> (result: ^WindowManager_LayoutParams, exception: ^Throwable) {
+WindowManager_LayoutParams_new_int_int_int_int_int_int_int :: proc "contextless" (w: i32, h: i32, xpos: i32, ypos: i32, _type: WindowManager_LayoutParams_Type, _flags: WindowManager_LayoutParams_Flags, _format: PixelFormat_Format) -> (result: ^WindowManager_LayoutParams, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &WindowManager_LayoutParams__class, "<init>", "(IIIIIII)V", false) or_return
-	jni_args := [?]android.jvalue{{i = w}, {i = h}, {i = xpos}, {i = ypos}, {i = _type}, {i = _flags}, {i = _format}}
+	jni_args := [?]android.jvalue{{i = w}, {i = h}, {i = xpos}, {i = ypos}, {i = i32(_type)}, {i = transmute(i32)_flags}, {i = i32(_format)}}
 	return (^WindowManager_LayoutParams)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -21874,10 +23007,10 @@ WindowManager_LayoutParams_debug :: proc "contextless" (self: ^WindowManager_Lay
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_describeContents :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: i32, exception: ^Throwable) {
+WindowManager_LayoutParams_describeContents :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowManager_LayoutParams__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 WindowManager_LayoutParams_getBlurBehindRadius :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: i32, exception: ^Throwable) { // API level 31
@@ -21886,10 +23019,10 @@ WindowManager_LayoutParams_getBlurBehindRadius :: proc "contextless" (self: ^Win
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_getColorMode :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: i32, exception: ^Throwable) {
+WindowManager_LayoutParams_getColorMode :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: ActivityInfo_ColorMode, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowManager_LayoutParams__class, "getColorMode", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return ActivityInfo_ColorMode(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 WindowManager_LayoutParams_getDesiredHdrHeadroom :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: f32, exception: ^Throwable) { // API level 35
@@ -21898,10 +23031,10 @@ WindowManager_LayoutParams_getDesiredHdrHeadroom :: proc "contextless" (self: ^W
 	return jni_env->CallFloatMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_getFitInsetsSides :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: i32, exception: ^Throwable) { // API level 30
+WindowManager_LayoutParams_getFitInsetsSides :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: WindowInsets_Side_FitInsetsSides, exception: ^Throwable) { // API level 30
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowManager_LayoutParams__class, "getFitInsetsSides", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(WindowInsets_Side_FitInsetsSides)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 WindowManager_LayoutParams_getFitInsetsTypes :: proc "contextless" (self: ^WindowManager_LayoutParams) -> (result: i32, exception: ^Throwable) { // API level 30
@@ -21946,10 +23079,10 @@ WindowManager_LayoutParams_isHdrConversionEnabled :: proc "contextless" (self: ^
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_mayUseInputMethod :: proc "contextless" (flags: i32) -> (result: bool, exception: ^Throwable) {
+WindowManager_LayoutParams_mayUseInputMethod :: proc "contextless" (flags: WindowManager_LayoutParams_Flags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &WindowManager_LayoutParams__class, "mayUseInputMethod", "(I)Z", true) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	return jni_env->CallStaticBooleanMethodA(jni_class, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -21977,10 +23110,10 @@ WindowManager_LayoutParams_setCanPlayMoveAnimation :: proc "contextless" (self: 
 	return jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_setColorMode :: proc "contextless" (self: ^WindowManager_LayoutParams, colorMode: i32) -> (exception: ^Throwable) {
+WindowManager_LayoutParams_setColorMode :: proc "contextless" (self: ^WindowManager_LayoutParams, colorMode: ActivityInfo_ColorMode) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowManager_LayoutParams__class, "setColorMode", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = colorMode}}
+	jni_args := [?]android.jvalue{{i = i32(colorMode)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -22001,10 +23134,10 @@ WindowManager_LayoutParams_setFitInsetsIgnoringVisibility :: proc "contextless" 
 	return jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_setFitInsetsSides :: proc "contextless" (self: ^WindowManager_LayoutParams, sides: i32) -> (exception: ^Throwable) { // API level 30
+WindowManager_LayoutParams_setFitInsetsSides :: proc "contextless" (self: ^WindowManager_LayoutParams, sides: WindowInsets_Side_FitInsetsSides) -> (exception: ^Throwable) { // API level 30
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowManager_LayoutParams__class, "setFitInsetsSides", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = sides}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)sides}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -22071,12 +23204,133 @@ WindowManager_LayoutParams_toString :: proc "contextless" (self: ^WindowManager_
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-WindowManager_LayoutParams_writeToParcel :: proc "contextless" (self: ^WindowManager_LayoutParams, out: ^Parcel, parcelableFlags: i32) -> (exception: ^Throwable) {
+WindowManager_LayoutParams_writeToParcel :: proc "contextless" (self: ^WindowManager_LayoutParams, out: ^Parcel, parcelableFlags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &WindowManager_LayoutParams__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = parcelableFlags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)parcelableFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+WindowManager_LayoutParams_RotationAnimation :: enum i32 {
+	CHANGED   = 4096,
+	CROSSFADE = 1,
+	JUMPCUT   = 2,
+	ROTATE    = 0,
+	SEAMLESS  = 3,
+}
+
+WindowManager_LayoutParams_SoftInputState :: enum u32 {
+	UNSPECIFIED    = 0,
+	UNCHANGED      = 1,
+	HIDDEN         = 2,
+	ALWAYS_HIDDEN  = 3,
+	VISIBLE        = 4,
+	ALWAYS_VISIBLE = 5,
+}
+
+WindowManager_LayoutParams_SoftInputAdjust :: enum u32 {
+	UNSPECIFIED = 0,
+	RESIZE      = 1,
+	PAN         = 2,
+	NOTHING     = 3,
+}
+
+WindowManager_LayoutParams_SoftInputMode :: bit_field i32 {
+	state:                 WindowManager_LayoutParams_SoftInputState  | 4,
+	adjust:                WindowManager_LayoutParams_SoftInputAdjust | 4,
+	is_forward_navigation: bool                                       | 1,
+	mode_changed:          bool                                       | 1,
+	_:                     u32                                        | 22,
+}
+
+WindowManager_LayoutParams_SoftInputMode_ADJUST_NOTHING        :: WindowManager_LayoutParams_SoftInputMode{adjust = .NOTHING}
+WindowManager_LayoutParams_SoftInputMode_ADJUST_PAN            :: WindowManager_LayoutParams_SoftInputMode{adjust = .PAN}
+WindowManager_LayoutParams_SoftInputMode_ADJUST_RESIZE         :: WindowManager_LayoutParams_SoftInputMode{adjust = .RESIZE}
+WindowManager_LayoutParams_SoftInputMode_ADJUST_UNSPECIFIED    :: WindowManager_LayoutParams_SoftInputMode{}
+WindowManager_LayoutParams_SoftInputMode_IS_FORWARD_NAVIGATION :: WindowManager_LayoutParams_SoftInputMode{is_forward_navigation = true}
+WindowManager_LayoutParams_SoftInputMode_MASK_ADJUST           :: WindowManager_LayoutParams_SoftInputMode{adjust = WindowManager_LayoutParams_SoftInputAdjust(0xf)}
+WindowManager_LayoutParams_SoftInputMode_MASK_STATE            :: WindowManager_LayoutParams_SoftInputMode{state = WindowManager_LayoutParams_SoftInputState(0xf)}
+WindowManager_LayoutParams_SoftInputMode_MODE_CHANGED          :: WindowManager_LayoutParams_SoftInputMode{mode_changed = true}
+WindowManager_LayoutParams_SoftInputMode_STATE_ALWAYS_HIDDEN   :: WindowManager_LayoutParams_SoftInputMode{state = .ALWAYS_HIDDEN}
+WindowManager_LayoutParams_SoftInputMode_STATE_ALWAYS_VISIBLE  :: WindowManager_LayoutParams_SoftInputMode{state = .ALWAYS_VISIBLE}
+WindowManager_LayoutParams_SoftInputMode_STATE_HIDDEN          :: WindowManager_LayoutParams_SoftInputMode{state = .HIDDEN}
+WindowManager_LayoutParams_SoftInputMode_STATE_UNCHANGED       :: WindowManager_LayoutParams_SoftInputMode{state = .UNCHANGED}
+WindowManager_LayoutParams_SoftInputMode_STATE_UNSPECIFIED     :: WindowManager_LayoutParams_SoftInputMode{}
+WindowManager_LayoutParams_SoftInputMode_STATE_VISIBLE         :: WindowManager_LayoutParams_SoftInputMode{state = .VISIBLE}
+
+WindowManager_LayoutParams_Type :: enum i32 {
+	ACCESSIBILITY_OVERLAY       = 2032,
+	APPLICATION                 = 2,
+	APPLICATION_ATTACHED_DIALOG = 1003,
+	APPLICATION_MEDIA           = 1001,
+	APPLICATION_OVERLAY         = 2038,
+	APPLICATION_PANEL           = 1000,
+	APPLICATION_STARTING        = 3,
+	APPLICATION_SUB_PANEL       = 1002,
+	BASE_APPLICATION            = 1,
+	DRAWN_APPLICATION           = 4,
+	INPUT_METHOD                = 2011,
+	INPUT_METHOD_DIALOG         = 2012,
+	KEYGUARD_DIALOG             = 2009,
+	PHONE                       = 2002,
+	PRIORITY_PHONE              = 2007,
+	PRIVATE_PRESENTATION        = 2030,
+	SEARCH_BAR                  = 2001,
+	STATUS_BAR                  = 2000,
+	SYSTEM_ALERT                = 2003,
+	SYSTEM_DIALOG               = 2008,
+	SYSTEM_ERROR                = 2010,
+	SYSTEM_OVERLAY              = 2006,
+	TOAST                       = 2005,
+	WALLPAPER                   = 2013,
+}
+
+WindowManager_LayoutParams_Flag :: enum u32 {
+	ALLOW_LOCK_WHILE_SCREEN_ON   = 0,
+	ALT_FOCUSABLE_IM             = 17,
+	BLUR_BEHIND                  = 2,
+	DIM_BEHIND                   = 1,
+	DISMISS_KEYGUARD             = 22,
+	DITHER                       = 12,
+	DRAWS_SYSTEM_BAR_BACKGROUNDS = 31,
+	FORCE_NOT_FULLSCREEN         = 11,
+	FULLSCREEN                   = 10,
+	HARDWARE_ACCELERATED         = 24,
+	IGNORE_CHEEK_PRESSES         = 15,
+	KEEP_SCREEN_ON               = 7,
+	LAYOUT_ATTACHED_IN_DECOR     = 30,
+	LAYOUT_INSET_DECOR           = 16,
+	LAYOUT_IN_OVERSCAN           = 25,
+	LAYOUT_IN_SCREEN             = 8,
+	LAYOUT_NO_LIMITS             = 9,
+	LOCAL_FOCUS_MODE             = 28,
+	NOT_FOCUSABLE                = 3,
+	NOT_TOUCHABLE                = 4,
+	NOT_TOUCH_MODAL              = 5,
+	SCALED                       = 14,
+	SECURE                       = 13,
+	SHOW_WALLPAPER               = 20,
+	SHOW_WHEN_LOCKED             = 19,
+	SPLIT_TOUCH                  = 23,
+	TOUCHABLE_WHEN_WAKING        = 6,
+	TRANSLUCENT_NAVIGATION       = 27,
+	TRANSLUCENT_STATUS           = 26,
+	TURN_SCREEN_ON               = 21,
+	WATCH_OUTSIDE_TOUCH          = 18,
+}
+WindowManager_LayoutParams_Flags :: distinct bit_set[WindowManager_LayoutParams_Flag; u32]
+
+WindowManager_LayoutParams_LayoutInDisplayCutoutMode :: enum i32 {
+	ALWAYS      = 3,
+	DEFAULT     = 0,
+	NEVER       = 2,
+	SHORT_EDGES = 1,
+}
+
+DisplayManager_BrightnessUnit :: enum i32 {
+	PERCENTAGE = 1,
+	RAW        = 3,
 }
 
 // class android.view.WindowMetrics // API level 30

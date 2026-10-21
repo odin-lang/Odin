@@ -20,12 +20,14 @@ ACameraCaptureSession_stateCallbacks :: struct {
 
 ACameraCaptureSession_prepareCallback :: proc "c" (context_: rawptr, window: ^android.ANativeWindow, session: ^ACameraCaptureSession)
 
-CAPTURE_FAILURE_REASON_FLUSHED :: 0
-CAPTURE_FAILURE_REASON_ERROR   :: 1
+ACameraCaptureFailureReason :: enum i32 {
+	FLUSHED = 0,
+	ERROR   = 1,
+}
 
 ACameraCaptureFailure :: struct {
 	frameNumber:      i64,
-	reason:           c.int,
+	reason:           ACameraCaptureFailureReason,
 	sequenceId:       c.int,
 	wasImageCaptured: bool,
 }

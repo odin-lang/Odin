@@ -8,10 +8,10 @@ foreign import libandroid "system:android"
 ANativeService            :: struct {}
 ANativeService_createFunc :: proc "c" (service: ^ANativeService)
 
-ANativeServiceTrimMemoryLevel :: i32
-
-ANATIVE_SERVICE_TRIM_MEMORY_UI_HIDDEN  :: 20
-ANATIVE_SERVICE_TRIM_MEMORY_BACKGROUND :: 40
+ANativeServiceTrimMemoryLevel :: enum i32 {
+	UI_HIDDEN  = 20,
+	BACKGROUND = 40,
+}
 
 ANativeService_onBindCallback       :: proc "c" (service: ^ANativeService, bindToken: u64, action: cstring, data: cstring) -> ^AIBinder
 ANativeService_onUnbindCallback     :: proc "c" (service: ^ANativeService, bindToken: u64) -> bool

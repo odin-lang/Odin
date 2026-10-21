@@ -9,941 +9,941 @@ foreign import libicu "system:icu"
 
 USet :: struct {}
 
-UProperty :: c.int
+UProperty :: enum c.int {
+	ALPHABETIC                      = 0,
+	BINARY_START                    = 0,
+	ASCII_HEX_DIGIT                 = 1,
+	BIDI_CONTROL                    = 2,
+	BIDI_MIRRORED                   = 3,
+	DASH                            = 4,
+	DEFAULT_IGNORABLE_CODE_POINT    = 5,
+	DEPRECATED                      = 6,
+	DIACRITIC                       = 7,
+	EXTENDER                        = 8,
+	FULL_COMPOSITION_EXCLUSION      = 9,
+	GRAPHEME_BASE                   = 10,
+	GRAPHEME_EXTEND                 = 11,
+	GRAPHEME_LINK                   = 12,
+	HEX_DIGIT                       = 13,
+	HYPHEN                          = 14,
+	ID_CONTINUE                     = 15,
+	ID_START                        = 16,
+	IDEOGRAPHIC                     = 17,
+	IDS_BINARY_OPERATOR             = 18,
+	IDS_TRINARY_OPERATOR            = 19,
+	JOIN_CONTROL                    = 20,
+	LOGICAL_ORDER_EXCEPTION         = 21,
+	LOWERCASE                       = 22,
+	MATH                            = 23,
+	NONCHARACTER_CODE_POINT         = 24,
+	QUOTATION_MARK                  = 25,
+	RADICAL                         = 26,
+	SOFT_DOTTED                     = 27,
+	TERMINAL_PUNCTUATION            = 28,
+	UNIFIED_IDEOGRAPH               = 29,
+	UPPERCASE                       = 30,
+	WHITE_SPACE                     = 31,
+	XID_CONTINUE                    = 32,
+	XID_START                       = 33,
+	CASE_SENSITIVE                  = 34,
+	S_TERM                          = 35,
+	VARIATION_SELECTOR              = 36,
+	NFD_INERT                       = 37,
+	NFKD_INERT                      = 38,
+	NFC_INERT                       = 39,
+	NFKC_INERT                      = 40,
+	SEGMENT_STARTER                 = 41,
+	PATTERN_SYNTAX                  = 42,
+	PATTERN_WHITE_SPACE             = 43,
+	POSIX_ALNUM                     = 44,
+	POSIX_BLANK                     = 45,
+	POSIX_GRAPH                     = 46,
+	POSIX_PRINT                     = 47,
+	POSIX_XDIGIT                    = 48,
+	CASED                           = 49,
+	CASE_IGNORABLE                  = 50,
+	CHANGES_WHEN_LOWERCASED         = 51,
+	CHANGES_WHEN_UPPERCASED         = 52,
+	CHANGES_WHEN_TITLECASED         = 53,
+	CHANGES_WHEN_CASEFOLDED         = 54,
+	CHANGES_WHEN_CASEMAPPED         = 55,
+	CHANGES_WHEN_NFKC_CASEFOLDED    = 56,
+	EMOJI                           = 57,
+	EMOJI_PRESENTATION              = 58,
+	EMOJI_MODIFIER                  = 59,
+	EMOJI_MODIFIER_BASE             = 60,
+	EMOJI_COMPONENT                 = 61,
+	REGIONAL_INDICATOR              = 62,
+	PREPENDED_CONCATENATION_MARK    = 63,
+	EXTENDED_PICTOGRAPHIC           = 64,
+	BASIC_EMOJI                     = 65,
+	EMOJI_KEYCAP_SEQUENCE           = 66,
+	RGI_EMOJI_MODIFIER_SEQUENCE     = 67,
+	RGI_EMOJI_FLAG_SEQUENCE         = 68,
+	RGI_EMOJI_TAG_SEQUENCE          = 69,
+	RGI_EMOJI_ZWJ_SEQUENCE          = 70,
+	RGI_EMOJI                       = 71,
+	IDS_UNARY_OPERATOR              = 72,
+	ID_COMPAT_MATH_START            = 73,
+	ID_COMPAT_MATH_CONTINUE         = 74,
+	MODIFIER_COMBINING_MARK         = 75,
+	BIDI_CLASS                      = 0x1000,
+	INT_START                       = 4096,
+	BLOCK                           = 0x1001,
+	CANONICAL_COMBINING_CLASS       = 0x1002,
+	DECOMPOSITION_TYPE              = 0x1003,
+	EAST_ASIAN_WIDTH                = 0x1004,
+	GENERAL_CATEGORY                = 0x1005,
+	JOINING_GROUP                   = 0x1006,
+	JOINING_TYPE                    = 0x1007,
+	LINE_BREAK                      = 0x1008,
+	NUMERIC_TYPE                    = 0x1009,
+	SCRIPT                          = 0x100A,
+	HANGUL_SYLLABLE_TYPE            = 0x100B,
+	NFD_QUICK_CHECK                 = 0x100C,
+	NFKD_QUICK_CHECK                = 0x100D,
+	NFC_QUICK_CHECK                 = 0x100E,
+	NFKC_QUICK_CHECK                = 0x100F,
+	LEAD_CANONICAL_COMBINING_CLASS  = 0x1010,
+	TRAIL_CANONICAL_COMBINING_CLASS = 0x1011,
+	GRAPHEME_CLUSTER_BREAK          = 0x1012,
+	SENTENCE_BREAK                  = 0x1013,
+	WORD_BREAK                      = 0x1014,
+	BIDI_PAIRED_BRACKET_TYPE        = 0x1015,
+	INDIC_POSITIONAL_CATEGORY       = 0x1016,
+	INDIC_SYLLABIC_CATEGORY         = 0x1017,
+	VERTICAL_ORIENTATION            = 0x1018,
+	IDENTIFIER_STATUS               = 0x1019,
+	INDIC_CONJUNCT_BREAK            = 0x101A,
+	GENERAL_CATEGORY_MASK           = 0x2000,
+	MASK_START                      = 8192,
+	NUMERIC_VALUE                   = 0x3000,
+	DOUBLE_START                    = 12288,
+	AGE                             = 0x4000,
+	STRING_START                    = 16384,
+	BIDI_MIRRORING_GLYPH            = 0x4001,
+	CASE_FOLDING                    = 0x4002,
+	LOWERCASE_MAPPING               = 0x4004,
+	NAME                            = 0x4005,
+	SIMPLE_CASE_FOLDING             = 0x4006,
+	SIMPLE_LOWERCASE_MAPPING        = 0x4007,
+	SIMPLE_TITLECASE_MAPPING        = 0x4008,
+	SIMPLE_UPPERCASE_MAPPING        = 0x4009,
+	TITLECASE_MAPPING               = 0x400A,
+	UPPERCASE_MAPPING               = 0x400C,
+	BIDI_PAIRED_BRACKET             = 0x400D,
+	SCRIPT_EXTENSIONS               = 0x7000,
+	OTHER_PROPERTY_START            = 28672,
+	IDENTIFIER_TYPE                 = 0x7001,
+	INVALID_CODE                    = -1,
+}
 
-UCHAR_ALPHABETIC                      :: 0
-UCHAR_BINARY_START                    :: 0
-UCHAR_ASCII_HEX_DIGIT                 :: 1
-UCHAR_BIDI_CONTROL                    :: 2
-UCHAR_BIDI_MIRRORED                   :: 3
-UCHAR_DASH                            :: 4
-UCHAR_DEFAULT_IGNORABLE_CODE_POINT    :: 5
-UCHAR_DEPRECATED                      :: 6
-UCHAR_DIACRITIC                       :: 7
-UCHAR_EXTENDER                        :: 8
-UCHAR_FULL_COMPOSITION_EXCLUSION      :: 9
-UCHAR_GRAPHEME_BASE                   :: 10
-UCHAR_GRAPHEME_EXTEND                 :: 11
-UCHAR_GRAPHEME_LINK                   :: 12
-UCHAR_HEX_DIGIT                       :: 13
-UCHAR_HYPHEN                          :: 14
-UCHAR_ID_CONTINUE                     :: 15
-UCHAR_ID_START                        :: 16
-UCHAR_IDEOGRAPHIC                     :: 17
-UCHAR_IDS_BINARY_OPERATOR             :: 18
-UCHAR_IDS_TRINARY_OPERATOR            :: 19
-UCHAR_JOIN_CONTROL                    :: 20
-UCHAR_LOGICAL_ORDER_EXCEPTION         :: 21
-UCHAR_LOWERCASE                       :: 22
-UCHAR_MATH                            :: 23
-UCHAR_NONCHARACTER_CODE_POINT         :: 24
-UCHAR_QUOTATION_MARK                  :: 25
-UCHAR_RADICAL                         :: 26
-UCHAR_SOFT_DOTTED                     :: 27
-UCHAR_TERMINAL_PUNCTUATION            :: 28
-UCHAR_UNIFIED_IDEOGRAPH               :: 29
-UCHAR_UPPERCASE                       :: 30
-UCHAR_WHITE_SPACE                     :: 31
-UCHAR_XID_CONTINUE                    :: 32
-UCHAR_XID_START                       :: 33
-UCHAR_CASE_SENSITIVE                  :: 34
-UCHAR_S_TERM                          :: 35
-UCHAR_VARIATION_SELECTOR              :: 36
-UCHAR_NFD_INERT                       :: 37
-UCHAR_NFKD_INERT                      :: 38
-UCHAR_NFC_INERT                       :: 39
-UCHAR_NFKC_INERT                      :: 40
-UCHAR_SEGMENT_STARTER                 :: 41
-UCHAR_PATTERN_SYNTAX                  :: 42
-UCHAR_PATTERN_WHITE_SPACE             :: 43
-UCHAR_POSIX_ALNUM                     :: 44
-UCHAR_POSIX_BLANK                     :: 45
-UCHAR_POSIX_GRAPH                     :: 46
-UCHAR_POSIX_PRINT                     :: 47
-UCHAR_POSIX_XDIGIT                    :: 48
-UCHAR_CASED                           :: 49
-UCHAR_CASE_IGNORABLE                  :: 50
-UCHAR_CHANGES_WHEN_LOWERCASED         :: 51
-UCHAR_CHANGES_WHEN_UPPERCASED         :: 52
-UCHAR_CHANGES_WHEN_TITLECASED         :: 53
-UCHAR_CHANGES_WHEN_CASEFOLDED         :: 54
-UCHAR_CHANGES_WHEN_CASEMAPPED         :: 55
-UCHAR_CHANGES_WHEN_NFKC_CASEFOLDED    :: 56
-UCHAR_EMOJI                           :: 57
-UCHAR_EMOJI_PRESENTATION              :: 58
-UCHAR_EMOJI_MODIFIER                  :: 59
-UCHAR_EMOJI_MODIFIER_BASE             :: 60
-UCHAR_EMOJI_COMPONENT                 :: 61
-UCHAR_REGIONAL_INDICATOR              :: 62
-UCHAR_PREPENDED_CONCATENATION_MARK    :: 63
-UCHAR_EXTENDED_PICTOGRAPHIC           :: 64
-UCHAR_BASIC_EMOJI                     :: 65
-UCHAR_EMOJI_KEYCAP_SEQUENCE           :: 66
-UCHAR_RGI_EMOJI_MODIFIER_SEQUENCE     :: 67
-UCHAR_RGI_EMOJI_FLAG_SEQUENCE         :: 68
-UCHAR_RGI_EMOJI_TAG_SEQUENCE          :: 69
-UCHAR_RGI_EMOJI_ZWJ_SEQUENCE          :: 70
-UCHAR_RGI_EMOJI                       :: 71
-UCHAR_IDS_UNARY_OPERATOR              :: 72
-UCHAR_ID_COMPAT_MATH_START            :: 73
-UCHAR_ID_COMPAT_MATH_CONTINUE         :: 74
-UCHAR_MODIFIER_COMBINING_MARK         :: 75
-UCHAR_BIDI_CLASS                      :: 0x1000
-UCHAR_INT_START                       :: 4096
-UCHAR_BLOCK                           :: 0x1001
-UCHAR_CANONICAL_COMBINING_CLASS       :: 0x1002
-UCHAR_DECOMPOSITION_TYPE              :: 0x1003
-UCHAR_EAST_ASIAN_WIDTH                :: 0x1004
-UCHAR_GENERAL_CATEGORY                :: 0x1005
-UCHAR_JOINING_GROUP                   :: 0x1006
-UCHAR_JOINING_TYPE                    :: 0x1007
-UCHAR_LINE_BREAK                      :: 0x1008
-UCHAR_NUMERIC_TYPE                    :: 0x1009
-UCHAR_SCRIPT                          :: 0x100A
-UCHAR_HANGUL_SYLLABLE_TYPE            :: 0x100B
-UCHAR_NFD_QUICK_CHECK                 :: 0x100C
-UCHAR_NFKD_QUICK_CHECK                :: 0x100D
-UCHAR_NFC_QUICK_CHECK                 :: 0x100E
-UCHAR_NFKC_QUICK_CHECK                :: 0x100F
-UCHAR_LEAD_CANONICAL_COMBINING_CLASS  :: 0x1010
-UCHAR_TRAIL_CANONICAL_COMBINING_CLASS :: 0x1011
-UCHAR_GRAPHEME_CLUSTER_BREAK          :: 0x1012
-UCHAR_SENTENCE_BREAK                  :: 0x1013
-UCHAR_WORD_BREAK                      :: 0x1014
-UCHAR_BIDI_PAIRED_BRACKET_TYPE        :: 0x1015
-UCHAR_INDIC_POSITIONAL_CATEGORY       :: 0x1016
-UCHAR_INDIC_SYLLABIC_CATEGORY         :: 0x1017
-UCHAR_VERTICAL_ORIENTATION            :: 0x1018
-UCHAR_IDENTIFIER_STATUS               :: 0x1019
-UCHAR_INDIC_CONJUNCT_BREAK            :: 0x101A
-UCHAR_GENERAL_CATEGORY_MASK           :: 0x2000
-UCHAR_MASK_START                      :: 8192
-UCHAR_NUMERIC_VALUE                   :: 0x3000
-UCHAR_DOUBLE_START                    :: 12288
-UCHAR_AGE                             :: 0x4000
-UCHAR_STRING_START                    :: 16384
-UCHAR_BIDI_MIRRORING_GLYPH            :: 0x4001
-UCHAR_CASE_FOLDING                    :: 0x4002
-UCHAR_LOWERCASE_MAPPING               :: 0x4004
-UCHAR_NAME                            :: 0x4005
-UCHAR_SIMPLE_CASE_FOLDING             :: 0x4006
-UCHAR_SIMPLE_LOWERCASE_MAPPING        :: 0x4007
-UCHAR_SIMPLE_TITLECASE_MAPPING        :: 0x4008
-UCHAR_SIMPLE_UPPERCASE_MAPPING        :: 0x4009
-UCHAR_TITLECASE_MAPPING               :: 0x400A
-UCHAR_UPPERCASE_MAPPING               :: 0x400C
-UCHAR_BIDI_PAIRED_BRACKET             :: 0x400D
-UCHAR_SCRIPT_EXTENSIONS               :: 0x7000
-UCHAR_OTHER_PROPERTY_START            :: 28672
-UCHAR_IDENTIFIER_TYPE                 :: 0x7001
-UCHAR_INVALID_CODE                    :: -1
+UCharCategory :: enum c.int {
+	UNASSIGNED             = 0,
+	GENERAL_OTHER_TYPES    = 0,
+	UPPERCASE_LETTER       = 1,
+	LOWERCASE_LETTER       = 2,
+	TITLECASE_LETTER       = 3,
+	MODIFIER_LETTER        = 4,
+	OTHER_LETTER           = 5,
+	NON_SPACING_MARK       = 6,
+	ENCLOSING_MARK         = 7,
+	COMBINING_SPACING_MARK = 8,
+	DECIMAL_DIGIT_NUMBER   = 9,
+	LETTER_NUMBER          = 10,
+	OTHER_NUMBER           = 11,
+	SPACE_SEPARATOR        = 12,
+	LINE_SEPARATOR         = 13,
+	PARAGRAPH_SEPARATOR    = 14,
+	CONTROL_CHAR           = 15,
+	FORMAT_CHAR            = 16,
+	PRIVATE_USE_CHAR       = 17,
+	SURROGATE              = 18,
+	DASH_PUNCTUATION       = 19,
+	START_PUNCTUATION      = 20,
+	END_PUNCTUATION        = 21,
+	CONNECTOR_PUNCTUATION  = 22,
+	OTHER_PUNCTUATION      = 23,
+	MATH_SYMBOL            = 24,
+	CURRENCY_SYMBOL        = 25,
+	MODIFIER_SYMBOL        = 26,
+	OTHER_SYMBOL           = 27,
+	INITIAL_PUNCTUATION    = 28,
+	FINAL_PUNCTUATION      = 29,
+	CHAR_CATEGORY_COUNT    = 30,
+}
 
-UCharCategory :: c.int
+UCharDirection :: enum c.int {
+	LEFT_TO_RIGHT              = 0,
+	RIGHT_TO_LEFT              = 1,
+	EUROPEAN_NUMBER            = 2,
+	EUROPEAN_NUMBER_SEPARATOR  = 3,
+	EUROPEAN_NUMBER_TERMINATOR = 4,
+	ARABIC_NUMBER              = 5,
+	COMMON_NUMBER_SEPARATOR    = 6,
+	BLOCK_SEPARATOR            = 7,
+	SEGMENT_SEPARATOR          = 8,
+	WHITE_SPACE_NEUTRAL        = 9,
+	OTHER_NEUTRAL              = 10,
+	LEFT_TO_RIGHT_EMBEDDING    = 11,
+	LEFT_TO_RIGHT_OVERRIDE     = 12,
+	RIGHT_TO_LEFT_ARABIC       = 13,
+	RIGHT_TO_LEFT_EMBEDDING    = 14,
+	RIGHT_TO_LEFT_OVERRIDE     = 15,
+	POP_DIRECTIONAL_FORMAT     = 16,
+	DIR_NON_SPACING_MARK       = 17,
+	BOUNDARY_NEUTRAL           = 18,
+	FIRST_STRONG_ISOLATE       = 19,
+	LEFT_TO_RIGHT_ISOLATE      = 20,
+	RIGHT_TO_LEFT_ISOLATE      = 21,
+	POP_DIRECTIONAL_ISOLATE    = 22,
+}
 
-U_UNASSIGNED             :: 0
-U_GENERAL_OTHER_TYPES    :: 0
-U_UPPERCASE_LETTER       :: 1
-U_LOWERCASE_LETTER       :: 2
-U_TITLECASE_LETTER       :: 3
-U_MODIFIER_LETTER        :: 4
-U_OTHER_LETTER           :: 5
-U_NON_SPACING_MARK       :: 6
-U_ENCLOSING_MARK         :: 7
-U_COMBINING_SPACING_MARK :: 8
-U_DECIMAL_DIGIT_NUMBER   :: 9
-U_LETTER_NUMBER          :: 10
-U_OTHER_NUMBER           :: 11
-U_SPACE_SEPARATOR        :: 12
-U_LINE_SEPARATOR         :: 13
-U_PARAGRAPH_SEPARATOR    :: 14
-U_CONTROL_CHAR           :: 15
-U_FORMAT_CHAR            :: 16
-U_PRIVATE_USE_CHAR       :: 17
-U_SURROGATE              :: 18
-U_DASH_PUNCTUATION       :: 19
-U_START_PUNCTUATION      :: 20
-U_END_PUNCTUATION        :: 21
-U_CONNECTOR_PUNCTUATION  :: 22
-U_OTHER_PUNCTUATION      :: 23
-U_MATH_SYMBOL            :: 24
-U_CURRENCY_SYMBOL        :: 25
-U_MODIFIER_SYMBOL        :: 26
-U_OTHER_SYMBOL           :: 27
-U_INITIAL_PUNCTUATION    :: 28
-U_FINAL_PUNCTUATION      :: 29
-U_CHAR_CATEGORY_COUNT    :: 30
+UBidiPairedBracketType :: enum c.int {
+	NONE  = 0,
+	OPEN  = 1,
+	CLOSE = 2,
+}
 
-UCharDirection :: c.int
+UBlockCode :: enum c.int {
+	NO_BLOCK                                         = 0,
+	BASIC_LATIN                                      = 1,
+	LATIN_1_SUPPLEMENT                               = 2,
+	LATIN_EXTENDED_A                                 = 3,
+	LATIN_EXTENDED_B                                 = 4,
+	IPA_EXTENSIONS                                   = 5,
+	SPACING_MODIFIER_LETTERS                         = 6,
+	COMBINING_DIACRITICAL_MARKS                      = 7,
+	GREEK                                            = 8,
+	CYRILLIC                                         = 9,
+	ARMENIAN                                         = 10,
+	HEBREW                                           = 11,
+	ARABIC                                           = 12,
+	SYRIAC                                           = 13,
+	THAANA                                           = 14,
+	DEVANAGARI                                       = 15,
+	BENGALI                                          = 16,
+	GURMUKHI                                         = 17,
+	GUJARATI                                         = 18,
+	ORIYA                                            = 19,
+	TAMIL                                            = 20,
+	TELUGU                                           = 21,
+	KANNADA                                          = 22,
+	MALAYALAM                                        = 23,
+	SINHALA                                          = 24,
+	THAI                                             = 25,
+	LAO                                              = 26,
+	TIBETAN                                          = 27,
+	MYANMAR                                          = 28,
+	GEORGIAN                                         = 29,
+	HANGUL_JAMO                                      = 30,
+	ETHIOPIC                                         = 31,
+	CHEROKEE                                         = 32,
+	UNIFIED_CANADIAN_ABORIGINAL_SYLLABICS            = 33,
+	OGHAM                                            = 34,
+	RUNIC                                            = 35,
+	KHMER                                            = 36,
+	MONGOLIAN                                        = 37,
+	LATIN_EXTENDED_ADDITIONAL                        = 38,
+	GREEK_EXTENDED                                   = 39,
+	GENERAL_PUNCTUATION                              = 40,
+	SUPERSCRIPTS_AND_SUBSCRIPTS                      = 41,
+	CURRENCY_SYMBOLS                                 = 42,
+	COMBINING_MARKS_FOR_SYMBOLS                      = 43,
+	LETTERLIKE_SYMBOLS                               = 44,
+	NUMBER_FORMS                                     = 45,
+	ARROWS                                           = 46,
+	MATHEMATICAL_OPERATORS                           = 47,
+	MISCELLANEOUS_TECHNICAL                          = 48,
+	CONTROL_PICTURES                                 = 49,
+	OPTICAL_CHARACTER_RECOGNITION                    = 50,
+	ENCLOSED_ALPHANUMERICS                           = 51,
+	BOX_DRAWING                                      = 52,
+	BLOCK_ELEMENTS                                   = 53,
+	GEOMETRIC_SHAPES                                 = 54,
+	MISCELLANEOUS_SYMBOLS                            = 55,
+	DINGBATS                                         = 56,
+	BRAILLE_PATTERNS                                 = 57,
+	CJK_RADICALS_SUPPLEMENT                          = 58,
+	KANGXI_RADICALS                                  = 59,
+	IDEOGRAPHIC_DESCRIPTION_CHARACTERS               = 60,
+	CJK_SYMBOLS_AND_PUNCTUATION                      = 61,
+	HIRAGANA                                         = 62,
+	KATAKANA                                         = 63,
+	BOPOMOFO                                         = 64,
+	HANGUL_COMPATIBILITY_JAMO                        = 65,
+	KANBUN                                           = 66,
+	BOPOMOFO_EXTENDED                                = 67,
+	ENCLOSED_CJK_LETTERS_AND_MONTHS                  = 68,
+	CJK_COMPATIBILITY                                = 69,
+	CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A               = 70,
+	CJK_UNIFIED_IDEOGRAPHS                           = 71,
+	YI_SYLLABLES                                     = 72,
+	YI_RADICALS                                      = 73,
+	HANGUL_SYLLABLES                                 = 74,
+	HIGH_SURROGATES                                  = 75,
+	HIGH_PRIVATE_USE_SURROGATES                      = 76,
+	LOW_SURROGATES                                   = 77,
+	PRIVATE_USE_AREA                                 = 78,
+	PRIVATE_USE                                      = 78,
+	CJK_COMPATIBILITY_IDEOGRAPHS                     = 79,
+	ALPHABETIC_PRESENTATION_FORMS                    = 80,
+	ARABIC_PRESENTATION_FORMS_A                      = 81,
+	COMBINING_HALF_MARKS                             = 82,
+	CJK_COMPATIBILITY_FORMS                          = 83,
+	SMALL_FORM_VARIANTS                              = 84,
+	ARABIC_PRESENTATION_FORMS_B                      = 85,
+	SPECIALS                                         = 86,
+	HALFWIDTH_AND_FULLWIDTH_FORMS                    = 87,
+	OLD_ITALIC                                       = 88,
+	GOTHIC                                           = 89,
+	DESERET                                          = 90,
+	BYZANTINE_MUSICAL_SYMBOLS                        = 91,
+	MUSICAL_SYMBOLS                                  = 92,
+	MATHEMATICAL_ALPHANUMERIC_SYMBOLS                = 93,
+	CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B               = 94,
+	CJK_COMPATIBILITY_IDEOGRAPHS_SUPPLEMENT          = 95,
+	TAGS                                             = 96,
+	CYRILLIC_SUPPLEMENT                              = 97,
+	CYRILLIC_SUPPLEMENTARY                           = 97,
+	TAGALOG                                          = 98,
+	HANUNOO                                          = 99,
+	BUHID                                            = 100,
+	TAGBANWA                                         = 101,
+	MISCELLANEOUS_MATHEMATICAL_SYMBOLS_A             = 102,
+	SUPPLEMENTAL_ARROWS_A                            = 103,
+	SUPPLEMENTAL_ARROWS_B                            = 104,
+	MISCELLANEOUS_MATHEMATICAL_SYMBOLS_B             = 105,
+	SUPPLEMENTAL_MATHEMATICAL_OPERATORS              = 106,
+	KATAKANA_PHONETIC_EXTENSIONS                     = 107,
+	VARIATION_SELECTORS                              = 108,
+	SUPPLEMENTARY_PRIVATE_USE_AREA_A                 = 109,
+	SUPPLEMENTARY_PRIVATE_USE_AREA_B                 = 110,
+	LIMBU                                            = 111,
+	TAI_LE                                           = 112,
+	KHMER_SYMBOLS                                    = 113,
+	PHONETIC_EXTENSIONS                              = 114,
+	MISCELLANEOUS_SYMBOLS_AND_ARROWS                 = 115,
+	YIJING_HEXAGRAM_SYMBOLS                          = 116,
+	LINEAR_B_SYLLABARY                               = 117,
+	LINEAR_B_IDEOGRAMS                               = 118,
+	AEGEAN_NUMBERS                                   = 119,
+	UGARITIC                                         = 120,
+	SHAVIAN                                          = 121,
+	OSMANYA                                          = 122,
+	CYPRIOT_SYLLABARY                                = 123,
+	TAI_XUAN_JING_SYMBOLS                            = 124,
+	VARIATION_SELECTORS_SUPPLEMENT                   = 125,
+	ANCIENT_GREEK_MUSICAL_NOTATION                   = 126,
+	ANCIENT_GREEK_NUMBERS                            = 127,
+	ARABIC_SUPPLEMENT                                = 128,
+	BUGINESE                                         = 129,
+	CJK_STROKES                                      = 130,
+	COMBINING_DIACRITICAL_MARKS_SUPPLEMENT           = 131,
+	COPTIC                                           = 132,
+	ETHIOPIC_EXTENDED                                = 133,
+	ETHIOPIC_SUPPLEMENT                              = 134,
+	GEORGIAN_SUPPLEMENT                              = 135,
+	GLAGOLITIC                                       = 136,
+	KHAROSHTHI                                       = 137,
+	MODIFIER_TONE_LETTERS                            = 138,
+	NEW_TAI_LUE                                      = 139,
+	OLD_PERSIAN                                      = 140,
+	PHONETIC_EXTENSIONS_SUPPLEMENT                   = 141,
+	SUPPLEMENTAL_PUNCTUATION                         = 142,
+	SYLOTI_NAGRI                                     = 143,
+	TIFINAGH                                         = 144,
+	VERTICAL_FORMS                                   = 145,
+	NKO                                              = 146,
+	BALINESE                                         = 147,
+	LATIN_EXTENDED_C                                 = 148,
+	LATIN_EXTENDED_D                                 = 149,
+	PHAGS_PA                                         = 150,
+	PHOENICIAN                                       = 151,
+	CUNEIFORM                                        = 152,
+	CUNEIFORM_NUMBERS_AND_PUNCTUATION                = 153,
+	COUNTING_ROD_NUMERALS                            = 154,
+	SUNDANESE                                        = 155,
+	LEPCHA                                           = 156,
+	OL_CHIKI                                         = 157,
+	CYRILLIC_EXTENDED_A                              = 158,
+	VAI                                              = 159,
+	CYRILLIC_EXTENDED_B                              = 160,
+	SAURASHTRA                                       = 161,
+	KAYAH_LI                                         = 162,
+	REJANG                                           = 163,
+	CHAM                                             = 164,
+	ANCIENT_SYMBOLS                                  = 165,
+	PHAISTOS_DISC                                    = 166,
+	LYCIAN                                           = 167,
+	CARIAN                                           = 168,
+	LYDIAN                                           = 169,
+	MAHJONG_TILES                                    = 170,
+	DOMINO_TILES                                     = 171,
+	SAMARITAN                                        = 172,
+	UNIFIED_CANADIAN_ABORIGINAL_SYLLABICS_EXTENDED   = 173,
+	TAI_THAM                                         = 174,
+	VEDIC_EXTENSIONS                                 = 175,
+	LISU                                             = 176,
+	BAMUM                                            = 177,
+	COMMON_INDIC_NUMBER_FORMS                        = 178,
+	DEVANAGARI_EXTENDED                              = 179,
+	HANGUL_JAMO_EXTENDED_A                           = 180,
+	JAVANESE                                         = 181,
+	MYANMAR_EXTENDED_A                               = 182,
+	TAI_VIET                                         = 183,
+	MEETEI_MAYEK                                     = 184,
+	HANGUL_JAMO_EXTENDED_B                           = 185,
+	IMPERIAL_ARAMAIC                                 = 186,
+	OLD_SOUTH_ARABIAN                                = 187,
+	AVESTAN                                          = 188,
+	INSCRIPTIONAL_PARTHIAN                           = 189,
+	INSCRIPTIONAL_PAHLAVI                            = 190,
+	OLD_TURKIC                                       = 191,
+	RUMI_NUMERAL_SYMBOLS                             = 192,
+	KAITHI                                           = 193,
+	EGYPTIAN_HIEROGLYPHS                             = 194,
+	ENCLOSED_ALPHANUMERIC_SUPPLEMENT                 = 195,
+	ENCLOSED_IDEOGRAPHIC_SUPPLEMENT                  = 196,
+	CJK_UNIFIED_IDEOGRAPHS_EXTENSION_C               = 197,
+	MANDAIC                                          = 198,
+	BATAK                                            = 199,
+	ETHIOPIC_EXTENDED_A                              = 200,
+	BRAHMI                                           = 201,
+	BAMUM_SUPPLEMENT                                 = 202,
+	KANA_SUPPLEMENT                                  = 203,
+	PLAYING_CARDS                                    = 204,
+	MISCELLANEOUS_SYMBOLS_AND_PICTOGRAPHS            = 205,
+	EMOTICONS                                        = 206,
+	TRANSPORT_AND_MAP_SYMBOLS                        = 207,
+	ALCHEMICAL_SYMBOLS                               = 208,
+	CJK_UNIFIED_IDEOGRAPHS_EXTENSION_D               = 209,
+	ARABIC_EXTENDED_A                                = 210,
+	ARABIC_MATHEMATICAL_ALPHABETIC_SYMBOLS           = 211,
+	CHAKMA                                           = 212,
+	MEETEI_MAYEK_EXTENSIONS                          = 213,
+	MEROITIC_CURSIVE                                 = 214,
+	MEROITIC_HIEROGLYPHS                             = 215,
+	MIAO                                             = 216,
+	SHARADA                                          = 217,
+	SORA_SOMPENG                                     = 218,
+	SUNDANESE_SUPPLEMENT                             = 219,
+	TAKRI                                            = 220,
+	BASSA_VAH                                        = 221,
+	CAUCASIAN_ALBANIAN                               = 222,
+	COPTIC_EPACT_NUMBERS                             = 223,
+	COMBINING_DIACRITICAL_MARKS_EXTENDED             = 224,
+	DUPLOYAN                                         = 225,
+	ELBASAN                                          = 226,
+	GEOMETRIC_SHAPES_EXTENDED                        = 227,
+	GRANTHA                                          = 228,
+	KHOJKI                                           = 229,
+	KHUDAWADI                                        = 230,
+	LATIN_EXTENDED_E                                 = 231,
+	LINEAR_A                                         = 232,
+	MAHAJANI                                         = 233,
+	MANICHAEAN                                       = 234,
+	MENDE_KIKAKUI                                    = 235,
+	MODI                                             = 236,
+	MRO                                              = 237,
+	MYANMAR_EXTENDED_B                               = 238,
+	NABATAEAN                                        = 239,
+	OLD_NORTH_ARABIAN                                = 240,
+	OLD_PERMIC                                       = 241,
+	ORNAMENTAL_DINGBATS                              = 242,
+	PAHAWH_HMONG                                     = 243,
+	PALMYRENE                                        = 244,
+	PAU_CIN_HAU                                      = 245,
+	PSALTER_PAHLAVI                                  = 246,
+	SHORTHAND_FORMAT_CONTROLS                        = 247,
+	SIDDHAM                                          = 248,
+	SINHALA_ARCHAIC_NUMBERS                          = 249,
+	SUPPLEMENTAL_ARROWS_C                            = 250,
+	TIRHUTA                                          = 251,
+	WARANG_CITI                                      = 252,
+	AHOM                                             = 253,
+	ANATOLIAN_HIEROGLYPHS                            = 254,
+	CHEROKEE_SUPPLEMENT                              = 255,
+	CJK_UNIFIED_IDEOGRAPHS_EXTENSION_E               = 256,
+	EARLY_DYNASTIC_CUNEIFORM                         = 257,
+	HATRAN                                           = 258,
+	MULTANI                                          = 259,
+	OLD_HUNGARIAN                                    = 260,
+	SUPPLEMENTAL_SYMBOLS_AND_PICTOGRAPHS             = 261,
+	SUTTON_SIGNWRITING                               = 262,
+	ADLAM                                            = 263,
+	BHAIKSUKI                                        = 264,
+	CYRILLIC_EXTENDED_C                              = 265,
+	GLAGOLITIC_SUPPLEMENT                            = 266,
+	IDEOGRAPHIC_SYMBOLS_AND_PUNCTUATION              = 267,
+	MARCHEN                                          = 268,
+	MONGOLIAN_SUPPLEMENT                             = 269,
+	NEWA                                             = 270,
+	OSAGE                                            = 271,
+	TANGUT                                           = 272,
+	TANGUT_COMPONENTS                                = 273,
+	CJK_UNIFIED_IDEOGRAPHS_EXTENSION_F               = 274,
+	KANA_EXTENDED_A                                  = 275,
+	MASARAM_GONDI                                    = 276,
+	NUSHU                                            = 277,
+	SOYOMBO                                          = 278,
+	SYRIAC_SUPPLEMENT                                = 279,
+	ZANABAZAR_SQUARE                                 = 280,
+	CHESS_SYMBOLS                                    = 281,
+	DOGRA                                            = 282,
+	GEORGIAN_EXTENDED                                = 283,
+	GUNJALA_GONDI                                    = 284,
+	HANIFI_ROHINGYA                                  = 285,
+	INDIC_SIYAQ_NUMBERS                              = 286,
+	MAKASAR                                          = 287,
+	MAYAN_NUMERALS                                   = 288,
+	MEDEFAIDRIN                                      = 289,
+	OLD_SOGDIAN                                      = 290,
+	SOGDIAN                                          = 291,
+	EGYPTIAN_HIEROGLYPH_FORMAT_CONTROLS              = 292,
+	ELYMAIC                                          = 293,
+	NANDINAGARI                                      = 294,
+	NYIAKENG_PUACHUE_HMONG                           = 295,
+	OTTOMAN_SIYAQ_NUMBERS                            = 296,
+	SMALL_KANA_EXTENSION                             = 297,
+	SYMBOLS_AND_PICTOGRAPHS_EXTENDED_A               = 298,
+	TAMIL_SUPPLEMENT                                 = 299,
+	WANCHO                                           = 300,
+	CHORASMIAN                                       = 301,
+	CJK_UNIFIED_IDEOGRAPHS_EXTENSION_G               = 302,
+	DIVES_AKURU                                      = 303,
+	KHITAN_SMALL_SCRIPT                              = 304,
+	LISU_SUPPLEMENT                                  = 305,
+	SYMBOLS_FOR_LEGACY_COMPUTING                     = 306,
+	TANGUT_SUPPLEMENT                                = 307,
+	YEZIDI                                           = 308,
+	ARABIC_EXTENDED_B                                = 309,
+	CYPRO_MINOAN                                     = 310,
+	ETHIOPIC_EXTENDED_B                              = 311,
+	KANA_EXTENDED_B                                  = 312,
+	LATIN_EXTENDED_F                                 = 313,
+	LATIN_EXTENDED_G                                 = 314,
+	OLD_UYGHUR                                       = 315,
+	TANGSA                                           = 316,
+	TOTO                                             = 317,
+	UNIFIED_CANADIAN_ABORIGINAL_SYLLABICS_EXTENDED_A = 318,
+	VITHKUQI                                         = 319,
+	ZNAMENNY_MUSICAL_NOTATION                        = 320,
+	ARABIC_EXTENDED_C                                = 321,
+	CJK_UNIFIED_IDEOGRAPHS_EXTENSION_H               = 322,
+	CYRILLIC_EXTENDED_D                              = 323,
+	DEVANAGARI_EXTENDED_A                            = 324,
+	KAKTOVIK_NUMERALS                                = 325,
+	KAWI                                             = 326,
+	NAG_MUNDARI                                      = 327,
+	CJK_UNIFIED_IDEOGRAPHS_EXTENSION_I               = 328,
+	EGYPTIAN_HIEROGLYPHS_EXTENDED_A                  = 329,
+	GARAY                                            = 330,
+	GURUNG_KHEMA                                     = 331,
+	KIRAT_RAI                                        = 332,
+	MYANMAR_EXTENDED_C                               = 333,
+	OL_ONAL                                          = 334,
+	SUNUWAR                                          = 335,
+	SYMBOLS_FOR_LEGACY_COMPUTING_SUPPLEMENT          = 336,
+	TODHRI                                           = 337,
+	TULU_TIGALARI                                    = 338,
+	BERIA_ERFE                                       = 339,
+	CJK_UNIFIED_IDEOGRAPHS_EXTENSION_J               = 340,
+	MISCELLANEOUS_SYMBOLS_SUPPLEMENT                 = 341,
+	SHARADA_SUPPLEMENT                               = 342,
+	SIDETIC                                          = 343,
+	TAI_YO                                           = 344,
+	TANGUT_COMPONENTS_SUPPLEMENT                     = 345,
+	TOLONG_SIKI                                      = 346,
+	INVALID_CODE                                     = -1,
+}
 
-U_LEFT_TO_RIGHT              :: 0
-U_RIGHT_TO_LEFT              :: 1
-U_EUROPEAN_NUMBER            :: 2
-U_EUROPEAN_NUMBER_SEPARATOR  :: 3
-U_EUROPEAN_NUMBER_TERMINATOR :: 4
-U_ARABIC_NUMBER              :: 5
-U_COMMON_NUMBER_SEPARATOR    :: 6
-U_BLOCK_SEPARATOR            :: 7
-U_SEGMENT_SEPARATOR          :: 8
-U_WHITE_SPACE_NEUTRAL        :: 9
-U_OTHER_NEUTRAL              :: 10
-U_LEFT_TO_RIGHT_EMBEDDING    :: 11
-U_LEFT_TO_RIGHT_OVERRIDE     :: 12
-U_RIGHT_TO_LEFT_ARABIC       :: 13
-U_RIGHT_TO_LEFT_EMBEDDING    :: 14
-U_RIGHT_TO_LEFT_OVERRIDE     :: 15
-U_POP_DIRECTIONAL_FORMAT     :: 16
-U_DIR_NON_SPACING_MARK       :: 17
-U_BOUNDARY_NEUTRAL           :: 18
-U_FIRST_STRONG_ISOLATE       :: 19
-U_LEFT_TO_RIGHT_ISOLATE      :: 20
-U_RIGHT_TO_LEFT_ISOLATE      :: 21
-U_POP_DIRECTIONAL_ISOLATE    :: 22
+UEastAsianWidth :: enum c.int {
+	NEUTRAL   = 0,
+	AMBIGUOUS = 1,
+	HALFWIDTH = 2,
+	FULLWIDTH = 3,
+	NARROW    = 4,
+	WIDE      = 5,
+}
 
-UBidiPairedBracketType :: c.int
+UCharNameChoice :: enum c.int {
+	UNICODE_CHAR_NAME  = 0,
+	EXTENDED_CHAR_NAME = 2,
+	CHAR_NAME_ALIAS    = 3,
+}
 
-U_BPT_NONE  :: 0
-U_BPT_OPEN  :: 1
-U_BPT_CLOSE :: 2
+UPropertyNameChoice :: enum c.int {
+	SHORT_PROPERTY_NAME = 0,
+	LONG_PROPERTY_NAME  = 1,
+}
 
-UBlockCode :: c.int
+UDecompositionType :: enum c.int {
+	NONE      = 0,
+	CANONICAL = 1,
+	COMPAT    = 2,
+	CIRCLE    = 3,
+	FINAL     = 4,
+	FONT      = 5,
+	FRACTION  = 6,
+	INITIAL   = 7,
+	ISOLATED  = 8,
+	MEDIAL    = 9,
+	NARROW    = 10,
+	NOBREAK   = 11,
+	SMALL     = 12,
+	SQUARE    = 13,
+	SUB       = 14,
+	SUPER     = 15,
+	VERTICAL  = 16,
+	WIDE      = 17,
+}
 
-UBLOCK_NO_BLOCK                                         :: 0
-UBLOCK_BASIC_LATIN                                      :: 1
-UBLOCK_LATIN_1_SUPPLEMENT                               :: 2
-UBLOCK_LATIN_EXTENDED_A                                 :: 3
-UBLOCK_LATIN_EXTENDED_B                                 :: 4
-UBLOCK_IPA_EXTENSIONS                                   :: 5
-UBLOCK_SPACING_MODIFIER_LETTERS                         :: 6
-UBLOCK_COMBINING_DIACRITICAL_MARKS                      :: 7
-UBLOCK_GREEK                                            :: 8
-UBLOCK_CYRILLIC                                         :: 9
-UBLOCK_ARMENIAN                                         :: 10
-UBLOCK_HEBREW                                           :: 11
-UBLOCK_ARABIC                                           :: 12
-UBLOCK_SYRIAC                                           :: 13
-UBLOCK_THAANA                                           :: 14
-UBLOCK_DEVANAGARI                                       :: 15
-UBLOCK_BENGALI                                          :: 16
-UBLOCK_GURMUKHI                                         :: 17
-UBLOCK_GUJARATI                                         :: 18
-UBLOCK_ORIYA                                            :: 19
-UBLOCK_TAMIL                                            :: 20
-UBLOCK_TELUGU                                           :: 21
-UBLOCK_KANNADA                                          :: 22
-UBLOCK_MALAYALAM                                        :: 23
-UBLOCK_SINHALA                                          :: 24
-UBLOCK_THAI                                             :: 25
-UBLOCK_LAO                                              :: 26
-UBLOCK_TIBETAN                                          :: 27
-UBLOCK_MYANMAR                                          :: 28
-UBLOCK_GEORGIAN                                         :: 29
-UBLOCK_HANGUL_JAMO                                      :: 30
-UBLOCK_ETHIOPIC                                         :: 31
-UBLOCK_CHEROKEE                                         :: 32
-UBLOCK_UNIFIED_CANADIAN_ABORIGINAL_SYLLABICS            :: 33
-UBLOCK_OGHAM                                            :: 34
-UBLOCK_RUNIC                                            :: 35
-UBLOCK_KHMER                                            :: 36
-UBLOCK_MONGOLIAN                                        :: 37
-UBLOCK_LATIN_EXTENDED_ADDITIONAL                        :: 38
-UBLOCK_GREEK_EXTENDED                                   :: 39
-UBLOCK_GENERAL_PUNCTUATION                              :: 40
-UBLOCK_SUPERSCRIPTS_AND_SUBSCRIPTS                      :: 41
-UBLOCK_CURRENCY_SYMBOLS                                 :: 42
-UBLOCK_COMBINING_MARKS_FOR_SYMBOLS                      :: 43
-UBLOCK_LETTERLIKE_SYMBOLS                               :: 44
-UBLOCK_NUMBER_FORMS                                     :: 45
-UBLOCK_ARROWS                                           :: 46
-UBLOCK_MATHEMATICAL_OPERATORS                           :: 47
-UBLOCK_MISCELLANEOUS_TECHNICAL                          :: 48
-UBLOCK_CONTROL_PICTURES                                 :: 49
-UBLOCK_OPTICAL_CHARACTER_RECOGNITION                    :: 50
-UBLOCK_ENCLOSED_ALPHANUMERICS                           :: 51
-UBLOCK_BOX_DRAWING                                      :: 52
-UBLOCK_BLOCK_ELEMENTS                                   :: 53
-UBLOCK_GEOMETRIC_SHAPES                                 :: 54
-UBLOCK_MISCELLANEOUS_SYMBOLS                            :: 55
-UBLOCK_DINGBATS                                         :: 56
-UBLOCK_BRAILLE_PATTERNS                                 :: 57
-UBLOCK_CJK_RADICALS_SUPPLEMENT                          :: 58
-UBLOCK_KANGXI_RADICALS                                  :: 59
-UBLOCK_IDEOGRAPHIC_DESCRIPTION_CHARACTERS               :: 60
-UBLOCK_CJK_SYMBOLS_AND_PUNCTUATION                      :: 61
-UBLOCK_HIRAGANA                                         :: 62
-UBLOCK_KATAKANA                                         :: 63
-UBLOCK_BOPOMOFO                                         :: 64
-UBLOCK_HANGUL_COMPATIBILITY_JAMO                        :: 65
-UBLOCK_KANBUN                                           :: 66
-UBLOCK_BOPOMOFO_EXTENDED                                :: 67
-UBLOCK_ENCLOSED_CJK_LETTERS_AND_MONTHS                  :: 68
-UBLOCK_CJK_COMPATIBILITY                                :: 69
-UBLOCK_CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A               :: 70
-UBLOCK_CJK_UNIFIED_IDEOGRAPHS                           :: 71
-UBLOCK_YI_SYLLABLES                                     :: 72
-UBLOCK_YI_RADICALS                                      :: 73
-UBLOCK_HANGUL_SYLLABLES                                 :: 74
-UBLOCK_HIGH_SURROGATES                                  :: 75
-UBLOCK_HIGH_PRIVATE_USE_SURROGATES                      :: 76
-UBLOCK_LOW_SURROGATES                                   :: 77
-UBLOCK_PRIVATE_USE_AREA                                 :: 78
-UBLOCK_PRIVATE_USE                                      :: 78
-UBLOCK_CJK_COMPATIBILITY_IDEOGRAPHS                     :: 79
-UBLOCK_ALPHABETIC_PRESENTATION_FORMS                    :: 80
-UBLOCK_ARABIC_PRESENTATION_FORMS_A                      :: 81
-UBLOCK_COMBINING_HALF_MARKS                             :: 82
-UBLOCK_CJK_COMPATIBILITY_FORMS                          :: 83
-UBLOCK_SMALL_FORM_VARIANTS                              :: 84
-UBLOCK_ARABIC_PRESENTATION_FORMS_B                      :: 85
-UBLOCK_SPECIALS                                         :: 86
-UBLOCK_HALFWIDTH_AND_FULLWIDTH_FORMS                    :: 87
-UBLOCK_OLD_ITALIC                                       :: 88
-UBLOCK_GOTHIC                                           :: 89
-UBLOCK_DESERET                                          :: 90
-UBLOCK_BYZANTINE_MUSICAL_SYMBOLS                        :: 91
-UBLOCK_MUSICAL_SYMBOLS                                  :: 92
-UBLOCK_MATHEMATICAL_ALPHANUMERIC_SYMBOLS                :: 93
-UBLOCK_CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B               :: 94
-UBLOCK_CJK_COMPATIBILITY_IDEOGRAPHS_SUPPLEMENT          :: 95
-UBLOCK_TAGS                                             :: 96
-UBLOCK_CYRILLIC_SUPPLEMENT                              :: 97
-UBLOCK_CYRILLIC_SUPPLEMENTARY                           :: 97
-UBLOCK_TAGALOG                                          :: 98
-UBLOCK_HANUNOO                                          :: 99
-UBLOCK_BUHID                                            :: 100
-UBLOCK_TAGBANWA                                         :: 101
-UBLOCK_MISCELLANEOUS_MATHEMATICAL_SYMBOLS_A             :: 102
-UBLOCK_SUPPLEMENTAL_ARROWS_A                            :: 103
-UBLOCK_SUPPLEMENTAL_ARROWS_B                            :: 104
-UBLOCK_MISCELLANEOUS_MATHEMATICAL_SYMBOLS_B             :: 105
-UBLOCK_SUPPLEMENTAL_MATHEMATICAL_OPERATORS              :: 106
-UBLOCK_KATAKANA_PHONETIC_EXTENSIONS                     :: 107
-UBLOCK_VARIATION_SELECTORS                              :: 108
-UBLOCK_SUPPLEMENTARY_PRIVATE_USE_AREA_A                 :: 109
-UBLOCK_SUPPLEMENTARY_PRIVATE_USE_AREA_B                 :: 110
-UBLOCK_LIMBU                                            :: 111
-UBLOCK_TAI_LE                                           :: 112
-UBLOCK_KHMER_SYMBOLS                                    :: 113
-UBLOCK_PHONETIC_EXTENSIONS                              :: 114
-UBLOCK_MISCELLANEOUS_SYMBOLS_AND_ARROWS                 :: 115
-UBLOCK_YIJING_HEXAGRAM_SYMBOLS                          :: 116
-UBLOCK_LINEAR_B_SYLLABARY                               :: 117
-UBLOCK_LINEAR_B_IDEOGRAMS                               :: 118
-UBLOCK_AEGEAN_NUMBERS                                   :: 119
-UBLOCK_UGARITIC                                         :: 120
-UBLOCK_SHAVIAN                                          :: 121
-UBLOCK_OSMANYA                                          :: 122
-UBLOCK_CYPRIOT_SYLLABARY                                :: 123
-UBLOCK_TAI_XUAN_JING_SYMBOLS                            :: 124
-UBLOCK_VARIATION_SELECTORS_SUPPLEMENT                   :: 125
-UBLOCK_ANCIENT_GREEK_MUSICAL_NOTATION                   :: 126
-UBLOCK_ANCIENT_GREEK_NUMBERS                            :: 127
-UBLOCK_ARABIC_SUPPLEMENT                                :: 128
-UBLOCK_BUGINESE                                         :: 129
-UBLOCK_CJK_STROKES                                      :: 130
-UBLOCK_COMBINING_DIACRITICAL_MARKS_SUPPLEMENT           :: 131
-UBLOCK_COPTIC                                           :: 132
-UBLOCK_ETHIOPIC_EXTENDED                                :: 133
-UBLOCK_ETHIOPIC_SUPPLEMENT                              :: 134
-UBLOCK_GEORGIAN_SUPPLEMENT                              :: 135
-UBLOCK_GLAGOLITIC                                       :: 136
-UBLOCK_KHAROSHTHI                                       :: 137
-UBLOCK_MODIFIER_TONE_LETTERS                            :: 138
-UBLOCK_NEW_TAI_LUE                                      :: 139
-UBLOCK_OLD_PERSIAN                                      :: 140
-UBLOCK_PHONETIC_EXTENSIONS_SUPPLEMENT                   :: 141
-UBLOCK_SUPPLEMENTAL_PUNCTUATION                         :: 142
-UBLOCK_SYLOTI_NAGRI                                     :: 143
-UBLOCK_TIFINAGH                                         :: 144
-UBLOCK_VERTICAL_FORMS                                   :: 145
-UBLOCK_NKO                                              :: 146
-UBLOCK_BALINESE                                         :: 147
-UBLOCK_LATIN_EXTENDED_C                                 :: 148
-UBLOCK_LATIN_EXTENDED_D                                 :: 149
-UBLOCK_PHAGS_PA                                         :: 150
-UBLOCK_PHOENICIAN                                       :: 151
-UBLOCK_CUNEIFORM                                        :: 152
-UBLOCK_CUNEIFORM_NUMBERS_AND_PUNCTUATION                :: 153
-UBLOCK_COUNTING_ROD_NUMERALS                            :: 154
-UBLOCK_SUNDANESE                                        :: 155
-UBLOCK_LEPCHA                                           :: 156
-UBLOCK_OL_CHIKI                                         :: 157
-UBLOCK_CYRILLIC_EXTENDED_A                              :: 158
-UBLOCK_VAI                                              :: 159
-UBLOCK_CYRILLIC_EXTENDED_B                              :: 160
-UBLOCK_SAURASHTRA                                       :: 161
-UBLOCK_KAYAH_LI                                         :: 162
-UBLOCK_REJANG                                           :: 163
-UBLOCK_CHAM                                             :: 164
-UBLOCK_ANCIENT_SYMBOLS                                  :: 165
-UBLOCK_PHAISTOS_DISC                                    :: 166
-UBLOCK_LYCIAN                                           :: 167
-UBLOCK_CARIAN                                           :: 168
-UBLOCK_LYDIAN                                           :: 169
-UBLOCK_MAHJONG_TILES                                    :: 170
-UBLOCK_DOMINO_TILES                                     :: 171
-UBLOCK_SAMARITAN                                        :: 172
-UBLOCK_UNIFIED_CANADIAN_ABORIGINAL_SYLLABICS_EXTENDED   :: 173
-UBLOCK_TAI_THAM                                         :: 174
-UBLOCK_VEDIC_EXTENSIONS                                 :: 175
-UBLOCK_LISU                                             :: 176
-UBLOCK_BAMUM                                            :: 177
-UBLOCK_COMMON_INDIC_NUMBER_FORMS                        :: 178
-UBLOCK_DEVANAGARI_EXTENDED                              :: 179
-UBLOCK_HANGUL_JAMO_EXTENDED_A                           :: 180
-UBLOCK_JAVANESE                                         :: 181
-UBLOCK_MYANMAR_EXTENDED_A                               :: 182
-UBLOCK_TAI_VIET                                         :: 183
-UBLOCK_MEETEI_MAYEK                                     :: 184
-UBLOCK_HANGUL_JAMO_EXTENDED_B                           :: 185
-UBLOCK_IMPERIAL_ARAMAIC                                 :: 186
-UBLOCK_OLD_SOUTH_ARABIAN                                :: 187
-UBLOCK_AVESTAN                                          :: 188
-UBLOCK_INSCRIPTIONAL_PARTHIAN                           :: 189
-UBLOCK_INSCRIPTIONAL_PAHLAVI                            :: 190
-UBLOCK_OLD_TURKIC                                       :: 191
-UBLOCK_RUMI_NUMERAL_SYMBOLS                             :: 192
-UBLOCK_KAITHI                                           :: 193
-UBLOCK_EGYPTIAN_HIEROGLYPHS                             :: 194
-UBLOCK_ENCLOSED_ALPHANUMERIC_SUPPLEMENT                 :: 195
-UBLOCK_ENCLOSED_IDEOGRAPHIC_SUPPLEMENT                  :: 196
-UBLOCK_CJK_UNIFIED_IDEOGRAPHS_EXTENSION_C               :: 197
-UBLOCK_MANDAIC                                          :: 198
-UBLOCK_BATAK                                            :: 199
-UBLOCK_ETHIOPIC_EXTENDED_A                              :: 200
-UBLOCK_BRAHMI                                           :: 201
-UBLOCK_BAMUM_SUPPLEMENT                                 :: 202
-UBLOCK_KANA_SUPPLEMENT                                  :: 203
-UBLOCK_PLAYING_CARDS                                    :: 204
-UBLOCK_MISCELLANEOUS_SYMBOLS_AND_PICTOGRAPHS            :: 205
-UBLOCK_EMOTICONS                                        :: 206
-UBLOCK_TRANSPORT_AND_MAP_SYMBOLS                        :: 207
-UBLOCK_ALCHEMICAL_SYMBOLS                               :: 208
-UBLOCK_CJK_UNIFIED_IDEOGRAPHS_EXTENSION_D               :: 209
-UBLOCK_ARABIC_EXTENDED_A                                :: 210
-UBLOCK_ARABIC_MATHEMATICAL_ALPHABETIC_SYMBOLS           :: 211
-UBLOCK_CHAKMA                                           :: 212
-UBLOCK_MEETEI_MAYEK_EXTENSIONS                          :: 213
-UBLOCK_MEROITIC_CURSIVE                                 :: 214
-UBLOCK_MEROITIC_HIEROGLYPHS                             :: 215
-UBLOCK_MIAO                                             :: 216
-UBLOCK_SHARADA                                          :: 217
-UBLOCK_SORA_SOMPENG                                     :: 218
-UBLOCK_SUNDANESE_SUPPLEMENT                             :: 219
-UBLOCK_TAKRI                                            :: 220
-UBLOCK_BASSA_VAH                                        :: 221
-UBLOCK_CAUCASIAN_ALBANIAN                               :: 222
-UBLOCK_COPTIC_EPACT_NUMBERS                             :: 223
-UBLOCK_COMBINING_DIACRITICAL_MARKS_EXTENDED             :: 224
-UBLOCK_DUPLOYAN                                         :: 225
-UBLOCK_ELBASAN                                          :: 226
-UBLOCK_GEOMETRIC_SHAPES_EXTENDED                        :: 227
-UBLOCK_GRANTHA                                          :: 228
-UBLOCK_KHOJKI                                           :: 229
-UBLOCK_KHUDAWADI                                        :: 230
-UBLOCK_LATIN_EXTENDED_E                                 :: 231
-UBLOCK_LINEAR_A                                         :: 232
-UBLOCK_MAHAJANI                                         :: 233
-UBLOCK_MANICHAEAN                                       :: 234
-UBLOCK_MENDE_KIKAKUI                                    :: 235
-UBLOCK_MODI                                             :: 236
-UBLOCK_MRO                                              :: 237
-UBLOCK_MYANMAR_EXTENDED_B                               :: 238
-UBLOCK_NABATAEAN                                        :: 239
-UBLOCK_OLD_NORTH_ARABIAN                                :: 240
-UBLOCK_OLD_PERMIC                                       :: 241
-UBLOCK_ORNAMENTAL_DINGBATS                              :: 242
-UBLOCK_PAHAWH_HMONG                                     :: 243
-UBLOCK_PALMYRENE                                        :: 244
-UBLOCK_PAU_CIN_HAU                                      :: 245
-UBLOCK_PSALTER_PAHLAVI                                  :: 246
-UBLOCK_SHORTHAND_FORMAT_CONTROLS                        :: 247
-UBLOCK_SIDDHAM                                          :: 248
-UBLOCK_SINHALA_ARCHAIC_NUMBERS                          :: 249
-UBLOCK_SUPPLEMENTAL_ARROWS_C                            :: 250
-UBLOCK_TIRHUTA                                          :: 251
-UBLOCK_WARANG_CITI                                      :: 252
-UBLOCK_AHOM                                             :: 253
-UBLOCK_ANATOLIAN_HIEROGLYPHS                            :: 254
-UBLOCK_CHEROKEE_SUPPLEMENT                              :: 255
-UBLOCK_CJK_UNIFIED_IDEOGRAPHS_EXTENSION_E               :: 256
-UBLOCK_EARLY_DYNASTIC_CUNEIFORM                         :: 257
-UBLOCK_HATRAN                                           :: 258
-UBLOCK_MULTANI                                          :: 259
-UBLOCK_OLD_HUNGARIAN                                    :: 260
-UBLOCK_SUPPLEMENTAL_SYMBOLS_AND_PICTOGRAPHS             :: 261
-UBLOCK_SUTTON_SIGNWRITING                               :: 262
-UBLOCK_ADLAM                                            :: 263
-UBLOCK_BHAIKSUKI                                        :: 264
-UBLOCK_CYRILLIC_EXTENDED_C                              :: 265
-UBLOCK_GLAGOLITIC_SUPPLEMENT                            :: 266
-UBLOCK_IDEOGRAPHIC_SYMBOLS_AND_PUNCTUATION              :: 267
-UBLOCK_MARCHEN                                          :: 268
-UBLOCK_MONGOLIAN_SUPPLEMENT                             :: 269
-UBLOCK_NEWA                                             :: 270
-UBLOCK_OSAGE                                            :: 271
-UBLOCK_TANGUT                                           :: 272
-UBLOCK_TANGUT_COMPONENTS                                :: 273
-UBLOCK_CJK_UNIFIED_IDEOGRAPHS_EXTENSION_F               :: 274
-UBLOCK_KANA_EXTENDED_A                                  :: 275
-UBLOCK_MASARAM_GONDI                                    :: 276
-UBLOCK_NUSHU                                            :: 277
-UBLOCK_SOYOMBO                                          :: 278
-UBLOCK_SYRIAC_SUPPLEMENT                                :: 279
-UBLOCK_ZANABAZAR_SQUARE                                 :: 280
-UBLOCK_CHESS_SYMBOLS                                    :: 281
-UBLOCK_DOGRA                                            :: 282
-UBLOCK_GEORGIAN_EXTENDED                                :: 283
-UBLOCK_GUNJALA_GONDI                                    :: 284
-UBLOCK_HANIFI_ROHINGYA                                  :: 285
-UBLOCK_INDIC_SIYAQ_NUMBERS                              :: 286
-UBLOCK_MAKASAR                                          :: 287
-UBLOCK_MAYAN_NUMERALS                                   :: 288
-UBLOCK_MEDEFAIDRIN                                      :: 289
-UBLOCK_OLD_SOGDIAN                                      :: 290
-UBLOCK_SOGDIAN                                          :: 291
-UBLOCK_EGYPTIAN_HIEROGLYPH_FORMAT_CONTROLS              :: 292
-UBLOCK_ELYMAIC                                          :: 293
-UBLOCK_NANDINAGARI                                      :: 294
-UBLOCK_NYIAKENG_PUACHUE_HMONG                           :: 295
-UBLOCK_OTTOMAN_SIYAQ_NUMBERS                            :: 296
-UBLOCK_SMALL_KANA_EXTENSION                             :: 297
-UBLOCK_SYMBOLS_AND_PICTOGRAPHS_EXTENDED_A               :: 298
-UBLOCK_TAMIL_SUPPLEMENT                                 :: 299
-UBLOCK_WANCHO                                           :: 300
-UBLOCK_CHORASMIAN                                       :: 301
-UBLOCK_CJK_UNIFIED_IDEOGRAPHS_EXTENSION_G               :: 302
-UBLOCK_DIVES_AKURU                                      :: 303
-UBLOCK_KHITAN_SMALL_SCRIPT                              :: 304
-UBLOCK_LISU_SUPPLEMENT                                  :: 305
-UBLOCK_SYMBOLS_FOR_LEGACY_COMPUTING                     :: 306
-UBLOCK_TANGUT_SUPPLEMENT                                :: 307
-UBLOCK_YEZIDI                                           :: 308
-UBLOCK_ARABIC_EXTENDED_B                                :: 309
-UBLOCK_CYPRO_MINOAN                                     :: 310
-UBLOCK_ETHIOPIC_EXTENDED_B                              :: 311
-UBLOCK_KANA_EXTENDED_B                                  :: 312
-UBLOCK_LATIN_EXTENDED_F                                 :: 313
-UBLOCK_LATIN_EXTENDED_G                                 :: 314
-UBLOCK_OLD_UYGHUR                                       :: 315
-UBLOCK_TANGSA                                           :: 316
-UBLOCK_TOTO                                             :: 317
-UBLOCK_UNIFIED_CANADIAN_ABORIGINAL_SYLLABICS_EXTENDED_A :: 318
-UBLOCK_VITHKUQI                                         :: 319
-UBLOCK_ZNAMENNY_MUSICAL_NOTATION                        :: 320
-UBLOCK_ARABIC_EXTENDED_C                                :: 321
-UBLOCK_CJK_UNIFIED_IDEOGRAPHS_EXTENSION_H               :: 322
-UBLOCK_CYRILLIC_EXTENDED_D                              :: 323
-UBLOCK_DEVANAGARI_EXTENDED_A                            :: 324
-UBLOCK_KAKTOVIK_NUMERALS                                :: 325
-UBLOCK_KAWI                                             :: 326
-UBLOCK_NAG_MUNDARI                                      :: 327
-UBLOCK_CJK_UNIFIED_IDEOGRAPHS_EXTENSION_I               :: 328
-UBLOCK_EGYPTIAN_HIEROGLYPHS_EXTENDED_A                  :: 329
-UBLOCK_GARAY                                            :: 330
-UBLOCK_GURUNG_KHEMA                                     :: 331
-UBLOCK_KIRAT_RAI                                        :: 332
-UBLOCK_MYANMAR_EXTENDED_C                               :: 333
-UBLOCK_OL_ONAL                                          :: 334
-UBLOCK_SUNUWAR                                          :: 335
-UBLOCK_SYMBOLS_FOR_LEGACY_COMPUTING_SUPPLEMENT          :: 336
-UBLOCK_TODHRI                                           :: 337
-UBLOCK_TULU_TIGALARI                                    :: 338
-UBLOCK_BERIA_ERFE                                       :: 339
-UBLOCK_CJK_UNIFIED_IDEOGRAPHS_EXTENSION_J               :: 340
-UBLOCK_MISCELLANEOUS_SYMBOLS_SUPPLEMENT                 :: 341
-UBLOCK_SHARADA_SUPPLEMENT                               :: 342
-UBLOCK_SIDETIC                                          :: 343
-UBLOCK_TAI_YO                                           :: 344
-UBLOCK_TANGUT_COMPONENTS_SUPPLEMENT                     :: 345
-UBLOCK_TOLONG_SIKI                                      :: 346
-UBLOCK_INVALID_CODE                                     :: -1
+UJoiningType :: enum c.int {
+	NON_JOINING   = 0,
+	JOIN_CAUSING  = 1,
+	DUAL_JOINING  = 2,
+	LEFT_JOINING  = 3,
+	RIGHT_JOINING = 4,
+	TRANSPARENT   = 5,
+}
 
-UEastAsianWidth :: c.int
+UJoiningGroup :: enum c.int {
+	NO_JOINING_GROUP         = 0,
+	AIN                      = 1,
+	ALAPH                    = 2,
+	ALEF                     = 3,
+	BEH                      = 4,
+	BETH                     = 5,
+	DAL                      = 6,
+	DALATH_RISH              = 7,
+	E                        = 8,
+	FEH                      = 9,
+	FINAL_SEMKATH            = 10,
+	GAF                      = 11,
+	GAMAL                    = 12,
+	HAH                      = 13,
+	TEH_MARBUTA_GOAL         = 14,
+	HAMZA_ON_HEH_GOAL        = 14,
+	HE                       = 15,
+	HEH                      = 16,
+	HEH_GOAL                 = 17,
+	HETH                     = 18,
+	KAF                      = 19,
+	KAPH                     = 20,
+	KNOTTED_HEH              = 21,
+	LAM                      = 22,
+	LAMADH                   = 23,
+	MEEM                     = 24,
+	MIM                      = 25,
+	NOON                     = 26,
+	NUN                      = 27,
+	PE                       = 28,
+	QAF                      = 29,
+	QAPH                     = 30,
+	REH                      = 31,
+	REVERSED_PE              = 32,
+	SAD                      = 33,
+	SADHE                    = 34,
+	SEEN                     = 35,
+	SEMKATH                  = 36,
+	SHIN                     = 37,
+	SWASH_KAF                = 38,
+	SYRIAC_WAW               = 39,
+	TAH                      = 40,
+	TAW                      = 41,
+	TEH_MARBUTA              = 42,
+	TETH                     = 43,
+	WAW                      = 44,
+	YEH                      = 45,
+	YEH_BARREE               = 46,
+	YEH_WITH_TAIL            = 47,
+	YUDH                     = 48,
+	YUDH_HE                  = 49,
+	ZAIN                     = 50,
+	FE                       = 51,
+	KHAPH                    = 52,
+	ZHAIN                    = 53,
+	BURUSHASKI_YEH_BARREE    = 54,
+	FARSI_YEH                = 55,
+	NYA                      = 56,
+	ROHINGYA_YEH             = 57,
+	MANICHAEAN_ALEPH         = 58,
+	MANICHAEAN_AYIN          = 59,
+	MANICHAEAN_BETH          = 60,
+	MANICHAEAN_DALETH        = 61,
+	MANICHAEAN_DHAMEDH       = 62,
+	MANICHAEAN_FIVE          = 63,
+	MANICHAEAN_GIMEL         = 64,
+	MANICHAEAN_HETH          = 65,
+	MANICHAEAN_HUNDRED       = 66,
+	MANICHAEAN_KAPH          = 67,
+	MANICHAEAN_LAMEDH        = 68,
+	MANICHAEAN_MEM           = 69,
+	MANICHAEAN_NUN           = 70,
+	MANICHAEAN_ONE           = 71,
+	MANICHAEAN_PE            = 72,
+	MANICHAEAN_QOPH          = 73,
+	MANICHAEAN_RESH          = 74,
+	MANICHAEAN_SADHE         = 75,
+	MANICHAEAN_SAMEKH        = 76,
+	MANICHAEAN_TAW           = 77,
+	MANICHAEAN_TEN           = 78,
+	MANICHAEAN_TETH          = 79,
+	MANICHAEAN_THAMEDH       = 80,
+	MANICHAEAN_TWENTY        = 81,
+	MANICHAEAN_WAW           = 82,
+	MANICHAEAN_YODH          = 83,
+	MANICHAEAN_ZAYIN         = 84,
+	STRAIGHT_WAW             = 85,
+	AFRICAN_FEH              = 86,
+	AFRICAN_NOON             = 87,
+	AFRICAN_QAF              = 88,
+	MALAYALAM_BHA            = 89,
+	MALAYALAM_JA             = 90,
+	MALAYALAM_LLA            = 91,
+	MALAYALAM_LLLA           = 92,
+	MALAYALAM_NGA            = 93,
+	MALAYALAM_NNA            = 94,
+	MALAYALAM_NNNA           = 95,
+	MALAYALAM_NYA            = 96,
+	MALAYALAM_RA             = 97,
+	MALAYALAM_SSA            = 98,
+	MALAYALAM_TTA            = 99,
+	HANIFI_ROHINGYA_KINNA_YA = 100,
+	HANIFI_ROHINGYA_PA       = 101,
+	THIN_YEH                 = 102,
+	VERTICAL_TAIL            = 103,
+	KASHMIRI_YEH             = 104,
+	THIN_NOON                = 105,
+}
 
-U_EA_NEUTRAL   :: 0
-U_EA_AMBIGUOUS :: 1
-U_EA_HALFWIDTH :: 2
-U_EA_FULLWIDTH :: 3
-U_EA_NARROW    :: 4
-U_EA_WIDE      :: 5
+UGraphemeClusterBreak :: enum c.int {
+	OTHER              = 0,
+	CONTROL            = 1,
+	CR                 = 2,
+	EXTEND             = 3,
+	L                  = 4,
+	LF                 = 5,
+	LV                 = 6,
+	LVT                = 7,
+	T                  = 8,
+	V                  = 9,
+	SPACING_MARK       = 10,
+	PREPEND            = 11,
+	REGIONAL_INDICATOR = 12,
+	E_BASE             = 13,
+	E_BASE_GAZ         = 14,
+	E_MODIFIER         = 15,
+	GLUE_AFTER_ZWJ     = 16,
+	ZWJ                = 17,
+}
 
-UCharNameChoice :: c.int
+UWordBreakValues :: enum c.int {
+	OTHER              = 0,
+	ALETTER            = 1,
+	FORMAT             = 2,
+	KATAKANA           = 3,
+	MIDLETTER          = 4,
+	MIDNUM             = 5,
+	NUMERIC            = 6,
+	EXTENDNUMLET       = 7,
+	CR                 = 8,
+	EXTEND             = 9,
+	LF                 = 10,
+	MIDNUMLET          = 11,
+	NEWLINE            = 12,
+	REGIONAL_INDICATOR = 13,
+	HEBREW_LETTER      = 14,
+	SINGLE_QUOTE       = 15,
+	DOUBLE_QUOTE       = 16,
+	E_BASE             = 17,
+	E_BASE_GAZ         = 18,
+	E_MODIFIER         = 19,
+	GLUE_AFTER_ZWJ     = 20,
+	ZWJ                = 21,
+	WSEGSPACE          = 22,
+}
 
-U_UNICODE_CHAR_NAME  :: 0
-U_EXTENDED_CHAR_NAME :: 2
-U_CHAR_NAME_ALIAS    :: 3
+USentenceBreak :: enum c.int {
+	OTHER     = 0,
+	ATERM     = 1,
+	CLOSE     = 2,
+	FORMAT    = 3,
+	LOWER     = 4,
+	NUMERIC   = 5,
+	OLETTER   = 6,
+	SEP       = 7,
+	SP        = 8,
+	STERM     = 9,
+	UPPER     = 10,
+	CR        = 11,
+	EXTEND    = 12,
+	LF        = 13,
+	SCONTINUE = 14,
+}
 
-UPropertyNameChoice :: c.int
+ULineBreak :: enum c.int {
+	UNKNOWN                      = 0,
+	AMBIGUOUS                    = 1,
+	ALPHABETIC                   = 2,
+	BREAK_BOTH                   = 3,
+	BREAK_AFTER                  = 4,
+	BREAK_BEFORE                 = 5,
+	MANDATORY_BREAK              = 6,
+	CONTINGENT_BREAK             = 7,
+	CLOSE_PUNCTUATION            = 8,
+	COMBINING_MARK               = 9,
+	CARRIAGE_RETURN              = 10,
+	EXCLAMATION                  = 11,
+	GLUE                         = 12,
+	HYPHEN                       = 13,
+	IDEOGRAPHIC                  = 14,
+	INSEPARABLE                  = 15,
+	INSEPERABLE                  = 15,
+	INFIX_NUMERIC                = 16,
+	LINE_FEED                    = 17,
+	NONSTARTER                   = 18,
+	NUMERIC                      = 19,
+	OPEN_PUNCTUATION             = 20,
+	POSTFIX_NUMERIC              = 21,
+	PREFIX_NUMERIC               = 22,
+	QUOTATION                    = 23,
+	COMPLEX_CONTEXT              = 24,
+	SURROGATE                    = 25,
+	SPACE                        = 26,
+	BREAK_SYMBOLS                = 27,
+	ZWSPACE                      = 28,
+	NEXT_LINE                    = 29,
+	WORD_JOINER                  = 30,
+	H2                           = 31,
+	H3                           = 32,
+	JL                           = 33,
+	JT                           = 34,
+	JV                           = 35,
+	CLOSE_PARENTHESIS            = 36,
+	CONDITIONAL_JAPANESE_STARTER = 37,
+	HEBREW_LETTER                = 38,
+	REGIONAL_INDICATOR           = 39,
+	E_BASE                       = 40,
+	E_MODIFIER                   = 41,
+	ZWJ                          = 42,
+	AKSARA                       = 43,
+	AKSARA_PREBASE               = 44,
+	AKSARA_START                 = 45,
+	VIRAMA_FINAL                 = 46,
+	VIRAMA                       = 47,
+	UNAMBIGUOUS_HYPHEN           = 48,
+}
 
-U_SHORT_PROPERTY_NAME :: 0
-U_LONG_PROPERTY_NAME  :: 1
+UNumericType :: enum c.int {
+	NONE    = 0,
+	DECIMAL = 1,
+	DIGIT   = 2,
+	NUMERIC = 3,
+}
 
-UDecompositionType :: c.int
+UHangulSyllableType :: enum c.int {
+	NOT_APPLICABLE = 0,
+	LEADING_JAMO   = 1,
+	VOWEL_JAMO     = 2,
+	TRAILING_JAMO  = 3,
+	LV_SYLLABLE    = 4,
+	LVT_SYLLABLE   = 5,
+}
 
-U_DT_NONE      :: 0
-U_DT_CANONICAL :: 1
-U_DT_COMPAT    :: 2
-U_DT_CIRCLE    :: 3
-U_DT_FINAL     :: 4
-U_DT_FONT      :: 5
-U_DT_FRACTION  :: 6
-U_DT_INITIAL   :: 7
-U_DT_ISOLATED  :: 8
-U_DT_MEDIAL    :: 9
-U_DT_NARROW    :: 10
-U_DT_NOBREAK   :: 11
-U_DT_SMALL     :: 12
-U_DT_SQUARE    :: 13
-U_DT_SUB       :: 14
-U_DT_SUPER     :: 15
-U_DT_VERTICAL  :: 16
-U_DT_WIDE      :: 17
+UIndicPositionalCategory :: enum c.int {
+	NA                       = 0,
+	BOTTOM                   = 1,
+	BOTTOM_AND_LEFT          = 2,
+	BOTTOM_AND_RIGHT         = 3,
+	LEFT                     = 4,
+	LEFT_AND_RIGHT           = 5,
+	OVERSTRUCK               = 6,
+	RIGHT                    = 7,
+	TOP                      = 8,
+	TOP_AND_BOTTOM           = 9,
+	TOP_AND_BOTTOM_AND_RIGHT = 10,
+	TOP_AND_LEFT             = 11,
+	TOP_AND_LEFT_AND_RIGHT   = 12,
+	TOP_AND_RIGHT            = 13,
+	VISUAL_ORDER_LEFT        = 14,
+	TOP_AND_BOTTOM_AND_LEFT  = 15,
+}
 
-UJoiningType :: c.int
+UIndicSyllabicCategory :: enum c.int {
+	OTHER                       = 0,
+	AVAGRAHA                    = 1,
+	BINDU                       = 2,
+	BRAHMI_JOINING_NUMBER       = 3,
+	CANTILLATION_MARK           = 4,
+	CONSONANT                   = 5,
+	CONSONANT_DEAD              = 6,
+	CONSONANT_FINAL             = 7,
+	CONSONANT_HEAD_LETTER       = 8,
+	CONSONANT_INITIAL_POSTFIXED = 9,
+	CONSONANT_KILLER            = 10,
+	CONSONANT_MEDIAL            = 11,
+	CONSONANT_PLACEHOLDER       = 12,
+	CONSONANT_PRECEDING_REPHA   = 13,
+	CONSONANT_PREFIXED          = 14,
+	CONSONANT_SUBJOINED         = 15,
+	CONSONANT_SUCCEEDING_REPHA  = 16,
+	CONSONANT_WITH_STACKER      = 17,
+	GEMINATION_MARK             = 18,
+	INVISIBLE_STACKER           = 19,
+	JOINER                      = 20,
+	MODIFYING_LETTER            = 21,
+	NON_JOINER                  = 22,
+	NUKTA                       = 23,
+	NUMBER                      = 24,
+	NUMBER_JOINER               = 25,
+	PURE_KILLER                 = 26,
+	REGISTER_SHIFTER            = 27,
+	SYLLABLE_MODIFIER           = 28,
+	TONE_LETTER                 = 29,
+	TONE_MARK                   = 30,
+	VIRAMA                      = 31,
+	VISARGA                     = 32,
+	VOWEL                       = 33,
+	VOWEL_DEPENDENT             = 34,
+	VOWEL_INDEPENDENT           = 35,
+	REORDERING_KILLER           = 36,
+}
 
-U_JT_NON_JOINING   :: 0
-U_JT_JOIN_CAUSING  :: 1
-U_JT_DUAL_JOINING  :: 2
-U_JT_LEFT_JOINING  :: 3
-U_JT_RIGHT_JOINING :: 4
-U_JT_TRANSPARENT   :: 5
+UIndicConjunctBreak :: enum c.int {
+	NONE      = 0,
+	CONSONANT = 1,
+	EXTEND    = 2,
+	LINKER    = 3,
+}
 
-UJoiningGroup :: c.int
+UVerticalOrientation :: enum c.int {
+	ROTATED             = 0,
+	TRANSFORMED_ROTATED = 1,
+	TRANSFORMED_UPRIGHT = 2,
+	UPRIGHT             = 3,
+}
 
-U_JG_NO_JOINING_GROUP         :: 0
-U_JG_AIN                      :: 1
-U_JG_ALAPH                    :: 2
-U_JG_ALEF                     :: 3
-U_JG_BEH                      :: 4
-U_JG_BETH                     :: 5
-U_JG_DAL                      :: 6
-U_JG_DALATH_RISH              :: 7
-U_JG_E                        :: 8
-U_JG_FEH                      :: 9
-U_JG_FINAL_SEMKATH            :: 10
-U_JG_GAF                      :: 11
-U_JG_GAMAL                    :: 12
-U_JG_HAH                      :: 13
-U_JG_TEH_MARBUTA_GOAL         :: 14
-U_JG_HAMZA_ON_HEH_GOAL        :: 14
-U_JG_HE                       :: 15
-U_JG_HEH                      :: 16
-U_JG_HEH_GOAL                 :: 17
-U_JG_HETH                     :: 18
-U_JG_KAF                      :: 19
-U_JG_KAPH                     :: 20
-U_JG_KNOTTED_HEH              :: 21
-U_JG_LAM                      :: 22
-U_JG_LAMADH                   :: 23
-U_JG_MEEM                     :: 24
-U_JG_MIM                      :: 25
-U_JG_NOON                     :: 26
-U_JG_NUN                      :: 27
-U_JG_PE                       :: 28
-U_JG_QAF                      :: 29
-U_JG_QAPH                     :: 30
-U_JG_REH                      :: 31
-U_JG_REVERSED_PE              :: 32
-U_JG_SAD                      :: 33
-U_JG_SADHE                    :: 34
-U_JG_SEEN                     :: 35
-U_JG_SEMKATH                  :: 36
-U_JG_SHIN                     :: 37
-U_JG_SWASH_KAF                :: 38
-U_JG_SYRIAC_WAW               :: 39
-U_JG_TAH                      :: 40
-U_JG_TAW                      :: 41
-U_JG_TEH_MARBUTA              :: 42
-U_JG_TETH                     :: 43
-U_JG_WAW                      :: 44
-U_JG_YEH                      :: 45
-U_JG_YEH_BARREE               :: 46
-U_JG_YEH_WITH_TAIL            :: 47
-U_JG_YUDH                     :: 48
-U_JG_YUDH_HE                  :: 49
-U_JG_ZAIN                     :: 50
-U_JG_FE                       :: 51
-U_JG_KHAPH                    :: 52
-U_JG_ZHAIN                    :: 53
-U_JG_BURUSHASKI_YEH_BARREE    :: 54
-U_JG_FARSI_YEH                :: 55
-U_JG_NYA                      :: 56
-U_JG_ROHINGYA_YEH             :: 57
-U_JG_MANICHAEAN_ALEPH         :: 58
-U_JG_MANICHAEAN_AYIN          :: 59
-U_JG_MANICHAEAN_BETH          :: 60
-U_JG_MANICHAEAN_DALETH        :: 61
-U_JG_MANICHAEAN_DHAMEDH       :: 62
-U_JG_MANICHAEAN_FIVE          :: 63
-U_JG_MANICHAEAN_GIMEL         :: 64
-U_JG_MANICHAEAN_HETH          :: 65
-U_JG_MANICHAEAN_HUNDRED       :: 66
-U_JG_MANICHAEAN_KAPH          :: 67
-U_JG_MANICHAEAN_LAMEDH        :: 68
-U_JG_MANICHAEAN_MEM           :: 69
-U_JG_MANICHAEAN_NUN           :: 70
-U_JG_MANICHAEAN_ONE           :: 71
-U_JG_MANICHAEAN_PE            :: 72
-U_JG_MANICHAEAN_QOPH          :: 73
-U_JG_MANICHAEAN_RESH          :: 74
-U_JG_MANICHAEAN_SADHE         :: 75
-U_JG_MANICHAEAN_SAMEKH        :: 76
-U_JG_MANICHAEAN_TAW           :: 77
-U_JG_MANICHAEAN_TEN           :: 78
-U_JG_MANICHAEAN_TETH          :: 79
-U_JG_MANICHAEAN_THAMEDH       :: 80
-U_JG_MANICHAEAN_TWENTY        :: 81
-U_JG_MANICHAEAN_WAW           :: 82
-U_JG_MANICHAEAN_YODH          :: 83
-U_JG_MANICHAEAN_ZAYIN         :: 84
-U_JG_STRAIGHT_WAW             :: 85
-U_JG_AFRICAN_FEH              :: 86
-U_JG_AFRICAN_NOON             :: 87
-U_JG_AFRICAN_QAF              :: 88
-U_JG_MALAYALAM_BHA            :: 89
-U_JG_MALAYALAM_JA             :: 90
-U_JG_MALAYALAM_LLA            :: 91
-U_JG_MALAYALAM_LLLA           :: 92
-U_JG_MALAYALAM_NGA            :: 93
-U_JG_MALAYALAM_NNA            :: 94
-U_JG_MALAYALAM_NNNA           :: 95
-U_JG_MALAYALAM_NYA            :: 96
-U_JG_MALAYALAM_RA             :: 97
-U_JG_MALAYALAM_SSA            :: 98
-U_JG_MALAYALAM_TTA            :: 99
-U_JG_HANIFI_ROHINGYA_KINNA_YA :: 100
-U_JG_HANIFI_ROHINGYA_PA       :: 101
-U_JG_THIN_YEH                 :: 102
-U_JG_VERTICAL_TAIL            :: 103
-U_JG_KASHMIRI_YEH             :: 104
-U_JG_THIN_NOON                :: 105
+UIdentifierStatus :: enum c.int {
+	RESTRICTED = 0,
+	ALLOWED    = 1,
+}
 
-UGraphemeClusterBreak :: c.int
-
-U_GCB_OTHER              :: 0
-U_GCB_CONTROL            :: 1
-U_GCB_CR                 :: 2
-U_GCB_EXTEND             :: 3
-U_GCB_L                  :: 4
-U_GCB_LF                 :: 5
-U_GCB_LV                 :: 6
-U_GCB_LVT                :: 7
-U_GCB_T                  :: 8
-U_GCB_V                  :: 9
-U_GCB_SPACING_MARK       :: 10
-U_GCB_PREPEND            :: 11
-U_GCB_REGIONAL_INDICATOR :: 12
-U_GCB_E_BASE             :: 13
-U_GCB_E_BASE_GAZ         :: 14
-U_GCB_E_MODIFIER         :: 15
-U_GCB_GLUE_AFTER_ZWJ     :: 16
-U_GCB_ZWJ                :: 17
-
-UWordBreakValues :: c.int
-
-U_WB_OTHER              :: 0
-U_WB_ALETTER            :: 1
-U_WB_FORMAT             :: 2
-U_WB_KATAKANA           :: 3
-U_WB_MIDLETTER          :: 4
-U_WB_MIDNUM             :: 5
-U_WB_NUMERIC            :: 6
-U_WB_EXTENDNUMLET       :: 7
-U_WB_CR                 :: 8
-U_WB_EXTEND             :: 9
-U_WB_LF                 :: 10
-U_WB_MIDNUMLET          :: 11
-U_WB_NEWLINE            :: 12
-U_WB_REGIONAL_INDICATOR :: 13
-U_WB_HEBREW_LETTER      :: 14
-U_WB_SINGLE_QUOTE       :: 15
-U_WB_DOUBLE_QUOTE       :: 16
-U_WB_E_BASE             :: 17
-U_WB_E_BASE_GAZ         :: 18
-U_WB_E_MODIFIER         :: 19
-U_WB_GLUE_AFTER_ZWJ     :: 20
-U_WB_ZWJ                :: 21
-U_WB_WSEGSPACE          :: 22
-
-USentenceBreak :: c.int
-
-U_SB_OTHER     :: 0
-U_SB_ATERM     :: 1
-U_SB_CLOSE     :: 2
-U_SB_FORMAT    :: 3
-U_SB_LOWER     :: 4
-U_SB_NUMERIC   :: 5
-U_SB_OLETTER   :: 6
-U_SB_SEP       :: 7
-U_SB_SP        :: 8
-U_SB_STERM     :: 9
-U_SB_UPPER     :: 10
-U_SB_CR        :: 11
-U_SB_EXTEND    :: 12
-U_SB_LF        :: 13
-U_SB_SCONTINUE :: 14
-
-ULineBreak :: c.int
-
-U_LB_UNKNOWN                      :: 0
-U_LB_AMBIGUOUS                    :: 1
-U_LB_ALPHABETIC                   :: 2
-U_LB_BREAK_BOTH                   :: 3
-U_LB_BREAK_AFTER                  :: 4
-U_LB_BREAK_BEFORE                 :: 5
-U_LB_MANDATORY_BREAK              :: 6
-U_LB_CONTINGENT_BREAK             :: 7
-U_LB_CLOSE_PUNCTUATION            :: 8
-U_LB_COMBINING_MARK               :: 9
-U_LB_CARRIAGE_RETURN              :: 10
-U_LB_EXCLAMATION                  :: 11
-U_LB_GLUE                         :: 12
-U_LB_HYPHEN                       :: 13
-U_LB_IDEOGRAPHIC                  :: 14
-U_LB_INSEPARABLE                  :: 15
-U_LB_INSEPERABLE                  :: 15
-U_LB_INFIX_NUMERIC                :: 16
-U_LB_LINE_FEED                    :: 17
-U_LB_NONSTARTER                   :: 18
-U_LB_NUMERIC                      :: 19
-U_LB_OPEN_PUNCTUATION             :: 20
-U_LB_POSTFIX_NUMERIC              :: 21
-U_LB_PREFIX_NUMERIC               :: 22
-U_LB_QUOTATION                    :: 23
-U_LB_COMPLEX_CONTEXT              :: 24
-U_LB_SURROGATE                    :: 25
-U_LB_SPACE                        :: 26
-U_LB_BREAK_SYMBOLS                :: 27
-U_LB_ZWSPACE                      :: 28
-U_LB_NEXT_LINE                    :: 29
-U_LB_WORD_JOINER                  :: 30
-U_LB_H2                           :: 31
-U_LB_H3                           :: 32
-U_LB_JL                           :: 33
-U_LB_JT                           :: 34
-U_LB_JV                           :: 35
-U_LB_CLOSE_PARENTHESIS            :: 36
-U_LB_CONDITIONAL_JAPANESE_STARTER :: 37
-U_LB_HEBREW_LETTER                :: 38
-U_LB_REGIONAL_INDICATOR           :: 39
-U_LB_E_BASE                       :: 40
-U_LB_E_MODIFIER                   :: 41
-U_LB_ZWJ                          :: 42
-U_LB_AKSARA                       :: 43
-U_LB_AKSARA_PREBASE               :: 44
-U_LB_AKSARA_START                 :: 45
-U_LB_VIRAMA_FINAL                 :: 46
-U_LB_VIRAMA                       :: 47
-U_LB_UNAMBIGUOUS_HYPHEN           :: 48
-
-UNumericType :: c.int
-
-U_NT_NONE    :: 0
-U_NT_DECIMAL :: 1
-U_NT_DIGIT   :: 2
-U_NT_NUMERIC :: 3
-
-UHangulSyllableType :: c.int
-
-U_HST_NOT_APPLICABLE :: 0
-U_HST_LEADING_JAMO   :: 1
-U_HST_VOWEL_JAMO     :: 2
-U_HST_TRAILING_JAMO  :: 3
-U_HST_LV_SYLLABLE    :: 4
-U_HST_LVT_SYLLABLE   :: 5
-
-UIndicPositionalCategory :: c.int
-
-U_INPC_NA                       :: 0
-U_INPC_BOTTOM                   :: 1
-U_INPC_BOTTOM_AND_LEFT          :: 2
-U_INPC_BOTTOM_AND_RIGHT         :: 3
-U_INPC_LEFT                     :: 4
-U_INPC_LEFT_AND_RIGHT           :: 5
-U_INPC_OVERSTRUCK               :: 6
-U_INPC_RIGHT                    :: 7
-U_INPC_TOP                      :: 8
-U_INPC_TOP_AND_BOTTOM           :: 9
-U_INPC_TOP_AND_BOTTOM_AND_RIGHT :: 10
-U_INPC_TOP_AND_LEFT             :: 11
-U_INPC_TOP_AND_LEFT_AND_RIGHT   :: 12
-U_INPC_TOP_AND_RIGHT            :: 13
-U_INPC_VISUAL_ORDER_LEFT        :: 14
-U_INPC_TOP_AND_BOTTOM_AND_LEFT  :: 15
-
-UIndicSyllabicCategory :: c.int
-
-U_INSC_OTHER                       :: 0
-U_INSC_AVAGRAHA                    :: 1
-U_INSC_BINDU                       :: 2
-U_INSC_BRAHMI_JOINING_NUMBER       :: 3
-U_INSC_CANTILLATION_MARK           :: 4
-U_INSC_CONSONANT                   :: 5
-U_INSC_CONSONANT_DEAD              :: 6
-U_INSC_CONSONANT_FINAL             :: 7
-U_INSC_CONSONANT_HEAD_LETTER       :: 8
-U_INSC_CONSONANT_INITIAL_POSTFIXED :: 9
-U_INSC_CONSONANT_KILLER            :: 10
-U_INSC_CONSONANT_MEDIAL            :: 11
-U_INSC_CONSONANT_PLACEHOLDER       :: 12
-U_INSC_CONSONANT_PRECEDING_REPHA   :: 13
-U_INSC_CONSONANT_PREFIXED          :: 14
-U_INSC_CONSONANT_SUBJOINED         :: 15
-U_INSC_CONSONANT_SUCCEEDING_REPHA  :: 16
-U_INSC_CONSONANT_WITH_STACKER      :: 17
-U_INSC_GEMINATION_MARK             :: 18
-U_INSC_INVISIBLE_STACKER           :: 19
-U_INSC_JOINER                      :: 20
-U_INSC_MODIFYING_LETTER            :: 21
-U_INSC_NON_JOINER                  :: 22
-U_INSC_NUKTA                       :: 23
-U_INSC_NUMBER                      :: 24
-U_INSC_NUMBER_JOINER               :: 25
-U_INSC_PURE_KILLER                 :: 26
-U_INSC_REGISTER_SHIFTER            :: 27
-U_INSC_SYLLABLE_MODIFIER           :: 28
-U_INSC_TONE_LETTER                 :: 29
-U_INSC_TONE_MARK                   :: 30
-U_INSC_VIRAMA                      :: 31
-U_INSC_VISARGA                     :: 32
-U_INSC_VOWEL                       :: 33
-U_INSC_VOWEL_DEPENDENT             :: 34
-U_INSC_VOWEL_INDEPENDENT           :: 35
-U_INSC_REORDERING_KILLER           :: 36
-
-UIndicConjunctBreak :: c.int
-
-U_INCB_NONE      :: 0
-U_INCB_CONSONANT :: 1
-U_INCB_EXTEND    :: 2
-U_INCB_LINKER    :: 3
-
-UVerticalOrientation :: c.int
-
-U_VO_ROTATED             :: 0
-U_VO_TRANSFORMED_ROTATED :: 1
-U_VO_TRANSFORMED_UPRIGHT :: 2
-U_VO_UPRIGHT             :: 3
-
-UIdentifierStatus :: c.int
-
-U_ID_STATUS_RESTRICTED :: 0
-U_ID_STATUS_ALLOWED    :: 1
-
-UIdentifierType :: c.int
-
-U_ID_TYPE_NOT_CHARACTER     :: 0
-U_ID_TYPE_DEPRECATED        :: 1
-U_ID_TYPE_DEFAULT_IGNORABLE :: 2
-U_ID_TYPE_NOT_NFKC          :: 3
-U_ID_TYPE_NOT_XID           :: 4
-U_ID_TYPE_EXCLUSION         :: 5
-U_ID_TYPE_OBSOLETE          :: 6
-U_ID_TYPE_TECHNICAL         :: 7
-U_ID_TYPE_UNCOMMON_USE      :: 8
-U_ID_TYPE_LIMITED_USE       :: 9
-U_ID_TYPE_INCLUSION         :: 10
-U_ID_TYPE_RECOMMENDED       :: 11
+UIdentifierType :: enum c.int {
+	NOT_CHARACTER     = 0,
+	DEPRECATED        = 1,
+	DEFAULT_IGNORABLE = 2,
+	NOT_NFKC          = 3,
+	NOT_XID           = 4,
+	EXCLUSION         = 5,
+	OBSOLETE          = 6,
+	TECHNICAL         = 7,
+	UNCOMMON_USE      = 8,
+	LIMITED_USE       = 9,
+	INCLUSION         = 10,
+	RECOMMENDED       = 11,
+}
 
 UCharEnumTypeRange :: proc "c" (context_: rawptr, start: UChar32, limit: UChar32, type: UCharCategory) -> UBool
 UEnumCharNamesFn   :: proc "c" (context_: rawptr, code: UChar32, nameChoice: UCharNameChoice, name: cstring, length: i32) -> UBool

@@ -8,20 +8,20 @@ import "core:c"
 foreign import libandroid "system:android"
 foreign import libnativewindow "system:nativewindow"
 
-ANativeWindow_LegacyFormat :: c.int
+ANativeWindow_LegacyFormat :: enum c.int {
+	RGBA_8888 = 1,
+	RGBX_8888 = 2,
+	RGB_565   = 4,
+}
 
-WINDOW_FORMAT_RGBA_8888 :: 1
-WINDOW_FORMAT_RGBX_8888 :: 2
-WINDOW_FORMAT_RGB_565   :: 4
-
-ANativeWindowTransform :: c.int
-
-ANATIVEWINDOW_TRANSFORM_IDENTITY          :: 0x00
-ANATIVEWINDOW_TRANSFORM_MIRROR_HORIZONTAL :: 0x01
-ANATIVEWINDOW_TRANSFORM_MIRROR_VERTICAL   :: 0x02
-ANATIVEWINDOW_TRANSFORM_ROTATE_90         :: 0x04
-ANATIVEWINDOW_TRANSFORM_ROTATE_180        :: 0x3
-ANATIVEWINDOW_TRANSFORM_ROTATE_270        :: 0x7
+ANativeWindowTransform :: enum c.int {
+	IDENTITY          = 0x00,
+	MIRROR_HORIZONTAL = 0x01,
+	MIRROR_VERTICAL   = 0x02,
+	ROTATE_90         = 0x04,
+	ROTATE_180        = 0x3,
+	ROTATE_270        = 0x7,
+}
 
 ANativeWindow :: struct {}
 
@@ -29,21 +29,21 @@ ANativeWindow_Buffer :: struct {
 	width:    i32,
 	height:   i32,
 	stride:   i32,
-	format:   i32,
+	format:   AHardwareBuffer_Format,
 	bits:     rawptr,
 	reserved: [6]u32,
 }
 
-ANativeWindow_FrameRateCompatibility :: c.int
+ANativeWindow_FrameRateCompatibility :: enum i8 {
+	DEFAULT      = 0,
+	FIXED_SOURCE = 1,
+	AT_LEAST     = 2,
+}
 
-ANATIVEWINDOW_FRAME_RATE_COMPATIBILITY_DEFAULT      :: 0
-ANATIVEWINDOW_FRAME_RATE_COMPATIBILITY_FIXED_SOURCE :: 1
-ANATIVEWINDOW_FRAME_RATE_COMPATIBILITY_AT_LEAST     :: 2
-
-ANativeWindow_ChangeFrameRateStrategy :: c.int
-
-ANATIVEWINDOW_CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS :: 0
-ANATIVEWINDOW_CHANGE_FRAME_RATE_ALWAYS           :: 1
+ANativeWindow_ChangeFrameRateStrategy :: enum i8 {
+	ONLY_IF_SEAMLESS = 0,
+	ALWAYS           = 1,
+}
 
 @(default_calling_convention="c")
 foreign libandroid {
@@ -57,17 +57,17 @@ foreign libnativewindow {
 	ANativeWindow_release                        :: proc(window: ^ANativeWindow) ---
 	ANativeWindow_getWidth                       :: proc(window: ^ANativeWindow) -> i32 ---
 	ANativeWindow_getHeight                      :: proc(window: ^ANativeWindow) -> i32 ---
-	ANativeWindow_getFormat                      :: proc(window: ^ANativeWindow) -> i32 ---
-	ANativeWindow_setBuffersGeometry             :: proc(window: ^ANativeWindow, width: i32, height: i32, format: i32) -> i32 ---
+	ANativeWindow_getFormat                      :: proc(window: ^ANativeWindow) -> AHardwareBuffer_Format ---
+	ANativeWindow_setBuffersGeometry             :: proc(window: ^ANativeWindow, width: i32, height: i32, format: AHardwareBuffer_Format) -> i32 ---
 	ANativeWindow_lock                           :: proc(window: ^ANativeWindow, outBuffer: ^ANativeWindow_Buffer, inOutDirtyBounds: ^ARect) -> i32 ---
 	ANativeWindow_unlockAndPost                  :: proc(window: ^ANativeWindow) -> i32 ---
-	ANativeWindow_setBuffersTransform            :: proc(window: ^ANativeWindow, transform: i32) -> i32 ---
-	ANativeWindow_setBuffersDataSpace            :: proc(window: ^ANativeWindow, dataSpace: i32) -> i32 ---
-	ANativeWindow_getBuffersDataSpace            :: proc(window: ^ANativeWindow) -> i32 ---
-	ANativeWindow_getBuffersDefaultDataSpace     :: proc(window: ^ANativeWindow) -> i32 --- // API level 34
-	ANativeWindow_setFrameRate                   :: proc(window: ^ANativeWindow, frameRate: f32, compatibility: i8) -> i32 --- // API level 30
+	ANativeWindow_setBuffersTransform            :: proc(window: ^ANativeWindow, transform: ANativeWindowTransform) -> i32 ---
+	ANativeWindow_setBuffersDataSpace            :: proc(window: ^ANativeWindow, dataSpace: ADataSpace) -> i32 ---
+	ANativeWindow_getBuffersDataSpace            :: proc(window: ^ANativeWindow) -> ADataSpace ---
+	ANativeWindow_getBuffersDefaultDataSpace     :: proc(window: ^ANativeWindow) -> ADataSpace --- // API level 34
+	ANativeWindow_setFrameRate                   :: proc(window: ^ANativeWindow, frameRate: f32, compatibility: ANativeWindow_FrameRateCompatibility) -> i32 --- // API level 30
 	ANativeWindow_tryAllocateBuffers             :: proc(window: ^ANativeWindow) --- // API level 30
-	ANativeWindow_setFrameRateWithChangeStrategy :: proc(window: ^ANativeWindow, frameRate: f32, compatibility: i8, changeFrameRateStrategy: i8) -> i32 --- // API level 31
+	ANativeWindow_setFrameRateWithChangeStrategy :: proc(window: ^ANativeWindow, frameRate: f32, compatibility: ANativeWindow_FrameRateCompatibility, changeFrameRateStrategy: ANativeWindow_ChangeFrameRateStrategy) -> i32 --- // API level 31
 	ANativeWindow_setProducerThrottlingEnabled   :: proc(window: ^ANativeWindow, enabled: bool) -> i32 --- // API level 37
 	ANativeWindow_isProducerThrottlingEnabled    :: proc(window: ^ANativeWindow, outEnabled: ^bool) -> i32 --- // API level 37
 }

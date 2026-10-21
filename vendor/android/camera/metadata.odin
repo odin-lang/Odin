@@ -10,13 +10,16 @@ foreign import libcamera2ndk "system:camera2ndk"
 
 ACameraMetadata :: struct {}
 
-ACAMERA_TYPE_BYTE     :: 0
-ACAMERA_TYPE_INT32    :: 1
-ACAMERA_TYPE_FLOAT    :: 2
-ACAMERA_TYPE_INT64    :: 3
-ACAMERA_TYPE_DOUBLE   :: 4
-ACAMERA_TYPE_RATIONAL :: 5
-ACAMERA_NUM_TYPES     :: 6
+ACAMERA_NUM_TYPES :: 6
+
+ACameraMetadataType :: enum i8 {
+	BYTE     = 0,
+	INT32    = 1,
+	FLOAT    = 2,
+	INT64    = 3,
+	DOUBLE   = 4,
+	RATIONAL = 5,
+}
 
 ACameraMetadata_rational :: struct {
 	numerator:   i32,
@@ -24,8 +27,8 @@ ACameraMetadata_rational :: struct {
 }
 
 ACameraMetadata_entry :: struct {
-	tag:   u32,
-	type:  u8,
+	tag:   acamera_metadata_tag_t,
+	type:  ACameraMetadataType,
 	count: u32,
 	data: struct #raw_union {
 		u8:  ^u8,
@@ -38,8 +41,8 @@ ACameraMetadata_entry :: struct {
 }
 
 ACameraMetadata_const_entry :: struct {
-	tag:   u32,
-	type:  u8,
+	tag:   acamera_metadata_tag_t,
+	type:  ACameraMetadataType,
 	count: u32,
 	data: struct #raw_union {
 		u8:  ^u8,
@@ -53,7 +56,7 @@ ACameraMetadata_const_entry :: struct {
 
 @(default_calling_convention="c")
 foreign libcamera2ndk {
-	ACameraMetadata_getConstEntry        :: proc(metadata: ^ACameraMetadata, tag: u32, entry: ^ACameraMetadata_const_entry) -> camera_status_t ---
+	ACameraMetadata_getConstEntry        :: proc(metadata: ^ACameraMetadata, tag: acamera_metadata_tag_t, entry: ^ACameraMetadata_const_entry) -> camera_status_t ---
 	ACameraMetadata_getAllTags           :: proc(metadata: ^ACameraMetadata, numEntries: ^i32, tags: ^^u32) -> camera_status_t ---
 	ACameraMetadata_getTagFromName       :: proc(metadata: ^ACameraMetadata, name: cstring, tag: ^u32) -> camera_status_t --- // API level 35
 	ACameraMetadata_copy                 :: proc(src: ^ACameraMetadata) -> ^ACameraMetadata ---

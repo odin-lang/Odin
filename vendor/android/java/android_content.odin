@@ -370,10 +370,10 @@ AttributionSource_checkCallingUid :: proc "contextless" (self: ^AttributionSourc
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-AttributionSource_describeContents :: proc "contextless" (self: ^AttributionSource) -> (result: i32, exception: ^Throwable) {
+AttributionSource_describeContents :: proc "contextless" (self: ^AttributionSource) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &AttributionSource__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 AttributionSource_enforceCallingUid :: proc "contextless" (self: ^AttributionSource) -> (exception: ^Throwable) {
@@ -451,10 +451,10 @@ AttributionSource_toString :: proc "contextless" (self: ^AttributionSource) -> (
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-AttributionSource_writeToParcel :: proc "contextless" (self: ^AttributionSource, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+AttributionSource_writeToParcel :: proc "contextless" (self: ^AttributionSource, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &AttributionSource__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -829,10 +829,10 @@ ClipData_addItem :: proc{
 	ClipData_addItem_ContentResolver_ClipData_Item,
 }
 
-ClipData_describeContents :: proc "contextless" (self: ^ClipData) -> (result: i32, exception: ^Throwable) {
+ClipData_describeContents :: proc "contextless" (self: ^ClipData) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ClipData__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ClipData_getDescription :: proc "contextless" (self: ^ClipData) -> (result: ^ClipDescription, exception: ^Throwable) {
@@ -895,10 +895,10 @@ ClipData_toString :: proc "contextless" (self: ^ClipData) -> (result: ^String, e
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ClipData_writeToParcel :: proc "contextless" (self: ^ClipData, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+ClipData_writeToParcel :: proc "contextless" (self: ^ClipData, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ClipData__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1132,10 +1132,10 @@ ClipDescription_compareMimeTypes :: proc "contextless" (concreteType: ^String, d
 	return jni_env->CallStaticBooleanMethodA(jni_class, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-ClipDescription_describeContents :: proc "contextless" (self: ^ClipDescription) -> (result: i32, exception: ^Throwable) {
+ClipDescription_describeContents :: proc "contextless" (self: ^ClipDescription) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ClipDescription__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ClipDescription_filterMimeTypes :: proc "contextless" (self: ^ClipDescription, mimeType: ^String) -> (result: ^Array(String), exception: ^Throwable) {
@@ -1145,10 +1145,10 @@ ClipDescription_filterMimeTypes :: proc "contextless" (self: ^ClipDescription, m
 	return (^Array(String))(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ClipDescription_getClassificationStatus :: proc "contextless" (self: ^ClipDescription) -> (result: i32, exception: ^Throwable) { // API level 31
+ClipDescription_getClassificationStatus :: proc "contextless" (self: ^ClipDescription) -> (result: ClipDescription_Classification, exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ClipDescription__class, "getClassificationStatus", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return ClipDescription_Classification(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ClipDescription_getConfidenceScore :: proc "contextless" (self: ^ClipDescription, entity: ^String) -> (result: f32, exception: ^Throwable) { // API level 31
@@ -1242,12 +1242,18 @@ ClipDescription_toString :: proc "contextless" (self: ^ClipDescription) -> (resu
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ClipDescription_writeToParcel :: proc "contextless" (self: ^ClipDescription, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+ClipDescription_writeToParcel :: proc "contextless" (self: ^ClipDescription, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ClipDescription__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+ClipDescription_Classification :: enum i32 {
+	COMPLETE      = 3,
+	NOT_COMPLETE  = 1,
+	NOT_PERFORMED = 2,
 }
 
 // class android.content.ClipboardManager
@@ -1381,12 +1387,22 @@ ComponentCallbacks2_TRIM_MEMORY_RUNNING_LOW      :: 10
 ComponentCallbacks2_TRIM_MEMORY_RUNNING_MODERATE :: 5
 ComponentCallbacks2_TRIM_MEMORY_UI_HIDDEN        :: 20
 
-ComponentCallbacks2_onTrimMemory :: proc "contextless" (self: ^ComponentCallbacks2, level: i32) -> (exception: ^Throwable) {
+ComponentCallbacks2_onTrimMemory :: proc "contextless" (self: ^ComponentCallbacks2, level: ComponentCallbacks2_TrimMemory) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ComponentCallbacks2__class, "onTrimMemory", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = level}}
+	jni_args := [?]android.jvalue{{i = i32(level)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+ComponentCallbacks2_TrimMemory :: enum i32 {
+	BACKGROUND       = 40,
+	COMPLETE         = 80,
+	MODERATE         = 60,
+	RUNNING_CRITICAL = 15,
+	RUNNING_LOW      = 10,
+	RUNNING_MODERATE = 5,
+	UI_HIDDEN        = 20,
 }
 
 // class android.content.ComponentName
@@ -1473,10 +1489,10 @@ ComponentName_createRelative :: proc{
 	ComponentName_createRelative_String_String,
 }
 
-ComponentName_describeContents :: proc "contextless" (self: ^ComponentName) -> (result: i32, exception: ^Throwable) {
+ComponentName_describeContents :: proc "contextless" (self: ^ComponentName) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ComponentName__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ComponentName_equals :: proc "contextless" (self: ^ComponentName, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -1556,10 +1572,10 @@ ComponentName_writeToParcel_ComponentName_Parcel :: proc "contextless" (c: ^Comp
 	return jni_take(jni_env)
 }
 
-ComponentName_writeToParcel_Parcel_int :: proc "contextless" (self: ^ComponentName, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+ComponentName_writeToParcel_Parcel_int :: proc "contextless" (self: ^ComponentName, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ComponentName__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -1788,10 +1804,10 @@ ContentProvider_onLowMemory :: proc "contextless" (self: ^ContentProvider) -> (e
 	return jni_take(jni_env)
 }
 
-ContentProvider_onTrimMemory :: proc "contextless" (self: ^ContentProvider, level: i32) -> (exception: ^Throwable) {
+ContentProvider_onTrimMemory :: proc "contextless" (self: ^ContentProvider, level: ComponentCallbacks2_TrimMemory) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContentProvider__class, "onTrimMemory", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = level}}
+	jni_args := [?]android.jvalue{{i = i32(level)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -2243,10 +2259,10 @@ ContentProviderOperation_apply :: proc "contextless" (self: ^ContentProviderOper
 	return (^ContentProviderResult)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContentProviderOperation_describeContents :: proc "contextless" (self: ^ContentProviderOperation) -> (result: i32, exception: ^Throwable) {
+ContentProviderOperation_describeContents :: proc "contextless" (self: ^ContentProviderOperation) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContentProviderOperation__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ContentProviderOperation_getUri :: proc "contextless" (self: ^ContentProviderOperation) -> (result: ^Uri, exception: ^Throwable) {
@@ -2371,10 +2387,10 @@ ContentProviderOperation_toString :: proc "contextless" (self: ^ContentProviderO
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ContentProviderOperation_writeToParcel :: proc "contextless" (self: ^ContentProviderOperation, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+ContentProviderOperation_writeToParcel :: proc "contextless" (self: ^ContentProviderOperation, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContentProviderOperation__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -2595,10 +2611,10 @@ ContentProviderResult_new :: proc{
 	ContentProviderResult_new_Throwable,
 }
 
-ContentProviderResult_describeContents :: proc "contextless" (self: ^ContentProviderResult) -> (result: i32, exception: ^Throwable) {
+ContentProviderResult_describeContents :: proc "contextless" (self: ^ContentProviderResult) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContentProviderResult__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ContentProviderResult_toString :: proc "contextless" (self: ^ContentProviderResult) -> (result: ^String, exception: ^Throwable) {
@@ -2607,10 +2623,10 @@ ContentProviderResult_toString :: proc "contextless" (self: ^ContentProviderResu
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ContentProviderResult_writeToParcel :: proc "contextless" (self: ^ContentProviderResult, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+ContentProviderResult_writeToParcel :: proc "contextless" (self: ^ContentProviderResult, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContentProviderResult__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -2996,18 +3012,18 @@ ContentResolver_notifyChange_Uri_ContentObserver_bool :: proc "contextless" (sel
 	return jni_take(jni_env)
 }
 
-ContentResolver_notifyChange_Uri_ContentObserver_int :: proc "contextless" (self: ^ContentResolver, uri: ^Uri, observer: ^ContentObserver, flags: i32) -> (exception: ^Throwable) {
+ContentResolver_notifyChange_Uri_ContentObserver_int :: proc "contextless" (self: ^ContentResolver, uri: ^Uri, observer: ^ContentObserver, flags: ContentResolver_NotifyFlags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContentResolver__class, "notifyChange", "(Landroid/net/Uri;Landroid/database/ContentObserver;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {l = observer}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = uri}, {l = observer}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-ContentResolver_notifyChange_Collection_ContentObserver_int :: proc "contextless" (self: ^ContentResolver, uris: ^Collection, observer: ^ContentObserver, flags: i32) -> (exception: ^Throwable) { // API level 30
+ContentResolver_notifyChange_Collection_ContentObserver_int :: proc "contextless" (self: ^ContentResolver, uris: ^Collection, observer: ^ContentObserver, flags: ContentResolver_NotifyFlags) -> (exception: ^Throwable) { // API level 30
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContentResolver__class, "notifyChange", "(Ljava/util/Collection;Landroid/database/ContentObserver;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = uris}, {l = observer}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = uris}, {l = observer}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -3165,10 +3181,10 @@ ContentResolver_registerContentObserver :: proc "contextless" (self: ^ContentRes
 	return jni_take(jni_env)
 }
 
-ContentResolver_releasePersistableUriPermission :: proc "contextless" (self: ^ContentResolver, uri: ^Uri, modeFlags: i32) -> (exception: ^Throwable) {
+ContentResolver_releasePersistableUriPermission :: proc "contextless" (self: ^ContentResolver, uri: ^Uri, modeFlags: Intent_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContentResolver__class, "releasePersistableUriPermission", "(Landroid/net/Uri;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {i = modeFlags}}
+	jni_args := [?]android.jvalue{{l = uri}, {i = transmute(i32)modeFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -3242,10 +3258,10 @@ ContentResolver_startSync :: proc "contextless" (self: ^ContentResolver, uri: ^U
 	return jni_take(jni_env)
 }
 
-ContentResolver_takePersistableUriPermission :: proc "contextless" (self: ^ContentResolver, uri: ^Uri, modeFlags: i32) -> (exception: ^Throwable) {
+ContentResolver_takePersistableUriPermission :: proc "contextless" (self: ^ContentResolver, uri: ^Uri, modeFlags: Intent_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContentResolver__class, "takePersistableUriPermission", "(Landroid/net/Uri;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {i = modeFlags}}
+	jni_args := [?]android.jvalue{{l = uri}, {i = transmute(i32)modeFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -3310,6 +3326,22 @@ ContentResolver_wrap :: proc{
 	ContentResolver_wrap_ContentProvider,
 	ContentResolver_wrap_ContentProviderClient,
 }
+
+ContentResolver_SyncObserverTypeFlag :: enum u32 {
+	ACTIVE   = 2,
+	PENDING  = 1,
+	SETTINGS = 0,
+}
+ContentResolver_SyncObserverType :: distinct bit_set[ContentResolver_SyncObserverTypeFlag; u32]
+
+ContentResolver_NotifyFlag :: enum u32 {
+	DELETE                      = 4,
+	INSERT                      = 2,
+	SKIP_NOTIFY_FOR_DESCENDANTS = 1,
+	SYNC_TO_NETWORK             = 0,
+	UPDATE                      = 3,
+}
+ContentResolver_NotifyFlags :: distinct bit_set[ContentResolver_NotifyFlag; u32]
 
 // class android.content.ContentResolver.MimeTypeInfo
 ContentResolver_MimeTypeInfo :: struct #raw_union {
@@ -3436,10 +3468,10 @@ ContentValues_containsKey :: proc "contextless" (self: ^ContentValues, key: ^Str
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-ContentValues_describeContents :: proc "contextless" (self: ^ContentValues) -> (result: i32, exception: ^Throwable) {
+ContentValues_describeContents :: proc "contextless" (self: ^ContentValues) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContentValues__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 ContentValues_equals :: proc "contextless" (self: ^ContentValues, object: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -3663,10 +3695,10 @@ ContentValues_valueSet :: proc "contextless" (self: ^ContentValues) -> (result: 
 	return (^Set)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ContentValues_writeToParcel :: proc "contextless" (self: ^ContentValues, parcel: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+ContentValues_writeToParcel :: proc "contextless" (self: ^ContentValues, parcel: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContentValues__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = parcel}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = parcel}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -3835,10 +3867,10 @@ Context_bindIsolatedService_Intent_Context_BindServiceFlags_String_Executor_Serv
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-Context_bindIsolatedService_Intent_int_String_Executor_ServiceConnection :: proc "contextless" (self: ^Context, service: ^Intent, flags: i32, instanceName: ^String, executor: ^Executor, conn: ^ServiceConnection) -> (result: bool, exception: ^Throwable) {
+Context_bindIsolatedService_Intent_int_String_Executor_ServiceConnection :: proc "contextless" (self: ^Context, service: ^Intent, flags: Context_BindFlags, instanceName: ^String, executor: ^Executor, conn: ^ServiceConnection) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "bindIsolatedService", "(Landroid/content/Intent;ILjava/lang/String;Ljava/util/concurrent/Executor;Landroid/content/ServiceConnection;)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = service}, {i = flags}, {l = instanceName}, {l = executor}, {l = conn}}
+	jni_args := [?]android.jvalue{{l = service}, {i = transmute(i32)flags}, {l = instanceName}, {l = executor}, {l = conn}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -3861,17 +3893,17 @@ Context_bindService_Intent_ServiceConnection_Context_BindServiceFlags :: proc "c
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-Context_bindService_Intent_ServiceConnection_int :: proc "contextless" (self: ^Context, service: ^Intent, conn: ^ServiceConnection, flags: i32) -> (result: bool, exception: ^Throwable) {
+Context_bindService_Intent_ServiceConnection_int :: proc "contextless" (self: ^Context, service: ^Intent, conn: ^ServiceConnection, flags: Context_BindFlags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "bindService", "(Landroid/content/Intent;Landroid/content/ServiceConnection;I)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = service}, {l = conn}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = service}, {l = conn}, {i = transmute(i32)flags}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-Context_bindService_Intent_int_Executor_ServiceConnection :: proc "contextless" (self: ^Context, service: ^Intent, flags: i32, executor: ^Executor, conn: ^ServiceConnection) -> (result: bool, exception: ^Throwable) {
+Context_bindService_Intent_int_Executor_ServiceConnection :: proc "contextless" (self: ^Context, service: ^Intent, flags: Context_BindFlags, executor: ^Executor, conn: ^ServiceConnection) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "bindService", "(Landroid/content/Intent;ILjava/util/concurrent/Executor;Landroid/content/ServiceConnection;)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = service}, {i = flags}, {l = executor}, {l = conn}}
+	jni_args := [?]android.jvalue{{l = service}, {i = transmute(i32)flags}, {l = executor}, {l = conn}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -3889,10 +3921,10 @@ Context_bindServiceAsUser_Intent_ServiceConnection_Context_BindServiceFlags_User
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-Context_bindServiceAsUser_Intent_ServiceConnection_int_UserHandle :: proc "contextless" (self: ^Context, service: ^Intent, conn: ^ServiceConnection, flags: i32, user: ^UserHandle) -> (result: bool, exception: ^Throwable) { // API level 30
+Context_bindServiceAsUser_Intent_ServiceConnection_int_UserHandle :: proc "contextless" (self: ^Context, service: ^Intent, conn: ^ServiceConnection, flags: Context_BindFlags, user: ^UserHandle) -> (result: bool, exception: ^Throwable) { // API level 30
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "bindServiceAsUser", "(Landroid/content/Intent;Landroid/content/ServiceConnection;ILandroid/os/UserHandle;)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = service}, {l = conn}, {i = flags}, {l = user}}
+	jni_args := [?]android.jvalue{{l = service}, {l = conn}, {i = transmute(i32)flags}, {l = user}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -3901,81 +3933,81 @@ Context_bindServiceAsUser :: proc{
 	Context_bindServiceAsUser_Intent_ServiceConnection_int_UserHandle,
 }
 
-Context_checkCallingOrSelfPermission :: proc "contextless" (self: ^Context, permission: ^String) -> (result: i32, exception: ^Throwable) {
+Context_checkCallingOrSelfPermission :: proc "contextless" (self: ^Context, permission: ^String) -> (result: PackageManager_Permission, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "checkCallingOrSelfPermission", "(Ljava/lang/String;)I", false) or_return
 	jni_args := [?]android.jvalue{{l = permission}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return PackageManager_Permission(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Context_checkCallingOrSelfUriPermission :: proc "contextless" (self: ^Context, uri: ^Uri, modeFlags: i32) -> (result: i32, exception: ^Throwable) {
+Context_checkCallingOrSelfUriPermission :: proc "contextless" (self: ^Context, uri: ^Uri, modeFlags: Intent_Flags) -> (result: PackageManager_Permission, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "checkCallingOrSelfUriPermission", "(Landroid/net/Uri;I)I", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {i = modeFlags}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{l = uri}, {i = transmute(i32)modeFlags}}
+	return PackageManager_Permission(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Context_checkCallingOrSelfUriPermissions :: proc "contextless" (self: ^Context, uris: ^List, modeFlags: i32) -> (result: ^IntArray, exception: ^Throwable) { // API level 31
+Context_checkCallingOrSelfUriPermissions :: proc "contextless" (self: ^Context, uris: ^List, modeFlags: Intent_Flags) -> (result: ^IntArray, exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "checkCallingOrSelfUriPermissions", "(Ljava/util/List;I)[I", false) or_return
-	jni_args := [?]android.jvalue{{l = uris}, {i = modeFlags}}
+	jni_args := [?]android.jvalue{{l = uris}, {i = transmute(i32)modeFlags}}
 	return (^IntArray)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Context_checkCallingPermission :: proc "contextless" (self: ^Context, permission: ^String) -> (result: i32, exception: ^Throwable) {
+Context_checkCallingPermission :: proc "contextless" (self: ^Context, permission: ^String) -> (result: PackageManager_Permission, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "checkCallingPermission", "(Ljava/lang/String;)I", false) or_return
 	jni_args := [?]android.jvalue{{l = permission}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return PackageManager_Permission(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Context_checkCallingUriPermission :: proc "contextless" (self: ^Context, uri: ^Uri, modeFlags: i32) -> (result: i32, exception: ^Throwable) {
+Context_checkCallingUriPermission :: proc "contextless" (self: ^Context, uri: ^Uri, modeFlags: Intent_Flags) -> (result: PackageManager_Permission, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "checkCallingUriPermission", "(Landroid/net/Uri;I)I", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {i = modeFlags}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{l = uri}, {i = transmute(i32)modeFlags}}
+	return PackageManager_Permission(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Context_checkCallingUriPermissions :: proc "contextless" (self: ^Context, uris: ^List, modeFlags: i32) -> (result: ^IntArray, exception: ^Throwable) { // API level 31
+Context_checkCallingUriPermissions :: proc "contextless" (self: ^Context, uris: ^List, modeFlags: Intent_Flags) -> (result: ^IntArray, exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "checkCallingUriPermissions", "(Ljava/util/List;I)[I", false) or_return
-	jni_args := [?]android.jvalue{{l = uris}, {i = modeFlags}}
+	jni_args := [?]android.jvalue{{l = uris}, {i = transmute(i32)modeFlags}}
 	return (^IntArray)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Context_checkContentUriPermissionFull :: proc "contextless" (self: ^Context, uri: ^Uri, pid: i32, uid: i32, modeFlags: i32) -> (result: i32, exception: ^Throwable) { // API level 35
+Context_checkContentUriPermissionFull :: proc "contextless" (self: ^Context, uri: ^Uri, pid: i32, uid: i32, modeFlags: Intent_Flags) -> (result: PackageManager_Permission, exception: ^Throwable) { // API level 35
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "checkContentUriPermissionFull", "(Landroid/net/Uri;III)I", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {i = pid}, {i = uid}, {i = modeFlags}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{l = uri}, {i = pid}, {i = uid}, {i = transmute(i32)modeFlags}}
+	return PackageManager_Permission(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Context_checkPermission :: proc "contextless" (self: ^Context, permission: ^String, pid: i32, uid: i32) -> (result: i32, exception: ^Throwable) {
+Context_checkPermission :: proc "contextless" (self: ^Context, permission: ^String, pid: i32, uid: i32) -> (result: PackageManager_Permission, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "checkPermission", "(Ljava/lang/String;II)I", false) or_return
 	jni_args := [?]android.jvalue{{l = permission}, {i = pid}, {i = uid}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return PackageManager_Permission(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Context_checkSelfPermission :: proc "contextless" (self: ^Context, permission: ^String) -> (result: i32, exception: ^Throwable) {
+Context_checkSelfPermission :: proc "contextless" (self: ^Context, permission: ^String) -> (result: PackageManager_Permission, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "checkSelfPermission", "(Ljava/lang/String;)I", false) or_return
 	jni_args := [?]android.jvalue{{l = permission}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return PackageManager_Permission(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Context_checkUriPermission_Uri_int_int_int :: proc "contextless" (self: ^Context, uri: ^Uri, pid: i32, uid: i32, modeFlags: i32) -> (result: i32, exception: ^Throwable) {
+Context_checkUriPermission_Uri_int_int_int :: proc "contextless" (self: ^Context, uri: ^Uri, pid: i32, uid: i32, modeFlags: Intent_Flags) -> (result: PackageManager_Permission, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "checkUriPermission", "(Landroid/net/Uri;III)I", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {i = pid}, {i = uid}, {i = modeFlags}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{l = uri}, {i = pid}, {i = uid}, {i = transmute(i32)modeFlags}}
+	return PackageManager_Permission(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Context_checkUriPermission_Uri_String_String_int_int_int :: proc "contextless" (self: ^Context, uri: ^Uri, readPermission: ^String, writePermission: ^String, pid: i32, uid: i32, modeFlags: i32) -> (result: i32, exception: ^Throwable) {
+Context_checkUriPermission_Uri_String_String_int_int_int :: proc "contextless" (self: ^Context, uri: ^Uri, readPermission: ^String, writePermission: ^String, pid: i32, uid: i32, modeFlags: Intent_Flags) -> (result: PackageManager_Permission, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "checkUriPermission", "(Landroid/net/Uri;Ljava/lang/String;Ljava/lang/String;III)I", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {l = readPermission}, {l = writePermission}, {i = pid}, {i = uid}, {i = modeFlags}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{l = uri}, {l = readPermission}, {l = writePermission}, {i = pid}, {i = uid}, {i = transmute(i32)modeFlags}}
+	return PackageManager_Permission(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 Context_checkUriPermission :: proc{
@@ -3983,10 +4015,10 @@ Context_checkUriPermission :: proc{
 	Context_checkUriPermission_Uri_String_String_int_int_int,
 }
 
-Context_checkUriPermissions :: proc "contextless" (self: ^Context, uris: ^List, pid: i32, uid: i32, modeFlags: i32) -> (result: ^IntArray, exception: ^Throwable) { // API level 31
+Context_checkUriPermissions :: proc "contextless" (self: ^Context, uris: ^List, pid: i32, uid: i32, modeFlags: Intent_Flags) -> (result: ^IntArray, exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "checkUriPermissions", "(Ljava/util/List;III)[I", false) or_return
-	jni_args := [?]android.jvalue{{l = uris}, {i = pid}, {i = uid}, {i = modeFlags}}
+	jni_args := [?]android.jvalue{{l = uris}, {i = pid}, {i = uid}, {i = transmute(i32)modeFlags}}
 	return (^IntArray)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4045,24 +4077,24 @@ Context_createDisplayContext :: proc "contextless" (self: ^Context, display: ^Di
 	return (^Context)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Context_createPackageContext :: proc "contextless" (self: ^Context, packageName: ^String, flags: i32) -> (result: ^Context, exception: ^Throwable) {
+Context_createPackageContext :: proc "contextless" (self: ^Context, packageName: ^String, flags: Context_ContextFlags) -> (result: ^Context, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "createPackageContext", "(Ljava/lang/String;I)Landroid/content/Context;", false) or_return
-	jni_args := [?]android.jvalue{{l = packageName}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = packageName}, {i = transmute(i32)flags}}
 	return (^Context)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Context_createWindowContext_Display_int_Bundle :: proc "contextless" (self: ^Context, display: ^Display, type: i32, options: ^Bundle) -> (result: ^Context, exception: ^Throwable) { // API level 31
+Context_createWindowContext_Display_int_Bundle :: proc "contextless" (self: ^Context, display: ^Display, type: WindowManager_LayoutParams_Type, options: ^Bundle) -> (result: ^Context, exception: ^Throwable) { // API level 31
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "createWindowContext", "(Landroid/view/Display;ILandroid/os/Bundle;)Landroid/content/Context;", false) or_return
-	jni_args := [?]android.jvalue{{l = display}, {i = type}, {l = options}}
+	jni_args := [?]android.jvalue{{l = display}, {i = i32(type)}, {l = options}}
 	return (^Context)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Context_createWindowContext_int_Bundle :: proc "contextless" (self: ^Context, type: i32, options: ^Bundle) -> (result: ^Context, exception: ^Throwable) { // API level 30
+Context_createWindowContext_int_Bundle :: proc "contextless" (self: ^Context, type: WindowManager_LayoutParams_Type, options: ^Bundle) -> (result: ^Context, exception: ^Throwable) { // API level 30
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "createWindowContext", "(ILandroid/os/Bundle;)Landroid/content/Context;", false) or_return
-	jni_args := [?]android.jvalue{{i = type}, {l = options}}
+	jni_args := [?]android.jvalue{{i = i32(type)}, {l = options}}
 	return (^Context)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4106,10 +4138,10 @@ Context_enforceCallingOrSelfPermission :: proc "contextless" (self: ^Context, pe
 	return jni_take(jni_env)
 }
 
-Context_enforceCallingOrSelfUriPermission :: proc "contextless" (self: ^Context, uri: ^Uri, modeFlags: i32, message: ^String) -> (exception: ^Throwable) {
+Context_enforceCallingOrSelfUriPermission :: proc "contextless" (self: ^Context, uri: ^Uri, modeFlags: Intent_Flags, message: ^String) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "enforceCallingOrSelfUriPermission", "(Landroid/net/Uri;ILjava/lang/String;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {i = modeFlags}, {l = message}}
+	jni_args := [?]android.jvalue{{l = uri}, {i = transmute(i32)modeFlags}, {l = message}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4122,10 +4154,10 @@ Context_enforceCallingPermission :: proc "contextless" (self: ^Context, permissi
 	return jni_take(jni_env)
 }
 
-Context_enforceCallingUriPermission :: proc "contextless" (self: ^Context, uri: ^Uri, modeFlags: i32, message: ^String) -> (exception: ^Throwable) {
+Context_enforceCallingUriPermission :: proc "contextless" (self: ^Context, uri: ^Uri, modeFlags: Intent_Flags, message: ^String) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "enforceCallingUriPermission", "(Landroid/net/Uri;ILjava/lang/String;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {i = modeFlags}, {l = message}}
+	jni_args := [?]android.jvalue{{l = uri}, {i = transmute(i32)modeFlags}, {l = message}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4138,18 +4170,18 @@ Context_enforcePermission :: proc "contextless" (self: ^Context, permission: ^St
 	return jni_take(jni_env)
 }
 
-Context_enforceUriPermission_Uri_int_int_int_String :: proc "contextless" (self: ^Context, uri: ^Uri, pid: i32, uid: i32, modeFlags: i32, message: ^String) -> (exception: ^Throwable) {
+Context_enforceUriPermission_Uri_int_int_int_String :: proc "contextless" (self: ^Context, uri: ^Uri, pid: i32, uid: i32, modeFlags: Intent_Flags, message: ^String) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "enforceUriPermission", "(Landroid/net/Uri;IIILjava/lang/String;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {i = pid}, {i = uid}, {i = modeFlags}, {l = message}}
+	jni_args := [?]android.jvalue{{l = uri}, {i = pid}, {i = uid}, {i = transmute(i32)modeFlags}, {l = message}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-Context_enforceUriPermission_Uri_String_String_int_int_int_String :: proc "contextless" (self: ^Context, uri: ^Uri, readPermission: ^String, writePermission: ^String, pid: i32, uid: i32, modeFlags: i32, message: ^String) -> (exception: ^Throwable) {
+Context_enforceUriPermission_Uri_String_String_int_int_int_String :: proc "contextless" (self: ^Context, uri: ^Uri, readPermission: ^String, writePermission: ^String, pid: i32, uid: i32, modeFlags: Intent_Flags, message: ^String) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "enforceUriPermission", "(Landroid/net/Uri;Ljava/lang/String;Ljava/lang/String;IIILjava/lang/String;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {l = readPermission}, {l = writePermission}, {i = pid}, {i = uid}, {i = modeFlags}, {l = message}}
+	jni_args := [?]android.jvalue{{l = uri}, {l = readPermission}, {l = writePermission}, {i = pid}, {i = uid}, {i = transmute(i32)modeFlags}, {l = message}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4252,10 +4284,10 @@ Context_getDeviceId :: proc "contextless" (self: ^Context) -> (result: i32, exce
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-Context_getDir :: proc "contextless" (self: ^Context, name: ^String, mode: i32) -> (result: ^File, exception: ^Throwable) {
+Context_getDir :: proc "contextless" (self: ^Context, name: ^String, mode: Context_ModeFlags) -> (result: ^File, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "getDir", "(Ljava/lang/String;I)Ljava/io/File;", false) or_return
-	jni_args := [?]android.jvalue{{l = name}, {i = mode}}
+	jni_args := [?]android.jvalue{{l = name}, {i = transmute(i32)mode}}
 	return (^File)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4389,10 +4421,10 @@ Context_getResources :: proc "contextless" (self: ^Context) -> (result: ^Resourc
 	return (^Resources)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Context_getSharedPreferences :: proc "contextless" (self: ^Context, name: ^String, mode: i32) -> (result: ^SharedPreferences, exception: ^Throwable) {
+Context_getSharedPreferences :: proc "contextless" (self: ^Context, name: ^String, mode: Context_ModeFlags) -> (result: ^SharedPreferences, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "getSharedPreferences", "(Ljava/lang/String;I)Landroid/content/SharedPreferences;", false) or_return
-	jni_args := [?]android.jvalue{{l = name}, {i = mode}}
+	jni_args := [?]android.jvalue{{l = name}, {i = transmute(i32)mode}}
 	return (^SharedPreferences)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4478,10 +4510,10 @@ Context_getWallpaperDesiredMinimumWidth :: proc "contextless" (self: ^Context) -
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-Context_grantUriPermission :: proc "contextless" (self: ^Context, toPackage: ^String, uri: ^Uri, modeFlags: i32) -> (exception: ^Throwable) {
+Context_grantUriPermission :: proc "contextless" (self: ^Context, toPackage: ^String, uri: ^Uri, modeFlags: Intent_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "grantUriPermission", "(Ljava/lang/String;Landroid/net/Uri;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = toPackage}, {l = uri}, {i = modeFlags}}
+	jni_args := [?]android.jvalue{{l = toPackage}, {l = uri}, {i = transmute(i32)modeFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4560,24 +4592,24 @@ Context_openFileInput :: proc "contextless" (self: ^Context, name: ^String) -> (
 	return (^FileInputStream)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Context_openFileOutput :: proc "contextless" (self: ^Context, name: ^String, mode: i32) -> (result: ^FileOutputStream, exception: ^Throwable) {
+Context_openFileOutput :: proc "contextless" (self: ^Context, name: ^String, mode: Context_ModeFlags) -> (result: ^FileOutputStream, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "openFileOutput", "(Ljava/lang/String;I)Ljava/io/FileOutputStream;", false) or_return
-	jni_args := [?]android.jvalue{{l = name}, {i = mode}}
+	jni_args := [?]android.jvalue{{l = name}, {i = transmute(i32)mode}}
 	return (^FileOutputStream)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Context_openOrCreateDatabase_String_int_SQLiteDatabase_CursorFactory :: proc "contextless" (self: ^Context, name: ^String, mode: i32, factory: ^SQLiteDatabase_CursorFactory) -> (result: ^SQLiteDatabase, exception: ^Throwable) {
+Context_openOrCreateDatabase_String_int_SQLiteDatabase_CursorFactory :: proc "contextless" (self: ^Context, name: ^String, mode: Context_ModeFlags, factory: ^SQLiteDatabase_CursorFactory) -> (result: ^SQLiteDatabase, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "openOrCreateDatabase", "(Ljava/lang/String;ILandroid/database/sqlite/SQLiteDatabase$CursorFactory;)Landroid/database/sqlite/SQLiteDatabase;", false) or_return
-	jni_args := [?]android.jvalue{{l = name}, {i = mode}, {l = factory}}
+	jni_args := [?]android.jvalue{{l = name}, {i = transmute(i32)mode}, {l = factory}}
 	return (^SQLiteDatabase)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Context_openOrCreateDatabase_String_int_SQLiteDatabase_CursorFactory_DatabaseErrorHandler :: proc "contextless" (self: ^Context, name: ^String, mode: i32, factory: ^SQLiteDatabase_CursorFactory, errorHandler: ^DatabaseErrorHandler) -> (result: ^SQLiteDatabase, exception: ^Throwable) {
+Context_openOrCreateDatabase_String_int_SQLiteDatabase_CursorFactory_DatabaseErrorHandler :: proc "contextless" (self: ^Context, name: ^String, mode: Context_ModeFlags, factory: ^SQLiteDatabase_CursorFactory, errorHandler: ^DatabaseErrorHandler) -> (result: ^SQLiteDatabase, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "openOrCreateDatabase", "(Ljava/lang/String;ILandroid/database/sqlite/SQLiteDatabase$CursorFactory;Landroid/database/DatabaseErrorHandler;)Landroid/database/sqlite/SQLiteDatabase;", false) or_return
-	jni_args := [?]android.jvalue{{l = name}, {i = mode}, {l = factory}, {l = errorHandler}}
+	jni_args := [?]android.jvalue{{l = name}, {i = transmute(i32)mode}, {l = factory}, {l = errorHandler}}
 	return (^SQLiteDatabase)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4623,10 +4655,10 @@ Context_registerReceiver_BroadcastReceiver_IntentFilter :: proc "contextless" (s
 	return (^Intent)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Context_registerReceiver_BroadcastReceiver_IntentFilter_int :: proc "contextless" (self: ^Context, receiver: ^BroadcastReceiver, filter: ^IntentFilter, flags: i32) -> (result: ^Intent, exception: ^Throwable) {
+Context_registerReceiver_BroadcastReceiver_IntentFilter_int :: proc "contextless" (self: ^Context, receiver: ^BroadcastReceiver, filter: ^IntentFilter, flags: Context_ReceiverFlags) -> (result: ^Intent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "registerReceiver", "(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;I)Landroid/content/Intent;", false) or_return
-	jni_args := [?]android.jvalue{{l = receiver}, {l = filter}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = receiver}, {l = filter}, {i = transmute(i32)flags}}
 	return (^Intent)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4637,10 +4669,10 @@ Context_registerReceiver_BroadcastReceiver_IntentFilter_String_Handler :: proc "
 	return (^Intent)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Context_registerReceiver_BroadcastReceiver_IntentFilter_String_Handler_int :: proc "contextless" (self: ^Context, receiver: ^BroadcastReceiver, filter: ^IntentFilter, broadcastPermission: ^String, scheduler: ^Handler, flags: i32) -> (result: ^Intent, exception: ^Throwable) {
+Context_registerReceiver_BroadcastReceiver_IntentFilter_String_Handler_int :: proc "contextless" (self: ^Context, receiver: ^BroadcastReceiver, filter: ^IntentFilter, broadcastPermission: ^String, scheduler: ^Handler, flags: Context_ReceiverFlags) -> (result: ^Intent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "registerReceiver", "(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;I)Landroid/content/Intent;", false) or_return
-	jni_args := [?]android.jvalue{{l = receiver}, {l = filter}, {l = broadcastPermission}, {l = scheduler}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = receiver}, {l = filter}, {l = broadcastPermission}, {l = scheduler}, {i = transmute(i32)flags}}
 	return (^Intent)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -4683,18 +4715,18 @@ Context_revokeSelfPermissionsOnKill :: proc "contextless" (self: ^Context, permi
 	return jni_take(jni_env)
 }
 
-Context_revokeUriPermission_Uri_int :: proc "contextless" (self: ^Context, uri: ^Uri, modeFlags: i32) -> (exception: ^Throwable) {
+Context_revokeUriPermission_Uri_int :: proc "contextless" (self: ^Context, uri: ^Uri, modeFlags: Intent_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "revokeUriPermission", "(Landroid/net/Uri;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {i = modeFlags}}
+	jni_args := [?]android.jvalue{{l = uri}, {i = transmute(i32)modeFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-Context_revokeUriPermission_String_Uri_int :: proc "contextless" (self: ^Context, toPackage: ^String, uri: ^Uri, modeFlags: i32) -> (exception: ^Throwable) {
+Context_revokeUriPermission_String_Uri_int :: proc "contextless" (self: ^Context, toPackage: ^String, uri: ^Uri, modeFlags: Intent_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "revokeUriPermission", "(Ljava/lang/String;Landroid/net/Uri;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = toPackage}, {l = uri}, {i = modeFlags}}
+	jni_args := [?]android.jvalue{{l = toPackage}, {l = uri}, {i = transmute(i32)modeFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -4956,18 +4988,18 @@ Context_startInstrumentation :: proc "contextless" (self: ^Context, className: ^
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-Context_startIntentSender_IntentSender_Intent_int_int_int :: proc "contextless" (self: ^Context, intent: ^IntentSender, fillInIntent: ^Intent, flagsMask: i32, flagsValues: i32, extraFlags: i32) -> (exception: ^Throwable) {
+Context_startIntentSender_IntentSender_Intent_int_int_int :: proc "contextless" (self: ^Context, intent: ^IntentSender, fillInIntent: ^Intent, flagsMask: Intent_Flags, flagsValues: Intent_Flags, extraFlags: Intent_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "startIntentSender", "(Landroid/content/IntentSender;Landroid/content/Intent;III)V", false) or_return
-	jni_args := [?]android.jvalue{{l = intent}, {l = fillInIntent}, {i = flagsMask}, {i = flagsValues}, {i = extraFlags}}
+	jni_args := [?]android.jvalue{{l = intent}, {l = fillInIntent}, {i = transmute(i32)flagsMask}, {i = transmute(i32)flagsValues}, {i = transmute(i32)extraFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-Context_startIntentSender_IntentSender_Intent_int_int_int_Bundle :: proc "contextless" (self: ^Context, intent: ^IntentSender, fillInIntent: ^Intent, flagsMask: i32, flagsValues: i32, extraFlags: i32, options: ^Bundle) -> (exception: ^Throwable) {
+Context_startIntentSender_IntentSender_Intent_int_int_int_Bundle :: proc "contextless" (self: ^Context, intent: ^IntentSender, fillInIntent: ^Intent, flagsMask: Intent_Flags, flagsValues: Intent_Flags, extraFlags: Intent_Flags, options: ^Bundle) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Context__class, "startIntentSender", "(Landroid/content/IntentSender;Landroid/content/Intent;IIILandroid/os/Bundle;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = intent}, {l = fillInIntent}, {i = flagsMask}, {i = flagsValues}, {i = extraFlags}, {l = options}}
+	jni_args := [?]android.jvalue{{l = intent}, {l = fillInIntent}, {i = transmute(i32)flagsMask}, {i = transmute(i32)flagsValues}, {i = transmute(i32)extraFlags}, {l = options}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -5039,6 +5071,68 @@ Context_updateServiceGroup :: proc "contextless" (self: ^Context, conn: ^Service
 	return jni_take(jni_env)
 }
 
+Context_ModeFlag :: enum u32 {
+	APPEND                     = 15,
+	ENABLE_WRITE_AHEAD_LOGGING = 3,
+	MULTI_PROCESS              = 2,
+	NO_LOCALIZED_COLLATORS     = 4,
+	WORLD_READABLE             = 0,
+	WORLD_WRITEABLE            = 1,
+}
+Context_ModeFlags :: distinct bit_set[Context_ModeFlag; u32]
+
+Context_ModeFlags_PRIVATE :: Context_ModeFlags{}
+
+Context_BindFlag :: enum u32 {
+	ABOVE_CLIENT             = 3,
+	ADJUST_WITH_ACTIVITY     = 7,
+	ALLOW_ACTIVITY_STARTS    = 9,
+	ALLOW_OOM_MANAGEMENT     = 4,
+	AUTO_CREATE              = 0,
+	DEBUG_UNBIND             = 1,
+	EXTERNAL_SERVICE         = 31,
+	IMPORTANT                = 6,
+	INCLUDE_CAPABILITIES     = 12,
+	NOT_FOREGROUND           = 2,
+	NOT_PERCEPTIBLE          = 8,
+	PACKAGE_ISOLATED_PROCESS = 14,
+	SHARED_ISOLATED_PROCESS  = 13,
+	WAIVE_PRIORITY           = 5,
+}
+Context_BindFlags :: distinct bit_set[Context_BindFlag; u32]
+
+Context_ContextFlag :: enum u32 {
+	IGNORE_SECURITY = 1,
+	INCLUDE_CODE    = 0,
+	RESTRICTED      = 2,
+}
+Context_ContextFlags :: distinct bit_set[Context_ContextFlag; u32]
+
+Context_ReceiverFlag :: enum u32 {
+	EXPORTED                = 1,
+	NOT_EXPORTED            = 2,
+	VISIBLE_TO_INSTANT_APPS = 0,
+}
+Context_ReceiverFlags :: distinct bit_set[Context_ReceiverFlag; u32]
+
+Context_BindFlags64Flag :: enum u64 {
+	ABOVE_CLIENT             = 3,
+	ADJUST_WITH_ACTIVITY     = 7,
+	ALLOW_ACTIVITY_STARTS    = 9,
+	ALLOW_OOM_MANAGEMENT     = 4,
+	AUTO_CREATE              = 0,
+	DEBUG_UNBIND             = 1,
+	EXTERNAL_SERVICE_LONG    = 62,
+	IMPORTANT                = 6,
+	INCLUDE_CAPABILITIES     = 12,
+	NOT_FOREGROUND           = 2,
+	NOT_PERCEPTIBLE          = 8,
+	PACKAGE_ISOLATED_PROCESS = 14,
+	SHARED_ISOLATED_PROCESS  = 13,
+	WAIVE_PRIORITY           = 5,
+}
+Context_BindFlags64 :: distinct bit_set[Context_BindFlags64Flag; u64]
+
 // class android.content.Context.BindServiceFlags // API level 34
 Context_BindServiceFlags :: struct #raw_union {
 	using Object: Object,
@@ -5047,10 +5141,10 @@ Context_BindServiceFlags :: struct #raw_union {
 @(private)
 Context_BindServiceFlags__class := Cached_Class{name = "android/content/Context$BindServiceFlags"}
 
-Context_BindServiceFlags_of :: proc "contextless" (value: i64) -> (result: ^Context_BindServiceFlags, exception: ^Throwable) {
+Context_BindServiceFlags_of :: proc "contextless" (value: Context_BindFlags64) -> (result: ^Context_BindServiceFlags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Context_BindServiceFlags__class, "of", "(J)Landroid/content/Context$BindServiceFlags;", true) or_return
-	jni_args := [?]android.jvalue{{j = value}}
+	jni_args := [?]android.jvalue{{j = transmute(i64)value}}
 	return (^Context_BindServiceFlags)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -5228,10 +5322,10 @@ ContextWrapper_new :: proc "contextless" (base: ^Context) -> (result: ^ContextWr
 	return (^ContextWrapper)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContextWrapper_bindIsolatedService :: proc "contextless" (self: ^ContextWrapper, service: ^Intent, flags: i32, instanceName: ^String, executor: ^Executor, conn: ^ServiceConnection) -> (result: bool, exception: ^Throwable) {
+ContextWrapper_bindIsolatedService :: proc "contextless" (self: ^ContextWrapper, service: ^Intent, flags: Context_BindFlags, instanceName: ^String, executor: ^Executor, conn: ^ServiceConnection) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "bindIsolatedService", "(Landroid/content/Intent;ILjava/lang/String;Ljava/util/concurrent/Executor;Landroid/content/ServiceConnection;)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = service}, {i = flags}, {l = instanceName}, {l = executor}, {l = conn}}
+	jni_args := [?]android.jvalue{{l = service}, {i = transmute(i32)flags}, {l = instanceName}, {l = executor}, {l = conn}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -5249,17 +5343,17 @@ ContextWrapper_bindService_Intent_ServiceConnection_Context_BindServiceFlags :: 
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-ContextWrapper_bindService_Intent_ServiceConnection_int :: proc "contextless" (self: ^ContextWrapper, service: ^Intent, conn: ^ServiceConnection, flags: i32) -> (result: bool, exception: ^Throwable) {
+ContextWrapper_bindService_Intent_ServiceConnection_int :: proc "contextless" (self: ^ContextWrapper, service: ^Intent, conn: ^ServiceConnection, flags: Context_BindFlags) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "bindService", "(Landroid/content/Intent;Landroid/content/ServiceConnection;I)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = service}, {l = conn}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = service}, {l = conn}, {i = transmute(i32)flags}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-ContextWrapper_bindService_Intent_int_Executor_ServiceConnection :: proc "contextless" (self: ^ContextWrapper, service: ^Intent, flags: i32, executor: ^Executor, conn: ^ServiceConnection) -> (result: bool, exception: ^Throwable) {
+ContextWrapper_bindService_Intent_int_Executor_ServiceConnection :: proc "contextless" (self: ^ContextWrapper, service: ^Intent, flags: Context_BindFlags, executor: ^Executor, conn: ^ServiceConnection) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "bindService", "(Landroid/content/Intent;ILjava/util/concurrent/Executor;Landroid/content/ServiceConnection;)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = service}, {i = flags}, {l = executor}, {l = conn}}
+	jni_args := [?]android.jvalue{{l = service}, {i = transmute(i32)flags}, {l = executor}, {l = conn}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -5277,10 +5371,10 @@ ContextWrapper_bindServiceAsUser_Intent_ServiceConnection_Context_BindServiceFla
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-ContextWrapper_bindServiceAsUser_Intent_ServiceConnection_int_UserHandle :: proc "contextless" (self: ^ContextWrapper, service: ^Intent, conn: ^ServiceConnection, flags: i32, user: ^UserHandle) -> (result: bool, exception: ^Throwable) {
+ContextWrapper_bindServiceAsUser_Intent_ServiceConnection_int_UserHandle :: proc "contextless" (self: ^ContextWrapper, service: ^Intent, conn: ^ServiceConnection, flags: Context_BindFlags, user: ^UserHandle) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "bindServiceAsUser", "(Landroid/content/Intent;Landroid/content/ServiceConnection;ILandroid/os/UserHandle;)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = service}, {l = conn}, {i = flags}, {l = user}}
+	jni_args := [?]android.jvalue{{l = service}, {l = conn}, {i = transmute(i32)flags}, {l = user}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -5289,81 +5383,81 @@ ContextWrapper_bindServiceAsUser :: proc{
 	ContextWrapper_bindServiceAsUser_Intent_ServiceConnection_int_UserHandle,
 }
 
-ContextWrapper_checkCallingOrSelfPermission :: proc "contextless" (self: ^ContextWrapper, permission: ^String) -> (result: i32, exception: ^Throwable) {
+ContextWrapper_checkCallingOrSelfPermission :: proc "contextless" (self: ^ContextWrapper, permission: ^String) -> (result: PackageManager_Permission, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "checkCallingOrSelfPermission", "(Ljava/lang/String;)I", false) or_return
 	jni_args := [?]android.jvalue{{l = permission}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return PackageManager_Permission(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContextWrapper_checkCallingOrSelfUriPermission :: proc "contextless" (self: ^ContextWrapper, uri: ^Uri, modeFlags: i32) -> (result: i32, exception: ^Throwable) {
+ContextWrapper_checkCallingOrSelfUriPermission :: proc "contextless" (self: ^ContextWrapper, uri: ^Uri, modeFlags: Intent_Flags) -> (result: PackageManager_Permission, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "checkCallingOrSelfUriPermission", "(Landroid/net/Uri;I)I", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {i = modeFlags}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{l = uri}, {i = transmute(i32)modeFlags}}
+	return PackageManager_Permission(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContextWrapper_checkCallingOrSelfUriPermissions :: proc "contextless" (self: ^ContextWrapper, uris: ^List, modeFlags: i32) -> (result: ^IntArray, exception: ^Throwable) {
+ContextWrapper_checkCallingOrSelfUriPermissions :: proc "contextless" (self: ^ContextWrapper, uris: ^List, modeFlags: Intent_Flags) -> (result: ^IntArray, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "checkCallingOrSelfUriPermissions", "(Ljava/util/List;I)[I", false) or_return
-	jni_args := [?]android.jvalue{{l = uris}, {i = modeFlags}}
+	jni_args := [?]android.jvalue{{l = uris}, {i = transmute(i32)modeFlags}}
 	return (^IntArray)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContextWrapper_checkCallingPermission :: proc "contextless" (self: ^ContextWrapper, permission: ^String) -> (result: i32, exception: ^Throwable) {
+ContextWrapper_checkCallingPermission :: proc "contextless" (self: ^ContextWrapper, permission: ^String) -> (result: PackageManager_Permission, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "checkCallingPermission", "(Ljava/lang/String;)I", false) or_return
 	jni_args := [?]android.jvalue{{l = permission}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return PackageManager_Permission(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContextWrapper_checkCallingUriPermission :: proc "contextless" (self: ^ContextWrapper, uri: ^Uri, modeFlags: i32) -> (result: i32, exception: ^Throwable) {
+ContextWrapper_checkCallingUriPermission :: proc "contextless" (self: ^ContextWrapper, uri: ^Uri, modeFlags: Intent_Flags) -> (result: PackageManager_Permission, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "checkCallingUriPermission", "(Landroid/net/Uri;I)I", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {i = modeFlags}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{l = uri}, {i = transmute(i32)modeFlags}}
+	return PackageManager_Permission(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContextWrapper_checkCallingUriPermissions :: proc "contextless" (self: ^ContextWrapper, uris: ^List, modeFlags: i32) -> (result: ^IntArray, exception: ^Throwable) {
+ContextWrapper_checkCallingUriPermissions :: proc "contextless" (self: ^ContextWrapper, uris: ^List, modeFlags: Intent_Flags) -> (result: ^IntArray, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "checkCallingUriPermissions", "(Ljava/util/List;I)[I", false) or_return
-	jni_args := [?]android.jvalue{{l = uris}, {i = modeFlags}}
+	jni_args := [?]android.jvalue{{l = uris}, {i = transmute(i32)modeFlags}}
 	return (^IntArray)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContextWrapper_checkContentUriPermissionFull :: proc "contextless" (self: ^ContextWrapper, uri: ^Uri, pid: i32, uid: i32, modeFlags: i32) -> (result: i32, exception: ^Throwable) {
+ContextWrapper_checkContentUriPermissionFull :: proc "contextless" (self: ^ContextWrapper, uri: ^Uri, pid: i32, uid: i32, modeFlags: Intent_Flags) -> (result: PackageManager_Permission, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "checkContentUriPermissionFull", "(Landroid/net/Uri;III)I", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {i = pid}, {i = uid}, {i = modeFlags}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{l = uri}, {i = pid}, {i = uid}, {i = transmute(i32)modeFlags}}
+	return PackageManager_Permission(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContextWrapper_checkPermission :: proc "contextless" (self: ^ContextWrapper, permission: ^String, pid: i32, uid: i32) -> (result: i32, exception: ^Throwable) {
+ContextWrapper_checkPermission :: proc "contextless" (self: ^ContextWrapper, permission: ^String, pid: i32, uid: i32) -> (result: PackageManager_Permission, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "checkPermission", "(Ljava/lang/String;II)I", false) or_return
 	jni_args := [?]android.jvalue{{l = permission}, {i = pid}, {i = uid}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return PackageManager_Permission(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContextWrapper_checkSelfPermission :: proc "contextless" (self: ^ContextWrapper, permission: ^String) -> (result: i32, exception: ^Throwable) {
+ContextWrapper_checkSelfPermission :: proc "contextless" (self: ^ContextWrapper, permission: ^String) -> (result: PackageManager_Permission, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "checkSelfPermission", "(Ljava/lang/String;)I", false) or_return
 	jni_args := [?]android.jvalue{{l = permission}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	return PackageManager_Permission(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContextWrapper_checkUriPermission_Uri_int_int_int :: proc "contextless" (self: ^ContextWrapper, uri: ^Uri, pid: i32, uid: i32, modeFlags: i32) -> (result: i32, exception: ^Throwable) {
+ContextWrapper_checkUriPermission_Uri_int_int_int :: proc "contextless" (self: ^ContextWrapper, uri: ^Uri, pid: i32, uid: i32, modeFlags: Intent_Flags) -> (result: PackageManager_Permission, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "checkUriPermission", "(Landroid/net/Uri;III)I", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {i = pid}, {i = uid}, {i = modeFlags}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{l = uri}, {i = pid}, {i = uid}, {i = transmute(i32)modeFlags}}
+	return PackageManager_Permission(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContextWrapper_checkUriPermission_Uri_String_String_int_int_int :: proc "contextless" (self: ^ContextWrapper, uri: ^Uri, readPermission: ^String, writePermission: ^String, pid: i32, uid: i32, modeFlags: i32) -> (result: i32, exception: ^Throwable) {
+ContextWrapper_checkUriPermission_Uri_String_String_int_int_int :: proc "contextless" (self: ^ContextWrapper, uri: ^Uri, readPermission: ^String, writePermission: ^String, pid: i32, uid: i32, modeFlags: Intent_Flags) -> (result: PackageManager_Permission, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "checkUriPermission", "(Landroid/net/Uri;Ljava/lang/String;Ljava/lang/String;III)I", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {l = readPermission}, {l = writePermission}, {i = pid}, {i = uid}, {i = modeFlags}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{l = uri}, {l = readPermission}, {l = writePermission}, {i = pid}, {i = uid}, {i = transmute(i32)modeFlags}}
+	return PackageManager_Permission(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 ContextWrapper_checkUriPermission :: proc{
@@ -5371,10 +5465,10 @@ ContextWrapper_checkUriPermission :: proc{
 	ContextWrapper_checkUriPermission_Uri_String_String_int_int_int,
 }
 
-ContextWrapper_checkUriPermissions :: proc "contextless" (self: ^ContextWrapper, uris: ^List, pid: i32, uid: i32, modeFlags: i32) -> (result: ^IntArray, exception: ^Throwable) {
+ContextWrapper_checkUriPermissions :: proc "contextless" (self: ^ContextWrapper, uris: ^List, pid: i32, uid: i32, modeFlags: Intent_Flags) -> (result: ^IntArray, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "checkUriPermissions", "(Ljava/util/List;III)[I", false) or_return
-	jni_args := [?]android.jvalue{{l = uris}, {i = pid}, {i = uid}, {i = modeFlags}}
+	jni_args := [?]android.jvalue{{l = uris}, {i = pid}, {i = uid}, {i = transmute(i32)modeFlags}}
 	return (^IntArray)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -5433,24 +5527,24 @@ ContextWrapper_createDisplayContext :: proc "contextless" (self: ^ContextWrapper
 	return (^Context)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContextWrapper_createPackageContext :: proc "contextless" (self: ^ContextWrapper, packageName: ^String, flags: i32) -> (result: ^Context, exception: ^Throwable) {
+ContextWrapper_createPackageContext :: proc "contextless" (self: ^ContextWrapper, packageName: ^String, flags: Context_ContextFlags) -> (result: ^Context, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "createPackageContext", "(Ljava/lang/String;I)Landroid/content/Context;", false) or_return
-	jni_args := [?]android.jvalue{{l = packageName}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = packageName}, {i = transmute(i32)flags}}
 	return (^Context)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContextWrapper_createWindowContext_Display_int_Bundle :: proc "contextless" (self: ^ContextWrapper, display: ^Display, type: i32, options: ^Bundle) -> (result: ^Context, exception: ^Throwable) {
+ContextWrapper_createWindowContext_Display_int_Bundle :: proc "contextless" (self: ^ContextWrapper, display: ^Display, type: WindowManager_LayoutParams_Type, options: ^Bundle) -> (result: ^Context, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "createWindowContext", "(Landroid/view/Display;ILandroid/os/Bundle;)Landroid/content/Context;", false) or_return
-	jni_args := [?]android.jvalue{{l = display}, {i = type}, {l = options}}
+	jni_args := [?]android.jvalue{{l = display}, {i = i32(type)}, {l = options}}
 	return (^Context)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContextWrapper_createWindowContext_int_Bundle :: proc "contextless" (self: ^ContextWrapper, type: i32, options: ^Bundle) -> (result: ^Context, exception: ^Throwable) {
+ContextWrapper_createWindowContext_int_Bundle :: proc "contextless" (self: ^ContextWrapper, type: WindowManager_LayoutParams_Type, options: ^Bundle) -> (result: ^Context, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "createWindowContext", "(ILandroid/os/Bundle;)Landroid/content/Context;", false) or_return
-	jni_args := [?]android.jvalue{{i = type}, {l = options}}
+	jni_args := [?]android.jvalue{{i = i32(type)}, {l = options}}
 	return (^Context)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -5494,10 +5588,10 @@ ContextWrapper_enforceCallingOrSelfPermission :: proc "contextless" (self: ^Cont
 	return jni_take(jni_env)
 }
 
-ContextWrapper_enforceCallingOrSelfUriPermission :: proc "contextless" (self: ^ContextWrapper, uri: ^Uri, modeFlags: i32, message: ^String) -> (exception: ^Throwable) {
+ContextWrapper_enforceCallingOrSelfUriPermission :: proc "contextless" (self: ^ContextWrapper, uri: ^Uri, modeFlags: Intent_Flags, message: ^String) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "enforceCallingOrSelfUriPermission", "(Landroid/net/Uri;ILjava/lang/String;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {i = modeFlags}, {l = message}}
+	jni_args := [?]android.jvalue{{l = uri}, {i = transmute(i32)modeFlags}, {l = message}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -5510,10 +5604,10 @@ ContextWrapper_enforceCallingPermission :: proc "contextless" (self: ^ContextWra
 	return jni_take(jni_env)
 }
 
-ContextWrapper_enforceCallingUriPermission :: proc "contextless" (self: ^ContextWrapper, uri: ^Uri, modeFlags: i32, message: ^String) -> (exception: ^Throwable) {
+ContextWrapper_enforceCallingUriPermission :: proc "contextless" (self: ^ContextWrapper, uri: ^Uri, modeFlags: Intent_Flags, message: ^String) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "enforceCallingUriPermission", "(Landroid/net/Uri;ILjava/lang/String;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {i = modeFlags}, {l = message}}
+	jni_args := [?]android.jvalue{{l = uri}, {i = transmute(i32)modeFlags}, {l = message}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -5526,18 +5620,18 @@ ContextWrapper_enforcePermission :: proc "contextless" (self: ^ContextWrapper, p
 	return jni_take(jni_env)
 }
 
-ContextWrapper_enforceUriPermission_Uri_int_int_int_String :: proc "contextless" (self: ^ContextWrapper, uri: ^Uri, pid: i32, uid: i32, modeFlags: i32, message: ^String) -> (exception: ^Throwable) {
+ContextWrapper_enforceUriPermission_Uri_int_int_int_String :: proc "contextless" (self: ^ContextWrapper, uri: ^Uri, pid: i32, uid: i32, modeFlags: Intent_Flags, message: ^String) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "enforceUriPermission", "(Landroid/net/Uri;IIILjava/lang/String;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {i = pid}, {i = uid}, {i = modeFlags}, {l = message}}
+	jni_args := [?]android.jvalue{{l = uri}, {i = pid}, {i = uid}, {i = transmute(i32)modeFlags}, {l = message}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-ContextWrapper_enforceUriPermission_Uri_String_String_int_int_int_String :: proc "contextless" (self: ^ContextWrapper, uri: ^Uri, readPermission: ^String, writePermission: ^String, pid: i32, uid: i32, modeFlags: i32, message: ^String) -> (exception: ^Throwable) {
+ContextWrapper_enforceUriPermission_Uri_String_String_int_int_int_String :: proc "contextless" (self: ^ContextWrapper, uri: ^Uri, readPermission: ^String, writePermission: ^String, pid: i32, uid: i32, modeFlags: Intent_Flags, message: ^String) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "enforceUriPermission", "(Landroid/net/Uri;Ljava/lang/String;Ljava/lang/String;IIILjava/lang/String;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {l = readPermission}, {l = writePermission}, {i = pid}, {i = uid}, {i = modeFlags}, {l = message}}
+	jni_args := [?]android.jvalue{{l = uri}, {l = readPermission}, {l = writePermission}, {i = pid}, {i = uid}, {i = transmute(i32)modeFlags}, {l = message}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -5632,10 +5726,10 @@ ContextWrapper_getDeviceId :: proc "contextless" (self: ^ContextWrapper) -> (res
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-ContextWrapper_getDir :: proc "contextless" (self: ^ContextWrapper, name: ^String, mode: i32) -> (result: ^File, exception: ^Throwable) {
+ContextWrapper_getDir :: proc "contextless" (self: ^ContextWrapper, name: ^String, mode: Context_ModeFlags) -> (result: ^File, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "getDir", "(Ljava/lang/String;I)Ljava/io/File;", false) or_return
-	jni_args := [?]android.jvalue{{l = name}, {i = mode}}
+	jni_args := [?]android.jvalue{{l = name}, {i = transmute(i32)mode}}
 	return (^File)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -5762,10 +5856,10 @@ ContextWrapper_getResources :: proc "contextless" (self: ^ContextWrapper) -> (re
 	return (^Resources)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-ContextWrapper_getSharedPreferences :: proc "contextless" (self: ^ContextWrapper, name: ^String, mode: i32) -> (result: ^SharedPreferences, exception: ^Throwable) {
+ContextWrapper_getSharedPreferences :: proc "contextless" (self: ^ContextWrapper, name: ^String, mode: Context_ModeFlags) -> (result: ^SharedPreferences, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "getSharedPreferences", "(Ljava/lang/String;I)Landroid/content/SharedPreferences;", false) or_return
-	jni_args := [?]android.jvalue{{l = name}, {i = mode}}
+	jni_args := [?]android.jvalue{{l = name}, {i = transmute(i32)mode}}
 	return (^SharedPreferences)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -5807,10 +5901,10 @@ ContextWrapper_getWallpaperDesiredMinimumWidth :: proc "contextless" (self: ^Con
 	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
 }
 
-ContextWrapper_grantUriPermission :: proc "contextless" (self: ^ContextWrapper, toPackage: ^String, uri: ^Uri, modeFlags: i32) -> (exception: ^Throwable) {
+ContextWrapper_grantUriPermission :: proc "contextless" (self: ^ContextWrapper, toPackage: ^String, uri: ^Uri, modeFlags: Intent_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "grantUriPermission", "(Ljava/lang/String;Landroid/net/Uri;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = toPackage}, {l = uri}, {i = modeFlags}}
+	jni_args := [?]android.jvalue{{l = toPackage}, {l = uri}, {i = transmute(i32)modeFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -5854,24 +5948,24 @@ ContextWrapper_openFileInput :: proc "contextless" (self: ^ContextWrapper, name:
 	return (^FileInputStream)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContextWrapper_openFileOutput :: proc "contextless" (self: ^ContextWrapper, name: ^String, mode: i32) -> (result: ^FileOutputStream, exception: ^Throwable) {
+ContextWrapper_openFileOutput :: proc "contextless" (self: ^ContextWrapper, name: ^String, mode: Context_ModeFlags) -> (result: ^FileOutputStream, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "openFileOutput", "(Ljava/lang/String;I)Ljava/io/FileOutputStream;", false) or_return
-	jni_args := [?]android.jvalue{{l = name}, {i = mode}}
+	jni_args := [?]android.jvalue{{l = name}, {i = transmute(i32)mode}}
 	return (^FileOutputStream)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContextWrapper_openOrCreateDatabase_String_int_SQLiteDatabase_CursorFactory :: proc "contextless" (self: ^ContextWrapper, name: ^String, mode: i32, factory: ^SQLiteDatabase_CursorFactory) -> (result: ^SQLiteDatabase, exception: ^Throwable) {
+ContextWrapper_openOrCreateDatabase_String_int_SQLiteDatabase_CursorFactory :: proc "contextless" (self: ^ContextWrapper, name: ^String, mode: Context_ModeFlags, factory: ^SQLiteDatabase_CursorFactory) -> (result: ^SQLiteDatabase, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "openOrCreateDatabase", "(Ljava/lang/String;ILandroid/database/sqlite/SQLiteDatabase$CursorFactory;)Landroid/database/sqlite/SQLiteDatabase;", false) or_return
-	jni_args := [?]android.jvalue{{l = name}, {i = mode}, {l = factory}}
+	jni_args := [?]android.jvalue{{l = name}, {i = transmute(i32)mode}, {l = factory}}
 	return (^SQLiteDatabase)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContextWrapper_openOrCreateDatabase_String_int_SQLiteDatabase_CursorFactory_DatabaseErrorHandler :: proc "contextless" (self: ^ContextWrapper, name: ^String, mode: i32, factory: ^SQLiteDatabase_CursorFactory, errorHandler: ^DatabaseErrorHandler) -> (result: ^SQLiteDatabase, exception: ^Throwable) {
+ContextWrapper_openOrCreateDatabase_String_int_SQLiteDatabase_CursorFactory_DatabaseErrorHandler :: proc "contextless" (self: ^ContextWrapper, name: ^String, mode: Context_ModeFlags, factory: ^SQLiteDatabase_CursorFactory, errorHandler: ^DatabaseErrorHandler) -> (result: ^SQLiteDatabase, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "openOrCreateDatabase", "(Ljava/lang/String;ILandroid/database/sqlite/SQLiteDatabase$CursorFactory;Landroid/database/DatabaseErrorHandler;)Landroid/database/sqlite/SQLiteDatabase;", false) or_return
-	jni_args := [?]android.jvalue{{l = name}, {i = mode}, {l = factory}, {l = errorHandler}}
+	jni_args := [?]android.jvalue{{l = name}, {i = transmute(i32)mode}, {l = factory}, {l = errorHandler}}
 	return (^SQLiteDatabase)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -5917,10 +6011,10 @@ ContextWrapper_registerReceiver_BroadcastReceiver_IntentFilter :: proc "contextl
 	return (^Intent)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContextWrapper_registerReceiver_BroadcastReceiver_IntentFilter_int :: proc "contextless" (self: ^ContextWrapper, receiver: ^BroadcastReceiver, filter: ^IntentFilter, flags: i32) -> (result: ^Intent, exception: ^Throwable) {
+ContextWrapper_registerReceiver_BroadcastReceiver_IntentFilter_int :: proc "contextless" (self: ^ContextWrapper, receiver: ^BroadcastReceiver, filter: ^IntentFilter, flags: Context_ReceiverFlags) -> (result: ^Intent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "registerReceiver", "(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;I)Landroid/content/Intent;", false) or_return
-	jni_args := [?]android.jvalue{{l = receiver}, {l = filter}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = receiver}, {l = filter}, {i = transmute(i32)flags}}
 	return (^Intent)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -5931,10 +6025,10 @@ ContextWrapper_registerReceiver_BroadcastReceiver_IntentFilter_String_Handler ::
 	return (^Intent)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-ContextWrapper_registerReceiver_BroadcastReceiver_IntentFilter_String_Handler_int :: proc "contextless" (self: ^ContextWrapper, receiver: ^BroadcastReceiver, filter: ^IntentFilter, broadcastPermission: ^String, scheduler: ^Handler, flags: i32) -> (result: ^Intent, exception: ^Throwable) {
+ContextWrapper_registerReceiver_BroadcastReceiver_IntentFilter_String_Handler_int :: proc "contextless" (self: ^ContextWrapper, receiver: ^BroadcastReceiver, filter: ^IntentFilter, broadcastPermission: ^String, scheduler: ^Handler, flags: Context_ReceiverFlags) -> (result: ^Intent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "registerReceiver", "(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;I)Landroid/content/Intent;", false) or_return
-	jni_args := [?]android.jvalue{{l = receiver}, {l = filter}, {l = broadcastPermission}, {l = scheduler}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = receiver}, {l = filter}, {l = broadcastPermission}, {l = scheduler}, {i = transmute(i32)flags}}
 	return (^Intent)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -5969,18 +6063,18 @@ ContextWrapper_revokeSelfPermissionsOnKill :: proc "contextless" (self: ^Context
 	return jni_take(jni_env)
 }
 
-ContextWrapper_revokeUriPermission_Uri_int :: proc "contextless" (self: ^ContextWrapper, uri: ^Uri, modeFlags: i32) -> (exception: ^Throwable) {
+ContextWrapper_revokeUriPermission_Uri_int :: proc "contextless" (self: ^ContextWrapper, uri: ^Uri, modeFlags: Intent_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "revokeUriPermission", "(Landroid/net/Uri;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {i = modeFlags}}
+	jni_args := [?]android.jvalue{{l = uri}, {i = transmute(i32)modeFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-ContextWrapper_revokeUriPermission_String_Uri_int :: proc "contextless" (self: ^ContextWrapper, targetPackage: ^String, uri: ^Uri, modeFlags: i32) -> (exception: ^Throwable) {
+ContextWrapper_revokeUriPermission_String_Uri_int :: proc "contextless" (self: ^ContextWrapper, targetPackage: ^String, uri: ^Uri, modeFlags: Intent_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "revokeUriPermission", "(Ljava/lang/String;Landroid/net/Uri;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = targetPackage}, {l = uri}, {i = modeFlags}}
+	jni_args := [?]android.jvalue{{l = targetPackage}, {l = uri}, {i = transmute(i32)modeFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -6243,18 +6337,18 @@ ContextWrapper_startInstrumentation :: proc "contextless" (self: ^ContextWrapper
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-ContextWrapper_startIntentSender_IntentSender_Intent_int_int_int :: proc "contextless" (self: ^ContextWrapper, intent: ^IntentSender, fillInIntent: ^Intent, flagsMask: i32, flagsValues: i32, extraFlags: i32) -> (exception: ^Throwable) {
+ContextWrapper_startIntentSender_IntentSender_Intent_int_int_int :: proc "contextless" (self: ^ContextWrapper, intent: ^IntentSender, fillInIntent: ^Intent, flagsMask: Intent_Flags, flagsValues: Intent_Flags, extraFlags: Intent_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "startIntentSender", "(Landroid/content/IntentSender;Landroid/content/Intent;III)V", false) or_return
-	jni_args := [?]android.jvalue{{l = intent}, {l = fillInIntent}, {i = flagsMask}, {i = flagsValues}, {i = extraFlags}}
+	jni_args := [?]android.jvalue{{l = intent}, {l = fillInIntent}, {i = transmute(i32)flagsMask}, {i = transmute(i32)flagsValues}, {i = transmute(i32)extraFlags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
 
-ContextWrapper_startIntentSender_IntentSender_Intent_int_int_int_Bundle :: proc "contextless" (self: ^ContextWrapper, intent: ^IntentSender, fillInIntent: ^Intent, flagsMask: i32, flagsValues: i32, extraFlags: i32, options: ^Bundle) -> (exception: ^Throwable) {
+ContextWrapper_startIntentSender_IntentSender_Intent_int_int_int_Bundle :: proc "contextless" (self: ^ContextWrapper, intent: ^IntentSender, fillInIntent: ^Intent, flagsMask: Intent_Flags, flagsValues: Intent_Flags, extraFlags: Intent_Flags, options: ^Bundle) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &ContextWrapper__class, "startIntentSender", "(Landroid/content/IntentSender;Landroid/content/Intent;IIILandroid/os/Bundle;)V", false) or_return
-	jni_args := [?]android.jvalue{{l = intent}, {l = fillInIntent}, {i = flagsMask}, {i = flagsValues}, {i = extraFlags}, {l = options}}
+	jni_args := [?]android.jvalue{{l = intent}, {l = fillInIntent}, {i = transmute(i32)flagsMask}, {i = transmute(i32)flagsValues}, {i = transmute(i32)extraFlags}, {l = options}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -6489,6 +6583,12 @@ DialogInterface_dismiss :: proc "contextless" (self: ^DialogInterface) -> (excep
 	return jni_take(jni_env)
 }
 
+DialogInterface_Button :: enum i32 {
+	NEGATIVE = -2,
+	NEUTRAL  = -3,
+	POSITIVE = -1,
+}
+
 // interface android.content.DialogInterface.OnCancelListener
 DialogInterface_OnCancelListener :: struct #raw_union {
 	using Object: Object,
@@ -6545,10 +6645,10 @@ DialogInterface_OnKeyListener :: struct #raw_union {
 @(private)
 DialogInterface_OnKeyListener__class := Cached_Class{name = "android/content/DialogInterface$OnKeyListener"}
 
-DialogInterface_OnKeyListener_onKey :: proc "contextless" (self: ^DialogInterface_OnKeyListener, dialog: ^DialogInterface, keyCode: i32, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
+DialogInterface_OnKeyListener_onKey :: proc "contextless" (self: ^DialogInterface_OnKeyListener, dialog: ^DialogInterface, keyCode: KeyEvent_KeyCode, event: ^KeyEvent) -> (result: bool, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &DialogInterface_OnKeyListener__class, "onKey", "(Landroid/content/DialogInterface;ILandroid/view/KeyEvent;)Z", false) or_return
-	jni_args := [?]android.jvalue{{l = dialog}, {i = keyCode}, {l = event}}
+	jni_args := [?]android.jvalue{{l = dialog}, {i = i32(keyCode)}, {l = event}}
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
@@ -7102,10 +7202,10 @@ Intent_addCategory :: proc "contextless" (self: ^Intent, category: ^String) -> (
 	return (^Intent)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Intent_addFlags :: proc "contextless" (self: ^Intent, flags: i32) -> (result: ^Intent, exception: ^Throwable) {
+Intent_addFlags :: proc "contextless" (self: ^Intent, flags: Intent_Flags) -> (result: ^Intent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Intent__class, "addFlags", "(I)Landroid/content/Intent;", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	return (^Intent)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -7140,17 +7240,17 @@ Intent_createChooser :: proc{
 	Intent_createChooser_Intent_CharSequence_IntentSender,
 }
 
-Intent_describeContents :: proc "contextless" (self: ^Intent) -> (result: i32, exception: ^Throwable) {
+Intent_describeContents :: proc "contextless" (self: ^Intent) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Intent__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Intent_fillIn :: proc "contextless" (self: ^Intent, other: ^Intent, flags: i32) -> (result: i32, exception: ^Throwable) {
+Intent_fillIn :: proc "contextless" (self: ^Intent, other: ^Intent, flags: PendingIntent_Flags) -> (result: PendingIntent_Flags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Intent__class, "fillIn", "(Landroid/content/Intent;I)I", false) or_return
-	jni_args := [?]android.jvalue{{l = other}, {i = flags}}
-	return jni_env->CallIntMethodA(self, jni_id, &jni_args[0]), jni_take(jni_env)
+	jni_args := [?]android.jvalue{{l = other}, {i = transmute(i32)flags}}
+	return transmute(PendingIntent_Flags)(jni_env->CallIntMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
 Intent_filterEquals :: proc "contextless" (self: ^Intent, other: ^Intent) -> (result: bool, exception: ^Throwable) {
@@ -7292,10 +7392,10 @@ Intent_getExtras :: proc "contextless" (self: ^Intent) -> (result: ^Bundle, exce
 	return (^Bundle)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Intent_getFlags :: proc "contextless" (self: ^Intent) -> (result: i32, exception: ^Throwable) {
+Intent_getFlags :: proc "contextless" (self: ^Intent) -> (result: Intent_Flags, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Intent__class, "getFlags", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Intent_Flags)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Intent_getFloatArrayExtra :: proc "contextless" (self: ^Intent, name: ^String) -> (result: ^FloatArray, exception: ^Throwable) {
@@ -7569,10 +7669,10 @@ Intent_parseIntent :: proc "contextless" (resources: ^Resources, parser: ^XmlPul
 	return (^Intent)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Intent_parseUri :: proc "contextless" (uri: ^String, flags: i32) -> (result: ^Intent, exception: ^Throwable) {
+Intent_parseUri :: proc "contextless" (uri: ^String, flags: Intent_UriFlags) -> (result: ^Intent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &Intent__class, "parseUri", "(Ljava/lang/String;I)Landroid/content/Intent;", true) or_return
-	jni_args := [?]android.jvalue{{l = uri}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = uri}, {i = transmute(i32)flags}}
 	return (^Intent)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -7842,10 +7942,10 @@ Intent_removeExtra :: proc "contextless" (self: ^Intent, name: ^String) -> (exce
 	return jni_take(jni_env)
 }
 
-Intent_removeFlags :: proc "contextless" (self: ^Intent, flags: i32) -> (exception: ^Throwable) {
+Intent_removeFlags :: proc "contextless" (self: ^Intent, flags: Intent_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Intent__class, "removeFlags", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -7883,10 +7983,10 @@ Intent_resolveActivity :: proc "contextless" (self: ^Intent, pm: ^PackageManager
 	return (^ComponentName)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Intent_resolveActivityInfo :: proc "contextless" (self: ^Intent, pm: ^PackageManager, flags: i32) -> (result: ^ActivityInfo, exception: ^Throwable) {
+Intent_resolveActivityInfo :: proc "contextless" (self: ^Intent, pm: ^PackageManager, flags: PackageManager_InfoFlags) -> (result: ^ActivityInfo, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Intent__class, "resolveActivityInfo", "(Landroid/content/pm/PackageManager;I)Landroid/content/pm/ActivityInfo;", false) or_return
-	jni_args := [?]android.jvalue{{l = pm}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = pm}, {i = transmute(i32)flags}}
 	return (^ActivityInfo)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -8000,10 +8100,10 @@ Intent_setExtrasClassLoader :: proc "contextless" (self: ^Intent, loader: ^Class
 	return jni_take(jni_env)
 }
 
-Intent_setFlags :: proc "contextless" (self: ^Intent, flags: i32) -> (result: ^Intent, exception: ^Throwable) {
+Intent_setFlags :: proc "contextless" (self: ^Intent, flags: Intent_Flags) -> (result: ^Intent, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Intent__class, "setFlags", "(I)Landroid/content/Intent;", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	return (^Intent)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -8063,20 +8163,86 @@ Intent_toURI :: proc "contextless" (self: ^Intent) -> (result: ^String, exceptio
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Intent_toUri :: proc "contextless" (self: ^Intent, flags: i32) -> (result: ^String, exception: ^Throwable) {
+Intent_toUri :: proc "contextless" (self: ^Intent, flags: Intent_UriFlags) -> (result: ^String, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Intent__class, "toUri", "(I)Ljava/lang/String;", false) or_return
-	jni_args := [?]android.jvalue{{i = flags}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)flags}}
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-Intent_writeToParcel :: proc "contextless" (self: ^Intent, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+Intent_writeToParcel :: proc "contextless" (self: ^Intent, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Intent__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
+
+PendingIntent_Flag :: enum u32 {
+	FLAG_ALLOW_UNSAFE_IMPLICIT_INTENT = 24,
+	FLAG_CANCEL_CURRENT               = 28,
+	FLAG_IMMUTABLE                    = 26,
+	FLAG_MUTABLE                      = 25,
+	FLAG_NO_CREATE                    = 29,
+	FLAG_ONE_SHOT                     = 30,
+	FLAG_UPDATE_CURRENT               = 27,
+	FILL_IN_ACTION                    = 0,
+	FILL_IN_CATEGORIES                = 2,
+	FILL_IN_CLIP_DATA                 = 7,
+	FILL_IN_COMPONENT                 = 3,
+	FILL_IN_DATA                      = 1,
+	FILL_IN_PACKAGE                   = 4,
+	FILL_IN_SELECTOR                  = 6,
+	FILL_IN_SOURCE_BOUNDS             = 5,
+}
+PendingIntent_Flags :: distinct bit_set[PendingIntent_Flag; u32]
+
+Intent_Flag :: enum u32 {
+	ACTIVITY_BROUGHT_TO_FRONT        = 22,
+	ACTIVITY_CLEAR_TASK              = 15,
+	ACTIVITY_CLEAR_TOP               = 26,
+	ACTIVITY_CLEAR_WHEN_TASK_RESET   = 19,
+	ACTIVITY_EXCLUDE_FROM_RECENTS    = 23,
+	ACTIVITY_FORWARD_RESULT          = 25,
+	ACTIVITY_LAUNCHED_FROM_HISTORY   = 20,
+	ACTIVITY_LAUNCH_ADJACENT         = 12,
+	ACTIVITY_MATCH_EXTERNAL          = 11,
+	ACTIVITY_MULTIPLE_TASK           = 27,
+	ACTIVITY_NEW_DOCUMENT            = 19,
+	ACTIVITY_NEW_TASK                = 28,
+	ACTIVITY_NO_ANIMATION            = 16,
+	ACTIVITY_NO_HISTORY              = 30,
+	ACTIVITY_NO_USER_ACTION          = 18,
+	ACTIVITY_PREVIOUS_IS_TOP         = 24,
+	ACTIVITY_REORDER_TO_FRONT        = 17,
+	ACTIVITY_REQUIRE_DEFAULT         = 9,
+	ACTIVITY_REQUIRE_NON_BROWSER     = 10,
+	ACTIVITY_RESET_TASK_IF_NEEDED    = 21,
+	ACTIVITY_RETAIN_IN_RECENTS       = 13,
+	ACTIVITY_SINGLE_TOP              = 29,
+	ACTIVITY_TASK_ON_HOME            = 14,
+	DEBUG_LOG_RESOLUTION             = 3,
+	EXCLUDE_STOPPED_PACKAGES         = 4,
+	FROM_BACKGROUND                  = 2,
+	GRANT_PERSISTABLE_URI_PERMISSION = 6,
+	GRANT_PREFIX_URI_PERMISSION      = 7,
+	GRANT_READ_URI_PERMISSION        = 0,
+	GRANT_WRITE_URI_PERMISSION       = 1,
+	INCLUDE_STOPPED_PACKAGES         = 5,
+	RECEIVER_FOREGROUND              = 28,
+	RECEIVER_NO_ABORT                = 27,
+	RECEIVER_REGISTERED_ONLY         = 30,
+	RECEIVER_REPLACE_PENDING         = 29,
+	RECEIVER_VISIBLE_TO_INSTANT_APPS = 21,
+}
+Intent_Flags :: distinct bit_set[Intent_Flag; u32]
+
+Intent_UriFlag :: enum u32 {
+	ALLOW_UNSAFE       = 2,
+	ANDROID_APP_SCHEME = 1,
+	INTENT_SCHEME      = 0,
+}
+Intent_UriFlags :: distinct bit_set[Intent_UriFlag; u32]
 
 // class android.content.Intent.FilterComparison
 Intent_FilterComparison :: struct #raw_union {
@@ -8159,10 +8325,10 @@ Intent_ShortcutIconResource_new :: proc "contextless" () -> (result: ^Intent_Sho
 	return (^Intent_ShortcutIconResource)(jni_env->NewObjectA(jni_class, jni_id, nil)), jni_take(jni_env)
 }
 
-Intent_ShortcutIconResource_describeContents :: proc "contextless" (self: ^Intent_ShortcutIconResource) -> (result: i32, exception: ^Throwable) {
+Intent_ShortcutIconResource_describeContents :: proc "contextless" (self: ^Intent_ShortcutIconResource) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Intent_ShortcutIconResource__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 Intent_ShortcutIconResource_fromContext :: proc "contextless" (context_: ^Context, resourceId: i32) -> (result: ^Intent_ShortcutIconResource, exception: ^Throwable) {
@@ -8178,10 +8344,10 @@ Intent_ShortcutIconResource_toString :: proc "contextless" (self: ^Intent_Shortc
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-Intent_ShortcutIconResource_writeToParcel :: proc "contextless" (self: ^Intent_ShortcutIconResource, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+Intent_ShortcutIconResource_writeToParcel :: proc "contextless" (self: ^Intent_ShortcutIconResource, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &Intent_ShortcutIconResource__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -8282,10 +8448,10 @@ IntentFilter_addDataAuthority :: proc "contextless" (self: ^IntentFilter, host: 
 	return jni_take(jni_env)
 }
 
-IntentFilter_addDataPath :: proc "contextless" (self: ^IntentFilter, path: ^String, type: i32) -> (exception: ^Throwable) {
+IntentFilter_addDataPath :: proc "contextless" (self: ^IntentFilter, path: ^String, type: PatternMatcher_Pattern) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &IntentFilter__class, "addDataPath", "(Ljava/lang/String;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = path}, {i = type}}
+	jni_args := [?]android.jvalue{{l = path}, {i = i32(type)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -8298,10 +8464,10 @@ IntentFilter_addDataScheme :: proc "contextless" (self: ^IntentFilter, scheme: ^
 	return jni_take(jni_env)
 }
 
-IntentFilter_addDataSchemeSpecificPart :: proc "contextless" (self: ^IntentFilter, ssp: ^String, type: i32) -> (exception: ^Throwable) {
+IntentFilter_addDataSchemeSpecificPart :: proc "contextless" (self: ^IntentFilter, ssp: ^String, type: PatternMatcher_Pattern) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &IntentFilter__class, "addDataSchemeSpecificPart", "(Ljava/lang/String;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = ssp}, {i = type}}
+	jni_args := [?]android.jvalue{{l = ssp}, {i = i32(type)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -8409,10 +8575,10 @@ IntentFilter_create :: proc "contextless" (action: ^String, dataType: ^String) -
 	return (^IntentFilter)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-IntentFilter_describeContents :: proc "contextless" (self: ^IntentFilter) -> (result: i32, exception: ^Throwable) {
+IntentFilter_describeContents :: proc "contextless" (self: ^IntentFilter) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &IntentFilter__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 IntentFilter_dump :: proc "contextless" (self: ^IntentFilter, du: ^Printer, prefix: ^String) -> (exception: ^Throwable) {
@@ -8621,10 +8787,10 @@ IntentFilter_typesIterator :: proc "contextless" (self: ^IntentFilter) -> (resul
 	return (^Iterator)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-IntentFilter_writeToParcel :: proc "contextless" (self: ^IntentFilter, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+IntentFilter_writeToParcel :: proc "contextless" (self: ^IntentFilter, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &IntentFilter__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -8719,10 +8885,10 @@ IntentSender_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creato
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-IntentSender_describeContents :: proc "contextless" (self: ^IntentSender) -> (result: i32, exception: ^Throwable) {
+IntentSender_describeContents :: proc "contextless" (self: ^IntentSender) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &IntentSender__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 IntentSender_equals :: proc "contextless" (self: ^IntentSender, otherObj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -8813,10 +8979,10 @@ IntentSender_writeIntentSenderOrNullToParcel :: proc "contextless" (sender: ^Int
 	return jni_take(jni_env)
 }
 
-IntentSender_writeToParcel :: proc "contextless" (self: ^IntentSender, out: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+IntentSender_writeToParcel :: proc "contextless" (self: ^IntentSender, out: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &IntentSender__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = out}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = out}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -9135,10 +9301,10 @@ LocusId_new :: proc "contextless" (id: ^String) -> (result: ^LocusId, exception:
 	return (^LocusId)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-LocusId_describeContents :: proc "contextless" (self: ^LocusId) -> (result: i32, exception: ^Throwable) {
+LocusId_describeContents :: proc "contextless" (self: ^LocusId) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &LocusId__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 LocusId_equals :: proc "contextless" (self: ^LocusId, obj: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -9166,10 +9332,10 @@ LocusId_toString :: proc "contextless" (self: ^LocusId) -> (result: ^String, exc
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-LocusId_writeToParcel :: proc "contextless" (self: ^LocusId, parcel: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+LocusId_writeToParcel :: proc "contextless" (self: ^LocusId, parcel: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &LocusId__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = parcel}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = parcel}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -9307,10 +9473,10 @@ PeriodicSync_new :: proc "contextless" (account: ^Account, authority: ^String, e
 	return (^PeriodicSync)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-PeriodicSync_describeContents :: proc "contextless" (self: ^PeriodicSync) -> (result: i32, exception: ^Throwable) {
+PeriodicSync_describeContents :: proc "contextless" (self: ^PeriodicSync) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PeriodicSync__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 PeriodicSync_equals :: proc "contextless" (self: ^PeriodicSync, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -9326,10 +9492,10 @@ PeriodicSync_toString :: proc "contextless" (self: ^PeriodicSync) -> (result: ^S
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-PeriodicSync_writeToParcel :: proc "contextless" (self: ^PeriodicSync, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+PeriodicSync_writeToParcel :: proc "contextless" (self: ^PeriodicSync, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &PeriodicSync__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -9395,10 +9561,10 @@ RestrictionEntry_new_Parcel :: proc "contextless" (in_: ^Parcel) -> (result: ^Re
 	return (^RestrictionEntry)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-RestrictionEntry_new_int_String :: proc "contextless" (type: i32, key: ^String) -> (result: ^RestrictionEntry, exception: ^Throwable) {
+RestrictionEntry_new_int_String :: proc "contextless" (type: RestrictionEntry_Type, key: ^String) -> (result: ^RestrictionEntry, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &RestrictionEntry__class, "<init>", "(ILjava/lang/String;)V", false) or_return
-	jni_args := [?]android.jvalue{{i = type}, {l = key}}
+	jni_args := [?]android.jvalue{{i = i32(type)}, {l = key}}
 	return (^RestrictionEntry)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -9453,10 +9619,10 @@ RestrictionEntry_createBundleEntry :: proc "contextless" (key: ^String, restrict
 	return (^RestrictionEntry)(jni_env->CallStaticObjectMethodA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
-RestrictionEntry_describeContents :: proc "contextless" (self: ^RestrictionEntry) -> (result: i32, exception: ^Throwable) {
+RestrictionEntry_describeContents :: proc "contextless" (self: ^RestrictionEntry) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &RestrictionEntry__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 RestrictionEntry_equals :: proc "contextless" (self: ^RestrictionEntry, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -9526,10 +9692,10 @@ RestrictionEntry_getTitle :: proc "contextless" (self: ^RestrictionEntry) -> (re
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-RestrictionEntry_getType :: proc "contextless" (self: ^RestrictionEntry) -> (result: i32, exception: ^Throwable) {
+RestrictionEntry_getType :: proc "contextless" (self: ^RestrictionEntry) -> (result: RestrictionEntry_Type, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &RestrictionEntry__class, "getType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return RestrictionEntry_Type(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 RestrictionEntry_hashCode :: proc "contextless" (self: ^RestrictionEntry) -> (result: i32, exception: ^Throwable) {
@@ -9636,10 +9802,10 @@ RestrictionEntry_setTitle :: proc "contextless" (self: ^RestrictionEntry, title:
 	return jni_take(jni_env)
 }
 
-RestrictionEntry_setType :: proc "contextless" (self: ^RestrictionEntry, type: i32) -> (exception: ^Throwable) {
+RestrictionEntry_setType :: proc "contextless" (self: ^RestrictionEntry, type: RestrictionEntry_Type) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &RestrictionEntry__class, "setType", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = type}}
+	jni_args := [?]android.jvalue{{i = i32(type)}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -9650,12 +9816,23 @@ RestrictionEntry_toString :: proc "contextless" (self: ^RestrictionEntry) -> (re
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-RestrictionEntry_writeToParcel :: proc "contextless" (self: ^RestrictionEntry, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+RestrictionEntry_writeToParcel :: proc "contextless" (self: ^RestrictionEntry, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &RestrictionEntry__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
+}
+
+RestrictionEntry_Type :: enum i32 {
+	BOOLEAN      = 1,
+	BUNDLE       = 7,
+	BUNDLE_ARRAY = 8,
+	CHOICE       = 2,
+	INTEGER      = 5,
+	MULTI_SELECT = 4,
+	NULL         = 0,
+	STRING       = 6,
 }
 
 // class android.content.RestrictionsManager
@@ -10084,10 +10261,10 @@ SyncAdapterType_allowParallelSyncs :: proc "contextless" (self: ^SyncAdapterType
 	return jni_env->CallBooleanMethodA(self, jni_id, nil) != 0, jni_take(jni_env)
 }
 
-SyncAdapterType_describeContents :: proc "contextless" (self: ^SyncAdapterType) -> (result: i32, exception: ^Throwable) {
+SyncAdapterType_describeContents :: proc "contextless" (self: ^SyncAdapterType) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SyncAdapterType__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 SyncAdapterType_equals :: proc "contextless" (self: ^SyncAdapterType, o: ^Object) -> (result: bool, exception: ^Throwable) {
@@ -10140,10 +10317,10 @@ SyncAdapterType_toString :: proc "contextless" (self: ^SyncAdapterType) -> (resu
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-SyncAdapterType_writeToParcel :: proc "contextless" (self: ^SyncAdapterType, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+SyncAdapterType_writeToParcel :: proc "contextless" (self: ^SyncAdapterType, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SyncAdapterType__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -10197,16 +10374,16 @@ SyncInfo_get_startTime :: proc "contextless" (self: ^SyncInfo) -> (result: i64, 
 	return jni_env->GetLongField(self, jni_id), jni_take(jni_env)
 }
 
-SyncInfo_describeContents :: proc "contextless" (self: ^SyncInfo) -> (result: i32, exception: ^Throwable) {
+SyncInfo_describeContents :: proc "contextless" (self: ^SyncInfo) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SyncInfo__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-SyncInfo_writeToParcel :: proc "contextless" (self: ^SyncInfo, parcel: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+SyncInfo_writeToParcel :: proc "contextless" (self: ^SyncInfo, parcel: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SyncInfo__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = parcel}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = parcel}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -10226,16 +10403,16 @@ SyncRequest_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creator
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-SyncRequest_describeContents :: proc "contextless" (self: ^SyncRequest) -> (result: i32, exception: ^Throwable) {
+SyncRequest_describeContents :: proc "contextless" (self: ^SyncRequest) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SyncRequest__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-SyncRequest_writeToParcel :: proc "contextless" (self: ^SyncRequest, parcel: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+SyncRequest_writeToParcel :: proc "contextless" (self: ^SyncRequest, parcel: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SyncRequest__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = parcel}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = parcel}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -10480,10 +10657,10 @@ SyncResult_clear :: proc "contextless" (self: ^SyncResult) -> (exception: ^Throw
 	return jni_take(jni_env)
 }
 
-SyncResult_describeContents :: proc "contextless" (self: ^SyncResult) -> (result: i32, exception: ^Throwable) {
+SyncResult_describeContents :: proc "contextless" (self: ^SyncResult) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SyncResult__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 SyncResult_hasError :: proc "contextless" (self: ^SyncResult) -> (result: bool, exception: ^Throwable) {
@@ -10522,10 +10699,10 @@ SyncResult_toString :: proc "contextless" (self: ^SyncResult) -> (result: ^Strin
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-SyncResult_writeToParcel :: proc "contextless" (self: ^SyncResult, parcel: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+SyncResult_writeToParcel :: proc "contextless" (self: ^SyncResult, parcel: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SyncResult__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = parcel}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = parcel}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -10687,10 +10864,10 @@ SyncStats_clear :: proc "contextless" (self: ^SyncStats) -> (exception: ^Throwab
 	return jni_take(jni_env)
 }
 
-SyncStats_describeContents :: proc "contextless" (self: ^SyncStats) -> (result: i32, exception: ^Throwable) {
+SyncStats_describeContents :: proc "contextless" (self: ^SyncStats) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SyncStats__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 SyncStats_toString :: proc "contextless" (self: ^SyncStats) -> (result: ^String, exception: ^Throwable) {
@@ -10699,10 +10876,10 @@ SyncStats_toString :: proc "contextless" (self: ^SyncStats) -> (result: ^String,
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-SyncStats_writeToParcel :: proc "contextless" (self: ^SyncStats, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+SyncStats_writeToParcel :: proc "contextless" (self: ^SyncStats, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SyncStats__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -10715,10 +10892,10 @@ SyncStatusObserver :: struct #raw_union {
 @(private)
 SyncStatusObserver__class := Cached_Class{name = "android/content/SyncStatusObserver"}
 
-SyncStatusObserver_onStatusChanged :: proc "contextless" (self: ^SyncStatusObserver, which: i32) -> (exception: ^Throwable) {
+SyncStatusObserver_onStatusChanged :: proc "contextless" (self: ^SyncStatusObserver, which: ContentResolver_SyncObserverType) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &SyncStatusObserver__class, "onStatusChanged", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = which}}
+	jni_args := [?]android.jvalue{{i = transmute(i32)which}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -10772,10 +10949,10 @@ UriPermission_get_CREATOR :: proc "contextless" () -> (result: ^Parcelable_Creat
 	return (^Parcelable_Creator)(jni_env->GetStaticObjectField(jni_class, jni_id)), jni_take(jni_env)
 }
 
-UriPermission_describeContents :: proc "contextless" (self: ^UriPermission) -> (result: i32, exception: ^Throwable) {
+UriPermission_describeContents :: proc "contextless" (self: ^UriPermission) -> (result: Parcelable_DescribeContents, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &UriPermission__class, "describeContents", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return transmute(Parcelable_DescribeContents)(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 UriPermission_getPersistedTime :: proc "contextless" (self: ^UriPermission) -> (result: i64, exception: ^Throwable) {
@@ -10808,10 +10985,10 @@ UriPermission_toString :: proc "contextless" (self: ^UriPermission) -> (result: 
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-UriPermission_writeToParcel :: proc "contextless" (self: ^UriPermission, dest: ^Parcel, flags: i32) -> (exception: ^Throwable) {
+UriPermission_writeToParcel :: proc "contextless" (self: ^UriPermission, dest: ^Parcel, flags: Parcelable_Flags) -> (exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &UriPermission__class, "writeToParcel", "(Landroid/os/Parcel;I)V", false) or_return
-	jni_args := [?]android.jvalue{{l = dest}, {i = flags}}
+	jni_args := [?]android.jvalue{{l = dest}, {i = transmute(i32)flags}}
 	jni_env->CallVoidMethodA(self, jni_id, &jni_args[0])
 	return jni_take(jni_env)
 }
@@ -10828,10 +11005,10 @@ UriRelativeFilter_FRAGMENT :: 2
 UriRelativeFilter_PATH     :: 0
 UriRelativeFilter_QUERY    :: 1
 
-UriRelativeFilter_new :: proc "contextless" (uriPart: i32, patternType: i32, filter: ^String) -> (result: ^UriRelativeFilter, exception: ^Throwable) {
+UriRelativeFilter_new :: proc "contextless" (uriPart: UriRelativeFilter_UriPart, patternType: PatternMatcher_Pattern, filter: ^String) -> (result: ^UriRelativeFilter, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &UriRelativeFilter__class, "<init>", "(IILjava/lang/String;)V", false) or_return
-	jni_args := [?]android.jvalue{{i = uriPart}, {i = patternType}, {l = filter}}
+	jni_args := [?]android.jvalue{{i = i32(uriPart)}, {i = i32(patternType)}, {l = filter}}
 	return (^UriRelativeFilter)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -10848,16 +11025,16 @@ UriRelativeFilter_getFilter :: proc "contextless" (self: ^UriRelativeFilter) -> 
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-UriRelativeFilter_getPatternType :: proc "contextless" (self: ^UriRelativeFilter) -> (result: i32, exception: ^Throwable) {
+UriRelativeFilter_getPatternType :: proc "contextless" (self: ^UriRelativeFilter) -> (result: PatternMatcher_Pattern, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &UriRelativeFilter__class, "getPatternType", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return PatternMatcher_Pattern(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
-UriRelativeFilter_getUriPart :: proc "contextless" (self: ^UriRelativeFilter) -> (result: i32, exception: ^Throwable) {
+UriRelativeFilter_getUriPart :: proc "contextless" (self: ^UriRelativeFilter) -> (result: UriRelativeFilter_UriPart, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &UriRelativeFilter__class, "getUriPart", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return UriRelativeFilter_UriPart(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 UriRelativeFilter_hashCode :: proc "contextless" (self: ^UriRelativeFilter) -> (result: i32, exception: ^Throwable) {
@@ -10879,6 +11056,12 @@ UriRelativeFilter_toString :: proc "contextless" (self: ^UriRelativeFilter) -> (
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
+UriRelativeFilter_UriPart :: enum i32 {
+	FRAGMENT = 2,
+	PATH     = 0,
+	QUERY    = 1,
+}
+
 // class android.content.UriRelativeFilterGroup // API level 35
 UriRelativeFilterGroup :: struct #raw_union {
 	using Object: Object,
@@ -10890,10 +11073,10 @@ UriRelativeFilterGroup__class := Cached_Class{name = "android/content/UriRelativ
 UriRelativeFilterGroup_ACTION_ALLOW :: 0
 UriRelativeFilterGroup_ACTION_BLOCK :: 1
 
-UriRelativeFilterGroup_new :: proc "contextless" (action: i32) -> (result: ^UriRelativeFilterGroup, exception: ^Throwable) {
+UriRelativeFilterGroup_new :: proc "contextless" (action: UriRelativeFilterGroup_Action) -> (result: ^UriRelativeFilterGroup, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, jni_class, jni_id := jni_method(&jni_cache, &UriRelativeFilterGroup__class, "<init>", "(I)V", false) or_return
-	jni_args := [?]android.jvalue{{i = action}}
+	jni_args := [?]android.jvalue{{i = i32(action)}}
 	return (^UriRelativeFilterGroup)(jni_env->NewObjectA(jni_class, jni_id, &jni_args[0])), jni_take(jni_env)
 }
 
@@ -10912,10 +11095,10 @@ UriRelativeFilterGroup_equals :: proc "contextless" (self: ^UriRelativeFilterGro
 	return jni_env->CallBooleanMethodA(self, jni_id, &jni_args[0]) != 0, jni_take(jni_env)
 }
 
-UriRelativeFilterGroup_getAction :: proc "contextless" (self: ^UriRelativeFilterGroup) -> (result: i32, exception: ^Throwable) {
+UriRelativeFilterGroup_getAction :: proc "contextless" (self: ^UriRelativeFilterGroup) -> (result: UriRelativeFilterGroup_Action, exception: ^Throwable) {
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &UriRelativeFilterGroup__class, "getAction", "()I", false) or_return
-	return jni_env->CallIntMethodA(self, jni_id, nil), jni_take(jni_env)
+	return UriRelativeFilterGroup_Action(jni_env->CallIntMethodA(self, jni_id, nil)), jni_take(jni_env)
 }
 
 UriRelativeFilterGroup_getUriRelativeFilters :: proc "contextless" (self: ^UriRelativeFilterGroup) -> (result: ^Collection, exception: ^Throwable) {
@@ -10941,4 +11124,9 @@ UriRelativeFilterGroup_toString :: proc "contextless" (self: ^UriRelativeFilterG
 	@(static) jni_cache: Cached_Method
 	jni_env, _, jni_id := jni_method(&jni_cache, &UriRelativeFilterGroup__class, "toString", "()Ljava/lang/String;", false) or_return
 	return (^String)(jni_env->CallObjectMethodA(self, jni_id, nil)), jni_take(jni_env)
+}
+
+UriRelativeFilterGroup_Action :: enum i32 {
+	ALLOW = 0,
+	BLOCK = 1,
 }

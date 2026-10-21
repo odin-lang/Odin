@@ -17,23 +17,23 @@ foreign libcamera2ndk {
 	ACameraOutputTarget_free                         :: proc(output: ^ACameraOutputTarget) ---
 	ACaptureRequest_addTarget                        :: proc(request: ^ACaptureRequest, output: ^ACameraOutputTarget) -> camera_status_t ---
 	ACaptureRequest_removeTarget                     :: proc(request: ^ACaptureRequest, output: ^ACameraOutputTarget) -> camera_status_t ---
-	ACaptureRequest_getConstEntry                    :: proc(request: ^ACaptureRequest, tag: u32, entry: ^ACameraMetadata_const_entry) -> camera_status_t ---
+	ACaptureRequest_getConstEntry                    :: proc(request: ^ACaptureRequest, tag: acamera_metadata_tag_t, entry: ^ACameraMetadata_const_entry) -> camera_status_t ---
 	ACaptureRequest_getAllTags                       :: proc(request: ^ACaptureRequest, numTags: ^i32, tags: ^^u32) -> camera_status_t ---
-	ACaptureRequest_setEntry_u8                      :: proc(request: ^ACaptureRequest, tag: u32, count: u32, data: ^u8) -> camera_status_t ---
-	ACaptureRequest_setEntry_i32                     :: proc(request: ^ACaptureRequest, tag: u32, count: u32, data: ^i32) -> camera_status_t ---
-	ACaptureRequest_setEntry_float                   :: proc(request: ^ACaptureRequest, tag: u32, count: u32, data: ^f32) -> camera_status_t ---
-	ACaptureRequest_setEntry_i64                     :: proc(request: ^ACaptureRequest, tag: u32, count: u32, data: ^i64) -> camera_status_t ---
-	ACaptureRequest_setEntry_double                  :: proc(request: ^ACaptureRequest, tag: u32, count: u32, data: ^f64) -> camera_status_t ---
-	ACaptureRequest_setEntry_rational                :: proc(request: ^ACaptureRequest, tag: u32, count: u32, data: ^ACameraMetadata_rational) -> camera_status_t ---
+	ACaptureRequest_setEntry_u8                      :: proc(request: ^ACaptureRequest, tag: acamera_metadata_tag_t, count: u32, data: ^u8) -> camera_status_t ---
+	ACaptureRequest_setEntry_i32                     :: proc(request: ^ACaptureRequest, tag: acamera_metadata_tag_t, count: u32, data: ^i32) -> camera_status_t ---
+	ACaptureRequest_setEntry_float                   :: proc(request: ^ACaptureRequest, tag: acamera_metadata_tag_t, count: u32, data: ^f32) -> camera_status_t ---
+	ACaptureRequest_setEntry_i64                     :: proc(request: ^ACaptureRequest, tag: acamera_metadata_tag_t, count: u32, data: ^i64) -> camera_status_t ---
+	ACaptureRequest_setEntry_double                  :: proc(request: ^ACaptureRequest, tag: acamera_metadata_tag_t, count: u32, data: ^f64) -> camera_status_t ---
+	ACaptureRequest_setEntry_rational                :: proc(request: ^ACaptureRequest, tag: acamera_metadata_tag_t, count: u32, data: ^ACameraMetadata_rational) -> camera_status_t ---
 	ACaptureRequest_free                             :: proc(request: ^ACaptureRequest) ---
 	ACaptureRequest_setUserContext                   :: proc(request: ^ACaptureRequest, context_: rawptr) -> camera_status_t ---
 	ACaptureRequest_getUserContext                   :: proc(request: ^ACaptureRequest, context_: ^rawptr) -> camera_status_t ---
 	ACaptureRequest_copy                             :: proc(src: ^ACaptureRequest) -> ^ACaptureRequest ---
-	ACaptureRequest_getConstEntry_physicalCamera     :: proc(request: ^ACaptureRequest, physicalId: cstring, tag: u32, entry: ^ACameraMetadata_const_entry) -> camera_status_t ---
-	ACaptureRequest_setEntry_physicalCamera_u8       :: proc(request: ^ACaptureRequest, physicalId: cstring, tag: u32, count: u32, data: ^u8) -> camera_status_t ---
-	ACaptureRequest_setEntry_physicalCamera_i32      :: proc(request: ^ACaptureRequest, physicalId: cstring, tag: u32, count: u32, data: ^i32) -> camera_status_t ---
-	ACaptureRequest_setEntry_physicalCamera_float    :: proc(request: ^ACaptureRequest, physicalId: cstring, tag: u32, count: u32, data: ^f32) -> camera_status_t ---
-	ACaptureRequest_setEntry_physicalCamera_i64      :: proc(request: ^ACaptureRequest, physicalId: cstring, tag: u32, count: u32, data: ^i64) -> camera_status_t ---
-	ACaptureRequest_setEntry_physicalCamera_double   :: proc(request: ^ACaptureRequest, physicalId: cstring, tag: u32, count: u32, data: ^f64) -> camera_status_t ---
-	ACaptureRequest_setEntry_physicalCamera_rational :: proc(request: ^ACaptureRequest, physicalId: cstring, tag: u32, count: u32, data: ^ACameraMetadata_rational) -> camera_status_t ---
+	ACaptureRequest_getConstEntry_physicalCamera     :: proc(request: ^ACaptureRequest, physicalId: cstring, tag: acamera_metadata_tag_t, entry: ^ACameraMetadata_const_entry) -> camera_status_t ---
+	ACaptureRequest_setEntry_physicalCamera_u8       :: proc(request: ^ACaptureRequest, physicalId: cstring, tag: acamera_metadata_tag_t, count: u32, data: ^u8) -> camera_status_t ---
+	ACaptureRequest_setEntry_physicalCamera_i32      :: proc(request: ^ACaptureRequest, physicalId: cstring, tag: acamera_metadata_tag_t, count: u32, data: ^i32) -> camera_status_t ---
+	ACaptureRequest_setEntry_physicalCamera_float    :: proc(request: ^ACaptureRequest, physicalId: cstring, tag: acamera_metadata_tag_t, count: u32, data: ^f32) -> camera_status_t ---
+	ACaptureRequest_setEntry_physicalCamera_i64      :: proc(request: ^ACaptureRequest, physicalId: cstring, tag: acamera_metadata_tag_t, count: u32, data: ^i64) -> camera_status_t ---
+	ACaptureRequest_setEntry_physicalCamera_double   :: proc(request: ^ACaptureRequest, physicalId: cstring, tag: acamera_metadata_tag_t, count: u32, data: ^f64) -> camera_status_t ---
+	ACaptureRequest_setEntry_physicalCamera_rational :: proc(request: ^ACaptureRequest, physicalId: cstring, tag: acamera_metadata_tag_t, count: u32, data: ^ACameraMetadata_rational) -> camera_status_t ---
 }

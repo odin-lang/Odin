@@ -5,42 +5,43 @@ package android_binder
 
 foreign import libbinder_ndk "system:binder_ndk"
 
-STATUS_OK                  :: 0
-STATUS_UNKNOWN_ERROR       :: -2147483648
-STATUS_NO_MEMORY           :: -12
-STATUS_INVALID_OPERATION   :: -38
-STATUS_BAD_VALUE           :: -22
-STATUS_BAD_TYPE            :: -2147483647
-STATUS_NAME_NOT_FOUND      :: -2
-STATUS_PERMISSION_DENIED   :: -1
-STATUS_NO_INIT             :: -19
-STATUS_ALREADY_EXISTS      :: -17
-STATUS_DEAD_OBJECT         :: -32
-STATUS_FAILED_TRANSACTION  :: -2147483646
-STATUS_BAD_INDEX           :: -75
-STATUS_NOT_ENOUGH_DATA     :: -61
-STATUS_WOULD_BLOCK         :: -11
-STATUS_TIMED_OUT           :: -110
-STATUS_UNKNOWN_TRANSACTION :: -74
-STATUS_FDS_NOT_ALLOWED     :: -2147483641
-STATUS_UNEXPECTED_NULL     :: -2147483640
+binder_status_t :: enum i32 {
+	OK                  = 0,
+	UNKNOWN_ERROR       = -2147483648,
+	NO_MEMORY           = -12,
+	INVALID_OPERATION   = -38,
+	BAD_VALUE           = -22,
+	BAD_TYPE            = -2147483647,
+	NAME_NOT_FOUND      = -2,
+	PERMISSION_DENIED   = -1,
+	NO_INIT             = -19,
+	ALREADY_EXISTS      = -17,
+	DEAD_OBJECT         = -32,
+	FAILED_TRANSACTION  = -2147483646,
+	BAD_INDEX           = -75,
+	NOT_ENOUGH_DATA     = -61,
+	WOULD_BLOCK         = -11,
+	TIMED_OUT           = -110,
+	UNKNOWN_TRANSACTION = -74,
+	FDS_NOT_ALLOWED     = -2147483641,
+	UNEXPECTED_NULL     = -2147483640,
+}
 
-binder_status_t :: i32
+binder_exception_t :: enum i32 {
+	NONE                  = 0,
+	SECURITY              = -1,
+	BAD_PARCELABLE        = -2,
+	ILLEGAL_ARGUMENT      = -3,
+	NULL_POINTER          = -4,
+	ILLEGAL_STATE         = -5,
+	NETWORK_MAIN_THREAD   = -6,
+	UNSUPPORTED_OPERATION = -7,
+	SERVICE_SPECIFIC      = -8,
+	PARCELABLE            = -9,
+	TRANSACTION_FAILED    = -129,
+}
 
-EX_NONE                  :: 0
-EX_SECURITY              :: -1
-EX_BAD_PARCELABLE        :: -2
-EX_ILLEGAL_ARGUMENT      :: -3
-EX_NULL_POINTER          :: -4
-EX_ILLEGAL_STATE         :: -5
-EX_NETWORK_MAIN_THREAD   :: -6
-EX_UNSUPPORTED_OPERATION :: -7
-EX_SERVICE_SPECIFIC      :: -8
-EX_PARCELABLE            :: -9
-EX_TRANSACTION_FAILED    :: -129
-
-binder_exception_t :: i32
-AStatus            :: struct {}
+AStatus :: struct {}
 
 @(default_calling_convention="c")
 foreign libbinder_ndk {

@@ -13,14 +13,16 @@ ACameraIdList :: struct {
 	cameraIds:  ^cstring,
 }
 
-ERROR_CAMERA_IN_USE      :: 1
-ERROR_MAX_CAMERAS_IN_USE :: 2
-ERROR_CAMERA_DISABLED    :: 3
-ERROR_CAMERA_DEVICE      :: 4
-ERROR_CAMERA_SERVICE     :: 5
+ACameraDeviceError :: enum i32 {
+	CAMERA_IN_USE      = 1,
+	MAX_CAMERAS_IN_USE = 2,
+	CAMERA_DISABLED    = 3,
+	CAMERA_DEVICE      = 4,
+	CAMERA_SERVICE     = 5,
+}
 
 ACameraDevice_StateCallback                             :: proc "c" (context_: rawptr, device: ^ACameraDevice)
-ACameraDevice_ErrorStateCallback                        :: proc "c" (context_: rawptr, device: ^ACameraDevice, error: c.int)
+ACameraDevice_ErrorStateCallback                        :: proc "c" (context_: rawptr, device: ^ACameraDevice, error: ACameraDeviceError)
 ACameraDevice_ClientSharedAccessPriorityChangedCallback :: proc "c" (context_: rawptr, device: ^ACameraDevice, isPrimaryClient: bool)
 
 ACameraDevice_StateCallbacks :: struct {
@@ -32,14 +34,14 @@ ACameraDevice_StateCallbacks :: struct {
 
 ACameraDevice_stateCallbacks :: ACameraDevice_StateCallbacks
 
-ACameraDevice_request_template :: c.int
-
-TEMPLATE_PREVIEW          :: 1
-TEMPLATE_STILL_CAPTURE    :: 2
-TEMPLATE_RECORD           :: 3
-TEMPLATE_VIDEO_SNAPSHOT   :: 4
-TEMPLATE_ZERO_SHUTTER_LAG :: 5
-TEMPLATE_MANUAL           :: 6
+ACameraDevice_request_template :: enum c.int {
+	PREVIEW          = 1,
+	STILL_CAPTURE    = 2,
+	RECORD           = 3,
+	VIDEO_SNAPSHOT   = 4,
+	ZERO_SHUTTER_LAG = 5,
+	MANUAL           = 6,
+}
 
 ACaptureSessionOutputContainer :: struct {}
 

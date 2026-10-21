@@ -3,11 +3,11 @@
 #+build linux
 package android
 
-AHdrMetadataType :: u32
-
-HDR10_SMPTE2086 :: 1
-HDR10_CTA861_3  :: 2
-HDR10PLUS_SEI   :: 3
+AHdrMetadataType :: enum u32 {
+	HDR10_SMPTE2086 = 1,
+	HDR10_CTA861_3  = 2,
+	HDR10PLUS_SEI   = 3,
+}
 
 AColor_xy :: struct {
 	x: f32,

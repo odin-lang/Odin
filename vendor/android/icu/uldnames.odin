@@ -7,10 +7,10 @@ import "core:c"
 
 foreign import libicu "system:icu"
 
-UDialectHandling :: c.int
-
-ULDN_STANDARD_NAMES :: 0
-ULDN_DIALECT_NAMES  :: 1
+UDialectHandling :: enum c.int {
+	STANDARD_NAMES = 0,
+	DIALECT_NAMES  = 1,
+}
 
 ULocaleDisplayNames :: struct {}
 

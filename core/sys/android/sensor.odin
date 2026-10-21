@@ -7,70 +7,82 @@ import "core:c"
 
 foreign import libandroid "system:android"
 
-ASENSOR_TYPE_INVALID                                 :: -1
-ASENSOR_TYPE_ACCELEROMETER                           :: 1
-ASENSOR_TYPE_MAGNETIC_FIELD                          :: 2
-ASENSOR_TYPE_GYROSCOPE                               :: 4
-ASENSOR_TYPE_LIGHT                                   :: 5
-ASENSOR_TYPE_PRESSURE                                :: 6
-ASENSOR_TYPE_PROXIMITY                               :: 8
-ASENSOR_TYPE_GRAVITY                                 :: 9
-ASENSOR_TYPE_LINEAR_ACCELERATION                     :: 10
-ASENSOR_TYPE_ROTATION_VECTOR                         :: 11
-ASENSOR_TYPE_RELATIVE_HUMIDITY                       :: 12
-ASENSOR_TYPE_AMBIENT_TEMPERATURE                     :: 13
-ASENSOR_TYPE_MAGNETIC_FIELD_UNCALIBRATED             :: 14
-ASENSOR_TYPE_GAME_ROTATION_VECTOR                    :: 15
-ASENSOR_TYPE_GYROSCOPE_UNCALIBRATED                  :: 16
-ASENSOR_TYPE_SIGNIFICANT_MOTION                      :: 17
-ASENSOR_TYPE_STEP_DETECTOR                           :: 18
-ASENSOR_TYPE_STEP_COUNTER                            :: 19
-ASENSOR_TYPE_GEOMAGNETIC_ROTATION_VECTOR             :: 20
-ASENSOR_TYPE_HEART_RATE                              :: 21
-ASENSOR_TYPE_POSE_6DOF                               :: 28
-ASENSOR_TYPE_STATIONARY_DETECT                       :: 29
-ASENSOR_TYPE_MOTION_DETECT                           :: 30
-ASENSOR_TYPE_HEART_BEAT                              :: 31
-ASENSOR_TYPE_DYNAMIC_SENSOR_META                     :: 32
-ASENSOR_TYPE_ADDITIONAL_INFO                         :: 33
-ASENSOR_TYPE_LOW_LATENCY_OFFBODY_DETECT              :: 34
-ASENSOR_TYPE_ACCELEROMETER_UNCALIBRATED              :: 35
-ASENSOR_TYPE_HINGE_ANGLE                             :: 36
-ASENSOR_TYPE_HEAD_TRACKER                            :: 37
-ASENSOR_TYPE_ACCELEROMETER_LIMITED_AXES              :: 38
-ASENSOR_TYPE_GYROSCOPE_LIMITED_AXES                  :: 39
-ASENSOR_TYPE_ACCELEROMETER_LIMITED_AXES_UNCALIBRATED :: 40
-ASENSOR_TYPE_GYROSCOPE_LIMITED_AXES_UNCALIBRATED     :: 41
-ASENSOR_TYPE_HEADING                                 :: 42
-ASENSOR_TYPE_MOISTURE_INTRUSION                      :: 43
+ASensorType :: enum i32 {
+	INVALID                                 = -1,
+	ACCELEROMETER                           = 1,
+	MAGNETIC_FIELD                          = 2,
+	GYROSCOPE                               = 4,
+	LIGHT                                   = 5,
+	PRESSURE                                = 6,
+	PROXIMITY                               = 8,
+	GRAVITY                                 = 9,
+	LINEAR_ACCELERATION                     = 10,
+	ROTATION_VECTOR                         = 11,
+	RELATIVE_HUMIDITY                       = 12,
+	AMBIENT_TEMPERATURE                     = 13,
+	MAGNETIC_FIELD_UNCALIBRATED             = 14,
+	GAME_ROTATION_VECTOR                    = 15,
+	GYROSCOPE_UNCALIBRATED                  = 16,
+	SIGNIFICANT_MOTION                      = 17,
+	STEP_DETECTOR                           = 18,
+	STEP_COUNTER                            = 19,
+	GEOMAGNETIC_ROTATION_VECTOR             = 20,
+	HEART_RATE                              = 21,
+	POSE_6DOF                               = 28,
+	STATIONARY_DETECT                       = 29,
+	MOTION_DETECT                           = 30,
+	HEART_BEAT                              = 31,
+	DYNAMIC_SENSOR_META                     = 32,
+	ADDITIONAL_INFO                         = 33,
+	LOW_LATENCY_OFFBODY_DETECT              = 34,
+	ACCELEROMETER_UNCALIBRATED              = 35,
+	HINGE_ANGLE                             = 36,
+	HEAD_TRACKER                            = 37,
+	ACCELEROMETER_LIMITED_AXES              = 38,
+	GYROSCOPE_LIMITED_AXES                  = 39,
+	ACCELEROMETER_LIMITED_AXES_UNCALIBRATED = 40,
+	GYROSCOPE_LIMITED_AXES_UNCALIBRATED     = 41,
+	HEADING                                 = 42,
+	MOISTURE_INTRUSION                      = 43,
+}
 
-ASENSOR_STATUS_NO_CONTACT      :: -1
-ASENSOR_STATUS_UNRELIABLE      :: 0
-ASENSOR_STATUS_ACCURACY_LOW    :: 1
-ASENSOR_STATUS_ACCURACY_MEDIUM :: 2
-ASENSOR_STATUS_ACCURACY_HIGH   :: 3
+ASensorStatus :: enum i8 {
+	NO_CONTACT      = -1,
+	UNRELIABLE      = 0,
+	ACCURACY_LOW    = 1,
+	ACCURACY_MEDIUM = 2,
+	ACCURACY_HIGH   = 3,
+}
 
-AREPORTING_MODE_INVALID         :: -1
-AREPORTING_MODE_CONTINUOUS      :: 0
-AREPORTING_MODE_ON_CHANGE       :: 1
-AREPORTING_MODE_ONE_SHOT        :: 2
-AREPORTING_MODE_SPECIAL_TRIGGER :: 3
+AReportingMode :: enum i32 {
+	INVALID         = -1,
+	CONTINUOUS      = 0,
+	ON_CHANGE       = 1,
+	ONE_SHOT        = 2,
+	SPECIAL_TRIGGER = 3,
+}
 
-ASENSOR_DIRECT_RATE_STOP      :: 0
-ASENSOR_DIRECT_RATE_NORMAL    :: 1
-ASENSOR_DIRECT_RATE_FAST      :: 2
-ASENSOR_DIRECT_RATE_VERY_FAST :: 3
+ASensorDirectRate :: enum i32 {
+	STOP      = 0,
+	NORMAL    = 1,
+	FAST      = 2,
+	VERY_FAST = 3,
+}
 
-ASENSOR_DIRECT_CHANNEL_TYPE_SHARED_MEMORY   :: 1
-ASENSOR_DIRECT_CHANNEL_TYPE_HARDWARE_BUFFER :: 2
+ASensorDirectChannelType :: enum i32 {
+	SHARED_MEMORY   = 1,
+	HARDWARE_BUFFER = 2,
+}
 
-ASENSOR_ADDITIONAL_INFO_BEGIN                :: 0
-ASENSOR_ADDITIONAL_INFO_END                  :: 1
-ASENSOR_ADDITIONAL_INFO_UNTRACKED_DELAY      :: 0x10000
-ASENSOR_ADDITIONAL_INFO_INTERNAL_TEMPERATURE :: 65537
-ASENSOR_ADDITIONAL_INFO_VEC3_CALIBRATION     :: 65538
-ASENSOR_ADDITIONAL_INFO_SENSOR_PLACEMENT     :: 65539
-ASENSOR_ADDITIONAL_INFO_SAMPLING             :: 65540
+ASensorAdditionalInfoType :: enum i32 {
+	BEGIN                = 0,
+	END                  = 1,
+	UNTRACKED_DELAY      = 0x10000,
+	INTERNAL_TEMPERATURE = 65537,
+	VEC3_CALIBRATION     = 65538,
+	SENSOR_PLACEMENT     = 65539,
+	SAMPLING             = 65540,
+}
 
 ASensorVector :: struct {
 	using _: struct #raw_union {
@@ -86,7 +98,7 @@ ASensorVector :: struct {
 			roll:    f32,
 		},
 	},
-	status:   i8,
+	status:   ASensorStatus,
 	reserved: [3]u8,
 }
 
@@ -125,7 +137,7 @@ ADynamicSensorEvent :: struct {
 }
 
 AAdditionalInfoEvent :: struct {
-	type:   i32,
+	type:   ASensorAdditionalInfoType,
 	serial: i32,
 	using _: struct #raw_union {
 		data_int32: [14]i32,
@@ -197,7 +209,7 @@ AHeadingEvent :: struct {
 ASensorEvent :: struct {
 	version:   i32,
 	sensor:    i32,
-	type:      i32,
+	type:      ASensorType,
 	reserved0: i32,
 	timestamp: i64,
 	using _: struct #raw_union {
@@ -252,14 +264,14 @@ foreign libandroid {
 	ASensorManager_getInstanceForPackage             :: proc(packageName: cstring) -> ^ASensorManager ---
 	ASensorManager_getSensorList                     :: proc(manager: ^ASensorManager, list: ^ASensorList) -> c.int ---
 	ASensorManager_getDynamicSensorList              :: proc(manager: ^ASensorManager, list: ^ASensorList) -> c.ssize_t --- // API level 33
-	ASensorManager_getDefaultSensor                  :: proc(manager: ^ASensorManager, type: c.int) -> ^ASensor ---
-	ASensorManager_getDefaultSensorEx                :: proc(manager: ^ASensorManager, type: c.int, wakeUp: bool) -> ^ASensor ---
+	ASensorManager_getDefaultSensor                  :: proc(manager: ^ASensorManager, type: ASensorType) -> ^ASensor ---
+	ASensorManager_getDefaultSensorEx                :: proc(manager: ^ASensorManager, type: ASensorType, wakeUp: bool) -> ^ASensor ---
 	ASensorManager_createEventQueue                  :: proc(manager: ^ASensorManager, looper: ^ALooper, ident: c.int, callback: ALooper_callbackFunc, data: rawptr) -> ^ASensorEventQueue ---
 	ASensorManager_destroyEventQueue                 :: proc(manager: ^ASensorManager, queue: ^ASensorEventQueue) -> c.int ---
 	ASensorManager_createSharedMemoryDirectChannel   :: proc(manager: ^ASensorManager, fd: c.int, size: c.size_t) -> c.int ---
 	ASensorManager_createHardwareBufferDirectChannel :: proc(manager: ^ASensorManager, buffer: ^AHardwareBuffer, size: c.size_t) -> c.int ---
 	ASensorManager_destroyDirectChannel              :: proc(manager: ^ASensorManager, channelId: c.int) ---
-	ASensorManager_configureDirectReport             :: proc(manager: ^ASensorManager, sensor: ^ASensor, channelId: c.int, rate: c.int) -> c.int ---
+	ASensorManager_configureDirectReport             :: proc(manager: ^ASensorManager, sensor: ^ASensor, channelId: c.int, rate: ASensorDirectRate) -> c.int ---
 	ASensorEventQueue_registerSensor                 :: proc(queue: ^ASensorEventQueue, sensor: ^ASensor, samplingPeriodUs: i32, maxBatchReportLatencyUs: i64) -> c.int ---
 	ASensorEventQueue_enableSensor                   :: proc(queue: ^ASensorEventQueue, sensor: ^ASensor) -> c.int ---
 	ASensorEventQueue_disableSensor                  :: proc(queue: ^ASensorEventQueue, sensor: ^ASensor) -> c.int ---
@@ -269,15 +281,15 @@ foreign libandroid {
 	ASensorEventQueue_requestAdditionalInfoEvents    :: proc(queue: ^ASensorEventQueue, enable: bool) -> c.int ---
 	ASensor_getName                                  :: proc(sensor: ^ASensor) -> cstring ---
 	ASensor_getVendor                                :: proc(sensor: ^ASensor) -> cstring ---
-	ASensor_getType                                  :: proc(sensor: ^ASensor) -> c.int ---
+	ASensor_getType                                  :: proc(sensor: ^ASensor) -> ASensorType ---
 	ASensor_getResolution                            :: proc(sensor: ^ASensor) -> f32 ---
 	ASensor_getMinDelay                              :: proc(sensor: ^ASensor) -> c.int ---
 	ASensor_getFifoMaxEventCount                     :: proc(sensor: ^ASensor) -> c.int ---
 	ASensor_getFifoReservedEventCount                :: proc(sensor: ^ASensor) -> c.int ---
 	ASensor_getStringType                            :: proc(sensor: ^ASensor) -> cstring ---
-	ASensor_getReportingMode                         :: proc(sensor: ^ASensor) -> c.int ---
+	ASensor_getReportingMode                         :: proc(sensor: ^ASensor) -> AReportingMode ---
 	ASensor_isWakeUpSensor                           :: proc(sensor: ^ASensor) -> bool ---
-	ASensor_isDirectChannelTypeSupported             :: proc(sensor: ^ASensor, channelType: c.int) -> bool ---
-	ASensor_getHighestDirectReportRateLevel          :: proc(sensor: ^ASensor) -> c.int ---
+	ASensor_isDirectChannelTypeSupported             :: proc(sensor: ^ASensor, channelType: ASensorDirectChannelType) -> bool ---
+	ASensor_getHighestDirectReportRateLevel          :: proc(sensor: ^ASensor) -> ASensorDirectRate ---
 	ASensor_getHandle                                :: proc(sensor: ^ASensor) -> c.int ---
 }

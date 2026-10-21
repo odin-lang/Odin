@@ -5,206 +5,206 @@ package android_neuralnetworks
 
 import "core:c"
 
-OperandCode :: c.int
+OperandCode :: enum c.int {
+	FLOAT32                        = 0,
+	INT32                          = 1,
+	UINT32                         = 2,
+	TENSOR_FLOAT32                 = 3,
+	TENSOR_INT32                   = 4,
+	TENSOR_QUANT8_ASYMM            = 5,
+	BOOL                           = 6,
+	TENSOR_QUANT16_SYMM            = 7,
+	TENSOR_FLOAT16                 = 8,
+	TENSOR_BOOL8                   = 9,
+	FLOAT16                        = 10,
+	TENSOR_QUANT8_SYMM_PER_CHANNEL = 11,
+	TENSOR_QUANT16_ASYMM           = 12,
+	TENSOR_QUANT8_SYMM             = 13,
+	TENSOR_QUANT8_ASYMM_SIGNED     = 14,
+	MODEL                          = 15,
+}
 
-ANEURALNETWORKS_FLOAT32                        :: 0
-ANEURALNETWORKS_INT32                          :: 1
-ANEURALNETWORKS_UINT32                         :: 2
-ANEURALNETWORKS_TENSOR_FLOAT32                 :: 3
-ANEURALNETWORKS_TENSOR_INT32                   :: 4
-ANEURALNETWORKS_TENSOR_QUANT8_ASYMM            :: 5
-ANEURALNETWORKS_BOOL                           :: 6
-ANEURALNETWORKS_TENSOR_QUANT16_SYMM            :: 7
-ANEURALNETWORKS_TENSOR_FLOAT16                 :: 8
-ANEURALNETWORKS_TENSOR_BOOL8                   :: 9
-ANEURALNETWORKS_FLOAT16                        :: 10
-ANEURALNETWORKS_TENSOR_QUANT8_SYMM_PER_CHANNEL :: 11
-ANEURALNETWORKS_TENSOR_QUANT16_ASYMM           :: 12
-ANEURALNETWORKS_TENSOR_QUANT8_SYMM             :: 13
-ANEURALNETWORKS_TENSOR_QUANT8_ASYMM_SIGNED     :: 14
-ANEURALNETWORKS_MODEL                          :: 15
+OperationCode :: enum c.int {
+	ADD                          = 0,
+	AVERAGE_POOL_2D              = 1,
+	CONCATENATION                = 2,
+	CONV_2D                      = 3,
+	DEPTHWISE_CONV_2D            = 4,
+	DEPTH_TO_SPACE               = 5,
+	DEQUANTIZE                   = 6,
+	EMBEDDING_LOOKUP             = 7,
+	FLOOR                        = 8,
+	FULLY_CONNECTED              = 9,
+	HASHTABLE_LOOKUP             = 10,
+	L2_NORMALIZATION             = 11,
+	L2_POOL_2D                   = 12,
+	LOCAL_RESPONSE_NORMALIZATION = 13,
+	LOGISTIC                     = 14,
+	LSH_PROJECTION               = 15,
+	LSTM                         = 16,
+	MAX_POOL_2D                  = 17,
+	MUL                          = 18,
+	RELU                         = 19,
+	RELU1                        = 20,
+	RELU6                        = 21,
+	RESHAPE                      = 22,
+	RESIZE_BILINEAR              = 23,
+	RNN                          = 24,
+	SOFTMAX                      = 25,
+	SPACE_TO_DEPTH               = 26,
+	SVDF                         = 27,
+	TANH                         = 28,
+	BATCH_TO_SPACE_ND            = 29,
+	DIV                          = 30,
+	MEAN                         = 31,
+	PAD                          = 32,
+	SPACE_TO_BATCH_ND            = 33,
+	SQUEEZE                      = 34,
+	STRIDED_SLICE                = 35,
+	SUB                          = 36,
+	TRANSPOSE                    = 37,
+	ABS                          = 38,
+	ARGMAX                       = 39,
+	ARGMIN                       = 40,
+	AXIS_ALIGNED_BBOX_TRANSFORM  = 41,
+	BIDIRECTIONAL_SEQUENCE_LSTM  = 42,
+	BIDIRECTIONAL_SEQUENCE_RNN   = 43,
+	BOX_WITH_NMS_LIMIT           = 44,
+	CAST                         = 45,
+	CHANNEL_SHUFFLE              = 46,
+	DETECTION_POSTPROCESSING     = 47,
+	EQUAL                        = 48,
+	EXP                          = 49,
+	EXPAND_DIMS                  = 50,
+	GATHER                       = 51,
+	GENERATE_PROPOSALS           = 52,
+	GREATER                      = 53,
+	GREATER_EQUAL                = 54,
+	GROUPED_CONV_2D              = 55,
+	HEATMAP_MAX_KEYPOINT         = 56,
+	INSTANCE_NORMALIZATION       = 57,
+	LESS                         = 58,
+	LESS_EQUAL                   = 59,
+	LOG                          = 60,
+	LOGICAL_AND                  = 61,
+	LOGICAL_NOT                  = 62,
+	LOGICAL_OR                   = 63,
+	LOG_SOFTMAX                  = 64,
+	MAXIMUM                      = 65,
+	MINIMUM                      = 66,
+	NEG                          = 67,
+	NOT_EQUAL                    = 68,
+	PAD_V2                       = 69,
+	POW                          = 70,
+	PRELU                        = 71,
+	QUANTIZE                     = 72,
+	QUANTIZED_16BIT_LSTM         = 73,
+	RANDOM_MULTINOMIAL           = 74,
+	REDUCE_ALL                   = 75,
+	REDUCE_ANY                   = 76,
+	REDUCE_MAX                   = 77,
+	REDUCE_MIN                   = 78,
+	REDUCE_PROD                  = 79,
+	REDUCE_SUM                   = 80,
+	ROI_ALIGN                    = 81,
+	ROI_POOLING                  = 82,
+	RSQRT                        = 83,
+	SELECT                       = 84,
+	SIN                          = 85,
+	SLICE                        = 86,
+	SPLIT                        = 87,
+	SQRT                         = 88,
+	TILE                         = 89,
+	TOPK_V2                      = 90,
+	TRANSPOSE_CONV_2D            = 91,
+	UNIDIRECTIONAL_SEQUENCE_LSTM = 92,
+	UNIDIRECTIONAL_SEQUENCE_RNN  = 93,
+	RESIZE_NEAREST_NEIGHBOR      = 94,
+	QUANTIZED_LSTM               = 95,
+	IF                           = 96,
+	WHILE                        = 97,
+	ELU                          = 98,
+	HARD_SWISH                   = 99,
+	FILL                         = 100,
+	RANK                         = 101,
+	BATCH_MATMUL                 = 102,
+	PACK                         = 103,
+	MIRROR_PAD                   = 104,
+	REVERSE                      = 105,
+}
 
-OperationCode :: c.int
+FuseCode :: enum c.int {
+	NONE  = 0,
+	RELU  = 1,
+	RELU1 = 2,
+	RELU6 = 3,
+}
 
-ANEURALNETWORKS_ADD                          :: 0
-ANEURALNETWORKS_AVERAGE_POOL_2D              :: 1
-ANEURALNETWORKS_CONCATENATION                :: 2
-ANEURALNETWORKS_CONV_2D                      :: 3
-ANEURALNETWORKS_DEPTHWISE_CONV_2D            :: 4
-ANEURALNETWORKS_DEPTH_TO_SPACE               :: 5
-ANEURALNETWORKS_DEQUANTIZE                   :: 6
-ANEURALNETWORKS_EMBEDDING_LOOKUP             :: 7
-ANEURALNETWORKS_FLOOR                        :: 8
-ANEURALNETWORKS_FULLY_CONNECTED              :: 9
-ANEURALNETWORKS_HASHTABLE_LOOKUP             :: 10
-ANEURALNETWORKS_L2_NORMALIZATION             :: 11
-ANEURALNETWORKS_L2_POOL_2D                   :: 12
-ANEURALNETWORKS_LOCAL_RESPONSE_NORMALIZATION :: 13
-ANEURALNETWORKS_LOGISTIC                     :: 14
-ANEURALNETWORKS_LSH_PROJECTION               :: 15
-ANEURALNETWORKS_LSTM                         :: 16
-ANEURALNETWORKS_MAX_POOL_2D                  :: 17
-ANEURALNETWORKS_MUL                          :: 18
-ANEURALNETWORKS_RELU                         :: 19
-ANEURALNETWORKS_RELU1                        :: 20
-ANEURALNETWORKS_RELU6                        :: 21
-ANEURALNETWORKS_RESHAPE                      :: 22
-ANEURALNETWORKS_RESIZE_BILINEAR              :: 23
-ANEURALNETWORKS_RNN                          :: 24
-ANEURALNETWORKS_SOFTMAX                      :: 25
-ANEURALNETWORKS_SPACE_TO_DEPTH               :: 26
-ANEURALNETWORKS_SVDF                         :: 27
-ANEURALNETWORKS_TANH                         :: 28
-ANEURALNETWORKS_BATCH_TO_SPACE_ND            :: 29
-ANEURALNETWORKS_DIV                          :: 30
-ANEURALNETWORKS_MEAN                         :: 31
-ANEURALNETWORKS_PAD                          :: 32
-ANEURALNETWORKS_SPACE_TO_BATCH_ND            :: 33
-ANEURALNETWORKS_SQUEEZE                      :: 34
-ANEURALNETWORKS_STRIDED_SLICE                :: 35
-ANEURALNETWORKS_SUB                          :: 36
-ANEURALNETWORKS_TRANSPOSE                    :: 37
-ANEURALNETWORKS_ABS                          :: 38
-ANEURALNETWORKS_ARGMAX                       :: 39
-ANEURALNETWORKS_ARGMIN                       :: 40
-ANEURALNETWORKS_AXIS_ALIGNED_BBOX_TRANSFORM  :: 41
-ANEURALNETWORKS_BIDIRECTIONAL_SEQUENCE_LSTM  :: 42
-ANEURALNETWORKS_BIDIRECTIONAL_SEQUENCE_RNN   :: 43
-ANEURALNETWORKS_BOX_WITH_NMS_LIMIT           :: 44
-ANEURALNETWORKS_CAST                         :: 45
-ANEURALNETWORKS_CHANNEL_SHUFFLE              :: 46
-ANEURALNETWORKS_DETECTION_POSTPROCESSING     :: 47
-ANEURALNETWORKS_EQUAL                        :: 48
-ANEURALNETWORKS_EXP                          :: 49
-ANEURALNETWORKS_EXPAND_DIMS                  :: 50
-ANEURALNETWORKS_GATHER                       :: 51
-ANEURALNETWORKS_GENERATE_PROPOSALS           :: 52
-ANEURALNETWORKS_GREATER                      :: 53
-ANEURALNETWORKS_GREATER_EQUAL                :: 54
-ANEURALNETWORKS_GROUPED_CONV_2D              :: 55
-ANEURALNETWORKS_HEATMAP_MAX_KEYPOINT         :: 56
-ANEURALNETWORKS_INSTANCE_NORMALIZATION       :: 57
-ANEURALNETWORKS_LESS                         :: 58
-ANEURALNETWORKS_LESS_EQUAL                   :: 59
-ANEURALNETWORKS_LOG                          :: 60
-ANEURALNETWORKS_LOGICAL_AND                  :: 61
-ANEURALNETWORKS_LOGICAL_NOT                  :: 62
-ANEURALNETWORKS_LOGICAL_OR                   :: 63
-ANEURALNETWORKS_LOG_SOFTMAX                  :: 64
-ANEURALNETWORKS_MAXIMUM                      :: 65
-ANEURALNETWORKS_MINIMUM                      :: 66
-ANEURALNETWORKS_NEG                          :: 67
-ANEURALNETWORKS_NOT_EQUAL                    :: 68
-ANEURALNETWORKS_PAD_V2                       :: 69
-ANEURALNETWORKS_POW                          :: 70
-ANEURALNETWORKS_PRELU                        :: 71
-ANEURALNETWORKS_QUANTIZE                     :: 72
-ANEURALNETWORKS_QUANTIZED_16BIT_LSTM         :: 73
-ANEURALNETWORKS_RANDOM_MULTINOMIAL           :: 74
-ANEURALNETWORKS_REDUCE_ALL                   :: 75
-ANEURALNETWORKS_REDUCE_ANY                   :: 76
-ANEURALNETWORKS_REDUCE_MAX                   :: 77
-ANEURALNETWORKS_REDUCE_MIN                   :: 78
-ANEURALNETWORKS_REDUCE_PROD                  :: 79
-ANEURALNETWORKS_REDUCE_SUM                   :: 80
-ANEURALNETWORKS_ROI_ALIGN                    :: 81
-ANEURALNETWORKS_ROI_POOLING                  :: 82
-ANEURALNETWORKS_RSQRT                        :: 83
-ANEURALNETWORKS_SELECT                       :: 84
-ANEURALNETWORKS_SIN                          :: 85
-ANEURALNETWORKS_SLICE                        :: 86
-ANEURALNETWORKS_SPLIT                        :: 87
-ANEURALNETWORKS_SQRT                         :: 88
-ANEURALNETWORKS_TILE                         :: 89
-ANEURALNETWORKS_TOPK_V2                      :: 90
-ANEURALNETWORKS_TRANSPOSE_CONV_2D            :: 91
-ANEURALNETWORKS_UNIDIRECTIONAL_SEQUENCE_LSTM :: 92
-ANEURALNETWORKS_UNIDIRECTIONAL_SEQUENCE_RNN  :: 93
-ANEURALNETWORKS_RESIZE_NEAREST_NEIGHBOR      :: 94
-ANEURALNETWORKS_QUANTIZED_LSTM               :: 95
-ANEURALNETWORKS_IF                           :: 96
-ANEURALNETWORKS_WHILE                        :: 97
-ANEURALNETWORKS_ELU                          :: 98
-ANEURALNETWORKS_HARD_SWISH                   :: 99
-ANEURALNETWORKS_FILL                         :: 100
-ANEURALNETWORKS_RANK                         :: 101
-ANEURALNETWORKS_BATCH_MATMUL                 :: 102
-ANEURALNETWORKS_PACK                         :: 103
-ANEURALNETWORKS_MIRROR_PAD                   :: 104
-ANEURALNETWORKS_REVERSE                      :: 105
+PaddingCode :: enum c.int {
+	SAME  = 1,
+	VALID = 2,
+}
 
-FuseCode :: c.int
+PreferenceCode :: enum c.int {
+	LOW_POWER          = 0,
+	FAST_SINGLE_ANSWER = 1,
+	SUSTAINED_SPEED    = 2,
+}
 
-ANEURALNETWORKS_FUSED_NONE  :: 0
-ANEURALNETWORKS_FUSED_RELU  :: 1
-ANEURALNETWORKS_FUSED_RELU1 :: 2
-ANEURALNETWORKS_FUSED_RELU6 :: 3
+DeviceTypeCode :: enum c.int {
+	UNKNOWN     = 0,
+	OTHER       = 1,
+	CPU         = 2,
+	GPU         = 3,
+	ACCELERATOR = 4,
+}
 
-PaddingCode :: c.int
+FeatureLevelCode :: enum i64 {
+	_1 = 27,
+	_2 = 28,
+	_3 = 29,
+	_4 = 30,
+	_5 = 31,
+	_6 = 1000006,
+	_7 = 1000007,
+	_8 = 1000008,
+}
 
-ANEURALNETWORKS_PADDING_SAME  :: 1
-ANEURALNETWORKS_PADDING_VALID :: 2
-
-PreferenceCode :: c.int
-
-ANEURALNETWORKS_PREFER_LOW_POWER          :: 0
-ANEURALNETWORKS_PREFER_FAST_SINGLE_ANSWER :: 1
-ANEURALNETWORKS_PREFER_SUSTAINED_SPEED    :: 2
-
-DeviceTypeCode :: c.int
-
-ANEURALNETWORKS_DEVICE_UNKNOWN     :: 0
-ANEURALNETWORKS_DEVICE_OTHER       :: 1
-ANEURALNETWORKS_DEVICE_CPU         :: 2
-ANEURALNETWORKS_DEVICE_GPU         :: 3
-ANEURALNETWORKS_DEVICE_ACCELERATOR :: 4
-
-FeatureLevelCode :: c.int
-
-ANEURALNETWORKS_FEATURE_LEVEL_1 :: 27
-ANEURALNETWORKS_FEATURE_LEVEL_2 :: 28
-ANEURALNETWORKS_FEATURE_LEVEL_3 :: 29
-ANEURALNETWORKS_FEATURE_LEVEL_4 :: 30
-ANEURALNETWORKS_FEATURE_LEVEL_5 :: 31
-ANEURALNETWORKS_FEATURE_LEVEL_6 :: 1000006
-ANEURALNETWORKS_FEATURE_LEVEL_7 :: 1000007
-ANEURALNETWORKS_FEATURE_LEVEL_8 :: 1000008
-
-ResultCode :: c.int
-
-ANEURALNETWORKS_NO_ERROR                      :: 0
-ANEURALNETWORKS_OUT_OF_MEMORY                 :: 1
-ANEURALNETWORKS_INCOMPLETE                    :: 2
-ANEURALNETWORKS_UNEXPECTED_NULL               :: 3
-ANEURALNETWORKS_BAD_DATA                      :: 4
-ANEURALNETWORKS_OP_FAILED                     :: 5
-ANEURALNETWORKS_BAD_STATE                     :: 6
-ANEURALNETWORKS_UNMAPPABLE                    :: 7
-ANEURALNETWORKS_OUTPUT_INSUFFICIENT_SIZE      :: 8
-ANEURALNETWORKS_UNAVAILABLE_DEVICE            :: 9
-ANEURALNETWORKS_MISSED_DEADLINE_TRANSIENT     :: 10
-ANEURALNETWORKS_MISSED_DEADLINE_PERSISTENT    :: 11
-ANEURALNETWORKS_RESOURCE_EXHAUSTED_TRANSIENT  :: 12
-ANEURALNETWORKS_RESOURCE_EXHAUSTED_PERSISTENT :: 13
-ANEURALNETWORKS_DEAD_OBJECT                   :: 14
+ResultCode :: enum c.int {
+	NO_ERROR                      = 0,
+	OUT_OF_MEMORY                 = 1,
+	INCOMPLETE                    = 2,
+	UNEXPECTED_NULL               = 3,
+	BAD_DATA                      = 4,
+	OP_FAILED                     = 5,
+	BAD_STATE                     = 6,
+	UNMAPPABLE                    = 7,
+	OUTPUT_INSUFFICIENT_SIZE      = 8,
+	UNAVAILABLE_DEVICE            = 9,
+	MISSED_DEADLINE_TRANSIENT     = 10,
+	MISSED_DEADLINE_PERSISTENT    = 11,
+	RESOURCE_EXHAUSTED_TRANSIENT  = 12,
+	RESOURCE_EXHAUSTED_PERSISTENT = 13,
+	DEAD_OBJECT                   = 14,
+}
 
 ANEURALNETWORKS_MAX_SIZE_OF_IMMEDIATELY_COPIED_VALUES :: 128
 
 ANEURALNETWORKS_BYTE_SIZE_OF_CACHE_TOKEN :: 32
 
-DurationCode :: c.int
+DurationCode :: enum c.int {
+	DURATION_ON_HARDWARE        = 0,
+	DURATION_IN_DRIVER          = 1,
+	FENCED_DURATION_ON_HARDWARE = 2,
+	FENCED_DURATION_IN_DRIVER   = 3,
+}
 
-ANEURALNETWORKS_DURATION_ON_HARDWARE        :: 0
-ANEURALNETWORKS_DURATION_IN_DRIVER          :: 1
-ANEURALNETWORKS_FENCED_DURATION_ON_HARDWARE :: 2
-ANEURALNETWORKS_FENCED_DURATION_IN_DRIVER   :: 3
-
-PriorityCode :: c.int
-
-ANEURALNETWORKS_PRIORITY_LOW     :: 90
-ANEURALNETWORKS_PRIORITY_MEDIUM  :: 100
-ANEURALNETWORKS_PRIORITY_HIGH    :: 110
-ANEURALNETWORKS_PRIORITY_DEFAULT :: 100
+PriorityCode :: enum c.int {
+	LOW     = 90,
+	MEDIUM  = 100,
+	HIGH    = 110,
+	DEFAULT = 100,
+}
 
 ANeuralNetworksMemory      :: struct {}
 ANeuralNetworksModel       :: struct {}
@@ -220,7 +220,7 @@ ANeuralNetworksSymmPerChannelQuantParams :: struct {
 ANeuralNetworksBurst :: struct {}
 
 ANeuralNetworksOperandType :: struct {
-	type:           i32,
+	type:           OperandCode,
 	dimensionCount: u32,
 	dimensions:     ^u32,
 	scale:          f32,

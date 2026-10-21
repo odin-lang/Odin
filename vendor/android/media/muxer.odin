@@ -9,18 +9,18 @@ foreign import libmediandk "system:mediandk"
 
 AMediaMuxer :: struct {}
 
-OutputFormat :: c.int
+OutputFormat :: enum c.int {
+	MPEG_4    = 0,
+	WEBM      = 1,
+	THREE_GPP = 2,
+	HEIF      = 3,
+	OGG       = 4,
+}
 
-AMEDIAMUXER_OUTPUT_FORMAT_MPEG_4    :: 0
-AMEDIAMUXER_OUTPUT_FORMAT_WEBM      :: 1
-AMEDIAMUXER_OUTPUT_FORMAT_THREE_GPP :: 2
-AMEDIAMUXER_OUTPUT_FORMAT_HEIF      :: 3
-AMEDIAMUXER_OUTPUT_FORMAT_OGG       :: 4
-
-AppendMode :: c.int
-
-AMEDIAMUXER_APPEND_IGNORE_LAST_VIDEO_GOP :: 0
-AMEDIAMUXER_APPEND_TO_EXISTING_DATA      :: 1
+AppendMode :: enum c.int {
+	IGNORE_LAST_VIDEO_GOP = 0,
+	TO_EXISTING_DATA      = 1,
+}
 
 @(default_calling_convention="c")
 foreign libmediandk {

@@ -5,23 +5,23 @@ package android_icu
 
 import "core:c"
 
-UDisplayContextType :: c.int
+UDisplayContextType :: enum c.int {
+	DIALECT_HANDLING    = 0,
+	CAPITALIZATION      = 1,
+	DISPLAY_LENGTH      = 2,
+	SUBSTITUTE_HANDLING = 3,
+}
 
-UDISPCTX_TYPE_DIALECT_HANDLING    :: 0
-UDISPCTX_TYPE_CAPITALIZATION      :: 1
-UDISPCTX_TYPE_DISPLAY_LENGTH      :: 2
-UDISPCTX_TYPE_SUBSTITUTE_HANDLING :: 3
-
-UDisplayContext :: c.int
-
-UDISPCTX_STANDARD_NAMES                           :: 0x0
-UDISPCTX_DIALECT_NAMES                            :: 0x1
-UDISPCTX_CAPITALIZATION_NONE                      :: 0x100
-UDISPCTX_CAPITALIZATION_FOR_MIDDLE_OF_SENTENCE    :: 0x101
-UDISPCTX_CAPITALIZATION_FOR_BEGINNING_OF_SENTENCE :: 0x102
-UDISPCTX_CAPITALIZATION_FOR_UI_LIST_OR_MENU       :: 0x103
-UDISPCTX_CAPITALIZATION_FOR_STANDALONE            :: 0x104
-UDISPCTX_LENGTH_FULL                              :: 0x200
-UDISPCTX_LENGTH_SHORT                             :: 0x201
-UDISPCTX_SUBSTITUTE                               :: 0x300
-UDISPCTX_NO_SUBSTITUTE                            :: 0x301
+UDisplayContext :: enum c.int {
+	STANDARD_NAMES                           = 0x0,
+	DIALECT_NAMES                            = 0x1,
+	CAPITALIZATION_NONE                      = 0x100,
+	CAPITALIZATION_FOR_MIDDLE_OF_SENTENCE    = 0x101,
+	CAPITALIZATION_FOR_BEGINNING_OF_SENTENCE = 0x102,
+	CAPITALIZATION_FOR_UI_LIST_OR_MENU       = 0x103,
+	CAPITALIZATION_FOR_STANDALONE            = 0x104,
+	LENGTH_FULL                              = 0x200,
+	LENGTH_SHORT                             = 0x201,
+	SUBSTITUTE                               = 0x300,
+	NO_SUBSTITUTE                            = 0x301,
+}

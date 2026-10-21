@@ -5,16 +5,16 @@ package android
 
 foreign import libandroid "system:android"
 
-ADisplayLuts_Dimension :: i32
+ADisplayLuts_Dimension :: enum i32 {
+	ONE_DIMENSION   = 1,
+	THREE_DIMENSION = 3,
+}
 
-ADISPLAYLUTS_ONE_DIMENSION   :: 1
-ADISPLAYLUTS_THREE_DIMENSION :: 3
-
-ADisplayLuts_SamplingKey :: i32
-
-ADISPLAYLUTS_SAMPLINGKEY_RGB     :: 0
-ADISPLAYLUTS_SAMPLINGKEY_MAX_RGB :: 1
-ADISPLAYLUTS_SAMPLINGKEY_CIE_Y   :: 2
+ADisplayLuts_SamplingKey :: enum i32 {
+	RGB     = 0,
+	MAX_RGB = 1,
+	CIE_Y   = 2,
+}
 
 ADisplayLutsEntry :: struct {}
 ADisplayLuts      :: struct {}

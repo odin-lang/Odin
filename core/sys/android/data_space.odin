@@ -3,80 +3,93 @@
 #+build linux
 package android
 
-ADataSpace :: i32
+ADataSpaceStandard :: enum u32 {
+	UNSPECIFIED               = 0,
+	BT709                     = 1,
+	BT601_625                 = 2,
+	BT601_625_UNADJUSTED      = 3,
+	BT601_525                 = 4,
+	BT601_525_UNADJUSTED      = 5,
+	BT2020                    = 6,
+	BT2020_CONSTANT_LUMINANCE = 7,
+	BT470M                    = 8,
+	FILM                      = 9,
+	DCI_P3                    = 0xa,
+	ADOBE_RGB                 = 0xb,
+}
 
-ADATASPACE_UNKNOWN                            :: 0
-ADATASPACE_STANDARD_MASK                      :: 0x3f0000
-ADATASPACE_STANDARD_UNSPECIFIED               :: 0x0
-ADATASPACE_STANDARD_BT709                     :: 0x10000
-ADATASPACE_STANDARD_BT601_625                 :: 0x20000
-ADATASPACE_STANDARD_BT601_625_UNADJUSTED      :: 0x30000
-ADATASPACE_STANDARD_BT601_525                 :: 0x40000
-ADATASPACE_STANDARD_BT601_525_UNADJUSTED      :: 0x50000
-ADATASPACE_STANDARD_BT2020                    :: 0x60000
-ADATASPACE_STANDARD_BT2020_CONSTANT_LUMINANCE :: 0x70000
-ADATASPACE_STANDARD_BT470M                    :: 0x80000
-ADATASPACE_STANDARD_FILM                      :: 0x90000
-ADATASPACE_STANDARD_DCI_P3                    :: 0xa0000
-ADATASPACE_STANDARD_ADOBE_RGB                 :: 0xb0000
-ADATASPACE_TRANSFER_MASK                      :: 0x7c00000
-ADATASPACE_TRANSFER_UNSPECIFIED               :: 0x0
-ADATASPACE_TRANSFER_LINEAR                    :: 0x400000
-ADATASPACE_TRANSFER_SRGB                      :: 0x800000
-ADATASPACE_TRANSFER_SMPTE_170M                :: 0xc00000
-ADATASPACE_TRANSFER_GAMMA2_2                  :: 0x1000000
-ADATASPACE_TRANSFER_GAMMA2_6                  :: 0x1400000
-ADATASPACE_TRANSFER_GAMMA2_8                  :: 0x1800000
-ADATASPACE_TRANSFER_ST2084                    :: 0x1c00000
-ADATASPACE_TRANSFER_HLG                       :: 0x2000000
-ADATASPACE_RANGE_MASK                         :: 0x38000000
-ADATASPACE_RANGE_UNSPECIFIED                  :: 0x0
-ADATASPACE_RANGE_FULL                         :: 0x8000000
-ADATASPACE_RANGE_LIMITED                      :: 0x10000000
-ADATASPACE_RANGE_EXTENDED                     :: 0x18000000
-ADATASPACE_SCRGB_LINEAR                       :: 406913024
-ADATASPACE_SRGB                               :: 142671872
-ADATASPACE_SCRGB                              :: 411107328
-ADATASPACE_DISPLAY_P3                         :: 143261696
-ADATASPACE_BT2020_PQ                          :: 163971072
-ADATASPACE_BT2020_ITU_PQ                      :: 298188800
-ADATASPACE_ADOBE_RGB                          :: 151715840
-ADATASPACE_JFIF                               :: 146931712
-ADATASPACE_BT601_625                          :: 281149440
-ADATASPACE_BT601_525                          :: 281280512
-ADATASPACE_BT2020                             :: 147193856
-ADATASPACE_BT709                              :: 281083904
-ADATASPACE_DCI_P3                             :: 155844608
-ADATASPACE_SRGB_LINEAR                        :: 138477568
-ADATASPACE_BT2020_HLG                         :: 168165376
-ADATASPACE_BT2020_ITU_HLG                     :: 302383104
-ADATASPACE_DISPLAY_BT2020                     :: 142999552
-ADATASPACE_DEPTH                              :: 4096
-ADATASPACE_DYNAMIC_DEPTH                      :: 4098
-STANDARD_MASK                                 :: 4128768
-STANDARD_UNSPECIFIED                          :: 0
-STANDARD_BT709                                :: 65536
-STANDARD_BT601_625                            :: 131072
-STANDARD_BT601_625_UNADJUSTED                 :: 196608
-STANDARD_BT601_525                            :: 262144
-STANDARD_BT601_525_UNADJUSTED                 :: 327680
-STANDARD_BT470M                               :: 524288
-STANDARD_BT2020                               :: 393216
-STANDARD_FILM                                 :: 589824
-STANDARD_DCI_P3                               :: 655360
-STANDARD_ADOBE_RGB                            :: 720896
-TRANSFER_MASK                                 :: 130023424
-TRANSFER_UNSPECIFIED                          :: 0
-TRANSFER_LINEAR                               :: 4194304
-TRANSFER_SMPTE_170M                           :: 12582912
-TRANSFER_GAMMA2_2                             :: 16777216
-TRANSFER_GAMMA2_6                             :: 20971520
-TRANSFER_GAMMA2_8                             :: 25165824
-TRANSFER_SRGB                                 :: 8388608
-TRANSFER_ST2084                               :: 29360128
-TRANSFER_HLG                                  :: 33554432
-RANGE_MASK                                    :: 939524096
-RANGE_UNSPECIFIED                             :: 0
-RANGE_FULL                                    :: 134217728
-RANGE_LIMITED                                 :: 268435456
-RANGE_EXTENDED                                :: 402653184
+ADataSpaceTransfer :: enum u32 {
+	UNSPECIFIED = 0,
+	LINEAR      = 1,
+	SRGB        = 2,
+	SMPTE_170M  = 3,
+	GAMMA2_2    = 4,
+	GAMMA2_6    = 5,
+	GAMMA2_8    = 6,
+	ST2084      = 7,
+	HLG         = 8,
+}
+
+ADataSpaceRange :: enum u32 {
+	UNSPECIFIED = 0,
+	FULL        = 1,
+	LIMITED     = 2,
+	EXTENDED    = 3,
+}
+
+ADataSpace :: bit_field i32 {
+	other:    u16                | 16,
+	standard: ADataSpaceStandard | 6,
+	transfer: ADataSpaceTransfer | 5,
+	range:    ADataSpaceRange    | 3,
+	_:        u8                 | 2,
+}
+
+ADATASPACE_UNKNOWN                            :: ADataSpace{}
+ADATASPACE_STANDARD_MASK                      :: ADataSpace{standard = ADataSpaceStandard(0x3f)}
+ADATASPACE_STANDARD_UNSPECIFIED               :: ADataSpace{}
+ADATASPACE_STANDARD_BT709                     :: ADataSpace{standard = .BT709}
+ADATASPACE_STANDARD_BT601_625                 :: ADataSpace{standard = .BT601_625}
+ADATASPACE_STANDARD_BT601_625_UNADJUSTED      :: ADataSpace{standard = .BT601_625_UNADJUSTED}
+ADATASPACE_STANDARD_BT601_525                 :: ADataSpace{standard = .BT601_525}
+ADATASPACE_STANDARD_BT601_525_UNADJUSTED      :: ADataSpace{standard = .BT601_525_UNADJUSTED}
+ADATASPACE_STANDARD_BT2020                    :: ADataSpace{standard = .BT2020}
+ADATASPACE_STANDARD_BT2020_CONSTANT_LUMINANCE :: ADataSpace{standard = .BT2020_CONSTANT_LUMINANCE}
+ADATASPACE_STANDARD_BT470M                    :: ADataSpace{standard = .BT470M}
+ADATASPACE_STANDARD_FILM                      :: ADataSpace{standard = .FILM}
+ADATASPACE_STANDARD_DCI_P3                    :: ADataSpace{standard = .DCI_P3}
+ADATASPACE_STANDARD_ADOBE_RGB                 :: ADataSpace{standard = .ADOBE_RGB}
+ADATASPACE_TRANSFER_MASK                      :: ADataSpace{transfer = ADataSpaceTransfer(0x1f)}
+ADATASPACE_TRANSFER_UNSPECIFIED               :: ADataSpace{}
+ADATASPACE_TRANSFER_LINEAR                    :: ADataSpace{transfer = .LINEAR}
+ADATASPACE_TRANSFER_SRGB                      :: ADataSpace{transfer = .SRGB}
+ADATASPACE_TRANSFER_SMPTE_170M                :: ADataSpace{transfer = .SMPTE_170M}
+ADATASPACE_TRANSFER_GAMMA2_2                  :: ADataSpace{transfer = .GAMMA2_2}
+ADATASPACE_TRANSFER_GAMMA2_6                  :: ADataSpace{transfer = .GAMMA2_6}
+ADATASPACE_TRANSFER_GAMMA2_8                  :: ADataSpace{transfer = .GAMMA2_8}
+ADATASPACE_TRANSFER_ST2084                    :: ADataSpace{transfer = .ST2084}
+ADATASPACE_TRANSFER_HLG                       :: ADataSpace{transfer = .HLG}
+ADATASPACE_RANGE_MASK                         :: ADataSpace{range = ADataSpaceRange(0x7)}
+ADATASPACE_RANGE_UNSPECIFIED                  :: ADataSpace{}
+ADATASPACE_RANGE_FULL                         :: ADataSpace{range = .FULL}
+ADATASPACE_RANGE_LIMITED                      :: ADataSpace{range = .LIMITED}
+ADATASPACE_RANGE_EXTENDED                     :: ADataSpace{range = .EXTENDED}
+ADATASPACE_SCRGB_LINEAR                       :: ADataSpace{standard = .BT709, transfer = .LINEAR, range = .EXTENDED}
+ADATASPACE_SRGB                               :: ADataSpace{standard = .BT709, transfer = .SRGB, range = .FULL}
+ADATASPACE_SCRGB                              :: ADataSpace{standard = .BT709, transfer = .SRGB, range = .EXTENDED}
+ADATASPACE_DISPLAY_P3                         :: ADataSpace{standard = .DCI_P3, transfer = .SRGB, range = .FULL}
+ADATASPACE_BT2020_PQ                          :: ADataSpace{standard = .BT2020, transfer = .ST2084, range = .FULL}
+ADATASPACE_BT2020_ITU_PQ                      :: ADataSpace{standard = .BT2020, transfer = .ST2084, range = .LIMITED}
+ADATASPACE_ADOBE_RGB                          :: ADataSpace{standard = .ADOBE_RGB, transfer = .GAMMA2_2, range = .FULL}
+ADATASPACE_JFIF                               :: ADataSpace{standard = .BT601_625, transfer = .SMPTE_170M, range = .FULL}
+ADATASPACE_BT601_625                          :: ADataSpace{standard = .BT601_625, transfer = .SMPTE_170M, range = .LIMITED}
+ADATASPACE_BT601_525                          :: ADataSpace{standard = .BT601_525, transfer = .SMPTE_170M, range = .LIMITED}
+ADATASPACE_BT2020                             :: ADataSpace{standard = .BT2020, transfer = .SMPTE_170M, range = .FULL}
+ADATASPACE_BT709                              :: ADataSpace{standard = .BT709, transfer = .SMPTE_170M, range = .LIMITED}
+ADATASPACE_DCI_P3                             :: ADataSpace{standard = .DCI_P3, transfer = .GAMMA2_6, range = .FULL}
+ADATASPACE_SRGB_LINEAR                        :: ADataSpace{standard = .BT709, transfer = .LINEAR, range = .FULL}
+ADATASPACE_BT2020_HLG                         :: ADataSpace{standard = .BT2020, transfer = .HLG, range = .FULL}
+ADATASPACE_BT2020_ITU_HLG                     :: ADataSpace{standard = .BT2020, transfer = .HLG, range = .LIMITED}
+ADATASPACE_DISPLAY_BT2020                     :: ADataSpace{standard = .BT2020, transfer = .SRGB, range = .FULL}
+ADATASPACE_DEPTH                              :: ADataSpace{other = 0x1000}
+ADATASPACE_DYNAMIC_DEPTH                      :: ADataSpace{other = 0x1002}
