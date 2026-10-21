@@ -755,7 +755,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Microarch,               str_lit("microarch"),                 BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_TargetFeatures,          str_lit("target-features"),           BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_StrictTargetFeatures,    str_lit("strict-target-features"),    BuildFlagParam_None,    Command__does_build);
-	add_flag(&build_flags, BuildFlag_MinimumOSVersion,        str_lit("minimum-os-version"),        BuildFlagParam_String,  Command__does_build | Command_bundle_android);
+	add_flag(&build_flags, BuildFlag_MinimumOSVersion,        str_lit("minimum-os-version"),        BuildFlagParam_String,  Command__does_check | Command_bundle_android);
 
 	add_flag(&build_flags, BuildFlag_RelocMode,               str_lit("reloc-mode"),                BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_StackProtector,          str_lit("stack-protector"),           BuildFlagParam_String,  Command__does_build);
@@ -3356,10 +3356,10 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 	}
 
-	if (run_or_build || bundle) {
+	if (check || bundle) {
 		if (print_flag("-minimum-os-version:<string>")) {
-			print_usage_line(2, "Sets the minimum OS version targeted by the application.");
-			print_usage_line(2, "Default: -minimum-os-version:11.0.0");
+			print_usage_line(2, "Sets the minimum OS version targeted by the application, and so ODIN_MINIMUM_OS_VERSION.");
+			print_usage_line(2, "Default: 11.0.0 for macOS, 17.4.0 for iOS, and 34 for Android (29 is the lowest).");
 			print_usage_line(2, "Only used when target is Darwin or subtarget is Android, if given, linking mismatched versions will emit a warning.");
 		}
 	}
