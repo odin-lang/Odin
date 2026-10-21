@@ -481,7 +481,11 @@ ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedS
 		sync.mutex_unlock(&app.mutex)
 
 		// `main` has returned, so the process ends, as it does on other platforms.
-		libc.exit(0)
+		// NOTE(bill): `exit` would also run C++ static destructors that Android's own threads (HWUI's) still use,
+		// and they abort on the destroyed mutexes. So the `@(fini)` procedures run here, then the process `_exit`s.
+		runtime._cleanup_runtime_contextless()
+		libc.fflush(nil)
+		posix._exit(0)
 	}
 	callbacks.onConfigurationChanged = proc "c" (activity: ^android.ANativeActivity) {
 		write_cmd(to_app(activity), APP_CMD_CONFIG_CHANGED)

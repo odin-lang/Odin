@@ -1663,31 +1663,29 @@ gb_internal void init_android_values(bool with_sdk) {
 	#endif
 
 	if (bc->ODIN_ANDROID_NDK.len != 0 && bc->ODIN_ANDROID_NDK_TOOLCHAIN.len == 0) {
-		String arch = str_lit("x86_64");
-		#if defined (GB_CPU_ARM)
-			// TODO(bill): this is a complete guess
-			arch = str_lit("aarch64");
-		#endif
+		// NOTE(bill): The NDK's host tools are always in a directory named for x86_64. On macOS they are
+		// universal binaries that run on Apple Silicon too.
+		String host = {};
 		#if defined(GB_SYSTEM_WINDOWS)
-			bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate4_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), str_lit("windows-"), arch);
+			host = str_lit("windows-x86_64");
 		#elif defined(GB_SYSTEM_OSX)
-			// TODO(bill): is this name even correct?
-			bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate4_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), str_lit("darwin-"), arch);
+			host = str_lit("darwin-x86_64");
 		#elif defined(GB_SYSTEM_LINUX)
-			bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate4_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), str_lit("linux-"), arch);
+			host = str_lit("linux-x86_64");
 		#endif
+		bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate3_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), host);
 
 		bc->ODIN_ANDROID_NDK_TOOLCHAIN = normalize_path(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, NIX_SEPARATOR_STRING);
 	}
 
 	if (bc->ODIN_ANDROID_NDK.len == 0 && !with_sdk)  {
-		gb_printf_err("Error: ODIN_ANDROID_NDK not set");
+		gb_printf_err("Error: ODIN_ANDROID_NDK not set\n");
 		gb_exit(1);
 
 	}
 
 	if (bc->ODIN_ANDROID_NDK_TOOLCHAIN.len == 0 && !with_sdk)  {
-		gb_printf_err("Error: ODIN_ANDROID_NDK not set");
+		gb_printf_err("Error: ODIN_ANDROID_NDK not set\n");
 		gb_exit(1);
 	}
 

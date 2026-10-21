@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.odin_lang.example">
+	<application android:label="@string/app_name" android:hasCode="true">
+		<!-- OdinActivity is a NativeActivity that also passes on activity and permission results, for vendor:android/java. `odin bundle android` adds it to every app. -->
+		<activity
+			android:name="org.odin_lang.OdinActivity"
+			android:exported="true"
+			android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|density|uiMode">
+			<!-- The library to load: lib/<abi>/libexample.so. -->
+			<meta-data android:name="android.app.lib_name" android:value="example"/>
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN"/>
+				<category android:name="android.intent.category.LAUNCHER"/>
+			</intent-filter>
+		</activity>
+	</application>
+</manifest>

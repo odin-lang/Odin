@@ -245,6 +245,32 @@ gb_internal bool zip_writer_finish(ZipWriter *w) {
 }
 
 
+// Whether `lib_dir` holds a library for at least one ABI, as lib/<abi>/*.so.
+gb_internal bool android_has_native_library(String lib_dir) {
+	Array<FileInfo> abis = {};
+	defer (array_free(&abis));
+	if (read_directory(lib_dir, &abis) != ReadDirectory_None) {
+		return false;
+	}
+
+	for (FileInfo const &abi : abis) {
+		if (!abi.is_dir) {
+			continue;
+		}
+		Array<FileInfo> files = {};
+		defer (array_free(&files));
+		if (read_directory(abi.fullpath, &files) != ReadDirectory_None) {
+			continue;
+		}
+		for (FileInfo const &fi : files) {
+			if (!fi.is_dir && string_ends_with(fi.name, str_lit(".so"))) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 // The newest version under `dir`, e.g. "37.0.0" in build-tools or "android-37.2" in platforms.
 // Names that do not start with `prefix` and a number are skipped.
 gb_internal String android_newest_sdk_dir(String dir, String prefix, i32 *major_) {
@@ -414,15 +440,22 @@ i32 bundle_android(String original_init_directory) {
 	}
 
 	String work = concatenate_strings(temporary_allocator(), output, str_lit(".build/"));
-	check_if_exists_directory_otherwise_create(work);
 
-	String res_dir    = concatenate_strings(temporary_allocator(), init_directory, str_lit("res"));
+	String res_dir    =concatenate_strings(temporary_allocator(), init_directory, str_lit("res"));
 	String assets_dir = concatenate_strings(temporary_allocator(), init_directory, str_lit("assets"));
 	String lib_dir    = concatenate_strings(temporary_allocator(), init_directory, str_lit("lib"));
 	String res_zip    = concatenate_strings(temporary_allocator(), work, str_lit("res.zip"));
 	String linked_zip = concatenate_strings(temporary_allocator(), work, str_lit("linked.zip"));
 	String module_zip = concatenate_strings(temporary_allocator(), work, app_bundle ? str_lit("base.zip") : str_lit("unaligned.apk"));
 	bool has_res = path_is_directory(res_dir);
+
+	// NOTE(bill): An app without its library cannot start, so this is an error rather than an empty lib/.
+	if (!android_has_native_library(lib_dir)) {
+		gb_printf_err("Error: %.*s has no libraries; build one per ABI with -build-mode:shared, e.g. lib/arm64-v8a/libmain.so\n", LIT(lib_dir));
+		return 1;
+	}
+
+	check_if_exists_directory_otherwise_create(work);
 
 	gbString cmd = gb_string_make(heap_allocator(), "");
 	defer (gb_string_free(cmd));
