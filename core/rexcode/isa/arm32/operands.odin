@@ -60,6 +60,8 @@ Shift_Type :: enum u8 {
 	LSR_REG = 7,
 	ASR_REG = 8,
 	ROR_REG = 9,
+	// MVE's scaled vector offset, `[r0, q1, uxtw #2]`.
+	UXTW = 10,
 }
 
 Index_Mode :: enum u8 {

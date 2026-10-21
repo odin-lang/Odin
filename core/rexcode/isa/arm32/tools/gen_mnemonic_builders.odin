@@ -97,42 +97,52 @@ Operand_Class :: enum {
 // appear in a form has a mapping. The encoder's operand_matches_inline /
 // pack_operand_inline define the contract each class must satisfy.
 operand_class :: proc(ot: a.Operand_Type) -> Operand_Class {
-	#partial switch ot {
-	// ---- Shifted / register-shifted GPR ----
+	// Every operand type, in declaration order. An immediate is packed from
+	// op.immediate: IMM, the modified immediates, barriers, endianness, iflags,
+	// banked registers, SYSm, coprocessor numbers and opcodes, NEON immediates,
+	// hints, PSR fields, conditions, the MVE size and VPT mask.
+	switch ot {
+	case .NONE:
+		panic("no operand to build")
+	case .GPR, .GPR_NOPC, .GPR_NOSP, .GPR_LOW:
+		return .REG
 	case .GPR_SHIFTED:
 		return .SHIFTED
 	case .GPR_RSR:
 		return .RSR
-
-	// ---- Register lists (GPR/SPR/DPR/MVE-Q) ----
-	case .GPR_LIST, .SPR_LIST, .DPR_LIST, .QPR_MVE_LIST:
+	case .GPR_LIST:
 		return .LIST
-
-	// ---- NEON lane elements ----
+	case .GPR_ZR, .SPR, .DPR, .QPR:
+		return .REG
+	case .SPR_LIST, .DPR_LIST:
+		return .LIST
+	case .SPR_ELEM:
+		return .REG
 	case .DPR_ELEM:
 		return .LANE_D
 	case .QPR_ELEM:
 		return .LANE_Q
-
-	// ---- Memory ----
+	case .IMM, .IMM_MOD, .IMM_T32_MOD, .IMM16_LO_HI, .IMM12, .IMM5, .IMM5_W, .IMM4, .IMM4_SAT, .IMM8, .IMM3, .IMM_HINT, .IMM_BARRIER, .IMM_ENDIAN, .IMM_IFLAGS, .IMM_BANKED, .IMM_SYSM, .IMM_COPROC, .IMM_COPROC_OP, .NEON_IMM:
+		return .IMM
+	case .REL24, .REL24_T32, .REL20, .REL11, .REL8, .REL_LDR_LITERAL, .REL_BF:
+		return .REL
+	case .COND:
+		return .IMM
 	case .MEM:
 		return .MEM
-
-	// ---- PC-relative branch targets & low-overhead-loop targets ----
-	case .REL24, .REL24_T32, .REL20, .REL11, .REL8, .REL_LDR_LITERAL, .MVE_LOOP_TGT, .REL_BF:
-		return .REL
-
-	// ---- Plain registers (single Register value) ----
-	case .GPR, .GPR_NOPC, .GPR_NOSP, .GPR_LOW,
-	     .SPR, .DPR, .QPR, .SPR_ELEM, .QPR_MVE, .VPR,
-	     .COPROC_REG, .COPROC_NUM:
+	case .COPROC_REG, .COPROC_NUM:
 		return .REG
+	case .PSR_FIELD:
+		return .IMM
+	case .VPR, .QPR_MVE:
+		return .REG
+	case .QPR_MVE_LIST:
+		return .LIST
+	case .MVE_VPT_MASK, .MVE_VCTP_SIZE:
+		return .IMM
+	case .MVE_LOOP_TGT:
+		return .REL
 	}
-
-	// Everything else is an immediate the encoder packs from op.immediate:
-	// IMM/IMM12/IMM5/.../modified-imm/barrier/endian/iflags/banked/sysm/coproc/
-	// coproc-op/NEON-imm/hint/PSR_FIELD/COND/MVE-size/MVE-vpt-mask/CDE-imm/
-	// CDE-coproc, etc. All single i64 via op_imm.
 	return .IMM
 }
 
@@ -140,60 +150,62 @@ operand_class :: proc(ot: a.Operand_Type) -> Operand_Class {
 // proc names stay readable; overload ambiguity is handled separately by the
 // Odin param-type-tuple dedup.
 operand_suffix :: proc(ot: a.Operand_Type) -> string {
-	#partial switch ot {
-	case .GPR:           return "r"
-	case .GPR_NOPC:      return "r"
-	case .GPR_NOSP:      return "r"
-	case .GPR_LOW:       return "rlo"
-	case .GPR_SHIFTED:   return "rsh"
-	case .GPR_RSR:       return "rsr"
-	case .GPR_LIST:      return "list"
-	case .SPR:           return "s"
-	case .SPR_ELEM:      return "s"
-	case .SPR_LIST:      return "slist"
-	case .DPR:           return "d"
-	case .DPR_ELEM:      return "dlane"
-	case .DPR_LIST:      return "dlist"
-	case .QPR:           return "q"
-	case .QPR_ELEM:      return "qlane"
-	case .QPR_MVE:       return "qm"
-	case .QPR_MVE_LIST:  return "qlist"
-	case .VPR:           return "vpr"
-	case .IMM:           return "imm"
-	case .IMM_MOD:       return "immm"
-	case .IMM_T32_MOD:   return "immtm"
-	case .IMM12:         return "imm12"
-	case .IMM5:          return "imm5"
-	case .IMM5_W:        return "imm5w"
-	case .IMM4:          return "imm4"
-	case .IMM4_SAT:      return "imm4s"
-	case .IMM8:          return "imm8"
-	case .IMM3:          return "imm3"
-	case .IMM16_LO_HI:   return "imm16"
-	case .IMM_HINT:      return "hint"
-	case .IMM_BARRIER:   return "barr"
-	case .IMM_ENDIAN:    return "end"
-	case .IMM_IFLAGS:    return "ifl"
-	case .IMM_BANKED:    return "bank"
-	case .IMM_SYSM:      return "sysm"
-	case .IMM_COPROC:    return "cp"
-	case .IMM_COPROC_OP: return "cpop"
-	case .NEON_IMM:      return "nimm"
-	case .COND:          return "cond"
-	case .MEM:           return "mem"
-	case .REL24:         return "rel"
-	case .REL24_T32:     return "rel"
-	case .REL20:         return "rel"
-	case .REL11:         return "rel"
-	case .REL8:          return "rel"
-	case .REL_LDR_LITERAL: return "rel"
-	case .REL_BF:        return "rel"
-	case .COPROC_REG:    return "crd"
-	case .COPROC_NUM:    return "cpn"
-	case .PSR_FIELD:     return "psr"
-	case .MVE_VPT_MASK:  return "vpt"
-	case .MVE_VCTP_SIZE: return "vsz"
-	case .MVE_LOOP_TGT:  return "loop"
+	switch ot {
+	case .NONE:          panic("no operand to name")
+	case .GPR:            return "r"
+	case .GPR_NOPC:       return "r"
+	case .GPR_NOSP:       return "r"
+	case .GPR_LOW:        return "rlo"
+	case .GPR_SHIFTED:    return "rsh"
+	case .GPR_RSR:        return "rsr"
+	case .GPR_LIST:       return "list"
+	case .GPR_ZR:         return "rz"
+	case .SPR:            return "s"
+	case .DPR:            return "d"
+	case .QPR:            return "q"
+	case .SPR_LIST:       return "slist"
+	case .DPR_LIST:       return "dlist"
+	case .SPR_ELEM:       return "s"
+	case .DPR_ELEM:       return "dlane"
+	case .QPR_ELEM:       return "qlane"
+	case .IMM:            return "imm"
+	case .IMM_MOD:        return "immm"
+	case .IMM_T32_MOD:    return "immtm"
+	case .IMM16_LO_HI:    return "imm16"
+	case .IMM12:          return "imm12"
+	case .IMM5:           return "imm5"
+	case .IMM5_W:         return "imm5w"
+	case .IMM4:           return "imm4"
+	case .IMM4_SAT:       return "imm4s"
+	case .IMM8:           return "imm8"
+	case .IMM3:           return "imm3"
+	case .IMM_HINT:       return "hint"
+	case .IMM_BARRIER:    return "barr"
+	case .IMM_ENDIAN:     return "end"
+	case .IMM_IFLAGS:     return "ifl"
+	case .IMM_BANKED:     return "bank"
+	case .IMM_SYSM:       return "sysm"
+	case .IMM_COPROC:     return "cp"
+	case .IMM_COPROC_OP:  return "cpop"
+	case .NEON_IMM:       return "nimm"
+	case .REL24:          return "rel"
+	case .REL24_T32:      return "rel"
+	case .REL20:          return "rel"
+	case .REL11:          return "rel"
+	case .REL8:           return "rel"
+	case .REL_LDR_LITERAL:  return "rel"
+	case .REL_BF:         return "rel"
+	case .COND:           return "cond"
+	case .MEM:            return "mem"
+	case .COPROC_REG:     return "crd"
+	case .COPROC_NUM:     return "cpn"
+	case .PSR_FIELD:      return "psr"
+	case .VPR:            return "vpr"
+	case .QPR_MVE:        return "qm"
+	case .QPR_MVE_LIST:   return "qlist"
+	case .MVE_VPT_MASK:   return "vpt"
+	case .MVE_VCTP_SIZE:  return "vsz"
+	case .MVE_LOOP_TGT:   return "loop"
 	}
 	return "x"
 }

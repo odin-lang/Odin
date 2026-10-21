@@ -476,13 +476,8 @@ Operand_Encoding :: enum u8 {
 	VMOV_LANE_8,
 	VMOV_LANE_16,
 	VMOV_LANE_32,
-	// MVE complex-op rotation immediate (user passes degrees):
-	//   MVE_ROT_HCADD: #90/#270 -> bit 12;  MVE_ROT_CMLA: #0/90/180/270 -> bits 24:23
+	// MVE's VHCADD and integer VCADD rotation, #90 or #270 by bit 12.
 	MVE_ROT_HCADD,
-	MVE_ROT_CMLA,
-	// MVE 3-bit Q registers (Q0..Q7): Qn at bits 19:17, Qm at bits 3:1.
-	VN_Q_MVE,
-	VM_Q_MVE,
 	VFP_IMM8,
 	VM_S_PLUS1,            // the second S register of a consecutive pair
 	DBG_OPTION,            // DBG's option, bits 3:0 -- not the wider hint field
@@ -578,6 +573,7 @@ Operand_Encoding :: enum u8 {
 	BF_BLOC,               // branch target: J at hw1[11] + imm10 at hw1[10:1]
 	BF_RM,                 // BFLX/BFX register target at hw0[3:0]
 	BFCSEL_COND,           // BFCSEL condition at hw0[5:2]
+	BFCSEL_ELSE,           // BFCSEL's else target: 2 past the bf-point, or 4 by hw0[1]
 
 	// ---- Misc ----
 	PSR_FIELD_MASK,        // APSR fields_mask at bits 19-16 (MSR)
@@ -614,7 +610,6 @@ Operand_Encoding :: enum u8 {
 	NEON_SHIFT_RIGHT,
 	NEON_SHIFT_LEFT,
 	NEON_FBITS,
-	NEON_SHIFT_IMM6,       // MVE's: the 6-bit amount at bits 21:16, as it stands
 
 	// ---- ARMv8-M / MVE / CDE ----
 	QD_MVE,                // MVE Qd: bit 22 fixed 0, bits 15:13 = Qd[2:0]
@@ -623,7 +618,60 @@ Operand_Encoding :: enum u8 {
 	MVE_RDA_EVEN,          // an even accumulator, Rda / 2 at bits 15:13 (VADDV, VMLADAV)
 	MVE_RDALO,             // a long accumulator's low half, RdaLo / 2 at bits 15:13
 	MVE_RDAHI,             // its high half, RdaHi / 2 at bits 22:20 (RdaHi is odd)
-	MVE_VPT_MASK_FIELD,    // VPT mask in bits 3:0 of second halfword
+	// VPT and VPST's mask, bit 22 then 15-13, spelled on the mnemonic the way
+	// IT's is: each bit below the top one says whether the next instruction
+	// takes the predicate the other way from the one before.
+	MVE_VPT_MASK,
+	// VCMP and VPT's condition, fc at bits 12, 7 and 0 -- or 12, 7 and 5 where
+	// the second source is a core register at 3-0.
+	MVE_VCMP_COND,
+	MVE_VCMP_COND_SCALAR,
+	// A lane of Qd: Qd at 19-17 and the lane in bits 16, 21, 6 and 5, as
+	// many of them as the element size needs (bit 22 marks .8, bit 5 .16).
+	MVE_LANE,
+	// The two-lane VMOV's Qd[2 + i] and Qd[i]: Qd at 15-13, i at bit 4.
+	MVE_LANE_PAIR_HIGH,
+	MVE_LANE_PAIR_LOW,
+	// MVE's shift amounts. L:imm6 without the L: imm6 at 21-16 has the
+	// element size as its leading one (bit 21 for 32, 20 for 16, 19 for 8).
+	// The long shifts by an immediate keep it in imm5 at 20-16 (leading one at
+	// 20 or 19), and VSHLC's is 1 to 32 at 20-16, 32 written as 0.
+	MVE_SHIFT_RIGHT,
+	MVE_SHIFT_LEFT,
+	MVE_SHIFT_LONG,
+	MVE_SHLC_IMM,
+	// VSHLL's widest form shifts by the element size, 8 << bit 18.
+	MVE_SHLL_MAX,
+	// The scalar long shifts' pair: RdaLo / 2 at 19-17, RdaHi / 2 at 11-9,
+	// their amount 1 to 32 in 14-12 and 7-6 (32 written as 0), and SQRSHRL's
+	// and UQRSHLL's saturation, #64 or #48 by bit 7.
+	MVE_LONG_RDALO,
+	MVE_LONG_RDAHI,
+	MVE_LONG_SHIFT_IMM,
+	MVE_SATURATE,
+	// VCMUL's rotation, bits 12 and 0, in quarter turns.
+	MVE_ROT_CMUL,
+	// VLD2x and VLD4x's run of Q registers from Qd at 15-13: two, or four by
+	// bit 0.
+	MVE_Q_LIST,
+	// MVE addresses. Each holds a 7-bit offset at 6-0, scaled, with U at 23
+	// and P and W at 24 and 21 for the indexing:
+	//   MVE_ADDRESS         [Rn, #imm]: Rn at 19-16, scaled by the element
+	//                       size at 8-7 -- or by 4 for the system registers
+	//   MVE_ADDRESS_WIDE    [Rn, #imm] of a widening load or narrowing store:
+	//                       Rn at 18-16, scaled by bit 19's halfword
+	//   MVE_ADDRESS_VECTOR  [Qm, #imm]: Qm at 19-17, scaled by 4 or by 8
+	// and MVE_ADDRESS_OFFSET is [Rn, Qm{, uxtw #s}]: Rn at 19-16, Qm at 3-1,
+	// scaled by the memory element (bits 6 and 4) where bit 0 is set.
+	MVE_ADDRESS,
+	// VLD2x and VLD4x take no offset: [Rn], or [Rn]! with W at bit 21.
+	MVE_STRUCTURE_ADDRESS,
+	MVE_ADDRESS_WIDE,
+	MVE_ADDRESS_VECTOR,
+	MVE_ADDRESS_OFFSET,
+	// A floating-point system register as VLDR and VSTR name it: bit 22, then
+	// 15-13.
+	FP_SYSTEM_REGISTER,
 	MVE_RN_EVEN,           // an even GPR, Rn / 2 at bits 19:17 (VIDUP's offset)
 	MVE_RM_ODD,            // an odd GPR, Rm / 2 at bits 3:1 (VIWDUP's wrap)
 	MVE_DUP_IMM,           // 1, 2, 4 or 8, as its log2 in bits 7 and 0

@@ -59,6 +59,10 @@ decode :: proc(
 	// takes its condition from bits 7:4, and the mask shifts up one per
 	// instruction until it is empty. Zero is "not in a block".
 	it_state: u8 = 0
+	// The VPT block the same way: which predicate each instruction after a
+	// VPT or VPST runs under.
+	vpt_block: VPT_Block
+	vpt_next := 0
 
 	for byte_count < n_bytes {
 		word: u32
@@ -96,6 +100,14 @@ decode :: proc(
 			inst.mode   = mode
 			inst.in_it_block = in_it_block
 			inst.m_profile   = profile == .M_PROFILE
+			if vpt_next < vpt_block.count {
+				inst.vector_predicate = vpt_block.predicates[vpt_next]
+				vpt_next += 1
+			}
+			if inst.mnemonic == .VPT || inst.mnemonic == .VPST {
+				vpt_block = vpt_block_of(u8(inst.ops[0].immediate))
+				vpt_next = 0
+			}
 			inst_idx := u32(len(instructions))
 			for slot in 0..<inst.operand_count {
 				op := &inst.ops[slot]
@@ -170,7 +182,13 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, pc: u32, it_state: u8,
 		if mode == .A32 && e.mask >> 28 == 0 && word >> 28 == 0xF { continue }
 		coprocessor := (word >> 8) & 0xF
 		if e.feature == .CDE && (coprocessor > 7 || int(coprocessor) not_in cde) { continue }
-		if is_generic_coprocessor(e.mnemonic) && !coprocessor_is_generic(coprocessor, profile, cde) { continue }
+		if is_generic_coprocessor(e.mnemonic) && !coprocessor_is_generic(coprocessor, profile, cde) {
+			// On v8.1-M the floating-point unit leaves one corner of
+			// coprocessors 10 and 11 alone: LDC2L and STC2L without an offset,
+			// passing an option.
+			long_transfer := e.mnemonic == .LDC2L || e.mnemonic == .STC2L
+			if !(profile == .M_PROFILE && long_transfer && e.enc[3] == .COPROC_OPTION && (coprocessor == 10 || coprocessor == 11)) { continue }
+		}
 		if profile == .M_PROFILE && e.flags.a_profile_only { continue }
 		if profile == .A_PROFILE && e.flags.m_profile_only { continue }
 
@@ -234,8 +252,14 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, pc: u32, it_state: u8,
 		// candidate.
 		if !thumb_list_valid(e, inst) || !banked_valid(inst) || !q_registers_even(word, e) || !pairs_valid(e, inst) ||
 		   !register_lists_valid(e, inst) || !special_register_valid(e, word, profile) ||
-		   !conditional_select_valid(e, word) || !loop_valid(e, word) || !thumb_operands_valid(e, word) {
+		   !conditional_select_valid(e, word) || !loop_valid(e, word) || !thumb_operands_valid(e, word) ||
+		   !mve_operands_valid(e, inst) || !branch_future_valid(e, word) {
 			continue
+		}
+		// VMRS transfers flags to APSR_nzcv only from FPSCR; from anything
+		// else Rt 1111 is PC.
+		if e.mnemonic == .VMRS && inst.ops[0].reg == APSR_NZCV && (word >> 16) & 0xF != 1 {
+			inst.ops[0].reg = PC
 		}
 		// The 16-bit STM always writes the base back. The 16-bit LDM does
 		// unless it loads the base itself, and the syntax shows which.
@@ -370,6 +394,67 @@ thumb_operands_valid :: proc "contextless" (e: ^Decode_Entry, word: u32) -> bool
 	if m == .SSAT || m == .USAT {
 		if (word >> 21) & 1 != 0 && t32_shift_amount(word) == 0 { return false }
 	}
+	// Data processing does not write PC in 32-bit Thumb: with Rd 1111 the
+	// flag-setting ones are TST, TEQ, CMN and CMP, and the rest are not
+	// instructions -- on v8.1-M, the scalar shifts.
+	for k in 0 ..< len(e.enc) {
+		if e.enc[k] == .RD_T32 && is_data_processing(m) && (word >> 8) & 0xF == 0xF { return false }
+	}
+	// A byte or halfword loaded into PC without writeback is a memory hint's
+	// word, or none.
+	if m == .LDRB || m == .LDRSB || m == .LDRH || m == .LDRSH {
+		writeback := false
+		for enc in e.enc {
+			writeback ||= enc == .MEM_T32_IMM8_PRE || enc == .MEM_T32_IMM8_POST
+		}
+		if (word >> 12) & 0xF == 0xF && !writeback { return false }
+	}
+	// Nor does a load write back to PC.
+	for enc in e.enc {
+		if (enc == .MEM_T32_IMM8_PRE || enc == .MEM_T32_IMM8_POST) && (word >> 16) & 0xF == 0xF { return false }
+	}
+	return true
+}
+
+@(private="file")
+is_data_processing :: proc "contextless" (m: Mnemonic) -> bool {
+	return m == .AND || m == .BIC || m == .ORR || m == .ORN || m == .EOR || m == .ADD ||
+	       m == .ADC || m == .SBC || m == .SUB || m == .RSB || m == .MOV || m == .MVN ||
+	       m == .LSL || m == .LSR || m == .ASR || m == .ROR || m == .RRX
+}
+
+// MVE's registers that a field could name but the architecture does not
+// allow: the high half of an accumulator pair or of a scalar long shift is
+// R1 to R11, VIWDUP's wrap the same, a run of Q registers stops at Q7, and
+// VLDR and VSTR reach six system registers.
+@(private="file")
+mve_operands_valid :: proc "contextless" (e: ^Decode_Entry, inst: ^Instruction) -> bool {
+	for k in 0 ..< len(e.enc) {
+		enc := e.enc[k]
+		op := &inst.ops[k]
+		if enc == .MVE_RDAHI || enc == .MVE_LONG_RDAHI || enc == .MVE_RM_ODD {
+			if reg_hw(op.reg) > 11 { return false }
+		} else if enc == .MVE_Q_LIST {
+			if u32(reg_hw(op.reg)) + u32(op.list.count) > 8 { return false }
+		} else if enc == .FP_SYSTEM_REGISTER {
+			n := reg_hw(op.reg)
+			if n != 1 && n != 2 && n < 12 { return false }
+		}
+	}
+	return true
+}
+
+// A Branch Future names a condition other than AL and NV, and branches to a
+// register other than SP and PC -- BFLX not LR either.
+@(private="file")
+branch_future_valid :: proc "contextless" (e: ^Decode_Entry, word: u32) -> bool {
+	if e.mnemonic == .BFCSEL {
+		return (word >> 18) & 0xF < 14
+	}
+	if e.mnemonic == .BFX || e.mnemonic == .BFLX {
+		rm := (word >> 16) & 0xF
+		return rm != 13 && rm != 15 && (e.mnemonic != .BFLX || rm != 14)
+	}
 	return true
 }
 
@@ -430,25 +515,48 @@ banked_valid :: proc "contextless" (inst: ^Instruction) -> bool {
 // shape_matches accepts the re-encode.
 @(private="file")
 default_operand_for :: proc(ot: Operand_Type) -> Operand {
-	#partial switch ot {
+	switch ot {
+	case .NONE:
+		return Operand{}
 	case .GPR, .GPR_NOPC, .GPR_NOSP, .GPR_LOW, .GPR_SHIFTED, .GPR_RSR:
 		return op_reg(R0)
 	case .GPR_LIST:
 		return op_reg_list(0)
-	case .SPR:        return op_reg(S0)
-	case .DPR:        return op_reg(D0)
-	case .QPR:        return op_reg(Q0)
-	case .DPR_ELEM:   return op_reg(D0)
-	case .QPR_ELEM:   return op_reg(Q0)
-	case .SPR_ELEM:   return op_reg(S0)
+	case .GPR_ZR:
+		return op_reg(R0)
+	case .SPR:
+		return op_reg(S0)
+	case .DPR:
+		return op_reg(D0)
+	case .QPR:
+		return op_reg(Q0)
 	case .SPR_LIST, .DPR_LIST:
 		return op_reg_list(0)
-	case .QPR_MVE_LIST:
-		return op_reg_list(0)
+	case .SPR_ELEM:
+		return op_reg(S0)
+	case .DPR_ELEM:
+		return op_reg(D0)
+	case .QPR_ELEM:
+		return op_reg(Q0)
+	case .IMM, .IMM_MOD, .IMM_T32_MOD, .IMM16_LO_HI, .IMM12, .IMM5, .IMM5_W, .IMM4,
+	     .IMM4_SAT, .IMM8, .IMM3, .IMM_HINT, .IMM_BARRIER, .IMM_ENDIAN, .IMM_IFLAGS,
+	     .IMM_BANKED, .IMM_SYSM, .IMM_COPROC, .IMM_COPROC_OP, .NEON_IMM:
+		return op_imm(0)
+	case .REL24, .REL24_T32, .REL20, .REL11, .REL8, .REL_LDR_LITERAL, .REL_BF:
+		return op_rel_offset(0)
+	case .COND:
+		return op_imm(0)
+	case .MEM:
+		return op_mem(mem_imm(R0, 0))
+	case .COPROC_REG, .COPROC_NUM, .PSR_FIELD:
+		return op_imm(0)
 	case .VPR, .QPR_MVE:
 		return op_reg(Q0)
-	case .MEM:        return op_mem(mem_imm(R0, 0))
-	case .REL24, .REL24_T32, .REL20, .REL11, .REL8, .REL_LDR_LITERAL:
+	case .QPR_MVE_LIST:
+		return op_reg_list(0)
+	case .MVE_VPT_MASK, .MVE_VCTP_SIZE:
+		return op_imm(0)
+	case .MVE_LOOP_TGT:
 		return op_rel_offset(0)
 	}
 	return op_imm(0)
@@ -485,8 +593,7 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 		return op_reg(reg)
 	case .RM_A32:
 		reg := Register(REG_GPR | u16(word & 0xF))
-		#partial switch ot {
-		case .GPR_RSR:
+		if ot == .GPR_RSR {
 			// Register-shifted register: Rs in bits 11..8, shift type in 6..5,
 			// bit 4 = 1. We map the 2-bit shift type onto the .{LSL,LSR,ASR,
 			// ROR}_REG markers so the encoder shape-match can distinguish
@@ -496,7 +603,8 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 			rs  := u8((word >> 8) & 0xF)
 			return Operand{reg = reg, kind = .REGISTER, size = 4,
 						   shift_type = st, shift_amt = rs}
-		case .GPR_SHIFTED:
+		}
+		if ot == .GPR_SHIFTED {
 			// Imm-shift: amount in bits 11..7, type in 6..5, bit 4 = 0.
 			st  := Shift_Type((word >> 5) & 0x3)
 			amt := u8((word >> 7) & 0x1F)
@@ -825,12 +933,6 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 		return op_dpr_lane(Register(REG_DPR | u16(n)), u8(lane))
 	case .MVE_ROT_HCADD:
 		return op_imm(((word >> 12) & 1) == 1 ? 270 : 90)
-	case .MVE_ROT_CMLA:
-		return op_imm(i64((word >> 23) & 0x3) * 90)
-	case .VN_Q_MVE:
-		return op_reg(Register(REG_QPR | u16((word >> 17) & 0x7)))
-	case .VM_Q_MVE:
-		return op_reg(Register(REG_QPR | u16((word >> 1) & 0x7)))
 	case .VD_Q:
 		n := (((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)) >> 1
 		return op_reg(Register(REG_QPR | u16(n)))
@@ -1041,7 +1143,10 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 	case .BF_RM:
 		return op_reg(Register(REG_GPR | u16((word >> 16) & 0xF)))
 	case .BFCSEL_COND:
-		return op_imm(i64((word >> 18) & 0xF))
+		return op_reg(Register(REG_COND | u16((word >> 18) & 0xF)))
+	case .BFCSEL_ELSE:
+		imm4 := (word >> 23) & 0xF
+		return op_rel_offset(pc_value + i64(imm4) << 1 + 2 + i64((word >> 17) & 1) * 2)
 
 	// ---- Saturate / bit field ----
 	case .NEON_SHLL:    return op_imm(i64(8) << ((word >> 18) & 0x3))
@@ -1101,8 +1206,6 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 		return op_imm(i64(shift_field(word)) - i64(shift_element_bits(word)))
 	case .NEON_FBITS:
 		return op_imm(64 - i64((word >> 16) & 0x3F))
-	case .NEON_SHIFT_IMM6:
-		return op_imm(i64((word >> 16) & 0x3F))
 
 	// ---- A32 RS shift (Rs register in bits 11:8) ----
 	// ---- A32 COND ----
@@ -1121,7 +1224,72 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 		n := (word >> 1) & 0x7
 		return op_reg(Register(REG_QPR | u16(n)))
 
-	case .MVE_VPT_MASK_FIELD:  return op_imm(i64((word >> 13) & 0xF))
+	case .MVE_VPT_MASK:        return op_imm(i64(((word >> 22) & 1) << 3 | (word >> 13) & 0x7))
+	case .MVE_VCMP_COND:
+		fc := ((word >> 12) & 1) << 2 | ((word >> 7) & 1) << 1 | word & 1
+		return op_reg(Register(REG_COND | u16(MVE_CONDITIONS[fc])))
+	case .MVE_VCMP_COND_SCALAR:
+		fc := ((word >> 12) & 1) << 2 | ((word >> 7) & 1) << 1 | (word >> 5) & 1
+		return op_reg(Register(REG_COND | u16(MVE_CONDITIONS[fc])))
+	case .MVE_LANE:
+		return op_qpr_lane(Register(REG_QPR | u16((word >> 17) & 0x7)), mve_lane(word))
+	case .MVE_LANE_PAIR_HIGH:
+		return op_qpr_lane(Register(REG_QPR | u16((word >> 13) & 0x7)), u8(2 + (word >> 4) & 1))
+	case .MVE_LANE_PAIR_LOW:
+		return op_qpr_lane(Register(REG_QPR | u16((word >> 13) & 0x7)), u8((word >> 4) & 1))
+	case .MVE_SHIFT_RIGHT:
+		return op_imm(i64(2 * mve_shift_element_bits(word, false)) - i64((word >> 16) & 0x3F))
+	case .MVE_SHIFT_LEFT:
+		return op_imm(i64((word >> 16) & 0x3F) - i64(mve_shift_element_bits(word, false)))
+	case .MVE_SHIFT_LONG:
+		return op_imm(i64((word >> 16) & 0x1F) - i64(mve_shift_element_bits(word, true)))
+	case .MVE_SHLL_MAX:
+		return op_imm(i64(8) << ((word >> 18) & 1))
+	case .MVE_SHLC_IMM:
+		amount := (word >> 16) & 0x1F
+		return op_imm(i64(amount == 0 ? 32 : amount))
+	case .MVE_LONG_RDALO:
+		return op_reg(Register(REG_GPR | u16(((word >> 17) & 0x7) * 2)))
+	case .MVE_LONG_RDAHI:
+		return op_reg(Register(REG_GPR | u16(((word >> 9) & 0x7) * 2 + 1)))
+	case .MVE_LONG_SHIFT_IMM:
+		amount := ((word >> 12) & 0x7) << 2 | (word >> 6) & 0x3
+		return op_imm(i64(amount == 0 ? 32 : amount))
+	case .MVE_SATURATE:
+		return op_imm((word >> 7) & 1 != 0 ? 48 : 64)
+	case .MVE_ROT_CMUL:
+		return op_imm(i64(((word >> 12) & 1) << 1 | word & 1) * 90)
+	case .MVE_Q_LIST:
+		return op_reg_run(Register(REG_QPR | u16((word >> 13) & 0x7)), word & 1 != 0 ? 4 : 2)
+	case .MVE_ADDRESS, .MVE_ADDRESS_WIDE, .MVE_ADDRESS_VECTOR:
+		m := Memory{sign = (word >> 23) & 1 != 0 ? 1 : -1, mode = mve_index_mode(word)}
+		scale: i32
+		if enc == .MVE_ADDRESS {
+			m.base = Register(REG_GPR | u16((word >> 16) & 0xF))
+			scale = mve_address_scale(word)
+		} else if enc == .MVE_ADDRESS_WIDE {
+			m.base = Register(REG_GPR | u16((word >> 16) & 0x7))
+			scale = mve_wide_scale(word)
+		} else {
+			m.base = Register(REG_QPR | u16((word >> 17) & 0x7))
+			scale = mve_vector_scale(word)
+		}
+		m.disp = i32(word & 0x7F) * scale
+		if m.sign < 0 { m.disp = -m.disp }
+		return op_mem(m)
+	case .MVE_STRUCTURE_ADDRESS:
+		m := Memory{base = Register(REG_GPR | u16((word >> 16) & 0xF)), sign = 1}
+		m.mode = (word >> 21) & 1 != 0 ? .POST_INCREMENT : .OFFSET
+		return op_mem(m)
+	case .MVE_ADDRESS_OFFSET:
+		m := Memory{base = Register(REG_GPR | u16((word >> 16) & 0xF)), index = Register(REG_QPR | u16((word >> 1) & 0x7)), sign = 1, mode = .OFFSET}
+		if word & 1 != 0 {
+			m.shift_type = .UXTW
+			m.shift_amt = mve_offset_shift(word)
+		}
+		return op_mem(m)
+	case .FP_SYSTEM_REGISTER:
+		return op_reg(Register(REG_FPSC | u16(((word >> 22) & 1) << 3 | (word >> 13) & 0x7)))
 	case .MVE_RN_EVEN:         return op_reg(Register(REG_GPR | u16(((word >> 17) & 0x7) * 2)))
 	case .MVE_RM_ODD:          return op_reg(Register(REG_GPR | u16(((word >> 1) & 0x7) * 2 + 1)))
 	case .MVE_DUP_IMM:         return op_imm(i64(1) << (((word >> 7) & 1) << 1 | word & 1))

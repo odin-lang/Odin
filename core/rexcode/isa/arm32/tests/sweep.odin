@@ -183,71 +183,92 @@ run_sweep_tests :: proc() {
 // instead of accidentally aliasing another register's slot.
 @(private="file")
 sweep_safe_fill :: proc(enc: a.Operand_Encoding) -> u32 {
-	#partial switch enc {
-	// ---- A32 GPR slots ----
-	case .RD:                  return u32(1) << 12
-	case .RN_A32:              return u32(2) << 16
-	case .RM_A32:              return u32(3)
-	case .RS_A32:              return u32(4) << 8
-	case .RT_A32:              return u32(1) << 12
-	case .RT2_A32:             return u32(2) << 16
+	for fill in SWEEP_FILLS {
+		if fill.encoding == enc {
+			return fill.bits
+		}
+	}
+	return 0    // an encoding not listed fills with zero
+}
 
-	case .RDLO_A32:            return u32(1) << 12
-	case .RDHI_A32:            return u32(2) << 16
+@(private="file")
+Sweep_Fill :: struct {
+	encoding: a.Operand_Encoding,
+	bits:     u32,
+}
+
+@(private="file", rodata)
+SWEEP_FILLS := []Sweep_Fill{
+	// ---- A32 GPR slots ----
+	{.RD, u32(1) << 12},
+	{.RN_A32, u32(2) << 16},
+	{.RM_A32, u32(3)},
+	{.RS_A32, u32(4) << 8},
+	{.RT_A32, u32(1) << 12},
+	{.RT2_A32, u32(2) << 16},
+	{.RDLO_A32, u32(1) << 12},
+	{.RDHI_A32, u32(2) << 16},
 
 	// ---- T32 GPR slots ----
-	case .RD_T32:              return u32(1) << 8
-	case .RN_T32:              return u32(2) << 16
+	{.RD_T32, u32(1) << 8},
+	{.RN_T32, u32(2) << 16},
 	// Some MVE entries fix the LSB of Rm (bit 0) to zero, so the canonical
 	// word for those forms must use an even-numbered Rm (R2 = 0010). Older
 	// safe-fills used R3 here, which collided with the parity constraint.
-	case .RM_T32:              return u32(2)
-	case .RT_T32:              return u32(1) << 12
-	case .RT2_T32:             return u32(2) << 8
-	case .RA_T32:              return u32(5) << 12
+	{.RM_T32, u32(2)},
+	{.RT_T32, u32(1) << 12},
+	{.RT2_T32, u32(2) << 8},
+	{.RA_T32, u32(5) << 12},
 
 	// ---- T16 GPR slots ----
-	case .RD_T16_LO:           return 1
-	case .RM_T16_LO, .RN_T16_LO: return u32(2) << 3
-	case .RD_T16_HI:           return 1
-	case .RM_T16_HI:           return u32(2) << 3
+	{.RD_T16_LO, 1},
+	{.RM_T16_LO, u32(2) << 3},
+	{.RN_T16_LO, u32(2) << 3},
+	{.RD_T16_HI, 1},
+	{.RM_T16_HI, u32(2) << 3},
 
 	// ---- VFP/NEON split-register fields (even Q values for MVE compat) ----
-	case .VD_S, .VD_D:         return u32(1) << 12
-	case .VD_Q:                return u32(2) << 12
-	case .VN_S, .VN_D:         return u32(2) << 16
-	case .VN_Q:                return u32(4) << 16
-	case .VM_S, .VM_D:         return u32(3)
-	case .VM_Q:                return u32(6)
+	{.VD_S, u32(1) << 12},
+	{.VD_D, u32(1) << 12},
+	{.VD_Q, u32(2) << 12},
+	{.VN_S, u32(2) << 16},
+	{.VN_D, u32(2) << 16},
+	{.VN_Q, u32(4) << 16},
+	{.VM_S, u32(3)},
+	{.VM_D, u32(3)},
+	{.VM_Q, u32(6)},
 
 	// ---- MVE Q regs ----
-	case .QD_MVE:              return u32(1) << 13
-	case .QN_MVE:              return u32(2) << 17
-	case .QM_MVE:              return u32(3) << 1
+	{.QD_MVE, u32(1) << 13},
+	{.QN_MVE, u32(2) << 17},
+	{.QM_MVE, u32(3) << 1},
 
 	// ---- Memory ----
-	case .MEM_IMM12_OFFSET, .MEM_IMM8_OFFSET,
-		 .MEM_PRE_INDEX, .MEM_POST_INDEX:
-		return (u32(4) << 16) | (u32(1) << 23)
-	case .MEM_REG_OFFSET:
-		// Include Rm at bits 3..0 so the resulting Memory has index != R0,
-		// letting the encoder pick the register-offset form on round-trip.
-		return (u32(4) << 16) | (u32(1) << 23) | u32(3)
+	{.MEM_IMM12_OFFSET, (u32(4) << 16) | (u32(1) << 23)},
+	{.MEM_IMM8_OFFSET, (u32(4) << 16) | (u32(1) << 23)},
+	{.MEM_PRE_INDEX, (u32(4) << 16) | (u32(1) << 23)},
+	{.MEM_POST_INDEX, (u32(4) << 16) | (u32(1) << 23)},
+	// Include Rm at bits 3..0 so the resulting Memory has index != R0,
+	// letting the encoder pick the register-offset form on round-trip.
+	{.MEM_REG_OFFSET, (u32(4) << 16) | (u32(1) << 23) | u32(3)},
+
 	// ---- Register lists ----
-	case .VFP_S_LIST, .VFP_D_LIST, .VFP_DX_LIST: return 4
-	case .A32_REG_LIST:            return 0x0030
-	case .T16_REG_LIST, .T16_REG_LIST_LR, .T16_REG_LIST_PC: return 0x0030
-	case .T32_REG_LIST:            return 0x0030
+	{.VFP_S_LIST, 4},
+	{.VFP_D_LIST, 4},
+	{.VFP_DX_LIST, 4},
+	{.A32_REG_LIST, 0x0030},
+	{.T16_REG_LIST, 0x0030},
+	{.T16_REG_LIST_LR, 0x0030},
+	{.T16_REG_LIST_PC, 0x0030},
+	{.T32_REG_LIST, 0x0030},
 
 	// ---- Coprocessor ----
-	case .COPROC_NUM_FIELD:    return u32(15) << 8
-	case .COPROC_CRN_FIELD:    return u32(1) << 16
-	case .COPROC_CRM_FIELD:    return 1
+	{.COPROC_NUM_FIELD, u32(15) << 8},
+	{.FP_SYSTEM_REGISTER, u32(1) << 13},    // FPSCR: of the sixteen numbers, six name one
+	{.COPROC_CRN_FIELD, u32(1) << 16},
+	{.COPROC_CRM_FIELD, 1},
 
 	// ---- Misc ----
-	case .BARRIER_TYPE:        return 0xF
-	case .PSR_FIELD_MASK:      return u32(0xF) << 16
-	case .NEON_SHIFT_IMM6:     return u32(12) << 16
-	}
-	return 0
+	{.BARRIER_TYPE, 0xF},
+	{.PSR_FIELD_MASK, u32(0xF) << 16},
 }

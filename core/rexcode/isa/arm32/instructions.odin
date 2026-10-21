@@ -69,10 +69,16 @@ Instruction :: struct #align(64) {
 	// every instruction did before this field existed. Set it and the encoder
 	// picks the encoding for that type.
 	dt:            Data_Types,
+	// An MVE instruction inside a VPT block runs where its lane's predicate
+	// is true (THEN) or false (ELSE), and the syntax says which on the
+	// mnemonic: `vaddt.i32`.
+	vector_predicate: Vector_Predicate,
 	// Spare, and free: the operands leave the tail of the second cache line
 	// unused either way. New fields land here without changing the layout.
-	_:             [48]u8,
+	_:             [47]u8,
 }
+
+Vector_Predicate :: enum u8 { NONE, THEN, ELSE }
 #assert(size_of(Instruction)  == 128)
 #assert(align_of(Instruction) == 64)
 

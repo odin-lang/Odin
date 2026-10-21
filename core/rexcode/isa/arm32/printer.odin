@@ -87,9 +87,24 @@ sbprint :: proc(
 	// ITSTATE, followed the way the decoder follows it, so that `.w` can be
 	// decided for instructions built by hand as well as decoded ones.
 	it_state: u8 = 0
+	// A VPT block, followed the same way: whether each instruction in it is
+	// predicated Then or Else, which the syntax spells on the mnemonic.
+	vpt_block: VPT_Block
+	vpt_next := 0
 
 	for i in 0..<len(instructions) {
 		inst := &instructions[i]
+		// The decoder says where a decoded instruction sits; an instruction
+		// built by hand is placed by the VPT before it.
+		predicate := inst.vector_predicate
+		if vpt_next < vpt_block.count {
+			if predicate == .NONE { predicate = vpt_block.predicates[vpt_next] }
+			vpt_next += 1
+		}
+		if inst.mnemonic == .VPT || inst.mnemonic == .VPST {
+			vpt_block = vpt_block_of(u8(inst.ops[0].immediate))
+			vpt_next = 0
+		}
 		in_it_block := inst.mode == .T32 && (it_state & 0xF != 0 || inst.in_it_block)
 		if inst.mnemonic == .IT {
 			it_state = u8(inst.ops[0].immediate & 0xF) << 4 | u8(inst.ops[1].immediate & 0xF)
@@ -147,7 +162,20 @@ sbprint :: proc(
 			continue
 		}
 
-		write_mnemonic(sb, inst.mnemonic, inst.cond, inst.sets_flags, opts.uppercase)
+		// VPT and VPST spell their block on the mnemonic, as IT does, and
+		// their mask is not written as an operand.
+		first_operand := u8(0)
+		if inst.mnemonic == .VPT || inst.mnemonic == .VPST {
+			write_vpt(sb, inst, opts.uppercase)
+			first_operand = 1
+		} else {
+			write_mnemonic(sb, inst.mnemonic, inst.cond, inst.sets_flags, opts.uppercase)
+		}
+		switch predicate {
+		case .NONE:
+		case .THEN: strings.write_byte(sb, opts.uppercase ? 'T' : 't')
+		case .ELSE: strings.write_byte(sb, opts.uppercase ? 'E' : 'e')
+		}
 		if dt[0] != .NONE {
 			write_data_type(sb, dt, opts.uppercase)
 		}
@@ -163,15 +191,15 @@ sbprint :: proc(
 		if inst.mode == .T32 && inst.length == 4 {
 			in_block := in_it_block || (inst.cond != 14 && !is_thumb_conditional_branch(inst))
 			mov_immediate := inst.mnemonic == .MOV && inst.ops[1].kind != .REGISTER
-			if mov_immediate || has_narrow_encoding(inst, in_block) {
+			if mov_immediate || has_narrow_encoding(inst, in_block) || is_wide_load_store(inst) {
 				strings.write_string(sb, opts.uppercase ? ".W" : ".w")
 			}
 		}
 
-		if inst.operand_count > 0 {
+		if inst.operand_count > first_operand {
 			strings.write_string(sb, " ")
-			for k in 0..<inst.operand_count {
-				if k > 0 { strings.write_string(sb, ", ") }
+			for k in first_operand ..< inst.operand_count {
+				if k > first_operand { strings.write_string(sb, ", ") }
 				write_operand(sb, &inst.ops[k], inst, offset, &display, opts)
 				// LDM/STM write the updated base back, and the syntax marks
 				// that with a `!` on the base register itself.
@@ -349,6 +377,27 @@ write_it :: proc(sb: ^strings.Builder, inst: ^Instruction, uppercase: bool) {
 	strings.write_string(sb, first_condition == 14 ? "al" : COND_SUFFIX[first_condition])
 }
 
+// VPT and VPST name the block they open by a T or an E per instruction
+// after the first. Below the mask's top bit each bit says whether the next
+// instruction is predicated the other way from the one before; the lowest set
+// bit ends the block.
+@(private="file")
+write_vpt :: proc(sb: ^strings.Builder, inst: ^Instruction, uppercase: bool) {
+	block := vpt_block_of(u8(inst.ops[0].immediate))
+	if uppercase {
+		strings.write_string(sb, inst.mnemonic == .VPT ? "VPT" : "VPST")
+	} else {
+		strings.write_string(sb, inst.mnemonic == .VPT ? "vpt" : "vpst")
+	}
+	// The first is always THEN, and not written.
+	for k in 1 ..< block.count {
+		then := block.predicates[k] == .THEN
+		strings.write_byte(sb, uppercase ? (then ? 'T' : 'E') : (then ? 't' : 'e'))
+	}
+}
+
+
+
 // `apsr_nzcvq`, `cpsr_fc`, `spsr_fsxc`: the mask bits are f, s, x and c from
 // the top. APSR is CPSR seen from the application level, and it only has the
 // two fields an application can write -- nzcvq (f) and g (s) -- so the CPSR
@@ -470,6 +519,20 @@ barrier_option_name :: proc(mnemonic: Mnemonic, option: i64, m_profile: bool) ->
 	return ""
 }
 
+// The loads and stores with a 12-bit offset have 16-bit forms with smaller
+// ones, and llvm writes them with `.w` whatever the offset -- and needs it
+// where the register is SP or PC, which no 16-bit form takes.
+@(private="file")
+is_wide_load_store :: proc "contextless" (inst: ^Instruction) -> bool {
+	m := inst.mnemonic
+	if m != .LDR && m != .LDRB && m != .LDRH && m != .LDRSB && m != .LDRSH && m != .STR && m != .STRB && m != .STRH {
+		return false
+	}
+	address := &inst.ops[1]
+	return address.kind == .MEMORY && address.mem.mode == .OFFSET && reg_class(address.mem.index) != REG_GPR &&
+	       address.mem.disp >= 0 && address.mem.sign >= 0
+}
+
 // A B<c> carries its own condition; every other conditional Thumb
 // instruction has it from an IT block.
 @(private="file")
@@ -498,6 +561,8 @@ write_shift :: proc(sb: ^strings.Builder, st: Shift_Type, amt: u8) {
 		// no shift to print
 	case .LSL_REG, .LSR_REG, .ASR_REG, .ROR_REG:
 		fmt.sbprintf(sb, ", %s %s", SHIFT_NAMES[int(st) - int(Shift_Type.LSL_REG)], GPR_NAMES[amt & 0xF])
+	case .UXTW:
+		fmt.sbprintf(sb, ", uxtw #%d", amt)
 	}
 }
 
@@ -707,8 +772,8 @@ write_memory :: proc(sb: ^strings.Builder, m: Memory) {
 	}
 	// An immediate-only form leaves index at Register(0), whose class is not
 	// REG_GPR -- so the class alone says whether there is an index. Excluding
-	// hw 0 as well made r0 unusable as one.
-	if reg_class(m.index) == REG_GPR {
+	// hw 0 as well made r0 unusable as one. MVE's vector offset is a Q one.
+	if reg_class(m.index) == REG_GPR || reg_class(m.index) == REG_QPR {
 		// Register offset
 		switch m.mode {
 		case .OFFSET:

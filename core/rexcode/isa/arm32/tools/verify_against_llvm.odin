@@ -162,11 +162,13 @@ main :: proc() {
 		{name = "T16", mode = .T32, targets = thumb_targets},
 		{name = "T32", mode = .T32, targets = thumb_targets},
 		{name = "IT",  mode = .T32, targets = thumb_targets},
+		{name = "VPT", mode = .T32, targets = thumb_targets[2:]},
 	}
 	build_a32_words(&suites[0], random)
 	build_t16_words(&suites[1])
 	build_t32_words(&suites[2], random)
 	build_it_blocks(&suites[3], random)
+	build_vpt_blocks(&suites[4], random)
 
 	// Object files named on the command line are verified as corpora too:
 	// `path` is taken as A-profile code, `path:m` as M-profile.
@@ -326,6 +328,37 @@ build_it_blocks :: proc(suite: ^Suite, random: rand.Generator) {
 	}
 }
 
+// Every VPST and a VPT of each kind, with every mask, each followed by the
+// instructions it predicates -- which the syntax marks with a T or an E on
+// each mnemonic, so the block is only right if all of them are.
+build_vpt_blocks :: proc(suite: ^Suite, random: rand.Generator) {
+	BODY := [?]Word{
+		{0xEF22_0844, 4},   // vadd.i32 q0, q1, q2
+		{0xED91_7F04, 4},   // vldrw.u32 q3, [r1, #16]
+		{0xFF0A_8D5C, 4},   // vmul.f32 q4, q5, q6
+		{0xED82_3E00, 4},   // vstrb.8 q1, [r2]
+		{0xEE17_4E44, 4},   // vmla.i16 q2, q3, r4
+		{0xFFB1_A34C, 4},   // vabs.s8 q5, q6
+		{0xFEE6_3F04, 4},   // vmaxv.u16 r3, q2
+	}
+	OPENERS := [?]u32{
+		0xFE31_0F4D,        // vpst
+		0xFE03_0F04,        // vpt.i8 eq, q1, q2
+		0xFE21_1F61,        // vpt.s32 gt, q0, r1
+	}
+	for opener in OPENERS {
+		for mask in u32(1) ..< 16 {
+			count := 4 - int(trailing_zeros4(mask))
+			block := make([]Word, 1 + count)
+			block[0] = {opener | (mask >> 3) << 22 | (mask & 0x7) << 13, 4}
+			for k in 0 ..< count {
+				block[1 + k] = BODY[rand.int_max(len(BODY), random)]
+			}
+			append(&suite.blocks, block)
+		}
+	}
+}
+
 // The Thumb instructions of a compiled object, as llvm-objdump finds them --
 // it reads the mapping symbols, so literal pools stay data. An IT and the
 // instructions it predicates become one block; everything else is a word.
@@ -374,6 +407,14 @@ build_corpus :: proc(suite: ^Suite, path: string) {
 		}
 		if word.length == 2 && is_it(word.value) {
 			remaining = 4 - int(trailing_zeros4(word.value & 0xF))
+			append(&pending, word)
+			continue
+		}
+		// MVE's VPT and VPST open a block the same way, with the mask at bit
+		// 22 and bits 15-13; VPNOT is VPST without one.
+		if word.length == 4 && (strings.has_prefix(mnemonic, "vpt") || strings.has_prefix(mnemonic, "vpst")) {
+			mask := ((word.value >> 22) & 1) << 3 | (word.value >> 13) & 0x7
+			remaining = 4 - int(trailing_zeros4(mask))
 			append(&pending, word)
 			continue
 		}

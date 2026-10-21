@@ -472,7 +472,25 @@ Mnemonic :: enum u16 {
 	VRMLALDAVH, VRMLALDAVHA, VRMLALDAVHX, VRMLALDAVHAX,
 	VRMLSLDAVH, VRMLSLDAVHA, VRMLSLDAVHX, VRMLSLDAVHAX,
 	VMLAV,    VMLAVA,                      // simple MAC across vector
+	VMLALV,   VMLALVA,   VRMLALVH, VRMLALVHA,
 	VMLSV,    VMLSVA,
+
+	// The rest of MVE's vector arithmetic
+	VMULH,    VRMULH,                      // multiply, keep the high half (rounding)
+	VQDMULLB, VQDMULLT,                    // saturating doubling multiply long B/T
+	VMLAS,                                 // multiply by vector, add scalar
+	VFMAS,                                 // fused: multiply by vector, add scalar
+	VQDMLAH,  VQDMLASH,  VQRDMLASH,        // saturating doubling multiply-add high, by scalar
+	VADC,     VADCI,     VSBC,     VSBCI,  // add / subtract with carry, across the vector
+	VMAXA,    VMINA,                       // max / min of absolute values, into Qda
+	VMAXNMA,  VMINNMA,
+	VMOVLB,   VMOVLT,                      // widen bottom / top halves
+
+	// Scalar shifts on a core register, or a pair of them (v8.1-M MVE)
+	ASRL,     LSLL,      LSRL,
+	SQSHLL,   SRSHRL,    UQSHLL,   URSHRL,
+	SQRSHRL,  UQRSHLL,
+	SQRSHR,   UQRSHL,    SQSHL,    SRSHR,    UQSHL,    URSHR,
 
 	// Complex arithmetic (Q-register vector form)
 	VCMUL,                                 // complex multiply (separate from VCMLA)
@@ -494,8 +512,6 @@ Mnemonic :: enum u16 {
 	// Widening with B/T
 	VSHLLB,    VSHLLT,                     // shift left long bottom/top
 	VMULLB,    VMULLT,                     // multiply long B/T
-	VMLALB,    VMLALT,                     // multiply-accumulate long B/T
-	VMLSLB,    VMLSLT,
 
 	VSHRNB,    VSHRNT,                     // shift right narrow B/T
 	VRSHRNB,   VRSHRNT,

@@ -157,8 +157,8 @@ half_precision_form_of :: proc(form: Encoding) -> (half: Encoding, ok: bool) {
 }
 
 // Every form of a mnemonic: its ENCODING_TABLE rows, its Advanced SIMD rows
-// (simd_table.odin), its THUMB_TABLE rows, then the Thumb forms derived from
-// its A32 coprocessor, VFP and Advanced SIMD rows. Built once; the index of a form in this list is its
+// (simd_table.odin), its THUMB_TABLE and MVE_TABLE rows, then the Thumb forms
+// derived from its A32 coprocessor, VFP and Advanced SIMD rows. Built once; the index of a form in this list is its
 // form id.
 forms_of :: proc(m: Mnemonic) -> []Encoding {
 	@(static) merged: [Mnemonic][dynamic]Encoding
@@ -187,6 +187,9 @@ forms_of :: proc(m: Mnemonic) -> []Encoding {
 			append(&merged[form.mnemonic], form)
 		}
 		for form in THUMB_TABLE {
+			append(&merged[form.mnemonic], form)
+		}
+		for form in MVE_TABLE {
 			append(&merged[form.mnemonic], form)
 		}
 		for mnemonic in Mnemonic {
