@@ -223,9 +223,11 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			is_windows_cross = true;
 			goto try_cross_linking;
 		}
-	} else if (build_context.cross_compiling && (build_context.different_os || selected_subtarget != Subtarget_Default)) {
+	} else if (selected_subtarget == Subtarget_Android || (build_context.cross_compiling && (build_context.different_os || selected_subtarget != Subtarget_Default))) {
 		switch (selected_subtarget) {
 		case Subtarget_Android:
+			// NOTE(bill): Android always links with the NDK's toolchain, even when the host has the target's OS and
+			// architecture (linux_amd64 on an x86-64 Linux host), which does not count as cross compiling.
 			is_android = true;
 			goto try_cross_linking;
 		default:
