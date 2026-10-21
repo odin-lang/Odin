@@ -142,6 +142,8 @@ set ODIN=..\..\..\odin
 
 %ODIN% test "..\test_issue_6344" %COMMON% -o:speed || exit /b
 
+%ODIN% test "..\test_issue_max_simd_align" %COMMON% -o:speed || exit /b
+
 %ODIN% test "..\test_pr_6470" %COMMON% -define:TEST_EXPECT_FAILURE=true 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 
 %ODIN% check "..\test_pr_7848\pkg_b" "..\test_pr_7848\pkg_a" -no-entry-point -workspace -overlay:..\test_pr_7848\overlay.json %COMMON% -export-semantics:json -export-semantics-file:pr_7848.json || exit /b
