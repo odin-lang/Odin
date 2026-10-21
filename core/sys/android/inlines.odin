@@ -14,5 +14,5 @@ ANativeWindow_clearFrameRate :: proc "contextless" (window: ^ANativeWindow) -> i
 }
 
 __android_log_id_is_valid :: proc "contextless" (log_id: log_id_t) -> bool {
-	return log_id >= LOG_ID_MIN && log_id < LOG_ID_MAX
+	return LOG_ID_MIN <= log_id && log_id < LOG_ID_MAX
 }

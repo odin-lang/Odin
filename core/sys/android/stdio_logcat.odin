@@ -12,14 +12,12 @@ An Android app's stdout and stderr go to `/dev/null` otherwise.
 C code writing through `libc.stdout` is switched to line buffering.
 */
 redirect_stdio_to_logcat :: proc "contextless" (tag: string = "Odin") -> bool {
-
 	Forwarder :: struct {
 		fd:  posix.FD,
 		tag: [64]byte,
 	}
 
 	forward :: proc "c" (arg: rawptr) -> rawptr {
-
 		f := (^Forwarder)(arg)
 		tag := cstring(&f.tag[0])
 

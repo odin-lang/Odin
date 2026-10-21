@@ -36,7 +36,6 @@ A thread Java did not start is attached on first use, and detached when it exits
 Returns nil before `jni_set_vm`, or if attaching fails.
 */
 jni_env :: proc "contextless" () -> ^JNIEnv {
-
 	vm := jni_vm()
 	if vm == nil {
 		return nil
@@ -63,7 +62,6 @@ Every JNI call that can throw must be followed by this (or by `env->ExceptionCle
 Calling JNI with an exception pending aborts the app.
 */
 jni_take_exception :: proc "contextless" (env: ^JNIEnv) -> jthrowable {
-
 	if env->ExceptionCheck() == JNI_FALSE {
 		return nil
 	}
@@ -74,7 +72,6 @@ jni_take_exception :: proc "contextless" (env: ^JNIEnv) -> jthrowable {
 
 @(private="file")
 jni_detach_key_get :: proc "contextless" () -> posix.pthread_key_t {
-
 	detach :: proc "c" (vm: rawptr) {
 		(^JavaVM)(vm)->DetachCurrentThread()
 	}

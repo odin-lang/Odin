@@ -127,7 +127,6 @@ Replace the saved state with a copy of `data`.
 Call it while handling `APP_CMD_SAVE_STATE`. The copy is allocated with `libc.malloc` because the activity frees it.
 */
 set_saved_state :: proc "contextless" (app: ^android_app, data: []byte) {
-
 	sync.mutex_lock(&app.mutex)
 	defer sync.mutex_unlock(&app.mutex)
 
@@ -145,7 +144,6 @@ set_saved_state :: proc "contextless" (app: ^android_app, data: []byte) {
 
 // Read the next command from the activity. Returns -1 if none is waiting.
 android_app_read_cmd :: proc "contextless" (app: ^android_app) -> i8 {
-
 	cmd: i8
 	if posix.read(app.msgread, (^byte)(&cmd), 1) != 1 {
 		android.__android_log_write(android.ANDROID_LOG_ERROR, "native_app_glue", "no data on the command pipe")
@@ -159,7 +157,6 @@ android_app_read_cmd :: proc "contextless" (app: ^android_app) -> i8 {
 
 // The glue's own handling of `cmd`, before `onAppCmd`.
 android_app_pre_exec_cmd :: proc "contextless" (app: ^android_app, cmd: i8) {
-
 	switch cmd {
 	case APP_CMD_INPUT_CHANGED:
 		sync.mutex_lock(&app.mutex)
@@ -198,7 +195,6 @@ android_app_pre_exec_cmd :: proc "contextless" (app: ^android_app, cmd: i8) {
 
 // The glue's own handling of `cmd`, after `onAppCmd`.
 android_app_post_exec_cmd :: proc "contextless" (app: ^android_app, cmd: i8) {
-
 	switch cmd {
 	case APP_CMD_TERM_WINDOW:
 		sync.mutex_lock(&app.mutex)
@@ -219,7 +215,6 @@ android_app_post_exec_cmd :: proc "contextless" (app: ^android_app, cmd: i8) {
 
 @(export)
 ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedState: rawptr, savedStateSize: c.size_t) {
-
 	context = runtime.default_context()
 	defer free_all(context.temp_allocator)
 
