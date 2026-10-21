@@ -8448,16 +8448,24 @@ gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("sort init and fini procedures");
 	check_sort_init_and_fini_procedures(c);
 
+	bool entry_point_called_outside_runtime = false;
 	if (c->info.intrinsics_entry_point_usage.count > 0) {
 		TIME_SECTION("check intrinsics.__entry_point usage");
 		Ast *node = nullptr;
 		while (mpsc_dequeue(&c->info.intrinsics_entry_point_usage, &node)) {
-			if (c->info.entry_point == nullptr && node != nullptr) {
-				if (node->file()->pkg->kind != Package_Runtime) {
-					error(node, "usage of intrinsics.__entry_point will be a no-op");
+			if (node != nullptr && node->file()->pkg->kind != Package_Runtime) {
+				entry_point_called_outside_runtime = true;
+				if (c->info.entry_point == nullptr && !build_context.no_entry_point) {
+					error(node, "usage of intrinsics.__entry_point will be a no-op: the program does not define 'main'");
 				}
 			}
 		}
+	}
+
+	// NOTE(bill): The runtime does not call `main` when an Android library is loaded. Only a package calling
+	// `intrinsics.__entry_point` does, such as `core:sys/android/native_app_glue` once its activity is created.
+	if (selected_subtarget == Subtarget_Android && c->info.entry_point != nullptr && !entry_point_called_outside_runtime) {
+		error(c->info.entry_point->token, "Nothing calls 'main' on Android: import \"core:sys/android/native_app_glue\" to run it, or remove it");
 	}
 
 	TIME_SECTION("collate type info stuff");

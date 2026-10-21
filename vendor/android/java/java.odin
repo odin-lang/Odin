@@ -30,7 +30,7 @@ That needs the process's JavaVM: `core:sys/android/native_app_glue` sets it, and
 `android.jni_set_vm` once. Classes are found with the system class loader, so the app's own classes
 cannot be found by name from a native thread.
 
-Returned references are local references. A thread Java did not start, `android_main`'s included,
+Returned references are local references. A thread Java did not start, the glue's `main` thread included,
 never returns to Java to free them, so free them with `delete_local`, or wrap loops in
 `push_local_frame` and `pop_local_frame`. Keep a reference across calls or threads with `new_global`.
 */

@@ -1,22 +1,17 @@
 /*
-Runs an Odin program as an Android `NativeActivity`. The same contract as the NDK's C `android_native_app_glue`.
+Runs an Odin program as an Android `NativeActivity`, starting at `main` as on other platforms.
 
 Importing this package exports `ANativeActivity_onCreate`, the entry point `NativeActivity` calls.
-It starts your `android_main` on a thread of its own with an `ALooper`.
-The activity's callbacks arrive on that looper as `APP_CMD_*` commands, and input events as `LOOPER_ID_INPUT`.
-
-`android_main` must be exported:
+It runs `main` on a thread of its own with an `ALooper`, once per process. `app` returns the app's state.
+The activity's callbacks arrive on that looper as `APP_CMD_*` commands, and input events as `LOOPER_ID_INPUT`:
 
 	package main
 
-	import "base:runtime"
 	import "core:sys/android"
 	import glue "core:sys/android/native_app_glue"
 
-	@(export)
-	android_main :: proc "c" (app: ^glue.android_app) {
-		context = runtime.default_context()
-
+	main :: proc() {
+		app := glue.app()
 		app.onAppCmd = proc(app: ^glue.android_app, cmd: i32) {
 			switch cmd {
 			case glue.APP_CMD_INIT_WINDOW: // `app.window` can be drawn to.
@@ -32,7 +27,16 @@ The activity's callbacks arrive on that looper as `APP_CMD_*` commands, and inpu
 		}
 	}
 
-Differences from the C glue:
+When `main` returns, the activity is finished and the process exits, as returning from `main` does elsewhere.
+Return once `destroyRequested` is set: the activity waits for it. The next launch starts a new process,
+with the state saved during `APP_CMD_SAVE_STATE` in `savedState` if Android restores the activity.
+
+An activity recreated for a configuration change the manifest does not declare (`android:configChanges`) goes to
+the running `main`. `APP_CMD_ACTIVITY_CHANGED` arrives as the old activity goes, with `activity` nil, and again
+when the new one comes. Apps usually declare every change they can handle, so this does not happen.
+
+Differences from the NDK's C `android_native_app_glue`:
+- The program starts at `main`, not an exported `android_main`, and runs once per process.
 - `onAppCmd`, `onInputEvent` and `process` use the Odin calling convention.
 - `HOME` and `TMPDIR` are set to the app's files and cache directories when unset, for `core:os`.
 
@@ -41,6 +45,7 @@ An app's stdout and stderr go to `/dev/null`. `android.redirect_stdio_to_logcat`
 #+build linux
 package native_app_glue
 
+import "base:intrinsics"
 import "base:runtime"
 import "core:c"
 import "core:c/libc"
@@ -73,7 +78,8 @@ APP_CMD_RESUME               :: 11
 APP_CMD_SAVE_STATE           :: 12 // Store state with `set_saved_state` before returning.
 APP_CMD_PAUSE                :: 13
 APP_CMD_STOP                 :: 14
-APP_CMD_DESTROY              :: 15 // `destroyRequested` is set. Return from `android_main`.
+APP_CMD_DESTROY              :: 15 // `destroyRequested` is set. Return from `main`.
+APP_CMD_ACTIVITY_CHANGED     :: 16 // `activity` is nil while a recreated activity goes, then the new one, with `config`.
 
 // The data pointer `ALooper_pollOnce` returns for `LOOPER_ID_MAIN` and `LOOPER_ID_INPUT`.
 android_poll_source :: struct {
@@ -87,7 +93,7 @@ android_app :: struct {
 	onAppCmd:     proc(app: ^android_app, cmd: i32),
 	onInputEvent: proc(app: ^android_app, event: ^android.AInputEvent) -> i32, // Return 1 if the event was handled.
 
-	activity: ^android.ANativeActivity,
+	activity: ^android.ANativeActivity, // nil while a recreated activity is replaced (`APP_CMD_ACTIVITY_CHANGED`).
 	config:   ^android.AConfiguration,
 
 	// The state from the previous instance, if any. It must be allocated with `libc.malloc` (see `set_saved_state`).
@@ -114,11 +120,15 @@ android_app :: struct {
 	destroyed:         bool,
 	pendingInputQueue: ^android.AInputQueue,
 	pendingWindow:     ^android.ANativeWindow,
+	pendingActivity:   ^android.ANativeActivity,
 }
 
-foreign {
-	// Provided by the program with `@(export)`.
-	android_main :: proc "c" (app: ^android_app) ---
+@(private)
+the_app: ^android_app
+
+// The app of the process, which `main` runs with. Activities come and go under it.
+app :: proc "contextless" () -> ^android_app {
+	return the_app
 }
 
 /*
@@ -186,10 +196,21 @@ android_app_pre_exec_cmd :: proc "contextless" (app: ^android_app, cmd: i8) {
 		sync.mutex_unlock(&app.mutex)
 
 	case APP_CMD_CONFIG_CHANGED:
-		android.AConfiguration_fromAssetManager(app.config, app.activity.assetManager)
+		if app.activity != nil {
+			android.AConfiguration_fromAssetManager(app.config, app.activity.assetManager)
+		}
 
 	case APP_CMD_DESTROY:
 		app.destroyRequested = 1
+
+	case APP_CMD_ACTIVITY_CHANGED:
+		sync.mutex_lock(&app.mutex)
+		app.activity = app.pendingActivity
+		if app.activity != nil {
+			android.AConfiguration_fromAssetManager(app.config, app.activity.assetManager)
+		}
+		sync.cond_broadcast(&app.cond)
+		sync.mutex_unlock(&app.mutex)
 	}
 }
 
@@ -260,11 +281,34 @@ ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedS
 		sync.mutex_unlock(&app.mutex)
 	}
 
+	set_activity :: proc "contextless" (app: ^android_app, activity: ^android.ANativeActivity) {
+		sync.mutex_lock(&app.mutex)
+		app.pendingActivity = activity
+		write_cmd(app, APP_CMD_ACTIVITY_CHANGED)
+		for app.activity != app.pendingActivity {
+			sync.cond_wait(&app.cond, &app.mutex)
+		}
+		sync.mutex_unlock(&app.mutex)
+	}
+
+	// Whether the activity is destroyed only to be recreated, for a configuration change.
+	is_changing_configurations :: proc "contextless" (activity: ^android.ANativeActivity) -> bool {
+		env := activity.env
+		class := env->GetObjectClass(activity.clazz)
+		defer env->DeleteLocalRef(class)
+		method := env->GetMethodID(class, "isChangingConfigurations", "()Z")
+		if method == nil {
+			env->ExceptionClear()
+			return false
+		}
+		return env->CallBooleanMethodA(activity.clazz, method, nil) != 0
+	}
+
 	to_app :: proc "contextless" (activity: ^android.ANativeActivity) -> ^android_app {
 		return (^android_app)(activity.instance)
 	}
 
-	// The thread `android_main` runs on.
+	// The thread `main` runs on.
 	app_thread :: proc(app: ^android_app) {
 		process_cmd :: proc(app: ^android_app, source: ^android_poll_source) {
 			cmd := android_app_read_cmd(app)
@@ -304,7 +348,22 @@ ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedS
 		sync.cond_broadcast(&app.cond)
 		sync.mutex_unlock(&app.mutex)
 
-		android_main(app)
+		intrinsics.__entry_point()
+
+		// `main` returned. Finish the activity, and answer the commands it sends until it is destroyed.
+		app.onAppCmd     = nil
+		app.onInputEvent = nil
+		finished: ^android.ANativeActivity
+		for app.destroyRequested == 0 {
+			if app.activity != nil && app.activity != finished {
+				android.ANativeActivity_finish(app.activity)
+				finished = app.activity
+			}
+			source: ^android_poll_source
+			if android.ALooper_pollOnce(-1, nil, nil, (^rawptr)(&source)) >= 0 && source != nil {
+				source.process(app, source)
+			}
+		}
 
 		set_saved_state(app, nil)
 
@@ -316,7 +375,7 @@ ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedS
 		app.destroyed = true
 		sync.cond_broadcast(&app.cond)
 		sync.mutex_unlock(&app.mutex)
-		// `app` belongs to the activity's thread from here on.
+		// The activity's thread ends the process from here on.
 	}
 
 	callbacks := activity.callbacks
@@ -353,8 +412,13 @@ ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedS
 		return state
 	}
 	callbacks.onDestroy = proc "c" (activity: ^android.ANativeActivity) {
-		context = runtime.default_context()
 		app := to_app(activity)
+
+		// The running `main` gets the activity that replaces this one.
+		if is_changing_configurations(activity) {
+			set_activity(app, nil)
+			return
+		}
 
 		sync.mutex_lock(&app.mutex)
 		write_cmd(app, APP_CMD_DESTROY)
@@ -363,9 +427,8 @@ ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedS
 		}
 		sync.mutex_unlock(&app.mutex)
 
-		posix.close(app.msgread)
-		posix.close(app.msgwrite)
-		free(app, runtime.heap_allocator())
+		// `main` has returned, so the process ends, as it does on other platforms.
+		libc.exit(0)
 	}
 	callbacks.onConfigurationChanged = proc "c" (activity: ^android.ANativeActivity) {
 		write_cmd(to_app(activity), APP_CMD_CONFIG_CHANGED)
@@ -402,6 +465,13 @@ ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedS
 		set_input(to_app(activity), nil)
 	}
 
+	// An activity recreated for a configuration change goes to the running `main`.
+	if the_app != nil {
+		activity.instance = the_app
+		set_activity(the_app, activity)
+		return
+	}
+
 	// `core:os` looks for writable directories in `HOME` and `TMPDIR`. The cache directory sits next to the files directory.
 	if activity.internalDataPath != nil {
 		posix.setenv("HOME", activity.internalDataPath, false)
@@ -433,6 +503,7 @@ ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedS
 	app.msgwrite = fds[1]
 
 	activity.instance = app
+	the_app = app
 
 	thread.create_and_start_with_poly_data(app, app_thread, self_cleanup=true)
 
