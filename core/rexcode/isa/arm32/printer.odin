@@ -126,7 +126,6 @@ sbprint :: proc(
 		// nothing to reconstruct: read it straight off. This is also what
 		// makes the convert family print correctly -- `vcvt.s32.f32` names
 		// both ends, and the old bit-pattern inference only ever produced one.
-		dt_suffix := ""
 		dt := inst.dt
 		if dt[0] == .NONE && i < len(inst_info) {
 			de_idx := int(inst_info[i].decode_entry)
@@ -151,8 +150,6 @@ sbprint :: proc(
 		write_mnemonic(sb, inst.mnemonic, inst.cond, inst.sets_flags, opts.uppercase)
 		if dt[0] != .NONE {
 			write_data_type(sb, dt, opts.uppercase)
-		} else if dt_suffix != "" {
-			strings.write_string(sb, dt_suffix)
 		}
 		// A 32-bit Thumb instruction that a 16-bit form could also encode
 		// says so with `.w`; an assembler otherwise picks the narrow one.
@@ -183,110 +180,6 @@ sbprint :: proc(
 		}
 		strings.write_string(sb, "\n")
 	}
-}
-
-// =============================================================================
-// Data-type suffix inference
-// =============================================================================
-//
-// UAL syntax for VFP/NEON ops: VADD.F32 / VADD.I16 / VADD.F64 etc.
-// The suffix is determined by the matched encoding form's:
-//   * Feature flag (HALF_FP -> .F16, NEON_HALF_FP -> .F16, VFPV2 -> .F32/.F64)
-//   * Opcode bits (11:8 within the NEON 3-reg-same family)
-//   * Size bits (21:20 select element width for integer NEON)
-//   * U bit (24) for signed/unsigned (e.g. .S16 vs .U16)
-//   * Register class of operand 0 (SPR -> single, DPR -> double or NEON D, QPR -> NEON Q)
-
-@(private="file")
-infer_dt_suffix :: proc(form: ^Decode_Entry, inst: ^Instruction) -> string {
-	op0 := form.ops[0]
-	feat := form.feature
-
-	// VFP scalar single/double/half by register class + feature
-	if op0 == .SPR && (feat == .VFPV2 || feat == .VFPV3 || feat == .VFPV4 ||
-					   feat == .V8 || feat == .DIV) {
-		return ".f32"
-	}
-	if op0 == .DPR && (feat == .VFPV2 || feat == .VFPV3 || feat == .VFPV4 ||
-					   feat == .V8) && !is_neon_class_op(form) {
-		return ".f64"
-	}
-	if (op0 == .SPR || op0 == .DPR) && feat == .HALF_FP {
-		return ".f16"
-	}
-	if feat == .NEON_HALF_FP {
-		return ".f16"
-	}
-
-	// MVE FP forms
-	if feat == .MVE_FP {
-		// MVE bit 20 distinguishes F16 (1) from F32 (0)
-		if (form.bits >> 20) & 1 != 0 { return ".f16" }
-		return ".f32"
-	}
-	if feat == .MVE_INT {
-		sz := (form.bits >> 20) & 0x3
-		switch sz {
-		case 0: return ".i8"
-		case 1: return ".i16"
-		case 2: return ".i32"
-		case 3: return ".i64"
-		}
-	}
-
-	// NEON integer / FP by opcode bits 11:8 + size bits 21:20
-	if feat == .NEON && (op0 == .DPR || op0 == .QPR) {
-		return neon_3reg_suffix(form)
-	}
-
-	// BF16 / DOT / FCMA / FHM
-	if feat == .BF16 { return ".bf16" }
-	if feat == .DOT  { return ".s8" }    // VSDOT / VUDOT default suffix
-	if feat == .FHM  { return ".f16" }
-	if feat == .FCMA { return ".f32" }
-
-	return ""
-}
-
-@(private="file")
-is_neon_class_op :: proc(form: ^Decode_Entry) -> bool {
-	// NEON A32 unconditional class top byte is F2/F3; T32 is E2/E3 (after bit-28 swap).
-	top := (form.bits >> 24) & 0xFF
-	if top == 0xF2 || top == 0xF3 { return true }
-	if top == 0xE2 || top == 0xE3 { return true }
-	return false
-}
-
-@(private="file")
-neon_3reg_suffix :: proc(form: ^Decode_Entry) -> string {
-	// For 3-reg-same family: bits 11:8 = opcode, bit 4 = subtype, bit 24 = U
-	op_bits := (form.bits >> 8) & 0xF
-	sz := (form.bits >> 20) & 0x3
-	u  := (form.bits >> 24) & 1
-
-	switch op_bits {
-	case 0xD:    // FP add/sub/mul/abd
-		return ".f32"
-	case 0xF:    // FP max/min/recps/rsqrts/etc.
-		return ".f32"
-	case 0x1:    // VAND/VBIC/VORR/VORN/VEOR/VBSL/VBIT/VBIF (no size suffix)
-		return ""
-	}
-
-	// Integer ops -- size from bits 21:20, signed/unsigned from U
-	prefix := u == 1 ? ".u" : ".s"
-	// Some ops are size-agnostic (.I8/.I16/etc. when signedness doesn't matter)
-	#partial switch form.mnemonic {
-	case .VADD, .VSUB, .VMUL, .VMLA, .VMLS, .VEXT, .VCEQ, .VTST:
-		prefix = ".i"
-	}
-	switch sz {
-	case 0: return strings.concatenate({prefix, "8"},  context.temp_allocator)
-	case 1: return strings.concatenate({prefix, "16"}, context.temp_allocator)
-	case 2: return strings.concatenate({prefix, "32"}, context.temp_allocator)
-	case 3: return strings.concatenate({prefix, "64"}, context.temp_allocator)
-	}
-	return ""
 }
 
 sbprintln :: proc(
@@ -542,6 +435,12 @@ write_sysm :: proc(sb: ^strings.Builder, hw: u16) {
 // DMB and DSB name their option -- `dmb ish` -- and ISB has the one name, SY.
 // The values the architecture leaves unnamed are written as numbers.
 @(private="file")
+is_coprocessor_transfer :: proc "contextless" (m: Mnemonic) -> bool {
+	return m == .LDC || m == .LDCL || m == .LDC2 || m == .LDC2L ||
+	       m == .STC || m == .STCL || m == .STC2 || m == .STC2L
+}
+
+@(private="file")
 barrier_option_name :: proc(mnemonic: Mnemonic, option: i64) -> string {
 	if mnemonic == .ISB {
 		return option == 0xF ? "sy" : ""
@@ -762,9 +661,19 @@ write_operand :: proc(
 			strings.write_string(sb, name)
 			return
 		}
+		// A coprocessor load or store has no other immediate operand: this
+		// is the option it passes the coprocessor in place of an offset.
+		if is_coprocessor_transfer(inst.mnemonic) {
+			strings.write_byte(sb, '{')
+			strings.write_i64(sb, op.immediate)
+			strings.write_byte(sb, '}')
+			return
+		}
 		fmt.sbprintf(sb, "#%d", op.immediate)
 	case .HEX_IMMEDIATE:
 		fmt.sbprintf(sb, "#0x%x", u64(op.immediate))
+	case .ROTATED_IMMEDIATE:
+		fmt.sbprintf(sb, "#%d, #%d", op.immediate, op.size)
 	case .FLOAT_IMMEDIATE:
 		fmt.sbprintf(sb, "#%e", f64(transmute(f32)u32(op.immediate)))
 	case .MEMORY:
@@ -780,6 +689,7 @@ write_operand :: proc(
 		}
 	case .REG_LIST:
 		write_reg_list(sb, u16(op.immediate))
+		if op.list.user { strings.write_byte(sb, '^') }
 	}
 }
 
@@ -803,11 +713,13 @@ write_memory :: proc(sb: ^strings.Builder, m: Memory) {
 			strings.write_string(sb, ", ")
 			if m.sign < 0 { strings.write_string(sb, "-") }
 			write_register(sb, m.index)
+			write_shift(sb, m.shift_type, m.shift_amt)
 			strings.write_string(sb, "]!")
 		case .POST_INDEX:
 			strings.write_string(sb, "], ")
 			if m.sign < 0 { strings.write_string(sb, "-") }
 			write_register(sb, m.index)
+			write_shift(sb, m.shift_type, m.shift_amt)
 		}
 	} else {
 		// An indexed form writes its displacement even when it is zero: the

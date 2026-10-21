@@ -79,6 +79,12 @@ Profile :: enum u8 {
 	M_PROFILE,    // M profile: MVE, v8-M security, v8.1-M loops and selects
 }
 
+// The coprocessors, of 0 to 7, a v8-M core gives to the Custom Datapath
+// Extension. Their space then holds CDE's instructions instead of the generic
+// coprocessor ones. Which coprocessors a core configures that way is nowhere
+// in the code, so a caller decoding for one has to say.
+CDE_Coprocessors :: bit_set[0 ..= 7; u8]
+
 // Whether a form belongs to a profile. Most do to both.
 @(require_results)
 feature_in_profile :: #force_inline proc "contextless" (feature: Feature, profile: Profile) -> bool {
@@ -312,9 +318,6 @@ Operand_Type :: enum u8 {
 	MVE_VPT_MASK,         // VPT block mask (4-bit then/else pattern)
 	MVE_VCTP_SIZE,        // 2-bit element-size selector for VCTP (B/H/W/D)
 	MVE_LOOP_TGT,         // low-overhead-loop branch target (WLS/LE/DLS imm)
-	CDE_COPROC,           // CDE coprocessor number 0..7
-	CDE_IMM,              // CDE immediate (varies per CX1/CX2/CX3 form)
-	CDE_VFP_REG,          // CDE VCX1/2/3 destination S/D-reg
 }
 
 // ---- Operand encodings (where the bits land) -------------------------------
@@ -330,7 +333,6 @@ Operand_Encoding :: enum u8 {
 	RS_A32,                // bits 11-8  (register-shifted-register shift amount)
 	RT_A32,                // bits 15-12 (load/store target = RD slot)
 	RT2_A32,               // bits 15-12 + 1 (LDRD/STRD even-odd pair, implicit)
-	RA_A32,                // bits 15-12 (MLA, MLS accumulator)
 	RDLO_A32,              // bits 15-12 (UMULL/SMULL low result)
 	RDHI_A32,              // bits 19-16 (UMULL/SMULL high result)
 
@@ -384,6 +386,7 @@ Operand_Encoding :: enum u8 {
 
 	// ---- T32 (packed first_halfword << 16 | second) ----
 	RM_T32_ROTATED,        // Rm at 3-0, rotated right by 8 * bits 5-4 (the extends)
+	RM_A32_ROTATED,        // the same in A32, with the rotation at bits 11-10
 	RM_T32_TWICE,          // Rm at 3-0 and again at 19-16 (REV, RBIT, CLZ)
 	RN_T32_SAT,            // SSAT/USAT's Rn at 19-16, LSL or ASR (bit 21) by imm3:imm2
 	T32_IMM12,             // i:imm3:imm8, as is (ADDW, SUBW)
@@ -394,7 +397,19 @@ Operand_Encoding :: enum u8 {
 	SAT16_IMM4_U_T32,      // USAT16's width, bits 3-0
 	BFI_MSB_T32,           // BFI/BFC's top bit, bits 4-0
 	BFX_WIDTH_T32,         // SBFX/UBFX's width, bits 4-0, less one
-	T32_IMM4_IMM12,        // imm4 at 19-16 and imm12 at 11-0 (HVC, UDF.W)
+	IMM4_IMM12,            // imm4 at 19-16 and imm12 at 11-0 (A32 MOVW/MOVT, Thumb HVC/UDF.W)
+	IMM12_IMM4,            // imm12 at 19-8 and imm4 at 3-0 (A32 BKPT, HVC, UDF, HLT)
+	CPS_IFLAGS_A32,        // A, I and F at bits 8-6
+	SETPAN_IMM_A32,        // bit 9
+	RM_PAIR_NEXT,          // the register after the one at 3-0: no bits (STREXD's Rt2)
+	BRANCH_BLX_A32,        // BLX to Thumb: imm24 words and H, a halfword, at bit 24
+	NEON_VEXT_IMM4,        // VEXT's byte index, bits 11-8
+	A32_REG_LIST_USER,     // an LDM/STM list written with `^`: the user registers, or exception return
+	MEM_REG_SHIFTED,       // [Rn, +/-Rm{, shift}]: Rm 3-0, shift imm5 at 11-7 and type 6-5, U 23
+	MEM_REG_SHIFTED_PRE,   // [Rn, +/-Rm{, shift}]!
+	MEM_REG_SHIFTED_POST,  // [Rn], +/-Rm{, shift}
+	MEM_REG_PRE,           // [Rn, +/-Rm]! (halfword and dual: no shift)
+	MEM_REG_POST,          // [Rn], +/-Rm
 	T32_IMM4_SMC,          // bits 19-16
 	T32_IMM8,              // bits 7-0 (SUBS PC, LR)
 	CPS_IFLAGS_T32,        // A, I and F at bits 7-5
@@ -430,20 +445,12 @@ Operand_Encoding :: enum u8 {
 	// ---- Modified immediate ----
 	A32_IMM_MOD,           // bits 11-0 carry rotate(11:8) + value(7:0)
 	T32_IMM_MOD,           // Thumb-2 modified-imm in i:imm3:imm8 (bits 26, 14-12, 7-0)
-	A32_IMM12_ROT,         // identical to A32_IMM_MOD; alternate name for clarity
 
 	// ---- Immediate field placements (A32) ----
-	A32_IMM12,             // bits 11-0 (LDR/STR offset)
 	A32_IMM_SHIFT,         // bits 11-7 (data-proc shift_imm)
 	A32_IMM_SHIFT_32,      // same field, but a zero means 32 (LSR/ASR)
-	A32_SHIFT_TYPE,        // bits 6-5
-	A32_RS_SHIFT,          // bits 11-8 (RSR uses Rs register)
 	A32_IMM24,             // bits 23-0 (B/BL/SVC)
 	A32_IMM4,              // bits 3-0 in modified-imm rotate or SAT amount
-	A32_IMM4_ROTATE,       // bits 11-8 (rotation in some forms)
-	A32_IMM5_LSB,          // bits 11-7 (BFC/BFI/UBFX lsb)
-	A32_IMM5_W,            // bits 20-16 (BFC/BFI msb -- width = msb - lsb + 1)
-	A32_COND_FIELD,        // bits 31-28
 	A32_REG_LIST,          // bits 15-0 (LDM/STM/PUSH/POP bitmask of R0..R15)
 
 	// ---- VFP / NEON register fields ----
@@ -489,8 +496,6 @@ Operand_Encoding :: enum u8 {
 	RN_A32_WB,             // base register whose writeback rides in bit 21
 	NEON_LANE_VN_32,       // Vn:N with the 32-bit lane index in bit 21              // VFP immediate (VMOV.F32/F64 #imm)
 	NEON_IMM8_ABCDEFGH,    // bits 18-16 (abc) + bits 3-0 (defgh)
-	NEON_CMODE,            // bits 11-8 (cmode for VMOV/VMVN immediate)
-	NEON_OP_BIT,           // bit 5 (op for VMOV immediate variant)
 
 	// ---- VFP / NEON list ----
 	VFP_S_LIST,            // VLDM/VSTM single-prec list (8-bit count, start in Vd_S)
@@ -498,7 +503,9 @@ Operand_Encoding :: enum u8 {
 	VFP_DX_LIST,           // FLDMX/FSTMX: the same, with an odd count one past the list
 	VD_S_AGAIN,            // the fixed-point VCVTs name Sd twice and encode it once
 	VD_D_AGAIN,            // the same for Dd
-	RT_VMRS,               // VMRS's Rt, where 1111 is APSR_nzcv
+	RT_OR_APSR_NZCV,       // Rt at 15-12, where 1111 is APSR_nzcv (VMRS, MRC, CDE)
+	RN_OR_APSR_NZCV,       // the same at 19-16 (CDE)
+	RM_OR_APSR_NZCV,       // the same at 3-0 (CDE)
 
 	// VTBL/VTBX read their table from a run of one to four D registers
 	// starting at Vn. Which run length applies is the `len` field, which is
@@ -547,7 +554,7 @@ Operand_Encoding :: enum u8 {
 	// opcode at bits 7:4, so they cannot use the 12-bit forms below.
 	// LDRD/STRD name a register pair, and the second is always the first plus
 	// one, so it occupies no bits of its own.
-	RT2_A32_PAIR,
+	RT_PAIR_NEXT,          // the register after the one at 15-12: no bits (LDRD's Rt2)
 	MEM_IMM8_PRE_INDEX,
 	MEM_IMM8_POST_INDEX,
 	MEM_IMM8_OFFSET,
@@ -558,8 +565,6 @@ Operand_Encoding :: enum u8 {
 	MEM_REG_OFFSET,        // [Rn, ±Rm{, shift}]
 	MEM_PRE_INDEX,         // [Rn, #imm]! / [Rn, ±Rm]!
 	MEM_POST_INDEX,        // [Rn], #imm / [Rn], ±Rm
-	MEM_LITERAL,           // [PC, #imm]  (LDR literal)
-	MEM_DOUBLEREG,         // [Rn, Rm] for LDRD/STRD register offset
 
 	// ---- Coprocessor ----
 	COPROC_NUM_FIELD,      // bits 11-8 in CDP/LDC/STC (cp_num)
@@ -570,6 +575,7 @@ Operand_Encoding :: enum u8 {
 	COPROC_CRN_FIELD,      // bits 19-16
 	COPROC_CRM_FIELD,      // bits 3-0
 	COPROC_OPC_MCRR,       // bits 7-4 (MCRR/MRRC 4-bit opcode)
+	COPROC_OPTION,         // bits 7-0, LDC/STC's `{option}` where an offset would be
 
 	// ---- Branch fields ----
 	BRANCH_24,             // A32 imm24 at bits 23-0 (scaled ×4, ±32MB)
@@ -586,9 +592,7 @@ Operand_Encoding :: enum u8 {
 
 	// ---- Misc ----
 	PSR_FIELD_MASK,        // APSR fields_mask at bits 19-16 (MSR)
-	SYSM_FIELD,            // SYSm at bits 7-0 (MRS_BANKED)
 	BARRIER_TYPE,          // bits 3-0 for DMB/DSB/ISB
-	CPS_IFLAGS,            // imod + iflags + mode for CPS
 	HINT_FIELD,            // hint imm
 
 	// ---- Saturate ----
@@ -628,13 +632,20 @@ Operand_Encoding :: enum u8 {
 	MVE_RDA_EVEN,          // an even accumulator, Rda / 2 at bits 15:13 (VADDV, VMLADAV)
 	MVE_RDALO,             // a long accumulator's low half, RdaLo / 2 at bits 15:13
 	MVE_RDAHI,             // its high half, RdaHi / 2 at bits 22:20 (RdaHi is odd)
-	MVE_SIZE_FIELD,        // 2-bit size in bits 21:20 (B/H/W/D)
 	MVE_VPT_MASK_FIELD,    // VPT mask in bits 3:0 of second halfword
-	MVE_LOOP_IMM,          // low-overhead-loop immediate
-	CDE_COPROC_FIELD,      // CDE p<n> coprocessor selector (bits 11:8)
-	CDE_IMM_FIELD,         // CDE immediate (variable layout)
-	CDE_ACC_FIELD,         // CDE accumulator bit (distinguishes CX1/CX1A)
-	V8M_TT_AT_BITS,        // TT/TTA/TTT/TTAT A and T bit field at bits 7:6
+	MVE_RN_EVEN,           // an even GPR, Rn / 2 at bits 19:17 (VIDUP's offset)
+	MVE_RM_ODD,            // an odd GPR, Rm / 2 at bits 3:1 (VIWDUP's wrap)
+	MVE_DUP_IMM,           // 1, 2, 4 or 8, as its log2 in bits 7 and 0
+	CDE_COPROC_FIELD,      // CDE p<n>, bits 10-8 (bit 11 is 0: CDE has coprocessors 0-7)
+	// CDE immediates, scattered around the register fields. The vector forms
+	// on Q registers (bit 6 set) have one bit more, at 24, where the S and D
+	// forms say which of the two they are.
+	CDE_IMM_CX1,           // imm13: 5-0, then 7, then 21-16
+	CDE_IMM_CX2,           // imm9: 5-0, then 7, then 21-20
+	CDE_IMM_CX3,           // imm6: 5-4, then 7, then 22-20
+	CDE_IMM_VCX1,          // imm11: 5-0, then 7, then 19-16 (imm12: then 24)
+	CDE_IMM_VCX2,          // imm6: 4, then 7, then 19-16 (imm7: then 24)
+	CDE_IMM_VCX3,          // imm3: 4, then 21-20 (imm4: then 24)
 }
 
 // ---- Encoding struct -------------------------------------------------------

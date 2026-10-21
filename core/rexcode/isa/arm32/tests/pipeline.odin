@@ -513,7 +513,7 @@ THUMB_GOLDEN_TEXT :: `.L0:
     push {r4-fp, lr}
     pop {r4-fp, pc}
     ldmdb r0!, {r1-r3}
-    stm.w r0, {r1-r2}
+    stm r0, {r1-r2}
     b.w .L3
     bne.w .L0
     bl .L3

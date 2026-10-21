@@ -112,14 +112,6 @@ thumb_form_of :: proc(form: Encoding) -> (thumb: Encoding, ok: bool) {
 		return
 	}
 	thumb.flags.thumb32 = true
-	// M-profile cores give the generic coprocessor space to CDE.
-	GENERIC_COPROCESSOR :: []Mnemonic{
-		.CDP, .CDP2, .MCR, .MCR2, .MRC, .MRC2, .MCRR, .MCRR2, .MRRC, .MRRC2,
-		.LDC, .LDCL, .LDC2, .LDC2L, .STC, .STCL, .STC2, .STC2L,
-	}
-	if slice.contains(GENERIC_COPROCESSOR, form.mnemonic) {
-		thumb.flags.a_profile_only = true
-	}
 	ok = true
 	return
 }

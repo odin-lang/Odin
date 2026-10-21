@@ -37,6 +37,11 @@ Operand_Kind :: enum u8 {
 	// it is the 32-bit pattern, which is what the encoder needs back.
 	HEX_IMMEDIATE,
 	FLOAT_IMMEDIATE,
+	// An A32 modified immediate written as its parts, `#imm8, #rotation`:
+	// the value has more than one encoding, the word uses one an assembler
+	// would not choose, and only the parts say which. `immediate` holds imm8
+	// and `size` the rotation, 0 to 30.
+	ROTATED_IMMEDIATE,
 }
 
 // ---- Shift / addressing-mode helpers ---------------------------------------
@@ -148,7 +153,10 @@ List_Shape :: bit_field u16 {
 	count:     u8   | 6,   // 0 = not a list, else 1..32
 	stride:    u8   | 3,   // 1 for {d2, d3}, 2 for {d2, d4}
 	all_lanes: bool | 1,   // `{d2[]}` -- loaded to every lane
-	_:         u8   | 6,
+	// An A32 LDM/STM list written `{...}^`: the user-mode registers, or for
+	// an LDM that loads PC, a return from exception.
+	user:      bool | 1,
+	_:         u8   | 5,
 }
 #assert(size_of(Operand) == 12)
 
@@ -176,6 +184,11 @@ op_hex_imm :: #force_inline proc "contextless" (v: u32) -> Operand {
 op_float_imm :: #force_inline proc "contextless" (bits: u32) -> Operand {
 	return Operand{immediate = i64(bits), kind = .FLOAT_IMMEDIATE, size = 4}
 }
+@(require_results)
+op_rotated_imm :: #force_inline proc "contextless" (imm8: u8, rotation: u8) -> Operand {
+	return Operand{immediate = i64(imm8), kind = .ROTATED_IMMEDIATE, size = rotation}
+}
+
 @(require_results)
 op_mem :: #force_inline proc "contextless" (m: Memory) -> Operand {
 	return Operand{mem = m, kind = .MEMORY, size = 4}

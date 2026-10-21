@@ -39,6 +39,11 @@ package main
 //   EXTRA          rexcode decodes the word, llvm does not
 //   BOTH_INVALID   neither does
 //
+// Apart from its bucket, every word rexcode decodes must come back unchanged
+// out of rexcode's own encoder (`reencode` in the summary counts the ones that
+// do not). llvm never sees what the encoder does, so this is the only check on
+// the encoder's half of the round trip for real words.
+//
 // Each suite runs against an A-profile and an M-profile LLVM target: the two
 // disagree about parts of the encoding space (MVE reuses Advanced SIMD's, and
 // BXNS is BX with should-be-zero bits set), and a word passes when it round
@@ -113,6 +118,9 @@ Result :: struct {
 	assembled:   string,   // what llvm-mc made of our text, as hex
 	diagnostic:  string,   // llvm-mc's complaint, for UNASSEMBLABLE
 	target:      string,   // the target the kept outcome came from
+	// rexcode's encoder, given what rexcode's decoder made of the word, does
+	// not give the word back -- under some target's profile.
+	encoder_disagrees: bool,
 }
 
 // Allowed counts per suite. Every one of these should name what it excuses.
@@ -433,12 +441,14 @@ verify_suite :: proc(suite: ^Suite, work_dir: string) -> []Result {
 		llvm := llvm_disassemble(suite, target, t, words, work_dir)
 		verdicts := make([]Verdict, len(words))
 		ours := make([]string, len(words))
+		encoder_disagrees := make([]bool, len(words))
 		assembled_hex := make([]string, len(words))
 		diagnostic := make([]string, len(words))
 		lines := make([]string, len(words))
 		for word, i in words {
-			valid: bool
-			ours[i], valid = rexcode_text(suite.mode, []Word{word}, target.profile)
+			valid, reencoded: bool
+			ours[i], valid, reencoded = rexcode_text(suite.mode, []Word{word}, target.profile)
+			encoder_disagrees[i] = valid && !reencoded
 			llvm_valid := llvm[i] != ""
 			switch {
 			case valid && llvm_valid:
@@ -461,6 +471,15 @@ verify_suite :: proc(suite: ^Suite, work_dir: string) -> []Result {
 			verdicts[i] = judge(encoded[:words[i].length], assembled[i], ours[i], llvm[i])
 			assembled_hex[i] = hex_string(assembled[i])
 			diagnostic[i] = diagnostics[i]
+		}
+
+		// Where llvm reproduces the word from the text, the word is the one
+		// way to write the instruction, and the encoder must agree; elsewhere
+		// it may rightly pick another.
+		for i in 0 ..< len(words) {
+			if verdicts[i] != .EXACT {
+				encoder_disagrees[i] = false
+			}
 		}
 
 		// For what is failing, ask whether llvm's own text for the word
@@ -504,6 +523,7 @@ verify_suite :: proc(suite: ^Suite, work_dir: string) -> []Result {
 				assembled  = assembled_hex[i],
 				diagnostic = diagnostic[i],
 				target     = target.triple,
+				encoder_disagrees = encoder_disagrees[i],
 			}
 		}
 	}
@@ -526,6 +546,12 @@ verify_suite :: proc(suite: ^Suite, work_dir: string) -> []Result {
 				seen[target.profile] = true
 			}
 		}
+		encoder_disagrees := false
+		for target, t in suite.targets {
+			_ = target
+			encoder_disagrees ||= outcomes[t][i].encoder_disagrees
+		}
+		defer results[i].encoder_disagrees = encoder_disagrees
 		first := true
 		for profile in a.Profile {
 			if !seen[profile] {
@@ -643,8 +669,9 @@ verify_blocks :: proc(suite: ^Suite, work_dir: string) -> []Result {
 		lines := make([]string, len(suite.blocks))
 		for block, i in suite.blocks {
 			results[i].word = block[0]
-			text, valid := rexcode_text(suite.mode, block, target.profile)
+			text, valid, reencoded := rexcode_text(suite.mode, block, target.profile)
 			results[i].ours = text
+			results[i].encoder_disagrees ||= valid && !reencoded
 			if !valid {
 				results[i].verdict = .MISSING
 				results[i].target = target.triple
@@ -665,6 +692,9 @@ verify_blocks :: proc(suite: ^Suite, work_dir: string) -> []Result {
 			}
 			// A block passes only if it passes under every target.
 			outcome := judge(original[:], assembled[i], "", "-")
+			if outcome != .EXACT {
+				results[i].encoder_disagrees = false
+			}
 			if t == 0 || outcome > results[i].verdict {
 				results[i].verdict = outcome
 				results[i].assembled = hex_string(assembled[i])
@@ -695,7 +725,7 @@ is_branch_with_link :: proc(mnemonic: string) -> bool {
 // of the printer as absolute offsets from the start of the run; they are
 // rewritten as offsets from the instruction itself, which is where llvm-mc
 // will place it.
-rexcode_text :: proc(mode: a.Mode, words: []Word, profile: a.Profile) -> (text: string, valid: bool) {
+rexcode_text :: proc(mode: a.Mode, words: []Word, profile: a.Profile) -> (text: string, valid: bool, reencoded: bool) {
 	bytes: [dynamic]u8
 	for word in words {
 		encoded := word_bytes(mode, word)
@@ -705,9 +735,37 @@ rexcode_text :: proc(mode: a.Mode, words: []Word, profile: a.Profile) -> (text: 
 	info:         [dynamic]a.Instruction_Info
 	labels:       [dynamic]a.Label_Definition
 	errors:       [dynamic]a.Error
-	a.decode(bytes[:], nil, &instructions, &info, &labels, &errors, mode, profile)
+	// The M-profile target gives llvm every CDE coprocessor (M_PROFILE_FEATURES).
+	cde: a.CDE_Coprocessors
+	if profile == .M_PROFILE {
+		cde = ~a.CDE_Coprocessors{}
+	}
+	a.decode(bytes[:], nil, &instructions, &info, &labels, &errors, mode, profile, cde)
 	if len(errors) > 0 || len(instructions) != len(words) {
-		return "", false
+		return "", false, false
+	}
+
+	// rexcode's own encoder must give the bytes back from what its decoder
+	// made of them. The text check below cannot see this: a field the
+	// encoder misplaces never reaches llvm.
+	//
+	// Not for a PC-relative operand: decoding gives the target as an address
+	// and encoding takes a label, and a single word's target lies outside the
+	// run where no label can name it. The text check covers those.
+	reencoded = true
+	has_relative := false
+	for &inst in instructions {
+		for k in 0 ..< int(inst.operand_count) {
+			has_relative ||= inst.ops[k].kind == .RELATIVE
+		}
+	}
+	if !has_relative {
+		// encode wants room for every instruction at its widest.
+		code := make([]u8, len(instructions) * 4)
+		encode_relocs: [dynamic]a.Relocation
+		encode_errors: [dynamic]a.Error
+		encoded_count, encoded := a.encode(instructions[:], labels[:], code, &encode_relocs, &encode_errors)
+		reencoded = encoded && int(encoded_count) == len(bytes) && slice.equal(code[:encoded_count], bytes[:])
 	}
 
 	builder := strings.builder_make()
@@ -749,7 +807,7 @@ rexcode_text :: proc(mode: a.Mode, words: []Word, profile: a.Profile) -> (text: 
 		}
 		strings.write_string(&builder, line)
 	}
-	return strings.to_string(builder), true
+	return strings.to_string(builder), true, reencoded
 }
 
 word_bytes :: proc(mode: a.Mode, word: Word) -> [4]u8 {
@@ -974,20 +1032,52 @@ llvm_assemble :: proc(suite: ^Suite, target: Target, target_index: int, lines: [
 
 summarize :: proc(suite: ^Suite, results: []Result, report: ^strings.Builder) -> (passed: bool) {
 	counts: [Verdict]int
+	encoder_disagreements := 0
 	for result in results {
 		counts[result.verdict] += 1
+		if result.encoder_disagrees {
+			encoder_disagreements += 1
+		}
 	}
 	allowance := suite.allowance
 	passed = counts[.WRONG] == 0 &&
+	         encoder_disagreements == 0 &&
 	         counts[.MISSING] <= allowance.missing &&
 	         counts[.EXTRA] <= allowance.extra &&
 	         counts[.UNASSEMBLABLE] <= allowance.unassemblable
 
-	fmt.printfln("[%-3s] %6d words  exact %6d  equivalent %4d  unrepresentable %4d  profile-extra %4d  wrong %5d  unassemblable %5d  missing %5d  extra %5d  both-invalid %6d  %s",
+	fmt.printfln("[%-3s] %6d words  exact %6d  equivalent %4d  unrepresentable %4d  profile-extra %4d  wrong %5d  unassemblable %5d  missing %5d  extra %5d  both-invalid %6d  reencode %4d  %s",
 	             suite.name, len(results), counts[.EXACT], counts[.EQUIVALENT], counts[.UNREPRESENTABLE], counts[.PROFILE_EXTRA], counts[.WRONG], counts[.UNASSEMBLABLE],
-	             counts[.MISSING], counts[.EXTRA], counts[.BOTH_INVALID], passed ? "ok" : "FAIL")
+	             counts[.MISSING], counts[.EXTRA], counts[.BOTH_INVALID], encoder_disagreements, passed ? "ok" : "FAIL")
 
 	fmt.sbprintfln(report, "\n===== %s =====", suite.name)
+	if encoder_disagreements > 0 {
+		groups := make(map[string][dynamic]^Result)
+		for &result in results {
+			if !result.encoder_disagrees {
+				continue
+			}
+			key := first_token(result.ours)
+			if key not_in groups {
+				groups[key] = make([dynamic]^Result)
+			}
+			append(&groups[key], &result)
+		}
+		keys, _ := slice.map_keys(groups)
+		slice.sort_by(keys, proc(x, y: string) -> bool { return x < y })
+		fmt.sbprintfln(report, "\n--- ENCODER_DISAGREES (%d) ---", encoder_disagreements)
+		for key in keys {
+			group := groups[key]
+			fmt.sbprintfln(report, "  %-16s %6d", key, len(group))
+			for result, n in group {
+				if n >= 4 {
+					break
+				}
+				fmt.sbprintfln(report, "      %0*x  ours %q", int(result.word.length) * 2, result.word.value, result.ours)
+			}
+		}
+	}
+
 	for verdict in Verdict {
 		switch verdict {
 		case .BOTH_INVALID, .EXACT:

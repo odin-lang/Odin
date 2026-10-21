@@ -70,8 +70,8 @@ run_smoke :: proc() {
 	check("QADD8", .QADD8, 0x06200F90, 0x0FF00FF0)
 
 	// ---- Extends + bit-field ----
-	check("SXTB", .SXTB, 0x06AF0070, 0x0FFF0070)
-	check("UXTH", .UXTH, 0x06FF0070, 0x0FFF0070)
+	check("SXTB",   .SXTB,   0x06AF0070, 0x0FFF03F0)
+	check("UXTH",   .UXTH,   0x06FF0070, 0x0FFF03F0)
 	check("CLZ", .CLZ, 0x016F0F10, 0x0FFF0FF0)
 	check("REV", .REV, 0x06BF0F30, 0x0FFF0FF0)
 	check("RBIT", .RBIT, 0x06FF0F30, 0x0FFF0FF0)
@@ -107,9 +107,9 @@ run_smoke :: proc() {
 	check("LDRB imm", .LDRB, 0x05500000, 0x0F700000)
 	check("STRH imm", .STRH, 0x014000B0, 0x0F7000F0)
 	check("LDRSB imm", .LDRSB, 0x015000D0, 0x0F7000F0)
-	check("LDRD", .LDRD, 0x014000D0, 0x0F7000F0)
+	check("LDRD", .LDRD, 0x014000D0, 0x0F7010F0)
 	check("LDM", .LDM, 0x08900000, 0x0FF00000)
-	check("STM DB", .STMDB, 0x09000000, 0x0FD00000)
+	check("STM DB", .STMDB, 0x09000000, 0x0FF00000)
 	check("PUSH", .PUSH, 0x092D0000, 0x0FFF0000)
 	check("POP", .POP, 0x08BD0000, 0x0FFF0000)
 	check("SWP", .SWP, 0x01000090, 0x0FF00FF0)
@@ -118,7 +118,7 @@ run_smoke :: proc() {
 	check("LDREX", .LDREX, 0x01900F9F, 0x0FF00FFF)
 	check("STREX", .STREX, 0x01800F90, 0x0FF00FF0)
 	check("LDREXB", .LDREXB, 0x01D00F9F, 0x0FF00FFF)
-	check("LDREXD", .LDREXD, 0x01B00F9F, 0x0FF00FFF)
+	check("LDREXD", .LDREXD, 0x01B00F9F, 0x0FF01FFF)
 	check("LDA (v8)", .LDA, 0x01900C9F, 0x0FF00FFF)
 	check("STL (v8)", .STL, 0x0180FC90, 0x0FF0FFF0)
 
@@ -139,8 +139,8 @@ run_smoke :: proc() {
 	check("VLDR.F32", .VLDR, 0x0D100A00, 0x0F300F00)
 	check("VSTR.F64", .VSTR, 0x0D000B00, 0x0F300F00)
 	// The system register is an operand now, so its field is not fixed.
-	check("VMRS", .VMRS, 0x0EF10A10, 0x0FF00FFF)
-	check("VMSR", .VMSR, 0x0EE10A10, 0x0FF00FFF)
+	check("VMRS", .VMRS, 0x0EF00A10, 0x0FF00FFF)
+	check("VMSR", .VMSR, 0x0EE00A10, 0x0FF00FFF)
 	check("VPUSH.F32", .VPUSH, 0x0D2D0A00, 0x0FFF0F00)
 	check("VPOP.F64", .VPOP, 0x0CBD0B00, 0x0FFF0F01)
 	check("VCMP.F32", .VCMP, 0x0EB40A40, 0x0FBF0FD0)
@@ -190,7 +190,7 @@ run_smoke :: proc() {
 	check("VCLZ.I8 D", .VCLZ, 0xF3B00480, 0xFFBF0FD0)
 	check("VSHR.S8 D imm", .VSHR, 0xF2800010, 0xFE800F10)
 	check("VSHL reg.S8 D", .VSHL, 0xF2000400, 0xFFB00F10)
-	check("VEXT D", .VEXT, 0xF2B00000, 0xFFB00010)
+	check("VEXT D", .VEXT, 0xF2B00000, 0xFFB00850)
 	check("VDUP from Rt D", .VDUP, 0x0EC00B10, 0x0FF00FD0)
 	check("VREV64.I8 D", .VREV64, 0xF3B00000, 0xFFBF0FD0)
 	check("VTRN.I8 D", .VTRN, 0xF3B20080, 0xFFBF0FD0)
@@ -299,7 +299,7 @@ run_smoke :: proc() {
 
 	// ---- T32 32-bit Thumb-2 data-processing ----
 	check("AND T32 imm", .AND, 0xF0000000, 0xFBF08000)
-	check("AND T32 reg", .AND, 0xEA000000, 0xFFF00000)
+	check("AND T32 reg", .AND, 0xEA000000, 0xFFF08000)
 	check("EOR T32 imm", .EOR, 0xF0800000, 0xFBF08000)
 	check("ORR T32 imm", .ORR, 0xF0400000, 0xFBF08000)
 	check("BIC T32 imm", .BIC, 0xF0200000, 0xFBF08000)
@@ -333,11 +333,11 @@ run_smoke :: proc() {
 	check("STRH T32 imm12", .STRH, 0xF8A00000, 0xFFF00000)
 	check("LDRSB T32 imm12", .LDRSB, 0xF9900000, 0xFFF00000)
 	check("LDRSH T32 imm12", .LDRSH, 0xF9B00000, 0xFFF00000)
-	check("LDM T32 IA", .LDM, 0xE8900000, 0xFFF00000)
-	check("LDM T32 DB", .LDMDB, 0xE9100000, 0xFFF00000)
-	check("STM T32 IA", .STM, 0xE8800000, 0xFFF00000)
-	check("PUSH T32", .PUSH, 0xE92D0000, 0xFFFF0000)
-	check("POP T32", .POP, 0xE8BD0000, 0xFFFF0000)
+	check("LDM T32 IA", .LDM, 0xE8900000, 0xFFF02000)
+	check("LDM T32 DB", .LDMDB, 0xE9100000, 0xFFF02000)
+	check("STM T32 IA", .STM, 0xE8800000, 0xFFF0A000)
+	check("PUSH T32", .PUSH, 0xE92D0000, 0xFFFFA000)
+	check("POP T32", .POP, 0xE8BD0000, 0xFFFF2000)
 
 	// ---- Round 2: more NEON + T32 forms ----
 	check("VMLAL.S8", .VMLAL, 0xF2800800, 0xFFB00F50)
@@ -345,7 +345,7 @@ run_smoke :: proc() {
 	check("VQDMULH.S16", .VQDMULH, 0xF2100B00, 0xFFB00F10)
 	check("VQRDMULH.S16", .VQRDMULH, 0xF3100B00, 0xFFB00F10)
 	check("VQDMULL.S16", .VQDMULL, 0xF2900D00, 0xFFB00F50)
-	check("VMOVL.S8", .VMOVL, 0xF2880A10, 0xFFB80FD0)
+	check("VMOVL.S8", .VMOVL, 0xF2880A10, 0xFFBF0FD0)
 	check("VMOVN.I16", .VMOVN, 0xF3B20200, 0xFFBF0FD0)
 	check("VQMOVN.S16", .VQMOVN, 0xF3B20280, 0xFFBF0FD0)
 	check("VQMOVUN.S16", .VQMOVUN, 0xF3B20240, 0xFFBF0FD0)
@@ -438,13 +438,18 @@ run_smoke :: proc() {
 	check("LCTP", .LCTP, 0xF00FE001, 0xFFFFFFFF)
 
 	// ---- Custom Datapath Extension (CDE) ----
-	check("CX1", .CX1, 0xEE000000, 0xFF800800)
-	check("CX1A", .CX1A, 0xFE000000, 0xFF800800)
-	check("CX2", .CX2, 0xEE400000, 0xFFC00800)
-	check("CX3", .CX3, 0xEE800000, 0xFFC00800)
-	check("VCX1 S", .VCX1, 0xEC200000, 0xFF300800)
-	check("VCX1 D", .VCX1, 0xEC300000, 0xFF300800)
-	check("VCX3 D", .VCX3, 0xEC900000, 0xFF300800)
+	// Checked against llvm-mc with every coprocessor configured for CDE.
+	check("CX1", .CX1, 0xEE000000, 0xFFC00840)
+	check("CX1A", .CX1A, 0xFE000000, 0xFFC00840)
+	check("CX1D", .CX1D, 0xEE000040, 0xFFC01840)
+	check("CX2", .CX2, 0xEE400000, 0xFFC00840)
+	check("CX3", .CX3, 0xEE800000, 0xFF800840)
+	check("CX3D", .CX3D, 0xEE800040, 0xFF800841)
+	check("VCX1 S", .VCX1, 0xEC200000, 0xFFB00840)
+	check("VCX1 D", .VCX1, 0xED200000, 0xFFF00840)
+	check("VCX1 Q", .VCX1, 0xEC200040, 0xFEF01840)
+	check("VCX3 D", .VCX3, 0xED800000, 0xFFC008E0)
+	check("VCX3 Q", .VCX3, 0xEC800040, 0xFEC118E1)
 
 	// ---- MVE predication and tail-loop (LLVM-verified) ----
 	check("VPT", .VPT, 0xFE010F00, 0xFE018FF0)
@@ -471,7 +476,8 @@ run_smoke :: proc() {
 	check("VHCADD", .VHCADD, 0xEE000F00, 0xEFF10FF1)
 	check("VBRSR", .VBRSR, 0xEE011E60, 0xEFC11FF1)
 	check("VSHLC", .VSHLC, 0xEE000FC0, 0xFFC00FF1)
-	check("VIDUP", .VIDUP, 0xEE010F6E, 0xEFC11F7E)
+	check("VIDUP", .VIDUP, 0xEE010F6E, 0xFFF11F7E)
+	check("VIWDUP", .VIWDUP, 0xEE010F60, 0xFFF11F70)
 
 	// ---- MVE narrowing/widening ----
 	check("VMOVNB", .VMOVNB, 0xFE310E81, 0xFFF31FF1)

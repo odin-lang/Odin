@@ -42,6 +42,8 @@ decode :: proc(
 	mode:         Mode = .A32,
 	// Only matters for Thumb: which reading of the words the profiles share.
 	profile:      Profile = .A_PROFILE,
+	// Only matters for M-profile Thumb: the coprocessors that are CDE's.
+	cde:          CDE_Coprocessors = {},
 ) -> (byte_count: u32, ok: bool) {
 	n_bytes := u32(len(data))
 	if mode == .T32 { n_bytes = n_bytes & ~u32(1) }
@@ -86,7 +88,7 @@ decode :: proc(
 		info.offset = byte_count
 
 		in_it_block := it_state & 0xF != 0
-		if !find_and_decode(word, mode, ilen, byte_count, it_state, profile, &inst, &info) {
+		if !find_and_decode(word, mode, ilen, byte_count, it_state, profile, cde, &inst, &info) {
 			append(errors, Error{inst_idx = byte_count, code = .INVALID_OPCODE})
 			inst = Instruction{mnemonic = .INVALID, length = u8(ilen), mode = mode}
 		} else {
@@ -132,7 +134,7 @@ decode :: proc(
 // =============================================================================
 
 @(private="file")
-find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, pc: u32, it_state: u8, profile: Profile, inst: ^Instruction, info: ^Instruction_Info) -> bool {
+find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, pc: u32, it_state: u8, profile: Profile, cde: CDE_Coprocessors, inst: ^Instruction, info: ^Instruction_Info) -> bool {
 	in_it_block := it_state & 0xF != 0
 	range: Decode_Index
 	if mode == .A32 {
@@ -162,6 +164,12 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, pc: u32, it_state: u8,
 		// and the variable bits in `bits` must not affect the match decision.
 		if (word & e.mask) != (e.bits & e.mask) { continue }
 		if !feature_in_profile(e.feature, profile) { continue }
+		// A conditional A32 form never has condition 1111: that is the
+		// unconditional space, a different set of instructions.
+		if mode == .A32 && e.mask >> 28 == 0 && word >> 28 == 0xF { continue }
+		coprocessor := (word >> 8) & 0xF
+		if e.feature == .CDE && (coprocessor > 7 || int(coprocessor) not_in cde) { continue }
+		if is_generic_coprocessor(e.mnemonic) && !coprocessor_is_generic(coprocessor, profile, cde) { continue }
 		if profile == .M_PROFILE && e.flags.a_profile_only { continue }
 
 		// Match -- decode this entry
@@ -195,7 +203,7 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, pc: u32, it_state: u8,
 		// LDM/STM carry the writeback in bit 21; nothing else in the operand
 		// model records it, and without it the two forms print identically.
 		for k in 0 ..< len(e.enc) {
-			if e.enc[k] == .A32_REG_LIST || e.enc[k] == .T32_REG_LIST || e.enc[k] == .RN_A32_WB || e.enc[k] == .IMPL_SP {
+			if e.enc[k] == .A32_REG_LIST || e.enc[k] == .A32_REG_LIST_USER || e.enc[k] == .T32_REG_LIST || e.enc[k] == .RN_A32_WB || e.enc[k] == .IMPL_SP {
 				inst.writeback = (word >> 21) & 1 != 0
 				break
 			}
@@ -217,7 +225,7 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, pc: u32, it_state: u8,
 		// instruction, nor is a banked register the architecture does not
 		// name, nor a Q register whose D-register field is odd; try the next
 		// candidate.
-		if !thumb_list_valid(e, inst) || !banked_valid(inst) || !q_registers_even(word, e) {
+		if !thumb_list_valid(e, inst) || !banked_valid(inst) || !q_registers_even(word, e) || !pairs_valid(e, inst) {
 			continue
 		}
 		// The 16-bit STM always writes the base back. The 16-bit LDM does
@@ -247,6 +255,31 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, pc: u32, it_state: u8,
 	return false
 }
 
+// Whether a coprocessor number names a generic coprocessor rather than
+// space given to other instructions: 10 and 11 are the floating-point unit's
+// everywhere, v8.1-M gives 8, 9, 14 and 15 to MVE, and a v8-M core can give
+// any of 0 to 7 to CDE.
+@(private="file")
+coprocessor_is_generic :: proc "contextless" (number: u32, profile: Profile, cde: CDE_Coprocessors) -> bool {
+	switch profile {
+	case .A_PROFILE:
+		return number != 10 && number != 11
+	case .M_PROFILE:
+		if number < 8 { return int(number) not_in cde }
+		return number == 12 || number == 13
+	}
+	return false
+}
+
+@(private="file")
+is_generic_coprocessor :: proc "contextless" (m: Mnemonic) -> bool {
+	return m == .CDP || m == .CDP2 ||
+	       m == .MCR || m == .MCR2 || m == .MRC || m == .MRC2 ||
+	       m == .MCRR || m == .MCRR2 || m == .MRRC || m == .MRRC2 ||
+	       m == .LDC || m == .LDCL || m == .LDC2 || m == .LDC2L ||
+	       m == .STC || m == .STCL || m == .STC2 || m == .STC2L
+}
+
 @(private="file")
 thumb_list_valid :: proc "contextless" (e: ^Decode_Entry, inst: ^Instruction) -> bool {
 	if e.mode != .T32 {
@@ -268,6 +301,17 @@ q_registers_even :: proc "contextless" (word: u32, e: ^Decode_Entry) -> bool {
 		if enc == .VD_Q && (word >> 12) & 1 != 0 { return false }
 		if enc == .VN_Q && (word >> 16) & 1 != 0 { return false }
 		if enc == .VM_Q && word & 1 != 0 { return false }
+	}
+	return true
+}
+
+// The second of a register pair is the one after the first, and there is
+// none after LR that a pair can use.
+@(private="file")
+pairs_valid :: proc "contextless" (e: ^Decode_Entry, inst: ^Instruction) -> bool {
+	for k in 1 ..< len(e.enc) {
+		if e.enc[k] != .RT_PAIR_NEXT && e.enc[k] != .RM_PAIR_NEXT { continue }
+		if reg_hw(inst.ops[k - 1].reg) >= 14 { return false }
 	}
 	return true
 }
@@ -330,7 +374,7 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 		return op_imm(0)
 
 	// ---- GPR slots ----
-	case .RD, .RT_A32, .RA_A32, .RDLO_A32:
+	case .RD, .RT_A32, .RDLO_A32:
 		return op_reg(Register(REG_GPR | u16((word >> 12) & 0xF)))
 	case .RT2_A32:
 		return op_reg(Register(REG_GPR | u16((word >> 16) & 0xF)))
@@ -453,6 +497,11 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 		return op_reg_list(u16(word & 0xFF) | u16((word >> 8) & 1) << 15)
 
 	// ---- T32 ----
+	case .RM_A32_ROTATED:
+		reg := Register(REG_GPR | u16(word & 0xF))
+		rotation := u8((word >> 10) & 0x3) * 8
+		if rotation == 0 { return op_reg(reg) }
+		return op_reg_shifted(reg, .ROR, rotation)
 	case .RM_T32_TWICE:
 		return op_reg(Register(REG_GPR | u16(word & 0xF)))
 	case .RM_T32_ROTATED:
@@ -477,8 +526,50 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 	case .T32_IMM_SHIFT_32:
 		amount := t32_shift_amount(word)
 		return op_imm(i64(amount == 0 ? 32 : amount))
-	case .T32_IMM4_IMM12:
+	case .IMM4_IMM12:
 		return op_imm(i64(((word >> 16) & 0xF) << 12 | (word & 0xFFF)))
+	case .CPS_IFLAGS_A32:
+		return op_reg(Register(REG_IFLAGS | u16((word >> 6) & 0x7)))
+	case .SETPAN_IMM_A32:
+		return op_imm(i64((word >> 9) & 1))
+	case .RM_PAIR_NEXT:
+		return op_reg(Register(REG_GPR | u16(((word & 0xF) + 1) & 0xF)))
+	case .BRANCH_BLX_A32:
+		v := i32(word & 0xFFFFFF)
+		if v & 0x800000 != 0 { v |= -0x1000000 }
+		return op_rel_offset(pc_value + i64(v << 2) + i64((word >> 24) & 1) * 2)
+	case .IMM12_IMM4:
+		return op_imm(i64(((word >> 8) & 0xFFF) << 4 | (word & 0xF)))
+	case .NEON_VEXT_IMM4:
+		return op_imm(i64((word >> 8) & 0xF))
+	case .A32_REG_LIST_USER:
+		op := op_reg_list(u16(word & 0xFFFF))
+		op.list.user = true
+		return op
+	case .MEM_REG_SHIFTED, .MEM_REG_SHIFTED_PRE, .MEM_REG_SHIFTED_POST:
+		base  := Register(REG_GPR | u16((word >> 16) & 0xF))
+		index := Register(REG_GPR | u16(word & 0xF))
+		sign: i8 = (word >> 23) & 1 != 0 ? 1 : -1
+		// The same shift encoding as a data-processing register: a zero
+		// amount is no shift for LSL, 32 for LSR and ASR, RRX for ROR.
+		shift := Shift_Type((word >> 5) & 0x3)
+		amount := u8((word >> 7) & 0x1F)
+		if shift == .ROR && amount == 0 {
+			shift = .RRX
+		} else if (shift == .LSR || shift == .ASR) && amount == 0 {
+			amount = 32
+		}
+		m := mem_reg_shift(base, index, shift, amount, sign)
+		if enc == .MEM_REG_SHIFTED_PRE  { m.mode = .PRE_INDEX }
+		if enc == .MEM_REG_SHIFTED_POST { m.mode = .POST_INDEX }
+		return op_mem(m)
+	case .MEM_REG_PRE, .MEM_REG_POST:
+		base  := Register(REG_GPR | u16((word >> 16) & 0xF))
+		index := Register(REG_GPR | u16(word & 0xF))
+		sign: i8 = (word >> 23) & 1 != 0 ? 1 : -1
+		m := mem_reg(base, index, sign)
+		m.mode = enc == .MEM_REG_PRE ? .PRE_INDEX : .POST_INDEX
+		return op_mem(m)
 	case .T32_IMM4_SMC:    return op_imm(i64((word >> 16) & 0xF))
 	case .T32_IMM8:        return op_imm(i64(word & 0xFF))
 	case .CPS_IFLAGS_T32:  return op_reg(Register(REG_IFLAGS | u16((word >> 5) & 0x7)))
@@ -564,8 +655,15 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 		return op_rel_offset(pc_aligned + i64(i32(v) << 2))
 
 	// ---- Modified immediates (decoded to their effective 32-bit value) ----
-	case .A32_IMM_MOD, .A32_IMM12_ROT:
-		return op_imm(i64(decode_a32_modimm(word & 0xFFF)))
+	case .A32_IMM_MOD:
+		// Written as a value when the word holds the encoding an assembler
+		// would choose for it, and as its parts when it holds another.
+		field := word & 0xFFF
+		value := decode_a32_modimm(field)
+		if canonical, ok := encode_a32_modimm(value); ok && canonical == field {
+			return op_imm(i64(value))
+		}
+		return op_rotated_imm(u8(field & 0xFF), u8((field >> 8) * 2))
 	case .T32_IMM_MOD:
 		i_bit := (word >> 26) & 1
 		imm3  := (word >> 12) & 0x7
@@ -574,14 +672,14 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 		return op_imm(i64(decode_t32_modimm(f12)))
 
 	// ---- A32 immediates ----
-	case .A32_IMM12:    return op_imm(i64(word & 0xFFF))
+
 	case .A32_IMM_SHIFT: return op_imm(i64((word >> 7) & 0x1F))
 	case .A32_IMM_SHIFT_32:
 		// The LSR and ASR mnemonics reach 32 the same way a shifted operand
 		// does: a field of zero, since a shift of zero would be a MOV.
 		amt := (word >> 7) & 0x1F
 		return op_imm(i64(amt == 0 ? 32 : amt))
-	case .A32_SHIFT_TYPE: return op_imm(i64((word >> 5) & 0x3))
+
 	case .A32_IMM24:
 		// Ambiguous: A32_IMM24 is used both for branch displacements (B/BL,
 		// shape REL24) and for the 24-bit `imm` of SVC (shape IMM). Use the
@@ -593,9 +691,9 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 		if v & 0x800000 != 0 { v |= -0x1000000 }
 		return op_rel_offset(pc_value + i64(v << 2))
 	case .A32_IMM4:      return op_imm(i64(word & 0xF))
-	case .A32_IMM4_ROTATE: return op_imm(i64((word >> 8) & 0xF))
-	case .A32_IMM5_LSB:  return op_imm(i64((word >> 7) & 0x1F))
-	case .A32_IMM5_W:    return op_imm(i64((word >> 16) & 0x1F))
+
+
+
 	case .A32_REG_LIST:  return op_reg_list(u16(word & 0xFFFF))
 
 	// ---- VFP/NEON split fields ----
@@ -692,27 +790,23 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 		idx  := Register(REG_GPR | u16(word & 0xF))
 		sign: i8 = (word >> 23) & 1 != 0 ? 1 : -1
 		return op_mem(mem_reg(base, idx, sign))
-	case .MEM_DOUBLEREG:
-		base := Register(REG_GPR | u16((word >> 16) & 0xF))
-		idx  := Register(REG_GPR | u16(word & 0xF))
-		return op_mem(mem_reg(base, idx))
-
 	// ---- Misc ----
 	case .BARRIER_TYPE: return op_imm(i64(word & 0xF))
 	case .HINT_FIELD:   return op_imm(i64(word & 0xFF))
-	case .CPS_IFLAGS:   return op_imm(i64(word & 0x1FF))
+
 	case .PSR_FIELD_MASK: return op_imm(i64(decode_psr_field(word)))
-	case .SYSM_FIELD:   return op_imm(i64(word & 0xFF))
+
 	case .COPROC_NUM_FIELD:  return op_reg(Register(REG_COPROC_NUM | u16((word >> 8) & 0xF)))
 	case .COPROC_OPC1_FIELD: return op_imm(i64((word >> 20) & 0xF))
 	case .COPROC_OPC2_FIELD: return op_imm(i64((word >> 5) & 0x7))
 	case .COPROC_CRN_FIELD:  return op_reg(Register(REG_COPROC | u16((word >> 16) & 0xF)))
 	case .COPROC_CRM_FIELD:  return op_reg(Register(REG_COPROC | u16(word & 0xF)))
 	case .COPROC_CRD_FIELD:  return op_reg(Register(REG_COPROC | u16((word >> 12) & 0xF)))
+	case .COPROC_OPTION:     return op_imm(i64(word & 0xFF))
 	case .COPROC_OPC1_MCR:   return op_imm(i64((word >> 21) & 0x7))
 	case .COPROC_OPC_MCRR:   return op_imm(i64((word >> 4) & 0xF))
-	case .NEON_CMODE:        return op_imm(i64((word >> 8) & 0xF))
-	case .NEON_OP_BIT:       return op_imm(i64((word >> 5) & 1))
+
+
 	case .NEON_IMM8_ABCDEFGH:
 		// Reconstruct abcdefgh from scattered wire bits, then apply cmode/op
 		// expansion via decode_neon_modimm.
@@ -882,9 +976,15 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 	case .VD_D_AGAIN:
 		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
 		return op_reg(Register(REG_DPR | u16(n)))
-	case .RT_VMRS:
+	case .RT_OR_APSR_NZCV:
 		rt := (word >> 12) & 0xF
 		return op_reg(rt == 15 ? APSR_NZCV : Register(REG_GPR | u16(rt)))
+	case .RN_OR_APSR_NZCV:
+		rn := (word >> 16) & 0xF
+		return op_reg(rn == 15 ? APSR_NZCV : Register(REG_GPR | u16(rn)))
+	case .RM_OR_APSR_NZCV:
+		rm := word & 0xF
+		return op_reg(rm == 15 ? APSR_NZCV : Register(REG_GPR | u16(rm)))
 	case .SAT_IMM5:
 		// SSAT and SSAT16 saturate to a signed width of one to 32, and the
 		// field holds one less than that. USAT and USAT16 saturate to an
@@ -920,12 +1020,7 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 		return op_imm(i64((word >> 16) & 0x1F))
 
 	// ---- A32 RS shift (Rs register in bits 11:8) ----
-	case .A32_RS_SHIFT:
-		return op_reg(Register(REG_GPR | u16((word >> 8) & 0xF)))
-
 	// ---- A32 COND ----
-	case .A32_COND_FIELD: return op_imm(i64((word >> 28) & 0xF))
-
 	// ---- MVE Q-registers (3-bit indexed) ----
 	case .QD_MVE:
 		n := (word >> 13) & 0x7
@@ -940,24 +1035,36 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 	case .QM_MVE:
 		n := (word >> 1) & 0x7
 		return op_reg(Register(REG_QPR | u16(n)))
-	case .MVE_SIZE_FIELD:      return op_imm(i64((word >> 20) & 0x3))
-	case .MVE_VPT_MASK_FIELD:  return op_imm(i64((word >> 13) & 0xF))
-	case .MVE_LOOP_IMM:
-		// ARMv8.1-M loop-branch imm11 sign-extended
-		v := (word >> 1) & 0x7FF
-		if v & 0x400 != 0 { v |= ~u32(0x7FF) }
-		return op_rel_offset(pc_value + i64(i32(v) << 1))
 
-	case .CDE_COPROC_FIELD:    return op_imm(i64((word >> 8) & 0x7))
-	case .CDE_IMM_FIELD:       return op_imm(i64(word & 0x7F))
-	case .CDE_ACC_FIELD:       return op_imm(i64((word >> 16) & 1))
-	case .V8M_TT_AT_BITS:      return op_imm(i64((word >> 6) & 0x3))
+	case .MVE_VPT_MASK_FIELD:  return op_imm(i64((word >> 13) & 0xF))
+	case .MVE_RN_EVEN:         return op_reg(Register(REG_GPR | u16(((word >> 17) & 0x7) * 2)))
+	case .MVE_RM_ODD:          return op_reg(Register(REG_GPR | u16(((word >> 1) & 0x7) * 2 + 1)))
+	case .MVE_DUP_IMM:         return op_imm(i64(1) << (((word >> 7) & 1) << 1 | word & 1))
+	case .CDE_COPROC_FIELD:    return op_reg(Register(REG_COPROC_NUM | u16((word >> 8) & 0x7)))
+	case .CDE_IMM_CX1:
+		return op_imm(i64(word & 0x3F | ((word >> 7) & 1) << 6 | ((word >> 16) & 0x3F) << 7))
+	case .CDE_IMM_CX2:
+		return op_imm(i64(word & 0x3F | ((word >> 7) & 1) << 6 | ((word >> 20) & 0x3) << 7))
+	case .CDE_IMM_CX3:
+		return op_imm(i64((word >> 4) & 0x3 | ((word >> 7) & 1) << 2 | ((word >> 20) & 0x7) << 3))
+	case .CDE_IMM_VCX1:
+		imm := word & 0x3F | ((word >> 7) & 1) << 6 | ((word >> 16) & 0xF) << 7
+		if word & 0x40 != 0 { imm |= ((word >> 24) & 1) << 11 }
+		return op_imm(i64(imm))
+	case .CDE_IMM_VCX2:
+		imm := (word >> 4) & 1 | ((word >> 7) & 1) << 1 | ((word >> 16) & 0xF) << 2
+		if word & 0x40 != 0 { imm |= ((word >> 24) & 1) << 6 }
+		return op_imm(i64(imm))
+	case .CDE_IMM_VCX3:
+		imm := (word >> 4) & 1 | ((word >> 20) & 0x3) << 1
+		if word & 0x40 != 0 { imm |= ((word >> 24) & 1) << 3 }
+		return op_imm(i64(imm))
 
 	// ---- Memory addressing flavours ----
 	// PRE_INDEX and POST_INDEX wrap MEM_IMM12_OFFSET: same field layout but the
 	// addressing mode flag is set differently. We reconstruct the full Memory
 	// operand here (base, disp, sign, mode).
-	case .RT2_A32_PAIR:
+	case .RT_PAIR_NEXT:
 		return op_reg(Register(REG_GPR | u16(((word >> 12) + 1) & 0xF)))
 	case .MEM_IMM8_PRE_INDEX:
 		base := Register(REG_GPR | u16((word >> 16) & 0xF))
@@ -993,12 +1100,7 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 		mm := mem_imm_post(base, disp)
 		if u_bit == 0 { mm.sign = -1 }
 		return op_mem(mm)
-	case .MEM_LITERAL:
-		// PC-relative literal load: U bit + 12-bit signed disp
-		u_bit := (word >> 23) & 1
-		disp := i32(word & 0xFFF)
-		if u_bit == 0 { disp = -disp }
-		return op_rel_offset(pc_aligned + i64(disp))
+
 	}
 	return op_imm(0)
 }

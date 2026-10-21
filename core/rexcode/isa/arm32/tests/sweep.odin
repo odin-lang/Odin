@@ -50,7 +50,8 @@ run_sweep_tests :: proc() {
 
 			// Canonical word: form.bits | safe-fill operand bits.
 			word := f.bits
-			for _, k in f.enc { word |= sweep_safe_fill(f.enc[k]) }
+			// A fill the form pins (an even register, say) gives way to it.
+			for _, k in f.enc { word |= sweep_safe_fill(f.enc[k]) & ~f.mask }
 			// Operand-type-driven extras: GPR_RSR needs a non-zero Rs in bits
 			// 11..8 to disambiguate from GPR_SHIFTED on decode/re-encode; the
 			// base bits already set bit 4 (the RSR flag), but Rs=0 would alias
@@ -97,7 +98,9 @@ run_sweep_tests :: proc() {
 			if !a.feature_in_profile(f.feature, .A_PROFILE) {
 				profile = .M_PROFILE
 			}
-			a.decode(buf[:n], relocs, &insts, &info, &label_defs, &errors, f.mode, profile)
+			// And with CDE on every coprocessor it can have, for the CDE
+			// forms; a generic coprocessor form here uses one above 7.
+			a.decode(buf[:n], relocs, &insts, &info, &label_defs, &errors, f.mode, profile, ~a.CDE_Coprocessors{})
 
 			if len(insts) == 0 || insts[0].mnemonic == .INVALID {
 				stats.fail_decode += 1
@@ -188,7 +191,7 @@ sweep_safe_fill :: proc(enc: a.Operand_Encoding) -> u32 {
 	case .RS_A32:              return u32(4) << 8
 	case .RT_A32:              return u32(1) << 12
 	case .RT2_A32:             return u32(2) << 16
-	case .RA_A32:              return u32(5) << 12
+
 	case .RDLO_A32:            return u32(1) << 12
 	case .RDHI_A32:            return u32(2) << 16
 
@@ -226,13 +229,10 @@ sweep_safe_fill :: proc(enc: a.Operand_Encoding) -> u32 {
 	case .MEM_IMM12_OFFSET, .MEM_IMM8_OFFSET,
 		 .MEM_PRE_INDEX, .MEM_POST_INDEX:
 		return (u32(4) << 16) | (u32(1) << 23)
-	case .MEM_REG_OFFSET, .MEM_DOUBLEREG:
+	case .MEM_REG_OFFSET:
 		// Include Rm at bits 3..0 so the resulting Memory has index != R0,
 		// letting the encoder pick the register-offset form on round-trip.
 		return (u32(4) << 16) | (u32(1) << 23) | u32(3)
-	case .MEM_LITERAL:
-		return u32(1) << 23
-
 	// ---- Register lists ----
 	case .VFP_S_LIST, .VFP_D_LIST, .VFP_DX_LIST: return 4
 	case .A32_REG_LIST:            return 0x0030

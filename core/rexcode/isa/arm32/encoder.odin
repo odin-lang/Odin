@@ -210,6 +210,9 @@ encode_one_inline :: #force_inline proc(
 		return 0, 0, false
 	}
 
+	// `bits` outside the mask are the values a should-be-one or should-be-zero
+	// bit is written with; no operand field may hold one, or the operand is
+	// ORed onto it.
 	word = form.bits
 
 	// Bake condition into bits 31:28 for A32 conditional entries.
@@ -342,15 +345,16 @@ mem_mode_matches :: #force_inline proc "contextless" (inst: ^Instruction, form: 
 			// not a memory slot; the shape check keeps addresses out of it
 		case .RN_A32:
 			if m != .OFFSET || has_index { return false }
-		case .RM_A32, .RS_A32, .RT_A32, .RT2_A32, .RA_A32, .RDLO_A32, .RDHI_A32, .RD_T32:
+		case .RM_A32, .RS_A32, .RT_A32, .RT2_A32, .RDLO_A32, .RDHI_A32, .RD_T32:
 			// not a memory slot; the shape check keeps addresses out of it
 		case .RN_T32:
 			if m != .OFFSET || has_index { return false }
 		case .RM_T32, .RT_T32, .RT2_T32, .RA_T32, .RD_T16_LO, .RM_T16_LO, .RN_T16_LO,
 		     .RD_T16_HI, .RM_T16_HI, .RM_T16_8_6, .RD_T16_10_8, .RD_T16_LO_AGAIN,
-		     .RD_T16_HI_AGAIN, .IMM3_T16, .IMM8_T16, .IMM5_T16_SHIFT, .IMM5_T16_SHIFT_32,
-		     .IMM7_T16_SCALED4, .IMM8_T16_SCALED4, .IMM6_T16, .IMM4_T16_HINT, .IT_FIRSTCOND,
-		     .IT_MASK_FIELD, .SETEND_ENDIAN_T16, .SETPAN_IMM_T16, .CPS_IFLAGS_T16:
+		     .RD_T16_HI_AGAIN, .IMM3_T16, .IMM8_T16, .IMM5_T16_SHIFT,
+		     .IMM5_T16_SHIFT_32, .IMM7_T16_SCALED4, .IMM8_T16_SCALED4, .IMM6_T16,
+		     .IMM4_T16_HINT, .IT_FIRSTCOND, .IT_MASK_FIELD, .SETEND_ENDIAN_T16,
+		     .SETPAN_IMM_T16, .CPS_IFLAGS_T16:
 			// not a memory slot; the shape check keeps addresses out of it
 		case .MEM_T16_IMM5_W, .MEM_T16_IMM5_B, .MEM_T16_IMM5_H:
 			if m != .OFFSET || has_index { return false }
@@ -361,11 +365,24 @@ mem_mode_matches :: #force_inline proc "contextless" (inst: ^Instruction, form: 
 		case .MEM_T16_LITERAL:
 			return false    // a literal slot takes a label, not an address
 		case .REL_T16_ADR, .T16_REG_LIST, .T16_REG_LIST_LR, .T16_REG_LIST_PC,
-		     .RM_T32_ROTATED, .RM_T32_TWICE, .RN_T32_SAT, .T32_IMM12, .T32_IMM16,
-		     .T32_IMM_SHIFT, .T32_IMM_SHIFT_32, .SAT16_IMM4_T32, .SAT16_IMM4_U_T32,
-		     .BFI_MSB_T32, .BFX_WIDTH_T32, .T32_IMM4_IMM12, .T32_IMM4_SMC, .T32_IMM8,
-		     .CPS_IFLAGS_T32, .CPS_MODE_T32, .MRS_SPEC_REG_T32, .MSR_FIELDS_T32, .SYSM_T32,
-		     .MSR_SYSM_T32:
+		     .RM_T32_ROTATED, .RM_A32_ROTATED, .RM_T32_TWICE, .RN_T32_SAT, .T32_IMM12,
+		     .T32_IMM16, .T32_IMM_SHIFT, .T32_IMM_SHIFT_32, .SAT16_IMM4_T32,
+		     .SAT16_IMM4_U_T32, .BFI_MSB_T32, .BFX_WIDTH_T32, .IMM4_IMM12, .IMM12_IMM4,
+		     .CPS_IFLAGS_A32, .SETPAN_IMM_A32, .RM_PAIR_NEXT, .BRANCH_BLX_A32,
+		     .NEON_VEXT_IMM4, .A32_REG_LIST_USER:
+			// not a memory slot; the shape check keeps addresses out of it
+		case .MEM_REG_SHIFTED:
+			if m != .OFFSET || !has_index { return false }
+		case .MEM_REG_SHIFTED_PRE:
+			if m != .PRE_INDEX || !has_index { return false }
+		case .MEM_REG_SHIFTED_POST:
+			if m != .POST_INDEX || !has_index { return false }
+		case .MEM_REG_PRE:
+			if m != .PRE_INDEX || !has_index { return false }
+		case .MEM_REG_POST:
+			if m != .POST_INDEX || !has_index { return false }
+		case .T32_IMM4_SMC, .T32_IMM8, .CPS_IFLAGS_T32, .CPS_MODE_T32,
+		     .MRS_SPEC_REG_T32, .MSR_FIELDS_T32, .SYSM_T32, .MSR_SYSM_T32:
 			// not a memory slot; the shape check keeps addresses out of it
 		case .MEM_T32_IMM12, .MEM_T32_IMM8_NEG:
 			if m != .OFFSET || has_index { return false }
@@ -386,27 +403,27 @@ mem_mode_matches :: #force_inline proc "contextless" (inst: ^Instruction, form: 
 		case .RD_T32_STATUS, .T32_REG_LIST, .REL_T32_ADR_ADD, .REL_T32_ADR_SUB,
 		     .BRANCH_BLX_T32, .RN_T32_ZR, .RM_T32_ZR, .COND_T32_FCOND, .BANKED_MRS_T32,
 		     .BANKED_MSR_T32, .LOB_FORWARD, .LOB_BACKWARD, .A32_IMM_MOD, .T32_IMM_MOD,
-		     .A32_IMM12_ROT, .A32_IMM12, .A32_IMM_SHIFT, .A32_IMM_SHIFT_32, .A32_SHIFT_TYPE,
-		     .A32_RS_SHIFT, .A32_IMM24, .A32_IMM4, .A32_IMM4_ROTATE, .A32_IMM5_LSB,
-		     .A32_IMM5_W, .A32_COND_FIELD, .A32_REG_LIST, .VD_S, .VN_S, .VM_S, .VD_D, .VN_D,
-		     .VM_D, .VD_Q, .VN_Q, .VM_Q, .NEON_VM_SCALAR16, .NEON_VM_SCALAR32, .VMOV_LANE_8,
-		     .VMOV_LANE_16, .VMOV_LANE_32, .MVE_ROT_HCADD, .MVE_ROT_CMLA, .VN_Q_MVE,
-		     .VM_Q_MVE, .VFP_IMM8, .VM_S_PLUS1, .DBG_OPTION, .MRS_SPEC_REG, .VFP_SPEC_REG,
+		     .A32_IMM_SHIFT, .A32_IMM_SHIFT_32, .A32_IMM24, .A32_IMM4, .A32_REG_LIST,
+		     .VD_S, .VN_S, .VM_S, .VD_D, .VN_D, .VM_D, .VD_Q, .VN_Q, .VM_Q,
+		     .NEON_VM_SCALAR16, .NEON_VM_SCALAR32, .VMOV_LANE_8, .VMOV_LANE_16,
+		     .VMOV_LANE_32, .MVE_ROT_HCADD, .MVE_ROT_CMLA, .VN_Q_MVE, .VM_Q_MVE,
+		     .VFP_IMM8, .VM_S_PLUS1, .DBG_OPTION, .MRS_SPEC_REG, .VFP_SPEC_REG,
 		     .SETEND_ENDIAN, .IMPL_SP, .IMPL_PC, .IMPL_LR, .IMPL_R12, .MODE_IMM5,
-		     .RN_A32_WB, .NEON_LANE_VN_32, .NEON_IMM8_ABCDEFGH, .NEON_CMODE, .NEON_OP_BIT,
-		     .VFP_S_LIST, .VFP_D_LIST, .VFP_DX_LIST, .VD_S_AGAIN, .VD_D_AGAIN, .RT_VMRS,
-		     .NEON_VN_TABLE_1, .NEON_VN_TABLE_2, .NEON_VN_TABLE_3, .NEON_VN_TABLE_4,
-		     .NEON_VM_SCALAR_16, .NEON_VM_SCALAR_32, .NEON_VDUP_LANE_8, .NEON_VDUP_LANE_16,
-		     .NEON_VDUP_LANE_32, .NEON_D_LIST_1, .NEON_D_LIST_2, .NEON_D_LIST_3,
-		     .NEON_D_LIST_4, .NEON_D_LIST_2X, .NEON_D_LIST_3X, .NEON_D_LIST_4X,
-		     .NEON_D_LIST_ALL, .NEON_D_LIST_ALL_2, .NEON_D_LIST_ALL_3, .NEON_D_LIST_ALL_4,
-		     .NEON_LANE_D_8, .NEON_LANE_D_16, .NEON_LANE_D_32, .NEON_LANE_D_8_2,
-		     .NEON_LANE_D_16_2, .NEON_LANE_D_32_2, .NEON_LANE_D_8_3, .NEON_LANE_D_16_3,
-		     .NEON_LANE_D_32_3, .NEON_LANE_D_8_4, .NEON_LANE_D_16_4, .NEON_LANE_D_32_4:
+		     .RN_A32_WB, .NEON_LANE_VN_32, .NEON_IMM8_ABCDEFGH, .VFP_S_LIST,
+		     .VFP_D_LIST, .VFP_DX_LIST, .VD_S_AGAIN, .VD_D_AGAIN, .RT_OR_APSR_NZCV,
+		     .RN_OR_APSR_NZCV, .RM_OR_APSR_NZCV, .NEON_VN_TABLE_1, .NEON_VN_TABLE_2,
+		     .NEON_VN_TABLE_3, .NEON_VN_TABLE_4, .NEON_VM_SCALAR_16, .NEON_VM_SCALAR_32,
+		     .NEON_VDUP_LANE_8, .NEON_VDUP_LANE_16, .NEON_VDUP_LANE_32, .NEON_D_LIST_1,
+		     .NEON_D_LIST_2, .NEON_D_LIST_3, .NEON_D_LIST_4, .NEON_D_LIST_2X,
+		     .NEON_D_LIST_3X, .NEON_D_LIST_4X, .NEON_D_LIST_ALL, .NEON_D_LIST_ALL_2,
+		     .NEON_D_LIST_ALL_3, .NEON_D_LIST_ALL_4, .NEON_LANE_D_8, .NEON_LANE_D_16,
+		     .NEON_LANE_D_32, .NEON_LANE_D_8_2, .NEON_LANE_D_16_2, .NEON_LANE_D_32_2,
+		     .NEON_LANE_D_8_3, .NEON_LANE_D_16_3, .NEON_LANE_D_32_3, .NEON_LANE_D_8_4,
+		     .NEON_LANE_D_16_4, .NEON_LANE_D_32_4:
 			// not a memory slot; the shape check keeps addresses out of it
 		case .MEM_IMM12_OFFSET:
 			if m != .OFFSET || has_index { return false }
-		case .RT2_A32_PAIR:
+		case .RT_PAIR_NEXT:
 			// not a memory slot; the shape check keeps addresses out of it
 		case .MEM_IMM8_PRE_INDEX:
 			if m != .PRE_INDEX || has_index { return false }
@@ -426,21 +443,18 @@ mem_mode_matches :: #force_inline proc "contextless" (inst: ^Instruction, form: 
 			if m != .PRE_INDEX || has_index { return false }
 		case .MEM_POST_INDEX:
 			if m != .POST_INDEX || has_index { return false }
-		case .MEM_LITERAL:
-			return false    // a literal slot takes a label, not an address
-		case .MEM_DOUBLEREG:
-			if m != .OFFSET || !has_index { return false }
 		case .COPROC_NUM_FIELD, .COPROC_CRD_FIELD, .COPROC_OPC1_MCR, .COPROC_OPC1_FIELD,
 		     .COPROC_OPC2_FIELD, .COPROC_CRN_FIELD, .COPROC_CRM_FIELD, .COPROC_OPC_MCRR,
-		     .BRANCH_24, .BRANCH_24_T32, .BRANCH_20_T32, .BRANCH_11_T16, .BRANCH_8_T16,
-		     .BRANCH_CBZ, .BF_BOFF, .BF_BLOC, .BF_RM, .BFCSEL_COND, .PSR_FIELD_MASK,
-		     .SYSM_FIELD, .BARRIER_TYPE, .CPS_IFLAGS, .HINT_FIELD, .VFP_FBITS, .NEON_SHLL_8,
+		     .COPROC_OPTION, .BRANCH_24, .BRANCH_24_T32, .BRANCH_20_T32, .BRANCH_11_T16,
+		     .BRANCH_8_T16, .BRANCH_CBZ, .BF_BOFF, .BF_BLOC, .BF_RM, .BFCSEL_COND,
+		     .PSR_FIELD_MASK, .BARRIER_TYPE, .HINT_FIELD, .VFP_FBITS, .NEON_SHLL_8,
 		     .NEON_SHLL_16, .NEON_SHLL_32, .NEON_ROT_2, .NEON_ROT_4, .NEON_ROT_4_HI,
-		     .SAT_IMM5, .SAT_IMM5_T32, .SAT_IMM5_U, .SAT_IMM5_U_T32, .BFX_WIDTH, .BFI_MSB,
-		     .BFI_LSB, .BFI_LSB_T32, .NEON_SHIFT_IMM6, .NEON_SHIFT_IMM3, .NEON_SHIFT_IMM4,
-		     .NEON_SHIFT_IMM5, .QD_MVE, .QN_MVE, .QM_MVE, .MVE_RDA_EVEN, .MVE_RDALO,
-		     .MVE_RDAHI, .MVE_SIZE_FIELD, .MVE_VPT_MASK_FIELD, .MVE_LOOP_IMM,
-		     .CDE_COPROC_FIELD, .CDE_IMM_FIELD, .CDE_ACC_FIELD, .V8M_TT_AT_BITS:
+		     .SAT_IMM5, .SAT_IMM5_T32, .SAT_IMM5_U, .SAT_IMM5_U_T32, .BFX_WIDTH,
+		     .BFI_MSB, .BFI_LSB, .BFI_LSB_T32, .NEON_SHIFT_IMM6, .NEON_SHIFT_IMM3,
+		     .NEON_SHIFT_IMM4, .NEON_SHIFT_IMM5, .QD_MVE, .QN_MVE, .QM_MVE,
+		     .MVE_RDA_EVEN, .MVE_RDALO, .MVE_RDAHI, .MVE_VPT_MASK_FIELD, .MVE_RN_EVEN,
+		     .MVE_RM_ODD, .MVE_DUP_IMM, .CDE_COPROC_FIELD, .CDE_IMM_CX1, .CDE_IMM_CX2,
+		     .CDE_IMM_CX3, .CDE_IMM_VCX1, .CDE_IMM_VCX2, .CDE_IMM_VCX3:
 			// not a memory slot; the shape check keeps addresses out of it
 		}
 	}
@@ -465,15 +479,21 @@ encoding_matches_inline :: #force_inline proc "contextless" (inst: ^Instruction,
 operands_fit :: proc "contextless" (inst: ^Instruction, form: ^Encoding) -> bool {
 	for k in 0 ..< len(form.enc) {
 		op := &inst.ops[k]
-		if !operand_fits(op, form.ops[k], form.enc[k], inst, form) {
+		if !operand_fits(op, k, form.ops[k], form.enc[k], inst, form) {
 			return false
 		}
 	}
 	return true
 }
 
+// The second register of a pair is the one after the first, which is even.
 @(private="file")
-operand_fits :: proc "contextless" (op: ^Operand, ot: Operand_Type, enc: Operand_Encoding, inst: ^Instruction, form: ^Encoding) -> bool {
+register_pair :: proc "contextless" (first, second: ^Operand) -> bool {
+	return first.kind == .REGISTER && reg_hw(first.reg) % 2 == 0 && reg_hw(second.reg) == reg_hw(first.reg) + 1
+}
+
+@(private="file")
+operand_fits :: proc "contextless" (op: ^Operand, index: int, ot: Operand_Type, enc: Operand_Encoding, inst: ^Instruction, form: ^Encoding) -> bool {
 	if ot == .GPR_LOW && (op.kind != .REGISTER || reg_hw(op.reg) > 7) {
 		return false
 	}
@@ -482,7 +502,7 @@ operand_fits :: proc "contextless" (op: ^Operand, ot: Operand_Type, enc: Operand
 	// take a register with a rotation or a saturating shift.
 	if (ot == .GPR || ot == .GPR_LOW || ot == .GPR_NOPC || ot == .GPR_NOSP) &&
 	   op.kind == .REGISTER && is_shifted(op.shift_type, op.shift_amt) &&
-	   enc != .RM_T32_ROTATED && enc != .RN_T32_SAT {
+	   enc != .RM_T32_ROTATED && enc != .RM_A32_ROTATED && enc != .RN_T32_SAT {
 		return false
 	}
 	low_base :: proc "contextless" (m: Memory) -> bool {
@@ -531,8 +551,15 @@ operand_fits :: proc "contextless" (op: ^Operand, ot: Operand_Type, enc: Operand
 	switch enc {
 	case .NONE:
 		return ot != .IMM || (op.kind == .IMMEDIATE && op.immediate == 0)
-	case .IMPL, .RD, .RN_A32, .RM_A32, .RS_A32, .RT_A32, .RT2_A32, .RA_A32, .RDLO_A32,
-	     .RDHI_A32, .RD_T32, .RN_T32, .RM_T32, .RT_T32, .RT2_T32, .RA_T32:
+	case .IMPL, .RD:
+		return !(ot == .MEM && op.kind == .RELATIVE)
+	case .RN_A32:
+		return ot != .MEM || (op.kind == .MEMORY && op.mem.disp == 0 && op.mem.index == Register(0))
+	case .RM_A32, .RS_A32, .RT_A32, .RT2_A32, .RDLO_A32, .RDHI_A32, .RD_T32:
+		return !(ot == .MEM && op.kind == .RELATIVE)
+	case .RN_T32:
+		return ot != .MEM || (op.kind == .MEMORY && op.mem.disp == 0 && op.mem.index == Register(0))
+	case .RM_T32, .RT_T32, .RT2_T32, .RA_T32:
 		return !(ot == .MEM && op.kind == .RELATIVE)
 	case .RD_T16_LO, .RM_T16_LO, .RN_T16_LO:
 		return low_register(op)
@@ -581,19 +608,36 @@ operand_fits :: proc "contextless" (op: ^Operand, ot: Operand_Type, enc: Operand
 		return op.kind == .REG_LIST && u16(op.immediate) & 0xBF00 == 0
 	case .T16_REG_LIST_PC:
 		return op.kind == .REG_LIST && u16(op.immediate) & 0x7F00 == 0
-	case .RM_T32_ROTATED, .RM_T32_TWICE, .RN_T32_SAT, .T32_IMM12, .T32_IMM16,
-	     .T32_IMM_SHIFT, .T32_IMM_SHIFT_32, .SAT16_IMM4_T32, .SAT16_IMM4_U_T32,
-	     .BFI_MSB_T32, .BFX_WIDTH_T32, .T32_IMM4_IMM12, .T32_IMM4_SMC, .T32_IMM8,
-	     .CPS_IFLAGS_T32, .CPS_MODE_T32, .MRS_SPEC_REG_T32, .MSR_FIELDS_T32, .SYSM_T32,
-	     .MSR_SYSM_T32:
+	case .RM_T32_ROTATED, .RM_A32_ROTATED:
+		return op.kind == .REGISTER && (!is_shifted(op.shift_type, op.shift_amt) || (op.shift_type == .ROR && op.shift_amt % 8 == 0 && op.shift_amt <= 24))
+	case .RM_T32_TWICE, .RN_T32_SAT, .T32_IMM12, .T32_IMM16, .T32_IMM_SHIFT,
+	     .T32_IMM_SHIFT_32, .SAT16_IMM4_T32, .SAT16_IMM4_U_T32, .BFI_MSB_T32,
+	     .BFX_WIDTH_T32:
+		return !(ot == .MEM && op.kind == .RELATIVE)
+	case .IMM4_IMM12, .IMM12_IMM4:
+		return scaled(op.immediate, 1, 0xFFFF)
+	case .CPS_IFLAGS_A32, .SETPAN_IMM_A32:
+		return !(ot == .MEM && op.kind == .RELATIVE)
+	case .RM_PAIR_NEXT:
+		return op.kind == .REGISTER && index > 0 && register_pair(&inst.ops[index - 1], op)
+	case .BRANCH_BLX_A32:
+		return !(ot == .MEM && op.kind == .RELATIVE)
+	case .NEON_VEXT_IMM4:
+		return scaled(op.immediate, 1, 15)
+	case .A32_REG_LIST_USER:
+		return op.kind == .REG_LIST && op.list.user
+	case .MEM_REG_SHIFTED, .MEM_REG_SHIFTED_PRE, .MEM_REG_SHIFTED_POST:
+		return op.kind == .MEMORY && !is_rsr_shift_type(op.mem.shift_type)
+	case .MEM_REG_PRE, .MEM_REG_POST:
+		return op.kind == .MEMORY && !is_shifted(op.mem.shift_type, op.mem.shift_amt)
+	case .T32_IMM4_SMC, .T32_IMM8, .CPS_IFLAGS_T32, .CPS_MODE_T32, .MRS_SPEC_REG_T32,
+	     .MSR_FIELDS_T32, .SYSM_T32, .MSR_SYSM_T32:
 		return !(ot == .MEM && op.kind == .RELATIVE)
 	case .MEM_T32_IMM12:
 		return op.kind == .MEMORY && op.mem.sign >= 0 && address_within(op, 4095, 1)
 	case .MEM_T32_IMM8_NEG:
 		return op.kind == .MEMORY && (op.mem.disp < 0 || op.mem.sign < 0) && address_within(op, 255, 1)
-	case .MEM_T32_IMM8_PRE:
-		return address_within(op, 255, 1)
-	case .MEM_T32_IMM8_POST:
+	case .MEM_T32_IMM8_PRE, .MEM_T32_IMM8_POST:
 		return address_within(op, 255, 1)
 	case .MEM_T32_IMM8_POS:
 		return op.kind == .MEMORY && op.mem.sign >= 0 && address_within(op, 255, 1)
@@ -607,16 +651,21 @@ operand_fits :: proc "contextless" (op: ^Operand, ot: Operand_Type, enc: Operand
 		return op.kind == .MEMORY && !is_shifted(op.mem.shift_type, op.mem.shift_amt)
 	case .MEM_T32_TABLE_H:
 		return op.kind == .MEMORY && op.mem.shift_type == .LSL && op.mem.shift_amt == 1
-	case .RD_T32_STATUS, .T32_REG_LIST, .REL_T32_ADR_ADD, .REL_T32_ADR_SUB,
-	     .BRANCH_BLX_T32, .RN_T32_ZR, .RM_T32_ZR, .COND_T32_FCOND, .BANKED_MRS_T32,
-	     .BANKED_MSR_T32, .LOB_FORWARD, .LOB_BACKWARD, .A32_IMM_MOD, .T32_IMM_MOD,
-	     .A32_IMM12_ROT, .A32_IMM12, .A32_IMM_SHIFT, .A32_IMM_SHIFT_32, .A32_SHIFT_TYPE,
-	     .A32_RS_SHIFT, .A32_IMM24, .A32_IMM4, .A32_IMM4_ROTATE, .A32_IMM5_LSB,
-	     .A32_IMM5_W, .A32_COND_FIELD, .A32_REG_LIST, .VD_S, .VN_S, .VM_S, .VD_D, .VN_D,
-	     .VM_D, .VD_Q, .VN_Q, .VM_Q, .NEON_VM_SCALAR16, .NEON_VM_SCALAR32, .VMOV_LANE_8,
-	     .VMOV_LANE_16, .VMOV_LANE_32, .MVE_ROT_HCADD, .MVE_ROT_CMLA, .VN_Q_MVE,
-	     .VM_Q_MVE, .VFP_IMM8, .VM_S_PLUS1, .DBG_OPTION, .MRS_SPEC_REG, .VFP_SPEC_REG,
-	     .SETEND_ENDIAN:
+	case .RD_T32_STATUS:
+		return !(ot == .MEM && op.kind == .RELATIVE)
+	case .T32_REG_LIST:
+		return op.kind == .REG_LIST && u32(op.immediate) & form.mask & 0xFFFF == 0
+	case .REL_T32_ADR_ADD, .REL_T32_ADR_SUB, .BRANCH_BLX_T32, .RN_T32_ZR, .RM_T32_ZR,
+	     .COND_T32_FCOND, .BANKED_MRS_T32, .BANKED_MSR_T32, .LOB_FORWARD, .LOB_BACKWARD,
+	     .A32_IMM_MOD, .T32_IMM_MOD, .A32_IMM_SHIFT, .A32_IMM_SHIFT_32, .A32_IMM24,
+	     .A32_IMM4:
+		return !(ot == .MEM && op.kind == .RELATIVE)
+	case .A32_REG_LIST:
+		return op.kind == .REG_LIST && !op.list.user
+	case .VD_S, .VN_S, .VM_S, .VD_D, .VN_D, .VM_D, .VD_Q, .VN_Q, .VM_Q,
+	     .NEON_VM_SCALAR16, .NEON_VM_SCALAR32, .VMOV_LANE_8, .VMOV_LANE_16,
+	     .VMOV_LANE_32, .MVE_ROT_HCADD, .MVE_ROT_CMLA, .VN_Q_MVE, .VM_Q_MVE, .VFP_IMM8,
+	     .VM_S_PLUS1, .DBG_OPTION, .MRS_SPEC_REG, .VFP_SPEC_REG, .SETEND_ENDIAN:
 		return !(ot == .MEM && op.kind == .RELATIVE)
 	case .IMPL_SP:
 		return op.kind == .REGISTER && op.reg == SP
@@ -630,63 +679,73 @@ operand_fits :: proc "contextless" (op: ^Operand, ot: Operand_Type, enc: Operand
 		return !(ot == .MEM && op.kind == .RELATIVE)
 	case .NEON_IMM8_ABCDEFGH:
 		return modified_immediate_representable(op, form)
-	case .NEON_CMODE, .NEON_OP_BIT, .VFP_S_LIST, .VFP_D_LIST, .VFP_DX_LIST:
+	case .VFP_S_LIST, .VFP_D_LIST, .VFP_DX_LIST:
 		return !(ot == .MEM && op.kind == .RELATIVE)
 	case .VD_S_AGAIN, .VD_D_AGAIN:
 		return op.kind == .REGISTER && op.reg == inst.ops[0].reg
-	case .RT_VMRS, .NEON_VN_TABLE_1, .NEON_VN_TABLE_2, .NEON_VN_TABLE_3,
-	     .NEON_VN_TABLE_4, .NEON_VM_SCALAR_16, .NEON_VM_SCALAR_32, .NEON_VDUP_LANE_8,
-	     .NEON_VDUP_LANE_16, .NEON_VDUP_LANE_32, .NEON_D_LIST_1, .NEON_D_LIST_2,
-	     .NEON_D_LIST_3, .NEON_D_LIST_4, .NEON_D_LIST_2X, .NEON_D_LIST_3X,
-	     .NEON_D_LIST_4X, .NEON_D_LIST_ALL, .NEON_D_LIST_ALL_2, .NEON_D_LIST_ALL_3,
-	     .NEON_D_LIST_ALL_4, .NEON_LANE_D_8, .NEON_LANE_D_16, .NEON_LANE_D_32,
-	     .NEON_LANE_D_8_2, .NEON_LANE_D_16_2, .NEON_LANE_D_32_2, .NEON_LANE_D_8_3,
-	     .NEON_LANE_D_16_3, .NEON_LANE_D_32_3, .NEON_LANE_D_8_4, .NEON_LANE_D_16_4,
-	     .NEON_LANE_D_32_4:
+	case .RT_OR_APSR_NZCV, .RN_OR_APSR_NZCV, .RM_OR_APSR_NZCV, .NEON_VN_TABLE_1,
+	     .NEON_VN_TABLE_2, .NEON_VN_TABLE_3, .NEON_VN_TABLE_4, .NEON_VM_SCALAR_16,
+	     .NEON_VM_SCALAR_32, .NEON_VDUP_LANE_8, .NEON_VDUP_LANE_16, .NEON_VDUP_LANE_32,
+	     .NEON_D_LIST_1, .NEON_D_LIST_2, .NEON_D_LIST_3, .NEON_D_LIST_4,
+	     .NEON_D_LIST_2X, .NEON_D_LIST_3X, .NEON_D_LIST_4X, .NEON_D_LIST_ALL,
+	     .NEON_D_LIST_ALL_2, .NEON_D_LIST_ALL_3, .NEON_D_LIST_ALL_4, .NEON_LANE_D_8,
+	     .NEON_LANE_D_16, .NEON_LANE_D_32, .NEON_LANE_D_8_2, .NEON_LANE_D_16_2,
+	     .NEON_LANE_D_32_2, .NEON_LANE_D_8_3, .NEON_LANE_D_16_3, .NEON_LANE_D_32_3,
+	     .NEON_LANE_D_8_4, .NEON_LANE_D_16_4, .NEON_LANE_D_32_4:
 		return !(ot == .MEM && op.kind == .RELATIVE)
 	case .MEM_IMM12_OFFSET:
 		return address_within(op, 4095, 1)
-	case .RT2_A32_PAIR:
-		return !(ot == .MEM && op.kind == .RELATIVE)
-	case .MEM_IMM8_PRE_INDEX:
+	case .RT_PAIR_NEXT:
+		return op.kind == .REGISTER && index > 0 && register_pair(&inst.ops[index - 1], op)
+	case .MEM_IMM8_PRE_INDEX, .MEM_IMM8_POST_INDEX, .MEM_IMM8_OFFSET:
 		return address_within(op, 255, 1)
-	case .MEM_IMM8_POST_INDEX:
-		return address_within(op, 255, 1)
-	case .MEM_IMM8_OFFSET:
-		return address_within(op, 255, 1)
-	case .MEM_IMM8_SCALED4:
-		return address_within(op, 1020, 4)
-	case .MEM_IMM8_SCALED4_PRE:
-		return address_within(op, 1020, 4)
-	case .MEM_IMM8_SCALED4_POST:
+	case .MEM_IMM8_SCALED4, .MEM_IMM8_SCALED4_PRE, .MEM_IMM8_SCALED4_POST:
 		return address_within(op, 1020, 4)
 	case .MEM_IMM8_SCALED2:
 		return address_within(op, 510, 2)
 	case .MEM_REG_OFFSET:
+		return op.kind == .MEMORY && !is_shifted(op.mem.shift_type, op.mem.shift_amt)
+	case .MEM_PRE_INDEX, .MEM_POST_INDEX:
+		return address_within(op, 4095, 1)
+	case .COPROC_NUM_FIELD, .COPROC_CRD_FIELD, .COPROC_OPC1_MCR, .COPROC_OPC1_FIELD,
+	     .COPROC_OPC2_FIELD, .COPROC_CRN_FIELD, .COPROC_CRM_FIELD, .COPROC_OPC_MCRR:
 		return !(ot == .MEM && op.kind == .RELATIVE)
-	case .MEM_PRE_INDEX:
-		return address_within(op, 4095, 1)
-	case .MEM_POST_INDEX:
-		return address_within(op, 4095, 1)
-	case .MEM_LITERAL:
-		return op.kind == .RELATIVE
-	case .MEM_DOUBLEREG, .COPROC_NUM_FIELD, .COPROC_CRD_FIELD, .COPROC_OPC1_MCR,
-	     .COPROC_OPC1_FIELD, .COPROC_OPC2_FIELD, .COPROC_CRN_FIELD, .COPROC_CRM_FIELD,
-	     .COPROC_OPC_MCRR, .BRANCH_24, .BRANCH_24_T32, .BRANCH_20_T32, .BRANCH_11_T16,
-	     .BRANCH_8_T16, .BRANCH_CBZ, .BF_BOFF, .BF_BLOC, .BF_RM, .BFCSEL_COND,
-	     .PSR_FIELD_MASK, .SYSM_FIELD, .BARRIER_TYPE, .CPS_IFLAGS, .HINT_FIELD, .VFP_FBITS,
-	     .NEON_SHLL_8, .NEON_SHLL_16, .NEON_SHLL_32, .NEON_ROT_2, .NEON_ROT_4,
-	     .NEON_ROT_4_HI, .SAT_IMM5, .SAT_IMM5_T32, .SAT_IMM5_U, .SAT_IMM5_U_T32, .BFX_WIDTH,
-	     .BFI_MSB, .BFI_LSB, .BFI_LSB_T32, .NEON_SHIFT_IMM6, .NEON_SHIFT_IMM3,
-	     .NEON_SHIFT_IMM4, .NEON_SHIFT_IMM5, .QD_MVE, .QN_MVE, .QM_MVE:
+	case .COPROC_OPTION:
+		return scaled(op.immediate, 1, 255)
+	case .BRANCH_24, .BRANCH_24_T32, .BRANCH_20_T32, .BRANCH_11_T16, .BRANCH_8_T16,
+	     .BRANCH_CBZ, .BF_BOFF, .BF_BLOC, .BF_RM, .BFCSEL_COND, .PSR_FIELD_MASK,
+	     .BARRIER_TYPE, .HINT_FIELD, .VFP_FBITS, .NEON_SHLL_8, .NEON_SHLL_16,
+	     .NEON_SHLL_32, .NEON_ROT_2, .NEON_ROT_4, .NEON_ROT_4_HI, .SAT_IMM5,
+	     .SAT_IMM5_T32, .SAT_IMM5_U, .SAT_IMM5_U_T32, .BFX_WIDTH, .BFI_MSB, .BFI_LSB,
+	     .BFI_LSB_T32, .NEON_SHIFT_IMM6, .NEON_SHIFT_IMM3, .NEON_SHIFT_IMM4,
+	     .NEON_SHIFT_IMM5, .QD_MVE, .QN_MVE, .QM_MVE:
 		return !(ot == .MEM && op.kind == .RELATIVE)
 	case .MVE_RDA_EVEN, .MVE_RDALO:
 		return op.kind == .REGISTER && reg_hw(op.reg) % 2 == 0 && reg_hw(op.reg) < 14
 	case .MVE_RDAHI:
 		return op.kind == .REGISTER && reg_hw(op.reg) % 2 == 1 && reg_hw(op.reg) < 14
-	case .MVE_SIZE_FIELD, .MVE_VPT_MASK_FIELD, .MVE_LOOP_IMM, .CDE_COPROC_FIELD,
-	     .CDE_IMM_FIELD, .CDE_ACC_FIELD, .V8M_TT_AT_BITS:
+	case .MVE_VPT_MASK_FIELD:
 		return !(ot == .MEM && op.kind == .RELATIVE)
+	case .MVE_RN_EVEN:
+		return op.kind == .REGISTER && reg_hw(op.reg) % 2 == 0 && reg_hw(op.reg) <= 14
+	case .MVE_RM_ODD:
+		return op.kind == .REGISTER && reg_hw(op.reg) % 2 == 1 && reg_hw(op.reg) <= 13
+	case .MVE_DUP_IMM:
+		return op.kind == .IMMEDIATE && (op.immediate == 1 || op.immediate == 2 || op.immediate == 4 || op.immediate == 8)
+	case .CDE_COPROC_FIELD:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_COPROC_NUM && reg_hw(op.reg) < 8
+	case .CDE_IMM_CX1:
+		return scaled(op.immediate, 1, 8191)
+	case .CDE_IMM_CX2:
+		return scaled(op.immediate, 1, 511)
+	case .CDE_IMM_CX3:
+		return scaled(op.immediate, 1, 63)
+	case .CDE_IMM_VCX1:
+		return scaled(op.immediate, 1, form.bits & 0x40 != 0 ? 4095 : 2047)
+	case .CDE_IMM_VCX2:
+		return scaled(op.immediate, 1, form.bits & 0x40 != 0 ? 127 : 63)
+	case .CDE_IMM_VCX3:
+		return scaled(op.immediate, 1, form.bits & 0x40 != 0 ? 15 : 7)
 	}
 	return false
 }
@@ -696,12 +755,17 @@ operand_matches_inline :: #force_inline proc "contextless" (op: ^Operand, ot: Op
 	// A modified immediate reaches an immediate slot as an expanded bit
 	// pattern or a float, so all three kinds are the same slot's shape.
 	immediate :: proc "contextless" (op: ^Operand) -> bool {
-		return op.kind == .IMMEDIATE || op.kind == .HEX_IMMEDIATE || op.kind == .FLOAT_IMMEDIATE
+		return op.kind == .IMMEDIATE || op.kind == .HEX_IMMEDIATE || op.kind == .FLOAT_IMMEDIATE ||
+		       op.kind == .ROTATED_IMMEDIATE
 	}
 	switch ot {
 	case .NONE:
 		return op.kind == .NONE
 	case .GPR, .GPR_NOPC, .GPR_NOSP, .GPR_LOW:
+		// Some fields spell their 1111 as APSR_nzcv rather than PC.
+		if op.kind == .REGISTER && op.reg == APSR_NZCV {
+			return enc == .RT_OR_APSR_NZCV || enc == .RN_OR_APSR_NZCV || enc == .RM_OR_APSR_NZCV
+		}
 		return op.kind == .REGISTER && is_gpr(op.reg)
 	case .GPR_SHIFTED:
 		// An unshifted register is the shifted register with no shift:
@@ -775,7 +839,7 @@ operand_matches_inline :: #force_inline proc "contextless" (op: ^Operand, ot: Op
 		return op.kind == .REGISTER && is_qpr(op.reg)
 	case .QPR_MVE_LIST:
 		return op.kind == .REG_LIST || (op.kind == .REGISTER && is_qpr(op.reg))
-	case .MVE_VPT_MASK, .MVE_VCTP_SIZE, .MVE_LOOP_TGT, .CDE_COPROC, .CDE_IMM, .CDE_VFP_REG:
+	case .MVE_VPT_MASK, .MVE_VCTP_SIZE, .MVE_LOOP_TGT:
 		return op.kind == .IMMEDIATE || op.kind == .REGISTER || op.kind == .RELATIVE
 	}
 	return false
@@ -820,7 +884,7 @@ pack_operand_inline :: #force_inline proc(
 	case .RS_A32:              return (u32(reg_hw(op.reg)) & 0xF) << 8
 	case .RT_A32:              return (u32(reg_hw(op.reg)) & 0xF) << 12
 	case .RT2_A32:             return (u32(reg_hw(op.reg)) & 0xF) << 16
-	case .RA_A32:              return (u32(reg_hw(op.reg)) & 0xF) << 12
+
 	case .RDLO_A32:            return (u32(reg_hw(op.reg)) & 0xF) << 12
 	case .RDHI_A32:            return (u32(reg_hw(op.reg)) & 0xF) << 16
 
@@ -899,6 +963,10 @@ pack_operand_inline :: #force_inline proc(
 	case .T16_REG_LIST_PC:   return (u32(op.immediate) & 0xFF) | ((u32(op.immediate) >> 15) & 1) << 8
 
 	// ---- T32 ----
+	case .RM_A32_ROTATED:
+		reg := u32(reg_hw(op.reg)) & 0xF
+		if op.shift_type != .ROR { return reg }
+		return reg | ((u32(op.shift_amt) / 8) & 0x3) << 10
 	case .RM_T32_TWICE:
 		reg := u32(reg_hw(op.reg)) & 0xF
 		return reg << 16 | reg
@@ -928,9 +996,44 @@ pack_operand_inline :: #force_inline proc(
 		return (v >> 12) << 16 | ((v >> 11) & 1) << 26 | ((v >> 8) & 0x7) << 12 | (v & 0xFF)
 	case .T32_IMM_SHIFT, .T32_IMM_SHIFT_32:
 		return t32_split_shift(u32(op.immediate) & 0x1F)
-	case .T32_IMM4_IMM12:
+	case .IMM4_IMM12:
 		v := u32(op.immediate) & 0xFFFF
 		return (v >> 12) << 16 | (v & 0xFFF)
+	case .CPS_IFLAGS_A32:    return (u32(reg_hw(op.reg)) & 0x7) << 6
+	case .SETPAN_IMM_A32:    return (u32(op.immediate) & 1) << 9
+	case .RM_PAIR_NEXT:       return 0    // only the first of the pair is encoded
+	case .BRANCH_BLX_A32:
+		append(relocs, Relocation{
+			offset = pc, label_id = u32(op.relative),
+			type = .BLX_A32, size = 4, inst_idx = inst_idx,
+		})
+		return 0
+	case .IMM12_IMM4:
+		v := u32(op.immediate) & 0xFFFF
+		return (v >> 4) << 8 | (v & 0xF)
+	case .NEON_VEXT_IMM4:
+		return (u32(op.immediate) & 0xF) << 8
+	case .A32_REG_LIST_USER:
+		return u32(op.immediate) & 0xFFFF
+	case .MEM_REG_SHIFTED, .MEM_REG_SHIFTED_PRE, .MEM_REG_SHIFTED_POST:
+		m := op.mem
+		word := (u32(reg_hw(m.base)) & 0xF) << 16 | (u32(reg_hw(m.index)) & 0xF)
+		if m.sign >= 0 { word |= 1 << 23 }
+		switch m.shift_type {
+		case .LSL, .LSR, .ASR, .ROR:
+			if !is_shifted(m.shift_type, m.shift_amt) { return word }
+			return word | (u32(m.shift_amt) & 0x1F) << 7 | u32(m.shift_type) << 5    // 32 wraps to the zero that writes it
+		case .RRX:
+			return word | u32(Shift_Type.ROR) << 5
+		case .NONE, .LSL_REG, .LSR_REG, .ASR_REG, .ROR_REG:
+			return word    // no register-shifted index in a load or store
+		}
+		return word
+	case .MEM_REG_PRE, .MEM_REG_POST:
+		m := op.mem
+		word := (u32(reg_hw(m.base)) & 0xF) << 16 | (u32(reg_hw(m.index)) & 0xF)
+		if m.sign >= 0 { word |= 1 << 23 }
+		return word
 	case .T32_IMM4_SMC:      return (u32(op.immediate) & 0xF) << 16
 	case .T32_IMM8:          return  u32(op.immediate) & 0xFF
 	case .CPS_IFLAGS_T32:    return (u32(reg_hw(op.reg)) & 0x7) << 5
@@ -1010,7 +1113,11 @@ pack_operand_inline :: #force_inline proc(
 		return 0
 
 	// ---- Modified-immediate (A32 + T32) ----
-	case .A32_IMM_MOD, .A32_IMM12_ROT:
+	case .A32_IMM_MOD:
+		// Given as parts, the parts are the encoding.
+		if op.kind == .ROTATED_IMMEDIATE {
+			return (u32(op.size) / 2 & 0xF) << 8 | (u32(op.immediate) & 0xFF)
+		}
 		// Run the ARM modified-immediate algorithm: find a (rotate, value)
 		// pair that represents the full 32-bit constant.
 		v, ok := encode_a32_modimm(u32(op.immediate))
@@ -1031,23 +1138,17 @@ pack_operand_inline :: #force_inline proc(
 		return (i_bit << 26) | (imm3 << 12) | imm8
 
 	// ---- A32 immediate field placements ----
-	case .A32_IMM12:        return u32(op.immediate) & 0xFFF
+
 	case .A32_IMM_SHIFT:    return (u32(op.immediate) & 0x1F) << 7
 	case .A32_IMM_SHIFT_32: return (u32(op.immediate) & 0x1F) << 7   // 32 wraps to 0, which is what encodes it
-	case .A32_SHIFT_TYPE:   return (u32(op.immediate) & 0x3)  << 5
-	case .A32_RS_SHIFT:     return (u32(reg_hw(op.reg)) & 0xF) << 8
-	case .A32_IMM24:
-		// Branches: emit relocation
-		append(relocs, Relocation{
-			offset = pc, label_id = u32(op.relative),
-			type = .BRANCH_A32_24, size = 4, inst_idx = inst_idx,
-		})
-		return 0
+
+
+	case .A32_IMM24:        return u32(op.immediate) & 0xFFFFFF    // SVC's; branches are BRANCH_24
 	case .A32_IMM4:         return u32(op.immediate) & 0xF
-	case .A32_IMM4_ROTATE:  return (u32(op.immediate) & 0xF) << 8
-	case .A32_IMM5_LSB:     return (u32(op.immediate) & 0x1F) << 7
-	case .A32_IMM5_W:       return (u32(op.immediate) & 0x1F) << 16
-	case .A32_COND_FIELD:   return (u32(op.immediate) & 0xF)  << 28
+
+
+
+
 	case .A32_REG_LIST:     return u32(op.immediate) & 0xFFFF
 
 	// ---- VFP / NEON register-field split encoders --------------------------
@@ -1103,7 +1204,7 @@ pack_operand_inline :: #force_inline proc(
 	case .VM_Q_MVE:
 		return (u32(reg_hw(op.reg)) & 0x7) << 1
 	case .DBG_OPTION:    return u32(op.immediate) & 0xF
-	case .MRS_SPEC_REG:  return 0    // the R bit is a fixed bit of the form
+	case .MRS_SPEC_REG:  return ((u32(reg_hw(op.reg)) >> 1) & 1) << 22    // SPSR sets R
 	case .VFP_SPEC_REG:  return (u32(reg_hw(op.reg)) & 0xF) << 16
 	case .SETEND_ENDIAN: return (u32(reg_hw(op.reg)) & 1) << 9
 	case .IMPL_SP, .IMPL_PC, .IMPL_LR, .IMPL_R12:
@@ -1130,8 +1231,6 @@ pack_operand_inline :: #force_inline proc(
 		abcdefgh, _ := encode_neon_modimm_for(neon_modimm_value(op, cmode), cmode, op_bit)
 		v := u32(abcdefgh)
 		return ((v >> 7) & 1) << 24 | ((v >> 4) & 0x7) << 16 | (v & 0xF)
-	case .NEON_CMODE:       return (u32(op.immediate) & 0xF) << 8
-	case .NEON_OP_BIT:      return (u32(op.immediate) & 1) << 5
 
 	// ---- VFP/NEON register lists (LDM/STM/PUSH/POP for FP regs) ------------
 	case .NEON_D_LIST_1, .NEON_D_LIST_2, .NEON_D_LIST_3, .NEON_D_LIST_4, .NEON_D_LIST_2X, .NEON_D_LIST_3X, .NEON_D_LIST_4X, .NEON_D_LIST_ALL:
@@ -1172,9 +1271,15 @@ pack_operand_inline :: #force_inline proc(
 		return ((n >> 4) & 1) << 22 | (n & 0xF) << 12 | ((u32(op.list.count) * 2 + 1) & 0xFF)
 	case .VD_S_AGAIN, .VD_D_AGAIN:
 		return 0    // Vd already holds it, from the first mention
-	case .RT_VMRS:
+	case .RT_OR_APSR_NZCV:
 		if op.reg == APSR_NZCV { return 0xF << 12 }
 		return (u32(reg_hw(op.reg)) & 0xF) << 12
+	case .RN_OR_APSR_NZCV:
+		if op.reg == APSR_NZCV { return 0xF << 16 }
+		return (u32(reg_hw(op.reg)) & 0xF) << 16
+	case .RM_OR_APSR_NZCV:
+		if op.reg == APSR_NZCV { return 0xF }
+		return u32(reg_hw(op.reg)) & 0xF
 
 	// ---- Memory addressing composites --------------------------------------
 	case .MEM_IMM8_SCALED2:
@@ -1193,7 +1298,7 @@ pack_operand_inline :: #force_inline proc(
 		u_bit: u32 = (m.disp > 0 || (m.disp == 0 && m.sign >= 0)) ? 1 : 0
 		disp := u32(abs_i32(m.disp)) & 0xFFF
 		return base | (u_bit << 23) | disp
-	case .RT2_A32_PAIR:
+	case .RT_PAIR_NEXT:
 		return 0
 	case .MEM_IMM8_PRE_INDEX, .MEM_IMM8_POST_INDEX, .MEM_IMM8_OFFSET:
 		m := op.mem
@@ -1222,19 +1327,11 @@ pack_operand_inline :: #force_inline proc(
 		u_bit: u32 = (m.disp > 0 || (m.disp == 0 && m.sign >= 0)) ? 1 : 0
 		disp := u32(abs_i32(m.disp)) & 0xFFF
 		return base | (u_bit << 23) | disp
-	case .MEM_LITERAL:
-		append(relocs, Relocation{
-			offset = pc, label_id = u32(op.relative),
-			type = .LDR_LITERAL_A32, size = 4, inst_idx = inst_idx,
-		})
-		return 0
-	case .MEM_DOUBLEREG:
-		m := op.mem
-		return ((u32(reg_hw(m.base)) & 0xF) << 16) | (u32(reg_hw(m.index)) & 0xF)
 
 	// ---- Coprocessor -------------------------------------------------------
 	case .COPROC_NUM_FIELD:   return (u32(reg_hw(op.reg)) & 0xF) << 8
 	case .COPROC_CRD_FIELD:   return (u32(reg_hw(op.reg)) & 0xF) << 12
+	case .COPROC_OPTION:      return u32(op.immediate) & 0xFF
 	case .COPROC_OPC1_MCR:    return (u32(op.immediate) & 0x7) << 21
 	case .COPROC_OPC1_FIELD:  return (u32(op.immediate) & 0xF) << 20
 	case .COPROC_OPC2_FIELD:  return (u32(op.immediate) & 0x7) << 5
@@ -1300,9 +1397,9 @@ pack_operand_inline :: #force_inline proc(
 
 	// ---- Misc --------------------------------------------------------------
 	case .PSR_FIELD_MASK:   return encode_psr_field(u8(op.immediate))
-	case .SYSM_FIELD:       return u32(op.immediate) & 0xFF
+
 	case .BARRIER_TYPE:     return u32(op.immediate) & 0xF
-	case .CPS_IFLAGS:       return u32(op.immediate) & 0x1FF
+
 	case .HINT_FIELD:       return u32(op.immediate) & 0xFF
 	case .NEON_SHLL_8, .NEON_SHLL_16, .NEON_SHLL_32:
 		return 0    // the amount is the form's element size; no field carries it
@@ -1356,18 +1453,41 @@ pack_operand_inline :: #force_inline proc(
 		return ((u32(reg_hw(op.reg)) / 2) & 0x7) << 13
 	case .MVE_RDAHI:
 		return ((u32(reg_hw(op.reg)) / 2) & 0x7) << 20
-	case .MVE_SIZE_FIELD:   return (u32(op.immediate) & 0x3) << 20
+
 	case .MVE_VPT_MASK_FIELD: return (u32(op.immediate) & 0xF) << 13
-	case .MVE_LOOP_IMM:
-		append(relocs, Relocation{
-			offset = pc, label_id = u32(op.relative),
-			type = .BRANCH_T32_WLS, size = 4, inst_idx = inst_idx,
-		})
-		return 0
-	case .CDE_COPROC_FIELD: return (u32(op.immediate) & 0x7) << 8
-	case .CDE_IMM_FIELD:    return  u32(op.immediate) & 0x7F
-	case .CDE_ACC_FIELD:    return (u32(op.immediate) & 1) << 16
-	case .V8M_TT_AT_BITS:   return (u32(op.immediate) & 0x3) << 6
+	case .MVE_RN_EVEN:        return ((u32(reg_hw(op.reg)) / 2) & 0x7) << 17
+	case .MVE_RM_ODD:         return ((u32(reg_hw(op.reg)) / 2) & 0x7) << 1
+	case .MVE_DUP_IMM:
+		log2: u32 = op.immediate == 8 ? 3 : op.immediate == 4 ? 2 : op.immediate == 2 ? 1 : 0
+		return (log2 >> 1) << 7 | (log2 & 1)
+
+	case .CDE_COPROC_FIELD: return (u32(reg_hw(op.reg)) & 0x7) << 8
+	case .CDE_IMM_CX1:
+		imm := u32(op.immediate)
+		return imm & 0x3F | ((imm >> 6) & 1) << 7 | ((imm >> 7) & 0x3F) << 16
+	case .CDE_IMM_CX2:
+		imm := u32(op.immediate)
+		return imm & 0x3F | ((imm >> 6) & 1) << 7 | ((imm >> 7) & 0x3) << 20
+	case .CDE_IMM_CX3:
+		imm := u32(op.immediate)
+		return (imm & 0x3) << 4 | ((imm >> 2) & 1) << 7 | ((imm >> 3) & 0x7) << 20
+	case .CDE_IMM_VCX1:
+		imm := u32(op.immediate)
+		bits := imm & 0x3F | ((imm >> 6) & 1) << 7 | ((imm >> 7) & 0xF) << 16
+		if form.bits & 0x40 != 0 { bits |= ((imm >> 11) & 1) << 24 }
+		return bits
+	case .CDE_IMM_VCX2:
+		imm := u32(op.immediate)
+		bits := (imm & 1) << 4 | ((imm >> 1) & 1) << 7 | ((imm >> 2) & 0xF) << 16
+		if form.bits & 0x40 != 0 { bits |= ((imm >> 6) & 1) << 24 }
+		return bits
+	case .CDE_IMM_VCX3:
+		imm := u32(op.immediate)
+		bits := (imm & 1) << 4 | ((imm >> 1) & 0x3) << 20
+		if form.bits & 0x40 != 0 { bits |= ((imm >> 3) & 1) << 24 }
+		return bits
+
+
 	}
 
 	return 0
@@ -1410,9 +1530,21 @@ resolve_relocation_inline :: #force_inline proc(
 	target := u32(ld)
 
 	switch r.type {
-	case .NONE, .BLX_A32, .ADR_A32, .MOVW_ABS, .MOVT_ABS:
+	case .NONE, .ADR_A32, .MOVW_ABS, .MOVT_ABS:
 		// encode produces none of these; they stay pending for the caller.
 		return false
+	case .BLX_A32:
+		// BLX to Thumb lands on a halfword: imm24 counts words from PC + 8,
+		// and the H bit at 24 adds the halfword.
+		rel := i32(target) - (i32(r.offset) + 8) + r.addend
+		if rel & 1 != 0 || rel < -(1 << 25) || rel >= (1 << 25) {
+			append(errors, Error{inst_idx = u32(r.inst_idx), code = .LABEL_OUT_OF_RANGE})
+			return true
+		}
+		word := read_u32_le(code, r.offset)
+		word = (word & 0xFE000000) | u32((rel >> 1) & 1) << 24 | (u32(rel >> 2) & 0xFFFFFF)
+		write_u32_le(code, r.offset, word)
+		return true
 	case .BRANCH_A32_24:
 		// PC = inst_addr + 8 in A32 mode
 		rel := i32(target) - (i32(r.offset) + 8) + r.addend
@@ -1709,8 +1841,17 @@ neon_lane_shape :: #force_inline proc "contextless" (e: Operand_Encoding) -> (sh
 @(private, require_results)
 writeback_matches :: #force_inline proc "contextless" (inst: ^Instruction, f: ^Encoding) -> bool {
 	for e in f.enc {
-		if e == .A32_REG_LIST || e == .RN_A32_WB || e == .IMPL_SP {
+		if e == .A32_REG_LIST || e == .A32_REG_LIST_USER || e == .T32_REG_LIST || e == .RN_A32_WB || e == .IMPL_SP {
 			return ((f.bits >> 21) & 1 != 0) == inst.writeback
+		}
+		// The 16-bit STM always writes back; the 16-bit LDM does exactly
+		// when its list leaves the base out.
+		if e == .T16_REG_LIST {
+			if f.mnemonic == .STM {
+				return inst.writeback
+			}
+			base := u16(1) << (reg_hw(inst.ops[0].reg) & 0xF)
+			return inst.writeback == (u16(inst.ops[1].immediate) & base == 0)
 		}
 	}
 	return true

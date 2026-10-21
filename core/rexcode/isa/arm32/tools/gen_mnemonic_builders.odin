@@ -125,7 +125,7 @@ operand_class :: proc(ot: a.Operand_Type) -> Operand_Class {
 	// ---- Plain registers (single Register value) ----
 	case .GPR, .GPR_NOPC, .GPR_NOSP, .GPR_LOW,
 	     .SPR, .DPR, .QPR, .SPR_ELEM, .QPR_MVE, .VPR,
-	     .COPROC_REG, .COPROC_NUM, .CDE_VFP_REG:
+	     .COPROC_REG, .COPROC_NUM:
 		return .REG
 	}
 
@@ -194,9 +194,6 @@ operand_suffix :: proc(ot: a.Operand_Type) -> string {
 	case .MVE_VPT_MASK:  return "vpt"
 	case .MVE_VCTP_SIZE: return "vsz"
 	case .MVE_LOOP_TGT:  return "loop"
-	case .CDE_COPROC:    return "cdec"
-	case .CDE_IMM:       return "cdei"
-	case .CDE_VFP_REG:   return "cdev"
 	}
 	return "x"
 }
