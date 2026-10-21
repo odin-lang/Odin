@@ -214,12 +214,17 @@ is_graphic :: proc(r: rune) -> bool {
 	return false
 }
 
+// Reports whether r is a letter, mark, number, punctuation, symbol, or ASCII space.
+// Other spacing characters and format characters are not printable.
 @(require_results)
 is_print :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pp != 0
 	}
-	return false
+	if u32(r) > MAX_RUNE {
+		return false
+	}
+	return is_graphic(r) && !in_range(r, zs_ranges)
 }
 
 @(require_results)

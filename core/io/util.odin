@@ -1,6 +1,7 @@
 package io
 
 import "core:strconv"
+import "core:unicode"
 import "core:unicode/utf8"
 import "core:unicode/utf16"
 
@@ -162,20 +163,9 @@ write_encoded_rune :: proc(w: Writer, r: rune, write_quote := true, n_written: ^
 	return
 }
 
+// Writes printable Unicode directly, escaping the active quote, backslash, and
+// nonprintable runes. for_json selects JSON-compatible escape sequences.
 write_escaped_rune :: proc(w: Writer, r: rune, quote: byte, html_safe := false, n_written: ^int = nil, for_json := false) -> (n: int, err: Error) {
-	is_printable :: proc(r: rune) -> bool {
-		if r <= 0xff {
-			switch r {
-			case 0x20..=0x7e:
-				return true
-			case 0xa1..=0xff: // ¡ through ÿ except for the soft hyphen
-				return r != 0xad //
-			}
-		}
-
-		// TODO(bill): A proper unicode library will be needed!
-		return false
-	}
 	defer if n_written != nil {
 		n_written^ += n
 	}
@@ -196,7 +186,7 @@ write_escaped_rune :: proc(w: Writer, r: rune, quote: byte, html_safe := false, 
 		write_byte(w, '\\', &n)    or_return
 		write_byte(w, byte(r), &n) or_return
 		return
-	} else if is_printable(r) {
+	} else if unicode.is_print(r) {
 		write_encoded_rune(w, r, false, &n) or_return
 		return
 	}

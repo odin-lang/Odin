@@ -1,6 +1,7 @@
 // Conversions to and from `string` representations of other data types like integers and booleans.
 package strconv
 
+import "core:unicode"
 import "core:unicode/utf8"
 import "decimal"
 /*
@@ -1598,6 +1599,10 @@ quote :: proc(buf: []byte, str: string) -> string {
 /*
 Writes a quoted rune representation of the input rune to a given byte slice and returns the result as a string
 
+Printable Unicode is written directly; the single quote, backslash, and
+nonprintable runes are escaped. Printability is defined by `unicode.is_print`.
+If the buffer is too small, the result is truncated to its capacity.
+
 **Inputs**
 - buf: The byte slice to which the quoted rune will be written
 - r: The input rune to be quoted
@@ -1648,6 +1653,7 @@ quote_rune :: proc(buf: []byte, r: rune) -> string {
 	write_byte(buf, &i, '\'')
 
 	switch r {
+	case '\'', '\\': write_byte(buf, &i, '\\', byte(r))
 	case '\a': write_string(buf, &i, "\\a")
 	case '\b': write_string(buf, &i, "\\b")
 	case '\e': write_string(buf, &i, "\\e")
@@ -1658,16 +1664,24 @@ quote_rune :: proc(buf: []byte, r: rune) -> string {
 	case '\v': write_string(buf, &i, "\\v")
 	case:
 		if r < 32 {
-			write_string(buf, &i, "\\x")
-			b: [2]byte
-			s := write_bits(b[:], u64(r), 16, true, 64, digits, nil)
-			switch len(s) {
-			case 0: write_string(buf, &i, "00")
-			case 1: write_rune(buf, &i, '0')
-			case 2: write_string(buf, &i, s)
-			}
-		} else {
+			write_byte(buf, &i, '\\', 'x', digits[r>>4], digits[r&0xf])
+		} else if unicode.is_print(r) {
 			write_rune(buf, &i, r)
+		} else {
+			c := r
+			if c > utf8.MAX_RUNE {
+				c = utf8.RUNE_ERROR
+			}
+			shift := 12
+			if c < 0x10000 {
+				write_string(buf, &i, `\u`)
+			} else {
+				write_string(buf, &i, `\U`)
+				shift = 28
+			}
+			for s := shift; s >= 0; s -= 4 {
+				write_byte(buf, &i, digits[c>>uint(s)&0xf])
+			}
 		}
 	}
 	write_byte(buf, &i, '\'')
