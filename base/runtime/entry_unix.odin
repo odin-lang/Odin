@@ -9,6 +9,9 @@ when ODIN_BUILD_MODE == .Dynamic {
 	@(link_name="_odin_entry_point", linkage="strong", require/*, link_section=".init"*/)
 	_odin_entry_point :: proc "c" () {
 		context = default_context()
+		when ODIN_PLATFORM_SUBTARGET == .Android {
+			args__ = _android_args()
+		}
 		when !ODIN_BEDROCK { #force_no_inline _startup_runtime() }
 		// NOTE(bill): An Android app's library is loaded by `System.loadLibrary` on the UI thread, before its
 		// activity exists. `core:sys/android/native_app_glue` calls `main` on a thread of its own instead.

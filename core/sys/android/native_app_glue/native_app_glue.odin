@@ -35,12 +35,17 @@ An activity recreated for a configuration change the manifest does not declare (
 the running `main`. `APP_CMD_ACTIVITY_CHANGED` arrives as the old activity goes, with `activity` nil, and again
 when the new one comes. Apps usually declare every change they can handle, so this does not happen.
 
+Before `main`, the process is set up as `core:os` expects of other platforms:
+- stdout and stderr go to logcat, tagged with the package name, at `.INFO` and `.WARN`. They go to `/dev/null`
+  when built with `-define:ODIN_ANDROID_STDIO_TO_LOGCAT=false`.
+- The working directory is the app's files directory, its private storage.
+- `HOME`, `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, and `XDG_STATE_HOME` are set to the files directory, and `TMPDIR`
+  and `XDG_CACHE_HOME` to the cache directory, when unset.
+- `os.args` holds only the package name. An activity's arguments arrive through its `Intent` instead.
+
 Differences from the NDK's C `android_native_app_glue`:
 - The program starts at `main`, not an exported `android_main`, and runs once per process.
-- `onAppCmd`, `onInputEvent` and `process` use the Odin calling convention.
-- `HOME` and `TMPDIR` are set to the app's files and cache directories when unset, for `core:os`.
-
-An app's stdout and stderr go to `/dev/null`. `android.redirect_stdio_to_logcat` sends them to logcat instead.
+- `onAppCmd`, `onInputEvent`, and `process` use the Odin calling convention.
 */
 #+build linux
 package native_app_glue
@@ -121,6 +126,21 @@ android_app :: struct {
 	pendingInputQueue: ^android.AInputQueue,
 	pendingWindow:     ^android.ANativeWindow,
 	pendingActivity:   ^android.ANativeActivity,
+}
+
+/*
+Whether stdout and stderr go to logcat, tagged with the package name (see `android.redirect_stdio_to_logcat`).
+Build with `-define:ODIN_ANDROID_STDIO_TO_LOGCAT=false` to leave them at `/dev/null`.
+*/
+ODIN_ANDROID_STDIO_TO_LOGCAT :: #config(ODIN_ANDROID_STDIO_TO_LOGCAT, true)
+
+// Runs as the library loads, before `main` and the `@(init)` procedures of the packages importing this one.
+@(init, private)
+init_stdio :: proc "contextless" () {
+	when ODIN_ANDROID_STDIO_TO_LOGCAT {
+		tag := string(runtime.args__[0]) if len(runtime.args__) > 0 else "Odin"
+		android.redirect_stdio_to_logcat(tag)
+	}
 }
 
 @(private)
@@ -472,14 +492,20 @@ ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedS
 		return
 	}
 
-	// `core:os` looks for writable directories in `HOME` and `TMPDIR`. The cache directory sits next to the files directory.
-	if activity.internalDataPath != nil {
-		posix.setenv("HOME", activity.internalDataPath, false)
+	// `core:os` finds the user directories through `HOME`, `TMPDIR`, and the XDG variables. The files directory is
+	// the one place an app can write, so relative paths resolve there. The cache directory sits next to it.
+	if files := activity.internalDataPath; files != nil {
+		posix.setenv("HOME",            files, false)
+		posix.setenv("XDG_CONFIG_HOME", files, false)
+		posix.setenv("XDG_DATA_HOME",   files, false)
+		posix.setenv("XDG_STATE_HOME",  files, false)
+		posix.chdir(files)
 
-		files := string(activity.internalDataPath)
-		if i := strings.last_index_byte(files, '/'); i > 0 {
-			cache := strings.concatenate({files[:i], "/cache"}, context.temp_allocator)
-			posix.setenv("TMPDIR", strings.clone_to_cstring(cache, context.temp_allocator), false)
+		if i := strings.last_index_byte(string(files), '/'); i > 0 {
+			cache := strings.concatenate({string(files)[:i], "/cache"}, context.temp_allocator)
+			ccache := strings.clone_to_cstring(cache, context.temp_allocator)
+			posix.setenv("TMPDIR",         ccache, false)
+			posix.setenv("XDG_CACHE_HOME", ccache, false)
 		}
 	}
 

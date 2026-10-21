@@ -200,7 +200,8 @@ console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string, opt
 	options := options
 	data := cast(^File_Console_Logger_Data)logger_data
 	when ODIN_PLATFORM_SUBTARGET == .Android {
-		// NOTE(bill): an Android app's stdout and stderr go to `/dev/null`. Write to logcat instead.
+		// NOTE(bill): an Android app's stdout and stderr go to `/dev/null` unless `native_app_glue` sends them to
+		// logcat. Write to logcat directly, at the message's own priority.
 		_logcat_logger_proc(data.ident, level, text, options, location)
 	} else {
 		h: ^os.File = nil
