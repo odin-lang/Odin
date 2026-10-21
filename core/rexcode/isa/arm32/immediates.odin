@@ -312,8 +312,9 @@ decode_neon_modimm :: proc "contextless" (abcdefgh: u32, cmode: u32, op: u32) ->
 	case 0b1100: return (a << 8) | 0xFF
 	case 0b1101: return (a << 16) | 0xFFFF
 	case 0b1110:
+		// .I8: the byte itself, which every element of the vector gets.
 		if op == 0 {
-			return a | (a << 8) | (a << 16) | (a << 24)
+			return a
 		}
 		// .I64: each of the eight bits becomes a whole byte.
 		result: u64 = 0

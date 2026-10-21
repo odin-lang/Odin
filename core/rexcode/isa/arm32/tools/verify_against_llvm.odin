@@ -491,8 +491,18 @@ verify_suite :: proc(suite: ^Suite, work_dir: string) -> []Result {
 				continue
 			}
 			// An address in the text is a branch target llvm has resolved
-			// against its own layout, which this one does not share.
-			if llvm[i] == "" || strings.contains(llvm[i], "0x") {
+			// against its own layout, which this one does not share. (Not one
+			// in llvm's trailing comment: that is only where a literal is.)
+			if llvm[i] == "" || strings.contains(strip_comment(llvm[i]), "0x") {
+				continue
+			}
+			// A D-register list that runs past D31 is UNPREDICTABLE, and llvm
+			// prints it with the names of whatever follows D31 in its own
+			// register table -- `{d31, fpinst2, mvfr0}` -- which its assembler
+			// then takes back. No assembler that checks what a register is
+			// would; rexcode rejects the word, and that is the right reading.
+			if verdict == .MISSING && list_runs_past_d31(llvm[i]) {
+				verdicts[i] = .UNREPRESENTABLE
 				continue
 			}
 			if verdict != .MISSING && mnemonic_of(ours[i]) != mnemonic_of(llvm[i]) {
@@ -575,6 +585,24 @@ verify_suite :: proc(suite: ^Suite, work_dir: string) -> []Result {
 		}
 	}
 	return results
+}
+
+list_runs_past_d31 :: proc(text: string) -> bool {
+	open := strings.index_byte(text, '{')
+	close := strings.index_byte(text, '}')
+	if open < 0 || close < open {
+		return false
+	}
+	list := text[open + 1:close]
+	if !strings.has_prefix(strings.trim_space(list), "d") {
+		return false
+	}
+	for name in ([]string{"fpinst2", "mvfr0", "mvfr1", "mvfr2", "fpexc", "fpinst"}) {
+		if strings.contains(list, name) {
+			return true
+		}
+	}
+	return false
 }
 
 strip_comment :: proc(text: string) -> string {

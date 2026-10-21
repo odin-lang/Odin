@@ -66,6 +66,9 @@ Index_Mode :: enum u8 {
 	OFFSET     = 0,   // [Rn, #imm]      -- no writeback
 	PRE_INDEX  = 1,   // [Rn, #imm]!     -- writeback after addr calc
 	POST_INDEX = 2,   // [Rn], #imm      -- writeback, base = Rn pre-update
+	// [Rn]! -- Rn steps past what was transferred. Only the Advanced SIMD
+	// element and structure loads and stores, which are written this way.
+	POST_INCREMENT = 3,
 }
 
 // Packed into one word: this sits in every Operand, so its width is
@@ -75,8 +78,8 @@ Index_Mode :: enum u8 {
 // A memory base or index is always a GPR, whose raw value never exceeds
 // REG_GPR|15 = 0x100F, so 15 bits hold one losslessly (index uses
 // Register(0), not a high sentinel, for "absent").
-// `disp` gets 19 bits (+/-262,143) against a worst case of 4,095 -- the imm12
-// of an A32 load -- so there is ~64x headroom.
+// `disp` gets 16 bits (+/-32,767) against a worst case of 4,095 -- the imm12
+// of an A32 load -- so there is ~8x headroom.
 Memory :: bit_field u64 {
 	base:       Register   | 15,  // GPR base register
 	index:      Register   | 15,  // GPR, or Register(0) for imm-only forms
@@ -84,7 +87,10 @@ Memory :: bit_field u64 {
 	shift_amt:  u8         | 6,   // 0..32 -- LSR and ASR reach 32 through a zero field
 	mode:       Index_Mode | 2,
 	sign:       i8         | 3,   // +1 or -1 (U bit)
-	disp:       i32        | 19,  // immediate displacement (sign-extended)
+	disp:       i32        | 16,  // immediate displacement (sign-extended)
+	// An Advanced SIMD element or structure address's alignment, `[r0:64]`:
+	// 0 for none, else log2 of the bits less 3 -- 1 for 16 up to 5 for 256.
+	align:      u8         | 3,
 }
 #assert(size_of(Memory) == 8)
 

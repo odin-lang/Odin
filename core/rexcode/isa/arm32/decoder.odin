@@ -172,9 +172,10 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, pc: u32, it_state: u8,
 		if is_generic_coprocessor(e.mnemonic) && !coprocessor_is_generic(coprocessor, profile, cde) { continue }
 		if profile == .M_PROFILE && e.flags.a_profile_only { continue }
 
-		// Match -- decode this entry
+		// Match -- decode this entry, from nothing: a candidate rejected below
+		// after unpacking its operands must leave none of them behind.
+		inst^ = {}
 		inst.mnemonic      = e.mnemonic
-		inst.operand_count = 0
 		info.decode_entry  = entry_idx
 		// Stamp the form-id hint. DECODE_FORM_IDX maps a DECODE_ENTRIES index
 		// back to the index within ENCODING_TABLE[mnemonic]. Stored as
@@ -225,7 +226,8 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, pc: u32, it_state: u8,
 		// instruction, nor is a banked register the architecture does not
 		// name, nor a Q register whose D-register field is odd; try the next
 		// candidate.
-		if !thumb_list_valid(e, inst) || !banked_valid(inst) || !q_registers_even(word, e) || !pairs_valid(e, inst) {
+		if !thumb_list_valid(e, inst) || !banked_valid(inst) || !q_registers_even(word, e) || !pairs_valid(e, inst) ||
+		   !register_lists_valid(e, inst) || !special_register_valid(e, word, profile) {
 			continue
 		}
 		// The 16-bit STM always writes the base back. The 16-bit LDM does
@@ -303,6 +305,47 @@ q_registers_even :: proc "contextless" (word: u32, e: ^Decode_Entry) -> bool {
 		if enc == .VM_Q && word & 1 != 0 { return false }
 	}
 	return true
+}
+
+// A run of registers that is empty, or runs off the end of its bank, is
+// UNPREDICTABLE -- and not one an assembler can write. (More than sixteen D
+// registers in a VLDM or VSTM is UNPREDICTABLE too, but assemblers take it;
+// what the word says is clear, and it decodes.)
+@(private="file")
+register_lists_valid :: proc "contextless" (e: ^Decode_Entry, inst: ^Instruction) -> bool {
+	for k in 0 ..< len(e.enc) {
+		op := &inst.ops[k]
+		first := u32(reg_hw(op.reg))
+		count := u32(op.list.count)
+		stride := u32(max(op.list.stride, 1))
+		enc := e.enc[k]
+		if enc == .NEON_MULTIPLE_LIST || enc == .NEON_LANE_LIST || enc == .NEON_ALL_LANES_LIST || enc == .NEON_VN_TABLE {
+			if first + (count - 1) * stride > 31 { return false }
+		} else if enc == .VFP_S_LIST {
+			if count == 0 || first + count > 32 { return false }
+		} else if enc == .VFP_D_LIST || enc == .VFP_DX_LIST {
+			if count == 0 || first + count > 32 { return false }
+		}
+	}
+	return true
+}
+
+// VMRS and VMSR reach a different set of system registers in each profile:
+// the M profile drops none of the A profile's but adds FPSCR_nzcvqc, VPR, P0
+// and the FPCXT pair, and VMSR cannot write the three MVFRs.
+@(private="file")
+special_register_valid :: proc "contextless" (e: ^Decode_Entry, word: u32, profile: Profile) -> bool {
+	if e.mnemonic != .VMRS && e.mnemonic != .VMSR {
+		return true
+	}
+	register := (word >> 16) & 0xF
+	A_READ  :: 0b0000_0111_1110_0011    // fpsid fpscr mvfr2-0 fpexc fpinst fpinst2
+	M_EXTRA :: 0b1111_0000_0000_0100    // fpscr_nzcvqc vpr p0 fpcxtns fpcxts
+	MVFR    :: 0b0000_0000_1110_0000
+	valid: u32 = A_READ
+	if profile == .M_PROFILE { valid |= M_EXTRA }
+	if e.mnemonic == .VMSR { valid &~= MVFR }
+	return valid & (1 << register) != 0
 }
 
 // The second of a register pair is the one after the first, and there is
@@ -715,11 +758,6 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 	case .VM_D:
 		n := ((word >> 5) & 1) << 4 | (word & 0xF)
 		return op_reg(Register(REG_DPR | u16(n)))
-	case .NEON_VM_SCALAR16:
-		lane := ((word >> 5) & 1) << 1 | ((word >> 3) & 1)
-		return op_dpr_lane(Register(REG_DPR | u16(word & 0x7)), u8(lane))
-	case .NEON_VM_SCALAR32:
-		return op_dpr_lane(Register(REG_DPR | u16(word & 0xF)), u8((word >> 5) & 1))
 	case .VMOV_LANE_8, .VMOV_LANE_16, .VMOV_LANE_32:
 		n := ((word >> 7) & 1) << 4 | ((word >> 16) & 0xF)
 		lane: u32 = 0
@@ -794,7 +832,8 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 	case .BARRIER_TYPE: return op_imm(i64(word & 0xF))
 	case .HINT_FIELD:   return op_imm(i64(word & 0xFF))
 
-	case .PSR_FIELD_MASK: return op_imm(i64(decode_psr_field(word)))
+	// The fields MSR writes, and whether they are SPSR's: `cpsr_fc`.
+	case .PSR_FIELD_MASK: return op_reg(Register(REG_PSR_FIELDS | u16(((word >> 22) & 1) << 4) | u16(decode_psr_field(word))))
 
 	case .COPROC_NUM_FIELD:  return op_reg(Register(REG_COPROC_NUM | u16((word >> 8) & 0xF)))
 	case .COPROC_OPC1_FIELD: return op_imm(i64((word >> 20) & 0xF))
@@ -839,67 +878,61 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 		// Held as the 32-bit pattern whatever the form's width: it is the
 		// same value either way, and it is what re-encoding needs back.
 		return op_float_imm(decode_vfp_imm8_f32(a))
-	case .NEON_D_LIST_1:
+	case .NEON_MULTIPLE_LIST, .NEON_LANE_LIST, .NEON_ALL_LANES_LIST:
 		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
-		return op_reg_run(Register(REG_DPR | u16(n)), 1, 1, false)
-	case .NEON_D_LIST_2:
-		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
-		return op_reg_run(Register(REG_DPR | u16(n)), 2, 1, false)
-	case .NEON_D_LIST_3:
-		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
-		return op_reg_run(Register(REG_DPR | u16(n)), 3, 1, false)
-	case .NEON_D_LIST_4:
-		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
-		return op_reg_run(Register(REG_DPR | u16(n)), 4, 1, false)
-	case .NEON_D_LIST_2X:
-		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
-		return op_reg_run(Register(REG_DPR | u16(n)), 2, 2, false)
-	case .NEON_D_LIST_3X:
-		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
-		return op_reg_run(Register(REG_DPR | u16(n)), 3, 2, false)
-	case .NEON_D_LIST_4X:
-		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
-		return op_reg_run(Register(REG_DPR | u16(n)), 4, 2, false)
-	case .NEON_D_LIST_ALL:
-		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
-		return op_reg_run(Register(REG_DPR | u16(n)), 1, 1, true)
-	case .NEON_D_LIST_ALL_2, .NEON_D_LIST_ALL_3, .NEON_D_LIST_ALL_4:
-		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
-		count := u8(2 + (int(enc) - int(Operand_Encoding.NEON_D_LIST_ALL_2)))
-		return op_reg_run(Register(REG_DPR | u16(n)), count,
-		                  ((word >> 5) & 1) != 0 ? 2 : 1, true)
-	case .NEON_LANE_D_8, .NEON_LANE_D_16, .NEON_LANE_D_32, .NEON_LANE_D_8_2, .NEON_LANE_D_16_2, .NEON_LANE_D_32_2, .NEON_LANE_D_8_3, .NEON_LANE_D_16_3, .NEON_LANE_D_32_3, .NEON_LANE_D_8_4, .NEON_LANE_D_16_4, .NEON_LANE_D_32_4:
-		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
-		shift, mask, count := neon_lane_shape(enc)
-		op := op_dpr_lane(Register(REG_DPR | u16(n)), u8((word >> shift) & mask))
-		op.list = {count = count, stride = 1}
+		list := structure_list(word)
+		op := op_reg_run(Register(REG_DPR | u16(n)), list.count, list.stride, enc == .NEON_ALL_LANES_LIST)
+		if enc == .NEON_LANE_LIST {
+			op.lane = list.lane
+			op.has_lane = true
+		}
 		return op
-	case .NEON_VDUP_LANE_8, .NEON_VDUP_LANE_16, .NEON_VDUP_LANE_32:
+	case .NEON_ADDRESS:
+		// Rm says the writeback: 1111 none, 1101 by what was transferred, any
+		// other register by that register.
+		m := Memory{base = Register(REG_GPR | u16((word >> 16) & 0xF)), sign = 1, align = structure_alignment(word)}
+		switch rm := word & 0xF; rm {
+		case 0xF:
+			m.mode = .OFFSET
+		case 0xD:
+			m.mode = .POST_INCREMENT
+		case:
+			m.mode = .POST_INDEX
+			m.index = Register(REG_GPR | u16(rm))
+		}
+		return op_mem(m)
+	case .NEON_VDUP_LANE:
+		// The marker is the lowest set bit of imm4, the lane the bits above.
 		imm4 := (word >> 16) & 0xF
-		shift: u32 = enc == .NEON_VDUP_LANE_8 ? 1 : enc == .NEON_VDUP_LANE_16 ? 2 : 3
-		return op_dpr_lane(Register(REG_DPR | u16(((word >> 5) & 1) << 4 | (word & 0xF))),
-		                   u8(imm4 >> shift))
+		shift: u32 = imm4 & 1 != 0 ? 1 : imm4 & 2 != 0 ? 2 : 3
+		return op_dpr_lane(Register(REG_DPR | u16(((word >> 5) & 1) << 4 | (word & 0xF))), u8(imm4 >> shift))
 	case .NEON_VM_SCALAR_16:
 		return op_dpr_lane(Register(REG_DPR | u16(word & 0x7)),
 		                   u8(((word >> 5) & 1) << 1 | ((word >> 3) & 1)))
 	case .NEON_VM_SCALAR_32:
 		return op_dpr_lane(Register(REG_DPR | u16(word & 0xF)), u8((word >> 5) & 1))
-	case .NEON_VN_TABLE_1, .NEON_VN_TABLE_2, .NEON_VN_TABLE_3, .NEON_VN_TABLE_4:
+	case .NEON_VM_D_LANE0:
+		return op_dpr_lane(Register(REG_DPR | u16(((word >> 5) & 1) << 4 | (word & 0xF))), 0)
+	case .NEON_VM_S_SCALAR:
+		op := op_reg(Register(REG_SPR | u16((word & 0x7) << 1 | (word >> 5) & 1)))
+		op.lane = u8((word >> 3) & 1)
+		op.has_lane = true
+		return op
+	case .NEON_VN_TABLE:
 		n := ((word >> 7) & 1) << 4 | ((word >> 16) & 0xF)
-		return op_reg_run(Register(REG_DPR | u16(n)), table_run_length(enc))
+		return op_reg_run(Register(REG_DPR | u16(n)), u8((word >> 8) & 0x3) + 1)
 	case .VFP_S_LIST:
 		// {S<Vd>, ...} -- imm8 counts the registers, and the run starts at Vd.
 		// Both halves matter: keeping only the count printed the wrong bank
-		// and the wrong registers. A count that runs past s31 is
-		// UNPREDICTABLE; the list stops at the last register, as every
-		// disassembler prints it.
+		// and the wrong registers. register_lists_valid turns away a count
+		// that is zero or runs past s31.
 		n := ((word >> 12) & 0xF) << 1 | ((word >> 22) & 1)
-		return op_reg_run(Register(REG_SPR | u16(n)), u8(clamp(word & 0xFF, 1, 32 - n)))
+		return op_reg_run(Register(REG_SPR | u16(n)), u8(min(word & 0xFF, 32)))
 	case .VFP_D_LIST, .VFP_DX_LIST:
 		// {D<Vd>, ...} -- imm8 counts words, two per D register; the FLDMX
 		// and FSTMX forms add one more, so their count is odd.
 		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
-		return op_reg_run(Register(REG_DPR | u16(n)), u8(clamp((word & 0xFF) / 2, 1, 32 - n)))
+		return op_reg_run(Register(REG_DPR | u16(n)), u8(min((word & 0xFF) / 2, 32)))
 
 	// ---- Branch fields (decoded into RELATIVE) ----
 	case .BRANCH_24:
@@ -957,9 +990,7 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 		return op_imm(i64((word >> 18) & 0xF))
 
 	// ---- Saturate / bit field ----
-	case .NEON_SHLL_8:  return op_imm(8)
-	case .NEON_SHLL_16: return op_imm(16)
-	case .NEON_SHLL_32: return op_imm(32)
+	case .NEON_SHLL:    return op_imm(i64(8) << ((word >> 18) & 0x3))
 	case .NEON_ROT_2:   return op_imm(((word >> 24) & 1) != 0 ? 270 : 90)
 	case .NEON_ROT_4:   return op_imm(i64(((word >> 20) & 3) * 90))
 	case .NEON_ROT_4_HI: return op_imm(i64(((word >> 23) & 3) * 90))
@@ -1010,14 +1041,14 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u
 		return op_imm(i64((word & 0x1F) - t32_shift_amount(word) + 1))
 	case .BFX_WIDTH_T32:
 		return op_imm(i64((word & 0x1F) + 1))
+	case .NEON_SHIFT_RIGHT:
+		return op_imm(i64(2 * shift_element_bits(word)) - i64(shift_field(word)))
+	case .NEON_SHIFT_LEFT:
+		return op_imm(i64(shift_field(word)) - i64(shift_element_bits(word)))
+	case .NEON_FBITS:
+		return op_imm(64 - i64((word >> 16) & 0x3F))
 	case .NEON_SHIFT_IMM6:
 		return op_imm(i64((word >> 16) & 0x3F))
-	case .NEON_SHIFT_IMM3:
-		return op_imm(i64((word >> 16) & 0x7))
-	case .NEON_SHIFT_IMM4:
-		return op_imm(i64((word >> 16) & 0xF))
-	case .NEON_SHIFT_IMM5:
-		return op_imm(i64((word >> 16) & 0x1F))
 
 	// ---- A32 RS shift (Rs register in bits 11:8) ----
 	// ---- A32 COND ----
@@ -1142,18 +1173,6 @@ t32_imm12 :: #force_inline proc "contextless" (word: u32) -> u32 {
 	return ((word >> 26) & 1) << 11 | ((word >> 12) & 0x7) << 8 | (word & 0xFF)
 }
 
-// How many D registers a VTBL/VTBX table spans.
-@(private="file", require_results)
-table_run_length :: #force_inline proc "contextless" (e: Operand_Encoding) -> u8 {
-	#partial switch e {
-	case .NEON_VN_TABLE_1: return 1
-	case .NEON_VN_TABLE_2: return 2
-	case .NEON_VN_TABLE_3: return 3
-	case .NEON_VN_TABLE_4: return 4
-	}
-	return 1
-}
-
 // The conditions VSEL can name, in the order bits 21:20 give them.
 @(private="file")
 VSEL_CONDITIONS := [4]u8{0, 6, 10, 12}   // EQ, VS, GE, GT
@@ -1173,23 +1192,4 @@ decode_reserve :: proc(instructions: ^[dynamic]Instruction, inst_info: ^[dynamic
 	if label_defs   != nil { reserve(label_defs,   len(label_defs)   + n) }
 }
 
-// The lane field's position and the list length for a NEON single-lane
-// load/store. The lane sits just above the alignment bits, and how far above
-// follows the element size: bits 7:5 for .8, 7:6 for .16, bit 7 for .32.
-@(private="file", require_results)
-neon_lane_shape :: #force_inline proc "contextless" (e: Operand_Encoding) -> (shift, mask: u32, count: u8) {
-	#partial switch e {
-	case .NEON_LANE_D_8:    return 5, 0x7, 1
-	case .NEON_LANE_D_16:   return 6, 0x3, 1
-	case .NEON_LANE_D_32:   return 7, 0x1, 1
-	case .NEON_LANE_D_8_2:  return 5, 0x7, 2
-	case .NEON_LANE_D_16_2: return 6, 0x3, 2
-	case .NEON_LANE_D_32_2: return 7, 0x1, 2
-	case .NEON_LANE_D_8_3:  return 5, 0x7, 3
-	case .NEON_LANE_D_16_3: return 6, 0x3, 3
-	case .NEON_LANE_D_32_3: return 7, 0x1, 3
-	case .NEON_LANE_D_8_4:  return 5, 0x7, 4
-	case .NEON_LANE_D_16_4: return 6, 0x3, 4
-	case:                   return 7, 0x1, 4
-	}
-}
+

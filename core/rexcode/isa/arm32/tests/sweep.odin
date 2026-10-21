@@ -248,7 +248,6 @@ sweep_safe_fill :: proc(enc: a.Operand_Encoding) -> u32 {
 	case .BARRIER_TYPE:        return 0xF
 	case .PSR_FIELD_MASK:      return u32(0xF) << 16
 	case .NEON_SHIFT_IMM6:     return u32(12) << 16
-	case .NEON_SHIFT_IMM3:     return u32(1) << 16
 	}
 	return 0
 }

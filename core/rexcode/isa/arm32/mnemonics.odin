@@ -149,7 +149,6 @@ Mnemonic :: enum u16 {
 
 	// ARMv8 security/profiling/trace barriers (FEAT_RAS, FEAT_SB, FEAT_SPE, FEAT_TRF)
 	ESB,                                   // error synchronization barrier (HINT #16)
-	PSB_CSYNC,                             // profile sync barrier (HINT #17)
 	TSB_CSYNC,                             // trace sync barrier (HINT #18)
 	CSDB,                                  // consumption of speculative data barrier (HINT #20)
 	SSBB,   PSSBB,                         // speculative store bypass barriers (DSB #0, DSB #4)
@@ -270,6 +269,7 @@ Mnemonic :: enum u16 {
 
 	// -- NEON-specific (vector D/Q reg) -----------------------------------------
 	VADDL,  VADDW,  VSUBL,  VSUBW,
+	VADDHN, VRADDHN, VSUBHN, VRSUBHN,      // add or subtract, keep the high half
 	VHADD,  VHSUB,  VRHADD,
 	VQADD,  VQSUB,
 	VMULL,  VMLAL,  VMLSL,
@@ -302,7 +302,7 @@ Mnemonic :: enum u16 {
 
 	VSHL,   VSHR,   VSRA,   VRSHL,  VRSHR, VRSRA,
 	VSLI,   VSRI,
-	VQSHL,  VQSHRN, VQSHRUN,
+	VQSHL,  VQSHLU, VQSHRN, VQSHRUN,
 	VQRSHL, VQRSHRN, VQRSHRUN,
 	VSHRN,  VRSHRN,
 	VSHLL,                                 // shift-left long

@@ -236,7 +236,10 @@ Encoding_Flags :: bit_field u16 {
 	// SEVL, the 32-bit CPS, SRS and RFE, SMC, and the generic coprocessor
 	// instructions, whose coprocessor space M-profile cores give to CDE.
 	a_profile_only:   bool | 1,
-	_:                u8   | 4,
+	// An assembler's spelling of another form's word -- `vcle d0, d1, d2` is
+	// `vcge d0, d2, d1`. The encoder takes it; the decoder gives the other.
+	encode_only:      bool | 1,
+	_:                u8   | 3,
 }
 
 // ---- Operand types ----------------------------------------------------------
@@ -463,11 +466,6 @@ Operand_Encoding :: enum u8 {
 	VD_Q,                  // Q<reg>: D=bit 22, Vd<3:0>=bits 15-12 (must be even)
 	VN_Q,                  // Q<reg>: N=bit 7,  Vn<3:0>=bits 19-16 (must be even)
 	VM_Q,                  // Q<reg>: M=bit 5,  Vm<3:0>=bits 3-0 (must be even)
-	// NEON by-element scalar Dm[lane] (VQDMULH/VQRDMULH-by-scalar):
-	//   .16: Dm in D0..D7 at bits 2:0, lane = bit5:bit3
-	//   .32: Dm in D0..D15 at bits 3:0, lane = bit5
-	NEON_VM_SCALAR16,
-	NEON_VM_SCALAR32,
 	// VMOV (core register to scalar) destination Dd[lane]: Dd at bits 19:16 +
 	// bit 7; the lane bits depend on element size:
 	//   .8  lane[2:0] = bit22 : bit21 : bit5     .16 lane[1:0] = bit21 : bit6
@@ -508,11 +506,8 @@ Operand_Encoding :: enum u8 {
 	RM_OR_APSR_NZCV,       // the same at 3-0 (CDE)
 
 	// VTBL/VTBX read their table from a run of one to four D registers
-	// starting at Vn. Which run length applies is the `len` field, which is
-	// a fixed pattern bit of each form rather than something the operand
-	// encodes -- so the length rides in the encoding, the way the NEON
-	// structure-list lengths already do, and the encoder emits only Vn.
-	NEON_VN_TABLE_1, NEON_VN_TABLE_2, NEON_VN_TABLE_3, NEON_VN_TABLE_4,
+	// starting at Vn, the length less one in bits 9-8.
+	NEON_VN_TABLE,
 
 	// NEON "by scalar": the multiplier is one lane of a low D register, and
 	// the register number and the lane number share one four-bit field. How
@@ -520,33 +515,24 @@ Operand_Encoding :: enum u8 {
 	// 2:0, so D0..D7, and the lane from M:bit3; 32-bit takes Vm from bits
 	// 3:0, so D0..D15, and the lane from M alone.
 	NEON_VM_SCALAR_16, NEON_VM_SCALAR_32,
+	// The same for the two that take Dm whole: VCMLA.F32 by element, whose
+	// lane can only be 0, and VFMAL's D form, whose scalar is a lane of S0-S15
+	// -- Sm at 2:0 and M, the lane at bit 3.
+	NEON_VM_D_LANE0,
+	NEON_VM_S_SCALAR,
 	// VDUP from a lane packs the element size and the lane index into one
 	// four-bit field: `xxx1` is a byte lane, `xx10` a halfword, `x100` a
 	// word, and the bits above the marker are the index.
-	NEON_VDUP_LANE_8, NEON_VDUP_LANE_16, NEON_VDUP_LANE_32,
-	// NEON structure load/store lists (VLD1-4 / VST1-4). Unlike VLDM's list,
-	// the register count is part of the form's type field at bits 11:8, so the
-	// encoding writes only Vd; how many registers -- and whether the run steps
-	// by one or by two -- comes from the form. Verified against llvm-mc.
-	NEON_D_LIST_1,         // {d2}
-	NEON_D_LIST_2,         // {d2, d3}
-	NEON_D_LIST_3,         // {d2, d3, d4}
-	NEON_D_LIST_4,         // {d2, d3, d4, d5}
-	NEON_D_LIST_2X,        // {d2, d4}          -- spaced
-	NEON_D_LIST_3X,        // {d2, d4, d6}      -- spaced
-	NEON_D_LIST_4X,        // {d2, d4, d6, d8}  -- spaced
-	NEON_D_LIST_ALL,       // {d2[]}            -- to all lanes
-	// The structure loads that broadcast take a list of two, three or four,
-	// and bit 5 spaces it -- `{d0[], d2[]}` rather than `{d0[], d1[]}`.
-	NEON_D_LIST_ALL_2, NEON_D_LIST_ALL_3, NEON_D_LIST_ALL_4,
-	// VLD1/VST1 single-lane: Vd plus the lane index, whose width and position
-	// follow the element size -- bits 7:5 for .8, 7:6 for .16, bit 7 for .32.
-	// Verified against llvm-mc.
-	// ..._N is how many registers the list holds: VLD2 writes `{d0[1], d1[1]}`.
-	NEON_LANE_D_8,    NEON_LANE_D_16,    NEON_LANE_D_32,
-	NEON_LANE_D_8_2,  NEON_LANE_D_16_2,  NEON_LANE_D_32_2,
-	NEON_LANE_D_8_3,  NEON_LANE_D_16_3,  NEON_LANE_D_32_3,
-	NEON_LANE_D_8_4,  NEON_LANE_D_16_4,  NEON_LANE_D_32_4,
+	NEON_VDUP_LANE,
+	// The element and structure loads and stores. How many registers the list
+	// holds, how they are spaced, which lane and what alignment the address
+	// names are each spread across bits that mean different things by class,
+	// element count and size; they are read from the whole word (simd.odin),
+	// and the encoder reads them from the form's.
+	NEON_MULTIPLE_LIST,    // {d0, d1}: several structures to whole registers
+	NEON_LANE_LIST,        // {d0[1], d1[1]}: one structure to a lane
+	NEON_ALL_LANES_LIST,   // {d0[], d1[]}: one structure to every lane
+	NEON_ADDRESS,          // [Rn:align], with Rm the writeback
 
 	// ---- Memory addressing composites ----
 	MEM_IMM12_OFFSET,      // [Rn, #±imm12]
@@ -598,8 +584,8 @@ Operand_Encoding :: enum u8 {
 	// ---- Saturate ----
 	VFP_FBITS,             // VCVT fixed-point fraction bits: width - (imm4:i)
 	// VSHLL's widest form shifts by exactly the element size, which no field
-	// carries -- the size is a fixed bit of the form, so the amount is too.
-	NEON_SHLL_8, NEON_SHLL_16, NEON_SHLL_32,
+	// carries: it is 8 << the size field, bits 19-18.
+	NEON_SHLL,
 	// Complex-arithmetic rotations, named in degrees. VCADD has two, in bit
 	// 24; VCMLA has four, in bits 21:20.
 	// VCMLA names its rotation twice over: the by-element forms put it in
@@ -618,12 +604,14 @@ Operand_Encoding :: enum u8 {
 	BFI_LSB,               // bits 11-7  (lsb position; also shift_imm slot)
 	BFI_LSB_T32,           // Thumb-2 BFI lsb (different layout)
 
-	// ---- NEON shift-immediate (imm6 in bits 21:16, with element-size hint
-	//      in bit 22 = L bit for 64-bit shifts) ----
-	NEON_SHIFT_IMM6,       // 6-bit shift amount at bits 21:16 (NEON VSHR/VSRA/...)
-	NEON_SHIFT_IMM3,       // 3-bit shift at bits 18:16 (.I8 form, top 3 bits zero)
-	NEON_SHIFT_IMM4,       // 4-bit shift at bits 19:16 (.16 forms)
-	NEON_SHIFT_IMM5,       // 5-bit shift at bits 20:16 (.32 forms)
+	// ---- Shift by immediate ----
+	// L:imm6 (bits 7, 21-16) holds the element size as its leading one and
+	// the shift below it: a right shift is twice the size less L:imm6, a left
+	// shift L:imm6 less the size. The fixed-point VCVT's #fbits is 64 - imm6.
+	NEON_SHIFT_RIGHT,
+	NEON_SHIFT_LEFT,
+	NEON_FBITS,
+	NEON_SHIFT_IMM6,       // MVE's: the 6-bit amount at bits 21:16, as it stands
 
 	// ---- ARMv8-M / MVE / CDE ----
 	QD_MVE,                // MVE Qd: bit 22 fixed 0, bits 15:13 = Qd[2:0]
@@ -665,7 +653,7 @@ Data_Type :: enum u8 {
 	U8, U16, U32, U64,     // unsigned integer
 	I8, I16, I32, I64,     // sign-agnostic integer
 	F16, F32, F64,         // floating point
-	P8, P16,               // polynomial
+	P8, P16, P64,          // polynomial
 	BF16,                  // bfloat16
 	SZ8, SZ16, SZ32, SZ64, // bare element size (`vmov.32`, `vstrb.8`)
 }

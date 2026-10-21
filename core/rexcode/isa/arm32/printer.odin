@@ -520,18 +520,18 @@ DATA_TYPE_NAMES := [Data_Type]string{
 	.U8 = "u8", .U16 = "u16", .U32 = "u32", .U64 = "u64",
 	.I8 = "i8", .I16 = "i16", .I32 = "i32", .I64 = "i64",
 	.F16 = "f16", .F32 = "f32", .F64 = "f64",
-	.P8 = "p8", .P16 = "p16", .BF16 = "bf16",
+	.P8 = "p8", .P16 = "p16", .P64 = "p64", .BF16 = "bf16",
 	.SZ8 = "8", .SZ16 = "16", .SZ32 = "32", .SZ64 = "64",
 }
 
 @(private="file")
 write_mnemonic :: proc(sb: ^strings.Builder, m: Mnemonic, cond: u8, sets_flags: bool, uppercase: bool) {
 	name, _ := reflect.enum_name_from_value(m)
-	// PSB_CSYNC / TSB_CSYNC are the only names left holding an underscore:
-	// assemblers write them as a mnemonic plus an operand token, `psb csync`,
-	// so that underscore is a space. No other mnemonic has one.
+	// TSB_CSYNC is the only name holding an underscore: assemblers write it
+	// as a mnemonic plus an operand token, `tsb csync`, so that underscore is
+	// a space. No other mnemonic has one.
 	split := -1
-	if len(name) > 4 && (name[:4] == "PSB_" || name[:4] == "TSB_") {
+	if len(name) > 4 && name[:4] == "TSB_" {
 		split = 3
 	}
 	for i in 0..<len(name) {
@@ -697,6 +697,9 @@ write_operand :: proc(
 write_memory :: proc(sb: ^strings.Builder, m: Memory) {
 	strings.write_string(sb, "[")
 	write_register(sb, m.base)
+	if m.align != 0 {
+		fmt.sbprintf(sb, ":%d", u32(8) << m.align)
+	}
 	// An immediate-only form leaves index at Register(0), whose class is not
 	// REG_GPR -- so the class alone says whether there is an index. Excluding
 	// hw 0 as well made r0 unusable as one.
@@ -720,6 +723,8 @@ write_memory :: proc(sb: ^strings.Builder, m: Memory) {
 			if m.sign < 0 { strings.write_string(sb, "-") }
 			write_register(sb, m.index)
 			write_shift(sb, m.shift_type, m.shift_amt)
+		case .POST_INCREMENT:
+			panic("a post-increment address steps by what it transfers, and has no index register")
 		}
 	} else {
 		// An indexed form writes its displacement even when it is zero: the
@@ -736,6 +741,7 @@ write_memory :: proc(sb: ^strings.Builder, m: Memory) {
 			}
 		case .PRE_INDEX:  fmt.sbprintf(sb, ", #%s%d]!", neg, m.disp)
 		case .POST_INDEX: fmt.sbprintf(sb, "], #%s%d", neg, m.disp)
+		case .POST_INCREMENT: strings.write_string(sb, "]!")
 		}
 	}
 }

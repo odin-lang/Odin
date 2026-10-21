@@ -116,16 +116,21 @@ thumb_form_of :: proc(form: Encoding) -> (thumb: Encoding, ok: bool) {
 	return
 }
 
-// Every form of a mnemonic: its ENCODING_TABLE rows, then its THUMB_TABLE
-// rows, then the Thumb forms derived from its A32 coprocessor, VFP and
-// Advanced SIMD rows. Built once; the index of a form in this list is its
+// Every form of a mnemonic: its ENCODING_TABLE rows, its Advanced SIMD rows
+// (simd_table.odin), its THUMB_TABLE rows, then the Thumb forms derived from
+// its A32 coprocessor, VFP and Advanced SIMD rows. Built once; the index of a form in this list is its
 // form id.
 forms_of :: proc(m: Mnemonic) -> []Encoding {
 	@(static) merged: [Mnemonic][dynamic]Encoding
 	@(static) built: bool
 	if !built {
+		simd: [dynamic]Encoding
+		advanced_simd_forms(&simd)
 		for mnemonic in Mnemonic {
 			append(&merged[mnemonic], ..ENCODING_TABLE[mnemonic])
+		}
+		for form in simd {
+			append(&merged[form.mnemonic], form)
 		}
 		for form in THUMB_TABLE {
 			append(&merged[form.mnemonic], form)
@@ -135,6 +140,11 @@ forms_of :: proc(m: Mnemonic) -> []Encoding {
 				if derived, ok := thumb_form_of(form); ok {
 					append(&merged[mnemonic], derived)
 				}
+			}
+		}
+		for form in simd {
+			if derived, ok := thumb_form_of(form); ok {
+				append(&merged[form.mnemonic], derived)
 			}
 		}
 		built = true
@@ -229,6 +239,9 @@ emit_decode_tables :: proc() -> (total: int) {
 
 	for mn in Mnemonic {
 		for f, fi in forms_of(mn) {
+			if f.flags.encode_only {
+				continue
+			}
 			ilen := lib.inst_size_from_bits(f.bits, f.mode)
 			e := Entry{
 				mnemonic   = mn,
@@ -447,6 +460,7 @@ flags_lit :: proc(f: lib.Encoding_Flags) -> string {
 	if f.thumb_condition  { append(&parts, "thumb_condition=true")  }
 	if f.preferred        { append(&parts, "preferred=true")        }
 	if f.a_profile_only   { append(&parts, "a_profile_only=true")   }
+	if f.encode_only      { append(&parts, "encode_only=true")      }
 	// Every flag has to be named here: this is what re-emits the table, so a
 	// flag left out is a flag silently dropped on the next regeneration.
 	return strings.join(parts[:], ", ", context.temp_allocator)
