@@ -88,6 +88,7 @@ gb_internal i32 system_exec_command_line_app_internal(bool exit_on_err, char con
 	char *cmd_line = gb_alloc_array(gb_heap_allocator(), char, cmd_cap);
 	isize cmd_len = 0;
 	i32 exit_code = 0;
+	system_exec_spawn_failed = false;
 
 	cmd_len = gb_snprintf_va(cmd_line, cmd_cap-1, fmt, va);
 
@@ -145,7 +146,8 @@ gb_internal i32 system_exec_command_line_app_internal(bool exit_on_err, char con
 	} else {
 		// NOTE(bill): failed to create process
 		gb_printf_err("Failed to execute command:\n\t%s\n", cmd_line);
-		exit_code = SYSTEM_EXEC_SPAWN_FAILED;
+		exit_code = -1;
+		system_exec_spawn_failed = true;
 	}
 
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
@@ -158,11 +160,7 @@ gb_internal i32 system_exec_command_line_app_internal(bool exit_on_err, char con
 	char **argv = command_line_to_spawn_argv(cmd_line, &argc);
 
 	// NOTE: `run_subprocess` already returns the decoded exit status (and re-raises fatal signals itself)
-	bool spawn_failed = false;
-	exit_code = run_subprocess(argv[0], cast(const char**)(argv), true, &spawn_failed);
-	if (spawn_failed) {
-		exit_code = SYSTEM_EXEC_SPAWN_FAILED;
-	}
+	exit_code = run_subprocess(argv[0], cast(const char**)(argv), true, &system_exec_spawn_failed);
 #endif
 
 	if (exit_on_err && exit_code) {

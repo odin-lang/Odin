@@ -10,15 +10,15 @@ struct LinkerData {
 	bool     needs_system_library_linked;
 };
 
-// NOTE: returned by `system_exec_command_line_app` when the process could not be started at all
-gb_internal i32 const SYSTEM_EXEC_SPAWN_FAILED = -2;
+// NOTE: set by `system_exec_command_line_app` when the last process could not be started at all
+gb_global bool system_exec_spawn_failed = false;
 
 gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, ...);
 gb_internal bool system_exec_command_line_app_output(char const *command, gbString *output);
 
 // NOTE: prints a hint if running the linker failed because it could not be found
 gb_internal void print_linker_not_found_suggestion(i32 result, char const *path, char const *tool, char const *env_name, bool has_env, char const *install_suggestion) {
-	if (result == SYSTEM_EXEC_SPAWN_FAILED) {
+	if (system_exec_spawn_failed) {
 		gb_printf_err("executing `%s` to link failed.\n", path);
 	} else if (result == 127) {
 		// NOTE: some `posix_spawn` implementations (e.g. glibc < 2.24, OpenBSD) report a missing
