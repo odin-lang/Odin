@@ -1884,8 +1884,9 @@ read_u16_le :: #force_inline proc "contextless" (code: []u8, offset: u32) -> u16
 // so the operand shapes cannot tell them apart.
 @(private, require_results)
 writeback_matches :: #force_inline proc "contextless" (inst: ^Instruction, f: ^Encoding) -> bool {
-	for e in f.enc {
-		if e == .A32_REG_LIST || e == .A32_REG_LIST_USER || e == .T32_REG_LIST || e == .RN_A32_WB || e == .IMPL_SP {
+	for e, k in f.enc {
+		// An SP as the first operand is SRS's base; PAC's is only a source.
+		if e == .A32_REG_LIST || e == .A32_REG_LIST_USER || e == .T32_REG_LIST || e == .RN_A32_WB || (e == .IMPL_SP && k == 0) {
 			return ((f.bits >> 21) & 1 != 0) == inst.writeback
 		}
 		// The 16-bit STM always writes back; the 16-bit LDM does exactly

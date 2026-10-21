@@ -418,7 +418,8 @@ write_sysm :: proc(sb: ^strings.Builder, hw: u16) {
 	case 0xA6: name = "pac_key_u_2_ns"
 	case 0xA7: name = "pac_key_u_3_ns"
 	case:
-		fmt.sbprintf(sb, "sysm%d", sysm)
+		// A SYSm the architecture does not name is written as its number.
+		fmt.sbprintf(sb, "%d", sysm)
 		return
 	}
 	strings.write_string(sb, name)
@@ -441,11 +442,15 @@ is_coprocessor_transfer :: proc "contextless" (m: Mnemonic) -> bool {
 }
 
 @(private="file")
-barrier_option_name :: proc(mnemonic: Mnemonic, option: i64) -> string {
+barrier_option_name :: proc(mnemonic: Mnemonic, option: i64, m_profile: bool) -> string {
 	if mnemonic == .ISB {
 		return option == 0xF ? "sy" : ""
 	}
 	if mnemonic != .DMB && mnemonic != .DSB {
+		return ""
+	}
+	// The load-only barriers are v8-A's; v8-M has none of them.
+	if m_profile && (option == 0x1 || option == 0x5 || option == 0x9 || option == 0xD) {
 		return ""
 	}
 	switch option {
@@ -657,7 +662,7 @@ write_operand :: proc(
 			fmt.sbprintf(sb, "[%d]", op.lane)
 		}
 	case .IMMEDIATE:
-		if name := barrier_option_name(inst.mnemonic, op.immediate); name != "" {
+		if name := barrier_option_name(inst.mnemonic, op.immediate, inst.m_profile); name != "" {
 			strings.write_string(sb, name)
 			return
 		}
@@ -688,7 +693,7 @@ write_operand :: proc(
 			fmt.sbprintf(sb, "0x%x", target)
 		}
 	case .REG_LIST:
-		write_reg_list(sb, u16(op.immediate))
+		write_reg_list(sb, u16(op.immediate), inst.mnemonic == .CLRM)
 		if op.list.user { strings.write_byte(sb, '^') }
 	}
 }
@@ -747,13 +752,15 @@ write_memory :: proc(sb: ^strings.Builder, m: Memory) {
 }
 
 @(private="file")
-write_reg_list :: proc(sb: ^strings.Builder, mask: u16) {
+// CLRM's list has APSR where bit 15 would be PC, and it ends no range.
+write_reg_list :: proc(sb: ^strings.Builder, mask: u16, apsr_last := false) {
 	strings.write_string(sb, "{")
 	first := true
 	range_start: int = -1
-	for b in 0..<16 {
+	last := apsr_last ? 14 : 15
+	for b in 0 ..= last {
 		bit := mask & (1 << u32(b)) != 0
-		next_bit := b < 15 && mask & (1 << u32(b + 1)) != 0
+		next_bit := b < last && mask & (1 << u32(b + 1)) != 0
 		if bit && range_start < 0 { range_start = b }
 		if bit && !next_bit {
 			if !first { strings.write_string(sb, ", ") }
@@ -765,6 +772,10 @@ write_reg_list :: proc(sb: ^strings.Builder, mask: u16) {
 			}
 			range_start = -1
 		}
+	}
+	if apsr_last && mask & 0x8000 != 0 {
+		if !first { strings.write_string(sb, ", ") }
+		strings.write_string(sb, "apsr")
 	}
 	strings.write_string(sb, "}")
 }

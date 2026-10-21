@@ -52,7 +52,10 @@ Instruction :: struct #align(64) {
 		// condition, but not whether it is in a block at all: `it al` gives
 		// AL to instructions that are, and that changes how they encode.
 		in_it_block:   bool | 1,
-		// 1 bit spare
+		// Decoded as M-profile code. The printer writes what an M-profile
+		// assembler takes: v8-M has no load-only barriers, so `dmb ishld` is
+		// `dmb #9` there.
+		m_profile:     bool | 1,
 	},
 	// Form-id hint: when non-zero, this is (1 + the index into
 	// ENCODING_TABLE[mnemonic]) of the form the decoder produced. The encoder

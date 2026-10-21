@@ -138,13 +138,17 @@ append_row :: proc(
 	dt:       Data_Types,
 	flags:    lib.Encoding_Flags = {},
 ) {
+	// Advanced SIMD is the A profile's, whatever the feature: VFMA's is
+	// VFPv4, which the M profile has, and v8.1-M gives the space to MVE.
+	row_flags := flags
+	row_flags.a_profile_only = true
 	row := Encoding{
 		mnemonic = mnemonic,
 		bits     = bits,
 		mask     = mask,
 		feature  = feature,
 		mode     = .A32,
-		flags    = flags,
+		flags    = row_flags,
 		dt       = dt,
 	}
 	for k in 0 ..< len(ops) {

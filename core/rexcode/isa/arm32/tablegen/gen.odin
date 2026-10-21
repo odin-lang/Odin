@@ -116,6 +116,46 @@ thumb_form_of :: proc(form: Encoding) -> (thumb: Encoding, ok: bool) {
 	return
 }
 
+// The half-precision form of a single-precision VFP form, which v8.2's FP16
+// adds for most of the data-processing instructions: the same word with
+// coprocessor 9 where single precision has 10, and .f16 where it has .f32.
+// Not for the register-to-register VMOV, which has none, nor the conversions
+// between floating-point widths.
+half_precision_form_of :: proc(form: Encoding) -> (half: Encoding, ok: bool) {
+	HALF_PRECISION :: []Mnemonic{
+		.VABS, .VADD, .VCMP, .VCMPE, .VDIV, .VFMA, .VFMS, .VFNMA, .VFNMS,
+		.VMAXNM, .VMINNM, .VMLA, .VMLS, .VMUL, .VNEG, .VNMLA, .VNMLS, .VNMUL,
+		.VRINTA, .VRINTM, .VRINTN, .VRINTP, .VRINTR, .VRINTX, .VRINTZ,
+		.VSEL, .VSQRT, .VSUB, .VCVT, .VCVTA, .VCVTM, .VCVTN, .VCVTP, .VCVTR, .VMOV,
+	}
+	if form.mode != .A32 || !slice.contains(HALF_PRECISION, form.mnemonic) {
+		return
+	}
+	if (form.bits >> 8) & 0xF != 0xA || (form.mask >> 8) & 0xF != 0xF {
+		return
+	}
+	single := false
+	for t in form.dt {
+		if t == .F32 { single = true }
+		if t == .F64 || t == .F16 { return }
+	}
+	if !single {
+		return
+	}
+	// Only VMOV's immediate form, and only VCVT's to or from an integer.
+	if form.mnemonic == .VMOV && form.enc[1] != .VFP_IMM8 {
+		return
+	}
+	half = form
+	half.bits = (form.bits & ~u32(0xF00)) | 0x900
+	half.feature = .HALF_FP
+	for k in 0 ..< len(half.dt) {
+		if half.dt[k] == .F32 { half.dt[k] = .F16 }
+	}
+	ok = true
+	return
+}
+
 // Every form of a mnemonic: its ENCODING_TABLE rows, its Advanced SIMD rows
 // (simd_table.odin), its THUMB_TABLE rows, then the Thumb forms derived from
 // its A32 coprocessor, VFP and Advanced SIMD rows. Built once; the index of a form in this list is its
@@ -129,6 +169,20 @@ forms_of :: proc(m: Mnemonic) -> []Encoding {
 		for mnemonic in Mnemonic {
 			append(&merged[mnemonic], ..ENCODING_TABLE[mnemonic])
 		}
+		// The half-precision forms, where the table does not list one already.
+		for mnemonic in Mnemonic {
+			for form in ENCODING_TABLE[mnemonic] {
+				half, ok := half_precision_form_of(form)
+				if !ok { continue }
+				listed := false
+				for other in ENCODING_TABLE[mnemonic] {
+					listed ||= other.bits == half.bits && other.mask == half.mask && other.mode == half.mode
+				}
+				if !listed {
+					append(&merged[mnemonic], half)
+				}
+			}
+		}
 		for form in simd {
 			append(&merged[form.mnemonic], form)
 		}
@@ -139,6 +193,16 @@ forms_of :: proc(m: Mnemonic) -> []Encoding {
 			for form in ENCODING_TABLE[mnemonic] {
 				if derived, ok := thumb_form_of(form); ok {
 					append(&merged[mnemonic], derived)
+				}
+				half, half_ok := half_precision_form_of(form)
+				listed := false
+				for other in ENCODING_TABLE[mnemonic] {
+					listed ||= half_ok && other.bits == half.bits && other.mask == half.mask && other.mode == half.mode
+				}
+				if half_ok && !listed {
+					if derived, ok := thumb_form_of(half); ok {
+						append(&merged[mnemonic], derived)
+					}
 				}
 			}
 		}
@@ -461,6 +525,7 @@ flags_lit :: proc(f: lib.Encoding_Flags) -> string {
 	if f.preferred        { append(&parts, "preferred=true")        }
 	if f.a_profile_only   { append(&parts, "a_profile_only=true")   }
 	if f.encode_only      { append(&parts, "encode_only=true")      }
+	if f.m_profile_only   { append(&parts, "m_profile_only=true")   }
 	// Every flag has to be named here: this is what re-emits the table, so a
 	// flag left out is a flag silently dropped on the next regeneration.
 	return strings.join(parts[:], ", ", context.temp_allocator)

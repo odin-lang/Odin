@@ -95,6 +95,7 @@ decode :: proc(
 			inst.length = u8(ilen)
 			inst.mode   = mode
 			inst.in_it_block = in_it_block
+			inst.m_profile   = profile == .M_PROFILE
 			inst_idx := u32(len(instructions))
 			for slot in 0..<inst.operand_count {
 				op := &inst.ops[slot]
@@ -171,6 +172,7 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, pc: u32, it_state: u8,
 		if e.feature == .CDE && (coprocessor > 7 || int(coprocessor) not_in cde) { continue }
 		if is_generic_coprocessor(e.mnemonic) && !coprocessor_is_generic(coprocessor, profile, cde) { continue }
 		if profile == .M_PROFILE && e.flags.a_profile_only { continue }
+		if profile == .A_PROFILE && e.flags.m_profile_only { continue }
 
 		// Match -- decode this entry, from nothing: a candidate rejected below
 		// after unpacking its operands must leave none of them behind.
@@ -193,6 +195,9 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, pc: u32, it_state: u8,
 			inst.cond = u8((word >> 28) & 0xF)
 		} else if e.flags.thumb_condition {
 			inst.cond = u8(ilen == 2 ? (word >> 8) & 0xF : (word >> 22) & 0xF)
+			// A B<c> with condition 111x is not one: in sixteen bits that is
+			// UDF and SVC, in thirty-two the miscellaneous control space.
+			if inst.cond >= 14 { continue }
 		} else if in_it_block {
 			inst.cond = it_state >> 4
 		} else {
@@ -204,7 +209,8 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, pc: u32, it_state: u8,
 		// LDM/STM carry the writeback in bit 21; nothing else in the operand
 		// model records it, and without it the two forms print identically.
 		for k in 0 ..< len(e.enc) {
-			if e.enc[k] == .A32_REG_LIST || e.enc[k] == .A32_REG_LIST_USER || e.enc[k] == .T32_REG_LIST || e.enc[k] == .RN_A32_WB || e.enc[k] == .IMPL_SP {
+			// An SP as the first operand is SRS's base; PAC's is only a source.
+			if e.enc[k] == .A32_REG_LIST || e.enc[k] == .A32_REG_LIST_USER || e.enc[k] == .T32_REG_LIST || e.enc[k] == .RN_A32_WB || (e.enc[k] == .IMPL_SP && k == 0) {
 				inst.writeback = (word >> 21) & 1 != 0
 				break
 			}
@@ -227,7 +233,8 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, pc: u32, it_state: u8,
 		// name, nor a Q register whose D-register field is odd; try the next
 		// candidate.
 		if !thumb_list_valid(e, inst) || !banked_valid(inst) || !q_registers_even(word, e) || !pairs_valid(e, inst) ||
-		   !register_lists_valid(e, inst) || !special_register_valid(e, word, profile) {
+		   !register_lists_valid(e, inst) || !special_register_valid(e, word, profile) ||
+		   !conditional_select_valid(e, word) || !loop_valid(e, word) || !thumb_operands_valid(e, word) {
 			continue
 		}
 		// The 16-bit STM always writes the base back. The 16-bit LDM does
@@ -319,7 +326,10 @@ register_lists_valid :: proc "contextless" (e: ^Decode_Entry, inst: ^Instruction
 		count := u32(op.list.count)
 		stride := u32(max(op.list.stride, 1))
 		enc := e.enc[k]
-		if enc == .NEON_MULTIPLE_LIST || enc == .NEON_LANE_LIST || enc == .NEON_ALL_LANES_LIST || enc == .NEON_VN_TABLE {
+		if enc == .VM_S_PLUS1 {
+			// The pair starts at the S register before this one.
+			if first > 31 || first == 0 { return false }
+		} else if enc == .NEON_MULTIPLE_LIST || enc == .NEON_LANE_LIST || enc == .NEON_ALL_LANES_LIST || enc == .NEON_VN_TABLE {
 			if first + (count - 1) * stride > 31 { return false }
 		} else if enc == .VFP_S_LIST {
 			if count == 0 || first + count > 32 { return false }
@@ -328,6 +338,50 @@ register_lists_valid :: proc "contextless" (e: ^Decode_Entry, inst: ^Instruction
 		}
 	}
 	return true
+}
+
+// v8.1-M's conditional selects take neither AL nor NV, write neither SP nor
+// PC, and read ZR where a source field is 1111 -- but never SP.
+@(private="file")
+conditional_select_valid :: proc "contextless" (e: ^Decode_Entry, word: u32) -> bool {
+	if e.mnemonic != .CSEL && e.mnemonic != .CSINC && e.mnemonic != .CSINV && e.mnemonic != .CSNEG {
+		return true
+	}
+	rd := (word >> 8) & 0xF
+	rn := (word >> 16) & 0xF
+	rm := word & 0xF
+	condition := (word >> 4) & 0xF
+	return condition < 14 && rd != 13 && rd != 15 && rn != 13 && rm != 13
+}
+
+// Two corners of the 32-bit Thumb space that a row cannot pin. A store
+// cannot address relative to PC -- the word is UNDEFINED. And a saturate
+// shifted arithmetic-right by nothing is not one: with sh set and no amount,
+// the word is SSAT16's or USAT16's.
+@(private="file")
+thumb_operands_valid :: proc "contextless" (e: ^Decode_Entry, word: u32) -> bool {
+	if e.mode != .T32 || inst_size_from_bits(e.bits, e.mode) != 4 {
+		return true
+	}
+	m := e.mnemonic
+	if m == .STR || m == .STRB || m == .STRH || m == .STRT || m == .STRBT || m == .STRHT {
+		if (word >> 16) & 0xF == 0xF { return false }
+	}
+	if m == .SSAT || m == .USAT {
+		if (word >> 21) & 1 != 0 && t32_shift_amount(word) == 0 { return false }
+	}
+	return true
+}
+
+// A low-overhead loop counts in a register, which SP and PC are not; DLSTP
+// with PC there is LCTP.
+@(private="file")
+loop_valid :: proc "contextless" (e: ^Decode_Entry, word: u32) -> bool {
+	if e.mnemonic != .WLS && e.mnemonic != .DLS && e.mnemonic != .WLSTP && e.mnemonic != .DLSTP {
+		return true
+	}
+	rn := (word >> 16) & 0xF
+	return rn != 13 && rn != 15
 }
 
 // VMRS and VMSR reach a different set of system registers in each profile:

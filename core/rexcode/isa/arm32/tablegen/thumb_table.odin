@@ -224,14 +224,16 @@ THUMB_TABLE := []Encoding{
 	{.SUBW, {.GPR, .GPR, .IMM12, .NONE, .NONE, .NONE}, {.RD_T32, .RN_T32, .T32_IMM12, .NONE, .NONE, .NONE}, 0xF2A00000, 0xFBF08000, .V6T2, .T32, {}, {}},
 	{.ADR, {.GPR, .REL_LDR_LITERAL, .NONE, .NONE, .NONE, .NONE}, {.RD_T32, .REL_T32_ADR_SUB, .NONE, .NONE, .NONE, .NONE}, 0xF2AF0000, 0xFBFF8000, .V6T2, .T32, {}, {}},
 	{.MOVT, {.GPR, .IMM16_LO_HI, .NONE, .NONE, .NONE, .NONE}, {.RD_T32, .T32_IMM16, .NONE, .NONE, .NONE, .NONE}, 0xF2C00000, 0xFBF08000, .V6T2, .T32, {}, {}},
-	{.SSAT, {.GPR, .IMM4_SAT, .GPR_SHIFTED, .NONE, .NONE, .NONE}, {.RD_T32, .SAT_IMM5_T32, .RN_T32_SAT, .NONE, .NONE, .NONE}, 0xF3000000, 0xFBD08000, .V6T2, .T32, {}, {}},
-	{.SSAT16, {.GPR, .IMM4_SAT, .GPR, .NONE, .NONE, .NONE}, {.RD_T32, .SAT16_IMM4_T32, .RN_T32, .NONE, .NONE, .NONE}, 0xF3200000, 0xFBF0F0C0, .V6T2, .T32, {}, {}},
-	{.SBFX, {.GPR, .GPR, .IMM5, .IMM5_W, .NONE, .NONE}, {.RD_T32, .RN_T32, .BFI_LSB_T32, .BFX_WIDTH_T32, .NONE, .NONE}, 0xF3400000, 0xFBF08000, .V6T2, .T32, {}, {}},
-	{.BFI, {.GPR, .GPR, .IMM5, .IMM5_W, .NONE, .NONE}, {.RD_T32, .RN_T32, .BFI_LSB_T32, .BFI_MSB_T32, .NONE, .NONE}, 0xF3600000, 0xFBF08000, .V6T2, .T32, {}, {}},
-	{.BFC, {.GPR, .IMM5, .IMM5_W, .NONE, .NONE, .NONE}, {.RD_T32, .BFI_LSB_T32, .BFI_MSB_T32, .NONE, .NONE, .NONE}, 0xF36F0000, 0xFBFF8000, .V6T2, .T32, {}, {}},
-	{.USAT, {.GPR, .IMM4_SAT, .GPR_SHIFTED, .NONE, .NONE, .NONE}, {.RD_T32, .SAT_IMM5_U_T32, .RN_T32_SAT, .NONE, .NONE, .NONE}, 0xF3800000, 0xFBD08000, .V6T2, .T32, {}, {}},
-	{.USAT16, {.GPR, .IMM4_SAT, .GPR, .NONE, .NONE, .NONE}, {.RD_T32, .SAT16_IMM4_U_T32, .RN_T32, .NONE, .NONE, .NONE}, 0xF3A00000, 0xFBF0F0C0, .V6T2, .T32, {}, {}},
-	{.UBFX, {.GPR, .GPR, .IMM5, .IMM5_W, .NONE, .NONE}, {.RD_T32, .RN_T32, .BFI_LSB_T32, .BFX_WIDTH_T32, .NONE, .NONE}, 0xF3C00000, 0xFBF08000, .V6T2, .T32, {}, {}},
+	// The saturates and the bitfield operations have no i: bit 26 is 0, and
+	// so is bit 5.
+	{.SSAT, {.GPR, .IMM4_SAT, .GPR_SHIFTED, .NONE, .NONE, .NONE}, {.RD_T32, .SAT_IMM5_T32, .RN_T32_SAT, .NONE, .NONE, .NONE}, 0xF3000000, 0xFFD08020, .V6T2, .T32, {}, {}},
+	{.SSAT16, {.GPR, .IMM4_SAT, .GPR, .NONE, .NONE, .NONE}, {.RD_T32, .SAT16_IMM4_T32, .RN_T32, .NONE, .NONE, .NONE}, 0xF3200000, 0xFFF0F0F0, .V6T2, .T32, {}, {}},
+	{.SBFX, {.GPR, .GPR, .IMM5, .IMM5_W, .NONE, .NONE}, {.RD_T32, .RN_T32, .BFI_LSB_T32, .BFX_WIDTH_T32, .NONE, .NONE}, 0xF3400000, 0xFFF08020, .V6T2, .T32, {}, {}},
+	{.BFI, {.GPR, .GPR, .IMM5, .IMM5_W, .NONE, .NONE}, {.RD_T32, .RN_T32, .BFI_LSB_T32, .BFI_MSB_T32, .NONE, .NONE}, 0xF3600000, 0xFFF08020, .V6T2, .T32, {}, {}},
+	{.BFC, {.GPR, .IMM5, .IMM5_W, .NONE, .NONE, .NONE}, {.RD_T32, .BFI_LSB_T32, .BFI_MSB_T32, .NONE, .NONE, .NONE}, 0xF36F0000, 0xFFFF8020, .V6T2, .T32, {}, {}},
+	{.USAT, {.GPR, .IMM4_SAT, .GPR_SHIFTED, .NONE, .NONE, .NONE}, {.RD_T32, .SAT_IMM5_U_T32, .RN_T32_SAT, .NONE, .NONE, .NONE}, 0xF3800000, 0xFFD08020, .V6T2, .T32, {}, {}},
+	{.USAT16, {.GPR, .IMM4_SAT, .GPR, .NONE, .NONE, .NONE}, {.RD_T32, .SAT16_IMM4_U_T32, .RN_T32, .NONE, .NONE, .NONE}, 0xF3A00000, 0xFFF0F0F0, .V6T2, .T32, {}, {}},
+	{.UBFX, {.GPR, .GPR, .IMM5, .IMM5_W, .NONE, .NONE}, {.RD_T32, .RN_T32, .BFI_LSB_T32, .BFX_WIDTH_T32, .NONE, .NONE}, 0xF3C00000, 0xFFF08020, .V6T2, .T32, {}, {}},
 
 	// =========================================================================
 	// 32-bit: data processing (shifted register)
@@ -524,6 +526,9 @@ THUMB_TABLE := []Encoding{
 	// bits are zero in the word.
 	{.STM, {.GPR, .GPR_LIST, .NONE, .NONE, .NONE, .NONE}, {.RN_T32, .T32_REG_LIST, .NONE, .NONE, .NONE, .NONE}, 0xE8800000, 0xFFF0A000, .V6T2, .T32, {}, {}},
 	{.STM, {.GPR, .GPR_LIST, .NONE, .NONE, .NONE, .NONE}, {.RN_T32, .T32_REG_LIST, .NONE, .NONE, .NONE, .NONE}, 0xE8A00000, 0xFFF0A000, .V6T2, .T32, {}, {}},
+	// v8.1-M's CLRM is the LDM whose base would be PC; bit 15 of its list is
+	// APSR.
+	{.CLRM, {.GPR_LIST, .NONE, .NONE, .NONE, .NONE, .NONE}, {.T32_REG_LIST, .NONE, .NONE, .NONE, .NONE, .NONE}, 0xE89F0000, 0xFFFF2000, .V81M, .T32, {preferred = true}, {}},
 	{.LDM, {.GPR, .GPR_LIST, .NONE, .NONE, .NONE, .NONE}, {.RN_T32, .T32_REG_LIST, .NONE, .NONE, .NONE, .NONE}, 0xE8900000, 0xFFF02000, .V6T2, .T32, {}, {}},
 	{.LDM, {.GPR, .GPR_LIST, .NONE, .NONE, .NONE, .NONE}, {.RN_T32, .T32_REG_LIST, .NONE, .NONE, .NONE, .NONE}, 0xE8B00000, 0xFFF02000, .V6T2, .T32, {}, {}},
 	{.STMDB, {.GPR, .GPR_LIST, .NONE, .NONE, .NONE, .NONE}, {.RN_T32, .T32_REG_LIST, .NONE, .NONE, .NONE, .NONE}, 0xE9000000, 0xFFF0A000, .V6T2, .T32, {}, {}},
@@ -552,9 +557,9 @@ THUMB_TABLE := []Encoding{
 	{.BLX, {.REL24_T32, .NONE, .NONE, .NONE, .NONE, .NONE}, {.BRANCH_BLX_T32, .NONE, .NONE, .NONE, .NONE, .NONE}, 0xF000C000, 0xF800D001, .V5T, .T32, {branch = true, writes_pc = true}, {}},
 	//   1111 0011 100R Rn | 1000 mask 000m 0000   MSR; M-profile puts SYSm in the low byte
 	{.MSR, {.PSR_FIELD, .GPR, .NONE, .NONE, .NONE, .NONE}, {.MSR_FIELDS_T32, .RN_T32, .NONE, .NONE, .NONE, .NONE}, 0xF3808000, 0xFFE0F0FF, .V6T2, .T32, {}, {}},
-	{.MSR, {.PSR_FIELD, .GPR, .NONE, .NONE, .NONE, .NONE}, {.MSR_SYSM_T32, .RN_T32, .NONE, .NONE, .NONE, .NONE}, 0xF3808000, 0xFFF0F300, .V6T2, .T32, {}, {}},
+	{.MSR, {.PSR_FIELD, .GPR, .NONE, .NONE, .NONE, .NONE}, {.MSR_SYSM_T32, .RN_T32, .NONE, .NONE, .NONE, .NONE}, 0xF3808000, 0xFFF0F300, .V6T2, .T32, {m_profile_only = true}, {}},
 	{.MRS, {.GPR, .PSR_FIELD, .NONE, .NONE, .NONE, .NONE}, {.RD_T32, .MRS_SPEC_REG_T32, .NONE, .NONE, .NONE, .NONE}, 0xF3EF8000, 0xFFEFF0FF, .V6T2, .T32, {}, {}},
-	{.MRS, {.GPR, .PSR_FIELD, .NONE, .NONE, .NONE, .NONE}, {.RD_T32, .SYSM_T32, .NONE, .NONE, .NONE, .NONE}, 0xF3EF8000, 0xFFFFF000, .V6T2, .T32, {}, {}},
+	{.MRS, {.GPR, .PSR_FIELD, .NONE, .NONE, .NONE, .NONE}, {.RD_T32, .SYSM_T32, .NONE, .NONE, .NONE, .NONE}, 0xF3EF8000, 0xFFFFF000, .V6T2, .T32, {m_profile_only = true}, {}},
 	//   1111 0011 1010 1111 | 1000 0 imod M A I F mode    CPS; with imod and M zero, the hints
 	{.CPSIE, {.IMM_IFLAGS, .NONE, .NONE, .NONE, .NONE, .NONE}, {.CPS_IFLAGS_T32, .NONE, .NONE, .NONE, .NONE, .NONE}, 0xF3AF8400, 0xFFFFFF1F, .V6, .T32, {a_profile_only = true}, {}},
 	{.CPSIE, {.IMM_IFLAGS, .IMM, .NONE, .NONE, .NONE, .NONE}, {.CPS_IFLAGS_T32, .CPS_MODE_T32, .NONE, .NONE, .NONE, .NONE}, 0xF3AF8500, 0xFFFFFF00, .V6, .T32, {a_profile_only = true}, {}},
@@ -580,8 +585,8 @@ THUMB_TABLE := []Encoding{
 	{.ISB, {.IMM_BARRIER, .NONE, .NONE, .NONE, .NONE, .NONE}, {.BARRIER_TYPE, .NONE, .NONE, .NONE, .NONE, .NONE}, 0xF3BF8F60, 0xFFFFFFF0, .V7, .T32, {}, {}},
 	{.SB, {.NONE, .NONE, .NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE, .NONE, .NONE}, 0xF3BF8F70, 0xFFFFFFFF, .V8, .T32, {}, {}},
 	{.BXJ, {.GPR, .NONE, .NONE, .NONE, .NONE, .NONE}, {.RN_T32, .NONE, .NONE, .NONE, .NONE, .NONE}, 0xF3C08F00, 0xFFF0FFFF, .V6T2, .T32, {}, {}},
-	{.ERET, {.NONE, .NONE, .NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE, .NONE, .NONE}, 0xF3DE8F00, 0xFFFFFFFF, .V7VE, .T32, {}, {}},
-	{.SUB, {.GPR, .GPR, .IMM, .NONE, .NONE, .NONE}, {.IMPL_PC, .IMPL_LR, .T32_IMM8, .NONE, .NONE, .NONE}, 0xF3DE8F00, 0xFFFFFF00, .V6T2, .T32, {sets_flags = true}, {}},
+	{.ERET, {.NONE, .NONE, .NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE, .NONE, .NONE}, 0xF3DE8F00, 0xFFFFFFFF, .V7VE, .T32, {a_profile_only = true}, {}},
+	{.SUB, {.GPR, .GPR, .IMM, .NONE, .NONE, .NONE}, {.IMPL_PC, .IMPL_LR, .T32_IMM8, .NONE, .NONE, .NONE}, 0xF3DE8F00, 0xFFFFFF00, .V6T2, .T32, {sets_flags = true, a_profile_only = true}, {}},
 	{.HVC, {.IMM, .NONE, .NONE, .NONE, .NONE, .NONE}, {.IMM4_IMM12, .NONE, .NONE, .NONE, .NONE, .NONE}, 0xF7E08000, 0xFFF0F000, .V7VE, .T32, {}, {}},
 	{.SMC, {.IMM, .NONE, .NONE, .NONE, .NONE, .NONE}, {.T32_IMM4_SMC, .NONE, .NONE, .NONE, .NONE, .NONE}, 0xF7F08000, 0xFFF0FFFF, .V6K, .T32, {a_profile_only = true}, {}},
 	{.UDF, {.IMM, .NONE, .NONE, .NONE, .NONE, .NONE}, {.IMM4_IMM12, .NONE, .NONE, .NONE, .NONE, .NONE}, 0xF7F0A000, 0xFFF0F000, .V6T2, .T32, {}, {}},
@@ -618,7 +623,8 @@ THUMB_TABLE := []Encoding{
 	{.LE, {.GPR, .REL11, .NONE, .NONE, .NONE, .NONE}, {.IMPL_LR, .LOB_BACKWARD, .NONE, .NONE, .NONE, .NONE}, 0xF00FC001, 0xFFFFF001, .V81M, .T32, {branch = true}, {}},
 	{.LE, {.REL11, .NONE, .NONE, .NONE, .NONE, .NONE}, {.LOB_BACKWARD, .NONE, .NONE, .NONE, .NONE, .NONE}, 0xF02FC001, 0xFFFFF001, .V81M, .T32, {branch = true}, {}},
 	{.LETP, {.GPR, .REL11, .NONE, .NONE, .NONE, .NONE}, {.IMPL_LR, .LOB_BACKWARD, .NONE, .NONE, .NONE, .NONE}, 0xF01FC001, 0xFFFFF001, .MVE_INT, .T32, {branch = true}, {}},
-	{.LCTP, {.NONE, .NONE, .NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE, .NONE, .NONE}, 0xF00FE001, 0xFFFFFFFF, .MVE_INT, .T32, {}, {}},
+	// Whatever the size field holds.
+	{.LCTP, {.NONE, .NONE, .NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE, .NONE, .NONE}, 0xF00FE001, 0xFFCFFFFF, .MVE_INT, .T32, {preferred = true}, {}},
 
 	// =========================================================================
 	// 32-bit: v8.1-M pointer authentication and branch target identification
@@ -630,8 +636,9 @@ THUMB_TABLE := []Encoding{
 	{.PACBTI, {.GPR, .GPR, .GPR, .NONE, .NONE, .NONE}, {.IMPL_R12, .IMPL_LR, .IMPL_SP, .NONE, .NONE, .NONE}, 0xF3AF800D, 0xFFFFFFFF, .V81M, .T32, {}, {}},
 	{.AUT, {.GPR, .GPR, .GPR, .NONE, .NONE, .NONE}, {.IMPL_R12, .IMPL_LR, .IMPL_SP, .NONE, .NONE, .NONE}, 0xF3AF802D, 0xFFFFFFFF, .V81M, .T32, {}, {}},
 	{.BTI, {.NONE, .NONE, .NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE, .NONE, .NONE}, 0xF3AF800F, 0xFFFFFFFF, .V81M, .T32, {}, {}},
-	{.AUTG, {.GPR, .GPR, .GPR, .NONE, .NONE, .NONE}, {.RT_T32, .RN_T32, .RM_T32, .NONE, .NONE, .NONE}, 0xFB500F00, 0xFFF00FF0, .V81M, .T32, {}, {}},
-	{.BXAUT, {.GPR, .GPR, .GPR, .NONE, .NONE, .NONE}, {.RT_T32, .RN_T32, .RM_T32, .NONE, .NONE, .NONE}, 0xFB500F10, 0xFFF00FF0, .V81M, .T32, {branch = true, writes_pc = true}, {}},
+	// Preferred over SMMUL and SMMULR, whose words they are when Rd is 1111.
+	{.AUTG, {.GPR, .GPR, .GPR, .NONE, .NONE, .NONE}, {.RT_T32, .RN_T32, .RM_T32, .NONE, .NONE, .NONE}, 0xFB500F00, 0xFFF00FF0, .V81M, .T32, {preferred = true}, {}},
+	{.BXAUT, {.GPR, .GPR, .GPR, .NONE, .NONE, .NONE}, {.RT_T32, .RN_T32, .RM_T32, .NONE, .NONE, .NONE}, 0xFB500F10, 0xFFF00FF0, .V81M, .T32, {branch = true, writes_pc = true, preferred = true}, {}},
 	{.PACG, {.GPR, .GPR, .GPR, .NONE, .NONE, .NONE}, {.RD_T32, .RN_T32, .RM_T32, .NONE, .NONE, .NONE}, 0xFB60F000, 0xFFF0F0F0, .V81M, .T32, {}, {}},
 
 	// =========================================================================

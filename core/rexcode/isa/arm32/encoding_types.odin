@@ -239,7 +239,10 @@ Encoding_Flags :: bit_field u16 {
 	// An assembler's spelling of another form's word -- `vcle d0, d1, d2` is
 	// `vcge d0, d2, d1`. The encoder takes it; the decoder gives the other.
 	encode_only:      bool | 1,
-	_:                u8   | 3,
+	// Only in the M profile, though its feature is in both: MRS and MSR on
+	// a SYSm, which the A profile writes as a mask of PSR fields.
+	m_profile_only:   bool | 1,
+	_:                u8   | 2,
 }
 
 // ---- Operand types ----------------------------------------------------------

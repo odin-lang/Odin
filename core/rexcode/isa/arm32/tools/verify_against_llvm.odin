@@ -485,15 +485,15 @@ verify_suite :: proc(suite: ^Suite, work_dir: string) -> []Result {
 		// For what is failing, ask whether llvm's own text for the word
 		// reproduces it. Where it does not, no text does.
 		retry := make([]string, len(words))
+		address: u32 = 0
 		for i in 0 ..< len(words) {
+			word_address := address
+			address += u32(words[i].length)
 			verdict := verdicts[i]
 			if verdict != .WRONG && verdict != .UNASSEMBLABLE && verdict != .MISSING {
 				continue
 			}
-			// An address in the text is a branch target llvm has resolved
-			// against its own layout, which this one does not share. (Not one
-			// in llvm's trailing comment: that is only where a literal is.)
-			if llvm[i] == "" || strings.contains(strip_comment(llvm[i]), "0x") {
+			if llvm[i] == "" {
 				continue
 			}
 			// A D-register list that runs past D31 is UNPREDICTABLE, and llvm
@@ -509,6 +509,22 @@ verify_suite :: proc(suite: ^Suite, work_dir: string) -> []Result {
 				continue
 			}
 			retry[i] = strip_comment(llvm[i])
+			// An address in the text is a branch target llvm resolved against
+			// the layout it disassembled, where this word sat at word_address;
+			// give it back as an offset from the instruction, the way ours are.
+			// (Not one in llvm's trailing comment: that is where a literal is.)
+			if at := strings.index(retry[i], "0x"); at >= 0 {
+				end := at + 2
+				for end < len(retry[i]) && strings.index_byte("0123456789abcdef", retry[i][end]) >= 0 {
+					end += 1
+				}
+				target, ok := strconv.parse_u64_of_base(retry[i][at + 2:end], 16)
+				if !ok {
+					retry[i] = ""
+					continue
+				}
+				retry[i] = relative_target_text(retry[i], at, end, i64(target) - i64(word_address), suite.mode)
+			}
 		}
 		llvm_assembled, _ := llvm_assemble(suite, target, t + 100, retry, work_dir)
 		for i in 0 ..< len(words) {
@@ -736,6 +752,26 @@ verify_blocks :: proc(suite: ^Suite, work_dir: string) -> []Result {
 
 symbol_counter := 0
 
+// A branch's text with the target -- line[start:end] -- replaced by one
+// `distance` bytes from the instruction, in a form llvm-mc assembles to that
+// distance wherever the line is placed.
+relative_target_text :: proc(line: string, start, end: int, distance: i64, mode: a.Mode) -> string {
+	// BL and BLX keep a relocation even against a local symbol, so the
+	// object would not hold the offset; their `#imm` syntax is the offset
+	// from PC itself. Slots are word-aligned, so PC is the slot plus 4 for
+	// both.
+	if is_branch_with_link(first_token(line)) {
+		pc_bias: i64 = mode == .A32 ? 8 : 4
+		return fmt.tprintf("%s#%d%s", line[:start], distance - pc_bias, line[end:])
+	}
+	// llvm-mc range-checks a branch to `. + n` while parsing, before it
+	// knows where the branch lands, and rejects some that fit; a symbol
+	// defers the check to layout.
+	symbol_counter += 1
+	symbol := fmt.tprintf("target_%d", symbol_counter)
+	return fmt.tprintf(".set %s, . + %d; %s%s%s", symbol, distance, line[:start], symbol, line[end:])
+}
+
 // BL or BLX, possibly conditional -- `bleq` is BL, but `ble` and `bls` are B.
 is_branch_with_link :: proc(mnemonic: string) -> bool {
 	CONDITIONS :: []string{"eq", "ne", "cs", "cc", "hs", "lo", "mi", "pl", "vs", "vc", "hi", "ls", "ge", "lt", "gt", "le", "al"}
@@ -814,21 +850,7 @@ rexcode_text :: proc(mode: a.Mode, words: []Word, profile: a.Profile) -> (text: 
 			if at < 0 {
 				continue
 			}
-			// BL and BLX keep a relocation even against a local symbol, so
-			// the object would not hold the offset; their `#imm` syntax is the
-			// offset from PC itself. Slots are word-aligned, so PC is the
-			// slot plus 4 for both.
-			if is_branch_with_link(first_token(line)) {
-				pc_bias: i64 = mode == .A32 ? 8 : 4
-				line = fmt.tprintf("%s#%d%s", line[:at], operand.relative - offset - pc_bias, line[at + len(target):])
-				continue
-			}
-			// llvm-mc range-checks a branch to `. + n` while parsing, before
-			// it knows where the branch lands, and rejects some that fit; a
-			// symbol defers the check to layout.
-			symbol_counter += 1
-			symbol := fmt.tprintf("target_%d", symbol_counter)
-			line = fmt.tprintf(".set %s, . + %d; %s%s%s", symbol, operand.relative - offset, line[:at], symbol, line[at + len(target):])
+			line = relative_target_text(line, at, at + len(target), operand.relative - offset, mode)
 		}
 		if i > 0 {
 			strings.write_byte(&builder, '\n')

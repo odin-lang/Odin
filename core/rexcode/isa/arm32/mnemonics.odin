@@ -197,6 +197,7 @@ Mnemonic :: enum u16 {
 
 	// Block move
 	LDM,    STM,                           // IA order (the default spelling)
+	CLRM,                                  // v8.1-M: clear the registers in a list
 	// The other three increment/decrement orders are their own mnemonics --
 	// that is how an assembler spells them, and it is the only way to reach
 	// their encodings: all four share one operand shape, so nothing else
