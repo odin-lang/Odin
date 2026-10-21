@@ -1985,21 +1985,24 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			bc->reloc_mode = RelocMode_PIC;
 		}
 	} else if (metrics->os == TargetOs_linux && subtarget == Subtarget_Android) {
+		// NOTE(bill): LLVM-C does not normalize triples, so they need the vendor. Read as `i686-linux-android`,
+		// "linux" is the vendor and LLVM does not know it is Android: i386 gets a 4-byte aligned stack
+		// and arm64 does not reserve x18, which Android's shadow call stack uses.
 		switch (metrics->arch) {
 		case TargetArch_arm64:
-			bc->metrics.target_triplet = str_lit("aarch64-linux-android");
+			bc->metrics.target_triplet = str_lit("aarch64-unknown-linux-android");
 			bc->reloc_mode = RelocMode_PIC;
 			break;
 		case TargetArch_arm32:
-			bc->metrics.target_triplet = str_lit("armv7a-linux-androideabi");
+			bc->metrics.target_triplet = str_lit("armv7a-unknown-linux-androideabi");
 			bc->reloc_mode = RelocMode_PIC;
 			break;
 		case TargetArch_amd64:
-			bc->metrics.target_triplet = str_lit("x86_64-linux-android");
+			bc->metrics.target_triplet = str_lit("x86_64-unknown-linux-android");
 			bc->reloc_mode = RelocMode_PIC;
 			break;
 		case TargetArch_i386:
-			bc->metrics.target_triplet = str_lit("i686-linux-android");
+			bc->metrics.target_triplet = str_lit("i686-unknown-linux-android");
 			bc->reloc_mode = RelocMode_PIC;
 			break;
 		default:
