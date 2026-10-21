@@ -77,7 +77,13 @@ gb_internal bool zip_read_entries(u8 const *data, isize size, Array<ZipEntry> *e
 		if (cursor+46+name_len > size || local+30 > size) {
 			return false;
 		}
-		e.name = make_string(h+46, name_len);
+		// NOTE(bill): aapt2 on Windows names the assets `-A` adds with backslashes. A zip's names use '/'.
+		e.name = copy_string(permanent_allocator(), make_string(h+46, name_len));
+		for (isize j = 0; j < e.name.len; j++) {
+			if (e.name.text[j] == '\\') {
+				e.name.text[j] = '/';
+			}
+		}
 		if (e.flags & 1) {
 			return false; // encrypted
 		}

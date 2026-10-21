@@ -48,6 +48,8 @@ Not generated:
 | `android.odin`               | The package documentation and `va_list_arg`.                                          |
 | `native_app_glue`            | Hand-written Odin, not a binding.                                                     |
 | `jni_env.odin`               | The implicit `JNIEnv` (`jni_set_vm`, `jni_env`) is hand-written.                      |
+| `assets.odin`                | The `asset_*` helpers over `AAssetManager`, listing directories through JNI.          |
+| `stdio_logcat.odin`          | `redirect_stdio_to_logcat`, which the glue calls before `main`.                       |
 | EGL, GLES, Vulkan, zlib      | `vendor:egl`, `vendor:OpenGL` (`load_gles_up_to`), `vendor:vulkan` and `vendor:zlib`. |
 | GLES 1.x (libGLESv1_CM)      | Fixed-function OpenGL ES. Not bound.                                                  |
 | The Java APIs                | `vendor:android/java`, generated from the SDK's `android.jar` by its own `_gen`.      |

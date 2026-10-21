@@ -8,6 +8,7 @@ Procedures introduced later are marked `// API level N`.
 Calling one while targeting a lower minimum API level is a link error.
 
 For a NativeActivity app, see `core:sys/android/native_app_glue`.
+For the APK's assets, see `asset_read_entire_file`, `asset_to_stream`, and `asset_list`, or `core:os` paths under `/android_asset`.
 */
 #+build linux
 package android

@@ -42,6 +42,7 @@ Before `main`, the process is set up as `core:os` expects of other platforms:
 - `HOME`, `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, and `XDG_STATE_HOME` are set to the files directory, and `TMPDIR`
   and `XDG_CACHE_HOME` to the cache directory, when unset.
 - `os.args` holds only the package name. An activity's arguments arrive through its `Intent` instead.
+- The APK's assets can be read through `core:os` under `/android_asset`, and with `android.asset_*`.
 
 Differences from the NDK's C `android_native_app_glue`:
 - The program starts at `main`, not an exported `android_main`, and runs once per process.
@@ -324,6 +325,38 @@ ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedS
 		return env->CallBooleanMethodA(activity.clazz, method, nil) != 0
 	}
 
+	// Keep the application's `AssetManager`, which outlives any activity.
+	set_asset_manager :: proc "contextless" (activity: ^android.ANativeActivity) -> bool {
+		call :: proc "contextless" (env: ^android.JNIEnv, object: android.jobject, name, signature: cstring) -> android.jobject {
+			class := env->GetObjectClass(object)
+			defer env->DeleteLocalRef(class)
+			method := env->GetMethodID(class, name, signature)
+			if method == nil {
+				env->ExceptionClear()
+				return nil
+			}
+			result := env->CallObjectMethodA(object, method, nil)
+			if env->ExceptionCheck() != android.JNI_FALSE {
+				env->ExceptionClear()
+				return nil
+			}
+			return result
+		}
+
+		env := activity.env
+		app_context := call(env, activity.clazz, "getApplicationContext", "()Landroid/content/Context;")
+		if app_context == nil {
+			return false
+		}
+		defer env->DeleteLocalRef(app_context)
+		assets := call(env, app_context, "getAssets", "()Landroid/content/res/AssetManager;")
+		if assets == nil {
+			return false
+		}
+		defer env->DeleteLocalRef(assets)
+		return android.asset_set_manager(env, assets)
+	}
+
 	to_app :: proc "contextless" (activity: ^android.ANativeActivity) -> ^android_app {
 		return (^android_app)(activity.instance)
 	}
@@ -511,6 +544,11 @@ ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedS
 
 	// For `android.jni_env` and the `vendor:android/java` wrappers.
 	android.jni_set_vm(activity.vm)
+
+	// For `android.asset_*` and `core:os`'s `/android_asset` paths.
+	if !set_asset_manager(activity) {
+		android.__android_log_write(.ERROR, "native_app_glue", "could not get the application's AssetManager")
+	}
 
 	app := new(android_app, runtime.heap_allocator())
 	app.activity = activity
