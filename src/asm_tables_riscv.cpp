@@ -691,6 +691,11 @@ struct Asm_riscv {
 		}
 	}
 
+	String implicit_reg_name(OperandType t) const {
+		gb_unused(t);
+		return {};
+	}
+
 	bool operand_type_is_cond_code(OperandType t) const {
 		return false;
 	}

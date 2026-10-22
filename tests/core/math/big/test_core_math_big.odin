@@ -1,8 +1,86 @@
 package test_core_math_big
 
 import "core:math/big"
+import "core:mem"
 import "core:strconv"
 import "core:testing"
+
+@(test)
+test_int_destroy :: proc(t: ^testing.T) {
+	a, b, zero: big.Int
+	testing.expect_value(t, big.set(&a, -123456789), nil)
+	testing.expect_value(t, big.set(&b, 987654321), nil)
+
+	big.destroy(&a, &b, &zero)
+	integers := [?]^big.Int{&a, &b, &zero}
+	for integer in integers {
+		testing.expect_value(t, integer.used, 0)
+		testing.expect_value(t, raw_data(integer.digit), nil)
+		testing.expect_value(t, len(integer.digit), 0)
+		testing.expect_value(t, cap(integer.digit), 0)
+		testing.expect_value(t, integer.sign, .Zero_or_Positive)
+		testing.expect_value(t, integer.flags, {})
+	}
+
+	// Avoid accessing freed memory if destroy did not clear the integers.
+	if testing.failed(t) {
+		return
+	}
+
+	big.destroy(&a, &b, &zero)
+	defer big.destroy(&a, &b, &zero)
+
+	testing.expect_value(t, big.set(&a, 42), nil)
+	value, err := big.get_i64(&a)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, value, 42)
+}
+
+@(test)
+test_int_destroy_custom_allocator :: proc(t: ^testing.T) {
+	tracker: mem.Tracking_Allocator
+	mem.tracking_allocator_init(&tracker, context.allocator)
+	defer mem.tracking_allocator_destroy(&tracker)
+
+	a: big.Int
+	err := big.set(&a, 123456789, allocator = mem.tracking_allocator(&tracker))
+	if !testing.expect_value(t, err, nil) {
+		return
+	}
+
+	big.destroy(&a)
+
+	testing.expect_value(t, len(tracker.allocation_map), 0)
+	testing.expect_value(t, tracker.current_memory_allocated, 0)
+}
+
+@(test)
+test_int_destroy_wipes_capacity :: proc(t: ^testing.T) {
+	for length in 0..=1 {
+		storage: [1024]byte
+		arena: mem.Arena
+		mem.arena_init(&arena, storage[:])
+
+		a: big.Int
+		err := big.set(&a, 123456789, allocator = mem.arena_allocator(&arena))
+		if !testing.expect_value(t, err, nil) {
+			return
+		}
+
+		backing := a.digit[:cap(a.digit)]
+		for &digit in backing {
+			digit = 42
+		}
+		testing.expect_value(t, resize(&a.digit, length), nil)
+
+		big.destroy(&a)
+
+		// The arena retains its backing memory after individual frees.
+		for digit in backing {
+			testing.expect_value(t, digit, 0)
+		}
+	}
+}
 
 @(test)
 test_permutations_and_combinations :: proc(t: ^testing.T) {

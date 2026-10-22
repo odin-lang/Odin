@@ -114,6 +114,7 @@ Optionally specify the thread's name/description.
 the name/description will be truncated to fit the OS's limit.
 */
 
+@(synchronizes=.Release)
 create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal, name: Maybe(string) = nil) -> ^Thread {
 	return _create(procedure, priority, name)
 }
@@ -121,6 +122,7 @@ create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal, name:
 /*
 Wait for the thread to finish and free all data associated with it.
 */
+@(synchronizes=.Acquire)
 destroy :: proc(thread: ^Thread) {
 	_destroy(thread)
 }
@@ -128,6 +130,7 @@ destroy :: proc(thread: ^Thread) {
 /*
 Start a suspended thread.
 */
+@(synchronizes=.Release)
 start :: proc(thread: ^Thread) {
 	_start(thread)
 }
@@ -135,6 +138,7 @@ start :: proc(thread: ^Thread) {
 /*
 Check if the thread has finished work.
 */
+@(synchronizes=.Acquire)
 is_done :: proc(thread: ^Thread) -> bool {
 	return _is_done(thread)
 }
@@ -142,6 +146,7 @@ is_done :: proc(thread: ^Thread) -> bool {
 /*
 Wait for the thread to finish work.
 */
+@(synchronizes=.Acquire)
 join :: proc(thread: ^Thread) {
 	_join(thread)
 }
@@ -149,6 +154,7 @@ join :: proc(thread: ^Thread) {
 /*
 Wait for all threads to finish work.
 */
+@(synchronizes=.Acquire)
 join_multiple :: proc(threads: ..^Thread) {
 	_join_multiple(..threads)
 }
@@ -195,6 +201,7 @@ the name/description will be truncated to fit the OS's limit.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
+@(synchronizes=.Release)
 run :: proc(fn: proc(), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, name: Maybe(string) = nil) {
 	create_and_start(fn, init_context, priority, true, name)
 }
@@ -213,6 +220,7 @@ the name/description will be truncated to fit the OS's limit.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
+@(synchronizes=.Release)
 run_with_data :: proc(data: rawptr, fn: proc(data: rawptr), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, name: Maybe(string) = nil) {
 	create_and_start_with_data(data, fn, init_context, priority, true, name)
 }
@@ -231,6 +239,7 @@ the name/description will be truncated to fit the OS's limit.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
+@(synchronizes=.Release)
 run_with_poly_data :: proc(data: $T, fn: proc(data: T), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, name: Maybe(string) = nil)
 	where size_of(T) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	create_and_start_with_poly_data(data, fn, init_context, priority, true, name)
@@ -250,6 +259,7 @@ the name/description will be truncated to fit the OS's limit.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
+@(synchronizes=.Release)
 run_with_poly_data2 :: proc(arg1: $T1, arg2: $T2, fn: proc(T1, T2), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, name: Maybe(string) = nil)
 	where size_of(T1) + size_of(T2) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	create_and_start_with_poly_data2(arg1, arg2, fn, init_context, priority, true, name)
@@ -269,6 +279,7 @@ the name/description will be truncated to fit the OS's limit.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
+@(synchronizes=.Release)
 run_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: proc(arg1: T1, arg2: T2, arg3: T3), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, name: Maybe(string) = nil)
 	where size_of(T1) + size_of(T2) + size_of(T3) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	create_and_start_with_poly_data3(arg1, arg2, arg3, fn, init_context, priority, true, name)
@@ -288,6 +299,7 @@ the name/description will be truncated to fit the OS's limit.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
+@(synchronizes=.Release)
 run_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: $T4, fn: proc(arg1: T1, arg2: T2, arg3: T3, arg4: T4), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, name: Maybe(string) = nil)
 	where size_of(T1) + size_of(T2) + size_of(T3) + size_of(T4) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	create_and_start_with_poly_data4(arg1, arg2, arg3, arg4, fn, init_context, priority, true, name)
@@ -314,6 +326,7 @@ That includes calling `join`, which needs to dereference ^Thread`.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
+@(synchronizes=.Release)
 create_and_start :: proc(fn: proc(), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false, name: Maybe(string) = nil) -> (t: ^Thread) {
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc())t.data
@@ -352,6 +365,7 @@ That includes calling `join`, which needs to dereference ^Thread`.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
+@(synchronizes=.Release)
 create_and_start_with_data :: proc(data: rawptr, fn: proc(data: rawptr), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false, name: Maybe(string) = nil) -> (t: ^Thread) {
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc(rawptr))t.data
@@ -394,6 +408,7 @@ That includes calling `join`, which needs to dereference ^Thread`.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
+@(synchronizes=.Release)
 create_and_start_with_poly_data :: proc(data: $T, fn: proc(data: T), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false, name: Maybe(string) = nil) -> (t: ^Thread)
 	where size_of(T) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	thread_proc :: proc(t: ^Thread) {
@@ -442,6 +457,7 @@ That includes calling `join`, which needs to dereference ^Thread`.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
+@(synchronizes=.Release)
 create_and_start_with_poly_data2 :: proc(arg1: $T1, arg2: $T2, fn: proc(T1, T2), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false, name: Maybe(string) = nil) -> (t: ^Thread)
 	where size_of(T1) + size_of(T2) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	thread_proc :: proc(t: ^Thread) {
@@ -496,6 +512,7 @@ That includes calling `join`, which needs to dereference ^Thread`.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
+@(synchronizes=.Release)
 create_and_start_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: proc(arg1: T1, arg2: T2, arg3: T3), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false, name: Maybe(string) = nil) -> (t: ^Thread)
 	where size_of(T1) + size_of(T2) + size_of(T3) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	thread_proc :: proc(t: ^Thread) {
@@ -552,6 +569,7 @@ That includes calling `join`, which needs to dereference ^Thread`.
 is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
 in order to free the resources associated with the temporary allocations.
 */
+@(synchronizes=.Release)
 create_and_start_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: $T4, fn: proc(arg1: T1, arg2: T2, arg3: T3, arg4: T4), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false, name: Maybe(string) = nil) -> (t: ^Thread)
 	where size_of(T1) + size_of(T2) + size_of(T3) + size_of(T4) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 	thread_proc :: proc(t: ^Thread) {

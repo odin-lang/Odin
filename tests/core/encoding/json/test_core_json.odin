@@ -504,6 +504,23 @@ map_with_integer_keys :: proc(t: ^testing.T) {
 }
 
 @test
+map_with_cstring_keys :: proc(t: ^testing.T) {
+	my_map: map[cstring]int
+	defer {
+		for key in my_map {
+			delete(key)
+		}
+		delete(my_map)
+	}
+
+	err := json.unmarshal_string(`{"a": 1, "with\tescape": 3}`, &my_map)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, len(my_map), 2)
+	testing.expect_value(t, my_map["a"], 1)
+	testing.expect_value(t, my_map["with\tescape"], 3)
+}
+
+@test
 enumerated_array :: proc(t: ^testing.T) {
 	Fruit :: enum { Apple, Banana, Pear }
 	Fruit_Stock :: [Fruit]uint {

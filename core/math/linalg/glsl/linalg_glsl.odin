@@ -760,10 +760,10 @@ mix :: proc{
 @(require_results) mix_f64  :: proc "c" (x, y, t: f64) -> f64   { return x*(1-t) + y*t }
 @(require_results) mix_vec2 :: proc "c" (x, y, t: vec2) -> vec2 { return {mix(x.x, y.x, t.x), mix(x.y, y.y, t.y)} }
 @(require_results) mix_vec3 :: proc "c" (x, y, t: vec3) -> vec3 { return {mix(x.x, y.x, t.x), mix(x.y, y.y, t.y), mix(x.z, y.z, t.z)} }
-@(require_results) mix_vec4 :: proc "c" (x, y, t: vec4) -> vec4 { return {mix(x.x, y.x, t.x), mix(x.y, y.y, y.y), mix(x.z, y.z, t.z), mix(x.w, y.w, t.w)} }
+@(require_results) mix_vec4 :: proc "c" (x, y, t: vec4) -> vec4 { return {mix(x.x, y.x, t.x), mix(x.y, y.y, t.y), mix(x.z, y.z, t.z), mix(x.w, y.w, t.w)} }
 @(require_results) mix_dvec2 :: proc "c" (x, y, t: dvec2) -> dvec2 { return {mix(x.x, y.x, t.x), mix(x.y, y.y, t.y)} }
 @(require_results) mix_dvec3 :: proc "c" (x, y, t: dvec3) -> dvec3 { return {mix(x.x, y.x, t.x), mix(x.y, y.y, t.y), mix(x.z, y.z, t.z)} }
-@(require_results) mix_dvec4 :: proc "c" (x, y, t: dvec4) -> dvec4 { return {mix(x.x, y.x, t.x), mix(x.y, y.y, y.y), mix(x.z, y.z, t.z), mix(x.w, y.w, t.w)} }
+@(require_results) mix_dvec4 :: proc "c" (x, y, t: dvec4) -> dvec4 { return {mix(x.x, y.x, t.x), mix(x.y, y.y, t.y), mix(x.z, y.z, t.z), mix(x.w, y.w, t.w)} }
 
 lerp :: proc{
 	lerp_f32,

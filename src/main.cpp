@@ -13,17 +13,10 @@
 #endif
 #include "exact_value.cpp"
 #include "build_settings.cpp"
-gb_global ThreadPool global_thread_pool;
 gb_internal void init_global_thread_pool(void) {
 	isize thread_count = gb_max(build_context.thread_count, 1);
 	isize worker_count = thread_count; // +1
 	thread_pool_init(&global_thread_pool, worker_count, "ThreadPoolWorker");
-}
-gb_internal bool thread_pool_add_task(WorkerTaskProc *proc, void *data) {
-	return thread_pool_add_task(&global_thread_pool, proc, data);
-}
-gb_internal void thread_pool_wait(void) {
-	thread_pool_wait(&global_thread_pool);
 }
 
 
@@ -74,6 +67,7 @@ gb_global Timings global_timings = {0};
 #include "parser.cpp"
 #include "checker.cpp"
 #include "docs.cpp"
+#include "semantics_writer.cpp"
 
 #include "cached.cpp"
 
@@ -437,6 +431,8 @@ enum BuildFlagKind {
 	BuildFlag_NoCRT,
 	BuildFlag_NoRPath,
 	BuildFlag_NoEntryPoint,
+	BuildFlag_NoEscapeAnalysis,
+	BuildFlag_NoAtomicAnalysis,
 	BuildFlag_Linker,
 	BuildFlag_UseSeparateModules,
 	BuildFlag_UseSingleModule,
@@ -446,6 +442,11 @@ enum BuildFlagKind {
 
 	BuildFlag_ShowDefineables,
 	BuildFlag_ExportDefineables,
+	BuildFlag_Overlay,
+	BuildFlag_Workspace,
+	BuildFlag_ExportSemantics,
+	BuildFlag_ExportSemanticsFile,
+	BuildFlag_ExportSemanticsFor,
 	BuildFlag_IgnoreUnusedDefineables,
 
 	BuildFlag_Vet,
@@ -460,6 +461,10 @@ enum BuildFlagKind {
 	BuildFlag_VetSemicolon,
 	BuildFlag_VetCast,
 	BuildFlag_VetTabs,
+	BuildFlag_VetWhenShadowing,
+	BuildFlag_VetNilDeref,
+	BuildFlag_VetUninitialized,
+	BuildFlag_VetAtomicAccess,
 	BuildFlag_VetPackages,
 
 	BuildFlag_CustomAttribute,
@@ -532,6 +537,9 @@ enum BuildFlagKind {
 	BuildFlag_InternalLLVMVerification,
 	BuildFlag_InternalLLVMNoSROA,
 	BuildFlag_InternalEnableRVO,
+	BuildFlag_InternalGlobalEntityGraph,
+	BuildFlag_InternalShuffleGlobalEntities,
+	BuildFlag_InternalCheckGlobalEdges,
 
 	BuildFlag_Sanitize,
 	BuildFlag_LTO,
@@ -546,6 +554,10 @@ enum BuildFlagKind {
 	BuildFlag_AndroidKeystore,
 	BuildFlag_AndroidKeystoreAlias,
 	BuildFlag_AndroidKeystorePassword,
+
+#if !defined(GB_SYSTEM_WINDOWS)
+	BuildFlag_WindowsSDKRoot,
+#endif
 
 	BuildFlag_COUNT,
 };
@@ -700,6 +712,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoCRT,                   str_lit("no-crt"),                    BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoRPath,                 str_lit("no-rpath"),                  BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoEntryPoint,            str_lit("no-entry-point"),            BuildFlagParam_None,    Command__does_check &~ Command_test);
+	add_flag(&build_flags, BuildFlag_NoEscapeAnalysis,        str_lit("no-escape-analysis"),        BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoAtomicAnalysis,        str_lit("no-atomic-analysis"),        BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_Linker,                  str_lit("linker"),                    BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,      str_lit("use-separate-modules"),      BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSingleModule,         str_lit("use-single-module"),         BuildFlagParam_None,    Command__does_build);
@@ -709,6 +723,11 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_ShowDefineables,         str_lit("show-defineables"),          BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExportDefineables,       str_lit("export-defineables"),        BuildFlagParam_String,  Command__does_check);
+	add_flag(&build_flags, BuildFlag_Overlay,                 str_lit("overlay"),                   BuildFlagParam_String,  Command__does_check);
+	add_flag(&build_flags, BuildFlag_Workspace,               str_lit("workspace"),                 BuildFlagParam_None,    Command_check);
+	add_flag(&build_flags, BuildFlag_ExportSemantics,         str_lit("export-semantics"),          BuildFlagParam_String,  Command_check);
+	add_flag(&build_flags, BuildFlag_ExportSemanticsFile,     str_lit("export-semantics-file"),     BuildFlagParam_String,  Command_check);
+	add_flag(&build_flags, BuildFlag_ExportSemanticsFor,      str_lit("export-semantics-for"),      BuildFlagParam_String,  Command_check, true);
 	add_flag(&build_flags, BuildFlag_IgnoreUnusedDefineables, str_lit("ignore-unused-defineables"), BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_Vet,                     str_lit("vet"),                       BuildFlagParam_None,    Command__does_check);
@@ -723,6 +742,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetSemicolon,            str_lit("vet-semicolon"),             BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetCast,                 str_lit("vet-cast"),                  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetTabs,                 str_lit("vet-tabs"),                  BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetWhenShadowing,        str_lit("vet-when-shadowing"),        BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetNilDeref,             str_lit("vet-nil-deref"),             BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetUninitialized,        str_lit("vet-uninitialized"),         BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetAtomicAccess,         str_lit("vet-atomic-access"),         BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetPackages,             str_lit("vet-packages"),              BuildFlagParam_String,  Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_CustomAttribute,         str_lit("custom-attribute"),          BuildFlagParam_String,  Command__does_check, true);
@@ -793,6 +816,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_InternalLLVMVerification, str_lit("internal-ignore-llvm-verification"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_InternalLLVMNoSROA,      str_lit("internal-llvm-no-sroa"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_InternalEnableRVO,       str_lit("internal-enable-rvo"), BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_InternalGlobalEntityGraph, str_lit("internal-global-entity-graph"), BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_InternalShuffleGlobalEntities, str_lit("internal-shuffle-global-entities"), BuildFlagParam_Integer, Command__does_check);
+	add_flag(&build_flags, BuildFlag_InternalCheckGlobalEdges, str_lit("internal-check-global-edges"), BuildFlagParam_None, Command__does_check);
 
 
 	add_flag(&build_flags, BuildFlag_Sanitize,                str_lit("sanitize"),                  BuildFlagParam_String,  Command__does_build, true);
@@ -809,6 +835,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_AndroidKeystore,         str_lit("android-keystore"),          BuildFlagParam_String,  Command_bundle_android);
 	add_flag(&build_flags, BuildFlag_AndroidKeystoreAlias,    str_lit("android-keystore-alias"),    BuildFlagParam_String,  Command_bundle_android);
 	add_flag(&build_flags, BuildFlag_AndroidKeystorePassword, str_lit("android-keystore-password"), BuildFlagParam_String,  Command_bundle_android);
+
+#if !defined(GB_SYSTEM_WINDOWS)
+	add_flag(&build_flags, BuildFlag_WindowsSDKRoot,          str_lit("windows-sdk-root"),          BuildFlagParam_String,  Command__does_build);
+#endif
 
 
 	Array<String> flag_args = {};
@@ -1103,6 +1133,50 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 							break;
 						}
+						case BuildFlag_Overlay: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.overlay_file = string_trim_whitespace(value.value_string);
+							break;
+						}
+						case BuildFlag_Workspace: {
+							GB_ASSERT(value.kind == ExactValue_Invalid);
+							build_context.workspace = true;
+							break;
+						}
+						case BuildFlag_ExportSemantics: {
+							GB_ASSERT(value.kind == ExactValue_String);
+
+							if (value.value_string == "json") {
+								build_context.export_semantics_format = SemanticsFormat_Json;
+							} else if (value.value_string == "cbor") {
+								build_context.export_semantics_format = SemanticsFormat_Cbor;
+							} else {
+								gb_printf_err("Invalid export format for -export-semantics:<string>, got %.*s\n", LIT(value.value_string));
+								gb_printf_err("Valid export formats:\n");
+								gb_printf_err("\tjson\n");
+								gb_printf_err("\tcbor\n");
+								bad_flags = true;
+							}
+							break;
+						}
+						case BuildFlag_ExportSemanticsFile: {
+							GB_ASSERT(value.kind == ExactValue_String);
+
+							String export_path = string_trim_whitespace(value.value_string);
+							if (is_build_flag_path_valid(export_path)) {
+								build_context.export_semantics_file = path_to_full_path(heap_allocator(), export_path);
+							} else {
+								gb_printf_err("Invalid -export-semantics-file path, got %.*s\n", LIT(export_path));
+								bad_flags = true;
+							}
+							break;
+						}
+						case BuildFlag_ExportSemanticsFor: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							String path = string_trim_whitespace(value.value_string);
+							array_add(&build_context.export_semantics_for, path_to_full_path(heap_allocator(), path));
+							break;
+						}
 						case BuildFlag_IgnoreUnusedDefineables: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.ignore_unused_defineables = true;
@@ -1339,8 +1413,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String str = value.value_string;
 
-							if (build_context.command != "build") {
-								gb_printf_err("'build-mode' can only be used with the 'build' command\n");
+							if (build_context.command != "build" && build_context.command != "test") {
+								gb_printf_err("'build-mode' can only be used with the 'build' and 'test' commands\n");
 								bad_flags = true;
 								break;
 							}
@@ -1412,6 +1486,12 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_NoEntryPoint:
 							build_context.no_entry_point = true;
+							break;
+						case BuildFlag_NoEscapeAnalysis:
+							build_context.no_analysis_flags |= AnalysisFlag_Escape;
+							break;
+						case BuildFlag_NoAtomicAnalysis:
+							build_context.no_analysis_flags |= AnalysisFlag_Atomic;
 							break;
 						case BuildFlag_NoThreadLocal:
 							build_context.no_thread_local = true;
@@ -1489,6 +1569,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_VetSemicolon:        build_context.vet_flags |= VetFlag_Semicolon;        break;
 						case BuildFlag_VetCast:             build_context.vet_flags |= VetFlag_Cast;             break;
 						case BuildFlag_VetTabs:             build_context.vet_flags |= VetFlag_Tabs;             break;
+						case BuildFlag_VetWhenShadowing:    build_context.vet_flags |= VetFlag_WhenShadowing;    break;
+						case BuildFlag_VetNilDeref:         build_context.vet_flags |= VetFlag_NilDeref;         break;
+						case BuildFlag_VetUninitialized:    build_context.vet_flags |= VetFlag_Uninitialized;    break;
+						case BuildFlag_VetAtomicAccess:     build_context.vet_flags |= VetFlag_AtomicAccess;     break;
 						case BuildFlag_VetUnusedProcedures: build_context.vet_flags |= VetFlag_UnusedProcedures; break;
 
 						case BuildFlag_VetPackages:
@@ -1841,6 +1925,16 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_InternalEnableRVO:
 							build_context.enable_rvo = true;
 							break;
+						case BuildFlag_InternalGlobalEntityGraph:
+							build_context.internal_global_entity_graph = true;
+							break;
+						case BuildFlag_InternalShuffleGlobalEntities:
+							GB_ASSERT(value.kind == ExactValue_Integer);
+							build_context.internal_shuffle_global_entities = cast(u64)big_int_to_i64(&value.value_integer);
+							break;
+						case BuildFlag_InternalCheckGlobalEdges:
+							build_context.internal_check_global_edges = true;
+							break;
 
 
 						case BuildFlag_Sanitize:
@@ -1867,7 +1961,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_String);
 							if (str_eq_ignore_case(value.value_string, str_lit("thin"))) {
 								build_context.lto_kind = LTO_Thin;
-								if (build_context.linker_choice == Linker_Invalid || build_context.linker_choice == Linker_Default) {
+								if (build_context.linker_choice <= Linker_Default) {
 									build_context.linker_choice = Linker_lld;
 								}
 								if (!build_context.use_separate_modules) {
@@ -1879,7 +1973,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								}
 							} else if (str_eq_ignore_case(value.value_string, str_lit("thin-files"))) {
 								build_context.lto_kind = LTO_Thin_Files;
-								if (build_context.linker_choice == Linker_Invalid) {
+								if (build_context.linker_choice <= Linker_Default) {
 									build_context.linker_choice = Linker_lld;
 								}
 								if (!build_context.use_separate_modules) {
@@ -2007,6 +2101,13 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.android_keystore_password = value.value_string;
 							break;
+
+					#if !defined(GB_SYSTEM_WINDOWS)
+						case BuildFlag_WindowsSDKRoot:
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.windows_sdk_root = value.value_string;
+							break;
+					#endif
 						}
 					}
 
@@ -2041,6 +2142,16 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	if (set_flags[BuildFlag_VetUnusedProcedures] && !set_flags[BuildFlag_VetPackages]) {
 		gb_printf_err("-vet-unused-procedures must be used with -vet-packages\n");
+		bad_flags = true;
+	}
+
+	if (set_flags[BuildFlag_NoEscapeAnalysis] && (set_flags[BuildFlag_VetNilDeref] || set_flags[BuildFlag_VetUninitialized])) {
+		gb_printf_err("-vet-nil-deref and -vet-uninitialized cannot be used with -no-escape-analysis, as they are part of it\n");
+		bad_flags = true;
+	}
+
+	if (set_flags[BuildFlag_NoAtomicAnalysis] && set_flags[BuildFlag_VetAtomicAccess]) {
+		gb_printf_err("-vet-atomic-access cannot be used with -no-atomic-analysis, as it is part of it\n");
 		bad_flags = true;
 	}
 
@@ -2364,6 +2475,132 @@ gb_internal void show_import_graph(Checker *c) {
 	gb_printf("}\n\n");
 }
 
+gb_internal void add_time_to_tokenize_only(AstFile *f, f64 *time, u64 *cpu_time) {
+	isize size = f->tokenizer.end - f->tokenizer.start;
+	if (size <= 0) {
+		return;
+	}
+	Tokenizer t = {};
+	t.curr_file_id = f->id;
+	init_tokenizer_with_data(&t, f->fullpath, f->tokenizer.start, size);
+
+	u64 start     = time_stamp_time_now();
+	u64 cpu_start = thread_cpu_time_now();
+	Token token = {};
+	do {
+		tokenizer_get_token(&t, &token);
+	} while (token.kind != Token_EOF && token.kind != Token_Invalid);
+	*cpu_time += thread_cpu_time_now()-cpu_start;
+	*time     += cast(f64)(time_stamp_time_now()-start)/cast(f64)time_stamp__freq();
+}
+
+gb_internal GB_COMPARE_PROC(file_cpu_time_to_parse_cmp) {
+	AstFile *x = *(AstFile **)a;
+	AstFile *y = *(AstFile **)b;
+	if (x->cpu_time_to_parse != y->cpu_time_to_parse) {
+		return x->cpu_time_to_parse > y->cpu_time_to_parse ? -1 : +1;
+	}
+	return string_compare(x->fullpath, y->fullpath);
+}
+
+gb_internal void show_parse_timings(Parser *p, Timings *t) {
+	auto all_files = array_make<AstFile *>(heap_allocator(), 0, p->packages.count*8);
+	defer (array_free(&all_files));
+	for (AstPackage *pkg : p->packages) {
+		for (AstFile *file : pkg->files) {
+			array_add(&all_files, file);
+		}
+	}
+
+	f64 cpu_freq = thread_cpu_time_freq();
+
+	isize tokens = p->total_token_count;
+	isize lines  = p->total_line_count;
+	isize total_file_size = 0;
+
+	f64 load_time          = 0;
+	f64 load_cpu_time      = 0;
+	f64 parse_time         = 0;
+	f64 parse_cpu_time     = 0;
+	f64 setup_time         = 0;
+	f64 setup_cpu_time     = 0;
+	f64 tokenize_time      = 0;
+	u64 tokenize_cpu_ticks = 0;
+
+	for (AstFile *file : all_files) {
+		total_file_size += file->tokenizer.end - file->tokenizer.start;
+		load_time       += file->time_to_load;
+		parse_time      += file->time_to_parse;
+		setup_time      += file->time_to_setup_decls;
+		load_cpu_time   += cast(f64)file->cpu_time_to_load/cpu_freq;
+		parse_cpu_time  += cast(f64)file->cpu_time_to_parse/cpu_freq;
+		setup_cpu_time  += cast(f64)file->cpu_time_to_setup_decls/cpu_freq;
+
+		add_time_to_tokenize_only(file, &tokenize_time, &tokenize_cpu_ticks);
+	}
+
+	f64 tokenize_cpu_time = cast(f64)tokenize_cpu_ticks/cpu_freq;
+
+	f64 wall_time = 0;
+	for (TimeStamp const &s : t->sections) {
+		if (s.label == "parse files") {
+			wall_time = time_stamp_as_s(s, t->freq);
+			break;
+		}
+	}
+
+	isize thread_count = gb_max(global_thread_pool.threads.count, 1);
+	f64 task_time     = load_time + parse_time + setup_time;
+	f64 task_cpu_time = load_cpu_time + parse_cpu_time + setup_cpu_time;
+	f64 mib = cast(f64)total_file_size/(1024.0*1024.0);
+
+	auto const &row = [&](char const *label, f64 time, f64 cpu_time, bool rates) {
+		gb_printf_err("    %s - %9.3f ms  %9.3f ms", label, 1.0e3*time, 1.0e3*cpu_time);
+		if (rates) {
+			f64 lines_per_second = cast(f64)lines/cpu_time;
+			char const *loc = "  LOC/s";
+			if (lines_per_second >= 1.0e6) {
+				lines_per_second /= 1.0e6;
+				loc = " MLOC/s";
+			} else if (lines_per_second >= 1.0e3) {
+				lines_per_second /= 1.0e3;
+				loc = " kLOC/s";
+			}
+			gb_printf_err("  %7.3f us/token  %7.3f us/line  %8.2f MiB/s  %7.2f%s",
+			              1.0e6*cpu_time/cast(f64)tokens, 1.0e6*cpu_time/cast(f64)lines, mib/cpu_time, lines_per_second, loc);
+		}
+		gb_printf_err("\n");
+	};
+
+	gb_printf_err("Parsing (%td files, %td lines, %td tokens, %.2f MiB, %td threads)\n", all_files.count, lines, tokens, mib, thread_count);
+	gb_printf_err("    parse files                      - %9.3f ms (wall time)\n", 1.0e3*wall_time);
+	gb_printf_err("                                         wall time   CPU time  (rates from the CPU time)\n");
+	row(          "file tasks                      ", task_time, task_cpu_time, false);
+	row(          "  loading files                 ", load_time, load_cpu_time, false);
+	row(          "  tokenizing and parsing        ", parse_time, parse_cpu_time, true);
+	row(          "  setting up decls and imports  ", setup_time, setup_cpu_time, false);
+	row(          "tokenizing alone, 1 thread      ", tokenize_time, tokenize_cpu_time, true);
+	if (build_context.thread_count == 1) {
+		row(      "parsing alone (estimated)       ", parse_time-tokenize_time, parse_cpu_time-tokenize_cpu_time, true);
+	} else {
+		gb_printf_err("    parsing alone                    - estimated with -thread-count:1\n");
+	}
+	gb_printf_err("    the file tasks kept the threads %.0f%% busy and %.0f%% of their time was spent running\n",
+	              100.0*task_time/(wall_time*cast(f64)thread_count), 100.0*task_cpu_time/task_time);
+	gb_printf_err("\n");
+
+	array_sort(all_files, file_cpu_time_to_parse_cmp);
+	gb_printf_err("Slowest files to tokenize and parse, by CPU time\n");
+	for (isize i = 0; i < gb_min(all_files.count, 8); i++) {
+		AstFile *file = all_files[i];
+		f64 cpu_time = cast(f64)file->cpu_time_to_parse/cpu_freq;
+		gb_printf_err("    %9.3f ms  %9.3f ms (wall)  %8td tokens  %7.3f us/token  %.*s\n",
+		              1.0e3*cpu_time, 1.0e3*file->time_to_parse, file->token_count,
+		              1.0e6*cpu_time/cast(f64)gb_max(file->token_count, 1), LIT(file->fullpath));
+	}
+	gb_printf_err("\n");
+}
+
 gb_internal void show_timings(Checker *c, Timings *t) {
 	Parser *p      = c->parser;
 	isize lines    = p->total_line_count;
@@ -2371,13 +2608,9 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 	isize files    = 0;
 	isize packages = p->packages.count;
 	isize total_file_size = 0;
-	f64 total_tokenizing_time = 0;
-	f64 total_parsing_time = 0;
 	for (AstPackage *pkg : p->packages) {
 		files += pkg->files.count;
 		for (AstFile *file : pkg->files) {
-			total_tokenizing_time += file->time_to_tokenize;
-			total_parsing_time += file->time_to_parse;
 			total_file_size += file->tokenizer.end - file->tokenizer.start;
 		}
 	}
@@ -2401,53 +2634,20 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 			gb_printf_err("\n");
 		}
 		{
-			f64 time = total_tokenizing_time;
-			gb_printf_err("Tokenization Only\n");
-			gb_printf_err("LOC/s        - %.3f\n", cast(f64)lines/time);
-			gb_printf_err("us/LOC       - %.3f\n", 1.0e6*time/cast(f64)lines);
-			gb_printf_err("Tokens/s     - %.3f\n", cast(f64)tokens/time);
-			gb_printf_err("us/Token     - %.3f\n", 1.0e6*time/cast(f64)tokens);
-			gb_printf_err("bytes/s      - %.3f\n", cast(f64)total_file_size/time);
-			gb_printf_err("MiB/s        - %.3f\n", cast(f64)(total_file_size/time)/(1024*1024));
-			gb_printf_err("us/bytes     - %.3f\n", 1.0e6*time/cast(f64)total_file_size);
-
-			gb_printf_err("\n");
-		}
-		{
-			f64 time = total_parsing_time;
-			gb_printf_err("Parsing Only\n");
-			gb_printf_err("LOC/s        - %.3f\n", cast(f64)lines/time);
-			gb_printf_err("us/LOC       - %.3f\n", 1.0e6*time/cast(f64)lines);
-			gb_printf_err("Tokens/s     - %.3f\n", cast(f64)tokens/time);
-			gb_printf_err("us/Token     - %.3f\n", 1.0e6*time/cast(f64)tokens);
-			gb_printf_err("bytes/s      - %.3f\n", cast(f64)total_file_size/time);
-			gb_printf_err("MiB/s        - %.3f\n", cast(f64)(total_file_size/time)/(1024*1024));
-			gb_printf_err("us/bytes     - %.3f\n", 1.0e6*time/cast(f64)total_file_size);
-
-			gb_printf_err("\n");
-		}
-		{
-			TimeStamp ts = {};
-			for (TimeStamp const &s : t->sections) {
-				if (s.label == "parse files") {
-					ts = s;
-					break;
-				}
+			isize total = 0;
+			isize total_bytes = 0;
+			gb_printf_err("     Count     Size  Type Kind\n");
+			for (isize kind = 1; kind < Type_Count; kind++) {
+				isize count = global_type_kind_counts[kind].load(std::memory_order_relaxed);
+				isize size = type_alloc_size(cast(TypeKind)kind);
+				total += count;
+				total_bytes += count*size;
+				gb_printf_err("%10td %8td  %.*s\n", count, size, LIT(type_strings[kind]));
 			}
-			GB_ASSERT(ts.label == "parse files");
-
-			f64 parse_time = time_stamp_as_s(ts, t->freq);
-			gb_printf_err("Parse pass\n");
-			gb_printf_err("LOC/s        - %.3f\n", cast(f64)lines/parse_time);
-			gb_printf_err("us/LOC       - %.3f\n", 1.0e6*parse_time/cast(f64)lines);
-			gb_printf_err("Tokens/s     - %.3f\n", cast(f64)tokens/parse_time);
-			gb_printf_err("us/Token     - %.3f\n", 1.0e6*parse_time/cast(f64)tokens);
-			gb_printf_err("bytes/s      - %.3f\n", cast(f64)total_file_size/parse_time);
-			gb_printf_err("MiB/s        - %.3f\n", cast(f64)(total_file_size/parse_time)/(1024*1024));
-			gb_printf_err("us/bytes     - %.3f\n", 1.0e6*parse_time/cast(f64)total_file_size);
-
+			gb_printf_err("Total Types     - %td (%td bytes)\n", total, total_bytes);
 			gb_printf_err("\n");
 		}
+		show_parse_timings(p, t);
 		{
 			TimeStamp ts = {};
 			TimeStamp ts_end = {};
@@ -2537,7 +2737,7 @@ gb_internal void export_dependencies(Checker *c) {
 		}
 		array_add(&load_files, cache);
 	}
-	array_sort(files, file_cache_sort_cmp);
+	array_sort(load_files, file_cache_sort_cmp);
 
 	if (build_context.export_dependencies_format == DependenciesExportMake) {
 		String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
@@ -2646,8 +2846,8 @@ gb_internal void export_linked_libraries(LinkerData *gen) {
 			gb_fprintf(&f, "\t");
 
 			Ast *file_path = imp->filepaths[i];
-			GB_ASSERT(file_path->tav.mode == Addressing_Constant && file_path->tav.value.kind == ExactValue_String);
-			String file_path_str = file_path->tav.value.value_string;
+			GB_ASSERT(file_path->tav.mode == Addressing_Constant && file_path->tav.value().kind == ExactValue_String);
+			String file_path_str = file_path->tav.value().value_string;
 
 			if (string_starts_with(file_path_str, str_lit("system:"))) {
 				gb_fprintf(&f, "system");
@@ -2740,6 +2940,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		print_usage_line(2, "Examples:");
 		print_usage_line(3, "odin check .                     Type checks package in current directory.");
 		print_usage_line(3, "odin check <dir>                 Type checks package in <dir>.");
+		print_usage_line(3, "odin check <dir> <dir2> ... -workspace   Type checks the packages in <dir>, <dir2>, and so on, together.");
 		print_usage_line(3, "odin check filename.odin -file   Type checks single-file package, must contain entry point.");
 	} else if (command == "test") {
 		print_usage_header_once();
@@ -2970,6 +3171,32 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Specifies the filename for `-export-dependencies`.");
 			print_usage_line(2, "Example: -export-dependencies-file:dependencies.d");
 		}
+	}
+
+	if (check_only) {
+		if (print_flag("-export-semantics:<format>")) {
+			print_usage_line(2, "Exports what each identifier refers to, its entity's kind, type, and definition, for editors and other tools.");
+			print_usage_line(2, "Also exports type layouts and the branches of 'when' statements not taken. Requires `-export-semantics-file`.");
+			print_usage_line(2, "It covers the packages named on the command line, or only the files given with `-export-semantics-for`.");
+			print_usage_line(2, "It is written once type checking finishes, even with type errors, but not when the errors reach `-max-error-count`.");
+			print_usage_line(2, "Tools should raise that, and remove the file before each run, as a previous one is otherwise left in place.");
+			print_usage_line(2, "Available options:");
+				print_usage_line(3, "-export-semantics:json   Exports in JSON format");
+				print_usage_line(3, "-export-semantics:cbor   Exports in CBOR format");
+		}
+
+		if (print_flag("-export-semantics-file:<filename>")) {
+			print_usage_line(2, "Specifies the filename for `-export-semantics`.");
+			print_usage_line(2, "Example: -export-semantics-file:semantics.json");
+		}
+
+		if (print_flag("-export-semantics-for:<filename>")) {
+			print_usage_line(2, "Exports the semantics of only this file. Can be given several times.");
+			print_usage_line(2, "Example: -export-semantics-for:src/main.odin");
+		}
+	}
+
+	if (check) {
 
 		if (print_flag("-export-timings:<format>")) {
 			print_usage_line(2, "Exports timings to one of a few formats. Requires `-show-timings` or `-show-more-timings`.");
@@ -3073,6 +3300,9 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Specify the linker to use.");
 			print_usage_line(2, "Choices:");
 			for (i32 i = 0; i < Linker_COUNT; i++) {
+				#if !defined(GB_SYSTEM_WINDOWS)
+				if (linker_choices[i] == "msvc") continue;
+				#endif
 				print_usage_line(3, "%.*s", LIT(linker_choices[i]));
 			}
 		}
@@ -3146,6 +3376,20 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 	}
 
+	if (check) {
+		if (print_flag("-no-atomic-analysis")) {
+			print_usage_line(2, "Disables the analysis of atomic memory orderings, except in files with '#+analysis atomic'.");
+			print_usage_line(2, "It warns where what is written with release ordering is only loaded with relaxed ordering, or the reverse.");
+			print_usage_line(2, "Cannot be used with -vet-atomic-access.");
+		}
+
+		if (print_flag("-no-escape-analysis")) {
+			print_usage_line(2, "Disables the escape analysis of stack memory, except in files with '#+analysis escape'.");
+			print_usage_line(2, "Where it is disabled, by this or by '#+analysis !escape', only returning the address of a local or similar is an error.");
+			print_usage_line(2, "Cannot be used with -vet-nil-deref or -vet-uninitialized.");
+		}
+	}
+
 	if (run_or_build) {
 		if (print_flag("-no-rpath")) {
 			print_usage_line(2, "Disables automatic addition of an rpath linked to the executable directory.");
@@ -3191,6 +3435,15 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-out:<filepath>")) {
 			print_usage_line(2, "Sets the file name of the outputted executable.");
 			print_usage_line(2, "Example: -out:foo.exe");
+		}
+	}
+
+	if (check) {
+		if (print_flag("-overlay:<filename>")) {
+			print_usage_line(2, "Reads some files from elsewhere instead, as for an editor's unsaved files.");
+			print_usage_line(2, "The file holds JSON in the form Go's -overlay takes: {\"Replace\": {\"<path>\": \"<replacement path>\", ...}}");
+			print_usage_line(2, "An empty replacement path treats the file as deleted.");
+			print_usage_line(2, "Example: -overlay:overlay.json");
 		}
 	}
 
@@ -3291,6 +3544,12 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	}
 
 	if (check_only) {
+		if (print_flag("-workspace")) {
+			print_usage_line(2, "Type checks several packages together, given before the flags, as editors and other tools need.");
+			print_usage_line(2, "The packages may be of different programs, so names and link names may repeat across them.");
+			print_usage_line(2, "They all share one target and set of defines.");
+			print_usage_line(2, "Example: odin check game tools -workspace");
+		}
 		if (print_flag("-show-unused")) {
 			print_usage_line(2, "Shows unused package declarations within the current project.");
 		}
@@ -3345,6 +3604,16 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 	}
 
+#if !defined(GB_SYSTEM_WINDOWS)
+	if (run_or_build) {
+		if (print_flag("-windows-sdk-root:<string>")) {
+			print_usage_line(2, "Path to the root directory of the Windows SDK for cross-linking.");
+			print_usage_line(2, "Requires '-linker:lld' flag and 'lld-link' installation.");
+			print_usage_line(2, "Example: -windows-sdk-root:~/windows-sdk");
+		}
+	}
+#endif
+
 	if (run_or_build) {
 		if (print_flag("-target-features:<string>")) {
 			print_usage_line(2, "Specifies CPU features to enable on top of the enabled features implied by -microarch.");
@@ -3392,15 +3661,25 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-vet")) {
 			print_usage_line(2, "Does extra checks on the code.");
 			print_usage_line(2, "Extra checks include:");
-				print_usage_line(3, "-vet-unused");
-				print_usage_line(3, "-vet-unused-variables");
-				print_usage_line(3, "-vet-unused-imports");
+				print_usage_line(3, "-vet-cast");
 				print_usage_line(3, "-vet-shadowing");
+				print_usage_line(3, "-vet-unused-imports");
+				print_usage_line(3, "-vet-unused-variables");
 				print_usage_line(3, "-vet-using-stmt");
+				print_usage_line(3, "-vet-when-shadowing");
+		}
+
+		if (print_flag("-vet-atomic-access")) {
+			print_usage_line(2, "Errs on a plain read of a variable or field which is accessed atomically elsewhere, except in procedures which take a lock.");
 		}
 
 		if (print_flag("-vet-cast")) {
 			print_usage_line(2, "Errs on casting a value to its own type or using `transmute` rather than `cast`.");
+		}
+
+		if (print_flag("-vet-nil-deref")) {
+			print_usage_line(2, "Errs on dereferencing a pointer, or calling a procedure value, which is nil on every path reaching it.");
+			print_usage_line(2, "A pointer made through an explicit conversion to 'rawptr' or 'uintptr', or a 'transmute', is never assumed to be nil.");
 		}
 
 		if (print_flag("-vet-packages:<comma-separated-strings>")) {
@@ -3447,6 +3726,11 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 
 
+		if (print_flag("-vet-uninitialized")) {
+			print_usage_line(2, "Errs on reading a variable declared with '---', or a part of it, before anything is stored in it on every path reaching it.");
+			print_usage_line(2, "Taking its address, e.g. to pass it to a procedure which fills it in, counts as storing into it.");
+		}
+
 		if (print_flag("-vet-using-param")) {
 			print_usage_line(2, "Checks for the use of 'using' on procedure parameters.");
 			print_usage_line(2, "'using' is considered bad practice outside of immediate refactoring.");
@@ -3455,6 +3739,10 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-vet-using-stmt")) {
 			print_usage_line(2, "Checks for the use of 'using' as a statement.");
 			print_usage_line(2, "'using' is considered bad practice outside of immediate refactoring.");
+		}
+
+		if (print_flag("-vet-when-shadowing")) {
+			print_usage_line(2, "Checks for declarations within a global 'when' that shadow a builtin or package-level name.");
 		}
 	}
 
@@ -3607,7 +3895,7 @@ gb_internal gbFileError write_file_with_stripped_tokens(gbFile *f, AstFile *file
 	u8 const *file_data = file->tokenizer.start;
 	i32 prev_offset = 0;
 	i32 const end_offset = cast(i32)(file->tokenizer.end - file->tokenizer.start);
-	for (Token const &token : file->tokens) {
+	for (Token const &token : file->token_edits) {
 		if (token.flags & (TokenFlag_Remove|TokenFlag_Replace)) {
 			i32 offset = token.pos.offset;
 			i32 to_write = offset-prev_offset;
@@ -3650,15 +3938,7 @@ gb_internal int strip_semicolons(Parser *parser) {
 
 	for (AstPackage *pkg : parser->packages) {
 		for (AstFile *file : pkg->files) {
-			bool nothing_to_change = true;
-			for (Token const &token : file->tokens) {
-				if (token.flags) {
-					nothing_to_change = false;
-					break;
-				}
-			}
-
-			if (nothing_to_change) {
+			if (file->token_edits.count == 0) {
 				continue;
 			}
 
@@ -3849,6 +4129,58 @@ gb_internal void init_terminal(void) {
 	}
 }
 
+gb_internal bool load_overlays(String overlay_file) {
+	gbFileContents fc = gb_file_read_contents(permanent_allocator(), true, alloc_cstring(temporary_allocator(), overlay_file));
+	if (fc.data == nullptr) {
+		error(TokenPos{}, "Unable to read the overlay file '%.*s'", LIT(overlay_file));
+		return false;
+	}
+
+	JsonValue *root = nullptr;
+	JsonError json_err = {};
+	if (!json_parse(permanent_allocator(), make_string(cast(u8 *)fc.data, fc.size), &root, &json_err)) {
+		error(TokenPos{}, "%.*s(%d:%d) %s", LIT(overlay_file), json_err.line, json_err.column, json_err.message);
+		return false;
+	}
+
+	JsonValue *replace = nullptr;
+	if (root->kind == Json_Object) {
+		for_array(i, root->object) {
+			if (root->object[i].key == "Replace") {
+				replace = root->object[i].value;
+			}
+		}
+	}
+	if (replace == nullptr || replace->kind != Json_Object) {
+		error(TokenPos{}, "%.*s: expected an object with a \"Replace\" object", LIT(overlay_file));
+		return false;
+	}
+
+	array_init(&global_overlays, heap_allocator(), 0, replace->object.count);
+	for_array(i, replace->object) {
+		JsonObjectEntry const &entry = replace->object[i];
+		if (entry.value->kind != Json_String) {
+			error(TokenPos{}, "%.*s: expected the replacement for '%.*s' to be a string", LIT(overlay_file), LIT(entry.key));
+			return false;
+		}
+		OverlayEntry e = {};
+		e.path = path_to_full_path(permanent_allocator(), entry.key);
+		if (!gb_file_exists(alloc_cstring(temporary_allocator(), entry.key))) {
+			String dir = directory_from_path(entry.key);
+			if (dir.len == 0) {
+				dir = str_lit(".");
+			}
+			dir = path_to_full_path(temporary_allocator(), dir);
+			e.path = concatenate3_strings(permanent_allocator(), dir, str_lit("/"), filename_without_directory(entry.key));
+		}
+		if (entry.value->string.len != 0) {
+			e.replacement = path_to_full_path(permanent_allocator(), entry.value->string);
+		}
+		array_add(&global_overlays, e);
+	}
+	return true;
+}
+
 int main(int arg_count, char const **arg_ptr) {
 	if (arg_count < 2) {
 		usage(make_string_c(arg_ptr[0]));
@@ -3891,12 +4223,12 @@ int main(int arg_count, char const **arg_ptr) {
 
 	add_collection(str_lit("base"));
 	add_collection(str_lit("core"));
-	add_collection(str_lit("vendor"));
 
 	TIME_SECTION("init args");
 	map_init(&build_context.defined_values);
 	build_context.extra_packages.allocator = heap_allocator();
-	
+	build_context.export_semantics_for.allocator = heap_allocator();
+
 	init_build_context_error_pos_style();
 
 	isize double_dash_pos = -1;
@@ -4010,19 +4342,6 @@ int main(int arg_count, char const **arg_ptr) {
 
 		build_context.command_kind = Command_doc;
 		init_filename = args[2];
-		for (isize i = 3; i < args.count; i++) {
-			auto arg = args[i];
-			if (string_starts_with(arg, str_lit("-"))) {
-				break;
-			}
-			array_add(&build_context.extra_packages, arg);
-		}
-		isize extra_count = build_context.extra_packages.count;
-		if (extra_count > 0) {
-			gb_memmove(args.data + 3, args.data + 3 + extra_count, extra_count * gb_size_of(*args.data));
-			args.count -= extra_count;
-		}
-
 
 		build_context.no_output_files = true;
 		build_context.generate_docs = true;
@@ -4099,6 +4418,20 @@ int main(int arg_count, char const **arg_ptr) {
 		return 1;
 	}
 
+	if (build_context.command_kind == Command_doc || build_context.command_kind == Command_check) {
+		for (isize i = 3; i < args.count; i++) {
+			if (string_starts_with(args[i], str_lit("-"))) {
+				break;
+			}
+			array_add(&build_context.extra_packages, args[i]);
+		}
+		isize extra_count = build_context.extra_packages.count;
+		if (extra_count > 0) {
+			gb_memmove(args.data + 3, args.data + 3 + extra_count, (args.count - 3 - extra_count) * gb_size_of(*args.data));
+			args.count -= extra_count;
+		}
+	}
+
 	init_filename = copy_string(permanent_allocator(), init_filename);
 
 	build_context.command = command;
@@ -4107,6 +4440,26 @@ int main(int arg_count, char const **arg_ptr) {
 	string_set_init(&build_context.vet_packages);
 
 	if (!parse_build_flags(args)) {
+		return 1;
+	}
+
+	if (build_context.export_semantics_format != SemanticsFormat_Invalid && build_context.export_semantics_file.len == 0) {
+		gb_printf_err("No semantics file specified with `-export-semantics-file`\n");
+		return 1;
+	}
+	if (build_context.export_semantics_format == SemanticsFormat_Invalid &&
+	    (build_context.export_semantics_file.len != 0 || build_context.export_semantics_for.count != 0)) {
+		gb_printf_err("`-export-semantics-file` and `-export-semantics-for` need `-export-semantics:<format>`\n");
+		return 1;
+	}
+
+	if (build_context.command_kind == Command_check && build_context.extra_packages.count > 0 && !build_context.workspace) {
+		gb_printf_err("`%.*s check` takes one package; use -workspace to check several together\n", LIT(args[0]));
+		return 1;
+	}
+
+	if (build_context.overlay_file.len != 0 && !load_overlays(build_context.overlay_file)) {
+		print_all_errors();
 		return 1;
 	}
 
@@ -4191,7 +4544,8 @@ int main(int arg_count, char const **arg_ptr) {
 					gb_printf_err("Expected either a directory or a .odin file, got '%.*s'\n", LIT(init_filename));
 					return 1;
 				}
-				if (!gb_file_exists(cast(const char*)init_filename.text)) {
+				if (!gb_file_exists(cast(const char*)init_filename.text) &&
+				    overlay_find(path_to_full_path(temporary_allocator(), init_filename)) == nullptr) {
 					gb_printf_err("The file '%.*s' was not found.\n", LIT(init_filename));
 					return 1;
 				}
@@ -4205,7 +4559,11 @@ int main(int arg_count, char const **arg_ptr) {
 		return bundle(init_filename);
 	}
 
-	// NOTE(bill): add 'shared' directory if it is not already set
+	// NOTE(bill): add 'vendor' and 'shared' collections if they are not already set
+	if (!find_library_collection_path(str_lit("vendor"), nullptr)) {
+		add_library_collection(str_lit("vendor"),
+			get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("vendor"), nullptr));
+	}
 	if (!find_library_collection_path(str_lit("shared"), nullptr)) {
 		add_library_collection(str_lit("shared"),
 			get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("shared"), nullptr));
@@ -4216,7 +4574,21 @@ int main(int arg_count, char const **arg_ptr) {
 	// 	print_usage_line(0, "%.*s 32-bit is not yet supported for this platform", LIT(args[0]));
 	// 	return 1;
 	// }
-	
+
+#if !defined(GB_SYSTEM_WINDOWS)
+	if (build_context.metrics.os == TargetOs_windows && build_context.windows_sdk_root.len == 0 &&
+	    (build_context.command_kind & Command__does_build) != 0) {
+		switch (build_context.build_mode) {
+		case BuildMode_Executable:
+		case BuildMode_StaticLibrary:
+		case BuildMode_DynamicLibrary:
+			gb_printf_err("-windows-sdk-root:<path> must be used to target Windows\n");
+			gb_exit(1);
+			break;
+		}
+	}
+#endif
+
 	// Warn about Windows i386 thread-local storage limitations
 	if (build_context.metrics.arch == TargetArch_i386 && build_context.metrics.os == TargetOs_windows) {
 		gb_printf_err("Warning: Thread-local storage is disabled on Windows i386.\n");
@@ -4325,13 +4697,13 @@ int main(int arg_count, char const **arg_ptr) {
 
 				return 1;
 			}
-			
+
 			// Ensure the feature name always has +/- prefix. If there isn't, default to '+'
 			String feature_str = item;
 			if (*feature_str.text != '+' && *feature_str.text != '-') {
 				feature_str = concatenate_strings(temporary_allocator(), make_string_c("+"), feature_str);
 			}
-			
+
 			// Ensure there is only a single entry for each feature in the target set.
 			// If the negative exists, override the existing value with the current one.
 			String neg_feature_str = clone_string(temporary_allocator(), feature_str);
@@ -4340,9 +4712,9 @@ int main(int arg_count, char const **arg_ptr) {
 				case '-': *neg_feature_str.text = '+'; break;
 				default: GB_ASSERT(false); break;
 			}
-			
+
 			string_set_remove(&build_context.target_features_set, neg_feature_str);
-			
+
 			string_set_add(&build_context.target_features_set, feature_str);
 		}
 	}
@@ -4381,12 +4753,16 @@ int main(int arg_count, char const **arg_ptr) {
 	TIME_SECTION("init asm tables");
 	init_asm_tables(build_context.metrics.ptr_size);
 
+	checker->parser = parser;
+	init_checker(checker);
+
 	MAIN_TIME_SECTION("parse files");
 
 	if (!init_parser(parser)) {
 		return 1;
 	}
 	defer (destroy_parser(parser));
+	parser->package_parsed_proc = check_collect_package_entities_worker_proc;
 
 	// TODO(jeroen): Remove the `init_filename` param.
 	// Let's put that on `build_context.build_paths[0]` instead.
@@ -4399,10 +4775,8 @@ int main(int arg_count, char const **arg_ptr) {
 		print_all_errors();
 		return 1;
 	}
-
-	checker->parser = parser;
-	init_checker(checker);
-	defer (destroy_checker(checker)); // this is here because of a `goto`
+	release_held_errors();
+	defer (destroy_checker(checker));
 
 	if (build_context.cached && parser->total_seen_load_directive_count.load() == 0) {
 		MAIN_TIME_SECTION("check cached build (pre-semantic check)");
@@ -4416,6 +4790,12 @@ int main(int arg_count, char const **arg_ptr) {
 	if (!build_context.ignore_unused_defineables) {
 		check_defines(&build_context, checker);
 	}
+
+	if (build_context.export_semantics_format != SemanticsFormat_Invalid) {
+		MAIN_TIME_SECTION("export semantics");
+		export_semantics(checker);
+	}
+
 	if (any_errors()) {
 		print_all_errors();
 		return 1;
@@ -4558,7 +4938,7 @@ end_of_code_gen:;
 		show_import_graph(checker);
 	}
 
-	if (run_output) {
+	if (run_output && build_context.build_mode == BuildMode_Executable) {
 		String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
 		defer (gb_free(heap_allocator(), exe_name.text));
 

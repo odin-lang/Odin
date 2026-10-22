@@ -58,7 +58,9 @@ HAT_LEFTDOWN  :: HAT_LEFT|HAT_DOWN
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
+	@(synchronizes=.Acquire)
 	LockJoysticks                   :: proc() ---
+	@(synchronizes=.Release)
 	UnlockJoysticks                 :: proc() ---
 	NumJoysticks                    :: proc() -> c.int ---
 	JoystickNameForIndex            :: proc(device_index: c.int) -> cstring ---

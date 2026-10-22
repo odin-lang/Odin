@@ -427,11 +427,11 @@ gb_internal ExactValue exact_value_float_from_string(String string) {
 		if (digit_count == 4) {
 			u16 x = cast(u16)u;
 			f32 f = f16_to_f32(x);
-			return exact_value_float(cast(f64)f);
+			return exact_value_float(f32_to_f64(f));
 		} else if (digit_count == 8) {
 			u32 x = cast(u32)u;
 			f32 f = bit_cast<f32>(x);
-			return exact_value_float(cast(f64)f);
+			return exact_value_float(f32_to_f64(f));
 		} else if (digit_count == 16) {
 			f64 f = bit_cast<f64>(u);
 			return exact_value_float(f);
@@ -823,6 +823,7 @@ gb_internal i32 exact_value_order(ExactValue const &v) {
 	case ExactValue_Pointer:
 		return 7;
 	case ExactValue_Procedure:
+	case ExactValue_Typeid:
 		return 8;
 
 	default:
@@ -1157,6 +1158,33 @@ gb_internal gb_inline i32 cmp_f64(f64 a, f64 b) {
 
 gb_internal bool compare_exact_values_compound_lit(TokenKind op, ExactValue x, ExactValue y);
 gb_internal bool compare_exact_values_variant(TokenKind op, ExactValue x, ExactValue y);
+
+// NOTE(bill): this isn't the same as `compare_exact_values` in that even if the implicit types do not match, the values could e.g. 1 vs 1.0
+gb_internal bool are_exact_values_identical(ExactValue const &x, ExactValue const &y) {
+	if (x.kind != y.kind || x.variant_type != y.variant_type) {
+		return false;
+	}
+	switch (x.kind) {
+	case ExactValue_Invalid:     return true;
+	case ExactValue_Integer:     return big_int_cmp(&x.value_integer, &y.value_integer) == 0;
+	case ExactValue_Float:       return gb_memcompare(&x.value_float, &y.value_float, gb_size_of(f64)) == 0;
+	case ExactValue_Bool:        return x.value_bool         == y.value_bool;
+	case ExactValue_String:      return x.value_string       == y.value_string;
+	case ExactValue_Pointer:     return x.value_pointer      == y.value_pointer;
+	case ExactValue_Typeid:      return x.value_typeid       == y.value_typeid;
+	case ExactValue_Compound:    return x.value_compound     == y.value_compound;
+	case ExactValue_Procedure:   return x.value_procedure    == y.value_procedure;
+	case ExactValue_AsmTemplate: return x.value_asm_template == y.value_asm_template;
+	case ExactValue_Variant:     return x.value_variant      == y.value_variant;
+	case ExactValue_Rational:    return x.value_rational     == y.value_rational;
+	case ExactValue_Complex:     return x.value_complex      == y.value_complex;
+	case ExactValue_Quaternion:  return x.value_quaternion   == y.value_quaternion;
+	case ExactValue_String16:
+		return x.value_string16.len == y.value_string16.len &&
+		       gb_memcompare(x.value_string16.text, y.value_string16.text, x.value_string16.len*gb_size_of(u16)) == 0;
+	}
+	return false;
+}
 
 gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 	match_exact_values(&x, &y);

@@ -104,7 +104,7 @@ OverlapResultFcn :: proc "c" (shapeId: ShapeId, ctx: rawptr) -> bool
 // @return -1 to filter, 0 to terminate, fraction to clip the ray for closest hit, 1 to continue
 // @see b3World_CastRay
 // @ingroup world
-CastResultFcn :: proc "c" (shapeId: ShapeId, point: Pos, normal: Vec3, fraction: f32, userMateriald: u64, triangleIndex: c.int, childIndex: c.int, ctx: rawptr) -> f32
+CastResultFcn :: proc "c" (shapeId: ShapeId, point: Pos, normal: Vec3, fraction: f32, userMaterialId: u64, triangleIndex: c.int, childIndex: c.int, ctx: rawptr) -> f32
 
 @(link_prefix="b3", default_calling_convention="c", require_results)
 foreign lib {

@@ -377,7 +377,7 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 	GB_ASSERT(entity->kind == Entity_AsmTemplate);
 	auto *ate = &entity->AsmTemplate;
 	auto const &decls     = ate->decls;
-	bool        diverging = entity->type->Proc.diverging;
+	bool        diverging = ate->proc_type->Proc.diverging;
 
 	if (cfg->blocks.count == 0) {
 		// With an empty body, the CFG cannot really do nothing

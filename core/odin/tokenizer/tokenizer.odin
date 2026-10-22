@@ -48,12 +48,14 @@ global_keyword_lut: Keyword_LUT // protected by `_global_keyword_lut_spinlock`
 _global_keyword_lut_initialized: bool // atomic
 _global_keyword_lut_spinlock:    bool // atomic
 
+@(synchronizes=.Acquire)
 _global_keyword_spin_lock :: proc() {
 	for intrinsics.atomic_exchange_explicit(&_global_keyword_lut_spinlock, true, .Acquire) {
 		intrinsics.cpu_relax()
 	}
 }
 
+@(synchronizes=.Release)
 _global_keyword_spin_unlock :: proc() {
 	intrinsics.atomic_store_explicit(&_global_keyword_lut_spinlock, false, .Release)
 }

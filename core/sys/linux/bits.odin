@@ -1120,6 +1120,7 @@ Protocol_Family :: enum u16 {
 	  /etc/protocols
 */
 Protocol :: enum {
+	UNSPECIFIED     = 0,
 	HOPOPT          = 0,
 	ICMP            = 1,
 	IGMP            = 2,

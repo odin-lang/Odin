@@ -905,7 +905,7 @@ _assign_int :: proc(val: any, i: $T) -> bool {
 	case:
 		ti := type_info_of(v.id)
 		if _, ok := ti.variant.(runtime.Type_Info_Bit_Set); ok {
-			do_byte_swap := !reflect.bit_set_is_big_endian(v)
+			do_byte_swap := reflect.bit_set_is_big_endian(v) != (ODIN_ENDIAN == .Big)
 			switch ti.size * 8 {
 			case 0: // no-op.
 			case 8:

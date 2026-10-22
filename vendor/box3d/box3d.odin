@@ -1089,12 +1089,12 @@ foreign lib {
 	// Allows you to change a shape to be a hull or update the current hull.
 	// This does not modify the mass properties.
 	// @see Body_ApplyMassFromShapes
-	Shape_SetHull :: proc(shapeId: ShapeId, #by_ptr hull: HullData) ---
+	Shape_SetHull :: proc(shapeId: ShapeId, hull: ^HullData) ---
 
 	// Allows you to change a shape to be a mesh or update the current mesh.
 	// This does not modify the mass properties.
 	// @see Body_ApplyMassFromShapes
-	Shape_SetMesh :: proc(shapeId: ShapeId, #by_ptr meshData: MeshData, scale: Vec3) ---
+	Shape_SetMesh :: proc(shapeId: ShapeId, meshData: ^MeshData, scale: Vec3) ---
 
 	// Get the maximum capacity required for retrieving all the touching contacts on a shape
 	Shape_GetContactCapacity :: proc(shapeId: ShapeId) -> c.int ---
