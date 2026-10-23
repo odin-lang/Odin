@@ -10,8 +10,30 @@ struct LinkerData {
 	bool     needs_system_library_linked;
 };
 
+// NOTE: set by `system_exec_command_line_app` when the last process could not be started at all
+gb_global bool system_exec_spawn_failed = false;
+
 gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, ...);
 gb_internal bool system_exec_command_line_app_output(char const *command, gbString *output);
+
+// NOTE: prints a hint if running the linker failed because it could not be found
+gb_internal void print_linker_not_found_suggestion(i32 result, char const *path, char const *tool, char const *env_name, bool has_env, char const *install_suggestion) {
+	if (system_exec_spawn_failed) {
+		gb_printf_err("executing `%s` to link failed.\n", path);
+	} else if (result == 127) {
+		// NOTE: some `posix_spawn` implementations (e.g. glibc < 2.24, OpenBSD) report a missing
+		//       executable as the child exiting with 127 rather than as a spawn error
+		gb_printf_err("executing `%s` to link failed with exit code 127, which may mean it could not be found.\n", path);
+	} else {
+		return;
+	}
+
+	if (has_env) {
+		gb_printf_err("\tSuggestion: make sure %s points to a valid `%s` executable.\n", env_name, tool);
+	} else {
+		gb_printf_err("\tSuggestion: %s, or set %s to its location.\n", install_suggestion, env_name);
+	}
+}
 
 gb_internal i32 system_exec_msvc_linker_app(char const *name, char const *fmt, ...) {
 	isize const cmd_cap = 64<<20;
@@ -510,6 +532,7 @@ try_cross_linking:;
 					);
 				#else
 					const char *linker_path = gb_get_env("ODIN_LLD_PATH", permanent_allocator());
+					bool has_odin_lld_path_env = linker_path != nullptr;
 					if (linker_path == nullptr) {
 						linker_path = "lld-link";
 					}
@@ -532,6 +555,10 @@ try_cross_linking:;
 					);
 
 					if (result) {
+					#if !defined(GB_SYSTEM_WINDOWS)
+						print_linker_not_found_suggestion(result, linker_path, "lld-link", "ODIN_LLD_PATH", has_odin_lld_path_env,
+							"`lld-link` is part of LLD, which does not ship with the compiler and should be installed with your system's package manager");
+					#endif
 						return result;
 					}
 					break;
@@ -1193,6 +1220,14 @@ try_cross_linking:;
 			}
 
 			if (result) {
+				if (!is_android) {
+				#if defined(GB_SYSTEM_OSX)
+					char const *install_suggestion = "`clang` comes with Xcode or the Xcode Command Line Tools, which can be installed with `xcode-select --install`";
+				#else
+					char const *install_suggestion = "`clang` does not ship with the compiler and should be installed with your system's package manager";
+				#endif
+					print_linker_not_found_suggestion(result, clang_path, "clang", "ODIN_CLANG_PATH", has_odin_clang_path_env, install_suggestion);
+				}
 				return result;
 			}
 

@@ -79,7 +79,7 @@ gb_global Timings global_timings = {0};
 #include "bug_report.cpp"
 
 #if defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
-int run_subprocess(const char *name, const char **args, bool honor_path = false);
+int run_subprocess(const char *name, const char **args, bool honor_path = false, bool *spawn_failed = nullptr);
 #endif
 
 // NOTE(bill): 'name' is used in debugging and profiling modes
@@ -88,6 +88,7 @@ gb_internal i32 system_exec_command_line_app_internal(bool exit_on_err, char con
 	char *cmd_line = gb_alloc_array(gb_heap_allocator(), char, cmd_cap);
 	isize cmd_len = 0;
 	i32 exit_code = 0;
+	system_exec_spawn_failed = false;
 
 	cmd_len = gb_snprintf_va(cmd_line, cmd_cap-1, fmt, va);
 
@@ -146,6 +147,7 @@ gb_internal i32 system_exec_command_line_app_internal(bool exit_on_err, char con
 		// NOTE(bill): failed to create process
 		gb_printf_err("Failed to execute command:\n\t%s\n", cmd_line);
 		exit_code = -1;
+		system_exec_spawn_failed = true;
 	}
 
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
@@ -157,15 +159,8 @@ gb_internal i32 system_exec_command_line_app_internal(bool exit_on_err, char con
 	int argc;
 	char **argv = command_line_to_spawn_argv(cmd_line, &argc);
 
-	exit_code = run_subprocess(argv[0], cast(const char**)(argv), true);
-	if (exit_on_err && WIFSIGNALED(exit_code)) {
-		struct rlimit limit = { 0, 0, };
-		setrlimit(RLIMIT_CORE, &limit);
-		raise(WTERMSIG(exit_code));
-	}
-	if (WIFEXITED(exit_code)) {
-		exit_code = WEXITSTATUS(exit_code);
-	}
+	// NOTE: `run_subprocess` already returns the decoded exit status (and re-raises fatal signals itself)
+	exit_code = run_subprocess(argv[0], cast(const char**)(argv), true, &system_exec_spawn_failed);
 #endif
 
 	if (exit_on_err && exit_code) {
@@ -255,7 +250,7 @@ int run_subprocess(String const &exe_name, wchar_t *after_double_dash_raw) {
 	return exit_code;
 }
 #else
-int run_subprocess(const char *name, const char **args, bool honor_path) {
+int run_subprocess(const char *name, const char **args, bool honor_path, bool *spawn_failed) {
 	pid_t pid;
 	int status;
 
@@ -269,7 +264,11 @@ int run_subprocess(const char *name, const char **args, bool honor_path) {
 		status = posix_spawnp(&pid, name, NULL, NULL, (char *const *)args, environ);
 	}
 	if (status != 0) {
-		gb_printf_err("Could not spawn subprocess: %s\n", strerror(errno));
+		// NOTE: posix_spawn returns the error code directly and does not set `errno`
+		gb_printf_err("Could not spawn subprocess `%s`: %s\n", name, strerror(status));
+		if (spawn_failed) {
+			*spawn_failed = true;
+		}
 		return -1;
 	}
 
