@@ -571,21 +571,11 @@ decode_impl :: proc(dst: $T, info: Decode_Info, DEC_TBL := DEC_TABLE) -> ([]byte
 	}
 }
 
-// TODO: This API is fundamentally broken because it is public, but has aboslutely no error reporting strategy.
-decoded_len :: proc(data: string) -> int {
-	length := len(data)
-	if length == 0 {
-		return 0
-	}
-
-	padding: int
-	if data[length - 1] == PADDING {
-		if length > 1 && data[length - 2] == PADDING {
-			padding = 2
-		} else {
-			padding = 1
-		}
-	}
-
-	return max(0, ((length * 6) >> 3) - padding)
+decoded_len :: proc(data: string, DEC_TBL := DEC_TABLE, options: Decode_Options = {}) -> (n: int, err: Decode_Error) {
+	// NOTE(bplu4t2f):
+	//     It's not clear whether this is intended to be a public API.
+	//     There are no regression tests for it.
+	info := decode_analyze(data, DEC_TBL, options) or_return
+	n = info.out_length
+	return
 }
