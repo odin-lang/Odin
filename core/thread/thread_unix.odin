@@ -46,7 +46,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority, name: Maybe(s
 			// variable above. We must perform that waiting BEFORE we select the context!
 			context = _select_context_for_thread(init_context)
 			defer {
-				_maybe_destroy_default_temp_allocator(init_context)
+				_detach_allocators_from_thread()
 				runtime.run_thread_local_cleaners()
 			}
 

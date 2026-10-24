@@ -17,7 +17,7 @@ nil_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		return nil, .Out_Of_Memory
 	case .Query_Features:
 		return nil, .Mode_Not_Implemented
-	case .Query_Info:
+	case .Query_Info, .Thread_Attach, .Thread_Detach:
 		return nil, .Mode_Not_Implemented
 	}
 	return nil, .None
@@ -73,6 +73,9 @@ panic_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			set^ = {.Query_Features}
 		}
 		return nil, nil
+
+	case .Thread_Attach, .Thread_Detach:
+		return nil, .Mode_Not_Implemented
 
 	case .Query_Info:
 		panic("panic allocator, .Query_Info called", loc=loc)

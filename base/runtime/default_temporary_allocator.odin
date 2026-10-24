@@ -45,6 +45,29 @@ when NO_DEFAULT_TEMP_ALLOCATOR {
 	                                    size, alignment: int,
 	                                    old_memory: rawptr, old_size: int, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
 
+		#partial switch mode {
+		case .Thread_Attach:
+			a := (^Allocator)(old_memory)
+
+			// This gives the default temp allocator thread-local data, making the temp allocator
+			// thread safe. 
+			if a != nil && a.procedure == default_temp_allocator_proc && a.data == allocator_data {
+				a.data = &global_default_temp_allocator_data
+			}
+
+			return
+
+		case .Thread_Detach:
+			// No thread-local storage on Windows i386
+			when !(ODIN_ARCH == .i386 && ODIN_OS == .Windows) {
+				if allocator_data == &global_default_temp_allocator_data {
+					default_temp_allocator_destroy(&global_default_temp_allocator_data)
+				}
+			}
+			
+			return
+		}
+
 		s := (^Default_Temp_Allocator)(allocator_data)
 		return arena_allocator_proc(&s.arena, mode, size, alignment, old_memory, old_size, loc)
 	}
