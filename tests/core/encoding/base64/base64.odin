@@ -126,7 +126,7 @@ test_strict_reject :: proc(t: ^testing.T) {
 		options: base64.Decode_Options,
 		err:     base64.Decode_Error,
 	} {
-		{"A", {.Strict}, .Invalid_Padding},
+		{"A", {.Strict}, .Invalid_Padding}, // Debatable -> should be malformed quantum
 		{"AA", {.Strict}, .Invalid_Padding},
 		{"Zg", {.Strict}, .Invalid_Padding},
 		{"Zm8", {.Strict}, .Invalid_Padding},
@@ -140,7 +140,7 @@ test_strict_reject :: proc(t: ^testing.T) {
 		{"WvLTlMrX9NpYDQlEIFlnDB==", {.Strict}, .Non_Canonical},
 		{"Zg==", {.Strict, .No_Padding}, .Invalid_Padding},
 		{"Zm8=", {.Strict, .No_Padding}, .Invalid_Padding},
-		{"Z", {.Strict, .No_Padding}, .Invalid_Padding},
+		{"Z", {.Strict, .No_Padding}, .Invalid_Padding}, // Debatable -> should be malformed quantum
 		{"QR", {.Strict, .No_Padding}, .Non_Canonical},
 		{"!!!!", {.Strict}, .Invalid_Character},
 		{"Zm9!", {.Strict}, .Invalid_Character},
@@ -467,7 +467,7 @@ test_rfc4648_and_go_vectors :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_newline_rejected :: proc(t: ^testing.T) {
+test_newline_rejected_strict :: proc(t: ^testing.T) {
 	// Inputs from Go's TestNewLineCharacters. Go's decoder deliberately ignores
 	// "\r" and "\n" (MIME legacy); RFC 4648 section 3.3 says implementations
 	// MUST reject characters outside the alphabet, so Odin must not accept them.
@@ -490,10 +490,14 @@ test_newline_rejected :: proc(t: ^testing.T) {
 		testing.expectf(t, err != nil, "strict decode(%q): expected rejection, got %q", c, err)
 		delete(decoded)
 	}
+}
 
+@(test)
+test_newline_rejected_lenient :: proc(t: ^testing.T) {
 	// Lenient mode only scans the input span `decoded_len` implies, so bytes
 	// past the decoded tail are not always inspected (e.g. "c3VyZQ\n=="
 	// currently decodes to "sure"); interior ones are always seen.
+	// NOTE(bplu4t2f): I would argue that ^ this is a bug.
 	lenient_cases := []string{
 		"c3VyZQ==\n",
 		"c3VyZQ=\n=",
@@ -503,5 +507,137 @@ test_newline_rejected :: proc(t: ^testing.T) {
 		decoded, err := base64.decode(c)
 		testing.expectf(t, err == base64.Decode_Error.Invalid_Character, "lenient decode(%q): got %v, want Invalid_Character", c, err)
 		testing.expect(t, decoded == nil)
+	}
+}
+
+@(test)
+reject_lenient_malformed_quantum_1 :: proc(t: ^testing.T) {
+	decoded, err := base64.decode("Q===")
+	// Debatable -> should be malformed quantum
+	testing.expect_value(t, err, .Invalid_Padding)
+	testing.expect(t, decoded == nil)
+}
+
+@(test)
+reject_strict_malformed_quantum_1 :: proc(t: ^testing.T) {
+	decoded, err := base64.decode("Q===", options = { .Strict })
+	// Debatable -> should be malformed quantum
+	testing.expect_value(t, err, .Invalid_Padding)
+	testing.expect(t, decoded == nil)
+}
+
+@(test)
+reject_lenient_malformed_quantum_2 :: proc(t: ^testing.T) {
+	decoded, err := base64.decode("QUJDQ===")
+	// Debatable -> should be malformed quantum
+	testing.expect_value(t, err, .Invalid_Padding)
+	testing.expect(t, decoded == nil)
+}
+
+@(test)
+reject_strict_malformed_quantum_2 :: proc(t: ^testing.T) {
+	decoded, err := base64.decode("QUJDQ===", options = { .Strict })
+	// Debatable -> should be malformed quantum
+	testing.expect_value(t, err, .Invalid_Padding)
+	testing.expect(t, decoded == nil)
+}
+
+@(test)
+reject_lenient_malformed_quantum_3 :: proc(t: ^testing.T) {
+	decoded, err := base64.decode("Q===QUJD")
+	testing.expect_value(t, err, .Invalid_Padding)
+	testing.expect(t, decoded == nil)
+}
+
+@(test)
+reject_strict_malformed_quantum_3 :: proc(t: ^testing.T) {
+	decoded, err := base64.decode("Q===QUJD", options = { .Strict })
+	testing.expect_value(t, err, .Invalid_Padding)
+	testing.expect(t, decoded == nil)
+}
+
+@(private)
+dynamic_array_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	b := (^[dynamic]byte)(stream_data)
+	#partial switch mode {
+	case .Write:
+		written, err := append(b, ..p)
+		if err != nil {
+			return auto_cast written, .EOF
+		} else {
+			return auto_cast written, nil
+		}
+	case .Size:
+		n = i64(len(b))
+		return
+	case .Destroy:
+		delete(b^)
+		return
+	case .Query:
+		return io.query_utility({.Write, .Size, .Destroy, .Query})
+	}
+	return 0, .Unsupported
+}
+
+@(test)
+writer_path_malformed_tails :: proc(t: ^testing.T) {
+	backing := make([dynamic]byte)
+	defer delete(backing)
+	writer := io.Writer { procedure = dynamic_array_stream_proc, data = cast(rawptr)&backing }
+
+	err := base64.decode_into(writer, "QUJDQ")
+	// Debatable -> should be malformed quantum
+	testing.expect(t, err != nil)
+}
+
+@(test)
+invalid_padding_error_lenient :: proc(t: ^testing.T) {
+	decoded, err := base64.decode("A=AA")
+	testing.expect_value(t, err, .Invalid_Padding)
+	testing.expect(t, decoded == nil)
+}
+
+@(test)
+invalid_padding_error_strict :: proc(t: ^testing.T) {
+	decoded, err := base64.decode("A=AA", options = {.Strict})
+	testing.expect_value(t, err, .Invalid_Padding)
+	testing.expect(t, decoded == nil)
+}
+
+@(test)
+invalid_padding_error_end_lenient :: proc(t: ^testing.T) {
+	decoded, err := base64.decode("QUJDA=A")
+	testing.expect_value(t, err, .Invalid_Padding)
+	testing.expect(t, decoded == nil)
+}
+
+@(test)
+invalid_padding_error_end_strict :: proc(t: ^testing.T) {
+	decoded, err := base64.decode("QUJDA=A", options = {.Strict})
+	testing.expect_value(t, err, .Invalid_Padding)
+	testing.expect(t, decoded == nil)
+}
+
+@(test)
+lenient_ignore_excess_padding :: proc(t: ^testing.T) {
+	// Test different well-formed inputs with varying amount of padding,
+	// e.g.  "QQ====="
+	cases := []struct {
+		input: string,
+		output: string,
+	} {
+		{ input = "",      output = "",     },
+		{ input = "QQ",    output = "A",    },
+		{ input = "QUI",   output = "AB",   },
+		{ input = "QUJD",  output = "ABC",  },
+	}
+	for base in cases {
+		for num_padding in 1 ..= 8 {
+			s := strings.concatenate([]string { base.input, strings.repeat("=", num_padding, context.temp_allocator) }, context.temp_allocator)
+			decoded, err := base64.decode(s)
+			defer delete(decoded)
+			testing.expect_value(t, err, nil)
+			testing.expect_value(t, transmute(string)decoded, base.output)
+		}
 	}
 }

@@ -47,7 +47,7 @@ test_issue_7763__3eq :: proc(t: ^testing.T) {
 test_issue_7763__Aeq :: proc(t: ^testing.T) {
 	input := "A="
 	decoded, err := base64.decode(input)
-	testing.expect(t, err == nil)
+	testing.expect_value(t, err, .Invalid_Padding)
 	testing.expect(t, decoded == nil)
 }
 
