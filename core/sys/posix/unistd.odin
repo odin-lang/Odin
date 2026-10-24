@@ -310,8 +310,8 @@ foreign lib {
 
 	/*
 	Example:
-		for i, entry := 0, posix.environ[0]; entry != nil; i, entry = i+1, posix.environ[i] {
-			fmt.println(entry)
+		for i := 0; posix.environ[i] != nil; i += 1 {
+			fmt.println(posix.environ[i])
 		}
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/execl.html ]]

@@ -89,7 +89,7 @@ _clear_env :: proc() {
 
 _environ :: proc(allocator: runtime.Allocator) -> (environ: []string, err: Error) {
 	n := 0
-	for entry := posix.environ[0]; entry != nil; n, entry = n+1, posix.environ[n] {}
+	for ; posix.environ[n] != nil; n += 1 {}
 
 	r := make([dynamic]string, 0, n, allocator) or_return
 	defer if err != nil {
@@ -99,7 +99,7 @@ _environ :: proc(allocator: runtime.Allocator) -> (environ: []string, err: Error
 		delete(r)
 	}
 
-	for i, entry := 0, posix.environ[0]; entry != nil; i, entry = i+1, posix.environ[i] {
+	for entry in posix.environ[:n] {
 		append(&r, strings.clone(string(entry), allocator) or_return)
 	}
 
