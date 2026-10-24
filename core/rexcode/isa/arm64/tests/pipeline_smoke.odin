@@ -76,10 +76,10 @@ run_pipeline_tests :: proc() {
 		clear(&relocs); clear(&errors)
 		for i in 0..<len(code) { code[i] = 0 }
 		insts := []a.Instruction{
-			a.inst_r_r_i(.ADD_IMM, a.X0, a.X1, 100),
+			a.inst_r_r_i(.ADD, a.X0, a.X1, 100),
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("ADD_IMM: encode", success)
+		ok("ADD: encode", success)
 		eq_word("ADD X0,X1,#100",         load_le(code[:], 0), 0x91019020)
 	}
 
@@ -107,12 +107,12 @@ run_pipeline_tests :: proc() {
 		for i in 0..<len(code) { code[i] = 0 }
 		insts := []a.Instruction{
 			a.Instruction{
-				mnemonic = .ADD_SR, operand_count = 3, length = 4,
-				ops = {a.op_reg(a.X0), a.op_reg(a.X1), a.op_shifted(a.X2, .LSL, 3), {}},
+				mnemonic = .ADD, operand_count = 3, length = 4,
+				ops = {a.op_reg(a.X0), a.op_reg(a.X1), a.op_shifted(a.X2, .LSL, 3), {}, {}},
 			},
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("ADD_SR: encode", success)
+		ok("ADD: encode", success)
 		eq_word("ADD X0,X1,X2,LSL#3",     load_le(code[:], 0), 0x8B020C20)
 	}
 
@@ -125,12 +125,12 @@ run_pipeline_tests :: proc() {
 		for i in 0..<len(code) { code[i] = 0 }
 		insts := []a.Instruction{
 			a.Instruction{
-				mnemonic = .ADD_ER, operand_count = 3, length = 4,
-				ops = {a.op_reg(a.X0), a.op_reg(a.SP), a.op_extended(a.W1, .UXTW, 2), {}},
+				mnemonic = .ADD, operand_count = 3, length = 4,
+				ops = {a.op_reg(a.X0), a.op_reg(a.SP), a.op_extended(a.W1, .UXTW, 2), {}, {}},
 			},
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("ADD_ER: encode", success)
+		ok("ADD: encode", success)
 		eq_word("ADD X0,SP,W1,UXTW#2",   load_le(code[:], 0), 0x8B214BE0)
 	}
 
@@ -281,7 +281,7 @@ run_pipeline_tests :: proc() {
 		insts := []a.Instruction{
 			a.Instruction{
 				mnemonic = .ADR, operand_count = 2, length = 4,
-				ops = {a.op_reg(a.X0), a.op_label(0, 4), {}, {}},
+				ops = {a.op_reg(a.X0), a.op_label(0, 4), {}, {}, {}},
 			},
 			a.inst_none(.NOP),
 			a.inst_none(.NOP),
@@ -308,11 +308,11 @@ run_pipeline_tests :: proc() {
 			a.inst_none(.NOP),
 			a.Instruction{
 				mnemonic = .SVC, operand_count = 1, length = 4,
-				ops = {a.op_imm(1, 2), {}, {}, {}},
+				ops = {a.op_imm(1, 2), {}, {}, {}, {}},
 			},
 			a.Instruction{
 				mnemonic = .MRS, operand_count = 2, length = 4,
-				ops = {a.op_reg(a.X0), a.op_imm(0xDA10, 2), {}, {}},
+				ops = {a.op_reg(a.X0), a.op_sysreg(a.NZCV), {}, {}, {}},
 			},
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
@@ -345,7 +345,7 @@ run_pipeline_tests :: proc() {
 		append(&ld, a.Label_Definition(0))   // loop: at inst 0
 
 		src := []a.Instruction{
-			a.inst_r_r_i(.ADD_IMM, a.X0, a.X0, 1),
+			a.inst_r_r_i(.ADD, a.X0, a.X0, 1),
 			a.inst_cbnz(a.X0, 0),
 			a.inst_none(.RET),
 		}
@@ -360,7 +360,7 @@ run_pipeline_tests :: proc() {
 		_, d_success := a.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
 		ok("rt: decode", d_success)
 		ok("rt: 3 insts",  len(d_insts) == 3)
-		ok("rt: ADD",      d_insts[0].mnemonic == .ADD_IMM)
+		ok("rt: ADD",      d_insts[0].mnemonic == .ADD)
 		ok("rt: CBNZ",     d_insts[1].mnemonic == .CBNZ)
 		ok("rt: RET",      d_insts[2].mnemonic == .RET)
 
@@ -381,8 +381,8 @@ run_pipeline_tests :: proc() {
 		append(&ld, a.Label_Definition(0))
 
 		src := []a.Instruction{
-			a.inst_r_r_i(.SUBS_IMM, a.X0, a.X1, 0),
-			a.inst_b_cond(.EQ, 0),
+			a.inst_r_r_i(.SUBS, a.X0, a.X1, 0),
+			a.inst_b_eq(0),
 			a.inst_none(.RET),
 		}
 		byte_count, success := a.encode(src, ld[:], code[:], &relocs, &errors)
@@ -421,7 +421,7 @@ run_pipeline_tests :: proc() {
 		// Sign-bit-set u64 routed through transmute to i64.
 		mask: u64 = 0xFF00FF00FF00FF00
 		insts := []a.Instruction{
-			a.inst_r_r_i(.ORR_IMM, a.X0, a.X1, transmute(i64)mask),
+			a.inst_r_r_i(.ORR, a.X0, a.X1, transmute(i64)mask),
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
 		ok("bitmask ORR: encode", success)
@@ -434,7 +434,7 @@ run_pipeline_tests :: proc() {
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
 		a.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
-		ok("bitmask ORR: decode", len(d_insts) == 1 && d_insts[0].mnemonic == .ORR_IMM)
+		ok("bitmask ORR: decode", len(d_insts) == 1 && d_insts[0].mnemonic == .ORR)
 		if len(d_insts) == 1 {
 			got := u64(d_insts[0].ops[2].immediate)
 			ok("bitmask ORR: roundtrip", got == 0xFF00FF00FF00FF00)
@@ -455,7 +455,7 @@ run_pipeline_tests :: proc() {
 		clear(&relocs); clear(&errors)
 		for i in 0..<len(code) { code[i] = 0 }
 		insts := []a.Instruction{
-			a.inst_r_r_i(.AND_IMM, a.W0, a.W1, 0xF0),
+			a.inst_r_r_i(.AND, a.W0, a.W1, 0xF0),
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
 		ok("bitmask AND 32: encode", success)
@@ -468,7 +468,7 @@ run_pipeline_tests :: proc() {
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
 		a.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
-		ok("bitmask AND 32: decode", len(d_insts) == 1 && d_insts[0].mnemonic == .AND_IMM)
+		ok("bitmask AND 32: decode", len(d_insts) == 1 && d_insts[0].mnemonic == .AND)
 		if len(d_insts) == 1 {
 			got := u64(d_insts[0].ops[2].immediate)
 			ok("bitmask AND 32: roundtrip", got == 0xF0)
@@ -483,8 +483,8 @@ run_pipeline_tests :: proc() {
 		for i in 0..<len(code) { code[i] = 0 }
 		insts := []a.Instruction{
 			a.Instruction{
-				mnemonic = .SVE_ADD_Z, operand_count = 3, length = 4,
-				ops = {a.op_z_s(0), a.op_z_s(1), a.op_z_s(2), {}},
+				mnemonic = .ADD, operand_count = 3, length = 4,
+				ops = {a.op_z_s(0), a.op_z_s(1), a.op_z_s(2), {}, {}},
 			},
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
@@ -498,25 +498,25 @@ run_pipeline_tests :: proc() {
 		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
 		clear(&errors)
 		a.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
-		ok("SVE ADD Z: decode", len(d_insts) == 1 && d_insts[0].mnemonic == .SVE_ADD_Z)
+		ok("SVE ADD Z: decode", len(d_insts) == 1 && d_insts[0].mnemonic == .ADD)
 	}
 
 	// ---- 19. SVE predicated: ADD Z0.S, P0/M, Z0.S, Z1.S --------------------
 	//   bits = 0x04800000 | (Pg=0<<10) | (Zm=1<<16) | Zdn=0
-	//        = 0x04810000
+	//        = 0x04800020
 	{
 		clear(&relocs); clear(&errors)
 		for i in 0..<len(code) { code[i] = 0 }
 		p0 := a.Register(a.REG_P | 0)
 		insts := []a.Instruction{
 			a.Instruction{
-				mnemonic = .SVE_ADD_PRED, operand_count = 4, length = 4,
-				ops = {a.op_z_s(0), a.op_reg(p0), a.op_z_s(0), a.op_z_s(1)},
+				mnemonic = .ADD, operand_count = 4, length = 4,
+				ops = {a.op_z_s(0), a.op_reg(p0), a.op_z_s(0), a.op_z_s(1), {}},
 			},
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
 		ok("SVE ADD_PRED: encode", success)
-		eq_word("SVE ADD Z0.S,P0/M,Z0.S,Z1.S", load_le(code[:], 0), 0x04810000)
+		eq_word("SVE ADD Z0.S,P0/M,Z0.S,Z1.S", load_le(code[:], 0), 0x04800020)
 	}
 
 	// ---- 20. SVE PTRUE P0.B, ALL --------------------------------------------
@@ -528,8 +528,8 @@ run_pipeline_tests :: proc() {
 		p0 := a.Register(a.REG_P | 0)
 		insts := []a.Instruction{
 			a.Instruction{
-				mnemonic = .SVE_PTRUE, operand_count = 2, length = 4,
-				ops = {a.op_reg(p0), a.op_imm(0x1F, 1), {}, {}},
+				mnemonic = .PTRUE, operand_count = 2, length = 4,
+				ops = {a.op_reg(p0), a.op_imm(0x1F, 1), {}, {}, {}},
 			},
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
@@ -544,8 +544,8 @@ run_pipeline_tests :: proc() {
 		clear(&relocs); clear(&errors)
 		for i in 0..<len(code) { code[i] = 0 }
 		insts := []a.Instruction{
-			a.inst_none(.SME_SMSTART),
-			a.inst_none(.SME_SMSTOP),
+			a.inst_none(.SMSTART),
+			a.inst_none(.SMSTOP),
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
 		ok("SME SMSTART/SMSTOP: encode", success)
@@ -568,8 +568,9 @@ run_pipeline_tests :: proc() {
 		p1 := a.Register(a.REG_P | 1)
 		insts := []a.Instruction{
 			a.Instruction{
-				mnemonic = .SME_FMOPA, operand_count = 4, length = 4,
-				ops = {a.op_imm(0, 1), a.op_reg(p0), a.op_reg(p1), a.op_z_s(0)},
+				mnemonic = .FMOPA, operand_count = 5, length = 4,
+				ops = {a.op_reg(a.Register(a.REG_ZA | 0)), a.op_reg(p0), a.op_reg(p1),
+				       a.op_z_s(0), a.op_z_s(0)},
 			},
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
@@ -643,10 +644,10 @@ run_pipeline_tests :: proc() {
 		defer delete(insts)
 
 		back := isa.label(&labels, &insts)                          // .L0: at instruction 0
-		append(&insts, a.inst_r_r_i(.ADD_IMM, a.X0, a.X0, 1))      // [0] byte  0: ADD X0,X0,#1
-		append(&insts, a.inst_r_r_i(.SUBS_IMM, a.XZR, a.X0, 5))    // [1] byte  4: SUBS XZR,X0,#5
+		append(&insts, a.inst_r_r_i(.ADD, a.X0, a.X0, 1))      // [0] byte  0: ADD X0,X0,#1
+		append(&insts, a.inst_r_r_i(.SUBS, a.XZR, a.X0, 5))    // [1] byte  4: SUBS XZR,X0,#5
 		fwd  := isa.label_forward(&labels)                          //    reserve .L1
-		append(&insts, a.inst_b_cond(.LT, fwd))                    // [2] byte  8: B.LT .L1
+		append(&insts, a.inst_b_lt(fwd))                    // [2] byte  8: B.LT .L1
 		append(&insts, a.inst_branch(.B, back))                    // [3] byte 12: B .L0
 		isa.label_set_at(&labels, fwd, &insts)                     //    .L1: at instruction 4
 		append(&insts, a.inst_none(.RET))                          // [4] byte 16: RET
@@ -698,19 +699,19 @@ run_pipeline_tests :: proc() {
 		insts := []a.Instruction{
 			a.Instruction{
 				mnemonic = .MRS, operand_count = 2, length = 4,
-				ops = {a.op_reg(a.X0), a.op_imm(a.NZCV, 2), {}, {}},
+				ops = {a.op_reg(a.X0), a.op_sysreg(a.NZCV), {}, {}, {}},
 			},
 			a.Instruction{
 				mnemonic = .MRS, operand_count = 2, length = 4,
-				ops = {a.op_reg(a.X1), a.op_imm(a.TPIDR_EL0, 2), {}, {}},
+				ops = {a.op_reg(a.X1), a.op_sysreg(a.TPIDR_EL0), {}, {}, {}},
 			},
 			a.Instruction{
 				mnemonic = .MRS, operand_count = 2, length = 4,
-				ops = {a.op_reg(a.X2), a.op_imm(a.CNTVCT_EL0, 2), {}, {}},
+				ops = {a.op_reg(a.X2), a.op_sysreg(a.CNTVCT_EL0), {}, {}, {}},
 			},
 			a.Instruction{
 				mnemonic = .MRS, operand_count = 2, length = 4,
-				ops = {a.op_reg(a.X3), a.op_imm(a.DCZID_EL0, 2), {}, {}},
+				ops = {a.op_reg(a.X3), a.op_sysreg(a.DCZID_EL0), {}, {}, {}},
 			},
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
@@ -752,12 +753,12 @@ run_pipeline_tests :: proc() {
 		for i in 0..<len(code) { code[i] = 0 }
 		insts := []a.Instruction{
 			a.Instruction{
-				mnemonic = .CMP_SR, operand_count = 2, length = 4,
-				ops = {a.op_reg(a.X0), a.op_shifted(a.X1, .LSL, 0), {}, {}},
+				mnemonic = .CMP, operand_count = 2, length = 4,
+				ops = {a.op_reg(a.X0), a.op_shifted(a.X1, .LSL, 0), {}, {}, {}},
 			},
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("CMP_SR: encode",    success)
+		ok("CMP: encode",    success)
 		eq_word("CMP X0,X1",    load_le(code[:], 0), 0xEB01001F)
 	}
 
@@ -775,15 +776,15 @@ run_pipeline_tests :: proc() {
 		insts := []a.Instruction{
 			a.Instruction{
 				mnemonic = .CPYP, operand_count = 3, length = 4,
-				ops = {a.op_reg(a.X0), a.op_reg(a.X1), a.op_reg(a.X2), {}},
+				ops = {a.op_reg(a.X0), a.op_reg(a.X1), a.op_reg(a.X2), {}, {}},
 			},
 			a.Instruction{
 				mnemonic = .CPYM, operand_count = 3, length = 4,
-				ops = {a.op_reg(a.X0), a.op_reg(a.X1), a.op_reg(a.X2), {}},
+				ops = {a.op_reg(a.X0), a.op_reg(a.X1), a.op_reg(a.X2), {}, {}},
 			},
 			a.Instruction{
 				mnemonic = .CPYE, operand_count = 3, length = 4,
-				ops = {a.op_reg(a.X0), a.op_reg(a.X1), a.op_reg(a.X2), {}},
+				ops = {a.op_reg(a.X0), a.op_reg(a.X1), a.op_reg(a.X2), {}, {}},
 			},
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
@@ -804,8 +805,8 @@ run_pipeline_tests :: proc() {
 		for i in 0..<len(code) { code[i] = 0 }
 		insts := []a.Instruction{
 			a.Instruction{
-				mnemonic = .SVE_FMLA_IDX_S, operand_count = 4, length = 4,
-				ops = {a.op_z_s(0), a.op_z_s(1), a.op_z_s(2), a.op_imm(2, 1)},
+				mnemonic = .FMLA, operand_count = 4, length = 4,
+				ops = {a.op_z_s(0), a.op_z_s(1), a.op_z_s(2), a.op_imm(2, 1), {}},
 			},
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
@@ -831,8 +832,8 @@ run_pipeline_tests :: proc() {
 		}
 		insts := []a.Instruction{
 			a.Instruction{
-				mnemonic = .SVE_LD1W_GATHER_S, operand_count = 3, length = 4,
-				ops = {a.op_z_s(0), a.op_reg(p0), a.op_mem(mem), {}},
+				mnemonic = .LD1W, operand_count = 3, length = 4,
+				ops = {a.op_z_s(0), a.op_reg(p0), a.op_mem(mem), {}, {}},
 			},
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
@@ -845,14 +846,12 @@ run_pipeline_tests :: proc() {
 	//   ld1b { za0v.b[w14, 5] }, p5/z, [x10, x21]  =  0xE015D545
 	//
 	//   Per LLVM MC test for AArch64 SME (file: test/MC/AArch64/SME/ld1b.s).
-	//   Slice descriptor (packed): imm=5, V=1 (vertical), Ws=W14 (idx=2),
-	//   tile=0 (ZA0.B is implicit for byte tile)
-	//     packed = 5 | (1<<4) | (2<<5) | (0<<7) = 0x55
+	//   Slice: tile 0 (ZA0.B is the only byte tile), taken vertically, indexed
+	//   by W14 with an offset of 5.
 	{
 		clear(&relocs); clear(&errors)
 		for i in 0..<len(code) { code[i] = 0 }
 		p5 := a.Register(a.REG_P | 5)
-		slice_packed := i64(5 | (1 << 4) | (2 << 5))
 		mem := a.Memory{
 			base  = a.X10,
 			index = a.X21,
@@ -860,8 +859,8 @@ run_pipeline_tests :: proc() {
 		}
 		insts := []a.Instruction{
 			a.Instruction{
-				mnemonic = .SME_LD1B_TILE, operand_count = 3, length = 4,
-				ops = {a.op_imm(slice_packed, 2), a.op_reg(p5), a.op_mem(mem), {}},
+				mnemonic = .LD1B, operand_count = 3, length = 4,
+				ops = {a.op_za_slice(0, 2, 5, a.ZSHAPE_B, true), a.op_reg(p5), a.op_mem(mem), {}, {}},
 			},
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
@@ -875,9 +874,11 @@ run_pipeline_tests :: proc() {
 		clear(&errors)
 		a.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
 		ok("SME LD1B tile: decode 1 inst", len(d_insts) == 1)
-		ok("SME LD1B tile: mnemonic",      len(d_insts) == 1 && d_insts[0].mnemonic == .SME_LD1B_TILE)
+		ok("SME LD1B tile: mnemonic",      len(d_insts) == 1 && d_insts[0].mnemonic == .LD1B)
 		ok("SME LD1B tile: slice roundtrip",
-		   len(d_insts) == 1 && d_insts[0].ops[0].immediate == slice_packed)
+		   len(d_insts) == 1 && d_insts[0].ops[0].kind == .ZA_SLICE &&
+		   d_insts[0].ops[0].za.tile == 0 && d_insts[0].ops[0].za.vertical &&
+		   d_insts[0].ops[0].za.ws == 2 && d_insts[0].ops[0].za.offset == 5)
 	}
 
 	// ---- 32. FCMLA v0.4s, v1.4s, v2.4s, #0 (LLVM golden) ----------------
@@ -887,8 +888,8 @@ run_pipeline_tests :: proc() {
 		for i in 0..<len(code) { code[i] = 0 }
 		insts := []a.Instruction{
 			a.Instruction{
-				mnemonic = .FCMLA_4S, operand_count = 4, length = 4,
-				ops = {a.op_v_4s(0), a.op_v_4s(1), a.op_v_4s(2), a.op_imm(0, 1)},
+				mnemonic = .FCMLA, operand_count = 4, length = 4,
+				ops = {a.op_v_4s(a.V0), a.op_v_4s(a.V1), a.op_v_4s(a.V2), a.op_imm(0, 1), {}},
 			},
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
@@ -958,7 +959,7 @@ run_pipeline_tests :: proc() {
 		insts := []a.Instruction{
 			a.Instruction{
 				mnemonic = .MRS, operand_count = 2, length = 4,
-				ops = {a.op_reg(a.X7), a.op_imm(a.RNDR, 2), {}, {}},
+				ops = {a.op_reg(a.X7), a.op_sysreg(a.RNDR), {}, {}, {}},
 			},
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
@@ -997,7 +998,7 @@ run_pipeline_tests :: proc() {
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
 		ok("barriers/BTI: encode", success)
 		eq_word("SB",        load_le(code[:], 0), 0xD50330FF)
-		eq_word("BTI j",     load_le(code[:], 4), 0xD503245F)
+		eq_word("BTI j",     load_le(code[:], 4), 0xD503249F)
 		eq_word("PSB CSYNC", load_le(code[:], 8), 0xD503223F)
 	}
 
@@ -1009,10 +1010,10 @@ run_pipeline_tests :: proc() {
 		clear(&relocs); clear(&errors)
 		for i in 0..<len(code) { code[i] = 0 }
 		insts := []a.Instruction{
-			a.inst_r_r_i(.LSL_IMM, a.W0, a.W1, 4),
+			a.inst_r_r_i(.LSL, a.W0, a.W1, 4),
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("LSL_IMM 32: encode", success)
+		ok("LSL 32: encode", success)
 		eq_word("LSL W0,W1,#4", load_le(code[:], 0), 0x531C6C20)
 	}
 
@@ -1024,11 +1025,315 @@ run_pipeline_tests :: proc() {
 		clear(&relocs); clear(&errors)
 		for i in 0..<len(code) { code[i] = 0 }
 		insts := []a.Instruction{
-			a.inst_r_r_i(.ROR_IMM, a.W0, a.W1, 4),
+			a.inst_r_r_i(.ROR, a.W0, a.W1, 4),
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
-		ok("ROR_IMM 32: encode", success)
+		ok("ROR 32: encode", success)
 		eq_word("ROR W0,W1,#4", load_le(code[:], 0), 0x13811020)
+	}
+
+	// ---- 41. Every named system register round-trips --------------------
+	//   For each SYSREG_NAMES entry: encode MRS X0, <sr> (the word is fully
+	//   determined by the 15-bit field, so the expected bytes derive from the
+	//   table value), decode it back to the same register, and print it by
+	//   name. Guards the field's placement in `Register` end to end.
+	{
+		mismatches := 0
+		for entry in a.SYSREG_NAMES {
+			clear(&relocs)
+			clear(&errors)
+			sr := a.sysreg_from_bits(u32(entry.value))
+			insts := []a.Instruction{
+				a.Instruction{
+					mnemonic = .MRS, operand_count = 2, length = 4,
+					ops = {a.op_reg(a.X0), a.op_sysreg(sr), {}, {}, {}},
+				},
+			}
+			_, success := a.encode(insts, nil, code[:], &relocs, &errors)
+			want := u32(0xD5300000) | u32(entry.value) << 5
+			if !success || load_le(code[:], 0) != want {
+				fmt.printfln("  [FAIL] sysreg %s: encode got=%08x want=%08x",
+							 entry.name, load_le(code[:], 0), want)
+				mismatches += 1
+				continue
+			}
+
+			d_insts:  [dynamic]a.Instruction
+			d_info:   [dynamic]a.Instruction_Info
+			d_labels: [dynamic]a.Label_Definition
+			defer delete(d_insts)
+			defer delete(d_info)
+			defer delete(d_labels)
+			clear(&errors)
+			_, d_success := a.decode(code[:4], nil, &d_insts, &d_info, &d_labels, &errors)
+			if !d_success || len(d_insts) != 1 || d_insts[0].ops[1].reg != sr {
+				fmt.printfln("  [FAIL] sysreg %s: decode", entry.name)
+				mismatches += 1
+				continue
+			}
+
+			text := a.aprint(d_insts[:], d_info[:], d_labels[:],
+							 nil, nil, nil, context.temp_allocator)
+			want_text := fmt.tprintf("    mrs x0, %s\n", entry.name)
+			if text != want_text {
+				fmt.printfln("  [FAIL] sysreg %s: print got %q want %q",
+							 entry.name, text, want_text)
+				mismatches += 1
+			}
+		}
+		ok(fmt.tprintf("sysreg: all %d named registers round-trip", len(a.SYSREG_NAMES)),
+		   mismatches == 0)
+	}
+
+	// ---- 42. Extended-register addressing: [Xn, Wm|Xm, <extend> {#s}] ----
+	//   Register offset and extended-register offset are one instruction
+	//   word (option at 15:13 selects LSL/UXTW/SXTW/SXTX), served by the one
+	//   MEM_REG form. Golden words from llvm-mc --triple=aarch64.
+	{
+		clear(&relocs); clear(&errors)
+		for i in 0..<len(code) { code[i] = 0 }
+		insts := []a.Instruction{
+			a.inst_ldst(.LDR,   a.X0, a.mem_ext(a.X1, a.W2, .SXTW)),
+			a.inst_ldst(.LDR,   a.X0, a.mem_ext(a.X1, a.W2, .SXTW, 3)),
+			a.inst_ldst(.LDR,   a.X0, a.mem_ext(a.X1, a.W2, .UXTW, 3)),
+			a.inst_ldst(.LDR,   a.X0, a.mem_ext(a.X1, a.X2, .SXTX)),
+			a.inst_ldst(.LDR,   a.W0, a.mem_ext(a.X1, a.W2, .UXTW, 2)),
+			a.inst_ldst(.LDRB,  a.W0, a.mem_ext(a.X1, a.W2, .SXTW)),
+			a.inst_ldst(.LDRH,  a.W0, a.mem_ext(a.X1, a.W2, .UXTW, 1)),
+			a.inst_ldst(.LDRSW, a.X0, a.mem_ext(a.X1, a.W2, .SXTW, 2)),
+			a.inst_ldst(.STR,   a.X0, a.mem_ext(a.X1, a.W2, .SXTW, 3)),
+			a.inst_ldst(.STRB,  a.W0, a.mem_ext(a.X1, a.W2, .UXTW)),
+		}
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("mem ext: encode", success)
+		eq_word("LDR X0,[X1,W2,SXTW]",      load_le(code[:],  0), 0xF862C820)
+		eq_word("LDR X0,[X1,W2,SXTW #3]",   load_le(code[:],  4), 0xF862D820)
+		eq_word("LDR X0,[X1,W2,UXTW #3]",   load_le(code[:],  8), 0xF8625820)
+		eq_word("LDR X0,[X1,X2,SXTX]",      load_le(code[:], 12), 0xF862E820)
+		eq_word("LDR W0,[X1,W2,UXTW #2]",   load_le(code[:], 16), 0xB8625820)
+		eq_word("LDRB W0,[X1,W2,SXTW]",     load_le(code[:], 20), 0x3862C820)
+		eq_word("LDRH W0,[X1,W2,UXTW #1]",  load_le(code[:], 24), 0x78625820)
+		eq_word("LDRSW X0,[X1,W2,SXTW #2]", load_le(code[:], 28), 0xB8A2D820)
+		eq_word("STR X0,[X1,W2,SXTW #3]",   load_le(code[:], 32), 0xF822D820)
+		eq_word("STRB W0,[X1,W2,UXTW]",     load_le(code[:], 36), 0x38224820)
+
+		d_insts:  [dynamic]a.Instruction
+		d_info:   [dynamic]a.Instruction_Info
+		d_labels: [dynamic]a.Label_Definition
+		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
+		clear(&errors)
+		_, d_success := a.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		ok("mem ext: decode", d_success && len(d_insts) == len(insts))
+		ok("mem ext: mode",   len(d_insts) == len(insts) &&
+		   d_insts[0].ops[1].mem.mode == .EXT_REG_OFFSET &&
+		   d_insts[0].ops[1].mem.extend == .SXTW)
+		text := a.aprint(d_insts[:], d_info[:], d_labels[:],
+						 nil, nil, nil, context.temp_allocator)
+		eq_str("mem ext: print",
+			   text,
+			   "    ldr x0, [x1, w2, sxtw]\n"    +
+			   "    ldr x0, [x1, w2, sxtw #3]\n" +
+			   "    ldr x0, [x1, w2, uxtw #3]\n" +
+			   "    ldr x0, [x1, x2, sxtx]\n"    +
+			   "    ldr w0, [x1, w2, uxtw #2]\n" +
+			   "    ldrb w0, [x1, w2, sxtw]\n"   +
+			   "    ldrh w0, [x1, w2, uxtw #1]\n" +
+			   "    ldrsw x0, [x1, w2, sxtw #2]\n" +
+			   "    str x0, [x1, w2, sxtw #3]\n" +
+			   "    strb w0, [x1, w2, uxtw]\n")
+	}
+
+	// ---- 43. LSL register offset prints its real amount ------------------
+	//   The S bit is one bit; the amount it stands for is log2 of the
+	//   transfer size. LDR X's #3 used to decode (and print) as #1.
+	{
+		clear(&relocs); clear(&errors)
+		for i in 0..<len(code) { code[i] = 0 }
+		insts := []a.Instruction{
+			a.inst_ldst(.LDR, a.X0, a.mem_reg(a.X1, a.X2, 3)),
+		}
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("LSL amount: encode", success)
+		eq_word("LDR X0,[X1,X2,LSL #3]", load_le(code[:], 0), 0xF8627820)
+
+		d_insts:  [dynamic]a.Instruction
+		d_info:   [dynamic]a.Instruction_Info
+		d_labels: [dynamic]a.Label_Definition
+		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
+		clear(&errors)
+		a.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		text := a.aprint(d_insts[:], d_info[:], d_labels[:],
+						 nil, nil, nil, context.temp_allocator)
+		eq_str("LSL amount: print", text, "    ldr x0, [x1, x2, lsl #3]\n")
+	}
+
+	// ---- 44. Extended-register addressing rejects malformed operands -----
+	//   A W index needs an extend; a W-extend needs a W index; the byte and
+	//   half extends cannot be named by the option field at all.
+	{
+		reject :: proc(name: string, inst: a.Instruction, code: []u8,
+					   relocs: ^[dynamic]a.Relocation, errors: ^[dynamic]a.Error) {
+			clear(relocs)
+			clear(errors)
+			insts := []a.Instruction{inst}
+			_, success := a.encode(insts, nil, code, relocs, errors)
+			ok(name, !success)
+		}
+		reject("reject W index without extend",
+			   a.inst_ldst(.LDR, a.X0, a.mem_reg(a.X1, a.W2)), code[:], &relocs, &errors)
+		reject("reject X index with UXTW",
+			   a.inst_ldst(.LDR, a.X0, a.mem_ext(a.X1, a.X2, .UXTW)), code[:], &relocs, &errors)
+		reject("reject W index with SXTX",
+			   a.inst_ldst(.LDR, a.X0, a.mem_ext(a.X1, a.W2, .SXTX)), code[:], &relocs, &errors)
+		reject("reject SXTB extend",
+			   a.inst_ldst(.LDR, a.X0, a.mem_ext(a.X1, a.W2, .SXTB)), code[:], &relocs, &errors)
+	}
+
+	// ---- 45. FP/SIMD register-offset loads and stores --------------------
+	//   LDR/STR B/H/S/D/Q with [Xn, Xm{, LSL #s}] and the extended forms.
+	//   Golden words from llvm-mc --triple=aarch64.
+	{
+		clear(&relocs); clear(&errors)
+		for i in 0..<len(code) { code[i] = 0 }
+		insts := []a.Instruction{
+			a.inst_ldst(.LDR, a.b_reg(0), a.mem_reg(a.X1, a.X2)),
+			a.inst_ldst(.LDR, a.h_reg(0), a.mem_reg(a.X1, a.X2, 1)),
+			a.inst_ldst(.LDR, a.s_reg(0), a.mem_reg(a.X1, a.X2, 2)),
+			a.inst_ldst(.LDR, a.d_reg(0), a.mem_reg(a.X1, a.X2, 3)),
+			a.inst_ldst(.LDR, a.q_reg(0), a.mem_reg(a.X1, a.X2, 4)),
+			a.inst_ldst(.STR, a.b_reg(0), a.mem_reg(a.X1, a.X2)),
+			a.inst_ldst(.STR, a.h_reg(0), a.mem_reg(a.X1, a.X2)),
+			a.inst_ldst(.STR, a.s_reg(0), a.mem_reg(a.X1, a.X2)),
+			a.inst_ldst(.STR, a.d_reg(0), a.mem_reg(a.X1, a.X2, 3)),
+			a.inst_ldst(.STR, a.q_reg(0), a.mem_reg(a.X1, a.X2, 4)),
+			a.inst_ldst(.LDR, a.d_reg(0), a.mem_ext(a.X1, a.W2, .SXTW, 3)),
+			a.inst_ldst(.LDR, a.q_reg(0), a.mem_ext(a.X1, a.W2, .UXTW)),
+			a.inst_ldst(.STR, a.s_reg(0), a.mem_ext(a.X1, a.W2, .SXTW, 2)),
+		}
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("FP mem reg: encode", success)
+		eq_word("LDR B0,[X1,X2]",          load_le(code[:],  0), 0x3C626820)
+		eq_word("LDR H0,[X1,X2,LSL #1]",   load_le(code[:],  4), 0x7C627820)
+		eq_word("LDR S0,[X1,X2,LSL #2]",   load_le(code[:],  8), 0xBC627820)
+		eq_word("LDR D0,[X1,X2,LSL #3]",   load_le(code[:], 12), 0xFC627820)
+		eq_word("LDR Q0,[X1,X2,LSL #4]",   load_le(code[:], 16), 0x3CE27820)
+		eq_word("STR B0,[X1,X2]",          load_le(code[:], 20), 0x3C226820)
+		eq_word("STR H0,[X1,X2]",          load_le(code[:], 24), 0x7C226820)
+		eq_word("STR S0,[X1,X2]",          load_le(code[:], 28), 0xBC226820)
+		eq_word("STR D0,[X1,X2,LSL #3]",   load_le(code[:], 32), 0xFC227820)
+		eq_word("STR Q0,[X1,X2,LSL #4]",   load_le(code[:], 36), 0x3CA27820)
+		eq_word("LDR D0,[X1,W2,SXTW #3]",  load_le(code[:], 40), 0xFC62D820)
+		eq_word("LDR Q0,[X1,W2,UXTW]",     load_le(code[:], 44), 0x3CE24820)
+		eq_word("STR S0,[X1,W2,SXTW #2]",  load_le(code[:], 48), 0xBC22D820)
+
+		d_insts:  [dynamic]a.Instruction
+		d_info:   [dynamic]a.Instruction_Info
+		d_labels: [dynamic]a.Label_Definition
+		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
+		clear(&errors)
+		_, d_success := a.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		ok("FP mem reg: decode", d_success && len(d_insts) == len(insts))
+		text := a.aprint(d_insts[:], d_info[:], d_labels[:],
+						 nil, nil, nil, context.temp_allocator)
+		eq_str("FP mem reg: print",
+			   text,
+			   "    ldr b0, [x1, x2]\n"          +
+			   "    ldr h0, [x1, x2, lsl #1]\n"  +
+			   "    ldr s0, [x1, x2, lsl #2]\n"  +
+			   "    ldr d0, [x1, x2, lsl #3]\n"  +
+			   "    ldr q0, [x1, x2, lsl #4]\n"  +
+			   "    str b0, [x1, x2]\n"          +
+			   "    str h0, [x1, x2]\n"          +
+			   "    str s0, [x1, x2]\n"          +
+			   "    str d0, [x1, x2, lsl #3]\n"  +
+			   "    str q0, [x1, x2, lsl #4]\n"  +
+			   "    ldr d0, [x1, w2, sxtw #3]\n" +
+			   "    ldr q0, [x1, w2, uxtw]\n"    +
+			   "    str s0, [x1, w2, sxtw #2]\n")
+	}
+
+	// ---- 46. FP/SIMD pre/post-indexed loads and stores -------------------
+	//   LDR/STR B/H/S/D/Q with [Xn, #imm9]! and [Xn], #imm9 writeback.
+	//   Golden words from llvm-mc --triple=aarch64.
+	{
+		clear(&relocs); clear(&errors)
+		for i in 0..<len(code) { code[i] = 0 }
+		insts := []a.Instruction{
+			a.inst_ldst(.LDR, a.b_reg(0), a.mem_pre(a.X1, -16)),
+			a.inst_ldst(.LDR, a.h_reg(0), a.mem_pre(a.X1, -16)),
+			a.inst_ldst(.LDR, a.s_reg(0), a.mem_pre(a.X1, -16)),
+			a.inst_ldst(.LDR, a.d_reg(0), a.mem_pre(a.X1, -16)),
+			a.inst_ldst(.LDR, a.q_reg(0), a.mem_pre(a.X1, -16)),
+			a.inst_ldst(.STR, a.b_reg(0), a.mem_pre(a.X1, -16)),
+			a.inst_ldst(.STR, a.h_reg(0), a.mem_pre(a.X1, -16)),
+			a.inst_ldst(.STR, a.s_reg(0), a.mem_pre(a.X1, -16)),
+			a.inst_ldst(.STR, a.d_reg(0), a.mem_pre(a.X1, -16)),
+			a.inst_ldst(.STR, a.q_reg(0), a.mem_pre(a.X1, -16)),
+			a.inst_ldst(.LDR, a.b_reg(0), a.mem_post(a.X1, 32)),
+			a.inst_ldst(.LDR, a.h_reg(0), a.mem_post(a.X1, 32)),
+			a.inst_ldst(.LDR, a.s_reg(0), a.mem_post(a.X1, 32)),
+			a.inst_ldst(.LDR, a.d_reg(0), a.mem_post(a.X1, 32)),
+			a.inst_ldst(.LDR, a.q_reg(0), a.mem_post(a.X1, 32)),
+			a.inst_ldst(.STR, a.b_reg(0), a.mem_post(a.X1, 32)),
+			a.inst_ldst(.STR, a.h_reg(0), a.mem_post(a.X1, 32)),
+			a.inst_ldst(.STR, a.s_reg(0), a.mem_post(a.X1, 32)),
+			a.inst_ldst(.STR, a.d_reg(0), a.mem_post(a.X1, 32)),
+			a.inst_ldst(.STR, a.q_reg(0), a.mem_post(a.X1, 32)),
+		}
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("FP pre/post: encode", success)
+		eq_word("LDR B0,[X1,#-16]!", load_le(code[:],  0), 0x3C5F0C20)
+		eq_word("LDR H0,[X1,#-16]!", load_le(code[:],  4), 0x7C5F0C20)
+		eq_word("LDR S0,[X1,#-16]!", load_le(code[:],  8), 0xBC5F0C20)
+		eq_word("LDR D0,[X1,#-16]!", load_le(code[:], 12), 0xFC5F0C20)
+		eq_word("LDR Q0,[X1,#-16]!", load_le(code[:], 16), 0x3CDF0C20)
+		eq_word("STR B0,[X1,#-16]!", load_le(code[:], 20), 0x3C1F0C20)
+		eq_word("STR H0,[X1,#-16]!", load_le(code[:], 24), 0x7C1F0C20)
+		eq_word("STR S0,[X1,#-16]!", load_le(code[:], 28), 0xBC1F0C20)
+		eq_word("STR D0,[X1,#-16]!", load_le(code[:], 32), 0xFC1F0C20)
+		eq_word("STR Q0,[X1,#-16]!", load_le(code[:], 36), 0x3C9F0C20)
+		eq_word("LDR B0,[X1],#32",   load_le(code[:], 40), 0x3C420420)
+		eq_word("LDR H0,[X1],#32",   load_le(code[:], 44), 0x7C420420)
+		eq_word("LDR S0,[X1],#32",   load_le(code[:], 48), 0xBC420420)
+		eq_word("LDR D0,[X1],#32",   load_le(code[:], 52), 0xFC420420)
+		eq_word("LDR Q0,[X1],#32",   load_le(code[:], 56), 0x3CC20420)
+		eq_word("STR B0,[X1],#32",   load_le(code[:], 60), 0x3C020420)
+		eq_word("STR H0,[X1],#32",   load_le(code[:], 64), 0x7C020420)
+		eq_word("STR S0,[X1],#32",   load_le(code[:], 68), 0xBC020420)
+		eq_word("STR D0,[X1],#32",   load_le(code[:], 72), 0xFC020420)
+		eq_word("STR Q0,[X1],#32",   load_le(code[:], 76), 0x3C820420)
+
+		d_insts:  [dynamic]a.Instruction
+		d_info:   [dynamic]a.Instruction_Info
+		d_labels: [dynamic]a.Label_Definition
+		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
+		clear(&errors)
+		_, d_success := a.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		ok("FP pre/post: decode", d_success && len(d_insts) == len(insts))
+		text := a.aprint(d_insts[:], d_info[:], d_labels[:],
+						 nil, nil, nil, context.temp_allocator)
+		eq_str("FP pre/post: print",
+			   text,
+			   "    ldr b0, [x1, #-16]!\n" +
+			   "    ldr h0, [x1, #-16]!\n" +
+			   "    ldr s0, [x1, #-16]!\n" +
+			   "    ldr d0, [x1, #-16]!\n" +
+			   "    ldr q0, [x1, #-16]!\n" +
+			   "    str b0, [x1, #-16]!\n" +
+			   "    str h0, [x1, #-16]!\n" +
+			   "    str s0, [x1, #-16]!\n" +
+			   "    str d0, [x1, #-16]!\n" +
+			   "    str q0, [x1, #-16]!\n" +
+			   "    ldr b0, [x1], #32\n"   +
+			   "    ldr h0, [x1], #32\n"   +
+			   "    ldr s0, [x1], #32\n"   +
+			   "    ldr d0, [x1], #32\n"   +
+			   "    ldr q0, [x1], #32\n"   +
+			   "    str b0, [x1], #32\n"   +
+			   "    str h0, [x1], #32\n"   +
+			   "    str s0, [x1], #32\n"   +
+			   "    str d0, [x1], #32\n"   +
+			   "    str q0, [x1], #32\n")
 	}
 
 	fmt.println()

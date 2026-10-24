@@ -54,8 +54,14 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
     // mask = OPCODE | RD | SHAMT | FUNCT = 0xFC00FFFF
     .MULT  = { {.MULT,  {.GPR,.GPR,.NONE,.NONE}, {.RS,.RT,.NONE,.NONE}, 0x00000018, 0xFC00FFFF, .MIPS_I, {writes_hilo=true}} },
     .MULTU = { {.MULTU, {.GPR,.GPR,.NONE,.NONE}, {.RS,.RT,.NONE,.NONE}, 0x00000019, 0xFC00FFFF, .MIPS_I, {writes_hilo=true}} },
-    .DIV   = { {.DIV,   {.GPR,.GPR,.NONE,.NONE}, {.RS,.RT,.NONE,.NONE}, 0x0000001A, 0xFC00FFFF, .MIPS_I, {writes_hilo=true}} },
-    .DIVU  = { {.DIVU,  {.GPR,.GPR,.NONE,.NONE}, {.RS,.RT,.NONE,.NONE}, 0x0000001B, 0xFC00FFFF, .MIPS_I, {writes_hilo=true}} },
+    .DIV = {
+        {.DIV,   {.GPR,.GPR,.NONE,.NONE}, {.RS,.RT,.NONE,.NONE}, 0x0000001A, 0xFC00FFFF, .MIPS_I, {writes_hilo=true}},
+        {.DIV,  {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x0000009A, 0xFC0007FF, .MIPS32_R6, {}},
+    },
+    .DIVU = {
+        {.DIVU,  {.GPR,.GPR,.NONE,.NONE}, {.RS,.RT,.NONE,.NONE}, 0x0000001B, 0xFC00FFFF, .MIPS_I, {writes_hilo=true}},
+        {.DIVU, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x0000009B, 0xFC0007FF, .MIPS32_R6, {}},
+    },
 
     // ---- HI/LO move ----------------------------------------------------------
     // MF*: only rd is operand; mask = OPCODE | RS | RT | SHAMT | FUNCT = 0xFFFF07FF
@@ -214,8 +220,14 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
     // Doubleword multiply/divide.
     .DMULT  = { {.DMULT,  {.GPR,.GPR,.NONE,.NONE}, {.RS,.RT,.NONE,.NONE}, 0x0000001C, 0xFC00FFFF, .MIPS_III, {only_64=true, writes_hilo=true}} },
     .DMULTU = { {.DMULTU, {.GPR,.GPR,.NONE,.NONE}, {.RS,.RT,.NONE,.NONE}, 0x0000001D, 0xFC00FFFF, .MIPS_III, {only_64=true, writes_hilo=true}} },
-    .DDIV   = { {.DDIV,   {.GPR,.GPR,.NONE,.NONE}, {.RS,.RT,.NONE,.NONE}, 0x0000001E, 0xFC00FFFF, .MIPS_III, {only_64=true, writes_hilo=true}} },
-    .DDIVU  = { {.DDIVU,  {.GPR,.GPR,.NONE,.NONE}, {.RS,.RT,.NONE,.NONE}, 0x0000001F, 0xFC00FFFF, .MIPS_III, {only_64=true, writes_hilo=true}} },
+    .DDIV = {
+        {.DDIV,   {.GPR,.GPR,.NONE,.NONE}, {.RS,.RT,.NONE,.NONE}, 0x0000001E, 0xFC00FFFF, .MIPS_III, {only_64=true, writes_hilo=true}},
+        {.DDIV,   {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x0000009E, 0xFC0007FF, .MIPS64_R6, {only_64=true}},
+    },
+    .DDIVU = {
+        {.DDIVU,  {.GPR,.GPR,.NONE,.NONE}, {.RS,.RT,.NONE,.NONE}, 0x0000001F, 0xFC00FFFF, .MIPS_III, {only_64=true, writes_hilo=true}},
+        {.DDIVU,  {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x0000009F, 0xFC0007FF, .MIPS64_R6, {only_64=true}},
+    },
 
     // Doubleword shifts by constant.
     .DSLL   = { {.DSLL,   {.GPR,.GPR,.IMM5,.NONE}, {.RD,.RT,.IMM_5,.NONE}, 0x00000038, 0xFFE0003F, .MIPS_III, {only_64=true}} },
@@ -273,11 +285,26 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 
     // SPECIAL2 (opcode 0x1C) — common shape: bits = (0x1C<<26) | funct = 0x70000000 | f.
     // mask = OPCODE | SHAMT | FUNCT = 0xFC0007FF (shamt=0 fixed).
-    .MADD  = { {.MADD,  {.GPR,.GPR,.NONE,.NONE}, {.RS,.RT,.NONE,.NONE}, 0x70000000, 0xFC00FFFF, .MIPS32_R1, {writes_hilo=true}} },
-    .MADDU = { {.MADDU, {.GPR,.GPR,.NONE,.NONE}, {.RS,.RT,.NONE,.NONE}, 0x70000001, 0xFC00FFFF, .MIPS32_R1, {writes_hilo=true}} },
-    .MUL   = { {.MUL,   {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE},  0x70000002, 0xFC0007FF, .MIPS32_R1, {}} },
-    .MSUB  = { {.MSUB,  {.GPR,.GPR,.NONE,.NONE}, {.RS,.RT,.NONE,.NONE}, 0x70000004, 0xFC00FFFF, .MIPS32_R1, {writes_hilo=true}} },
-    .MSUBU = { {.MSUBU, {.GPR,.GPR,.NONE,.NONE}, {.RS,.RT,.NONE,.NONE}, 0x70000005, 0xFC00FFFF, .MIPS32_R1, {writes_hilo=true}} },
+    .MADD = {
+        {.MADD,  {.GPR,.GPR,.NONE,.NONE}, {.RS,.RT,.NONE,.NONE}, 0x70000000, 0xFC00FFFF, .MIPS32_R1, {writes_hilo=true}},
+        {.MADD,  {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x70000000, 0xFC0007FF, .MMI_PS2, {writes_hilo=true}},
+    },
+    .MADDU = {
+        {.MADDU, {.GPR,.GPR,.NONE,.NONE}, {.RS,.RT,.NONE,.NONE}, 0x70000001, 0xFC00FFFF, .MIPS32_R1, {writes_hilo=true}},
+        {.MADDU, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x70000001, 0xFC0007FF, .MMI_PS2, {writes_hilo=true}},
+    },
+    .MUL = {
+        {.MUL,   {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE},  0x70000002, 0xFC0007FF, .MIPS32_R1, {}},
+        {.MUL, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x00000098, 0xFC0007FF, .MIPS32_R6, {}},
+    },
+    .MSUB = {
+        {.MSUB,  {.GPR,.GPR,.NONE,.NONE}, {.RS,.RT,.NONE,.NONE}, 0x70000004, 0xFC00FFFF, .MIPS32_R1, {writes_hilo=true}},
+        {.MSUB,  {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x70000004, 0xFC0007FF, .MMI_PS2, {writes_hilo=true}},
+    },
+    .MSUBU = {
+        {.MSUBU, {.GPR,.GPR,.NONE,.NONE}, {.RS,.RT,.NONE,.NONE}, 0x70000005, 0xFC00FFFF, .MIPS32_R1, {writes_hilo=true}},
+        {.MSUBU, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x70000005, 0xFC0007FF, .MMI_PS2, {writes_hilo=true}},
+    },
     .CLZ   = { {.CLZ,   {.GPR,.GPR,.NONE,.NONE}, {.RD,.RS,.NONE,.NONE}, 0x70000020, 0xFC1F07FF, .MIPS32_R1, {}} },
     .CLO   = { {.CLO,   {.GPR,.GPR,.NONE,.NONE}, {.RD,.RS,.NONE,.NONE}, 0x70000021, 0xFC1F07FF, .MIPS32_R1, {}} },
     .DCLZ  = { {.DCLZ,  {.GPR,.GPR,.NONE,.NONE}, {.RD,.RS,.NONE,.NONE}, 0x70000024, 0xFC1F07FF, .MIPS64_R1, {only_64=true}} },
@@ -535,7 +562,6 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 
     .RTPS    = { {.RTPS,    {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x4A000001, 0xFE00003F, .GTE_PS1, {}} },
     .NCLIP   = { {.NCLIP,   {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x4A000006, 0xFE00003F, .GTE_PS1, {}} },
-    .OP_GTE  = { {.OP_GTE,  {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x4A00000C, 0xFE00003F, .GTE_PS1, {}} },
     .DPCS    = { {.DPCS,    {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x4A000010, 0xFE00003F, .GTE_PS1, {}} },
     .INTPL   = { {.INTPL,   {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x4A000011, 0xFE00003F, .GTE_PS1, {}} },
     .MVMVA   = { {.MVMVA,   {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x4A000012, 0xFE00003F, .GTE_PS1, {}} },
@@ -546,7 +572,6 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
     .CC      = { {.CC,      {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x4A00001C, 0xFE00003F, .GTE_PS1, {}} },
     .NCS     = { {.NCS,     {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x4A00001E, 0xFE00003F, .GTE_PS1, {}} },
     .NCT     = { {.NCT,     {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x4A000020, 0xFE00003F, .GTE_PS1, {}} },
-    .SQR_GTE = { {.SQR_GTE, {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x4A000028, 0xFE00003F, .GTE_PS1, {}} },
     .DCPL    = { {.DCPL,    {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x4A000029, 0xFE00003F, .GTE_PS1, {}} },
     .DPCT    = { {.DPCT,    {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x4A00002A, 0xFE00003F, .GTE_PS1, {}} },
     .AVSZ3   = { {.AVSZ3,   {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x4A00002D, 0xFE00003F, .GTE_PS1, {}} },
@@ -596,10 +621,6 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
     // R5900 three-operand multiply-accumulate (writes Rd as well as HI/LO).
     // Same SPECIAL2 funcs as the MIPS32 two-operand MADD/MADDU/MSUB/MSUBU; the
     // Rd != 0 form is selected by the less-specific mask after those match.
-    .MADD_EE  = { {.MADD_EE,  {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x70000000, 0xFC0007FF, .MMI_PS2, {writes_hilo=true}} },
-    .MADDU_EE = { {.MADDU_EE, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x70000001, 0xFC0007FF, .MMI_PS2, {writes_hilo=true}} },
-    .MSUB_EE  = { {.MSUB_EE,  {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x70000004, 0xFC0007FF, .MMI_PS2, {writes_hilo=true}} },
-    .MSUBU_EE = { {.MSUBU_EE, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x70000005, 0xFC0007FF, .MMI_PS2, {writes_hilo=true}} },
 
     // Pack/unpack HI:LO (PMFHL with 5-bit sub-op in sa slot).
     .PMFHL_LW  = { {.PMFHL_LW,  {.GPR,.NONE,.NONE,.NONE}, {.RD,.NONE,.NONE,.NONE}, 0x70000030, 0xFFFF07FF, .MMI_PS2, {}} },
@@ -753,22 +774,16 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
     // R6 mul/div: reuse SPECIAL functs 0x18-0x1F (which were MULT/MULTU/
     // DIV/DIVU in pre-R6) with shamt distinguishing low half (0x02) from
     // high half (0x03). Results land in rd, not HI/LO.
-    .MUL_R6 = { {.MUL_R6, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x00000098, 0xFC0007FF, .MIPS32_R6, {}} },
     .MUH   = { {.MUH,   {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x000000D8, 0xFC0007FF, .MIPS32_R6, {}} },
     .MULU  = { {.MULU,  {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x00000099, 0xFC0007FF, .MIPS32_R6, {}} },
     .MUHU  = { {.MUHU,  {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x000000D9, 0xFC0007FF, .MIPS32_R6, {}} },
-    .DIV_R6  = { {.DIV_R6,  {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x0000009A, 0xFC0007FF, .MIPS32_R6, {}} },
     .MOD   = { {.MOD,   {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x000000DA, 0xFC0007FF, .MIPS32_R6, {}} },
-    .DIVU_R6 = { {.DIVU_R6, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x0000009B, 0xFC0007FF, .MIPS32_R6, {}} },
     .MODU  = { {.MODU,  {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x000000DB, 0xFC0007FF, .MIPS32_R6, {}} },
     // 64-bit R6 mul/div (functs 0x1C-0x1F).
-    .DMUL_R6   = { {.DMUL_R6,   {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x0000009C, 0xFC0007FF, .MIPS64_R6, {only_64=true}} },
     .DMUH      = { {.DMUH,      {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x000000DC, 0xFC0007FF, .MIPS64_R6, {only_64=true}} },
     .DMULU     = { {.DMULU,     {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x0000009D, 0xFC0007FF, .MIPS64_R6, {only_64=true}} },
     .DMUHU     = { {.DMUHU,     {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x000000DD, 0xFC0007FF, .MIPS64_R6, {only_64=true}} },
-    .DDIV_R6   = { {.DDIV_R6,   {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x0000009E, 0xFC0007FF, .MIPS64_R6, {only_64=true}} },
     .DMOD      = { {.DMOD,      {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x000000DE, 0xFC0007FF, .MIPS64_R6, {only_64=true}} },
-    .DDIVU_R6  = { {.DDIVU_R6,  {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x0000009F, 0xFC0007FF, .MIPS64_R6, {only_64=true}} },
     .DMODU     = { {.DMODU,     {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x000000DF, 0xFC0007FF, .MIPS64_R6, {only_64=true}} },
 
     // LSA / DLSA (load shifted add): SPECIAL funct=0x05/0x15 with sa=imm2.
@@ -1723,4 +1738,13 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
     .LWUPC = { {.LWUPC, {.GPR,.REL19,.NONE,.NONE}, {.RS,.BRANCH_19,.NONE,.NONE}, 0xEC100000, 0xFC180000, .MIPS64_R6, {}} },
     .LDPC = { {.LDPC, {.GPR,.REL18,.NONE,.NONE}, {.RS,.BRANCH_18,.NONE,.NONE}, 0xEC180000, 0xFC1C0000, .MIPS64_R6, {}} },
     // SPECGEN:END
+    .OP = {
+        {.OP,  {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x4A00000C, 0xFE00003F, .GTE_PS1, {}},
+    },
+    .SQR = {
+        {.SQR, {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x4A000028, 0xFE00003F, .GTE_PS1, {}},
+    },
+    .DMUL = {
+        {.DMUL,   {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x0000009C, 0xFC0007FF, .MIPS64_R6, {only_64=true}},
+    },
 }

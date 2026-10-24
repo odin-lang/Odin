@@ -25,7 +25,9 @@ here=$(cd "$(dirname "$0")" && pwd)
 COMMON="-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused-defineables"
 
 CC_TARGET=""; [ -n "$TRIPLE" ] && CC_TARGET="--target=$TRIPLE"
-ODIN_TARGET=""; [ -n "$TARGET" ] && ODIN_TARGET="-target:$TARGET"
+
+HOST_MARCH=""; case "$(uname -m)" in x86_64|amd64) HOST_MARCH="-microarch:x86-64" ;; esac
+ODIN_TARGET="$HOST_MARCH"; [ -n "$TARGET" ] && ODIN_TARGET="-target:$TARGET"
 
 
 # Cleaned BEFORE, not after: the generated corpus is left in place so it can be
@@ -36,7 +38,7 @@ pushd "$here/build" > /dev/null
 
 set -x
 
-$ODIN run ../gen.odin -file -- .
+$ODIN run ../gen.odin -file $HOST_MARCH -- .
 
 # Ask the C compiler which tiers it has, by preprocessing the generated `build-cross/tiers.c`. 
 # The Odin side must use the same tiers or it references symbols C never emitted.

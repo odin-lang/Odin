@@ -28,10 +28,10 @@ write_range_arrays :: proc(writer: io.Writer, name: string, range: Dynamic_Range
 		fmt.wprintf(writer, "%s_singles16 := [?]u16{{", name)
 		for v, count in range.single_16 {
 			if count % 8 == 0 {
-				fmt.wprintf(writer, "\n\t0x%4X,", v)
+				fmt.wprintf(writer, "\n\t0x%04X,", v)
 				continue
 			} else {
-				fmt.wprintf(writer, " 0x%4X,", v)
+				fmt.wprintf(writer, " 0x%04X,", v)
 			}
 		}
 		fmt.wprintln(writer, "\n}\n")
@@ -41,7 +41,7 @@ write_range_arrays :: proc(writer: io.Writer, name: string, range: Dynamic_Range
 		fmt.wprintln(writer, "@(rodata)")
 		fmt.wprintfln(writer, "%s_ranges16 := [?]u16{{", name)
 		for v in range.ranges_16 {
-			fmt.wprintfln(writer, "\t0x%4X, 0x%4X,", v.first, v.last)
+			fmt.wprintfln(writer, "\t0x%04X, 0x%04X,", v.first, v.last)
 		}
 		fmt.wprintln(writer, "}\n")
 	}
@@ -51,10 +51,10 @@ write_range_arrays :: proc(writer: io.Writer, name: string, range: Dynamic_Range
 		fmt.wprintf(writer, "%s_singles32 := [?]i32{{", name)
 		for v, count in range.single_32 {
 			if count % 8 == 0 {
-				fmt.wprintf(writer, "\n\t0x%4X,", v)
+				fmt.wprintf(writer, "\n\t0x%04X,", v)
 				continue
 			} else {
-				fmt.wprintf(writer, " 0x%4X,", v)
+				fmt.wprintf(writer, " 0x%04X,", v)
 			}
 		}
 		fmt.wprintln(writer, "\n}\n")
@@ -64,7 +64,7 @@ write_range_arrays :: proc(writer: io.Writer, name: string, range: Dynamic_Range
 		fmt.wprintln(writer, "@(rodata)")
 		fmt.wprintfln(writer, "%s_ranges32 := [?]i32{{", name)
 		for v in range.ranges_32 {
-			fmt.wprintfln(writer, "\t0x%4X, 0x%4X,", v.first, v.last)
+			fmt.wprintfln(writer, "\t0x%04X, 0x%04X,", v.first, v.last)
 		}
 		fmt.wprintln(writer, "}\n")
 	}
@@ -111,6 +111,26 @@ write_range :: proc(writer: io.Writer, name: union{string, General_Category}, ra
 	fmt.wprintln(writer, "}\n")
 
 	return
+}
+
+/*
+Writes a `Case_Table` as the `<name>_ranges` and `<name>_singlets` arrays used by
+`to_upper`, `to_lower` and `to_title`.
+*/
+write_case_table :: proc(writer: io.Writer, name: string, ct: Case_Table) {
+	fmt.wprintln(writer, "@(rodata)")
+	fmt.wprintfln(writer, "%s_ranges := [?]i32{{", name)
+	for r in ct.ranges {
+		fmt.wprintfln(writer, "\t0x%04X, 0x%04X, %d,", r[0], r[1], r[2])
+	}
+	fmt.wprintln(writer, "}\n")
+
+	fmt.wprintln(writer, "@(rodata)")
+	fmt.wprintfln(writer, "%s_singlets := [?]i32{{", name)
+	for r in ct.singlets {
+		fmt.wprintfln(writer, "\t0x%04X, %d,", r[0], r[1])
+	}
+	fmt.wprintln(writer, "}\n")
 }
 
 GENERATED :: `/*
@@ -278,6 +298,18 @@ main :: proc() {
 	write_range(writer, "extra_digits",    extra_digits)
 	write_range(writer, "other_lowercase", proplist[.Other_Lowercase])
 	write_range(writer, "other_uppercase", proplist[.Other_Uppercase])
+
+	to_upper := case_table(&unicode_data, .Upper)
+	defer destroy_case_table(to_upper)
+	write_case_table(writer, "to_upper", to_upper)
+
+	to_lower := case_table(&unicode_data, .Lower)
+	defer destroy_case_table(to_lower)
+	write_case_table(writer, "to_lower", to_lower)
+
+	to_title := case_table(&unicode_data, .Title)
+	defer destroy_case_table(to_title)
+	write_case_table(writer, "to_title", to_title)
 
 	file_name := ODIN_ROOT + "core/unicode/generated.odin"
 

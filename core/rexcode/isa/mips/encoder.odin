@@ -86,6 +86,7 @@ encode :: proc(
 	endianness:   Endianness = .BIG,
 	resolve:      bool       = true,
 	base_address: u64        = 0,
+	features:     Feature_Set = FEATURES_ALL,
 ) -> (byte_count: u32, ok: bool) {
 	n_inst := u32(len(instructions))
 	if u32(len(code)) < n_inst * 4 {
@@ -99,7 +100,7 @@ encode :: proc(
 	// ---- PASS 1 ------------------------------------------------------------
 	for i in 0..<n_inst {
 		inst := &instructions[i]
-		word := encode_one_inline(inst, byte_count, u16(i), relocs, errors) or_return
+		word := encode_one_inline(inst, byte_count, u16(i), relocs, errors, features) or_return
 		write_u32(code, byte_count, word, endianness)
 		byte_count += 4
 	}
@@ -151,6 +152,7 @@ encode_one_inline :: #force_inline proc(
 	inst_idx: u16,
 	relocs:   ^[dynamic]Relocation,
 	errors:   ^[dynamic]Error,
+	features: Feature_Set,
 ) -> (word: u32, ok: bool) {
 	if inst.mnemonic == .INVALID {
 		append(errors, Error{inst_idx = u32(inst_idx), code = .INVALID_MNEMONIC})
@@ -164,8 +166,12 @@ encode_one_inline :: #force_inline proc(
 	}
 
 	// Find a matching form. Most mnemonics have exactly one.
+	// Mirror of the decoder's filter: several MIPS variants reuse a mnemonic
+	// for different encodings (pre-R6 MUL vs R6 MUL, MADD vs the PS2 MMI
+	// MADD), and only the target's feature set tells them apart.
 	form: ^Encoding
 	for &f in forms {
+		if f.feature not_in features { continue }
 		if encoding_matches_inline(inst, &f) {
 			form = &f
 			break

@@ -241,6 +241,48 @@ VEX_L :: enum u8 {
 	L2,             // L = 2 (512-bit, EVEX only)
 }
 
+/*
+	The ADDRESS size a form requires -- a different axis from operand size (66h /
+	REX.W), selected by 67h against the mode's default: 64-bit in long mode and
+	32-bit under 67h; 32-bit in protected mode and 16-bit under 67h.
+
+	Almost every instruction is DEFAULT (it works at whatever address size is in
+	effect). It matters where address size picks the MNEMONIC: 0xE3 is JRCXZ,
+	JECXZ or JCXZ purely by which counter register it tests, and nothing else in
+	the encoding says which. Modelling that as REX.W (which does not affect
+	address size at all) made `48 E3 cb` the encoding of JRCXZ, where the correct
+	one is a bare `E3 cb`, and left the decoder unable to tell the three apart.
+*/
+Addr_Size :: enum u8 {
+	DEFAULT,        // whatever the mode/prefix selects; the form does not care
+	A16,            // 16-bit addressing (CX)
+	A32,            // 32-bit addressing (ECX)
+	A64,            // 64-bit addressing (RCX); long mode only
+}
+
+// The address size in effect for `mode` with/without a 67h override.
+effective_addr_size :: #force_inline proc "contextless" (mode: Mode, prefix_67: bool) -> Addr_Size {
+	if mode == ._64 {
+		return prefix_67 ? .A32 : .A64
+	}
+	return prefix_67 ? .A16 : .A32
+}
+
+// Does reaching `want` in `mode` require a 67h prefix, and is it reachable at all?
+addr_size_prefix :: #force_inline proc "contextless" (want: Addr_Size, mode: Mode) -> (prefix_67: bool, ok: bool) {
+	if want == .DEFAULT {
+		return false, true
+	}
+	if want == effective_addr_size(mode, false) {
+		return false, true
+	}
+	if want == effective_addr_size(mode, true) {
+		return true, true
+	}
+	// e.g. JCXZ (A16) in long mode: 67h there gives 32-bit, never 16-bit.
+	return false, false
+}
+
 // -----------------------------------------------------------------------------
 // SECTION: 6.5 Encoding Flags
 // -----------------------------------------------------------------------------
@@ -259,6 +301,7 @@ Encoding_Flags :: bit_field u32 {
 	rep_ok:         bool     | 1, // REP prefix valid
 	modrm_reg_ext:  bool     | 1, // ModR/M reg field is opcode extension (use ext field)
 	mode_32_only:   bool     | 1, // only valid in Mode._32 (e.g. short-form INC/DEC at 0x40-0x4F)
+	addr_size:  Addr_Size    | 2, // required ADDRESS size (67h axis); selects JCXZ/JECXZ/JRCXZ
 
 	explicit_count: u8       | 3, // 0..<4 non-implicit operands
 	has_implicit:   bool     | 1, // any implicit operand
@@ -302,8 +345,9 @@ encoding_flags :: #force_inline proc "contextless" (
 	no_rex:        bool     = false,
 	lock_ok:       bool     = false,
 	rep_ok:        bool     = false,
-	modrm_reg_ext: bool     = false,
-	mode_32_only:  bool     = false,
+	modrm_reg_ext: bool      = false,
+	mode_32_only:  bool      = false,
+	addr_size:     Addr_Size = .DEFAULT,
 ) -> Encoding_Flags {
 	return Encoding_Flags{
 		esc           = esc,
@@ -319,6 +363,7 @@ encoding_flags :: #force_inline proc "contextless" (
 		rep_ok        = rep_ok,
 		modrm_reg_ext = modrm_reg_ext,
 		mode_32_only  = mode_32_only,
+		addr_size     = addr_size,
 	}
 }
 

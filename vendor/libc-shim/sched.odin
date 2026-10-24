@@ -13,7 +13,7 @@ Time_Spec :: struct {
 }
 
 @(require, linkage="strong", link_name="clock_gettime")
-clock_gettine :: proc "c" (clockid: Clock, tp: ^Time_Spec) -> i32 {
+clock_gettime :: proc "c" (clockid: Clock, tp: ^Time_Spec) -> i32 {
 	switch clockid {
 	case .Monotonic:
 		tick := time.tick_now()

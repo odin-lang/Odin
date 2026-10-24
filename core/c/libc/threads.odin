@@ -38,6 +38,7 @@ when ODIN_OS == .Windows {
 	@(default_calling_convention="c")
 	foreign libc {
 		// 7.26.2 Initialization functions
+		@(synchronizes=.Acquire)
 		@(link_name="_Call_once")     call_once     :: proc(flag: ^once_flag, func: proc "c" ()) ---
 		// 7.26.3 Condition variable functions
 		@(link_name="_Cnd_broadcast") cnd_broadcast :: proc(cond: ^cnd_t) -> int ---
@@ -50,17 +51,23 @@ when ODIN_OS == .Windows {
 		// 7.26.4 Mutex functions
 		@(link_name="_Mtx_destroy")   mtx_destroy   :: proc(mtx: ^mtx_t) ---
 		@(link_name="_Mtx_init")      mtx_init      :: proc(mtx: ^mtx_t, type: int) -> int ---
+		@(synchronizes=.Acquire)
 		@(link_name="_Mtx_lock")      mtx_lock      :: proc(mtx: ^mtx_t) -> int ---
+		@(synchronizes=.Acquire)
 		@(link_name="_Mtx_timedlock") mtx_timedlock :: proc(mtx: ^mtx_t, ts: ^timespec) -> int ---
+		@(synchronizes=.Acquire)
 		@(link_name="_Mtx_trylock")   mtx_trylock   :: proc(mtx: ^mtx_t) -> int ---
+		@(synchronizes=.Release)
 		@(link_name="_Mtx_unlock")    mtx_unlock    :: proc(mtx: ^mtx_t) -> int ---
 
 		// 7.26.5 Thread functions
+		@(synchronizes=.Release)
 		@(link_name="_Thrd_create")   thrd_create   :: proc(thr: ^thrd_t, func: thrd_start_t, arg: rawptr) -> int ---
 		@(link_name="_Thrd_current")  thrd_current  :: proc() -> thrd_t ---
 		@(link_name="_Thrd_detach")   thrd_detach   :: proc(thr: thrd_t) -> int ---
 		@(link_name="_Thrd_equal")    thrd_equal    :: proc(lhs, rhs: thrd_t) -> int ---
 		@(link_name="_Thrd_exit")     thrd_exit     :: proc(res: int) -> ! ---
+		@(synchronizes=.Acquire)
 		@(link_name="_Thrd_join")     thrd_join     :: proc(thr: thrd_t, res: ^int) -> int ---
 		@(link_name="_Thrd_sleep")    thrd_sleep    :: proc(duration, remaining: ^timespec) -> int ---
 		@(link_name="_Thrd_yield")    thrd_yield    :: proc() ---
@@ -101,6 +108,7 @@ when ODIN_OS == .Linux {
 	@(default_calling_convention="c")
 	foreign libc {
 		// 7.26.2 Initialization functions
+		@(synchronizes=.Acquire)
 		call_once     :: proc(flag: ^once_flag, func: proc "c" ()) ---
 
 		// 7.26.3 Condition variable functions
@@ -114,17 +122,23 @@ when ODIN_OS == .Linux {
 		// 7.26.4 Mutex functions
 		mtx_destroy   :: proc(mtx: ^mtx_t) ---
 		mtx_init      :: proc(mtx: ^mtx_t, type: int) -> int ---
+		@(synchronizes=.Acquire)
 		mtx_lock      :: proc(mtx: ^mtx_t) -> int ---
+		@(synchronizes=.Acquire)
 		mtx_timedlock :: proc(mtx: ^mtx_t, ts: ^timespec) -> int ---
+		@(synchronizes=.Acquire)
 		mtx_trylock   :: proc(mtx: ^mtx_t) -> int ---
+		@(synchronizes=.Release)
 		mtx_unlock    :: proc(mtx: ^mtx_t) -> int ---
 
 		// 7.26.5 Thread functions
+		@(synchronizes=.Release)
 		thrd_create   :: proc(thr: ^thrd_t, func: thrd_start_t, arg: rawptr) -> int ---
 		thrd_current  :: proc() -> thrd_t ---
 		thrd_detach   :: proc(thr: thrd_t) -> int ---
 		thrd_equal    :: proc(lhs, rhs: thrd_t) -> int ---
 		thrd_exit     :: proc(res: int) -> ! ---
+		@(synchronizes=.Acquire)
 		thrd_join     :: proc(thr: thrd_t, res: ^int) -> int ---
 		thrd_sleep    :: proc(duration, remaining: ^timespec) -> int ---
 		thrd_yield    :: proc() ---

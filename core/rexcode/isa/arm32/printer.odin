@@ -108,21 +108,28 @@ sbprint :: proc(
 
 		strings.write_string(sb, "    ")
 
-		// Compute the .<dt> suffix from the matched decoder entry (if any)
-		// and from the operand kinds when no entry is available.
+		// The `.<dt>` suffix. It is data on the instruction now, so there is
+		// nothing to reconstruct: read it straight off. This is also what
+		// makes the convert family print correctly -- `vcvt.s32.f32` names
+		// both ends, and the old bit-pattern inference only ever produced one.
 		dt_suffix := ""
-		if i < len(inst_info) {
+		dt := inst.dt
+		if dt[0] == .NONE && i < len(inst_info) {
 			de_idx := int(inst_info[i].decode_entry)
 			if de_idx < len(DECODE_ENTRIES) {
-				dt_suffix = infer_dt_suffix(&DECODE_ENTRIES[de_idx], inst)
+				dt = DECODE_ENTRIES[de_idx].dt
 			}
 		}
-		if dt_suffix == "" {
-			dt_suffix = infer_dt_suffix_from_inst(inst)
-		}
+		// No fallback beyond this. Guessing a data type from the register
+		// bank produced one for every VFP instruction that does not take
+		// any -- `vldr.f32`, `vorn.f64` -- and those are not accepted
+		// syntax. If a form needs a suffix, the table is where it says so.
 
-		write_mnemonic(sb, inst.mnemonic, inst.cond, inst.flags.sets_flags, opts.uppercase)
-		if dt_suffix != "" {
+
+		write_mnemonic(sb, inst.mnemonic, inst.cond, inst.sets_flags, opts.uppercase)
+		if dt[0] != .NONE {
+			write_data_type(sb, dt, opts.uppercase)
+		} else if dt_suffix != "" {
 			strings.write_string(sb, dt_suffix)
 		}
 
@@ -131,6 +138,9 @@ sbprint :: proc(
 			for k in 0..<inst.operand_count {
 				if k > 0 { strings.write_string(sb, ", ") }
 				write_operand(sb, &inst.ops[k], inst, offset, &display, opts)
+				// LDM/STM write the updated base back, and the syntax marks
+				// that with a `!` on the base register itself.
+				if k == 0 && inst.writeback { strings.write_byte(sb, '!') }
 			}
 		}
 		strings.write_string(sb, "\n")
@@ -197,19 +207,6 @@ infer_dt_suffix :: proc(form: ^Decode_Entry, inst: ^Instruction) -> string {
 	if feat == .FHM  { return ".f16" }
 	if feat == .FCMA { return ".f32" }
 
-	return ""
-}
-
-@(private="file")
-infer_dt_suffix_from_inst :: proc(inst: ^Instruction) -> string {
-	if inst.operand_count == 0 { return "" }
-	op0 := &inst.ops[0]
-	if op0.kind != .REGISTER { return "" }
-	switch reg_class(op0.reg) {
-	case REG_SPR: return ".f32"
-	case REG_DPR: return ".f64"
-	case REG_QPR: return ""        // can't tell integer vs FP from operand alone
-	}
 	return ""
 }
 
@@ -391,15 +388,78 @@ wprintln :: proc(
 // Writers
 // =============================================================================
 
+// `.i32`, `.s32.f32`, `.8`. Both slots print when the second is set.
+// A shift suffix on a register operand. Three spellings, and the enum covers
+// all of them: `, lsl #3` for an immediate amount, `, lsl r3` when the count
+// comes from a register (Shift_Type.LSL_REG..ROR_REG keep the Rs index in
+// shift_amt), and a bare `, rrx`, which takes no amount at all.
+//
+// SHIFT_NAMES only holds LSL..RRX, so the register-shifted variants have to be
+// folded back onto it. Indexing it with the raw enum value ran off the end --
+// LSL_REG is 6 against a 5-entry table -- and crashed the printer outright.
+@(private="file")
+write_shift :: proc(sb: ^strings.Builder, st: Shift_Type, amt: u8) {
+	switch st {
+	case .LSL, .LSR, .ASR, .ROR:
+		if amt == 0 {
+			return
+		}
+		fmt.sbprintf(sb, ", %s #%d", SHIFT_NAMES[int(st)], amt)
+	case .RRX:
+		strings.write_string(sb, ", rrx")
+	case .NONE:
+		// no shift to print
+	case .LSL_REG, .LSR_REG, .ASR_REG, .ROR_REG:
+		fmt.sbprintf(sb, ", %s %s", SHIFT_NAMES[int(st) - int(Shift_Type.LSL_REG)], GPR_NAMES[amt & 0xF])
+	}
+}
+
+@(private="file")
+write_data_type :: proc(sb: ^strings.Builder, dt: Data_Types, uppercase: bool) {
+	for d in dt {
+		if d == .NONE { continue }
+		strings.write_byte(sb, '.')
+		name := DATA_TYPE_NAMES[d]
+		for i in 0 ..< len(name) {
+			c := name[i]
+			if uppercase && c >= 'a' && c <= 'z' {
+				strings.write_byte(sb, c - 'a' + 'A')
+			} else {
+				strings.write_byte(sb, c)
+			}
+		}
+	}
+}
+
+@(rodata, private="file")
+DATA_TYPE_NAMES := [Data_Type]string{
+	.NONE = "",
+	.S8 = "s8", .S16 = "s16", .S32 = "s32", .S64 = "s64",
+	.U8 = "u8", .U16 = "u16", .U32 = "u32", .U64 = "u64",
+	.I8 = "i8", .I16 = "i16", .I32 = "i32", .I64 = "i64",
+	.F16 = "f16", .F32 = "f32", .F64 = "f64",
+	.P8 = "p8", .P16 = "p16", .BF16 = "bf16",
+	.SZ8 = "8", .SZ16 = "16", .SZ32 = "32", .SZ64 = "64",
+}
+
 @(private="file")
 write_mnemonic :: proc(sb: ^strings.Builder, m: Mnemonic, cond: u8, sets_flags: bool, uppercase: bool) {
 	name, _ := reflect.enum_name_from_value(m)
-	if uppercase {
-		strings.write_string(sb, name)
-	} else {
-		for r in name {
-			if r >= 'A' && r <= 'Z' { strings.write_byte(sb, u8(r - 'A' + 'a')) }
-			else                    { strings.write_rune(sb, r) }
+	// PSB_CSYNC / TSB_CSYNC are the only names left holding an underscore:
+	// assemblers write them as a mnemonic plus an operand token, `psb csync`,
+	// so that underscore is a space. No other mnemonic has one.
+	split := -1
+	if len(name) > 4 && (name[:4] == "PSB_" || name[:4] == "TSB_") {
+		split = 3
+	}
+	for i in 0..<len(name) {
+		c := name[i]
+		if i == split {
+			strings.write_byte(sb, ' ')
+		} else if !uppercase && c >= 'A' && c <= 'Z' {
+			strings.write_byte(sb, c - 'A' + 'a')
+		} else {
+			strings.write_byte(sb, c)
 		}
 	}
 	if sets_flags {
@@ -441,6 +501,10 @@ write_register :: proc(sb: ^strings.Builder, r: Register, uppercase: bool = fals
 		}
 	case REG_COPROC:
 		fmt.sbprintf(sb, "c%d", hw)
+	case REG_COPROC_NUM:
+		fmt.sbprintf(sb, "p%d", hw)
+	case REG_ENDIAN:
+		strings.write_string(sb, hw == 0 ? "le" : "be")
 	case:
 		fmt.sbprintf(sb, "?%d", hw)
 	}
@@ -459,15 +523,36 @@ write_operand :: proc(
 	case .NONE:
 		return
 	case .REGISTER:
-		write_register(sb, op.reg)
-		if op.shift_type != .NONE && op.shift_type != .RRX && op.shift_amt > 0 {
-			fmt.sbprintf(sb, ", %s #%d", SHIFT_NAMES[int(op.shift_type)], op.shift_amt)
+		// A VFP/NEON list is a contiguous run written in braces, and every
+		// register is named -- `{d1, d2, d3}`, not a range.
+		if op.list.count > 0 {
+			strings.write_string(sb, "{")
+			step := u16(max(op.list.stride, 1))
+			for n in 0 ..< u16(op.list.count) {
+				if n > 0 { strings.write_string(sb, ", ") }
+				write_register(sb, Register(reg_class(op.reg) | ((reg_hw(op.reg) + n * step) & 0x1F)))
+				// Every member of a single-lane list carries the index:
+				// `{d0[1], d1[1]}`. `{d0[]}` is the to-all-lanes form.
+				if op.list.all_lanes {
+					strings.write_string(sb, "[]")
+				} else if op.has_lane {
+					fmt.sbprintf(sb, "[%d]", op.lane)
+				}
+			}
+			strings.write_string(sb, "}")
+			return
 		}
-		if op.lane != 0 {
+		write_register(sb, op.reg)
+		write_shift(sb, op.shift_type, op.shift_amt)
+		if op.has_lane {
 			fmt.sbprintf(sb, "[%d]", op.lane)
 		}
 	case .IMMEDIATE:
 		fmt.sbprintf(sb, "#%d", op.immediate)
+	case .HEX_IMMEDIATE:
+		fmt.sbprintf(sb, "#0x%x", op.immediate)
+	case .FLOAT_IMMEDIATE:
+		fmt.sbprintf(sb, "#%e", f64(transmute(f32)u32(op.immediate)))
 	case .MEMORY:
 		write_memory(sb, op.mem)
 	case .RELATIVE:
@@ -488,16 +573,17 @@ write_operand :: proc(
 write_memory :: proc(sb: ^strings.Builder, m: Memory) {
 	strings.write_string(sb, "[")
 	write_register(sb, m.base)
-	if reg_class(m.index) == REG_GPR && reg_hw(m.index) != 0 {
+	// An immediate-only form leaves index at Register(0), whose class is not
+	// REG_GPR -- so the class alone says whether there is an index. Excluding
+	// hw 0 as well made r0 unusable as one.
+	if reg_class(m.index) == REG_GPR {
 		// Register offset
 		switch m.mode {
 		case .OFFSET:
 			strings.write_string(sb, ", ")
 			if m.sign < 0 { strings.write_string(sb, "-") }
 			write_register(sb, m.index)
-			if m.shift_type != .NONE && m.shift_amt > 0 {
-				fmt.sbprintf(sb, ", %s #%d", SHIFT_NAMES[int(m.shift_type)], m.shift_amt)
-			}
+			write_shift(sb, m.shift_type, m.shift_amt)
 			strings.write_string(sb, "]")
 		case .PRE_INDEX:
 			strings.write_string(sb, ", ")
@@ -509,15 +595,22 @@ write_memory :: proc(sb: ^strings.Builder, m: Memory) {
 			if m.sign < 0 { strings.write_string(sb, "-") }
 			write_register(sb, m.index)
 		}
-	} else if m.disp != 0 {
-		// Immediate offset
-		switch m.mode {
-		case .OFFSET:    fmt.sbprintf(sb, ", #%d]", m.disp)
-		case .PRE_INDEX: fmt.sbprintf(sb, ", #%d]!", m.disp)
-		case .POST_INDEX: fmt.sbprintf(sb, "], #%d", m.disp)
-		}
 	} else {
-		strings.write_string(sb, "]")
+		// An indexed form writes its displacement even when it is zero: the
+		// writeback is the point, and `[r0]` alone is the plain offset form.
+		// The U bit also survives a zero displacement, and an assembler needs
+		// to see it -- `#-0` and `#0` are different words.
+		neg := m.disp == 0 && m.sign < 0 ? "-" : ""
+		switch m.mode {
+		case .OFFSET:
+			if m.disp != 0 || m.sign < 0 {
+				fmt.sbprintf(sb, ", #%s%d]", neg, m.disp)
+			} else {
+				strings.write_string(sb, "]")
+			}
+		case .PRE_INDEX:  fmt.sbprintf(sb, ", #%s%d]!", neg, m.disp)
+		case .POST_INDEX: fmt.sbprintf(sb, "], #%s%d", neg, m.disp)
+		}
 	}
 }
 

@@ -431,7 +431,7 @@ foreign lib {
 	*/
 	start_temporary_context :: proc(
 		ctxt:         ^context_t,
-		context_name: [^]c.char,
+		context_name: cstring,
 		ctxtdata:     ^context_initializer_t) -> result_t ---
 
 	/** @brief Retrieve the file name the context is for as provided

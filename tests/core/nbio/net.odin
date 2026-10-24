@@ -245,7 +245,7 @@ And it tests big send/recv buffers being handled properly.
 @(test)
 poll :: proc(t: ^testing.T) {
 	if event_loop_guard(t) {
-//		testing.set_fail_timeout(t, time.Minute)
+		testing.set_fail_timeout(t, time.Minute)
 
 		can_recv: bool
 
@@ -302,13 +302,32 @@ poll :: proc(t: ^testing.T) {
 			on_poll1 :: proc(op: ^nbio.Operation, t: ^testing.T, can_recv: ^bool) {
 				ev(t, op.poll.result, nil)
 
-				// Send 4 GB of data, which in my experience causes a Would_Block error because we filled up the internal buffer.
-				buf, mem_err := make([]byte, mem.Gigabyte*4, context.temp_allocator)
+				// Fill the socket until sending actually blocks. How much that takes depends
+				// on the machine's socket buffers, so keep sending rather than assuming a
+				// fixed amount does it. Nothing is reading yet, so this terminates.
+				// NOTE: Don't make the chunk too large; we need the system to be able to send
+				//       at least one chunk.
+				buf, mem_err := make([]byte, mem.Megabyte*512, context.temp_allocator)
 				ev(t, mem_err, nil)
 
 				// Use `core:net` as example external code that doesn't care about the event loop.
 				net.set_blocking(op.poll.socket, false)
-				n, send_err := net.send(op.poll.socket, buf)
+
+				n: int
+				send_err: net.Network_Error
+				// Send up to 64 GiB total.
+				for i in 0..<128 {
+					sent: int
+					sent, send_err = net.send(op.poll.socket, buf)
+					n += sent
+					if send_err != nil {
+						log.debugf("net.send failed on iteration %v with error %v", i, send_err)
+						break
+					}
+				}
+				if send_err == nil {
+					log.warnf("We were expecting the TCP socket send buffer to be full at some point, but the system just ate it. The maximum amount of data sent by this test may need to be increased.")
+				}
 				ev(t, send_err, net.TCP_Send_Error.Would_Block)
 
 				log.debugf("blocking after %M", n)

@@ -28,13 +28,15 @@ import lib "../"
 // Package-scope aliases so the moved SoT resolves Mnemonic/Encoding unqualified.
 Encoding :: lib.Encoding
 Mnemonic :: lib.Mnemonic
+Clobber  :: lib.Clobber
 
 Blob :: struct { global, file, typ: string }
 BLOBS := [?]Blob{
-	{"ENCODE_FORMS",     "arm64.encode_forms.bin", "Encoding"},
-	{"ENCODE_RUNS",      "arm64.encode_runs.bin",  "Encode_Run"},
-	{"DECODE_ENTRIES",   "arm64.entries.bin",      "Decode_Entry"},
-	{"DECODE_INDEX_OP0", "arm64.idx_op0.bin",      "Decode_Index"},
+	{"ENCODE_FORMS",     "arm64.encode_forms.bin",  "Encoding"},
+	{"CLOBBER_FORMS",    "arm64.clobber_forms.bin", "Clobber"},
+	{"ENCODE_RUNS",      "arm64.encode_runs.bin",   "Encode_Run"},
+	{"DECODE_ENTRIES",   "arm64.entries.bin",       "Decode_Entry"},
+	{"DECODE_INDEX_OP0", "arm64.idx_op0.bin",       "Decode_Index"},
 }
 
 DIR_GEN     :: #directory + "/generated/"
@@ -42,13 +44,17 @@ PATH_LOADER :: #directory + "/../tables.odin"
 
 Entry :: struct {
 	mnemonic: lib.Mnemonic,
-	ops:      [4]lib.Operand_Type,
-	enc:      [4]lib.Operand_Encoding,
+	ops:      [5]lib.Operand_Type,
+	enc:      [5]lib.Operand_Encoding,
 	bits:     u32,
 	mask:     u32,
 	feature:  lib.Feature,
 	flags:    lib.Encoding_Flags,
 	op0:      u8,    // bits[28:25]
+	// Table order, so the sort is a total one. Without it, entries that tie on
+	// every other key come out in whatever order the sort leaves -- and which
+	// of them decode picks would vary between builds.
+	seq:      u32,
 }
 
 Range :: struct { start: u16, count: u16 }
@@ -72,16 +78,29 @@ emit_encode_tables :: proc() -> (total: int) {
 	strings.write_string(&sb, "// Flattened encode forms + per-mnemonic run index (source: ENCODING_TABLE).\n\n")
 	strings.write_string(&sb, "import lib \"../..\"\n\n")
 
-	for m in Mnemonic { total += len(ENCODING_TABLE[m]) }
+	for m in Mnemonic { total += len(INSTRUCTION_TABLE[m]) }
 
 	strings.write_string(&sb, "@(rodata)\n")
 	fmt.sbprintfln(&sb, "ENCODE_FORMS := [%d]lib.Encoding{{", total)
 	for m in Mnemonic {
-		forms := ENCODING_TABLE[m]
+		forms := INSTRUCTION_TABLE[m]
 		if len(forms) == 0 { continue }
 		fmt.sbprintfln(&sb, "\t// .%v", m)
 		for f in forms {
-			write_row(&sb, f.mnemonic, f.ops, f.enc, f.bits, f.mask, f.feature, f.flags)
+			e := f.encoding
+			write_row(&sb, e.mnemonic, e.ops, e.enc, e.bits, e.mask, e.feature, e.flags)
+		}
+	}
+	strings.write_string(&sb, "}\n\n")
+
+	strings.write_string(&sb, "@(rodata)\n")
+	fmt.sbprintfln(&sb, "CLOBBER_FORMS := [%d]lib.Clobber{{", total)
+	for m in Mnemonic {
+		forms := INSTRUCTION_TABLE[m]
+		if len(forms) == 0 { continue }
+		fmt.sbprintfln(&sb, "\t// .%v", m)
+		for f in forms {
+			write_clobber(&sb, f.clobber)
 		}
 	}
 	strings.write_string(&sb, "}\n\n")
@@ -92,7 +111,7 @@ emit_encode_tables :: proc() -> (total: int) {
 	strings.write_string(&sb, "ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{\n")
 	start := 0
 	for m in Mnemonic {
-		c := len(ENCODING_TABLE[m])
+		c := len(INSTRUCTION_TABLE[m])
 		name := reflect.enum_string(m)
 		fmt.sbprintf(&sb, "\t.%s", name)
 		for _ in 0..<run_w-len(name) { strings.write_byte(&sb, ' ') }
@@ -102,6 +121,72 @@ emit_encode_tables :: proc() -> (total: int) {
 	strings.write_string(&sb, "}\n")
 	emit_file(DIR_GEN + "encode_tables.odin", &sb)
 	return
+}
+
+write_clobber :: proc(sb: ^strings.Builder, clobber: lib.Clobber) {
+	strings.write_string(sb, "\t{")
+	defer strings.write_string(sb, "},\n")
+
+	n := 0
+	for field in reflect.struct_fields_zipped(lib.Clobber) {
+		value := reflect.struct_field_value(clobber, field)
+		if reflect.is_bit_set(field.type) {
+			if !reflect.is_nil(value) {
+				if n > 0 { strings.write_string(sb, ", ") }
+				defer n += 1
+
+				value_int := value
+				switch type_info_of(value.id).size {
+				case 1: value_int.id = u8
+				case 2: value_int.id = u16
+				case 4: value_int.id = u32
+				case 8: value_int.id = u64
+				}
+				bits := reflect.as_u64(value_int) or_else panic("cannot get bits")
+
+				bs := reflect.type_info_base(field.type).variant.(reflect.Type_Info_Bit_Set)
+				et := reflect.type_info_base(bs.elem)
+				lower := bs.lower
+				upper := bs.upper
+
+				strings.write_string(sb, field.name)
+				strings.write_string(sb, "={")
+				defer strings.write_byte(sb, '}')
+
+				e, is_enum := et.variant.(reflect.Type_Info_Enum)
+
+				commas := 0
+				loop: for i in transmute(bit_set[0..<64])bits {
+					elem := i64(i) + lower
+					if commas > 0 { strings.write_string(sb, ", ") }
+
+					if is_enum {
+						for ev, evi in e.values {
+							v := u64(ev)
+							if v == u64(elem) {
+								strings.write_string(sb, ".")
+								strings.write_string(sb, e.names[evi])
+								commas += 1
+								continue loop
+							}
+						}
+					} else {
+						fmt.sbprintf(sb, "%d", elem)
+						commas += 1
+					}
+				}
+			}
+		} else if reflect.is_boolean(field.type) {
+			if reflect.as_bool(value) or_else false {
+				if n > 0 { strings.write_string(sb, ", ") }
+				defer n += 1
+				strings.write_string(sb, field.name)
+				strings.write_string(sb, "=true")
+			}
+		} else {
+			panic("unhandled type")
+		}
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -118,13 +203,14 @@ emit_decode_tables :: proc() -> (total: int) {
 	all: [dynamic]Entry
 	defer delete(all)
 	for mn in Mnemonic {
-		for f in ENCODING_TABLE[mn] {
-			op0_static := u8((f.bits >> 25) & 0xF)
-			op0_mask   := u8((f.mask >> 25) & 0xF)
+		for form in INSTRUCTION_TABLE[mn] {
+			e := form.encoding
+			op0_static := u8((e.bits >> 25) & 0xF)
+			op0_mask   := u8((e.mask >> 25) & 0xF)
 			// Enumerate every 4-bit bucket B such that (B & op0_mask) == op0_static.
 			for b: u8 = 0; b < 16; b += 1 {
 				if (b & op0_mask) != op0_static { continue }
-				append(&all, Entry{f.mnemonic, f.ops, f.enc, f.bits, f.mask, f.feature, f.flags, b})
+				append(&all, Entry{e.mnemonic, e.ops, e.enc, e.bits, e.mask, e.feature, e.flags, b, u32(len(all))})
 			}
 		}
 	}
@@ -132,7 +218,8 @@ emit_decode_tables :: proc() -> (total: int) {
 		if a.op0 != b.op0 { return a.op0 < b.op0 }
 		ac := bits.count_ones(a.mask); bc := bits.count_ones(b.mask)
 		if ac != bc { return ac > bc }
-		return u16(a.mnemonic) < u16(b.mnemonic)
+		if a.mnemonic != b.mnemonic { return u16(a.mnemonic) < u16(b.mnemonic) }
+		return a.seq < b.seq
 	})
 
 	op0_idx: [16]Range
@@ -173,13 +260,13 @@ emit_range :: proc(sb: ^strings.Builder, name: string, ranges: []Range) {
 // Shared row + flags formatting (compact, matching arm64's original generator)
 // -----------------------------------------------------------------------------
 
-write_row :: proc(sb: ^strings.Builder, mn: lib.Mnemonic, ops: [4]lib.Operand_Type,
-                  enc: [4]lib.Operand_Encoding, bits, mask: u32, feature: lib.Feature, flags: lib.Encoding_Flags) {
-	fmt.sbprintf(sb, "\t{{ .%v, {{.%v,.%v,.%v,.%v}}, {{.%v,.%v,.%v,.%v}}, 0x%08X, 0x%08X, .%v, {{%s}} }},\n",
-		mn, ops[0], ops[1], ops[2], ops[3], enc[0], enc[1], enc[2], enc[3], bits, mask, feature, flags_lit(flags))
+write_row :: proc(sb: ^strings.Builder, mn: lib.Mnemonic, ops: [5]lib.Operand_Type,
+                  enc: [5]lib.Operand_Encoding, bits, mask: u32, feature: lib.Feature, flags: lib.Encoding_Flags) {
+	fmt.sbprintf(sb, "\t{{ .%v, {{.%v,.%v,.%v,.%v,.%v}}, {{.%v,.%v,.%v,.%v,.%v}}, 0x%08X, 0x%08X, .%v, {{%s}} }},\n",
+		mn, ops[0], ops[1], ops[2], ops[3], ops[4], enc[0], enc[1], enc[2], enc[3], enc[4], bits, mask, feature, flags_lit(flags, ops))
 }
 
-flags_lit :: proc(f: lib.Encoding_Flags) -> string {
+flags_lit :: proc(f: lib.Encoding_Flags, ops: [5]lib.Operand_Type) -> string {
 	parts: [dynamic]string
 	defer delete(parts)
 	if f.branch      { append(&parts, "branch=true")      }
@@ -187,6 +274,15 @@ flags_lit :: proc(f: lib.Encoding_Flags) -> string {
 	if f.writes_pc   { append(&parts, "writes_pc=true")   }
 	if f.sets_flags  { append(&parts, "sets_flags=true")  }
 	if f.is_64       { append(&parts, "is_64=true")       }
+	encoding_operand_count: u8 = 0
+	for op_type in ops {
+		if op_type == .NONE { break }
+		encoding_operand_count += 1
+	}
+	if encoding_operand_count > 0 {
+		append(&parts, fmt.tprintf("explicit_count=%d", encoding_operand_count))
+	}
+
 	return strings.join(parts[:], ", ", context.temp_allocator)
 }
 
@@ -225,14 +321,14 @@ Encode_Run :: struct {
 
 Decode_Entry :: struct #packed {
 	mnemonic: Mnemonic,            // 2
-	ops:      [4]Operand_Type,     // 4
-	enc:      [4]Operand_Encoding, // 4
+	ops:      [5]Operand_Type,     // 4
+	enc:      [5]Operand_Encoding, // 4
 	bits:     u32,                 // 4
 	mask:     u32,                 // 4
 	feature:  Feature,             // 1
 	flags:    Encoding_Flags,      // 1
 }
-#assert(size_of(Decode_Entry) == 20)
+#assert(size_of(Decode_Entry) == 22)
 
 Decode_Index :: struct #packed {
 	start: u16,

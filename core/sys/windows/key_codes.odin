@@ -213,7 +213,7 @@ VK_OEM_3      :: 0xC0 // '`~' for US
 // 0xC1 - 0xDA : reserved
 
 VK_OEM_4 :: 0xDB // '[{' for US
-VK_OEM_5 :: 0xDC // '\|' for US
+VK_OEM_5 :: 0xDC // `'\|'` for US
 VK_OEM_6 :: 0xDD // ']}' for US
 VK_OEM_7 :: 0xDE // ''"' for US
 VK_OEM_8 :: 0xDF
@@ -222,7 +222,7 @@ VK_OEM_8 :: 0xDF
 
 // Various extended or enhanced keyboards
 VK_OEM_AX   :: 0xE1  //  'AX' key on Japanese AX kbd
-VK_OEM_102  :: 0xE2  //  "<>" or "\|" on RT 102-key kbd.
+VK_OEM_102  :: 0xE2  //  `"<>"` or `"\|"` on RT 102-key kbd.
 VK_ICO_HELP :: 0xE3  //  Help key on ICO
 VK_ICO_00   :: 0xE4  //  00 key on ICO
 

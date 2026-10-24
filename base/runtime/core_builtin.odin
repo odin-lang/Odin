@@ -696,6 +696,9 @@ when MAP_ENABLED {
 	// Note: Prefer the procedure group `reserve`
 	@builtin
 	reserve_map :: proc(m: ^$T/map[$K]$V, #any_int capacity: int, loc := #caller_location) -> Allocator_Error {
+		if capacity < 0 {
+			return .Invalid_Argument
+		}
 		return __dynamic_map_reserve((^Raw_Map)(m), map_info(T), uint(capacity), loc)
 	}
 
@@ -718,7 +721,11 @@ when MAP_ENABLED {
 	delete_key :: proc(m: ^$T/map[$K]$V, key: K) -> (deleted_key: K, deleted_value: V) {
 		if m != nil {
 			key := key
-			old_k, old_v, ok := map_erase_dynamic((^Raw_Map)(m), map_info(T), uintptr(&key))
+			when ODIN_OPTIMIZATION_MODE >= .Size {
+				old_k, old_v, ok := map_erase_static(m, &key)
+			} else {
+				old_k, old_v, ok := map_erase_dynamic((^Raw_Map)(m), map_info(T), uintptr(&key))
+			}
 			if ok {
 				deleted_key   = (^K)(old_k)^
 				deleted_value = (^V)(old_v)^
@@ -804,7 +811,7 @@ append_elem :: proc(#no_alias array: ^$T/[dynamic]$E, #no_broadcast arg: E, loc 
 		if arr.cap-arr.len > 0 {
 			// NOTE(bill, 2026-06-19): When this is in the hot path with -o:speed or -o:aggressive enabled,
 			// this code path cannot rely on type erasure and `mem_copy_non_overlapping`.
-			// So directly inlining the call and storing the argument like this helps the optimize a lot
+			// So directly inlining the call and storing the argument like this helps the optimizer a lot
 			assert(arr.data != nil, loc=loc)
 			([^]E)(arr.data)[arr.len] = arg
 			arr.len += 1
@@ -1383,6 +1390,9 @@ _reserve_dynamic_array :: #force_no_inline proc(#no_alias a: ^Raw_Dynamic_Array,
 	}
 
 	if capacity <= a.cap {
+		if capacity < 0 {
+			return .Invalid_Argument
+		}
 		return nil
 	}
 
@@ -1652,7 +1662,18 @@ when MAP_ENABLED {
 // `card` returns the number of bits that are set in a bit_set—its cardinality
 @builtin
 card :: proc "contextless" (s: $S/bit_set[$E; $U]) -> int {
-	return int(intrinsics.count_ones(transmute(intrinsics.type_bit_set_underlying_type(S))s))
+	Backing :: intrinsics.type_bit_set_underlying_type(S)
+	when intrinsics.type_is_array(Backing) {
+		// bit_set backed by an array of integers: sum the population count of each element
+		backing := transmute(Backing)s
+		count := 0
+		for elem in backing {
+			count += int(intrinsics.count_ones(elem))
+		}
+		return count
+	} else {
+		return int(intrinsics.count_ones(transmute(Backing)s))
+	}
 }
 
 

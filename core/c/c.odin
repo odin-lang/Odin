@@ -49,32 +49,109 @@ uint_least32_t :: builtin.u32
 int_least64_t  :: builtin.i64
 uint_least64_t :: builtin.u64
 
-// Same on Windows, Linux, and FreeBSD
+// 7.18.1.3 Fastest minimum-width integer types
+// Linux (glibc only, musl matches BSD spec)
+// https://sourceware.org/cgit/glibc/tree/stdlib/stdint.h
+// *BSD
+// https://cgit.freebsd.org/src/tree/sys/x86/include/_types.h
+// https://cgit.freebsd.org/src/tree/sys/i386/include/_types.h
+// Darwin
+// https://github.com/apple-oss-distributions/Libc/blob/main/include/stdint.h
+//
 when ODIN_ARCH == .i386 {
-	int_fast8_t    :: builtin.i8
-	uint_fast8_t   :: builtin.u8
-	int_fast16_t   :: builtin.i32
-	uint_fast16_t  :: builtin.u32
-	int_fast32_t   :: builtin.i32
-	uint_fast32_t  :: builtin.u32
+	when ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD { // https://cgit.freebsd.org/src/tree/sys/i386/include/_types.h
+		int_fast8_t    :: builtin.i32
+		uint_fast8_t   :: builtin.u32
+		int_fast16_t   :: builtin.i32
+		uint_fast16_t  :: builtin.u32
+		int_fast32_t   :: builtin.i32
+		uint_fast32_t  :: builtin.u32
+	} else when ODIN_OS == .Darwin { // https://github.com/apple-oss-distributions/Libc/blob/main/include/stdint.h#L39
+		int_fast8_t    :: builtin.i8
+		uint_fast8_t   :: builtin.u8
+		int_fast16_t   :: builtin.i16
+		uint_fast16_t  :: builtin.u16
+		int_fast32_t   :: builtin.i32
+		uint_fast32_t  :: builtin.u32
+	} else {
+		int_fast8_t    :: builtin.i8
+		uint_fast8_t   :: builtin.u8
+		int_fast16_t   :: builtin.i32
+		uint_fast16_t  :: builtin.u32
+		int_fast32_t   :: builtin.i32
+		uint_fast32_t  :: builtin.u32
+	}
 	int_fast64_t   :: builtin.i64
 	uint_fast64_t  :: builtin.u64
 } else when ODIN_ARCH == .amd64 {
-	int_fast8_t    :: builtin.i8
-	uint_fast8_t   :: builtin.u8
-	int_fast16_t   :: long
-	uint_fast16_t  :: ulong
-	int_fast32_t   :: long
-	uint_fast32_t  :: ulong
+	when ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD { // https://cgit.freebsd.org/src/tree/sys/x86/include/_types.h#n66
+		int_fast8_t    :: builtin.i32
+		uint_fast8_t   :: builtin.u32
+		int_fast16_t   :: builtin.i32
+		uint_fast16_t  :: builtin.u32
+		int_fast32_t   :: builtin.i32
+		uint_fast32_t  :: builtin.u32
+	} else when ODIN_OS == .Darwin {
+		int_fast8_t    :: builtin.i8
+		uint_fast8_t   :: builtin.u8
+		int_fast16_t   :: builtin.i16
+		uint_fast16_t  :: builtin.u16
+		int_fast32_t   :: builtin.i32
+		uint_fast32_t  :: builtin.u32
+	} else when ODIN_OS == .Windows {
+		int_fast8_t    :: builtin.i8
+		uint_fast8_t   :: builtin.u8
+		int_fast16_t   :: builtin.i32
+		uint_fast16_t  :: builtin.u32
+		int_fast32_t   :: builtin.i32
+		uint_fast32_t  :: builtin.u32
+	} else when ODIN_OS == .Linux {
+		int_fast8_t    :: builtin.i8
+		uint_fast8_t   :: builtin.u8
+		int_fast16_t   :: long // todo: musl is i32 to match BSD spec. No way to target it yet
+		uint_fast16_t  :: ulong
+		int_fast32_t   :: long
+		uint_fast32_t  :: ulong
+	} else {
+		int_fast8_t    :: builtin.i8
+		uint_fast8_t   :: builtin.u8
+		int_fast16_t   :: builtin.i32
+		uint_fast16_t  :: builtin.u32
+		int_fast32_t   :: builtin.i32
+		uint_fast32_t  :: builtin.u32
+	}
 	int_fast64_t   :: builtin.i64
 	uint_fast64_t  :: builtin.u64
 } else {
-	int_fast8_t    :: builtin.i8
-	uint_fast8_t   :: builtin.u8
-	int_fast16_t   :: builtin.i16
-	uint_fast16_t  :: builtin.u16
-	int_fast32_t   :: builtin.i32
-	uint_fast32_t  :: builtin.u32
+	when ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
+		int_fast8_t    :: builtin.i32
+		uint_fast8_t   :: builtin.u32
+		int_fast16_t   :: builtin.i32
+		uint_fast16_t  :: builtin.u32
+		int_fast32_t   :: builtin.i32
+		uint_fast32_t  :: builtin.u32
+	} else when ODIN_OS == .Darwin {
+		int_fast8_t    :: builtin.i8
+		uint_fast8_t   :: builtin.u8
+		int_fast16_t   :: builtin.i16
+		uint_fast16_t  :: builtin.u16
+		int_fast32_t   :: builtin.i32
+		uint_fast32_t  :: builtin.u32
+	} else when ODIN_OS == .Linux {
+		int_fast8_t    :: builtin.i8
+		uint_fast8_t   :: builtin.u8
+		int_fast16_t   :: long // todo: musl is i32 to match BSD spec. No way to target it yet
+		uint_fast16_t  :: ulong
+		int_fast32_t   :: long
+		uint_fast32_t  :: ulong
+	} else {
+		int_fast8_t    :: builtin.i8
+		uint_fast8_t   :: builtin.u8
+		int_fast16_t   :: builtin.i32
+		uint_fast16_t  :: builtin.u32
+		int_fast32_t   :: builtin.i32
+		uint_fast32_t  :: builtin.u32
+	}
 	int_fast64_t   :: builtin.i64
 	uint_fast64_t  :: builtin.u64
 }

@@ -14,8 +14,8 @@
 #ifndef LLVM_C_TYPES_H
 #define LLVM_C_TYPES_H
 
-#include "llvm-c/DataTypes.h"
-#include "llvm-c/ExternC.h"
+#include "DataTypes.h"
+#include "ExternC.h"
 
 LLVM_C_EXTERN_C_BEGIN
 

@@ -159,6 +159,27 @@ encode :: proc(
 		if mode == ._64 && inst.enc_hint != ENC_HINT_NONE && int(inst.enc_hint) <= len(ENCODE_FORMS) {
 			form_index = int(inst.enc_hint) - 1
 			matched_enc = &ENCODE_FORMS[form_index]
+			/* THE HINT MUST NAME A FORM OF THIS MNEMONIC. The bounds check above is not enough: the
+			   index is GLOBAL and baked into `mnemonic_builders.odin` at generation time, so any
+			   later edit to the encoding table that inserts or removes a form shifts every index
+			   after it and leaves the builders naming someone else's instruction. Nothing here
+			   noticed — the encoder took the form, emitted its bytes, and returned success.
+
+			   It has happened twice. `6e17e7a2d` left 2130 of 3671 builders pointing at the wrong
+			   form; `36af73834` regenerated both halves and cleared it; `baae2636b` (adding `in`
+			   and `out`) re-broke 37; `9ae9a9bf9` shifted an early mnemonic and broke 3393 of 3802,
+			   including CALL — whose r/m64 builder then encoded `0F 8A` (JPE) instead of `FF /2`,
+			   turning every indirect call into a conditional jump. The symptom was a segfault in a
+			   JIT'd program, arbitrarily far from the cause.
+
+			   Debug-only, so the release fast path is byte-for-byte what it was: this is a
+			   REGENERATION-TIME mistake, and it only has to be caught once by anyone running tests. */
+			when ODIN_DEBUG {
+				run := ENCODE_RUNS[inst.mnemonic]
+				if form_index < int(run.start) || form_index >= int(run.start) + int(run.count) {
+					panic("rexcode/x86: a baked enc_hint names a form outside its own mnemonic's run — mnemonic_builders.odin is stale relative to tables/x86.encode_*.bin. Regenerate it: odin run core/rexcode/isa/x86/tools/gen_mnemonic_builders.odin -file")
+				}
+			}
 		} else {
 			// Resolve the form on the matcher path (memoizing cache + scan) in a
 			// separate, non-inlined proc so this hot loop stays lean for the hint
@@ -313,8 +334,26 @@ encode :: proc(
 				pos += 1
 			}
 
-			// Address size override (67h)
-			if inst.flags.addr32 {
+			// Address size override (67h), when the CALLER asked for one. A form
+			// that requires a particular address size emits it below instead --
+			// this branch is inside the "any instruction flag is set" gate, and
+			// such a form needs the prefix whether or not the caller set a flag.
+			if inst.flags.addr32 && enc.flags.addr_size == .DEFAULT {
+				out[pos] = 0x67
+				pos += 1
+			}
+		}
+
+		// A form whose ADDRESS size is fixed (JRCXZ/JECXZ/JCXZ -- one opcode, the
+		// mnemonic saying which counter register) carries the prefix when its size
+		// is not the mode's default. Outside the flags gate above because it is a
+		// property of the ENCODING, not of the caller's request; `addr_size` is
+		// .DEFAULT for all but three forms, so the test is one compare against a
+		// field already loaded.
+		if enc.flags.addr_size != .DEFAULT {
+			// Reachability was settled by the matcher's gate, which refuses a form
+			// whose address size this mode cannot express.
+			if needs_67, _ := addr_size_prefix(enc.flags.addr_size, mode); needs_67 {
 				out[pos] = 0x67
 				pos += 1
 			}
@@ -869,6 +908,15 @@ encoding_matches_inline :: proc "contextless" (inst: ^Instruction, enc: ^Encodin
 	// when not in Mode._32.
 	if enc.flags.mode_32_only && mode != ._32 {
 		return false
+	}
+
+	// Address-size gate: a form fixed to an address size this mode cannot reach
+	// is not encodable here at all -- JCXZ (16-bit) in long mode, where 67h
+	// selects 32-bit; JRCXZ (64-bit) outside it. Every other form is .DEFAULT.
+	if enc.flags.addr_size != .DEFAULT {
+		if _, reachable := addr_size_prefix(enc.flags.addr_size, mode); !reachable {
+			return false
+		}
 	}
 
 	// PUSH/POP FS/GS: the segment operand is fixed by the opcode (0F A0/A1 -> FS,

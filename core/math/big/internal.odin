@@ -1841,18 +1841,19 @@ internal_root_n :: proc { internal_int_root_n, }
 */
 
 /*
-	Deallocates the backing memory of one or more `Int`s.
-	Asssumes none of the `integers` to be a `nil`.
+	Zeros the full backing storage of one or more `Int`s and deallocates it
+	using each dynamic array's own allocator. Resets each `Int` to its zero
+	value, so repeated destruction is safe and the `Int` can be reused.
+
+	Assumes no pointer in `integers` is `nil`.
 */
 internal_int_destroy :: proc(integers: ..^Int) {
-	integers := integers
-
-	for &a in integers {
+	for a in integers {
 		if internal_int_allocated_cap(a) > 0 {
-			_zero(a.digit[:])
-			free(&a.digit[0])
+			_zero(raw_data(a.digit)[:cap(a.digit)])
+			delete(a.digit)
 		}
-		a = &Int{}
+		a^ = {}
 	}
 }
 internal_destroy :: proc{ 

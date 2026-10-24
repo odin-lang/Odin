@@ -24,6 +24,7 @@ REM Odin side needs to match
 set TIER_GNU=false
 set TIER_F16=false
 set TIER_I128=false
+clang --version || exit /b
 clang -E tiers.c 2>nul | findstr /C:"ABI_YES_GNU" >nul && set TIER_GNU=true
 clang -E tiers.c 2>nul | findstr /C:"ABI_YES_F16" >nul && set TIER_F16=true
 clang -E tiers.c 2>nul | findstr /C:"ABI_YES_I128" >nul && set TIER_I128=true

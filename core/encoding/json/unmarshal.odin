@@ -358,7 +358,6 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, token: Token, ti: ^reflect.
 	return false, nil
 }
 
-@(private)
 unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 	UNSUPPORTED_TYPE := Unsupported_Type_Error{v.id, p.curr_token}
 	token := p.curr_token
@@ -668,22 +667,24 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 				return uerr
 			}
 
-			key_ptr: rawptr
+			key_ptr:  rawptr
+			key_cstr: cstring
+			key_int:  i128
 
 			#partial switch tk in t.key.variant {
 				case runtime.Type_Info_String:
 					assert(tk.encoding == .UTF_8)
 
 					key_ptr = rawptr(&key)
-					key_cstr: cstring
 					if reflect.is_cstring(t.key) {
 						key_cstr = cstring(raw_data(key))
 						key_ptr = &key_cstr
 					}
 				case runtime.Type_Info_Integer:
-					i, ok := strconv.parse_i128(key)
+					ok: bool
+					key_int, ok = strconv.parse_i128(key)
 					if !ok	{ return UNSUPPORTED_TYPE }
-					key_ptr = rawptr(&i)
+					key_ptr = &key_int
 				case: return UNSUPPORTED_TYPE
 			}
 

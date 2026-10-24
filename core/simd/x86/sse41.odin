@@ -49,11 +49,23 @@ _mm_blendv_ps :: #force_inline proc "c" (a, b, mask: __m128) -> __m128 {
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_blend_pd :: #force_inline proc "c" (a, b: __m128d, $IMM2: u8) -> __m128d {
-	return blendpd(a, b, IMM2)
+	return simd.shuffle(
+		a,
+		b,
+		2 when (IMM2 >> 0) & 1 == 1 else 0,
+		3 when (IMM2 >> 1) & 1 == 1 else 1,
+	)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_blend_ps :: #force_inline proc "c" (a, b: __m128, $IMM4: u8) -> __m128 {
-	return blendps(a, b, IMM4)
+	return simd.shuffle(
+		a,
+		b,
+		4 when (IMM4 >> 0) & 1 == 1 else 0,
+		5 when (IMM4 >> 1) & 1 == 1 else 1,
+		6 when (IMM4 >> 2) & 1 == 1 else 2,
+		7 when (IMM4 >> 3) & 1 == 1 else 3,
+	)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_extract_ps :: #force_inline proc "c" (a: __m128, $IMM8: u32) -> i32 {
@@ -81,35 +93,35 @@ _mm_insert_epi32 :: #force_inline proc "c" (a: __m128i, i: i32, $IMM8: u32) -> _
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_max_epi8 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)pmaxsb(transmute(i8x16)a, transmute(i8x16)b)
+	return transmute(__m128i)simd.max(transmute(i8x16)a, transmute(i8x16)b)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_max_epu16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)pmaxuw(transmute(u16x8)a, transmute(u16x8)b)
+	return transmute(__m128i)simd.max(transmute(u16x8)a, transmute(u16x8)b)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_max_epi32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)pmaxsd(transmute(i32x4)a, transmute(i32x4)b)
+	return transmute(__m128i)simd.max(transmute(i32x4)a, transmute(i32x4)b)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_max_epu32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)pmaxud(transmute(u32x4)a, transmute(u32x4)b)
+	return transmute(__m128i)simd.max(transmute(u32x4)a, transmute(u32x4)b)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_min_epi8 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)pminsb(transmute(i8x16)a, transmute(i8x16)b)
+	return transmute(__m128i)simd.min(transmute(i8x16)a, transmute(i8x16)b)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_min_epu16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)pminuw(transmute(u16x8)a, transmute(u16x8)b)
+	return transmute(__m128i)simd.min(transmute(u16x8)a, transmute(u16x8)b)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_min_epi32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)pminsd(transmute(i32x4)a, transmute(i32x4)b)
+	return transmute(__m128i)simd.min(transmute(i32x4)a, transmute(i32x4)b)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_min_epu32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)pminud(transmute(u32x4)a, transmute(u32x4)b)
+	return transmute(__m128i)simd.min(transmute(u32x4)a, transmute(u32x4)b)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_packus_epi32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
@@ -253,7 +265,9 @@ _mm_minpos_epu16 :: #force_inline proc "c" (a: __m128i) -> __m128i {
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_mul_epi32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return pmuldq(transmute(i32x4)a, transmute(i32x4)b)
+	c := cast(__m128i)(cast(#simd[2]i32)a)
+	d := cast(__m128i)(cast(#simd[2]i32)b)
+	return simd.mul(c, d)
 }
 @(require_results, enable_target_feature="sse4.1")
 _mm_mullo_epi32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
@@ -310,28 +324,8 @@ foreign _ {
 	blendvpd   :: proc(a, b, mask: __m128d) -> __m128d ---
 	@(link_name = "llvm.x86.sse41.blendvps")
 	blendvps   :: proc(a, b, mask: __m128) -> __m128 ---
-	@(link_name = "llvm.x86.sse41.blendpd")
-	blendpd    :: proc(a, b: __m128d, #const imm2: u8) -> __m128d ---
-	@(link_name = "llvm.x86.sse41.blendps")
-	blendps    :: proc(a, b: __m128, #const imm4: u8) -> __m128 ---
 	@(link_name = "llvm.x86.sse41.insertps")
 	insertps   :: proc(a, b: __m128, #const imm8: u8) -> __m128 ---
-	@(link_name = "llvm.x86.sse41.pmaxsb")
-	pmaxsb     :: proc(a, b: i8x16) -> i8x16 ---
-	@(link_name = "llvm.x86.sse41.pmaxuw")
-	pmaxuw     :: proc(a, b: u16x8) -> u16x8 ---
-	@(link_name = "llvm.x86.sse41.pmaxsd")
-	pmaxsd     :: proc(a, b: i32x4) -> i32x4 ---
-	@(link_name = "llvm.x86.sse41.pmaxud")
-	pmaxud     :: proc(a, b: u32x4) -> u32x4 ---
-	@(link_name = "llvm.x86.sse41.pminsb")
-	pminsb     :: proc(a, b: i8x16) -> i8x16 ---
-	@(link_name = "llvm.x86.sse41.pminuw")
-	pminuw     :: proc(a, b: u16x8) -> u16x8 ---
-	@(link_name = "llvm.x86.sse41.pminsd")
-	pminsd     :: proc(a, b: i32x4) -> i32x4 ---
-	@(link_name = "llvm.x86.sse41.pminud")
-	pminud     :: proc(a, b: u32x4) -> u32x4 ---
 	@(link_name = "llvm.x86.sse41.packusdw")
 	packusdw   :: proc(a, b: i32x4) -> u16x8 ---
 	@(link_name = "llvm.x86.sse41.dppd")
@@ -348,8 +342,6 @@ foreign _ {
 	roundss    :: proc(a, b: __m128, rounding: i32) -> __m128 ---
 	@(link_name = "llvm.x86.sse41.phminposuw")
 	phminposuw :: proc(a: u16x8) -> u16x8 ---
-	@(link_name = "llvm.x86.sse41.pmuldq")
-	pmuldq     :: proc(a, b: i32x4) -> i64x2 ---
 	@(link_name = "llvm.x86.sse41.mpsadbw")
 	mpsadbw    :: proc(a, b: u8x16, #const imm8: u8) -> u16x8 ---
 	@(link_name = "llvm.x86.sse41.ptestz")

@@ -8,7 +8,7 @@ gb_internal bool is_diverging_expr(Ast *expr) {
 		return name == "panic";
 	}
 	Ast *proc = unparen_expr(expr->CallExpr.proc);
-	TypeAndValue tv = proc->tav;
+	TypeAndValue tv = type_and_value_of_expr(proc);
 	if (tv.mode == Addressing_Builtin) {
 		Entity *e = entity_of_node(proc);
 		BuiltinProcId id = BuiltinProc_Invalid;
@@ -339,7 +339,7 @@ gb_internal bool check_is_terminating(Ast *node, String const &label) {
 
 	case_ast_node(ws, WhenStmt, node);
 		// TODO(bill): Is this logic correct for when statements?
-		auto const &tv = ws->cond->tav;
+		AstTypeAndValue const &tv = ws->cond->tav;
 		if (tv.mode != Addressing_Constant) {
 			// NOTE(bill): Check the things regardless as a bug occurred earlier
 			if (ws->else_stmt != nullptr) {
@@ -351,8 +351,8 @@ gb_internal bool check_is_terminating(Ast *node, String const &label) {
 			return false;
 		}
 
-		if (tv.value.kind == ExactValue_Bool) {
-			if (tv.value.value_bool) {
+		if (tv.value().kind == ExactValue_Bool) {
+			if (tv.value().value_bool) {
 				return check_is_terminating(ws->body, label);
 			} else {
 				if (ws->else_stmt == nullptr) {
@@ -544,7 +544,7 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 		Ast *ln = unparen_expr(lhs->expr);
 		if (ln->kind == Ast_IndexExpr) {
 			Ast *x = ln->IndexExpr.expr;
-			TypeAndValue tav = x->tav;
+			TypeAndValue tav = type_and_value_of_expr(x);
 			GB_ASSERT(tav.mode != Addressing_Invalid);
 			if (tav.mode != Addressing_Variable) {
 				if (!is_type_pointer(tav.type)) {
@@ -710,8 +710,13 @@ gb_internal void check_when_stmt(CheckerContext *ctx, AstWhenStmt *ws, u32 flags
 		error(ws->cond, "Invalid body for 'when' statement");
 		return;
 	}
-	if (operand.value.kind == ExactValue_Bool &&
-	    operand.value.value_bool) {
+
+	bool taken = operand.value.kind == ExactValue_Bool && operand.value.value_bool;
+	if (build_context.export_semantics_format != SemanticsFormat_Invalid) {
+		per_thread_array_add(&ctx->info->semantic_when_queue, SemanticWhen{ws, taken});
+	}
+
+	if (taken) {
 		check_stmt_list(ctx, ws->body->BlockStmt.stmts, flags);
 	} else if (ws->else_stmt) {
 		switch (ws->else_stmt->kind) {
@@ -751,8 +756,8 @@ gb_internal void check_label(CheckerContext *ctx, Ast *label, Ast *parent) {
 	GB_ASSERT(ctx->decl != nullptr);
 
 	bool ok = true;
-	for_array(i, ctx->decl->labels) {
-		BlockLabel bl = ctx->decl->labels[i];
+	for_array(i, ctx->decl->proc->labels) {
+		BlockLabel bl = ctx->decl->proc->labels[i];
 		if (bl.name == name) {
 			error(label, "Duplicate label with the name '%.*s'", LIT(name));
 			ok = false;
@@ -766,7 +771,7 @@ gb_internal void check_label(CheckerContext *ctx, Ast *label, Ast *parent) {
 
 	if (ok) {
 		BlockLabel bl = {name, label};
-		array_add(&ctx->decl->labels, bl);
+		array_add(&ctx->decl->proc->labels, bl);
 	}
 }
 
@@ -846,10 +851,10 @@ gb_internal bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, 
 	}
 
 	case Entity_Variable: {
-		bool is_ptr = is_type_pointer(e->type);
+		bool is_ptr = is_type_pointer(e->type) || is_type_soa_pointer(e->type);
 		Type *t = base_type(type_deref(e->type));
 		if (t->kind == Type_Struct) {
-			wait_signal_until_available(&t->Struct.fields_wait_signal);
+			wait_for_record_signal(&t->Struct.fields_wait_signal, &t->Struct.checking_thread);
 
 			Scope *found = t->Struct.scope;
 			GB_ASSERT(found != nullptr);
@@ -954,14 +959,17 @@ gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 			error(x.expr, "Expected a constant integer for #unroll, got '%s'", s);
 			gb_string_free(s);
 		} else {
-			ExactValue value = exact_value_to_integer(x.value);
-			i64 v = exact_value_to_i64(value);
-			if (v < 1) {
-				error(x.expr, "Expected a constant integer >= 1 for #unroll, got %lld", cast(long long)v);
-			} else {
-				unroll_count = v;
-				if (v > 1024) {
-					error(x.expr, "Too large of a value for #unroll, got %lld, expected <= 1024", cast(long long)v);
+			convert_to_typed(ctx, &x, t_int);
+			if (x.mode != Addressing_Invalid) {
+				ExactValue value = exact_value_to_integer(x.value);
+				i64 v = exact_value_to_i64(value);
+				if (v < 1) {
+					error(x.expr, "Expected a constant integer >= 1 for #unroll, got %lld", cast(long long)v);
+				} else {
+					unroll_count = v;
+					if (v > 1024) {
+						error(x.expr, "Too large of a value for #unroll, got %lld, expected <= 1024", cast(long long)v);
+					}
 				}
 			}
 
@@ -1164,6 +1172,8 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 	ast_node(ss, SwitchStmt, node);
 
 	Operand x = {};
+	// Tagless switch cases are independent predicates, not case values.
+	bool check_duplicate_cases = ss->tag != nullptr;
 
 	mod_flags |= Stmt_BreakAllowed | Stmt_FallthroughAllowed;
 	check_open_scope(ctx, node);
@@ -1182,12 +1192,13 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 		}
 	} else {
 		x.mode  = Addressing_Constant;
-		x.type  = t_bool;
+		x.type  = t_untyped_bool;
 		x.value = exact_value_bool(true);
 
 		Token token  = {};
 		token.pos    = ast_token(ss->body).pos;
 		token.string = str_lit("true");
+		token.flags  = TokenFlag_Synthesized;
 
 		x.expr = alloc_ast_node(nullptr, Ast_Ident);
 		x.expr->Ident.token = token;
@@ -1264,6 +1275,17 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 					continue;
 				}
 
+				// NOTE: like a single case value, the bounds take the type of the switch tag, otherwise
+				// untyped bounds would default to their own type (e.g. 'string' for a 'cstring' tag) (#7853)
+				convert_to_typed(ctx, &lhs, x.type);
+				if (lhs.mode == Addressing_Invalid) {
+					continue;
+				}
+				convert_to_typed(ctx, &rhs, x.type);
+				if (rhs.mode == Addressing_Invalid) {
+					continue;
+				}
+
 				TokenKind upper_op = Token_Invalid;
 				switch (be->op.kind) {
 				case Token_Ellipsis:  upper_op = Token_LtEq; break;
@@ -1289,9 +1311,17 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 				Operand b1 = rhs;
 				check_comparison(ctx, expr, &a1, &b1, Token_LtEq);
 
-				add_to_seen_map(ctx, &seen, upper_op, x, lhs, rhs);
+				if (check_duplicate_cases) {
+					add_to_seen_map(ctx, &seen, upper_op, x, lhs, rhs);
+				}
 
-				if (is_type_string16(x.type)) {
+				if (is_type_cstring16(x.type)) {
+					add_package_dependency(ctx, "runtime", "cstring16_le");
+					add_package_dependency(ctx, "runtime", "cstring16_lt");
+				} else if (is_type_cstring(x.type)) {
+					add_package_dependency(ctx, "runtime", "cstring_le");
+					add_package_dependency(ctx, "runtime", "cstring_lt");
+				} else if (is_type_string16(x.type)) {
 					// NOTE(bill): Force dependency for strings here
 					add_package_dependency(ctx, "runtime", "string16_le");
 					add_package_dependency(ctx, "runtime", "string16_lt");
@@ -1308,6 +1338,9 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 				} else {
 					check_expr_with_type_hint(ctx, &y, expr, x.type);
 				}
+				if (expr->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) {
+					error(expr, "Procedure calls that have an associated deferred procedure are not allowed within case clauses");
+				}
 
 				if (x.mode == Addressing_Invalid ||
 				    y.mode == Addressing_Invalid) {
@@ -1322,7 +1355,9 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 					}
 					t = default_type(t);
 					add_type_info_type(ctx, t);
-					add_type_to_seen_map(ctx, &seen, y);
+					if (check_duplicate_cases) {
+						add_type_to_seen_map(ctx, &seen, y);
+					}
 				} else {
 					convert_to_typed(ctx, &y, x.type);
 					if (y.mode == Addressing_Invalid) {
@@ -1339,7 +1374,9 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 						continue;
 					}
 					update_untyped_expr_type(ctx, z.expr, x.type, !is_type_untyped(x.type));
-					add_to_seen_map(ctx, &seen, y);
+					if (check_duplicate_cases) {
+						add_to_seen_map(ctx, &seen, y);
+					}
 				}
 			}
 		}
@@ -1384,7 +1421,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 		}
 	}
 
-	if (build_context.strict_style) {
+	if (is_strict_style(node->thread_safe_file())) {
 		Token stok = ss->token;
 		for_array(i, bs->stmts) {
 			Ast *stmt = bs->stmts[i];
@@ -1525,6 +1562,9 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		bool saw_nil = false;
 		// TODO(bill): Make robust
 		Type *bt = base_type(type_deref(x.type));
+		if (bt->kind == Type_Union) {
+			wait_for_record_signal(&bt->Union.variants_wait_signal, &bt->Union.checking_thread);
+		}
 
 		Type *case_type = nullptr;
 		for (Ast *type_expr : cc->list) {
@@ -1660,7 +1700,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		}
 	}
 
-	if (build_context.strict_style) {
+	if (is_strict_style(node->thread_safe_file())) {
 		Token stok = ss->token;
 		for_array(i, bs->stmts) {
 			Ast *stmt = bs->stmts[i];
@@ -2092,6 +2132,11 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				if (is_addressed) {
 					if (is_possibly_addressable && i == addressable_index) {
 						entity->flags &= ~EntityFlag_Value;
+						if (analysis_in_use(AnalysisFlag_Atomic)) {
+							if (Entity *e = check_atomic_location(expr)) {
+								per_thread_array_add(&ctx->info->checked_addresses_queue, CheckedAddress{node, e});
+							}
+						}
 					} else {
 						char const *idx_name = is_map ? "key" : (is_bit_set || i == 0) ? "element" : "index";
 						error(token, "The %s variable '%.*s' cannot be made addressable", idx_name, LIT(str));
@@ -2178,6 +2223,8 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 			if (found == nullptr) {
 				entity = alloc_entity_variable(ctx->scope, token, nullptr);
 				entity->identifier = name;
+				add_semantic_ident(ctx->info, name, entity, true);
+				add_semantic_attributes(ctx->info, entity, vd->attributes);
 
 				Ast *fl = ctx->foreign_context.curr_library;
 				if (fl != nullptr) {
@@ -2270,6 +2317,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 		if (ac.link_name.len > 0) {
 			e->Variable.link_name = ac.link_name;
 		}
+		e->Variable.custom_align = ac.align;
 
 		e->flags &= ~EntityFlag_Static;
 		if (ac.is_static) {
@@ -2338,23 +2386,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 			}
 			init_entity_foreign_library(ctx, e);
 
-			auto *fp = &ctx->checker->info.foreigns;
-			StringHashKey key = string_hash_string(name);
-			Entity **found = string_map_get(fp, key);
-			if (found) {
-				Entity *f = *found;
-				TokenPos pos = f->token.pos;
-				Type *this_type = base_type(e->type);
-				Type *other_type = base_type(f->type);
-				if (!signature_parameter_similar_enough(this_type, other_type)) {
-					error(e->token,
-					      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
-					      "\tat %s",
-					      LIT(name), token_pos_to_string(pos));
-				}
-			} else {
-				string_map_set(fp, key, e);
-			}
+			add_link_name_use(ctx->info, name, e, ctx->decl, LinkNameUse_Variable);
 		} else if (e->flags & EntityFlag_Static) {
 			if (vd->values.count > 0) {
 				if (entity_count != vd->values.count) {
@@ -2449,7 +2481,8 @@ gb_internal void check_expr_stmt(CheckerContext *ctx, Ast *node) {
 			do_require = t->Proc.require_results;
 		} else if (check_stmt_internal_builtin_proc_id(ce->proc, &builtin_id)) {
 			auto const &bp = builtin_procs[builtin_id];
-			do_require = bp.kind == Expr_Expr && !bp.ignore_results;
+			// NOTE(Jeroen): diverging builtins like `unreachable` have no results to be handled
+			do_require = bp.kind == Expr_Expr && !bp.ignore_results && !bp.diverging;
 		}
 		if (do_require) {
 			gbString expr_str = expr_to_string(ce->proc);
@@ -2632,10 +2665,8 @@ gb_internal void check_if_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	check_close_scope(ctx);
 }
 
-// NOTE(bill): This is very basic escape analysis
-// This needs to be improved tremendously, and a lot of it done during the
-// middle-end (or LLVM side) to improve checks and error messages
-void check_unsafe_return(Operand const &o, Type *type, Ast *expr) {
+// returning stack memory made by the returned expression itself, where the escape analysis is disabled
+gb_internal void check_unsafe_return(Operand const &o, Type *type, Ast *expr) {
 	auto const unsafe_return_error = [](Operand const &o, char const *msg, Type *extra_type=nullptr) {
 		gbString s = expr_to_string(o.expr);
 		if (extra_type) {
@@ -2768,6 +2799,9 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 		}
 	}
 
+	if (ast_file_analysis(node->file(), AnalysisFlag_Escape)) {
+		return;
+	}
 	for (Operand &o : operands) {
 		if (o.expr == nullptr) {
 			continue;
@@ -2786,7 +2820,6 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 
 		check_unsafe_return(o, o.type, expr);
 	}
-
 }
 
 gb_internal void check_for_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
@@ -2811,16 +2844,16 @@ gb_internal void check_for_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 			    cond->BinaryExpr.op.kind == Token_GtEq &&
 			    type_of_expr(cond->BinaryExpr.left) != nullptr &&
 			    is_type_unsigned(type_of_expr(cond->BinaryExpr.left)) &&
-			    cond->BinaryExpr.right->tav.value.kind == ExactValue_Integer &&
-			    is_exact_value_zero(cond->BinaryExpr.right->tav.value)) {
+			    cond->BinaryExpr.right->tav.value().kind == ExactValue_Integer &&
+			    is_exact_value_zero(cond->BinaryExpr.right->tav.value())) {
 				warning(cond, "Expression is always true since unsigned numbers are always >= 0");
 			} else if (cond && cond->kind == Ast_BinaryExpr &&
 			    cond->BinaryExpr.left && cond->BinaryExpr.right &&
 			    cond->BinaryExpr.op.kind == Token_LtEq &&
 			    type_of_expr(cond->BinaryExpr.right) != nullptr &&
 			    is_type_unsigned(type_of_expr(cond->BinaryExpr.right)) &&
-			    cond->BinaryExpr.left->tav.value.kind == ExactValue_Integer &&
-			    is_exact_value_zero(cond->BinaryExpr.left->tav.value)) {
+			    cond->BinaryExpr.left->tav.value().kind == ExactValue_Integer &&
+			    is_exact_value_zero(cond->BinaryExpr.left->tav.value())) {
 				warning(cond, "Expression is always true since unsigned numbers are always >= 0");
 			}
 		}
@@ -2903,8 +2936,8 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 			ctx->in_defer = true;
 			check_stmt(ctx, ds->stmt, 0);
 			ctx->in_defer = out_in_defer;
-			if (ctx->decl) {
-				ctx->decl->defer_used += 1;
+			if (ctx->decl && ctx->decl->proc) {
+				ctx->decl->proc->defer_used += 1;
 			}
 
 			// NOTE(bill): Handling errors/warnings

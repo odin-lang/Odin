@@ -1,6 +1,7 @@
 package test_internal
 
 import "core:log"
+import "base:intrinsics"
 import "base:runtime"
 import "core:math/rand"
 import "core:testing"
@@ -13,6 +14,9 @@ map_insert_random_key_value :: proc(t: ^testing.T) {
 	for entries in ENTRY_COUNTS {
 		log.infof("Testing %v entries", entries)
 		m: map[i64]i64
+		if entries >= 100_000 {
+			m = make_map_cap(map[i64]i64, entries * 2)
+		}
 		defer delete(m)
 
 		unique_keys := 0
@@ -63,6 +67,9 @@ map_update_random_key_value :: proc(t: ^testing.T) {
 	for entries in ENTRY_COUNTS {
 		log.infof("Testing %v entries", entries)
 		m: map[i64]i64
+		if entries >= 100_000 {
+			m = make_map_cap(map[i64]i64, entries * 2)
+		}
 		defer delete(m)
 
 		unique_keys := 0
@@ -127,6 +134,9 @@ map_delete_random_key_value :: proc(t: ^testing.T) {
 	for entries in ENTRY_COUNTS {
 		log.infof("Testing %v entries", entries)
 		m: map[i64]i64
+		if entries >= 100_000 {
+			m = make_map_cap(map[i64]i64, entries * 2)
+		}
 		defer delete(m)
 
 		unique_keys := 0
@@ -255,6 +265,9 @@ set_insert_random_key_value :: proc(t: ^testing.T) {
 	for entries in ENTRY_COUNTS {
 		log.infof("Testing %v entries", entries)
 		m: map[i64]struct{}
+		if entries >= 100_000 {
+			m = make_map_cap(map[i64]struct{}, entries * 2)
+		}
 		defer delete(m)
 
 		unique_keys := 0
@@ -303,6 +316,9 @@ set_delete_random_key_value :: proc(t: ^testing.T) {
 	for entries in ENTRY_COUNTS {
 		log.infof("Testing %v entries", entries)
 		m: map[i64]struct{}
+		if entries >= 100_000 {
+			m = make_map_cap(map[i64]struct{}, entries * 2)
+		}
 		defer delete(m)
 
 		unique_keys := 0
@@ -384,4 +400,129 @@ test_union_key_should_not_be_hashing_specifc_variant :: proc(t: ^testing.T) {
 
 	testing.expect_value(t, bone_1 in m, true)
 	testing.expect_value(t, Id(bone_1) in m, true)
+}
+
+@test
+test_map_range_by_ref :: proc(t: ^testing.T) {
+	m: map[u32]int
+	defer delete(m)
+
+	m[0] = 0
+	m[1] = 0
+
+	for _, &v in m {
+		v = 1
+	}
+
+	for k, v in m {
+		testing.expectf(t, v == 1, "Expected m[%v] to be 1, got %v", k, v)
+	}
+}
+
+// A `string16` length counts u16 units, so hashing it as a `string` covered only half its bytes,
+// and a `cstring16` was read as a `string16`.
+@test
+map_utf16_string_keys :: proc(t: ^testing.T) {
+	hasher := intrinsics.type_hasher_proc(string16)
+	a: string16 = "abcd"
+	b: string16 = "abXY"
+	testing.expect(t, hasher(&a, 0) != hasher(&b, 0))
+	testing.expect_value(t, hasher(&a, 0), runtime.default_hasher_fixed(raw_data(a), 0, len(a)*size_of(u16)))
+
+	m: map[string16]int
+	defer delete(m)
+	m[a] = 1
+	m[b] = 2
+	testing.expect_value(t, m[a], 1)
+	testing.expect_value(t, m[b], 2)
+
+	chasher := intrinsics.type_hasher_proc(cstring16)
+	c: cstring16 = "abcd"
+	testing.expect_value(t, chasher(&c, 0), hasher(&a, 0))
+
+	mc: map[cstring16]int
+	defer delete(mc)
+	d: cstring16 = "abXY"
+	mc[c] = 1
+	mc[d] = 2
+	testing.expect_value(t, len(mc), 2)
+	testing.expect_value(t, mc[c], 1)
+	testing.expect_value(t, mc[d], 2)
+}
+
+// Ranging over `m[key]` took the address of the map value, which is nil for a missing key, and crashed.
+// A missing key iterates over the zero value instead.
+@test
+map_range_over_map_index :: proc(t: ^testing.T) {
+	count :: proc(t: ^testing.T, values: $M/map[$K]$V, key: K) -> (n: int) {
+		for _ in values[key] {
+			n += 1
+		}
+		return
+	}
+
+	{
+		m: map[string]map[string]int
+		defer {
+			for _, inner in m {
+				delete(inner)
+			}
+			delete(m)
+		}
+		testing.expect_value(t, count(t, m, "missing"), 0)
+
+		m["a"] = {}
+		inner := &m["a"]
+		inner["x"] = 1
+		inner["y"] = 2
+		testing.expect_value(t, count(t, m, "a"), 2)
+		testing.expect_value(t, count(t, m, "missing"), 0)
+	}
+	{
+		m: map[string][dynamic]int
+		defer {
+			for _, d in m {
+				delete(d)
+			}
+			delete(m)
+		}
+		testing.expect_value(t, count(t, m, "missing"), 0)
+		m["a"] = {}
+		append(&m["a"], 1, 2, 3)
+		testing.expect_value(t, count(t, m, "a"), 3)
+	}
+	{
+		m: map[string][dynamic; 4]int
+		defer delete(m)
+		testing.expect_value(t, count(t, m, "missing"), 0)
+	}
+	{
+		Axis :: enum { X, Y, Z }
+		m: map[string][Axis]int
+		defer delete(m)
+		testing.expect_value(t, count(t, m, "missing"), 3)
+	}
+	{
+		m: map[string][4]int
+		defer delete(m)
+		testing.expect_value(t, count(t, m, "missing"), 4)
+		for v in m["missing"] {
+			testing.expect_value(t, v, 0)
+		}
+		testing.expect_value(t, "missing" in m, false)
+
+		m["a"] = {1, 2, 3, 4}
+		sum := 0
+		for v in m["a"] {
+			sum += v
+		}
+		testing.expect_value(t, sum, 10)
+	}
+}
+
+@test
+map_reserve_negative :: proc(t: ^testing.T) {
+	m: map[int]int
+	err_reserve := reserve_map(&m, -10)
+	testing.expect_value(t, err_reserve, runtime.Allocator_Error.Invalid_Argument)
 }

@@ -152,14 +152,14 @@ foreign lib {
 	// to avoid missing parts of a page header if they cross a datablock boundary,
 	// without writing state-machiney code to record a partial detection.
 	//
-	// The number of channels returned are stored in *channels (which can be
+	// The number of channels returned are stored in `*channels` (which can be
 	// NULL--it is always the same as the number of channels reported by
-	// get_info). *output will contain an array of float* buffers, one per
-	// channel. In other words, (*output)[0][0] contains the first sample from
-	// the first channel, and (*output)[1][0] contains the first sample from
+	// get_info). `*output` will contain an array of `float*` buffers, one per
+	// channel. In other words, `(*output)[0][0]` contains the first sample from
+	// the first channel, and `(*output)[1][0]` contains the first sample from
 	// the second channel.
 	//
-	// *output points into stb_vorbis's internal output buffer storage; these
+	// `*output` points into stb_vorbis's internal output buffer storage; these
 	// buffers are owned by stb_vorbis and application code should not free
 	// them or modify their contents. They are transient and will be overwritten
 	// once you ask for more data to get decoded, so be sure to grab any data
@@ -239,10 +239,10 @@ foreign lib {
 	}
 
 	// these functions seek in the Vorbis file to (approximately) 'sample_number'.
-	// after calling seek_frame(), the next call to get_frame_*() will include
+	// after calling seek_frame(), the next call to `get_frame_*()` will include
 	// the specified sample. after calling stb_vorbis_seek(), the next call to
-	// stb_vorbis_get_samples_* will start with the specified sample. If you
-	// do not need to seek to EXACTLY the target sample when using get_samples_*,
+	// `stb_vorbis_get_samples_*` will start with the specified sample. If you
+	// do not need to seek to EXACTLY the target sample when using `get_samples_*`,
 	// you can also use seek_frame().
 	seek_frame :: proc(f: ^vorbis, sample_number: c.uint) -> c.int ---
 	seek       :: proc(f: ^vorbis, sample_number: c.uint) -> c.int ---
@@ -255,13 +255,13 @@ foreign lib {
 	stream_length_in_seconds :: proc(f: ^vorbis) -> f32 ---
 
 	// decode the next frame and return the number of samples. the number of
-	// channels returned are stored in *channels (which can be NULL--it is always
-	// the same as the number of channels reported by get_info). *output will
-	// contain an array of float* buffers, one per channel. These outputs will
-	// be overwritten on the next call to stb_vorbis_get_frame_*.
+	// channels returned are stored in `*channels` (which can be NULL--it is always
+	// the same as the number of channels reported by get_info). `*output` will
+	// contain an array of `float*` buffers, one per channel. These outputs will
+	// be overwritten on the next call to `stb_vorbis_get_frame_*`.
 	//
-	// You generally should not intermix calls to stb_vorbis_get_frame_*()
-	// and stb_vorbis_get_samples_*(), since the latter calls the former.
+	// You generally should not intermix calls to `stb_vorbis_get_frame_*()`
+	// and `stb_vorbis_get_samples_*()`, since the latter calls the former.
 	get_frame_float :: proc(f: ^vorbis, channels: ^c.int, output: ^[^]^f32) -> c.int ---
 
 	// decode the next frame and return the number of *samples* per channel.

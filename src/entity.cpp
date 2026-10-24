@@ -76,7 +76,8 @@ enum EntityFlag : u64 {
 	EntityFlag_Init          = 1ull<<31,
 	EntityFlag_Subtype       = 1ull<<32,
 	EntityFlag_Fini          = 1ull<<33,
-	
+	EntityFlag_PolyConstArg  = 1ull<<34, // passed to a `$` parameter, so a local procedure may be called outside its parent
+
 	EntityFlag_CustomLinkName = 1ull<<40,
 	EntityFlag_CustomLinkage_Internal = 1ull<<41,
 	EntityFlag_CustomLinkage_Strong   = 1ull<<42,
@@ -139,8 +140,19 @@ enum ProcedureOptimizationMode : u8 {
 	ProcedureOptimizationMode_FavorSize,
 };
 
+// see `@(futex=...)`
+enum ProcedureFutex : u8 {
+	ProcedureFutex_None,
+	ProcedureFutex_Wait,
+	ProcedureFutex_Wake,
+};
+
 
 BlockingMutex global_type_name_objc_metadata_mutex;
+
+struct TypeNameObjCMetadata;
+
+gb_internal TypeNameObjCMetadata *entity_objc_metadata(struct Entity *e);
 
 struct TypeNameObjCMetadataEntry {
 	InternedString interned;
@@ -196,14 +208,18 @@ struct AsmTemplateEntityDecl {
 
 	i32 view_of; // total_index of the source operand this is a width-view of, else -1
 	i32 view_bits; // the view width in bits, otherwise 0
+
+	bool no_init;
 };
 
 // An Entity is a named "thing" in the language
 struct Entity {
 	EntityKind  kind;
+	i32         global_graph_node; // 1 + the index of its node in the global groups' graph, 0 if it is none
 	u64         id;
 	std::atomic<u64>         flags;
 	std::atomic<EntityState> state;
+	Futex                    checking_thread; // 1 + the index of the thread in `check_entity_decl` for it, else 0
 	std::atomic<i32>         min_dep_count;
 	Token       token;
 	Scope *     scope;
@@ -226,6 +242,7 @@ struct Entity {
 
 	std::atomic<struct lbModule *> code_gen_module;
 	std::atomic<struct lbProcedure *> code_gen_procedure;
+	std::atomic<String *>             ir_mangled_name; // the backend's name for it, published once as modules may name it in parallel
 
 	u64         order_in_src;
 	String      deprecated_message;
@@ -264,6 +281,7 @@ struct Entity {
 			String     link_prefix;
 			String     link_suffix;
 			String     link_section;
+			i64        custom_align;
 			CommentGroup *docs;
 			CommentGroup *comment;
 			bool       is_foreign;
@@ -274,7 +292,6 @@ struct Entity {
 		struct {
 			Type * type_parameter_specialization;
 			Type * original_type_for_parapoly;
-			String ir_mangled_name;
 			bool   is_type_alias;
 			bool   objc_is_implementation;
 			Type*  objc_superclass;
@@ -298,6 +315,10 @@ struct Entity {
 			struct GenProcsData *gen_procs;
 			BlockingMutex gen_procs_mutex;
 			ProcedureOptimizationMode optimization_mode;
+			ProcedureFutex            futex;
+			i32                       futex_parameter; // the index of what `futex` waits on or wakes
+			u8                        synchronizes;        // OdinAtomicMemoryOrder, see `@(synchronizes=...)`
+			bool                      synchronizes_shared; // see `@(synchronizes_shared=...)`
 
 			u64     fast_math_flags;
 
@@ -340,22 +361,26 @@ struct Entity {
 			String name;
 			Ast *node;
 			Ast *parent;
+
+			i32 asm_block_index;
 		} Label;
 		struct {
 			Ast *node;
+			Type *proc_type; // of its signature, as an asm group can make the entity's type invalid before its body is checked
 			bool is_volatile;
 			bool is_align_stack;
+			bool is_pure;
 
 			bool has_observable_side_effect;
-
-
-			bool      clobber_flags;
-			bool      clobber_memory;
-			StringSet clobber_registers_set;
 
 			Scope *param_scope;
 			Scope *label_scope;
 			Array<AsmTemplateEntityDecl> decls;
+
+			StringSet clobber_registers_set;
+			StringSet preserve_registers_set;
+			bool      clobber_flags;
+			bool      clobber_memory;
 		} AsmTemplate;
 	};
 };
@@ -438,6 +463,18 @@ gb_internal bool entity_has_deferred_procedure(Entity *e) {
 
 gb_global std::atomic<u64> global_entity_id;
 
+gb_global thread_local u64 entity_id_next;
+gb_global thread_local u64 entity_id_end;
+
+gb_internal u64 next_entity_id(void) {
+	if (entity_id_next == entity_id_end) {
+		enum {ENTITY_ID_BLOCK = 1024};
+		entity_id_next = global_entity_id.fetch_add(ENTITY_ID_BLOCK, std::memory_order_relaxed);
+		entity_id_end  = entity_id_next + ENTITY_ID_BLOCK;
+	}
+	return 1 + entity_id_next++;
+}
+
 // NOTE(bill): This exists to allow for bulk allocations of entities all at once to improve performance for type generation
 #define INTERNAL_ENTITY_INIT(e_, kind_, scope_, token_, type_) do {                  \
 	(e_)->kind   = (kind_);                                                      \
@@ -445,7 +482,7 @@ gb_global std::atomic<u64> global_entity_id;
 	(e_)->scope  = (scope_);                                                     \
 	(e_)->token  = (token_);                                                     \
 	(e_)->type   = (type_);                                                      \
-	(e_)->id     = 1 + global_entity_id.fetch_add(1);                            \
+	(e_)->id     = next_entity_id();                                             \
 	if ((token_).pos.file_id) {                                                  \
 		e_->file = thread_unsafe_get_ast_file_from_id((token_).pos.file_id); \
 	}                                                                            \
@@ -574,6 +611,7 @@ gb_internal Entity *alloc_entity_label(Scope *scope, Token token, Type *type, As
 	Entity *entity = alloc_entity(Entity_Label, scope, token, type);
 	entity->Label.node = node;
 	entity->Label.parent = parent;
+	entity->Label.asm_block_index = -1;
 	entity->state = EntityState_Resolved;
 	return entity;
 }

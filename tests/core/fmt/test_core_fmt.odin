@@ -17,7 +17,7 @@ test_fmt_memory :: proc(t: ^testing.T) {
 	check(t, "3KiB",      "%.0M",  mem.Kilobyte * 3)
 	check(t, "3.000 mib", "%#.3m", mem.Megabyte * 3)
 	check(t, "3.50 gib",  "%#m",   u32(mem.Gigabyte * 3.5))
-	check(t, "01tib",     "%5.0m", mem.Terabyte)
+	check(t, " 1tib",     "%5.0m", mem.Terabyte)
 	check(t, "-1tib",     "%5.0m", -mem.Terabyte)
 	check(t, "2 pib",     "%#5.m", uint(mem.Petabyte * 2.5))
 	check(t, "1.00 EiB",  "%#M",   mem.Exabyte)
@@ -93,13 +93,13 @@ test_fmt_complex_quaternion :: proc(t: ^testing.T) {
 test_fmt_doc_examples :: proc(t: ^testing.T) {
 	// C-like syntax
 	check(t, "37 13",  "%[1]d %[0]d",    13,   37)
-	check(t, "017.00", "%*[2].*[1][0]f", 17.0, 2, 6)
-	check(t, "017.00", "%6.2f",          17.0)
+	check(t, " 17.00", "%*[2].*[1][0]f", 17.0, 2, 6)
+	check(t, " 17.00", "%6.2f",          17.0)
 
 	 // Python-like syntax
 	check(t, "37 13",  "{1:d} {0:d}",    13,   37)
-	check(t, "017.00", "{0:*[2].*[1]f}", 17.0, 2, 6)
-	check(t, "017.00", "{:6.2f}",        17.0)
+	check(t, " 17.00", "{0:*[2].*[1]f}", 17.0, 2, 6)
+	check(t, " 17.00", "{:6.2f}",        17.0)
 }
 
 @(test)
@@ -134,7 +134,7 @@ test_fmt_width_precision :: proc(t: ^testing.T) {
 	check(t, "3.140",  "%f",  3.14)
 	check(t, "3.140",  "%4f", 3.14)
 	check(t, "3.140",  "%5f", 3.14)
-	check(t, "03.140", "%6f", 3.14)
+	check(t, " 3.140", "%6f", 3.14)
 
 	// Precision
 	check(t, "3",       "%.f",  3.14)
@@ -167,6 +167,12 @@ test_fmt_width_precision :: proc(t: ^testing.T) {
 	check(t, "3.140", "%*[1].*[2][0]f", 3.14, 5, 3)
 	check(t, "3.140", "%*[2].*[1]f",    3.14, 3, 5)
 	check(t, "3.140", "%5.*[1]f",       3.14, 3)
+
+	// Width in runes, not bytes
+	check(t, "|     naive|", "|%10s|", "naive")
+	check(t, "|     naïve|", "|%10s|", "naïve")
+	check(t, "|naive     |", "|%-10s|", "naive")
+	check(t, "|naïve     |", "|%-10s|", "naïve")
 }
 
 @(test)
@@ -387,6 +393,77 @@ leaking_struct_tag :: proc(t: ^testing.T) {
 	}
 
 	check(t, "My_Struct{names = [\"hello?\"], name_count = 1}", "%v", foo)
+}
+
+@(test)
+test_fmt_left_justified_padding :: proc(t: ^testing.T) {
+	// a left-justified field pads to the right of the digits, so the fill has to be a space;
+	// a '0' there is read back as part of the number
+	check(t, "42   ",          "%-5d",    42)
+	check(t, "42   ",          "%-5v",    42)
+	check(t, "-42   ",         "%-6d",    -42)
+	check(t, "ff      ",       "%-8x",    255)
+	check(t, "101       ",     "%-10b",   5)
+	check(t, "3.140   ",       "%-8f",    3.14)
+	check(t, "3.0e+02   ",     "%-10.1e", 300.0)
+	check(t, "3.000000e+00  ", "%-14e",   3.0)
+	check(t, "1tib    ",       "%-8.0m",  mem.Terabyte)
+	check(t, "0    ",          "%-5.0d",  0)
+	check(t, "0    ",          "%-5d",    0)
+	check(t, "ab   ",          "%-5s",    "ab")
+	check(t, "true ",          "%-5t",    true)
+	check(t, "42   ",          "%- 5d",   42)
+	check(t, "42   ",          "{:-5d}",  42)
+	check(t, "42   ",          "%-05d",   42)
+
+	// right-justified fields fill with spaces unless given the '0' flag
+	check(t, "   42",  "%5d",   42)
+	check(t, "00042",  "%05d",  42)
+	check(t, " 3.140", "%6f",   3.14)
+	check(t, "   -42", "%6d",   -42)
+	check(t, " 1tib",  "%5.0m", mem.Terabyte)
+	check(t, "   ab",  "%5s",   "ab")
+	check(t, "    0",  "% 5.0d", 0)
+	check(t, "    0",  "% 5d",   0)
+	check(t, "    0",  "%5.0d",  0)
+	check(t, "    0",  "%5d",    0)
+	check(t, "   42",  "% 5.0d", 42)
+	check(t, "   42",  "{: 5d}", 42)
+}
+
+@(test)
+test_fmt_zero_flag :: proc(t: ^testing.T) {
+	check(t, "[   8] [  1.50] [8   ] [0008]", "[%4d] [%6.2f] [%-4d] [%04d]", 8, 1.5, 8, 8)
+
+	check(t, "   8",    "%4d",     8)
+	check(t, "8   ",    "%-4d",    8)
+	check(t, "0008",    "%04d",    8)
+	check(t, "  -8",    "%4d",     -8)
+	check(t, "-008",    "%04d",    -8)
+	check(t, "   8",    "{:4d}",   8)
+	check(t, "0008",    "{:04d}",  8)
+	check(t, "   8",    "%*d",     4, 8)
+	check(t, "0008",    "%0*d",    4, 8)
+	check(t, "  1.50",  "%6.2f",   1.5)
+	check(t, "001.50",  "%06.2f",  1.5)
+	check(t, "1.50  ",  "%-6.2f",  1.5)
+	check(t, " -1.50",  "%6.2f",   -1.5)
+	check(t, "-01.50",  "%06.2f",  -1.5)
+	check(t, "  +1.50", "%+7.2f",  1.5)
+	check(t, "+001.50", "%+07.2f", 1.5)
+	check(t, "  1.50",  "{:6.2f}", 1.5)
+	check(t, "001.50",  "{:06.2f}", 1.5)
+
+	// a '#' prefix stays next to the digits
+	check(t, "    0xff",   "%#8x",  255)
+	check(t, "    0xff",   "%#8x",  u64(255))
+	check(t, "    0xff",   "%#8x",  u128(255))
+	check(t, "0x000000ff", "%#08x", u64(255))
+	check(t, "0x000000ff", "%#08x", u128(255))
+
+	// an implied width always zero fills
+	check(t, "0h3c00",   "%h", f16(1))
+	check(t, "00000101", "%b", bit_set[0..<8; u8]{0, 2})
 }
 
 @(private)

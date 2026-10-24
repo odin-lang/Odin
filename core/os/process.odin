@@ -344,7 +344,7 @@ Process_Desc :: struct {
 	// stderr output.
 	stderr: ^File,
 	// The `stdout` handle to give to the child process. It can be either a file
-	// or a writeabe end of a pipe. Passing a `nil` will shut down the process'
+	// or a writeable end of a pipe. Passing a `nil` will shut down the process'
 	// stdout output.
 	stdout: ^File,
 	// The `stdin` handle to give to the child process. It can either be a file

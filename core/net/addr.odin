@@ -24,12 +24,12 @@ import "core:strings"
 
 /*
 	Expects an IPv4 address with no leading or trailing whitespace:
-	- a.b.c.d
-	- a.b.c.d:port
-	- [a.b.c.d]:port
+	- `a.b.c.d`
+	- `a.b.c.d:port`
+	- `[a.b.c.d]:port`
 
 	If the IP address is bracketed, the port must be present and valid (though it will be ignored):
-	- [a.b.c.d] will be treated as a parsing failure.
+	- `[a.b.c.d]` will be treated as a parsing failure.
 
 	The port, if present, is required to be a base 10 number in the range 0-65535, inclusive.
 

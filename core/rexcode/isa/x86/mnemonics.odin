@@ -53,6 +53,7 @@ Mnemonic :: enum u16 {
 	SHL,
 	SHR,
 	SAR,
+	SAL,
 	ROL,
 	ROR,
 	RCL,

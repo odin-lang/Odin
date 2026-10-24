@@ -6,9 +6,8 @@ package debug_trace
 @require import "base:runtime"
 
 @require import "core:c"
-@require import "core:os"
-@require import "core:strconv"
 @require import "core:strings"
+@require import "core:sys/posix"
 
 when !INSTRUMENTATION_MODE {
 
@@ -153,19 +152,18 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 	}
 
 	exec_and_fill :: proc(command: []string, locations: []Location, msgs: []cstring, allocator, temp_allocator: runtime.Allocator) -> (filled: int, err: Resolve_Error) {
-		state, stdout, stderr, perr := os.process_exec({command = command}, temp_allocator)
+		stdout, exec_errno, success := exec_symbolizer(command, temp_allocator)
 		defer delete(stdout, temp_allocator)
-		defer delete(stderr, temp_allocator)
 
 		count := len(command)-COMMAND_START_LEN
 
 		// `SYMBOLIZER_PROGRAM` does not exist, lets fall back to unresolved info.
-		if perr == .Not_Exist {
+		if exec_errno == .ENOENT {
 			fill_unresolved(locations, msgs, allocator)
 			return count, nil
 		}
 
-		if perr != nil || !state.success {
+		if !success {
 			return 0, .Resolve_Aborted
 		}
 
@@ -201,18 +199,156 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 		colon_idx := strings.last_index_byte(location, ':')
 		if colon_idx > 0 {
 			line_str := location[colon_idx+1:]
-			if line_int, ok := strconv.parse_i64_of_base(line_str, 10); ok {
+			if line_int, ok := parse_line_number(line_str); ok {
 				file_path = location[:colon_idx]
 				line      = i32(line_int)
 			}
 		}
 
 		return
+
+		parse_line_number :: proc(s: string) -> (n: i64, ok: bool) {
+			if len(s) == 0 { return }
+			for c in s {
+				if c < '0' || c > '9' { return }
+				n = n*10 + i64(c-'0')
+			}
+			return n, true
+		}
 	}
 
 	process_line :: proc(line: string, ok: bool) -> (string, Resolve_Error) {
 		if !ok || line == "" { return "", .Resolve_Aborted }
 		return strings.trim_right_space(line), nil
 	}
+
+	exec_symbolizer :: proc(command: []string, allocator: runtime.Allocator) -> (stdout: []byte, exec_errno: posix.Errno, ok: bool) {
+		cargs, cargs_err := make([]cstring, len(command)+1, allocator)
+		if cargs_err != nil {
+			return
+		}
+		defer delete(cargs, allocator)
+
+		args_size := 0
+		for arg in command {
+			args_size += len(arg)+1
+		}
+		args, args_err := make([]byte, args_size, allocator)
+		if args_err != nil {
+			return
+		}
+		defer delete(args, allocator)
+
+		offset := 0
+		for arg, i in command {
+			cargs[i] = cstring(&args[offset])
+			copy(args[offset:], arg)
+			offset += len(arg)+1
+		}
+
+		READ, WRITE :: 0, 1
+		stdout_pipe, exec_pipe: [2]posix.FD
+		if posix.pipe(&stdout_pipe) != .OK {
+			return
+		}
+		if posix.pipe(&exec_pipe) != .OK {
+			posix.close(stdout_pipe[READ])
+			posix.close(stdout_pipe[WRITE])
+			return
+		}
+		if posix.fcntl(exec_pipe[WRITE], .SETFD, i32(posix.FD_CLOEXEC)) == -1 {
+			posix.close(stdout_pipe[READ])
+			posix.close(stdout_pipe[WRITE])
+			posix.close(exec_pipe[READ])
+			posix.close(exec_pipe[WRITE])
+			return
+		}
+
+		pid := posix.fork()
+		if pid == -1 {
+			posix.close(stdout_pipe[READ])
+			posix.close(stdout_pipe[WRITE])
+			posix.close(exec_pipe[READ])
+			posix.close(exec_pipe[WRITE])
+			return
+		}
+
+		if pid == 0 {
+			abort :: proc(exec_fd: posix.FD) -> ! {
+				errno := posix.errno()
+				posix.write(exec_fd, ([^]byte)(&errno), size_of(errno))
+				posix._exit(126)
+			}
+
+			posix.close(stdout_pipe[READ])
+			posix.close(exec_pipe[READ])
+			if posix.dup2(stdout_pipe[WRITE], posix.STDOUT_FILENO) == -1 {
+				abort(exec_pipe[WRITE])
+			}
+
+			dev_null := posix.open("/dev/null", {.WRONLY})
+			if dev_null == -1 || posix.dup2(dev_null, posix.STDERR_FILENO) == -1 {
+				abort(exec_pipe[WRITE])
+			}
+			if dev_null != posix.STDERR_FILENO {
+				posix.close(dev_null)
+			}
+			if stdout_pipe[WRITE] != posix.STDOUT_FILENO {
+				posix.close(stdout_pipe[WRITE])
+			}
+
+			posix.execvp(cargs[0], raw_data(cargs))
+			abort(exec_pipe[WRITE])
+		}
+
+		posix.close(stdout_pipe[WRITE])
+		posix.close(exec_pipe[WRITE])
+
+		output: [dynamic]byte
+		output.allocator = allocator
+		read_ok := true
+		buf: [1024]byte
+		for {
+			n := posix.read(stdout_pipe[READ], raw_data(buf[:]), len(buf))
+			if n > 0 {
+				if _, err := append(&output, ..buf[:n]); err != nil {
+					read_ok = false
+				}
+			} else if n == -1 && posix.errno() == .EINTR {
+				continue
+			} else {
+				read_ok = read_ok && n == 0
+				break
+			}
+		}
+		posix.close(stdout_pipe[READ])
+
+		exec_errno = .NONE
+		for {
+			n := posix.read(exec_pipe[READ], ([^]byte)(&exec_errno), size_of(exec_errno))
+			if n == -1 && posix.errno() == .EINTR {
+				continue
+			}
+			read_ok = read_ok && (n == 0 || n == size_of(exec_errno))
+			break
+		}
+		posix.close(exec_pipe[READ])
+
+		status: c.int
+		for {
+			if posix.waitpid(pid, &status, {}) == -1 {
+				if posix.errno() == .EINTR {
+					continue
+				}
+				read_ok = false
+			}
+			break
+		}
+
+		stdout = output[:]
+		ok = read_ok && exec_errno == nil && posix.WIFEXITED(status) && posix.WEXITSTATUS(status) == 0
+		return
+	}
+
 }
 } // INSTRUMENTATION_MODE

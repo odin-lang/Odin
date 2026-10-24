@@ -4,8 +4,6 @@ package debug_trace
 
 @require import "base:runtime"
 
-@require import "core:slice"
-
 when INSTRUMENTATION_MODE {
 
 when ODIN_OPTIMIZATION_MODE == .None {
@@ -55,8 +53,11 @@ _locations_destroy :: proc(locations: []Location, allocator: runtime.Allocator) 
 
 @(private="package")
 _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (out: []Location, err: Resolve_Error) {
-	clone, mem_err := slice.clone(bt, allocator)
+	clone, mem_err := make(Capture, len(bt), allocator)
 	if mem_err != nil { return nil, .Allocator_Error }
+	for entry, i in bt {
+		clone[i] = entry
+	}
 	return transmute([]Location)clone, nil
 }
 
