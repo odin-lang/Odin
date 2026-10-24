@@ -638,6 +638,14 @@ gb_internal lbValue lb_emit_or_return(lbProcedure *p, Ast *arg, TypeAndValue con
 	lbValue rhs = {};
 	lb_emit_try_lhs_rhs(p, arg, tv, &lhs, &rhs);
 
+	// NOTE(bplu4t2f):
+	//     We must store the debug location before the or_return machinery, so that we can
+	//     restore it for the "continue_block". Otherwise the source location of the assignment
+	//     that is happening in the "continue" case is still stuck at the end of the "return_block".
+	//     That means the cursor would jump to the closing brace of a `defer` statement,
+	//     if the current scope has one, since that's running at the end of the "return" case.
+	LLVMMetadataRef debug_loc = LLVMGetCurrentDebugLocation2(p->builder);
+
 	lbBlock *return_block  = lb_create_block(p, "or_return.return");
 	lbBlock *continue_block  = lb_create_block(p, "or_return.continue");
 
@@ -666,7 +674,10 @@ gb_internal lbValue lb_emit_or_return(lbProcedure *p, Ast *arg, TypeAndValue con
 			lb_build_return_stmt_internal(p, rhs, ast_token(arg).pos);
 		}
 	}
+
+	// NOTE: The debug source location is still at the end of whatever the return case was doing.
 	lb_start_block(p, continue_block);
+	LLVMSetCurrentDebugLocation2(p->builder, debug_loc);
 	if (tv.type != nullptr) {
 		return lb_emit_conv(p, lhs, tv.type);
 	}
