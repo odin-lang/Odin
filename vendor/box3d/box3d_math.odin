@@ -322,8 +322,8 @@ MulQuat :: proc "c" (q1, q2: Quat) -> Quat {
 @(require_results)
 InvMulQuat :: proc "c" (q1, q2: Quat) -> Quat {
 	t1 := Cross(q2.xyz, q1.xyz)
-	t2 := t1 * q1.w + q2.xyz
-	t3 := t2 * q2.w - q1.xyz
+	t2 := t1 + q1.w * q2.xyz
+	t3 := t2 - q2.w * q1.xyz
 	return quaternion(x=t3.x, y=t3.y, z=t3.z, w=q1.w * q2.w + Dot(q1.xyz, q2.xyz))
 }
 
