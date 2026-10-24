@@ -236,6 +236,27 @@ class WebGLInterface {
 		return true;
 	}
 
+	setCurrentContextES2(element, contextSettings) {
+		if (!element) {
+			return false;
+		}
+		if (this.ctxElement == element) {
+			return true;
+		}
+
+		contextSettings = contextSettings ?? {};
+		this.ctx = element.getContext("webgl", contextSettings);
+		if (!this.ctx) {
+			return false;
+		}
+		this.ctxElement = element;
+		this.ctxVersion = 1.0;
+
+		this.extensions = this.ctx.getSupportedExtensions();
+
+		return true;
+	}
+
 	assertWebGL2() {
 		if (this.ctxVersion < 2) {
 			throw new Error("WebGL2 procedure called in a canvas without a WebGL2 context");
@@ -336,6 +357,28 @@ class WebGLInterface {
 				};
 
 				return this.setCurrentContext(element, contextSettings);
+			},
+			SetCurrentContextES2ById: (name_ptr, name_len) => {
+				let name = this.mem.loadString(name_ptr, name_len);
+				let element = getElement(name);
+				return this.setCurrentContextES2(element, {alpha: true, antialias: true, depth: true, premultipliedAlpha: true});
+			},
+			CreateCurrentContextES2ById: (name_ptr, name_len, attributes) => {
+				let name = this.mem.loadString(name_ptr, name_len);
+				let element = getElement(name);
+
+				let contextSettings = {
+					alpha:                        !(attributes & (1<<0)),
+					antialias:                    !(attributes & (1<<1)),
+					depth:                        !(attributes & (1<<2)),
+					failIfMajorPerformanceCaveat: !!(attributes & (1<<3)),
+					premultipliedAlpha:           !(attributes & (1<<4)),
+					preserveDrawingBuffer:        !!(attributes & (1<<5)),
+					stencil:                      !!(attributes & (1<<6)),
+					desynchronized:               !!(attributes & (1<<7)),
+				};
+
+				return this.setCurrentContextES2(element, contextSettings);
 			},
 			GetCurrentContextAttributes: () => {
 				if (!this.ctx) {
