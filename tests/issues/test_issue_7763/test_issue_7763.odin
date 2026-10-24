@@ -47,7 +47,7 @@ test_issue_7763__3eq :: proc(t: ^testing.T) {
 test_issue_7763__Aeq :: proc(t: ^testing.T) {
 	input := "A="
 	decoded, err := base64.decode(input)
-	testing.expect_value(t, err, .Invalid_Padding)
+	testing.expect_value(t, err, .Malformed_Quantum)
 	testing.expect(t, decoded == nil)
 }
 
@@ -111,7 +111,7 @@ test_issue_7763__strict_eq :: proc(t: ^testing.T) {
 test_issue_7763__strict_Aeq :: proc(t: ^testing.T) {
 	input := "A="
 	decoded, err := base64.decode(input, options = { .Strict })
-	testing.expect_value(t, err, .Invalid_Padding)
+	testing.expect_value(t, err, .Malformed_Quantum)
 	testing.expect(t, decoded == nil)
 }
 

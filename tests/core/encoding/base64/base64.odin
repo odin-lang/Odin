@@ -126,7 +126,7 @@ test_strict_reject :: proc(t: ^testing.T) {
 		options: base64.Decode_Options,
 		err:     base64.Decode_Error,
 	} {
-		{"A", {.Strict}, .Invalid_Padding}, // Debatable -> should be malformed quantum
+		{"A", {.Strict}, .Malformed_Quantum},
 		{"AA", {.Strict}, .Invalid_Padding},
 		{"Zg", {.Strict}, .Invalid_Padding},
 		{"Zm8", {.Strict}, .Invalid_Padding},
@@ -140,7 +140,7 @@ test_strict_reject :: proc(t: ^testing.T) {
 		{"WvLTlMrX9NpYDQlEIFlnDB==", {.Strict}, .Non_Canonical},
 		{"Zg==", {.Strict, .No_Padding}, .Invalid_Padding},
 		{"Zm8=", {.Strict, .No_Padding}, .Invalid_Padding},
-		{"Z", {.Strict, .No_Padding}, .Invalid_Padding}, // Debatable -> should be malformed quantum
+		{"Z", {.Strict, .No_Padding}, .Malformed_Quantum},
 		{"QR", {.Strict, .No_Padding}, .Non_Canonical},
 		{"!!!!", {.Strict}, .Invalid_Character},
 		{"Zm9!", {.Strict}, .Invalid_Character},
@@ -521,46 +521,48 @@ test_newline_rejected_lenient :: proc(t: ^testing.T) {
 @(test)
 reject_lenient_malformed_quantum_1 :: proc(t: ^testing.T) {
 	decoded, err := base64.decode("Q===")
-	// Debatable -> should be malformed quantum
-	testing.expect_value(t, err, .Invalid_Padding)
+	testing.expect_value(t, err, .Malformed_Quantum)
 	testing.expect(t, decoded == nil)
 }
 
 @(test)
 reject_strict_malformed_quantum_1 :: proc(t: ^testing.T) {
 	decoded, err := base64.decode("Q===", options = { .Strict })
-	// Debatable -> should be malformed quantum
-	testing.expect_value(t, err, .Invalid_Padding)
+	testing.expect_value(t, err, .Malformed_Quantum)
 	testing.expect(t, decoded == nil)
 }
 
 @(test)
 reject_lenient_malformed_quantum_2 :: proc(t: ^testing.T) {
 	decoded, err := base64.decode("QUJDQ===")
-	// Debatable -> should be malformed quantum
-	testing.expect_value(t, err, .Invalid_Padding)
+	testing.expect_value(t, err, .Malformed_Quantum)
 	testing.expect(t, decoded == nil)
 }
 
 @(test)
 reject_strict_malformed_quantum_2 :: proc(t: ^testing.T) {
 	decoded, err := base64.decode("QUJDQ===", options = { .Strict })
-	// Debatable -> should be malformed quantum
-	testing.expect_value(t, err, .Invalid_Padding)
+	testing.expect_value(t, err, .Malformed_Quantum)
 	testing.expect(t, decoded == nil)
 }
 
 @(test)
 reject_lenient_malformed_quantum_3 :: proc(t: ^testing.T) {
 	decoded, err := base64.decode("Q===QUJD")
-	testing.expect_value(t, err, .Invalid_Padding)
+	// Debatable: The current implementation treats any interior padding as
+	// "Invalid_Padding", even though in this case an argument could
+	// be made for "Malformed_Quantum" instead.
+	testing.expect(t, err != nil)
 	testing.expect(t, decoded == nil)
 }
 
 @(test)
 reject_strict_malformed_quantum_3 :: proc(t: ^testing.T) {
 	decoded, err := base64.decode("Q===QUJD", options = { .Strict })
-	testing.expect_value(t, err, .Invalid_Padding)
+	// Debatable: The current implementation treats any interior padding as
+	// "Invalid_Padding", even though in this case an argument could
+	// be made for "Malformed_Quantum" instead.
+	testing.expect(t, err != nil)
 	testing.expect(t, decoded == nil)
 }
 
@@ -594,8 +596,7 @@ writer_path_malformed_tails :: proc(t: ^testing.T) {
 	writer := io.Writer { procedure = dynamic_array_stream_proc, data = cast(rawptr)&backing }
 
 	err := base64.decode_into(writer, "QUJDQ")
-	// Debatable -> should be malformed quantum
-	testing.expect(t, err != nil)
+	testing.expect_value(t, err, .Malformed_Quantum)
 }
 
 @(test)

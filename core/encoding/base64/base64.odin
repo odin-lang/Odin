@@ -132,6 +132,7 @@ Decode_Error :: enum {
 	Invalid_Character,
 	Invalid_Padding,
 	Non_Canonical,
+	Malformed_Quantum,
 }
 
 // Decode_Option selects optional validation performed by the decode routines.
@@ -308,42 +309,53 @@ validate_strict_decode :: proc(data: string, dec_tbl: [256]i8, options: Decode_O
 			si -= 1
 			pad += 1
 		}
-		if pad > 2 {
-			return .Invalid_Padding
-		}
 		for j in 0 ..< si {
 			if data[j] == PADDING {
+				// Interior padding, e.g. QQ=Q
 				return .Invalid_Padding
 			}
 		}
 	}
 
+	// `si` is the amount of meaningful data, excluding trailing padding.
+
+	// Number of non-padding characters in the last quantum (e.g. 2 for "QQ==", 3 for "QUI=").
 	rem := si % 4
-	if .No_Padding in options && rem == 1 {
-		return .Invalid_Padding
+	if rem == 1 {
+		// "QUJDQ"  ||  "QUJDQ==="
+		//  -> unsalvageable (this is not just missing padding or non-canonical).
+		return .Malformed_Quantum
 	}
 
 	if .Strict in options {
 		if .No_Padding not_in options {
 			if n % 4 != 0 {
+				// "QQ"  ||  "QUI"
+				//  -> MUST be "QQ=="  ||  "QUI="
 				return .Invalid_Padding
 			}
 
 			switch rem {
 			case 0:
 				if pad != 0 {
+					// "QUJD="  ||  "QUJD=="
+					//  -> MUST be "QUJD"
 					return .Invalid_Padding
 				}
 			case 2:
 				if pad != 2 {
+					// "QQ"  ||  "QQ="
+					//  -> MUST be "QQ=="
 					return .Invalid_Padding
 				}
 			case 3:
 				if pad != 1 {
+					// "QUI"  ||  "QUI=="
+					//  -> MUST be "QUI="
 					return .Invalid_Padding
 				}
 			case:
-				return .Invalid_Padding
+				unreachable()
 			}
 		}
 
@@ -354,6 +366,8 @@ validate_strict_decode :: proc(data: string, dec_tbl: [256]i8, options: Decode_O
 				return .Invalid_Character
 			}
 			if (c & 0x0f) != 0 {
+				// In the last quantum, the second encoded character would decode into
+				// non-zero bits in the second decoded byte, which is beyond the decoded range.
 				return .Non_Canonical
 			}
 		case 3:
@@ -362,6 +376,8 @@ validate_strict_decode :: proc(data: string, dec_tbl: [256]i8, options: Decode_O
 				return .Invalid_Character
 			}
 			if (c & 0x03) != 0 {
+				// In the last quantum, the third encoded character would decode into
+				// non-zero bits in the third decoded byte, which is beyond the decoded range.
 				return .Non_Canonical
 			}
 		}
@@ -395,7 +411,7 @@ decode_analyze :: proc(data: string, DEC_TBL := DEC_TABLE, options: Decode_Optio
 	switch rem_in {
 	case 0:
 	case 1:
-		err = .Invalid_Padding // Debatable; should be malformed quantum
+		err = .Malformed_Quantum
 		return
 	case 2: rem_out = 1
 	case 3: rem_out = 2
@@ -548,7 +564,7 @@ decode_impl :: proc(dst: $T, info: Decode_Info, DEC_TBL := DEC_TABLE) -> ([]byte
 				switch rest_in {
 				case 1:
 					// Last quantum is malformed:  "Q==="
-					return nil, .Invalid_Padding // Debatable; should be malformed quantum.
+					return nil, .Malformed_Quantum
 				case 2:
 					dst[dst_cursor + 0] = byte(b0)
 					dst_cursor += 1
@@ -561,7 +577,7 @@ decode_impl :: proc(dst: $T, info: Decode_Info, DEC_TBL := DEC_TABLE) -> ([]byte
 				switch rest_in {
 				case 1:
 					// Last quantum is malformed:  "Q==="
-					return nil, .Invalid_Padding // Debatable; should be malformed quantum.
+					return nil, .Malformed_Quantum
 				case 2:
 					buf[0] = byte(b0)
 					rest_out = 1
