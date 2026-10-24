@@ -501,7 +501,13 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		stdin_handle = win32.HANDLE((^File_Impl)(desc.stdin.impl).fd)
 	}
 
-	working_dir_w := (win32_utf8_to_wstring(desc.working_dir, temp_allocator) or_else nil) if len(desc.working_dir) > 0 else nil
+	working_dir_w: cstring16
+	if len(desc.working_dir) > 0 {
+		// NOTE: Return with an error if this fails.
+		//       We don't want to start the process in the wrong working directory; that can be fatal.
+		working_dir_w = win32_utf8_to_wstring(desc.working_dir, temp_allocator) or_return
+	}
+
 	process_info: win32.PROCESS_INFORMATION
 	ok := win32.CreateProcessW(
 		nil,
