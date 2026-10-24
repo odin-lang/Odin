@@ -20,10 +20,12 @@ posix_sendfile :: proc(fd: Handle, s: TCP_Socket, offset, nbytes: int) -> (sent:
 	return
 }
 
-posix_listen_error   :: net._listen_error
-posix_accept_error   :: net._accept_error
-posix_dial_error     :: net._dial_error
-posix_tcp_send_error :: net._tcp_send_error
-posix_udp_send_error :: net._udp_send_error
-posix_tcp_recv_error :: net._tcp_recv_error
-posix_udp_recv_error :: net._udp_recv_error
+posix_listen_error    :: net._listen_error
+posix_accept_error    :: net._accept_error
+posix_dial_error      :: net._dial_error
+posix_tcp_send_error  :: net._tcp_send_error
+posix_unix_send_error :: net._unix_send_error
+posix_udp_send_error  :: net._udp_send_error
+posix_tcp_recv_error  :: net._tcp_recv_error
+posix_unix_recv_error :: net._unix_recv_error
+posix_udp_recv_error  :: net._udp_recv_error
