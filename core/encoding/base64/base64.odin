@@ -476,7 +476,17 @@ decode_impl :: proc(dst: $T, info: Decode_Info, DEC_TBL := DEC_TABLE) -> ([]byte
 			d3 = DEC_TBL[data[i + 3]]
 
 			if intrinsics.unlikely((d0 | d1 | d2 | d3) & ~i8(0x3f) != 0) {
-				return nil, Decode_Error.Invalid_Character
+				// To be consistent with validate_strict_decode, this will return
+				// Invalid_Padding if the input string contains invalid padding
+				// characters, but would otherwise be valid.
+				if (data[i + 0] == PADDING || d0 & ~i8(0x3f) == 0) &&
+				   (data[i + 1] == PADDING || d1 & ~i8(0x3f) == 0) &&
+				   (data[i + 2] == PADDING || d2 & ~i8(0x3f) == 0) &&
+				   (data[i + 3] == PADDING || d3 & ~i8(0x3f) == 0) {
+					return nil, .Invalid_Padding
+				} else {
+					return nil, .Invalid_Character
+				}
 			}
 
 			c0, c1, c2, c3 = int(d0), int(d1), int(d2), int(d3)
@@ -517,7 +527,16 @@ decode_impl :: proc(dst: $T, info: Decode_Info, DEC_TBL := DEC_TABLE) -> ([]byte
 			d2 = DEC_TBL[data[i + 2]] if rest_in >= 3 else 0
 
 			if intrinsics.unlikely((d0 | d1 | d2) & ~i8(0x3f) != 0) {
-				return nil, Decode_Error.Invalid_Character
+				// To be consistent with validate_strict_decode, this will return
+				// Invalid_Padding if the input string contains invalid padding
+				// characters, but would otherwise be valid.
+				if (               (data[i + 0] == PADDING || d0 & ~i8(0x3f) == 0)) &&
+				   (rest_in < 2 || (data[i + 1] == PADDING || d1 & ~i8(0x3f) == 0)) &&
+				   (rest_in < 3 || (data[i + 2] == PADDING || d2 & ~i8(0x3f) == 0)) {
+					return nil, .Invalid_Padding
+				} else {
+					return nil, .Invalid_Character
+				}
 			}
 
 			c0, c1, c2 = int(d0), int(d1), int(d2)
