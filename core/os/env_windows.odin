@@ -4,35 +4,35 @@ package os
 import win32 "core:sys/windows"
 import "base:runtime"
 
-_lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
+_lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: string, error: Error) {
 	if key == "" {
-		return
+		return "", .Env_Var_Not_Found
 	}
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
-	wkey, _ := win32_utf8_to_wstring(key, temp_allocator)
+	wkey := win32_utf8_to_wstring(key, temp_allocator) or_return
 
 	n := win32.GetEnvironmentVariableW(wkey, nil, 0)
 	if n == 0 {
 		err := win32.GetLastError()
 		if err == win32.ERROR_ENVVAR_NOT_FOUND {
-			return "", false
+			return "", .Env_Var_Not_Found
 		}
-		return "", true
+		return "", _get_platform_error()
 	}
 
-	b := make([]u16, n+1, temp_allocator)
+	b := make([]u16, n+1, temp_allocator) or_return
 
 	n = win32.GetEnvironmentVariableW(wkey, raw_data(b), u32(len(b)))
 	if n == 0 {
 		err := win32.GetLastError()
 		if err == win32.ERROR_ENVVAR_NOT_FOUND {
-			return "", false
+			return "", .Env_Var_Not_Found
 		}
-		return "", false
+		return "", _get_platform_error()
 	}
 
-	value = win32_utf16_to_utf8(string16(b[:n]), allocator) or_else ""
-	found = true
+	value = win32_utf16_to_utf8(string16(b[:n]), allocator) or_return
+
 	return
 }
 
@@ -41,6 +41,9 @@ _lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: 
 // due to the necessary utf-8 <> utf-16 conversion.
 @(require_results)
 _lookup_env_buf :: proc(buf: []u8, key: string) -> (value: string, err: Error) {
+	if key == "" {
+		return "", .Env_Var_Not_Found
+	}
 	key_buf: [513]u16
 	wkey := win32.utf8_to_wstring(key_buf[:], key)
 	if wkey == nil {
