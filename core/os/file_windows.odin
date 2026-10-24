@@ -37,8 +37,7 @@ File_Impl :: struct {
 	w_n:   int,
 	max_consecutive_empty_writes: int,
 
-	rw_mutex: sync.RW_Mutex, // read write calls
-	p_mutex:  sync.Mutex, // pread pwrite calls
+	rw_mutex: sync.RW_Mutex,
 }
 
 @(init)
@@ -298,6 +297,10 @@ _seek :: proc(f: ^File_Impl, offset: i64, whence: io.Seek_From) -> (ret: i64, er
 
 	sync.guard(&f.rw_mutex)
 
+	return _seek_unsafe(handle, offset, whence)
+}
+
+_seek_unsafe :: proc(handle: win32.HANDLE, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Error) {
 	w: u32
 	switch whence {
 	case .Start:   w = win32.FILE_BEGIN
@@ -382,22 +385,20 @@ _read_internal :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
 
 	sync.shared_guard(&f.rw_mutex) // multiple readers
 
-	if sync.guard(&f.p_mutex) {
-		to_read := win32.DWORD(min(length, MAX_RW))
-		switch f.kind {
-		case .Console:
-			// NOTE(laytan): at least for now, just use ReadFile, it seems to work fine,
-			// but, there may be issues with certain situations that we need to get reproductions for.
-			// total_read, err = read_console(handle, p[total_read:][:to_read])
-			fallthrough
-		case .Pipe, .File:
-			single_read_length: win32.DWORD
-			ok := win32.ReadFile(handle, &p[total_read], to_read, &single_read_length, nil)
-			if ok {
-				total_read += int(single_read_length)
-			} else {
-				err = _get_platform_error()
-			}
+	to_read := win32.DWORD(min(length, MAX_RW))
+	switch f.kind {
+	case .Console:
+		// NOTE(laytan): at least for now, just use ReadFile, it seems to work fine,
+		// but, there may be issues with certain situations that we need to get reproductions for.
+		// total_read, err = read_console(handle, p[total_read:][:to_read])
+		fallthrough
+	case .Pipe, .File:
+		single_read_length: win32.DWORD
+		ok := win32.ReadFile(handle, &p[total_read], to_read, &single_read_length, nil)
+		if ok {
+			total_read += int(single_read_length)
+		} else {
+			err = _get_platform_error()
 		}
 	}
 
@@ -417,8 +418,6 @@ _read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error) 
 			buf = buf[:MAX_RW]
 
 		}
-		curr_offset := _seek(f, 0, .Current) or_return
-		defer _seek(f, curr_offset, .Start)
 
 		o := win32.OVERLAPPED{
 			OffsetHigh = u32(offset>>32),
@@ -432,12 +431,35 @@ _read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error) 
 		if !win32.ReadFile(h, raw_data(buf), u32(len(buf)), &done, &o) {
 			err = _get_platform_error()
 			done = 0
+		} else if done == 0 {
+			err = .EOF
 		}
 		n = i64(done)
 		return
 	}
 
-	sync.guard(&f.p_mutex)
+	if len(p) <= 0 {
+		return
+	}
+
+	if offset < 0 {
+		err = .Invalid_Offset
+		return
+	}
+
+	handle := _handle(&f.file)
+	if handle == win32.INVALID_HANDLE {
+		return 0, .Invalid_File
+	}
+
+	if f.kind != .File {
+		return 0, .Invalid_File
+	}
+
+	sync.guard(&f.rw_mutex)
+
+	curr_offset := _seek_unsafe(handle, 0, .Current) or_return
+	defer _seek_unsafe(handle, curr_offset, .Start)
 
 	p, offset := p, offset
 	for len(p) > 0 {
@@ -486,8 +508,6 @@ _write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error)
 			buf = buf[:MAX_RW]
 
 		}
-		curr_offset := _seek(f, 0, .Current) or_return
-		defer _seek(f, curr_offset, .Start)
 
 		o := win32.OVERLAPPED{
 			OffsetHigh = u32(offset>>32),
@@ -504,10 +524,36 @@ _write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error)
 		return
 	}
 
-	sync.guard(&f.p_mutex)
+	if len(p) <= 0 {
+		return
+	}
+
+	if offset < 0 {
+		err = .Invalid_Offset
+		return
+	}
+
+	handle := _handle(&f.file)
+	if handle == win32.INVALID_HANDLE {
+		return 0, .Invalid_File
+	}
+
+	if f.kind != .File {
+		return 0, .Invalid_File
+	}
+
+	sync.guard(&f.rw_mutex)
+
+	curr_offset := _seek_unsafe(handle, 0, .Current) or_return
+	defer _seek_unsafe(handle, curr_offset, .Start)
+
 	p, offset := p, offset
 	for len(p) > 0 {
 		m := pwrite(f, p, offset) or_return
+		if m == 0 {
+			err = .Short_Write
+			return
+		}
 		n += m
 		p = p[m:]
 		offset += i64(m)
