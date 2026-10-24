@@ -487,7 +487,7 @@ test_newline_rejected :: proc(t: ^testing.T) {
 	}
 	for c in strict_cases {
 		decoded, err := base64.decode(c, options = {.Strict})
-		testing.expectf(t, err != nil, "strict decode(%q): expected rejection, got %q", c, decoded)
+		testing.expectf(t, err != nil, "strict decode(%q): expected rejection, got %q", c, err)
 		delete(decoded)
 	}
 
