@@ -3143,6 +3143,13 @@ STARTUPINFOW :: struct {
 	hStdError:       HANDLE,
 }
 
+LPPROC_THREAD_ATTRIBUTE_LIST :: distinct rawptr
+
+STARTUPINFOEXW :: struct {
+	StartupInfo:     STARTUPINFOW,
+	lpAttributeList: LPPROC_THREAD_ATTRIBUTE_LIST,
+}
+
 FILETIME :: struct {
 	dwLowDateTime:  DWORD,
 	dwHighDateTime: DWORD,
