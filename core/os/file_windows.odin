@@ -432,8 +432,19 @@ _read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error) 
 		if !win32.ReadFile(h, raw_data(buf), u32(len(buf)), &done, &o) {
 			err = _get_platform_error()
 			done = 0
+		} else if done == 0 {
+			err = .EOF
 		}
 		n = i64(done)
+		return
+	}
+
+	if len(p) <= 0 {
+		return
+	}
+
+	if offset < 0 {
+		err = .Invalid_Offset
 		return
 	}
 
