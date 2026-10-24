@@ -494,18 +494,26 @@ test_newline_rejected_strict :: proc(t: ^testing.T) {
 
 @(test)
 test_newline_rejected_lenient :: proc(t: ^testing.T) {
-	// Lenient mode only scans the input span `decoded_len` implies, so bytes
-	// past the decoded tail are not always inspected (e.g. "c3VyZQ\n=="
-	// currently decodes to "sure"); interior ones are always seen.
-	// NOTE(bplu4t2f): I would argue that ^ this is a bug.
 	lenient_cases := []string{
+		"c3VyZQ\n==",
 		"c3VyZQ==\n",
 		"c3VyZQ=\n=",
 		"c3V\ryZ\rQ==",
 	}
 	for c in lenient_cases {
 		decoded, err := base64.decode(c)
-		testing.expectf(t, err == base64.Decode_Error.Invalid_Character, "lenient decode(%q): got %v, want Invalid_Character", c, err)
+		// NOTE(bplu4t2f):
+		//     Ideally we would like to see Invalid_Character for all of these, however, that
+		//     would imply an O(N) linear scan through the entire rest of the input data, even
+		//     though we already know for sure that it contains an error.
+		//     Ex.:  QQ==QQ==Q\nQQQQ==
+		//             ^     ^^^^^
+		//             |     this quantum is not even inspected.
+		//             interior padding; decoding failure is already set in stone.
+		//
+		//     Instead, the implementation bails out early on error.
+		//     That means that this can either yield Invalid_Padding or Invalid_Character, for now.
+		testing.expectf(t, err != nil, "lenient decode(%q): expected rejection, got %q", c, err)
 		testing.expect(t, decoded == nil)
 	}
 }
