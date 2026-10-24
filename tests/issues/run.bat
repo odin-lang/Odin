@@ -161,6 +161,9 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 %ODIN% test "..\test_issue_split_globals" -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables || exit /b
 %ODIN% test "..\test_issue_split_globals" -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug || exit /b
 
+%ODIN% build "..\test_issue_7986\lib" -build-mode:shared -out:test_issue_7986_lib.dll %COMMON% || exit /b
+%ODIN% test "..\test_issue_7986" %COMMON% || exit /b
+
 %ODIN% test "..\test_issue_fast_isel_lowering" %COMMON% -o:none || exit /b
 
 %ODIN% test "..\test_issue_equal_proc_dependencies" %COMMON% -build-mode:obj 2>&1 | find /i /c "missing procedure" | findstr /x "0" || exit /b

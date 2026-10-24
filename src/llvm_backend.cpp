@@ -2464,6 +2464,8 @@ gb_internal void lb_create_global_variable(lbModule *m, lbGlobalVariable *var) {
 		LLVMSetLinkage(g.value, LLVMDLLExportLinkage);
 		LLVMSetDLLStorageClass(g.value, LLVMDLLExportStorageClass);
 	} else if (!is_foreign) {
+		// Make sure shared libraries use their own globals, as exported weak definitions are merged across images on Darwin.
+		LLVMSetVisibility(g.value, LLVMHiddenVisibility);
 		LLVM_SET_INTERNAL_WEAK_LINKAGE(g.value);
 	}
 	lb_set_linkage_from_entity_flags(m, g.value, e->flags);
