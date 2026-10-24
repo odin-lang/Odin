@@ -187,7 +187,10 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		// allow uints to be printed as hex
 		if opt.write_uint_as_hex && (opt.spec == .JSON5 || opt.spec == .MJSON) {
 			switch i in a {
-			case u8, u16, u32, u64, u128:
+			case u8, u16, u32, u64, u128, 
+				 u16be, u32be, u64be, u128be, 
+				 u16le, u32le, u64le, u128le,
+				 uintptr:
 				s = strconv.write_bits_128(buf[:], u, 16, info.signed, 8*ti.size, "0123456789abcdef", { .Prefix })
 
 			case:
@@ -211,6 +214,14 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		case f16: io.write_f16(w, f) or_return
 		case f32: io.write_f32(w, f) or_return
 		case f64: io.write_f64(w, f) or_return
+		
+		case f16le: io.write_f16(w, f16(f)) or_return
+		case f32le: io.write_f32(w, f32(f)) or_return
+		case f64le: io.write_f64(w, f64(f)) or_return
+		
+		case f16be: io.write_f16(w, f16(f)) or_return
+		case f32be: io.write_f32(w, f32(f)) or_return
+		case f64be: io.write_f64(w, f64(f)) or_return
 		case: return .Unsupported_Type
 		}
 
