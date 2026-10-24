@@ -677,6 +677,11 @@ gb_internal gb_inline i64 lb_max_zero_init_size(void) {
 	}
 }
 
+// NOTE: a loaded value larger than this is stored by copying its memory rather than as a first-class value
+gb_internal gb_inline i64 lb_max_store_size(void) {
+	return 64;
+}
+
 gb_internal LLVMTypeRef OdinLLVMGetArrayElementType(LLVMTypeRef type);
 gb_internal LLVMTypeRef OdinLLVMGetVectorElementType(LLVMTypeRef type);
 
