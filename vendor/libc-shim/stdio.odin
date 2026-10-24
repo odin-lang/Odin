@@ -484,3 +484,46 @@ _sscanf :: proc "c" (str, fmt: [^]byte, orig_ptrs: [^]rawptr) -> i32 {
 
 	return matches
 }
+
+@(require, linkage="strong", link_name="fgetc")
+fgetc :: proc "c" (file: FILE) -> c.int {
+	context = g_ctx
+	b: byte
+	if _fread(&b, 1, 1, file) != 1 {
+		return EOF
+	}
+	return c.int(b)
+}
+
+// True when the position is at (or past) the end. Built on fseek/ftell, since
+// this libc does not keep per-file EOF flags.
+@(require, linkage="strong", link_name="feof")
+feof :: proc "c" (file: FILE) -> c.int {
+	context = g_ctx
+	cur := _ftell(file)
+	if cur < 0 || _fseek(file, 0, 2) != 0 {
+		return 0
+	}
+	end := _ftell(file)
+	_fseek(file, cur, 0)
+	return 1 if cur >= end else 0
+}
+
+// No per-file error state is tracked: always 0.
+@(require, linkage="strong", link_name="ferror")
+ferror :: proc "c" (file: FILE) -> c.int {
+	return 0
+}
+
+// File descriptors are not exposed: fileno and fstat always fail with EBADF.
+@(require, linkage="strong", link_name="fileno")
+fileno :: proc "c" (file: FILE) -> c.int {
+	_errno = EBADF
+	return -1
+}
+
+@(require, linkage="strong", link_name="fstat")
+fstat :: proc "c" (fd: c.int, buf: rawptr) -> c.int {
+	_errno = EBADF
+	return -1
+}
