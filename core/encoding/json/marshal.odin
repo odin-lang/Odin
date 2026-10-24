@@ -208,26 +208,27 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 
 	case runtime.Type_Info_Float:
 		switch f in a {
-		case f16: io.write_f16(w, f) or_return
-		case f32: io.write_f32(w, f) or_return
-		case f64: io.write_f64(w, f) or_return
+		case f16: write_float(w, f64(f), 16) or_return
+		case f32: write_float(w, f64(f), 32) or_return
+		case f64: write_float(w, f,      64) or_return
 		case: return .Unsupported_Type
 		}
 
 	case runtime.Type_Info_Complex:
 		r, i: f64
+		bit_size: int
 		switch z in a {
-		case complex32:  r, i = f64(real(z)), f64(imag(z))
-		case complex64:  r, i = f64(real(z)), f64(imag(z))
-		case complex128: r, i = f64(real(z)), f64(imag(z))
+		case complex32:  r, i, bit_size = f64(real(z)), f64(imag(z)), 16
+		case complex64:  r, i, bit_size = f64(real(z)), f64(imag(z)), 32
+		case complex128: r, i, bit_size = f64(real(z)), f64(imag(z)), 64
 		case: return .Unsupported_Type
 		}
 
-		io.write_byte(w, '[')    or_return
-		io.write_f64(w, r)       or_return
-		io.write_string(w, ", ") or_return
-		io.write_f64(w, i)       or_return
-		io.write_byte(w, ']')    or_return
+		io.write_byte(w, '[')        or_return
+		write_float(w, r, bit_size)  or_return
+		io.write_string(w, ", ")     or_return
+		write_float(w, i, bit_size)  or_return
+		io.write_byte(w, ']')        or_return
 
 	case runtime.Type_Info_Quaternion:
 		return .Unsupported_Type
@@ -647,6 +648,27 @@ opt_write_comment :: proc(w: io.Writer, opt: ^Marshal_Options, comment: ^string)
 	}
 
 	return nil
+}
+
+// write the shortest decimal that parses back to the same `bit_size` float, in fixed notation
+// unless the magnitude is very small or very large, matching Go's `encoding/json`
+@(private)
+write_float :: proc(w: io.Writer, val: f64, bit_size: int) -> (err: io.Error) {
+	buf: [386]byte
+	format: byte = 'f'
+	if a := abs(val); a != 0 && (a < 1e-6 || a >= 1e21) {
+		format = 'e'
+	}
+	s := strconv.write_float(buf[:], val, format, -1, bit_size)
+	if len(s) > 0 && s[0] == '+' {
+		s = s[1:]
+	}
+	io.write_string(w, s) or_return
+	// keep integral values (and -0) parsing back as floats rather than integers
+	if format == 'f' && strings.index_byte(s, '.') < 0 && len(s) > 0 && '0' <= s[len(s)-1] && s[len(s)-1] <= '9' {
+		io.write_string(w, ".0") or_return
+	}
+	return
 }
 
 // write key as quoted string or with optional quotes in mjson
