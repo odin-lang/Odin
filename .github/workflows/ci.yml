@@ -15,6 +15,7 @@ jobs:
       with:
         release: "10.0"
         envs: PKGSRC_BRANCH
+        sync: scp
         usesh: true
         copyback: false
         prepare: |
