@@ -32,25 +32,31 @@ _mkdir_all :: proc(path: string, perm: Permissions) -> Error {
 		}
 		path[i] = 0
 		new_dfd, errno := linux.openat(dfd, cstring(&path[0]), _OPENDIR_FLAGS)
-		#partial switch errno {
-		case .ENOENT:
-			if errno = linux.mkdirat(dfd, cstring(&path[0]), transmute(linux.Mode)transmute(u32)perm); errno != .NONE {
+		if errno == .ENOENT {
+			errno = linux.mkdirat(dfd, cstring(&path[0]), transmute(linux.Mode)transmute(u32)perm)
+			#partial switch errno {
+			case .NONE:
+				has_created^ = true
+			case .EEXIST:
+				// Another thread or process created it after the `openat` above;
+				// the `openat` below tells a directory from a file.
+			case:
+				linux.close(dfd)
 				return _get_platform_error(errno)
 			}
-			has_created^ = true
-			if new_dfd, errno = linux.openat(dfd, cstring(&path[0]), _OPENDIR_FLAGS); errno != .NONE {
-				return _get_platform_error(errno)
-			}
-			fallthrough
-		case .NONE:
-			if errno = linux.close(dfd); errno != .NONE {
-				return _get_platform_error(errno)
-			}
-			// skip consecutive '/'
-			for i += 1; i < len(path) && path[i] == '/'; i += 1 {}
-			return mkdirat(new_dfd, path[i:], perm, has_created)
+			new_dfd, errno = linux.openat(dfd, cstring(&path[0]), _OPENDIR_FLAGS)
 		}
-		return _get_platform_error(errno)
+		if errno != .NONE {
+			linux.close(dfd)
+			return _get_platform_error(errno)
+		}
+		if errno = linux.close(dfd); errno != .NONE {
+			linux.close(new_dfd)
+			return _get_platform_error(errno)
+		}
+		// skip consecutive '/'
+		for i += 1; i < len(path) && path[i] == '/'; i += 1 {}
+		return mkdirat(new_dfd, path[i:], perm, has_created)
 	}
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	// need something we can edit, and use to generate cstrings
