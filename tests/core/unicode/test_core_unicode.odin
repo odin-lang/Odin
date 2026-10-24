@@ -262,3 +262,17 @@ test_case_mapping :: proc(t: ^testing.T) {
 		testing.expectf(t, unicode.to_title(c.r) == c.title, "to_title(%U): expected %U, got %U", c.r, c.title, unicode.to_title(c.r))
 	}
 }
+
+@(test)
+test_utf8_encode_invalid_runes_as_replacement :: proc(t: ^testing.T) {
+	runes := [?]rune { 0xd800, 0x110000, -1 }
+	for r in runes {
+		encoded, width := utf8.encode_rune(r)
+		testing.expect_value(t, width, 3)
+		testing.expect(t, encoded[0] == 0xef && encoded[1] == 0xbf && encoded[2] == 0xbd, "invalid runes must encode as the UTF-8 replacement character")
+		// It must decode back as the replacement character.
+		decoded, decoded_width := utf8.decode_rune_in_bytes(encoded[:width])
+		testing.expect_value(t, decoded, utf8.REPLACEMENT_CHAR)
+		testing.expect_value(t, decoded_width, 3)
+	}
+}

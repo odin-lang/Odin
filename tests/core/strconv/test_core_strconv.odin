@@ -3,6 +3,7 @@ package test_core_strconv
 import "core:math"
 import "core:strconv"
 import "core:testing"
+import "core:unicode/utf8"
 
 @(test)
 test_float :: proc(t: ^testing.T) {
@@ -67,6 +68,127 @@ test_float :: proc(t: ^testing.T) {
 	testing.expect_value(t, f, f64(17.5))
 	testing.expect_value(t, n, 21)
 	testing.expect_value(t, ok, true)
+}
+
+@(test)
+test_write_float_sign_flags :: proc(t: ^testing.T) {
+	buf: [32]byte
+	result: string
+
+	result = strconv.write_float(buf[:], 3.14159, fmt = 'f', prec = 2, bit_size = 64)
+	testing.expect_value(t, result, "+3.14")
+
+	result = strconv.write_float(buf[:], 3.14159, fmt = 'f', prec = 2, bit_size = 64, flags = { .Plus })
+	testing.expect_value(t, result, "+3.14")
+
+	result = strconv.write_float(buf[:], 3.14159, fmt = 'f', prec = 2, bit_size = 64, flags = nil)
+	testing.expect_value(t, result, "3.14")
+
+	result = strconv.write_float(buf[:], math.inf_f64(+1), fmt = 'f', prec = 2, bit_size = 64, flags = nil)
+	testing.expect_value(t, result, "+Inf")
+
+	result = strconv.write_float(buf[:], math.inf_f64(-1), fmt = 'f', prec = 2, bit_size = 64)
+	testing.expect_value(t, result, "-Inf")
+
+	result = strconv.write_float(buf[:], math.inf_f64(-1), fmt = 'f', prec = 2, bit_size = 64, flags = { .Plus })
+	testing.expect_value(t, result, "-Inf")
+
+	result = strconv.write_float(buf[:], math.nan_f64(), fmt = 'f', prec = 2, bit_size = 64, flags = nil)
+	testing.expect_value(t, result, "NaN")
+
+	result = strconv.write_float(buf[:], math.nan_f64(), fmt = 'f', prec = 2, bit_size = 64, flags = { .Plus })
+	testing.expect_value(t, result, "NaN")
+
+	result = strconv.write_float(buf[:], 0, fmt = 'f', prec = 2, bit_size = 64, flags = nil)
+	testing.expect_value(t, result, "0.00")
+
+	result = strconv.write_float(buf[:], 0, fmt = 'f', prec = 2, bit_size = 64, flags = { .Plus })
+	testing.expect_value(t, result, "+0.00")
+
+	result = strconv.write_float(buf[:], 3.14, fmt = 'f', prec = 10, bit_size = 64, flags = nil)
+	testing.expect_value(t, result, "3.1400000000")
+
+	result = strconv.write_float(buf[:], 3.14, fmt = 'f', prec = 10, bit_size = 64, flags = { .Plus })
+	testing.expect_value(t, result, "+3.1400000000")
+}
+
+@(test)
+test_quote_rune :: proc(t: ^testing.T) {
+	runes := [?]rune { 'a', '¡', 'ÿ', 'あ', 'φ', '♥', '\'',   '"',  '\t',  '\x00',  '\u0300',  '\u1ab0',  '\x01', '\\',   ' ',  '\u202f' }
+	expected :=       "'a'  '¡'  'ÿ'  'あ'  'φ'  '♥'  '\\''  '\"'  '\\t'  '\\x00'  '\\u0300'  '\\u1ab0'  '\\x01'  '\\\\'  ' '  '\\u202f'  "
+	result_buf: [150]byte
+	i := 0
+	
+	for r in runes {
+		buf: [strconv.QUOTED_RUNE_MAX_NEEDED_BYTES]byte
+		quoted, ok := strconv.quote_rune(buf[:], r)
+		testing.expect_value(t, ok, true)
+		i += copy(result_buf[i:], quoted)
+		i += copy(result_buf[i:], "  ")
+	}
+
+	testing.expect_value(t, string(result_buf[:i]), expected)
+}
+
+@(test)
+test_quote_rune_out_of_range :: proc(t: ^testing.T) {
+	runes := [?]rune { 0x110000, 0xd800, -1 }
+	for r in runes {
+		buf: [strconv.QUOTED_RUNE_MAX_NEEDED_BYTES]byte
+		quoted, ok := strconv.quote_rune(buf[:], r)
+		testing.expect_value(t, ok, true)
+
+		// I don't think this API is very user friendly
+		unquoted_rune, _, tail, unquote_ok := strconv.unquote_char(quoted[1:], '\'')
+		testing.expect_value(t, unquote_ok, true)
+		testing.expect_value(t, unquoted_rune, utf8.REPLACEMENT_CHAR)
+		testing.expect_value(t, tail, "'")
+	}
+}
+
+@(test)
+test_utf16_string_conversions :: proc(t: ^testing.T) {
+	//                A   é       😀     \ufffd_________
+	units := []u16 { 'A', 0x00e9, 0xd83d, 0xde00, 0xd800 }
+	expected := "Aé😀\ufffd"
+	buf: [32]byte
+
+	result, ok := strconv.write_string16(buf[:], transmute(string16)units)
+	testing.expect_value(t, ok, true)
+	testing.expect_value(t, result, expected)
+
+	dynamic_buf: [dynamic]byte
+	// Fill it with something to test that it doesn't screw up the length.
+	_, err := append(&dynamic_buf, "prefix:")
+	testing.expect_value(t, err, nil)
+	result_dynamic, dynamic_err := strconv.write_string16(&dynamic_buf, transmute(string16)units)
+	testing.expect_value(t, dynamic_err, nil)
+	testing.expect_value(t, result_dynamic, expected)
+	testing.expect_value(t, string(dynamic_buf[:]), "prefix:Aé😀\ufffd")
+	delete(dynamic_buf)
+}
+
+@(test)
+test_quote_string16_buffer :: proc(t: ^testing.T) {
+	//                A    "    \    é       😀     \ufffd_________
+	units := []u16 { 'A', '"', '\\', 0x00e9, 0xd83d, 0xde00 }
+	expected := "\"A\\\"\\\\é😀\""
+	buf: [32]byte
+
+	result, ok := strconv.quote_string16_buf(buf[:], transmute(string16)units)
+	testing.expect_value(t, ok, true)
+	testing.expect_value(t, result, expected)
+}
+
+@(test)
+test_quote_string_invalid_utf8 :: proc(t: ^testing.T) {
+	input_bytes := []byte { 'a', 0xff, 'z' }
+	input := transmute(string)input_bytes
+	buf: [16]byte
+
+	result, ok := strconv.quote_string_buf(buf[:], input)
+	testing.expect_value(t, ok, true)
+	testing.expect_value(t, result, `"a\xffz"`)
 }
 
 @(test)

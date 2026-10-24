@@ -3,12 +3,15 @@ package utf8
 
 @(require) import "base:runtime"
 
-RUNE_ERROR :: '\ufffd'
-RUNE_SELF  :: 0x80
-RUNE_BOM   :: 0xfeff
-RUNE_EOF   :: ~rune(0)
-MAX_RUNE   :: '\U0010ffff'
-UTF_MAX    :: 4
+import "core:unicode"
+
+RUNE_ERROR        :: unicode.RUNE_ERROR
+RUNE_SELF         :: 0x80
+MAX_RUNE          :: unicode.MAX_RUNE
+REPLACEMENT_CHAR  :: unicode.REPLACEMENT_CHAR
+RUNE_BOM          :: 0xfeff
+RUNE_EOF          :: ~rune(0)
+UTF_MAX           :: 4
 
 SURROGATE_MIN :: 0xd800
 SURROGATE_MAX :: 0xdfff
@@ -82,7 +85,8 @@ encode_rune :: proc "contextless" (c: rune) -> ([4]u8, int) #no_bounds_check {
 	// Invalid or Surrogate range
 	if i > 0x0010ffff ||
 	   (0xd800 <= i && i <= 0xdfff) {
-		r = 0xfffd
+		r = RUNE_ERROR
+		i = u32(r)
 	}
 
 	if i <= 1<<16-1 {
@@ -100,14 +104,44 @@ encode_rune :: proc "contextless" (c: rune) -> ([4]u8, int) #no_bounds_check {
 }
 
 
+/*
+	Decode the next UTF-8 encoded rune found at the beginning of the specified input string.
+
+	On success, returns the decoded rune, and the amount of bytes in the input string that
+	have been successfully decoded.
+
+	Edge cases:
+	- If the input is empty, returns `RUNE_ERROR, 0`.
+	- If the input string does not start with a correctly encoded UTF-8 codepoint, returns `RUNE_ERROR, 1`
+*/
 decode_rune :: proc{
 	decode_rune_in_string,
 	decode_rune_in_bytes,
 }
+/*
+	Decode the next UTF-8 encoded rune found at the beginning of the specified input string.
+
+	On success, returns the decoded rune, and the amount of bytes in the input string that
+	have been successfully decoded.
+
+	Edge cases:
+	- If the input is an empty string, returns `RUNE_ERROR, 0`.
+	- If the input string does not start with a correctly encoded UTF-8 codepoint, returns `RUNE_ERROR, 1`
+*/
 @(require_results)
 decode_rune_in_string :: #force_inline proc "contextless" (s: string) -> (rune, int) {
 	return decode_rune_in_bytes(transmute([]u8)s)
 }
+/*
+	Decode the next UTF-8 encoded rune found at the beginning of the specified buffer.
+
+	On success, returns the decoded rune, and the amount of bytes in the buffer that
+	have been successfully decoded.
+
+	Edge cases:
+	- If the buffer is empty, returns `RUNE_ERROR, 0`.
+	- If the buffer does not start with a correctly encoded UTF-8 codepoint, returns `RUNE_ERROR, 1`
+*/
 @(require_results)
 decode_rune_in_bytes :: proc "contextless" (s: []u8) -> (rune, int) #no_bounds_check {
 	n := len(s)

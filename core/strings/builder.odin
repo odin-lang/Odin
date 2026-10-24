@@ -4,16 +4,7 @@ import "base:runtime"
 import "core:unicode/utf8"
 import "core:strconv"
 import "core:io"
-/*
-Type definition for a procedure that flushes a Builder
 
-Inputs:
-- b: A pointer to the Builder
-
-Returns:
-A boolean indicating whether the Builder should be reset
-*/
-Builder_Flush_Proc :: #type proc(b: ^Builder) -> (do_reset: bool)
 /*
 A dynamic byte buffer / string builder with helper procedures
 The dynamic array is wrapped inside the struct to be more opaque
@@ -216,11 +207,20 @@ to_writer :: proc(b: ^Builder) -> (res: io.Writer) {
 /*
 Deletes the Builder byte buffer content
 
+NOTE: If the Builder is re-used after this operation, be aware that its stored allocator
+      has been cleared as well.
+      Consider calling `builder_init` to reinstate a specific allocator, if needed.
+
 Inputs:
 - b: A pointer to the Builder
 */
-builder_destroy :: proc(b: ^Builder) {
-	delete(b.buf)
+builder_destroy :: proc(b: ^Builder, loc := #caller_location) {
+	// NOTE: Delete might not be supported (e.g. arena allocator).
+	//       In this case, we set the buffer to nil anyway, which effectively
+	//       behaves as if it got freed.
+	//       If a real error occurred while freeing the memory, this will
+	//       cause a memory leak.
+	delete(b.buf, loc=loc)
 	b.buf = nil
 }
 /*
@@ -230,8 +230,8 @@ Inputs:
 - b: A pointer to the Builder
 - cap: The desired capacity for the Builder's buffer
 */
-builder_grow :: proc(b: ^Builder, cap: int) {
-	reserve(&b.buf, cap)
+builder_grow :: proc(b: ^Builder, cap: int, loc := #caller_location) -> (err: runtime.Allocator_Error) {
+	return reserve(&b.buf, cap, loc=loc)
 }
 /*
 Clears the Builder byte buffer content (sets len to zero)
@@ -312,12 +312,13 @@ Inputs:
 
 Returns:
 - res: A cstring of the Builder's buffer
+- err: An allocator error if one occured, `nil` otherwise.
 */
 @(require_results)
-unsafe_to_cstring :: proc(b: ^Builder, loc := #caller_location) -> (res: cstring) {
-	append(&b.buf, 0, loc)
+unsafe_to_cstring :: proc(b: ^Builder, loc := #caller_location) -> (res: cstring, err: runtime.Allocator_Error) #optional_allocator_error {
+	append(&b.buf, 0, loc) or_return
 	pop(&b.buf)
-	return cstring(raw_data(b.buf))
+	return cstring(raw_data(b.buf)), nil
 }
 /*
 Appends a trailing null byte after the end of the current Builder byte buffer and then casts it to a cstring
@@ -380,17 +381,22 @@ Returns:
 builder_space :: proc(b: Builder) -> (res: int) {
 	return cap(b.buf) - len(b.buf)
 }
+
+
 /*
-Appends a byte to the Builder and returns the number of bytes appended
+Appends a single byte `x` to the Builder `b`, and returns the number of bytes appended.
 
-Inputs:
-- b: A pointer to the Builder
-- x: The byte to be appended
+**Inputs:**
+- `b`: A pointer to the Builder.
+- `x`: The byte to be appended.
 
-Returns:
-- n: The number of bytes appended
+**Returns:**
+- `n`: The number of bytes appended.
+- `err`:  An allocator error if one occured, `nil` otherwise.
 
-NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
+**Remarks:**
+
+The backing dynamic array may be fixed in capacity or fail to resize; `n` states the number actually written.
 
 Example:
 
@@ -409,18 +415,28 @@ Output:
 	ab
 
 */
-write_byte :: proc(b: ^Builder, x: byte, loc := #caller_location) -> (n: int) {
+write_byte :: proc(b: ^Builder, x: byte, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	n0 := len(b.buf)
-	append(&b.buf, x, loc)
+	append(&b.buf, x, loc) or_return
 	n1 := len(b.buf)
-	return n1-n0
+	return n1-n0, nil
 }
-/*
-Appends a slice of bytes to the Builder and returns the number of bytes appended
 
-Inputs:
-- b: A pointer to the Builder
-- x: The slice of bytes to be appended
+
+/*
+Appends a slice of bytes to the Builder `b`, and returns the number of bytes appended.
+
+**Inputs:**
+- `b`: A pointer to the Builder.
+- `x`: The slice of bytes to be appended.
+
+**Returns:**
+- `n`: The number of bytes appended.
+- `err`:  An allocator error if one occured, `nil` otherwise.
+
+**Remarks:**
+
+The backing dynamic array may be fixed in capacity or fail to resize; `n` states the number actually written.
 
 Example:
 
@@ -434,29 +450,33 @@ Example:
 		fmt.println(strings.to_string(builder)) // -> abc
 	}
 
-NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
-
-Returns:
-- n: The number of bytes appended
 */
-write_bytes :: proc(b: ^Builder, x: []byte, loc := #caller_location) -> (n: int) {
+write_bytes :: proc(b: ^Builder, x: []byte, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	n0 := len(b.buf)
-	append(&b.buf, ..x, loc=loc)
+	append(&b.buf, ..x, loc=loc) or_return
 	n1 := len(b.buf)
-	return n1-n0
+	return n1-n0, nil
 }
+
+
 /*
-Appends a single rune to the Builder and returns the number of bytes written and an `io.Error`
+Appends a single rune `r` as its UTF-8 encoded byte sequence to the Builder `b`, and returns the number of bytes written.
 
-Inputs:
-- b: A pointer to the Builder
-- r: The rune to be appended
+**Inputs:**
+- `b`:    A pointer to the Builder.
+- `r`:    The rune to be appended.
 
-Returns:
-- res: The number of bytes written
-- err: An io.Error if one occured, `nil` otherwise
+**Returns:**
+- `n`:    The number of bytes written.
+- `err`:  An allocator error if one occured, `nil` otherwise.
 
-NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
+**Remarks:**
+
+The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
+
+The rune is encoded as-is. It is not escaped or quoted.
+
+If the rune cannot be encoded as a valid Unicode codepoint, this will append a Replacement Character (`\ufffd`) instead.
 
 Example:
 
@@ -465,8 +485,8 @@ Example:
 
 	write_rune_example :: proc() {
 		builder := strings.builder_make()
-		strings.write_rune(&builder, 'ä')       // 2 None
-		strings.write_rune(&builder, 'b')       // 1 None
+		strings.write_rune(&builder, 'ä')       // 2
+		strings.write_rune(&builder, 'b')       // 1
 		fmt.println(strings.to_string(builder)) // -> äb
 	}
 
@@ -475,28 +495,38 @@ Output:
 	äb
 
 */
-write_rune :: proc(b: ^Builder, r: rune, loc := #caller_location) -> (n: int) {
+write_rune :: proc(b: ^Builder, r: rune, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	n0 := len(b.buf)
 	if r < utf8.RUNE_SELF {
-		append(&b.buf, cast(byte)r, loc)
+		append(&b.buf, cast(byte)r, loc) or_return
 	} else {
 		buf, w := utf8.encode_rune(r)
-		append(&b.buf, ..buf[:w], loc=loc)
+		append(&b.buf, ..buf[:w], loc=loc) or_return
 	}
 	n1 := len(b.buf)
-	return n1-n0
+	return n1-n0, nil
 }
+
+
 /*
-Appends a quoted rune to the Builder and returns the number of bytes written
+Appends a single quoted rune `r` as its UTF-8 encoded byte sequence to the Builder `b`, and returns the number of bytes written.
 
-Inputs:
-- b: A pointer to the Builder
-- r: The rune to be appended
+**Inputs:**
+- `b`:        A pointer to the Builder.
+- `r`:        The rune to be appended.
+- `options`:  Controls how characters in the string are escaped.
 
-Returns:
-- n: The number of bytes written
+**Returns:**
+- `n`:        The number of bytes written.
+- `err`:      An allocator error if one occured, `nil` otherwise.
 
-NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
+**Remarks:**
+
+The rune is quoted such that it would parse back as a valid rune literal in Odin syntax.
+
+This implies that single quotes (`'`) are used.
+
+The backing dynamic array may be fixed in capacity or fail to resize; `n` states the number actually written.
 
 Example:
 
@@ -516,20 +546,27 @@ Output:
 	abc'ä'abc
 
 */
-write_quoted_rune :: proc(b: ^Builder, r: rune) -> (n: int) {
-	return io.write_quoted_rune(to_writer(b), r)
+write_quoted_rune :: proc(b: ^Builder, r: rune, options: strconv.Rune_Escaping_Options = nil, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+	buf: [strconv.QUOTED_RUNE_MAX_NEEDED_BYTES]byte
+	s := strconv.quote_rune(buf[:], r, options = options)
+	return write_string(b, s, loc=loc)
 }
+
+
 /*
-Appends a string to the Builder and returns the number of bytes written
+Appends string `s` to the Builder `b`, and returns the number of bytes written.
 
-Inputs:
-- b: A pointer to the Builder
-- s: The string to be appended
+**Inputs:**
+- `b`:    A pointer to the Builder.
+- `s`:    The string to be appended.
 
-Returns:
-- n: The number of bytes written
+**Returns:**
+- `n`:    The number of bytes written.
+- `err`:  An allocator error if one occured, `nil` otherwise.
 
-NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
+**Remarks:**
+
+The backing dynamic array may be fixed in capacity or fail to resize; `n` states the number actually written.
 
 Example:
 
@@ -548,20 +585,47 @@ Output:
 	abc
 
 */
-write_string :: proc(b: ^Builder, s: string, loc := #caller_location) -> (n: int) {
-	n0 := len(b.buf)
-	append(&b.buf, s, loc)
-	n1 := len(b.buf)
-	return n1-n0
+write_string :: proc(b: ^Builder, s: string, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+	return append(&b.buf, s, loc=loc)
 }
+
+
 /*
-Pops and returns the last byte in the Builder or 0 when the Builder is empty
+Appends UTF-16 encoded string `str` to the Builder `b`, and returns the number of bytes written.
 
-Inputs:
-- b: A pointer to the Builder
+**Inputs:**
+- `b`:    A pointer to the Builder.
+- `s`:    The string to be appended.
 
-Returns:
-- r: The last byte in the Builder or 0 if empty
+**Returns:**
+- `n`:    The number of bytes written.
+- `err`:  An allocator error if one occured, `nil` otherwise.
+
+**Remarks:**
+
+The UTF-16 input string is encoded as UTF-8 in the output.
+
+Unpaired UTF-16 surrogates are encoded as the Unicode replacement character. The UTF-16 decoder does not
+distinguish malformed sequences from literal replacement characters, so both are written identically.
+
+The backing dynamic array may be fixed in capacity or fail to resize; `n` states the number actually written.
+*/
+write_string16 :: proc(b: ^Builder, str: string16, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+	result := strconv.write_string16_dynamic_array(&b.buf, str, loc=loc) or_return
+	return len(result), nil
+}
+
+
+/*
+Removes the last byte in the Builder `b`, and returns its value.
+
+If the Builder is empty, returns `0`.
+
+**Inputs:**
+- `b`: A pointer to the Builder
+
+**Returns:**
+- `r`: The last byte in the Builder, or `0` if empty.
 */
 pop_byte :: proc(b: ^Builder) -> (r: byte) {
 	if len(b.buf) == 0 {
@@ -573,15 +637,19 @@ pop_byte :: proc(b: ^Builder) -> (r: byte) {
 	d.len = max(d.len-1, 0)
 	return
 }
+
+
 /*
-Pops the last rune in the Builder and returns the popped rune and its rune width or (0, 0) if empty
+Decodes the last UTF-8 rune in the Builder `b`, and returns its value and width (in bytes).
 
-Inputs:
-- b: A pointer to the Builder
+If the Builder is empty, returns `(0, 0)`.
 
-Returns:
-- r: The popped rune
-- width: The rune width or 0 if the builder was empty
+**Inputs:**
+- `b`:      A pointer to the Builder
+
+**Returns:**
+- `r`:      The popped rune
+- `width`:  The rune width or 0 if the builder was empty
 */
 pop_rune :: proc(b: ^Builder) -> (r: rune, width: int) {
 	if len(b.buf) == 0 {
@@ -593,18 +661,29 @@ pop_rune :: proc(b: ^Builder) -> (r: rune, width: int) {
 	d.len = max(d.len-width, 0)
 	return
 }
-@(private)
-DIGITS_LOWER := "0123456789abcdefx"
+
+
 /*
-Inputs:
-- b: A pointer to the Builder
-- str: The string to be quoted and appended
-- quote: The optional quote character (default is double quotes)
+Appends string `str` to the Builder `b`, and returns the number of bytes written.
 
-Returns:
-- n: The number of bytes written
+Runes in the string are escaped when appropriate, and surrounded with the specified `quote`.
 
-NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
+**Inputs:**
+- `b`:        A pointer to the Builder.
+- `str`:      The string to be quoted and appended.
+- `quote`:    The quote character. Default is double quotes (`"`).
+- `options`:  Controls how characters in the string are escaped.
+
+**Returns:**
+- `n`:        The number of bytes written
+- `err`:      An allocator error if one occured, `nil` otherwise
+
+**Remarks:**
+
+Runes are escaped according to Odin string syntax rules. If double-quotes (`"`) are used, then the string is quoted and escaped such that
+it would parse back as the same string in an Odin string literal.
+
+The backing dynamic array may be fixed in capacity or fail to resize; `n` states the number actually written.
 
 Example:
 
@@ -624,22 +703,67 @@ Output:
 	"a"'bc'"xyz"
 
 */
-write_quoted_string :: proc(b: ^Builder, str: string, quote: byte = '"') -> (n: int) {
-	n, _ = io.write_quoted_string(to_writer(b), str, quote)
-	return
+write_quoted_string :: proc(b: ^Builder, str: string, quote: byte = '"', options: strconv.Rune_Escaping_Options = nil, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+	result := strconv.quote_string_dynamic_array(&b.buf, str, quote, options = options, loc = loc) or_return
+	return len(result), nil
 }
+
+
 /*
-Appends a rune to the Builder and returns the number of bytes written
+Appends UTF-16 encoded string `str` to the Builder `b`, and returns the number of bytes written.
 
-Inputs:
-- b: A pointer to the Builder
-- r: The rune to be appended
-- write_quote: Optional boolean flag to wrap in single-quotes (') (default is true)
+Runes in the string are escaped when appropriate, and surrounded with the specified `quote`.
 
-Returns:
-- n: The number of bytes written
+**Inputs:**
+- `b`:        A pointer to the Builder.
+- `str`:      The string to be quoted and appended.
+- `quote`:    The quote character. Default is double quotes (`"`).
+- `options`:  Controls how characters in the string are escaped.
 
-NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
+**Returns:**
+- `n`:        The number of bytes written
+- `err`:      An allocator error if one occured, `nil` otherwise
+
+**Remarks:**
+
+The UTF-16 input string is encoded as UTF-8 in the output.
+
+Runes are escaped according to Odin string syntax rules. If double-quotes (`"`) are used, then the string is quoted and escaped such that
+it would parse back as the same string in an Odin string literal.
+
+Unpaired UTF-16 surrogates are encoded as the Unicode replacement character. The UTF-16 decoder does not
+distinguish malformed sequences from literal replacement characters, so both are written identically.
+
+The backing dynamic array may be fixed in capacity or fail to resize; `n` states the number actually written.
+*/
+write_quoted_string16 :: proc(b: ^Builder, str: string16, quote: byte = '"', options: strconv.Rune_Escaping_Options = nil, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+	result := strconv.quote_string16_dynamic_array(&b.buf, str, quote, options = options, loc = loc) or_return
+	return len(result), nil
+}
+
+
+/*
+Appends a single rune `r`, in UTF-8 encoded, possibly escaped, and optionally quoted form,
+to the Builder `b`, and returns the number of bytes written.
+
+**Inputs:**
+- `b`:            A pointer to the Builder.
+- `r`:            The rune to be appended.
+- `write_quote`:  Optional boolean flag to wrap in single-quotes (`'`) (default is true).
+- `options`:      Controls how the rune is escaped.
+
+**Returns:**
+- `n`:            The number of bytes written.
+- `err`:          An allocator error if one occured, `nil` otherwise.
+
+**Remarks:**
+
+When `write_quote` is `true`, a single quote (`'`) will be escaped.
+
+When `write_quote` is `false`, neither single quotes (`'`) nor double quotes (`"`) will be escaped.
+For better control over this, please migrate to `write_encoded_and_escaped_rune`.
+
+The backing dynamic array may be fixed in capacity or fail to resize; `n` states the number actually written.
 
 Example:
 
@@ -659,34 +783,99 @@ Output:
 	a'"'x
 
 */
-write_encoded_rune :: proc(b: ^Builder, r: rune, write_quote := true) -> (n: int) {
-	n, _ = io.write_encoded_rune(to_writer(b), r, write_quote)
-	return
-
+write_encoded_rune :: proc(b: ^Builder, r: rune, write_quote := true, options: strconv.Rune_Escaping_Options = nil, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+	if write_quote {
+		return write_quoted_rune(b, r, options, loc=loc)
+	} else {
+		// COMPAT: Originally, this procedure would never escape the quote character.
+		//         It does now when `write_quote` is true (that was arguably a bug),
+		//         but for compatibility, we still don't escape the quote in this branch.
+		return write_encoded_and_escaped_rune(b, r, 0, options, loc=loc)
+	}
 }
+
+
 /*
-Appends an escaped rune to the Builder and returns the number of bytes written
+Appends an escaped rune `r`, in UTF-8 encoded and possibly escaped, to the Builder `b`, and returns the number of bytes written.
 
-Inputs:
-- b: A pointer to the Builder
-- r: The rune to be appended
-- quote: The quote character
-- html_safe: Optional boolean flag to encode '<', '>', '&' as digits (default is false)
+**Inputs:**
+- `b`:          A pointer to the Builder.
+- `r`:          The rune to be appended.
+- `quote`:      An additional character that is considered the enclosing quote character. This character will be escaped.
+                This feature can be disabled by passing `quote = 0`.
+- `html_safe`:  Optional boolean flag to escape `<`, `>`, `&` in the format `\x##` (default is false).
 
-**Usage**
-- '\a' will be written as such
-- `r` and `quote` match and `quote` is `\\` - they will be written as two slashes
-- `html_safe` flag in case the runes '<', '>', '&' should be encoded as digits e.g. `\u0026`
+**Returns:**
+- `n`:          The number of bytes written
+- `err`:        An allocator error if one occured, `nil` otherwise.
 
-NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
+**Remarks:**
 
-Returns:
-- n: The number of bytes written
+The rune `'\a'` will be written as such.
+
+The backing dynamic array may be fixed in capacity or fail to resize; `n` states the number actually written.
 */
-write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false) -> (n: int) {
-	n, _ = io.write_escaped_rune(to_writer(b), r, quote, html_safe)
-	return
+write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) {
+	options: strconv.Rune_Escaping_Options
+	if html_safe {
+		options |= { .html_safe }
+	}
+	return write_encoded_and_escaped_rune(b, r, quote, options, loc=loc)
 }
+
+
+/*
+Appends a single rune `r`, encoded as UTF-8 and possibly escaped, to the Builder `b`, and returns the number of bytes written.
+
+**Inputs:**
+- `b`:        A pointer to the Builder.
+- `r`:        The rune to be appended.
+- `quote`:    An additional character that is considered the enclosing quote character. This character will be escaped.
+              This feature can be disabled by passing `quote = 0`.
+- `options`:  Controls how the rune is escaped.
+
+**Returns:**
+- `n`:        The number of bytes written.
+- `err`:      An allocator error if one occured, `nil` otherwise.
+
+**Remarks:**
+
+The backing dynamic array may be fixed in capacity or fail to resize; `n` states the number actually written.
+
+To write out a properly quoted single rune, such that it would parse back as a valid Odin rune literal, consider using `write_quoted_rune`.
+
+To write out a properly quoted string, such that it would parse back as a valid Odin string literal, consider using `write_quoted_string`.
+
+Example:
+
+	import "core:fmt"
+	import "core:strings"
+
+	write_encoded_and_escaped_rune_example :: proc() {
+		builder := strings.builder_make()
+		strings.write_encoded_and_escaped_rune(&builder, 'a', '\'') // 1
+		strings.write_encoded_and_escaped_rune(&builder, '\"', '\'') // 1
+		strings.write_encoded_and_escaped_rune(&builder, '\'', '\'') // 2
+		strings.write_encoded_and_escaped_rune(&builder, 'z', '\'') // 1
+		strings.write_encoded_and_escaped_rune(&builder, 0, '\'') // 4
+		strings.write_encoded_and_escaped_rune(&builder, '\n', '\'') // 2
+		fmt.println(strings.to_string(builder))
+	}
+
+Output:
+
+	a"\'z\x00\n
+
+*/
+write_encoded_and_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte, options: strconv.Rune_Escaping_Options = nil, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) {
+	// CONSIDER: Ensure capacity `ESCAPED_RUNE_MAX_NEEDED_BYTES`, and write directly to the buffer.
+	buf: [strconv.ESCAPED_RUNE_MAX_NEEDED_BYTES]byte
+	encoded, encode_and_escape_rune_ok := strconv.encode_and_escape_rune(buf[:], r, quote, options = options)
+	assert(encode_and_escape_rune_ok == true)
+	return write_string(b, encoded, loc=loc)
+}
+
+
 /*
 Writes a f64 value to the Builder and returns the number of characters written
 
@@ -702,16 +891,16 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 
 Returns:
 - n: The number of characters written
+- err: An allocator error if one occured, `nil` otherwise.
 */
-write_float :: proc(b: ^Builder, f: f64, fmt: byte, prec, bit_size: int, always_signed := false) -> (n: int) {
-	buf: [384]byte
-	s := strconv.write_float(buf[:], f, fmt, prec, bit_size)
-	// If the result starts with a `+` then unless we always want signed results,
-	// we skip it unless it's followed by an `I` (because of +Inf).
-	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
-		s = s[1:]
+write_float :: proc(b: ^Builder, f: f64, fmt: byte, prec, bit_size: int, always_signed := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+	flags: strconv.Float_Flags
+	if always_signed {
+		flags |= { .Plus }
 	}
-	return write_string(b, s)
+	buf: [384]byte
+	s := strconv.write_float(buf[:], f, fmt, prec, bit_size, flags)
+	return write_string(b, s, loc=loc)
 }
 /*
 Writes a f16 value to the Builder and returns the number of characters written
@@ -726,14 +915,16 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 
 Returns:
 - n: The number of characters written
+- err: An allocator error if one occured, `nil` otherwise.
 */
-write_f16 :: proc(b: ^Builder, f: f16, fmt: byte, always_signed := false) -> (n: int) {
-	buf: [384]byte
-	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
-	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
-		s = s[1:]
+write_f16 :: proc(b: ^Builder, f: f16, fmt: byte, always_signed := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+	flags: strconv.Float_Flags
+	if always_signed {
+		flags |= { .Plus }
 	}
-	return write_string(b, s)
+	buf: [384]byte
+	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f), flags)
+	return write_string(b, s, loc=loc)
 }
 /*
 Writes a f32 value to the Builder and returns the number of characters written
@@ -746,6 +937,7 @@ Inputs:
 
 Returns:
 - n: The number of characters written
+- err: An allocator error if one occured, `nil` otherwise.
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
@@ -767,13 +959,14 @@ Output:
 	3.14159012 - -1.23000003e-01
 
 */
-write_f32 :: proc(b: ^Builder, f: f32, fmt: byte, always_signed := false) -> (n: int) {
-	buf: [384]byte
-	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
-	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
-		s = s[1:]
+write_f32 :: proc(b: ^Builder, f: f32, fmt: byte, always_signed := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+	flags: strconv.Float_Flags
+	if always_signed {
+		flags |= { .Plus }
 	}
-	return write_string(b, s)
+	buf: [384]byte
+	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f), flags)
+	return write_string(b, s, loc=loc)
 }
 /*
 Writes a f64 value to the Builder and returns the number of characters written
@@ -788,14 +981,16 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 
 Returns:
 - n: The number of characters written
+- err: An allocator error if one occured, `nil` otherwise.
 */
-write_f64 :: proc(b: ^Builder, f: f64, fmt: byte, always_signed := false) -> (n: int) {
-	buf: [384]byte
-	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
-	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
-		s = s[1:]
+write_f64 :: proc(b: ^Builder, f: f64, fmt: byte, always_signed := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+	flags: strconv.Float_Flags
+	if always_signed {
+		flags |= { .Plus }
 	}
-	return write_string(b, s)
+	buf: [384]byte
+	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f), flags)
+	return write_string(b, s, loc=loc)
 }
 /*
 Writes a u64 value to the Builder and returns the number of characters written
@@ -809,11 +1004,12 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 
 Returns:
 - n: The number of characters written
+- err: An allocator error if one occured, `nil` otherwise.
 */
-write_u64 :: proc(b: ^Builder, i: u64, base: int = 10) -> (n: int) {
+write_u64 :: proc(b: ^Builder, i: u64, base: int = 10, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	buf: [32]byte
 	s := strconv.write_bits(buf[:], i, base, false, 64, strconv.digits, nil)
-	return write_string(b, s)
+	return write_string(b, s, loc=loc)
 }
 /*
 Writes a i64 value to the Builder and returns the number of characters written
@@ -827,11 +1023,12 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 
 Returns:
 - n: The number of characters written
+- err: An allocator error if one occured, `nil` otherwise.
 */
-write_i64 :: proc(b: ^Builder, i: i64, base: int = 10) -> (n: int) {
+write_i64 :: proc(b: ^Builder, i: i64, base: int = 10, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	buf: [32]byte
 	s := strconv.write_bits(buf[:], u64(i), base, true, 64, strconv.digits, nil)
-	return write_string(b, s)
+	return write_string(b, s, loc=loc)
 }
 /*
 Writes a uint value to the Builder and returns the number of characters written
@@ -845,9 +1042,10 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 
 Returns:
 - n: The number of characters written
+- err: An allocator error if one occured, `nil` otherwise.
 */
-write_uint :: proc(b: ^Builder, i: uint, base: int = 10) -> (n: int) {
-	return write_u64(b, u64(i), base)
+write_uint :: proc(b: ^Builder, i: uint, base: int = 10, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+	return write_u64(b, u64(i), base, loc=loc)
 }
 /*
 Writes a int value to the Builder and returns the number of characters written
@@ -861,9 +1059,10 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 
 Returns:
 - n: The number of characters written
+- err: An allocator error if one occured, `nil` otherwise.
 */
-write_int :: proc(b: ^Builder, i: int, base: int = 10) -> (n: int) {
-	return write_i64(b, i64(i), base)
+write_int :: proc(b: ^Builder, i: int, base: int = 10, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+	return write_i64(b, i64(i), base, loc=loc)
 }
 
 
@@ -881,12 +1080,12 @@ Returns:
 - replaced: The number of replacements
 - err: if any allocation errors occurred
 */
-builder_replace_all :: proc(b: ^Builder, old, new: string) -> (replaced: int, err: runtime.Allocator_Error) {
-	return builder_replace(b, old, new, -1)
+builder_replace_all :: proc(b: ^Builder, old, new: string, loc := #caller_location) -> (replaced: int, err: runtime.Allocator_Error) {
+	return builder_replace(b, old, new, -1, loc=loc)
 }
 
 /*
-Replaces n instances of `old` in the string in a Builder `b` with the `new` string
+Replaces up to `n` instances of `old` in the string in a Builder `b` with the `new` string
 
 *Allocates Using The Allocator On The Builder*
 
@@ -894,7 +1093,7 @@ Inputs:
 - b: The input `Builder`
 - old: The substring to be replaced
 - new: The replacement string
-- n: The number of instances to replace (if `n < 0`, no limit on the number of replacements)
+- n: The maximum number of instances to replace (if `n < 0`, no limit on the number of replacements)
 
 Returns:
 - replaced: The number of replacements
@@ -905,6 +1104,7 @@ builder_replace :: proc(b: ^Builder, old, new: string, n: int, loc := #caller_lo
 		return
 	}
 
+	// TODO(bplu4t2f): This whole procedure can be made more efficient.
 	if m := count(to_string(b^), old); m == 0 {
 		return
 	}
