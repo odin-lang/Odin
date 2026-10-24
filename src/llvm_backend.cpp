@@ -3718,8 +3718,20 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		lbModule *m = entry.value;
 		m->target_machine = target_machine;
 		LLVMTargetDataRef data_layout = LLVMCreateTargetDataLayout(target_machine);
-		LLVMSetModuleDataLayout(m->mod, data_layout);
+		char *layout_string = LLVMCopyStringRepOfTargetData(data_layout);
 		LLVMDisposeTargetData(data_layout);
+		// LLVM aligns a vector to its size, but Odin caps at max_simd_align (lb_alignof);
+		// listing wider vectors with the capped ABI alignment makes LLVM's defaults (load/store, sret) claim that
+		gbString layout = gb_string_make(heap_allocator(), layout_string);
+		LLVMDisposeMessage(layout_string);
+		i64 cap_bits = 8*build_context.max_simd_align;
+		i64 max_bits = 8*LB_MAX_VECTOR_SIZE;
+		for (i64 bits = cap_bits+8; bits <= max_bits; bits += 8) {
+			// v<bits>:<abi>:<preferred>; the preferred alignment stays natural (for LLVM's own stack slots)
+			layout = gb_string_append_fmt(layout, "-v%lld:%lld:%lld", cast(long long)bits, cast(long long)cap_bits, cast(long long)(8*next_pow2(bits/8)));
+		}
+		LLVMSetDataLayout(m->mod, layout);
+		gb_string_free(layout);
 
 	#if LLVM_VERSION_MAJOR >= 18
 		if (build_context.fast_isel) {

@@ -29,6 +29,9 @@ struct lbArgType {
 gb_internal i64 lb_sizeof(LLVMTypeRef type);
 gb_internal i64 lb_alignof(LLVMTypeRef type);
 
+// the widest vector in bytes (e.g. a matrix's 64 elements)
+enum { LB_MAX_VECTOR_SIZE = 8*SIMD_ELEMENT_COUNT_MAX };
+
 gb_internal lbArgType lb_arg_type_direct(LLVMTypeRef type, LLVMTypeRef cast_type, LLVMTypeRef pad_type, LLVMAttributeRef attr) {
 	return lbArgType{lbArg_Direct, type, cast_type, pad_type, attr, {}, false};
 }
@@ -352,6 +355,7 @@ gb_internal i64 lb_alignof(LLVMTypeRef type) {
 			i64 elem_size = lb_sizeof(elem);
 			i64 count = LLVMGetVectorSize(type);
 			i64 size = count * elem_size;
+			GB_ASSERT_MSG(size <= build_context.max_simd_align || size <= LB_MAX_VECTOR_SIZE, "%s is wider than the datalayout's capped vector entries", LLVMPrintTypeToString(type));
 			return gb_clamp(next_pow2(size), 1, build_context.max_simd_align);
 		}
 
