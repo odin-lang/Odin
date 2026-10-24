@@ -21,9 +21,13 @@ internal_args_to_free: []string
 @(private="file")
 get_args :: proc "contextless" () -> []string {
 	context = runtime.default_context()
-	result := make([]string, len(runtime.args__), heap_allocator())
-	for rt_arg, i in runtime.args__ {
-		result[i] = string(rt_arg)
+	when ODIN_OS == .Windows {
+		result := _get_args(heap_allocator())
+	} else {
+		result := make([]string, len(runtime.args__), heap_allocator())
+		for rt_arg, i in runtime.args__ {
+			result[i] = string(rt_arg)
+		}
 	}
 	internal_args_to_free = result
 	return result
@@ -33,7 +37,8 @@ get_args :: proc "contextless" () -> []string {
 delete_args :: proc "contextless" () {
 	if internal_args_to_free != nil {
 		context = runtime.default_context()
-		delete(internal_args_to_free, heap_allocator())
+		// On Windows the allocation of the slice also holds the text of the arguments.
+		free(raw_data(internal_args_to_free), heap_allocator())
 	}
 }
 
