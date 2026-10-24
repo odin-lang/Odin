@@ -110,7 +110,6 @@ PDWORD_PTR :: ^DWORD_PTR
 ATOM       :: distinct WORD
 
 wstring :: cstring16
-PWSTR   :: cstring16
 
 PBYTE                 :: ^BYTE
 LPBYTE                :: ^BYTE
@@ -144,13 +143,15 @@ PULONG                :: ^ULONG
 LPWIN32_FIND_DATAW    :: ^WIN32_FIND_DATAW
 LPWSADATA             :: ^WSADATA
 LPWSAPROTOCOL_INFO    :: ^WSAPROTOCOL_INFO
-LPSTR                 :: ^CHAR
-LPWSTR                :: ^WCHAR
+PSTR                  :: [^]CHAR
+LPSTR                 :: [^]CHAR
+PWSTR                 :: [^]WCHAR
+LPWSTR                :: [^]WCHAR
 OLECHAR               :: WCHAR
-BSTR                  :: ^OLECHAR
+LPOLESTR              :: [^]OLECHAR
+LPCOLESTR             :: wstring
+BSTR                  :: [^]OLECHAR
 
-LPOLESTR   :: cstring16
-LPCOLESTR  :: LPCSTR
 LPFILETIME :: ^FILETIME
 LPWSABUF   :: ^WSABUF
 
