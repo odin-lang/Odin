@@ -194,7 +194,7 @@ _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, 
 			return
 		}
 
-		gaps := []int{43, 17, 7, 3, 1}
+		gaps := []int{51, 23, 10, 4, 1}
 
 		k := 0
 		for gaps[k] > length {
