@@ -109,7 +109,6 @@ sort_inlined_by_with_indices :: proc(arr: $T/[]$E, $LESS: proc(l, r: E) -> bool,
 				index = i
 			}
 
-			// arr := arr
 			_quick_lomuto(indices, arr, proc(l, r: int, arr: T) -> bool {
 				return LESS(arr[l], arr[r])
 			})
@@ -521,7 +520,7 @@ _quick_lomuto :: proc(arr: $T/[]$E, data: $D, $LESS: $P) #no_bounds_check {
 		}
 
 		swap: [SMALL_THRESHOLD]E = ---
-		// swap := s[:]
+
 		parity_merge(arr[:half1], swap[:half1], data, quad1, quad2)
 		parity_merge(arr[half1:], swap[half1:], data, quad3, quad4)
 		parity_merge(swap[:],     arr,          data, half1, half2)
