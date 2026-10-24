@@ -309,7 +309,7 @@ Process_Open_Flag :: enum {
 }
 
 /*
-Open a process handle using it's pid.
+Open a process handle using its pid.
 
 This procedure obtains a process handle of a process specified by `pid`.
 This procedure can be subject to race conditions. See the description of
@@ -532,7 +532,7 @@ process_wait :: proc(process: Process, timeout := TIMEOUT_INFINITE) -> (Process_
 /*
 Kill a process.
 
-This procedure kills a process, specified by it's handle, `process`.
+This procedure kills a process, specified by its handle, `process`.
 
 The process is forced to exit and can't ignore the request.
 */
@@ -544,7 +544,7 @@ process_kill :: proc(process: Process) -> (Error) {
 /*
 Terminate a process.
 
-This procedure terminates a process, specified by it's handle, `process`.
+This procedure terminates a process, specified by its handle, `process`.
 
 The process is requested to exit and can ignore the request.
 */

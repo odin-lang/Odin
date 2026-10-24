@@ -29,7 +29,7 @@ foreign lib {
 	You must always use this to initialize the default state of the `ma_context_config` object. Not using this will result in your program breaking when miniaudio
 	is updated and new members are added to `ma_context_config`. It also sets logical defaults.
 
-	You can override members of the returned object by changing it's members directly.
+	You can override members of the returned object by changing its members directly.
 
 
 	See Also
@@ -189,7 +189,7 @@ foreign lib {
 	It is recommended that only a single context is active at any given time because it's a bulky data structure which performs run-time linking for the
 	relevant backends every time it's initialized.
 
-	The location of the context cannot change throughout it's lifetime. Consider allocating the `ma_context` object with `malloc()` if this is an issue. The
+	The location of the context cannot change throughout its lifetime. Consider allocating the `ma_context` object with `malloc()` if this is an issue. The
 	reason for this is that a pointer to the context is stored in the `ma_device` structure.
 
 
@@ -209,7 +209,7 @@ foreign lib {
 	Example 2 - Custom Configuration
 	--------------------------------
 	The example below shows how to initialize the context using custom backend priorities and a custom configuration. In this hypothetical example, the program
-	wants to prioritize ALSA over PulseAudio on Linux. They also want to avoid using the WinMM backend on Windows because it's latency is too high. They also
+	wants to prioritize ALSA over PulseAudio on Linux. They also want to avoid using the WinMM backend on Windows because its latency is too high. They also
 	want an error to be returned if no valid backend is available which they achieve by excluding the Null backend.
 
 	For the configuration, the program wants to capture any log messages so they can, for example, route it to a log file and user interface.
