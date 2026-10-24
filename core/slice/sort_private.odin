@@ -127,10 +127,13 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 
 @(private)
 _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr) {
-	loop(data, length, width, cmp, arg, true)
+	loop(data, length, width, cmp, arg, true, 0)
 
-	loop :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr, leftmost: bool) {
-		data := data; length := length; leftmost := leftmost
+	loop :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr, leftmost: bool, unbalanced: int) {
+		data := data
+		length := length
+		leftmost := leftmost
+		unbalanced := unbalanced
 
 		for {
 			if length <= 64 {
@@ -146,7 +149,12 @@ _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, 
 			}
 
 			median_3_depth := log2(length) / 5
-			pivot_index := median_3(data, 0, length, width, cmp, arg, median_3_depth)
+			rand := 0
+			if unbalanced >= 3 {
+				unbalanced -= 1
+				rand = cast(int)intrinsics.read_cycle_counter() & (63 if length > 2048 else 3)
+			}
+			pivot_index := median_3(data, rand * width, length, width, cmp, arg, median_3_depth)
 
 			if !leftmost {
 				if cmp(data[pivot_index * width:], data[-width:], arg) == .Equal {
@@ -163,13 +171,19 @@ _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, 
 			right := length - left
 
 			if left < right {
-				loop(data, left, width, cmp, arg, leftmost)
+				loop(data, left, width, cmp, arg, leftmost, 0)
 				data = data[(left + 1) * width:]
 				length = right - 1
 				leftmost = false
+				if left < right / 32 {
+					unbalanced += 1
+				}
 			} else {
-				loop(data[(left + 1) * width:], right - 1, width, cmp, arg, false)
+				loop(data[(left + 1) * width:], right - 1, width, cmp, arg, false, 0)
 				length = left
+				if right < left / 32 {
+					unbalanced += 1
+				}
 			}
 		}
 		
