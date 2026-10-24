@@ -15,7 +15,6 @@ import "base:runtime"
 import "base:intrinsics"
 
 import "core:os"
-import "core:sync"
 import "core:c/libc"
 import "core:strconv"
 import "core:terminal/ansi"
@@ -25,7 +24,7 @@ import win32 "core:sys/windows"
 
 @(private="file") stop_runner_flag: int
 
-@(private="file") stop_test_gate:   sync.Mutex
+@(private="file") stop_test_gate:   int
 @(private="file") stop_test_index:  int
 @(private="file") stop_test_signal: win32.DWORD
 @(private="file") stop_test_passed: bool
@@ -117,7 +116,10 @@ This is a dire bug and should be reported to the Odin developers.
 		win32.TerminateProcess(win32.GetCurrentProcess(), 1)
 	}
 
-	if sync.mutex_guard(&stop_test_gate) {
+	// This will be unlocked *by a different thread* in the deferred_out of _should_stop_test.
+	lock_stop_test_gate()
+
+	{
 		intrinsics.atomic_store(&stop_test_index, local_test_index)
 		intrinsics.atomic_store(&stop_test_signal, code)
 		passed: bool
@@ -151,10 +153,18 @@ This is a dire bug and should be reported to the Odin developers.
 		}
 		intrinsics.atomic_store(&stop_test_passed, passed)
 		intrinsics.atomic_store(&stop_test_alert, 1)
-
 	}
 
-	// Pass on the exeption to the next handler. As we don't wont to recover from it.
+	for {
+		// TODO: This is a deeper problem.
+		//       We must wait here until the test runner thread has called `TerminateThread` on us.
+		//       Which is a function that Raymond Chen describes as "having no valid use cases, period".
+		//       A much better approach would be to look into a cooperative cancellation mechanism.
+		// Keep the exception from propagating as an unhandled process-level exception.
+		intrinsics.cpu_relax()
+	}
+
+	// Pass on the exeption to the next handler. As we don't want to recover from it.
 	// This also allows debuggers handle it properly.
 	return win32.EXCEPTION_CONTINUE_SEARCH
 }
@@ -185,9 +195,22 @@ _should_stop_runner :: proc() -> bool {
 }
 
 @(private="file")
+lock_stop_test_gate :: proc "contextless"() {
+	for {
+		// Use a spin lock here. A `sync.Mutex` is not guaranteed to support cross-thread unlock,
+		// at least on Windows (see: https://devblogs.microsoft.com/oldnewthing/20230623-00/?p=108371/)
+		_, ok := intrinsics.atomic_compare_exchange_strong(&stop_test_gate, 0, 1)
+		if ok {
+			return
+		}
+		intrinsics.cpu_relax()
+	}
+}
+
+@(private="file")
 unlock_stop_test_gate :: proc(_: int, _: Stop_Reason, ok: bool) {
 	if ok {
-		sync.mutex_unlock(&stop_test_gate)
+		intrinsics.atomic_store(&stop_test_gate, 0)
 	}
 }
 
