@@ -223,9 +223,11 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 			is_windows_cross = true;
 			goto try_cross_linking;
 		}
-	} else if (build_context.cross_compiling && (build_context.different_os || selected_subtarget != Subtarget_Default)) {
+	} else if (selected_subtarget == Subtarget_Android || (build_context.cross_compiling && (build_context.different_os || selected_subtarget != Subtarget_Default))) {
 		switch (selected_subtarget) {
 		case Subtarget_Android:
+			// NOTE(bill): Android always links with the NDK's toolchain, even when the host has the target's OS and
+			// architecture (linux_amd64 on an x86-64 Linux host), which does not count as cross compiling.
 			is_android = true;
 			goto try_cross_linking;
 		default:
@@ -603,7 +605,6 @@ try_cross_linking:;
 
 			int const ODIN_ANDROID_API_LEVEL = build_context.ODIN_ANDROID_API_LEVEL;
 
-			String ODIN_ANDROID_NDK                     = build_context.ODIN_ANDROID_NDK;
 			String ODIN_ANDROID_NDK_TOOLCHAIN           = build_context.ODIN_ANDROID_NDK_TOOLCHAIN;
 			String ODIN_ANDROID_NDK_TOOLCHAIN_LIB       = build_context.ODIN_ANDROID_NDK_TOOLCHAIN_LIB;
 			String ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL = build_context.ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL;
@@ -624,17 +625,17 @@ try_cross_linking:;
 			#if !defined(GB_SYSTEM_WINDOWS)
 				lib_str = gb_string_appendc(lib_str, "-L/ ");
 			#endif
-			
+
 			StringSet asm_files = {};
 			string_set_init(&asm_files, 64);
 			defer (string_set_destroy(&asm_files));
-			
+
 			StringSet min_libs_set = {};
 			string_set_init(&min_libs_set, 64);
 			defer (string_set_destroy(&min_libs_set));
 
 			String prev_lib = {};
-			
+
 			for (Entity *e : gen->foreign_libraries) {
 				GB_ASSERT(e->kind == Entity_LibraryName);
 				// NOTE(bill): Add these before the linking values
@@ -755,7 +756,7 @@ try_cross_linking:;
 								LIT(obj_format),
 								LIT(obj_file),
 								LIT(build_context.extra_assembler_flags)
-							);						
+							);
 							if (result) {
 								gb_printf_err("executing `nasm` to assemble foreing import of %.*s failed.\n\tSuggestion: `nasm` does not ship with the compiler and should be installed with your system's package manager.\n", LIT(asm_file));
 								return result;
@@ -812,7 +813,24 @@ try_cross_linking:;
 							//                available at runtime wherever the executable is run, so we make require those to be
 							//                local to the executable (unless the system collection is used, in which case we search
 							//                the system library paths for the library file).
-							if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o")) || string_ends_with(lib, str_lit(".so")) || string_contains_string(lib, str_lit(".so."))) {
+							bool is_static = string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o"));
+							bool is_shared = string_ends_with(lib, str_lit(".so")) || string_contains_string(lib, str_lit(".so."));
+						#if defined(GB_SYSTEM_WINDOWS)
+							// NOTE(bill): `-l:` with a full path relies on the `-L/` added above, which Windows hosts
+							// (cross-linking for Linux or Android) do not have. Archives are passed by path. Shared
+							// libraries keep `-l:` with their own directory, so `DT_NEEDED` stays a bare file name.
+							if (is_static) {
+								lib_str = gb_string_append_fmt(lib_str, " \"%.*s\" ", LIT(lib));
+								continue;
+							}
+							if (is_shared) {
+								String dir  = directory_from_path(lib);
+								String name = filename_without_directory(lib);
+								lib_str = gb_string_append_fmt(lib_str, " -L\"%.*s\" -l:\"%.*s\" ", LIT(dir), LIT(name));
+								continue;
+							}
+						#endif
+							if (is_static || is_shared) {
 								lib_str = gb_string_append_fmt(lib_str, " -l:\"%.*s\" ", LIT(lib));
 							} else {
 								// dynamic or static system lib, just link regularly searching system library paths
@@ -827,82 +845,8 @@ try_cross_linking:;
 			defer (gb_string_free(object_files));
 
 
-			if (is_android) { // NOTE(bill): glue code needed for Android
-				TIME_SECTION("Android Native App Glue Compile");
-
-				String android_glue_object = {};
-				String android_glue_static_lib = {};
-
-				char hash_buf[64] = {};
-				gb_snprintf(hash_buf, gb_size_of(hash_buf), "%p", &hash_buf);
-				String hash = make_string_c(hash_buf);
-
-				String temp_dir = normalize_path(temporary_allocator(), temporary_directory(temporary_allocator()), NIX_SEPARATOR_STRING);
-				android_glue_object = concatenate4_strings(temporary_allocator(), temp_dir, str_lit("android_native_app_glue-"), hash, str_lit(".o"));
-				android_glue_static_lib = concatenate4_strings(permanent_allocator(), temp_dir, str_lit("libandroid_native_app_glue-"), hash, str_lit(".a"));
-
-				gbString glue = gb_string_make_length(heap_allocator(), ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
-				defer (gb_string_free(glue));
-
-				glue = gb_string_append_fmt(glue, "bin/clang");
-				glue = gb_string_append_fmt(glue, " --target=%.*s%d ", LIT(build_context.metrics.target_triplet), ODIN_ANDROID_API_LEVEL);
-				glue = gb_string_appendc(glue, "-c \"");
-				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK.text, ODIN_ANDROID_NDK.len);
-				glue = gb_string_appendc(glue, "sources/android/native_app_glue/android_native_app_glue.c");
-				glue = gb_string_appendc(glue, "\" ");
-				glue = gb_string_appendc(glue, "-o \"");
-				glue = gb_string_append_length(glue, android_glue_object.text, android_glue_object.len);
-				glue = gb_string_appendc(glue, "\" ");
-
-				glue = gb_string_appendc(glue, "--sysroot \"");
-				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
-				glue = gb_string_appendc(glue, "sysroot");
-				glue = gb_string_appendc(glue, "\" ");
-
-				glue = gb_string_appendc(glue, "\"-I");
-				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
-				glue = gb_string_appendc(glue, "sysroot/usr/include/");
-				glue = gb_string_appendc(glue, "\" ");
-
-				glue = gb_string_appendc(glue, "\"-I");
-				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
-				glue = gb_string_appendc(glue, "sysroot/usr/include/");
-				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_TOOLCHAIN_LIB.text, ODIN_ANDROID_NDK_TOOLCHAIN_LIB.len);
-				glue = gb_string_appendc(glue, "/\" ");
-
-
-				glue = gb_string_appendc(glue, "-Wno-macro-redefined ");
-
-				result = system_exec_command_line_app("android-native-app-glue-compile", glue);
-				if (result) {
-					return result;
-				}
-
-				TIME_SECTION("Android Native App Glue ar");
-
-				gbString ar = gb_string_make_length(heap_allocator(), ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
-				defer (gb_string_free(ar));
-
-				ar = gb_string_appendc(ar, "bin/llvm-ar");
-
-				ar = gb_string_appendc(ar, " rcs ");
-
-				ar = gb_string_appendc(ar, "\"");
-				ar = gb_string_append_length(ar, android_glue_static_lib.text, android_glue_static_lib.len);
-				ar = gb_string_appendc(ar, "\" ");
-
-				ar = gb_string_appendc(ar, "\"");
-				ar = gb_string_append_length(ar, android_glue_object.text, android_glue_object.len);
-				ar = gb_string_appendc(ar, "\" ");
-
-				result = system_exec_command_line_app("android-native-app-glue-ar", ar);
-				if (result) {
-					return result;
-				}
-
-				object_files = gb_string_append_fmt(object_files, "\"%.*s\" ", LIT(android_glue_static_lib));
-			}
-
+			// NOTE(bill): Android's `ANativeActivity_onCreate` now comes from `core:sys/android/native_app_glue`, and only
+			// when a program imports it. Programs using SDL, raylib or their own activity no longer get the NDK's C glue.
 
 			for (String object_path : gen->output_object_paths) {
 				object_files = gb_string_append_fmt(object_files, "\"%.*s\" ", LIT(object_path));
@@ -1059,7 +1003,7 @@ try_cross_linking:;
 
 				// Only specify this flag if the user has given a minimum version to target.
 				// This will cause warnings to show up for mismatched libraries.
-				// NOTE(harold): For device subtargets we have to explicitly set the default version to 
+				// NOTE(harold): For device subtargets we have to explicitly set the default version to
 				//               avoid the same warning since we configure our own minimum version when compiling for devices.
 				if (build_context.minimum_os_version_string_given || selected_subtarget != Subtarget_Default) {
 					link_settings = gb_string_append_fmt(link_settings, "-m%s-version-min=%.*s ", darwin_min_version_id, LIT(build_context.minimum_os_version_string));
@@ -1115,7 +1059,10 @@ try_cross_linking:;
 				platform_lib_str = gb_string_append_length(platform_lib_str, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.text, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.len);
 				platform_lib_str = gb_string_appendc(platform_lib_str, "\" ");
 
-				link_settings = gb_string_appendc(link_settings, "-u ANativeActivity_onCreate ");
+				// NOTE(bill): To match the NDK's own build systems.
+				// A symbol missing at the target API level is a link error rather than a failure when the device loads the library.
+				// `-extra-linker-flags:"-Wl,-z,undefs"` turns this off.
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,--no-undefined ");
 			}
 
 			if (!build_context.no_rpath) {

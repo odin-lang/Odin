@@ -10,6 +10,9 @@ import "core:slice"
 import "core:strings"
 import "core:strconv"
 import "core:sys/linux"
+import "core:sys/posix"
+
+_ :: posix // Used only on Android.
 
 PIDFD_UNASSIGNED  :: ~uintptr(0)
 
@@ -135,41 +138,52 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			break username_if
 		}
 
-		passwd_bytes: []u8
-		passwd_err: Error
-		passwd_bytes, passwd_err = _read_entire_pseudo_file_cstring("/etc/passwd", temp_allocator)
-		if passwd_err != nil {
-			err = passwd_err
-			break username_if
-		}
-
-		passwd := string(passwd_bytes)
-		for len(passwd) > 0 {
-			n := strings.index_byte(passwd, ':')
-			if n < 0 {
-				break
-			}
-			username := passwd[:n]
-			passwd = passwd[n+1:]
-
-			// skip password field
-			passwd = passwd[strings.index_byte(passwd, ':') + 1:]
-
-			n = strings.index_byte(passwd, ':')
-			if uid, ok := strconv.parse_int(passwd[:n]); ok && uid == int(s.uid) {
-				info.username = strings.clone(username, allocator) or_return
+		when ODIN_PLATFORM_SUBTARGET == .Android {
+			// NOTE(bill): Android's `/etc/passwd` is empty. bionic makes up the names of app users, like `u0_a184`.
+			pwd: posix.passwd
+			result: ^posix.passwd
+			buf: [1024]byte
+			if posix.getpwuid_r(posix.uid_t(s.uid), &pwd, &buf[0], len(buf), &result) == .NONE && result != nil {
+				info.username = strings.clone(string(pwd.pw_name), allocator) or_return
 				info.fields += {.Username}
-				break
-			} else if !ok {
-				err = .Invalid_File
+			}
+		} else {
+			passwd_bytes: []u8
+			passwd_err: Error
+			passwd_bytes, passwd_err = _read_entire_pseudo_file_cstring("/etc/passwd", temp_allocator)
+			if passwd_err != nil {
+				err = passwd_err
 				break username_if
 			}
 
-			eol := strings.index_byte(passwd, '\n')
-			if eol < 0 {
-				break
+			passwd := string(passwd_bytes)
+			for len(passwd) > 0 {
+				n := strings.index_byte(passwd, ':')
+				if n < 0 {
+					break
+				}
+				username := passwd[:n]
+				passwd = passwd[n+1:]
+
+				// skip password field
+				passwd = passwd[strings.index_byte(passwd, ':') + 1:]
+
+				n = strings.index_byte(passwd, ':')
+				if uid, ok := strconv.parse_int(passwd[:n]); ok && uid == int(s.uid) {
+					info.username = strings.clone(username, allocator) or_return
+					info.fields += {.Username}
+					break
+				} else if !ok {
+					err = .Invalid_File
+					break username_if
+				}
+
+				eol := strings.index_byte(passwd, '\n')
+				if eol < 0 {
+					break
+				}
+				passwd = passwd[eol + 1:]
 			}
-			passwd = passwd[eol + 1:]
 		}
 	}
 
@@ -185,6 +199,12 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			break cmdline_if
 		}
 		cmdline := string(cmdline_bytes)
+		when ODIN_PLATFORM_SUBTARGET == .Android {
+			// NOTE(bill): zygote overwrites an app's arguments with its package name, padded with NULs.
+			for len(cmdline) > 1 && cmdline[len(cmdline)-1] == 0 && cmdline[len(cmdline)-2] == 0 {
+				cmdline = cmdline[:len(cmdline)-1]
+			}
+		}
 
 		terminator := strings.index_byte(cmdline, 0)
 		assert(terminator > 0)
@@ -382,7 +402,22 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 
 @(private="package")
 _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
-	return _process_info_by_pid(get_pid(), selection, allocator)
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		// NOTE(bill): an app is not dumpable, so its `/proc/<pid>/environ` belongs to root, even for the app itself.
+		info, err = _process_info_by_pid(get_pid(), selection - {.Environment}, allocator)
+		if .Environment in selection {
+			env, env_err := environ(allocator)
+			if env_err == nil {
+				info.environment = env
+				info.fields += {.Environment}
+			} else if err == nil {
+				err = env_err
+			}
+		}
+		return
+	} else {
+		return _process_info_by_pid(get_pid(), selection, allocator)
+	}
 }
 
 @(private="package")

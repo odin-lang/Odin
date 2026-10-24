@@ -15,11 +15,21 @@ when ODIN_OS == .Windows {
 //	EILSEQ
 //	ERANGE
 when ODIN_OS == .Linux {
-	@(private="file")
-	@(default_calling_convention="c")
-	foreign libc {
-		@(link_name="__errno_location")
-		_get_errno :: proc() -> ^int ---
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		// Bionic has no `__errno_location`.
+		@(private="file")
+		@(default_calling_convention="c")
+		foreign libc {
+			@(link_name="__errno")
+			_get_errno :: proc() -> ^int ---
+		}
+	} else {
+		@(private="file")
+		@(default_calling_convention="c")
+		foreign libc {
+			@(link_name="__errno_location")
+			_get_errno :: proc() -> ^int ---
+		}
 	}
 
 	EDOM   :: 33

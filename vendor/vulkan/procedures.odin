@@ -23,6 +23,7 @@ ProcVoidFunction                   :: #type proc "system" ()
 // Instance Procedure Types
 ProcAcquireDrmDisplayEXT                                               :: #type proc "system" (physicalDevice: PhysicalDevice, drmFd: i32, display: DisplayKHR) -> Result
 ProcAcquireWinrtDisplayNV                                              :: #type proc "system" (physicalDevice: PhysicalDevice, display: DisplayKHR) -> Result
+ProcCreateAndroidSurfaceKHR                                            :: #type proc "system" (instance: Instance, pCreateInfo: ^AndroidSurfaceCreateInfoKHR, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
 ProcCreateDebugReportCallbackEXT                                       :: #type proc "system" (instance: Instance, pCreateInfo: ^DebugReportCallbackCreateInfoEXT, pAllocator: ^AllocationCallbacks, pCallback: ^DebugReportCallbackEXT) -> Result
 ProcCreateDebugUtilsMessengerEXT                                       :: #type proc "system" (instance: Instance, pCreateInfo: ^DebugUtilsMessengerCreateInfoEXT, pAllocator: ^AllocationCallbacks, pMessenger: ^DebugUtilsMessengerEXT) -> Result
 ProcCreateDevice                                                       :: #type proc "system" (physicalDevice: PhysicalDevice, pCreateInfo: ^DeviceCreateInfo, pAllocator: ^AllocationCallbacks, pDevice: ^Device) -> Result
@@ -605,6 +606,7 @@ ProcGetAccelerationStructureDeviceAddressKHR               :: #type proc "system
 ProcGetAccelerationStructureHandleNV                       :: #type proc "system" (device: Device, accelerationStructure: AccelerationStructureNV, dataSize: int, pData: rawptr) -> Result
 ProcGetAccelerationStructureMemoryRequirementsNV           :: #type proc "system" (device: Device, pInfo: ^AccelerationStructureMemoryRequirementsInfoNV, pMemoryRequirements: [^]MemoryRequirements2)
 ProcGetAccelerationStructureOpaqueCaptureDescriptorDataEXT :: #type proc "system" (device: Device, pInfo: ^AccelerationStructureCaptureDescriptorDataInfoEXT, pData: rawptr) -> Result
+ProcGetAndroidHardwareBufferPropertiesANDROID              :: #type proc "system" (device: Device, buffer: ^AHardwareBuffer, pProperties: [^]AndroidHardwareBufferPropertiesANDROID) -> Result
 ProcGetBufferDeviceAddress                                 :: #type proc "system" (device: Device, pInfo: ^BufferDeviceAddressInfo) -> DeviceAddress
 ProcGetBufferDeviceAddressEXT                              :: #type proc "system" (device: Device, pInfo: ^BufferDeviceAddressInfo) -> DeviceAddress
 ProcGetBufferDeviceAddressKHR                              :: #type proc "system" (device: Device, pInfo: ^BufferDeviceAddressInfo) -> DeviceAddress
@@ -690,6 +692,7 @@ ProcGetImageViewHandle64NVX                                :: #type proc "system
 ProcGetImageViewHandleNVX                                  :: #type proc "system" (device: Device, pInfo: ^ImageViewHandleInfoNVX) -> u32
 ProcGetImageViewOpaqueCaptureDescriptorDataEXT             :: #type proc "system" (device: Device, pInfo: ^ImageViewCaptureDescriptorDataInfoEXT, pData: rawptr) -> Result
 ProcGetLatencyTimingsNV                                    :: #type proc "system" (device: Device, swapchain: SwapchainKHR, pLatencyMarkerInfo: ^GetLatencyMarkerInfoNV)
+ProcGetMemoryAndroidHardwareBufferANDROID                  :: #type proc "system" (device: Device, pInfo: ^MemoryGetAndroidHardwareBufferInfoANDROID, pBuffer: ^^AHardwareBuffer) -> Result
 ProcGetMemoryFdKHR                                         :: #type proc "system" (device: Device, pGetFdInfo: ^MemoryGetFdInfoKHR, pFd: ^c.int) -> Result
 ProcGetMemoryFdPropertiesKHR                               :: #type proc "system" (device: Device, handleType: ExternalMemoryHandleTypeFlags, fd: c.int, pMemoryFdProperties: [^]MemoryFdPropertiesKHR) -> Result
 ProcGetMemoryHostPointerPropertiesEXT                      :: #type proc "system" (device: Device, handleType: ExternalMemoryHandleTypeFlags, pHostPointer: rawptr, pMemoryHostPointerProperties: [^]MemoryHostPointerPropertiesEXT) -> Result
@@ -840,6 +843,7 @@ GetInstanceProcAddr:                  ProcGetInstanceProcAddr
 // Instance Procedures
 AcquireDrmDisplayEXT:                                               ProcAcquireDrmDisplayEXT
 AcquireWinrtDisplayNV:                                              ProcAcquireWinrtDisplayNV
+CreateAndroidSurfaceKHR:                                            ProcCreateAndroidSurfaceKHR
 CreateDebugReportCallbackEXT:                                       ProcCreateDebugReportCallbackEXT
 CreateDebugUtilsMessengerEXT:                                       ProcCreateDebugUtilsMessengerEXT
 CreateDevice:                                                       ProcCreateDevice
@@ -1421,6 +1425,7 @@ GetAccelerationStructureDeviceAddressKHR:               ProcGetAccelerationStruc
 GetAccelerationStructureHandleNV:                       ProcGetAccelerationStructureHandleNV
 GetAccelerationStructureMemoryRequirementsNV:           ProcGetAccelerationStructureMemoryRequirementsNV
 GetAccelerationStructureOpaqueCaptureDescriptorDataEXT: ProcGetAccelerationStructureOpaqueCaptureDescriptorDataEXT
+GetAndroidHardwareBufferPropertiesANDROID:              ProcGetAndroidHardwareBufferPropertiesANDROID
 GetBufferDeviceAddress:                                 ProcGetBufferDeviceAddress
 GetBufferDeviceAddressEXT:                              ProcGetBufferDeviceAddressEXT
 GetBufferDeviceAddressKHR:                              ProcGetBufferDeviceAddressKHR
@@ -1506,6 +1511,7 @@ GetImageViewHandle64NVX:                                ProcGetImageViewHandle64
 GetImageViewHandleNVX:                                  ProcGetImageViewHandleNVX
 GetImageViewOpaqueCaptureDescriptorDataEXT:             ProcGetImageViewOpaqueCaptureDescriptorDataEXT
 GetLatencyTimingsNV:                                    ProcGetLatencyTimingsNV
+GetMemoryAndroidHardwareBufferANDROID:                  ProcGetMemoryAndroidHardwareBufferANDROID
 GetMemoryFdKHR:                                         ProcGetMemoryFdKHR
 GetMemoryFdPropertiesKHR:                               ProcGetMemoryFdPropertiesKHR
 GetMemoryHostPointerPropertiesEXT:                      ProcGetMemoryHostPointerPropertiesEXT
@@ -1656,6 +1662,7 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	// Instance Procedures
 	set_proc_address(&AcquireDrmDisplayEXT,                                               "vkAcquireDrmDisplayEXT")
 	set_proc_address(&AcquireWinrtDisplayNV,                                              "vkAcquireWinrtDisplayNV")
+	set_proc_address(&CreateAndroidSurfaceKHR,                                            "vkCreateAndroidSurfaceKHR")
 	set_proc_address(&CreateDebugReportCallbackEXT,                                       "vkCreateDebugReportCallbackEXT")
 	set_proc_address(&CreateDebugUtilsMessengerEXT,                                       "vkCreateDebugUtilsMessengerEXT")
 	set_proc_address(&CreateDevice,                                                       "vkCreateDevice")
@@ -2237,6 +2244,7 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&GetAccelerationStructureHandleNV,                       "vkGetAccelerationStructureHandleNV")
 	set_proc_address(&GetAccelerationStructureMemoryRequirementsNV,           "vkGetAccelerationStructureMemoryRequirementsNV")
 	set_proc_address(&GetAccelerationStructureOpaqueCaptureDescriptorDataEXT, "vkGetAccelerationStructureOpaqueCaptureDescriptorDataEXT")
+	set_proc_address(&GetAndroidHardwareBufferPropertiesANDROID,              "vkGetAndroidHardwareBufferPropertiesANDROID")
 	set_proc_address(&GetBufferDeviceAddress,                                 "vkGetBufferDeviceAddress")
 	set_proc_address(&GetBufferDeviceAddressEXT,                              "vkGetBufferDeviceAddressEXT")
 	set_proc_address(&GetBufferDeviceAddressKHR,                              "vkGetBufferDeviceAddressKHR")
@@ -2322,6 +2330,7 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&GetImageViewHandleNVX,                                  "vkGetImageViewHandleNVX")
 	set_proc_address(&GetImageViewOpaqueCaptureDescriptorDataEXT,             "vkGetImageViewOpaqueCaptureDescriptorDataEXT")
 	set_proc_address(&GetLatencyTimingsNV,                                    "vkGetLatencyTimingsNV")
+	set_proc_address(&GetMemoryAndroidHardwareBufferANDROID,                  "vkGetMemoryAndroidHardwareBufferANDROID")
 	set_proc_address(&GetMemoryFdKHR,                                         "vkGetMemoryFdKHR")
 	set_proc_address(&GetMemoryFdPropertiesKHR,                               "vkGetMemoryFdPropertiesKHR")
 	set_proc_address(&GetMemoryHostPointerPropertiesEXT,                      "vkGetMemoryHostPointerPropertiesEXT")
@@ -2938,6 +2947,7 @@ Device_VTable :: struct {
 	GetAccelerationStructureHandleNV:                       ProcGetAccelerationStructureHandleNV,
 	GetAccelerationStructureMemoryRequirementsNV:           ProcGetAccelerationStructureMemoryRequirementsNV,
 	GetAccelerationStructureOpaqueCaptureDescriptorDataEXT: ProcGetAccelerationStructureOpaqueCaptureDescriptorDataEXT,
+	GetAndroidHardwareBufferPropertiesANDROID:              ProcGetAndroidHardwareBufferPropertiesANDROID,
 	GetBufferDeviceAddress:                                 ProcGetBufferDeviceAddress,
 	GetBufferDeviceAddressEXT:                              ProcGetBufferDeviceAddressEXT,
 	GetBufferDeviceAddressKHR:                              ProcGetBufferDeviceAddressKHR,
@@ -3023,6 +3033,7 @@ Device_VTable :: struct {
 	GetImageViewHandleNVX:                                  ProcGetImageViewHandleNVX,
 	GetImageViewOpaqueCaptureDescriptorDataEXT:             ProcGetImageViewOpaqueCaptureDescriptorDataEXT,
 	GetLatencyTimingsNV:                                    ProcGetLatencyTimingsNV,
+	GetMemoryAndroidHardwareBufferANDROID:                  ProcGetMemoryAndroidHardwareBufferANDROID,
 	GetMemoryFdKHR:                                         ProcGetMemoryFdKHR,
 	GetMemoryFdPropertiesKHR:                               ProcGetMemoryFdPropertiesKHR,
 	GetMemoryHostPointerPropertiesEXT:                      ProcGetMemoryHostPointerPropertiesEXT,
@@ -3637,6 +3648,7 @@ load_proc_addresses_device_vtable :: proc(device: Device, vtable: ^Device_VTable
 	vtable.GetAccelerationStructureHandleNV                       = auto_cast GetDeviceProcAddr(device, "vkGetAccelerationStructureHandleNV")
 	vtable.GetAccelerationStructureMemoryRequirementsNV           = auto_cast GetDeviceProcAddr(device, "vkGetAccelerationStructureMemoryRequirementsNV")
 	vtable.GetAccelerationStructureOpaqueCaptureDescriptorDataEXT = auto_cast GetDeviceProcAddr(device, "vkGetAccelerationStructureOpaqueCaptureDescriptorDataEXT")
+	vtable.GetAndroidHardwareBufferPropertiesANDROID              = auto_cast GetDeviceProcAddr(device, "vkGetAndroidHardwareBufferPropertiesANDROID")
 	vtable.GetBufferDeviceAddress                                 = auto_cast GetDeviceProcAddr(device, "vkGetBufferDeviceAddress")
 	vtable.GetBufferDeviceAddressEXT                              = auto_cast GetDeviceProcAddr(device, "vkGetBufferDeviceAddressEXT")
 	vtable.GetBufferDeviceAddressKHR                              = auto_cast GetDeviceProcAddr(device, "vkGetBufferDeviceAddressKHR")
@@ -3722,6 +3734,7 @@ load_proc_addresses_device_vtable :: proc(device: Device, vtable: ^Device_VTable
 	vtable.GetImageViewHandleNVX                                  = auto_cast GetDeviceProcAddr(device, "vkGetImageViewHandleNVX")
 	vtable.GetImageViewOpaqueCaptureDescriptorDataEXT             = auto_cast GetDeviceProcAddr(device, "vkGetImageViewOpaqueCaptureDescriptorDataEXT")
 	vtable.GetLatencyTimingsNV                                    = auto_cast GetDeviceProcAddr(device, "vkGetLatencyTimingsNV")
+	vtable.GetMemoryAndroidHardwareBufferANDROID                  = auto_cast GetDeviceProcAddr(device, "vkGetMemoryAndroidHardwareBufferANDROID")
 	vtable.GetMemoryFdKHR                                         = auto_cast GetDeviceProcAddr(device, "vkGetMemoryFdKHR")
 	vtable.GetMemoryFdPropertiesKHR                               = auto_cast GetDeviceProcAddr(device, "vkGetMemoryFdPropertiesKHR")
 	vtable.GetMemoryHostPointerPropertiesEXT                      = auto_cast GetDeviceProcAddr(device, "vkGetMemoryHostPointerPropertiesEXT")
@@ -4336,6 +4349,7 @@ load_proc_addresses_device :: proc(device: Device) {
 	GetAccelerationStructureHandleNV                       = auto_cast GetDeviceProcAddr(device, "vkGetAccelerationStructureHandleNV")
 	GetAccelerationStructureMemoryRequirementsNV           = auto_cast GetDeviceProcAddr(device, "vkGetAccelerationStructureMemoryRequirementsNV")
 	GetAccelerationStructureOpaqueCaptureDescriptorDataEXT = auto_cast GetDeviceProcAddr(device, "vkGetAccelerationStructureOpaqueCaptureDescriptorDataEXT")
+	GetAndroidHardwareBufferPropertiesANDROID              = auto_cast GetDeviceProcAddr(device, "vkGetAndroidHardwareBufferPropertiesANDROID")
 	GetBufferDeviceAddress                                 = auto_cast GetDeviceProcAddr(device, "vkGetBufferDeviceAddress")
 	GetBufferDeviceAddressEXT                              = auto_cast GetDeviceProcAddr(device, "vkGetBufferDeviceAddressEXT")
 	GetBufferDeviceAddressKHR                              = auto_cast GetDeviceProcAddr(device, "vkGetBufferDeviceAddressKHR")
@@ -4421,6 +4435,7 @@ load_proc_addresses_device :: proc(device: Device) {
 	GetImageViewHandleNVX                                  = auto_cast GetDeviceProcAddr(device, "vkGetImageViewHandleNVX")
 	GetImageViewOpaqueCaptureDescriptorDataEXT             = auto_cast GetDeviceProcAddr(device, "vkGetImageViewOpaqueCaptureDescriptorDataEXT")
 	GetLatencyTimingsNV                                    = auto_cast GetDeviceProcAddr(device, "vkGetLatencyTimingsNV")
+	GetMemoryAndroidHardwareBufferANDROID                  = auto_cast GetDeviceProcAddr(device, "vkGetMemoryAndroidHardwareBufferANDROID")
 	GetMemoryFdKHR                                         = auto_cast GetDeviceProcAddr(device, "vkGetMemoryFdKHR")
 	GetMemoryFdPropertiesKHR                               = auto_cast GetDeviceProcAddr(device, "vkGetMemoryFdPropertiesKHR")
 	GetMemoryHostPointerPropertiesEXT                      = auto_cast GetDeviceProcAddr(device, "vkGetMemoryHostPointerPropertiesEXT")
@@ -4561,6 +4576,7 @@ load_proc_addresses_device :: proc(device: Device) {
 load_proc_addresses_instance :: proc(instance: Instance) {
 	AcquireDrmDisplayEXT                                               = auto_cast GetInstanceProcAddr(instance, "vkAcquireDrmDisplayEXT")
 	AcquireWinrtDisplayNV                                              = auto_cast GetInstanceProcAddr(instance, "vkAcquireWinrtDisplayNV")
+	CreateAndroidSurfaceKHR                                            = auto_cast GetInstanceProcAddr(instance, "vkCreateAndroidSurfaceKHR")
 	CreateDebugReportCallbackEXT                                       = auto_cast GetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT")
 	CreateDebugUtilsMessengerEXT                                       = auto_cast GetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT")
 	CreateDevice                                                       = auto_cast GetInstanceProcAddr(instance, "vkCreateDevice")
@@ -5142,6 +5158,7 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	GetAccelerationStructureHandleNV                       = auto_cast GetInstanceProcAddr(instance, "vkGetAccelerationStructureHandleNV")
 	GetAccelerationStructureMemoryRequirementsNV           = auto_cast GetInstanceProcAddr(instance, "vkGetAccelerationStructureMemoryRequirementsNV")
 	GetAccelerationStructureOpaqueCaptureDescriptorDataEXT = auto_cast GetInstanceProcAddr(instance, "vkGetAccelerationStructureOpaqueCaptureDescriptorDataEXT")
+	GetAndroidHardwareBufferPropertiesANDROID              = auto_cast GetInstanceProcAddr(instance, "vkGetAndroidHardwareBufferPropertiesANDROID")
 	GetBufferDeviceAddress                                 = auto_cast GetInstanceProcAddr(instance, "vkGetBufferDeviceAddress")
 	GetBufferDeviceAddressEXT                              = auto_cast GetInstanceProcAddr(instance, "vkGetBufferDeviceAddressEXT")
 	GetBufferDeviceAddressKHR                              = auto_cast GetInstanceProcAddr(instance, "vkGetBufferDeviceAddressKHR")
@@ -5227,6 +5244,7 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	GetImageViewHandleNVX                                  = auto_cast GetInstanceProcAddr(instance, "vkGetImageViewHandleNVX")
 	GetImageViewOpaqueCaptureDescriptorDataEXT             = auto_cast GetInstanceProcAddr(instance, "vkGetImageViewOpaqueCaptureDescriptorDataEXT")
 	GetLatencyTimingsNV                                    = auto_cast GetInstanceProcAddr(instance, "vkGetLatencyTimingsNV")
+	GetMemoryAndroidHardwareBufferANDROID                  = auto_cast GetInstanceProcAddr(instance, "vkGetMemoryAndroidHardwareBufferANDROID")
 	GetMemoryFdKHR                                         = auto_cast GetInstanceProcAddr(instance, "vkGetMemoryFdKHR")
 	GetMemoryFdPropertiesKHR                               = auto_cast GetInstanceProcAddr(instance, "vkGetMemoryFdPropertiesKHR")
 	GetMemoryHostPointerPropertiesEXT                      = auto_cast GetInstanceProcAddr(instance, "vkGetMemoryHostPointerPropertiesEXT")

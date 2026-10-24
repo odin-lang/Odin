@@ -28,15 +28,18 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority, name: Maybe(s
 			sync.wait(&t.start_ok)
 		}
 
-		// Enable thread's cancelability.
-		err := posix.pthread_setcancelstate(.ENABLE, nil)
-		assert_contextless(err == nil)
+		// NOTE: Bionic (Android) has no thread cancellation.
+		when ODIN_PLATFORM_SUBTARGET != .Android {
+			// Enable thread's cancelability.
+			err := posix.pthread_setcancelstate(.ENABLE, nil)
+			assert_contextless(err == nil)
 
-		// NOTE(laytan): .ASYNCHRONOUS should make `pthread_cancel` cancel immediately
-		// instead of waiting for a cancellation point.
-		// This does not seem to work on at least Darwin and NetBSD though.
-		err = posix.pthread_setcanceltype(.ASYNCHRONOUS, nil)
-		assert_contextless(err == nil)
+			// NOTE(laytan): .ASYNCHRONOUS should make `pthread_cancel` cancel immediately
+			// instead of waiting for a cancellation point.
+			// This does not seem to work on at least Darwin and NetBSD though.
+			err = posix.pthread_setcanceltype(.ASYNCHRONOUS, nil)
+			assert_contextless(err == nil)
+		}
 
 		{
 			init_context := t.init_context
@@ -181,7 +184,11 @@ _terminate :: proc(t: ^Thread, exit_code: int) {
 	//
 	// This is in contrast to behavior I have seen on Linux where the thread is
 	// just terminated.
-	posix.pthread_cancel(t.unix_thread)
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		unimplemented("core:thread: `terminate` is not supported on Android (bionic has no `pthread_cancel`)")
+	} else {
+		posix.pthread_cancel(t.unix_thread)
+	}
 }
 
 _yield :: proc() {

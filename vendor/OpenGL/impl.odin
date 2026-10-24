@@ -1302,6 +1302,7 @@ impl_ObjectLabel:                     proc "c" (identifier: u32, name: u32, leng
 impl_GetObjectLabel:                  proc "c" (identifier: u32, name: u32, bufSize: i32, length: ^i32, label: [^]u8)
 impl_ObjectPtrLabel:                  proc "c" (ptr: rawptr, length: i32, label: cstring)
 impl_GetObjectPtrLabel:               proc "c" (ptr: rawptr, bufSize: i32, length: ^i32, label: [^]u8)
+impl_GetPointerv:                     proc "c" (pname: u32, params: ^rawptr)
 
 load_4_3 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_ClearBufferData,                 "glClearBufferData")
@@ -1347,6 +1348,7 @@ load_4_3 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_GetObjectLabel,                  "glGetObjectLabel")
 	set_proc_address(&impl_ObjectPtrLabel,                  "glObjectPtrLabel")
 	set_proc_address(&impl_GetObjectPtrLabel,               "glGetObjectPtrLabel")
+	set_proc_address(&impl_GetPointerv,                     "glGetPointerv")
 }
 
 // VERSION_4_4
