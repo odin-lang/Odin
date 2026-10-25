@@ -9,6 +9,16 @@ when ODIN_OS == .Windows {
 	} else {
 		foreign import lib_ "OpenEXRCore-3_5.lib"
 	}
+} else when ODIN_OS == .Darwin {
+	when OPENEXRCORE_SHARED {
+		#panic("Dynamic linking is not supported for OpenEXRCore yet")
+	} else {
+		// The library contains C++ code (OpenJPH, for the HTJ2K and LJ2K codecs), so it needs the C++ runtime.
+		foreign import lib_ {
+			"darwin/OpenEXRCore-3_5.a",
+			"system:c++",
+		}
+	}
 } else {
 	foreign import lib_ "system:OpenEXRCore-3_5"
 }

@@ -94,6 +94,10 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: git lfs pull --include="vendor/lua/*/linux/*"
 
+      - name: Fetch the OpenEXRCore library from Git LFS
+        if: matrix.os == 'macos-latest'
+        run: git lfs pull --include="vendor/OpenEXRCore/darwin/*"
+
       - name: Download LLVM (MacOS ARM)
         if: matrix.os == 'macos-latest'
         run: |
