@@ -1,4 +1,4 @@
-/*  kb_text_shape - v2.21 - text segmentation and shaping
+/*  kb_text_shape - v2.28g - text segmentation and shaping
     by Jimmy Lefevre
 
     SECURITY
@@ -185,6 +185,25 @@
       The library also contains several miscellaneous utility functions that are not
       obviously part of any of the two aforementioned APIs.
 
+      Variable fonts are supported. A variable font has a certain number of "variation
+      axes" which describes how its look can be configured. Within each axis' bounds,
+      configuration is continuous, and so the API uses floats for coordinates. However,
+      internally, these coordinates are normalized to 16-bit fixed-point, so some of our
+      lower-level functions expect normalized input. (See kbts_NormalizeVariationVector.)
+
+      Furthermore, there are two ways to represent a set of variations. One is an
+      array of coordinates, each applying to exactly one font axis, all in order. We
+      call these arrays "variation vectors". They are the simplest and fastest
+      representation, but they only work for one font at a time. This is because each
+      font is free to list its axes in whichever order it pleases.
+      The other representation is an array of _tagged_ values (see kbts_variation),
+      wherein each tag uniquely identifies the axis it applies to. This is a more
+      convenient representation, especially when handling multiple fonts, because it
+      requires no per-font shuffling at all.
+      Lower-level functions will tend to expect variation vectors, whereas higher-level
+      ones will tend to accept the looser tagged values. I have tried to fill in the gaps
+      and cater to different use cases wherever seemed appropriate, although, inevitably,
+      some combinations are missing. We may add them if they turn out to be useful.
 
       In the documentation below, all functions (as well as some structs/enums) are
       marked with "search tags".
@@ -255,7 +274,7 @@
               KBTS_SHAPE_CONTEXT_FLAG_FONT_PRIORITY_BOTTOM_TO_TOP = (1 << 0)
                 The default priority order for the font stack is top-to-bottom, i.e.
                 fonts that were pushed later have higher priority.
-                If this flag is set, then this priority is reversed: fonts that are
+              If this flag is set, then this priority is reversed: fonts that are
                 pushed earlier, and are thus closer to the bottom of the stack, have
                 higher priority.
                 For more details on the font stack, see CONTEXT:FONT HANDLING.
@@ -303,36 +322,76 @@
           you try to shape some text, the context will check to see if it is supported by
           the font at the top of the stack. If it is not, it will try the next font down,
           and so on, until all fonts have been tried. As such, you should push your fallback
-          fonts first, and your preferred fonts last.
+          fonts first, and your preferred fonts last. Alternatively, you can use the context
+          flag KBTS_SHAPE_CONTEXT_FLAG_FONT_PRIORITY_BOTTOM_TO_TOP which reverses the order.
 
-          :kbts_ShapePushFontFromFile
-          :ShapePushFontFromFile
-          kbts_font *kbts_ShapePushFontFromFile(kbts_shape_context *Context, const char *FileName, int FontIndex)
+          The font stack is dynamically-sized. Internally, it is a list of fixed-size blocks.
+          Each block contains KBTS_CONTEXT_FONTS_PER_BLOCK fonts, which you can configure by
+          defining before including the library.
+
+          :kbts_ShapePushFontFromFile2
+          :ShapePushFontFromFile2
+          kbts_font *kbts_ShapePushFontFromFile2(kbts_shape_context *Context, const char *FileName, int FontIndex,
+                                                 kbts_variation *Variations, int VariationCount, kbts_u32 *ContextFontHandle)
             (This function is not available if KB_TEXT_SHAPE_NO_CRT is defined.)
 
             Opens the file corresponding to [FileName], parses the [FontIndex]th font
             within it, and, if successful, pushes the result onto the stack.
 
-            A [return value] of 0 could mean that the stack is out of space (see
-            KBTS_CONTEXT_MAX_FONT_COUNT), that the file could not be found or opened,
-            or that the parse has failed.
+            [Variations] is an array of [VariationCount] font variation settings.
+            We try to apply as many of them as we can, ignoring those that the font
+            does not support.
+
+            If [ContextFontHandle] is non-zero, it receives a handle to the font.
+
+            A [return value] of 0 could mean that the stack is out of space, that the
+            file could not be found or opened, or that the parse has failed.
+
+          :kbts_ShapePushFontFromFile
+          :ShapePushFontFromFile
+          kbts_font *kbts_ShapePushFontFromFile(kbts_shape_context *Context, const char *FileName, int FontIndex)
+            (This function is not available if KB_TEXT_SHAPE_NO_CRT is defined.)
+            Equivalent to kbts_ShapePushFontFromFile2([Context], [FileName], [FontIndex], 0, 0, 0).
+
+          :kbts_ShapePushFontFromMemory2
+          :ShapePushFontFromMemory2
+          kbts_font *kbts_ShapePushFontFromMemory2(kbts_shape_context *Context, void *Memory, int Size, int FontIndex,
+                                                   kbts_variation *Variations, int VariationCount, kbts_u32 *ContextFontHandle)
+            Parses the [FontIndex]th font in [Memory] and pushes the result to the font
+            stack.
+
+            [Variations] is an array of [VariationCount] font variation settings.
+            We try to apply as many of them as we can, ignoring those that the font
+            does not support.
+
+            If [ContextFontHandle] is non-zero, it receives a handle to the font.
+
+            A [return value] of 0 could mean that the stack is out of space or that
+            the font could not be parsed.
 
           :kbts_ShapePushFontFromMemory
           :ShapePushFontFromMemory
           kbts_font *kbts_ShapePushFontFromMemory(kbts_shape_context *Context, void *Memory, int Size, int FontIndex)
-            Parses the [FontIndex]th font in [Memory] and pushes the result to the font
-            stack.
+            Equivalent to kbts_ShapePushFontFromMemory([Context], [Memory], [Size], [FontIndex], 0).
 
-            A [return value] of 0 could mean that the stack is out of space (see
-            KBTS_CONTEXT_MAX_FONT_COUNT) or that the font could not be parsed.
+          :kbts_ShapePushFont2
+          :ShapePushFont2
+          kbts_font *kbts_ShapePushFont2(kbts_shape_context *Context, kbts_font *Font,
+                                         kbts_variation *Variations, int VariationCount, kbts_u32 *ContextFontHandle)
+            Pushes the pre-parsed [Font] onto the stack.
+
+            [Variations] is an array of [VariationCount] font variation settings.
+            We try to apply as many of them as we can, ignoring those that the font
+            does not support.
+
+            If [ContextFontHandle] is non-zero, it receives a handle to the font.
+
+            A [return value] of 0 means that the stack has run out of space.
 
           :kbts_ShapePushFont
           :ShapePushFont
           kbts_font *kbts_ShapePushFont(kbts_shape_context *Context, kbts_font *Font)
-            Pushes the pre-parsed [Font] onto the stack.
-
-            A [return value] of 0 means that the stack has run out of space (see
-            KBTS_CONTEXT_MAX_FONT_COUNT).
+            Equivalent to kbts_ShapePushFont([Context], [Font], 0, 0, 0).
 
           :kbts_ShapePopFont
           :ShapePopFont
@@ -525,6 +584,51 @@
 
             The [return value] is non-zero if [CodepointIndex] is in-bounds, 0 if not.
 
+        CONTEXT:VARIATIONS
+          :kbts_ShapeSetFontVariationVector
+          :ShapeSetFontVariationVector
+          int kbts_ShapeSetFontVariationVector(kbts_shape_context *Context, kbts_u32 ContextFontHandle, float *VariationVector)
+            Sets all of the variations in the font corresponding to [ContextFontHandle]
+            to be [VariationVector].
+
+            If any value in [VariationVector] is KBTS_VARIATION_VALUE_UNSET, then any
+            font-specific variations to that axis will we wiped.
+
+            [VariationVector] must be as big as the number of variation axes in the font.
+
+          :kbts_ShapeSetFontVariations
+          :ShapeSetFontVariations
+          int kbts_ShapeSetFontVariations(kbts_shape_context *Context, kbts_u32 ContextFontHandle,
+                                          kbts_variation *Variations, int VariationCount)
+            Will try to apply all variations described in [Variations] to the font
+            referenced by [ContextFontHandle].
+
+            [Variations] must be at least [VariationCount] big.
+
+            The [return value] is the amount of variations that were successfully
+            applied, i.e. that the font supports.
+
+          :kbts_ShapeSetFontVariation
+          :ShapeSetFontVariation
+          int kbts_ShapeSetFontVariation(kbts_shape_context *Context, kbts_u32 ContextFontHandle, kbts_u32 Tag, float Value)
+            Equivalent to calling kbts_ShapeSetFontVariations with a single variation
+            containing [Tag] and [Value].
+
+          :kbts_ShapePushGlobalVariation
+          :ShapePushGlobalVariation
+          int kbts_ShapePushGlobalVariation(kbts_shape_context *Context, kbts_u32 Tag, float Value)
+            Pushes a variation setting [Tag] to [Value] on to [Context]'s variation
+            stack.
+
+            If [Value] is KBTS_VARIATION_VALUE_UNSET, then we instead pop the topmost
+            variation to [Tag] from the stack.
+
+            Global variations affect all fonts in [Context] and are lower priority than
+            font-specific variations.
+
+          int kbts_ShapePopGlobalVariation(kbts_shape_context *Context, kbts_u32 Tag)
+            Equivalent to kbts_ShapePushGlobalVariation([Context], [Tag], KBTS_VARIATION_VALUE_UNSET).
+
         CONTEXT:MISCELLANEOUS
           :kbts_ShapeError
           :ShapeError
@@ -579,6 +683,11 @@
             font, script and language.
             You can think of it as a pipeline state in a modern graphics API.
             In practice, you are only ever shaping text with a single active configuration.
+
+            Sometimes, creating two different shape configs from the same font, but from different
+            variation vectors will result in two identical configs. You can detect this case by
+            checking the configs' UID, which you can obtain directly from PlaceShapeConfig2 or
+            CreateShapeConfig2 or query with ShapeConfigUid.
         - Glyph storage (kbts_glyph_storage)
             Glyph storage fills two roles: it allocates and holds glyph data, and it also manages
             a set of active glyphs.
@@ -590,11 +699,16 @@
 
         The central function to call is this:
 
-          :kbts_ShapeDirect
-          :ShapeDirect
-          kbts_shape_error kbts_ShapeDirect(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storage *Storage,
-                                            kbts_direction RunDirection, kbts_glyph_iterator *Output)
+          :kbts_ShapeDirect2
+          :ShapeDirect2
+          kbts_shape_error kbts_ShapeDirect2(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storage *Storage,
+                                             kbts_direction RunDirection, kbts_s16 *VariationVectorNormalized, kbts_glyph_iterator *Output)
             [RunDirection] is the direction of the specific run being shaped.
+
+            [VariationVectorNormalized], if it exists, is at least as big as the number
+            of variation axes in [Scratchpad]'s font. You can get a normalized variation
+            vector from kbts_NormalizeVariationVector.
+
             If the [return value] is KBTS_SHAPE_ERROR_NONE, then the shaping operation
             completed successfully.
 
@@ -604,6 +718,13 @@
             Note that kbts_ShapeDirect does not care about the paragraph direction.
             Glyphs are always returned in left-to-right order. In other words, RTL runs
             are flipped so that visual order is consistent.
+
+
+          :kbts_ShapeDirect
+          :ShapeDirect
+          kbts_shape_error kbts_ShapeDirect(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storage *Storage,
+                                            kbts_direction RunDirection, kbts_glyph_iterator *Output)
+            Equivalent to calling kbts_ShapeDirect2([Scratchpad], [Storage], [RunDirection], 0, [Output]).
 
         The rest of the direct API is more or less about preparing the data you need to call
         kbts_ShapeDirect.
@@ -698,6 +819,11 @@
           void kbts_GetFontInfo2(kbts_font *Font, kbts_font_info2 *Info)
             Writes a bunch of useful metadata about [Font] into [Info].
 
+            !!! WARNING: The Strings and StringLengths members of font_info only
+                         support ASCII/UTF-8-encoded strings, which many font files
+                         do not have. If you want to extract strings from a font,
+                         use kbts_LookupFontString() instead.
+
             Before calling this function, you must fill out [Info].Size to be
             sizeof([Info]).
 
@@ -728,30 +854,123 @@
             Equivalent to calling kbts_GetFontInfo2 with an Info struct of type
             kbts_font_info2.
 
+          :kbts_WindowsIdsForLanguage
+          :WindowsIdsForLanguage
+          int kbts_WindowsIdsForLanguage(kbts_language Language, kbts_windows_language_id *Ids, int IdCapacity)
+            Writes a list of Windows language IDs that match [Language] to [Ids].
+
+            Windows language IDs are used to specify the locale/language of strings in a
+            font. You use them when calling LookupFontString().
+
+            IDs are written to [Ids] if [IdCapacity] is large enough. If it is not, then
+            nothing is written.
+
+            Returns how many IDs match [Language], and thus how big [IdCapacity] needs to be.
+            Does NOT return how many IDs were written.
+
+          :kbts_LookupFontString
+          :LookupFontString
+          int kbts_LookupFontString(kbts_font *Font,
+                                    kbts_font_info_string_id StringId, kbts_windows_language_id LanguageId,
+                                    char *String, int StringCapacity)
+            Extracts a string from [Font]'s name table corresponding to
+            [StringId], in the language specified by [LanguageId].
+
+            The resulting string is written to [String] in UTF-8.
+            If the string is longer than [StringCapacity], then only up to [StringCapacity]
+            bytes will be written.
+
+            The return value is the byte length of the string. It is NOT how many bytes were
+            written.
+
+          :kbts_GetVariationInfo
+          :GetVariationInfo
+          void kbts_GetVariationInfo(kbts_font *Font, int *AxisCount, int *InstanceCount)
+            Writes the number of variation axes contained by [Font] to [AxisCount],
+            and the number of variation instances to [InstanceCount].
+
+            You can then query axis information with kbts_GetVariationAxisInfo,
+            and instance information with kbts_GetVariationInstance.
+
+          :kbts_NormalizeVariationVector
+          :NormalizeVariationVector
+          void kbts_NormalizeVariationVector(kbts_font *Font, float *VariationVector,
+                                             kbts_s16 *VariationVectorNormalized)
+            Normalizes the variation coordinates in [VariationVector] for use with [Font],
+            and writes out the result to [VariationVectorNormalized].
+
+            [VariationVector] and [VariationVectorNormalized] should both be as big as the
+            number of variation axes in [Font].
+
+          :kbts_GetVariationAxisInfo
+          :GetVariationAxisInfo
+          int kbts_GetVariationAxisInfo(kbts_font *Font, int AxisIndex,
+                                        kbts_variation_axis_info *Info)
+            Gets the description of the [AxisIndex]th variation axis contained in [Font],
+            and writes it out to [Info].
+
+            Returns 1 if [AxisIndex] is in-bounds.
+
+          :kbts_GetVariationInstance
+          :GetVariationInstance
+          int kbts_GetVariationInstance(kbts_font *Font, int InstanceIndex,
+                                        kbts_variation_instance_info *Info, float *VariationVector)
+            Gets the description of the [InstanceIndex]th variation instance contained
+            in [Font], and writes it out to [Info].
+
+            If [VariationVector] is non-zero, it receives the variation vector
+            corresponding to the instance. As such, it must be as big as the number of
+            variation axes in [Font].
+
         DIRECT:SHAPE CONFIG
+          :kbts_SizeOfShapeConfig2
+          :SizeOfShapeConfig2
+          int kbts_SizeOfShapeConfig2(kbts_font *Font, kbts_script Script, kbts_language Language, float *VariationVector)
+            Returns how large the buffer you pass into kbts_PlaceShapeConfig2 needs to be.
+
+          :kbts_PlaceShapeConfig2
+          :PlaceShapeConfig2
+          kbts_shape_config *kbts_PlaceShapeConfig2(kbts_font *Font, kbts_script Script, kbts_language Language, float *VariationVector,
+                                                    void *Memory, kbts_uid *Uid)
+            Writes a shape config into [Memory] and returns a pointer to it.
+            [Memory] needs to be at least kbts_SizeOfShapeConfig2([Font], [Script], [Language], [VariationVector]) bytes.
+
+            If [Uid] is non-zero, then we write the resulting shape config's UID to it.
+
+          :kbts_CreateShapeConfig2
+          :CreateShapeConfig2
+          kbts_shape_config *kbts_CreateShapeConfig2(kbts_font *Font, kbts_script Script, kbts_language Language, float *VariationVector, kbts_allocator_function *Allocator, void *AllocatorData, kbts_uid *Uid)
+            Allocates and initializes a shape config.
+
+            If [Uid] is non-zero, then we write the resulting shape config's UID to it.
+
           :kbts_SizeOfShapeConfig
           :SizeOfShapeConfig
           int kbts_SizeOfShapeConfig(kbts_font *Font, kbts_script Script, kbts_language Language)
-            Returns how large the buffer you pass into kbts_PlaceShapeConfig needs to be.
+            Equivalent to kbts_SizeOfShapeConfig([Font], [Script], [Language], 0).
 
           :kbts_PlaceShapeConfig
           :PlaceShapeConfig
           kbts_shape_config *kbts_PlaceShapeConfig(kbts_font *Font, kbts_script Script, kbts_language Language,
                                                    void *Memory)
-            Writes a shape config into [Memory] and returns a pointer to it.
-            [Memory] needs to be at least kbts_SizeOfShapeConfig([Font], [Script], [Language]) bytes.
+            Equivalent to kbts_PlaceShapeConfig2([Font], [Script], [Language], 0, [Memory], 0).
 
           :kbts_CreateShapeConfig
           :CreateShapeConfig
           kbts_shape_config *kbts_CreateShapeConfig(kbts_font *Font, kbts_script Script, kbts_language Language,
                                                     kbts_allocator_function *Allocator, void *AllocatorData)
-            Allocates and initializes a shape config.
+            Equivalent to kbts_CreateShapeConfig2([Font], [Script], [Language], 0, [Allocator], [AllocatorData], 0).
 
           :kbts_DestroyShapeConfig
           :DestroyShapeConfig
           void kbts_DestroyShapeConfig(kbts_shape_config *Config)
             If [Config] was allocated in kbts_CreateShapeConfig, frees all of [Config]'s data.
             Otherwise, nothing is done.
+
+          :kbts_ShapeConfigUid
+          :ShapeConfigUid
+          void kbts_ShapeConfigUid(kbts_shape_config *Config, kbts_uid *Uid)
+            Writes [Config]'s UID to [Uid].
 
         DIRECT:SHAPE SCRATCHPAD
           :kbts_SizeOfShapeScratchpad
@@ -890,12 +1109,10 @@
 
         DIRECT:GLYPH CONFIG
           The shaper figures out most of the work it needs to do based on the writing system
-          it is shaping.
-
-          However, some fonts support optional, toggleable features, like "make this text
-          smallcaps". For things like this, you will want to create a kbts_glyph_config.
-          You can then pass it to glyph creation functions or write it to the Config field
-          of a kbts_glyph.
+          it is shaping. However, some fonts support optional, toggleable features, like
+          "make this text smallcaps". For things like this, you will want to create a
+          kbts_glyph_config. You can then pass it to glyph creation functions or write it to
+          the Config field of a kbts_glyph.
 
           A kbts_glyph_config can hold any number of feature overrides. A feature override
           is a feature tag and a value. Most of the time, you only care whether the value
@@ -1248,6 +1465,16 @@
             Valid is zero if we run out of characters, or if the characters in [Utf8]
             are invalid.
 
+          :kbts_DecodeUtf16
+          :DecodeUtf16
+          kbts_decode kbts_DecodeUtf16(const kbts_u16 *Utf16, kbts_un Length, kbts_decode_utf16_flags Flags)
+            Just like DecodeUtf8(), but for Utf16 input.
+
+            [Length] is the _character_ length of [Utf16], NOT its byte length.
+            [Flags] can be:
+              KBTS_DECODE_UTF16_FLAG_NONE = 0
+              KBTS_DECODE_UTF16_FLAG_BIG_ENDIAN = (1 << 0) // [Utf16] points to a big-endian buffer.
+
           :kbts_EncodeUtf8
           :EncodeUtf8
           kbts_encode_utf8 kbts_EncodeUtf8(int Codepoint)
@@ -1307,6 +1534,7 @@
      to be compatible with every font under the sun.
 
    OTHER LIMITATIONS
+     Hinting is not supported.
      Explicit direction control characters are not supported. This includes:
        0x202A Left-to-right embedding
        0x202B Right-to-left embedding
@@ -1319,7 +1547,77 @@
        0x2069 Pop directional isolate
      See https://unicode.org/reports/tr9 for more information.
 
+   CONTRIBUTORS
+     Jimmy Lefevre           Daniel Jennings    github:HueHue44      github:JCash
+     github:loganamcnichols  Antoine Gagnon     github:dmarjenburgh  github:pdoane
+     github:hollinwilkins    .                  .                    .
+     .                       .                  .                    .
+     .                       .                  .                    .
+     .                       .                  .                    .
+     .                       .                  .                    .
+     .                       .                  .                    .
+     .                       .                  .                    .
+     .                       .                  .                    .
+
    VERSION HISTORY
+     2.28g - Fix GCC 15.2 warnings. Fix typo in version history.
+     2.28f - Removed many UB unaligned memory accesses.
+     2.28e - Fix word and line break positions with heterogenous-sized strings.
+     2.28d - Better cache keys in the context.
+             Fix an infinite loop in non-cluster Myanmar syllable splitting.
+     2.28c - Only perform single decomposition on unsupported glyphs.
+     2.28b - Make kbts_PlaceBlob not error out when State->ScratchSize is 0 and ScratchMemory is NULL.
+             Make kbts_PlaceBlob return KBTS_LOAD_FONT_ERROR_NONE when State->TotalSize is 0 and OutputMemory is 0.
+             Remove KBTS_CONTEXT_MAX_FONT_COUNT. The font stack now resizes dynamically in increments of KBTS_CONTEXT_FONTS_PER_BLOCK.
+             Interpret a GSUB or GPOS table with NULL ScriptListOffset, FeatureListOffset and LookupListOffset as empty.
+             Properly namespace kbts_lookup_list to kbts__lookup_list.
+             Improved script matching: handle 'dflt'; fall back to 'latn' if we don't match anything and no default was found.
+             Fix some Han characters not having a Script property.
+             Fix Hangul glyphs always having NULL UserId and Config after shaping.
+             Fix Hangul recomposition trying to compose with incorrect trailing characters.
+             Fix nested recompositions.
+     2.28a - Fix unaligned reads and NULL pointer offsets when reading variation data.
+             Fix minimum size computation for delta set index maps.
+             Fix various clang warnings.
+     2.28  - Add support for variable fonts.
+             New functions:
+               kbts_ShapePushFontFromFile2
+               kbts_ShapePushFontFromMemory2
+               kbts_ShapePushFont2
+               kbts_ShapeSetFontVariationVector
+               kbts_ShapeSetFontVariations
+               kbts_ShapeSetFontVariation
+               kbts_ShapePushGlobalVariation
+               kbts_ShapePopGlobalVariation
+               kbts_ShapeDirect2
+               kbts_GetVariationInfo
+               kbts_GetVariationAxisInfo
+               kbts_GetVariationInstance
+               kbts_NormalizeVariationVector
+               kbts_SizeOfShapeConfig2
+               kbts_PlaceShapeConfig2
+               kbts_CreateShapeConfig2
+               kbts_ShapeConfigUid
+             New enums: kbts_variation_axis_flags, kbts_variation_instance_flags.
+             Removed singleton recompositions from the normalization pass. This saves us ~60KiB of table data.
+     2.27  - Rename internal function kbts_ByteSwapValueRecord to kbts__ByteSwapValueRecord.
+     2.26c - Reorder language IDs returned from WindowsIdsForLanguage.
+     2.26b - In kbts_LookupFontString, return the string length even when StringCapacity is 0.
+     2.26a - Fix cmap4 compatibility regression introduced in 2.24.
+     2.26  - Deprecate font_info.Strings, .StringLengths.
+               To extract strings from fonts, use kbts_WindowsIdsForLanguage and kbts_LookupFontString.
+               These functions are compatible with Windows-encoded strings, which are by far the most
+               common type of string in OpenType fonts.
+             New functions: kbts_WindowsIdsForLanguage, kbts_LookupFontString, kbts_DecodeUtf16.
+             New enums: kbts_decode_utf16_flags, kbts_windows_language_id.
+             Extend kbts_font_info_string_id to contain more(all?) pre-defined OpenType string IDs.
+             Fix several typos in kbts_language.
+     2.25  - Check for empty input and context errors in segmentation updates.
+             Clean up mixed line endings.
+     2.24  - Improve cmap4 compatibility with old fonts.
+     2.23  - Improve direction inference at the end of paragraphs and for short paragraphs.
+     2.22  - Fix a segmentation bug where a line with an unknown script would inherit the next
+             line's script.
      2.21  - Eliminate redundant typedefs for C99 compatibility.
      2.20  - Properly check kbts__InputCodepoint return values.
              Handle null shape configs in kbts_PlaceGlyphConfig.
@@ -1566,6 +1864,426 @@
 
 #  define KBTS_FOURCC(A, B, C, D) ((kbts_u32)(A) | ((kbts_u32)(B) << 8) | ((kbts_u32)(C) << 16) | ((kbts_u32)(D) << 24))
 
+typedef kbts_u16 kbts_windows_language_id;
+enum kbts_windows_language_id_enum
+{
+  KBTS_WINDOWS_LANGUAGE_ID_AFRIKAANS = 0x36, // af
+  KBTS_WINDOWS_LANGUAGE_ID_AFRIKAANS_SOUTH_AFRICA = 0x436, // af-ZA
+  KBTS_WINDOWS_LANGUAGE_ID_ALBANIAN = 0x1C, // sq
+  KBTS_WINDOWS_LANGUAGE_ID_ALBANIAN_ALBANIA = 0x41C, // sq-AL
+  KBTS_WINDOWS_LANGUAGE_ID_ALSATIAN = 0x84, // gsw
+  KBTS_WINDOWS_LANGUAGE_ID_ALSATIAN_FRANCE = 0x484, // gsw-FR
+  KBTS_WINDOWS_LANGUAGE_ID_AMHARIC = 0x5E, // am
+  KBTS_WINDOWS_LANGUAGE_ID_AMHARIC_ETHIOPIA = 0x45E, // am-ET
+  KBTS_WINDOWS_LANGUAGE_ID_ARABIC = 0x1, // ar
+  KBTS_WINDOWS_LANGUAGE_ID_ARABIC_ALGERIA = 0x1401, // ar-DZ
+  KBTS_WINDOWS_LANGUAGE_ID_ARABIC_BAHRAIN = 0x3C01, // ar-BH
+  KBTS_WINDOWS_LANGUAGE_ID_ARABIC_EGYPT = 0xC01, // ar-EG
+  KBTS_WINDOWS_LANGUAGE_ID_ARABIC_IRAQ = 0x801, // ar-IQ
+  KBTS_WINDOWS_LANGUAGE_ID_ARABIC_JORDAN = 0x2C01, // ar-JO
+  KBTS_WINDOWS_LANGUAGE_ID_ARABIC_KUWAIT = 0x3401, // ar-KW
+  KBTS_WINDOWS_LANGUAGE_ID_ARABIC_LEBANON = 0x3001, // ar-LB
+  KBTS_WINDOWS_LANGUAGE_ID_ARABIC_LIBYA = 0x1001, // ar-LY
+  KBTS_WINDOWS_LANGUAGE_ID_ARABIC_MOROCCO = 0x1801, // ar-MA
+  KBTS_WINDOWS_LANGUAGE_ID_ARABIC_OMAN = 0x2001, // ar-OM
+  KBTS_WINDOWS_LANGUAGE_ID_ARABIC_QATAR = 0x4001, // ar-QA
+  KBTS_WINDOWS_LANGUAGE_ID_ARABIC_SAUDI_ARABIA = 0x401, // ar-SA
+  KBTS_WINDOWS_LANGUAGE_ID_ARABIC_SYRIA = 0x2801, // ar-SY
+  KBTS_WINDOWS_LANGUAGE_ID_ARABIC_TUNISIA = 0x1C01, // ar-TN
+  KBTS_WINDOWS_LANGUAGE_ID_ARABIC_UAE = 0x3801, // ar-AE
+  KBTS_WINDOWS_LANGUAGE_ID_ARABIC_YEMEN = 0x2401, // ar-YE
+  KBTS_WINDOWS_LANGUAGE_ID_ARMENIAN = 0x2B, // hy
+  KBTS_WINDOWS_LANGUAGE_ID_ARMENIAN_ARMENIA = 0x42B, // hy-AM
+  KBTS_WINDOWS_LANGUAGE_ID_ASSAMESE = 0x4D, // as
+  KBTS_WINDOWS_LANGUAGE_ID_ASSAMESE_INDIA = 0x44D, // as-IN
+  KBTS_WINDOWS_LANGUAGE_ID_AZERBAIJANI_CYRILLIC = 0x742C, // az-Cyrl
+  KBTS_WINDOWS_LANGUAGE_ID_AZERBAIJANI_CYRILLIC_AZERBAIJAN = 0x82C, // az-Cyrl-AZ
+  KBTS_WINDOWS_LANGUAGE_ID_AZERBAIJANI_LATIN = 0x2C, // az
+  KBTS_WINDOWS_LANGUAGE_ID_AZERBAIJANI_LATIN_2 = 0x782C, // az-Latn
+  KBTS_WINDOWS_LANGUAGE_ID_AZERBAIJANI_LATIN_AZERBAIJAN = 0x42C, // az-Latn-AZ
+  KBTS_WINDOWS_LANGUAGE_ID_BANGLA = 0x45, // bn
+  KBTS_WINDOWS_LANGUAGE_ID_BANGLA_BANGLADESH = 0x845, // bn-BD
+  KBTS_WINDOWS_LANGUAGE_ID_BANGLA_INDIA = 0x445, // bn-IN
+  KBTS_WINDOWS_LANGUAGE_ID_BASHKIR = 0x6D, // ba
+  KBTS_WINDOWS_LANGUAGE_ID_BASHKIR_RUSSIA = 0x46D, // ba-RU
+  KBTS_WINDOWS_LANGUAGE_ID_BASQUE = 0x2D, // eu
+  KBTS_WINDOWS_LANGUAGE_ID_BASQUE_SPAIN = 0x42D, // eu-ES
+  KBTS_WINDOWS_LANGUAGE_ID_BELARUSIAN = 0x23, // be
+  KBTS_WINDOWS_LANGUAGE_ID_BELARUSIAN_BELARUS = 0x423, // be-BY
+  KBTS_WINDOWS_LANGUAGE_ID_BOSNIAN_CYRILLIC = 0x641A, // bs-Cyrl
+  KBTS_WINDOWS_LANGUAGE_ID_BOSNIAN_CYRILLIC_BOSNIA_HERZEGOVINA = 0x201A, // bs-Cyrl-BA
+  KBTS_WINDOWS_LANGUAGE_ID_BOSNIAN_LATIN = 0x681A, // bs-Latn
+  KBTS_WINDOWS_LANGUAGE_ID_BOSNIAN_LATIN_2 = 0x781A, // bs
+  KBTS_WINDOWS_LANGUAGE_ID_BOSNIAN_LATIN_BOSNIA_HERZEGOVINA = 0x141A, // bs-Latn-BA
+  KBTS_WINDOWS_LANGUAGE_ID_BRETON = 0x7E, // br
+  KBTS_WINDOWS_LANGUAGE_ID_BRETON_FRANCE = 0x47E, // br-FR
+  KBTS_WINDOWS_LANGUAGE_ID_BULGARIAN = 0x2, // bg
+  KBTS_WINDOWS_LANGUAGE_ID_BULGARIAN_BULGARIA = 0x402, // bg-BG
+  KBTS_WINDOWS_LANGUAGE_ID_BURMESE = 0x55, // my
+  KBTS_WINDOWS_LANGUAGE_ID_BURMESE_MYANMAR = 0x455, // my-MM
+  KBTS_WINDOWS_LANGUAGE_ID_CATALAN = 0x3, // ca
+  KBTS_WINDOWS_LANGUAGE_ID_CATALAN_SPAIN = 0x403, // ca-ES
+  KBTS_WINDOWS_LANGUAGE_ID_CENTRAL_ATLAS_TAMAZIGHT_ARABIC = 0x45F, // tzm-Arab-MA
+  KBTS_WINDOWS_LANGUAGE_ID_CENTRAL_KURDISH = 0x92, // ku
+  KBTS_WINDOWS_LANGUAGE_ID_CENTRAL_KURDISH_2 = 0x7c92, // ku-Arab
+  KBTS_WINDOWS_LANGUAGE_ID_CENTRAL_KURDISH_IRAQ = 0x492, // ku-Arab-IQ
+  KBTS_WINDOWS_LANGUAGE_ID_CHEROKEE = 0x5C, // chr
+  KBTS_WINDOWS_LANGUAGE_ID_CHEROKEE_2 = 0x7C5C, // chr-Cher
+  KBTS_WINDOWS_LANGUAGE_ID_CHEROKEE_UNITED_STATES = 0x45C, // chr-Cher-US
+  KBTS_WINDOWS_LANGUAGE_ID_CHINESE_SIMPLIFIED = 0x4, // zh-Hans
+  KBTS_WINDOWS_LANGUAGE_ID_CHINESE_SIMPLIFIED_2 = 0x7804, // zh
+  KBTS_WINDOWS_LANGUAGE_ID_CHINESE_SIMPLIFIED_PRC = 0x804, // zh-CN
+  KBTS_WINDOWS_LANGUAGE_ID_CHINESE_SIMPLIFIED_SINGAPORE = 0x1004, // zh-SG
+  KBTS_WINDOWS_LANGUAGE_ID_CHINESE_TRADITIONAL = 0x7C04, // zh-Hant
+  KBTS_WINDOWS_LANGUAGE_ID_CHINESE_TRADITIONAL_HONG_KONG = 0xC04, // zh-HK
+  KBTS_WINDOWS_LANGUAGE_ID_CHINESE_TRADITIONAL_MACAO = 0x1404, // zh-MO
+  KBTS_WINDOWS_LANGUAGE_ID_CHINESE_TRADITIONAL_TAIWAN = 0x404, // zh-TW
+  KBTS_WINDOWS_LANGUAGE_ID_CORSICAN = 0x83, // co
+  KBTS_WINDOWS_LANGUAGE_ID_CORSICAN_FRANCE = 0x483, // co-FR
+  KBTS_WINDOWS_LANGUAGE_ID_CROATIAN = 0x1A, // hr
+  KBTS_WINDOWS_LANGUAGE_ID_CROATIAN_CROATIA = 0x41A, // hr-HR
+  KBTS_WINDOWS_LANGUAGE_ID_CROATIAN_LATIN_BOSNIA_HERZEGOVINA = 0x101A, // hr-BA
+  KBTS_WINDOWS_LANGUAGE_ID_CZECH = 0x5, // cs
+  KBTS_WINDOWS_LANGUAGE_ID_CZECH_CZECHIA = 0x405, // cs-CZ
+  KBTS_WINDOWS_LANGUAGE_ID_DANISH = 0x6, // da
+  KBTS_WINDOWS_LANGUAGE_ID_DANISH_DENMARK = 0x406, // da-DK
+  KBTS_WINDOWS_LANGUAGE_ID_DARI = 0x8C, // prs
+  KBTS_WINDOWS_LANGUAGE_ID_DARI_AFGHANISTAN = 0x48C, // prs-AF
+  KBTS_WINDOWS_LANGUAGE_ID_DIVEHI = 0x65, // dv
+  KBTS_WINDOWS_LANGUAGE_ID_DIVEHI_MALDIVES = 0x465, // dv-MV
+  KBTS_WINDOWS_LANGUAGE_ID_DUTCH = 0x13, // nl
+  KBTS_WINDOWS_LANGUAGE_ID_DUTCH_BELGIUM = 0x813, // nl-BE
+  KBTS_WINDOWS_LANGUAGE_ID_DUTCH_NETHERLANDS = 0x413, // nl-NL
+  KBTS_WINDOWS_LANGUAGE_ID_DZONGKHA_BHUTAN = 0xC51, // dz-BT
+  KBTS_WINDOWS_LANGUAGE_ID_ENGLISH = 0x9, // en
+  KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_AUSTRALIA = 0xC09, // en-AU
+  KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_BELIZE = 0x2809, // en-BZ
+  KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_CANADA = 0x1009, // en-CA
+  KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_CARIBBEAN = 0x2409, // en-029
+  KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_HONG_KONG = 0x3C09, // en-HK
+  KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_INDIA = 0x4009, // en-IN
+  KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_IRELAND = 0x1809, // en-IE
+  KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_JAMAICA = 0x2009, // en-JM
+  KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_MALAYSIA = 0x4409, // en-MY
+  KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_NEW_ZEALAND = 0x1409, // en-NZ
+  KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_PHILIPPINES = 0x3409, // en-PH
+  KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_SINGAPORE = 0x4809, // en-SG
+  KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_SOUTH_AFRICA = 0x1C09, // en-ZA
+  KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_TRINIDAD_TOBAGO = 0x2C09, // en-TT
+  KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_UNITED_ARAB_EMIRATES = 0x4C09, // en-AE
+  KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_UNITED_KINGDOM = 0x809, // en-GB
+  KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_UNITED_STATES = 0x409, // en-US
+  KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_ZIMBABWE = 0x3009, // en-ZW
+  KBTS_WINDOWS_LANGUAGE_ID_ESTONIAN = 0x25, // et
+  KBTS_WINDOWS_LANGUAGE_ID_ESTONIAN_ESTONIA = 0x425, // et-EE
+  KBTS_WINDOWS_LANGUAGE_ID_FAROESE = 0x38, // fo
+  KBTS_WINDOWS_LANGUAGE_ID_FAROESE_FAROE_ISLANDS = 0x438, // fo-FO
+  KBTS_WINDOWS_LANGUAGE_ID_FILIPINO = 0x64, // fil
+  KBTS_WINDOWS_LANGUAGE_ID_FILIPINO_PHILIPPINES = 0x464, // fil-PH
+  KBTS_WINDOWS_LANGUAGE_ID_FINNISH = 0xB, // fi
+  KBTS_WINDOWS_LANGUAGE_ID_FINNISH_FINLAND = 0x40B, // fi-FI
+  KBTS_WINDOWS_LANGUAGE_ID_FRENCH = 0xC, // fr
+  KBTS_WINDOWS_LANGUAGE_ID_FRENCH_BELGIUM = 0x80C, // fr-BE
+  KBTS_WINDOWS_LANGUAGE_ID_FRENCH_CAMEROON = 0x2C0C, // fr-CM
+  KBTS_WINDOWS_LANGUAGE_ID_FRENCH_CANADA = 0xC0C, // fr-CA
+  KBTS_WINDOWS_LANGUAGE_ID_FRENCH_CARIBBEAN = 0x1C0C, // fr-029
+  KBTS_WINDOWS_LANGUAGE_ID_FRENCH_DRC = 0x240C, // fr-CD
+  KBTS_WINDOWS_LANGUAGE_ID_FRENCH_COTE_D_IVOIRE = 0x300C, // fr-CI
+  KBTS_WINDOWS_LANGUAGE_ID_FRENCH_FRANCE = 0x40C, // fr-FR
+  KBTS_WINDOWS_LANGUAGE_ID_FRENCH_HAITI = 0x3C0C, // fr-HT
+  KBTS_WINDOWS_LANGUAGE_ID_FRENCH_LUXEMBOURG = 0x140C, // fr-LU
+  KBTS_WINDOWS_LANGUAGE_ID_FRENCH_MALI = 0x340C, // fr-ML
+  KBTS_WINDOWS_LANGUAGE_ID_FRENCH_MOROCCO = 0x380C, // fr-MA
+  KBTS_WINDOWS_LANGUAGE_ID_FRENCH_MONACO = 0x180C, // fr-MC
+  KBTS_WINDOWS_LANGUAGE_ID_FRENCH_REUNION = 0x200C, // fr-RE
+  KBTS_WINDOWS_LANGUAGE_ID_FRENCH_SENEGAL = 0x280C, // fr-SN
+  KBTS_WINDOWS_LANGUAGE_ID_FRENCH_SWITZERLAND = 0x100C, // fr-CH
+  KBTS_WINDOWS_LANGUAGE_ID_FRISIAN = 0x62, // fy
+  KBTS_WINDOWS_LANGUAGE_ID_FRISIAN_NETHERLANDS = 0x462, // fy-NL
+  KBTS_WINDOWS_LANGUAGE_ID_FULAH = 0x67, // ff
+  KBTS_WINDOWS_LANGUAGE_ID_FULAH_LATIN = 0x7C67, // ff-Latn
+  KBTS_WINDOWS_LANGUAGE_ID_FULAH_NIGERIA = 0x467, // ff-NG
+  KBTS_WINDOWS_LANGUAGE_ID_FULAH_SENEGAL = 0x867, // ff-Latn-SN
+  KBTS_WINDOWS_LANGUAGE_ID_GALICIAN = 0x56, // gl
+  KBTS_WINDOWS_LANGUAGE_ID_GALICIAN_SPAIN = 0x456, // gl-ES
+  KBTS_WINDOWS_LANGUAGE_ID_GEORGIAN = 0x37, // ka
+  KBTS_WINDOWS_LANGUAGE_ID_GEORGIAN_GEORGIA = 0x437, // ka-GE
+  KBTS_WINDOWS_LANGUAGE_ID_GERMAN = 0x7, // de
+  KBTS_WINDOWS_LANGUAGE_ID_GERMAN_AUSTRIA = 0xC07, // de-AT
+  KBTS_WINDOWS_LANGUAGE_ID_GERMAN_GERMANY = 0x407, // de-DE
+  KBTS_WINDOWS_LANGUAGE_ID_GERMAN_LIECHTENSTEIN = 0x1407, // de-LI
+  KBTS_WINDOWS_LANGUAGE_ID_GERMAN_LUXEMBOURG = 0x1007, // de-LU
+  KBTS_WINDOWS_LANGUAGE_ID_GERMAN_SWITZERLAND = 0x807, // de-CH
+  KBTS_WINDOWS_LANGUAGE_ID_GREEK = 0x8, // el
+  KBTS_WINDOWS_LANGUAGE_ID_GREEK_GREECE = 0x408, // el-GR
+  KBTS_WINDOWS_LANGUAGE_ID_GREENLANDIC = 0x6F, // kl
+  KBTS_WINDOWS_LANGUAGE_ID_GREENLANDIC_GREENLAND = 0x46F, // kl-GL
+  KBTS_WINDOWS_LANGUAGE_ID_GUARANI = 0x74, // gn
+  KBTS_WINDOWS_LANGUAGE_ID_GUARANI_PARAGUAY = 0x474, // gn-PY
+  KBTS_WINDOWS_LANGUAGE_ID_GUJARATI = 0x47, // gu
+  KBTS_WINDOWS_LANGUAGE_ID_GUJARATI_INDIA = 0x447, // gu-IN
+  KBTS_WINDOWS_LANGUAGE_ID_HAUSA = 0x68, // ha
+  KBTS_WINDOWS_LANGUAGE_ID_HAUSA_LATIN = 0x7C68, // ha-Latn
+  KBTS_WINDOWS_LANGUAGE_ID_HAUSA_NIGERIA = 0x468, // ha-Latn-NG
+  KBTS_WINDOWS_LANGUAGE_ID_HAWAIIAN = 0x75, // haw
+  KBTS_WINDOWS_LANGUAGE_ID_HAWAIIAN_UNITED_STATES = 0x475, // haw-US
+  KBTS_WINDOWS_LANGUAGE_ID_HEBREW = 0xD, // he
+  KBTS_WINDOWS_LANGUAGE_ID_HEBREW_ISRAEL = 0x40D, // he-IL
+  KBTS_WINDOWS_LANGUAGE_ID_HINDI = 0x39, // hi
+  KBTS_WINDOWS_LANGUAGE_ID_HINDI_INDIA = 0x439, // hi-IN
+  KBTS_WINDOWS_LANGUAGE_ID_HUNGARIAN = 0xE, // hu
+  KBTS_WINDOWS_LANGUAGE_ID_HUNGARIAN_HUNGARY = 0x40E, // hu-HU
+  KBTS_WINDOWS_LANGUAGE_ID_ICELANDIC = 0xF, // is
+  KBTS_WINDOWS_LANGUAGE_ID_ICELANDIC_ICELAND = 0x40F, // is-IS
+  KBTS_WINDOWS_LANGUAGE_ID_IGBO = 0x70, // ig
+  KBTS_WINDOWS_LANGUAGE_ID_IGBO_NIGERIA = 0x470, // ig-NG
+  KBTS_WINDOWS_LANGUAGE_ID_INDONESIAN = 0x21, // id
+  KBTS_WINDOWS_LANGUAGE_ID_INDONESIAN_INDONESIA = 0x421, // id-ID
+  KBTS_WINDOWS_LANGUAGE_ID_INUKTITUT = 0x5D, // iu
+  KBTS_WINDOWS_LANGUAGE_ID_INUKTITUT_LATIN = 0x7C5D, // iu-Latn
+  KBTS_WINDOWS_LANGUAGE_ID_INUKTITUT_LATIN_CANADA = 0x85D, // iu-Latn-CA
+  KBTS_WINDOWS_LANGUAGE_ID_INUKTITUT_SYLLABICS = 0x785D, // iu-Cans
+  KBTS_WINDOWS_LANGUAGE_ID_INUKTITUT_SYLLABICS_CANADA = 0x45D, // iu-Cans-CA
+  KBTS_WINDOWS_LANGUAGE_ID_IRISH = 0x3C, // ga
+  KBTS_WINDOWS_LANGUAGE_ID_IRISH_IRELAND = 0x83C, // ga-IE
+  KBTS_WINDOWS_LANGUAGE_ID_ITALIAN = 0x10, // it
+  KBTS_WINDOWS_LANGUAGE_ID_ITALIAN_ITALY = 0x410, // it-IT
+  KBTS_WINDOWS_LANGUAGE_ID_ITALIAN_SWITZERLAND = 0x810, // it-CH
+  KBTS_WINDOWS_LANGUAGE_ID_JAPANESE = 0x11, // ja
+  KBTS_WINDOWS_LANGUAGE_ID_JAPANESE_JAPAN = 0x411, // ja-JP
+  KBTS_WINDOWS_LANGUAGE_ID_KANNADA = 0x4B, // kn
+  KBTS_WINDOWS_LANGUAGE_ID_KANNADA_INDIA = 0x44B, // kn-IN
+  KBTS_WINDOWS_LANGUAGE_ID_KANURI_LATIN_NIGERIA = 0x471, // kr-Latn-NG
+  KBTS_WINDOWS_LANGUAGE_ID_KASHMIRI = 0x60, // ks
+  KBTS_WINDOWS_LANGUAGE_ID_KASHMIRI_PERSO_ARABIC = 0x460, // ks-Arab
+  KBTS_WINDOWS_LANGUAGE_ID_KASHMIRI_DEVANAGARI_INDIA = 0x860, // ks-Deva-IN
+  KBTS_WINDOWS_LANGUAGE_ID_KAZAKH = 0x3F, // kk
+  KBTS_WINDOWS_LANGUAGE_ID_KAZAKH_KAZAKHSTAN = 0x43F, // kk-KZ
+  KBTS_WINDOWS_LANGUAGE_ID_KHMER = 0x53, // km
+  KBTS_WINDOWS_LANGUAGE_ID_KHMER_CAMBODIA = 0x453, // km-KH
+  KBTS_WINDOWS_LANGUAGE_ID_KICHE = 0x86, // quc
+  KBTS_WINDOWS_LANGUAGE_ID_KICHE_GUATEMALA = 0x486, // quc-Latn-GT
+  KBTS_WINDOWS_LANGUAGE_ID_KINYARWANDA = 0x87, // rw
+  KBTS_WINDOWS_LANGUAGE_ID_KINYARWANDA_RWANDA = 0x487, // rw-RW
+  KBTS_WINDOWS_LANGUAGE_ID_KISWAHILI = 0x41, // sw
+  KBTS_WINDOWS_LANGUAGE_ID_KISWAHILI_KENYA = 0x441, // sw-KE
+  KBTS_WINDOWS_LANGUAGE_ID_KONKANI = 0x57, // kok
+  KBTS_WINDOWS_LANGUAGE_ID_KONKANI_INDIA = 0x457, // kok-IN
+  KBTS_WINDOWS_LANGUAGE_ID_KOREAN = 0x12, // ko
+  KBTS_WINDOWS_LANGUAGE_ID_KOREAN_KOREA = 0x412, // ko-KR
+  KBTS_WINDOWS_LANGUAGE_ID_KYRGYZ = 0x40, // ky
+  KBTS_WINDOWS_LANGUAGE_ID_KYRGYZ_KYRGYZSTAN = 0x440, // ky-KG
+  KBTS_WINDOWS_LANGUAGE_ID_LAO = 0x54, // lo
+  KBTS_WINDOWS_LANGUAGE_ID_LAO_PDR = 0x454, // lo-LA
+  KBTS_WINDOWS_LANGUAGE_ID_LATIN_VATICAN = 0x476, // la-VA
+  KBTS_WINDOWS_LANGUAGE_ID_LATVIAN = 0x26, // lv
+  KBTS_WINDOWS_LANGUAGE_ID_LATVIAN_LATVIA = 0x426, // lv-LV
+  KBTS_WINDOWS_LANGUAGE_ID_LITHUANIAN = 0x27, // lt
+  KBTS_WINDOWS_LANGUAGE_ID_LITHUANIAN_LITHUANIA = 0x427, // lt-LT
+  KBTS_WINDOWS_LANGUAGE_ID_LOWER_SORBIAN = 0x7C2E, // dsb
+  KBTS_WINDOWS_LANGUAGE_ID_LOWER_SORBIAN_GERMANY = 0x82E, // dsb-DE
+  KBTS_WINDOWS_LANGUAGE_ID_LUXEMBOURGISH = 0x6E, // lb
+  KBTS_WINDOWS_LANGUAGE_ID_LUXEMBOURGISH_LUXEMBOURG = 0x46E, // lb-LU
+  KBTS_WINDOWS_LANGUAGE_ID_MACEDONIAN = 0x2F, // mk
+  KBTS_WINDOWS_LANGUAGE_ID_MACEDONIAN_NORTH_MACEDONIA = 0x42F, // mk-MK
+  KBTS_WINDOWS_LANGUAGE_ID_MALAY = 0x3E, // ms
+  KBTS_WINDOWS_LANGUAGE_ID_MALAY_BRUNEI = 0x83E, // ms-BN
+  KBTS_WINDOWS_LANGUAGE_ID_MALAY_MALAYSIA = 0x43E, // ms-MY
+  KBTS_WINDOWS_LANGUAGE_ID_MALAYALAM = 0x4C, // ml
+  KBTS_WINDOWS_LANGUAGE_ID_MALAYALAM_INDIA = 0x44C, // ml-IN
+  KBTS_WINDOWS_LANGUAGE_ID_MALTESE = 0x3A, // mt
+  KBTS_WINDOWS_LANGUAGE_ID_MALTESE_MALTA = 0x43A, // mt-MT
+  KBTS_WINDOWS_LANGUAGE_ID_MAORI = 0x81, // mi
+  KBTS_WINDOWS_LANGUAGE_ID_MAORI_NEW_ZEALAND = 0x481, // mi-NZ
+  KBTS_WINDOWS_LANGUAGE_ID_MAPUDUNGUN = 0x7A, // arn
+  KBTS_WINDOWS_LANGUAGE_ID_MAPUDUNGUN_CHILE = 0x47A, // arn-CL
+  KBTS_WINDOWS_LANGUAGE_ID_MARATHI = 0x4E, // mr
+  KBTS_WINDOWS_LANGUAGE_ID_MARATHI_INDIA = 0x44E, // mr-IN
+  KBTS_WINDOWS_LANGUAGE_ID_MOHAWK = 0x7C, // moh
+  KBTS_WINDOWS_LANGUAGE_ID_MOHAWK_CANADA = 0x47C, // moh-CA
+  KBTS_WINDOWS_LANGUAGE_ID_MONGOLIAN = 0x50, // mn
+  KBTS_WINDOWS_LANGUAGE_ID_MONGOLIAN_CYRILLIC = 0x7850, // mn-Cyrl
+  KBTS_WINDOWS_LANGUAGE_ID_MONGOLIAN_CYRILLIC_MONGOLIA = 0x450, // mn-MN
+  KBTS_WINDOWS_LANGUAGE_ID_MONGOLIAN_TRADITIONAL = 0x7C50, // mn-Mong
+  KBTS_WINDOWS_LANGUAGE_ID_MONGOLIAN_TRADITIONAL_PRC = 0x850, // mn-Mong-CN
+  KBTS_WINDOWS_LANGUAGE_ID_MONGOLIAN_TRADITIONAL_MONGOLIA = 0xC50, // mn-Mong-MN
+  KBTS_WINDOWS_LANGUAGE_ID_NEPALI = 0x61, // ne
+  KBTS_WINDOWS_LANGUAGE_ID_NEPALI_INDIA = 0x861, // ne-IN
+  KBTS_WINDOWS_LANGUAGE_ID_NEPALI_NEPAL = 0x461, // ne-NP
+  KBTS_WINDOWS_LANGUAGE_ID_NORWEGIAN = 0x14, // no
+  KBTS_WINDOWS_LANGUAGE_ID_NORWEGIAN_BOKMAL = 0x7C14, // nb
+  KBTS_WINDOWS_LANGUAGE_ID_NORWEGIAN_BOKMAL_NORWAY = 0x414, // nb-NO
+  KBTS_WINDOWS_LANGUAGE_ID_NORWEGIAN_NYNORSK = 0x7814, // nn
+  KBTS_WINDOWS_LANGUAGE_ID_NORWEGIAN_NYNORSK_NORWAY = 0x814, // nn-NO
+  KBTS_WINDOWS_LANGUAGE_ID_OCCITAN = 0x82, // oc
+  KBTS_WINDOWS_LANGUAGE_ID_OCCITAN_FRANCE = 0x482, // oc-FR
+  KBTS_WINDOWS_LANGUAGE_ID_ODIA = 0x48, // or
+  KBTS_WINDOWS_LANGUAGE_ID_ODIA_INDIA = 0x448, // or-IN
+  KBTS_WINDOWS_LANGUAGE_ID_OROMO = 0x72, // om
+  KBTS_WINDOWS_LANGUAGE_ID_OROMO_ETHIOPIA = 0x472, // om-ET
+  KBTS_WINDOWS_LANGUAGE_ID_PASHTO = 0x63, // ps
+  KBTS_WINDOWS_LANGUAGE_ID_PASHTO_AFGHANISTAN = 0x463, // ps-AF
+  KBTS_WINDOWS_LANGUAGE_ID_PERSIAN = 0x29, // fa
+  KBTS_WINDOWS_LANGUAGE_ID_PERSIAN_IRAN = 0x429, // fa-IR
+  KBTS_WINDOWS_LANGUAGE_ID_POLISH = 0x15, // pl
+  KBTS_WINDOWS_LANGUAGE_ID_POLISH_POLAND = 0x415, // pl-PL
+  KBTS_WINDOWS_LANGUAGE_ID_PORTUGUESE = 0x16, // pt
+  KBTS_WINDOWS_LANGUAGE_ID_PORTUGUESE_BRAZIL = 0x416, // pt-BR
+  KBTS_WINDOWS_LANGUAGE_ID_PORTUGUESE_PORTUGAL = 0x816, // pt-PT
+  KBTS_WINDOWS_LANGUAGE_ID_PUNJABI = 0x46, // pa
+  KBTS_WINDOWS_LANGUAGE_ID_PUNJABI_ARABIC = 0x7C46, // pa-Arab
+  KBTS_WINDOWS_LANGUAGE_ID_PUNJABI_INDIA = 0x446, // pa-IN
+  KBTS_WINDOWS_LANGUAGE_ID_PUNJABI_PAKISTAN = 0x846, // pa-Arab-PK
+  KBTS_WINDOWS_LANGUAGE_ID_QUECHUA = 0x6B, // quz
+  KBTS_WINDOWS_LANGUAGE_ID_QUECHUA_BOLIVIA = 0x46B, // quz-BO
+  KBTS_WINDOWS_LANGUAGE_ID_QUECHUA_ECUADOR = 0x86B, // quz-EC
+  KBTS_WINDOWS_LANGUAGE_ID_QUECHUA_PERU = 0xC6B, // quz-PE
+  KBTS_WINDOWS_LANGUAGE_ID_ROMANIAN = 0x18, // ro
+  KBTS_WINDOWS_LANGUAGE_ID_ROMANIAN_MOLDOVA = 0x818, // ro-MD
+  KBTS_WINDOWS_LANGUAGE_ID_ROMANIAN_ROMANIA = 0x418, // ro-RO
+  KBTS_WINDOWS_LANGUAGE_ID_ROMANSH = 0x17, // rm
+  KBTS_WINDOWS_LANGUAGE_ID_ROMANSH_SWITZERLAND = 0x417, // rm-CH
+  KBTS_WINDOWS_LANGUAGE_ID_RUSSIAN = 0x19, // ru
+  KBTS_WINDOWS_LANGUAGE_ID_RUSSIAN_MOLDOVA = 0x819, // ru-MD
+  KBTS_WINDOWS_LANGUAGE_ID_RUSSIAN_RUSSIA = 0x419, // ru-RU
+  KBTS_WINDOWS_LANGUAGE_ID_SAKHA = 0x85, // sah
+  KBTS_WINDOWS_LANGUAGE_ID_SAKHA_RUSSIA = 0x485, // sah-RU
+  KBTS_WINDOWS_LANGUAGE_ID_SAMI_INARI = 0x703B, // smn
+  KBTS_WINDOWS_LANGUAGE_ID_SAMI_INARI_FINLAND = 0x243B, // smn-FI
+  KBTS_WINDOWS_LANGUAGE_ID_SAMI_LULE = 0x7C3B, // smj
+  KBTS_WINDOWS_LANGUAGE_ID_SAMI_LULE_NORWAY = 0x103B, // smj-NO
+  KBTS_WINDOWS_LANGUAGE_ID_SAMI_LULE_SWEDEN = 0x143B, // smj-SE
+  KBTS_WINDOWS_LANGUAGE_ID_SAMI_NORTHERN = 0x3B, // se
+  KBTS_WINDOWS_LANGUAGE_ID_SAMI_NORTHERN_FINLAND = 0xC3B, // se-FI
+  KBTS_WINDOWS_LANGUAGE_ID_SAMI_NORTHERN_NORWAY = 0x43B, // se-NO
+  KBTS_WINDOWS_LANGUAGE_ID_SAMI_NORTHERN_SWEDEN = 0x83B, // se-SE
+  KBTS_WINDOWS_LANGUAGE_ID_SAMI_SKOLT = 0x743B, // sms
+  KBTS_WINDOWS_LANGUAGE_ID_SAMI_SKOLT_FINLAND = 0x203B, // sms-FI
+  KBTS_WINDOWS_LANGUAGE_ID_SAMI_SOUTHERN = 0x783B, // sma
+  KBTS_WINDOWS_LANGUAGE_ID_SAMI_SOUTHERN_NORWAY = 0x183B, // sma-NO
+  KBTS_WINDOWS_LANGUAGE_ID_SAMI_SOUTHERN_SWEDEN = 0x1C3B, // sma-SE
+  KBTS_WINDOWS_LANGUAGE_ID_SANSKRIT = 0x4F, // sa
+  KBTS_WINDOWS_LANGUAGE_ID_SANSKRIT_INDIA = 0x44F, // sa-IN
+  KBTS_WINDOWS_LANGUAGE_ID_SCOTTISH_GAELIC = 0x91, // gd
+  KBTS_WINDOWS_LANGUAGE_ID_SCOTTISH_GAELIC_UNITED_KINGDOM = 0x491, // gd-GB
+  KBTS_WINDOWS_LANGUAGE_ID_SERBIAN_CYRILLIC = 0x6C1A, // sr-Cyrl
+  KBTS_WINDOWS_LANGUAGE_ID_SERBIAN_CYRILLIC_BOSNIA_HERZEGOVINA = 0x1C1A, // sr-Cyrl-BA
+  KBTS_WINDOWS_LANGUAGE_ID_SERBIAN_CYRILLIC_MONTENEGRO = 0x301A, // sr-Cyrl-ME
+  KBTS_WINDOWS_LANGUAGE_ID_SERBIAN_CYRILLIC_SERBIA = 0x281A, // sr-Cyrl-RS
+  KBTS_WINDOWS_LANGUAGE_ID_SERBIAN_CYRILLIC_SERBIA_MONTENEGRO = 0xC1A, // sr-Cyrl-CS
+  KBTS_WINDOWS_LANGUAGE_ID_SERBIAN_LATIN = 0x701A, // sr-Latn
+  KBTS_WINDOWS_LANGUAGE_ID_SERBIAN = 0x7C1A, // sr
+  KBTS_WINDOWS_LANGUAGE_ID_SERBIAN_LATIN_BOSNIA_HERZEGOVINA = 0x181A, // sr-Latn-BA
+  KBTS_WINDOWS_LANGUAGE_ID_SERBIAN_LATIN_MONTENEGRO = 0x2C1A, // sr-Latn-ME
+  KBTS_WINDOWS_LANGUAGE_ID_SERBIAN_LATIN_SERBIA = 0x241A, // sr-Latn-RS
+  KBTS_WINDOWS_LANGUAGE_ID_SERBIAN_LATIN_SERBIA_MONTENEGRO = 0x81A, // sr-Latn-CS
+  KBTS_WINDOWS_LANGUAGE_ID_SESOTHO_SA_LEBOA = 0x6C, // nso
+  KBTS_WINDOWS_LANGUAGE_ID_SESOTHO_SA_LEBOA_SOUTH_AFRICA = 0x46C, // nso-ZA
+  KBTS_WINDOWS_LANGUAGE_ID_SETSWANA = 0x32, // tn
+  KBTS_WINDOWS_LANGUAGE_ID_SETSWANA_BOTSWANA = 0x832, // tn-BW
+  KBTS_WINDOWS_LANGUAGE_ID_SETSWANA_SOUTH_AFRICA = 0x432, // tn-ZA
+  KBTS_WINDOWS_LANGUAGE_ID_SINDHI = 0x59, // sd
+  KBTS_WINDOWS_LANGUAGE_ID_SINDHI_ARABIC = 0x7C59, // sd-Arab
+  KBTS_WINDOWS_LANGUAGE_ID_SINDHI_PAKISTAN = 0x859, // sd-Arab-PK
+  KBTS_WINDOWS_LANGUAGE_ID_SINHALA = 0x5B, // si
+  KBTS_WINDOWS_LANGUAGE_ID_SINHALA_SRI_LANKA = 0x45B, // si-LK
+  KBTS_WINDOWS_LANGUAGE_ID_SLOVAK = 0x1B, // sk
+  KBTS_WINDOWS_LANGUAGE_ID_SLOVAK_SLOVAKIA = 0x41B, // sk-SK
+  KBTS_WINDOWS_LANGUAGE_ID_SLOVENIAN = 0x24, // sl
+  KBTS_WINDOWS_LANGUAGE_ID_SLOVENIAN_SLOVENIA = 0x424, // sl-SI
+  KBTS_WINDOWS_LANGUAGE_ID_SOMALI = 0x77, // so
+  KBTS_WINDOWS_LANGUAGE_ID_SOMALI_SOMALIA = 0x477, // so-SO
+  KBTS_WINDOWS_LANGUAGE_ID_SOTHO = 0x30, // st
+  KBTS_WINDOWS_LANGUAGE_ID_SOTHO_SOUTH_AFRICA = 0x430, // st-ZA
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH = 0xA, // es
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_ARGENTINA = 0x2C0A, // es-AR
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_VENEZUELA = 0x200A, // es-VE
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_BOLIVIA = 0x400A, // es-BO
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_CHILE = 0x340A, // es-CL
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_COLOMBIA = 0x240A, // es-CO
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_COSTA_RICA = 0x140A, // es-CR
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_CUBA = 0x5C0A, // es-CU
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_DOMINICAN_REPUBLIC = 0x1C0A, // es-DO
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_ECUADOR = 0x300A, // es-EC
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_EL_SALVADOR = 0x440A, // es-SV
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_GUATEMALA = 0x100A, // es-GT
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_HONDURAS = 0x480A, // es-HN
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_LATIN_AMERICA = 0x580A, // es-419
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_MEXICO = 0x80A, // es-MX
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_NICARAGUA = 0x4C0A, // es-NI
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_PANAMA = 0x180A, // es-PA
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_PARAGUAY = 0x3C0A, // es-PY
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_PERU = 0x280A, // es-PE
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_PUERTO_RICO = 0x500A, // es-PR
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_SPAIN_TRADITIONAL_SORT = 0x40A, // es-ES-tradnl
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_SPAIN = 0xC0A, // es-ES
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_UNITED_STATES = 0x540A, // es-US
+  KBTS_WINDOWS_LANGUAGE_ID_SPANISH_URUGUAY = 0x380A, // es-UY
+  KBTS_WINDOWS_LANGUAGE_ID_SWEDISH = 0x1D, // sv
+  KBTS_WINDOWS_LANGUAGE_ID_SWEDISH_FINLAND = 0x81D, // sv-FI
+  KBTS_WINDOWS_LANGUAGE_ID_SWEDISH_SWEDEN = 0x41D, // sv-SE
+  KBTS_WINDOWS_LANGUAGE_ID_SYRIAC = 0x5A, // syr
+  KBTS_WINDOWS_LANGUAGE_ID_SYRIAC_SYRIA = 0x45A, // syr-SY
+  KBTS_WINDOWS_LANGUAGE_ID_TAJIKI = 0x28, // tg
+  KBTS_WINDOWS_LANGUAGE_ID_TAJIKI_CYRILLIC = 0x7C28, // tg-Cyrl
+  KBTS_WINDOWS_LANGUAGE_ID_TAJIKI_CYRILLIC_TAJIKISTAN = 0x428, // tg-Cyrl-TJ
+  KBTS_WINDOWS_LANGUAGE_ID_TAMAZIGHT = 0x5F, // tzm
+  KBTS_WINDOWS_LANGUAGE_ID_TAMAZIGHT_LATIN = 0x7C5F, // tzm-Latn
+  KBTS_WINDOWS_LANGUAGE_ID_TAMAZIGHT_LATIN_ALGERIA = 0x85F, // tzm-Latn-DZ
+  KBTS_WINDOWS_LANGUAGE_ID_TAMIL = 0x49, // ta
+  KBTS_WINDOWS_LANGUAGE_ID_TAMIL_INDIA = 0x449, // ta-IN
+  KBTS_WINDOWS_LANGUAGE_ID_TAMIL_SRI_LANKA = 0x849, // ta-LK
+  KBTS_WINDOWS_LANGUAGE_ID_TATAR = 0x44, // tt
+  KBTS_WINDOWS_LANGUAGE_ID_TATAR_RUSSIA = 0x444, // tt-RU
+  KBTS_WINDOWS_LANGUAGE_ID_TELUGU = 0x4A, // te
+  KBTS_WINDOWS_LANGUAGE_ID_TELUGU_INDIA = 0x44A, // te-IN
+  KBTS_WINDOWS_LANGUAGE_ID_THAI = 0x1E, // th
+  KBTS_WINDOWS_LANGUAGE_ID_THAI_THAILAND = 0x41E, // th-TH
+  KBTS_WINDOWS_LANGUAGE_ID_TIBETAN = 0x51, // bo
+  KBTS_WINDOWS_LANGUAGE_ID_TIBETAN_PRC = 0x451, // bo-CN
+  KBTS_WINDOWS_LANGUAGE_ID_TIGRINYA = 0x73, // ti
+  KBTS_WINDOWS_LANGUAGE_ID_TIGRINYA_ERITREA = 0x873, // ti-ER
+  KBTS_WINDOWS_LANGUAGE_ID_TIGRINYA_ETHIOPIA = 0x473, // ti-ET
+  KBTS_WINDOWS_LANGUAGE_ID_TSONGA = 0x31, // ts
+  KBTS_WINDOWS_LANGUAGE_ID_TSONGA_SOUTH_AFRICA = 0x431, // ts-ZA
+  KBTS_WINDOWS_LANGUAGE_ID_TURKISH = 0x1F, // tr
+  KBTS_WINDOWS_LANGUAGE_ID_TURKISH_TURKEY = 0x41F, // tr-TR
+  KBTS_WINDOWS_LANGUAGE_ID_TURKMEN = 0x42, // tk
+  KBTS_WINDOWS_LANGUAGE_ID_TURKMEN_TURKMENISTAN = 0x442, // tk-TM
+  KBTS_WINDOWS_LANGUAGE_ID_UKRAINIAN = 0x22, // uk
+  KBTS_WINDOWS_LANGUAGE_ID_UKRAINIAN_UKRAINE = 0x422, // uk-UA
+  KBTS_WINDOWS_LANGUAGE_ID_UPPER_SORBIAN = 0x2E, // hsb
+  KBTS_WINDOWS_LANGUAGE_ID_UPPER_SORBIAN_GERMANY = 0x42E, // hsb-DE
+  KBTS_WINDOWS_LANGUAGE_ID_URDU = 0x20, // ur
+  KBTS_WINDOWS_LANGUAGE_ID_URDU_INDIA = 0x820, // ur-IN
+  KBTS_WINDOWS_LANGUAGE_ID_URDU_PAKISTAN = 0x420, // ur-PK
+  KBTS_WINDOWS_LANGUAGE_ID_UYGHUR = 0x80, // ug
+  KBTS_WINDOWS_LANGUAGE_ID_UYGHUR_PRC = 0x480, // ug-CN
+  KBTS_WINDOWS_LANGUAGE_ID_UZBEK_CYRILLIC = 0x7843, // uz-Cyrl
+  KBTS_WINDOWS_LANGUAGE_ID_UZBEK_CYRILLIC_UZBEKISTAN = 0x843, // uz-Cyrl-UZ
+  KBTS_WINDOWS_LANGUAGE_ID_UZBEK = 0x43, // uz
+  KBTS_WINDOWS_LANGUAGE_ID_UZBEK_LATIN = 0x7C43, // uz-Latn
+  KBTS_WINDOWS_LANGUAGE_ID_UZBEK_LATIN_UZBEKISTAN = 0x443, // uz-Latn-UZ
+  KBTS_WINDOWS_LANGUAGE_ID_VALENCIAN_SPAIN = 0x803, // ca-ES-valencia
+  KBTS_WINDOWS_LANGUAGE_ID_VENDA = 0x33, // ve
+  KBTS_WINDOWS_LANGUAGE_ID_VENDA_SOUTH_AFRICA = 0x433, // ve-ZA
+  KBTS_WINDOWS_LANGUAGE_ID_VIETNAMESE = 0x2A, // vi
+  KBTS_WINDOWS_LANGUAGE_ID_VIETNAMESE_VIETNAM = 0x42A, // vi-VN
+  KBTS_WINDOWS_LANGUAGE_ID_WELSH = 0x52, // cy
+  KBTS_WINDOWS_LANGUAGE_ID_WELSH_UNITED_KINGDOM = 0x452, // cy-GB
+  KBTS_WINDOWS_LANGUAGE_ID_WOLOF = 0x88, // wo
+  KBTS_WINDOWS_LANGUAGE_ID_WOLOF_SENEGAL = 0x488, // wo-SN
+  KBTS_WINDOWS_LANGUAGE_ID_XHOSA = 0x34, // xh
+  KBTS_WINDOWS_LANGUAGE_ID_XHOSA_SOUTH_AFRICA = 0x434, // xh-ZA
+  KBTS_WINDOWS_LANGUAGE_ID_YI = 0x78, // ii
+  KBTS_WINDOWS_LANGUAGE_ID_YI_PRC = 0x478, // ii-CN
+  KBTS_WINDOWS_LANGUAGE_ID_YIDDISH = 0x43D, // yi-001
+  KBTS_WINDOWS_LANGUAGE_ID_YORUBA = 0x6A, // yo
+  KBTS_WINDOWS_LANGUAGE_ID_YORUBA_NIGERIA = 0x46A, // yo-NG
+  KBTS_WINDOWS_LANGUAGE_ID_ZULU = 0x35, // zu
+  KBTS_WINDOWS_LANGUAGE_ID_ZULU_SOUTH_AFRICA = 0x435, // zu-ZA
+};
+
 typedef kbts_u32 kbts_language;
 enum kbts_language_enum
 {
@@ -1606,7 +2324,7 @@ enum kbts_language_enum
   KBTS_LANGUAGE_AVATIME = KBTS_FOURCC('A', 'V', 'N', ' '),
   KBTS_LANGUAGE_AWADHI = KBTS_FOURCC('A', 'W', 'A', ' '),
   KBTS_LANGUAGE_AYMARA = KBTS_FOURCC('A', 'Y', 'M', ' '),
-  KBTS_LANGUAGE_AZERBAIDJANI = KBTS_FOURCC('A', 'Z', 'E', ' '),
+  KBTS_LANGUAGE_AZERBAIJANI = KBTS_FOURCC('A', 'Z', 'E', ' '),
   KBTS_LANGUAGE_BADAGA = KBTS_FOURCC('B', 'A', 'D', ' '),
   KBTS_LANGUAGE_BAGHELKHANDI = KBTS_FOURCC('B', 'A', 'G', ' '),
   KBTS_LANGUAGE_BAGRI = KBTS_FOURCC('B', 'G', 'Q', ' '),
@@ -1735,7 +2453,7 @@ enum kbts_language_enum
   KBTS_LANGUAGE_ENGLISH = KBTS_FOURCC('E', 'N', 'G', ' '),
   KBTS_LANGUAGE_EPENA = KBTS_FOURCC('S', 'J', 'A', ' '),
   KBTS_LANGUAGE_ERZYA = KBTS_FOURCC('E', 'R', 'Z', ' '),
-  KBTS_LANGUAGE_KB_TEXT_SHAPEANTO = KBTS_FOURCC('N', 'T', 'O', ' '),
+  KBTS_LANGUAGE_ESPERANTO = KBTS_FOURCC('N', 'T', 'O', ' '),
   KBTS_LANGUAGE_ESTONIAN = KBTS_FOURCC('E', 'T', 'I', ' '),
   KBTS_LANGUAGE_EVEN = KBTS_FOURCC('E', 'V', 'N', ' '),
   KBTS_LANGUAGE_EVENKI = KBTS_FOURCC('E', 'V', 'K', ' '),
@@ -1888,7 +2606,7 @@ enum kbts_language_enum
   KBTS_LANGUAGE_KONKANI = KBTS_FOURCC('K', 'O', 'K', ' '),
   KBTS_LANGUAGE_KOORETE = KBTS_FOURCC('K', 'R', 'T', ' '),
   KBTS_LANGUAGE_KOREAN = KBTS_FOURCC('K', 'O', 'R', ' '),
-  KBTS_LANGUAGE_KOREAO_OLD_HANGUL = KBTS_FOURCC('K', 'O', 'H', ' '),
+  KBTS_LANGUAGE_KOREAN_OLD_HANGUL = KBTS_FOURCC('K', 'O', 'H', ' '),
   KBTS_LANGUAGE_KORYAK = KBTS_FOURCC('K', 'Y', 'K', ' '),
   KBTS_LANGUAGE_KOSRAEAN = KBTS_FOURCC('K', 'O', 'S', ' '),
   KBTS_LANGUAGE_KPELLE = KBTS_FOURCC('K', 'P', 'L', ' '),
@@ -2409,6 +3127,11 @@ enum kbts_blob_table_id_enum
   KBTS_BLOB_TABLE_ID_MAXP,
   KBTS_BLOB_TABLE_ID_OS2,
   KBTS_BLOB_TABLE_ID_NAME,
+  KBTS_BLOB_TABLE_ID_FVAR,
+  KBTS_BLOB_TABLE_ID_AVAR,
+  KBTS_BLOB_TABLE_ID_MVAR,
+  KBTS_BLOB_TABLE_ID_HVAR,
+  KBTS_BLOB_TABLE_ID_VVAR,
 
   KBTS_BLOB_TABLE_ID_COUNT,
 };
@@ -2431,8 +3154,9 @@ enum kbts_version_enum
 {
   KBTS_VERSION_1_X,
   KBTS_VERSION_2_0,
+  KBTS_VERSION_2_28, // Variable fonts
 
-  KBTS_VERSION_CURRENT = KBTS_VERSION_2_0,
+  KBTS_VERSION_CURRENT = KBTS_VERSION_2_28,
 };
 
 typedef kbts_u32 kbts_blob_version;
@@ -2567,6 +3291,14 @@ enum kbts_break_config_flags_enum
   KBTS_BREAK_CONFIG_FLAG_END_OF_TEXT_GENERATES_HARD_LINE_BREAK = 1,
 };
 
+typedef kbts_u32 kbts_decode_utf16_flags;
+enum kbts_decode_utf16_flags_enum
+{
+  KBTS_DECODE_UTF16_FLAG_NONE = 0,
+
+  KBTS_DECODE_UTF16_FLAG_BIG_ENDIAN = (1 << 0),
+};
+
 typedef kbts_u32 kbts_font_info_string_id;
 enum kbts_font_info_string_id_enum
 {
@@ -2584,8 +3316,41 @@ enum kbts_font_info_string_id_enum
   KBTS_FONT_INFO_STRING_ID_TYPOGRAPHIC_FAMILY,
   KBTS_FONT_INFO_STRING_ID_TYPOGRAPHIC_SUBFAMILY,
 
-  KBTS_FONT_INFO_STRING_ID_COUNT,
+  // This is kept for legacy purposes so that the layout of kbts_font_info does not change.
+  KBTS_FONT_INFO_STRING_ID_COUNT0,
+
+  KBTS_FONT_INFO_STRING_ID_DESCRIPTION = KBTS_FONT_INFO_STRING_ID_COUNT0,
+  KBTS_FONT_INFO_STRING_ID_VENDOR_URL,
+  KBTS_FONT_INFO_STRING_ID_DESIGNER_URL,
+  KBTS_FONT_INFO_STRING_ID_LICENSE,
+  KBTS_FONT_INFO_STRING_ID_LICENSE_URL,
+  KBTS_FONT_INFO_STRING_ID_COMPATIBLE_FULL_NAME,
+  KBTS_FONT_INFO_STRING_ID_SAMPLE_TEXT,
+  KBTS_FONT_INFO_STRING_ID_POSTSCRIPT_CID_FINDFONT_NAME,
+  KBTS_FONT_INFO_STRING_ID_WWS_FAMILY_NAME,
+  KBTS_FONT_INFO_STRING_ID_WWS_SUBFAMILY_NAME,
+  KBTS_FONT_INFO_STRING_ID_LIGHT_BACKGROUND_PALETTE,
+  KBTS_FONT_INFO_STRING_ID_DARK_BACKGROUND_PALETTE,
+  KBTS_FONT_INFO_STRING_ID_VARIATIONS_POSTSCRIPT_NAME_PREFIX,
+
+  KBTS_FONT_INFO_STRING_ID_COUNT1,
 };
+
+typedef kbts_u16 kbts_variation_axis_flags;
+enum kbts_variation_axis_flags_enum
+{
+  KBTS_VARIATION_AXIS_FLAG_NONE = 0,
+  KBTS_VARIATION_AXIS_FLAG_HIDDEN = (1 << 0),
+};
+
+typedef kbts_u32 kbts_variation_instance_flags;
+enum kbts_variation_instance_flags_enum
+{
+  KBTS_VARIATION_INSTANCE_FLAG_NONE = 0,
+  KBTS_VARIATION_INSTANCE_FLAG_HAS_POSTSCRIPT_NAME = (1 << 0),
+};
+
+#define KBTS_VARIATION_VALUE_UNSET -100000.0f
 
 
 typedef kbts_u8 kbts_unicode_joining_type;
@@ -3475,8 +4240,8 @@ typedef struct kbts_font
 
 typedef struct kbts_font_info
 {
-  char *Strings[KBTS_FONT_INFO_STRING_ID_COUNT];
-  kbts_u16 StringLengths[KBTS_FONT_INFO_STRING_ID_COUNT];
+  char *Strings[KBTS_FONT_INFO_STRING_ID_COUNT0];
+  kbts_u16 StringLengths[KBTS_FONT_INFO_STRING_ID_COUNT0];
 
   kbts_font_style_flags StyleFlags;
   kbts_font_weight Weight;
@@ -3487,8 +4252,8 @@ typedef struct kbts_font_info2
 {
   kbts_u32 Size;
 
-  char *Strings[KBTS_FONT_INFO_STRING_ID_COUNT];
-  kbts_u16 StringLengths[KBTS_FONT_INFO_STRING_ID_COUNT];
+  char *Strings[KBTS_FONT_INFO_STRING_ID_COUNT0];
+  kbts_u16 StringLengths[KBTS_FONT_INFO_STRING_ID_COUNT0];
 
   kbts_font_style_flags StyleFlags;
   kbts_font_weight Weight;
@@ -3539,6 +4304,12 @@ typedef struct kbts_feature_override
   kbts_feature_tag Tag;
   int Value;
 } kbts_feature_override;
+
+typedef struct kbts_variation
+{
+  kbts_u32 Tag;
+  float Value;
+} kbts_variation;
 
 typedef struct kbts_break
 {
@@ -3610,7 +4381,7 @@ typedef struct kbts_break_state
   kbts_u8 BidirectionalClass2;
   kbts_u8 BidirectionalClass1;
   kbts_s16 Bidirectional1PositionOffset;
-  kbts_s16 Bidirectional2PositionOffset;
+  kbts_s16 Bidirectional2PositionOffset; // Unused
 
   kbts_japanese_line_break_style JapaneseLineBreakStyle;
   kbts_break_config_flags ConfigFlags;
@@ -3640,7 +4411,6 @@ typedef struct kbts_glyph_classes
   kbts_u16 Class;
   kbts_u16 MarkAttachmentClass;
 } kbts_glyph_classes;
-
 
 typedef struct kbts__bucketed_glyph kbts__bucketed_glyph;
 struct kbts_glyph
@@ -3737,9 +4507,30 @@ typedef struct kbts_shape_codepoint
   kbts_direction ParagraphDirection; // Only set when (BreakFlags & KBTS_BREAK_FLAG_PARAGRAPH_DIRECTION) != 0.
 } kbts_shape_codepoint;
 
+typedef struct kbts_shape_codepoint2
+{
+  int Size;
+  int Padding0;
+
+  kbts_font *Font; // Only set when (BreakFlags & KBTS_BREAK_FLAG_GRAPHEME) != 0.
+  float *VariationVector; // Only set when (BreakFlags & KBTS_BREAK_FLAG_GRAPHEME) != 0.
+
+  kbts_feature_override *FeatureOverrides;
+  int FeatureOverrideCount;
+
+  int Codepoint;
+  int UserId;
+
+  kbts_break_flags BreakFlags;
+  kbts_script Script; // Only set when (BreakFlags & KBTS_BREAK_FLAG_SCRIPT) != 0.
+  kbts_direction Direction; // Only set when (BreakFlags & KBTS_BREAK_FLAG_DIRECTION) != 0.
+  kbts_direction ParagraphDirection; // Only set when (BreakFlags & KBTS_BREAK_FLAG_PARAGRAPH_DIRECTION) != 0.
+} kbts_shape_codepoint2;
+
+typedef struct kbts__shape_codepoint kbts__shape_codepoint;
 typedef struct kbts_shape_codepoint_iterator
 {
-  kbts_shape_codepoint *Codepoint;
+  kbts__shape_codepoint *Codepoint;
   kbts_shape_context *Context;
 
   kbts_u32 EndBlockIndex;
@@ -3816,6 +4607,43 @@ typedef struct kbts_run
   kbts_glyph_iterator Glyphs;
 } kbts_run;
 
+typedef struct kbts_run2
+{
+  // kbts_run:
+  kbts_font *Font;
+  kbts_script Script;
+  kbts_direction ParagraphDirection;
+  kbts_direction Direction;
+  kbts_break_flags Flags;
+
+  kbts_glyph_iterator Glyphs;
+
+  // New fields:
+  float *VariationVector;
+} kbts_run2;
+
+typedef struct kbts_uid
+{
+  kbts_u32 Data[4];
+} kbts_uid;
+
+typedef struct kbts_variation_axis_info
+{
+  kbts_u32 Tag;
+  float MinimumValue;
+  float DefaultValue;
+  float MaximumValue;
+  kbts_variation_axis_flags Flags;
+  kbts_u16 NameStringId;
+} kbts_variation_axis_info;
+
+typedef struct kbts_variation_instance_info
+{
+  kbts_u16 SubfamilyNameStringId;
+  kbts_u16 PostscriptNameStringId;
+  kbts_variation_instance_flags Flags;
+} kbts_variation_instance_info;
+
 //
 // Context API
 // The context can do everything for you. It is pretty convenient!
@@ -3830,9 +4658,12 @@ KBTS_EXPORT kbts_shape_context *kbts_CreateShapeContext2(kbts_allocator_function
 KBTS_EXPORT kbts_shape_context *kbts_CreateShapeContext(kbts_allocator_function *Allocator, void *AllocatorData);
 KBTS_EXPORT void kbts_DestroyShapeContext(kbts_shape_context *Context);
 #ifndef KB_TEXT_SHAPE_NO_CRT
+KBTS_EXPORT kbts_font *kbts_ShapePushFontFromFile2(kbts_shape_context *Context, const char *FileName, int FontIndex, kbts_variation *Variations, int VariationCount, kbts_u32 *ContextFontHandle);
 KBTS_EXPORT kbts_font *kbts_ShapePushFontFromFile(kbts_shape_context *Context, const char *FileName, int FontIndex);
 #endif
+KBTS_EXPORT kbts_font *kbts_ShapePushFontFromMemory2(kbts_shape_context *Context, void *Memory, int Size, int FontIndex, kbts_variation *Variations, int VariationCount, kbts_u32 *ContextFontHandle);
 KBTS_EXPORT kbts_font *kbts_ShapePushFontFromMemory(kbts_shape_context *Context, void *Memory, int Size, int FontIndex);
+KBTS_EXPORT kbts_font *kbts_ShapePushFont2(kbts_shape_context *Context, kbts_font *Font, kbts_variation *Variations, int VariationCount, kbts_u32 *ContextFontHandle);
 KBTS_EXPORT kbts_font *kbts_ShapePushFont(kbts_shape_context *Context, kbts_font *Font);
 KBTS_EXPORT kbts_font *kbts_ShapePopFont(kbts_shape_context *Context);
 KBTS_EXPORT void kbts_ShapeBegin(kbts_shape_context *Context, kbts_direction ParagraphDirection, kbts_language Language);
@@ -3853,13 +4684,21 @@ KBTS_EXPORT void kbts_ShapeEndManualRuns(kbts_shape_context *Context);
 KBTS_EXPORT void kbts_ShapeManualBreak(kbts_shape_context *Context);
 KBTS_EXPORT kbts_shape_codepoint_iterator kbts_ShapeCurrentCodepointsIterator(kbts_shape_context *Context);
 KBTS_EXPORT int kbts_ShapeCodepointIteratorIsValid(kbts_shape_codepoint_iterator *It);
+KBTS_EXPORT int kbts_ShapeCodepointIteratorNext2(kbts_shape_codepoint_iterator *It, kbts_shape_codepoint2 *Codepoint, int *CodepointIndex);
 KBTS_EXPORT int kbts_ShapeCodepointIteratorNext(kbts_shape_codepoint_iterator *It, kbts_shape_codepoint *Codepoint, int *CodepointIndex);
+KBTS_EXPORT int kbts_ShapeGetShapeCodepoint2(kbts_shape_context *Context, int CodepointIndex, kbts_shape_codepoint2 *Codepoint);
 KBTS_EXPORT int kbts_ShapeGetShapeCodepoint(kbts_shape_context *Context, int CodepointIndex, kbts_shape_codepoint *Codepoint);
+KBTS_EXPORT int kbts_ShapeSetFontVariationVector(kbts_shape_context *Context, kbts_u32 ContextFontHandle, float *VariationVector);
+KBTS_EXPORT int kbts_ShapeSetFontVariation(kbts_shape_context *Context, kbts_u32 ContextFontHandle, kbts_u32 Tag, float Value);
+KBTS_EXPORT int kbts_ShapePushGlobalVariation(kbts_shape_context *Context, kbts_u32 Tag, float Value);
+KBTS_EXPORT int kbts_ShapePopGlobalVariation(kbts_shape_context *Context, kbts_u32 Tag);
+
 
 //
 // Direct API
 //
 
+KBTS_EXPORT kbts_shape_error kbts_ShapeDirect2(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storage *Storage, kbts_direction RunDirection, kbts_s16 *VariationVectorNormalized, kbts_glyph_iterator *Output);
 KBTS_EXPORT kbts_shape_error kbts_ShapeDirect(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storage *Storage, kbts_direction RunDirection, kbts_glyph_iterator *Output);
 
 // A font holds all data that corresponds to a given font file.
@@ -3872,13 +4711,23 @@ KBTS_EXPORT void kbts_FreeFont(kbts_font *Font);
 KBTS_EXPORT int kbts_FontIsValid(kbts_font *Font);
 KBTS_EXPORT kbts_load_font_error kbts_LoadFont(kbts_font *Font, kbts_load_font_state *State, void *FontData, int FontDataSize, int FontIndex, int *ScratchSize_, int *OutputSize_);
 KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_state *State, void *ScratchMemory, void *OutputMemory);
-KBTS_EXPORT void kbts_GetFontInfo(kbts_font *Font, kbts_font_info *Info);
+
+// Fetching font information
 KBTS_EXPORT void kbts_GetFontInfo2(kbts_font *Font, kbts_font_info2 *Info);
+KBTS_EXPORT void kbts_GetFontInfo(kbts_font *Font, kbts_font_info *Info);
+KBTS_EXPORT void kbts_GetVariationInfo(kbts_font *Font, int *AxisCount, int *InstanceCount);
+KBTS_EXPORT void kbts_NormalizeVariationVector(kbts_font *Font, float *VariationVector, kbts_s16 *VariationVectorNormalized);
+KBTS_EXPORT int kbts_WindowsIdsForLanguage(kbts_language Language, kbts_windows_language_id *Ids, int IdCapacity);
+KBTS_EXPORT int kbts_LookupFontString(kbts_font *Font, kbts_font_info_string_id StringId, kbts_windows_language_id LanguageId, char *String, int StringCapacity);
 
 // A shape_config is a bag of pre-computed data for a specific shaping setup.
+KBTS_EXPORT int kbts_SizeOfShapeConfig2(kbts_font *Font, kbts_script Script, kbts_language Language, float *VariationVector);
 KBTS_EXPORT int kbts_SizeOfShapeConfig(kbts_font *Font, kbts_script Script, kbts_language Language);
+KBTS_EXPORT kbts_shape_config *kbts_PlaceShapeConfig2(kbts_font *Font, kbts_script Script, kbts_language Language, float *VariationVector, void *Memory, kbts_uid *Uid);
 KBTS_EXPORT kbts_shape_config *kbts_PlaceShapeConfig(kbts_font *Font, kbts_script Script, kbts_language Language, void *Memory);
+KBTS_EXPORT kbts_shape_config *kbts_CreateShapeConfig2(kbts_font *Font, kbts_script Script, kbts_language Language, float *VariationVector, kbts_allocator_function *Allocator, void *AllocatorData, kbts_uid *Uid);
 KBTS_EXPORT kbts_shape_config *kbts_CreateShapeConfig(kbts_font *Font, kbts_script Script, kbts_language Language, kbts_allocator_function *Allocator, void *AllocatorData);
+KBTS_EXPORT void kbts_ShapeConfigUid(kbts_shape_config *Config, kbts_uid *Uid);
 KBTS_EXPORT void kbts_DestroyShapeConfig(kbts_shape_config *Config);
 
 // A glyph_storage holds and recycles glyph data.
@@ -3942,6 +4791,7 @@ KBTS_EXPORT void kbts_FontCoverageTestCodepoint(kbts_font_coverage_test *Test, i
 KBTS_EXPORT int  kbts_FontCoverageTestEnd(kbts_font_coverage_test *Test);
 
 KBTS_EXPORT kbts_decode kbts_DecodeUtf8(const char *Utf8, kbts_un Length);
+KBTS_EXPORT kbts_decode kbts_DecodeUtf16(const kbts_u16 *Utf16, kbts_un Length, kbts_decode_utf16_flags Flags);
 KBTS_EXPORT kbts_encode_utf8 kbts_EncodeUtf8(int Codepoint);
 KBTS_EXPORT kbts_direction kbts_ScriptDirection(kbts_script Script);
 KBTS_EXPORT int kbts_ScriptIsComplex(kbts_script Script);
@@ -3957,39 +4807,38 @@ KBTS_EXPORT kbts_script kbts_ScriptTagToScript(kbts_script_tag Tag);
 #define KBTS__UNUSED(X) (void)(X)
 #define KBTS__RESTRICT __restrict__
 #endif
-#  define KBTS__FOR(I, Start, End) for(kbts_un I = (Start); I < (End); ++I)
-#  ifdef __cplusplus
-#    define KBTS__ZERO {}
-#    define KBTS__ZERO_TYPE(T) T{}
-#  else
-#    define KBTS__ZERO {0}
-#    define KBTS__ZERO_TYPE(T) (T){0}
-#  endif
-#  define KBTS__MAX(A, B) (((A) < (B)) ? (B) : (A))
-#  define KBTS__MIN(A, B) (((A) < (B)) ? (A) : (B))
-#  define KBTS__IDIV_ROUND_UP(A, B) (((A) + ((B) - 1)) / (B))
-#  define KBTS__ROUND_UP_POW2(A, B) (((A) + ((B) - 1)) & ~((B) - 1))
-#  define KBTS__ARRAY_LENGTH(A) (sizeof(A)/sizeof(*(A)))
-#  define KBTS__POINTER_AFTER(Type, X) ((Type *)((X) + 1))
-#  define KBTS__POINTER_OFFSET(Type, Base, Offset) ((Type *)((char *)(Base) + (Offset)))
-#  define KBTS__POINTER_DIFF32(Pointer, Base) ((kbts_u32)((char *)(Pointer) - (char *)(Base)))
-#  define KBTS__POINTER_DIFF(Pointer, Base) ((kbts_un)((char *)(Pointer) - (char *)(Base)))
-#  define KBTS__ALIGN_POINTER(Type, Pointer, Align) (Type *)(((kbts_un)(Pointer) + ((Align) - 1)) & ~((Align) - 1))
-#  define KBTS__PASTE_1(A, B) A##B
-#  define KBTS__PASTE_0(A, B) KBTS__PASTE_1(A, B)
-#  define KBTS__PASTE(A, B) KBTS__PASTE_0(A, B)
-#  define KBTS__IN_SET(X, Set) ((1u << (X)) & (Set))
-#  define KBTS__SET32_0(Arg) | (1u << (Arg)) KBTS__SET32_1
-#  define KBTS__SET32_1(Arg) | (1u << (Arg)) KBTS__SET32_0
-#  define KBTS__SET32_0End
-#  define KBTS__SET32_1End
-#  define KBTS__SET32(Args) (0u KBTS__PASTE(KBTS__SET32_0 Args, End))
-#  define KBTS__IN_SET64(X, Set) ((1ull << (X)) & (Set))
-#  define KBTS__SET64_0(Arg) | (1ull << (Arg)) KBTS__SET64_1
-#  define KBTS__SET64_1(Arg) | (1ull << (Arg)) KBTS__SET64_0
-#  define KBTS__SET64_0End
-#  define KBTS__SET64_1End
-#  define KBTS__SET64(Args) (0u KBTS__PASTE(KBTS__SET64_0 Args, End))
+#define KBTS__FOR(I, Start, End) for(kbts_un I = (Start); I < (End); ++I)
+#ifdef __cplusplus
+#  define KBTS__ZERO {}
+#else
+#  define KBTS__ZERO {0}
+#endif
+#define KBTS__ZERO_TYPE(X) KBTS_MEMSET((X), 0, sizeof(*(X)))
+#define KBTS__MAX(A, B) (((A) < (B)) ? (B) : (A))
+#define KBTS__MIN(A, B) (((A) < (B)) ? (A) : (B))
+#define KBTS__IDIV_ROUND_UP(A, B) (((A) + ((B) - 1)) / (B))
+#define KBTS__ROUND_UP_POW2(A, B) (((A) + ((B) - 1)) & ~((B) - 1))
+#define KBTS__ARRAY_LENGTH(A) (sizeof(A)/sizeof(*(A)))
+#define KBTS__POINTER_AFTER(Type, X) ((Type *)((X) + 1))
+#define KBTS__POINTER_OFFSET(Type, Base, Offset) ((Type *)((char *)(Base) + (Offset)))
+#define KBTS__POINTER_DIFF32(Pointer, Base) ((kbts_u32)((char *)(Pointer) - (char *)(Base)))
+#define KBTS__POINTER_DIFF(Pointer, Base) ((kbts_un)((char *)(Pointer) - (char *)(Base)))
+#define KBTS__ALIGN_POINTER(Type, Pointer, Align) (Type *)(((kbts_un)(Pointer) + ((Align) - 1)) & ~((Align) - 1))
+#define KBTS__PASTE_1(A, B) A##B
+#define KBTS__PASTE_0(A, B) KBTS__PASTE_1(A, B)
+#define KBTS__PASTE(A, B) KBTS__PASTE_0(A, B)
+#define KBTS__IN_SET(X, Set) ((1u << (X)) & (Set))
+#define KBTS__SET32_0(Arg) | (1u << (Arg)) KBTS__SET32_1
+#define KBTS__SET32_1(Arg) | (1u << (Arg)) KBTS__SET32_0
+#define KBTS__SET32_0End
+#define KBTS__SET32_1End
+#define KBTS__SET32(Args) (0u KBTS__PASTE(KBTS__SET32_0 Args, End))
+#define KBTS__IN_SET64(X, Set) ((1ull << (X)) & (Set))
+#define KBTS__SET64_0(Arg) | (1ull << (Arg)) KBTS__SET64_1
+#define KBTS__SET64_1(Arg) | (1ull << (Arg)) KBTS__SET64_0
+#define KBTS__SET64_0End
+#define KBTS__SET64_1End
+#define KBTS__SET64(Args) (0u KBTS__PASTE(KBTS__SET64_0 Args, End))
 #define KBTS__U32BE(X) kbts__ByteSwap32((X))
 #define KBTS__U32LE(X) (X)
 #define KBTS__BIT_WIDTH(Type) (sizeof(Type)*8)
@@ -3999,14 +4848,14 @@ KBTS_EXPORT kbts_script kbts_ScriptTagToScript(kbts_script_tag Tag);
 #define KBTS__BUCKETED_GLYPHS_PER_BLOCK 64
 #define KBTS_LOOKUP_STACK_SIZE 32
 
-#  ifndef KBTS_ASSERT
-#ifndef KB_TEXT_SHAPE_NO_CRT
+#ifndef KBTS_ASSERT
+#  ifndef KB_TEXT_SHAPE_NO_CRT
 #    include <assert.h>
 #    define KBTS_ASSERT(Cond) assert(Cond)
-#else
-#define KBTS_ASSERT(Cond)
-#endif
+#  else
+#    define KBTS_ASSERT(Cond)
 #  endif
+#endif
 
 #ifndef KB_TEXT_SHAPE_NO_CRT
 #include <stdio.h>
@@ -4036,6 +4885,12 @@ KBTS_EXPORT kbts_script kbts_ScriptTagToScript(kbts_script_tag Tag);
 #endif
 #endif
 
+#define KBTS__VARIATION_NORMALIZATION_COMPATIBILITY
+
+#ifdef KBTS__VARIATION_NORMALIZATION_COMPATIBILITY
+#define KBTS__ROUND_COMPATIBILITY
+#endif
+
 #ifndef kbts__ByteSwap16
 #  if defined(_MSC_VER) && !defined(__clang__)
 #include <intrin.h>
@@ -4060,6 +4915,84 @@ KBTS_INLINE kbts_u32 kbts__ByteSwap32(kbts_u32 X)
 #  else
 #    error Unsupported compiler!
 #  endif
+#endif
+
+#ifdef _M_IX86_FP
+  #if _M_IX86_FP >= 1
+    #ifndef KBTS_SSE
+      #define KBTS_SSE
+    #endif
+
+    #if _M_IX86_FP >= 2
+      #ifndef KBTS_SSE2
+        #define KBTS_SSE2
+      #endif
+    #endif
+  #endif
+#endif
+
+#ifdef __AVX__
+  #ifndef KBTS_AVX
+    #define KBTS_AVX
+  #endif
+#endif
+
+#ifdef KBTS_SSE2
+  #include <xmmintrin.h>
+#endif
+#ifdef KBTS_AVX
+  #include <smmintrin.h>
+#endif
+
+#ifndef kbts__Round32
+#if defined(KBTS_SSE2) && !defined(KBTS__ROUND_COMPATIBILITY)
+KBTS_INLINE kbts_s32 kbts__Round32(float X)
+{
+  kbts_s32 Result = _mm_cvtss_si32(_mm_set_ss(X));
+  return Result;
+}
+#else
+KBTS_INLINE kbts_s32 kbts__Round32(float X)
+{
+  int Result = (int)X;
+  float ResultF = (float)Result;
+  if((ResultF != X) && (X < 0))
+  {
+    Result -= 1;
+    ResultF -= 1;
+  }
+
+  // When the fractional part == 0.5f, round towards +infinity.
+  if((X - ResultF) >= 0.5f)
+  {
+    Result += 1;
+  }
+
+  return Result;
+}
+#endif
+#endif
+
+#ifndef kbts__Floor32
+#ifdef KBTS_AVX
+KBTS_INLINE kbts_s32 kbts__Floor32(float X)
+{
+  kbts_s32 Result = _mm_cvtss_si32(_mm_floor_ps(_mm_set_ss(X)));
+  return Result;
+}
+#else
+KBTS_INLINE kbts_s32 kbts__Floor32(float X)
+{
+  int Result = (int)X;
+  float ResultF = (float)Result;
+  if((ResultF != X) && (X < 0))
+  {
+    Result -= 1;
+  }
+
+  return Result;
+}
+#endif
 #endif
 
 #ifndef kbts__MsbPositionOrZero32
@@ -5349,60 +6282,28 @@ static kbts__feature_id kbts__FeatureTagToId(kbts_feature_tag Tag)
   return Result;
 }
 
-static kbts_s32 kbts__UnicodeParentDeltas[1679] = {
+static kbts_s32 kbts__UnicodeParentDeltas[671] = {
   132,133,134,135,244,246,248,250,252,254,315,351,416,418,7678,7680,7682,7792,7794,132,133,134,135,275,277,279,281,283,285,346,382,447,
   449,7709,7711,7713,7823,7825,131,132,133,134,174,176,178,180,182,416,418,452,7604,7606,7764,7766,7768,131,132,133,134,205,207,209,211,213,
-  447,449,483,7635,7637,7795,7797,7799,127,128,129,130,131,132,160,162,164,365,416,418,454,7584,7744,7746,127,128,129,130,131,132,191,193,
-  195,396,447,449,485,7615,7775,7777,131,132,133,134,135,222,224,226,306,355,380,414,416,448,7774,7776,131,132,133,134,135,253,255,257,
+  447,449,483,7635,7637,7795,7797,7799,131,132,133,134,135,222,224,226,306,355,380,414,416,448,7774,7776,127,128,129,130,131,132,160,162,
+  164,365,416,418,454,7584,7744,7746,127,128,129,130,131,132,191,193,195,396,447,449,485,7615,7775,7777,131,132,133,134,135,253,255,257,
   337,386,411,445,447,479,7805,7807,131,132,133,134,223,225,227,229,231,390,447,449,7651,7807,7809,131,132,133,134,192,194,196,198,359,
-  416,418,7620,7776,7778,132,134,254,442,7702,7712,7802,7804,7806,7808,-10,17,7031,7032,7101,7173,7191,7192,7197,131,214,216,218,395,7639,7641,7643,
-  7645,131,245,247,249,426,7670,7672,7674,7676,132,285,287,473,7733,7833,7835,7837,7839,227,229,231,415,417,7655,7657,7661,6,8,7051,7052,7093,
-  7195,7196,7201,189,439,7611,7613,7615,7617,7619,7726,239,241,423,7671,7673,7675,7677,7715,-5,6991,6992,7103,7167,7168,7170,7173,258,260,262,446,448,
-  7686,7688,7692,182,184,186,188,384,398,7610,213,215,217,219,415,429,7641,232,234,236,238,422,7662,7664,263,265,267,269,453,7693,7695,-15,
-  17,7071,7072,7231,7232,7233,220,470,7642,7644,7646,7648,7650,-11,7031,7032,7207,7208,7209,7211,254,7690,7692,7694,7696,7698,7713,270,272,454,7702,7704,
-  7706,7708,206,208,210,7627,7631,7633,-23,6,7092,7235,7236,7237,-26,7103,7104,7249,7251,7549,235,413,7653,7655,7657,8415,237,239,241,7658,7662,7664,
-  -9,7017,7018,7101,7180,7183,5,7063,7064,7091,7210,7213,256,258,260,7703,7705,7707,171,7591,7593,7595,7597,7599,287,289,291,7734,7736,7738,202,7622,
-  7624,7626,7628,7630,285,7721,7723,7725,7727,7729,-3,-2,-1,3,4,1,2,3,4,5,132,164,166,168,170,-14,7057,7058,7219,7221,132,195,
-  197,199,201,7481,7483,7485,7487,7489,7482,7484,7486,7488,7490,204,382,7622,7624,7626,2,4,6,64,3,4,5,7,-21,203,205,207,2,4,
-  6,112,-11,1,202,204,2,4,6,128,1,37,171,173,-8,7003,7004,7101,-19,7081,7082,7257,27,172,174,176,-13,7043,7044,7219,218,220,
-  222,224,249,251,253,255,13,7041,7042,7097,7596,7598,7600,7602,7619,7621,7623,7625,7637,7639,7641,7643,7645,7647,7649,7651,7650,7652,7654,7656,7668,7670,
-  7672,7674,7676,7678,7680,7682,-33,-32,-31,-58,7176,7181,-27,7191,7196,-5,-4,-2,1,2,4,1,3,5,2,3,5,1,4,5,-21,-20,
-  193,2,4,16,3,5,6,14,15,16,27,28,162,312,7512,7514,343,7543,7545,7585,7587,7589,733,7961,8005,7616,7618,7620,7634,7636,7638,7665,
-  7667,7669,22891,22892,23346,31318,31405,162165,31650,31843,31932,35977,36182,166849,36278,36572,167227,36626,36698,36797,62785,62786,62816,25280,156147,156148,37394,37755,168385,38990,39065,169662,
-  62814,62815,62816,39089,39163,169757,40312,40387,171144,173234,173235,173236,-29,-28,12,22,161,163,140,167,171,198,253,279,203,390,284,310,7109,7176,7111,7190,
-  7087,7206,7203,7204,7426,7428,7428,7430,7684,7686,309,8294,7687,7689,7699,7701,7718,7720,7730,7732,25135,25233,25194,25291,25286,25458,25477,25572,27117,27183,27997,28089,
-  28255,28607,28357,28407,28458,28550,28458,28610,28513,28603,28875,28962,30692,30693,24507,155384,32406,32493,27530,158375,28470,159303,33613,33756,28625,159459,29500,160322,34266,34388,34540,34678,
-  29402,160600,30216,161096,35034,35118,30351,161459,32788,163609,32908,163783,35621,35704,37790,37917,32943,164035,33018,163837,40630,40631,41398,41506,42137,42203,33247,163972,54624,54625,33631,164350,
-  33716,164428,33778,164808,34352,165055,34921,165612,35453,166134,35790,166464,62788,62816,62816,62826,36046,166794,62816,62834,62816,62838,37311,168029,37752,168382,37810,168510,62816,62843,161426,161674,
-  38130,168825,38679,169659,39225,169818,39337,169999,39518,170436,40398,171018,42033,172614,42209,172718,164391,164392,169819,169821,42724,173276,42572,173332,42877,173358,42832,173379,170354,170355,42858,173405,
-  42927,173406,43001,173641,43196,173670,43237,173761,171308,171309,43338,173859,172737,172738,43650,174167,47771,178448,178804,178805,48949,179530,-99324,-90618,-87924,-84098,-80132,-77179,-77172,-3295,-163,-70,
-  -60,-59,-36,-16,-6,9,10,26,32,34,41,48,51,55,56,59,60,63,66,67,78,81,100,118,169,187,200,278,282,294,340,720,
-  835,7085,7086,7110,7112,7156,7234,7243,7261,7273,7276,7277,7434,7440,7452,7458,7519,7609,7640,8009,8079,8739,8753,8754,21533,21757,22403,22533,22797,22850,23095,23227,
-  23233,23281,23298,23360,23371,23380,23445,23673,23963,24010,24281,24349,24361,24836,24879,24891,24946,24988,25094,25170,25195,25276,25316,25326,25344,25350,25352,25422,25430,25435,25464,25496,
-  25532,25561,25674,25675,25959,26097,26171,26173,26193,26425,26493,26543,26589,26627,26653,26703,26718,26756,26801,26921,26923,26951,26960,26999,27073,27179,27192,27217,27250,27309,27312,27340,
-  27464,27707,27770,27782,27832,28049,28122,28147,28267,28324,28331,28608,28656,28666,28698,28799,28894,28935,28936,28952,28977,29008,29015,29045,29116,29367,29393,29426,29487,29526,29684,29686,
-  29710,29867,29894,29915,29989,30055,30069,30405,30408,30477,30542,30561,30734,30805,30831,30919,30920,31016,31027,31082,31114,31253,31329,31341,31401,31464,31513,31603,31641,31645,31768,31776,
-  31816,31823,31892,31935,31972,32043,32045,32084,32095,32103,32104,32307,32472,32556,32570,32701,32715,32724,32763,32776,32859,32870,32873,32893,32949,32955,32965,32988,33012,33023,33028,33030,
-  33038,33053,33123,33210,33356,33388,33445,33526,33630,33642,33663,33740,33795,33809,33908,33926,33927,34059,34105,34117,34135,34152,34204,34243,34270,34273,34299,34344,34351,34354,34532,34563,
-  34594,34618,34800,34802,34846,34877,34890,35031,35039,35127,35170,35206,35327,35379,35391,35439,35457,35631,35634,35699,35773,35776,35820,35834,35882,35884,35898,35996,36049,36071,36074,36094,
-  36206,36343,36373,36377,36443,36446,36636,36665,37113,37178,37315,37331,37334,37344,37389,37453,37469,37523,37573,37693,37694,37714,37822,37837,37846,37873,37925,37977,37984,37996,38049,38135,
-  38202,38357,38441,38457,38461,38492,38514,38517,38540,38556,38590,38601,38700,38703,38730,38800,38820,38911,39000,39061,39126,39128,39210,39246,39296,39312,39342,39357,39397,39414,39487,39501,
-  39574,39640,39641,39706,39707,39736,39771,39850,39856,39889,39921,40124,40165,40169,40314,40318,40374,40407,40575,40793,40888,40900,40928,40974,40990,41059,41074,41230,41259,41274,41362,41418,
-  41465,41616,41648,41658,41772,41860,41936,42061,42273,42276,42288,42302,42407,42408,42447,42448,42577,42624,42634,42668,42735,42746,42814,42871,42872,42885,42889,42928,42932,42949,43023,43025,
-  43050,43063,43086,43088,43108,43212,43233,43253,43257,43274,43311,43396,43418,43430,43431,43433,43562,43673,43716,43721,43731,43763,43813,43828,43837,43866,44106,44197,44287,45331,45553,45851,
-  46452,46778,47491,47538,47676,47803,48104,48191,48639,48746,49225,49737,50294,50458,50655,50670,50678,50721,51392,52429,52652,53712,55046,55194,55959,56301,56665,56996,57719,57784,58229,60629,
-  60936,61695,61907,61909,62155,62198,62454,62765,63201,154337,154373,154379,154388,154394,154398,154458,154792,154895,155083,155657,155716,155742,155867,155936,156119,156186,156370,156464,156729,156771,157143,157170,
-  157457,157550,157615,157899,157907,157938,158030,158191,158474,158700,158735,158751,158816,158907,158996,159017,159101,159535,159951,159977,159983,160097,160099,160192,160223,160312,160338,160404,160427,160472,160526,160560,
-  160589,160590,160611,160840,160916,160950,160951,161207,161223,161238,161239,161248,161262,161335,161357,161401,161404,161456,161496,161505,161506,161524,161534,161541,161672,161833,161863,161920,162000,162063,162077,162175,
-  162275,162300,162603,162669,162727,162825,162922,162944,162950,162964,163226,163228,163441,163596,163600,163692,164096,164287,164650,164856,164880,164968,165036,165075,165095,165254,165278,165294,165520,165540,165586,165624,
-  165762,165829,165847,165997,166043,166050,166093,166106,166138,166220,166305,166469,166555,166617,166677,166784,166796,166810,166850,166867,166889,166960,166973,167063,167084,167253,167297,167325,167374,167442,167491,167680,
-  167750,167846,167890,168022,168079,168134,168165,168283,168317,168329,168377,168404,168505,168580,168680,168797,169000,169030,169039,169050,169117,169177,169211,169240,169273,169299,169319,169340,169406,169442,169476,169559,
-  169624,169634,169681,169722,169727,169737,169776,169822,169950,170015,170150,170183,170192,170242,170273,170287,170295,170386,170455,170457,170459,170526,170569,170589,170631,170656,170756,170768,170772,170809,170937,170989,
-  171031,171074,171091,171117,171123,171133,171158,171178,171361,171520,171581,171592,171638,171661,171729,171773,171836,171843,171862,171875,171876,171880,171948,172068,172070,172103,172127,172164,172234,172341,172342,172507,
-  172541,172680,172694,172701,172769,172784,172850,172875,172958,173015,173046,173061,173109,173129,173134,173144,173164,173244,173268,173283,173348,173484,173488,173531,173541,173595,173608,173678,173684,173696,173704,173722,
-  173740,173741,173755,173791,173884,173886,173888,173936,173966,174085,174155,174244,174413,174529,174531,174537,175296,175385,175393,175423,175674,175824,175946,176003,176010,176140,176218,176903,176911,177043,177097,177128,
-  177223,177230,177233,177276,177406,177443,177529,177580,177691,177725,177772,177863,177981,178014,178217,178286,178358,178437,178487,178498,178712,178814,179072,179159,179364,179414,179605,179637,179656,179693,179803,179860,
-  180071,180102,180152,180175,180238,180262,180308,180469,180588,180601,181007,181056,181082,181102,181519,
+  416,418,7620,7776,7778,132,134,254,442,7702,7712,7802,7804,7806,7808,131,214,216,218,395,7639,7641,7643,7645,131,245,247,249,426,7670,7672,7674,
+  7676,132,285,287,473,7733,7833,7835,7837,7839,-5,6991,6992,7103,7167,7168,7170,7173,-10,17,7031,7032,7101,7191,7192,7197,227,229,231,415,417,7655,
+  7657,7661,6,8,7051,7052,7093,7195,7196,7201,239,241,423,7671,7673,7675,7677,7715,189,439,7611,7613,7615,7617,7619,7726,258,260,262,446,448,7686,
+  7688,7692,182,184,186,188,384,398,7610,-11,7031,7032,7207,7208,7209,7211,213,215,217,219,415,429,7641,232,234,236,238,422,7662,7664,-15,17,
+  7071,7072,7231,7232,7233,220,470,7642,7644,7646,7648,7650,254,7690,7692,7694,7696,7698,7713,263,265,267,269,453,7693,7695,270,272,454,7702,7704,7706,
+  7708,-9,7017,7018,7101,7180,7183,-23,6,7092,7235,7236,7237,5,7063,7064,7091,7210,7213,206,208,210,7627,7631,7633,237,239,241,7658,7662,7664,171,
+  7591,7593,7595,7597,7599,202,7622,7624,7626,7628,7630,256,258,260,7703,7705,7707,285,7721,7723,7725,7727,7729,287,289,291,7734,7736,7738,-3,-2,-1,
+  3,4,1,2,3,4,5,132,164,166,168,170,132,195,197,199,201,204,382,7622,7624,7626,-14,7057,7058,7219,7221,-26,7103,7104,7249,7251,
+  7481,7483,7485,7487,7489,235,413,7653,7655,7657,7482,7484,7486,7488,7490,2,4,6,64,1,37,171,173,-21,203,205,207,3,4,5,7,2,
+  4,6,112,2,4,6,128,-19,7081,7082,7257,-13,7043,7044,7219,-11,1,202,204,-8,7003,7004,7101,27,172,174,176,218,220,222,224,249,
+  251,253,255,13,7041,7042,7097,7596,7598,7600,7602,7619,7621,7623,7625,7637,7639,7641,7643,7645,7647,7649,7651,7650,7652,7654,7656,7668,7670,7672,7674,7676,
+  7678,7680,7682,-33,-32,-31,-5,-4,-2,1,2,4,1,3,5,1,4,5,2,3,5,-58,7176,7181,-27,7191,7196,3,5,6,2,4,
+  16,14,15,16,-21,-20,193,27,28,162,312,7512,7514,343,7543,7545,7585,7587,7589,7616,7618,7620,7634,7636,7638,7665,7667,7669,733,7961,8005,62785,
+  62786,62816,62814,62815,62816,-29,-28,12,22,140,167,161,163,171,198,203,390,253,279,284,310,7203,7204,7426,7428,7428,7430,7684,7686,7687,7689,7699,
+  7701,7718,7720,7730,7732,62788,62816,62816,62826,62816,62834,62816,62838,62816,62843,-163,-70,-60,-59,-36,-16,-6,9,10,26,32,34,41,48,51,55,56,
+  59,60,63,66,67,78,81,100,118,169,200,278,282,294,309,340,7156,7190,7206,7243,7434,7440,7452,7458,7519,7609,7640,8739,8753,8754,62765,
 };
 
 static kbts_u8 kbts__ScriptExtensions[447] = {
@@ -10326,167 +11227,32 @@ KBTS_INLINE kbts_u8 kbts__GetUnicodeCombiningClass(kbts_u32 Codepoint)
   return (Codepoint < 1114110) ? kbts__UnicodeCombiningClass_Data[((Codepoint < 125280) ? ((kbts_un)kbts__UnicodeCombiningClass_PageIndices[Codepoint / 32] * 32) : 0) | (Codepoint & 31)]  : 0;
 }
 
-static kbts_u16 kbts__UnicodeParentInfo_PageIndices[21697] = {
-  0,0,0,0,0,0,0,1,2,3,4,5,6,7,8,9,0,0,0,0,0,10,11,0,12,13,14,15,16,17,18,19,
-  20,0,21,0,0,0,0,0,0,22,0,23,24,25,0,26,0,0,0,0,27,28,29,0,0,0,0,0,0,30,0,0,
-  0,0,0,0,31,32,0,0,0,0,0,0,0,0,0,0,0,0,33,0,0,0,0,34,0,0,0,0,0,0,0,0,
-  35,36,37,0,0,0,0,0,0,0,0,0,0,0,0,0,38,39,40,41,42,43,44,45,46,47,48,0,0,0,0,0,
-  49,0,50,51,52,53,54,55,56,57,49,0,0,0,58,0,0,0,0,0,0,0,0,0,0,0,0,59,0,59,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,60,61,62,63,64,0,
-  0,0,0,0,65,0,0,0,0,66,0,0,0,0,0,0,0,0,0,0,0,0,0,0,67,0,68,0,0,0,0,0,
+static kbts_u8 kbts__UnicodeParentInfo_PageIndices[7452] = {
+  0,0,0,1,2,3,4,5,0,0,6,0,7,8,9,10,11,12,0,0,13,14,15,16,0,0,17,18,0,0,19,0,
+  0,0,20,0,0,0,0,0,0,21,0,0,0,0,0,0,22,0,0,0,0,0,0,0,0,23,24,25,26,27,0,0,
+  28,29,30,31,32,28,0,33,0,0,0,0,0,34,34,0,0,0,0,0,0,0,0,0,0,0,0,0,0,35,36,37,
+  0,0,38,0,39,0,0,0,0,0,0,0,40,41,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,42,43,44,0,0,0,0,0,0,45,0,46,0,0,0,
+  0,47,48,49,0,0,0,0,0,0,0,0,0,0,0,0,0,0,50,0,51,0,0,0,0,0,0,0,52,0,0,0,
+  0,0,0,0,53,0,0,0,0,0,0,54,55,0,0,0,0,0,0,0,52,0,0,0,0,0,0,0,0,56,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,57,58,0,59,0,57,58,60,0,0,0,0,
+  0,0,61,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,69,70,71,72,73,0,0,0,0,0,0,0,0,0,0,0,0,0,0,74,0,0,75,0,0,0,0,0,0,0,
-  0,0,76,70,0,77,78,79,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,71,0,0,0,80,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,81,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,82,0,0,0,0,0,0,0,0,0,0,0,0,0,0,83,84,78,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,81,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,85,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,62,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,86,87,88,73,0,0,89,0,0,0,86,87,88,73,90,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,91,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,63,40,0,64,65,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,66,0,19,67,0,0,0,68,69,70,0,0,0,71,72,73,74,72,75,76,77,0,0,0,78,28,0,0,79,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,80,0,0,0,81,0,0,
+  82,0,83,84,85,0,86,87,88,89,90,91,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,92,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,92,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  93,94,67,0,0,0,0,95,78,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,96,0,0,0,0,30,97,0,0,0,0,0,0,0,98,0,0,99,0,100,0,0,0,0,0,0,
-  101,101,102,102,103,103,104,104,102,102,104,105,106,106,107,108,0,0,0,0,0,0,49,109,49,0,0,0,0,0,49,110,
-  111,0,112,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,113,0,0,0,0,0,0,0,114,0,0,0,0,0,
-  73,115,0,0,116,0,0,117,118,119,0,0,120,0,121,122,121,0,123,0,124,125,126,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,127,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,128,0,0,0,0,0,0,129,130,131,131,132,133,134,135,0,0,0,91,129,130,131,131,132,133,134,135,0,136,137,91,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,138,0,0,0,139,0,0,0,140,0,0,0,0,
-  0,0,141,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,142,0,143,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,144,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,145,0,0,0,0,0,0,146,0,0,147,0,0,0,0,0,0,0,0,148,0,0,0,149,0,0,0,
-  0,0,0,150,0,0,0,151,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,152,0,0,0,0,0,0,0,153,0,0,0,0,0,0,0,0,0,0,0,0,0,0,154,0,0,0,
-  0,155,0,156,0,0,0,0,0,157,0,0,0,0,0,0,0,0,0,158,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,159,0,0,0,0,0,160,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,161,0,0,0,0,0,0,0,0,0,0,0,162,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,163,0,164,0,0,0,0,0,0,0,0,
-  0,0,0,165,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,166,
-  0,167,0,168,0,0,0,169,170,0,0,0,0,0,0,0,0,0,171,0,0,0,0,0,0,0,0,0,172,0,0,0,
-  0,0,0,0,0,173,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  174,0,0,0,175,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,176,0,0,0,0,0,0,0,0,0,0,0,
-  177,0,0,0,0,0,178,0,0,0,0,179,0,0,0,0,0,0,0,0,0,0,0,0,0,0,180,181,0,0,0,0,
-  0,182,0,0,0,0,0,0,0,0,0,0,0,183,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,184,0,0,0,0,0,185,186,187,0,0,0,0,0,0,0,0,0,0,0,0,188,0,0,0,0,189,
-  0,0,0,0,0,0,190,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,191,192,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,193,0,0,0,0,0,0,0,0,0,194,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,195,196,0,0,0,0,0,0,0,197,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,198,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,199,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,200,0,0,0,201,0,202,
-  0,0,0,0,0,0,0,0,0,0,203,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,204,0,0,205,0,206,207,208,0,0,0,0,0,0,0,209,0,0,0,0,210,0,0,211,212,0,0,213,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,214,0,0,0,215,216,0,0,0,217,0,218,0,0,0,0,0,0,0,0,
-  219,0,0,0,0,220,0,0,0,0,0,0,0,0,0,221,0,0,0,222,0,0,0,0,0,223,0,224,225,0,0,0,
-  0,0,0,0,0,0,0,0,226,227,228,0,229,230,231,0,232,233,234,0,235,236,237,0,0,238,0,239,0,0,240,0,
-  241,0,242,0,0,243,0,244,245,0,0,0,0,0,246,0,0,247,0,248,249,0,250,0,251,252,253,254,255,0,256,257,
-  258,0,259,0,0,0,0,260,0,261,262,263,0,0,264,265,0,0,0,0,0,0,0,0,266,267,0,268,269,270,271,0,
-  272,273,0,274,0,0,0,275,276,277,0,0,0,278,0,0,0,0,0,279,280,0,0,281,0,0,0,0,0,0,282,0,
-  0,0,283,0,0,0,0,0,0,0,284,0,285,0,0,0,286,0,0,287,0,288,289,0,290,0,0,0,291,0,0,0,
-  292,0,0,0,0,0,0,0,0,0,293,0,0,294,295,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,296,
-  0,0,297,0,0,0,0,0,0,0,0,0,0,0,0,0,0,298,0,0,0,0,0,0,0,299,0,0,0,0,300,0,
-  0,301,0,0,0,0,302,0,303,0,0,304,0,0,0,0,0,0,0,0,0,305,306,0,0,0,0,307,0,308,309,0,
-  310,0,0,311,312,0,0,0,313,314,315,0,316,0,317,0,0,0,0,0,0,0,0,0,0,0,0,318,0,319,0,0,
-  0,0,0,320,321,0,0,0,0,0,0,0,322,0,0,0,0,0,0,0,0,0,323,0,0,0,0,0,0,0,0,0,
-  0,324,0,0,0,325,0,326,0,0,0,0,0,0,0,0,327,0,0,0,0,0,0,0,328,0,0,329,330,331,332,333,
-  334,0,0,0,335,0,0,336,0,0,0,0,337,338,0,0,0,339,0,0,0,0,0,0,340,0,0,0,0,0,0,0,
-  0,0,0,341,0,0,0,0,342,0,343,0,0,344,0,345,0,0,0,0,0,0,346,347,0,0,0,0,348,0,0,349,
-  0,0,0,0,0,350,0,351,0,0,0,0,0,352,353,0,0,0,0,0,354,0,355,0,0,356,357,358,0,359,0,360,
-  361,0,0,0,362,0,0,0,0,0,363,0,364,365,0,0,0,366,0,367,0,368,0,0,0,369,370,0,0,0,371,372,
-  0,0,373,374,0,0,0,0,0,0,0,0,0,0,375,0,376,0,377,0,0,0,0,0,378,0,0,379,380,0,0,0,
-  0,381,0,0,0,0,0,0,382,383,0,0,384,385,0,386,0,387,388,0,389,390,391,0,0,0,0,392,0,0,393,0,
-  394,0,395,396,0,397,398,0,0,0,0,399,0,0,0,0,0,0,0,0,0,0,400,0,0,401,402,0,0,0,0,403,
-  0,0,0,0,0,0,0,404,0,0,405,0,0,406,0,407,408,0,0,0,409,410,0,0,411,0,0,0,412,0,0,0,
-  0,0,0,413,414,0,0,0,0,0,415,0,0,416,417,418,0,0,0,419,0,0,0,0,420,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,421,422,0,0,423,0,424,0,0,0,425,0,0,0,0,426,0,0,0,427,0,0,0,
-  0,0,428,0,0,0,0,0,0,429,0,0,0,0,430,0,0,431,432,433,0,0,434,0,435,0,0,0,0,0,436,437,
-  437,0,438,439,440,0,0,0,0,441,442,443,0,0,0,444,445,0,446,0,0,0,0,0,0,0,0,0,0,0,447,448,
-  0,0,449,450,0,0,0,0,0,0,451,0,0,0,0,0,452,453,0,0,0,454,0,0,0,0,0,0,0,0,0,0,
-  0,0,455,0,0,0,0,0,456,0,0,0,0,0,0,0,0,0,0,0,457,0,0,0,0,0,0,0,0,458,0,0,
-  459,0,460,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,461,0,0,0,0,462,463,0,0,0,0,
-  464,0,0,0,465,0,0,0,0,0,466,0,0,0,467,468,0,0,0,469,0,470,0,471,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,472,0,0,473,0,0,0,0,474,0,0,0,0,0,475,0,476,0,0,477,0,0,0,
-  0,0,478,479,0,0,480,481,482,0,0,0,0,483,484,485,486,0,0,0,0,0,0,0,0,487,0,488,0,489,0,490,
-  0,0,0,491,0,492,0,0,0,0,0,0,0,493,0,0,0,0,0,494,0,0,0,495,496,497,498,499,0,0,0,0,
-  0,500,0,0,501,0,0,0,0,0,0,0,0,502,0,0,0,0,0,0,0,0,0,0,503,0,0,0,0,504,0,505,
-  0,0,0,506,0,0,0,507,0,508,0,0,0,0,509,510,0,0,0,511,0,512,0,0,0,513,0,514,0,0,0,0,
-  0,0,0,0,0,0,0,0,515,516,0,0,0,517,0,0,0,0,0,518,0,0,0,0,0,519,520,0,0,0,0,0,
-  0,0,521,522,0,523,524,0,0,0,525,0,526,0,0,0,527,0,528,0,0,529,0,0,530,0,0,0,0,0,0,531,
-  0,0,0,0,0,532,0,0,0,0,0,0,0,0,533,534,535,536,0,0,537,0,538,0,0,0,0,539,0,0,0,0,
-  540,541,0,0,542,0,0,0,543,0,0,544,0,545,546,0,547,548,0,549,0,0,0,0,0,550,0,0,0,0,0,0,
-  551,0,0,0,552,0,0,553,0,0,0,554,555,0,556,0,0,0,0,0,0,0,0,0,0,0,0,0,557,0,0,0,
-  0,0,558,559,0,0,0,0,560,0,0,0,0,561,0,0,0,0,0,0,0,0,0,0,0,562,0,563,564,0,565,0,
-  566,0,0,567,0,0,0,0,568,569,0,0,0,0,0,0,0,570,0,0,571,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,572,0,0,0,573,0,0,0,574,575,0,0,0,0,0,0,576,0,0,0,0,0,577,
-  0,0,0,0,0,578,0,579,0,580,581,582,583,0,0,584,0,585,0,0,0,586,0,0,0,587,0,0,0,588,0,0,
-  0,0,0,589,0,0,0,0,590,591,0,0,0,0,0,0,592,0,0,0,0,0,593,0,0,594,0,0,0,595,0,0,
-  0,0,0,0,596,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,597,598,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,599,0,0,0,0,600,0,0,601,0,0,602,0,0,0,0,603,0,0,604,0,605,606,0,0,
-  607,0,608,0,609,610,0,0,0,0,0,611,612,0,0,0,0,0,0,0,613,0,0,614,615,0,0,0,0,0,616,0,
-  617,618,0,0,0,0,619,0,620,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,621,0,0,0,0,0,0,622,623,624,0,625,626,0,0,0,627,0,0,0,0,0,0,0,628,
-  629,0,0,0,0,0,0,0,630,0,0,0,631,632,633,634,0,635,0,0,0,636,637,0,0,0,0,0,0,0,0,0,
-  638,0,0,0,0,0,0,639,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,640,0,641,0,0,
-  642,0,0,643,0,0,0,0,0,0,0,0,0,644,0,645,0,646,647,648,0,0,649,650,0,0,0,0,651,0,0,0,
-  0,0,0,652,653,0,654,0,0,0,655,0,656,0,0,0,0,0,0,0,0,657,0,658,0,659,0,660,661,662,663,0,
-  0,0,0,0,0,0,0,664,0,665,666,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,667,668,669,
-  0,0,670,0,0,0,0,0,0,0,0,0,671,0,0,0,0,0,0,0,0,0,0,0,0,672,0,0,0,0,0,673,
-  674,0,675,0,0,676,0,677,0,0,678,679,680,681,0,0,0,682,0,0,0,683,0,0,0,0,0,0,684,0,0,0,
-  0,685,0,0,0,686,0,0,0,0,0,0,0,687,0,688,689,0,0,0,0,0,0,690,0,0,0,0,691,0,0,0,
-  692,0,0,693,0,0,0,0,0,694,0,0,695,0,0,0,0,0,0,0,0,0,0,0,696,697,698,699,700,0,0,701,
-  0,0,702,0,0,0,0,0,703,0,0,0,704,0,0,0,705,706,707,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,708,709,0,710,0,711,712,0,0,713,0,714,
-  715,0,0,0,0,0,0,716,0,0,0,717,0,0,0,0,718,719,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,720,721,0,0,0,0,0,0,0,0,0,0,722,0,0,723,724,725,0,0,0,0,0,
-  0,726,0,727,0,0,0,0,0,0,0,0,0,0,728,0,0,0,0,0,0,0,0,729,0,730,0,0,0,731,732,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,733,734,0,0,0,0,0,
-  0,0,0,0,735,736,0,737,0,0,0,0,738,0,0,0,0,0,0,739,0,0,740,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,741,0,0,742,0,0,0,0,0,0,743,744,0,745,746,0,0,0,0,0,0,747,0,748,0,0,749,750,
-  0,0,751,752,0,0,0,0,0,0,0,0,0,753,0,0,0,0,0,754,0,0,755,0,0,756,757,0,0,0,0,0,
-  0,0,0,0,0,0,758,759,0,0,0,0,0,0,760,761,0,0,0,0,0,0,0,0,0,0,762,763,0,0,0,0,
-  764,0,0,0,0,0,0,0,0,765,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,766,
-  0,0,767,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,768,0,0,0,769,770,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,771,0,0,0,772,0,0,0,0,773,774,775,0,0,0,776,0,777,778,779,0,0,0,780,0,781,0,
-  0,0,0,0,782,0,783,0,0,784,785,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,786,787,0,0,788,
-  0,789,0,790,0,791,0,792,0,0,0,793,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,794,795,0,796,
-  0,0,0,0,0,797,0,0,0,0,0,0,0,0,0,0,0,0,0,0,798,0,0,0,799,0,0,0,0,0,800,801,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,802,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,803,0,0,0,0,0,0,0,0,0,0,804,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,805,0,806,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,807,
-  0,0,0,0,0,0,0,0,0,0,0,0,808,0,0,0,0,0,0,0,0,0,809,0,0,0,0,0,0,0,0,810,
-  0,0,0,811,0,0,0,0,0,0,0,0,0,0,0,812,0,0,813,814,0,0,0,815,0,816,0,0,0,0,0,817,
-  818,819,820,0,0,0,0,821,822,0,0,0,0,0,0,0,0,823,0,824,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,93,94,95,96,0,97,93,94,95,96,98,99,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -10578,7 +11344,6 @@ static kbts_u16 kbts__UnicodeParentInfo_PageIndices[21697] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,825,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -10588,27 +11353,26 @@ static kbts_u16 kbts__UnicodeParentInfo_PageIndices[21697] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,826,124,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,100,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,101,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,102,103,0,0,0,0,0,0,0,0,104,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,46,0,0,0,105,106,0,0,107,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,108,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,34,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,827,828,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,829,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,109,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,75,0,0,0,0,0,0,0,830,831,112,0,0,0,0,0,832,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,833,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,59,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,834,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -10640,11 +11404,13 @@ static kbts_u16 kbts__UnicodeParentInfo_PageIndices[21697] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,110,111,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,112,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -10680,7 +11446,6 @@ static kbts_u16 kbts__UnicodeParentInfo_PageIndices[21697] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,835,836,837,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -10692,566 +11457,76 @@ static kbts_u16 kbts__UnicodeParentInfo_PageIndices[21697] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,838,67,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,839,840,0,0,0,0,0,0,0,0,0,0,0,841,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,842,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,843,844,0,0,0,0,845,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,846,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  847,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,848,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,849,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,850,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,851,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,852,0,0,0,0,0,0,0,853,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,854,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,855,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,856,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,857,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,858,0,0,859,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,860,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,861,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,862,863,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,864,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,865,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,866,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,867,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,868,0,0,0,0,0,0,869,870,0,0,0,0,871,0,872,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,873,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,874,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,875,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,876,0,0,0,0,0,0,0,0,0,0,0,0,0,877,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,878,0,0,0,0,0,0,0,0,
-  0,0,0,879,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,880,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,881,0,0,0,0,0,882,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,883,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,884,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,885,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,886,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,887,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,888,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,889,0,0,0,0,0,0,0,0,0,0,0,890,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,891,0,0,892,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,893,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,894,0,
-  0,0,0,895,0,0,896,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,897,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,898,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,899,0,0,0,0,0,0,0,0,0,0,0,0,0,0,900,0,0,0,0,901,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,902,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,903,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,904,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,905,0,0,0,0,0,0,0,0,0,906,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,907,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,908,0,0,0,0,
-  0,0,0,0,0,909,0,0,910,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,911,0,0,0,0,
-  0,0,0,0,0,0,0,912,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,913,0,0,0,0,
-  0,0,0,0,914,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,915,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,916,0,917,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,918,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,919,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,920,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,921,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,922,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,923,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,924,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,925,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,926,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,927,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,928,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,929,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,930,0,0,0,0,0,
-  0,0,0,0,0,931,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,675,0,0,932,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,933,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,934,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,935,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,936,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,937,0,0,0,0,
-  0,0,0,938,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,939,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,940,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,941,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,942,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,943,0,0,0,0,0,0,
-  944,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,945,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,946,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,947,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  948,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,113,0,0,0,0,0,114,
 };
 
-static kbts_u32 kbts__UnicodeParentInfo_Data[7592] = {
-  0,0,0,0,0,0,0,0,0,0,0,66400,66423,66421,66422,0,0,1048664,197177,328094,393598,1114167,66418,459018,459046,983176,65810,393556,393562,197183,590017,1048696,
-  131720,0,524539,459032,459067,1245203,131728,393604,131730,590026,393592,0,0,0,0,0,66420,1048648,197171,328084,393586,1114150,66417,459011,524515,917655,131704,328109,393538,197180,590008,1048680,
-  131414,0,524499,459025,524523,1245184,131724,459060,131726,655525,393580,0,0,0,0,0,197174,0,0,0,0,0,0,0,0,0,0,0,66419,0,0,66399,
-  0,0,262650,0,66396,131722,131706,65959,0,0,262654,0,0,0,0,66416,0,0,0,0,262658,197168,66398,0,66397,0,0,0,262626,0,0,0,
-  0,0,262638,0,66019,66395,131702,66415,0,0,262642,0,0,0,0,65963,0,0,0,0,262646,197165,66186,0,65816,0,0,0,262622,0,0,0,
-  0,0,262634,262634,0,0,0,0,0,0,131716,131716,0,0,0,0,0,0,0,0,131718,131718,0,0,0,0,66412,66412,0,0,0,0,
-  66183,66183,0,0,0,0,0,0,66413,66413,66413,66413,0,0,0,0,0,0,0,0,0,0,0,66414,328104,328104,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,328099,328099,0,0,0,0,0,0,66381,0,0,65936,65936,0,0,0,0,0,0,0,0,0,0,66367,66367,
-  66405,66405,0,0,0,0,65936,65936,0,0,66366,0,0,0,0,0,0,66393,0,0,0,0,0,0,65973,65973,0,0,0,0,0,0,
-  66384,0,0,0,0,0,0,0,0,0,0,66379,0,0,0,0,0,0,0,0,0,66409,65949,0,65829,66406,65873,0,66411,0,66408,66410,
-  65867,459053,0,0,0,262618,0,328089,0,459039,0,0,0,0,0,262610,0,66407,0,0,0,393544,0,0,0,393550,0,0,131708,66403,131710,66404,
-  65948,524531,0,0,0,262606,0,393568,0,589999,0,0,0,0,0,262630,0,131714,0,0,0,524507,0,0,0,393574,197129,197132,66401,66402,131712,0,
-  0,0,131471,0,0,0,0,0,0,0,0,0,0,0,65935,0,131227,0,0,66371,0,197150,131700,65953,262594,0,65945,0,0,0,66394,0,
-  0,0,0,262586,0,0,0,65595,0,0,0,65595,0,65630,0,0,131696,0,0,66376,0,197162,131698,65943,262602,0,66377,0,0,0,66392,0,
-  0,0,0,262614,0,0,0,65578,0,0,0,65578,0,65614,0,0,0,0,0,0,65936,65936,0,0,65936,65936,0,0,0,0,0,0,
-  197216,131836,66134,66134,66134,131828,66134,0,66134,131820,66134,131826,66134,0,66134,0,66134,66134,0,66134,131822,0,66134,66134,66134,197204,66134,0,0,0,0,0,
-  0,0,66855,0,0,0,0,0,0,0,0,0,0,0,0,197135,66370,0,66370,0,0,0,0,0,0,65935,0,0,0,0,0,0,
-  0,0,65935,0,0,65978,0,0,0,0,0,0,0,66387,66387,66387,0,0,0,0,66385,0,0,0,0,66383,66383,0,0,0,0,0,
-  65935,0,0,66380,0,0,0,66379,0,0,0,65935,0,0,0,0,0,0,0,0,0,0,0,66379,0,0,0,0,0,0,0,131474,
-  0,0,0,0,0,0,66387,66387,0,0,0,66380,0,0,0,0,0,0,65935,0,0,0,0,0,65931,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,197147,0,0,0,0,0,0,131507,65934,0,0,0,0,0,0,65936,0,0,0,0,0,0,0,0,65935,
-  0,0,0,0,0,0,197138,0,0,197141,0,0,65935,0,0,0,66378,0,65935,0,0,0,0,0,0,0,0,0,65935,0,0,0,
-  0,65935,0,0,0,0,65935,0,0,197153,0,0,0,0,0,0,0,0,66368,66369,0,0,0,0,0,0,0,0,0,65935,0,0,
-  0,328074,0,0,0,0,0,0,0,0,0,0,0,65935,0,65935,0,65935,0,65935,0,65935,0,0,0,0,65935,0,65935,0,65936,65936,
-  0,0,0,0,0,0,65936,65936,0,0,65755,65755,0,0,0,0,131694,131694,0,0,0,0,0,0,66087,66087,0,0,0,0,0,0,
-  0,0,0,0,66158,66158,0,0,262598,262598,65609,65609,65609,65609,65609,65609,131506,131506,0,0,0,0,0,0,262590,262590,65985,65985,65985,65985,65985,65985,
-  197042,197042,0,0,0,0,0,0,0,197042,0,0,0,0,0,0,262578,262578,65973,65973,65973,65973,65973,65973,66386,0,0,0,66388,0,0,0,
-  0,0,0,0,66391,0,0,0,0,0,0,0,0,0,0,197159,0,0,0,0,0,0,197126,0,0,0,65931,65931,0,0,0,0,
-  65935,0,0,0,0,0,0,0,66374,0,66373,0,66375,0,0,0,65930,0,65930,0,66372,0,0,0,65935,0,0,65935,0,0,0,0,
-  0,0,0,65935,0,65935,0,0,0,0,0,0,65894,0,0,0,0,0,0,65935,0,65936,0,0,65935,0,0,0,0,66376,0,0,
-  0,65935,0,0,66158,66158,0,0,0,0,65936,65936,0,0,65936,65936,0,0,65755,65755,66390,66390,0,0,0,66389,66389,0,0,0,0,0,
-  0,0,66374,0,0,0,0,0,65894,65894,0,65934,0,0,0,0,0,0,66382,66382,66382,66382,0,0,0,0,0,0,0,65932,0,0,
-  66365,66365,0,0,0,0,0,0,0,0,0,0,0,0,66388,0,0,0,0,65935,0,65935,0,65935,0,65935,0,65935,0,65935,0,65935,
-  0,65935,0,0,65935,0,65935,0,65935,0,0,0,0,0,0,131471,0,0,131471,0,0,131471,0,0,131471,0,0,131471,0,0,0,0,
-  0,0,0,0,0,0,0,65756,65756,65756,65756,0,0,0,0,0,0,0,0,0,0,0,67213,0,0,67212,0,67214,0,0,0,0,
-  0,0,0,0,0,0,0,67211,0,0,0,0,0,67210,0,0,0,0,0,0,0,0,67209,0,0,0,0,0,67208,0,0,0,
-  0,67207,0,0,0,0,0,0,0,0,0,0,0,0,0,67206,0,0,67205,0,0,0,0,0,0,0,0,0,67204,0,0,0,
-  0,0,0,0,0,0,0,67203,0,0,0,67202,0,0,0,0,0,0,0,0,67201,0,0,0,0,0,67200,0,0,0,0,0,
-  0,0,0,0,0,0,67199,0,0,0,0,0,67198,0,0,0,0,0,0,0,67197,0,0,0,67196,0,0,0,0,0,0,0,
-  0,67195,0,0,0,0,0,0,0,67194,0,0,0,0,0,0,0,0,0,0,0,131892,0,0,67193,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,67192,0,0,0,0,67191,0,0,0,0,0,0,0,0,0,0,67190,0,0,0,0,0,67189,0,0,0,
-  131890,0,0,0,0,0,0,0,0,0,0,67188,0,0,0,0,0,0,0,0,67187,0,0,0,67186,0,0,0,0,0,0,0,
-  66821,0,0,0,0,0,0,0,0,131888,0,0,0,0,0,0,0,0,0,0,0,0,67185,0,0,0,0,0,0,0,67184,0,
-  0,0,0,67183,0,0,0,0,0,0,0,0,0,0,0,67182,0,0,67181,0,0,0,0,0,0,0,0,0,0,0,0,67180,
-  67179,0,0,0,0,0,0,0,0,67178,0,0,0,0,0,0,0,0,0,0,67177,0,0,0,0,67176,0,0,0,0,0,0,
-  0,0,0,0,0,67175,0,0,0,67172,0,0,0,0,0,0,0,0,0,67174,0,0,0,0,0,0,0,67173,0,0,0,0,
-  0,0,0,67171,0,0,0,0,0,0,0,0,0,67170,0,0,0,67169,0,0,0,0,0,0,0,0,0,67168,0,0,0,0,
-  0,0,0,0,0,0,0,67167,0,67166,0,0,0,0,0,0,0,0,0,0,0,67165,0,0,0,0,0,0,0,0,67164,0,
-  0,0,0,0,0,0,0,67163,0,0,0,0,0,67162,0,0,0,0,0,0,0,0,67161,0,0,0,0,0,0,0,67160,0,
-  0,0,0,0,0,0,67159,0,0,0,67158,0,0,0,0,0,0,0,0,67157,0,0,0,0,0,0,0,0,0,0,67156,0,
-  0,0,0,0,0,0,67155,0,0,0,0,0,0,67154,0,0,67153,0,0,0,0,0,0,0,0,0,0,0,0,0,67152,0,
-  0,0,0,0,0,66809,0,0,0,0,0,0,0,0,66810,0,0,0,66804,0,0,0,0,0,67151,66806,0,0,0,67150,0,0,
-  0,67149,0,0,0,0,0,0,0,0,66801,0,0,0,66807,0,0,0,0,0,0,0,66803,0,66808,0,0,0,0,0,0,0,
-  0,0,0,0,67148,0,0,0,0,0,0,0,66802,0,0,0,67147,0,0,0,0,0,0,0,66805,0,0,0,0,0,66798,0,
-  0,0,0,66800,0,0,0,0,0,0,0,0,0,0,131886,0,0,0,0,67146,0,0,0,66797,0,0,67145,0,0,0,0,0,
-  0,0,0,66799,0,0,0,0,0,0,67144,0,0,0,0,0,0,67143,0,0,0,0,0,0,0,0,0,0,0,0,0,67140,
-  0,0,66790,0,0,0,0,0,0,0,0,0,0,0,0,131882,66789,0,0,0,0,66794,0,0,0,0,0,0,0,131878,0,0,
-  0,0,0,0,67138,0,0,0,0,0,0,0,67136,0,0,67137,66793,66782,0,0,0,66788,0,0,0,0,0,0,0,0,0,67135,
-  66791,0,0,0,0,0,0,0,0,0,0,0,0,67134,0,0,0,0,67142,0,0,67141,0,67133,0,0,0,0,67132,0,0,0,
-  0,0,0,0,67131,0,0,0,0,0,0,0,0,131876,0,66775,0,66779,0,0,66778,0,0,0,0,0,0,0,66776,0,66785,0,
-  0,0,0,0,0,67130,0,0,0,0,0,67129,0,0,0,131874,0,0,0,0,0,0,0,66777,0,66780,0,0,0,0,0,0,
-  0,0,66781,67128,0,0,0,0,0,0,0,0,0,0,67127,0,0,0,67126,0,0,0,0,67125,0,66774,0,0,0,0,0,0,
-  0,0,0,66772,0,0,0,0,0,0,0,66773,0,0,0,0,0,0,0,67139,0,0,0,0,0,0,0,0,0,0,0,131872,
-  0,131870,0,0,0,0,0,0,0,0,66769,0,0,0,0,0,0,0,0,0,0,0,66768,0,0,0,0,0,131866,0,0,0,
-  0,0,0,0,0,66770,0,0,0,0,131864,0,0,0,0,0,0,0,0,0,0,67124,67124,0,0,0,0,0,0,0,0,131862,
-  0,0,0,0,0,0,0,66771,0,67123,0,0,0,0,0,0,0,131860,0,0,0,0,0,0,0,0,67122,0,0,0,0,0,
-  0,0,0,67121,0,66764,0,0,0,0,0,0,0,66154,0,197225,0,0,0,66765,0,0,0,0,0,0,67120,0,0,0,0,0,
-  0,0,0,0,0,0,0,67119,0,0,0,0,0,66760,0,0,0,0,0,67118,0,0,0,0,0,67117,0,0,0,0,0,0,
-  0,0,0,0,0,0,67116,0,0,0,0,0,0,0,0,66766,0,0,0,0,0,66767,0,0,67115,0,0,0,0,0,0,0,
-  0,0,66763,0,0,0,0,0,67114,0,0,0,0,0,0,0,67113,0,0,0,0,0,0,0,0,0,0,0,0,0,67112,0,
-  0,0,67112,0,0,0,0,0,0,0,0,0,0,66318,0,0,0,0,0,0,0,0,67111,0,67110,0,0,0,0,0,0,0,
-  0,0,0,67109,0,66761,0,0,0,0,0,67108,0,0,0,0,0,0,0,0,131884,0,0,66757,0,131854,0,0,0,131800,0,0,
-  0,0,0,67107,0,0,0,0,0,0,0,67106,0,0,0,0,66759,0,67105,0,0,0,0,0,0,0,66264,0,0,0,0,0,
-  0,0,0,0,0,0,131852,0,0,67104,0,0,0,0,0,0,66758,0,0,0,0,0,0,0,0,0,0,0,67103,0,0,0,
-  0,66754,0,0,0,0,0,0,0,0,0,0,0,0,67101,67102,0,0,0,67100,0,0,0,0,0,0,0,0,0,0,67099,0,
-  0,0,0,0,67098,0,0,0,0,0,0,0,0,67097,0,0,0,67096,67095,0,0,0,0,0,66752,0,0,0,0,0,0,0,
-  0,0,131798,0,0,0,66747,0,66750,0,0,0,67094,0,0,0,0,0,0,66751,0,0,0,0,66746,0,0,0,0,0,0,66745,
-  0,0,0,0,0,0,67091,0,0,0,67093,0,0,0,0,67092,0,0,0,0,0,0,67090,0,0,0,67089,0,0,0,0,0,
-  0,0,67088,0,0,0,0,0,0,0,0,0,66749,0,0,0,66741,0,0,0,0,0,0,0,0,66740,0,0,66748,0,0,0,
-  0,0,67087,0,0,0,0,0,0,0,0,66743,0,0,0,0,67085,0,0,0,0,0,0,0,0,0,0,0,67084,0,0,0,
-  0,0,0,67083,0,0,0,0,0,0,0,0,0,0,0,67082,0,0,66744,0,0,0,67081,0,0,0,0,0,0,67086,0,0,
-  67080,0,0,0,0,0,0,0,66739,0,0,0,0,0,0,0,0,0,0,0,0,0,131880,0,0,0,0,0,0,66738,0,0,
-  0,0,0,67079,0,0,0,0,67078,0,0,0,0,0,0,0,0,0,0,0,0,0,0,197222,0,0,0,0,0,0,66314,0,
-  0,0,0,67077,0,0,0,0,0,0,0,0,0,0,0,67076,0,0,0,0,0,0,67075,0,0,0,67074,0,0,0,0,0,
-  0,0,0,0,0,0,0,66735,67072,0,66733,0,66737,66734,0,0,0,0,0,0,0,0,131850,0,0,0,0,0,0,67071,0,0,
-  67070,0,0,0,0,0,0,0,0,66731,0,0,0,0,0,0,0,0,0,67069,0,0,0,0,66729,0,0,0,0,0,0,0,
-  0,0,0,67068,0,0,67067,0,0,0,0,0,67066,0,0,0,0,0,67073,0,0,0,0,0,0,0,66730,0,0,0,0,0,
-  0,67065,67065,0,0,0,0,0,0,0,0,0,0,67064,0,0,67063,0,0,0,0,0,0,0,0,0,0,0,0,67062,0,0,
-  0,67061,0,0,0,0,0,0,0,0,0,0,66723,0,0,0,0,0,0,0,0,0,66726,0,67060,0,0,67059,0,0,67058,0,
-  0,66722,131848,0,0,0,0,0,0,0,66728,66725,0,0,0,0,0,66727,0,0,0,0,0,0,0,0,0,0,66720,0,0,0,
-  0,0,0,0,0,0,67057,0,0,0,0,0,66718,0,0,0,0,0,131868,0,0,0,0,0,0,0,0,67054,0,0,0,0,
-  0,0,67056,0,0,0,0,0,0,66724,0,67055,0,0,0,0,0,0,0,66719,0,0,0,0,0,0,67053,0,0,0,0,0,
-  0,66715,0,0,0,66721,0,0,0,0,0,0,0,67052,0,0,0,0,0,0,0,0,0,67051,0,0,0,0,0,66714,0,0,
-  0,67050,0,0,0,0,0,0,0,0,66711,0,0,0,0,0,0,0,0,0,66713,0,0,0,0,0,0,0,0,66717,0,0,
-  0,67049,0,0,0,0,0,0,0,0,0,0,131846,0,0,0,0,0,0,0,0,0,0,67048,66714,0,0,0,0,0,0,0,
-  0,66709,0,0,0,0,0,0,66712,0,0,0,0,0,0,0,0,0,0,0,66707,0,0,0,67047,0,0,0,131858,0,131844,0,
-  66710,0,0,0,0,0,0,0,66708,0,0,0,0,0,0,0,0,0,67046,0,0,0,0,0,0,0,0,0,0,0,197219,0,
-  66705,0,0,0,0,0,0,0,0,0,0,0,67045,0,0,0,0,0,0,0,0,0,0,67044,0,0,67043,0,0,0,0,0,
-  0,0,0,0,0,0,67042,0,0,0,197213,0,0,0,131842,0,66703,0,0,0,0,0,0,0,67041,0,0,0,0,0,0,0,
-  0,0,0,67040,0,0,0,0,0,0,0,0,0,0,66704,0,0,0,0,0,66706,0,0,0,0,0,0,0,0,67039,0,0,
-  0,67038,0,0,0,0,0,0,0,66693,0,0,0,0,0,66696,0,0,0,66701,67037,0,0,0,0,0,0,0,67036,0,66695,0,
-  0,0,0,0,0,67035,0,0,67034,0,0,0,0,0,0,0,67033,0,0,0,0,0,0,0,0,0,0,66690,0,0,0,0,
-  0,0,0,67032,0,0,0,0,66689,0,0,0,0,0,0,0,0,67031,0,0,0,0,0,0,0,0,0,0,66699,67030,0,0,
-  0,0,0,0,67029,0,0,0,0,0,0,0,66694,0,0,0,0,0,67028,0,0,0,0,0,0,0,66692,0,0,0,0,0,
-  0,67027,0,0,0,0,0,0,0,0,0,0,0,0,0,67026,0,0,0,0,0,0,67025,0,0,0,66687,0,0,67024,0,0,
-  0,0,0,0,66685,0,0,0,0,0,0,0,0,0,0,131840,0,0,0,0,0,0,66688,0,0,0,0,0,67023,0,0,0,
-  66681,0,0,0,0,0,0,0,0,66682,0,0,0,0,0,0,0,0,0,0,0,66678,0,0,0,0,66684,67022,0,0,0,0,
-  0,0,0,66679,0,0,0,0,0,67021,0,0,0,0,0,0,0,0,0,0,131790,0,0,0,66675,0,0,0,0,0,0,0,
-  0,131834,0,0,0,0,0,0,0,0,0,0,67020,0,0,0,0,0,0,0,66677,0,0,0,0,0,0,0,0,0,66674,0,
-  0,0,0,0,66670,0,0,0,67019,0,0,0,0,0,0,0,0,0,0,0,0,0,0,197210,0,0,0,131832,0,0,0,0,
-  0,67018,0,0,0,0,0,0,0,0,0,0,0,0,66673,0,0,0,0,67017,0,0,66676,0,0,0,0,0,0,0,67016,0,
-  0,0,0,66671,0,0,0,0,0,0,0,0,0,67015,0,0,0,0,0,0,0,0,0,66672,0,0,0,66668,0,0,0,0,
-  0,0,67014,0,0,0,0,0,0,0,0,0,0,0,0,66666,0,0,0,0,0,0,0,67013,0,0,67012,0,0,0,0,0,
-  0,66664,0,0,0,131830,0,0,0,0,0,0,0,0,67011,0,66665,0,0,0,0,0,0,0,0,0,0,0,67010,0,0,0,
-  0,0,67009,0,0,0,0,0,0,0,0,67008,0,0,0,0,0,0,67007,0,0,0,0,0,0,0,197201,0,0,0,0,0,
-  0,0,0,66663,0,0,0,0,67006,0,0,0,0,0,0,0,0,0,0,66661,0,0,0,0,0,0,0,67005,0,0,0,0,
-  0,0,0,0,66659,0,0,0,0,67004,0,0,0,0,0,0,0,0,0,0,67003,0,0,0,0,0,67002,0,0,0,0,66658,
-  0,66662,0,0,0,0,0,0,0,0,0,0,0,0,0,67001,0,0,0,0,0,0,66657,0,0,0,197198,66128,0,0,0,0,
-  0,0,0,0,0,0,67000,0,0,0,0,0,0,0,0,66999,66654,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66998,
-  0,0,0,0,66651,66997,0,0,0,0,0,0,0,66655,0,0,0,0,0,0,0,0,66996,0,0,0,0,66647,0,0,66653,0,
-  0,0,0,0,66995,0,0,0,0,0,0,0,0,0,66994,0,0,197195,0,0,0,0,0,0,0,66993,66645,0,0,0,0,0,
-  0,0,0,0,0,0,0,131824,66992,0,0,0,0,0,0,0,0,0,0,0,0,66991,0,0,0,0,0,66648,0,0,0,0,
-  0,0,66643,0,0,0,0,0,0,0,66646,0,0,0,0,0,0,66990,0,0,0,0,0,0,0,0,66649,0,0,0,0,0,
-  0,0,0,0,0,0,0,66989,0,0,0,0,0,0,66988,0,0,0,0,0,66641,0,0,0,0,0,66642,0,0,0,0,0,
-  0,0,0,0,0,0,0,66987,0,0,0,131818,0,0,0,0,0,66637,0,0,0,0,0,0,0,0,0,66644,0,0,0,0,
-  0,0,0,0,0,0,0,66638,0,0,131788,66639,0,0,0,0,0,0,0,0,0,0,66986,0,0,0,0,0,0,0,66985,0,
-  0,0,0,66633,0,0,0,0,0,0,0,0,0,0,66635,0,0,0,0,66984,0,0,131816,0,0,66983,0,0,0,0,0,0,
-  0,0,66982,0,0,0,0,0,66977,0,0,0,0,0,0,66981,0,0,0,0,0,66980,0,0,0,66634,0,0,0,0,0,0,
-  0,0,0,0,0,66979,0,0,66631,0,0,0,0,0,0,0,0,66629,0,0,0,0,0,0,0,0,0,0,0,66978,0,0,
-  0,66630,0,0,0,0,0,0,0,0,0,0,0,0,131780,0,0,0,0,0,66976,0,0,0,0,0,0,0,0,0,66627,0,
-  66628,0,0,0,0,0,0,0,66624,0,0,0,0,0,0,0,0,0,0,66623,0,0,0,0,66975,0,0,66628,0,0,0,0,
-  0,0,0,0,0,131814,0,0,66974,0,0,0,0,0,0,0,0,0,66622,0,0,0,0,0,66973,0,0,0,0,0,0,0,
-  0,0,0,0,0,66972,0,0,0,0,0,0,0,0,0,66626,66625,0,0,0,0,0,0,0,0,0,0,0,66620,0,0,0,
-  0,0,131774,0,0,0,0,0,0,0,0,0,0,66621,0,0,0,0,66971,0,0,0,0,0,0,0,0,0,0,0,0,131772,
-  0,0,0,66970,0,0,0,0,0,0,0,0,0,66969,0,0,0,0,66618,0,0,0,0,0,0,0,0,0,0,0,66610,0,
-  0,0,0,0,0,0,66616,0,0,66615,0,0,0,0,0,0,0,0,66619,0,0,0,0,0,0,0,0,0,0,0,0,66968,
-  0,0,0,0,66967,0,0,0,0,66611,0,0,0,0,0,0,0,131812,0,0,0,0,0,0,0,0,0,0,0,66966,0,0,
-  0,66609,0,0,0,0,0,0,66612,0,0,0,0,0,0,0,0,0,66965,0,0,0,0,0,0,0,0,0,0,0,66614,0,
-  0,0,0,0,66964,0,0,0,0,0,0,66613,0,0,66963,0,0,66606,0,0,0,0,0,0,0,0,0,0,0,66605,0,0,
-  131810,0,0,0,0,0,0,0,0,0,66604,0,0,0,0,0,66962,0,0,0,0,0,0,0,0,0,0,0,0,66608,0,66607,
-  0,0,66602,0,0,0,0,0,0,66598,0,0,0,0,0,0,0,0,131766,0,0,0,0,0,0,0,0,66603,0,0,0,0,
-  0,0,0,0,0,0,0,66596,0,0,0,0,131808,0,0,0,0,66597,0,0,0,0,0,0,0,0,0,0,0,0,66320,131856,
-  66601,0,0,0,0,0,0,0,0,0,131806,0,0,0,0,0,0,0,0,66961,0,0,0,0,0,0,0,0,0,0,0,66599,
-  0,0,0,0,0,0,66960,0,0,0,0,66594,0,0,0,0,0,0,0,0,131792,0,0,0,0,66595,0,0,0,0,0,0,
-  0,0,66583,0,131802,0,0,0,0,0,0,66582,0,0,0,0,0,0,66580,0,0,0,0,0,0,0,0,0,66587,0,66592,0,
-  66591,66590,0,0,0,0,0,0,66589,0,0,0,0,0,131794,0,0,0,0,0,0,66588,66585,0,0,0,0,0,0,66584,0,0,
-  0,0,0,0,0,0,0,66575,0,0,0,0,0,66586,66586,131786,0,0,0,0,0,0,66579,0,0,0,66576,0,0,0,0,0,
-  0,0,0,66959,0,0,0,0,0,0,0,0,66574,0,0,0,131784,0,0,0,0,0,0,0,0,0,66958,0,0,0,0,66957,
-  0,66577,0,0,0,0,0,0,0,66578,0,0,0,0,0,0,0,0,0,66573,0,0,0,0,0,0,0,0,0,0,66956,0,
-  66572,0,0,0,0,0,0,0,131760,0,0,0,0,0,66955,0,0,66954,0,0,0,0,0,0,0,0,0,0,0,0,66570,0,
-  66564,0,0,0,0,0,0,0,0,0,0,66571,0,0,0,0,0,0,66569,0,0,0,0,0,0,0,0,0,0,0,66568,0,
-  0,0,66953,0,0,0,66566,0,0,0,0,66952,0,0,0,66562,66951,0,0,0,0,0,0,0,66950,0,0,0,0,0,0,0,
-  66563,0,0,0,0,0,0,0,0,0,66560,0,0,0,0,0,0,0,0,0,0,0,0,66559,0,0,0,66567,0,0,0,0,
-  0,0,0,66949,0,0,0,0,66557,0,0,0,0,0,0,0,0,0,0,0,0,0,66556,0,0,0,0,0,0,0,0,66948,
-  0,0,0,0,197192,0,0,0,0,0,66947,0,0,0,0,0,0,66561,0,0,0,0,0,0,0,0,0,0,0,0,0,66554,
-  0,66558,0,0,0,66946,0,0,0,0,0,0,0,0,66555,0,0,0,66553,0,0,0,0,0,0,66551,66945,0,0,0,0,0,
-  0,0,0,0,0,66548,0,0,0,0,0,0,0,66944,0,0,0,0,66549,0,0,0,0,0,0,0,0,0,0,66550,0,0,
-  0,0,66943,0,0,0,0,0,0,66546,0,0,0,197189,0,0,0,0,0,0,0,0,66547,0,66942,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,66545,66941,0,0,0,0,0,0,0,0,0,0,0,0,0,66543,0,0,0,0,66544,0,0,0,0,
-  0,0,0,0,0,66937,0,0,0,0,66940,0,0,0,0,0,0,0,0,66939,0,0,0,0,0,0,0,0,0,0,66938,0,
-  66538,0,0,0,0,0,0,0,66540,0,0,0,0,66542,0,0,0,131838,0,0,66936,0,0,0,66541,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,66537,0,131756,0,0,0,0,0,0,0,0,0,66935,0,0,0,0,0,66934,0,0,0,0,0,0,
-  0,0,0,0,0,66933,0,0,0,66932,0,66931,0,0,0,0,0,0,0,0,0,66930,0,0,0,0,0,0,0,131782,66929,0,
-  0,0,0,0,0,66928,0,0,0,0,0,66927,0,0,0,0,0,0,0,0,0,0,66536,0,0,0,66539,66926,0,0,0,0,
-  0,0,0,66925,0,0,0,0,0,0,0,0,0,66924,0,0,0,0,0,0,0,66923,0,0,0,66534,66922,0,66921,0,0,0,
-  0,0,0,0,66920,0,0,0,0,0,0,0,0,0,0,66919,0,0,0,0,0,0,0,66535,0,66533,0,0,0,0,0,0,
-  0,0,0,0,0,66531,0,0,0,66532,0,0,0,0,0,0,0,0,0,0,0,0,0,131778,0,0,0,0,0,0,66529,0,
-  0,66918,0,66917,0,0,0,0,0,0,0,0,66530,0,0,0,0,0,0,0,0,0,66916,0,0,0,0,0,66915,0,0,0,
-  0,0,0,0,0,66525,0,0,0,0,66527,0,0,0,0,0,0,0,0,0,0,0,66524,0,0,0,66528,0,0,0,0,0,
-  0,0,0,0,0,66523,0,0,0,0,0,0,0,0,0,66522,66914,0,0,0,0,0,0,0,0,0,0,0,131776,0,0,0,
-  0,0,0,0,0,0,0,66913,0,66912,0,0,0,0,0,0,66911,0,0,0,0,0,0,0,0,66910,0,0,0,0,0,0,
-  0,0,66909,0,0,0,0,0,0,0,0,0,0,0,66908,0,66907,0,0,0,0,0,0,0,0,0,0,66906,0,0,0,0,
-  0,131770,0,0,0,0,0,0,0,0,0,0,0,0,66905,0,0,0,66518,0,0,0,0,0,0,66904,0,0,0,0,0,0,
-  0,66903,0,0,0,0,0,0,0,0,0,0,0,0,0,66514,0,0,0,0,66520,0,0,0,66902,0,0,66901,0,0,0,0,
-  0,0,66512,0,0,0,0,0,0,0,0,0,0,0,0,66515,0,0,0,0,0,0,0,66900,0,0,0,0,0,0,66899,0,
-  0,66513,0,0,0,0,0,0,66510,0,66898,0,0,0,0,0,66517,0,0,0,0,0,0,0,0,66519,0,0,0,0,0,0,
-  0,0,0,0,66507,0,0,0,0,0,0,0,0,0,66516,0,0,0,0,66511,0,0,0,0,0,0,0,0,0,0,131754,0,
-  66897,0,0,0,0,0,0,0,0,0,131746,0,0,0,0,0,0,0,0,0,0,0,0,66509,0,0,0,66508,0,0,0,0,
-  0,0,66506,0,0,0,66504,0,0,0,0,0,0,131768,0,0,131750,0,0,0,0,0,131744,0,0,131752,0,0,0,0,0,0,
-  0,131748,0,0,0,0,0,0,66505,0,0,0,0,0,0,0,66502,0,0,0,0,0,0,0,0,0,131764,0,0,0,0,0,
-  66500,0,0,0,0,0,0,0,0,0,0,0,0,66896,0,0,0,0,0,66895,0,0,0,0,0,66894,66499,0,0,0,0,0,
-  66497,0,0,0,0,0,0,0,0,0,0,66501,0,0,0,0,131742,0,0,0,0,0,0,0,0,0,0,66893,0,0,0,0,
-  0,0,0,0,0,0,0,66892,0,0,0,0,66891,0,0,0,0,0,0,66890,0,0,0,0,0,0,0,0,0,0,0,66496,
-  66889,0,0,0,0,0,0,0,0,0,66490,0,0,0,0,0,0,0,0,0,66888,0,0,0,0,0,0,0,0,0,66492,0,
-  0,0,66493,0,0,0,0,0,131762,0,0,66495,0,0,0,0,0,0,66489,0,0,0,0,0,0,0,0,0,0,0,66887,0,
-  66488,0,0,0,0,0,66494,0,0,0,0,66487,0,0,0,0,131740,0,0,0,0,0,0,0,0,0,66491,0,0,0,0,0,
-  0,0,0,0,66485,0,0,0,0,0,0,0,0,0,0,66481,0,0,0,0,66886,0,0,0,0,0,0,0,0,0,66480,0,
-  0,0,0,0,0,0,66486,0,0,66885,0,0,0,0,0,0,0,0,0,0,0,66483,0,0,0,66884,0,0,0,0,0,0,
-  0,0,0,66883,0,0,0,0,0,0,66475,0,0,0,0,0,0,66484,0,0,0,0,0,0,0,0,0,0,66477,0,0,0,
-  0,0,0,0,66478,0,0,66475,0,66473,0,0,0,0,0,0,0,0,0,0,66474,0,0,0,66882,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,66479,0,0,0,0,0,66881,0,0,0,0,0,0,0,0,0,0,66880,66880,0,0,0,0,0,0,0,
-  0,0,0,0,66470,0,0,0,0,0,66472,0,0,0,0,0,0,66879,0,0,0,0,0,0,0,0,0,0,0,66878,0,0,
-  0,0,0,66877,0,0,0,0,0,0,0,0,0,66465,0,0,0,0,0,0,0,0,0,66876,0,0,0,0,0,0,66463,0,
-  0,0,0,66457,0,66464,0,0,0,0,0,0,0,66454,0,0,66461,0,0,0,66466,0,0,0,0,0,0,0,0,0,66460,0,
-  0,0,0,66459,0,0,0,0,0,0,0,0,0,0,0,66462,66456,0,0,0,0,0,0,0,0,0,0,66875,0,0,0,0,
-  0,0,66458,131738,0,0,0,0,0,0,0,0,0,0,66453,66451,0,0,0,66874,0,0,0,0,0,0,66450,0,0,0,0,0,
-  66452,0,0,0,0,0,0,0,0,0,0,0,0,0,131736,0,0,0,0,66455,0,0,0,0,66873,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,131734,0,0,0,197207,0,0,0,0,66449,0,0,0,0,0,0,0,0,66872,0,0,0,0,0,0,
-  0,0,0,131732,0,0,0,0,0,0,0,0,0,0,66448,0,0,0,66871,0,0,0,0,0,0,0,0,0,0,0,0,66447,
-  0,0,0,0,66446,0,0,0,66445,66870,0,0,0,0,0,0,0,0,0,0,0,0,0,66869,0,0,66868,0,0,0,0,0,
-  0,66444,0,0,0,0,0,0,0,0,0,0,0,0,66867,0,0,0,66443,0,0,0,0,0,0,0,131758,0,0,0,0,0,
-  0,0,0,0,0,0,0,66441,66866,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66440,0,0,0,0,0,66865,0,0,
-  0,0,0,0,0,0,0,66864,0,0,0,0,66439,0,0,0,0,0,66435,0,0,0,0,0,0,0,0,0,0,0,66434,0,
-  0,0,0,0,0,0,0,66432,0,0,0,0,0,0,0,66433,0,0,0,0,0,0,0,66437,0,0,0,66863,0,0,0,0,
-  0,0,0,0,0,0,66431,0,0,66862,0,0,0,0,66861,0,0,0,0,0,0,66860,0,0,0,0,0,0,0,0,0,66859,
-  0,0,0,0,0,0,66858,0,0,0,0,66857,0,0,0,0,0,0,0,66438,0,0,0,0,0,0,0,0,0,66430,66436,0,
-  0,0,0,0,197186,0,0,0,0,131692,0,0,0,0,0,0,0,0,65888,0,0,0,0,0,0,65935,0,65935,0,0,0,0,
-  0,0,0,0,0,65755,0,0,0,65930,65930,0,0,0,0,0,0,0,65935,0,65935,0,0,0,0,0,0,65933,0,0,0,0,
-  0,0,197156,0,0,0,0,0,0,197144,0,0,0,0,0,0,0,0,0,0,0,65933,0,0,0,0,0,0,0,0,262582,0,
-  0,131512,65894,0,0,0,0,0,0,65779,0,0,0,0,0,0,0,0,0,65755,0,0,0,65935,0,0,0,0,0,0,0,65977,
-  65977,0,0,0,0,0,0,328079,0,65936,65936,131506,131506,0,0,0,0,0,66856,0,0,0,0,0,0,0,0,0,66853,0,0,0,
-  0,0,0,0,0,66854,0,0,0,0,0,66852,0,0,0,0,0,0,66850,0,0,0,0,0,0,0,0,0,66851,0,0,0,
-  0,0,0,0,0,0,66849,0,0,0,0,0,66848,0,0,0,0,0,0,66847,0,0,0,0,0,0,0,0,66846,0,0,0,
-  66845,0,0,0,0,0,0,0,0,0,66844,0,0,0,0,0,66843,0,0,0,0,0,0,0,66842,0,0,0,0,0,0,0,
-  0,0,0,66841,0,0,0,0,0,0,0,0,66840,0,66840,0,0,0,0,66838,0,0,0,0,0,0,0,0,0,0,0,66839,
-  0,131804,0,0,0,0,0,0,0,0,0,0,66837,0,0,0,0,0,0,0,66364,0,0,0,0,0,66363,0,0,0,0,0,
-  0,0,0,0,66836,0,0,0,0,66835,0,0,0,0,0,0,0,0,66834,0,0,0,0,0,66830,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,66833,0,0,0,66832,0,0,0,0,0,0,0,0,66831,0,0,0,0,0,0,66829,0,0,0,0,
-  0,0,0,0,0,66362,0,0,0,0,0,0,0,66828,0,0,0,0,0,66827,0,0,0,0,0,0,0,0,0,0,0,66826,
-  0,0,0,0,0,66825,0,0,0,0,66824,0,0,0,0,0,0,0,0,0,66823,0,0,0,0,0,0,0,0,0,66822,0,
-  0,66820,0,0,0,0,0,0,0,0,0,0,0,0,66819,0,0,0,0,0,0,0,66818,0,0,0,0,66817,0,0,0,0,
-  0,0,0,0,0,0,66361,0,0,0,0,66816,0,0,0,0,66815,0,0,0,0,0,0,0,0,0,0,0,0,66814,0,0,
-  0,0,0,0,66813,0,0,0,0,0,0,0,0,0,66812,0,0,0,66811,0,0,0,0,0,0,66796,0,0,0,0,0,0,
-  66795,0,0,0,0,0,0,0,0,0,0,0,66792,0,0,0,0,0,66787,66786,0,0,0,0,0,66784,0,0,0,0,0,0,
-  0,0,0,66783,0,0,0,0,0,66360,0,0,0,0,0,0,0,0,0,0,0,66762,0,0,0,0,0,0,0,0,66756,0,
-  0,0,66755,0,0,0,0,0,0,0,0,0,0,66753,0,0,0,0,0,0,66742,0,0,0,0,0,0,0,0,0,0,131796,
-  0,0,0,66736,0,0,0,0,66732,0,0,0,0,0,0,0,66359,0,0,0,0,0,0,0,0,0,0,0,0,0,66716,0,
-  0,0,66698,0,0,0,0,0,66702,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66700,0,66697,0,0,0,0,0,0,
-  0,0,0,0,0,0,66691,0,0,0,66686,0,0,0,0,0,0,0,0,66683,0,0,0,0,66680,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,66669,0,0,0,0,0,66667,0,0,0,0,0,0,66660,0,0,0,0,0,0,0,0,0,66656,0,
-  0,0,0,0,0,66652,0,0,0,0,0,66650,0,0,0,0,0,0,0,0,66640,0,0,0,0,66636,0,0,0,0,0,0,
-  0,0,66632,0,0,0,0,0,0,0,66617,0,0,0,0,0,0,0,0,0,0,0,0,66600,0,0,0,0,0,0,66593,0,
-  0,0,0,0,0,0,66581,0,66565,0,0,0,0,0,0,0,0,0,0,66358,0,0,0,0,0,0,0,0,0,0,0,66552,
-  0,0,0,0,0,66526,0,0,0,0,0,0,0,0,66521,0,0,0,66503,0,0,0,0,0,0,0,0,0,0,0,0,66498,
-  0,0,0,0,0,66482,0,0,0,0,0,0,0,0,0,66471,0,0,66476,0,0,0,0,0,0,0,66469,0,0,0,0,0,
-  0,0,0,0,0,0,66468,0,0,0,0,0,0,0,66467,0,66442,0,0,0,0,0,0,0,0,0,0,0,0,0,66429,0,
-  0,0,0,0,0,66428,0,0,0,0,0,0,0,0,66427,0,0,66426,0,0,0,0,0,0,0,0,66425,0,0,0,0,0,
-  66424,0,0,0,0,0,0,0,
+static kbts_u32 kbts__UnicodeParentInfo_Data[1840] = {
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66205,66203,66204,0,
+  0,1048680,197171,328076,393573,1114167,66202,459024,459045,983176,65816,328101,393561,197177,590008,1048696,131675,0,524538,459059,459066,1245203,131681,393585,131683,590017,393591,0,0,0,0,0,
+  0,1048664,197168,328071,393567,1114150,66201,459010,524530,917655,131663,328081,393555,197174,589999,1048648,131495,0,524506,459031,524522,1245184,131677,459052,131679,655525,393579,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,197180,0,0,0,0,0,0,0,0,0,262647,0,66188,66190,131667,65956,0,0,262651,0,0,0,0,66200,
+  0,0,0,0,262655,197165,66191,0,66189,0,0,0,262623,0,0,0,0,0,262635,0,66016,66187,131665,66199,0,0,262639,0,0,0,0,65965,
+  0,0,0,0,262643,197162,66190,0,65843,0,0,0,262619,0,0,0,0,0,262631,262631,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,131671,131671,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,131673,131673,0,0,
+  0,0,0,0,0,0,0,0,0,0,66196,66196,0,0,0,0,66138,66138,0,0,0,0,0,0,66197,66197,66197,66197,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66198,328106,328106,0,0,0,0,0,0,0,0,0,0,0,0,0,328096,
+  328096,0,0,0,0,0,0,66174,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65923,65923,0,0,0,0,
+  0,0,0,0,0,0,66160,66160,66192,66192,0,0,0,0,65923,65923,0,0,66159,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,66177,0,0,0,0,0,0,0,0,459017,0,0,0,262603,0,328086,0,459038,0,0,0,0,0,262599,
+  0,66195,0,0,0,393543,0,0,0,328091,0,0,66070,0,66193,0,0,524490,0,0,0,262611,0,393537,0,524498,0,0,0,0,0,262627,
+  0,131669,0,0,0,524514,0,0,0,393549,197141,197144,0,0,66194,0,0,0,131458,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,65922,0,0,0,0,0,0,0,0,0,131227,0,0,66164,0,197156,131661,65935,262607,0,65942,0,0,0,66186,0,
+  0,0,0,262583,0,0,0,65595,0,0,0,65595,0,65646,0,0,131659,0,0,66169,0,197159,131657,65930,262579,0,66170,0,0,0,66185,0,
+  0,0,0,262615,0,0,0,65578,0,0,0,65578,0,65630,0,0,0,0,0,0,65923,65923,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,65923,65923,0,0,0,0,0,0,197186,131693,66113,66113,66113,131691,66113,0,66113,131685,66113,131689,66113,0,66113,0,
+  66113,66113,0,66113,131687,0,66113,66113,66113,197183,66113,0,0,0,0,0,0,0,66206,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,197126,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66163,0,66163,0,0,0,0,0,
+  0,65922,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65922,0,0,65975,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,66180,66180,66180,0,0,0,0,66178,0,0,0,0,66176,66176,0,0,0,0,0,65922,0,0,66173,0,0,0,66172,
+  0,0,0,65922,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66172,
+  0,0,0,0,0,0,0,131461,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66180,66180,0,0,0,0,66178,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,66173,0,0,0,0,0,0,65922,0,0,0,0,0,65918,0,0,0,0,0,0,0,
+  0,66176,66176,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,197135,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,131504,65921,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65923,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65922,0,0,0,0,0,0,197129,0,0,0,65922,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,197132,0,0,65922,0,0,0,66171,0,65922,0,0,0,0,0,0,0,0,0,65922,0,0,0,
+  0,65922,0,0,0,0,65922,0,0,0,0,65922,0,0,0,0,0,197150,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,66161,66162,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65922,0,0,0,0,0,0,0,0,0,0,
+  0,328061,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65922,0,65922,0,65922,0,65922,0,65922,0,0,
+  0,0,0,0,0,0,0,0,0,0,65922,0,65922,0,65923,65923,0,0,65922,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,65923,65923,0,0,0,0,0,0,0,0,0,0,65762,65762,0,0,0,0,0,0,0,0,0,0,0,0,
+  131655,131655,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,66081,66081,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,66119,66119,0,0,262595,262595,65625,65625,65625,65625,65625,65625,262595,262595,65625,65625,65625,65625,65625,65625,
+  131503,131503,0,0,0,0,0,0,131503,131503,0,0,0,0,0,0,262591,262591,65986,65986,65986,65986,65986,65986,262591,262591,65986,65986,65986,65986,65986,65986,
+  197039,197039,0,0,0,0,0,0,197039,197039,0,0,0,0,0,0,197039,197039,0,0,0,0,0,0,0,197039,0,0,0,0,0,0,
+  262575,262575,65970,65970,65970,65970,65970,65970,262575,262575,65970,65970,65970,65970,65970,65970,66179,0,0,0,66181,0,0,0,0,0,0,0,66184,0,0,0,
+  0,0,0,0,0,0,65922,0,0,0,0,0,0,0,0,197153,0,0,0,0,0,0,65922,0,0,0,0,0,0,0,197123,0,
+  66167,0,66166,0,66168,0,0,0,0,0,0,0,0,0,0,0,65917,0,65917,0,66165,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,65922,0,0,0,0,65922,0,0,65922,0,0,0,0,0,0,0,65922,0,65922,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,65869,0,0,0,0,0,0,65922,0,65923,0,0,65922,0,0,0,0,66169,0,0,
+  0,65922,0,0,66119,66119,0,0,0,0,0,0,0,0,0,0,0,0,65923,65923,0,0,65923,65923,0,0,65762,65762,66183,66183,0,0,
+  0,0,65923,65923,0,0,65923,65923,0,0,0,0,0,0,0,0,0,66182,66182,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,66167,0,0,0,0,0,65869,65869,0,65921,0,0,0,0,0,0,66175,66175,66175,66175,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,65919,0,0,0,0,0,0,0,0,66181,0,0,0,0,65922,0,65922,0,65922,
+  0,65922,0,65922,0,65922,0,65922,0,65922,0,65922,0,65922,0,65922,0,65922,0,0,65922,0,65922,0,65922,0,0,0,0,0,0,131458,
+  0,0,131458,0,0,131458,0,0,131458,0,0,131458,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65922,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65763,65763,65763,65763,0,0,0,0,0,0,0,0,0,0,65922,0,0,
+  0,0,0,0,0,0,0,0,0,131653,0,0,0,0,0,0,0,0,65857,0,0,0,0,0,0,0,66167,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,65922,0,65922,0,0,0,0,0,0,0,0,0,65762,0,0,0,0,0,0,0,0,0,0,
+  0,65917,65917,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,65922,0,65922,0,0,0,0,0,0,65920,0,0,0,0,
+  65922,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,197147,0,0,0,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,197138,0,0,0,0,0,0,0,0,0,0,0,65920,0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,262587,0,0,131517,65869,0,0,0,0,0,0,65738,0,0,0,0,0,0,
+  0,0,0,65762,0,0,0,65922,0,65922,0,0,0,0,0,0,0,0,0,0,0,0,0,65982,65982,0,0,0,0,0,0,328066,
+  0,0,0,0,0,0,0,0,0,65923,65923,131503,131503,0,0,0,
 };
 
 KBTS_INLINE kbts_u32 kbts__GetUnicodeParentInfo(kbts_u32 Codepoint)
 {
-  return (Codepoint < 1114110) ? kbts__UnicodeParentInfo_Data[((Codepoint < 173576) ? ((kbts_un)kbts__UnicodeParentInfo_PageIndices[Codepoint / 8] * 8) : 0) | (Codepoint & 7)]  : 0;
+  return (Codepoint < 1114110) ? kbts__UnicodeParentInfo_Data[((Codepoint < 119232) ? ((kbts_un)kbts__UnicodeParentInfo_PageIndices[Codepoint / 16] * 16) : 0) | (Codepoint & 15)]  : 0;
 }
 
 static kbts_u8 kbts__UnicodeUseClass_PageIndices[3915] = {
@@ -11514,39 +11789,58 @@ KBTS_INLINE kbts_u8 kbts__GetUnicodeUseClass(kbts_u32 Codepoint)
   return (Codepoint < 1114110) ? kbts__UnicodeUseClass_Data[((Codepoint < 125280) ? ((kbts_un)kbts__UnicodeUseClass_PageIndices[Codepoint / 32] * 32) : 0) | (Codepoint & 31)]  : 0;
 }
 
-static kbts_u8 kbts__UnicodeScriptExtension_PageIndices[7172] = {
+static kbts_u16 kbts__UnicodeScriptExtension_PageIndices[7172] = {
   0,1,2,2,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,
   30,31,32,32,33,34,35,36,37,37,37,37,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,2,2,53,54,
-  55,56,57,58,59,59,59,59,60,59,59,59,59,59,59,59,61,61,59,59,59,59,62,63,64,65,66,67,68,61,61,69,
-  70,71,72,73,74,75,76,77,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,78,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  79,79,79,79,79,79,79,79,79,80,81,81,82,83,84,85,86,87,88,89,90,91,92,93,32,32,32,32,32,32,32,32,
+  55,56,57,58,59,59,59,59,60,59,59,59,59,59,59,59,61,61,59,59,59,59,62,63,64,65,66,67,68,69,70,71,
+  72,73,74,75,76,77,78,79,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,80,70,70,70,70,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,
+  81,81,81,81,81,81,81,81,81,82,83,83,84,85,86,87,88,89,90,91,92,93,94,95,32,32,32,32,32,32,32,32,
   32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,
   32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,
-  32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,94,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
+  32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,96,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
   61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,95,96,97,97,98,99,100,101,102,103,
-  104,105,106,107,61,108,109,110,111,112,113,114,115,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133,
-  134,135,136,137,138,139,140,141,142,143,61,144,145,146,147,61,148,149,150,151,152,153,154,155,156,157,158,159,61,160,161,162,
-  163,163,163,163,163,163,163,164,165,163,166,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,167,
-  168,168,168,168,168,168,168,168,169,168,168,168,168,168,168,168,168,168,168,168,168,168,168,168,168,168,168,168,168,168,168,168,
-  168,168,168,168,168,168,168,170,171,171,171,171,172,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
+  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,70,70,97,98,99,100,101,101,102,103,104,105,106,107,
+  108,109,110,111,61,112,113,114,115,116,117,118,119,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133,134,135,136,137,
+  138,139,140,141,142,143,144,145,146,147,61,148,149,150,151,61,152,153,154,155,156,157,158,159,160,161,162,163,61,164,165,166,
+  167,167,167,167,167,167,167,168,169,167,170,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,171,
+  172,172,172,172,172,172,172,172,173,172,172,172,172,172,172,172,172,172,172,172,172,172,172,172,172,172,172,172,172,172,172,172,
+  172,172,172,172,172,172,172,174,175,175,175,175,176,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
   61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,173,61,61,61,61,61,61,61,61,61,61,61,61,61,174,174,174,174,175,176,177,178,61,61,179,61,180,181,182,183,
-  184,184,184,184,184,184,184,184,184,184,184,184,184,184,184,184,184,184,184,184,184,184,184,184,184,184,184,184,184,184,184,184,
-  184,184,184,184,184,184,184,184,184,184,184,184,184,184,184,185,184,184,184,184,184,184,186,186,186,187,188,61,61,61,61,61,
+  61,61,177,61,61,61,61,61,61,61,61,61,61,61,61,61,178,178,178,178,179,180,181,182,61,61,183,61,184,185,186,187,
+  188,188,188,188,188,188,188,188,188,188,188,188,188,188,188,188,188,188,188,188,188,188,188,188,188,188,188,188,188,188,188,188,
+  188,188,188,188,188,188,188,188,188,188,188,188,188,188,188,189,188,188,188,188,188,188,190,190,190,191,192,61,61,61,61,61,
   61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,189,
-  190,191,192,193,193,194,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,195,196,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,59,197,59,59,59,198,199,200,
-  59,201,202,203,204,205,206,61,207,208,209,59,59,210,59,211,212,212,212,212,212,213,61,61,61,61,61,61,61,61,214,61,
-  215,216,217,61,61,218,61,61,61,219,61,220,61,61,61,221,222,223,224,61,61,61,61,61,225,226,227,61,228,229,61,61,
-  230,231,59,232,233,61,59,59,59,59,59,59,59,234,235,236,237,238,59,59,239,240,59,241,61,61,61,61,61,61,61,61,
+  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,193,
+  194,195,196,197,197,198,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,199,200,61,61,61,61,61,61,
+  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,59,201,59,59,59,202,203,204,
+  59,205,206,207,208,209,210,61,211,212,213,59,59,214,59,215,216,216,216,216,216,217,61,61,61,61,61,61,61,61,218,61,
+  219,220,221,61,61,222,61,61,61,223,61,224,61,61,61,225,226,227,228,61,61,61,61,61,229,230,231,61,232,233,61,61,
+  234,235,59,236,237,61,59,59,59,59,59,59,59,238,239,240,241,242,59,59,243,244,59,245,61,61,61,61,61,61,61,61,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,246,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,70,247,70,248,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,249,70,70,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,250,70,70,70,70,251,61,61,61,
+  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,70,70,70,70,252,61,61,61,61,61,61,61,61,61,61,61,
+  70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,
+  70,70,70,70,70,70,253,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,70,
+  70,70,70,70,70,70,70,254,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
   61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
   61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
   61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
@@ -11720,29 +12014,10 @@ static kbts_u8 kbts__UnicodeScriptExtension_PageIndices[7172] = {
   61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
   61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
   61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,61,
-  242,61,243,244,
+  255,61,256,257,
 };
 
-static kbts_u16 kbts__UnicodeScriptExtension_Data[31360] = {
+static kbts_u16 kbts__UnicodeScriptExtension_Data[33024] = {
   929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,
   929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,
   929,2305,2305,2305,2305,2305,2305,2305,2305,2305,2305,2305,2305,2305,2305,2305,2305,2305,2305,2305,2305,2305,2305,2305,2305,2305,2305,929,929,929,929,929,
@@ -12019,12 +12294,20 @@ static kbts_u16 kbts__UnicodeScriptExtension_Data[31360] = {
   929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,10050,10119,929,929,929,929,929,929,929,929,929,929,1121,929,929,929,
   929,10339,929,4226,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,1,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,1,1,1,1,1,1,1,1,1,1,1,1,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,10434,10434,10434,10434,10434,10434,10434,10434,10434,10434,10434,10434,10434,10434,10434,10434,
-  929,10503,10728,10501,929,1,769,1,10984,10984,11241,11241,11526,11526,11526,11526,11526,11526,929,10501,11526,11526,11526,11526,11526,11526,11526,11526,10501,10501,10501,10501,
-  929,1,1,1,1,1,1,1,1,1,10498,10498,10498,10498,1601,1601,10501,10594,10594,10594,10594,10594,929,10501,1,1,1,1,11715,11715,769,769,
+  929,10503,10728,10501,929,769,769,769,10984,10984,11241,11241,11526,11526,11526,11526,11526,11526,929,10501,11526,11526,11526,11526,11526,11526,11526,11526,10501,10501,10501,10501,
+  929,769,769,769,769,769,769,769,769,769,10498,10498,10498,10498,1601,1601,10501,10594,10594,10594,10594,10594,929,10501,769,769,769,769,11715,11715,769,769,
   1,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,
   1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,
   1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1761,1,1,10594,10594,10594,10594,1761,1761,1761,
@@ -12055,8 +12338,8 @@ static kbts_u16 kbts__UnicodeScriptExtension_Data[31360] = {
   929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,
   929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,
   769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,929,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
   929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,
   929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,
   5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,5377,
@@ -12123,6 +12406,14 @@ static kbts_u16 kbts__UnicodeScriptExtension_Data[31360] = {
   1601,1601,1601,1601,1,1,1,1,1,1,1,1,1,1,1,1,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,
   1601,1601,1601,1601,1601,1601,1601,1,1,1,1,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,
   1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1601,1,1,1,1,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,1,1,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   2305,2305,2305,2305,2305,2305,2305,1,1,1,1,1,1,1,1,1,1,1,1,161,161,161,161,161,1,1,1,1,1,1729,1729,1729,
   1729,1729,1729,1729,1729,1729,1729,1729,1729,1729,1729,1729,1729,1729,1729,1729,1729,1729,1729,1729,1729,1729,1729,1,1729,1729,1729,1729,1729,1,1729,1,
   1729,1729,1,1729,1729,1,1729,1729,1729,1729,1729,1729,1729,1729,1729,1729,129,129,129,129,129,129,129,129,129,129,129,129,129,129,129,129,
@@ -12478,7 +12769,7 @@ static kbts_u16 kbts__UnicodeScriptExtension_Data[31360] = {
   2945,2945,2945,2945,2945,2945,2945,2945,1,1,1,1,1,1,1,2945,2945,2945,2945,2945,2945,2945,2945,2945,2945,2945,2945,2945,2945,2945,2945,2945,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-  4865,3329,1,1,2113,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  4865,3329,769,769,2113,1,1,1,1,1,1,1,1,1,1,1,769,769,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,
   4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,
   4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,4865,
@@ -12711,6 +13002,42 @@ static kbts_u16 kbts__UnicodeScriptExtension_Data[31360] = {
   929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,
   929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,
   929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,1,1,1,1,1,1,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,1,1,1,1,1,1,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,1,1,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,1,1,1,1,1,1,1,1,1,1,1,1,1,1,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,1,1,1,1,1,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,
+  769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,769,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   1,929,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
   929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,
   929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,929,
@@ -13414,7 +13741,9 @@ typedef struct kbts__bucketed_glyph_block
   kbts__bucketed_glyph Glyphs[KBTS__BUCKETED_GLYPHS_PER_BLOCK];
 } kbts__bucketed_glyph_block;
 
+#define KBTS__MAX_VARIATION_AXIS_COUNT 32
 #define KBTS_MAX_SIMULTANEOUS_FEATURES 32
+typedef struct kbts__item_variation_store kbts__item_variation_store;
 struct kbts_shape_scratchpad
 {
   kbts_allocator_function *Allocator;
@@ -13431,6 +13760,10 @@ struct kbts_shape_scratchpad
   kbts_u32 LookupSubtableCount;
   kbts_u32 GposLookupIndexOffset;
   kbts_u32 SequentialLookupCount;
+
+  kbts_s16 *VariationVectorNormalized;
+
+  kbts__item_variation_store *GdefItemVariationStore;
 
   kbts__bucketed_glyph_block_header *LookupGlyphBuckets;
   kbts__bucketed_glyph_block_header FreeBucketedBlockSentinel;
@@ -13457,17 +13790,40 @@ struct kbts_shape_scratchpad
   kbts_shape_error Error;
 };
 
-#define KBTS_CONTEXT_MAX_FONT_COUNT 32
-
 #define KBTS__INPUT_CODEPOINT_FIRST_BLOCK_MSB 6
 #define KBTS__INPUT_CODEPOINT_ONE_PAST_LAST_BLOCK_MSB 27
+
+typedef kbts_u32 kbts__context_font_flags;
+enum kbts__context_font_flags_enum
+{
+  KBTS__CONTEXT_FONT_FLAG_NONE = 0,
+  KBTS__CONTEXT_FONT_FLAG_VARIATIONS_DIRTY = 1,
+};
+
+typedef struct kbts__interned_context_font_info
+{
+  kbts_font *Font;
+  float *VariationVector;
+  kbts_s16 *VariationVectorNormalized;
+  kbts_u32 Hash;
+} kbts__interned_context_font_info;
+
+typedef struct kbts__context_font_info
+{
+  kbts_font *Font;
+  float *VariationVector;
+
+  kbts__interned_context_font_info *Interned;
+  kbts__context_font_flags Flags;
+} kbts__context_font_info;
 
 typedef struct kbts__existing_shape_config
 {
   kbts_shape_config *Config;
 
-  kbts_font *Font;
+  kbts__interned_context_font_info *FontInfo;
   kbts_script Script;
+  kbts_language Language;
 } kbts__existing_shape_config;
 
 typedef kbts_u32 kbts__context_flags;
@@ -13478,12 +13834,15 @@ enum kbts__context_flags_enum
   KBTS__CONTEXT_FLAG_MANUAL_SEGMENTATION = 1,
   KBTS__CONTEXT_FLAG_START_OF_MANUAL_RUN = 2,
   KBTS__CONTEXT_FLAG_USE_MANUAL_BREAK_INFO = 4,
+  KBTS__CONTEXT_FLAG_FEATURE_OVERRIDES_DIRTY = 8,
+  KBTS__CONTEXT_FLAG_GLOBAL_VARIATIONS_DIRTY = 0x10,
 };
 
 typedef struct kbts__context_font
 {
-  kbts_font *Font;
   kbts__arena_lifetime Lifetime;
+  kbts__context_font_info Info;
+  kbts_u16 Generation;
 } kbts__context_font;
 
 typedef struct kbts__existing_glyph_config
@@ -13491,6 +13850,7 @@ typedef struct kbts__existing_glyph_config
   kbts_shape_config *ShapeConfig;
   kbts_feature_override *FeatureOverrides;
   int FeatureOverrideCount;
+  kbts_u32 Hash;
   kbts_glyph_config *GlyphConfig;
 } kbts__existing_glyph_config;
 
@@ -13524,6 +13884,43 @@ typedef struct kbts__existing_glyph_config_block
   kbts__existing_glyph_config Items[KBTS__EXISTING_GLYPH_CONFIGS_PER_BLOCK];
 } kbts__existing_glyph_config_block;
 
+struct kbts__shape_codepoint
+{
+  kbts__interned_context_font_info *FontInfo; // Only set when (BreakFlags & KBTS_BREAK_FLAG_GRAPHEME) != 0.
+
+  kbts_feature_override *FeatureOverrides;
+  int FeatureOverrideCount;
+
+  int Codepoint;
+  int UserId;
+
+  // @Memory: Pack these into u8s.
+  kbts_break_flags BreakFlags;
+  kbts_script Script; // Only set when (BreakFlags & KBTS_BREAK_FLAG_SCRIPT) != 0.
+  kbts_direction Direction; // Only set when (BreakFlags & KBTS_BREAK_FLAG_DIRECTION) != 0.
+  kbts_direction ParagraphDirection; // Only set when (BreakFlags & KBTS_BREAK_FLAG_PARAGRAPH_DIRECTION) != 0.
+};
+
+typedef struct kbts__context_font_block_header
+{
+  struct kbts__context_font_block_header *Prev;
+  struct kbts__context_font_block_header *Next;
+} kbts__context_font_block_header;
+
+#ifndef KBTS_CONTEXT_FONTS_PER_BLOCK
+#define KBTS_CONTEXT_FONTS_PER_BLOCK 32
+#endif
+
+// Hopefully, this is enough of a safeguard against weird user #defines..?
+#define KBTS__CONTEXT_FONTS_PER_BLOCK (KBTS_CONTEXT_FONTS_PER_BLOCK)
+
+typedef struct kbts__context_font_block
+{
+  kbts__context_font_block_header Header;
+
+  kbts__context_font Fonts[KBTS__CONTEXT_FONTS_PER_BLOCK];
+} kbts__context_font_block;
+
 struct kbts_shape_context
 {
   kbts_arena PermanentArena;
@@ -13534,17 +13931,17 @@ struct kbts_shape_context
   kbts_allocator_function *SelfAllocator;
   void *SelfAllocatorData;
 
-  kbts_shape_codepoint *LastGraphemeBreak;
+  kbts__shape_codepoint *LastGraphemeBreak;
   kbts_u32 LastGraphemeBreakIndex;
   kbts_u32 LastLineBreakIndex;
   kbts_u32 BreakStartIndex;
 
   kbts_u32 FontCount;
-  kbts__context_font Fonts[KBTS_CONTEXT_MAX_FONT_COUNT];
+  kbts__context_font_block_header FontBlockSentinel;
 
   kbts_un InputCodepointCount;
   int NextUserId;
-  kbts_shape_codepoint *InputBlocks[KBTS__INPUT_CODEPOINT_ONE_PAST_LAST_BLOCK_MSB - KBTS__INPUT_CODEPOINT_FIRST_BLOCK_MSB];
+  kbts__shape_codepoint *InputBlocks[KBTS__INPUT_CODEPOINT_ONE_PAST_LAST_BLOCK_MSB - KBTS__INPUT_CODEPOINT_FIRST_BLOCK_MSB];
 
   kbts_glyph_storage GlyphStorage;
 
@@ -13554,13 +13951,14 @@ struct kbts_shape_context
   kbts_script ManualRunScript;
 
   kbts_feature_override *CurrentFeatureOverrides;
+  kbts_variation *CurrentGlobalVariations;
   kbts_u32 CurrentFeatureOverrideCount;
-  int NeedNewGlyphConfig;
+  kbts_u32 CurrentGlobalVariationCount;
 
   kbts_direction ParagraphDirection;
   kbts_language Language;
 
-  kbts_font *RunFont;
+  kbts__interned_context_font_info *RunFontInfo;
   kbts_script RunScript;
   // This may be different from ParagraphDirection if ParagraphDirection == KBTS_DIRECTION_DONT_KNOW.
   kbts_direction RunParagraphDirection;
@@ -13573,6 +13971,9 @@ struct kbts_shape_context
 
   kbts_u32 ScratchFeatureOverrideCount;
   kbts_feature_override ScratchFeatureOverrides[KBTS_MAX_SIMULTANEOUS_FEATURES];
+
+  kbts_u32 ScratchGlobalVariationCount;
+  kbts_variation ScratchGlobalVariations[KBTS__MAX_VARIATION_AXIS_COUNT];
 
   kbts_break_state BreakState;
 
@@ -13623,6 +14024,8 @@ struct kbts_shape_config
 
   kbts_shaper Shaper;
   kbts_shaper_properties *ShaperProperties;
+
+  kbts_uid Uid;
 
   kbts__indic_script_properties IndicScriptProperties;
   kbts__feature *Blwf;
@@ -13761,7 +14164,7 @@ KBTS_INLINE kbts_u32 kbts__ReadU32Unaligned(kbts_u32 *Data)
   KBTS_MEMCPY(&Result, (void *)Data, sizeof(kbts_u32));
   return Result;
 }
-KBTS_INLINE kbts_u16 kbts__ReadU16Unaligned(kbts_u16 *Data)
+KBTS_INLINE kbts_u16 kbts__ReadU16Unaligned(const kbts_u16 *Data)
 {
   kbts_u16 Result;
   KBTS_MEMCPY(&Result, (void *)Data, sizeof(kbts_u16));
@@ -13780,6 +14183,15 @@ KBTS_INLINE void kbts__WriteU32Unaligned(kbts_u32 *Dest, kbts_u32 Value)
 KBTS_INLINE void kbts__WriteU16Unaligned(kbts_u16 *Dest, kbts_u16 Value)
 {
   KBTS_MEMCPY((void *)Dest, &Value, sizeof(kbts_u16));
+}
+
+KBTS_INLINE kbts_u32 kbts__ReadU32UnalignedEndOfBuffer(void *Data, kbts_un Left)
+{
+  kbts_un Overhang = 4 - Left;
+  kbts_u32 Result = kbts__ReadU32Unaligned((kbts_u32 *)((char *)Data - Overhang));
+  // @Endianness
+  Result >>= Overhang * 8;
+  return Result;
 }
 
 static void kbts__ByteSwapArray16Unchecked(kbts_u16 *Array, kbts_un Count)
@@ -13831,6 +14243,22 @@ static int kbts__ByteSwapArray32(kbts_u32 *Array, kbts_un Count, char *End)
     kbts__ByteSwapArray32Unchecked(Array, Count);
     Result = 1;
   }
+  return Result;
+}
+
+static kbts_u16 kbts__ByteSwap16InPlace(kbts_u16 *X)
+{
+  kbts_u16 Result = kbts__ReadU16Unaligned(X);
+  Result = kbts__ByteSwap16(Result);
+  kbts__WriteU16Unaligned(X, Result);
+  return Result;
+}
+
+static kbts_u32 kbts__ByteSwap32InPlace(kbts_u32 *X)
+{
+  kbts_u32 Result = kbts__ReadU32Unaligned(X);
+  Result = kbts__ByteSwap32(Result);
+  kbts__WriteU32Unaligned(X, Result);
   return Result;
 }
 
@@ -13915,7 +14343,7 @@ enum
   KBTS__OS2_SELECTION_FLAG_OBLIQUE = (1 << 9),
 };
 
-#  pragma pack(push, 1)
+#pragma pack(push, 1)
 
 typedef struct kbts__script_record
 {
@@ -13969,11 +14397,11 @@ struct kbts__feature
   // kbts_u16 LookupIndices[LookupIndexCount];
 };
 
-typedef struct kbts_lookup_list
+typedef struct kbts__lookup_list
 {
   kbts_u16 Count;
   // kbts_u16 Offsets[Count];
-} kbts_lookup_list;
+} kbts__lookup_list;
 
 // Lookups are used both in GSUB and GPOS.
 // Type means either GSUB Lookup Type, or GPOS Lookup Type, depending on the table we are parsing.
@@ -14144,14 +14572,15 @@ typedef struct kbts__device
     {
       kbts_u16 StartSize;
       kbts_u16 EndSize;
-    } Device;
+    } Device; // If DeltaFormat <= 3
 
     struct
     {
       kbts_u16 DeltaSetOuterIndex;
       kbts_u16 DeltaSetInnerIndex;
-    } VariationIndex;
+    } VariationIndex; // If DeltaFormat == 0x8000
   } U;
+
   kbts_u16 DeltaFormat;
   // kbts_u16 DeltaValue[];
 } kbts__device;
@@ -14176,12 +14605,17 @@ typedef struct kbts__condition_set
   // kbts_u32 Offsets[Count];
 } kbts__condition_set;
 
+typedef struct kbts__fixed16_16
+{
+  kbts_s32 Value;
+} kbts__fixed16_16;
+
 typedef struct kbts__condition_1
 {
   kbts_u16 Format;
   kbts_u16 AxisIndex;
-  kbts_u16 FilterRangeMinValue;
-  kbts_u16 FilterRangeMaxValue;
+  kbts_s16 FilterRangeMinValue;
+  kbts_s16 FilterRangeMaxValue;
 } kbts__condition_1;
 
 typedef struct kbts__feature_table_substitution
@@ -14370,7 +14804,7 @@ struct kbts__gsub_gpos
   kbts_u16 ScriptListOffset;
   kbts_u16 FeatureListOffset;
   kbts_u16 LookupListOffset;
-  kbts_u32 FeatureVariationsOffset; // Only present in v1.1
+  kbts_u32 FeatureVariationsOffset; // Only present in v1.1. May be 0.
 };
 
 typedef struct kbts__single_substitution
@@ -14732,6 +15166,164 @@ typedef struct kbts__name
   // kbts__lang_tag_record LangTags[LangTagCount];
 } kbts__name;
 
+enum kbts__variation_axis_flags_enum
+{
+  KBTS__VARIATION_AXIS_FLAG_NONE = 0,
+  KBTS__VARIATION_AXIS_FLAG_HIDDEN = (1 << 0), // Hide from UI
+};
+
+typedef struct kbts__variation_axis_record
+{
+  kbts_u32 Tag;
+  kbts__fixed16_16 MinValue;
+  kbts__fixed16_16 DefaultValue;
+  kbts__fixed16_16 MaxValue;
+  kbts_u16 Flags;
+  kbts_u16 AxisNameId; // See 'name' table for display names.
+} kbts__variation_axis_record;
+
+typedef struct kbts__instance_record
+{
+  kbts_u16 SubfamilyNameId; // The full string can be looked up in the 'name' table.
+  kbts_u16 Flags; // Always 0.
+  // kbts__fixed16_16 Coordinates[AxisCount];
+  // kbts_u16 PostscriptNameId; // Optional (check InstanceSize). Full string is in 'name'.
+} kbts__instance_record;
+
+typedef struct kbts__avar
+{
+  kbts_u16 Major; // 1
+  kbts_u16 Minor; // 0
+  kbts_u16 Reserved; // 0
+  kbts_u16 AxisCount; // Same as the one in fvar
+  // kbts__segment_maps AxisSegmentMaps[AxisCount];
+} kbts__avar;
+
+typedef struct kbts__segment_maps
+{
+  kbts_u16 PositionMapCount;
+  // kbts__axis_value_map AxisValueMaps[PositionMapCount];
+} kbts__segment_maps;
+
+typedef struct kbts__axis_value_map
+{
+  kbts_s16 FromCoordinate;
+  kbts_s16 ToCoordinate;
+} kbts__axis_value_map;
+
+typedef struct kbts__fvar
+{
+  kbts_u16 Major;
+  kbts_u16 Minor;
+  kbts_u16 AxesArrayOffset;
+  kbts_u16 Reserved; // Always 2.
+  kbts_u16 AxisCount;
+  kbts_u16 AxisSize; // Must be 20 "for this version" of OpenType.
+  kbts_u16 InstanceCount;
+  kbts_u16 InstanceSize; // Must be (AxisCount * sizeof(fixed16_16) + 4) or (AxisCount * sizeof(fixed16_16) + 6).
+} kbts__fvar;
+
+typedef struct kbts__hvar_vvar_common
+{
+  kbts_u16 Major; // 1
+  kbts_u16 Minor; // 0
+  kbts_u32 ItemVariationStoreOffset;
+  kbts_u32 AdvanceWidthMappingOffset; // May be 0.
+  kbts_u32 LsbMappingOffset; // May be 0.
+  kbts_u32 RsbMappingOffset; // May be 0.
+} kbts__hvar_vvar_common;
+
+typedef struct kbts__vvar
+{
+  kbts__hvar_vvar_common Common;
+  kbts_u32 OriginMappingOffset; // May be 0.
+} kbts__vvar;
+
+typedef struct kbts__mvar
+{
+  kbts_u16 Major; // 1
+  kbts_u16 Minor; // 0
+  kbts_u16 Reserved; // 0
+  kbts_u16 ValueRecordSize;
+  kbts_u16 ValueRecordCount;
+  kbts_u16 ItemVariationStoreOffset;
+  // kbts__mvar_value_record ValueRecords[ValueRecordCount]
+} kbts__mvar;
+
+typedef struct kbts__mvar_value_record
+{
+  kbts_u32 Tag;
+  kbts_u16 DeltaSetOuterIndex;
+  kbts_u16 DeltaSetInnerIndex;
+} kbts__mvar_value_record;
+
+typedef struct kbts__delta_set_index_map
+{
+  kbts_u8 Format;
+  kbts_u8 EntryFormat;
+
+  // If Format == 0:
+  // kbts_u16 MapCount;
+  // kbts_u8 MapData[];
+
+  // If Format == 1:
+  // kbts_u32 MapCount;
+  // kbts_u8 MapData[];
+} kbts__delta_set_index_map;
+
+typedef struct kbts__variation_region_list
+{
+  kbts_u16 AxisCount;
+  kbts_u16 RegionCount;
+
+  // variation_region VariationRegions[RegionCount];
+  // aka. kbts__region_axis_coordinates RegionAxes[RegionCount][AxisCount];
+} kbts__variation_region_list;
+
+typedef struct kbts__region_axis_coordinates
+{
+  kbts_s16 StartCoord;
+  kbts_s16 PeakCoord;
+  kbts_s16 EndCoord;
+} kbts__region_axis_coordinates;
+
+struct kbts__item_variation_store
+{
+  kbts_u16 Format;
+
+  // !!! Compiler bug !!!
+  // For some reason, #pragma pack does not work on this struct.
+  // Use macros to access these members.
+  // kbts_u32 VariationRegionListOffset;
+  // kbts_u16 ItemVariationDataCount;
+  // kbts_u32 ItemVariationDataOffsets[ItemVariationDataCount]; // Each offset can be 0.
+};
+#define kbts__item_variation_store_VariationRegionListOffset(Store) KBTS__POINTER_OFFSET(kbts_u32, (Store), 2)
+#define kbts__item_variation_store_ItemVariationDataCount(Store) KBTS__POINTER_OFFSET(kbts_u16, (Store), 6)
+#define kbts__item_variation_store_ItemVariationDataOffsets(Store) KBTS__POINTER_OFFSET(kbts_u32, (Store), 8)
+
+typedef struct kbts__item_variation_data
+{
+  kbts_u16 ItemCount;
+  kbts_u16 WordDeltaCount;
+  kbts_u16 RegionIndexCount;
+  // kbts_u16 RegionIndexes[RegionIndexCount];
+
+  // If WordDeltaCount & 0x8000:
+  // struct
+  // {
+  //   kbts_s32 Words[WordDeltaCount & 0x7FFF];
+  //   kbts_s16 HalfWords[RegionIndexCount - (WordDeltaCount & 0x7FFF)];
+  // } DeltaSets[ItemCount];
+  //
+  // If !(WordDeltaCount & 0x8000):
+  // struct
+  // {
+  //   kbts_s16 Words[WordDeltaCount & 0x7FFF];
+  //   kbts_s8 HalfWords[RegionIndexCount - (WordDeltaCount & 0x7FFF)];
+  // } DeltaSets[ItemCount];
+} kbts__item_variation_data;
+
 struct kbts__maxp
 {
   kbts_u16 Major;
@@ -14754,7 +15346,7 @@ struct kbts__maxp
   kbts_u16 MaximumComponentDepth;
 };
 
-#  pragma pack(pop)
+#pragma pack(pop)
 
 //
 // Unpack functions for TTF structs.
@@ -14848,6 +15440,14 @@ typedef struct kbts__unpacked_value_record
   kbts__device *AdvanceYDevice;
 } kbts__unpacked_value_record;
 
+typedef struct kbts__resolved_value_record
+{
+  kbts_s16 PlacementX;
+  kbts_s16 PlacementY;
+  kbts_s16 AdvanceX;
+  kbts_s16 AdvanceY;
+} kbts__resolved_value_record;
+
 static kbts__unpacked_value_record kbts__UnpackValueRecord(void *Parent, kbts_u16 Format, kbts_u16 *Record)
 {
   kbts__unpacked_value_record Result = KBTS__ZERO;
@@ -14856,23 +15456,28 @@ static kbts__unpacked_value_record kbts__UnpackValueRecord(void *Parent, kbts_u1
 
   if(Format & KBTS__VALUE_FORMAT_X_PLACEMENT)
   {
-    Result.PlacementX = (kbts_s16)*At++;
+    Result.PlacementX = kbts__ReadS16Unaligned((kbts_s16 *)At);
+    At += 1;
   }
   if(Format & KBTS__VALUE_FORMAT_Y_PLACEMENT)
   {
-    Result.PlacementY = (kbts_s16)*At++;
+    Result.PlacementY = kbts__ReadS16Unaligned((kbts_s16 *)At);
+    At += 1;
   }
   if(Format & KBTS__VALUE_FORMAT_X_ADVANCE)
   {
-    Result.AdvanceX = (kbts_s16)*At++;
+    Result.AdvanceX = kbts__ReadS16Unaligned((kbts_s16 *)At);
+    At += 1;
   }
   if(Format & KBTS__VALUE_FORMAT_Y_ADVANCE)
   {
-    Result.AdvanceY = (kbts_s16)*At++;
+    Result.AdvanceY = kbts__ReadS16Unaligned((kbts_s16 *)At);
+    At += 1;
   }
   if(Format & KBTS__VALUE_FORMAT_X_PLACEMENT_DEVICE)
   {
-    kbts_u16 Offset = *At++;
+    kbts_u16 Offset = kbts__ReadU16Unaligned(At);
+    At += 1;
 
     if(Offset)
     {
@@ -14881,7 +15486,8 @@ static kbts__unpacked_value_record kbts__UnpackValueRecord(void *Parent, kbts_u1
   }
   if(Format & KBTS__VALUE_FORMAT_Y_PLACEMENT_DEVICE)
   {
-    kbts_u16 Offset = *At++;
+    kbts_u16 Offset = kbts__ReadU16Unaligned(At);
+    At += 1;
 
     if(Offset)
     {
@@ -14890,7 +15496,8 @@ static kbts__unpacked_value_record kbts__UnpackValueRecord(void *Parent, kbts_u1
   }
   if(Format & KBTS__VALUE_FORMAT_X_ADVANCE_DEVICE)
   {
-    kbts_u16 Offset = *At++;
+    kbts_u16 Offset = kbts__ReadU16Unaligned(At);
+    At += 1;
 
     if(Offset)
     {
@@ -14899,7 +15506,8 @@ static kbts__unpacked_value_record kbts__UnpackValueRecord(void *Parent, kbts_u1
   }
   if(Format & KBTS__VALUE_FORMAT_Y_ADVANCE_DEVICE)
   {
-    kbts_u16 Offset = *At++;
+    kbts_u16 Offset = kbts__ReadU16Unaligned(At);
+    At += 1;
 
     if(Offset)
     {
@@ -14912,26 +15520,248 @@ static kbts__unpacked_value_record kbts__UnpackValueRecord(void *Parent, kbts_u1
   return Result;
 }
 
+static kbts_s16 kbts__FloatToFixed2_14(float X)
+{
+  kbts_s32 Result;
+
+  if(X <= -1.0f)
+  {
+    Result = 0xC000;
+  }
+  else if(X >= 1.0f)
+  {
+    Result = 0x4000;
+  }
+  else
+  {
+    Result = kbts__Round32(X * (1 << 14));
+  }
+
+  return (kbts_s16)Result;
+}
+
+static float kbts__Fixed2_14ToFloat(kbts_s16 X)
+{
+  float Result = (float)X * (1.0f / (float)(1 << 14));
+  return Result;
+}
+
+static float kbts__ItemVariationStoreDelta(kbts__item_variation_store *Store, kbts_un DeltaSetOuterIndex, kbts_un DeltaSetInnerIndex, kbts_s16 *VariationVectorNormalized)
+{
+  float Result = 0;
+
+  if(VariationVectorNormalized &&
+     Store)
+  {
+    kbts_u32 *Store_VariationRegionListOffset = kbts__item_variation_store_VariationRegionListOffset(Store);
+    kbts_u32 *Store_ItemVariationDataOffsets = kbts__item_variation_store_ItemVariationDataOffsets(Store);
+
+    kbts_un VariationRegionListOffset = kbts__ReadU32Unaligned(Store_VariationRegionListOffset);
+
+    kbts__variation_region_list *VariationRegionList = KBTS__POINTER_OFFSET(kbts__variation_region_list, Store, VariationRegionListOffset);
+    kbts__region_axis_coordinates *RegionAxisCoordinates = KBTS__POINTER_AFTER(kbts__region_axis_coordinates, VariationRegionList);
+    kbts_un AxisCount = kbts__ReadU16Unaligned(&VariationRegionList->AxisCount);
+
+    kbts__item_variation_data *ItemVariationData = KBTS__POINTER_OFFSET(kbts__item_variation_data, Store, kbts__ReadU32Unaligned(&Store_ItemVariationDataOffsets[DeltaSetOuterIndex]));
+    kbts_un RegionIndexCount = kbts__ReadU16Unaligned(&ItemVariationData->RegionIndexCount);
+    kbts_un WordDeltaCount = kbts__ReadU16Unaligned(&ItemVariationData->WordDeltaCount);
+
+    kbts_u16 *RegionIndices = KBTS__POINTER_AFTER(kbts_u16, ItemVariationData);
+    char *Deltas = (char *)(RegionIndices + RegionIndexCount);
+    kbts_s16 *WordDeltas = (kbts_s16 *)(Deltas + DeltaSetInnerIndex * (WordDeltaCount + RegionIndexCount));
+    kbts_s8 *HalfWordDeltas = (kbts_s8 *)(WordDeltas + WordDeltaCount);
+
+    KBTS__FOR(RegionIndexIndex, 0, RegionIndexCount)
+    {
+      kbts_un RegionIndex = kbts__ReadU16Unaligned(&RegionIndices[RegionIndexIndex]);
+      kbts__region_axis_coordinates *RegionCoords = &RegionAxisCoordinates[RegionIndex * AxisCount];
+
+      float RegionDelta = 0;
+      if(RegionIndexIndex < WordDeltaCount)
+      {
+        RegionDelta = (float)kbts__ReadS16Unaligned(&WordDeltas[RegionIndexIndex]);
+      }
+      else
+      {
+        RegionDelta = (float)HalfWordDeltas[RegionIndexIndex - WordDeltaCount];
+      }
+
+      float RegionFactor = 1;
+
+      KBTS__FOR(AxisIndex, 0, AxisCount)
+      {
+        kbts_s16 InputFixed = VariationVectorNormalized[AxisIndex];
+
+        kbts__region_axis_coordinates *RegionAxis = &RegionCoords[AxisIndex];
+        kbts_s16 LowFixed = kbts__ReadS16Unaligned(&RegionAxis->StartCoord);
+        kbts_s16 PeakFixed = kbts__ReadS16Unaligned(&RegionAxis->PeakCoord);
+        kbts_s16 HighFixed = kbts__ReadS16Unaligned(&RegionAxis->EndCoord);
+
+        if(PeakFixed &&
+           (LowFixed <= PeakFixed) &&
+           (PeakFixed <= HighFixed) &&
+           !((LowFixed < 0) && (HighFixed > 0) && (PeakFixed != 0)) &&
+           (InputFixed != PeakFixed))
+        {
+          float AxisFactor = 0;
+
+          if((InputFixed >= LowFixed) &&
+             (InputFixed <= HighFixed))
+          {
+            // @Cleanup: Why don't we just compute the factor, and then check for bounds and NaN afterwards?
+            float InputFloat = kbts__Fixed2_14ToFloat(InputFixed);
+            float PeakFloat = kbts__Fixed2_14ToFloat(PeakFixed);
+
+            if(InputFixed < PeakFixed)
+            {
+              float LowFloat = kbts__Fixed2_14ToFloat(LowFixed);
+
+              AxisFactor = (InputFloat - LowFloat) / (PeakFloat - LowFloat);
+            }
+            else
+            {
+              float HighFloat = kbts__Fixed2_14ToFloat(HighFixed);
+
+              AxisFactor = (HighFloat - InputFloat) / (HighFloat - PeakFloat);
+            }
+          }
+
+          RegionFactor *= AxisFactor;
+        }
+
+        if(RegionFactor == 0)
+        {
+          break;
+        }
+      }
+
+      Result += RegionDelta * RegionFactor;
+    }
+  }
+
+  return Result;
+}
+
+static float kbts__ResolveDevice(kbts__item_variation_store *Store, kbts_s16 *VariationVectorNormalized, kbts__device *Device)
+{
+  float Result = 0;
+
+  if(VariationVectorNormalized &&
+     (kbts__ReadU16Unaligned(&Device->DeltaFormat) == 0x8000))
+  {
+    Result = kbts__ItemVariationStoreDelta(Store, kbts__ReadU16Unaligned(&Device->U.VariationIndex.DeltaSetOuterIndex), kbts__ReadU16Unaligned(&Device->U.VariationIndex.DeltaSetInnerIndex), VariationVectorNormalized);
+  }
+
+  return Result;
+}
+
+static kbts__resolved_value_record kbts__ResolveValueRecord(kbts_shape_scratchpad *Scratchpad, void *Parent, kbts_u16 Format, kbts_u16 *Record)
+{
+  kbts__resolved_value_record Result = KBTS__ZERO;
+
+  kbts_u16 *At = Record;
+
+  if(Format & KBTS__VALUE_FORMAT_X_PLACEMENT)
+  {
+    Result.PlacementX = kbts__ReadS16Unaligned((kbts_s16 *)At);
+    At += 1;
+  }
+  if(Format & KBTS__VALUE_FORMAT_Y_PLACEMENT)
+  {
+    Result.PlacementY = kbts__ReadS16Unaligned((kbts_s16 *)At);
+    At += 1;
+  }
+  if(Format & KBTS__VALUE_FORMAT_X_ADVANCE)
+  {
+    Result.AdvanceX = kbts__ReadS16Unaligned((kbts_s16 *)At);
+    At += 1;
+  }
+  if(Format & KBTS__VALUE_FORMAT_Y_ADVANCE)
+  {
+    Result.AdvanceY = kbts__ReadS16Unaligned((kbts_s16 *)At);
+    At += 1;
+  }
+  if(Format & (KBTS__VALUE_FORMAT_X_PLACEMENT_DEVICE |
+               KBTS__VALUE_FORMAT_Y_PLACEMENT_DEVICE |
+               KBTS__VALUE_FORMAT_X_ADVANCE_DEVICE |
+               KBTS__VALUE_FORMAT_Y_ADVANCE_DEVICE))
+  {
+    kbts__item_variation_store *Store = Scratchpad->GdefItemVariationStore;
+    kbts_s16 *VariationVectorNormalized = Scratchpad->VariationVectorNormalized;
+
+    if(Format & KBTS__VALUE_FORMAT_X_PLACEMENT_DEVICE)
+    {
+      kbts_u16 Offset = kbts__ReadU16Unaligned(At);
+      At += 1;
+
+      if(Offset)
+      {
+        kbts__device *PlacementXDevice = KBTS__POINTER_OFFSET(kbts__device, Parent, Offset);
+        float DeviceDelta = kbts__ResolveDevice(Store, VariationVectorNormalized, PlacementXDevice);
+        Result.PlacementX += (kbts_s16)kbts__Round32(DeviceDelta);
+      }
+    }
+    if(Format & KBTS__VALUE_FORMAT_Y_PLACEMENT_DEVICE)
+    {
+      kbts_u16 Offset = kbts__ReadU16Unaligned(At);
+      At += 1;
+
+      if(Offset)
+      {
+        kbts__device *PlacementYDevice = KBTS__POINTER_OFFSET(kbts__device, Parent, Offset);
+        float DeviceDelta = kbts__ResolveDevice(Store, VariationVectorNormalized, PlacementYDevice);
+        Result.PlacementY += (kbts_s16)kbts__Round32(DeviceDelta);
+      }
+    }
+    if(Format & KBTS__VALUE_FORMAT_X_ADVANCE_DEVICE)
+    {
+      kbts_u16 Offset = kbts__ReadU16Unaligned(At);
+      At += 1;
+
+      if(Offset)
+      {
+        kbts__device *AdvanceXDevice = KBTS__POINTER_OFFSET(kbts__device, Parent, Offset);
+        float DeviceDelta = kbts__ResolveDevice(Store, VariationVectorNormalized, AdvanceXDevice);
+        Result.AdvanceX += (kbts_s16)kbts__Round32(DeviceDelta);
+      }
+    }
+    if(Format & KBTS__VALUE_FORMAT_Y_ADVANCE_DEVICE)
+    {
+      kbts_u16 Offset = kbts__ReadU16Unaligned(At);
+      At += 1;
+
+      if(Offset)
+      {
+        kbts__device *AdvanceYDevice = KBTS__POINTER_OFFSET(kbts__device, Parent, Offset);
+        float DeviceDelta = kbts__ResolveDevice(Store, VariationVectorNormalized, AdvanceYDevice);
+        Result.AdvanceY += (kbts_s16)kbts__Round32(DeviceDelta);
+      }
+    }
+  }
+
+  return Result;
+}
+
 static kbts__unpacked_reverse_chain_substitution kbts__UnpackReverseChainSubstitution(kbts__reverse_chain_substitution *Subst, int ByteSwap)
 {
   kbts__unpacked_reverse_chain_substitution Result;
 
   Result.BacktrackCoverageOffsets = KBTS__POINTER_AFTER(kbts_u16, Subst);
-  Result.BacktrackCount = Subst->BacktrackGlyphCount;
+  Result.BacktrackCount = kbts__ReadU16Unaligned(&Subst->BacktrackGlyphCount);
   if(ByteSwap)
   {
     Result.BacktrackCount = kbts__ByteSwap16(Result.BacktrackCount);
   }
 
   Result.LookaheadCoverageOffsets = Result.BacktrackCoverageOffsets + Result.BacktrackCount + 1;
-  Result.LookaheadCount = Result.BacktrackCoverageOffsets[Result.BacktrackCount];
+  Result.LookaheadCount = kbts__ReadU16Unaligned(&Result.BacktrackCoverageOffsets[Result.BacktrackCount]);
   if(ByteSwap)
   {
     Result.LookaheadCount = kbts__ByteSwap16(Result.LookaheadCount);
   }
 
   Result.SubstituteGlyphIds = Result.LookaheadCoverageOffsets + Result.LookaheadCount + 1;
-  Result.GlyphCount = Result.LookaheadCoverageOffsets[Result.LookaheadCount];
+  Result.GlyphCount = kbts__ReadU16Unaligned(&Result.LookaheadCoverageOffsets[Result.LookaheadCount]);
   if(ByteSwap)
   {
     Result.GlyphCount = kbts__ByteSwap16(Result.GlyphCount);
@@ -14945,28 +15775,28 @@ static kbts__unpacked_chained_sequence_rule kbts__UnpackChainedSequenceRule(kbts
   kbts__unpacked_chained_sequence_rule Result;
 
   Result.Backtrack = KBTS__POINTER_AFTER(kbts_u16, Rule);
-  Result.BacktrackCount = Rule->BacktrackGlyphCount;
+  Result.BacktrackCount = kbts__ReadU16Unaligned(&Rule->BacktrackGlyphCount);
   if(ByteSwap)
   {
     Result.BacktrackCount = kbts__ByteSwap16(Result.BacktrackCount);
   }
 
   Result.Input = Result.Backtrack + Result.BacktrackCount + 1;
-  Result.InputCount = Result.Backtrack[Result.BacktrackCount];
+  Result.InputCount = kbts__ReadU16Unaligned(&Result.Backtrack[Result.BacktrackCount]);
   if(ByteSwap)
   {
     Result.InputCount = kbts__ByteSwap16(Result.InputCount);
   }
 
   Result.Lookahead = Result.Input + Result.InputCount;
-  Result.LookaheadCount = Result.Input[Result.InputCount - 1];
+  Result.LookaheadCount = kbts__ReadU16Unaligned(&Result.Input[Result.InputCount - 1]);
   if(ByteSwap)
   {
     Result.LookaheadCount = kbts__ByteSwap16(Result.LookaheadCount);
   }
 
   Result.Records = (kbts__sequence_lookup_record *)(Result.Lookahead + Result.LookaheadCount + 1);
-  Result.RecordCount = Result.Lookahead[Result.LookaheadCount];
+  Result.RecordCount = kbts__ReadU16Unaligned(&Result.Lookahead[Result.LookaheadCount]);
   if(ByteSwap)
   {
     Result.RecordCount = kbts__ByteSwap16(Result.RecordCount);
@@ -14980,28 +15810,28 @@ static kbts__unpacked_chained_sequence_context_3 kbts__UnpackChainedSequenceCont
   kbts__unpacked_chained_sequence_context_3 Result;
 
   Result.BacktrackCoverageOffsets = KBTS__POINTER_AFTER(kbts_u16, Subst);
-  Result.BacktrackCount = Subst->BacktrackGlyphCount;
+  Result.BacktrackCount = kbts__ReadU16Unaligned(&Subst->BacktrackGlyphCount);
   if(ByteSwap)
   {
     Result.BacktrackCount = kbts__ByteSwap16(Result.BacktrackCount);
   }
 
   Result.InputCoverageOffsets = Result.BacktrackCoverageOffsets + Result.BacktrackCount + 1;
-  Result.InputCount = Result.BacktrackCoverageOffsets[Result.BacktrackCount];
+  Result.InputCount = kbts__ReadU16Unaligned(&Result.BacktrackCoverageOffsets[Result.BacktrackCount]);
   if(ByteSwap)
   {
     Result.InputCount = kbts__ByteSwap16(Result.InputCount);
   }
 
   Result.LookaheadCoverageOffsets = Result.InputCoverageOffsets + Result.InputCount + 1;
-  Result.LookaheadCount = Result.InputCoverageOffsets[Result.InputCount];
+  Result.LookaheadCount = kbts__ReadU16Unaligned(&Result.InputCoverageOffsets[Result.InputCount]);
   if(ByteSwap)
   {
     Result.LookaheadCount = kbts__ByteSwap16(Result.LookaheadCount);
   }
 
   Result.Records = (kbts__sequence_lookup_record *)(Result.LookaheadCoverageOffsets + Result.LookaheadCount + 1);
-  Result.RecordCount = Result.LookaheadCoverageOffsets[Result.LookaheadCount];
+  Result.RecordCount = kbts__ReadU16Unaligned(&Result.LookaheadCoverageOffsets[Result.LookaheadCount]);
   if(ByteSwap)
   {
     Result.RecordCount = kbts__ByteSwap16(Result.RecordCount);
@@ -15023,17 +15853,19 @@ static kbts__unpacked_lookup kbts__UnpackLookup(kbts__gdef *Gdef, kbts__lookup *
 {
   kbts__unpacked_lookup Result = KBTS__ZERO;
 
-  Result.Type = Lookup->Type;
-  Result.Flags = Lookup->Flag;
-  Result.SubtableCount = Lookup->SubtableCount;
+  Result.Type = kbts__ReadU16Unaligned(&Lookup->Type);
+  Result.Flags = kbts__ReadU16Unaligned(&Lookup->Flag);
+  Result.SubtableCount = kbts__ReadU16Unaligned(&Lookup->SubtableCount);
   Result.SubtableOffsets = KBTS__POINTER_AFTER(kbts_u16, Lookup);
   if(Result.Flags & KBTS__LOOKUP_FLAG_USE_MARK_FILTERING_SET)
   {
-    kbts_u16 MarkFilteringSetIndex = Result.SubtableOffsets[Result.SubtableCount];
-    if(Gdef && Gdef->MarkGlyphSetsDefinitionOffset)
+    kbts_u16 MarkFilteringSetIndex = kbts__ReadU16Unaligned(&Result.SubtableOffsets[Result.SubtableCount]);
+
+    if(Gdef && kbts__ReadU16Unaligned(&Gdef->MarkGlyphSetsDefinitionOffset))
     {
-      kbts__mark_glyph_sets *MarkGlyphSets = KBTS__POINTER_OFFSET(kbts__mark_glyph_sets, Gdef, Gdef->MarkGlyphSetsDefinitionOffset);
-      if(MarkGlyphSets->MarkGlyphSetCount > MarkFilteringSetIndex)
+      kbts__mark_glyph_sets *MarkGlyphSets = KBTS__POINTER_OFFSET(kbts__mark_glyph_sets, Gdef, kbts__ReadU16Unaligned(&Gdef->MarkGlyphSetsDefinitionOffset));
+
+      if(kbts__ReadU16Unaligned(&MarkGlyphSets->MarkGlyphSetCount) > MarkFilteringSetIndex)
       {
         kbts_u32 *CoverageOffsets = KBTS__POINTER_AFTER(kbts_u32, MarkGlyphSets);
         kbts_un CoverageOffset = kbts__ReadU32Unaligned(&CoverageOffsets[MarkFilteringSetIndex]);
@@ -15051,15 +15883,15 @@ static kbts__script_pointer kbts__GetScript(kbts__script_list *List, kbts_un Ind
   kbts__script_record *Record = &Records[Index];
 
   kbts__script_pointer Result;
-  Result.Tag = Record->Tag;
-  Result.Script = (kbts__ot_script *)((char *)List + Record->Offset);
+  Result.Tag = kbts__ReadU32Unaligned(&Record->Tag);
+  Result.Script = (kbts__ot_script *)((char *)List + kbts__ReadU16Unaligned(&Record->Offset));
 
   return Result;
 }
 
 static kbts__langsys *kbts__GetDefaultLangsys(kbts__ot_script *Script)
 {
-  kbts__langsys *Result = Script->DefaultLangsysOffset ? KBTS__POINTER_OFFSET(kbts__langsys, Script, Script->DefaultLangsysOffset) : 0;
+  kbts__langsys *Result = kbts__ReadU16Unaligned(&Script->DefaultLangsysOffset) ? KBTS__POINTER_OFFSET(kbts__langsys, Script, kbts__ReadU16Unaligned(&Script->DefaultLangsysOffset)) : 0;
   return Result;
 }
 
@@ -15069,8 +15901,8 @@ static kbts__langsys_pointer kbts__GetLangsys(kbts__ot_script *Script, kbts_un I
   kbts__langsys_record *Record = &Records[Index];
 
   kbts__langsys_pointer Result;
-  Result.Tag = Record->Tag;
-  Result.Langsys = KBTS__POINTER_OFFSET(kbts__langsys, Script, Record->Offset);
+  Result.Tag = kbts__ReadU32Unaligned(&Record->Tag);
+  Result.Langsys = KBTS__POINTER_OFFSET(kbts__langsys, Script, kbts__ReadU16Unaligned(&Record->Offset));
   return Result;
 }
 
@@ -15080,46 +15912,46 @@ static kbts__feature_pointer kbts__GetFeature(kbts__feature_list *List, kbts_un 
   kbts__feature_record *Record = &Records[Index];
 
   kbts__feature_pointer Result;
-  Result.Tag = Record->Tag;
-  Result.Feature = KBTS__POINTER_OFFSET(kbts__feature, List, Record->Offset);
+  Result.Tag = kbts__ReadU32Unaligned(&Record->Tag);
+  Result.Feature = KBTS__POINTER_OFFSET(kbts__feature, List, kbts__ReadU16Unaligned(&Record->Offset));
   return Result;
 }
 
-static kbts_lookup_list *kbts__GetLookupList(kbts__gsub_gpos *GsubGpos)
+static kbts__lookup_list *kbts__GetLookupList(kbts__gsub_gpos *GsubGpos)
 {
-  kbts_lookup_list *Result = 0;
+  kbts__lookup_list *Result = 0;
 
   if(GsubGpos)
   {
-    Result = KBTS__POINTER_OFFSET(kbts_lookup_list, GsubGpos, GsubGpos->LookupListOffset);
+    Result = KBTS__POINTER_OFFSET(kbts__lookup_list, GsubGpos, kbts__ReadU16Unaligned(&GsubGpos->LookupListOffset));
   }
 
   return Result;
 }
 
-static kbts__lookup *kbts__GetLookup(kbts_lookup_list *List, kbts_un Index)
+static kbts__lookup *kbts__GetLookup(kbts__lookup_list *List, kbts_un Index)
 {
-  KBTS_ASSERT(Index < List->Count);
+  KBTS_ASSERT(Index < kbts__ReadU16Unaligned(&List->Count));
   kbts_u16 *Offsets = (kbts_u16 *)(List + 1);
-  kbts__lookup *Result = KBTS__POINTER_OFFSET(kbts__lookup, List, Offsets[Index]);
+  kbts__lookup *Result = KBTS__POINTER_OFFSET(kbts__lookup, List, kbts__ReadU16Unaligned(&Offsets[Index]));
   return Result;
 }
 
 static kbts__sequence_rule_set *kbts__GetSequenceRuleSet(kbts__sequence_context_1 *Context, kbts_un Index)
 {
-  KBTS_ASSERT(Index < Context->SeqRuleSetCount);
+  KBTS_ASSERT(Index < kbts__ReadU16Unaligned(&Context->SeqRuleSetCount));
   kbts_u16 *Offsets = (kbts_u16 *)(Context + 1);
-  kbts_u16 Offset = Offsets[Index];
+  kbts_u16 Offset = kbts__ReadU16Unaligned(&Offsets[Index]);
 
-  kbts__sequence_rule_set *Result = Offset ? KBTS__POINTER_OFFSET(kbts__sequence_rule_set, Context, Offsets[Index]) : 0;
+  kbts__sequence_rule_set *Result = Offset ? KBTS__POINTER_OFFSET(kbts__sequence_rule_set, Context, Offset) : 0;
   return Result;
 }
 
 static kbts__sequence_rule *kbts__GetSequenceRule(kbts__sequence_rule_set *Set, kbts_un Index)
 {
-  KBTS_ASSERT(Index < Set->Count);
+  KBTS_ASSERT(Index < kbts__ReadU16Unaligned(&Set->Count));
   kbts_u16 *Offsets = (kbts_u16 *)(Set + 1);
-  kbts__sequence_rule *Result = KBTS__POINTER_OFFSET(kbts__sequence_rule, Set, Offsets[Index]);
+  kbts__sequence_rule *Result = KBTS__POINTER_OFFSET(kbts__sequence_rule, Set, kbts__ReadU16Unaligned(&Offsets[Index]));
   return Result;
 }
 
@@ -15128,81 +15960,52 @@ static kbts__sequence_rule *kbts__GetSequenceRule(kbts__sequence_rule_set *Set, 
 static kbts__class_sequence_rule_set *kbts__GetClassSequenceRuleSet(kbts__sequence_context_2 *Context, kbts_un Index)
 {
   kbts__class_sequence_rule_set *Result = 0;
-  if(Index < Context->ClassSequenceRuleSetCount)
+  if(Index < kbts__ReadU16Unaligned(&Context->ClassSequenceRuleSetCount))
   {
     kbts_u16 *Offsets = (kbts_u16 *)(Context + 1);
-    Result = Offsets[Index] ? KBTS__POINTER_OFFSET(kbts__class_sequence_rule_set, Context, Offsets[Index]) : 0;
+    kbts_u16 Offset = kbts__ReadU16Unaligned(&Offsets[Index]);
+    Result = Offset ? KBTS__POINTER_OFFSET(kbts__class_sequence_rule_set, Context, Offset) : 0;
   }
   return Result;
 }
 
 static kbts__class_sequence_rule *kbts__GetClassSequenceRule(kbts__class_sequence_rule_set *Set, kbts_un Index)
 {
-  KBTS_ASSERT(Index < Set->Count);
+  KBTS_ASSERT(Index < kbts__ReadU16Unaligned(&Set->Count));
   kbts_u16 *Offsets = (kbts_u16 *)(Set + 1);
-  kbts__class_sequence_rule *Result = KBTS__POINTER_OFFSET(kbts__class_sequence_rule, Set, Offsets[Index]);
+  kbts__class_sequence_rule *Result = KBTS__POINTER_OFFSET(kbts__class_sequence_rule, Set, kbts__ReadU16Unaligned(&Offsets[Index]));
   return Result;
 }
 
 static kbts__chained_sequence_rule_set *kbts__GetChainedSequenceRuleSet(kbts__chained_sequence_context_1 *Context, kbts_un Index)
 {
   kbts_u16 *Offsets = (kbts_u16 *)(Context + 1);
-  kbts__chained_sequence_rule_set *Result = Offsets[Index] ? KBTS__POINTER_OFFSET(kbts__chained_sequence_rule_set, Context, Offsets[Index]) : 0;
+  kbts_u16 Offset = kbts__ReadU16Unaligned(&Offsets[Index]);
+  kbts__chained_sequence_rule_set *Result = Offset ? KBTS__POINTER_OFFSET(kbts__chained_sequence_rule_set, Context, Offset) : 0;
   return Result;
 }
 
 static kbts__chained_sequence_rule *kbts__GetChainedSequenceRule(kbts__chained_sequence_rule_set *Set, kbts_un Index)
 {
   kbts_u16 *Offsets = (kbts_u16 *)(Set + 1);
-  kbts__chained_sequence_rule *Result = KBTS__POINTER_OFFSET(kbts__chained_sequence_rule, Set, Offsets[Index]);
+  kbts__chained_sequence_rule *Result = KBTS__POINTER_OFFSET(kbts__chained_sequence_rule, Set, kbts__ReadU16Unaligned(&Offsets[Index]));
   return Result;
 }
 
 static kbts__chained_sequence_rule_set *kbts__GetChainedClassSequenceRuleSet(kbts__chained_sequence_context_2 *Context, kbts_un Index)
 {
   kbts_u16 *Offsets = (kbts_u16 *)(Context + 1);
-  kbts_u16 Offset = Offsets[Index];
-  kbts__chained_sequence_rule_set *Result = Offset ? KBTS__POINTER_OFFSET(kbts__chained_sequence_rule_set, Context, Offset) : NULL;
+  kbts_u16 Offset = kbts__ReadU16Unaligned(&Offsets[Index]);
+  kbts__chained_sequence_rule_set *Result = Offset ? KBTS__POINTER_OFFSET(kbts__chained_sequence_rule_set, Context, Offset) : 0;
   return Result;
 }
 
 static kbts__chained_sequence_rule *kbts__GetChainedClassSequenceRule(kbts__chained_sequence_rule_set *Set, kbts_un Index)
 {
   kbts_u16 *Offsets = (kbts_u16 *)(Set + 1);
-  kbts__chained_sequence_rule *Result = KBTS__POINTER_OFFSET(kbts__chained_sequence_rule, Set, Offsets[Index]);
+  kbts__chained_sequence_rule *Result = KBTS__POINTER_OFFSET(kbts__chained_sequence_rule, Set, kbts__ReadU16Unaligned(&Offsets[Index]));
   return Result;
 }
-
-#if 0 // @Incomplete
-static kbts__feature_variation_pointer kbts__GetFeatureVariation(kbts__feature_variations *Variations, kbts_un Index)
-{
-  kbts__feature_variation_record *Records = (kbts__feature_variation_record *)(Variations + 1);
-  kbts__feature_variation_record *Record = &Records[Index];
-
-  kbts__feature_variation_pointer Result;
-  Result.ConditionSet = KBTS__POINTER_OFFSET(kbts__condition_set, Variations, Record->ConditionSetOffset);
-  Result.FeatureTableSubstitution = KBTS__POINTER_OFFSET(kbts__feature_table_substitution, Variations, Record->FeatureTableSubstitutionOffset);
-  return Result;
-}
-
-static kbts__condition_1 *kbts__GetCondition(kbts__condition_set *Set, kbts_un Index)
-{
-  kbts_u32 *Offsets = (kbts_u32 *)(Set + 1);
-  kbts__condition_1 *Result = KBTS__POINTER_OFFSET(kbts__condition_1, Set, Offsets[Index]);
-  return Result;
-}
-
-static kbts__feature_substitution_pointer kbts__GetFeatureSubstitution(kbts__feature_table_substitution *Table, kbts_un Index)
-{
-  kbts__feature_table_substitution_record *Records = (kbts__feature_table_substitution_record *)(Table + 1);
-  kbts__feature_table_substitution_record *Record = &Records[Index];
-
-  kbts__feature_substitution_pointer Result;
-  Result.SubstitutedFeatureIndex = Record->FeatureIndex;
-  Result.AlternateFeature = KBTS__POINTER_OFFSET(kbts__feature, Table, Record->AlternateFeatureOffset);
-  return Result;
-}
-#endif
 
 static kbts__cmap_subtable_pointer kbts__GetCmapSubtable(kbts__cmap *Cmap, kbts_un Index)
 {
@@ -15210,9 +16013,9 @@ static kbts__cmap_subtable_pointer kbts__GetCmapSubtable(kbts__cmap *Cmap, kbts_
   kbts__encoding_record *Record = &Records[Index];
 
   kbts__cmap_subtable_pointer Result;
-  Result.PlatformId = Record->PlatformId;
-  Result.EncodingId = Record->EncodingId;
-  Result.Subtable = KBTS__POINTER_OFFSET(kbts_u16, Cmap, Record->SubtableOffset);
+  Result.PlatformId = kbts__ReadU16Unaligned(&Record->PlatformId);
+  Result.EncodingId = kbts__ReadU16Unaligned(&Record->EncodingId);
+  Result.Subtable = KBTS__POINTER_OFFSET(kbts_u16, Cmap, kbts__ReadU32Unaligned(&Record->SubtableOffset));
 
   return Result;
 }
@@ -15220,21 +16023,21 @@ static kbts__cmap_subtable_pointer kbts__GetCmapSubtable(kbts__cmap *Cmap, kbts_
 static kbts__sequence *kbts__GetSequence(kbts__multiple_substitution *Subst, kbts_un Index)
 {
   kbts_u16 *Offsets = (kbts_u16 *)(Subst + 1);
-  kbts__sequence *Result = KBTS__POINTER_OFFSET(kbts__sequence, Subst, Offsets[Index]);
+  kbts__sequence *Result = KBTS__POINTER_OFFSET(kbts__sequence, Subst, kbts__ReadU16Unaligned(&Offsets[Index]));
   return Result;
 }
 
 static kbts__alternate_set *kbts__GetAlternateSet(kbts__alternate_substitution *Subst, kbts_un Index)
 {
   kbts_u16 *Offsets = (kbts_u16 *)(Subst + 1);
-  kbts__alternate_set *Result = KBTS__POINTER_OFFSET(kbts__alternate_set, Subst, Offsets[Index]);
+  kbts__alternate_set *Result = KBTS__POINTER_OFFSET(kbts__alternate_set, Subst, kbts__ReadU16Unaligned(&Offsets[Index]));
   return Result;
 }
 
 static kbts__ligature_set *kbts__GetLigatureSet(kbts__ligature_substitution *Subst, kbts_un Index)
 {
   kbts_u16 *Offsets = (kbts_u16 *)(Subst + 1);
-  kbts__ligature_set *Result = KBTS__POINTER_OFFSET(kbts__ligature_set, Subst, Offsets[Index]);
+  kbts__ligature_set *Result = KBTS__POINTER_OFFSET(kbts__ligature_set, Subst, kbts__ReadU16Unaligned(&Offsets[Index]));
   return Result;
 }
 
@@ -15256,14 +16059,15 @@ static kbts__mark_record *kbts__GetMarkRecord(kbts__mark_array *Array, kbts_un I
 static kbts__ligature_attach *kbts__GetLigatureAttach(kbts__ligature_array *Array, kbts_un Index)
 {
   kbts_u16 *Offsets = KBTS__POINTER_AFTER(kbts_u16, Array);
-  kbts__ligature_attach *Result = KBTS__POINTER_OFFSET(kbts__ligature_attach, Array, Offsets[Index]);
+  kbts__ligature_attach *Result = KBTS__POINTER_OFFSET(kbts__ligature_attach, Array, kbts__ReadU16Unaligned(&Offsets[Index]));
   return Result;
 }
 
 static kbts__anchor *kbts__GetLigatureAttachAnchor(kbts__mark_to_ligature_attachment *Adjust, kbts__ligature_attach *Attach, kbts_u16 MarkClass, kbts_un ComponentIndex)
 {
   kbts_u16 *Offsets = KBTS__POINTER_AFTER(kbts_u16, Attach);
-  kbts_u16 Offset = Offsets[ComponentIndex * Adjust->MarkClassCount + MarkClass];
+  kbts_un Adjust_MarkClassCount = kbts__ReadU16Unaligned(&Adjust->MarkClassCount);
+  kbts_u16 Offset = kbts__ReadU16Unaligned(&Offsets[ComponentIndex * Adjust_MarkClassCount + MarkClass]);
 
   kbts__anchor *Result = 0;
   if(Offset)
@@ -15272,6 +16076,35 @@ static kbts__anchor *kbts__GetLigatureAttachAnchor(kbts__mark_to_ligature_attach
   }
 
   return Result;
+}
+
+static void kbts__ResolveAnchorXy(kbts_shape_scratchpad *Scratchpad, kbts__anchor *Anchor, kbts_s32 *X_, kbts_s32 *Y_)
+{
+  kbts_s32 X = kbts__ReadS16Unaligned(&Anchor->X);
+  kbts_s32 Y = kbts__ReadS16Unaligned(&Anchor->Y);
+
+  if(kbts__ReadU16Unaligned(&Anchor->Format) == 3)
+  {
+    kbts__item_variation_store *GdefItemVariationStore = Scratchpad->GdefItemVariationStore;
+    kbts_s16 *VariationVectorNormalized = Scratchpad->VariationVectorNormalized;
+
+    if(kbts__ReadU16Unaligned(&Anchor->U.XDeviceOffset))
+    {
+      kbts__device *Device = KBTS__POINTER_OFFSET(kbts__device, Anchor, kbts__ReadU16Unaligned(&Anchor->U.XDeviceOffset));
+      float DeviceDelta = kbts__ResolveDevice(GdefItemVariationStore, VariationVectorNormalized, Device);
+      X += kbts__Round32(DeviceDelta);
+    }
+
+    if(kbts__ReadU16Unaligned(&Anchor->YDeviceOffset))
+    {
+      kbts__device *Device = KBTS__POINTER_OFFSET(kbts__device, Anchor, kbts__ReadU16Unaligned(&Anchor->YDeviceOffset));
+      float DeviceDelta = kbts__ResolveDevice(GdefItemVariationStore, VariationVectorNormalized, Device);
+      Y += kbts__Round32(DeviceDelta);
+    }
+  }
+
+  *X_ = X;
+  *Y_ = Y;
 }
 
 typedef struct kbts__mark_info
@@ -15287,7 +16120,7 @@ static kbts__mark_info kbts__GetMarkInfo(void *Subtable, kbts_un SubtableOffsetT
 
   Result.Array = KBTS__POINTER_OFFSET(kbts__mark_array, Subtable, SubtableOffsetToMarkArray);
   Result.Record = kbts__GetMarkRecord(Result.Array, CoverageIndex);
-  Result.Anchor = KBTS__POINTER_OFFSET(kbts__anchor, Result.Array, Result.Record->AnchorOffset);
+  Result.Anchor = KBTS__POINTER_OFFSET(kbts__anchor, Result.Array, kbts__ReadU16Unaligned(&Result.Record->AnchorOffset));
 
   return Result;
 }
@@ -15401,22 +16234,22 @@ static void kbts__ByteSwapFeature(kbts__byteswap_context *Context, kbts__feature
   {
     kbts_u16 *LookupIndices = KBTS__POINTER_AFTER(kbts_u16, Feature);
     Context->Error |= !kbts__ByteSwapArray16(&Feature->FeatureParamsOffset, 2, Context->FileEnd);
-    Context->Error |= !kbts__ByteSwapArray16(LookupIndices, Feature->LookupIndexCount, Context->FileEnd);
+    kbts_un Feature_LookupIndexCount = kbts__ReadU16Unaligned(&Feature->LookupIndexCount);
+    Context->Error |= !kbts__ByteSwapArray16(LookupIndices, Feature_LookupIndexCount, Context->FileEnd);
 
     // We require lookup indices to be sorted per feature for the lookup application order to match Harfbuzz.
     // Lookup indices are _typically_ sorted per feature, but we can't assume it is always the case.
-    kbts_un LookupIndexCount = Feature->LookupIndexCount;
-    KBTS__FOR(Iter, 0, LookupIndexCount)
+    KBTS__FOR(Iter, 0, Feature_LookupIndexCount)
     {
-      KBTS__FOR(IndexIndex, 1, LookupIndexCount)
+      KBTS__FOR(IndexIndex, 1, Feature_LookupIndexCount)
       {
-        kbts_u16 Left = LookupIndices[IndexIndex - 1];
-        kbts_u16 Right = LookupIndices[IndexIndex];
+        kbts_u16 Left = kbts__ReadU16Unaligned(&LookupIndices[IndexIndex - 1]);
+        kbts_u16 Right = kbts__ReadU16Unaligned(&LookupIndices[IndexIndex]);
 
         if(Left > Right)
         {
-          LookupIndices[IndexIndex - 1] = Right;
-          LookupIndices[IndexIndex] = Left;
+          kbts__WriteU16Unaligned(&LookupIndices[IndexIndex - 1], Right);
+          kbts__WriteU16Unaligned(&LookupIndices[IndexIndex], Left);
         }
       }
     }
@@ -15424,9 +16257,10 @@ static void kbts__ByteSwapFeature(kbts__byteswap_context *Context, kbts__feature
 
 #  ifdef KBTS_DUMP
   kbts_u16 *LookupIndices = KBTS__POINTER_AFTER(kbts_u16, Feature);
-  KBTS__FOR(LookupIndexIndex, 0, Feature->LookupIndexCount)
+  kbts_un Feature_LookupIndexCount = kbts__ReadU16Unaligned(&Feature->LookupIndexCount);
+  KBTS__FOR(LookupIndexIndex, 0, Feature_LookupIndexCount)
   {
-    KBTS_DUMPF("  Lookup index %u\n", LookupIndices[LookupIndexIndex]);
+    KBTS_DUMPF("  Lookup index %u\n", kbts__ReadU16Unaligned(&LookupIndices[LookupIndexIndex]));
   }
 #  endif
 }
@@ -15434,52 +16268,51 @@ static void kbts__ByteSwapFeature(kbts__byteswap_context *Context, kbts__feature
 static void kbts__ByteSwapGsubGposCommon(kbts__byteswap_context *Context, kbts__gsub_gpos *Header)
 {
   kbts__ByteSwapArray16Context(&Header->Major, 5, Context);
+  kbts_u16 Header_Minor = kbts__ReadU16Unaligned(&Header->Minor);
 
-  if(Header->Minor == 1)
+  if(Header_Minor == 1)
   {
-    Header->FeatureVariationsOffset = kbts__ByteSwap32(Header->FeatureVariationsOffset);
+    kbts__ByteSwap32InPlace(&Header->FeatureVariationsOffset);
   }
 
-  kbts__script_list *ScriptList = KBTS__POINTER_OFFSET(kbts__script_list, Header, Header->ScriptListOffset);
+  kbts__script_list *ScriptList = KBTS__POINTER_OFFSET(kbts__script_list, Header, kbts__ReadU16Unaligned(&Header->ScriptListOffset));
   if(!kbts__AlreadyVisited(Context, ScriptList))
   {
-    ScriptList->Count = kbts__ByteSwap16(ScriptList->Count);
+    kbts_un ScriptListScriptCount = kbts__ByteSwap16InPlace(&ScriptList->Count);
 
     kbts__script_record *ScriptRecords = KBTS__POINTER_AFTER(kbts__script_record, ScriptList);
-    KBTS__FOR(It, 0, ScriptList->Count)
+    KBTS__FOR(It, 0, ScriptListScriptCount)
     {
       kbts__script_record *Record = &ScriptRecords[It];
-
-      Record->Offset = kbts__ByteSwap16(Record->Offset);
+      kbts_un RecordScriptOffset = kbts__ByteSwap16InPlace(&Record->Offset);
 
       KBTS_DUMPF("Script %.4s\n", (char *)&Record->Tag);
 
-      kbts__ot_script *Script = KBTS__POINTER_OFFSET(kbts__ot_script, ScriptList, Record->Offset);
+      kbts__ot_script *Script = KBTS__POINTER_OFFSET(kbts__ot_script, ScriptList, RecordScriptOffset);
       if(!kbts__AlreadyVisited(Context, Script))
       {
-        Script->DefaultLangsysOffset = kbts__ByteSwap16(Script->DefaultLangsysOffset);
-        Script->Count = kbts__ByteSwap16(Script->Count);
+        kbts__ByteSwap16InPlace(&Script->DefaultLangsysOffset);
+        kbts_un ScriptLangsysCount = kbts__ByteSwap16InPlace(&Script->Count);
 
         kbts__langsys *DefaultLangsys = kbts__GetDefaultLangsys(Script);
 
         if(DefaultLangsys && !kbts__AlreadyVisited(Context, DefaultLangsys))
         {
           kbts__ByteSwapArray16Context(&DefaultLangsys->LookupOrderOffset, 3, Context);
-          kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, DefaultLangsys), DefaultLangsys->FeatureIndexCount, Context);
+          kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, DefaultLangsys), kbts__ReadU16Unaligned(&DefaultLangsys->FeatureIndexCount), Context);
         }
 
         kbts__langsys_record *LangsysRecords = KBTS__POINTER_AFTER(kbts__langsys_record, Script);
-        KBTS__FOR(LangsysIndex, 0, Script->Count)
+        KBTS__FOR(LangsysIndex, 0, ScriptLangsysCount)
         {
           kbts__langsys_record *LangsysRecord = &LangsysRecords[LangsysIndex];
+          kbts_un LangsysRecord_Offset = kbts__ByteSwap16InPlace(&LangsysRecord->Offset);
 
-          LangsysRecord->Offset = kbts__ByteSwap16(LangsysRecord->Offset);
-
-          kbts__langsys *Langsys = KBTS__POINTER_OFFSET(kbts__langsys, Script, LangsysRecord->Offset);
+          kbts__langsys *Langsys = KBTS__POINTER_OFFSET(kbts__langsys, Script, LangsysRecord_Offset);
           if(!kbts__AlreadyVisited(Context, Langsys))
           {
             kbts__ByteSwapArray16Context(&Langsys->LookupOrderOffset, 3, Context);
-            kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Langsys), Langsys->FeatureIndexCount, Context);
+            kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Langsys), kbts__ReadU16Unaligned(&Langsys->FeatureIndexCount), Context);
           }
         }
 
@@ -15487,62 +16320,64 @@ static void kbts__ByteSwapGsubGposCommon(kbts__byteswap_context *Context, kbts__
         if(DefaultLangsys)
         {
           KBTS_DUMPF("  Default langsys @ %zu\n", (char *)DefaultLangsys - Context->FileBase);
-          KBTS_DUMPF("    Lookup order offset %u\n", DefaultLangsys->LookupOrderOffset);
-          KBTS_DUMPF("    Required feature %u\n", DefaultLangsys->RequiredFeatureIndex);
+          KBTS_DUMPF("    Lookup order offset %u\n", kbts__ReadU16Unaligned(&DefaultLangsys->LookupOrderOffset));
+          KBTS_DUMPF("    Required feature %u\n", kbts__ReadU16Unaligned(&DefaultLangsys->RequiredFeatureIndex));
           kbts_u16 *FeatureIndices = KBTS__POINTER_AFTER(kbts_u16, DefaultLangsys);
-          KBTS__FOR(FeatureIndexIndex, 0, DefaultLangsys->FeatureIndexCount)
+          KBTS__FOR(FeatureIndexIndex, 0, kbts__ReadU16Unaligned(&DefaultLangsys->FeatureIndexCount))
           {
-            KBTS_DUMPF("      Feature %u\n", FeatureIndices[FeatureIndexIndex]);
+            KBTS_DUMPF("      Feature %u\n", kbts__ReadU16Unaligned(&FeatureIndices[FeatureIndexIndex]));
           }
         }
 
-        KBTS__FOR(LangsysIndex, 0, Script->Count)
+        KBTS__FOR(LangsysIndex, 0, ScriptLangsysCount)
         {
           kbts__langsys_record *LangsysRecord = &LangsysRecords[LangsysIndex];
-          kbts__langsys *Langsys = KBTS__POINTER_OFFSET(kbts__langsys, Script, LangsysRecord->Offset);
-          KBTS_DUMPF("    Langsys %.4s @ %zu\n", (char *)&LangsysRecord->Tag, (char *)Script + LangsysRecord->Offset - Context->FileBase);
+          kbts_un LangsysRecord_Offset = kbts__ReadU16Unaligned(&LangsysRecord->Offset);
+
+          kbts__langsys *Langsys = KBTS__POINTER_OFFSET(kbts__langsys, Script, LangsysRecord_Offset);
+          KBTS_DUMPF("    Langsys %.4s @ %zu\n", (char *)&LangsysRecord->Tag, (char *)Script + LangsysRecord_Offset - Context->FileBase);
           KBTS_DUMPF("    Lookup order offset %u\n"
                      "    Required feature %u\n",
-                     Langsys->LookupOrderOffset, Langsys->RequiredFeatureIndex);
+                     kbts__ReadU16Unaligned(&Langsys->LookupOrderOffset), kbts__ReadU16Unaligned(&Langsys->RequiredFeatureIndex));
           kbts_u16 *FeatureIndices = KBTS__POINTER_AFTER(kbts_u16, Langsys);
-          KBTS__FOR(FeatureIndexIndex, 0, Langsys->FeatureIndexCount)
+          kbts_un Langsys_FeatureIndexCount = kbts__ReadU16Unaligned(&Langsys->FeatureIndexCount);
+          KBTS__FOR(FeatureIndexIndex, 0, Langsys_FeatureIndexCount)
           {
-            KBTS_DUMPF("      Feature %u\n", FeatureIndices[FeatureIndexIndex]);
+            KBTS_DUMPF("      Feature %u\n", kbts__ReadU16Unaligned(&FeatureIndices[FeatureIndexIndex]));
           }
         }
 #  endif
       }
     }
 
-    // @Incomplete
-    if((Header->Minor == 1) && Header->FeatureVariationsOffset)
+    kbts_un Header_FeatureVariationsOffset = kbts__ReadU32Unaligned(&Header->FeatureVariationsOffset);
+    if((Header_Minor == 1) && Header_FeatureVariationsOffset)
     {
-      kbts__feature_variations *FeatureVariations = KBTS__POINTER_OFFSET(kbts__feature_variations, Header, Header->FeatureVariationsOffset);
+      kbts__feature_variations *FeatureVariations = KBTS__POINTER_OFFSET(kbts__feature_variations, Header, Header_FeatureVariationsOffset);
 
       if(!kbts__AlreadyVisited(Context, FeatureVariations))
       {
         kbts__ByteSwapArray16Context(&FeatureVariations->Major, 2, Context);
-        FeatureVariations->RecordCount = kbts__ByteSwap32(FeatureVariations->RecordCount);
+        kbts_un FeatureVariations_RecordCount = kbts__ByteSwap32InPlace(&FeatureVariations->RecordCount);
 
         kbts__feature_variation_record *Records = KBTS__POINTER_AFTER(kbts__feature_variation_record, FeatureVariations);
-        KBTS__FOR(VariationIndex, 0, FeatureVariations->RecordCount)
+        KBTS__FOR(VariationIndex, 0, FeatureVariations_RecordCount)
         {
           kbts__feature_variation_record *Record = &Records[VariationIndex];
 
           kbts__ByteSwapArray32Context(&Record->ConditionSetOffset, 2, Context);
 
-          kbts__condition_set *Set = KBTS__POINTER_OFFSET(kbts__condition_set, FeatureVariations, Record->ConditionSetOffset);
-
+          kbts__condition_set *Set = KBTS__POINTER_OFFSET(kbts__condition_set, FeatureVariations, kbts__ReadU32Unaligned(&Record->ConditionSetOffset));
           if(!kbts__AlreadyVisited(Context, Set))
           {
-            Set->Count = kbts__ByteSwap16(Set->Count);
+            kbts_un Set_Count = kbts__ByteSwap16InPlace(&Set->Count);
 
             kbts_u32 *ConditionOffsets = KBTS__POINTER_AFTER(kbts_u32, Set);
-            kbts__ByteSwapArray32Context(ConditionOffsets, Set->Count, Context);
+            kbts__ByteSwapArray32Context(ConditionOffsets, Set_Count, Context);
 
-            KBTS__FOR(ConditionIndex, 0, Set->Count)
+            KBTS__FOR(ConditionIndex, 0, Set_Count)
             {
-              kbts__condition_1 *Condition = KBTS__POINTER_OFFSET(kbts__condition_1, Set, ConditionOffsets[ConditionIndex]);
+              kbts__condition_1 *Condition = KBTS__POINTER_OFFSET(kbts__condition_1, Set, kbts__ReadU32Unaligned(&ConditionOffsets[ConditionIndex]));
 
               if(!kbts__AlreadyVisited(Context, Condition))
               {
@@ -15550,21 +16385,20 @@ static void kbts__ByteSwapGsubGposCommon(kbts__byteswap_context *Context, kbts__
               }
             }
 
-            // @Incomplete
-            kbts__feature_table_substitution *FeatureSubst = KBTS__POINTER_OFFSET(kbts__feature_table_substitution, FeatureVariations, Record->FeatureTableSubstitutionOffset);
-
+            kbts__feature_table_substitution *FeatureSubst = KBTS__POINTER_OFFSET(kbts__feature_table_substitution, FeatureVariations, kbts__ReadU32Unaligned(&Record->FeatureTableSubstitutionOffset));
             if(!kbts__AlreadyVisited(Context, FeatureSubst))
             {
               kbts__ByteSwapArray16Context(&FeatureSubst->Major, 3, Context);
 
               kbts__feature_table_substitution_record *SubstRecords = KBTS__POINTER_AFTER(kbts__feature_table_substitution_record, FeatureSubst);
-              KBTS__FOR(SubstRecordIndex, 0, FeatureSubst->Count)
+              kbts_un FeatureSubst_Count = kbts__ReadU16Unaligned(&FeatureSubst->Count);
+              KBTS__FOR(SubstRecordIndex, 0, FeatureSubst_Count)
               {
                 kbts__feature_table_substitution_record *SubstRecord = &SubstRecords[SubstRecordIndex];
-                SubstRecord->FeatureIndex = kbts__ByteSwap16(SubstRecord->FeatureIndex);
-                SubstRecord->AlternateFeatureOffset = kbts__ByteSwap32(SubstRecord->AlternateFeatureOffset);
+                kbts__ByteSwap16InPlace(&SubstRecord->FeatureIndex);
+                kbts_un SubstRecord_AlternateFeatureOffset = kbts__ByteSwap32InPlace(&SubstRecord->AlternateFeatureOffset);
 
-                kbts__feature *Feature = KBTS__POINTER_OFFSET(kbts__feature, FeatureSubst, SubstRecord->AlternateFeatureOffset);
+                kbts__feature *Feature = KBTS__POINTER_OFFSET(kbts__feature, FeatureSubst, SubstRecord_AlternateFeatureOffset);
                 kbts__ByteSwapFeature(Context, Feature);
               }
             }
@@ -15574,12 +16408,12 @@ static void kbts__ByteSwapGsubGposCommon(kbts__byteswap_context *Context, kbts__
     }
   }
 
-  kbts__feature_list *FeatureList = KBTS__POINTER_OFFSET(kbts__feature_list, Header, Header->FeatureListOffset);
+  kbts__feature_list *FeatureList = KBTS__POINTER_OFFSET(kbts__feature_list, Header, kbts__ReadU16Unaligned(&Header->FeatureListOffset));
   if(!kbts__AlreadyVisited(Context, FeatureList))
   {
-    FeatureList->Count = kbts__ByteSwap16(FeatureList->Count);
+    kbts_un FeatureList_Count = kbts__ByteSwap16InPlace(&FeatureList->Count);
     kbts__feature_record *FeatureRecords = KBTS__POINTER_AFTER(kbts__feature_record, FeatureList);
-    KBTS__FOR(FeatureRecordIndex, 0, FeatureList->Count)
+    KBTS__FOR(FeatureRecordIndex, 0, FeatureList_Count)
     {
       kbts__feature_record *FeatureRecord = &FeatureRecords[FeatureRecordIndex];
 
@@ -15587,9 +16421,9 @@ static void kbts__ByteSwapGsubGposCommon(kbts__byteswap_context *Context, kbts__
 
       if(!kbts__AlreadyVisited(Context, FeatureRecord))
       {
-        FeatureRecord->Offset = kbts__ByteSwap16(FeatureRecord->Offset);
+        kbts_un FeatureRecord_Offset = kbts__ByteSwap16InPlace(&FeatureRecord->Offset);
 
-        kbts__feature *Feature = KBTS__POINTER_OFFSET(kbts__feature, FeatureList, FeatureRecord->Offset);
+        kbts__feature *Feature = KBTS__POINTER_OFFSET(kbts__feature, FeatureList, FeatureRecord_Offset);
         kbts__ByteSwapFeature(Context, Feature);
       }
     }
@@ -15607,8 +16441,8 @@ static int kbts__ByteSwapLookup(kbts__byteswap_context *Context, kbts__lookup *L
     kbts__ByteSwapArray16Context(&Lookup->Type, 3, Context);
     kbts_u16 *SubtableOffsets = KBTS__POINTER_AFTER(kbts_u16, Lookup);
 
-    kbts_un U16Count = Lookup->SubtableCount;
-    if(Lookup->Flag & KBTS__LOOKUP_FLAG_USE_MARK_FILTERING_SET)
+    kbts_un U16Count = kbts__ReadU16Unaligned(&Lookup->SubtableCount);
+    if(kbts__ReadU16Unaligned(&Lookup->Flag) & KBTS__LOOKUP_FLAG_USE_MARK_FILTERING_SET)
     {
       U16Count += 1;
     }
@@ -15630,13 +16464,16 @@ static void kbts__ByteSwapCoverage(kbts__byteswap_context *Context, kbts__covera
     kbts__ByteSwapArray16Context(&Coverage->Format, 2, Context);
 
     kbts_un U16Count = 0;
-    if(Coverage->Format == 1)
+    kbts_u16 Coverage_Format = kbts__ReadU16Unaligned(&Coverage->Format);
+    kbts_un Coverage_Count = kbts__ReadU16Unaligned(&Coverage->Count);
+
+    if(Coverage_Format == 1)
     {
-      U16Count = Coverage->Count;
+      U16Count = Coverage_Count;
     }
-    else if(Coverage->Format == 2)
+    else if(Coverage_Format == 2)
     {
-      U16Count = Coverage->Count * 3;
+      U16Count = Coverage_Count * 3;
     }
 
     kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Coverage), U16Count, Context);
@@ -15647,14 +16484,14 @@ static void kbts__ByteSwapAnchor(kbts__byteswap_context *Context, kbts__anchor *
 {
   if(!kbts__AlreadyVisited(Context, Anchor))
   {
-    Anchor->Format = kbts__ByteSwap16(Anchor->Format);
+    kbts_un Anchor_Format = kbts__ByteSwap16InPlace(&Anchor->Format);
 
     kbts_un U16Count = 2;
-    if(Anchor->Format == 2)
+    if(Anchor_Format == 2)
     {
       U16Count = 3;
     }
-    else if(Anchor->Format == 3)
+    else if(Anchor_Format == 3)
     {
       U16Count = 4;
     }
@@ -15667,14 +16504,14 @@ static void kbts__ByteSwapBaseArray(kbts__byteswap_context *Context, kbts_u16 Ma
 {
   if(!kbts__AlreadyVisited(Context, Array))
   {
-    Array->BaseCount = kbts__ByteSwap16(Array->BaseCount);
+    kbts_un Array_BaseCount = kbts__ByteSwap16InPlace(&Array->BaseCount);
 
     kbts_u16 *BaseAnchorOffsets = KBTS__POINTER_AFTER(kbts_u16, Array);
-    kbts__ByteSwapArray16Context(BaseAnchorOffsets, Array->BaseCount * MarkClassCount, Context);
+    kbts__ByteSwapArray16Context(BaseAnchorOffsets, Array_BaseCount * MarkClassCount, Context);
 
-    KBTS__FOR(OffsetIndex, 0, (kbts_un)Array->BaseCount * MarkClassCount)
+    KBTS__FOR(OffsetIndex, 0, Array_BaseCount * MarkClassCount)
     {
-      kbts_u16 Offset = BaseAnchorOffsets[OffsetIndex];
+      kbts_u16 Offset = kbts__ReadU16Unaligned(&BaseAnchorOffsets[OffsetIndex]);
 
       if(Offset)
       {
@@ -15690,14 +16527,14 @@ static void kbts__ByteSwapDevice(kbts__byteswap_context *Context, kbts__device *
   {
     kbts__ByteSwapArray16Context(&Device->U.Device.StartSize, 3, Context);
 
-    if(Device->DeltaFormat <= 3)
+    if(kbts__ReadU16Unaligned(&Device->DeltaFormat) <= 3)
     {
       // @Incomplete
     }
   }
 }
 
-static kbts__unpacked_value_record kbts_ByteSwapValueRecord(kbts__byteswap_context *Context, void *Parent, kbts_u16 ValueFormat, kbts_u16 *Record)
+static kbts__unpacked_value_record kbts__ByteSwapValueRecord(kbts__byteswap_context *Context, void *Parent, kbts_u16 ValueFormat, kbts_u16 *Record)
 {
   kbts__unpacked_value_record Result = KBTS__ZERO;
 
@@ -15718,19 +16555,165 @@ static kbts__unpacked_value_record kbts_ByteSwapValueRecord(kbts__byteswap_conte
   return Result;
 }
 
+KBTS_INLINE kbts_un kbts__DeltaSetIndexMapBytesPerEntry(kbts__delta_set_index_map *Map)
+{
+  kbts_un Result = ((Map->EntryFormat >> 4) & 0x3) + 1;
+  return Result;
+}
+
+KBTS_INLINE kbts_un kbts__DeltaSetIndexMapBitsPerInnerIndex(kbts__delta_set_index_map *Map)
+{
+  kbts_un Result = (Map->EntryFormat & 0xF) + 1;
+  return Result;
+}
+
+static void kbts__ByteSwapDeltaSetIndexMap(kbts__byteswap_context *Context, kbts__delta_set_index_map *Map)
+{
+  if(!kbts__AlreadyVisited(Context, Map))
+  {
+    kbts_un MinimumSize = sizeof(*Map) + ((Map->Format == 0) ? sizeof(kbts_u16) : sizeof(kbts_u32));
+    kbts_un BytesPerEntry = kbts__DeltaSetIndexMapBytesPerEntry(Map);
+
+    if(KBTS__POINTER_OFFSET(char, Map, MinimumSize) <= Context->FileEnd)
+    {
+      char *Entries = 0;
+      kbts_un EntryCount = 0;
+
+      switch(Map->Format)
+      {
+      case 0:
+      {
+        kbts_u16 *MapCount = KBTS__POINTER_AFTER(kbts_u16, Map);
+        kbts_un MapCount_ = kbts__ByteSwap16InPlace(MapCount);
+
+        Entries = KBTS__POINTER_AFTER(char, MapCount);
+        EntryCount = MapCount_;
+      } break;
+
+      case 1:
+      {
+        kbts_u32 *MapCount = KBTS__POINTER_AFTER(kbts_u32, Map);
+        kbts_un MapCount_ = kbts__ByteSwap32InPlace(MapCount);
+
+        Entries = KBTS__POINTER_AFTER(char, MapCount);
+        EntryCount = MapCount_;
+      } break;
+      }
+
+      if((Entries + EntryCount * BytesPerEntry) > Context->FileEnd)
+      {
+        Context->Error |= 1;
+      }
+
+      // If BytesPerEntry == 1, we have nothing to byteswap.
+      switch(BytesPerEntry)
+      {
+      case 1: break; // Nothing to do.
+
+      case 2:
+      {
+        kbts__ByteSwapArray16Context((kbts_u16 *)Entries, EntryCount, Context);
+      } break;
+
+      case 4:
+      {
+        kbts__ByteSwapArray32Context((kbts_u32 *)Entries, EntryCount, Context);
+      } break;
+
+      default: Context->Error |= 1; break;
+      }
+    }
+    else
+    {
+      Context->Error |= 1;
+    }
+  }
+}
+
+static void kbts__ByteSwapItemVariationStore(kbts__byteswap_context *Context, kbts__item_variation_store *Store)
+{
+  if(!kbts__AlreadyVisited(Context, Store))
+  {
+    kbts_u32 *Store_VariationRegionListOffset = kbts__item_variation_store_VariationRegionListOffset(Store);
+    kbts_u16 *Store_ItemVariationDataCount = kbts__item_variation_store_ItemVariationDataCount(Store);
+    kbts_u32 *Store_ItemVariationDataOffsets = kbts__item_variation_store_ItemVariationDataOffsets(Store);
+
+    kbts__ByteSwap16InPlace(&Store->Format);
+    kbts_un VariationRegionListOffset = kbts__ByteSwap32InPlace(Store_VariationRegionListOffset);
+    kbts_un ItemVariationDataCount = kbts__ByteSwap16InPlace(Store_ItemVariationDataCount);
+
+    kbts__variation_region_list *VariationRegionList = KBTS__POINTER_OFFSET(kbts__variation_region_list, Store, VariationRegionListOffset);
+    if(!kbts__AlreadyVisited(Context, VariationRegionList))
+    {
+      kbts__region_axis_coordinates *RegionAxes = KBTS__POINTER_AFTER(kbts__region_axis_coordinates, VariationRegionList);
+      
+      kbts__ByteSwapArray16Context(&VariationRegionList->AxisCount, 2, Context);
+
+      kbts_un VariationRegionList_RegionCount = kbts__ReadU16Unaligned(&VariationRegionList->RegionCount);
+      kbts_un VariationRegionList_AxisCount = kbts__ReadU16Unaligned(&VariationRegionList->AxisCount);
+
+      kbts__ByteSwapArray16Context((kbts_u16 *)RegionAxes, VariationRegionList_RegionCount * VariationRegionList_AxisCount * 3, Context);
+    }
+
+    if(kbts__ByteSwapArray32Context(Store_ItemVariationDataOffsets, ItemVariationDataCount, Context))
+    {
+      KBTS__FOR(ItemVariationDataIndex, 0, ItemVariationDataCount)
+      {
+        kbts_un Offset = kbts__ReadU32Unaligned(&Store_ItemVariationDataOffsets[ItemVariationDataIndex]);
+
+        if(Offset)
+        {
+          kbts__item_variation_data *Data = KBTS__POINTER_OFFSET(kbts__item_variation_data, Store, Offset);
+
+          if(!kbts__AlreadyVisited(Context, Data))
+          {
+            kbts__ByteSwapArray16Context(&Data->ItemCount, 3, Context);
+
+            kbts_u16 *RegionIndices = KBTS__POINTER_AFTER(kbts_u16, Data);
+            kbts_un Data_RegionIndexCount = kbts__ReadU16Unaligned(&Data->RegionIndexCount);
+            if(kbts__ByteSwapArray16Context(RegionIndices, Data_RegionIndexCount, Context))
+            {
+              // From the Microsoft docs:
+              //   The LONG_WORDS flag should only be used in top-level tables that include
+              //   32-bit values that can be variable - currently, only the COLR table.
+              // As such, we do not care about (Data->WordDeltaCount & 0x8000).
+
+              kbts_un WordDeltaCount = kbts__ReadU16Unaligned(&Data->WordDeltaCount) & 0x7FFF;
+
+              char *DeltaRow = (char *)(RegionIndices + Data_RegionIndexCount);
+              kbts_un DeltaRowSize = Data_RegionIndexCount + WordDeltaCount;
+              kbts_un Data_ItemCount = kbts__ReadU16Unaligned(&Data->ItemCount);
+              KBTS__FOR(DataItemIndex, 0, Data_ItemCount)
+              {
+                if(!kbts__ByteSwapArray16Context((kbts_u16 *)DeltaRow, WordDeltaCount, Context))
+                {
+                  break;
+                }
+
+                DeltaRow += DeltaRowSize;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 static void kbts__ByteSwapMarkArray(kbts__byteswap_context *Context, kbts__mark_array *MarkArray)
 {
   if(!kbts__AlreadyVisited(Context, MarkArray))
   {
-    MarkArray->Count = kbts__ByteSwap16(MarkArray->Count);
-    kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, MarkArray), MarkArray->Count * 2, Context);
+    kbts_un MarkArray_Count = kbts__ByteSwap16InPlace(&MarkArray->Count);
+    kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, MarkArray), MarkArray_Count * 2, Context);
 
     kbts__mark_record *MarkRecords = KBTS__POINTER_AFTER(kbts__mark_record, MarkArray);
-    KBTS__FOR(MarkRecordIndex, 0, MarkArray->Count)
+    KBTS__FOR(MarkRecordIndex, 0, MarkArray_Count)
     {
       kbts__mark_record *MarkRecord = &MarkRecords[MarkRecordIndex];
+      kbts_un MarkRecord_AnchorOffset = kbts__ReadU16Unaligned(&MarkRecord->AnchorOffset);
 
-      kbts__ByteSwapAnchor(Context, KBTS__POINTER_OFFSET(kbts__anchor, MarkArray, MarkRecord->AnchorOffset));
+      kbts__ByteSwapAnchor(Context, KBTS__POINTER_OFFSET(kbts__anchor, MarkArray, MarkRecord_AnchorOffset));
     }
   }
 }
@@ -15739,10 +16722,10 @@ static void kbts__ByteSwapChainedSequenceRuleSet(kbts__byteswap_context *Context
 {
   if(Set && !kbts__AlreadyVisited(Context, Set))
   {
-    Set->Count = kbts__ByteSwap16(Set->Count);
-    kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Set), Set->Count, Context);
+    kbts_un Set_Count = kbts__ByteSwap16InPlace(&Set->Count);
+    kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Set), Set_Count, Context);
 
-    KBTS__FOR(RuleIndex, 0, Set->Count)
+    KBTS__FOR(RuleIndex, 0, Set_Count)
     {
       kbts__chained_sequence_rule *Rule = kbts__GetChainedSequenceRule(Set, RuleIndex);
 
@@ -15760,24 +16743,28 @@ static void kbts__ByteSwapChainedSequenceRuleSet(kbts__byteswap_context *Context
 #ifdef KBTS_DUMP
 static void kbts__DumpClassDefinition(kbts_u16 *Base)
 {
-  if(*Base == 1)
+  kbts_u16 Format = kbts__ReadU16Unaligned(Base);
+  if(Format == 1)
   {
     kbts__class_definition_1 *ClassDef = (kbts__class_definition_1 *)Base;
     kbts_u16 *ClassValues = KBTS__POINTER_AFTER(kbts_u16, ClassDef);
-    KBTS__FOR(GlyphIndex, 0, ClassDef->GlyphCount)
+    kbts_un ClassDef_GlyphCount = kbts__ReadU16Unaligned(&ClassDef->GlyphCount);
+
+    KBTS__FOR(GlyphIndex, 0, ClassDef_GlyphCount)
     {
-      KBTS_DUMPF("%llx -> %u\n", ClassDef->StartGlyphId + GlyphIndex, ClassValues[GlyphIndex]);
+      KBTS_DUMPF("%llx -> %u\n", kbts__ReadU16Unaligned(&ClassDef->StartGlyphId) + GlyphIndex, kbts__ReadU16Unaligned(&ClassValues[GlyphIndex]));
     }
   }
-  else if(*Base == 2)
+  else if(Format == 2)
   {
     kbts__class_definition_2 *ClassDef = (kbts__class_definition_2 *)Base;
     kbts__class_range_record *Ranges = KBTS__POINTER_AFTER(kbts__class_range_record, ClassDef);
-    KBTS__FOR(RangeIndex, 0, ClassDef->Count)
+    kbts_un ClassDef_Count = kbts__ReadU16Unaligned(&ClassDef->Count);
+    KBTS__FOR(RangeIndex, 0, ClassDef_Count)
     {
       kbts__class_range_record *Range = &Ranges[RangeIndex];
 
-      KBTS_DUMPF("[%x..%x] -> %u\n", Range->StartGlyphId, Range->EndGlyphId, Range->Class);
+      KBTS_DUMPF("[%x..%x] -> %u\n", kbts__ReadU16Unaligned(&Range->StartGlyphId), kbts__ReadU16Unaligned(&Range->EndGlyphId), kbts__ReadU16Unaligned(&Range->Class));
     }
   }
 }
@@ -15787,20 +16774,20 @@ static void kbts__ByteSwapClassDefinition(kbts__byteswap_context *Context, kbts_
 {
   if(!kbts__AlreadyVisited(Context, Base))
   {
-    *Base = kbts__ByteSwap16(*Base);
+    kbts_u16 Format = kbts__ByteSwap16InPlace(Base);
 
-    if(*Base == 1)
+    if(Format == 1)
     {
       kbts__class_definition_1 *ClassDef = (kbts__class_definition_1 *)Base;
       kbts__ByteSwapArray16Context(&ClassDef->StartGlyphId, 2, Context);
-      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, ClassDef), ClassDef->GlyphCount, Context);
+      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, ClassDef), kbts__ReadU16Unaligned(&ClassDef->GlyphCount), Context);
     }
-    else if(*Base == 2)
+    else if(Format == 2)
     {
       kbts__class_definition_2 *ClassDef = (kbts__class_definition_2 *)Base;
-      ClassDef->Count = kbts__ByteSwap16(ClassDef->Count);
+      kbts_un ClassDef_Count = kbts__ByteSwap16InPlace(&ClassDef->Count);
 
-      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, ClassDef), ClassDef->Count * 3, Context);
+      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, ClassDef), ClassDef_Count * 3, Context);
     }
   }
 }
@@ -15824,37 +16811,40 @@ static kbts__glyph_class_from_table_result kbts__GlyphClassFromTable(kbts_u16 *C
   //   A class definition table (ClassDef) assigns glyphs into classes, beginning with Class 1, then Class 2, and so
   //   on. All glyphs not assigned to a class fall into Class 0.
   // So, we should be able to pretty reliably just subtract 1 from the class to get.
-  if(*ClassDefinitionBase == 1)
+  kbts_u16 Format = kbts__ReadU16Unaligned(ClassDefinitionBase);
+  if(Format == 1)
   {
     KBTS_INSTRUMENT_BLOCK_BEGIN(GlyphClassFromTable1);
     kbts__class_definition_1 *ClassDef = (kbts__class_definition_1 *)ClassDefinitionBase;
     kbts_u16 *GlyphClasses = KBTS__POINTER_AFTER(kbts_u16, ClassDef);
 
-    kbts_un Offset = Id - ClassDef->StartGlyphId;
-    if(Offset < ClassDef->GlyphCount)
+    kbts_un Offset = Id - kbts__ReadU16Unaligned(&ClassDef->StartGlyphId);
+    if(Offset < kbts__ReadU16Unaligned(&ClassDef->GlyphCount))
     {
-      Result.Class = GlyphClasses[Offset];
+      Result.Class = kbts__ReadU16Unaligned(&GlyphClasses[Offset]);
       Result.Found = 1;
     }
     KBTS_INSTRUMENT_BLOCK_END(GlyphClassFromTable1);
   }
-  else if(*ClassDefinitionBase == 2)
+  else if(Format == 2)
   {
     kbts__class_definition_2 *ClassDef = (kbts__class_definition_2 *)ClassDefinitionBase;
     kbts__class_range_record *Ranges = KBTS__POINTER_AFTER(kbts__class_range_record, ClassDef);
 
-    kbts_un RangeCount = ClassDef->Count;
+    kbts_un RangeCount = kbts__ReadU16Unaligned(&ClassDef->Count);
     if(RangeCount)
     {
       while(RangeCount > 1)
       {
         kbts_un HalfCount = RangeCount / 2;
-        Ranges = (Ranges[HalfCount - 1].EndGlyphId < Id) ? (Ranges + HalfCount) : Ranges;
+        Ranges = (kbts__ReadU16Unaligned(&Ranges[HalfCount - 1].EndGlyphId) < Id) ? (Ranges + HalfCount) : Ranges;
         RangeCount -= HalfCount;
       }
-      if((Id >= Ranges->StartGlyphId) && (Id <= Ranges->EndGlyphId))
+
+      if((Id >= kbts__ReadU16Unaligned(&Ranges->StartGlyphId)) &&
+         (Id <= kbts__ReadU16Unaligned(&Ranges->EndGlyphId)))
       {
-        Result.Class = Ranges->Class;
+        Result.Class = kbts__ReadU16Unaligned(&Ranges->Class);
         Result.Found = 1;
       }
     }
@@ -15868,41 +16858,45 @@ static kbts__cover_glyph_result kbts__CoverGlyph(kbts__coverage *Coverage, kbts_
   KBTS_INSTRUMENT_FUNCTION_BEGIN;
   kbts__cover_glyph_result Result = KBTS__ZERO;
 
-  kbts_un Count = Coverage->Count;
+  kbts_un Count = kbts__ReadU16Unaligned(&Coverage->Count);
 
   if(Count)
   {
-    if(Coverage->Format == 1)
+    kbts_u16 Format = kbts__ReadU16Unaligned(&Coverage->Format);
+
+    if(Format == 1)
     {
       kbts_u16 *GlyphIds = KBTS__POINTER_AFTER(kbts_u16, Coverage);
 
       while(Count > 1)
       {
         kbts_un HalfCount = Count / 2;
-        GlyphIds = (GlyphIds[HalfCount - 1] < GlyphId) ? (GlyphIds + HalfCount) : GlyphIds;
+        GlyphIds = (kbts__ReadU16Unaligned(&GlyphIds[HalfCount - 1]) < GlyphId) ? (GlyphIds + HalfCount) : GlyphIds;
         Count -= HalfCount;
       }
 
-      if(GlyphId == *GlyphIds)
+      if(GlyphId == kbts__ReadU16Unaligned(GlyphIds))
       {
         Result.Valid = 1;
         Result.Index = (kbts_u32)(GlyphIds - KBTS__POINTER_AFTER(kbts_u16, Coverage));
       }
     }
-    else if(Coverage->Format == 2)
+    else if(Format == 2)
     {
       kbts__range_record *Ranges = KBTS__POINTER_AFTER(kbts__range_record, Coverage);
 
       while(Count > 1)
       {
         kbts_un HalfCount = Count / 2;
-        Ranges = (Ranges[HalfCount - 1].EndGlyphId < GlyphId) ? (Ranges + HalfCount) : Ranges;
+        Ranges = (kbts__ReadU16Unaligned(&Ranges[HalfCount - 1].EndGlyphId) < GlyphId) ? (Ranges + HalfCount) : Ranges;
         Count -= HalfCount;
       }
-      if((GlyphId >= Ranges->StartGlyphId) && (GlyphId <= Ranges->EndGlyphId))
+
+      if((GlyphId >= kbts__ReadU16Unaligned(&Ranges->StartGlyphId)) &&
+         (GlyphId <= kbts__ReadU16Unaligned(&Ranges->EndGlyphId)))
       {
         Result.Valid = 1;
-        Result.Index = Ranges->StartCoverageIndex + GlyphId - Ranges->StartGlyphId;
+        Result.Index = kbts__ReadU16Unaligned(&Ranges->StartCoverageIndex) + GlyphId - kbts__ReadU16Unaligned(&Ranges->StartGlyphId);
       }
     }
   }
@@ -15913,60 +16907,70 @@ static kbts__cover_glyph_result kbts__CoverGlyph(kbts__coverage *Coverage, kbts_
 
 static void kbts__ByteSwapSequenceContextSubtable(kbts__byteswap_context *Context, kbts_u16 *Base)
 {
-  if(Base[0] == 1)
+  kbts_u16 Format = kbts__ReadU16Unaligned(Base);
+
+  if(Format == 1)
   {
     kbts__sequence_context_1 *Subst = (kbts__sequence_context_1 *)Base;
-    Subst->SeqRuleSetCount = kbts__ByteSwap16(Subst->SeqRuleSetCount);
-    kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst->SeqRuleSetCount, Context);
+    kbts_un Subst_SeqRuleSetCount = kbts__ByteSwap16InPlace(&Subst->SeqRuleSetCount);
+    kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst_SeqRuleSetCount, Context);
 
-    KBTS__FOR(SetIndex, 0, Subst->SeqRuleSetCount)
+    KBTS__FOR(SetIndex, 0, Subst_SeqRuleSetCount)
     {
       kbts__sequence_rule_set *Set = kbts__GetSequenceRuleSet(Subst, SetIndex);
 
       if(Set && !kbts__AlreadyVisited(Context, Set))
       {
-        Set->Count = kbts__ByteSwap16(Set->Count);
-        kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Set), Set->Count, Context);
+        kbts_un SetRuleCount = kbts__ByteSwap16InPlace(&Set->Count);
+        kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Set), SetRuleCount, Context);
 
-        KBTS__FOR(RuleIndex, 0, Set->Count)
+        KBTS__FOR(RuleIndex, 0, SetRuleCount)
         {
           kbts__sequence_rule *Rule = kbts__GetSequenceRule(Set, RuleIndex);
 
           if(!kbts__AlreadyVisited(Context, Rule))
           {
             kbts__ByteSwapArray16Context(&Rule->GlyphCount, 2, Context);
-            kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Rule), (kbts_un)Rule->GlyphCount - 1 + (kbts_un)Rule->SequenceLookupCount * 2, Context);
+            kbts_un Rule_GlyphCount = kbts__ReadU16Unaligned(&Rule->GlyphCount);
+            kbts_un Rule_SequenceLookupCount = kbts__ReadU16Unaligned(&Rule->SequenceLookupCount);
+            kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Rule), Rule_GlyphCount - 1 + Rule_SequenceLookupCount * 2, Context);
           }
         }
       }
     }
   }
-  else if(Base[0] == 2)
+  else if(Format == 2)
   {
     kbts__sequence_context_2 *Subst = (kbts__sequence_context_2 *)Base;
     kbts__ByteSwapArray16Context(&Subst->ClassDefOffset, 2, Context);
-    kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst->ClassSequenceRuleSetCount, Context);
+    kbts_un Subst_ClassSequenceRuleSetCount = kbts__ReadU16Unaligned(&Subst->ClassSequenceRuleSetCount);
+    kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst_ClassSequenceRuleSetCount, Context);
 
-    kbts_u16 *ClassDefBase = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst->ClassDefOffset);
+    kbts_un Subst_ClassDefOffset = kbts__ReadU16Unaligned(&Subst->ClassDefOffset);
+    kbts_u16 *ClassDefBase = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst_ClassDefOffset);
     kbts__ByteSwapClassDefinition(Context, ClassDefBase);
 
-    KBTS__FOR(SetIndex, 0, Subst->ClassSequenceRuleSetCount)
+    KBTS__FOR(SetIndex, 0, Subst_ClassSequenceRuleSetCount)
     {
       kbts__class_sequence_rule_set *Set = kbts__GetClassSequenceRuleSet(Subst, SetIndex);
 
       if(Set && !kbts__AlreadyVisited(Context, Set))
       {
-        Set->Count = kbts__ByteSwap16(Set->Count);
-        kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Set), Set->Count, Context);
+        kbts_un Set_Count = kbts__ByteSwap16InPlace(&Set->Count);
+        kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Set), Set_Count, Context);
 
-        KBTS__FOR(RuleIndex, 0, Set->Count)
+        KBTS__FOR(RuleIndex, 0, Set_Count)
         {
           kbts__class_sequence_rule *Rule = kbts__GetClassSequenceRule(Set, RuleIndex);
 
           if(!kbts__AlreadyVisited(Context, Rule))
           {
             kbts__ByteSwapArray16Context(&Rule->GlyphCount, 2, Context);
-            kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Rule), Rule->GlyphCount - 1 + 2 * Rule->SequenceLookupCount, Context);
+
+            kbts_un Rule_GlyphCount = kbts__ReadU16Unaligned(&Rule->GlyphCount);
+            kbts_un Rule_SequenceLookupCount = kbts__ReadU16Unaligned(&Rule->SequenceLookupCount);
+
+            kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Rule), Rule_GlyphCount - 1 + 2 * Rule_SequenceLookupCount, Context);
           }
         }
       }
@@ -15974,28 +16978,33 @@ static void kbts__ByteSwapSequenceContextSubtable(kbts__byteswap_context *Contex
 
     #ifdef KBTS_DUMP
     kbts__DumpClassDefinition(ClassDefBase);
-    KBTS__FOR(SetIndex, 0, Subst->ClassSequenceRuleSetCount)
+    kbts_un Subst_ClassSequenceRuleSetCount = kbts__ReadU16Unaligned(&Subst->ClassSequenceRuleSetCount);
+    KBTS__FOR(SetIndex, 0, Subst_ClassSequenceRuleSetCount)
     {
       kbts__class_sequence_rule_set *Set = kbts__GetClassSequenceRuleSet(Subst, SetIndex);
 
       if(Set)
       {
-        KBTS__FOR(RuleIndex, 0, Set->Count)
+        kbts_un Set_Count = kbts__ReadU16Unaligned(&Set->Count);
+
+        KBTS__FOR(RuleIndex, 0, Set_Count)
         {
           kbts__class_sequence_rule *Rule = kbts__GetClassSequenceRule(Set, RuleIndex);
           kbts_u16 *InputSequence = KBTS__POINTER_AFTER(kbts_u16, Rule);
-          kbts__sequence_lookup_record *Records = (kbts__sequence_lookup_record *)(InputSequence + Rule->GlyphCount - 1);
+          kbts_un Rule_GlyphCount = kbts__ReadU16Unaligned(&Rule->GlyphCount);
+          kbts__sequence_lookup_record *Records = (kbts__sequence_lookup_record *)(InputSequence + Rule_GlyphCount - 1);
           KBTS_DUMPF("Input: [");
-          KBTS__FOR(GlyphIndex, 1, Rule->GlyphCount)
+          KBTS__FOR(GlyphIndex, 1, Rule_GlyphCount)
           {
-            KBTS_DUMPF(", %x", InputSequence[GlyphIndex - 1]);
+            KBTS_DUMPF(", %x", kbts__ReadU16Unaligned(&InputSequence[GlyphIndex - 1]));
           }
           KBTS_DUMPF("]\nRecords: [");
-          KBTS__FOR(RecordIndex, 0, Rule->SequenceLookupCount)
+          kbts_un Rule_SequenceLookupCount = kbts__ReadU16Unaligned(&Rule->SequenceLookupCount);
+          KBTS__FOR(RecordIndex, 0, Rule_SequenceLookupCount)
           {
             kbts__sequence_lookup_record *Record = &Records[RecordIndex];
             if(RecordIndex) KBTS_DUMPF(", ");
-            KBTS_DUMPF("%u@%u", Record->LookupListIndex, Record->SequenceIndex);
+            KBTS_DUMPF("%u@%u", kbts__ReadU16Unaligned(&Record->LookupListIndex), kbts__ReadU16Unaligned(&Record->SequenceIndex));
           }
           KBTS_DUMPF("]\n");
         }
@@ -16003,16 +17012,20 @@ static void kbts__ByteSwapSequenceContextSubtable(kbts__byteswap_context *Contex
     }
     #endif
   }
-  else if(Base[0] == 3)
+  else if(Format == 3)
   {
     kbts__sequence_context_3 *Subst = (kbts__sequence_context_3 *)Base;
     kbts__ByteSwapArray16Context(&Subst->GlyphCount, 2, Context);
-    kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst->GlyphCount + 2 * Subst->SequenceLookupCount, Context);
+
+    kbts_un Subst_GlyphCount = kbts__ReadU16Unaligned(&Subst->GlyphCount);
+    kbts_un Subst_SequenceLookupCount = kbts__ReadU16Unaligned(&Subst->SequenceLookupCount);
 
     kbts_u16 *CoverageOffsets = KBTS__POINTER_AFTER(kbts_u16, Subst);
-    KBTS__FOR(CoverageIndex, 0, Subst->GlyphCount)
+    kbts__ByteSwapArray16Context(CoverageOffsets, Subst_GlyphCount + 2 * Subst_SequenceLookupCount, Context);
+
+    KBTS__FOR(CoverageIndex, 0, Subst_GlyphCount)
     {
-      kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, CoverageOffsets[CoverageIndex]);
+      kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&CoverageOffsets[CoverageIndex]));
 
       kbts__ByteSwapCoverage(Context, Coverage);
     }
@@ -16280,21 +17293,25 @@ static kbts_b32 kbts__GlyphIncludedInLookupSubtable(kbts_shape_scratchpad *Scrat
 static void kbts__DumpCoverage(kbts__coverage *Coverage)
 {
   KBTS_DUMPF("[");
-  if(Coverage->Format == 1)
+  kbts_u16 Coverage_Format = kbts__ReadU16Unaligned(&Coverage->Format);
+
+  if(Coverage_Format == 1)
   {
     kbts_u16 *GlyphIds = KBTS__POINTER_AFTER(kbts_u16, Coverage);
-    KBTS__FOR(GlyphIndex, 0, Coverage->Count)
+    kbts_un Coverage_Count = kbts__ReadU16Unaligned(&Coverage->Count);
+    KBTS__FOR(GlyphIndex, 0, Coverage_Count)
     {
-      KBTS_DUMPF("%x,", GlyphIds[GlyphIndex]);
+      KBTS_DUMPF("%x,", kbts__ReadU16Unaligned(&GlyphIds[GlyphIndex]));
     }
   }
-  else if(Coverage->Format == 2)
+  else if(Coverage_Format == 2)
   {
     kbts__range_record *Ranges = KBTS__POINTER_AFTER(kbts__range_record, Coverage);
-    KBTS__FOR(RangeIndex, 0, Coverage->Count)
+    kbts_un Coverage_Count = kbts__ReadU16Unaligned(&Coverage->Count);
+    KBTS__FOR(RangeIndex, 0, Coverage_Count)
     {
       kbts__range_record *Range = &Ranges[RangeIndex];
-      KBTS_DUMPF("%x..%x @ %u,", Range->StartGlyphId, Range->EndGlyphId, Range->StartCoverageIndex);
+      KBTS_DUMPF("%x..%x @ %u,", kbts__ReadU16Unaligned(&Range->StartGlyphId), kbts__ReadU16Unaligned(&Range->EndGlyphId), kbts__ReadU16Unaligned(&Range->StartCoverageIndex));
     }
   }
   KBTS_DUMPF("]");
@@ -16303,30 +17320,33 @@ static void kbts__DumpCoverage(kbts__coverage *Coverage)
 
 static void kbts__ByteSwapChainedSequenceContextSubtable(kbts__byteswap_context *Context, kbts_u16 *Base)
 {
-  if(Base[0] == 1)
+  kbts_u16 Format = kbts__ReadU16Unaligned(Base);
+
+  if(Format == 1)
   {
     kbts__chained_sequence_context_1 *Subst = (kbts__chained_sequence_context_1 *)Base;
-    Subst->ChainedSequenceRuleSetCount = kbts__ByteSwap16(Subst->ChainedSequenceRuleSetCount);
-    kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst->ChainedSequenceRuleSetCount, Context);
+    kbts_un Subst_ChainedSequenceRuleSetCount = kbts__ByteSwap16InPlace(&Subst->ChainedSequenceRuleSetCount);
+    kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst_ChainedSequenceRuleSetCount, Context);
 
-    KBTS__FOR(SetIndex, 0, Subst->ChainedSequenceRuleSetCount)
+    KBTS__FOR(SetIndex, 0, Subst_ChainedSequenceRuleSetCount)
     {
       kbts__ByteSwapChainedSequenceRuleSet(Context, kbts__GetChainedSequenceRuleSet(Subst, SetIndex));
     }
   }
-  else if(Base[0] == 2)
+  else if(Format == 2)
   {
     kbts__chained_sequence_context_2 *Subst = (kbts__chained_sequence_context_2 *)Base;
     kbts__ByteSwapArray16Context(&Subst->BacktrackClassDefOffset, 4, Context);
-    kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst->ChainedClassSequenceRuleSetCount, Context);
+    kbts_un Subst_ChainedClassSequenceRuleSetCount = kbts__ReadU16Unaligned(&Subst->ChainedClassSequenceRuleSetCount);
+    kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst_ChainedClassSequenceRuleSetCount, Context);
 
-    kbts_u16 *BacktrackClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst->BacktrackClassDefOffset);
+    kbts_u16 *BacktrackClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, kbts__ReadU16Unaligned(&Subst->BacktrackClassDefOffset));
     kbts__ByteSwapClassDefinition(Context, BacktrackClassDefinition);
 
-    kbts_u16 *InputClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst->InputClassDefOffset);
+    kbts_u16 *InputClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, kbts__ReadU16Unaligned(&Subst->InputClassDefOffset));
     kbts__ByteSwapClassDefinition(Context, InputClassDefinition);
 
-    kbts_u16 *LookaheadClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst->LookaheadClassDefOffset);
+    kbts_u16 *LookaheadClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, kbts__ReadU16Unaligned(&Subst->LookaheadClassDefOffset));
     kbts__ByteSwapClassDefinition(Context, LookaheadClassDefinition);
 
     #ifdef KBTS_DUMP
@@ -16338,7 +17358,7 @@ static void kbts__ByteSwapChainedSequenceContextSubtable(kbts__byteswap_context 
     // kbts__DumpClassDefinition(LookaheadClassDefinition);
     #endif
 
-    KBTS__FOR(SetIndex, 0, Subst->ChainedClassSequenceRuleSetCount)
+    KBTS__FOR(SetIndex, 0, Subst_ChainedClassSequenceRuleSetCount)
     {
       kbts__chained_sequence_rule_set *Set = kbts__GetChainedClassSequenceRuleSet(Subst, SetIndex);
       kbts__ByteSwapChainedSequenceRuleSet(Context, Set);
@@ -16346,7 +17366,9 @@ static void kbts__ByteSwapChainedSequenceContextSubtable(kbts__byteswap_context 
       #ifdef KBTS_DUMP
       if(Set)
       {
-        KBTS__FOR(RuleIndex, 0, Set->Count)
+        kbts_un Set_Count = kbts__ReadU16Unaligned(&Set->Count);
+
+        KBTS__FOR(RuleIndex, 0, Set_Count)
         {
           kbts__chained_sequence_rule *Rule = kbts__GetChainedClassSequenceRule(Set, RuleIndex);
           kbts__unpacked_chained_sequence_rule Unpacked = kbts__UnpackChainedSequenceRule(Rule, 0);
@@ -16355,21 +17377,21 @@ static void kbts__ByteSwapChainedSequenceContextSubtable(kbts__byteswap_context 
           KBTS__FOR(BacktrackIndex, 0, Unpacked.BacktrackCount)
           {
             if(BacktrackIndex) KBTS_DUMPF(", ");
-            KBTS_DUMPF("%u", Unpacked.Backtrack[BacktrackIndex]);
+            KBTS_DUMPF("%u", kbts__ReadU16Unaligned(&Unpacked.Backtrack[BacktrackIndex]));
           }
           KBTS_DUMPF("]\n"
                      "Input: [");
           KBTS__FOR(InputIndex, 1, Unpacked.InputCount)
           {
             if(InputIndex) KBTS_DUMPF(", ");
-            KBTS_DUMPF("%u", Unpacked.Input[InputIndex - 1]);
+            KBTS_DUMPF("%u", kbts__ReadU16Unaligned(&Unpacked.Input[InputIndex - 1]));
           }
           KBTS_DUMPF("]\n"
                      "Lookahead: [");
           KBTS__FOR(LookaheadIndex, 0, Unpacked.LookaheadCount)
           {
             if(LookaheadIndex) KBTS_DUMPF(", ");
-            KBTS_DUMPF("%u", Unpacked.Lookahead[LookaheadIndex]);
+            KBTS_DUMPF("%u", kbts__ReadU16Unaligned(&Unpacked.Lookahead[LookaheadIndex]));
           }
           KBTS_DUMPF("]\n"
                      "Records: [");
@@ -16377,7 +17399,7 @@ static void kbts__ByteSwapChainedSequenceContextSubtable(kbts__byteswap_context 
           {
             kbts__sequence_lookup_record *Record = &Unpacked.Records[RecordIndex];
             if(RecordIndex) KBTS_DUMPF(", ");
-            KBTS_DUMPF("%u@%u", Record->LookupListIndex, Record->SequenceIndex);
+            KBTS_DUMPF("%u@%u", kbts__ReadU16Unaligned(&Record->LookupListIndex), kbts__ReadU16Unaligned(&Record->SequenceIndex));
           }
           KBTS_DUMPF("]\n");
         }
@@ -16385,7 +17407,7 @@ static void kbts__ByteSwapChainedSequenceContextSubtable(kbts__byteswap_context 
       #endif
     }
   }
-  else if(Base[0] == 3)
+  else if(Format == 3)
   {
     kbts__chained_sequence_context_3 *Subst = (kbts__chained_sequence_context_3 *)Base;
     kbts__unpacked_chained_sequence_context_3 Unpacked = kbts__UnpackChainedSequenceContext3(Subst, 1);
@@ -16395,21 +17417,21 @@ static void kbts__ByteSwapChainedSequenceContextSubtable(kbts__byteswap_context 
 
     KBTS__FOR(BacktrackCoverageIndex, 0, Unpacked.BacktrackCount)
     {
-      kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, Unpacked.BacktrackCoverageOffsets[BacktrackCoverageIndex]);
+      kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.BacktrackCoverageOffsets[BacktrackCoverageIndex]));
 
       kbts__ByteSwapCoverage(Context, Coverage);
     }
 
     KBTS__FOR(InputCoverageIndex, 0, Unpacked.InputCount)
     {
-      kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, Unpacked.InputCoverageOffsets[InputCoverageIndex]);
+      kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.InputCoverageOffsets[InputCoverageIndex]));
 
       kbts__ByteSwapCoverage(Context, Coverage);
     }
 
     KBTS__FOR(LookaheadCoverageIndex, 0, Unpacked.LookaheadCount)
     {
-      kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, Unpacked.LookaheadCoverageOffsets[LookaheadCoverageIndex]);
+      kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.LookaheadCoverageOffsets[LookaheadCoverageIndex]));
 
       kbts__ByteSwapCoverage(Context, Coverage);
     }
@@ -16418,24 +17440,24 @@ static void kbts__ByteSwapChainedSequenceContextSubtable(kbts__byteswap_context 
     KBTS_DUMPF("      Backtrack: ");
     KBTS__FOR(BacktrackCoverageIndex, 0, Unpacked.BacktrackCount)
     {
-      kbts__DumpCoverage(KBTS__POINTER_OFFSET(kbts__coverage, Subst, Unpacked.BacktrackCoverageOffsets[BacktrackCoverageIndex]));
+      kbts__DumpCoverage(KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.BacktrackCoverageOffsets[BacktrackCoverageIndex])));
     }
     KBTS_DUMPF("\n      Input: ");
     KBTS__FOR(InputCoverageIndex, 0, Unpacked.InputCount)
     {
-      kbts__DumpCoverage(KBTS__POINTER_OFFSET(kbts__coverage, Subst, Unpacked.InputCoverageOffsets[InputCoverageIndex]));
+      kbts__DumpCoverage(KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.InputCoverageOffsets[InputCoverageIndex])));
     }
     KBTS_DUMPF("\n      Lookahead: ");
     KBTS__FOR(LookaheadCoverageIndex, 0, Unpacked.LookaheadCount)
     {
-      kbts__DumpCoverage(KBTS__POINTER_OFFSET(kbts__coverage, Subst, Unpacked.LookaheadCoverageOffsets[LookaheadCoverageIndex]));
+      kbts__DumpCoverage(KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.LookaheadCoverageOffsets[LookaheadCoverageIndex])));
     }
     KBTS_DUMPF("\n      Lookups: [");
     KBTS__FOR(RecordIndex, 0, Unpacked.RecordCount)
     {
       kbts__sequence_lookup_record *Record = &Unpacked.Records[RecordIndex];
 
-      KBTS_DUMPF("%u@%u,", Record->LookupListIndex, Record->SequenceIndex);
+      KBTS_DUMPF("%u@%u,", kbts__ReadU16Unaligned(&Record->LookupListIndex), kbts__ReadU16Unaligned(&Record->SequenceIndex));
     }
     KBTS_DUMPF("]\n");
 #  endif
@@ -16448,53 +17470,59 @@ static void kbts__ByteSwapGsubLookupSubtable(kbts__byteswap_context *Context, kb
   while(Swap && (LookupType == 7))
   {
     kbts__extension *Subst = (kbts__extension *)Base;
-    Subst->Format = kbts__ByteSwap16(Subst->Format);
-    Subst->LookupType = kbts__ByteSwap16(Subst->LookupType);
-    Subst->Offset = kbts__ByteSwap32(Subst->Offset);
+    kbts__ByteSwap16InPlace(&Subst->Format);
+    kbts_u16 Subst_LookupType = kbts__ByteSwap16InPlace(&Subst->LookupType);
+    kbts_u32 Subst_Offset = kbts__ByteSwap32InPlace(&Subst->Offset);
 
     KBTS_DUMPF("    Type 7.1\n"
                "    Offset %zu\n"
                "    -> %zu\n",
-               (char *)Base - Context->FileBase, (char *)Subst + Subst->Offset - Context->FileBase);
+               (char *)Base - Context->FileBase, (char *)Subst + Subst_Offset - Context->FileBase);
 
-    Base = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst->Offset);
-    LookupType = Subst->LookupType;
+    Base = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst_Offset);
+    LookupType = Subst_LookupType;
 
     Swap = !kbts__AlreadyVisited(Context, Base);
   }
 
   if(Swap)
   {
-    *Base = kbts__ByteSwap16(*Base);
+    kbts_u16 LookupFormat = kbts__ByteSwap16InPlace(Base);
 
     KBTS_DUMPF("    Type %u.%u\n"
                "    Offset %zu\n",
-               LookupType, *Base, (char *)Base - Context->FileBase);
+               LookupType, LookupFormat, (char *)Base - Context->FileBase);
 
-    if(kbts__GsubLookupBeginsWithCoverage(LookupType, Base[0]))
+    if(kbts__GsubLookupBeginsWithCoverage(LookupType, LookupFormat))
     {
-      Base[1] = kbts__ByteSwap16(Base[1]);
-      kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Base, Base[1]);
+      kbts_u16 LookupCoverageOffset = kbts__ByteSwap16InPlace(&Base[1]);
+      kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Base, LookupCoverageOffset);
 
       kbts__ByteSwapCoverage(Context, Coverage);
 
 #  ifdef KBTS_DUMP
-      KBTS_DUMPF("    Coverage %u\n", Coverage->Format);
-      if(Coverage->Format == 1)
+      kbts_u16 Coverage_Format = kbts__ReadU16Unaligned(&Coverage->Format);
+      kbts_un Coverage_Count = kbts__ReadU16Unaligned(&Coverage->Count);
+
+      KBTS_DUMPF("    Coverage %u\n", Coverage_Format);
+      if(Coverage_Format == 1)
       {
         kbts_u16 *GlyphIds = KBTS__POINTER_AFTER(kbts_u16, Coverage);
-        KBTS__FOR(GlyphIndex, 0, Coverage->Count)
+        KBTS__FOR(GlyphIndex, 0, Coverage_Count)
         {
-          KBTS_DUMPF("      %x\n", GlyphIds[GlyphIndex]);
+          KBTS_DUMPF("      %x\n", kbts__ReadU16Unaligned(&GlyphIds[GlyphIndex]));
         }
       }
-      else if(Coverage->Format == 2)
+      else if(Coverage_Format == 2)
       {
         kbts__range_record *Ranges = KBTS__POINTER_AFTER(kbts__range_record, Coverage);
-        KBTS__FOR(RangeIndex, 0, Coverage->Count)
+        KBTS__FOR(RangeIndex, 0, Coverage_Count)
         {
-          kbts__range_record Range = Ranges[RangeIndex];
-          KBTS_DUMPF("        %x..%x@%u..%u\n", Range.StartGlyphId, Range.EndGlyphId, Range.StartCoverageIndex, Range.StartCoverageIndex + (Range.EndGlyphId - Range.StartGlyphId));
+          kbts__range_record *Range = &Ranges[RangeIndex];
+          kbts_u16 Range_StartGlyphId = kbts__ReadU16Unaligned(&Range->StartGlyphId);
+          kbts_u16 Range_EndGlyphId = kbts__ReadU16Unaligned(&Range->EndGlyphId);
+          kbts_u16 Range_StartCoverageIndex = kbts__ReadU16Unaligned(&Range->StartCoverageIndex);
+          KBTS_DUMPF("        %x..%x@%u..%u\n", Range_StartGlyphId, Range_EndGlyphId, Range_StartCoverageIndex, Range_StartCoverageIndex + (Range_EndGlyphId - Range_StartGlyphId));
         }
       }
 #  endif
@@ -16505,26 +17533,26 @@ static void kbts__ByteSwapGsubLookupSubtable(kbts__byteswap_context *Context, kb
     case 1:
     {
       kbts__single_substitution *Subst = (kbts__single_substitution *)Base;
-      Subst->DeltaOrCount.GlyphCount = kbts__ByteSwap16(Subst->DeltaOrCount.GlyphCount);
+      kbts_un Subst_GlyphCount = kbts__ByteSwap16InPlace(&Subst->DeltaOrCount.GlyphCount);
 
 #  ifdef KBTS_DUMP
-      if(Subst->Format == 1)
+      if(LookupFormat == 1)
       {
-        KBTS_DUMPF("    += %d\n", Subst->DeltaOrCount.DeltaGlyphId);
+        KBTS_DUMPF("    += %d\n", kbts__ReadS16Unaligned(&Subst->DeltaOrCount.DeltaGlyphId));
       }
 #  endif
 
-      if(Subst->Format == 2)
+      if(LookupFormat == 2)
       {
         kbts_u16 *GlyphIds = KBTS__POINTER_AFTER(kbts_u16, Subst);
-        kbts__ByteSwapArray16Context(GlyphIds, Subst->DeltaOrCount.GlyphCount, Context);
+        kbts__ByteSwapArray16Context(GlyphIds, Subst_GlyphCount, Context);
 
         #ifdef KBTS_DUMP
         KBTS_DUMPF("    [");
-        KBTS__FOR(IdIndex, 0, Subst->DeltaOrCount.GlyphCount)
+        KBTS__FOR(IdIndex, 0, Subst_GlyphCount)
         {
           if(IdIndex) KBTS_DUMPF(" ");
-          KBTS_DUMPF("%x", GlyphIds[IdIndex]);
+          KBTS_DUMPF("%x", kbts__ReadU16Unaligned(&GlyphIds[IdIndex]));
         }
         KBTS_DUMPF("]\n");
         #endif
@@ -16535,27 +17563,28 @@ static void kbts__ByteSwapGsubLookupSubtable(kbts__byteswap_context *Context, kb
     case 2:
     {
       kbts__multiple_substitution *Subst = (kbts__multiple_substitution *)Base;
-      Subst->SequenceCount = kbts__ByteSwap16(Subst->SequenceCount);
-      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst->SequenceCount, Context);
+      kbts_un Subst_SequenceCount = kbts__ByteSwap16InPlace(&Subst->SequenceCount);
+      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst_SequenceCount, Context);
 
-      KBTS__FOR(SequenceIndex, 0, Subst->SequenceCount)
+      KBTS__FOR(SequenceIndex, 0, Subst_SequenceCount)
       {
         kbts__sequence *Sequence = kbts__GetSequence(Subst, SequenceIndex);
 
         if(!kbts__AlreadyVisited(Context, Sequence))
         {
-          Sequence->GlyphCount = kbts__ByteSwap16(Sequence->GlyphCount);
+          kbts_un Sequence_GlyphCount = kbts__ByteSwap16InPlace(&Sequence->GlyphCount);
 
-          kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Sequence), Sequence->GlyphCount, Context);
+          kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Sequence), Sequence_GlyphCount, Context);
         }
 
         #ifdef KBTS_DUMP
         KBTS_DUMPF("    [");
         kbts_u16 *SequenceGlyphIds = KBTS__POINTER_AFTER(kbts_u16, Sequence);
-        KBTS__FOR(SequenceGlyphIndex, 0, Sequence->GlyphCount)
+        kbts_un Sequence_GlyphCount = kbts__ReadU16Unaligned(&Sequence->GlyphCount);
+        KBTS__FOR(SequenceGlyphIndex, 0, Sequence_GlyphCount)
         {
           if(SequenceGlyphIndex) KBTS_DUMPF(" ");
-          KBTS_DUMPF("%x", SequenceGlyphIds[SequenceGlyphIndex]);
+          KBTS_DUMPF("%x", kbts__ReadU16Unaligned(&SequenceGlyphIds[SequenceGlyphIndex]));
         }
         KBTS_DUMPF("]\n");
         #endif
@@ -16566,27 +17595,28 @@ static void kbts__ByteSwapGsubLookupSubtable(kbts__byteswap_context *Context, kb
     case 3:
     {
       kbts__alternate_substitution *Subst = (kbts__alternate_substitution *)Base;
-      Subst->AlternateSetCount = kbts__ByteSwap16(Subst->AlternateSetCount);
-      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst->AlternateSetCount, Context);
+      kbts_un Subst_AlternateSetCount = kbts__ByteSwap16InPlace(&Subst->AlternateSetCount);
+      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst_AlternateSetCount, Context);
 
-      KBTS__FOR(SetIndex, 0, Subst->AlternateSetCount)
+      KBTS__FOR(SetIndex, 0, Subst_AlternateSetCount)
       {
         kbts__alternate_set *Set = kbts__GetAlternateSet(Subst, SetIndex);
 
         if(!kbts__AlreadyVisited(Context, Set))
         {
-          Set->GlyphCount = kbts__ByteSwap16(Set->GlyphCount);
+          kbts_un Set_GlyphCount = kbts__ByteSwap16InPlace(&Set->GlyphCount);
 
-          kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Set), Set->GlyphCount, Context);
+          kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Set), Set_GlyphCount, Context);
         }
 
         #ifdef KBTS_DUMP
         KBTS_DUMPF("    [");
         kbts_u16 *SetGlyphIds = KBTS__POINTER_AFTER(kbts_u16, Set);
-        KBTS__FOR(SetGlyphIndex, 0, Set->GlyphCount)
+        kbts_un Set_GlyphCount = kbts__ReadU16Unaligned(&Set->GlyphCount);
+        KBTS__FOR(SetGlyphIndex, 0, Set_GlyphCount)
         {
           if(SetGlyphIndex) KBTS_DUMPF(" ");
-          KBTS_DUMPF("%x", SetGlyphIds[SetGlyphIndex]);
+          KBTS_DUMPF("%x", kbts__ReadU16Unaligned(&SetGlyphIds[SetGlyphIndex]));
         }
         KBTS_DUMPF("]\n");
         #endif
@@ -16597,35 +17627,36 @@ static void kbts__ByteSwapGsubLookupSubtable(kbts__byteswap_context *Context, kb
     case 4:
     {
       kbts__ligature_substitution *Subst = (kbts__ligature_substitution *)Base;
-      Subst->LigatureSetCount = kbts__ByteSwap16(Subst->LigatureSetCount);
-      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst->LigatureSetCount, Context);
+      kbts_un Subst_LigatureSetCount = kbts__ByteSwap16InPlace(&Subst->LigatureSetCount);
+      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst_LigatureSetCount, Context);
 
-      KBTS__FOR(SetIndex, 0, Subst->LigatureSetCount)
+      KBTS__FOR(SetIndex, 0, Subst_LigatureSetCount)
       {
         kbts__ligature_set *Set = kbts__GetLigatureSet(Subst, SetIndex);
 
         if(!kbts__AlreadyVisited(Context, Set))
         {
-          Set->Count = kbts__ByteSwap16(Set->Count);
-          kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Set), Set->Count, Context);
+          kbts_un Set_Count = kbts__ByteSwap16InPlace(&Set->Count);
+          kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Set), Set_Count, Context);
 
-          KBTS__FOR(LigatureIndex, 0, Set->Count)
+          KBTS__FOR(LigatureIndex, 0, Set_Count)
           {
             kbts__ligature *Ligature = kbts__GetLigature(Set, LigatureIndex);
 
             if(!kbts__AlreadyVisited(Context, Ligature))
             {
               kbts__ByteSwapArray16Context(&Ligature->Glyph, 2, Context);
-              kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Ligature), Ligature->ComponentCount - 1, Context);
+              kbts_un Ligature_ComponentCount = kbts__ReadU16Unaligned(&Ligature->ComponentCount);
+              kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Ligature), Ligature_ComponentCount - 1, Context);
 
 #  ifdef KBTS_DUMP
               KBTS_DUMPF("ligature: [");
               kbts_u16 *ComponentIds = KBTS__POINTER_AFTER(kbts_u16, Ligature);
-              KBTS__FOR(ComponentIndex, 1, Ligature->ComponentCount)
+              KBTS__FOR(ComponentIndex, 1, Ligature_ComponentCount)
               {
-                KBTS_DUMPF("%x,", ComponentIds[ComponentIndex - 1]);
+                KBTS_DUMPF("%x,", kbts__ReadU16Unaligned(&ComponentIds[ComponentIndex - 1]));
               }
-              KBTS_DUMPF("] -> %x\n", Ligature->Glyph);
+              KBTS_DUMPF("] -> %x\n", kbts__ReadU16Unaligned(&Ligature->Glyph));
 #  endif
             }
           }
@@ -16660,11 +17691,13 @@ static void kbts__ByteSwapGsubLookupSubtable(kbts__byteswap_context *Context, kb
 
       KBTS__FOR(BacktrackCoverageIndex, 0, Unpacked.BacktrackCount)
       {
-        kbts__ByteSwapCoverage(Context, KBTS__POINTER_OFFSET(kbts__coverage, Subst, Unpacked.BacktrackCoverageOffsets[BacktrackCoverageIndex]));
+        kbts_un BacktrackCoverageOffset = kbts__ReadU16Unaligned(&Unpacked.BacktrackCoverageOffsets[BacktrackCoverageIndex]);
+        kbts__ByteSwapCoverage(Context, KBTS__POINTER_OFFSET(kbts__coverage, Subst, BacktrackCoverageOffset));
       }
       KBTS__FOR(LookaheadCoverageIndex, 0, Unpacked.LookaheadCount)
       {
-        kbts__ByteSwapCoverage(Context, KBTS__POINTER_OFFSET(kbts__coverage, Subst, Unpacked.LookaheadCoverageOffsets[LookaheadCoverageIndex]));
+        kbts_un LookaheadCoverageOffset = kbts__ReadU16Unaligned(&Unpacked.LookaheadCoverageOffsets[LookaheadCoverageIndex]);
+        kbts__ByteSwapCoverage(Context, KBTS__POINTER_OFFSET(kbts__coverage, Subst, LookaheadCoverageOffset));
       }
     }
     break;
@@ -16672,20 +17705,19 @@ static void kbts__ByteSwapGsubLookupSubtable(kbts__byteswap_context *Context, kb
   }
 }
 
-static void kbts__ByteSwapGposLookupSubtable(kbts__byteswap_context *Context, kbts_lookup_list *LookupList, kbts_u16 LookupType, kbts_u16 *Base)
+static void kbts__ByteSwapGposLookupSubtable(kbts__byteswap_context *Context, kbts__lookup_list *LookupList, kbts_u16 LookupType, kbts_u16 *Base)
 {
   if(!kbts__AlreadyVisited(Context, Base))
   {
-    *Base = kbts__ByteSwap16(*Base);
+    kbts_u16 LookupFormat = kbts__ByteSwap16InPlace(Base);
 
-    KBTS_DUMPF("  GPOS subtable %u.%u\n", LookupType, *Base);
+    KBTS_DUMPF("  GPOS subtable %u.%u\n", LookupType, LookupFormat);
 
-    if(kbts__GposLookupBeginsWithCoverage(LookupType, *Base))
+    if(kbts__GposLookupBeginsWithCoverage(LookupType, LookupFormat))
     {
-      kbts_u16 *CoverageOffset = &Base[1];
-      *CoverageOffset = kbts__ByteSwap16(*CoverageOffset);
+      kbts_u16 CoverageOffset = kbts__ByteSwap16InPlace(&Base[1]);
 
-      kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Base, *CoverageOffset);
+      kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Base, CoverageOffset);
       kbts__ByteSwapCoverage(Context, Coverage);
     }
 
@@ -16694,21 +17726,21 @@ static void kbts__ByteSwapGposLookupSubtable(kbts__byteswap_context *Context, kb
     case 1:
     {
       kbts__single_adjustment_1 *Adjust = (kbts__single_adjustment_1 *)Base;
-      Adjust->ValueFormat = kbts__ByteSwap16(Adjust->ValueFormat);
+      kbts_u16 Adjust_ValueFormat = kbts__ByteSwap16InPlace(&Adjust->ValueFormat);
 
-      if(Adjust->Format == 1)
+      if(LookupFormat == 1)
       {
-        kbts_ByteSwapValueRecord(Context, Adjust, Adjust->ValueFormat, KBTS__POINTER_AFTER(kbts_u16, Adjust));
+        kbts__ByteSwapValueRecord(Context, Adjust, Adjust_ValueFormat, KBTS__POINTER_AFTER(kbts_u16, Adjust));
       }
-      else if(Adjust->Format == 2)
+      else if(LookupFormat == 2)
       {
         kbts__single_adjustment_2 *Adjust2 = (kbts__single_adjustment_2 *)Base;
-        Adjust2->RecordCount = kbts__ByteSwap16(Adjust2->RecordCount);
+        kbts_un Adjust2_RecordCount = kbts__ByteSwap16InPlace(&Adjust2->RecordCount);
 
         kbts_u16 *At = KBTS__POINTER_AFTER(kbts_u16, Adjust2);
-        KBTS__FOR(RecordIndex, 0, Adjust2->RecordCount)
+        KBTS__FOR(RecordIndex, 0, Adjust2_RecordCount)
         {
-          kbts__unpacked_value_record Unpacked = kbts_ByteSwapValueRecord(Context, Adjust2, Adjust2->ValueFormat, At);
+          kbts__unpacked_value_record Unpacked = kbts__ByteSwapValueRecord(Context, Adjust2, Adjust_ValueFormat, At);
 
           At += Unpacked.Size;
         }
@@ -16717,62 +17749,75 @@ static void kbts__ByteSwapGposLookupSubtable(kbts__byteswap_context *Context, kb
 
     case 2:
     {
-      if(*Base == 1)
+      if(LookupFormat == 1)
       {
         kbts__pair_adjustment_1 *Adjust = (kbts__pair_adjustment_1 *)Base;
         kbts__ByteSwapArray16Context(&Adjust->ValueFormat1, 3, Context);
+        kbts_un Adjust_SetCount = kbts__ReadU16Unaligned(&Adjust->SetCount);
 
         kbts_u16 *SetOffsets = KBTS__POINTER_AFTER(kbts_u16, Adjust);
-        kbts__ByteSwapArray16Context(SetOffsets, Adjust->SetCount, Context);
+        kbts__ByteSwapArray16Context(SetOffsets, Adjust_SetCount, Context);
 
-        kbts_un Size1 = kbts__PopCount32(Adjust->ValueFormat1);
-        kbts_un Size2 = kbts__PopCount32(Adjust->ValueFormat2);
+        kbts_u16 Adjust_ValueFormat1 = kbts__ReadU16Unaligned(&Adjust->ValueFormat1);
+        kbts_u16 Adjust_ValueFormat2 = kbts__ReadU16Unaligned(&Adjust->ValueFormat2);
+
+        kbts_un Size1 = kbts__PopCount32(Adjust_ValueFormat1);
+        kbts_un Size2 = kbts__PopCount32(Adjust_ValueFormat2);
         kbts_un PairRecordSize = Size1 + Size2 + 1;
 
-        KBTS__FOR(SetIndex, 0, Adjust->SetCount)
+        KBTS__FOR(SetIndex, 0, Adjust_SetCount)
         {
-          kbts__pair_set *Set = KBTS__POINTER_OFFSET(kbts__pair_set, Adjust, SetOffsets[SetIndex]);
+          kbts__pair_set *Set = KBTS__POINTER_OFFSET(kbts__pair_set, Adjust, kbts__ReadU16Unaligned(&SetOffsets[SetIndex]));
 
           if(!kbts__AlreadyVisited(Context, Set))
           {
-            Set->Count = kbts__ByteSwap16(Set->Count);
+            kbts_un Set_Count = kbts__ByteSwap16InPlace(&Set->Count);
 
             kbts_u16 *At = KBTS__POINTER_AFTER(kbts_u16, Set);
 
-            KBTS__FOR(RecordIndex, 0, Set->Count)
+            KBTS__FOR(RecordIndex, 0, Set_Count)
             {
               kbts__pair_value_record *PairRecord = (kbts__pair_value_record *)(At + RecordIndex * PairRecordSize);
 
-              PairRecord->SecondGlyph = kbts__ByteSwap16(PairRecord->SecondGlyph);
+              kbts__ByteSwap16InPlace(&PairRecord->SecondGlyph);
               kbts_u16 *Record = KBTS__POINTER_AFTER(kbts_u16, PairRecord);
 
-              kbts__unpacked_value_record Unpacked1 = kbts_ByteSwapValueRecord(Context, Set, Adjust->ValueFormat1, Record);
+              kbts__unpacked_value_record Unpacked1 = kbts__ByteSwapValueRecord(Context, Set, Adjust_ValueFormat1, Record);
               Record += Unpacked1.Size;
-              kbts_ByteSwapValueRecord(Context, Set, Adjust->ValueFormat2, Record);
+              kbts__ByteSwapValueRecord(Context, Set, Adjust_ValueFormat2, Record);
             }
           }
         }
       }
-      else if(*Base == 2)
+      else if(LookupFormat == 2)
       {
         kbts__pair_adjustment_2 *Adjust = (kbts__pair_adjustment_2 *)Base;
         kbts__ByteSwapArray16Context(&Adjust->ValueFormat1, 6, Context);
 
-        kbts__ByteSwapClassDefinition(Context, KBTS__POINTER_OFFSET(kbts_u16, Adjust, Adjust->ClassDefinition1Offset));
-        kbts__ByteSwapClassDefinition(Context, KBTS__POINTER_OFFSET(kbts_u16, Adjust, Adjust->ClassDefinition2Offset));
+        kbts_un Adjust_ClassDefinition1Offset = kbts__ReadU16Unaligned(&Adjust->ClassDefinition1Offset);
+        kbts_un Adjust_ClassDefinition2Offset = kbts__ReadU16Unaligned(&Adjust->ClassDefinition2Offset);
+
+        kbts__ByteSwapClassDefinition(Context, KBTS__POINTER_OFFSET(kbts_u16, Adjust, Adjust_ClassDefinition1Offset));
+        kbts__ByteSwapClassDefinition(Context, KBTS__POINTER_OFFSET(kbts_u16, Adjust, Adjust_ClassDefinition2Offset));
 
         kbts_u16 *Records = KBTS__POINTER_AFTER(kbts_u16, Adjust);
 
-        kbts_un Size1 = kbts__PopCount32(Adjust->ValueFormat1);
-        kbts_un Size2 = kbts__PopCount32(Adjust->ValueFormat2);
+        kbts_u16 Adjust_ValueFormat1 = kbts__ReadU16Unaligned(&Adjust->ValueFormat1);
+        kbts_u16 Adjust_ValueFormat2 = kbts__ReadU16Unaligned(&Adjust->ValueFormat2);
+
+        kbts_un Size1 = kbts__PopCount32(Adjust_ValueFormat1);
+        kbts_un Size2 = kbts__PopCount32(Adjust_ValueFormat2);
+
+        kbts_un Adjust_Class1Count = kbts__ReadU16Unaligned(&Adjust->Class1Count);
+        kbts_un Adjust_Class2Count = kbts__ReadU16Unaligned(&Adjust->Class2Count);
 
         kbts_u16 *RecordPair = Records;
-        KBTS__FOR(RecordIndex, 0, (kbts_un)Adjust->Class1Count * (kbts_un)Adjust->Class2Count)
+        KBTS__FOR(RecordIndex, 0, Adjust_Class1Count * Adjust_Class2Count)
         {
-          kbts_ByteSwapValueRecord(Context, Adjust, Adjust->ValueFormat1, RecordPair);
+          kbts__ByteSwapValueRecord(Context, Adjust, Adjust_ValueFormat1, RecordPair);
           RecordPair += Size1;
 
-          kbts_ByteSwapValueRecord(Context, Adjust, Adjust->ValueFormat2, RecordPair);
+          kbts__ByteSwapValueRecord(Context, Adjust, Adjust_ValueFormat2, RecordPair);
           RecordPair += Size2;
         }
       }
@@ -16781,22 +17826,24 @@ static void kbts__ByteSwapGposLookupSubtable(kbts__byteswap_context *Context, kb
     case 3:
     {
       kbts__cursive_attachment *Adjust = (kbts__cursive_attachment *)Base;
-      Adjust->EntryExitCount = kbts__ByteSwap16(Adjust->EntryExitCount);
-      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Adjust), Adjust->EntryExitCount * 2, Context);
+      kbts_un Adjust_EntryExitCount = kbts__ByteSwap16InPlace(&Adjust->EntryExitCount);
+      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Adjust), Adjust_EntryExitCount * 2, Context);
 
       kbts__entry_exit *EntryExits = KBTS__POINTER_AFTER(kbts__entry_exit, Adjust);
-      KBTS__FOR(EntryExitIndex, 0, Adjust->EntryExitCount)
+      KBTS__FOR(EntryExitIndex, 0, Adjust_EntryExitCount)
       {
         kbts__entry_exit *EntryExit = &EntryExits[EntryExitIndex];
+        kbts_un EntryExit_EntryAnchorOffset = kbts__ReadU16Unaligned(&EntryExit->EntryAnchorOffset);
+        kbts_un EntryExit_ExitAnchorOffset = kbts__ReadU16Unaligned(&EntryExit->ExitAnchorOffset);
 
-        if(EntryExit->EntryAnchorOffset)
+        if(EntryExit_EntryAnchorOffset)
         {
-          kbts__ByteSwapAnchor(Context, KBTS__POINTER_OFFSET(kbts__anchor, Adjust, EntryExit->EntryAnchorOffset));
+          kbts__ByteSwapAnchor(Context, KBTS__POINTER_OFFSET(kbts__anchor, Adjust, EntryExit_EntryAnchorOffset));
         }
 
-        if(EntryExit->ExitAnchorOffset)
+        if(EntryExit_ExitAnchorOffset)
         {
-          kbts__ByteSwapAnchor(Context, KBTS__POINTER_OFFSET(kbts__anchor, Adjust, EntryExit->ExitAnchorOffset));
+          kbts__ByteSwapAnchor(Context, KBTS__POINTER_OFFSET(kbts__anchor, Adjust, EntryExit_ExitAnchorOffset));
         }
       }
     } break;
@@ -16807,9 +17854,9 @@ static void kbts__ByteSwapGposLookupSubtable(kbts__byteswap_context *Context, kb
       kbts__mark_to_base_attachment *Adjust = (kbts__mark_to_base_attachment *)Base;
       kbts__ByteSwapArray16Context(&Adjust->BaseCoverageOffset, 4, Context);
 
-      kbts__ByteSwapCoverage(Context, KBTS__POINTER_OFFSET(kbts__coverage, Adjust, Adjust->BaseCoverageOffset));
-      kbts__ByteSwapMarkArray(Context, KBTS__POINTER_OFFSET(kbts__mark_array, Adjust, Adjust->MarkArrayOffset));
-      kbts__ByteSwapBaseArray(Context, Adjust->MarkClassCount, KBTS__POINTER_OFFSET(kbts__base_array, Adjust, Adjust->BaseArrayOffset));
+      kbts__ByteSwapCoverage(Context, KBTS__POINTER_OFFSET(kbts__coverage, Adjust, kbts__ReadU16Unaligned(&Adjust->BaseCoverageOffset)));
+      kbts__ByteSwapMarkArray(Context, KBTS__POINTER_OFFSET(kbts__mark_array, Adjust, kbts__ReadU16Unaligned(&Adjust->MarkArrayOffset)));
+      kbts__ByteSwapBaseArray(Context, kbts__ReadU16Unaligned(&Adjust->MarkClassCount), KBTS__POINTER_OFFSET(kbts__base_array, Adjust, kbts__ReadU16Unaligned(&Adjust->BaseArrayOffset)));
     } break;
 
     case 5:
@@ -16817,29 +17864,30 @@ static void kbts__ByteSwapGposLookupSubtable(kbts__byteswap_context *Context, kb
       kbts__mark_to_ligature_attachment *Adjust = (kbts__mark_to_ligature_attachment *)Base;
       kbts__ByteSwapArray16Context(&Adjust->LigatureCoverageOffset, 4, Context);
 
-      kbts__ByteSwapCoverage(Context, KBTS__POINTER_OFFSET(kbts__coverage, Adjust, Adjust->LigatureCoverageOffset));
-      kbts__ByteSwapMarkArray(Context, KBTS__POINTER_OFFSET(kbts__mark_array, Adjust, Adjust->MarkArrayOffset));
+      kbts__ByteSwapCoverage(Context, KBTS__POINTER_OFFSET(kbts__coverage, Adjust, kbts__ReadU16Unaligned(&Adjust->LigatureCoverageOffset)));
+      kbts__ByteSwapMarkArray(Context, KBTS__POINTER_OFFSET(kbts__mark_array, Adjust, kbts__ReadU16Unaligned(&Adjust->MarkArrayOffset)));
 
-      kbts__ligature_array *LigatureArray = KBTS__POINTER_OFFSET(kbts__ligature_array, Adjust, Adjust->LigatureArrayOffset);
+      kbts__ligature_array *LigatureArray = KBTS__POINTER_OFFSET(kbts__ligature_array, Adjust, kbts__ReadU16Unaligned(&Adjust->LigatureArrayOffset));
       if(!kbts__AlreadyVisited(Context, LigatureArray))
       {
-        LigatureArray->Count = kbts__ByteSwap16(LigatureArray->Count);
-        kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, LigatureArray), LigatureArray->Count, Context);
+        kbts_un LigatureArray_Count = kbts__ByteSwap16InPlace(&LigatureArray->Count);
+        kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, LigatureArray), LigatureArray_Count, Context);
 
-        KBTS__FOR(AttachIndex, 0, LigatureArray->Count)
+        KBTS__FOR(AttachIndex, 0, LigatureArray_Count)
         {
           kbts__ligature_attach *Attach = kbts__GetLigatureAttach(LigatureArray, AttachIndex);
 
           if(!kbts__AlreadyVisited(Context, Attach))
           {
-            Attach->Count = kbts__ByteSwap16(Attach->Count);
+            kbts_un Attach_Count = kbts__ByteSwap16InPlace(&Attach->Count);
+            kbts_un Adjust_MarkClassCount = kbts__ReadU16Unaligned(&Adjust->MarkClassCount);
 
             kbts_u16 *AttachAnchorOffsets = KBTS__POINTER_AFTER(kbts_u16, Attach);
-            kbts__ByteSwapArray16Context(AttachAnchorOffsets, Attach->Count * Adjust->MarkClassCount, Context);
+            kbts__ByteSwapArray16Context(AttachAnchorOffsets, Attach_Count * Adjust_MarkClassCount, Context);
 
-            KBTS__FOR(ComponentIndex, 0, Attach->Count)
+            KBTS__FOR(ComponentIndex, 0, Attach_Count)
             {
-              KBTS__FOR(MarkClass, 0, Adjust->MarkClassCount)
+              KBTS__FOR(MarkClass, 0, Adjust_MarkClassCount)
               {
                 kbts__anchor *Anchor = kbts__GetLigatureAttachAnchor(Adjust, Attach, (kbts_u16)MarkClass, ComponentIndex);
 
@@ -16866,10 +17914,10 @@ static void kbts__ByteSwapGposLookupSubtable(kbts__byteswap_context *Context, kb
       // @Cleanup: Replace recursion with a loop at the start of this function!
       kbts__extension *Adjust = (kbts__extension *)Base;
 
-      Adjust->LookupType = kbts__ByteSwap16(Adjust->LookupType);
-      Adjust->Offset = kbts__ByteSwap32(Adjust->Offset);
+      kbts_u16 Adjust_LookupType = kbts__ByteSwap16InPlace(&Adjust->LookupType);
+      kbts_un Adjust_Offset = kbts__ByteSwap32InPlace(&Adjust->Offset);
 
-      kbts__ByteSwapGposLookupSubtable(Context, LookupList, Adjust->LookupType, KBTS__POINTER_OFFSET(kbts_u16, Adjust, Adjust->Offset));
+      kbts__ByteSwapGposLookupSubtable(Context, LookupList, Adjust_LookupType, KBTS__POINTER_OFFSET(kbts_u16, Adjust, Adjust_Offset));
     } break;
     }
   }
@@ -16889,6 +17937,29 @@ static void *kbts__BlobTableData(kbts_blob_header *Header, kbts_blob_table_id Ta
 }
 #define kbts__BlobTableDataType(Header, TableId, Type) (Type *)kbts__BlobTableData((Header), (TableId))
 
+static void *kbts__BlobTableHeaderChecked_(kbts_blob_header *Header, kbts_blob_table_id TableId, kbts_un HeaderSize, char **TableEnd, kbts_load_font_error *Error)
+{
+  void *Result = 0;
+  kbts_blob_table *Table = &Header->Tables[TableId];
+  kbts_un TableLength = Table->Length;
+
+  if(TableLength)
+  {
+    if(TableLength >= HeaderSize)
+    {
+      Result = KBTS__POINTER_OFFSET(void, Header, Table->OffsetFromStartOfFile);
+      *TableEnd = KBTS__POINTER_OFFSET(char, Result, TableLength);
+    }
+    else
+    {
+      *Error = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
+    }
+  }
+
+  return Result;
+}
+#define kbts__BlobTableHeaderChecked(Header, TableId, HeaderType, TableEnd, Error) (HeaderType *)kbts__BlobTableHeaderChecked_((Header), (TableId), sizeof(HeaderType), (TableEnd), (Error))
+
 static kbts_glyph_classes kbts__GlyphClasses(kbts_font *Font, kbts_u32 Id)
 {
   kbts_glyph_classes Result = KBTS__ZERO;
@@ -16897,15 +17968,19 @@ static kbts_glyph_classes kbts__GlyphClasses(kbts_font *Font, kbts_u32 Id)
   kbts__gdef *Gdef = kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_GDEF, kbts__gdef);
   if(Gdef)
   {
-    if(Gdef->ClassDefinitionOffset)
+    kbts_un Gdef_ClassDefinitionOffset = kbts__ReadU16Unaligned(&Gdef->ClassDefinitionOffset);
+    kbts_un Gdef_MarkAttachmentClassDefinitionOffset = kbts__ReadU16Unaligned(&Gdef->MarkAttachmentClassDefinitionOffset);
+
+    if(Gdef_ClassDefinitionOffset)
     {
-      kbts_u16 *ClassDefBase = KBTS__POINTER_OFFSET(kbts_u16, Gdef, Gdef->ClassDefinitionOffset);
+      kbts_u16 *ClassDefBase = KBTS__POINTER_OFFSET(kbts_u16, Gdef, Gdef_ClassDefinitionOffset);
       Result.Class = kbts__GlyphClassFromTable(ClassDefBase, Id).Class;
     }
 
-    if(Gdef->MarkAttachmentClassDefinitionOffset && (Result.Class == KBTS__GLYPH_CLASS_MARK))
+    if(Gdef_MarkAttachmentClassDefinitionOffset &&
+       (Result.Class == KBTS__GLYPH_CLASS_MARK))
     {
-      kbts_u16 *MarkAttachmentClassDefBase = KBTS__POINTER_OFFSET(kbts_u16, Gdef, Gdef->MarkAttachmentClassDefinitionOffset);
+      kbts_u16 *MarkAttachmentClassDefBase = KBTS__POINTER_OFFSET(kbts_u16, Gdef, Gdef_MarkAttachmentClassDefinitionOffset);
       Result.MarkAttachmentClass = kbts__GlyphClassFromTable(MarkAttachmentClassDefBase, Id).Class;
     }
   }
@@ -16960,7 +18035,7 @@ KBTS_EXPORT int kbts_CodepointToGlyphId(kbts_font *Font, int ICodepoint)
 
       // The Microsoft documentation doesn't mention that the SubHeaderKeys are indices multiplied by 8, for some
       // reason..! The Apple documentation does.
-      kbts_u16 SubHeaderIndex = Cmap2->SubHeaderKeys[High] / 8;
+      kbts_u16 SubHeaderIndex = kbts__ReadU16Unaligned(&Cmap2->SubHeaderKeys[High]) / 8;
       kbts__sub_header *SubHeader = &SubHeaders[SubHeaderIndex];
 
       if(!SubHeaderIndex)
@@ -16973,15 +18048,15 @@ KBTS_EXPORT int kbts_CodepointToGlyphId(kbts_font *Font, int ICodepoint)
         Codepoint = Codepoint & 0xFF;
       }
 
-      kbts_u32 Offset = Codepoint - SubHeader->FirstCode;
-      if(Offset < SubHeader->EntryCount)
+      kbts_u32 Offset = Codepoint - kbts__ReadU16Unaligned(&SubHeader->FirstCode);
+      if(Offset < kbts__ReadU16Unaligned(&SubHeader->EntryCount))
       {
-        kbts_u16 *GlyphIds = KBTS__POINTER_OFFSET(kbts_u16, &SubHeader->IdRangeOffset, SubHeader->IdRangeOffset);
-        kbts_un GlyphId = GlyphIds[Offset];
+        kbts_u16 *GlyphIds = KBTS__POINTER_OFFSET(kbts_u16, &SubHeader->IdRangeOffset, kbts__ReadU16Unaligned(&SubHeader->IdRangeOffset));
+        kbts_un GlyphId = kbts__ReadU16Unaligned(&GlyphIds[Offset]);
 
         if(GlyphId)
         {
-          GlyphId += SubHeader->IdDelta;
+          GlyphId += kbts__ReadS16Unaligned(&SubHeader->IdDelta);
         }
 
         Result = (kbts_u16)GlyphId;
@@ -16991,7 +18066,7 @@ KBTS_EXPORT int kbts_CodepointToGlyphId(kbts_font *Font, int ICodepoint)
     case 4:
     {
       kbts__cmap_4 *Cmap4 = (kbts__cmap_4 *)CmapBase;
-      kbts_un SegmentCount = Cmap4->SegmentCountTimesTwo / 2;
+      kbts_un SegmentCount = kbts__ReadU16Unaligned(&Cmap4->SegmentCountTimesTwo) / 2;
       kbts_u16 *EndCodes = KBTS__POINTER_AFTER(kbts_u16, Cmap4);
       kbts_u16 *StartCodes = EndCodes + SegmentCount + 1;
       kbts_s16 *IdDeltas = (kbts_s16 *)(StartCodes + SegmentCount);
@@ -17003,16 +18078,16 @@ KBTS_EXPORT int kbts_CodepointToGlyphId(kbts_font *Font, int ICodepoint)
         while(SegmentCount > 1)
         {
           kbts_un HalfCount = SegmentCount / 2;
-          SegmentIndexOffset = (EndCodes[SegmentIndexOffset + HalfCount - 1] < Codepoint) ? (SegmentIndexOffset + HalfCount) : SegmentIndexOffset;
+          SegmentIndexOffset = (kbts__ReadU16Unaligned(&EndCodes[SegmentIndexOffset + HalfCount - 1]) < Codepoint) ? (SegmentIndexOffset + HalfCount) : SegmentIndexOffset;
           SegmentCount -= HalfCount;
         }
       }
 
-      kbts_u16 Start = StartCodes[SegmentIndexOffset];
-      if((Codepoint >= Start) && (Codepoint <= EndCodes[SegmentIndexOffset]))
+      kbts_u16 Start = kbts__ReadU16Unaligned(&StartCodes[SegmentIndexOffset]);
+      if((Codepoint >= Start) && (Codepoint <= kbts__ReadU16Unaligned(&EndCodes[SegmentIndexOffset])))
       {
-        kbts_s16 Delta = IdDeltas[SegmentIndexOffset];
-        kbts_u16 RangeOffset = IdRangeOffsets[SegmentIndexOffset];
+        kbts_s16 Delta = kbts__ReadS16Unaligned(&IdDeltas[SegmentIndexOffset]);
+        kbts_u16 RangeOffset = kbts__ReadU16Unaligned(&IdRangeOffsets[SegmentIndexOffset]);
 
         kbts_u16 GlyphId = (kbts_u16)Delta;
         if(RangeOffset)
@@ -17032,10 +18107,10 @@ KBTS_EXPORT int kbts_CodepointToGlyphId(kbts_font *Font, int ICodepoint)
       kbts__cmap_6 *Cmap6 = (kbts__cmap_6 *)CmapBase;
       kbts_u16 *GlyphIds = KBTS__POINTER_AFTER(kbts_u16, Cmap6);
 
-      kbts_un Offset = Codepoint - Cmap6->FirstCode;
-      if(Offset < Cmap6->EntryCount)
+      kbts_un Offset = Codepoint - kbts__ReadU16Unaligned(&Cmap6->FirstCode);
+      if(Offset < kbts__ReadU16Unaligned(&Cmap6->EntryCount))
       {
-        Result = GlyphIds[Offset];
+        Result = kbts__ReadU16Unaligned(&GlyphIds[Offset]);
       }
     } break;
 
@@ -17045,21 +18120,22 @@ KBTS_EXPORT int kbts_CodepointToGlyphId(kbts_font *Font, int ICodepoint)
       kbts__sequential_map_group *Groups = KBTS__POINTER_AFTER(kbts__sequential_map_group, Cmap12);
 
       kbts_un GlyphId = 0;
-      kbts_un GroupCount = Cmap12->GroupCount;
+      kbts_un GroupCount = kbts__ReadU32Unaligned(&Cmap12->GroupCount);
       if(GroupCount)
       {
         while(GroupCount > 1)
         {
           kbts_un HalfCount = GroupCount / 2;
-          Groups = (Groups[HalfCount - 1].EndCharacterCode < Codepoint) ? (Groups + HalfCount) : Groups;
+          Groups = (kbts__ReadU32Unaligned(&Groups[HalfCount - 1].EndCharacterCode) < Codepoint) ? (Groups + HalfCount) : Groups;
           GroupCount -= HalfCount;
         }
       }
 
-      if((Codepoint >= Groups->StartCharacterCode) && (Codepoint <= Groups->EndCharacterCode))
+      if((Codepoint >= kbts__ReadU32Unaligned(&Groups->StartCharacterCode)) &&
+         (Codepoint <= kbts__ReadU32Unaligned(&Groups->EndCharacterCode)))
       {
-        kbts_un Offset = Codepoint - Groups->StartCharacterCode;
-        GlyphId = Groups->StartGlyphId + Offset;
+        kbts_un Offset = Codepoint - kbts__ReadU32Unaligned(&Groups->StartCharacterCode);
+        GlyphId = kbts__ReadU32Unaligned(&Groups->StartGlyphId) + Offset;
       }
 
       Result = (int)GlyphId;
@@ -17144,7 +18220,7 @@ static kbts__iterate_features kbts__IterateFeatures(kbts_shape_config *Config, k
     //   Result.FeatureVariations = KBTS__POINTER_OFFSET(kbts__feature_variations, Header, Header->FeatureVariationsOffset);
     // }
 
-    Result.FeatureList = KBTS__POINTER_OFFSET(kbts__feature_list, Header, Header->FeatureListOffset);
+    Result.FeatureList = KBTS__POINTER_OFFSET(kbts__feature_list, Header, kbts__ReadU16Unaligned(&Header->FeatureListOffset));
     Result.Header = Header;
     Result.Langsys = Config->Langsys[ShapingTable];
     Result.EnabledFeatures = EnabledFeatures;
@@ -17171,7 +18247,7 @@ static kbts_b32 kbts__NextFeature(kbts__iterate_features *It)
     // kbts__feature_variations *FeatureVariations = It->FeatureVariations;
     while(It->FeatureIndex < It->Langsys->FeatureIndexCount)
     {
-      kbts__feature_pointer Feature = kbts__GetFeature(It->FeatureList, FeatureIndices[It->FeatureIndex]);
+      kbts__feature_pointer Feature = kbts__GetFeature(It->FeatureList, kbts__ReadU16Unaligned(&FeatureIndices[It->FeatureIndex]));
 
       // We might need to swap out this feature with another.
       // Check for variations.
@@ -17212,7 +18288,7 @@ static kbts_b32 kbts__NextFeature(kbts__iterate_features *It)
 
 typedef struct kbts__iterate_lookups
 {
-  kbts_lookup_list *LookupList;
+  kbts__lookup_list *LookupList;
   kbts__feature *Feature;
 
   kbts__lookup *Lookup;
@@ -17221,7 +18297,7 @@ typedef struct kbts__iterate_lookups
   kbts_u32 LookupIndexIndex;
 } kbts__iterate_lookups;
 
-static kbts__iterate_lookups kbts__IterateLookups(kbts_lookup_list *List, kbts__feature *Feature)
+static kbts__iterate_lookups kbts__IterateLookups(kbts__lookup_list *List, kbts__feature *Feature)
 {
   kbts__iterate_lookups Result = KBTS__ZERO;
   Result.LookupList = List;
@@ -17235,11 +18311,11 @@ static kbts_b32 kbts__NextLookup(kbts__iterate_lookups *It)
   kbts_b32 Result = 0;
   kbts__feature *Feature = It->Feature;
 
-  if(It->LookupList && Feature && (It->LookupIndexIndex < Feature->LookupIndexCount))
+  if(It->LookupList && Feature && (It->LookupIndexIndex < kbts__ReadU16Unaligned(&Feature->LookupIndexCount)))
   {
     kbts_u16 *LookupIndices = KBTS__POINTER_AFTER(kbts_u16, Feature);
 
-    It->LookupIndex = LookupIndices[It->LookupIndexIndex];
+    It->LookupIndex = kbts__ReadU16Unaligned(&LookupIndices[It->LookupIndexIndex]);
     It->Lookup = kbts__GetLookup(It->LookupList, It->LookupIndex);
 
     Result = 1;
@@ -17418,8 +18494,8 @@ static void *kbts__AllocatorAllocate(kbts_allocator_function *Allocator, void *A
   void *Result = AllocatorOp.Allocate.Pointer;
   return Result;
 }
-#define kbts__AllocatorAllocateType(Allocator, AllocatorData, Type) (Type *)kbts_AllocatorAllocate((Allocator), (AllocatorData), sizeof(Type))
-#define kbts__AllocatorAllocateArray(Allocator, AllocatorData, Type, Count) (Type *)kbts_AllocatorAllocate((Allocator), (AllocatorData), sizeof(Type) * (Count))
+#define kbts__AllocatorAllocateType(Allocator, AllocatorData, Type) (Type *)kbts__AllocatorAllocate((Allocator), (AllocatorData), sizeof(Type))
+#define kbts__AllocatorAllocateArray(Allocator, AllocatorData, Type, Count) (Type *)kbts__AllocatorAllocate((Allocator), (AllocatorData), sizeof(Type) * (Count))
 
 static void kbts__AllocatorFree(kbts_allocator_function *Allocator, void *AllocatorData, void *Pointer)
 {
@@ -17766,6 +18842,15 @@ KBTS_EXPORT kbts_shape_scratchpad *kbts_PlaceShapeScratchpad(kbts_shape_config *
       if(Blob->LookupSubtableIndexOffsetsOffsetFromStartOfFile)
       {
         Result->LookupSubtableIndexOffsets = KBTS__POINTER_OFFSET(kbts_u32, Blob, Blob->LookupSubtableIndexOffsetsOffsetFromStartOfFile);
+      }
+
+      kbts__gdef *Gdef = kbts__BlobTableDataType(Blob, KBTS_BLOB_TABLE_ID_GDEF, kbts__gdef);
+      if(Gdef &&
+         (kbts__ReadU16Unaligned(&Gdef->Major) == 1) &&
+         (kbts__ReadU16Unaligned(&Gdef->Minor) >= 3) &&
+         kbts__ReadU32Unaligned(&Gdef->ItemVariationStoreOffset))
+      {
+        Result->GdefItemVariationStore = KBTS__POINTER_OFFSET(kbts__item_variation_store, Gdef, kbts__ReadU32Unaligned(&Gdef->ItemVariationStoreOffset));
       }
     }
 
@@ -18260,7 +19345,7 @@ static kbts__sequence_match kbts__MatchCoverageSequence(kbts_glyph_storage *Stor
   kbts_un GlyphCounter = 0;
   while(kbts__GlyphIsValid(Storage, AtGlyph) && (CoverageIndex < CoverageCount))
   {
-    kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Base, CoverageOffsets[CoverageIndex]);
+    kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Base, kbts__ReadU16Unaligned(&CoverageOffsets[CoverageIndex]));
 
     if(!kbts__SkipGlyph(AtGlyph, Lookup, SkipFlags, SkipUnicodeFlags))
     {
@@ -18292,7 +19377,7 @@ static int kbts__BranchlessCompareArray16(kbts_u16 *A, kbts_u16 *B, kbts_un Coun
   kbts_u16 DifferenceMask = 0;
   KBTS__FOR(Index, 0, Count)
   {
-    DifferenceMask |= A[Index] ^ B[Index];
+    DifferenceMask |= kbts__ReadU16Unaligned(&A[Index]) ^ kbts__ReadU16Unaligned(&B[Index]);
   }
   return (int)DifferenceMask;
 }
@@ -18309,6 +19394,9 @@ static kbts__sequence_lookup_result kbts__DoSequenceLookup(kbts_glyph_storage *S
   kbts_un InputGlyphsTraversed = 1;
   kbts_glyph *BacktrackGlyph = AtGlyph->Prev;
 
+  kbts_u16 LookupFormat = kbts__ReadU16Unaligned(Base);
+  kbts_u16 Lookup_Type = kbts__ReadU16Unaligned(&Lookup->Type);
+
   // Lookup types 7 and 8 are dispatch mechanisms. They do not substitute anything by themselves, they only point to
   // other rules.
   // Some formats have multiple rules; when that happens, we only ever match on the first one that fits.
@@ -18316,7 +19404,7 @@ static kbts__sequence_lookup_result kbts__DoSequenceLookup(kbts_glyph_storage *S
   // We want to go to the right LookupType/SubtableFormat combination in a single jump, so we concatenate them here.
   // GSUB format 5 == GPOS format 7.
   // GSUB format 6 == GPOS format 8.
-  switch(((kbts_u32)Lookup->Type << 16) | (kbts_u32)Base[0])
+  switch(((kbts_u32)Lookup_Type << 16) | (kbts_u32)LookupFormat)
   {
   case 0x50001:
   case 0x70001:
@@ -18326,46 +19414,51 @@ static kbts__sequence_lookup_result kbts__DoSequenceLookup(kbts_glyph_storage *S
 
     if(Set)
     {
-      kbts_u16 Ids[64]; // @Hardcoded
-      kbts_u16 InputGlyphOffsets[64];
-      kbts_glyph *InputGlyphs[64];
+      enum {RuleGlyphCapacity = 64}; // @Hardcoded
+      kbts_u16 Ids[RuleGlyphCapacity];
+      kbts_u16 InputGlyphOffsets[RuleGlyphCapacity];
+      kbts_glyph *InputGlyphs[RuleGlyphCapacity];
+      kbts_un Set_Count = kbts__ReadU16Unaligned(&Set->Count);
       kbts_un IdCount = 0;
 
-      KBTS__FOR(RuleIndex, 0, Set->Count)
+      KBTS__FOR(RuleIndex, 0, Set_Count)
       {
         kbts__sequence_rule *Rule = kbts__GetSequenceRule(Set, RuleIndex);
-        kbts_u16 *InputSequence = KBTS__POINTER_AFTER(kbts_u16, Rule);
+        kbts_un Rule_GlyphCount = kbts__ReadU16Unaligned(&Rule->GlyphCount);
 
-        // @Hardcoded!
-        KBTS_ASSERT(Rule->GlyphCount <= 64);
-
-        while(kbts__GlyphIsValid(Storage, InputGlyph) && ((IdCount + 1) < Rule->GlyphCount))
+        if(Rule_GlyphCount <= RuleGlyphCapacity)
         {
-          if(!kbts__SkipGlyph(InputGlyph, Lookup, SkipFlags, SkipUnicodeFlags))
+          kbts_u16 *InputSequence = KBTS__POINTER_AFTER(kbts_u16, Rule);
+
+          while(kbts__GlyphIsValid(Storage, InputGlyph) &&
+                ((IdCount + 1) < Rule_GlyphCount))
           {
-            InputGlyphOffsets[IdCount] = (kbts_u16)InputGlyphsTraversed;
-            InputGlyphs[IdCount] = InputGlyph;
-            Ids[IdCount++] = InputGlyph->Id;
+            if(!kbts__SkipGlyph(InputGlyph, Lookup, SkipFlags, SkipUnicodeFlags))
+            {
+              InputGlyphOffsets[IdCount] = (kbts_u16)InputGlyphsTraversed;
+              InputGlyphs[IdCount] = InputGlyph;
+              Ids[IdCount++] = InputGlyph->Id;
+            }
+
+            InputGlyph = InputGlyph->Next;
+            InputGlyphsTraversed += 1;
           }
 
-          InputGlyph = InputGlyph->Next;
-          InputGlyphsTraversed += 1;
-        }
-
-        if(((IdCount + 1) >= Rule->GlyphCount) &&
-           !kbts__BranchlessCompareArray16(Ids, InputSequence, Rule->GlyphCount - 1))
-        {
-          Result.Records = (kbts__sequence_lookup_record *)(InputSequence + Rule->GlyphCount - 1);
-          Result.RecordCount = Rule->SequenceLookupCount;
-          Result.InputSequenceCountIncludingSkippedGlyphs = 1;
-          if(Rule->GlyphCount > 1)
+          if(((IdCount + 1) >= Rule_GlyphCount) &&
+             !kbts__BranchlessCompareArray16(Ids, InputSequence, Rule_GlyphCount - 1))
           {
-            Result.InputSequenceCountIncludingSkippedGlyphs = InputGlyphOffsets[Rule->GlyphCount - 2] + 1;
-            Result.OnePastLastGlyphMatched = InputGlyphs[Rule->GlyphCount - 2]->Next;
-          }
-          Result.Matched = 1;
+            Result.Records = (kbts__sequence_lookup_record *)(InputSequence + Rule_GlyphCount - 1);
+            Result.RecordCount = kbts__ReadU16Unaligned(&Rule->SequenceLookupCount);
+            Result.InputSequenceCountIncludingSkippedGlyphs = 1;
+            if(Rule_GlyphCount > 1)
+            {
+              Result.InputSequenceCountIncludingSkippedGlyphs = InputGlyphOffsets[Rule_GlyphCount - 2] + 1;
+              Result.OnePastLastGlyphMatched = InputGlyphs[Rule_GlyphCount - 2]->Next;
+            }
+            Result.Matched = 1;
 
-          break;
+            break;
+          }
         }
       }
     }
@@ -18376,12 +19469,12 @@ static kbts__sequence_lookup_result kbts__DoSequenceLookup(kbts_glyph_storage *S
   case 0x70002:
   {
     kbts__sequence_context_2 *Subst = (kbts__sequence_context_2 *)Base;
-    kbts_u16 *ClassDefinitionBase = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst->ClassDefOffset);
+    kbts_u16 *ClassDefinitionBase = KBTS__POINTER_OFFSET(kbts_u16, Subst, kbts__ReadU16Unaligned(&Subst->ClassDefOffset));
 
-    // @Hardcoded!
-    kbts_u16 InputClasses[64];
-    kbts_u16 InputOffsets[64];
-    kbts_glyph *InputGlyphs[64];
+    enum {RuleGlyphCapacity = 64}; // @Hardcoded
+    kbts_u16 InputClasses[RuleGlyphCapacity];
+    kbts_u16 InputOffsets[RuleGlyphCapacity];
+    kbts_glyph *InputGlyphs[RuleGlyphCapacity];
     kbts_un InputCount = 0;
 
     // For class-based contexts, the coverage index is not used.
@@ -18391,40 +19484,49 @@ static kbts__sequence_lookup_result kbts__DoSequenceLookup(kbts_glyph_storage *S
     kbts__glyph_class_from_table_result CurrentGlyphClass = kbts__GlyphClassFromTable(ClassDefinitionBase, CurrentGlyph->Id);
     kbts__class_sequence_rule_set *Set = kbts__GetClassSequenceRuleSet(Subst, CurrentGlyphClass.Class);
 
-    if((CurrentGlyphClass.Class < Subst->ClassSequenceRuleSetCount) && Set)
+    if((CurrentGlyphClass.Class < kbts__ReadU16Unaligned(&Subst->ClassSequenceRuleSetCount)) &&
+       Set)
     {
-      KBTS__FOR(RuleIndex, 0, Set->Count)
+      kbts_un Set_Count = kbts__ReadU16Unaligned(&Set->Count);
+
+      KBTS__FOR(RuleIndex, 0, Set_Count)
       {
         kbts__class_sequence_rule *Rule = kbts__GetClassSequenceRule(Set, RuleIndex);
-        kbts_u16 *InputSequence = KBTS__POINTER_AFTER(kbts_u16, Rule);
+        kbts_un Rule_GlyphCount = kbts__ReadU16Unaligned(&Rule->GlyphCount);
 
-        while(kbts__GlyphIsValid(Storage, InputGlyph) && ((InputCount + 1) < Rule->GlyphCount))
+        if(Rule_GlyphCount <= RuleGlyphCapacity)
         {
-          if(!kbts__SkipGlyph(InputGlyph, Lookup, SkipFlags, SkipUnicodeFlags))
+          kbts_u16 *InputSequence = KBTS__POINTER_AFTER(kbts_u16, Rule);
+
+          while(kbts__GlyphIsValid(Storage, InputGlyph) &&
+                ((InputCount + 1) < Rule_GlyphCount))
           {
-            InputOffsets[InputCount] = (kbts_u16)InputGlyphsTraversed;
-            InputGlyphs[InputCount] = InputGlyph;
-            InputClasses[InputCount++] = kbts__GlyphClassFromTable(ClassDefinitionBase, InputGlyph->Id).Class;
+            if(!kbts__SkipGlyph(InputGlyph, Lookup, SkipFlags, SkipUnicodeFlags))
+            {
+              InputOffsets[InputCount] = (kbts_u16)InputGlyphsTraversed;
+              InputGlyphs[InputCount] = InputGlyph;
+              InputClasses[InputCount++] = kbts__GlyphClassFromTable(ClassDefinitionBase, InputGlyph->Id).Class;
+            }
+
+            InputGlyph = InputGlyph->Next;
+            InputGlyphsTraversed += 1;
           }
 
-          InputGlyph = InputGlyph->Next;
-          InputGlyphsTraversed += 1;
-        }
-
-        if(((InputCount + 1) >= Rule->GlyphCount) &&
-           !kbts__BranchlessCompareArray16(InputClasses, InputSequence, Rule->GlyphCount - 1))
-        {
-          Result.Records = (kbts__sequence_lookup_record *)(InputSequence + Rule->GlyphCount - 1);
-          Result.RecordCount = Rule->SequenceLookupCount;
-          Result.InputSequenceCountIncludingSkippedGlyphs = 1;
-          if(Rule->GlyphCount > 1)
+          if(((InputCount + 1) >= Rule_GlyphCount) &&
+             !kbts__BranchlessCompareArray16(InputClasses, InputSequence, Rule_GlyphCount - 1))
           {
-            Result.InputSequenceCountIncludingSkippedGlyphs = InputOffsets[Rule->GlyphCount - 2] + 1;
-            Result.OnePastLastGlyphMatched = InputGlyphs[Rule->GlyphCount - 2]->Next;
-          }
-          Result.Matched = 1;
+            Result.Records = (kbts__sequence_lookup_record *)(InputSequence + Rule_GlyphCount - 1);
+            Result.RecordCount = kbts__ReadU16Unaligned(&Rule->SequenceLookupCount);
+            Result.InputSequenceCountIncludingSkippedGlyphs = 1;
+            if(Rule_GlyphCount > 1)
+            {
+              Result.InputSequenceCountIncludingSkippedGlyphs = InputOffsets[Rule_GlyphCount - 2] + 1;
+              Result.OnePastLastGlyphMatched = InputGlyphs[Rule_GlyphCount - 2]->Next;
+            }
+            Result.Matched = 1;
 
-          break;
+            break;
+          }
         }
       }
     }
@@ -18436,13 +19538,14 @@ static kbts__sequence_lookup_result kbts__DoSequenceLookup(kbts_glyph_storage *S
   {
     kbts__sequence_context_3 *Subst = (kbts__sequence_context_3 *)Base;
     kbts_u16 *CoverageOffsets = KBTS__POINTER_AFTER(kbts_u16, Subst);
+    kbts_un Subst_GlyphCount = kbts__ReadU16Unaligned(&Subst->GlyphCount);
 
-    kbts__sequence_match InputMatch = kbts__MatchCoverageSequence(Storage, Lookup, SkipFlags, SkipUnicodeFlags, Subst, CoverageOffsets, Subst->GlyphCount, AtGlyph, 0);
+    kbts__sequence_match InputMatch = kbts__MatchCoverageSequence(Storage, Lookup, SkipFlags, SkipUnicodeFlags, Subst, CoverageOffsets, Subst_GlyphCount, AtGlyph, 0);
 
-    if(InputMatch.MatchCount == Subst->GlyphCount)
+    if(InputMatch.MatchCount == Subst_GlyphCount)
     {
-      Result.Records = (kbts__sequence_lookup_record *)(CoverageOffsets + Subst->GlyphCount);
-      Result.RecordCount = Subst->SequenceLookupCount;
+      Result.Records = (kbts__sequence_lookup_record *)(CoverageOffsets + Subst_GlyphCount);
+      Result.RecordCount = kbts__ReadU16Unaligned(&Subst->SequenceLookupCount);
       Result.InputSequenceCountIncludingSkippedGlyphs = InputMatch.MatchOrSkipCount;
       Result.OnePastLastGlyphMatched = InputMatch.OnePastMatchGlyph;
       Result.Matched = 1;
@@ -18458,59 +19561,66 @@ static kbts__sequence_lookup_result kbts__DoSequenceLookup(kbts_glyph_storage *S
 
     if(Set)
     {
-      // @Hardcoded!
-      kbts_u16 BacktrackIds[64];
-      kbts_u16 InputIds[64];
-      kbts_u16 InputOffsets[64];
-      kbts_glyph *InputGlyphs[64];
+      enum {RuleGlyphCapacity = 64}; // @Hardcoded
+      kbts_u16 BacktrackIds[RuleGlyphCapacity];
+      kbts_u16 InputIds[RuleGlyphCapacity];
+      kbts_u16 InputOffsets[RuleGlyphCapacity];
+      kbts_glyph *InputGlyphs[RuleGlyphCapacity];
       kbts_un BacktrackCount = 0;
       kbts_un InputCount = 0;
+      kbts_un Set_Count = kbts__ReadU16Unaligned(&Set->Count);
 
-      KBTS__FOR(RuleIndex, 0, Set->Count)
+      KBTS__FOR(RuleIndex, 0, Set_Count)
       {
         kbts__chained_sequence_rule *Rule = kbts__GetChainedSequenceRule(Set, RuleIndex);
         kbts__unpacked_chained_sequence_rule Unpacked = kbts__UnpackChainedSequenceRule(Rule, 0);
 
-        while(kbts__GlyphIsValid(Storage, BacktrackGlyph) && (BacktrackCount < Unpacked.BacktrackCount))
+        if((Unpacked.BacktrackCount <= RuleGlyphCapacity) &&
+           (Unpacked.InputCount <= RuleGlyphCapacity) &&
+           (Unpacked.LookaheadCount <= RuleGlyphCapacity))
         {
-          if(!kbts__SkipGlyph(BacktrackGlyph, Lookup, SkipFlags, SkipUnicodeFlags))
+          while(kbts__GlyphIsValid(Storage, BacktrackGlyph) &&
+                (BacktrackCount < Unpacked.BacktrackCount))
           {
-            BacktrackIds[BacktrackCount++] = BacktrackGlyph->Id;
+            if(!kbts__SkipGlyph(BacktrackGlyph, Lookup, SkipFlags, SkipUnicodeFlags))
+            {
+              BacktrackIds[BacktrackCount++] = BacktrackGlyph->Id;
+            }
+
+            BacktrackGlyph = BacktrackGlyph->Prev;
           }
 
-          BacktrackGlyph = BacktrackGlyph->Prev;
-        }
-
-        kbts_un TotalInputGlyphsRequired = Unpacked.InputCount - 1 + Unpacked.LookaheadCount;
-        while(kbts__GlyphIsValid(Storage, InputGlyph) && (InputCount < TotalInputGlyphsRequired))
-        {
-          if(!kbts__SkipGlyph(InputGlyph, Lookup, SkipFlags, SkipUnicodeFlags))
+          kbts_un TotalInputGlyphsRequired = Unpacked.InputCount - 1 + Unpacked.LookaheadCount;
+          while(kbts__GlyphIsValid(Storage, InputGlyph) && (InputCount < TotalInputGlyphsRequired))
           {
-            InputGlyphs[InputCount] = InputGlyph;
-            InputOffsets[InputCount] = (kbts_u16)InputGlyphsTraversed;
-            InputIds[InputCount++] = InputGlyph->Id;
+            if(!kbts__SkipGlyph(InputGlyph, Lookup, SkipFlags, SkipUnicodeFlags))
+            {
+              InputGlyphs[InputCount] = InputGlyph;
+              InputOffsets[InputCount] = (kbts_u16)InputGlyphsTraversed;
+              InputIds[InputCount++] = InputGlyph->Id;
+            }
+
+            InputGlyph = InputGlyph->Next;
+            InputGlyphsTraversed += 1;
           }
 
-          InputGlyph = InputGlyph->Next;
-          InputGlyphsTraversed += 1;
-        }
-
-        if((BacktrackCount >= Unpacked.BacktrackCount) && (InputCount >= TotalInputGlyphsRequired) &&
-           !kbts__BranchlessCompareArray16(BacktrackIds, Unpacked.Backtrack, Unpacked.BacktrackCount) &&
-           !kbts__BranchlessCompareArray16(InputIds, Unpacked.Input, Unpacked.InputCount - 1) &&
-           !kbts__BranchlessCompareArray16(InputIds + Unpacked.InputCount - 1, Unpacked.Lookahead, Unpacked.LookaheadCount))
-        {
-          Result.Records = Unpacked.Records;
-          Result.RecordCount = Unpacked.RecordCount;
-          Result.InputSequenceCountIncludingSkippedGlyphs = 1;
-          if(Unpacked.InputCount > 1)
+          if((BacktrackCount >= Unpacked.BacktrackCount) && (InputCount >= TotalInputGlyphsRequired) &&
+             !kbts__BranchlessCompareArray16(BacktrackIds, Unpacked.Backtrack, Unpacked.BacktrackCount) &&
+             !kbts__BranchlessCompareArray16(InputIds, Unpacked.Input, Unpacked.InputCount - 1) &&
+             !kbts__BranchlessCompareArray16(InputIds + Unpacked.InputCount - 1, Unpacked.Lookahead, Unpacked.LookaheadCount))
           {
-            Result.InputSequenceCountIncludingSkippedGlyphs = InputOffsets[Unpacked.InputCount - 2] + 1;
-            Result.OnePastLastGlyphMatched = InputGlyphs[Unpacked.InputCount - 2]->Next;
-          }
-          Result.Matched = 1;
+            Result.Records = Unpacked.Records;
+            Result.RecordCount = Unpacked.RecordCount;
+            Result.InputSequenceCountIncludingSkippedGlyphs = 1;
+            if(Unpacked.InputCount > 1)
+            {
+              Result.InputSequenceCountIncludingSkippedGlyphs = InputOffsets[Unpacked.InputCount - 2] + 1;
+              Result.OnePastLastGlyphMatched = InputGlyphs[Unpacked.InputCount - 2]->Next;
+            }
+            Result.Matched = 1;
 
-          break;
+            break;
+          }
         }
       }
     }
@@ -18524,18 +19634,22 @@ static kbts__sequence_lookup_result kbts__DoSequenceLookup(kbts_glyph_storage *S
     kbts_u16 *BacktrackClassDefinition = 0;
     kbts_u16 *InputClassDefinition = 0;
     kbts_u16 *LookaheadClassDefinition = 0;
-    if(Subst->BacktrackClassDefOffset) {BacktrackClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst->BacktrackClassDefOffset);}
-    if(Subst->InputClassDefOffset) {InputClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst->InputClassDefOffset);}
-    if(Subst->LookaheadClassDefOffset) {LookaheadClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst->LookaheadClassDefOffset);}
+    kbts_un Subst_BacktrackClassDefOffset = kbts__ReadU16Unaligned(&Subst->BacktrackClassDefOffset);
+    kbts_un Subst_InputClassDefOffset = kbts__ReadU16Unaligned(&Subst->InputClassDefOffset);
+    kbts_un Subst_LookaheadClassDefOffset = kbts__ReadU16Unaligned(&Subst->LookaheadClassDefOffset);
+    if(Subst_BacktrackClassDefOffset) {BacktrackClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst_BacktrackClassDefOffset);}
+    if(Subst_InputClassDefOffset) {InputClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst_InputClassDefOffset);}
+    if(Subst_LookaheadClassDefOffset) {LookaheadClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst_LookaheadClassDefOffset);}
 
     // @Incomplete: Do this with all sequence types!
 
     // @Hardcoded: Pre-alloc this using LookupInfo!
-    kbts_u16 BacktrackClasses[64];
-    kbts_u16 InputClasses[64];
-    kbts_u16 InputClassOffsets[64];
-    kbts_glyph *InputGlyphs[64];
-    kbts_u16 LookaheadClasses[64];
+    enum {RuleGlyphCapacity = 64};
+    kbts_u16 BacktrackClasses[RuleGlyphCapacity];
+    kbts_u16 InputClasses[RuleGlyphCapacity];
+    kbts_u16 InputClassOffsets[RuleGlyphCapacity];
+    kbts_glyph *InputGlyphs[RuleGlyphCapacity];
+    kbts_u16 LookaheadClasses[RuleGlyphCapacity];
     kbts_un BacktrackClassCount = 0;
     kbts_un InputClassCount = 0;
 
@@ -18552,75 +19666,81 @@ static kbts__sequence_lookup_result kbts__DoSequenceLookup(kbts_glyph_storage *S
     // table here, so we double-check it here.
     // (It is also possible for a font to want to reuse the same class definition table across multiple lookups,
     //  in which case ignoring these classes becomes a feature.)
-    if((CurrentGlyphClass < Subst->ChainedClassSequenceRuleSetCount) && Set)
+    if((CurrentGlyphClass < kbts__ReadU16Unaligned(&Subst->ChainedClassSequenceRuleSetCount)) &&
+       Set)
     {
-      KBTS__FOR(RuleIndex, 0, Set->Count)
+      kbts_un Set_Count = kbts__ReadU16Unaligned(&Set->Count);
+
+      KBTS__FOR(RuleIndex, 0, Set_Count)
       {
         kbts__chained_sequence_rule *Rule = kbts__GetChainedClassSequenceRule(Set, RuleIndex);
         kbts__unpacked_chained_sequence_rule Unpacked = kbts__UnpackChainedSequenceRule(Rule, 0);
 
-        // @Hardcoded
-        KBTS_ASSERT(Unpacked.BacktrackCount <= 64);
-        KBTS_ASSERT(Unpacked.InputCount <= 64);
-        KBTS_ASSERT(Unpacked.LookaheadCount <= 64);
-
-        while(kbts__GlyphIsValid(Storage, BacktrackGlyph) && (BacktrackClassCount < Unpacked.BacktrackCount))
+        if((Unpacked.BacktrackCount <= RuleGlyphCapacity) &&
+           (Unpacked.InputCount <= RuleGlyphCapacity) &&
+           (Unpacked.LookaheadCount <= RuleGlyphCapacity))
         {
-          if(!kbts__SkipGlyph(BacktrackGlyph, Lookup, SkipFlags, SkipUnicodeFlags))
+          while(kbts__GlyphIsValid(Storage, BacktrackGlyph) &&
+                (BacktrackClassCount < Unpacked.BacktrackCount))
           {
-            // @Robustness: Do we want to break if we don't find a class?
-            kbts__glyph_class_from_table_result Class = kbts__GlyphClassFromTable(BacktrackClassDefinition, BacktrackGlyph->Id);
-            BacktrackClasses[BacktrackClassCount++] = Class.Class;
-          }
-
-          BacktrackGlyph = BacktrackGlyph->Prev;
-        }
-
-        kbts_un InputClassCountRequired = Unpacked.InputCount - 1 + Unpacked.LookaheadCount;
-        while(kbts__GlyphIsValid(Storage, InputGlyph) && (InputClassCount < InputClassCountRequired))
-        {
-          if(!kbts__SkipGlyph(InputGlyph, Lookup, SkipFlags, SkipUnicodeFlags))
-          {
-            kbts__glyph_class_from_table_result InputClass = kbts__GlyphClassFromTable(InputClassDefinition, InputGlyph->Id);
-            // In many cases, the font designer just wants to match "a set of glyphs" forward,
-            // and it doesn't matter whether those glyphs are in the input sequence or part of the lookahead.
-            // This happens often enough that we care to special-case it.
-            kbts__glyph_class_from_table_result LookaheadClass = InputClass;
-            if(LookaheadClassDefinition && (LookaheadClassDefinition != InputClassDefinition))
+            if(!kbts__SkipGlyph(BacktrackGlyph, Lookup, SkipFlags, SkipUnicodeFlags))
             {
-              LookaheadClass = kbts__GlyphClassFromTable(LookaheadClassDefinition, InputGlyph->Id);
+              // @Robustness: Do we want to break if we don't find a class?
+              kbts__glyph_class_from_table_result Class = kbts__GlyphClassFromTable(BacktrackClassDefinition, BacktrackGlyph->Id);
+              BacktrackClasses[BacktrackClassCount++] = Class.Class;
             }
 
-            // @Robustness: Do we want to break if we don't find a class?
-            InputGlyphs[InputClassCount] = InputGlyph;
-            InputClassOffsets[InputClassCount] = (kbts_u16)InputGlyphsTraversed;
-            InputClasses[InputClassCount] = InputClass.Class;
-            LookaheadClasses[InputClassCount] = LookaheadClass.Class;
-
-            InputClassCount += 1;
+            BacktrackGlyph = BacktrackGlyph->Prev;
           }
 
-          InputGlyph = InputGlyph->Next;
-          InputGlyphsTraversed += 1;
-        }
-
-        if((BacktrackClassCount >= Unpacked.BacktrackCount) &&
-           (InputClassCount >= InputClassCountRequired) &&
-           !kbts__BranchlessCompareArray16(BacktrackClasses, Unpacked.Backtrack, Unpacked.BacktrackCount) &&
-           !kbts__BranchlessCompareArray16(InputClasses, Unpacked.Input, Unpacked.InputCount - 1) &&
-           !kbts__BranchlessCompareArray16(LookaheadClasses + Unpacked.InputCount - 1, Unpacked.Lookahead, Unpacked.LookaheadCount))
-        {
-          Result.Records = Unpacked.Records;
-          Result.RecordCount = Unpacked.RecordCount;
-          Result.InputSequenceCountIncludingSkippedGlyphs = 1;
-          if(Unpacked.InputCount > 1)
+          kbts_un InputClassCountRequired = Unpacked.InputCount - 1 + Unpacked.LookaheadCount;
+          while(kbts__GlyphIsValid(Storage, InputGlyph) &&
+                (InputClassCount < InputClassCountRequired))
           {
-            Result.InputSequenceCountIncludingSkippedGlyphs = InputClassOffsets[Unpacked.InputCount - 2] + 1;
-            Result.OnePastLastGlyphMatched = InputGlyphs[Unpacked.InputCount - 2]->Next;
-          }
-          Result.Matched = 1;
+            if(!kbts__SkipGlyph(InputGlyph, Lookup, SkipFlags, SkipUnicodeFlags))
+            {
+              kbts__glyph_class_from_table_result InputClass = kbts__GlyphClassFromTable(InputClassDefinition, InputGlyph->Id);
+              // In many cases, the font designer just wants to match "a set of glyphs" forward,
+              // and it doesn't matter whether those glyphs are in the input sequence or part of the lookahead.
+              // This happens often enough that we care to special-case it.
+              kbts__glyph_class_from_table_result LookaheadClass = InputClass;
+              if(LookaheadClassDefinition &&
+                 (LookaheadClassDefinition != InputClassDefinition))
+              {
+                LookaheadClass = kbts__GlyphClassFromTable(LookaheadClassDefinition, InputGlyph->Id);
+              }
 
-          break;
+              // @Robustness: Do we want to break if we don't find a class?
+              InputGlyphs[InputClassCount] = InputGlyph;
+              InputClassOffsets[InputClassCount] = (kbts_u16)InputGlyphsTraversed;
+              InputClasses[InputClassCount] = InputClass.Class;
+              LookaheadClasses[InputClassCount] = LookaheadClass.Class;
+
+              InputClassCount += 1;
+            }
+
+            InputGlyph = InputGlyph->Next;
+            InputGlyphsTraversed += 1;
+          }
+
+          if((BacktrackClassCount >= Unpacked.BacktrackCount) &&
+             (InputClassCount >= InputClassCountRequired) &&
+             !kbts__BranchlessCompareArray16(BacktrackClasses, Unpacked.Backtrack, Unpacked.BacktrackCount) &&
+             !kbts__BranchlessCompareArray16(InputClasses, Unpacked.Input, Unpacked.InputCount - 1) &&
+             !kbts__BranchlessCompareArray16(LookaheadClasses + Unpacked.InputCount - 1, Unpacked.Lookahead, Unpacked.LookaheadCount))
+          {
+            Result.Records = Unpacked.Records;
+            Result.RecordCount = Unpacked.RecordCount;
+            Result.InputSequenceCountIncludingSkippedGlyphs = 1;
+            if(Unpacked.InputCount > 1)
+            {
+              Result.InputSequenceCountIncludingSkippedGlyphs = InputClassOffsets[Unpacked.InputCount - 2] + 1;
+              Result.OnePastLastGlyphMatched = InputGlyphs[Unpacked.InputCount - 2]->Next;
+            }
+            Result.Matched = 1;
+
+            break;
+          }
         }
       }
     }
@@ -18642,7 +19762,7 @@ static kbts__sequence_lookup_result kbts__DoSequenceLookup(kbts_glyph_storage *S
     CurrentCover.Valid = !Unpacked.InputCount || kbts__GlyphPassesLookupFilter(CurrentGlyph, Lookup);
     if(Unpacked.InputCount)
     {
-      kbts__coverage *CurrentCoverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, Unpacked.InputCoverageOffsets[0]);
+      kbts__coverage *CurrentCoverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.InputCoverageOffsets[0]));
       CurrentCover = kbts__CoverGlyph(CurrentCoverage, CurrentGlyph->Id);
     }
 
@@ -18654,7 +19774,9 @@ static kbts__sequence_lookup_result kbts__DoSequenceLookup(kbts_glyph_storage *S
       kbts_un MatchedOrSkippedInputGlyphCount = 1 + InputMatch.MatchOrSkipCount;
       kbts__sequence_match LookaheadMatch = kbts__MatchCoverageSequence(Storage, Lookup, SkipFlags, SkipUnicodeFlags, Subst, Unpacked.LookaheadCoverageOffsets, Unpacked.LookaheadCount, InputMatch.OnePastMatchGlyph, 0);
 
-      if((BacktrackMatch.MatchCount == Unpacked.BacktrackCount) && ((MatchingInputGlyphCount) == Unpacked.InputCount) && (LookaheadMatch.MatchCount == Unpacked.LookaheadCount))
+      if((BacktrackMatch.MatchCount == Unpacked.BacktrackCount) &&
+         (MatchingInputGlyphCount == Unpacked.InputCount) &&
+         (LookaheadMatch.MatchCount == Unpacked.LookaheadCount))
       {
         Result.Records = Unpacked.Records;
         Result.RecordCount = Unpacked.RecordCount;
@@ -18673,13 +19795,13 @@ static kbts__sequence_lookup_result kbts__DoSequenceLookup(kbts_glyph_storage *S
   return Result;
 }
 
-static void kbts__ApplyValueRecord(kbts_glyph *Glyph, kbts__unpacked_value_record *Unpacked)
+static void kbts__ApplyValueRecord(kbts_glyph *Glyph, kbts__resolved_value_record *ValueRecord)
 {
-  Glyph->OffsetX += Unpacked->PlacementX;
-  Glyph->OffsetY += Unpacked->PlacementY;
+  Glyph->OffsetX += ValueRecord->PlacementX;
+  Glyph->OffsetY += ValueRecord->PlacementY;
 
-  Glyph->AdvanceX += Unpacked->AdvanceX;
-  Glyph->AdvanceY += Unpacked->AdvanceY;
+  Glyph->AdvanceX += ValueRecord->AdvanceX;
+  Glyph->AdvanceY += ValueRecord->AdvanceY;
 }
 
 static kbts_b32 kbts__NextGlyph(kbts_glyph_storage *Storage, kbts__unpacked_lookup *Lookup, kbts_glyph *AtGlyph, kbts__skip_flags SkipFlags, kbts_u32 SkipUnicodeFlags, kbts_glyph **Match, int Backward)
@@ -18766,7 +19888,7 @@ KBTS_INLINE void kbts__SetCursiveFlags(kbts_glyph *Glyph, kbts__cursive_flags Cu
 }
 
 static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts_shape_config *Config, kbts_glyph_storage *Storage,
-                                         kbts_lookup_list *LookupList, kbts_un LookupIndex, kbts_un SubtableIndex, kbts__unpacked_lookup *Lookup, kbts_u16 *Base,
+                                         kbts__lookup_list *LookupList, kbts_un LookupIndex, kbts_un SubtableIndex, kbts__unpacked_lookup *Lookup, kbts_u16 *Base,
                                          kbts_glyph *CurrentGlyph, kbts_un StartIndex, kbts__skip_flags RequestedSkipFlags)
 {
   KBTS_INSTRUMENT_FUNCTION_BEGIN;
@@ -18784,23 +19906,27 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
     // CAREFUL: We want kbts__unpacked_lookup to be a useful bag-of-arguments type, but, for extension
     // lookups, each subtable may specify its own lookup type, so we save it here and restore it at
     // the end of this function.
-    kbts_u16 OriginalLookupType = Lookup->Type;
+    kbts_u16 OriginalLookupType = kbts__ReadU16Unaligned(&Lookup->Type);
+    kbts_u16 Lookup_Type = OriginalLookupType;
 
-    while(Lookup->Type == 9)
+    while(Lookup_Type == 9)
     {
       kbts__extension *Extension = (kbts__extension *)Base;
 
-      Lookup->Type = Extension->LookupType;
-      Base = KBTS__POINTER_OFFSET(kbts_u16, Extension, Extension->Offset);
+      Lookup_Type = kbts__ReadU16Unaligned(&Extension->LookupType);
+      Base = KBTS__POINTER_OFFSET(kbts_u16, Extension, kbts__ReadU32Unaligned(&Extension->Offset));
     }
+
+    kbts_u16 LookupFormat = kbts__ReadU16Unaligned(Base);
 
     kbts__cover_glyph_result Cover = KBTS__ZERO;
     Cover.Valid = kbts__GlyphPassesLookupFilter(CurrentGlyph, Lookup);
     kbts__coverage *Coverage = 0;
-    if(Cover.Valid && kbts__GposLookupBeginsWithCoverage(Lookup->Type, Base[0]))
+    if(Cover.Valid &&
+       kbts__GposLookupBeginsWithCoverage(Lookup_Type, LookupFormat))
     {
-      kbts_u16 *CoverageOffset = Base + 1;
-      Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Base, *CoverageOffset);
+      kbts_un CoverageOffset = kbts__ReadU16Unaligned(&Base[1]);
+      Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Base, CoverageOffset);
       Cover = kbts__CoverGlyph(Coverage, CurrentGlyph->Id);
     }
 
@@ -18808,21 +19934,21 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
     {
       kbts_un OnePastLastGlyphOffset = 0;
       
-      switch(Lookup->Type)
+      switch(Lookup_Type)
       {
       case 1:
       {
-        kbts_u16 ValueFormat = Base[2];
+        kbts_u16 ValueFormat = kbts__ReadU16Unaligned(&Base[2]);
 
-        kbts__unpacked_value_record Unpacked = KBTS__ZERO;
+        kbts__resolved_value_record ValueRecord = KBTS__ZERO;
 
-        if(Base[0] == 1)
+        if(LookupFormat == 1)
         {
           kbts__single_adjustment_1 *Adjust = (kbts__single_adjustment_1 *)Base;
 
-          Unpacked = kbts__UnpackValueRecord(Adjust, ValueFormat, KBTS__POINTER_AFTER(kbts_u16, Adjust));
+          ValueRecord = kbts__ResolveValueRecord(Scratchpad, Adjust, ValueFormat, KBTS__POINTER_AFTER(kbts_u16, Adjust));
         }
-        else if(Base[0] == 2)
+        else if(LookupFormat == 2)
         {
           kbts__single_adjustment_2 *Adjust = (kbts__single_adjustment_2 *)Base;
 
@@ -18830,10 +19956,10 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
           kbts_u16 *Records = KBTS__POINTER_AFTER(kbts_u16, Adjust);
           kbts_u16 *Record = Records + RecordSize * Cover.Index;
 
-          Unpacked = kbts__UnpackValueRecord(Adjust, ValueFormat, Record);
+          ValueRecord = kbts__ResolveValueRecord(Scratchpad, Adjust, ValueFormat, Record);
         }
 
-        kbts__ApplyValueRecord(CurrentGlyph, &Unpacked);
+        kbts__ApplyValueRecord(CurrentGlyph, &ValueRecord);
 
         CurrentGlyph->Flags |= KBTS_GLYPH_FLAG_USED_IN_GPOS;
 
@@ -18858,24 +19984,24 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
 
           {
             kbts__pair_adjustment_1 *Adjust = (kbts__pair_adjustment_1 *)Base;
-            ValueFormat1 = Adjust->ValueFormat1;
-            ValueFormat2 = Adjust->ValueFormat2;
+            ValueFormat1 = kbts__ReadU16Unaligned(&Adjust->ValueFormat1);
+            ValueFormat2 = kbts__ReadU16Unaligned(&Adjust->ValueFormat2);
 
             Size1 = kbts__PopCount32(ValueFormat1);
             Size2 = kbts__PopCount32(ValueFormat2);
           }
 
-          if(Base[0] == 1)
+          if(LookupFormat == 1)
           {
             kbts__pair_adjustment_1 *Adjust = (kbts__pair_adjustment_1 *)Base;
 
             kbts_u16 *SetOffsets = KBTS__POINTER_AFTER(kbts_u16, Adjust);
-            kbts__pair_set *Set = KBTS__POINTER_OFFSET(kbts__pair_set, Adjust, SetOffsets[Cover.Index]);
+            kbts__pair_set *Set = KBTS__POINTER_OFFSET(kbts__pair_set, Adjust, kbts__ReadU16Unaligned(&SetOffsets[Cover.Index]));
 
             kbts_un PairRecordSize = Size1 + Size2 + 1; // + 1 because each pair stores the next glyph ID.
             kbts__pair_value_record *PairRecords = KBTS__POINTER_AFTER(kbts__pair_value_record, Set);
 
-            kbts_un PairCount = Set->Count;
+            kbts_un PairCount = kbts__ReadU16Unaligned(&Set->Count);
 
             KBTS_INSTRUMENT_BLOCK_BEGIN(PairSearch);
 
@@ -18884,11 +20010,11 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
             while(PairCount > 1) \
             { \
               kbts_un HalfCount = PairCount / 2; \
-              PairSizeTimesPairIndex = (PairRecords[PairSizeTimesPairIndex + HalfCount*PairSize - PairSize].SecondGlyph < NextGlyphId) ? (PairSizeTimesPairIndex + HalfCount*PairSize) : PairSizeTimesPairIndex; \
+              PairSizeTimesPairIndex = (kbts__ReadU16Unaligned(&PairRecords[PairSizeTimesPairIndex + HalfCount*PairSize - PairSize].SecondGlyph) < NextGlyphId) ? (PairSizeTimesPairIndex + HalfCount*PairSize) : PairSizeTimesPairIndex; \
               PairCount -= HalfCount; \
             } \
             kbts__pair_value_record *PairRecord = PairRecords + PairSizeTimesPairIndex; \
-            if(PairRecord->SecondGlyph == NextGlyphId) \
+            if(kbts__ReadU16Unaligned(&PairRecord->SecondGlyph) == NextGlyphId) \
             { \
               kbts_u16 *Records = KBTS__POINTER_AFTER(kbts_u16, PairRecord); \
               Unpacked1Base = Records; \
@@ -18916,7 +20042,7 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
                 kbts__pair_value_record *OnePastProbe = PairRecord + HalfCount * PairRecordSize;
                 kbts__pair_value_record *Probe = OnePastProbe - PairRecordSize;
 
-                if(Probe->SecondGlyph < NextGlyphId)
+                if(kbts__ReadU16Unaligned(&Probe->SecondGlyph) < NextGlyphId)
                 {
                   PairRecord = OnePastProbe;
                 }
@@ -18924,7 +20050,7 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
                 PairCount -= HalfCount;
               }
 
-              if(PairRecord->SecondGlyph == NextGlyphId)
+              if(kbts__ReadU16Unaligned(&PairRecord->SecondGlyph) == NextGlyphId)
               {
                 kbts_u16 *Records = KBTS__POINTER_AFTER(kbts_u16, PairRecord);
 
@@ -18939,13 +20065,13 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
             #undef KBTS__PAIR_SEARCH
             KBTS_INSTRUMENT_BLOCK_END(PairSearch);
           }
-          else if(Base[0] == 2)
+          else if(LookupFormat == 2)
           {
             KBTS_INSTRUMENT_BLOCK_BEGIN(PairClasses);
 
             kbts__pair_adjustment_2 *Adjust = (kbts__pair_adjustment_2 *)Base;
-            kbts_u16 *ClassDef1 = KBTS__POINTER_OFFSET(kbts_u16, Adjust, Adjust->ClassDefinition1Offset);
-            kbts_u16 *ClassDef2 = KBTS__POINTER_OFFSET(kbts_u16, Adjust, Adjust->ClassDefinition2Offset);
+            kbts_u16 *ClassDef1 = KBTS__POINTER_OFFSET(kbts_u16, Adjust, kbts__ReadU16Unaligned(&Adjust->ClassDefinition1Offset));
+            kbts_u16 *ClassDef2 = KBTS__POINTER_OFFSET(kbts_u16, Adjust, kbts__ReadU16Unaligned(&Adjust->ClassDefinition2Offset));
 
             kbts_un PairRecordSize = Size1 + Size2;
             kbts_u16 *PairRecords = KBTS__POINTER_AFTER(kbts_u16, Adjust);
@@ -18961,10 +20087,13 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
             kbts__glyph_class_from_table_result Class1 = kbts__GlyphClassFromTable(ClassDef1, CurrentGlyph->Id);
             kbts__glyph_class_from_table_result Class2 = kbts__GlyphClassFromTable(ClassDef2, NextGlyphId);
 
-            if((Class1.Class < Adjust->Class1Count) &&
-               (Class2.Class < Adjust->Class2Count))
+            kbts_un Adjust_Class1Count = kbts__ReadU16Unaligned(&Adjust->Class1Count);
+            kbts_un Adjust_Class2Count = kbts__ReadU16Unaligned(&Adjust->Class2Count);
+
+            if((Class1.Class < Adjust_Class1Count) &&
+               (Class2.Class < Adjust_Class2Count))
             {
-              kbts_u16 *PairRecord = PairRecords + Class1.Class * PairRecordSize * Adjust->Class2Count + Class2.Class * PairRecordSize;
+              kbts_u16 *PairRecord = PairRecords + Class1.Class * PairRecordSize * Adjust_Class2Count + Class2.Class * PairRecordSize;
 
               Unpacked1Base = PairRecord;
               Unpacked2Base = PairRecord + Size1;
@@ -18982,8 +20111,8 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
 
             KBTS_INSTRUMENT_BLOCK_BEGIN(ApplyPairPositioning);
 
-            kbts__unpacked_value_record Unpacked1 = kbts__UnpackValueRecord(Base, ValueFormat1, Unpacked1Base);
-            kbts__ApplyValueRecord(CurrentGlyph, &Unpacked1);
+            kbts__resolved_value_record ValueRecord1 = kbts__ResolveValueRecord(Scratchpad, Base, ValueFormat1, Unpacked1Base);
+            kbts__ApplyValueRecord(CurrentGlyph, &ValueRecord1);
 
             CurrentGlyph->Flags |= KBTS_GLYPH_FLAG_USED_IN_GPOS;
             NextGlyph->Flags |= KBTS_GLYPH_FLAG_USED_IN_GPOS;
@@ -18992,8 +20121,8 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
 
             if(ValueFormat2)
             {
-              kbts__unpacked_value_record Unpacked2 = kbts__UnpackValueRecord(Base, ValueFormat2, Unpacked2Base);
-              kbts__ApplyValueRecord(NextGlyph, &Unpacked2);
+              kbts__resolved_value_record ValueRecord2 = kbts__ResolveValueRecord(Scratchpad, Base, ValueFormat2, Unpacked2Base);
+              kbts__ApplyValueRecord(NextGlyph, &ValueRecord2);
               OnePastLastGlyph = NextGlyph->Next;
             }
 
@@ -19024,14 +20153,21 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
             kbts__entry_exit *PrevEntryExit = &EntryExits[PrevCover.Index];
             kbts__entry_exit *EntryExit = &EntryExits[Cover.Index];
 
-            if(PrevEntryExit->ExitAnchorOffset && EntryExit->EntryAnchorOffset)
+            kbts_un PrevEntryExit_ExitAnchorOffset = kbts__ReadU16Unaligned(&PrevEntryExit->ExitAnchorOffset);
+            kbts_un EntryExit_EntryAnchorOffset = kbts__ReadU16Unaligned(&EntryExit->EntryAnchorOffset);
+
+            if(PrevEntryExit_ExitAnchorOffset &&
+               EntryExit_EntryAnchorOffset)
             {
-              kbts__anchor *PrevExitAnchor = KBTS__POINTER_OFFSET(kbts__anchor, Adjust, PrevEntryExit->ExitAnchorOffset);
-              kbts__anchor *EntryAnchor = KBTS__POINTER_OFFSET(kbts__anchor, Adjust, EntryExit->EntryAnchorOffset);
-              kbts_s32 Anchor0X = PrevExitAnchor->X;
-              kbts_s32 Anchor0Y = PrevExitAnchor->Y;
-              kbts_s32 Anchor1X = EntryAnchor->X;
-              kbts_s32 Anchor1Y = EntryAnchor->Y;
+              kbts__anchor *PrevExitAnchor = KBTS__POINTER_OFFSET(kbts__anchor, Adjust, PrevEntryExit_ExitAnchorOffset);
+              kbts__anchor *EntryAnchor = KBTS__POINTER_OFFSET(kbts__anchor, Adjust, EntryExit_EntryAnchorOffset);
+
+              kbts_s32 Anchor0X, Anchor0Y;
+              kbts__ResolveAnchorXy(Scratchpad, PrevExitAnchor, &Anchor0X, &Anchor0Y);
+
+              kbts_s32 Anchor1X, Anchor1Y;
+              kbts__ResolveAnchorXy(Scratchpad, EntryAnchor, &Anchor1X, &Anchor1Y);
+
               kbts_s32 Advance0X = Prev->AdvanceX;
               kbts_s32 Advance1X = CurrentGlyph->AdvanceX;
               kbts_s32 Offset0X = Prev->OffsetX;
@@ -19189,14 +20325,16 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
         // don't do that zeroing at the end (either because they do it at the beginning of GPOS, or
         // because they don't do it at all).
         kbts_b32 CountMarkAdvances = !kbts__ShaperClearsMarkAdvancesInPostGposFixup(Config->Shaper);
-        kbts__coverage *BaseCoverage = KBTS__POINTER_OFFSET(kbts__coverage, Adjust, Adjust->BaseCoverageOffset);
-        kbts_un MarkClassCount = Adjust->MarkClassCount;
+        kbts__coverage *BaseCoverage = KBTS__POINTER_OFFSET(kbts__coverage, Adjust, kbts__ReadU16Unaligned(&Adjust->BaseCoverageOffset));
+        kbts_un MarkClassCount = kbts__ReadU16Unaligned(&Adjust->MarkClassCount);
         kbts_s32 AdvanceSinceBaseX = 0;
         kbts_s32 AdvanceSinceBaseY = 0;
         kbts_u32 BaseClasses = Lookup->Type == 6 ? (1 << KBTS__GLYPH_CLASS_MARK) : (1 | (1 << KBTS__GLYPH_CLASS_BASE) | (1 << KBTS__GLYPH_CLASS_LIGATURE) | (1 << KBTS__GLYPH_CLASS_COMPONENT));
         kbts_glyph *BaseGlyph = 0;
 
-        for(kbts_glyph *PrevGlyph = CurrentGlyph->Prev; kbts__GlyphIsValid(Storage, PrevGlyph); PrevGlyph = PrevGlyph->Prev)
+        for(kbts_glyph *PrevGlyph = CurrentGlyph->Prev;
+            kbts__GlyphIsValid(Storage, PrevGlyph);
+            PrevGlyph = PrevGlyph->Prev)
         {
           if(CountMarkAdvances || (PrevGlyph->Classes.Class != KBTS__GLYPH_CLASS_MARK))
           {
@@ -19262,14 +20400,19 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
 
             if(ValidBase)
             {
-              kbts__base_array *BaseArray = KBTS__POINTER_OFFSET(kbts__base_array, Adjust, Adjust->BaseArrayOffset);
+              kbts__base_array *BaseArray = KBTS__POINTER_OFFSET(kbts__base_array, Adjust, kbts__ReadU16Unaligned(&Adjust->BaseArrayOffset));
               kbts_u16 *BaseAnchorOffsets = KBTS__POINTER_AFTER(kbts_u16, BaseArray) + BaseIndex * MarkClassCount;
-              kbts__mark_info MarkInfo = kbts__GetMarkInfo(Adjust, Adjust->MarkArrayOffset, Cover.Index);
+              kbts__mark_info MarkInfo = kbts__GetMarkInfo(Adjust, kbts__ReadU16Unaligned(&Adjust->MarkArrayOffset), Cover.Index);
 
-              kbts_u16 BaseAnchorOffset = BaseAnchorOffsets[MarkInfo.Record->Class];
+              kbts_u16 BaseAnchorOffset = kbts__ReadU16Unaligned(&BaseAnchorOffsets[kbts__ReadU16Unaligned(&MarkInfo.Record->Class)]);
               if(BaseAnchorOffset)
               {
                 kbts__anchor *BaseAnchor = KBTS__POINTER_OFFSET(kbts__anchor, BaseArray, BaseAnchorOffset);
+                kbts_s32 BaseAnchorX, BaseAnchorY;
+                kbts__ResolveAnchorXy(Scratchpad, BaseAnchor, &BaseAnchorX, &BaseAnchorY);
+
+                kbts_s32 MarkAnchorX, MarkAnchorY;
+                kbts__ResolveAnchorXy(Scratchpad, MarkInfo.Anchor, &MarkAnchorX, &MarkAnchorY);
 
                 /* From the Microsoft docs:
                      When a mark is combined with a given base, the mark placement is adjusted so that the mark anchor is
@@ -19277,8 +20420,8 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
                    both glyphs are not affected.
                 */
 
-                kbts_s32 NewOffsetX = BaseGlyph->OffsetX - AdvanceSinceBaseX + (BaseAnchor->X - MarkInfo.Anchor->X);
-                kbts_s32 NewOffsetY = BaseGlyph->OffsetY - AdvanceSinceBaseY + (BaseAnchor->Y - MarkInfo.Anchor->Y);
+                kbts_s32 NewOffsetX = BaseGlyph->OffsetX - AdvanceSinceBaseX + (BaseAnchorX - MarkAnchorX);
+                kbts_s32 NewOffsetY = BaseGlyph->OffsetY - AdvanceSinceBaseY + (BaseAnchorY - MarkAnchorY);
 
                 kbts__AttachGlyph(Storage, BaseGlyph, CurrentGlyph, NewOffsetX, NewOffsetY);
 
@@ -19313,9 +20456,9 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
 
         if(LigatureGlyph)
         {
-          kbts__ligature_array *LigatureArray = KBTS__POINTER_OFFSET(kbts__ligature_array, Adjust, Adjust->LigatureArrayOffset);
+          kbts__ligature_array *LigatureArray = KBTS__POINTER_OFFSET(kbts__ligature_array, Adjust, kbts__ReadU16Unaligned(&Adjust->LigatureArrayOffset));
 
-          kbts__cover_glyph_result LigatureCover = kbts__CoverGlyph(KBTS__POINTER_OFFSET(kbts__coverage, Adjust, Adjust->LigatureCoverageOffset),
+          kbts__cover_glyph_result LigatureCover = kbts__CoverGlyph(KBTS__POINTER_OFFSET(kbts__coverage, Adjust, kbts__ReadU16Unaligned(&Adjust->LigatureCoverageOffset)),
                                                                     LigatureGlyph->Id);
 
           kbts_un LigatureIndex = LigatureCover.Index;
@@ -19324,17 +20467,18 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
           if(ValidLigature)
           {
             kbts__ligature_attach *LigatureAttach = kbts__GetLigatureAttach(LigatureArray, LigatureIndex);
-            kbts__mark_info MarkInfo = kbts__GetMarkInfo(Adjust, Adjust->MarkArrayOffset, Cover.Index);
+            kbts_un LigatureAttach_Count = kbts__ReadU16Unaligned(&LigatureAttach->Count);
+            kbts__mark_info MarkInfo = kbts__GetMarkInfo(Adjust, kbts__ReadU16Unaligned(&Adjust->MarkArrayOffset), Cover.Index);
             kbts_un LigatureComponentIndexPlusOne = CurrentGlyph->LigatureComponentIndexPlusOne;
 
             if(CurrentGlyph->LigatureUid != LigatureGlyph->Uid)
             {
               // If the mark is not yet attached to the ligature, attach it now.
               // Apparently, in this case, the mark should be considered part of the _last_ component of the ligature.
-              LigatureComponentIndexPlusOne = LigatureAttach->Count;
+              LigatureComponentIndexPlusOne = LigatureAttach_Count;
             }
 
-            if(LigatureComponentIndexPlusOne <= LigatureAttach->Count)
+            if(LigatureComponentIndexPlusOne <= LigatureAttach_Count)
             {
               kbts_un AnchorIndex = LigatureComponentIndexPlusOne;
               if(AnchorIndex)
@@ -19343,13 +20487,18 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
               }
               else
               {
-                AnchorIndex = LigatureAttach->Count - 1;
+                AnchorIndex = LigatureAttach_Count - 1;
               }
 
-              kbts__anchor *LigatureAnchor = kbts__GetLigatureAttachAnchor(Adjust, LigatureAttach, MarkInfo.Record->Class, AnchorIndex);
+              kbts__anchor *LigatureAnchor = kbts__GetLigatureAttachAnchor(Adjust, LigatureAttach, kbts__ReadU16Unaligned(&MarkInfo.Record->Class), AnchorIndex);
+              kbts_s32 LigatureAnchorX, LigatureAnchorY;
+              kbts__ResolveAnchorXy(Scratchpad, LigatureAnchor, &LigatureAnchorX, &LigatureAnchorY);
 
-              kbts_s32 NewOffsetX = LigatureGlyph->OffsetX - AdvanceSinceBaseX + (LigatureAnchor->X - MarkInfo.Anchor->X);
-              kbts_s32 NewOffsetY = LigatureGlyph->OffsetY - AdvanceSinceBaseY + (LigatureAnchor->Y - MarkInfo.Anchor->Y);
+              kbts_s32 MarkAnchorX, MarkAnchorY;
+              kbts__ResolveAnchorXy(Scratchpad, MarkInfo.Anchor, &MarkAnchorX, &MarkAnchorY);
+
+              kbts_s32 NewOffsetX = LigatureGlyph->OffsetX - AdvanceSinceBaseX + (LigatureAnchorX - MarkAnchorX);
+              kbts_s32 NewOffsetY = LigatureGlyph->OffsetY - AdvanceSinceBaseY + (LigatureAnchorY - MarkAnchorY);
 
               kbts__AttachGlyph(Storage, LigatureGlyph, CurrentGlyph, NewOffsetX, NewOffsetY);
 
@@ -19384,7 +20533,9 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
           KBTS__FOR(RecordIndex, 0, SequenceLookup.RecordCount)
           {
             kbts__sequence_lookup_record *Record = &SequenceLookup.Records[RecordIndex];
-            kbts__lookup *PackedRecordLookup = kbts__GetLookup(LookupList, Record->LookupListIndex);
+            kbts_un Record_LookupListIndex = kbts__ReadU16Unaligned(&Record->LookupListIndex);
+            kbts_un Record_SequenceIndex = kbts__ReadU16Unaligned(&Record->SequenceIndex);
+            kbts__lookup *PackedRecordLookup = kbts__GetLookup(LookupList, Record_LookupListIndex);
             kbts__unpacked_lookup RecordLookup = kbts__UnpackLookup(Gdef, PackedRecordLookup);
 
             kbts_glyph *NestedCurrentGlyph = CurrentGlyph;
@@ -19397,7 +20548,7 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
               {
                 if(!kbts__SkipGlyph(Glyph, Lookup, SequenceSkipFlags, SkipUnicodeFlags))
                 {
-                  if(SequenceIndex == Record->SequenceIndex)
+                  if(SequenceIndex == Record_SequenceIndex)
                   {
                     NestedCurrentGlyph = Glyph;
 
@@ -19413,10 +20564,10 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
 
             KBTS__FOR(NestedSubtableIndex, 0, RecordLookup.SubtableCount)
             {
-              kbts_u16 *NestedBase = KBTS__POINTER_OFFSET(kbts_u16, PackedRecordLookup, RecordLookup.SubtableOffsets[NestedSubtableIndex]);
+              kbts_u16 *NestedBase = KBTS__POINTER_OFFSET(kbts_u16, PackedRecordLookup, kbts__ReadU16Unaligned(&RecordLookup.SubtableOffsets[NestedSubtableIndex]));
 
               kbts__DoSingleAdjustment(Scratchpad, Config, Storage, LookupList,
-                                       Record->LookupListIndex, NestedSubtableIndex, &RecordLookup, NestedBase,
+                                       Record_LookupListIndex, NestedSubtableIndex, &RecordLookup, NestedBase,
                                        NestedCurrentGlyph, StartIndex + NestedCurrentGlyphIndex, RequestedSkipFlags);
             }
           }
@@ -19576,7 +20727,7 @@ KBTS_INLINE kbts_u16 kbts__NextGlyphUid(kbts_shape_scratchpad *Scratchpad)
 }
 
 static kbts__substitution_result_flags kbts__DoSubstitution(kbts_shape_scratchpad *Scratchpad, kbts_shape_config *Config, kbts_glyph_storage *Storage,
-                                                            kbts_lookup_list *LookupList, kbts_un SequentialLookupIndex, kbts_u16 FeatureValue,
+                                                            kbts__lookup_list *LookupList, kbts_un SequentialLookupIndex, kbts_u16 FeatureValue,
                                                             kbts__gsub_frame *Frames, kbts_un *FrameCount_,
                                                             int CheckOnly, kbts__skip_flags RequestedSkipFlags, kbts_u32 GeneratedGlyphFlags)
 {
@@ -19598,7 +20749,7 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts_shape_scratchpa
 
   while(Frame->SubtableIndex < Lookup.SubtableCount)
   {
-    kbts_u16 *Subtable = KBTS__POINTER_OFFSET(kbts_u16, PackedLookup, Lookup.SubtableOffsets[Frame->SubtableIndex]);
+    kbts_u16 *Subtable = KBTS__POINTER_OFFSET(kbts_u16, PackedLookup, kbts__ReadU16Unaligned(&Lookup.SubtableOffsets[Frame->SubtableIndex]));
     // In a type-7 lookup, each subtable can specify a different lookup type.
     // We still want to pass kbts__unpacked_lookup around as a useful bag of arguments, though.
     // So, we restore the original lookup's type here before resolving each subtable.
@@ -19607,17 +20758,18 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts_shape_scratchpa
     while(Lookup.Type == 7)
     {
       kbts__extension *Extension = (kbts__extension *)Subtable;
-      Lookup.Type = Extension->LookupType;
-      Subtable = KBTS__POINTER_OFFSET(kbts_u16, Extension, Extension->Offset);
+      Lookup.Type = kbts__ReadU16Unaligned(&Extension->LookupType);
+      Subtable = KBTS__POINTER_OFFSET(kbts_u16, Extension, kbts__ReadU32Unaligned(&Extension->Offset));
     }
 
     if(kbts__GlyphIncludedInLookupSubtable(Scratchpad, KBTS_SHAPING_TABLE_GSUB, Frame->LookupIndex, Frame->SubtableIndex, CurrentGlyph))
     {
       kbts__cover_glyph_result Cover = KBTS__ZERO;
       Cover.Valid = kbts__GlyphPassesLookupFilter(CurrentGlyph, &Lookup);
-      if(Cover.Valid && kbts__GsubLookupBeginsWithCoverage(Lookup.Type, Subtable[0]))
+      if(Cover.Valid &&
+         kbts__GsubLookupBeginsWithCoverage(Lookup.Type, kbts__ReadU16Unaligned(&Subtable[0])))
       {
-        kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subtable, Subtable[1]);
+        kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subtable, kbts__ReadU16Unaligned(&Subtable[1]));
         Cover = kbts__CoverGlyph(Coverage, CurrentGlyph->Id);
       }
 
@@ -19657,16 +20809,18 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts_shape_scratchpa
               kbts__single_substitution *Subst = (kbts__single_substitution *)Subtable;
 
               kbts_u16 NewId = 0;
-              if(Subst->Format == 1)
+              kbts_u16 Subst_Format = kbts__ReadU16Unaligned(&Subst->Format);
+
+              if(Subst_Format == 1)
               {
                 // From the Microsoft docs:
                 // "Addition of deltaGlyphID is modulo 65536."
-                NewId = (CurrentGlyph->Id + (kbts_u32)Subst->DeltaOrCount.DeltaGlyphId) & 0xFFFF;
+                NewId = (CurrentGlyph->Id + (kbts_u32)kbts__ReadS16Unaligned(&Subst->DeltaOrCount.DeltaGlyphId)) & 0xFFFF;
               }
-              else if(Subst->Format == 2)
+              else if(Subst_Format == 2)
               {
                 kbts_u16 *SubstituteGlyphIds = KBTS__POINTER_AFTER(kbts_u16, Subst);
-                NewId = SubstituteGlyphIds[Cover.Index];
+                NewId = kbts__ReadU16Unaligned(&SubstituteGlyphIds[Cover.Index]);
               }
 
               kbts__GsubMutate(Scratchpad, Font, CurrentGlyph, SequentialLookupIndex, NewId, GeneratedGlyphFlags);
@@ -19677,22 +20831,22 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts_shape_scratchpa
           {
             kbts__multiple_substitution *Subst = (kbts__multiple_substitution *)Subtable;
             kbts__sequence *Sequence = kbts__GetSequence(Subst, Cover.Index);
+            kbts_un Sequence_GlyphCount = kbts__ReadU16Unaligned(&Sequence->GlyphCount);
             Result |= KBTS__SUBSTITUTION_RESULT_FLAG_MATCHED_SUBSTITUTION;
 
             if(!CheckOnly)
             {
               kbts_u16 *SubstGlyphIds = KBTS__POINTER_AFTER(kbts_u16, Sequence);
+              kbts_un GrowCount = Sequence_GlyphCount - 1;
 
-              kbts_un GrowCount = Sequence->GlyphCount - 1;
-
-              if(Sequence->GlyphCount)
+              if(Sequence_GlyphCount)
               {
                 kbts_glyph OriginalGlyph = *CurrentGlyph;
                 kbts_glyph *LastInsert = CurrentGlyph;
 
                 kbts_un RunningSortKey = CurrentGlyph->SortKey;
-                kbts_un SortKeyInterval = CurrentGlyph->SortKeyInterval / Sequence->GlyphCount;
-                KBTS__FOR(SubstGlyphIndex, 0, Sequence->GlyphCount)
+                kbts_un SortKeyInterval = CurrentGlyph->SortKeyInterval / Sequence_GlyphCount;
+                KBTS__FOR(SubstGlyphIndex, 0, Sequence_GlyphCount)
                 {
                   kbts_u32 NewGlyphFlags = GeneratedGlyphFlags | KBTS_GLYPH_FLAG_MULTIPLE_SUBSTITUTION;
                   kbts_u16 NewGlyphId = kbts__ReadU16Unaligned(&SubstGlyphIds[SubstGlyphIndex]);
@@ -19744,7 +20898,7 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts_shape_scratchpa
                 }
               }
             }
-            else if(Sequence->GlyphCount > 1)
+            else if(Sequence_GlyphCount > 1)
             {
               Result |= KBTS__SUBSTITUTION_RESULT_FLAG_TRIED_TO_INSERT_WHILE_CHECK_ONLY;
             }
@@ -19761,12 +20915,12 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts_shape_scratchpa
               kbts_u16 *AltGlyphIds = KBTS__POINTER_AFTER(kbts_u16, Set);
 
               kbts_un AlternateIndex = FeatureValue - 1;
-              if(AlternateIndex >= Set->GlyphCount)
+              if(AlternateIndex >= kbts__ReadU16Unaligned(&Set->GlyphCount))
               {
                 AlternateIndex = 0;
               }
 
-              kbts_u16 NewId = AltGlyphIds[AlternateIndex];
+              kbts_u16 NewId = kbts__ReadU16Unaligned(&AltGlyphIds[AlternateIndex]);
               kbts__GsubMutate(Scratchpad, Font, CurrentGlyph, SequentialLookupIndex, NewId, GeneratedGlyphFlags);
             }
           } break;
@@ -19777,19 +20931,20 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts_shape_scratchpa
 
             kbts__ligature_substitution *Subst = (kbts__ligature_substitution *)Subtable;
             kbts__ligature_set *Set = kbts__GetLigatureSet(Subst, Cover.Index);
+            kbts_un Set_Count = kbts__ReadU16Unaligned(&Set->Count);
 
-            KBTS__FOR(LigatureIndex, 0, Set->Count)
+            KBTS__FOR(LigatureIndex, 0, Set_Count)
             {
               kbts__ligature *Ligature = kbts__GetLigature(Set, LigatureIndex);
               kbts_u16 *ComponentIds = KBTS__POINTER_AFTER(kbts_u16, Ligature);
-              kbts_un ComponentCount = Ligature->ComponentCount;
+              kbts_un ComponentCount = kbts__ReadU16Unaligned(&Ligature->ComponentCount);
 
               kbts_un MatchingGlyphCount = 1;
 
               {
                 kbts_glyph *LigatureGlyphCursor = CurrentGlyph->Next;
                 while(kbts__GlyphIsValid(Storage, LigatureGlyphCursor) &&
-                      (MatchingGlyphCount < Ligature->ComponentCount))
+                      (MatchingGlyphCount < ComponentCount))
                 {
                   // A ligature may contain an explicit ZWJ, which SkipGlyph() would probably skip.
                   // The expected behavior in that case is to assume the font designer knows what they are doing
@@ -19843,7 +20998,7 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts_shape_scratchpa
                     {
                       kbts_glyph *Next = LigatureGlyphCursor->Next;
 
-                      if(LigatureGlyphCursor->Id == ComponentIds[LigatureGlyphCount - 1])
+                      if(LigatureGlyphCursor->Id == kbts__ReadU16Unaligned(&ComponentIds[LigatureGlyphCount - 1]))
                       {
                         PreviousLigatureUid = LigatureGlyphCursor->LigatureUid;
                         PreviousComponentCount = LigatureGlyphCursor->LigatureComponentCount;
@@ -19921,7 +21076,7 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts_shape_scratchpa
 
                   // Currently, we only take the main glyph's config into account while making the ligature's config.
                   // Maybe we should merge all of the components' configs into one instead?
-                  kbts__GsubMutate(Scratchpad, Font, CurrentGlyph, SequentialLookupIndex, Ligature->Glyph, GeneratedGlyphFlags | KBTS_GLYPH_FLAG_LIGATURE);
+                  kbts__GsubMutate(Scratchpad, Font, CurrentGlyph, SequentialLookupIndex, kbts__ReadU16Unaligned(&Ligature->Glyph), GeneratedGlyphFlags | KBTS_GLYPH_FLAG_LIGATURE);
                   CurrentGlyph->Uid = (kbts_u16)LigatureUid;
                   CurrentGlyph->LigatureUid = (kbts_u16)LigatureUid;
                   CurrentGlyph->LigatureComponentCount = (kbts_u16)ComponentCount;
@@ -19950,10 +21105,11 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts_shape_scratchpa
                                                                                 CurrentGlyph->Prev, 1);
               kbts__sequence_match LookaheadMatch = kbts__MatchCoverageSequence(Storage, &Lookup, RegularSkipFlags, SkipUnicodeFlags, Subst, Unpacked.LookaheadCoverageOffsets, Unpacked.LookaheadCount,
                                                                                 CurrentGlyph->Next, 0);
-              if((BacktrackMatch.MatchCount == Unpacked.BacktrackCount) && (LookaheadMatch.MatchCount == Unpacked.LookaheadCount))
+              if((BacktrackMatch.MatchCount == Unpacked.BacktrackCount) &&
+                 (LookaheadMatch.MatchCount == Unpacked.LookaheadCount))
               {
                 Result |= KBTS__SUBSTITUTION_RESULT_FLAG_MATCHED_SUBSTITUTION;
-                kbts__GsubMutate(Scratchpad, Font, CurrentGlyph, SequentialLookupIndex, Unpacked.SubstituteGlyphIds[Cover.Index], GeneratedGlyphFlags);
+                kbts__GsubMutate(Scratchpad, Font, CurrentGlyph, SequentialLookupIndex, kbts__ReadU16Unaligned(&Unpacked.SubstituteGlyphIds[Cover.Index]), GeneratedGlyphFlags);
               }
             }
           } break;
@@ -19983,11 +21139,13 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts_shape_scratchpa
     if(FrameCount < KBTS_LOOKUP_STACK_SIZE)
     {
       kbts__gsub_frame NewFrame = KBTS__ZERO;
-      NewFrame.LookupIndex = SequenceRecord->LookupListIndex;
+      NewFrame.LookupIndex = kbts__ReadU16Unaligned(&SequenceRecord->LookupListIndex);
       NewFrame.StartIndex = Frame->StartIndex;
       NewFrame.InputGlyph = Frame->InputGlyph;
 
-      if(SequenceRecord->SequenceIndex)
+      kbts_un SequenceRecord_SequenceIndex = kbts__ReadU16Unaligned(&SequenceRecord->SequenceIndex);
+
+      if(SequenceRecord_SequenceIndex)
       {
         // @Speed: Re-scan the sequence to find where we are in the _filtered_ sequence.
         kbts_un SequenceInputIndex = 0;
@@ -20001,7 +21159,7 @@ static kbts__substitution_result_flags kbts__DoSubstitution(kbts_shape_scratchpa
           {
             SequenceInputIndex += 1;
 
-            if(SequenceInputIndex == SequenceRecord->SequenceIndex)
+            if(SequenceInputIndex == SequenceRecord_SequenceIndex)
             {
               NewFrame.InputGlyph = FilterGlyph;
 
@@ -20062,11 +21220,18 @@ static void kbts__PopGlyphList(kbts_glyph_storage *Storage, kbts__glyph_list *Li
 
   Storage->GlyphSentinel.Prev->Next = Storage->GlyphSentinel.Next->Prev = (kbts_glyph *)&Storage->GlyphSentinel;
 
-  *List = KBTS__ZERO_TYPE(kbts__glyph_list);
+  KBTS_MEMSET(List, 0, sizeof(*List));
+}
+
+static void kbts__GsubFrameInitialize(kbts__gsub_frame *Frame, kbts_glyph *InputGlyph, kbts_u16 LookupIndex)
+{
+  KBTS_MEMSET(Frame, 0, sizeof(*Frame));
+  Frame->InputGlyph = InputGlyph;
+  Frame->LookupIndex = LookupIndex;
 }
 
 static int kbts__WouldSubstitute(kbts_shape_scratchpad *Scratchpad, kbts_shape_config *Config, kbts_glyph_storage *Storage,
-                                     kbts_lookup_list *LookupList,
+                                     kbts__lookup_list *LookupList,
                                      kbts__gsub_frame *Frames, kbts__feature *Feature, kbts__skip_flags SkipFlags,
                                      kbts_glyph *Glyphs, kbts_un GlyphCount)
 {
@@ -20099,12 +21264,7 @@ static int kbts__WouldSubstitute(kbts_shape_scratchpad *Scratchpad, kbts_shape_c
     kbts_glyph *CurrentGlyph = &Scratch[0];
     while(kbts__GlyphIsValid(Storage, CurrentGlyph))
     {
-      kbts__gsub_frame *Frame = &Frames[0];
-      *Frame = KBTS__ZERO_TYPE(kbts__gsub_frame);
-      Frame->LookupIndex = IterateLookups.LookupIndex;
-      Frame->SubtableIndex = 0;
-      Frame->StartIndex = 0;
-      Frame->InputGlyph = CurrentGlyph;
+      kbts__GsubFrameInitialize(&Frames[0], CurrentGlyph, IterateLookups.LookupIndex);
       kbts_un FrameCount = 1;
 
       kbts__BeginLookupApplication(Scratchpad, CurrentGlyph);
@@ -20177,6 +21337,27 @@ static void kbts__FreeGlyphBucket(kbts_shape_scratchpad *Scratchpad, kbts_un Seq
 
     KBTS__DLLIST_SENTINEL_INIT(Sentinel);
   }
+}
+
+static void kbts__LoadParents(kbts_glyph *Glyph, kbts_glyph_parent *Parents, kbts_un *ParentCount_, kbts_u32 *ParentsLoaded_)
+{
+  kbts_s32 *ParentDeltas = kbts__GetParentInfoDeltas(Glyph->ParentInfo);
+  kbts_un ParentCount = kbts__GetParentInfoCount(Glyph->ParentInfo);
+
+  kbts_un DoubleDecompositionCount = 0;
+  KBTS__FOR(ParentIndex, 0, ParentCount)
+  {
+    kbts_glyph_parent Parent = KBTS__ZERO;
+    Parent.Codepoint = Glyph->Codepoint + (kbts_u32)ParentDeltas[ParentIndex];
+
+    kbts_u64 Decomposition = kbts__GetUnicodeDecomposition(Parent.Codepoint);
+    Parent.Codepoint1 = kbts__GetDecompositionCodepoint(Decomposition, 1);
+
+    Parents[DoubleDecompositionCount++] = Parent;
+  }
+
+  *ParentCount_ = DoubleDecompositionCount;
+  *ParentsLoaded_ = 0;
 }
 
 static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storage *Storage)
@@ -20358,15 +21539,22 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
                 Decomposition = GlyphToDecompose.Decomposition;
                 DecompositionSize = kbts__GetDecompositionSize(Decomposition);
 
-                // Only decompose when the font supports the decomposed form.
-                KBTS__FOR(DecompositionIndex, 0, DecompositionSize)
+                // Only do single decompositions if the current glyph is not supported.
+                if((DecompositionSize == 2) ||
+                   !GlyphToDecompose.Id)
                 {
-                  kbts_glyph DecompositionGlyph = kbts_CodepointToGlyph(Font, (int)kbts__GetDecompositionCodepoint(Decomposition, DecompositionIndex), 0, 0);
-                  DecompositionGlyph.Config = GlyphToDecompose.Config;
-                  DecompositionGlyph.UserIdOrCodepointIndex = GlyphToDecompose.UserIdOrCodepointIndex;
+                  // Only decompose when the font supports the decomposed form.
+                  KBTS__FOR(DecompositionIndex, 0, DecompositionSize)
+                  {
+                    kbts_glyph DecompositionGlyph = kbts_CodepointToGlyph(Font, (int)kbts__GetDecompositionCodepoint(Decomposition, DecompositionIndex), GlyphToDecompose.Config, GlyphToDecompose.UserIdOrCodepointIndex);
 
-                  AnyUnsupported |= !DecompositionGlyph.Id;
-                  Decomposed[DecompositionIndex] = DecompositionGlyph;
+                    AnyUnsupported |= !DecompositionGlyph.Id;
+                    Decomposed[DecompositionIndex] = DecompositionGlyph;
+                  }
+                }
+                else
+                {
+                  AnyUnsupported = 1;
                 }
               }
 
@@ -20450,8 +21638,6 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
             }
           }
 
-          kbts_u32 SingleRecompositionCodepoints[KBTS_MAXIMUM_RECOMPOSITION_PARENTS];
-          kbts_un SingleRecompositionCodepointCount = 0;
           kbts_un DoubleRecompositionCount = LastBaseParentCount;
 
           if(!Glyph->CombiningClass)
@@ -20466,31 +21652,7 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
             if((Config->Shaper != KBTS_SHAPER_USE) ||
                (Glyph->SyllabicClass != KBTS_INDIC_SYLLABIC_CLASS_MATRA))
             {
-              kbts_s32 *LastBaseParentDeltas = kbts__GetParentInfoDeltas(Glyph->ParentInfo);
-              kbts_un ParentCount = kbts__GetParentInfoCount(Glyph->ParentInfo);
-
-              kbts_un DoubleDecompositionCount = 0;
-              KBTS__FOR(ParentIndex, 0, ParentCount)
-              {
-                kbts_glyph_parent Parent = KBTS__ZERO;
-                Parent.Codepoint = Glyph->Codepoint + (kbts_u32)LastBaseParentDeltas[ParentIndex];
-
-                kbts_u64 Decomposition = kbts__GetUnicodeDecomposition(Parent.Codepoint);
-                Parent.Codepoint1 = kbts__GetDecompositionCodepoint(Decomposition, 1);
-
-                kbts_un DecompositionSize = kbts__GetDecompositionSize(Decomposition);
-                if(DecompositionSize == 1)
-                {
-                  SingleRecompositionCodepoints[SingleRecompositionCodepointCount++] = Parent.Codepoint;
-                }
-                else
-                {
-                  LastBaseParents[DoubleDecompositionCount++] = Parent;
-                }
-              }
-
-              LastBaseParentCount = DoubleDecompositionCount;
-              LastBaseParentsLoaded = 0;
+              kbts__LoadParents(Glyph, LastBaseParents, &LastBaseParentCount, &LastBaseParentsLoaded);
             }
             else
             {
@@ -20535,6 +21697,9 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
                   Recomposed = 1;
                   kbts__SetGlyphPreserveLinksAndUserId(LastBase, &ParentGlyph);
 
+                  // Refresh the parent list for nested recompositions.
+                  kbts__LoadParents(LastBase, LastBaseParents, &LastBaseParentCount, &LastBaseParentsLoaded);
+
                   break;
                 }
                 else
@@ -20552,24 +21717,6 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
               }
             }
             KBTS_INSTRUMENT_BLOCK_END(ParentNSquaredStupidity);
-          }
-
-          if(!Recomposed)
-          {
-            KBTS__FOR(SingleRecompositionIndex, 0, SingleRecompositionCodepointCount)
-            {
-              kbts_u16 ParentGlyphId = (kbts_u16)kbts_CodepointToGlyphId(Font, (int)SingleRecompositionCodepoints[SingleRecompositionIndex]);
-
-              if(ParentGlyphId)
-              {
-                kbts_glyph ParentGlyph = kbts_CodepointToGlyph(Font, (int)SingleRecompositionCodepoints[SingleRecompositionIndex], 0, 0);
-                ParentGlyph.Config = Glyph->Config;
-
-                kbts__SetGlyphPreserveLinksAndUserId(Glyph, &ParentGlyph);
-                Recomposed = 1;
-                break;
-              }
-            }
           }
 
           // It is safe to look for fractions here, because decimal digits/the fraction slash are not marks or
@@ -20828,6 +21975,10 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
             }
 
             kbts_glyph_config *GlyphConfig = Glyph->Config;
+
+            NewGlyph->UserIdOrCodepointIndex = Glyph->UserIdOrCodepointIndex;
+            NewGlyph->Config = GlyphConfig;
+
             kbts__SetGlyphPreserveLinksAndUserId(Glyph, &Config->SaraAa);
             Glyph->Config = GlyphConfig;
 
@@ -20863,6 +22014,8 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
           )
       {
         kbts_glyph *Next = Glyph->Next;
+        int UserId = Glyph->UserIdOrCodepointIndex;
+        kbts_glyph_config *GlyphConfig = Glyph->Config;
 
         kbts_un L = 0;
         kbts_un V = 0;
@@ -20896,12 +22049,12 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
           if(!V && kbts__GlyphIsValid(Storage, Next))
           {
             kbts_u32 VCodepoint = Next->Codepoint;
+            kbts__hangul_syllable_info MaybeVInfo = kbts__HangulSyllableInfo(VCodepoint);
 
-            VInfo = kbts__HangulSyllableInfo(VCodepoint);
-
-            if(VInfo.Type == KBTS__HANGUL_SYLLABLE_TYPE_V)
+            if(MaybeVInfo.Type == KBTS__HANGUL_SYLLABLE_TYPE_V)
             {
               V = VCodepoint;
+              VInfo = MaybeVInfo;
 
               Next = Next->Next;
             }
@@ -20915,11 +22068,12 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
             {
               kbts_u32 TCodepoint = Next->Codepoint;
 
-              TInfo = kbts__HangulSyllableInfo(TCodepoint);
+              kbts__hangul_syllable_info MaybeTInfo = kbts__HangulSyllableInfo(TCodepoint);
 
-              if(TInfo.Type == KBTS__HANGUL_SYLLABLE_TYPE_T)
+              if(MaybeTInfo.Type == KBTS__HANGUL_SYLLABLE_TYPE_T)
               {
                 T = TCodepoint;
+                TInfo = MaybeTInfo;
 
                 Next = Next->Next;
               }
@@ -20935,7 +22089,7 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
 
               if((ToneMarkCodepoint >= 0x302E) && (ToneMarkCodepoint <= 0x302F))
               {
-                LvtGlyphs[LvtGlyphCount++] = kbts_CodepointToGlyph(Font, (int)ToneMarkCodepoint, 0, 0);
+                LvtGlyphs[LvtGlyphCount++] = kbts_CodepointToGlyph(Font, (int)ToneMarkCodepoint, GlyphConfig, UserId);
 
                 Next = Next->Next;
               }
@@ -20946,7 +22100,7 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
               // Try LVT.
               kbts_un LvtCodepoint = 0xAC00 + (L - 0x1100) * 588 + (V - 0x1161) * 28 + (T - 0x11A7);
 
-              kbts_glyph LvtGlyph = kbts_CodepointToGlyph(Font, (int)LvtCodepoint, 0, 0);
+              kbts_glyph LvtGlyph = kbts_CodepointToGlyph(Font, (int)LvtCodepoint, GlyphConfig, UserId);
               if(LvtGlyph.Id)
               {
                 LvtGlyphs[LvtGlyphCount++] = LvtGlyph;
@@ -20961,7 +22115,7 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
                 // Try LV.
                 kbts_un LvCodepoint = 0xAC00 + (L - 0x1100) * 588 + (V - 0x1161) * 28;
 
-                LvGlyph = kbts_CodepointToGlyph(Font, (int)LvCodepoint, 0, 0);
+                LvGlyph = kbts_CodepointToGlyph(Font, (int)LvCodepoint, GlyphConfig, UserId);
               }
 
               if(LvGlyph.Id)
@@ -20971,10 +22125,10 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
               else
               {
                 // Do L-V.
-                kbts_glyph LGlyph = kbts_CodepointToGlyph(Font, (int)L, 0, 0);
+                kbts_glyph LGlyph = kbts_CodepointToGlyph(Font, (int)L, GlyphConfig, UserId);
                 LGlyph.Flags |= KBTS_GLYPH_FLAG_LJMO;
 
-                kbts_glyph VGlyph = kbts_CodepointToGlyph(Font, (int)V, 0, 0);
+                kbts_glyph VGlyph = kbts_CodepointToGlyph(Font, (int)V, GlyphConfig, UserId);
                 VGlyph.Flags |= KBTS_GLYPH_FLAG_VJMO;
 
                 LvtGlyphs[LvtGlyphCount++] = LGlyph;
@@ -20983,7 +22137,7 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
 
               if(T)
               {
-                kbts_glyph TGlyph = kbts_CodepointToGlyph(Font, (int)T, 0, 0);
+                kbts_glyph TGlyph = kbts_CodepointToGlyph(Font, (int)T, GlyphConfig, UserId);
                 TGlyph.Flags |= KBTS_GLYPH_FLAG_TJMO;
 
                 LvtGlyphs[LvtGlyphCount++] = TGlyph;
@@ -20994,7 +22148,7 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
 
         if(!LvtGlyphCount)
         {
-          kbts_glyph NewGlyph = kbts_CodepointToGlyph(Font, (int)Glyph->Codepoint, 0, 0);
+          kbts_glyph NewGlyph = kbts_CodepointToGlyph(Font, (int)Glyph->Codepoint, GlyphConfig, UserId);
 
           LvtGlyphs[LvtGlyphCount++] = NewGlyph;
         }
@@ -21055,7 +22209,7 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
 
       // @Duplication
       kbts__gsub_gpos *FontGsub = kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_GSUB, kbts__gsub_gpos);
-      kbts_lookup_list *LookupList = kbts__GetLookupList(FontGsub);
+      kbts__lookup_list *LookupList = kbts__GetLookupList(FontGsub);
 
       kbts__gsub_frame *Frames = (kbts__gsub_frame *)Scratchpad->ScratchMemory;
 
@@ -21076,11 +22230,12 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
         if(Sentinel->Next != Sentinel)
         {
           kbts__lookup *PackedLookup = kbts__GetLookup(LookupList, LookupIndex);
-          kbts_b32 LookupTypeIs8 = (PackedLookup->Type == 8);
+          kbts_u16 PackedLookup_Type = kbts__ReadU16Unaligned(&PackedLookup->Type);
+          kbts_b32 LookupTypeIs8 = (PackedLookup_Type == 8);
 
           KBTS_INSTRUMENT_BLOCK_BEGIN(GsubSortBucket);
 
-          if(PackedLookup->Type >= 4)
+          if(PackedLookup_Type >= 4)
           {
             kbts__SortGlyphBucket(Scratchpad, SequentialLookupIndex);
           }
@@ -21222,6 +22377,11 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
 
       kbts__hea *Hea = kbts__BlobTableDataType(Font->Blob, HeaTableId, kbts__hea);
       kbts_u16 *Mtx = kbts__BlobTableDataType(Font->Blob, MtxTableId, kbts_u16);
+      kbts__hvar_vvar_common *Hvar = kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_HVAR, kbts__hvar_vvar_common);
+      kbts__item_variation_store *HvarStore = Hvar ? KBTS__POINTER_OFFSET(kbts__item_variation_store, Hvar, kbts__ReadU32Unaligned(&Hvar->ItemVariationStoreOffset)) : 0;
+      kbts_s16 *VariationVectorNormalized = Scratchpad->VariationVectorNormalized;
+
+      kbts_un Hea_MetricCount = Hea ? kbts__ReadU16Unaligned(&Hea->MetricCount) : 0;
 
       kbts__long_mtx *LongMetrics = 0;
       // :LeftSideBearing
@@ -21237,7 +22397,7 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
       kbts__head *Head = kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_HEAD, kbts__head);
       if(Head)
       {
-        DefaultMetric.Advance = Head->UnitsPerEm;
+        DefaultMetric.Advance = kbts__ReadU16Unaligned(&Head->UnitsPerEm);
         if(Orientation == KBTS_ORIENTATION_HORIZONTAL)
         {
           DefaultMetric.Advance /= 2;
@@ -21264,22 +22424,78 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
           //    cursive offsets.)
           // - In POST_GPOS_FIXUP, we perform the glyph ID substitution. We have to wait until all GPOS features have been
           //   executed to do this because they might possibly match the original ID.
-          if(!(Glyph->Flags & KBTS_GLYPH_FLAG_GENERATED_BY_GSUB) && (Glyph->UnicodeFlags & KBTS_UNICODE_FLAG_DEFAULT_IGNORABLE))
+          if(!(Glyph->Flags & KBTS_GLYPH_FLAG_GENERATED_BY_GSUB) &&
+             (Glyph->UnicodeFlags & KBTS_UNICODE_FLAG_DEFAULT_IGNORABLE))
           {
             Metric.Advance = 0;
             // :LeftSideBearing
             // Metric.PreviousSideBearing = 0;
           }
-          else if(Id < Hea->MetricCount)
+          else if(Id < Hea_MetricCount)
           {
-            Metric = LongMetrics[Id];
+            KBTS_MEMCPY(&Metric, &LongMetrics[Id], sizeof(Metric));
           }
           else
           {
-            Metric.Advance = LongMetrics[Hea->MetricCount - 1].Advance;
+            Metric.Advance = kbts__ReadU16Unaligned(&LongMetrics[Hea_MetricCount - 1].Advance);
             // :LeftSideBearing
-            // Metric.PreviousSideBearing = ShortMetrics[Id - Hea->MetricCount];
+            // Metric.PreviousSideBearing = ShortMetrics[Id - Hea_MetricCount];
           }
+        }
+
+        if(Hvar)
+        {
+          kbts_un OuterIndex = 0;
+          kbts_un InnerIndex = (kbts_un)Glyph->Id;
+          kbts_un Hvar_AdvanceWidthMappingOffset = kbts__ReadU32Unaligned(&Hvar->AdvanceWidthMappingOffset);
+
+          if(Hvar_AdvanceWidthMappingOffset)
+          {
+            kbts__delta_set_index_map *AdvanceIndexMap = KBTS__POINTER_OFFSET(kbts__delta_set_index_map, Hvar, Hvar_AdvanceWidthMappingOffset);
+            kbts_un MapCount = 0;
+            char *Map = 0;
+
+            switch(AdvanceIndexMap->Format)
+            {
+            case 0:
+            {
+              kbts_u16 *MapCount_ = KBTS__POINTER_AFTER(kbts_u16, AdvanceIndexMap);
+
+              MapCount = kbts__ReadU16Unaligned(MapCount_);
+              Map = KBTS__POINTER_AFTER(char, MapCount_);
+            } break;
+
+            case 1:
+            {
+              kbts_u32 *MapCount_ = KBTS__POINTER_AFTER(kbts_u32, AdvanceIndexMap);
+              
+              MapCount = kbts__ReadU32Unaligned(MapCount_);
+              Map = KBTS__POINTER_AFTER(char, MapCount_);
+            } break;
+            }
+
+            if(MapCount)
+            {
+              kbts_un MapLookupIndex = (InnerIndex < MapCount) ? InnerIndex : (MapCount - 1);
+              kbts_un BytesPerEntry = kbts__DeltaSetIndexMapBytesPerEntry(AdvanceIndexMap);
+              kbts_un BitsPerInnerIndex = kbts__DeltaSetIndexMapBitsPerInnerIndex(AdvanceIndexMap);
+
+              char *AtLookupEntry = Map + MapLookupIndex * BytesPerEntry;
+              kbts_u32 LookupEntry = 0;
+              switch(BytesPerEntry)
+              {
+              case 1: LookupEntry = *(kbts_u8 *)AtLookupEntry; break;
+              case 2: LookupEntry = kbts__ReadU16Unaligned((kbts_u16 *)AtLookupEntry); break;
+              case 4: LookupEntry = kbts__ReadU32Unaligned((kbts_u32 *)AtLookupEntry); break;
+              }
+
+              InnerIndex = LookupEntry & ((1 << BitsPerInnerIndex) - 1);
+              OuterIndex = LookupEntry >> BitsPerInnerIndex;
+            }
+          }
+
+          float Delta = kbts__ItemVariationStoreDelta(HvarStore, OuterIndex, InnerIndex, VariationVectorNormalized);
+          Metric.Advance += (kbts_u16)kbts__Round32(Delta);
         }
 
         if(!ClearMarkAdvances | (Glyph->Classes.Class != KBTS__GLYPH_CLASS_MARK))
@@ -21312,7 +22528,7 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
       kbts__gsub_gpos *Gpos = kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_GPOS, kbts__gsub_gpos);
       kbts__gdef *Gdef = kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_GDEF, kbts__gdef);
 
-      kbts_lookup_list *LookupList = kbts__GetLookupList(Gpos);
+      kbts__lookup_list *LookupList = kbts__GetLookupList(Gpos);
       kbts_un FeatureStageIndex = kbts__CurrentBakedFeatureStageIndex(Scratchpad);
 
       kbts_un FirstSequentialLookupIndex = Config->FeatureStageFirstLookupIndices[FeatureStageIndex];
@@ -21329,11 +22545,11 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
         {
           kbts__lookup *PackedLookup = kbts__GetLookup(LookupList, LookupIndex);
           kbts__unpacked_lookup Lookup = kbts__UnpackLookup(Gdef, PackedLookup);
-          kbts_un SubtableCount = PackedLookup->SubtableCount;
+          kbts_un SubtableCount = kbts__ReadU16Unaligned(&PackedLookup->SubtableCount);
 
           KBTS_INSTRUMENT_BLOCK_BEGIN(GposSortBucket);
 
-          if(PackedLookup->Type >= 2)
+          if(kbts__ReadU16Unaligned(&PackedLookup->Type) >= 2)
           {
             kbts__SortGlyphBucket(Scratchpad, SequentialLookupIndex);
           }
@@ -21360,7 +22576,7 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
 
                 KBTS__FOR(SubtableIndex, 0, SubtableCount)
                 {
-                  kbts_u16 *Subtable = KBTS__POINTER_OFFSET(kbts_u16, PackedLookup, SubtableOffsets[SubtableIndex]);
+                  kbts_u16 *Subtable = KBTS__POINTER_OFFSET(kbts_u16, PackedLookup, kbts__ReadU16Unaligned(&SubtableOffsets[SubtableIndex]));
 
                   if(kbts__DoSingleAdjustment(Scratchpad, Config, Storage,
                                               LookupList, LookupIndex, SubtableIndex, &Lookup, Subtable,
@@ -21601,7 +22817,7 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
 }
 
 static kbts_glyph kbts__Substitute1(kbts_shape_scratchpad *Scratchpad, kbts_shape_config *Config, kbts_glyph_storage *Storage,
-                                   kbts_lookup_list *LookupList, kbts__feature *Feature, kbts__skip_flags SkipFlags, kbts_glyph *Glyph)
+                                   kbts__lookup_list *LookupList, kbts__feature *Feature, kbts__skip_flags SkipFlags, kbts_glyph *Glyph)
 {
   kbts_glyph Result = *Glyph;
   kbts_glyph TempSentinel;
@@ -21615,11 +22831,7 @@ static kbts_glyph kbts__Substitute1(kbts_shape_scratchpad *Scratchpad, kbts_shap
     kbts__gsub_frame Frames[8];
     {
       kbts__gsub_frame *Frame = &Frames[0];
-      *Frame = KBTS__ZERO_TYPE(kbts__gsub_frame);
-      Frame->LookupIndex = IterateLookups.LookupIndex;
-      Frame->SubtableIndex = 0;
-      Frame->StartIndex = 0;
-      Frame->InputGlyph = &Result;
+      kbts__GsubFrameInitialize(Frame, &Result, IterateLookups.LookupIndex);
     }
     kbts_un FrameCount = 1;
 
@@ -21662,7 +22874,7 @@ static kbts_glyph *kbts__BeginCluster(kbts_shape_scratchpad *Scratchpad, kbts_gl
   {
   case KBTS_SHAPER_INDIC:
   {
-    kbts_lookup_list *LookupList = kbts__GetLookupList(kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_GSUB, kbts__gsub_gpos));
+    kbts__lookup_list *LookupList = kbts__GetLookupList(kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_GSUB, kbts__gsub_gpos));
 
     int NonCluster = 0;
     while(kbts__GlyphIsValid(Storage, Glyph) &&
@@ -22200,7 +23412,8 @@ static kbts_glyph *kbts__BeginCluster(kbts_shape_scratchpad *Scratchpad, kbts_gl
       }
 
       // All post-base glyphs get BLWF, ABVF, PSTF. Some get PREF.
-      kbts_glyph Scratch[2]; Scratch[0] = Scratch[1] = KBTS__ZERO_TYPE(kbts_glyph);
+      kbts_glyph Scratch[2];
+      KBTS_MEMSET(Scratch, 0, sizeof(Scratch));
       kbts_glyph *LastGlyph; LastGlyph = 0;
       for(Glyph = BaseGlyph->Next;
           Glyph != OnePastLastSyllableGlyph;
@@ -22427,6 +23640,7 @@ static kbts_glyph *kbts__BeginCluster(kbts_shape_scratchpad *Scratchpad, kbts_gl
            (Glyph->SyllabicClass >= KBTS_MYANMAR_SYLLABIC_CLASS_COUNT)))
     {
       NonCluster = 1;
+      Glyph = Glyph->Next;
     }
 
     if(!NonCluster)
@@ -23216,7 +24430,58 @@ static kbts_b32 kbts__ReadOp(kbts_shape_scratchpad *Scratchpad, kbts__op_kind En
   return Result;
 }
 
-static kbts_shape_config *kbts__PlaceShapeConfig(kbts_font *Font, kbts_script Script, kbts_language Language, void *Memory, kbts_un *Size)
+typedef struct kbts__murmur_state
+{
+  kbts_u32 State;
+  kbts_u32 BytesHashed;
+} kbts__murmur_state;
+
+static void kbts__MurmurBegin(kbts__murmur_state *State, kbts_u32 Seed)
+{
+  State->State = Seed;
+  State->BytesHashed = 0;
+}
+
+static void kbts__MurmurAbsorb(kbts__murmur_state *State, kbts_u32 Value)
+{
+  kbts_un H = State->State;
+
+  kbts_un K = Value * 0xCC9E2D51;
+  K = (((K << 15) | (K >> 17)) * 0x1B873593) & 0xFFFFFFFF;
+
+  kbts_un HxK = H ^ K;
+  H = (((HxK << 13) | (HxK >> 19)) * 5 + 0xE6546B64) & 0xFFFFFFFF;
+
+  State->State = (kbts_u32)H;
+  State->BytesHashed += 4;
+}
+
+static kbts_u32 kbts__MurmurFinalize(kbts__murmur_state *State)
+{
+  kbts_un H = State->State;
+  kbts_un L = State->BytesHashed;
+  kbts_un HxL = H ^ L;
+
+  kbts_un Result = (HxL ^ (HxL >> 16)) * 0x85EBCA6B;
+  Result = (Result ^ ((Result & 0xFFFFFFFF) >> 13)) * 0xC2B2AE35;
+  Result ^= (Result & 0xFFFFFFFF) >> 16;
+
+  return (kbts_u32)Result;
+}
+
+static void kbts__ShapeConfigUid(kbts_shape_config *Config, kbts_uid *Uid)
+{
+  if(Config)
+  {
+    KBTS_MEMCPY(Uid, &Config->Uid, sizeof(*Uid));
+  }
+  else
+  {
+    KBTS_MEMSET(Uid, 0, sizeof(*Uid));
+  }
+}
+
+static kbts_shape_config *kbts__PlaceShapeConfig(kbts_font *Font, kbts_script Script, kbts_language Language, float *VariationVector, void *Memory, kbts_un *Size, kbts_uid *Uid)
 {
   kbts_shape_config *Result = 0;
   kbts__pointer_bump_allocator Bump = kbts__PointerBumpAllocator(Memory);
@@ -23238,6 +24503,76 @@ static kbts_shape_config *kbts__PlaceShapeConfig(kbts_font *Font, kbts_script Sc
 
     kbts__gsub_gpos *Gsub = ShapingTables[0];
 
+    kbts_un AxisCount;
+    {
+      int AxisCountS;
+      int InstanceCount;
+      kbts_GetVariationInfo(Font, &AxisCountS, &InstanceCount);
+
+      AxisCount = (kbts_un)AxisCountS;
+    }
+
+    kbts_s16 VariationVectorNormalized[KBTS__MAX_VARIATION_AXIS_COUNT];
+    kbts_NormalizeVariationVector(Font, VariationVector, VariationVectorNormalized);
+
+    kbts__murmur_state Murmur;
+    kbts__MurmurBegin(&Murmur, 0xBfACB51B);
+
+    { // Initialize the hash with the full name of the font.
+      kbts_u64 Blob64 = (kbts_u64)Font->Blob;
+      kbts__MurmurBegin(&Murmur, Blob64 & 0xFFFFFFFF);
+
+      kbts__name *Name = kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_NAME, kbts__name);
+      if(Name)
+      {
+        kbts__name_record *Records = KBTS__POINTER_AFTER(kbts__name_record, Name);
+        char *StringBase = KBTS__POINTER_OFFSET(char, Name, kbts__ReadU16Unaligned(&Name->StringStorageOffset));
+
+        kbts_un Offset = 0;
+        kbts_un Length = 0;
+        kbts_un Name_Count = kbts__ReadU16Unaligned(&Name->Count);
+        KBTS__FOR(RecordIndex, 0, Name_Count)
+        {
+          kbts__name_record *Record = &Records[RecordIndex];
+
+          if(kbts__ReadU16Unaligned(&Record->PlatformId) == 3)
+          {
+            kbts_u16 Record_NameId = kbts__ReadU16Unaligned(&Record->NameId);
+
+            if((Record_NameId == 3) /* UID */ ||
+               (Record_NameId == 4) /* If we can't find a UID, use the full name */)
+            {
+              Offset = kbts__ReadU16Unaligned(&Record->StringOffset);
+              Length = kbts__ReadU16Unaligned(&Record->Length);
+
+              break;
+            }
+          }
+        }
+
+        if(Length)
+        {
+          char *At = StringBase + Offset;
+          kbts_un Left = Length;
+          while(Left >= 4)
+          {
+            kbts_u32 Word = kbts__ReadU32Unaligned((kbts_u32 *)At);
+
+            kbts__MurmurAbsorb(&Murmur, Word);
+
+            At += 4;
+            Left -= 4;
+          }
+
+          if(Left)
+          {
+            kbts_u32 LastBytes = kbts__ReadU32UnalignedEndOfBuffer(At, Left);
+            kbts__MurmurAbsorb(&Murmur, LastBytes);
+          }
+        }
+      }
+    }
+
     // Find the appropriate language system in GSUB/GPOS.
     kbts__script_properties *ScriptProperties = &kbts__ScriptProperties[Script];
     int FoundScriptIsIndic3 = 0;
@@ -23245,24 +24580,28 @@ static kbts_shape_config *kbts__PlaceShapeConfig(kbts_font *Font, kbts_script Sc
     KBTS__FOR(ShapingTableIndex, 0, KBTS_SHAPING_TABLE_COUNT)
     {
       kbts__gsub_gpos *ShapingTable = ShapingTables[ShapingTableIndex];
+
       if(ShapingTable)
       {
-        kbts__script_list *ScriptList = KBTS__POINTER_OFFSET(kbts__script_list, ShapingTable, ShapingTable->ScriptListOffset);
+        kbts__script_list *ScriptList = KBTS__POINTER_OFFSET(kbts__script_list, ShapingTable, kbts__ReadU16Unaligned(&ShapingTable->ScriptListOffset));
+        kbts_un ScriptList_Count = kbts__ReadU16Unaligned(&ScriptList->Count);
 
         kbts__langsys *ChosenLangsys = 0;
         kbts_u32 DesiredTag = ScriptProperties->Tag;
+        kbts_u32 LatinFallbackTag = KBTS_FOURCC('l', 'a', 't', 'n');
 
-        KBTS__FOR(ScriptIndex, 0, ScriptList->Count)
+        KBTS__FOR(ScriptIndex, 0, ScriptList_Count)
         {
           kbts__script_pointer ThisScript = kbts__GetScript(ScriptList, ScriptIndex);
           kbts_u32 Tag = ThisScript.Tag;
 
           // The OpenType spec does not define or even mention "Indic3" scripts at all.
           // Nevertheless, Harfbuzz at least checks for '3' at the end of script tags, and, if one exists, they choose USE.
-          int Indic3 = (ThisScript.Tag >> 24) == '3';
+          kbts_b32 Indic3 = (ThisScript.Tag >> 24) == '3';
           kbts_u32 MatchMask = Indic3 ? 0xFFFFFF : 0xFFFFFFFF;
-          int PerfectMatch = !((Tag ^ DesiredTag) & MatchMask);
-          if(!ScriptIndex || PerfectMatch || (Tag == KBTS_FOURCC('D', 'F', 'L', 'T')))
+          kbts_b32 Default = (Tag == KBTS_FOURCC('D', 'F', 'L', 'T')) | (Tag == KBTS_FOURCC('d', 'f', 'l', 't'));
+          kbts_b32 PerfectMatch = !((Tag ^ DesiredTag) & MatchMask);
+          if(!ScriptIndex || PerfectMatch || Default || (Tag == LatinFallbackTag))
           {
             kbts__langsys *Langsys = kbts__GetDefaultLangsys(ThisScript.Script);
             KBTS__FOR(LangsysIndex, 0, ThisScript.Script->Count)
@@ -23272,9 +24611,13 @@ static kbts_shape_config *kbts__PlaceShapeConfig(kbts_font *Font, kbts_script Sc
               if(LangsysPointer.Tag == Language)
               {
                 Langsys = LangsysPointer.Langsys;
+
                 break;
               }
             }
+
+            // Only try the latin fallback if we don't find a DFLT tag.
+            LatinFallbackTag = Default ? 0 : LatinFallbackTag;
 
             // It is tempting to try to look for another script if the one we want has no langsys.
             // However, it is possible for a script to purposefully have no langsys at all. In that case,
@@ -23299,10 +24642,10 @@ static kbts_shape_config *kbts__PlaceShapeConfig(kbts_font *Font, kbts_script Sc
     }
     
     Config.IndicScriptProperties = kbts__IndicScriptProperties(Script);
-    Config.Shaper = FoundScriptIsIndic3 ? KBTS_SHAPER_USE : ScriptProperties->Shaper;
+    Config.Shaper = FoundScriptIsIndic3 ? (kbts_shaper)KBTS_SHAPER_USE : ScriptProperties->Shaper;
     Config.OpList = *kbts__ShaperOpLists[Config.Shaper];
 
-    Config.Features = KBTS__ZERO_TYPE(kbts__feature_set);
+    KBTS_MEMSET(&Config.Features, 0, sizeof(Config.Features));
     KBTS__FOR(StageIndex, 0, Config.OpList.FeatureStageCount)
     {
       kbts__feature_stage *Stage = &Config.OpList.FeatureStages[StageIndex];
@@ -23407,18 +24750,29 @@ static kbts_shape_config *kbts__PlaceShapeConfig(kbts_font *Font, kbts_script Sc
 
             if(GsubGpos && Langsys)
             {
-              kbts__feature_list *FeatureList = KBTS__POINTER_OFFSET(kbts__feature_list, GsubGpos, GsubGpos->FeatureListOffset);
+              kbts__feature_list *FeatureList = KBTS__POINTER_OFFSET(kbts__feature_list, GsubGpos, kbts__ReadU16Unaligned(&GsubGpos->FeatureListOffset));
               kbts_u16 *FeatureIndices = KBTS__POINTER_AFTER(kbts_u16, Langsys);
+              kbts__feature_variations *FeatureVariations = 0;
+
+              if((kbts__ReadU16Unaligned(&GsubGpos->Minor) == 1) &&
+                 kbts__ReadU32Unaligned(&GsubGpos->FeatureVariationsOffset) &&
+                 VariationVector &&
+                 (AxisCount < KBTS__MAX_VARIATION_AXIS_COUNT))
+              {
+                FeatureVariations = KBTS__POINTER_OFFSET(kbts__feature_variations, GsubGpos, kbts__ReadU32Unaligned(&GsubGpos->FeatureVariationsOffset));
+              }
 
               // @Speed: Maybe we don't care about fragmentation and we just allocate Langsys->FeatureIndexCount in advance?
-              KBTS__FOR(FeatureIndexIndex, 0, Langsys->FeatureIndexCount)
+              kbts_un Langsys_FeatureIndexCount = kbts__ReadU16Unaligned(&Langsys->FeatureIndexCount);
+
+              KBTS__FOR(FeatureIndexIndex, 0, Langsys_FeatureIndexCount)
               {
-                kbts_un FeatureIndex = FeatureIndices[FeatureIndexIndex];
+                kbts_un FeatureIndex = kbts__ReadU16Unaligned(&FeatureIndices[FeatureIndexIndex]);
                 kbts__feature_pointer Feature = kbts__GetFeature(FeatureList, FeatureIndex);
 
                 kbts_u32 FeatureId = kbts__FeatureTagToId(Feature.Tag);
 
-                if(Feature.Feature->LookupIndexCount &&
+                if(kbts__ReadU16Unaligned(&Feature.Feature->LookupIndexCount) &&
                    ((UserFeaturesAllowed &&
                      !kbts__ContainsFeature(&Config.Features, FeatureId)) ||
                     kbts__ContainsFeature(&FeatureStage->Features, FeatureId)))
@@ -23434,14 +24788,69 @@ static kbts_shape_config *kbts__PlaceShapeConfig(kbts_font *Font, kbts_script Sc
 
               BakedFeatureCount = 0;
 
-              KBTS__FOR(FeatureIndexIndex, 0, Langsys->FeatureIndexCount)
+              KBTS__FOR(FeatureIndexIndex, 0, Langsys_FeatureIndexCount)
               {
-                kbts_un FeatureIndex = FeatureIndices[FeatureIndexIndex];
+                kbts_un FeatureIndex = kbts__ReadU16Unaligned(&FeatureIndices[FeatureIndexIndex]);
                 kbts__feature_pointer Feature = kbts__GetFeature(FeatureList, FeatureIndex);
+
+                if(FeatureVariations)
+                {
+                  // Substitute features.
+                  // @Speed: This is N-squared and omega slow!
+                  kbts__feature_variation_record *VariationRecords = KBTS__POINTER_AFTER(kbts__feature_variation_record, FeatureVariations);
+                  kbts_un FeatureVariations_RecordCount = kbts__ReadU32Unaligned(&FeatureVariations->RecordCount);
+
+                  KBTS__FOR(VariationIndex, 0, FeatureVariations_RecordCount)
+                  {
+                    kbts__feature_variation_record *VariationRecord = &VariationRecords[VariationIndex];
+                    kbts__condition_set *ConditionSet = KBTS__POINTER_OFFSET(kbts__condition_set, FeatureVariations, kbts__ReadU32Unaligned(&VariationRecord->ConditionSetOffset));
+                    kbts_u32 *ConditionOffsets = KBTS__POINTER_AFTER(kbts_u32, ConditionSet);
+                    kbts_un ConditionSet_Count = kbts__ReadU16Unaligned(&ConditionSet->Count);
+
+                    KBTS__FOR(ConditionIndex, 0, ConditionSet_Count)
+                    {
+                      kbts__condition_1 *Condition = KBTS__POINTER_OFFSET(kbts__condition_1, ConditionSet, kbts__ReadU32Unaligned(&ConditionOffsets[ConditionIndex]));
+                      kbts_un Condition_AxisIndex = kbts__ReadU16Unaligned(&Condition->AxisIndex);
+
+                      if(Condition_AxisIndex < AxisCount)
+                      {
+                        kbts_s16 Input = VariationVectorNormalized[Condition_AxisIndex];
+
+                        if((Input >= kbts__ReadS16Unaligned(&Condition->FilterRangeMinValue)) &&
+                           (Input <= kbts__ReadS16Unaligned(&Condition->FilterRangeMaxValue)))
+                        {
+                          kbts__feature_table_substitution *FeatureTableSubstitution = KBTS__POINTER_OFFSET(kbts__feature_table_substitution, FeatureVariations, kbts__ReadU32Unaligned(&VariationRecord->FeatureTableSubstitutionOffset));
+                          kbts__feature_table_substitution_record *SubstitutionRecords = KBTS__POINTER_AFTER(kbts__feature_table_substitution_record, FeatureTableSubstitution);
+                          kbts_un FeatureTableSubstitution_Count = kbts__ReadU16Unaligned(&FeatureTableSubstitution->Count);
+
+                          KBTS__FOR(SubstitutionRecordIndex, 0, FeatureTableSubstitution_Count)
+                          {
+                            kbts__feature_table_substitution_record *SubstitutionRecord = &SubstitutionRecords[SubstitutionRecordIndex];
+                            kbts_un SubstitutionRecord_FeatureIndex = kbts__ReadU16Unaligned(&SubstitutionRecord->FeatureIndex);
+
+                            if(SubstitutionRecord_FeatureIndex == FeatureIndex)
+                            {
+                              kbts__feature *SubstitutingFeature = KBTS__POINTER_OFFSET(kbts__feature, FeatureTableSubstitution, kbts__ReadU32Unaligned(&SubstitutionRecord->AlternateFeatureOffset));
+
+                              Feature.Feature = SubstitutingFeature;
+
+                              break;
+                            }
+                            else if(SubstitutionRecord_FeatureIndex > FeatureIndex)
+                            {
+                              break;
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
 
                 kbts_u32 FeatureId = kbts__FeatureTagToId(Feature.Tag);
                 // We add all features indiscriminately for ops that might incorporate user features.
-                if(Feature.Feature->LookupIndexCount &&
+                kbts_un Feature_LookupIndexCount = kbts__ReadU16Unaligned(&Feature.Feature->LookupIndexCount);
+                if(Feature_LookupIndexCount &&
                    // We add "all" features to user feature stages, except for features that are a default part of the shaper.
                    // If a user asks for a default feature explicitly, it is unclear whether it should be applied now or in its
                    // default stage.
@@ -23451,28 +24860,16 @@ static kbts_shape_config *kbts__PlaceShapeConfig(kbts_font *Font, kbts_script Sc
                      !kbts__ContainsFeature(&Config.Features, FeatureId)) ||
                     kbts__ContainsFeature(&FeatureStage->Features, FeatureId)))
                 {
+                  kbts__MurmurAbsorb(&Murmur, KBTS__POINTER_DIFF32(Feature.Feature, Font->Blob));
+
                   kbts__baked_feature BakedFeature = KBTS__ZERO;
                   BakedFeature.FeatureTag = Feature.Tag;
                   BakedFeature.FeatureId = FeatureId;
                   // CAREFUL: We use SkipFlags as a temporary index until the end of the stage.
                   BakedFeature.SkipFlags = kbts__SkipFlags(ShapingTable, BakedFeature.FeatureId, Config.Shaper);
-                  BakedFeature.Count = Feature.Feature->LookupIndexCount;
+                  BakedFeature.Count = (kbts_u32)Feature_LookupIndexCount;
                   // These point directly into the file.
                   BakedFeature.Indices = KBTS__POINTER_AFTER(kbts_u16, Feature.Feature);
-
-                  // @Incomplete
-                  //if(FeatureVariations)
-                  //{
-                  //  KBTS__FOR(VariationIndex, 0, FeatureVariations->RecordCount)
-                  //  {
-                  //    kbts__feature_variation_pointer Variation = kbts__GetFeatureVariation(FeatureVariations, VariationIndex);
-                  //    KBTS__FOR(ConditionIndex, 0, Variation.ConditionSet->Count)
-                  //    {
-                  //      kbts__condition_1 *Condition = kbts__GetCondition(Variation.ConditionSet, ConditionIndex);
-                  //      KBTS_ASSERT(0);
-                  //    }
-                  //  }
-                  //}
 
                   // For Myanmar, we could try and tag glyphs depending on their Indic properties in BeginCluster, just like we do for
                   // Indic scripts.
@@ -23633,10 +25030,16 @@ static kbts_shape_config *kbts__PlaceShapeConfig(kbts_font *Font, kbts_script Sc
     }
 
     Config.FeatureStageFirstLookupIndices = FeatureStageFirstLookupIndices;
+    Config.Uid.Data[0] = kbts__MurmurFinalize(&Murmur);
 
     if(Memory)
     {
       *Result = Config;
+    }
+
+    if(Uid)
+    {
+      KBTS_MEMCPY(Uid, &Config.Uid, sizeof(*Uid));
     }
   }
 
@@ -23650,22 +25053,32 @@ static kbts_shape_config *kbts__PlaceShapeConfig(kbts_font *Font, kbts_script Sc
   return Result;
 }
 
-KBTS_EXPORT int kbts_SizeOfShapeConfig(kbts_font *Font, kbts_script Script, kbts_language Language)
+KBTS_EXPORT int kbts_SizeOfShapeConfig2(kbts_font *Font, kbts_script Script, kbts_language Language, float *VariationVector)
 {
   kbts_un Size;
-  kbts__PlaceShapeConfig(Font, Script, Language, 0, &Size);
+  kbts__PlaceShapeConfig(Font, Script, Language, VariationVector, 0, &Size, 0);
 
   return (int)Size;
 }
 
-KBTS_EXPORT kbts_shape_config *kbts_PlaceShapeConfig(kbts_font *Font, kbts_script Script, kbts_language Language, void *Memory)
+KBTS_EXPORT int kbts_SizeOfShapeConfig(kbts_font *Font, kbts_script Script, kbts_language Language)
+{
+  return kbts_SizeOfShapeConfig2(Font, Script, Language, 0);
+}
+
+KBTS_EXPORT kbts_shape_config *kbts_PlaceShapeConfig2(kbts_font *Font, kbts_script Script, kbts_language Language, float *VariationVector, void *Memory, kbts_uid *Uid)
 {
   kbts_un Size;
-  kbts_shape_config *Result = kbts__PlaceShapeConfig(Font, Script, Language, Memory, &Size);
+  kbts_shape_config *Result = kbts__PlaceShapeConfig(Font, Script, Language, VariationVector, Memory, &Size, Uid);
   return Result;
 }
 
-KBTS_EXPORT kbts_shape_config *kbts_CreateShapeConfig(kbts_font *Font, kbts_script Script, kbts_language Language, kbts_allocator_function *Allocator, void *AllocatorData)
+KBTS_EXPORT kbts_shape_config *kbts_PlaceShapeConfig(kbts_font *Font, kbts_script Script, kbts_language Language, void *Memory)
+{
+  return kbts_PlaceShapeConfig2(Font, Script, Language, 0, Memory, 0);
+}
+
+KBTS_EXPORT kbts_shape_config *kbts_CreateShapeConfig2(kbts_font *Font, kbts_script Script, kbts_language Language, float *VariationVector, kbts_allocator_function *Allocator, void *AllocatorData, kbts_uid *Uid)
 {
   if(!Allocator)
   {
@@ -23673,8 +25086,8 @@ KBTS_EXPORT kbts_shape_config *kbts_CreateShapeConfig(kbts_font *Font, kbts_scri
   }
 
   kbts_un Size;
-  kbts__PlaceShapeConfig(Font, Script, Language, 0, &Size);
-  kbts_shape_config *Result = kbts__PlaceShapeConfig(Font, Script, Language, kbts__AllocatorAllocate(Allocator, AllocatorData, Size), &Size);
+  kbts__PlaceShapeConfig(Font, Script, Language, VariationVector, 0, &Size, Uid);
+  kbts_shape_config *Result = kbts__PlaceShapeConfig(Font, Script, Language, VariationVector, kbts__AllocatorAllocate(Allocator, AllocatorData, Size), &Size, Uid);
   if(Result)
   {
     Result->Allocator = Allocator;
@@ -23682,6 +25095,11 @@ KBTS_EXPORT kbts_shape_config *kbts_CreateShapeConfig(kbts_font *Font, kbts_scri
   }
 
   return Result;
+}
+
+KBTS_EXPORT kbts_shape_config *kbts_CreateShapeConfig(kbts_font *Font, kbts_script Script, kbts_language Language, kbts_allocator_function *Allocator, void *AllocatorData)
+{
+  return kbts_CreateShapeConfig2(Font, Script, Language, 0, Allocator, AllocatorData, 0);
 }
 
 KBTS_EXPORT void kbts_DestroyShapeConfig(kbts_shape_config *Config)
@@ -23730,6 +25148,7 @@ KBTS_EXPORT kbts_shape_context *kbts_PlaceShapeContext2(kbts_allocator_function 
 
     KBTS__DLLIST_SENTINEL_INIT(&Result->ExistingShapeConfigBlockSentinel);
     KBTS__DLLIST_SENTINEL_INIT(&Result->ExistingGlyphConfigBlockSentinel);
+    KBTS__DLLIST_SENTINEL_INIT(&Result->FontBlockSentinel);
   }
 
   return Result;
@@ -23806,33 +25225,511 @@ KBTS_EXPORT kbts_direction kbts_ScriptDirection(kbts_script Script)
   return Result;
 }
 
-static kbts__context_font *kbts__ShapePushFont(kbts_shape_context *Context)
+static kbts__context_font *kbts__ShapePushFont(kbts_shape_context *Context, kbts_u32 *Handle)
 {
   kbts__context_font *Result = 0;
 
-  if(!Context->Error && (Context->FontCount < KBTS_CONTEXT_MAX_FONT_COUNT))
+  if(!Context->Error)
   {
-    Result = &Context->Fonts[Context->FontCount++];
-    Result->Font = 0;
-    Result->Lifetime = kbts__BeginLifetime(&Context->FontArena);
+    kbts__arena_lifetime Lifetime = kbts__BeginLifetime(&Context->FontArena);
+
+    kbts__context_font_block_header *LastBlockHeader = Context->FontBlockSentinel.Prev;
+
+    if(!(Context->FontCount & (KBTS__CONTEXT_FONTS_PER_BLOCK - 1)))
+    {
+      kbts__context_font_block *NewBlock = kbts__PushType(&Context->FontArena, kbts__context_font_block);
+
+      if(NewBlock)
+      {
+        kbts__context_font_block_header *NewBlockHeader = &NewBlock->Header;
+        NewBlockHeader->Prev = LastBlockHeader;
+        NewBlockHeader->Next = &Context->FontBlockSentinel;
+        NewBlockHeader->Prev->Next = NewBlockHeader->Next->Prev = NewBlockHeader;
+
+        KBTS__FOR(FontIndex, 0, KBTS__CONTEXT_FONTS_PER_BLOCK)
+        {
+          NewBlock->Fonts[FontIndex].Generation = 0;
+        }
+
+        LastBlockHeader = NewBlockHeader;
+      }
+      else
+      {
+        Context->Error = KBTS_SHAPE_ERROR_OUT_OF_MEMORY;
+      }
+    }
+
+    if(!Context->Error)
+    {
+      kbts__context_font_block *LastBlock = (kbts__context_font_block *)LastBlockHeader;
+      kbts_un NewFontIndex = Context->FontCount++;
+
+      Result = &LastBlock->Fonts[NewFontIndex & (KBTS__CONTEXT_FONTS_PER_BLOCK - 1)];
+      Result->Lifetime = Lifetime;
+      Result->Generation += 1;
+      KBTS__ZERO_TYPE(&Result->Info);
+
+      *Handle = ((kbts_u32)Result->Generation << 16) | (kbts_u32)NewFontIndex;
+    }
   }
 
   return Result;
 }
 
-KBTS_EXPORT kbts_font *kbts_ShapePushFont(kbts_shape_context *Context, kbts_font *Font)
+static float kbts__Fixed16_16ToFloat(kbts__fixed16_16 X)
 {
-  if(!Context->Error)
-  {
-    kbts__context_font *ContextFont = kbts__ShapePushFont(Context);
+  float Result = (float)(X.Value >> 16) + (float)(X.Value & 0xFFFF) * (1.0f / 65536.0f);
+  return Result;
+}
 
-    if(ContextFont)
+static float kbts__Fixed16_16ToFloatFromMemory(kbts__fixed16_16 *X)
+{
+  kbts__fixed16_16 Loaded;
+  KBTS_MEMCPY(&Loaded, X, sizeof(Loaded));
+  float Result = kbts__Fixed16_16ToFloat(Loaded);
+  return Result;
+}
+
+KBTS_EXPORT void kbts_GetVariationInfo(kbts_font *Font, int *AxisCount_, int *InstanceCount_)
+{
+  int AxisCount = 0;
+  int InstanceCount = 0;
+
+  if(Font && Font->Blob)
+  {
+    kbts__fvar *Fvar = kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_FVAR, kbts__fvar);
+
+    if(Fvar)
     {
-      ContextFont->Font = Font;
+      AxisCount = kbts__ReadU16Unaligned(&Fvar->AxisCount);
+      InstanceCount = kbts__ReadU16Unaligned(&Fvar->InstanceCount);
     }
   }
 
+  if(AxisCount_)
+  {
+    *AxisCount_ = AxisCount;
+  }
+
+  if(InstanceCount_)
+  {
+    *InstanceCount_ = InstanceCount;
+  }
+}
+
+KBTS_EXPORT void kbts_NormalizeVariationVector(kbts_font *Font, float *VariationVector, kbts_s16 *VariationVectorNormalized)
+{
+  if(Font && Font->Blob &&
+     VariationVector)
+  {
+    kbts__fvar *Fvar = kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_FVAR, kbts__fvar);
+    kbts__avar *Avar = kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_AVAR, kbts__avar);
+
+    if(Fvar)
+    {
+      kbts__variation_axis_record *Axes = KBTS__POINTER_OFFSET(kbts__variation_axis_record, Fvar, kbts__ReadU16Unaligned(&Fvar->AxesArrayOffset));
+      kbts_un AxisCount = kbts__ReadU16Unaligned(&Fvar->AxisCount);
+
+      kbts__segment_maps DummySegmentMaps = KBTS__ZERO;
+      kbts__segment_maps *SegmentMaps = Avar ? KBTS__POINTER_AFTER(kbts__segment_maps, Avar) : &DummySegmentMaps;
+
+      KBTS__FOR(AxisIndex, 0, AxisCount)
+      {
+        kbts__variation_axis_record *Axis = &Axes[AxisIndex];
+
+        kbts__axis_value_map *AxisValueMaps = KBTS__POINTER_AFTER(kbts__axis_value_map, SegmentMaps);
+        kbts_un PositionMapCount = kbts__ReadU16Unaligned(&SegmentMaps->PositionMapCount);
+
+        float AxisMin = kbts__Fixed16_16ToFloatFromMemory(&Axis->MinValue);
+        float AxisDefault = kbts__Fixed16_16ToFloatFromMemory(&Axis->DefaultValue);
+        float AxisMax = kbts__Fixed16_16ToFloatFromMemory(&Axis->MaxValue);
+
+        float InputCoord = VariationVector[AxisIndex];
+
+        if(InputCoord < AxisMin)
+        {
+          InputCoord = AxisMin;
+        }
+        else if(InputCoord > AxisMax)
+        {
+          InputCoord = AxisMax;
+        }
+
+        float NormalizedInputFloat;
+        if(InputCoord < AxisDefault)
+        {
+          NormalizedInputFloat = -(AxisDefault - InputCoord) / (AxisDefault - AxisMin);
+        }
+        else if (InputCoord > AxisDefault)
+        {
+          NormalizedInputFloat = (InputCoord - AxisDefault) / (AxisMax - AxisDefault);
+        }
+        else
+        {
+          NormalizedInputFloat = 0;
+        }
+
+        #ifdef KBTS__VARIATION_NORMALIZATION_COMPATIBILITY
+        NormalizedInputFloat = (float)kbts__Floor32(NormalizedInputFloat * 65536.0f + 0.5f) / 65536.0f;
+        kbts_s16 NormalizedInputFixed = (kbts_s16)(((kbts_s32)(NormalizedInputFloat * 65536.0f) + 2) >> 2);
+        #else
+        kbts_s16 NormalizedInputFixed = kbts__FloatToFixed2_14(NormalizedInputFloat);
+        #endif
+
+        if(PositionMapCount)
+        {
+          // @Speed: Binary search?
+          kbts_s16 Last_From = kbts__ReadS16Unaligned(&AxisValueMaps[0].FromCoordinate);
+          kbts_s16 Last_To = kbts__ReadS16Unaligned(&AxisValueMaps[0].ToCoordinate);
+          float From0 = kbts__Fixed2_14ToFloat(Last_From);
+
+          #ifdef KBTS__VARIATION_NORMALIZATION_COMPATIBILITY
+          KBTS__FOR(PositionMapIndex, 1, PositionMapCount)
+          {
+            kbts__axis_value_map *Current = &AxisValueMaps[PositionMapIndex];
+            kbts_s16 Current_From = kbts__ReadS16Unaligned(&Current->FromCoordinate);
+            kbts_s16 Current_To = kbts__ReadS16Unaligned(&Current->ToCoordinate);
+            float From1 = kbts__Fixed2_14ToFloat(Current_From);
+
+            if(From1 >= NormalizedInputFloat)
+            {
+              float To0 = kbts__Fixed2_14ToFloat(Last_To);
+              float To1 = kbts__Fixed2_14ToFloat(Current_To);
+
+              float LerpFactor = (NormalizedInputFloat - From0) / (From1 - From0);
+              float RemappedFloat = To0 + (To1 - To0) * LerpFactor;
+
+              RemappedFloat = (float)kbts__Round32(RemappedFloat * 65536.0f);
+              kbts_s16 RemappedFixed = (kbts_s16)(((kbts_s32)RemappedFloat + 2) >> 2);
+
+              VariationVectorNormalized[AxisIndex] = RemappedFixed;
+
+              break;
+            }
+
+            From0 = From1;
+            Last_From = Current_From;
+            Last_To = Current_To;
+          }
+          #else
+          KBTS__FOR(PositionMapIndex, 1, PositionMapCount)
+          {
+            kbts__axis_value_map *Current = &AxisValueMaps[PositionMapIndex];
+            kbts_s16 Current_From = kbts__ReadS16Unaligned(&Current->FromCoordinate);
+            kbts_s16 Current_To = kbts__ReadS16Unaligned(&Current->ToCoordinate);
+
+            if(Current_From >= NormalizedInputFixed)
+            {
+              float From0 = kbts__Fixed2_14ToFloat(Last_From);
+              float To0 = kbts__Fixed2_14ToFloat(Last_To);
+              float From1 = kbts__Fixed2_14ToFloat(Current_From);
+              float To1 = kbts__Fixed2_14ToFloat(Current_To);
+
+              float LerpFactor = (NormalizedInputFloat - From0) / (From1 - From0);
+              float RemappedFloat = To0 + (To1 - To0) * LerpFactor;
+
+              kbts_s16 RemappedFixed = kbts__FloatToFixed2_14(RemappedFloat);
+
+              VariationVectorNormalized[AxisIndex] = RemappedFixed;
+
+              break;
+            }
+
+            Last_From = Current_From;
+            Last_To = Current_To;
+          }
+          #endif
+        }
+        else
+        {
+          VariationVectorNormalized[AxisIndex] = NormalizedInputFixed;
+        }
+
+        SegmentMaps = Avar ? (kbts__segment_maps *)(AxisValueMaps + PositionMapCount) : &DummySegmentMaps;
+      }
+    }
+  }
+}
+
+KBTS_EXPORT int kbts_GetVariationAxisInfo(kbts_font *Font, int AxisIndex, kbts_variation_axis_info *Info)
+{
+  int Result = 0;
+
+  if(Font && Font->Blob)
+  {
+    kbts__fvar *Fvar = kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_FVAR, kbts__fvar);
+
+    if(Fvar &&
+       ((unsigned)AxisIndex < kbts__ReadU16Unaligned(&Fvar->AxisCount)))
+    {
+      kbts__variation_axis_record *Axes = KBTS__POINTER_OFFSET(kbts__variation_axis_record, Fvar, kbts__ReadU16Unaligned(&Fvar->AxesArrayOffset));
+      kbts__variation_axis_record *Axis = &Axes[AxisIndex];
+
+      Info->Tag = kbts__ReadU32Unaligned(&Axis->Tag);
+      Info->MinimumValue = kbts__Fixed16_16ToFloatFromMemory(&Axis->MinValue);
+      Info->DefaultValue = kbts__Fixed16_16ToFloatFromMemory(&Axis->DefaultValue);
+      Info->MaximumValue = kbts__Fixed16_16ToFloatFromMemory(&Axis->MaxValue);
+      Info->Flags = kbts__ReadU16Unaligned(&Axis->Flags);
+      Info->NameStringId = kbts__ReadU16Unaligned(&Axis->AxisNameId);
+
+      Result = 1;
+    }
+  }
+
+  return Result;
+}
+
+KBTS_EXPORT int kbts_GetVariationInstance(kbts_font *Font, int InstanceIndex, kbts_variation_instance_info *Info, float *VariationVector)
+{
+  int Result = 0;
+
+  if(Font && Font->Blob)
+  {
+    kbts__fvar *Fvar = kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_FVAR, kbts__fvar);
+
+    if(Fvar &&
+       ((unsigned)InstanceIndex < kbts__ReadU16Unaligned(&Fvar->InstanceCount)))
+    {
+      kbts_un AxisCount = kbts__ReadU16Unaligned(&Fvar->AxisCount);
+      kbts_un InstanceSize = kbts__ReadU16Unaligned(&Fvar->InstanceSize);
+      kbts__variation_axis_record *Axes = KBTS__POINTER_OFFSET(kbts__variation_axis_record, Fvar, kbts__ReadU16Unaligned(&Fvar->AxesArrayOffset));
+      kbts__instance_record *Instance = KBTS__POINTER_OFFSET(kbts__instance_record, Axes, AxisCount * kbts__ReadU16Unaligned(&Fvar->AxisSize) + InstanceIndex * InstanceSize);
+      kbts__fixed16_16 *InstanceCoordinates = KBTS__POINTER_AFTER(kbts__fixed16_16, Instance);
+      kbts_u16 *PostscriptNameId = (kbts_u16 *)(InstanceCoordinates + AxisCount);
+
+      kbts_variation_instance_flags Flags = 0;
+      kbts_u16 PostscriptNameStringId = 0xFFFF;
+      if(InstanceSize == (AxisCount * sizeof(kbts__fixed16_16) + 6))
+      {
+        Flags |= KBTS_VARIATION_INSTANCE_FLAG_HAS_POSTSCRIPT_NAME;
+        PostscriptNameStringId = kbts__ReadU16Unaligned(PostscriptNameId);
+      }
+
+      Info->SubfamilyNameStringId = kbts__ReadU16Unaligned(&Instance->SubfamilyNameId);
+      Info->PostscriptNameStringId = PostscriptNameStringId;
+      Info->Flags = Flags;
+
+      if(VariationVector)
+      {
+        KBTS__FOR(AxisIndex, 0, AxisCount)
+        {
+          VariationVector[AxisIndex] = kbts__Fixed16_16ToFloatFromMemory(&InstanceCoordinates[AxisIndex]);
+        }
+      }
+
+      Result = 1;
+    }
+  }
+
+  return Result;
+}
+
+KBTS_INLINE int kbts__IsNan32(float X)
+{
+  int Result = (X != X);
+  return Result;
+}
+
+KBTS_EXPORT float kbts_FontMetric(kbts_font *Font, kbts_u32 Tag, float *VariationVector)
+{
+  float Result = 0;
+
+  if(Font && Font->Blob)
+  {
+    if(VariationVector)
+    {
+      kbts__mvar *Mvar = kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_MVAR, kbts__mvar);
+
+      if(Mvar)
+      {
+        kbts__mvar_value_record *FoundValueRecord = 0;
+
+        char *AtValueRecords = KBTS__POINTER_AFTER(char, Mvar);
+        kbts_un Mvar_ValueRecordCount = kbts__ReadU16Unaligned(&Mvar->ValueRecordCount);
+        KBTS__FOR(ValueRecordIndex, 0, Mvar_ValueRecordCount)
+        {
+          kbts__mvar_value_record *ValueRecord = (kbts__mvar_value_record *)AtValueRecords;
+
+          if(kbts__ReadU32Unaligned(&ValueRecord->Tag) == Tag)
+          {
+            FoundValueRecord = ValueRecord;
+
+            break;
+          }
+
+          AtValueRecords += kbts__ReadU16Unaligned(&Mvar->ValueRecordSize);
+        }
+
+        if(FoundValueRecord)
+        {
+          kbts__item_variation_store *Store = KBTS__POINTER_OFFSET(kbts__item_variation_store, Mvar, kbts__ReadU16Unaligned(&Mvar->ItemVariationStoreOffset));
+          kbts_u32 *Store_VariationRegionListOffset = kbts__item_variation_store_VariationRegionListOffset(Store);
+
+          kbts__variation_region_list *VariationRegionList = KBTS__POINTER_OFFSET(kbts__variation_region_list, Store, kbts__ReadU32Unaligned(Store_VariationRegionListOffset));
+          // @Hardcoded
+          if(kbts__ReadU16Unaligned(&VariationRegionList->AxisCount) <= 64)
+          {
+            kbts_s16 VariationVectorNormalized[64];
+            kbts_NormalizeVariationVector(Font, VariationVector, (kbts_s16 *)VariationVectorNormalized);
+
+            Result = kbts__ItemVariationStoreDelta(Store, kbts__ReadU16Unaligned(&FoundValueRecord->DeltaSetOuterIndex), kbts__ReadU16Unaligned(&FoundValueRecord->DeltaSetInnerIndex), VariationVectorNormalized);
+          }
+        }
+      }
+      else
+      {
+        // No valid variation table. Fall back to static font info.
+        kbts_font_info2_2 Info;
+        Info.Base.Size = sizeof(Info);
+        kbts_GetFontInfo2(Font, &Info.Base);
+
+        switch(Tag)
+        {
+        case KBTS_FOURCC('v', 'a', 's', 'c'): Result = (float)Info.Ascent; break;
+        case KBTS_FOURCC('v', 'd', 's', 'c'): Result = (float)Info.Descent; break;
+        case KBTS_FOURCC('v', 'l', 'g', 'p'): Result = (float)Info.LineGap; break;
+        case KBTS_FOURCC('c', 'p', 'h', 't'): Result = (float)Info.CapitalHeight; break;
+        }
+      }
+    }
+  }
+
+  return Result;
+}
+
+static kbts__context_font *kbts__GetContextFont(kbts_shape_context *Context, kbts_u32 ContextFontHandle)
+{
+  kbts__context_font *Result = 0;
+  if(!Context->Error)
+  {
+    kbts_un FontIndex = ContextFontHandle & 0xFFFF;
+    if(FontIndex < Context->FontCount)
+    {
+      kbts_un RunningIndex = FontIndex;
+      kbts__context_font_block_header *BlockHeader = Context->FontBlockSentinel.Next;
+      while(RunningIndex >= KBTS__CONTEXT_FONTS_PER_BLOCK)
+      {
+        BlockHeader = BlockHeader->Next;
+        RunningIndex -= KBTS__CONTEXT_FONTS_PER_BLOCK;
+      }
+
+      kbts__context_font_block *Block = (kbts__context_font_block *)BlockHeader;
+      kbts__context_font *Font = &Block->Fonts[RunningIndex];
+      kbts_un FontGeneration = ContextFontHandle >> 16;
+
+      if(Font->Generation == FontGeneration)
+      {
+        Result = Font;
+      }
+    }
+  }
+
+  return Result;
+}
+
+typedef kbts_u32 kbts__shape_set_font_variations_flags;
+enum kbts__shape_set_font_variations_flags_enum
+{
+  KBTS__SHAPE_SET_FONT_VARIATIONS_FLAG_NONE = 0,
+  KBTS__SHAPE_SET_FONT_VARIATIONS_FLAG_SET_TO_DEFAULT_IF_NOT_EXPLICITLY_SET = 1,
+};
+
+static int kbts__ShapeSetFontVariations(kbts_shape_context *Context, kbts_u32 ContextFontHandle, kbts_variation *Variations, int VariationCount, kbts__shape_set_font_variations_flags Flags)
+{
+  int Result = 0;
+  kbts__context_font *ContextFont = kbts__GetContextFont(Context, ContextFontHandle);
+
+  if(ContextFont)
+  {
+    int AxisCount;
+    kbts_GetVariationInfo(ContextFont->Info.Font, &AxisCount, 0);
+
+    if(AxisCount > 0)
+    {
+      float *VariationVector = ContextFont->Info.VariationVector;
+
+      for(int AxisIndex = 0;
+          AxisIndex < AxisCount;
+          ++AxisIndex)
+      {
+        kbts_variation_axis_info AxisInfo;
+        kbts_GetVariationAxisInfo(ContextFont->Info.Font, AxisIndex, &AxisInfo);
+
+        float AxisValue = AxisInfo.DefaultValue;
+        int Found = 0;
+
+        for(int VariationIndex = 0;
+            VariationIndex < VariationCount;
+            ++VariationIndex)
+        {
+          kbts_variation *Variation = &Variations[VariationIndex];
+
+          if(Variation->Tag == AxisInfo.Tag)
+          {
+            AxisValue = Variation->Value;
+            Result += 1;
+            Found = 1;
+
+            break;
+          }
+        }
+
+        if(Found ||
+           (Flags & KBTS__SHAPE_SET_FONT_VARIATIONS_FLAG_SET_TO_DEFAULT_IF_NOT_EXPLICITLY_SET))
+        {
+          VariationVector[AxisIndex] = AxisValue;
+        }
+      }
+
+      ContextFont->Info.Flags |= KBTS__CONTEXT_FONT_FLAG_VARIATIONS_DIRTY;
+    }
+  }
+
+  return Result;
+}
+
+KBTS_EXPORT int kbts_ShapeSetFontVariations(kbts_shape_context *Context, kbts_u32 ContextFontHandle, kbts_variation *Variations, int VariationCount)
+{
+  return kbts__ShapeSetFontVariations(Context, ContextFontHandle, Variations, VariationCount, 0);
+}
+
+static void kbts__InitializeContextFont(kbts_shape_context *Context, kbts__context_font *ContextFont, kbts_font *Font)
+{
+  ContextFont->Info.Font = Font;
+
+  int AxisCount;
+  kbts_GetVariationInfo(Font, &AxisCount, 0);
+  ContextFont->Info.VariationVector = kbts__PushArray(&Context->FontArena, float, AxisCount);
+}
+
+KBTS_EXPORT kbts_font *kbts_ShapePushFont2(kbts_shape_context *Context, kbts_font *Font, kbts_variation *Variations, int VariationCount, kbts_u32 *ContextFontHandle_)
+{
+  kbts_u32 ContextFontHandle = 0xFFFF0000u;
+
+  if(!Context->Error)
+  {
+    kbts__context_font *ContextFont = kbts__ShapePushFont(Context, &ContextFontHandle);
+
+    if(ContextFont)
+    {
+      kbts__InitializeContextFont(Context, ContextFont, Font);
+
+      kbts__ShapeSetFontVariations(Context, ContextFontHandle, Variations, VariationCount, KBTS__SHAPE_SET_FONT_VARIATIONS_FLAG_SET_TO_DEFAULT_IF_NOT_EXPLICITLY_SET);
+    }
+  }
+
+  if(ContextFontHandle_)
+  {
+    *ContextFontHandle_ = ContextFontHandle;
+  }
+
   return Font;
+}
+
+KBTS_EXPORT kbts_font *kbts_ShapePushFont(kbts_shape_context *Context, kbts_font *Font)
+{
+  kbts_font *Result = kbts_ShapePushFont2(Context, Font, 0, 0, 0);
+  return Result;
 }
 
 KBTS_EXPORT kbts_font *kbts_ShapePopFont(kbts_shape_context *Context)
@@ -23841,10 +25738,18 @@ KBTS_EXPORT kbts_font *kbts_ShapePopFont(kbts_shape_context *Context)
 
   if(!Context->Error && Context->FontCount)
   {
-    kbts__context_font *ContextFont = &Context->Fonts[Context->FontCount - 1];
-    Result = ContextFont->Font;
+    kbts__context_font_block *Block = (kbts__context_font_block *)&Context->FontBlockSentinel.Prev;
+    kbts_un BlockFontIndex = (Context->FontCount - 1) & (KBTS__CONTEXT_FONTS_PER_BLOCK - 1);
+    kbts__context_font *Font = &Block->Fonts[BlockFontIndex];
+    Result = Font->Info.Font;
 
-    kbts__EndLifetime(&ContextFont->Lifetime);
+    if(!BlockFontIndex)
+    {
+      // The EndLifetime() call below will also free this font block.
+      KBTS__DLLIST_REMOVE(&Block->Header);
+    }
+
+    kbts__EndLifetime(&Font->Lifetime);
 
     Context->FontCount -= 1;
   }
@@ -23853,12 +25758,13 @@ KBTS_EXPORT kbts_font *kbts_ShapePopFont(kbts_shape_context *Context)
 }
 
 #ifndef KB_TEXT_SHAPE_NO_CRT
-KBTS_EXPORT kbts_font *kbts_ShapePushFontFromFile(kbts_shape_context *Context, const char *FileName, int FontIndex)
+KBTS_EXPORT kbts_font *kbts_ShapePushFontFromFile2(kbts_shape_context *Context, const char *FileName, int FontIndex, kbts_variation *Variations, int VariationCount, kbts_u32 *ContextFontHandle_)
 {
-  kbts__context_font *ContextFont = kbts__ShapePushFont(Context);
   kbts_font *Result = 0;
+  kbts_u32 ContextFontHandle = 0xFFFF0000u;
+  kbts__context_font *ContextFont = kbts__ShapePushFont(Context, &ContextFontHandle);
 
-  if(!Context->Error)
+  if(ContextFont)
   {
     Result = kbts__PushType(&Context->FontArena, kbts_font);
     if(Result)
@@ -23867,7 +25773,9 @@ KBTS_EXPORT kbts_font *kbts_ShapePushFontFromFile(kbts_shape_context *Context, c
 
       if(!Result->Error)
       {
-        ContextFont->Font = Result;
+        kbts__InitializeContextFont(Context, ContextFont, Result);
+
+        kbts__ShapeSetFontVariations(Context, ContextFontHandle, Variations, VariationCount, KBTS__SHAPE_SET_FONT_VARIATIONS_FLAG_SET_TO_DEFAULT_IF_NOT_EXPLICITLY_SET);
       }
       else
       {
@@ -23881,45 +25789,72 @@ KBTS_EXPORT kbts_font *kbts_ShapePushFontFromFile(kbts_shape_context *Context, c
     }
   }
 
+  if(ContextFontHandle_)
+  {
+    *ContextFontHandle_ = ContextFontHandle;
+  }
+
+  return Result;
+}
+
+KBTS_EXPORT kbts_font *kbts_ShapePushFontFromFile(kbts_shape_context *Context, const char *FileName, int FontIndex)
+{
+  kbts_font *Result = kbts_ShapePushFontFromFile2(Context, FileName, FontIndex, 0, 0, 0);
   return Result;
 }
 #endif
 
-KBTS_EXPORT kbts_font *kbts_ShapePushFontFromMemory(kbts_shape_context *Context, void *Memory, int Length, int FontIndex)
+KBTS_EXPORT kbts_font *kbts_ShapePushFontFromMemory2(kbts_shape_context *Context, void *Memory, int Length, int FontIndex, kbts_variation *Variations, int VariationCount, kbts_u32 *ContextFontHandle_)
 {
   kbts_font *Result = 0;
+  kbts_u32 ContextFontHandle = 0xFFFF0000u;
 
-  if(!Context->Error && (Length > 0))
+  if(Length > 0)
   {
-    kbts__context_font *ContextFont = kbts__ShapePushFont(Context);
+    kbts__context_font *ContextFont = kbts__ShapePushFont(Context, &ContextFontHandle);
 
-    Result = kbts__PushType(&Context->FontArena, kbts_font);
-
-    if(Result)
+    if(ContextFont)
     {
-      int ScratchSize, OutputSize;
-      kbts_load_font_state State = KBTS__ZERO;
-      kbts_load_font_error Error = kbts_LoadFont(Result, &State, Memory, Length, FontIndex, &ScratchSize, &OutputSize);
-      if(Error == KBTS_LOAD_FONT_ERROR_NEED_TO_CREATE_BLOB)
-      {
-        void *Scratch = kbts__PushSize(&Context->ScratchArena, (kbts_un)ScratchSize, 8);
-        void *Output = kbts__PushSize(&Context->FontArena, (kbts_un)OutputSize, 8);
+      Result = kbts__PushType(&Context->FontArena, kbts_font);
 
-        Error = kbts_PlaceBlob(Result, &State, Scratch, Output);
-      }
-
-      if(!Error)
+      if(Result)
       {
-        ContextFont->Font = Result;
+        int ScratchSize, OutputSize;
+        kbts_load_font_state State = KBTS__ZERO;
+        kbts_load_font_error Error = kbts_LoadFont(Result, &State, Memory, Length, FontIndex, &ScratchSize, &OutputSize);
+        if(Error == KBTS_LOAD_FONT_ERROR_NEED_TO_CREATE_BLOB)
+        {
+          void *Scratch = kbts__PushSize(&Context->ScratchArena, (kbts_un)ScratchSize, 8);
+          void *Output = kbts__PushSize(&Context->FontArena, (kbts_un)OutputSize, 8);
+
+          Error = kbts_PlaceBlob(Result, &State, Scratch, Output);
+        }
+
+        if(!Error)
+        {
+          kbts__InitializeContextFont(Context, ContextFont, Result);
+
+          kbts__ShapeSetFontVariations(Context, ContextFontHandle, Variations, VariationCount, KBTS__SHAPE_SET_FONT_VARIATIONS_FLAG_SET_TO_DEFAULT_IF_NOT_EXPLICITLY_SET);
+        }
+        else
+        {
+          kbts_ShapePopFont(Context);
+          Result = 0;
+        }
       }
       else
       {
-        kbts_ShapePopFont(Context);
-        Result = 0;
+        Context->Error = KBTS_SHAPE_ERROR_OUT_OF_MEMORY;
       }
     }
   }
 
+  return Result;
+}
+
+KBTS_EXPORT kbts_font *kbts_ShapePushFontFromMemory(kbts_shape_context *Context, void *Memory, int Length, int FontIndex)
+{
+  kbts_font *Result = kbts_ShapePushFontFromMemory2(Context, Memory, Length, FontIndex, 0, 0, 0);
   return Result;
 }
 
@@ -24060,6 +25995,24 @@ KBTS_EXPORT int kbts_SizeOfGlyphConfig(kbts_shape_config *ShapeConfig, kbts_feat
   return (int)Result;
 }
 
+static kbts_u32 kbts__GlyphConfigHash(kbts_shape_config *ShapeConfig, kbts_feature_override *Overrides, kbts_un OverrideCount)
+{
+  kbts__murmur_state Murmur;
+  kbts__MurmurBegin(&Murmur, ShapeConfig->Uid.Data[0] ^ ShapeConfig->Uid.Data[1] ^ ShapeConfig->Uid.Data[2] ^ ShapeConfig->Uid.Data[3]);
+
+  // Note that different override orders will result in different hashes.
+  KBTS__FOR(OverrideIndex, 0, OverrideCount)
+  {
+    kbts_feature_override *Override = &Overrides[OverrideIndex];
+
+    kbts__MurmurAbsorb(&Murmur, Override->Tag);
+    kbts__MurmurAbsorb(&Murmur, (kbts_u32)Override->Value);
+  }
+
+  kbts_u32 Result = kbts__MurmurFinalize(&Murmur);
+  return Result;
+}
+
 KBTS_EXPORT kbts_glyph_config *kbts_PlaceGlyphConfig(kbts_shape_config *ShapeConfig, kbts_feature_override *Overrides, int OverrideCount, void *Memory)
 {
   kbts__pointer_bump_allocator Bump = kbts__PointerBumpAllocator(Memory);
@@ -24101,7 +26054,7 @@ KBTS_EXPORT kbts_glyph_config *kbts_PlaceGlyphConfig(kbts_shape_config *ShapeCon
         OnePastLastSequentialLookupIndex = kbts__SequentialLookupCount(ShapeConfig);
       }
 
-      kbts_lookup_list *LookupList = kbts__GetLookupList(GsubGpos);
+      kbts__lookup_list *LookupList = kbts__GetLookupList(GsubGpos);
 
       kbts__iterate_features IterateFeatures = kbts__IterateFeatures(ShapeConfig, (kbts_shaping_table)ShapingTable, OverriddenFeatures);
 
@@ -24187,13 +26140,6 @@ KBTS_EXPORT kbts_glyph_config *kbts_PlaceGlyphConfig(kbts_shape_config *ShapeCon
     Result->DisabledLookupBits = DisabledLookupBits;
   }
 
-  kbts__feature_set OverriddenFeatures = KBTS__ZERO;
-  KBTS__FOR(OverrideIndex, 0, (kbts_un)OverrideCount)
-  {
-    kbts_feature_override *Override = &Overrides[OverrideIndex];
-    kbts__AddFeature(&OverriddenFeatures, kbts__FeatureTagToId(Override->Tag));
-  }
-
   return Result;
 }
 
@@ -24234,6 +26180,19 @@ KBTS_EXPORT void kbts_ShapeBegin(kbts_shape_context *Context, kbts_direction Par
   if(!Context->Error)
   {
     kbts__ClearArena(&Context->ScratchArena);
+
+    for(kbts__context_font_block_header *Header = Context->FontBlockSentinel.Next;
+        Header != &Context->FontBlockSentinel;
+        Header = Header->Next)
+    {
+      kbts__context_font_block *Block = (kbts__context_font_block *)Header;
+
+      KBTS__FOR(FontIndex, 0, KBTS__CONTEXT_FONTS_PER_BLOCK)
+      {
+        Block->Fonts[FontIndex].Info.Interned = 0;
+      }
+    }
+
     kbts_ClearActiveGlyphs(&Context->GlyphStorage);
 
     Context->BreakStartIndex = 0;
@@ -24241,7 +26200,7 @@ KBTS_EXPORT void kbts_ShapeBegin(kbts_shape_context *Context, kbts_direction Par
     // Scratch features persist across frames. Don't reset ScratchFeatureOverrideCount.
     Context->CurrentFeatureOverrides = 0;
     Context->CurrentFeatureOverrideCount = 0;
-    Context->NeedNewGlyphConfig = 1;
+    Context->Flags |= KBTS__CONTEXT_FLAG_FEATURE_OVERRIDES_DIRTY;
 
     Context->ParagraphDirection = ParagraphDirection;
     Context->Language = Language;
@@ -24250,7 +26209,7 @@ KBTS_EXPORT void kbts_ShapeBegin(kbts_shape_context *Context, kbts_direction Par
     Context->NextUserId = 0;
     Context->LastGraphemeBreak = 0;
     Context->LastLineBreakIndex = 0;
-    Context->RunFont = 0;
+    Context->RunFontInfo = 0;
     Context->RunScript = 0;
     Context->RunDirection = 0;
 
@@ -24286,21 +26245,22 @@ static kbts__input_codepoint_index kbts__InputCodepointIndex(kbts_un FlatCodepoi
   return Result;
 }
 
-static kbts_shape_codepoint *kbts__InputCodepoint(kbts_shape_context *Context, kbts_un Index, kbts_b32 AllocateIfNeeded)
+static kbts__shape_codepoint *kbts__InputCodepoint(kbts_shape_context *Context, kbts_un Index, kbts_b32 AllocateIfNeeded)
 {
-  kbts_shape_codepoint *Result = 0;
+  kbts__shape_codepoint *Result = 0;
 
   if(!Context->Error)
   {
     kbts__input_codepoint_index InputIndex = kbts__InputCodepointIndex(Index);
 
-    kbts_shape_codepoint *Block = Context->InputBlocks[InputIndex.BlockIndex];
+    kbts__shape_codepoint *Block = Context->InputBlocks[InputIndex.BlockIndex];
     if(!Block && AllocateIfNeeded)
     {
-      Block = kbts__PushArray(&Context->PermanentArena, kbts_shape_codepoint, InputIndex.BlockCodepointCount);
+      Block = kbts__PushArray(&Context->PermanentArena, kbts__shape_codepoint, InputIndex.BlockCodepointCount);
       if(!Block)
       {
         Context->Error = KBTS_SHAPE_ERROR_OUT_OF_MEMORY;
+
         return Result;
       }
 
@@ -24377,13 +26337,68 @@ KBTS_EXPORT int kbts_ShapeCodepointIteratorIsValid(kbts_shape_codepoint_iterator
   return Result;
 }
 
+static void kbts__PublicShapeCodepointFromInternal(kbts_shape_codepoint *Public, kbts__shape_codepoint *Internal)
+{
+  kbts__interned_context_font_info *FontInfo = Internal->FontInfo;
+
+  Public->Font = FontInfo ? FontInfo->Font : 0;
+  Public->FeatureOverrides = Internal->FeatureOverrides;
+  Public->FeatureOverrideCount = Internal->FeatureOverrideCount;
+  Public->Codepoint = Internal->Codepoint;
+  Public->UserId = Internal->UserId;
+  Public->BreakFlags = Internal->BreakFlags;
+  Public->Script = Internal->Script;
+  Public->Direction = Internal->Direction;
+  Public->ParagraphDirection = Internal->Direction;
+}
+
+static int kbts__PublicShapeCodepointFromInternal2(kbts_shape_codepoint2 *Public, kbts__shape_codepoint *Internal)
+{
+  int Result = 1;
+
+  switch(Public->Size)
+  {
+  case sizeof(kbts_shape_codepoint2):
+  {
+    kbts__interned_context_font_info *FontInfo = Internal->FontInfo;
+
+    Public->Font = FontInfo ? FontInfo->Font : 0;
+    Public->VariationVector = FontInfo ? FontInfo->VariationVector : 0;
+    Public->FeatureOverrides = Internal->FeatureOverrides;
+    Public->FeatureOverrideCount = Internal->FeatureOverrideCount;
+    Public->Codepoint = Internal->Codepoint;
+    Public->UserId = Internal->UserId;
+    Public->BreakFlags = Internal->BreakFlags;
+    Public->Script = Internal->Script;
+    Public->Direction = Internal->Direction;
+    Public->ParagraphDirection = Internal->ParagraphDirection;
+  } break;
+
+  default: Result = 0; break;
+  }
+
+  return Result;
+}
+
 KBTS_EXPORT int kbts_ShapeCodepointIteratorNext(kbts_shape_codepoint_iterator *It, kbts_shape_codepoint *Codepoint, int *CodepointIndex)
 {
   int Result = kbts__NextInputCodepoint(It, CodepointIndex);
 
   if(Result)
   {
-    *Codepoint = *It->Codepoint;
+    kbts__PublicShapeCodepointFromInternal(Codepoint, It->Codepoint);
+  }
+
+  return Result;
+}
+
+KBTS_EXPORT int kbts_ShapeCodepointIteratorNext2(kbts_shape_codepoint_iterator *It, kbts_shape_codepoint2 *Codepoint, int *CodepointIndex)
+{
+  int Result = kbts__NextInputCodepoint(It, CodepointIndex);
+
+  if(Result)
+  {
+    Result = kbts__PublicShapeCodepointFromInternal2(Codepoint, It->Codepoint);
   }
 
   return Result;
@@ -24396,10 +26411,11 @@ KBTS_EXPORT int kbts_ShapeGetShapeCodepoint(kbts_shape_context *Context, int Cod
   if((CodepointIndex >= 0) &&
      ((kbts_un)CodepointIndex < Context->InputCodepointCount))
   {
-    kbts_shape_codepoint *Source = kbts__InputCodepoint(Context, (kbts_un)CodepointIndex, 0);
+    kbts__shape_codepoint *Source = kbts__InputCodepoint(Context, (kbts_un)CodepointIndex, 0);
+
     if(Source)
     {
-      *Codepoint = *Source;
+      kbts__PublicShapeCodepointFromInternal(Codepoint, Source);
     }
     else
     {
@@ -24412,16 +26428,119 @@ KBTS_EXPORT int kbts_ShapeGetShapeCodepoint(kbts_shape_context *Context, int Cod
   return Result;
 }
 
+KBTS_EXPORT int kbts_ShapeGetShapeCodepoint2(kbts_shape_context *Context, int CodepointIndex, kbts_shape_codepoint2 *Codepoint)
+{
+  int Result = 0;
+
+  if((CodepointIndex >= 0) &&
+     ((kbts_un)CodepointIndex < Context->InputCodepointCount))
+  {
+    kbts__shape_codepoint *Source = kbts__InputCodepoint(Context, (kbts_un)CodepointIndex, 0);
+
+    if(Source)
+    {
+      Result = kbts__PublicShapeCodepointFromInternal2(Codepoint, Source);
+    }
+    else
+    {
+      KBTS_MEMSET(Codepoint, 0, sizeof(*Codepoint));
+    }
+  }
+
+  return Result;
+}
+
+static kbts__interned_context_font_info *kbts__InternContextFontInfo(kbts_shape_context *Context, kbts__context_font_info *FontInfo)
+{
+  kbts__interned_context_font_info *Result = 0;
+
+  if(FontInfo)
+  {
+    Result = FontInfo->Interned;
+
+    if(!Result ||
+       (FontInfo->Flags & KBTS__CONTEXT_FONT_FLAG_VARIATIONS_DIRTY))
+    {
+      int AxisCount;
+      kbts_GetVariationInfo(FontInfo->Font, &AxisCount, 0);
+
+      kbts__interned_context_font_info *New = kbts__PushType(&Context->ScratchArena, kbts__interned_context_font_info);
+
+      if(New)
+      {
+        float *VariationVector;
+
+        if(Result &&
+           !(FontInfo->Flags & KBTS__CONTEXT_FONT_FLAG_VARIATIONS_DIRTY))
+        {
+          VariationVector = Result->VariationVector;
+        }
+        else
+        {
+          VariationVector = kbts__PushArray(&Context->ScratchArena, float, AxisCount);
+
+          if(VariationVector)
+          {
+            KBTS_MEMCPY(VariationVector, FontInfo->VariationVector, sizeof(*VariationVector) * AxisCount);
+          }
+          else
+          {
+            Context->Error = KBTS_SHAPE_ERROR_OUT_OF_MEMORY;
+
+            return 0;
+          }
+        }
+
+        New->Font = FontInfo->Font;
+        New->VariationVector = VariationVector;
+        New->VariationVectorNormalized = 0;
+
+        kbts__murmur_state Murmur;
+        kbts__MurmurBegin(&Murmur, 0x97978573);
+        kbts__MurmurAbsorb(&Murmur, (kbts_u32)(kbts_un)FontInfo->Font);
+        kbts__MurmurAbsorb(&Murmur, (kbts_u32)((kbts_un)FontInfo->Font >> 32));
+        if(VariationVector)
+        {
+          for(int AxisIndex = 0;
+              AxisIndex < AxisCount;
+              ++AxisIndex)
+          {
+            typedef union {kbts_u32 U; float F;} uf;
+            uf *Axis = (uf *)&VariationVector[AxisIndex];
+
+            kbts__MurmurAbsorb(&Murmur, Axis->U);
+          }
+        }
+        New->Hash = kbts__MurmurFinalize(&Murmur);
+
+        FontInfo->Interned = New;
+        FontInfo->Flags &= ~KBTS__CONTEXT_FONT_FLAG_VARIATIONS_DIRTY;
+
+        Result = New;
+      }
+      else
+      {
+        Context->Error = KBTS_SHAPE_ERROR_OUT_OF_MEMORY;
+
+        return 0;
+      }
+    }
+  }
+
+  return Result;
+}
+
 static void kbts__UpdateBreaks(kbts_shape_context *Context)
 {
-  if(!(Context->Flags & KBTS__CONTEXT_FLAG_MANUAL_SEGMENTATION))
+  if(!Context->Error &&
+     !(Context->Flags & KBTS__CONTEXT_FLAG_MANUAL_SEGMENTATION))
   {
     kbts_break Break;
     while(kbts_Break(&Context->BreakState, &Break))
     {
       // Strictly speaking, we do not need all of the flags, but we record them all anyway so we can expose them to the user.
       kbts_un BreakPosition = (kbts_u32)Break.Position + Context->BreakStartIndex;
-      kbts_shape_codepoint *InputCodepoint = kbts__InputCodepoint(Context, BreakPosition, 1);
+      kbts__shape_codepoint *InputCodepoint = kbts__InputCodepoint(Context, BreakPosition, 1);
 
       if(Break.Flags & KBTS_BREAK_FLAG_LINE_HARD)
       {
@@ -24431,36 +26550,60 @@ static void kbts__UpdateBreaks(kbts_shape_context *Context)
       if(Break.Flags & KBTS_BREAK_FLAG_GRAPHEME)
       {
         // Try fonts, potentially break run.
-        kbts_font *MatchFont = 0;
+        kbts__context_font_info *MatchFontInfo = 0;
         kbts_shape_context_flags ShapeContextFlags = Context->PublicFlags;
 
-        KBTS__FOR(FontIndex_, 0, Context->FontCount)
+        kbts__context_font_block_header *Header;
+        kbts_un FontIndex;
+        kbts_un FontIndexInc;
+        if(!(ShapeContextFlags & KBTS_SHAPE_CONTEXT_FLAG_FONT_PRIORITY_BOTTOM_TO_TOP))
         {
-          kbts_un FontIndex = (ShapeContextFlags & KBTS_SHAPE_CONTEXT_FLAG_FONT_PRIORITY_BOTTOM_TO_TOP) ? FontIndex_ : (Context->FontCount - 1 - FontIndex_);
-          kbts_font *Font = Context->Fonts[FontIndex].Font;
+          Header = Context->FontBlockSentinel.Prev;
+          FontIndex = Context->FontCount - 1;
+          FontIndexInc = ~(kbts_un)0;
+        }
+        else
+        {
+          Header = Context->FontBlockSentinel.Next;
+          FontIndex = 0;
+          FontIndexInc = 1;
+        }
+
+        KBTS__FOR(Iter, 0, Context->FontCount)
+        {
+          kbts__context_font_block *Block = (kbts__context_font_block *)Header;
+          kbts__context_font_info *FontInfo = &Block->Fonts[FontIndex & (KBTS__CONTEXT_FONTS_PER_BLOCK - 1)].Info;
+
           kbts_font_coverage_test CoverageTest;
-          kbts_FontCoverageTestBegin(&CoverageTest, Font);
+          kbts_FontCoverageTestBegin(&CoverageTest, FontInfo->Font);
 
           kbts_shape_codepoint_iterator It = kbts__InputCodepointIterator(Context, Context->LastGraphemeBreakIndex, BreakPosition);
 
           while(kbts__NextInputCodepoint(&It, 0))
           {
-            kbts_shape_codepoint *GraphemeCodepoint = It.Codepoint;
-
-            kbts_FontCoverageTestCodepoint(&CoverageTest, GraphemeCodepoint->Codepoint);
+            kbts_FontCoverageTestCodepoint(&CoverageTest, It.Codepoint->Codepoint);
           }
 
           kbts_FontCoverageTestEnd(&CoverageTest);
 
           if(!CoverageTest.Error)
           {
-            MatchFont = Font;
+            MatchFontInfo = FontInfo;
 
             break;
           }
+
+          FontIndex += FontIndexInc;
         }
 
-        Context->LastGraphemeBreak->Font = MatchFont;
+        // There are two cases in which LastGraphemeBreak can be 0:
+        // - Either we immediately run out of memory in __InputCodepoint(), in which case we never set the LastGraphemeBreak,
+        //   (This case should be handled by the context error check above.)
+        // - Or the user tries to shape 0 codepoints, either because ShapeUtf8() found invalid codepoints or through normal use.
+        if(Context->LastGraphemeBreak)
+        {
+          Context->LastGraphemeBreak->FontInfo = kbts__InternContextFontInfo(Context, MatchFontInfo);
+        }
         Context->LastGraphemeBreak = InputCodepoint;
         Context->LastGraphemeBreakIndex = (kbts_u32)BreakPosition;
       }
@@ -24537,7 +26680,7 @@ KBTS_EXPORT void kbts_ShapeCodepointWithUserId(kbts_shape_context *Context, int 
 {
   if(!Context->Error)
   {
-    if(Context->NeedNewGlyphConfig)
+    if(Context->Flags & KBTS__CONTEXT_FLAG_FEATURE_OVERRIDES_DIRTY)
     {
       kbts_un NewFeatureOverrideCount = Context->ScratchFeatureOverrideCount;
 
@@ -24584,12 +26727,67 @@ KBTS_EXPORT void kbts_ShapeCodepointWithUserId(kbts_shape_context *Context, int 
       }
 
       Context->CurrentFeatureOverrideCount = (kbts_u32)NewFeatureOverrideCount;
-      Context->NeedNewGlyphConfig = 0;
+      Context->Flags &= ~KBTS__CONTEXT_FLAG_FEATURE_OVERRIDES_DIRTY;
+    }
+
+    if(Context->Flags & KBTS__CONTEXT_FLAG_GLOBAL_VARIATIONS_DIRTY)
+    {
+      kbts_un NewGlobalVariationCount = 0;
+
+      if(Context->ScratchGlobalVariationCount)
+      {
+        kbts_variation UniqueVariations[KBTS__MAX_VARIATION_AXIS_COUNT];
+        kbts_un UniqueVariationCount = 0;
+
+        for(kbts_un ScratchGlobalVariationIndex = Context->ScratchGlobalVariationCount - 1;
+            ScratchGlobalVariationIndex < Context->ScratchGlobalVariationCount;
+            --ScratchGlobalVariationIndex)
+        {
+          kbts_variation *ScratchVariation = &Context->ScratchGlobalVariations[ScratchGlobalVariationIndex];
+
+          kbts_b32 Dupe = 0;
+          KBTS__FOR(UniqueVariationIndex, 0, UniqueVariationCount)
+          {
+            kbts_variation *UniqueVariation = &UniqueVariations[UniqueVariationIndex];
+
+            if(UniqueVariation->Tag == ScratchVariation->Tag)
+            {
+              Dupe = 1;
+
+              break;
+            }
+          }
+
+          if(!Dupe)
+          {
+            UniqueVariations[UniqueVariationCount++] = *ScratchVariation;
+
+            if(UniqueVariationCount >= KBTS__ARRAY_LENGTH(UniqueVariations))
+            {
+              break;
+            }
+          }
+        }
+
+        kbts_variation *Hoisted = kbts__PushArray(&Context->ScratchArena, kbts_variation, UniqueVariationCount);
+        if(!Hoisted)
+        {
+          Context->Error = KBTS_SHAPE_ERROR_OUT_OF_MEMORY;
+          return;
+        }
+        KBTS_MEMCPY(Hoisted, UniqueVariations, sizeof(*UniqueVariations) * UniqueVariationCount);
+
+        Context->CurrentGlobalVariations = Hoisted;
+        NewGlobalVariationCount = UniqueVariationCount;
+      }
+
+      Context->CurrentGlobalVariationCount = (kbts_u32)NewGlobalVariationCount;
+      Context->Flags &= ~KBTS__CONTEXT_FLAG_GLOBAL_VARIATIONS_DIRTY;
     }
 
     { // Add the codepoint.
       kbts_un FlatCodepointIndex = Context->InputCodepointCount;
-      kbts_shape_codepoint InputCodepoint = KBTS__ZERO;
+      kbts__shape_codepoint InputCodepoint = KBTS__ZERO;
       InputCodepoint.Codepoint = Codepoint;
       InputCodepoint.UserId = UserId;
       InputCodepoint.FeatureOverrides = Context->CurrentFeatureOverrides;
@@ -24617,7 +26815,7 @@ KBTS_EXPORT void kbts_ShapeCodepointWithUserId(kbts_shape_context *Context, int 
         Context->Flags &= ~KBTS__CONTEXT_FLAG_START_OF_MANUAL_RUN;
       }
 
-      kbts_shape_codepoint *To = kbts__InputCodepoint(Context, FlatCodepointIndex, 1);
+      kbts__shape_codepoint *To = kbts__InputCodepoint(Context, FlatCodepointIndex, 1);
       if(To)
       {
         *To = InputCodepoint;
@@ -24747,9 +26945,9 @@ KBTS_EXPORT void kbts_ShapePushFeature(kbts_shape_context *Context, kbts_u32 Tag
       kbts_feature_override *Override = &Context->ScratchFeatureOverrides[Context->ScratchFeatureOverrideCount++];
       Override->Tag = Tag;
       Override->Value = Value;
-    }
 
-    Context->NeedNewGlyphConfig = 1;
+      Context->Flags |= KBTS__CONTEXT_FLAG_FEATURE_OVERRIDES_DIRTY;
+    }
   }
 }
 
@@ -24769,26 +26967,26 @@ KBTS_EXPORT int kbts_ShapePopFeature(kbts_shape_context *Context, kbts_u32 Tag)
       {
         KBTS__FOR(MoveIndex, ScratchFeatureOverrideIndex, Context->ScratchFeatureOverrideCount)
         {
-          Context->ScratchFeatureOverrides[ScratchFeatureOverrideIndex - 1] = Context->ScratchFeatureOverrides[ScratchFeatureOverrideIndex];
+          Context->ScratchFeatureOverrides[MoveIndex - 1] = Context->ScratchFeatureOverrides[MoveIndex];
         }
 
         Context->ScratchFeatureOverrideCount -= 1;
+        Result = 1;
+        Context->Flags |= KBTS__CONTEXT_FLAG_FEATURE_OVERRIDES_DIRTY;
+
         break;
       }
-    }
-
-    if(Result)
-    {
-      Context->NeedNewGlyphConfig = 1;
     }
   }
   
   return Result;
 }
 
-static void kbts__ShapeDirect(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storage *Storage, kbts_direction RunDirection)
+static void kbts__ShapeDirect(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storage *Storage, kbts_direction RunDirection, kbts_s16 *VariationVectorNormalized)
 {
   KBTS_INSTRUMENT_FUNCTION_BEGIN;
+
+  Scratchpad->VariationVectorNormalized = VariationVectorNormalized;
 
   if(kbts__GlyphIsValid(Storage, Storage->GlyphSentinel.Next))
   {
@@ -24990,9 +27188,9 @@ KBTS_EXPORT void kbts_DestroyShapeScratchpad(kbts_shape_scratchpad *Scratchpad)
   }
 }
 
-KBTS_EXPORT kbts_shape_error kbts_ShapeDirect(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storage *Storage, kbts_direction RunDirection, kbts_glyph_iterator *Output)
+KBTS_EXPORT kbts_shape_error kbts_ShapeDirect2(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storage *Storage, kbts_direction RunDirection, kbts_s16 *VariationVectorNormalized, kbts_glyph_iterator *Output)
 {
-  kbts__ShapeDirect(Scratchpad, Storage, RunDirection);
+  kbts__ShapeDirect(Scratchpad, Storage, RunDirection, VariationVectorNormalized);
   kbts_shape_error Result = Scratchpad->Error;
 
   if(!Result)
@@ -25001,20 +27199,44 @@ KBTS_EXPORT kbts_shape_error kbts_ShapeDirect(kbts_shape_scratchpad *Scratchpad,
   }
   else
   {
-    *Output = KBTS__ZERO_TYPE(kbts_glyph_iterator);
+    KBTS_MEMSET(Output, 0, sizeof(*Output));
   }
+
+  return Result;
+}
+
+KBTS_EXPORT kbts_shape_error kbts_ShapeDirect(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storage *Storage, kbts_direction RunDirection, kbts_glyph_iterator *Output)
+{
+  kbts_shape_error Result = kbts_ShapeDirect2(Scratchpad, Storage, RunDirection, 0, Output);
 
   return Result;
 }
 
 static void kbts__BeginParagraph(kbts_shape_context *Context)
 {
-  Context->RunFont = 0;
+  kbts__context_font_info *FontInfo = 0;
+
   if(Context->FontCount)
   {
-    Context->RunFont = Context->Fonts[Context->FontCount - 1].Font;
+    kbts_un BlockFontIndex;
+    kbts__context_font_block *Block;
+    if(!(Context->Flags & KBTS_SHAPE_CONTEXT_FLAG_FONT_PRIORITY_BOTTOM_TO_TOP))
+    {
+      Block = (kbts__context_font_block *)Context->FontBlockSentinel.Prev;
+      BlockFontIndex = (Context->FontCount - 1) & (KBTS__CONTEXT_FONTS_PER_BLOCK - 1);
+    }
+    else
+    {
+      Block = (kbts__context_font_block *)Context->FontBlockSentinel.Next;
+      BlockFontIndex = 0;
+    }
+
+    kbts__context_font *MainFont = &Block->Fonts[BlockFontIndex];
+
+    FontInfo = &MainFont->Info;
   }
 
+  Context->RunFontInfo = kbts__InternContextFontInfo(Context, FontInfo);
   Context->RunScript = 0;
   Context->RunParagraphDirection = 0;
   Context->RunDirection = 0;
@@ -25025,7 +27247,7 @@ KBTS_EXPORT void kbts_ShapeEnd(kbts_shape_context *Context)
   if(!Context->Error)
   {
     // We check the break flags of the one-past-last codepoint, so reset it here.
-    kbts_shape_codepoint *OnePastLastCodepoint = kbts__InputCodepoint(Context, Context->InputCodepointCount, 1);
+    kbts__shape_codepoint *OnePastLastCodepoint = kbts__InputCodepoint(Context, Context->InputCodepointCount, 1);
     if(OnePastLastCodepoint)
     {
       KBTS_MEMSET(OnePastLastCodepoint, 0, sizeof(*OnePastLastCodepoint));
@@ -25041,7 +27263,96 @@ KBTS_EXPORT void kbts_ShapeEnd(kbts_shape_context *Context)
   }
 }
 
-static kbts_shape_config *kbts__FindOrCreateShapeConfig(kbts_shape_context *Context, kbts_font *Font, kbts_script Script, kbts_language Language)
+KBTS_EXPORT int kbts_ShapeSetFontVariationVector(kbts_shape_context *Context, kbts_u32 ContextFontHandle, float *VariationVector)
+{
+  int Result = 0;
+  kbts__context_font *ContextFont = kbts__GetContextFont(Context, ContextFontHandle);
+
+  if(ContextFont)
+  {
+    int AxisCount;
+    kbts_GetVariationInfo(ContextFont->Info.Font, &AxisCount, 0);
+
+    if(AxisCount)
+    {
+      KBTS_MEMCPY(ContextFont->Info.VariationVector, VariationVector, sizeof(*VariationVector) * AxisCount);
+
+      ContextFont->Info.Flags |= KBTS__CONTEXT_FONT_FLAG_VARIATIONS_DIRTY;
+    }
+
+    Result = 1;
+  }
+
+  return Result;
+}
+
+KBTS_EXPORT int kbts_ShapeSetFontVariation(kbts_shape_context *Context, kbts_u32 ContextFontHandle, kbts_u32 Tag, float Value)
+{
+  kbts_variation Variation;
+  Variation.Tag = Tag;
+  Variation.Value = Value;
+
+  int Result = kbts_ShapeSetFontVariations(Context, ContextFontHandle, &Variation, 1);
+
+  return Result;
+}
+
+KBTS_EXPORT int kbts_ShapePushGlobalVariation(kbts_shape_context *Context, kbts_u32 Tag, float Value)
+{
+  int Result = 0;
+
+  // @Duplication with PushFeature.
+  if(!Context->Error)
+  {
+    if(Context->ScratchGlobalVariationCount < KBTS__ARRAY_LENGTH(Context->ScratchGlobalVariations))
+    {
+      kbts_variation *Variation = &Context->ScratchGlobalVariations[Context->ScratchGlobalVariationCount++];
+      Variation->Tag = Tag;
+      Variation->Value = Value;
+
+      Result = 1;
+      Context->Flags |= KBTS__CONTEXT_FLAG_GLOBAL_VARIATIONS_DIRTY;
+    }
+  }
+
+  return Result;
+}
+
+KBTS_EXPORT int kbts_ShapePopGlobalVariation(kbts_shape_context *Context, kbts_u32 Tag)
+{
+  // @Duplication with PopFeature.
+  int Result = 0;
+
+  if(!Context->Error)
+  {
+    kbts_un ScratchGlobalVariationCount = Context->ScratchGlobalVariationCount;
+
+    for(kbts_un GlobalVariationIndex = ScratchGlobalVariationCount - 1;
+        GlobalVariationIndex < ScratchGlobalVariationCount;
+        --GlobalVariationIndex)
+    {
+      kbts_variation *Variation = &Context->ScratchGlobalVariations[GlobalVariationIndex];
+
+      if(Variation->Tag == Tag)
+      {
+        KBTS__FOR(MoveIndex, GlobalVariationIndex, ScratchGlobalVariationCount)
+        {
+          Context->ScratchGlobalVariations[MoveIndex - 1] = Context->ScratchGlobalVariations[MoveIndex];
+        }
+
+        Context->ScratchGlobalVariationCount -= 1;
+        Result = 1;
+        Context->Flags |= KBTS__CONTEXT_FLAG_GLOBAL_VARIATIONS_DIRTY;
+
+        break;
+      }
+    }
+  }
+  
+  return Result;
+}
+
+static kbts_shape_config *kbts__FindOrCreateShapeConfig(kbts_shape_context *Context, kbts__interned_context_font_info *FontInfo, kbts_script Script, kbts_language Language)
 {
   kbts_shape_config *Result = 0;
 
@@ -25053,8 +27364,9 @@ static kbts_shape_config *kbts__FindOrCreateShapeConfig(kbts_shape_context *Cont
     {
       kbts__existing_shape_config *Existing = &ExistingBlock->Items[ExistingIndex];
 
-      if((Existing->Font == Font) &&
-         (Existing->Script == Script))
+      if((Existing->FontInfo->Hash == FontInfo->Hash) &&
+         (Existing->Script == Script) &&
+         (Existing->Language == Language))
       {
         Result = Existing->Config;
 
@@ -25083,15 +27395,25 @@ static kbts_shape_config *kbts__FindOrCreateShapeConfig(kbts_shape_context *Cont
       Last = NewBlock;
     }
 
-    Result = kbts_CreateShapeConfig(Font, Script, Language, kbts__ArenaAllocator, &Context->ConfigArena);
+    Result = kbts_CreateShapeConfig2(FontInfo->Font, Script, Language, FontInfo->VariationVector, kbts__ArenaAllocator, &Context->ConfigArena, 0);
 
     KBTS_ASSERT(Last->Count < KBTS__EXISTING_SHAPE_CONFIGS_PER_BLOCK);
     kbts__existing_shape_config *NewExisting = &Last->Items[Last->Count++];
     NewExisting->Config = Result;
-    NewExisting->Font = Font;
+    NewExisting->FontInfo = FontInfo;
     NewExisting->Script = Script;
+    NewExisting->Language = Language;
   }
 
+  return Result;
+}
+
+static kbts_b32 kbts__UidEquals(kbts_uid A, kbts_uid B)
+{
+  kbts_b32 Result = (A.Data[0] == B.Data[0]) &
+                    (A.Data[1] == B.Data[1]) &
+                    (A.Data[2] == B.Data[2]) &
+                    (A.Data[3] == B.Data[3]);
   return Result;
 }
 
@@ -25099,8 +27421,10 @@ static kbts_glyph_config *kbts__FindOrCreateGlyphConfig(kbts_shape_context *Cont
 {
   kbts_glyph_config *Result = 0;
 
-  if(FeatureOverrideCount)
+  if(FeatureOverrideCount > 0)
   {
+    kbts_u32 Hash = kbts__GlyphConfigHash(ShapeConfig, FeatureOverrides, (kbts_un)FeatureOverrideCount);
+
     for(kbts__existing_glyph_config_block *ExistingBlock = (kbts__existing_glyph_config_block *)Context->ExistingGlyphConfigBlockSentinel.Next;
         kbts__ExistingGlyphConfigBlockIsValid(Context, ExistingBlock);
         ExistingBlock = (kbts__existing_glyph_config_block *)ExistingBlock->Header.Next)
@@ -25109,9 +27433,7 @@ static kbts_glyph_config *kbts__FindOrCreateGlyphConfig(kbts_shape_context *Cont
       {
         kbts__existing_glyph_config *Existing = &ExistingBlock->Items[ExistingIndex];
 
-        if((Existing->ShapeConfig == ShapeConfig) &&
-           (Existing->FeatureOverrides == FeatureOverrides) &&
-           (Existing->FeatureOverrideCount == FeatureOverrideCount))
+        if(Hash == Existing->Hash)
         {
           Result = Existing->GlyphConfig;
 
@@ -25148,20 +27470,21 @@ static kbts_glyph_config *kbts__FindOrCreateGlyphConfig(kbts_shape_context *Cont
       Existing->FeatureOverrides = FeatureOverrides;
       Existing->FeatureOverrideCount = FeatureOverrideCount;
       Existing->GlyphConfig = Result;
+      Existing->Hash = Hash;
     }
   }
 
   return Result;
 }
 
-KBTS_EXPORT int kbts_ShapeRun(kbts_shape_context *Context, kbts_run *Run)
+static int kbts__ShapeRun(kbts_shape_context *Context, kbts_run *Run, int Version)
 {
   int Result = 0;
 
   if(!Context->Error &&
      !Context->DoneShapingRuns)
   {
-    kbts_font *RunFont = Context->RunFont;
+    kbts__interned_context_font_info *RunFontInfo = Context->RunFontInfo;
     kbts_script RunScript = Context->RunScript;
     kbts_direction RunParagraphDirection = Context->RunParagraphDirection;
     kbts_direction RunDirection = Context->RunDirection;
@@ -25187,7 +27510,7 @@ KBTS_EXPORT int kbts_ShapeRun(kbts_shape_context *Context, kbts_run *Run)
       int InputCodepointIndex = 0;
       while(kbts__NextInputCodepoint(It, &InputCodepointIndex))
       {
-        kbts_shape_codepoint *InputCodepoint = It->Codepoint;
+        kbts__shape_codepoint *InputCodepoint = It->Codepoint;
 
         // Resolve neutral directions.
         if((InputCodepoint->BreakFlags & KBTS_BREAK_FLAG_DIRECTION) &&
@@ -25199,7 +27522,7 @@ KBTS_EXPORT int kbts_ShapeRun(kbts_shape_context *Context, kbts_run *Run)
         int First = !Result;
         Result = 1;
 
-        kbts_font *CodepointFont = InputCodepoint->Font;
+        kbts__interned_context_font_info *CodepointFontInfo = InputCodepoint->FontInfo;
         kbts_script CodepointScript = InputCodepoint->Script;
         kbts_direction CodepointDirection = InputCodepoint->Direction;
         kbts_direction CodepointParagraphDirection = InputCodepoint->ParagraphDirection;
@@ -25214,7 +27537,7 @@ KBTS_EXPORT int kbts_ShapeRun(kbts_shape_context *Context, kbts_run *Run)
           if(CodepointBreakFlags & KBTS_BREAK_FLAG_LINE_HARD)
           {
             kbts__BeginParagraph(Context);
-            RunFont = Context->RunFont;
+            RunFontInfo = Context->RunFontInfo;
             RunScript = 0;
             RunDirection = 0;
 
@@ -25224,15 +27547,15 @@ KBTS_EXPORT int kbts_ShapeRun(kbts_shape_context *Context, kbts_run *Run)
           }
         }
 
-        if((CodepointFont && (CodepointFont != RunFont)) ||
+        if((CodepointFontInfo && (CodepointFontInfo != RunFontInfo)) ||
            (CodepointScript && (CodepointScript != RunScript)) ||
            (CodepointDirection && (CodepointDirection != RunDirection)) ||
            (CodepointParagraphDirection && (CodepointParagraphDirection != RunParagraphDirection)) ||
            NewLine)
         {
-          if(CodepointFont)
+          if(CodepointFontInfo)
           {
-            Context->RunFont = CodepointFont;
+            Context->RunFontInfo = CodepointFontInfo;
           }
           if(CodepointScript)
           {
@@ -25268,16 +27591,16 @@ KBTS_EXPORT int kbts_ShapeRun(kbts_shape_context *Context, kbts_run *Run)
           else
           {
             // Initialize and keep matching.
-            RunFont = Context->RunFont;
+            RunFontInfo = Context->RunFontInfo;
             RunScript = Context->RunScript;
             RunDirection = Context->RunDirection;
             RunParagraphDirection = Context->RunParagraphDirection;
 
             // Initialize the shape_config now, before pushing glyphs.
-            ShapeConfig = kbts__FindOrCreateShapeConfig(Context, RunFont, RunScript, Language);
+            ShapeConfig = kbts__FindOrCreateShapeConfig(Context, RunFontInfo, RunScript, Language);
 
             kbts_glyph_config *GlyphConfig = kbts__FindOrCreateGlyphConfig(Context, ShapeConfig, InputCodepoint->FeatureOverrides, InputCodepoint->FeatureOverrideCount);
-            kbts_PushGlyph(&Context->GlyphStorage, RunFont, InputCodepoint->Codepoint, GlyphConfig, InputCodepointIndex);
+            kbts_PushGlyph(&Context->GlyphStorage, RunFontInfo->Font, InputCodepoint->Codepoint, GlyphConfig, InputCodepointIndex);
 
             Initialized = 1;
           }
@@ -25287,11 +27610,11 @@ KBTS_EXPORT int kbts_ShapeRun(kbts_shape_context *Context, kbts_run *Run)
           // This is an exceptional case, but it can happen when we detect no script.
           if(!ShapeConfig)
           {
-            ShapeConfig = kbts__FindOrCreateShapeConfig(Context, RunFont, RunScript, Language);
+            ShapeConfig = kbts__FindOrCreateShapeConfig(Context, RunFontInfo, RunScript, Language);
           }
 
           kbts_glyph_config *GlyphConfig = kbts__FindOrCreateGlyphConfig(Context, ShapeConfig, InputCodepoint->FeatureOverrides, InputCodepoint->FeatureOverrideCount);
-          kbts_PushGlyph(&Context->GlyphStorage, RunFont, InputCodepoint->Codepoint, GlyphConfig, InputCodepointIndex);
+          kbts_PushGlyph(&Context->GlyphStorage, RunFontInfo->Font, InputCodepoint->Codepoint, GlyphConfig, InputCodepointIndex);
         }
       }
 
@@ -25314,7 +27637,22 @@ KBTS_EXPORT int kbts_ShapeRun(kbts_shape_context *Context, kbts_run *Run)
         kbts_un ScratchpadSize = kbts_SizeOfShapeScratchpad(ShapeConfig);
         kbts_shape_scratchpad *Scratchpad = kbts_PlaceShapeScratchpad(ShapeConfig, kbts__PushSize(&Context->ScratchArena, ScratchpadSize, 8), kbts__ArenaAllocator, &Context->ScratchArena);
 
-        kbts__ShapeDirect(Scratchpad, &Context->GlyphStorage, RunDirection);
+        if(!RunFontInfo->VariationVectorNormalized)
+        {
+          int AxisCount;
+          kbts_GetVariationInfo(RunFontInfo->Font, &AxisCount, 0);
+          RunFontInfo->VariationVectorNormalized = kbts__PushArray(&Context->ScratchArena, kbts_s16, AxisCount);
+          if(!RunFontInfo->VariationVectorNormalized)
+          {
+            Context->Error |= KBTS_SHAPE_ERROR_OUT_OF_MEMORY;
+
+            return 0;
+          }
+
+          kbts_NormalizeVariationVector(RunFontInfo->Font, RunFontInfo->VariationVector, RunFontInfo->VariationVectorNormalized);
+        }
+
+        kbts__ShapeDirect(Scratchpad, &Context->GlyphStorage, RunDirection, RunFontInfo->VariationVectorNormalized);
 
         if(Scratchpad->Error)
         {
@@ -25324,7 +27662,7 @@ KBTS_EXPORT int kbts_ShapeRun(kbts_shape_context *Context, kbts_run *Run)
     }
     else
     {
-      kbts_shape_codepoint *OnePastLast = kbts__InputCodepoint(Context, Context->InputCodepointCount, 1);
+      kbts__shape_codepoint *OnePastLast = kbts__InputCodepoint(Context, Context->InputCodepointCount, 1);
       if(OnePastLast)
       {
         if(OnePastLast->BreakFlags & KBTS_BREAK_FLAG_LINE_HARD)
@@ -25341,15 +27679,32 @@ KBTS_EXPORT int kbts_ShapeRun(kbts_shape_context *Context, kbts_run *Run)
 
     if(Result)
     {
-      Run->Font = RunFont;
+      Run->Font = RunFontInfo->Font;
       Run->Script = RunScript;
       Run->ParagraphDirection = RunParagraphDirection;
       Run->Direction = RunDirection;
       Run->Glyphs = kbts_ActiveGlyphIterator(&Context->GlyphStorage);
+
+      if(Version >= 2)
+      {
+        kbts_run2 *Run2 = (kbts_run2 *)Run;
+
+        Run2->VariationVector = RunFontInfo->VariationVector;
+      }
     }
   }
 
   return Result;
+}
+
+KBTS_EXPORT int kbts_ShapeRun(kbts_shape_context *Context, kbts_run *Run)
+{
+  return kbts__ShapeRun(Context, Run, 1);
+}
+
+KBTS_EXPORT int kbts_ShapeRun2(kbts_shape_context *Context, kbts_run2 *Run)
+{
+  return kbts__ShapeRun(Context, (kbts_run *)Run, 2);
 }
 
 KBTS_EXPORT int kbts_GlyphIteratorIsValid(kbts_glyph_iterator *It)
@@ -25380,15 +27735,15 @@ KBTS_EXPORT int kbts_FontCount(void *Data, int Size)
 
   if(Data && (Size >= 4))
   {
-    kbts_u32 Magic = *(kbts_u32 *)Data;
+    kbts_u32 Magic = kbts__ReadU32Unaligned((kbts_u32 *)Data);
 
     if(Magic == KBTS_FOURCC('t', 't', 'c', 'f'))
     {
       kbts__ttc_header *Header = (kbts__ttc_header *)Data;
 
-      if(Header->Magic == KBTS_FOURCC('t', 't', 'c', 'f'))
+      if(kbts__ReadU32Unaligned(&Header->Magic) == KBTS_FOURCC('t', 't', 'c', 'f'))
       {
-        Result = (int)kbts__ByteSwap32(Header->FontCount);
+        Result = (int)kbts__ByteSwap32(kbts__ReadU32Unaligned(&Header->FontCount));
       }
     }
     else if((Magic == KBTS_FOURCC('O', 'T', 'T', 'O')) ||
@@ -25402,7 +27757,64 @@ KBTS_EXPORT int kbts_FontCount(void *Data, int Size)
   return Result;
 }
 
-static kbts__cmap_subtable_pointer kbts__SelectCmapSubtable(kbts_blob_header *Header, kbts_blob_table *CmapTable, kbts__cmap_14 **Cmap14, kbts_u16 *ResultFormat)
+static kbts__cmap_subtable_pointer kbts__SelectCmapSubtable(kbts__cmap *Cmap, char *TableEnd, kbts__cmap_14 **Cmap14, kbts_u16 *ResultFormat)
+{
+  kbts__cmap_subtable_pointer Result = KBTS__ZERO;
+
+  kbts_u16 PreferredFormat = 1;
+  kbts_un Cmap_TableCount = kbts__ReadU16Unaligned(&Cmap->TableCount);
+  KBTS__FOR(It, 0, Cmap_TableCount)
+  {
+    kbts__cmap_subtable_pointer Subtable = kbts__GetCmapSubtable(Cmap, It);
+    if((char *)(Subtable.Subtable + 1) <= TableEnd)
+    {
+      kbts_u16 Format = kbts__ReadU16Unaligned(Subtable.Subtable);
+
+      // This is kind of iffy, but the statelessness is useful for selecting
+      // the cmap from an already-prepared blob without having to deal with
+      // the byteswap context.
+      if((Format > 0xFF) && 
+         ((Format >> 8) <= 14))
+      {
+        Format = kbts__ByteSwap16(Format);
+        kbts__WriteU16Unaligned(Subtable.Subtable, Format);
+      }
+
+      if(Format == 14)
+      {
+        if((char *)(Subtable.Subtable + sizeof(kbts__cmap_14)) <= TableEnd)
+        {
+          if(Cmap14)
+          {
+            *Cmap14 = (kbts__cmap_14 *)Subtable.Subtable;
+          }
+        }
+      }
+      else if(!Result.Subtable)
+      {
+        Result = Subtable;
+      }
+      else if(Format < KBTS__ARRAY_LENGTH(kbts__CmapFormatPrecedence))
+      {
+        kbts_u16 Precedence = kbts__CmapFormatPrecedence[Format];
+        kbts_u16 PreferredPrecedence = kbts__CmapFormatPrecedence[PreferredFormat];
+
+        if((Precedence > PreferredPrecedence) || ((Precedence == PreferredPrecedence) && (Subtable.PlatformId == 3)))
+        {
+          Result = Subtable;
+          if(ResultFormat)
+          {
+            *ResultFormat = Format;
+          }
+        }
+      }
+    }
+  }
+
+  return Result;
+}
+
+static kbts__cmap_subtable_pointer kbts__SelectCmapSubtableFromBlob(kbts_blob_header *Header, kbts_blob_table *CmapTable, kbts__cmap_14 **Cmap14, kbts_u16 *ResultFormat)
 {
   kbts__cmap_subtable_pointer Result = KBTS__ZERO;
 
@@ -25411,54 +27823,7 @@ static kbts__cmap_subtable_pointer kbts__SelectCmapSubtable(kbts_blob_header *He
     char *TableEnd = KBTS__POINTER_OFFSET(char, Header, CmapTable->OffsetFromStartOfFile + CmapTable->Length);
     kbts__cmap *Cmap = KBTS__POINTER_OFFSET(kbts__cmap, Header, CmapTable->OffsetFromStartOfFile);
 
-    kbts_u16 PreferredFormat = 1;
-    KBTS__FOR(It, 0, Cmap->TableCount)
-    {
-      kbts__cmap_subtable_pointer Subtable = kbts__GetCmapSubtable(Cmap, It);
-      if((char *)(Subtable.Subtable + 1) <= TableEnd)
-      {
-        kbts_u16 Format = kbts__ReadU16Unaligned(Subtable.Subtable);
-
-        // This is kind of iffy, but the statelessness is useful for selecting
-        // the cmap from an already-prepared blob without having to deal with
-        // the byteswap context.
-        if((Format > 0xFF) && 
-           ((Format >> 8) <= 14))
-        {
-          Format = kbts__ByteSwap16(Format);
-          kbts__WriteU16Unaligned(Subtable.Subtable, Format);
-        }
-
-        if(Format == 14)
-        {
-          if((char *)(Subtable.Subtable + sizeof(kbts__cmap_14)) <= TableEnd)
-          {
-            if(Cmap14)
-            {
-              *Cmap14 = (kbts__cmap_14 *)Subtable.Subtable;
-            }
-          }
-        }
-        else if(!Result.Subtable)
-        {
-          Result = Subtable;
-        }
-        else if(Format < KBTS__ARRAY_LENGTH(kbts__CmapFormatPrecedence))
-        {
-          kbts_u16 Precedence = kbts__CmapFormatPrecedence[Format];
-          kbts_u16 PreferredPrecedence = kbts__CmapFormatPrecedence[PreferredFormat];
-
-          if((Precedence > PreferredPrecedence) || ((Precedence == PreferredPrecedence) && (Subtable.PlatformId == 3)))
-          {
-            Result = Subtable;
-            if(ResultFormat)
-            {
-              *ResultFormat = Format;
-            }
-          }
-        }
-      }
-    }
+    Result = kbts__SelectCmapSubtable(Cmap, TableEnd, Cmap14, ResultFormat);
   }
 
   return Result;
@@ -25471,7 +27836,7 @@ KBTS_EXPORT kbts_load_font_error kbts_LoadFont(kbts_font *Font, kbts_load_font_s
   if(FontDataSize >= 4)
   {
     char *FileEnd = (char *)FontData + FontDataSize;
-    kbts_u32 Magic = *(kbts_u32 *)FontData;
+    kbts_u32 Magic = kbts__ReadU32Unaligned((kbts_u32 *)FontData);
     kbts_un DirectoryOffset = 0;
 
     if(Magic == KBTS_FOURCC('t', 't', 'c', 'f'))
@@ -25481,13 +27846,13 @@ KBTS_EXPORT kbts_load_font_error kbts_LoadFont(kbts_font *Font, kbts_load_font_s
       if(FontDataSize >= (int)sizeof(kbts__ttc_header))
       {
         kbts__ttc_header *Header = (kbts__ttc_header *)FontData;
-        kbts_un FontCount = kbts__ByteSwap32(Header->FontCount);
+        kbts_un FontCount = kbts__ByteSwap32(kbts__ReadU32Unaligned(&Header->FontCount));
 
         if(((kbts_u32)FontIndex < FontCount) &&
            ((kbts_un)FontDataSize >= (sizeof(kbts__ttc_header) + sizeof(kbts_u32) * FontCount)))
         {
           kbts_u32 *TableDirectoryOffsets = KBTS__POINTER_AFTER(kbts_u32, Header);
-          DirectoryOffset = kbts__ByteSwap32(TableDirectoryOffsets[FontIndex]);
+          DirectoryOffset = kbts__ByteSwap32(kbts__ReadU32Unaligned(&TableDirectoryOffsets[FontIndex]));
 
           Magic = KBTS__U32BE(0x10000);
         }
@@ -25503,7 +27868,7 @@ KBTS_EXPORT kbts_load_font_error kbts_LoadFont(kbts_font *Font, kbts_load_font_s
       State->FontDataSize = (kbts_u32)FontDataSize;
 
       kbts__table_directory *Directory = KBTS__POINTER_OFFSET(kbts__table_directory, FontData, DirectoryOffset);
-      kbts_un DirectoryTableCount = kbts__ByteSwap16(Directory->TableCount);
+      kbts_un DirectoryTableCount = kbts__ByteSwap16(kbts__ReadU16Unaligned(&Directory->TableCount));
 
       kbts__table_record *Tables = KBTS__POINTER_AFTER(kbts__table_record, Directory);
 
@@ -25513,8 +27878,8 @@ KBTS_EXPORT kbts_load_font_error kbts_LoadFont(kbts_font *Font, kbts_load_font_s
         for(kbts_un TableIndex = 0; TableIndex < DirectoryTableCount; ++TableIndex)
         {
           kbts__table_record *Table = &Tables[TableIndex];
-          kbts_u32 TableOffset = kbts__ByteSwap32(Table->Offset);
-          kbts_u32 TableLength = kbts__ByteSwap32(Table->Length);
+          kbts_u32 TableOffset = kbts__ByteSwap32(kbts__ReadU32Unaligned(&Table->Offset));
+          kbts_u32 TableLength = kbts__ByteSwap32(kbts__ReadU32Unaligned(&Table->Length));
 
           void *TableBase = KBTS__POINTER_OFFSET(void, FontData, TableOffset);
           char *TableEnd = (char *)TableBase + TableLength;
@@ -25522,7 +27887,7 @@ KBTS_EXPORT kbts_load_font_error kbts_LoadFont(kbts_font *Font, kbts_load_font_s
           {
             kbts_blob_table_id TableId = 0;
 
-            switch(Table->Tag)
+            switch(kbts__ReadU32Unaligned(&Table->Tag))
             {
             case KBTS_FOURCC('h', 'e', 'a', 'd'): TableId = KBTS_BLOB_TABLE_ID_HEAD; break;
             case KBTS_FOURCC('c', 'm', 'a', 'p'): TableId = KBTS_BLOB_TABLE_ID_CMAP; break;
@@ -25536,6 +27901,11 @@ KBTS_EXPORT kbts_load_font_error kbts_LoadFont(kbts_font *Font, kbts_load_font_s
             case KBTS_FOURCC('m', 'a', 'x', 'p'): TableId = KBTS_BLOB_TABLE_ID_MAXP; break;
             case KBTS_FOURCC('O', 'S', '/', '2'): TableId = KBTS_BLOB_TABLE_ID_OS2;  break;
             case KBTS_FOURCC('n', 'a', 'm', 'e'): TableId = KBTS_BLOB_TABLE_ID_NAME; break;
+            case KBTS_FOURCC('f', 'v', 'a', 'r'): TableId = KBTS_BLOB_TABLE_ID_FVAR; break;
+            case KBTS_FOURCC('a', 'v', 'a', 'r'): TableId = KBTS_BLOB_TABLE_ID_AVAR; break;
+            case KBTS_FOURCC('M', 'V', 'A', 'R'): TableId = KBTS_BLOB_TABLE_ID_MVAR; break;
+            case KBTS_FOURCC('H', 'V', 'A', 'R'): TableId = KBTS_BLOB_TABLE_ID_HVAR; break;
+            case KBTS_FOURCC('V', 'V', 'A', 'R'): TableId = KBTS_BLOB_TABLE_ID_VVAR; break;
             }
 
             if(TableId)
@@ -25552,6 +27922,7 @@ KBTS_EXPORT kbts_load_font_error kbts_LoadFont(kbts_font *Font, kbts_load_font_s
         kbts_un TotalLookupCount = 0;
         kbts_un TotalSubtableCount = 0;
 
+        kbts_blob_table_id GsubGposTableIds[] = {KBTS_BLOB_TABLE_ID_GSUB, KBTS_BLOB_TABLE_ID_GPOS};
         kbts_blob_table *GsubGposTables[] = {&State->Tables[KBTS_BLOB_TABLE_ID_GSUB], &State->Tables[KBTS_BLOB_TABLE_ID_GPOS]};
         KBTS__FOR(GsubGposTableIndex, 0, KBTS__ARRAY_LENGTH(GsubGposTables))
         {
@@ -25560,18 +27931,40 @@ KBTS_EXPORT kbts_load_font_error kbts_LoadFont(kbts_font *Font, kbts_load_font_s
           if(Table->Length)
           {
             kbts__gsub_gpos *GsubGpos = KBTS__POINTER_OFFSET(kbts__gsub_gpos, FontData, Table->OffsetFromStartOfFile);
-            kbts_lookup_list *LookupList = KBTS__POINTER_OFFSET(kbts_lookup_list, GsubGpos, kbts__ByteSwap16(GsubGpos->LookupListOffset));
-            kbts_u16 *LookupOffsets = KBTS__POINTER_AFTER(kbts_u16, LookupList);
-            kbts_un LookupCount = kbts__ByteSwap16(LookupList->Count);
+            kbts_u16 ScriptListOffset = kbts__ByteSwap16(kbts__ReadU16Unaligned(&GsubGpos->ScriptListOffset));
+            kbts_u16 FeatureListOffset = kbts__ByteSwap16(kbts__ReadU16Unaligned(&GsubGpos->FeatureListOffset));
+            kbts_u16 LookupListOffset = kbts__ByteSwap16(kbts__ReadU16Unaligned(&GsubGpos->LookupListOffset));
 
-            KBTS__FOR(LookupIndex, 0, LookupCount)
+            if(!ScriptListOffset &&
+               !FeatureListOffset &&
+               !LookupListOffset)
             {
-              kbts__lookup *Lookup = KBTS__POINTER_OFFSET(kbts__lookup, LookupList, kbts__ByteSwap16(LookupOffsets[LookupIndex]));
+              // Apparently, this is a valid way of specifying an empty table.
+              kbts_blob_table_id TableId = GsubGposTableIds[GsubGposTableIndex];
 
-              TotalSubtableCount += kbts__ByteSwap16(Lookup->SubtableCount);
+              KBTS__ZERO_TYPE(&State->Tables[TableId]);
             }
+            else if(((ScriptListOffset + sizeof(kbts__script_list)) > Table->Length) ||
+                    ((FeatureListOffset + sizeof(kbts__feature_list)) > Table->Length) ||
+                    ((LookupListOffset + sizeof(kbts__lookup_list)) > Table->Length))
+            {
+              return KBTS_LOAD_FONT_ERROR_INVALID_FONT;
+            }
+            else
+            {
+              kbts__lookup_list *LookupList = KBTS__POINTER_OFFSET(kbts__lookup_list, GsubGpos, kbts__ByteSwap16(kbts__ReadU16Unaligned(&GsubGpos->LookupListOffset)));
+              kbts_u16 *LookupOffsets = KBTS__POINTER_AFTER(kbts_u16, LookupList);
+              kbts_un LookupCount = kbts__ByteSwap16(kbts__ReadU16Unaligned(&LookupList->Count));
 
-            TotalLookupCount += LookupCount;
+              KBTS__FOR(LookupIndex, 0, LookupCount)
+              {
+                kbts__lookup *Lookup = KBTS__POINTER_OFFSET(kbts__lookup, LookupList, kbts__ByteSwap16(kbts__ReadU16Unaligned(&LookupOffsets[LookupIndex])));
+
+                TotalSubtableCount += kbts__ByteSwap16(kbts__ReadU16Unaligned(&Lookup->SubtableCount));
+              }
+
+              TotalLookupCount += LookupCount;
+            }
           }
         }
 
@@ -25587,7 +27980,7 @@ KBTS_EXPORT kbts_load_font_error kbts_LoadFont(kbts_font *Font, kbts_load_font_s
         {
           kbts__maxp *Maxp = KBTS__POINTER_OFFSET(kbts__maxp, FontData, MaxpTable->OffsetFromStartOfFile);
 
-          GlyphCount = kbts__ByteSwap16(Maxp->GlyphCount);
+          GlyphCount = kbts__ByteSwap16(kbts__ReadU16Unaligned(&Maxp->GlyphCount));
         }
 
         State->GlyphCount = (kbts_u32)GlyphCount;
@@ -25649,7 +28042,7 @@ KBTS_EXPORT kbts_load_font_error kbts_LoadFont(kbts_font *Font, kbts_load_font_s
       // @Incomplete: Bounds check or something.
 
       Font->Blob = Header;
-      kbts__cmap_subtable_pointer PreferredSubtable = kbts__SelectCmapSubtable(Header, &Header->Tables[KBTS_BLOB_TABLE_ID_CMAP], &Font->Cmap14, 0);
+      kbts__cmap_subtable_pointer PreferredSubtable = kbts__SelectCmapSubtableFromBlob(Header, &Header->Tables[KBTS_BLOB_TABLE_ID_CMAP], &Font->Cmap14, 0);
       Font->Cmap = PreferredSubtable.Subtable;
     }
   }
@@ -25667,13 +28060,16 @@ static void kbts__MarkMatrixCoverage(kbts_u32 *Matrix, kbts_un TableIndex, kbts_
 {
   if(Coverage)
   {
-    if(Coverage->Format == 1)
+    kbts_u16 Coverage_Format = kbts__ReadU16Unaligned(&Coverage->Format);
+    kbts_u16 Coverage_Count = kbts__ReadU16Unaligned(&Coverage->Count);
+
+    if(Coverage_Format == 1)
     {
       kbts_u16 *GlyphIds = KBTS__POINTER_AFTER(kbts_u16, Coverage);
 
-      KBTS__FOR(GlyphIndex, 0, Coverage->Count)
+      KBTS__FOR(GlyphIndex, 0, Coverage_Count)
       {
-        kbts_un GlyphId = GlyphIds[GlyphIndex];
+        kbts_un GlyphId = kbts__ReadU16Unaligned(&GlyphIds[GlyphIndex]);
         kbts__matrix_index MatrixIndex = SubtableMatrix ? 
           kbts__GlyphLookupSubtableMatrixIndex(TableIndex, TableCount, GlyphId, GlyphCount) :
           kbts__GlyphLookupMatrixIndex(TableIndex, GlyphId, GlyphCount);
@@ -25684,14 +28080,17 @@ static void kbts__MarkMatrixCoverage(kbts_u32 *Matrix, kbts_un TableIndex, kbts_
         }
       }
     }
-    else if(Coverage->Format == 2)
+    else if(Coverage_Format == 2)
     {
       kbts__range_record *Ranges = KBTS__POINTER_AFTER(kbts__range_record, Coverage);
 
-      KBTS__FOR(RangeIndex, 0, Coverage->Count)
+      KBTS__FOR(RangeIndex, 0, Coverage_Count)
       {
         kbts__range_record *Range = &Ranges[RangeIndex];
-        KBTS__FOR(GlyphId, Range->StartGlyphId, (kbts_un)Range->EndGlyphId + 1)
+        kbts_un Range_StartGlyphId = kbts__ReadU16Unaligned(&Range->StartGlyphId);
+        kbts_un Range_EndGlyphId = kbts__ReadU16Unaligned(&Range->EndGlyphId);
+
+        KBTS__FOR(GlyphId, Range_StartGlyphId, Range_EndGlyphId + 1)
         {
           kbts__matrix_index MatrixIndex = SubtableMatrix ? 
             kbts__GlyphLookupSubtableMatrixIndex(TableIndex, TableCount, GlyphId, GlyphCount) :
@@ -25711,15 +28110,19 @@ static void kbts__MarkMatrixClassDef(kbts_u32 *Matrix, kbts_un SubtableIndex, kb
 {
   if(ClassDefBase)
   {
-    if(*ClassDefBase == 1)
+    kbts_u16 ClassDefFormat = kbts__ReadU16Unaligned(ClassDefBase);
+
+    if(ClassDefFormat == 1)
     {
       kbts__class_definition_1 *ClassDef = (kbts__class_definition_1 *)ClassDefBase;
+      kbts_un ClassDef_GlyphCount = kbts__ReadU16Unaligned(&ClassDef->GlyphCount);
+      kbts_un ClassDef_StartGlyphId = kbts__ReadU16Unaligned(&ClassDef->StartGlyphId);
       kbts_u16 *GlyphClasses = KBTS__POINTER_AFTER(kbts_u16, ClassDef);
 
-      KBTS__FOR(GlyphIndex, 0, ClassDef->GlyphCount)
+      KBTS__FOR(GlyphIndex, 0, ClassDef_GlyphCount)
       {
-        kbts_un GlyphId = ClassDef->StartGlyphId + GlyphIndex;
-        kbts_un GlyphClass = GlyphClasses[GlyphIndex];
+        kbts_un GlyphId = ClassDef_StartGlyphId + GlyphIndex;
+        kbts_un GlyphClass = kbts__ReadU16Unaligned(&GlyphClasses[GlyphIndex]);
 
         if((GlyphId >= (ClassesIncludedLength * 64)) ||
            (ClassesIncluded[GlyphClass / 64] & (1ull << (GlyphClass % 64))))
@@ -25729,26 +28132,30 @@ static void kbts__MarkMatrixClassDef(kbts_u32 *Matrix, kbts_un SubtableIndex, kb
         }
       }
     }
-    else if(*ClassDefBase == 2)
+    else if(ClassDefFormat == 2)
     {
       kbts__class_definition_2 *ClassDef = (kbts__class_definition_2 *)ClassDefBase;
+      kbts_un ClassDef_Count = kbts__ReadU16Unaligned(&ClassDef->Count);
       kbts__class_range_record *Ranges = KBTS__POINTER_AFTER(kbts__class_range_record, ClassDef);
 
-      KBTS__FOR(RangeIndex, 0, ClassDef->Count)
+      KBTS__FOR(RangeIndex, 0, ClassDef_Count)
       {
         kbts__class_range_record *Range = &Ranges[RangeIndex];
-        kbts_un RangeClass = Range->Class;
+        kbts_un RangeClass = kbts__ReadU16Unaligned(&Range->Class);
 
         if((RangeClass >= (ClassesIncludedLength * 64)) ||
            (ClassesIncluded[RangeClass / 64] & (1ull << (RangeClass % 64))))
         {
-          kbts_un OnePastLastGlyphId = Range->EndGlyphId + 1;
+          kbts_u16 Range_StartGlyphId = kbts__ReadU16Unaligned(&Range->StartGlyphId);
+          kbts_u16 Range_EndGlyphId = kbts__ReadU16Unaligned(&Range->EndGlyphId);
+
+          kbts_un OnePastLastGlyphId = Range_EndGlyphId + 1;
           if(OnePastLastGlyphId > GlyphCount)
           {
             OnePastLastGlyphId = GlyphCount;
           }
 
-          KBTS__FOR(GlyphId, Range->StartGlyphId, OnePastLastGlyphId)
+          KBTS__FOR(GlyphId, Range_StartGlyphId, OnePastLastGlyphId)
           {
             kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(SubtableIndex, SubtableCount, GlyphId, GlyphCount);
             Matrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
@@ -25768,17 +28175,19 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
     Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
   }
 
-  if(!ScratchMemory || !OutputMemory)
+  if((State->ScratchSize && !ScratchMemory) ||
+     (State->TotalSize && !OutputMemory))
   {
     Result = KBTS_LOAD_FONT_ERROR_OUT_OF_MEMORY;
   }
 
-  if(Result == KBTS_LOAD_FONT_ERROR_NONE)
+  if((Result == KBTS_LOAD_FONT_ERROR_NONE) &&
+     State->TotalSize)
   {
     kbts__pointer_bump_allocator Bump = kbts__PointerBumpAllocator(OutputMemory);
 
     kbts_blob_header *Header = kbts__PointerPushType(&Bump, kbts_blob_header);
-    *Header = KBTS__ZERO_TYPE(kbts_blob_header);
+    KBTS_MEMSET(Header, 0, sizeof(*Header));
     Header->Magic = KBTS_FOURCC('k', 'b', 't', 's');
     Header->Version = KBTS_BLOB_VERSION_CURRENT;
     Header->LookupCount = State->LookupCount;
@@ -25801,117 +28210,111 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
     // Byteswap it.
 
     {
-      kbts_blob_table *HeadTable = &Header->Tables[KBTS_BLOB_TABLE_ID_HEAD];
-
-      if(HeadTable->Length)
+      char *TableEnd;
+      kbts__head *Head = kbts__BlobTableHeaderChecked(Header, KBTS_BLOB_TABLE_ID_HEAD, kbts__head, &TableEnd, &Result);
+      if(Head)
       {
-        if(HeadTable->Length >= sizeof(kbts__head))
-        {
-          kbts__head *Head = KBTS__POINTER_OFFSET(kbts__head, Header, HeadTable->OffsetFromStartOfFile);
-
-          kbts__ByteSwapArray16Unchecked(&Head->Major, 2);
-          kbts__ByteSwapArray32Unchecked(&Head->Revision, 2);
-          // We do not swap the magic number.
-          kbts__ByteSwapArray16Unchecked(&Head->Flags, 2);
-          // We do not swap file times.
-          kbts__ByteSwapArray16Unchecked((kbts_u16 *)&Head->XMin, 9);
-        }
-        else
-        {
-          Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
-        }
+        kbts__ByteSwapArray16Unchecked(&Head->Major, 2);
+        kbts__ByteSwapArray32Unchecked(&Head->Revision, 2);
+        // We do not swap the magic number.
+        kbts__ByteSwapArray16Unchecked(&Head->Flags, 2);
+        // We do not swap file times.
+        kbts__ByteSwapArray16Unchecked((kbts_u16 *)&Head->XMin, 9);
       }
     }
 
     Font->Blob = Header;
 
     {
-      kbts_blob_table *CmapTable = &Header->Tables[KBTS_BLOB_TABLE_ID_CMAP];
-
-      if(CmapTable->Length)
+      char *TableEnd;
+      kbts__cmap *Cmap = kbts__BlobTableHeaderChecked(Header, KBTS_BLOB_TABLE_ID_CMAP, kbts__cmap, &TableEnd, &Result);
+      if(Cmap)
       {
-        if(CmapTable->Length >= sizeof(kbts__cmap))
+        int TableValid = 0;
+        kbts__ByteSwap16InPlace(&Cmap->Version);
+        kbts__ByteSwap16InPlace(&Cmap->TableCount);
+
+        kbts__encoding_record *Records = KBTS__POINTER_AFTER(kbts__encoding_record, Cmap);
+        kbts_un Cmap_TableCount = kbts__ReadU16Unaligned(&Cmap->TableCount);
+
+        if((char *)(Records + Cmap_TableCount) <= TableEnd)
         {
-          int TableValid = 0;
-          char *TableEnd = KBTS__POINTER_OFFSET(char, Header, CmapTable->OffsetFromStartOfFile + CmapTable->Length);
-          kbts__cmap *Cmap = KBTS__POINTER_OFFSET(kbts__cmap, Header, CmapTable->OffsetFromStartOfFile);
-          Cmap->Version = kbts__ByteSwap16(Cmap->Version);
-          Cmap->TableCount = kbts__ByteSwap16(Cmap->TableCount);
-
-          kbts__encoding_record *Records = KBTS__POINTER_AFTER(kbts__encoding_record, Cmap);
-
-          if((char *)(Records + Cmap->TableCount) <= TableEnd)
+          KBTS__FOR(It, 0, Cmap_TableCount)
           {
-            KBTS__FOR(It, 0, Cmap->TableCount)
+            kbts__encoding_record *Record = &Records[It];
+            kbts__ByteSwap16InPlace(&Record->EncodingId);
+            kbts__ByteSwap16InPlace(&Record->PlatformId);
+            kbts__ByteSwap32InPlace(&Record->SubtableOffset);
+          }
+
+          kbts_u16 PreferredFormat = 1;
+
+          kbts__cmap_subtable_pointer PreferredSubtable = kbts__SelectCmapSubtable(Cmap, TableEnd, &Font->Cmap14, &PreferredFormat);
+          if(PreferredSubtable.Subtable)
+          {
+            kbts_u16 SubtableFormat = kbts__ReadU16Unaligned(PreferredSubtable.Subtable);
+            switch(SubtableFormat)
             {
-              kbts__encoding_record *Record = &Records[It];
-              Record->EncodingId = kbts__ByteSwap16(Record->EncodingId);
-              Record->PlatformId = kbts__ByteSwap16(Record->PlatformId);
-              Record->SubtableOffset = kbts__ByteSwap32(Record->SubtableOffset);
+            case 0:
+            {
+              kbts__cmap_0 *Cmap0 = (kbts__cmap_0 *)PreferredSubtable.Subtable;
+              if((char *)(Cmap0 + 1) <= TableEnd)
+              {
+                kbts__ByteSwap16InPlace(&Cmap0->Length);
+                kbts__ByteSwap16InPlace(&Cmap0->Language);
+                TableValid = 1;
+              }
             }
+            break;
 
-            kbts_u16 PreferredFormat = 1;
-
-            kbts__cmap_subtable_pointer PreferredSubtable = kbts__SelectCmapSubtable(Header, CmapTable, &Font->Cmap14, &PreferredFormat);
-            if(PreferredSubtable.Subtable)
+            case 2:
             {
-              kbts_u16 SubtableFormat = kbts__ReadU16Unaligned(PreferredSubtable.Subtable);
-              switch(SubtableFormat)
+              kbts__cmap_2 *Cmap2 = (kbts__cmap_2 *)PreferredSubtable.Subtable;
+              if(kbts__ByteSwapArray16(&Cmap2->Length, 258, TableEnd))
               {
-              case 0:
-              {
-                kbts__cmap_0 *Cmap0 = (kbts__cmap_0 *)PreferredSubtable.Subtable;
-                if((char *)(Cmap0 + 1) <= TableEnd)
+                kbts_un SubHeaderCount = 0;
+                KBTS__FOR(It, 0, 256)
                 {
-                  Cmap0->Length = kbts__ByteSwap16(Cmap0->Length);
-                  Cmap0->Language = kbts__ByteSwap16(Cmap0->Language);
-                  TableValid = 1;
+                  kbts_un SubHeaderIndex = kbts__ReadU16Unaligned(&Cmap2->SubHeaderKeys[It]);
+                  SubHeaderCount = KBTS__MAX(SubHeaderCount, SubHeaderIndex + 1);
                 }
-              }
-              break;
 
-              case 2:
-              {
-                kbts__cmap_2 *Cmap2 = (kbts__cmap_2 *)PreferredSubtable.Subtable;
-                if(kbts__ByteSwapArray16(&Cmap2->Length, 258, TableEnd))
+                kbts__sub_header *SubHeaders = KBTS__POINTER_AFTER(kbts__sub_header, Cmap2);
+                if(kbts__ByteSwapArray16(&SubHeaders->FirstCode, 4 * SubHeaderCount, TableEnd))
                 {
-                  kbts_un SubHeaderCount = 0;
-                  KBTS__FOR(It, 0, 256)
+                  kbts_u16 *GlyphIds = (kbts_u16 *)(SubHeaders + SubHeaderCount);
+
+                  kbts_sn GlyphIdCount = 0;
+                  KBTS__FOR(It, 0, SubHeaderCount)
                   {
-                    kbts_un SubHeaderIndex = Cmap2->SubHeaderKeys[It];
-                    SubHeaderCount = KBTS__MAX(SubHeaderCount, SubHeaderIndex + 1);
+                    kbts__sub_header *SubHeader = &SubHeaders[It];
+                    kbts_u16 SubHeader_IdRangeOffset = kbts__ReadU16Unaligned(&SubHeader->IdRangeOffset);
+                    kbts_u16 SubHeader_EntryCount = kbts__ReadU16Unaligned(&SubHeader->EntryCount);
+
+                    kbts_u16 *OnePastLastGlyphId = &SubHeader->IdRangeOffset + SubHeader_IdRangeOffset / 2 + SubHeader_EntryCount;
+                    GlyphIdCount = KBTS__MAX(GlyphIdCount, OnePastLastGlyphId - GlyphIds);
                   }
 
-                  kbts__sub_header *SubHeaders = KBTS__POINTER_AFTER(kbts__sub_header, Cmap2);
-                  if(kbts__ByteSwapArray16(&SubHeaders->FirstCode, 4 * SubHeaderCount, TableEnd))
+                  if(kbts__ByteSwapArray16(GlyphIds, (kbts_un)GlyphIdCount, TableEnd))
                   {
-                    kbts_u16 *GlyphIds = (kbts_u16 *)(SubHeaders + SubHeaderCount);
-
-                    kbts_sn GlyphIdCount = 0;
-                    KBTS__FOR(It, 0, SubHeaderCount)
-                    {
-                      kbts__sub_header *SubHeader = &SubHeaders[It];
-
-                      kbts_u16 *OnePastLastGlyphId = &SubHeader->IdRangeOffset + SubHeader->IdRangeOffset / 2 + SubHeader->EntryCount;
-                      GlyphIdCount = KBTS__MAX(GlyphIdCount, OnePastLastGlyphId - GlyphIds);
-                    }
-
-                    if(kbts__ByteSwapArray16(GlyphIds, (kbts_un)GlyphIdCount, TableEnd))
-                    {
-                      TableValid = 1;
-                    }
+                    TableValid = 1;
                   }
                 }
               }
-              break;
+            }
+            break;
 
-              case 4:
+            case 4:
+            {
+              kbts__cmap_4 *Cmap4 = (kbts__cmap_4 *)PreferredSubtable.Subtable;
+
+              if(kbts__ByteSwapArray16(&Cmap4->Length, 5, TableEnd))
               {
-                kbts__cmap_4 *Cmap4 = (kbts__cmap_4 *)PreferredSubtable.Subtable;
-                if(kbts__ByteSwapArray16(&Cmap4->Length, 5, TableEnd) &&
-                   kbts__ByteSwapArray16(KBTS__POINTER_AFTER(kbts_u16, Cmap4), Cmap4->SegmentCountTimesTwo * 2 + 1, TableEnd))
+                kbts_u16 Cmap4_SegmentCountTimesTwo = kbts__ReadU16Unaligned(&Cmap4->SegmentCountTimesTwo);
+
+                if(kbts__ByteSwapArray16(KBTS__POINTER_AFTER(kbts_u16, Cmap4), Cmap4_SegmentCountTimesTwo * 2 + 1, TableEnd))
                 {
-                  kbts_un SegmentCount = Cmap4->SegmentCountTimesTwo / 2;
+                  kbts_un SegmentCount = Cmap4_SegmentCountTimesTwo / 2;
                   kbts_u16 *EndCodes = KBTS__POINTER_AFTER(kbts_u16, Cmap4);
                   kbts_u16 *StartCodes = EndCodes + SegmentCount + 1;
                   kbts_s16 *IdDeltas = (kbts_s16 *)(StartCodes + SegmentCount);
@@ -25922,13 +28325,22 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
 
                   KBTS__FOR(SegmentIndex, 0, SegmentCount)
                   {
-                    kbts_u16 Offset = IdRangeOffsets[SegmentIndex];
+                    kbts_u16 Offset = kbts__ReadU16Unaligned(&IdRangeOffsets[SegmentIndex]);
+                    kbts_u16 StartCode = kbts__ReadU16Unaligned(&StartCodes[SegmentIndex]);
+                    kbts_u16 EndCode = kbts__ReadU16Unaligned(&EndCodes[SegmentIndex]);
+
+                    if((StartCode == 0xFFFF) && (EndCode == 0xFFFF))
+                    {
+                      kbts__WriteU16Unaligned(&IdRangeOffsets[SegmentIndex], 0);
+
+                      Offset = 0;
+                    }
 
                     if(Offset)
                     {
-                      kbts_u16 *IdLookup = &IdRangeOffsets[SegmentIndex] + (EndCodes[SegmentIndex] - StartCodes[SegmentIndex] + 1) + Offset / 2;
+                      kbts_u16 *OnePastIdLookup = &IdRangeOffsets[SegmentIndex] + (EndCode - StartCode + 1) + Offset / 2;
 
-                      GlyphIdCount = KBTS__MAX(GlyphIdCount, (IdLookup - GlyphIds));
+                      GlyphIdCount = KBTS__MAX(GlyphIdCount, (kbts_sn)(OnePastIdLookup - GlyphIds));
                     }
                   }
 
@@ -25938,41 +28350,37 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                   }
                 }
               }
-              break;
-
-              case 6:
-              {
-                kbts__cmap_6 *Cmap6 = (kbts__cmap_6 *)PreferredSubtable.Subtable;
-                if(kbts__ByteSwapArray16(&Cmap6->Length, 4, TableEnd) &&
-                   kbts__ByteSwapArray16(KBTS__POINTER_AFTER(kbts_u16, Cmap6), Cmap6->EntryCount, TableEnd))
-                {
-                  TableValid = 1;
-                }
-              }
-              break;
-
-              case 12:
-              {
-                kbts__cmap_12_13 *Cmap12 = (kbts__cmap_12_13 *)PreferredSubtable.Subtable;
-                if(kbts__ByteSwapArray32(&Cmap12->Length, 3, TableEnd) &&
-                   kbts__ByteSwapArray32(KBTS__POINTER_AFTER(kbts_u32, Cmap12), Cmap12->GroupCount * 3, TableEnd))
-                {
-                  TableValid = 1;
-                }
-              }
-              break;
-              }
-
-              Font->Cmap = PreferredSubtable.Subtable;
             }
-          }
+            break;
 
-          if(!TableValid)
-          {
-            Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
+            case 6:
+            {
+              kbts__cmap_6 *Cmap6 = (kbts__cmap_6 *)PreferredSubtable.Subtable;
+              if(kbts__ByteSwapArray16(&Cmap6->Length, 4, TableEnd) &&
+                 kbts__ByteSwapArray16(KBTS__POINTER_AFTER(kbts_u16, Cmap6), kbts__ReadU16Unaligned(&Cmap6->EntryCount), TableEnd))
+              {
+                TableValid = 1;
+              }
+            }
+            break;
+
+            case 12:
+            {
+              kbts__cmap_12_13 *Cmap12 = (kbts__cmap_12_13 *)PreferredSubtable.Subtable;
+              if(kbts__ByteSwapArray32(&Cmap12->Length, 3, TableEnd) &&
+                 kbts__ByteSwapArray32(KBTS__POINTER_AFTER(kbts_u32, Cmap12), kbts__ReadU32Unaligned(&Cmap12->GroupCount) * 3, TableEnd))
+              {
+                TableValid = 1;
+              }
+            }
+            break;
+            }
+
+            Font->Cmap = PreferredSubtable.Subtable;
           }
         }
-        else
+
+        if(!TableValid)
         {
           Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
         }
@@ -25989,18 +28397,19 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
 
         if(kbts__ByteSwapArray16(&Gdef->Major, 6, TableEnd))
         {
-          if(Gdef->Minor >= 2)
+          kbts_u16 Gdef_Minor = kbts__ReadU16Unaligned(&Gdef->Minor);
+
+          if(Gdef_Minor >= 2)
           {
             if(GdefTable->Length >= 14)
             {
-              Gdef->MarkGlyphSetsDefinitionOffset = kbts__ByteSwap16(Gdef->MarkGlyphSetsDefinitionOffset);
+              kbts__ByteSwap16InPlace(&Gdef->MarkGlyphSetsDefinitionOffset);
 
-              if(Gdef->Minor == 3)
+              if(Gdef_Minor == 3)
               {
                 if(GdefTable->Length >= sizeof(kbts__gdef))
                 {
-                  // @Incomplete
-                  Gdef->ItemVariationStoreOffset = kbts__ByteSwap32(Gdef->ItemVariationStoreOffset);
+                  kbts__ByteSwap32InPlace(&Gdef->ItemVariationStoreOffset);
                 }
                 else
                 {
@@ -26065,22 +28474,22 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
           kbts__maxp *Maxp = KBTS__POINTER_OFFSET(kbts__maxp, Header, MaxpTable->OffsetFromStartOfFile);
           char *TableEnd = KBTS__POINTER_OFFSET(char, Header, MaxpTable->OffsetFromStartOfFile + MaxpTable->Length);
 
-          Maxp->Major = kbts__ByteSwap16(Maxp->Major);
-          Maxp->Minor = kbts__ByteSwap16(Maxp->Minor);
+          kbts_u16 Maxp_Major = kbts__ByteSwap16InPlace(&Maxp->Major);
+          kbts_u16 Maxp_Minor = kbts__ByteSwap16InPlace(&Maxp->Minor);
 
           kbts_un U16Count = 0;
-          if(!Maxp->Major && (Maxp->Minor == 0x5000))
+          if(!Maxp_Major && (Maxp_Minor == 0x5000))
           {
             U16Count = 1;
           }
-          else if((Maxp->Major == 1) && !Maxp->Minor)
+          else if((Maxp_Major == 1) && !Maxp_Minor)
           {
             U16Count = 14;
           }
 
           if(kbts__ByteSwapArray16(&Maxp->GlyphCount, U16Count, TableEnd))
           {
-            Header->GlyphCount = Maxp->GlyphCount;
+            Header->GlyphCount = kbts__ReadU16Unaligned(&Maxp->GlyphCount);
           }
           else
           {
@@ -26108,7 +28517,7 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
           kbts__ByteSwapArray32Unchecked(Os2->UnicodeRange, 4);
           kbts__ByteSwapArray16Unchecked(&Os2->Selection, 3);
 
-          kbts_un Version = Os2->Version;
+          kbts_un Version = kbts__ReadU16Unaligned(&Os2->Version);
 
           if(Length >= 78)
           {
@@ -26161,23 +28570,21 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
     }
 
     {
-      kbts_blob_table *NameTable = &Header->Tables[KBTS_BLOB_TABLE_ID_NAME];
-
-      if(NameTable->Length >= sizeof(kbts__name))
+      char *TableEnd;
+      kbts__name *Name = kbts__BlobTableHeaderChecked(Header, KBTS_BLOB_TABLE_ID_NAME, kbts__name, &TableEnd, &Result);  
+      if(Name)
       {
-        kbts__name *Name = KBTS__POINTER_OFFSET(kbts__name, Header, NameTable->OffsetFromStartOfFile);
-        char *TableEnd = KBTS__POINTER_OFFSET(char, Name, NameTable->Length);
-
         kbts__ByteSwapArray16Unchecked(&Name->Version, 3);
 
         kbts__name_record *NameRecords = KBTS__POINTER_AFTER(kbts__name_record, Name);
 
-        kbts_un U16Count = Name->Count * 6;
+        kbts_un U16Count = kbts__ReadU16Unaligned(&Name->Count) * 6;
         if(!kbts__ByteSwapArray16(&NameRecords->PlatformId, U16Count, TableEnd))
         {
           Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
         }
       }
+
       // We should normally set Result to INVALID_FONT if there is no name table.
       // However, one Harfbuzz test has a font with no name table.
     }
@@ -26188,38 +28595,229 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
     ByteSwapContext.PointerCapacity = State->ScratchSize / sizeof(kbts_u32);
     ByteSwapContext.Pointers = (kbts_u32 *)ScratchMemory;
 
+    {
+      char *TableEnd;
+      kbts__fvar *Fvar = kbts__BlobTableHeaderChecked(Header, KBTS_BLOB_TABLE_ID_FVAR, kbts__fvar, &TableEnd, &Result);
+      if(Fvar)
+      {
+        kbts__ByteSwapArray16Unchecked(&Fvar->Major, 8);
+
+        kbts__variation_axis_record *Axes = KBTS__POINTER_OFFSET(kbts__variation_axis_record, Fvar, kbts__ReadU16Unaligned(&Fvar->AxesArrayOffset));
+        kbts_un AxisCount = kbts__ReadU16Unaligned(&Fvar->AxisCount);
+
+        kbts__instance_record *Instances = (kbts__instance_record *)(Axes + AxisCount);
+        kbts_un InstanceCount = kbts__ReadU16Unaligned(&Fvar->InstanceCount);
+        kbts_un InstanceSize = kbts__ReadU16Unaligned(&Fvar->InstanceSize);
+
+        if(((char *)Instances + InstanceCount * InstanceSize) <= TableEnd)
+        {
+          KBTS__FOR(AxisIndex, 0, AxisCount)
+          {
+            kbts__variation_axis_record *Axis = &Axes[AxisIndex];
+
+            kbts__ByteSwapArray32Unchecked((kbts_u32 *)&Axis->MinValue, 3);
+            kbts__ByteSwapArray16Unchecked(&Axis->Flags, 2);
+          }
+
+          kbts_b32 InstancesContainPostscriptNameId = (InstanceSize >= (sizeof(kbts__instance_record) + sizeof(kbts__fixed16_16) * AxisCount + sizeof(kbts_u16)));
+
+          KBTS__FOR(InstanceIndex, 0, InstanceCount)
+          {
+            kbts__instance_record *Instance = KBTS__POINTER_OFFSET(kbts__instance_record, Instances, InstanceIndex * InstanceSize);
+            kbts__fixed16_16 *InstanceCoordinates = KBTS__POINTER_AFTER(kbts__fixed16_16, Instance);
+
+            kbts__ByteSwap16InPlace(&Instance->SubfamilyNameId);
+            kbts__ByteSwapArray32Unchecked((kbts_u32 *)InstanceCoordinates, AxisCount);
+
+            if(InstancesContainPostscriptNameId)
+            {
+              kbts_u16 *InstancePostscriptNameId = (kbts_u16 *)(InstanceCoordinates + AxisCount);
+              kbts__ByteSwap16InPlace(InstancePostscriptNameId);
+            }
+          }
+        }
+        else
+        {
+          Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
+        }
+      }
+    }
+
+    {
+      char *TableEnd;
+      kbts__avar *Avar = kbts__BlobTableHeaderChecked(Header, KBTS_BLOB_TABLE_ID_AVAR, kbts__avar, &TableEnd, &Result);
+      if(Avar)
+      {
+        kbts__ByteSwapArray16Unchecked(&Avar->Major, 4);
+
+        char *At = KBTS__POINTER_AFTER(char, Avar);
+        kbts_un Avar_AxisCount = kbts__ReadU16Unaligned(&Avar->AxisCount);
+        KBTS__FOR(AxisIndex, 0, Avar_AxisCount)
+        {
+          kbts__segment_maps *SegmentMaps = (kbts__segment_maps *)At;
+
+          if((char *)(SegmentMaps + 1) <= TableEnd)
+          {
+            kbts_un SegmentMaps_PositionMapCount = kbts__ByteSwap16InPlace(&SegmentMaps->PositionMapCount);
+
+            kbts__axis_value_map *AxisValueMaps = KBTS__POINTER_AFTER(kbts__axis_value_map, SegmentMaps);
+            if(kbts__ByteSwapArray16((kbts_u16 *)&AxisValueMaps->FromCoordinate, 2 * SegmentMaps_PositionMapCount, TableEnd))
+            {
+              At = (char *)(AxisValueMaps + SegmentMaps_PositionMapCount);
+            }
+            else
+            {
+              Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
+
+              break;
+            }
+          }
+          else
+          {
+            Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
+
+            break;
+          }
+        }
+      }
+    }
+
+    {
+      kbts_blob_table_id TableIds[] = {KBTS_BLOB_TABLE_ID_HVAR, KBTS_BLOB_TABLE_ID_VVAR};
+      kbts_u32 HeaderSizes[] = {sizeof(kbts__hvar_vvar_common), sizeof(kbts__vvar)};
+
+      KBTS__FOR(TableIdIndex, 0, KBTS__ARRAY_LENGTH(TableIds))
+      {
+        kbts_u32 TableId = TableIds[TableIdIndex];
+        kbts_un HeaderSize = HeaderSizes[TableIdIndex];
+
+        char *TableEnd;
+        kbts__hvar_vvar_common *HvarVvar = (kbts__hvar_vvar_common *)kbts__BlobTableHeaderChecked_(Header, TableId, HeaderSize, &TableEnd, &Result);
+
+        if(HvarVvar)
+        {
+          kbts__ByteSwapArray16Unchecked(&HvarVvar->Major, 2);
+          kbts__ByteSwapArray32Unchecked(&HvarVvar->ItemVariationStoreOffset, 4);
+
+          kbts__ByteSwapItemVariationStore(&ByteSwapContext, KBTS__POINTER_OFFSET(kbts__item_variation_store, HvarVvar, kbts__ReadU32Unaligned(&HvarVvar->ItemVariationStoreOffset)));
+
+          kbts_un HvarVvar_AdvanceWidthMappingOffset = kbts__ReadU32Unaligned(&HvarVvar->AdvanceWidthMappingOffset);
+          if(HvarVvar_AdvanceWidthMappingOffset)
+          {
+            kbts__ByteSwapDeltaSetIndexMap(&ByteSwapContext, KBTS__POINTER_OFFSET(kbts__delta_set_index_map, HvarVvar, HvarVvar_AdvanceWidthMappingOffset));
+          }
+
+          kbts_un HvarVvar_LsbMappingOffset = kbts__ReadU32Unaligned(&HvarVvar->LsbMappingOffset);
+          if(HvarVvar_LsbMappingOffset)
+          {
+            kbts__ByteSwapDeltaSetIndexMap(&ByteSwapContext, KBTS__POINTER_OFFSET(kbts__delta_set_index_map, HvarVvar, HvarVvar_LsbMappingOffset));
+          }
+
+          kbts_un HvarVvar_RsbMappingOffset = kbts__ReadU32Unaligned(&HvarVvar->RsbMappingOffset);
+          if(HvarVvar_RsbMappingOffset)
+          {
+            kbts__ByteSwapDeltaSetIndexMap(&ByteSwapContext, KBTS__POINTER_OFFSET(kbts__delta_set_index_map, HvarVvar, HvarVvar_RsbMappingOffset));
+          }
+
+          if(TableId == KBTS_BLOB_TABLE_ID_VVAR)
+          {
+            kbts__vvar *Vvar = (kbts__vvar *)(HvarVvar);
+            kbts_un Vvar_OriginMappingOffset = kbts__ByteSwap32InPlace(&Vvar->OriginMappingOffset);
+
+            if(Vvar_OriginMappingOffset)
+            {
+              kbts__ByteSwapDeltaSetIndexMap(&ByteSwapContext, KBTS__POINTER_OFFSET(kbts__delta_set_index_map, Vvar, Vvar_OriginMappingOffset));
+            }
+          }
+        }
+      }
+    }
+
+    {
+      char *TableEnd;
+      kbts__mvar *Mvar = kbts__BlobTableHeaderChecked(Header, KBTS_BLOB_TABLE_ID_MVAR, kbts__mvar, &TableEnd, &Result);
+
+      if(Mvar)
+      {
+        kbts__ByteSwapArray16Unchecked(&Mvar->Major, 6);
+
+        kbts_un ValueRecordCount = kbts__ReadU16Unaligned(&Mvar->ValueRecordCount);
+        kbts_un ValueRecordSize = kbts__ReadU16Unaligned(&Mvar->ValueRecordSize);
+
+        char *ValueRecordAt = KBTS__POINTER_AFTER(char, Mvar);
+        if((ValueRecordSize >= sizeof(kbts__mvar_value_record)) &&
+           ((ValueRecordAt + ValueRecordCount * ValueRecordSize) <= TableEnd))
+        {
+          KBTS__FOR(ValueRecordIndex, 0, ValueRecordCount)
+          {
+            kbts__mvar_value_record *ValueRecord = (kbts__mvar_value_record *)ValueRecordAt;
+            kbts__ByteSwapArray16Unchecked(&ValueRecord->DeltaSetOuterIndex, 2);
+
+            ValueRecordAt += ValueRecordSize;
+          }
+
+          kbts__ByteSwapItemVariationStore(&ByteSwapContext, KBTS__POINTER_OFFSET(kbts__item_variation_store, Mvar, kbts__ReadU16Unaligned(&Mvar->ItemVariationStoreOffset)));
+        }
+        else
+        {
+          Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
+        }
+      }
+    }
+
     kbts_blob_table *GdefTable = &Header->Tables[KBTS_BLOB_TABLE_ID_GDEF];
     if(GdefTable->Length)
     {
       kbts__gdef *Gdef = KBTS__POINTER_OFFSET(kbts__gdef, Header, GdefTable->OffsetFromStartOfFile);
 
-      if(Gdef->ClassDefinitionOffset)
+      kbts_un Gdef_ClassDefinitionOffset = kbts__ReadU16Unaligned(&Gdef->ClassDefinitionOffset);
+      if(Gdef_ClassDefinitionOffset)
       {
-        kbts_u16 *ClassDefBase = KBTS__POINTER_OFFSET(kbts_u16, Gdef, Gdef->ClassDefinitionOffset);
+        kbts_u16 *ClassDefBase = KBTS__POINTER_OFFSET(kbts_u16, Gdef, Gdef_ClassDefinitionOffset);
         kbts__ByteSwapClassDefinition(&ByteSwapContext, ClassDefBase);
       }
 
-      if(Gdef->MarkAttachmentClassDefinitionOffset)
+      kbts_un Gdef_MarkAttachmentClassDefinitionOffset = kbts__ReadU16Unaligned(&Gdef->MarkAttachmentClassDefinitionOffset);
+      if(Gdef_MarkAttachmentClassDefinitionOffset)
       {
-        kbts_u16 *ClassDefBase = KBTS__POINTER_OFFSET(kbts_u16, Gdef, Gdef->MarkAttachmentClassDefinitionOffset);
+        kbts_u16 *ClassDefBase = KBTS__POINTER_OFFSET(kbts_u16, Gdef, Gdef_MarkAttachmentClassDefinitionOffset);
         kbts__ByteSwapClassDefinition(&ByteSwapContext, ClassDefBase);
       }
 
-      if((Gdef->Minor >= 2) && Gdef->MarkGlyphSetsDefinitionOffset)
+      kbts_u16 Gdef_Minor = kbts__ReadU16Unaligned(&Gdef->Minor);
+      if(Gdef_Minor >= 2)
       {
-        kbts__mark_glyph_sets *MarkGlyphSets = KBTS__POINTER_OFFSET(kbts__mark_glyph_sets, Gdef, Gdef->MarkGlyphSetsDefinitionOffset);
-        kbts__ByteSwapArray16Context(&MarkGlyphSets->Format, 2, &ByteSwapContext);
-        if(MarkGlyphSets->Format == 1)
+        kbts_un Gdef_MarkGlyphSetsDefinitionOffset = kbts__ReadU16Unaligned(&Gdef->MarkGlyphSetsDefinitionOffset);
+
+        if(Gdef_MarkGlyphSetsDefinitionOffset)
         {
-          kbts_u32 *CoverageOffsets = KBTS__POINTER_AFTER(kbts_u32, MarkGlyphSets);
-          kbts__ByteSwapArray32Context(CoverageOffsets, MarkGlyphSets->MarkGlyphSetCount, &ByteSwapContext);
+          kbts__mark_glyph_sets *MarkGlyphSets = KBTS__POINTER_OFFSET(kbts__mark_glyph_sets, Gdef, Gdef_MarkGlyphSetsDefinitionOffset);
+          kbts__ByteSwapArray16Context(&MarkGlyphSets->Format, 2, &ByteSwapContext);
 
-          KBTS__FOR(MarkGlyphSetIndex, 0, MarkGlyphSets->MarkGlyphSetCount)
+          if(kbts__ReadU16Unaligned(&MarkGlyphSets->Format) == 1)
           {
-            kbts_un CoverageOffset = kbts__ReadU32Unaligned(&CoverageOffsets[MarkGlyphSetIndex]);
-            kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, MarkGlyphSets, CoverageOffset);
-            kbts__ByteSwapCoverage(&ByteSwapContext, Coverage);
+            kbts_un MarkGlyphSets_MarkGlyphSetCount = kbts__ReadU16Unaligned(&MarkGlyphSets->MarkGlyphSetCount);
+
+            kbts_u32 *CoverageOffsets = KBTS__POINTER_AFTER(kbts_u32, MarkGlyphSets);
+            kbts__ByteSwapArray32Context(CoverageOffsets, MarkGlyphSets_MarkGlyphSetCount, &ByteSwapContext);
+
+            KBTS__FOR(MarkGlyphSetIndex, 0, MarkGlyphSets_MarkGlyphSetCount)
+            {
+              kbts_un CoverageOffset = kbts__ReadU32Unaligned(&CoverageOffsets[MarkGlyphSetIndex]);
+              kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, MarkGlyphSets, CoverageOffset);
+              kbts__ByteSwapCoverage(&ByteSwapContext, Coverage);
+            }
           }
+        }
+      }
+
+      if(Gdef_Minor >= 3)
+      {
+        kbts_un Gdef_ItemVariationStoreOffset = kbts__ReadU32Unaligned(&Gdef->ItemVariationStoreOffset);
+
+        if(Gdef_ItemVariationStoreOffset)
+        {
+          kbts__ByteSwapItemVariationStore(&ByteSwapContext, KBTS__POINTER_OFFSET(kbts__item_variation_store, Gdef, Gdef_ItemVariationStoreOffset));
         }
       }
     }
@@ -26232,11 +28830,11 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
     {
       kbts__ByteSwapGsubGposCommon(&ByteSwapContext, Gsub);
 
-      kbts_lookup_list *LookupList = kbts__GetLookupList(Gsub);
-      LookupList->Count = kbts__ByteSwap16(LookupList->Count);
-      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, LookupList), LookupList->Count, &ByteSwapContext);
+      kbts__lookup_list *LookupList = kbts__GetLookupList(Gsub);
+      kbts_un LookupList_Count = kbts__ByteSwap16InPlace(&LookupList->Count);
+      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, LookupList), LookupList_Count, &ByteSwapContext);
 
-      KBTS__FOR(LookupIndex, 0, LookupList->Count)
+      KBTS__FOR(LookupIndex, 0, LookupList_Count)
       {
         kbts__lookup *PackedLookup = kbts__GetLookup(LookupList, LookupIndex);
 
@@ -26249,7 +28847,7 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
 
           KBTS__FOR(SubstitutionIndex, 0, Lookup.SubtableCount)
           {
-            kbts_u16 *Base = KBTS__POINTER_OFFSET(kbts_u16, PackedLookup, Lookup.SubtableOffsets[SubstitutionIndex]);
+            kbts_u16 *Base = KBTS__POINTER_OFFSET(kbts_u16, PackedLookup, kbts__ReadU16Unaligned(&Lookup.SubtableOffsets[SubstitutionIndex]));
 
             KBTS_DUMPF("  Subtable %llu:\n", SubstitutionIndex);
 
@@ -26263,11 +28861,11 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
     {
       kbts__ByteSwapGsubGposCommon(&ByteSwapContext, Gpos);
 
-      kbts_lookup_list *LookupList = kbts__GetLookupList(Gpos);
-      LookupList->Count = kbts__ByteSwap16(LookupList->Count);
-      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, LookupList), LookupList->Count, &ByteSwapContext);
+      kbts__lookup_list *LookupList = kbts__GetLookupList(Gpos);
+      kbts_un LookupList_Count = kbts__ByteSwap16InPlace(&LookupList->Count);
+      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, LookupList), LookupList_Count, &ByteSwapContext);
 
-      KBTS__FOR(LookupIndex, 0, LookupList->Count)
+      KBTS__FOR(LookupIndex, 0, LookupList_Count)
       {
         kbts__lookup *PackedLookup = kbts__GetLookup(LookupList, LookupIndex);
 
@@ -26281,7 +28879,7 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
 
           KBTS__FOR(SubstitutionIndex, 0, Lookup.SubtableCount)
           {
-            kbts_u16 *Base = KBTS__POINTER_OFFSET(kbts_u16, PackedLookup, Lookup.SubtableOffsets[SubstitutionIndex]);
+            kbts_u16 *Base = KBTS__POINTER_OFFSET(kbts_u16, PackedLookup, kbts__ReadU16Unaligned(&Lookup.SubtableOffsets[SubstitutionIndex]));
             
             KBTS_DUMPF("  Subtable %llu:\n", (kbts_un)SubstitutionIndex);
 
@@ -26327,8 +28925,10 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
 
           if(ShapingTable)
           {
-            kbts_lookup_list *LookupList = kbts__GetLookupList(ShapingTable);
-            KBTS__FOR(LookupIndex, 0, LookupList->Count)
+            kbts__lookup_list *LookupList = kbts__GetLookupList(ShapingTable);
+            kbts_un LookupList_Count = kbts__ReadU16Unaligned(&LookupList->Count);
+
+            KBTS__FOR(LookupIndex, 0, LookupList_Count)
             {
               kbts__lookup *PackedLookup = kbts__GetLookup(LookupList, LookupIndex);
               kbts__unpacked_lookup Lookup = kbts__UnpackLookup(Gdef, PackedLookup);
@@ -26338,7 +28938,7 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
               KBTS__FOR(SubtableIndex, 0, Lookup.SubtableCount)
               {
                 kbts_u16 LookupType = Lookup.Type;
-                kbts_u16 *Base = KBTS__POINTER_OFFSET(kbts_u16, PackedLookup, Lookup.SubtableOffsets[SubtableIndex]);
+                kbts_u16 *Base = KBTS__POINTER_OFFSET(kbts_u16, PackedLookup, kbts__ReadU16Unaligned(&Lookup.SubtableOffsets[SubtableIndex]));
 
                 while((!InGpos && (LookupType == 7)) ||
                       (InGpos && (LookupType == 9)))
@@ -26347,31 +28947,36 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
 
                   // CAREFUL: Here, we remap LookupType only.
                   // Do not use Lookup.Type beyond this point!
-                  LookupType = Extension->LookupType;
-                  Base = KBTS__POINTER_OFFSET(kbts_u16, Extension, Extension->Offset);
+                  LookupType = kbts__ReadU16Unaligned(&Extension->LookupType);
+                  Base = KBTS__POINTER_OFFSET(kbts_u16, Extension, kbts__ReadU32Unaligned(&Extension->Offset));
                 }
 
                 kbts__coverage *Coverage = 0;
 
-                if(kbts__LookupBeginsWithCoverage(ShapingTableId, LookupType, Base[0]))
+                if(kbts__LookupBeginsWithCoverage(ShapingTableId, LookupType, kbts__ReadU16Unaligned(&Base[0])))
                 {
-                  Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Base, Base[1]);
+                  Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Base, kbts__ReadU16Unaligned(&Base[1]));
                 }
 
                 if(!InGpos && (LookupType == 4))
                 {
                   kbts__ligature_substitution *Subst = (kbts__ligature_substitution *)Base;
-                  KBTS__FOR(SetIndex, 0, Subst->LigatureSetCount)
+                  kbts_un Subst_LigatureSetCount = kbts__ReadU16Unaligned(&Subst->LigatureSetCount);
+
+                  KBTS__FOR(SetIndex, 0, Subst_LigatureSetCount)
                   {
                     kbts__ligature_set *Set = kbts__GetLigatureSet(Subst, SetIndex);
-                    KBTS__FOR(LigatureIndex, 0, Set->Count)
+                    kbts_un Set_Count = kbts__ReadU16Unaligned(&Set->Count);
+
+                    KBTS__FOR(LigatureIndex, 0, Set_Count)
                     {
                       kbts__ligature *Ligature = kbts__GetLigature(Set, LigatureIndex);
+                      kbts_un Ligature_ComponentCount = kbts__ReadU16Unaligned(&Ligature->ComponentCount);
                       kbts_u16 *Ids = KBTS__POINTER_AFTER(kbts_u16, Ligature);
 
-                      KBTS__FOR(IdIndex, 1, Ligature->ComponentCount)
+                      KBTS__FOR(IdIndex, 1, Ligature_ComponentCount)
                       {
-                        kbts_un GlyphId = Ids[IdIndex - 1];
+                        kbts_un GlyphId = kbts__ReadU16Unaligned(&Ids[IdIndex - 1]);
 
                         kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(RunningSubtableIndex, SubtableCount, GlyphId, GlyphCount);
                         GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
@@ -26382,25 +28987,30 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                 else if((!InGpos && (LookupType == 5)) ||
                         (InGpos && (LookupType == 7)))
                 {
-                  switch(Base[0])
+                  switch(kbts__ReadU16Unaligned(&Base[0]))
                   {
                   case 1:
                   {
                     kbts__sequence_context_1 *Subst = (kbts__sequence_context_1 *)Base;
-                    KBTS__FOR(SetIndex, 0, Subst->SeqRuleSetCount)
+                    kbts_un Subst_SeqRuleSetCount = kbts__ReadU16Unaligned(&Subst->SeqRuleSetCount);
+
+                    KBTS__FOR(SetIndex, 0, Subst_SeqRuleSetCount)
                     {
                       kbts__sequence_rule_set *Set = kbts__GetSequenceRuleSet(Subst, SetIndex);
 
                       if(Set)
                       {
-                        KBTS__FOR(RuleIndex, 0, Set->Count)
+                        kbts_un Set_Count = kbts__ReadU16Unaligned(&Set->Count);
+
+                        KBTS__FOR(RuleIndex, 0, Set_Count)
                         {
                           kbts__sequence_rule *Rule = kbts__GetSequenceRule(Set, RuleIndex);
+                          kbts_un Rule_GlyphCount = kbts__ReadU16Unaligned(&Rule->GlyphCount);
 
                           kbts_u16 *SequenceGlyphIds = KBTS__POINTER_AFTER(kbts_u16, Rule);
-                          KBTS__FOR(InputIndex, 1, Rule->GlyphCount)
+                          KBTS__FOR(InputIndex, 1, Rule_GlyphCount)
                           {
-                            kbts_un GlyphId = SequenceGlyphIds[InputIndex - 1];
+                            kbts_un GlyphId = kbts__ReadU16Unaligned(&SequenceGlyphIds[InputIndex - 1]);
 
                             kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(RunningSubtableIndex, SubtableCount, GlyphId, GlyphCount);
                             GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
@@ -26413,23 +29023,26 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                   case 2:
                   {
                     kbts__sequence_context_2 *Subst = (kbts__sequence_context_2 *)Base;
-                    kbts_u16 *ClassDefBase = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst->ClassDefOffset);
+                    kbts_u16 *ClassDefBase = KBTS__POINTER_OFFSET(kbts_u16, Subst, kbts__ReadU16Unaligned(&Subst->ClassDefOffset));
 
                     kbts_u64 ClassesIncluded[16] = KBTS__ZERO;
 
-                    KBTS__FOR(SetIndex, 0, Subst->ClassSequenceRuleSetCount)
+                    KBTS__FOR(SetIndex, 0, kbts__ReadU16Unaligned(&Subst->ClassSequenceRuleSetCount))
                     {
                       kbts__class_sequence_rule_set *Set = kbts__GetClassSequenceRuleSet(Subst, SetIndex);
                       if(Set)
                       {
-                        KBTS__FOR(RuleIndex, 0, Set->Count)
+                        kbts_un Set_Count = kbts__ReadU16Unaligned(&Set->Count);
+
+                        KBTS__FOR(RuleIndex, 0, Set_Count)
                         {
                           kbts__class_sequence_rule *Rule = kbts__GetClassSequenceRule(Set, RuleIndex);
+                          kbts_un Rule_GlyphCount = kbts__ReadU16Unaligned(&Rule->GlyphCount);
                           kbts_u16 *SequenceClasses = KBTS__POINTER_AFTER(kbts_u16, Rule);
 
-                          KBTS__FOR(SequenceIndex, 1, Rule->GlyphCount)
+                          KBTS__FOR(SequenceIndex, 1, Rule_GlyphCount)
                           {
-                            kbts_un Class = SequenceClasses[SequenceIndex - 1];
+                            kbts_un Class = kbts__ReadU16Unaligned(&SequenceClasses[SequenceIndex - 1]);
 
                             if(Class < (KBTS__ARRAY_LENGTH(ClassesIncluded) * 64))
                             {
@@ -26446,54 +29059,58 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                   case 3:
                   {
                     kbts__sequence_context_3 *Subst = (kbts__sequence_context_3 *)Base;
+                    kbts_un Subst_GlyphCount = kbts__ReadU16Unaligned(&Subst->GlyphCount);
                     kbts_u16 *CoverageOffsets = KBTS__POINTER_AFTER(kbts_u16, Subst);
 
-                    KBTS__FOR(CoverageIndex, 1, Subst->GlyphCount)
+                    KBTS__FOR(CoverageIndex, 1, Subst_GlyphCount)
                     {
-                      kbts__coverage *SubstCoverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, CoverageOffsets[CoverageIndex]);
+                      kbts__coverage *SubstCoverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&CoverageOffsets[CoverageIndex]));
 
                       kbts__MarkMatrixCoverage(GlyphLookupSubtableMatrix, RunningSubtableIndex, SubtableCount, GlyphCount, SubstCoverage, 1);
                     }
 
-                    Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, CoverageOffsets[0]);
+                    Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&CoverageOffsets[0]));
                   } break;
                   }
                 }
                 else if((!InGpos && (LookupType == 6)) ||
                         (InGpos && (LookupType == 8)))
                 {
-                  switch(Base[0])
+                  switch(kbts__ReadU16Unaligned(&Base[0]))
                   {
                   case 1:
                   {
                     kbts__chained_sequence_context_1 *Subst = (kbts__chained_sequence_context_1 *)Base;
+                    kbts_un Subst_ChainedSequenceRuleSetCount = kbts__ReadU16Unaligned(&Subst->ChainedSequenceRuleSetCount);
                     kbts_u16 *ChainedSequenceRuleSetOffsets = KBTS__POINTER_AFTER(kbts_u16, Subst);
 
-                    KBTS__FOR(SetIndex, 0, Subst->ChainedSequenceRuleSetCount)
+                    KBTS__FOR(SetIndex, 0, Subst_ChainedSequenceRuleSetCount)
                     {
-                      kbts__chained_sequence_rule_set *Set = KBTS__POINTER_OFFSET(kbts__chained_sequence_rule_set, Subst, ChainedSequenceRuleSetOffsets[SetIndex]);
-                      KBTS__FOR(RuleIndex, 0, Set->Count)
+                      kbts__chained_sequence_rule_set *Set = KBTS__POINTER_OFFSET(kbts__chained_sequence_rule_set, Subst, kbts__ReadU16Unaligned(&ChainedSequenceRuleSetOffsets[SetIndex]));
+                      kbts_un Set_Count = kbts__ReadU16Unaligned(&Set->Count);
+
+                      KBTS__FOR(RuleIndex, 0, Set_Count)
                       {
                         kbts__chained_sequence_rule *Rule = kbts__GetChainedClassSequenceRule(Set, RuleIndex);
                         kbts__unpacked_chained_sequence_rule Unpacked = kbts__UnpackChainedSequenceRule(Rule, 0);
 
                         KBTS__FOR(BacktrackIndex, 0, Unpacked.BacktrackCount)
                         {
-                          kbts_un GlyphId = Unpacked.Backtrack[BacktrackIndex];
+                          kbts_un GlyphId = kbts__ReadU16Unaligned(&Unpacked.Backtrack[BacktrackIndex]);
                           kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(RunningSubtableIndex, SubtableCount, GlyphId, GlyphCount);
                           GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
                         }
 
                         KBTS__FOR(InputIndex, 1, Unpacked.InputCount)
                         {
-                          kbts_un GlyphId = Unpacked.Input[InputIndex - 1];
+                          kbts_un GlyphId = kbts__ReadU16Unaligned(&Unpacked.Input[InputIndex - 1]);
                           kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(RunningSubtableIndex, SubtableCount, GlyphId, GlyphCount);
                           GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
                         }
 
                         KBTS__FOR(LookaheadIndex, 0, Unpacked.LookaheadCount)
                         {
-                          kbts_un GlyphId = Unpacked.Lookahead[LookaheadIndex];
+                          kbts_un GlyphId = kbts__ReadU16Unaligned(&Unpacked.Lookahead[LookaheadIndex]);
                           kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(RunningSubtableIndex, SubtableCount, GlyphId, GlyphCount);
                           GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
                         }
@@ -26504,9 +29121,9 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                   case 2:
                   {
                     kbts__chained_sequence_context_2 *Subst = (kbts__chained_sequence_context_2 *)Base;
-                    kbts_un BacktrackClassDefOffset = Subst->BacktrackClassDefOffset;
-                    kbts_un InputClassDefOffset = Subst->InputClassDefOffset;
-                    kbts_un LookaheadClassDefOffset = Subst->LookaheadClassDefOffset;
+                    kbts_un BacktrackClassDefOffset = kbts__ReadU16Unaligned(&Subst->BacktrackClassDefOffset);
+                    kbts_un InputClassDefOffset = kbts__ReadU16Unaligned(&Subst->InputClassDefOffset);
+                    kbts_un LookaheadClassDefOffset = kbts__ReadU16Unaligned(&Subst->LookaheadClassDefOffset);
                     kbts_u16 *BacktrackClassDefinition = 0;
                     if(BacktrackClassDefOffset)
                     {
@@ -26527,19 +29144,22 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                     kbts_u64 InputClassesIncluded[16] = KBTS__ZERO;
                     kbts_u64 LookaheadClassesIncluded[16] = KBTS__ZERO;
 
-                    KBTS__FOR(SetIndex, 0, Subst->ChainedClassSequenceRuleSetCount)
+                    kbts_un Subst_ChainedClassSequenceRuleSetCount = kbts__ReadU16Unaligned(&Subst->ChainedClassSequenceRuleSetCount);
+                    KBTS__FOR(SetIndex, 0, Subst_ChainedClassSequenceRuleSetCount)
                     {
                       kbts__chained_sequence_rule_set *Set = kbts__GetChainedClassSequenceRuleSet(Subst, SetIndex);
                       if(Set)
                       {
-                        KBTS__FOR(RuleIndex, 0, Set->Count)
+                        kbts_un Set_Count = kbts__ReadU16Unaligned(&Set->Count);
+
+                        KBTS__FOR(RuleIndex, 0, Set_Count)
                         {
                           kbts__chained_sequence_rule *Rule = kbts__GetChainedSequenceRule(Set, RuleIndex);
                           kbts__unpacked_chained_sequence_rule Unpacked = kbts__UnpackChainedSequenceRule(Rule, 0);
 
                           KBTS__FOR(BacktrackIndex, 0, Unpacked.BacktrackCount)
                           {
-                            kbts_un Class = Unpacked.Backtrack[BacktrackIndex];
+                            kbts_un Class = kbts__ReadU16Unaligned(&Unpacked.Backtrack[BacktrackIndex]);
                             if(Class < (KBTS__ARRAY_LENGTH(BacktrackClassesIncluded) * 64))
                             {
                               BacktrackClassesIncluded[Class / 64] |= 1ull << (Class % 64);
@@ -26548,7 +29168,7 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
 
                           KBTS__FOR(InputIndex, 1, Unpacked.InputCount)
                           {
-                            kbts_un Class = Unpacked.Input[InputIndex - 1];
+                            kbts_un Class = kbts__ReadU16Unaligned(&Unpacked.Input[InputIndex - 1]);
                             if(Class < (KBTS__ARRAY_LENGTH(InputClassesIncluded) * 64))
                             {
                               InputClassesIncluded[Class / 64] |= 1ull << (Class % 64);
@@ -26557,7 +29177,7 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
 
                           KBTS__FOR(LookaheadIndex, 0, Unpacked.LookaheadCount)
                           {
-                            kbts_un Class = Unpacked.Lookahead[LookaheadIndex];
+                            kbts_un Class = kbts__ReadU16Unaligned(&Unpacked.Lookahead[LookaheadIndex]);
                             if(Class < (KBTS__ARRAY_LENGTH(LookaheadClassesIncluded) * 64))
                             {
                               LookaheadClassesIncluded[Class / 64] |= 1ull << (Class % 64);
@@ -26577,24 +29197,24 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                     kbts__chained_sequence_context_3 *Subst = (kbts__chained_sequence_context_3 *)Base;
                     kbts__unpacked_chained_sequence_context_3 Unpacked = kbts__UnpackChainedSequenceContext3(Subst, 0);
 
-                    Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, Unpacked.InputCoverageOffsets[0]);
+                    Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.InputCoverageOffsets[0]));
 
                     KBTS__FOR(BacktrackCoverageIndex, 0, Unpacked.BacktrackCount)
                     {
-                      kbts__coverage *SubCoverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, Unpacked.BacktrackCoverageOffsets[BacktrackCoverageIndex]);
+                      kbts__coverage *SubCoverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.BacktrackCoverageOffsets[BacktrackCoverageIndex]));
                       kbts__MarkMatrixCoverage(GlyphLookupSubtableMatrix, RunningSubtableIndex, SubtableCount, GlyphCount, SubCoverage, 1);
                     }
 
                     KBTS__FOR(InputCoverageIndex, 1, Unpacked.InputCount)
                     {
-                      kbts__coverage *SubCoverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, Unpacked.InputCoverageOffsets[InputCoverageIndex]);
+                      kbts__coverage *SubCoverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.InputCoverageOffsets[InputCoverageIndex]));
                       kbts__MarkMatrixCoverage(GlyphLookupSubtableMatrix, RunningSubtableIndex, SubtableCount, GlyphCount, SubCoverage, 1);
                     }
 
 
                     KBTS__FOR(LookaheadCoverageIndex, 0, Unpacked.LookaheadCount)
                     {
-                      kbts__coverage *SubCoverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, Unpacked.LookaheadCoverageOffsets[LookaheadCoverageIndex]);
+                      kbts__coverage *SubCoverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.LookaheadCoverageOffsets[LookaheadCoverageIndex]));
                       kbts__MarkMatrixCoverage(GlyphLookupSubtableMatrix, RunningSubtableIndex, SubtableCount, GlyphCount, SubCoverage, 1);
                     }
                   } break;
@@ -26607,13 +29227,13 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
 
                   KBTS__FOR(BacktrackIndex, 0, Unpacked.BacktrackCount)
                   {
-                    kbts__coverage *SubCoverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, Unpacked.BacktrackCoverageOffsets[BacktrackIndex]);
+                    kbts__coverage *SubCoverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.BacktrackCoverageOffsets[BacktrackIndex]));
                     kbts__MarkMatrixCoverage(GlyphLookupSubtableMatrix, RunningSubtableIndex, SubtableCount, GlyphCount, SubCoverage, 1);
                   }
 
                   KBTS__FOR(LookaheadIndex, 0, Unpacked.LookaheadCount)
                   {
-                    kbts__coverage *SubCoverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, Unpacked.LookaheadCoverageOffsets[LookaheadIndex]);
+                    kbts__coverage *SubCoverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.LookaheadCoverageOffsets[LookaheadIndex]));
                     kbts__MarkMatrixCoverage(GlyphLookupSubtableMatrix, RunningSubtableIndex, SubtableCount, GlyphCount, SubCoverage, 1);
                   }
                 }
@@ -26677,7 +29297,7 @@ KBTS_EXPORT void kbts_GetFontInfo2(kbts_font *Font, kbts_font_info2 *Info)
 
         if(Os2)
         {
-          Info2_2->CapitalHeight = Os2->CapHeight;
+          Info2_2->CapitalHeight = kbts__ReadS16Unaligned(&Os2->CapHeight);
         }
       }
       KBTS__FALLTHROUGH;
@@ -26688,25 +29308,25 @@ KBTS_EXPORT void kbts_GetFontInfo2(kbts_font *Font, kbts_font_info2 *Info)
 
         if(Os2)
         {
-          Info2_1->Ascent = Os2->TypoAscender;
-          Info2_1->Descent = Os2->TypoDescender;
-          Info2_1->LineGap = Os2->TypoLineGap;
+          Info2_1->Ascent = kbts__ReadS16Unaligned(&Os2->TypoAscender);
+          Info2_1->Descent = kbts__ReadS16Unaligned(&Os2->TypoDescender);
+          Info2_1->LineGap = kbts__ReadS16Unaligned(&Os2->TypoLineGap);
         }
         else if(Hhea)
         {
-          Info2_1->Ascent = Hhea->Ascent;
-          Info2_1->Descent = Hhea->Descent;
-          Info2_1->LineGap = Hhea->LineGap;
+          Info2_1->Ascent = kbts__ReadS16Unaligned(&Hhea->Ascent);
+          Info2_1->Descent = kbts__ReadS16Unaligned(&Hhea->Descent);
+          Info2_1->LineGap = kbts__ReadS16Unaligned(&Hhea->LineGap);
         }
 
         if(Head)
         {
-          Info2_1->UnitsPerEm = Head->UnitsPerEm;
+          Info2_1->UnitsPerEm = kbts__ReadU16Unaligned(&Head->UnitsPerEm);
 
-          Info2_1->XMin = Head->XMin;
-          Info2_1->YMin = Head->YMin;
-          Info2_1->XMax = Head->XMax;
-          Info2_1->YMax = Head->YMax;
+          Info2_1->XMin = kbts__ReadS16Unaligned(&Head->XMin);
+          Info2_1->YMin = kbts__ReadS16Unaligned(&Head->YMin);
+          Info2_1->XMax = kbts__ReadS16Unaligned(&Head->XMax);
+          Info2_1->YMax = kbts__ReadS16Unaligned(&Head->YMax);
         }
       }
       KBTS__FALLTHROUGH;
@@ -26716,17 +29336,18 @@ KBTS_EXPORT void kbts_GetFontInfo2(kbts_font *Font, kbts_font_info2 *Info)
         if(Name)
         {
           kbts__name_record *Records = KBTS__POINTER_AFTER(kbts__name_record, Name);
-          char *StringBase = KBTS__POINTER_OFFSET(char, Name, Name->StringStorageOffset);
+          char *StringBase = KBTS__POINTER_OFFSET(char, Name, kbts__ReadU16Unaligned(&Name->StringStorageOffset));
+          kbts_un Name_Count = kbts__ReadU16Unaligned(&Name->Count);
 
-          KBTS__FOR(RecordIndex, 0, Name->Count)
+          KBTS__FOR(RecordIndex, 0, Name_Count)
           {
             kbts__name_record *Record = &Records[RecordIndex];
 
-            if(!Record->LanguageId)
+            if(!kbts__ReadU16Unaligned(&Record->LanguageId))
             {
               kbts_font_info_string_id Id = KBTS_FONT_INFO_STRING_ID_NONE;
 
-              switch(Record->NameId)
+              switch(kbts__ReadU16Unaligned(&Record->NameId))
               {
               case 0: Id = KBTS_FONT_INFO_STRING_ID_COPYRIGHT; break;
               case 1: Id = KBTS_FONT_INFO_STRING_ID_FAMILY; break;
@@ -26744,8 +29365,8 @@ KBTS_EXPORT void kbts_GetFontInfo2(kbts_font *Font, kbts_font_info2 *Info)
 
               if(Id)
               {
-                Info->Strings[Id] = KBTS__POINTER_OFFSET(char, StringBase, Record->StringOffset);
-                Info->StringLengths[Id] = Record->Length;
+                Info->Strings[Id] = KBTS__POINTER_OFFSET(char, StringBase, kbts__ReadU16Unaligned(&Record->StringOffset));
+                Info->StringLengths[Id] = kbts__ReadU16Unaligned(&Record->Length);
               }
             }
           }
@@ -26769,7 +29390,7 @@ KBTS_EXPORT void kbts_GetFontInfo2(kbts_font *Font, kbts_font_info2 *Info)
           kbts_font_width Width = KBTS_FONT_WIDTH_UNKNOWN;
           kbts_font_style_flags StyleFlags = KBTS_FONT_STYLE_FLAG_NONE;
 
-          switch(Os2->WeightClass)
+          switch(kbts__ReadU16Unaligned(&Os2->WeightClass))
           {
           case 100: Weight = KBTS_FONT_WEIGHT_THIN; break;
           case 200: Weight = KBTS_FONT_WEIGHT_EXTRA_LIGHT; break;
@@ -26782,7 +29403,7 @@ KBTS_EXPORT void kbts_GetFontInfo2(kbts_font *Font, kbts_font_info2 *Info)
           case 900: Weight = KBTS_FONT_WEIGHT_BLACK; break;
           }
 
-          switch(Os2->WidthClass)
+          switch(kbts__ReadU16Unaligned(&Os2->WidthClass))
           {
           case 1: Width = KBTS_FONT_WIDTH_ULTRA_CONDENSED; break;
           case 2: Width = KBTS_FONT_WIDTH_EXTRA_CONDENSED; break;
@@ -26795,15 +29416,16 @@ KBTS_EXPORT void kbts_GetFontInfo2(kbts_font *Font, kbts_font_info2 *Info)
           case 9: Width = KBTS_FONT_WIDTH_ULTRA_EXPANDED; break;
           }
 
-          if(Os2->Selection & (KBTS__OS2_SELECTION_FLAG_ITALIC | KBTS__OS2_SELECTION_FLAG_OBLIQUE))
+          kbts_u16 Os2_Selection = kbts__ReadU16Unaligned(&Os2->Selection);
+          if(Os2_Selection & (KBTS__OS2_SELECTION_FLAG_ITALIC | KBTS__OS2_SELECTION_FLAG_OBLIQUE))
           {
             StyleFlags |= KBTS_FONT_STYLE_FLAG_ITALIC;
           }
-          if(Os2->Selection & KBTS__OS2_SELECTION_FLAG_BOLD)
+          if(Os2_Selection & KBTS__OS2_SELECTION_FLAG_BOLD)
           {
             StyleFlags |= KBTS_FONT_STYLE_FLAG_BOLD;
           }
-          if(Os2->Selection & KBTS__OS2_SELECTION_FLAG_REGULAR)
+          if(Os2_Selection & KBTS__OS2_SELECTION_FLAG_REGULAR)
           {
             StyleFlags |= KBTS_FONT_STYLE_FLAG_REGULAR;        
           }
@@ -27234,7 +29856,6 @@ static void kbts__BreakAddCodepoint(kbts_break_state *State, kbts_u32 Codepoint,
   kbts_u8 BreakScript = ScriptSet[0];
   kbts__break_flush_flags FlushFlags = 0;
   kbts_s16 Bidirectional1PositionOffset = State->Bidirectional1PositionOffset;
-  kbts_s16 Bidirectional2PositionOffset = State->Bidirectional2PositionOffset;
   kbts_u8 Bidirectional2 = State->BidirectionalClass2;
   kbts_u8 Bidirectional1 = State->BidirectionalClass1;
 
@@ -27322,364 +29943,6 @@ static void kbts__BreakAddCodepoint(kbts_break_state *State, kbts_u32 Codepoint,
       }
     }
   }
-
-  // Script breaking.
-  if(EndOfText)
-  {
-    FlushFlags |= KBTS__BREAK_FLUSH_FLAG_SCRIPT;
-  }
-
-  if(CodepointScriptCount < 2)
-  {
-    // We special case this entire path because, supposedly, this is the common case.
-    kbts_u8 CodepointScript = (kbts_u8)CodepointScriptOffset;
-
-    if((CodepointScript == KBTS_SCRIPT_DONT_KNOW) ||
-       (CodepointScript == KBTS_SCRIPT_DEFAULT) ||
-       (CodepointScript == KBTS_SCRIPT_DEFAULT2))
-    {
-      // Nothing to do.
-    }
-    else
-    {
-      kbts_u32 ScriptSetMatch = 0;
-      KBTS__FOR(ScriptIndex, 0, ScriptCount)
-      {
-        ScriptSetMatch |= (ScriptSet[ScriptIndex] == CodepointScript);
-      }
-
-      if(!ScriptSetMatch)
-      {
-        FlushFlags |= KBTS__BREAK_FLUSH_FLAG_SCRIPT;
-      }
-
-      ScriptCount = 1;
-      ScriptSet[0] = CodepointScript;
-    }
-  }
-  else
-  {
-    // Refine the script set.
-    kbts_un NewScriptCount = 0;
-
-    {
-      kbts_un CodepointScriptIndex = 0;
-      kbts_un ScriptIndex = 0;
-
-      while((ScriptIndex < ScriptCount) &&
-            (CodepointScriptIndex < CodepointScriptCount))
-      {
-        kbts_u8 CodepointScript = CodepointScripts[CodepointScriptIndex];
-        kbts_u8 Script = ScriptSet[ScriptIndex];
-
-        if(CodepointScript < Script)
-        {
-          CodepointScriptIndex += 1;
-        }
-        else if(Script < CodepointScript)
-        {
-          ScriptIndex += 1;
-        }
-        else
-        {
-          ScriptSet[NewScriptCount++] = Script;
-
-          CodepointScriptIndex += 1;
-          ScriptIndex += 1;
-        }
-      }
-    }
-
-    if(!NewScriptCount)
-    {
-      FlushFlags |= KBTS__BREAK_FLUSH_FLAG_SCRIPT;
-
-      KBTS__FOR(CodepointScriptIndex, 0, CodepointScriptCount)
-      {
-        ScriptSet[CodepointScriptIndex] = CodepointScripts[CodepointScriptIndex];
-      }
-      ScriptCount = (kbts_u32)CodepointScriptCount;
-    }
-    else
-    {
-      ScriptCount = (kbts_u32)NewScriptCount;
-    }
-  }
-
-  // Direction breaking.
-  if(EndOfText)
-  {
-    BidirectionalClass = KBTS_UNICODE_BIDIRECTIONAL_CLASS_NI;
-  }
-
-  if(BidirectionalClass != KBTS_UNICODE_BIDIRECTIONAL_CLASS_BN) // Formatting characters should be ignored.
-  {
-    switch(BidirectionalClass)
-    {
-    case KBTS_UNICODE_BIDIRECTIONAL_CLASS_NSM: BidirectionalClass = Bidirectional1; break;
-
-    case KBTS_UNICODE_BIDIRECTIONAL_CLASS_L:
-      Flags &= ~(KBTS_BREAK_STATE_FLAG_SAW_R_AFTER_L | KBTS_BREAK_STATE_FLAG_SAW_AL_AFTER_LR);
-      break;
-
-    case KBTS_UNICODE_BIDIRECTIONAL_CLASS_R:
-      Flags |= KBTS_BREAK_STATE_FLAG_SAW_R_AFTER_L;
-      Flags &= ~KBTS_BREAK_STATE_FLAG_SAW_AL_AFTER_LR;
-      break;
-
-    case KBTS_UNICODE_BIDIRECTIONAL_CLASS_AL:
-      // Rule W3 occurs before W7, so we treat AL as R for the purposes of rule W7.
-      Flags |= (KBTS_BREAK_STATE_FLAG_SAW_AL_AFTER_LR | KBTS_BREAK_STATE_FLAG_SAW_R_AFTER_L);
-      BidirectionalClass = KBTS_UNICODE_BIDIRECTIONAL_CLASS_R;
-      break;
-
-    case KBTS_UNICODE_BIDIRECTIONAL_CLASS_EN:
-      if(Flags & KBTS_BREAK_STATE_FLAG_SAW_AL_AFTER_LR)
-      {
-        BidirectionalClass = KBTS_UNICODE_BIDIRECTIONAL_CLASS_AN;
-        goto CaseAn;
-      }
-      if((Bidirectional2 == KBTS_UNICODE_BIDIRECTIONAL_CLASS_EN) &&
-         ((Bidirectional1 == KBTS_UNICODE_BIDIRECTIONAL_CLASS_ES) ||
-          (Bidirectional1 == KBTS_UNICODE_BIDIRECTIONAL_CLASS_CS)))
-      {
-        Bidirectional1 = KBTS_UNICODE_BIDIRECTIONAL_CLASS_EN;
-      }
-
-      // We test State->ParagraphDirection here because we do not want
-      // digits to coerce to L when the paragrpah direction is unknown.
-      // It might be cleaner to explicitly store the last strong direction seen,
-      // with DONT_KNOW as an option.
-      // @Cleanup
-      if(State->ParagraphDirection &&
-         !(Flags & KBTS_BREAK_STATE_FLAG_SAW_R_AFTER_L))
-      {
-        BidirectionalClass = KBTS_UNICODE_BIDIRECTIONAL_CLASS_L;
-      }
-      break;
-    case KBTS_UNICODE_BIDIRECTIONAL_CLASS_AN:
-      CaseAn:;
-      if((Bidirectional2 == KBTS_UNICODE_BIDIRECTIONAL_CLASS_AN) &&
-         (Bidirectional1 == KBTS_UNICODE_BIDIRECTIONAL_CLASS_CS))
-      {
-        Bidirectional1 = KBTS_UNICODE_BIDIRECTIONAL_CLASS_AN;
-      }
-      break;
-    case KBTS_UNICODE_BIDIRECTIONAL_CLASS_ET:
-      if(Bidirectional1 == KBTS_UNICODE_BIDIRECTIONAL_CLASS_EN)
-      {
-        BidirectionalClass = KBTS_UNICODE_BIDIRECTIONAL_CLASS_EN;
-      }
-      break;
-    }
-
-    // This rule has a lower priority than AN CS AN -> AN AN AN, so we have to wait until slot 1 to apply it.
-    if(KBTS__IN_SET(Bidirectional1, KBTS__SET32((KBTS_UNICODE_BIDIRECTIONAL_CLASS_ET)
-                                                (KBTS_UNICODE_BIDIRECTIONAL_CLASS_ES)
-                                                (KBTS_UNICODE_BIDIRECTIONAL_CLASS_CS))))
-    {
-      Bidirectional1 = KBTS_UNICODE_BIDIRECTIONAL_CLASS_NI;
-    }
-
-    if(Bidirectional1 == KBTS_UNICODE_BIDIRECTIONAL_CLASS_NI)
-    {
-      if(KBTS__IN_SET(BidirectionalClass, KBTS__SET32((KBTS_UNICODE_BIDIRECTIONAL_CLASS_NI)
-                                                      (KBTS_UNICODE_BIDIRECTIONAL_CLASS_ET)
-                                                      (KBTS_UNICODE_BIDIRECTIONAL_CLASS_ES)
-                                                      (KBTS_UNICODE_BIDIRECTIONAL_CLASS_CS))))
-      {
-        // All of these input classes end up resolving to NI later on anyway if they are preceded by NI.
-        // We are in a situation where:
-        // - We have an NI in slot 1
-        // - The direction in slot 0 will eventually resolve to NI due to the NI in slot 1
-        // - Storing multiple NIs in our shift buffer is redundant, because no rule necessitates multiple NIs
-        // - NIs don't interact with anything, except that they resolve when surrounded by strong characters
-        // - NIs are resolved in groups. As per the Unicode specification:
-        //     N1. A sequence of NIs takes the direction of the surrounding strong text if the text on both
-        //         sides has the same direction.
-        // This means we can merge the current bidirectional class with the preceding NI, bump the offset,
-        // and it just works.
-        goto SkipDirectionBreak;
-      }
-      else if(((Bidirectional2 == KBTS_UNICODE_BIDIRECTIONAL_CLASS_R) ||
-               (BidirectionalClass == KBTS_UNICODE_BIDIRECTIONAL_CLASS_R)) &&
-              KBTS__IN_SET(Bidirectional2, KBTS__SET32((KBTS_UNICODE_BIDIRECTIONAL_CLASS_R)
-                                                       (KBTS_UNICODE_BIDIRECTIONAL_CLASS_AN)
-                                                       (KBTS_UNICODE_BIDIRECTIONAL_CLASS_EN))) &&
-              KBTS__IN_SET(BidirectionalClass, KBTS__SET32((KBTS_UNICODE_BIDIRECTIONAL_CLASS_R)
-                                                           (KBTS_UNICODE_BIDIRECTIONAL_CLASS_AN)
-                                                           (KBTS_UNICODE_BIDIRECTIONAL_CLASS_EN))))
-      {
-        // From the Unicode Bidirectional Algorithm:
-        //   European and Arabic numbers act as if they were R in terms of their influence on NIs.
-        //
-        // Note that the way we resolve digits is different from the way the Unicode standard specifies it.
-        // This is because the standard assumes the paragraph direction is always known, whereas in our case it isn't.
-        // We want neutral surrounded by uncoerced digits to resolve to the paragraph direction, which may be DONT_KNOW.
-        Bidirectional1 = KBTS_UNICODE_BIDIRECTIONAL_CLASS_R;
-      }
-      else if((Bidirectional2 == KBTS_UNICODE_BIDIRECTIONAL_CLASS_L) &&
-              (BidirectionalClass == KBTS_UNICODE_BIDIRECTIONAL_CLASS_L))
-      {
-        Bidirectional1 = KBTS_UNICODE_BIDIRECTIONAL_CLASS_L;
-      }
-      else
-      {
-        if     (State->ParagraphDirection == KBTS_DIRECTION_LTR) Bidirectional1 = KBTS_UNICODE_BIDIRECTIONAL_CLASS_L;
-        else if(State->ParagraphDirection == KBTS_DIRECTION_RTL) Bidirectional1 = KBTS_UNICODE_BIDIRECTIONAL_CLASS_R;
-        // Otherwise, don't coerce to anything.
-      }
-    }
-
-    FlushFlags |= KBTS__BREAK_FLUSH_FLAG_DIRECTION_2;
-    if(EndOfText)
-    {
-      FlushFlags |= KBTS__BREAK_FLUSH_FLAG_DIRECTION_1;
-    }
-  }
-  else
-  {
-    SkipDirectionBreak:;
-    State->Bidirectional2PositionOffset -= (kbts_s16)PositionIncrement;
-    State->Bidirectional1PositionOffset -= (kbts_s16)PositionIncrement;
-  }
-
-  { // Grapheme breaking.
-    if(EndOfText && !StartOfText)
-    {
-      KBTS_BREAK(KBTS_BREAK_FLAG_GRAPHEME, 1);
-      State->GraphemeBreakState = KBTS_GRAPHEME_BREAK_STATE_START;
-    }
-    else
-    {
-      kbts_u8 GraphemeBreakState = kbts_GraphemeBreakTransition[GraphemeBreakClass][State->GraphemeBreakState];
-      switch(GraphemeBreakState)
-      {
-      case KBTS_GRAPHEME_BREAK_STATE_b01: KBTS_BREAK2(KBTS_BREAK_FLAG_GRAPHEME, 1, 0); GraphemeBreakState = KBTS_GRAPHEME_BREAK_STATE_START; break;
-      case KBTS_GRAPHEME_BREAK_STATE_b0: KBTS_BREAK(KBTS_BREAK_FLAG_GRAPHEME, 0); GraphemeBreakState = KBTS_GRAPHEME_BREAK_STATE_START; break;
-
-      case KBTS_GRAPHEME_BREAK_STATE_b1:
-      case KBTS_GRAPHEME_BREAK_STATE_b1toCR:
-      case KBTS_GRAPHEME_BREAK_STATE_b1toL:
-      case KBTS_GRAPHEME_BREAK_STATE_b1toLVxV:
-      case KBTS_GRAPHEME_BREAK_STATE_b1toLVTxT:
-      case KBTS_GRAPHEME_BREAK_STATE_b1toIndicConsonantxIndicLinker:
-      case KBTS_GRAPHEME_BREAK_STATE_PADDING0: // Padding values are just here to help the compiler.
-      case KBTS_GRAPHEME_BREAK_STATE_PADDING1:
-      case KBTS_GRAPHEME_BREAK_STATE_b1toExtendedPictographic:
-      case KBTS_GRAPHEME_BREAK_STATE_PADDING2:
-      case KBTS_GRAPHEME_BREAK_STATE_PADDING3:
-      case KBTS_GRAPHEME_BREAK_STATE_b1toRI:
-      case KBTS_GRAPHEME_BREAK_STATE_b1toSKIP:
-        KBTS_BREAK(KBTS_BREAK_FLAG_GRAPHEME, 1);
-        GraphemeBreakState -= KBTS_GRAPHEME_BREAK_STATE_b1;
-      }
-
-      State->GraphemeBreakState = GraphemeBreakState;
-    }
-  }
-
-  // Word breaks.
-  // We buffer 3 characters for word breaks.
-  // Each character gets 3 bits (padded to 4) representing 3 levels of priority.
-  #define KBTS_WORD_BREAK_BITS(Priority, Position) (((1u << ((Priority) + 1)) - 1) << ((Position) * 4))
-  #define KBTS_C2(A, B) case (KBTS_WORD_BREAK_CLASS_##A << 8) | (KBTS_WORD_BREAK_CLASS_##B)
-  #define KBTS_C3(A, B, C) case (KBTS_WORD_BREAK_CLASS_##A << 16) | (KBTS_WORD_BREAK_CLASS_##B << 8) | (KBTS_WORD_BREAK_CLASS_##C)
-
-  // Ignore [EX FO ZWJ] after ^[_sot_ CR LF NL].
-  // @Cleanup: This is the only time we explicitly use EX and FO. They can be merged.
-  if(KBTS__IN_SET(WordBreakClass, KBTS__SET32((KBTS_WORD_BREAK_CLASS_EX)(KBTS_WORD_BREAK_CLASS_FO)(KBTS_WORD_BREAK_CLASS_ZWJ))) &&
-     !KBTS__IN_SET(LastWordBreakClass, KBTS__SET32((KBTS_WORD_BREAK_CLASS_SOT)(KBTS_WORD_BREAK_CLASS_CR)(KBTS_WORD_BREAK_CLASS_LF)(KBTS_WORD_BREAK_CLASS_NL))))
-  {
-    WordBreak2PositionOffset -= (kbts_s16)PositionIncrement;
-    State->WordBreak2PositionOffset = WordBreak2PositionOffset;
-  }
-  else
-  {
-    kbts_u32 WordBreaks = State->WordBreaks << 4;
-    kbts_u32 WordUnbreaks = State->WordUnbreaks << 4;
-    WordBreakHistory = (WordBreakHistory << 8) | WordBreakClass;
-
-    WordBreaks |= KBTS_WORD_BREAK_BITS(0, 1) | KBTS_WORD_BREAK_BITS(0, 0);
-    if(StartOfText)
-    {
-      WordBreaks |= KBTS_WORD_BREAK_BITS(2, 1);
-    }
-
-    if(KBTS__IN_SET(WordBreakClass, KBTS__SET32((KBTS_WORD_BREAK_CLASS_CR)(KBTS_WORD_BREAK_CLASS_LF)(KBTS_WORD_BREAK_CLASS_NL))))
-    {
-      WordBreaks |= KBTS_WORD_BREAK_BITS(1, 1) | KBTS_WORD_BREAK_BITS(1, 0);
-    }
-    else if(KBTS__IN_SET(WordBreakClass, KBTS__SET32((KBTS_WORD_BREAK_CLASS_Oep)(KBTS_WORD_BREAK_CLASS_ALep))))
-    {
-      // ZWJ x {Extended_Pictographic}
-      if(LastWordBreakClassIncludingIgnored == KBTS_WORD_BREAK_CLASS_ZWJ)
-      {
-        WordUnbreaks |= KBTS_WORD_BREAK_BITS(0, 1);
-      }
-    }
-
-    switch(WordBreakHistory & 0xFFFF)
-    {
-      KBTS_C2(CR, LF): WordUnbreaks |= KBTS_WORD_BREAK_BITS(1, 1); break;
-
-      KBTS_C2(WSS, WSS):
-        // WSS x WSS is a special rule, because it is supposed to happen _before_ ignores.
-        if(WordBreak2PositionOffset >= 0) WordUnbreaks |= KBTS_WORD_BREAK_BITS(0, 1);
-        break;
-
-      // (RI RI)* RI x RI
-      KBTS_C2(RI, RI):
-        WordBreakHistory = 0;
-        KBTS__FALLTHROUGH;
-      KBTS_C2(HL, SQ):
-      KBTS_C2(ALnep, ALnep): KBTS_C2(ALnep, ALep): KBTS_C2(ALnep, HL): KBTS_C2(ALnep, NM): KBTS_C2(ALnep, ENL):
-      KBTS_C2(ALep, ALnep): KBTS_C2(ALep, ALep): KBTS_C2(ALep, HL): KBTS_C2(ALep, NM): KBTS_C2(ALep, ENL):
-      KBTS_C2(HL, ALnep): KBTS_C2(HL, ALep): KBTS_C2(HL, HL): KBTS_C2(HL, NM): KBTS_C2(HL, ENL):
-      KBTS_C2(NM, ALnep): KBTS_C2(NM, ALep): KBTS_C2(NM, HL): KBTS_C2(NM, NM): KBTS_C2(NM, ENL):
-      KBTS_C2(KA, KA): KBTS_C2(KA, ENL):
-      KBTS_C2(ENL, ALnep): KBTS_C2(ENL, ALep): KBTS_C2(ENL, HL): KBTS_C2(ENL, NM): KBTS_C2(ENL, KA): KBTS_C2(ENL, ENL):
-        WordUnbreaks |= KBTS_WORD_BREAK_BITS(0, 1); break;
-    }
-
-    switch(WordBreakHistory & 0xFFFFFF)
-    {
-      KBTS_C3(ALnep, ML, ALnep): KBTS_C3(ALnep, ML, ALep): KBTS_C3(ALnep, ML, HL):
-      KBTS_C3(ALnep, MNL, ALnep): KBTS_C3(ALnep, MNL, ALep): KBTS_C3(ALnep, MNL, HL):
-      KBTS_C3(ALnep, SQ, ALnep): KBTS_C3(ALnep, SQ, ALep): KBTS_C3(ALnep, SQ, HL):
-      KBTS_C3(ALep, ML, ALnep): KBTS_C3(ALep, ML, ALep): KBTS_C3(ALep, ML, HL):
-      KBTS_C3(ALep, MNL, ALnep): KBTS_C3(ALep, MNL, ALep): KBTS_C3(ALep, MNL, HL):
-      KBTS_C3(ALep, SQ, ALnep): KBTS_C3(ALep, SQ, ALep): KBTS_C3(ALep, SQ, HL):
-      KBTS_C3(HL, ML, ALnep): KBTS_C3(HL, ML, ALep): KBTS_C3(HL, ML, HL):
-      KBTS_C3(HL, MNL, ALnep): KBTS_C3(HL, MNL, ALep): KBTS_C3(HL, MNL, HL):
-      KBTS_C3(HL, SQ, ALnep): KBTS_C3(HL, SQ, ALep): KBTS_C3(HL, SQ, HL):
-      KBTS_C3(HL, DQ, HL):
-      KBTS_C3(NM, MN, NM): KBTS_C3(NM, MNL, NM): KBTS_C3(NM, SQ, NM):
-        WordUnbreaks |= KBTS_WORD_BREAK_BITS(0, 1) | KBTS_WORD_BREAK_BITS(0, 2); break;
-    }
-
-    kbts_u32 EffectiveWordBreaks = WordBreaks & ~WordUnbreaks;
-    if(EffectiveWordBreaks & KBTS_WORD_BREAK_BITS(2, 2))
-    {
-      kbts__DoBreak(State, PositionOffset2 + WordBreak2PositionOffset, KBTS_BREAK_FLAG_WORD, 0, 0, 0);
-    }
-    if(EndOfText)
-    {
-      // Always break at the end of the text.
-      KBTS_BREAK(KBTS_BREAK_FLAG_WORD, 1);
-      // Do not break after the end of the text.
-    }
-
-    State->WordBreaks = (kbts_u16)WordBreaks;
-    State->WordUnbreaks = (kbts_u16)WordUnbreaks;
-    State->LastWordBreakClass = WordBreakClass;
-    State->WordBreak2PositionOffset = 0;
-    State->WordBreakHistory = WordBreakHistory;
-  }
-  State->LastWordBreakClassIncludingIgnored = WordBreakClass;
-  #undef KBTS_WORD_BREAK_BITS
-  #undef KBTS_C2
-  #undef KBTS_C3
 
   kbts_s16 LineBreak3PositionOffset = State->LineBreak3PositionOffset;
   kbts_s16 LineBreak2PositionOffset = State->LineBreak2PositionOffset;
@@ -28217,13 +30480,378 @@ static void kbts__BreakAddCodepoint(kbts_break_state *State, kbts_u32 Codepoint,
     if(0)
     {
       LineBreakAbsorbCharacter:;
-      State->LineBreak2PositionOffset -= (kbts_s16)PositionIncrement;
-      State->LineBreak3PositionOffset -= (kbts_s16)PositionIncrement;
+      // The buffered positions lag behind the current codepoint, so we have to step them
+      // by the increments of the codepoints they lag by, not by PositionIncrement.
+      // Increments do not have to be uniform, so these can differ.
+      State->LineBreak2PositionOffset += PositionOffset2;
+      State->LineBreak3PositionOffset += (kbts_s16)(PositionOffset3 - PositionOffset2);
     }
 
     // This always gets updated.
     State->LineUnbreaksAsync = LineUnbreaksAsync;
   }
+
+  // Script breaking.
+  if(EndOfText)
+  {
+    FlushFlags |= KBTS__BREAK_FLUSH_FLAG_SCRIPT;
+  }
+
+  if(CodepointScriptCount < 2)
+  {
+    // We special case this entire path because, supposedly, this is the common case.
+    kbts_u8 CodepointScript = (kbts_u8)CodepointScriptOffset;
+
+    if((CodepointScript == KBTS_SCRIPT_DONT_KNOW) ||
+       (CodepointScript == KBTS_SCRIPT_DEFAULT) ||
+       (CodepointScript == KBTS_SCRIPT_DEFAULT2))
+    {
+      // Nothing to do.
+    }
+    else
+    {
+      kbts_u32 ScriptSetMatch = 0;
+      KBTS__FOR(ScriptIndex, 0, ScriptCount)
+      {
+        ScriptSetMatch |= (ScriptSet[ScriptIndex] == CodepointScript);
+      }
+
+      if(!ScriptSetMatch)
+      {
+        FlushFlags |= KBTS__BREAK_FLUSH_FLAG_SCRIPT;
+      }
+
+      ScriptCount = 1;
+      ScriptSet[0] = CodepointScript;
+    }
+  }
+  else
+  {
+    // Refine the script set.
+    kbts_un NewScriptCount = 0;
+
+    {
+      kbts_un CodepointScriptIndex = 0;
+      kbts_un ScriptIndex = 0;
+
+      while((ScriptIndex < ScriptCount) &&
+            (CodepointScriptIndex < CodepointScriptCount))
+      {
+        kbts_u8 CodepointScript = CodepointScripts[CodepointScriptIndex];
+        kbts_u8 Script = ScriptSet[ScriptIndex];
+
+        if(CodepointScript < Script)
+        {
+          CodepointScriptIndex += 1;
+        }
+        else if(Script < CodepointScript)
+        {
+          ScriptIndex += 1;
+        }
+        else
+        {
+          ScriptSet[NewScriptCount++] = Script;
+
+          CodepointScriptIndex += 1;
+          ScriptIndex += 1;
+        }
+      }
+    }
+
+    if(!NewScriptCount)
+    {
+      FlushFlags |= KBTS__BREAK_FLUSH_FLAG_SCRIPT;
+
+      KBTS__FOR(CodepointScriptIndex, 0, CodepointScriptCount)
+      {
+        ScriptSet[CodepointScriptIndex] = CodepointScripts[CodepointScriptIndex];
+      }
+      ScriptCount = (kbts_u32)CodepointScriptCount;
+    }
+    else
+    {
+      ScriptCount = (kbts_u32)NewScriptCount;
+    }
+  }
+
+  // Direction breaking.
+  if(EndOfText)
+  {
+    BidirectionalClass = KBTS_UNICODE_BIDIRECTIONAL_CLASS_NI;
+  }
+
+  if(BidirectionalClass != KBTS_UNICODE_BIDIRECTIONAL_CLASS_BN) // Formatting characters should be ignored.
+  {
+    switch(BidirectionalClass)
+    {
+    case KBTS_UNICODE_BIDIRECTIONAL_CLASS_NSM: BidirectionalClass = Bidirectional1; break;
+
+    case KBTS_UNICODE_BIDIRECTIONAL_CLASS_L:
+      Flags &= ~(KBTS_BREAK_STATE_FLAG_SAW_R_AFTER_L | KBTS_BREAK_STATE_FLAG_SAW_AL_AFTER_LR);
+      break;
+
+    case KBTS_UNICODE_BIDIRECTIONAL_CLASS_R:
+      Flags |= KBTS_BREAK_STATE_FLAG_SAW_R_AFTER_L;
+      Flags &= ~KBTS_BREAK_STATE_FLAG_SAW_AL_AFTER_LR;
+      break;
+
+    case KBTS_UNICODE_BIDIRECTIONAL_CLASS_AL:
+      // Rule W3 occurs before W7, so we treat AL as R for the purposes of rule W7.
+      Flags |= (KBTS_BREAK_STATE_FLAG_SAW_AL_AFTER_LR | KBTS_BREAK_STATE_FLAG_SAW_R_AFTER_L);
+      BidirectionalClass = KBTS_UNICODE_BIDIRECTIONAL_CLASS_R;
+      break;
+
+    case KBTS_UNICODE_BIDIRECTIONAL_CLASS_EN:
+      if(Flags & KBTS_BREAK_STATE_FLAG_SAW_AL_AFTER_LR)
+      {
+        BidirectionalClass = KBTS_UNICODE_BIDIRECTIONAL_CLASS_AN;
+        goto CaseAn;
+      }
+      if((Bidirectional2 == KBTS_UNICODE_BIDIRECTIONAL_CLASS_EN) &&
+         ((Bidirectional1 == KBTS_UNICODE_BIDIRECTIONAL_CLASS_ES) ||
+          (Bidirectional1 == KBTS_UNICODE_BIDIRECTIONAL_CLASS_CS)))
+      {
+        Bidirectional1 = KBTS_UNICODE_BIDIRECTIONAL_CLASS_EN;
+      }
+
+      // We test State->ParagraphDirection here because we do not want
+      // digits to coerce to L when the paragrpah direction is unknown.
+      // It might be cleaner to explicitly store the last strong direction seen,
+      // with DONT_KNOW as an option.
+      // @Cleanup
+      if(State->ParagraphDirection &&
+         !(Flags & KBTS_BREAK_STATE_FLAG_SAW_R_AFTER_L))
+      {
+        BidirectionalClass = KBTS_UNICODE_BIDIRECTIONAL_CLASS_L;
+      }
+      break;
+    case KBTS_UNICODE_BIDIRECTIONAL_CLASS_AN:
+      CaseAn:;
+      if((Bidirectional2 == KBTS_UNICODE_BIDIRECTIONAL_CLASS_AN) &&
+         (Bidirectional1 == KBTS_UNICODE_BIDIRECTIONAL_CLASS_CS))
+      {
+        Bidirectional1 = KBTS_UNICODE_BIDIRECTIONAL_CLASS_AN;
+      }
+      break;
+    case KBTS_UNICODE_BIDIRECTIONAL_CLASS_ET:
+      if(Bidirectional1 == KBTS_UNICODE_BIDIRECTIONAL_CLASS_EN)
+      {
+        BidirectionalClass = KBTS_UNICODE_BIDIRECTIONAL_CLASS_EN;
+      }
+      break;
+    }
+
+    // This rule has a lower priority than AN CS AN -> AN AN AN, so we have to wait until slot 1 to apply it.
+    if(KBTS__IN_SET(Bidirectional1, KBTS__SET32((KBTS_UNICODE_BIDIRECTIONAL_CLASS_ET)
+                                                (KBTS_UNICODE_BIDIRECTIONAL_CLASS_ES)
+                                                (KBTS_UNICODE_BIDIRECTIONAL_CLASS_CS))))
+    {
+      Bidirectional1 = KBTS_UNICODE_BIDIRECTIONAL_CLASS_NI;
+    }
+
+    if(Bidirectional1 == KBTS_UNICODE_BIDIRECTIONAL_CLASS_NI)
+    {
+      if(!HardLineBreak &&
+         KBTS__IN_SET(BidirectionalClass, KBTS__SET32((KBTS_UNICODE_BIDIRECTIONAL_CLASS_NI)
+                                                      (KBTS_UNICODE_BIDIRECTIONAL_CLASS_ET)
+                                                      (KBTS_UNICODE_BIDIRECTIONAL_CLASS_ES)
+                                                      (KBTS_UNICODE_BIDIRECTIONAL_CLASS_CS))))
+      {
+        // All of these input classes end up resolving to NI later on anyway if they are preceded by NI.
+        // We are in a situation where:
+        // - We have an NI in slot 1
+        // - The direction in slot 0 will eventually resolve to NI due to the NI in slot 1
+        // - Storing multiple NIs in our shift buffer is redundant, because no rule necessitates multiple NIs
+        // - NIs don't interact with anything, except that they resolve when surrounded by strong characters
+        // - NIs are resolved in groups. As per the Unicode specification:
+        //     N1. A sequence of NIs takes the direction of the surrounding strong text if the text on both
+        //         sides has the same direction.
+        // This means we can merge the current bidirectional class with the preceding NI, bump the offset,
+        // and it just works.
+        goto SkipDirectionBreak;
+      }
+      else if(((Bidirectional2 == KBTS_UNICODE_BIDIRECTIONAL_CLASS_R) ||
+               (BidirectionalClass == KBTS_UNICODE_BIDIRECTIONAL_CLASS_R)) &&
+              KBTS__IN_SET(Bidirectional2, KBTS__SET32((KBTS_UNICODE_BIDIRECTIONAL_CLASS_R)
+                                                       (KBTS_UNICODE_BIDIRECTIONAL_CLASS_AN)
+                                                       (KBTS_UNICODE_BIDIRECTIONAL_CLASS_EN))) &&
+              KBTS__IN_SET(BidirectionalClass, KBTS__SET32((KBTS_UNICODE_BIDIRECTIONAL_CLASS_R)
+                                                           (KBTS_UNICODE_BIDIRECTIONAL_CLASS_AN)
+                                                           (KBTS_UNICODE_BIDIRECTIONAL_CLASS_EN))))
+      {
+        // From the Unicode Bidirectional Algorithm:
+        //   European and Arabic numbers act as if they were R in terms of their influence on NIs.
+        //
+        // Note that the way we resolve digits is different from the way the Unicode standard specifies it.
+        // This is because the standard assumes the paragraph direction is always known, whereas in our case it isn't.
+        // We want neutral surrounded by uncoerced digits to resolve to the paragraph direction, which may be DONT_KNOW.
+        Bidirectional1 = KBTS_UNICODE_BIDIRECTIONAL_CLASS_R;
+      }
+      else if((Bidirectional2 == KBTS_UNICODE_BIDIRECTIONAL_CLASS_L) &&
+              (BidirectionalClass == KBTS_UNICODE_BIDIRECTIONAL_CLASS_L))
+      {
+        Bidirectional1 = KBTS_UNICODE_BIDIRECTIONAL_CLASS_L;
+      }
+      else
+      {
+        if     (State->ParagraphDirection == KBTS_DIRECTION_LTR) Bidirectional1 = KBTS_UNICODE_BIDIRECTIONAL_CLASS_L;
+        else if(State->ParagraphDirection == KBTS_DIRECTION_RTL) Bidirectional1 = KBTS_UNICODE_BIDIRECTIONAL_CLASS_R;
+        // Otherwise, don't coerce to anything.
+      }
+    }
+
+    FlushFlags |= KBTS__BREAK_FLUSH_FLAG_DIRECTION_2 |
+                  KBTS__BREAK_FLUSH_FLAG_DIRECTION_1;
+    if(EndOfText)
+    {
+      FlushFlags |= KBTS__BREAK_FLUSH_FLAG_DIRECTION_1;
+    }
+  }
+  else
+  {
+    SkipDirectionBreak:;
+    State->Bidirectional1PositionOffset -= (kbts_s16)PositionIncrement;
+  }
+
+  { // Grapheme breaking.
+    if(EndOfText && !StartOfText)
+    {
+      KBTS_BREAK(KBTS_BREAK_FLAG_GRAPHEME, 1);
+      State->GraphemeBreakState = KBTS_GRAPHEME_BREAK_STATE_START;
+    }
+    else
+    {
+      kbts_u8 GraphemeBreakState = kbts_GraphemeBreakTransition[GraphemeBreakClass][State->GraphemeBreakState];
+      switch(GraphemeBreakState)
+      {
+      case KBTS_GRAPHEME_BREAK_STATE_b01: KBTS_BREAK2(KBTS_BREAK_FLAG_GRAPHEME, 1, 0); GraphemeBreakState = KBTS_GRAPHEME_BREAK_STATE_START; break;
+      case KBTS_GRAPHEME_BREAK_STATE_b0: KBTS_BREAK(KBTS_BREAK_FLAG_GRAPHEME, 0); GraphemeBreakState = KBTS_GRAPHEME_BREAK_STATE_START; break;
+
+      case KBTS_GRAPHEME_BREAK_STATE_b1:
+      case KBTS_GRAPHEME_BREAK_STATE_b1toCR:
+      case KBTS_GRAPHEME_BREAK_STATE_b1toL:
+      case KBTS_GRAPHEME_BREAK_STATE_b1toLVxV:
+      case KBTS_GRAPHEME_BREAK_STATE_b1toLVTxT:
+      case KBTS_GRAPHEME_BREAK_STATE_b1toIndicConsonantxIndicLinker:
+      case KBTS_GRAPHEME_BREAK_STATE_PADDING0: // Padding values are just here to help the compiler.
+      case KBTS_GRAPHEME_BREAK_STATE_PADDING1:
+      case KBTS_GRAPHEME_BREAK_STATE_b1toExtendedPictographic:
+      case KBTS_GRAPHEME_BREAK_STATE_PADDING2:
+      case KBTS_GRAPHEME_BREAK_STATE_PADDING3:
+      case KBTS_GRAPHEME_BREAK_STATE_b1toRI:
+      case KBTS_GRAPHEME_BREAK_STATE_b1toSKIP:
+        KBTS_BREAK(KBTS_BREAK_FLAG_GRAPHEME, 1);
+        GraphemeBreakState -= KBTS_GRAPHEME_BREAK_STATE_b1;
+      }
+
+      State->GraphemeBreakState = GraphemeBreakState;
+    }
+  }
+
+  // Word breaks.
+  // We buffer 3 characters for word breaks.
+  // Each character gets 3 bits (padded to 4) representing 3 levels of priority.
+  #define KBTS_WORD_BREAK_BITS(Priority, Position) (((1u << ((Priority) + 1)) - 1) << ((Position) * 4))
+  #define KBTS_C2(A, B) case (KBTS_WORD_BREAK_CLASS_##A << 8) | (KBTS_WORD_BREAK_CLASS_##B)
+  #define KBTS_C3(A, B, C) case (KBTS_WORD_BREAK_CLASS_##A << 16) | (KBTS_WORD_BREAK_CLASS_##B << 8) | (KBTS_WORD_BREAK_CLASS_##C)
+
+  // Ignore [EX FO ZWJ] after ^[_sot_ CR LF NL].
+  // @Cleanup: This is the only time we explicitly use EX and FO. They can be merged.
+  if(KBTS__IN_SET(WordBreakClass, KBTS__SET32((KBTS_WORD_BREAK_CLASS_EX)(KBTS_WORD_BREAK_CLASS_FO)(KBTS_WORD_BREAK_CLASS_ZWJ))) &&
+     !KBTS__IN_SET(LastWordBreakClass, KBTS__SET32((KBTS_WORD_BREAK_CLASS_SOT)(KBTS_WORD_BREAK_CLASS_CR)(KBTS_WORD_BREAK_CLASS_LF)(KBTS_WORD_BREAK_CLASS_NL))))
+  {
+    // The buffered position lags behind the current codepoint, so we have to step it
+    // by the increment of the codepoint it lags by, not by PositionIncrement.
+    // Increments do not have to be uniform, so these can differ.
+    WordBreak2PositionOffset += PositionOffset2;
+    State->WordBreak2PositionOffset = WordBreak2PositionOffset;
+  }
+  else
+  {
+    kbts_u32 WordBreaks = State->WordBreaks << 4;
+    kbts_u32 WordUnbreaks = State->WordUnbreaks << 4;
+    WordBreakHistory = (WordBreakHistory << 8) | WordBreakClass;
+
+    WordBreaks |= KBTS_WORD_BREAK_BITS(0, 1) | KBTS_WORD_BREAK_BITS(0, 0);
+    if(StartOfText)
+    {
+      WordBreaks |= KBTS_WORD_BREAK_BITS(2, 1);
+    }
+
+    if(KBTS__IN_SET(WordBreakClass, KBTS__SET32((KBTS_WORD_BREAK_CLASS_CR)(KBTS_WORD_BREAK_CLASS_LF)(KBTS_WORD_BREAK_CLASS_NL))))
+    {
+      WordBreaks |= KBTS_WORD_BREAK_BITS(1, 1) | KBTS_WORD_BREAK_BITS(1, 0);
+    }
+    else if(KBTS__IN_SET(WordBreakClass, KBTS__SET32((KBTS_WORD_BREAK_CLASS_Oep)(KBTS_WORD_BREAK_CLASS_ALep))))
+    {
+      // ZWJ x {Extended_Pictographic}
+      if(LastWordBreakClassIncludingIgnored == KBTS_WORD_BREAK_CLASS_ZWJ)
+      {
+        WordUnbreaks |= KBTS_WORD_BREAK_BITS(0, 1);
+      }
+    }
+
+    switch(WordBreakHistory & 0xFFFF)
+    {
+      KBTS_C2(CR, LF): WordUnbreaks |= KBTS_WORD_BREAK_BITS(1, 1); break;
+
+      KBTS_C2(WSS, WSS):
+        // WSS x WSS is a special rule, because it is supposed to happen _before_ ignores.
+        if(WordBreak2PositionOffset >= 0) WordUnbreaks |= KBTS_WORD_BREAK_BITS(0, 1);
+        break;
+
+      // (RI RI)* RI x RI
+      KBTS_C2(RI, RI):
+        WordBreakHistory = 0;
+        KBTS__FALLTHROUGH;
+      KBTS_C2(HL, SQ):
+      KBTS_C2(ALnep, ALnep): KBTS_C2(ALnep, ALep): KBTS_C2(ALnep, HL): KBTS_C2(ALnep, NM): KBTS_C2(ALnep, ENL):
+      KBTS_C2(ALep, ALnep): KBTS_C2(ALep, ALep): KBTS_C2(ALep, HL): KBTS_C2(ALep, NM): KBTS_C2(ALep, ENL):
+      KBTS_C2(HL, ALnep): KBTS_C2(HL, ALep): KBTS_C2(HL, HL): KBTS_C2(HL, NM): KBTS_C2(HL, ENL):
+      KBTS_C2(NM, ALnep): KBTS_C2(NM, ALep): KBTS_C2(NM, HL): KBTS_C2(NM, NM): KBTS_C2(NM, ENL):
+      KBTS_C2(KA, KA): KBTS_C2(KA, ENL):
+      KBTS_C2(ENL, ALnep): KBTS_C2(ENL, ALep): KBTS_C2(ENL, HL): KBTS_C2(ENL, NM): KBTS_C2(ENL, KA): KBTS_C2(ENL, ENL):
+        WordUnbreaks |= KBTS_WORD_BREAK_BITS(0, 1); break;
+    }
+
+    switch(WordBreakHistory & 0xFFFFFF)
+    {
+      KBTS_C3(ALnep, ML, ALnep): KBTS_C3(ALnep, ML, ALep): KBTS_C3(ALnep, ML, HL):
+      KBTS_C3(ALnep, MNL, ALnep): KBTS_C3(ALnep, MNL, ALep): KBTS_C3(ALnep, MNL, HL):
+      KBTS_C3(ALnep, SQ, ALnep): KBTS_C3(ALnep, SQ, ALep): KBTS_C3(ALnep, SQ, HL):
+      KBTS_C3(ALep, ML, ALnep): KBTS_C3(ALep, ML, ALep): KBTS_C3(ALep, ML, HL):
+      KBTS_C3(ALep, MNL, ALnep): KBTS_C3(ALep, MNL, ALep): KBTS_C3(ALep, MNL, HL):
+      KBTS_C3(ALep, SQ, ALnep): KBTS_C3(ALep, SQ, ALep): KBTS_C3(ALep, SQ, HL):
+      KBTS_C3(HL, ML, ALnep): KBTS_C3(HL, ML, ALep): KBTS_C3(HL, ML, HL):
+      KBTS_C3(HL, MNL, ALnep): KBTS_C3(HL, MNL, ALep): KBTS_C3(HL, MNL, HL):
+      KBTS_C3(HL, SQ, ALnep): KBTS_C3(HL, SQ, ALep): KBTS_C3(HL, SQ, HL):
+      KBTS_C3(HL, DQ, HL):
+      KBTS_C3(NM, MN, NM): KBTS_C3(NM, MNL, NM): KBTS_C3(NM, SQ, NM):
+        WordUnbreaks |= KBTS_WORD_BREAK_BITS(0, 1) | KBTS_WORD_BREAK_BITS(0, 2); break;
+    }
+
+    kbts_u32 EffectiveWordBreaks = WordBreaks & ~WordUnbreaks;
+    if(EffectiveWordBreaks & KBTS_WORD_BREAK_BITS(2, 2))
+    {
+      kbts__DoBreak(State, PositionOffset2 + WordBreak2PositionOffset, KBTS_BREAK_FLAG_WORD, 0, 0, 0);
+    }
+    if(EndOfText)
+    {
+      // Always break at the end of the text.
+      KBTS_BREAK(KBTS_BREAK_FLAG_WORD, 1);
+      // Do not break after the end of the text.
+    }
+
+    State->WordBreaks = (kbts_u16)WordBreaks;
+    State->WordUnbreaks = (kbts_u16)WordUnbreaks;
+    State->LastWordBreakClass = WordBreakClass;
+    State->WordBreak2PositionOffset = 0;
+    State->WordBreakHistory = WordBreakHistory;
+  }
+  State->LastWordBreakClassIncludingIgnored = WordBreakClass;
+  #undef KBTS_WORD_BREAK_BITS
+  #undef KBTS_C2
+  #undef KBTS_C3
 
   // We flush scripts late because hard line breaks also want to flush scripts.
   //
@@ -28231,11 +30859,13 @@ static void kbts__BreakAddCodepoint(kbts_break_state *State, kbts_u32 Codepoint,
   // or we have only seen common/inherited scripts so far.
   // Either way, we want everything before us to coerce to our type, so don't actually break,
   // and do not update the script break position.
-  if((FlushFlags & KBTS__BREAK_FLUSH_FLAG_SCRIPT) &&
-     ScriptCountAtBeginningOfUpdate)
+  if(FlushFlags & KBTS__BREAK_FLUSH_FLAG_SCRIPT)
   {
-    kbts__DoBreak(State, ScriptPositionOffset, KBTS_BREAK_FLAG_SCRIPT, 0, 0, BreakScript);
-    ScriptPositionOffset = 0;
+    if(ScriptCountAtBeginningOfUpdate)
+    {
+      kbts__DoBreak(State, ScriptPositionOffset, KBTS_BREAK_FLAG_SCRIPT, 0, 0, BreakScript);
+      ScriptPositionOffset = 0;
+    }
 
     if(HardLineBreak)
     {
@@ -28244,10 +30874,6 @@ static void kbts__BreakAddCodepoint(kbts_break_state *State, kbts_u32 Codepoint,
     }
   }
 
-  if(FlushFlags & KBTS__BREAK_FLUSH_FLAG_DIRECTION_2)
-  {
-    kbts__FlushDirection(State, &LastDirection, Bidirectional2, Bidirectional2PositionOffset);
-  }
   if(FlushFlags & KBTS__BREAK_FLUSH_FLAG_DIRECTION_1)
   {
     kbts__FlushDirection(State, &LastDirection, Bidirectional1, Bidirectional1PositionOffset);
@@ -28299,7 +30925,6 @@ static void kbts__BreakAddCodepoint(kbts_break_state *State, kbts_u32 Codepoint,
     // Only update the buffer if we've actually flushed something.
     State->BidirectionalClass2 = Bidirectional1;
     State->BidirectionalClass1 = BidirectionalClass;
-    State->Bidirectional2PositionOffset = State->Bidirectional1PositionOffset - (kbts_s16)PositionIncrement;
     State->Bidirectional1PositionOffset = (kbts_s16)-(int)PositionIncrement;
   }
   State->LastDirection = (kbts_u8)LastDirection;
@@ -28444,7 +31069,6 @@ KBTS_EXPORT void kbts_BreakBegin(kbts_break_state *State, kbts_direction Paragra
     State->LineBreak2PositionOffset = -100;
     State->LineBreak3PositionOffset = -100;
     State->Bidirectional1PositionOffset = -100;
-    State->Bidirectional2PositionOffset = -100;
 
     kbts__BreakStateStartParagraph(State);
 
@@ -28716,6 +31340,547 @@ KBTS_EXPORT int kbts_ScriptIsComplex(kbts_script Script)
 
   kbts__script_properties *Properties = &kbts__ScriptProperties[Script];
   int Result = kbts__ShaperIsComplex(Properties->Shaper);
+  return Result;
+}
+
+KBTS_EXPORT int kbts_WindowsIdsForLanguage(kbts_language Language, kbts_windows_language_id *Ids, int IdCapacity)
+{
+  int Result = 0;
+  kbts_windows_language_id Id0, Id1, Id2, Id3, Id4;
+
+  #define KBTS__CASE1(KbtsLanguage, Id0_) case KBTS_LANGUAGE_##KbtsLanguage: Id0 = KBTS_WINDOWS_LANGUAGE_ID_##Id0_; goto Case1;
+  #define KBTS__CASE2(KbtsLanguage, Id0_, Id1_) case KBTS_LANGUAGE_##KbtsLanguage: Id0 = KBTS_WINDOWS_LANGUAGE_ID_##Id0_; Id1 = KBTS_WINDOWS_LANGUAGE_ID_##Id1_; goto Case2;
+  #define KBTS__CASE3(KbtsLanguage, Id0_, Id1_, Id2_) case KBTS_LANGUAGE_##KbtsLanguage: Id0 = KBTS_WINDOWS_LANGUAGE_ID_##Id0_; Id1 = KBTS_WINDOWS_LANGUAGE_ID_##Id1_; Id2 = KBTS_WINDOWS_LANGUAGE_ID_##Id2_; goto Case3;
+  #define KBTS__CASE4(KbtsLanguage, Id0_, Id1_, Id2_, Id3_) case KBTS_LANGUAGE_##KbtsLanguage: Id0 = KBTS_WINDOWS_LANGUAGE_ID_##Id0_; Id1 = KBTS_WINDOWS_LANGUAGE_ID_##Id1_; Id2 = KBTS_WINDOWS_LANGUAGE_ID_##Id2_; Id3 = KBTS_WINDOWS_LANGUAGE_ID_##Id3_; goto Case4;
+  #define KBTS__CASE5(KbtsLanguage, Id0_, Id1_, Id2_, Id3_, Id4_) case KBTS_LANGUAGE_##KbtsLanguage: Id0 = KBTS_WINDOWS_LANGUAGE_ID_##Id0_; Id1 = KBTS_WINDOWS_LANGUAGE_ID_##Id1_; Id2 = KBTS_WINDOWS_LANGUAGE_ID_##Id2_; Id3 = KBTS_WINDOWS_LANGUAGE_ID_##Id3_; Id4 = KBTS_WINDOWS_LANGUAGE_ID_##Id4_; goto Case5;
+
+  switch(Language)
+  {
+    KBTS__CASE2(AFRIKAANS, AFRIKAANS_SOUTH_AFRICA, AFRIKAANS);
+    KBTS__CASE2(ALBANIAN, ALBANIAN_ALBANIA, ALBANIAN);
+    KBTS__CASE2(ALSATIAN, ALSATIAN_FRANCE, ALSATIAN);
+    KBTS__CASE2(AMHARIC, AMHARIC_ETHIOPIA, AMHARIC);
+
+    case KBTS_LANGUAGE_ARABIC:
+    case KBTS_LANGUAGE_CYPRIOT_ARABIC:
+    {
+      Result = 17;
+      if(IdCapacity >= 17)
+      {
+        Ids[0] = KBTS_WINDOWS_LANGUAGE_ID_ARABIC_EGYPT;
+        Ids[1] = KBTS_WINDOWS_LANGUAGE_ID_ARABIC_SAUDI_ARABIA;
+        Ids[2] = KBTS_WINDOWS_LANGUAGE_ID_ARABIC_SYRIA;
+        Ids[3] = KBTS_WINDOWS_LANGUAGE_ID_ARABIC_UAE;
+        Ids[4] = KBTS_WINDOWS_LANGUAGE_ID_ARABIC_IRAQ;
+        Ids[5] = KBTS_WINDOWS_LANGUAGE_ID_ARABIC_QATAR;
+        Ids[6] = KBTS_WINDOWS_LANGUAGE_ID_ARABIC_YEMEN;
+        Ids[7] = KBTS_WINDOWS_LANGUAGE_ID_ARABIC_OMAN;
+        Ids[8] = KBTS_WINDOWS_LANGUAGE_ID_ARABIC_JORDAN;
+        Ids[9] = KBTS_WINDOWS_LANGUAGE_ID_ARABIC_MOROCCO;
+        Ids[10] = KBTS_WINDOWS_LANGUAGE_ID_ARABIC_ALGERIA;
+        Ids[11] = KBTS_WINDOWS_LANGUAGE_ID_ARABIC_TUNISIA;
+        Ids[12] = KBTS_WINDOWS_LANGUAGE_ID_ARABIC_BAHRAIN;
+        Ids[13] = KBTS_WINDOWS_LANGUAGE_ID_ARABIC_LEBANON;
+        Ids[14] = KBTS_WINDOWS_LANGUAGE_ID_ARABIC_LIBYA;
+        Ids[15] = KBTS_WINDOWS_LANGUAGE_ID_ARABIC_KUWAIT;
+        Ids[16] = KBTS_WINDOWS_LANGUAGE_ID_ARABIC;
+      }
+    } break;
+
+    KBTS__CASE2(ARMENIAN, ARMENIAN_ARMENIA, ARMENIAN);
+    KBTS__CASE2(ASSAMESE, ASSAMESE_INDIA, ASSAMESE);
+    KBTS__CASE5(AZERBAIJANI, AZERBAIJANI_CYRILLIC_AZERBAIJAN, AZERBAIJANI_LATIN_AZERBAIJAN, AZERBAIJANI_CYRILLIC, AZERBAIJANI_LATIN_2, AZERBAIJANI_LATIN);
+    KBTS__CASE3(BANGLA, BANGLA_BANGLADESH, BANGLA_INDIA, BANGLA);
+    KBTS__CASE2(BASHKIR, BASHKIR_RUSSIA, BASHKIR);
+    KBTS__CASE2(BASQUE, BASQUE_SPAIN, BASQUE);
+    KBTS__CASE2(BELARUSIAN, BELARUSIAN_BELARUS, BELARUSIAN);
+    KBTS__CASE5(BOSNIAN, BOSNIAN_CYRILLIC_BOSNIA_HERZEGOVINA, BOSNIAN_CYRILLIC, BOSNIAN_LATIN_BOSNIA_HERZEGOVINA, BOSNIAN_LATIN_2, BOSNIAN_LATIN);
+    KBTS__CASE2(BRETON, BRETON_FRANCE, BRETON);
+    KBTS__CASE2(BULGARIAN, BULGARIAN_BULGARIA, BULGARIAN);
+    KBTS__CASE2(BURMESE, BURMESE_MYANMAR, BURMESE);
+    KBTS__CASE2(CATALAN, CATALAN_SPAIN, CATALAN);
+    KBTS__CASE3(CHEROKEE, CHEROKEE_UNITED_STATES, CHEROKEE_2, CHEROKEE);
+    KBTS__CASE4(CHINESE_SIMPLIFIED, CHINESE_SIMPLIFIED_PRC, CHINESE_SIMPLIFIED_SINGAPORE, CHINESE_SIMPLIFIED_2, CHINESE_SIMPLIFIED);
+    KBTS__CASE4(CHINESE_TRADITIONAL, CHINESE_TRADITIONAL_TAIWAN, CHINESE_TRADITIONAL_MACAO, CHINESE_TRADITIONAL_HONG_KONG, CHINESE_TRADITIONAL);
+    KBTS__CASE2(CHINESE_TRADITIONAL_HONG_KONG, CHINESE_TRADITIONAL_HONG_KONG, CHINESE_TRADITIONAL);
+    KBTS__CASE2(CHINESE_TRADITIONAL_MACAO, CHINESE_TRADITIONAL_MACAO, CHINESE_TRADITIONAL);
+    KBTS__CASE2(CORSICAN, CORSICAN_FRANCE, CORSICAN);
+    KBTS__CASE3(CROATIAN, CROATIAN_CROATIA, CROATIAN_LATIN_BOSNIA_HERZEGOVINA, CROATIAN);
+    KBTS__CASE2(CZECH, CZECH_CZECHIA, CZECH);
+    KBTS__CASE2(DANISH, DANISH_DENMARK, DANISH);
+    KBTS__CASE2(DARI, DARI_AFGHANISTAN, DARI);
+    KBTS__CASE2(DIVEHI, DIVEHI_MALDIVES, DIVEHI);
+    KBTS__CASE3(DUTCH, DUTCH_NETHERLANDS, DUTCH_BELGIUM, DUTCH);
+    KBTS__CASE1(DZONGKHA, DZONGKHA_BHUTAN);
+
+    case KBTS_LANGUAGE_ENGLISH:
+    {
+      Result = 19;
+      if(IdCapacity >= 19)
+      {
+        Ids[0] = KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_UNITED_STATES;
+        Ids[1] = KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_UNITED_KINGDOM;
+        Ids[2] = KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_IRELAND;
+        Ids[3] = KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_AUSTRALIA;
+        Ids[4] = KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_CANADA;
+        Ids[5] = KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_NEW_ZEALAND;
+        Ids[6] = KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_SINGAPORE;
+        Ids[7] = KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_HONG_KONG;
+        Ids[8] = KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_MALAYSIA;
+        Ids[9] = KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_INDIA;
+        Ids[10] = KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_JAMAICA;
+        Ids[11] = KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_CARIBBEAN;
+        Ids[12] = KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_PHILIPPINES;
+        Ids[13] = KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_SOUTH_AFRICA;
+        Ids[14] = KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_TRINIDAD_TOBAGO;
+        Ids[15] = KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_BELIZE;
+        Ids[16] = KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_UNITED_ARAB_EMIRATES;
+        Ids[17] = KBTS_WINDOWS_LANGUAGE_ID_ENGLISH_ZIMBABWE;
+        Ids[18] = KBTS_WINDOWS_LANGUAGE_ID_ENGLISH;
+      }
+    } break;
+
+    KBTS__CASE2(ESTONIAN, ESTONIAN_ESTONIA, ESTONIAN);
+    KBTS__CASE2(FAROESE, FAROESE_FAROE_ISLANDS, FAROESE);
+    KBTS__CASE2(FILIPINO, FILIPINO_PHILIPPINES, FILIPINO);
+    KBTS__CASE2(FINNISH, FINNISH_FINLAND, FINNISH);
+
+    case KBTS_LANGUAGE_FRENCH:
+    case KBTS_LANGUAGE_FRENCH_ANTILLEAN:
+    {
+      Result = 16;
+      if(IdCapacity >= 16)
+      {
+        Ids[0] = KBTS_WINDOWS_LANGUAGE_ID_FRENCH_FRANCE;
+        Ids[1] = KBTS_WINDOWS_LANGUAGE_ID_FRENCH_BELGIUM;
+        Ids[2] = KBTS_WINDOWS_LANGUAGE_ID_FRENCH_SWITZERLAND;
+        Ids[3] = KBTS_WINDOWS_LANGUAGE_ID_FRENCH_LUXEMBOURG;
+        Ids[4] = KBTS_WINDOWS_LANGUAGE_ID_FRENCH_MONACO;
+        Ids[5] = KBTS_WINDOWS_LANGUAGE_ID_FRENCH_CANADA;
+        Ids[6] = KBTS_WINDOWS_LANGUAGE_ID_FRENCH_REUNION;
+        Ids[7] = KBTS_WINDOWS_LANGUAGE_ID_FRENCH_COTE_D_IVOIRE;
+        Ids[8] = KBTS_WINDOWS_LANGUAGE_ID_FRENCH_MOROCCO;
+        Ids[9] = KBTS_WINDOWS_LANGUAGE_ID_FRENCH_SENEGAL;
+        Ids[10] = KBTS_WINDOWS_LANGUAGE_ID_FRENCH_MALI;
+        Ids[11] = KBTS_WINDOWS_LANGUAGE_ID_FRENCH_HAITI;
+        Ids[12] = KBTS_WINDOWS_LANGUAGE_ID_FRENCH_DRC;
+        Ids[13] = KBTS_WINDOWS_LANGUAGE_ID_FRENCH_CARIBBEAN;
+        Ids[14] = KBTS_WINDOWS_LANGUAGE_ID_FRENCH_CAMEROON;
+        Ids[15] = KBTS_WINDOWS_LANGUAGE_ID_FRENCH;
+      }
+    } break;
+
+    KBTS__CASE2(FRISIAN, FRISIAN_NETHERLANDS, FRISIAN);
+    KBTS__CASE4(FULAH, FULAH_NIGERIA, FULAH_SENEGAL, FULAH_LATIN, FULAH);
+    KBTS__CASE2(GALICIAN, GALICIAN_SPAIN, GALICIAN);
+    KBTS__CASE2(GEORGIAN, GEORGIAN_GEORGIA, GEORGIAN);
+
+    case KBTS_LANGUAGE_GERMAN:
+    {
+      Result = 6;
+      if(IdCapacity >= 6)
+      {
+        Ids[0] = KBTS_WINDOWS_LANGUAGE_ID_GERMAN_GERMANY;
+        Ids[1] = KBTS_WINDOWS_LANGUAGE_ID_GERMAN_AUSTRIA;
+        Ids[2] = KBTS_WINDOWS_LANGUAGE_ID_GERMAN_SWITZERLAND;
+        Ids[3] = KBTS_WINDOWS_LANGUAGE_ID_GERMAN_LIECHTENSTEIN;
+        Ids[4] = KBTS_WINDOWS_LANGUAGE_ID_GERMAN_LUXEMBOURG;
+        Ids[5] = KBTS_WINDOWS_LANGUAGE_ID_GERMAN;
+      }
+    } break;
+
+    KBTS__CASE2(GREEK, GREEK_GREECE, GREEK);
+    KBTS__CASE2(GREENLANDIC, GREENLANDIC_GREENLAND, GREENLANDIC);
+    KBTS__CASE2(GUARANI, GUARANI_PARAGUAY, GUARANI);
+    KBTS__CASE2(GUJARATI, GUJARATI_INDIA, GUJARATI);
+    KBTS__CASE3(HAUSA, HAUSA_NIGERIA, HAUSA_LATIN, HAUSA);
+    KBTS__CASE2(HAWAIIAN, HAWAIIAN_UNITED_STATES, HAWAIIAN);
+    KBTS__CASE2(HEBREW, HEBREW_ISRAEL, HEBREW);
+    KBTS__CASE2(HINDI, HINDI_INDIA, HINDI);
+    KBTS__CASE2(HUNGARIAN, HUNGARIAN_HUNGARY, HUNGARIAN);
+    KBTS__CASE2(ICELANDIC, ICELANDIC_ICELAND, ICELANDIC);
+    KBTS__CASE2(IGBO, IGBO_NIGERIA, IGBO);
+    KBTS__CASE2(INDONESIAN, INDONESIAN_INDONESIA, INDONESIAN);
+    KBTS__CASE5(INUKTITUT, INUKTITUT_LATIN_CANADA, INUKTITUT_LATIN, INUKTITUT_SYLLABICS_CANADA, INUKTITUT_SYLLABICS, INUKTITUT);
+
+    case KBTS_LANGUAGE_IRISH_TRADITIONAL:
+    KBTS__CASE2(IRISH, IRISH_IRELAND, IRISH);
+
+    KBTS__CASE3(ITALIAN, ITALIAN_ITALY, ITALIAN_SWITZERLAND, ITALIAN);
+    KBTS__CASE2(JAPANESE, JAPANESE_JAPAN, JAPANESE);
+    KBTS__CASE2(KANNADA, KANNADA_INDIA, KANNADA);
+    KBTS__CASE1(KANURI, KANURI_LATIN_NIGERIA);
+    KBTS__CASE3(KASHMIRI, KASHMIRI_PERSO_ARABIC, KASHMIRI_DEVANAGARI_INDIA, KASHMIRI);
+    KBTS__CASE2(KAZAKH, KAZAKH_KAZAKHSTAN, KAZAKH);
+    KBTS__CASE2(KHMER, KHMER_CAMBODIA, KHMER);
+    KBTS__CASE2(KICHE, KICHE_GUATEMALA, KICHE);
+    KBTS__CASE2(KINYARWANDA, KINYARWANDA_RWANDA, KINYARWANDA);
+    KBTS__CASE2(KONKANI, KONKANI_INDIA, KONKANI);
+
+    case KBTS_LANGUAGE_KOREAN_OLD_HANGUL:
+    KBTS__CASE2(KOREAN, KOREAN_KOREA, KOREAN);
+    KBTS__CASE2(KYRGYZ, KYRGYZ_KYRGYZSTAN, KYRGYZ);
+    KBTS__CASE2(LAO, LAO_PDR, LAO);
+    KBTS__CASE1(LATIN, LATIN_VATICAN);
+    KBTS__CASE2(LATVIAN, LATVIAN_LATVIA, LATVIAN);
+    KBTS__CASE2(LITHUANIAN, LITHUANIAN_LITHUANIA, LITHUANIAN);
+    KBTS__CASE2(LOWER_SORBIAN, LOWER_SORBIAN_GERMANY, LOWER_SORBIAN);
+    KBTS__CASE2(LUXEMBOURGISH, LUXEMBOURGISH_LUXEMBOURG, LUXEMBOURGISH);
+    KBTS__CASE2(MACEDONIAN, MACEDONIAN_NORTH_MACEDONIA, MACEDONIAN);
+    KBTS__CASE3(MALAY, MALAY_MALAYSIA, MALAY_BRUNEI, MALAY);
+    KBTS__CASE2(MALAYALAM, MALAYALAM_INDIA, MALAYALAM);
+    KBTS__CASE2(MALTESE, MALTESE_MALTA, MALTESE);
+    KBTS__CASE2(MAORI, MAORI_NEW_ZEALAND, MAORI);
+    KBTS__CASE2(MAPUDUNGUN, MAPUDUNGUN_CHILE, MAPUDUNGUN);
+    KBTS__CASE2(MARATHI, MARATHI_INDIA, MARATHI);
+    KBTS__CASE2(MOHAWK, MOHAWK_CANADA, MOHAWK);
+
+    case KBTS_LANGUAGE_MONGOLIAN:
+    {
+      Result = 6;
+      if(IdCapacity >= 6)
+      {
+        Ids[0] = KBTS_WINDOWS_LANGUAGE_ID_MONGOLIAN_TRADITIONAL_MONGOLIA;
+        Ids[1] = KBTS_WINDOWS_LANGUAGE_ID_MONGOLIAN_CYRILLIC_MONGOLIA;
+        Ids[2] = KBTS_WINDOWS_LANGUAGE_ID_MONGOLIAN_TRADITIONAL_PRC;
+        Ids[3] = KBTS_WINDOWS_LANGUAGE_ID_MONGOLIAN_TRADITIONAL;
+        Ids[4] = KBTS_WINDOWS_LANGUAGE_ID_MONGOLIAN_CYRILLIC;
+        Ids[5] = KBTS_WINDOWS_LANGUAGE_ID_MONGOLIAN;
+      }
+    } break;
+
+    KBTS__CASE3(NEPALI, NEPALI_NEPAL, NEPALI_INDIA, NEPALI);
+    KBTS__CASE5(NORWEGIAN, NORWEGIAN_NYNORSK_NORWAY, NORWEGIAN_NYNORSK, NORWEGIAN_BOKMAL_NORWAY, NORWEGIAN_BOKMAL, NORWEGIAN);
+    KBTS__CASE2(OCCITAN, OCCITAN_FRANCE, OCCITAN);
+    KBTS__CASE2(ODIA, ODIA_INDIA, ODIA);
+    KBTS__CASE2(OROMO, OROMO_ETHIOPIA, OROMO);
+    KBTS__CASE2(PASHTO, PASHTO_AFGHANISTAN, PASHTO);
+    KBTS__CASE2(PERSIAN, PERSIAN_IRAN, PERSIAN);
+    KBTS__CASE2(POLISH, POLISH_POLAND, POLISH);
+    KBTS__CASE3(PORTUGUESE, PORTUGUESE_PORTUGAL, PORTUGUESE_BRAZIL, PORTUGUESE);
+    KBTS__CASE4(PUNJABI, PUNJABI_INDIA, PUNJABI_PAKISTAN, PUNJABI_ARABIC, PUNJABI);
+    KBTS__CASE4(QUECHUA, QUECHUA_PERU, QUECHUA_ECUADOR, QUECHUA_BOLIVIA, QUECHUA);
+    KBTS__CASE3(ROMANIAN, ROMANIAN_ROMANIA, ROMANIAN_MOLDOVA, ROMANIAN);
+    KBTS__CASE2(ROMANSH, ROMANSH_SWITZERLAND, ROMANSH);
+
+    case KBTS_LANGUAGE_RUSSIAN_BURIAT:
+    KBTS__CASE3(RUSSIAN, RUSSIAN_RUSSIA, RUSSIAN_MOLDOVA, RUSSIAN);
+
+    KBTS__CASE2(SAKHA, SAKHA_RUSSIA, SAKHA);
+    KBTS__CASE2(SANSKRIT, SANSKRIT_INDIA, SANSKRIT);
+    KBTS__CASE2(SCOTTISH_GAELIC, SCOTTISH_GAELIC_UNITED_KINGDOM, SCOTTISH_GAELIC);
+
+    case KBTS_LANGUAGE_SERBIAN:
+    {
+      Result = 11;
+      if(IdCapacity >= 11)
+      {
+        Ids[0] = KBTS_WINDOWS_LANGUAGE_ID_SERBIAN_CYRILLIC_SERBIA;
+        Ids[1] = KBTS_WINDOWS_LANGUAGE_ID_SERBIAN_LATIN_SERBIA;
+        Ids[2] = KBTS_WINDOWS_LANGUAGE_ID_SERBIAN_CYRILLIC_SERBIA_MONTENEGRO;
+        Ids[3] = KBTS_WINDOWS_LANGUAGE_ID_SERBIAN_LATIN_SERBIA_MONTENEGRO;
+        Ids[4] = KBTS_WINDOWS_LANGUAGE_ID_SERBIAN_CYRILLIC_BOSNIA_HERZEGOVINA;
+        Ids[5] = KBTS_WINDOWS_LANGUAGE_ID_SERBIAN_LATIN_BOSNIA_HERZEGOVINA;
+        Ids[6] = KBTS_WINDOWS_LANGUAGE_ID_SERBIAN_CYRILLIC_MONTENEGRO;
+        Ids[7] = KBTS_WINDOWS_LANGUAGE_ID_SERBIAN_LATIN_MONTENEGRO;
+        Ids[8] = KBTS_WINDOWS_LANGUAGE_ID_SERBIAN_CYRILLIC;
+        Ids[9] = KBTS_WINDOWS_LANGUAGE_ID_SERBIAN_LATIN;
+        Ids[10] = KBTS_WINDOWS_LANGUAGE_ID_SERBIAN;
+      }
+    } break;
+
+    KBTS__CASE3(SINDHI, SINDHI_PAKISTAN, SINDHI_ARABIC, SINDHI);
+    KBTS__CASE2(SINHALA, SINHALA_SRI_LANKA, SINHALA);
+    KBTS__CASE2(SLOVAK, SLOVAK_SLOVAKIA, SLOVAK);
+    KBTS__CASE2(SLOVENIAN, SLOVENIAN_SLOVENIA, SLOVENIAN);
+    KBTS__CASE2(SOMALI, SOMALI_SOMALIA, SOMALI);
+
+    case KBTS_LANGUAGE_SPANISH:
+    {
+      Result = 24;
+      if(IdCapacity >= 24)
+      {
+        Ids[0] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_SPAIN;
+        Ids[1] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_SPAIN_TRADITIONAL_SORT;
+        Ids[2] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_MEXICO;
+        Ids[3] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_UNITED_STATES;
+        Ids[4] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_ARGENTINA;
+        Ids[5] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_CHILE;
+        Ids[6] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_VENEZUELA;
+        Ids[7] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_COSTA_RICA;
+        Ids[8] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_CUBA;
+        Ids[9] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_COLOMBIA;
+        Ids[10] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_PARAGUAY;
+        Ids[11] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_URUGUAY;
+        Ids[12] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_BOLIVIA;
+        Ids[13] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_ECUADOR;
+        Ids[14] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_PERU;
+        Ids[15] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_PANAMA;
+        Ids[16] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_DOMINICAN_REPUBLIC;
+        Ids[17] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_EL_SALVADOR;
+        Ids[18] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_GUATEMALA;
+        Ids[19] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_HONDURAS;
+        Ids[20] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_NICARAGUA;
+        Ids[21] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_LATIN_AMERICA;
+        Ids[22] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH_PUERTO_RICO;
+        Ids[23] = KBTS_WINDOWS_LANGUAGE_ID_SPANISH;
+      }
+    } break;
+
+    KBTS__CASE1(STANDARD_MOROCCAN_TAMAZIGHT, CENTRAL_ATLAS_TAMAZIGHT_ARABIC);
+    KBTS__CASE3(SWEDISH, SWEDISH_SWEDEN, SWEDISH_FINLAND, SWEDISH);
+
+    case KBTS_LANGUAGE_SYRIAC_EASTERN:
+    case KBTS_LANGUAGE_SYRIAC_ESTRANGELA:
+    case KBTS_LANGUAGE_SYRIAC_WESTERN:
+    KBTS__CASE2(SYRIAC, SYRIAC_SYRIA, SYRIAC);
+
+    KBTS__CASE3(TAJIKI, TAJIKI_CYRILLIC_TAJIKISTAN, TAJIKI_CYRILLIC, TAJIKI);
+    KBTS__CASE3(TAMAZIGHT, TAMAZIGHT_LATIN_ALGERIA, TAMAZIGHT_LATIN, TAMAZIGHT);
+    KBTS__CASE3(TAMIL, TAMIL_SRI_LANKA, TAMIL_INDIA, TAMIL);
+    KBTS__CASE2(TATAR, TATAR_RUSSIA, TATAR);
+    KBTS__CASE2(TELUGU, TELUGU_INDIA, TELUGU);
+
+    case KBTS_LANGUAGE_THAILAND_MON:
+    KBTS__CASE2(THAI, THAI_THAILAND, THAI);
+
+    KBTS__CASE2(TIBETAN, TIBETAN_PRC, TIBETAN);
+    KBTS__CASE3(TIGRINYA, TIGRINYA_ERITREA, TIGRINYA_ETHIOPIA, TIGRINYA);
+    KBTS__CASE2(TSONGA, TSONGA_SOUTH_AFRICA, TSONGA);
+    KBTS__CASE2(TURKISH, TURKISH_TURKEY, TURKISH);
+    KBTS__CASE2(TURKMEN, TURKMEN_TURKMENISTAN, TURKMEN);
+    KBTS__CASE2(UKRAINIAN, UKRAINIAN_UKRAINE, UKRAINIAN);
+    KBTS__CASE2(UPPER_SORBIAN, UPPER_SORBIAN_GERMANY, UPPER_SORBIAN);
+    KBTS__CASE3(URDU, URDU_INDIA, URDU_PAKISTAN, URDU);
+    KBTS__CASE2(UYGHUR, UYGHUR_PRC, UYGHUR);
+    KBTS__CASE5(UZBEK, UZBEK_CYRILLIC_UZBEKISTAN, UZBEK_CYRILLIC, UZBEK_LATIN_UZBEKISTAN, UZBEK_LATIN, UZBEK);
+    KBTS__CASE2(VENDA, VENDA_SOUTH_AFRICA, VENDA);
+    KBTS__CASE2(VIETNAMESE, VIETNAMESE_VIETNAM, VIETNAMESE);
+    KBTS__CASE2(WELSH, WELSH_UNITED_KINGDOM, WELSH);
+    KBTS__CASE2(WOLOF, WOLOF_SENEGAL, WOLOF);
+    KBTS__CASE2(XHOSA, XHOSA_SOUTH_AFRICA, XHOSA);
+
+    case KBTS_LANGUAGE_YI_CLASSIC:
+    KBTS__CASE2(YI_MODERN, YI_PRC, YI);
+
+    KBTS__CASE1(YIDDISH, YIDDISH);
+    KBTS__CASE2(YORUBA, YORUBA_NIGERIA, YORUBA);
+    KBTS__CASE2(ZULU, ZULU_SOUTH_AFRICA, ZULU);
+  }
+
+  if(0)
+  {
+    Case5:
+    Result = 5;
+    if(IdCapacity >= 5)
+    {
+      Ids[0] = Id0;
+      Ids[1] = Id1;
+      Ids[2] = Id2;
+      Ids[3] = Id3;
+      Ids[4] = Id4;
+    }
+  }
+
+  if(0)
+  {
+    Case4:
+    Result = 4;
+    if(IdCapacity >= 4)
+    {
+      Ids[0] = Id0;
+      Ids[1] = Id1;
+      Ids[2] = Id2;
+      Ids[3] = Id3;
+    }
+  }
+
+  if(0)
+  {
+    Case3:
+    Result = 3;
+    if(IdCapacity >= 3)
+    {
+      Ids[0] = Id0;
+      Ids[1] = Id1;
+      Ids[2] = Id2;
+    }
+  }
+
+  if(0)
+  {
+    Case2:
+    Result = 2;
+    if(IdCapacity >= 2)
+    {
+      Ids[0] = Id0;
+      Ids[1] = Id1;
+    }
+  }
+
+  if(0)
+  {
+    Case1:
+    Result = 1;
+    if(IdCapacity >= 1)
+    {
+      Ids[0] = Id0;
+    }
+  }
+
+  #undef KBTS__CASE1
+  #undef KBTS__CASE2
+  #undef KBTS__CASE3
+  #undef KBTS__CASE4
+  #undef KBTS__CASE5
+
+  return Result;
+}
+
+KBTS_EXPORT int kbts_LookupFontString(kbts_font *Font, kbts_font_info_string_id StringId, kbts_windows_language_id LanguageId, char *String, int StringCapacity)
+{
+  int Result = 0;
+
+  if(Font && Font->Blob)
+  {
+    kbts_un StringCapacityU = (kbts_un)StringCapacity;
+    kbts__name *Name = kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_NAME, kbts__name);
+
+    if(Name)
+    {
+      kbts_u16 OpenTypeStringId = (kbts_u16)StringId;
+
+      if(OpenTypeStringId < KBTS_FONT_INFO_STRING_ID_COUNT1)
+      {
+        // @Cleanup: Since we reserve this transform to the first few IDs, we can probably
+        // make it much simpler.
+        switch(StringId)
+        {
+        case KBTS_FONT_INFO_STRING_ID_COPYRIGHT: OpenTypeStringId = 0; break;
+        case KBTS_FONT_INFO_STRING_ID_FAMILY: OpenTypeStringId = 1; break;
+        case KBTS_FONT_INFO_STRING_ID_SUBFAMILY: OpenTypeStringId = 2; break;
+        case KBTS_FONT_INFO_STRING_ID_UID: OpenTypeStringId = 3; break;
+        case KBTS_FONT_INFO_STRING_ID_FULL_NAME: OpenTypeStringId = 4; break;
+        case KBTS_FONT_INFO_STRING_ID_VERSION: OpenTypeStringId = 5; break;
+        case KBTS_FONT_INFO_STRING_ID_POSTSCRIPT_NAME: OpenTypeStringId = 6; break;
+        case KBTS_FONT_INFO_STRING_ID_TRADEMARK: OpenTypeStringId = 7; break;
+        case KBTS_FONT_INFO_STRING_ID_MANUFACTURER: OpenTypeStringId = 8; break;
+        case KBTS_FONT_INFO_STRING_ID_DESIGNER: OpenTypeStringId = 9; break;
+        case KBTS_FONT_INFO_STRING_ID_TYPOGRAPHIC_FAMILY: OpenTypeStringId = 16; break;
+        case KBTS_FONT_INFO_STRING_ID_TYPOGRAPHIC_SUBFAMILY: OpenTypeStringId = 17; break;
+        case KBTS_FONT_INFO_STRING_ID_DESCRIPTION: OpenTypeStringId = 10; break;
+        case KBTS_FONT_INFO_STRING_ID_VENDOR_URL: OpenTypeStringId = 11; break;
+        case KBTS_FONT_INFO_STRING_ID_DESIGNER_URL: OpenTypeStringId = 12; break;
+        case KBTS_FONT_INFO_STRING_ID_LICENSE: OpenTypeStringId = 13; break;
+        case KBTS_FONT_INFO_STRING_ID_LICENSE_URL: OpenTypeStringId = 14; break;
+        case KBTS_FONT_INFO_STRING_ID_COMPATIBLE_FULL_NAME: OpenTypeStringId = 18; break;
+        case KBTS_FONT_INFO_STRING_ID_SAMPLE_TEXT: OpenTypeStringId = 19; break;
+        case KBTS_FONT_INFO_STRING_ID_POSTSCRIPT_CID_FINDFONT_NAME: OpenTypeStringId = 20; break;
+        case KBTS_FONT_INFO_STRING_ID_WWS_FAMILY_NAME: OpenTypeStringId = 21; break;
+        case KBTS_FONT_INFO_STRING_ID_WWS_SUBFAMILY_NAME: OpenTypeStringId = 22; break;
+        case KBTS_FONT_INFO_STRING_ID_LIGHT_BACKGROUND_PALETTE: OpenTypeStringId = 23; break;
+        case KBTS_FONT_INFO_STRING_ID_DARK_BACKGROUND_PALETTE: OpenTypeStringId = 24; break;
+        case KBTS_FONT_INFO_STRING_ID_VARIATIONS_POSTSCRIPT_NAME_PREFIX: OpenTypeStringId = 25; break;
+        default: OpenTypeStringId = 0xFFFF; break;
+        }
+      }
+
+      if(OpenTypeStringId != 0xFFFF)
+      {
+        kbts__name_record *Records = KBTS__POINTER_AFTER(kbts__name_record, Name);
+        char *StringBase = KBTS__POINTER_OFFSET(char, Name, kbts__ReadU16Unaligned(&Name->StringStorageOffset));
+
+        // @Speed: Binary search?
+        // From the Microsoft docs:
+        //   As with encoding records in the 'cmap' table, name records must be sorted first by platform ID,
+        //   then by platform-specific encoding ID, then by language ID, and then by name ID.
+        kbts_un Name_Count = kbts__ReadU16Unaligned(&Name->Count);
+        KBTS__FOR(RecordIndex, 0, Name_Count)
+        {
+          kbts__name_record *Record = &Records[RecordIndex];
+          kbts_u16 Record_EncodingId = kbts__ReadU16Unaligned(&Record->EncodingId);
+
+          if((kbts__ReadU16Unaligned(&Record->PlatformId) == 3) && // Windows platform
+             ((Record_EncodingId < 3) || (Record_EncodingId > 5)) && // We don't support code pages for now.
+             (kbts__ReadU16Unaligned(&Record->LanguageId) == LanguageId) &&
+             (kbts__ReadU16Unaligned(&Record->NameId) == OpenTypeStringId))
+          {
+            kbts_u16 *Utf16 = KBTS__POINTER_OFFSET(kbts_u16, StringBase, kbts__ReadU16Unaligned(&Record->StringOffset));
+            kbts_un Utf16Length = kbts__ReadU16Unaligned(&Record->Length) / 2;
+
+            kbts_un WriteCursor = 0;
+            kbts_un At = 0;
+            while(At < Utf16Length)
+            {
+              kbts_decode Decode = kbts_DecodeUtf16(Utf16 + At, Utf16Length - At, KBTS_DECODE_UTF16_FLAG_BIG_ENDIAN);
+
+              if(Decode.Valid)
+              {
+                kbts_encode_utf8 Encode = kbts_EncodeUtf8(Decode.Codepoint);
+                kbts_un EncodeLengthU = (kbts_un)Encode.EncodedLength;
+
+                if((WriteCursor + EncodeLengthU) <= StringCapacityU)
+                {
+                  KBTS__FOR(ByteIndex, 0, EncodeLengthU)
+                  {
+                    String[WriteCursor + ByteIndex] = Encode.Encoded[ByteIndex];
+                  }
+                }
+
+                WriteCursor += EncodeLengthU;
+              }
+
+              At += Decode.SourceCharactersConsumed;
+            }
+
+            Result = (int)WriteCursor;
+
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  return Result;
+}
+
+KBTS_EXPORT kbts_decode kbts_DecodeUtf16(const kbts_u16 *Utf16, kbts_un Length, kbts_decode_utf16_flags Flags)
+{
+  kbts_decode Result = KBTS__ZERO;
+
+  if(Length)
+  {
+    kbts_u16 High = kbts__ReadU16Unaligned(Utf16);
+    if(Flags & KBTS_DECODE_UTF16_FLAG_BIG_ENDIAN)
+    {
+      High = kbts__ByteSwap16(High);
+    }
+
+    if((High < 0xD800) || (High > 0xDBFF))
+    {
+      Result.Codepoint = High;
+      Result.SourceCharactersConsumed = 1;
+      Result.Valid = 1;
+    }
+    else
+    {
+      // Surrogate pair.
+      if(Length > 1)
+      {
+        kbts_u16 Low = kbts__ReadU16Unaligned(&Utf16[1]);
+        if(Flags & KBTS_DECODE_UTF16_FLAG_BIG_ENDIAN)
+        {
+          Low = kbts__ByteSwap16(Low);
+        }
+
+        Result.Codepoint = (int)(0x010000 + (kbts_un)High * 0x400 + (kbts_un)Low);
+        Result.SourceCharactersConsumed = 2;
+        Result.Valid = 1;
+      }
+    }
+  }
+
   return Result;
 }
 
