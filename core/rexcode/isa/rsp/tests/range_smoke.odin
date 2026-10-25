@@ -58,6 +58,20 @@ rejects :: proc(name: string, inst: rsp.Instruction) {
 }
 
 @(private="file")
+rejects_form :: proc(name: string, inst: rsp.Instruction) {
+	_, ok, errors := encode_single(inst)
+	defer delete(errors)
+	if !ok && len(errors) == 1 && errors[0].code == .NO_MATCHING_ENCODING {
+		fmt.printfln("  [ok]   %-34s no matching encoding", name)
+		gpasses += 1
+	} else {
+		code := len(errors) > 0 ? errors[0].code : .NONE
+		fmt.printfln("  [FAIL] %-34s ok=%v errors=%d code=%v", name, ok, len(errors), code)
+		gfailures += 1
+	}
+}
+
+@(private="file")
 r_r_i :: proc(m: rsp.Mnemonic, imm: i64) -> rsp.Instruction {
 	return rsp.Instruction{mnemonic = m, operand_count = 3, length = 4,
 		ops = {rsp.op_reg(rsp.T0), rsp.op_reg(rsp.T0), rsp.op_imm(imm, 2), {}}}
@@ -73,6 +87,24 @@ lw_disp :: proc(disp: i32) -> rsp.Instruction {
 vls :: proc(m: rsp.Mnemonic, element: u8, offset: i32) -> rsp.Instruction {
 	return rsp.Instruction{mnemonic = m, operand_count = 2, length = 4,
 		ops = {rsp.op_vr(rsp.VR1), rsp.op_vmem(rsp.vmem(rsp.T0, element, offset), 16), {}, {}}}
+}
+
+@(private="file")
+lui :: proc(imm: i64) -> rsp.Instruction {
+	return rsp.Instruction{mnemonic = .LUI, operand_count = 2, length = 4,
+		ops = {rsp.op_reg(rsp.T0), rsp.op_imm(imm, 2), {}, {}}}
+}
+
+@(private="file")
+sll :: proc(sa: i64) -> rsp.Instruction {
+	return rsp.Instruction{mnemonic = .SLL, operand_count = 3, length = 4,
+		ops = {rsp.op_reg(rsp.T0), rsp.op_reg(rsp.T0), rsp.op_imm(sa, 1), {}}}
+}
+
+@(private="file")
+brk :: proc(code: i64) -> rsp.Instruction {
+	return rsp.Instruction{mnemonic = .BREAK, operand_count = 1, length = 4,
+		ops = {rsp.op_imm(code, 4), {}, {}, {}}}
 }
 
 run_rsp_range_tests :: proc() {
@@ -91,19 +123,11 @@ run_rsp_range_tests :: proc() {
 	accepts("ori imm 0",                r_r_i(.ORI, 0),      0x35080000)
 	rejects("ori imm 0x10000",          r_r_i(.ORI, 0x10000))
 	rejects("ori imm -1",               r_r_i(.ORI, -1))
-	lui :: proc(imm: i64) -> rsp.Instruction {
-		return rsp.Instruction{mnemonic = .LUI, operand_count = 2, length = 4,
-			ops = {rsp.op_reg(rsp.T0), rsp.op_imm(imm, 2), {}, {}}}
-	}
 	accepts("lui imm 0xFFFF",           lui(0xFFFF), 0x3C08FFFF)
 	rejects("lui imm 0x10000",          lui(0x10000))
 	rejects("lui imm -1",               lui(-1))
 
 	// Shift amounts: 0..31.
-	sll :: proc(sa: i64) -> rsp.Instruction {
-		return rsp.Instruction{mnemonic = .SLL, operand_count = 3, length = 4,
-			ops = {rsp.op_reg(rsp.T0), rsp.op_reg(rsp.T0), rsp.op_imm(sa, 1), {}}}
-	}
 	accepts("sll sa 31",                sll(31), 0x000847C0)
 	accepts("sll sa 0",                 sll(0),  0x00084000)
 	rejects("sll sa 32",                sll(32))
@@ -111,10 +135,6 @@ run_rsp_range_tests :: proc() {
 	rejects("sll sa -1",                sll(-1))
 
 	// BREAK code: 0..0xFFFFF.
-	brk :: proc(code: i64) -> rsp.Instruction {
-		return rsp.Instruction{mnemonic = .BREAK, operand_count = 1, length = 4,
-			ops = {rsp.op_imm(code, 4), {}, {}, {}}}
-	}
 	accepts("break 0xFFFFF",            brk(0xFFFFF), 0x03FFFFCD)
 	rejects("break 0x100000",           brk(0x100000))
 	rejects("break -1",                 brk(-1))
@@ -141,7 +161,17 @@ run_rsp_range_tests :: proc() {
 	accepts("vadd element 15",          rsp.inst_vadd(rsp.VR1, rsp.VR2, rsp.VR3, 15), 0x4BE31050)
 	rejects("vadd element 16",          rsp.inst_vadd(rsp.VR1, rsp.VR2, rsp.VR3, 16))
 	rejects("vadd element 17",          rsp.inst_vadd(rsp.VR1, rsp.VR2, rsp.VR3, 17))
+	accepts("vmov element 15",          rsp.inst_vmov(rsp.VR1, rsp.VR3, 15), 0x4BE30073)
 	rejects("vmov element 16",          rsp.inst_vmov(rsp.VR1, rsp.VR3, 16))
+
+	// Plain vector register slots (VD, VS, L/S VT) have no element field, so a
+	// non-zero element finds no matching encoding instead of being dropped.
+	rejects_form("vadd vd element 5",   rsp.Instruction{mnemonic = .VADD, operand_count = 3, length = 4,
+		ops = {rsp.op_vr(rsp.VR1, 5), rsp.op_vr(rsp.VR2), rsp.op_vr(rsp.VR3), {}}})
+	rejects_form("vadd vs element 7",   rsp.Instruction{mnemonic = .VADD, operand_count = 3, length = 4,
+		ops = {rsp.op_vr(rsp.VR1), rsp.op_vr(rsp.VR2, 7), rsp.op_vr(rsp.VR3), {}}})
+	rejects_form("lqv vt element 4",    rsp.Instruction{mnemonic = .LQV, operand_count = 2, length = 4,
+		ops = {rsp.op_vr(rsp.VR1, 4), rsp.op_vmem(rsp.vmem(rsp.T0, 0, 0), 16), {}, {}}})
 
 	// MTC2/MFC2 element (bits 10-7): 0..15.
 	accepts("mtc2 $t0, $v1 (no element)", rsp.inst_mtc2(rsp.T0, rsp.VR1),     0x48880800)
@@ -173,7 +203,7 @@ run_rsp_range_tests :: proc() {
 
 	// MTC2/MFC2 elements survive a decode.
 	{
-		code: [8]u8
+		code:   [8]u8
 		relocs: [dynamic]rsp.Relocation
 		errors: [dynamic]rsp.Error
 		defer delete(relocs)

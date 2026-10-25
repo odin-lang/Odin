@@ -181,8 +181,9 @@ operand_matches_inline :: #force_inline proc "contextless" (
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_GPR
 	case .VR:
 		// Plain vector register (no element).  Accept VECTOR_REG OR
-		// REGISTER if the user did not need an element.
-		if op.kind == .VECTOR_REG  { return reg_class(op.reg) == REG_VR }
+		// REGISTER if the user did not need an element; a non-zero element
+		// has no field to go in, so it must not be silently dropped.
+		if op.kind == .VECTOR_REG  { return reg_class(op.reg) == REG_VR && op.element == 0 }
 		if op.kind == .REGISTER    { return reg_class(op.reg) == REG_VR }
 		return false
 	case .VR_ELEM:
