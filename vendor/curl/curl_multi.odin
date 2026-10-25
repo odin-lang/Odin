@@ -341,6 +341,10 @@ Moption :: enum c.int {
 
 	/* This is the argument passed to the notify callback */
 	NOTIFYDATA = OPTTYPE_OBJECTPOINT + 19,
+
+	RESOLVE_THREADS_MAX = OPTTYPE_LONG + 20,
+
+	QUICK_EXIT = OPTTYPE_LONG + 21,
 }
 
 /* Definition of bits for the CURLMOPT_NETWORK_CHANGED argument: */
