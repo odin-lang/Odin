@@ -321,6 +321,34 @@ bug_5931 :: proc(t: ^testing.T) {
 }
 
 @(test)
+bug_8033 :: proc(t: ^testing.T) {
+	// b = 2^10080 + 1 is large enough to take the recursive division path.
+	// (b * b + c) / b must give quotient b and remainder c for any 0 <= c < b.
+	b, c, numerator, quotient, remainder: big.Int
+	defer big.destroy(&b, &c, &numerator, &quotient, &remainder)
+
+	big.set(&b, 1)
+	big.shl(&b, &b, 10080)
+	big.add(&b, &b, 1)
+
+	for shift in ([]int{0, 1, 64, 5000, 10080}) {
+		// c = 2^shift - 1
+		big.set(&c, 1)
+		big.shl(&c, &c, shift)
+		big.sub(&c, &c, 1)
+
+		big.mul(&numerator, &b, &b)
+		big.add(&numerator, &numerator, &c)
+		testing.expect_value(t, big.int_divmod(&quotient, &remainder, &numerator, &b), nil)
+
+		quotient_cmp, _ := big.cmp(&quotient, &b)
+		testing.expectf(t, quotient_cmp == 0, "Expected quotient to be b for c = 2^%v - 1", shift)
+		remainder_cmp, _ := big.cmp(&remainder, &c)
+		testing.expectf(t, remainder_cmp == 0, "Expected remainder to be c for c = 2^%v - 1", shift)
+	}
+}
+
+@(test)
 bug_rat_mul_rat_square :: proc(t: ^testing.T) {
 	x, square: big.Rat
 	defer big.destroy(&x, &square)
