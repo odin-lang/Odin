@@ -20,7 +20,7 @@ typedef struct {} FILE;
 
 #define EOF -1
 
-FILE *fopen(const char *, char *);
+FILE *fopen(const char *, const char *);
 int fclose(FILE *);
 int fseek(FILE *, long, int);
 long ftell(FILE *);
@@ -33,6 +33,11 @@ int vsprintf(char *, const char *, va_list);
 
 int putchar(int ch);
 int getchar();
+
+int fgetc(FILE *);
+int feof(FILE *);
+int ferror(FILE *);
+int fileno(FILE *);
 
 static inline int snprintf(char *buf, size_t size, const char *fmt, ...) {
 	va_list args;
