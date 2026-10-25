@@ -84,10 +84,10 @@ ENCODING_TABLE:= #partial [Mnemonic][]Encoding{
 	// CP0 / CP2 moves
 	.MFC0 = { {.MFC0, {.GPR,.CP0_REG,.NONE,.NONE}, {.RT,.RD,.NONE,.NONE}, 0x40000000, 0xFFE007FF, .RSP_SCALAR, {}} },
 	.MTC0 = { {.MTC0, {.GPR,.CP0_REG,.NONE,.NONE}, {.RT,.RD,.NONE,.NONE}, 0x40800000, 0xFFE007FF, .RSP_SCALAR, {}} },
-	// MFC2/MTC2/CFC2/CTC2 use the RD slot for vector register number + the
-	// element field in bits 10-7 of the standard COP2 layout.
-	.MFC2 = { {.MFC2, {.GPR,.VR,.NONE,.NONE}, {.RT,.RD,.NONE,.NONE}, 0x48000000, 0xFFE0007F, .RSP_SCALAR, {}} },
-	.MTC2 = { {.MTC2, {.GPR,.VR,.NONE,.NONE}, {.RT,.RD,.NONE,.NONE}, 0x48800000, 0xFFE0007F, .RSP_SCALAR, {}} },
+	// MFC2/MTC2 pack the vector register into the RD slot and its byte
+	// element into bits 10-7 (VS_ELEM); CFC2/CTC2 use the RD slot only.
+	.MFC2 = { {.MFC2, {.GPR,.VR_ELEM,.NONE,.NONE}, {.RT,.VS_ELEM,.NONE,.NONE}, 0x48000000, 0xFFE0007F, .RSP_SCALAR, {}} },
+	.MTC2 = { {.MTC2, {.GPR,.VR_ELEM,.NONE,.NONE}, {.RT,.VS_ELEM,.NONE,.NONE}, 0x48800000, 0xFFE0007F, .RSP_SCALAR, {}} },
 	.CFC2 = { {.CFC2, {.GPR,.CP2_CTRL,.NONE,.NONE}, {.RT,.RD,.NONE,.NONE}, 0x48400000, 0xFFE007FF, .RSP_SCALAR, {}} },
 	.CTC2 = { {.CTC2, {.GPR,.CP2_CTRL,.NONE,.NONE}, {.RT,.RD,.NONE,.NONE}, 0x48C00000, 0xFFE007FF, .RSP_SCALAR, {}} },
 

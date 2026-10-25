@@ -141,16 +141,16 @@ encode_one_inline :: #force_inline proc(
 	word = form.bits
 
 	if form.enc[0] != .NONE {
-		word |= pack_operand_inline(&inst.ops[0], form.enc[0], pc, inst_idx, relocs)
+		word |= pack_operand_inline(&inst.ops[0], form.ops[0], form.enc[0], pc, inst_idx, relocs, errors) or_return
 	}
 	if form.enc[1] != .NONE {
-		word |= pack_operand_inline(&inst.ops[1], form.enc[1], pc, inst_idx, relocs)
+		word |= pack_operand_inline(&inst.ops[1], form.ops[1], form.enc[1], pc, inst_idx, relocs, errors) or_return
 	}
 	if form.enc[2] != .NONE {
-		word |= pack_operand_inline(&inst.ops[2], form.enc[2], pc, inst_idx, relocs)
+		word |= pack_operand_inline(&inst.ops[2], form.ops[2], form.enc[2], pc, inst_idx, relocs, errors) or_return
 	}
 	if form.enc[3] != .NONE {
-		word |= pack_operand_inline(&inst.ops[3], form.enc[3], pc, inst_idx, relocs)
+		word |= pack_operand_inline(&inst.ops[3], form.ops[3], form.enc[3], pc, inst_idx, relocs, errors) or_return
 	}
 
 	return word, true
@@ -211,59 +211,92 @@ operand_matches_inline :: #force_inline proc "contextless" (
 // -----------------------------------------------------------------------------
 // Operand packer
 // -----------------------------------------------------------------------------
+//
+// A value that does not fit its field is reported as IMMEDIATE_OUT_OF_RANGE
+// instead of being masked into a different instruction.
+
+@(private="file")
+fits_signed :: #force_inline proc "contextless" (v: i64, bits: uint) -> bool {
+	return v >= -(i64(1) << (bits - 1)) && v < (i64(1) << (bits - 1))
+}
+
+@(private="file")
+fits_unsigned :: #force_inline proc "contextless" (v: i64, bits: uint) -> bool {
+	return v >= 0 && v < (i64(1) << bits)
+}
+
+@(private="file")
+out_of_range :: #force_inline proc(errors: ^[dynamic]Error, inst_idx: u16) -> (u32, bool) {
+	append(errors, Error{inst_idx = u32(inst_idx), code = .IMMEDIATE_OUT_OF_RANGE})
+	return 0, false
+}
 
 @(private="file")
 pack_operand_inline :: #force_inline proc(
 	op:       ^Operand,
+	ot:       Operand_Type,
 	enc:      Operand_Encoding,
 	pc:       u32,
 	inst_idx: u16,
 	relocs:   ^[dynamic]Relocation,
-) -> u32 {
+	errors:   ^[dynamic]Error,
+) -> (u32, bool) {
 	switch enc {
 	case .NONE:
-		return 0
+		return 0, true
 
 	// Scalar GPR slots ------------------------------------------------------
 	case .RS:
-		return (u32(reg_hw(op.reg)) & 0x1F) << 21
+		return (u32(reg_hw(op.reg)) & 0x1F) << 21, true
 	case .RT:
-		return (u32(reg_hw(op.reg)) & 0x1F) << 16
+		return (u32(reg_hw(op.reg)) & 0x1F) << 16, true
 	case .RD:
-		return (u32(reg_hw(op.reg)) & 0x1F) << 11
+		return (u32(reg_hw(op.reg)) & 0x1F) << 11, true
 	case .SHAMT:
-		return (u32(op.immediate) & 0x1F) << 6
+		if !fits_unsigned(op.immediate, 5) { return out_of_range(errors, inst_idx) }
+		return u32(op.immediate) << 6, true
 
 	// Immediates ------------------------------------------------------------
+	// IMM16S (addi/addiu/slti/sltiu) is sign-extended by the CPU; IMM16U
+	// (andi/ori/xori/lui) is zero-extended.
 	case .IMM_16:
-		return u32(op.immediate) & 0xFFFF
+		if ot == .IMM16S {
+			if !fits_signed(op.immediate, 16) { return out_of_range(errors, inst_idx) }
+		} else {
+			if !fits_unsigned(op.immediate, 16) { return out_of_range(errors, inst_idx) }
+		}
+		return u32(op.immediate) & 0xFFFF, true
 	case .IMM_5:
-		return (u32(op.immediate) & 0x1F) << 6
+		if !fits_unsigned(op.immediate, 5) { return out_of_range(errors, inst_idx) }
+		return u32(op.immediate) << 6, true
 	case .IMM_20:
-		return (u32(op.immediate) & 0xFFFFF) << 6
+		if !fits_unsigned(op.immediate, 20) { return out_of_range(errors, inst_idx) }
+		return u32(op.immediate) << 6, true
 	case .IMM_26:
 		if op.kind == .RELATIVE {
 			append(relocs, Relocation{
 				offset = pc, label_id = u32(op.relative),
 				type = .J26, size = 4, inst_idx = inst_idx,
 			})
-			return 0
+			return 0, true
 		}
-		return u32(op.immediate) & 0x3FFFFFF
+		if !fits_unsigned(op.immediate, 26) { return out_of_range(errors, inst_idx) }
+		return u32(op.immediate), true
 
 	// Scalar memory ---------------------------------------------------------
 	case .OFFSET_BASE:
-		return ((u32(reg_hw(op.mem.base)) & 0x1F) << 21) | (u32(op.mem.disp) & 0xFFFF)
+		if !fits_signed(i64(op.mem.disp), 16) { return out_of_range(errors, inst_idx) }
+		return ((u32(reg_hw(op.mem.base)) & 0x1F) << 21) | (u32(op.mem.disp) & 0xFFFF), true
 
 	case .BRANCH_16:
 		append(relocs, Relocation{
 			offset = pc, label_id = u32(op.relative),
 			type = .REL16, size = 4, inst_idx = inst_idx,
 		})
-		return 0
+		return 0, true
 
 	case .IMPL:
-		return 0
+		return 0, true
 
 	// Vector ALU register slots --------------------------------------------
 	// VT packs the vector register hw number AND its element selector
@@ -271,33 +304,48 @@ pack_operand_inline :: #force_inline proc(
 	case .VT:
 		v := (u32(reg_hw(op.reg)) & 0x1F) << 16
 		if op.kind == .VECTOR_REG {
-			v |= (u32(op.element) & 0x0F) << 21   // element field bits 24-21
+			if !fits_unsigned(i64(op.element), 4) { return out_of_range(errors, inst_idx) }
+			v |= u32(op.element) << 21   // element field bits 24-21
 		}
-		return v
+		return v, true
 	case .VS:
-		return (u32(reg_hw(op.reg)) & 0x1F) << 11
+		return (u32(reg_hw(op.reg)) & 0x1F) << 11, true
 	case .VD:
-		return (u32(reg_hw(op.reg)) & 0x1F) << 6
+		return (u32(reg_hw(op.reg)) & 0x1F) << 6, true
 	case .ELEM:
-		return (u32(op.element) & 0x0F) << 21
+		if !fits_unsigned(i64(op.element), 4) { return out_of_range(errors, inst_idx) }
+		return u32(op.element) << 21, true
+	case .VS_ELEM:
+		// MTC2/MFC2: vector register in bits 15-11, byte element in bits 10-7.
+		v := (u32(reg_hw(op.reg)) & 0x1F) << 11
+		if op.kind == .VECTOR_REG {
+			if !fits_unsigned(i64(op.element), 4) { return out_of_range(errors, inst_idx) }
+			v |= u32(op.element) << 7
+		}
+		return v, true
 
 	// Vector load/store -----------------------------------------------------
 	case .VT_LS:
-		return (u32(reg_hw(op.reg)) & 0x1F) << 16
+		return (u32(reg_hw(op.reg)) & 0x1F) << 16, true
 	case .VOP:
-		return 0   // VOP is part of static bits, not operand-driven
+		return 0, true   // VOP is part of static bits, not operand-driven
 	case .VELEM_LS:
-		return (u32(op.vmem.element) & 0x0F) << 7
+		if !fits_unsigned(i64(op.vmem.element), 4) { return out_of_range(errors, inst_idx) }
+		return u32(op.vmem.element) << 7, true
 	case .VOFFSET:
-		return u32(op.vmem.offset) & 0x7F
+		if !fits_signed(i64(op.vmem.offset), 7) { return out_of_range(errors, inst_idx) }
+		return u32(op.vmem.offset) & 0x7F, true
 	case .VBASE:
-		// The VMEM operand packs base + element + offset in one shot.
+		// The VMEM operand packs base + element + offset in one shot. The
+		// offset is in units of the access size, so its range is -64..63.
+		if !fits_unsigned(i64(op.vmem.element), 4) { return out_of_range(errors, inst_idx) }
+		if !fits_signed(i64(op.vmem.offset), 7) { return out_of_range(errors, inst_idx) }
 		base_bits   := (u32(reg_hw(op.vmem.base)) & 0x1F) << 21
-		elem_bits   := (u32(op.vmem.element) & 0x0F) << 7
+		elem_bits   :=  u32(op.vmem.element) << 7
 		offset_bits :=  u32(op.vmem.offset) & 0x7F
-		return base_bits | elem_bits | offset_bits
+		return base_bits | elem_bits | offset_bits, true
 	}
-	return 0
+	return 0, true
 }
 
 // =============================================================================

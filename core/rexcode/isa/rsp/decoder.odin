@@ -207,6 +207,10 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		return Operand{reg = Register(REG_VR | hw), kind = .VECTOR_REG, size = 16}
 	case .ELEM:
 		return Operand{immediate = i64((word >> 21) & 0x0F), kind = .IMMEDIATE, size = 1}
+	case .VS_ELEM:
+		hw   := u16((word >> 11) & 0x1F)
+		elem := u8 ((word >>  7) & 0x0F)
+		return Operand{reg = Register(REG_VR | hw), kind = .VECTOR_REG, size = 16, element = elem}
 
 	// Vector L/S placements -------------------------------------------------
 	case .VT_LS:

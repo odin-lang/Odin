@@ -114,10 +114,10 @@ inst_mfc0_gpr_cp0        :: #force_inline proc "contextless" (a: Register, b: Re
 emit_mfc0_gpr_cp0        :: #force_inline proc(instructions: ^[dynamic]Instruction, a: Register, b: Register) { append_elem(instructions, inst_mfc0_gpr_cp0(a, b)) }
 inst_mtc0_gpr_cp0        :: #force_inline proc "contextless" (a: Register, b: Register) -> Instruction { return Instruction{ mnemonic = .MTC0, operand_count = 2, length = 4, ops = {op_reg(a), op_reg(b), {}, {}} } }
 emit_mtc0_gpr_cp0        :: #force_inline proc(instructions: ^[dynamic]Instruction, a: Register, b: Register) { append_elem(instructions, inst_mtc0_gpr_cp0(a, b)) }
-inst_mfc2_gpr_vr         :: #force_inline proc "contextless" (a: Register, b: Register) -> Instruction { return Instruction{ mnemonic = .MFC2, operand_count = 2, length = 4, ops = {op_reg(a), op_vr(b), {}, {}} } }
-emit_mfc2_gpr_vr         :: #force_inline proc(instructions: ^[dynamic]Instruction, a: Register, b: Register) { append_elem(instructions, inst_mfc2_gpr_vr(a, b)) }
-inst_mtc2_gpr_vr         :: #force_inline proc "contextless" (a: Register, b: Register) -> Instruction { return Instruction{ mnemonic = .MTC2, operand_count = 2, length = 4, ops = {op_reg(a), op_vr(b), {}, {}} } }
-emit_mtc2_gpr_vr         :: #force_inline proc(instructions: ^[dynamic]Instruction, a: Register, b: Register) { append_elem(instructions, inst_mtc2_gpr_vr(a, b)) }
+inst_mfc2_gpr_vr         :: #force_inline proc "contextless" (a: Register, b: Register, element: u8 = 0) -> Instruction { return Instruction{ mnemonic = .MFC2, operand_count = 2, length = 4, ops = {op_reg(a), op_vr(b, element), {}, {}} } }
+emit_mfc2_gpr_vr         :: #force_inline proc(instructions: ^[dynamic]Instruction, a: Register, b: Register, element: u8 = 0) { append_elem(instructions, inst_mfc2_gpr_vr(a, b, element)) }
+inst_mtc2_gpr_vr         :: #force_inline proc "contextless" (a: Register, b: Register, element: u8 = 0) -> Instruction { return Instruction{ mnemonic = .MTC2, operand_count = 2, length = 4, ops = {op_reg(a), op_vr(b, element), {}, {}} } }
+emit_mtc2_gpr_vr         :: #force_inline proc(instructions: ^[dynamic]Instruction, a: Register, b: Register, element: u8 = 0) { append_elem(instructions, inst_mtc2_gpr_vr(a, b, element)) }
 inst_cfc2_gpr_cp2        :: #force_inline proc "contextless" (a: Register, b: Register) -> Instruction { return Instruction{ mnemonic = .CFC2, operand_count = 2, length = 4, ops = {op_reg(a), op_reg(b), {}, {}} } }
 emit_cfc2_gpr_cp2        :: #force_inline proc(instructions: ^[dynamic]Instruction, a: Register, b: Register) { append_elem(instructions, inst_cfc2_gpr_cp2(a, b)) }
 inst_ctc2_gpr_cp2        :: #force_inline proc "contextless" (a: Register, b: Register) -> Instruction { return Instruction{ mnemonic = .CTC2, operand_count = 2, length = 4, ops = {op_reg(a), op_reg(b), {}, {}} } }

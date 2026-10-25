@@ -103,6 +103,8 @@ Operand_Encoding :: enum u8 {
 	VELEM_LS,      // bits 10-7  (element offset for L/S)
 	VOFFSET,       // bits  6-0  (signed 7-bit offset, element-scaled)
 	VBASE,         // bits 25-21 (GPR base for vector L/S)
+	// COP2 moves
+	VS_ELEM,       // bits 15-11 vector reg + bits 10-7 byte element (MTC2/MFC2)
 }
 
 Encoding :: struct #packed {
