@@ -4,3 +4,4 @@ package tests_vendor
 @(require) import _ "lua/5.4"
 @(require) import _ "curl"
 @(require) import _ "stb"
+@(require) import _ "commonmark"
