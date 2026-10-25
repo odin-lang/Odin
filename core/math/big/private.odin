@@ -1227,6 +1227,8 @@ _private_div_recursion :: proc(quotient, remainder, a, b: ^Int, allocator := con
 	_private_int_shl_leg(R1, 2 * k) or_return
 	internal_add(A1, R1, t) or_return
 	internal_mul(t, Q1, B0) or_return
+	_private_int_shl_leg(t, k) or_return
+	internal_sub(A1, A1, t) or_return
 
 	/*
 		While A1 < 0 do Q1 = Q1 - 1, A1 = A1 + (beta^k * B)
