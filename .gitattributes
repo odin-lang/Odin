@@ -43,3 +43,4 @@ vendor/lua/*/linux/*.a filter=lfs diff=lfs merge=lfs -text
 vendor/lua/*/linux/*.so filter=lfs diff=lfs merge=lfs -text
 vendor/OpenEXRCore/*.lib filter=lfs diff=lfs merge=lfs -text
 vendor/OpenEXRCore/darwin/*.a filter=lfs diff=lfs merge=lfs -text
+vendor/miniaudio/lib/darwin/*.a filter=lfs diff=lfs merge=lfs -text
