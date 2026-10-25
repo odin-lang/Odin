@@ -306,7 +306,12 @@ tag_base64_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, 
 	case reflect.Type_Info_String:
 		assert(t.encoding == .UTF_8)
 		if t.is_cstring {
-			length  := base64.decoded_len(bytes)
+			// Convert this using an auxiliary builder so we get a terminating null character.
+			length, derr := base64.decoded_len(bytes)
+			if derr != nil {
+				err = err_from_b64(derr)
+				return
+			}
 			builder := strings.builder_make(0, length+1)
 			b64_decode_into(strings.to_stream(&builder), bytes) or_return
 
@@ -347,9 +352,15 @@ tag_base64_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, 
 
 		if elem_base.id != byte { return _unsupported(v, hdr) }
 
-		if base64.decoded_len(bytes) > t.count { return _unsupported(v, hdr) }
+		decoded_length, derr := base64.decoded_len(bytes)
+		if derr != nil {
+			err = err_from_b64(derr)
+			return
+		}
+		if decoded_length > t.count { return _unsupported(v, hdr) }
 
 		slice := ([^]byte)(v.data)[:len(bytes)]
+		// TODO: base64 can decode directly into a byte buffer.
 		copy(slice, b64_decode(bytes) or_return)
 		return
 	}
