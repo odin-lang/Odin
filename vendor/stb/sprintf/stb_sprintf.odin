@@ -5,7 +5,7 @@ import "core:c"
 @(private)
 LIB :: (
 	     "../lib/stb_sprintf.lib"      when ODIN_OS == .Windows
-	else "../lib/stb_sprintf.a"        when ODIN_OS == .Linux
+	else "../lib/stb_sprintf.a"        when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD
 	else "../lib/darwin/stb_sprintf.a" when ODIN_OS == .Darwin
 	else "../lib/stb_sprintf_wasm.o"   when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
 	else ""
