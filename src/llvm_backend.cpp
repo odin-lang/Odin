@@ -2735,6 +2735,9 @@ gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, Checker
 
 		if (e->kind == Entity_Procedure) {
 			if (e->Procedure.is_foreign && e->Procedure.is_objc_impl_or_import) {
+				// Track usage of Objective-C frameworks when an imported Objective-C method is used.
+				lb_add_foreign_library_path(m, e->Procedure.foreign_library);
+
 				// Do not generate declarations for foreign Objective-C methods. These are called indirectly through the Objective-C runtime.
 				continue;
 			}
