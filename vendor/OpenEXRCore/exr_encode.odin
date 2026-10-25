@@ -262,6 +262,9 @@ encode_pipeline_t :: struct {
 	 * this being used.
 	 */
 	_quick_chan_store: [5]coding_channel_info_t,
+
+	/** When set, skip compressing the sample count table separately. */
+	skip_sample_count_table_compression: c.int,
 }
 
 ENCODE_PIPELINE_INITIALIZER :: encode_pipeline_t{ pipe_size = size_of(encode_pipeline_t) }

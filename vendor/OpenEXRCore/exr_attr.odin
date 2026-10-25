@@ -14,6 +14,10 @@ compression_t :: enum c.int {
 	B44A  = 7,
 	DWAA  = 8,
 	DWAB  = 9,
+	HTJ2K256 = 10, // High-Throughput JPEG 2000, lossless, 256 scanlines.
+	HTJ2K32  = 11, // High-Throughput JPEG 2000, lossless, 32 scanlines.
+	LJ2K     = 12, // High-Throughput JPEG 2000, lossy, 256 scanlines.
+	ZSTD     = 13, // zstd lossless compression, one scan line at a time.
 }
 
 // Enum declaring allowed values for \c u8 value stored in built-in env map type.
@@ -249,6 +253,16 @@ attr_preview_t :: struct {
 	rgba: [^]u8,
 }
 
+/** @brief Struct to define bytes attributes */
+attr_bytes_t :: struct {
+	size: c.size_t,
+	data: [^]u8,
+	// The type hint is not null terminated when serialized. The length
+	// is instead determined by the hint_length attribute.
+	hint_length: u32,
+	type_hint:   cstring,
+}
+
 /** Custom storage structure for opaque data.
  *
  * Handlers for opaque types can be registered, then when a
@@ -304,6 +318,7 @@ attribute_type_t :: enum c.int {
 	UNKNOWN = 0,      // Type indicating an error or uninitialized attribute.
 	BOX2I,            // Integer region definition. @see attr_box2i_t.
 	BOX2F,            // Float region definition. @see attr_box2f_t.
+	BYTES,            // Bytes definition. @see attr_bytes_t.
 	CHLIST,           // Definition of channels in file @see chlist_entry.
 	CHROMATICITIES,   // Values to specify color space of colors in file @see attr_chromaticities_t.
 	COMPRESSION,      // ``u8`` declaring compression present.
@@ -380,6 +395,7 @@ attribute_t :: struct {
 
 		box2i:          ^attr_box2i_t,
 		box2f:          ^attr_box2f_t,
+		bytes:          ^attr_bytes_t,
 		chlist:         ^attr_chlist_t,
 		chromaticities: ^attr_chromaticities_t,
 		keycode:        ^attr_keycode_t,
