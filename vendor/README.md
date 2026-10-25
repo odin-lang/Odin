@@ -183,7 +183,7 @@ image writing to disk: PNG, TGA, BMP
 
 resize images larger/smaller with good quality
 
-Bindings of `stb_image.h`, `stb_image_rewrite.h`, `stb_image_resize.h`
+Bindings of `stb_image.h`, `stb_image_write.h`, `stb_image_resize2.h`
 
 ### vendor:stb/rect_pack
 simple 2D rectangle packer with decent quality
