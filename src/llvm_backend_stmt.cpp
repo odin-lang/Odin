@@ -2595,7 +2595,7 @@ gb_internal bool lb_copy_loaded_value_to_local(lbProcedure *p, lbValue *value) {
 		return false;
 	}
 	i64 size = lb_sizeof(LLVMTypeOf(load));
-	if (size <= lb_max_store_size()) {
+	if (size <= LB_MAX_STORE_SIZE) {
 		return false;
 	}
 
