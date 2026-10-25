@@ -601,7 +601,12 @@ test_make_directory_all :: proc(t: ^testing.T) {
 	defer delete(nested)
 	testing.expect_value(t, os.make_directory_all(nested), nil)
 	testing.expect(t, os.is_dir(nested))
-	testing.expect_value(t, os.make_directory_all(nested), os.General_Error.Exist)
+	// Windows reports an existing directory as success; the other targets report `.Exist`.
+	when ODIN_OS == .Windows {
+		testing.expect_value(t, os.make_directory_all(nested), nil)
+	} else {
+		testing.expect_value(t, os.make_directory_all(nested), os.General_Error.Exist)
+	}
 
 	file, _ := os.join_path({root, "file"}, context.allocator)
 	defer delete(file)
