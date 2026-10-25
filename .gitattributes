@@ -37,3 +37,7 @@ vendor/raylib/windows/raylibdll.lib filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/windows/raygui.dll filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/windows/raygui.lib filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/windows/rayguidll.lib filter=lfs diff=lfs merge=lfs -text
+vendor/lua/*/windows/*.dll filter=lfs diff=lfs merge=lfs -text
+vendor/lua/*/windows/*.lib filter=lfs diff=lfs merge=lfs -text
+vendor/lua/*/linux/*.a filter=lfs diff=lfs merge=lfs -text
+vendor/lua/*/linux/*.so filter=lfs diff=lfs merge=lfs -text

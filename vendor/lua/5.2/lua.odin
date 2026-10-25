@@ -54,7 +54,7 @@ MULTRET :: -1
 
 FIRSTPSEUDOIDX :: -MAXSTACK - 1000
 
-REGISTRYINDEX :: -FIRSTPSEUDOIDX
+REGISTRYINDEX :: FIRSTPSEUDOIDX
 
 
 /*
@@ -86,8 +86,10 @@ IDSIZE :: 60
 
 /*
 @@ LUAL_BUFFERSIZE is the buffer size used by the lauxlib buffer system.
+** In Lua 5.2 it is the C library's BUFSIZ, and it has to match the value the Lua library was compiled with:
+** 512 with MSVC, 8192 with glibc, 1024 with the BSDs, macOS and musl.
 */
-L_BUFFERSIZE :: c.int(16 * size_of(rawptr) * size_of(Number))
+L_BUFFERSIZE :: c.int(512 when ODIN_OS == .Windows else 8192 when ODIN_OS == .Linux else 1024)
 
 
 MAXALIGNVAL :: max(align_of(Number), align_of(f64), align_of(rawptr), align_of(Integer), align_of(c.long))
@@ -346,7 +348,6 @@ foreign {
 	isnumber    :: proc(L: ^State, idx: c.int) -> b32 ---
 	isstring    :: proc(L: ^State, idx: c.int) -> b32 ---
 	iscfunction :: proc(L: ^State, idx: c.int) -> b32 ---
-	isinteger   :: proc(L: ^State, idx: c.int) -> b32 ---
 	isuserdata  :: proc(L: ^State, idx: c.int) -> b32 ---
 	type        :: proc(L: ^State, idx: c.int) -> Type ---
 	typename    :: proc(L: ^State, tp: Type) -> cstring ---
@@ -397,9 +398,8 @@ foreign {
 	getglobal :: proc(L: ^State, name: cstring) ---
 	gettable  :: proc(L: ^State, idx: c.int) ---
 	getfield  :: proc(L: ^State, idx: c.int, k: cstring) ---
-	geti      :: proc(L: ^State, idx: c.int, n: Integer) ---
 	rawget    :: proc(L: ^State, idx: c.int) ---
-	rawgeti   :: proc(L: ^State, idx: c.int, n: Integer) ---
+	rawgeti   :: proc(L: ^State, idx: c.int, n: c.int) ---
 	rawgetp   :: proc(L: ^State, idx: c.int, p: rawptr) ---
 
 	createtable  :: proc(L: ^State, narr, nrec: c.int) ---
@@ -419,7 +419,7 @@ foreign {
 	rawseti      :: proc(L: ^State, idx: c.int, n: c.int) ---
 	rawsetp      :: proc(L: ^State, idx: c.int, p: rawptr) ---
 	setmetatable :: proc(L: ^State, objindex: c.int) -> c.int ---
-	setuservalue :: proc(L: ^State, idx: c.int) -> c.int ---
+	setuservalue :: proc(L: ^State, idx: c.int) ---
 
 
 	/*
@@ -472,7 +472,7 @@ foreign {
 	concat :: proc(L: ^State, n: c.int) ---
 	len    :: proc(L: ^State, idx: c.int) ---
 
-	getallocf :: proc(L: State, ud: ^rawptr) -> Alloc ---
+	getallocf :: proc(L: ^State, ud: ^rawptr) -> Alloc ---
 	setallocf :: proc(L: ^State, f: Alloc, ud: rawptr) ---
 
 	/*
@@ -509,7 +509,6 @@ TABLIBNAME  :: "table"
 IOLIBNAME   :: "io"
 OSLIBNAME   :: "os"
 STRLIBNAME  :: "string"
-UTF8LIBNAME :: "utf8"
 BITLIBNAME  :: "bit32"
 MATHLIBNAME :: "math"
 DBLIBNAME   :: "debug"
@@ -524,7 +523,6 @@ foreign lib {
 	open_io        :: proc(L: ^State) -> c.int ---
 	open_os        :: proc(L: ^State) -> c.int ---
 	open_string    :: proc(L: ^State) -> c.int ---
-	open_utf8      :: proc(L: ^State) -> c.int ---
 	open_bit32     :: proc(L: ^State) -> c.int ---
 	open_math      :: proc(L: ^State) -> c.int ---
 	open_debug     :: proc(L: ^State) -> c.int ---
@@ -541,7 +539,7 @@ GNAME :: "_G"
 
 L_Reg :: struct {
 	name: cstring,
-  	func: CFunction,
+	func: CFunction,
 }
 
 
@@ -634,7 +632,7 @@ L_Buffer :: struct {
 }
 
 L_addchar :: #force_inline proc "c" (B: ^L_Buffer, c: byte) {
-	if B.n < B.size {
+	if B.n >= B.size {
 		L_prepbuffsize(B, 1)
 	}
 	B.b[B.n] = c

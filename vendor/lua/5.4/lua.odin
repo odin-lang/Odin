@@ -37,14 +37,14 @@ when LUA_SHARED {
 
 VERSION_MAJOR       :: "5"
 VERSION_MINOR       :: "4"
-VERSION_RELEASE     :: "2"
+VERSION_RELEASE     :: "9"
 
 VERSION_NUM         :: 504
-VERSION_RELEASE_NUM :: VERSION_NUM * 100 + 0
+VERSION_RELEASE_NUM :: VERSION_NUM * 100 + 9
 
 VERSION             :: "Lua " + VERSION_MAJOR + "." + VERSION_MINOR
 RELEASE             :: VERSION + "." + VERSION_RELEASE
-COPYRIGHT           :: RELEASE + "  Copyright (C) 1994-2020 Lua.org, PUC-Rio"
+COPYRIGHT           :: RELEASE + "  Copyright (C) 1994-2026 Lua.org, PUC-Rio"
 AUTHORS             :: "R. Ierusalimschy, L. H. de Figueiredo, W. Celes"
 
 
@@ -343,6 +343,7 @@ foreign {
 	close       :: proc(L: ^State) ---
 	newthread   :: proc(L: ^State) -> ^State ---
 	resetthread :: proc(L: ^State) -> Status ---
+	closethread :: proc(L: ^State, from: ^State) -> Status ---
 
 	atpanic :: proc(L: ^State, panicf: CFunction) -> CFunction ---
 
@@ -479,7 +480,7 @@ foreign {
 	*/
 
 	setwarnf :: proc(L: ^State, f: WarnFunction, ud: rawptr) ---
-	warning  :: proc(L: ^State, msg: string, tocont: b32) ---
+	warning  :: proc(L: ^State, msg: cstring, tocont: b32) ---
 
 
 	/*
@@ -504,10 +505,11 @@ foreign {
 
 	stringtonumber :: proc(L: ^State, s: cstring) -> c.size_t ---
 
-	getallocf :: proc(L: State, ud: ^rawptr) -> Alloc ---
+	getallocf :: proc(L: ^State, ud: ^rawptr) -> Alloc ---
 	setallocf :: proc(L: ^State, f: Alloc, ud: rawptr) ---
 
-	toclose :: proc(L: ^State, idx: c.int) ---
+	toclose   :: proc(L: ^State, idx: c.int) ---
+	closeslot :: proc(L: ^State, idx: c.int) ---
 
 	/*
 	** {======================================================================
@@ -685,7 +687,7 @@ L_buffaddr :: #force_inline proc "c" (bf: ^L_Buffer) -> [^]byte {
 }
 
 L_addchar :: #force_inline proc "c" (B: ^L_Buffer, c: byte) {
-	if B.n < B.size {
+	if B.n >= B.size {
 		L_prepbuffsize(B, 1)
 	}
 	B.b[B.n] = c
