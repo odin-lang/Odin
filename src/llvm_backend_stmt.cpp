@@ -2585,10 +2585,8 @@ gb_internal isize lb_append_tuple_values(lbProcedure *p, Array<lbValue> *dst_val
 }
 
 
-// NOTE: Copies a large loaded value into a new local right after the load, where it reads the same memory.
-// The value can then be stored from that local by copying memory, as `lb_emit_store` does outside a multiple
-// assignment, instead of as a first-class aggregate, which LLVM splits into a value per element: optimizing
-// that takes seconds to minutes for values of a few kilobytes.
+// NOTE: Copies a large loaded value into a local right after its load, so it is stored by copying memory and
+// not as a first-class aggregate, which LLVM splits per element and can take minutes to optimize
 gb_internal bool lb_copy_loaded_value_to_local(lbProcedure *p, lbValue *value) {
 	LLVMValueRef load = value->value;
 	if (!LLVMIsALoadInst(load) || LLVMGetVolatile(load) || LLVMGetOrdering(load) != LLVMAtomicOrderingNotAtomic) {
