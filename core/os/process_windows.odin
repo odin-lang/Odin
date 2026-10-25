@@ -463,11 +463,8 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		win32.CloseHandle(null_handle)
 	}
 
-	// The child inherits its standard handles and no other handle of this
-	// process: `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` keeps the other inheritable
-	// handles, such as the pipes of children started at the same time by
-	// other threads, out of the child. The list takes only inheritable
-	// handles, each one once, so each stream gets an inheritable duplicate.
+	// NOTE: Only the standard handles are inherited, so a child never holds the pipes of another one
+	// started by another thread. The handle list takes each inheritable handle once, hence the duplicates.
 	std_files := [3]^File{desc.stdin, desc.stdout, desc.stderr}
 	std_handles: [3]win32.HANDLE
 	defer for handle in std_handles {
