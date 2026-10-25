@@ -1277,6 +1277,12 @@ _fmt_memory :: proc(fi: ^Info, u: u64, is_signed: bool, bit_size: int, units: st
 		flags |= { .Plus }
 	}
 	buf: [256]byte
+	// NOTE(bplu4t2f):
+	//     This is currently the only instance of strconv.write_float in core which assumes
+	//     that `&str[0] == &buf[0]`. This assumption is not formally part of the API contract.
+	//     This may be relevant because an implementation could decide to strip or trim
+	//     something from the beginning by simply offseting the returned slice's start index.
+	//     Currently, this works only because no implementation does that.
 	str := strconv.write_float(buf[:], amt, 'f', prec, 64, flags)
 
 	// Add the unit at the end.

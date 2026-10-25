@@ -38,6 +38,14 @@ precision: The number of decimal places to round to
 bit_size: The size of the floating-point number in bits, valid values are 16, 32, 64
 flags: Additional formatting options; `.Plus` prefixes non-negative finite values with `+`
 
+**Returns**
+- A byte slice containing the formatted string
+
+**Remarks**
+
+Some callers assume that the written payload will always start at index 0 in `buf`. This means
+the implementation cannot trim anything from the beginning of the buffer after-the-fact.
+
 Example:
 
 	buf: [32]byte
@@ -46,24 +54,20 @@ Example:
 	precision := 2
 	bit_size := 64
 	result := strconv.generic_ftoa(buf[:], val, fmt, precision, bit_size) -> "3.14"
-
-**Returns**
-- A byte slice containing the formatted string
 */
 generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int, flags: Float_Flags) -> []byte {
 	when FAST_FLOAT {
-		// TODO: propagate flags.
 		if bit_size == 64 {
-			if res, ok := _ftoa_fast(buf, val, fmt, precision); ok {
+			if res, ok := _ftoa_fast(buf, val, fmt, precision, flags); ok {
 				return res
 			}
 		} else if bit_size == 32 || (bit_size == 16 && precision >= 0) {
 			f := f32(f16(val)) if bit_size == 16 else f32(val)
-			if res, ok := _ftoa_fast(buf, f, fmt, precision); ok {
+			if res, ok := _ftoa_fast(buf, f, fmt, precision, flags); ok {
 				return res
 			}
 		} else if bit_size == 16 {
-			if res, ok := _ftoa_fast_f16(buf, f16(val), fmt); ok {
+			if res, ok := _ftoa_fast_f16(buf, f16(val), fmt, flags); ok {
 				return res
 			}
 		}
