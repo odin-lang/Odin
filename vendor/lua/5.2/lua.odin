@@ -4,11 +4,13 @@ package lua_5_2
 import "base:intrinsics"
 import "base:builtin"
 
-import c "core:c/libc"
+import c "core:c"
 
 #assert(size_of(c.int) == size_of(b32))
 
 LUA_SHARED :: #config(LUA_SHARED, false)
+
+LUA_WASM_LIB :: #config(LUA_WASM_LIB, "env.o")
 
 when LUA_SHARED {
 	when ODIN_OS == .Windows {
@@ -16,6 +18,8 @@ when LUA_SHARED {
 		foreign import lib "windows/lua52dll.lib"
 	} else when ODIN_OS == .Linux && ODIN_ARCH == .amd64 {
 		foreign import lib "linux/liblua52.so"
+	} else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+		foreign import lib { LUA_WASM_LIB }
 	} else {
 		foreign import lib "system:lua5.2"
 	}
@@ -24,6 +28,8 @@ when LUA_SHARED {
 		foreign import lib "windows/lua52dll.lib"
 	} else when ODIN_OS == .Linux && ODIN_ARCH == .amd64 {
 		foreign import lib "linux/liblua52.a"
+	} else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+		foreign import lib { LUA_WASM_LIB }
 	} else {
 		foreign import lib "system:lua5.2"
 	}
@@ -295,7 +301,7 @@ State :: struct {} // opaque data type
 
 @(link_prefix="lua_")
 @(default_calling_convention="c")
-foreign lib {
+foreign {
 	/*
 	** RCS ident string
 	*/
