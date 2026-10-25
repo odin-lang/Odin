@@ -59,14 +59,29 @@ gb_internal lbValue lb_correct_endianness(lbProcedure *p, lbValue value) {
 }
 
 
+gb_internal unsigned lb_metadata_kind(lbModule *m, String const &name) {
+	for (isize i = 0; i < m->metadata_kind_count; i++) {
+		if (m->metadata_kinds[i].name == name) {
+			return m->metadata_kinds[i].kind;
+		}
+	}
+	unsigned kind = LLVMGetMDKindIDInContext(m->ctx, cast(char const *)name.text, cast(unsigned)name.len);
+	if (m->metadata_kind_count < gb_count_of(m->metadata_kinds)) {
+		m->metadata_kinds[m->metadata_kind_count].name = name;
+		m->metadata_kinds[m->metadata_kind_count].kind = kind;
+		m->metadata_kind_count += 1;
+	}
+	return kind;
+}
+
 gb_internal void lb_set_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, String name, u64 value) {
-	unsigned md_id = LLVMGetMDKindIDInContext(m->ctx, cast(char const *)name.text, cast(unsigned)name.len);
+	unsigned md_id = lb_metadata_kind(m, name);
 	LLVMMetadataRef md = LLVMValueAsMetadata(LLVMConstInt(lb_type(m, t_u64), value, false));
 	LLVMValueRef node = LLVMMetadataAsValue(m->ctx, LLVMMDNodeInContext2(m->ctx, &md, 1));
 	LLVMSetMetadata(v_ref, md_id, node);
 }
 gb_internal u64 lb_get_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, String name) {
-	unsigned md_id = LLVMGetMDKindIDInContext(m->ctx, cast(char const *)name.text, cast(unsigned)name.len);
+	unsigned md_id = lb_metadata_kind(m, name);
 	LLVMValueRef v_md = LLVMGetMetadata(v_ref, md_id);
 	if (v_md == nullptr) {
 		return 0;
@@ -97,6 +112,27 @@ gb_internal LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef p
 		}
 	}
 
+
+	if (is_inlinable && !is_volatile && lb_uses_fast_isel()) {
+		LLVMValueRef dst = LLVMBuildPointerCast(p->builder, ptr, lb_type(p->module, t_rawptr), "");
+		LLVMValueRef last = nullptr;
+		for (i64 offset = 0; offset < const_len; /**/) {
+			i64 chunk = 8;
+			while (chunk > const_len - offset) {
+				chunk >>= 1;
+			}
+			LLVMTypeRef chunk_type = LLVMIntTypeInContext(p->module->ctx, cast(unsigned)(8*chunk));
+			LLVMValueRef chunk_ptr = dst;
+			if (offset != 0) {
+				LLVMValueRef index = LLVMConstInt(lb_type(p->module, t_int), offset, false);
+				chunk_ptr = LLVMBuildGEP2(p->builder, LLVMInt8TypeInContext(p->module->ctx), dst, &index, 1, "");
+			}
+			last = LLVMBuildStore(p->builder, LLVMConstNull(chunk_type), chunk_ptr);
+			LLVMSetAlignment(last, 1);
+			offset += chunk;
+		}
+		return last;
+	}
 
 	char const *name = "llvm.memset";
 	if (is_inlinable) {
@@ -137,7 +173,10 @@ gb_internal void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, u
 		}
 		break;
 	default:
-		LLVMBuildStore(p->builder, LLVMConstNull(lb_type(p->module, type)), ptr);
+		{
+			LLVMValueRef store = LLVMBuildStore(p->builder, LLVMConstNull(lb_type(p->module, type)), ptr);
+			lb_lower_store_alignment_to_known(p, store, ptr);
+		}
 		break;
 	}
 }
@@ -321,7 +360,9 @@ gb_internal lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 	} else if (lb_is_type_aggregate(src) || lb_is_type_aggregate(dst)) {
 		lbValue s = lb_address_from_load_or_generate_local(p, value);
 		lbValue d = lb_emit_transmute(p, s, alloc_type_pointer(t));
-		return lb_emit_load(p, d);
+		// s is only guaranteed type_align_of(src) alignment
+		res.value = OdinLLVMBuildLoadAligned(p, lb_type(m, t), d.value, type_align_of(src));
+		return res;
 	}
 
 	res.value = OdinLLVMBuildTransmute(p, value.value, lb_type(m, res.type));
@@ -453,6 +494,11 @@ gb_internal bool lb_is_type_trivial(Type *type) {
 	return false;
 }
 
+gb_internal bool lb_is_type_large_aggregate(lbModule *m, Type *type) {
+	LLVMTypeKind kind = LLVMGetTypeKind(lb_type(m, type));
+	return (kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind) && type_size_of(type) > 64;
+}
+
 gb_internal bool lb_is_expr_trivial(Ast *e) {
 	Type *type = default_type(type_of_expr(e));
 	if (lb_is_type_trivial(type)) {
@@ -520,6 +566,25 @@ gb_internal lbValue lb_emit_or_else(lbProcedure *p, Ast *arg, Ast *else_expr, Ty
 		}
 		return {};
 	} else {
+		if (lb_is_type_large_aggregate(p->module, type)) {
+			lbAddr res = lb_add_local_generated(p, type, false);
+
+			lbBlock *then  = lb_create_block(p, "or_else.then");
+			lbBlock *done  = lb_create_block(p, "or_else.done");
+			lbBlock *else_ = lb_create_block(p, "or_else.else");
+
+			lb_emit_if(p, lb_emit_try_has_value(p, rhs), then, else_);
+			lb_start_block(p, then);
+			lb_addr_store(p, res, lb_emit_conv(p, lhs, type));
+			lb_emit_jump(p, done);
+
+			lb_start_block(p, else_);
+			lb_addr_store(p, res, lb_emit_conv(p, lb_build_expr(p, else_expr), type));
+			lb_emit_jump(p, done);
+
+			lb_start_block(p, done);
+			return lb_addr_load(p, res);
+		}
 		if (lb_is_type_trivial(type) && lb_is_expr_trivial(else_expr)) {
 			lbValue has_value = lb_emit_try_has_value(p, rhs);
 			lbValue then_val = lb_emit_conv(p, lhs, type);
@@ -813,8 +878,8 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 	lbValue value_  = lb_address_from_load_or_generate_local(p, value);
 
 	if ((p->state_flags & StateFlag_no_type_assert) != 0 && !is_tuple) {
-		// just do a bit cast of the data at the front
-		lbValue ptr = lb_emit_conv(p, value_, alloc_type_pointer(type));
+		// no tag check, just load the variant data at the front
+		lbValue ptr = lb_emit_union_variant_ptr(p, value_, dst);
 		return lb_emit_load(p, ptr);
 	}
 
@@ -827,7 +892,7 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 	lbValue gep1 = lb_emit_struct_ep(p, v.addr, 1);
 
 	if (is_type_union_maybe_pointer(src)) {
-		data = lb_emit_load(p, lb_emit_conv(p, value_, gep0.type));
+		data = lb_emit_load(p, lb_emit_union_variant_ptr(p, value_, dst));
 	} else {
 		tag     = lb_emit_load(p, lb_emit_union_tag_ptr(p, value_));
 		dst_tag = lb_const_union_tag(m, src, dst);
@@ -849,7 +914,7 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 
 
 	if (data.value == nullptr) {
-		data = lb_emit_load(p, lb_emit_conv(p, value_, gep0.type));
+		data = lb_emit_load(p, lb_emit_union_variant_ptr(p, value_, dst));
 	}
 	lb_emit_store(p, gep0, data);
 	lb_emit_store(p, gep1, lb_const_bool(m, t_bool, true));
@@ -1363,6 +1428,10 @@ gb_internal lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		}
 		u64 align_max = bt->Struct.custom_max_field_align;
 		u64 align_min = bt->Struct.custom_min_field_align;
+		u64 align_custom = cast(u64)bt->Struct.custom_align;
+		if (align_custom != 0) {
+			align_max = align_max ? gb_min(align_max, align_custom) : align_custom;
+		}
 		GB_ASSERT(align_min == 0 || align_max == 0 || align_min <= align_max);
 		if (align_max) {
 			lb_set_metadata_custom_u64(p->module, gep.value, ODIN_METADATA_MAX_ALIGN, align_max);
@@ -1557,34 +1626,31 @@ gb_internal lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection 
 		type = core_type(type);
 
 		if (type->kind == Type_SoaPointer) {
+			// #soa pointer is {^container, index}; index into the selected
+			// column, then keep walking remaining selection indices (e.g. `using`)
 			lbValue addr = lb_emit_struct_ep(p, e, 0);
-			lbValue index = lb_emit_struct_ep(p, e, 1);
+			lbValue soa_index = lb_emit_struct_ep(p, e, 1);
 			addr = lb_emit_load(p, addr);
-			index = lb_emit_load(p, index);
+			soa_index = lb_emit_load(p, soa_index);
 
-			i32 first_index = sel.index[0];
-			Selection sub_sel = sel;
-			sub_sel.index.data += 1;
-			sub_sel.index.count -= 1;
-
-			lbValue arr = lb_emit_struct_ep(p, addr, first_index);
+			lbValue arr = lb_emit_struct_ep(p, addr, index);
 
 			Type *t = base_type(type_deref(addr.type));
 			GB_ASSERT(is_type_soa_struct(t));
 
 			if (t->Struct.soa_kind == StructSoa_Fixed) {
-				e = lb_emit_array_ep(p, arr, index);
+				e = lb_emit_array_ep(p, arr, soa_index);
 			} else {
-				e = lb_emit_ptr_offset(p, lb_emit_load(p, arr), index);
+				e = lb_emit_ptr_offset(p, lb_emit_load(p, arr), soa_index);
 			}
 			e.type = alloc_type_multi_pointer_to_pointer(e.type);
+			type = type_deref(e.type);
 
 		} else if (is_type_quaternion(type)) {
 			e = lb_emit_struct_ep(p, e, index);
 		} else if (is_type_raw_union(type)) {
 			type = get_struct_field_type(type, index);
-			GB_ASSERT(is_type_pointer(e.type));
-			e = lb_emit_transmute(p, e, alloc_type_pointer(type));
+			e = lb_emit_struct_ep(p, e, index);
 		} else if (is_type_struct(type)) {
 			type = get_struct_field_type(type, index);
 			e = lb_emit_struct_ep(p, e, index);
@@ -1725,7 +1791,7 @@ gb_internal lbValue lb_emit_matrix_epi(lbProcedure *p, lbValue s, isize row, isi
 	GB_ASSERT(is_type_pointer(t));
 	Type *mt = base_type(type_deref(t));
 
-	if (!mt->Matrix.is_row_major) {
+	if (!is_type_matrix(mt) || !mt->Matrix.is_row_major) {
 		if (column == 0) {
 			GB_ASSERT_MSG(is_type_matrix(mt) || is_type_array_like(mt), "%s", type_to_string(mt));
 			return lb_emit_epi(p, s, row);
@@ -1768,7 +1834,7 @@ gb_internal lbValue lb_emit_matrix_ep(lbProcedure *p, lbValue s, lbValue row, lb
 
 	LLVMTypeRef type = lb_type(p->module, mt);
 	lbValue res = {};
-	if (lb_is_const(s)) {
+	if (lb_is_const(s) && LLVMIsConstant(index)) {
 		res.value = LLVMConstGEP2(type, s.value, indices, gb_count_of(indices));
 	} else {
 		res.value = LLVMBuildGEP2(p->builder, type, s.value, indices, gb_count_of(indices), "");
@@ -2925,7 +2991,7 @@ gb_internal lbValue lb_handle_objc_super(lbProcedure *p, Ast *expr) {
 gb_internal lbValue lb_handle_objc_find_selector(lbProcedure *p, Ast *expr) {
 	ast_node(ce, CallExpr, expr);
 
-	auto tav = ce->args[0]->tav;
+	TypeAndValue tav = type_and_value_of_expr(ce->args[0]);
 	GB_ASSERT(tav.value.kind == ExactValue_String);
 	String name = tav.value.value_string;
 	return lb_addr_load(p, lb_handle_objc_find_or_register_selector(p, name));
@@ -2935,7 +3001,7 @@ gb_internal lbValue lb_handle_objc_register_selector(lbProcedure *p, Ast *expr) 
 	ast_node(ce, CallExpr, expr);
 	lbModule *m = p->module;
 
-	auto tav = ce->args[0]->tav;
+	TypeAndValue tav = type_and_value_of_expr(ce->args[0]);
 	GB_ASSERT(tav.value.kind == ExactValue_String);
 	String name = tav.value.value_string;
 	lbAddr dst = lb_handle_objc_find_or_register_selector(p, name);
@@ -2952,7 +3018,7 @@ gb_internal lbValue lb_handle_objc_register_selector(lbProcedure *p, Ast *expr) 
 gb_internal lbValue lb_handle_objc_find_class(lbProcedure *p, Ast *expr) {
 	ast_node(ce, CallExpr, expr);
 
-	auto tav = ce->args[0]->tav;
+	TypeAndValue tav = type_and_value_of_expr(ce->args[0]);
 	GB_ASSERT(tav.value.kind == ExactValue_String);
 	String name = tav.value.value_string;
 	return lb_addr_load(p, lb_handle_objc_find_or_register_class(p, name, nullptr));
@@ -2962,14 +3028,14 @@ gb_internal lbValue lb_handle_objc_register_class(lbProcedure *p, Ast *expr) {
 	ast_node(ce, CallExpr, expr);
 	lbModule *m = p->module;
 
-	auto tav = ce->args[0]->tav;
+	TypeAndValue tav = type_and_value_of_expr(ce->args[0]);
 	GB_ASSERT(tav.value.kind == ExactValue_String);
 	String name = tav.value.value_string;
 	lbAddr dst = lb_handle_objc_find_or_register_class(p, name, nullptr);
 
 	auto args = array_make<lbValue>(permanent_allocator(), 3);
 	args[0] = lb_const_nil(m, t_objc_Class);
-	args[1] = lb_const_nil(m, t_objc_Class);
+	args[1] = lb_const_value(m, t_cstring, exact_value_string(name));
 	args[2] = lb_const_int(m, t_uint, 0);
 	lbValue ptr = lb_emit_runtime_call(p, "objc_allocateClassPair", args);
 	lb_addr_store(p, dst, ptr);
@@ -3008,8 +3074,8 @@ gb_internal lbValue lb_handle_objc_send(lbProcedure *p, Ast *expr) {
 
 	lbValue id = lb_handle_objc_id(p, ce->args[1]);
 	Ast *sel_expr = ce->args[2];
-	GB_ASSERT(sel_expr->tav.value.kind == ExactValue_String);
-	lbValue sel = lb_addr_load(p, lb_handle_objc_find_or_register_selector(p, sel_expr->tav.value.value_string));
+	GB_ASSERT(sel_expr->tav.value().kind == ExactValue_String);
+	lbValue sel = lb_addr_load(p, lb_handle_objc_find_or_register_selector(p, sel_expr->tav.value().value_string));
 
 	array_add(&args, id);
 	array_add(&args, sel);
@@ -3055,7 +3121,10 @@ gb_internal lbValue lb_handle_objc_auto_send(lbProcedure *p, Ast *expr, Slice<lb
 
 	Type *objc_super_orig_type = nullptr;
 	if (ce->args.count > 0) {
-		objc_super_orig_type = unparen_expr(ce->args[0])->tav.objc_super_target;
+		Ast *arg = unparen_expr(ce->args[0]);
+		if (arg->kind == Ast_CallExpr) {
+			objc_super_orig_type = arg->CallExpr.objc_super_target;
+		}
 	}
 
 	isize arg_offset = 1;
@@ -3084,12 +3153,14 @@ gb_internal lbValue lb_handle_objc_auto_send(lbProcedure *p, Ast *expr, Slice<lb
 		}
 	} else {
 		Entity *objc_class = objc_method_ent->Procedure.objc_class;
-		if (ce->proc->kind == Ast_SelectorExpr) {
+		Ast *proc_expr = unparen_expr(ce->proc);
+		// NOTE(bill): `pkg.Foo_alloc()` is also a selector expression, but its lhs is a package rather than a type
+		if (proc_expr->kind == Ast_SelectorExpr && proc_expr->SelectorExpr.expr->tav.mode == Addressing_Type) {
 			// NOTE (harold): If called via a selector expression (ex: Foo.alloc()), then we should use
 			//                the lhs-side to determine the class. This allows for class methods to be called
 			//                with the correct class as the target, even when the method is defined in a superclass.
-			ast_node(se, SelectorExpr, ce->proc);
-			GB_ASSERT(se->expr->tav.mode == Addressing_Type && se->expr->tav.type->kind == Type_Named);
+			ast_node(se, SelectorExpr, proc_expr);
+			GB_ASSERT(se->expr->tav.type->kind == Type_Named);
 
 			objc_class = entity_from_expr(se->expr);
 			GB_ASSERT(objc_class);
@@ -3214,7 +3285,7 @@ gb_internal void lb_do_para_poly_diagnostics(lbGenerator *gen) {
 			}
 
 			DeclInfo *d = e->decl_info;
-			Entity *para_poly_parent = d->para_poly_original;
+			Entity *para_poly_parent = d->proc->para_poly_original;
 			if (para_poly_parent == nullptr) {
 				continue;
 			}
@@ -3461,4 +3532,33 @@ gb_internal void lb_do_build_diagnostics(lbGenerator *gen) {
 	lb_do_module_diagnostics(gen);
 	gb_printf("------------------------------------------------------------------------------------------\n");
 	gb_printf("------------------------------------------------------------------------------------------\n\n");
+}
+
+// LLVM only adds `evex512` by itself for the generic x86 CPUs, so with e.g. the default `x86-64-v2`
+// an explicit `+avx512f` gives no zmm registers and 512-bit vectors are returned as ymm pairs, unlike C.
+// Like clang, ask for it whenever an AVX-512 feature is enabled and `evex512` isn't named explicitly.
+gb_internal bool lb_x86_features_need_evex512(String features) {
+#if LLVM_VERSION_MAJOR >= 18
+	if (!is_arch_x86()) {
+		return false;
+	}
+	bool has_avx512 = false;
+	String_Iterator it = {features, 0};
+	String str = {};
+	while (string_split_iterator_next(&it, ',', &str)) {
+		bool disabled = string_starts_with(str, '-');
+		if (string_starts_with(str, '+') || disabled) {
+			str = substring(str, 1, str.len);
+		}
+		if (str == "evex512") {
+			return false;
+		}
+		if (!disabled && string_starts_with(str, str_lit("avx512"))) {
+			has_avx512 = true;
+		}
+	}
+	return has_avx512;
+#else
+	return false;
+#endif
 }

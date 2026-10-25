@@ -61,7 +61,7 @@ strncpy :: proc "c" (dst: [^]byte, src: cstring, count: uint) -> cstring {
 	assert_contextless(icount >= 0)
 	cnt := min(len(src), icount)
 	intrinsics.mem_copy_non_overlapping(dst, rawptr(src), cnt)
-	intrinsics.mem_zero(dst, icount-cnt)
+	dst[icount-cnt] = 0
 	return cstring(dst)
 }
 

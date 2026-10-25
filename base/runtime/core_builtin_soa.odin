@@ -280,6 +280,9 @@ _reserve_soa :: #force_no_inline proc(array: ^$T/#soa[dynamic]$E, capacity: int,
 
 	old_cap := cap(array)
 	if capacity <= old_cap {
+		if capacity < 0 {
+			return .Invalid_Argument
+		}
 		return nil
 	}
 

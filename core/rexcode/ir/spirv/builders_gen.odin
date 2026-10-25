@@ -10,7 +10,7 @@ inst_OpNop :: #force_inline proc "contextless" () -> Operation {
 }
 
 nop :: proc(b: ^Builder) {
-	append(&b.ops, inst_OpNop())
+	append_elem(&b.ops, inst_OpNop())
 }
 
 inst_OpUndef :: #force_inline proc "contextless" (result_type: Type_Ref, result: Id) -> Operation {
@@ -19,7 +19,7 @@ inst_OpUndef :: #force_inline proc "contextless" (result_type: Type_Ref, result:
 
 undef :: proc(b: ^Builder, result_type: Type_Ref) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUndef(result_type, r))
+	append_elem(&b.ops, inst_OpUndef(result_type, r))
 	return r
 }
 
@@ -30,7 +30,7 @@ inst_OpSourceContinued :: #force_inline proc "contextless" (buf: []Operand, op1:
 }
 
 source_continued :: proc(b: ^Builder, op1: string) {
-	append(&b.ops, inst_OpSourceContinued(opbuf(b, (len(op1) + 4) / 4), op1))
+	append_elem(&b.ops, inst_OpSourceContinued(opbuf(b, (len(op1) + 4) / 4), op1))
 }
 
 inst_OpSource :: #force_inline proc "contextless" (buf: []Operand, op1: Source_Language, op2: i64, op3: Maybe(Id), op4: Maybe(string)) -> Operation {
@@ -43,7 +43,7 @@ inst_OpSource :: #force_inline proc "contextless" (buf: []Operand, op1: Source_L
 }
 
 source :: proc(b: ^Builder, op1: Source_Language, op2: i64, op3: Maybe(Id), op4: Maybe(string)) {
-	append(&b.ops, inst_OpSource(opbuf(b, 1 + 1 + 1 + (len(op4.? or_else "") + 4) / 4), op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpSource(opbuf(b, 1 + 1 + 1 + (len(op4.? or_else "") + 4) / 4), op1, op2, op3, op4))
 }
 
 inst_OpSourceExtension :: #force_inline proc "contextless" (buf: []Operand, op1: string) -> Operation {
@@ -53,7 +53,7 @@ inst_OpSourceExtension :: #force_inline proc "contextless" (buf: []Operand, op1:
 }
 
 source_extension :: proc(b: ^Builder, op1: string) {
-	append(&b.ops, inst_OpSourceExtension(opbuf(b, (len(op1) + 4) / 4), op1))
+	append_elem(&b.ops, inst_OpSourceExtension(opbuf(b, (len(op1) + 4) / 4), op1))
 }
 
 inst_OpName :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: string) -> Operation {
@@ -64,7 +64,7 @@ inst_OpName :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: s
 }
 
 name :: proc(b: ^Builder, op1: Id, op2: string) {
-	append(&b.ops, inst_OpName(opbuf(b, 1 + (len(op2) + 4) / 4), op1, op2))
+	append_elem(&b.ops, inst_OpName(opbuf(b, 1 + (len(op2) + 4) / 4), op1, op2))
 }
 
 inst_OpMemberName :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: i64, op3: string) -> Operation {
@@ -76,7 +76,7 @@ inst_OpMemberName :: #force_inline proc "contextless" (buf: []Operand, op1: Id, 
 }
 
 member_name :: proc(b: ^Builder, op1: Id, op2: i64, op3: string) {
-	append(&b.ops, inst_OpMemberName(opbuf(b, 1 + 1 + (len(op3) + 4) / 4), op1, op2, op3))
+	append_elem(&b.ops, inst_OpMemberName(opbuf(b, 1 + 1 + (len(op3) + 4) / 4), op1, op2, op3))
 }
 
 inst_OpString :: #force_inline proc "contextless" (buf: []Operand, result: Id, op1: string) -> Operation {
@@ -87,7 +87,7 @@ inst_OpString :: #force_inline proc "contextless" (buf: []Operand, result: Id, o
 
 string_ :: proc(b: ^Builder, op1: string) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpString(opbuf(b, (len(op1) + 4) / 4), r, op1))
+	append_elem(&b.ops, inst_OpString(opbuf(b, (len(op1) + 4) / 4), r, op1))
 	return r
 }
 
@@ -100,7 +100,7 @@ inst_OpLine :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: i
 }
 
 line :: proc(b: ^Builder, op1: Id, op2: i64, op3: i64) {
-	append(&b.ops, inst_OpLine(opbuf(b, 1 + 1 + 1), op1, op2, op3))
+	append_elem(&b.ops, inst_OpLine(opbuf(b, 1 + 1 + 1), op1, op2, op3))
 }
 
 inst_OpExtension :: #force_inline proc "contextless" (buf: []Operand, op1: string) -> Operation {
@@ -110,7 +110,7 @@ inst_OpExtension :: #force_inline proc "contextless" (buf: []Operand, op1: strin
 }
 
 extension :: proc(b: ^Builder, op1: string) {
-	append(&b.ops, inst_OpExtension(opbuf(b, (len(op1) + 4) / 4), op1))
+	append_elem(&b.ops, inst_OpExtension(opbuf(b, (len(op1) + 4) / 4), op1))
 }
 
 inst_OpExtInstImport :: #force_inline proc "contextless" (buf: []Operand, result: Id, op1: string) -> Operation {
@@ -121,7 +121,7 @@ inst_OpExtInstImport :: #force_inline proc "contextless" (buf: []Operand, result
 
 ext_inst_import :: proc(b: ^Builder, op1: string) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpExtInstImport(opbuf(b, (len(op1) + 4) / 4), r, op1))
+	append_elem(&b.ops, inst_OpExtInstImport(opbuf(b, (len(op1) + 4) / 4), r, op1))
 	return r
 }
 
@@ -135,7 +135,7 @@ inst_OpExtInst :: #force_inline proc "contextless" (buf: []Operand, result_type:
 
 ext_inst :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpExtInst(opbuf(b, 1 + 1 + len(op3)), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpExtInst(opbuf(b, 1 + 1 + len(op3)), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -147,7 +147,7 @@ inst_OpMemoryModel :: #force_inline proc "contextless" (buf: []Operand, op1: Add
 }
 
 memory_model :: proc(b: ^Builder, op1: Addressing_Model, op2: Memory_Model) {
-	append(&b.ops, inst_OpMemoryModel(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpMemoryModel(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpEntryPoint :: #force_inline proc "contextless" (buf: []Operand, op1: Execution_Model, op2: Id, op3: string, op4: []Id) -> Operation {
@@ -160,7 +160,7 @@ inst_OpEntryPoint :: #force_inline proc "contextless" (buf: []Operand, op1: Exec
 }
 
 entry_point :: proc(b: ^Builder, op1: Execution_Model, op2: Id, op3: string, op4: []Id) {
-	append(&b.ops, inst_OpEntryPoint(opbuf(b, 1 + 1 + (len(op3) + 4) / 4 + len(op4)), op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpEntryPoint(opbuf(b, 1 + 1 + (len(op3) + 4) / 4 + len(op4)), op1, op2, op3, op4))
 }
 
 inst_OpExecutionMode :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Execution_Mode) -> Operation {
@@ -171,7 +171,7 @@ inst_OpExecutionMode :: #force_inline proc "contextless" (buf: []Operand, op1: I
 }
 
 execution_mode :: proc(b: ^Builder, op1: Id, op2: Execution_Mode) {
-	append(&b.ops, inst_OpExecutionMode(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpExecutionMode(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpCapability :: #force_inline proc "contextless" (buf: []Operand, op1: Capability) -> Operation {
@@ -181,7 +181,7 @@ inst_OpCapability :: #force_inline proc "contextless" (buf: []Operand, op1: Capa
 }
 
 capability :: proc(b: ^Builder, op1: Capability) {
-	append(&b.ops, inst_OpCapability(opbuf(b, 1), op1))
+	append_elem(&b.ops, inst_OpCapability(opbuf(b, 1), op1))
 }
 
 inst_OpTypeVoid :: #force_inline proc "contextless" (result: Id) -> Operation {
@@ -190,7 +190,7 @@ inst_OpTypeVoid :: #force_inline proc "contextless" (result: Id) -> Operation {
 
 type_void_ :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeVoid(r))
+	append_elem(&b.ops, inst_OpTypeVoid(r))
 	return r
 }
 
@@ -200,7 +200,7 @@ inst_OpTypeBool :: #force_inline proc "contextless" (result: Id) -> Operation {
 
 type_bool_ :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeBool(r))
+	append_elem(&b.ops, inst_OpTypeBool(r))
 	return r
 }
 
@@ -213,7 +213,7 @@ inst_OpTypeInt :: #force_inline proc "contextless" (buf: []Operand, result: Id, 
 
 type_int_ :: proc(b: ^Builder, op1: i64, op2: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeInt(opbuf(b, 1 + 1), r, op1, op2))
+	append_elem(&b.ops, inst_OpTypeInt(opbuf(b, 1 + 1), r, op1, op2))
 	return r
 }
 
@@ -226,7 +226,7 @@ inst_OpTypeFloat :: #force_inline proc "contextless" (buf: []Operand, result: Id
 
 type_float_ :: proc(b: ^Builder, op1: i64, op2: Maybe(FP_Encoding)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeFloat(opbuf(b, 1 + 1), r, op1, op2))
+	append_elem(&b.ops, inst_OpTypeFloat(opbuf(b, 1 + 1), r, op1, op2))
 	return r
 }
 
@@ -239,7 +239,7 @@ inst_OpTypeVector :: #force_inline proc "contextless" (buf: []Operand, result: I
 
 type_vector_ :: proc(b: ^Builder, op1: Id, op2: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeVector(opbuf(b, 1 + 1), r, op1, op2))
+	append_elem(&b.ops, inst_OpTypeVector(opbuf(b, 1 + 1), r, op1, op2))
 	return r
 }
 
@@ -252,7 +252,7 @@ inst_OpTypeMatrix :: #force_inline proc "contextless" (buf: []Operand, result: I
 
 type_matrix :: proc(b: ^Builder, op1: Id, op2: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeMatrix(opbuf(b, 1 + 1), r, op1, op2))
+	append_elem(&b.ops, inst_OpTypeMatrix(opbuf(b, 1 + 1), r, op1, op2))
 	return r
 }
 
@@ -271,7 +271,7 @@ inst_OpTypeImage :: #force_inline proc "contextless" (buf: []Operand, result: Id
 
 type_image :: proc(b: ^Builder, op1: Id, op2: Dim, op3: i64, op4: i64, op5: i64, op6: i64, op7: Image_Format, op8: Maybe(Access_Qualifier)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeImage(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), r, op1, op2, op3, op4, op5, op6, op7, op8))
+	append_elem(&b.ops, inst_OpTypeImage(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), r, op1, op2, op3, op4, op5, op6, op7, op8))
 	return r
 }
 
@@ -281,7 +281,7 @@ inst_OpTypeSampler :: #force_inline proc "contextless" (result: Id) -> Operation
 
 type_sampler :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeSampler(r))
+	append_elem(&b.ops, inst_OpTypeSampler(r))
 	return r
 }
 
@@ -293,7 +293,7 @@ inst_OpTypeSampledImage :: #force_inline proc "contextless" (buf: []Operand, res
 
 type_sampled_image :: proc(b: ^Builder, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeSampledImage(opbuf(b, 1), r, op1))
+	append_elem(&b.ops, inst_OpTypeSampledImage(opbuf(b, 1), r, op1))
 	return r
 }
 
@@ -306,7 +306,7 @@ inst_OpTypeArray :: #force_inline proc "contextless" (buf: []Operand, result: Id
 
 type_array_ :: proc(b: ^Builder, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeArray(opbuf(b, 1 + 1), r, op1, op2))
+	append_elem(&b.ops, inst_OpTypeArray(opbuf(b, 1 + 1), r, op1, op2))
 	return r
 }
 
@@ -318,7 +318,7 @@ inst_OpTypeRuntimeArray :: #force_inline proc "contextless" (buf: []Operand, res
 
 type_runtime_array :: proc(b: ^Builder, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeRuntimeArray(opbuf(b, 1), r, op1))
+	append_elem(&b.ops, inst_OpTypeRuntimeArray(opbuf(b, 1), r, op1))
 	return r
 }
 
@@ -330,7 +330,7 @@ inst_OpTypeStruct :: #force_inline proc "contextless" (buf: []Operand, result: I
 
 type_struct :: proc(b: ^Builder, op1: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeStruct(opbuf(b, len(op1)), r, op1))
+	append_elem(&b.ops, inst_OpTypeStruct(opbuf(b, len(op1)), r, op1))
 	return r
 }
 
@@ -342,7 +342,7 @@ inst_OpTypeOpaque :: #force_inline proc "contextless" (buf: []Operand, result: I
 
 type_opaque :: proc(b: ^Builder, op1: string) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeOpaque(opbuf(b, (len(op1) + 4) / 4), r, op1))
+	append_elem(&b.ops, inst_OpTypeOpaque(opbuf(b, (len(op1) + 4) / 4), r, op1))
 	return r
 }
 
@@ -355,7 +355,7 @@ inst_OpTypePointer :: #force_inline proc "contextless" (buf: []Operand, result: 
 
 type_pointer_ :: proc(b: ^Builder, op1: Storage_Class, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypePointer(opbuf(b, 1 + 1), r, op1, op2))
+	append_elem(&b.ops, inst_OpTypePointer(opbuf(b, 1 + 1), r, op1, op2))
 	return r
 }
 
@@ -368,7 +368,7 @@ inst_OpTypeFunction :: #force_inline proc "contextless" (buf: []Operand, result:
 
 type_function :: proc(b: ^Builder, op1: Id, op2: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeFunction(opbuf(b, 1 + len(op2)), r, op1, op2))
+	append_elem(&b.ops, inst_OpTypeFunction(opbuf(b, 1 + len(op2)), r, op1, op2))
 	return r
 }
 
@@ -378,7 +378,7 @@ inst_OpTypeEvent :: #force_inline proc "contextless" (result: Id) -> Operation {
 
 type_event :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeEvent(r))
+	append_elem(&b.ops, inst_OpTypeEvent(r))
 	return r
 }
 
@@ -388,7 +388,7 @@ inst_OpTypeDeviceEvent :: #force_inline proc "contextless" (result: Id) -> Opera
 
 type_device_event :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeDeviceEvent(r))
+	append_elem(&b.ops, inst_OpTypeDeviceEvent(r))
 	return r
 }
 
@@ -398,7 +398,7 @@ inst_OpTypeReserveId :: #force_inline proc "contextless" (result: Id) -> Operati
 
 type_reserve_id :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeReserveId(r))
+	append_elem(&b.ops, inst_OpTypeReserveId(r))
 	return r
 }
 
@@ -408,7 +408,7 @@ inst_OpTypeQueue :: #force_inline proc "contextless" (result: Id) -> Operation {
 
 type_queue :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeQueue(r))
+	append_elem(&b.ops, inst_OpTypeQueue(r))
 	return r
 }
 
@@ -420,7 +420,7 @@ inst_OpTypePipe :: #force_inline proc "contextless" (buf: []Operand, result: Id,
 
 type_pipe :: proc(b: ^Builder, op1: Access_Qualifier) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypePipe(opbuf(b, 1), r, op1))
+	append_elem(&b.ops, inst_OpTypePipe(opbuf(b, 1), r, op1))
 	return r
 }
 
@@ -432,7 +432,7 @@ inst_OpTypeForwardPointer :: #force_inline proc "contextless" (buf: []Operand, o
 }
 
 type_forward_pointer :: proc(b: ^Builder, op1: Id, op2: Storage_Class) {
-	append(&b.ops, inst_OpTypeForwardPointer(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpTypeForwardPointer(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpConstantTrue :: #force_inline proc "contextless" (result_type: Type_Ref, result: Id) -> Operation {
@@ -441,7 +441,7 @@ inst_OpConstantTrue :: #force_inline proc "contextless" (result_type: Type_Ref, 
 
 constant_true :: proc(b: ^Builder, result_type: Type_Ref) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConstantTrue(result_type, r))
+	append_elem(&b.ops, inst_OpConstantTrue(result_type, r))
 	return r
 }
 
@@ -451,7 +451,7 @@ inst_OpConstantFalse :: #force_inline proc "contextless" (result_type: Type_Ref,
 
 constant_false :: proc(b: ^Builder, result_type: Type_Ref) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConstantFalse(result_type, r))
+	append_elem(&b.ops, inst_OpConstantFalse(result_type, r))
 	return r
 }
 
@@ -463,7 +463,7 @@ inst_OpConstant :: #force_inline proc "contextless" (buf: []Operand, result_type
 
 constant :: proc(b: ^Builder, result_type: Type_Ref, op1: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConstant(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConstant(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -475,7 +475,7 @@ inst_OpConstantComposite :: #force_inline proc "contextless" (buf: []Operand, re
 
 constant_composite :: proc(b: ^Builder, result_type: Type_Ref, op1: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConstantComposite(opbuf(b, len(op1)), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConstantComposite(opbuf(b, len(op1)), result_type, r, op1))
 	return r
 }
 
@@ -489,7 +489,7 @@ inst_OpConstantSampler :: #force_inline proc "contextless" (buf: []Operand, resu
 
 constant_sampler :: proc(b: ^Builder, result_type: Type_Ref, op1: Sampler_Addressing_Mode, op2: i64, op3: Sampler_Filter_Mode) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConstantSampler(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpConstantSampler(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -499,7 +499,7 @@ inst_OpConstantNull :: #force_inline proc "contextless" (result_type: Type_Ref, 
 
 constant_null :: proc(b: ^Builder, result_type: Type_Ref) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConstantNull(result_type, r))
+	append_elem(&b.ops, inst_OpConstantNull(result_type, r))
 	return r
 }
 
@@ -509,7 +509,7 @@ inst_OpSpecConstantTrue :: #force_inline proc "contextless" (result_type: Type_R
 
 spec_constant_true :: proc(b: ^Builder, result_type: Type_Ref) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSpecConstantTrue(result_type, r))
+	append_elem(&b.ops, inst_OpSpecConstantTrue(result_type, r))
 	return r
 }
 
@@ -519,7 +519,7 @@ inst_OpSpecConstantFalse :: #force_inline proc "contextless" (result_type: Type_
 
 spec_constant_false :: proc(b: ^Builder, result_type: Type_Ref) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSpecConstantFalse(result_type, r))
+	append_elem(&b.ops, inst_OpSpecConstantFalse(result_type, r))
 	return r
 }
 
@@ -531,7 +531,7 @@ inst_OpSpecConstant :: #force_inline proc "contextless" (buf: []Operand, result_
 
 spec_constant :: proc(b: ^Builder, result_type: Type_Ref, op1: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSpecConstant(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSpecConstant(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -543,7 +543,7 @@ inst_OpSpecConstantComposite :: #force_inline proc "contextless" (buf: []Operand
 
 spec_constant_composite :: proc(b: ^Builder, result_type: Type_Ref, op1: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSpecConstantComposite(opbuf(b, len(op1)), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSpecConstantComposite(opbuf(b, len(op1)), result_type, r, op1))
 	return r
 }
 
@@ -555,7 +555,7 @@ inst_OpSpecConstantOp :: #force_inline proc "contextless" (buf: []Operand, resul
 
 spec_constant_op :: proc(b: ^Builder, result_type: Type_Ref, op1: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSpecConstantOp(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSpecConstantOp(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -568,7 +568,7 @@ inst_OpFunction :: #force_inline proc "contextless" (buf: []Operand, result_type
 
 function :: proc(b: ^Builder, result_type: Type_Ref, op1: Function_Control, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFunction(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpFunction(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -578,7 +578,7 @@ inst_OpFunctionParameter :: #force_inline proc "contextless" (result_type: Type_
 
 function_parameter :: proc(b: ^Builder, result_type: Type_Ref) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFunctionParameter(result_type, r))
+	append_elem(&b.ops, inst_OpFunctionParameter(result_type, r))
 	return r
 }
 
@@ -587,7 +587,7 @@ inst_OpFunctionEnd :: #force_inline proc "contextless" () -> Operation {
 }
 
 function_end :: proc(b: ^Builder) {
-	append(&b.ops, inst_OpFunctionEnd())
+	append_elem(&b.ops, inst_OpFunctionEnd())
 }
 
 inst_OpFunctionCall :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: []Id) -> Operation {
@@ -599,7 +599,7 @@ inst_OpFunctionCall :: #force_inline proc "contextless" (buf: []Operand, result_
 
 function_call :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFunctionCall(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpFunctionCall(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
 	return r
 }
 
@@ -612,7 +612,7 @@ inst_OpVariable :: #force_inline proc "contextless" (buf: []Operand, result_type
 
 variable :: proc(b: ^Builder, result_type: Type_Ref, op1: Storage_Class, op2: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpVariable(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpVariable(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -626,7 +626,7 @@ inst_OpImageTexelPointer :: #force_inline proc "contextless" (buf: []Operand, re
 
 image_texel_pointer :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageTexelPointer(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpImageTexelPointer(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -639,7 +639,7 @@ inst_OpLoad :: #force_inline proc "contextless" (buf: []Operand, result_type: Ty
 
 load :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Maybe(Memory_Access)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpLoad(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpLoad(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -652,7 +652,7 @@ inst_OpStore :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: 
 }
 
 store :: proc(b: ^Builder, op1: Id, op2: Id, op3: Maybe(Memory_Access)) {
-	append(&b.ops, inst_OpStore(opbuf(b, 1 + 1 + 1), op1, op2, op3))
+	append_elem(&b.ops, inst_OpStore(opbuf(b, 1 + 1 + 1), op1, op2, op3))
 }
 
 inst_OpCopyMemory :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Maybe(Memory_Access), op4: Maybe(Memory_Access)) -> Operation {
@@ -665,7 +665,7 @@ inst_OpCopyMemory :: #force_inline proc "contextless" (buf: []Operand, op1: Id, 
 }
 
 copy_memory :: proc(b: ^Builder, op1: Id, op2: Id, op3: Maybe(Memory_Access), op4: Maybe(Memory_Access)) {
-	append(&b.ops, inst_OpCopyMemory(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpCopyMemory(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
 }
 
 inst_OpCopyMemorySized :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Maybe(Memory_Access), op5: Maybe(Memory_Access)) -> Operation {
@@ -679,7 +679,7 @@ inst_OpCopyMemorySized :: #force_inline proc "contextless" (buf: []Operand, op1:
 }
 
 copy_memory_sized :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Maybe(Memory_Access), op5: Maybe(Memory_Access)) {
-	append(&b.ops, inst_OpCopyMemorySized(opbuf(b, 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpCopyMemorySized(opbuf(b, 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5))
 }
 
 inst_OpAccessChain :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: []Id) -> Operation {
@@ -691,7 +691,7 @@ inst_OpAccessChain :: #force_inline proc "contextless" (buf: []Operand, result_t
 
 access_chain :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAccessChain(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpAccessChain(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
 	return r
 }
 
@@ -704,7 +704,7 @@ inst_OpInBoundsAccessChain :: #force_inline proc "contextless" (buf: []Operand, 
 
 in_bounds_access_chain :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpInBoundsAccessChain(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpInBoundsAccessChain(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
 	return r
 }
 
@@ -718,7 +718,7 @@ inst_OpPtrAccessChain :: #force_inline proc "contextless" (buf: []Operand, resul
 
 ptr_access_chain :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpPtrAccessChain(opbuf(b, 1 + 1 + len(op3)), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpPtrAccessChain(opbuf(b, 1 + 1 + len(op3)), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -731,7 +731,7 @@ inst_OpArrayLength :: #force_inline proc "contextless" (buf: []Operand, result_t
 
 array_length :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArrayLength(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpArrayLength(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -743,7 +743,7 @@ inst_OpGenericPtrMemSemantics :: #force_inline proc "contextless" (buf: []Operan
 
 generic_ptr_mem_semantics :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGenericPtrMemSemantics(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpGenericPtrMemSemantics(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -757,7 +757,7 @@ inst_OpInBoundsPtrAccessChain :: #force_inline proc "contextless" (buf: []Operan
 
 in_bounds_ptr_access_chain :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpInBoundsPtrAccessChain(opbuf(b, 1 + 1 + len(op3)), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpInBoundsPtrAccessChain(opbuf(b, 1 + 1 + len(op3)), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -769,7 +769,7 @@ inst_OpDecorate :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op
 }
 
 decorate :: proc(b: ^Builder, op1: Id, op2: Decoration) {
-	append(&b.ops, inst_OpDecorate(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpDecorate(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpMemberDecorate :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: i64, op3: Decoration) -> Operation {
@@ -781,7 +781,7 @@ inst_OpMemberDecorate :: #force_inline proc "contextless" (buf: []Operand, op1: 
 }
 
 member_decorate :: proc(b: ^Builder, op1: Id, op2: i64, op3: Decoration) {
-	append(&b.ops, inst_OpMemberDecorate(opbuf(b, 1 + 1 + 1), op1, op2, op3))
+	append_elem(&b.ops, inst_OpMemberDecorate(opbuf(b, 1 + 1 + 1), op1, op2, op3))
 }
 
 inst_OpDecorationGroup :: #force_inline proc "contextless" (result: Id) -> Operation {
@@ -790,7 +790,7 @@ inst_OpDecorationGroup :: #force_inline proc "contextless" (result: Id) -> Opera
 
 decoration_group :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpDecorationGroup(r))
+	append_elem(&b.ops, inst_OpDecorationGroup(r))
 	return r
 }
 
@@ -802,7 +802,7 @@ inst_OpGroupDecorate :: #force_inline proc "contextless" (buf: []Operand, op1: I
 }
 
 group_decorate :: proc(b: ^Builder, op1: Id, op2: []Id) {
-	append(&b.ops, inst_OpGroupDecorate(opbuf(b, 1 + len(op2)), op1, op2))
+	append_elem(&b.ops, inst_OpGroupDecorate(opbuf(b, 1 + len(op2)), op1, op2))
 }
 
 inst_OpGroupMemberDecorate :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: []Pair_Id_Lit) -> Operation {
@@ -813,7 +813,7 @@ inst_OpGroupMemberDecorate :: #force_inline proc "contextless" (buf: []Operand, 
 }
 
 group_member_decorate :: proc(b: ^Builder, op1: Id, op2: []Pair_Id_Lit) {
-	append(&b.ops, inst_OpGroupMemberDecorate(opbuf(b, 1 + 2 * len(op2)), op1, op2))
+	append_elem(&b.ops, inst_OpGroupMemberDecorate(opbuf(b, 1 + 2 * len(op2)), op1, op2))
 }
 
 inst_OpVectorExtractDynamic :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id) -> Operation {
@@ -825,7 +825,7 @@ inst_OpVectorExtractDynamic :: #force_inline proc "contextless" (buf: []Operand,
 
 vector_extract_dynamic :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpVectorExtractDynamic(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpVectorExtractDynamic(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -839,7 +839,7 @@ inst_OpVectorInsertDynamic :: #force_inline proc "contextless" (buf: []Operand, 
 
 vector_insert_dynamic :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpVectorInsertDynamic(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpVectorInsertDynamic(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -853,7 +853,7 @@ inst_OpVectorShuffle :: #force_inline proc "contextless" (buf: []Operand, result
 
 vector_shuffle :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: []i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpVectorShuffle(opbuf(b, 1 + 1 + len(op3)), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpVectorShuffle(opbuf(b, 1 + 1 + len(op3)), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -865,7 +865,7 @@ inst_OpCompositeConstruct :: #force_inline proc "contextless" (buf: []Operand, r
 
 composite_construct :: proc(b: ^Builder, result_type: Type_Ref, op1: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCompositeConstruct(opbuf(b, len(op1)), result_type, r, op1))
+	append_elem(&b.ops, inst_OpCompositeConstruct(opbuf(b, len(op1)), result_type, r, op1))
 	return r
 }
 
@@ -878,7 +878,7 @@ inst_OpCompositeExtract :: #force_inline proc "contextless" (buf: []Operand, res
 
 composite_extract :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: []i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCompositeExtract(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpCompositeExtract(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
 	return r
 }
 
@@ -892,7 +892,7 @@ inst_OpCompositeInsert :: #force_inline proc "contextless" (buf: []Operand, resu
 
 composite_insert :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: []i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCompositeInsert(opbuf(b, 1 + 1 + len(op3)), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpCompositeInsert(opbuf(b, 1 + 1 + len(op3)), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -904,7 +904,7 @@ inst_OpCopyObject :: #force_inline proc "contextless" (buf: []Operand, result_ty
 
 copy_object :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCopyObject(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpCopyObject(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -916,7 +916,7 @@ inst_OpTranspose :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 transpose :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTranspose(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpTranspose(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -929,7 +929,7 @@ inst_OpSampledImage :: #force_inline proc "contextless" (buf: []Operand, result_
 
 sampled_image :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSampledImage(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSampledImage(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -943,7 +943,7 @@ inst_OpImageSampleImplicitLod :: #force_inline proc "contextless" (buf: []Operan
 
 image_sample_implicit_lod :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Maybe(Image_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSampleImplicitLod(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpImageSampleImplicitLod(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -957,7 +957,7 @@ inst_OpImageSampleExplicitLod :: #force_inline proc "contextless" (buf: []Operan
 
 image_sample_explicit_lod :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Image_Operands) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSampleExplicitLod(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpImageSampleExplicitLod(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -972,7 +972,7 @@ inst_OpImageSampleDrefImplicitLod :: #force_inline proc "contextless" (buf: []Op
 
 image_sample_dref_implicit_lod :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Maybe(Image_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSampleDrefImplicitLod(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpImageSampleDrefImplicitLod(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -987,7 +987,7 @@ inst_OpImageSampleDrefExplicitLod :: #force_inline proc "contextless" (buf: []Op
 
 image_sample_dref_explicit_lod :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Image_Operands) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSampleDrefExplicitLod(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpImageSampleDrefExplicitLod(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -1001,7 +1001,7 @@ inst_OpImageSampleProjImplicitLod :: #force_inline proc "contextless" (buf: []Op
 
 image_sample_proj_implicit_lod :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Maybe(Image_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSampleProjImplicitLod(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpImageSampleProjImplicitLod(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -1015,7 +1015,7 @@ inst_OpImageSampleProjExplicitLod :: #force_inline proc "contextless" (buf: []Op
 
 image_sample_proj_explicit_lod :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Image_Operands) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSampleProjExplicitLod(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpImageSampleProjExplicitLod(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -1030,7 +1030,7 @@ inst_OpImageSampleProjDrefImplicitLod :: #force_inline proc "contextless" (buf: 
 
 image_sample_proj_dref_implicit_lod :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Maybe(Image_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSampleProjDrefImplicitLod(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpImageSampleProjDrefImplicitLod(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -1045,7 +1045,7 @@ inst_OpImageSampleProjDrefExplicitLod :: #force_inline proc "contextless" (buf: 
 
 image_sample_proj_dref_explicit_lod :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Image_Operands) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSampleProjDrefExplicitLod(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpImageSampleProjDrefExplicitLod(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -1059,7 +1059,7 @@ inst_OpImageFetch :: #force_inline proc "contextless" (buf: []Operand, result_ty
 
 image_fetch :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Maybe(Image_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageFetch(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpImageFetch(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -1074,7 +1074,7 @@ inst_OpImageGather :: #force_inline proc "contextless" (buf: []Operand, result_t
 
 image_gather :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Maybe(Image_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageGather(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpImageGather(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -1089,7 +1089,7 @@ inst_OpImageDrefGather :: #force_inline proc "contextless" (buf: []Operand, resu
 
 image_dref_gather :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Maybe(Image_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageDrefGather(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpImageDrefGather(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -1103,7 +1103,7 @@ inst_OpImageRead :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 image_read :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Maybe(Image_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageRead(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpImageRead(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -1117,7 +1117,7 @@ inst_OpImageWrite :: #force_inline proc "contextless" (buf: []Operand, op1: Id, 
 }
 
 image_write :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Maybe(Image_Operands)) {
-	append(&b.ops, inst_OpImageWrite(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpImageWrite(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
 }
 
 inst_OpImage :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id) -> Operation {
@@ -1128,7 +1128,7 @@ inst_OpImage :: #force_inline proc "contextless" (buf: []Operand, result_type: T
 
 image :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImage(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpImage(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1140,7 +1140,7 @@ inst_OpImageQueryFormat :: #force_inline proc "contextless" (buf: []Operand, res
 
 image_query_format :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageQueryFormat(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpImageQueryFormat(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1152,7 +1152,7 @@ inst_OpImageQueryOrder :: #force_inline proc "contextless" (buf: []Operand, resu
 
 image_query_order :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageQueryOrder(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpImageQueryOrder(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1165,7 +1165,7 @@ inst_OpImageQuerySizeLod :: #force_inline proc "contextless" (buf: []Operand, re
 
 image_query_size_lod :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageQuerySizeLod(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpImageQuerySizeLod(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1177,7 +1177,7 @@ inst_OpImageQuerySize :: #force_inline proc "contextless" (buf: []Operand, resul
 
 image_query_size :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageQuerySize(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpImageQuerySize(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1190,7 +1190,7 @@ inst_OpImageQueryLod :: #force_inline proc "contextless" (buf: []Operand, result
 
 image_query_lod :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageQueryLod(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpImageQueryLod(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1202,7 +1202,7 @@ inst_OpImageQueryLevels :: #force_inline proc "contextless" (buf: []Operand, res
 
 image_query_levels :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageQueryLevels(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpImageQueryLevels(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1214,7 +1214,7 @@ inst_OpImageQuerySamples :: #force_inline proc "contextless" (buf: []Operand, re
 
 image_query_samples :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageQuerySamples(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpImageQuerySamples(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1226,7 +1226,7 @@ inst_OpConvertFToU :: #force_inline proc "contextless" (buf: []Operand, result_t
 
 convert_f_to_u :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConvertFToU(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConvertFToU(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1238,7 +1238,7 @@ inst_OpConvertFToS :: #force_inline proc "contextless" (buf: []Operand, result_t
 
 convert_f_to_s :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConvertFToS(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConvertFToS(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1250,7 +1250,7 @@ inst_OpConvertSToF :: #force_inline proc "contextless" (buf: []Operand, result_t
 
 convert_s_to_f :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConvertSToF(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConvertSToF(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1262,7 +1262,7 @@ inst_OpConvertUToF :: #force_inline proc "contextless" (buf: []Operand, result_t
 
 convert_u_to_f :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConvertUToF(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConvertUToF(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1274,7 +1274,7 @@ inst_OpUConvert :: #force_inline proc "contextless" (buf: []Operand, result_type
 
 u_convert :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUConvert(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpUConvert(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1286,7 +1286,7 @@ inst_OpSConvert :: #force_inline proc "contextless" (buf: []Operand, result_type
 
 s_convert :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSConvert(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSConvert(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1298,7 +1298,7 @@ inst_OpFConvert :: #force_inline proc "contextless" (buf: []Operand, result_type
 
 f_convert :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFConvert(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpFConvert(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1310,7 +1310,7 @@ inst_OpQuantizeToF16 :: #force_inline proc "contextless" (buf: []Operand, result
 
 quantize_to_f16 :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpQuantizeToF16(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpQuantizeToF16(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1322,7 +1322,7 @@ inst_OpConvertPtrToU :: #force_inline proc "contextless" (buf: []Operand, result
 
 convert_ptr_to_u :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConvertPtrToU(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConvertPtrToU(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1334,7 +1334,7 @@ inst_OpSatConvertSToU :: #force_inline proc "contextless" (buf: []Operand, resul
 
 sat_convert_s_to_u :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSatConvertSToU(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSatConvertSToU(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1346,7 +1346,7 @@ inst_OpSatConvertUToS :: #force_inline proc "contextless" (buf: []Operand, resul
 
 sat_convert_u_to_s :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSatConvertUToS(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSatConvertUToS(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1358,7 +1358,7 @@ inst_OpConvertUToPtr :: #force_inline proc "contextless" (buf: []Operand, result
 
 convert_u_to_ptr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConvertUToPtr(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConvertUToPtr(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1370,7 +1370,7 @@ inst_OpPtrCastToGeneric :: #force_inline proc "contextless" (buf: []Operand, res
 
 ptr_cast_to_generic :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpPtrCastToGeneric(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpPtrCastToGeneric(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1382,7 +1382,7 @@ inst_OpGenericCastToPtr :: #force_inline proc "contextless" (buf: []Operand, res
 
 generic_cast_to_ptr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGenericCastToPtr(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpGenericCastToPtr(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1395,7 +1395,7 @@ inst_OpGenericCastToPtrExplicit :: #force_inline proc "contextless" (buf: []Oper
 
 generic_cast_to_ptr_explicit :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Storage_Class) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGenericCastToPtrExplicit(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpGenericCastToPtrExplicit(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1407,7 +1407,7 @@ inst_OpBitcast :: #force_inline proc "contextless" (buf: []Operand, result_type:
 
 bitcast :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpBitcast(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpBitcast(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1419,7 +1419,7 @@ inst_OpSNegate :: #force_inline proc "contextless" (buf: []Operand, result_type:
 
 s_negate :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSNegate(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSNegate(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1431,7 +1431,7 @@ inst_OpFNegate :: #force_inline proc "contextless" (buf: []Operand, result_type:
 
 f_negate :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFNegate(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpFNegate(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1444,7 +1444,7 @@ inst_OpIAdd :: #force_inline proc "contextless" (buf: []Operand, result_type: Ty
 
 i_add :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpIAdd(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpIAdd(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1457,7 +1457,7 @@ inst_OpFAdd :: #force_inline proc "contextless" (buf: []Operand, result_type: Ty
 
 f_add :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFAdd(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpFAdd(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1470,7 +1470,7 @@ inst_OpISub :: #force_inline proc "contextless" (buf: []Operand, result_type: Ty
 
 i_sub :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpISub(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpISub(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1483,7 +1483,7 @@ inst_OpFSub :: #force_inline proc "contextless" (buf: []Operand, result_type: Ty
 
 f_sub :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFSub(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpFSub(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1496,7 +1496,7 @@ inst_OpIMul :: #force_inline proc "contextless" (buf: []Operand, result_type: Ty
 
 i_mul :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpIMul(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpIMul(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1509,7 +1509,7 @@ inst_OpFMul :: #force_inline proc "contextless" (buf: []Operand, result_type: Ty
 
 f_mul :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFMul(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpFMul(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1522,7 +1522,7 @@ inst_OpUDiv :: #force_inline proc "contextless" (buf: []Operand, result_type: Ty
 
 u_div :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUDiv(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpUDiv(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1535,7 +1535,7 @@ inst_OpSDiv :: #force_inline proc "contextless" (buf: []Operand, result_type: Ty
 
 s_div :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSDiv(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSDiv(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1548,7 +1548,7 @@ inst_OpFDiv :: #force_inline proc "contextless" (buf: []Operand, result_type: Ty
 
 f_div :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFDiv(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpFDiv(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1561,7 +1561,7 @@ inst_OpUMod :: #force_inline proc "contextless" (buf: []Operand, result_type: Ty
 
 u_mod :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUMod(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpUMod(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1574,7 +1574,7 @@ inst_OpSRem :: #force_inline proc "contextless" (buf: []Operand, result_type: Ty
 
 s_rem :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSRem(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSRem(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1587,7 +1587,7 @@ inst_OpSMod :: #force_inline proc "contextless" (buf: []Operand, result_type: Ty
 
 s_mod :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSMod(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSMod(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1600,7 +1600,7 @@ inst_OpFRem :: #force_inline proc "contextless" (buf: []Operand, result_type: Ty
 
 f_rem :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFRem(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpFRem(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1613,7 +1613,7 @@ inst_OpFMod :: #force_inline proc "contextless" (buf: []Operand, result_type: Ty
 
 f_mod :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFMod(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpFMod(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1626,7 +1626,7 @@ inst_OpVectorTimesScalar :: #force_inline proc "contextless" (buf: []Operand, re
 
 vector_times_scalar :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpVectorTimesScalar(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpVectorTimesScalar(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1639,7 +1639,7 @@ inst_OpMatrixTimesScalar :: #force_inline proc "contextless" (buf: []Operand, re
 
 matrix_times_scalar :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpMatrixTimesScalar(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpMatrixTimesScalar(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1652,7 +1652,7 @@ inst_OpVectorTimesMatrix :: #force_inline proc "contextless" (buf: []Operand, re
 
 vector_times_matrix :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpVectorTimesMatrix(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpVectorTimesMatrix(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1665,7 +1665,7 @@ inst_OpMatrixTimesVector :: #force_inline proc "contextless" (buf: []Operand, re
 
 matrix_times_vector :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpMatrixTimesVector(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpMatrixTimesVector(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1678,7 +1678,7 @@ inst_OpMatrixTimesMatrix :: #force_inline proc "contextless" (buf: []Operand, re
 
 matrix_times_matrix :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpMatrixTimesMatrix(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpMatrixTimesMatrix(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1691,7 +1691,7 @@ inst_OpOuterProduct :: #force_inline proc "contextless" (buf: []Operand, result_
 
 outer_product :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpOuterProduct(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpOuterProduct(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1704,7 +1704,7 @@ inst_OpDot :: #force_inline proc "contextless" (buf: []Operand, result_type: Typ
 
 dot :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpDot(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpDot(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1717,7 +1717,7 @@ inst_OpIAddCarry :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 i_add_carry :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpIAddCarry(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpIAddCarry(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1730,7 +1730,7 @@ inst_OpISubBorrow :: #force_inline proc "contextless" (buf: []Operand, result_ty
 
 i_sub_borrow :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpISubBorrow(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpISubBorrow(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1743,7 +1743,7 @@ inst_OpUMulExtended :: #force_inline proc "contextless" (buf: []Operand, result_
 
 u_mul_extended :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUMulExtended(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpUMulExtended(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1756,7 +1756,7 @@ inst_OpSMulExtended :: #force_inline proc "contextless" (buf: []Operand, result_
 
 s_mul_extended :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSMulExtended(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSMulExtended(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1768,7 +1768,7 @@ inst_OpAny :: #force_inline proc "contextless" (buf: []Operand, result_type: Typ
 
 any_ :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAny(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpAny(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1780,7 +1780,7 @@ inst_OpAll :: #force_inline proc "contextless" (buf: []Operand, result_type: Typ
 
 all :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAll(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpAll(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1792,7 +1792,7 @@ inst_OpIsNan :: #force_inline proc "contextless" (buf: []Operand, result_type: T
 
 is_nan :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpIsNan(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpIsNan(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1804,7 +1804,7 @@ inst_OpIsInf :: #force_inline proc "contextless" (buf: []Operand, result_type: T
 
 is_inf :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpIsInf(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpIsInf(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1816,7 +1816,7 @@ inst_OpIsFinite :: #force_inline proc "contextless" (buf: []Operand, result_type
 
 is_finite :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpIsFinite(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpIsFinite(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1828,7 +1828,7 @@ inst_OpIsNormal :: #force_inline proc "contextless" (buf: []Operand, result_type
 
 is_normal :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpIsNormal(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpIsNormal(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1840,7 +1840,7 @@ inst_OpSignBitSet :: #force_inline proc "contextless" (buf: []Operand, result_ty
 
 sign_bit_set :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSignBitSet(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSignBitSet(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1853,7 +1853,7 @@ inst_OpLessOrGreater :: #force_inline proc "contextless" (buf: []Operand, result
 
 less_or_greater :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpLessOrGreater(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpLessOrGreater(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1866,7 +1866,7 @@ inst_OpOrdered :: #force_inline proc "contextless" (buf: []Operand, result_type:
 
 ordered :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpOrdered(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpOrdered(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1879,7 +1879,7 @@ inst_OpUnordered :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 unordered :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUnordered(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpUnordered(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1892,7 +1892,7 @@ inst_OpLogicalEqual :: #force_inline proc "contextless" (buf: []Operand, result_
 
 logical_equal :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpLogicalEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpLogicalEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1905,7 +1905,7 @@ inst_OpLogicalNotEqual :: #force_inline proc "contextless" (buf: []Operand, resu
 
 logical_not_equal :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpLogicalNotEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpLogicalNotEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1918,7 +1918,7 @@ inst_OpLogicalOr :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 logical_or :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpLogicalOr(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpLogicalOr(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1931,7 +1931,7 @@ inst_OpLogicalAnd :: #force_inline proc "contextless" (buf: []Operand, result_ty
 
 logical_and :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpLogicalAnd(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpLogicalAnd(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1943,7 +1943,7 @@ inst_OpLogicalNot :: #force_inline proc "contextless" (buf: []Operand, result_ty
 
 logical_not :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpLogicalNot(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpLogicalNot(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -1957,7 +1957,7 @@ inst_OpSelect :: #force_inline proc "contextless" (buf: []Operand, result_type: 
 
 select :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSelect(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpSelect(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -1970,7 +1970,7 @@ inst_OpIEqual :: #force_inline proc "contextless" (buf: []Operand, result_type: 
 
 i_equal :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpIEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpIEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1983,7 +1983,7 @@ inst_OpINotEqual :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 i_not_equal :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpINotEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpINotEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -1996,7 +1996,7 @@ inst_OpUGreaterThan :: #force_inline proc "contextless" (buf: []Operand, result_
 
 u_greater_than :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUGreaterThan(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpUGreaterThan(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2009,7 +2009,7 @@ inst_OpSGreaterThan :: #force_inline proc "contextless" (buf: []Operand, result_
 
 s_greater_than :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSGreaterThan(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSGreaterThan(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2022,7 +2022,7 @@ inst_OpUGreaterThanEqual :: #force_inline proc "contextless" (buf: []Operand, re
 
 u_greater_than_equal :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUGreaterThanEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpUGreaterThanEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2035,7 +2035,7 @@ inst_OpSGreaterThanEqual :: #force_inline proc "contextless" (buf: []Operand, re
 
 s_greater_than_equal :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSGreaterThanEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSGreaterThanEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2048,7 +2048,7 @@ inst_OpULessThan :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 u_less_than :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpULessThan(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpULessThan(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2061,7 +2061,7 @@ inst_OpSLessThan :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 s_less_than :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSLessThan(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSLessThan(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2074,7 +2074,7 @@ inst_OpULessThanEqual :: #force_inline proc "contextless" (buf: []Operand, resul
 
 u_less_than_equal :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpULessThanEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpULessThanEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2087,7 +2087,7 @@ inst_OpSLessThanEqual :: #force_inline proc "contextless" (buf: []Operand, resul
 
 s_less_than_equal :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSLessThanEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSLessThanEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2100,7 +2100,7 @@ inst_OpFOrdEqual :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 f_ord_equal :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFOrdEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpFOrdEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2113,7 +2113,7 @@ inst_OpFUnordEqual :: #force_inline proc "contextless" (buf: []Operand, result_t
 
 f_unord_equal :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFUnordEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpFUnordEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2126,7 +2126,7 @@ inst_OpFOrdNotEqual :: #force_inline proc "contextless" (buf: []Operand, result_
 
 f_ord_not_equal :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFOrdNotEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpFOrdNotEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2139,7 +2139,7 @@ inst_OpFUnordNotEqual :: #force_inline proc "contextless" (buf: []Operand, resul
 
 f_unord_not_equal :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFUnordNotEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpFUnordNotEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2152,7 +2152,7 @@ inst_OpFOrdLessThan :: #force_inline proc "contextless" (buf: []Operand, result_
 
 f_ord_less_than :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFOrdLessThan(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpFOrdLessThan(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2165,7 +2165,7 @@ inst_OpFUnordLessThan :: #force_inline proc "contextless" (buf: []Operand, resul
 
 f_unord_less_than :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFUnordLessThan(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpFUnordLessThan(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2178,7 +2178,7 @@ inst_OpFOrdGreaterThan :: #force_inline proc "contextless" (buf: []Operand, resu
 
 f_ord_greater_than :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFOrdGreaterThan(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpFOrdGreaterThan(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2191,7 +2191,7 @@ inst_OpFUnordGreaterThan :: #force_inline proc "contextless" (buf: []Operand, re
 
 f_unord_greater_than :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFUnordGreaterThan(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpFUnordGreaterThan(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2204,7 +2204,7 @@ inst_OpFOrdLessThanEqual :: #force_inline proc "contextless" (buf: []Operand, re
 
 f_ord_less_than_equal :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFOrdLessThanEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpFOrdLessThanEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2217,7 +2217,7 @@ inst_OpFUnordLessThanEqual :: #force_inline proc "contextless" (buf: []Operand, 
 
 f_unord_less_than_equal :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFUnordLessThanEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpFUnordLessThanEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2230,7 +2230,7 @@ inst_OpFOrdGreaterThanEqual :: #force_inline proc "contextless" (buf: []Operand,
 
 f_ord_greater_than_equal :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFOrdGreaterThanEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpFOrdGreaterThanEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2243,7 +2243,7 @@ inst_OpFUnordGreaterThanEqual :: #force_inline proc "contextless" (buf: []Operan
 
 f_unord_greater_than_equal :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFUnordGreaterThanEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpFUnordGreaterThanEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2256,7 +2256,7 @@ inst_OpShiftRightLogical :: #force_inline proc "contextless" (buf: []Operand, re
 
 shift_right_logical :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpShiftRightLogical(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpShiftRightLogical(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2269,7 +2269,7 @@ inst_OpShiftRightArithmetic :: #force_inline proc "contextless" (buf: []Operand,
 
 shift_right_arithmetic :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpShiftRightArithmetic(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpShiftRightArithmetic(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2282,7 +2282,7 @@ inst_OpShiftLeftLogical :: #force_inline proc "contextless" (buf: []Operand, res
 
 shift_left_logical :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpShiftLeftLogical(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpShiftLeftLogical(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2295,7 +2295,7 @@ inst_OpBitwiseOr :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 bitwise_or :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpBitwiseOr(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpBitwiseOr(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2308,7 +2308,7 @@ inst_OpBitwiseXor :: #force_inline proc "contextless" (buf: []Operand, result_ty
 
 bitwise_xor :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpBitwiseXor(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpBitwiseXor(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2321,7 +2321,7 @@ inst_OpBitwiseAnd :: #force_inline proc "contextless" (buf: []Operand, result_ty
 
 bitwise_and :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpBitwiseAnd(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpBitwiseAnd(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2333,7 +2333,7 @@ inst_OpNot :: #force_inline proc "contextless" (buf: []Operand, result_type: Typ
 
 not :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpNot(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpNot(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -2348,7 +2348,7 @@ inst_OpBitFieldInsert :: #force_inline proc "contextless" (buf: []Operand, resul
 
 bit_field_insert :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpBitFieldInsert(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpBitFieldInsert(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -2362,7 +2362,7 @@ inst_OpBitFieldSExtract :: #force_inline proc "contextless" (buf: []Operand, res
 
 bit_field_s_extract :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpBitFieldSExtract(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpBitFieldSExtract(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -2376,7 +2376,7 @@ inst_OpBitFieldUExtract :: #force_inline proc "contextless" (buf: []Operand, res
 
 bit_field_u_extract :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpBitFieldUExtract(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpBitFieldUExtract(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -2388,7 +2388,7 @@ inst_OpBitReverse :: #force_inline proc "contextless" (buf: []Operand, result_ty
 
 bit_reverse :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpBitReverse(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpBitReverse(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -2400,7 +2400,7 @@ inst_OpBitCount :: #force_inline proc "contextless" (buf: []Operand, result_type
 
 bit_count :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpBitCount(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpBitCount(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -2412,7 +2412,7 @@ inst_OpDPdx :: #force_inline proc "contextless" (buf: []Operand, result_type: Ty
 
 d_pdx :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpDPdx(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpDPdx(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -2424,7 +2424,7 @@ inst_OpDPdy :: #force_inline proc "contextless" (buf: []Operand, result_type: Ty
 
 d_pdy :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpDPdy(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpDPdy(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -2436,7 +2436,7 @@ inst_OpFwidth :: #force_inline proc "contextless" (buf: []Operand, result_type: 
 
 fwidth :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFwidth(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpFwidth(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -2448,7 +2448,7 @@ inst_OpDPdxFine :: #force_inline proc "contextless" (buf: []Operand, result_type
 
 d_pdx_fine :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpDPdxFine(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpDPdxFine(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -2460,7 +2460,7 @@ inst_OpDPdyFine :: #force_inline proc "contextless" (buf: []Operand, result_type
 
 d_pdy_fine :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpDPdyFine(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpDPdyFine(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -2472,7 +2472,7 @@ inst_OpFwidthFine :: #force_inline proc "contextless" (buf: []Operand, result_ty
 
 fwidth_fine :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFwidthFine(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpFwidthFine(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -2484,7 +2484,7 @@ inst_OpDPdxCoarse :: #force_inline proc "contextless" (buf: []Operand, result_ty
 
 d_pdx_coarse :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpDPdxCoarse(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpDPdxCoarse(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -2496,7 +2496,7 @@ inst_OpDPdyCoarse :: #force_inline proc "contextless" (buf: []Operand, result_ty
 
 d_pdy_coarse :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpDPdyCoarse(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpDPdyCoarse(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -2508,7 +2508,7 @@ inst_OpFwidthCoarse :: #force_inline proc "contextless" (buf: []Operand, result_
 
 fwidth_coarse :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFwidthCoarse(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpFwidthCoarse(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -2517,7 +2517,7 @@ inst_OpEmitVertex :: #force_inline proc "contextless" () -> Operation {
 }
 
 emit_vertex :: proc(b: ^Builder) {
-	append(&b.ops, inst_OpEmitVertex())
+	append_elem(&b.ops, inst_OpEmitVertex())
 }
 
 inst_OpEndPrimitive :: #force_inline proc "contextless" () -> Operation {
@@ -2525,7 +2525,7 @@ inst_OpEndPrimitive :: #force_inline proc "contextless" () -> Operation {
 }
 
 end_primitive :: proc(b: ^Builder) {
-	append(&b.ops, inst_OpEndPrimitive())
+	append_elem(&b.ops, inst_OpEndPrimitive())
 }
 
 inst_OpEmitStreamVertex :: #force_inline proc "contextless" (buf: []Operand, op1: Id) -> Operation {
@@ -2535,7 +2535,7 @@ inst_OpEmitStreamVertex :: #force_inline proc "contextless" (buf: []Operand, op1
 }
 
 emit_stream_vertex :: proc(b: ^Builder, op1: Id) {
-	append(&b.ops, inst_OpEmitStreamVertex(opbuf(b, 1), op1))
+	append_elem(&b.ops, inst_OpEmitStreamVertex(opbuf(b, 1), op1))
 }
 
 inst_OpEndStreamPrimitive :: #force_inline proc "contextless" (buf: []Operand, op1: Id) -> Operation {
@@ -2545,7 +2545,7 @@ inst_OpEndStreamPrimitive :: #force_inline proc "contextless" (buf: []Operand, o
 }
 
 end_stream_primitive :: proc(b: ^Builder, op1: Id) {
-	append(&b.ops, inst_OpEndStreamPrimitive(opbuf(b, 1), op1))
+	append_elem(&b.ops, inst_OpEndStreamPrimitive(opbuf(b, 1), op1))
 }
 
 inst_OpControlBarrier :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id) -> Operation {
@@ -2557,7 +2557,7 @@ inst_OpControlBarrier :: #force_inline proc "contextless" (buf: []Operand, op1: 
 }
 
 control_barrier :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id) {
-	append(&b.ops, inst_OpControlBarrier(opbuf(b, 1 + 1 + 1), op1, op2, op3))
+	append_elem(&b.ops, inst_OpControlBarrier(opbuf(b, 1 + 1 + 1), op1, op2, op3))
 }
 
 inst_OpMemoryBarrier :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id) -> Operation {
@@ -2568,7 +2568,7 @@ inst_OpMemoryBarrier :: #force_inline proc "contextless" (buf: []Operand, op1: I
 }
 
 memory_barrier :: proc(b: ^Builder, op1: Id, op2: Id) {
-	append(&b.ops, inst_OpMemoryBarrier(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpMemoryBarrier(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpAtomicLoad :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id, op3: Id) -> Operation {
@@ -2581,7 +2581,7 @@ inst_OpAtomicLoad :: #force_inline proc "contextless" (buf: []Operand, result_ty
 
 atomic_load :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAtomicLoad(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpAtomicLoad(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -2595,7 +2595,7 @@ inst_OpAtomicStore :: #force_inline proc "contextless" (buf: []Operand, op1: Id,
 }
 
 atomic_store :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id) {
-	append(&b.ops, inst_OpAtomicStore(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpAtomicStore(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
 }
 
 inst_OpAtomicExchange :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id, op3: Id, op4: Id) -> Operation {
@@ -2609,7 +2609,7 @@ inst_OpAtomicExchange :: #force_inline proc "contextless" (buf: []Operand, resul
 
 atomic_exchange :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAtomicExchange(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpAtomicExchange(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -2626,7 +2626,7 @@ inst_OpAtomicCompareExchange :: #force_inline proc "contextless" (buf: []Operand
 
 atomic_compare_exchange :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAtomicCompareExchange(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpAtomicCompareExchange(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -2643,7 +2643,7 @@ inst_OpAtomicCompareExchangeWeak :: #force_inline proc "contextless" (buf: []Ope
 
 atomic_compare_exchange_weak :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAtomicCompareExchangeWeak(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpAtomicCompareExchangeWeak(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -2657,7 +2657,7 @@ inst_OpAtomicIIncrement :: #force_inline proc "contextless" (buf: []Operand, res
 
 atomic_i_increment :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAtomicIIncrement(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpAtomicIIncrement(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -2671,7 +2671,7 @@ inst_OpAtomicIDecrement :: #force_inline proc "contextless" (buf: []Operand, res
 
 atomic_i_decrement :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAtomicIDecrement(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpAtomicIDecrement(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -2686,7 +2686,7 @@ inst_OpAtomicIAdd :: #force_inline proc "contextless" (buf: []Operand, result_ty
 
 atomic_i_add :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAtomicIAdd(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpAtomicIAdd(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -2701,7 +2701,7 @@ inst_OpAtomicISub :: #force_inline proc "contextless" (buf: []Operand, result_ty
 
 atomic_i_sub :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAtomicISub(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpAtomicISub(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -2716,7 +2716,7 @@ inst_OpAtomicSMin :: #force_inline proc "contextless" (buf: []Operand, result_ty
 
 atomic_s_min :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAtomicSMin(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpAtomicSMin(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -2731,7 +2731,7 @@ inst_OpAtomicUMin :: #force_inline proc "contextless" (buf: []Operand, result_ty
 
 atomic_u_min :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAtomicUMin(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpAtomicUMin(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -2746,7 +2746,7 @@ inst_OpAtomicSMax :: #force_inline proc "contextless" (buf: []Operand, result_ty
 
 atomic_s_max :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAtomicSMax(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpAtomicSMax(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -2761,7 +2761,7 @@ inst_OpAtomicUMax :: #force_inline proc "contextless" (buf: []Operand, result_ty
 
 atomic_u_max :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAtomicUMax(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpAtomicUMax(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -2776,7 +2776,7 @@ inst_OpAtomicAnd :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 atomic_and :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAtomicAnd(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpAtomicAnd(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -2791,7 +2791,7 @@ inst_OpAtomicOr :: #force_inline proc "contextless" (buf: []Operand, result_type
 
 atomic_or :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAtomicOr(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpAtomicOr(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -2806,7 +2806,7 @@ inst_OpAtomicXor :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 atomic_xor :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAtomicXor(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpAtomicXor(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -2818,7 +2818,7 @@ inst_OpPhi :: #force_inline proc "contextless" (buf: []Operand, result_type: Typ
 
 phi :: proc(b: ^Builder, result_type: Type_Ref, op1: []Pair_Id_Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpPhi(opbuf(b, 2 * len(op1)), result_type, r, op1))
+	append_elem(&b.ops, inst_OpPhi(opbuf(b, 2 * len(op1)), result_type, r, op1))
 	return r
 }
 
@@ -2831,7 +2831,7 @@ inst_OpLoopMerge :: #force_inline proc "contextless" (buf: []Operand, op1: Id, o
 }
 
 loop_merge :: proc(b: ^Builder, op1: Id, op2: Id, op3: Loop_Control) {
-	append(&b.ops, inst_OpLoopMerge(opbuf(b, 1 + 1 + 1), op1, op2, op3))
+	append_elem(&b.ops, inst_OpLoopMerge(opbuf(b, 1 + 1 + 1), op1, op2, op3))
 }
 
 inst_OpSelectionMerge :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Selection_Control) -> Operation {
@@ -2842,7 +2842,7 @@ inst_OpSelectionMerge :: #force_inline proc "contextless" (buf: []Operand, op1: 
 }
 
 selection_merge :: proc(b: ^Builder, op1: Id, op2: Selection_Control) {
-	append(&b.ops, inst_OpSelectionMerge(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpSelectionMerge(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpLabel :: #force_inline proc "contextless" (result: Id) -> Operation {
@@ -2851,7 +2851,7 @@ inst_OpLabel :: #force_inline proc "contextless" (result: Id) -> Operation {
 
 label :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpLabel(r))
+	append_elem(&b.ops, inst_OpLabel(r))
 	return r
 }
 
@@ -2862,7 +2862,7 @@ inst_OpBranch :: #force_inline proc "contextless" (buf: []Operand, op1: Id) -> O
 }
 
 branch :: proc(b: ^Builder, op1: Id) {
-	append(&b.ops, inst_OpBranch(opbuf(b, 1), op1))
+	append_elem(&b.ops, inst_OpBranch(opbuf(b, 1), op1))
 }
 
 inst_OpBranchConditional :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: []i64) -> Operation {
@@ -2875,7 +2875,7 @@ inst_OpBranchConditional :: #force_inline proc "contextless" (buf: []Operand, op
 }
 
 branch_conditional :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: []i64) {
-	append(&b.ops, inst_OpBranchConditional(opbuf(b, 1 + 1 + 1 + len(op4)), op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpBranchConditional(opbuf(b, 1 + 1 + 1 + len(op4)), op1, op2, op3, op4))
 }
 
 inst_OpSwitch :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: []Pair_Lit_Id) -> Operation {
@@ -2887,7 +2887,7 @@ inst_OpSwitch :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2:
 }
 
 switch_ :: proc(b: ^Builder, op1: Id, op2: Id, op3: []Pair_Lit_Id) {
-	append(&b.ops, inst_OpSwitch(opbuf(b, 1 + 1 + 2 * len(op3)), op1, op2, op3))
+	append_elem(&b.ops, inst_OpSwitch(opbuf(b, 1 + 1 + 2 * len(op3)), op1, op2, op3))
 }
 
 inst_OpKill :: #force_inline proc "contextless" () -> Operation {
@@ -2895,7 +2895,7 @@ inst_OpKill :: #force_inline proc "contextless" () -> Operation {
 }
 
 kill :: proc(b: ^Builder) {
-	append(&b.ops, inst_OpKill())
+	append_elem(&b.ops, inst_OpKill())
 }
 
 inst_OpReturn :: #force_inline proc "contextless" () -> Operation {
@@ -2903,7 +2903,7 @@ inst_OpReturn :: #force_inline proc "contextless" () -> Operation {
 }
 
 return_ :: proc(b: ^Builder) {
-	append(&b.ops, inst_OpReturn())
+	append_elem(&b.ops, inst_OpReturn())
 }
 
 inst_OpReturnValue :: #force_inline proc "contextless" (buf: []Operand, op1: Id) -> Operation {
@@ -2913,7 +2913,7 @@ inst_OpReturnValue :: #force_inline proc "contextless" (buf: []Operand, op1: Id)
 }
 
 return_value :: proc(b: ^Builder, op1: Id) {
-	append(&b.ops, inst_OpReturnValue(opbuf(b, 1), op1))
+	append_elem(&b.ops, inst_OpReturnValue(opbuf(b, 1), op1))
 }
 
 inst_OpUnreachable :: #force_inline proc "contextless" () -> Operation {
@@ -2921,7 +2921,7 @@ inst_OpUnreachable :: #force_inline proc "contextless" () -> Operation {
 }
 
 unreachable :: proc(b: ^Builder) {
-	append(&b.ops, inst_OpUnreachable())
+	append_elem(&b.ops, inst_OpUnreachable())
 }
 
 inst_OpLifetimeStart :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: i64) -> Operation {
@@ -2932,7 +2932,7 @@ inst_OpLifetimeStart :: #force_inline proc "contextless" (buf: []Operand, op1: I
 }
 
 lifetime_start :: proc(b: ^Builder, op1: Id, op2: i64) {
-	append(&b.ops, inst_OpLifetimeStart(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpLifetimeStart(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpLifetimeStop :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: i64) -> Operation {
@@ -2943,7 +2943,7 @@ inst_OpLifetimeStop :: #force_inline proc "contextless" (buf: []Operand, op1: Id
 }
 
 lifetime_stop :: proc(b: ^Builder, op1: Id, op2: i64) {
-	append(&b.ops, inst_OpLifetimeStop(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpLifetimeStop(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpGroupAsyncCopy :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id) -> Operation {
@@ -2959,7 +2959,7 @@ inst_OpGroupAsyncCopy :: #force_inline proc "contextless" (buf: []Operand, resul
 
 group_async_copy :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupAsyncCopy(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpGroupAsyncCopy(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -2972,7 +2972,7 @@ inst_OpGroupWaitEvents :: #force_inline proc "contextless" (buf: []Operand, op1:
 }
 
 group_wait_events :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id) {
-	append(&b.ops, inst_OpGroupWaitEvents(opbuf(b, 1 + 1 + 1), op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupWaitEvents(opbuf(b, 1 + 1 + 1), op1, op2, op3))
 }
 
 inst_OpGroupAll :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id) -> Operation {
@@ -2984,7 +2984,7 @@ inst_OpGroupAll :: #force_inline proc "contextless" (buf: []Operand, result_type
 
 group_all :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupAll(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpGroupAll(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -2997,7 +2997,7 @@ inst_OpGroupAny :: #force_inline proc "contextless" (buf: []Operand, result_type
 
 group_any :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupAny(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpGroupAny(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -3011,7 +3011,7 @@ inst_OpGroupBroadcast :: #force_inline proc "contextless" (buf: []Operand, resul
 
 group_broadcast :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupBroadcast(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupBroadcast(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -3025,7 +3025,7 @@ inst_OpGroupIAdd :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 group_i_add :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupIAdd(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupIAdd(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -3039,7 +3039,7 @@ inst_OpGroupFAdd :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 group_f_add :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupFAdd(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupFAdd(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -3053,7 +3053,7 @@ inst_OpGroupFMin :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 group_f_min :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupFMin(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupFMin(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -3067,7 +3067,7 @@ inst_OpGroupUMin :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 group_u_min :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupUMin(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupUMin(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -3081,7 +3081,7 @@ inst_OpGroupSMin :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 group_s_min :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupSMin(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupSMin(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -3095,7 +3095,7 @@ inst_OpGroupFMax :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 group_f_max :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupFMax(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupFMax(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -3109,7 +3109,7 @@ inst_OpGroupUMax :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 group_u_max :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupUMax(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupUMax(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -3123,7 +3123,7 @@ inst_OpGroupSMax :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 group_s_max :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupSMax(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupSMax(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -3138,7 +3138,7 @@ inst_OpReadPipe :: #force_inline proc "contextless" (buf: []Operand, result_type
 
 read_pipe :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpReadPipe(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpReadPipe(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -3153,7 +3153,7 @@ inst_OpWritePipe :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 write_pipe :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpWritePipe(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpWritePipe(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -3170,7 +3170,7 @@ inst_OpReservedReadPipe :: #force_inline proc "contextless" (buf: []Operand, res
 
 reserved_read_pipe :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpReservedReadPipe(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpReservedReadPipe(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -3187,7 +3187,7 @@ inst_OpReservedWritePipe :: #force_inline proc "contextless" (buf: []Operand, re
 
 reserved_write_pipe :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpReservedWritePipe(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpReservedWritePipe(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -3202,7 +3202,7 @@ inst_OpReserveReadPipePackets :: #force_inline proc "contextless" (buf: []Operan
 
 reserve_read_pipe_packets :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpReserveReadPipePackets(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpReserveReadPipePackets(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -3217,7 +3217,7 @@ inst_OpReserveWritePipePackets :: #force_inline proc "contextless" (buf: []Opera
 
 reserve_write_pipe_packets :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpReserveWritePipePackets(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpReserveWritePipePackets(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -3231,7 +3231,7 @@ inst_OpCommitReadPipe :: #force_inline proc "contextless" (buf: []Operand, op1: 
 }
 
 commit_read_pipe :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id) {
-	append(&b.ops, inst_OpCommitReadPipe(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpCommitReadPipe(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
 }
 
 inst_OpCommitWritePipe :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id) -> Operation {
@@ -3244,7 +3244,7 @@ inst_OpCommitWritePipe :: #force_inline proc "contextless" (buf: []Operand, op1:
 }
 
 commit_write_pipe :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id) {
-	append(&b.ops, inst_OpCommitWritePipe(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpCommitWritePipe(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
 }
 
 inst_OpIsValidReserveId :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id) -> Operation {
@@ -3255,7 +3255,7 @@ inst_OpIsValidReserveId :: #force_inline proc "contextless" (buf: []Operand, res
 
 is_valid_reserve_id :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpIsValidReserveId(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpIsValidReserveId(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -3269,7 +3269,7 @@ inst_OpGetNumPipePackets :: #force_inline proc "contextless" (buf: []Operand, re
 
 get_num_pipe_packets :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGetNumPipePackets(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGetNumPipePackets(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -3283,7 +3283,7 @@ inst_OpGetMaxPipePackets :: #force_inline proc "contextless" (buf: []Operand, re
 
 get_max_pipe_packets :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGetMaxPipePackets(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGetMaxPipePackets(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -3299,7 +3299,7 @@ inst_OpGroupReserveReadPipePackets :: #force_inline proc "contextless" (buf: []O
 
 group_reserve_read_pipe_packets :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupReserveReadPipePackets(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpGroupReserveReadPipePackets(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -3315,7 +3315,7 @@ inst_OpGroupReserveWritePipePackets :: #force_inline proc "contextless" (buf: []
 
 group_reserve_write_pipe_packets :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupReserveWritePipePackets(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpGroupReserveWritePipePackets(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -3330,7 +3330,7 @@ inst_OpGroupCommitReadPipe :: #force_inline proc "contextless" (buf: []Operand, 
 }
 
 group_commit_read_pipe :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) {
-	append(&b.ops, inst_OpGroupCommitReadPipe(opbuf(b, 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpGroupCommitReadPipe(opbuf(b, 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5))
 }
 
 inst_OpGroupCommitWritePipe :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) -> Operation {
@@ -3344,7 +3344,7 @@ inst_OpGroupCommitWritePipe :: #force_inline proc "contextless" (buf: []Operand,
 }
 
 group_commit_write_pipe :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) {
-	append(&b.ops, inst_OpGroupCommitWritePipe(opbuf(b, 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpGroupCommitWritePipe(opbuf(b, 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5))
 }
 
 inst_OpEnqueueMarker :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id, op3: Id, op4: Id) -> Operation {
@@ -3358,7 +3358,7 @@ inst_OpEnqueueMarker :: #force_inline proc "contextless" (buf: []Operand, result
 
 enqueue_marker :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpEnqueueMarker(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpEnqueueMarker(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -3380,7 +3380,7 @@ inst_OpEnqueueKernel :: #force_inline proc "contextless" (buf: []Operand, result
 
 enqueue_kernel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpEnqueueKernel(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + len(op11)), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11))
+	append_elem(&b.ops, inst_OpEnqueueKernel(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + len(op11)), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11))
 	return r
 }
 
@@ -3396,7 +3396,7 @@ inst_OpGetKernelNDrangeSubGroupCount :: #force_inline proc "contextless" (buf: [
 
 get_kernel_n_drange_sub_group_count :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGetKernelNDrangeSubGroupCount(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpGetKernelNDrangeSubGroupCount(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -3412,7 +3412,7 @@ inst_OpGetKernelNDrangeMaxSubGroupSize :: #force_inline proc "contextless" (buf:
 
 get_kernel_n_drange_max_sub_group_size :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGetKernelNDrangeMaxSubGroupSize(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpGetKernelNDrangeMaxSubGroupSize(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -3427,7 +3427,7 @@ inst_OpGetKernelWorkGroupSize :: #force_inline proc "contextless" (buf: []Operan
 
 get_kernel_work_group_size :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGetKernelWorkGroupSize(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpGetKernelWorkGroupSize(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -3442,7 +3442,7 @@ inst_OpGetKernelPreferredWorkGroupSizeMultiple :: #force_inline proc "contextles
 
 get_kernel_preferred_work_group_size_multiple :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGetKernelPreferredWorkGroupSizeMultiple(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpGetKernelPreferredWorkGroupSizeMultiple(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -3453,7 +3453,7 @@ inst_OpRetainEvent :: #force_inline proc "contextless" (buf: []Operand, op1: Id)
 }
 
 retain_event :: proc(b: ^Builder, op1: Id) {
-	append(&b.ops, inst_OpRetainEvent(opbuf(b, 1), op1))
+	append_elem(&b.ops, inst_OpRetainEvent(opbuf(b, 1), op1))
 }
 
 inst_OpReleaseEvent :: #force_inline proc "contextless" (buf: []Operand, op1: Id) -> Operation {
@@ -3463,7 +3463,7 @@ inst_OpReleaseEvent :: #force_inline proc "contextless" (buf: []Operand, op1: Id
 }
 
 release_event :: proc(b: ^Builder, op1: Id) {
-	append(&b.ops, inst_OpReleaseEvent(opbuf(b, 1), op1))
+	append_elem(&b.ops, inst_OpReleaseEvent(opbuf(b, 1), op1))
 }
 
 inst_OpCreateUserEvent :: #force_inline proc "contextless" (result_type: Type_Ref, result: Id) -> Operation {
@@ -3472,7 +3472,7 @@ inst_OpCreateUserEvent :: #force_inline proc "contextless" (result_type: Type_Re
 
 create_user_event :: proc(b: ^Builder, result_type: Type_Ref) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCreateUserEvent(result_type, r))
+	append_elem(&b.ops, inst_OpCreateUserEvent(result_type, r))
 	return r
 }
 
@@ -3484,7 +3484,7 @@ inst_OpIsValidEvent :: #force_inline proc "contextless" (buf: []Operand, result_
 
 is_valid_event :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpIsValidEvent(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpIsValidEvent(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -3496,7 +3496,7 @@ inst_OpSetUserEventStatus :: #force_inline proc "contextless" (buf: []Operand, o
 }
 
 set_user_event_status :: proc(b: ^Builder, op1: Id, op2: Id) {
-	append(&b.ops, inst_OpSetUserEventStatus(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpSetUserEventStatus(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpCaptureEventProfilingInfo :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id) -> Operation {
@@ -3508,7 +3508,7 @@ inst_OpCaptureEventProfilingInfo :: #force_inline proc "contextless" (buf: []Ope
 }
 
 capture_event_profiling_info :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id) {
-	append(&b.ops, inst_OpCaptureEventProfilingInfo(opbuf(b, 1 + 1 + 1), op1, op2, op3))
+	append_elem(&b.ops, inst_OpCaptureEventProfilingInfo(opbuf(b, 1 + 1 + 1), op1, op2, op3))
 }
 
 inst_OpGetDefaultQueue :: #force_inline proc "contextless" (result_type: Type_Ref, result: Id) -> Operation {
@@ -3517,7 +3517,7 @@ inst_OpGetDefaultQueue :: #force_inline proc "contextless" (result_type: Type_Re
 
 get_default_queue :: proc(b: ^Builder, result_type: Type_Ref) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGetDefaultQueue(result_type, r))
+	append_elem(&b.ops, inst_OpGetDefaultQueue(result_type, r))
 	return r
 }
 
@@ -3531,7 +3531,7 @@ inst_OpBuildNDRange :: #force_inline proc "contextless" (buf: []Operand, result_
 
 build_nd_range :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpBuildNDRange(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpBuildNDRange(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -3545,7 +3545,7 @@ inst_OpImageSparseSampleImplicitLod :: #force_inline proc "contextless" (buf: []
 
 image_sparse_sample_implicit_lod :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Maybe(Image_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSparseSampleImplicitLod(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpImageSparseSampleImplicitLod(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -3559,7 +3559,7 @@ inst_OpImageSparseSampleExplicitLod :: #force_inline proc "contextless" (buf: []
 
 image_sparse_sample_explicit_lod :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Image_Operands) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSparseSampleExplicitLod(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpImageSparseSampleExplicitLod(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -3574,7 +3574,7 @@ inst_OpImageSparseSampleDrefImplicitLod :: #force_inline proc "contextless" (buf
 
 image_sparse_sample_dref_implicit_lod :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Maybe(Image_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSparseSampleDrefImplicitLod(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpImageSparseSampleDrefImplicitLod(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -3589,7 +3589,7 @@ inst_OpImageSparseSampleDrefExplicitLod :: #force_inline proc "contextless" (buf
 
 image_sparse_sample_dref_explicit_lod :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Image_Operands) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSparseSampleDrefExplicitLod(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpImageSparseSampleDrefExplicitLod(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -3603,7 +3603,7 @@ inst_OpImageSparseSampleProjImplicitLod :: #force_inline proc "contextless" (buf
 
 image_sparse_sample_proj_implicit_lod :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Maybe(Image_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSparseSampleProjImplicitLod(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpImageSparseSampleProjImplicitLod(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -3617,7 +3617,7 @@ inst_OpImageSparseSampleProjExplicitLod :: #force_inline proc "contextless" (buf
 
 image_sparse_sample_proj_explicit_lod :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Image_Operands) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSparseSampleProjExplicitLod(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpImageSparseSampleProjExplicitLod(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -3632,7 +3632,7 @@ inst_OpImageSparseSampleProjDrefImplicitLod :: #force_inline proc "contextless" 
 
 image_sparse_sample_proj_dref_implicit_lod :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Maybe(Image_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSparseSampleProjDrefImplicitLod(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpImageSparseSampleProjDrefImplicitLod(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -3647,7 +3647,7 @@ inst_OpImageSparseSampleProjDrefExplicitLod :: #force_inline proc "contextless" 
 
 image_sparse_sample_proj_dref_explicit_lod :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Image_Operands) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSparseSampleProjDrefExplicitLod(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpImageSparseSampleProjDrefExplicitLod(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -3661,7 +3661,7 @@ inst_OpImageSparseFetch :: #force_inline proc "contextless" (buf: []Operand, res
 
 image_sparse_fetch :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Maybe(Image_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSparseFetch(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpImageSparseFetch(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -3676,7 +3676,7 @@ inst_OpImageSparseGather :: #force_inline proc "contextless" (buf: []Operand, re
 
 image_sparse_gather :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Maybe(Image_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSparseGather(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpImageSparseGather(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -3691,7 +3691,7 @@ inst_OpImageSparseDrefGather :: #force_inline proc "contextless" (buf: []Operand
 
 image_sparse_dref_gather :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Maybe(Image_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSparseDrefGather(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpImageSparseDrefGather(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -3703,7 +3703,7 @@ inst_OpImageSparseTexelsResident :: #force_inline proc "contextless" (buf: []Ope
 
 image_sparse_texels_resident :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSparseTexelsResident(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpImageSparseTexelsResident(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -3712,7 +3712,7 @@ inst_OpNoLine :: #force_inline proc "contextless" () -> Operation {
 }
 
 no_line :: proc(b: ^Builder) {
-	append(&b.ops, inst_OpNoLine())
+	append_elem(&b.ops, inst_OpNoLine())
 }
 
 inst_OpAtomicFlagTestAndSet :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id, op3: Id) -> Operation {
@@ -3725,7 +3725,7 @@ inst_OpAtomicFlagTestAndSet :: #force_inline proc "contextless" (buf: []Operand,
 
 atomic_flag_test_and_set :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAtomicFlagTestAndSet(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpAtomicFlagTestAndSet(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -3738,7 +3738,7 @@ inst_OpAtomicFlagClear :: #force_inline proc "contextless" (buf: []Operand, op1:
 }
 
 atomic_flag_clear :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id) {
-	append(&b.ops, inst_OpAtomicFlagClear(opbuf(b, 1 + 1 + 1), op1, op2, op3))
+	append_elem(&b.ops, inst_OpAtomicFlagClear(opbuf(b, 1 + 1 + 1), op1, op2, op3))
 }
 
 inst_OpImageSparseRead :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id, op3: Maybe(Image_Operands)) -> Operation {
@@ -3751,7 +3751,7 @@ inst_OpImageSparseRead :: #force_inline proc "contextless" (buf: []Operand, resu
 
 image_sparse_read :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Maybe(Image_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSparseRead(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpImageSparseRead(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -3763,7 +3763,7 @@ inst_OpSizeOf :: #force_inline proc "contextless" (buf: []Operand, result_type: 
 
 size_of_ :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSizeOf(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSizeOf(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -3773,7 +3773,7 @@ inst_OpTypePipeStorage :: #force_inline proc "contextless" (result: Id) -> Opera
 
 type_pipe_storage :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypePipeStorage(r))
+	append_elem(&b.ops, inst_OpTypePipeStorage(r))
 	return r
 }
 
@@ -3787,7 +3787,7 @@ inst_OpConstantPipeStorage :: #force_inline proc "contextless" (buf: []Operand, 
 
 constant_pipe_storage :: proc(b: ^Builder, result_type: Type_Ref, op1: i64, op2: i64, op3: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConstantPipeStorage(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpConstantPipeStorage(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -3799,7 +3799,7 @@ inst_OpCreatePipeFromPipeStorage :: #force_inline proc "contextless" (buf: []Ope
 
 create_pipe_from_pipe_storage :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCreatePipeFromPipeStorage(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpCreatePipeFromPipeStorage(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -3815,7 +3815,7 @@ inst_OpGetKernelLocalSizeForSubgroupCount :: #force_inline proc "contextless" (b
 
 get_kernel_local_size_for_subgroup_count :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGetKernelLocalSizeForSubgroupCount(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpGetKernelLocalSizeForSubgroupCount(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -3830,7 +3830,7 @@ inst_OpGetKernelMaxNumSubgroups :: #force_inline proc "contextless" (buf: []Oper
 
 get_kernel_max_num_subgroups :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGetKernelMaxNumSubgroups(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpGetKernelMaxNumSubgroups(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -3840,7 +3840,7 @@ inst_OpTypeNamedBarrier :: #force_inline proc "contextless" (result: Id) -> Oper
 
 type_named_barrier :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeNamedBarrier(r))
+	append_elem(&b.ops, inst_OpTypeNamedBarrier(r))
 	return r
 }
 
@@ -3852,7 +3852,7 @@ inst_OpNamedBarrierInitialize :: #force_inline proc "contextless" (buf: []Operan
 
 named_barrier_initialize :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpNamedBarrierInitialize(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpNamedBarrierInitialize(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -3865,7 +3865,7 @@ inst_OpMemoryNamedBarrier :: #force_inline proc "contextless" (buf: []Operand, o
 }
 
 memory_named_barrier :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id) {
-	append(&b.ops, inst_OpMemoryNamedBarrier(opbuf(b, 1 + 1 + 1), op1, op2, op3))
+	append_elem(&b.ops, inst_OpMemoryNamedBarrier(opbuf(b, 1 + 1 + 1), op1, op2, op3))
 }
 
 inst_OpModuleProcessed :: #force_inline proc "contextless" (buf: []Operand, op1: string) -> Operation {
@@ -3875,7 +3875,7 @@ inst_OpModuleProcessed :: #force_inline proc "contextless" (buf: []Operand, op1:
 }
 
 module_processed :: proc(b: ^Builder, op1: string) {
-	append(&b.ops, inst_OpModuleProcessed(opbuf(b, (len(op1) + 4) / 4), op1))
+	append_elem(&b.ops, inst_OpModuleProcessed(opbuf(b, (len(op1) + 4) / 4), op1))
 }
 
 inst_OpExecutionModeId :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Execution_Mode) -> Operation {
@@ -3886,7 +3886,7 @@ inst_OpExecutionModeId :: #force_inline proc "contextless" (buf: []Operand, op1:
 }
 
 execution_mode_id :: proc(b: ^Builder, op1: Id, op2: Execution_Mode) {
-	append(&b.ops, inst_OpExecutionModeId(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpExecutionModeId(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpDecorateId :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Decoration) -> Operation {
@@ -3897,7 +3897,7 @@ inst_OpDecorateId :: #force_inline proc "contextless" (buf: []Operand, op1: Id, 
 }
 
 decorate_id :: proc(b: ^Builder, op1: Id, op2: Decoration) {
-	append(&b.ops, inst_OpDecorateId(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpDecorateId(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpGroupNonUniformElect :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id) -> Operation {
@@ -3908,7 +3908,7 @@ inst_OpGroupNonUniformElect :: #force_inline proc "contextless" (buf: []Operand,
 
 group_non_uniform_elect :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformElect(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpGroupNonUniformElect(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -3921,7 +3921,7 @@ inst_OpGroupNonUniformAll :: #force_inline proc "contextless" (buf: []Operand, r
 
 group_non_uniform_all :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformAll(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpGroupNonUniformAll(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -3934,7 +3934,7 @@ inst_OpGroupNonUniformAny :: #force_inline proc "contextless" (buf: []Operand, r
 
 group_non_uniform_any :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformAny(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpGroupNonUniformAny(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -3947,7 +3947,7 @@ inst_OpGroupNonUniformAllEqual :: #force_inline proc "contextless" (buf: []Opera
 
 group_non_uniform_all_equal :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformAllEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpGroupNonUniformAllEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -3961,7 +3961,7 @@ inst_OpGroupNonUniformBroadcast :: #force_inline proc "contextless" (buf: []Oper
 
 group_non_uniform_broadcast :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformBroadcast(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupNonUniformBroadcast(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -3974,7 +3974,7 @@ inst_OpGroupNonUniformBroadcastFirst :: #force_inline proc "contextless" (buf: [
 
 group_non_uniform_broadcast_first :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformBroadcastFirst(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpGroupNonUniformBroadcastFirst(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -3987,7 +3987,7 @@ inst_OpGroupNonUniformBallot :: #force_inline proc "contextless" (buf: []Operand
 
 group_non_uniform_ballot :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformBallot(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpGroupNonUniformBallot(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -4000,7 +4000,7 @@ inst_OpGroupNonUniformInverseBallot :: #force_inline proc "contextless" (buf: []
 
 group_non_uniform_inverse_ballot :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformInverseBallot(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpGroupNonUniformInverseBallot(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -4014,7 +4014,7 @@ inst_OpGroupNonUniformBallotBitExtract :: #force_inline proc "contextless" (buf:
 
 group_non_uniform_ballot_bit_extract :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformBallotBitExtract(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupNonUniformBallotBitExtract(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -4028,7 +4028,7 @@ inst_OpGroupNonUniformBallotBitCount :: #force_inline proc "contextless" (buf: [
 
 group_non_uniform_ballot_bit_count :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformBallotBitCount(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupNonUniformBallotBitCount(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -4041,7 +4041,7 @@ inst_OpGroupNonUniformBallotFindLSB :: #force_inline proc "contextless" (buf: []
 
 group_non_uniform_ballot_find_lsb :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformBallotFindLSB(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpGroupNonUniformBallotFindLSB(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -4054,7 +4054,7 @@ inst_OpGroupNonUniformBallotFindMSB :: #force_inline proc "contextless" (buf: []
 
 group_non_uniform_ballot_find_msb :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformBallotFindMSB(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpGroupNonUniformBallotFindMSB(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -4068,7 +4068,7 @@ inst_OpGroupNonUniformShuffle :: #force_inline proc "contextless" (buf: []Operan
 
 group_non_uniform_shuffle :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformShuffle(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupNonUniformShuffle(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -4082,7 +4082,7 @@ inst_OpGroupNonUniformShuffleXor :: #force_inline proc "contextless" (buf: []Ope
 
 group_non_uniform_shuffle_xor :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformShuffleXor(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupNonUniformShuffleXor(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -4096,7 +4096,7 @@ inst_OpGroupNonUniformShuffleUp :: #force_inline proc "contextless" (buf: []Oper
 
 group_non_uniform_shuffle_up :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformShuffleUp(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupNonUniformShuffleUp(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -4110,7 +4110,7 @@ inst_OpGroupNonUniformShuffleDown :: #force_inline proc "contextless" (buf: []Op
 
 group_non_uniform_shuffle_down :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformShuffleDown(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupNonUniformShuffleDown(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -4125,7 +4125,7 @@ inst_OpGroupNonUniformIAdd :: #force_inline proc "contextless" (buf: []Operand, 
 
 group_non_uniform_i_add :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id, op4: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformIAdd(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpGroupNonUniformIAdd(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -4140,7 +4140,7 @@ inst_OpGroupNonUniformFAdd :: #force_inline proc "contextless" (buf: []Operand, 
 
 group_non_uniform_f_add :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id, op4: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformFAdd(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpGroupNonUniformFAdd(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -4155,7 +4155,7 @@ inst_OpGroupNonUniformIMul :: #force_inline proc "contextless" (buf: []Operand, 
 
 group_non_uniform_i_mul :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id, op4: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformIMul(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpGroupNonUniformIMul(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -4170,7 +4170,7 @@ inst_OpGroupNonUniformFMul :: #force_inline proc "contextless" (buf: []Operand, 
 
 group_non_uniform_f_mul :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id, op4: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformFMul(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpGroupNonUniformFMul(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -4185,7 +4185,7 @@ inst_OpGroupNonUniformSMin :: #force_inline proc "contextless" (buf: []Operand, 
 
 group_non_uniform_s_min :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id, op4: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformSMin(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpGroupNonUniformSMin(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -4200,7 +4200,7 @@ inst_OpGroupNonUniformUMin :: #force_inline proc "contextless" (buf: []Operand, 
 
 group_non_uniform_u_min :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id, op4: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformUMin(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpGroupNonUniformUMin(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -4215,7 +4215,7 @@ inst_OpGroupNonUniformFMin :: #force_inline proc "contextless" (buf: []Operand, 
 
 group_non_uniform_f_min :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id, op4: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformFMin(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpGroupNonUniformFMin(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -4230,7 +4230,7 @@ inst_OpGroupNonUniformSMax :: #force_inline proc "contextless" (buf: []Operand, 
 
 group_non_uniform_s_max :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id, op4: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformSMax(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpGroupNonUniformSMax(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -4245,7 +4245,7 @@ inst_OpGroupNonUniformUMax :: #force_inline proc "contextless" (buf: []Operand, 
 
 group_non_uniform_u_max :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id, op4: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformUMax(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpGroupNonUniformUMax(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -4260,7 +4260,7 @@ inst_OpGroupNonUniformFMax :: #force_inline proc "contextless" (buf: []Operand, 
 
 group_non_uniform_f_max :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id, op4: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformFMax(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpGroupNonUniformFMax(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -4275,7 +4275,7 @@ inst_OpGroupNonUniformBitwiseAnd :: #force_inline proc "contextless" (buf: []Ope
 
 group_non_uniform_bitwise_and :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id, op4: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformBitwiseAnd(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpGroupNonUniformBitwiseAnd(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -4290,7 +4290,7 @@ inst_OpGroupNonUniformBitwiseOr :: #force_inline proc "contextless" (buf: []Oper
 
 group_non_uniform_bitwise_or :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id, op4: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformBitwiseOr(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpGroupNonUniformBitwiseOr(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -4305,7 +4305,7 @@ inst_OpGroupNonUniformBitwiseXor :: #force_inline proc "contextless" (buf: []Ope
 
 group_non_uniform_bitwise_xor :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id, op4: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformBitwiseXor(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpGroupNonUniformBitwiseXor(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -4320,7 +4320,7 @@ inst_OpGroupNonUniformLogicalAnd :: #force_inline proc "contextless" (buf: []Ope
 
 group_non_uniform_logical_and :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id, op4: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformLogicalAnd(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpGroupNonUniformLogicalAnd(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -4335,7 +4335,7 @@ inst_OpGroupNonUniformLogicalOr :: #force_inline proc "contextless" (buf: []Oper
 
 group_non_uniform_logical_or :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id, op4: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformLogicalOr(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpGroupNonUniformLogicalOr(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -4350,7 +4350,7 @@ inst_OpGroupNonUniformLogicalXor :: #force_inline proc "contextless" (buf: []Ope
 
 group_non_uniform_logical_xor :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id, op4: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformLogicalXor(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpGroupNonUniformLogicalXor(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -4364,7 +4364,7 @@ inst_OpGroupNonUniformQuadBroadcast :: #force_inline proc "contextless" (buf: []
 
 group_non_uniform_quad_broadcast :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformQuadBroadcast(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupNonUniformQuadBroadcast(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -4378,7 +4378,7 @@ inst_OpGroupNonUniformQuadSwap :: #force_inline proc "contextless" (buf: []Opera
 
 group_non_uniform_quad_swap :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformQuadSwap(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupNonUniformQuadSwap(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -4390,7 +4390,7 @@ inst_OpCopyLogical :: #force_inline proc "contextless" (buf: []Operand, result_t
 
 copy_logical :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCopyLogical(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpCopyLogical(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -4403,7 +4403,7 @@ inst_OpPtrEqual :: #force_inline proc "contextless" (buf: []Operand, result_type
 
 ptr_equal :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpPtrEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpPtrEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -4416,7 +4416,7 @@ inst_OpPtrNotEqual :: #force_inline proc "contextless" (buf: []Operand, result_t
 
 ptr_not_equal :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpPtrNotEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpPtrNotEqual(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -4429,7 +4429,7 @@ inst_OpPtrDiff :: #force_inline proc "contextless" (buf: []Operand, result_type:
 
 ptr_diff :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpPtrDiff(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpPtrDiff(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -4442,7 +4442,7 @@ inst_OpColorAttachmentReadEXT :: #force_inline proc "contextless" (buf: []Operan
 
 color_attachment_read_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpColorAttachmentReadEXT(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpColorAttachmentReadEXT(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -4454,7 +4454,7 @@ inst_OpDepthAttachmentReadEXT :: #force_inline proc "contextless" (buf: []Operan
 
 depth_attachment_read_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpDepthAttachmentReadEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpDepthAttachmentReadEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -4466,7 +4466,7 @@ inst_OpStencilAttachmentReadEXT :: #force_inline proc "contextless" (buf: []Oper
 
 stencil_attachment_read_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpStencilAttachmentReadEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpStencilAttachmentReadEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -4480,7 +4480,7 @@ inst_OpTypeTensorARM :: #force_inline proc "contextless" (buf: []Operand, result
 
 type_tensor_arm :: proc(b: ^Builder, op1: Id, op2: Maybe(Id), op3: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeTensorARM(opbuf(b, 1 + 1 + 1), r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpTypeTensorARM(opbuf(b, 1 + 1 + 1), r, op1, op2, op3))
 	return r
 }
 
@@ -4494,7 +4494,7 @@ inst_OpTensorReadARM :: #force_inline proc "contextless" (buf: []Operand, result
 
 tensor_read_arm :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Maybe(Tensor_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTensorReadARM(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpTensorReadARM(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -4508,7 +4508,7 @@ inst_OpTensorWriteARM :: #force_inline proc "contextless" (buf: []Operand, op1: 
 }
 
 tensor_write_arm :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Maybe(Tensor_Operands)) {
-	append(&b.ops, inst_OpTensorWriteARM(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpTensorWriteARM(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
 }
 
 inst_OpTensorQuerySizeARM :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id) -> Operation {
@@ -4520,7 +4520,7 @@ inst_OpTensorQuerySizeARM :: #force_inline proc "contextless" (buf: []Operand, r
 
 tensor_query_size_arm :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTensorQuerySizeARM(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpTensorQuerySizeARM(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -4532,7 +4532,7 @@ inst_OpGraphConstantARM :: #force_inline proc "contextless" (buf: []Operand, res
 
 graph_constant_arm :: proc(b: ^Builder, result_type: Type_Ref, op1: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGraphConstantARM(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpGraphConstantARM(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -4545,7 +4545,7 @@ inst_OpGraphEntryPointARM :: #force_inline proc "contextless" (buf: []Operand, o
 }
 
 graph_entry_point_arm :: proc(b: ^Builder, op1: Id, op2: string, op3: []Id) {
-	append(&b.ops, inst_OpGraphEntryPointARM(opbuf(b, 1 + (len(op2) + 4) / 4 + len(op3)), op1, op2, op3))
+	append_elem(&b.ops, inst_OpGraphEntryPointARM(opbuf(b, 1 + (len(op2) + 4) / 4 + len(op3)), op1, op2, op3))
 }
 
 inst_OpGraphARM :: #force_inline proc "contextless" (result_type: Type_Ref, result: Id) -> Operation {
@@ -4554,7 +4554,7 @@ inst_OpGraphARM :: #force_inline proc "contextless" (result_type: Type_Ref, resu
 
 graph_arm :: proc(b: ^Builder, result_type: Type_Ref) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGraphARM(result_type, r))
+	append_elem(&b.ops, inst_OpGraphARM(result_type, r))
 	return r
 }
 
@@ -4567,7 +4567,7 @@ inst_OpGraphInputARM :: #force_inline proc "contextless" (buf: []Operand, result
 
 graph_input_arm :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGraphInputARM(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpGraphInputARM(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
 	return r
 }
 
@@ -4580,7 +4580,7 @@ inst_OpGraphSetOutputARM :: #force_inline proc "contextless" (buf: []Operand, op
 }
 
 graph_set_output_arm :: proc(b: ^Builder, op1: Id, op2: Id, op3: []Id) {
-	append(&b.ops, inst_OpGraphSetOutputARM(opbuf(b, 1 + 1 + len(op3)), op1, op2, op3))
+	append_elem(&b.ops, inst_OpGraphSetOutputARM(opbuf(b, 1 + 1 + len(op3)), op1, op2, op3))
 }
 
 inst_OpGraphEndARM :: #force_inline proc "contextless" () -> Operation {
@@ -4588,7 +4588,7 @@ inst_OpGraphEndARM :: #force_inline proc "contextless" () -> Operation {
 }
 
 graph_end_arm :: proc(b: ^Builder) {
-	append(&b.ops, inst_OpGraphEndARM())
+	append_elem(&b.ops, inst_OpGraphEndARM())
 }
 
 inst_OpTypeGraphARM :: #force_inline proc "contextless" (buf: []Operand, result: Id, op1: i64, op2: []Id) -> Operation {
@@ -4600,7 +4600,7 @@ inst_OpTypeGraphARM :: #force_inline proc "contextless" (buf: []Operand, result:
 
 type_graph_arm :: proc(b: ^Builder, op1: i64, op2: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeGraphARM(opbuf(b, 1 + len(op2)), r, op1, op2))
+	append_elem(&b.ops, inst_OpTypeGraphARM(opbuf(b, 1 + len(op2)), r, op1, op2))
 	return r
 }
 
@@ -4609,7 +4609,7 @@ inst_OpTerminateInvocation :: #force_inline proc "contextless" () -> Operation {
 }
 
 terminate_invocation :: proc(b: ^Builder) {
-	append(&b.ops, inst_OpTerminateInvocation())
+	append_elem(&b.ops, inst_OpTerminateInvocation())
 }
 
 inst_OpTypeUntypedPointerKHR :: #force_inline proc "contextless" (buf: []Operand, result: Id, op1: Storage_Class) -> Operation {
@@ -4620,7 +4620,7 @@ inst_OpTypeUntypedPointerKHR :: #force_inline proc "contextless" (buf: []Operand
 
 type_untyped_pointer_khr :: proc(b: ^Builder, op1: Storage_Class) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeUntypedPointerKHR(opbuf(b, 1), r, op1))
+	append_elem(&b.ops, inst_OpTypeUntypedPointerKHR(opbuf(b, 1), r, op1))
 	return r
 }
 
@@ -4634,7 +4634,7 @@ inst_OpUntypedVariableKHR :: #force_inline proc "contextless" (buf: []Operand, r
 
 untyped_variable_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Storage_Class, op2: Maybe(Id), op3: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUntypedVariableKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpUntypedVariableKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -4648,7 +4648,7 @@ inst_OpUntypedAccessChainKHR :: #force_inline proc "contextless" (buf: []Operand
 
 untyped_access_chain_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUntypedAccessChainKHR(opbuf(b, 1 + 1 + len(op3)), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpUntypedAccessChainKHR(opbuf(b, 1 + 1 + len(op3)), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -4662,7 +4662,7 @@ inst_OpUntypedInBoundsAccessChainKHR :: #force_inline proc "contextless" (buf: [
 
 untyped_in_bounds_access_chain_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUntypedInBoundsAccessChainKHR(opbuf(b, 1 + 1 + len(op3)), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpUntypedInBoundsAccessChainKHR(opbuf(b, 1 + 1 + len(op3)), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -4674,7 +4674,7 @@ inst_OpSubgroupBallotKHR :: #force_inline proc "contextless" (buf: []Operand, re
 
 subgroup_ballot_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupBallotKHR(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupBallotKHR(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -4686,7 +4686,7 @@ inst_OpSubgroupFirstInvocationKHR :: #force_inline proc "contextless" (buf: []Op
 
 subgroup_first_invocation_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupFirstInvocationKHR(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupFirstInvocationKHR(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -4701,7 +4701,7 @@ inst_OpUntypedPtrAccessChainKHR :: #force_inline proc "contextless" (buf: []Oper
 
 untyped_ptr_access_chain_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUntypedPtrAccessChainKHR(opbuf(b, 1 + 1 + 1 + len(op4)), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpUntypedPtrAccessChainKHR(opbuf(b, 1 + 1 + 1 + len(op4)), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -4716,7 +4716,7 @@ inst_OpUntypedInBoundsPtrAccessChainKHR :: #force_inline proc "contextless" (buf
 
 untyped_in_bounds_ptr_access_chain_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUntypedInBoundsPtrAccessChainKHR(opbuf(b, 1 + 1 + 1 + len(op4)), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpUntypedInBoundsPtrAccessChainKHR(opbuf(b, 1 + 1 + 1 + len(op4)), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -4730,7 +4730,7 @@ inst_OpUntypedArrayLengthKHR :: #force_inline proc "contextless" (buf: []Operand
 
 untyped_array_length_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUntypedArrayLengthKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpUntypedArrayLengthKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -4745,7 +4745,7 @@ inst_OpUntypedPrefetchKHR :: #force_inline proc "contextless" (buf: []Operand, o
 }
 
 untyped_prefetch_khr :: proc(b: ^Builder, op1: Id, op2: Id, op3: Maybe(Id), op4: Maybe(Id), op5: Maybe(Id)) {
-	append(&b.ops, inst_OpUntypedPrefetchKHR(opbuf(b, 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpUntypedPrefetchKHR(opbuf(b, 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5))
 }
 
 inst_OpFmaKHR :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id, op3: Id) -> Operation {
@@ -4758,7 +4758,7 @@ inst_OpFmaKHR :: #force_inline proc "contextless" (buf: []Operand, result_type: 
 
 fma_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFmaKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpFmaKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -4770,7 +4770,7 @@ inst_OpSubgroupAllKHR :: #force_inline proc "contextless" (buf: []Operand, resul
 
 subgroup_all_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAllKHR(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAllKHR(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -4782,7 +4782,7 @@ inst_OpSubgroupAnyKHR :: #force_inline proc "contextless" (buf: []Operand, resul
 
 subgroup_any_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAnyKHR(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAnyKHR(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -4794,7 +4794,7 @@ inst_OpSubgroupAllEqualKHR :: #force_inline proc "contextless" (buf: []Operand, 
 
 subgroup_all_equal_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAllEqualKHR(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAllEqualKHR(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -4809,7 +4809,7 @@ inst_OpGroupNonUniformRotateKHR :: #force_inline proc "contextless" (buf: []Oper
 
 group_non_uniform_rotate_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformRotateKHR(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpGroupNonUniformRotateKHR(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -4822,7 +4822,7 @@ inst_OpSubgroupReadInvocationKHR :: #force_inline proc "contextless" (buf: []Ope
 
 subgroup_read_invocation_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupReadInvocationKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupReadInvocationKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -4836,7 +4836,7 @@ inst_OpExtInstWithForwardRefsKHR :: #force_inline proc "contextless" (buf: []Ope
 
 ext_inst_with_forward_refs_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpExtInstWithForwardRefsKHR(opbuf(b, 1 + 1 + len(op3)), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpExtInstWithForwardRefsKHR(opbuf(b, 1 + 1 + len(op3)), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -4856,7 +4856,7 @@ inst_OpUntypedGroupAsyncCopyKHR :: #force_inline proc "contextless" (buf: []Oper
 
 untyped_group_async_copy_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Maybe(Memory_Access), op9: Maybe(Memory_Access)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUntypedGroupAsyncCopyKHR(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8, op9))
+	append_elem(&b.ops, inst_OpUntypedGroupAsyncCopyKHR(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8, op9))
 	return r
 }
 
@@ -4877,7 +4877,7 @@ inst_OpTraceRayKHR :: #force_inline proc "contextless" (buf: []Operand, op1: Id,
 }
 
 trace_ray_khr :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id) {
-	append(&b.ops, inst_OpTraceRayKHR(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11))
+	append_elem(&b.ops, inst_OpTraceRayKHR(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11))
 }
 
 inst_OpExecuteCallableKHR :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id) -> Operation {
@@ -4888,7 +4888,7 @@ inst_OpExecuteCallableKHR :: #force_inline proc "contextless" (buf: []Operand, o
 }
 
 execute_callable_khr :: proc(b: ^Builder, op1: Id, op2: Id) {
-	append(&b.ops, inst_OpExecuteCallableKHR(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpExecuteCallableKHR(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpConvertUToAccelerationStructureKHR :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id) -> Operation {
@@ -4899,7 +4899,7 @@ inst_OpConvertUToAccelerationStructureKHR :: #force_inline proc "contextless" (b
 
 convert_u_to_acceleration_structure_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConvertUToAccelerationStructureKHR(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConvertUToAccelerationStructureKHR(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -4908,7 +4908,7 @@ inst_OpIgnoreIntersectionKHR :: #force_inline proc "contextless" () -> Operation
 }
 
 ignore_intersection_khr :: proc(b: ^Builder) {
-	append(&b.ops, inst_OpIgnoreIntersectionKHR())
+	append_elem(&b.ops, inst_OpIgnoreIntersectionKHR())
 }
 
 inst_OpTerminateRayKHR :: #force_inline proc "contextless" () -> Operation {
@@ -4916,7 +4916,7 @@ inst_OpTerminateRayKHR :: #force_inline proc "contextless" () -> Operation {
 }
 
 terminate_ray_khr :: proc(b: ^Builder) {
-	append(&b.ops, inst_OpTerminateRayKHR())
+	append_elem(&b.ops, inst_OpTerminateRayKHR())
 }
 
 inst_OpSDot :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id, op3: Maybe(Packed_Vector_Format)) -> Operation {
@@ -4929,7 +4929,7 @@ inst_OpSDot :: #force_inline proc "contextless" (buf: []Operand, result_type: Ty
 
 s_dot :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Maybe(Packed_Vector_Format)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSDot(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpSDot(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -4943,7 +4943,7 @@ inst_OpUDot :: #force_inline proc "contextless" (buf: []Operand, result_type: Ty
 
 u_dot :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Maybe(Packed_Vector_Format)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUDot(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpUDot(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -4957,7 +4957,7 @@ inst_OpSUDot :: #force_inline proc "contextless" (buf: []Operand, result_type: T
 
 su_dot :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Maybe(Packed_Vector_Format)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSUDot(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpSUDot(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -4972,7 +4972,7 @@ inst_OpSDotAccSat :: #force_inline proc "contextless" (buf: []Operand, result_ty
 
 s_dot_acc_sat :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Maybe(Packed_Vector_Format)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSDotAccSat(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpSDotAccSat(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -4987,7 +4987,7 @@ inst_OpUDotAccSat :: #force_inline proc "contextless" (buf: []Operand, result_ty
 
 u_dot_acc_sat :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Maybe(Packed_Vector_Format)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUDotAccSat(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpUDotAccSat(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -5002,7 +5002,7 @@ inst_OpSUDotAccSat :: #force_inline proc "contextless" (buf: []Operand, result_t
 
 su_dot_acc_sat :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Maybe(Packed_Vector_Format)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSUDotAccSat(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpSUDotAccSat(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -5018,7 +5018,7 @@ inst_OpTypeCooperativeMatrixKHR :: #force_inline proc "contextless" (buf: []Oper
 
 type_cooperative_matrix_khr :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeCooperativeMatrixKHR(opbuf(b, 1 + 1 + 1 + 1 + 1), r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpTypeCooperativeMatrixKHR(opbuf(b, 1 + 1 + 1 + 1 + 1), r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -5033,7 +5033,7 @@ inst_OpCooperativeMatrixLoadKHR :: #force_inline proc "contextless" (buf: []Oper
 
 cooperative_matrix_load_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Maybe(Id), op4: Maybe(Memory_Access)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCooperativeMatrixLoadKHR(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpCooperativeMatrixLoadKHR(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -5048,7 +5048,7 @@ inst_OpCooperativeMatrixStoreKHR :: #force_inline proc "contextless" (buf: []Ope
 }
 
 cooperative_matrix_store_khr :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Maybe(Id), op5: Maybe(Memory_Access)) {
-	append(&b.ops, inst_OpCooperativeMatrixStoreKHR(opbuf(b, 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpCooperativeMatrixStoreKHR(opbuf(b, 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5))
 }
 
 inst_OpCooperativeMatrixMulAddKHR :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id, op3: Id, op4: Maybe(Cooperative_Matrix_Operands)) -> Operation {
@@ -5062,7 +5062,7 @@ inst_OpCooperativeMatrixMulAddKHR :: #force_inline proc "contextless" (buf: []Op
 
 cooperative_matrix_mul_add_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Maybe(Cooperative_Matrix_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCooperativeMatrixMulAddKHR(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpCooperativeMatrixMulAddKHR(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -5074,7 +5074,7 @@ inst_OpCooperativeMatrixLengthKHR :: #force_inline proc "contextless" (buf: []Op
 
 cooperative_matrix_length_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCooperativeMatrixLengthKHR(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpCooperativeMatrixLengthKHR(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5086,7 +5086,7 @@ inst_OpConstantCompositeReplicateEXT :: #force_inline proc "contextless" (buf: [
 
 constant_composite_replicate_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConstantCompositeReplicateEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConstantCompositeReplicateEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5098,7 +5098,7 @@ inst_OpSpecConstantCompositeReplicateEXT :: #force_inline proc "contextless" (bu
 
 spec_constant_composite_replicate_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSpecConstantCompositeReplicateEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSpecConstantCompositeReplicateEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5110,7 +5110,7 @@ inst_OpCompositeConstructReplicateEXT :: #force_inline proc "contextless" (buf: 
 
 composite_construct_replicate_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCompositeConstructReplicateEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpCompositeConstructReplicateEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5120,7 +5120,7 @@ inst_OpTypeRayQueryKHR :: #force_inline proc "contextless" (result: Id) -> Opera
 
 type_ray_query_khr :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeRayQueryKHR(r))
+	append_elem(&b.ops, inst_OpTypeRayQueryKHR(r))
 	return r
 }
 
@@ -5138,7 +5138,7 @@ inst_OpRayQueryInitializeKHR :: #force_inline proc "contextless" (buf: []Operand
 }
 
 ray_query_initialize_khr :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id) {
-	append(&b.ops, inst_OpRayQueryInitializeKHR(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8))
+	append_elem(&b.ops, inst_OpRayQueryInitializeKHR(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8))
 }
 
 inst_OpRayQueryTerminateKHR :: #force_inline proc "contextless" (buf: []Operand, op1: Id) -> Operation {
@@ -5148,7 +5148,7 @@ inst_OpRayQueryTerminateKHR :: #force_inline proc "contextless" (buf: []Operand,
 }
 
 ray_query_terminate_khr :: proc(b: ^Builder, op1: Id) {
-	append(&b.ops, inst_OpRayQueryTerminateKHR(opbuf(b, 1), op1))
+	append_elem(&b.ops, inst_OpRayQueryTerminateKHR(opbuf(b, 1), op1))
 }
 
 inst_OpRayQueryGenerateIntersectionKHR :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id) -> Operation {
@@ -5159,7 +5159,7 @@ inst_OpRayQueryGenerateIntersectionKHR :: #force_inline proc "contextless" (buf:
 }
 
 ray_query_generate_intersection_khr :: proc(b: ^Builder, op1: Id, op2: Id) {
-	append(&b.ops, inst_OpRayQueryGenerateIntersectionKHR(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryGenerateIntersectionKHR(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpRayQueryConfirmIntersectionKHR :: #force_inline proc "contextless" (buf: []Operand, op1: Id) -> Operation {
@@ -5169,7 +5169,7 @@ inst_OpRayQueryConfirmIntersectionKHR :: #force_inline proc "contextless" (buf: 
 }
 
 ray_query_confirm_intersection_khr :: proc(b: ^Builder, op1: Id) {
-	append(&b.ops, inst_OpRayQueryConfirmIntersectionKHR(opbuf(b, 1), op1))
+	append_elem(&b.ops, inst_OpRayQueryConfirmIntersectionKHR(opbuf(b, 1), op1))
 }
 
 inst_OpRayQueryProceedKHR :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id) -> Operation {
@@ -5180,7 +5180,7 @@ inst_OpRayQueryProceedKHR :: #force_inline proc "contextless" (buf: []Operand, r
 
 ray_query_proceed_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryProceedKHR(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpRayQueryProceedKHR(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5193,7 +5193,7 @@ inst_OpRayQueryGetIntersectionTypeKHR :: #force_inline proc "contextless" (buf: 
 
 ray_query_get_intersection_type_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetIntersectionTypeKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryGetIntersectionTypeKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -5207,7 +5207,7 @@ inst_OpImageSampleWeightedQCOM :: #force_inline proc "contextless" (buf: []Opera
 
 image_sample_weighted_qcom :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSampleWeightedQCOM(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpImageSampleWeightedQCOM(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -5221,7 +5221,7 @@ inst_OpImageBoxFilterQCOM :: #force_inline proc "contextless" (buf: []Operand, r
 
 image_box_filter_qcom :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageBoxFilterQCOM(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpImageBoxFilterQCOM(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -5237,7 +5237,7 @@ inst_OpImageBlockMatchSSDQCOM :: #force_inline proc "contextless" (buf: []Operan
 
 image_block_match_ssdqcom :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageBlockMatchSSDQCOM(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpImageBlockMatchSSDQCOM(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -5253,7 +5253,7 @@ inst_OpImageBlockMatchSADQCOM :: #force_inline proc "contextless" (buf: []Operan
 
 image_block_match_sadqcom :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageBlockMatchSADQCOM(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpImageBlockMatchSADQCOM(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -5265,7 +5265,7 @@ inst_OpBitCastArrayQCOM :: #force_inline proc "contextless" (buf: []Operand, res
 
 bit_cast_array_qcom :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpBitCastArrayQCOM(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpBitCastArrayQCOM(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5281,7 +5281,7 @@ inst_OpImageBlockMatchWindowSSDQCOM :: #force_inline proc "contextless" (buf: []
 
 image_block_match_window_ssdqcom :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageBlockMatchWindowSSDQCOM(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpImageBlockMatchWindowSSDQCOM(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -5297,7 +5297,7 @@ inst_OpImageBlockMatchWindowSADQCOM :: #force_inline proc "contextless" (buf: []
 
 image_block_match_window_sadqcom :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageBlockMatchWindowSADQCOM(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpImageBlockMatchWindowSADQCOM(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -5313,7 +5313,7 @@ inst_OpImageBlockMatchGatherSSDQCOM :: #force_inline proc "contextless" (buf: []
 
 image_block_match_gather_ssdqcom :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageBlockMatchGatherSSDQCOM(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpImageBlockMatchGatherSSDQCOM(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -5329,7 +5329,7 @@ inst_OpImageBlockMatchGatherSADQCOM :: #force_inline proc "contextless" (buf: []
 
 image_block_match_gather_sadqcom :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageBlockMatchGatherSADQCOM(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpImageBlockMatchGatherSADQCOM(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -5341,7 +5341,7 @@ inst_OpCompositeConstructCoopMatQCOM :: #force_inline proc "contextless" (buf: [
 
 composite_construct_coop_mat_qcom :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCompositeConstructCoopMatQCOM(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpCompositeConstructCoopMatQCOM(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5353,7 +5353,7 @@ inst_OpCompositeExtractCoopMatQCOM :: #force_inline proc "contextless" (buf: []O
 
 composite_extract_coop_mat_qcom :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCompositeExtractCoopMatQCOM(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpCompositeExtractCoopMatQCOM(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5366,7 +5366,7 @@ inst_OpExtractSubArrayQCOM :: #force_inline proc "contextless" (buf: []Operand, 
 
 extract_sub_array_qcom :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpExtractSubArrayQCOM(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpExtractSubArrayQCOM(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -5380,7 +5380,7 @@ inst_OpGroupIAddNonUniformAMD :: #force_inline proc "contextless" (buf: []Operan
 
 group_i_add_non_uniform_amd :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupIAddNonUniformAMD(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupIAddNonUniformAMD(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -5394,7 +5394,7 @@ inst_OpGroupFAddNonUniformAMD :: #force_inline proc "contextless" (buf: []Operan
 
 group_f_add_non_uniform_amd :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupFAddNonUniformAMD(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupFAddNonUniformAMD(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -5408,7 +5408,7 @@ inst_OpGroupFMinNonUniformAMD :: #force_inline proc "contextless" (buf: []Operan
 
 group_f_min_non_uniform_amd :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupFMinNonUniformAMD(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupFMinNonUniformAMD(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -5422,7 +5422,7 @@ inst_OpGroupUMinNonUniformAMD :: #force_inline proc "contextless" (buf: []Operan
 
 group_u_min_non_uniform_amd :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupUMinNonUniformAMD(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupUMinNonUniformAMD(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -5436,7 +5436,7 @@ inst_OpGroupSMinNonUniformAMD :: #force_inline proc "contextless" (buf: []Operan
 
 group_s_min_non_uniform_amd :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupSMinNonUniformAMD(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupSMinNonUniformAMD(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -5450,7 +5450,7 @@ inst_OpGroupFMaxNonUniformAMD :: #force_inline proc "contextless" (buf: []Operan
 
 group_f_max_non_uniform_amd :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupFMaxNonUniformAMD(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupFMaxNonUniformAMD(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -5464,7 +5464,7 @@ inst_OpGroupUMaxNonUniformAMD :: #force_inline proc "contextless" (buf: []Operan
 
 group_u_max_non_uniform_amd :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupUMaxNonUniformAMD(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupUMaxNonUniformAMD(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -5478,7 +5478,7 @@ inst_OpGroupSMaxNonUniformAMD :: #force_inline proc "contextless" (buf: []Operan
 
 group_s_max_non_uniform_amd :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupSMaxNonUniformAMD(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupSMaxNonUniformAMD(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -5491,7 +5491,7 @@ inst_OpFragmentMaskFetchAMD :: #force_inline proc "contextless" (buf: []Operand,
 
 fragment_mask_fetch_amd :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFragmentMaskFetchAMD(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpFragmentMaskFetchAMD(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -5505,7 +5505,7 @@ inst_OpFragmentFetchAMD :: #force_inline proc "contextless" (buf: []Operand, res
 
 fragment_fetch_amd :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFragmentFetchAMD(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpFragmentFetchAMD(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -5517,7 +5517,7 @@ inst_OpReadClockKHR :: #force_inline proc "contextless" (buf: []Operand, result_
 
 read_clock_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpReadClockKHR(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpReadClockKHR(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5531,7 +5531,7 @@ inst_OpAllocateNodePayloadsAMDX :: #force_inline proc "contextless" (buf: []Oper
 
 allocate_node_payloads_amdx :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAllocateNodePayloadsAMDX(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpAllocateNodePayloadsAMDX(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -5542,7 +5542,7 @@ inst_OpEnqueueNodePayloadsAMDX :: #force_inline proc "contextless" (buf: []Opera
 }
 
 enqueue_node_payloads_amdx :: proc(b: ^Builder, op1: Id) {
-	append(&b.ops, inst_OpEnqueueNodePayloadsAMDX(opbuf(b, 1), op1))
+	append_elem(&b.ops, inst_OpEnqueueNodePayloadsAMDX(opbuf(b, 1), op1))
 }
 
 inst_OpTypeNodePayloadArrayAMDX :: #force_inline proc "contextless" (buf: []Operand, result: Id, op1: Id) -> Operation {
@@ -5553,7 +5553,7 @@ inst_OpTypeNodePayloadArrayAMDX :: #force_inline proc "contextless" (buf: []Oper
 
 type_node_payload_array_amdx :: proc(b: ^Builder, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeNodePayloadArrayAMDX(opbuf(b, 1), r, op1))
+	append_elem(&b.ops, inst_OpTypeNodePayloadArrayAMDX(opbuf(b, 1), r, op1))
 	return r
 }
 
@@ -5565,7 +5565,7 @@ inst_OpFinishWritingNodePayloadAMDX :: #force_inline proc "contextless" (buf: []
 
 finish_writing_node_payload_amdx :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFinishWritingNodePayloadAMDX(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpFinishWritingNodePayloadAMDX(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5577,7 +5577,7 @@ inst_OpNodePayloadArrayLengthAMDX :: #force_inline proc "contextless" (buf: []Op
 
 node_payload_array_length_amdx :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpNodePayloadArrayLengthAMDX(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpNodePayloadArrayLengthAMDX(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5590,7 +5590,7 @@ inst_OpIsNodePayloadValidAMDX :: #force_inline proc "contextless" (buf: []Operan
 
 is_node_payload_valid_amdx :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpIsNodePayloadValidAMDX(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpIsNodePayloadValidAMDX(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -5602,7 +5602,7 @@ inst_OpConstantStringAMDX :: #force_inline proc "contextless" (buf: []Operand, r
 
 constant_string_amdx :: proc(b: ^Builder, op1: string) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConstantStringAMDX(opbuf(b, (len(op1) + 4) / 4), r, op1))
+	append_elem(&b.ops, inst_OpConstantStringAMDX(opbuf(b, (len(op1) + 4) / 4), r, op1))
 	return r
 }
 
@@ -5614,7 +5614,7 @@ inst_OpSpecConstantStringAMDX :: #force_inline proc "contextless" (buf: []Operan
 
 spec_constant_string_amdx :: proc(b: ^Builder, op1: string) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSpecConstantStringAMDX(opbuf(b, (len(op1) + 4) / 4), r, op1))
+	append_elem(&b.ops, inst_OpSpecConstantStringAMDX(opbuf(b, (len(op1) + 4) / 4), r, op1))
 	return r
 }
 
@@ -5626,7 +5626,7 @@ inst_OpGroupNonUniformQuadAllKHR :: #force_inline proc "contextless" (buf: []Ope
 
 group_non_uniform_quad_all_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformQuadAllKHR(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpGroupNonUniformQuadAllKHR(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5638,7 +5638,7 @@ inst_OpGroupNonUniformQuadAnyKHR :: #force_inline proc "contextless" (buf: []Ope
 
 group_non_uniform_quad_any_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformQuadAnyKHR(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpGroupNonUniformQuadAnyKHR(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5650,7 +5650,7 @@ inst_OpTypeBufferEXT :: #force_inline proc "contextless" (buf: []Operand, result
 
 type_buffer_ext :: proc(b: ^Builder, op1: Storage_Class) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeBufferEXT(opbuf(b, 1), r, op1))
+	append_elem(&b.ops, inst_OpTypeBufferEXT(opbuf(b, 1), r, op1))
 	return r
 }
 
@@ -5662,7 +5662,7 @@ inst_OpBufferPointerEXT :: #force_inline proc "contextless" (buf: []Operand, res
 
 buffer_pointer_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpBufferPointerEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpBufferPointerEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5674,7 +5674,7 @@ inst_OpAbortKHR :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op
 }
 
 abort_khr :: proc(b: ^Builder, op1: Id, op2: Id) {
-	append(&b.ops, inst_OpAbortKHR(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpAbortKHR(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpUntypedImageTexelPointerEXT :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id, op3: Id, op4: Id) -> Operation {
@@ -5688,7 +5688,7 @@ inst_OpUntypedImageTexelPointerEXT :: #force_inline proc "contextless" (buf: []O
 
 untyped_image_texel_pointer_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUntypedImageTexelPointerEXT(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpUntypedImageTexelPointerEXT(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -5701,7 +5701,7 @@ inst_OpMemberDecorateIdEXT :: #force_inline proc "contextless" (buf: []Operand, 
 }
 
 member_decorate_id_ext :: proc(b: ^Builder, op1: Id, op2: i64, op3: Decoration) {
-	append(&b.ops, inst_OpMemberDecorateIdEXT(opbuf(b, 1 + 1 + 1), op1, op2, op3))
+	append_elem(&b.ops, inst_OpMemberDecorateIdEXT(opbuf(b, 1 + 1 + 1), op1, op2, op3))
 }
 
 inst_OpConstantSizeOfEXT :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id) -> Operation {
@@ -5712,7 +5712,7 @@ inst_OpConstantSizeOfEXT :: #force_inline proc "contextless" (buf: []Operand, re
 
 constant_size_of_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConstantSizeOfEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConstantSizeOfEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5724,7 +5724,7 @@ inst_OpConstantDataKHR :: #force_inline proc "contextless" (buf: []Operand, resu
 
 constant_data_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: []i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConstantDataKHR(opbuf(b, len(op1)), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConstantDataKHR(opbuf(b, len(op1)), result_type, r, op1))
 	return r
 }
 
@@ -5736,7 +5736,7 @@ inst_OpSpecConstantDataKHR :: #force_inline proc "contextless" (buf: []Operand, 
 
 spec_constant_data_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: []i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSpecConstantDataKHR(opbuf(b, len(op1)), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSpecConstantDataKHR(opbuf(b, len(op1)), result_type, r, op1))
 	return r
 }
 
@@ -5746,7 +5746,7 @@ inst_OpPoisonKHR :: #force_inline proc "contextless" (result_type: Type_Ref, res
 
 poison_khr :: proc(b: ^Builder, result_type: Type_Ref) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpPoisonKHR(result_type, r))
+	append_elem(&b.ops, inst_OpPoisonKHR(result_type, r))
 	return r
 }
 
@@ -5758,7 +5758,7 @@ inst_OpFreezeKHR :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 freeze_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFreezeKHR(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpFreezeKHR(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5782,7 +5782,7 @@ inst_OpHitObjectRecordHitMotionNV :: #force_inline proc "contextless" (buf: []Op
 }
 
 hit_object_record_hit_motion_nv :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id, op13: Id, op14: Id) {
-	append(&b.ops, inst_OpHitObjectRecordHitMotionNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12, op13, op14))
+	append_elem(&b.ops, inst_OpHitObjectRecordHitMotionNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12, op13, op14))
 }
 
 inst_OpHitObjectRecordHitWithIndexMotionNV :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id, op13: Id) -> Operation {
@@ -5804,7 +5804,7 @@ inst_OpHitObjectRecordHitWithIndexMotionNV :: #force_inline proc "contextless" (
 }
 
 hit_object_record_hit_with_index_motion_nv :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id, op13: Id) {
-	append(&b.ops, inst_OpHitObjectRecordHitWithIndexMotionNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12, op13))
+	append_elem(&b.ops, inst_OpHitObjectRecordHitWithIndexMotionNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12, op13))
 }
 
 inst_OpHitObjectRecordMissMotionNV :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id) -> Operation {
@@ -5820,7 +5820,7 @@ inst_OpHitObjectRecordMissMotionNV :: #force_inline proc "contextless" (buf: []O
 }
 
 hit_object_record_miss_motion_nv :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id) {
-	append(&b.ops, inst_OpHitObjectRecordMissMotionNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7))
+	append_elem(&b.ops, inst_OpHitObjectRecordMissMotionNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7))
 }
 
 inst_OpHitObjectGetWorldToObjectNV :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id) -> Operation {
@@ -5831,7 +5831,7 @@ inst_OpHitObjectGetWorldToObjectNV :: #force_inline proc "contextless" (buf: []O
 
 hit_object_get_world_to_object_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetWorldToObjectNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetWorldToObjectNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5843,7 +5843,7 @@ inst_OpHitObjectGetObjectToWorldNV :: #force_inline proc "contextless" (buf: []O
 
 hit_object_get_object_to_world_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetObjectToWorldNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetObjectToWorldNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5855,7 +5855,7 @@ inst_OpHitObjectGetObjectRayDirectionNV :: #force_inline proc "contextless" (buf
 
 hit_object_get_object_ray_direction_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetObjectRayDirectionNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetObjectRayDirectionNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5867,7 +5867,7 @@ inst_OpHitObjectGetObjectRayOriginNV :: #force_inline proc "contextless" (buf: [
 
 hit_object_get_object_ray_origin_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetObjectRayOriginNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetObjectRayOriginNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5890,7 +5890,7 @@ inst_OpHitObjectTraceRayMotionNV :: #force_inline proc "contextless" (buf: []Ope
 }
 
 hit_object_trace_ray_motion_nv :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id, op13: Id) {
-	append(&b.ops, inst_OpHitObjectTraceRayMotionNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12, op13))
+	append_elem(&b.ops, inst_OpHitObjectTraceRayMotionNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12, op13))
 }
 
 inst_OpHitObjectGetShaderRecordBufferHandleNV :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id) -> Operation {
@@ -5901,7 +5901,7 @@ inst_OpHitObjectGetShaderRecordBufferHandleNV :: #force_inline proc "contextless
 
 hit_object_get_shader_record_buffer_handle_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetShaderRecordBufferHandleNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetShaderRecordBufferHandleNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5913,7 +5913,7 @@ inst_OpHitObjectGetShaderBindingTableRecordIndexNV :: #force_inline proc "contex
 
 hit_object_get_shader_binding_table_record_index_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetShaderBindingTableRecordIndexNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetShaderBindingTableRecordIndexNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -5924,7 +5924,7 @@ inst_OpHitObjectRecordEmptyNV :: #force_inline proc "contextless" (buf: []Operan
 }
 
 hit_object_record_empty_nv :: proc(b: ^Builder, op1: Id) {
-	append(&b.ops, inst_OpHitObjectRecordEmptyNV(opbuf(b, 1), op1))
+	append_elem(&b.ops, inst_OpHitObjectRecordEmptyNV(opbuf(b, 1), op1))
 }
 
 inst_OpHitObjectTraceRayNV :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id) -> Operation {
@@ -5945,7 +5945,7 @@ inst_OpHitObjectTraceRayNV :: #force_inline proc "contextless" (buf: []Operand, 
 }
 
 hit_object_trace_ray_nv :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id) {
-	append(&b.ops, inst_OpHitObjectTraceRayNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12))
+	append_elem(&b.ops, inst_OpHitObjectTraceRayNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12))
 }
 
 inst_OpHitObjectRecordHitNV :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id, op13: Id) -> Operation {
@@ -5967,7 +5967,7 @@ inst_OpHitObjectRecordHitNV :: #force_inline proc "contextless" (buf: []Operand,
 }
 
 hit_object_record_hit_nv :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id, op13: Id) {
-	append(&b.ops, inst_OpHitObjectRecordHitNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12, op13))
+	append_elem(&b.ops, inst_OpHitObjectRecordHitNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12, op13))
 }
 
 inst_OpHitObjectRecordHitWithIndexNV :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id) -> Operation {
@@ -5988,7 +5988,7 @@ inst_OpHitObjectRecordHitWithIndexNV :: #force_inline proc "contextless" (buf: [
 }
 
 hit_object_record_hit_with_index_nv :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id) {
-	append(&b.ops, inst_OpHitObjectRecordHitWithIndexNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12))
+	append_elem(&b.ops, inst_OpHitObjectRecordHitWithIndexNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12))
 }
 
 inst_OpHitObjectRecordMissNV :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id) -> Operation {
@@ -6003,7 +6003,7 @@ inst_OpHitObjectRecordMissNV :: #force_inline proc "contextless" (buf: []Operand
 }
 
 hit_object_record_miss_nv :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id) {
-	append(&b.ops, inst_OpHitObjectRecordMissNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpHitObjectRecordMissNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6))
 }
 
 inst_OpHitObjectExecuteShaderNV :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id) -> Operation {
@@ -6014,7 +6014,7 @@ inst_OpHitObjectExecuteShaderNV :: #force_inline proc "contextless" (buf: []Oper
 }
 
 hit_object_execute_shader_nv :: proc(b: ^Builder, op1: Id, op2: Id) {
-	append(&b.ops, inst_OpHitObjectExecuteShaderNV(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpHitObjectExecuteShaderNV(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpHitObjectGetCurrentTimeNV :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id) -> Operation {
@@ -6025,7 +6025,7 @@ inst_OpHitObjectGetCurrentTimeNV :: #force_inline proc "contextless" (buf: []Ope
 
 hit_object_get_current_time_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetCurrentTimeNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetCurrentTimeNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6037,7 +6037,7 @@ inst_OpHitObjectGetAttributesNV :: #force_inline proc "contextless" (buf: []Oper
 }
 
 hit_object_get_attributes_nv :: proc(b: ^Builder, op1: Id, op2: Id) {
-	append(&b.ops, inst_OpHitObjectGetAttributesNV(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpHitObjectGetAttributesNV(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpHitObjectGetHitKindNV :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id) -> Operation {
@@ -6048,7 +6048,7 @@ inst_OpHitObjectGetHitKindNV :: #force_inline proc "contextless" (buf: []Operand
 
 hit_object_get_hit_kind_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetHitKindNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetHitKindNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6060,7 +6060,7 @@ inst_OpHitObjectGetPrimitiveIndexNV :: #force_inline proc "contextless" (buf: []
 
 hit_object_get_primitive_index_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetPrimitiveIndexNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetPrimitiveIndexNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6072,7 +6072,7 @@ inst_OpHitObjectGetGeometryIndexNV :: #force_inline proc "contextless" (buf: []O
 
 hit_object_get_geometry_index_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetGeometryIndexNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetGeometryIndexNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6084,7 +6084,7 @@ inst_OpHitObjectGetInstanceIdNV :: #force_inline proc "contextless" (buf: []Oper
 
 hit_object_get_instance_id_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetInstanceIdNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetInstanceIdNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6096,7 +6096,7 @@ inst_OpHitObjectGetInstanceCustomIndexNV :: #force_inline proc "contextless" (bu
 
 hit_object_get_instance_custom_index_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetInstanceCustomIndexNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetInstanceCustomIndexNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6108,7 +6108,7 @@ inst_OpHitObjectGetWorldRayDirectionNV :: #force_inline proc "contextless" (buf:
 
 hit_object_get_world_ray_direction_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetWorldRayDirectionNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetWorldRayDirectionNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6120,7 +6120,7 @@ inst_OpHitObjectGetWorldRayOriginNV :: #force_inline proc "contextless" (buf: []
 
 hit_object_get_world_ray_origin_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetWorldRayOriginNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetWorldRayOriginNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6132,7 +6132,7 @@ inst_OpHitObjectGetRayTMaxNV :: #force_inline proc "contextless" (buf: []Operand
 
 hit_object_get_ray_t_max_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetRayTMaxNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetRayTMaxNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6144,7 +6144,7 @@ inst_OpHitObjectGetRayTMinNV :: #force_inline proc "contextless" (buf: []Operand
 
 hit_object_get_ray_t_min_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetRayTMinNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetRayTMinNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6156,7 +6156,7 @@ inst_OpHitObjectIsEmptyNV :: #force_inline proc "contextless" (buf: []Operand, r
 
 hit_object_is_empty_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectIsEmptyNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectIsEmptyNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6168,7 +6168,7 @@ inst_OpHitObjectIsHitNV :: #force_inline proc "contextless" (buf: []Operand, res
 
 hit_object_is_hit_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectIsHitNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectIsHitNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6180,7 +6180,7 @@ inst_OpHitObjectIsMissNV :: #force_inline proc "contextless" (buf: []Operand, re
 
 hit_object_is_miss_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectIsMissNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectIsMissNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6193,7 +6193,7 @@ inst_OpReorderThreadWithHitObjectNV :: #force_inline proc "contextless" (buf: []
 }
 
 reorder_thread_with_hit_object_nv :: proc(b: ^Builder, op1: Id, op2: Maybe(Id), op3: Maybe(Id)) {
-	append(&b.ops, inst_OpReorderThreadWithHitObjectNV(opbuf(b, 1 + 1 + 1), op1, op2, op3))
+	append_elem(&b.ops, inst_OpReorderThreadWithHitObjectNV(opbuf(b, 1 + 1 + 1), op1, op2, op3))
 }
 
 inst_OpReorderThreadWithHintNV :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id) -> Operation {
@@ -6204,7 +6204,7 @@ inst_OpReorderThreadWithHintNV :: #force_inline proc "contextless" (buf: []Opera
 }
 
 reorder_thread_with_hint_nv :: proc(b: ^Builder, op1: Id, op2: Id) {
-	append(&b.ops, inst_OpReorderThreadWithHintNV(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpReorderThreadWithHintNV(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpTypeHitObjectNV :: #force_inline proc "contextless" (result: Id) -> Operation {
@@ -6213,7 +6213,7 @@ inst_OpTypeHitObjectNV :: #force_inline proc "contextless" (result: Id) -> Opera
 
 type_hit_object_nv :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeHitObjectNV(r))
+	append_elem(&b.ops, inst_OpTypeHitObjectNV(r))
 	return r
 }
 
@@ -6229,7 +6229,7 @@ inst_OpImageSampleFootprintNV :: #force_inline proc "contextless" (buf: []Operan
 
 image_sample_footprint_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Maybe(Image_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpImageSampleFootprintNV(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpImageSampleFootprintNV(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -6242,7 +6242,7 @@ inst_OpTypeVectorIdEXT :: #force_inline proc "contextless" (buf: []Operand, resu
 
 type_vector_id_ext :: proc(b: ^Builder, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeVectorIdEXT(opbuf(b, 1 + 1), r, op1, op2))
+	append_elem(&b.ops, inst_OpTypeVectorIdEXT(opbuf(b, 1 + 1), r, op1, op2))
 	return r
 }
 
@@ -6264,7 +6264,7 @@ inst_OpCooperativeVectorMatrixMulNV :: #force_inline proc "contextless" (buf: []
 
 cooperative_vector_matrix_mul_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Maybe(Id), op11: Maybe(Cooperative_Matrix_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCooperativeVectorMatrixMulNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11))
+	append_elem(&b.ops, inst_OpCooperativeVectorMatrixMulNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11))
 	return r
 }
 
@@ -6281,7 +6281,7 @@ inst_OpCooperativeVectorOuterProductAccumulateNV :: #force_inline proc "contextl
 }
 
 cooperative_vector_outer_product_accumulate_nv :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Maybe(Id)) {
-	append(&b.ops, inst_OpCooperativeVectorOuterProductAccumulateNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7))
+	append_elem(&b.ops, inst_OpCooperativeVectorOuterProductAccumulateNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7))
 }
 
 inst_OpCooperativeVectorReduceSumAccumulateNV :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id) -> Operation {
@@ -6293,7 +6293,7 @@ inst_OpCooperativeVectorReduceSumAccumulateNV :: #force_inline proc "contextless
 }
 
 cooperative_vector_reduce_sum_accumulate_nv :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id) {
-	append(&b.ops, inst_OpCooperativeVectorReduceSumAccumulateNV(opbuf(b, 1 + 1 + 1), op1, op2, op3))
+	append_elem(&b.ops, inst_OpCooperativeVectorReduceSumAccumulateNV(opbuf(b, 1 + 1 + 1), op1, op2, op3))
 }
 
 inst_OpCooperativeVectorMatrixMulAddNV :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id, op13: Maybe(Id), op14: Maybe(Cooperative_Matrix_Operands)) -> Operation {
@@ -6317,7 +6317,7 @@ inst_OpCooperativeVectorMatrixMulAddNV :: #force_inline proc "contextless" (buf:
 
 cooperative_vector_matrix_mul_add_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id, op13: Maybe(Id), op14: Maybe(Cooperative_Matrix_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCooperativeVectorMatrixMulAddNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12, op13, op14))
+	append_elem(&b.ops, inst_OpCooperativeVectorMatrixMulAddNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12, op13, op14))
 	return r
 }
 
@@ -6329,7 +6329,7 @@ inst_OpCooperativeMatrixConvertNV :: #force_inline proc "contextless" (buf: []Op
 
 cooperative_matrix_convert_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCooperativeMatrixConvertNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpCooperativeMatrixConvertNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6343,7 +6343,7 @@ inst_OpEmitMeshTasksEXT :: #force_inline proc "contextless" (buf: []Operand, op1
 }
 
 emit_mesh_tasks_ext :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Maybe(Id)) {
-	append(&b.ops, inst_OpEmitMeshTasksEXT(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpEmitMeshTasksEXT(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
 }
 
 inst_OpSetMeshOutputsEXT :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id) -> Operation {
@@ -6354,7 +6354,7 @@ inst_OpSetMeshOutputsEXT :: #force_inline proc "contextless" (buf: []Operand, op
 }
 
 set_mesh_outputs_ext :: proc(b: ^Builder, op1: Id, op2: Id) {
-	append(&b.ops, inst_OpSetMeshOutputsEXT(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpSetMeshOutputsEXT(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpGroupNonUniformPartitionEXT :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id) -> Operation {
@@ -6365,7 +6365,7 @@ inst_OpGroupNonUniformPartitionEXT :: #force_inline proc "contextless" (buf: []O
 
 group_non_uniform_partition_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupNonUniformPartitionEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpGroupNonUniformPartitionEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6377,7 +6377,7 @@ inst_OpWritePackedPrimitiveIndices4x8NV :: #force_inline proc "contextless" (buf
 }
 
 write_packed_primitive_indices4x8_nv :: proc(b: ^Builder, op1: Id, op2: Id) {
-	append(&b.ops, inst_OpWritePackedPrimitiveIndices4x8NV(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpWritePackedPrimitiveIndices4x8NV(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpFetchMicroTriangleVertexPositionNV :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) -> Operation {
@@ -6392,7 +6392,7 @@ inst_OpFetchMicroTriangleVertexPositionNV :: #force_inline proc "contextless" (b
 
 fetch_micro_triangle_vertex_position_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFetchMicroTriangleVertexPositionNV(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpFetchMicroTriangleVertexPositionNV(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -6408,7 +6408,7 @@ inst_OpFetchMicroTriangleVertexBarycentricNV :: #force_inline proc "contextless"
 
 fetch_micro_triangle_vertex_barycentric_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFetchMicroTriangleVertexBarycentricNV(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpFetchMicroTriangleVertexBarycentricNV(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -6422,7 +6422,7 @@ inst_OpCooperativeVectorLoadNV :: #force_inline proc "contextless" (buf: []Opera
 
 cooperative_vector_load_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Maybe(Memory_Access)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCooperativeVectorLoadNV(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpCooperativeVectorLoadNV(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -6436,7 +6436,7 @@ inst_OpCooperativeVectorStoreNV :: #force_inline proc "contextless" (buf: []Oper
 }
 
 cooperative_vector_store_nv :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Maybe(Memory_Access)) {
-	append(&b.ops, inst_OpCooperativeVectorStoreNV(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpCooperativeVectorStoreNV(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
 }
 
 inst_OpHitObjectRecordFromQueryEXT :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Maybe(Id)) -> Operation {
@@ -6450,7 +6450,7 @@ inst_OpHitObjectRecordFromQueryEXT :: #force_inline proc "contextless" (buf: []O
 }
 
 hit_object_record_from_query_ext :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Maybe(Id)) {
-	append(&b.ops, inst_OpHitObjectRecordFromQueryEXT(opbuf(b, 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpHitObjectRecordFromQueryEXT(opbuf(b, 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5))
 }
 
 inst_OpHitObjectRecordMissEXT :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id) -> Operation {
@@ -6466,7 +6466,7 @@ inst_OpHitObjectRecordMissEXT :: #force_inline proc "contextless" (buf: []Operan
 }
 
 hit_object_record_miss_ext :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id) {
-	append(&b.ops, inst_OpHitObjectRecordMissEXT(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7))
+	append_elem(&b.ops, inst_OpHitObjectRecordMissEXT(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7))
 }
 
 inst_OpHitObjectRecordMissMotionEXT :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id) -> Operation {
@@ -6483,7 +6483,7 @@ inst_OpHitObjectRecordMissMotionEXT :: #force_inline proc "contextless" (buf: []
 }
 
 hit_object_record_miss_motion_ext :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id) {
-	append(&b.ops, inst_OpHitObjectRecordMissMotionEXT(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8))
+	append_elem(&b.ops, inst_OpHitObjectRecordMissMotionEXT(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8))
 }
 
 inst_OpHitObjectGetIntersectionTriangleVertexPositionsEXT :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id) -> Operation {
@@ -6494,7 +6494,7 @@ inst_OpHitObjectGetIntersectionTriangleVertexPositionsEXT :: #force_inline proc 
 
 hit_object_get_intersection_triangle_vertex_positions_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetIntersectionTriangleVertexPositionsEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetIntersectionTriangleVertexPositionsEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6506,7 +6506,7 @@ inst_OpHitObjectGetRayFlagsEXT :: #force_inline proc "contextless" (buf: []Opera
 
 hit_object_get_ray_flags_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetRayFlagsEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetRayFlagsEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6518,7 +6518,7 @@ inst_OpHitObjectSetShaderBindingTableRecordIndexEXT :: #force_inline proc "conte
 }
 
 hit_object_set_shader_binding_table_record_index_ext :: proc(b: ^Builder, op1: Id, op2: Id) {
-	append(&b.ops, inst_OpHitObjectSetShaderBindingTableRecordIndexEXT(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpHitObjectSetShaderBindingTableRecordIndexEXT(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpHitObjectReorderExecuteShaderEXT :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Maybe(Id), op4: Maybe(Id)) -> Operation {
@@ -6531,7 +6531,7 @@ inst_OpHitObjectReorderExecuteShaderEXT :: #force_inline proc "contextless" (buf
 }
 
 hit_object_reorder_execute_shader_ext :: proc(b: ^Builder, op1: Id, op2: Id, op3: Maybe(Id), op4: Maybe(Id)) {
-	append(&b.ops, inst_OpHitObjectReorderExecuteShaderEXT(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpHitObjectReorderExecuteShaderEXT(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
 }
 
 inst_OpHitObjectTraceReorderExecuteEXT :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id, op13: Maybe(Id), op14: Maybe(Id)) -> Operation {
@@ -6554,7 +6554,7 @@ inst_OpHitObjectTraceReorderExecuteEXT :: #force_inline proc "contextless" (buf:
 }
 
 hit_object_trace_reorder_execute_ext :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id, op13: Maybe(Id), op14: Maybe(Id)) {
-	append(&b.ops, inst_OpHitObjectTraceReorderExecuteEXT(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12, op13, op14))
+	append_elem(&b.ops, inst_OpHitObjectTraceReorderExecuteEXT(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12, op13, op14))
 }
 
 inst_OpHitObjectTraceMotionReorderExecuteEXT :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id, op13: Id, op14: Maybe(Id), op15: Maybe(Id)) -> Operation {
@@ -6578,7 +6578,7 @@ inst_OpHitObjectTraceMotionReorderExecuteEXT :: #force_inline proc "contextless"
 }
 
 hit_object_trace_motion_reorder_execute_ext :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id, op13: Id, op14: Maybe(Id), op15: Maybe(Id)) {
-	append(&b.ops, inst_OpHitObjectTraceMotionReorderExecuteEXT(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12, op13, op14, op15))
+	append_elem(&b.ops, inst_OpHitObjectTraceMotionReorderExecuteEXT(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12, op13, op14, op15))
 }
 
 inst_OpTypeHitObjectEXT :: #force_inline proc "contextless" (result: Id) -> Operation {
@@ -6587,7 +6587,7 @@ inst_OpTypeHitObjectEXT :: #force_inline proc "contextless" (result: Id) -> Oper
 
 type_hit_object_ext :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeHitObjectEXT(r))
+	append_elem(&b.ops, inst_OpTypeHitObjectEXT(r))
 	return r
 }
 
@@ -6599,7 +6599,7 @@ inst_OpReorderThreadWithHintEXT :: #force_inline proc "contextless" (buf: []Oper
 }
 
 reorder_thread_with_hint_ext :: proc(b: ^Builder, op1: Id, op2: Id) {
-	append(&b.ops, inst_OpReorderThreadWithHintEXT(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpReorderThreadWithHintEXT(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpReorderThreadWithHitObjectEXT :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Maybe(Id), op3: Maybe(Id)) -> Operation {
@@ -6611,7 +6611,7 @@ inst_OpReorderThreadWithHitObjectEXT :: #force_inline proc "contextless" (buf: [
 }
 
 reorder_thread_with_hit_object_ext :: proc(b: ^Builder, op1: Id, op2: Maybe(Id), op3: Maybe(Id)) {
-	append(&b.ops, inst_OpReorderThreadWithHitObjectEXT(opbuf(b, 1 + 1 + 1), op1, op2, op3))
+	append_elem(&b.ops, inst_OpReorderThreadWithHitObjectEXT(opbuf(b, 1 + 1 + 1), op1, op2, op3))
 }
 
 inst_OpHitObjectTraceRayEXT :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id) -> Operation {
@@ -6632,7 +6632,7 @@ inst_OpHitObjectTraceRayEXT :: #force_inline proc "contextless" (buf: []Operand,
 }
 
 hit_object_trace_ray_ext :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id) {
-	append(&b.ops, inst_OpHitObjectTraceRayEXT(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12))
+	append_elem(&b.ops, inst_OpHitObjectTraceRayEXT(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12))
 }
 
 inst_OpHitObjectTraceRayMotionEXT :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id, op13: Id) -> Operation {
@@ -6654,7 +6654,7 @@ inst_OpHitObjectTraceRayMotionEXT :: #force_inline proc "contextless" (buf: []Op
 }
 
 hit_object_trace_ray_motion_ext :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id, op13: Id) {
-	append(&b.ops, inst_OpHitObjectTraceRayMotionEXT(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12, op13))
+	append_elem(&b.ops, inst_OpHitObjectTraceRayMotionEXT(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12, op13))
 }
 
 inst_OpHitObjectRecordEmptyEXT :: #force_inline proc "contextless" (buf: []Operand, op1: Id) -> Operation {
@@ -6664,7 +6664,7 @@ inst_OpHitObjectRecordEmptyEXT :: #force_inline proc "contextless" (buf: []Opera
 }
 
 hit_object_record_empty_ext :: proc(b: ^Builder, op1: Id) {
-	append(&b.ops, inst_OpHitObjectRecordEmptyEXT(opbuf(b, 1), op1))
+	append_elem(&b.ops, inst_OpHitObjectRecordEmptyEXT(opbuf(b, 1), op1))
 }
 
 inst_OpHitObjectExecuteShaderEXT :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id) -> Operation {
@@ -6675,7 +6675,7 @@ inst_OpHitObjectExecuteShaderEXT :: #force_inline proc "contextless" (buf: []Ope
 }
 
 hit_object_execute_shader_ext :: proc(b: ^Builder, op1: Id, op2: Id) {
-	append(&b.ops, inst_OpHitObjectExecuteShaderEXT(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpHitObjectExecuteShaderEXT(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpHitObjectGetCurrentTimeEXT :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id) -> Operation {
@@ -6686,7 +6686,7 @@ inst_OpHitObjectGetCurrentTimeEXT :: #force_inline proc "contextless" (buf: []Op
 
 hit_object_get_current_time_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetCurrentTimeEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetCurrentTimeEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6698,7 +6698,7 @@ inst_OpHitObjectGetAttributesEXT :: #force_inline proc "contextless" (buf: []Ope
 }
 
 hit_object_get_attributes_ext :: proc(b: ^Builder, op1: Id, op2: Id) {
-	append(&b.ops, inst_OpHitObjectGetAttributesEXT(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpHitObjectGetAttributesEXT(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpHitObjectGetHitKindEXT :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id) -> Operation {
@@ -6709,7 +6709,7 @@ inst_OpHitObjectGetHitKindEXT :: #force_inline proc "contextless" (buf: []Operan
 
 hit_object_get_hit_kind_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetHitKindEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetHitKindEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6721,7 +6721,7 @@ inst_OpHitObjectGetPrimitiveIndexEXT :: #force_inline proc "contextless" (buf: [
 
 hit_object_get_primitive_index_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetPrimitiveIndexEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetPrimitiveIndexEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6733,7 +6733,7 @@ inst_OpHitObjectGetGeometryIndexEXT :: #force_inline proc "contextless" (buf: []
 
 hit_object_get_geometry_index_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetGeometryIndexEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetGeometryIndexEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6745,7 +6745,7 @@ inst_OpHitObjectGetInstanceIdEXT :: #force_inline proc "contextless" (buf: []Ope
 
 hit_object_get_instance_id_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetInstanceIdEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetInstanceIdEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6757,7 +6757,7 @@ inst_OpHitObjectGetInstanceCustomIndexEXT :: #force_inline proc "contextless" (b
 
 hit_object_get_instance_custom_index_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetInstanceCustomIndexEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetInstanceCustomIndexEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6769,7 +6769,7 @@ inst_OpHitObjectGetObjectRayOriginEXT :: #force_inline proc "contextless" (buf: 
 
 hit_object_get_object_ray_origin_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetObjectRayOriginEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetObjectRayOriginEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6781,7 +6781,7 @@ inst_OpHitObjectGetObjectRayDirectionEXT :: #force_inline proc "contextless" (bu
 
 hit_object_get_object_ray_direction_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetObjectRayDirectionEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetObjectRayDirectionEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6793,7 +6793,7 @@ inst_OpHitObjectGetWorldRayDirectionEXT :: #force_inline proc "contextless" (buf
 
 hit_object_get_world_ray_direction_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetWorldRayDirectionEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetWorldRayDirectionEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6805,7 +6805,7 @@ inst_OpHitObjectGetWorldRayOriginEXT :: #force_inline proc "contextless" (buf: [
 
 hit_object_get_world_ray_origin_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetWorldRayOriginEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetWorldRayOriginEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6817,7 +6817,7 @@ inst_OpHitObjectGetObjectToWorldEXT :: #force_inline proc "contextless" (buf: []
 
 hit_object_get_object_to_world_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetObjectToWorldEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetObjectToWorldEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6829,7 +6829,7 @@ inst_OpHitObjectGetWorldToObjectEXT :: #force_inline proc "contextless" (buf: []
 
 hit_object_get_world_to_object_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetWorldToObjectEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetWorldToObjectEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6841,7 +6841,7 @@ inst_OpHitObjectGetRayTMaxEXT :: #force_inline proc "contextless" (buf: []Operan
 
 hit_object_get_ray_t_max_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetRayTMaxEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetRayTMaxEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -6854,7 +6854,7 @@ inst_OpReportIntersectionKHR :: #force_inline proc "contextless" (buf: []Operand
 
 report_intersection_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpReportIntersectionKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpReportIntersectionKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -6863,7 +6863,7 @@ inst_OpIgnoreIntersectionNV :: #force_inline proc "contextless" () -> Operation 
 }
 
 ignore_intersection_nv :: proc(b: ^Builder) {
-	append(&b.ops, inst_OpIgnoreIntersectionNV())
+	append_elem(&b.ops, inst_OpIgnoreIntersectionNV())
 }
 
 inst_OpTerminateRayNV :: #force_inline proc "contextless" () -> Operation {
@@ -6871,7 +6871,7 @@ inst_OpTerminateRayNV :: #force_inline proc "contextless" () -> Operation {
 }
 
 terminate_ray_nv :: proc(b: ^Builder) {
-	append(&b.ops, inst_OpTerminateRayNV())
+	append_elem(&b.ops, inst_OpTerminateRayNV())
 }
 
 inst_OpTraceNV :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id) -> Operation {
@@ -6891,7 +6891,7 @@ inst_OpTraceNV :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2
 }
 
 trace_nv :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id) {
-	append(&b.ops, inst_OpTraceNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11))
+	append_elem(&b.ops, inst_OpTraceNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11))
 }
 
 inst_OpTraceMotionNV :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id) -> Operation {
@@ -6912,7 +6912,7 @@ inst_OpTraceMotionNV :: #force_inline proc "contextless" (buf: []Operand, op1: I
 }
 
 trace_motion_nv :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id) {
-	append(&b.ops, inst_OpTraceMotionNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12))
+	append_elem(&b.ops, inst_OpTraceMotionNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12))
 }
 
 inst_OpTraceRayMotionNV :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id) -> Operation {
@@ -6933,7 +6933,7 @@ inst_OpTraceRayMotionNV :: #force_inline proc "contextless" (buf: []Operand, op1
 }
 
 trace_ray_motion_nv :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id, op12: Id) {
-	append(&b.ops, inst_OpTraceRayMotionNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12))
+	append_elem(&b.ops, inst_OpTraceRayMotionNV(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11, op12))
 }
 
 inst_OpRayQueryGetIntersectionTriangleVertexPositionsKHR :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id) -> Operation {
@@ -6945,7 +6945,7 @@ inst_OpRayQueryGetIntersectionTriangleVertexPositionsKHR :: #force_inline proc "
 
 ray_query_get_intersection_triangle_vertex_positions_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetIntersectionTriangleVertexPositionsKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryGetIntersectionTriangleVertexPositionsKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -6955,7 +6955,7 @@ inst_OpTypeAccelerationStructureKHR :: #force_inline proc "contextless" (result:
 
 type_acceleration_structure_khr :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeAccelerationStructureKHR(r))
+	append_elem(&b.ops, inst_OpTypeAccelerationStructureKHR(r))
 	return r
 }
 
@@ -6967,7 +6967,7 @@ inst_OpExecuteCallableNV :: #force_inline proc "contextless" (buf: []Operand, op
 }
 
 execute_callable_nv :: proc(b: ^Builder, op1: Id, op2: Id) {
-	append(&b.ops, inst_OpExecuteCallableNV(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpExecuteCallableNV(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpRayQueryGetIntersectionClusterIdNV :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id) -> Operation {
@@ -6979,7 +6979,7 @@ inst_OpRayQueryGetIntersectionClusterIdNV :: #force_inline proc "contextless" (b
 
 ray_query_get_intersection_cluster_id_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetIntersectionClusterIdNV(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryGetIntersectionClusterIdNV(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -6991,7 +6991,7 @@ inst_OpHitObjectGetClusterIdNV :: #force_inline proc "contextless" (buf: []Opera
 
 hit_object_get_cluster_id_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetClusterIdNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetClusterIdNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7003,7 +7003,7 @@ inst_OpHitObjectGetRayTMinEXT :: #force_inline proc "contextless" (buf: []Operan
 
 hit_object_get_ray_t_min_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetRayTMinEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetRayTMinEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7015,7 +7015,7 @@ inst_OpHitObjectGetShaderBindingTableRecordIndexEXT :: #force_inline proc "conte
 
 hit_object_get_shader_binding_table_record_index_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetShaderBindingTableRecordIndexEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetShaderBindingTableRecordIndexEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7027,7 +7027,7 @@ inst_OpHitObjectGetShaderRecordBufferHandleEXT :: #force_inline proc "contextles
 
 hit_object_get_shader_record_buffer_handle_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetShaderRecordBufferHandleEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetShaderRecordBufferHandleEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7039,7 +7039,7 @@ inst_OpHitObjectIsEmptyEXT :: #force_inline proc "contextless" (buf: []Operand, 
 
 hit_object_is_empty_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectIsEmptyEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectIsEmptyEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7051,7 +7051,7 @@ inst_OpHitObjectIsHitEXT :: #force_inline proc "contextless" (buf: []Operand, re
 
 hit_object_is_hit_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectIsHitEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectIsHitEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7063,7 +7063,7 @@ inst_OpHitObjectIsMissEXT :: #force_inline proc "contextless" (buf: []Operand, r
 
 hit_object_is_miss_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectIsMissEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectIsMissEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7078,7 +7078,7 @@ inst_OpTypeCooperativeMatrixNV :: #force_inline proc "contextless" (buf: []Opera
 
 type_cooperative_matrix_nv :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeCooperativeMatrixNV(opbuf(b, 1 + 1 + 1 + 1), r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpTypeCooperativeMatrixNV(opbuf(b, 1 + 1 + 1 + 1), r, op1, op2, op3, op4))
 	return r
 }
 
@@ -7093,7 +7093,7 @@ inst_OpCooperativeMatrixLoadNV :: #force_inline proc "contextless" (buf: []Opera
 
 cooperative_matrix_load_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Maybe(Memory_Access)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCooperativeMatrixLoadNV(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpCooperativeMatrixLoadNV(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -7108,7 +7108,7 @@ inst_OpCooperativeMatrixStoreNV :: #force_inline proc "contextless" (buf: []Oper
 }
 
 cooperative_matrix_store_nv :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Maybe(Memory_Access)) {
-	append(&b.ops, inst_OpCooperativeMatrixStoreNV(opbuf(b, 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpCooperativeMatrixStoreNV(opbuf(b, 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5))
 }
 
 inst_OpCooperativeMatrixMulAddNV :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id, op3: Id) -> Operation {
@@ -7121,7 +7121,7 @@ inst_OpCooperativeMatrixMulAddNV :: #force_inline proc "contextless" (buf: []Ope
 
 cooperative_matrix_mul_add_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCooperativeMatrixMulAddNV(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpCooperativeMatrixMulAddNV(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -7133,7 +7133,7 @@ inst_OpCooperativeMatrixLengthNV :: #force_inline proc "contextless" (buf: []Ope
 
 cooperative_matrix_length_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCooperativeMatrixLengthNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpCooperativeMatrixLengthNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7142,7 +7142,7 @@ inst_OpBeginInvocationInterlockEXT :: #force_inline proc "contextless" () -> Ope
 }
 
 begin_invocation_interlock_ext :: proc(b: ^Builder) {
-	append(&b.ops, inst_OpBeginInvocationInterlockEXT())
+	append_elem(&b.ops, inst_OpBeginInvocationInterlockEXT())
 }
 
 inst_OpEndInvocationInterlockEXT :: #force_inline proc "contextless" () -> Operation {
@@ -7150,7 +7150,7 @@ inst_OpEndInvocationInterlockEXT :: #force_inline proc "contextless" () -> Opera
 }
 
 end_invocation_interlock_ext :: proc(b: ^Builder) {
-	append(&b.ops, inst_OpEndInvocationInterlockEXT())
+	append_elem(&b.ops, inst_OpEndInvocationInterlockEXT())
 }
 
 inst_OpCooperativeMatrixReduceNV :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Cooperative_Matrix_Reduce, op3: Id) -> Operation {
@@ -7163,7 +7163,7 @@ inst_OpCooperativeMatrixReduceNV :: #force_inline proc "contextless" (buf: []Ope
 
 cooperative_matrix_reduce_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Cooperative_Matrix_Reduce, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCooperativeMatrixReduceNV(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpCooperativeMatrixReduceNV(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -7179,7 +7179,7 @@ inst_OpCooperativeMatrixLoadTensorNV :: #force_inline proc "contextless" (buf: [
 
 cooperative_matrix_load_tensor_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Memory_Access, op5: Tensor_Addressing_Operands) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCooperativeMatrixLoadTensorNV(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpCooperativeMatrixLoadTensorNV(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -7194,7 +7194,7 @@ inst_OpCooperativeMatrixStoreTensorNV :: #force_inline proc "contextless" (buf: 
 }
 
 cooperative_matrix_store_tensor_nv :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Memory_Access, op5: Tensor_Addressing_Operands) {
-	append(&b.ops, inst_OpCooperativeMatrixStoreTensorNV(opbuf(b, 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpCooperativeMatrixStoreTensorNV(opbuf(b, 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5))
 }
 
 inst_OpCooperativeMatrixPerElementOpNV :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id, op3: []Id) -> Operation {
@@ -7207,7 +7207,7 @@ inst_OpCooperativeMatrixPerElementOpNV :: #force_inline proc "contextless" (buf:
 
 cooperative_matrix_per_element_op_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCooperativeMatrixPerElementOpNV(opbuf(b, 1 + 1 + len(op3)), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpCooperativeMatrixPerElementOpNV(opbuf(b, 1 + 1 + len(op3)), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -7220,7 +7220,7 @@ inst_OpTypeTensorLayoutNV :: #force_inline proc "contextless" (buf: []Operand, r
 
 type_tensor_layout_nv :: proc(b: ^Builder, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeTensorLayoutNV(opbuf(b, 1 + 1), r, op1, op2))
+	append_elem(&b.ops, inst_OpTypeTensorLayoutNV(opbuf(b, 1 + 1), r, op1, op2))
 	return r
 }
 
@@ -7234,7 +7234,7 @@ inst_OpTypeTensorViewNV :: #force_inline proc "contextless" (buf: []Operand, res
 
 type_tensor_view_nv :: proc(b: ^Builder, op1: Id, op2: Id, op3: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeTensorViewNV(opbuf(b, 1 + 1 + len(op3)), r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpTypeTensorViewNV(opbuf(b, 1 + 1 + len(op3)), r, op1, op2, op3))
 	return r
 }
 
@@ -7244,7 +7244,7 @@ inst_OpCreateTensorLayoutNV :: #force_inline proc "contextless" (result_type: Ty
 
 create_tensor_layout_nv :: proc(b: ^Builder, result_type: Type_Ref) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCreateTensorLayoutNV(result_type, r))
+	append_elem(&b.ops, inst_OpCreateTensorLayoutNV(result_type, r))
 	return r
 }
 
@@ -7257,7 +7257,7 @@ inst_OpTensorLayoutSetDimensionNV :: #force_inline proc "contextless" (buf: []Op
 
 tensor_layout_set_dimension_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTensorLayoutSetDimensionNV(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpTensorLayoutSetDimensionNV(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
 	return r
 }
 
@@ -7270,7 +7270,7 @@ inst_OpTensorLayoutSetStrideNV :: #force_inline proc "contextless" (buf: []Opera
 
 tensor_layout_set_stride_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTensorLayoutSetStrideNV(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpTensorLayoutSetStrideNV(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
 	return r
 }
 
@@ -7283,7 +7283,7 @@ inst_OpTensorLayoutSliceNV :: #force_inline proc "contextless" (buf: []Operand, 
 
 tensor_layout_slice_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTensorLayoutSliceNV(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpTensorLayoutSliceNV(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
 	return r
 }
 
@@ -7296,7 +7296,7 @@ inst_OpTensorLayoutSetClampValueNV :: #force_inline proc "contextless" (buf: []O
 
 tensor_layout_set_clamp_value_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTensorLayoutSetClampValueNV(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpTensorLayoutSetClampValueNV(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7306,7 +7306,7 @@ inst_OpCreateTensorViewNV :: #force_inline proc "contextless" (result_type: Type
 
 create_tensor_view_nv :: proc(b: ^Builder, result_type: Type_Ref) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCreateTensorViewNV(result_type, r))
+	append_elem(&b.ops, inst_OpCreateTensorViewNV(result_type, r))
 	return r
 }
 
@@ -7319,7 +7319,7 @@ inst_OpTensorViewSetDimensionNV :: #force_inline proc "contextless" (buf: []Oper
 
 tensor_view_set_dimension_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTensorViewSetDimensionNV(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpTensorViewSetDimensionNV(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
 	return r
 }
 
@@ -7332,7 +7332,7 @@ inst_OpTensorViewSetStrideNV :: #force_inline proc "contextless" (buf: []Operand
 
 tensor_view_set_stride_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTensorViewSetStrideNV(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpTensorViewSetStrideNV(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
 	return r
 }
 
@@ -7341,7 +7341,7 @@ inst_OpDemoteToHelperInvocation :: #force_inline proc "contextless" () -> Operat
 }
 
 demote_to_helper_invocation :: proc(b: ^Builder) {
-	append(&b.ops, inst_OpDemoteToHelperInvocation())
+	append_elem(&b.ops, inst_OpDemoteToHelperInvocation())
 }
 
 inst_OpIsHelperInvocationEXT :: #force_inline proc "contextless" (result_type: Type_Ref, result: Id) -> Operation {
@@ -7350,7 +7350,7 @@ inst_OpIsHelperInvocationEXT :: #force_inline proc "contextless" (result_type: T
 
 is_helper_invocation_ext :: proc(b: ^Builder, result_type: Type_Ref) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpIsHelperInvocationEXT(result_type, r))
+	append_elem(&b.ops, inst_OpIsHelperInvocationEXT(result_type, r))
 	return r
 }
 
@@ -7366,7 +7366,7 @@ inst_OpTensorViewSetClipNV :: #force_inline proc "contextless" (buf: []Operand, 
 
 tensor_view_set_clip_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTensorViewSetClipNV(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpTensorViewSetClipNV(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -7379,7 +7379,7 @@ inst_OpTensorLayoutSetBlockSizeNV :: #force_inline proc "contextless" (buf: []Op
 
 tensor_layout_set_block_size_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTensorLayoutSetBlockSizeNV(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpTensorLayoutSetBlockSizeNV(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
 	return r
 }
 
@@ -7391,7 +7391,7 @@ inst_OpCooperativeMatrixTransposeNV :: #force_inline proc "contextless" (buf: []
 
 cooperative_matrix_transpose_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCooperativeMatrixTransposeNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpCooperativeMatrixTransposeNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7403,7 +7403,7 @@ inst_OpConvertUToImageNV :: #force_inline proc "contextless" (buf: []Operand, re
 
 convert_u_to_image_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConvertUToImageNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConvertUToImageNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7415,7 +7415,7 @@ inst_OpConvertUToSamplerNV :: #force_inline proc "contextless" (buf: []Operand, 
 
 convert_u_to_sampler_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConvertUToSamplerNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConvertUToSamplerNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7427,7 +7427,7 @@ inst_OpConvertImageToUNV :: #force_inline proc "contextless" (buf: []Operand, re
 
 convert_image_to_unv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConvertImageToUNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConvertImageToUNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7439,7 +7439,7 @@ inst_OpConvertSamplerToUNV :: #force_inline proc "contextless" (buf: []Operand, 
 
 convert_sampler_to_unv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConvertSamplerToUNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConvertSamplerToUNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7451,7 +7451,7 @@ inst_OpConvertUToSampledImageNV :: #force_inline proc "contextless" (buf: []Oper
 
 convert_u_to_sampled_image_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConvertUToSampledImageNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConvertUToSampledImageNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7463,7 +7463,7 @@ inst_OpConvertSampledImageToUNV :: #force_inline proc "contextless" (buf: []Oper
 
 convert_sampled_image_to_unv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConvertSampledImageToUNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConvertSampledImageToUNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7474,7 +7474,7 @@ inst_OpSamplerImageAddressingModeNV :: #force_inline proc "contextless" (buf: []
 }
 
 sampler_image_addressing_mode_nv :: proc(b: ^Builder, op1: i64) {
-	append(&b.ops, inst_OpSamplerImageAddressingModeNV(opbuf(b, 1), op1))
+	append_elem(&b.ops, inst_OpSamplerImageAddressingModeNV(opbuf(b, 1), op1))
 }
 
 inst_OpRawAccessChainNV :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id, op3: Id, op4: Id, op5: Maybe(Raw_Access_Chain_Operands)) -> Operation {
@@ -7489,7 +7489,7 @@ inst_OpRawAccessChainNV :: #force_inline proc "contextless" (buf: []Operand, res
 
 raw_access_chain_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Maybe(Raw_Access_Chain_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRawAccessChainNV(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpRawAccessChainNV(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -7502,7 +7502,7 @@ inst_OpRayQueryGetIntersectionSpherePositionNV :: #force_inline proc "contextles
 
 ray_query_get_intersection_sphere_position_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetIntersectionSpherePositionNV(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryGetIntersectionSpherePositionNV(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7515,7 +7515,7 @@ inst_OpRayQueryGetIntersectionSphereRadiusNV :: #force_inline proc "contextless"
 
 ray_query_get_intersection_sphere_radius_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetIntersectionSphereRadiusNV(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryGetIntersectionSphereRadiusNV(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7528,7 +7528,7 @@ inst_OpRayQueryGetIntersectionLSSPositionsNV :: #force_inline proc "contextless"
 
 ray_query_get_intersection_lss_positions_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetIntersectionLSSPositionsNV(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryGetIntersectionLSSPositionsNV(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7541,7 +7541,7 @@ inst_OpRayQueryGetIntersectionLSSRadiiNV :: #force_inline proc "contextless" (bu
 
 ray_query_get_intersection_lss_radii_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetIntersectionLSSRadiiNV(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryGetIntersectionLSSRadiiNV(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7554,7 +7554,7 @@ inst_OpRayQueryGetIntersectionLSSHitValueNV :: #force_inline proc "contextless" 
 
 ray_query_get_intersection_lss_hit_value_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetIntersectionLSSHitValueNV(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryGetIntersectionLSSHitValueNV(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7566,7 +7566,7 @@ inst_OpHitObjectGetSpherePositionNV :: #force_inline proc "contextless" (buf: []
 
 hit_object_get_sphere_position_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetSpherePositionNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetSpherePositionNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7578,7 +7578,7 @@ inst_OpHitObjectGetSphereRadiusNV :: #force_inline proc "contextless" (buf: []Op
 
 hit_object_get_sphere_radius_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetSphereRadiusNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetSphereRadiusNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7590,7 +7590,7 @@ inst_OpHitObjectGetLSSPositionsNV :: #force_inline proc "contextless" (buf: []Op
 
 hit_object_get_lss_positions_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetLSSPositionsNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetLSSPositionsNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7602,7 +7602,7 @@ inst_OpHitObjectGetLSSRadiiNV :: #force_inline proc "contextless" (buf: []Operan
 
 hit_object_get_lss_radii_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectGetLSSRadiiNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectGetLSSRadiiNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7614,7 +7614,7 @@ inst_OpHitObjectIsSphereHitNV :: #force_inline proc "contextless" (buf: []Operan
 
 hit_object_is_sphere_hit_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectIsSphereHitNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectIsSphereHitNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7626,7 +7626,7 @@ inst_OpHitObjectIsLSSHitNV :: #force_inline proc "contextless" (buf: []Operand, 
 
 hit_object_is_lss_hit_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpHitObjectIsLSSHitNV(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpHitObjectIsLSSHitNV(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7639,7 +7639,7 @@ inst_OpRayQueryIsSphereHitNV :: #force_inline proc "contextless" (buf: []Operand
 
 ray_query_is_sphere_hit_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryIsSphereHitNV(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryIsSphereHitNV(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7652,7 +7652,7 @@ inst_OpRayQueryIsLSSHitNV :: #force_inline proc "contextless" (buf: []Operand, r
 
 ray_query_is_lss_hit_nv :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryIsLSSHitNV(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryIsLSSHitNV(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7665,7 +7665,7 @@ inst_OpSubgroupShuffleINTEL :: #force_inline proc "contextless" (buf: []Operand,
 
 subgroup_shuffle_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupShuffleINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupShuffleINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7679,7 +7679,7 @@ inst_OpSubgroupShuffleDownINTEL :: #force_inline proc "contextless" (buf: []Oper
 
 subgroup_shuffle_down_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupShuffleDownINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpSubgroupShuffleDownINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -7693,7 +7693,7 @@ inst_OpSubgroupShuffleUpINTEL :: #force_inline proc "contextless" (buf: []Operan
 
 subgroup_shuffle_up_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupShuffleUpINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpSubgroupShuffleUpINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -7706,7 +7706,7 @@ inst_OpSubgroupShuffleXorINTEL :: #force_inline proc "contextless" (buf: []Opera
 
 subgroup_shuffle_xor_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupShuffleXorINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupShuffleXorINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7718,7 +7718,7 @@ inst_OpSubgroupBlockReadINTEL :: #force_inline proc "contextless" (buf: []Operan
 
 subgroup_block_read_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupBlockReadINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupBlockReadINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7730,7 +7730,7 @@ inst_OpSubgroupBlockWriteINTEL :: #force_inline proc "contextless" (buf: []Opera
 }
 
 subgroup_block_write_intel :: proc(b: ^Builder, op1: Id, op2: Id) {
-	append(&b.ops, inst_OpSubgroupBlockWriteINTEL(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupBlockWriteINTEL(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpSubgroupImageBlockReadINTEL :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id) -> Operation {
@@ -7742,7 +7742,7 @@ inst_OpSubgroupImageBlockReadINTEL :: #force_inline proc "contextless" (buf: []O
 
 subgroup_image_block_read_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupImageBlockReadINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupImageBlockReadINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7755,7 +7755,7 @@ inst_OpSubgroupImageBlockWriteINTEL :: #force_inline proc "contextless" (buf: []
 }
 
 subgroup_image_block_write_intel :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id) {
-	append(&b.ops, inst_OpSubgroupImageBlockWriteINTEL(opbuf(b, 1 + 1 + 1), op1, op2, op3))
+	append_elem(&b.ops, inst_OpSubgroupImageBlockWriteINTEL(opbuf(b, 1 + 1 + 1), op1, op2, op3))
 }
 
 inst_OpSubgroupImageMediaBlockReadINTEL :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id, op3: Id, op4: Id) -> Operation {
@@ -7769,7 +7769,7 @@ inst_OpSubgroupImageMediaBlockReadINTEL :: #force_inline proc "contextless" (buf
 
 subgroup_image_media_block_read_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupImageMediaBlockReadINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpSubgroupImageMediaBlockReadINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -7784,7 +7784,7 @@ inst_OpSubgroupImageMediaBlockWriteINTEL :: #force_inline proc "contextless" (bu
 }
 
 subgroup_image_media_block_write_intel :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) {
-	append(&b.ops, inst_OpSubgroupImageMediaBlockWriteINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpSubgroupImageMediaBlockWriteINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5))
 }
 
 inst_OpUCountLeadingZerosINTEL :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id) -> Operation {
@@ -7795,7 +7795,7 @@ inst_OpUCountLeadingZerosINTEL :: #force_inline proc "contextless" (buf: []Opera
 
 u_count_leading_zeros_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUCountLeadingZerosINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpUCountLeadingZerosINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7807,7 +7807,7 @@ inst_OpUCountTrailingZerosINTEL :: #force_inline proc "contextless" (buf: []Oper
 
 u_count_trailing_zeros_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUCountTrailingZerosINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpUCountTrailingZerosINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7820,7 +7820,7 @@ inst_OpAbsISubINTEL :: #force_inline proc "contextless" (buf: []Operand, result_
 
 abs_i_sub_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAbsISubINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpAbsISubINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7833,7 +7833,7 @@ inst_OpAbsUSubINTEL :: #force_inline proc "contextless" (buf: []Operand, result_
 
 abs_u_sub_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAbsUSubINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpAbsUSubINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7846,7 +7846,7 @@ inst_OpIAddSatINTEL :: #force_inline proc "contextless" (buf: []Operand, result_
 
 i_add_sat_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpIAddSatINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpIAddSatINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7859,7 +7859,7 @@ inst_OpUAddSatINTEL :: #force_inline proc "contextless" (buf: []Operand, result_
 
 u_add_sat_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUAddSatINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpUAddSatINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7872,7 +7872,7 @@ inst_OpIAverageINTEL :: #force_inline proc "contextless" (buf: []Operand, result
 
 i_average_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpIAverageINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpIAverageINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7885,7 +7885,7 @@ inst_OpUAverageINTEL :: #force_inline proc "contextless" (buf: []Operand, result
 
 u_average_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUAverageINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpUAverageINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7898,7 +7898,7 @@ inst_OpIAverageRoundedINTEL :: #force_inline proc "contextless" (buf: []Operand,
 
 i_average_rounded_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpIAverageRoundedINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpIAverageRoundedINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7911,7 +7911,7 @@ inst_OpUAverageRoundedINTEL :: #force_inline proc "contextless" (buf: []Operand,
 
 u_average_rounded_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUAverageRoundedINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpUAverageRoundedINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7924,7 +7924,7 @@ inst_OpISubSatINTEL :: #force_inline proc "contextless" (buf: []Operand, result_
 
 i_sub_sat_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpISubSatINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpISubSatINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7937,7 +7937,7 @@ inst_OpUSubSatINTEL :: #force_inline proc "contextless" (buf: []Operand, result_
 
 u_sub_sat_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUSubSatINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpUSubSatINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7950,7 +7950,7 @@ inst_OpIMul32x16INTEL :: #force_inline proc "contextless" (buf: []Operand, resul
 
 i_mul32x16_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpIMul32x16INTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpIMul32x16INTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7963,7 +7963,7 @@ inst_OpUMul32x16INTEL :: #force_inline proc "contextless" (buf: []Operand, resul
 
 u_mul32x16_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUMul32x16INTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpUMul32x16INTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -7975,7 +7975,7 @@ inst_OpConstantFunctionPointerINTEL :: #force_inline proc "contextless" (buf: []
 
 constant_function_pointer_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConstantFunctionPointerINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConstantFunctionPointerINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -7987,7 +7987,7 @@ inst_OpFunctionPointerCallINTEL :: #force_inline proc "contextless" (buf: []Oper
 
 function_pointer_call_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFunctionPointerCallINTEL(opbuf(b, len(op1)), result_type, r, op1))
+	append_elem(&b.ops, inst_OpFunctionPointerCallINTEL(opbuf(b, len(op1)), result_type, r, op1))
 	return r
 }
 
@@ -7999,7 +7999,7 @@ inst_OpAsmTargetINTEL :: #force_inline proc "contextless" (buf: []Operand, resul
 
 asm_target_intel :: proc(b: ^Builder, op1: string) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAsmTargetINTEL(opbuf(b, (len(op1) + 4) / 4), r, op1))
+	append_elem(&b.ops, inst_OpAsmTargetINTEL(opbuf(b, (len(op1) + 4) / 4), r, op1))
 	return r
 }
 
@@ -8014,7 +8014,7 @@ inst_OpAsmINTEL :: #force_inline proc "contextless" (buf: []Operand, result_type
 
 asm_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: string, op4: string) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAsmINTEL(opbuf(b, 1 + 1 + (len(op3) + 4) / 4 + (len(op4) + 4) / 4), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpAsmINTEL(opbuf(b, 1 + 1 + (len(op3) + 4) / 4 + (len(op4) + 4) / 4), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -8027,7 +8027,7 @@ inst_OpAsmCallINTEL :: #force_inline proc "contextless" (buf: []Operand, result_
 
 asm_call_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAsmCallINTEL(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpAsmCallINTEL(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
 	return r
 }
 
@@ -8042,7 +8042,7 @@ inst_OpAtomicFMinEXT :: #force_inline proc "contextless" (buf: []Operand, result
 
 atomic_f_min_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAtomicFMinEXT(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpAtomicFMinEXT(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -8057,7 +8057,7 @@ inst_OpAtomicFMaxEXT :: #force_inline proc "contextless" (buf: []Operand, result
 
 atomic_f_max_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAtomicFMaxEXT(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpAtomicFMaxEXT(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -8068,7 +8068,7 @@ inst_OpAssumeTrueKHR :: #force_inline proc "contextless" (buf: []Operand, op1: I
 }
 
 assume_true_khr :: proc(b: ^Builder, op1: Id) {
-	append(&b.ops, inst_OpAssumeTrueKHR(opbuf(b, 1), op1))
+	append_elem(&b.ops, inst_OpAssumeTrueKHR(opbuf(b, 1), op1))
 }
 
 inst_OpExpectKHR :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id) -> Operation {
@@ -8080,7 +8080,7 @@ inst_OpExpectKHR :: #force_inline proc "contextless" (buf: []Operand, result_typ
 
 expect_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpExpectKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpExpectKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -8092,7 +8092,7 @@ inst_OpDecorateString :: #force_inline proc "contextless" (buf: []Operand, op1: 
 }
 
 decorate_string :: proc(b: ^Builder, op1: Id, op2: Decoration) {
-	append(&b.ops, inst_OpDecorateString(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpDecorateString(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpMemberDecorateString :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: i64, op3: Decoration) -> Operation {
@@ -8104,7 +8104,7 @@ inst_OpMemberDecorateString :: #force_inline proc "contextless" (buf: []Operand,
 }
 
 member_decorate_string :: proc(b: ^Builder, op1: Id, op2: i64, op3: Decoration) {
-	append(&b.ops, inst_OpMemberDecorateString(opbuf(b, 1 + 1 + 1), op1, op2, op3))
+	append_elem(&b.ops, inst_OpMemberDecorateString(opbuf(b, 1 + 1 + 1), op1, op2, op3))
 }
 
 inst_OpVmeImageINTEL :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id) -> Operation {
@@ -8116,7 +8116,7 @@ inst_OpVmeImageINTEL :: #force_inline proc "contextless" (buf: []Operand, result
 
 vme_image_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpVmeImageINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpVmeImageINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -8128,7 +8128,7 @@ inst_OpTypeVmeImageINTEL :: #force_inline proc "contextless" (buf: []Operand, re
 
 type_vme_image_intel :: proc(b: ^Builder, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeVmeImageINTEL(opbuf(b, 1), r, op1))
+	append_elem(&b.ops, inst_OpTypeVmeImageINTEL(opbuf(b, 1), r, op1))
 	return r
 }
 
@@ -8138,7 +8138,7 @@ inst_OpTypeAvcImePayloadINTEL :: #force_inline proc "contextless" (result: Id) -
 
 type_avc_ime_payload_intel :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeAvcImePayloadINTEL(r))
+	append_elem(&b.ops, inst_OpTypeAvcImePayloadINTEL(r))
 	return r
 }
 
@@ -8148,7 +8148,7 @@ inst_OpTypeAvcRefPayloadINTEL :: #force_inline proc "contextless" (result: Id) -
 
 type_avc_ref_payload_intel :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeAvcRefPayloadINTEL(r))
+	append_elem(&b.ops, inst_OpTypeAvcRefPayloadINTEL(r))
 	return r
 }
 
@@ -8158,7 +8158,7 @@ inst_OpTypeAvcSicPayloadINTEL :: #force_inline proc "contextless" (result: Id) -
 
 type_avc_sic_payload_intel :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeAvcSicPayloadINTEL(r))
+	append_elem(&b.ops, inst_OpTypeAvcSicPayloadINTEL(r))
 	return r
 }
 
@@ -8168,7 +8168,7 @@ inst_OpTypeAvcMcePayloadINTEL :: #force_inline proc "contextless" (result: Id) -
 
 type_avc_mce_payload_intel :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeAvcMcePayloadINTEL(r))
+	append_elem(&b.ops, inst_OpTypeAvcMcePayloadINTEL(r))
 	return r
 }
 
@@ -8178,7 +8178,7 @@ inst_OpTypeAvcMceResultINTEL :: #force_inline proc "contextless" (result: Id) ->
 
 type_avc_mce_result_intel :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeAvcMceResultINTEL(r))
+	append_elem(&b.ops, inst_OpTypeAvcMceResultINTEL(r))
 	return r
 }
 
@@ -8188,7 +8188,7 @@ inst_OpTypeAvcImeResultINTEL :: #force_inline proc "contextless" (result: Id) ->
 
 type_avc_ime_result_intel :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeAvcImeResultINTEL(r))
+	append_elem(&b.ops, inst_OpTypeAvcImeResultINTEL(r))
 	return r
 }
 
@@ -8198,7 +8198,7 @@ inst_OpTypeAvcImeResultSingleReferenceStreamoutINTEL :: #force_inline proc "cont
 
 type_avc_ime_result_single_reference_streamout_intel :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeAvcImeResultSingleReferenceStreamoutINTEL(r))
+	append_elem(&b.ops, inst_OpTypeAvcImeResultSingleReferenceStreamoutINTEL(r))
 	return r
 }
 
@@ -8208,7 +8208,7 @@ inst_OpTypeAvcImeResultDualReferenceStreamoutINTEL :: #force_inline proc "contex
 
 type_avc_ime_result_dual_reference_streamout_intel :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeAvcImeResultDualReferenceStreamoutINTEL(r))
+	append_elem(&b.ops, inst_OpTypeAvcImeResultDualReferenceStreamoutINTEL(r))
 	return r
 }
 
@@ -8218,7 +8218,7 @@ inst_OpTypeAvcImeSingleReferenceStreaminINTEL :: #force_inline proc "contextless
 
 type_avc_ime_single_reference_streamin_intel :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeAvcImeSingleReferenceStreaminINTEL(r))
+	append_elem(&b.ops, inst_OpTypeAvcImeSingleReferenceStreaminINTEL(r))
 	return r
 }
 
@@ -8228,7 +8228,7 @@ inst_OpTypeAvcImeDualReferenceStreaminINTEL :: #force_inline proc "contextless" 
 
 type_avc_ime_dual_reference_streamin_intel :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeAvcImeDualReferenceStreaminINTEL(r))
+	append_elem(&b.ops, inst_OpTypeAvcImeDualReferenceStreaminINTEL(r))
 	return r
 }
 
@@ -8238,7 +8238,7 @@ inst_OpTypeAvcRefResultINTEL :: #force_inline proc "contextless" (result: Id) ->
 
 type_avc_ref_result_intel :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeAvcRefResultINTEL(r))
+	append_elem(&b.ops, inst_OpTypeAvcRefResultINTEL(r))
 	return r
 }
 
@@ -8248,7 +8248,7 @@ inst_OpTypeAvcSicResultINTEL :: #force_inline proc "contextless" (result: Id) ->
 
 type_avc_sic_result_intel :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeAvcSicResultINTEL(r))
+	append_elem(&b.ops, inst_OpTypeAvcSicResultINTEL(r))
 	return r
 }
 
@@ -8261,7 +8261,7 @@ inst_OpSubgroupAvcMceGetDefaultInterBaseMultiReferencePenaltyINTEL :: #force_inl
 
 subgroup_avc_mce_get_default_inter_base_multi_reference_penalty_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceGetDefaultInterBaseMultiReferencePenaltyINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceGetDefaultInterBaseMultiReferencePenaltyINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -8274,7 +8274,7 @@ inst_OpSubgroupAvcMceSetInterBaseMultiReferencePenaltyINTEL :: #force_inline pro
 
 subgroup_avc_mce_set_inter_base_multi_reference_penalty_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceSetInterBaseMultiReferencePenaltyINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceSetInterBaseMultiReferencePenaltyINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -8287,7 +8287,7 @@ inst_OpSubgroupAvcMceGetDefaultInterShapePenaltyINTEL :: #force_inline proc "con
 
 subgroup_avc_mce_get_default_inter_shape_penalty_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceGetDefaultInterShapePenaltyINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceGetDefaultInterShapePenaltyINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -8300,7 +8300,7 @@ inst_OpSubgroupAvcMceSetInterShapePenaltyINTEL :: #force_inline proc "contextles
 
 subgroup_avc_mce_set_inter_shape_penalty_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceSetInterShapePenaltyINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceSetInterShapePenaltyINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -8313,7 +8313,7 @@ inst_OpSubgroupAvcMceGetDefaultInterDirectionPenaltyINTEL :: #force_inline proc 
 
 subgroup_avc_mce_get_default_inter_direction_penalty_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceGetDefaultInterDirectionPenaltyINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceGetDefaultInterDirectionPenaltyINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -8326,7 +8326,7 @@ inst_OpSubgroupAvcMceSetInterDirectionPenaltyINTEL :: #force_inline proc "contex
 
 subgroup_avc_mce_set_inter_direction_penalty_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceSetInterDirectionPenaltyINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceSetInterDirectionPenaltyINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -8339,7 +8339,7 @@ inst_OpSubgroupAvcMceGetDefaultIntraLumaShapePenaltyINTEL :: #force_inline proc 
 
 subgroup_avc_mce_get_default_intra_luma_shape_penalty_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceGetDefaultIntraLumaShapePenaltyINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceGetDefaultIntraLumaShapePenaltyINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -8352,7 +8352,7 @@ inst_OpSubgroupAvcMceGetDefaultInterMotionVectorCostTableINTEL :: #force_inline 
 
 subgroup_avc_mce_get_default_inter_motion_vector_cost_table_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceGetDefaultInterMotionVectorCostTableINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceGetDefaultInterMotionVectorCostTableINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -8362,7 +8362,7 @@ inst_OpSubgroupAvcMceGetDefaultHighPenaltyCostTableINTEL :: #force_inline proc "
 
 subgroup_avc_mce_get_default_high_penalty_cost_table_intel :: proc(b: ^Builder, result_type: Type_Ref) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceGetDefaultHighPenaltyCostTableINTEL(result_type, r))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceGetDefaultHighPenaltyCostTableINTEL(result_type, r))
 	return r
 }
 
@@ -8372,7 +8372,7 @@ inst_OpSubgroupAvcMceGetDefaultMediumPenaltyCostTableINTEL :: #force_inline proc
 
 subgroup_avc_mce_get_default_medium_penalty_cost_table_intel :: proc(b: ^Builder, result_type: Type_Ref) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceGetDefaultMediumPenaltyCostTableINTEL(result_type, r))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceGetDefaultMediumPenaltyCostTableINTEL(result_type, r))
 	return r
 }
 
@@ -8382,7 +8382,7 @@ inst_OpSubgroupAvcMceGetDefaultLowPenaltyCostTableINTEL :: #force_inline proc "c
 
 subgroup_avc_mce_get_default_low_penalty_cost_table_intel :: proc(b: ^Builder, result_type: Type_Ref) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceGetDefaultLowPenaltyCostTableINTEL(result_type, r))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceGetDefaultLowPenaltyCostTableINTEL(result_type, r))
 	return r
 }
 
@@ -8397,7 +8397,7 @@ inst_OpSubgroupAvcMceSetMotionVectorCostFunctionINTEL :: #force_inline proc "con
 
 subgroup_avc_mce_set_motion_vector_cost_function_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceSetMotionVectorCostFunctionINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceSetMotionVectorCostFunctionINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -8410,7 +8410,7 @@ inst_OpSubgroupAvcMceGetDefaultIntraLumaModePenaltyINTEL :: #force_inline proc "
 
 subgroup_avc_mce_get_default_intra_luma_mode_penalty_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceGetDefaultIntraLumaModePenaltyINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceGetDefaultIntraLumaModePenaltyINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -8420,7 +8420,7 @@ inst_OpSubgroupAvcMceGetDefaultNonDcLumaIntraPenaltyINTEL :: #force_inline proc 
 
 subgroup_avc_mce_get_default_non_dc_luma_intra_penalty_intel :: proc(b: ^Builder, result_type: Type_Ref) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceGetDefaultNonDcLumaIntraPenaltyINTEL(result_type, r))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceGetDefaultNonDcLumaIntraPenaltyINTEL(result_type, r))
 	return r
 }
 
@@ -8430,7 +8430,7 @@ inst_OpSubgroupAvcMceGetDefaultIntraChromaModeBasePenaltyINTEL :: #force_inline 
 
 subgroup_avc_mce_get_default_intra_chroma_mode_base_penalty_intel :: proc(b: ^Builder, result_type: Type_Ref) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceGetDefaultIntraChromaModeBasePenaltyINTEL(result_type, r))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceGetDefaultIntraChromaModeBasePenaltyINTEL(result_type, r))
 	return r
 }
 
@@ -8442,7 +8442,7 @@ inst_OpSubgroupAvcMceSetAcOnlyHaarINTEL :: #force_inline proc "contextless" (buf
 
 subgroup_avc_mce_set_ac_only_haar_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceSetAcOnlyHaarINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceSetAcOnlyHaarINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8455,7 +8455,7 @@ inst_OpSubgroupAvcMceSetSourceInterlacedFieldPolarityINTEL :: #force_inline proc
 
 subgroup_avc_mce_set_source_interlaced_field_polarity_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceSetSourceInterlacedFieldPolarityINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceSetSourceInterlacedFieldPolarityINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -8468,7 +8468,7 @@ inst_OpSubgroupAvcMceSetSingleReferenceInterlacedFieldPolarityINTEL :: #force_in
 
 subgroup_avc_mce_set_single_reference_interlaced_field_polarity_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceSetSingleReferenceInterlacedFieldPolarityINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceSetSingleReferenceInterlacedFieldPolarityINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -8482,7 +8482,7 @@ inst_OpSubgroupAvcMceSetDualReferenceInterlacedFieldPolaritiesINTEL :: #force_in
 
 subgroup_avc_mce_set_dual_reference_interlaced_field_polarities_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceSetDualReferenceInterlacedFieldPolaritiesINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceSetDualReferenceInterlacedFieldPolaritiesINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -8494,7 +8494,7 @@ inst_OpSubgroupAvcMceConvertToImePayloadINTEL :: #force_inline proc "contextless
 
 subgroup_avc_mce_convert_to_ime_payload_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceConvertToImePayloadINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceConvertToImePayloadINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8506,7 +8506,7 @@ inst_OpSubgroupAvcMceConvertToImeResultINTEL :: #force_inline proc "contextless"
 
 subgroup_avc_mce_convert_to_ime_result_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceConvertToImeResultINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceConvertToImeResultINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8518,7 +8518,7 @@ inst_OpSubgroupAvcMceConvertToRefPayloadINTEL :: #force_inline proc "contextless
 
 subgroup_avc_mce_convert_to_ref_payload_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceConvertToRefPayloadINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceConvertToRefPayloadINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8530,7 +8530,7 @@ inst_OpSubgroupAvcMceConvertToRefResultINTEL :: #force_inline proc "contextless"
 
 subgroup_avc_mce_convert_to_ref_result_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceConvertToRefResultINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceConvertToRefResultINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8542,7 +8542,7 @@ inst_OpSubgroupAvcMceConvertToSicPayloadINTEL :: #force_inline proc "contextless
 
 subgroup_avc_mce_convert_to_sic_payload_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceConvertToSicPayloadINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceConvertToSicPayloadINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8554,7 +8554,7 @@ inst_OpSubgroupAvcMceConvertToSicResultINTEL :: #force_inline proc "contextless"
 
 subgroup_avc_mce_convert_to_sic_result_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceConvertToSicResultINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceConvertToSicResultINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8566,7 +8566,7 @@ inst_OpSubgroupAvcMceGetMotionVectorsINTEL :: #force_inline proc "contextless" (
 
 subgroup_avc_mce_get_motion_vectors_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceGetMotionVectorsINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceGetMotionVectorsINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8578,7 +8578,7 @@ inst_OpSubgroupAvcMceGetInterDistortionsINTEL :: #force_inline proc "contextless
 
 subgroup_avc_mce_get_inter_distortions_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceGetInterDistortionsINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceGetInterDistortionsINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8590,7 +8590,7 @@ inst_OpSubgroupAvcMceGetBestInterDistortionsINTEL :: #force_inline proc "context
 
 subgroup_avc_mce_get_best_inter_distortions_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceGetBestInterDistortionsINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceGetBestInterDistortionsINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8602,7 +8602,7 @@ inst_OpSubgroupAvcMceGetInterMajorShapeINTEL :: #force_inline proc "contextless"
 
 subgroup_avc_mce_get_inter_major_shape_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceGetInterMajorShapeINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceGetInterMajorShapeINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8614,7 +8614,7 @@ inst_OpSubgroupAvcMceGetInterMinorShapeINTEL :: #force_inline proc "contextless"
 
 subgroup_avc_mce_get_inter_minor_shape_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceGetInterMinorShapeINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceGetInterMinorShapeINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8626,7 +8626,7 @@ inst_OpSubgroupAvcMceGetInterDirectionsINTEL :: #force_inline proc "contextless"
 
 subgroup_avc_mce_get_inter_directions_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceGetInterDirectionsINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceGetInterDirectionsINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8638,7 +8638,7 @@ inst_OpSubgroupAvcMceGetInterMotionVectorCountINTEL :: #force_inline proc "conte
 
 subgroup_avc_mce_get_inter_motion_vector_count_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceGetInterMotionVectorCountINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceGetInterMotionVectorCountINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8650,7 +8650,7 @@ inst_OpSubgroupAvcMceGetInterReferenceIdsINTEL :: #force_inline proc "contextles
 
 subgroup_avc_mce_get_inter_reference_ids_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceGetInterReferenceIdsINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceGetInterReferenceIdsINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8664,7 +8664,7 @@ inst_OpSubgroupAvcMceGetInterReferenceInterlacedFieldPolaritiesINTEL :: #force_i
 
 subgroup_avc_mce_get_inter_reference_interlaced_field_polarities_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcMceGetInterReferenceInterlacedFieldPolaritiesINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpSubgroupAvcMceGetInterReferenceInterlacedFieldPolaritiesINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -8678,7 +8678,7 @@ inst_OpSubgroupAvcImeInitializeINTEL :: #force_inline proc "contextless" (buf: [
 
 subgroup_avc_ime_initialize_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeInitializeINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeInitializeINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -8692,7 +8692,7 @@ inst_OpSubgroupAvcImeSetSingleReferenceINTEL :: #force_inline proc "contextless"
 
 subgroup_avc_ime_set_single_reference_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeSetSingleReferenceINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeSetSingleReferenceINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -8707,7 +8707,7 @@ inst_OpSubgroupAvcImeSetDualReferenceINTEL :: #force_inline proc "contextless" (
 
 subgroup_avc_ime_set_dual_reference_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeSetDualReferenceINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeSetDualReferenceINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -8720,7 +8720,7 @@ inst_OpSubgroupAvcImeRefWindowSizeINTEL :: #force_inline proc "contextless" (buf
 
 subgroup_avc_ime_ref_window_size_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeRefWindowSizeINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeRefWindowSizeINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -8735,7 +8735,7 @@ inst_OpSubgroupAvcImeAdjustRefOffsetINTEL :: #force_inline proc "contextless" (b
 
 subgroup_avc_ime_adjust_ref_offset_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeAdjustRefOffsetINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeAdjustRefOffsetINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -8747,7 +8747,7 @@ inst_OpSubgroupAvcImeConvertToMcePayloadINTEL :: #force_inline proc "contextless
 
 subgroup_avc_ime_convert_to_mce_payload_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeConvertToMcePayloadINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeConvertToMcePayloadINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8760,7 +8760,7 @@ inst_OpSubgroupAvcImeSetMaxMotionVectorCountINTEL :: #force_inline proc "context
 
 subgroup_avc_ime_set_max_motion_vector_count_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeSetMaxMotionVectorCountINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeSetMaxMotionVectorCountINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -8772,7 +8772,7 @@ inst_OpSubgroupAvcImeSetUnidirectionalMixDisableINTEL :: #force_inline proc "con
 
 subgroup_avc_ime_set_unidirectional_mix_disable_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeSetUnidirectionalMixDisableINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeSetUnidirectionalMixDisableINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8785,7 +8785,7 @@ inst_OpSubgroupAvcImeSetEarlySearchTerminationThresholdINTEL :: #force_inline pr
 
 subgroup_avc_ime_set_early_search_termination_threshold_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeSetEarlySearchTerminationThresholdINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeSetEarlySearchTerminationThresholdINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -8798,7 +8798,7 @@ inst_OpSubgroupAvcImeSetWeightedSadINTEL :: #force_inline proc "contextless" (bu
 
 subgroup_avc_ime_set_weighted_sad_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeSetWeightedSadINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeSetWeightedSadINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -8812,7 +8812,7 @@ inst_OpSubgroupAvcImeEvaluateWithSingleReferenceINTEL :: #force_inline proc "con
 
 subgroup_avc_ime_evaluate_with_single_reference_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeEvaluateWithSingleReferenceINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeEvaluateWithSingleReferenceINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -8827,7 +8827,7 @@ inst_OpSubgroupAvcImeEvaluateWithDualReferenceINTEL :: #force_inline proc "conte
 
 subgroup_avc_ime_evaluate_with_dual_reference_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeEvaluateWithDualReferenceINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeEvaluateWithDualReferenceINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -8842,7 +8842,7 @@ inst_OpSubgroupAvcImeEvaluateWithSingleReferenceStreaminINTEL :: #force_inline p
 
 subgroup_avc_ime_evaluate_with_single_reference_streamin_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeEvaluateWithSingleReferenceStreaminINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeEvaluateWithSingleReferenceStreaminINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -8858,7 +8858,7 @@ inst_OpSubgroupAvcImeEvaluateWithDualReferenceStreaminINTEL :: #force_inline pro
 
 subgroup_avc_ime_evaluate_with_dual_reference_streamin_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeEvaluateWithDualReferenceStreaminINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeEvaluateWithDualReferenceStreaminINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -8872,7 +8872,7 @@ inst_OpSubgroupAvcImeEvaluateWithSingleReferenceStreamoutINTEL :: #force_inline 
 
 subgroup_avc_ime_evaluate_with_single_reference_streamout_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeEvaluateWithSingleReferenceStreamoutINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeEvaluateWithSingleReferenceStreamoutINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -8887,7 +8887,7 @@ inst_OpSubgroupAvcImeEvaluateWithDualReferenceStreamoutINTEL :: #force_inline pr
 
 subgroup_avc_ime_evaluate_with_dual_reference_streamout_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeEvaluateWithDualReferenceStreamoutINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeEvaluateWithDualReferenceStreamoutINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -8902,7 +8902,7 @@ inst_OpSubgroupAvcImeEvaluateWithSingleReferenceStreaminoutINTEL :: #force_inlin
 
 subgroup_avc_ime_evaluate_with_single_reference_streaminout_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeEvaluateWithSingleReferenceStreaminoutINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeEvaluateWithSingleReferenceStreaminoutINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -8918,7 +8918,7 @@ inst_OpSubgroupAvcImeEvaluateWithDualReferenceStreaminoutINTEL :: #force_inline 
 
 subgroup_avc_ime_evaluate_with_dual_reference_streaminout_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeEvaluateWithDualReferenceStreaminoutINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeEvaluateWithDualReferenceStreaminoutINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -8930,7 +8930,7 @@ inst_OpSubgroupAvcImeConvertToMceResultINTEL :: #force_inline proc "contextless"
 
 subgroup_avc_ime_convert_to_mce_result_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeConvertToMceResultINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeConvertToMceResultINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8942,7 +8942,7 @@ inst_OpSubgroupAvcImeGetSingleReferenceStreaminINTEL :: #force_inline proc "cont
 
 subgroup_avc_ime_get_single_reference_streamin_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeGetSingleReferenceStreaminINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeGetSingleReferenceStreaminINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8954,7 +8954,7 @@ inst_OpSubgroupAvcImeGetDualReferenceStreaminINTEL :: #force_inline proc "contex
 
 subgroup_avc_ime_get_dual_reference_streamin_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeGetDualReferenceStreaminINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeGetDualReferenceStreaminINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8966,7 +8966,7 @@ inst_OpSubgroupAvcImeStripSingleReferenceStreamoutINTEL :: #force_inline proc "c
 
 subgroup_avc_ime_strip_single_reference_streamout_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeStripSingleReferenceStreamoutINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeStripSingleReferenceStreamoutINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8978,7 +8978,7 @@ inst_OpSubgroupAvcImeStripDualReferenceStreamoutINTEL :: #force_inline proc "con
 
 subgroup_avc_ime_strip_dual_reference_streamout_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeStripDualReferenceStreamoutINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeStripDualReferenceStreamoutINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -8991,7 +8991,7 @@ inst_OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeMotionVectorsINTEL :: 
 
 subgroup_avc_ime_get_streamout_single_reference_major_shape_motion_vectors_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeMotionVectorsINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeMotionVectorsINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -9004,7 +9004,7 @@ inst_OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeDistortionsINTEL :: #f
 
 subgroup_avc_ime_get_streamout_single_reference_major_shape_distortions_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeDistortionsINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeDistortionsINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -9017,7 +9017,7 @@ inst_OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeReferenceIdsINTEL :: #
 
 subgroup_avc_ime_get_streamout_single_reference_major_shape_reference_ids_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeReferenceIdsINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeGetStreamoutSingleReferenceMajorShapeReferenceIdsINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -9031,7 +9031,7 @@ inst_OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeMotionVectorsINTEL :: #f
 
 subgroup_avc_ime_get_streamout_dual_reference_major_shape_motion_vectors_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeMotionVectorsINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeMotionVectorsINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -9045,7 +9045,7 @@ inst_OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeDistortionsINTEL :: #for
 
 subgroup_avc_ime_get_streamout_dual_reference_major_shape_distortions_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeDistortionsINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeDistortionsINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -9059,7 +9059,7 @@ inst_OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeReferenceIdsINTEL :: #fo
 
 subgroup_avc_ime_get_streamout_dual_reference_major_shape_reference_ids_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeReferenceIdsINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeGetStreamoutDualReferenceMajorShapeReferenceIdsINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -9072,7 +9072,7 @@ inst_OpSubgroupAvcImeGetBorderReachedINTEL :: #force_inline proc "contextless" (
 
 subgroup_avc_ime_get_border_reached_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeGetBorderReachedINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeGetBorderReachedINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -9084,7 +9084,7 @@ inst_OpSubgroupAvcImeGetTruncatedSearchIndicationINTEL :: #force_inline proc "co
 
 subgroup_avc_ime_get_truncated_search_indication_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeGetTruncatedSearchIndicationINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeGetTruncatedSearchIndicationINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -9096,7 +9096,7 @@ inst_OpSubgroupAvcImeGetUnidirectionalEarlySearchTerminationINTEL :: #force_inli
 
 subgroup_avc_ime_get_unidirectional_early_search_termination_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeGetUnidirectionalEarlySearchTerminationINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeGetUnidirectionalEarlySearchTerminationINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -9108,7 +9108,7 @@ inst_OpSubgroupAvcImeGetWeightingPatternMinimumMotionVectorINTEL :: #force_inlin
 
 subgroup_avc_ime_get_weighting_pattern_minimum_motion_vector_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeGetWeightingPatternMinimumMotionVectorINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeGetWeightingPatternMinimumMotionVectorINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -9120,7 +9120,7 @@ inst_OpSubgroupAvcImeGetWeightingPatternMinimumDistortionINTEL :: #force_inline 
 
 subgroup_avc_ime_get_weighting_pattern_minimum_distortion_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcImeGetWeightingPatternMinimumDistortionINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcImeGetWeightingPatternMinimumDistortionINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -9138,7 +9138,7 @@ inst_OpSubgroupAvcFmeInitializeINTEL :: #force_inline proc "contextless" (buf: [
 
 subgroup_avc_fme_initialize_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcFmeInitializeINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7))
+	append_elem(&b.ops, inst_OpSubgroupAvcFmeInitializeINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7))
 	return r
 }
 
@@ -9157,7 +9157,7 @@ inst_OpSubgroupAvcBmeInitializeINTEL :: #force_inline proc "contextless" (buf: [
 
 subgroup_avc_bme_initialize_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcBmeInitializeINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
+	append_elem(&b.ops, inst_OpSubgroupAvcBmeInitializeINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
 	return r
 }
 
@@ -9169,7 +9169,7 @@ inst_OpSubgroupAvcRefConvertToMcePayloadINTEL :: #force_inline proc "contextless
 
 subgroup_avc_ref_convert_to_mce_payload_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcRefConvertToMcePayloadINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcRefConvertToMcePayloadINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -9181,7 +9181,7 @@ inst_OpSubgroupAvcRefSetBidirectionalMixDisableINTEL :: #force_inline proc "cont
 
 subgroup_avc_ref_set_bidirectional_mix_disable_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcRefSetBidirectionalMixDisableINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcRefSetBidirectionalMixDisableINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -9193,7 +9193,7 @@ inst_OpSubgroupAvcRefSetBilinearFilterEnableINTEL :: #force_inline proc "context
 
 subgroup_avc_ref_set_bilinear_filter_enable_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcRefSetBilinearFilterEnableINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcRefSetBilinearFilterEnableINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -9207,7 +9207,7 @@ inst_OpSubgroupAvcRefEvaluateWithSingleReferenceINTEL :: #force_inline proc "con
 
 subgroup_avc_ref_evaluate_with_single_reference_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcRefEvaluateWithSingleReferenceINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpSubgroupAvcRefEvaluateWithSingleReferenceINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -9222,7 +9222,7 @@ inst_OpSubgroupAvcRefEvaluateWithDualReferenceINTEL :: #force_inline proc "conte
 
 subgroup_avc_ref_evaluate_with_dual_reference_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcRefEvaluateWithDualReferenceINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpSubgroupAvcRefEvaluateWithDualReferenceINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -9236,7 +9236,7 @@ inst_OpSubgroupAvcRefEvaluateWithMultiReferenceINTEL :: #force_inline proc "cont
 
 subgroup_avc_ref_evaluate_with_multi_reference_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcRefEvaluateWithMultiReferenceINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpSubgroupAvcRefEvaluateWithMultiReferenceINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -9251,7 +9251,7 @@ inst_OpSubgroupAvcRefEvaluateWithMultiReferenceInterlacedINTEL :: #force_inline 
 
 subgroup_avc_ref_evaluate_with_multi_reference_interlaced_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcRefEvaluateWithMultiReferenceInterlacedINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpSubgroupAvcRefEvaluateWithMultiReferenceInterlacedINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -9263,7 +9263,7 @@ inst_OpSubgroupAvcRefConvertToMceResultINTEL :: #force_inline proc "contextless"
 
 subgroup_avc_ref_convert_to_mce_result_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcRefConvertToMceResultINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcRefConvertToMceResultINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -9275,7 +9275,7 @@ inst_OpSubgroupAvcSicInitializeINTEL :: #force_inline proc "contextless" (buf: [
 
 subgroup_avc_sic_initialize_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicInitializeINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicInitializeINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -9292,7 +9292,7 @@ inst_OpSubgroupAvcSicConfigureSkcINTEL :: #force_inline proc "contextless" (buf:
 
 subgroup_avc_sic_configure_skc_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicConfigureSkcINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicConfigureSkcINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -9311,7 +9311,7 @@ inst_OpSubgroupAvcSicConfigureIpeLumaINTEL :: #force_inline proc "contextless" (
 
 subgroup_avc_sic_configure_ipe_luma_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicConfigureIpeLumaINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicConfigureIpeLumaINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
 	return r
 }
 
@@ -9333,7 +9333,7 @@ inst_OpSubgroupAvcSicConfigureIpeLumaChromaINTEL :: #force_inline proc "contextl
 
 subgroup_avc_sic_configure_ipe_luma_chroma_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id, op11: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicConfigureIpeLumaChromaINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicConfigureIpeLumaChromaINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8, op9, op10, op11))
 	return r
 }
 
@@ -9346,7 +9346,7 @@ inst_OpSubgroupAvcSicGetMotionVectorMaskINTEL :: #force_inline proc "contextless
 
 subgroup_avc_sic_get_motion_vector_mask_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicGetMotionVectorMaskINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicGetMotionVectorMaskINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -9358,7 +9358,7 @@ inst_OpSubgroupAvcSicConvertToMcePayloadINTEL :: #force_inline proc "contextless
 
 subgroup_avc_sic_convert_to_mce_payload_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicConvertToMcePayloadINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicConvertToMcePayloadINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -9371,7 +9371,7 @@ inst_OpSubgroupAvcSicSetIntraLumaShapePenaltyINTEL :: #force_inline proc "contex
 
 subgroup_avc_sic_set_intra_luma_shape_penalty_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicSetIntraLumaShapePenaltyINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicSetIntraLumaShapePenaltyINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -9386,7 +9386,7 @@ inst_OpSubgroupAvcSicSetIntraLumaModeCostFunctionINTEL :: #force_inline proc "co
 
 subgroup_avc_sic_set_intra_luma_mode_cost_function_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicSetIntraLumaModeCostFunctionINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicSetIntraLumaModeCostFunctionINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -9399,7 +9399,7 @@ inst_OpSubgroupAvcSicSetIntraChromaModeCostFunctionINTEL :: #force_inline proc "
 
 subgroup_avc_sic_set_intra_chroma_mode_cost_function_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicSetIntraChromaModeCostFunctionINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicSetIntraChromaModeCostFunctionINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -9411,7 +9411,7 @@ inst_OpSubgroupAvcSicSetBilinearFilterEnableINTEL :: #force_inline proc "context
 
 subgroup_avc_sic_set_bilinear_filter_enable_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicSetBilinearFilterEnableINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicSetBilinearFilterEnableINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -9424,7 +9424,7 @@ inst_OpSubgroupAvcSicSetSkcForwardTransformEnableINTEL :: #force_inline proc "co
 
 subgroup_avc_sic_set_skc_forward_transform_enable_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicSetSkcForwardTransformEnableINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicSetSkcForwardTransformEnableINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -9437,7 +9437,7 @@ inst_OpSubgroupAvcSicSetBlockBasedRawSkipSadINTEL :: #force_inline proc "context
 
 subgroup_avc_sic_set_block_based_raw_skip_sad_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicSetBlockBasedRawSkipSadINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicSetBlockBasedRawSkipSadINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -9450,7 +9450,7 @@ inst_OpSubgroupAvcSicEvaluateIpeINTEL :: #force_inline proc "contextless" (buf: 
 
 subgroup_avc_sic_evaluate_ipe_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicEvaluateIpeINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicEvaluateIpeINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -9464,7 +9464,7 @@ inst_OpSubgroupAvcSicEvaluateWithSingleReferenceINTEL :: #force_inline proc "con
 
 subgroup_avc_sic_evaluate_with_single_reference_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicEvaluateWithSingleReferenceINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicEvaluateWithSingleReferenceINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -9479,7 +9479,7 @@ inst_OpSubgroupAvcSicEvaluateWithDualReferenceINTEL :: #force_inline proc "conte
 
 subgroup_avc_sic_evaluate_with_dual_reference_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicEvaluateWithDualReferenceINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicEvaluateWithDualReferenceINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -9493,7 +9493,7 @@ inst_OpSubgroupAvcSicEvaluateWithMultiReferenceINTEL :: #force_inline proc "cont
 
 subgroup_avc_sic_evaluate_with_multi_reference_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicEvaluateWithMultiReferenceINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicEvaluateWithMultiReferenceINTEL(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -9508,7 +9508,7 @@ inst_OpSubgroupAvcSicEvaluateWithMultiReferenceInterlacedINTEL :: #force_inline 
 
 subgroup_avc_sic_evaluate_with_multi_reference_interlaced_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicEvaluateWithMultiReferenceInterlacedINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicEvaluateWithMultiReferenceInterlacedINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -9520,7 +9520,7 @@ inst_OpSubgroupAvcSicConvertToMceResultINTEL :: #force_inline proc "contextless"
 
 subgroup_avc_sic_convert_to_mce_result_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicConvertToMceResultINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicConvertToMceResultINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -9532,7 +9532,7 @@ inst_OpSubgroupAvcSicGetIpeLumaShapeINTEL :: #force_inline proc "contextless" (b
 
 subgroup_avc_sic_get_ipe_luma_shape_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicGetIpeLumaShapeINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicGetIpeLumaShapeINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -9544,7 +9544,7 @@ inst_OpSubgroupAvcSicGetBestIpeLumaDistortionINTEL :: #force_inline proc "contex
 
 subgroup_avc_sic_get_best_ipe_luma_distortion_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicGetBestIpeLumaDistortionINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicGetBestIpeLumaDistortionINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -9556,7 +9556,7 @@ inst_OpSubgroupAvcSicGetBestIpeChromaDistortionINTEL :: #force_inline proc "cont
 
 subgroup_avc_sic_get_best_ipe_chroma_distortion_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicGetBestIpeChromaDistortionINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicGetBestIpeChromaDistortionINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -9568,7 +9568,7 @@ inst_OpSubgroupAvcSicGetPackedIpeLumaModesINTEL :: #force_inline proc "contextle
 
 subgroup_avc_sic_get_packed_ipe_luma_modes_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicGetPackedIpeLumaModesINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicGetPackedIpeLumaModesINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -9580,7 +9580,7 @@ inst_OpSubgroupAvcSicGetIpeChromaModeINTEL :: #force_inline proc "contextless" (
 
 subgroup_avc_sic_get_ipe_chroma_mode_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicGetIpeChromaModeINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicGetIpeChromaModeINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -9592,7 +9592,7 @@ inst_OpSubgroupAvcSicGetPackedSkcLumaCountThresholdINTEL :: #force_inline proc "
 
 subgroup_avc_sic_get_packed_skc_luma_count_threshold_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicGetPackedSkcLumaCountThresholdINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicGetPackedSkcLumaCountThresholdINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -9604,7 +9604,7 @@ inst_OpSubgroupAvcSicGetPackedSkcLumaSumThresholdINTEL :: #force_inline proc "co
 
 subgroup_avc_sic_get_packed_skc_luma_sum_threshold_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicGetPackedSkcLumaSumThresholdINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicGetPackedSkcLumaSumThresholdINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -9616,7 +9616,7 @@ inst_OpSubgroupAvcSicGetInterRawSadsINTEL :: #force_inline proc "contextless" (b
 
 subgroup_avc_sic_get_inter_raw_sads_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupAvcSicGetInterRawSadsINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSubgroupAvcSicGetInterRawSadsINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -9628,7 +9628,7 @@ inst_OpVariableLengthArrayINTEL :: #force_inline proc "contextless" (buf: []Oper
 
 variable_length_array_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpVariableLengthArrayINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpVariableLengthArrayINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -9638,7 +9638,7 @@ inst_OpSaveMemoryINTEL :: #force_inline proc "contextless" (result_type: Type_Re
 
 save_memory_intel :: proc(b: ^Builder, result_type: Type_Ref) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSaveMemoryINTEL(result_type, r))
+	append_elem(&b.ops, inst_OpSaveMemoryINTEL(result_type, r))
 	return r
 }
 
@@ -9649,7 +9649,7 @@ inst_OpRestoreMemoryINTEL :: #force_inline proc "contextless" (buf: []Operand, o
 }
 
 restore_memory_intel :: proc(b: ^Builder, op1: Id) {
-	append(&b.ops, inst_OpRestoreMemoryINTEL(opbuf(b, 1), op1))
+	append_elem(&b.ops, inst_OpRestoreMemoryINTEL(opbuf(b, 1), op1))
 }
 
 inst_OpArbitraryFloatSinCosPiALTERA :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Operation {
@@ -9665,7 +9665,7 @@ inst_OpArbitraryFloatSinCosPiALTERA :: #force_inline proc "contextless" (buf: []
 
 arbitrary_float_sin_cos_pi_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatSinCosPiALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatSinCosPiALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -9682,7 +9682,7 @@ inst_OpArbitraryFloatCastALTERA :: #force_inline proc "contextless" (buf: []Oper
 
 arbitrary_float_cast_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatCastALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatCastALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -9699,7 +9699,7 @@ inst_OpArbitraryFloatCastFromIntALTERA :: #force_inline proc "contextless" (buf:
 
 arbitrary_float_cast_from_int_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatCastFromIntALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatCastFromIntALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -9716,7 +9716,7 @@ inst_OpArbitraryFloatCastToIntALTERA :: #force_inline proc "contextless" (buf: [
 
 arbitrary_float_cast_to_int_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatCastToIntALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatCastToIntALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -9735,7 +9735,7 @@ inst_OpArbitraryFloatAddALTERA :: #force_inline proc "contextless" (buf: []Opera
 
 arbitrary_float_add_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: Id, op4: i64, op5: i64, op6: i64, op7: i64, op8: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatAddALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
+	append_elem(&b.ops, inst_OpArbitraryFloatAddALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
 	return r
 }
 
@@ -9754,7 +9754,7 @@ inst_OpArbitraryFloatSubALTERA :: #force_inline proc "contextless" (buf: []Opera
 
 arbitrary_float_sub_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: Id, op4: i64, op5: i64, op6: i64, op7: i64, op8: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatSubALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
+	append_elem(&b.ops, inst_OpArbitraryFloatSubALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
 	return r
 }
 
@@ -9773,7 +9773,7 @@ inst_OpArbitraryFloatMulALTERA :: #force_inline proc "contextless" (buf: []Opera
 
 arbitrary_float_mul_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: Id, op4: i64, op5: i64, op6: i64, op7: i64, op8: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatMulALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
+	append_elem(&b.ops, inst_OpArbitraryFloatMulALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
 	return r
 }
 
@@ -9792,7 +9792,7 @@ inst_OpArbitraryFloatDivALTERA :: #force_inline proc "contextless" (buf: []Opera
 
 arbitrary_float_div_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: Id, op4: i64, op5: i64, op6: i64, op7: i64, op8: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatDivALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
+	append_elem(&b.ops, inst_OpArbitraryFloatDivALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
 	return r
 }
 
@@ -9807,7 +9807,7 @@ inst_OpArbitraryFloatGTALTERA :: #force_inline proc "contextless" (buf: []Operan
 
 arbitrary_float_gtaltera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: Id, op4: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatGTALTERA(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpArbitraryFloatGTALTERA(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -9822,7 +9822,7 @@ inst_OpArbitraryFloatGEALTERA :: #force_inline proc "contextless" (buf: []Operan
 
 arbitrary_float_gealtera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: Id, op4: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatGEALTERA(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpArbitraryFloatGEALTERA(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -9837,7 +9837,7 @@ inst_OpArbitraryFloatLTALTERA :: #force_inline proc "contextless" (buf: []Operan
 
 arbitrary_float_ltaltera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: Id, op4: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatLTALTERA(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpArbitraryFloatLTALTERA(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -9852,7 +9852,7 @@ inst_OpArbitraryFloatLEALTERA :: #force_inline proc "contextless" (buf: []Operan
 
 arbitrary_float_lealtera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: Id, op4: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatLEALTERA(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpArbitraryFloatLEALTERA(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -9867,7 +9867,7 @@ inst_OpArbitraryFloatEQALTERA :: #force_inline proc "contextless" (buf: []Operan
 
 arbitrary_float_eqaltera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: Id, op4: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatEQALTERA(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpArbitraryFloatEQALTERA(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -9884,7 +9884,7 @@ inst_OpArbitraryFloatRecipALTERA :: #force_inline proc "contextless" (buf: []Ope
 
 arbitrary_float_recip_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatRecipALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatRecipALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -9901,7 +9901,7 @@ inst_OpArbitraryFloatRSqrtALTERA :: #force_inline proc "contextless" (buf: []Ope
 
 arbitrary_float_r_sqrt_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatRSqrtALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatRSqrtALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -9918,7 +9918,7 @@ inst_OpArbitraryFloatCbrtALTERA :: #force_inline proc "contextless" (buf: []Oper
 
 arbitrary_float_cbrt_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatCbrtALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatCbrtALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -9937,7 +9937,7 @@ inst_OpArbitraryFloatHypotALTERA :: #force_inline proc "contextless" (buf: []Ope
 
 arbitrary_float_hypot_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: Id, op4: i64, op5: i64, op6: i64, op7: i64, op8: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatHypotALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
+	append_elem(&b.ops, inst_OpArbitraryFloatHypotALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
 	return r
 }
 
@@ -9954,7 +9954,7 @@ inst_OpArbitraryFloatSqrtALTERA :: #force_inline proc "contextless" (buf: []Oper
 
 arbitrary_float_sqrt_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatSqrtALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatSqrtALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -9971,7 +9971,7 @@ inst_OpArbitraryFloatLogINTEL :: #force_inline proc "contextless" (buf: []Operan
 
 arbitrary_float_log_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatLogINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatLogINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -9988,7 +9988,7 @@ inst_OpArbitraryFloatLog2INTEL :: #force_inline proc "contextless" (buf: []Opera
 
 arbitrary_float_log2_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatLog2INTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatLog2INTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10005,7 +10005,7 @@ inst_OpArbitraryFloatLog10INTEL :: #force_inline proc "contextless" (buf: []Oper
 
 arbitrary_float_log10_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatLog10INTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatLog10INTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10022,7 +10022,7 @@ inst_OpArbitraryFloatLog1pINTEL :: #force_inline proc "contextless" (buf: []Oper
 
 arbitrary_float_log1p_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatLog1pINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatLog1pINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10039,7 +10039,7 @@ inst_OpArbitraryFloatExpINTEL :: #force_inline proc "contextless" (buf: []Operan
 
 arbitrary_float_exp_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatExpINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatExpINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10056,7 +10056,7 @@ inst_OpArbitraryFloatExp2INTEL :: #force_inline proc "contextless" (buf: []Opera
 
 arbitrary_float_exp2_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatExp2INTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatExp2INTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10073,7 +10073,7 @@ inst_OpArbitraryFloatExp10INTEL :: #force_inline proc "contextless" (buf: []Oper
 
 arbitrary_float_exp10_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatExp10INTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatExp10INTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10090,7 +10090,7 @@ inst_OpArbitraryFloatExpm1INTEL :: #force_inline proc "contextless" (buf: []Oper
 
 arbitrary_float_expm1_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatExpm1INTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatExpm1INTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10107,7 +10107,7 @@ inst_OpArbitraryFloatSinINTEL :: #force_inline proc "contextless" (buf: []Operan
 
 arbitrary_float_sin_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatSinINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatSinINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10124,7 +10124,7 @@ inst_OpArbitraryFloatCosINTEL :: #force_inline proc "contextless" (buf: []Operan
 
 arbitrary_float_cos_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatCosINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatCosINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10141,7 +10141,7 @@ inst_OpArbitraryFloatSinCosINTEL :: #force_inline proc "contextless" (buf: []Ope
 
 arbitrary_float_sin_cos_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatSinCosINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatSinCosINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10158,7 +10158,7 @@ inst_OpArbitraryFloatSinPiINTEL :: #force_inline proc "contextless" (buf: []Oper
 
 arbitrary_float_sin_pi_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatSinPiINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatSinPiINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10175,7 +10175,7 @@ inst_OpArbitraryFloatCosPiINTEL :: #force_inline proc "contextless" (buf: []Oper
 
 arbitrary_float_cos_pi_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatCosPiINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatCosPiINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10192,7 +10192,7 @@ inst_OpArbitraryFloatASinINTEL :: #force_inline proc "contextless" (buf: []Opera
 
 arbitrary_float_a_sin_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatASinINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatASinINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10209,7 +10209,7 @@ inst_OpArbitraryFloatASinPiINTEL :: #force_inline proc "contextless" (buf: []Ope
 
 arbitrary_float_a_sin_pi_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatASinPiINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatASinPiINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10226,7 +10226,7 @@ inst_OpArbitraryFloatACosINTEL :: #force_inline proc "contextless" (buf: []Opera
 
 arbitrary_float_a_cos_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatACosINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatACosINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10243,7 +10243,7 @@ inst_OpArbitraryFloatACosPiINTEL :: #force_inline proc "contextless" (buf: []Ope
 
 arbitrary_float_a_cos_pi_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatACosPiINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatACosPiINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10260,7 +10260,7 @@ inst_OpArbitraryFloatATanINTEL :: #force_inline proc "contextless" (buf: []Opera
 
 arbitrary_float_a_tan_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatATanINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatATanINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10277,7 +10277,7 @@ inst_OpArbitraryFloatATanPiINTEL :: #force_inline proc "contextless" (buf: []Ope
 
 arbitrary_float_a_tan_pi_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatATanPiINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpArbitraryFloatATanPiINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10296,7 +10296,7 @@ inst_OpArbitraryFloatATan2INTEL :: #force_inline proc "contextless" (buf: []Oper
 
 arbitrary_float_a_tan2_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: Id, op4: i64, op5: i64, op6: i64, op7: i64, op8: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatATan2INTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
+	append_elem(&b.ops, inst_OpArbitraryFloatATan2INTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
 	return r
 }
 
@@ -10315,7 +10315,7 @@ inst_OpArbitraryFloatPowINTEL :: #force_inline proc "contextless" (buf: []Operan
 
 arbitrary_float_pow_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: Id, op4: i64, op5: i64, op6: i64, op7: i64, op8: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatPowINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
+	append_elem(&b.ops, inst_OpArbitraryFloatPowINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
 	return r
 }
 
@@ -10334,7 +10334,7 @@ inst_OpArbitraryFloatPowRINTEL :: #force_inline proc "contextless" (buf: []Opera
 
 arbitrary_float_pow_rintel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: Id, op4: i64, op5: i64, op6: i64, op7: i64, op8: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatPowRINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
+	append_elem(&b.ops, inst_OpArbitraryFloatPowRINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
 	return r
 }
 
@@ -10353,7 +10353,7 @@ inst_OpArbitraryFloatPowNINTEL :: #force_inline proc "contextless" (buf: []Opera
 
 arbitrary_float_pow_nintel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: Id, op4: i64, op5: i64, op6: i64, op7: i64, op8: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArbitraryFloatPowNINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
+	append_elem(&b.ops, inst_OpArbitraryFloatPowNINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6, op7, op8))
 	return r
 }
 
@@ -10364,7 +10364,7 @@ inst_OpLoopControlINTEL :: #force_inline proc "contextless" (buf: []Operand, op1
 }
 
 loop_control_intel :: proc(b: ^Builder, op1: []i64) {
-	append(&b.ops, inst_OpLoopControlINTEL(opbuf(b, len(op1)), op1))
+	append_elem(&b.ops, inst_OpLoopControlINTEL(opbuf(b, len(op1)), op1))
 }
 
 inst_OpAliasDomainDeclINTEL :: #force_inline proc "contextless" (buf: []Operand, result: Id, op1: Maybe(Id)) -> Operation {
@@ -10375,7 +10375,7 @@ inst_OpAliasDomainDeclINTEL :: #force_inline proc "contextless" (buf: []Operand,
 
 alias_domain_decl_intel :: proc(b: ^Builder, op1: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAliasDomainDeclINTEL(opbuf(b, 1), r, op1))
+	append_elem(&b.ops, inst_OpAliasDomainDeclINTEL(opbuf(b, 1), r, op1))
 	return r
 }
 
@@ -10388,7 +10388,7 @@ inst_OpAliasScopeDeclINTEL :: #force_inline proc "contextless" (buf: []Operand, 
 
 alias_scope_decl_intel :: proc(b: ^Builder, op1: Id, op2: Maybe(Id)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAliasScopeDeclINTEL(opbuf(b, 1 + 1), r, op1, op2))
+	append_elem(&b.ops, inst_OpAliasScopeDeclINTEL(opbuf(b, 1 + 1), r, op1, op2))
 	return r
 }
 
@@ -10400,7 +10400,7 @@ inst_OpAliasScopeListDeclINTEL :: #force_inline proc "contextless" (buf: []Opera
 
 alias_scope_list_decl_intel :: proc(b: ^Builder, op1: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAliasScopeListDeclINTEL(opbuf(b, len(op1)), r, op1))
+	append_elem(&b.ops, inst_OpAliasScopeListDeclINTEL(opbuf(b, len(op1)), r, op1))
 	return r
 }
 
@@ -10417,7 +10417,7 @@ inst_OpFixedSqrtALTERA :: #force_inline proc "contextless" (buf: []Operand, resu
 
 fixed_sqrt_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFixedSqrtALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpFixedSqrtALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10434,7 +10434,7 @@ inst_OpFixedRecipALTERA :: #force_inline proc "contextless" (buf: []Operand, res
 
 fixed_recip_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFixedRecipALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpFixedRecipALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10451,7 +10451,7 @@ inst_OpFixedRsqrtALTERA :: #force_inline proc "contextless" (buf: []Operand, res
 
 fixed_rsqrt_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFixedRsqrtALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpFixedRsqrtALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10468,7 +10468,7 @@ inst_OpFixedSinALTERA :: #force_inline proc "contextless" (buf: []Operand, resul
 
 fixed_sin_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFixedSinALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpFixedSinALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10485,7 +10485,7 @@ inst_OpFixedCosALTERA :: #force_inline proc "contextless" (buf: []Operand, resul
 
 fixed_cos_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFixedCosALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpFixedCosALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10502,7 +10502,7 @@ inst_OpFixedSinCosALTERA :: #force_inline proc "contextless" (buf: []Operand, re
 
 fixed_sin_cos_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFixedSinCosALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpFixedSinCosALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10519,7 +10519,7 @@ inst_OpFixedSinPiALTERA :: #force_inline proc "contextless" (buf: []Operand, res
 
 fixed_sin_pi_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFixedSinPiALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpFixedSinPiALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10536,7 +10536,7 @@ inst_OpFixedCosPiALTERA :: #force_inline proc "contextless" (buf: []Operand, res
 
 fixed_cos_pi_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFixedCosPiALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpFixedCosPiALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10553,7 +10553,7 @@ inst_OpFixedSinCosPiALTERA :: #force_inline proc "contextless" (buf: []Operand, 
 
 fixed_sin_cos_pi_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFixedSinCosPiALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpFixedSinCosPiALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10570,7 +10570,7 @@ inst_OpFixedLogALTERA :: #force_inline proc "contextless" (buf: []Operand, resul
 
 fixed_log_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFixedLogALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpFixedLogALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10587,7 +10587,7 @@ inst_OpFixedExpALTERA :: #force_inline proc "contextless" (buf: []Operand, resul
 
 fixed_exp_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64, op6: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFixedExpALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
+	append_elem(&b.ops, inst_OpFixedExpALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5, op6))
 	return r
 }
 
@@ -10599,7 +10599,7 @@ inst_OpPtrCastToCrossWorkgroupALTERA :: #force_inline proc "contextless" (buf: [
 
 ptr_cast_to_cross_workgroup_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpPtrCastToCrossWorkgroupALTERA(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpPtrCastToCrossWorkgroupALTERA(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -10611,7 +10611,7 @@ inst_OpCrossWorkgroupCastToPtrALTERA :: #force_inline proc "contextless" (buf: [
 
 cross_workgroup_cast_to_ptr_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpCrossWorkgroupCastToPtrALTERA(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpCrossWorkgroupCastToPtrALTERA(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -10625,7 +10625,7 @@ inst_OpReadPipeBlockingALTERA :: #force_inline proc "contextless" (buf: []Operan
 }
 
 read_pipe_blocking_altera :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id) {
-	append(&b.ops, inst_OpReadPipeBlockingALTERA(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpReadPipeBlockingALTERA(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
 }
 
 inst_OpWritePipeBlockingALTERA :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id) -> Operation {
@@ -10638,7 +10638,7 @@ inst_OpWritePipeBlockingALTERA :: #force_inline proc "contextless" (buf: []Opera
 }
 
 write_pipe_blocking_altera :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id) {
-	append(&b.ops, inst_OpWritePipeBlockingALTERA(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpWritePipeBlockingALTERA(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
 }
 
 inst_OpFPGARegALTERA :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id) -> Operation {
@@ -10649,7 +10649,7 @@ inst_OpFPGARegALTERA :: #force_inline proc "contextless" (buf: []Operand, result
 
 fpga_reg_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFPGARegALTERA(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpFPGARegALTERA(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -10661,7 +10661,7 @@ inst_OpRayQueryGetRayTMinKHR :: #force_inline proc "contextless" (buf: []Operand
 
 ray_query_get_ray_t_min_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetRayTMinKHR(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpRayQueryGetRayTMinKHR(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -10673,7 +10673,7 @@ inst_OpRayQueryGetRayFlagsKHR :: #force_inline proc "contextless" (buf: []Operan
 
 ray_query_get_ray_flags_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetRayFlagsKHR(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpRayQueryGetRayFlagsKHR(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -10686,7 +10686,7 @@ inst_OpRayQueryGetIntersectionTKHR :: #force_inline proc "contextless" (buf: []O
 
 ray_query_get_intersection_tkhr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetIntersectionTKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryGetIntersectionTKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -10699,7 +10699,7 @@ inst_OpRayQueryGetIntersectionInstanceCustomIndexKHR :: #force_inline proc "cont
 
 ray_query_get_intersection_instance_custom_index_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetIntersectionInstanceCustomIndexKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryGetIntersectionInstanceCustomIndexKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -10712,7 +10712,7 @@ inst_OpRayQueryGetIntersectionInstanceIdKHR :: #force_inline proc "contextless" 
 
 ray_query_get_intersection_instance_id_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetIntersectionInstanceIdKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryGetIntersectionInstanceIdKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -10725,7 +10725,7 @@ inst_OpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR :: #forc
 
 ray_query_get_intersection_instance_shader_binding_table_record_offset_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -10738,7 +10738,7 @@ inst_OpRayQueryGetIntersectionGeometryIndexKHR :: #force_inline proc "contextles
 
 ray_query_get_intersection_geometry_index_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetIntersectionGeometryIndexKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryGetIntersectionGeometryIndexKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -10751,7 +10751,7 @@ inst_OpRayQueryGetIntersectionPrimitiveIndexKHR :: #force_inline proc "contextle
 
 ray_query_get_intersection_primitive_index_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetIntersectionPrimitiveIndexKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryGetIntersectionPrimitiveIndexKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -10764,7 +10764,7 @@ inst_OpRayQueryGetIntersectionBarycentricsKHR :: #force_inline proc "contextless
 
 ray_query_get_intersection_barycentrics_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetIntersectionBarycentricsKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryGetIntersectionBarycentricsKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -10777,7 +10777,7 @@ inst_OpRayQueryGetIntersectionFrontFaceKHR :: #force_inline proc "contextless" (
 
 ray_query_get_intersection_front_face_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetIntersectionFrontFaceKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryGetIntersectionFrontFaceKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -10789,7 +10789,7 @@ inst_OpRayQueryGetIntersectionCandidateAABBOpaqueKHR :: #force_inline proc "cont
 
 ray_query_get_intersection_candidate_aabb_opaque_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetIntersectionCandidateAABBOpaqueKHR(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpRayQueryGetIntersectionCandidateAABBOpaqueKHR(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -10802,7 +10802,7 @@ inst_OpRayQueryGetIntersectionObjectRayDirectionKHR :: #force_inline proc "conte
 
 ray_query_get_intersection_object_ray_direction_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetIntersectionObjectRayDirectionKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryGetIntersectionObjectRayDirectionKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -10815,7 +10815,7 @@ inst_OpRayQueryGetIntersectionObjectRayOriginKHR :: #force_inline proc "contextl
 
 ray_query_get_intersection_object_ray_origin_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetIntersectionObjectRayOriginKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryGetIntersectionObjectRayOriginKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -10827,7 +10827,7 @@ inst_OpRayQueryGetWorldRayDirectionKHR :: #force_inline proc "contextless" (buf:
 
 ray_query_get_world_ray_direction_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetWorldRayDirectionKHR(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpRayQueryGetWorldRayDirectionKHR(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -10839,7 +10839,7 @@ inst_OpRayQueryGetWorldRayOriginKHR :: #force_inline proc "contextless" (buf: []
 
 ray_query_get_world_ray_origin_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetWorldRayOriginKHR(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpRayQueryGetWorldRayOriginKHR(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -10852,7 +10852,7 @@ inst_OpRayQueryGetIntersectionObjectToWorldKHR :: #force_inline proc "contextles
 
 ray_query_get_intersection_object_to_world_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetIntersectionObjectToWorldKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryGetIntersectionObjectToWorldKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -10865,7 +10865,7 @@ inst_OpRayQueryGetIntersectionWorldToObjectKHR :: #force_inline proc "contextles
 
 ray_query_get_intersection_world_to_object_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRayQueryGetIntersectionWorldToObjectKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpRayQueryGetIntersectionWorldToObjectKHR(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -10880,7 +10880,7 @@ inst_OpAtomicFAddEXT :: #force_inline proc "contextless" (buf: []Operand, result
 
 atomic_f_add_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpAtomicFAddEXT(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpAtomicFAddEXT(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -10892,7 +10892,7 @@ inst_OpTypeBufferSurfaceINTEL :: #force_inline proc "contextless" (buf: []Operan
 
 type_buffer_surface_intel :: proc(b: ^Builder, op1: Access_Qualifier) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeBufferSurfaceINTEL(opbuf(b, 1), r, op1))
+	append_elem(&b.ops, inst_OpTypeBufferSurfaceINTEL(opbuf(b, 1), r, op1))
 	return r
 }
 
@@ -10903,7 +10903,7 @@ inst_OpTypeStructContinuedINTEL :: #force_inline proc "contextless" (buf: []Oper
 }
 
 type_struct_continued_intel :: proc(b: ^Builder, op1: []Id) {
-	append(&b.ops, inst_OpTypeStructContinuedINTEL(opbuf(b, len(op1)), op1))
+	append_elem(&b.ops, inst_OpTypeStructContinuedINTEL(opbuf(b, len(op1)), op1))
 }
 
 inst_OpConstantCompositeContinuedINTEL :: #force_inline proc "contextless" (buf: []Operand, op1: []Id) -> Operation {
@@ -10913,7 +10913,7 @@ inst_OpConstantCompositeContinuedINTEL :: #force_inline proc "contextless" (buf:
 }
 
 constant_composite_continued_intel :: proc(b: ^Builder, op1: []Id) {
-	append(&b.ops, inst_OpConstantCompositeContinuedINTEL(opbuf(b, len(op1)), op1))
+	append_elem(&b.ops, inst_OpConstantCompositeContinuedINTEL(opbuf(b, len(op1)), op1))
 }
 
 inst_OpSpecConstantCompositeContinuedINTEL :: #force_inline proc "contextless" (buf: []Operand, op1: []Id) -> Operation {
@@ -10923,7 +10923,7 @@ inst_OpSpecConstantCompositeContinuedINTEL :: #force_inline proc "contextless" (
 }
 
 spec_constant_composite_continued_intel :: proc(b: ^Builder, op1: []Id) {
-	append(&b.ops, inst_OpSpecConstantCompositeContinuedINTEL(opbuf(b, len(op1)), op1))
+	append_elem(&b.ops, inst_OpSpecConstantCompositeContinuedINTEL(opbuf(b, len(op1)), op1))
 }
 
 inst_OpCompositeConstructContinuedINTEL :: #force_inline proc "contextless" (buf: []Operand, op1: []Id) -> Operation {
@@ -10933,7 +10933,7 @@ inst_OpCompositeConstructContinuedINTEL :: #force_inline proc "contextless" (buf
 }
 
 composite_construct_continued_intel :: proc(b: ^Builder, op1: []Id) {
-	append(&b.ops, inst_OpCompositeConstructContinuedINTEL(opbuf(b, len(op1)), op1))
+	append_elem(&b.ops, inst_OpCompositeConstructContinuedINTEL(opbuf(b, len(op1)), op1))
 }
 
 inst_OpConvertFToBF16INTEL :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id) -> Operation {
@@ -10944,7 +10944,7 @@ inst_OpConvertFToBF16INTEL :: #force_inline proc "contextless" (buf: []Operand, 
 
 convert_f_to_bf16_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConvertFToBF16INTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConvertFToBF16INTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -10956,7 +10956,7 @@ inst_OpConvertBF16ToFINTEL :: #force_inline proc "contextless" (buf: []Operand, 
 
 convert_bf16_to_fintel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConvertBF16ToFINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConvertBF16ToFINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -10969,7 +10969,7 @@ inst_OpControlBarrierArriveEXT :: #force_inline proc "contextless" (buf: []Opera
 }
 
 control_barrier_arrive_ext :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id) {
-	append(&b.ops, inst_OpControlBarrierArriveEXT(opbuf(b, 1 + 1 + 1), op1, op2, op3))
+	append_elem(&b.ops, inst_OpControlBarrierArriveEXT(opbuf(b, 1 + 1 + 1), op1, op2, op3))
 }
 
 inst_OpControlBarrierWaitEXT :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id) -> Operation {
@@ -10981,7 +10981,7 @@ inst_OpControlBarrierWaitEXT :: #force_inline proc "contextless" (buf: []Operand
 }
 
 control_barrier_wait_ext :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id) {
-	append(&b.ops, inst_OpControlBarrierWaitEXT(opbuf(b, 1 + 1 + 1), op1, op2, op3))
+	append_elem(&b.ops, inst_OpControlBarrierWaitEXT(opbuf(b, 1 + 1 + 1), op1, op2, op3))
 }
 
 inst_OpArithmeticFenceEXT :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id) -> Operation {
@@ -10992,7 +10992,7 @@ inst_OpArithmeticFenceEXT :: #force_inline proc "contextless" (buf: []Operand, r
 
 arithmetic_fence_ext :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpArithmeticFenceEXT(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpArithmeticFenceEXT(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -11008,7 +11008,7 @@ inst_OpTaskSequenceCreateALTERA :: #force_inline proc "contextless" (buf: []Oper
 
 task_sequence_create_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: i64, op4: i64, op5: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTaskSequenceCreateALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpTaskSequenceCreateALTERA(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -11020,7 +11020,7 @@ inst_OpTaskSequenceAsyncALTERA :: #force_inline proc "contextless" (buf: []Opera
 }
 
 task_sequence_async_altera :: proc(b: ^Builder, op1: Id, op2: []Id) {
-	append(&b.ops, inst_OpTaskSequenceAsyncALTERA(opbuf(b, 1 + len(op2)), op1, op2))
+	append_elem(&b.ops, inst_OpTaskSequenceAsyncALTERA(opbuf(b, 1 + len(op2)), op1, op2))
 }
 
 inst_OpTaskSequenceGetALTERA :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id) -> Operation {
@@ -11031,7 +11031,7 @@ inst_OpTaskSequenceGetALTERA :: #force_inline proc "contextless" (buf: []Operand
 
 task_sequence_get_altera :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTaskSequenceGetALTERA(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpTaskSequenceGetALTERA(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -11042,7 +11042,7 @@ inst_OpTaskSequenceReleaseALTERA :: #force_inline proc "contextless" (buf: []Ope
 }
 
 task_sequence_release_altera :: proc(b: ^Builder, op1: Id) {
-	append(&b.ops, inst_OpTaskSequenceReleaseALTERA(opbuf(b, 1), op1))
+	append_elem(&b.ops, inst_OpTaskSequenceReleaseALTERA(opbuf(b, 1), op1))
 }
 
 inst_OpTypeTaskSequenceALTERA :: #force_inline proc "contextless" (result: Id) -> Operation {
@@ -11051,7 +11051,7 @@ inst_OpTypeTaskSequenceALTERA :: #force_inline proc "contextless" (result: Id) -
 
 type_task_sequence_altera :: proc(b: ^Builder) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpTypeTaskSequenceALTERA(r))
+	append_elem(&b.ops, inst_OpTypeTaskSequenceALTERA(r))
 	return r
 }
 
@@ -11064,7 +11064,7 @@ inst_OpSubgroupBlockPrefetchINTEL :: #force_inline proc "contextless" (buf: []Op
 }
 
 subgroup_block_prefetch_intel :: proc(b: ^Builder, op1: Id, op2: Id, op3: Maybe(Memory_Access)) {
-	append(&b.ops, inst_OpSubgroupBlockPrefetchINTEL(opbuf(b, 1 + 1 + 1), op1, op2, op3))
+	append_elem(&b.ops, inst_OpSubgroupBlockPrefetchINTEL(opbuf(b, 1 + 1 + 1), op1, op2, op3))
 }
 
 inst_OpSubgroup2DBlockLoadINTEL :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id) -> Operation {
@@ -11083,7 +11083,7 @@ inst_OpSubgroup2DBlockLoadINTEL :: #force_inline proc "contextless" (buf: []Oper
 }
 
 subgroup2_d_block_load_intel :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id) {
-	append(&b.ops, inst_OpSubgroup2DBlockLoadINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10))
+	append_elem(&b.ops, inst_OpSubgroup2DBlockLoadINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10))
 }
 
 inst_OpSubgroup2DBlockLoadTransformINTEL :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id) -> Operation {
@@ -11102,7 +11102,7 @@ inst_OpSubgroup2DBlockLoadTransformINTEL :: #force_inline proc "contextless" (bu
 }
 
 subgroup2_d_block_load_transform_intel :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id) {
-	append(&b.ops, inst_OpSubgroup2DBlockLoadTransformINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10))
+	append_elem(&b.ops, inst_OpSubgroup2DBlockLoadTransformINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10))
 }
 
 inst_OpSubgroup2DBlockLoadTransposeINTEL :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id) -> Operation {
@@ -11121,7 +11121,7 @@ inst_OpSubgroup2DBlockLoadTransposeINTEL :: #force_inline proc "contextless" (bu
 }
 
 subgroup2_d_block_load_transpose_intel :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id) {
-	append(&b.ops, inst_OpSubgroup2DBlockLoadTransposeINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10))
+	append_elem(&b.ops, inst_OpSubgroup2DBlockLoadTransposeINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10))
 }
 
 inst_OpSubgroup2DBlockPrefetchINTEL :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id) -> Operation {
@@ -11139,7 +11139,7 @@ inst_OpSubgroup2DBlockPrefetchINTEL :: #force_inline proc "contextless" (buf: []
 }
 
 subgroup2_d_block_prefetch_intel :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id) {
-	append(&b.ops, inst_OpSubgroup2DBlockPrefetchINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9))
+	append_elem(&b.ops, inst_OpSubgroup2DBlockPrefetchINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9))
 }
 
 inst_OpSubgroup2DBlockStoreINTEL :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id) -> Operation {
@@ -11158,7 +11158,7 @@ inst_OpSubgroup2DBlockStoreINTEL :: #force_inline proc "contextless" (buf: []Ope
 }
 
 subgroup2_d_block_store_intel :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Id, op5: Id, op6: Id, op7: Id, op8: Id, op9: Id, op10: Id) {
-	append(&b.ops, inst_OpSubgroup2DBlockStoreINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10))
+	append_elem(&b.ops, inst_OpSubgroup2DBlockStoreINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1), op1, op2, op3, op4, op5, op6, op7, op8, op9, op10))
 }
 
 inst_OpSubgroupMatrixMultiplyAccumulateINTEL :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Id, op3: Id, op4: Id, op5: Maybe(Matrix_Multiply_Accumulate_Operands)) -> Operation {
@@ -11173,7 +11173,7 @@ inst_OpSubgroupMatrixMultiplyAccumulateINTEL :: #force_inline proc "contextless"
 
 subgroup_matrix_multiply_accumulate_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id, op5: Maybe(Matrix_Multiply_Accumulate_Operands)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSubgroupMatrixMultiplyAccumulateINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpSubgroupMatrixMultiplyAccumulateINTEL(opbuf(b, 1 + 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4, op5))
 	return r
 }
 
@@ -11188,7 +11188,7 @@ inst_OpBitwiseFunctionINTEL :: #force_inline proc "contextless" (buf: []Operand,
 
 bitwise_function_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpBitwiseFunctionINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpBitwiseFunctionINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -11201,7 +11201,7 @@ inst_OpUntypedVariableLengthArrayINTEL :: #force_inline proc "contextless" (buf:
 
 untyped_variable_length_array_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpUntypedVariableLengthArrayINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpUntypedVariableLengthArrayINTEL(opbuf(b, 1 + 1), result_type, r, op1, op2))
 	return r
 }
 
@@ -11213,7 +11213,7 @@ inst_OpConditionalExtensionINTEL :: #force_inline proc "contextless" (buf: []Ope
 }
 
 conditional_extension_intel :: proc(b: ^Builder, op1: Id, op2: string) {
-	append(&b.ops, inst_OpConditionalExtensionINTEL(opbuf(b, 1 + (len(op2) + 4) / 4), op1, op2))
+	append_elem(&b.ops, inst_OpConditionalExtensionINTEL(opbuf(b, 1 + (len(op2) + 4) / 4), op1, op2))
 }
 
 inst_OpConditionalEntryPointINTEL :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Execution_Model, op3: Id, op4: string, op5: []Id) -> Operation {
@@ -11227,7 +11227,7 @@ inst_OpConditionalEntryPointINTEL :: #force_inline proc "contextless" (buf: []Op
 }
 
 conditional_entry_point_intel :: proc(b: ^Builder, op1: Id, op2: Execution_Model, op3: Id, op4: string, op5: []Id) {
-	append(&b.ops, inst_OpConditionalEntryPointINTEL(opbuf(b, 1 + 1 + 1 + (len(op4) + 4) / 4 + len(op5)), op1, op2, op3, op4, op5))
+	append_elem(&b.ops, inst_OpConditionalEntryPointINTEL(opbuf(b, 1 + 1 + 1 + (len(op4) + 4) / 4 + len(op5)), op1, op2, op3, op4, op5))
 }
 
 inst_OpConditionalCapabilityINTEL :: #force_inline proc "contextless" (buf: []Operand, op1: Id, op2: Capability) -> Operation {
@@ -11238,7 +11238,7 @@ inst_OpConditionalCapabilityINTEL :: #force_inline proc "contextless" (buf: []Op
 }
 
 conditional_capability_intel :: proc(b: ^Builder, op1: Id, op2: Capability) {
-	append(&b.ops, inst_OpConditionalCapabilityINTEL(opbuf(b, 1 + 1), op1, op2))
+	append_elem(&b.ops, inst_OpConditionalCapabilityINTEL(opbuf(b, 1 + 1), op1, op2))
 }
 
 inst_OpSpecConstantTargetINTEL :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: i64, op2: []i64) -> Operation {
@@ -11250,7 +11250,7 @@ inst_OpSpecConstantTargetINTEL :: #force_inline proc "contextless" (buf: []Opera
 
 spec_constant_target_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: i64, op2: []i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSpecConstantTargetINTEL(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
+	append_elem(&b.ops, inst_OpSpecConstantTargetINTEL(opbuf(b, 1 + len(op2)), result_type, r, op1, op2))
 	return r
 }
 
@@ -11265,7 +11265,7 @@ inst_OpSpecConstantArchitectureINTEL :: #force_inline proc "contextless" (buf: [
 
 spec_constant_architecture_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: i64, op2: i64, op3: i64, op4: i64) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSpecConstantArchitectureINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpSpecConstantArchitectureINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -11277,7 +11277,7 @@ inst_OpSpecConstantCapabilitiesINTEL :: #force_inline proc "contextless" (buf: [
 
 spec_constant_capabilities_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: []Capability) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpSpecConstantCapabilitiesINTEL(opbuf(b, len(op1)), result_type, r, op1))
+	append_elem(&b.ops, inst_OpSpecConstantCapabilitiesINTEL(opbuf(b, len(op1)), result_type, r, op1))
 	return r
 }
 
@@ -11289,7 +11289,7 @@ inst_OpConditionalCopyObjectINTEL :: #force_inline proc "contextless" (buf: []Op
 
 conditional_copy_object_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: []Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConditionalCopyObjectINTEL(opbuf(b, len(op1)), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConditionalCopyObjectINTEL(opbuf(b, len(op1)), result_type, r, op1))
 	return r
 }
 
@@ -11304,7 +11304,7 @@ inst_OpPredicatedLoadINTEL :: #force_inline proc "contextless" (buf: []Operand, 
 
 predicated_load_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id, op4: Maybe(Memory_Access)) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpPredicatedLoadINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpPredicatedLoadINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -11318,7 +11318,7 @@ inst_OpPredicatedStoreINTEL :: #force_inline proc "contextless" (buf: []Operand,
 }
 
 predicated_store_intel :: proc(b: ^Builder, op1: Id, op2: Id, op3: Id, op4: Maybe(Memory_Access)) {
-	append(&b.ops, inst_OpPredicatedStoreINTEL(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpPredicatedStoreINTEL(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
 }
 
 inst_OpGroupIMulKHR :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id, op2: Group_Operation, op3: Id) -> Operation {
@@ -11331,7 +11331,7 @@ inst_OpGroupIMulKHR :: #force_inline proc "contextless" (buf: []Operand, result_
 
 group_i_mul_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupIMulKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupIMulKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -11345,7 +11345,7 @@ inst_OpGroupFMulKHR :: #force_inline proc "contextless" (buf: []Operand, result_
 
 group_f_mul_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupFMulKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupFMulKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -11359,7 +11359,7 @@ inst_OpGroupBitwiseAndKHR :: #force_inline proc "contextless" (buf: []Operand, r
 
 group_bitwise_and_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupBitwiseAndKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupBitwiseAndKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -11373,7 +11373,7 @@ inst_OpGroupBitwiseOrKHR :: #force_inline proc "contextless" (buf: []Operand, re
 
 group_bitwise_or_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupBitwiseOrKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupBitwiseOrKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -11387,7 +11387,7 @@ inst_OpGroupBitwiseXorKHR :: #force_inline proc "contextless" (buf: []Operand, r
 
 group_bitwise_xor_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupBitwiseXorKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupBitwiseXorKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -11401,7 +11401,7 @@ inst_OpGroupLogicalAndKHR :: #force_inline proc "contextless" (buf: []Operand, r
 
 group_logical_and_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupLogicalAndKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupLogicalAndKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -11415,7 +11415,7 @@ inst_OpGroupLogicalOrKHR :: #force_inline proc "contextless" (buf: []Operand, re
 
 group_logical_or_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupLogicalOrKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupLogicalOrKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -11429,7 +11429,7 @@ inst_OpGroupLogicalXorKHR :: #force_inline proc "contextless" (buf: []Operand, r
 
 group_logical_xor_khr :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Group_Operation, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpGroupLogicalXorKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpGroupLogicalXorKHR(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -11441,7 +11441,7 @@ inst_OpRoundFToTF32INTEL :: #force_inline proc "contextless" (buf: []Operand, re
 
 round_f_to_tf32_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpRoundFToTF32INTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpRoundFToTF32INTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -11456,7 +11456,7 @@ inst_OpMaskedGatherINTEL :: #force_inline proc "contextless" (buf: []Operand, re
 
 masked_gather_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: i64, op3: Id, op4: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpMaskedGatherINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpMaskedGatherINTEL(opbuf(b, 1 + 1 + 1 + 1), result_type, r, op1, op2, op3, op4))
 	return r
 }
 
@@ -11470,7 +11470,7 @@ inst_OpMaskedScatterINTEL :: #force_inline proc "contextless" (buf: []Operand, o
 }
 
 masked_scatter_intel :: proc(b: ^Builder, op1: Id, op2: Id, op3: i64, op4: Id) {
-	append(&b.ops, inst_OpMaskedScatterINTEL(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
+	append_elem(&b.ops, inst_OpMaskedScatterINTEL(opbuf(b, 1 + 1 + 1 + 1), op1, op2, op3, op4))
 }
 
 inst_OpConvertHandleToImageINTEL :: #force_inline proc "contextless" (buf: []Operand, result_type: Type_Ref, result: Id, op1: Id) -> Operation {
@@ -11481,7 +11481,7 @@ inst_OpConvertHandleToImageINTEL :: #force_inline proc "contextless" (buf: []Ope
 
 convert_handle_to_image_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConvertHandleToImageINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConvertHandleToImageINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -11493,7 +11493,7 @@ inst_OpConvertHandleToSamplerINTEL :: #force_inline proc "contextless" (buf: []O
 
 convert_handle_to_sampler_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConvertHandleToSamplerINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConvertHandleToSamplerINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -11505,7 +11505,7 @@ inst_OpConvertHandleToSampledImageINTEL :: #force_inline proc "contextless" (buf
 
 convert_handle_to_sampled_image_intel :: proc(b: ^Builder, result_type: Type_Ref, op1: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpConvertHandleToSampledImageINTEL(opbuf(b, 1), result_type, r, op1))
+	append_elem(&b.ops, inst_OpConvertHandleToSampledImageINTEL(opbuf(b, 1), result_type, r, op1))
 	return r
 }
 
@@ -11519,7 +11519,7 @@ inst_OpFDot2MixAcc32VALVE :: #force_inline proc "contextless" (buf: []Operand, r
 
 f_dot2_mix_acc32_valve :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFDot2MixAcc32VALVE(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpFDot2MixAcc32VALVE(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -11533,7 +11533,7 @@ inst_OpFDot2MixAcc16VALVE :: #force_inline proc "contextless" (buf: []Operand, r
 
 f_dot2_mix_acc16_valve :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFDot2MixAcc16VALVE(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpFDot2MixAcc16VALVE(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }
 
@@ -11547,6 +11547,6 @@ inst_OpFDot4MixAcc32VALVE :: #force_inline proc "contextless" (buf: []Operand, r
 
 f_dot4_mix_acc32_valve :: proc(b: ^Builder, result_type: Type_Ref, op1: Id, op2: Id, op3: Id) -> Id {
 	r := alloc_id(b)
-	append(&b.ops, inst_OpFDot4MixAcc32VALVE(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
+	append_elem(&b.ops, inst_OpFDot4MixAcc32VALVE(opbuf(b, 1 + 1 + 1), result_type, r, op1, op2, op3))
 	return r
 }

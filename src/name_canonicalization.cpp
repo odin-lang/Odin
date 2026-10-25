@@ -411,6 +411,9 @@ bool type_writer_append_fmt(TypeWriter *w, char const *fmt, ...) {
 
 TYPE_WRITER_PROC(type_writer_string_writer_proc) {
 	gbString *s = cast(gbString *)&w->user_data;
+	if (gb_string_available_space(*s) < len) {
+		*s = gb_string_make_space_for(*s, gb_max(len, gb_string_length(*s)));
+	}
 	*s = gb_string_append_length(*s, ptr, len);
 	return true;
 }
@@ -494,9 +497,23 @@ gb_internal void write_canonical_params(TypeWriter *w, Type *params) {
 		case Entity_Constant:
 			{
 				type_writer_appendc(w, CANONICAL_PARAM_CONST);
-				gbString s = exact_value_to_string(v->Constant.value, 1<<16);
-				type_writer_append(w, s, gb_string_length(s));
-				gb_string_free(s);
+				if (v->Constant.value.kind == ExactValue_Procedure) {
+					// NOTE: a procedure is named by its declaration, as different procedures can be spelt the same (See #5318)
+					Ast *expr = unparen_expr(v->Constant.value.value_procedure);
+					Entity *proc = strip_entity_wrapping(expr);
+					if (proc != nullptr) {
+						write_canonical_entity_name(w, proc);
+						break;
+					}
+					if (expr->kind == Ast_ProcLit) {
+						DeclInfo *parent = expr->ProcLit.decl->parent;
+						if (parent != nullptr && parent->entity) {
+							write_canonical_entity_name(w, parent->entity);
+							type_writer_appendc(w, CANONICAL_NAME_SEPARATOR);
+						}
+					}
+				}
+				write_canonical_exact_value(w, v->Constant.value);
 			}
 			break;
 		default:
@@ -505,6 +522,65 @@ gb_internal void write_canonical_params(TypeWriter *w, Type *params) {
 		}
 	}
 	return;
+}
+
+gb_internal void write_canonical_exact_value(TypeWriter *w, ExactValue const &v);
+
+gb_internal void write_canonical_constant_expr(TypeWriter *w, Ast *expr) {
+	if (expr->tav.mode == Addressing_Constant) {
+		write_canonical_exact_value(w, expr->tav.value());
+		return;
+	}
+	gbString s = write_expr_to_string(gb_string_make(heap_allocator(), ""), expr, false);
+	type_writer_append(w, s, gb_string_length(s));
+	gb_string_free(s);
+}
+
+gb_internal void write_canonical_exact_value(TypeWriter *w, ExactValue const &v) {
+	if (v.kind == ExactValue_Compound && v.value_compound != nullptr && v.value_compound->kind == Ast_CompoundLit) {
+		ast_node(cl, CompoundLit, v.value_compound);
+		type_writer_appendb(w, '{');
+		for_array(i, cl->elems) {
+			if (i > 0) {
+				type_writer_appendc(w, CANONICAL_FIELD_SEPARATOR);
+			}
+			Ast *elem = cl->elems[i];
+			if (elem->kind == Ast_FieldValue) {
+				Ast *field = elem->FieldValue.field;
+				if (field->kind == Ast_Ident) {
+					type_writer_append(w, field->Ident.token.string.text, field->Ident.token.string.len);
+				} else if (is_ast_range(field)) {
+					write_canonical_constant_expr(w, field->BinaryExpr.left);
+					type_writer_append(w, field->BinaryExpr.op.string.text, field->BinaryExpr.op.string.len);
+					write_canonical_constant_expr(w, field->BinaryExpr.right);
+				} else {
+					write_canonical_constant_expr(w, field);
+				}
+				type_writer_appendc(w, "=");
+				elem = elem->FieldValue.value;
+			}
+			write_canonical_constant_expr(w, elem);
+		}
+		type_writer_appendb(w, '}');
+		return;
+	}
+	if (v.kind == ExactValue_Variant && v.value_variant != nullptr) {
+		Ast *expr = v.value_variant;
+		bool is_self = expr->tav.value().kind == ExactValue_Variant && expr->tav.value().value_variant == expr;
+		if (expr->tav.mode == Addressing_Constant && !is_self) {
+			write_type_to_canonical_string(w, expr->tav.type);
+			type_writer_appendc(w, "=");
+			write_canonical_exact_value(w, expr->tav.value());
+			return;
+		}
+	}
+	if (v.kind == ExactValue_Typeid) {
+		write_type_to_canonical_string(w, v.value_typeid);
+		return;
+	}
+	gbString s = exact_value_to_string(v, 1<<16);
+	type_writer_append(w, s, gb_string_length(s));
+	gb_string_free(s);
 }
 
 gb_internal u64 type_hash_canonical_type(Type *type) {
@@ -585,9 +661,9 @@ gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e) {
 			Entity *p = e->parent_proc_decl.load(std::memory_order_relaxed)->entity;
 			write_canonical_parent_prefix(w, p);
 			type_writer_append(w, p->token.string.text, p->token.string.len);
-			if (is_type_polymorphic(p->type)) {
+			if (is_type_polymorphic_or_specialized_proc(proc_entity_full_type(p))) {
 				type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);
-				write_type_to_canonical_string(w, p->type);
+				write_type_to_canonical_string(w, proc_entity_full_type(p));
 			}
 			type_writer_appendc(w, CANONICAL_NAME_SEPARATOR);
 
@@ -615,9 +691,9 @@ gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e) {
 		type_writer_append(w, e->token.string.text, e->token.string.len);
 	}
 
-	if (is_type_polymorphic(e->type)) {
+	if (is_type_polymorphic_or_specialized_proc(proc_entity_full_type(e))) {
 		type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);
-		write_type_to_canonical_string(w, e->type);
+		write_type_to_canonical_string(w, proc_entity_full_type(e));
 	}
 	type_writer_appendc(w, CANONICAL_NAME_SEPARATOR);
 
@@ -702,7 +778,7 @@ gb_internal void write_canonical_entity_name(TypeWriter *w, Entity *e) {
 			goto write_base_name;
 		}
 
-		gb_printf_err("%s WEIRD ENTITY TYPE %s %u %p\n", token_pos_to_string(e->token.pos), type_to_string(e->type), s->flags, s->decl_info);
+		gb_printf_err("%s WEIRD ENTITY TYPE %s %u %p\n", token_pos_to_string(e->token.pos), type_to_string(e->type), s->flags.load(), s->decl_info);
 
 		auto const print_scope_flags = [](Scope *s) {
 			if (s->flags & ScopeFlag_Pkg)             gb_printf_err("Pkg ");
@@ -755,9 +831,9 @@ write_base_name:
 	case Entity_AsmTemplate:
 	case Entity_Variable:
 		type_writer_append(w, e->token.string.text, e->token.string.len);
-		if (is_type_polymorphic(e->type)) {
+		if (is_type_polymorphic_or_specialized_proc(proc_entity_full_type(e))) {
 			type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);
-			write_type_to_canonical_string(w, e->type);
+			write_type_to_canonical_string(w, proc_entity_full_type(e));
 		}
 		break;
 

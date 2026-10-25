@@ -20,449 +20,449 @@ package rexcode_ppc_vle
 // =============================================================================
 
 inst_se_illegal_none      :: #force_inline proc "contextless" () -> Instruction { return Instruction{mnemonic = .SE_ILLEGAL, operand_count = 0, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {{}, {}, {}, {}}} }
-emit_se_illegal_none      :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_se_illegal_none()) }
+emit_se_illegal_none      :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_se_illegal_none()) }
 inst_se_isync_none        :: #force_inline proc "contextless" () -> Instruction { return Instruction{mnemonic = .SE_ISYNC, operand_count = 0, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {{}, {}, {}, {}}} }
-emit_se_isync_none        :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_se_isync_none()) }
+emit_se_isync_none        :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_se_isync_none()) }
 inst_se_sc_none           :: #force_inline proc "contextless" () -> Instruction { return Instruction{mnemonic = .SE_SC, operand_count = 0, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {{}, {}, {}, {}}} }
-emit_se_sc_none           :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_se_sc_none()) }
+emit_se_sc_none           :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_se_sc_none()) }
 inst_se_blr_none          :: #force_inline proc "contextless" () -> Instruction { return Instruction{mnemonic = .SE_BLR, operand_count = 0, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {{}, {}, {}, {}}} }
-emit_se_blr_none          :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_se_blr_none()) }
+emit_se_blr_none          :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_se_blr_none()) }
 inst_se_blrl_none         :: #force_inline proc "contextless" () -> Instruction { return Instruction{mnemonic = .SE_BLRL, operand_count = 0, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {{}, {}, {}, {}}} }
-emit_se_blrl_none         :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_se_blrl_none()) }
+emit_se_blrl_none         :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_se_blrl_none()) }
 inst_se_bctr_none         :: #force_inline proc "contextless" () -> Instruction { return Instruction{mnemonic = .SE_BCTR, operand_count = 0, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {{}, {}, {}, {}}} }
-emit_se_bctr_none         :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_se_bctr_none()) }
+emit_se_bctr_none         :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_se_bctr_none()) }
 inst_se_bctrl_none        :: #force_inline proc "contextless" () -> Instruction { return Instruction{mnemonic = .SE_BCTRL, operand_count = 0, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {{}, {}, {}, {}}} }
-emit_se_bctrl_none        :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_se_bctrl_none()) }
+emit_se_bctrl_none        :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_se_bctrl_none()) }
 inst_se_rfi_none          :: #force_inline proc "contextless" () -> Instruction { return Instruction{mnemonic = .SE_RFI, operand_count = 0, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {{}, {}, {}, {}}} }
-emit_se_rfi_none          :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_se_rfi_none()) }
+emit_se_rfi_none          :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_se_rfi_none()) }
 inst_se_rfci_none         :: #force_inline proc "contextless" () -> Instruction { return Instruction{mnemonic = .SE_RFCI, operand_count = 0, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {{}, {}, {}, {}}} }
-emit_se_rfci_none         :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_se_rfci_none()) }
+emit_se_rfci_none         :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_se_rfci_none()) }
 inst_se_rfdi_none         :: #force_inline proc "contextless" () -> Instruction { return Instruction{mnemonic = .SE_RFDI, operand_count = 0, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {{}, {}, {}, {}}} }
-emit_se_rfdi_none         :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_se_rfdi_none()) }
+emit_se_rfdi_none         :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_se_rfdi_none()) }
 inst_se_rfmci_none        :: #force_inline proc "contextless" () -> Instruction { return Instruction{mnemonic = .SE_RFMCI, operand_count = 0, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {{}, {}, {}, {}}} }
-emit_se_rfmci_none        :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_se_rfmci_none()) }
+emit_se_rfmci_none        :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_se_rfmci_none()) }
 inst_se_rfgi_none         :: #force_inline proc "contextless" () -> Instruction { return Instruction{mnemonic = .SE_RFGI, operand_count = 0, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {{}, {}, {}, {}}} }
-emit_se_rfgi_none         :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_se_rfgi_none()) }
+emit_se_rfgi_none         :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_se_rfgi_none()) }
 inst_se_not_r             :: #force_inline proc "contextless" (rd: Register) -> Instruction { return Instruction{mnemonic = .SE_NOT, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), {}, {}, {}}} }
-emit_se_not_r             :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register) { append(instructions, inst_se_not_r(rd)) }
+emit_se_not_r             :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register) { append_elem(instructions, inst_se_not_r(rd)) }
 inst_se_neg_r             :: #force_inline proc "contextless" (rd: Register) -> Instruction { return Instruction{mnemonic = .SE_NEG, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), {}, {}, {}}} }
-emit_se_neg_r             :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register) { append(instructions, inst_se_neg_r(rd)) }
+emit_se_neg_r             :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register) { append_elem(instructions, inst_se_neg_r(rd)) }
 inst_se_mflr_r            :: #force_inline proc "contextless" (rd: Register) -> Instruction { return Instruction{mnemonic = .SE_MFLR, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), {}, {}, {}}} }
-emit_se_mflr_r            :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register) { append(instructions, inst_se_mflr_r(rd)) }
+emit_se_mflr_r            :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register) { append_elem(instructions, inst_se_mflr_r(rd)) }
 inst_se_mtlr_r            :: #force_inline proc "contextless" (rd: Register) -> Instruction { return Instruction{mnemonic = .SE_MTLR, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), {}, {}, {}}} }
-emit_se_mtlr_r            :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register) { append(instructions, inst_se_mtlr_r(rd)) }
+emit_se_mtlr_r            :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register) { append_elem(instructions, inst_se_mtlr_r(rd)) }
 inst_se_mfctr_r           :: #force_inline proc "contextless" (rd: Register) -> Instruction { return Instruction{mnemonic = .SE_MFCTR, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), {}, {}, {}}} }
-emit_se_mfctr_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register) { append(instructions, inst_se_mfctr_r(rd)) }
+emit_se_mfctr_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register) { append_elem(instructions, inst_se_mfctr_r(rd)) }
 inst_se_mtctr_r           :: #force_inline proc "contextless" (rd: Register) -> Instruction { return Instruction{mnemonic = .SE_MTCTR, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), {}, {}, {}}} }
-emit_se_mtctr_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register) { append(instructions, inst_se_mtctr_r(rd)) }
+emit_se_mtctr_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register) { append_elem(instructions, inst_se_mtctr_r(rd)) }
 inst_se_extzb_r           :: #force_inline proc "contextless" (rd: Register) -> Instruction { return Instruction{mnemonic = .SE_EXTZB, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), {}, {}, {}}} }
-emit_se_extzb_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register) { append(instructions, inst_se_extzb_r(rd)) }
+emit_se_extzb_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register) { append_elem(instructions, inst_se_extzb_r(rd)) }
 inst_se_extsb_r           :: #force_inline proc "contextless" (rd: Register) -> Instruction { return Instruction{mnemonic = .SE_EXTSB, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), {}, {}, {}}} }
-emit_se_extsb_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register) { append(instructions, inst_se_extsb_r(rd)) }
+emit_se_extsb_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register) { append_elem(instructions, inst_se_extsb_r(rd)) }
 inst_se_extzh_r           :: #force_inline proc "contextless" (rd: Register) -> Instruction { return Instruction{mnemonic = .SE_EXTZH, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), {}, {}, {}}} }
-emit_se_extzh_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register) { append(instructions, inst_se_extzh_r(rd)) }
+emit_se_extzh_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register) { append_elem(instructions, inst_se_extzh_r(rd)) }
 inst_se_extsh_r           :: #force_inline proc "contextless" (rd: Register) -> Instruction { return Instruction{mnemonic = .SE_EXTSH, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), {}, {}, {}}} }
-emit_se_extsh_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register) { append(instructions, inst_se_extsh_r(rd)) }
+emit_se_extsh_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register) { append_elem(instructions, inst_se_extsh_r(rd)) }
 inst_se_mr_r_r            :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .SE_MR, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_se_mr_r_r            :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_se_mr_r_r(rd, r2)) }
+emit_se_mr_r_r            :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_se_mr_r_r(rd, r2)) }
 inst_se_mtar_r_r          :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .SE_MTAR, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_se_mtar_r_r          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_se_mtar_r_r(rd, r2)) }
+emit_se_mtar_r_r          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_se_mtar_r_r(rd, r2)) }
 inst_se_mfar_r_r          :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .SE_MFAR, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_se_mfar_r_r          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_se_mfar_r_r(rd, r2)) }
+emit_se_mfar_r_r          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_se_mfar_r_r(rd, r2)) }
 inst_se_add_r_r           :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .SE_ADD, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_se_add_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_se_add_r_r(rd, r2)) }
+emit_se_add_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_se_add_r_r(rd, r2)) }
 inst_se_mullw_r_r         :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .SE_MULLW, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_se_mullw_r_r         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_se_mullw_r_r(rd, r2)) }
+emit_se_mullw_r_r         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_se_mullw_r_r(rd, r2)) }
 inst_se_sub_r_r           :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .SE_SUB, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_se_sub_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_se_sub_r_r(rd, r2)) }
+emit_se_sub_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_se_sub_r_r(rd, r2)) }
 inst_se_subf_r_r          :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .SE_SUBF, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_se_subf_r_r          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_se_subf_r_r(rd, r2)) }
+emit_se_subf_r_r          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_se_subf_r_r(rd, r2)) }
 inst_se_cmp_r_r           :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .SE_CMP, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_se_cmp_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_se_cmp_r_r(rd, r2)) }
+emit_se_cmp_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_se_cmp_r_r(rd, r2)) }
 inst_se_cmpl_r_r          :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .SE_CMPL, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_se_cmpl_r_r          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_se_cmpl_r_r(rd, r2)) }
+emit_se_cmpl_r_r          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_se_cmpl_r_r(rd, r2)) }
 inst_se_cmph_r_r          :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .SE_CMPH, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_se_cmph_r_r          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_se_cmph_r_r(rd, r2)) }
+emit_se_cmph_r_r          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_se_cmph_r_r(rd, r2)) }
 inst_se_cmphl_r_r         :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .SE_CMPHL, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_se_cmphl_r_r         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_se_cmphl_r_r(rd, r2)) }
+emit_se_cmphl_r_r         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_se_cmphl_r_r(rd, r2)) }
 inst_se_srw_r_r           :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .SE_SRW, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_se_srw_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_se_srw_r_r(rd, r2)) }
+emit_se_srw_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_se_srw_r_r(rd, r2)) }
 inst_se_sraw_r_r          :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .SE_SRAW, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_se_sraw_r_r          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_se_sraw_r_r(rd, r2)) }
+emit_se_sraw_r_r          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_se_sraw_r_r(rd, r2)) }
 inst_se_slw_r_r           :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .SE_SLW, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_se_slw_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_se_slw_r_r(rd, r2)) }
+emit_se_slw_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_se_slw_r_r(rd, r2)) }
 inst_se_or_r_r            :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .SE_OR, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_se_or_r_r            :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_se_or_r_r(rd, r2)) }
+emit_se_or_r_r            :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_se_or_r_r(rd, r2)) }
 inst_se_andc_r_r          :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .SE_ANDC, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_se_andc_r_r          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_se_andc_r_r(rd, r2)) }
+emit_se_andc_r_r          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_se_andc_r_r(rd, r2)) }
 inst_se_and_r_r           :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .SE_AND, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_se_and_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_se_and_r_r(rd, r2)) }
+emit_se_and_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_se_and_r_r(rd, r2)) }
 inst_se_and_dot_r_r       :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .SE_AND_DOT, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_se_and_dot_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_se_and_dot_r_r(rd, r2)) }
+emit_se_and_dot_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_se_and_dot_r_r(rd, r2)) }
 inst_se_addi_r_imm        :: #force_inline proc "contextless" (rd: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SE_ADDI, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_imm(imm), {}, {}}} }
-emit_se_addi_r_imm        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append(instructions, inst_se_addi_r_imm(rd, imm)) }
+emit_se_addi_r_imm        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append_elem(instructions, inst_se_addi_r_imm(rd, imm)) }
 inst_se_cmpli_r_imm       :: #force_inline proc "contextless" (rd: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SE_CMPLI, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_imm(imm), {}, {}}} }
-emit_se_cmpli_r_imm       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append(instructions, inst_se_cmpli_r_imm(rd, imm)) }
+emit_se_cmpli_r_imm       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append_elem(instructions, inst_se_cmpli_r_imm(rd, imm)) }
 inst_se_subi_r_imm        :: #force_inline proc "contextless" (rd: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SE_SUBI, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_imm(imm), {}, {}}} }
-emit_se_subi_r_imm        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append(instructions, inst_se_subi_r_imm(rd, imm)) }
+emit_se_subi_r_imm        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append_elem(instructions, inst_se_subi_r_imm(rd, imm)) }
 inst_se_subi_dot_r_imm    :: #force_inline proc "contextless" (rd: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SE_SUBI_DOT, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_imm(imm), {}, {}}} }
-emit_se_subi_dot_r_imm    :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append(instructions, inst_se_subi_dot_r_imm(rd, imm)) }
+emit_se_subi_dot_r_imm    :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append_elem(instructions, inst_se_subi_dot_r_imm(rd, imm)) }
 inst_se_cmpi_r_imm        :: #force_inline proc "contextless" (rd: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SE_CMPI, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_imm(imm), {}, {}}} }
-emit_se_cmpi_r_imm        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append(instructions, inst_se_cmpi_r_imm(rd, imm)) }
+emit_se_cmpi_r_imm        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append_elem(instructions, inst_se_cmpi_r_imm(rd, imm)) }
 inst_se_bmaski_r_imm      :: #force_inline proc "contextless" (rd: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SE_BMASKI, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_imm(imm), {}, {}}} }
-emit_se_bmaski_r_imm      :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append(instructions, inst_se_bmaski_r_imm(rd, imm)) }
+emit_se_bmaski_r_imm      :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append_elem(instructions, inst_se_bmaski_r_imm(rd, imm)) }
 inst_se_andi_r_imm        :: #force_inline proc "contextless" (rd: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SE_ANDI, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_imm(imm), {}, {}}} }
-emit_se_andi_r_imm        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append(instructions, inst_se_andi_r_imm(rd, imm)) }
+emit_se_andi_r_imm        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append_elem(instructions, inst_se_andi_r_imm(rd, imm)) }
 inst_se_nop_r_r           :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .SE_NOP, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_se_nop_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_se_nop_r_r(rd, r2)) }
+emit_se_nop_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_se_nop_r_r(rd, r2)) }
 inst_se_li_r_imm          :: #force_inline proc "contextless" (rd: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SE_LI, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_imm(imm), {}, {}}} }
-emit_se_li_r_imm          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append(instructions, inst_se_li_r_imm(rd, imm)) }
+emit_se_li_r_imm          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append_elem(instructions, inst_se_li_r_imm(rd, imm)) }
 inst_se_bclri_r_imm       :: #force_inline proc "contextless" (rd: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SE_BCLRI, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_imm(imm), {}, {}}} }
-emit_se_bclri_r_imm       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append(instructions, inst_se_bclri_r_imm(rd, imm)) }
+emit_se_bclri_r_imm       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append_elem(instructions, inst_se_bclri_r_imm(rd, imm)) }
 inst_se_bgeni_r_imm       :: #force_inline proc "contextless" (rd: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SE_BGENI, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_imm(imm), {}, {}}} }
-emit_se_bgeni_r_imm       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append(instructions, inst_se_bgeni_r_imm(rd, imm)) }
+emit_se_bgeni_r_imm       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append_elem(instructions, inst_se_bgeni_r_imm(rd, imm)) }
 inst_se_bseti_r_imm       :: #force_inline proc "contextless" (rd: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SE_BSETI, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_imm(imm), {}, {}}} }
-emit_se_bseti_r_imm       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append(instructions, inst_se_bseti_r_imm(rd, imm)) }
+emit_se_bseti_r_imm       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append_elem(instructions, inst_se_bseti_r_imm(rd, imm)) }
 inst_se_btsti_r_imm       :: #force_inline proc "contextless" (rd: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SE_BTSTI, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_imm(imm), {}, {}}} }
-emit_se_btsti_r_imm       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append(instructions, inst_se_btsti_r_imm(rd, imm)) }
+emit_se_btsti_r_imm       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append_elem(instructions, inst_se_btsti_r_imm(rd, imm)) }
 inst_se_srwi_r_imm        :: #force_inline proc "contextless" (rd: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SE_SRWI, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_imm(imm), {}, {}}} }
-emit_se_srwi_r_imm        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append(instructions, inst_se_srwi_r_imm(rd, imm)) }
+emit_se_srwi_r_imm        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append_elem(instructions, inst_se_srwi_r_imm(rd, imm)) }
 inst_se_srawi_r_imm       :: #force_inline proc "contextless" (rd: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SE_SRAWI, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_imm(imm), {}, {}}} }
-emit_se_srawi_r_imm       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append(instructions, inst_se_srawi_r_imm(rd, imm)) }
+emit_se_srawi_r_imm       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append_elem(instructions, inst_se_srawi_r_imm(rd, imm)) }
 inst_se_slwi_r_imm        :: #force_inline proc "contextless" (rd: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SE_SLWI, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_imm(imm), {}, {}}} }
-emit_se_slwi_r_imm        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append(instructions, inst_se_slwi_r_imm(rd, imm)) }
+emit_se_slwi_r_imm        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append_elem(instructions, inst_se_slwi_r_imm(rd, imm)) }
 inst_se_lbz_r_mem         :: #force_inline proc "contextless" (rd: Register, mem: Memory) -> Instruction { return Instruction{mnemonic = .SE_LBZ, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_mem(mem), {}, {}}} }
-emit_se_lbz_r_mem         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append(instructions, inst_se_lbz_r_mem(rd, mem)) }
+emit_se_lbz_r_mem         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append_elem(instructions, inst_se_lbz_r_mem(rd, mem)) }
 inst_se_stb_r_mem         :: #force_inline proc "contextless" (rd: Register, mem: Memory) -> Instruction { return Instruction{mnemonic = .SE_STB, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_mem(mem), {}, {}}} }
-emit_se_stb_r_mem         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append(instructions, inst_se_stb_r_mem(rd, mem)) }
+emit_se_stb_r_mem         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append_elem(instructions, inst_se_stb_r_mem(rd, mem)) }
 inst_se_lhz_r_mem         :: #force_inline proc "contextless" (rd: Register, mem: Memory) -> Instruction { return Instruction{mnemonic = .SE_LHZ, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_mem(mem), {}, {}}} }
-emit_se_lhz_r_mem         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append(instructions, inst_se_lhz_r_mem(rd, mem)) }
+emit_se_lhz_r_mem         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append_elem(instructions, inst_se_lhz_r_mem(rd, mem)) }
 inst_se_sth_r_mem         :: #force_inline proc "contextless" (rd: Register, mem: Memory) -> Instruction { return Instruction{mnemonic = .SE_STH, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_mem(mem), {}, {}}} }
-emit_se_sth_r_mem         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append(instructions, inst_se_sth_r_mem(rd, mem)) }
+emit_se_sth_r_mem         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append_elem(instructions, inst_se_sth_r_mem(rd, mem)) }
 inst_se_lwz_r_mem         :: #force_inline proc "contextless" (rd: Register, mem: Memory) -> Instruction { return Instruction{mnemonic = .SE_LWZ, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_mem(mem), {}, {}}} }
-emit_se_lwz_r_mem         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append(instructions, inst_se_lwz_r_mem(rd, mem)) }
+emit_se_lwz_r_mem         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append_elem(instructions, inst_se_lwz_r_mem(rd, mem)) }
 inst_se_stw_r_mem         :: #force_inline proc "contextless" (rd: Register, mem: Memory) -> Instruction { return Instruction{mnemonic = .SE_STW, operand_count = 2, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_mem(mem), {}, {}}} }
-emit_se_stw_r_mem         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append(instructions, inst_se_stw_r_mem(rd, mem)) }
+emit_se_stw_r_mem         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append_elem(instructions, inst_se_stw_r_mem(rd, mem)) }
 inst_se_bge_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .SE_BGE, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_se_bge_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_se_bge_rel(target)) }
+emit_se_bge_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_se_bge_rel(target)) }
 inst_se_bnl_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .SE_BNL, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_se_bnl_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_se_bnl_rel(target)) }
+emit_se_bnl_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_se_bnl_rel(target)) }
 inst_se_ble_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .SE_BLE, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_se_ble_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_se_ble_rel(target)) }
+emit_se_ble_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_se_ble_rel(target)) }
 inst_se_bng_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .SE_BNG, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_se_bng_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_se_bng_rel(target)) }
+emit_se_bng_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_se_bng_rel(target)) }
 inst_se_bne_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .SE_BNE, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_se_bne_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_se_bne_rel(target)) }
+emit_se_bne_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_se_bne_rel(target)) }
 inst_se_bns_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .SE_BNS, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_se_bns_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_se_bns_rel(target)) }
+emit_se_bns_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_se_bns_rel(target)) }
 inst_se_bnu_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .SE_BNU, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_se_bnu_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_se_bnu_rel(target)) }
+emit_se_bnu_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_se_bnu_rel(target)) }
 inst_se_bf_rel            :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .SE_BF, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_se_bf_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_se_bf_rel(target)) }
+emit_se_bf_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_se_bf_rel(target)) }
 inst_se_blt_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .SE_BLT, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_se_blt_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_se_blt_rel(target)) }
+emit_se_blt_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_se_blt_rel(target)) }
 inst_se_bgt_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .SE_BGT, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_se_bgt_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_se_bgt_rel(target)) }
+emit_se_bgt_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_se_bgt_rel(target)) }
 inst_se_beq_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .SE_BEQ, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_se_beq_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_se_beq_rel(target)) }
+emit_se_beq_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_se_beq_rel(target)) }
 inst_se_bso_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .SE_BSO, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_se_bso_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_se_bso_rel(target)) }
+emit_se_bso_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_se_bso_rel(target)) }
 inst_se_bun_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .SE_BUN, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_se_bun_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_se_bun_rel(target)) }
+emit_se_bun_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_se_bun_rel(target)) }
 inst_se_bt_rel            :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .SE_BT, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_se_bt_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_se_bt_rel(target)) }
+emit_se_bt_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_se_bt_rel(target)) }
 inst_se_bc_bo_crb_rel     :: #force_inline proc "contextless" (imm: i64, imm2: i64, target: u32) -> Instruction { return Instruction{mnemonic = .SE_BC, operand_count = 3, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_imm(imm), op_imm(imm2), op_label(target), {}}} }
-emit_se_bc_bo_crb_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64, target: u32) { append(instructions, inst_se_bc_bo_crb_rel(imm, imm2, target)) }
+emit_se_bc_bo_crb_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64, target: u32) { append_elem(instructions, inst_se_bc_bo_crb_rel(imm, imm2, target)) }
 inst_se_b_rel             :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .SE_B, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_se_b_rel             :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_se_b_rel(target)) }
+emit_se_b_rel             :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_se_b_rel(target)) }
 inst_se_bl_rel            :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .SE_BL, operand_count = 1, length = 2, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_se_bl_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_se_bl_rel(target)) }
+emit_se_bl_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_se_bl_rel(target)) }
 inst_e_lbzu_r_r           :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_LBZU, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_lbzu_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_lbzu_r_r(rd, r2)) }
+emit_e_lbzu_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_lbzu_r_r(rd, r2)) }
 inst_e_lhau_r_r           :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_LHAU, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_lhau_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_lhau_r_r(rd, r2)) }
+emit_e_lhau_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_lhau_r_r(rd, r2)) }
 inst_e_lhzu_r_r           :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_LHZU, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_lhzu_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_lhzu_r_r(rd, r2)) }
+emit_e_lhzu_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_lhzu_r_r(rd, r2)) }
 inst_e_lmw_r_r            :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_LMW, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_lmw_r_r            :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_lmw_r_r(rd, r2)) }
+emit_e_lmw_r_r            :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_lmw_r_r(rd, r2)) }
 inst_e_lwzu_r_r           :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_LWZU, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_lwzu_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_lwzu_r_r(rd, r2)) }
+emit_e_lwzu_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_lwzu_r_r(rd, r2)) }
 inst_e_stbu_r_r           :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_STBU, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_stbu_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_stbu_r_r(rd, r2)) }
+emit_e_stbu_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_stbu_r_r(rd, r2)) }
 inst_e_sthu_r_r           :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_STHU, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_sthu_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_sthu_r_r(rd, r2)) }
+emit_e_sthu_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_sthu_r_r(rd, r2)) }
 inst_e_stwu_r_r           :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_STWU, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_stwu_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_stwu_r_r(rd, r2)) }
+emit_e_stwu_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_stwu_r_r(rd, r2)) }
 inst_e_stmw_r_r           :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_STMW, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_stmw_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_stmw_r_r(rd, r2)) }
+emit_e_stmw_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_stmw_r_r(rd, r2)) }
 inst_e_lmvgprw_r_r        :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_LMVGPRW, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_lmvgprw_r_r        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_lmvgprw_r_r(rd, r2)) }
+emit_e_lmvgprw_r_r        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_lmvgprw_r_r(rd, r2)) }
 inst_e_ldmvgprw_r_r       :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_LDMVGPRW, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_ldmvgprw_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_ldmvgprw_r_r(rd, r2)) }
+emit_e_ldmvgprw_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_ldmvgprw_r_r(rd, r2)) }
 inst_e_stmvgprw_r_r       :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_STMVGPRW, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_stmvgprw_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_stmvgprw_r_r(rd, r2)) }
+emit_e_stmvgprw_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_stmvgprw_r_r(rd, r2)) }
 inst_e_lmvsprw_r_r        :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_LMVSPRW, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_lmvsprw_r_r        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_lmvsprw_r_r(rd, r2)) }
+emit_e_lmvsprw_r_r        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_lmvsprw_r_r(rd, r2)) }
 inst_e_ldmvsprw_r_r       :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_LDMVSPRW, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_ldmvsprw_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_ldmvsprw_r_r(rd, r2)) }
+emit_e_ldmvsprw_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_ldmvsprw_r_r(rd, r2)) }
 inst_e_stmvsprw_r_r       :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_STMVSPRW, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_stmvsprw_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_stmvsprw_r_r(rd, r2)) }
+emit_e_stmvsprw_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_stmvsprw_r_r(rd, r2)) }
 inst_e_lmvsrrw_r_r        :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_LMVSRRW, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_lmvsrrw_r_r        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_lmvsrrw_r_r(rd, r2)) }
+emit_e_lmvsrrw_r_r        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_lmvsrrw_r_r(rd, r2)) }
 inst_e_ldmvsrrw_r_r       :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_LDMVSRRW, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_ldmvsrrw_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_ldmvsrrw_r_r(rd, r2)) }
+emit_e_ldmvsrrw_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_ldmvsrrw_r_r(rd, r2)) }
 inst_e_stmvsrrw_r_r       :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_STMVSRRW, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_stmvsrrw_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_stmvsrrw_r_r(rd, r2)) }
+emit_e_stmvsrrw_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_stmvsrrw_r_r(rd, r2)) }
 inst_e_lmvcsrrw_r_r       :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_LMVCSRRW, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_lmvcsrrw_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_lmvcsrrw_r_r(rd, r2)) }
+emit_e_lmvcsrrw_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_lmvcsrrw_r_r(rd, r2)) }
 inst_e_ldmvcsrrw_r_r      :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_LDMVCSRRW, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_ldmvcsrrw_r_r      :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_ldmvcsrrw_r_r(rd, r2)) }
+emit_e_ldmvcsrrw_r_r      :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_ldmvcsrrw_r_r(rd, r2)) }
 inst_e_stmvcsrrw_r_r      :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_STMVCSRRW, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_stmvcsrrw_r_r      :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_stmvcsrrw_r_r(rd, r2)) }
+emit_e_stmvcsrrw_r_r      :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_stmvcsrrw_r_r(rd, r2)) }
 inst_e_lmvdsrrw_r_r       :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_LMVDSRRW, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_lmvdsrrw_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_lmvdsrrw_r_r(rd, r2)) }
+emit_e_lmvdsrrw_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_lmvdsrrw_r_r(rd, r2)) }
 inst_e_ldmvdsrrw_r_r      :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_LDMVDSRRW, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_ldmvdsrrw_r_r      :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_ldmvdsrrw_r_r(rd, r2)) }
+emit_e_ldmvdsrrw_r_r      :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_ldmvdsrrw_r_r(rd, r2)) }
 inst_e_stmvdsrrw_r_r      :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_STMVDSRRW, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_stmvdsrrw_r_r      :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_stmvdsrrw_r_r(rd, r2)) }
+emit_e_stmvdsrrw_r_r      :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_stmvdsrrw_r_r(rd, r2)) }
 inst_e_lmvmcsrrw_r_r      :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_LMVMCSRRW, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_lmvmcsrrw_r_r      :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_lmvmcsrrw_r_r(rd, r2)) }
+emit_e_lmvmcsrrw_r_r      :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_lmvmcsrrw_r_r(rd, r2)) }
 inst_e_stmvmcsrrw_r_r     :: #force_inline proc "contextless" (rd: Register, r2: Register) -> Instruction { return Instruction{mnemonic = .E_STMVMCSRRW, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), {}, {}}} }
-emit_e_stmvmcsrrw_r_r     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append(instructions, inst_e_stmvmcsrrw_r_r(rd, r2)) }
+emit_e_stmvmcsrrw_r_r     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register) { append_elem(instructions, inst_e_stmvmcsrrw_r_r(rd, r2)) }
 inst_e_add16i_r_r_imm     :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_ADD16I, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_add16i_r_r_imm     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_add16i_r_r_imm(rd, r2, imm)) }
+emit_e_add16i_r_r_imm     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_add16i_r_r_imm(rd, r2, imm)) }
 inst_e_la_r_mem           :: #force_inline proc "contextless" (rd: Register, mem: Memory) -> Instruction { return Instruction{mnemonic = .E_LA, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_mem(mem), {}, {}}} }
-emit_e_la_r_mem           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append(instructions, inst_e_la_r_mem(rd, mem)) }
+emit_e_la_r_mem           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append_elem(instructions, inst_e_la_r_mem(rd, mem)) }
 inst_e_sub16i_r_r_imm     :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_SUB16I, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_sub16i_r_r_imm     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_sub16i_r_r_imm(rd, r2, imm)) }
+emit_e_sub16i_r_r_imm     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_sub16i_r_r_imm(rd, r2, imm)) }
 inst_e_lbz_r_mem          :: #force_inline proc "contextless" (rd: Register, mem: Memory) -> Instruction { return Instruction{mnemonic = .E_LBZ, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_mem(mem), {}, {}}} }
-emit_e_lbz_r_mem          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append(instructions, inst_e_lbz_r_mem(rd, mem)) }
+emit_e_lbz_r_mem          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append_elem(instructions, inst_e_lbz_r_mem(rd, mem)) }
 inst_e_stb_r_mem          :: #force_inline proc "contextless" (rd: Register, mem: Memory) -> Instruction { return Instruction{mnemonic = .E_STB, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_mem(mem), {}, {}}} }
-emit_e_stb_r_mem          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append(instructions, inst_e_stb_r_mem(rd, mem)) }
+emit_e_stb_r_mem          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append_elem(instructions, inst_e_stb_r_mem(rd, mem)) }
 inst_e_lha_r_mem          :: #force_inline proc "contextless" (rd: Register, mem: Memory) -> Instruction { return Instruction{mnemonic = .E_LHA, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_mem(mem), {}, {}}} }
-emit_e_lha_r_mem          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append(instructions, inst_e_lha_r_mem(rd, mem)) }
+emit_e_lha_r_mem          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append_elem(instructions, inst_e_lha_r_mem(rd, mem)) }
 inst_e_lwz_r_mem          :: #force_inline proc "contextless" (rd: Register, mem: Memory) -> Instruction { return Instruction{mnemonic = .E_LWZ, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_mem(mem), {}, {}}} }
-emit_e_lwz_r_mem          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append(instructions, inst_e_lwz_r_mem(rd, mem)) }
+emit_e_lwz_r_mem          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append_elem(instructions, inst_e_lwz_r_mem(rd, mem)) }
 inst_e_stw_r_mem          :: #force_inline proc "contextless" (rd: Register, mem: Memory) -> Instruction { return Instruction{mnemonic = .E_STW, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_mem(mem), {}, {}}} }
-emit_e_stw_r_mem          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append(instructions, inst_e_stw_r_mem(rd, mem)) }
+emit_e_stw_r_mem          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append_elem(instructions, inst_e_stw_r_mem(rd, mem)) }
 inst_e_lhz_r_mem          :: #force_inline proc "contextless" (rd: Register, mem: Memory) -> Instruction { return Instruction{mnemonic = .E_LHZ, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_mem(mem), {}, {}}} }
-emit_e_lhz_r_mem          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append(instructions, inst_e_lhz_r_mem(rd, mem)) }
+emit_e_lhz_r_mem          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append_elem(instructions, inst_e_lhz_r_mem(rd, mem)) }
 inst_e_sth_r_mem          :: #force_inline proc "contextless" (rd: Register, mem: Memory) -> Instruction { return Instruction{mnemonic = .E_STH, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_mem(mem), {}, {}}} }
-emit_e_sth_r_mem          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append(instructions, inst_e_sth_r_mem(rd, mem)) }
+emit_e_sth_r_mem          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, mem: Memory) { append_elem(instructions, inst_e_sth_r_mem(rd, mem)) }
 inst_e_rlwimi_r_r_r       :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_RLWIMI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_rlwimi_r_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_rlwimi_r_r_r(rd, r2, r3)) }
+emit_e_rlwimi_r_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_rlwimi_r_r_r(rd, r2, r3)) }
 inst_e_inslwi_r_r_r       :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_INSLWI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_inslwi_r_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_inslwi_r_r_r(rd, r2, r3)) }
+emit_e_inslwi_r_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_inslwi_r_r_r(rd, r2, r3)) }
 inst_e_insrwi_r_r_r       :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_INSRWI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_insrwi_r_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_insrwi_r_r_r(rd, r2, r3)) }
+emit_e_insrwi_r_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_insrwi_r_r_r(rd, r2, r3)) }
 inst_e_rotlwi_r_r_r       :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_ROTLWI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_rotlwi_r_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_rotlwi_r_r_r(rd, r2, r3)) }
+emit_e_rotlwi_r_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_rotlwi_r_r_r(rd, r2, r3)) }
 inst_e_rotrwi_r_r_r       :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_ROTRWI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_rotrwi_r_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_rotrwi_r_r_r(rd, r2, r3)) }
+emit_e_rotrwi_r_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_rotrwi_r_r_r(rd, r2, r3)) }
 inst_e_clrlwi_r_r_r       :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_CLRLWI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_clrlwi_r_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_clrlwi_r_r_r(rd, r2, r3)) }
+emit_e_clrlwi_r_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_clrlwi_r_r_r(rd, r2, r3)) }
 inst_e_clrrwi_r_r_r       :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_CLRRWI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_clrrwi_r_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_clrrwi_r_r_r(rd, r2, r3)) }
+emit_e_clrrwi_r_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_clrrwi_r_r_r(rd, r2, r3)) }
 inst_e_rlwinm_r_r_r       :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_RLWINM, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_rlwinm_r_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_rlwinm_r_r_r(rd, r2, r3)) }
+emit_e_rlwinm_r_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_rlwinm_r_r_r(rd, r2, r3)) }
 inst_e_extlwi_r_r_r       :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_EXTLWI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_extlwi_r_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_extlwi_r_r_r(rd, r2, r3)) }
+emit_e_extlwi_r_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_extlwi_r_r_r(rd, r2, r3)) }
 inst_e_extrwi_r_r_r       :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_EXTRWI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_extrwi_r_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_extrwi_r_r_r(rd, r2, r3)) }
+emit_e_extrwi_r_r_r       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_extrwi_r_r_r(rd, r2, r3)) }
 inst_e_clrlslwi_r_r_r     :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_CLRLSLWI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_clrlslwi_r_r_r     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_clrlslwi_r_r_r(rd, r2, r3)) }
+emit_e_clrlslwi_r_r_r     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_clrlslwi_r_r_r(rd, r2, r3)) }
 inst_e_cmph_r_r_r         :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_CMPH, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_cmph_r_r_r         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_cmph_r_r_r(rd, r2, r3)) }
+emit_e_cmph_r_r_r         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_cmph_r_r_r(rd, r2, r3)) }
 inst_e_sc_r_r_r           :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_SC, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_sc_r_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_sc_r_r_r(rd, r2, r3)) }
+emit_e_sc_r_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_sc_r_r_r(rd, r2, r3)) }
 inst_e_cmphl_r_r_r        :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_CMPHL, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_cmphl_r_r_r        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_cmphl_r_r_r(rd, r2, r3)) }
+emit_e_cmphl_r_r_r        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_cmphl_r_r_r(rd, r2, r3)) }
 inst_e_crandc_bo_crb      :: #force_inline proc "contextless" (imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .E_CRANDC, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_imm(imm), op_imm(imm2), {}, {}}} }
-emit_e_crandc_bo_crb      :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append(instructions, inst_e_crandc_bo_crb(imm, imm2)) }
+emit_e_crandc_bo_crb      :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append_elem(instructions, inst_e_crandc_bo_crb(imm, imm2)) }
 inst_e_crnand_bo_crb      :: #force_inline proc "contextless" (imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .E_CRNAND, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_imm(imm), op_imm(imm2), {}, {}}} }
-emit_e_crnand_bo_crb      :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append(instructions, inst_e_crnand_bo_crb(imm, imm2)) }
+emit_e_crnand_bo_crb      :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append_elem(instructions, inst_e_crnand_bo_crb(imm, imm2)) }
 inst_e_crnot_bo_crb       :: #force_inline proc "contextless" (imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .E_CRNOT, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_imm(imm), op_imm(imm2), {}, {}}} }
-emit_e_crnot_bo_crb       :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append(instructions, inst_e_crnot_bo_crb(imm, imm2)) }
+emit_e_crnot_bo_crb       :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append_elem(instructions, inst_e_crnot_bo_crb(imm, imm2)) }
 inst_e_crnor_bo_crb       :: #force_inline proc "contextless" (imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .E_CRNOR, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_imm(imm), op_imm(imm2), {}, {}}} }
-emit_e_crnor_bo_crb       :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append(instructions, inst_e_crnor_bo_crb(imm, imm2)) }
+emit_e_crnor_bo_crb       :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append_elem(instructions, inst_e_crnor_bo_crb(imm, imm2)) }
 inst_e_crclr_bo_crb       :: #force_inline proc "contextless" (imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .E_CRCLR, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_imm(imm), op_imm(imm2), {}, {}}} }
-emit_e_crclr_bo_crb       :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append(instructions, inst_e_crclr_bo_crb(imm, imm2)) }
+emit_e_crclr_bo_crb       :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append_elem(instructions, inst_e_crclr_bo_crb(imm, imm2)) }
 inst_e_crxor_bo_crb       :: #force_inline proc "contextless" (imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .E_CRXOR, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_imm(imm), op_imm(imm2), {}, {}}} }
-emit_e_crxor_bo_crb       :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append(instructions, inst_e_crxor_bo_crb(imm, imm2)) }
+emit_e_crxor_bo_crb       :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append_elem(instructions, inst_e_crxor_bo_crb(imm, imm2)) }
 inst_e_mcrf_bo_crb        :: #force_inline proc "contextless" (imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .E_MCRF, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_imm(imm), op_imm(imm2), {}, {}}} }
-emit_e_mcrf_bo_crb        :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append(instructions, inst_e_mcrf_bo_crb(imm, imm2)) }
+emit_e_mcrf_bo_crb        :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append_elem(instructions, inst_e_mcrf_bo_crb(imm, imm2)) }
 inst_e_slwi_r_r_r         :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_SLWI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_slwi_r_r_r         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_slwi_r_r_r(rd, r2, r3)) }
+emit_e_slwi_r_r_r         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_slwi_r_r_r(rd, r2, r3)) }
 inst_e_slwi_dot_r_r_r     :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_SLWI_DOT, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_slwi_dot_r_r_r     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_slwi_dot_r_r_r(rd, r2, r3)) }
+emit_e_slwi_dot_r_r_r     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_slwi_dot_r_r_r(rd, r2, r3)) }
 inst_e_crand_bo_crb       :: #force_inline proc "contextless" (imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .E_CRAND, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_imm(imm), op_imm(imm2), {}, {}}} }
-emit_e_crand_bo_crb       :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append(instructions, inst_e_crand_bo_crb(imm, imm2)) }
+emit_e_crand_bo_crb       :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append_elem(instructions, inst_e_crand_bo_crb(imm, imm2)) }
 inst_e_rlw_r_r_r          :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_RLW, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_rlw_r_r_r          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_rlw_r_r_r(rd, r2, r3)) }
+emit_e_rlw_r_r_r          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_rlw_r_r_r(rd, r2, r3)) }
 inst_e_rlw_dot_r_r_r      :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_RLW_DOT, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_rlw_dot_r_r_r      :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_rlw_dot_r_r_r(rd, r2, r3)) }
+emit_e_rlw_dot_r_r_r      :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_rlw_dot_r_r_r(rd, r2, r3)) }
 inst_e_crset_bo_crb       :: #force_inline proc "contextless" (imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .E_CRSET, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_imm(imm), op_imm(imm2), {}, {}}} }
-emit_e_crset_bo_crb       :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append(instructions, inst_e_crset_bo_crb(imm, imm2)) }
+emit_e_crset_bo_crb       :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append_elem(instructions, inst_e_crset_bo_crb(imm, imm2)) }
 inst_e_creqv_bo_crb       :: #force_inline proc "contextless" (imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .E_CREQV, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_imm(imm), op_imm(imm2), {}, {}}} }
-emit_e_creqv_bo_crb       :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append(instructions, inst_e_creqv_bo_crb(imm, imm2)) }
+emit_e_creqv_bo_crb       :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append_elem(instructions, inst_e_creqv_bo_crb(imm, imm2)) }
 inst_e_rlwi_r_r_r         :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_RLWI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_rlwi_r_r_r         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_rlwi_r_r_r(rd, r2, r3)) }
+emit_e_rlwi_r_r_r         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_rlwi_r_r_r(rd, r2, r3)) }
 inst_e_rlwi_dot_r_r_r     :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_RLWI_DOT, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_rlwi_dot_r_r_r     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_rlwi_dot_r_r_r(rd, r2, r3)) }
+emit_e_rlwi_dot_r_r_r     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_rlwi_dot_r_r_r(rd, r2, r3)) }
 inst_e_crorc_bo_crb       :: #force_inline proc "contextless" (imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .E_CRORC, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_imm(imm), op_imm(imm2), {}, {}}} }
-emit_e_crorc_bo_crb       :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append(instructions, inst_e_crorc_bo_crb(imm, imm2)) }
+emit_e_crorc_bo_crb       :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append_elem(instructions, inst_e_crorc_bo_crb(imm, imm2)) }
 inst_e_crmove_bo_crb      :: #force_inline proc "contextless" (imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .E_CRMOVE, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_imm(imm), op_imm(imm2), {}, {}}} }
-emit_e_crmove_bo_crb      :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append(instructions, inst_e_crmove_bo_crb(imm, imm2)) }
+emit_e_crmove_bo_crb      :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append_elem(instructions, inst_e_crmove_bo_crb(imm, imm2)) }
 inst_e_cror_bo_crb        :: #force_inline proc "contextless" (imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .E_CROR, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_imm(imm), op_imm(imm2), {}, {}}} }
-emit_e_cror_bo_crb        :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append(instructions, inst_e_cror_bo_crb(imm, imm2)) }
+emit_e_cror_bo_crb        :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append_elem(instructions, inst_e_cror_bo_crb(imm, imm2)) }
 inst_e_srwi_r_r_r         :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_SRWI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_srwi_r_r_r         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_srwi_r_r_r(rd, r2, r3)) }
+emit_e_srwi_r_r_r         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_srwi_r_r_r(rd, r2, r3)) }
 inst_e_srwi_dot_r_r_r     :: #force_inline proc "contextless" (rd: Register, r2: Register, r3: Register) -> Instruction { return Instruction{mnemonic = .E_SRWI_DOT, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_reg(r3), {}}} }
-emit_e_srwi_dot_r_r_r     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append(instructions, inst_e_srwi_dot_r_r_r(rd, r2, r3)) }
+emit_e_srwi_dot_r_r_r     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, r3: Register) { append_elem(instructions, inst_e_srwi_dot_r_r_r(rd, r2, r3)) }
 inst_e_bdnz_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BDNZ, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bdnz_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bdnz_rel(target)) }
+emit_e_bdnz_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bdnz_rel(target)) }
 inst_e_bdnzl_rel          :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BDNZL, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bdnzl_rel          :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bdnzl_rel(target)) }
+emit_e_bdnzl_rel          :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bdnzl_rel(target)) }
 inst_e_bdz_rel            :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BDZ, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bdz_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bdz_rel(target)) }
+emit_e_bdz_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bdz_rel(target)) }
 inst_e_bdzl_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BDZL, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bdzl_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bdzl_rel(target)) }
+emit_e_bdzl_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bdzl_rel(target)) }
 inst_e_cmpi_crf_r_imm     :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_CMPI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_cmpi_crf_r_imm     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_cmpi_crf_r_imm(rd, r2, imm)) }
+emit_e_cmpi_crf_r_imm     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_cmpi_crf_r_imm(rd, r2, imm)) }
 inst_e_cmpwi_crf_r_imm    :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_CMPWI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_cmpwi_crf_r_imm    :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_cmpwi_crf_r_imm(rd, r2, imm)) }
+emit_e_cmpwi_crf_r_imm    :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_cmpwi_crf_r_imm(rd, r2, imm)) }
 inst_e_cmpli_crf_r_imm    :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_CMPLI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_cmpli_crf_r_imm    :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_cmpli_crf_r_imm(rd, r2, imm)) }
+emit_e_cmpli_crf_r_imm    :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_cmpli_crf_r_imm(rd, r2, imm)) }
 inst_e_cmplwi_crf_r_imm   :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_CMPLWI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_cmplwi_crf_r_imm   :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_cmplwi_crf_r_imm(rd, r2, imm)) }
+emit_e_cmplwi_crf_r_imm   :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_cmplwi_crf_r_imm(rd, r2, imm)) }
 inst_e_addi_r_r_imm       :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_ADDI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_addi_r_r_imm       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_addi_r_r_imm(rd, r2, imm)) }
+emit_e_addi_r_r_imm       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_addi_r_r_imm(rd, r2, imm)) }
 inst_e_subi_r_r_imm       :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_SUBI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_subi_r_r_imm       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_subi_r_r_imm(rd, r2, imm)) }
+emit_e_subi_r_r_imm       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_subi_r_r_imm(rd, r2, imm)) }
 inst_e_addi_dot_r_r_imm   :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_ADDI_DOT, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_addi_dot_r_r_imm   :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_addi_dot_r_r_imm(rd, r2, imm)) }
+emit_e_addi_dot_r_r_imm   :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_addi_dot_r_r_imm(rd, r2, imm)) }
 inst_e_addic_r_r_imm      :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_ADDIC, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_addic_r_r_imm      :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_addic_r_r_imm(rd, r2, imm)) }
+emit_e_addic_r_r_imm      :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_addic_r_r_imm(rd, r2, imm)) }
 inst_e_subic_r_r_imm      :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_SUBIC, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_subic_r_r_imm      :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_subic_r_r_imm(rd, r2, imm)) }
+emit_e_subic_r_r_imm      :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_subic_r_r_imm(rd, r2, imm)) }
 inst_e_addic_dot_r_r_imm  :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_ADDIC_DOT, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_addic_dot_r_r_imm  :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_addic_dot_r_r_imm(rd, r2, imm)) }
+emit_e_addic_dot_r_r_imm  :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_addic_dot_r_r_imm(rd, r2, imm)) }
 inst_e_subic_dot_r_r_imm  :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_SUBIC_DOT, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_subic_dot_r_r_imm  :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_subic_dot_r_r_imm(rd, r2, imm)) }
+emit_e_subic_dot_r_r_imm  :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_subic_dot_r_r_imm(rd, r2, imm)) }
 inst_e_mulli_r_r_imm      :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_MULLI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_mulli_r_r_imm      :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_mulli_r_r_imm(rd, r2, imm)) }
+emit_e_mulli_r_r_imm      :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_mulli_r_r_imm(rd, r2, imm)) }
 inst_e_subfic_r_r_imm     :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_SUBFIC, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_subfic_r_r_imm     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_subfic_r_r_imm(rd, r2, imm)) }
+emit_e_subfic_r_r_imm     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_subfic_r_r_imm(rd, r2, imm)) }
 inst_e_subfic_dot_r_r_imm :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_SUBFIC_DOT, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_subfic_dot_r_r_imm :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_subfic_dot_r_r_imm(rd, r2, imm)) }
+emit_e_subfic_dot_r_r_imm :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_subfic_dot_r_r_imm(rd, r2, imm)) }
 inst_e_andi_r_r_imm       :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_ANDI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_andi_r_r_imm       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_andi_r_r_imm(rd, r2, imm)) }
+emit_e_andi_r_r_imm       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_andi_r_r_imm(rd, r2, imm)) }
 inst_e_andi_dot_r_r_imm   :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_ANDI_DOT, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_andi_dot_r_r_imm   :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_andi_dot_r_r_imm(rd, r2, imm)) }
+emit_e_andi_dot_r_r_imm   :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_andi_dot_r_r_imm(rd, r2, imm)) }
 inst_e_nop_r_r_imm        :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_NOP, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_nop_r_r_imm        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_nop_r_r_imm(rd, r2, imm)) }
+emit_e_nop_r_r_imm        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_nop_r_r_imm(rd, r2, imm)) }
 inst_e_ori_r_r_imm        :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_ORI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_ori_r_r_imm        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_ori_r_r_imm(rd, r2, imm)) }
+emit_e_ori_r_r_imm        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_ori_r_r_imm(rd, r2, imm)) }
 inst_e_ori_dot_r_r_imm    :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_ORI_DOT, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_ori_dot_r_r_imm    :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_ori_dot_r_r_imm(rd, r2, imm)) }
+emit_e_ori_dot_r_r_imm    :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_ori_dot_r_r_imm(rd, r2, imm)) }
 inst_e_xori_r_r_imm       :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_XORI, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_xori_r_r_imm       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_xori_r_r_imm(rd, r2, imm)) }
+emit_e_xori_r_r_imm       :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_xori_r_r_imm(rd, r2, imm)) }
 inst_e_xori_dot_r_r_imm   :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_XORI_DOT, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_xori_dot_r_r_imm   :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_xori_dot_r_r_imm(rd, r2, imm)) }
+emit_e_xori_dot_r_r_imm   :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_xori_dot_r_r_imm(rd, r2, imm)) }
 inst_e_lis_r_imm          :: #force_inline proc "contextless" (rd: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_LIS, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_imm(imm), {}, {}}} }
-emit_e_lis_r_imm          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append(instructions, inst_e_lis_r_imm(rd, imm)) }
+emit_e_lis_r_imm          :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append_elem(instructions, inst_e_lis_r_imm(rd, imm)) }
 inst_e_and2is_dot_r_imm   :: #force_inline proc "contextless" (rd: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_AND2IS_DOT, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_imm(imm), {}, {}}} }
-emit_e_and2is_dot_r_imm   :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append(instructions, inst_e_and2is_dot_r_imm(rd, imm)) }
+emit_e_and2is_dot_r_imm   :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append_elem(instructions, inst_e_and2is_dot_r_imm(rd, imm)) }
 inst_e_or2is_r_imm        :: #force_inline proc "contextless" (rd: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_OR2IS, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_imm(imm), {}, {}}} }
-emit_e_or2is_r_imm        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append(instructions, inst_e_or2is_r_imm(rd, imm)) }
+emit_e_or2is_r_imm        :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append_elem(instructions, inst_e_or2is_r_imm(rd, imm)) }
 inst_e_and2i_dot_r_imm    :: #force_inline proc "contextless" (rd: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_AND2I_DOT, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_imm(imm), {}, {}}} }
-emit_e_and2i_dot_r_imm    :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append(instructions, inst_e_and2i_dot_r_imm(rd, imm)) }
+emit_e_and2i_dot_r_imm    :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append_elem(instructions, inst_e_and2i_dot_r_imm(rd, imm)) }
 inst_e_or2i_r_imm         :: #force_inline proc "contextless" (rd: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_OR2I, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_imm(imm), {}, {}}} }
-emit_e_or2i_r_imm         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append(instructions, inst_e_or2i_r_imm(rd, imm)) }
+emit_e_or2i_r_imm         :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append_elem(instructions, inst_e_or2i_r_imm(rd, imm)) }
 inst_e_cmphl16i_r_r_imm   :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_CMPHL16I, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_cmphl16i_r_r_imm   :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_cmphl16i_r_r_imm(rd, r2, imm)) }
+emit_e_cmphl16i_r_r_imm   :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_cmphl16i_r_r_imm(rd, r2, imm)) }
 inst_e_cmph16i_r_r_imm    :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_CMPH16I, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_cmph16i_r_r_imm    :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_cmph16i_r_r_imm(rd, r2, imm)) }
+emit_e_cmph16i_r_r_imm    :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_cmph16i_r_r_imm(rd, r2, imm)) }
 inst_e_cmpl16i_r_r_imm    :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_CMPL16I, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_cmpl16i_r_r_imm    :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_cmpl16i_r_r_imm(rd, r2, imm)) }
+emit_e_cmpl16i_r_r_imm    :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_cmpl16i_r_r_imm(rd, r2, imm)) }
 inst_e_mull2i_r_r_imm     :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_MULL2I, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_mull2i_r_r_imm     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_mull2i_r_r_imm(rd, r2, imm)) }
+emit_e_mull2i_r_r_imm     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_mull2i_r_r_imm(rd, r2, imm)) }
 inst_e_cmp16i_r_r_imm     :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_CMP16I, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_cmp16i_r_r_imm     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_cmp16i_r_r_imm(rd, r2, imm)) }
+emit_e_cmp16i_r_r_imm     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_cmp16i_r_r_imm(rd, r2, imm)) }
 inst_e_sub2is_r_r_imm     :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_SUB2IS, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_sub2is_r_r_imm     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_sub2is_r_r_imm(rd, r2, imm)) }
+emit_e_sub2is_r_r_imm     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_sub2is_r_r_imm(rd, r2, imm)) }
 inst_e_add2is_r_r_imm     :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_ADD2IS, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_add2is_r_r_imm     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_add2is_r_r_imm(rd, r2, imm)) }
+emit_e_add2is_r_r_imm     :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_add2is_r_r_imm(rd, r2, imm)) }
 inst_e_sub2i_dot_r_r_imm  :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_SUB2I_DOT, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_sub2i_dot_r_r_imm  :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_sub2i_dot_r_r_imm(rd, r2, imm)) }
+emit_e_sub2i_dot_r_r_imm  :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_sub2i_dot_r_r_imm(rd, r2, imm)) }
 inst_e_add2i_dot_r_r_imm  :: #force_inline proc "contextless" (rd: Register, r2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_ADD2I_DOT, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_reg(r2), op_imm(imm), {}}} }
-emit_e_add2i_dot_r_r_imm  :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append(instructions, inst_e_add2i_dot_r_r_imm(rd, r2, imm)) }
+emit_e_add2i_dot_r_r_imm  :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, r2: Register, imm: i64) { append_elem(instructions, inst_e_add2i_dot_r_r_imm(rd, r2, imm)) }
 inst_e_li_r_imm           :: #force_inline proc "contextless" (rd: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .E_LI, operand_count = 2, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_reg(rd), op_imm(imm), {}, {}}} }
-emit_e_li_r_imm           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append(instructions, inst_e_li_r_imm(rd, imm)) }
+emit_e_li_r_imm           :: #force_inline proc(instructions: ^[dynamic]Instruction, rd: Register, imm: i64) { append_elem(instructions, inst_e_li_r_imm(rd, imm)) }
 inst_e_b_rel              :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_B, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_b_rel              :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_b_rel(target)) }
+emit_e_b_rel              :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_b_rel(target)) }
 inst_e_bl_rel             :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BL, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bl_rel             :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bl_rel(target)) }
+emit_e_bl_rel             :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bl_rel(target)) }
 inst_e_bge_rel            :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BGE, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bge_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bge_rel(target)) }
+emit_e_bge_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bge_rel(target)) }
 inst_e_bgel_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BGEL, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bgel_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bgel_rel(target)) }
+emit_e_bgel_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bgel_rel(target)) }
 inst_e_bnl_rel            :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BNL, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bnl_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bnl_rel(target)) }
+emit_e_bnl_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bnl_rel(target)) }
 inst_e_bnll_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BNLL, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bnll_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bnll_rel(target)) }
+emit_e_bnll_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bnll_rel(target)) }
 inst_e_blt_rel            :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BLT, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_blt_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_blt_rel(target)) }
+emit_e_blt_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_blt_rel(target)) }
 inst_e_bltl_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BLTL, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bltl_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bltl_rel(target)) }
+emit_e_bltl_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bltl_rel(target)) }
 inst_e_bgt_rel            :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BGT, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bgt_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bgt_rel(target)) }
+emit_e_bgt_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bgt_rel(target)) }
 inst_e_bgtl_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BGTL, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bgtl_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bgtl_rel(target)) }
+emit_e_bgtl_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bgtl_rel(target)) }
 inst_e_ble_rel            :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BLE, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_ble_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_ble_rel(target)) }
+emit_e_ble_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_ble_rel(target)) }
 inst_e_blel_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BLEL, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_blel_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_blel_rel(target)) }
+emit_e_blel_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_blel_rel(target)) }
 inst_e_bng_rel            :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BNG, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bng_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bng_rel(target)) }
+emit_e_bng_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bng_rel(target)) }
 inst_e_bngl_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BNGL, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bngl_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bngl_rel(target)) }
+emit_e_bngl_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bngl_rel(target)) }
 inst_e_bne_rel            :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BNE, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bne_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bne_rel(target)) }
+emit_e_bne_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bne_rel(target)) }
 inst_e_bnel_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BNEL, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bnel_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bnel_rel(target)) }
+emit_e_bnel_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bnel_rel(target)) }
 inst_e_beq_rel            :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BEQ, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_beq_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_beq_rel(target)) }
+emit_e_beq_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_beq_rel(target)) }
 inst_e_beql_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BEQL, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_beql_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_beql_rel(target)) }
+emit_e_beql_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_beql_rel(target)) }
 inst_e_bso_rel            :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BSO, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bso_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bso_rel(target)) }
+emit_e_bso_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bso_rel(target)) }
 inst_e_bsol_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BSOL, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bsol_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bsol_rel(target)) }
+emit_e_bsol_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bsol_rel(target)) }
 inst_e_bun_rel            :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BUN, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bun_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bun_rel(target)) }
+emit_e_bun_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bun_rel(target)) }
 inst_e_bunl_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BUNL, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bunl_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bunl_rel(target)) }
+emit_e_bunl_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bunl_rel(target)) }
 inst_e_bns_rel            :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BNS, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bns_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bns_rel(target)) }
+emit_e_bns_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bns_rel(target)) }
 inst_e_bnsl_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BNSL, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bnsl_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bnsl_rel(target)) }
+emit_e_bnsl_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bnsl_rel(target)) }
 inst_e_bnu_rel            :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BNU, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bnu_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bnu_rel(target)) }
+emit_e_bnu_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bnu_rel(target)) }
 inst_e_bnul_rel           :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BNUL, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bnul_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bnul_rel(target)) }
+emit_e_bnul_rel           :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bnul_rel(target)) }
 inst_e_bc_bo_crb_rel      :: #force_inline proc "contextless" (imm: i64, imm2: i64, target: u32) -> Instruction { return Instruction{mnemonic = .E_BC, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_imm(imm), op_imm(imm2), op_label(target), {}}} }
-emit_e_bc_bo_crb_rel      :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64, target: u32) { append(instructions, inst_e_bc_bo_crb_rel(imm, imm2, target)) }
+emit_e_bc_bo_crb_rel      :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64, target: u32) { append_elem(instructions, inst_e_bc_bo_crb_rel(imm, imm2, target)) }
 inst_e_bcl_bo_crb_rel     :: #force_inline proc "contextless" (imm: i64, imm2: i64, target: u32) -> Instruction { return Instruction{mnemonic = .E_BCL, operand_count = 3, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_imm(imm), op_imm(imm2), op_label(target), {}}} }
-emit_e_bcl_bo_crb_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64, target: u32) { append(instructions, inst_e_bcl_bo_crb_rel(imm, imm2, target)) }
+emit_e_bcl_bo_crb_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64, target: u32) { append_elem(instructions, inst_e_bcl_bo_crb_rel(imm, imm2, target)) }
 inst_e_bf_rel             :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BF, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bf_rel             :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bf_rel(target)) }
+emit_e_bf_rel             :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bf_rel(target)) }
 inst_e_bfl_rel            :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BFL, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bfl_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bfl_rel(target)) }
+emit_e_bfl_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bfl_rel(target)) }
 inst_e_bt_rel             :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BT, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_bt_rel             :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_bt_rel(target)) }
+emit_e_bt_rel             :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_bt_rel(target)) }
 inst_e_btl_rel            :: #force_inline proc "contextless" (target: u32) -> Instruction { return Instruction{mnemonic = .E_BTL, operand_count = 1, length = 4, mode = .PPC32_VLE, form_id = 1, ops = {op_label(target), {}, {}, {}}} }
-emit_e_btl_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append(instructions, inst_e_btl_rel(target)) }
+emit_e_btl_rel            :: #force_inline proc(instructions: ^[dynamic]Instruction, target: u32) { append_elem(instructions, inst_e_btl_rel(target)) }
 
 // =============================================================================
 // Overload Groups

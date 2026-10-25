@@ -1,16 +1,16 @@
 /*
 Bindings for [[ miniaudio ; https://miniaud.io/docs ]] audio playback and capture library.
 
-Choice of public domain or MIT-0. See license statements at the end of this file.
+Choice of public domain or MIT-0. See license statements at the end of this file.\
 miniaudio - v0.11.24 - 2025-09-11
 
 David Reid - mackron@gmail.com
 
-Website:       https://miniaud.io
-Documentation: https://miniaud.io/docs
+Website:       https://miniaud.io\
+Documentation: https://miniaud.io/docs\
 GitHub:        https://github.com/mackron/miniaudio
 
-1. Introduction
+1\. Introduction
 ===============
 miniaudio is a single file library for audio playback and capture. To use it, do the following in
 one .c file:
@@ -455,7 +455,7 @@ is at the end, use `ma_sound_at_end()`. Looping of a sound can be controlled wit
 
 
 
-2. Building
+2\. Building
 ===========
 miniaudio should work cleanly out of the box without the need to download or install any
 dependencies. See below for platform-specific details.
@@ -722,7 +722,7 @@ To run locally, you'll need to use emrun:
     +----------------------------------+--------------------------------------------------------------------+
 
 
-3. Definitions
+3\. Definitions
 ==============
 This section defines common terms used throughout miniaudio. Unfortunately there is often ambiguity
 in the use of terms throughout the audio space, so this section is intended to clarify how miniaudio
@@ -773,7 +773,7 @@ All formats are native-endian.
 
 
 
-4. Data Sources
+4\. Data Sources
 ===============
 The data source abstraction in miniaudio is used for retrieving audio data from some source. A few
 examples include `ma_decoder`, `ma_noise` and `ma_waveform`. You will need to be familiar with data
@@ -1025,7 +1025,7 @@ init/uninit functions.
 
 
 
-5. Engine
+5\. Engine
 =========
 The `ma_engine` API is a high level API for managing and mixing sounds and effect processing. The
 `ma_engine` object encapsulates a resource manager and a node graph, both of which will be
@@ -1527,7 +1527,7 @@ resource manager and configure it appropriately. See the "Resource Management" s
 details on how to set this up.
 
 
-6. Resource Management
+6\. Resource Management
 ======================
 Many programs will want to manage sound resources for things such as reference counting and
 streaming. This is supported by miniaudio via the `ma_resource_manager` API.
@@ -2029,7 +2029,7 @@ thread.
 
 
 
-7. Node Graph
+7\. Node Graph
 =============
 miniaudio's routing infrastructure follows a node graph paradigm. The idea is that you create a
 node whose outputs are attached to inputs of another node, thereby creating a graph. There are
@@ -2500,7 +2500,7 @@ used. The same general process applies to detachment. See `ma_node_attach_output
 
 
 
-8. Decoding
+8\. Decoding
 ===========
 The `ma_decoder` API is used for reading audio files. Decoders are completely decoupled from
 devices and can be used independently. Built-in support is included for the following formats:
@@ -2662,7 +2662,7 @@ opportunity to clean up and internal data.
 
 
 
-9. Encoding
+9\. Encoding
 ===========
 The `ma_encoding` API is used for writing audio files. The only supported output format is WAV.
 This can be disabled by specifying the following option before the implementation of miniaudio:
@@ -2718,7 +2718,7 @@ Encoders must be uninitialized with `ma_encoder_uninit()`.
 
 
 
-10. Data Conversion
+10\. Data Conversion
 ===================
 A data conversion API is included with miniaudio which supports the majority of data conversion
 requirements. This supports conversion between sample formats, channel counts (with channel
@@ -3152,7 +3152,7 @@ is required. This can be retrieved in terms of both the input rate and the outpu
 
 
 
-11. Filtering
+11\. Filtering
 =============
 
 11.1. Biquad Filtering
@@ -3341,7 +3341,7 @@ the high shelf filter does the same thing for high frequencies.
 
 
 
-12. Waveform and Noise Generation
+12\. Waveform and Noise Generation
 =================================
 
 12.1. Waveforms
@@ -3439,7 +3439,7 @@ Below are the supported noise types.
 
 
 
-13. Audio Buffers
+13\. Audio Buffers
 =================
 miniaudio supports reading from a buffer of raw audio data via the `ma_audio_buffer` API. This can
 read from memory that's managed by the application, but can also handle the memory management for
@@ -3541,7 +3541,7 @@ as an error when returned by `ma_audio_buffer_unmap()`.
 
 
 
-14. Ring Buffers
+14\. Ring Buffers
 ================
 miniaudio supports lock free (single producer, single consumer) ring buffers which are exposed via
 the `ma_rb` and `ma_pcm_rb` APIs. The `ma_rb` API operates on bytes, whereas the `ma_pcm_rb`
@@ -3610,7 +3610,7 @@ producer thread.
 
 
 
-15. Backends
+15\. Backends
 ============
 The following backends are supported by miniaudio. These are listed in order of default priority.
 When no backend is specified when initializing a context or device, miniaudio will attempt to use
@@ -3704,7 +3704,7 @@ BSD
 
 
 
-16. Optimization Tips
+16\. Optimization Tips
 =====================
 See below for some tips on improving performance.
 
@@ -3731,7 +3731,7 @@ See below for some tips on improving performance.
 
 
 
-17. Miscellaneous Notes
+17\. Miscellaneous Notes
 =======================
 - Automatic stream routing is enabled on a per-backend basis. Support is explicitly enabled for
   WASAPI and Core Audio, however other backends such as PulseAudio may naturally support it, though

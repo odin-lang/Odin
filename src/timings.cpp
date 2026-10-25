@@ -32,6 +32,7 @@ gb_internal u64 win32_time_stamp__freq(void) {
 #elif defined(GB_SYSTEM_OSX)
 
 #include <mach/mach_time.h>
+#include <time.h>
 
 gb_internal mach_timebase_info_data_t osx_init_timebase_info(void) {
 	mach_timebase_info_data_t data;
@@ -102,6 +103,40 @@ gb_internal u64 time_stamp__freq(void) {
 	return unix_time_stamp__freq();
 #else
 #error time_stamp__freq
+#endif
+}
+
+gb_internal u64 thread_cpu_time_now(void) {
+#if defined(GB_SYSTEM_WINDOWS)
+	ULONG64 cycles = 0;
+	QueryThreadCycleTime(GetCurrentThread(), &cycles);
+	return cycles;
+#else
+	struct timespec ts;
+	clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+	return (cast(u64)ts.tv_sec * 1000000000ull) + cast(u64)ts.tv_nsec;
+#endif
+}
+
+gb_internal f64 thread_cpu_time_freq(void) {
+#if defined(GB_SYSTEM_WINDOWS)
+	gb_local_persist f64 freq = 0;
+	if (freq == 0) {
+		for (isize i = 0; i < 5; i++) {
+			u64 start = time_stamp_time_now();
+			u64 start_cycles = thread_cpu_time_now();
+			u64 end = start;
+			while (end-start < time_stamp__freq()/100) {
+				end = time_stamp_time_now();
+			}
+			u64 end_cycles = thread_cpu_time_now();
+			f64 measured = cast(f64)(end_cycles-start_cycles) * cast(f64)time_stamp__freq() / cast(f64)(end-start);
+			freq = gb_max(freq, measured);
+		}
+	}
+	return freq;
+#else
+	return 1.0e9;
 #endif
 }
 

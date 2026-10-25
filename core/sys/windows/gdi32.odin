@@ -229,20 +229,20 @@ BS_DIBPATTERN8X8 :: 8
 BS_MONOPATTERN   :: 9
 
 /* Hatch Styles */
-HS_HORIZONTAL    :: 0       /* ----- */
-HS_VERTICAL      :: 1       /* ||||| */
-HS_FDIAGONAL     :: 2       /* \\\\\ */
-HS_BDIAGONAL     :: 3       /* ///// */
-HS_CROSS         :: 4       /* +++++ */
-HS_DIAGCROSS     :: 5       /* xxxxx */
+HS_HORIZONTAL    :: 0       /* `-----` */
+HS_VERTICAL      :: 1       /* `|||||` */
+HS_FDIAGONAL     :: 2       /* `\\\\\` */
+HS_BDIAGONAL     :: 3       /* `/////` */
+HS_CROSS         :: 4       /* `+++++` */
+HS_DIAGCROSS     :: 5       /* `xxxxx` */
 HS_API_MAX       :: 12
 
 /* Pen Styles */
 PS_SOLID         ::  0
-PS_DASH          ::  1      /* ------- */
-PS_DOT           ::  2      /* ....... */
-PS_DASHDOT       ::  3      /* _._._._ */
-PS_DASHDOTDOT    ::  4      /* _.._.._ */
+PS_DASH          ::  1      /* `-------` */
+PS_DOT           ::  2      /* `.......` */
+PS_DASHDOT       ::  3      /* `_._._._` */
+PS_DASHDOTDOT    ::  4      /* `_.._.._` */
 PS_NULL          ::  5
 PS_INSIDEFRAME   ::  6
 PS_USERSTYLE     ::  7

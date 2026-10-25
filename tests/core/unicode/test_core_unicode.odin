@@ -2,6 +2,7 @@ package test_core_unicode
 
 import "core:log"
 import "core:testing"
+import "core:unicode"
 import "core:unicode/utf8"
 
 Test_Case :: struct {
@@ -202,5 +203,62 @@ test_grapheme_cluster_text :: proc(t: ^testing.T) {
 			i += 1
 		}
 		testing.expectf(t, i == len(c.expected_output), "%q: expected %d clusters, got %d", c.str, len(c.expected_output), i)
+	}
+}
+
+@test
+test_case_mapping :: proc(t: ^testing.T) {
+	Case_Test_Case :: struct {
+		r:     rune,
+		upper: rune,
+		lower: rune,
+		title: rune,
+	}
+
+	cases :: []Case_Test_Case {
+		{'a',          'A',          'a',          'A'},
+		{'A',          'A',          'a',          'A'},
+		{'1',          '1',          '1',          '1'},
+		{'ß',          'ß',          'ß',          'ß'},
+		{'ẞ',          'ẞ',          'ß',          'ẞ'},
+		{'ÿ',          'Ÿ',          'ÿ',          'Ÿ'},
+		{'ā',          'Ā',          'ā',          'Ā'},
+		{'ą',          'Ą',          'ą',          'Ą'},
+		{'ĉ',          'Ĉ',          'ĉ',          'Ĉ'},
+		{'ƀ',          'Ƀ',          'ƀ',          'Ƀ'},
+		{'Ǝ',          'Ǝ',          'ǝ',          'Ǝ'},
+		{'ɘ',          'ɘ',          'ɘ',          'ɘ'},
+		{'Ǆ',          'Ǆ',          'ǆ',          'ǅ'},
+		{'ǅ',          'Ǆ',          'ǆ',          'ǅ'},
+		{'ǆ',          'Ǆ',          'ǆ',          'ǅ'},
+		{'Ǉ',          'Ǉ',          'ǉ',          'ǈ'},
+		{'ǳ',          'Ǳ',          'ǳ',          'ǲ'},
+		{'ș',          'Ș',          'ș',          'Ș'},
+		{'Ț',          'Ț',          'ț',          'Ț'},
+		{'µ',          'Μ',          'µ',          'Μ'},
+		{'ς',          'Σ',          'ς',          'Σ'},
+		{'Ѐ',          'Ѐ',          'ѐ',          'Ѐ'},
+		{'Ӏ',          'Ӏ',          'ӏ',          'Ӏ'},
+		{'Ԁ',          'Ԁ',          'ԁ',          'Ԁ'},
+		{'Ⴀ',          'Ⴀ',          'ⴀ',          'Ⴀ'},
+		{'ა',          'Ა',          'ა',          'ა'},
+		{'Ა',          'Ა',          'ა',          'Ა'},
+		{'\u2126',     '\u2126',     'ω',          '\u2126'},
+		{'\u212A',     '\u212A',     'k',          '\u212A'},
+		{'Ⰰ',          'Ⰰ',          'ⰰ',          'Ⰰ'},
+		{'Ⲁ',          'Ⲁ',          'ⲁ',          'Ⲁ'},
+		{'Ꜣ',          'Ꜣ',          'ꜣ',          'Ꜣ'},
+		{'ꭰ',          'Ꭰ',          'ꭰ',          'Ꭰ'},
+		{'𐐀',          '𐐀',          '𐐨',          '𐐀'},
+		{'𐓘',          '𐒰',          '𐓘',          '𐒰'},
+		{'𐲀',          '𐲀',          '𐳀',          '𐲀'},
+		{'\U00010D50', '\U00010D50', '\U00010D70', '\U00010D50'},
+		{'𞤀',          '𞤀',          '𞤢',          '𞤀'},
+	}
+
+	for c in cases {
+		testing.expectf(t, unicode.to_upper(c.r) == c.upper, "to_upper(%U): expected %U, got %U", c.r, c.upper, unicode.to_upper(c.r))
+		testing.expectf(t, unicode.to_lower(c.r) == c.lower, "to_lower(%U): expected %U, got %U", c.r, c.lower, unicode.to_lower(c.r))
+		testing.expectf(t, unicode.to_title(c.r) == c.title, "to_title(%U): expected %U, got %U", c.r, c.title, unicode.to_title(c.r))
 	}
 }

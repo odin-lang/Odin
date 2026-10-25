@@ -693,11 +693,17 @@ def main():
 		print("Usage: {} <path to assets> [debug]".format(sys.argv[0]))
 		return 1
 
+	if "ODIN_DONT_DOWNLOAD_TEST_ASSETS" in os.environ:
+		print("WARNING:  Downloading test assets skipped (ODIN_DONT_DOWNLOAD_TEST_ASSETS set).\n")
+		return 0
+
 	debug = False
 	if len(sys.argv) >= 3 and sys.argv[2] == "debug":
 		debug = True
 
 	for suite in TEST_SUITES:
+		print("Downloading test assets: {}\n".format(suite))
+		sys.stdout.flush()
 		base_path = sys.argv[1] + "/{}".format(suite)
 		# Make assets path
 		try:
@@ -712,6 +718,7 @@ def main():
 
 		# We could fall back on downloading the PNG files individually, but it's slow
 		print("Done downloading {} assets.\n".format(suite))
+		sys.stdout.flush()
 
 	return 0
 

@@ -833,9 +833,9 @@ internal_int_prime_strong_lucas_selfridge :: proc(a: ^Int, allocator := context.
 /*
 	Performs one Fermat test.
 
-	If "a" were prime then b**a == b (mod a) since the order of
-	the multiplicative sub-group would be phi(a) = a-1.  That means
-	it would be the same as b**(a mod (a-1)) == b**1 == b (mod a).
+	If "a" were prime then `b**a == b (mod a)` since the order of
+	the multiplicative sub-group would be `phi(a) = a-1`.  That means
+	it would be the same as `b**(a mod (a-1)) == b**1 == b (mod a)`.
 
 	Returns `true` if the congruence holds, or `false` otherwise.
 

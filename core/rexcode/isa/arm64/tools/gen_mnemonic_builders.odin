@@ -686,7 +686,7 @@ write_emit_proc :: proc(sb: ^strings.Builder, entry: Proc_Entry, pad: int) {
 	for n := pad - len(entry.proc_name); n > 0; n -= 1 { strings.write_byte(sb, ' ') }
 	strings.write_string(sb, " :: #force_inline proc(")
 	strings.write_string(sb, strings.to_string(pstr))
-	strings.write_string(sb, ") { append(instructions, ")
+	strings.write_string(sb, ") { append_elem(instructions, ")
 	strings.write_string(sb, entry.proc_name)
 	strings.write_byte(sb, '(')
 	strings.write_string(sb, strings.to_string(astr))

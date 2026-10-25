@@ -205,6 +205,7 @@ foreign user32 {
 	ClipCursor   :: proc(lpRect: LPRECT) -> BOOL ---
 	GetCursorPos :: proc(lpPoint: LPPOINT) -> BOOL ---
 	SetCursorPos :: proc(X, Y: INT) -> BOOL ---
+	GetCursor    :: proc() -> HCURSOR ---
 	SetCursor    :: proc(hCursor: HCURSOR) -> HCURSOR ---
 	when !intrinsics.is_package_imported("raylib") {
 		ShowCursor :: proc(bShow: BOOL) -> INT ---
@@ -229,6 +230,7 @@ foreign user32 {
 	GetThreadDpiAwarenessContext  :: proc() -> DPI_AWARENESS_CONTEXT ---
 	GetWindowDpiAwarenessContext  :: proc(hwnd: HWND) -> DPI_AWARENESS_CONTEXT ---
 	GetDpiFromDpiAwarenessContext :: proc(value: DPI_AWARENESS_CONTEXT) -> UINT ---
+	GetDpiForSystem 			  :: proc() -> UINT ---
 	GetDpiForWindow               :: proc(hwnd: HWND) -> UINT ---
 	SetProcessDpiAwarenessContext :: proc(value: DPI_AWARENESS_CONTEXT) -> BOOL ---
 

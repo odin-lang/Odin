@@ -44,7 +44,7 @@ is_performant :: proc "contextless" () -> bool {
 	return info.cpu_features() >= req_features
 }
 
-@(private = "file")
+@(private = "file", enable_target_feature = "sse2,ssse3,avx,avx2")
 _dq_round_simd256 :: #force_inline proc "contextless" (
 	v0, v1, v2, v3: simd.u32x8,
 ) -> (
@@ -108,7 +108,7 @@ _dq_round_simd256 :: #force_inline proc "contextless" (
 	return v0, v1, v2, v3
 }
 
-@(private = "file")
+@(private = "file", enable_target_feature = "sse2,ssse3,avx,avx2")
 _add_and_permute_state_simd256 :: #force_inline proc "contextless" (
 	v0, v1, v2, v3, s0, s1, s2, s3: simd.u32x8,
 ) -> (
@@ -135,7 +135,7 @@ _add_and_permute_state_simd256 :: #force_inline proc "contextless" (
 	return r0, r1, r2, r3
 }
 
-@(private = "file")
+@(private = "file", enable_target_feature = "sse2,ssse3,avx,avx2")
 _xor_simd256 :: #force_inline proc "contextless" (
 	src: [^]simd.u32x8,
 	v0, v1, v2, v3: simd.u32x8,
@@ -155,7 +155,7 @@ _xor_simd256 :: #force_inline proc "contextless" (
 	return v0, v1, v2, v3
 }
 
-@(private = "file")
+@(private = "file", enable_target_feature = "sse2,ssse3,avx,avx2")
 _xor_simd256_x1 :: #force_inline proc "contextless" (
 	src: [^]simd.u32x8,
 	v0, v1: simd.u32x8,
@@ -171,7 +171,7 @@ _xor_simd256_x1 :: #force_inline proc "contextless" (
 	return v0, v1
 }
 
-@(private = "file")
+@(private = "file", enable_target_feature = "sse2,ssse3,avx,avx2")
 _store_simd256 :: #force_inline proc "contextless" (
 	dst: [^]simd.u32x8,
 	v0, v1, v2, v3: simd.u32x8,
@@ -182,7 +182,7 @@ _store_simd256 :: #force_inline proc "contextless" (
 	intrinsics.unaligned_store((^simd.u32x8)(dst[3:]), v3)
 }
 
-@(private = "file")
+@(private = "file", enable_target_feature = "sse2,ssse3,avx,avx2")
 _store_simd256_x1 :: #force_inline proc "contextless" (
 	dst: [^]simd.u32x8,
 	v0, v1: simd.u32x8,

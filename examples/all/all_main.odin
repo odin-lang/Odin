@@ -62,9 +62,12 @@ package all
 @(require) import "core:crypto/tuplehash"
 @(require) import "core:crypto/x25519"
 @(require) import "core:crypto/x448"
+@(require) import "core:crypto/x509"
 
 @(require) import "core:debug/pe"
 @(require) import "core:debug/trace"
+
+@(require) import "core:diff"
 
 @(require) import "core:dynlib"
 @(require) import "core:net"
@@ -118,6 +121,7 @@ package all
 
 @(require) import "core:odin/ast"
 @(require) import doc_format "core:odin/doc-format"
+@(require) import tool_format "core:odin/tool-format"
 @(require) import "core:odin/parser"
 @(require) import "core:odin/tokenizer"
 

@@ -130,9 +130,10 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 		i32 count = cast(i32)get_array_type_count(tl);
 
 		LLVMTypeRef vector_type = nullptr;
-		if (op != Token_Not && lb_try_vector_cast(p->module, val, &vector_type)) {
+		i64 vector_load_alignment = 0;
+		if (op != Token_Not && lb_try_vector_cast(p->module, val, &vector_type, &vector_load_alignment)) {
 			LLVMValueRef vp = LLVMBuildPointerCast(p->builder, val.value, LLVMPointerType(vector_type, 0), "");
-			LLVMValueRef v = OdinLLVMBuildLoad(p, vector_type, vp);
+			LLVMValueRef v = OdinLLVMBuildLoadAligned(p, vector_type, vp, vector_load_alignment);
 
 			LLVMValueRef opv = nullptr;
 			switch (op) {
@@ -185,9 +186,12 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 		lbValue cmp = {};
 		cmp.type = x.type;
 		if (is_type_bit_set(x.type)) {
+			// NOTE: `mask &~ x` rather than `x ~ mask`, so that bits outside of the set are cleared,
+			// as they are for a constant `~x`
 			ExactValue ev_mask = exact_bit_set_all_set_mask(x.type);
 			lbValue mask = lb_const_value(p->module, x.type, ev_mask);
-			cmp.value = LLVMBuildXor(p->builder, x.value, mask.value, "");
+			lbValue res = lb_emit_arith(p, Token_AndNot, mask, x, x.type);
+			return lb_emit_conv(p, res, type);
 		} else {
 			cmp.value = LLVMBuildNot(p->builder, x.value, "");
 		}
@@ -434,8 +438,10 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 
 	LLVMTypeRef vector_type0 = nullptr;
 	LLVMTypeRef vector_type1 = nullptr;
-	if (lb_try_vector_cast(p->module, lhs_ptr, &vector_type0) &&
-	    lb_try_vector_cast(p->module, rhs_ptr, &vector_type1)) {
+	i64 lhs_alignment = 0;
+	i64 rhs_alignment = 0;
+	if (lb_try_vector_cast(p->module, lhs_ptr, &vector_type0, &lhs_alignment) &&
+	    lb_try_vector_cast(p->module, rhs_ptr, &vector_type1, &rhs_alignment)) {
 		GB_ASSERT(vector_type0 == vector_type1);
 		LLVMTypeRef vector_type = vector_type0;
 
@@ -456,8 +462,8 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 
 		LLVMValueRef lhs_vp = LLVMBuildPointerCast(p->builder, lhs_ptr.value, LLVMPointerType(vector_type, 0), "");
 		LLVMValueRef rhs_vp = LLVMBuildPointerCast(p->builder, rhs_ptr.value, LLVMPointerType(vector_type, 0), "");
-		LLVMValueRef x = OdinLLVMBuildLoad(p, vector_type, lhs_vp);
-		LLVMValueRef y = OdinLLVMBuildLoad(p, vector_type, rhs_vp);
+		LLVMValueRef x = OdinLLVMBuildLoadAligned(p, vector_type, lhs_vp, lhs_alignment);
+		LLVMValueRef y = OdinLLVMBuildLoadAligned(p, vector_type, rhs_vp, rhs_alignment);
 		LLVMValueRef z = nullptr;
 
 		if (is_type_float(integral_type)) {
@@ -1290,10 +1296,9 @@ gb_internal lbValue lb_emit_matrix_mul_vector(lbProcedure *p, lbValue lhs, lbVal
 		if (LLVMIsALoadInst(rhs.value)) {
 			LLVMValueRef rhs_ptr = LLVMGetOperand(rhs.value, 0);
 			LLVMTypeRef vector_type = LLVMVectorType(lb_type(p->module, elem), cast(unsigned)vector_count);
-			LLVMValueRef rhs_vector = LLVMBuildLoad2(p->builder, vector_type, rhs_ptr, "");
 			// The alignment of what is being loaded, which is the right-hand vector. `type` is the
 			// result, and asking it cannot be right except by coincidence.
-			LLVMSetAlignment(rhs_vector, cast(unsigned)type_align_of(vt));
+			LLVMValueRef rhs_vector = OdinLLVMBuildLoadAligned(p, vector_type, rhs_ptr, type_align_of(vt));
 
 			for (unsigned i = 0; i < column_count; i++) {
 				LLVMValueRef mask = llvm_mask_same(p->module, i, row_count);
@@ -1411,6 +1416,13 @@ gb_internal lbValue lb_emit_vector_mul_matrix(lbProcedure *p, lbValue lhs, lbVal
 
 gb_internal lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, bool component_wise) {
 	GB_ASSERT(is_type_matrix(lhs.type) || is_type_matrix(rhs.type));
+
+	// NOTE: Only an array of the matrix's element type is a vector. Any other array is array programming. (See #6302)
+	Type *elem = base_array_type(is_type_matrix(lhs.type) ? lhs.type : rhs.type);
+	if ((is_type_array_like(lhs.type) && !are_types_identical(base_array_type(lhs.type), elem)) ||
+	    (is_type_array_like(rhs.type) && !are_types_identical(base_array_type(rhs.type), elem))) {
+		return lb_emit_arith_array(p, op, lhs, rhs, type);
+	}
 
 	if (op == Token_Mul && !component_wise) {
 		Type *xt = base_type(lhs.type);
@@ -1577,6 +1589,46 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 	return res;
 }
 
+// LLVM legalizes a 64-bit [su]div.fix into a 128-bit division with remainder, which has no
+// library call, so it is built here from 128-bit division, rounded down like LLVM's expansion.
+gb_internal LLVMValueRef lb_fixed_point_div_128(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs, LLVMValueRef scale, bool is_signed, bool is_sat) {
+	LLVMBuilderRef b = p->builder;
+	LLVMTypeRef type = LLVMTypeOf(lhs);
+	unsigned bits = LLVMGetIntTypeWidth(type);
+	LLVMTypeRef wide = LLVMIntTypeInContext(p->module->ctx, 128);
+	LLVMValueRef zero = LLVMConstNull(wide);
+
+	LLVMValueRef x = is_signed ? LLVMBuildSExt(b, lhs, wide, "") : LLVMBuildZExt(b, lhs, wide, "");
+	LLVMValueRef y = is_signed ? LLVMBuildSExt(b, rhs, wide, "") : LLVMBuildZExt(b, rhs, wide, "");
+	LLVMValueRef n = LLVMBuildShl(b, x, LLVMConstInt(wide, LLVMConstIntGetZExtValue(scale), false), "");
+	LLVMValueRef q = nullptr;
+	if (is_signed) {
+		// the quotient truncates, one less when a remainder is left and the signs differ
+		q = LLVMBuildSDiv(b, n, y, "");
+		LLVMValueRef r = LLVMBuildSRem(b, n, y, "");
+		LLVMValueRef inexact = LLVMBuildICmp(b, LLVMIntNE, r, zero, "");
+		LLVMValueRef differ = LLVMBuildICmp(b, LLVMIntSLT, LLVMBuildXor(b, r, y, ""), zero, "");
+		LLVMValueRef down = LLVMBuildAnd(b, inexact, differ, "");
+		q = LLVMBuildSub(b, q, LLVMBuildZExt(b, down, wide, ""), "");
+	} else {
+		q = LLVMBuildUDiv(b, n, y, "");
+	}
+
+	if (is_sat) {
+		if (is_signed) {
+			u64 max = (1ull << (bits-1)) - 1;
+			LLVMValueRef hi = LLVMConstInt(wide, max, false);
+			LLVMValueRef lo = LLVMConstInt(wide, ~max, true);
+			q = LLVMBuildSelect(b, LLVMBuildICmp(b, LLVMIntSGT, q, hi, ""), hi, q, "");
+			q = LLVMBuildSelect(b, LLVMBuildICmp(b, LLVMIntSLT, q, lo, ""), lo, q, "");
+		} else {
+			LLVMValueRef hi = LLVMConstInt(wide, bits == 64 ? ~0ull : (1ull << bits) - 1, false);
+			q = LLVMBuildSelect(b, LLVMBuildICmp(b, LLVMIntUGT, q, hi, ""), hi, q, "");
+		}
+	}
+	return LLVMBuildTrunc(b, q, type, "");
+}
+
 gb_internal LLVMValueRef lb_integer_division_fixed_point_intrinsics(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs, LLVMValueRef scale, Type *platform_type, char const *name) {
 	LLVMTypeRef type = LLVMTypeOf(rhs);
 	GB_ASSERT(LLVMTypeOf(lhs) == type);
@@ -1586,6 +1638,10 @@ gb_internal LLVMValueRef lb_integer_division_fixed_point_intrinsics(lbProcedure 
 	auto behaviour = lb_check_for_integer_division_by_zero_behaviour(p);
 
 	auto const do_op = [&]() -> LLVMValueRef {
+		if (type_size_of(platform_type) == 8) {
+			bool is_sat = string_ends_with(make_string_c(name), str_lit(".sat"));
+			return lb_fixed_point_div_128(p, lhs, rhs, scale, !is_type_unsigned(platform_type), is_sat);
+		}
 		LLVMTypeRef types[1] = {lb_type(p->module, platform_type)};
 
 		LLVMValueRef args[3] = {
@@ -1924,7 +1980,12 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 	}
 
 	lhs = lb_emit_conv(p, lhs, type);
-	rhs = lb_emit_conv(p, rhs, type);
+	if ((op == Token_Shl || op == Token_Shr) && type_size_of(rhs.type) > type_size_of(type)) {
+		// NOTE: Keep a wider shift amount wide until it has been tested against the bit width of `type`
+		rhs = lb_emit_conv(p, rhs, integer_endian_type_to_platform_type(rhs.type));
+	} else {
+		rhs = lb_emit_conv(p, rhs, type);
+	}
 
 	if (is_type_integer(type) && is_type_different_to_arch_endianness(type)) {
 		switch (op) {
@@ -1937,7 +1998,7 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 
 		Type *platform_type = integer_endian_type_to_platform_type(type);
 		lbValue x = lb_emit_byte_swap(p, lhs, integer_endian_type_to_platform_type(lhs.type));
-		lbValue y = lb_emit_byte_swap(p, rhs, integer_endian_type_to_platform_type(rhs.type));
+		lbValue y = lb_emit_conv(p, rhs, integer_endian_type_to_platform_type(rhs.type));
 
 		lbValue res = lb_emit_arith(p, op, x, y, platform_type);
 
@@ -2031,13 +2092,12 @@ handle_op:;
 		return res;
 	case Token_Shl:
 		{
+			LLVMValueRef bit_size = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type), false);
+			LLVMValueRef width_test = LLVMBuildICmp(p->builder, LLVMIntULT, rhs.value, bit_size, "");
+
 			rhs = lb_emit_conv(p, rhs, lhs.type);
 			LLVMValueRef lhsval = lhs.value;
 			LLVMValueRef bits = rhs.value;
-
-			LLVMValueRef bit_size = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type), false);
-
-			LLVMValueRef width_test = LLVMBuildICmp(p->builder, LLVMIntULT, bits, bit_size, "");
 
 			res.value = LLVMBuildShl(p->builder, lhsval, bits, "");
 			LLVMValueRef zero = LLVMConstNull(lb_type(p->module, lhs.type));
@@ -2046,12 +2106,13 @@ handle_op:;
 		}
 	case Token_Shr:
 		{
+			LLVMValueRef bit_size = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type), false);
+			LLVMValueRef width_test = LLVMBuildICmp(p->builder, LLVMIntULT, rhs.value, bit_size, "");
+
 			rhs = lb_emit_conv(p, rhs, lhs.type);
 			LLVMValueRef lhsval = lhs.value;
 			LLVMValueRef bits = rhs.value;
 			bool is_unsigned = is_type_unsigned(integral_type);
-			LLVMValueRef bit_size = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type), false);
-			LLVMValueRef width_test = LLVMBuildICmp(p->builder, LLVMIntULT, bits, bit_size, "");
 
 			if (is_unsigned) {
 				res.value = LLVMBuildLShr(p->builder, lhsval, bits, "");
@@ -2081,9 +2142,9 @@ handle_op:;
 }
 
 gb_internal bool lb_is_empty_string_constant(Ast *expr) {
-	if (expr->tav.value.kind == ExactValue_String &&
+	if (expr->tav.value().kind == ExactValue_String &&
 	    is_type_string(expr->tav.type)) {
-		String s = expr->tav.value.value_string;
+		String s = expr->tav.value().value_string;
 		return s.len == 0;
 	}
 	return false;
@@ -2115,6 +2176,36 @@ gb_internal lbValue lb_build_binary_in(lbProcedure *p, lbValue left, lbValue rig
 			GB_ASSERT(are_types_identical(left.type, key_type));
 
 			Type *it = bit_set_to_int(rt);
+
+			if (is_type_array(it)) {
+				Type *elem    = base_array_type(it);
+				i64 elem_bits = 8*type_size_of(elem);
+
+				lbValue key     = lb_emit_conv(p, left, t_int);
+				lbValue lower_v = lb_const_int(p->module, t_int, rt->BitSet.lower);
+				key = lb_emit_arith(p, Token_Sub, key, lower_v, t_int);
+
+				lbValue ebits    = lb_const_int(p->module, t_int, elem_bits);
+				lbValue elem_idx = lb_emit_arith(p, Token_Quo, key, ebits, t_int);
+				lbValue bit_idx  = lb_emit_arith(p, Token_Mod, key, ebits, t_int);
+
+				lbValue arr     = lb_emit_transmute(p, right, it);
+				lbValue arr_ptr = lb_address_from_load_or_generate_local(p, arr);
+				arr_ptr.type    = alloc_type_pointer(it);
+
+				lbValue e_ptr   = lb_emit_array_ep(p, arr_ptr, elem_idx);
+				lbValue e_val   = lb_emit_load(p, e_ptr);
+
+				lbValue shifted = lb_emit_arith(p, Token_Shr, e_val, lb_emit_conv(p, bit_idx, elem), elem);
+				lbValue masked  = lb_emit_arith(p, Token_And, shifted, lb_const_int(p->module, elem, 1), elem);
+				lbValue zero    = lb_const_int(p->module, elem, 0);
+
+				if (op == Token_in) {
+					return lb_emit_conv(p, lb_emit_comp(p, Token_NotEq, masked, zero), t_bool);
+				} else {
+					return lb_emit_conv(p, lb_emit_comp(p, Token_CmpEq, masked, zero), t_bool);
+				}
+			}
 
 			left = lb_emit_conv(p, left, it);
 			if (is_type_different_to_arch_endianness(it)) {
@@ -2305,7 +2396,8 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 				String str = lb_get_const_string(m, value);
 				lbValue res = {};
 				res.type = t;
-				res.value = llvm_cstring(m, str);
+				// NOTE: as with a constant 'cstring', even "" points to its terminator rather than being nil
+				res.value = lb_find_or_add_entity_string_ptr(m, str, false);
 				return res;
 			} else if (src->kind == Type_Basic && src->Basic.kind == Basic_string16 && dst->Basic.kind == Basic_cstring16) {
 				GB_PANIC("TODO(bill): UTF-16 string");
@@ -2916,7 +3008,14 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 					}
 				}
 
-				return lb_emit_deep_field_ev(p, value, sel);
+				// NOTE: a pointer to the field is only wanted when the selection goes through a 'using' pointer field,
+				// in which case it points into the referenced value rather than the local copy
+				lbValue ptr = lb_address_from_load_or_generate_local(p, value);
+				lbValue res = lb_emit_deep_field_gep(p, ptr, sel);
+				if (!are_types_identical(res.type, dt)) {
+					res = lb_emit_load(p, res);
+				}
+				return res;
 
 			}
 		}
@@ -3011,9 +3110,9 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 	if (is_type_array(dst) && is_type_array(src)) {
 		Type *dst_elem = base_array_type(dst);
 		Type *src_elem = base_array_type(src);
+		// NOTE: only arrays nested equally deep convert element by element, a shallower one is broadcast (See #6642)
 		if (dst->Array.count == src->Array.count &&
-		    !is_type_array_like(dst->Array.elem) &&
-		    !is_type_array_like(src->Array.elem)) {
+		    type_array_depth(dst) == type_array_depth(src)) {
 			if (are_types_identical(dst_elem, src_elem)) {
 				lbValue v = value;
 				v.type = t;
@@ -3076,8 +3175,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 					LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, psrc.value, LLVMPointerType(src_vector_type, 0), "");
 					LLVMValueRef dst_ptr = LLVMBuildPointerCast(p->builder, pdst.value, LLVMPointerType(dst_vector_type, 0), "");
 
-					LLVMValueRef src_vector = LLVMBuildLoad2(p->builder, src_vector_type, src_ptr, "");
-					LLVMSetAlignment(src_vector, cast(unsigned)type_align_of(se));
+					LLVMValueRef src_vector = OdinLLVMBuildLoadAligned(p, src_vector_type, src_ptr, type_align_of(se));
 
 					LLVMValueRef dst_vector = LLVMBuildCast(p->builder, op, src_vector, dst_vector_type, "");
 
@@ -3110,8 +3208,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 					LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, psrc.value, LLVMPointerType(src_vector_type, 0), "");
 					LLVMValueRef dst_ptr = LLVMBuildPointerCast(p->builder, pdst.value, LLVMPointerType(dst_vector_type, 0), "");
 
-					LLVMValueRef src_vector = LLVMBuildLoad2(p->builder, src_vector_type, src_ptr, "");
-					LLVMSetAlignment(src_vector, cast(unsigned)type_align_of(se));
+					LLVMValueRef src_vector = OdinLLVMBuildLoadAligned(p, src_vector_type, src_ptr, type_align_of(se));
 
 					LLVMValueRef dst_vector = LLVMBuildCast(p->builder, op, src_vector, dst_vector_type, "");
 					LLVMValueRef dst_zero = LLVMConstNull(dst_vector_type);
@@ -3428,6 +3525,29 @@ gb_internal lbValue lb_compare_records(lbProcedure *p, TokenKind op_kind, lbValu
 }
 
 
+
+gb_internal lbValue lb_bit_set_array_is_zero(lbProcedure *p, lbValue arr) {
+	Type *at = base_type(arr.type);
+	GB_ASSERT(at->kind == Type_Array);
+	Type *elem = at->Array.elem;
+	i64 n = at->Array.count;
+
+	lbValue acc = {};
+	acc.type = elem;
+	acc.value = LLVMBuildExtractValue(p->builder, arr.value, 0, "");
+	for (i64 i = 1; i < n; i++) {
+		lbValue e = {};
+		e.type  = elem;
+		e.value = LLVMBuildExtractValue(p->builder, arr.value, cast(unsigned)i, "");
+
+		acc = lb_emit_arith(p, Token_Or, acc, e, elem);
+	}
+
+	lbValue res = {};
+	res.type  = t_llvm_bool;
+	res.value = LLVMBuildICmp(p->builder, LLVMIntEQ, acc.value, lb_const_int(p->module, elem, 0).value, "");
+	return res;
+}
 
 gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right) {
 	Type *a = core_type(left.type);
@@ -3753,6 +3873,52 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 	}
 
 	if (is_type_bit_set(a)) {
+		Type *it_backing = bit_set_to_int(a);
+		if (is_type_array(it_backing)) {
+			lbValue lhs = lb_emit_transmute(p, left, it_backing);
+			lbValue rhs = lb_emit_transmute(p, right, it_backing);
+			switch (op_kind) {
+			case Token_CmpEq:
+			case Token_NotEq:
+				{
+					lbValue diff = lb_emit_arith(p, Token_Xor, lhs, rhs, it_backing);
+					lbValue equal = lb_bit_set_array_is_zero(p, diff);
+					if (op_kind == Token_NotEq) {
+						lbValue res = {};
+						res.type = t_llvm_bool;
+						res.value = LLVMBuildNot(p->builder, equal.value, "");
+						return res;
+					}
+					return equal;
+				}
+			case Token_Lt:
+			case Token_LtEq:
+				{
+					// subset: (lhs &~ rhs) == {}; strict also requires lhs != rhs
+					lbValue d = lb_emit_arith(p, Token_AndNot, lhs, rhs, it_backing);
+					lbValue res = lb_bit_set_array_is_zero(p, d);
+					if (op_kind == Token_Lt) {
+						lbValue diff = lb_emit_arith(p, Token_Xor, lhs, rhs, it_backing);
+						lbValue equal = lb_bit_set_array_is_zero(p, diff);
+						res = lb_emit_arith(p, Token_AndNot, res, equal, t_llvm_bool);
+					}
+					return res;
+				}
+			case Token_Gt:
+			case Token_GtEq:
+				{
+					// superset: (rhs &~ lhs) == {}; strict also requires lhs != rhs
+					lbValue d = lb_emit_arith(p, Token_AndNot, rhs, lhs, it_backing);
+					lbValue res = lb_bit_set_array_is_zero(p, d);
+					if (op_kind == Token_Gt) {
+						lbValue diff = lb_emit_arith(p, Token_Xor, lhs, rhs, it_backing);
+						lbValue equal = lb_bit_set_array_is_zero(p, diff);
+						res = lb_emit_arith(p, Token_AndNot, res, equal, t_llvm_bool);
+					}
+					return res;
+				}
+			}
+		}
 		switch (op_kind) {
 		case Token_Lt:
 		case Token_LtEq:
@@ -4255,7 +4421,9 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 		Type *type = v.type;
 		lbAddr addr = {};
 		if (p->is_startup) {
-			addr = lb_add_global_generated_from_procedure(p, type, v);
+			// NOTE: only a constant can be the global's initializer, any other value is written by the store below
+			lbValue initializer = LLVMIsConstant(v.value) ? v : lbValue{};
+			addr = lb_add_global_generated_from_procedure(p, type, initializer);
 		} else {
 			addr = lb_add_local_generated(p, type, false);
 		}
@@ -4598,6 +4766,27 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 	case_ast_node(te, TernaryIfExpr, expr);
 		GB_ASSERT(te->y != nullptr);
 		Type *type = default_type(type_of_expr(expr));
+		if (lb_is_type_large_aggregate(p->module, type)) {
+			// NOTE(bill): A large aggregate needs to be selected through memory
+			// as instruction selection splits a `phi` or `select` of it per field
+			lbAddr res = lb_add_local_generated(p, type, false);
+
+			lbBlock *then  = lb_create_block(p, "if.then");
+			lbBlock *done  = lb_create_block(p, "if.done");
+			lbBlock *else_ = lb_create_block(p, "if.else");
+
+			lb_build_cond(p, te->cond, then, else_);
+			lb_start_block(p, then);
+			lb_addr_store(p, res, lb_emit_conv(p, lb_build_expr(p, te->x), type));
+			lb_emit_jump(p, done);
+
+			lb_start_block(p, else_);
+			lb_addr_store(p, res, lb_emit_conv(p, lb_build_expr(p, te->y), type));
+			lb_emit_jump(p, done);
+
+			lb_start_block(p, done);
+			return lb_addr_load(p, res);
+		}
 		if (lb_is_expr_trivial(te->x) && lb_is_expr_trivial(te->y)) {
 			lbValue cond = lb_build_expr(p, te->cond);
 			lbValue x = lb_emit_conv(p, lb_build_expr(p, te->x), type);
@@ -4771,7 +4960,7 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 	case_end;
 
 	case_ast_node(pl, ProcLit, expr);
-		return lb_generate_anonymous_proc_lit(p->module, p->name, expr, p);
+		return lb_generate_anonymous_proc_lit(p->module, expr, p);
 	case_end;
 
 	case_ast_node(cl, CompoundLit, expr);
@@ -5005,8 +5194,8 @@ gb_internal void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *
 			}
 			if (is_ast_range(fv->field)) {
 				ast_node(ie, BinaryExpr, fv->field);
-				TypeAndValue lo_tav = ie->left->tav;
-				TypeAndValue hi_tav = ie->right->tav;
+				TypeAndValue lo_tav = type_and_value_of_expr(ie->left);
+				TypeAndValue hi_tav = type_and_value_of_expr(ie->right);
 				GB_ASSERT(lo_tav.mode == Addressing_Constant);
 				GB_ASSERT(hi_tav.mode == Addressing_Constant);
 
@@ -5047,7 +5236,7 @@ gb_internal void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *
 					}
 				}
 			} else {
-				auto tav = fv->field->tav;
+				TypeAndValue tav = type_and_value_of_expr(fv->field);
 				GB_ASSERT(tav.mode == Addressing_Constant);
 				i64 index = exact_value_to_i64(tav.value);
 
@@ -5148,6 +5337,7 @@ gb_internal lbAddr lb_build_addr_soa_elem_index(lbProcedure *p, Ast *expr, lbAdd
 
 gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 	ast_node(ie, IndexExpr, expr);
+	bool proven = (expr->state_flags & StateFlag_bounds_check_proven) != 0; // see check_escape.cpp
 
 	Type *t = base_type(type_of_expr(ie->expr));
 
@@ -5238,6 +5428,15 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 			lbAddr soa_addr = lb_addr_soa_variable_from_soa_ptr(p, soa_ptr);
 			return lb_build_addr_soa_elem_index(p, expr, soa_addr, t);
 		}
+		switch (array_addr.kind) {
+		case lbAddr_Swizzle:
+		case lbAddr_SwizzleLarge:
+		case lbAddr_SwizzleSoa:
+			// v.yx[j], a swizzle has no pointer of its own, and the checker
+			// only allows reading its elements, so index a copy of it
+			array_addr = lb_addr(lb_address_from_load_or_generate_local(p, lb_addr_load(p, array_addr)));
+			break;
+		}
 		lbValue array = lb_addr_get_ptr(p, array_addr);
 		if (deref) {
 			array = lb_emit_load(p, array);
@@ -5247,7 +5446,7 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		lbValue elem = lb_emit_array_ep(p, array, index);
 
 		auto index_tv = type_and_value_of_expr(ie->index);
-		if (index_tv.mode != Addressing_Constant) {
+		if (index_tv.mode != Addressing_Constant && !proven) {
 			lbValue len = lb_const_int(p->module, t_int, t->Array.count);
 			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 		}
@@ -5302,7 +5501,7 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 
 		lbValue elem = lb_emit_array_ep(p, array, index);
 
-		if (index_tv.mode != Addressing_Constant) {
+		if (index_tv.mode != Addressing_Constant && !proven) {
 			lbValue len = lb_const_int(p->module, t_int, t->EnumeratedArray.count);
 			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 		}
@@ -5318,7 +5517,9 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		lbValue elem = lb_slice_elem(p, slice);
 		lbValue index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
 		lbValue len = lb_slice_len(p, slice);
-		lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+		if (!proven) {
+			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+		}
 		lbValue v = lb_emit_ptr_offset(p, elem, index);
 		return lb_addr(v);
 	}
@@ -5348,7 +5549,9 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		lbValue elem = lb_dynamic_array_elem(p, dynamic_array);
 		lbValue len = lb_dynamic_array_len(p, dynamic_array);
 		lbValue index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
-		lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+		if (!proven) {
+			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+		}
 		lbValue v = lb_emit_ptr_offset(p, elem, index);
 		return lb_addr(v);
 	}
@@ -5397,7 +5600,9 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		len = lb_string_len(p, str);
 
 		index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
-		lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+		if (!proven) {
+			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+		}
 
 		return lb_addr(lb_emit_ptr_offset(p, elem, index));
 	}
@@ -5408,6 +5613,7 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 
 gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr) {
 	ast_node(se, SliceExpr, expr);
+	bool proven = (expr->state_flags & StateFlag_bounds_check_proven) != 0; // see check_escape.cpp
 
 	if (true) {
 		// NOTE(bill): Fused nested slice chain: src[a:b][c:d][e:f]...
@@ -5480,7 +5686,7 @@ gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr) {
 					}
 
 					bool no_indices = s->low == nullptr && s->high == nullptr;
-					if (!no_indices) {
+					if (!no_indices && (chain[i]->state_flags & StateFlag_bounds_check_proven) == 0) {
 						lb_emit_slice_bounds_check(p, s->open, lo, hi, cur_len, s->low != nullptr);
 					}
 
@@ -5524,7 +5730,7 @@ gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr) {
 		lbValue len = lb_slice_len(p, base);
 		if (high.value == nullptr) high = len;
 
-		if (!no_indices) {
+		if (!no_indices && !proven) {
 			lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 		}
 
@@ -5543,7 +5749,7 @@ gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr) {
 		lbValue len = lb_dynamic_array_len(p, base);
 		if (high.value == nullptr) high = len;
 
-		if (!no_indices) {
+		if (!no_indices && !proven) {
 			lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 		}
 
@@ -5561,7 +5767,7 @@ gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr) {
 			lbValue len = lb_string_len(p, base);
 			if (high.value == nullptr) high = len;
 
-			if (!no_indices) {
+			if (!no_indices && !proven) {
 				lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 			}
 
@@ -5576,7 +5782,7 @@ gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr) {
 		lbValue len = lb_string_len(p, base);
 		if (high.value == nullptr) high = len;
 
-		if (!no_indices) {
+		if (!no_indices && !proven) {
 			lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 		}
 
@@ -5596,7 +5802,9 @@ gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr) {
 		low = lb_emit_conv(p, low, t_int);
 		high = lb_emit_conv(p, high, t_int);
 
-		lb_emit_multi_pointer_slice_bounds_check(p, se->open, low, high);
+		if (!proven) {
+			lb_emit_multi_pointer_slice_bounds_check(p, se->open, low, high);
+		}
 
 		LLVMValueRef indices[1] = {low.value};
 		lbValue ptr = {};
@@ -5618,6 +5826,7 @@ gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr) {
 
 gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 	ast_node(se, SliceExpr, expr);
+	bool proven = (expr->state_flags & StateFlag_bounds_check_proven) != 0; // see check_escape.cpp
 
 	lbAddr addr = lb_build_addr(p, se->expr);
 	lbValue base = lb_addr_load(p, addr);
@@ -5648,7 +5857,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 		lbValue len = lb_slice_len(p, base);
 		if (high.value == nullptr) high = len;
 
-		if (!no_indices) {
+		if (!no_indices && !proven) {
 			lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 		}
 
@@ -5667,7 +5876,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 		lbValue len = lb_dynamic_array_len(p, base);
 		if (high.value == nullptr) high = len;
 
-		if (!no_indices) {
+		if (!no_indices && !proven) {
 			lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 		}
 
@@ -5690,7 +5899,9 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 			low = lb_emit_conv(p, low, t_int);
 			high = lb_emit_conv(p, high, t_int);
 
-			lb_emit_multi_pointer_slice_bounds_check(p, se->open, low, high);
+			if (!proven) {
+				lb_emit_multi_pointer_slice_bounds_check(p, se->open, low, high);
+			}
 
 			LLVMValueRef indices[1] = {low.value};
 			LLVMValueRef ptr = LLVMBuildGEP2(p->builder, lb_type(p->module, base_type(base.type)->MultiPointer.elem), base.value, indices, 1, "");
@@ -5714,7 +5925,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 		bool high_const = type_and_value_of_expr(se->high).mode == Addressing_Constant;
 
 		if (!low_const || !high_const) {
-			if (!no_indices) {
+			if (!no_indices && !proven) {
 				lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 			}
 		}
@@ -5733,13 +5944,9 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 		lbValue len = lb_fixed_capacity_dynamic_array_len(p, base);
 		if (high.value == nullptr) high = len;
 
-		bool low_const  = type_and_value_of_expr(se->low).mode  == Addressing_Constant;
-		bool high_const = type_and_value_of_expr(se->high).mode == Addressing_Constant;
-
-		if (!low_const || !high_const) {
-			if (!no_indices) {
-				lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
-			}
+		// unlike a fixed array, the length is only known at runtime, so constant indices are checked too
+		if (!no_indices) {
+			lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 		}
 		lbValue data_ptr = lb_addr_get_ptr(p, addr);
 		lbValue array_ptr = lb_emit_struct_ep(p, data_ptr, 0);
@@ -5757,7 +5964,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 			lbValue len = lb_string_len(p, base);
 			if (high.value == nullptr) high = len;
 
-			if (!no_indices) {
+			if (!no_indices && !proven) {
 				lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 			}
 
@@ -5772,7 +5979,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 		lbValue len = lb_string_len(p, base);
 		if (high.value == nullptr) high = len;
 
-		if (!no_indices) {
+		if (!no_indices && !proven) {
 			lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 		}
 
@@ -6074,7 +6281,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 		// NOTE(bill): inline insertion sort should be good enough, right?
 		for (isize i = 1; i < values.count; i++) {
 			for (isize j = i;
-			     j > 0 && fields[i].bit_offset < fields[j].bit_offset;
+			     j > 0 && fields[j].bit_offset < fields[j-1].bit_offset;
 			     j--) {
 				auto vtmp = values[j];
 				values[j] = values[j-1];
@@ -6163,14 +6370,14 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 						GB_ASSERT(mask_width > 0);
 						bits_to_set -= mask_width;
 
-						LLVMValueRef mask = lb_const_low_bits_mask(vt, mask_width);
+						LLVMValueRef mask = lb_const_low_bits_mask(lit, mask_width);
 
-						LLVMValueRef to_set = LLVMBuildAnd(p->builder, val, mask, "");
+						LLVMValueRef to_set = LLVMBuildIntCast2(p->builder, val, lit, false, "");
+						to_set = LLVMBuildAnd(p->builder, to_set, mask, "");
 
 						if (elem_bit_offset != 0) {
-							to_set = LLVMBuildShl(p->builder, to_set, LLVMConstInt(vt, elem_bit_offset, false), "");
+							to_set = LLVMBuildShl(p->builder, to_set, LLVMConstInt(lit, elem_bit_offset, false), "");
 						}
-						to_set = LLVMBuildTrunc(p->builder, to_set, lit, "");
 
 						if (LLVMIsNull(elems[elem_idx])) {
 							elems[elem_idx] = to_set; // don't even bother doing `0 | to_set`
@@ -6348,13 +6555,16 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 	case Type_FixedCapacityDynamicArray: {
 		if (cl->elems.count > 0) {
-			lb_addr_store(p, v, lb_const_value(p->module, type, exact_value_compound(expr)));
+			// NOTE: the length isn't taken from the literal's constant, which is nil when its elements can't be constant
+			lbValue dst_ptr = lb_addr_get_ptr(p, v);
+			lbValue value = lb_const_value(p->module, type, exact_value_compound(expr));
+			lb_emit_store(p, lb_emit_struct_ep(p, dst_ptr, 0), lb_emit_struct_ev(p, value, 0));
+			lb_emit_store(p, lb_emit_struct_ep(p, dst_ptr, 1), lb_const_int(p->module, t_int, cl->max_count));
 
 			auto temp_data = array_make<lbCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
 
 			lb_build_addr_compound_lit_populate(p, cl->elems, &temp_data, type);
 
-			lbValue dst_ptr = lb_addr_get_ptr(p, v);
 			for_array(i, temp_data) {
 				i32 index = cast(i32)(temp_data[i].elem_index);
 				temp_data[i].gep = lb_emit_array_epi(p, dst_ptr, index);
@@ -6461,20 +6671,30 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 			Type *backing = bit_set_to_int(type);
 			if (is_type_array(backing)) {
-				GB_PANIC("TODO: bit_set [N]T");
 				Type *base_it = core_array_type(backing);
 				i64 bits_per_elem = 8*type_size_of(base_it);
-				gb_unused(bits_per_elem);
-				lbValue one = lb_const_value(p->module, t_i64, exact_value_i64(1));
+				lbValue ebits = lb_const_value(p->module, t_int, exact_value_i64(bits_per_elem));
+				lbValue one = lb_const_value(p->module, base_it, exact_value_i64(1));
+
+				lbValue arr_ptr = lb_addr_get_ptr(p, v);
+				arr_ptr.type = alloc_type_pointer(backing);
+
 				for (Ast *elem : cl->elems) {
 					GB_ASSERT(elem->kind != Ast_FieldValue);
 					lbValue expr = lb_build_expr(p, elem);
 					GB_ASSERT(expr.type->kind != Type_Tuple);
 
-					lbValue e = lb_emit_conv(p, expr, t_i64);
-					e = lb_emit_arith(p, Token_Sub, e, lower, t_i64);
-					// lbValue idx = lb_emit_arith(p, Token_Div, e, bits_per_elem, t_i64);
-					// lbValue val = lb_emit_arith(p, Token_Div, e, bits_per_elem, t_i64);
+					lbValue e = lb_emit_conv(p, expr, t_int);
+					e = lb_emit_arith(p, Token_Sub, e, lower, t_int);
+
+					lbValue elem_idx = lb_emit_arith(p, Token_Quo, e, ebits, t_int);
+					lbValue bit_idx  = lb_emit_arith(p, Token_Mod, e, ebits, t_int);
+
+					lbValue e_ptr     = lb_emit_array_ep(p, arr_ptr, elem_idx);
+					lbValue bit       = lb_emit_arith(p, Token_Shl, one, lb_emit_conv(p, bit_idx, base_it), base_it);
+					lbValue old_value = lb_emit_load(p, e_ptr);
+					lbValue new_value = lb_emit_arith(p, Token_Or, old_value, bit, base_it);
+					lb_emit_store(p, e_ptr, new_value);
 				}
 			} else {
 				Type *it = bit_set_to_int(bt);
@@ -6643,6 +6863,29 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 						return lb_addr_swizzle_soa(addr.addr, addr.soa.index, addr.soa.index_expr,
 						                           type, soa_indices);
 					}
+
+					// v.zyx.xy, compose with the inner swizzle so that it stays assignable
+					Type *type = type_deref(expr->tav.type);
+					switch (addr.kind) {
+					case lbAddr_Swizzle:
+						for (u8 i = 0; i < swizzle_count; i++) {
+							swizzle_indices[i] = addr.swizzle.indices[swizzle_indices[i]];
+						}
+						return lb_addr_swizzle(addr.addr, type, swizzle_count, swizzle_indices);
+					case lbAddr_SwizzleLarge:
+					case lbAddr_SwizzleSoa: {
+						Slice<i32> const &inner = addr.kind == lbAddr_SwizzleLarge ? addr.swizzle_large.indices : addr.swizzle_soa.indices;
+						auto indices = slice_make<i32>(permanent_allocator(), swizzle_count);
+						for (u8 i = 0; i < swizzle_count; i++) {
+							indices[i] = inner[swizzle_indices[i]];
+						}
+						if (addr.kind == lbAddr_SwizzleSoa) {
+							return lb_addr_swizzle_soa(addr.addr, addr.swizzle_soa.index, addr.swizzle_soa.index_expr,
+							                           type, indices);
+						}
+						return lb_addr_swizzle_large(addr.addr, type, indices);
+					}
+					}
 					a = lb_addr_get_ptr(p, addr);
 				}
 
@@ -6659,7 +6902,15 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 				return lb_addr(lb_find_value_from_entity(p->module, e));
 			}
 
-			lbAddr addr = lb_build_addr(p, se->expr);
+			lbAddr addr = {};
+			if (is_type_soa_pointer(tav.type)) {
+				// auto-deref p.bar, where p is an #soa pointer;
+				// same lowering as an explicit p^.bar so `using` paths
+				// go through lbAddr_SoaVariable instead of deep-GEP on the fat pointer
+				addr = lb_addr_soa_variable_from_soa_ptr(p, lb_build_expr(p, se->expr));
+			} else {
+				addr = lb_build_addr(p, se->expr);
+			}
 
 			// NOTE(harold): Only allow ivar pseudo field access on indirect selectors.
 			//				 It is incoherent otherwise as Objective-C objects are zero-sized.
@@ -6748,10 +6999,18 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 					GB_ASSERT(sel.index.count > 0);
 					// NOTE(bill): just patch the index in place
 					sel.index[0] = addr.swizzle.indices[sel.index[0]];
+					addr = lb_addr(addr.addr);
 				} else if (addr.kind == lbAddr_SwizzleLarge) {
 					GB_ASSERT(sel.index.count > 0);
 					// NOTE(bill): just patch the index in place
-					sel.index[0] = addr.swizzle.indices[sel.index[0]];
+					sel.index[0] = addr.swizzle_large.indices[sel.index[0]];
+					addr = lb_addr(addr.addr);
+				} else if (addr.kind == lbAddr_SwizzleSoa) {
+					// soa[i].zyx.x
+					GB_ASSERT(sel.index.count == 1);
+					lb_emit_soa_index_bounds_check(p, addr.addr, addr.swizzle_soa.index, addr.swizzle_soa.index_expr);
+					i32 field_index = addr.swizzle_soa.indices[sel.index[0]];
+					return lb_addr_soa_field_elem(lb_soa_field_elem_ptr(p, addr.addr, field_index, addr.swizzle_soa.index));
 				}
 
 				Type *atype = type_deref(lb_addr_type(addr));
@@ -6867,7 +7126,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 				builtin_id = BuiltinProc_DIRECTIVE;
 			}
 		}
-		auto const &tv = expr->tav;
+		TypeAndValue tv = type_and_value_of_expr(expr);
 		if (builtin_id == BuiltinProc_swizzle &&
 		    is_type_array(tv.type)) {
 		    	// NOTE(bill, 2021-08-09): `swizzle` has some bizarre semantics so it needs to be
@@ -6984,7 +7243,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 		}
 
 		GB_ASSERT(block != nullptr);
-		TypeAndValue tv = expr->tav;
+		TypeAndValue tv = type_and_value_of_expr(expr);
 
 		lbValue lhs = {};
 		lbValue rhs = {};
