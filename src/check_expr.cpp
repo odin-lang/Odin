@@ -1034,6 +1034,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	entity->Procedure.futex_parameter = base_entity->Procedure.futex_parameter;
 	entity->Procedure.synchronizes        = base_entity->Procedure.synchronizes;
 	entity->Procedure.synchronizes_shared = base_entity->Procedure.synchronizes_shared;
+	entity->Procedure.fast_math_flags     = base_entity->Procedure.fast_math_flags;
 	entity->Procedure.generated_from_polymorphic = true;
 
 	if (base_entity->flags & EntityFlag_Cold) {
