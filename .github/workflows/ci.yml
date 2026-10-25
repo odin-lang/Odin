@@ -211,8 +211,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch the Lua libraries from Git LFS
-        run: git lfs pull --include="vendor/lua/*/windows/*"
+      - name: Fetch the Lua and OpenEXRCore libraries from Git LFS
+        run: git lfs pull --include="vendor/lua/*/windows/*,vendor/OpenEXRCore/*.lib"
       - name: build Odin
         shell: cmd
         run: |
