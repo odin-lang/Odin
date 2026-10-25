@@ -2,9 +2,8 @@
 package lua_5_1
 
 import "base:intrinsics"
-import "base:builtin"
 
-import c "core:c/libc"
+import c "core:c"
 
 #assert(size_of(c.int) == size_of(b32))
 
@@ -248,7 +247,7 @@ State :: struct {} // opaque data type
 
 @(link_prefix="lua_")
 @(default_calling_convention="c")
-foreign lib {
+foreign {
 	/*
 	** RCS ident string
 	*/
