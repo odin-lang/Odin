@@ -79,8 +79,10 @@ IDSIZE :: 60
 
 /*
 @@ LUAL_BUFFERSIZE is the buffer size used by the lauxlib buffer system.
+** In Lua 5.1 it is the C library's BUFSIZ, and it has to match the value the Lua library was compiled with:
+** 512 with MSVC, 8192 with glibc, 1024 with the BSDs, macOS and musl.
 */
-L_BUFFERSIZE :: c.int(16 * size_of(rawptr) * size_of(Number))
+L_BUFFERSIZE :: c.int(512 when ODIN_OS == .Windows else 8192 when ODIN_OS == .Linux else 1024)
 
 
 MAXALIGNVAL :: max(align_of(Number), align_of(f64), align_of(rawptr), align_of(Integer), align_of(c.long))
@@ -294,7 +296,6 @@ foreign {
 	isnumber    :: proc(L: ^State, idx: c.int) -> b32 ---
 	isstring    :: proc(L: ^State, idx: c.int) -> b32 ---
 	iscfunction :: proc(L: ^State, idx: c.int) -> b32 ---
-	isinteger   :: proc(L: ^State, idx: c.int) -> b32 ---
 	isuserdata  :: proc(L: ^State, idx: c.int) -> b32 ---
 	type        :: proc(L: ^State, idx: c.int) -> Type ---
 	typename    :: proc(L: ^State, tp: Type) -> cstring ---
@@ -303,6 +304,8 @@ foreign {
 	rawequal :: proc(L: ^State, idx1, idx2: c.int) -> b32 ---
 	lessthan :: proc(L: ^State, idx1, idx2: c.int) -> b32 ---
 
+	tonumber    :: proc(L: ^State, idx: c.int) -> Number ---
+	tointeger   :: proc(L: ^State, idx: c.int) -> Integer ---
 	toboolean   :: proc(L: ^State, idx: c.int) -> b32 ---
 	tolstring   :: proc(L: ^State, idx: c.int, len: ^c.size_t) -> cstring ---
 	objlen      :: proc(L: ^State, idx: c.int) -> c.size_t ---
@@ -333,10 +336,8 @@ foreign {
 
 	gettable  :: proc(L: ^State, idx: c.int) ---
 	getfield  :: proc(L: ^State, idx: c.int, k: cstring) ---
-	geti      :: proc(L: ^State, idx: c.int, n: Integer) ---
 	rawget    :: proc(L: ^State, idx: c.int) ---
-	rawgeti   :: proc(L: ^State, idx: c.int, n: Integer) ---
-	rawgetp   :: proc(L: ^State, idx: c.int, p: rawptr) ---
+	rawgeti   :: proc(L: ^State, idx: c.int, n: c.int) ---
 
 	createtable  :: proc(L: ^State, narr, nrec: c.int) ---
 	newuserdata  :: proc(L: ^State, sz: c.size_t) -> rawptr ---
@@ -352,7 +353,6 @@ foreign {
 	setfield     :: proc(L: ^State, idx: c.int, k: cstring) ---
 	rawset       :: proc(L: ^State, idx: c.int) ---
 	rawseti      :: proc(L: ^State, idx: c.int, n: c.int) ---
-	rawsetp      :: proc(L: ^State, idx: c.int, p: rawptr) ---
 	setmetatable :: proc(L: ^State, objindex: c.int) -> c.int ---
 	setfenv      :: proc(L: ^State, idx: c.int) -> c.int ---
 
@@ -362,8 +362,6 @@ foreign {
 	*/
 
 	call :: proc(L: ^State, nargs, nresults: c.int) ---
-
-	getctx :: proc(L: ^State, ctx: ^c.int) -> c.int ---
 
 	pcall :: proc(L: ^State, nargs, nresults: c.int, errfunc: c.int) -> c.int ---
 	cpcall :: proc(L: ^State, func: CFunction, ud: rawptr) -> c.int ---
@@ -401,9 +399,8 @@ foreign {
 	next :: proc(L: ^State, idx: c.int) -> c.int ---
 
 	concat :: proc(L: ^State, n: c.int) ---
-	len    :: proc(L: ^State, idx: c.int) ---
 
-	getallocf :: proc(L: State, ud: ^rawptr) -> Alloc ---
+	getallocf :: proc(L: ^State, ud: ^rawptr) -> Alloc ---
 	setallocf :: proc(L: ^State, f: Alloc, ud: rawptr) ---
 
 	/*
@@ -434,7 +431,6 @@ TABLIBNAME  :: "table"
 IOLIBNAME   :: "io"
 OSLIBNAME   :: "os"
 STRLIBNAME  :: "string"
-UTF8LIBNAME :: "utf8"
 MATHLIBNAME :: "math"
 DBLIBNAME   :: "debug"
 LOADLIBNAME :: "package"
@@ -447,7 +443,6 @@ foreign lib {
 	open_io        :: proc(L: ^State) -> c.int ---
 	open_os        :: proc(L: ^State) -> c.int ---
 	open_string    :: proc(L: ^State) -> c.int ---
-	open_utf8      :: proc(L: ^State) -> c.int ---
 	open_math      :: proc(L: ^State) -> c.int ---
 	open_debug     :: proc(L: ^State) -> c.int ---
 	open_package   :: proc(L: ^State) -> c.int ---
@@ -463,7 +458,7 @@ GNAME :: "_G"
 
 L_Reg :: struct {
 	name: cstring,
-  	func: CFunction,
+	func: CFunction,
 }
 
 /* predefined references */
@@ -473,11 +468,11 @@ REFNIL :: -1
 @(link_prefix="lua")
 @(default_calling_convention="c")
 foreign lib {
-	L_openlib      :: proc(L: ^State, libname: cstring, l: [^]L_Reg, nup: c.int) ---
+	L_openlib     :: proc(L: ^State, libname: cstring, l: [^]L_Reg, nup: c.int) ---
 	L_register     :: proc(L: ^State, libname: cstring, l: ^L_Reg) ---
 	L_getmetafield :: proc(L: ^State, obj: c.int, e: cstring) -> c.int ---
 	L_callmeta     :: proc(L: ^State, obj: c.int, e: cstring) -> c.int ---
-	L_typeerror    :: proc(L: ^State, narg: c.int, tname: cstring) -> c.int ---
+	L_typerror     :: proc(L: ^State, narg: c.int, tname: cstring) -> c.int ---
 	L_argerror     :: proc(L: ^State, numarg: c.int, extramsg: cstring) -> c.int ---
 	@(link_name="luaL_checklstring")
 	L_checkstring  :: proc(L: ^State, numArg: c.int, l: ^c.size_t = nil) -> cstring ---
@@ -533,7 +528,7 @@ L_Buffer :: struct {
 
 L_addchar :: #force_inline proc "c" (B: ^L_Buffer, c: byte) {
 	end := ([^]byte)(&B.buffer)[L_BUFFERSIZE:]
-	if B.p < end {
+	if B.p >= end {
 		L_prepbuffer(B)
 	}
 	B.p[0] = c
@@ -556,8 +551,6 @@ foreign lib {
 	L_addstring      :: proc(B: ^L_Buffer, s: cstring) ---
 	L_addvalue       :: proc(B: ^L_Buffer) ---
 	L_pushresult     :: proc(B: ^L_Buffer) ---
-	L_pushresultsize :: proc(B: ^L_Buffer, sz: c.size_t) ---
-	L_buffinitsize   :: proc(L: ^State, B: ^L_Buffer, sz: c.size_t) -> [^]byte ---
 }
 
 @(link_prefix="lua_")
@@ -620,7 +613,7 @@ tostring :: #force_inline proc "c" (L: ^State, i: c.int) -> cstring {
 	return tolstring(L, i, nil)
 }
 
-open :: newstate
+open :: L_newstate
 getregistry :: #force_inline proc "c" (L: ^State) {
 	pushvalue(L, REGISTRYINDEX)
 }
@@ -670,7 +663,7 @@ ref :: #force_inline proc "c" (L: ^State, lock: bool) -> c.int {
 unref :: #force_inline proc "c" (L: ^State, ref: c.int) {
 	L_unref(L,REGISTRYINDEX, ref)
 }
-getref :: #force_inline proc "c" (L: ^State, ref: Integer) {
+getref :: #force_inline proc "c" (L: ^State, ref: c.int) {
 	rawgeti(L, REGISTRYINDEX, ref)
 }
 

@@ -84,8 +84,9 @@ IDSIZE :: 60
 
 /*
 @@ LUAL_BUFFERSIZE is the buffer size used by the lauxlib buffer system.
+** In Lua 5.3 it is 0x80 * sizeof(void *) * sizeof(lua_Integer), and lua_Integer is a 64 bit `long long`.
 */
-L_BUFFERSIZE :: c.int(16 * size_of(rawptr) * size_of(Number))
+L_BUFFERSIZE :: c.int(0x80 * size_of(rawptr) * size_of(i64))
 
 
 MAXALIGNVAL :: max(align_of(Number), align_of(f64), align_of(rawptr), align_of(Integer), align_of(c.long))
@@ -428,7 +429,7 @@ foreign {
 	rawseti      :: proc(L: ^State, idx: c.int, n: Integer) ---
 	rawsetp      :: proc(L: ^State, idx: c.int, p: rawptr) ---
 	setmetatable :: proc(L: ^State, objindex: c.int) -> c.int ---
-	setuservalue :: proc(L: ^State, idx: c.int) -> c.int ---
+	setuservalue :: proc(L: ^State, idx: c.int) ---
 
 
 	/*
@@ -482,7 +483,7 @@ foreign {
 
 	stringtonumber :: proc(L: ^State, s: cstring) -> c.size_t ---
 
-	getallocf :: proc(L: State, ud: ^rawptr) -> Alloc ---
+	getallocf :: proc(L: ^State, ud: ^rawptr) -> Alloc ---
 	setallocf :: proc(L: ^State, f: Alloc, ud: rawptr) ---
 
 	/*
@@ -558,7 +559,7 @@ PRELOAD_TABLE :: "_PRELOAD"
 
 L_Reg :: struct {
 	name: cstring,
-  	func: CFunction,
+	func: CFunction,
 }
 
 L_NUMSIZES :: size_of(Integer)*16 + size_of(Number)
@@ -650,7 +651,7 @@ L_Buffer :: struct {
 }
 
 L_addchar :: #force_inline proc "c" (B: ^L_Buffer, c: byte) {
-	if B.n < B.size {
+	if B.n >= B.size {
 		L_prepbuffsize(B, 1)
 	}
 	B.b[B.n] = c

@@ -90,6 +90,10 @@ jobs:
 
       - uses: actions/checkout@v4
 
+      - name: Fetch the Lua libraries from Git LFS
+        if: matrix.os == 'ubuntu-latest'
+        run: git lfs pull --include="vendor/lua/*/linux/*"
+
       - name: Download LLVM (MacOS ARM)
         if: matrix.os == 'macos-latest'
         run: |
@@ -207,6 +211,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch the Lua libraries from Git LFS
+        run: git lfs pull --include="vendor/lua/*/windows/*"
       - name: build Odin
         shell: cmd
         run: |
