@@ -2224,6 +2224,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 				entity = alloc_entity_variable(ctx->scope, token, nullptr);
 				entity->identifier = name;
 				add_semantic_ident(ctx->info, name, entity, true);
+				add_semantic_attributes(ctx->info, entity, vd->attributes);
 
 				Ast *fl = ctx->foreign_context.curr_library;
 				if (fl != nullptr) {

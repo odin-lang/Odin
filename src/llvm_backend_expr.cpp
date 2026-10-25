@@ -186,13 +186,12 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 		lbValue cmp = {};
 		cmp.type = x.type;
 		if (is_type_bit_set(x.type)) {
+			// NOTE: `mask &~ x` rather than `x ~ mask`, so that bits outside of the set are cleared,
+			// as they are for a constant `~x`
 			ExactValue ev_mask = exact_bit_set_all_set_mask(x.type);
 			lbValue mask = lb_const_value(p->module, x.type, ev_mask);
-			if (is_type_array(bit_set_to_int(x.type))) {
-				lbValue res = lb_emit_arith(p, Token_Xor, x, mask, x.type);
-				return lb_emit_conv(p, res, type);
-			}
-			cmp.value = LLVMBuildXor(p->builder, x.value, mask.value, "");
+			lbValue res = lb_emit_arith(p, Token_AndNot, mask, x, x.type);
+			return lb_emit_conv(p, res, type);
 		} else {
 			cmp.value = LLVMBuildNot(p->builder, x.value, "");
 		}
@@ -339,6 +338,23 @@ gb_internal LLVMValueRef lb_srem_safe_divisor(lbProcedure *p, LLVMValueRef rhs) 
 	}
 	LLVMValueRef is_minus_one = LLVMBuildICmp(p->builder, LLVMIntEQ, rhs, minus_one, "");
 	return LLVMBuildSelect(p->builder, is_minus_one, one, rhs, "");
+}
+
+
+// LLVM has sdiv(min(Integer_Type), -1) as UB and it raises an FP exception on a hardware
+// divide, yet Odin integer arithmetic wraps, so the quotient is -x for every x; `x sdiv 1`
+// is x and cannot trap, so a runtime -1 divisor is swapped for 1 and the quotient negated.
+// Vectorizable.
+gb_internal LLVMValueRef lb_sdiv_wrapping(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs) {
+	LLVMValueRef minus_one = LLVMConstAllOnes(LLVMTypeOf(rhs));
+	if (LLVMIsAConstantInt(rhs)) {
+		return rhs == minus_one ? LLVMBuildNeg(p->builder, lhs, "") : LLVMBuildSDiv(p->builder, lhs, rhs, "");
+	}
+	// build 1 as neg(-1), this folds for both scalars and vectors
+	LLVMValueRef one = LLVMBuildNeg(p->builder, minus_one, "");
+	LLVMValueRef is_minus_one = LLVMBuildICmp(p->builder, LLVMIntEQ, rhs, minus_one, "");
+	LLVMValueRef q = LLVMBuildSDiv(p->builder, lhs, LLVMBuildSelect(p->builder, is_minus_one, one, rhs, ""), "");
+	return LLVMBuildSelect(p->builder, is_minus_one, LLVMBuildNeg(p->builder, q, ""), q, "");
 }
 
 
@@ -501,9 +517,10 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 				z = LLVMBuildMul(p->builder, x, y, "");
 				break;
 			case Token_Quo:
-				{
-					auto *call = is_type_unsigned(integral_type) ? LLVMBuildUDiv : LLVMBuildSDiv;
-					z = call(p->builder, x, y, "");
+				if (is_type_unsigned(integral_type)) {
+					z = LLVMBuildUDiv(p->builder, x, y, "");
+				} else {
+					z = lb_sdiv_wrapping(p, x, y);
 				}
 				break;
 			case Token_Mod:
@@ -614,9 +631,10 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 				z = LLVMBuildMul(p->builder, x, y, "");
 				break;
 			case Token_Quo:
-				{
-					auto *call = is_type_unsigned(integral_type) ? LLVMBuildUDiv : LLVMBuildSDiv;
-					z = call(p->builder, x, y, "");
+				if (is_type_unsigned(integral_type)) {
+					z = LLVMBuildUDiv(p->builder, x, y, "");
+				} else {
+					z = lb_sdiv_wrapping(p, x, y);
 				}
 				break;
 			case Token_Mod:
@@ -1500,7 +1518,12 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 	LLVMValueRef all_bits = LLVMConstNot(zero);
 	auto behaviour = lb_check_for_integer_division_by_zero_behaviour(p);
 
-	auto *call = is_signed ? LLVMBuildSDiv : LLVMBuildUDiv;
+	auto const do_div = [&]() -> LLVMValueRef {
+		if (is_signed) {
+			return lb_sdiv_wrapping(p, lhs, rhs);
+		}
+		return LLVMBuildUDiv(p->builder, lhs, rhs, "");
+	};
 
 	if (LLVMIsConstant(rhs)) {
 		if (LLVMIsNull(rhs)) {
@@ -1524,7 +1547,7 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 				}
 			}
 
-			return call(p->builder, lhs, rhs, "");
+			return do_div();
 		}
 	}
 
@@ -1541,7 +1564,7 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 	lb_emit_if(p, cond, safe_block, edge_case_block);
 
 	lb_start_block(p, safe_block);
-	incoming_values[0] = call(p->builder, lhs, rhs, "");
+	incoming_values[0] = do_div();
 	lb_emit_jump(p, done_block);
 
 	lb_start_block(p, edge_case_block);
@@ -3009,7 +3032,14 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 					}
 				}
 
-				return lb_emit_deep_field_ev(p, value, sel);
+				// NOTE: a pointer to the field is only wanted when the selection goes through a 'using' pointer field,
+				// in which case it points into the referenced value rather than the local copy
+				lbValue ptr = lb_address_from_load_or_generate_local(p, value);
+				lbValue res = lb_emit_deep_field_gep(p, ptr, sel);
+				if (!are_types_identical(res.type, dt)) {
+					res = lb_emit_load(p, res);
+				}
+				return res;
 
 			}
 		}

@@ -1275,20 +1275,24 @@ FontDescriptorSymbolicTrait :: enum cffi.uint {
 	TraitUIOptimized  = 12,
 	TraitTightLeading = 15,
 	TraitLooseLeading = 16,
+	_Bit28            = 28,
+	_Bit29            = 29,
+	_Bit30            = 30,
+	_Bit31            = 31,
 }
 FontDescriptorSymbolicTraits :: bit_set[FontDescriptorSymbolicTrait; cffi.uint]
-FontDescriptorSymbolicTraits_ClassMask :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0xf0000000)
+FontDescriptorSymbolicTraits_ClassMask :: FontDescriptorSymbolicTraits{._Bit28, ._Bit29, ._Bit30, ._Bit31}
 FontDescriptorSymbolicTraits_ClassUnknown :: FontDescriptorSymbolicTraits{}
-FontDescriptorSymbolicTraits_ClassOldStyleSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x10000000)
-FontDescriptorSymbolicTraits_ClassTransitionalSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x20000000)
-FontDescriptorSymbolicTraits_ClassModernSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x30000000)
-FontDescriptorSymbolicTraits_ClassClarendonSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x40000000)
-FontDescriptorSymbolicTraits_ClassSlabSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x50000000)
-FontDescriptorSymbolicTraits_ClassFreeformSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x70000000)
-FontDescriptorSymbolicTraits_ClassSansSerif :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x80000000)
-FontDescriptorSymbolicTraits_ClassOrnamentals :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x90000000)
-FontDescriptorSymbolicTraits_ClassScripts :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0xa0000000)
-FontDescriptorSymbolicTraits_ClassSymbolic :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0xc0000000)
+FontDescriptorSymbolicTraits_ClassOldStyleSerifs :: FontDescriptorSymbolicTraits{._Bit28}
+FontDescriptorSymbolicTraits_ClassTransitionalSerifs :: FontDescriptorSymbolicTraits{._Bit29}
+FontDescriptorSymbolicTraits_ClassModernSerifs :: FontDescriptorSymbolicTraits{._Bit28, ._Bit29}
+FontDescriptorSymbolicTraits_ClassClarendonSerifs :: FontDescriptorSymbolicTraits{._Bit30}
+FontDescriptorSymbolicTraits_ClassSlabSerifs :: FontDescriptorSymbolicTraits{._Bit28, ._Bit30}
+FontDescriptorSymbolicTraits_ClassFreeformSerifs :: FontDescriptorSymbolicTraits{._Bit28, ._Bit29, ._Bit30}
+FontDescriptorSymbolicTraits_ClassSansSerif :: FontDescriptorSymbolicTraits{._Bit31}
+FontDescriptorSymbolicTraits_ClassOrnamentals :: FontDescriptorSymbolicTraits{._Bit28, ._Bit31}
+FontDescriptorSymbolicTraits_ClassScripts :: FontDescriptorSymbolicTraits{._Bit29, ._Bit31}
+FontDescriptorSymbolicTraits_ClassSymbolic :: FontDescriptorSymbolicTraits{._Bit30, ._Bit31}
 
 PreferredPresentationStyle :: enum cffi.long {
 	Unspecified = 0,
@@ -1629,16 +1633,25 @@ NSLayoutFormatOption :: enum cffi.ulong {
 	AlignAllLastBaseline  = 11,
 	AlignAllFirstBaseline = 12,
 	AlignAllBaseline      = 11,
+	_Bit0                 = 0,
+	_Bit7                 = 7,
+	_Bit8                 = 8,
+	_Bit13                = 13,
+	_Bit14                = 14,
+	_Bit15                = 15,
+	_Bit16                = 16,
+	_Bit17                = 17,
+	_Bit19                = 19,
 }
 NSLayoutFormatOptions :: bit_set[NSLayoutFormatOption; cffi.ulong]
-NSLayoutFormatOptions_AlignmentMask :: transmute(NSLayoutFormatOptions)cffi.ulong(0xffff)
+NSLayoutFormatOptions_AlignmentMask :: NSLayoutFormatOptions{.AlignAllLeft, .AlignAllRight, .AlignAllTop, .AlignAllBottom, .AlignAllLeading, .AlignAllTrailing, .AlignAllCenterX, .AlignAllCenterY, .AlignAllLastBaseline, .AlignAllFirstBaseline, ._Bit0, ._Bit7, ._Bit8, ._Bit13, ._Bit14, ._Bit15}
 NSLayoutFormatOptions_DirectionLeadingToTrailing :: NSLayoutFormatOptions{}
-NSLayoutFormatOptions_DirectionLeftToRight :: transmute(NSLayoutFormatOptions)cffi.ulong(0x10000)
-NSLayoutFormatOptions_DirectionRightToLeft :: transmute(NSLayoutFormatOptions)cffi.ulong(0x20000)
-NSLayoutFormatOptions_DirectionMask :: transmute(NSLayoutFormatOptions)cffi.ulong(0x30000)
+NSLayoutFormatOptions_DirectionLeftToRight :: NSLayoutFormatOptions{._Bit16}
+NSLayoutFormatOptions_DirectionRightToLeft :: NSLayoutFormatOptions{._Bit17}
+NSLayoutFormatOptions_DirectionMask :: NSLayoutFormatOptions{._Bit16, ._Bit17}
 NSLayoutFormatOptions_SpacingEdgeToEdge :: NSLayoutFormatOptions{}
-NSLayoutFormatOptions_SpacingBaselineToBaseline :: transmute(NSLayoutFormatOptions)cffi.ulong(0x80000)
-NSLayoutFormatOptions_SpacingMask :: transmute(NSLayoutFormatOptions)cffi.ulong(0x80000)
+NSLayoutFormatOptions_SpacingBaselineToBaseline :: NSLayoutFormatOptions{._Bit19}
+NSLayoutFormatOptions_SpacingMask :: NSLayoutFormatOptions{._Bit19}
 
 DeviceOrientation :: enum cffi.long {
 	Unknown            = 0,
@@ -1851,23 +1864,32 @@ ViewAnimationOption :: enum cffi.ulong {
 	ShowHideTransitionViews   = 8,
 	OverrideInheritedOptions  = 9,
 	FlushUpdates              = 28,
+	_Bit16                    = 16,
+	_Bit17                    = 17,
+	_Bit20                    = 20,
+	_Bit21                    = 21,
+	_Bit22                    = 22,
+	_Bit24                    = 24,
+	_Bit25                    = 25,
+	_Bit26                    = 26,
+	_Bit27                    = 27,
 }
 ViewAnimationOptions :: bit_set[ViewAnimationOption; cffi.ulong]
 ViewAnimationOptions_CurveEaseInOut :: ViewAnimationOptions{}
-ViewAnimationOptions_CurveEaseIn :: transmute(ViewAnimationOptions)cffi.ulong(0x10000)
-ViewAnimationOptions_CurveEaseOut :: transmute(ViewAnimationOptions)cffi.ulong(0x20000)
-ViewAnimationOptions_CurveLinear :: transmute(ViewAnimationOptions)cffi.ulong(0x30000)
+ViewAnimationOptions_CurveEaseIn :: ViewAnimationOptions{._Bit16}
+ViewAnimationOptions_CurveEaseOut :: ViewAnimationOptions{._Bit17}
+ViewAnimationOptions_CurveLinear :: ViewAnimationOptions{._Bit16, ._Bit17}
 ViewAnimationOptions_TransitionNone :: ViewAnimationOptions{}
-ViewAnimationOptions_TransitionFlipFromLeft :: transmute(ViewAnimationOptions)cffi.ulong(0x100000)
-ViewAnimationOptions_TransitionFlipFromRight :: transmute(ViewAnimationOptions)cffi.ulong(0x200000)
-ViewAnimationOptions_TransitionCurlUp :: transmute(ViewAnimationOptions)cffi.ulong(0x300000)
-ViewAnimationOptions_TransitionCurlDown :: transmute(ViewAnimationOptions)cffi.ulong(0x400000)
-ViewAnimationOptions_TransitionCrossDissolve :: transmute(ViewAnimationOptions)cffi.ulong(0x500000)
-ViewAnimationOptions_TransitionFlipFromTop :: transmute(ViewAnimationOptions)cffi.ulong(0x600000)
-ViewAnimationOptions_TransitionFlipFromBottom :: transmute(ViewAnimationOptions)cffi.ulong(0x700000)
+ViewAnimationOptions_TransitionFlipFromLeft :: ViewAnimationOptions{._Bit20}
+ViewAnimationOptions_TransitionFlipFromRight :: ViewAnimationOptions{._Bit21}
+ViewAnimationOptions_TransitionCurlUp :: ViewAnimationOptions{._Bit20, ._Bit21}
+ViewAnimationOptions_TransitionCurlDown :: ViewAnimationOptions{._Bit22}
+ViewAnimationOptions_TransitionCrossDissolve :: ViewAnimationOptions{._Bit20, ._Bit22}
+ViewAnimationOptions_TransitionFlipFromTop :: ViewAnimationOptions{._Bit21, ._Bit22}
+ViewAnimationOptions_TransitionFlipFromBottom :: ViewAnimationOptions{._Bit20, ._Bit21, ._Bit22}
 ViewAnimationOptions_PreferredFramesPerSecondDefault :: ViewAnimationOptions{}
-ViewAnimationOptions_PreferredFramesPerSecond60 :: transmute(ViewAnimationOptions)cffi.ulong(0x3000000)
-ViewAnimationOptions_PreferredFramesPerSecond30 :: transmute(ViewAnimationOptions)cffi.ulong(0x7000000)
+ViewAnimationOptions_PreferredFramesPerSecond60 :: ViewAnimationOptions{._Bit24, ._Bit25}
+ViewAnimationOptions_PreferredFramesPerSecond30 :: ViewAnimationOptions{._Bit24, ._Bit25, ._Bit26}
 
 ViewKeyframeAnimationOption :: enum cffi.ulong {
 	LayoutSubviews            = 0,
@@ -1877,13 +1899,16 @@ ViewKeyframeAnimationOption :: enum cffi.ulong {
 	Autoreverse               = 4,
 	OverrideInheritedDuration = 5,
 	OverrideInheritedOptions  = 9,
+	_Bit10                    = 10,
+	_Bit11                    = 11,
+	_Bit12                    = 12,
 }
 ViewKeyframeAnimationOptions :: bit_set[ViewKeyframeAnimationOption; cffi.ulong]
 ViewKeyframeAnimationOptions_CalculationModeLinear :: ViewKeyframeAnimationOptions{}
-ViewKeyframeAnimationOptions_CalculationModeDiscrete :: transmute(ViewKeyframeAnimationOptions)cffi.ulong(0x400)
-ViewKeyframeAnimationOptions_CalculationModePaced :: transmute(ViewKeyframeAnimationOptions)cffi.ulong(0x800)
-ViewKeyframeAnimationOptions_CalculationModeCubic :: transmute(ViewKeyframeAnimationOptions)cffi.ulong(0xc00)
-ViewKeyframeAnimationOptions_CalculationModeCubicPaced :: transmute(ViewKeyframeAnimationOptions)cffi.ulong(0x1000)
+ViewKeyframeAnimationOptions_CalculationModeDiscrete :: ViewKeyframeAnimationOptions{._Bit10}
+ViewKeyframeAnimationOptions_CalculationModePaced :: ViewKeyframeAnimationOptions{._Bit11}
+ViewKeyframeAnimationOptions_CalculationModeCubic :: ViewKeyframeAnimationOptions{._Bit10, ._Bit11}
+ViewKeyframeAnimationOptions_CalculationModeCubicPaced :: ViewKeyframeAnimationOptions{._Bit12}
 
 SystemAnimation :: enum cffi.ulong {
 	Delete = 0,

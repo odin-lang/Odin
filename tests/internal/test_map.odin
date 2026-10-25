@@ -449,3 +449,80 @@ map_utf16_string_keys :: proc(t: ^testing.T) {
 	testing.expect_value(t, mc[c], 1)
 	testing.expect_value(t, mc[d], 2)
 }
+
+// Ranging over `m[key]` took the address of the map value, which is nil for a missing key, and crashed.
+// A missing key iterates over the zero value instead.
+@test
+map_range_over_map_index :: proc(t: ^testing.T) {
+	count :: proc(t: ^testing.T, values: $M/map[$K]$V, key: K) -> (n: int) {
+		for _ in values[key] {
+			n += 1
+		}
+		return
+	}
+
+	{
+		m: map[string]map[string]int
+		defer {
+			for _, inner in m {
+				delete(inner)
+			}
+			delete(m)
+		}
+		testing.expect_value(t, count(t, m, "missing"), 0)
+
+		m["a"] = {}
+		inner := &m["a"]
+		inner["x"] = 1
+		inner["y"] = 2
+		testing.expect_value(t, count(t, m, "a"), 2)
+		testing.expect_value(t, count(t, m, "missing"), 0)
+	}
+	{
+		m: map[string][dynamic]int
+		defer {
+			for _, d in m {
+				delete(d)
+			}
+			delete(m)
+		}
+		testing.expect_value(t, count(t, m, "missing"), 0)
+		m["a"] = {}
+		append(&m["a"], 1, 2, 3)
+		testing.expect_value(t, count(t, m, "a"), 3)
+	}
+	{
+		m: map[string][dynamic; 4]int
+		defer delete(m)
+		testing.expect_value(t, count(t, m, "missing"), 0)
+	}
+	{
+		Axis :: enum { X, Y, Z }
+		m: map[string][Axis]int
+		defer delete(m)
+		testing.expect_value(t, count(t, m, "missing"), 3)
+	}
+	{
+		m: map[string][4]int
+		defer delete(m)
+		testing.expect_value(t, count(t, m, "missing"), 4)
+		for v in m["missing"] {
+			testing.expect_value(t, v, 0)
+		}
+		testing.expect_value(t, "missing" in m, false)
+
+		m["a"] = {1, 2, 3, 4}
+		sum := 0
+		for v in m["a"] {
+			sum += v
+		}
+		testing.expect_value(t, sum, 10)
+	}
+}
+
+@test
+map_reserve_negative :: proc(t: ^testing.T) {
+	m: map[int]int
+	err_reserve := reserve_map(&m, -10)
+	testing.expect_value(t, err_reserve, runtime.Allocator_Error.Invalid_Argument)
+}

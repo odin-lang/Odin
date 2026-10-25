@@ -976,6 +976,11 @@ struct Asm_arm64 {
 		return false;
 	}
 
+	String implicit_reg_name(OperandType t) const {
+		gb_unused(t);
+		return {};
+	}
+
 	bool operand_type_is_cond_code(OperandType t) const {
 		switch (t){
 		case OP_COND:

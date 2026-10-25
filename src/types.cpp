@@ -3294,7 +3294,7 @@ gb_internal String lookup_subtype_polymorphic_field(Type *dst, Type *src) {
 					return f->token.string;
 				}
 			}
-			if ((f->flags & EntityFlag_Using) != 0 && is_type_struct(f->type)) {
+			if ((f->flags & EntityFlag_Using) != 0 && is_type_struct(type_deref(f->type))) {
 				String name = lookup_subtype_polymorphic_field(dst, f->type);
 				if (name.len > 0) {
 					return name;
@@ -3333,7 +3333,7 @@ gb_internal bool lookup_subtype_polymorphic_selection(Type *dst, Type *src, Sele
 					return true;
 				}
 			}
-			if ((f->flags & EntityFlags_IsSubtype) != 0 && is_type_struct(f->type)) {
+			if ((f->flags & EntityFlags_IsSubtype) != 0 && is_type_struct(type_deref(f->type))) {
 				String name = lookup_subtype_polymorphic_field(dst, f->type);
 				if (name.len > 0) {
 					array_add(&sel->index, cast(i32)i);

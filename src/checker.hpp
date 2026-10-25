@@ -213,6 +213,7 @@ struct ProcDeclInfo {
 	BlockingMutex next_mutex; // for `nested_to_check`
 
 	Array<struct ProcInfo *> nested_to_check; // nested procedures to check once this body is checked
+	Array<Entity *> asm_templates_to_check;   // the asm templates whose bodies are checked once this body is checked, see `check_asm_template_body_later`
 
 	Type *  gen_proc_type; // Precalculated
 	Entity *para_poly_original;
@@ -690,7 +691,7 @@ struct UntypedExprInfo {
 	ExprInfo *info;
 };
 
-typedef PtrMap<Ast *, ExprInfo *> UntypedExprInfoMap; 
+typedef PtrMap<Ast *, ExprInfo *> UntypedExprInfoMap;
 
 enum ObjcMsgKind : u32 {
 	ObjcMsg_normal,
@@ -807,6 +808,11 @@ struct SemanticWhen {
 	bool         taken;
 };
 
+struct SemanticAttributes {
+	Entity *             entity;
+	Array<Ast *> const * attributes;
+};
+
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
 	Checker *checker;
@@ -863,8 +869,9 @@ struct CheckerInfo {
 	PerThreadArray<Entity *> entity_queue;
 
 	// `-export-semantics` related stuff
-	PerThreadArray<SemanticIdent> semantic_ident_queue;
-	PerThreadArray<SemanticWhen>  semantic_when_queue;
+	PerThreadArray<SemanticIdent>      semantic_ident_queue;
+	PerThreadArray<SemanticWhen>       semantic_when_queue;
+	PerThreadArray<SemanticAttributes> semantic_attributes_queue;
 
 	bool                     entities_by_file; // until gathered, see `check_add_entities_from_files`
 	std::atomic<u64>         entities_without_file; // for their `order_in_src`
@@ -937,6 +944,8 @@ struct CheckerContext {
 	bool           in_proc_sig;
 	ForeignContext foreign_context;
 
+	Array<Entity *> *asm_templates_to_check; // of the procedure body being checked, see `check_asm_template_body_later`
+
 	CheckerTypePath *type_path;
 	isize            type_level;
 
@@ -984,6 +993,9 @@ struct Checker {
 	MPSCQueue<Entity *> procs_with_objc_context_provider_to_check;
 	BlockingMutex     procs_to_check_mutex;
 	Array<ProcInfo *> procs_to_check;
+
+	BlockingMutex     asm_templates_to_check_mutex;
+	Array<Entity *>   asm_templates_to_check; // those not within a procedure body, see `check_asm_template_body_later`
 
 
 	PerThreadArray<UntypedExprInfo> global_untyped_queue;
@@ -1087,3 +1099,4 @@ gb_internal GenTypesData *ensure_polymorphic_record_entity_has_gen_types(Checker
 gb_internal void init_map_internal_types(Type *type);
 
 gb_internal void check_asm_template_from_entity(CheckerContext *c, Entity *e, DeclInfo *d);
+gb_internal void check_asm_template_body_from_entity(CheckerContext *c, Entity *e);

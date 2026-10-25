@@ -347,7 +347,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		switch {
 		case old_data == nil:
 			return arena_alloc(arena, size, alignment, location)
-		case size == old_size:
+		case size == old_size && uintptr(old_data) & uintptr(alignment-1) == 0:
 			// return old memory
 			data = old_data[:size]
 			return
@@ -359,26 +359,40 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		sync.mutex_guard(&arena.mutex)
 
 		if uintptr(old_data) & uintptr(alignment-1) == 0 {
-			if size < old_size {
-				// shrink data in-place
-				data = old_data[:size]
-				// sanitizer.address_poison(old_data[size:old_size])
-				return
-			}
-
 			if block := arena.curr_block; block != nil {
 				start := uint(uintptr(old_memory)) - uint(uintptr(block.base))
 				old_end := start + old_size
 				new_end := start + size
 				if start < old_end && old_end == block.used && new_end <= block.reserved {
-					// grow data in-place, adjusting next allocation
-					prev_used := block.used
-					_ = alloc_from_memory_block(block, new_end - old_end, 1, default_commit_size=arena.default_commit_size) or_return
-					arena.total_used += block.used - prev_used
+					switch {
+					case size > old_size:
+						// Grow data in-place by adjusting the next allocation
+						prev_used := block.used
+						_ = alloc_from_memory_block(block, new_end - old_end, 1, default_commit_size=arena.default_commit_size) or_return
+						arena.total_used += block.used - prev_used
+
+					case arena.temp_count == 0:
+						// Shrink data in-place by giving the tail back to the block
+						//
+						// NOTE(bill): This is not done while an `Arena_Temp` is active.
+						// It may have saved a position inside the tail.
+						// The memory past `used` is kept zeroed because `.Alloc` relies on it.
+						mem.zero_slice(block.base[new_end:old_end])
+						// sanitizer.address_poison(block.base[new_end:old_end])
+						block.used = new_end
+						arena.total_used -= old_size - size
+					}
 					data = block.base[start:new_end]
 					// sanitizer.address_unpoison(data)
 					return
 				}
+			}
+
+			if size < old_size {
+				// Allow for shrinking data in-place
+				data = old_data[:size]
+				// sanitizer.address_poison(old_data[size:old_size])
+				return
 			}
 		}
 

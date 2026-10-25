@@ -306,7 +306,9 @@ resize :: proc(control: ^Allocator, ptr: rawptr, old_size, new_size: uint, align
 
 	min_size := min(curr_size, new_size, old_size)
 
-	if adjust > curr_size && (!block_is_free(next) || adjust > combined) {
+	// NOTE(bill): A stricter alignment than the block has cannot be met in place.
+	misaligned := uintptr(ptr) % uintptr(max(ALIGN_SIZE, alignment)) != 0
+	if misaligned || adjust > curr_size && (!block_is_free(next) || adjust > combined) {
 		res = alloc_bytes(control, new_size, alignment) or_return
 		if res != nil {
 			copy(res, ([^]byte)(ptr)[:min_size])
@@ -351,7 +353,9 @@ resize_non_zeroed :: proc(control: ^Allocator, ptr: rawptr, old_size, new_size: 
 
 	min_size := min(curr_size, new_size, old_size)
 
-	if adjust > curr_size && (!block_is_free(next) || adjust > combined) {
+	// NOTE(bill): A stricter alignment than the block has cannot be met in place.
+	misaligned := uintptr(ptr) % uintptr(max(ALIGN_SIZE, alignment)) != 0
+	if misaligned || adjust > curr_size && (!block_is_free(next) || adjust > combined) {
 		res = alloc_bytes_non_zeroed(control, new_size, alignment) or_return
 		if res != nil {
 			copy(res, ([^]byte)(ptr)[:min_size])

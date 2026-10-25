@@ -2444,6 +2444,14 @@ gb_internal void lb_create_global_variable(lbModule *m, lbGlobalVariable *var) {
 
 	lb_apply_thread_local_model(g.value, e->Variable.thread_local_model);
 
+	u32 alignment = cast(u32)gb_max(type_align_of(e->type), e->Variable.custom_align);
+
+	#ifdef __BIONIC__
+	if (e->Variable.thread_local_model != "") {
+		alignment = gb_max(alignment, 64);
+	}
+	#endif
+
 	if (is_foreign) {
 		LLVMSetLinkage(g.value, LLVMExternalLinkage);
 		LLVMSetDLLStorageClass(g.value, LLVMDLLImportStorageClass);
@@ -2459,7 +2467,7 @@ gb_internal void lb_create_global_variable(lbModule *m, lbGlobalVariable *var) {
 		LLVM_SET_INTERNAL_WEAK_LINKAGE(g.value);
 	}
 	lb_set_linkage_from_entity_flags(m, g.value, e->flags);
-	LLVMSetAlignment(g.value, cast(u32)gb_max(type_align_of(e->type), e->Variable.custom_align));
+	LLVMSetAlignment(g.value, alignment);
 
 	if (e->Variable.link_section.len > 0) {
 		LLVMSetSection(g.value, alloc_cstring(permanent_allocator(), e->Variable.link_section));

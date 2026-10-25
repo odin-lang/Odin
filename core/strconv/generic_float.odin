@@ -51,6 +51,24 @@ Example:
 - A byte slice containing the formatted string
 */
 generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int, flags: Float_Flags) -> []byte {
+	when FAST_FLOAT {
+		// TODO: propagate flags.
+		if bit_size == 64 {
+			if res, ok := _ftoa_fast(buf, val, fmt, precision); ok {
+				return res
+			}
+		} else if bit_size == 32 || (bit_size == 16 && precision >= 0) {
+			f := f32(f16(val)) if bit_size == 16 else f32(val)
+			if res, ok := _ftoa_fast(buf, f, fmt, precision); ok {
+				return res
+			}
+		} else if bit_size == 16 {
+			if res, ok := _ftoa_fast_f16(buf, f16(val), fmt); ok {
+				return res
+			}
+		}
+	}
+
 	bits: u64
 	flt: ^Float_Info
 	switch bit_size {
@@ -73,18 +91,7 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int,
 
 	switch exp {
 	case 1<<flt.expbits - 1:
-		s: string
-		if mant != 0 {
-			// NOTE: This is never prefixed with '+', even if flags specify `.Plus`.
-			s = "NaN"
-		} else if neg {
-			s = "-Inf"
-		} else {
-			// NOTE: This is always prefixed with '+', even if flags does not specify `.Plus`.
-			s = "+Inf"
-		}
-		n := copy(buf, s)
-		return buf[:n]
+		return _format_inf_nan(buf, neg, mant != 0)
 
 	case 0: // denormalized
 		exp += 1
@@ -105,11 +112,7 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int,
 	if shortest {
 		round_shortest(d, mant, exp, flt)
 		digs = Decimal_Slice{digits = d.digits[:], count = d.count, decimal_point = d.decimal_point}
-		switch fmt {
-		case 'e', 'E': prec = digs.count-1
-		case 'f', 'F': prec = max(digs.count-digs.decimal_point, 0)
-		case 'g', 'G': prec = digs.count
-		}
+		prec = _shortest_precision(digs, fmt)
 	} else {
 		switch fmt {
 		case 'e', 'E':
@@ -126,6 +129,32 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int,
 		digs = Decimal_Slice{digits = d.digits[:], count = d.count, decimal_point = d.decimal_point}
 	}
 	return format_digits(buf, shortest, neg, digs, prec, fmt, flags)
+}
+
+_format_inf_nan :: proc "contextless" (buf: []byte, neg, nan: bool) -> []byte {
+	// NOTE: NaN is never prefixed with '+', even if flags specify `.Plus`.
+	// NOTE: Inf is always prefixed with '+', even if flags does not specify `.Plus`.s := "NaN" if nan else "-Inf" if neg else "+Inf"
+	s := "NaN" if nan else "-Inf" if neg else "+Inf"
+	return buf[:copy(buf, s)]
+}
+
+_shortest_precision :: proc "contextless" (digs: Decimal_Slice, fmt: byte) -> int {
+	switch fmt {
+	case 'e', 'E': return digs.count-1
+	case 'f', 'F': return max(digs.count-digs.decimal_point, 0)
+	case 'g', 'G': return digs.count
+	}
+	return -1
+}
+
+// Picks scientific 'e' or fixed 'f' notation for 'g', and its precision, as C's %g does.
+_choose_g :: #force_inline proc "contextless" (digs: Decimal_Slice, prec: int, shortest: bool, fmt: byte) -> (new_prec: int, new_fmt: byte) {
+	exp := digs.decimal_point - 1
+	if exp < -4 || exp >= (6 if shortest else prec) {
+		return min(prec, digs.count) - 1, fmt + 'e' - 'g'
+	}
+	p := digs.count if prec > digs.decimal_point else prec
+	return max(p - digs.decimal_point, 0), 'f'
 }
 
 /*
@@ -152,73 +181,83 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 	to_bytes :: proc(b: Buffer) -> []byte {
 		return b.b[:b.n]
 	}
-	add_bytes :: proc(buf: ^Buffer, bytes: ..byte) {
-		buf.n += copy(buf.b[buf.n:], bytes)
+	add_byte :: proc(buf: ^Buffer, c: byte) {
+		if buf.n < len(buf.b) {
+			buf.b[buf.n] = c
+			buf.n += 1
+		}
+	}
+	add_zeros :: proc(buf: ^Buffer, count: int) {
+		n := clamp(count, 0, len(buf.b) - buf.n)
+		for &c in buf.b[buf.n:][:n] {
+			c = '0'
+		}
+		buf.n += n
 	}
 
 	b := Buffer{b = buf}
 	prec := precision
 
 	switch fmt {
+	case 'f', 'F', 'e', 'E':
+		prec = min(prec, len(buf)) // clamp to buffer length
+	}
+
+	switch fmt {
 	case 'f', 'F':
 		if neg {
-			add_bytes(&b, '-')
+			add_byte(&b, '-')
 		} else if .Plus in flags {
-			add_bytes(&b, '+')
+			add_byte(&b, '+')
 		}
 
 		// integer, padded with zeros when needed
 		if digs.decimal_point > 0 {
 			m := min(digs.count, digs.decimal_point)
-			add_bytes(&b, ..digs.digits[0:m])
-			for ; m < digs.decimal_point; m += 1 {
-				add_bytes(&b, '0')
-			}
+			b.n += copy(buf[b.n:], digs.digits[0:m])
+			add_zeros(&b, digs.decimal_point - m)
 		} else {
-			add_bytes(&b, '0')
+			add_byte(&b, '0')
 		}
 
 
 		// fractional part
 		if prec > 0 {
-			add_bytes(&b, '.')
-			for i in 0..<prec {
-				c: byte = '0'
-				if j := digs.decimal_point + i; 0 <= j && j < digs.count {
-					c = digs.digits[j]
-				}
-				add_bytes(&b, c)
-			}
+			add_byte(&b, '.')
+			lead := clamp(-digs.decimal_point, 0, prec)
+			add_zeros(&b, lead)
+			lo := min(max(digs.decimal_point, 0), digs.count)
+			hi := max(min(digs.count, digs.decimal_point + prec), lo)
+			b.n += copy(buf[b.n:], digs.digits[lo:hi])
+			add_zeros(&b, prec - lead - (hi - lo))
 		}
 		return to_bytes(b)
 
 	case 'e', 'E':
 		if neg {
-			add_bytes(&b, '-')
+			add_byte(&b, '-')
 		} else if .Plus in flags {
-			add_bytes(&b, '+')
+			add_byte(&b, '+')
 		}
 
 		ch := byte('0')
 		if digs.count != 0 {
 			ch = digs.digits[0]
 		}
-		add_bytes(&b, ch)
+		add_byte(&b, ch)
 
 		if prec > 0 {
-			add_bytes(&b, '.')
+			add_byte(&b, '.')
 			i := 1
 			m := min(digs.count, prec+1)
 			if i < m {
-				add_bytes(&b, ..digs.digits[i:m])
+				b.n += copy(buf[b.n:], digs.digits[i:m])
 				i = m
 			}
-			for ; i <= prec; i += 1 {
-				add_bytes(&b, '0')
-			}
+			add_zeros(&b, prec + 1 - i)
 		}
 
-		add_bytes(&b, fmt)
+		add_byte(&b, fmt)
 		exp := digs.decimal_point-1
 		if digs.count == 0 {
 			// Zero has exponent of 0
@@ -230,42 +269,23 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 			ch = '-'
 			exp = -exp
 		}
-		add_bytes(&b, ch)
+		add_byte(&b, ch)
 
-		switch {
-		case exp < 10:  add_bytes(&b, '0', byte(exp)+'0') // add prefix 0
-		case exp < 100: add_bytes(&b, byte(exp/10)+'0',  byte(exp%10)+'0')
-		case:           add_bytes(&b, byte(exp/100)+'0', byte(exp/10)%10+'0', byte(exp%10)+'0')
+		if exp >= 100 {
+			add_byte(&b, byte(exp/100)+'0')
 		}
+		add_byte(&b, byte(exp/10)%10+'0') // at least two digits
+		add_byte(&b, byte(exp%10)+'0')
 
 		return to_bytes(b)
 
 	case 'g', 'G':
-		eprec := prec
-		if eprec > digs.count && digs.count >= digs.decimal_point {
-			eprec = digs.count
-		}
-
-		if shortest {
-			eprec = 6
-		}
-
-		exp := digs.decimal_point - 1
-		if exp < -4 || exp >= eprec {
-			if prec > digs.count {
-				prec = digs.count
-			}
-			return format_digits(buf, shortest, neg, digs, prec-1, fmt+'e'-'g', flags) // keep the same case
-		}
-
-		if prec > digs.decimal_point {
-			prec = digs.count
-		}
-
-		return format_digits(buf, shortest, neg, digs, max(prec-digs.decimal_point, 0), 'f', flags)
+		p, f := _choose_g(digs, prec, shortest, fmt)
+		return format_digits(buf, shortest, neg, digs, p, f, flags)
 
 	case:
-		add_bytes(&b, '%', fmt)
+		add_byte(&b, '%')
+		add_byte(&b, fmt)
 		return to_bytes(b)
 	}
 
@@ -317,19 +337,38 @@ round_shortest :: proc(d: ^decimal.Decimal, mant: u64, exp: int, flt: ^Float_Inf
 
 	inclusive := mant%2 == 0
 
-	for i in 0..<d.count {
-		l: byte = '0' // lower digit
-		if i < lower.count {
-			l = lower.digits[i]
+	// upper_delta tells if rounding d up stays below upper, with 0 equal, 1 one unit above and 2 more
+	upper_delta: u8
+	for ui := 0; ; ui += 1 {
+		i := ui - upper.decimal_point + d.decimal_point
+		if i >= d.count {
+			break
 		}
-		m := d.digits[i]   // middle digit
+		li := ui - upper.decimal_point + lower.decimal_point
+		l: byte = '0' // lower digit
+		if li >= 0 && li < lower.count {
+			l = lower.digits[li]
+		}
+		m: byte = '0' // middle digit
+		if i >= 0 {
+			m = d.digits[i]
+		}
 		u: byte = '0' // upper digit
-		if i < upper.count {
-			u = upper.digits[i]
+		if ui < upper.count {
+			u = upper.digits[ui]
 		}
 
-		ok_round_down := l != m || inclusive && i+1 == lower.count
-		ok_round_up   := m != u && (inclusive || m+1 < u || i+1 < upper.count)
+		ok_round_down := l != m || inclusive && li+1 == lower.count
+
+		switch {
+		case upper_delta == 0 && m+1 < u:
+			upper_delta = 2
+		case upper_delta == 0 && m != u:
+			upper_delta = 1
+		case upper_delta == 1 && (m != '9' || u != '0'):
+			upper_delta = 2
+		}
+		ok_round_up := upper_delta > 0 && (inclusive || upper_delta > 1 || ui+1 < upper.count)
 
 		if ok_round_down && ok_round_up {
 			decimal.round(d, i+1)

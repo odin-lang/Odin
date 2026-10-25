@@ -44,6 +44,8 @@ set ODIN=..\..\..\odin
 %ODIN% check "..\test_issue_7421_tagged_duplicate" %COMMON% 2>&1 | find /c "Error: Duplicate case" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_7429" %COMMON% || exit /b
 %ODIN% check "..\test_issue_7708_mismatch" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_7938" -no-entry-point %COMMON% 2>&1 | find /c "Error: Missing return statement" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_7975_7976_mismatch" %COMMON% 2>&1 | find /c "Error:" | findstr /x "8" || exit /b
 %ODIN% check "..\test_issue_ambiguous_union_literal" %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_global_when_cycle" -no-entry-point %COMMON% 2>&1 | find /c "Contradictory global" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_global_when_cycle_ambiguous" -no-entry-point %COMMON% 2>&1 | find /c "Ambiguous global" | findstr /x "1" || exit /b
@@ -62,6 +64,7 @@ set ODIN=..\..\..\odin
 @rem Objective-C tests target darwin, which can be checked and built for from any host
 %ODIN% check "..\test_issue_objc_import_missing_selector" -no-entry-point -target:darwin_arm64 %COMMON% 2>&1 | find /c "is required for imported Objective-C methods" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_objc_deferred_import" -no-entry-point -target:darwin_arm64 %COMMON% 2>&1 | find /c "cannot be used as a deferred_out procedure" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_7980" -target:darwin_arm64 %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
 
 @rem #########################################################################################################
 
@@ -164,6 +167,9 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 
 @rem `asm` templates are amd64-only, assuming this is going to work on Windows (ARM?)
 %ODIN% doc "..\test_issue_asm_doc_category" 2>&1 | find /c "asm templates" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_asm_deferred_errors" %COMMON% 2>&1 | find /c "Unknown mnemonic" | findstr /x "5" || exit /b
+%ODIN% check "..\test_issue_asm_target_features" %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_asm_target_features" %COMMON% 2>&1 | find /c "enables target feature 'avx'" | findstr /x "3" || exit /b
 
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:size -lifetime-markers || exit /b
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:speed -lifetime-markers || exit /b

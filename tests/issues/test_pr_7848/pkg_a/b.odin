@@ -1,7 +1,8 @@
 package pkg_a
 
-import str "core:strings"
+@(require) import str "core:strings"
 
+@(priority_index=2)
 foreign import tool_lib "system:tool_lib"
 
 foreign tool_lib {
@@ -16,6 +17,7 @@ Point :: struct {
 
 FIVE :: 5
 
+@(require_results)
 twice :: proc(x: $T) -> T {
 	return x + x
 }
@@ -49,6 +51,8 @@ side :: proc(s: Side, f: f32) -> int {
 pick :: proc{axis, side}
 
 use_all :: proc() -> int {
+	@(static) calls: int
+	calls += 1
 	p := Point{1, 2, 3}
 	a := twice(int(p.z))
 	b := twice(p.x)
@@ -62,4 +66,10 @@ use_all :: proc() -> int {
 		c += REPLACED + ADDED
 	}
 	return c
+}
+
+@(private="file", require_results)
+@(deprecated="use add_int")
+plus :: proc(a, b: int) -> int {
+	return a + b
 }

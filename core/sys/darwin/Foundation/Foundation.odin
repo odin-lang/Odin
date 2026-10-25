@@ -3501,15 +3501,23 @@ StringEnumerationOption :: enum cffi.ulong {
 	Reverse              = 8,
 	SubstringNotRequired = 9,
 	Localized            = 10,
+	_Bit0                = 0,
+	_Bit1                = 1,
+	_Bit2                = 2,
+	_Bit3                = 3,
+	_Bit4                = 4,
+	_Bit5                = 5,
+	_Bit6                = 6,
+	_Bit7                = 7,
 }
 StringEnumerationOptions :: bit_set[StringEnumerationOption; cffi.ulong]
 StringEnumerationOptions_ByLines :: StringEnumerationOptions{}
-StringEnumerationOptions_ByParagraphs :: transmute(StringEnumerationOptions)cffi.ulong(0x1)
-StringEnumerationOptions_ByComposedCharacterSequences :: transmute(StringEnumerationOptions)cffi.ulong(0x2)
-StringEnumerationOptions_ByWords :: transmute(StringEnumerationOptions)cffi.ulong(0x3)
-StringEnumerationOptions_BySentences :: transmute(StringEnumerationOptions)cffi.ulong(0x4)
-StringEnumerationOptions_ByCaretPositions :: transmute(StringEnumerationOptions)cffi.ulong(0x5)
-StringEnumerationOptions_ByDeletionClusters :: transmute(StringEnumerationOptions)cffi.ulong(0x6)
+StringEnumerationOptions_ByParagraphs :: StringEnumerationOptions{._Bit0}
+StringEnumerationOptions_ByComposedCharacterSequences :: StringEnumerationOptions{._Bit1}
+StringEnumerationOptions_ByWords :: StringEnumerationOptions{._Bit0, ._Bit1}
+StringEnumerationOptions_BySentences :: StringEnumerationOptions{._Bit2}
+StringEnumerationOptions_ByCaretPositions :: StringEnumerationOptions{._Bit0, ._Bit2}
+StringEnumerationOptions_ByDeletionClusters :: StringEnumerationOptions{._Bit1, ._Bit2}
 
 CalendarUnitFlag :: enum cffi.ulong {
 	Era                           = 1,
@@ -3581,14 +3589,18 @@ DataWritingOption :: enum cffi.ulong {
 	Atomic             = 0,
 	WithoutOverwriting = 1,
 	AtomicWrite        = 0,
+	_Bit28             = 28,
+	_Bit29             = 29,
+	_Bit30             = 30,
+	_Bit31             = 31,
 }
 DataWritingOptions :: bit_set[DataWritingOption; cffi.ulong]
-DataWritingOptions_FileProtectionNone :: transmute(DataWritingOptions)cffi.ulong(0x10000000)
-DataWritingOptions_FileProtectionComplete :: transmute(DataWritingOptions)cffi.ulong(0x20000000)
-DataWritingOptions_FileProtectionCompleteUnlessOpen :: transmute(DataWritingOptions)cffi.ulong(0x30000000)
-DataWritingOptions_FileProtectionCompleteUntilFirstUserAuthentication :: transmute(DataWritingOptions)cffi.ulong(0x40000000)
-DataWritingOptions_FileProtectionCompleteWhenUserInactive :: transmute(DataWritingOptions)cffi.ulong(0x50000000)
-DataWritingOptions_FileProtectionMask :: transmute(DataWritingOptions)cffi.ulong(0xf0000000)
+DataWritingOptions_FileProtectionNone :: DataWritingOptions{._Bit28}
+DataWritingOptions_FileProtectionComplete :: DataWritingOptions{._Bit29}
+DataWritingOptions_FileProtectionCompleteUnlessOpen :: DataWritingOptions{._Bit28, ._Bit29}
+DataWritingOptions_FileProtectionCompleteUntilFirstUserAuthentication :: DataWritingOptions{._Bit30}
+DataWritingOptions_FileProtectionCompleteWhenUserInactive :: DataWritingOptions{._Bit28, ._Bit30}
+DataWritingOptions_FileProtectionMask :: DataWritingOptions{._Bit28, ._Bit29, ._Bit30, ._Bit31}
 
 DataSearchOption :: enum cffi.ulong {
 	Backwards = 0,
@@ -3975,20 +3987,36 @@ FileManagerUploadLocalVersionConflictPolicy :: enum cffi.long {
 
 PointerFunctionsOption :: enum cffi.ulong {
 	CopyIn = 16,
+	_Bit0  = 0,
+	_Bit1  = 1,
+	_Bit2  = 2,
+	_Bit3  = 3,
+	_Bit4  = 4,
+	_Bit5  = 5,
+	_Bit6  = 6,
+	_Bit7  = 7,
+	_Bit8  = 8,
+	_Bit9  = 9,
+	_Bit10 = 10,
+	_Bit11 = 11,
+	_Bit12 = 12,
+	_Bit13 = 13,
+	_Bit14 = 14,
+	_Bit15 = 15,
 }
 PointerFunctionsOptions :: bit_set[PointerFunctionsOption; cffi.ulong]
 PointerFunctionsOptions_StrongMemory :: PointerFunctionsOptions{}
-PointerFunctionsOptions_ZeroingWeakMemory :: transmute(PointerFunctionsOptions)cffi.ulong(0x1)
-PointerFunctionsOptions_OpaqueMemory :: transmute(PointerFunctionsOptions)cffi.ulong(0x2)
-PointerFunctionsOptions_MallocMemory :: transmute(PointerFunctionsOptions)cffi.ulong(0x3)
-PointerFunctionsOptions_MachVirtualMemory :: transmute(PointerFunctionsOptions)cffi.ulong(0x4)
-PointerFunctionsOptions_WeakMemory :: transmute(PointerFunctionsOptions)cffi.ulong(0x5)
+PointerFunctionsOptions_ZeroingWeakMemory :: PointerFunctionsOptions{._Bit0}
+PointerFunctionsOptions_OpaqueMemory :: PointerFunctionsOptions{._Bit1}
+PointerFunctionsOptions_MallocMemory :: PointerFunctionsOptions{._Bit0, ._Bit1}
+PointerFunctionsOptions_MachVirtualMemory :: PointerFunctionsOptions{._Bit2}
+PointerFunctionsOptions_WeakMemory :: PointerFunctionsOptions{._Bit0, ._Bit2}
 PointerFunctionsOptions_ObjectPersonality :: PointerFunctionsOptions{}
-PointerFunctionsOptions_OpaquePersonality :: transmute(PointerFunctionsOptions)cffi.ulong(0x100)
-PointerFunctionsOptions_ObjectPointerPersonality :: transmute(PointerFunctionsOptions)cffi.ulong(0x200)
-PointerFunctionsOptions_CStringPersonality :: transmute(PointerFunctionsOptions)cffi.ulong(0x300)
-PointerFunctionsOptions_StructPersonality :: transmute(PointerFunctionsOptions)cffi.ulong(0x400)
-PointerFunctionsOptions_IntegerPersonality :: transmute(PointerFunctionsOptions)cffi.ulong(0x500)
+PointerFunctionsOptions_OpaquePersonality :: PointerFunctionsOptions{._Bit8}
+PointerFunctionsOptions_ObjectPointerPersonality :: PointerFunctionsOptions{._Bit9}
+PointerFunctionsOptions_CStringPersonality :: PointerFunctionsOptions{._Bit8, ._Bit9}
+PointerFunctionsOptions_StructPersonality :: PointerFunctionsOptions{._Bit10}
+PointerFunctionsOptions_IntegerPersonality :: PointerFunctionsOptions{._Bit8, ._Bit10}
 
 HTTPCookieAcceptPolicy :: enum cffi.ulong {
 	Always                     = 0,
@@ -4791,15 +4819,19 @@ when ODIN_PLATFORM_SUBTARGET == .Default {
 		DontRecord     = 12,
 		DontExecute    = 13,
 		DontAnnotate   = 16,
+		_Bit0          = 0,
+		_Bit1          = 1,
+		_Bit4          = 4,
+		_Bit5          = 5,
 	}
 	AppleEventSendOptions :: bit_set[AppleEventSendOption; cffi.ulong]
-	AppleEventSendOptions_NoReply :: transmute(AppleEventSendOptions)cffi.ulong(0x1)
-	AppleEventSendOptions_QueueReply :: transmute(AppleEventSendOptions)cffi.ulong(0x2)
-	AppleEventSendOptions_WaitForReply :: transmute(AppleEventSendOptions)cffi.ulong(0x3)
-	AppleEventSendOptions_NeverInteract :: transmute(AppleEventSendOptions)cffi.ulong(0x10)
-	AppleEventSendOptions_CanInteract :: transmute(AppleEventSendOptions)cffi.ulong(0x20)
-	AppleEventSendOptions_AlwaysInteract :: transmute(AppleEventSendOptions)cffi.ulong(0x30)
-	AppleEventSendOptions_DefaultOptions :: transmute(AppleEventSendOptions)cffi.ulong(0x23)
+	AppleEventSendOptions_NoReply :: AppleEventSendOptions{._Bit0}
+	AppleEventSendOptions_QueueReply :: AppleEventSendOptions{._Bit1}
+	AppleEventSendOptions_WaitForReply :: AppleEventSendOptions{._Bit0, ._Bit1}
+	AppleEventSendOptions_NeverInteract :: AppleEventSendOptions{._Bit4}
+	AppleEventSendOptions_CanInteract :: AppleEventSendOptions{._Bit5}
+	AppleEventSendOptions_AlwaysInteract :: AppleEventSendOptions{._Bit4, ._Bit5}
+	AppleEventSendOptions_DefaultOptions :: AppleEventSendOptions{._Bit0, ._Bit1, ._Bit5}
 
 	InsertionPosition :: enum cffi.ulong {
 		After     = 0,
