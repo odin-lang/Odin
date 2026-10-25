@@ -471,10 +471,7 @@ process_exec :: proc(
 				}
 			}
 
-			// A child that has just written is likely to write again soon, so
-			// the pipes are polled again right away. Once both have been empty
-			// for a while, sleep between polls instead of keeping a core busy
-			// until the child writes or exits.
+			// NOTE: Sleep instead of spinning once the pipes have been empty for a millisecond
 			if err == nil && (!stdout_done || !stderr_done) && time.tick_since(last_read) >= time.Millisecond {
 				time.sleep(time.Millisecond)
 			}
