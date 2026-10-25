@@ -239,7 +239,7 @@ poll_timeout :: proc(t: ^testing.T) {
 This test walks through the scenario where a user wants to `poll` in order to check if some other package (in this case `core:net`),
 would be able to do an operation without blocking.
 
-It also tests whether a poll can be issues when it is already in a ready state.
+It also tests whether a poll can be issued when it is already in a ready state.
 And it tests big send/recv buffers being handled properly.
 */
 @(test)
@@ -267,18 +267,18 @@ poll :: proc(t: ^testing.T) {
 
 					free_all(context.temp_allocator)
 
-					// Connection was closed by client, close server.
 					if op.type == .Recv && op.recv.received == 0 && op.recv.err == nil {
+						// Connection was closed by client, close server.
 						nbio.close(client)
 						return
 					}
 
 					if op.type == .Recv {
-						log.debugf("received %M this time", op.recv.received)
+						log.infof("Send buffer saturation test: Server received %M this time", op.recv.received)
 					}
 
 					// Receive some data to unblock the client, which should complete the poll it does, allowing it to send data again.
-					buf, mem_err := make([]byte, mem.Gigabyte, context.temp_allocator)
+					buf, mem_err := make([]byte, mem.Megabyte*64, context.temp_allocator)
 					ev(t, mem_err, nil)
 					nbio.recv_poly3(client, {buf}, t, can_recv, client, check_recv)
 				}
@@ -307,8 +307,14 @@ poll :: proc(t: ^testing.T) {
 				// fixed amount does it. Nothing is reading yet, so this terminates.
 				// NOTE: Don't make the chunk too large; we need the system to be able to send
 				//       at least one chunk.
-				buf, mem_err := make([]byte, mem.Megabyte*512, context.temp_allocator)
+				// INFO: In the CI VMs, on Windows, this seems to fail after 2 iterations regardless of size,
+				//       and on all other systems, it fails after queuing something between
+				//       a few KiB to a few (single-digit) MiB. So it seems we really don't need to
+				//       send a lot of data to make this block.
+				buf, mem_err := make([]byte, mem.Megabyte*64, context.temp_allocator)
 				ev(t, mem_err, nil)
+
+				log.infof("Send buffer saturation test: %M buffer allocated.", len(buf))
 
 				// Use `core:net` as example external code that doesn't care about the event loop.
 				net.set_blocking(op.poll.socket, false)
@@ -316,13 +322,15 @@ poll :: proc(t: ^testing.T) {
 				n: int
 				send_err: net.Network_Error
 				// Send up to 64 GiB total.
-				for i in 0..<128 {
+				for i in 0..<1024 {
 					sent: int
 					sent, send_err = net.send(op.poll.socket, buf)
 					n += sent
 					if send_err != nil {
-						log.debugf("net.send failed on iteration %v with error %v", i, send_err)
+						log.infof("Send buffer saturation test: net.send failed on iteration %v (%M) with error %v", i, n, send_err)
 						break
+					} else {
+						log.infof("Send buffer saturation test: net.send succeeded on iteration %v (%M)", i, n)
 					}
 				}
 				if send_err == nil {
@@ -330,9 +338,9 @@ poll :: proc(t: ^testing.T) {
 				}
 				ev(t, send_err, net.TCP_Send_Error.Would_Block)
 
-				log.debugf("blocking after %M", n)
+				log.infof("blocking after %M", n)
 
-				// Tell the server it can start issueing recv calls, so it unblocks us.
+				// Tell the server it can start issuing recv calls, so it unblocks us.
 				can_recv^ = true
 
 				// Now poll again, when the server reads enough data it should complete, telling us we can send without blocking again.
