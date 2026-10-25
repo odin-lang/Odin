@@ -10,12 +10,16 @@ import c "core:c"
 
 LUA_SHARED :: #config(LUA_SHARED, false)
 
+LUA_WASM_LIB :: #config(LUA_WASM_LIB, "env.o")
+
 when LUA_SHARED {
 	when ODIN_OS == .Windows {
 		// Does nothing special on windows
 		foreign import lib "windows/lua53dll.lib"
 	} else when ODIN_OS == .Linux && ODIN_ARCH == .amd64 {
 		foreign import lib "linux/liblua53.so"
+	} else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+		foreign import lib { LUA_WASM_LIB }
 	} else {
 		foreign import lib "system:lua5.3"
 	}
@@ -24,6 +28,8 @@ when LUA_SHARED {
 		foreign import lib "windows/lua53dll.lib"
 	} else when ODIN_OS == .Linux && ODIN_ARCH == .amd64 {
 		foreign import lib "linux/liblua53.a"
+	} else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+		foreign import lib { LUA_WASM_LIB }
 	} else {
 		foreign import lib "system:lua5.3"
 	}
