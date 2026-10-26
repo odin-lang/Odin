@@ -32,6 +32,42 @@ import "core:sys/linux"
 
 Ifs :: map[c.int]Network_Interface
 
+@(private)
+_enumerate_interfaces :: proc(
+	allocator := context.allocator,
+) -> (
+	interfaces: []Network_Interface,
+	err: Interfaces_Error,
+) {
+	context.allocator = allocator
+
+	/*
+	 * Interfaces are id-ed with their idx since it is easier to get
+	 * from `nlmsghdr` messages
+	 */
+	idx_to_interface := make(Ifs)
+	defer delete(idx_to_interface)
+
+	/*
+	 * Use rtnetlink to enumerate interfaces, the callback will populate
+	 * `idx_to_interface` incrementally
+	 */
+	if err := _rtnetlink_enumerate(&idx_to_interface, _handle_newlink, _handle_newaddr);
+	   err != .NONE {
+		return nil, Interfaces_Error.Unable_To_Enumerate_Network_Interfaces
+	}
+
+	// Dump the interfaces into a slice
+	// NOTE: the order isn't stable
+	interfaces = make([]Network_Interface, len(idx_to_interface))
+	idx := 0
+	for _, intf in idx_to_interface {
+		interfaces[idx] = intf
+		idx += 1
+	}
+	return
+}
+
 // from /usr/include/linux/netlink.h
 nlmsghdr :: struct {
 	nlmsg_len:            u32,
@@ -204,16 +240,14 @@ _rta_payload :: #force_inline proc(rta: ^rtattr) -> []byte {
 	return _buffer_after(rta)[:rta.rta_len - size_of(rtattr)]
 }
 
-Nlmsghdr_Callback :: struct($T: typeid) {
-	fn:  proc(ctx: ^T, h: ^nlmsghdr) -> linux.Errno,
-	ctx: ^T,
-}
+Nlmsghdr_Callback :: proc(ifs: ^Ifs, h: ^nlmsghdr) -> linux.Errno
 
 _netlink_enumerate :: proc(
 	fd: linux.Fd,
 	seq: u32,
 	type: u16,
-	cb: Nlmsghdr_Callback($T),
+	cb: Nlmsghdr_Callback,
+	ifs: ^Ifs,
 ) -> linux.Errno {
 	Request :: struct {
 		header: nlmsghdr,
@@ -244,19 +278,19 @@ _netlink_enumerate :: proc(
 				err := -_read_T(_nlmsg_payload(h), linux.Errno)
 				return linux.Errno(err)
 			case:
-				cb.fn(cb.ctx, h) or_return
+				cb(ifs, h) or_return
 			}
 		}
 	}
 	return .NONE
 }
 
-_rtnetlink_enumerate :: proc(cb: Nlmsghdr_Callback($T)) -> linux.Errno {
+_rtnetlink_enumerate :: proc(ifs: ^Ifs, newlink_cb, newaddr_cb: Nlmsghdr_Callback) -> linux.Errno {
 	fd := linux.socket(.NETLINK, .RAW, {.CLOEXEC}, nil) or_return
 	defer linux.close(fd)
 
-	_netlink_enumerate(fd, 1, u16(RTM.GETLINK), cb) or_return
-	_netlink_enumerate(fd, 2, u16(RTM.GETADDR), cb) or_return
+	_netlink_enumerate(fd, 1, u16(RTM.GETLINK), newlink_cb, ifs) or_return
+	_netlink_enumerate(fd, 2, u16(RTM.GETADDR), newaddr_cb, ifs) or_return
 
 	return .NONE
 }
@@ -292,7 +326,8 @@ _flags_to_link_state :: proc(flags: IFF_Flags) -> (state: Link_State) {
 	return
 }
 
-_handle_newlink :: proc(ifs: ^Ifs, h: ^nlmsghdr) {
+_handle_newlink: Nlmsghdr_Callback : proc(ifs: ^Ifs, h: ^nlmsghdr) -> linux.Errno {
+	if RTM(h.nlmsg_type) != .NEWLINK do return .EPROTO
 	ifi := _read_T(_nlmsg_payload(h), ifinfomsg)
 
 	ifs[ifi.ifi_index] = {
@@ -315,9 +350,11 @@ _handle_newlink :: proc(ifs: ^Ifs, h: ^nlmsghdr) {
 		// there could be something interesting in `case .STATS:`
 		}
 	}
+
+	return .NONE
 }
 
-_handle_newaddr :: proc(ifs: ^Ifs, h: ^nlmsghdr) -> bool {
+_handle_newaddr: Nlmsghdr_Callback : proc(ifs: ^Ifs, h: ^nlmsghdr) -> linux.Errno {
 	to_addr :: proc(bytes: []u8, af: AF) -> Address {
 		#partial switch af {
 		case .INET:
@@ -340,8 +377,19 @@ _handle_newaddr :: proc(ifs: ^Ifs, h: ^nlmsghdr) -> bool {
 		return nil
 	}
 
+	if RTM(h.nlmsg_type) != .NEWADDR do return .EPROTO
+
 	ifa := _read_T(_nlmsg_payload(h), ifaddrmsg)
-	ifs0 := (&ifs[c.int(ifa.fa_index)]) or_return
+	ifs0, ok := &ifs[c.int(ifa.fa_index)]
+
+	if !ok {
+		// this branch is a last resort, interfaces should first be created by
+		// a .NEWLINK nlmsghdr
+		ifs[c.int(ifa.fa_index)] = {
+			unicast = make([dynamic]Lease),
+		}
+		ifs0 = &ifs[c.int(ifa.fa_index)]
+	}
 
 	iter: ^rtattr
 	lease: Lease
@@ -359,53 +407,5 @@ _handle_newaddr :: proc(ifs: ^Ifs, h: ^nlmsghdr) -> bool {
 	}
 	lease.netmask = prefix_to_netmask(ifa.fa_prefixlen, ifa.fa_family)
 	append(&ifs0.unicast, lease)
-	return true
-}
-
-_parse_nlmsg :: proc(ifs: ^Ifs, h: ^nlmsghdr) -> linux.Errno {
-	#partial switch RTM(h.nlmsg_type) {
-	case .NEWLINK:
-		_handle_newlink(ifs, h)
-	case .NEWADDR:
-		if !_handle_newaddr(ifs, h) do return .EPROTO
-	case:
-		panic("the netlink request got an unsupported nlmsg_type")
-	}
 	return .NONE
-}
-
-@(private)
-_enumerate_interfaces :: proc(
-	allocator := context.allocator,
-) -> (
-	interfaces: []Network_Interface,
-	err: Interfaces_Error,
-) {
-	context.allocator = allocator
-
-	/*
-	 * Interfaces are id-ed with their idx since it is easier to get
-	 * from `nlmsghdr` messages
-	 */
-	idx_to_interface := make(Ifs)
-	defer delete(idx_to_interface)
-
-	/*
-	 * Use rtnetlink to enumerate interfaces, the callback will populate
-	 * `idx_to_interface` incrementally
-	 */
-	if err := _rtnetlink_enumerate(Nlmsghdr_Callback(Ifs){_parse_nlmsg, &idx_to_interface});
-	   err != .NONE {
-		return nil, Interfaces_Error.Unable_To_Enumerate_Network_Interfaces
-	}
-
-	// Dump the interfaces into a slice
-	// NOTE: the order isn't stable
-	interfaces = make([]Network_Interface, len(idx_to_interface))
-	idx := 0
-	for _, intf in idx_to_interface {
-		interfaces[idx] = intf
-		idx += 1
-	}
-	return interfaces, {}
 }
