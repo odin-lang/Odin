@@ -291,8 +291,12 @@ differential_unquote_string :: proc(t: ^testing.T) {
 // `C` is the target type for the current package and `R` the one for the reference. They are the
 // same type except where `json.Value` is involved.
 
-compare_unmarshal :: proc(f: ^Fuzz, what: string, data: []byte, spec: json.Specification, a, b: rawptr, $C, $R: typeid, ea, eb: Norm_Error, extra := "") {
-	d := diff_values(a, b, type_info_of(C), type_info_of(R), after_error = ea.kind != .None && errors_equal(ea, eb))
+compare_unmarshal :: proc(f: ^Fuzz, what: string, data: []byte, spec: json.Specification, a, b: rawptr, $C, $R: typeid, ea, eb: Norm_Error, extra := "", flags := Diff_Flags{}) {
+	flags := flags
+	if ea.kind != .None && errors_equal(ea, eb) {
+		flags += {.After_Error}
+	}
+	d := diff_values(a, b, type_info_of(C), type_info_of(R), flags)
 	if errors_equal(ea, eb) && d == "" && extra == "" {
 		return
 	}
@@ -309,7 +313,7 @@ check_unmarshal :: proc(f: ^Fuzz, $C, $R: typeid, data: []byte, spec: json.Speci
 	b := new(R, allocator)
 	eb := norm_error_reference(ref.unmarshal(data, b, ref_spec(spec), allocator))
 	ea := norm_error_current(json.unmarshal(data, a, spec, allocator, flags))
-	what := "unmarshal" if flags == {} else "unmarshal with .Skip_Validation"
+	what := "unmarshal" if flags == {} else fmt.tprintf("unmarshal with %v", flags)
 	if .Skip_Validation in flags && eb.kind == .Data && eb.code == int(json.Unmarshal_Data_Error.Invalid_Data) {
 		// The reference rejected the input up front. Without validation any error will do, and
 		// the destination may be partly written.
@@ -319,7 +323,7 @@ check_unmarshal :: proc(f: ^Fuzz, $C, $R: typeid, data: []byte, spec: json.Speci
 		}
 		return ea
 	}
-	compare_unmarshal(f, what, data, spec, a, b, C, R, ea, eb)
+	compare_unmarshal(f, what, data, spec, a, b, C, R, ea, eb, flags = {.Any_Map_Cap} if .Reserve_Maps in flags else {})
 	return ea
 }
 
@@ -447,6 +451,21 @@ differential_unmarshal_skip_validation :: proc(t: ^testing.T) {
 	log.infof("skip validation: %d of %d unmarshals were of input is_valid rejects", f.rejected, f.outcomes.total)
 	if f.outcomes.total >= 100 {
 		testing.expect(t, f.rejected > 0, "no input that is_valid rejects was unmarshalled without validation")
+	}
+}
+
+// With `.Reserve_Maps` the result must match the reference except for map capacities.
+@(test)
+differential_unmarshal_reserve_maps :: proc(t: ^testing.T) {
+	f: Fuzz
+	fuzz_init(&f, t)
+	defer fuzz_destroy(&f)
+
+	for flags in ([]json.Unmarshal_Flags{{.Reserve_Maps}, {.Reserve_Maps, .Skip_Validation}}) {
+		fuzz_unmarshal(&f, Everything,         Everything,           ITERATIONS/2, flags)
+		fuzz_unmarshal(&f, map[string]Inner,   map[string]Inner,     ITERATIONS/2, flags)
+		fuzz_unmarshal(&f, map[int]string,     map[int]string,       ITERATIONS/2, flags)
+		fuzz_unmarshal(&f, With_Value_Current, With_Value_Reference, ITERATIONS/4, flags)
 	}
 }
 

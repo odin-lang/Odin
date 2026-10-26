@@ -237,7 +237,11 @@ bench_unmarshal :: proc(b: ^Bench, name: string, data: []byte, $T: typeid, flags
 	}
 	b.flags = flags
 	defer b.flags = {}
-	op := "unmarshal" if flags == {} else "unmarshal, no validation"
+	op := "unmarshal"
+	switch {
+	case .Skip_Validation in flags: op = "unmarshal, no validation"
+	case .Reserve_Maps in flags:    op = "unmarshal, reserve maps"
+	}
 	for mode in Alloc_Mode {
 		times: [Impl]time.Duration
 		for impl in Impl {
@@ -381,6 +385,7 @@ benchmark_unmarshal :: proc(t: ^testing.T) {
 	bench_unmarshal(&b, "f64 array",          floats_json,    []f64,    {.Skip_Validation})
 	bench_unmarshal(&b, "string array",       strs_json,      []string, {.Skip_Validation})
 	bench_unmarshal(&b, "long ASCII strings", long_strs_json, []string, {.Skip_Validation})
+	bench_unmarshal(&b, "map",                entities_json,  map[string]Stats, {.Reserve_Maps})
 	bench_parse    (&b, "records",            records_min)
 	bench_is_valid (&b, "records",            records_min)
 	bench_is_valid (&b, "long ASCII strings", long_strs_json)

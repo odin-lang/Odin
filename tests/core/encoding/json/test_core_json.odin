@@ -1,6 +1,9 @@
 package test_core_json
 
 import "core:encoding/json"
+import "core:fmt"
+import "core:mem"
+import "core:strings"
 import "core:testing"
 import "core:unicode/utf8"
 import "core:mem/virtual"
@@ -636,5 +639,67 @@ unmarshal_skip_validation :: proc(t: ^testing.T) {
 		testing.expectf(t, err == json.Unmarshal_Data_Error.Invalid_Data, "%q: expected Invalid_Data when validating, got %v", c.src, err)
 		err = json.unmarshal_string(c.src, &n, c.spec, flags = {.Skip_Validation})
 		testing.expectf(t, err == c.err, "%q: expected %v with .Skip_Validation, got %v", c.src, c.err, err)
+	}
+}
+
+@test
+unmarshal_without_temporary_allocations :: proc(t: ^testing.T) {
+	// Keys, enum names, numbers in strings and runes are read without allocating, so unmarshalling
+	// into a struct holding none of `string`, `cstring`, slices or maps allocates nothing at all.
+	Kind :: enum {A, B, C}
+	Thing :: struct {
+		x, y:   int,
+		kind:   Kind,
+		n:      int,
+		f:      f32,
+		r:      rune,
+		counts: [Kind]int,
+	}
+	src := `{"x": 1, "\u0079": 2, "kind": "B", "n": "42", "f": "1.5", "r": "\u00e9", "counts": {"A": 1, "\u0043": 3}, "other": "skipped"}`
+
+	for flags in ([]json.Unmarshal_Flags{{}, {.Skip_Validation}}) {
+		track: mem.Tracking_Allocator
+		mem.tracking_allocator_init(&track, context.allocator)
+		defer mem.tracking_allocator_destroy(&track)
+
+		thing: Thing
+		err := json.unmarshal_string(src, &thing, allocator = mem.tracking_allocator(&track), flags = flags)
+		testing.expect_value(t, err, nil)
+		testing.expect_value(t, thing, Thing{x = 1, y = 2, kind = .B, n = 42, f = 1.5, r = 'é', counts = {.A = 1, .B = 0, .C = 3}})
+		testing.expectf(t, track.total_allocation_count == 0, "%v: expected no allocations, got %d", flags, track.total_allocation_count)
+	}
+}
+
+@test
+unmarshal_reserve_maps :: proc(t: ^testing.T) {
+	// With `.Reserve_Maps` a map is allocated once at its final size, never grown, and holds the same
+	// entries. The sizes straddle the points where an unreserved map grows.
+	for n in ([]int{0, 1, 5, 6, 7, 12, 13, 24, 25, 100, 1000}) {
+		b := strings.builder_make(context.temp_allocator)
+		strings.write_byte(&b, '{')
+		for i in 0..<n {
+			fmt.sbprintf(&b, `%s"%d": %d`, "," if i > 0 else "", i*7, i)
+		}
+		strings.write_byte(&b, '}')
+		src := strings.to_string(b)
+
+		expected: map[int]int
+		defer delete(expected)
+		testing.expect_value(t, json.unmarshal_string(src, &expected), nil)
+
+		track: mem.Tracking_Allocator
+		mem.tracking_allocator_init(&track, context.allocator)
+		defer mem.tracking_allocator_destroy(&track)
+
+		reserved: map[int]int
+		defer delete(reserved)
+		testing.expect_value(t, json.unmarshal_string(src, &reserved, allocator = mem.tracking_allocator(&track), flags = {.Reserve_Maps}), nil)
+
+		testing.expectf(t, len(reserved) == n, "%d entries: got %d", n, len(reserved))
+		for k, v in expected {
+			testing.expectf(t, reserved[k] == v, "%d entries: key %d is %d, expected %d", n, k, reserved[k], v)
+		}
+		testing.expectf(t, track.total_allocation_count == (1 if n > 0 else 0) && track.total_free_count == 0,
+			"%d entries: expected one allocation and no frees, got %d and %d", n, track.total_allocation_count, track.total_free_count)
 	}
 }

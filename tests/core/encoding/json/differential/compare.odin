@@ -189,11 +189,11 @@ allocators_equal :: proc(a, b: runtime.Allocator) -> bool {
 }
 
 @(private="file")
-elems_diff :: proc(a, b: rawptr, ea, eb: ^reflect.Type_Info, size_a, size_b, count: int, after_error: bool) -> string {
+elems_diff :: proc(a, b: rawptr, ea, eb: ^reflect.Type_Info, size_a, size_b, count: int, flags: Diff_Flags) -> string {
 	for i in 0..<count {
 		pa := ptr_add(a, uintptr(i*size_a))
 		pb := ptr_add(b, uintptr(i*size_b))
-		if d := diff_values(pa, pb, ea, eb, after_error); d != "" {
+		if d := diff_values(pa, pb, ea, eb, flags); d != "" {
 			return fmt.tprintf("[%d]%s", i, d)
 		}
 	}
@@ -203,8 +203,14 @@ elems_diff :: proc(a, b: rawptr, ea, eb: ^reflect.Type_Info, size_a, size_b, cou
 // Returns "" when the value at `a` (type `ta`, written by the current package) is observably
 // the same as the value at `b` (type `tb`, written by the reference), otherwise the path to the
 // first difference and what differs. `ta` and `tb` are the same type except where `Value` is
-// involved. `after_error` is set when both packages returned the same error, see the union case.
-diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, after_error := false) -> string {
+// involved.
+Diff_Flag :: enum {
+	After_Error, // Both packages returned the same error, see the union case.
+	Any_Map_Cap, // `.Reserve_Maps` sizes maps up front, so their capacity may differ.
+}
+Diff_Flags :: bit_set[Diff_Flag]
+
+diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flags{}) -> string {
 	if ta.id == json.Value || tb.id == ref.Value {
 		va, vb := (^json.Value)(a)^, (^ref.Value)(b)^
 		if ta.id != json.Value || tb.id != ref.Value {
@@ -233,7 +239,7 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, after_error := fal
 		for i in 0..<int(ia.field_count) {
 			pa := ptr_add(a, ia.offsets[i])
 			pb := ptr_add(b, ib.offsets[i])
-			if d := diff_values(pa, pb, ia.types[i], ib.types[i], after_error); d != "" {
+			if d := diff_values(pa, pb, ia.types[i], ib.types[i], flags); d != "" {
 				return fmt.tprintf(".%s%s", ia.names[i], d)
 			}
 		}
@@ -268,11 +274,11 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, after_error := fal
 
 	case reflect.Type_Info_Array:
 		ib := bb.variant.(reflect.Type_Info_Array)
-		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.count, after_error)
+		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.count, flags)
 
 	case reflect.Type_Info_Enumerated_Array:
 		ib := bb.variant.(reflect.Type_Info_Enumerated_Array)
-		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.count, after_error)
+		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.count, flags)
 
 	case reflect.Type_Info_Slice:
 		ib := bb.variant.(reflect.Type_Info_Slice)
@@ -283,7 +289,7 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, after_error := fal
 		if (ra.data == nil) != (rb.data == nil) {
 			return fmt.tprintf(": data is nil=%v in current, nil=%v in reference", ra.data == nil, rb.data == nil)
 		}
-		return elems_diff(ra.data, rb.data, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ra.len, after_error)
+		return elems_diff(ra.data, rb.data, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ra.len, flags)
 
 	case reflect.Type_Info_Dynamic_Array:
 		ib := bb.variant.(reflect.Type_Info_Dynamic_Array)
@@ -297,7 +303,7 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, after_error := fal
 		if !allocators_equal(ra.allocator, rb.allocator) {
 			return ": allocator differs"
 		}
-		return elems_diff(ra.data, rb.data, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ra.len, after_error)
+		return elems_diff(ra.data, rb.data, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ra.len, flags)
 
 	case reflect.Type_Info_Fixed_Capacity_Dynamic_Array:
 		ib := bb.variant.(reflect.Type_Info_Fixed_Capacity_Dynamic_Array)
@@ -305,7 +311,7 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, after_error := fal
 		if la != lb {
 			return fmt.tprintf(": len %d in current, %d in reference", la, lb)
 		}
-		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.capacity, after_error)
+		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.capacity, flags)
 
 	case reflect.Type_Info_Union:
 		ib := bb.variant.(reflect.Type_Info_Union)
@@ -330,13 +336,13 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, after_error := fal
 		if index < 0 || index >= len(ia.variants) {
 			return fmt.tprintf(": invalid union tag %d", tag_a)
 		}
-		if after_error {
+		if .After_Error in flags {
 			// A variant tried and abandoned during a failed unmarshal can leave its bytes behind, for
 			// example a string's data pointer over the active `int`. Addresses differ between the
 			// two packages, so after an error only the tags are compared.
 			return ""
 		}
-		if d := diff_values(a, b, ia.variants[index], ib.variants[index], after_error); d != "" {
+		if d := diff_values(a, b, ia.variants[index], ib.variants[index], flags); d != "" {
 			return fmt.tprintf(".(%v)%s", ia.variants[index].id, d)
 		}
 		return ""
@@ -346,7 +352,7 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, after_error := fal
 		ra, rb := (^runtime.Raw_Map)(a)^, (^runtime.Raw_Map)(b)^
 		len_a, len_b := runtime.map_len(ra), runtime.map_len(rb)
 		cap_a, cap_b := runtime.map_cap(ra), runtime.map_cap(rb)
-		if len_a != len_b || cap_a != cap_b {
+		if len_a != len_b || (cap_a != cap_b && .Any_Map_Cap not_in flags) {
 			return fmt.tprintf(": len/cap %d/%d in current, %d/%d in reference", len_a, cap_a, len_b, cap_b)
 		}
 		if !allocators_equal(ra.allocator, rb.allocator) {
@@ -357,10 +363,10 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, after_error := fal
 			found := false
 			it_b := 0
 			for kb, vb in reflect.iterate_map(any{b, tb.id}, &it_b) {
-				if diff_values(ka.data, kb.data, ia.key, ib.key, after_error) != "" {
+				if diff_values(ka.data, kb.data, ia.key, ib.key, flags) != "" {
 					continue
 				}
-				if d := diff_values(va.data, vb.data, ia.value, ib.value, after_error); d != "" {
+				if d := diff_values(va.data, vb.data, ia.value, ib.value, flags); d != "" {
 					return fmt.tprintf("[%v]%s", ka, d)
 				}
 				found = true
