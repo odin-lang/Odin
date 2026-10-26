@@ -881,27 +881,6 @@ _mm_storel_epi64 :: #force_inline proc "c" (mem_addr: ^__m128i, a: __m128i) {
 	intrinsics.mem_copy_non_overlapping(mem_addr, &b, size_of(i64))
 }
 
-when ODIN_ARCH == .amd64 {
-
-	// Store 128-bits of integer data from `a` into memory using a non-temporal memory hint.
-	// `mem_addr` must be aligned on a 16-byte boundary or a general-protection exception may be generated.
-	//
-	// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_stream_si128)
-	@(enable_target_feature="sse2")
-	_mm_stream_si128 :: asm (mem_addr: ^__m128i, a: __m128i) {
-		movntdq [mem_addr], a
-	}
-
-	// Store 32-bit integer `a` into memory using a non-temporal hint to minimize cache pollution.
-	// If the cache line containing address `mem_addr` is already in the cache, the cache will be updated.
-	//
-	// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_stream_si32)
-	// @(enable_target_feature="sse2")
-	// _mm_stream_si32 :: asm (mem_addr: ^i32, a: i32) {
-	// 	movnti [mem_addr], a
-	// }
-}
-
 // Copy the lower 64-bit integer in `a` to the lower element of `dst`, and zero the upper element.
 //
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_move_epi64)
@@ -1806,19 +1785,6 @@ _mm_loadl_pd :: #force_inline proc "c" (a: __m128d, mem_addr: ^f64) -> __m128d {
 	return __m128d {mem_addr^, simd.extract(a, 1)}
 }
 
-when ODIN_ARCH == .amd64 {
-
-	// Store 128-bits (composed of 2 packed double-precision (64-bit) floating-point elements)
-	// from `a` into memory using a non-temporal memory hint. `mem_addr` must be aligned on a 16-byte boundary
-	// or a general-protection exception may be generated.
-	//
-	// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_stream_pd)
-	@(enable_target_feature="sse2")
-	_mm_stream_pd :: asm (mem_addr: ^f64, a: __m128d) {
-		movntpd [mem_addr], a
-	}
-}
-
 // Store the lower double-precision (64-bit) floating-point element from `a` into memory.
 // `mem_addr` does not need to be aligned on any particular boundary.
 //
@@ -2089,6 +2055,43 @@ _mm_unpacklo_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
 }
 
 when ODIN_ARCH == .amd64 {
+	// Store 128-bits (composed of 2 packed double-precision (64-bit) floating-point elements)
+	// from `a` into memory using a non-temporal memory hint. `mem_addr` must be aligned on a 16-byte boundary
+	// or a general-protection exception may be generated.
+	//
+	// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_stream_pd)
+	// @(enable_target_feature="sse2")
+	// _mm_stream_pd :: asm (mem_addr: ^f64, a: __m128d) {
+	// 	movntpd [mem_addr], a
+	// }
+
+	// Store 128-bits of integer data from `a` into memory using a non-temporal memory hint.
+	// `mem_addr` must be aligned on a 16-byte boundary or a general-protection exception may be generated.
+	//
+	// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_stream_si128)
+	// @(enable_target_feature="sse2")
+	// _mm_stream_si128 :: asm (mem_addr: ^__m128i, a: __m128i) {
+	// 	movntdq [mem_addr], a
+	// }
+
+	// Store 32-bit integer `a` into memory using a non-temporal hint to minimize cache pollution.
+	// If the cache line containing address `mem_addr` is already in the cache, the cache will be updated.
+	//
+	// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_stream_si32)
+	// @(enable_target_feature="sse2")
+	// _mm_stream_si32 :: asm (mem_addr: ^i32, a: i32) {
+	// 	movnti [mem_addr], a
+	// }
+
+	// Store 64-bit integer `a` into memory using a non-temporal hint to minimize cache pollution.
+	// If the cache line containing address `mem_addr` is already in the cache, the cache will be updated.
+	//
+	// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_stream_si64)
+	// @(enable_target_feature="sse2")
+	// _mm_stream_si64 :: asm (mem_addr: ^i64, a: i64) {
+	// 	movnti [mem_addr], a
+	// }
+
 	// Convert the lower double-precision (64-bit) floating-point element in `a` to a 64-bit integer,
 	// and store the result in `dst`.
 	//
@@ -2124,15 +2127,6 @@ when ODIN_ARCH == .amd64 {
 	_mm_cvttsd_si64x :: #force_inline proc "c" (a: __m128d) -> i64 {
 		return llvm_cvttsd2si64(a)
 	}
-
-	// Store 64-bit integer `a` into memory using a non-temporal hint to minimize cache pollution.
-	// If the cache line containing address `mem_addr` is already in the cache, the cache will be updated.
-	//
-	// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_stream_si64)
-	// @(enable_target_feature="sse2")
-	// _mm_stream_si64 :: asm (mem_addr: ^i64, a: i64) {
-	// 	movnti [mem_addr], a
-	// }
 
 	// Copy 64-bit integer `a` to the lower element of `dst`, and zero the upper element.
 	//
