@@ -703,3 +703,84 @@ unmarshal_reserve_maps :: proc(t: ^testing.T) {
 			"%d entries: expected one allocation and no frees, got %d and %d", n, track.total_allocation_count, track.total_free_count)
 	}
 }
+
+Duplicate_Base :: struct {
+	id: int,
+}
+
+Duplicate_Mid :: struct {
+	using _: Duplicate_Base,
+	mid:     int,
+}
+
+// `none` has no size, so it shares its offset with `after`, and `after` is past the first byte of the
+// bitset that tracks the fields.
+Duplicate_Fields :: struct {
+	a:       int,
+	b:       string `json:"B"`,
+	using _: Duplicate_Mid,
+	c, d, e: int,
+	f, g, h: int,
+	none:    struct{},
+	after:   int,
+}
+
+@(test)
+unmarshal_duplicate_fields :: proc(t: ^testing.T) {
+	Case :: struct {
+		src: string,
+		err: json.Unmarshal_Error,
+	}
+	cases := []Case{
+		{`{"a": 1, "a": 2}`,                        .Multiple_Use_Field},
+		{`{"a": 1, "\u0061": 2}`,                   .Multiple_Use_Field},
+		{`{"B": "x", "B": "y"}`,                    .Multiple_Use_Field},
+		{`{"mid": 1, "mid": 2}`,                    .Multiple_Use_Field},
+		{`{"id": 1, "mid": 2, "id": 3}`,            .Multiple_Use_Field},
+		{`{"after": 1, "h": 2, "after": 3}`,        .Multiple_Use_Field},
+		{`{"none": {}, "none": {}}`,                .Multiple_Use_Field},
+		{`{"none": {}, "after": 1}`,                nil},
+		{`{"id": 1, "mid": 2, "a": 3, "after": 4}`, nil},
+		{`{"B": "x", "mid": 1, "id": 2, "a": 3}`,   nil},
+		{`{"x": 1, "x": 2, "c": 3, "d": 4}`,        nil},
+	}
+	for c in cases {
+		v: Duplicate_Fields
+		err := json.unmarshal_string(c.src, &v)
+		delete(v.b)
+		testing.expectf(t, err == c.err, "%s: expected %v, got %v", c.src, c.err, err)
+	}
+
+	// Separate objects never share fields.
+	list: []Duplicate_Fields
+	testing.expect_value(t, json.unmarshal_string(`[{"a": 1, "id": 1}, {"a": 2, "id": 2}]`, &list), nil)
+	testing.expect_value(t, len(list), 2)
+	delete(list)
+
+	// `.Allow_Duplicate_Fields` keeps the last value, as before.
+	v: Duplicate_Fields
+	testing.expect_value(t, json.unmarshal_string(`{"a": 1, "id": 2, "a": 3, "id": 4}`, &v, flags = {.Allow_Duplicate_Fields}), nil)
+	testing.expect_value(t, v.a, 3)
+	testing.expect_value(t, v.id, 4)
+}
+
+@(test)
+unmarshal_many_unknown_keys :: proc(t: ^testing.T) {
+	// Each key used to grow the stack by a bitset as large as the struct, which overflowed it.
+	Big :: struct {
+		id:  int,
+		pad: [8192]byte,
+	}
+
+	b := strings.builder_make(context.temp_allocator)
+	strings.write_string(&b, `{"id": 1`)
+	for i in 0..<20_000 {
+		fmt.sbprintf(&b, `, "k%d": 0`, i)
+	}
+	strings.write_byte(&b, '}')
+
+	v := new(Big)
+	defer free(v)
+	testing.expect_value(t, json.unmarshal_string(strings.to_string(b), v), nil)
+	testing.expect_value(t, v.id, 1)
+}

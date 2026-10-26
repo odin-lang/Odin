@@ -53,6 +53,17 @@ Tagged :: struct {
 	ignored: int    `json:"-"`,
 }
 
+// Keys reach two levels of `using _`, and the fields without a size share their offsets with the
+// fields after them, so a struct's fields cannot be told apart by offset.
+Deep :: struct {
+	using _: Tagged,
+	none:    struct{},
+	after:   int,
+	using _: Inner,
+	zero:    [0]int,
+	last:    string,
+}
+
 Raw :: struct #raw_union {
 	i: i32,
 	f: f32,
