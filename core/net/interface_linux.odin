@@ -303,11 +303,20 @@ _flags_to_link_state :: proc(flags: IFF_Flags) -> (state: Link_State) {
 	/*
 		TODO: Refine this based on the type of adapter.
 	*/
-	if .UP in flags do state += {.Up}
-	else do state += {.Down}
-	if .DORMANT in flags do state += {.Dormant}
-	if .LOWER_UP not_in flags do state += {.Lower_Layer_Down}
-	if .LOOPBACK in flags do state += {.Loopback}
+	if .UP in flags {
+		state += {.Up}
+	} else {
+		state += {.Down}
+	}
+	if .DORMANT in flags {
+		state += {.Dormant}
+	}
+	if .LOWER_UP not_in flags {
+		state += {.Lower_Layer_Down}
+	}
+	if .LOOPBACK in flags {
+		state += {.Loopback}
+	}
 	return
 }
 
@@ -336,7 +345,9 @@ _handle_newlink: Nlmsghdr_Callback : proc(ifs: ^Ifs, h: ^nlmsghdr) -> linux.Errn
 	}
 
 
-	if RTM(h.nlmsg_type) != .NEWLINK do return .EPROTO
+	if RTM(h.nlmsg_type) != .NEWLINK {
+		return .EPROTO
+	}
 	ifi := _read_T(_nlmsg_payload(h), ifinfomsg)
 
 	ifs[ifi.ifi_index] = {
@@ -405,7 +416,9 @@ _handle_newaddr: Nlmsghdr_Callback : proc(ifs: ^Ifs, h: ^nlmsghdr) -> linux.Errn
 	}
 
 
-	if RTM(h.nlmsg_type) != .NEWADDR do return .EPROTO
+	if RTM(h.nlmsg_type) != .NEWADDR {
+		return .EPROTO
+	}
 
 	ifa := _read_T(_nlmsg_payload(h), ifaddrmsg)
 	ifs0, ok := &ifs[c.int(ifa.fa_index)]
