@@ -434,7 +434,7 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 	s = s[1:len(s)-1]
 
 	i := 0
-	#no_bounds_check for i < len(s) {
+	for i < len(s) {
 		c := s[i]
 		if c == '\\' || c == quote || c < ' ' {
 			break
@@ -461,7 +461,7 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 	// most three for six, and a surrogate pair four for twelve.
 	extra := 0
 	replacement_size := utf8.rune_size(utf8.RUNE_ERROR)
-	#no_bounds_check for j := i; j < len(s); /**/ {
+	for j := i; j < len(s); /**/ {
 		if s[j] < utf8.RUNE_SELF {
 			j += 1
 			continue

@@ -315,23 +315,20 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 
 		has_dot, frac_digits := false, 0
 		has_exp, exp_digits  := false, 0
-		#no_bounds_check {
-			// Every index is tested against len(data) first.
-			if i < len(data) && data[i] == '.' {
-				token.kind = .Float
-				end := digits_end(data, i+1)
-				has_dot, frac_digits, i = true, end - (i+1), end
-			}
+		if i < len(data) && data[i] == '.' {
+			token.kind = .Float
+			end := digits_end(data, i+1)
+			has_dot, frac_digits, i = true, end - (i+1), end
+		}
 
-			if i < len(data) && (data[i] == 'e' || data[i] == 'E') {
-				token.kind = .Float
+		if i < len(data) && (data[i] == 'e' || data[i] == 'E') {
+			token.kind = .Float
+			i += 1
+			if i < len(data) && (data[i] == '+' || data[i] == '-') {
 				i += 1
-				if i < len(data) && (data[i] == '+' || data[i] == '-') {
-					i += 1
-				}
-				end := digits_end(data, i)
-				has_exp, exp_digits, i = true, end - i, end
 			}
+			end := digits_end(data, i)
+			has_exp, exp_digits, i = true, end - i, end
 		}
 
 		move_to(t, i)
@@ -374,39 +371,36 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		closed, escaped, invalid := false, false, false
 
 		i := t.offset
-		#no_bounds_check {
-			// Every index is tested against len(t.data) first
-			loop: for {
-				i = plain_run_end(t.data, i, quote)
-				if i >= len(t.data) {
-					break
-				}
-				c := t.data[i]
-				switch {
-				case c == '\n':
-					err = .String_Not_Terminated
-					break loop
-				case c == quote:
-					i += 1
-					closed = true
-					break loop
-				case c == '\\':
-					escaped = true
-					move_to(t, i+1)
-					_ = scan_escape(t)
-					i = t.offset
-				case c < ' ':
+		loop: for {
+			i = plain_run_end(t.data, i, quote)
+			if i >= len(t.data) {
+				break
+			}
+			c := t.data[i]
+			switch {
+			case c == '\n':
+				err = .String_Not_Terminated
+				break loop
+			case c == quote:
+				i += 1
+				closed = true
+				break loop
+			case c == '\\':
+				escaped = true
+				move_to(t, i+1)
+				_ = scan_escape(t)
+				i = t.offset
+			case c < ' ':
+				invalid = true
+				i += 1
+			case escaped:
+				i += 1
+			case:
+				r, w := utf8.decode_rune_in_string(t.data[i:])
+				if r == utf8.RUNE_ERROR && w == 1 {
 					invalid = true
-					i += 1
-				case escaped:
-					i += 1
-				case:
-					r, w := utf8.decode_rune_in_string(t.data[i:])
-					if r == utf8.RUNE_ERROR && w == 1 {
-						invalid = true
-					}
-					i += w
 				}
+				i += w
 			}
 		}
 
@@ -575,7 +569,7 @@ is_valid_number :: proc(str: string, spec: Specification) -> bool {
 }
 
 @(require_results)
-is_valid_string_literal :: proc(str: string, spec: Specification) -> bool #no_bounds_check {
+is_valid_string_literal :: proc(str: string, spec: Specification) -> bool {
 	s := str
 	if len(s) < 2 {
 		return false
