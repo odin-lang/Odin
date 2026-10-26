@@ -143,6 +143,7 @@ unmarshal_any :: proc(data: []byte, v: any, spec := DEFAULT_SPECIFICATION, alloc
 		return .Invalid_Data
 	}
 	p := make_parser(data, spec, PARSE_INTEGERS, allocator)
+	p.tok.validated = !have_custom && .Skip_Validation not_in flags
 
 	data := any{(^rawptr)(v.data)^, ti.variant.(reflect.Type_Info_Pointer).elem.id}
 	if v.data == nil {
@@ -530,8 +531,9 @@ unmarshal_value :: proc(p: ^Parser, v: any, flags := Unmarshal_Flags{}) -> (err:
 		return UNSUPPORTED_TYPE
 
 	case .String:
+		invalid := p.curr_token_err == .Invalid_String
 		advance_token(p)
-		if .Skip_Validation in flags && !is_valid_string_literal(token.text, p.spec) {
+		if .Skip_Validation in flags && invalid {
 			return .Invalid_String
 		}
 		if unmarshal_string_token(p, any{v.data, ti.id}, token, ti) or_return {

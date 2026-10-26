@@ -51,6 +51,7 @@ Tokenizer :: struct {
 	spec:             Specification,
 	parse_integers:   bool,
 	insert_comma:     bool,
+	validated:        bool,
 }
 
 
@@ -406,7 +407,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 
 		move_to(t, i)
 
-		if !closed || escaped {
+		if (!closed || escaped) && !t.validated {
 			str := string(t.data[token.offset : t.offset])
 			if !is_valid_string_literal(str, t.spec) {
 				err = .Invalid_String

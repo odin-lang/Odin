@@ -9,6 +9,7 @@ Parser :: struct {
 	tok:            Tokenizer,
 	prev_token:     Token,
 	curr_token:     Token,
+	curr_token_err: Error,
 	spec:           Specification,
 	allocator:      mem.Allocator,
 	parse_integers: bool,
@@ -73,10 +74,9 @@ token_end_pos :: proc(tok: Token) -> Pos {
 }
 
 advance_token :: proc(p: ^Parser) -> (Token, Error) {
-	err: Error
 	p.prev_token = p.curr_token
-	p.curr_token, err = get_token(&p.tok)
-	return p.prev_token, err
+	p.curr_token, p.curr_token_err = get_token(&p.tok)
+	return p.prev_token, p.curr_token_err
 }
 
 
@@ -203,9 +203,9 @@ skip_value :: proc(p: ^Parser, check_strings := false) -> Error {
 		advance_token(p)
 		return nil
 	case .String:
-		text := p.curr_token.text
+		invalid := p.curr_token_err == .Invalid_String
 		advance_token(p)
-		if check_strings && !is_valid_string_literal(text, p.spec) {
+		if check_strings && invalid {
 			return .Invalid_String
 		}
 		return nil
