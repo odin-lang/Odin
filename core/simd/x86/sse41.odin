@@ -316,7 +316,7 @@ when ODIN_ARCH == .amd64 {
 }
 
 
-@(private, default_calling_convention="none")
+@(private="file", default_calling_convention="none")
 foreign _ {
 	@(link_name = "llvm.x86.sse41.pblendvb")
 	pblendvb   :: proc(a, b: i8x16, mask: i8x16) -> i8x16 ---
