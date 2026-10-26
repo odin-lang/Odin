@@ -637,7 +637,7 @@ accept4_nil :: proc "contextless" (s: Fd, flags: Socket_Flags = {}) -> (Fd, Errn
 accept4 :: proc { accept4_nil, accept4_T }
 
 ioctl :: proc "contextless" (fd: Fd, request: c.ulong, arg: uintptr) -> (int, Errno) {
-	result, ok := intrinsics.syscall_bsd(SYS_ioctl, cast(uintptr)fd, arg)
+	result, ok := intrinsics.syscall_bsd(SYS_ioctl, cast(uintptr)fd, cast(uintptr)request, arg)
 
 	if !ok {
 		return -1, cast(Errno)result		
