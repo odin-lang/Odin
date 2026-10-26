@@ -6,7 +6,7 @@ import "core:c"
 @(private)
 LIB :: (
 	     "../lib/stb_image.lib"      when ODIN_OS == .Windows
-	else "../lib/stb_image.a"        when ODIN_OS == .Linux
+	else "../lib/stb_image.a"        when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD
 	else "../lib/darwin/stb_image.a" when ODIN_OS == .Darwin
 	else "../lib/stb_image_wasm.o"   when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
 	else ""

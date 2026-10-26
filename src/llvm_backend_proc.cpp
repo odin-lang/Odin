@@ -434,7 +434,12 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		lb_set_llvm_metadata(m, p, p->debug_info);
 	}
 
-	if (p->body && entity->pkg && ((entity->pkg->kind == Package_Normal) || (entity->pkg->kind == Package_Init))) {
+	AstPackage *pkg = entity->pkg;
+	if (pkg == nullptr && entity->file != nullptr) {
+		// NOTE: procedure literals have no package
+		pkg = entity->file->pkg;
+	}
+	if (p->body && pkg && ((pkg->kind == Package_Normal) || (pkg->kind == Package_Init))) {
 		if (build_context.sanitizer_flags & SanitizerFlag_Address && !entity->Procedure.no_sanitize_address) {
 			lb_add_attribute_to_proc(m, p->value, "sanitize_address");
 		}

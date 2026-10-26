@@ -5,7 +5,7 @@ pushd "%~dp0" || exit /b 1
 
 if not exist "..\lib" mkdir "..\lib"
 
-cl -nologo -MT -TC -O2 -c stb_image.c stb_image_write.c stb_image_resize.c stb_truetype.c stb_rect_pack.c stb_vorbis.c stb_sprintf.c
+cl -nologo -MT -TC -O2 -c stb_image.c stb_image_write.c stb_image_resize2.c stb_truetype.c stb_rect_pack.c stb_vorbis.c stb_sprintf.c
 if errorlevel 1 (
     popd
     exit /b 1
@@ -21,7 +21,7 @@ if errorlevel 1 (
     popd
     exit /b 1
 )
-lib -nologo stb_image_resize.obj -out:..\lib\stb_image_resize.lib
+lib -nologo stb_image_resize2.obj -out:..\lib\stb_image_resize2.lib
 if errorlevel 1 (
     popd
     exit /b 1

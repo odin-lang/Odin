@@ -9,6 +9,8 @@ import "core:c"
 
 when ODIN_OS == .Windows {
 	foreign import lib "portmidi_s.lib"
+} else when ODIN_OS == .Darwin && !PORTMIDI_SHARED {
+	foreign import lib "darwin/portmidi_s.a"
 } else {
 	foreign import lib "system:portmidi"
 }

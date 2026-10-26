@@ -1810,7 +1810,7 @@ _mm256_extract_epi64 :: #force_inline proc "c" (a: __m256i, $idx: u32) -> i64 {
 }
 
 
-@(private, default_calling_convention="none")
+@(private="file", default_calling_convention="none")
 foreign _ {
 	@(link_name="llvm.x86.avx.round.pd.256")      llvm_roundpd256    :: proc(a: __m256d, #const b: u32) -> __m256d ---
 	@(link_name="llvm.x86.avx.round.ps.256")      llvm_roundps256    :: proc(a: __m256, #const b: u32) -> __m256 ---
