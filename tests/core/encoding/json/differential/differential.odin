@@ -308,21 +308,25 @@ compare_unmarshal :: proc(f: ^Fuzz, what: string, data: []byte, spec: json.Speci
 }
 
 // The reference accepts a key that sets a struct field twice, so the current package must match it
-// exactly with `.Allow_Duplicate_Fields`, and without it wherever no object repeats a key.
-duplicate_flag_runs :: proc(data: []byte, spec: json.Specification, flags: json.Unmarshal_Flags) -> []json.Unmarshal_Flags {
-	runs := make([dynamic]json.Unmarshal_Flags, 0, 2, context.temp_allocator)
-	append(&runs, flags + {.Allow_Duplicate_Fields})
-	if .Allow_Duplicate_Fields not_in flags && !repeats_key(data, spec) {
-		append(&runs, flags)
+// exactly with `.Allow_Duplicate_Fields`, and without it wherever no object repeats a key. The
+// reference also gives an empty key to the first field without a `json` tag, where the current
+// package only gives it to a field tagged `json:""`, so input with an empty key is not compared.
+unmarshal_runs :: proc(data: []byte, spec: json.Specification, flags: json.Unmarshal_Flags) -> (runs: []json.Unmarshal_Flags, comparable: bool) {
+	keys := object_keys(data, spec)
+	r := make([dynamic]json.Unmarshal_Flags, 0, 2, context.temp_allocator)
+	append(&r, flags + {.Allow_Duplicate_Fields})
+	if .Allow_Duplicate_Fields not_in flags && !keys.repeated {
+		append(&r, flags)
 	}
-	return runs[:]
+	return r[:], !keys.empty
 }
 
 check_unmarshal :: proc(f: ^Fuzz, $C, $R: typeid, data: []byte, spec: json.Specification, flags: json.Unmarshal_Flags = {}) -> (ea: Norm_Error) {
 	allocator := virtual.arena_allocator(&f.arena)
 	b := new(R, allocator)
 	eb := norm_error_reference(ref.unmarshal(data, b, ref_spec(spec), allocator))
-	for run_flags, run in duplicate_flag_runs(data, spec, flags) {
+	runs, comparable := unmarshal_runs(data, spec, flags)
+	for run_flags, run in runs {
 		a := new(C, allocator)
 		e := norm_error_current(json.unmarshal(data, a, spec, allocator, run_flags))
 		if run == 0 {
@@ -340,7 +344,9 @@ check_unmarshal :: proc(f: ^Fuzz, $C, $R: typeid, data: []byte, spec: json.Speci
 			}
 			continue
 		}
-		compare_unmarshal(f, what, data, spec, a, b, C, R, e, eb, flags = {.Any_Map_Cap} if .Reserve_Maps in flags else {})
+		if comparable {
+			compare_unmarshal(f, what, data, spec, a, b, C, R, e, eb, flags = {.Any_Map_Cap} if .Reserve_Maps in flags else {})
+		}
 	}
 	return
 }
@@ -514,7 +520,11 @@ check_unmarshal_value :: proc(f: ^Fuzz, $C, $R: typeid, data: []byte, spec: json
 
 	context.allocator = allocator
 	eb := norm_error_reference(ref.unmarshal_value(&pb, b^))
-	for flags in duplicate_flag_runs(data, spec, {}) {
+	runs, comparable := unmarshal_runs(data, spec, {})
+	if !comparable {
+		return
+	}
+	for flags in runs {
 		check_unmarshal_value_with(f, C, R, data, spec, parse_integers, flags, b, eb, &pb)
 	}
 }
@@ -597,28 +607,31 @@ structurally_valid :: proc(data: []byte, spec: json.Specification) -> bool {
 	return structure_document(&p)
 }
 
-// Whether an object may set a struct field twice, up to the first error in the structure: a key
-// repeats (after unquoting), or there is an empty key besides others. An empty key matches the
-// first field without a `json` name, so it aliases that field's own name.
-repeats_key :: proc(data: []byte, spec: json.Specification) -> (repeated: bool) {
+Object_Keys :: struct {
+	repeated: bool, // An object has the same key twice (after unquoting).
+	empty:    bool, // An object has an empty key.
+}
+
+// The keys of every object, up to the first error in the structure.
+object_keys :: proc(data: []byte, spec: json.Specification) -> (keys: Object_Keys) {
 	p := ref.make_parser(data, ref_spec(spec), true, mem.nil_allocator())
-	structure_document(&p, &repeated)
+	structure_document(&p, &keys)
 	return
 }
 
 @(private="file")
-structure_document :: proc(p: ^ref.Parser, repeated: ^bool = nil) -> bool {
+structure_document :: proc(p: ^ref.Parser, seen: ^Object_Keys = nil) -> bool {
 	if p.spec == .MJSON {
 		#partial switch p.curr_token.kind {
 		case .Ident, .String:
-			return structure_object_body(p, .EOF, repeated)
+			return structure_object_body(p, .EOF, seen)
 		}
 	}
-	return structure_value(p, repeated)
+	return structure_value(p, seen)
 }
 
 @(private="file")
-structure_object_body :: proc(p: ^ref.Parser, end_token: ref.Token_Kind, repeated: ^bool) -> bool {
+structure_object_body :: proc(p: ^ref.Parser, end_token: ref.Token_Kind, seen: ^Object_Keys) -> bool {
 	keys := make([dynamic]string, context.temp_allocator)
 	for p.curr_token.kind != end_token {
 		key := p.curr_token
@@ -626,17 +639,16 @@ structure_object_body :: proc(p: ^ref.Parser, end_token: ref.Token_Kind, repeate
 		if !key_ok {
 			return false
 		}
-		if repeated != nil {
+		if seen != nil {
 			name := key.text
 			if key.kind == .String {
 				name, _ = ref.unquote_string(key, p.spec, context.temp_allocator)
 			}
-			if slice.contains(keys[:], name) || (len(keys) > 0 && (name == "" || slice.contains(keys[:], ""))) {
-				repeated^ = true
-			}
+			seen.repeated ||= slice.contains(keys[:], name)
+			seen.empty    ||= name == ""
 			append(&keys, name)
 		}
-		if ref.parse_colon(p) != nil || !structure_value(p, repeated) {
+		if ref.parse_colon(p) != nil || !structure_value(p, seen) {
 			return false
 		}
 		if ref.parse_comma(p) {
@@ -647,21 +659,21 @@ structure_object_body :: proc(p: ^ref.Parser, end_token: ref.Token_Kind, repeate
 }
 
 @(private="file")
-structure_value :: proc(p: ^ref.Parser, repeated: ^bool) -> bool {
+structure_value :: proc(p: ^ref.Parser, seen: ^Object_Keys) -> bool {
 	#partial switch p.curr_token.kind {
 	case .Null, .False, .True, .Integer, .Float, .String:
 		ref.advance_token(p)
 		return true
 	case .Open_Brace:
 		return ref.expect_token(p, .Open_Brace) == nil &&
-		       structure_object_body(p, .Close_Brace, repeated) &&
+		       structure_object_body(p, .Close_Brace, seen) &&
 		       ref.expect_token(p, .Close_Brace) == nil
 	case .Open_Bracket:
 		if ref.expect_token(p, .Open_Bracket) != nil {
 			return false
 		}
 		for p.curr_token.kind != .Close_Bracket {
-			if !structure_value(p, repeated) {
+			if !structure_value(p, seen) {
 				return false
 			}
 			if ref.parse_comma(p) {

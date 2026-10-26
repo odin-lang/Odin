@@ -784,3 +784,49 @@ unmarshal_many_unknown_keys :: proc(t: ^testing.T) {
 	testing.expect_value(t, json.unmarshal_string(strings.to_string(b), v), nil)
 	testing.expect_value(t, v.id, 1)
 }
+
+@(test)
+unmarshal_empty_key :: proc(t: ^testing.T) {
+	// An empty key matches only a field tagged exactly `json:""`, never an untagged field nor one
+	// whose tag only names options.
+	Plain :: struct {
+		a, b: int,
+	}
+	Tagged_Empty :: struct {
+		a: int,
+		o: int `json:",omitempty"`,
+		e: int `json:""`,
+	}
+	Embedded :: struct {
+		using _: Plain,
+		c:       int,
+	}
+	Embedded_Empty :: struct {
+		using _: Tagged_Empty,
+		c:       int,
+	}
+
+	plain: Plain
+	testing.expect_value(t, json.unmarshal_string(`{"": 1, "a": 2}`, &plain), nil)
+	testing.expect_value(t, plain, Plain{a = 2})
+
+	tagged: Tagged_Empty
+	testing.expect_value(t, json.unmarshal_string(`{"": 5}`, &tagged), nil)
+	testing.expect_value(t, tagged, Tagged_Empty{e = 5})
+
+	// `e` is reached by its name and by the empty key, so both set the same field.
+	tagged = {}
+	err := json.unmarshal_string(`{"e": 1, "": 2}`, &tagged)
+	testing.expectf(t, err == .Multiple_Use_Field, "expected Multiple_Use_Field, got %v", err)
+	tagged = {}
+	testing.expect_value(t, json.unmarshal_string(`{"e": 1, "": 2}`, &tagged, flags = {.Allow_Duplicate_Fields}), nil)
+	testing.expect_value(t, tagged, Tagged_Empty{e = 2})
+
+	embedded: Embedded
+	testing.expect_value(t, json.unmarshal_string(`{"": {"a": 3}, "c": 4}`, &embedded), nil)
+	testing.expect_value(t, embedded, Embedded{c = 4})
+
+	embedded_empty: Embedded_Empty
+	testing.expect_value(t, json.unmarshal_string(`{"": 9}`, &embedded_empty), nil)
+	testing.expect_value(t, embedded_empty, Embedded_Empty{e = 9})
+}

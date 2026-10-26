@@ -41,7 +41,8 @@ Base :: struct {
 }
 
 // Field lookup priority: a `json` tag match beats a plain name match (`alias` takes the key
-// "plain"), an empty tag counts as no tag, and keys can reach into `using _` fields.
+// "plain"), an empty tag counts as no tag except that it takes the empty key, and keys can reach
+// into `using _` fields.
 Tagged :: struct {
 	using _: Base,
 	name:    string `json:"Name"`,
