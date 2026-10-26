@@ -33,6 +33,9 @@ Unmarshal_Flag :: enum {
 
 	// Count an object's entries and reserve the map once rather than growing it
 	Reserve_Maps,
+
+	// Accept duplicate keys for a struct field, the last value winning, rather than returning `.Multiple_Use_Field`
+	Allow_Duplicate_Fields,
 }
 Unmarshal_Flags :: distinct bit_set[Unmarshal_Flag]
 
@@ -642,6 +645,19 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind, flags: Unmar
 
 		fields := reflect.struct_fields_zipped(ti.id)
 
+		json_resolved := 0
+		json_names := ([^]string)(intrinsics.alloca(len(fields)*size_of(string) + 1, align_of(string)))
+
+		field_used: [^]byte
+		if .Allow_Duplicate_Fields not_in flags {
+			field_used_bytes := (len(fields)+7)/8
+			field_used = intrinsics.alloca(field_used_bytes + 1, 1)
+			intrinsics.mem_zero(field_used, field_used_bytes)
+		}
+
+		using_count := -1
+		using_used:  [^]byte
+
 		struct_loop: for p.curr_token.kind != end_token {
 			key_buf: [256]byte = ---
 			key, key_allocated, key_err := parse_object_key_view(p, key_buf[:])
@@ -654,40 +670,50 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind, flags: Unmar
 
 			unmarshal_expect(p, .Colon, flags, .Expected_Colon_After_Key) or_return
 
-			field_used_bytes := (reflect.size_of_typeid(ti.id)+7)/8
-			field_used := intrinsics.alloca(field_used_bytes + 1, 1) // + 1 to not overflow on size_of 0 types.
-			intrinsics.mem_zero(field_used, field_used_bytes)
-
 			use_field_idx := -1
 
-			for field, field_idx in fields {
-				tag_value := reflect.struct_tag_get(field.tag, "json")
-				json_name, _ := json_name_from_tag_value(tag_value)
-				if key == json_name {
+			for field_idx in 0..<len(fields) {
+				if field_idx == json_resolved {
+					json_names[field_idx], _ = #force_inline json_name_from_tag_value(reflect.struct_tag_get(fields[field_idx].tag, "json"))
+					json_resolved += 1
+				}
+				if key == json_names[field_idx] {
 					use_field_idx = field_idx
 					break
 				}
 			}
 
 			if use_field_idx < 0 {
-				for field, field_idx in fields {
-					tag_value := reflect.struct_tag_get(field.tag, "json")
-					json_name, _ := json_name_from_tag_value(tag_value)
-					if json_name == "" && key == field.name {
+				for json_name, field_idx in json_names[:len(fields)] {
+					if json_name == "" && key == fields[field_idx].name {
 						use_field_idx = field_idx
 						break
 					}
 				}
 			}
 
-			check_children_using_fields :: proc(key: string, parent: typeid) -> (
+			count_fields :: proc(parent: typeid) -> (count: int) {
+				fields := reflect.struct_fields_zipped(parent)
+				count = len(fields)
+				for field in fields {
+					if field.is_using && field.name == "_" {
+						count += count_fields(field.type.id)
+					}
+				}
+				return
+			}
+
+			check_children_using_fields :: proc(key: string, parent: typeid, first: int) -> (
 				offset: uintptr,
 				type: ^reflect.Type_Info,
+				index: int,
 				found: bool,
 			) {
-				for field in reflect.struct_fields_zipped(parent) {
+				fields := reflect.struct_fields_zipped(parent)
+				index = first + len(fields)
+				for field, field_idx in fields {
 					if field.is_using && field.name == "_" {
-						offset, type, found = check_children_using_fields(key, field.type.id)
+						offset, type, index, found = check_children_using_fields(key, field.type.id, index)
 						if found {
 							offset += field.offset
 							return
@@ -699,6 +725,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind, flags: Unmar
 					if (json_name == "" && field.name == key) || json_name == key {
 						offset = field.offset
 						type = field.type
+						index = first + field_idx
 						found = true
 						return
 					}
@@ -708,22 +735,38 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind, flags: Unmar
 
 			offset: uintptr
 			type: ^reflect.Type_Info
+			field_index := use_field_idx
 			field_found: bool = use_field_idx >= 0
 
 			if field_found {
 				offset = fields[use_field_idx].offset
 				type = fields[use_field_idx].type
 			} else {
-				offset, type, field_found = check_children_using_fields(key, ti.id)
+				if using_count < 0 {
+					using_count = count_fields(ti.id) - len(fields)
+					if field_used != nil && using_count > 0 {
+						using_used_bytes := (using_count+7)/8
+						using_used = intrinsics.alloca(using_used_bytes + 1, 1)
+						intrinsics.mem_zero(using_used, using_used_bytes)
+					}
+				}
+				if using_count > 0 {
+					offset, type, field_index, field_found = check_children_using_fields(key, ti.id, 0)
+				}
 			}
 
 			if field_found {
-				field_test :: #force_inline proc "contextless" (field_used: [^]byte, offset: uintptr) -> bool {
-					prev_set := field_used[offset/8] & byte(offset&7) != 0
-					field_used[offset/8] |= byte(offset&7)
+				field_test :: #force_inline proc "contextless" (field_used: [^]byte, index: int) -> bool {
+					bit := byte(1) << uint(index&7)
+					prev_set := field_used[index/8] & bit != 0
+					field_used[index/8] |= bit
 					return prev_set
 				}
-				if field_test(field_used, offset) {
+				used, used_index := field_used, field_index
+				if field_index >= len(fields) {
+					used, used_index = using_used, field_index - len(fields)
+				}
+				if used != nil && field_test(used, used_index) {
 					return .Multiple_Use_Field
 				}
 
