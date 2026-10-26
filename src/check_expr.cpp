@@ -6879,6 +6879,20 @@ gb_internal bool check_identifier_exists(Scope *s, Ast *node, bool nested = fals
 	return false;
 }
 
+// a union type assertion x.(T) uses type info for the msg if it panics,
+// but when used as "v, ok" it can't panic and needs no TI added;
+// check_promote_optional_ok only converts it into v, ok after the expression check
+// (via check_type_assertion) has already decided whether to add that type info;
+// the following forms use this function to mark the expr before the expression check (and skip adding TI):
+// v, ok := x.(T); v, ok = x.(T); a two-value return x.(T);
+// and x.(T) or_else / or_return / or_break / or_continue
+gb_internal void mark_optional_ok_if_type_assertion(Ast *expr) {
+	expr = unparen_expr(expr);
+	if (expr != nullptr && expr->kind == Ast_TypeAssertion) {
+		expr->TypeAssertion.optional_ok = true;
+	}
+}
+
 gb_internal bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, Array<Operand> *operands, Slice<Ast *> const &rhs) {
 	bool optional_ok = false;
 	isize tuple_index = 0;
@@ -6894,6 +6908,9 @@ gb_internal bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> 
 			type_hint = lhs[tuple_index].type;
 		}
 
+		if (lhs.count == 2 && rhs.count == 1) {
+			mark_optional_ok_if_type_assertion(rhs_expr);
+		}
 		check_expr_base(c, &o, rhs_expr, type_hint);
 		if (o.mode == Addressing_NoValue) {
 			error_operand_no_value(&o);
@@ -7056,6 +7073,9 @@ gb_internal bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize
 			o.expr = rhs;
 			add_type_and_value(c, rhs, o.mode, o.type, o.value);
 		} else {
+			if (allow_ok && lhs_count == 2 && rhs_arguments.count == 1) {
+				mark_optional_ok_if_type_assertion(rhs);
+			}
 			check_expr_base(c, &o, rhs, type_hint);
 		}
 		if (o.mode == Addressing_NoValue) {
@@ -11069,6 +11089,7 @@ gb_internal ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node
 	Ast *default_value = oe->y;
 	Operand x = {};
 	Operand y = {};
+	mark_optional_ok_if_type_assertion(arg);
 
 	// NOTE(bill, 2022-08-11): edge case to handle #load(path) or_else default
 	if (is_load_directive_call(arg)) {
@@ -11203,6 +11224,7 @@ gb_internal ExprKind check_or_return_expr(CheckerContext *c, Operand *o, Ast *no
 
 	String name = re->token.string;
 	Operand x = {};
+	mark_optional_ok_if_type_assertion(re->expr);
 	check_multi_expr_with_type_hint(c, &x, re->expr, type_hint);
 	if (x.mode == Addressing_Invalid) {
 		o->mode = Addressing_Value;
@@ -11286,6 +11308,7 @@ gb_internal ExprKind check_or_branch_expr(CheckerContext *c, Operand *o, Ast *no
 
 	String name = be->token.string;
 	Operand x = {};
+	mark_optional_ok_if_type_assertion(be->expr);
 	check_multi_expr_with_type_hint(c, &x, be->expr, type_hint);
 	if (x.mode == Addressing_Invalid) {
 		o->mode = Addressing_Value;
@@ -12759,6 +12782,21 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 	return kind;
 }
 
+// a union type assertion only reads type info panics of the x.(T) form
+gb_internal void add_type_info_for_union_type_assertion(CheckerContext *c, Ast *node, Type *union_type, Type *variant) {
+	if (node->TypeAssertion.optional_ok || (c->state_flags & StateFlag_no_type_assert) != 0) {
+		return;
+	}
+	if (build_context.no_type_assert) {
+		AstFile *f = node->file();
+		if (f == nullptr || (f->feature_flags & OptInFeatureFlag_ForceTypeAssert) == 0) {
+			return;
+		}
+	}
+	add_type_info_type(c, union_type);
+	add_type_info_type(c, variant);
+}
+
 gb_internal ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	ExprKind kind = Expr_Expr;
 	ast_node(ta, TypeAssertion, node);
@@ -12809,12 +12847,11 @@ gb_internal ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *no
 			for (Type *vt : bsrc->Union.variants) {
 				if (are_types_identical(vt, type_hint)) {
 					allowed = true;
-					add_type_info_type(c, vt);
+					add_type_info_for_union_type_assertion(c, node, o->type, vt);
 					break;
 				}
 			}
 			if (allowed) {
-				add_type_info_type(c, o->type);
 				o->type = type_hint;
 				o->mode = Addressing_OptionalOk;
 				goto end;
@@ -12828,8 +12865,7 @@ gb_internal ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *no
 			return kind;
 		}
 
-		add_type_info_type(c, o->type);
-		add_type_info_type(c, bsrc->Union.variants[0]);
+		add_type_info_for_union_type_assertion(c, node, o->type, bsrc->Union.variants[0]);
 
 		o->type = bsrc->Union.variants[0];
 		o->mode = Addressing_OptionalOk;
@@ -12861,8 +12897,7 @@ gb_internal ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *no
 				return kind;
 			}
 
-			add_type_info_type(c, o->type);
-			add_type_info_type(c, t);
+			add_type_info_for_union_type_assertion(c, node, o->type, t);
 
 			o->type = t;
 			o->mode = Addressing_OptionalOk;

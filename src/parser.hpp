@@ -639,6 +639,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		Ast *type; \
 		Type *type_hint; \
 		bool ignores[2]; \
+		bool optional_ok; \
 	}) \
 	AST_KIND(TypeCast,      "type cast",           struct { Token token; Ast *type, *expr; }) \
 	AST_KIND(AutoCast,      "auto_cast",           struct { Token token; Ast *expr; }) \
