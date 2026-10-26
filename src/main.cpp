@@ -269,7 +269,7 @@ int run_subprocess(const char *name, const char **args, bool honor_path) {
 		status = posix_spawnp(&pid, name, NULL, NULL, (char *const *)args, environ);
 	}
 	if (status != 0) {
-		gb_printf_err("Could not spawn subprocess: %s\n", strerror(errno));
+		gb_printf_err("Could not spawn subprocess `%s`: %s\n", name, strerror(status));
 		return -1;
 	}
 
