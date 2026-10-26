@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eu
 
-VERSION="3.1.1"
+VERSION="3.2.0"
 RELEASE="https://github.com/erincatto/box2d/archive/refs/tags/v$VERSION.tar.gz"
 
 cd "$(dirname "$0")"
@@ -11,56 +11,42 @@ tar -xzvf "v$VERSION.tar.gz"
 
 cd "box2d-$VERSION"
 
-FLAGS="-DCMAKE_BUILD_TYPE=Release -DBOX2D_SAMPLES=OFF -DBOX2D_VALIDATE=OFF -DBOX2D_UNIT_TESTS=OFF"
+cc=${CC:-cc}
+ar=${AR:-ar}
+
+# Single precision, like the bindings. Box2D 3.2 selects AVX2 or SSE2 at run time (contact_solver_w8.c turns AVX2 on for
+# itself), so there is one library per platform.
+FLAGS="-c -O2 -DNDEBUG -ffp-contract=off -std=gnu17 -fPIC -Iinclude -Isrc"
+
+# compile <extra flags> <output prefix>: compile every source into <output prefix>-<name>.o
+compile() {
+	for source in src/*.c; do
+		name="$(basename "$source" .c)"
+		$cc $FLAGS $1 "$source" -o "$2-$name.o"
+	done
+}
 
 case "$(uname -s)" in
 Darwin)
-	export MACOSX_DEPLOYMENT_TARGET="11" 
-
-	case "$(uname -m)" in
-	"x86_64" | "amd64")
-		rm -rf build
-		mkdir build
-		cmake $FLAGS -DBOX2D_AVX2=ON -DCMAKE_OSX_ARCHITECTURES=x86_64 -S . -B build
-		cmake --build build
-		cp build/src/libbox2d.a ../lib/box2d_darwin_amd64_avx2.a
-
-		rm -rf build
-		mkdir build
-		cmake $FLAGS -DBOX2D_AVX2=OFF -DCMAKE_OSX_ARCHITECTURES=x86_64 -S . -B build
-		cmake --build build
-		cp build/src/libbox2d.a ../lib/box2d_darwin_amd64_sse2.a
-		;;
-	*)
-		rm -rf build
-		mkdir build
-		cmake $FLAGS -DCMAKE_OSX_ARCHITECTURES=arm64 -S . -B build
-		cmake --build build
-		cp build/src/libbox2d.a ../lib/box2d_darwin_arm64.a
-		;;
-	esac
+	# One universal (x86_64 + arm64) library
+	archives=()
+	for arch in x86_64 arm64; do
+		compile "-arch $arch -mmacosx-version-min=11.0" "$arch"
+		$ar rcs "box2d-$arch.a" "$arch"-*.o
+		archives+=("box2d-$arch.a")
+		rm -f "$arch"-*.o
+	done
+	lipo -create "${archives[@]}" -output ../lib/box2d_darwin.a
 	;;
 *)
+	compile "" box2d
+	$ar rcs box2d.a box2d-*.o
 	case "$(uname -m)" in
 	"x86_64" | "amd64")
-		rm -rf build
-		mkdir build
-		cmake $FLAGS -DBOX2D_AVX2=ON -S . -B build
-		cmake --build build
-		cp build/src/libbox2d.a ../lib/box2d_other_amd64_avx2.a
-
-		rm -rf build
-		mkdir build
-		cmake $FLAGS -DBOX2D_AVX2=OFF -S . -B build
-		cmake --build build
-		cp build/src/libbox2d.a ../lib/box2d_other_amd64_sse2.a
+		cp box2d.a ../lib/box2d_other_amd64.a
 		;;
 	*)
-		rm -rf build
-		mkdir build
-		cmake $FLAGS -S . -B build
-		cmake --build build
-		cp build/src/libbox2d.a ../lib/box2d_other.a
+		cp box2d.a ../lib/box2d_other.a
 		;;
 	esac
 	;;
