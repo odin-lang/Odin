@@ -50,8 +50,12 @@ _enumerate_interfaces :: proc(
 	 * Use rtnetlink to enumerate interfaces, the callback will populate
 	 * `idx_to_interface` incrementally
 	 */
-	if err := _rtnetlink_enumerate(&idx_to_interface, _handle_newlink, _handle_newaddr);
-	   err != .NONE {
+	if err := _rtnetlink_enumerate(
+		&idx_to_interface,
+		_handle_newlink,
+		_handle_newaddr,
+		_handle_newroute,
+	); err != .NONE {
 		return nil, Interfaces_Error.Unable_To_Enumerate_Network_Interfaces
 	}
 
@@ -81,7 +85,7 @@ NLMSG :: enum u16 {
 	OVERRUN,
 }
 
-NLM_Flag :: enum {
+NLM_FLAG :: enum {
 	REQUEST,
 	MULTI,
 	ACK,
@@ -92,39 +96,8 @@ NLM_Flag :: enum {
 	MATCH,
 	ATOMIC,
 }
-NLM_Flags :: bit_set[NLM_Flag;c.ushort]
+NLM_Flags :: bit_set[NLM_FLAG;c.ushort]
 NLM_F_DUMP :: NLM_Flags{.ROOT, .MATCH}
-
-// from /usr/include/linux/if_link.h
-IFLA :: enum u16 {
-	UNSPEC,
-	ADDRESS,
-	BROADCAST,
-	IFNAME,
-	MTU,
-	LINK,
-	QDISC,
-	STATS,
-	PERM_ADDRESS,
-}
-
-// from /usr/include/linux/if_addr.h
-ifaddrmsg :: struct {
-	fa_family:                        AF,
-	fa_prefixlen, fa_flags, fa_scope: u8,
-	fa_index:                         u32,
-}
-
-IFA :: enum u16 {
-	UNSPEC,
-	ADDRESS,
-	LOCAL,
-	LABEL,
-	BROADCAST,
-	ANYCAST,
-	CACHEINFO,
-}
-
 
 // from /usr/include/net/if.h
 IFF :: enum {
@@ -151,15 +124,6 @@ IFF :: enum {
 IFF_Flags :: bit_set[IFF;c.uint]
 
 // from /usr/include/linux/rtnetlink.h
-ifinfomsg :: struct {
-	ifi_family: AF,
-	__ifi_pad:  u8,
-	ifi_type:   c.ushort,
-	ifi_index:  c.int,
-	ifi_flags:  IFF_Flags,
-	ifi_change: c.uint,
-}
-
 rtgenmsg :: struct {
 	rtgen_family: AF,
 }
@@ -169,10 +133,12 @@ rtattr :: struct {
 }
 
 RTM :: enum {
-	NEWLINK = 16,
-	GETLINK = 18,
-	NEWADDR = 20,
-	GETADDR = 22,
+	NEWLINK  = 16,
+	GETLINK  = 18,
+	NEWADDR  = 20,
+	GETADDR  = 22,
+	NEWROUTE = 24,
+	GETROUTE = 26,
 	// ...
 }
 
@@ -283,12 +249,16 @@ _netlink_enumerate :: proc(
 	return .NONE
 }
 
-_rtnetlink_enumerate :: proc(ifs: ^Ifs, newlink_cb, newaddr_cb: Nlmsghdr_Callback) -> linux.Errno {
+_rtnetlink_enumerate :: proc(
+	ifs: ^Ifs,
+	newlink_cb, newaddr_cb, newroute_cb: Nlmsghdr_Callback,
+) -> linux.Errno {
 	fd := linux.socket(.NETLINK, .RAW, {.CLOEXEC}, nil) or_return
 	defer linux.close(fd)
 
 	_netlink_enumerate(fd, 1, u16(RTM.GETLINK), newlink_cb, ifs) or_return
 	_netlink_enumerate(fd, 2, u16(RTM.GETADDR), newaddr_cb, ifs) or_return
+	_netlink_enumerate(fd, 3, u16(RTM.GETROUTE), newroute_cb, ifs) or_return
 
 	return .NONE
 }
@@ -312,6 +282,30 @@ _flags_to_link_state :: proc(flags: IFF_Flags) -> (state: Link_State) {
 }
 
 _handle_newlink: Nlmsghdr_Callback : proc(ifs: ^Ifs, h: ^nlmsghdr) -> linux.Errno {
+	// from /usr/include/linux/rtnetlink.h
+	ifinfomsg :: struct {
+		ifi_family: AF,
+		__ifi_pad:  u8,
+		ifi_type:   c.ushort,
+		ifi_index:  c.int,
+		ifi_flags:  IFF_Flags,
+		ifi_change: c.uint,
+	}
+
+	// from /usr/include/linux/if_link.h
+	IFLA :: enum u16 {
+		UNSPEC,
+		ADDRESS,
+		BROADCAST,
+		IFNAME,
+		MTU,
+		LINK,
+		QDISC,
+		STATS,
+		PERM_ADDRESS,
+	}
+
+
 	if RTM(h.nlmsg_type) != .NEWLINK do return .EPROTO
 	ifi := _read_T(_nlmsg_payload(h), ifinfomsg)
 
@@ -339,17 +333,18 @@ _handle_newlink: Nlmsghdr_Callback : proc(ifs: ^Ifs, h: ^nlmsghdr) -> linux.Errn
 	return .NONE
 }
 
-_handle_newaddr: Nlmsghdr_Callback : proc(ifs: ^Ifs, h: ^nlmsghdr) -> linux.Errno {
-	to_addr :: proc(bytes: []u8, af: AF) -> Address {
-		#partial switch af {
-		case .INET:
-			return _read_T(bytes, IP4_Address)
-		case .INET6:
-			return _read_T(bytes, IP6_Address)
-		case:
-			return nil
-		}
+_to_addr :: proc(bytes: []u8, af: AF) -> Address {
+	#partial switch af {
+	case .INET:
+		return _read_T(bytes, IP4_Address)
+	case .INET6:
+		return _read_T(bytes, IP6_Address)
+	case:
+		return nil
 	}
+}
+
+_handle_newaddr: Nlmsghdr_Callback : proc(ifs: ^Ifs, h: ^nlmsghdr) -> linux.Errno {
 
 	prefix_to_netmask :: proc(prefixlen: u8, family: AF) -> Netmask {
 		#partial switch family {
@@ -361,6 +356,24 @@ _handle_newaddr: Nlmsghdr_Callback : proc(ifs: ^Ifs, h: ^nlmsghdr) -> linux.Errn
 		assert(false)
 		return nil
 	}
+
+	// from /usr/include/linux/if_addr.h
+	ifaddrmsg :: struct {
+		fa_family:                        AF,
+		fa_prefixlen, fa_flags, fa_scope: u8,
+		fa_index:                         u32,
+	}
+
+	IFA :: enum u16 {
+		UNSPEC,
+		ADDRESS,
+		LOCAL,
+		LABEL,
+		BROADCAST,
+		ANYCAST,
+		CACHEINFO,
+	}
+
 
 	if RTM(h.nlmsg_type) != .NEWADDR do return .EPROTO
 
@@ -381,16 +394,107 @@ _handle_newaddr: Nlmsghdr_Callback : proc(ifs: ^Ifs, h: ^nlmsghdr) -> linux.Errn
 	for type, data in _rta_iter(&iter, h, size_of(ifaddrmsg), IFA) {
 		#partial switch type {
 		case .ADDRESS:
-			lease.address = to_addr(data, ifa.fa_family)
+			lease.address = _to_addr(data, ifa.fa_family)
 		case .LABEL:
 			if ifs0.adapter_name == "" {
 				ifs0.adapter_name = strings.clone_from(data[:len(data) - 1])
 			}
-		case .BROADCAST:
-			append(&ifs0.multicast, to_addr(data, ifa.fa_family))
+		/*
+		 * we can read broadcast addresses from the GETROUTE netlink request
+		 * case .BROADCAST:
+		 * 	append(&ifs0.multicast, _to_addr(data, ifa.fa_family))
+		*/
 		}
 	}
 	lease.netmask = prefix_to_netmask(ifa.fa_prefixlen, ifa.fa_family)
 	append(&ifs0.unicast, lease)
+	return .NONE
+}
+
+_handle_newroute: Nlmsghdr_Callback : proc(ifs: ^Ifs, h: ^nlmsghdr) -> linux.Errno {
+	// from /usr/include/linux/rtnetlink.h
+	RTN :: enum u8 {
+		UNSPEC,
+		UNICAST,
+		LOCAL,
+		BROADCAST,
+		// we could get a bit more info if we use .ANYCAST and .MULTICAST properly
+		ANYCAST,
+		MULTICAST,
+		BLACKHOLE,
+		UNREACHABLE,
+		PROHIBIT,
+		THROW,
+		NAT,
+		XRESOLVE,
+	}
+
+	rtmsg :: struct {
+		rtm_family:                      AF,
+		rtm_dst_len:                     u8,
+		rtm_src_len, rtm_tos, rtm_table: u8,
+		// rtm_prot can be RTPROT_DHCP (16), which signals that it's
+		// coming from a dhcp client, might be useful
+		rtm_protocol, rtm_scope:         u8,
+		rtm_type:                        RTN,
+		rtm_flags:                       u32, // RTM_Flags,
+	}
+
+	RTA :: enum u16 {
+		UNSPEC,
+		DST,
+		SRC,
+		IIF,
+		OIF,
+		GATEWAY,
+		PRIORITY,
+		PREFSRC,
+		METRICS,
+		MULTIPATH,
+		PROTOINFO,
+		FLOW,
+		CACHEINFO,
+		SESSION,
+		MP_ALGO,
+		TABLE,
+		MARK,
+		MFC_STATS,
+		VIA,
+		NEWDST,
+		PREF,
+		ENCAP_TYPE,
+		ENCAP,
+		EXPIRES,
+	}
+
+
+	msg := _read_T(_nlmsg_payload(h), rtmsg)
+
+	iter: ^rtattr
+	gateways := make([dynamic]Address)
+	defer delete(gateways)
+	broadcasts := make([dynamic]Address)
+	defer delete(broadcasts)
+	intf_idx: Maybe(i32) = nil
+
+	for type, data in _rta_iter(&iter, h, size_of(rtmsg), RTA) {
+		#partial switch type {
+		case .DST:
+			if msg.rtm_type == .BROADCAST {
+				append(&broadcasts, _to_addr(data, msg.rtm_family))
+			}
+		case .OIF:
+			intf_idx = _read_T(data, i32)
+		case .GATEWAY:
+			append(&gateways, _to_addr(data, msg.rtm_family))
+		}
+	}
+
+	if intf_idx, ok := intf_idx.(i32); ok {
+		ifs0 := &ifs[intf_idx]
+		append(&ifs0.gateways, ..gateways[:])
+		append(&ifs0.multicast, ..broadcasts[:])
+	}
+
 	return .NONE
 }
