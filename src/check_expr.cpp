@@ -12782,7 +12782,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 	return kind;
 }
 
-// a union type assertion only reads type info panics of the x.(T) form
+// type info for a union type assertion is read only by the panic of the single-value form
 gb_internal void add_type_info_for_union_type_assertion(CheckerContext *c, Ast *node, Type *union_type, Type *variant) {
 	if (node->TypeAssertion.optional_ok || (c->state_flags & StateFlag_no_type_assert) != 0) {
 		return;
