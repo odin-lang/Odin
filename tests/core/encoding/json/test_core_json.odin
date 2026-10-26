@@ -596,3 +596,45 @@ malformed_object_frees_its_partial_allocations :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@test
+unmarshal_skip_validation :: proc(t: ^testing.T) {
+	// With `.Skip_Validation` the input is not checked up front: valid input gives the same result,
+	// and a syntax error is reported where it is reached, as a specific error instead of
+	// `.Invalid_Data`. None of the invalid cases below allocates anything that outlives the call,
+	// so the test runner's memory tracking also checks that the error paths free their keys.
+	Point :: struct {
+		x, y: int,
+	}
+	Named :: struct {
+		name: string,
+		x:    int,
+	}
+
+	valid := `{"x": 1, "y": 2}`
+	a, b: Point
+	testing.expect_value(t, json.unmarshal_string(valid, &a), nil)
+	testing.expect_value(t, json.unmarshal_string(valid, &b, flags = {.Skip_Validation}), nil)
+	testing.expect_value(t, b, a)
+
+	cases := []struct {
+		src:  string,
+		spec: json.Specification,
+		err:  json.Error,
+	}{
+		{`{"x" 1}`,                   .JSON,  .Expected_Colon_After_Key},
+		{`{"x": 1 "y": 2}`,           .JSON,  .Unexpected_Token},
+		{`{"x": 1,`,                  .JSON,  .EOF},
+		{`{"x": [1, 2`,               .JSON5, .EOF},
+		{`{"x": nope}`,               .JSON5, .Unexpected_Token},
+		{"{\"name\": \"a\tb\"}",      .JSON,  .Invalid_String},
+		{"{\"other\": \"a\tb\"}",     .JSON,  .Invalid_String},
+	}
+	for c in cases {
+		n: Named
+		err := json.unmarshal_string(c.src, &n, c.spec)
+		testing.expectf(t, err == json.Unmarshal_Data_Error.Invalid_Data, "%q: expected Invalid_Data when validating, got %v", c.src, err)
+		err = json.unmarshal_string(c.src, &n, c.spec, flags = {.Skip_Validation})
+		testing.expectf(t, err == c.err, "%q: expected %v with .Skip_Validation, got %v", c.src, c.err, err)
+	}
+}

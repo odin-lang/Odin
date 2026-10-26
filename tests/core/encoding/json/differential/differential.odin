@@ -45,6 +45,7 @@ Fuzz :: struct {
 	arena:    virtual.Arena,
 	failures: int,
 	outcomes: Outcomes,
+	rejected: int, // Inputs the reference rejected as `Invalid_Data` under `.Skip_Validation`.
 }
 
 // How the current package's `unmarshal` calls ended, to show that inputs get past validation.
@@ -302,17 +303,27 @@ compare_unmarshal :: proc(f: ^Fuzz, what: string, data: []byte, spec: json.Speci
 	))
 }
 
-check_unmarshal :: proc(f: ^Fuzz, $C, $R: typeid, data: []byte, spec: json.Specification) -> Norm_Error {
+check_unmarshal :: proc(f: ^Fuzz, $C, $R: typeid, data: []byte, spec: json.Specification, flags: json.Unmarshal_Flags = {}) -> Norm_Error {
 	allocator := virtual.arena_allocator(&f.arena)
 	a := new(C, allocator)
 	b := new(R, allocator)
 	eb := norm_error_reference(ref.unmarshal(data, b, ref_spec(spec), allocator))
-	ea := norm_error_current(json.unmarshal(data, a, spec, allocator))
-	compare_unmarshal(f, "unmarshal", data, spec, a, b, C, R, ea, eb)
+	ea := norm_error_current(json.unmarshal(data, a, spec, allocator, flags))
+	what := "unmarshal" if flags == {} else "unmarshal with .Skip_Validation"
+	if .Skip_Validation in flags && eb.kind == .Data && eb.code == int(json.Unmarshal_Data_Error.Invalid_Data) {
+		// The reference rejected the input up front. Without validation any error will do, and
+		// the destination may be partly written.
+		f.rejected += 1
+		if ea.kind == .None {
+			report(f, what, data, spec, "	accepted input that is_valid rejects")
+		}
+		return ea
+	}
+	compare_unmarshal(f, what, data, spec, a, b, C, R, ea, eb)
 	return ea
 }
 
-fuzz_unmarshal :: proc(f: ^Fuzz, $C, $R: typeid, iterations: int) {
+fuzz_unmarshal :: proc(f: ^Fuzz, $C, $R: typeid, iterations: int, flags: json.Unmarshal_Flags = {}) {
 	outcomes: Outcomes
 	defer {
 		add_outcomes(&f.outcomes, outcomes)
@@ -324,7 +335,10 @@ fuzz_unmarshal :: proc(f: ^Fuzz, $C, $R: typeid, iterations: int) {
 	for _ in 0..<iterations {
 		defer fuzz_reset(f)
 		data: []byte
-		if chance(50) {
+		if .Skip_Validation in flags && chance(15) {
+			// Without validation, nothing may crash or hang on arbitrary input either.
+			data = random_bytes(64) if chance(50) else mutate(transmute([]byte)rand.choice(SEED_CORPUS[:]))
+		} else if chance(50) {
 			data = generate(type_info_of(C), random_spec(), chaos = 0, noise = 0, exact = true)
 		} else {
 			chaos := rand.choice([]int{0, 2, 10, 30})
@@ -335,7 +349,7 @@ fuzz_unmarshal :: proc(f: ^Fuzz, $C, $R: typeid, iterations: int) {
 			}
 		}
 		for spec in SPECS {
-			count_outcome(&outcomes, check_unmarshal(f, C, R, data, spec))
+			count_outcome(&outcomes, check_unmarshal(f, C, R, data, spec, flags))
 		}
 		if fuzz_done(f) {
 			return
@@ -405,6 +419,35 @@ differential_unmarshal_scalars :: proc(t: ^testing.T) {
 	fuzz_unmarshal(&f, No_Nil,       No_Nil,       n)
 	fuzz_unmarshal(&f, Maybe(Inner), Maybe(Inner), n)
 	fuzz_unmarshal(&f, ^Inner,       ^Inner,       n/2)
+}
+
+// With `.Skip_Validation`, input the reference accepts must give exactly its result, and input it
+// rejects must give some error, without crashing or hanging.
+@(test)
+differential_unmarshal_skip_validation :: proc(t: ^testing.T) {
+	f: Fuzz
+	fuzz_init(&f, t)
+	defer fuzz_destroy(&f)
+
+	flags := json.Unmarshal_Flags{.Skip_Validation}
+	fuzz_unmarshal(&f, Everything,         Everything,           ITERATIONS,   flags)
+	fuzz_unmarshal(&f, Tagged,             Tagged,               ITERATIONS/2, flags)
+	fuzz_unmarshal(&f, []Tagged,           []Tagged,             ITERATIONS/2, flags)
+	fuzz_unmarshal(&f, [][]Inner,          [][]Inner,            ITERATIONS/2, flags)
+	fuzz_unmarshal(&f, map[string]Inner,   map[string]Inner,     ITERATIONS/2, flags)
+	fuzz_unmarshal(&f, map[int]string,     map[int]string,       ITERATIONS/2, flags)
+	fuzz_unmarshal(&f, [Color]int,         [Color]int,           ITERATIONS/2, flags)
+	fuzz_unmarshal(&f, [dynamic; 4]u8,     [dynamic; 4]u8,       ITERATIONS/4, flags)
+	fuzz_unmarshal(&f, Mixed,              Mixed,                ITERATIONS/2, flags)
+	fuzz_unmarshal(&f, string,             string,               ITERATIONS/2, flags)
+	fuzz_unmarshal(&f, json.Value,         ref.Value,            ITERATIONS/2, flags)
+	fuzz_unmarshal(&f, []json.Value,       []ref.Value,          ITERATIONS/4, flags)
+	fuzz_unmarshal(&f, With_Value_Current, With_Value_Reference, ITERATIONS/2, flags)
+
+	log.infof("skip validation: %d of %d unmarshals were of input is_valid rejects", f.rejected, f.outcomes.total)
+	if f.outcomes.total >= 100 {
+		testing.expect(t, f.rejected > 0, "no input that is_valid rejects was unmarshalled without validation")
+	}
 }
 
 @(test)

@@ -134,6 +134,7 @@ Bench :: struct {
 	tbl:    table.Table,
 	arena:  virtual.Arena,
 	failed: bool,
+	flags:  json.Unmarshal_Flags, // Used by the current package only; the reference always validates.
 }
 
 bench_allocator :: proc(b: ^Bench, mode: Alloc_Mode) -> mem.Allocator {
@@ -215,14 +216,14 @@ add_row :: proc(b: ^Bench, name, op, alloc: string, size: int, times: [Impl]time
 	)
 }
 
-bench_unmarshal :: proc(b: ^Bench, name: string, data: []byte, $T: typeid) {
+bench_unmarshal :: proc(b: ^Bench, name: string, data: []byte, $T: typeid, flags := json.Unmarshal_Flags{}) {
 	run :: proc(b: ^Bench, data: []byte, mode: Alloc_Mode, impl: Impl) -> (d: time.Duration, ok: bool) {
 		allocator := bench_allocator(b, mode)
 		v: T
 		start := time.tick_now()
 		switch impl {
 		case .Reference: ok = ref.unmarshal(data, &v, ref.DEFAULT_SPECIFICATION, allocator) == nil
-		case .Current:   ok = json.unmarshal(data, &v, json.DEFAULT_SPECIFICATION, allocator) == nil
+		case .Current:   ok = json.unmarshal(data, &v, json.DEFAULT_SPECIFICATION, allocator, b.flags) == nil
 		}
 		d = time.tick_since(start)
 		switch mode {
@@ -234,12 +235,15 @@ bench_unmarshal :: proc(b: ^Bench, name: string, data: []byte, $T: typeid) {
 		}
 		return
 	}
+	b.flags = flags
+	defer b.flags = {}
+	op := "unmarshal" if flags == {} else "unmarshal, no validation"
 	for mode in Alloc_Mode {
 		times: [Impl]time.Duration
 		for impl in Impl {
 			times[impl] = best_of(b, run, data, mode, impl)
 		}
-		add_row(b, name, "unmarshal", fmt.tprint(mode), len(data), times)
+		add_row(b, name, op, fmt.tprint(mode), len(data), times)
 	}
 }
 
@@ -373,6 +377,10 @@ benchmark_unmarshal :: proc(t: ^testing.T) {
 	bench_unmarshal(&b, "long ASCII strings", long_strs_json, []string)
 	bench_unmarshal(&b, "nested arrays",      nested_json,    [][][]i32)
 	bench_unmarshal(&b, "map",                entities_json,  map[string]Stats)
+	bench_unmarshal(&b, "records",            records_min,    []Record, {.Skip_Validation})
+	bench_unmarshal(&b, "f64 array",          floats_json,    []f64,    {.Skip_Validation})
+	bench_unmarshal(&b, "string array",       strs_json,      []string, {.Skip_Validation})
+	bench_unmarshal(&b, "long ASCII strings", long_strs_json, []string, {.Skip_Validation})
 	bench_parse    (&b, "records",            records_min)
 	bench_is_valid (&b, "records",            records_min)
 	bench_is_valid (&b, "long ASCII strings", long_strs_json)
