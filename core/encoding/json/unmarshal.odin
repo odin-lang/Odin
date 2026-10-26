@@ -672,18 +672,27 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind, flags: Unmar
 
 			use_field_idx := -1
 
-			for field_idx in 0..<len(fields) {
-				if field_idx == json_resolved {
-					json_names[field_idx], _ = #force_inline json_name_from_tag_value(reflect.struct_tag_get(fields[field_idx].tag, "json"))
-					json_resolved += 1
+			if key == "" {
+				for field, field_idx in fields {
+					if tag_value, tagged := reflect.struct_tag_lookup(field.tag, "json"); tagged && tag_value == "" {
+						use_field_idx = field_idx
+						break
+					}
 				}
-				if key == json_names[field_idx] {
-					use_field_idx = field_idx
-					break
+			} else {
+				for field_idx in 0..<len(fields) {
+					if field_idx == json_resolved {
+						json_names[field_idx], _ = #force_inline json_name_from_tag_value(reflect.struct_tag_get(fields[field_idx].tag, "json"))
+						json_resolved += 1
+					}
+					if key == json_names[field_idx] {
+						use_field_idx = field_idx
+						break
+					}
 				}
 			}
 
-			if use_field_idx < 0 {
+			if use_field_idx < 0 && key != "" {
 				for json_name, field_idx in json_names[:len(fields)] {
 					if json_name == "" && key == fields[field_idx].name {
 						use_field_idx = field_idx
@@ -720,13 +729,17 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind, flags: Unmar
 						}
 					}
 
-					tag_value := reflect.struct_tag_get(field.tag, "json")
+					tag_value, tagged := reflect.struct_tag_lookup(field.tag, "json")
 					json_name, _ := json_name_from_tag_value(tag_value)
-					if (json_name == "" && field.name == key) || json_name == key {
+					if key == "" {
+						found = tagged && tag_value == ""
+					} else {
+						found = (json_name == "" && field.name == key) || json_name == key
+					}
+					if found {
 						offset = field.offset
 						type = field.type
 						index = first + field_idx
-						found = true
 						return
 					}
 				}
