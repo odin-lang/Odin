@@ -202,7 +202,7 @@ _nlmsg_payload :: #force_inline proc(nlh: ^nlmsghdr) -> []byte {
 
 _nlmsg_iter :: proc(iter: ^^nlmsghdr, buf: []u8) -> (h: ^nlmsghdr, cont: bool) {
 	if iter^ == nil {
-		iter^ = transmute(^nlmsghdr)raw_data(buf)
+		iter^ = cast(^nlmsghdr)raw_data(buf)
 	} else {
 		iter^ = transmute(^nlmsghdr)(uintptr(iter^) + _nlmsg_align(iter^.nlmsg_len))
 	}
@@ -258,7 +258,7 @@ _netlink_enumerate :: proc(
 		msg = {rtgen_family = .UNSPEC},
 	}
 
-	written := linux.send(fd, mem.any_to_bytes(req), {}) or_return
+	linux.send(fd, mem.any_to_bytes(req), {}) or_return
 
 	buf: [8192]byte
 	for {
