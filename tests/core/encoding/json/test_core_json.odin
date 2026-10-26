@@ -2,6 +2,8 @@ package test_core_json
 
 import "core:encoding/json"
 import "core:fmt"
+import "core:math"
+import "core:math/rand"
 import "core:mem"
 import "core:strings"
 import "core:testing"
@@ -829,4 +831,118 @@ unmarshal_empty_key :: proc(t: ^testing.T) {
 	embedded_empty: Embedded_Empty
 	testing.expect_value(t, json.unmarshal_string(`{"": 9}`, &embedded_empty), nil)
 	testing.expect_value(t, embedded_empty, Embedded_Empty{e = 9})
+}
+
+@(test)
+marshal_floats :: proc(t: ^testing.T) {
+	expect_marshal :: proc(t: ^testing.T, v: any, expected: string, spec := json.Specification.JSON, loc := #caller_location) {
+		data, err := json.marshal(v, {spec = spec}, context.temp_allocator)
+		testing.expectf(t, err == nil && string(data) == expected, "marshal %v (%v): expected %s, got %s (%v)", v, v.id, expected, string(data), err, loc = loc)
+	}
+
+	// The shortest text that reads back as the same value: fixed notation for 1e-6 <= |x| < 1e21,
+	// with ".0" when it would otherwise read as an integer, and exponent notation outside it.
+	F64_Case :: struct { v: f64, s: string }
+	for c in ([]F64_Case{
+		{0, "0.0"}, {math.copy_sign(f64(0), -1), "-0.0"}, {1, "1.0"}, {-1.5, "-1.5"}, {0.1, "0.1"},
+		{1.0/3, "0.3333333333333333"}, {1e6, "1000000.0"}, {9007199254740992, "9007199254740992.0"},
+		{1e20, "100000000000000000000.0"}, {1e21, "1e+21"}, {6.02214076e23, "6.02214076e+23"},
+		{max(f64), "1.7976931348623157e+308"}, {1e-6, "0.000001"}, {1e-7, "1e-07"},
+		{1.234e-17, "1.234e-17"}, {5e-324, "5e-324"}, {5894.866874872898, "5894.866874872898"},
+	}) {
+		expect_marshal(t, c.v, c.s)
+	}
+
+	F32_Case :: struct { v: f32, s: string }
+	for c in ([]F32_Case{
+		{0.1, "0.1"}, {1e-10, "1e-10"}, {16777216, "16777216.0"}, {3.4e38, "3.4e+38"}, {1e-6, "1e-06"},
+	}) {
+		expect_marshal(t, c.v, c.s)
+	}
+
+	F16_Case :: struct { v: f16, s: string }
+	for c in ([]F16_Case{
+		{0.1, "0.1"}, {6.1e-5, "0.000061"}, {65504, "65500.0"}, {6e-8, "6e-08"},
+	}) {
+		expect_marshal(t, c.v, c.s)
+	}
+
+	expect_marshal(t, complex64(complex(1, 0.1)), "[1.0, 0.1]")
+	expect_marshal(t, complex(1e-20, -2), "[1e-20, -2.0]")
+
+	// Infinity and NaN only exist in JSON5 and MJSON.
+	inf, nan := math.inf_f64(1), math.nan_f64()
+	for v in ([]f64{inf, -inf, nan}) {
+		_, err := json.marshal(v, {}, context.temp_allocator)
+		testing.expectf(t, err == .Non_Finite_Float, "marshal %v as JSON: expected Non_Finite_Float, got %v", v, err)
+	}
+	_, err := json.marshal(complex(1, inf), {}, context.temp_allocator)
+	testing.expectf(t, err == .Non_Finite_Float, "marshal a complex with an infinite part as JSON: expected Non_Finite_Float, got %v", err)
+	for spec in ([]json.Specification{.JSON5, .MJSON}) {
+		expect_marshal(t, inf,       "Infinity",  spec)
+		expect_marshal(t, -inf,      "-Infinity", spec)
+		expect_marshal(t, nan,       "NaN",       spec)
+		expect_marshal(t, f32(-inf), "-Infinity", spec)
+	}
+
+	// `unparse` writes a `json.Value` float the same way.
+	text, unparse_err := json.unparse(json.Float(1), {}, context.temp_allocator)
+	testing.expect_value(t, text, "1.0")
+	testing.expect_value(t, unparse_err, nil)
+	text, unparse_err = json.unparse(json.Float(1e-20), {}, context.temp_allocator)
+	testing.expect_value(t, text, "1e-20")
+	_, unparse_err = json.unparse(json.Float(inf), {}, context.temp_allocator)
+	testing.expectf(t, unparse_err == .Non_Finite_Float, "unparse Infinity as JSON: expected Non_Finite_Float, got %v", unparse_err)
+	text, unparse_err = json.unparse(json.Float(inf), {spec = .JSON5}, context.temp_allocator)
+	testing.expect_value(t, text, "Infinity")
+
+	free_all(context.temp_allocator)
+}
+
+@(test)
+marshal_floats_round_trip :: proc(t: ^testing.T) {
+	// Every finite value, written as JSON, must be valid JSON and read back bit for bit.
+	round_trip :: proc(t: ^testing.T, v: $T, bits: $B) -> bool {
+		data, err := json.marshal(v, {}, context.temp_allocator)
+		if err != nil || !json.is_valid(data, .JSON) {
+			testing.expectf(t, false, "marshal %v (bits %x): %s (%v) is not valid JSON", v, bits, string(data), err)
+			return false
+		}
+		back: T
+		uerr := json.unmarshal(data, &back, allocator = context.temp_allocator)
+		if uerr != nil || transmute(B)back != bits {
+			testing.expectf(t, false, "%v (bits %x) wrote %s and read back %v (%v)", v, bits, string(data), back, uerr)
+			return false
+		}
+		return true
+	}
+
+	for _ in 0..<20_000 {
+		defer free_all(context.temp_allocator)
+		b64 := rand.uint64()
+		b32 := u32(b64)
+		b16 := u16(b64 >> 32)
+		f64v, f32v, f16v := transmute(f64)b64, transmute(f32)b32, transmute(f16)b16
+		if !math.is_nan(f64v) && !math.is_inf(f64v) && !round_trip(t, f64v, b64) {
+			return
+		}
+		if !math.is_nan(f32v) && !math.is_inf(f32v) && !round_trip(t, f32v, b32) {
+			return
+		}
+		if !math.is_nan(f16v) && !math.is_inf(f16v) && !round_trip(t, f16v, b16) {
+			return
+		}
+	}
+
+	// In JSON5 and MJSON the special values read back too.
+	for spec in ([]json.Specification{.JSON5, .MJSON}) {
+		for v in ([]f64{math.inf_f64(1), math.inf_f64(-1), math.nan_f64()}) {
+			data, err := json.marshal(v, {spec = spec}, context.temp_allocator)
+			back: f64
+			uerr := json.unmarshal(data, &back, spec, context.temp_allocator)
+			same := back == v || (math.is_nan(v) && math.is_nan(back))
+			testing.expectf(t, err == nil && uerr == nil && same, "%v in %v: wrote %s (%v), read back %v (%v)", v, spec, string(data), err, back, uerr)
+		}
+	}
+	free_all(context.temp_allocator)
 }
