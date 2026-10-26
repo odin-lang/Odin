@@ -102,9 +102,9 @@ This package is available under the MIT license. See `LICENSE` and `LICENSE_glad
 
 ## PortMidi
 
-[PortMidi](https://sourceforge.net/projects/portmedia/) Portable Real-Time MIDI Library.
+[PortMidi](https://github.com/PortMidi/portmidi) Portable Real-Time MIDI Library.
 
-`portmidi_s.lib` is available under PortMidi's [MIT](https://sourceforge.net/projects/portmedia/) license.
+`portmidi_s.lib` (Windows) and `darwin/portmidi_s.a` (macOS, arm64 and x86_64) are PortMidi 2.0.8, and are available under PortMidi's [MIT](https://github.com/PortMidi/portmidi/blob/master/license.txt) license. On Linux, `vendor:portmidi` links the system `portmidi`.
 
 See also LICENSE.txt in the `portmidi` directory itself.
 
