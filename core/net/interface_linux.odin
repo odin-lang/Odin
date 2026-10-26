@@ -20,12 +20,10 @@ package net
 		Jeroen van Rijn: Cross platform unification, code style, documentation
 		Feoramund:       FreeBSD platform code
 
-	This file uses `getifaddrs` libc call to enumerate interfaces.
-	TODO: When we have raw sockets, split off into its own file for Linux so we can use the NETLINK protocol and bypass libc.
+	This file uses netlink/rtnetlink kernel interfaces to list available network interfaces
 */
 
 import "core:c"
-import "core:fmt"
 import "core:mem"
 import "core:strings"
 import "core:sys/linux"
@@ -295,19 +293,6 @@ _rtnetlink_enumerate :: proc(ifs: ^Ifs, newlink_cb, newaddr_cb: Nlmsghdr_Callbac
 	return .NONE
 }
 
-_mac_to_string :: proc(mac: [6]u8, allocator := context.allocator) -> string {
-	return fmt.aprintf(
-		"{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
-		mac[0],
-		mac[1],
-		mac[2],
-		mac[3],
-		mac[4],
-		mac[5],
-		allocator = allocator,
-	)
-}
-
 // reinterpret_copy first bytes as T
 _read_T :: proc(slice: []byte, $T: typeid) -> T {
 	assert(size_of(T) <= len(slice))
@@ -344,7 +329,7 @@ _handle_newlink: Nlmsghdr_Callback : proc(ifs: ^Ifs, h: ^nlmsghdr) -> linux.Errn
 		case .IFNAME:
 			ifs0.adapter_name = strings.clone_from(data[:len(data) - 1])
 		case .ADDRESS:
-			ifs0.physical_address = _mac_to_string(_read_T(data, [6]byte))
+			ifs0.physical_address = physical_address_to_string(data[:6])
 		case .MTU:
 			ifs0.mtu = _read_T(data, c.uint)
 		// there could be something interesting in `case .STATS:`
