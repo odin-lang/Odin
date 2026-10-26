@@ -434,13 +434,13 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 	s = s[1:len(s)-1]
 
 	i := 0
-	for i < len(s) {
+	#no_bounds_check for i < len(s) {
 		c := s[i]
 		if c == '\\' || c == quote || c < ' ' {
 			break
 		}
 		if c < utf8.RUNE_SELF {
-			i += 1
+			i = plain_run_end(s, i, quote)
 			continue
 		}
 		r, w := utf8.decode_rune_in_string(s[i:])
@@ -461,7 +461,12 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 	// most three for six, and a surrogate pair four for twelve.
 	extra := 0
 	replacement_size := utf8.rune_size(utf8.RUNE_ERROR)
-	for j := i; j < len(s); {
+	#no_bounds_check for j := i; j < len(s); /**/ {
+		if s[j] < utf8.RUNE_SELF {
+			j += 1
+			continue
+		}
+
 		r, size := utf8.decode_rune_in_string(s[j:])
 		if r == utf8.RUNE_ERROR && size == 1 {
 			extra += replacement_size - 1
@@ -571,9 +576,9 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 			break loop
 
 		case c < utf8.RUNE_SELF:
-			b[w] = c
-			i += 1
-			w += 1
+			end := plain_run_end(s, i, quote)
+			w += copy(b[w:], s[i:end])
+			i = end
 
 		case:
 			r, width := utf8.decode_rune_in_string(s[i:])

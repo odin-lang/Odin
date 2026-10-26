@@ -1,5 +1,6 @@
 package encoding_json
 
+import "base:intrinsics"
 import "core:unicode/utf8"
 
 Pos :: struct {
@@ -92,6 +93,34 @@ move_to :: #force_inline proc "contextless" (t: ^Tokenizer, offset: int) #no_bou
 digits_end :: #force_inline proc "contextless" (s: string, i: int) -> int #no_bounds_check {
 	i := i
 	for i < len(s) && '0' <= s[i] && s[i] <= '9' {
+		i += 1
+	}
+	return i
+}
+
+@(private)
+plain_run_end :: proc "contextless" (s: string, i: int, quote: byte) -> int #no_bounds_check {
+	ONES  :: 0x0101_0101_0101_0101
+	HIGHS :: 0x8080_8080_8080_8080
+
+	i := i
+	for i+8 <= len(s) {
+		x := intrinsics.unaligned_load((^u64)(raw_data(s[i:])))
+		q := x ~ ONES*u64(quote)
+		b := x ~ ONES*'\\'
+
+		if ((x - ONES*' ') & ~x | (q - ONES) & ~q | (b - ONES) & ~b | x) & HIGHS != 0 {
+			break
+		}
+		i += 8
+	}
+
+	for i < len(s) {
+		c := s[i]
+		if c < ' ' || c >= utf8.RUNE_SELF ||
+		   c == quote || c == '\\' {
+			break
+		}
 		i += 1
 	}
 	return i
@@ -275,33 +304,39 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 			}
 		}
 
-		data  := t.data
-		first := token.offset+1 if curr_rune == '-' || curr_rune == '+' else token.offset
-
-		i := digits_end(data, t.offset)
-		int_digits := i - first
-
-		has_dot, frac_digits := false, 0
-		if i < len(data) && data[i] == '.' {
-			token.kind = .Float
-			end := digits_end(data, i+1)
-			has_dot, frac_digits, i = true, end - (i+1), end
+		data := t.data
+		first_digit, int_digits := byte(curr_rune), 1
+		if curr_rune == '-' || curr_rune == '+' {
+			first_digit, int_digits = byte(t.r), 0
 		}
 
-		has_exp, exp_digits := false, 0
-		if i < len(data) && (data[i] == 'e' || data[i] == 'E') {
-			token.kind = .Float
-			i += 1
-			if i < len(data) && (data[i] == '+' || data[i] == '-') {
-				i += 1
+		i := digits_end(data, t.offset)
+		int_digits += i - t.offset
+
+		has_dot, frac_digits := false, 0
+		has_exp, exp_digits  := false, 0
+		#no_bounds_check {
+			// Every index is tested against len(data) first.
+			if i < len(data) && data[i] == '.' {
+				token.kind = .Float
+				end := digits_end(data, i+1)
+				has_dot, frac_digits, i = true, end - (i+1), end
 			}
-			end := digits_end(data, i)
-			has_exp, exp_digits, i = true, end - i, end
+
+			if i < len(data) && (data[i] == 'e' || data[i] == 'E') {
+				token.kind = .Float
+				i += 1
+				if i < len(data) && (data[i] == '+' || data[i] == '-') {
+					i += 1
+				}
+				end := digits_end(data, i)
+				has_exp, exp_digits, i = true, end - i, end
+			}
 		}
 
 		move_to(t, i)
 
-		valid := (data[first] != '0' || int_digits == 1) &&
+		valid := (first_digit != '0' || int_digits == 1) &&
 		         (!has_dot || frac_digits > 0 || (t.spec != .JSON && !has_exp)) &&
 		         (!has_exp || exp_digits > 0)
 		if !valid {
@@ -336,37 +371,54 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		token.kind = .String
 		quote := byte(curr_rune)
 
-		simple, closed := true, false
+		closed, escaped, invalid := false, false, false
+
 		i := t.offset
-		for i < len(t.data) {
-			c := t.data[i]
-			if c == '\n' {
-				err = .String_Not_Terminated
-				break
-			}
-			i += 1
-			if c == quote {
-				closed = true
-				break
-			}
-			switch {
-			case c == '\\':
-				simple = false
-				move_to(t, i)
-				_ = scan_escape(t)
-				i = t.offset
-			case c < ' ', c >= utf8.RUNE_SELF:
-				simple = false
+		#no_bounds_check {
+			// Every index is tested against len(t.data) first
+			loop: for {
+				i = plain_run_end(t.data, i, quote)
+				if i >= len(t.data) {
+					break
+				}
+				c := t.data[i]
+				switch {
+				case c == '\n':
+					err = .String_Not_Terminated
+					break loop
+				case c == quote:
+					i += 1
+					closed = true
+					break loop
+				case c == '\\':
+					escaped = true
+					move_to(t, i+1)
+					_ = scan_escape(t)
+					i = t.offset
+				case c < ' ':
+					invalid = true
+					i += 1
+				case escaped:
+					i += 1
+				case:
+					r, w := utf8.decode_rune_in_string(t.data[i:])
+					if r == utf8.RUNE_ERROR && w == 1 {
+						invalid = true
+					}
+					i += w
+				}
 			}
 		}
 
 		move_to(t, i)
 
-		if !simple || !closed {
+		if !closed || escaped {
 			str := string(t.data[token.offset : t.offset])
 			if !is_valid_string_literal(str, t.spec) {
 				err = .Invalid_String
 			}
+		} else if invalid {
+			err = .Invalid_String
 		}
 
 
@@ -523,7 +575,7 @@ is_valid_number :: proc(str: string, spec: Specification) -> bool {
 }
 
 @(require_results)
-is_valid_string_literal :: proc(str: string, spec: Specification) -> bool {
+is_valid_string_literal :: proc(str: string, spec: Specification) -> bool #no_bounds_check {
 	s := str
 	if len(s) < 2 {
 		return false
@@ -597,7 +649,7 @@ is_valid_string_literal :: proc(str: string, spec: Specification) -> bool {
 			return false
 
 		case c < utf8.RUNE_SELF:
-			i += 1
+			i = plain_run_end(s, i, quote)
 
 		case:
 			r, width := utf8.decode_rune_in_string(s[i:])
