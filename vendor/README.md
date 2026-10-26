@@ -126,13 +126,13 @@ See also LICENSE.txt in the `sdl2` directory itself.
 
 Bindings for SDL's image decoding library, subject to SDL's [zlib](https://github.com/libsdl-org/SDL_image/blob/main/LICENSE.txt) license.
 
-SDL2 Image relies on 3rd party libraries to support various image formats. You can find the licenses for these in the `image` directory, alongside SDL\_image's own license.
+SDL2 Image relies on 3rd party libraries to support some image formats (AVIF, TIFF and WebP). The DLLs for these are in the `image` directory next to `SDL2_image.dll`, which loads them from there, with their licenses.
 
 ### SDL2 Mixer
 
 Bindings for SDL's sound decoding library and mixer, subject to SDL's [zlib](https://github.com/libsdl-org/SDL_mixer/blob/master/LICENSE.txt) license.
 
-SDL2 Mixer relies on 3rd party libraries to support various audio formats. You can find the licenses for these in the `mixer` directory, alongside SDL\_mixer's own license.
+SDL2 Mixer relies on 3rd party libraries to support some audio formats (Opus, tracker modules, game music, WavPack). The DLLs for these are in the `mixer` directory next to `SDL2_mixer.dll`, which loads them from there, with their licenses.
 
 ### SDL2 Net
 
@@ -156,7 +156,17 @@ See also LICENSE.txt in the `sdl3` directory itself.
 
 Bindings for SDL's image decoding library, subject to SDL's [zlib](https://github.com/libsdl-org/SDL_image/blob/main/LICENSE.txt) license.
 
-SDL2 Image relies on 3rd party libraries to support various image formats. You can find the licenses for these in the `image` directory, alongside SDL\_image's own license.
+SDL3 Image relies on 3rd party libraries to support some image formats (PNG, AVIF, TIFF and WebP). The DLLs for these are in the `image` directory next to `SDL3_image.dll`, which loads them from there, with their licenses.
+
+### SDL3 Mixer
+
+Bindings for SDL's sound decoding library and mixer, subject to SDL's [zlib](https://github.com/libsdl-org/SDL_mixer/blob/main/LICENSE.txt) license.
+
+SDL3 Mixer relies on 3rd party libraries to support some audio formats (Opus, tracker modules, game music, WavPack). The DLLs for these are in the `mixer` directory next to `SDL3_mixer.dll`, which loads them from there, with their licenses.
+
+### SDL3 Net
+
+Bindings for SDL's networking library, subject to SDL's [zlib](https://github.com/libsdl-org/SDL_net/blob/main/LICENSE.txt) license.
 
 ### SDL3 TTF
 
