@@ -196,6 +196,50 @@ parse_value :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: 
 	return
 }
 
+@(private, require_results)
+skip_value :: proc(p: ^Parser) -> Error {
+	#partial switch p.curr_token.kind {
+	case .Null, .False, .True, .Integer, .Float, .String:
+		advance_token(p)
+		return nil
+	case .Ident:
+		if p.spec == .MJSON {
+			advance_token(p)
+			return nil
+		}
+	case .Open_Brace:
+		expect_token(p, .Open_Brace) or_return
+		for p.curr_token.kind != .Close_Brace {
+			if !(p.spec != .JSON && allow_token(p, .Ident)) && expect_token(p, .String) != nil {
+				return .Expected_String_For_Object_Key
+			}
+			parse_colon(p) or_return
+			skip_value (p) or_return
+
+			if parse_comma(p) {
+				break
+			}
+		}
+		return expect_token(p, .Close_Brace)
+	case .Open_Bracket:
+		expect_token(p, .Open_Bracket) or_return
+		for p.curr_token.kind != .Close_Bracket {
+			skip_value(p) or_return
+
+			if parse_comma(p) {
+				break
+			}
+		}
+		return expect_token(p, .Close_Bracket)
+	case:
+		if p.spec != .JSON && (allow_token(p, .Infinity) || allow_token(p, .NaN)) {
+			return nil
+		}
+	}
+	advance_token(p)
+	return .Unexpected_Token
+}
+
 @(require_results)
 parse_array :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: Error) {
 	err = .None

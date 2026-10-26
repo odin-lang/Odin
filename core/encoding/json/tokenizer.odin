@@ -68,27 +68,41 @@ next_rune :: proc(t: ^Tokenizer) -> rune #no_bounds_check {
 	if t.offset >= len(t.data) {
 		t.r = utf8.RUNE_EOF
 	} else {
-		t.offset += t.w
-		t.r, t.w = utf8.decode_rune_in_string(t.data[t.offset:])
-		t.pos.column = t.offset - t.curr_line_offset
-		if t.offset >= len(t.data) {
-			t.r = utf8.RUNE_EOF
-		}
+		move_to(t, t.offset + t.w)
 	}
 	return t.r
+}
+
+@(private="file")
+move_to :: #force_inline proc "contextless" (t: ^Tokenizer, offset: int) #no_bounds_check {
+	t.offset     = offset
+	t.pos.column = offset - t.curr_line_offset
+
+	switch {
+	case offset >= len(t.data):
+		t.r, t.w = utf8.RUNE_EOF, 0
+	case t.data[offset] < utf8.RUNE_SELF:
+		t.r, t.w = rune(t.data[offset]), 1
+	case:
+		t.r, t.w = utf8.decode_rune_in_string(t.data[offset:])
+	}
+}
+
+@(private="file")
+digits_end :: #force_inline proc "contextless" (s: string, i: int) -> int #no_bounds_check {
+	i := i
+	for i < len(s) && '0' <= s[i] && s[i] <= '9' {
+		i += 1
+	}
+	return i
 }
 
 
 @(require_results)
 get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 	skip_digits :: proc(t: ^Tokenizer) {
-		for t.offset < len(t.data) {
-			if '0' <= t.r && t.r <= '9' {
-				// Okay
-			} else {
-				return
-			}
-			next_rune(t)
+		if i := digits_end(t.data, t.offset); i != t.offset {
+			move_to(t, i)
 		}
 	}
 	skip_hex_digits :: proc(t: ^Tokenizer) {
@@ -128,31 +142,35 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		return false
 	}
 
-	skip_whitespace :: proc(t: ^Tokenizer, on_newline: bool) {
-		loop: for t.offset < len(t.data) {
-			switch t.r {
+	skip_whitespace :: proc(t: ^Tokenizer, on_newline: bool) #no_bounds_check {
+		i := t.offset
+		loop: for i < len(t.data) {
+			switch t.data[i] {
 			case ' ', '\t', '\v', '\f', '\r':
-				next_rune(t)
+				i += 1
 			case '\n':
 				if on_newline {
 					break loop
 				}
 				t.line += 1
-				t.curr_line_offset = t.offset
-				t.pos.column = 1
-				next_rune(t)
-			case:
+				t.curr_line_offset = i
+				i += 1
+			case 0xe2, 0xef:
 				if t.spec != .JSON {
-					switch t.r {
-					case 0x2028, 0x2029, 0xFEFF:
-						next_rune(t)
+					switch t.data[i:min(i+3, len(t.data))] {
+					case "\u2028", "\u2029", "\uFEFF":
+						i += 3
 						continue loop
 					}
 				}
 				break loop
+			case:
+				break loop
 			}
 		}
-		return
+		if i != t.offset {
+			move_to(t, i)
+		}
 	}
 
 	skip_to_next_line :: proc(t: ^Tokenizer) {
@@ -164,15 +182,18 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		}
 	}
 
-	skip_alphanum :: proc(t: ^Tokenizer) {
-		for t.offset < len(t.data) {
-			switch t.r {
+	skip_alphanum :: proc(t: ^Tokenizer) #no_bounds_check {
+		i := t.offset
+		loop: for i < len(t.data) {
+			switch t.data[i] {
 			case 'A'..='Z', 'a'..='z', '0'..='9', '_':
-				next_rune(t)
-				continue
+				i += 1
+			case:
+				break loop
 			}
-
-			return
+		}
+		if i != t.offset {
+			move_to(t, i)
 		}
 	}
 
@@ -191,7 +212,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 	case utf8.RUNE_EOF, '\x00':
 		token.kind = .EOF
 		err = .EOF
-		
+
 	case '\n':
 		t.insert_comma = false
 		token.text = ","
@@ -254,24 +275,36 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 			}
 		}
 
-		skip_digits(t)
+		data  := t.data
+		first := token.offset+1 if curr_rune == '-' || curr_rune == '+' else token.offset
 
-		if t.r == '.' {
+		i := digits_end(data, t.offset)
+		int_digits := i - first
+
+		has_dot, frac_digits := false, 0
+		if i < len(data) && data[i] == '.' {
 			token.kind = .Float
-			next_rune(t)
-			skip_digits(t)
+			end := digits_end(data, i+1)
+			has_dot, frac_digits, i = true, end - (i+1), end
 		}
-		if t.r == 'e' || t.r == 'E' {
+
+		has_exp, exp_digits := false, 0
+		if i < len(data) && (data[i] == 'e' || data[i] == 'E') {
 			token.kind = .Float
-			switch r := next_rune(t); r {
-			case '+', '-':
-				next_rune(t)
+			i += 1
+			if i < len(data) && (data[i] == '+' || data[i] == '-') {
+				i += 1
 			}
-			skip_digits(t)
+			end := digits_end(data, i)
+			has_exp, exp_digits, i = true, end - i, end
 		}
 
-		str := string(t.data[token.offset:t.offset])
-		if !is_valid_number(str, t.spec) {
+		move_to(t, i)
+
+		valid := (data[first] != '0' || int_digits == 1) &&
+		         (!has_dot || frac_digits > 0 || (t.spec != .JSON && !has_exp)) &&
+		         (!has_exp || exp_digits > 0)
+		if !valid {
 			err = .Invalid_Number
 		}
 
@@ -301,29 +334,43 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		fallthrough
 	case '"':
 		token.kind = .String
-		quote := curr_rune
-		for t.offset < len(t.data) {
-			r := t.r
-			if r == '\n' || r < 0 {
+		quote := byte(curr_rune)
+
+		simple, closed := true, false
+		i := t.offset
+		for i < len(t.data) {
+			c := t.data[i]
+			if c == '\n' {
 				err = .String_Not_Terminated
 				break
 			}
-			next_rune(t)
-			if r == quote {
+			i += 1
+			if c == quote {
+				closed = true
 				break
 			}
-			if r == '\\' {
+			switch {
+			case c == '\\':
+				simple = false
+				move_to(t, i)
 				_ = scan_escape(t)
+				i = t.offset
+			case c < ' ', c >= utf8.RUNE_SELF:
+				simple = false
 			}
 		}
 
-		str := string(t.data[token.offset : t.offset])
-		if !is_valid_string_literal(str, t.spec) {
-			err = .Invalid_String
+		move_to(t, i)
+
+		if !simple || !closed {
+			str := string(t.data[token.offset : t.offset])
+			if !is_valid_string_literal(str, t.spec) {
+				err = .Invalid_String
+			}
 		}
 
 
-	case ',': 
+	case ',':
 		token.kind = .Comma
 		t.insert_comma = false
 	case ':': token.kind = .Colon
@@ -331,8 +378,8 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 	case '}': token.kind = .Close_Brace
 	case '[': token.kind = .Open_Bracket
 	case ']': token.kind = .Close_Bracket
-	
-	case '=': 
+
+	case '=':
 		if t.spec == .MJSON {
 			token.kind = .Colon
 		} else {
@@ -365,7 +412,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 	}
 
 	token.text = string(t.data[token.offset : t.offset])
-	
+
 	if t.spec == .MJSON {
 		switch token.kind {
 		case .Invalid:
@@ -374,8 +421,8 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 			t.insert_comma = false
 		case .Colon, .Comma, .Open_Brace, .Open_Bracket:
 			t.insert_comma = false
-		case .Null, .False, .True, .Infinity, .NaN, 
-		     .Ident, .Integer, .Float, .String, 
+		case .Null, .False, .True, .Infinity, .NaN,
+		     .Ident, .Integer, .Float, .String,
 		     .Close_Brace, .Close_Bracket:
 			t.insert_comma = true
 		}
@@ -406,7 +453,7 @@ is_valid_number :: proc(str: string, spec: Specification) -> bool {
 			}
 		}
 	}
-	
+
 	if spec != .JSON && len(s) >= 2 {
 		// Allow for hexadecimal strings
 		if s[:2] == "0x" || s[:2] == "0X" {
@@ -510,7 +557,6 @@ is_valid_string_literal :: proc(str: string, spec: Specification) -> bool {
 			switch s[i] {
 			case '"', '\'', '\\', '/', 'b', 'n', 'r', 't', 'f':
 				i += 1
-				
 			case '\r':
 				if spec != .JSON && i+1 < len(s) && s[i+1] == '\n' {
 					i += 2
