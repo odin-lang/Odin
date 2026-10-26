@@ -105,7 +105,7 @@ _mm_sign_epi32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 
 
 
-@(private, default_calling_convention="none")
+@(private="file", default_calling_convention="none")
 foreign _ {
 	@(link_name = "llvm.x86.ssse3.pshuf.b.128")
 	pshufb128    :: proc(a, b: u8x16) -> u8x16 ---
