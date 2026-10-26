@@ -32,7 +32,14 @@ _SHUTDOWN_MANNER_RECEIVE :: -1
 _SHUTDOWN_MANNER_SEND    :: -1
 _SHUTDOWN_MANNER_BOTH    :: -1
 
+DEFAULT_LISTEN_BACKLOG :: 128
+
 _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := DEFAULT_TCP_OPTIONS) -> (sock: TCP_Socket, err: Network_Error) {
+	err = Create_Socket_Error.Network_Unreachable
+	return
+}
+
+_dial_unix :: proc(path: string, loc := #caller_location) -> (sock: Unix_Socket, err: Network_Error) {
 	err = Create_Socket_Error.Network_Unreachable
 	return
 }
@@ -47,7 +54,12 @@ _bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Bind_Error) {
 	return
 }
 
-_listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_Socket, err: Network_Error) {
+_listen_tcp :: proc(interface_endpoint: Endpoint, backlog := DEFAULT_LISTEN_BACKLOG) -> (skt: TCP_Socket, err: Network_Error) {
+	err = Create_Socket_Error.Network_Unreachable
+	return
+}
+
+_listen_unix :: proc(path: string, backlog := DEFAULT_LISTEN_BACKLOG, loc := #caller_location) -> (skt: Unix_Socket, err: Network_Error) {
 	err = Create_Socket_Error.Network_Unreachable
 	return
 }
@@ -67,10 +79,20 @@ _accept_tcp :: proc(sock: TCP_Socket, options := DEFAULT_TCP_OPTIONS) -> (client
 	return
 }
 
+_accept_unix :: proc(sock: Unix_Socket) -> (client: Unix_Socket, err: Accept_Error) {
+	err = .Network_Unreachable
+	return
+}
+
 _close :: proc(skt: Any_Socket) {
 }
 
 _recv_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_read: int, err: TCP_Recv_Error) {
+	err = .Network_Unreachable
+	return
+}
+
+_recv_unix :: proc(skt: Unix_Socket, buf: []byte) -> (bytes_read: int, err: Unix_Recv_Error) {
 	err = .Network_Unreachable
 	return
 }
@@ -81,6 +103,11 @@ _recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endp
 }
 
 _send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: TCP_Send_Error) {
+	err = .Network_Unreachable
+	return
+}
+
+_send_unix :: proc(skt: Unix_Socket, buf: []byte) -> (bytes_written: int, err: Unix_Send_Error) {
 	err = .Network_Unreachable
 	return
 }

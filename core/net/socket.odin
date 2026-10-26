@@ -52,6 +52,7 @@ any_socket_to_socket :: proc "contextless" (socket: Any_Socket) -> Socket {
 	switch s in socket {
 	case TCP_Socket:  return Socket(s)
 	case UDP_Socket:  return Socket(s)
+	case Unix_Socket: return Socket(s)
 	case:
 		// TODO(tetra): Bluetooth, Raw
 		return Socket({})
@@ -150,6 +151,10 @@ dial_tcp :: proc{
 	dial_tcp_from_host_or_endpoint,
 }
 
+dial_unix :: proc(path: string, loc := #caller_location) -> (socket: Unix_Socket, err: Network_Error) {
+	return _dial_unix(path, loc)
+}
+
 create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Create_Socket_Error) {
 	return _create_socket(family, protocol)
 }
@@ -193,10 +198,15 @@ make_bound_udp_socket :: proc(bound_address: Address, port: int) -> (socket: UDP
 
 	Errors that can be returned: `Create_Socket_Error`, `Bind_Error`, or `Listen_Error`
 */
-listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: TCP_Socket, err: Network_Error) {
+listen_tcp :: proc(interface_endpoint: Endpoint, backlog := DEFAULT_LISTEN_BACKLOG) -> (socket: TCP_Socket, err: Network_Error) {
 	assert(backlog > 0 && backlog < int(max(i32)))
 
 	return _listen_tcp(interface_endpoint, backlog)
+}
+
+listen_unix :: proc(path: string, backlog := DEFAULT_LISTEN_BACKLOG, loc := #caller_location) -> (socket: Unix_Socket, err: Network_Error) {
+	assert(backlog > 0 && backlog < int(max(i32)))
+	return _listen_unix(path, backlog, loc)
 }
 
 /*
@@ -215,6 +225,10 @@ peer_endpoint :: proc(socket: Any_Socket) -> (endpoint: Endpoint, err: Socket_In
 
 accept_tcp :: proc(socket: TCP_Socket, options := DEFAULT_TCP_OPTIONS) -> (client: TCP_Socket, source: Endpoint, err: Accept_Error) {
 	return _accept_tcp(socket, options)
+}
+
+accept_unix :: proc(socket: Unix_Socket) -> (client: Unix_Socket, err: Network_Error) {
+	return _accept_unix(socket)
 }
 
 close :: proc(socket: Any_Socket) {
@@ -241,6 +255,10 @@ recv_udp :: proc(socket: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_en
 	return _recv_udp(socket, buf)
 }
 
+recv_unix :: proc(socket: Unix_Socket, buf: []byte) -> (bytes_read: int, err: Network_Error) {
+	return _recv_unix(socket, buf)
+}
+
 /*
 	Receive data into a buffer from any socket.
 
@@ -263,11 +281,14 @@ recv_any :: proc(socket: Any_Socket, buf: []byte) -> (
 		return
 	case UDP_Socket:
 		return recv_udp(socktype, buf)
+	case Unix_Socket:
+		bytes_read, err = recv_unix(socktype, buf)
+		return
 	case: panic("Not supported")
 	}
 }
 
-recv :: proc{recv_tcp, recv_udp, recv_any}
+recv :: proc{recv_tcp, recv_udp, recv_unix, recv_any}
 
 /*
 	Repeatedly sends data until the entire buffer is sent.
@@ -287,6 +308,10 @@ send_udp :: proc(socket: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_writte
 	return _send_udp(socket, buf, to)
 }
 
+send_unix :: proc(socket: Unix_Socket, buf: []byte) -> (bytes_written: int, err: Network_Error) {
+	return _send_unix(socket, buf)
+}
+
 /*
 	Sends data over the socket.
 
@@ -301,11 +326,13 @@ send_any :: proc(socket: Any_Socket, buf: []byte, to: Maybe(Endpoint) = nil) -> 
 		return send_tcp(socktype, buf)
 	case UDP_Socket:
 		return send_udp(socktype, buf, to.(Endpoint))
+	case Unix_Socket:
+		return send_unix(socktype, buf)
 	case: panic("Not supported")
 	}
 }
 
-send :: proc{send_tcp, send_udp, send_any}
+send :: proc{send_tcp, send_udp, send_unix, send_any}
 
 shutdown :: proc(socket: Any_Socket, manner: Shutdown_Manner) -> (err: Shutdown_Error) {
 	return _shutdown(socket, manner)

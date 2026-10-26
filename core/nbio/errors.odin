@@ -61,17 +61,19 @@ error_string :: proc(err: Error) -> string {
 
 error_string_recv :: proc(recv_err: Recv_Error) -> string {
 	switch err in recv_err {
-	case TCP_Recv_Error: return error_string(err)
-	case UDP_Recv_Error: return error_string(err)
-	case:                return "Unknown"
+	case TCP_Recv_Error:  return error_string(err)
+	case UDP_Recv_Error:  return error_string(err)
+	case Unix_Recv_Error: return error_string(err)
+	case:                 return "Unknown"
 	}
 }
 
 error_string_send :: proc(send_err: Send_Error) -> string {
 	switch err in send_err {
-	case TCP_Send_Error: return error_string(err)
-	case UDP_Send_Error: return error_string(err)
-	case:                return "Unknown"
+	case TCP_Send_Error:  return error_string(err)
+	case UDP_Send_Error:  return error_string(err)
+	case Unix_Send_Error: return error_string(err)
+	case:                 return "Unknown"
 	}
 }
 
