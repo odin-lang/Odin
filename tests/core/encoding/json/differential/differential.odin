@@ -152,6 +152,92 @@ differential_tokenizer :: proc(t: ^testing.T) {
 	}
 }
 
+// `get_token` judges each string as it scans it, and the validator and the unmarshaller use that
+// verdict instead of calling `is_valid_string_literal` again, so the two must agree on every string
+// token: exhaustively for short strings over the bytes that matter, and on fuzzed documents.
+@(test)
+string_token_verdict :: proc(t: ^testing.T) {
+	f: Fuzz
+	fuzz_init(&f, t)
+	defer fuzz_destroy(&f)
+
+	seen: [json.Error]int
+	check :: proc(f: ^Fuzz, data: []byte, spec: json.Specification, seen: ^[json.Error]int) {
+		tok := json.make_tokenizer(string(data), spec)
+		for _ in 0..<MAX_TOKENS {
+			token, err := json.get_token(&tok)
+			if token.kind == .EOF {
+				return
+			}
+			if token.kind != .String {
+				continue
+			}
+			seen[err] += 1
+			if valid := json.is_valid_string_literal(token.text, spec); valid != (err != .Invalid_String) {
+				report(f, "string verdict", data, spec, fmt.tprintf("\ttoken %q: err=%v, is_valid_string_literal=%v", token.text, err, valid))
+				return
+			}
+		}
+	}
+
+	enumerate :: proc(f: ^Fuzz, alphabet: string, max_len: int, seen: ^[json.Error]int) {
+		content := make([]byte, max_len, context.temp_allocator)
+		buf := make([dynamic]byte, 0, max_len+2, context.temp_allocator)
+		for n in 0..=max_len {
+			count := 1
+			for _ in 0..<n {
+				count *= len(alphabet)
+			}
+			for index in 0..<count {
+				x := index
+				for i in 0..<n {
+					content[i] = alphabet[x % len(alphabet)]
+					x /= len(alphabet)
+				}
+				for quote in ([]byte{'"', '\''}) {
+					for closed in ([]bool{true, false}) {
+						clear(&buf)
+						append(&buf, quote)
+						append(&buf, ..content[:n])
+						if closed {
+							append(&buf, quote)
+						}
+						for spec in SPECS {
+							check(f, buf[:], spec, seen)
+						}
+					}
+				}
+				if fuzz_done(f) {
+					return
+				}
+			}
+		}
+	}
+
+	enumerate(&f, "\"'\\u0F/n\n\r\x00\x1f\xc3\xa9\xffg ", 4, &seen)
+	enumerate(&f, "\\u0Fg\"'", 6, &seen)
+	free_all(context.temp_allocator)
+
+	for _ in 0..<ITERATIONS*10 {
+		defer fuzz_reset(&f)
+		data := any_input()
+		for spec in SPECS {
+			check(&f, data, spec, &seen)
+		}
+		if fuzz_done(&f) {
+			break
+		}
+	}
+
+	b := strings.builder_make(context.temp_allocator)
+	for n, e in seen {
+		if n > 0 {
+			fmt.sbprintf(&b, " %v=%d", e, n)
+		}
+	}
+	log.infof("errors on string tokens:%s", strings.to_string(b))
+}
+
 check_tokens :: proc(f: ^Fuzz, data: []byte, spec: json.Specification, parse_integers: bool) {
 	ta := json.make_tokenizer(string(data), spec, parse_integers)
 	tb := ref.make_tokenizer(string(data), ref_spec(spec), parse_integers)
