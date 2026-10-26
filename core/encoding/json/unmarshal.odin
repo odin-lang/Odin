@@ -30,6 +30,9 @@ Unmarshal_Flag :: enum {
 	// Skips the `is_valid` pass over the input. Syntax errors are reported
 	// where they are reached instead, as specific `Error` values, and the same input is accepted.
 	Skip_Validation,
+
+	// Count an object's entries and reserve the map once rather than growing it
+	Reserve_Maps,
 }
 Unmarshal_Flags :: distinct bit_set[Unmarshal_Flag]
 
@@ -306,7 +309,7 @@ parse_integer :: proc(s: string) -> (value: i128, ok: bool) {
 }
 
 @(private)
-unmarshal_string_token :: proc(p: ^Parser, val: any, token: Token, ti: ^reflect.Type_Info) -> (ok: bool, err: Error) {
+unmarshal_string_token_alloc :: proc(p: ^Parser, val: any, token: Token) -> (ok: bool, err: Error) {
 	str: string
 	switch {
 	case token.kind == .String:
@@ -314,7 +317,7 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, token: Token, ti: ^reflect.
 	case:
 		str = clone_string(token.text, p.allocator) or_return
 	}
-	defer if !ok || (val.id != string && val.id != cstring) {
+	defer if !ok {
 		delete(str, p.allocator)
 	}
 
@@ -343,6 +346,32 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, token: Token, ti: ^reflect.
 		}
 		ok = true
 		return
+	}
+	return
+}
+
+@(private)
+unmarshal_string_token :: proc(p: ^Parser, val: any, token: Token, ti: ^reflect.Type_Info) -> (ok: bool, err: Error) {
+	if val.id == string || val.id == cstring {
+		return unmarshal_string_token_alloc(p, val, token)
+	}
+
+	str_buf: [256]byte = ---
+	str       := token.text
+	allocated := false
+	if token.kind == .String {
+		fits: bool
+		str, fits = unquote_string_view(token, p.spec, str_buf[:])
+		if !fits {
+			str = unquote_string(token, p.spec, p.allocator) or_return
+			allocated = true
+		}
+	}
+	defer if allocated {
+		delete(str, p.allocator)
+	}
+
+	switch &dst in val {
 	case rune:
 		for rne, i in str {
 			if i > 0 {
@@ -614,11 +643,14 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind, flags: Unmar
 		fields := reflect.struct_fields_zipped(ti.id)
 
 		struct_loop: for p.curr_token.kind != end_token {
-			key, key_err := parse_object_key(p, p.allocator)
+			key_buf: [256]byte = ---
+			key, key_allocated, key_err := parse_object_key_view(p, key_buf[:])
 			if key_err != nil {
 				return syntax_error(p, key_err, flags)
 			}
-			defer delete(key, p.allocator)
+			defer if key_allocated {
+				delete(key, p.allocator)
+			}
 
 			unmarshal_expect(p, .Colon, flags, .Expected_Colon_After_Key) or_return
 
@@ -724,26 +756,55 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind, flags: Unmar
 			raw_map.allocator = p.allocator
 		}
 
-		elem_backing := bytes_make(t.value.size, t.value.align, p.allocator) or_return
-		defer delete(elem_backing, p.allocator)
+		if .Reserve_Maps in flags {
+			if n := uintptr(raw_map.len) + count_object_entries(p, end_token); n > 0 {
+				capacity := (n*100 + runtime.MAP_LOAD_FACTOR-1) / runtime.MAP_LOAD_FACTOR
+				if rerr := runtime.map_reserve_dynamic(raw_map, t.map_info, capacity); rerr != nil {
+					return .Out_Of_Memory if rerr == .Out_Of_Memory else .Invalid_Allocator
+				}
+			}
+		}
+
+		elem_buf: [32]u64 = ---
+		elem_backing: []byte
+
+		elem_on_heap := t.value.size > size_of(elem_buf) || t.value.align > align_of(u64)
+		if elem_on_heap {
+			elem_backing = bytes_make(t.value.size, t.value.align, p.allocator) or_return
+		} else {
+			elem_backing = ([^]byte)(&elem_buf)[:t.value.size]
+		}
+
+		defer if elem_on_heap {
+			delete(elem_backing, p.allocator)
+		}
 
 		map_backing_value := any{raw_data(elem_backing), t.value.id}
+		is_int_key        := reflect.is_integer(t.key)
 
 		map_loop: for p.curr_token.kind != end_token {
-			key, key_err := parse_object_key(p, p.allocator)
+			key_buf:       [256]byte = ---
+			key:           string
+			key_err:       Error
+			key_allocated: bool
+			if is_int_key {
+				key, key_allocated, key_err = parse_object_key_view(p, key_buf[:])
+			} else {
+				key, key_err  = parse_object_key(p, p.allocator)
+				key_allocated = true
+			}
+			key_stored := false
+			defer if key_allocated && !key_stored {
+				delete(key, p.allocator)
+			}
+
 			if .Skip_Validation in flags && key_err != nil {
 				return syntax_error(p, key_err, flags)
 			}
-			if colon_err := unmarshal_expect(p, .Colon, flags, .Expected_Colon_After_Key); colon_err != nil {
-				delete(key, p.allocator)
-				return colon_err
-			}
+			unmarshal_expect(p, .Colon, flags, .Expected_Colon_After_Key) or_return
 
 			mem.zero_slice(elem_backing)
-			if uerr := unmarshal_value(p, map_backing_value, flags); uerr != nil {
-				delete(key, p.allocator)
-				return uerr
-			}
+			unmarshal_value(p, map_backing_value, flags) or_return
 
 			key_ptr:  rawptr
 			key_cstr: cstring
@@ -767,14 +828,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind, flags: Unmar
 			}
 
 			set_ptr := runtime.__dynamic_map_set_without_hash(raw_map, t.map_info, key_ptr, map_backing_value.data)
-			if set_ptr == nil {
-				delete(key, p.allocator)
-			}
-
-			// there's no need to keep string value on the heap, since it was copied into map
-			if reflect.is_integer(t.key) {
-				delete(key, p.allocator)
-			}
+			key_stored = set_ptr != nil && !is_int_key
 
 			if parse_comma(p) {
 				break map_loop
@@ -786,8 +840,11 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind, flags: Unmar
 		enum_type := index_type.variant.(reflect.Type_Info_Enum)
 
 		enumerated_array_loop: for p.curr_token.kind != end_token {
-			key, key_err := parse_object_key(p, p.allocator)
-			defer delete(key, p.allocator)
+			key_buf: [256]byte = ---
+			key, key_allocated, key_err := parse_object_key_view(p, key_buf[:])
+			defer if key_allocated {
+				delete(key, p.allocator)
+			}
 
 			if .Skip_Validation in flags && key_err != nil {
 				return syntax_error(p, key_err, flags)
@@ -825,6 +882,27 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind, flags: Unmar
 	return
 }
 
+
+@(private)
+count_object_entries :: proc(p: ^Parser, end_token: Token_Kind) -> (count: uintptr) {
+	p_backup := p^
+	defer p^ = p_backup
+
+	for p.curr_token.kind != end_token {
+		if !(p.spec != .JSON && allow_token(p, .Ident)) && expect_token(p, .String) != nil {
+			break
+		}
+		if parse_colon(p) != nil || skip_value(p) != nil {
+			break
+		}
+		count += 1
+
+		if parse_comma(p) {
+			break
+		}
+	}
+	return
+}
 
 @(private)
 unmarshal_count_array :: proc(p: ^Parser, flags: Unmarshal_Flags) -> (length: uintptr, err: Error) {

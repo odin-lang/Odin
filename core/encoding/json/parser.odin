@@ -316,6 +316,22 @@ parse_object_key :: proc(p: ^Parser, key_allocator: mem.Allocator, loc := #calle
 	return unquote_string(tok, p.spec, key_allocator, loc)
 }
 
+@(private, require_results)
+parse_object_key_view :: proc(p: ^Parser, buf: []byte) -> (key: string, allocated: bool, err: Error) {
+	tok := p.curr_token
+	if p.spec != .JSON && allow_token(p, .Ident) {
+		return tok.text, false, nil
+	}
+	if expect_token(p, .String) != nil {
+		return "", false, .Expected_String_For_Object_Key
+	}
+	if view, ok := unquote_string_view(tok, p.spec, buf); ok {
+		return view, false, nil
+	}
+	key, err = unquote_string(tok, p.spec, p.allocator)
+	return key, err == nil, err
+}
+
 @(require_results)
 parse_object_body :: proc(p: ^Parser, end_token: Token_Kind, loc := #caller_location) -> (obj: Object, err: Error) {
 	obj = make(Object, allocator=p.allocator, loc=loc)
@@ -389,6 +405,107 @@ parse_object :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err:
 // IMPORTANT NOTE(bill): unquote_string assumes a mostly valid string
 @(require_results)
 unquote_string :: proc(token: Token, spec: Specification, allocator := context.allocator, loc := #caller_location) -> (value: string, err: Error) {
+	if token.kind != .String {
+		return "", nil
+	}
+	s := token.text
+	if len(s) <= 2 {
+		return "", nil
+	}
+	quote := s[0]
+	if s[0] != s[len(s)-1] {
+		// Invalid string
+		return "", nil
+	}
+	s = s[1:len(s)-1]
+
+	i := unquote_plain_end(s, quote)
+	if i == len(s) {
+		return clone_string(s, allocator, loc)
+	}
+
+	b := bytes_make(unquote_size(s, i), 1, allocator) or_return
+	w := copy(b, s[0:i])
+
+	if len(b) == 0 && allocator.data == nil {
+		// `unmarshal_count_array` calls us with a nil allocator
+		return string(b[:w]), nil
+	}
+
+	return string(b[:unquote_escapes(s, i, w, quote, spec, b)]), nil
+}
+
+@(private, require_results)
+unquote_string_view :: proc(token: Token, spec: Specification, buf: []byte) -> (value: string, ok: bool) {
+	s := token.text
+	if token.kind != .String || len(s) <= 2 || s[0] != s[len(s)-1] {
+		return "", true
+	}
+	quote := s[0]
+	s = s[1:len(s)-1]
+
+	i := unquote_plain_end(s, quote)
+	if i == len(s) {
+		return s, true
+	}
+
+	if unquote_size(s, i) > len(buf) {
+		return "", false
+	}
+
+	w := copy(buf, s[0:i])
+	return string(buf[:unquote_escapes(s, i, w, quote, spec, buf)]), true
+}
+
+@(private, require_results)
+unquote_plain_end :: #force_inline proc(s: string, quote: byte) -> int {
+	i := 0
+	for i < len(s) {
+		c := s[i]
+		if c == '\\' || c == quote || c < ' ' {
+			break
+		}
+		if c < utf8.RUNE_SELF {
+			i = plain_run_end(s, i, quote)
+			continue
+		}
+		r, w := utf8.decode_rune_in_string(s[i:])
+		if r == utf8.RUNE_ERROR && w == 1 {
+			break
+		}
+		i += w
+	}
+	return i
+}
+
+@(private, require_results)
+unquote_size :: proc(s: string, i: int) -> int {
+	// A byte that is not valid UTF-8 is replaced by utf8.RUNE_ERROR, which encodes
+	// wider than the single byte it stands in for, so a string holding several of
+	// them unquotes to more bytes than it was quoted in. Count them up front so the
+	// buffer fits. Nothing else in `unquote_escapes` grows its input: a two-byte
+	// escape like \n writes one byte, \xXX writes at most two for four, \uXXXX at
+	// most three for six, and a surrogate pair four for twelve.
+	extra := 0
+	replacement_size := utf8.rune_size(utf8.RUNE_ERROR)
+	for j := i; j < len(s); /**/ {
+		if s[j] < utf8.RUNE_SELF {
+			j += 1
+			continue
+		}
+
+		r, size := utf8.decode_rune_in_string(s[j:])
+		if r == utf8.RUNE_ERROR && size == 1 {
+			extra += replacement_size - 1
+		}
+		j += size
+	}
+
+	return len(s) + 2*utf8.UTF_MAX + extra
+}
+
+@(private, require_results)
+unquote_escapes :: proc(s: string, i, w: int, quote: byte, spec: Specification, b: []byte) -> int {
 	get_u2_rune :: proc(s: string) -> rune {
 		if len(s) < 4 || s[0] != '\\' || s[1] != 'x' {
 			return -1
@@ -426,69 +543,7 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 		return r
 	}
 
-	if token.kind != .String {
-		return "", nil
-	}
-	s := token.text
-	if len(s) <= 2 {
-		return "", nil
-	}
-	quote := s[0]
-	if s[0] != s[len(s)-1] {
-		// Invalid string
-		return "", nil
-	}
-	s = s[1:len(s)-1]
-
-	i := 0
-	for i < len(s) {
-		c := s[i]
-		if c == '\\' || c == quote || c < ' ' {
-			break
-		}
-		if c < utf8.RUNE_SELF {
-			i = plain_run_end(s, i, quote)
-			continue
-		}
-		r, w := utf8.decode_rune_in_string(s[i:])
-		if r == utf8.RUNE_ERROR && w == 1 {
-			break
-		}
-		i += w
-	}
-	if i == len(s) {
-		return clone_string(s, allocator, loc)
-	}
-
-	// A byte that is not valid UTF-8 is replaced by utf8.RUNE_ERROR, which encodes
-	// wider than the single byte it stands in for, so a string holding several of
-	// them unquotes to more bytes than it was quoted in. Count them up front so the
-	// buffer fits. Nothing else in the loop below grows its input: a two-byte
-	// escape like \n writes one byte, \xXX writes at most two for four, \uXXXX at
-	// most three for six, and a surrogate pair four for twelve.
-	extra := 0
-	replacement_size := utf8.rune_size(utf8.RUNE_ERROR)
-	for j := i; j < len(s); /**/ {
-		if s[j] < utf8.RUNE_SELF {
-			j += 1
-			continue
-		}
-
-		r, size := utf8.decode_rune_in_string(s[j:])
-		if r == utf8.RUNE_ERROR && size == 1 {
-			extra += replacement_size - 1
-		}
-		j += size
-	}
-
-	b := bytes_make(len(s) + 2*utf8.UTF_MAX + extra, 1, allocator) or_return
-	w := copy(b, s[0:i])
-
-	if len(b) == 0 && allocator.data == nil {
-		// `unmarshal_count_array` calls us with a nil allocator
-		return string(b[:w]), nil
-	}
-
+	i, w := i, w
 	loop: for i < len(s) {
 		c := s[i]
 		switch {
@@ -601,5 +656,5 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 		}
 	}
 
-	return string(b[:w]), nil
+	return w
 }
