@@ -786,35 +786,62 @@ gb_internal void lb_build_range_string(lbProcedure *p, lbValue expr, Type *val_t
 	lb_start_block(p, body);
 
 
-	lbValue rune_and_len = {};
+	lbAddr rune_ = lb_add_local_generated(p, t_rune, false);
+	lbAddr width_ = lb_add_local_generated(p, t_int, false);
+	lbBlock *ascii_block   = lb_create_block(p, "for.string.ascii");
+	lbBlock *decode_block  = lb_create_block(p, "for.string.decode");
+	lbBlock *decoded_block = lb_create_block(p, "for.string.decoded");
+
+	lbValue str_elem = lb_string_elem(p, expr);
+	lbValue byte_ptr = {};
 	if (!is_reverse) {
-		lbValue str_elem = lb_emit_ptr_offset(p, lb_string_elem(p, expr), offset);
-		lbValue str_len  = lb_emit_arith(p, Token_Sub, count, offset, t_int);
+		byte_ptr = lb_emit_ptr_offset(p, str_elem, offset);
+	} else {
+		byte_ptr = lb_emit_ptr_offset(p, str_elem, lb_emit_arith(p, Token_Sub, offset, lb_const_int(m, t_int, 1), t_int));
+	}
+	lbValue first_byte = lb_emit_load(p, byte_ptr);
+	lbValue is_ascii = lb_emit_comp(p, Token_Lt, first_byte, lb_const_int(m, t_u8, 0x80));
+	// Only decode a byte that is not ASCII
+	lb_emit_if(p, is_ascii, ascii_block, decode_block);
+
+	lb_start_block(p, ascii_block);
+	lb_addr_store(p, rune_, lb_emit_conv(p, first_byte, t_rune));
+	lb_addr_store(p, width_, lb_const_int(m, t_int, 1));
+	lb_emit_jump(p, decoded_block);
+
+	lb_start_block(p, decode_block);
+	{
 		auto args = array_make<lbValue>(permanent_allocator(), 1);
-		args[0] = lb_emit_string(p, str_elem, str_len);
+		if (!is_reverse) {
+			args[0] = lb_emit_string(p, byte_ptr, lb_emit_arith(p, Token_Sub, count, offset, t_int));
+		} else {
+			// NOTE(bill): REVERSED LOGIC
+			args[0] = lb_emit_string(p, str_elem, offset);
+		}
+		// At -o:speed and above, inline the forward decoder here so that multi-byte runes also do not pay for a call.
+		// LLVM already inlines string_decode_last_rune where it helps. Forcing it inline makes #reverse slower.
+		ProcInlining inlining = (!is_reverse && build_context.optimization_level >= OptimizationLevel_Speed) ? ProcInlining_inline : ProcInlining_none;
+		lbValue decode_proc = lb_lookup_runtime_procedure(m, make_string_c(is_reverse ? "string_decode_last_rune" : "string_decode_rune"));
+		lbValue rune_and_len = lb_emit_call(p, decode_proc, args, inlining);
+		lb_addr_store(p, rune_,  lb_emit_struct_ev(p, rune_and_len, 0));
+		lb_addr_store(p, width_, lb_emit_struct_ev(p, rune_and_len, 1));
+	}
+	lb_emit_jump(p, decoded_block);
 
-		rune_and_len = lb_emit_runtime_call(p, "string_decode_rune", args);
-		lbValue len  = lb_emit_struct_ev(p, rune_and_len, 1);
+	lb_start_block(p, decoded_block);
+	lbValue decoded_rune = lb_addr_load(p, rune_);
+	lbValue len          = lb_addr_load(p, width_);
+	if (!is_reverse) {
 		lb_addr_store(p, offset_, lb_emit_arith(p, Token_Add, offset, len, t_int));
-
 		idx = offset;
 	} else {
-		// NOTE(bill): REVERSED LOGIC
-		lbValue str_elem = lb_string_elem(p, expr);
-		lbValue str_len  = offset;
-		auto args = array_make<lbValue>(permanent_allocator(), 1);
-		args[0] = lb_emit_string(p, str_elem, str_len);
-
-		rune_and_len = lb_emit_runtime_call(p, "string_decode_last_rune", args);
-		lbValue len  = lb_emit_struct_ev(p, rune_and_len, 1);
 		lb_addr_store(p, offset_, lb_emit_arith(p, Token_Sub, offset, len, t_int));
-
 		idx = lb_addr_load(p, offset_);
 	}
 
 
 	if (val_type != nullptr) {
-		val = lb_emit_struct_ev(p, rune_and_len, 0);
+		val = decoded_rune;
 	}
 
 	if (val_)  *val_  = val;
