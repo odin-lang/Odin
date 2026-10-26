@@ -197,10 +197,17 @@ parse_value :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: 
 }
 
 @(private, require_results)
-skip_value :: proc(p: ^Parser) -> Error {
+skip_value :: proc(p: ^Parser, check_strings := false) -> Error {
 	#partial switch p.curr_token.kind {
-	case .Null, .False, .True, .Integer, .Float, .String:
+	case .Null, .False, .True, .Integer, .Float:
 		advance_token(p)
+		return nil
+	case .String:
+		text := p.curr_token.text
+		advance_token(p)
+		if check_strings && !is_valid_string_literal(text, p.spec) {
+			return .Invalid_String
+		}
 		return nil
 	case .Ident:
 		if p.spec == .MJSON {
@@ -213,8 +220,8 @@ skip_value :: proc(p: ^Parser) -> Error {
 			if !(p.spec != .JSON && allow_token(p, .Ident)) && expect_token(p, .String) != nil {
 				return .Expected_String_For_Object_Key
 			}
-			parse_colon(p) or_return
-			skip_value (p) or_return
+			parse_colon(p)                or_return
+			skip_value (p, check_strings) or_return
 
 			if parse_comma(p) {
 				break
@@ -224,7 +231,7 @@ skip_value :: proc(p: ^Parser) -> Error {
 	case .Open_Bracket:
 		expect_token(p, .Open_Bracket) or_return
 		for p.curr_token.kind != .Close_Bracket {
-			skip_value(p) or_return
+			skip_value(p, check_strings) or_return
 
 			if parse_comma(p) {
 				break
