@@ -93,6 +93,41 @@ jobs:
 
       - uses: actions/checkout@v4
 
+      # Persist apt package cache across runs.
+      #
+      # This is needed especially for riscv64 because the apt package servers can be slow.
+      # On a cache miss, actions/cache saves the configured .deb files at job completion.
+      # It restores the exact key if available, otherwise one cache matching the restore-key prefix.
+      # Cache entries are immutable, so an exact-key hit will not be updated with new archives.
+      # The cache action runs as the runner user, so we use a runner-writable directory
+      # "$RUNNER_TEMP/apt-cache/", and copy archives to (and later from) apt's root-owned
+      # "/var/cache/apt/archives" directory.
+      # We also want to rotate the key weekly to ensure that we occasionally get a fresh
+      # archive even if ci.yml never changes. This is a bit of a hack, maybe this could be done better.
+      # Note that out of date packages in the cache aren't a problem because apt will automatically
+      # download the newest version if necessary.
+      - name: Get apt cache week
+        if: matrix.os != 'macos-latest'
+        id: apt-cache-week
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache apt package archives
+        if: matrix.os != 'macos-latest'
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/apt-cache/*.deb
+          key: ${{ runner.os }}-${{ runner.arch }}-matrix-apt-${{ steps.apt-cache-week.outputs.week }}-${{ hashFiles('.github/workflows/ci.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-matrix-apt-
+
+      - name: Restore apt package archives
+        if: matrix.os != 'macos-latest'
+        run: |
+          mkdir -p "$RUNNER_TEMP/apt-cache"
+          if compgen -G "$RUNNER_TEMP/apt-cache/*.deb" > /dev/null; then
+            sudo cp -n "$RUNNER_TEMP"/apt-cache/*.deb /var/cache/apt/archives/
+          fi
+
       - name: Fetch the Lua libraries from Git LFS
         if: matrix.os == 'ubuntu-latest'
         run: git lfs pull --include="vendor/lua/*/linux/*"
@@ -115,23 +150,32 @@ jobs:
           chmod +x llvm.sh
           sudo ./llvm.sh 22
           echo "/usr/lib/llvm-22/bin" >> $GITHUB_PATH
+
+      - name: Get needed vendor libs
+        if: matrix.os == 'ubuntu-24.04-arm'
+        run: sudo apt-get install -y liblua5.4-dev
+
+      - name: Install libcurl (Ubuntu)
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-24.04-arm'
+        run: |
+          sudo apt-get install libcurl4-openssl-dev libmbedtls-dev
+
+      - name: Install libcurl (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install curl mbedtls
+
+      # Need to save all downloaded apt packages in "$RUNNER_TEMP/apt-cache/" so that actions/checkout@v4 will pick them up
+      - name: Save apt package archives
+        if: matrix.os != 'macos-latest'
+        run: sudo cp /var/cache/apt/archives/*.deb "$RUNNER_TEMP/apt-cache/"
+
       - name: Build Odin
         run: ./build_odin.sh release
       - name: Odin version
         run: ./odin version
       - name: Odin report
         run: ./odin report
-      - name: Get needed vendor libs
-        if: matrix.os == 'ubuntu-24.04-arm'
-        run: sudo apt-get install -y liblua5.4-dev
-      - name: Install libcurl (Ubuntu)
-        if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-24.04-arm'
-        run: |
-          sudo apt-get install libcurl4-openssl-dev libmbedtls-dev
-      - name: Install libcurl (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew install curl mbedtls
       - name: Compile needed Vendor
         run: |
           export ODIN_ROOT="$(pwd)"
@@ -345,6 +389,38 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Persist apt package cache across runs.
+      #
+      # This is needed especially for riscv64 because the apt package servers can be slow.
+      # On a cache miss, actions/cache saves the configured .deb files at job completion.
+      # It restores the exact key if available, otherwise one cache matching the restore-key prefix.
+      # Cache entries are immutable, so an exact-key hit will not be updated with new archives.
+      # The cache action runs as the runner user, so we use a runner-writable directory
+      # "$RUNNER_TEMP/apt-cache/", and copy archives to (and later from) apt's root-owned
+      # "/var/cache/apt/archives" directory.
+      # We also want to rotate the key weekly to ensure that we occasionally get a fresh
+      # archive even if ci.yml never changes. This is a bit of a hack, maybe this could be done better.
+      # Note that out of date packages in the cache aren't a problem because apt will automatically
+      # download the newest version if necessary.
+      - name: Get apt cache week
+        id: apt-cache-week
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache apt package archives
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/apt-cache/*.deb
+          key: ${{ runner.os }}-${{ runner.arch }}-riscv64-apt-${{ steps.apt-cache-week.outputs.week }}-${{ hashFiles('.github/workflows/ci.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-riscv64-apt-
+
+      - name: Restore apt package archives
+        run: |
+          mkdir -p "$RUNNER_TEMP/apt-cache"
+          if compgen -G "$RUNNER_TEMP/apt-cache/*.deb" > /dev/null; then
+            sudo cp -n "$RUNNER_TEMP"/apt-cache/*.deb /var/cache/apt/archives/
+          fi
+
       - name: Download LLVM (Linux)
         run: |
           wget https://apt.llvm.org/llvm.sh
@@ -355,6 +431,13 @@ jobs:
       - name: Install libcurl
         run: |
           sudo apt-get install libcurl4-openssl-dev libmbedtls-dev
+
+      - name: Install riscv64 toolchain and qemu
+        run: sudo apt-get install -y qemu-user qemu-user-static gcc-12-riscv64-linux-gnu libc6-riscv64-cross
+
+      # Need to save all downloaded apt packages in "$RUNNER_TEMP/apt-cache/" so that actions/checkout@v4 will pick them up
+      - name: Save apt package archives
+        run: sudo cp /var/cache/apt/archives/*.deb "$RUNNER_TEMP/apt-cache/"
 
       - name: Build Odin
         run: ./build_odin.sh release
@@ -378,9 +461,6 @@ jobs:
 
       - name: Odin check examples/all/sdl3
         run: ./odin check examples/all/sdl3 -target:linux_riscv64 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point
-
-      - name: Install riscv64 toolchain and qemu
-        run: sudo apt-get install -y qemu-user qemu-user-static gcc-12-riscv64-linux-gnu libc6-riscv64-cross
 
       - name: Odin run
         run: ./odin run examples/demo -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
