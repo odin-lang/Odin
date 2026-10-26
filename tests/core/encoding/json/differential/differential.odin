@@ -291,7 +291,7 @@ differential_unquote_string :: proc(t: ^testing.T) {
 // same type except where `json.Value` is involved.
 
 compare_unmarshal :: proc(f: ^Fuzz, what: string, data: []byte, spec: json.Specification, a, b: rawptr, $C, $R: typeid, ea, eb: Norm_Error, extra := "") {
-	d := diff_values(a, b, type_info_of(C), type_info_of(R))
+	d := diff_values(a, b, type_info_of(C), type_info_of(R), after_error = ea.kind != .None && errors_equal(ea, eb))
 	if errors_equal(ea, eb) && d == "" && extra == "" {
 		return
 	}

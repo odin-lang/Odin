@@ -189,11 +189,11 @@ allocators_equal :: proc(a, b: runtime.Allocator) -> bool {
 }
 
 @(private="file")
-elems_diff :: proc(a, b: rawptr, ea, eb: ^reflect.Type_Info, size_a, size_b, count: int) -> string {
+elems_diff :: proc(a, b: rawptr, ea, eb: ^reflect.Type_Info, size_a, size_b, count: int, after_error: bool) -> string {
 	for i in 0..<count {
 		pa := ptr_add(a, uintptr(i*size_a))
 		pb := ptr_add(b, uintptr(i*size_b))
-		if d := diff_values(pa, pb, ea, eb); d != "" {
+		if d := diff_values(pa, pb, ea, eb, after_error); d != "" {
 			return fmt.tprintf("[%d]%s", i, d)
 		}
 	}
@@ -203,8 +203,8 @@ elems_diff :: proc(a, b: rawptr, ea, eb: ^reflect.Type_Info, size_a, size_b, cou
 // Returns "" when the value at `a` (type `ta`, written by the current package) is observably
 // the same as the value at `b` (type `tb`, written by the reference), otherwise the path to the
 // first difference and what differs. `ta` and `tb` are the same type except where `Value` is
-// involved.
-diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info) -> string {
+// involved. `after_error` is set when both packages returned the same error, see the union case.
+diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, after_error := false) -> string {
 	if ta.id == json.Value || tb.id == ref.Value {
 		va, vb := (^json.Value)(a)^, (^ref.Value)(b)^
 		if ta.id != json.Value || tb.id != ref.Value {
@@ -233,7 +233,7 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info) -> string {
 		for i in 0..<int(ia.field_count) {
 			pa := ptr_add(a, ia.offsets[i])
 			pb := ptr_add(b, ib.offsets[i])
-			if d := diff_values(pa, pb, ia.types[i], ib.types[i]); d != "" {
+			if d := diff_values(pa, pb, ia.types[i], ib.types[i], after_error); d != "" {
 				return fmt.tprintf(".%s%s", ia.names[i], d)
 			}
 		}
@@ -268,11 +268,11 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info) -> string {
 
 	case reflect.Type_Info_Array:
 		ib := bb.variant.(reflect.Type_Info_Array)
-		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.count)
+		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.count, after_error)
 
 	case reflect.Type_Info_Enumerated_Array:
 		ib := bb.variant.(reflect.Type_Info_Enumerated_Array)
-		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.count)
+		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.count, after_error)
 
 	case reflect.Type_Info_Slice:
 		ib := bb.variant.(reflect.Type_Info_Slice)
@@ -283,7 +283,7 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info) -> string {
 		if (ra.data == nil) != (rb.data == nil) {
 			return fmt.tprintf(": data is nil=%v in current, nil=%v in reference", ra.data == nil, rb.data == nil)
 		}
-		return elems_diff(ra.data, rb.data, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ra.len)
+		return elems_diff(ra.data, rb.data, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ra.len, after_error)
 
 	case reflect.Type_Info_Dynamic_Array:
 		ib := bb.variant.(reflect.Type_Info_Dynamic_Array)
@@ -297,7 +297,7 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info) -> string {
 		if !allocators_equal(ra.allocator, rb.allocator) {
 			return ": allocator differs"
 		}
-		return elems_diff(ra.data, rb.data, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ra.len)
+		return elems_diff(ra.data, rb.data, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ra.len, after_error)
 
 	case reflect.Type_Info_Fixed_Capacity_Dynamic_Array:
 		ib := bb.variant.(reflect.Type_Info_Fixed_Capacity_Dynamic_Array)
@@ -305,7 +305,7 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info) -> string {
 		if la != lb {
 			return fmt.tprintf(": len %d in current, %d in reference", la, lb)
 		}
-		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.capacity)
+		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.capacity, after_error)
 
 	case reflect.Type_Info_Union:
 		ib := bb.variant.(reflect.Type_Info_Union)
@@ -330,7 +330,13 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info) -> string {
 		if index < 0 || index >= len(ia.variants) {
 			return fmt.tprintf(": invalid union tag %d", tag_a)
 		}
-		if d := diff_values(a, b, ia.variants[index], ib.variants[index]); d != "" {
+		if after_error {
+			// A variant tried and abandoned during a failed unmarshal can leave its bytes behind, for
+			// example a string's data pointer over the active `int`. Addresses differ between the
+			// two packages, so after an error only the tags are compared.
+			return ""
+		}
+		if d := diff_values(a, b, ia.variants[index], ib.variants[index], after_error); d != "" {
 			return fmt.tprintf(".(%v)%s", ia.variants[index].id, d)
 		}
 		return ""
@@ -351,10 +357,10 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info) -> string {
 			found := false
 			it_b := 0
 			for kb, vb in reflect.iterate_map(any{b, tb.id}, &it_b) {
-				if diff_values(ka.data, kb.data, ia.key, ib.key) != "" {
+				if diff_values(ka.data, kb.data, ia.key, ib.key, after_error) != "" {
 					continue
 				}
-				if d := diff_values(va.data, vb.data, ia.value, ib.value); d != "" {
+				if d := diff_values(va.data, vb.data, ia.value, ib.value, after_error); d != "" {
 					return fmt.tprintf("[%v]%s", ka, d)
 				}
 				found = true

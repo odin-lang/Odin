@@ -351,16 +351,31 @@ benchmark_unmarshal :: proc(t: ^testing.T) {
 	}
 	entities_json := marshal(entities, {}, sa)
 
-	bench_unmarshal(&b, "records",          records_min,    []Record)
-	bench_unmarshal(&b, "records (pretty)", records_pretty, []Record)
-	bench_unmarshal(&b, "records, id only", records_min,    []Record_Id)
-	bench_unmarshal(&b, "f64 array",        floats_json,    []f64)
-	bench_unmarshal(&b, "i64 array",        ints_json,      []i64)
-	bench_unmarshal(&b, "string array",     strs_json,      []string)
-	bench_unmarshal(&b, "nested arrays",    nested_json,    [][][]i32)
-	bench_unmarshal(&b, "map",              entities_json,  map[string]Stats)
-	bench_parse    (&b, "records",          records_min)
-	bench_is_valid (&b, "records",          records_min)
+	// Long strings of plain ASCII, like identifiers, URLs or prose without escapes. Generated last
+	// so the documents above stay the same as before it was added.
+	ascii := "abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/.:-_"
+	long_strs := make([]string, 20_000*SCALE, sa)
+	for &s in long_strs {
+		buf := make([]byte, 40 + rand_int(&r, 360), sa)
+		for &c in buf {
+			c = ascii[rand_int(&r, len(ascii))]
+		}
+		s = string(buf)
+	}
+	long_strs_json := marshal(long_strs, {}, sa)
+
+	bench_unmarshal(&b, "records",            records_min,    []Record)
+	bench_unmarshal(&b, "records (pretty)",   records_pretty, []Record)
+	bench_unmarshal(&b, "records, id only",   records_min,    []Record_Id)
+	bench_unmarshal(&b, "f64 array",          floats_json,    []f64)
+	bench_unmarshal(&b, "i64 array",          ints_json,      []i64)
+	bench_unmarshal(&b, "string array",       strs_json,      []string)
+	bench_unmarshal(&b, "long ASCII strings", long_strs_json, []string)
+	bench_unmarshal(&b, "nested arrays",      nested_json,    [][][]i32)
+	bench_unmarshal(&b, "map",                entities_json,  map[string]Stats)
+	bench_parse    (&b, "records",            records_min)
+	bench_is_valid (&b, "records",            records_min)
+	bench_is_valid (&b, "long ASCII strings", long_strs_json)
 
 	testing.expect(t, !b.failed, "a benchmark failed to unmarshal its document")
 
