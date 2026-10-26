@@ -15,9 +15,11 @@ jobs:
       with:
         release: "10.0"
         envs: PKGSRC_BRANCH
+        sync: scp
         usesh: true
         copyback: false
         prepare: |
+          set -e -x
           PKG_PATH="https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/amd64/$(uname -r | cut -d_ -f1)${PKGSRC_BRANCH:+_${PKGSRC_BRANCH}}/All" /usr/sbin/pkg_add pkgin
           pkgin -y in gmake git bash python311 llvm clang || cat /var/db/pkgin/pkg_install-err.log
           ln -s /usr/pkg/bin/python3.11 /usr/bin/python3
@@ -56,6 +58,7 @@ jobs:
         usesh: true
         copyback: false
         prepare: |
+          set -e -x
           pkg install -y gmake git bash python3 libxml2 llvm18
         run: |
           # `set -e` is needed for test failures to register. https://github.com/vmactions/freebsd-vm/issues/72

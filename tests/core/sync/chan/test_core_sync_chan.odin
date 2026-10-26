@@ -33,7 +33,8 @@ Comm :: struct {
 
 BUFFER_SIZE :: 8
 MAX_RAND    :: 32
-FAIL_TIME   :: 1 * time.Second
+// 1 second seems a bit too tight for the emulated targets, fails too often in CI.
+FAIL_TIME   :: 3 * time.Second
 
 // Synchronizes try_select tests that require access to global state.
 test_lock: sync.Mutex
