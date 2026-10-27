@@ -148,6 +148,7 @@ foreign lib {
 
 	GetAudioDeviceName :: proc(index: c.int, iscapture: bool) -> cstring ---
 	GetAudioDeviceSpec :: proc(index: c.int, iscapture: bool, spec: ^AudioSpec) -> c.int ---
+	GetDefaultAudioInfo :: proc(name: ^cstring, spec: ^AudioSpec, iscapture: bool) -> c.int ---
 
 	OpenAudioDevice :: proc(device: cstring,
 	                        iscapture: bool,

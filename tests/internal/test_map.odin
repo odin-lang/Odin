@@ -62,6 +62,25 @@ map_insert_random_key_value :: proc(t: ^testing.T) {
 }
 
 @test
+map_insert_error :: proc(t: ^testing.T) {
+	m: map[i64]i64
+	defer {
+		m.allocator = context.allocator
+		delete(m)
+	}
+
+	m.allocator = context.allocator
+	for i in i64(0)..<6 {
+		_, err_normal_insert := map_insert(&m, i, i)
+		testing.expectf(t, err_normal_insert == nil, "Unexpected error: '%s'.", err_normal_insert)
+	}
+
+	m.allocator = runtime.nil_allocator()
+	_, err_grow_insert := map_insert(&m, 67, 67)
+	testing.expectf(t, err_grow_insert == .Out_Of_Memory, "Expected error to be '.Out_Of_Memory'. Got '%s'", err_grow_insert)
+}
+
+@test
 map_update_random_key_value :: proc(t: ^testing.T) {
 	seed_incr := u64(0)
 	for entries in ENTRY_COUNTS {
@@ -448,6 +467,76 @@ map_utf16_string_keys :: proc(t: ^testing.T) {
 	testing.expect_value(t, len(mc), 2)
 	testing.expect_value(t, mc[c], 1)
 	testing.expect_value(t, mc[d], 2)
+}
+
+// Ranging over `m[key]` took the address of the map value, which is nil for a missing key, and crashed.
+// A missing key iterates over the zero value instead.
+@test
+map_range_over_map_index :: proc(t: ^testing.T) {
+	count :: proc(t: ^testing.T, values: $M/map[$K]$V, key: K) -> (n: int) {
+		for _ in values[key] {
+			n += 1
+		}
+		return
+	}
+
+	{
+		m: map[string]map[string]int
+		defer {
+			for _, inner in m {
+				delete(inner)
+			}
+			delete(m)
+		}
+		testing.expect_value(t, count(t, m, "missing"), 0)
+
+		m["a"] = {}
+		inner := &m["a"]
+		inner["x"] = 1
+		inner["y"] = 2
+		testing.expect_value(t, count(t, m, "a"), 2)
+		testing.expect_value(t, count(t, m, "missing"), 0)
+	}
+	{
+		m: map[string][dynamic]int
+		defer {
+			for _, d in m {
+				delete(d)
+			}
+			delete(m)
+		}
+		testing.expect_value(t, count(t, m, "missing"), 0)
+		m["a"] = {}
+		append(&m["a"], 1, 2, 3)
+		testing.expect_value(t, count(t, m, "a"), 3)
+	}
+	{
+		m: map[string][dynamic; 4]int
+		defer delete(m)
+		testing.expect_value(t, count(t, m, "missing"), 0)
+	}
+	{
+		Axis :: enum { X, Y, Z }
+		m: map[string][Axis]int
+		defer delete(m)
+		testing.expect_value(t, count(t, m, "missing"), 3)
+	}
+	{
+		m: map[string][4]int
+		defer delete(m)
+		testing.expect_value(t, count(t, m, "missing"), 4)
+		for v in m["missing"] {
+			testing.expect_value(t, v, 0)
+		}
+		testing.expect_value(t, "missing" in m, false)
+
+		m["a"] = {1, 2, 3, 4}
+		sum := 0
+		for v in m["a"] {
+			sum += v
+		}
+		testing.expect_value(t, sum, 10)
+	}
 }
 
 @test

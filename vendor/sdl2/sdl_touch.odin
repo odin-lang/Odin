@@ -34,6 +34,7 @@ MOUSE_TOUCH_ID :: TouchID(-1)
 foreign lib {
 	GetNumTouchDevices :: proc() -> c.int ---
 	GetTouchDevice     :: proc(index: c.int) -> TouchID ---
+	GetTouchName       :: proc(index: c.int) -> cstring ---
 	GetTouchDeviceType :: proc(touchID: TouchID) -> TouchDeviceType ---
 	GetNumTouchFingers :: proc(touchID: TouchID) -> c.int ---
 	GetTouchFinger     :: proc(touchID: TouchID, index: c.int) -> ^Finger ---

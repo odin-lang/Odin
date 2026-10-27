@@ -341,6 +341,23 @@ gb_internal LLVMValueRef lb_srem_safe_divisor(lbProcedure *p, LLVMValueRef rhs) 
 }
 
 
+// LLVM has sdiv(min(Integer_Type), -1) as UB and it raises an FP exception on a hardware
+// divide, yet Odin integer arithmetic wraps, so the quotient is -x for every x; `x sdiv 1`
+// is x and cannot trap, so a runtime -1 divisor is swapped for 1 and the quotient negated.
+// Vectorizable.
+gb_internal LLVMValueRef lb_sdiv_wrapping(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs) {
+	LLVMValueRef minus_one = LLVMConstAllOnes(LLVMTypeOf(rhs));
+	if (LLVMIsAConstantInt(rhs)) {
+		return rhs == minus_one ? LLVMBuildNeg(p->builder, lhs, "") : LLVMBuildSDiv(p->builder, lhs, rhs, "");
+	}
+	// build 1 as neg(-1), this folds for both scalars and vectors
+	LLVMValueRef one = LLVMBuildNeg(p->builder, minus_one, "");
+	LLVMValueRef is_minus_one = LLVMBuildICmp(p->builder, LLVMIntEQ, rhs, minus_one, "");
+	LLVMValueRef q = LLVMBuildSDiv(p->builder, lhs, LLVMBuildSelect(p->builder, is_minus_one, one, rhs, ""), "");
+	return LLVMBuildSelect(p->builder, is_minus_one, LLVMBuildNeg(p->builder, q, ""), q, "");
+}
+
+
 // implements %% (the remainder/floored mod operator) on signed integers;
 // this is branchless and vectorizable, so it also covers vectors
 gb_internal LLVMValueRef lb_emit_signed_floor_mod(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs) {	
@@ -500,9 +517,10 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 				z = LLVMBuildMul(p->builder, x, y, "");
 				break;
 			case Token_Quo:
-				{
-					auto *call = is_type_unsigned(integral_type) ? LLVMBuildUDiv : LLVMBuildSDiv;
-					z = call(p->builder, x, y, "");
+				if (is_type_unsigned(integral_type)) {
+					z = LLVMBuildUDiv(p->builder, x, y, "");
+				} else {
+					z = lb_sdiv_wrapping(p, x, y);
 				}
 				break;
 			case Token_Mod:
@@ -613,9 +631,10 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 				z = LLVMBuildMul(p->builder, x, y, "");
 				break;
 			case Token_Quo:
-				{
-					auto *call = is_type_unsigned(integral_type) ? LLVMBuildUDiv : LLVMBuildSDiv;
-					z = call(p->builder, x, y, "");
+				if (is_type_unsigned(integral_type)) {
+					z = LLVMBuildUDiv(p->builder, x, y, "");
+				} else {
+					z = lb_sdiv_wrapping(p, x, y);
 				}
 				break;
 			case Token_Mod:
@@ -1499,7 +1518,12 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 	LLVMValueRef all_bits = LLVMConstNot(zero);
 	auto behaviour = lb_check_for_integer_division_by_zero_behaviour(p);
 
-	auto *call = is_signed ? LLVMBuildSDiv : LLVMBuildUDiv;
+	auto const do_div = [&]() -> LLVMValueRef {
+		if (is_signed) {
+			return lb_sdiv_wrapping(p, lhs, rhs);
+		}
+		return LLVMBuildUDiv(p->builder, lhs, rhs, "");
+	};
 
 	if (LLVMIsConstant(rhs)) {
 		if (LLVMIsNull(rhs)) {
@@ -1523,7 +1547,7 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 				}
 			}
 
-			return call(p->builder, lhs, rhs, "");
+			return do_div();
 		}
 	}
 
@@ -1540,7 +1564,7 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 	lb_emit_if(p, cond, safe_block, edge_case_block);
 
 	lb_start_block(p, safe_block);
-	incoming_values[0] = call(p->builder, lhs, rhs, "");
+	incoming_values[0] = do_div();
 	lb_emit_jump(p, done_block);
 
 	lb_start_block(p, edge_case_block);

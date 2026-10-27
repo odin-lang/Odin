@@ -1192,6 +1192,14 @@ test_memory_compare :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_memory_compare_empty :: proc(t: ^testing.T) {
+	data: [1]u8
+
+	testing.expect_value(t, runtime.memory_compare(nil, &data[0], 0), 0)
+	testing.expect_value(t, runtime.memory_compare(&data[0], nil, 0), 0)
+}
+
+@(test)
 test_memory_compare_zero :: proc(t: ^testing.T) {
 	data: [256]u8
 

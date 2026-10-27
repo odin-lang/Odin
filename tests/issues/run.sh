@@ -193,6 +193,13 @@ else
 	exit 1
 fi
 
+if [[ $($ODIN check ../test_issue_8074 -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 34 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 # Objective-C tests target darwin, which can be checked and built for from any host
 if [[ $($ODIN check ../test_issue_objc_import_missing_selector -no-entry-point -target:darwin_arm64 $COMMON_CHECK 2>&1 >/dev/null | grep -c "is required for imported Objective-C methods") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
@@ -357,6 +364,11 @@ if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 fi
 
 $ODIN test ../test_issue_6344 $COMMON -o:speed
+
+if [[ "$(uname)" != "NetBSD" ]]; then
+	$ODIN test ../test_issue_8072 -o:minimal --sanitize:address $COMMON
+fi
+$ODIN test ../test_issue_8072 -o:speed -lifetime-markers $COMMON
 
 if [[ $($ODIN test ../test_pr_6470 -define:TEST_EXPECT_FAILURE=true $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"

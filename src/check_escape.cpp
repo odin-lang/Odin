@@ -226,6 +226,7 @@ struct EscapeAnalysis {
 	EscapeState          state;
 	EscapeState          fallthrough;
 	Array<Array<Ast *> > defers;
+	isize                defers_floor; // the levels of `defers` below it are running
 	Array<EscapeTarget>  targets;
 	Array<EscapeAlias>   aliases;
 	Array<Ast *>         reported;
@@ -3892,12 +3893,18 @@ gb_internal void escape_report_value(EscapeAnalysis *ea, Ast *node, Ast *expr, S
 }
 
 gb_internal void escape_run_defers(EscapeAnalysis *ea, isize depth) {
+	// an exit within a running defer (`return`, `or_return` or a branch out of it, which the checker reports)
+	// runs only the defers of the blocks within it: running the others again would never end (#8074)
+	depth = gb_max(depth, ea->defers_floor);
+	isize floor = ea->defers_floor;
+	ea->defers_floor = ea->defers.count;
 	for (isize i = ea->defers.count-1; i >= depth; i--) {
 		Array<Ast *> defers = array_clone(temporary_allocator(), ea->defers[i]);
 		for (isize j = defers.count-1; j >= 0; j--) {
 			escape_stmt(ea, defers[j]);
 		}
 	}
+	ea->defers_floor = floor;
 }
 
 gb_internal bool escape_param_index(TypeProc *pt, Entity *e, isize *index) {

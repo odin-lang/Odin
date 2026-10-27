@@ -20,10 +20,10 @@ when ODIN_PLATFORM_SUBTARGET == .Android {
 	}
 } else {
 	@(private)
-	LIB :: "lib/miniaudio.lib" when ODIN_OS == .Windows else "lib/miniaudio.a"
+	LIB :: "lib/miniaudio.lib" when ODIN_OS == .Windows else "lib/darwin/miniaudio.a" when ODIN_OS == .Darwin else "lib/miniaudio.a"
 
 	when !#exists(LIB) {
-		// Windows library is shipped with the compiler, so a Windows specific message should not be needed.
+		// The Windows and macOS libraries are shipped with the compiler, so a message for them should not be needed.
 		#panic("Could not find the compiled miniaudio library, it can be compiled by running `\"" + ODIN_ROOT + "vendor/miniaudio/src/build_miniaudio.sh\"`")
 	}
 }
@@ -32,9 +32,9 @@ foreign import lib { LIB }
 
 BINDINGS_VERSION_MAJOR    :: 0
 BINDINGS_VERSION_MINOR    :: 11
-BINDINGS_VERSION_REVISION :: 24
+BINDINGS_VERSION_REVISION :: 25
 BINDINGS_VERSION          :: [3]u32{BINDINGS_VERSION_MAJOR, BINDINGS_VERSION_MINOR, BINDINGS_VERSION_REVISION}
-BINDINGS_VERSION_STRING   :: "0.11.24"
+BINDINGS_VERSION_STRING   :: "0.11.25"
 
 @(init)
 version_check :: proc "contextless" () {

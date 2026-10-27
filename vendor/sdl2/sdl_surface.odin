@@ -105,6 +105,7 @@ foreign lib {
 	UpperBlit                         :: proc(src: ^Surface, srcrect: ^Rect, dst: ^Surface, dstrect: ^Rect) -> c.int ---
 	LowerBlit                         :: proc(src: ^Surface, srcrect: ^Rect, dst: ^Surface, dstrect: ^Rect) -> c.int ---
 	SoftStretch                       :: proc(src: ^Surface, srcrect: ^Rect, dst: ^Surface, dstrect: ^Rect) -> c.int ---
+	PremultiplyAlpha                  :: proc(width, height: c.int, src_format: u32, src: rawptr, src_pitch: c.int, dst_format: u32, dst: rawptr, dst_pitch: c.int) -> c.int ---
 	SoftStretchLinear                 :: proc(src: ^Surface, srcrect: ^Rect, dst: ^Surface, dstrect: ^Rect) -> c.int ---
 	UpperBlitScaled                   :: proc(src: ^Surface, srcrect: ^Rect, dst: ^Surface, dstrect: ^Rect) -> c.int ---
 	LowerBlitScaled                   :: proc(src: ^Surface, srcrect: ^Rect, dst: ^Surface, dstrect: ^Rect) -> c.int ---

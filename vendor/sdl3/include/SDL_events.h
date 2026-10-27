@@ -456,7 +456,7 @@ typedef struct SDL_MouseMotionEvent
     Uint32 reserved;
     Uint64 timestamp;   /**< In nanoseconds, populated using SDL_GetTicksNS() */
     SDL_WindowID windowID; /**< The window with mouse focus, if any */
-    SDL_MouseID which;  /**< The mouse instance id in relative mode, SDL_TOUCH_MOUSEID for touch events, or 0 */
+    SDL_MouseID which;  /**< The mouse instance id in relative mode, SDL_TOUCH_MOUSEID for touch events, SDL_PEN_MOUSEID for pen events, or 0 */
     SDL_MouseButtonFlags state;       /**< The current button state */
     float x;            /**< X coordinate, relative to window */
     float y;            /**< Y coordinate, relative to window */
@@ -830,6 +830,8 @@ typedef struct SDL_PenProximityEvent
     Uint64 timestamp;   /**< In nanoseconds, populated using SDL_GetTicksNS() */
     SDL_WindowID windowID; /**< The window with pen focus, if any */
     SDL_PenID which;        /**< The pen instance id */
+    SDL_PenInputFlags pen_state;   /**< Complete pen input state at time of event (added in 3.4.16). */
+    SDL_PenDeviceType device_type; /**< the device type of the pen, if known (added in 3.4.18). */
 } SDL_PenProximityEvent;
 
 /**
@@ -853,6 +855,7 @@ typedef struct SDL_PenMotionEvent
     SDL_PenInputFlags pen_state;   /**< Complete pen input state at time of event */
     float x;                /**< X coordinate, relative to window */
     float y;                /**< Y coordinate, relative to window */
+    SDL_PenDeviceType device_type; /**< the device type of the pen, if known (added in 3.4.18). */
 } SDL_PenMotionEvent;
 
 /**
@@ -875,6 +878,7 @@ typedef struct SDL_PenTouchEvent
     float y;                /**< Y coordinate, relative to window */
     bool eraser;        /**< true if eraser end is used (not all pens support this). */
     bool down;          /**< true if the pen is touching or false if the pen is lifted off */
+    SDL_PenDeviceType device_type; /**< the device type of the pen, if known (added in 3.4.18). */
 } SDL_PenTouchEvent;
 
 /**
@@ -897,6 +901,7 @@ typedef struct SDL_PenButtonEvent
     float y;                /**< Y coordinate, relative to window */
     Uint8 button;       /**< The pen button index (first button is 1). */
     bool down;      /**< true if the button is pressed */
+    SDL_PenDeviceType device_type; /**< the device type of the pen, if known (added in 3.4.18). */
 } SDL_PenButtonEvent;
 
 /**
@@ -919,6 +924,7 @@ typedef struct SDL_PenAxisEvent
     float y;                /**< Y coordinate, relative to window */
     SDL_PenAxis axis;       /**< Axis that has changed */
     float value;            /**< New value of axis */
+    SDL_PenDeviceType device_type; /**< the device type of the pen, if known (added in 3.4.18). */
 } SDL_PenAxisEvent;
 
 /**
@@ -1258,8 +1264,8 @@ extern SDL_DECLSPEC void SDLCALL SDL_FlushEvents(Uint32 minType, Uint32 maxType)
  * If `event` is not NULL, the next event is removed from the queue and stored
  * in the SDL_Event structure pointed to by `event`.
  *
- * If `event` is NULL, it simply returns true if there is an event in the queue,
- * but will not remove it from the queue.
+ * If `event` is NULL, it simply returns true if there is an event in the
+ * queue, but will not remove it from the queue.
  *
  * As this function may implicitly call SDL_PumpEvents(), you can only call
  * this function in the thread that initialized the video subsystem.

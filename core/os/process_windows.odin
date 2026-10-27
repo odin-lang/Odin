@@ -122,7 +122,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 	// conditions. Once the handle is open, the process will be kept alive by
 	// the OS.
 	ph := win32.INVALID_HANDLE_VALUE
-	if selection >= {.Command_Line, .Environment, .Working_Dir, .Username} {
+	if selection & {.Command_Line, .Environment, .Working_Dir, .Username} != {} {
 		ph = win32.OpenProcess(
 			win32.PROCESS_QUERY_LIMITED_INFORMATION | win32.PROCESS_VM_READ,
 			false,
@@ -136,7 +136,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 	defer if ph != win32.INVALID_HANDLE_VALUE {
 		win32.CloseHandle(ph)
 	}
-	snapshot_process: if selection >= {.PPid, .Priority} {
+	snapshot_process: if selection & {.PPid, .Priority} != {} {
 		entry, entry_err := _process_entry_by_pid(info.pid)
 		if entry_err != nil {
 			err = entry_err
@@ -166,7 +166,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		info.executable_path = exe_path
 		info.fields += {.Executable_Path}
 	}
-	read_peb: if selection >= {.Command_Line, .Environment, .Working_Dir} {
+	read_peb: if selection & {.Command_Line, .Environment, .Working_Dir} != {} {
 		process_info_size: u32
 		process_info: win32.PROCESS_BASIC_INFORMATION
 		status := win32.NtQueryInformationProcess(ph, .ProcessBasicInformation, &process_info, size_of(process_info), &process_info_size)
@@ -188,7 +188,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			break read_peb
 		}
 		temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
-		if selection >= {.Command_Line, .Command_Args} {
+		if selection & {.Command_Line, .Command_Args} != {} {
 			temp_allocator_scope(temp_allocator)
 			cmdline_w := make([]u16, process_params.CommandLine.Length, temp_allocator) or_return
 			_, err = read_memory_as_slice(ph, process_params.CommandLine.Buffer, cmdline_w)
@@ -246,7 +246,7 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 	pid := process.pid
 	info.pid = pid
 	// Data obtained from process snapshots
-	snapshot_process: if selection >= {.PPid, .Priority} {
+	snapshot_process: if selection & {.PPid, .Priority} != {} {
 		entry, entry_err := _process_entry_by_pid(info.pid)
 		if entry_err != nil {
 			err = entry_err
@@ -277,7 +277,7 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 		info.fields += {.Executable_Path}
 	}
 	ph := win32.HANDLE(process.handle)
-	read_peb: if selection >= {.Command_Line, .Environment, .Working_Dir} {
+	read_peb: if selection & {.Command_Line, .Environment, .Working_Dir} != {} {
 		process_info_size: u32
 		process_info: win32.PROCESS_BASIC_INFORMATION
 		status := win32.NtQueryInformationProcess(ph, .ProcessBasicInformation, &process_info, size_of(process_info), &process_info_size)
@@ -299,7 +299,7 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 			break read_peb
 		}
 		temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
-		if selection >= {.Command_Line, .Command_Args} {
+		if selection & {.Command_Line, .Command_Args} != {} {
 			temp_allocator_scope(temp_allocator)
 			cmdline_w := make([]u16, process_params.CommandLine.Length, temp_allocator) or_return
 			_, err = read_memory_as_slice(ph, process_params.CommandLine.Buffer, cmdline_w)
@@ -355,7 +355,7 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 @(private="package")
 _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime.Allocator) -> (info: Process_Info, err: Error) {
 	info.pid = get_pid()
-	snapshot_process: if selection >= {.PPid, .Priority} {
+	snapshot_process: if selection & {.PPid, .Priority} != {} {
 		entry, entry_err := _process_entry_by_pid(info.pid)
 		if entry_err != nil {
 			err = entry_err
@@ -381,7 +381,7 @@ _current_process_info :: proc(selection: Process_Info_Fields, allocator: runtime
 		info.executable_path = win32_utf16_to_utf8(exe_filename_w[:path_len], allocator) or_return
 		info.fields += {.Executable_Path}
 	}
-	command_line: if selection >= {.Command_Line,  .Command_Args} {
+	command_line: if selection & {.Command_Line, .Command_Args} != {} {
 		command_line_w := win32.GetCommandLineW()
 		assert(command_line_w != nil)
 		if .Command_Line in selection {
