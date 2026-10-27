@@ -659,3 +659,126 @@ is_valid_string_literal :: proc(str: string, spec: Specification) -> bool {
 	}
 	return true
 }
+
+@(private)
+count_validated_array :: proc(s: string, open: int, spec: Specification) -> (count: uintptr) #no_bounds_check {
+	rune_width :: #force_inline proc "contextless" (s: string, i: int) -> int {
+		if s[i] < utf8.RUNE_SELF {
+			return 1
+		}
+		_, w := utf8.decode_rune_in_string(s[i:])
+		return w
+	}
+	alphanum_end :: proc "contextless" (s: string, i: int) -> int #no_bounds_check {
+		i := i
+		for i < len(s) {
+			switch s[i] {
+			case 'A'..='Z', 'a'..='z', '0'..='9', '_':
+				i += 1
+			case:
+				return i
+			}
+		}
+		return i
+	}
+	number_end :: proc "contextless" (s: string, start: int) -> int #no_bounds_check {
+		i := digits_end(s, start)
+		if i < len(s) && s[i] == '.' {
+			i = digits_end(s, i+1)
+		}
+		if i < len(s) && (s[i] == 'e' || s[i] == 'E') {
+			i += 1
+			if i < len(s) && (s[i] == '+' || s[i] == '-') {
+				i += 1
+			}
+			i = digits_end(s, i)
+		}
+		return i
+	}
+
+	depth := 0
+	i := open + 1
+	for i < len(s) {
+		c := s[i]
+		switch c {
+		case '"', '\'':
+			count += uintptr(depth == 0)
+			for i += 1; i < len(s); /**/ {
+				i = plain_run_end(s, i, c)
+				if i >= len(s) || s[i] == c {
+					break
+				}
+				i += 2 if s[i] == '\\' else 1
+			}
+			i += 1
+
+		case '[', '{':
+			count += uintptr(depth == 0)
+			depth += 1
+			i += 1
+
+		case ']', '}':
+			if depth == 0 {
+				return
+			}
+			depth -= 1
+			i += 1
+
+		case 'A'..='Z', 'a'..='z', '_':
+			count += uintptr(depth == 0)
+			i = alphanum_end(s, i+1)
+
+		case '-', '+':
+			count += uintptr(depth == 0)
+			if i+1 < len(s) && (s[i+1] == 'I' || s[i+1] == 'N') {
+				i = alphanum_end(s, i+1)
+			} else {
+				i = number_end(s, i+1)
+			}
+
+		case '0'..='9':
+			count += uintptr(depth == 0)
+			is_hex := false
+			if c == '0' && spec != .JSON && i+1 < len(s) {
+				is_hex = s[i+1] == 'x' || s[i+1] == 'X'
+			}
+			if is_hex {
+				for i += 2; i < len(s); /**/ {
+					i += rune_width(s, i)
+					if i >= len(s) {
+						break
+					}
+					switch s[i] {
+					case '0'..='9', 'a'..='f', 'A'..='F':
+						continue
+					}
+					break
+				}
+			} else {
+				i = number_end(s, i+1)
+			}
+
+		case '/':
+			if i+1 < len(s) && s[i+1] == '*' {
+				for i += 1; i < len(s); /**/ {
+					i += rune_width(s, i)
+					if i < len(s) && s[i] == '*' {
+						i += 1
+						if i < len(s) && s[i] == '/' {
+							i += 1
+							break
+						}
+					}
+				}
+			} else {
+				for i < len(s) && s[i] != '\n' {
+					i += 1
+				}
+			}
+
+		case:
+			i += 1
+		}
+	}
+	return
+}

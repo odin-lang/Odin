@@ -964,6 +964,10 @@ count_object_entries :: proc(p: ^Parser, end_token: Token_Kind) -> (count: uintp
 
 @(private)
 unmarshal_count_array :: proc(p: ^Parser, flags: Unmarshal_Flags) -> (length: uintptr, err: Error) {
+	if p.tok.validated {
+		return count_validated_array(p.tok.data, p.curr_token.offset, p.spec), nil
+	}
+
 	p_backup := p^
 	unmarshal_expect_token(p, .Open_Bracket)
 	array_length_loop: for p.curr_token.kind != .Close_Bracket {
