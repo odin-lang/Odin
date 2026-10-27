@@ -152,8 +152,6 @@ iterator_last_error :: proc(r: Reader) -> (err: Error) {
 read :: proc(r: ^Reader, allocator := context.allocator) -> (record: []string, err: Error) {
 	if r.reuse_record {
 		record, err = _read_record(r, &r.last_record, allocator)
-		resize(&r.last_record, len(record))
-		copy(r.last_record[:], record)
 	} else {
 		record, err = _read_record(r, nil, allocator)
 	}
@@ -293,8 +291,12 @@ _read_record :: proc(r: ^Reader, dst: ^[dynamic]string, allocator := context.all
 					field_length += 1
 				}
 
-				rune_buf, rune_len := utf8.encode_rune(cur)
-				append(&r.raw_buffer, ..rune_buf[:rune_len])
+				if cur < utf8.RUNE_SELF {
+					append(&r.raw_buffer, byte(cur))
+				} else {
+					rune_buf, rune_len := utf8.encode_rune(cur)
+					append(&r.raw_buffer, ..rune_buf[:rune_len])
+				}
 			}
 
 			if err == .EOF && len(r.raw_buffer) > 0 {

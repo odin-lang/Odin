@@ -272,6 +272,15 @@ write_quoted_string :: proc(w: Writer, str: string, quote: byte = '"', n_written
 	}
 	write_byte(w, quote, &n) or_return
 	for width, s := 0, str; len(s) > 0; s = s[width:] {
+		// A run of printable ASCII other than the quote and backslash needs no escaping.
+		width = 0
+		for width < len(s) && 0x20 <= s[width] && s[width] < 0x7f && s[width] != quote && s[width] != '\\' {
+			width += 1
+		}
+		if width > 0 {
+			write_string(w, s[:width], &n) or_return
+			continue
+		}
 		r := rune(s[0])
 		width = 1
 		if r >= utf8.RUNE_SELF {

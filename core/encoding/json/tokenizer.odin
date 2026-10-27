@@ -69,7 +69,11 @@ next_rune :: proc(t: ^Tokenizer) -> rune #no_bounds_check {
 		t.r = utf8.RUNE_EOF
 	} else {
 		t.offset += t.w
-		t.r, t.w = utf8.decode_rune_in_string(t.data[t.offset:])
+		if t.offset < len(t.data) && t.data[t.offset] < utf8.RUNE_SELF {
+			t.r, t.w = rune(t.data[t.offset]), 1
+		} else {
+			t.r, t.w = utf8.decode_rune_in_string(t.data[t.offset:])
+		}
 		t.pos.column = t.offset - t.curr_line_offset
 		if t.offset >= len(t.data) {
 			t.r = utf8.RUNE_EOF

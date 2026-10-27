@@ -397,7 +397,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 
 				// If we are sorting the map by key, then we temp alloc an array
 				// and sort it, then output the result.
-				sorted := make([dynamic]Entry, 0, map_cap, context.temp_allocator)
+				sorted := make([dynamic]Entry, 0, m.len, context.temp_allocator)
 				for bucket_index in 0..<map_cap {
 					runtime.map_hash_is_valid(hs[bucket_index]) or_continue
 
@@ -747,15 +747,14 @@ opt_write_indentation :: proc(w: io.Writer, opt: ^Marshal_Options) -> (err: io.E
 		return
 	}
 
+	SPACES :: "                                                                "
+	TABS   :: "\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t"
+	pad, n := TABS, opt.indentation
 	if opt.use_spaces {
-		spaces := opt.spaces == 0 ? 4 : opt.spaces
-		for _ in 0..<opt.indentation * spaces {
-			io.write_byte(w, ' ') or_return
-		}
-	} else {
-		for _ in 0..<opt.indentation {
-			io.write_byte(w, '\t') or_return
-		}
+		pad, n = SPACES, n * (opt.spaces == 0 ? 4 : opt.spaces)
+	}
+	for ; n > 0; n -= len(pad) {
+		io.write_string(w, pad[:min(n, len(pad))]) or_return
 	}
 
 	return

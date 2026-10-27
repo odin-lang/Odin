@@ -545,10 +545,6 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			
 			unmarshal_expect_token(p, .Colon)						
 
-			field_used_bytes := (reflect.size_of_typeid(ti.id)+7)/8
-			field_used := intrinsics.alloca(field_used_bytes + 1, 1) // + 1 to not overflow on size_of 0 types.
-			intrinsics.mem_zero(field_used, field_used_bytes)
-
 			use_field_idx := -1
 			
 			for field, field_idx in fields {
@@ -609,15 +605,6 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			}
 
 			if field_found {
-				field_test :: #force_inline proc "contextless" (field_used: [^]byte, offset: uintptr) -> bool {
-					prev_set := field_used[offset/8] & byte(offset&7) != 0
-					field_used[offset/8] |= byte(offset&7)
-					return prev_set
-				}
-				if field_test(field_used, offset) {
-					return .Multiple_Use_Field
-				}
-				
 				field_ptr := rawptr(uintptr(v.data) + offset)
 				field := any{field_ptr, type.id}
 				unmarshal_value(p, field) or_return

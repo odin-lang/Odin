@@ -418,6 +418,10 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 	extra := 0
 	replacement_size := utf8.rune_size(utf8.RUNE_ERROR)
 	for j := i; j < len(s); {
+		if s[j] < utf8.RUNE_SELF {
+			j += 1
+			continue
+		}
 		r, size := utf8.decode_rune_in_string(s[j:])
 		if r == utf8.RUNE_ERROR && size == 1 {
 			extra += replacement_size - 1
