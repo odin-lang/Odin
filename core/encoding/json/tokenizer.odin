@@ -143,7 +143,99 @@ plain_run_end :: proc "contextless" (s: string, i: int, quote: byte) -> int #no_
 
 
 @(require_results)
-get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
+get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) #no_bounds_check {
+	data  := t.data
+	start := t.offset
+	end   := 0
+
+	scan: for start < len(data) {
+		c := data[start]
+		switch c {
+		case ' ', '\t', '\v', '\f', '\r':
+			start += 1
+			continue
+		case '\n':
+			if t.insert_comma {
+				break scan
+			}
+			t.line += 1
+			t.curr_line_offset = start
+			start += 1
+			continue
+
+		case ',':
+			token.kind = .Comma
+			t.insert_comma = false
+			end = start + 1
+		case ':': token.kind, end = .Colon,         start + 1
+		case '{': token.kind, end = .Open_Brace,    start + 1
+		case '}': token.kind, end = .Close_Brace,   start + 1
+		case '[': token.kind, end = .Open_Bracket,  start + 1
+		case ']': token.kind, end = .Close_Bracket, start + 1
+
+		case '"':
+			token.kind = .String
+			end = plain_run_end(data, start+1, '"')
+			if end < len(data) && data[end] == '"' {
+				end += 1
+			} else {
+				end, err = scan_string(t, start)
+			}
+		case '\'':
+			if t.spec == .JSON {
+				break scan
+			}
+			token.kind = .String
+			end, err = scan_string(t, start)
+			if err == nil {
+				err = .Illegal_Character
+			}
+
+		case 'A'..='Z', 'a'..='z', '_':
+			end = alphanum_end(data, start+1)
+			token.kind = ident_kind(data[start:end], t.spec)
+
+		case '-', '+':
+			if start+1 >= len(data) || data[start+1] - '0' > 9 {
+				break scan
+			}
+			if c == '+' && t.spec == .JSON {
+				break scan
+			}
+			end, token.kind, err = scan_decimal(t, start)
+			if c == '+' && err == nil {
+				err = .Illegal_Character
+			}
+
+		case '0'..='9':
+			if c == '0' && t.spec != .JSON && start+1 < len(data) {
+				if x := data[start+1]; x == 'x' || x == 'X' {
+					break scan
+				}
+			}
+			end, token.kind, err = scan_decimal(t, start)
+
+		case:
+			break scan
+		}
+
+		token.pos  = {start, t.line, start - t.curr_line_offset}
+		token.text = data[start:end]
+		move_to(t, end)
+		if t.spec == .MJSON {
+			update_insert_comma(t, token.kind)
+		}
+		return
+	}
+
+	if start != t.offset {
+		move_to(t, start)
+	}
+	return get_other_token(t)
+}
+
+@(private="file", require_results)
+get_other_token :: #force_no_inline proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 	skip_digits :: proc(t: ^Tokenizer) {
 		if i := digits_end(t.data, t.offset); i != t.offset {
 			move_to(t, i)
@@ -159,31 +251,6 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 				return
 			}
 		}
-	}
-
-	@(require_results)
-	scan_escape :: proc(t: ^Tokenizer) -> bool {
-		switch t.r {
-		case '"', '\'', '\\', '/', 'b', 'n', 'r', 't', 'f':
-			next_rune(t)
-			return true
-		case 'u':
-			// Expect 4 hexadecimal digits
-			for i := 0; i < 4; i += 1 {
-				r := next_rune(t)
-				switch r {
-				case '0'..='9', 'a'..='f', 'A'..='F':
-					// Okay
-				case:
-					return false
-				}
-			}
-			return true
-		case:
-			// Ignore the next rune regardless
-			next_rune(t)
-		}
-		return false
 	}
 
 	skip_whitespace :: proc(t: ^Tokenizer, on_newline: bool) #no_bounds_check {
@@ -226,17 +293,8 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		}
 	}
 
-	skip_alphanum :: proc(t: ^Tokenizer) #no_bounds_check {
-		i := t.offset
-		loop: for i < len(t.data) {
-			switch t.data[i] {
-			case 'A'..='Z', 'a'..='z', '0'..='9', '_':
-				i += 1
-			case:
-				break loop
-			}
-		}
-		if i != t.offset {
+	skip_alphanum :: proc(t: ^Tokenizer) {
+		if i := alphanum_end(t.data, t.offset); i != t.offset {
 			move_to(t, i)
 		}
 	}
@@ -264,22 +322,8 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		return
 
 	case 'A'..='Z', 'a'..='z', '_':
-		token.kind = .Ident
-
 		skip_alphanum(t)
-
-		switch str := string(t.data[token.offset:t.offset]); str {
-		case "null":  token.kind = .Null
-		case "false": token.kind = .False
-		case "true":  token.kind = .True
-		case:
-			if t.spec != .JSON {
-				switch str {
-				case "Infinity": token.kind = .Infinity
-				case "NaN":      token.kind = .NaN
-				}
-			}
-		}
+		token.kind = ident_kind(t.data[token.offset:t.offset], t.spec)
 
 	case '+':
 		err = .Illegal_Character
@@ -319,41 +363,12 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 			}
 		}
 
-		data := t.data
-		first_digit, int_digits := byte(curr_rune), 1
-		if curr_rune == '-' || curr_rune == '+' {
-			first_digit, int_digits = byte(t.r), 0
+		end, kind, number_err := scan_decimal(t, token.offset)
+		token.kind = kind
+		if number_err != nil {
+			err = number_err
 		}
-
-		i := digits_end(data, t.offset)
-		int_digits += i - t.offset
-
-		has_dot, frac_digits := false, 0
-		has_exp, exp_digits  := false, 0
-		if i < len(data) && data[i] == '.' {
-			token.kind = .Float
-			end := digits_end(data, i+1)
-			has_dot, frac_digits, i = true, end - (i+1), end
-		}
-
-		if i < len(data) && (data[i] == 'e' || data[i] == 'E') {
-			token.kind = .Float
-			i += 1
-			if i < len(data) && (data[i] == '+' || data[i] == '-') {
-				i += 1
-			}
-			end := digits_end(data, i)
-			has_exp, exp_digits, i = true, end - i, end
-		}
-
-		move_to(t, i)
-
-		valid := (first_digit != '0' || int_digits == 1) &&
-		         (!has_dot || frac_digits > 0 || (t.spec != .JSON && !has_exp)) &&
-		         (!has_exp || exp_digits > 0)
-		if !valid {
-			err = .Invalid_Number
-		}
+		move_to(t, end)
 
 	case '.':
 		err = .Illegal_Character
@@ -381,55 +396,11 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		fallthrough
 	case '"':
 		token.kind = .String
-		quote := byte(curr_rune)
-
-		closed, escaped, invalid := false, false, false
-
-		i := t.offset
-		loop: for {
-			i = plain_run_end(t.data, i, quote)
-			if i >= len(t.data) {
-				break
-			}
-			c := t.data[i]
-			switch {
-			case c == '\n':
-				err = .String_Not_Terminated
-				break loop
-			case c == quote:
-				i += 1
-				closed = true
-				break loop
-			case c == '\\':
-				escaped = true
-				move_to(t, i+1)
-				_ = scan_escape(t)
-				i = t.offset
-			case c < ' ':
-				invalid = true
-				i += 1
-			case escaped:
-				i += 1
-			case:
-				r, w := utf8.decode_rune_in_string(t.data[i:])
-				if r == utf8.RUNE_ERROR && w == 1 {
-					invalid = true
-				}
-				i += w
-			}
+		end, string_err := scan_string(t, token.offset)
+		if string_err != nil {
+			err = string_err
 		}
-
-		move_to(t, i)
-
-		if (!closed || escaped) && !t.validated {
-			str := string(t.data[token.offset : t.offset])
-			if !is_valid_string_literal(str, t.spec) {
-				err = .Invalid_String
-			}
-		} else if invalid {
-			err = .Invalid_String
-		}
-
+		move_to(t, end)
 
 	case ',':
 		token.kind = .Comma
@@ -475,22 +446,177 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 	token.text = string(t.data[token.offset : t.offset])
 
 	if t.spec == .MJSON {
-		switch token.kind {
-		case .Invalid:
-			// preserve insert_comma info
-		case .EOF:
-			t.insert_comma = false
-		case .Colon, .Comma, .Open_Brace, .Open_Bracket:
-			t.insert_comma = false
-		case .Null, .False, .True, .Infinity, .NaN,
-		     .Ident, .Integer, .Float, .String,
-		     .Close_Brace, .Close_Bracket:
-			t.insert_comma = true
-		}
+		update_insert_comma(t, token.kind)
 	}
 
 	return
 }
+
+@(private="file")
+update_insert_comma :: proc "contextless" (t: ^Tokenizer, kind: Token_Kind) {
+	switch kind {
+	case .Invalid:
+		// preserve insert_comma info
+	case .EOF:
+		t.insert_comma = false
+	case .Colon, .Comma, .Open_Brace, .Open_Bracket:
+		t.insert_comma = false
+	case .Null, .False, .True, .Infinity, .NaN,
+	     .Ident, .Integer, .Float, .String,
+	     .Close_Brace, .Close_Bracket:
+		t.insert_comma = true
+	}
+}
+
+@(private="file")
+alphanum_end :: proc "contextless" (s: string, i: int) -> int #no_bounds_check {
+	i := i
+	for i < len(s) {
+		switch s[i] {
+		case 'A'..='Z', 'a'..='z', '0'..='9', '_':
+			i += 1
+		case:
+			return i
+		}
+	}
+	return i
+}
+
+@(private="file")
+ident_kind :: proc(str: string, spec: Specification) -> Token_Kind {
+	switch str {
+	case "null":  return .Null
+	case "false": return .False
+	case "true":  return .True
+	}
+	if spec != .JSON {
+		switch str {
+		case "Infinity": return .Infinity
+		case "NaN":      return .NaN
+		}
+	}
+	return .Ident
+}
+
+// Scans the decimal number at `t.data[start]`, a digit or a sign followed by a digit.
+@(private="file")
+scan_decimal :: #force_inline proc "contextless" (t: ^Tokenizer, start: int) -> (end: int, kind: Token_Kind, err: Error) #no_bounds_check {
+	data := t.data
+	kind = t.parse_integers ? .Integer : .Float
+
+	i := start + 1
+	first_digit, int_digits := data[start], 1
+	if first_digit == '-' || first_digit == '+' {
+		first_digit, int_digits = data[i], 0
+	}
+
+	end = digits_end(data, i)
+	int_digits += end - i
+
+	has_dot, frac_digits := false, 0
+	has_exp, exp_digits  := false, 0
+	if end < len(data) && data[end] == '.' {
+		kind = .Float
+		e := digits_end(data, end+1)
+		has_dot, frac_digits, end = true, e - (end+1), e
+	}
+
+	if end < len(data) && (data[end] == 'e' || data[end] == 'E') {
+		kind = .Float
+		end += 1
+		if end < len(data) && (data[end] == '+' || data[end] == '-') {
+			end += 1
+		}
+		e := digits_end(data, end)
+		has_exp, exp_digits, end = true, e - end, e
+	}
+
+	valid := (first_digit != '0' || int_digits == 1) &&
+	         (!has_dot || frac_digits > 0 || (t.spec != .JSON && !has_exp)) &&
+	         (!has_exp || exp_digits > 0)
+	if !valid {
+		err = .Invalid_Number
+	}
+	return
+}
+
+// Scans the string literal whose opening quote is at `t.data[start]`.
+@(private="file")
+scan_string :: proc(t: ^Tokenizer, start: int) -> (end: int, err: Error) #no_bounds_check {
+	data  := t.data
+	quote := data[start]
+
+	closed, escaped, invalid := false, false, false
+
+	i := start + 1
+	loop: for {
+		i = plain_run_end(data, i, quote)
+		if i >= len(data) {
+			break
+		}
+		c := data[i]
+		switch {
+		case c == '\n':
+			err = .String_Not_Terminated
+			break loop
+		case c == quote:
+			i += 1
+			closed = true
+			break loop
+		case c == '\\':
+			escaped = true
+			move_to(t, i+1)
+			_ = scan_escape(t)
+			i = t.offset
+		case c < ' ':
+			invalid = true
+			i += 1
+		case escaped:
+			i += 1
+		case:
+			r, w := utf8.decode_rune_in_string(data[i:])
+			if r == utf8.RUNE_ERROR && w == 1 {
+				invalid = true
+			}
+			i += w
+		}
+	}
+
+	if (!closed || escaped) && !t.validated {
+		if !is_valid_string_literal(data[start:i], t.spec) {
+			err = .Invalid_String
+		}
+	} else if invalid {
+		err = .Invalid_String
+	}
+	return i, err
+}
+
+@(private="file", require_results)
+scan_escape :: proc(t: ^Tokenizer) -> bool {
+	switch t.r {
+	case '"', '\'', '\\', '/', 'b', 'n', 'r', 't', 'f':
+		next_rune(t)
+		return true
+	case 'u':
+		// Expect 4 hexadecimal digits
+		for i := 0; i < 4; i += 1 {
+			r := next_rune(t)
+			switch r {
+			case '0'..='9', 'a'..='f', 'A'..='F':
+				// Okay
+			case:
+				return false
+			}
+		}
+		return true
+	case:
+		// Ignore the next rune regardless
+		next_rune(t)
+	}
+	return false
+}
+
 
 
 
@@ -682,18 +808,6 @@ count_validated_array :: proc(s: string, open: int, spec: Specification) -> (cou
 		}
 		_, w := utf8.decode_rune_in_string(s[i:])
 		return w
-	}
-	alphanum_end :: proc "contextless" (s: string, i: int) -> int #no_bounds_check {
-		i := i
-		for i < len(s) {
-			switch s[i] {
-			case 'A'..='Z', 'a'..='z', '0'..='9', '_':
-				i += 1
-			case:
-				return i
-			}
-		}
-		return i
 	}
 	number_end :: proc "contextless" (s: string, start: int) -> int #no_bounds_check {
 		i := digits_end(s, start)
