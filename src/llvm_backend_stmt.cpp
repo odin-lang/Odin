@@ -3704,6 +3704,19 @@ gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlo
 	}
 	defer (p->branch_location_pos = prev_token_pos);
 
+	// NOTE: a `musttail` call must be directly followed by the `ret`, so with no deferred
+	// statements to run after it, the asan unpoisoning and lifetime ends go before the call
+	LLVMValueRef must_tail_call = nullptr;
+#if LLVM_VERSION_MAJOR > 17
+	if (p->defer_stmts.count == 0 && p->curr_block != nullptr) {
+		LLVMValueRef last = LLVMGetLastInstruction(p->curr_block->block);
+		if (last != nullptr && LLVMIsACallInst(last) && LLVMGetTailCallKind(last) == LLVMTailCallKindMustTail) {
+			must_tail_call = last;
+			LLVMPositionBuilderBefore(p->builder, must_tail_call);
+		}
+	}
+#endif
+
 	// TODO(lucas): In LLVM 21 use the 'use-after-scope' asan option which does this for us.
 	if (kind == lbDeferExit_Return) {
 		for_array(i, p->asan_stack_locals) {
@@ -3743,6 +3756,10 @@ gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlo
 
 	// end lifetimes after the defer bodies, a defer may reference the locals
 	lb_emit_lifetime_ends(p, kind, block);
+
+	if (must_tail_call != nullptr) {
+		LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);
+	}
 }
 
 gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block, Ast *node) {
