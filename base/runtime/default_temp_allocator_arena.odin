@@ -152,6 +152,7 @@ arena_free_last_memory_block :: proc(arena: ^Arena, loc := #caller_location) {
 	if free_block := arena.curr_block; free_block != nil {
 		arena.curr_block = free_block.prev
 
+		arena.total_used -= free_block.used
 		arena.total_capacity -= free_block.capacity
 		memory_block_dealloc(free_block, loc)
 	}
@@ -311,6 +312,9 @@ arena_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
 			block.used = temp.used
 			arena.total_used -= amount_to_zero
 		}
+	} else {
+		// The arena was empty at arena_temp_begin, so rewind it to empty
+		arena_free_all(arena, loc)
 	}
 
 	assert(arena.temp_count > 0, "double-use of arena_temp_end", loc)

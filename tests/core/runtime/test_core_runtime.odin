@@ -60,6 +60,86 @@ test_temp_allocator_returns_correct_size :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_temp_allocator_temp_end_on_empty_arena :: proc(t: ^testing.T) {
+	arena: runtime.Arena
+	defer runtime.arena_destroy(&arena)
+
+	temp := runtime.arena_temp_begin(&arena)
+	testing.expect(t, temp.block == nil)
+
+	data, err := runtime.arena_alloc(&arena, 1000, 16)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, len(data), 1000)
+
+	runtime.arena_temp_end(temp)
+	testing.expect_value(t, arena.total_used, 0)
+	testing.expect_value(t, arena.temp_count, 0)
+
+	if testing.expect(t, arena.curr_block != nil) {
+		testing.expect_value(t, arena.curr_block.used, 0)
+	}
+}
+
+@(test)
+test_temp_allocator_temp_end_on_empty_arena_multiple_blocks :: proc(t: ^testing.T) {
+	arena: runtime.Arena
+	arena.minimum_block_size = 4*mem.Kilobyte
+	defer runtime.arena_destroy(&arena)
+
+	temp := runtime.arena_temp_begin(&arena)
+	for _ in 0..<4 {
+		_, err := runtime.arena_alloc(&arena, 3*mem.Kilobyte, 16)
+		testing.expect_value(t, err, nil)
+	}
+	testing.expect(t, arena.curr_block != nil && arena.curr_block.prev != nil)
+
+	runtime.arena_temp_end(temp)
+	testing.expect_value(t, arena.total_used, 0)
+	testing.expect_value(t, arena.temp_count, 0)
+
+	if testing.expect(t, arena.curr_block != nil) {
+		testing.expect(t, arena.curr_block.prev == nil)
+		testing.expect_value(t, arena.curr_block.used, 0)
+	}
+}
+
+@(test)
+test_temp_allocator_total_used_after_multiblock_temp :: proc(t: ^testing.T) {
+	arena: runtime.Arena
+	arena.minimum_block_size = 4*mem.Kilobyte
+	defer runtime.arena_destroy(&arena)
+
+	_, err := runtime.arena_alloc(&arena, 100, 1)
+	testing.expect_value(t, err, nil)
+
+	temp := runtime.arena_temp_begin(&arena)
+	for _ in 0..<4 {
+		_, err = runtime.arena_alloc(&arena, 3*mem.Kilobyte, 16)
+		testing.expect_value(t, err, nil)
+	}
+	testing.expect(t, arena.curr_block != nil && arena.curr_block.prev != nil)
+
+	runtime.arena_temp_end(temp)
+	testing.expect_value(t, arena.total_used, 100)
+}
+
+@(test)
+test_temp_guard_on_custom_default_temp_allocator :: proc(t: ^testing.T) {
+	s: runtime.Default_Temp_Allocator
+	runtime.default_temp_allocator_init(&s, 4*mem.Kilobyte, context.allocator)
+	defer runtime.default_temp_allocator_destroy(&s)
+
+	context.temp_allocator = runtime.Allocator{runtime.default_temp_allocator_proc, &s}
+	{
+		runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+		data, err := make([]byte, 500, context.temp_allocator)
+		testing.expect_value(t, err, nil)
+		testing.expect_value(t, len(data), 500)
+	}
+	testing.expect_value(t, s.arena.total_used, 0)
+}
+
+@(test)
 test_init_cap_map_dynarray :: proc(t: ^testing.T) {
 	m1 := make(map[int]string)
 	defer delete(m1)

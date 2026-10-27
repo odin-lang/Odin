@@ -84,6 +84,69 @@ test_large_minimum_block_size :: proc(t: ^testing.T) {
 	}
 }
 
+@(private)
+expect_temp_end_rewinds_to_empty :: proc(t: ^testing.T, a: ^virtual.Arena, temp: virtual.Arena_Temp, written: []byte) {
+	for &b in written { b = 0xAA }
+	virtual.arena_temp_end(temp)
+
+	testing.expect_value(t, a.total_used, 0)
+	testing.expect_value(t, a.temp_count, 0)
+	if testing.expect(t, a.curr_block != nil) {
+		testing.expect(t, a.curr_block.prev == nil)
+		testing.expect_value(t, a.curr_block.used, 0)
+	}
+
+	data, err := virtual.arena_alloc(a, len(written), 1)
+	testing.expect_value(t, err, nil)
+	fail_if_not_zeroed(t, data)
+}
+
+@(test)
+test_arena_temp_end_on_empty_growing_arena :: proc(t: ^testing.T) {
+	a: virtual.Arena
+	defer virtual.arena_destroy(&a)
+
+	temp := virtual.arena_temp_begin(&a)
+	testing.expect(t, temp.block == nil)
+	data, err := virtual.arena_alloc(&a, 1000, 16)
+	testing.expect_value(t, err, nil)
+
+	expect_temp_end_rewinds_to_empty(t, &a, temp, data)
+}
+
+@(test)
+test_arena_temp_end_on_empty_growing_arena_multiple_blocks :: proc(t: ^testing.T) {
+	a: virtual.Arena
+	a.minimum_block_size = mem.Megabyte
+	defer virtual.arena_destroy(&a)
+
+	temp := virtual.arena_temp_begin(&a)
+	data: []byte
+	for _ in 0..<4 {
+		err: mem.Allocator_Error
+		data, err = virtual.arena_alloc(&a, 600*mem.Kilobyte, 16)
+		testing.expect_value(t, err, nil)
+	}
+	testing.expect(t, a.curr_block != nil && a.curr_block.prev != nil)
+
+	expect_temp_end_rewinds_to_empty(t, &a, temp, data)
+}
+
+@(test)
+test_arena_temp_end_on_empty_static_arena :: proc(t: ^testing.T) {
+	a: virtual.Arena
+	a.kind = .Static
+	a.minimum_block_size = mem.Megabyte
+	defer virtual.arena_destroy(&a)
+
+	temp := virtual.arena_temp_begin(&a)
+	testing.expect(t, temp.block == nil)
+	data, err := virtual.arena_alloc(&a, 1000, 16)
+	testing.expect_value(t, err, nil)
+
+	expect_temp_end_rewinds_to_empty(t, &a, temp, data)
+}
+
 @(test)
 tlsf_test_overlap_and_zero :: proc(t: ^testing.T) {
 	default_allocator := context.allocator

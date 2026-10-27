@@ -471,7 +471,17 @@ arena_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
 			block.used = temp.used
 			arena.total_used -= amount_to_zero
 		}
-	}
+	} else if arena.curr_block != nil {
+
+		for arena.curr_block.prev != nil {
+			arena_growing_free_last_memory_block(arena, loc)
+		}
+		
+		block := arena.curr_block
+		mem.zero_slice(block.base[:block.used])
+		block.used = 0
+		arena.total_used = 0
+ 	}
 
 	assert(arena.temp_count > 0, "double-use of arena_temp_end", loc)
 	arena.temp_count -= 1
