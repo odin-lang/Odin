@@ -716,6 +716,8 @@ gb_internal bool poly_proc_lookup_operands_equal(Slice<PolyProcLookupOperand> co
 	return true;
 }
 
+gb_internal bool check_proc_params_assignable(CheckerContext *c, Type *x, Type *y);
+
 gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, Entity *base_entity, Type *type,
                                                         Array<Operand> const *param_operands, Ast *poly_def_node, PolyProcData *poly_proc_data) {
 	///////////////////////////////////////////////////////////////////////////////
@@ -756,11 +758,15 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	if (!src->Proc.is_polymorphic || src->Proc.is_poly_specialized) {
 		// NOTE: polymorphic procedure check not idempotent without this
 		if (src->Proc.is_poly_specialized && base_entity->Procedure.generated_from_polymorphic) {
-			if (are_types_identical(src, dst) || are_types_identical(base_type(base_entity->type), dst)) {
-				if (poly_proc_data) {
-					poly_proc_data->gen_entity = base_entity;
+			if (dst != nullptr) {
+				Type *bt = base_type(base_entity->type);
+				if (are_types_identical(src, dst) || are_types_identical(bt, dst) ||
+				    (are_proc_properties_identical(dst, bt) && check_proc_params_assignable(old_c, dst, bt))) {
+					if (poly_proc_data) {
+						poly_proc_data->gen_entity = base_entity;
+					}
+					return true;
 				}
-				return true;
 			}
 		}
 		return false;
@@ -771,8 +777,9 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 			return false;
 		}
 
-		if (dst->Proc.param_count  != src->Proc.param_count ||
-		    dst->Proc.result_count != src->Proc.result_count) {
+		if (dst->Proc.param_count  != src->Proc.param_count  ||
+		    dst->Proc.result_count != src->Proc.result_count ||
+		    !are_proc_properties_identical(src, dst)) {
 		    return false;
 		}
 	}
@@ -942,6 +949,16 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	if (!success) {
 		record_lookup(nullptr);
 		return false;
+	}
+
+	if (dst != nullptr) {
+		// NOTE: only the parameters are inferred from `dst`, so the specialization must still be
+		// assignable to it (e.g. `proc(^$T) -> T` must not become `proc(^i32) -> f32`)
+		if (!are_types_identical(final_proc_type, dst) &&
+		    !(are_proc_properties_identical(dst, final_proc_type) && check_proc_params_assignable(old_c, dst, final_proc_type))) {
+			record_lookup(nullptr);
+			return false;
+		}
 	}
 
 	u64 final_hash = proc_type_identity_hash(final_proc_type);
@@ -1398,12 +1415,14 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 		PolyProcData poly_proc_data = {};
 		if (check_polymorphic_procedure_assignment(c, operand, type, operand->expr, &poly_proc_data)) {
 			Entity *e = poly_proc_data.gen_entity;
-			add_type_and_value(c, operand->expr, Addressing_Value, e->type, exact_value_procedure(operand->expr));
-			Ast *expr = unparen_expr(operand->expr);
-			if (expr->kind == Ast_SelectorExpr) {
-				add_entity_use(c, expr->SelectorExpr.selector, e);
-			} else {
-				add_entity_use(c, operand->expr, e);
+			if (!c->in_proc_group && !c->no_polymorphic_errors) {
+				add_type_and_value(c, operand->expr, Addressing_Value, e->type, exact_value_procedure(operand->expr));
+				Ast *expr = unparen_expr(operand->expr);
+				if (expr->kind == Ast_SelectorExpr) {
+					add_entity_use(c, expr->SelectorExpr.selector, e);
+				} else {
+					add_entity_use(c, expr, e);
+				}
 			}
 			return 4;
 		}

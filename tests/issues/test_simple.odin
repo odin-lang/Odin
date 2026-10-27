@@ -72,6 +72,7 @@ package tests_issues
 @(require) import "test_issue_global_proc_lits"
 @(require) import "test_issue_packed_field_by_value"
 @(require) import "test_issue_paren_poly_callee"
+@(require) import "test_issue_poly_proc_dollar_param"
 @(require) import "test_issue_procedure_of_specialized"
 @(require) import "test_issue_statics_across_modules"
 
