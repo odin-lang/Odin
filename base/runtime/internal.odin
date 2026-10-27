@@ -327,6 +327,7 @@ memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
 
 memory_compare :: proc "contextless" (x, y: rawptr, n: int) -> int #no_bounds_check {
 	switch {
+	case n == 0:   return 0
 	case x == y:   return 0
 	case x == nil: return -1
 	case y == nil: return +1
