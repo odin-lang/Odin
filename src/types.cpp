@@ -168,7 +168,7 @@ struct TypeStruct {
 	bool            is_poly_specialized         : 1;
 
 	std::atomic<bool> are_offsets_being_processed;
-	std::atomic<bool> where_clauses_failed;
+	std::atomic<bool> has_errors; // final once `fields_wait_signal` is set
 };
 
 struct TypeUnion {
@@ -191,7 +191,7 @@ struct TypeUnion {
 	UnionTypeKind    kind;
 	std::atomic<u8>  constantable; // 0 unknown, 1 false, 2 true
 
-	std::atomic<bool> where_clauses_failed;
+	std::atomic<bool> has_errors; // final once `variants_wait_signal` is set
 };
 
 struct TypeProc {

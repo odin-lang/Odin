@@ -9140,61 +9140,27 @@ gb_internal isize lookup_polymorphic_record_parameter(Type *t, String parameter_
 	return -1;
 }
 
-gb_internal void recheck_failed_record_where_clauses(CheckerContext *c, Type *named_type, Ast *call) {
+gb_internal bool polymorphic_record_has_errors(Type *named_type) {
+	// NOTE(bill): whilst this thread is still checking it, its errors so far count for the check referring to it
+	for (ErrorRecordInstantiation *r = global_error_context.instantiations.records; r != nullptr; r = r->prev) {
+		if (r->named_type == named_type) {
+			if (error_thread_count() != r->errors_before) {
+				error_count_again();
+			}
+			return false;
+		}
+	}
+
 	Type *bt = base_type(named_type);
-
-	Ast *  node          = nullptr;
-	Scope *scope         = nullptr;
-	Type * original_type = nullptr;
-	Slice<Ast *> where_clauses = {};
-
 	switch (bt->kind) {
 	case Type_Struct:
-		node          = bt->Struct.node;
-		scope         = bt->Struct.scope;
-		original_type = bt->Struct.polymorphic_parent;
-		where_clauses = node->StructType.where_clauses;
-		if (where_clauses.count == 0) {
-			return;
-		}
 		wait_for_struct_fields(bt);
-		if (!bt->Struct.where_clauses_failed.load()) {
-			return;
-		}
-		break;
+		return bt->Struct.has_errors.load();
 	case Type_Union:
-		node          = bt->Union.node;
-		scope         = bt->Union.scope;
-		original_type = bt->Union.polymorphic_parent;
-		where_clauses = node->UnionType.where_clauses;
-		if (where_clauses.count == 0) {
-			return;
-		}
 		wait_for_union_variants(bt);
-		if (!bt->Union.where_clauses_failed.load()) {
-			return;
-		}
-		break;
-	default:
-		return;
+		return bt->Union.has_errors.load();
 	}
-
-	CheckerContext ctx = *c;
-	ctx.scope = scope;
-	ctx.decl  = make_decl_info(scope, nullptr);
-	if (original_type->Named.type_name && original_type->Named.type_name->file) {
-		ctx.file = original_type->Named.type_name->file;
-		ctx.pkg  = ctx.file->pkg;
-	}
-
-	Slice<Ast *> clauses = clone_ast_array(where_clauses, nullptr);
-
-	ErrorRecordInstantiation instantiation = {global_error_context.instantiations.records, call, named_type};
-	global_error_context.instantiations.records = &instantiation;
-
-	evaluate_where_clauses(&ctx, node, scope, &clauses, true);
-
-	global_error_context.instantiations.records = instantiation.prev;
+	return false;
 }
 
 gb_internal Type *instantiate_polymorphic_record(CheckerContext *c, Type *original_type, Array<Operand> ordered_operands, Ast *call) {
@@ -9205,10 +9171,12 @@ gb_internal Type *instantiate_polymorphic_record(CheckerContext *c, Type *origin
 
 	// NOTE(bill, 2026-10-10):
 	// check_struct_type/check_union_type release this mutex early (after publishing, before checking members)
-	// to avoid a cross-record ABBA, clearing gen_types_locked. The cache-hit path releases it before rechecking
-	// the instantiation's where clauses, as their failure must be reported (or muted) at every use.
+	// to avoid a cross-record ABBA, clearing gen_types_locked. The cache-hit path releases it before waiting
+	// for the instantiation to be checked.
 	bool gen_types_locked = true;
 	defer (if (gen_types_locked) mutex_unlock(&found_gen_types->mutex));
+
+	Type *failed_type = nullptr;
 
 	Entity *found_entity = find_polymorphic_record_entity(found_gen_types, param_count, ordered_operands);
 	if (found_entity) {
@@ -9216,8 +9184,13 @@ gb_internal Type *instantiate_polymorphic_record(CheckerContext *c, Type *origin
 
 		mutex_unlock(&found_gen_types->mutex);
 		gen_types_locked = false;
-		recheck_failed_record_where_clauses(c, found_entity->type, call);
-		return found_entity->type;
+		if (!polymorphic_record_has_errors(found_entity->type)) {
+			return found_entity->type;
+		}
+
+		// NOTE: an instantiation with errors is checked again (unpublished) at every use, so that each use
+		// reports or mutes them just as the first use did
+		failed_type = found_entity->type;
 	}
 
 	CheckerContext ctx = *c;
@@ -9235,11 +9208,15 @@ gb_internal Type *instantiate_polymorphic_record(CheckerContext *c, Type *origin
 	GB_ASSERT(ctx.scope != nullptr);
 
 	Type *bt = base_type(original_type);
-	String generated_name = make_string_c(expr_to_string(call));
+	String generated_name = failed_type ? failed_type->Named.name : make_string_c(expr_to_string(call));
 
 	Type *named_type = alloc_type_named(generated_name, nullptr, nullptr);
-	ErrorRecordInstantiation instantiation = {global_error_context.instantiations.records, call, named_type};
+	ErrorRecordInstantiation instantiation = {global_error_context.instantiations.records, call, failed_type ? failed_type : named_type, error_thread_count()};
 	global_error_context.instantiations.records = &instantiation;
+
+	Type *        original_type_for_poly = failed_type == nullptr ? original_type   : nullptr;
+	GenTypesData *gen_types_to_unlock    = failed_type == nullptr ? found_gen_types : nullptr;
+
 	if (bt->kind == Type_Struct) {
 		Ast *node = clone_ast(bt->Struct.node);
 
@@ -9249,7 +9226,7 @@ gb_internal Type *instantiate_polymorphic_record(CheckerContext *c, Type *origin
 		set_base_type(named_type, struct_type);
 
 		check_open_scope(&ctx, node);
-		check_struct_type(&ctx, struct_type, node, &ordered_operands, named_type, original_type, found_gen_types);
+		check_struct_type(&ctx, struct_type, node, &ordered_operands, named_type, original_type_for_poly, gen_types_to_unlock);
 
 		// check_struct_type released found_gen_types->mutex after publishing the instantiation.
 		gen_types_locked = false;
@@ -9263,7 +9240,7 @@ gb_internal Type *instantiate_polymorphic_record(CheckerContext *c, Type *origin
 		set_base_type(named_type, union_type);
 
 		check_open_scope(&ctx, node);
-		check_union_type(&ctx, union_type, node, &ordered_operands, named_type, original_type, found_gen_types);
+		check_union_type(&ctx, union_type, node, &ordered_operands, named_type, original_type_for_poly, gen_types_to_unlock);
 
 		// check_union_type released found_gen_types->mutex after publishing the instantiation.
 		gen_types_locked = false;
@@ -9273,6 +9250,9 @@ gb_internal Type *instantiate_polymorphic_record(CheckerContext *c, Type *origin
 	}
 	global_error_context.instantiations.records = instantiation.prev;
 
+	if (failed_type != nullptr) {
+		return failed_type;
+	}
 	add_declaration_dependency(c, named_type->Named.type_name);
 	return named_type;
 }
