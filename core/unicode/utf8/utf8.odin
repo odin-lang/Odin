@@ -2,6 +2,7 @@
 package utf8
 
 @(require) import "base:runtime"
+import "base:intrinsics"
 
 RUNE_ERROR :: '\ufffd'
 RUNE_SELF  :: 0x80
@@ -9,6 +10,15 @@ RUNE_BOM   :: 0xfeff
 RUNE_EOF   :: ~rune(0)
 MAX_RUNE   :: '\U0010ffff'
 UTF_MAX    :: 4
+
+// A word with none of these bits set holds eight ASCII bytes.
+@(private)
+ASCII_WORD_MASK :: u64(0x8080808080808080)
+
+@(private)
+load_word :: #force_inline proc "contextless" (p: ^u8) -> u64 {
+	return intrinsics.unaligned_load((^u64)(p))
+}
 
 SURROGATE_MIN :: 0xd800
 SURROGATE_MAX :: 0xdfff
@@ -294,10 +304,21 @@ valid_rune :: proc "contextless" (r: rune) -> bool {
 @(require_results)
 valid_string :: proc "contextless" (s: string) -> bool #no_bounds_check {
 	n := len(s)
+	p := raw_data(s)
 	for i := 0; i < n; {
 		si := s[i]
 		if si < RUNE_SELF { // ascii
-			i += 1
+			if i+8 <= n && load_word(&p[i]) & ASCII_WORD_MASK == 0 {
+				i += 8
+				for i+32 <= n && (load_word(&p[i]) | load_word(&p[i+8]) | load_word(&p[i+16]) | load_word(&p[i+24])) & ASCII_WORD_MASK == 0 {
+					i += 32
+				}
+				for i+8 <= n && load_word(&p[i]) & ASCII_WORD_MASK == 0 {
+					i += 8
+				}
+			} else {
+				i += 1
+			}
 			continue
 		}
 		x := accept_sizes[si]
@@ -343,12 +364,26 @@ rune_count_in_string :: #force_inline proc(s: string) -> int {
 rune_count_in_bytes :: proc "contextless" (s: []u8) -> int #no_bounds_check {
 	count := 0
 	n := len(s)
+	p := raw_data(s)
 
 	for i := 0; i < n; {
 		defer count += 1
 		si := s[i]
 		if si < RUNE_SELF { // ascii
-			i += 1
+			if i+8 <= n && load_word(&p[i]) & ASCII_WORD_MASK == 0 {
+				i += 8
+				count += 7 // the deferred increment counts the eighth
+				for i+32 <= n && (load_word(&p[i]) | load_word(&p[i+8]) | load_word(&p[i+16]) | load_word(&p[i+24])) & ASCII_WORD_MASK == 0 {
+					i += 32
+					count += 32
+				}
+				for i+8 <= n && load_word(&p[i]) & ASCII_WORD_MASK == 0 {
+					i += 8
+					count += 8
+				}
+			} else {
+				i += 1
+			}
 			continue
 		}
 		x := accept_sizes[si]
