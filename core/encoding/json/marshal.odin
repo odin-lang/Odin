@@ -660,12 +660,12 @@ format_float :: proc(buf: []byte, f: f64, bit_size: int, spec: Specification) ->
 	}
 
 	a := abs(f)
-	s := strconv.write_float(buf, f, 'e' if a != 0 && (a < 1e-6 || a >= 1e21) else 'f', -1, bit_size)
-	start, end := 1 if s[0] == '+' else 0, len(s)
+	s := strconv.write_float(buf, f, 'e' if a != 0 && (a < 1e-6 || a >= 1e21) else 'f', -1, bit_size, flags = {})
+	end := len(s)
 	if strings.index_any(s, ".e") < 0 {
 		end += copy(buf[end:], ".0")
 	}
-	return string(buf[start:end]), nil
+	return string(buf[:end]), nil
 }
 
 /*
