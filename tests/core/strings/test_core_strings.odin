@@ -275,7 +275,6 @@ test_prefix_length :: proc(t: ^testing.T) {
 
 @test
 test_compare_empty :: proc(t: ^testing.T) {
-	// `""` has a nil `data`; an empty slice of a buffer does not.
 	buf: [1]u8
 	empty := string(buf[:0])
 
