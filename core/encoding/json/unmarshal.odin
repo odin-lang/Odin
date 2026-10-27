@@ -317,7 +317,7 @@ unmarshal_string_token_alloc :: proc(p: ^Parser, val: any, token: Token) -> (ok:
 	str: string
 	switch {
 	case token.kind == .String:
-		str = unquote_string(token, p.spec, p.allocator) or_return
+		str = unquote_token(token, p.spec, p.tok.validated, p.allocator) or_return
 	case:
 		str = clone_string(token.text, p.allocator) or_return
 	}
@@ -365,9 +365,9 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, token: Token, ti: ^reflect.
 	allocated := false
 	if token.kind == .String {
 		fits: bool
-		str, fits = unquote_string_view(token, p.spec, str_buf[:])
+		str, fits = unquote_string_view(token, p.spec, p.tok.validated, str_buf[:])
 		if !fits {
-			str = unquote_string(token, p.spec, p.allocator) or_return
+			str = unquote_token(token, p.spec, p.tok.validated, p.allocator) or_return
 			allocated = true
 		}
 	}

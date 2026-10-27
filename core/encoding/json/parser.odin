@@ -162,7 +162,7 @@ parse_value :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: 
 
 	case .String:
 		advance_token(p)
-		return unquote_string(token, p.spec, p.allocator, loc)
+		return unquote_token(token, p.spec, p.tok.validated, p.allocator, loc)
 
 	case .Open_Brace:
 		return parse_object(p, loc)
@@ -325,7 +325,7 @@ parse_object_key_view :: proc(p: ^Parser, buf: []byte) -> (key: string, allocate
 	if expect_token(p, .String) != nil {
 		return "", false, .Expected_String_For_Object_Key
 	}
-	if view, ok := unquote_string_view(tok, p.spec, buf); ok {
+	if view, ok := unquote_string_view(tok, p.spec, false, buf); ok {
 		return view, false, nil
 	}
 	key, err = unquote_string(tok, p.spec, p.allocator)
@@ -405,6 +405,11 @@ parse_object :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err:
 // IMPORTANT NOTE(bill): unquote_string assumes a mostly valid string
 @(require_results)
 unquote_string :: proc(token: Token, spec: Specification, allocator := context.allocator, loc := #caller_location) -> (value: string, err: Error) {
+	return unquote_token(token, spec, false, allocator, loc)
+}
+
+@(private, require_results)
+unquote_token :: proc(token: Token, spec: Specification, valid: bool, allocator := context.allocator, loc := #caller_location) -> (value: string, err: Error) {
 	if token.kind != .String {
 		return "", nil
 	}
@@ -419,12 +424,12 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 	}
 	s = s[1:len(s)-1]
 
-	i := unquote_plain_end(s, quote)
+	i := unquote_plain_end(s, quote, valid)
 	if i == len(s) {
 		return clone_string(s, allocator, loc)
 	}
 
-	b := bytes_make(unquote_size(s, i), 1, allocator) or_return
+	b := bytes_make(unquote_size(s, i, valid), 1, allocator) or_return
 	w := copy(b, s[0:i])
 
 	if len(b) == 0 && allocator.data == nil {
@@ -432,11 +437,11 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 		return string(b[:w]), nil
 	}
 
-	return string(b[:unquote_escapes(s, i, w, quote, spec, b)]), nil
+	return string(b[:unquote_escapes(s, i, w, quote, spec, valid, b)]), nil
 }
 
 @(private, require_results)
-unquote_string_view :: proc(token: Token, spec: Specification, buf: []byte) -> (value: string, ok: bool) {
+unquote_string_view :: proc(token: Token, spec: Specification, valid: bool, buf: []byte) -> (value: string, ok: bool) {
 	s := token.text
 	if token.kind != .String || len(s) <= 2 || s[0] != s[len(s)-1] {
 		return "", true
@@ -444,21 +449,24 @@ unquote_string_view :: proc(token: Token, spec: Specification, buf: []byte) -> (
 	quote := s[0]
 	s = s[1:len(s)-1]
 
-	i := unquote_plain_end(s, quote)
+	i := unquote_plain_end(s, quote, valid)
 	if i == len(s) {
 		return s, true
 	}
 
-	if unquote_size(s, i) > len(buf) {
+	if unquote_size(s, i, valid) > len(buf) {
 		return "", false
 	}
 
 	w := copy(buf, s[0:i])
-	return string(buf[:unquote_escapes(s, i, w, quote, spec, buf)]), true
+	return string(buf[:unquote_escapes(s, i, w, quote, spec, valid, buf)]), true
 }
 
 @(private, require_results)
-unquote_plain_end :: #force_inline proc(s: string, quote: byte) -> int {
+unquote_plain_end :: #force_inline proc(s: string, quote: byte, valid: bool) -> int {
+	if valid {
+		return string_stop(s, 0, quote)
+	}
 	i := 0
 	for i < len(s) {
 		c := s[i]
@@ -479,13 +487,16 @@ unquote_plain_end :: #force_inline proc(s: string, quote: byte) -> int {
 }
 
 @(private, require_results)
-unquote_size :: proc(s: string, i: int) -> int {
+unquote_size :: proc(s: string, i: int, valid: bool) -> int {
 	// A byte that is not valid UTF-8 is replaced by utf8.RUNE_ERROR, which encodes
 	// wider than the single byte it stands in for, so a string holding several of
 	// them unquotes to more bytes than it was quoted in. Count them up front so the
 	// buffer fits. Nothing else in `unquote_escapes` grows its input: a two-byte
 	// escape like \n writes one byte, \xXX writes at most two for four, \uXXXX at
 	// most three for six, and a surrogate pair four for twelve.
+	if valid {
+		return len(s) + 2*utf8.UTF_MAX
+	}
 	extra := 0
 	replacement_size := utf8.rune_size(utf8.RUNE_ERROR)
 	for j := i; j < len(s); /**/ {
@@ -505,7 +516,7 @@ unquote_size :: proc(s: string, i: int) -> int {
 }
 
 @(private, require_results)
-unquote_escapes :: proc(s: string, i, w: int, quote: byte, spec: Specification, b: []byte) -> int {
+unquote_escapes :: proc(s: string, i, w: int, quote: byte, spec: Specification, valid: bool, b: []byte) -> int {
 	get_u2_rune :: proc(s: string) -> rune {
 		if len(s) < 4 || s[0] != '\\' || s[1] != 'x' {
 			return -1
@@ -636,6 +647,11 @@ unquote_escapes :: proc(s: string, i, w: int, quote: byte, spec: Specification, 
 
 		case c == quote, c < ' ':
 			break loop
+
+		case valid:
+			end := string_stop(s, i, quote)
+			w += copy(b[w:], s[i:end])
+			i = end
 
 		case c < utf8.RUNE_SELF:
 			end := plain_run_end(s, i, quote)
