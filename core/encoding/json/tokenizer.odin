@@ -92,7 +92,21 @@ move_to :: #force_inline proc "contextless" (t: ^Tokenizer, offset: int) #no_bou
 
 @(private="file")
 digits_end :: #force_inline proc "contextless" (s: string, i: int) -> int #no_bounds_check {
+	ONES  :: 0x0101_0101_0101_0101
+	HIGHS :: 0x8080_8080_8080_8080
+
 	i := i
+	for i+8 <= len(s) {
+		x := u64(intrinsics.unaligned_load((^u64le)(raw_data(s[i:]))))
+		y := x &~ HIGHS
+
+		non_digits := (~(y + ONES*(0x80-'0')) | (y + ONES*(0x80-'9'-1)) | x) & HIGHS
+		if non_digits != 0 {
+			return i + int(intrinsics.count_trailing_zeros(non_digits) >> 3)
+		}
+		i += 8
+	}
+
 	for i < len(s) && '0' <= s[i] && s[i] <= '9' {
 		i += 1
 	}

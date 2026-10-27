@@ -152,6 +152,55 @@ differential_tokenizer :: proc(t: ^testing.T) {
 	}
 }
 
+// `digits_end` reads eight bytes at a time, so digit runs of every length are checked with each byte
+// that may end one, at every distance from the end of the input, alone and inside an array.
+@(test)
+differential_digit_runs :: proc(t: ^testing.T) {
+	f: Fuzz
+	fuzz_init(&f, t)
+	defer fuzz_destroy(&f)
+
+	PREFIXES := []string{"", "-", "1.", "1e", "1E-"}
+	ENDINGS  := []string{"", "/", ":", "\x00", "\x80", "\xb0", "\xb9", "\xff", "\xc3\xa9", ".", "e", "E", "+", "a", "_", ",", "]", " "}
+	DIGITS   := "12345678901234567890"
+	TAIL     := "987654321"
+
+	valid: [len(SPECS)]int
+	for prefix in PREFIXES {
+		for n in 0..=len(DIGITS) {
+			for ending in ENDINGS {
+				for m in 0..=len(TAIL) {
+					defer fuzz_reset(&f)
+					text  := strings.concatenate({prefix, DIGITS[:n], ending, TAIL[:m]}, context.temp_allocator)
+					array := strings.concatenate({"[", text, "]"}, context.temp_allocator)
+					for data in ([?][]byte{transmute([]byte)text, transmute([]byte)array}) {
+						for spec in SPECS {
+							check_tokens(&f, data, spec, false)
+							check_tokens(&f, data, spec, true)
+							a := json.is_valid(data, spec)
+							b := ref.is_valid(data, ref_spec(spec))
+							if a != b {
+								report(&f, "is_valid", data, spec, fmt.tprintf("\tcurrent:   %v\n\treference: %v", a, b))
+							}
+						}
+					}
+					for spec, i in SPECS {
+						if json.is_valid(transmute([]byte)array, spec) {
+							valid[i] += 1
+						}
+						check_unmarshal(&f, []json.Value, []ref.Value, transmute([]byte)array, spec)
+					}
+					if fuzz_done(&f) {
+						return
+					}
+				}
+			}
+		}
+	}
+	log.infof("valid arrays per spec %v: %v", SPECS, valid)
+	testing.expect(t, valid[0] > 0 && valid[1] > 0 && valid[2] > 0, "some spec never produced a valid array")
+}
+
 // `get_token` judges each string as it scans it, and the validator and the unmarshaller use that
 // verdict instead of calling `is_valid_string_literal` again, so the two must agree on every string
 // token: exhaustively for short strings over the bytes that matter, and on fuzzed documents.
