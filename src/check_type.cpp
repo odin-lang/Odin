@@ -824,7 +824,7 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 			error(st->where_clauses[0], "'where' clauses can only be used on structures with polymorphic parameters");
 		} else {
 			bool where_clause_ok = evaluate_where_clauses(ctx, node, ctx->scope, &st->where_clauses, true);
-			gb_unused(where_clause_ok);
+			struct_type->Struct.where_clauses_failed.store(!where_clause_ok);
 		}
 		check_struct_fields(ctx, node, &struct_type->Struct.fields, &struct_type->Struct.tags, st->fields, min_field_count, struct_type, context);
 
@@ -882,7 +882,7 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 			error(ut->where_clauses[0], "'where' clauses can only be used on unions with polymorphic parameters");
 		} else {
 			bool where_clause_ok = evaluate_where_clauses(ctx, node, ctx->scope, &ut->where_clauses, true);
-			gb_unused(where_clause_ok);
+			union_type->Union.where_clauses_failed.store(!where_clause_ok);
 		}
 	}
 
