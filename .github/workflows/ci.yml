@@ -8,7 +8,7 @@ jobs:
     env:
       PKGSRC_BRANCH: 2026Q3
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
       # Persist apt package cache across runs (see NOTE at end of file).
     - name: Get apt cache week
@@ -75,7 +75,7 @@ jobs:
     name: FreeBSD Build, Check, and Test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
       # Persist apt package cache across runs (see NOTE at end of file).
     - name: Get apt cache week
@@ -142,7 +142,7 @@ jobs:
     timeout-minutes: 15
     steps:
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
         # Persist apt package cache across runs (see NOTE at end of file).
       - name: Get apt cache week
@@ -300,7 +300,7 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Fetch vendor libraries under test from Git LFS
         run: git lfs pull --include="vendor/lua/*/windows/*,vendor/OpenEXRCore/*.lib,vendor/sdl2/,vendor/sdl3/"
       - name: build Odin
@@ -426,7 +426,7 @@ jobs:
     name: Linux riscv64 (emulated) Build, Check and Test
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
         # Persist apt package cache across runs (see NOTE at end of file).
       - name: Get apt cache week
