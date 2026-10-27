@@ -29,8 +29,9 @@ validate_object_key :: proc(p: ^Parser) -> bool {
 			return true
 		}
 	}
+	valid := p.curr_token_err != .Invalid_String
 	err := expect_token(p, .String)
-	return err == .None
+	return err == .None && valid
 }
 
 @(require_results)

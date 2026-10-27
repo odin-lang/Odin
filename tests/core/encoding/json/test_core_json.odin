@@ -998,19 +998,63 @@ parse_integers_out_of_range :: proc(t: ^testing.T) {
 }
 
 @(test)
-unmarshal_key_ending_at_newline :: proc(t: ^testing.T) {
-	// `is_valid` does not check the contents of keys, so a key may end unterminated at a newline,
-	// where the tokenizer ends it. Counting the array must end it there too.
-	data := "[{\"a\n:1},\"x\"]"
-	testing.expect(t, json.is_valid(transmute([]byte)data, .JSON))
+keys_checked_like_values :: proc(t: ^testing.T) {
+	// `is_valid` rejects a key that it would reject as a string value, and so does unmarshalling with
+	// `.Skip_Validation`, with `.Invalid_String` as for such a value.
+	Target :: struct {
+		a, c: int,
+	}
+	Color :: enum {
+		Red,
+		Green,
+	}
+	bad := [?]string{
+		"{\"a\tb\":1}",
+		"{\"c\r\":5}",
+		"{\"\xff\":1}",
+		"{\"\\q\":1}",
+		"{\"\\u12\":1}",
+		"{\"a\":1,\"x\":{\"k\x01\":2}}", // in a value that is skipped
+	}
+	for s in bad {
+		for spec in ([?]json.Specification{.JSON, .JSON5, .MJSON}) {
+			testing.expectf(t, !json.is_valid(transmute([]byte)s, spec), "is_valid accepts %q (%v)", s, spec)
 
-	v: []json.Value
-	err := json.unmarshal_string(data, &v, .JSON, context.temp_allocator)
-	testing.expect_value(t, err, nil)
-	testing.expect_value(t, len(v), 2)
-	if len(v) == 2 {
-		s, ok := v[1].(json.String)
-		testing.expectf(t, ok && s == "x", "expected \"x\", got %v", v[1])
+			target: Target
+			err := json.unmarshal_string(s, &target, spec, context.temp_allocator)
+			testing.expectf(t, err == json.Unmarshal_Data_Error.Invalid_Data, "unmarshal %q (%v): expected Invalid_Data, got %v", s, spec, err)
+
+			err = json.unmarshal_string(s, &target, spec, context.temp_allocator, {.Skip_Validation})
+			testing.expectf(t, err == json.Error.Invalid_String, "unmarshal %q (%v) into a struct with .Skip_Validation: expected Invalid_String, got %v", s, spec, err)
+
+			m: map[string]json.Value
+			err = json.unmarshal_string(s, &m, spec, context.temp_allocator, {.Skip_Validation})
+			testing.expectf(t, err == json.Error.Invalid_String, "unmarshal %q (%v) into a map with .Skip_Validation: expected Invalid_String, got %v", s, spec, err)
+
+			v: json.Value
+			err = json.unmarshal_string(s, &v, spec, context.temp_allocator, {.Skip_Validation})
+			testing.expectf(t, err == json.Error.Invalid_String, "unmarshal %q (%v) into a Value with .Skip_Validation: expected Invalid_String, got %v", s, spec, err)
+		}
+	}
+
+	colors: [Color]int
+	err := json.unmarshal_string("{\"Red\t\":1}", &colors, .JSON, context.temp_allocator, {.Skip_Validation})
+	testing.expectf(t, err == json.Error.Invalid_String, "unmarshal into an enumerated array with .Skip_Validation: expected Invalid_String, got %v", err)
+
+	// A key that ends unterminated at a newline, where the tokenizer ends it.
+	unterminated := "[{\"a\n:1},\"x\"]"
+	testing.expect(t, !json.is_valid(transmute([]byte)unterminated, .JSON))
+	values: []json.Value
+	err = json.unmarshal_string(unterminated, &values, .JSON, context.temp_allocator, {.Skip_Validation})
+	testing.expectf(t, err == json.Error.Invalid_String, "unterminated key with .Skip_Validation: expected Invalid_String, got %v", err)
+
+	Good :: struct {
+		s:    string,
+		spec: json.Specification,
+	}
+	good := [?]Good{{"{\"a\":1}", .JSON}, {"{\"\\u00e9\":1}", .JSON}, {"{'a':1}", .JSON5}, {"{a:1}", .JSON5}, {"{\"a\\\nb\":1}", .JSON5}}
+	for g in good {
+		testing.expectf(t, json.is_valid(transmute([]byte)g.s, g.spec), "is_valid rejects %q (%v)", g.s, g.spec)
 	}
 	free_all(context.temp_allocator)
 }

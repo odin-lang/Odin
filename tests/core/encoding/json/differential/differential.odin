@@ -339,11 +339,13 @@ differential_is_valid :: proc(t: ^testing.T) {
 		defer fuzz_reset(&f)
 		data := any_input()
 		for spec in SPECS {
+			// The reference does not check the contents of keys.
+			invalid_key := object_keys(data, spec).invalid
 			for parse_integers in ([?]bool{false, true}) {
 				a := json.is_valid(data, spec, parse_integers)
 				b := ref.is_valid(data, ref_spec(spec), parse_integers)
-				if a != b {
-					report(&f, "is_valid", data, spec, fmt.tprintf("\tcurrent:   %v\n\treference: %v (parse_integers=%v)", a, b, parse_integers))
+				if a != (b && !invalid_key) {
+					report(&f, "is_valid", data, spec, fmt.tprintf("\tcurrent:   %v\n\treference: %v (parse_integers=%v, invalid key=%v)", a, b, parse_integers, invalid_key))
 				}
 			}
 		}
@@ -448,14 +450,16 @@ compare_unmarshal :: proc(f: ^Fuzz, what: string, data: []byte, spec: json.Speci
 // exactly with `.Allow_Duplicate_Fields`, and without it wherever no object repeats a key. The
 // reference also gives an empty key to the first field without a `json` tag, where the current
 // package only gives it to a field tagged `json:""`, so input with an empty key is not compared.
-unmarshal_runs :: proc(data: []byte, spec: json.Specification, flags: json.Unmarshal_Flags) -> (runs: []json.Unmarshal_Flags, comparable: bool) {
+// And the reference accepts a key that would be rejected as a string value, where the current
+// package rejects it as such a value, which `invalid_key` reports.
+unmarshal_runs :: proc(data: []byte, spec: json.Specification, flags: json.Unmarshal_Flags) -> (runs: []json.Unmarshal_Flags, comparable, invalid_key: bool) {
 	keys := object_keys(data, spec)
 	r := make([dynamic]json.Unmarshal_Flags, 0, 2, context.temp_allocator)
 	append(&r, flags + {.Allow_Duplicate_Fields})
 	if .Allow_Duplicate_Fields not_in flags && !keys.repeated {
 		append(&r, flags)
 	}
-	return r[:], !keys.empty
+	return r[:], !keys.empty, keys.invalid
 }
 
 // An integer outside i64 wraps to 64 bits in a `Value`, as in a typed `i64`, where the reference keeps
@@ -489,7 +493,8 @@ check_unmarshal :: proc(f: ^Fuzz, $C, $R: typeid, data: []byte, spec: json.Speci
 	allocator := virtual.arena_allocator(&f.arena)
 	b := new(R, allocator)
 	eb := norm_error_reference(ref.unmarshal(data, b, ref_spec(spec), allocator))
-	runs, comparable := unmarshal_runs(data, spec, flags)
+	reference_rejected := eb.kind == .Data && eb.code == int(json.Unmarshal_Data_Error.Invalid_Data)
+	runs, comparable, invalid_key := unmarshal_runs(data, spec, flags)
 	for run_flags, run in runs {
 		a := new(C, allocator)
 		e := norm_error_current(json.unmarshal(data, a, spec, allocator, run_flags))
@@ -497,14 +502,20 @@ check_unmarshal :: proc(f: ^Fuzz, $C, $R: typeid, data: []byte, spec: json.Speci
 			ea = e
 		}
 		what := fmt.tprintf("unmarshal with %v", run_flags)
-		if .Skip_Validation in flags && eb.kind == .Data && eb.code == int(json.Unmarshal_Data_Error.Invalid_Data) {
-			// The reference rejected the input up front. Without validation any error will do, and
-			// the destination may be partly written.
-			if run == 0 {
+		if .Skip_Validation in flags && (reference_rejected || invalid_key) {
+			// The input is invalid. Without validation any error will do, and the destination may be
+			// partly written.
+			if run == 0 && reference_rejected {
 				f.rejected += 1
 			}
 			if e.kind == .None {
 				report(f, what, data, spec, "	accepted input that is_valid rejects")
+			}
+			continue
+		}
+		if invalid_key {
+			if e.kind != .Data || e.code != int(json.Unmarshal_Data_Error.Invalid_Data) {
+				report(f, what, data, spec, fmt.tprintf("\taccepted a key that is_valid rejects: %s", fmt_error(e)))
 			}
 			continue
 		}
@@ -672,7 +683,7 @@ differential_array_counts :: proc(t: ^testing.T) {
 		`1`, `-2`, `+3`, `0`, `0x1F`, `0X`, `0xg`, `0x]`, `0x,`, `0x"`, `1e`, `1E+`, `1.`, `1.5e-3`, `4a`, `1-2`, `1.2.3`,
 		`-Infinity`, `NaN`, `Infinity`, `true`, `null`, `foo_1`, `_`, `"a"`, `'b'`, `"[,]"`, `'{"'`, `"\""`, `'\''`,
 		`"\\"`, `"\u005D"`, `"x\]"`, "\"\xc3\xa9\"", `[]`, `{}`, `[1,[2]]`, `[[],[[]]]`, `{"a":[1,2],"b":"]"}`, `{a=1}`, `{'k':'v'}`,
-		// `is_valid` does not check the contents of keys, so a key may hold anything, or end at a newline.
+		// Keys that `is_valid` rejects as it would such values, which the reference accepts.
 		"{\"a\n:1}", "{'a\n:1}", "{\"a\\\n\":1}", "{\"c\r\":5}", "{\"k\x01\":1}", "{\"\xff\":1}",
 	}
 	SEPARATORS := []string{
@@ -693,10 +704,11 @@ differential_array_counts :: proc(t: ^testing.T) {
 		strings.write_byte(&b, ']')
 		data := b.buf[:]
 		for spec, i in SPECS {
-			if !json.is_valid(data, spec) {
+			is_valid := json.is_valid(data, spec)
+			if !is_valid && !ref.is_valid(data, ref_spec(spec)) {
 				continue
 			}
-			valid[i] += 1
+			valid[i] += int(is_valid)
 			check_unmarshal(&f, []json.Value,   []ref.Value,   data, spec)
 			check_unmarshal(&f, [][]json.Value, [][]ref.Value, data, spec)
 		}
@@ -734,7 +746,7 @@ check_unmarshal_value :: proc(f: ^Fuzz, $C, $R: typeid, data: []byte, spec: json
 
 	context.allocator = allocator
 	eb := norm_error_reference(ref.unmarshal_value(&pb, b^))
-	runs, comparable := unmarshal_runs(data, spec, {})
+	runs, comparable, _ := unmarshal_runs(data, spec, {})
 	if !comparable {
 		return
 	}
@@ -792,6 +804,50 @@ fuzz_unmarshal_value :: proc(f: ^Fuzz, stats: ^Unvalidated_Stats, $C, $R: typeid
 	}
 }
 
+// Without validation, as under a user unmarshaler, a key that `is_valid` rejects is still unquoted:
+// a control character or an escape the unquoting cannot read ends it, and invalid UTF-8 becomes
+// U+FFFD. Each key here unquotes to something other than its text, often to a field's name.
+@(test)
+differential_unvalidated_keys :: proc(t: ^testing.T) {
+	f: Fuzz
+	fuzz_init(&f, t)
+	defer fuzz_destroy(&f)
+
+	KEYS := []string{
+		"a", "c", "Red", "1", "a\tb", "c\r", "Red\x01", "1\x00", "\xffa", "a\xc3", "Re\xc0\xafd",
+		`a\x41`, `1\u12`, `Re\u0064`, "c\\\n", `Bl\ue`,
+	}
+	for _ in 0..<ITERATIONS {
+		defer fuzz_reset(&f)
+		b := strings.builder_make(context.temp_allocator)
+		strings.write_byte(&b, '{')
+		for i in 0..<1+rand.int_max(3) {
+			if i > 0 {
+				strings.write_byte(&b, ',')
+			}
+			quote := rand.choice([]byte{'"', '"', '\''})
+			strings.write_byte(&b, quote)
+			strings.write_string(&b, rand.choice(KEYS))
+			strings.write_byte(&b, quote)
+			fmt.sbprintf(&b, ":%d", rand.int_max(100))
+		}
+		strings.write_byte(&b, '}')
+		data := b.buf[:]
+		for spec in SPECS {
+			if !structurally_valid(data, spec) {
+				continue
+			}
+			check_unmarshal_value(&f, Inner,          Inner,          data, spec, true)
+			check_unmarshal_value(&f, map[string]int, map[string]int, data, spec, true)
+			check_unmarshal_value(&f, map[int]int,    map[int]int,    data, spec, true)
+			check_unmarshal_value(&f, [Color]int,     [Color]int,     data, spec, true)
+		}
+		if fuzz_done(&f) {
+			return
+		}
+	}
+}
+
 @(test)
 differential_unmarshal_unvalidated :: proc(t: ^testing.T) {
 	f: Fuzz
@@ -824,6 +880,7 @@ structurally_valid :: proc(data: []byte, spec: json.Specification) -> bool {
 Object_Keys :: struct {
 	repeated: bool, // An object has the same key twice (after unquoting).
 	empty:    bool, // An object has an empty key.
+	invalid:  bool, // A key would be rejected as a string value.
 }
 
 // The keys of every object, up to the first error in the structure.
@@ -860,6 +917,7 @@ structure_object_body :: proc(p: ^ref.Parser, end_token: ref.Token_Kind, seen: ^
 			}
 			seen.repeated ||= slice.contains(keys[:], name)
 			seen.empty    ||= name == ""
+			seen.invalid  ||= key.kind == .String && !json.is_valid_string_literal(key.text, json.Specification(int(p.spec)))
 			append(&keys, name)
 		}
 		if ref.parse_colon(p) != nil || !structure_value(p, seen) {

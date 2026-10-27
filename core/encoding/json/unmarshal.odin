@@ -661,6 +661,9 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind, flags: Unmar
 		using_used:  [^]byte
 
 		struct_loop: for p.curr_token.kind != end_token {
+			if .Skip_Validation in flags && p.curr_token_err == .Invalid_String {
+				return .Invalid_String
+			}
 			key_buf: [256]byte = ---
 			key, key_allocated, key_err := parse_object_key_view(p, key_buf[:])
 			if key_err != nil {
@@ -841,6 +844,9 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind, flags: Unmar
 		is_int_key        := reflect.is_integer(t.key)
 
 		map_loop: for p.curr_token.kind != end_token {
+			if .Skip_Validation in flags && p.curr_token_err == .Invalid_String {
+				return .Invalid_String
+			}
 			key_buf:       [256]byte = ---
 			key:           string
 			key_err:       Error
@@ -898,6 +904,9 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind, flags: Unmar
 		enum_type := index_type.variant.(reflect.Type_Info_Enum)
 
 		enumerated_array_loop: for p.curr_token.kind != end_token {
+			if .Skip_Validation in flags && p.curr_token_err == .Invalid_String {
+				return .Invalid_String
+			}
 			key_buf: [256]byte = ---
 			key, key_allocated, key_err := parse_object_key_view(p, key_buf[:])
 			defer if key_allocated {

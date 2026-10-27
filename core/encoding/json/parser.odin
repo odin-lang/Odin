@@ -217,6 +217,9 @@ skip_value :: proc(p: ^Parser, check_strings := false) -> Error {
 	case .Open_Brace:
 		expect_token(p, .Open_Brace) or_return
 		for p.curr_token.kind != .Close_Brace {
+			if check_strings && p.curr_token_err == .Invalid_String {
+				return .Invalid_String
+			}
 			if !(p.spec != .JSON && allow_token(p, .Ident)) && expect_token(p, .String) != nil {
 				return .Expected_String_For_Object_Key
 			}
@@ -313,7 +316,7 @@ parse_object_key :: proc(p: ^Parser, key_allocator: mem.Allocator, loc := #calle
 		err = .Expected_String_For_Object_Key
 		return
 	}
-	return unquote_string(tok, p.spec, key_allocator, loc)
+	return unquote_token(tok, p.spec, p.tok.validated, key_allocator, loc)
 }
 
 @(private, require_results)
@@ -325,10 +328,10 @@ parse_object_key_view :: proc(p: ^Parser, buf: []byte) -> (key: string, allocate
 	if expect_token(p, .String) != nil {
 		return "", false, .Expected_String_For_Object_Key
 	}
-	if view, ok := unquote_string_view(tok, p.spec, false, buf); ok {
+	if view, ok := unquote_string_view(tok, p.spec, p.tok.validated, buf); ok {
 		return view, false, nil
 	}
-	key, err = unquote_string(tok, p.spec, p.allocator)
+	key, err = unquote_token(tok, p.spec, p.tok.validated, p.allocator)
 	return key, err == nil, err
 }
 
