@@ -946,3 +946,53 @@ marshal_floats_round_trip :: proc(t: ^testing.T) {
 	}
 	free_all(context.temp_allocator)
 }
+
+@(test)
+parse_integers_out_of_range :: proc(t: ^testing.T) {
+	// An integer outside i64 wraps to 64 bits in a `Value`, the same as when it is unmarshalled
+	// into an `i64`. Past i128 only the digits that fit in an i128 are read.
+	Case :: struct {
+		text:     string,
+		spec:     json.Specification,
+		expected: i64,
+	}
+	cases := [?]Case{
+		{"9223372036854775807",    .JSON,  max(i64)},
+		{"-9223372036854775808",   .JSON,  min(i64)},
+		{"9223372036854775808",    .JSON,  min(i64)},
+		{"-9223372036854775809",   .JSON,  max(i64)},
+		{"18446744073709551615",   .JSON,  -1},
+		{"18446744073709551616",   .JSON,  0},
+		{"+18446744073709551617",  .JSON5, 1},
+		{"0xFFFFFFFFFFFFFFFF",     .JSON5, -1},
+		{"0x10000000000000000",    .MJSON, 0},
+		{"1000000000000000000000000000000000000000000000", .JSON, 687399551400673280}, // 10^38, wrapped
+	}
+	only_integer :: proc(v: json.Value) -> (i: i64, ok: bool) {
+		array := v.(json.Array) or_return
+		if len(array) != 1 {
+			return
+		}
+		return array[0].(json.Integer)
+	}
+	for c in cases {
+		data := fmt.tprintf("[%s]", c.text)
+
+		parsed, perr := json.parse_string(data, c.spec, true, context.temp_allocator)
+		i, ok := only_integer(parsed)
+		testing.expectf(t, perr == nil && ok && i == c.expected,
+			"parse %s (%v): expected [%d], got %v (%v)", c.text, c.spec, c.expected, parsed, perr)
+
+		value: json.Value
+		err := json.unmarshal_string(data, &value, c.spec, context.temp_allocator)
+		i, ok = only_integer(value)
+		testing.expectf(t, err == nil && ok && i == c.expected,
+			"unmarshal %s (%v) into json.Value: expected [%d], got %v (%v)", c.text, c.spec, c.expected, value, err)
+
+		typed: []i64
+		err = json.unmarshal_string(data, &typed, c.spec, context.temp_allocator)
+		testing.expectf(t, err == nil && len(typed) == 1 && typed[0] == c.expected,
+			"unmarshal %s (%v) into []i64: expected [%d], got %v (%v)", c.text, c.spec, c.expected, typed, err)
+	}
+	free_all(context.temp_allocator)
+}

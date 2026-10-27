@@ -5,6 +5,7 @@ import "core:encoding/json"
 import "core:fmt"
 import "core:mem"
 import "core:reflect"
+import "core:slice"
 import ref "../reference"
 
 // Results from the two packages have distinct types, so both are normalized before comparing.
@@ -121,14 +122,14 @@ errors_equal :: proc(a, b: Norm_Error) -> bool {
 	return a.kind == b.kind && a.code == b.code && ids_equivalent(a.id, b.id) && a.token == b.token
 }
 
-values_equal :: proc(a: json.Value, b: ref.Value) -> bool {
+values_equal :: proc(a: json.Value, b: ref.Value, wrapped: []Wrapped_Integer = nil) -> bool {
 	switch av in a {
 	case json.Null:
 		bv, ok := b.(ref.Null)
 		return ok && rawptr(av) == rawptr(bv)
 	case json.Integer:
 		bv, ok := b.(ref.Integer)
-		return ok && av == bv
+		return ok && (av == bv || slice.contains(wrapped, Wrapped_Integer{bv, av}))
 	case json.Float:
 		bv, ok := b.(ref.Float)
 		return ok && transmute(u64)av == transmute(u64)bv
@@ -144,7 +145,7 @@ values_equal :: proc(a: json.Value, b: ref.Value) -> bool {
 			return false
 		}
 		for x, i in av {
-			if !values_equal(x, bv[i]) {
+			if !values_equal(x, bv[i], wrapped) {
 				return false
 			}
 		}
@@ -156,7 +157,7 @@ values_equal :: proc(a: json.Value, b: ref.Value) -> bool {
 		}
 		for k, x in av {
 			y, found := bv[k]
-			if !found || !values_equal(x, y) {
+			if !found || !values_equal(x, y, wrapped) {
 				return false
 			}
 		}
@@ -189,11 +190,11 @@ allocators_equal :: proc(a, b: runtime.Allocator) -> bool {
 }
 
 @(private="file")
-elems_diff :: proc(a, b: rawptr, ea, eb: ^reflect.Type_Info, size_a, size_b, count: int, flags: Diff_Flags) -> string {
+elems_diff :: proc(a, b: rawptr, ea, eb: ^reflect.Type_Info, size_a, size_b, count: int, flags: Diff_Flags, wrapped: []Wrapped_Integer) -> string {
 	for i in 0..<count {
 		pa := ptr_add(a, uintptr(i*size_a))
 		pb := ptr_add(b, uintptr(i*size_b))
-		if d := diff_values(pa, pb, ea, eb, flags); d != "" {
+		if d := diff_values(pa, pb, ea, eb, flags, wrapped); d != "" {
 			return fmt.tprintf("[%d]%s", i, d)
 		}
 	}
@@ -210,13 +211,13 @@ Diff_Flag :: enum {
 }
 Diff_Flags :: bit_set[Diff_Flag]
 
-diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flags{}) -> string {
+diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flags{}, wrapped: []Wrapped_Integer = nil) -> string {
 	if ta.id == json.Value || tb.id == ref.Value {
 		va, vb := (^json.Value)(a)^, (^ref.Value)(b)^
 		if ta.id != json.Value || tb.id != ref.Value {
 			return fmt.tprintf(": type mismatch %v vs %v", ta.id, tb.id)
 		}
-		if !values_equal(va, vb) {
+		if !values_equal(va, vb, wrapped) {
 			return fmt.tprintf(": current %v, reference %v", va, vb)
 		}
 		return ""
@@ -239,7 +240,7 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flag
 		for i in 0..<int(ia.field_count) {
 			pa := ptr_add(a, ia.offsets[i])
 			pb := ptr_add(b, ib.offsets[i])
-			if d := diff_values(pa, pb, ia.types[i], ib.types[i], flags); d != "" {
+			if d := diff_values(pa, pb, ia.types[i], ib.types[i], flags, wrapped); d != "" {
 				return fmt.tprintf(".%s%s", ia.names[i], d)
 			}
 		}
@@ -274,11 +275,11 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flag
 
 	case reflect.Type_Info_Array:
 		ib := bb.variant.(reflect.Type_Info_Array)
-		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.count, flags)
+		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.count, flags, wrapped)
 
 	case reflect.Type_Info_Enumerated_Array:
 		ib := bb.variant.(reflect.Type_Info_Enumerated_Array)
-		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.count, flags)
+		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.count, flags, wrapped)
 
 	case reflect.Type_Info_Slice:
 		ib := bb.variant.(reflect.Type_Info_Slice)
@@ -289,7 +290,7 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flag
 		if (ra.data == nil) != (rb.data == nil) {
 			return fmt.tprintf(": data is nil=%v in current, nil=%v in reference", ra.data == nil, rb.data == nil)
 		}
-		return elems_diff(ra.data, rb.data, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ra.len, flags)
+		return elems_diff(ra.data, rb.data, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ra.len, flags, wrapped)
 
 	case reflect.Type_Info_Dynamic_Array:
 		ib := bb.variant.(reflect.Type_Info_Dynamic_Array)
@@ -303,7 +304,7 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flag
 		if !allocators_equal(ra.allocator, rb.allocator) {
 			return ": allocator differs"
 		}
-		return elems_diff(ra.data, rb.data, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ra.len, flags)
+		return elems_diff(ra.data, rb.data, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ra.len, flags, wrapped)
 
 	case reflect.Type_Info_Fixed_Capacity_Dynamic_Array:
 		ib := bb.variant.(reflect.Type_Info_Fixed_Capacity_Dynamic_Array)
@@ -311,7 +312,7 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flag
 		if la != lb {
 			return fmt.tprintf(": len %d in current, %d in reference", la, lb)
 		}
-		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.capacity, flags)
+		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.capacity, flags, wrapped)
 
 	case reflect.Type_Info_Union:
 		ib := bb.variant.(reflect.Type_Info_Union)
@@ -342,7 +343,7 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flag
 			// two packages, so after an error only the tags are compared.
 			return ""
 		}
-		if d := diff_values(a, b, ia.variants[index], ib.variants[index], flags); d != "" {
+		if d := diff_values(a, b, ia.variants[index], ib.variants[index], flags, wrapped); d != "" {
 			return fmt.tprintf(".(%v)%s", ia.variants[index].id, d)
 		}
 		return ""
@@ -363,10 +364,10 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flag
 			found := false
 			it_b := 0
 			for kb, vb in reflect.iterate_map(any{b, tb.id}, &it_b) {
-				if diff_values(ka.data, kb.data, ia.key, ib.key, flags) != "" {
+				if diff_values(ka.data, kb.data, ia.key, ib.key, flags, wrapped) != "" {
 					continue
 				}
-				if d := diff_values(va.data, vb.data, ia.value, ib.value, flags); d != "" {
+				if d := diff_values(va.data, vb.data, ia.value, ib.value, flags, wrapped); d != "" {
 					return fmt.tprintf("[%v]%s", ka, d)
 				}
 				found = true

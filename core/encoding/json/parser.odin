@@ -145,7 +145,7 @@ parse_value :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: 
 
 	case .Integer:
 		advance_token(p)
-		i, _ := strconv.parse_i64(token.text)
+		i, _ := parse_integer(token.text)
 		value = Integer(i)
 		return
 	case .Float:

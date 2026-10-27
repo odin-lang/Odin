@@ -19,6 +19,7 @@ import "core:mem"
 import "core:mem/virtual"
 import "core:reflect"
 import "core:slice"
+import "core:strconv"
 import "core:strings"
 import "core:testing"
 import ref "../reference"
@@ -362,11 +363,12 @@ differential_parse :: proc(t: ^testing.T) {
 		defer fuzz_reset(&f)
 		data := any_input()
 		for spec in SPECS {
+			wrapped := wrapped_integers(data, spec)
 			for parse_integers in ([?]bool{false, true}) {
 				allocator := virtual.arena_allocator(&f.arena)
 				va, ea := json.parse(data, spec, parse_integers, allocator)
 				vb, eb := ref.parse(data, ref_spec(spec), parse_integers, allocator)
-				if int(ea) != int(eb) || !values_equal(va, vb) {
+				if int(ea) != int(eb) || !values_equal(va, vb, wrapped) {
 					report(&f, "parse", data, spec, fmt.tprintf(
 						"\tcurrent:   %v, err=%v\n\treference: %v, err=%v (parse_integers=%v)",
 						va, ea, vb, json.Error(int(eb)), parse_integers,
@@ -431,7 +433,7 @@ compare_unmarshal :: proc(f: ^Fuzz, what: string, data: []byte, spec: json.Speci
 	if ea.kind != .None && errors_equal(ea, eb) {
 		flags += {.After_Error}
 	}
-	d := diff_values(a, b, type_info_of(C), type_info_of(R), flags)
+	d := diff_values(a, b, type_info_of(C), type_info_of(R), flags, wrapped_integers(data, spec))
 	if errors_equal(ea, eb) && d == "" && extra == "" {
 		return
 	}
@@ -454,6 +456,33 @@ unmarshal_runs :: proc(data: []byte, spec: json.Specification, flags: json.Unmar
 		append(&r, flags)
 	}
 	return r[:], !keys.empty
+}
+
+// An integer outside i64 wraps to 64 bits in a `Value`, as in a typed `i64`, where the reference keeps
+// the leading digits that fit. Each such integer token pairs the reference's value with the current
+// one, and `values_equal` accepts either.
+Wrapped_Integer :: struct {
+	reference, current: i64,
+}
+
+wrapped_integers :: proc(data: []byte, spec: json.Specification) -> []Wrapped_Integer {
+	r := make([dynamic]Wrapped_Integer, context.temp_allocator)
+	t := ref.make_tokenizer(string(data), ref_spec(spec), true)
+	for _ in 0..<MAX_TOKENS {
+		tok, _ := ref.get_token(&t)
+		if tok.kind == .EOF {
+			break
+		}
+		if tok.kind != .Integer {
+			continue
+		}
+		reference, _ := strconv.parse_i64(tok.text)
+		wide, _      := strconv.parse_i128(tok.text)
+		if current := i64(wide); current != reference {
+			append(&r, Wrapped_Integer{reference, current})
+		}
+	}
+	return r[:]
 }
 
 check_unmarshal :: proc(f: ^Fuzz, $C, $R: typeid, data: []byte, spec: json.Specification, flags: json.Unmarshal_Flags = {}) -> (ea: Norm_Error) {
