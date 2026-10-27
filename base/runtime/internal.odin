@@ -1068,60 +1068,91 @@ quo_quaternion256 :: proc "contextless" (q, r: quaternion256) -> quaternion256 {
 }
 
 @(private="file")
+f16_round :: #force_inline proc "contextless" (s: u16, sig: u64, e: i32, $WIDTH: u32) -> __float16 {
+	e := e
+	shift := WIDTH - 11
+	if e < 1 {
+		shift += u32(1 - e)
+		if shift > WIDTH {
+			return transmute(__float16)s
+		}
+	}
+
+	half := u64(1) << (shift - 1)
+
+	rest := sig & (half<<1 - 1)
+	q    := sig >> shift
+	if rest > half || (rest == half && q & 1 != 0) {
+		q += 1
+	}
+
+	if e < 1 {
+		// Rounding up to 0x400 gives the smallest normal
+		return transmute(__float16)u16(s | u16(q))
+	}
+	if q == 0x800 {
+		q = 0x400
+		e += 1
+	}
+
+	if e > 30 {
+		f := i64(1e12)
+		for j := 0; j < 10; j += 1 {
+			// NOTE(bill): Cause overflow
+			g := intrinsics.volatile_load(&f)
+			g *= g
+			intrinsics.volatile_store(&f, g)
+		}
+
+		return transmute(__float16)u16(s | 0x7c00)
+	}
+	return transmute(__float16)u16(s | u16(e) << 10 | u16(q & 0x3ff))
+}
+
+@(private="file")
 f32_to_f16 :: proc "contextless" (value: f32) -> __float16 {
-	v: struct #raw_union { i: u32, f: f32 }
-	i, s, e, m: i32
+	i := transmute(u32)value
+	s := u16(i >> 16) & 0x8000
+	b := i32(i >> 23) & 0xff
+	m := i & 0x007fffff
 
-	v.f = value
-	i = i32(v.i)
-
-	s =  (i >> 16) & 0x00008000
-	e = ((i >> 23) & 0x000000ff) - (127 - 15)
-	m =   i        & 0x007fffff
-
-
-	if e <= 0 {
-		if e < -10 {
-			return transmute(__float16)u16(s)
-		}
-		m = (m | 0x00800000) >> u32(1 - e)
-
-		if m & 0x00001000 != 0 {
-			m += 0x00002000
-		}
-
-		return transmute(__float16)u16(s | (m >> 13))
-	} else if e == 0xff - (127 - 15) {
+	if b == 0xff {
 		if m == 0 {
-			return transmute(__float16)u16(s | 0x7c00) /* NOTE(bill): infinity */
-		} else {
-			/* NOTE(bill): NAN */
-			m >>= 13
-			return transmute(__float16)u16(s | 0x7c00 | m | i32(m == 0))
-		}
-	} else {
-		if m & 0x00001000 != 0 {
-			m += 0x00002000
-			if (m & 0x00800000) != 0 {
-				m = 0
-				e += 1
-			}
-		}
-
-		if e > 30 {
-			f := i64(1e12)
-			for j := 0; j < 10; j += 1 {
-				/* NOTE(bill): Cause overflow */
-				g := intrinsics.volatile_load(&f)
-				g *= g
-				intrinsics.volatile_store(&f, g)
-			}
-
+			// NOTE(bill): Infinity
 			return transmute(__float16)u16(s | 0x7c00)
 		}
-
-		return transmute(__float16)u16(s | (e << 10) | (m >> 13))
+		// NOTE(bill): NaN
+		n := u16(m >> 13)
+		return transmute(__float16)u16(s | 0x7c00 | n | u16(n == 0))
 	}
+	if b == 0 {
+		b = 1
+	} else {
+		m |= 0x00800000
+	}
+	return f16_round(s, u64(m), b - (127 - 15), 24)
+}
+
+@(private="file")
+f64_to_f16 :: proc "contextless" (value: f64) -> __float16 {
+	i := transmute(u64)value
+	s := u16(i >> 48) & 0x8000
+	b := i32(i >> 52) & 0x7ff
+	m := i & 0x000fffff_ffffffff
+
+	if b == 0x7ff {
+		if m == 0 {
+			return transmute(__float16)u16(s | 0x7c00)
+		}
+		// Quiet as converting through f32 made it
+		return transmute(__float16)u16(s | 0x7e00 | u16(m >> 42))
+	}
+	if b == 0 {
+		b = 1
+	} else {
+		m |= 0x00100000_00000000
+	}
+	return f16_round(s, m, b - (1023 - 15), 53)
 }
 
 @(private="file")
@@ -1178,12 +1209,12 @@ gnu_f2h_ieee :: proc "c" (value: __f32_abi) -> __f16_abi {
 
 @(link_name="__aeabi_d2h", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 aeabi_d2h :: proc "c" (value: __f64_abi) -> __f16_abi {
-	return transmute(__f16_abi)f32_to_f16(f32(transmute(f64)value))
+	return transmute(__f16_abi)f64_to_f16(transmute(f64)value)
 }
 
 @(link_name="__truncdfhf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
 truncdfhf2 :: proc "c" (value: __f64_abi) -> __f16_abi {
-	return transmute(__f16_abi)f32_to_f16(f32(transmute(f64)value))
+	return transmute(__f16_abi)f64_to_f16(transmute(f64)value)
 }
 
 @(link_name="__gnu_h2f_ieee", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
