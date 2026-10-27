@@ -141,6 +141,50 @@ plain_run_end :: proc "contextless" (s: string, i: int, quote: byte) -> int #no_
 	return i
 }
 
+@(private)
+string_stop :: proc "contextless" (s: string, i: int, quote: byte) -> int #no_bounds_check {
+	ONES  :: 0x0101_0101_0101_0101
+	HIGHS :: 0x8080_8080_8080_8080
+
+	i := i
+	for i+8 <= len(s) {
+		x := u64(intrinsics.unaligned_load((^u64le)(raw_data(s[i:]))))
+		q := x ~ ONES*u64(quote)
+		b := x ~ ONES*'\\'
+		n := x ~ ONES*'\n'
+
+		found := ((q - ONES) & ~q | (b - ONES) & ~b | (n - ONES) & ~n) & HIGHS
+		if found != 0 {
+			return i + int(intrinsics.count_trailing_zeros(found) >> 3)
+		}
+		i += 8
+	}
+
+	for i < len(s) && s[i] != quote && s[i] != '\\' && s[i] != '\n' {
+		i += 1
+	}
+	return i
+}
+
+// Where the string token at `s[start]` ends, as `scan_string` finds it: after its closing quote, or
+// at a newline or the end of `s` that leaves it unterminated. No other byte matters, as no escape or
+// UTF-8 sequence can hide a quote or a newline.
+@(private="file")
+string_token_end :: proc "contextless" (s: string, start: int) -> (end: int, closed: bool) #no_bounds_check {
+	quote := s[start]
+	i := start + 1
+	for i < len(s) {
+		i = string_stop(s, i, quote)
+		if i >= len(s) || s[i] == '\n' {
+			return i, false
+		}
+		if s[i] == quote {
+			return i + 1, true
+		}
+		i += 2
+	}
+	return len(s), false
+}
 
 @(require_results)
 get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) #no_bounds_check {
@@ -175,17 +219,27 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) #no_bounds_check 
 
 		case '"':
 			token.kind = .String
-			end = plain_run_end(data, start+1, '"')
-			if end < len(data) && data[end] == '"' {
-				end += 1
-			} else {
-				end, err = scan_string(t, start)
+			if t.validated {
+				if e, closed := string_token_end(data, start); closed {
+					end = e
+					break
+				}
+			} else if e := plain_run_end(data, start+1, '"'); e < len(data) && data[e] == '"' {
+				end = e + 1
+				break
 			}
+			end, err = scan_string(t, start)
 		case '\'':
 			if t.spec == .JSON {
 				break scan
 			}
 			token.kind = .String
+			if t.validated {
+				if e, closed := string_token_end(data, start); closed {
+					end, err = e, .Illegal_Character
+					break
+				}
+			}
 			end, err = scan_string(t, start)
 			if err == nil {
 				err = .Illegal_Character
@@ -831,14 +885,7 @@ count_validated_array :: proc(s: string, open: int, spec: Specification) -> (cou
 		switch c {
 		case '"', '\'':
 			count += uintptr(depth == 0)
-			for i += 1; i < len(s); /**/ {
-				i = plain_run_end(s, i, c)
-				if i >= len(s) || s[i] == c {
-					break
-				}
-				i += 2 if s[i] == '\\' else 1
-			}
-			i += 1
+			i, _ = string_token_end(s, i)
 
 		case '[', '{':
 			count += uintptr(depth == 0)
