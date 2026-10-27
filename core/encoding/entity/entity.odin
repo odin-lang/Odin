@@ -130,15 +130,12 @@ decode_xml_sb :: proc(builder: ^strings.Builder, input: string, options := XML_D
 
 		case ']':
 			// If we're unboxing _and_ decoding CDATA, we'll have to check for the end tag.
-			if in_data {
-				if strings.has_prefix(t.src[t.offset:], CDATA_END) {
-					in_data = false
-					t.read_offset += len(CDATA_END) - 1
-				}
+			if in_data && strings.has_prefix(t.src[t.offset:], CDATA_END) {
+				in_data = false
+				t.read_offset += len(CDATA_END) - 1
 				continue
-			} else {
-				write_rune(builder, ']')
 			}
+			write_rune(builder, ']')
 
 		case:
 			if in_data && .Decode_CDATA not_in options {
@@ -567,7 +564,7 @@ _handle_xml_special :: proc(t: ^Tokenizer, builder: ^strings.Builder, options: X
 
 		// CDATA is passed through. Scan until end of CDATA.
 		start_offset  := t.offset
-		t.read_offset += len(CDATA_START)
+		t.read_offset += len(CDATA_START) - 1
 		for {
 			advance(t)
 			if t.r < 0 {
@@ -576,8 +573,8 @@ _handle_xml_special :: proc(t: ^Tokenizer, builder: ^strings.Builder, options: X
 			}
 
 			// Scan until the end of a CDATA tag.
-			if s = string(t.src[t.read_offset:]); strings.has_prefix(s, CDATA_END) {
-				t.read_offset += len(CDATA_END)
+			if strings.has_prefix(t.src[t.offset:], CDATA_END) {
+				t.read_offset = t.offset + len(CDATA_END)
 				cdata := string(t.src[start_offset:t.read_offset])
 
 				if .Unbox_CDATA in options {

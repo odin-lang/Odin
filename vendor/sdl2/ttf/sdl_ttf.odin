@@ -15,8 +15,8 @@ bool :: SDL.bool
 #assert(size_of(rune) == size_of(u32))
 
 MAJOR_VERSION :: 2
-MINOR_VERSION :: 0
-PATCHLEVEL    :: 18
+MINOR_VERSION :: 24
+PATCHLEVEL    :: 0
 
 UNICODE_BOM_NATIVE  :: 0xFEFF
 UNICODE_BOM_SWAPPED :: 0xFFFE
@@ -52,6 +52,25 @@ HINTING_MONO           :: Hinting.MONO
 HINTING_NONE           :: Hinting.NONE
 HINTING_LIGHT_SUBPIXEL :: Hinting.LIGHT_SUBPIXEL
 
+/* How wrapped text is aligned, see SetFontWrappedAlign */
+WrappedAlign :: enum c.int {
+	LEFT   = 0,
+	CENTER = 1,
+	RIGHT  = 2,
+}
+
+WRAPPED_ALIGN_LEFT   :: WrappedAlign.LEFT
+WRAPPED_ALIGN_CENTER :: WrappedAlign.CENTER
+WRAPPED_ALIGN_RIGHT  :: WrappedAlign.RIGHT
+
+/* The direction of text for shaping, see SetFontDirection */
+Direction :: enum c.int {
+	LTR = 0, /* Left to Right */
+	RTL,     /* Right to Left */
+	TTB,     /* Top to Bottom */
+	BTT,     /* Bottom to Top */
+}
+
 /* We'll use SDL for reporting errors */
 SetError :: SDL.SetError
 GetError :: SDL.GetError
@@ -70,6 +89,10 @@ RenderUNICODE :: #force_inline proc "c" (font: ^Font, text: [^]u16, fg, bg: SDL.
 @(default_calling_convention="c", link_prefix="TTF_")
 foreign lib {
 	Linked_Version :: proc() -> ^SDL.version ---
+
+	/* The versions of the libraries SDL_ttf is built with, valid once SDL_ttf is initialized. */
+	GetFreeTypeVersion :: proc(major, minor, patch: ^c.int) ---
+	GetHarfBuzzVersion :: proc(major, minor, patch: ^c.int) ---
 
 	Init :: proc() -> c.int ---
 	Quit :: proc() ---
@@ -96,10 +119,14 @@ foreign lib {
 	GetFontHinting :: proc(font: ^Font) -> Hinting ---
 	SetFontHinting :: proc(font: ^Font, hinting: Hinting) ---
 
+	GetFontWrappedAlign :: proc(font: ^Font) -> WrappedAlign ---
+	SetFontWrappedAlign :: proc(font: ^Font, align: WrappedAlign) ---
+
 	FontHeight           :: proc(font: ^Font) -> c.int ---
 	FontAscent           :: proc(font: ^Font) -> c.int ---
 	FontDescent          :: proc(font: ^Font) -> c.int ---
 	FontLineSkip         :: proc(font: ^Font) -> c.int ---
+	SetFontLineSkip      :: proc(font: ^Font, lineskip: c.int) ---
 	GetFontKerning       :: proc(font: ^Font) -> c.int ---
 	SetFontKerning       :: proc(font: ^Font, allowed: bool) ---
 	FontFaces            :: proc(font: ^Font) -> c.long ---
@@ -154,9 +181,24 @@ foreign lib {
 	RenderGlyph_Blended   :: proc(font: ^Font, ch: u16, fg: SDL.Color) -> ^SDL.Surface ---
 	RenderGlyph32_Blended :: proc(font: ^Font, ch: rune, fg: SDL.Color) -> ^SDL.Surface ---
 
+	/* Render at LCD subpixel quality to a new ARGB surface */
+	RenderText_LCD    :: proc(font: ^Font, text: cstring, fg, bg: SDL.Color) -> ^SDL.Surface ---
+	RenderUTF8_LCD    :: proc(font: ^Font, text: cstring, fg, bg: SDL.Color) -> ^SDL.Surface ---
+	RenderUNICODE_LCD :: proc(font: ^Font, text: [^]u16,  fg, bg: SDL.Color) -> ^SDL.Surface ---
+
+	RenderText_LCD_Wrapped    :: proc(font: ^Font, text: cstring, fg, bg: SDL.Color, wrapLength: u32) -> ^SDL.Surface ---
+	RenderUTF8_LCD_Wrapped    :: proc(font: ^Font, text: cstring, fg, bg: SDL.Color, wrapLength: u32) -> ^SDL.Surface ---
+	RenderUNICODE_LCD_Wrapped :: proc(font: ^Font, text: [^]u16,  fg, bg: SDL.Color, wrapLength: u32) -> ^SDL.Surface ---
+
+	RenderGlyph_LCD   :: proc(font: ^Font, ch: u16,  fg, bg: SDL.Color) -> ^SDL.Surface ---
+	RenderGlyph32_LCD :: proc(font: ^Font, ch: rune, fg, bg: SDL.Color) -> ^SDL.Surface ---
+
 
 	SetDirection :: proc(direction: c.int /* hb_direction_t */) -> c.int ---
 	SetScript    :: proc(script:    c.int /* hb_script_t    */) -> c.int ---
+
+	SetFontDirection  :: proc(font: ^Font, direction: Direction) -> c.int ---
+	SetFontScriptName :: proc(font: ^Font, script: cstring) -> c.int ---
 
 	CloseFont :: proc(font: ^Font) ---
 

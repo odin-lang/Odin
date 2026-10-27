@@ -21,7 +21,7 @@ when ODIN_OS == .Windows {
 
 VERSION_MAJOR :: u8(1)
 VERSION_MINOR :: u8(3)
-VERSION_PATCH :: u8(17)
+VERSION_PATCH :: u8(18)
 
 VERSION_CREATE :: #force_inline proc "contextless" (major, minor, patch: u8) -> u32 {
 	return (u32(major) << 16) | (u32(minor) << 8) | u32(patch)
@@ -85,6 +85,7 @@ SocketOption :: enum i32 {
 	SNDTIMEO  = 7,
 	ERROR     = 8,
 	NODELAY   = 9,
+	TTL       = 10,
 }
 
 SocketShutdown :: enum i32 {
@@ -134,7 +135,7 @@ OutgoingCommand :: struct {
 	unreliableSequenceNumber: u16,
 	sentTime:                 u32,
 	roundTripTimeout:         u32,
-	roundTripTimeoutLimit:    u32,
+	queueTime:                u32,
 	fragmentOffset:           u32,
 	fragmentLength:           u16,
 	sendAttempts:             u16,
@@ -171,7 +172,7 @@ BUFFER_MAXIMUM                    :: (1 + 2 * PROTOCOL_MAXIMUM_PACKET_COMMANDS)
 HOST_RECEIVE_BUFFER_SIZE          :: 256 * 1024
 HOST_SEND_BUFFER_SIZE             :: 256 * 1024
 HOST_BANDWIDTH_THROTTLE_INTERVAL  :: 1000
-HOST_DEFAULT_MTU                  :: 1400
+HOST_DEFAULT_MTU                  :: 1392
 HOST_DEFAULT_MAXIMUM_PACKET_SIZE  :: 32 * 1024 * 1024
 HOST_DEFAULT_MAXIMUM_WAITING_DATA :: 32 * 1024 * 1024
 
@@ -209,6 +210,7 @@ Channel :: struct {
 
 PeerFlag :: enum i32 {
 	NEEDS_DISPATCH,
+	CONTINUE_SENDING,
 }
 
 Peer :: struct {
@@ -262,7 +264,7 @@ Peer :: struct {
 	outgoingReliableSequenceNumber: u16,
 	acknowledgements:               List,
 	sentReliableCommands:           List,
-	sentUnreliableCommands:         List,
+	outgoingSendReliableCommands:   List,
 	outgoingCommands:               List,
 	dispatchedCommands:             List,
 	flags:                          u16,
@@ -298,7 +300,7 @@ Host :: struct {
 	channelLimit:               uint,
 	serviceTime:                u32,
 	dispatchQueue:              List,
-	continueSending:            i32,
+	totalQueued:                u32,
 	packetSize:                 uint,
 	headerFlags:                u16,
 	commands:                   [PROTOCOL_MAXIMUM_PACKET_COMMANDS]Protocol,

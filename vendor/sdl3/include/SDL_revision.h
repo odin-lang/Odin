@@ -48,9 +48,9 @@
  */
 #define SDL_REVISION "Some arbitrary string decided at SDL build time"
 #elif defined(SDL_VENDOR_INFO)
-#define SDL_REVISION "SDL-release-3.4.2-0-g683181b47 (" SDL_VENDOR_INFO ")"
+#define SDL_REVISION "SDL-release-3.4.18-0-g829a65d76 (" SDL_VENDOR_INFO ")"
 #else
-#define SDL_REVISION "SDL-release-3.4.2-0-g683181b47"
+#define SDL_REVISION "SDL-release-3.4.18-0-g829a65d76"
 #endif
 
 #endif /* SDL_revision_h_ */

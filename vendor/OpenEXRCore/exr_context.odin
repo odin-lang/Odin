@@ -277,7 +277,17 @@ context_initializer_t :: struct {
 	 */
 	flags: c.int,
 
-	pad: [4]u8,
+	/** Initialize the default HTJ2K compression quality. See
+	 * set_default_lossy_htj2k_quality() to set the default for all
+	 * contexts.
+	 */
+	lossy_htj2k_quality: f32,
+
+	/** Default zstd compression level for this context (1-22; values are
+	 * clamped). See set_default_zstd_compression_level() for the global
+	 * default (5).
+	 */
+	zstd_level: c.int,
 }
 
 /** @brief context flag which will enforce strict header validation
@@ -302,7 +312,12 @@ CONTEXT_FLAG_SILENT_HEADER_PARSE :: (1 << 1)
 CONTEXT_FLAG_DISABLE_CHUNK_RECONSTRUCTION :: (1 << 2)
 
 /** @brief Simple macro to initialize the context initializer with default values. */
-DEFAULT_CONTEXT_INITIALIZER :: context_initializer_t{zip_level = -2, dwa_quality = -1}
+DEFAULT_CONTEXT_INITIALIZER :: context_initializer_t{
+	size        = size_of(context_initializer_t),
+	zip_level   = -2,
+	dwa_quality = -1,
+	zstd_level  = -1,
+}
 
 /** @} */ /* context function pointer declarations */
 

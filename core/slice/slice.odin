@@ -330,17 +330,6 @@ equal :: proc "contextless" (a, b: $T/[]$E) -> bool where intrinsics.type_is_com
 		return false
 	}
 	when intrinsics.type_is_simple_compare(E) {
-		if len(a) == 0 {
-			// Empty slices are always equivalent to each other.
-			//
-			// This check is here in the event that a slice with a `data` of
-			// nil is compared against a slice with a non-nil `data` but a
-			// length of zero.
-			//
-			// In that case, `memory_compare` would return -1 or +1 because one
-			// of the pointers is nil.
-			return true
-		}
 		return runtime.memory_compare(raw_data(a), raw_data(b), len(a)*size_of(E)) == 0
 	} else {
 		for i in 0..<len(a) {
@@ -356,17 +345,6 @@ equal :: proc "contextless" (a, b: $T/[]$E) -> bool where intrinsics.type_is_com
 simple_equal :: proc "contextless" (a, b: $T/[]$E) -> bool where intrinsics.type_is_simple_compare(E) {
 	if len(a) != len(b) {
 		return false
-	}
-	if len(a) == 0 {
-		// Empty slices are always equivalent to each other.
-		//
-		// This check is here in the event that a slice with a `data` of
-		// nil is compared against a slice with a non-nil `data` but a
-		// length of zero.
-		//
-		// In that case, `memory_compare` would return -1 or +1 because one
-		// of the pointers is nil.
-		return true
 	}
 	return runtime.memory_compare(raw_data(a), raw_data(b), len(a)*size_of(E)) == 0
 }

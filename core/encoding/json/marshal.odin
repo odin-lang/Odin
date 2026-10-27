@@ -1,6 +1,7 @@
 package encoding_json
 
 import "core:mem"
+import "core:math"
 import "core:math/bits"
 import "base:runtime"
 import "core:strconv"
@@ -15,6 +16,7 @@ import "core:unicode/utf16"
 Marshal_Data_Error :: enum {
 	None,
 	Unsupported_Type,
+	Non_Finite_Float, // Infinity or NaN, which only JSON5 and MJSON can represent
 }
 
 Marshal_Error :: union #shared_nil {
@@ -143,7 +145,7 @@ marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocato
 	defer if err != nil {
 		strings.builder_destroy(&b)
 	}
-	
+
 	// temp guard in case we are sorting map keys, which will use temp allocations
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = allocator == context.temp_allocator)
 
@@ -219,26 +221,27 @@ _marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err:
 
 	case runtime.Type_Info_Float:
 		switch f in a {
-		case f16: io.write_f16(w, f) or_return
-		case f32: io.write_f32(w, f) or_return
-		case f64: io.write_f64(w, f) or_return
+		case f16: write_float(w, f64(f), 16, opt) or_return
+		case f32: write_float(w, f64(f), 32, opt) or_return
+		case f64: write_float(w, f,      64, opt) or_return
 		case: return .Unsupported_Type
 		}
 
 	case runtime.Type_Info_Complex:
 		r, i: f64
+		bit_size: int
 		switch z in a {
-		case complex32:  r, i = f64(real(z)), f64(imag(z))
-		case complex64:  r, i = f64(real(z)), f64(imag(z))
-		case complex128: r, i = f64(real(z)), f64(imag(z))
+		case complex32:  r, i, bit_size = f64(real(z)), f64(imag(z)), 16
+		case complex64:  r, i, bit_size = f64(real(z)), f64(imag(z)), 32
+		case complex128: r, i, bit_size = f64(real(z)), f64(imag(z)), 64
 		case: return .Unsupported_Type
 		}
 
-		io.write_byte(w, '[')    or_return
-		io.write_f64(w, r)       or_return
-		io.write_string(w, ", ") or_return
-		io.write_f64(w, i)       or_return
-		io.write_byte(w, ']')    or_return
+		io.write_byte(w, '[')            or_return
+		write_float(w, r, bit_size, opt) or_return
+		io.write_string(w, ", ")         or_return
+		write_float(w, i, bit_size, opt) or_return
+		io.write_byte(w, ']')            or_return
 
 	case runtime.Type_Info_Quaternion:
 		return .Unsupported_Type
@@ -287,7 +290,7 @@ _marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err:
 
 	case runtime.Type_Info_Simd_Vector:
 		return .Unsupported_Type
-		
+
 	case runtime.Type_Info_Matrix:
 		return .Unsupported_Type
 
@@ -302,7 +305,7 @@ _marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err:
 			_marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
 		opt_write_end(w, opt, ']') or_return
-		
+
 	case runtime.Type_Info_Enumerated_Array:
 		index_type := reflect.type_info_base(info.index)
 		enum_type := index_type.variant.(reflect.Type_Info_Enum)
@@ -321,7 +324,7 @@ _marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err:
 			_marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
 		opt_write_end(w, opt, '}') or_return
-		
+
 	case runtime.Type_Info_Dynamic_Array:
 		opt_write_start(w, opt, '[') or_return
 		array := cast(^mem.Raw_Dynamic_Array)v.data
@@ -392,7 +395,7 @@ _marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err:
 							buf: [40]byte
 							u := cast_any_int_to_u128(ka)
 							name = strconv.write_bits_128(buf[:], u, 10, info.signed, 8*kti.size, "0123456789", nil)
-							
+
 							opt_write_key(w, opt, name) or_return
 						case: return .Unsupported_Type
 						}
@@ -538,7 +541,7 @@ _marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err:
 			}
 			return
 		}
-		
+
 		opt_write_start(w, opt, '{') or_return
 		marshal_struct_fields(w, v, opt) or_return
 		opt_write_end(w, opt, '}') or_return
@@ -638,6 +641,31 @@ _marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err:
 	}
 
 	return
+}
+
+@(private)
+write_float :: proc(w: io.Writer, f: f64, bit_size: int, opt: ^Marshal_Options) -> Marshal_Error {
+	buf: [64]byte
+	io.write_string(w, format_float(buf[:], f, bit_size, opt.spec) or_return) or_return
+	return nil
+}
+
+@(private)
+format_float :: proc(buf: []byte, f: f64, bit_size: int, spec: Specification) -> (string, Marshal_Data_Error) {
+	if math.is_nan(f) || math.is_inf(f) {
+		if spec == .JSON {
+			return "", .Non_Finite_Float
+		}
+		return "NaN" if math.is_nan(f) else "-Infinity" if f < 0 else "Infinity", nil
+	}
+
+	a := abs(f)
+	s := strconv.write_float(buf, f, 'e' if a != 0 && (a < 1e-6 || a >= 1e21) else 'f', -1, bit_size)
+	start, end := 1 if s[0] == '+' else 0, len(s)
+	if strings.index_any(s, ".e") < 0 {
+		end += copy(buf[end:], ".0")
+	}
+	return string(buf[start:end]), nil
 }
 
 /*
@@ -807,7 +835,7 @@ opt_write_key :: proc(w: io.Writer, opt: ^Marshal_Options, name: string) -> (err
 		} else {
 			io.write_string(w, ": " if opt.pretty else ":") or_return
 		}
-	}	
+	}
 
 	return
 }

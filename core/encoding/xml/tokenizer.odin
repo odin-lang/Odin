@@ -273,22 +273,23 @@ skip_cdata :: proc(t: ^Tokenizer) -> (err: Error) {
 		return .None
 	}
 
-	t.read_offset += len(CDATA_START)
+	t.read_offset += len(CDATA_START) - 1
 	offset := t.offset
 
-	cdata_scan: for {
+	for {
 		advance_rune(t)
 		if t.ch < 0 {
 			error(t, offset, "[scan_string] CDATA was not terminated\n")
 			return .Premature_EOF
 		}
 
-		// Scan until the end of a CDATA tag.
-		if s := string(t.src[t.read_offset:]); strings.has_prefix(s, CDATA_END) {
-			t.read_offset += len(CDATA_END)
-			break cdata_scan
+		if strings.has_prefix(string(t.src[t.offset:]), CDATA_END) {
+			break
 		}
 	}
+
+	advance_rune(t)
+	advance_rune(t)
 	return .None
 }
 

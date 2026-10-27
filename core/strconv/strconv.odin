@@ -48,6 +48,40 @@ _digit_value :: proc(r: rune) -> int {
 	}
 	return v
 }
+
+@(private)
+overflow_limits :: #force_inline proc "contextless" ($T: typeid, base: int, neg: bool) -> (cut, lim: T) {
+	limits :: #force_inline proc "contextless" ($B: int, neg: bool) -> (cut, lim: T) {
+		when min(T) < 0 {
+			if neg {
+				return min(T)/T(B), -(min(T)%T(B))
+			}
+		}
+		return max(T)/T(B), max(T)%T(B)
+	}
+	switch base {
+	case 2:  return limits(2,  neg)
+	case 8:  return limits(8,  neg)
+	case 10: return limits(10, neg)
+	case 12: return limits(12, neg)
+	case 16: return limits(16, neg)
+	}
+	b := T(base)
+	when min(T) < 0 {
+		if b <= 0 {
+			return // Every digit is `>= b`, so the limits are never used.
+		}
+		if neg {
+			return min(T)/b, -(min(T)%b)
+		}
+	} else {
+		if b == 0 {
+			return // Every digit is `>= b`, so the limits are never used.
+		}
+	}
+	return max(T)/b, max(T)%b
+}
+
 /*
 Parses an integer value from the input string in the given base, without a prefix
 
@@ -96,6 +130,8 @@ parse_i64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i64,
 	}
 
 
+	cut, lim := overflow_limits(i64, base, neg)
+
 	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
@@ -108,12 +144,12 @@ parse_i64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i64,
 		}
 		if neg {
 			// Accumulate negatively so that min(i64) is accepted.
-			if value < (min(i64) + v)/i64(base) {
+			if value < cut || (value == cut && v > lim) {
 				break
 			}
 			value = value*i64(base) - v
 		} else {
-			if value > (max(i64) - v)/i64(base) {
+			if value > cut || (value == cut && v > lim) {
 				break
 			}
 			value = value*i64(base) + v
@@ -185,6 +221,8 @@ parse_i64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i64, ok:
 	}
 
 
+	cut, lim := overflow_limits(i64, int(base), neg)
+
 	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
@@ -197,12 +235,12 @@ parse_i64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i64, ok:
 		}
 		if neg {
 			// Accumulate negatively so that min(i64) is accepted.
-			if value < (min(i64) + v)/base {
+			if value < cut || (value == cut && v > lim) {
 				break
 			}
 			value = value*base - v
 		} else {
-			if value > (max(i64) - v)/base {
+			if value > cut || (value == cut && v > lim) {
 				break
 			}
 			value = value*base + v
@@ -259,6 +297,8 @@ parse_u64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u64,
 		s = s[1:]
 	}
 
+	cut, lim := overflow_limits(u64, base, false)
+
 	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
@@ -269,7 +309,7 @@ parse_u64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u64,
 		if v >= u64(base) {
 			break
 		}
-		if value > (max(u64) - v)/u64(base) {
+		if value > cut || (value == cut && v > lim) {
 			break
 		}
 		value = value*u64(base) + v
@@ -336,6 +376,8 @@ parse_u64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u64, ok:
 		}
 	}
 
+	cut, lim := overflow_limits(u64, int(base), false)
+
 	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
@@ -346,7 +388,7 @@ parse_u64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u64, ok:
 		if v >= base {
 			break
 		}
-		if value > (max(u64) - v)/base {
+		if value > cut || (value == cut && v > lim) {
 			break
 		}
 		value = value*base + v
@@ -498,6 +540,8 @@ parse_i128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i12
 	}
 
 
+	cut, lim := overflow_limits(i128, base, neg)
+
 	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
@@ -510,12 +554,12 @@ parse_i128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i12
 		}
 		if neg {
 			// Accumulate negatively so that min(i128) is accepted.
-			if value < (min(i128) + v)/i128(base) {
+			if value < cut || (value == cut && v > lim) {
 				break
 			}
 			value = value*i128(base) - v
 		} else {
-			if value > (max(i128) - v)/i128(base) {
+			if value > cut || (value == cut && v > lim) {
 				break
 			}
 			value = value*i128(base) + v
@@ -587,6 +631,8 @@ parse_i128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i128, o
 	}
 
 
+	cut, lim := overflow_limits(i128, int(base), neg)
+
 	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
@@ -599,12 +645,12 @@ parse_i128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i128, o
 		}
 		if neg {
 			// Accumulate negatively so that min(i128) is accepted.
-			if value < (min(i128) + v)/base {
+			if value < cut || (value == cut && v > lim) {
 				break
 			}
 			value = value*base - v
 		} else {
-			if value > (max(i128) - v)/base {
+			if value > cut || (value == cut && v > lim) {
 				break
 			}
 			value = value*base + v
@@ -660,6 +706,8 @@ parse_u128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u12
 		s = s[1:]
 	}
 
+	cut, lim := overflow_limits(u128, base, false)
+
 	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
@@ -670,7 +718,7 @@ parse_u128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u12
 		if v >= u128(base) {
 			break
 		}
-		if value > (max(u128) - v)/u128(base) {
+		if value > cut || (value == cut && v > lim) {
 			break
 		}
 		value = value*u128(base) + v
@@ -734,6 +782,8 @@ parse_u128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u128, o
 		}
 	}
 
+	cut, lim := overflow_limits(u128, int(base), false)
+
 	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
@@ -744,7 +794,7 @@ parse_u128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u128, o
 		if v >= base {
 			break
 		}
-		if value > (max(u128) - v)/base {
+		if value > cut || (value == cut && v > lim) {
 			break
 		}
 		value = value*base + v
