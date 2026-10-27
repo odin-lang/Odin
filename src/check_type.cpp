@@ -3562,9 +3562,31 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					}
 					if (is_poly_name) {
 						bool valid = false;
-						if (is_type_proc(op.type)) {
+						// NOTE: a polymorphic procedure passed to a `$f: proc(...)` parameter is specialized
+						// to that parameter's type, and the specialization becomes the constant value
+						Entity *specialized_proc_entity = nullptr;
+						bool poly_proc_failed = false;
+						if (is_type_proc(op.type) && is_type_polymorphic(op.type)) {
+							if (is_type_proc(type) && !is_type_polymorphic(type)) {
+								PolyProcData ppd = {};
+								if (check_polymorphic_procedure_assignment(ctx, &op, type, op.expr, &ppd)) {
+									specialized_proc_entity = ppd.gen_entity;
+									op.type = specialized_proc_entity->type;
+								}
+							}
+							if (specialized_proc_entity == nullptr) {
+								// NOTE: the assignability check below reports the error
+								valid = true;
+								success = false;
+								poly_proc_failed = true;
+							}
+						}
+						if (!poly_proc_failed && is_type_proc(op.type)) {
 							Ast *expr = unparen_expr(op.expr);
-							Entity *proc_entity = strip_entity_wrapping(expr);
+							Entity *proc_entity = specialized_proc_entity;
+							if (proc_entity == nullptr) {
+								proc_entity = strip_entity_wrapping(expr);
+							}
 							if (proc_entity) {
 								proc_entity->flags |= EntityFlag_PolyConstArg;
 								poly_const = exact_value_procedure(proc_entity->identifier.load() ? proc_entity->identifier.load() : op.expr);
