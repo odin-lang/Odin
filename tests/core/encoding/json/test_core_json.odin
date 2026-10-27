@@ -996,3 +996,21 @@ parse_integers_out_of_range :: proc(t: ^testing.T) {
 	}
 	free_all(context.temp_allocator)
 }
+
+@(test)
+unmarshal_key_ending_at_newline :: proc(t: ^testing.T) {
+	// `is_valid` does not check the contents of keys, so a key may end unterminated at a newline,
+	// where the tokenizer ends it. Counting the array must end it there too.
+	data := "[{\"a\n:1},\"x\"]"
+	testing.expect(t, json.is_valid(transmute([]byte)data, .JSON))
+
+	v: []json.Value
+	err := json.unmarshal_string(data, &v, .JSON, context.temp_allocator)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, len(v), 2)
+	if len(v) == 2 {
+		s, ok := v[1].(json.String)
+		testing.expectf(t, ok && s == "x", "expected \"x\", got %v", v[1])
+	}
+	free_all(context.temp_allocator)
+}

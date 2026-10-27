@@ -672,6 +672,8 @@ differential_array_counts :: proc(t: ^testing.T) {
 		`1`, `-2`, `+3`, `0`, `0x1F`, `0X`, `0xg`, `0x]`, `0x,`, `0x"`, `1e`, `1E+`, `1.`, `1.5e-3`, `4a`, `1-2`, `1.2.3`,
 		`-Infinity`, `NaN`, `Infinity`, `true`, `null`, `foo_1`, `_`, `"a"`, `'b'`, `"[,]"`, `'{"'`, `"\""`, `'\''`,
 		`"\\"`, `"\u005D"`, `"x\]"`, "\"\xc3\xa9\"", `[]`, `{}`, `[1,[2]]`, `[[],[[]]]`, `{"a":[1,2],"b":"]"}`, `{a=1}`, `{'k':'v'}`,
+		// `is_valid` does not check the contents of keys, so a key may hold anything, or end at a newline.
+		"{\"a\n:1}", "{'a\n:1}", "{\"a\\\n\":1}", "{\"c\r\":5}", "{\"k\x01\":1}", "{\"\xff\":1}",
 	}
 	SEPARATORS := []string{
 		``, ` `, `,`, `, `, "\n", "\t,\n", "\r\n", `/* ] */`, `/* "*/`, `/**/`, `/* **/ */`, `/***/`, "// ] \"\n", "//\n",
