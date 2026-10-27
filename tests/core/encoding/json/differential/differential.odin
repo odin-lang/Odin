@@ -580,6 +580,54 @@ differential_unmarshal_reserve_maps :: proc(t: ^testing.T) {
 	}
 }
 
+// Once the input passed `is_valid`, arrays are counted without the tokenizer, so the count must split
+// elements exactly where `get_token` does. These arrays are built from lexical corner cases: comments
+// holding brackets and quotes, "0x" taking the next rune whatever it is, a "*/" right after another '*',
+// Unicode whitespace, and JSON5/MJSON elements with no separator between them, like `4a` or `1-2`.
+@(test)
+differential_array_counts :: proc(t: ^testing.T) {
+	f: Fuzz
+	fuzz_init(&f, t)
+	defer fuzz_destroy(&f)
+
+	ATOMS := []string{
+		`1`, `-2`, `+3`, `0`, `0x1F`, `0X`, `0xg`, `0x]`, `0x,`, `0x"`, `1e`, `1E+`, `1.`, `1.5e-3`, `4a`, `1-2`, `1.2.3`,
+		`-Infinity`, `NaN`, `Infinity`, `true`, `null`, `foo_1`, `_`, `"a"`, `'b'`, `"[,]"`, `'{"'`, `"\""`, `'\''`,
+		`"\\"`, `"\u005D"`, `"x\]"`, "\"\xc3\xa9\"", `[]`, `{}`, `[1,[2]]`, `[[],[[]]]`, `{"a":[1,2],"b":"]"}`, `{a=1}`, `{'k':'v'}`,
+	}
+	SEPARATORS := []string{
+		``, ` `, `,`, `, `, "\n", "\t,\n", "\r\n", `/* ] */`, `/* "*/`, `/**/`, `/* **/ */`, `/***/`, "// ] \"\n", "//\n",
+		"\xe2\x80\xa8", "\xe2\x80\xa9", "\xef\xbb\xbf", "\v\f",
+	}
+
+	valid: [len(SPECS)]int
+	for _ in 0..<ITERATIONS*10 {
+		defer fuzz_reset(&f)
+		b := strings.builder_make(context.temp_allocator)
+		strings.write_byte(&b, '[')
+		for _ in 0..<rand.int_max(6) {
+			strings.write_string(&b, rand.choice(SEPARATORS))
+			strings.write_string(&b, rand.choice(ATOMS))
+		}
+		strings.write_string(&b, rand.choice(SEPARATORS))
+		strings.write_byte(&b, ']')
+		data := b.buf[:]
+		for spec, i in SPECS {
+			if !json.is_valid(data, spec) {
+				continue
+			}
+			valid[i] += 1
+			check_unmarshal(&f, []json.Value,   []ref.Value,   data, spec)
+			check_unmarshal(&f, [][]json.Value, [][]ref.Value, data, spec)
+		}
+		if fuzz_done(&f) {
+			return
+		}
+	}
+	log.infof("valid arrays per spec %v: %v", SPECS, valid)
+	testing.expect(t, valid[0] > 0 && valid[1] > 0 && valid[2] > 0, "some spec never produced a valid array")
+}
+
 @(test)
 differential_unmarshal_json_value :: proc(t: ^testing.T) {
 	f: Fuzz
