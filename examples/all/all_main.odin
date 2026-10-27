@@ -62,9 +62,12 @@ package all
 @(require) import "core:crypto/tuplehash"
 @(require) import "core:crypto/x25519"
 @(require) import "core:crypto/x448"
+@(require) import "core:crypto/x509"
 
 @(require) import "core:debug/pe"
 @(require) import "core:debug/trace"
+
+@(require) import "core:diff"
 
 @(require) import "core:dynlib"
 @(require) import "core:net"
@@ -118,13 +121,13 @@ package all
 
 @(require) import "core:odin/ast"
 @(require) import doc_format "core:odin/doc-format"
+@(require) import tool_format "core:odin/tool-format"
 @(require) import "core:odin/parser"
 @(require) import "core:odin/tokenizer"
 
 @(require) import "core:prof/spall"
 
 @(require) import "core:os"
-@(require) import "core:os/old"
 
 @(require) import "core:path/slashpath"
 @(require) import "core:path/filepath"
@@ -167,5 +170,22 @@ package all
 @(require) import "core:unicode/utf8"
 @(require) import "core:unicode/utf8/utf8string"
 @(require) import "core:unicode/utf16"
+
+
+@(require) import "core:rexcode"
+@(require) import rexcode_isa      "core:rexcode/isa"
+@(require) import rexcode_arm32    "core:rexcode/isa/arm32"
+@(require) import rexcode_arm64    "core:rexcode/isa/arm64"
+@(require) import rexcode_mips     "core:rexcode/isa/mips"
+@(require) import rexcode_mos6502  "core:rexcode/isa/mos6502"
+@(require) import rexcode_mos65816 "core:rexcode/isa/mos65816"
+@(require) import rexcode_ppc      "core:rexcode/isa/ppc"
+@(require) import rexcode_ppc_vle  "core:rexcode/isa/ppc_vle"
+@(require) import rexcode_riscv    "core:rexcode/isa/riscv"
+@(require) import rexcode_rsp      "core:rexcode/isa/rsp"
+@(require) import rexcode_x86      "core:rexcode/isa/x86"
+@(require) import rexcode_ir       "core:rexcode/ir"
+@(require) import rexcode_spirv    "core:rexcode/ir/spirv"
+@(require) import rexcode_wasm     "core:rexcode/ir/wasm"
 
 main :: proc() {}

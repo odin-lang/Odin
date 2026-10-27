@@ -10,58 +10,6 @@
 
 #include "box3d/math_functions.h"
 
-// p1 : origin on edge 1
-// e1 : edge 1
-// c1 : shape 1 centroid
-// p2 : origin on edge 2
-// e2 : edge 2
-// c2 : shape 2 centroid
-float b3EdgeEdgeSeparation( b3Vec3 p1, b3Vec3 e1, b3Vec3 c1, b3Vec3 p2, b3Vec3 e2, b3Vec3 c2 )
-{
-	// Build search direction
-	b3Vec3 u = b3Cross( e1, e2 );
-	float length = b3Length( u );
-
-	// Skip near parallel edges: |e1 x e1| = sin(alpha) * |e1| * |e2|
-	const float kTolerance = 0.005f;
-	if ( length < kTolerance * sqrtf( b3LengthSquared( e1 ) * b3LengthSquared( e2 ) ) )
-	{
-		return -FLT_MAX;
-	}
-
-	if ( length * length < 1000.0f * FLT_MIN )
-	{
-		return -FLT_MAX;
-	}
-
-	b3Vec3 n = b3MulSV( 1.0f / length, u );
-
-	// Make sure normal points away from the first shape
-	// For a triangle, it is possible that N is aligned with the triangle normal and the sign
-	// value can be close to zero and flicker between small negative and positive values, leading to
-	// an incorrect separation value. So we assume the other hull has some volume and pick the most
-	// significant sign value to orient N.
-	float sign1 = b3Dot( n, b3Sub( p1, c1 ) );
-	float sign2 = b3Dot( n, b3Sub( p2, c2 ) );
-	if ( b3AbsFloat( sign1 ) > b3AbsFloat( sign2 ) )
-	{
-		if ( sign1 < 0.0f )
-		{
-			n = b3Neg( n );
-		}
-	}
-	else
-	{
-		if ( sign2 > 0.0f )
-		{
-			n = b3Neg( n );
-		}
-	}
-
-	// s = Dot(n, p2) - d = Dot(n, p2) - Dot(n, p1) = Dot(n, p2 - p1)
-	return b3Dot( n, b3Sub( p2, p1 ) );
-}
-
 // This was extended to make the wedge shape get the correct incident face.
 // Instead of looking directly for the most anti-parallel face, we first find the closest vertex (passed in).
 // Then we look for all edges coming out of that vertex and look for the edge that is
@@ -69,6 +17,8 @@ float b3EdgeEdgeSeparation( b3Vec3 p1, b3Vec3 e1, b3Vec3 c1, b3Vec3 p2, b3Vec3 e
 // Then from that edge, we select the adjacent face that is most anti-parallel to the reference normal.
 int b3FindIncidentFace( const b3HullData* hull, b3Vec3 refNormal, int vertexIndex )
 {
+	B3_ASSERT( 0 <= vertexIndex && vertexIndex < hull->vertexCount );
+
 	const b3HullVertex* vertices = b3GetHullVertices( hull );
 	const b3HullHalfEdge* edges = b3GetHullEdges( hull );
 	const b3Plane* planes = b3GetHullPlanes( hull );

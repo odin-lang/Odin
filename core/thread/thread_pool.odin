@@ -123,6 +123,7 @@ pool_init :: proc(
 	}
 }
 
+@(synchronizes=.Acquire)
 pool_destroy :: proc(pool: ^Pool) {
 	queue.destroy(&pool.tasks)
 	delete(pool.tasks_done)
@@ -136,6 +137,7 @@ pool_destroy :: proc(pool: ^Pool) {
 	delete(pool.threads, pool.allocator)
 }
 
+@(synchronizes=.Release)
 pool_start :: proc(pool: ^Pool) {
 	for t in pool.threads {
 		start(t)
@@ -145,6 +147,7 @@ pool_start :: proc(pool: ^Pool) {
 // Finish tasks that have already started processing, then shut down all pool
 // threads. Might leave over waiting tasks, any memory allocated for the
 // user data of those tasks will not be freed.
+@(synchronizes=.Acquire)
 pool_join :: proc(pool: ^Pool) {
 	intrinsics.atomic_store(&pool.is_running, false)
 	sync.post(&pool.sem_available, len(pool.threads))
@@ -187,6 +190,10 @@ pool_join :: proc(pool: ^Pool) {
 //
 // Each task also needs an allocator which it either owns, or which is thread
 // safe.
+//
+// Completed tasks remain in the pool until removed with `pool_pop_done`.
+// When reusing the pool, call it once for every task added.
+@(synchronizes=.Release)
 pool_add_task :: proc(pool: ^Pool, allocator: mem.Allocator, procedure: Task_Proc, data: rawptr, user_index: int = 0) {
 	sync.guard(&pool.mutex)
 
@@ -331,6 +338,7 @@ pool_is_empty :: #force_inline proc(pool: ^Pool) -> bool {
 }
 
 // Mostly for internal use.
+@(synchronizes=.Acquire)
 pool_pop_waiting :: proc(pool: ^Pool) -> (task: Task, got_task: bool) {
 	sync.guard(&pool.mutex)
 
@@ -344,7 +352,11 @@ pool_pop_waiting :: proc(pool: ^Pool) -> (task: Task, got_task: bool) {
 	return
 }
 
-// Use this to take out finished tasks.
+// Remove and return the next completed task, if one is available.
+//
+// The caller is responsible for processing the result and releasing any
+// resources associated with the task.
+@(synchronizes=.Acquire)
 pool_pop_done :: proc(pool: ^Pool) -> (task: Task, got_task: bool) {
 	sync.guard(&pool.mutex)
 
@@ -358,6 +370,7 @@ pool_pop_done :: proc(pool: ^Pool) -> (task: Task, got_task: bool) {
 }
 
 // Mostly for internal use.
+@(synchronizes=.Release)
 pool_do_work :: proc(pool: ^Pool, task: Task) {
 	{
 		context.allocator = task.allocator
@@ -374,6 +387,10 @@ pool_do_work :: proc(pool: ^Pool, task: Task) {
 
 // Process the rest of the tasks, also use this thread for processing, then join
 // all the pool threads.
+//
+// Completed tasks are not removed. Retrieve each one with `pool_pop_done`.
+// The pool cannot be restarted after this procedure returns.
+@(synchronizes=.Acquire)
 pool_finish :: proc(pool: ^Pool) {
 	for task in pool_pop_waiting(pool) {
 		pool_do_work(pool, task)

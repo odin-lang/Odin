@@ -60,6 +60,7 @@ enum BuiltinProcId {
 	BuiltinProc_matrix_flatten,
 	
 	BuiltinProc_soa_struct,
+	BuiltinProc_soa_copy_from_slice,
 
 	BuiltinProc_concatenate,
 
@@ -69,6 +70,11 @@ enum BuiltinProcId {
 	BuiltinProc_debug_trap,
 	BuiltinProc_read_cycle_counter,
 	BuiltinProc_read_cycle_counter_frequency,
+
+	BuiltinProc_return_address,
+	BuiltinProc_frame_address,
+	BuiltinProc_stack_pointer,
+	BuiltinProc_address_of_return_address,
 
 	BuiltinProc_count_ones,
 	BuiltinProc_count_zeros,
@@ -99,12 +105,12 @@ enum BuiltinProcId {
 
 	BuiltinProc_volatile_store,
 	BuiltinProc_volatile_load,
-	
+
 	BuiltinProc_unaligned_store,
 	BuiltinProc_unaligned_load,
 	BuiltinProc_non_temporal_store,
 	BuiltinProc_non_temporal_load,
-	
+
 	BuiltinProc_prefetch_read_instruction,
 	BuiltinProc_prefetch_read_data,
 	BuiltinProc_prefetch_write_instruction,
@@ -152,7 +158,6 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_sub,
 	BuiltinProc_simd_mul,
 	BuiltinProc_simd_div,
-	BuiltinProc_simd_rem,
 	BuiltinProc_simd_shl,        // Odin logic
 	BuiltinProc_simd_shr,        // Odin logic
 	BuiltinProc_simd_shl_masked, // C logic
@@ -242,7 +247,7 @@ BuiltinProc__simd_begin,
 	// Platform specific SIMD intrinsics
 	BuiltinProc_simd_x86__MM_SHUFFLE,
 BuiltinProc__simd_end,
-	
+
 	// Platform specific intrinsics
 	BuiltinProc_syscall,
 	BuiltinProc_syscall_bsd,
@@ -328,7 +333,7 @@ BuiltinProc__type_simple_boolean_end,
 
 	BuiltinProc_type_has_field,
 	BuiltinProc_type_field_type,
-	
+
 	BuiltinProc_type_field_bit_offset,
 	BuiltinProc_type_field_bit_size,
 
@@ -467,8 +472,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("outer_product"),    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("hadamard_product"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("matrix_flatten"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-		
+
 	{STR_LIT("soa_struct"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics}, // Type
+	{STR_LIT("soa_copy_from_slice"), 3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("concatenate"), 2, true, Expr_Expr, BuiltinProcPkg_intrinsics},
 
@@ -479,6 +485,11 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("debug_trap"),         0, false, Expr_Stmt, BuiltinProcPkg_intrinsics, /*diverging*/false},
 	{STR_LIT("read_cycle_counter"), 0, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("read_cycle_counter_frequency"), 0, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("return_address"),            0, true,  Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("frame_address"),             0, true,  Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("stack_pointer"),             0, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("address_of_return_address"), 0, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("count_ones"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("count_zeros"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -562,7 +573,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_sub"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_mul"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_div"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("simd_rem"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_shl"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_shr"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_shl_masked"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},

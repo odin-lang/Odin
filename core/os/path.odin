@@ -746,7 +746,7 @@ glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []str
 	if !has_meta(pattern) {
 		// TODO(bill): os.lstat on here to check for error
 		m := make([]string, 1)
-		m[0] = pattern
+		m[0] = strings.clone(pattern)
 		return m[:], nil
 	}
 

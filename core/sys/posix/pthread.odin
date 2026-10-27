@@ -5,7 +5,7 @@ import "core:c"
 
 when ODIN_OS == .Darwin {
 	foreign import lib "system:System"
-} else when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .Linux {
+} else when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .Linux || ODIN_OS == .OpenBSD {
 	foreign import lib "system:pthread"
 } else {
 	foreign import lib "system:c"
@@ -174,6 +174,7 @@ foreign lib {
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_create.html ]]
 	*/
+	@(synchronizes=.Release)
 	pthread_create :: proc(
 		thread:        ^pthread_t,
 		attr:          ^pthread_attr_t,
@@ -294,6 +295,7 @@ foreign lib {
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_join.html ]]
 	*/
+	@(synchronizes=.Acquire)
 	pthread_join :: proc(thread: pthread_t, value_ptr: ^rawptr = nil) -> Errno ---
 
 	/*

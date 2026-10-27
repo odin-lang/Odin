@@ -267,6 +267,10 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		}
 	}
 
+	when ODIN_OS == .Windows {
+		set_utf8_codepage()
+		defer restore_old_codepage()
+	}
 
 	// `-vet` needs parameters to be shadowed by themselves first as an
 	// explicit declaration, to allow the next line to work.
@@ -278,9 +282,8 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	// The animations are only ever shown through STDOUT;
 	// STDERR is used exclusively for logging regardless of error level.
-	global_log_colors_disabled = !terminal.color_enabled || !terminal.is_terminal(os.stderr)
-	global_ansi_disabled       = !terminal.is_terminal(os.stdout)
-
+	global_log_colors_disabled = terminal.is_dumb || !terminal.color_enabled || !terminal.is_terminal(os.stderr)
+	global_ansi_disabled       = terminal.is_dumb || !terminal.is_terminal(os.stdout)
 	should_show_animations := FANCY_OUTPUT && terminal.color_enabled && !global_ansi_disabled
 
 	// -- Parse CLI options

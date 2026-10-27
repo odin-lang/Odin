@@ -74,6 +74,59 @@ test_dynamic_arena_alloc_unaligned :: proc(t: ^testing.T) {
 	expect_arena_allocation(t, expected_used_bytes = 16, num_bytes = 9, alignment = 8)
 }
 
+expect_reused_block_alignment :: proc(
+	t:            ^testing.T,
+	backing:      []byte,
+	block_size:   int,
+	should_reuse: bool,
+) {
+	block_arena: mem.Arena
+	mem.arena_init(&block_arena, backing)
+
+	arena: mem.Dynamic_Arena
+	mem.dynamic_arena_init(
+		&arena,
+		block_allocator = mem.arena_allocator(&block_arena),
+		block_size = block_size,
+		out_band_size = block_size + 1,
+	)
+	defer mem.dynamic_arena_destroy(&arena)
+
+	allocator := mem.dynamic_arena_allocator(&arena)
+	first, first_err := mem.alloc(1, 16, allocator)
+	testing.expect_value(t, first_err, mem.Allocator_Error.None)
+	testing.expect(t, uintptr(first) % 64 == 16)
+
+	mem.dynamic_arena_reset(&arena)
+
+	aligned, aligned_err := mem.alloc(1, 64, allocator)
+	testing.expect_value(t, aligned_err, mem.Allocator_Error.None)
+	testing.expect(t, uintptr(aligned) % 64 == 0)
+	testing.expect_value(t, arena.current_block == first, should_reuse)
+}
+
+@(test)
+test_dynamic_arena_realigns_reused_block :: proc(t: ^testing.T) {
+	Backing :: struct #align(64) {
+		_:    [16]byte,
+		data: [128]byte,
+	}
+
+	backing: Backing
+	expect_reused_block_alignment(t, backing.data[:], 128, true)
+}
+
+@(test)
+test_dynamic_arena_skips_incompatible_reused_block :: proc(t: ^testing.T) {
+	Backing :: struct #align(64) {
+		_:    [16]byte,
+		data: [176]byte,
+	}
+
+	backing: Backing
+	expect_reused_block_alignment(t, backing.data[:], 64, false)
+}
+
 @(test)
 test_dynamic_arena_alloc_out_of_band :: proc(t: ^testing.T) {
 	expect_arena_allocation_out_of_band(t, num_bytes = 128, block_size = 512, out_band_size = 128)

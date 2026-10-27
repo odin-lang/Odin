@@ -80,7 +80,7 @@ Vector2Subtract :: proc "c" (a, b: Vector2) -> Vector2 {
 	return a - b
 }
 // Subtract vector by float value
-@(require_results, deprecated="Prefer v + value")
+@(require_results, deprecated="Prefer v - value")
 Vector2SubtractValue :: proc "c" (v: Vector2, value: f32) -> Vector2 {
 	return v - value
 }
@@ -270,7 +270,7 @@ Vector3Subtract :: proc "c" (a, b: Vector3) -> Vector3 {
 	return a - b
 }
 // Subtract vector by float value
-@(require_results, deprecated="Prefer v + value")
+@(require_results, deprecated="Prefer v - value")
 Vector3SubtractValue :: proc "c" (v: Vector3, value: f32) -> Vector3 {
 	return v - value
 }

@@ -130,16 +130,17 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: Permissions) -> (h
 			if .Non_Blocking in flags {
 				nix_attrs |= win32.FILE_FLAG_OVERLAPPED
 			}
-			h := win32.CreateFileW(path, access, share_mode, &sa, win32.TRUNCATE_EXISTING, nix_attrs, nil)
-			if h == win32.INVALID_HANDLE {
-				switch e := win32.GetLastError(); e {
-				case win32.ERROR_FILE_NOT_FOUND, _ERROR_BAD_NETPATH, win32.ERROR_PATH_NOT_FOUND:
-					// file does not exist, create the file
-				case 0:
-					return uintptr(h), nil
-				case:
-					return 0, _get_platform_error()
-				}
+
+			h := win32.CreateFileW(path, access | win32.GENERIC_WRITE, share_mode, &sa, win32.TRUNCATE_EXISTING, nix_attrs, nil)
+			if h != win32.INVALID_HANDLE {
+				// File exists and is now truncated, preserving attributes.
+				return uintptr(h), nil
+			}
+			switch e := win32.GetLastError(); e {
+			case win32.ERROR_FILE_NOT_FOUND, _ERROR_BAD_NETPATH, win32.ERROR_PATH_NOT_FOUND:
+				// File does not exist, fall through and create it.
+			case:
+				return 0, _get_platform_error()
 			}
 		}
 	}
@@ -909,6 +910,39 @@ win32_utf8_to_utf16 :: proc(s: string, allocator: runtime.Allocator) -> (ws: []u
 		n -= 1
 	}
 	ws = text[:n]
+	return
+}
+
+// Used for `SHFILEOPSTRUCTW`, which requires double-null-terminated strings (`PCZZWSTR`).
+@(private="package", require_results)
+win32_utf8_to_pczzwstr :: proc(s: string, allocator: runtime.Allocator) -> (ws: win32.PCZZWSTR, err: Error) {
+	if len(s) < 1 {
+		// We still need to provide a double-null-terminated empty string.
+		t := make([]u16, 2, allocator) or_return
+		ws = cast(win32.PCZZWSTR)raw_data(t)
+		return
+	}
+
+	b := transmute([]byte)s
+	cstr := raw_data(b)
+	n := win32.MultiByteToWideChar(win32.CP_UTF8, win32.MB_ERR_INVALID_CHARS, cstr, i32(len(s)), nil, 0)
+	if n == 0 {
+		err = _get_platform_error()
+		return
+	}
+
+	text := make([]u16, n+2, allocator) or_return
+
+	n1 := win32.MultiByteToWideChar(win32.CP_UTF8, win32.MB_ERR_INVALID_CHARS, cstr, i32(len(s)), raw_data(text), n)
+	if n1 == 0 {
+		err = _get_platform_error()
+		delete(text, allocator)
+		return
+	}
+
+	text[n+1] = 0
+	text[n] = 0
+	ws = cast(win32.PCZZWSTR)raw_data(text)
 	return
 }
 

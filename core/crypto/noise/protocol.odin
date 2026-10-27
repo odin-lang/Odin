@@ -217,7 +217,7 @@ cipherstate_encrypt_with_ad :: proc(self: ^Cipher_State, ad, plaintext, dst: []b
 		}
 		_encrypt(&self.ctx, self.n, ad, plaintext, dst)
 		self.n += 1
-		if self.n == 0 {
+		if self.n == max(u64) {
 			self.n_exhausted = true
 		}
 	} else {
@@ -249,7 +249,7 @@ cipherstate_decrypt_with_ad :: proc(self: ^Cipher_State, ad, ciphertext, dst: []
 			return nil, status
 		}
 		self.n += 1
-		if self.n == 0 {
+		if self.n == max(u64) {
 			self.n_exhausted = true
 		}
 	} else {

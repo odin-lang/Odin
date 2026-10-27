@@ -1,8 +1,4 @@
-The source code to this library used with SDL_mixer can be found here:
-https://hg.libsdl.org/SDL_image/file/default/external
----
-
-Copyright (c) 2002-2008 Xiph.org Foundation
+Copyright (c) 2002-2020 Xiph.org Foundation
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions

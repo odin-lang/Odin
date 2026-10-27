@@ -20,7 +20,7 @@ Returns:
 - err: An optional allocator error if one occured, `.None` otherwise
 */
 encode :: proc(src: []byte, allocator := context.allocator, loc := #caller_location) -> (res: []byte, err: runtime.Allocator_Error) #optional_allocator_error {
-	res, err = make([]byte, len(src) * 2, allocator, loc)
+	res = make([]byte, len(src) * 2, allocator, loc) or_return
 	#no_bounds_check for i, j := 0, 0; i < len(src); i += 1 {
 		v := src[i]
 		res[j]   = LOWER[v>>4]
@@ -62,7 +62,7 @@ Returns:
 - err: An optional allocator error if one occured, `.None` otherwise
 */
 encode_upper :: proc(src: []byte, allocator := context.allocator, loc := #caller_location) -> (res: []byte, err: runtime.Allocator_Error) #optional_allocator_error {
-	res, err = make([]byte, len(src) * 2, allocator, loc)
+	res = make([]byte, len(src) * 2, allocator, loc) or_return
 	#no_bounds_check for i, j := 0, 0; i < len(src); i += 1 {
 		v := src[i]
 		res[j]   = UPPER[v>>4]
@@ -95,12 +95,12 @@ Decodes a hex sequence into a byte slice
 *Allocates Using Provided Allocator*
 
 Inputs:
-- dst: The hex sequence decoded into bytes
 - src: The `[]byte` to be hex-decoded
 - allocator: (default: context.allocator)
 - loc: The caller location for debugging purposes (default: #caller_location)
 
 Returns:
+- dst: The hex sequence decoded into bytes
 - ok:  A bool, `true` if decoding succeeded, `false` otherwise
 */
 decode :: proc(src: []byte, allocator := context.allocator, loc := #caller_location) -> (dst: []byte, ok: bool) {
@@ -108,7 +108,56 @@ decode :: proc(src: []byte, allocator := context.allocator, loc := #caller_locat
 		return
 	}
 
-	dst = make([]byte, len(src) / 2, allocator, loc)
+	err: runtime.Allocator_Error
+	dst, err = make([]byte, len(src) / 2, allocator, loc)
+	if err != nil {
+		return
+	}
+
+	#no_bounds_check for i, j := 0, 1; j < len(src); j += 2 {
+		p := src[j-1]
+		q := src[j]
+
+		a, a_ok := hex_digit(p)
+		if !a_ok {
+			delete(dst, allocator)
+			dst = nil
+			return
+		}
+		b, b_ok := hex_digit(q)
+		if !b_ok {
+			delete(dst, allocator)
+			dst = nil
+			return
+		}
+
+		dst[i] = (a << 4) | b
+		i += 1
+	}
+
+	return dst, true
+}
+
+/*
+Decodes a hex sequence into a byte slice
+
+Inputs:
+- src: The `[]byte` to be hex-decoded
+- buf: A buffer large enough to hold the decoded sequence
+
+Returns:
+- dst: The hex sequence decoded into bytes
+- ok:  A bool, `true` if decoding succeeded, `false` otherwise
+*/
+decode_into_buffer :: proc(src: []byte, buf: []byte) -> (dst: []byte, ok: bool) #optional_ok {
+	if len(src) % 2 == 1 {
+		return
+	}
+	dst_len := len(src) / 2
+	if len(buf) < dst_len {
+		return
+	}
+
 	#no_bounds_check for i, j := 0, 1; j < len(src); j += 2 {
 		p := src[j-1]
 		q := src[j]
@@ -116,11 +165,11 @@ decode :: proc(src: []byte, allocator := context.allocator, loc := #caller_locat
 		a := hex_digit(p) or_return
 		b := hex_digit(q) or_return
 
-		dst[i] = (a << 4) | b
+		buf[i] = (a << 4) | b
 		i += 1
 	}
 
-	return dst, true
+	return buf[:dst_len], true
 }
 
 /*

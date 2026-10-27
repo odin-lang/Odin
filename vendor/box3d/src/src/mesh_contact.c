@@ -608,7 +608,7 @@ bool b3ComputeMeshManifolds( b3World* world, int workerIndex, b3Contact* contact
 		switch ( shapeB->type )
 		{
 			case b3_capsuleShape:
-				b3CollideCapsuleAndTriangle( manifold, pointCapacity, &shapeB->capsule, vertices, &cache->simplexCache );
+				b3CollideTriangleAndCapsule( manifold, pointCapacity, vertices, &shapeB->capsule, &cache->simplexCache );
 				break;
 
 			case b3_hullShape:
@@ -619,14 +619,14 @@ bool b3ComputeMeshManifolds( b3World* world, int workerIndex, b3Contact* contact
 					cache->satCache = (b3SATCache){ 0 };
 				}
 
-				b3CollideHullAndTriangle( manifold, pointCapacity, hullB, vertices[0], vertices[1], vertices[2], triangle.flags,
+				b3CollideTriangleAndHull( manifold, pointCapacity, vertices[0], vertices[1], vertices[2], triangle.flags, hullB,
 										  &cache->satCache, enableSpeculative );
 				context->satCallCount += 1;
 				context->satCacheHitCount += cache->satCache.hit;
 				break;
 
 			case b3_sphereShape:
-				b3CollideSphereAndTriangle( manifold, pointCapacity, &shapeB->sphere, vertices );
+				b3CollideTriangleAndSphere( manifold, pointCapacity, vertices, &shapeB->sphere );
 				break;
 
 			default:

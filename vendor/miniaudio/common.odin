@@ -9,20 +9,20 @@ when MINIAUDIO_SHARED {
 }
 
 @(private)
-LIB :: "lib/miniaudio.lib" when ODIN_OS == .Windows else "lib/miniaudio.a"
+LIB :: "lib/miniaudio.lib" when ODIN_OS == .Windows else "lib/darwin/miniaudio.a" when ODIN_OS == .Darwin else "lib/miniaudio.a"
 
 when !#exists(LIB) {
-	// Windows library is shipped with the compiler, so a Windows specific message should not be needed.
-	#panic("Could not find the compiled miniaudio library, it can be compiled by running `make -C \"" + ODIN_ROOT + "vendor/miniaudio/src\"`")
+	// The Windows and macOS libraries are shipped with the compiler, so a message for them should not be needed.
+	#panic("Could not find the compiled miniaudio library, it can be compiled by running `\"" + ODIN_ROOT + "vendor/miniaudio/src/build_miniaudio.sh\"`")
 }
 
 foreign import lib { LIB }
 
 BINDINGS_VERSION_MAJOR    :: 0
 BINDINGS_VERSION_MINOR    :: 11
-BINDINGS_VERSION_REVISION :: 24
+BINDINGS_VERSION_REVISION :: 25
 BINDINGS_VERSION          :: [3]u32{BINDINGS_VERSION_MAJOR, BINDINGS_VERSION_MINOR, BINDINGS_VERSION_REVISION}
-BINDINGS_VERSION_STRING   :: "0.11.24"
+BINDINGS_VERSION_STRING   :: "0.11.25"
 
 @(init)
 version_check :: proc "contextless" () {
@@ -35,12 +35,12 @@ version_check :: proc "contextless" () {
 		n += copy(buf[n:], BINDINGS_VERSION_STRING)
 		n += copy(buf[n:], ", but version ")
 		n += copy(buf[n:], string(version_string()))
-		n += copy(buf[n:], " is linked, make sure to compile the correct miniaudio version by going to `vendor/miniaudio/src` ")
+		n += copy(buf[n:], " is linked, make sure to compile the correct miniaudio version by executing `")
 
 		when ODIN_OS == .Windows {
-			n += copy(buf[n:], "and executing `build.bat`")
+			n += copy(buf[n:], "vendor\\miniaudio\\src\\build.bat`")
 		} else {
-			n += copy(buf[n:], "and executing `make`")
+			n += copy(buf[n:], "vendor/miniaudio/src/build_miniaudio.sh`")
 		}
 
 		panic_contextless(string(buf[:n]))

@@ -48,6 +48,60 @@ hex_decode :: proc(t: ^testing.T) {
 }
 
 @(test)
+hex_decode_into_buffer :: proc(t: ^testing.T) {
+	for test in CASES {
+		buffer := make([]u8, len(test[1]) / 2)
+		defer delete(buffer)
+		decoded, ok := hex.decode_into_buffer(transmute([]byte)test[1], buffer)
+		testing.expect(t, ok, "decode_into_buffer: not ok")
+		testing.expectf(
+			t,
+			ok,
+			"decode: %q not ok",
+			test[1],
+		)
+		testing.expectf(
+			t,
+			string(decoded) == test[0],
+			"decode: %q -> %q (should be: %q)",
+			test[1],
+			string(decoded),
+			test[0],
+		)
+	}
+
+	// destination buffer is larger
+	for test in CASES {
+		buffer := make([]u8, len(test[1]) / 2 + 1)
+		defer delete(buffer)
+		decoded, ok := hex.decode_into_buffer(transmute([]byte)test[1], buffer)
+		testing.expect(t, ok, "decode_into_buffer: not ok")
+		testing.expectf(
+			t,
+			ok,
+			"decode: %q not ok",
+			test[1],
+		)
+		testing.expectf(
+			t,
+			string(decoded) == test[0],
+			"decode: %q -> %q (should be: %q)",
+			test[1],
+			string(decoded),
+			test[0],
+		)
+	}
+
+	// destination buffer is too small
+	for test in CASES {
+		buffer := make([]u8, len(test[1]) / 2 - 1)
+		defer delete(buffer)
+		_, ok := hex.decode_into_buffer(transmute([]byte)test[1], buffer)
+		testing.expect(t, !ok, "decode_into_buffer: should not be ok")
+	}
+}
+
+@(test)
 hex_decode_sequence :: proc(t: ^testing.T) {
 	b, ok := hex.decode_sequence("0x23")
 	testing.expect(t, ok, "decode_sequence: 0x23 not ok")

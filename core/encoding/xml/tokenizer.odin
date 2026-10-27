@@ -187,9 +187,9 @@ skip_whitespace :: proc(t: ^Tokenizer) {
 is_letter :: proc(r: rune) -> bool {
 	if r < utf8.RUNE_SELF {
 		switch r {
-		case '_':
-			return true
 		case 'A'..='Z', 'a'..='z':
+			return true
+		case '_':
 			return true
 		}
 	}
@@ -273,22 +273,23 @@ skip_cdata :: proc(t: ^Tokenizer) -> (err: Error) {
 		return .None
 	}
 
-	t.read_offset += len(CDATA_START)
+	t.read_offset += len(CDATA_START) - 1
 	offset := t.offset
 
-	cdata_scan: for {
+	for {
 		advance_rune(t)
 		if t.ch < 0 {
 			error(t, offset, "[scan_string] CDATA was not terminated\n")
 			return .Premature_EOF
 		}
 
-		// Scan until the end of a CDATA tag.
-		if s := string(t.src[t.read_offset:]); strings.has_prefix(s, CDATA_END) {
-			t.read_offset += len(CDATA_END)
-			break cdata_scan
+		if strings.has_prefix(string(t.src[t.offset:]), CDATA_END) {
+			break
 		}
 	}
+
+	advance_rune(t)
+	advance_rune(t)
 	return .None
 }
 
@@ -352,11 +353,9 @@ scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close
 	return lit, err
 }
 
-peek :: proc(t: ^Tokenizer) -> (token: Token) {
-	old  := t^
-	token = scan(t)
-	t^ = old
-	return token
+peek :: #force_inline proc(t: ^Tokenizer) -> (token: Token) {
+	tmp := t^
+	return scan(&tmp)
 }
 
 scan :: proc(t: ^Tokenizer, multiline_string := false) -> Token {
@@ -367,10 +366,10 @@ scan :: proc(t: ^Tokenizer, multiline_string := false) -> Token {
 	kind: Token_Kind
 	err:  Error
 	lit:  string
-	pos := offset_to_pos(t, offset)
+	pos := #force_inline offset_to_pos(t, offset)
 
 	switch ch := t.ch; true {
-	case is_letter(ch):
+	case #force_inline is_letter(ch):
 		lit = scan_identifier(t)
 		kind = .Ident
 
@@ -411,5 +410,6 @@ scan :: proc(t: ^Tokenizer, multiline_string := false) -> Token {
 	if kind != .String && lit == "" {
 		lit = string(t.src[offset : t.offset])
 	}
+
 	return Token{kind, lit, pos}
 }

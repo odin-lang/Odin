@@ -3,7 +3,7 @@
 
 #include "compound.h"
 
-#include "hull_map.h"
+#include "hull.h"
 #include "math_internal.h"
 #include "shape.h"
 
@@ -226,13 +226,19 @@ static bool b3CompareMeshes( const b3MeshData* mesh1, const b3MeshData* mesh2 )
 #define FREE_FN b3Free
 #include "verstable.h"
 
+_Static_assert( sizeof( b3SurfaceMaterial ) == 40, "review padding" );
+
 static inline uint64_t b3HashMaterial( const b3SurfaceMaterial* material )
 {
+	B3_ASSERT( material->padding == 0 );
+
 	return vt_wyhash( material, sizeof( b3SurfaceMaterial ) );
 }
 
 static bool b3CompareMaterials( const b3SurfaceMaterial* mat1, const b3SurfaceMaterial* mat2 )
 {
+	B3_ASSERT( mat1->padding == 0 && mat2->padding == 0);
+
 	if ( mat1 == mat2 )
 	{
 		return true;
@@ -276,7 +282,7 @@ b3CompoundData* b3CreateCompound( const b3CompoundDef* def )
 	int sphereCount = def->sphereCount;
 	b3CompoundSphere* sphereInstances = b3AllocZeroed( sphereCount * sizeof( b3CompoundSphere ) );
 
-	// Determine material capacity
+	// Determine material capacity.
 	int materialCapacity = convexCount;
 	for ( int i = 0; i < def->meshCount; ++i )
 	{
@@ -296,10 +302,10 @@ b3CompoundData* b3CreateCompound( const b3CompoundDef* def )
 		const b3CompoundCapsuleDef* capsuleDef = def->capsules + i;
 		capsuleInstances[i].capsule = capsuleDef->capsule;
 
-		// Look for an existing material
+		// Look for an existing material.
 		b3MaterialMap_itr materialItr = b3MaterialMap_get_or_insert( &materialMap, &capsuleDef->material, materialCount );
 
-		// Get the shared material index
+		// Get the shared material index.
 		int materialIndex = materialItr.data->val;
 		capsuleInstances[i].materialIndex = materialIndex;
 
@@ -333,10 +339,10 @@ b3CompoundData* b3CreateCompound( const b3CompoundDef* def )
 			b3DynamicTree_CreateProxy( &tree, aabb, ~0ull, childIndex );
 			childIndex += 1;
 
-			// Look for an existing material
+			// Look for an existing material.
 			b3MaterialMap_itr materialItr = b3MaterialMap_get_or_insert( &materialMap, &hullDef->material, materialCount );
 
-			// Get the shared material index
+			// Get the shared material index.
 			int materialIndex = materialItr.data->val;
 			hullInstances[i].materialIndex = materialIndex;
 
@@ -395,11 +401,11 @@ b3CompoundData* b3CreateCompound( const b3CompoundDef* def )
 
 			for ( int j = 0; j < meshDef->materialCount; ++j )
 			{
-				// Look for an existing material
+				// Look for an existing material.
 				b3MaterialMap_itr materialItr =
 					b3MaterialMap_get_or_insert( &materialMap, &meshDef->materials[j], materialCount );
 
-				// Get the shared material index
+				// Get the shared material index.
 				int materialIndex = materialItr.data->val;
 				meshInstances[i].materialIndices[j] = materialIndex;
 
@@ -411,17 +417,17 @@ b3CompoundData* b3CreateCompound( const b3CompoundDef* def )
 				}
 			}
 
-			// Look for an existing matching mesh
+			// Look for an existing matching mesh.
 			b3MeshMap_itr itr = b3MeshMap_get_or_insert( &meshMap, meshData, sharedMeshCount );
 
-			// Get the shared mesh index
+			// Get the shared mesh index.
 			int sharedMeshIndex = itr.data->val;
 
-			// Create mesh instance
+			// Create mesh instance.
 			meshInstances[i].transform = def->meshes[i].transform;
 			meshInstances[i].scale = def->meshes[i].scale;
 
-			// The offset isn't known yet, so store the index of the shared mesh
+			// The offset isn't known yet, so store the index of the shared mesh.
 			meshInstances[i].meshOffset = sharedMeshIndex;
 
 			// Is this a new mesh?
@@ -443,10 +449,10 @@ b3CompoundData* b3CreateCompound( const b3CompoundDef* def )
 		const b3CompoundSphereDef* sphereDef = def->spheres + i;
 		sphereInstances[i].sphere = sphereDef->sphere;
 
-		// Look for an existing material
+		// Look for an existing material.
 		b3MaterialMap_itr materialItr = b3MaterialMap_get_or_insert( &materialMap, &sphereDef->material, materialCount );
 
-		// Get the shared material index
+		// Get the shared material index.
 		int materialIndex = materialItr.data->val;
 		sphereInstances[i].materialIndex = materialIndex;
 
@@ -467,58 +473,55 @@ b3CompoundData* b3CreateCompound( const b3CompoundDef* def )
 
 	b3DynamicTree_Rebuild( &tree, true );
 
-	int byteCount = sizeof( b3CompoundData );
-
-	// Tree nodes - todo 64 byte alignment
-	int nodeOffset = byteCount;
-	byteCount += tree.nodeCapacity * sizeof( b3TreeNode );
-
-	int materialOffset = byteCount;
-	byteCount += materialCount * sizeof( b3SurfaceMaterial );
-
-	int capsuleOffset = byteCount;
-	byteCount += def->capsuleCount * sizeof( b3CompoundCapsule );
+	// Tree nodes
+	size_t byteCount = b3AlignUp8( sizeof( b3CompoundData ) );
+	int nodeOffset = (int)byteCount;
+	byteCount += b3AlignUp8( tree.nodeCapacity * sizeof( b3TreeNode ) );
+	int materialOffset = (int)byteCount;
+	byteCount += b3AlignUp8( materialCount * sizeof( b3SurfaceMaterial ) );
+	int capsuleOffset = (int)byteCount;
+	byteCount += b3AlignUp8( def->capsuleCount * sizeof( b3CompoundCapsule ) );
 
 	// Hull data layout has another level of indirection to allow for tight data packing
 	// 1. hull instance array : hull count array of b3HullInstance with individual hull transforms and offsets
 	// 2. heterogeneous array of shared hull data : each shared hull can have a different byte count, so direct indexing is not
 	// possible
-	int hullArrayOffset = byteCount;
+	int hullArrayOffset = (int)byteCount;
 
 	// Array of hull instances
-	byteCount += hullCount * sizeof( b3HullInstance );
+	byteCount += b3AlignUp8( hullCount * sizeof( b3HullInstance ) );
 
 	// Packed shared hull blobs
 	for ( int i = 0; i < sharedHullCount; ++i )
 	{
-		sharedHulls[i].hullOffset = byteCount;
-		byteCount += sharedHulls[i].hull->byteCount;
+		sharedHulls[i].hullOffset = (int)byteCount;
+		byteCount += b3AlignUp8( sharedHulls[i].hull->byteCount );
 	}
 
 	// Mesh data layout has another level of indirection to allow for tight data packing
 	// 1. mesh instance array : mesh count array of b3MeshInstance with individual mesh transform, scale, and offset
 	// 2. heterogeneous array of shared mesh data : each shared mesh can have a different byte count, so direct indexing is not
 	// possible
-	int meshArrayOffset = byteCount;
+	int meshArrayOffset = (int)byteCount;
 
 	// Array of mesh instances
-	byteCount += meshCount * sizeof( b3MeshInstance );
+	byteCount += b3AlignUp8( meshCount * sizeof( b3MeshInstance ) );
 
 	// Packed shared mesh blobs
 	for ( int i = 0; i < sharedMeshCount; ++i )
 	{
-		sharedMeshes[i].meshOffset = byteCount;
-		byteCount += sharedMeshes[i].meshData->byteCount;
+		sharedMeshes[i].meshOffset = (int)byteCount;
+		byteCount += b3AlignUp8( sharedMeshes[i].meshData->byteCount );
 	}
 
-	int sphereOffset = byteCount;
-	byteCount += def->sphereCount * sizeof( b3CompoundSphere );
+	int sphereOffset = (int)byteCount;
+	byteCount += b3AlignUp8( def->sphereCount * sizeof( b3CompoundSphere ) );
 
 	b3CompoundData* compound = b3Alloc( byteCount );
 	memset( compound, 0, byteCount );
 
 	compound->version = B3_COMPOUND_VERSION;
-	compound->byteCount = byteCount;
+	compound->byteCount = (int)byteCount;
 	compound->nodeOffset = nodeOffset;
 	memcpy( &compound->tree, &tree, sizeof( b3DynamicTree ) );
 

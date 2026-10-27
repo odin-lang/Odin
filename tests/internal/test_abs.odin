@@ -1,5 +1,6 @@
 package test_internal
 
+import "base:intrinsics"
 import "core:testing"
 
 @(private="file")
@@ -165,4 +166,27 @@ abs_f64_variable :: proc(t: ^testing.T) {
 	testing.expect_value(t, abs(not_const(min(f64be))), max(f64be))
 	testing.expect_value(t, abs(not_const(max(f64be))), max(f64be))
 	testing.expect_value(t, abs(not_const(f64be(-.12345))), .12345)
+}
+
+@(test)
+simd_abs_variable :: proc(t: ^testing.T) {
+	// signed ints -> abs(min(T)) wraps to min(T)
+	i32x4 := intrinsics.simd_abs(not_const(#simd[4]i32{min(i32), -1, 0, max(i32)}))
+	testing.expect_value(t, transmute([4]i32)i32x4, [4]i32{min(i32), 1, 0, max(i32)})
+	i8x16 := intrinsics.simd_abs(not_const(#simd[16]i8{min(i8), -1, 0, max(i8), -2, 2, -3, 3, -4, 4, -5, 5, -6, 6, -7, 7}))
+	testing.expect_value(t, transmute([16]i8)i8x16, [16]i8{min(i8), 1, 0, max(i8), 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7})
+
+	// unsigned ints
+	u32x4 := intrinsics.simd_abs(not_const(#simd[4]u32{0, 1, 100, max(u32)}))
+	testing.expect_value(t, transmute([4]u32)u32x4, [4]u32{0, 1, 100, max(u32)})
+	u8x16 := intrinsics.simd_abs(not_const(#simd[16]u8{0, 1, 100, 200, 255, 128, 127, 2, 3, 4, 5, 6, 7, 8, 9, 10}))
+	testing.expect_value(t, transmute([16]u8)u8x16, [16]u8{0, 1, 100, 200, 255, 128, 127, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+
+	// floats
+	f32x4 := intrinsics.simd_abs(not_const(#simd[4]f32{0., -0., -1., -.12345}))
+	f32_expected := [4]f32{0., 0., 1., .12345}
+	testing.expect_value(t, transmute([4]u32)f32x4, transmute([4]u32)f32_expected)
+	f64x2 := intrinsics.simd_abs(not_const(#simd[2]f64{-0., min(f64)}))
+	f64_expected := [2]f64{0., max(f64)}
+	testing.expect_value(t, transmute([2]u64)f64x2, transmute([2]u64)f64_expected)
 }

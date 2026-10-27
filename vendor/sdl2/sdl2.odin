@@ -41,8 +41,8 @@ version :: struct {
 }
 
 MAJOR_VERSION   :: 2
-MINOR_VERSION   :: 0
-PATCHLEVEL      :: 16
+MINOR_VERSION   :: 32
+PATCHLEVEL      :: 10
 
 VERSION :: proc "contextless" (ver: ^version) {
 	ver.major = MAJOR_VERSION
@@ -100,8 +100,11 @@ atomic_t :: struct { value: c.int }
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
+	@(synchronizes=.Acquire)
 	AtomicTryLock                :: proc(lock: ^SpinLock) -> bool ---
+	@(synchronizes=.Acquire)
 	AtomicLock                   :: proc(lock: ^SpinLock) ---
+	@(synchronizes=.Release)
 	AtomicUnlock                 :: proc(lock: ^SpinLock) ---
 	MemoryBarrierReleaseFunction :: proc() ---
 	MemoryBarrierAcquireFunction :: proc() ---
@@ -131,6 +134,10 @@ foreign lib {
 	SetClipboardText :: proc(text: cstring) -> c.int ---
 	GetClipboardText :: proc() -> cstring ---
 	HasClipboardText :: proc() -> bool ---
+
+	SetPrimarySelectionText :: proc(text: cstring) -> c.int ---
+	GetPrimarySelectionText :: proc() -> cstring ---
+	HasPrimarySelectionText :: proc() -> bool ---
 }
 
 
@@ -260,6 +267,10 @@ SensorType :: enum c.int {
 	UNKNOWN,         /**< Unknown sensor type */
 	ACCEL,           /**< Accelerometer */
 	GYRO,            /**< Gyroscope */
+	ACCEL_L,         /**< Accelerometer for left Joy-Con controller and Wii nunchuk */
+	GYRO_L,          /**< Gyroscope for left Joy-Con controller */
+	ACCEL_R,         /**< Accelerometer for right Joy-Con controller */
+	GYRO_R,          /**< Gyroscope for right Joy-Con controller */
 }
 
 STANDARD_GRAVITY :: 9.80665
@@ -267,7 +278,9 @@ STANDARD_GRAVITY :: 9.80665
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
+	@(synchronizes=.Acquire)
 	LockSensors                    :: proc() ---
+	@(synchronizes=.Release)
 	UnlockSensors                  :: proc() ---
 	NumSensors                     :: proc() -> c.int ---
 	SensorGetDeviceName            :: proc(device_index: c.int) -> cstring ---
@@ -281,6 +294,7 @@ foreign lib {
 	SensorGetNonPortableType       :: proc(sensor: ^Sensor) -> c.int ---
 	SensorGetInstanceID            :: proc(sensor: ^Sensor) -> SensorID ---
 	SensorGetData                  :: proc(sensor: ^Sensor, data: [^]f32, num_values: c.int) -> c.int ---
+	SensorGetDataWithTimestamp     :: proc(sensor: ^Sensor, timestamp: ^u64, data: [^]f32, num_values: c.int) -> c.int ---
 	SensorClose                    :: proc(sensor: ^Sensor) ---
 	SensorUpdate                   :: proc() ---
 }

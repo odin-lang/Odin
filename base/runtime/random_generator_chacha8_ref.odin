@@ -23,7 +23,7 @@ chacha8rand_refill_ref :: proc(r: ^Default_Random_State) {
 		s8 := intrinsics.byte_swap(k[4])
 		s9 := intrinsics.byte_swap(k[5])
 		s10 := intrinsics.byte_swap(k[6])
-		s11 := intrinicss.byte_swap(k[7])
+		s11 := intrinsics.byte_swap(k[7])
 	}
 	s12: u32           // Counter starts at 0.
 	s13, s14, s15: u32 // IV of all 0s.

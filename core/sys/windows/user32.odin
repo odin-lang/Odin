@@ -34,6 +34,7 @@ foreign user32 {
 	UnregisterClassW :: proc(lpClassName: LPCWSTR, hInstance: HINSTANCE) -> BOOL ---
 
 	RegisterHotKey :: proc(hnwd: HWND, id: c_int, fsModifiers: UINT, vk: UINT) -> BOOL ---
+	UnregisterHotKey :: proc(hnwd: HWND, id: c_int) -> BOOL ---
 
 	CreateWindowExW :: proc(
 		dwExStyle:             DWORD,
@@ -204,6 +205,7 @@ foreign user32 {
 	ClipCursor   :: proc(lpRect: LPRECT) -> BOOL ---
 	GetCursorPos :: proc(lpPoint: LPPOINT) -> BOOL ---
 	SetCursorPos :: proc(X, Y: INT) -> BOOL ---
+	GetCursor    :: proc() -> HCURSOR ---
 	SetCursor    :: proc(hCursor: HCURSOR) -> HCURSOR ---
 	when !intrinsics.is_package_imported("raylib") {
 		ShowCursor :: proc(bShow: BOOL) -> INT ---
@@ -228,6 +230,7 @@ foreign user32 {
 	GetThreadDpiAwarenessContext  :: proc() -> DPI_AWARENESS_CONTEXT ---
 	GetWindowDpiAwarenessContext  :: proc(hwnd: HWND) -> DPI_AWARENESS_CONTEXT ---
 	GetDpiFromDpiAwarenessContext :: proc(value: DPI_AWARENESS_CONTEXT) -> UINT ---
+	GetDpiForSystem 			  :: proc() -> UINT ---
 	GetDpiForWindow               :: proc(hwnd: HWND) -> UINT ---
 	SetProcessDpiAwarenessContext :: proc(value: DPI_AWARENESS_CONTEXT) -> BOOL ---
 
@@ -320,7 +323,7 @@ foreign user32 {
 
 	GetProcessWindowStation   :: proc() -> HWINSTA ---
 	GetUserObjectInformationW :: proc(hObj: HANDLE, nIndex: GetUserObjectInformationFlags, pvInfo: PVOID, nLength: DWORD, lpnLengthNeeded: LPDWORD) -> BOOL ---
-	
+
 	OpenClipboard                 :: proc(hWndNewOwner: HWND) -> BOOL ---
 	CloseClipboard                :: proc() -> BOOL ---
 	GetClipboardData              :: proc(uFormat: UINT) -> HANDLE ---
@@ -346,6 +349,10 @@ foreign user32 {
 	GetScrollInfo   :: proc(hwnd: HWND, nBar: c_int, lpsi: ^SCROLLINFO) -> BOOL ---
 	ShowScrollBar   :: proc(hwnd: HWND, nBar: c_int, bShow: BOOL) -> BOOL ---
 	EnableScrollBar :: proc(hwnd: HWND, wSBflags: UINT, wArrows: UINT) -> BOOL ---
+
+	EnableMouseInPointer :: proc(fEnable: BOOL) ---
+	GetPointerInfo :: proc(pointerId: UINT, pointerInfo: ^POINTER_INFO) -> BOOL ---
+	GetPointerPenInfo :: proc(pointerId: UINT, penInfo: ^POINTER_PEN_INFO) -> BOOL ---
 }
 
 CreateWindowW :: #force_inline proc "system" (
@@ -986,6 +993,97 @@ ESB_DISABLE_UP      :: 0x0001
 ESB_DISABLE_DOWN    :: 0x0002
 ESB_DISABLE_LTUP    :: ESB_DISABLE_LEFT
 ESB_DISABLE_RTDN    :: ESB_DISABLE_RIGHT
+
+POINTER_INPUT_TYPE :: enum DWORD {
+	PT_POINTER  = 1,
+	PT_TOUCH    = 2,
+	PT_PEN      = 3,
+	PT_MOUSE    = 4,
+	PT_TOUCHPAD = 5,
+}
+
+POINTER_BUTTON_CHANGE_TYPE :: enum {
+	NONE,
+	FIRSTBUTTON_DOWN,
+	FIRSTBUTTON_UP,
+	SECONDBUTTON_DOWN,
+	SECONDBUTTON_UP,
+	THIRDBUTTON_DOWN,
+	THIRDBUTTON_UP,
+	FOURTHBUTTON_DOWN,
+	FOURTHBUTTON_UP,
+	FIFTHBUTTON_DOWN,
+	FIFTHBUTTON_UP,
+}
+
+PointerFlag :: enum {
+	new             =  0,
+	in_range        =  1,
+	in_contact      =  2,
+	first_button    =  4,
+	second_button   =  5,
+	third_button    =  6,
+	fourth_button   =  7,
+	fifth_button    =  8,
+	primary         = 13,
+	confidence      = 14,
+	canceled        = 15,
+	down            = 16,
+	update          = 17,
+	up              = 18,
+	wheel           = 19,
+	hwheel          = 20,
+	capture_changed = 21,
+	has_transform   = 22,
+}
+
+PenFlag :: enum {
+	barrel   = 0,
+	inverted = 1,
+	eraser   = 2,
+}
+
+PenMask :: enum {
+	pressure = 0,
+	rotation = 1,
+	tiltX    = 2,
+	tiltY    = 3,
+}
+
+POINTER_INFO :: struct {
+	pointerType: POINTER_INPUT_TYPE,
+	pointerId: UINT,
+	frameId: UINT,
+	pointerFlags: bit_set[PointerFlag; UINT],
+	sourceDevice: HANDLE,
+	hwndTarget: HWND,
+	ptPixelLocation: POINT,
+	ptHimetricLocation: POINT,
+	ptPixelLocationRaw: POINT,
+	ptHimetricLocationRaw: POINT,
+	dwTime: DWORD,
+	historyCount: UINT,
+	InputData: INT32,
+	dwKeyStates: DWORD,
+	PerformanceCount: UINT,
+	ButtonChangeType: POINTER_BUTTON_CHANGE_TYPE,
+}
+
+POINTER_PEN_INFO :: struct {
+	pointerInfo: POINTER_INFO,
+	penFlags: bit_set[PenFlag; UINT],
+	penMask: bit_set[PenMask; UINT],
+
+	// pressure normalized to a range between 0 and 1024. 0 if the device does not report pressure.
+	pressure: UINT,
+
+	// clockwise rotation, or twist, of the pointer normalized in a range of 0 to 359
+	rotation: UINT,
+
+	// -90 to +90; positive value indicating a tilt toward the user
+	tiltX: INT,
+	tiltY: INT,
+}
 
 // Command constants for GetWindow
 GW_HWNDFIRST        :: 0

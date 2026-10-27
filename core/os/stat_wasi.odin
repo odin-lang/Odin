@@ -10,8 +10,9 @@ internal_stat :: proc(stat: wasi.filestat_t, fullpath: string) -> (fi: File_Info
 	fi.fullpath = fullpath
 	_, fi.name = split_path(fi.fullpath)
 
-	fi.inode = u128(stat.ino)
-	fi.size  = i64(stat.size)
+	fi.inode  = u128(stat.ino)
+	fi.device = u64(stat.dev)
+	fi.size   = i64(stat.size)
 
 	switch stat.filetype {
 	case .BLOCK_DEVICE:                 fi.type = .Block_Device

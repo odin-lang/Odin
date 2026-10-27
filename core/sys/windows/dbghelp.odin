@@ -259,6 +259,23 @@ MINIDUMP_TYPE :: enum u32 {
 	ValidTypeFlags                 = 0x01ffffff,
 }
 
+SYMBOL_INFO :: struct {
+	SizeOfStruct: ULONG,
+	TypeIndex:    ULONG,
+	Reserved:     [2]ULONG64,
+	Index:        ULONG,
+	Size:         ULONG,
+	ModBase:      ULONG64,
+	Flags:        ULONG,
+	Value:        ULONG64,
+	Address:      ULONG64,
+	Register:     ULONG,
+	Scope:        ULONG,
+	Tag:          ULONG,
+	NameLen:      ULONG,
+	MaxNameLen:   ULONG,
+	Name:         [1]CHAR,
+}
 
 SYMBOL_INFOW :: struct {
 	SizeOfStruct: ULONG,
@@ -282,14 +299,25 @@ IMAGEHLP_LINE64 :: struct {
 	SizeOfStruct: DWORD,
 	Key:          PVOID,
 	LineNumber:   DWORD,
+	FileName:     PCHAR,
+	Address:      DWORD64,
+}
+
+IMAGEHLP_LINEW64 :: struct {
+	SizeOfStruct: DWORD,
+	Key:          PVOID,
+	LineNumber:   DWORD,
 	FileName:     PWSTR,
 	Address:      DWORD64,
 }
 
+PSYMBOL_INFO      :: ^SYMBOL_INFO
 PSYMBOL_INFOW     :: ^SYMBOL_INFOW
-PIMAGEHLP_LINEW64 :: ^IMAGEHLP_LINE64
+PIMAGEHLP_LINE64  :: ^IMAGEHLP_LINE64
+PIMAGEHLP_LINEW64 :: ^IMAGEHLP_LINEW64
 
-SYMOPT_LOAD_LINES :: 0x00000010
+SYMOPT_LOAD_LINES     :: 0x00000010
+SYMOPT_DEFERRED_LOADS :: 0x00000004
 
 @(default_calling_convention = "system")
 foreign Dbghelp {
@@ -314,6 +342,8 @@ foreign Dbghelp {
 	SymInitialize         :: proc(hProcess: HANDLE, UserSearchPath: PCSTR, fInvadeProcess: BOOL) -> BOOL ---
 	SymCleanup            :: proc(hProcess: HANDLE) -> BOOL ---
 	SymSetOptions         :: proc(SymOptions: DWORD) -> DWORD ---
+	SymFromAddr           :: proc(hProcess: HANDLE, Address: DWORD64, Displacement: PDWORD64, Symbol: PSYMBOL_INFO) -> BOOL ---
 	SymFromAddrW          :: proc(hProcess: HANDLE, Address: DWORD64, Displacement: PDWORD64, Symbol: PSYMBOL_INFOW) -> BOOL ---
-	SymGetLineFromAddrW64 :: proc(hProcess: HANDLE, dwAddr: DWORD64, pdwDisplacement: PDWORD, Line: PIMAGEHLP_LINEW64) -> BOOL ---
+	SymGetLineFromAddr64  :: proc(hProcess: HANDLE, Address: DWORD64, Displacement: PDWORD, Line: PIMAGEHLP_LINE64) -> BOOL ---
+	SymGetLineFromAddrW64 :: proc(hProcess: HANDLE, Address: DWORD64, Displacement: PDWORD, Line: PIMAGEHLP_LINEW64) -> BOOL ---
 }

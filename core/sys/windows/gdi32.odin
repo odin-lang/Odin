@@ -82,6 +82,11 @@ foreign gdi32 {
 	Chord       :: proc(hdc: HDC, x1, y1, x2, y2, x3, y3, x4, y4: c_int) -> BOOL ---
 	Polygon     :: proc(hdc: HDC, apt: [^]POINT, cpt: c_int) -> BOOL ---
 	PolyPolygon :: proc(hdc: HDC, apt: [^]POINT, asz: [^]c_int, csz: c_int) -> BOOL ---
+
+	// Line Drawing Functions
+	MoveToEx   :: proc(hdc: HDC, x: i32, y: i32, lppt: ^POINT) -> BOOL ---
+	LineTo     :: proc(hdc: HDC, x: i32, y: i32) -> BOOL ---
+	PolylineTo :: proc(hdc: HDC, apt: [^]POINT, cpt: DWORD) -> BOOL ---
 }
 
 @(require_results)
@@ -224,20 +229,20 @@ BS_DIBPATTERN8X8 :: 8
 BS_MONOPATTERN   :: 9
 
 /* Hatch Styles */
-HS_HORIZONTAL    :: 0       /* ----- */
-HS_VERTICAL      :: 1       /* ||||| */
-HS_FDIAGONAL     :: 2       /* \\\\\ */
-HS_BDIAGONAL     :: 3       /* ///// */
-HS_CROSS         :: 4       /* +++++ */
-HS_DIAGCROSS     :: 5       /* xxxxx */
+HS_HORIZONTAL    :: 0       /* `-----` */
+HS_VERTICAL      :: 1       /* `|||||` */
+HS_FDIAGONAL     :: 2       /* `\\\\\` */
+HS_BDIAGONAL     :: 3       /* `/////` */
+HS_CROSS         :: 4       /* `+++++` */
+HS_DIAGCROSS     :: 5       /* `xxxxx` */
 HS_API_MAX       :: 12
 
 /* Pen Styles */
 PS_SOLID         ::  0
-PS_DASH          ::  1      /* ------- */
-PS_DOT           ::  2      /* ....... */
-PS_DASHDOT       ::  3      /* _._._._ */
-PS_DASHDOTDOT    ::  4      /* _.._.._ */
+PS_DASH          ::  1      /* `-------` */
+PS_DOT           ::  2      /* `.......` */
+PS_DASHDOT       ::  3      /* `_._._._` */
+PS_DASHDOTDOT    ::  4      /* `_.._.._` */
 PS_NULL          ::  5
 PS_INSIDEFRAME   ::  6
 PS_USERSTYLE     ::  7

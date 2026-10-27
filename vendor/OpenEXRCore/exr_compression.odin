@@ -56,6 +56,42 @@ foreign lib {
 	 */
 	compression_lines_per_chunk :: proc(comptype: compression_t) -> c.int ---
 
+	/** Routine to give a short name for a compression type.
+	 *
+	 * This is useful for building user-facing routines.
+	 */
+	compression_name :: proc(comptype: compression_t) -> cstring ---
+
+	/** Routine to map a short compression name back to a compression type.
+	 *
+	 * This is useful for building user-facing routines and similar
+	 * string-based storage where you may not want the integer.
+	 *
+	 * This will return an out of range value (the C enum's `LAST_TYPE`) when the name is invalid
+	 * or otherwise unrecognised.
+	 */
+	compression_type_from_name :: proc(compname: cstring) -> compression_t ---
+
+	/** Routine to give a short description for a compression type.
+	 *
+	 * This is useful for building user-facing routines.
+	 */
+	compression_description :: proc(comptype: compression_t) -> cstring ---
+
+	/** Routine to query whether the compression mechanism is lossy.
+	 *
+	 * Returns 1 when the compression type is valid and does NOT preserve
+	 * data integrity, 0 otherwise.
+	 */
+	compression_is_lossy :: proc(comptype: compression_t) -> c.int ---
+
+	/** Routine to query whether the compression mechanism is valid for deep
+	 * compression.
+	 *
+	 * Returns 1 when the compression type is valid to compress deep data, 0 otherwise.
+	 */
+	compression_is_valid_for_deep :: proc(comptype: compression_t) -> c.int ---
+
 	/** Exposes a method to apply compression to a chunk of data.
 	 *
 	 * This can be useful for inheriting default behavior of the

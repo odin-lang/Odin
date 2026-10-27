@@ -77,7 +77,11 @@ Document :: struct {
 
 	// Input. Either the original buffer, or a copy if `.Input_May_Be_Modified` isn't specified.
 	input:           []u8            `fmt:"-"`,
-	strings_to_free: [dynamic]string `fmt:"-"`,
+
+	// An arena for small strings, especially for attribute key-value pairs.
+	// This is a hot path optimization for large XML files.
+	extra_strings_arena: mem.Dynamic_Arena `fmt:"-"`,
+	extra_strings_allocator: mem.Allocator `fmt:"-"`,
 }
 
 Element :: struct {
@@ -182,6 +186,12 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 	doc.tokenizer = t
 	doc.input     = data
 
+	// Initialize arena allocator for small strings.
+	// Estimate the block size based on input size, but don't splurge on memory for very small XML documents.
+	dynamic_arena_block_size := max(256, len(data) / 4)
+	mem.dynamic_arena_init(&doc.extra_strings_arena, allocator, allocator, dynamic_arena_block_size)
+	doc.extra_strings_allocator = mem.dynamic_arena_allocator(&doc.extra_strings_arena)
+
 	doc.elements = make([dynamic]Element, 1024, 1024, allocator)
 
 	err = .Unexpected_Token
@@ -213,6 +223,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 				doc.elements[element].parent = parent
 				doc.elements[element].ident  = open.text
 
+				// PERF: Hot
 				parse_attributes(doc, &doc.elements[element].attribs) or_return
 
 				// If a DOCTYPE is present _or_ the caller
@@ -386,10 +397,7 @@ destroy :: proc(doc: ^Document, allocator := context.allocator) {
 	delete(doc.comments)
 	delete(doc.input)
 
-	for s in doc.strings_to_free {
-		delete(s)
-	}
-	delete(doc.strings_to_free)
+	mem.dynamic_arena_destroy(&doc.extra_strings_arena)
 
 	free(doc.tokenizer)
 	free(doc)
@@ -408,7 +416,7 @@ validate_options :: proc(options: Options) -> (validated: Options, err: Error) {
 	return validated, .None
 }
 
-expect :: proc(t: ^Tokenizer, kind: Token_Kind, multiline_string := false) -> (tok: Token, err: Error) {
+expect :: #force_inline proc(t: ^Tokenizer, kind: Token_Kind, multiline_string := false) -> (tok: Token, err: Error) {
 	tok = scan(t, multiline_string=multiline_string)
 	if tok.kind == kind { return tok, .None }
 
@@ -425,9 +433,10 @@ parse_attribute :: proc(doc: ^Document) -> (attr: Attribute, offset: int, err: E
 	_       = expect(t, .Eq)     or_return
 	value  := expect(t, .String, multiline_string=true) or_return
 
-	normalized, normalize_err := entity.decode_xml(value.text, {.Normalize_Whitespace}, doc.allocator)
+	// Estimate decoded size based on input text.
+	builder := strings.builder_make_len_cap(0, len(value.text) + 10, doc.extra_strings_allocator)
+	normalized, normalize_err := entity.decode_xml_sb(&builder, value.text, {.Normalize_Whitespace}, doc.allocator)
 	if normalize_err == .None {
-		append(&doc.strings_to_free, normalized)
 		value.text = normalized
 	}
 
@@ -445,7 +454,7 @@ check_duplicate_attributes :: proc(t: ^Tokenizer, attribs: Attributes, attr: Att
 			return .Duplicate_Attribute
 		}
 	}
-	return .None	
+	return .None
 }
 
 parse_attributes :: proc(doc: ^Document, attribs: ^Attributes) -> (err: Error) {
@@ -453,12 +462,18 @@ parse_attributes :: proc(doc: ^Document, attribs: ^Attributes) -> (err: Error) {
 	context.allocator = doc.allocator
 	t := doc.tokenizer
 
+	// PERF: Hot
 	for peek(t).kind == .Ident {
 		attr, offset := parse_attribute(doc)                  or_return
 		check_duplicate_attributes(t, attribs^, attr, offset) or_return
+		if attribs^ == nil {
+			attribs^ = make_dynamic_array(Attributes, doc.extra_strings_allocator)
+		}
 		append(attribs, attr)
 	}
+
 	skip_whitespace(t)
+
 	return .None
 }
 
@@ -584,10 +599,10 @@ parse_body :: proc(doc: ^Document, element: Element_ID, opts: Options) -> (err: 
 		}
 	}
 
-	decoded, decode_err := entity.decode_xml(body_text, decode_opts)
+	builder := strings.builder_make_len_cap(0, len(body_text) + 10, doc.extra_strings_allocator)
+	decoded, decode_err := entity.decode_xml_sb(&builder, body_text, decode_opts)
 	if decode_err == .None {
 		append(&doc.elements[element].value, decoded)
-		append(&doc.strings_to_free, decoded)
 	} else {
 		append(&doc.elements[element].value, body_text)
 	}

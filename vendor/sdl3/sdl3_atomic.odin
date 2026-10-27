@@ -8,8 +8,11 @@ SpinLock :: distinct c.int
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
 	@(require_results)
+	@(synchronizes=.Acquire)
 	TryLockSpinlock :: proc(lock: ^SpinLock) -> bool ---
+	@(synchronizes=.Acquire)
 	LockSpinlock    :: proc(lock: ^SpinLock) ---
+	@(synchronizes=.Release)
 	UnlockSpinlock  :: proc(lock: ^SpinLock) ---
 
 

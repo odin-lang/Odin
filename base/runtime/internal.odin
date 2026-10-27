@@ -327,6 +327,7 @@ memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
 
 memory_compare :: proc "contextless" (x, y: rawptr, n: int) -> int #no_bounds_check {
 	switch {
+	case n == 0:   return 0
 	case x == y:   return 0
 	case x == nil: return -1
 	case y == nil: return +1
@@ -1032,9 +1033,9 @@ quo_quaternion64 :: proc "contextless" (q, r: quaternion64) -> quaternion64 {
 	invmag2 := 1.0 / (r0*r0 + r1*r1 + r2*r2 + r3*r3)
 
 	t0 := (r0*q0 + r1*q1 + r2*q2 + r3*q3) * invmag2
-	t1 := (r0*q1 - r1*q0 - r2*q3 - r3*q2) * invmag2
+	t1 := (r0*q1 - r1*q0 + r2*q3 - r3*q2) * invmag2
 	t2 := (r0*q2 - r1*q3 - r2*q0 + r3*q1) * invmag2
-	t3 := (r0*q3 + r1*q2 + r2*q1 - r3*q0) * invmag2
+	t3 := (r0*q3 + r1*q2 - r2*q1 - r3*q0) * invmag2
 
 	return quaternion(w=f16(t0), x=f16(t1), y=f16(t2), z=f16(t3))
 }
@@ -1046,9 +1047,9 @@ quo_quaternion128 :: proc "contextless" (q, r: quaternion128) -> quaternion128 {
 	invmag2 := 1.0 / (r0*r0 + r1*r1 + r2*r2 + r3*r3)
 
 	t0 := (r0*q0 + r1*q1 + r2*q2 + r3*q3) * invmag2
-	t1 := (r0*q1 - r1*q0 - r2*q3 - r3*q2) * invmag2
+	t1 := (r0*q1 - r1*q0 + r2*q3 - r3*q2) * invmag2
 	t2 := (r0*q2 - r1*q3 - r2*q0 + r3*q1) * invmag2
-	t3 := (r0*q3 + r1*q2 + r2*q1 - r3*q0) * invmag2
+	t3 := (r0*q3 + r1*q2 - r2*q1 - r3*q0) * invmag2
 
 	return quaternion(w=t0, x=t1, y=t2, z=t3)
 }
@@ -1060,82 +1061,103 @@ quo_quaternion256 :: proc "contextless" (q, r: quaternion256) -> quaternion256 {
 	invmag2 := 1.0 / (r0*r0 + r1*r1 + r2*r2 + r3*r3)
 
 	t0 := (r0*q0 + r1*q1 + r2*q2 + r3*q3) * invmag2
-	t1 := (r0*q1 - r1*q0 - r2*q3 - r3*q2) * invmag2
+	t1 := (r0*q1 - r1*q0 + r2*q3 - r3*q2) * invmag2
 	t2 := (r0*q2 - r1*q3 - r2*q0 + r3*q1) * invmag2
-	t3 := (r0*q3 + r1*q2 + r2*q1 - r3*q0) * invmag2
+	t3 := (r0*q3 + r1*q2 - r2*q1 - r3*q0) * invmag2
 
 	return quaternion(w=t0, x=t1, y=t2, z=t3)
 }
 
-@(link_name="__truncsfhf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-truncsfhf2 :: proc "c" (value: f32) -> __float16 {
-	v: struct #raw_union { i: u32, f: f32 }
-	i, s, e, m: i32
-
-	v.f = value
-	i = i32(v.i)
-
-	s =  (i >> 16) & 0x00008000
-	e = ((i >> 23) & 0x000000ff) - (127 - 15)
-	m =   i        & 0x007fffff
-
-
-	if e <= 0 {
-		if e < -10 {
-			return transmute(__float16)u16(s)
+@(private="file")
+f16_round :: #force_inline proc "contextless" (s: u16, sig: u64, e: i32, $WIDTH: u32) -> __float16 {
+	e := e
+	shift := WIDTH - 11
+	if e < 1 {
+		shift += u32(1 - e)
+		if shift > WIDTH {
+			return transmute(__float16)s
 		}
-		m = (m | 0x00800000) >> u32(1 - e)
+	}
 
-		if m & 0x00001000 != 0 {
-			m += 0x00002000
+	half := u64(1) << (shift - 1)
+
+	rest := sig & (half<<1 - 1)
+	q    := sig >> shift
+	if rest > half || (rest == half && q & 1 != 0) {
+		q += 1
+	}
+
+	if e < 1 {
+		// Rounding up to 0x400 gives the smallest normal
+		return transmute(__float16)u16(s | u16(q))
+	}
+	if q == 0x800 {
+		q = 0x400
+		e += 1
+	}
+
+	if e > 30 {
+		f := i64(1e12)
+		for j := 0; j < 10; j += 1 {
+			// NOTE(bill): Cause overflow
+			g := intrinsics.volatile_load(&f)
+			g *= g
+			intrinsics.volatile_store(&f, g)
 		}
 
-		return transmute(__float16)u16(s | (m >> 13))
-	} else if e == 0xff - (127 - 15) {
+		return transmute(__float16)u16(s | 0x7c00)
+	}
+	return transmute(__float16)u16(s | u16(e) << 10 | u16(q & 0x3ff))
+}
+
+@(private="file")
+f32_to_f16 :: proc "contextless" (value: f32) -> __float16 {
+	i := transmute(u32)value
+	s := u16(i >> 16) & 0x8000
+	b := i32(i >> 23) & 0xff
+	m := i & 0x007fffff
+
+	if b == 0xff {
 		if m == 0 {
-			return transmute(__float16)u16(s | 0x7c00) /* NOTE(bill): infinity */
-		} else {
-			/* NOTE(bill): NAN */
-			m >>= 13
-			return transmute(__float16)u16(s | 0x7c00 | m | i32(m == 0))
-		}
-	} else {
-		if m & 0x00001000 != 0 {
-			m += 0x00002000
-			if (m & 0x00800000) != 0 {
-				m = 0
-				e += 1
-			}
-		}
-
-		if e > 30 {
-			f := i64(1e12)
-			for j := 0; j < 10; j += 1 {
-				/* NOTE(bill): Cause overflow */
-				g := intrinsics.volatile_load(&f)
-				g *= g
-				intrinsics.volatile_store(&f, g)
-			}
-
+			// NOTE(bill): Infinity
 			return transmute(__float16)u16(s | 0x7c00)
 		}
-
-		return transmute(__float16)u16(s | (e << 10) | (m >> 13))
+		// NOTE(bill): NaN
+		n := u16(m >> 13)
+		return transmute(__float16)u16(s | 0x7c00 | n | u16(n == 0))
 	}
+	if b == 0 {
+		b = 1
+	} else {
+		m |= 0x00800000
+	}
+	return f16_round(s, u64(m), b - (127 - 15), 24)
 }
 
-@(link_name="__aeabi_d2h", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-aeabi_d2h :: proc "c" (value: f64) -> __float16 {
-	return truncsfhf2(f32(value))
+@(private="file")
+f64_to_f16 :: proc "contextless" (value: f64) -> __float16 {
+	i := transmute(u64)value
+	s := u16(i >> 48) & 0x8000
+	b := i32(i >> 52) & 0x7ff
+	m := i & 0x000fffff_ffffffff
+
+	if b == 0x7ff {
+		if m == 0 {
+			return transmute(__float16)u16(s | 0x7c00)
+		}
+		// Quiet as converting through f32 made it
+		return transmute(__float16)u16(s | 0x7e00 | u16(m >> 42))
+	}
+	if b == 0 {
+		b = 1
+	} else {
+		m |= 0x00100000_00000000
+	}
+	return f16_round(s, m, b - (1023 - 15), 53)
 }
 
-@(link_name="__truncdfhf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-truncdfhf2 :: proc "c" (value: f64) -> __float16 {
-	return truncsfhf2(f32(value))
-}
-
-@(link_name="__gnu_h2f_ieee", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-gnu_h2f_ieee :: proc "c" (value_: __float16) -> f32 {
+@(private="file")
+f16_to_f32 :: proc "contextless" (value_: __float16) -> f32 {
 	fp32 :: struct #raw_union { u: u32, f: f32 }
 
 	value := transmute(u16)value_
@@ -1154,14 +1176,56 @@ gnu_h2f_ieee :: proc "c" (value_: __float16) -> f32 {
 }
 
 
+// The conversion helpers below are libgcc / compiler-rt entry points, so their calling convention
+// is compiler-rt's and not the target's ordinary one. On ARM they take and return their values in
+// the core registers even though the target is AAPCS-VFP, where an ordinary `proc "c"` float
+// travels in `s0`. clang's call sites move the value out of the VFP register and back around the
+// call:
+//
+//     vmov r0, s0 ; bl __gnu_h2f_ieee ; vmov s0, r0
+//
+// Typing the boundary as integers is what puts them in the same registers. Declared as floats they
+// land in `s0` at both ends and every `_Float16` conversion in C code linked against this runtime
+// reads whatever the other register happened to hold. Everywhere else the helpers really do take
+// and return floats, so only arm32 changes shape.
+when ODIN_ARCH == .arm32 {
+	__f16_abi :: u16
+	__f32_abi :: u32
+	__f64_abi :: u64
+} else {
+	__f16_abi :: __float16
+	__f32_abi :: f32
+	__f64_abi :: f64
+}
+
+@(link_name="__truncsfhf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
+truncsfhf2 :: proc "c" (value: __f32_abi) -> __f16_abi {
+	return transmute(__f16_abi)f32_to_f16(transmute(f32)value)
+}
+
 @(link_name="__gnu_f2h_ieee", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-gnu_f2h_ieee :: proc "c" (value: f32) -> __float16 {
-	return truncsfhf2(value)
+gnu_f2h_ieee :: proc "c" (value: __f32_abi) -> __f16_abi {
+	return transmute(__f16_abi)f32_to_f16(transmute(f32)value)
+}
+
+@(link_name="__aeabi_d2h", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
+aeabi_d2h :: proc "c" (value: __f64_abi) -> __f16_abi {
+	return transmute(__f16_abi)f64_to_f16(transmute(f64)value)
+}
+
+@(link_name="__truncdfhf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
+truncdfhf2 :: proc "c" (value: __f64_abi) -> __f16_abi {
+	return transmute(__f16_abi)f64_to_f16(transmute(f64)value)
+}
+
+@(link_name="__gnu_h2f_ieee", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
+gnu_h2f_ieee :: proc "c" (value: __f16_abi) -> __f32_abi {
+	return transmute(__f32_abi)f16_to_f32(transmute(__float16)value)
 }
 
 @(link_name="__extendhfsf2", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-extendhfsf2 :: proc "c" (value: __float16) -> f32 {
-	return gnu_h2f_ieee(value)
+extendhfsf2 :: proc "c" (value: __f16_abi) -> __f32_abi {
+	return transmute(__f32_abi)f16_to_f32(transmute(__float16)value)
 }
 
 when .Address in ODIN_SANITIZER_FLAGS {

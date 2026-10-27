@@ -247,7 +247,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			if slice.equal(ident[:], image.JFIF_Magic[:]) {
 				if length != 14 {
 					// Malformed APP0. Skip it
-					compress.read_slice(ctx, length - len(ident) - 1) or_return
+					compress.read_slice(ctx, max(0, length - len(ident) - 1)) or_return
 					continue
 				}
 

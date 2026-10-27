@@ -23,7 +23,8 @@
 #define WIN32_LEAN_AND_MEAN 1
 #endif
 
-#include <Windows.h>
+// Lower-case windows.h intentionally for cross compiling on mingw.
+#include <windows.h>
 #include <limits.h>
 
 static double s_invFrequency = 0.0;
@@ -517,7 +518,7 @@ typedef struct b3Thread
 	char name[NAME_LENGTH];
 } b3Thread;
 
-// macOS pthread_setname_np takes only the name — it always names the calling thread.
+// macOS pthread_setname_np takes only the name, it always names the calling thread.
 static void b3SetCurrentThreadName( const char* name )
 {
 	if ( name == NULL || name[0] == 0 )

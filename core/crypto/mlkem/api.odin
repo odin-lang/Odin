@@ -269,7 +269,7 @@ params :: proc(k: ^$T) -> Parameters where (T == Encapsulation_Key || T == Decap
 @(require_results)
 key_size :: proc(k: ^$T) -> int where (T == Encapsulation_Key || T == Decapsulation_Key) {
 	when T == Encapsulation_Key {
-		return ENCAPSULATION_KEY_SIZES[k.pke_ek.k]
+		return ENCAPSULATION_KEY_SIZES[params(k)]
 	} else {
 		return DECAPSULATION_KEY_SEED_SIZE
 	}

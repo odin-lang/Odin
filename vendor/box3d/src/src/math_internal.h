@@ -61,6 +61,7 @@ b3Matrix3 b3BoxInertia( float mass, b3Vec3 min, b3Vec3 max );
 int b3GetProxySupport( const b3ShapeProxy* proxy, b3Vec3 axis );
 int b3GetPointSupport( const b3Vec3* points, int count, b3Vec3 axis );
 
+// Align up to 8 byte alignment.
 static inline size_t b3AlignUp8( size_t x )
 {
 	return ( x + 7u ) & ~(size_t)7u;
