@@ -3,8 +3,10 @@
 # These files must always have *nix line-endings
 Makefile text eol=lf
 *.sh text eol=lf
-vendor/box2d/lib/box2d_windows_amd64_avx2.lib filter=lfs diff=lfs merge=lfs -text
-vendor/box2d/lib/box2d_windows_amd64_sse2.lib filter=lfs diff=lfs merge=lfs -text
+vendor/box2d/lib/box2d_windows_amd64.lib filter=lfs diff=lfs merge=lfs -text
+vendor/box2d/lib/box2d_darwin.a filter=lfs diff=lfs merge=lfs -text
+vendor/box2d/lib/box2d_wasm.o filter=lfs diff=lfs merge=lfs -text
+vendor/box2d/lib/box2d_wasm_simd.o filter=lfs diff=lfs merge=lfs -text
 vendor/box3d/lib/linux-amd64/libbox3d.a filter=lfs diff=lfs merge=lfs -text
 vendor/box3d/lib/darwin/libbox3d.a filter=lfs diff=lfs merge=lfs -text
 vendor/box3d/lib/box3d.lib filter=lfs diff=lfs merge=lfs -text
@@ -12,10 +14,6 @@ vendor/box3d/lib/box3d.dll filter=lfs diff=lfs merge=lfs -text
 vendor/box3d/lib/box3ddll.lib filter=lfs diff=lfs merge=lfs -text
 vendor/box3d/lib/box3d_wasm.o filter=lfs diff=lfs merge=lfs -text
 vendor/miniaudio/lib/miniaudio.lib filter=lfs diff=lfs merge=lfs -text
-vendor/sdl3/SDL3.dll filter=lfs diff=lfs merge=lfs -text
-vendor/sdl3/SDL3.lib filter=lfs diff=lfs merge=lfs -text
-vendor/sdl3/mixer/*.dll filter=lfs diff=lfs merge=lfs -text
-vendor/sdl3/mixer/*.lib filter=lfs diff=lfs merge=lfs -text
 vendor/wgpu/lib/wgpu-windows-x86_64-msvc-release/lib/wgpu_native.dll filter=lfs diff=lfs merge=lfs -text
 vendor/wgpu/lib/wgpu-windows-x86_64-msvc-release/lib/wgpu_native.dll.lib filter=lfs diff=lfs merge=lfs -text
 vendor/wgpu/lib/wgpu-windows-x86_64-msvc-release/lib/wgpu_native.lib filter=lfs diff=lfs merge=lfs -text
@@ -37,3 +35,21 @@ vendor/raylib/windows/raylibdll.lib filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/windows/raygui.dll filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/windows/raygui.lib filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/windows/rayguidll.lib filter=lfs diff=lfs merge=lfs -text
+vendor/lua/*/windows/*.dll filter=lfs diff=lfs merge=lfs -text
+vendor/lua/*/windows/*.lib filter=lfs diff=lfs merge=lfs -text
+vendor/lua/*/linux/*.a filter=lfs diff=lfs merge=lfs -text
+vendor/lua/*/linux/*.so filter=lfs diff=lfs merge=lfs -text
+vendor/OpenEXRCore/*.lib filter=lfs diff=lfs merge=lfs -text
+vendor/OpenEXRCore/darwin/*.a filter=lfs diff=lfs merge=lfs -text
+vendor/miniaudio/lib/darwin/*.a filter=lfs diff=lfs merge=lfs -text
+vendor/kb_text_shape/lib/darwin/*.a filter=lfs diff=lfs merge=lfs -text
+vendor/portmidi/portmidi_s.lib filter=lfs diff=lfs merge=lfs -text
+vendor/portmidi/darwin/*.a filter=lfs diff=lfs merge=lfs -text
+vendor/sdl2/*.dll filter=lfs diff=lfs merge=lfs -text
+vendor/sdl2/*/*.dll filter=lfs diff=lfs merge=lfs -text
+vendor/sdl2/*.lib filter=lfs diff=lfs merge=lfs -text
+vendor/sdl2/*/*.lib filter=lfs diff=lfs merge=lfs -text
+vendor/sdl3/*.dll filter=lfs diff=lfs merge=lfs -text
+vendor/sdl3/*/*.dll filter=lfs diff=lfs merge=lfs -text
+vendor/sdl3/*.lib filter=lfs diff=lfs merge=lfs -text
+vendor/sdl3/*/*.lib filter=lfs diff=lfs merge=lfs -text

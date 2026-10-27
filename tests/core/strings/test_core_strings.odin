@@ -272,3 +272,13 @@ test_prefix_length :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@test
+test_compare_empty :: proc(t: ^testing.T) {
+	buf: [1]u8
+	empty := string(buf[:0])
+
+	testing.expect_value(t, strings.compare("", empty), 0)
+	testing.expect_value(t, strings.compare(empty, ""), 0)
+	testing.expect(t, !("" < empty) && !(empty < ""), "two empty strings must not order before each other")
+}

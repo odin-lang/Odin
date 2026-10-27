@@ -449,6 +449,8 @@ PenProximityEvent :: struct {
 	using commonEvent: CommonEvent, /**< SDL_EVENT_PEN_PROXIMITY_IN or SDL_EVENT_PEN_PROXIMITY_OUT */
 	windowID: WindowID,  /**< The window with pen focus, if any */
 	which:    PenID,     /**< The pen instance id */
+	pen_state:   PenInputFlags, /**< Complete pen input state at time of event (added in 3.4.16). */
+	device_type: PenDeviceType, /**< the device type of the pen, if known (added in 3.4.18). */
 }
 
 
@@ -459,6 +461,7 @@ PenMotionEvent :: struct {
 	pen_state: PenInputFlags,  /**< Complete pen input state at time of event */
 	x:         f32,            /**< X coordinate, relative to window */
 	y:         f32,            /**< Y coordinate, relative to window */
+	device_type: PenDeviceType, /**< the device type of the pen, if known (added in 3.4.18). */
 }
 
 PenTouchEvent :: struct {
@@ -470,6 +473,7 @@ PenTouchEvent :: struct {
 	y:         f32,            /**< Y coordinate, relative to window */
 	eraser:    bool,           /**< true if eraser end is used (not all pens support this). */
 	down:      bool,           /**< true if the pen is touching or false if the pen is lifted off */
+	device_type: PenDeviceType, /**< the device type of the pen, if known (added in 3.4.18). */
 }
 
 PenButtonEvent :: struct {
@@ -481,6 +485,7 @@ PenButtonEvent :: struct {
 	y:         f32,            /**< Y coordinate, relative to window */
 	button:    Uint8,          /**< The pen button index (first button is 1). */
 	down:      bool,           /**< true if the button is pressed */
+	device_type: PenDeviceType, /**< the device type of the pen, if known (added in 3.4.18). */
 }
 
 PenAxisEvent :: struct {
@@ -492,6 +497,7 @@ PenAxisEvent :: struct {
 	y:         f32,            /**< Y coordinate, relative to window */
 	axis:      PenAxis,        /**< Axis that has changed */
 	value:     f32,            /**< New value of axis */
+	device_type: PenDeviceType, /**< the device type of the pen, if known (added in 3.4.18). */
 }
 
 DropEvent :: struct {

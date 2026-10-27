@@ -7,10 +7,20 @@ when ODIN_OS == .Windows {
 	when OPENEXRCORE_SHARED {
 		#panic("Dynamic linking is not supported for OpenEXRCore yet")
 	} else {
-		foreign import lib_ "OpenEXRCore-3_3.lib"
+		foreign import lib_ "OpenEXRCore-3_5.lib"
+	}
+} else when ODIN_OS == .Darwin {
+	when OPENEXRCORE_SHARED {
+		#panic("Dynamic linking is not supported for OpenEXRCore yet")
+	} else {
+		// The library contains C++ code (OpenJPH, for the HTJ2K and LJ2K codecs), so it needs the C++ runtime.
+		foreign import lib_ {
+			"darwin/OpenEXRCore-3_5.a",
+			"system:c++",
+		}
 	}
 } else {
-	foreign import lib_ "system:OpenEXRCore-3_3"
+	foreign import lib_ "system:OpenEXRCore-3_5"
 }
 
 lib :: lib_
@@ -165,6 +175,31 @@ foreign lib {
 	/** @brief Retrieve the global default dwa compression quality
 	 */
 	get_default_dwa_compression_quality :: proc(q: ^f32) ---
+
+	/** @brief Assigns a default lossy HTJ2K compression quality.
+	 *
+	 * This value may be controlled separately on each part, but this global control
+	 * determines the initial value.
+	 */
+	set_default_lossy_htj2k_quality :: proc(q: f32) ---
+
+	/** @brief Retrieve the global default lossy HTJ2K compression quality.
+	 */
+	get_default_lossy_htj2k_quality :: proc(q: ^f32) ---
+
+	/** @brief Assigns a default zstd compression level.
+	 *
+	 * Valid levels are 1 through 22 (libzstd). Values outside that range
+	 * are clamped. The library default is 5.
+	 *
+	 * This value may be controlled separately on each part, but this
+	 * global control determines the initial value.
+	 */
+	set_default_zstd_compression_level :: proc(l: c.int) ---
+
+	/** @brief Retrieve the global default zstd compression level (1-22; default 5).
+	 */
+	get_default_zstd_compression_level :: proc(l: ^c.int) ---
 
 	/** @brief Allow the user to override default allocator used internal
 	 * allocations necessary for files, attributes, and other temporary

@@ -217,7 +217,7 @@ typedef struct MIX_Group MIX_Group;
  *
  * \since This macro is available since SDL_mixer 3.0.0.
  */
-#define SDL_MIXER_MICRO_VERSION   0
+#define SDL_MIXER_MICRO_VERSION   4
 
 /**
  * This is the current version number macro of the SDL_mixer headers.
@@ -551,7 +551,7 @@ extern SDL_DECLSPEC bool SDLCALL MIX_GetMixerFormat(MIX_Mixer *mixer, SDL_AudioS
  * locked until the final matching unlock call.
  *
  * Do not lock the mixer for significant amounts of time, or it can cause
- * audio dropouts. Just do simply things quickly and unlock again.
+ * audio dropouts. Just do simple things quickly and unlock again.
  *
  * Locking a NULL mixer is a safe no-op.
  *
@@ -747,7 +747,6 @@ extern SDL_DECLSPEC MIX_Audio * SDLCALL MIX_LoadAudioNoCopy(MIX_Mixer *mixer, co
  * SDL_PropertiesID are discussed in
  * [SDL's documentation](https://wiki.libsdl.org/SDL3/CategoryProperties)
  * .
- *
  * These are the supported properties:
  *
  * - `MIX_PROP_AUDIO_LOAD_IOSTREAM_POINTER`: a pointer to an SDL_IOStream to
@@ -763,6 +762,11 @@ extern SDL_DECLSPEC MIX_Audio * SDLCALL MIX_LoadAudioNoCopy(MIX_Mixer *mixer, co
  *   metadata tags, like ID3 and APE tags. This can be used to speed up
  *   loading _if the data definitely doesn't have these tags_. Some decoders
  *   will fail if these tags are present when this property is true.
+ * - `MIX_PROP_AUDIO_LOAD_IGNORE_LOOPS_BOOLEAN`: true to ignore metadata in
+ *   the audio data specifying loop points. This will make a file decode from
+ *   start to finish without looping, even if the file specified it should
+ *   have. This audio can still be looped at playback time via MIX_Track loop
+ *   settings, regardless of this setting. Default false.
  * - `MIX_PROP_AUDIO_DECODER_STRING`: the name of the decoder to use for this
  *   data. Optional. If not specified, SDL_mixer will examine the data and
  *   choose the best decoder. These names are the same returned from
@@ -791,6 +795,7 @@ extern SDL_DECLSPEC MIX_Audio * SDLCALL MIX_LoadAudioWithProperties(SDL_Properti
 #define MIX_PROP_AUDIO_LOAD_PREDECODE_BOOLEAN "SDL_mixer.audio.load.predecode"
 #define MIX_PROP_AUDIO_LOAD_PREFERRED_MIXER_POINTER "SDL_mixer.audio.load.preferred_mixer"
 #define MIX_PROP_AUDIO_LOAD_SKIP_METADATA_TAGS_BOOLEAN "SDL_mixer.audio.load.skip_metadata_tags"
+#define MIX_PROP_AUDIO_LOAD_IGNORE_LOOPS_BOOLEAN "SDL_mixer.audio.load.ignore_loops"
 #define MIX_PROP_AUDIO_DECODER_STRING "SDL_mixer.audio.decoder"
 
 /**
@@ -1115,7 +1120,10 @@ extern SDL_DECLSPEC MIX_Track * SDLCALL MIX_CreateTrack(MIX_Mixer *mixer);
  * MIX_SetTrackStoppedCallback(), it will _not_ be called.
  *
  * If the mixer is currently mixing in another thread, this will block until
- * it finishes.
+ * it finishes. Destroying a track from the mixer thread itself (during a
+ * callback) will cause it to be destroyed as soon as this iteration of the
+ * mixer thread is not using it; in this scenario, destroying a track and then
+ * making futher changes to it is considered undefined behavior.
  *
  * Destroying a NULL MIX_Track is a legal no-op.
  *
@@ -1885,6 +1893,14 @@ extern SDL_DECLSPEC Sint64 SDLCALL MIX_FramesToMS(int sample_rate, Sint64 frames
  *   possible. Note that a track is not consider exhausted until all its loops
  *   and appended silence have been mixed (and also, that loops don't mean
  *   anything when the input is an AudioStream). Default true.
+ * - `MIX_PROP_PLAY_START_ORDER_NUMBER`: This is a special-case property that
+ *   most apps can ignore. For mod file formats, start mixing from a specific
+ *   "order" index instead of the start of the file. A value < 0 will cause
+ *   this property to be ignored. If the decoder doesn't support this
+ *   property, it will also be ignored. If this property is _not_ ignored, the
+ *   MIX_PROP_PLAY_START_FRAME_NUMBER and
+ *   MIX_PROP_PLAY_START_MILLISECOND_NUMBER properties will be ignored
+ *   instead. Default -1. Since SDL_mixer 3.2.2.
  *
  * If this function fails, mixing of this track will not start (or restart, if
  * it was already started).
@@ -1910,6 +1926,7 @@ extern SDL_DECLSPEC bool SDLCALL MIX_PlayTrack(MIX_Track *track, SDL_PropertiesI
 #define MIX_PROP_PLAY_MAX_MILLISECONDS_NUMBER "SDL_mixer.play.max_milliseconds"
 #define MIX_PROP_PLAY_START_FRAME_NUMBER "SDL_mixer.play.start_frame"
 #define MIX_PROP_PLAY_START_MILLISECOND_NUMBER "SDL_mixer.play.start_millisecond"
+#define MIX_PROP_PLAY_START_ORDER_NUMBER "SDL_mixer.play.start_order"
 #define MIX_PROP_PLAY_LOOP_START_FRAME_NUMBER "SDL_mixer.play.loop_start_frame"
 #define MIX_PROP_PLAY_LOOP_START_MILLISECOND_NUMBER "SDL_mixer.play.loop_start_millisecond"
 #define MIX_PROP_PLAY_FADE_IN_FRAMES_NUMBER "SDL_mixer.play.fade_in_frames"
@@ -2037,8 +2054,12 @@ extern SDL_DECLSPEC bool SDLCALL MIX_StopTrack(MIX_Track *track, Sint64 fade_out
  *
  * Once a track has completed any fadeout and come to a stop, it will call its
  * MIX_TrackStoppedCallback, if any. It is legal to assign the track a new
- * input and/or restart it during this callback. This function does not
- * prevent new play requests from being made.
+ * input and/or restart it during this callback.
+ *
+ * This function does not prevent new play requests from being made; it’s
+ * legal to use this function to begin fading all playing tracks but then
+ * start other tracks playing normally while those fade-outs are still in
+ * progress.
  *
  * \param mixer the mixer on which to stop all tracks.
  * \param fade_out_ms the number of milliseconds to spend fading out to
@@ -3228,8 +3249,9 @@ extern SDL_DECLSPEC MIX_AudioDecoder * SDLCALL MIX_CreateAudioDecoder(const char
  *
  * This function allows properties to be specified. This is intended to supply
  * file-specific settings, such as where to find SoundFonts for a MIDI file,
- * etc. In most cases, the caller should pass a zero to specify no extra
- * properties.
+ * etc. Most of the properties available to MIX_LoadAudioWithProperties()
+ * apply here, too. In most cases, the caller should pass a zero to specify no
+ * extra properties.
  *
  * If `closeio` is true, then `io` will be closed when this decoder is done
  * with it. If this function fails and `closeio` is true, then `io` will be

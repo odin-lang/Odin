@@ -191,6 +191,66 @@ xml_test_unicode :: proc(t: ^testing.T) {
 	})
 }
 
+@(test)
+xml_test_cdata_edge_cases :: proc(t: ^testing.T) {
+	Case :: struct {
+		src:     string,
+		err:     xml.Error,
+		value:   string,
+		decoded: string,
+		unboxed: string,
+	}
+
+	cases := [?]Case{
+		{src = `<a>x <![CDATA[l]]></a>`,                value = `x <![CDATA[l]]>`,                unboxed = `x l`},
+		{src = `<a>x <![CDATA[]]></a>`,                 value = `x <![CDATA[]]>`,                 unboxed = `x `},
+		{src = `<a>x <![CDATA[ab]]></a>`,               value = `x <![CDATA[ab]]>`,               unboxed = `x ab`},
+		{src = `<a>x <![CDATA[]]><!-- c --> y</a>`,     value = `x <![CDATA[]]><!-- c --> y`,     decoded = `x <![CDATA[]]> y`, unboxed = `x  y`},
+		{src = `<a>x <![CDATA[]]><![CDATA[z]]> y</a>`,  value = `x <![CDATA[]]><![CDATA[z]]> y`,  unboxed = `x z y`},
+		{src = `<a>x <![CDATA[a<]]> y</a>`,             value = `x <![CDATA[a<]]> y`,             unboxed = `x a< y`},
+		{src = `<a>x <![CDATA[]]]>y</a>`,               value = `x <![CDATA[]]]>y`,               unboxed = `x ]y`},
+		{src = `<a>x <![CDATA[a]b]]>y</a>`,             value = `x <![CDATA[a]b]]>y`,             unboxed = `x a]by`},
+		{src = "<a>x <![CDATA[l\nm]]>y</a>",             value = "x <![CDATA[l\nm]]>y",             unboxed = "x l\nmy"},
+		{src = `<a>x <![CDATA[unterminated</a>`,         err   = .Premature_EOF},
+	}
+
+	Mode :: struct {
+		flags:   xml.Option_Flags,
+		decoded: bool,
+		unboxed: bool,
+	}
+
+	modes := [?]Mode{
+		{flags = {.Ignore_Unsupported}},
+		{flags = {.Ignore_Unsupported, .Decode_SGML_Entities},               decoded = true},
+		{flags = {.Ignore_Unsupported, .Unbox_CDATA},                        unboxed = true},
+		{flags = {.Ignore_Unsupported, .Unbox_CDATA, .Decode_SGML_Entities}, unboxed = true},
+	}
+
+	for c in cases {
+		for m in modes {
+			doc, err := xml.parse_string(c.src, xml.Options{flags = m.flags}, error_handler = Silent)
+			defer xml.destroy(doc)
+
+			testing.expectf(t, err == c.err, "%q %v: expected %v, got %v", c.src, m.flags, c.err, err)
+			if c.err == .None && err == .None {
+				expected := c.value
+				if m.unboxed {
+					expected = c.unboxed
+				} else if m.decoded && c.decoded != "" {
+					expected = c.decoded
+				}
+				values   := doc.elements[0].value
+				testing.expectf(t, len(values) == 1, "%q %v: expected 1 value, got %v", c.src, m.flags, len(values))
+				if len(values) == 1 {
+					got, _ := values[0].(string)
+					testing.expectf(t, got == expected, "%q %v: expected %q, got %q", c.src, m.flags, expected, got)
+				}
+			}
+		}
+	}
+}
+
 @(private)
 run_test :: proc(t: ^testing.T, test: TEST, loc := #caller_location) {
 	path := strings.concatenate({TEST_SUITE_PATH, test.filename})

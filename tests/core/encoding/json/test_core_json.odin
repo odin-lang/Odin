@@ -1,6 +1,11 @@
 package test_core_json
 
 import "core:encoding/json"
+import "core:fmt"
+import "core:math"
+import "core:math/rand"
+import "core:mem"
+import "core:strings"
 import "core:testing"
 import "core:unicode/utf8"
 import "core:mem/virtual"
@@ -595,4 +600,461 @@ malformed_object_frees_its_partial_allocations :: proc(t: ^testing.T) {
 			json.destroy_value(value)
 		}
 	}
+}
+
+@test
+unmarshal_skip_validation :: proc(t: ^testing.T) {
+	// With `.Skip_Validation` the input is not checked up front: valid input gives the same result,
+	// and a syntax error is reported where it is reached, as a specific error instead of
+	// `.Invalid_Data`. None of the invalid cases below allocates anything that outlives the call,
+	// so the test runner's memory tracking also checks that the error paths free their keys.
+	Point :: struct {
+		x, y: int,
+	}
+	Named :: struct {
+		name: string,
+		x:    int,
+	}
+
+	valid := `{"x": 1, "y": 2}`
+	a, b: Point
+	testing.expect_value(t, json.unmarshal_string(valid, &a), nil)
+	testing.expect_value(t, json.unmarshal_string(valid, &b, flags = {.Skip_Validation}), nil)
+	testing.expect_value(t, b, a)
+
+	cases := []struct {
+		src:  string,
+		spec: json.Specification,
+		err:  json.Error,
+	}{
+		{`{"x" 1}`,                   .JSON,  .Expected_Colon_After_Key},
+		{`{"x": 1 "y": 2}`,           .JSON,  .Unexpected_Token},
+		{`{"x": 1,`,                  .JSON,  .EOF},
+		{`{"x": [1, 2`,               .JSON5, .EOF},
+		{`{"x": nope}`,               .JSON5, .Unexpected_Token},
+		{"{\"name\": \"a\tb\"}",      .JSON,  .Invalid_String},
+		{"{\"other\": \"a\tb\"}",     .JSON,  .Invalid_String},
+	}
+	for c in cases {
+		n: Named
+		err := json.unmarshal_string(c.src, &n, c.spec)
+		testing.expectf(t, err == json.Unmarshal_Data_Error.Invalid_Data, "%q: expected Invalid_Data when validating, got %v", c.src, err)
+		err = json.unmarshal_string(c.src, &n, c.spec, flags = {.Skip_Validation})
+		testing.expectf(t, err == c.err, "%q: expected %v with .Skip_Validation, got %v", c.src, c.err, err)
+	}
+}
+
+@test
+unmarshal_without_temporary_allocations :: proc(t: ^testing.T) {
+	// Keys, enum names, numbers in strings and runes are read without allocating, so unmarshalling
+	// into a struct holding none of `string`, `cstring`, slices or maps allocates nothing at all.
+	Kind :: enum {A, B, C}
+	Thing :: struct {
+		x, y:   int,
+		kind:   Kind,
+		n:      int,
+		f:      f32,
+		r:      rune,
+		counts: [Kind]int,
+	}
+	src := `{"x": 1, "\u0079": 2, "kind": "B", "n": "42", "f": "1.5", "r": "\u00e9", "counts": {"A": 1, "\u0043": 3}, "other": "skipped"}`
+
+	for flags in ([]json.Unmarshal_Flags{{}, {.Skip_Validation}}) {
+		track: mem.Tracking_Allocator
+		mem.tracking_allocator_init(&track, context.allocator)
+		defer mem.tracking_allocator_destroy(&track)
+
+		thing: Thing
+		err := json.unmarshal_string(src, &thing, allocator = mem.tracking_allocator(&track), flags = flags)
+		testing.expect_value(t, err, nil)
+		testing.expect_value(t, thing, Thing{x = 1, y = 2, kind = .B, n = 42, f = 1.5, r = 'é', counts = {.A = 1, .B = 0, .C = 3}})
+		testing.expectf(t, track.total_allocation_count == 0, "%v: expected no allocations, got %d", flags, track.total_allocation_count)
+	}
+}
+
+@test
+unmarshal_reserve_maps :: proc(t: ^testing.T) {
+	// With `.Reserve_Maps` a map is allocated once at its final size, never grown, and holds the same
+	// entries. The sizes straddle the points where an unreserved map grows.
+	for n in ([]int{0, 1, 5, 6, 7, 12, 13, 24, 25, 100, 1000}) {
+		b := strings.builder_make(context.temp_allocator)
+		strings.write_byte(&b, '{')
+		for i in 0..<n {
+			fmt.sbprintf(&b, `%s"%d": %d`, "," if i > 0 else "", i*7, i)
+		}
+		strings.write_byte(&b, '}')
+		src := strings.to_string(b)
+
+		expected: map[int]int
+		defer delete(expected)
+		testing.expect_value(t, json.unmarshal_string(src, &expected), nil)
+
+		track: mem.Tracking_Allocator
+		mem.tracking_allocator_init(&track, context.allocator)
+		defer mem.tracking_allocator_destroy(&track)
+
+		reserved: map[int]int
+		defer delete(reserved)
+		testing.expect_value(t, json.unmarshal_string(src, &reserved, allocator = mem.tracking_allocator(&track), flags = {.Reserve_Maps}), nil)
+
+		testing.expectf(t, len(reserved) == n, "%d entries: got %d", n, len(reserved))
+		for k, v in expected {
+			testing.expectf(t, reserved[k] == v, "%d entries: key %d is %d, expected %d", n, k, reserved[k], v)
+		}
+		testing.expectf(t, track.total_allocation_count == (1 if n > 0 else 0) && track.total_free_count == 0,
+			"%d entries: expected one allocation and no frees, got %d and %d", n, track.total_allocation_count, track.total_free_count)
+	}
+}
+
+Duplicate_Base :: struct {
+	id: int,
+}
+
+Duplicate_Mid :: struct {
+	using _: Duplicate_Base,
+	mid:     int,
+}
+
+// `none` has no size, so it shares its offset with `after`, and `after` is past the first byte of the
+// bitset that tracks the fields.
+Duplicate_Fields :: struct {
+	a:       int,
+	b:       string `json:"B"`,
+	using _: Duplicate_Mid,
+	c, d, e: int,
+	f, g, h: int,
+	none:    struct{},
+	after:   int,
+}
+
+@(test)
+unmarshal_duplicate_fields :: proc(t: ^testing.T) {
+	Case :: struct {
+		src: string,
+		err: json.Unmarshal_Error,
+	}
+	cases := []Case{
+		{`{"a": 1, "a": 2}`,                        .Multiple_Use_Field},
+		{`{"a": 1, "\u0061": 2}`,                   .Multiple_Use_Field},
+		{`{"B": "x", "B": "y"}`,                    .Multiple_Use_Field},
+		{`{"mid": 1, "mid": 2}`,                    .Multiple_Use_Field},
+		{`{"id": 1, "mid": 2, "id": 3}`,            .Multiple_Use_Field},
+		{`{"after": 1, "h": 2, "after": 3}`,        .Multiple_Use_Field},
+		{`{"none": {}, "none": {}}`,                .Multiple_Use_Field},
+		{`{"none": {}, "after": 1}`,                nil},
+		{`{"id": 1, "mid": 2, "a": 3, "after": 4}`, nil},
+		{`{"B": "x", "mid": 1, "id": 2, "a": 3}`,   nil},
+		{`{"x": 1, "x": 2, "c": 3, "d": 4}`,        nil},
+	}
+	for c in cases {
+		v: Duplicate_Fields
+		err := json.unmarshal_string(c.src, &v)
+		delete(v.b)
+		testing.expectf(t, err == c.err, "%s: expected %v, got %v", c.src, c.err, err)
+	}
+
+	// Separate objects never share fields.
+	list: []Duplicate_Fields
+	testing.expect_value(t, json.unmarshal_string(`[{"a": 1, "id": 1}, {"a": 2, "id": 2}]`, &list), nil)
+	testing.expect_value(t, len(list), 2)
+	delete(list)
+
+	// `.Allow_Duplicate_Fields` keeps the last value, as before.
+	v: Duplicate_Fields
+	testing.expect_value(t, json.unmarshal_string(`{"a": 1, "id": 2, "a": 3, "id": 4}`, &v, flags = {.Allow_Duplicate_Fields}), nil)
+	testing.expect_value(t, v.a, 3)
+	testing.expect_value(t, v.id, 4)
+}
+
+@(test)
+unmarshal_many_unknown_keys :: proc(t: ^testing.T) {
+	// Each key used to grow the stack by a bitset as large as the struct, which overflowed it.
+	Big :: struct {
+		id:  int,
+		pad: [8192]byte,
+	}
+
+	b := strings.builder_make(context.temp_allocator)
+	strings.write_string(&b, `{"id": 1`)
+	for i in 0..<20_000 {
+		fmt.sbprintf(&b, `, "k%d": 0`, i)
+	}
+	strings.write_byte(&b, '}')
+
+	v := new(Big)
+	defer free(v)
+	testing.expect_value(t, json.unmarshal_string(strings.to_string(b), v), nil)
+	testing.expect_value(t, v.id, 1)
+}
+
+@(test)
+unmarshal_empty_key :: proc(t: ^testing.T) {
+	// An empty key matches only a field tagged exactly `json:""`, never an untagged field nor one
+	// whose tag only names options.
+	Plain :: struct {
+		a, b: int,
+	}
+	Tagged_Empty :: struct {
+		a: int,
+		o: int `json:",omitempty"`,
+		e: int `json:""`,
+	}
+	Embedded :: struct {
+		using _: Plain,
+		c:       int,
+	}
+	Embedded_Empty :: struct {
+		using _: Tagged_Empty,
+		c:       int,
+	}
+
+	plain: Plain
+	testing.expect_value(t, json.unmarshal_string(`{"": 1, "a": 2}`, &plain), nil)
+	testing.expect_value(t, plain, Plain{a = 2})
+
+	tagged: Tagged_Empty
+	testing.expect_value(t, json.unmarshal_string(`{"": 5}`, &tagged), nil)
+	testing.expect_value(t, tagged, Tagged_Empty{e = 5})
+
+	// `e` is reached by its name and by the empty key, so both set the same field.
+	tagged = {}
+	err := json.unmarshal_string(`{"e": 1, "": 2}`, &tagged)
+	testing.expectf(t, err == .Multiple_Use_Field, "expected Multiple_Use_Field, got %v", err)
+	tagged = {}
+	testing.expect_value(t, json.unmarshal_string(`{"e": 1, "": 2}`, &tagged, flags = {.Allow_Duplicate_Fields}), nil)
+	testing.expect_value(t, tagged, Tagged_Empty{e = 2})
+
+	embedded: Embedded
+	testing.expect_value(t, json.unmarshal_string(`{"": {"a": 3}, "c": 4}`, &embedded), nil)
+	testing.expect_value(t, embedded, Embedded{c = 4})
+
+	embedded_empty: Embedded_Empty
+	testing.expect_value(t, json.unmarshal_string(`{"": 9}`, &embedded_empty), nil)
+	testing.expect_value(t, embedded_empty, Embedded_Empty{e = 9})
+}
+
+@(test)
+marshal_floats :: proc(t: ^testing.T) {
+	expect_marshal :: proc(t: ^testing.T, v: any, expected: string, spec := json.Specification.JSON, loc := #caller_location) {
+		data, err := json.marshal(v, {spec = spec}, context.temp_allocator)
+		testing.expectf(t, err == nil && string(data) == expected, "marshal %v (%v): expected %s, got %s (%v)", v, v.id, expected, string(data), err, loc = loc)
+	}
+
+	// The shortest text that reads back as the same value: fixed notation for 1e-6 <= |x| < 1e21,
+	// with ".0" when it would otherwise read as an integer, and exponent notation outside it.
+	F64_Case :: struct { v: f64, s: string }
+	for c in ([]F64_Case{
+		{0, "0.0"}, {math.copy_sign(f64(0), -1), "-0.0"}, {1, "1.0"}, {-1.5, "-1.5"}, {0.1, "0.1"},
+		{1.0/3, "0.3333333333333333"}, {1e6, "1000000.0"}, {9007199254740992, "9007199254740992.0"},
+		{1e20, "100000000000000000000.0"}, {1e21, "1e+21"}, {6.02214076e23, "6.02214076e+23"},
+		{max(f64), "1.7976931348623157e+308"}, {1e-6, "0.000001"}, {1e-7, "1e-07"},
+		{1.234e-17, "1.234e-17"}, {5e-324, "5e-324"}, {5894.866874872898, "5894.866874872898"},
+	}) {
+		expect_marshal(t, c.v, c.s)
+	}
+
+	F32_Case :: struct { v: f32, s: string }
+	for c in ([]F32_Case{
+		{0.1, "0.1"}, {1e-10, "1e-10"}, {16777216, "16777216.0"}, {3.4e38, "3.4e+38"}, {1e-6, "1e-06"},
+	}) {
+		expect_marshal(t, c.v, c.s)
+	}
+
+	F16_Case :: struct { v: f16, s: string }
+	for c in ([]F16_Case{
+		{0.1, "0.1"}, {6.1e-5, "0.000061"}, {65504, "65500.0"}, {6e-8, "6e-08"},
+	}) {
+		expect_marshal(t, c.v, c.s)
+	}
+
+	expect_marshal(t, complex64(complex(1, 0.1)), "[1.0, 0.1]")
+	expect_marshal(t, complex(1e-20, -2), "[1e-20, -2.0]")
+
+	// Infinity and NaN only exist in JSON5 and MJSON.
+	inf, nan := math.inf_f64(1), math.nan_f64()
+	for v in ([]f64{inf, -inf, nan}) {
+		_, err := json.marshal(v, {}, context.temp_allocator)
+		testing.expectf(t, err == .Non_Finite_Float, "marshal %v as JSON: expected Non_Finite_Float, got %v", v, err)
+	}
+	_, err := json.marshal(complex(1, inf), {}, context.temp_allocator)
+	testing.expectf(t, err == .Non_Finite_Float, "marshal a complex with an infinite part as JSON: expected Non_Finite_Float, got %v", err)
+	for spec in ([]json.Specification{.JSON5, .MJSON}) {
+		expect_marshal(t, inf,       "Infinity",  spec)
+		expect_marshal(t, -inf,      "-Infinity", spec)
+		expect_marshal(t, nan,       "NaN",       spec)
+		expect_marshal(t, f32(-inf), "-Infinity", spec)
+	}
+
+	// `unparse` writes a `json.Value` float the same way.
+	text, unparse_err := json.unparse(json.Float(1), {}, context.temp_allocator)
+	testing.expect_value(t, text, "1.0")
+	testing.expect_value(t, unparse_err, nil)
+	text, unparse_err = json.unparse(json.Float(1e-20), {}, context.temp_allocator)
+	testing.expect_value(t, text, "1e-20")
+	_, unparse_err = json.unparse(json.Float(inf), {}, context.temp_allocator)
+	testing.expectf(t, unparse_err == .Non_Finite_Float, "unparse Infinity as JSON: expected Non_Finite_Float, got %v", unparse_err)
+	text, unparse_err = json.unparse(json.Float(inf), {spec = .JSON5}, context.temp_allocator)
+	testing.expect_value(t, text, "Infinity")
+
+	free_all(context.temp_allocator)
+}
+
+@(test)
+marshal_floats_round_trip :: proc(t: ^testing.T) {
+	// Every finite value, written as JSON, must be valid JSON and read back bit for bit.
+	round_trip :: proc(t: ^testing.T, v: $T, bits: $B) -> bool {
+		data, err := json.marshal(v, {}, context.temp_allocator)
+		if err != nil || !json.is_valid(data, .JSON) {
+			testing.expectf(t, false, "marshal %v (bits %x): %s (%v) is not valid JSON", v, bits, string(data), err)
+			return false
+		}
+		back: T
+		uerr := json.unmarshal(data, &back, allocator = context.temp_allocator)
+		if uerr != nil || transmute(B)back != bits {
+			testing.expectf(t, false, "%v (bits %x) wrote %s and read back %v (%v)", v, bits, string(data), back, uerr)
+			return false
+		}
+		return true
+	}
+
+	for _ in 0..<20_000 {
+		defer free_all(context.temp_allocator)
+		b64 := rand.uint64()
+		b32 := u32(b64)
+		b16 := u16(b64 >> 32)
+		f64v, f32v, f16v := transmute(f64)b64, transmute(f32)b32, transmute(f16)b16
+		if !math.is_nan(f64v) && !math.is_inf(f64v) && !round_trip(t, f64v, b64) {
+			return
+		}
+		if !math.is_nan(f32v) && !math.is_inf(f32v) && !round_trip(t, f32v, b32) {
+			return
+		}
+		if !math.is_nan(f16v) && !math.is_inf(f16v) && !round_trip(t, f16v, b16) {
+			return
+		}
+	}
+
+	// In JSON5 and MJSON the special values read back too.
+	for spec in ([]json.Specification{.JSON5, .MJSON}) {
+		for v in ([]f64{math.inf_f64(1), math.inf_f64(-1), math.nan_f64()}) {
+			data, err := json.marshal(v, {spec = spec}, context.temp_allocator)
+			back: f64
+			uerr := json.unmarshal(data, &back, spec, context.temp_allocator)
+			same := back == v || (math.is_nan(v) && math.is_nan(back))
+			testing.expectf(t, err == nil && uerr == nil && same, "%v in %v: wrote %s (%v), read back %v (%v)", v, spec, string(data), err, back, uerr)
+		}
+	}
+	free_all(context.temp_allocator)
+}
+
+@(test)
+parse_integers_out_of_range :: proc(t: ^testing.T) {
+	// An integer outside i64 wraps to 64 bits in a `Value`, the same as when it is unmarshalled
+	// into an `i64`. Past i128 only the digits that fit in an i128 are read.
+	Case :: struct {
+		text:     string,
+		spec:     json.Specification,
+		expected: i64,
+	}
+	cases := [?]Case{
+		{"9223372036854775807",    .JSON,  max(i64)},
+		{"-9223372036854775808",   .JSON,  min(i64)},
+		{"9223372036854775808",    .JSON,  min(i64)},
+		{"-9223372036854775809",   .JSON,  max(i64)},
+		{"18446744073709551615",   .JSON,  -1},
+		{"18446744073709551616",   .JSON,  0},
+		{"+18446744073709551617",  .JSON5, 1},
+		{"0xFFFFFFFFFFFFFFFF",     .JSON5, -1},
+		{"0x10000000000000000",    .MJSON, 0},
+		{"1000000000000000000000000000000000000000000000", .JSON, 687399551400673280}, // 10^38, wrapped
+	}
+	only_integer :: proc(v: json.Value) -> (i: i64, ok: bool) {
+		array := v.(json.Array) or_return
+		if len(array) != 1 {
+			return
+		}
+		return array[0].(json.Integer)
+	}
+	for c in cases {
+		data := fmt.tprintf("[%s]", c.text)
+
+		parsed, perr := json.parse_string(data, c.spec, true, context.temp_allocator)
+		i, ok := only_integer(parsed)
+		testing.expectf(t, perr == nil && ok && i == c.expected,
+			"parse %s (%v): expected [%d], got %v (%v)", c.text, c.spec, c.expected, parsed, perr)
+
+		value: json.Value
+		err := json.unmarshal_string(data, &value, c.spec, context.temp_allocator)
+		i, ok = only_integer(value)
+		testing.expectf(t, err == nil && ok && i == c.expected,
+			"unmarshal %s (%v) into json.Value: expected [%d], got %v (%v)", c.text, c.spec, c.expected, value, err)
+
+		typed: []i64
+		err = json.unmarshal_string(data, &typed, c.spec, context.temp_allocator)
+		testing.expectf(t, err == nil && len(typed) == 1 && typed[0] == c.expected,
+			"unmarshal %s (%v) into []i64: expected [%d], got %v (%v)", c.text, c.spec, c.expected, typed, err)
+	}
+	free_all(context.temp_allocator)
+}
+
+@(test)
+keys_checked_like_values :: proc(t: ^testing.T) {
+	// `is_valid` rejects a key that it would reject as a string value, and so does unmarshalling with
+	// `.Skip_Validation`, with `.Invalid_String` as for such a value.
+	Target :: struct {
+		a, c: int,
+	}
+	Color :: enum {
+		Red,
+		Green,
+	}
+	bad := [?]string{
+		"{\"a\tb\":1}",
+		"{\"c\r\":5}",
+		"{\"\xff\":1}",
+		"{\"\\q\":1}",
+		"{\"\\u12\":1}",
+		"{\"a\":1,\"x\":{\"k\x01\":2}}", // in a value that is skipped
+	}
+	for s in bad {
+		for spec in ([?]json.Specification{.JSON, .JSON5, .MJSON}) {
+			testing.expectf(t, !json.is_valid(transmute([]byte)s, spec), "is_valid accepts %q (%v)", s, spec)
+
+			target: Target
+			err := json.unmarshal_string(s, &target, spec, context.temp_allocator)
+			testing.expectf(t, err == json.Unmarshal_Data_Error.Invalid_Data, "unmarshal %q (%v): expected Invalid_Data, got %v", s, spec, err)
+
+			err = json.unmarshal_string(s, &target, spec, context.temp_allocator, {.Skip_Validation})
+			testing.expectf(t, err == json.Error.Invalid_String, "unmarshal %q (%v) into a struct with .Skip_Validation: expected Invalid_String, got %v", s, spec, err)
+
+			m: map[string]json.Value
+			err = json.unmarshal_string(s, &m, spec, context.temp_allocator, {.Skip_Validation})
+			testing.expectf(t, err == json.Error.Invalid_String, "unmarshal %q (%v) into a map with .Skip_Validation: expected Invalid_String, got %v", s, spec, err)
+
+			v: json.Value
+			err = json.unmarshal_string(s, &v, spec, context.temp_allocator, {.Skip_Validation})
+			testing.expectf(t, err == json.Error.Invalid_String, "unmarshal %q (%v) into a Value with .Skip_Validation: expected Invalid_String, got %v", s, spec, err)
+		}
+	}
+
+	colors: [Color]int
+	err := json.unmarshal_string("{\"Red\t\":1}", &colors, .JSON, context.temp_allocator, {.Skip_Validation})
+	testing.expectf(t, err == json.Error.Invalid_String, "unmarshal into an enumerated array with .Skip_Validation: expected Invalid_String, got %v", err)
+
+	// A key that ends unterminated at a newline, where the tokenizer ends it.
+	unterminated := "[{\"a\n:1},\"x\"]"
+	testing.expect(t, !json.is_valid(transmute([]byte)unterminated, .JSON))
+	values: []json.Value
+	err = json.unmarshal_string(unterminated, &values, .JSON, context.temp_allocator, {.Skip_Validation})
+	testing.expectf(t, err == json.Error.Invalid_String, "unterminated key with .Skip_Validation: expected Invalid_String, got %v", err)
+
+	Good :: struct {
+		s:    string,
+		spec: json.Specification,
+	}
+	good := [?]Good{{"{\"a\":1}", .JSON}, {"{\"\\u00e9\":1}", .JSON}, {"{'a':1}", .JSON5}, {"{a:1}", .JSON5}, {"{\"a\\\nb\":1}", .JSON5}}
+	for g in good {
+		testing.expectf(t, json.is_valid(transmute([]byte)g.s, g.spec), "is_valid rejects %q (%v)", g.s, g.spec)
+	}
+	free_all(context.temp_allocator)
 }

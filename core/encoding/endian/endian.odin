@@ -161,3 +161,97 @@ put_f32 :: proc "contextless" (b: []byte, order: Byte_Order, v: f32) -> bool {
 put_f64 :: proc "contextless" (b: []byte, order: Byte_Order, v: f64) -> bool {
 	return put_u64(b, order, transmute(u64)v)
 }
+
+unchecked_get_unsigned_le :: #force_inline proc "contextless" (b: []byte, $N: int) -> (v: u64)
+	where N >= 8, N <= 64, N % 8 == 0 {
+	p := raw_data(b)
+	#unroll for i in 0..<N/8 {
+		v |= u64(p[i]) << uint(i * 8)
+	}
+	return
+}
+unchecked_get_unsigned_be :: #force_inline proc "contextless" (b: []byte, $N: int) -> (v: u64)
+	where N >= 8, N <= 64, N % 8 == 0 {
+	p := raw_data(b)
+	#unroll for i in 0..<N/8 {
+		v = v << 8 | u64(p[i])
+	}
+	return
+}
+
+unchecked_get_signed_le :: #force_inline proc "contextless" (b: []byte, $N: int) -> i64
+	where N >= 8, N <= 64, N % 8 == 0 {
+	return i64(unchecked_get_unsigned_le(b, N) << uint(64 - N)) >> uint(64 - N)
+}
+unchecked_get_signed_be :: #force_inline proc "contextless" (b: []byte, $N: int) -> i64
+	where N >= 8, N <= 64, N % 8 == 0 {
+	return i64(unchecked_get_unsigned_be(b, N) << uint(64 - N)) >> uint(64 - N)
+}
+
+get_unsigned :: proc "contextless" (b: []byte, order: Byte_Order, $N: int) -> (v: u64, ok: bool)
+	where N >= 8, N <= 64, N % 8 == 0 {
+	if len(b) < N / 8 {
+		return 0, false
+	}
+	if order == .Little {
+		v = unchecked_get_unsigned_le(b, N)
+	} else {
+		v = unchecked_get_unsigned_be(b, N)
+	}
+	return v, true
+}
+
+get_signed :: proc "contextless" (b: []byte, order: Byte_Order, $N: int) -> (v: i64, ok: bool)
+	where N >= 8, N <= 64, N % 8 == 0 {
+	if len(b) < N / 8 {
+		return 0, false
+	}
+	if order == .Little {
+		v = unchecked_get_signed_le(b, N)
+	} else {
+		v = unchecked_get_signed_be(b, N)
+	}
+	return v, true
+}
+
+unchecked_put_unsigned_le :: #force_inline proc "contextless" (b: []byte, v: u64, $N: int)
+	where N >= 8, N <= 64, N % 8 == 0 {
+	p := raw_data(b)
+	#unroll for i in 0..<N/8 {
+		p[i] = byte(v >> uint(i * 8))
+	}
+}
+unchecked_put_unsigned_be :: #force_inline proc "contextless" (b: []byte, v: u64, $N: int)
+	where N >= 8, N <= 64, N % 8 == 0 {
+	p := raw_data(b)
+	#unroll for i in 0..<N/8 {
+		p[i] = byte(v >> uint((N/8 - 1 - i) * 8))
+	}
+}
+
+unchecked_put_signed_le :: #force_inline proc "contextless" (b: []byte, v: i64, $N: int)
+	where N >= 8, N <= 64, N % 8 == 0 {
+	unchecked_put_unsigned_le(b, u64(v), N)
+}
+unchecked_put_signed_be :: #force_inline proc "contextless" (b: []byte, v: i64, $N: int)
+	where N >= 8, N <= 64, N % 8 == 0 {
+	unchecked_put_unsigned_be(b, u64(v), N)
+}
+
+put_unsigned :: proc "contextless" (b: []byte, order: Byte_Order, v: u64, $N: int) -> bool
+	where N >= 8, N <= 64, N % 8 == 0 {
+	if len(b) < N / 8 {
+		return false
+	}
+	if order == .Little {
+		unchecked_put_unsigned_le(b, v, N)
+	} else {
+		unchecked_put_unsigned_be(b, v, N)
+	}
+	return true
+}
+
+put_signed :: proc "contextless" (b: []byte, order: Byte_Order, v: i64, $N: int) -> bool
+	where N >= 8, N <= 64, N % 8 == 0 {
+	return put_unsigned(b, order, u64(v), N)
+}

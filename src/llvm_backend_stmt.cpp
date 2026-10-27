@@ -634,6 +634,20 @@ gb_internal lbValue lb_map_hash_is_valid(lbProcedure *p, lbValue hash) {
 	return lb_emit_arith(p, Token_And, not_deleted, not_empty, t_uintptr);
 }
 
+// The address of the value a range statement iterates over.
+// For a map index (`for x in m[key]`) the map lookup gives nil when the key is missing;
+// iterate over a zeroed local instead, as reading `m[key]` would give the zero value.
+// A found value is iterated in place, without a copy.
+gb_internal lbValue lb_range_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
+	lbValue ptr = lb_addr_get_ptr(p, addr);
+	if (addr.kind == lbAddr_Map) {
+		lbValue zero  = lb_add_local_generated(p, type_deref(ptr.type), true).addr;
+		lbValue found = lb_emit_comp_against_nil(p, Token_NotEq, ptr);
+		ptr = lb_emit_select(p, found, ptr, zero);
+	}
+	return ptr;
+}
+
 gb_internal void lb_build_range_map(lbProcedure *p, lbValue expr, Type *val_type,
                                     lbValue *val_, lbValue *key_, lbBlock **loop_, lbBlock **done_) {
 	lbModule *m = p->module;
@@ -772,35 +786,62 @@ gb_internal void lb_build_range_string(lbProcedure *p, lbValue expr, Type *val_t
 	lb_start_block(p, body);
 
 
-	lbValue rune_and_len = {};
+	lbAddr rune_ = lb_add_local_generated(p, t_rune, false);
+	lbAddr width_ = lb_add_local_generated(p, t_int, false);
+	lbBlock *ascii_block   = lb_create_block(p, "for.string.ascii");
+	lbBlock *decode_block  = lb_create_block(p, "for.string.decode");
+	lbBlock *decoded_block = lb_create_block(p, "for.string.decoded");
+
+	lbValue str_elem = lb_string_elem(p, expr);
+	lbValue byte_ptr = {};
 	if (!is_reverse) {
-		lbValue str_elem = lb_emit_ptr_offset(p, lb_string_elem(p, expr), offset);
-		lbValue str_len  = lb_emit_arith(p, Token_Sub, count, offset, t_int);
+		byte_ptr = lb_emit_ptr_offset(p, str_elem, offset);
+	} else {
+		byte_ptr = lb_emit_ptr_offset(p, str_elem, lb_emit_arith(p, Token_Sub, offset, lb_const_int(m, t_int, 1), t_int));
+	}
+	lbValue first_byte = lb_emit_load(p, byte_ptr);
+	lbValue is_ascii = lb_emit_comp(p, Token_Lt, first_byte, lb_const_int(m, t_u8, 0x80));
+	// Only decode a byte that is not ASCII
+	lb_emit_if(p, is_ascii, ascii_block, decode_block);
+
+	lb_start_block(p, ascii_block);
+	lb_addr_store(p, rune_, lb_emit_conv(p, first_byte, t_rune));
+	lb_addr_store(p, width_, lb_const_int(m, t_int, 1));
+	lb_emit_jump(p, decoded_block);
+
+	lb_start_block(p, decode_block);
+	{
 		auto args = array_make<lbValue>(permanent_allocator(), 1);
-		args[0] = lb_emit_string(p, str_elem, str_len);
+		if (!is_reverse) {
+			args[0] = lb_emit_string(p, byte_ptr, lb_emit_arith(p, Token_Sub, count, offset, t_int));
+		} else {
+			// NOTE(bill): REVERSED LOGIC
+			args[0] = lb_emit_string(p, str_elem, offset);
+		}
+		// At -o:speed and above, inline the forward decoder here so that multi-byte runes also do not pay for a call.
+		// LLVM already inlines string_decode_last_rune where it helps. Forcing it inline makes #reverse slower.
+		ProcInlining inlining = (!is_reverse && build_context.optimization_level >= OptimizationLevel_Speed) ? ProcInlining_inline : ProcInlining_none;
+		lbValue decode_proc = lb_lookup_runtime_procedure(m, make_string_c(is_reverse ? "string_decode_last_rune" : "string_decode_rune"));
+		lbValue rune_and_len = lb_emit_call(p, decode_proc, args, inlining);
+		lb_addr_store(p, rune_,  lb_emit_struct_ev(p, rune_and_len, 0));
+		lb_addr_store(p, width_, lb_emit_struct_ev(p, rune_and_len, 1));
+	}
+	lb_emit_jump(p, decoded_block);
 
-		rune_and_len = lb_emit_runtime_call(p, "string_decode_rune", args);
-		lbValue len  = lb_emit_struct_ev(p, rune_and_len, 1);
+	lb_start_block(p, decoded_block);
+	lbValue decoded_rune = lb_addr_load(p, rune_);
+	lbValue len          = lb_addr_load(p, width_);
+	if (!is_reverse) {
 		lb_addr_store(p, offset_, lb_emit_arith(p, Token_Add, offset, len, t_int));
-
 		idx = offset;
 	} else {
-		// NOTE(bill): REVERSED LOGIC
-		lbValue str_elem = lb_string_elem(p, expr);
-		lbValue str_len  = offset;
-		auto args = array_make<lbValue>(permanent_allocator(), 1);
-		args[0] = lb_emit_string(p, str_elem, str_len);
-
-		rune_and_len = lb_emit_runtime_call(p, "string_decode_last_rune", args);
-		lbValue len  = lb_emit_struct_ev(p, rune_and_len, 1);
 		lb_addr_store(p, offset_, lb_emit_arith(p, Token_Sub, offset, len, t_int));
-
 		idx = lb_addr_load(p, offset_);
 	}
 
 
 	if (val_type != nullptr) {
-		val = lb_emit_struct_ev(p, rune_and_len, 0);
+		val = decoded_rune;
 	}
 
 	if (val_)  *val_  = val;
@@ -886,35 +927,59 @@ gb_internal void lb_build_range_string16(lbProcedure *p, lbValue expr, Type *val
 	lb_start_block(p, body);
 
 
-	lbValue rune_and_len = {};
+	lbAddr rune_ = lb_add_local_generated(p, t_rune, false);
+	lbAddr width_ = lb_add_local_generated(p, t_int, false);
+	lbBlock *single_block  = lb_create_block(p, "for.string16.single");
+	lbBlock *decode_block  = lb_create_block(p, "for.string16.decode");
+	lbBlock *decoded_block = lb_create_block(p, "for.string16.decoded");
+
+	lbValue str_elem = lb_string_elem(p, expr);
+	lbValue unit_ptr = {};
 	if (!is_reverse) {
-		lbValue str_elem = lb_emit_ptr_offset(p, lb_string_elem(p, expr), offset);
-		lbValue str_len  = lb_emit_arith(p, Token_Sub, count, offset, t_int);
+		unit_ptr = lb_emit_ptr_offset(p, str_elem, offset);
+	} else {
+		unit_ptr = lb_emit_ptr_offset(p, str_elem, lb_emit_arith(p, Token_Sub, offset, lb_const_int(m, t_int, 1), t_int));
+	}
+	lbValue unit = lb_emit_load(p, unit_ptr);
+	lbValue surrogate_offset = lb_emit_arith(p, Token_Sub, unit, lb_const_int(m, t_u16, 0xD800), t_u16);
+	lbValue is_single = lb_emit_comp(p, Token_GtEq, surrogate_offset, lb_const_int(m, t_u16, 0x800));
+	// Only decode a surrogate
+	lb_emit_if(p, is_single, single_block, decode_block);
+
+	lb_start_block(p, single_block);
+	lb_addr_store(p, rune_, lb_emit_conv(p, unit, t_rune));
+	lb_addr_store(p, width_, lb_const_int(m, t_int, 1));
+	lb_emit_jump(p, decoded_block);
+
+	lb_start_block(p, decode_block);
+	{
 		auto args = array_make<lbValue>(permanent_allocator(), 1);
-		args[0] = lb_emit_string16(p, str_elem, str_len);
+		if (!is_reverse) {
+			args[0] = lb_emit_string16(p, unit_ptr, lb_emit_arith(p, Token_Sub, count, offset, t_int));
+		} else {
+			// NOTE(bill): REVERSED LOGIC
+			args[0] = lb_emit_string16(p, str_elem, offset);
+		}
+		lbValue rune_and_len = lb_emit_runtime_call(p, is_reverse ? "string16_decode_last_rune" : "string16_decode_rune", args);
+		lb_addr_store(p, rune_,  lb_emit_struct_ev(p, rune_and_len, 0));
+		lb_addr_store(p, width_, lb_emit_struct_ev(p, rune_and_len, 1));
+	}
+	lb_emit_jump(p, decoded_block);
 
-		rune_and_len = lb_emit_runtime_call(p, "string16_decode_rune", args);
-		lbValue len  = lb_emit_struct_ev(p, rune_and_len, 1);
+	lb_start_block(p, decoded_block);
+	lbValue decoded_rune = lb_addr_load(p, rune_);
+	lbValue len          = lb_addr_load(p, width_);
+	if (!is_reverse) {
 		lb_addr_store(p, offset_, lb_emit_arith(p, Token_Add, offset, len, t_int));
-
 		idx = offset;
 	} else {
-		// NOTE(bill): REVERSED LOGIC
-		lbValue str_elem = lb_string_elem(p, expr);
-		lbValue str_len  = offset;
-		auto args = array_make<lbValue>(permanent_allocator(), 1);
-		args[0] = lb_emit_string16(p, str_elem, str_len);
-
-		rune_and_len = lb_emit_runtime_call(p, "string16_decode_last_rune", args);
-		lbValue len  = lb_emit_struct_ev(p, rune_and_len, 1);
 		lb_addr_store(p, offset_, lb_emit_arith(p, Token_Sub, offset, len, t_int));
-
 		idx = lb_addr_load(p, offset_);
 	}
 
 
 	if (val_type != nullptr) {
-		val = lb_emit_struct_ev(p, rune_and_len, 0);
+		val = decoded_rune;
 	}
 
 	if (val_)  *val_  = val;
@@ -1394,7 +1459,7 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 		switch (et->kind) {
 		case Type_Map: {
 			is_map = true;
-			lbValue map = lb_build_addr_ptr(p, expr);
+			lbValue map = lb_range_addr_get_ptr(p, lb_build_addr(p, expr));
 			if (is_type_pointer(type_deref(map.type))) {
 				map = lb_emit_load(p, map);
 			}
@@ -1425,7 +1490,7 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 				soa_elem = &addr;
 				break;
 			default:
-				array = lb_addr_get_ptr(p, addr);
+				array = lb_range_addr_get_ptr(p, addr);
 				if (is_type_soa_pointer(type_deref(array.type))) {
 					// for v in p, where p is an #soa element ptr (e.g. p := &soa[i]);
 					// we need to build the soa variable from the soa ptr
@@ -1445,7 +1510,7 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 			break;
 		}
 		case Type_EnumeratedArray: {
-			lbValue array = lb_build_addr_ptr(p, expr);
+			lbValue array = lb_range_addr_get_ptr(p, lb_build_addr(p, expr));
 			if (is_type_pointer(type_deref(array.type))) {
 				array = lb_emit_load(p, array);
 			}
@@ -1455,7 +1520,7 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 			break;
 		}
 		case Type_FixedCapacityDynamicArray: {
-			lbValue array = lb_build_addr_ptr(p, expr);
+			lbValue array = lb_range_addr_get_ptr(p, lb_build_addr(p, expr));
 			if (is_type_pointer(type_deref(array.type))) {
 				array = lb_emit_load(p, array);
 			}
@@ -1465,7 +1530,7 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 		}
 		case Type_DynamicArray: {
 			lbValue count_ptr = {};
-			lbValue array = lb_build_addr_ptr(p, expr);
+			lbValue array = lb_range_addr_get_ptr(p, lb_build_addr(p, expr));
 			if (is_type_pointer(type_deref(array.type))) {
 				array = lb_emit_load(p, array);
 			}
@@ -3639,6 +3704,19 @@ gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlo
 	}
 	defer (p->branch_location_pos = prev_token_pos);
 
+	// NOTE: a `musttail` call must be directly followed by the `ret`, so with no deferred
+	// statements to run after it, the asan unpoisoning and lifetime ends go before the call
+	LLVMValueRef must_tail_call = nullptr;
+#if LLVM_VERSION_MAJOR > 17
+	if (p->defer_stmts.count == 0 && p->curr_block != nullptr) {
+		LLVMValueRef last = LLVMGetLastInstruction(p->curr_block->block);
+		if (last != nullptr && LLVMIsACallInst(last) && LLVMGetTailCallKind(last) == LLVMTailCallKindMustTail) {
+			must_tail_call = last;
+			LLVMPositionBuilderBefore(p->builder, must_tail_call);
+		}
+	}
+#endif
+
 	// TODO(lucas): In LLVM 21 use the 'use-after-scope' asan option which does this for us.
 	if (kind == lbDeferExit_Return) {
 		for_array(i, p->asan_stack_locals) {
@@ -3678,6 +3756,10 @@ gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlo
 
 	// end lifetimes after the defer bodies, a defer may reference the locals
 	lb_emit_lifetime_ends(p, kind, block);
+
+	if (must_tail_call != nullptr) {
+		LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);
+	}
 }
 
 gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block, Ast *node) {

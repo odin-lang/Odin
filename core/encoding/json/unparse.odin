@@ -8,6 +8,7 @@ import "core:slice"
 Unparse_Error :: union #shared_nil {
 	io.Error,
 	runtime.Allocator_Error,
+	Marshal_Data_Error,
 }
 
 @(require_results)
@@ -40,7 +41,8 @@ unparse_to_writer :: proc(w: io.Writer, value: Value, opt: ^Marshal_Options) -> 
 		base := 16 if opt.write_uint_as_hex && (opt.spec == .JSON5 || opt.spec == .MJSON) else 10
 		io.write_i64(w, v, base) or_return
 	case Float:
-		io.write_f64(w, v) or_return
+		buf: [64]byte
+		io.write_string(w, format_float(buf[:], v, 64, opt.spec) or_return) or_return
 	case Boolean:
 		io.write_string(w, "true" if v else "false") or_return
 	case String:
