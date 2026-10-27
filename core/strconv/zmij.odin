@@ -456,7 +456,7 @@ _format_precision :: #force_inline proc "contextless" (buf: []byte, neg: bool, d
 		if dp >= 18 {
 			copy16(out[n+0:], d)
 			copy16(out[n+16:], d[16:])
-			runtime.memset(out[count:], '0', dp - count)
+			runtime.memset(out[n+count:], '0', dp - count)
 			n += dp
 			if prec > 0 {
 				out[n] = '.'

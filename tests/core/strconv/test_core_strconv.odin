@@ -785,3 +785,12 @@ test_float_0h :: proc(t: ^testing.T) {
 	f32v, ok32 := strconv.parse_f32("0h7f9a7604")
 	testing.expectf(t, ok32 && transmute(u32)f32v == 0x7f9a7604, "got %08x (ok=%v), want 7f9a7604", transmute(u32)f32v, ok32)
 }
+
+@(test)
+test_write_float_large_negative_fixed :: proc(t: ^testing.T) {
+	bits := u32(0xe134670c)
+	f := transmute(f32)bits
+	buf: [32]byte
+	result := strconv.write_float(buf[:], cast(f64)f, 'f', -1, 32, flags = {})
+	testing.expect_value(t, result, "-207989950000000000000")
+}
