@@ -365,6 +365,11 @@ fi
 
 $ODIN test ../test_issue_6344 $COMMON -o:speed
 
+if [[ "$(uname)" != "NetBSD" ]]; then
+	$ODIN test ../test_issue_8072 -o:minimal --sanitize:address $COMMON
+fi
+$ODIN test ../test_issue_8072 -o:speed -lifetime-markers $COMMON
+
 if [[ $($ODIN test ../test_pr_6470 -define:TEST_EXPECT_FAILURE=true $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
