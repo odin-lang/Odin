@@ -2718,7 +2718,8 @@ gb_internal void check_unsafe_return(Operand const &o, Type *type, Ast *expr) {
 			unsafe_return_error(o, "a slice of a compound literal");
 		}
 	} else if (o.mode == Addressing_Constant && is_type_slice(type)) {
-		if (is_load_directive_call(o.expr)) {
+		// Constant strings are loaded into read-only memory, so this is fine.
+		if (o.value.kind == ExactValue_String || o.value.kind == ExactValue_String16) {
 			return;
 		}
 
