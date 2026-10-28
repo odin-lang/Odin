@@ -3011,12 +3011,46 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 			if (found->kind != Entity_Constant) {
 				error(arg, "'#config' entity '%.*s' found but expected a constant", LIT(name));
 			} else {
-				operand->type = found->type;
-				operand->mode = Addressing_Constant;
-				operand->value = found->Constant.value;
+				Operand config_value = {};
+				config_value.type = found->type;
+				config_value.mode = Addressing_Constant;
+				config_value.value = found->Constant.value;
+				config_value.expr = arg;
+
+				if (is_type_enum(def.type)) {
+					Type *enum_type = base_type(def.type);
+					if (config_value.value.kind != ExactValue_String) {
+						gbString type_str = type_to_string(def.type);
+						error(arg, "'#config' enum value for '%.*s' must name a field of '%s'", LIT(name), type_str);
+						gb_string_free(type_str);
+						config_value.mode = Addressing_Invalid;
+					} else {
+						String value_name = config_value.value.value_string;
+						InternedString value_interned = string_interner_insert(value_name);
+						Entity *enum_value = scope_lookup_current(enum_type->Enum.scope, value_interned);
+						if (enum_value == nullptr || enum_value->kind != Entity_Constant || !are_types_identical(enum_value->type, def.type)) {
+							gbString type_str = type_to_string(def.type);
+							error(arg, "Unknown enum value '%.*s' for '#config' '%.*s' of type '%s'", LIT(value_name), LIT(name), type_str);
+							gb_string_free(type_str);
+							check_did_you_mean_type(value_name, enum_type->Enum.fields);
+							config_value.mode = Addressing_Invalid;
+						} else {
+							config_value.type = enum_value->type;
+							config_value.value = enum_value->Constant.value;
+						}
+					}
+				}
+
+				if (config_value.mode != Addressing_Invalid) {
+					check_assignment(c, &config_value, def.type, str_lit("#config"));
+					if (config_value.mode != Addressing_Invalid) {
+						operand->type = config_value.type;
+						operand->mode = config_value.mode;
+						operand->value = config_value.value;
+					}
+				}
 			}
 		}
-
 		Defineable defineable    = {};
 		defineable.docs          = nullptr;
 		defineable.name          = name;

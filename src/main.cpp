@@ -3099,7 +3099,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 
 		if (print_flag("-define:<name>=<value>")) {
-			print_usage_line(2, "Defines a scalar boolean, integer or string as global constant.");
+			print_usage_line(2, "Defines a scalar boolean, integer, string or enum as global constant.");
 			print_usage_line(2, "Example: -define:SPAM=123");
 			print_usage_line(2, "Usage in code:");
 				print_usage_line(3, "#config(SPAM, default_value)");
