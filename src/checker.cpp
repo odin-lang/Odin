@@ -4145,6 +4145,8 @@ gb_internal bool is_foreign_name_valid(String const &name) {
 			case '.':
 			case '_':
 			case ':':
+			case '?':
+			case '@':
 				break;
 			default:
 				if (!gb_char_is_alpha(cast(char)rune))
