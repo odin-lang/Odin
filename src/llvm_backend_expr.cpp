@@ -53,11 +53,11 @@ gb_internal lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, As
 	incoming_blocks[done->preds.count] = p->curr_block->block;
 
 	lb_emit_jump(p, done);
-	lb_start_block(p, done);	
-	
+	lb_start_block(p, done);
+
 	LLVMTypeRef dst_type = lb_type(m, t_llvm_bool);
 	LLVMValueRef phi = nullptr;
-	
+
 	GB_ASSERT(incoming_values.count == incoming_blocks.count);
 	GB_ASSERT(incoming_values.count > 0);
 
@@ -70,7 +70,7 @@ gb_internal lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, As
 	}
 
 	lbValue res = {};
-	
+
 	if (phi_type == nullptr) {
 		phi = LLVMBuildPhi(p->builder, dst_type, "");
 		LLVMAddIncoming(phi, incoming_values.data, incoming_blocks.data, cast(unsigned)incoming_values.count);
@@ -358,9 +358,202 @@ gb_internal LLVMValueRef lb_sdiv_wrapping(lbProcedure *p, LLVMValueRef lhs, LLVM
 }
 
 
+/*
+	NOTE(bill, 2026-10-29): Floored division by a constant, after https://www.benjoffe.com/fast-floordiv
+
+	For d = |D| not a power of two, the round-up multiplier M = ceil(2^S/d) gives floor(x/d) = (x*M) >> S for every x >= 0.
+	The round-down multiplier M-1 = floor(2^S/d) gives it for every x < 0. Writing x = -(u+1) with u = ~x turns the negative side
+	into unsigned division with an increment.
+	Each side of a W-bit integer is a (W-1)-bit magnitude. M always fits in a signed register.
+
+	One of the two multipliers is used on both sides, with a one instruction bump on the side it misses.
+	A negative divisor is the same problem on -x with the multiplier negated.
+
+	The article also picks the multiplier by the sign of x (M + (x >> (W-1))) when both work. That is not used here.
+	LLVM sees that such a multiplier is never negative and widens a 64-bit one with a zero extension.
+	That splits the high multiply into two multiplies. In narrower loops a per-lane multiplier also vectorizes worse than a constant one.
+*/
+enum lbFloorDivKind {
+	lbFloorDiv_None,
+	lbFloorDiv_RoundUp,   // M = ceil(2^S/d),  x+1 for x < -1       (x-1 for x > 1 when D < 0)
+	lbFloorDiv_RoundDown, // M = floor(2^S/d), x+1 for 0 <= x < max (x-1 for min < x < 0 when D < 0)
+};
+
+struct lbFloorDivMagic {
+	lbFloorDivKind kind;
+	i64            multiplier; // negated for a negative divisor
+	u32            shift;
+};
+
+gb_internal int lb_floor_div_cmp_mul_pow2(u64 a, u64 b, u32 shift) {
+	u64 lo = 0;
+	u64 hi = 0;
+	mul_overflow_u64(a, b, &lo, &hi);
+
+	u64 pow_hi = shift >= 64 ? 1ull << (shift-64) : 0;
+	u64 pow_lo = shift >= 64 ? 0 : 1ull << shift;
+	if (hi != pow_hi) {
+		return hi < pow_hi ? -1 : +1;
+	}
+	if (lo != pow_lo) {
+		return lo < pow_lo ? -1 : +1;
+	}
+	return 0;
+}
+
+gb_internal u64 lb_floor_div_mul_shr(u64 a, u64 b, u32 shift) {
+	u64 lo = 0;
+	u64 hi = 0;
+	mul_overflow_u64(a, b, &lo, &hi);
+
+	if (shift >= 64) {
+		return hi >> (shift-64);
+	}
+	return (lo >> shift) | (shift > 0 ? hi << (64-shift) : 0);
+}
+
+gb_internal lbFloorDivMagic lb_floor_div_magic(i64 divisor, u32 bits) {
+	lbFloorDivMagic res = {};
+
+	u64 d = divisor < 0 ? -cast(u64)divisor : cast(u64)divisor;
+	if (bits < 3 || bits > 64 || d < 3 || (d & (d-1)) == 0) {
+		return res;
+	}
+	u64 half = 1ull << (bits-1);
+	if (d >= half) {
+		return res;
+	}
+
+	u64 pos_max = divisor > 0 ? half-1 : half;
+	u64 neg_max = divisor > 0 ? half-1 : half-2;
+
+	u32 up_shift   = 0;
+	u32 down_shift = 0;
+	u64 up_q       = 0;
+	u64 down_q     = 0;
+
+	u64 q = half / d;
+	u64 r = half % d;
+	for (u32 shift = bits; up_shift == 0 || down_shift == 0; shift++) {
+		q = 2*q;
+		r = 2*r;
+		if (r >= d) {
+			q += 1;
+			r -= d;
+		}
+		if (q+1 >= half) {
+			break;
+		}
+
+		if (up_shift == 0) {
+			u64 n = pos_max - (pos_max - (d-1)) % d;
+			if (lb_floor_div_cmp_mul_pow2(n, d-r, shift) < 0) {
+				up_shift = shift;
+				up_q     = q;
+			}
+		}
+
+		if (down_shift == 0) {
+			u64 n_neg = neg_max - neg_max % d;
+			u64 n_pos = (pos_max-1) - (pos_max-1) % d;
+			if (lb_floor_div_cmp_mul_pow2(n_neg+1, r, shift) <  0 &&
+			    lb_floor_div_cmp_mul_pow2(n_pos+1, r, shift) <= 0 &&
+			    lb_floor_div_mul_shr(pos_max, q, shift) == pos_max / d) {
+				down_shift = shift;
+				down_q     = q;
+			}
+		}
+	}
+
+	if (up_shift == 0 && down_shift == 0) {
+		return res;
+	}
+
+	// NOTE(bill): prefer a register sized shift and then round-down (cmp+adc on amd64)
+	bool use_down = down_shift != 0;
+	if (down_shift != bits && up_shift == bits) {
+		use_down = false;
+	}
+
+	if (use_down) {
+		res.kind       = lbFloorDiv_RoundDown;
+		res.shift      = down_shift;
+		res.multiplier = divisor > 0 ? cast(i64)down_q : -cast(i64)down_q;
+	} else {
+		res.kind       = lbFloorDiv_RoundUp;
+		res.shift      = up_shift;
+		res.multiplier = divisor > 0 ? cast(i64)(up_q+1) : -cast(i64)(up_q+1);
+	}
+	return res;
+}
+
+gb_internal LLVMValueRef lb_emit_signed_floor_div_by_constant(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs) {
+	LLVMTypeRef type = LLVMTypeOf(lhs);
+	if (!LLVMIsAConstantInt(rhs) || LLVMGetTypeKind(type) != LLVMIntegerTypeKind) {
+		return nullptr;
+	}
+	u32 bits = LLVMGetIntTypeWidth(type);
+	if (bits > 64) {
+		return nullptr;
+	}
+	if (bits == 64) {
+		// NOTE(bill): the 128-bit product needs a native high multiply
+		switch (build_context.metrics.arch) {
+		case TargetArch_amd64:
+		case TargetArch_arm64:
+		case TargetArch_riscv64:
+			break;
+		default:
+			return nullptr;
+		}
+	}
+
+	i64 divisor = LLVMConstIntGetSExtValue(rhs);
+	lbFloorDivMagic magic = lb_floor_div_magic(divisor, bits);
+	if (magic.kind == lbFloorDiv_None) {
+		return nullptr;
+	}
+
+	LLVMBuilderRef b    = p->builder;
+	LLVMTypeRef    wide = LLVMIntTypeInContext(p->module->ctx, 2*bits);
+	LLVMValueRef   m    = LLVMConstInt(type, cast(u64)magic.multiplier, true);
+	LLVMValueRef   x    = lhs;
+	u64            half = 1ull << (bits-1);
+
+	switch (magic.kind) {
+	case lbFloorDiv_None:
+		break;
+	case lbFloorDiv_RoundUp:
+		if (divisor > 0) {
+			LLVMValueRef bump = LLVMBuildICmp(b, LLVMIntSLT, lhs, LLVMConstAllOnes(type), "");
+			x = LLVMBuildAdd(b, lhs, LLVMBuildZExt(b, bump, type, ""), "");
+		} else {
+			LLVMValueRef bump = LLVMBuildICmp(b, LLVMIntSGT, lhs, LLVMConstInt(type, 1, false), "");
+			x = LLVMBuildSub(b, lhs, LLVMBuildZExt(b, bump, type, ""), "");
+		}
+		break;
+	case lbFloorDiv_RoundDown:
+		if (divisor > 0) {
+			// saturating, max(T) is left alone
+			LLVMValueRef bump = LLVMBuildICmp(b, LLVMIntULT, lhs, LLVMConstInt(type, half-1, false), "");
+			x = LLVMBuildAdd(b, lhs, LLVMBuildZExt(b, bump, type, ""), "");
+		} else {
+			// min(T) is left alone
+			LLVMValueRef bump = LLVMBuildICmp(b, LLVMIntUGT, lhs, LLVMConstInt(type, half, false), "");
+			x = LLVMBuildSub(b, lhs, LLVMBuildZExt(b, bump, type, ""), "");
+		}
+		break;
+	}
+
+	LLVMValueRef product = LLVMBuildMul(b, LLVMBuildSExt(b, x, wide, ""), LLVMBuildSExt(b, m, wide, ""), "");
+	LLVMValueRef shifted = LLVMBuildAShr(b, product, LLVMConstInt(wide, magic.shift, false), "");
+	return LLVMBuildTrunc(b, shifted, type, "");
+}
+
+
 // implements %% (the remainder/floored mod operator) on signed integers;
 // this is branchless and vectorizable, so it also covers vectors
-gb_internal LLVMValueRef lb_emit_signed_floor_mod(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs) {	
+gb_internal LLVMValueRef lb_emit_signed_floor_mod(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs) {
 	// constants implement this as srem(srem(x, y) + y, y), which is mathematically correct,
 	// and works for arbitrary precision integers, but the add can wrap at finite precision
 
@@ -369,6 +562,12 @@ gb_internal LLVMValueRef lb_emit_signed_floor_mod(lbProcedure *p, LLVMValueRef l
 	if (LLVMIsAConstantInt(rhs) && rhs == LLVMConstAllOnes(LLVMTypeOf(rhs))) {
 		return LLVMConstNull(LLVMTypeOf(rhs)); // the entire %% op folds to 0
 	}
+
+	// x - floor(x/rhs)*rhs avoids both the truncated remainder and its correction
+	if (LLVMValueRef q = lb_emit_signed_floor_div_by_constant(p, lhs, rhs)) {
+		return LLVMBuildSub(p->builder, lhs, LLVMBuildMul(p->builder, q, rhs, ""), "");
+	}
+
 	LLVMValueRef r = LLVMBuildSRem(p->builder, lhs, lb_srem_safe_divisor(p, rhs), "");
 	// srem truncs to 0, so r needs a +rhs correction when the operands signs differ (and r != 0)
 	// so we implement
@@ -760,16 +959,16 @@ gb_internal lbValue lb_emit_arith_array(lbProcedure *p, TokenKind op, lbValue lh
 gb_internal bool lb_is_matrix_simdable(Type *t, bool ignore_layout=false) {
 	Type *mt = base_type(t);
 	GB_ASSERT(mt->kind == Type_Matrix);
-	
+
 	Type *elem = core_type(mt->Matrix.elem);
 	if (is_type_complex(elem)) {
 		return false;
 	}
-	
+
 	if (is_type_different_to_arch_endianness(elem)) {
 		return false;
 	}
-	
+
 	switch (build_context.metrics.arch) {
 	default:
 		return false;
@@ -791,7 +990,7 @@ gb_internal bool lb_is_matrix_simdable(Type *t, bool ignore_layout=false) {
 			return false;
 		}
 	}
-	
+
 	if (elem->kind == Type_Basic) {
 		switch (elem->Basic.kind) {
 		case Basic_f16:
@@ -810,7 +1009,7 @@ gb_internal bool lb_is_matrix_simdable(Type *t, bool ignore_layout=false) {
 			}
 		}
 	}
-	
+
 	return true;
 }
 

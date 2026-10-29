@@ -85,6 +85,87 @@ modmod_const_divisors :: proc(t: ^testing.T) {
 }
 
 @(test)
+modmod_const_divisor_variants :: proc(t: ^testing.T) {
+	check :: proc(t: ^testing.T, $T: typeid, $D: T, loc := #caller_location) {
+		y := not_const(D)
+		d := abs(i128(D))
+		lo, hi := i128(min(T)), i128(max(T))
+
+		vals: [dynamic]i128
+		defer delete(vals)
+		for base in ([3]i128{lo, 0, hi}) {
+			for k in i128(-2048)..=2048 {
+				append(&vals, base + k)
+			}
+		}
+		for j in ([3]i128{0, 1, d - 1}) {
+			n := hi - (hi - j) %% d
+			append(&vals, n, n - d, -n, -n - 1, -n + d)
+		}
+		s := u64(0x9e37_79b9_7f4a_7c15)
+		for _ in 0..<2048 {
+			s = s*6364136223846793005 + 1442695040888963407
+			append(&vals, i128(T(s)))
+		}
+
+		for v in vals {
+			if v < lo || v > hi { continue }
+			x := T(v)
+			got, want := x %% D, floor_mod(x, y)
+			if got != want {
+				testing.expectf(t, false, "%v: %v %%%% %v == %v, want %v", typeid_of(T), x, D, got, want, loc = loc)
+				return
+			}
+		}
+	}
+
+	// round-up, round-down, register sized shifts, and the divisors of 2^(n-1)+-1
+	check(t, i8, 3)
+	check(t, i8, 5)
+	check(t, i8, 7)
+	check(t, i8, 100)
+	check(t, i8, 127)
+	check(t, i8, -3)
+	check(t, i8, -7)
+	check(t, i8, -127)
+
+	check(t, i16, 3)
+	check(t, i16, 10)
+	check(t, i16, 1000)
+	check(t, i16, 10923)
+	check(t, i16, max(i16))
+	check(t, i16, -10)
+	check(t, i16, -max(i16))
+
+	check(t, i32, 3)
+	check(t, i32, 7)
+	check(t, i32, 100)
+	check(t, i32, 86400)
+	check(t, i32, 1_000_000_007)
+	check(t, i32, max(i32))
+	check(t, i32, -5)
+	check(t, i32, -100)
+	check(t, i32, -max(i32))
+
+	check(t, i64, 3)
+	check(t, i64, 5)
+	check(t, i64, 6)
+	check(t, i64, 7)
+	check(t, i64, 49)
+	check(t, i64, 100)
+	check(t, i64, 1000)
+	check(t, i64, 86400)
+	check(t, i64, 1_000_000_007)
+	check(t, i64, max(i64) - 1)
+	check(t, i64, max(i64))
+	check(t, i64, -3)
+	check(t, i64, -5)
+	check(t, i64, -7)
+	check(t, i64, -86400)
+	check(t, i64, -max(i64))
+}
+
+@(test)
 modmod_const_fold :: proc(t: ^testing.T) {
 	// must match the folded constants (arbitrary precision)
 	{
@@ -136,13 +217,13 @@ modmod_128 :: proc(t: ^testing.T) {
 		x = 3
 		testing.expect_value(t, x %% -BIG, 3 - BIG)
 		testing.expect_value(t, x %% -BIG, floor_mod(x, -BIG))
-	
+
 		y = -BIG
 		testing.expect_value(t, x %% y, 3 - BIG)
 
 		x = BIG + 3
 		testing.expect_value(t, x %% BIG, 3)
-	
+
 		x, y = max(i128) - 1, max(i128)
 		testing.expect_value(t, x %% y, max(i128) - 1)
 	}
