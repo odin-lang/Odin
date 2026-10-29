@@ -371,6 +371,10 @@ to close and free the process handle.
 This procedure is not thread-safe. It may alter the inheritance properties
 of file handles in an unpredictable manner. In case multiple threads change
 handle inheritance properties, make sure to serialize all those calls.
+
+**Note(windows)**: A console program shares the console of the current
+process. When the current process has no console, the child gets a console
+without a window, instead of opening a new console window.
 */
 @(require_results)
 process_start :: proc(desc: Process_Desc) -> (Process, Error) {
