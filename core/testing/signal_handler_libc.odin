@@ -127,6 +127,7 @@ Unless you terminated the tests yourself, this could be a dire bug and should be
 			}
 		}
 		intrinsics.atomic_store(&stop_test_passed, cast(libc.sig_atomic_t)passed)
+		_test_thread_defer_cancel()
 		intrinsics.atomic_store(&stop_test_alert, 1)
 
 		for {
