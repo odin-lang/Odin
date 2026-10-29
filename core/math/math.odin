@@ -938,22 +938,22 @@ floor :: proc{
 @(require_results)
 floor_div :: proc "contextless" (x, y: $T) -> T
 	where intrinsics.type_is_integer(T) {
-	a := x / y
-	r := x % y
-	if (r > 0 && y < 0) || (r < 0 && y > 0) {
-		a -= 1
+	when intrinsics.type_is_endian_platform(T) {
+		return intrinsics.floor_div(x, y)
+	} else {
+		a := x / y
+		r := x % y
+		if (r > 0 && y < 0) || (r < 0 && y > 0) {
+			a -= 1
+		}
+		return a
 	}
-	return a
 }
 
 @(require_results)
 floor_mod :: proc "contextless" (x, y: $T) -> T
 	where intrinsics.type_is_integer(T) {
-	r := x % y
-	if (r > 0 && y < 0) || (r < 0 && y > 0) {
-		r += y
-	}
-	return r
+	return x %% y
 }
 
 @(require_results)
@@ -967,13 +967,7 @@ divmod :: #force_inline proc "contextless" (x, y: $T) -> (div, mod: T)
 @(require_results)
 floor_divmod :: #force_inline proc "contextless" (x, y: $T) -> (div, mod: T)
 	where intrinsics.type_is_integer(T) {
-	div = x / y
-	mod = x % y
-	if (mod > 0 && y < 0) || (mod < 0 && y > 0) {
-		div -= 1
-		mod += y
-	}
-	return
+	return floor_div(x, y), x %% y
 }
 
 

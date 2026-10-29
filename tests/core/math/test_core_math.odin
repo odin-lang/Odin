@@ -1271,15 +1271,33 @@ test_floor_divmod :: proc(t: ^testing.T) {
 		for j in -128..=127 {
 			if j == 0 { continue }
 			x, y := i8(i), i8(j)
+
+			// i32 cannot overflow here, and wrapping back to i8 matches min(i8)/-1
+			q, r := i32(i) / i32(j), i32(i) % i32(j)
+			if r != 0 && (r < 0) != (j < 0) {
+				q -= 1
+				r += i32(j)
+			}
+			want_div, want_mod := i8(q), i8(r)
+
 			div, mod := math.floor_divmod(x, y)
 			if !testing.expectf(t,
-				div == math.floor_div(x, y) && mod == x %% y,
-				"floor_divmod(%v, %v) = (%v, %v), want (%v, %v)",
-				x, y, div, mod, math.floor_div(x, y), x %% y) {
+				div == want_div && mod == want_mod &&
+				math.floor_div(x, y) == want_div &&
+				math.floor_mod(x, y) == want_mod,
+				"floor_divmod(%v, %v) = (%v, %v), floor_div %v, floor_mod %v, want (%v, %v)",
+				x, y, div, mod, math.floor_div(x, y), math.floor_mod(x, y), want_div, want_mod) {
 				return
 			}
 		}
 	}
+
+	// explicitly endian types do not take the intrinsic
+	div, mod := math.floor_divmod(i32be(-7), i32be(2))
+	testing.expect_value(t, div, -4)
+	testing.expect_value(t, mod, 1)
+	testing.expect_value(t, math.floor_div(i64le(7), i64le(-2)), -4)
+	testing.expect_value(t, math.floor_mod(u16be(7), u16be(2)), 1)
 }
 
 @test

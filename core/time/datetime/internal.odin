@@ -14,27 +14,16 @@ sign :: proc "contextless" (v: i64) -> (res: i64) {
 	return -1
 }
 
-// Caller has to ensure y != 0
-divmod :: proc "contextless" (x, y: $T, loc := #caller_location) -> (a: T, r: T)
+// `y` is a constant so the division is lowered to a multiply and shift
+divmod :: #force_inline proc "contextless" (x: $T, $y: T) -> (a: T, r: T)
 	where intrinsics.type_is_integer(T) {
-	a = x / y
-	r = x % y
-	if (r > 0 && y < 0) || (r < 0 && y > 0) {
-		a -= 1
-		r += y
-	}
-	return a, r
+	return intrinsics.floor_div(x, y), x %% y
 }
 
 // Divides and floors
-floor_div :: proc "contextless" (x, y: $T) -> (res: T)
+floor_div :: #force_inline proc "contextless" (x: $T, $y: T) -> (res: T)
 	where intrinsics.type_is_integer(T) {
-	res = x / y
-	r  := x % y
-	if (r > 0 && y < 0) || (r < 0 && y > 0) {
-		res -= 1
-	}
-	return res
+	return intrinsics.floor_div(x, y)
 }
 
 // Half open: x mod [1..b]
