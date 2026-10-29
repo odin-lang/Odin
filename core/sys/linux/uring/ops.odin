@@ -40,12 +40,34 @@ writev :: proc(ring: ^Ring, user_data: u64, fd: linux.Fd, iovs: []linux.IO_Vec, 
 	return
 }
 
-read_fixed :: proc() {
-	unimplemented()
+// Read operation using a registered buffer, see also read(2) and io_uring_register(2).
+read_fixed :: proc(ring: ^Ring, user_data: u64, fd: linux.Fd, buf: []u8, offset: u64, buf_index: u16) -> (sqe: ^linux.IO_Uring_SQE, ok: bool) {
+	sqe = get_sqe(ring) or_return
+	sqe.opcode = .READ_FIXED
+	sqe.fd = fd
+	sqe.addr = cast(u64)uintptr(raw_data(buf))
+	sqe.len = u32(len(buf))
+	sqe.off = offset
+	sqe.buf_index = buf_index
+	sqe.user_data = user_data
+
+	ok = true
+	return
 }
 
-write_fixed :: proc() {
-	unimplemented()
+// Write operation using a registered buffer, see also write(2) and io_uring_register(2).
+write_fixed :: proc(ring: ^Ring, user_data: u64, fd: linux.Fd, buf: []u8, offset: u64, buf_index: u16) -> (sqe: ^linux.IO_Uring_SQE, ok: bool) {
+	sqe = get_sqe(ring) or_return
+	sqe.opcode = .WRITE_FIXED
+	sqe.fd = fd
+	sqe.addr = cast(u64)uintptr(raw_data(buf))
+	sqe.len = u32(len(buf))
+	sqe.off = offset
+	sqe.buf_index = buf_index
+	sqe.user_data = user_data
+
+	ok = true
+	return
 }
 
 /*
@@ -452,8 +474,18 @@ where T == linux.Sock_Addr_In || T == linux.Sock_Addr_In6 || T == linux.Sock_Add
 	return
 }
 
-fallocate :: proc() {
-	unimplemented()
+// Manipulate allocated disk space for a file, see also fallocate(2).
+fallocate :: proc(ring: ^Ring, user_data: u64, fd: linux.Fd, mode: linux.Fallocate_Mode, offset: u64,len: u64) -> (sqe: ^linux.IO_Uring_SQE, ok: bool) {
+	sqe = get_sqe(ring) or_return
+	sqe.opcode = .FALLOCATE
+	sqe.fd = fd
+	sqe.off = offset
+	sqe.addr = len
+	sqe.len = transmute(u32)mode
+	sqe.user_data = user_data
+
+	ok = true
+	return
 }
 
 fadvise :: proc() {
@@ -696,8 +728,17 @@ renameat :: proc() {
 	unimplemented()
 }
 
-unlinkat :: proc() {
-	unimplemented()
+//Remove a directory entry relative to a directory file descriptor see also unlinkat(2).
+unlinkat :: proc(ring: ^Ring, user_data: u64, dirfd: linux.Fd, path: cstring, flags: linux.FD_Flags) -> (sqe: ^linux.IO_Uring_SQE, ok: bool) {
+	sqe = get_sqe(ring) or_return
+	sqe.opcode = .UNLINKAT
+	sqe.fd = dirfd
+	sqe.addr = cast(u64)transmute(uintptr)path
+	sqe.unlink_flags = transmute(u32)flags
+	sqe.user_data = user_data
+
+	ok = true
+	return
 }
 
 mkdirat :: proc() {
