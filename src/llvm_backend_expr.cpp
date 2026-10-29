@@ -2490,6 +2490,26 @@ gb_internal lbValue lb_build_binary_in(lbProcedure *p, lbValue left, lbValue rig
 	return {};
 }
 
+gb_internal Ast *lb_modmod_compared_with_zero(Ast *expr) {
+	ast_node(be, BinaryExpr, expr);
+	Ast *sides[2] = {unparen_expr(be->left), unparen_expr(be->right)};
+	for (isize i = 0; i < 2; i++) {
+		Ast *modmod = sides[i];
+		Ast *zero   = sides[1-i];
+		if (modmod->kind != Ast_BinaryExpr || modmod->BinaryExpr.op.kind != Token_ModMod) {
+			continue;
+		}
+		if (!is_type_integer(modmod->tav.type) || zero->tav.mode != Addressing_Constant) {
+			continue;
+		}
+		ExactValue v = zero->tav.value();
+		if (v.kind == ExactValue_Integer && big_int_is_zero(&v.value_integer)) {
+			return modmod;
+		}
+	}
+	return nullptr;
+}
+
 gb_internal lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 	ast_node(be, BinaryExpr, expr);
 
@@ -2571,6 +2591,15 @@ gb_internal lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 			s = lb_emit_conv(p, s, str_type);
 			lbValue len = lb_string_len(p, s);
 			lbValue cmp = lb_emit_comp(p, be->op.kind, len, lb_const_int(p->module, t_int, 0));
+			Type *type = default_type(tv.type);
+			return lb_emit_conv(p, cmp, type);
+		} else if (Ast *modmod = lb_modmod_compared_with_zero(expr)) {
+			ast_node(mbe, BinaryExpr, modmod);
+			Type *mod_type = default_type(modmod->tav.type);
+			lbValue x = lb_build_expr(p, mbe->left);
+			lbValue y = lb_build_expr(p, mbe->right);
+			lbValue r = lb_emit_arith(p, Token_Mod, x, y, mod_type);
+			lbValue cmp = lb_emit_comp(p, be->op.kind, r, lb_const_int(p->module, mod_type, 0));
 			Type *type = default_type(tv.type);
 			return lb_emit_conv(p, cmp, type);
 		}

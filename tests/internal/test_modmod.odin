@@ -166,6 +166,58 @@ modmod_const_divisor_variants :: proc(t: ^testing.T) {
 }
 
 @(test)
+modmod_compared_with_zero :: proc(t: ^testing.T) {
+	// `x %% y == 0` is lowered as `x % y == 0`
+	check :: proc(t: ^testing.T, $T: typeid, $D: T, loc := #caller_location) {
+		y := not_const(D)
+		lo, hi, d := i128(min(T)), i128(max(T)), abs(i128(D))
+
+		vals: [dynamic]i128
+		defer delete(vals)
+		for base in ([5]i128{lo, 0, hi, hi - hi %% d, lo + (-lo) %% d}) {
+			for k in i128(-300)..=300 {
+				append(&vals, base + k)
+			}
+		}
+
+		for v in vals {
+			if v < lo || v > hi { continue }
+			x := T(v)
+			want := floor_mod(x, y) == 0
+			got  := [4]bool{x %% D == 0, !(x %% D != 0), 0 == (x %% D), x %% y == 0}
+			for g in got {
+				if g != want {
+					testing.expectf(t, false, "%v: %v %%%% %v == 0 gave %v, want %v (%v)", typeid_of(T), x, D, g, want, got, loc = loc)
+					return
+				}
+			}
+		}
+	}
+
+	check(t, i8,  3)
+	check(t, i8,  -128)
+	check(t, i16, 10)
+	check(t, i32, 7)
+	check(t, i32, 86400)
+	check(t, i32, -100)
+	check(t, i64, 3)
+	check(t, i64, 7)
+	check(t, i64, 86400)
+	check(t, i64, 1 << 20)
+	check(t, i64, max(i64))
+	check(t, i64, -1)
+	check(t, i64, -7)
+
+	{
+		// endian-annotated operands
+		x, y := not_const(i32be(-14)), not_const(i32be(7))
+		testing.expect(t, x %% y == 0)
+		testing.expect(t, x %% 7 == 0)
+		testing.expect(t, (x + 1) %% 7 != 0)
+	}
+}
+
+@(test)
 modmod_const_fold :: proc(t: ^testing.T) {
 	// must match the folded constants (arbitrary precision)
 	{
