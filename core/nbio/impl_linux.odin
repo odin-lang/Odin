@@ -611,7 +611,7 @@ link_timeout :: proc(target: ^Operation, expires: time.Time) {
 
 link_timeout_callback :: proc(op: ^Operation, res: i32) {
 	err := linux.Errno(-res)
-	if err != nil && err != .ETIME && err != .ECANCELED {
+	if err != nil && err != .ETIME && err != .ECANCELED && err != .EALREADY && err != .ENOENT {
 		panic("unexpected nbio.link_timeout() error")
 	}
 }
