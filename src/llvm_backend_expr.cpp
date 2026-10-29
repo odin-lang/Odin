@@ -611,6 +611,38 @@ gb_internal LLVMValueRef lb_emit_signed_floor_mod(lbProcedure *p, LLVMValueRef l
 	return LLVMBuildSelect(p->builder, cond, corrected, r, "");
 }
 
+// floor(lhs/rhs) on signed integers. min(T)/-1 wraps like `/`.
+gb_internal LLVMValueRef lb_emit_signed_floor_div(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs) {
+	LLVMTypeRef type = LLVMTypeOf(lhs);
+	if (LLVMIsAConstantInt(rhs) && LLVMGetIntTypeWidth(type) <= 64) {
+		i64 divisor = LLVMConstIntGetSExtValue(rhs);
+		u64 d = divisor < 0 ? -cast(u64)divisor : cast(u64)divisor;
+		if (d != 0 && is_power_of_two_u64(d)) {
+			LLVMValueRef shift = LLVMConstInt(type, floor_log2(d), false);
+			LLVMValueRef q = LLVMBuildAShr(p->builder, lhs, shift, "");
+			if (divisor > 0) {
+				return q;
+			}
+			// NOTE(bill): floor(x / -d) = -ceil(x / d)
+			LLVMValueRef rem  = LLVMBuildAnd(p->builder, lhs, LLVMConstInt(type, d-1, false), "");
+			LLVMValueRef ceil = LLVMBuildAdd(p->builder, q, LLVMBuildZExt(p->builder, LLVMBuildICmp(p->builder, LLVMIntNE, rem, LLVMConstNull(type), ""), type, ""), "");
+			return LLVMBuildNeg(p->builder, ceil, "");
+		}
+	}
+	if (LLVMValueRef q = lb_emit_signed_floor_div_by_constant(p, lhs, rhs)) {
+		return q;
+	}
+
+	// NOTE(bill): the truncated quotient is one too high when there is a remainder and the signs differ
+	LLVMValueRef zero    = LLVMConstNull(type);
+	LLVMValueRef q       = lb_sdiv_wrapping(p, lhs, rhs);
+	LLVMValueRef r       = LLVMBuildSRem(p->builder, lhs, lb_srem_safe_divisor(p, rhs), "");
+	LLVMValueRef inexact = LLVMBuildICmp(p->builder, LLVMIntNE, r, zero, "");
+	LLVMValueRef differ  = LLVMBuildICmp(p->builder, LLVMIntSLT, LLVMBuildXor(p->builder, lhs, rhs, ""), zero, "");
+	LLVMValueRef down    = LLVMBuildAnd(p->builder, inexact, differ, "");
+	return LLVMBuildSub(p->builder, q, LLVMBuildZExt(p->builder, down, type, ""), "");
+}
+
 
 gb_internal bool is_simd_able_type(Type *t) {
 	if (t->kind != Type_Basic) {
@@ -1709,7 +1741,7 @@ gb_internal lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue l
 	return {};
 }
 
-gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs, bool is_signed) {
+gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs, bool is_signed, bool is_floored=false) {
 	LLVMTypeRef type = LLVMTypeOf(rhs);
 	GB_ASSERT(LLVMTypeOf(lhs) == type);
 
@@ -1719,6 +1751,9 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 
 	auto const do_div = [&]() -> LLVMValueRef {
 		if (is_signed) {
+			if (is_floored) {
+				return lb_emit_signed_floor_div(p, lhs, rhs);
+			}
 			return lb_sdiv_wrapping(p, lhs, rhs);
 		}
 		return LLVMBuildUDiv(p->builder, lhs, rhs, "");

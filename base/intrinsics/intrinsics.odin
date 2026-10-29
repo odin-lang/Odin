@@ -65,6 +65,10 @@ overflow_mul :: proc(lhs, rhs: $T) -> (T, bool) where type_is_integer(T) #option
 saturating_add :: proc(lhs, rhs: $T) -> T where type_is_integer(T) ---
 saturating_sub :: proc(lhs, rhs: $T) -> T where type_is_integer(T) ---
 
+// Integer division rounded towards negative infinity: the quotient that goes with `%%`.
+// Division by zero and `min(T)/-1` behave as they do for `/`.
+floor_div :: proc(lhs, rhs: $T) -> T where type_is_integer(T) ---
+
 sqrt :: proc(x: $T) -> T where type_is_float(T) || (type_is_simd_vector(T) && type_is_float(type_elem_type(T))) ---
 
 fused_mul_add :: proc(a, b, c: $T) -> T where type_is_float(T) || (type_is_simd_vector(T) && type_is_float(type_elem_type(T))) ---

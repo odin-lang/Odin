@@ -92,6 +92,8 @@ enum BuiltinProcId {
 	BuiltinProc_saturating_add,
 	BuiltinProc_saturating_sub,
 
+	BuiltinProc_floor_div,
+
 	BuiltinProc_sqrt,
 	BuiltinProc_fused_mul_add,
 
@@ -506,6 +508,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("saturating_add"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("saturating_sub"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("floor_div"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("sqrt"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("fused_mul_add"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},

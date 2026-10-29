@@ -3945,6 +3945,21 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			return res;
 		}
 
+	case BuiltinProc_floor_div:
+		{
+			Type *type = tv.type;
+
+			lbValue x = lb_build_expr(p, ce->args[0]);
+			lbValue y = lb_build_expr(p, ce->args[1]);
+			x = lb_emit_conv(p, x, type);
+			y = lb_emit_conv(p, y, type);
+
+			lbValue res = {};
+			res.value = lb_integer_division(p, x.value, y.value, !is_type_unsigned(type), /*is_floored*/true);
+			res.type = type;
+			return res;
+		}
+
 	case BuiltinProc_sqrt:
 		{
 			Type *type = tv.type;

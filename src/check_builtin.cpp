@@ -6302,6 +6302,88 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 		break;
 
+	case BuiltinProc_floor_div:
+		{
+			Operand x = {};
+			Operand y = {};
+			check_expr(c, &x, ce->args[0]);
+			check_expr(c, &y, ce->args[1]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (y.mode == Addressing_Invalid) {
+				return false;
+			}
+			convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
+			convert_to_typed(c, &x, y.type); if (x.mode == Addressing_Invalid) return false;
+			if (is_type_untyped(x.type)) {
+				Type *type = default_type(x.type);
+				convert_to_typed(c, &x, type); if (x.mode == Addressing_Invalid) return false;
+				convert_to_typed(c, &y, type); if (y.mode == Addressing_Invalid) return false;
+			}
+			if (!is_type_integer(x.type)) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Expected an integer for '%.*s', got %s", LIT(builtin_name), xts);
+				gb_string_free(xts);
+				return false;
+			}
+			Type *ct = core_type(x.type);
+			if (is_type_different_to_arch_endianness(ct)) {
+				GB_ASSERT(ct->kind == Type_Basic);
+				if (ct->Basic.flags & (BasicFlag_EndianLittle|BasicFlag_EndianBig)) {
+					gbString xts = type_to_string(x.type);
+					error(x.expr, "Expected an integer type of the same platform endianness for '%.*s', got %s", LIT(builtin_name), xts);
+					gb_string_free(xts);
+					return false;
+				}
+			}
+			if (!are_types_identical(x.type, y.type)) {
+				gbString xts = type_to_string(x.type);
+				gbString yts = type_to_string(y.type);
+				error(x.expr, "Mismatched types for '%.*s', got %s vs %s", LIT(builtin_name), xts, yts);
+				gb_string_free(yts);
+				gb_string_free(xts);
+				return false;
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = x.type;
+
+			// NOTE(bill): division by zero follows the same rules as `/`
+			IntegerDivisionByZeroKind zero_behaviour = check_for_integer_division_by_zero(c, call);
+			bool rhs_is_zero = y.mode == Addressing_Constant && y.value.kind == ExactValue_Integer && big_int_is_zero(&y.value.value_integer);
+			if (rhs_is_zero && zero_behaviour == IntegerDivisionByZero_Trap) {
+				error(y.expr, "Division by zero not allowed");
+				return false;
+			}
+
+			if (x.mode == Addressing_Constant && y.mode == Addressing_Constant) {
+				ExactValue a = x.value;
+				ExactValue b = y.value;
+				if (rhs_is_zero) {
+					switch (zero_behaviour) {
+					case IntegerDivisionByZero_Zero:
+						operand->value = b;
+						break;
+					case IntegerDivisionByZero_Self:
+						operand->value = a;
+						break;
+					case IntegerDivisionByZero_AllBits:
+						operand->value = exact_unary_operator_value(Token_Xor, b, cast(i32)(8*type_size_of(x.type)), is_type_unsigned(x.type));
+						break;
+					}
+				} else {
+					// (a - a %% b) / b is exact
+					ExactValue r = exact_binary_operator_value(Token_ModMod, a, b);
+					operand->value = exact_binary_operator_value(Token_QuoEq, exact_binary_operator_value(Token_Sub, a, r), b);
+				}
+				operand->mode = Addressing_Constant;
+				operand->expr = call;
+				check_is_expressible(c, operand, operand->type);
+			}
+		}
+		break;
+
 	case BuiltinProc_sqrt:
 		{
 			Operand x = {};
