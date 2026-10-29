@@ -393,7 +393,7 @@ glob_tests := []Glob_Test{
 test_glob :: proc(t: ^testing.T) {
 	compare_matches :: proc(t: ^testing.T, pattern: string, globbed, expected: []string) {
 		glob_fold   := make([]string, len(globbed), context.temp_allocator)
-		expect_fold := make([]string, len(globbed), context.temp_allocator)
+		expect_fold := make([]string, len(expected), context.temp_allocator)
 
 		for glob, i in globbed {
 			// If `glob` returned a path in response to a pattern,
@@ -415,7 +415,7 @@ test_glob :: proc(t: ^testing.T) {
 		slice.sort(glob_fold)
 		slice.sort(expect_fold)
 
-		not_equal_msg := fmt.tprintf("Expected os.glob(%q) to return %v, got %v", pattern, glob_fold, expect_fold)
+		not_equal_msg := fmt.tprintf("Expected os.glob(%q) to return %v, got %v", pattern, expect_fold, glob_fold)
 		testing.expect(t, slice.equal(glob_fold, expect_fold), not_equal_msg)
 	}
 
