@@ -498,8 +498,11 @@ Process_State :: struct {
 	// Will also store the number of the exception or signal that has crashed the
 	// process.
 	exit_code: int,
-	// Specifies whether the termination of the process was successful or not,
-	// i.e. whether it has crashed or not.
+	// The number of the signal that terminated the process, or 0 if the process
+	// exited normally.
+	// **Note(windows)**: Always 0, as there are no signals on windows.
+	signal: int,
+	// Specifies whether the process exited normally with an exit code of 0.
 	// **Note(windows)**: On windows `true` is always returned, as there is no
 	// reliable way to obtain information about whether the process has crashed.
 	success: bool,

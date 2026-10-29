@@ -323,6 +323,7 @@ _process_wait :: proc(process: Process, timeout: time.Duration) -> (process_stat
 	case .KILLED, .DUMPED, .TRAPPED:
 		process_state.exited    = true
 		process_state.exit_code = int(info.si_status)
+		process_state.signal    = int(info.si_status)
 		process_state.success   = false
 	}
 
