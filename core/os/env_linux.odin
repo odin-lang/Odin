@@ -338,9 +338,7 @@ when ODIN_NO_CRT {
 
 	_environ :: proc(allocator: runtime.Allocator) -> (environ: []string, err: Error) {
 		n := 0
-		for entry := posix.environ[0]; entry != nil; n += 1 {
-			entry = posix.environ[n]
-		}
+		for ; posix.environ[n] != nil; n += 1 {}
 
 		r := make([dynamic]string, 0, n, allocator) or_return
 		defer if err != nil {
@@ -350,8 +348,7 @@ when ODIN_NO_CRT {
 			delete(r)
 		}
 
-		for i, entry := 0, posix.environ[0]; entry != nil; i += 1 {
-			entry = posix.environ[i]
+		for entry in posix.environ[:n] {
 			append(&r, strings.clone(string(entry), allocator) or_return)
 		}
 
@@ -362,11 +359,9 @@ when ODIN_NO_CRT {
 
 
 	export_cstring_environment :: proc(allocator: runtime.Allocator) -> []cstring {
-		env := make([dynamic]cstring, allocator)
-		for i, entry := 0, posix.environ[0]; entry != nil; i, entry = i+1, posix.environ[i] {
-			append(&env, entry)
-		}
-		append(&env, nil)
-		return env[:]
+		// NOTE: terminated by nil pointer via + 1
+		n := 0
+		for ; posix.environ[n] != nil; n += 1 {}
+		return slice.clone(posix.environ[:n + 1], allocator)
 	}
 }
