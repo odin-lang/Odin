@@ -204,8 +204,8 @@ _mm256_div_pd :: #force_inline proc "c" (a, b: __m256d) -> __m256d {
 //
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_round_pd)
 @(require_results, enable_target_feature="avx")
-_mm256_round_pd :: #force_inline proc "c" (a: __m256d, $ROUNDING: u8) -> __m256d where ROUNDING < 16 {
-	return llvm_roundpd256(a, u32(ROUNDING))
+_mm256_round_pd :: #force_inline proc "c" (a: __m256d, $ROUNDING: i32) -> __m256d where 0 <= ROUNDING, ROUNDING < 16 {
+	return llvm_roundpd256(a, ROUNDING)
 }
 
 // Rounds packed double-precision (64-bit) floating point elements in `a`
@@ -236,8 +236,8 @@ _mm256_floor_pd :: #force_inline proc "c" (a: __m256d) -> __m256d {
 //
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_round_ps)
 @(require_results, enable_target_feature="avx")
-_mm256_round_ps :: #force_inline proc(a: __m256, $ROUNDING: u8) -> __m256 where ROUNDING < 16 {
-	return llvm_roundps256(a, u32(ROUNDING))
+_mm256_round_ps :: #force_inline proc(a: __m256, $ROUNDING: i32) -> __m256 where 0 <= ROUNDING, ROUNDING < 16 {
+	return llvm_roundps256(a, ROUNDING)
 }
 
 // Rounds packed single-precision (32-bit) floating point elements in `a`
@@ -1812,8 +1812,8 @@ _mm256_extract_epi64 :: #force_inline proc "c" (a: __m256i, $idx: u32) -> i64 {
 
 @(private="file", default_calling_convention="none")
 foreign _ {
-	@(link_name="llvm.x86.avx.round.pd.256")      llvm_roundpd256    :: proc(a: __m256d, #const b: u32) -> __m256d ---
-	@(link_name="llvm.x86.avx.round.ps.256")      llvm_roundps256    :: proc(a: __m256, #const b: u32) -> __m256 ---
+	@(link_name="llvm.x86.avx.round.pd.256")      llvm_roundpd256    :: proc(a: __m256d, b: i32) -> __m256d ---
+	@(link_name="llvm.x86.avx.round.ps.256")      llvm_roundps256    :: proc(a: __m256, b: i32) -> __m256 ---
 	@(link_name="llvm.x86.avx.dp.ps.256")         llvm_vdpps         :: proc(a, b: __m256, #const imm8: u8) -> __m256 ---
 	@(link_name="llvm.x86.sse2.cmp.pd")           llvm_vcmppd        :: proc(a, b: __m128d, #const imm8: u8) -> __m128d ---
 	@(link_name="llvm.x86.avx.cmp.pd.256")        llvm_vcmppd256     :: proc(a, b: __m256d, imm8: u8) -> __m256d ---
