@@ -428,6 +428,33 @@ surrogate :: proc(t: ^testing.T) {
 }
 
 @test
+marshal_escapes_map_keys_as_json :: proc(t: ^testing.T) {
+	// Keys used to be quoted without `for_json`, so a rune outside the BMP came out as `\U0001f600`
+	// and control characters as `\x01` or `\v`, none of which are valid JSON escapes.
+	input: map[string]int
+	defer delete(input)
+	input["😀"]       = 1
+	input["a\x01\vb"] = 2
+
+	out, err := json.marshal(input, {spec = .JSON, sort_maps_by_key = true})
+	defer delete(out)
+	testing.expectf(t, err == nil, "Expected `json.marshal` to return a nil error, got %v", err)
+	testing.expect_value(t, string(out), `{"a\u0001\u000bb":2,"\ud83d\ude00":1}`)
+
+	back: map[string]int
+	defer {
+		for k in back { delete(k) }
+		delete(back)
+	}
+	uerr := json.unmarshal(out, &back)
+	testing.expectf(t, uerr == nil, "Expected `json.unmarshal(%q)` to return a nil error, got %v", string(out), uerr)
+	testing.expect_value(t, len(back), len(input))
+	for k, v in input {
+		testing.expectf(t, back[k] == v, "Expected key %q to round-trip with value %v, got %v", k, v, back[k])
+	}
+}
+
+@test
 utf8_string_of_multibyte_characters :: proc(t: ^testing.T) {
 	val, err := json.parse_string(`"🐛✅"`)
 	defer json.destroy_value(val)

@@ -681,12 +681,12 @@ opt_write_comment :: proc(w: io.Writer, opt: ^Marshal_Options, comment: ^string)
 opt_write_key :: proc(w: io.Writer, opt: ^Marshal_Options, name: string) -> (err: io.Error)  {
 	switch opt.spec {
 	case .JSON, .JSON5:
-		io.write_quoted_string(w, name) or_return
+		io.write_quoted_string(w, name, '"', nil, true) or_return
 		io.write_string(w, ": " if opt.pretty else ":") or_return
 
 	case .MJSON:
 		if opt.mjson_keys_use_quotes {
-			io.write_quoted_string(w, name) or_return
+			io.write_quoted_string(w, name, '"', nil, true) or_return
 		} else {
 			io.write_string(w, name) or_return
 		}
