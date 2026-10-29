@@ -3463,21 +3463,30 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 		args[0] = lb_addr_load(p, all_tests_slice);
 		lbValue result = lb_emit_call(p, runner, args);
 
-		lbValue exit_runner = {};
-		{
-			AstPackage *pkg = get_runtime_package(m->info);
+		// NOTE: When linked against the CRT, return the status so that the CRT calls `exit`, which runs the
+		// `atexit` handlers (e.g. the sanitizer runtimes' finalisers) that `runtime.exit` may skip
+		bool return_status = !build_context.no_crt && !is_dll_main && !is_arch_wasm() &&
+		                     build_context.metrics.os != TargetOs_freestanding;
+		if (return_status) {
+			lbValue status = lb_emit_select(p, result, lb_const_int(m, t_i32, 0), lb_const_int(m, t_i32, 1));
+			LLVMBuildRet(p->builder, status.value);
+		} else {
+			lbValue exit_runner = {};
+			{
+				AstPackage *pkg = get_runtime_package(m->info);
 
-			String name = str_lit("exit");
-			Entity *e = scope_lookup_current(pkg->scope, string_interner_insert(name));
-			if (e == nullptr) {
-				compiler_error("Could not find type declaration for '%.*s.%.*s'\n", LIT(pkg->name), LIT(name));
+				String name = str_lit("exit");
+				Entity *e = scope_lookup_current(pkg->scope, string_interner_insert(name));
+				if (e == nullptr) {
+					compiler_error("Could not find type declaration for '%.*s.%.*s'\n", LIT(pkg->name), LIT(name));
+				}
+				exit_runner = lb_find_value_from_entity(m, e);
 			}
-			exit_runner = lb_find_value_from_entity(m, e);
-		}
 
-		auto exit_args = array_make<lbValue>(temporary_allocator(), 1);
-		exit_args[0] = lb_emit_select(p, result, lb_const_int(m, t_int, 0), lb_const_int(m, t_int, 1));
-		lb_emit_call(p, exit_runner, exit_args, ProcInlining_none, ProcTailing_none);
+			auto exit_args = array_make<lbValue>(temporary_allocator(), 1);
+			exit_args[0] = lb_emit_select(p, result, lb_const_int(m, t_int, 0), lb_const_int(m, t_int, 1));
+			lb_emit_call(p, exit_runner, exit_args, ProcInlining_none, ProcTailing_none);
+		}
 	} else {
 		if (m->info->entry_point != nullptr) {
 			lbValue entry_point = lb_find_procedure_value_from_entity(m, m->info->entry_point);
