@@ -325,6 +325,9 @@ process_open :: proc(pid: int, flags := Process_Open_Flags {}) -> (Process, Erro
 
 /*
 	The description of how a process should be created.
+
+	**Note(windows)**: The child inherits the `stdin`, `stdout` and `stderr`
+	handles and no other handle of the current process, inheritable or not.
 */
 Process_Desc :: struct {
 	// The working directory of the process. If the string has length 0, the
