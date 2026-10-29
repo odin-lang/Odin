@@ -1266,6 +1266,23 @@ test_count_digits :: proc(t: ^testing.T) {
 }
 
 @test
+test_floor_divmod :: proc(t: ^testing.T) {
+	for i in -128..=127 {
+		for j in -128..=127 {
+			if j == 0 { continue }
+			x, y := i8(i), i8(j)
+			div, mod := math.floor_divmod(x, y)
+			if !testing.expectf(t,
+				div == math.floor_div(x, y) && mod == x %% y,
+				"floor_divmod(%v, %v) = (%v, %v), want (%v, %v)",
+				x, y, div, mod, math.floor_div(x, y), x %% y) {
+				return
+			}
+		}
+	}
+}
+
+@test
 test_nextafter :: proc(t: ^testing.T) {
 	Datum :: struct($F: typeid) {
 		x, y, r: F,
