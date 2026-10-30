@@ -9,6 +9,9 @@ import "core:strings"
 import "core:reflect"
 import "core:io"
 import "core:slice"
+import "core:unicode"
+import "core:unicode/utf8"
+import "core:unicode/utf16"
 
 Marshal_Data_Error :: enum {
 	None,
@@ -146,9 +149,8 @@ marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocato
 	// temp guard in case we are sorting map keys, which will use temp allocations
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = allocator == context.temp_allocator)
 
-	opt := opt
-	marshal_to_builder(&b, v, &opt) or_return
-
+	marshal_to_builder(&b, v, opt) or_return
+	
 	if len(b.buf) != 0 {
 		data = b.buf[:]
 	}
@@ -156,11 +158,18 @@ marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocato
 	return data, nil
 }
 
-marshal_to_builder :: proc(b: ^strings.Builder, v: any, opt: ^Marshal_Options) -> Marshal_Error {
+@(private)
+marshal_to_builder :: proc(b: ^strings.Builder, v: any, opt: Marshal_Options = {}) -> Marshal_Error {
 	return marshal_to_writer(strings.to_writer(b), v, opt)
 }
 
-marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: Marshal_Error) {
+@(private)
+marshal_to_writer :: proc(w: io.Writer, v: any, opt: Marshal_Options = {}) -> (err: Marshal_Error) {
+	opt := opt
+	return _marshal_to_writer(w, v, &opt)
+}
+
+_marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: Marshal_Error) {
 	if v == nil {
 		io.write_string(w, "null") or_return
 		return
@@ -204,9 +213,11 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 
 	case runtime.Type_Info_Rune:
 		r := a.(rune)
-		io.write_byte(w, '"')                             or_return
-		io.write_escaped_rune(w, r, '"', for_json = true) or_return
-		io.write_byte(w, '"')                             or_return
+		// NOTE: JSON cannot represent individual runes directly, only strings.
+		//       Therefore, this will be marshaled as a regular, double-quoted JSON string.
+		io.write_byte(w, '"')         or_return
+		write_json_escaped_rune(w, r) or_return
+		io.write_byte(w, '"')         or_return
 
 	case runtime.Type_Info_Float:
 		switch f in a {
@@ -237,8 +248,8 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 
 	case runtime.Type_Info_String:
 		switch s in a {
-		case string:  io.write_quoted_string(w, s, '"', nil, true)         or_return
-		case cstring: io.write_quoted_string(w, string(s), '"', nil, true) or_return
+		case string:  write_quoted_json_string(w, s)         or_return
+		case cstring: write_quoted_json_string(w, string(s)) or_return
 		}
 
 	case runtime.Type_Info_Boolean:
@@ -291,7 +302,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		for i in 0..<info.count {
 			opt_write_iteration(w, opt, i == 0) or_return
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
-			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
+			_marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
 		opt_write_end(w, opt, ']') or_return
 
@@ -310,7 +321,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			opt_write_iteration(w, opt, i == 0) or_return
 			opt_write_key(w, opt, enum_type.names[index]) or_return
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
-			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
+			_marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
 		opt_write_end(w, opt, '}') or_return
 
@@ -320,7 +331,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		for i in 0..<array.len {
 			opt_write_iteration(w, opt, i == 0) or_return
 			data := uintptr(array.data) + uintptr(i*info.elem_size)
-			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
+			_marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
 		opt_write_end(w, opt, ']') or_return
 
@@ -330,7 +341,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		for i in 0..<len {
 			opt_write_iteration(w, opt, i == 0) or_return
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
-			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
+			_marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
 		opt_write_end(w, opt, ']') or_return
 
@@ -340,7 +351,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		for i in 0..<slice.len {
 			opt_write_iteration(w, opt, i == 0) or_return
 			data := uintptr(slice.data) + uintptr(i*info.elem_size)
-			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
+			_marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
 		opt_write_end(w, opt, ']') or_return
 
@@ -390,7 +401,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 						}
 					}
 
-					marshal_to_writer(w, any{value, info.value.id}, opt) or_return
+					_marshal_to_writer(w, any{value, info.value.id}, opt) or_return
 				}
 			} else {
 				Entry :: struct {
@@ -433,7 +444,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 				for s, i in sorted {
 					opt_write_iteration(w, opt, i == 0) or_return
 					opt_write_key(w, opt, s.key) or_return
-					marshal_to_writer(w, s.value, opt) or_return
+					_marshal_to_writer(w, s.value, opt) or_return
 				}
 			}
 		}
@@ -526,7 +537,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 				}
 
 
-				marshal_to_writer(w, the_value, opt) or_return
+				_marshal_to_writer(w, the_value, opt) or_return
 			}
 			return
 		}
@@ -565,17 +576,17 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			tag -= 1
 		}
 		id := info.variants[tag].id
-		return marshal_to_writer(w, any{v.data, id}, opt)
+		return _marshal_to_writer(w, any{v.data, id}, opt)
 
 	case runtime.Type_Info_Enum:
 		if !opt.use_enum_names || len(info.names) == 0 {
-			return marshal_to_writer(w, any{v.data, info.base.id}, opt)
+			return _marshal_to_writer(w, any{v.data, info.base.id}, opt)
 		} else {
 			name, found := reflect.enum_name_from_value_any(v)
 			if found {
-				return marshal_to_writer(w, name, opt)
+				return _marshal_to_writer(w, name, opt)
 			} else {
-				return marshal_to_writer(w, any{v.data, info.base.id}, opt)
+				return _marshal_to_writer(w, any{v.data, info.base.id}, opt)
 			}
 		}
 
@@ -649,15 +660,142 @@ format_float :: proc(buf: []byte, f: f64, bit_size: int, spec: Specification) ->
 	}
 
 	a := abs(f)
-	s := strconv.write_float(buf, f, 'e' if a != 0 && (a < 1e-6 || a >= 1e21) else 'f', -1, bit_size)
-	start, end := 1 if s[0] == '+' else 0, len(s)
+	s := strconv.write_float(buf, f, 'e' if a != 0 && (a < 1e-6 || a >= 1e21) else 'f', -1, bit_size, flags = {})
+	end := len(s)
 	if strings.index_any(s, ".e") < 0 {
 		end += copy(buf[end:], ".0")
 	}
-	return string(buf[start:end]), nil
+	return string(buf[:end]), nil
+}
+
+/*
+	Writes string `str` to `w`, encoding and escaping the string's runes,
+	according to the syntax rules of JSON.
+
+	**Remarks**
+
+	The bytes written to `w` are the UTF-8 encoded result string after conversion.
+
+	This a specialized version of `io.write_quoted_string` which uses a different ruleset.
+
+	The encoded string is always enclosed in double-quotes (`"`).
+
+	Control characters recognized by JSON (`\b`, `\f`, `\n`, `\r`, `\t`) are escaped as such.
+	Other runes are escaped only if they represent an unprintable or otherwise problematic
+	character, such as `\u0300`.
+
+	If the input string contains a UTF-8 encoding error, then its contents cannot be preserved
+	exactly, and invalid UTF-8 bytes are represented with the Unicode replacement character.
+*/
+write_quoted_json_string :: proc(w: io.Writer, str: string) -> io.Error {
+	// NOTE: In JSON-by-spec, only double quotes (`"`) are valid, so we always emit those.
+	//       The unmarshaler is permissive and would also accept single quotes (`'`).
+	quote :: '"'
+	io.write_byte(w, quote) or_return
+	
+	for width, s := 0, str; len(s) > 0; s = s[width:] {
+		r := rune(s[0])
+		width = 1
+		if r >= utf8.RUNE_SELF {
+			r, width = utf8.decode_rune_in_string(s)
+		}
+		if width == 1 && r == utf8.RUNE_ERROR {
+			// JSON has no escape for arbitrary bytes, so represent invalid UTF-8
+			// using the replacement character.
+			// NOTE(bplu4t2f):
+			//     It is not possible to encode this in such a way that it would survive
+			//     a round-trip through the unmarshaler. Even if we encode the next invalid
+			//     byte as `\u00##`, the problem is that an invalid `\u00ff` would later
+			//     not parse back as `0xff` in the unmarshaler, but rather as `\xc3\xbf`.
+			//     I currently see no way how we could build marshaler and unmarshaler
+			//     so that UTF-8 encoding errors in the input string would survive a
+			//     round-trip, while also staying compatible with the spec.
+			io.write_encoded_and_escaped_rune(w, unicode.REPLACEMENT_CHAR, quote = 0) or_return
+			continue
+		}
+
+		write_json_escaped_rune(w, r) or_return
+	}
+
+	io.write_byte(w, quote) or_return
+	return nil
+}
+
+
+/*
+	Writes rune `r` to `w`, encoding and escaping it,
+	according to the syntax rules of JSON.
+
+	**Remarks**
+
+	The bytes written to `w` are the UTF-8 encoded result string after conversion.
+
+	This a specialized version of `io.write_escaped_rune` which uses a different ruleset.
+
+	Control characters recognized by JSON (`\b`, `\f`, `\n`, `\r`, `\t`) are escaped as such.
+	Other runes are escaped only if they represent an unprintable or otherwise problematic
+	character, such as `\u0300`.
+*/
+write_json_escaped_rune :: proc(w: io.Writer, r: rune) -> io.Error {
+	if r < 0 || r > unicode.MAX_RUNE || utf8.SURROGATE_MIN <= r && r <= utf8.SURROGATE_MAX {
+		// Early out here. This is basically encoding error in the input; data will be lost.
+		// See NOTE in write_quoted_json_string.
+		// The best we can do is ensure that we emit valid JSON at least.
+		return write_json_escaped_rune(w, unicode.REPLACEMENT_CHAR)
+	}
+
+	if r == '"' || r == '\\' {
+		io.write_byte(w, '\\')    or_return
+		io.write_byte(w, byte(r)) or_return
+		return nil
+	}
+	
+	if utf8.is_printable(r) {
+		io.write_encoded_and_escaped_rune(w, r, quote = 0) or_return
+		return nil
+	}
+
+	if r < 32 {
+		switch r {
+		case '\b': io.write_string(w, `\b`) or_return
+		case '\f': io.write_string(w, `\f`) or_return
+		case '\n': io.write_string(w, `\n`) or_return
+		case '\r': io.write_string(w, `\r`) or_return
+		case '\t': io.write_string(w, `\t`) or_return
+		case:
+			// Other control characters:  \u00##
+			io.write_string(w, `\u00`)                   or_return
+			io.write_byte(w, strconv.digits[r>>4 & 0xf]) or_return
+			io.write_byte(w, strconv.digits[r    & 0xf]) or_return
+		}
+		return nil
+	}
+
+	c := r
+
+	if c <= 0xffff {
+		// Encode as  \u####
+		io.write_string(w, `\u`) or_return
+		for s := 12; s >= 0; s -= 4 {
+			io.write_byte(w, strconv.digits[c>>uint(s) & 0xf]) or_return
+		}
+	} else {
+		// Encode as UTF-16 surrogate pair:  \u####\u####
+		buf: [2]u16
+		utf16.encode(buf[:], []rune{c})
+		for bc in buf {
+			io.write_string(w, `\u`) or_return
+			for s := 12; s >= 0; s -= 4 {
+				io.write_byte(w, strconv.digits[bc>>uint(s) & 0xf]) or_return
+			}
+		}
+	}
+
+	return nil
 }
 
 // Newlines are split into multiple comment lines
+@(private)
 opt_write_comment :: proc(w: io.Writer, opt: ^Marshal_Options, comment: ^string) -> (err: io.Error) {
 	if comment^ == "" {
 		return nil
@@ -678,6 +816,7 @@ opt_write_comment :: proc(w: io.Writer, opt: ^Marshal_Options, comment: ^string)
 }
 
 // write key as quoted string or with optional quotes in mjson
+@(private)
 opt_write_key :: proc(w: io.Writer, opt: ^Marshal_Options, name: string) -> (err: io.Error)  {
 	switch opt.spec {
 	case .JSON, .JSON5:
@@ -702,6 +841,7 @@ opt_write_key :: proc(w: io.Writer, opt: ^Marshal_Options, name: string) -> (err
 }
 
 // insert start byte and increase indentation on pretty
+@(private)
 opt_write_start :: proc(w: io.Writer, opt: ^Marshal_Options, c: byte) -> (err: io.Error)  {
 	// Skip MJSON starting braces. We make sure to only do this for c == '{',
 	// skipping a starting '[' is not allowed.
@@ -721,6 +861,7 @@ opt_write_start :: proc(w: io.Writer, opt: ^Marshal_Options, c: byte) -> (err: i
 }
 
 // insert comma separation and write indentations
+@(private)
 opt_write_iteration :: proc(w: io.Writer, opt: ^Marshal_Options, first_iteration: bool) -> (err: io.Error) {
 	switch opt.spec {
 	case .JSON, .JSON5:
@@ -752,6 +893,7 @@ opt_write_iteration :: proc(w: io.Writer, opt: ^Marshal_Options, first_iteration
 }
 
 // decrease indent, write spacing and insert end byte
+@(private)
 opt_write_end :: proc(w: io.Writer, opt: ^Marshal_Options, c: byte) -> (err: io.Error)  {
 	if opt.spec == .MJSON && opt.mjson_skipped_first_braces_start && !opt.mjson_skipped_first_braces_end && opt.indentation == 0 && c == '}' {
 		opt.mjson_skipped_first_braces_end = true
@@ -770,6 +912,7 @@ opt_write_end :: proc(w: io.Writer, opt: ^Marshal_Options, c: byte) -> (err: io.
 }
 
 // writes current indentation level based on options
+@(private)
 opt_write_indentation :: proc(w: io.Writer, opt: ^Marshal_Options) -> (err: io.Error) {
 	if !opt.pretty {
 		return

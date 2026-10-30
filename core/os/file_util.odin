@@ -49,47 +49,22 @@ write_rune :: proc(f: ^File, r: rune) -> (n: int, err: Error) {
 	return write(f, b[:n])
 }
 
+// TODO xxxx maybe delete this? I think this is too high-level for core/os - just use io/writer for that.
+@(deprecated="This writes a quoted rune, not just an encoded one. If that was intended, please call `write_quoted_rune` instead.")
+write_encoded_rune :: #force_inline proc(f: ^File, r: rune) -> (n: int, err: Error) {
+	return write_quoted_rune(f, r)
+}
+
 /*
-	`write_encoded_rune` writes a rune `r` as an UTF-8 encoded string which with escaped control codes to file `f`.
+	`write_quoted_rune` writes a rune `r` as an UTF-8 encoded string which with escaped control codes to file `f`.
+	The rune is surrounded with single quotes (`'`), such that it would parse back as a valid rune literal in Odin syntax.
 	Returns the number of bytes written and an error, if any is encountered.
 */
-write_encoded_rune :: proc(f: ^File, r: rune) -> (n: int, err: Error) {
-	wrap :: proc(m: int, merr: Error, n: ^int, err: ^Error) -> bool {
-		n^ += m
-		if merr != nil {
-			err^ = merr
-			return true
-		}
-		return false
-	}
-
-	if wrap(write_byte(f, '\''), &n, &err) { return }
-
-	switch r {
-	case '\a': if wrap(write_string(f, "\\a"), &n, &err) { return }
-	case '\b': if wrap(write_string(f, "\\b"), &n, &err) { return }
-	case '\e': if wrap(write_string(f, "\\e"), &n, &err) { return }
-	case '\f': if wrap(write_string(f, "\\f"), &n, &err) { return }
-	case '\n': if wrap(write_string(f, "\\n"), &n, &err) { return }
-	case '\r': if wrap(write_string(f, "\\r"), &n, &err) { return }
-	case '\t': if wrap(write_string(f, "\\t"), &n, &err) { return }
-	case '\v': if wrap(write_string(f, "\\v"), &n, &err) { return }
-	case:
-		if r < 32 {
-			if wrap(write_string(f, "\\x"), &n, &err) { return }
-			b: [2]byte
-			s := strconv.write_bits(b[:], u64(r), 16, true, 64, strconv.digits, nil)
-			switch len(s) {
-			case 0: if wrap(write_string(f, "00"), &n, &err) { return }
-			case 1: if wrap(write_rune(f, '0'), &n, &err)    { return }
-			case 2: if wrap(write_string(f, s), &n, &err)    { return }
-			}
-		} else {
-			if wrap(write_rune(f, r), &n, &err) { return }
-		}
-	}
-	_ = wrap(write_byte(f, '\''), &n, &err)
-	return
+// TODO xxxx maybe delete this? I think this is too high-level for core/os - just use io/writer for that.
+write_quoted_rune :: proc(f: ^File, r: rune) -> (n: int, err: Error) {
+	buf: [strconv.QUOTED_RUNE_MAX_NEEDED_BYTES]byte
+	result := strconv.quote_rune(buf[:], r)
+	return write_string(f, result)
 }
 
 /*

@@ -11,6 +11,11 @@ Unparse_Error :: union #shared_nil {
 	Marshal_Data_Error,
 }
 
+/*
+	Formats value `v` back into an equivalent JSON string, and returns the result as a `string`.
+
+	Allocates the result using the provided `allocator` (caller must free the result).
+*/
 @(require_results)
 unparse :: proc(v: Value, opt: Marshal_Options = {}, allocator := context.allocator, loc := #caller_location) -> (data: string, err: Unparse_Error) {
 	b := strings.builder_make(allocator, loc)
@@ -21,19 +26,29 @@ unparse :: proc(v: Value, opt: Marshal_Options = {}, allocator := context.alloca
 	// temp guard in case we are sorting map keys, which will use temp allocations
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = allocator == context.temp_allocator)
 
-	opt := opt
-	unparse_to_builder(&b, v, &opt) or_return
+	unparse_to_builder(&b, v, opt) or_return
 	data = string(b.buf[:])
 	return
 }
 
+/*
+	Formats value `v` back into an equivalent JSON string, and writes it into `b`.
+*/
 @(require_results)
-unparse_to_builder :: proc(b: ^strings.Builder, v: Value, opt: ^Marshal_Options) -> Unparse_Error {
+unparse_to_builder :: proc(b: ^strings.Builder, v: Value, opt: Marshal_Options = {}) -> Unparse_Error {
 	return unparse_to_writer(strings.to_writer(b), v, opt)
 }
 
+/*
+	Formats value `v` back into an equivalent JSON string, and writes it into `w`.
+*/
 @(require_results)
-unparse_to_writer :: proc(w: io.Writer, value: Value, opt: ^Marshal_Options) -> Unparse_Error {
+unparse_to_writer :: proc(w: io.Writer, value: Value, opt: Marshal_Options = {}) -> Unparse_Error {
+	opt := opt
+	return _unparse_to_writer(w, value, &opt)
+}
+
+_unparse_to_writer :: proc(w: io.Writer, value: Value, opt: ^Marshal_Options) -> Unparse_Error {
 	switch v in value {
 	case nil, Null:
 		io.write_string(w, "null") or_return
@@ -46,12 +61,12 @@ unparse_to_writer :: proc(w: io.Writer, value: Value, opt: ^Marshal_Options) -> 
 	case Boolean:
 		io.write_string(w, "true" if v else "false") or_return
 	case String:
-		io.write_quoted_string(w, v, '"', nil, true) or_return
+		write_quoted_json_string(w, v) or_return
 	case Array:
 		opt_write_start(w, opt, '[') or_return
 		for e, i in v {
 			opt_write_iteration(w, opt, i == 0) or_return
-			unparse_to_writer  (w, e,   opt)    or_return
+			_unparse_to_writer (w, e,   opt)    or_return
 		}
 		opt_write_end(w, opt, ']') or_return
 	case Object:
@@ -60,7 +75,7 @@ unparse_to_writer :: proc(w: io.Writer, value: Value, opt: ^Marshal_Options) -> 
 			for first_iteration := true; key, val in v {
 				opt_write_iteration(w, opt, first_iteration) or_return
 				opt_write_key      (w, opt, key)             or_return
-				unparse_to_writer  (w, val, opt)             or_return
+				_unparse_to_writer (w, val, opt)             or_return
 				first_iteration = false
 			}
 			opt_write_end(w, opt, '}') or_return
@@ -81,7 +96,7 @@ unparse_to_writer :: proc(w: io.Writer, value: Value, opt: ^Marshal_Options) -> 
 			for e, i in entries {
 				opt_write_iteration(w, opt, i == 0)  or_return
 				opt_write_key      (w, opt, e.key)   or_return
-				unparse_to_writer  (w, e.value, opt) or_return
+				_unparse_to_writer (w, e.value, opt) or_return
 			}
 			opt_write_end(w, opt, '}') or_return
 		}

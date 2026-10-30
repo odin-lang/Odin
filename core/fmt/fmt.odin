@@ -116,16 +116,16 @@ register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Regist
 	_user_formatters[id] = formatter
 	return .None
 }
-// 	Creates a formatted string
+// Creates a formatted string
 //
-// 	*Allocates Using Provided Allocator*
+// *Allocates Using Provided Allocator*
 //
-// 	Inputs:
-// 	- args: A variadic list of arguments to be formatted.
-// 	- sep: An optional separator string (default is a single space).
-// 	- allocator: (default: context.allocator)
+// Inputs:
+// - args: A variadic list of arguments to be formatted.
+// - sep: An optional separator string (default is a single space).
+// - allocator: (default: context.allocator)
 //
-// 	Returns: A formatted string.
+// Returns: A formatted string.
 //
 @(require_results)
 aprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> string {
@@ -133,16 +133,16 @@ aprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> strin
 	strings.builder_init(&str, allocator)
 	return sbprint(&str, ..args, sep=sep)
 }
-// 	Creates a formatted string with a newline character at the end
+// Creates a formatted string with a newline character at the end
 //
-// 	*Allocates Using Provided Allocator*
+// *Allocates Using Provided Allocator*
 //
-// 	Inputs:
-// 	- args: A variadic list of arguments to be formatted.
-// 	- sep: An optional separator string (default is a single space).
-// 	- allocator: (default: context.allocator)
+// Inputs:
+// - args: A variadic list of arguments to be formatted.
+// - sep: An optional separator string (default is a single space).
+// - allocator: (default: context.allocator)
 //
-// 	Returns: A formatted string with a newline character at the end.
+// Returns: A formatted string with a newline character at the end.
 //
 @(require_results)
 aprintln :: proc(args: ..any, sep := " ", allocator := context.allocator) -> string {
@@ -150,17 +150,17 @@ aprintln :: proc(args: ..any, sep := " ", allocator := context.allocator) -> str
 	strings.builder_init(&str, allocator)
 	return sbprintln(&str, ..args, sep=sep)
 }
-// 	Creates a formatted string using a format string and arguments
+// Creates a formatted string using a format string and arguments
 //
-// 	*Allocates Using Provided Allocator*
+// *Allocates Using Provided Allocator*
 //
-// 	Inputs:
-//	- fmt: A format string with placeholders for the provided arguments.
-//	- args: A variadic list of arguments to be formatted.
-//	- allocator: (default: context.allocator)
-//	- newline: Whether the string should end with a newline. (See `aprintfln`.)
+// Inputs:
+// - fmt: A format string with placeholders for the provided arguments.
+// - args: A variadic list of arguments to be formatted.
+// - allocator: (default: context.allocator)
+// - newline: Whether the string should end with a newline. (See `aprintfln`.)
 //
-// 	Returns: A formatted string. The returned string must be freed accordingly.
+// Returns: A formatted string. The returned string must be freed accordingly.
 //
 @(require_results)
 aprintf :: proc(fmt: string, args: ..any, allocator := context.allocator, newline := false) -> string {
@@ -168,30 +168,30 @@ aprintf :: proc(fmt: string, args: ..any, allocator := context.allocator, newlin
 	strings.builder_init(&str, allocator)
 	return sbprintf(&str, fmt, ..args, newline=newline)
 }
-// 	Creates a formatted string using a format string and arguments, followed by a newline.
+// Creates a formatted string using a format string and arguments, followed by a newline.
 //
-// 	*Allocates Using Provided Allocator*
+// *Allocates Using Provided Allocator*
 //
-// 	Inputs:
-// 	- fmt: A format string with placeholders for the provided arguments.
-// 	- args: A variadic list of arguments to be formatted.
-// 	- allocator: (default: context.allocator)
+// Inputs:
+// - fmt: A format string with placeholders for the provided arguments.
+// - args: A variadic list of arguments to be formatted.
+// - allocator: (default: context.allocator)
 //
-// 	Returns: A formatted string. The returned string must be freed accordingly.
+// Returns: A formatted string. The returned string must be freed accordingly.
 //
 @(require_results)
 aprintfln :: proc(fmt: string, args: ..any, allocator := context.allocator) -> string {
 	return aprintf(fmt, ..args, allocator=allocator, newline=true)
 }
-// 	Creates a formatted string
+// Creates a formatted string
 //
-// 	*Allocates Using Context's Temporary Allocator*
+// *Allocates Using Context's Temporary Allocator*
 //
-// 	Inputs:
-// 	- args: A variadic list of arguments to be formatted.
-// 	- sep: An optional separator string (default is a single space).
+// Inputs:
+// - args: A variadic list of arguments to be formatted.
+// - sep: An optional separator string (default is a single space).
 //
-// 	Returns: A formatted string.
+// Returns: A formatted string.
 //
 @(require_results)
 tprint :: proc(args: ..any, sep := " ") -> string {
@@ -199,15 +199,15 @@ tprint :: proc(args: ..any, sep := " ") -> string {
 	strings.builder_init(&str, context.temp_allocator)
 	return sbprint(&str, ..args, sep=sep)
 }
-// 	Creates a formatted string with a newline character at the end
+// Creates a formatted string with a newline character at the end
 //
-// 	*Allocates Using Context's Temporary Allocator*
+// *Allocates Using Context's Temporary Allocator*
 //
-// 	Inputs:
-// 	- args: A variadic list of arguments to be formatted.
-// 	- sep: An optional separator string (default is a single space).
+// Inputs:
+// - args: A variadic list of arguments to be formatted.
+// - sep: An optional separator string (default is a single space).
 //
-// 	Returns: A formatted string with a newline character at the end.
+// Returns: A formatted string with a newline character at the end.
 //
 @(require_results)
 tprintln :: proc(args: ..any, sep := " ") -> string {
@@ -215,16 +215,16 @@ tprintln :: proc(args: ..any, sep := " ") -> string {
 	strings.builder_init(&str, context.temp_allocator)
 	return sbprintln(&str, ..args, sep=sep)
 }
-// 	Creates a formatted string using a format string and arguments
+// Creates a formatted string using a format string and arguments
 //
-// 	*Allocates Using Context's Temporary Allocator*
+// *Allocates Using Context's Temporary Allocator*
 //
-// 	Inputs:
-//	- fmt: A format string with placeholders for the provided arguments.
-//	- args: A variadic list of arguments to be formatted.
-//	- newline: Whether the string should end with a newline. (See `tprintfln`.)
+// Inputs:
+// - fmt: A format string with placeholders for the provided arguments.
+// - args: A variadic list of arguments to be formatted.
+// - newline: Whether the string should end with a newline. (See `tprintfln`.)
 //
-// 	Returns: A formatted string.
+// Returns: A formatted string.
 //
 @(require_results)
 tprintf :: proc(fmt: string, args: ..any, newline := false) -> string {
@@ -232,15 +232,15 @@ tprintf :: proc(fmt: string, args: ..any, newline := false) -> string {
 	strings.builder_init(&str, context.temp_allocator)
 	return sbprintf(&str, fmt, ..args, newline=newline)
 }
-// 	Creates a formatted string using a format string and arguments, followed by a newline.
+// Creates a formatted string using a format string and arguments, followed by a newline.
 //
-// 	*Allocates Using Context's Temporary Allocator*
+// *Allocates Using Context's Temporary Allocator*
 //
-// 	Inputs:
-// 	- fmt: A format string with placeholders for the provided arguments.
-// 	- args: A variadic list of arguments to be formatted.
+// Inputs:
+// - fmt: A format string with placeholders for the provided arguments.
+// - args: A variadic list of arguments to be formatted.
 //
-// 	Returns: A formatted string.
+// Returns: A formatted string.
 //
 @(require_results)
 tprintfln :: proc(fmt: string, args: ..any) -> string {
@@ -363,16 +363,16 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 	p("panic", message, loc)
 }
 
-// 	Creates a formatted C string
+// Creates a formatted C string
 //
-// 	*Allocates Using Provided Allocator*
+// *Allocates Using Provided Allocator*
 //
-// 	Inputs:
-// 	- args: A variadic list of arguments to be formatted.
-// 	- sep: An optional separator string (default is a single space).
-// 	- allocator: (default: context.allocator)
+// Inputs:
+// - args: A variadic list of arguments to be formatted.
+// - sep: An optional separator string (default is a single space).
+// - allocator: (default: context.allocator)
 //
-// 	Returns: A formatted C string.
+// Returns: A formatted C string.
 //
 @(require_results)
 caprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> cstring {
@@ -420,15 +420,15 @@ caprintf :: proc(format: string, args: ..any, allocator := context.allocator, ne
 caprintfln :: proc(format: string, args: ..any, allocator := context.allocator) -> cstring {
 	return caprintf(format, ..args, allocator=allocator, newline=true)
 }
-// 	Creates a formatted C string
+// Creates a formatted C string
 //
-// 	*Allocates Using Context's Temporary Allocator*
+// *Allocates Using Context's Temporary Allocator*
 //
-// 	Inputs:
-// 	- args: A variadic list of arguments to be formatted.
-// 	- sep: An optional separator string (default is a single space).
+// Inputs:
+// - args: A variadic list of arguments to be formatted.
+// - sep: An optional separator string (default is a single space).
 //
-// 	Returns: A formatted C string.
+// Returns: A formatted C string.
 //
 @(require_results)
 ctprint :: proc(args: ..any, sep := " ") -> cstring {
@@ -1117,6 +1117,8 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 		prec = fi.width
 		if neg || fi.plus {
 			// There needs to be space for the "sign"
+			// TODO xxxx clamp?
+			// TODO xxxx this value is not used. Pretty sure this has to do with bill's whitespace padding change
 			prec -= 1
 		}
 	}
@@ -1270,19 +1272,22 @@ _fmt_memory :: proc(fi: ^Info, u: u64, is_signed: bool, bit_size: int, units: st
 		amt = -amt
 	}
 
+	flags: strconv.Float_Flags
+	if fi.plus {
+		flags |= { .Plus }
+	}
 	buf: [256]byte
-	str := strconv.write_float(buf[:], amt, 'f', prec, 64)
+	// NOTE(bplu4t2f):
+	//     This is currently the only instance of strconv.write_float in core which assumes
+	//     that `&str[0] == &buf[0]`. This assumption is not formally part of the API contract.
+	//     This may be relevant because an implementation could decide to strip or trim
+	//     something from the beginning by simply offseting the returned slice's start index.
+	//     Currently, this works only because no implementation does that.
+	str := strconv.write_float(buf[:], amt, 'f', prec, 64, flags)
 
 	// Add the unit at the end.
 	copy(buf[len(str):], units[off:off+unit_len])
 	str = string(buf[:len(str)+unit_len])
-
-	if !fi.plus {
-		// Strip sign from "+<value>" but not "+Inf".
-		if str[0] == '+' && str[1] != 'I' {
-			str = str[1:]
-		}
-	}
 
 	_pad(fi, str)
 }
@@ -1301,7 +1306,8 @@ fmt_rune :: proc(fi: ^Info, r: rune, verb: rune) {
 	case 'c', 'r', 'v':
 		io.write_rune(fi.writer, r, &fi.n)
 	case 'q', 'w':
-		fi.n += io.write_quoted_rune(fi.writer, r)
+		n, _ := io.write_quoted_rune(fi.writer, r)
+		fi.n += n
 	case:
 		fmt_int(fi, u64(u32(r)), false, 32, verb)
 	}
@@ -1411,26 +1417,22 @@ _pad :: proc(fi: ^Info, s: string) {
 // - bit_size: The size of the floating-point number in bits (16, 32, or 64).
 // - verb: The format specifier character.
 // - float_fmt: The byte format used for formatting the float (either 'f' or 'e').
+// - default_prec: Precision used if `fi` does not specify anything.
 //
-// NOTE: Can return "NaN", "+Inf", "-Inf", "+<value>", or "-<value>".
+// NOTE: Can return "NaN", "+Inf", "-Inf", "<value>", "+<value>", or "-<value>".
 //
-_fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: byte, prec: int) {
-	prec := prec
-	if fi.prec_set {
-		prec = fi.prec
+_fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: byte, default_prec: int) {
+	prec := fi.prec if fi.prec_set else default_prec
+
+	flags: strconv.Float_Flags
+	if fi.plus {
+		flags |= { .Plus }
 	}
 
 	buf: [386]byte
 
-	// Can return "NaN", "+Inf", "-Inf", "+<value>", "-<value>".
-	str := strconv.write_float(buf[:], v, float_fmt, prec, bit_size)
-
-	if !fi.plus {
-		// Strip sign from "+<value>" but not "+Inf".
-		if str[0] == '+' && str[1] != 'I' {
-			str = str[1:]
-		}
-	}
+	// Can return "NaN", "+Inf", "-Inf", "<value>", "+<value>", "-<value>".
+	str := strconv.write_float(buf[:], v, float_fmt, prec, bit_size, flags)
 
 	_pad(fi, str)
 }

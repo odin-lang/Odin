@@ -2,6 +2,12 @@ package strconv
 
 import "decimal"
 
+Float_Flag :: enum {
+	Plus,
+}
+
+Float_Flags :: bit_set[Float_Flag]
+
 Decimal_Slice :: struct {
 	digits:        []byte,
 	count:         int,
@@ -30,6 +36,15 @@ val: The floating-point value to be converted
 fmt: The formatting byte, accepted values are 'e', 'E', 'f', 'F', 'g', 'G'
 precision: The number of decimal places to round to
 bit_size: The size of the floating-point number in bits, valid values are 16, 32, 64
+flags: Additional formatting options; `.Plus` prefixes non-negative finite values with `+`
+
+**Returns**
+- A byte slice containing the formatted string
+
+**Remarks**
+
+Some callers assume that the written payload will always start at index 0 in `buf`. This means
+the implementation cannot trim anything from the beginning of the buffer after-the-fact.
 
 Example:
 
@@ -39,23 +54,20 @@ Example:
 	precision := 2
 	bit_size := 64
 	result := strconv.generic_ftoa(buf[:], val, fmt, precision, bit_size) -> "3.14"
-
-**Returns**
-- A byte slice containing the formatted string
 */
-generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int) -> []byte {
+generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int, flags: Float_Flags) -> []byte {
 	when FAST_FLOAT {
 		if bit_size == 64 {
-			if res, ok := _ftoa_fast(buf, val, fmt, precision); ok {
+			if res, ok := _ftoa_fast(buf, val, fmt, precision, flags); ok {
 				return res
 			}
 		} else if bit_size == 32 || (bit_size == 16 && precision >= 0) {
 			f := f32(f16(val)) if bit_size == 16 else f32(val)
-			if res, ok := _ftoa_fast(buf, f, fmt, precision); ok {
+			if res, ok := _ftoa_fast(buf, f, fmt, precision, flags); ok {
 				return res
 			}
 		} else if bit_size == 16 {
-			if res, ok := _ftoa_fast_f16(buf, f16(val), fmt); ok {
+			if res, ok := _ftoa_fast_f16(buf, f16(val), fmt, flags); ok {
 				return res
 			}
 		}
@@ -120,10 +132,12 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int)
 
 		digs = Decimal_Slice{digits = d.digits[:], count = d.count, decimal_point = d.decimal_point}
 	}
-	return format_digits(buf, shortest, neg, digs, prec, fmt)
+	return format_digits(buf, shortest, neg, digs, prec, fmt, flags)
 }
 
 _format_inf_nan :: proc "contextless" (buf: []byte, neg, nan: bool) -> []byte {
+	// NOTE: NaN is never prefixed with '+', even if flags specify `.Plus`.
+	// NOTE: Inf is always prefixed with '+', even if flags does not specify `.Plus`.s := "NaN" if nan else "-Inf" if neg else "+Inf"
 	s := "NaN" if nan else "-Inf" if neg else "+Inf"
 	return buf[:copy(buf, s)]
 }
@@ -157,11 +171,12 @@ Converts a decimal floating-point number into a byte buffer with the given forma
 - digs: The decimal number to be formatted
 - precision: The number of digits after the decimal point
 - fmt: The format specifier (accepted values: 'f', 'F', 'e', 'E', 'g', 'G')
+- flags: Additional formatting options
 
 **Returns**
 - A byte slice containing the formatted decimal floating-point number
 */
-format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slice, precision: int, fmt: byte) -> []byte {
+format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slice, precision: int, fmt: byte, flags: Float_Flags) -> []byte {
 	Buffer :: struct {
 		b: []byte,
 		n: int,
@@ -194,7 +209,11 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 
 	switch fmt {
 	case 'f', 'F':
-		add_byte(&b, '-' if neg else '+')
+		if neg {
+			add_byte(&b, '-')
+		} else if .Plus in flags {
+			add_byte(&b, '+')
+		}
 
 		// integer, padded with zeros when needed
 		if digs.decimal_point > 0 {
@@ -219,7 +238,11 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 		return to_bytes(b)
 
 	case 'e', 'E':
-		add_byte(&b, '-' if neg else '+')
+		if neg {
+			add_byte(&b, '-')
+		} else if .Plus in flags {
+			add_byte(&b, '+')
+		}
 
 		ch := byte('0')
 		if digs.count != 0 {
@@ -262,7 +285,7 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 
 	case 'g', 'G':
 		p, f := _choose_g(digs, prec, shortest, fmt)
-		return format_digits(buf, shortest, neg, digs, p, f)
+		return format_digits(buf, shortest, neg, digs, p, f, flags)
 
 	case:
 		add_byte(&b, '%')
