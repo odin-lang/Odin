@@ -1802,8 +1802,13 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		}
 
 		u16 pinned_mask = 0;
+		u16 output_pinned_mask = 0;
 		for_array(i, ate->decls) {
-			pinned_mask |= asm_decl_resolve_pin_bit(asm_ctx, ate->decls, cast(i32)i);
+			u16 bit = asm_decl_resolve_pin_bit(asm_ctx, ate->decls, cast(i32)i);
+			pinned_mask |= bit;
+			if (ate->decls[i].param_group == AsmTemplateEntityDeclParamGroup_Output) {
+				output_pinned_mask |= bit;
+			}
 		}
 
 		u16 produced = cast(u16)clobber.implicit_wr & asm_ctx->CLOBBER_REGS_NAMED;
@@ -2039,7 +2044,9 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			facts->is_conditional = conditional;
 			facts->is_terminal = halt || (control && !conditional);
 		}
-		asm_ctx->clobber_implicit_regs(&ate->clobber_registers_set, produced);
+		// NOTE(bill): an output's register is already declared as written.
+		// Clobbering it as well lets LLVM drop the moves into it of an input tied to that output.
+		asm_ctx->clobber_implicit_regs(&ate->clobber_registers_set, produced & ~output_pinned_mask);
 
 		// Purity inference
 		if (cfg->can_be_pure) {

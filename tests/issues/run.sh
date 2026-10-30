@@ -429,6 +429,7 @@ if [[ "$(uname -m)" == "x86_64" || "$(uname -m)" == "amd64" ]]; then
 		echo "SUCCESSFUL 0/1"
 		exit 1
 	fi
+	$ODIN test ../test_issue_asm_pinned_clobbers $COMMON -o:speed
 fi
 
 $ODIN test ../test_lifetime_markers $COMMON -o:size -lifetime-markers
