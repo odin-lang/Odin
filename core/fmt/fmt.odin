@@ -692,20 +692,49 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 		return 0, false
 	}
 
+	@(require_results)
+	scan_literal :: proc "contextless" (s: string, i: int) -> int #no_bounds_check {
+		i := i
+		when ODIN_ENDIAN == .Little {
+			ONES  :: 0x0101010101010101
+			HIGHS :: 0x8080808080808080
+			for /**/; i+8 <= len(s); i += 8 {
+				x := intrinsics.unaligned_load((^u64)(raw_data(s[i:])))
+				a := x ~ (ONES * '%')
+				b := x ~ (ONES * '{')
+				c := x ~ (ONES * '}')
+				m := ((a - ONES) &~ a | (b - ONES) &~ b | (c - ONES) &~ c) & HIGHS
+				if m != 0 {
+					return i + int(intrinsics.count_trailing_zeros(m) >> 3)
+				}
+			}
+		}
+		for /**/; i < len(s); i += 1 {
+			switch s[i] {
+			case '%', '{', '}':
+				return i
+			}
+		}
+		return i
+	}
+
+	@(require_results)
+	next_rune :: #force_inline proc "contextless" (s: string) -> (rune, int) {
+		if s[0] < utf8.RUNE_SELF {
+			return rune(s[0]), 1
+		}
+		return utf8.decode_rune_in_string(s)
+	}
+
 	fi: Info
 	end := len(fmt)
-	unused_args: bit_set[0 ..< MAX_CHECKED_ARGS]
-	for _, i in args {
-		unused_args += {i}
-	}
+	unused_args := transmute(bit_set[0 ..< MAX_CHECKED_ARGS])(u64(1)<<uint(len(args)) - 1)
 
 	loop: for i := 0; i < end; /**/ {
 		fi = Info{writer = w, n = fi.n}
 
 		prev_i := i
-		for i < end && !(fmt[i] == '%' || fmt[i] == '{' || fmt[i] == '}') {
-			i += 1
-		}
+		i = scan_literal(fmt, i)
 		if i > prev_i {
 			io.write_string(fi.writer, fmt[prev_i:i], &fi.n)
 		}
@@ -756,7 +785,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 				continue loop
 			}
 
-			verb, w := utf8.decode_rune_in_string(fmt[i:])
+			verb, w := next_rune(fmt[i:])
 			i += w
 
 			if index_ok {
@@ -796,7 +825,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 				}
 
 				w: int = 1
-				verb, w = utf8.decode_rune_in_string(fmt[i:])
+				verb, w = next_rune(fmt[i:])
 				i += w
 			}
 
@@ -805,7 +834,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 				break loop
 			}
 
-			brace, w := utf8.decode_rune_in_string(fmt[i:])
+			brace, w := next_rune(fmt[i:])
 			i += w
 
 			switch {
@@ -1041,8 +1070,23 @@ fmt_write_padding :: proc(fi: ^Info, width: int) {
 		pad_byte = '0'
 	}
 
-	for i := 0; i < width; i += 1 {
-		io.write_byte(fi.writer, pad_byte, &fi.n)
+	_write_repeated_byte(fi, pad_byte, width)
+}
+// Writes the byte `c` to the Info's writer `count` times, in chunks
+//
+// Inputs:
+// - fi: A pointer to an Info structure
+// - c: The byte to write
+// - count: The number of times to write it
+//
+_write_repeated_byte :: proc(fi: ^Info, c: byte, count: int) {
+	buf: [64]byte = ---
+	chunk := min(count, len(buf))
+	for i in 0..<chunk {
+		buf[i] = c
+	}
+	for remaining := count; remaining > 0; remaining -= chunk {
+		io.write(fi.writer, buf[:min(remaining, chunk)], &fi.n)
 	}
 }
 
@@ -1073,7 +1117,7 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 		}
 	}
 
-	buf: [BUF_SIZE]byte
+	buf: [BUF_SIZE]byte = ---
 	start := 0
 
 	if fi.hash && !is_signed && _zero_pad(fi) {
@@ -1160,7 +1204,7 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 		}
 	}
 
-	buf: [256]byte
+	buf: [256]byte = ---
 	start := 0
 	if fi.hash && !is_signed && _zero_pad(fi) {
 		switch base {
@@ -1429,7 +1473,7 @@ _fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: b
 		flags |= { .Plus }
 	}
 
-	buf: [386]byte
+	buf: [386]byte = ---
 
 	// Can return "NaN", "+Inf", "-Inf", "<value>", "+<value>", "-<value>".
 	str := strconv.write_float(buf[:], v, float_fmt, prec, bit_size, flags)
@@ -1517,9 +1561,7 @@ fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
 					io.write_string(fi.writer, s, &fi.n)
 				}
 
-				for _ in 0..<fi.width - rune_count {
-					io.write_byte(fi.writer, ' ', &fi.n)
-				}
+				_write_repeated_byte(fi, ' ', fi.width - rune_count)
 
 				if !fi.minus {
 					io.write_string(fi.writer, s, &fi.n)
@@ -1589,9 +1631,7 @@ fmt_string16 :: proc(fi: ^Info, s: string16, verb: rune) {
 					io.write_string16(fi.writer, s, &fi.n)
 				}
 
-				for _ in 0..<fi.width - len(s) {
-					io.write_byte(fi.writer, ' ', &fi.n)
-				}
+				_write_repeated_byte(fi, ' ', fi.width - len(s))
 
 				if !fi.minus {
 					io.write_string16(fi.writer, s, &fi.n)
@@ -1992,9 +2032,7 @@ fmt_bit_set_array :: proc(fi: ^Info, v: any, type_info: ^runtime.Type_Info, name
 // - fi: A pointer to the Info structure where the indents will be written.
 //
 fmt_write_indent :: proc(fi: ^Info) {
-	for _ in 0..<fi.indent {
-		io.write_byte(fi.writer, '\t', &fi.n)
-	}
+	_write_repeated_byte(fi, '\t', fi.indent)
 }
 // Formats an array and writes it to the provided Info structure
 //
@@ -2372,7 +2410,7 @@ fmt_soa_struct_internal :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime
 	}
 
 	if hash && n > 0 {
-		for _ in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
+		_write_repeated_byte(fi, '\t', indent)
 	}
 }
 
@@ -2426,7 +2464,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 	}
 	defer {
 		if !is_soa && hash && !is_empty {
-			for _ in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
+			_write_repeated_byte(fi, '\t', indent)
 		}
 		io.write_byte(fi.writer, ']' if is_soa && the_verb == 'v' else '}', &fi.n)
 	}
@@ -2716,9 +2754,7 @@ fmt_named_buitlin_custom_formatters :: proc(fi: ^Info, v: any, verb: rune, info:
 			for x := i; x >= 10; x /= 10 {
 				n -= 1
 			}
-			for _ in 0..<n {
-				io.write_byte(fi.writer, '0', &fi.n)
-			}
+			_write_repeated_byte(fi, '0', n)
 			io.write_i64(fi.writer, i, 10, &fi.n)
 		}
 
@@ -2954,7 +2990,7 @@ fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit
 	}
 	defer {
 		if hash {
-			for _ in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
+			_write_repeated_byte(fi, '\t', indent)
 		}
 		io.write_byte(fi.writer, '}', &fi.n)
 	}
@@ -3189,7 +3225,7 @@ fmt_map :: proc(fi: ^Info, v: any, info: runtime.Type_Info_Map, verb: rune) {
 		}
 		defer {
 			if hash {
-				for _ in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
+				_write_repeated_byte(fi, '\t', indent)
 			}
 		}
 
