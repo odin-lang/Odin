@@ -33,9 +33,14 @@ when ODIN_BUILD_MODE == .Dynamic {
 		} else when ODIN_ARCH == .i386 {
 			@require foreign import entry "entry_unix_no_crt_i386.asm"
 			SYS_exit :: 1
-		} else when ODIN_OS == .Darwin && ODIN_ARCH == .arm64 {
-			@require foreign import entry "entry_unix_no_crt_darwin_arm64.asm"
-			SYS_exit :: 1
+		} else when ODIN_ARCH == .arm64 {
+			when ODIN_OS == .Darwin {
+				@require foreign import entry "entry_unix_no_crt_darwin_arm64.asm"
+				SYS_exit :: 1
+			} else {
+				@require foreign import entry "entry_unix_no_crt_arm64.asm"
+				SYS_exit :: 93
+			}
 		} else when ODIN_ARCH == .riscv64 {
 			@require foreign import entry "entry_unix_no_crt_riscv64.asm"
 			SYS_exit :: 93
