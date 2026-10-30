@@ -1477,6 +1477,9 @@ KHR_XLIB_SURFACE_EXTENSION_NAME                              :: "VK_KHR_xlib_sur
 KHR_xcb_surface                                              :: 1
 KHR_XCB_SURFACE_SPEC_VERSION                                 :: 6
 KHR_XCB_SURFACE_EXTENSION_NAME                               :: "VK_KHR_xcb_surface"
+KHR_android_surface                                          :: 1
+KHR_ANDROID_SURFACE_SPEC_VERSION                             :: 6
+KHR_ANDROID_SURFACE_EXTENSION_NAME                           :: "VK_KHR_android_surface"
 KHR_portability_subset                                       :: 1
 KHR_PORTABILITY_SUBSET_SPEC_VERSION                          :: 1
 KHR_PORTABILITY_SUBSET_EXTENSION_NAME                        :: "VK_KHR_portability_subset"

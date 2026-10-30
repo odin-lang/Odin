@@ -487,8 +487,14 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		SO_TYPE       :: 3
 		SO_LINGER     :: 13
 
-		SO_RCVTIMEO   :: 66
-		SO_SNDTIMEO   :: 67
+		// Bionic keeps the old values: the new ones need Linux 5.1, and Android still runs older kernels.
+		when ODIN_PLATFORM_SUBTARGET == .Android {
+			SO_RCVTIMEO :: 20
+			SO_SNDTIMEO :: 21
+		} else {
+			SO_RCVTIMEO :: 66
+			SO_SNDTIMEO :: 67
+		}
 	} else {
 		SOL_SOCKET :: 0xffff
 

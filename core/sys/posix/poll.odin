@@ -25,7 +25,7 @@ foreign lib {
 	poll :: proc(fds: [^]pollfd, nfds: nfds_t, timeout: c.int) -> c.int ---
 }
 
-when ODIN_OS == .Linux {
+when ODIN_OS == .Linux && ODIN_PLATFORM_SUBTARGET != .Android {
 	nfds_t :: c.ulong
 } else {
 	nfds_t :: c.uint

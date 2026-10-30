@@ -87,7 +87,7 @@ If threading is disabled, ma_fence_wait() will spin on the counter.
 */
 fence :: struct {
 	e:       (struct {} when NO_THREADING else event),
-	counter: (u32 when NO_THREADING else struct {}),
+	counter: u32,
 }
 
 @(default_calling_convention="c", link_prefix="ma_")

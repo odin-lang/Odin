@@ -15,14 +15,14 @@ foreign libc {
 	// 7.29.2 Formatted wide character input/output functions
 	fwprintf  :: proc(stream: ^FILE, format: [^]wchar_t, #c_vararg arg: ..any) -> int ---
 	fwscanf   :: proc(stream: ^FILE, format: [^]wchar_t, #c_vararg arg: ..any) -> int ---
-	swprintf  :: proc(stream: ^FILE, n: size_t, format: [^]wchar_t, #c_vararg arg: ..any) -> int ---
+	swprintf  :: proc(s: [^]wchar_t, n: size_t, format: [^]wchar_t, #c_vararg arg: ..any) -> int ---
 	swscanf   :: proc(s, format: [^]wchar_t, #c_vararg arg: ..any) -> int ---
 	wprintf   :: proc(format: [^]wchar_t, #c_vararg arg: ..any) -> int ---
 	wscanf    :: proc(format: [^]wchar_t, #c_vararg arg: ..any) -> int ---
 
 	// 7.29.3 Wide character input/output functions
-	fwgetc    :: proc(stream: ^FILE) -> wint_t ---
-	fgetws    :: proc(s: [^]wchar_t, n: int, stream: ^FILE) -> wchar_t ---
+	fgetwc    :: proc(stream: ^FILE) -> wint_t ---
+	fgetws    :: proc(s: [^]wchar_t, n: int, stream: ^FILE) -> [^]wchar_t ---
 	fputwc    :: proc(c: wchar_t, stream: ^FILE) -> wint_t ---
 	fputws    :: proc(s: [^]wchar_t, stream: ^FILE) -> int ---
 	fwide     :: proc(stream: ^FILE, mode: int) -> int ---
@@ -100,7 +100,7 @@ wint_t    :: distinct wchar_t
 
 // Calculate these values correctly regardless of what type wchar_t actually is.
 WINT_MIN  :: 0
-WINT_MAX  :: 1 << (size_of(wint_t) * 8)
+WINT_MAX  :: (1 << (size_of(wint_t) * 8)) - 1
 WEOF      :: ~wint_t(0)
 
 // The v* procedures take a pointer to the va_list on every target, see va_list_arg.

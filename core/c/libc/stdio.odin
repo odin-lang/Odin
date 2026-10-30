@@ -71,11 +71,15 @@ when ODIN_OS == .Linux {
 
 	EOF           :: int(-1)
 
-	FOPEN_MAX     :: 1000
-
 	FILENAME_MAX  :: 4096
 
-	L_tmpnam      :: 20
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		FOPEN_MAX :: 20
+		L_tmpnam  :: 4096
+	} else {
+		FOPEN_MAX :: 1000
+		L_tmpnam  :: 20
+	}
 
 	SEEK_SET      :: 0
 	SEEK_CUR      :: 1

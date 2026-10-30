@@ -63,6 +63,12 @@ _standard_stream_init :: proc "contextless" () {
 }
 
 _open :: proc(name: string, flags: File_Flags, perm: Permissions) -> (f: ^File, err: Error) {
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		if _is_asset_name(name) {
+			return _open_asset(name, flags)
+		}
+	}
+
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	name_cstr := clone_to_cstring(name, temp_allocator) or_return
 
@@ -132,7 +138,7 @@ _clone :: proc(f: ^File) -> (clone: ^File, err: Error) {
 _open_buffered :: proc(name: string, buffer_size: uint, flags := File_Flags{.Read}, perm: Permissions) -> (f: ^File, err: Error) {
 	assert(buffer_size > 0)
 	f, err = _open(name, flags, perm)
-	if f != nil && err == nil {
+	if f != nil && err == nil && f.stream.procedure == _file_stream_proc {
 		impl := (^File_Impl)(f.impl)
 		impl.buffer = make([]byte, buffer_size, file_allocator())
 		f.stream.procedure = _file_stream_buffered_proc
@@ -439,6 +445,12 @@ _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 
 _exists :: proc(name: string) -> bool {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		if _is_asset_name(name) {
+			_, err := _stat_asset(name, temp_allocator)
+			return err == nil
+		}
+	}
 	name_cstr, _ := clone_to_cstring(name, temp_allocator)
 	return linux.access(name_cstr, linux.F_OK) == .NONE
 }

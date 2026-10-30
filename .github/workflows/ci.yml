@@ -256,6 +256,62 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point -target:openbsd_amd64
 
+  build_android:
+    name: Android Check, Build, and Bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download LLVM
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 22
+          echo "/usr/lib/llvm-22/bin" >> $GITHUB_PATH
+      - name: Build Odin
+        run: ./build_odin.sh release
+      - name: Find the NDK, SDK, and JDK
+        run: |
+          ndk=$(ls -d "$ANDROID_HOME"/ndk/30.* | sort -V | tail -n 1)
+          test -d "$ndk"
+          echo "ODIN_ANDROID_NDK=$ndk" >> $GITHUB_ENV
+          echo "ODIN_ANDROID_SDK=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "JAVA_HOME=$JAVA_HOME_21_X64" >> $GITHUB_ENV
+      - name: Compile needed Vendor
+        run: |
+          export ODIN_ROOT="$(pwd)"
+          ./vendor/stb/src/build_stb.sh
+          ./vendor/cgltf/src/build_cgltf.sh
+          ./vendor/kb_text_shape/src/build_unix.sh
+          ./vendor/miniaudio/src/build_miniaudio_android.sh
+      - name: Odin check examples/all for Android
+        run: |
+          for target in linux_arm64 linux_arm32 linux_amd64 linux_i386; do
+            ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:$target -subtarget:android -minimum-os-version:29
+          done
+      - name: Build examples/android for every ABI
+        run: |
+          for pair in arm64-v8a:linux_arm64 armeabi-v7a:linux_arm32 x86:linux_i386 x86_64:linux_amd64; do
+            abi=${pair%%:*}
+            target=${pair#*:}
+            mkdir -p examples/android/app/lib/$abi
+            ./odin build examples/android -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:$target -subtarget:android -minimum-os-version:29 -build-mode:shared -out:examples/android/app/lib/$abi/libexample.so
+          done
+      - name: Bundle examples/android as an APK and an AAB
+        run: |
+          mkdir -p ~/.android
+          "$JAVA_HOME/bin/keytool" -genkeypair -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          wget -q https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar
+          echo "a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29  bundletool-all-1.18.3.jar" | sha256sum -c
+          ./odin bundle android examples/android/app -minimum-os-version:29 -out:examples/android/example.apk
+          ODIN_ANDROID_BUNDLETOOL="$(pwd)/bundletool-all-1.18.3.jar" ./odin bundle android examples/android/app -minimum-os-version:29 -out:examples/android/example.aab
+      - name: Verify the APK and AAB
+        run: |
+          build_tools=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)
+          "$build_tools/apksigner" verify --print-certs examples/android/example.apk
+          "$build_tools/zipalign" -c -P 16 4 examples/android/example.apk
+          "$JAVA_HOME/bin/java" -jar bundletool-all-1.18.3.jar validate --bundle=examples/android/example.aab
+
   build_windows:
     name: Windows Build, Check, and Test
     runs-on: windows-2022

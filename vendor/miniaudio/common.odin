@@ -8,12 +8,24 @@ when MINIAUDIO_SHARED {
 	#panic("Shared linking for miniaudio is not supported yet")
 }
 
-@(private)
-LIB :: "lib/miniaudio.lib" when ODIN_OS == .Windows else "lib/darwin/miniaudio.a" when ODIN_OS == .Darwin else "lib/miniaudio.a"
+when ODIN_PLATFORM_SUBTARGET == .Android {
+	// One library per Android ABI, built with the NDK by `src/build_miniaudio_android.sh` (or `.bat`).
+	@(private)
+	ANDROID_ABI :: "arm64-v8a" when ODIN_ARCH == .arm64 else "x86_64" when ODIN_ARCH == .amd64 else "armeabi-v7a" when ODIN_ARCH == .arm32 else "x86"
+	@(private)
+	LIB :: "lib/android/" + ANDROID_ABI + "/miniaudio.a"
 
-when !#exists(LIB) {
-	// The Windows and macOS libraries are shipped with the compiler, so a message for them should not be needed.
-	#panic("Could not find the compiled miniaudio library, it can be compiled by running `\"" + ODIN_ROOT + "vendor/miniaudio/src/build_miniaudio.sh\"`")
+	when !#exists(LIB) {
+		#panic("Could not find the compiled miniaudio library for Android, it can be compiled by running `\"" + ODIN_ROOT + "vendor/miniaudio/src/build_miniaudio_android.sh\"` (or `build_miniaudio_android.bat` on Windows) with ODIN_ANDROID_NDK set")
+	}
+} else {
+	@(private)
+	LIB :: "lib/miniaudio.lib" when ODIN_OS == .Windows else "lib/darwin/miniaudio.a" when ODIN_OS == .Darwin else "lib/miniaudio.a"
+
+	when !#exists(LIB) {
+		// The Windows and macOS libraries are shipped with the compiler, so a message for them should not be needed.
+		#panic("Could not find the compiled miniaudio library, it can be compiled by running `\"" + ODIN_ROOT + "vendor/miniaudio/src/build_miniaudio.sh\"`")
+	}
 }
 
 foreign import lib { LIB }
@@ -39,6 +51,8 @@ version_check :: proc "contextless" () {
 
 		when ODIN_OS == .Windows {
 			n += copy(buf[n:], "vendor\\miniaudio\\src\\build.bat`")
+		} else when ODIN_PLATFORM_SUBTARGET == .Android {
+			n += copy(buf[n:], "vendor/miniaudio/src/build_miniaudio_android.sh`")
 		} else {
 			n += copy(buf[n:], "vendor/miniaudio/src/build_miniaudio.sh`")
 		}

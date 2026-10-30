@@ -12,6 +12,8 @@ TIMEOUT_INFINITE :: time.MIN_DURATION // Note(flysand): Any negative duration wi
 
 /*
 Arguments to the current process.
+
+An Android app has one: its package name.
 */
 args := get_args()
 
