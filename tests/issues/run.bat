@@ -174,6 +174,7 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 %ODIN% check "..\test_issue_asm_target_features" %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_asm_target_features" %COMMON% 2>&1 | find /c "enables target feature 'avx'" | findstr /x "3" || exit /b
 %ODIN% test "..\test_issue_asm_pinned_clobbers" %COMMON% -o:speed || exit /b
+%ODIN% check "..\test_issue_asm_clobber_pinned_output" %COMMON% 2>&1 | find /c "which '#clobber' also names" | findstr /x "3" || exit /b
 
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:size -lifetime-markers || exit /b
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:speed -lifetime-markers || exit /b

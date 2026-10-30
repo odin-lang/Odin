@@ -430,6 +430,12 @@ if [[ "$(uname -m)" == "x86_64" || "$(uname -m)" == "amd64" ]]; then
 		exit 1
 	fi
 	$ODIN test ../test_issue_asm_pinned_clobbers $COMMON -o:speed
+	if [[ $($ODIN check ../test_issue_asm_clobber_pinned_output $COMMON_CHECK 2>&1 >/dev/null | grep -c "which '#clobber' also names") -eq 3 ]]; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1"
+		exit 1
+	fi
 fi
 
 $ODIN test ../test_lifetime_markers $COMMON -o:size -lifetime-markers

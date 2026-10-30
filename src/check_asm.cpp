@@ -3136,6 +3136,22 @@ gb_internal void check_asm_template_body(AsmCtx *asm_ctx, CheckerContext *ctx, E
 		}
 	}
 
+	// NOTE(bill): LLVM does not allow a clobber of a register that is also an output
+	for (auto const &ed : ate->decls) {
+		if (ed.param_group != AsmTemplateEntityDeclParamGroup_Output || ed.pin.len == 0) {
+			continue;
+		}
+		u16 bit = asm_ctx->clobber_bit_for_reg_name(ed.pin);
+		if (bit == 0) {
+			continue;
+		}
+		String rname = make_string_c(asm_ctx->clobber_reg_bit_name(bit));
+		if (string_set_exists(&ate->clobber_registers_set, rname)) {
+			error(ed.entity->token,
+			      "'asm' output '%.*s' is pinned to %%%.*s, which '#clobber' also names; an output's register is already written, so remove the '#clobber'",
+			      LIT(ed.entity->token.string), LIT(ed.pin));
+		}
+	}
 
 	// collect label decls
 	for (Ast *instruction_ : at->instructions) {
@@ -3501,6 +3517,34 @@ gb_internal void check_asm_template_body(AsmCtx *asm_ctx, CheckerContext *ctx, E
 			Token tok = node ? ast_token(node): entity->token;
 			error(tok, "'asm' template is marked #pure but it is not pure: %s", why);
 		}
+	}
+
+	// NOTE(bill): LLVM does not allow the asm to write an input's register unless that input is tied to an output.
+	// A pinned input whose register is written is tied to a discarded output in that register instead of being clobbered.
+	for (auto &ed : ate->decls) {
+		if (ed.param_group != AsmTemplateEntityDeclParamGroup_Input ||
+		    ed.kind        != AsmTemplateEntityDecl_Register        ||
+		    ed.tie         >= 0                                     ||
+		    ed.view_of     >= 0                                     ||
+		    ed.pin.len     == 0) {
+			continue;
+		}
+		u16 bit = asm_ctx->clobber_bit_for_reg_name(ed.pin);
+		if (bit == 0) {
+			continue;
+		}
+
+		TEMPORARY_ALLOCATOR_GUARD();
+		auto names = array_make<String>(temporary_allocator());
+		for (String const &reg : ate->clobber_registers_set) {
+			if (asm_ctx->clobber_bit_for_reg_name(reg) == bit) {
+				array_add(&names, reg);
+			}
+		}
+		for (String const &reg : names) {
+			string_set_remove(&ate->clobber_registers_set, reg);
+		}
+		ed.pin_overwritten = names.count != 0;
 	}
 }
 
