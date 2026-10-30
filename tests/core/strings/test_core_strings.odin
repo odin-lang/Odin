@@ -1,6 +1,7 @@
 package test_core_strings
 
 import "base:runtime"
+import "core:io"
 import "core:mem"
 import "core:strings"
 import "core:testing"
@@ -281,4 +282,46 @@ test_compare_empty :: proc(t: ^testing.T) {
 	testing.expect_value(t, strings.compare("", empty), 0)
 	testing.expect_value(t, strings.compare(empty, ""), 0)
 	testing.expect(t, !("" < empty) && !(empty < ""), "two empty strings must not order before each other")
+}
+
+@test
+test_builder_partial_write_counts :: proc(t: ^testing.T) {
+	check :: proc(t: ^testing.T, b: strings.Builder, n: int, err: runtime.Allocator_Error, expected: string, loc := #caller_location) {
+		testing.expect_value(t, strings.to_string(b), expected, loc=loc)
+		testing.expect_value(t, n, len(expected), loc=loc)
+		testing.expect_value(t, err, runtime.Allocator_Error.Out_Of_Memory, loc=loc)
+	}
+
+	buf: [4]byte
+
+	b := strings.builder_from_bytes(buf[:])
+	n, err := strings.write_bytes(&b, transmute([]byte)string("abcdef"))
+	check(t, b, n, err, "abcd")
+
+	b = strings.builder_from_bytes(buf[:])
+	n, err = strings.write_string(&b, "abcdef")
+	check(t, b, n, err, "abcd")
+
+	b = strings.builder_from_bytes(buf[:2])
+	n, err = strings.write_rune(&b, '€')
+	check(t, b, n, err, "\xe2\x82")
+
+	b = strings.builder_from_bytes(buf[:])
+	n, err = strings.write_string16(&b, string16("abcdef"))
+	check(t, b, n, err, "abcd")
+
+	b = strings.builder_from_bytes(buf[:])
+	n, err = strings.write_quoted_string(&b, "abcdef")
+	check(t, b, n, err, `"abc`)
+
+	b = strings.builder_from_bytes(buf[:])
+	n, err = strings.write_quoted_string16(&b, string16("abcdef"))
+	check(t, b, n, err, `"abc`)
+
+	// Writers such as `core:fmt` see the count through the stream
+	b = strings.builder_from_bytes(buf[:])
+	sn, serr := io.write_string(strings.to_writer(&b), "abcdef")
+	testing.expect_value(t, strings.to_string(b), "abcd")
+	testing.expect_value(t, sn, 4)
+	testing.expect_value(t, serr, io.Error.EOF)
 }
