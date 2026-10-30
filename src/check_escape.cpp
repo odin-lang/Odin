@@ -3448,7 +3448,9 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 
 	AstTypeAndValue const &tav = expr->tav;
 	if (tav.mode == Addressing_Constant) {
-		if (tav.type == nullptr || !is_type_slice(tav.type) || is_load_directive_call(expr)) {
+		ExactValueKind value_kind = tav.value().kind;
+		// String constants are loaded into read-only memory, they do not use the memory of the stack frame.
+		if (tav.type == nullptr || !is_type_slice(tav.type) || value_kind == ExactValue_String || value_kind == ExactValue_String16) {
 			return escape_value();
 		}
 		if (expr->kind == Ast_CompoundLit && expr->CompoundLit.elems.count == 0) {
