@@ -456,6 +456,7 @@ fi
 
 $ODIN test ../test_issue_disabled_proc_value $COMMON -disable-assert
 $ODIN test ../test_issue_loaded_pointer_alignment $COMMON -o:speed
+$ODIN test ../test_issue_max_simd_align $COMMON -o:speed
 
 #########################################################################################################
 

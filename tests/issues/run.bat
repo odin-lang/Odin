@@ -143,6 +143,7 @@ set ODIN=..\..\..\odin
 
 %ODIN% test "..\test_issue_6344" %COMMON% -o:speed || exit /b
 
+%ODIN% test "..\test_issue_max_simd_align" %COMMON% -o:speed || exit /b
 %ODIN% test "..\test_issue_8072" %COMMON% -o:speed -lifetime-markers || exit /b
 
 %ODIN% test "..\test_pr_6470" %COMMON% -define:TEST_EXPECT_FAILURE=true 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
