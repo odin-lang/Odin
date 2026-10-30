@@ -547,7 +547,7 @@ wprint :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> (bytes_w
 			io.write_string(fi.writer, sep, &fi.n)
 		}
 
-		fmt_value(&fi, args[i], 'v')
+		_fmt_value(&fi, args[i].data, args[i].id, nil, 'v')
 	}
 	if flush {
 		io.flush(w)
@@ -573,7 +573,7 @@ wprintln :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> (bytes
 			io.write_string(fi.writer, sep, &fi.n)
 		}
 
-		fmt_value(&fi, args[i], 'v')
+		_fmt_value(&fi, args[i].data, args[i].id, nil, 'v')
 	}
 	io.write_byte(fi.writer, '\n', &fi.n)
 	if flush {
@@ -790,7 +790,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 
 			if index_ok {
 				unused_args -= {arg_index}
-				fmt_arg(&fi, args[arg_index], verb)
+				_fmt_arg(&fi, args[arg_index].data, args[arg_index].id, nil, verb)
 			}
 
 
@@ -841,7 +841,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 			case brace != '}':
 				io.write_string(fi.writer, "%!(MISSING CLOSE BRACE)", &fi.n)
 			case index_ok:
-				fmt_arg(&fi, args[arg_index], verb)
+				_fmt_arg(&fi, args[arg_index].data, args[arg_index].id, nil, verb)
 				unused_args -= {arg_index}
 			}
 		}
@@ -1766,34 +1766,86 @@ fmt_enum :: proc(fi: ^Info, v: any, verb: rune) {
 		io.write_string(fi.writer, "<nil>", &fi.n)
 		return
 	}
+	_fmt_enum(fi, v.data, type_info_of(v.id), verb)
+}
 
-	type_info := type_info_of(v.id)
+@(private)
+_fmt_enum :: proc(fi: ^Info, data: rawptr, type_info: ^runtime.Type_Info, verb: rune) {
 	#partial switch &e in type_info.variant {
 	case: fmt_bad_verb(fi, verb)
 	case runtime.Type_Info_Enum:
+		base := runtime.type_info_base(e.base)
 		switch verb {
 		case: fmt_bad_verb(fi, verb)
 		case 'i', 'd', 'f':
-			fmt_arg(fi, any{v.data, runtime.type_info_base(e.base).id}, verb)
+			_fmt_arg(fi, data, base.id, base, verb)
 		case 's', 'v', 'q':
-			if str, ok := enum_value_to_string(v); ok {
+			if str, ok := _enum_value_name(data, e); ok {
 				fmt_string(fi, str, verb)
 			} else {
 				io.write_string(fi.writer, "%!(BAD ENUM VALUE=", &fi.n)
-				fmt_arg(fi, any{v.data, runtime.type_info_base(e.base).id}, 'i')
+				_fmt_arg(fi, data, base.id, base, 'i')
 				io.write_string(fi.writer, ")", &fi.n)
 			}
 		case 'w':
-			if str, ok := enum_value_to_string(v); ok {
+			if str, ok := _enum_value_name(data, e); ok {
 				io.write_byte(fi.writer, '.', &fi.n)
 				io.write_string(fi.writer, str, &fi.n)
 			} else {
 				io.write_string(fi.writer, "%!(BAD ENUM VALUE=", &fi.n)
-				fmt_arg(fi, any{v.data, runtime.type_info_base(e.base).id}, 'i')
+				_fmt_arg(fi, data, base.id, base, 'i')
 				io.write_string(fi.writer, ")", &fi.n)
 			}
 		}
 	}
+}
+
+// Equivalent to `enum_value_to_string`. Reads the value as `reflect.as_i64` does.
+@(private, require_results)
+_enum_value_name :: proc(data: rawptr, e: runtime.Type_Info_Enum) -> (name: string, ok: bool) {
+	if len(e.values) == 0 {
+		return
+	}
+
+	core := runtime.type_info_core(e.base)
+	value: i64
+	if info, is_integer := core.variant.(runtime.Type_Info_Integer); is_integer {
+		swap := info.endianness == .Little && ODIN_ENDIAN == .Big ||
+		        info.endianness == .Big    && ODIN_ENDIAN == .Little
+		switch core.size {
+		case 1:
+			x := (^u8)(data)^
+			value = i64(i8(x)) if info.signed else i64(x)
+		case 2:
+			x := (^u16)(data)^
+			if swap { x = intrinsics.byte_swap(x) }
+			value = i64(i16(x)) if info.signed else i64(x)
+		case 4:
+			x := (^u32)(data)^
+			if swap { x = intrinsics.byte_swap(x) }
+			value = i64(i32(x)) if info.signed else i64(x)
+		case 8:
+			x := (^u64)(data)^
+			if swap { x = intrinsics.byte_swap(x) }
+			value = i64(x)
+		case 16:
+			x := (^u128)(data)^
+			if swap { x = intrinsics.byte_swap(x) }
+			value = i64(x)
+		case:
+			return
+		}
+	} else {
+		value = reflect.as_i64(any{data, core.id}) or_return
+	}
+
+	ev := runtime.Type_Info_Enum_Value(value)
+	for val, idx in e.values {
+		if val == ev {
+			return e.names[idx], true
+		}
+	}
+	return
 }
 // Converts a stored enum value to a string representation
 //
@@ -2054,6 +2106,8 @@ fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: in
 	fi.record_level += 1
 	defer fi.record_level -= 1
 
+	elem_info := type_info_of(elem_id)
+
 	if fi.hash {
 		io.write_byte(fi.writer, '\n', &fi.n)
 		defer fmt_write_indent(fi)
@@ -2066,7 +2120,7 @@ fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: in
 			fmt_write_indent(fi)
 
 			data := uintptr(array_data) + uintptr(i*elem_size)
-			fmt_arg(fi, any{rawptr(data), elem_id}, verb)
+			_fmt_arg(fi, rawptr(data), elem_id, elem_info, verb)
 
 			io.write_string(fi.writer, ",\n", &fi.n)
 		}
@@ -2075,7 +2129,7 @@ fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: in
 			if i > 0 { io.write_string(fi.writer, ", ", &fi.n) }
 
 			data := uintptr(array_data) + uintptr(i*elem_size)
-			fmt_arg(fi, any{rawptr(data), elem_id}, verb)
+			_fmt_arg(fi, rawptr(data), elem_id, elem_info, verb)
 		}
 	}
 }
@@ -2509,7 +2563,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 				prev_state := fi.state
 				fi.state = new_state
 				data := rawptr(uintptr(v.data) + info.offsets[i])
-				fmt_arg(fi, any{data, t.id}, verb)
+				_fmt_arg(fi, data, t.id, t, verb)
 				fi.state = prev_state
 			}
 
@@ -2795,18 +2849,29 @@ fmt_named_buitlin_custom_formatters :: proc(fi: ^Info, v: any, verb: rune, info:
 // NOTE: This procedure supports built-in custom formatters for core library types such as runtime.Source_Code_Location, time.Duration, and time.Time.
 //
 fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) {
+	_fmt_named(fi, v.data, v.id, verb, info)
+}
+
+@(private)
+_fmt_named :: proc(fi: ^Info, data: rawptr, id: typeid, verb: rune, info: runtime.Type_Info_Named) {
 	// Built-in Custom Formatters for core library types
-	if verb != 'w' && fmt_named_buitlin_custom_formatters(fi, v, verb, info) {
-		return
+	if verb != 'w' {
+		if id == runtime.Source_Code_Location ||
+		   id == time.Duration                ||
+		   id == time.Time {
+			if fmt_named_buitlin_custom_formatters(fi, any{data, id}, verb, info) {
+				return
+			}
+		}
 	}
 
 	#partial switch &b in info.base.variant {
 	case runtime.Type_Info_Struct:
-		fmt_struct(fi, v, verb, b, info.name)
+		fmt_struct(fi, any{data, id}, verb, b, info.name)
 	case runtime.Type_Info_Bit_Field:
-		fmt_bit_field(fi, v, verb, b, info.name)
+		fmt_bit_field(fi, any{data, id}, verb, b, info.name)
 	case runtime.Type_Info_Bit_Set:
-		fmt_bit_set(fi, v, verb = verb)
+		fmt_bit_set(fi, any{data, id}, verb = verb)
 	case:
 		if verb == 'w' {
 			#partial switch _ in info.base.variant {
@@ -2824,7 +2889,7 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 				io.write_string(fi.writer, info.name, &fi.n)
 			}
 		}
-		fmt_value(fi, any{v.data, info.base.id}, verb)
+		_fmt_value(fi, data, info.base.id, info.base, verb)
 	}
 }
 // Formats a union type into a string representation
@@ -3249,14 +3314,14 @@ fmt_map :: proc(fi: ^Info, v: any, info: runtime.Type_Info_Map, verb: rune) {
 				key   := runtime.map_cell_index_dynamic(ks, info.map_info.ks, bucket_index)
 				value := runtime.map_cell_index_dynamic(vs, info.map_info.vs, bucket_index)
 
-				fmt_arg(&Info{writer = fi.writer}, any{rawptr(key), info.key.id}, verb)
+				_fmt_arg(&Info{writer = fi.writer}, rawptr(key), info.key.id, info.key, verb)
 				if info.value.size > 0 {
 					if hash {
 						io.write_string(fi.writer, " = ", &fi.n)
 					} else {
 						io.write_string(fi.writer, "=", &fi.n)
 					}
-					fmt_arg(fi, any{rawptr(value), info.value.id}, verb)
+					_fmt_arg(fi, rawptr(value), info.value.id, info.value, verb)
 				}
 
 				if do_trailing_comma { io.write_string(fi.writer, ",\n", &fi.n) }
@@ -3276,24 +3341,56 @@ fmt_map :: proc(fi: ^Info, v: any, info: runtime.Type_Info_Map, verb: rune) {
 // NOTE: Uses user formatters if available and not ignored.
 //
 fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
-	if v.data == nil || v.id == nil {
+	_fmt_value(fi, v.data, v.id, nil, verb)
+}
+
+// NOTE(bill): The internal procedures take the parts of an `any`, not the `any` itself.
+// Passing an `any` parameter on copies it with one 16-byte load. That load stalls when the caller wrote the two halves separately (every element and field `any`).
+
+// A nil `type_info` is looked up from `id`
+@(private)
+_fmt_value :: proc(fi: ^Info, data: rawptr, id: typeid, type_info: ^runtime.Type_Info, verb: rune) {
+	if data == nil || id == nil {
 		io.write_string(fi.writer, "<nil>", &fi.n)
 		return
 	}
 
 	if _user_formatters != nil && !fi.ignore_user_formatters {
-		formatter := _user_formatters[v.id]
+		formatter := _user_formatters[id]
 		if formatter != nil {
-			if ok := formatter(fi, v, verb); !ok {
+			if ok := formatter(fi, any{data, id}, verb); !ok {
 				fi.ignore_user_formatters = true
 				fmt_bad_verb(fi, verb)
 			}
 			return
 		}
 	}
+	type_info := type_info
+	if type_info == nil {
+		type_info = type_info_of(id)
+	}
+
+	// Basic types skip the heavier frame of `_fmt_value_info`. It only passes them to `_fmt_arg`.
+	#partial switch _ in type_info.variant {
+	case runtime.Type_Info_Boolean,
+	     runtime.Type_Info_Integer,
+	     runtime.Type_Info_Rune,
+	     runtime.Type_Info_Float,
+	     runtime.Type_Info_Complex,
+	     runtime.Type_Info_Quaternion,
+	     runtime.Type_Info_String:
+		fi.ignore_user_formatters = false
+		_fmt_arg(fi, data, id, type_info, verb)
+		return
+	}
+	_fmt_value_info(fi, data, id, type_info, verb)
+}
+
+@(private)
+_fmt_value_info :: proc(fi: ^Info, data: rawptr, id: typeid, type_info: ^runtime.Type_Info, verb: rune) {
 	fi.ignore_user_formatters = false
 
-	type_info := type_info_of(v.id)
+	v := any{data, id}
 	switch &info in type_info.variant {
 	case runtime.Type_Info_Any:
 		// Ignore
@@ -3301,7 +3398,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		// Ignore
 
 	case runtime.Type_Info_Named:
-		fmt_named(fi, v, verb, info)
+		_fmt_named(fi, data, id, verb, info)
 
 	case runtime.Type_Info_Boolean,
 	     runtime.Type_Info_Integer,
@@ -3310,7 +3407,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 	     runtime.Type_Info_Complex,
 	     runtime.Type_Info_Quaternion,
 	     runtime.Type_Info_String:
-		fmt_arg(fi, v, verb)
+		_fmt_arg(fi, data, id, type_info, verb)
 
 	case runtime.Type_Info_Pointer:
 		fmt_pointer_from_value(fi, v, info, verb)
@@ -3402,7 +3499,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		fmt_union(fi, v, verb, info, type_info.size)
 
 	case runtime.Type_Info_Enum:
-		fmt_enum(fi, v, verb)
+		_fmt_enum(fi, data, type_info, verb)
 
 	case runtime.Type_Info_Procedure:
 		ptr := (^rawptr)(v.data)^
@@ -3415,8 +3512,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		}
 
 	case runtime.Type_Info_Type_Id:
-		id := (^typeid)(v.data)^
-		reflect.write_typeid(fi.writer, id, &fi.n)
+		reflect.write_typeid(fi.writer, (^typeid)(v.data)^, &fi.n)
 
 	case runtime.Type_Info_Bit_Set:
 		fmt_bit_set(fi, v, verb = verb)
@@ -3515,41 +3611,51 @@ fmt_quaternion  :: proc(fi: ^Info, q: quaternion256, bits: int, verb: rune) {
 // NOTE: Uses user formatters if available and not ignored.
 //
 fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
-	if arg == nil {
+	_fmt_arg(fi, arg.data, arg.id, nil, verb)
+}
+
+// A nil `arg_info` is looked up from `id`
+@(private)
+_fmt_arg :: proc(fi: ^Info, data: rawptr, id: typeid, arg_info: ^runtime.Type_Info, verb: rune) {
+	if data == nil || id == nil {
 		io.write_string(fi.writer, "<nil>")
 		return
 	}
 	prev_arg := fi.arg
 	defer fi.arg = prev_arg
-	fi.arg = arg
+	fi.arg = any{data, id}
+
+	arg_info := arg_info
+	if arg_info == nil {
+		arg_info = type_info_of(id)
+	}
 
 	if verb == 'T' {
-		ti := type_info_of(arg.id)
-		switch a in arg {
-		case ^runtime.Type_Info: ti = a
+		ti := arg_info
+		if id == typeid_of(^runtime.Type_Info) {
+			ti = (^^runtime.Type_Info)(data)^
 		}
 		reflect.write_type(fi.writer, ti, &fi.n)
 		return
 	}
 
 	if _user_formatters != nil {
-		formatter := _user_formatters[arg.id]
+		formatter := _user_formatters[id]
 		if formatter != nil {
-			if ok := formatter(fi, arg, verb); !ok {
+			if ok := formatter(fi, any{data, id}, verb); !ok {
 				fmt_bad_verb(fi, verb)
 			}
 			return
 		}
 	}
 
-	arg_info := type_info_of(arg.id)
 	if info, ok := arg_info.variant.(runtime.Type_Info_Named); ok {
-		fmt_named(fi, arg, verb, info)
+		_fmt_named(fi, data, id, verb, info)
 		return
 	}
 
-	base_arg := arg
-	base_arg.id = runtime.typeid_base(base_arg.id)
+	// Named types returned above: `id` is its own base type
+	base_arg := any{data, id}
 	switch &a in base_arg {
 	case bool:       fmt_bool(fi, a, verb)
 	case b8:         fmt_bool(fi, bool(a), verb)
@@ -3557,7 +3663,7 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 	case b32:        fmt_bool(fi, bool(a), verb)
 	case b64:        fmt_bool(fi, bool(a), verb)
 
-	case any:        fmt_arg(fi,  a, verb)
+	case any:        _fmt_arg(fi, a.data, a.id, nil, verb)
 	case rune:       fmt_rune(fi, a, verb)
 
 	case f16:        fmt_float(fi, f64(a), 16, verb)
@@ -3623,7 +3729,7 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 	case i128be:   fmt_int_128(fi, u128(a), true,  128, verb)
 	case u128be:   fmt_int_128(fi, u128(a), false, 128, verb)
 
-	case: fmt_value(fi, arg, verb)
+	case: _fmt_value_info(fi, data, id, arg_info, verb)
 	}
 
 }
