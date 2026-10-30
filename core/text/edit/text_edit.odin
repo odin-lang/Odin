@@ -17,7 +17,6 @@ DEFAULT_UNDO_TIMEOUT :: 300 * time.Millisecond
 
 State :: struct {
 	selection: [2]int,
-	line_start, line_end: int,
 
 	// initialized each "frame" with `begin`
 	builder: ^strings.Builder, // let the caller store the text buffer data
@@ -285,10 +284,14 @@ is_continuation_byte :: proc(b: byte) -> bool {
 	return b >= 0x80 && b < 0xc0
 }
 
-// translates the caret position 
+// translates the caret position
 translate_position :: proc(s: ^State, t: Translation) -> int {
 	is_space :: proc(b: byte) -> bool {
 		return b == ' ' || b == '\t' || b == '\n'
+	}
+
+	is_newline :: proc(b: byte) -> bool {
+		return b == '\n'
 	}
 
 	buf: []byte
@@ -357,9 +360,13 @@ translate_position :: proc(s: ^State, t: Translation) -> int {
 			pos += 1
 		}
 	case .Soft_Line_Start:
-		pos = s.line_start
+		for pos > 0 && !is_newline(buf[pos-1]) {
+			pos -= 1
+		}
 	case .Soft_Line_End:
-		pos = s.line_end
+		for pos < len(buf) && !is_newline(buf[pos]) {
+			pos += 1
+		}
 	}
 	return clamp(pos, 0, len(buf))
 }
