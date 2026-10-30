@@ -45,7 +45,11 @@ _udivmod128_wide :: #force_no_inline proc "contextless" (a, b: u128) -> (q, r: u
 		s  := intrinsics.count_leading_zeros(d_hi)
 		v1 := u64((b << s) >> 64)
 		u1 := a >> 1
-		q1, _ := _udiv128by64(u64(u1 >> 64), u64(u1), v1)
+		when ODIN_ARCH == .amd64 {
+			q1, _ := _udiv128by64_amd64(u64(u1 >> 64), u64(u1), v1)
+		} else {
+			q1, _ := _udiv128by64(u64(u1 >> 64), u64(u1), v1)
+		}
 		q0 := u64((u128(q1) << s) >> 63)
 		if q0 != 0 {
 			q0 -= 1
@@ -62,6 +66,12 @@ _udivmod128_wide :: #force_no_inline proc "contextless" (a, b: u128) -> (q, r: u
 
 @(private, require_results)
 _udiv128by64 :: #force_inline proc "contextless" (u1, u0, v: u64) -> (q, r: u64) {
+	when ODIN_ARCH == .amd64 {
+		if u1 < v {
+			return _udiv128by64_amd64(u1, u0, v)
+		}
+	}
+
 	B :: u64(1) << 32
 
 	s  := intrinsics.count_leading_zeros(v)
