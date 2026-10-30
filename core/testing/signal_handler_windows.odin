@@ -152,6 +152,9 @@ This is a dire bug and should be reported to the Odin developers.
 		intrinsics.atomic_store(&stop_test_passed, passed)
 		intrinsics.atomic_store(&stop_test_alert, 1)
 
+		for {
+			intrinsics.cpu_relax()
+		}
 	}
 
 	// Pass on the exeption to the next handler. As we don't wont to recover from it.
