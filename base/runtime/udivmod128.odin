@@ -8,9 +8,15 @@ udivmod128 :: proc "c" (a, b: u128, rem: ^u128) -> u128 {
 	d_lo, d_hi := u64(b), u64(b >> 64)
 
 	q, r: u128
-	if n_hi == 0 && d_hi == 0 {
+	switch {
+	case b == 0:
+		q = u128(n_hi / d_lo)<<64 | u128(n_lo / d_lo)
+		r = u128(n_hi % d_lo)<<64 | u128(n_lo % d_lo)
+
+	case n_hi == 0 && d_hi == 0:
 		q, r = u128(n_lo / d_lo), u128(n_lo % d_lo)
-	} else {
+
+	case:
 		q, r = _udivmod128_wide(a, b)
 	}
 
@@ -38,7 +44,11 @@ _udivmod128_wide :: #force_no_inline proc "contextless" (a, b: u128) -> (q, r: u
 			q_hi = n_hi / d_lo
 			n_hi = n_hi % d_lo
 		}
-		q_lo, r_lo := _udiv128by64(n_hi, n_lo, d_lo)
+		when ODIN_ARCH == .amd64 {
+			q_lo, r_lo := _udiv128by64_amd64(n_hi, n_lo, d_lo)
+		} else {
+			q_lo, r_lo := _udiv128by64(n_hi, n_lo, d_lo)
+		}
 		q, r = u128(q_hi)<<64 | u128(q_lo), u128(r_lo)
 
 	case:
@@ -66,12 +76,6 @@ _udivmod128_wide :: #force_no_inline proc "contextless" (a, b: u128) -> (q, r: u
 
 @(private, require_results)
 _udiv128by64 :: #force_inline proc "contextless" (u1, u0, v: u64) -> (q, r: u64) {
-	when ODIN_ARCH == .amd64 {
-		if u1 < v {
-			return _udiv128by64_amd64(u1, u0, v)
-		}
-	}
-
 	B :: u64(1) << 32
 
 	s  := intrinsics.count_leading_zeros(v)

@@ -441,6 +441,10 @@ fi
 $ODIN test ../test_lifetime_markers $COMMON -o:size -lifetime-markers
 $ODIN test ../test_lifetime_markers $COMMON -o:speed -lifetime-markers
 
+$ODIN test ../test_issue_udivmod128_zero_divisor $COMMON -integer-division-by-zero:zero
+$ODIN test ../test_issue_udivmod128_zero_divisor $COMMON -integer-division-by-zero:self
+$ODIN test ../test_issue_udivmod128_zero_divisor $COMMON -integer-division-by-zero:all-bits
+
 if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 	clang -c ../test_issue_sysv_abi/test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o
 	$ODIN test ../test_issue_sysv_abi $COMMON

@@ -180,6 +180,10 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:size -lifetime-markers || exit /b
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:speed -lifetime-markers || exit /b
 
+%ODIN% test "..\test_issue_udivmod128_zero_divisor" %COMMON% -integer-division-by-zero:zero     || exit /b
+%ODIN% test "..\test_issue_udivmod128_zero_divisor" %COMMON% -integer-division-by-zero:self     || exit /b
+%ODIN% test "..\test_issue_udivmod128_zero_divisor" %COMMON% -integer-division-by-zero:all-bits || exit /b
+
 @if "%ODIN_TESTS_NO_CLANG%" == "" (
 	clang -c "..\test_issue_sysv_abi\test_issue_sysv_abi.c" -o test_issue_sysv_abi_c.o || exit /b
 ) else (
