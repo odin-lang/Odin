@@ -2654,6 +2654,36 @@ gb_internal isize lb_append_tuple_values(lbProcedure *p, Array<lbValue> *dst_val
 }
 
 
+// NOTE: Copies a large loaded value into a local right after its load, so it is stored by copying memory and
+// not as a first-class aggregate, which LLVM splits per element and can take minutes to optimize
+gb_internal bool lb_copy_loaded_value_to_local(lbProcedure *p, lbValue *value) {
+	LLVMValueRef load = value->value;
+	if (!LLVMIsALoadInst(load) || LLVMGetVolatile(load) || LLVMGetOrdering(load) != LLVMAtomicOrderingNotAtomic) {
+		return false;
+	}
+	i64 size = lb_sizeof(LLVMTypeOf(load));
+	if (size <= LB_MAX_STORE_SIZE) {
+		return false;
+	}
+
+	lbAddr copy = lb_add_local_generated(p, value->type, false);
+
+	LLVMValueRef next = LLVMGetNextInstruction(load);
+	if (next != nullptr) {
+		LLVMPositionBuilderBefore(p->builder, next);
+	} else {
+		LLVMPositionBuilderAtEnd(p->builder, LLVMGetInstructionParent(load));
+	}
+	LLVMBuildMemCpy(p->builder,
+	                copy.addr.value, lb_try_get_alignment(copy.addr.value, 1),
+	                LLVMGetOperand(load, 0), LLVMGetAlignment(load),
+	                LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), size, false));
+	LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);
+
+	*value = lb_addr_load(p, copy);
+	return true;
+}
+
 gb_internal void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice<Ast *> const &values) {
 	if (values.count == 0) {
 		return;
@@ -2675,12 +2705,22 @@ gb_internal void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice
 			lval_count += 1;
 		}
 	}
-	p->in_multi_assignment = lval_count > 1;
 
 	GB_ASSERT(lvals.count == inits.count);
+	auto copied = slice_make<bool>(temporary_allocator(), inits.count);
+	if (lval_count > 1) {
+		for_array(i, inits) {
+			if (lvals[i].addr.value != nullptr) {
+				copied[i] = lb_copy_loaded_value_to_local(p, &inits[i]);
+			}
+		}
+	}
+
 	for_array(i, inits) {
 		lbAddr lval = lvals[i];
 		lbValue init = inits[i];
+		// NOTE: no store of this assignment writes a copy, so a copy can be read when it is stored
+		p->in_multi_assignment = lval_count > 1 && !copied[i];
 		lb_addr_store(p, lval, init);
 	}
 
