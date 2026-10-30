@@ -1111,25 +1111,19 @@ builder_replace :: proc(b: ^Builder, old, new: string, n: int, loc := #caller_lo
 
 	if len(old) == 0 {
 		// NOTE(bill): reserve the necessary memory
-		found := 0
-		for i := 0; i <= len(b.buf); i += len(new)+1 {
-			if n > 0 && found == n {
-				break
-			}
-			found += 1
+		// new is inserted before every byte + after the last one
+		found := len(b.buf) + 1
+		if n > 0 {
+			found = min(found, n)
 		}
-		if found == 0 {
-			return
-		}
-		reserve(&b.buf, len(b.buf) + len(new)*found) or_return
-
+		non_zero_reserve(&b.buf, len(b.buf) + len(new)*found) or_return
 
 		for i := 0; i <= len(b.buf); i += len(new)+1 {
 			if n > 0 && replaced == n {
 				break
 			}
 
-			resize(&b.buf, len(b.buf)+len(new), loc) or_return
+			non_zero_resize(&b.buf, len(b.buf)+len(new), loc) or_return
 			copy(b.buf[i+len(new):], b.buf[i:])
 			copy(b.buf[i:], new)
 			replaced += 1
@@ -1153,7 +1147,7 @@ builder_replace :: proc(b: ^Builder, old, new: string, n: int, loc := #caller_lo
 			if found == 0 {
 				return
 			}
-			reserve(&b.buf, len(b.buf) + (len(new)-len(old))*found) or_return
+			non_zero_reserve(&b.buf, len(b.buf) + (len(new)-len(old))*found) or_return
 		}
 
 		for i := 0; i < len(b.buf); /**/ {
@@ -1167,7 +1161,7 @@ builder_replace :: proc(b: ^Builder, old, new: string, n: int, loc := #caller_lo
 			}
 
 			if len(new) > len(old) {
-				resize(&b.buf, len(b.buf) + len(new)-len(old)) or_return
+				non_zero_resize(&b.buf, len(b.buf) + len(new)-len(old)) or_return
 			}
 
 			cur := b.buf[i+j:]
