@@ -322,6 +322,13 @@ test_non_zeroed_allocations :: proc(t: ^testing.T) {
 	expect_strings(t, strings.split_n("a,b", ",", 5, a), {"a", "b"})
 	expect_strings(t, strings.split_multi("a,b;;c", {",", ";"}, a), {"a", "b", "", "c"})
 	expect_strings(t, strings.fields("  a bb\t ccc ", a), {"a", "bb", "ccc"})
+	// non-ASCII input goes to fields_proc
+	expect_strings(t, strings.fields("  a bb\t ccc ñ ", a), {"a", "bb", "ccc", "ñ"})
+	many := strings.fields(strings.repeat("ñ ", 40, a), a)
+	testing.expect_value(t, len(many), 40)
+	for field in many {
+		testing.expect_value(t, field, "ñ")
+	}
 
 	testing.expect_value(t, strings.repeat("abc", 5, a), "abcabcabcabcabc")
 	testing.expect_value(t, strings.repeat("abc", 0, a), "")
@@ -357,7 +364,9 @@ test_non_zeroed_allocations :: proc(t: ^testing.T) {
 
 	{
 		b := strings.builder_make_none(a)
+		strings.builder_grow(&b, 8)
 		strings.write_string(&b, "aXbXc")
+		strings.builder_grow(&b, 32)
 		strings.builder_replace_all(&b, "X", "YYY")
 		testing.expect_value(t, strings.to_string(b), "aYYYbYYYc")
 		strings.builder_replace_all(&b, "YYY", "Z")

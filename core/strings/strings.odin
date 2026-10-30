@@ -866,7 +866,7 @@ _split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocato
 		n = count(s, sep) + 1
 	}
 
-	res = make([]string, n, allocator, loc) or_return
+	res = non_zero_make([]string, n, allocator, loc) or_return
 
 	n -= 1
 
@@ -3347,7 +3347,7 @@ Returns:
 */
 @(require_results)
 fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error #no_bounds_check {
-	substrings := make([dynamic]string, 0, 32, allocator, loc) or_return
+	substrings := non_zero_make([dynamic]string, 0, 32, allocator, loc) or_return
 
 	start, end := -1, -1
 	for r, offset in s {

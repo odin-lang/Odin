@@ -231,7 +231,7 @@ Inputs:
 - cap: The desired capacity for the Builder's buffer
 */
 builder_grow :: proc(b: ^Builder, cap: int, loc := #caller_location) -> (err: runtime.Allocator_Error) {
-	return reserve(&b.buf, cap, loc=loc)
+	return non_zero_reserve(&b.buf, cap, loc=loc)
 }
 /*
 Clears the Builder byte buffer content (sets len to zero)
