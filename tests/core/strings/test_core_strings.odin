@@ -256,6 +256,8 @@ test_prefix_length :: proc(t: ^testing.T) {
 		{"Hellope, there!", "Foozle"},
 		{"Hellope, there!", "Hell"},
 		{"Hellope! 🦉",     "Hellope! 🦉"},
+		{"Hellopé",         "Hellopé"},
+		{"Hellope! €",      "Hellope! €"},
 	}
 
 	for v in cases {
