@@ -358,10 +358,26 @@ gb_internal lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 		res.type = t;
 		return res;
 	} else if (lb_is_type_aggregate(src) || lb_is_type_aggregate(dst)) {
+		i64 src_align = type_align_of(src);
+		i64 dst_align = type_align_of(dst);
+
 		lbValue s = lb_address_from_load_or_generate_local(p, value);
+
+		// NOTE(bill): The address of the result can be taken again (e.g. passed by pointer or put in an `any`)
+		// and is then assumed to be aligned for `t`. Copy it when the source might be less aligned.
+		if (dst_align > src_align &&
+		    cast(i64)lb_known_address_alignment(m, s.value, src_align) < dst_align &&
+		    !lb_try_update_alignment(s, cast(unsigned)dst_align)) {
+			lbAddr addr = lb_add_local_generated(p, t, false);
+			lbValue ap = lb_addr_get_ptr(p, addr);
+			ap = lb_emit_conv(p, ap, alloc_type_pointer(value.type));
+			lb_emit_store(p, ap, value);
+			return lb_addr_load(p, addr);
+		}
+
 		lbValue d = lb_emit_transmute(p, s, alloc_type_pointer(t));
 		// s is only guaranteed type_align_of(src) alignment
-		res.value = OdinLLVMBuildLoadAligned(p, lb_type(m, t), d.value, type_align_of(src));
+		res.value = OdinLLVMBuildLoadAligned(p, lb_type(m, t), d.value, src_align);
 		return res;
 	}
 
@@ -1245,7 +1261,7 @@ gb_internal LLVMTypeRef lb_type_padding_filler(lbModule *m, i64 padding, i64 pad
 		case 4: elem = lb_type(m, t_u32); break;
 		case 8: elem = lb_type(m, t_u64); break;
 		}
-		
+
 		GB_ASSERT_MSG(elem != nullptr, "Invalid lb_type_padding_filler padding and padding_align: %lld", padding_align);
 
 		LLVMTypeRef type = nullptr;
@@ -1428,7 +1444,7 @@ gb_internal lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 	}
 
 	GB_ASSERT_MSG(result_type != nullptr, "%s %d", type_to_string(t), index);
-	
+
 	lbValue gep = lb_emit_struct_ep_internal(p, s, index, result_type);
 
 	Type *bt = base_type(t);
@@ -1615,7 +1631,7 @@ gb_internal lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
 	}
 
 	GB_ASSERT_MSG(result_type != nullptr, "%s, %d", type_to_string(s.type), index);
-	
+
 	index = lb_convert_struct_index(p->module, t, index);
 
 	lbValue res = {};
@@ -1810,9 +1826,9 @@ gb_internal lbValue lb_emit_matrix_epi(lbProcedure *p, lbValue s, isize row, isi
 			return lb_emit_epi(p, s, column);
 		}
 	}
-	
+
 	GB_ASSERT_MSG(is_type_matrix(mt), "%s", type_to_string(mt));
-	
+
 	isize offset = matrix_indices_to_offset(mt, row, column);
 	return lb_emit_epi(p, s, offset);
 }
@@ -1824,12 +1840,12 @@ gb_internal lbValue lb_emit_matrix_ep(lbProcedure *p, lbValue s, lbValue row, lb
 	GB_ASSERT_MSG(is_type_matrix(mt), "%s", type_to_string(mt));
 
 	Type *ptr = base_array_type(mt);
-	
+
 	LLVMValueRef stride_elems = lb_const_int(p->module, t_int, matrix_type_stride_in_elems(mt)).value;
-	
+
 	row = lb_emit_conv(p, row, t_int);
 	column = lb_emit_conv(p, column, t_int);
-	
+
 	LLVMValueRef index = nullptr;
 
 	if (mt->Matrix.is_row_major) {
@@ -2103,13 +2119,13 @@ gb_internal lbValue lb_soa_struct_cap(lbProcedure *p, lbValue value) {
 
 gb_internal lbValue lb_emit_mul_add(lbProcedure *p, lbValue a, lbValue b, lbValue c, Type *t) {
 	lbModule *m = p->module;
-	
+
 	a = lb_emit_conv(p, a, t);
 	b = lb_emit_conv(p, b, t);
 	c = lb_emit_conv(p, c, t);
-	
+
 	bool is_possible = !is_type_different_to_arch_endianness(t) && is_type_float(t);
-	
+
 	if (is_possible) {
 		switch (build_context.metrics.arch) {
 		case TargetArch_amd64:
@@ -2189,7 +2205,7 @@ gb_internal LLVMValueRef llvm_vector_broadcast(lbProcedure *p, LLVMValueRef valu
 		LLVMValueRef mask = llvm_mask_zero(p->module, count);
 		return llvm_basic_const_shuffle(single, mask);
 	}
-	
+
 	LLVMTypeRef single_type = LLVMVectorType(LLVMTypeOf(value), 1);
 	LLVMValueRef single = LLVMBuildBitCast(p->builder, value, single_type, "");
 	if (count == 1) {
@@ -2201,16 +2217,16 @@ gb_internal LLVMValueRef llvm_vector_broadcast(lbProcedure *p, LLVMValueRef valu
 
 gb_internal LLVMValueRef llvm_vector_shuffle_reduction(lbProcedure *p, LLVMValueRef value, LLVMOpcode op_code) {
 	LLVMTypeRef original_vector_type = LLVMTypeOf(value);
-	
+
 	GB_ASSERT(LLVMGetTypeKind(original_vector_type) == LLVMVectorTypeKind);
 	unsigned len = LLVMGetVectorSize(original_vector_type);
-	
+
 	LLVMValueRef v_zero32 = lb_const_int(p->module, t_u32, 0).value;
 	if (len == 1) {
 		return LLVMBuildExtractElement(p->builder, value, v_zero32, "");
 	}
 	GB_ASSERT((len & (len-1)) == 0);
-	
+
 	for (unsigned i = len; i != 1; i >>= 1) {
 		unsigned mask_len = i/2;
 		LLVMValueRef lhs_mask = llvm_mask_iota(p->module, 0, mask_len);
@@ -2220,7 +2236,7 @@ gb_internal LLVMValueRef llvm_vector_shuffle_reduction(lbProcedure *p, LLVMValue
 		LLVMValueRef lhs = llvm_basic_shuffle(p, value, lhs_mask);
 		LLVMValueRef rhs = llvm_basic_shuffle(p, value, rhs_mask);
 		GB_ASSERT(LLVMTypeOf(lhs) == LLVMTypeOf(rhs));
-		
+
 		value = LLVMBuildBinOp(p->builder, op_code, lhs, rhs, "");
 	}
 	return LLVMBuildExtractElement(p->builder, value, v_zero32, "");
@@ -2235,7 +2251,7 @@ gb_internal LLVMValueRef llvm_vector_expand_to_power_of_two(lbProcedure *p, LLVM
 	if ((len & (len-1)) == 0) {
 		return value;
 	}
-	
+
 	unsigned expanded_len = cast(unsigned)next_pow2(cast(i64)len);
 	LLVMValueRef mask = llvm_mask_iota(p->module, 0, expanded_len);
 	return LLVMBuildShuffleVector(p->builder, value, LLVMConstNull(vector_type), mask, "");
@@ -2319,9 +2335,9 @@ gb_internal LLVMValueRef llvm_vector_reduce_add(lbProcedure *p, LLVMValueRef val
 
 gb_internal LLVMValueRef llvm_vector_add(lbProcedure *p, LLVMValueRef a, LLVMValueRef b) {
 	GB_ASSERT(LLVMTypeOf(a) == LLVMTypeOf(b));
-	
+
 	LLVMTypeRef elem = OdinLLVMGetVectorElementType(LLVMTypeOf(a));
-	
+
 	if (LLVMGetTypeKind(elem) == LLVMIntegerTypeKind) {
 		return LLVMBuildAdd(p->builder, a, b, "");
 	}
@@ -2330,9 +2346,9 @@ gb_internal LLVMValueRef llvm_vector_add(lbProcedure *p, LLVMValueRef a, LLVMVal
 
 gb_internal LLVMValueRef llvm_vector_mul(lbProcedure *p, LLVMValueRef a, LLVMValueRef b) {
 	GB_ASSERT(LLVMTypeOf(a) == LLVMTypeOf(b));
-	
+
 	LLVMTypeRef elem = OdinLLVMGetVectorElementType(LLVMTypeOf(a));
-	
+
 	if (LLVMGetTypeKind(elem) == LLVMIntegerTypeKind) {
 		return LLVMBuildMul(p->builder, a, b, "");
 	}
@@ -2374,11 +2390,11 @@ gb_internal LLVMValueRef llvm_vector_mul_add(lbProcedure *p, LLVMValueRef a, LLV
 	GB_ASSERT(t == LLVMTypeOf(b));
 	GB_ASSERT(t == LLVMTypeOf(c));
 	GB_ASSERT(LLVMGetTypeKind(t) == LLVMVectorTypeKind);
-	
+
 	LLVMTypeRef elem = OdinLLVMGetVectorElementType(t);
-	
+
 	bool is_possible = false;
-	
+
 	switch (LLVMGetTypeKind(elem)) {
 	case LLVMHalfTypeKind:
 		is_possible = true;
@@ -2423,7 +2439,7 @@ gb_internal void lb_set_wasm_procedure_import_attributes(LLVMValueRef value, Ent
 		Entity *foreign_library = entity->Procedure.foreign_library;
 		GB_ASSERT(foreign_library->kind == Entity_LibraryName);
 		GB_ASSERT(foreign_library->LibraryName.paths.count == 1);
-		
+
 		module_name = foreign_library->LibraryName.paths[0];
 
 		if (string_ends_with(module_name, str_lit(".o"))) {
@@ -2433,7 +2449,7 @@ gb_internal void lb_set_wasm_procedure_import_attributes(LLVMValueRef value, Ent
 		if (string_starts_with(import_name, module_name)) {
 			import_name = substring(import_name, module_name.len+WASM_MODULE_NAME_SEPARATOR.len, import_name.len);
 		}
-		
+
 	}
 	LLVMAddTargetDependentFunctionAttr(value, "wasm-import-module", alloc_cstring(permanent_allocator(), module_name));
 	LLVMAddTargetDependentFunctionAttr(value, "wasm-import-name",   alloc_cstring(permanent_allocator(), import_name));
