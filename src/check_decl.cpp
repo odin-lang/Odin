@@ -343,6 +343,9 @@ gb_internal void check_init_constant(CheckerContext *ctx, Entity *e, Operand *op
 	if (is_type_proc(e->type)) {
 		error(e->token, "Illegal declaration of a constant procedure value");
 	}
+	if (is_type_any(e->type)) {
+		error(e->token, "Illegal declaration of a constant 'any' value");
+	}
 
 	e->parent_proc_decl = ctx->curr_proc_decl;
 

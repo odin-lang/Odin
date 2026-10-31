@@ -34,6 +34,7 @@ set ODIN=..\..\..\odin
 
 @rem "odin check" tests:
 %ODIN% check "..\test_issue_5105_5569" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_5335" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
 %ODIN% check "..\test_issue_6484" -no-entry-point %COMMON% || exit /b
 %ODIN% check "..\test_issue_6874" %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_6979" -no-entry-point %COMMON% || exit /b
