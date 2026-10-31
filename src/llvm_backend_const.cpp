@@ -1177,7 +1177,9 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 					LLVMInstructionEraseFromParent(backing_array.value);
 				} else {
 					array_data = llvm_alloca(p, LLVMTypeOf(backing_array.value), alignment);
-					LLVMBuildStore(p->builder, backing_array.value, array_data);
+					// NOTE: a large constant is copied from a global rather than stored as a first class aggregate,
+					// which LLVM splits into a store per element
+					lb_emit_store(p, {array_data, alloc_type_pointer(t)}, backing_array);
 
 					array_data = LLVMBuildPointerCast(p->builder, array_data, LLVMPointerType(llvm_type, 0), "");
 				}
