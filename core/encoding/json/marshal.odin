@@ -158,17 +158,16 @@ marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocato
 	return data, nil
 }
 
-@(private)
 marshal_to_builder :: proc(b: ^strings.Builder, v: any, opt: Marshal_Options = {}) -> Marshal_Error {
 	return marshal_to_writer(strings.to_writer(b), v, opt)
 }
 
-@(private)
 marshal_to_writer :: proc(w: io.Writer, v: any, opt: Marshal_Options = {}) -> (err: Marshal_Error) {
 	opt := opt
 	return _marshal_to_writer(w, v, &opt)
 }
 
+@(private)
 _marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: Marshal_Error) {
 	if v == nil {
 		io.write_string(w, "null") or_return
