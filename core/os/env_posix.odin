@@ -7,21 +7,20 @@ import "base:runtime"
 import "core:strings"
 import "core:sys/posix"
 
-_lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
+_lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: string, error: Error) {
 	if key == "" {
-		return
+		return "", .Env_Var_Not_Found
 	}
 
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
-	ckey := strings.clone_to_cstring(key, temp_allocator)
+	ckey := strings.clone_to_cstring(key, temp_allocator) or_return
 	cval := posix.getenv(ckey)
 	if cval == nil {
-		return
+		return "", .Env_Var_Not_Found
 	}
 
-	found = true
-	value = strings.clone(string(cval), allocator) // NOTE(laytan): what if allocation fails?
+	value = strings.clone(string(cval), allocator) or_return
 
 	return
 }
