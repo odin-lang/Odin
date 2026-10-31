@@ -22,6 +22,7 @@ Arena :: struct {
 	total_capacity:     uint,
 	minimum_block_size: uint,
 	temp_count:         uint,
+	reset_count:        uint,
 }
 
 @(private, require_results)
@@ -152,6 +153,7 @@ arena_free_last_memory_block :: proc(arena: ^Arena, loc := #caller_location) {
 	if free_block := arena.curr_block; free_block != nil {
 		arena.curr_block = free_block.prev
 
+		arena.total_used -= free_block.used
 		arena.total_capacity -= free_block.capacity
 		memory_block_dealloc(free_block, loc)
 	}
@@ -169,6 +171,7 @@ arena_free_all :: proc(arena: ^Arena, loc := #caller_location) {
 		// sanitizer.address_poison(arena.curr_block.base, arena.curr_block.capacity)
 	}
 	arena.total_used = 0
+	arena.reset_count += 1
 }
 
 arena_destroy :: proc "contextless" (arena: ^Arena, loc := #caller_location) {
@@ -261,9 +264,10 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 
 Arena_Temp :: struct {
-	arena: ^Arena,
-	block: ^Memory_Block,
-	used:  uint,
+	arena:       ^Arena,
+	block:       ^Memory_Block,
+	used:        uint,
+	reset_count: uint,
 }
 
 @(require_results)
@@ -275,6 +279,7 @@ arena_temp_begin :: proc(arena: ^Arena, loc := #caller_location) -> (temp: Arena
 	if arena.curr_block != nil {
 		temp.used = arena.curr_block.used
 	}
+	temp.reset_count = arena.reset_count
 	arena.temp_count += 1
 	return
 }
@@ -287,7 +292,10 @@ arena_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
 	}
 	arena := temp.arena
 
-	if temp.block != nil {
+	if temp.reset_count != arena.reset_count {
+		// the arena was reset with `free_all` while this temp was active, rewind to empty
+		arena_free_all(arena, loc)
+	} else if temp.block != nil {
 		memory_block_found := false
 		for block := arena.curr_block; block != nil; block = block.prev {
 			if block == temp.block {
@@ -311,6 +319,9 @@ arena_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
 			block.used = temp.used
 			arena.total_used -= amount_to_zero
 		}
+	} else {
+		// The arena was empty at arena_temp_begin, so rewind it to empty
+		arena_free_all(arena, loc)
 	}
 
 	assert(arena.temp_count > 0, "double-use of arena_temp_end", loc)
