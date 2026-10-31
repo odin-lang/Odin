@@ -5,6 +5,8 @@ import "core:slice"
 import "core:testing"
 import "core:math/rand"
 import "core:log"
+import "core:mem"
+import "base:runtime"
 
 @test
 test_sort_with_indices :: proc(t: ^testing.T) {
@@ -334,4 +336,103 @@ test_linear_search_reverse :: proc(t: ^testing.T) {
 	index, found = slice.linear_search_reverse_proc(s, less_than_80)
 	testing.expect(t, found)
 	testing.expect_value(t, index, 2)
+}
+
+@test
+test_non_zero_allocating_procs :: proc(t: ^testing.T) {
+	// wraps an allocator and fills all new memory with 0xAA to catch non-written elements
+	poison_allocator_proc :: proc(data: rawptr, mode: runtime.Allocator_Mode, size, alignment: int, old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, runtime.Allocator_Error) {
+		parent := (^runtime.Allocator)(data)
+		res, err := parent.procedure(parent.data, mode, size, alignment, old_memory, old_size, loc)
+		if err == nil && res != nil {
+			#partial switch mode {
+			case .Alloc, .Alloc_Non_Zeroed:
+				mem.set(raw_data(res), 0xAA, size)
+			case .Resize, .Resize_Non_Zeroed:
+				if size > old_size {
+					mem.set(&res[old_size], 0xAA, size - old_size)
+				}
+			}
+		}
+		return res, err
+	}
+
+	parent := context.allocator
+	context.allocator = runtime.Allocator{poison_allocator_proc, &parent}
+
+	a := []int{1, 2, 3, 4, 5}
+
+	concatenated := slice.concatenate([][]int{a[:2], {}, a[2:]})
+	defer delete(concatenated)
+	testing.expect(t, slice.equal(concatenated, a))
+
+	cloned := slice.clone(a)
+	defer delete(cloned)
+	testing.expect(t, slice.equal(cloned, a))
+
+	dyn := slice.clone_to_dynamic(a)
+	defer delete(dyn)
+	testing.expect_value(t, len(dyn), len(a))
+	testing.expect(t, slice.equal(dyn[:], a))
+
+	mapped := slice.mapper(a, proc(x: int) -> int { return x * 10 })
+	defer delete(mapped)
+	testing.expect(t, slice.equal(mapped, []int{10, 20, 30, 40, 50}))
+
+	scanned := slice.scanner(a, 0, proc(acc, x: int) -> int { return acc + x })
+	defer delete(scanned)
+	testing.expect(t, slice.equal(scanned, []int{1, 3, 6, 10, 15}))
+
+	repeated := slice.repeat(a[:3], 3)
+	defer delete(repeated)
+	testing.expect(t, slice.equal(repeated, []int{1, 2, 3, 1, 2, 3, 1, 2, 3}))
+
+	E :: enum{A, B, C, D}
+	enums := slice.bitset_to_enum_slice(bit_set[E]{.B, .D}, E)
+	defer delete(enums)
+	testing.expect(t, slice.equal(enums, []E{.B, .D}))
+
+	reversed := slice.sort_by_indices(a, []int{4, 3, 2, 1, 0})
+	defer delete(reversed)
+	testing.expect(t, slice.equal(reversed, []int{5, 4, 3, 2, 1}))
+
+	slice.sort_by_indices_overwrite(cloned, []int{4, 3, 2, 1, 0})
+	testing.expect(t, slice.equal(cloned, []int{5, 4, 3, 2, 1}))
+
+	// large enough so that filter() grows its dynamic array
+	big := make([]int, 1000)
+	defer delete(big)
+	for &v, i in big {
+		v = i
+	}
+	is_multiple_of_3 :: proc(x: int) -> bool { return x % 3 == 0 }
+
+	filtered := slice.filter(big, is_multiple_of_3)
+	defer delete(filtered)
+	testing.expect_value(t, len(filtered), 334)
+	for v, i in filtered {
+		testing.expect_value(t, v, 3 * i)
+	}
+
+	filtered_reverse := slice.filter_reverse(big, is_multiple_of_3)
+	defer delete(filtered_reverse)
+	testing.expect_value(t, len(filtered_reverse), 334)
+	for v, i in filtered_reverse {
+		testing.expect_value(t, v, 999 - 3 * i)
+	}
+
+	m := map[int]int{1 = 10, 2 = 20, 3 = 30}
+	defer delete(m)
+
+	keys, keys_err := slice.map_keys(m)
+	defer delete(keys)
+	testing.expect_value(t, keys_err, nil)
+	slice.sort(keys)
+	testing.expect(t, slice.equal(keys, []int{1, 2, 3}))
+
+	values, values_err := slice.map_values(m)
+	defer delete(values)
+	testing.expect_value(t, values_err, nil)
+	slice.sort(values)
+	testing.expect(t, slice.equal(values, []int{10, 20, 30}))
 }
