@@ -1,5 +1,6 @@
 // Regression for #7442: on Windows, `os.args` must hold the arguments in UTF-8.
 // They are split from the wide command line with the rules of the CRT, with and without the CRT.
+// `Command_Args` of `os.process_info` must split them the same way, for this process and for another one.
 #+build windows
 package test_issue_7442
 
@@ -64,7 +65,7 @@ main :: proc() {
 		env_err := os.set_env(CASE_ENV, fmt.tprint(index))
 		assert(env_err == nil)
 
-		command_line, _ := case_at(index)
+		command_line, args := case_at(index)
 		startup_info := win32.STARTUPINFOW{cb = size_of(win32.STARTUPINFOW)}
 		process_info: win32.PROCESS_INFORMATION
 		ok := win32.CreateProcessW(
@@ -73,13 +74,20 @@ main :: proc() {
 			nil,
 			nil,
 			false,
-			0,
+			win32.CREATE_SUSPENDED,
 			nil,
 			nil,
 			&startup_info,
 			&process_info,
 		)
 		assert(bool(ok))
+
+		info, info_err := os.process_info_by_pid(int(process_info.dwProcessId), {.Command_Args}, context.allocator)
+		if info_err != nil || !slice.equal(info.command_args, args) {
+			fmt.eprintfln("case %d: the child's command_args are %q (%v), expected %q", index, info.command_args, info_err, args)
+			failed = true
+		}
+		win32.ResumeThread(process_info.hThread)
 
 		win32.WaitForSingleObject(process_info.hProcess, win32.INFINITE)
 		exit_code: win32.DWORD
@@ -123,6 +131,12 @@ check_args :: proc(index: int) -> (ok: bool) {
 
 	if !slice.equal(os.args, args) {
 		fmt.eprintfln("case %d: os.args is %q, expected %q", index, os.args, args)
+		ok = false
+	}
+
+	info, info_err := os.current_process_info({.Command_Args}, context.allocator)
+	if info_err != nil || !slice.equal(info.command_args, args) {
+		fmt.eprintfln("case %d: command_args are %q (%v), expected %q", index, info.command_args, info_err, args)
 		ok = false
 	}
 
