@@ -502,12 +502,13 @@ prefix_length :: proc "contextless" (a, b: string) -> (n: int) {
 	n    = runtime.memory_prefix_length(raw_data(a), raw_data(b), min(len(a), len(b)))
 	lim := max(n - UTF_MAX + 1, 0)
 	#no_bounds_check for l := n; l > lim; l -= 1 {
-		r, _ := runtime.string_decode_rune(a[l - 1:])
+		r, w := runtime.string_decode_rune(a[l - 1:])
 		if r != RUNE_ERROR {
-			if l > 0 && (a[l - 1] & 0xc0 == 0xc0) {
+			if l - 1 + w > n {
+				// The rune starting at `l - 1` doesn't fit in the common prefix.
 				return l - 1
 			}
-			return l
+			return l - 1 + w
 		}
 	}
 	return
