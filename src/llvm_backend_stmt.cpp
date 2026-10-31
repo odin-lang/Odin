@@ -1,5 +1,6 @@
-#define LB_ENABLE_BASIC_RVO    true
-#define LB_ENABLE_ADVANCED_RVO build_context.enable_rvo
+#define LB_ENABLE_BASIC_RVO       true                     // `return call()`
+#define LB_ENABLE_DECLARATION_RVO true                     // `x := call()`
+#define LB_ENABLE_ADVANCED_RVO    build_context.enable_rvo // `x = call()`
 
 // NOTE(bill): Orders entities by their canonical type
 gb_internal i32 lb_entity_type_cmp(Entity *x, Entity *y) {
@@ -33,6 +34,21 @@ gb_internal lbFunctionType *lb_call_sret_eligible(lbProcedure *p, Ast *call_expr
 	TypeAndValue proc_tv = type_and_value_of_expr(proc_expr);
 	if (proc_tv.mode == Addressing_Type || proc_tv.mode == Addressing_Builtin) {
 		return nullptr;
+	}
+	Entity *proc_entity = entity_of_node(proc_expr);
+	if (proc_entity != nullptr) {
+		// NOTE(bill): Objective-C sends and asm templates return their value and ignore the sret destination
+		if (proc_entity->kind == Entity_AsmTemplate) {
+			return nullptr;
+		}
+		if (proc_entity->kind == Entity_Procedure && proc_entity->Procedure.is_objc_impl_or_import) {
+			return nullptr;
+		}
+		// NOTE(bill): A deferred procedure takes the result as it was when the call returned.
+		// It must not see later changes to `x`, and `return call()` would skip running it.
+		if (entity_has_deferred_procedure(proc_entity)) {
+			return nullptr;
+		}
 	}
 	Type *pt = base_type(proc_tv.type);
 	if (pt == nullptr || pt->kind != Type_Proc || pt->Proc.results == nullptr) {
@@ -3515,7 +3531,7 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 				}
 			}
 		} else {
-			if (LB_ENABLE_ADVANCED_RVO) {
+			if (LB_ENABLE_DECLARATION_RVO) {
 				// @RVO: for `x := call()`
 				if (vd->names.count == 1 && values.count == 1 && !is_blank_ident(vd->names[0])) {
 					Ast *rhs_expr = unparen_expr(values[0]);
