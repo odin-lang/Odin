@@ -3,6 +3,7 @@ package test_core_fmt
 
 import "base:runtime"
 import "core:fmt"
+import "core:log"
 import "core:math"
 import "core:mem"
 import "core:testing"
@@ -48,7 +49,7 @@ test_fmt_complex_quaternion :: proc(t: ^testing.T) {
 	cptr^ = {0, neg_zero}
 	check(t, "0-0i",      "%v", c)
 	cptr^ = {nan, nan}
-	check(t, "NaNNaNi",   "%v", c)
+	check(t, "NaN+NaNi",   "%v", c)
 	cptr^ = {pos_inf, pos_inf}
 	check(t, "+Inf+Infi", "%v", c)
 	cptr^ = {neg_inf, neg_inf}
@@ -60,7 +61,7 @@ test_fmt_complex_quaternion :: proc(t: ^testing.T) {
 	cptr^ = {1, 1}
 	check(t, "+1+1i",     "%+v", c)
 	cptr^ = {nan, nan}
-	check(t, "NaNNaNi",   "%+v", c)
+	check(t, "NaN+NaNi",   "%+v", c)
 	cptr^ = {pos_inf, pos_inf}
 	check(t, "+Inf+Infi", "%+v", c)
 	cptr^ = {neg_inf, neg_inf}
@@ -86,7 +87,7 @@ test_fmt_complex_quaternion :: proc(t: ^testing.T) {
 	qptr^ = {pos_inf, pos_inf, pos_inf, -1}
 	check(t, "-1+Infi+Infj+Infk", "%v", q)
 	qptr^ = {nan, nan, nan, -1}
-	check(t, "-1NaNiNaNjNaNk",    "%v", q)
+	check(t, "-1+NaNi+NaNj+NaNk",    "%v", q)
 }
 
 @(test)
@@ -484,4 +485,71 @@ test_fmt_integer_precision_and_prefix_padding :: proc(t: ^testing.T) {
 check :: proc(t: ^testing.T, exp: string, format: string, args: ..any, loc := #caller_location) {
 	got := fmt.tprintf(format, ..args)
 	testing.expectf(t, got == exp, "(%q, %v): %q != %q", format, args, got, exp, loc = loc)
+}
+
+@(private="file")
+Test_Tuple :: struct {
+	q: quaternion256,
+	expected_normal: string,
+	expected_with_plus: string,
+}
+
+@(test)
+test_quaternion_with_padding :: proc(t: ^testing.T) {
+	quaternions := []Test_Tuple {
+		{ +1+1i+1j+1k, "  1.000 +1.000i +1.000j +1.000k", " +1.000 +1.000i +1.000j +1.000k" },
+		{ +1+1i+1j-1k, "  1.000 +1.000i +1.000j -1.000k", " +1.000 +1.000i +1.000j -1.000k" },
+		{ +1+1i-1j+1k, "  1.000 +1.000i -1.000j +1.000k", " +1.000 +1.000i -1.000j +1.000k" },
+		{ +1+1i-1j-1k, "  1.000 +1.000i -1.000j -1.000k", " +1.000 +1.000i -1.000j -1.000k" },
+		{ +1-1i+1j+1k, "  1.000 -1.000i +1.000j +1.000k", " +1.000 -1.000i +1.000j +1.000k" },
+		{ +1-1i+1j-1k, "  1.000 -1.000i +1.000j -1.000k", " +1.000 -1.000i +1.000j -1.000k" },
+		{ +1-1i-1j+1k, "  1.000 -1.000i -1.000j +1.000k", " +1.000 -1.000i -1.000j +1.000k" },
+		{ +1-1i-1j-1k, "  1.000 -1.000i -1.000j -1.000k", " +1.000 -1.000i -1.000j -1.000k" },
+		{ -1+1i+1j+1k, " -1.000 +1.000i +1.000j +1.000k", " -1.000 +1.000i +1.000j +1.000k" },
+		{ -1+1i+1j-1k, " -1.000 +1.000i +1.000j -1.000k", " -1.000 +1.000i +1.000j -1.000k" },
+		{ -1+1i-1j+1k, " -1.000 +1.000i -1.000j +1.000k", " -1.000 +1.000i -1.000j +1.000k" },
+		{ -1+1i-1j-1k, " -1.000 +1.000i -1.000j -1.000k", " -1.000 +1.000i -1.000j -1.000k" },
+		{ -1-1i+1j+1k, " -1.000 -1.000i +1.000j +1.000k", " -1.000 -1.000i +1.000j +1.000k" },
+		{ -1-1i+1j-1k, " -1.000 -1.000i +1.000j -1.000k", " -1.000 -1.000i +1.000j -1.000k" },
+		{ -1-1i-1j+1k, " -1.000 -1.000i -1.000j +1.000k", " -1.000 -1.000i -1.000j +1.000k" },
+		{ -1-1i-1j-1k, " -1.000 -1.000i -1.000j -1.000k", " -1.000 -1.000i -1.000j -1.000k" },
+		{ quaternion(real = math.INF_F64,    imag =  math.INF_F64,   jmag =  math.INF_F64,   kmag =  math.INF_F64),   "   +Inf   +Infi   +Infj   +Infk",                         "   +Inf   +Infi   +Infj   +Infk" },
+		{ quaternion(real = -math.INF_F64,   imag = -math.INF_F64,   jmag = -math.INF_F64,   kmag = -math.INF_F64),   "   -Inf   -Infi   -Infj   -Infk",                         "   -Inf   -Infi   -Infj   -Infk" },
+		{ quaternion(real = math.nan_f64(),  imag =  math.nan_f64(), jmag =  math.nan_f64(), kmag =  math.nan_f64()), "    NaN   +NaNi   +NaNj   +NaNk",                         "    NaN   +NaNi   +NaNj   +NaNk" },
+		{ quaternion(real = 0,               imag =  0,              jmag =  0,              kmag =  0),              "  0.000 +0.000i +0.000j +0.000k",                         " +0.000 +0.000i +0.000j +0.000k" },
+		{ quaternion(real = -0.0,            imag = -0.0,            jmag = -0.0,            kmag = -0.0),            " -0.000 -0.000i -0.000j -0.000k",                         " -0.000 -0.000i -0.000j -0.000k" },
+		{ quaternion(real = 99999999.9,      imag =  99999999.9,     jmag =  99999999.9,     kmag =  99999999.9),     "99999999.900+99999999.900i+99999999.900j+99999999.900k",  "+99999999.900+99999999.900i+99999999.900j+99999999.900k" },
+		{ quaternion(real = -99999999.9,     imag = -99999999.9,     jmag = -99999999.9,     kmag = -99999999.9),     "-99999999.900-99999999.900i-99999999.900j-99999999.900k", "-99999999.900-99999999.900i-99999999.900j-99999999.900k" },
+	}
+	for tuple in quaternions {
+		{
+			candidate := fmt.tprintf("% 7f", tuple.q)
+			testing.expect_value(t, candidate, tuple.expected_normal)
+		}
+		{
+			candidate := fmt.tprintf("% +7f", tuple.q)
+			testing.expect_value(t, candidate, tuple.expected_with_plus)
+		}
+		log.debugf("% 7f", tuple.q)
+	}
+}
+
+@(test)
+test_complex128_hex :: proc(t: ^testing.T) {
+	// This is an edge case because normally, fmt_float would disable the `+` sign.
+	testing.expect_value(t, fmt.tprintf("%+h", complex128(+1+1i)), "0h3ff0000000000000+0h3ff0000000000000i")
+}
+
+@(test)
+test_quaternion256_hex :: proc(t: ^testing.T) {
+	// This is an edge case because normally, fmt_float would disable the `+` sign.
+	testing.expect_value(t, fmt.tprintf("%+h", quaternion256(+1+1i-1j+1k)), "0h3ff0000000000000+0h3ff0000000000000i+0hbff0000000000000j+0h3ff0000000000000k")
+}
+
+@(test)
+test_complex_quaternion_hex_lower_precision_hex :: proc(t: ^testing.T) {
+	testing.expect_value(t, fmt.tprintf("%h", complex32(1+1i)), "0h3c00+0h3c00i")
+	testing.expect_value(t, fmt.tprintf("%h", complex64(1+1i)), "0h3f800000+0h3f800000i")
+	testing.expect_value(t, fmt.tprintf("%h", quaternion64(1+1i-1j+1k)), "0h3c00+0h3c00i+0hbc00j+0h3c00k")
+	testing.expect_value(t, fmt.tprintf("%h", quaternion128(1+1i-1j+1k)), "0h3f800000+0h3f800000i+0hbf800000j+0h3f800000k")
 }
