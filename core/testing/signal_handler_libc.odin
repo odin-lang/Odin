@@ -14,12 +14,11 @@ package testing
 import "base:intrinsics"
 import "core:c/libc"
 import "core:os"
-import "core:sync"
 import "core:terminal/ansi"
 
 @(private="file") stop_runner_flag: libc.sig_atomic_t
 
-@(private="file") stop_test_gate:   sync.Mutex
+@(private="file") stop_test_gate:   int
 @(private="file") stop_test_index:  libc.sig_atomic_t
 @(private="file") stop_test_signal: libc.sig_atomic_t
 @(private="file") stop_test_passed: libc.sig_atomic_t
@@ -101,7 +100,10 @@ Unless you terminated the tests yourself, this could be a dire bug and should be
 		libc.abort()
 	}
 
-	if sync.mutex_guard(&stop_test_gate) {
+	// This will be unlocked *by a different thread* in the deferred_out of _should_stop_test.
+	lock_stop_test_gate()
+
+	{
 		intrinsics.atomic_store(&stop_test_index, local_test_index)
 		intrinsics.atomic_store(&stop_test_signal, cast(libc.sig_atomic_t)sig)
 		passed: bool
@@ -169,9 +171,20 @@ _should_stop_runner :: proc() -> bool {
 }
 
 @(private="file")
+lock_stop_test_gate :: proc "contextless"() {
+	for {
+		_, ok := intrinsics.atomic_compare_exchange_strong(&stop_test_gate, 0, 1)
+		if ok {
+			return
+		}
+		intrinsics.cpu_relax()
+	}
+}
+
+@(private="file")
 unlock_stop_test_gate :: proc(_: int, _: Stop_Reason, ok: bool) {
 	if ok {
-		sync.mutex_unlock(&stop_test_gate)
+		intrinsics.atomic_store(&stop_test_gate, 0)
 	}
 }
 
