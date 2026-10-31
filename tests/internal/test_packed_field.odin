@@ -319,3 +319,42 @@ test_packed_field_zero_store :: proc(t: ^testing.T) {
 	#force_no_inline zero_v(&p6) // GEP with packed metadata
 	testing.expect(t, simd.to_array(p6.v) == [4]f32{})
 }
+
+
+// a #packed field put in an `any`;
+// the `any` data must be aligned for the field type
+
+Packed_Any :: struct #packed {
+	_: u8,
+	w: [2]u128,     // offs 1
+	v: #simd[4]f32, // offs 33
+}
+
+@(export)
+p7: Packed_Any
+
+@(private="file")
+xor_any_wide :: proc(a: any) -> u128 {
+	w := (^[2]u128)(a.data)^
+	return w[0] ~ w[1]
+}
+
+@(private="file")
+any_simd_to_array :: proc(a: any) -> [4]f32 {
+	return simd.to_array((^#simd[4]f32)(a.data)^)
+}
+
+@(private="file")
+xor_field_wide :: proc(p: ^Packed_Any) -> u128 {
+	return xor_any_wide(p.w)
+}
+
+@(test)
+test_packed_field_in_any :: proc(t: ^testing.T) {
+	p7.w = {3, 5}
+	p7.v = {1, 2, 3, 4}
+
+	testing.expect(t, #force_no_inline xor_any_wide(p7.w) == 6) // folded const GEP
+	testing.expect(t, #force_no_inline any_simd_to_array(p7.v) == [4]f32{1, 2, 3, 4})
+	testing.expect(t, #force_no_inline xor_field_wide(&p7) == 6) // GEP with packed metadata
+}
