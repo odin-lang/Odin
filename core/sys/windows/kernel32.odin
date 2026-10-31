@@ -1528,3 +1528,15 @@ foreign kernel32 {
 }
 
 
+ES_SYSTEM_REQUIRED   :: DWORD(0x00000001)
+ES_DISPLAY_REQUIRED  :: DWORD(0x00000002)
+ES_USER_PRESENT      :: DWORD(0x00000004)
+ES_AWAYMODE_REQUIRED :: DWORD(0x00000040)
+ES_CONTINUOUS        :: DWORD(0x80000000)
+
+EXECUTION_STATE :: DWORD
+
+@(default_calling_convention = "system")
+foreign kernel32 {
+    SetThreadExecutionState :: proc(esFlags: EXECUTION_STATE) -> EXECUTION_STATE ---
+}
