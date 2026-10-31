@@ -33,9 +33,9 @@ Presently, the `vendor:` collection comprises the following packages. Each name 
 | [lua/5.4](https://pkg.odin-lang.org/vendor/lua/5.4/) | Lua 5.4 scripting language | 5.4.9 | MIT | https://www.lua.org |
 | [lua/5.5](https://pkg.odin-lang.org/vendor/lua/5.5/) | Lua 5.5 scripting language | 5.5.1 | MIT | https://www.lua.org |
 | [microui](https://pkg.odin-lang.org/vendor/microui/) | Tiny immediate-mode UI library | Port | MIT | https://github.com/rxi/microui |
-| [miniaudio](https://pkg.odin-lang.org/vendor/miniaudio/) | Audio playback and capture | 0.11.25 | Public domain or MIT-0 | https://github.com/mackron/miniaudio |
+| [miniaudio](https://pkg.odin-lang.org/vendor/miniaudio/) | Audio playback and capture | 0.11.26 | Public domain or MIT-0 | https://github.com/mackron/miniaudio |
 | [nanovg](https://pkg.odin-lang.org/vendor/nanovg/) | Antialiased 2D vector graphics | Port | zlib | https://github.com/memononen/nanovg |
-| [OpenEXRCore](https://pkg.odin-lang.org/vendor/OpenEXRCore/) | Reading and writing EXR images | 3.5.2 | BSD-3-Clause[^exr] | https://github.com/AcademySoftwareFoundation/openexr |
+| [OpenEXRCore](https://pkg.odin-lang.org/vendor/OpenEXRCore/) | Reading and writing EXR images | 3.5.3 | BSD-3-Clause[^exr] | https://github.com/AcademySoftwareFoundation/openexr |
 | [OpenGL](https://pkg.odin-lang.org/vendor/OpenGL/) | OpenGL bindings with a loader and helpers | Generated with glad | MIT | https://github.com/Dav1dde/glad |
 | [portmidi](https://pkg.odin-lang.org/vendor/portmidi/) | Real-time MIDI input and output | 2.0.8 | MIT | https://github.com/PortMidi/portmidi |
 | [raylib](https://pkg.odin-lang.org/vendor/raylib/) (with raygui) | Simple library for making games, with raygui | 6.0 (raygui 4.0) | zlib | https://github.com/raysan5/raylib |
