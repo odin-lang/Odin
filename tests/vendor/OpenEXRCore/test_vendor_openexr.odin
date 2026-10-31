@@ -8,7 +8,7 @@ import "core:os"
 import "core:testing"
 import exr "vendor:OpenEXRCore"
 
-// Tests of the OpenEXRCore library built here (3.5.2), through `vendor:OpenEXRCore`. They write an image with every
+// Tests of the OpenEXRCore library built here (3.5.3), through `vendor:OpenEXRCore`. They write an image with every
 // compression method, read it back, and compare it, which exercises the codecs added in OpenEXR 3.4 and 3.5 (the
 // HTJ2K, LJ2K and ZSTD ones) as well as the older ones.
 
@@ -17,7 +17,7 @@ HEIGHT :: 53
 
 CHANNEL_NAMES := [3]cstring{"B", "G", "R"} // the channel list is sorted by name
 
-// `sizeof` and `offsetof` of the C structs of OpenEXR 3.5.2 on a 64-bit target.
+// `sizeof` and `offsetof` of the C structs of OpenEXR 3.5.3 on a 64-bit target.
 @(test)
 layout :: proc(t: ^testing.T) {
 	when size_of(rawptr) == 8 {
@@ -71,7 +71,7 @@ library_version :: proc(t: ^testing.T) {
 	exr.get_library_version(&major, &minor, &patch, &extra)
 	testing.expect_value(t, major, 3)
 	testing.expect_value(t, minor, 5)
-	testing.expect_value(t, patch, 2)
+	testing.expect_value(t, patch, 3)
 }
 
 @(test)
