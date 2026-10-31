@@ -1204,11 +1204,14 @@ device :: struct {
 			/*AAudioStream**/ pStreamCapture: rawptr,
 			rerouteLock: mutex,
 			isTearingDown: b32,
+			pendingReroutes: u32, /*atomic*/
 			usage: aaudio_usage,
 			contentType: aaudio_content_type,
 			inputPreset: aaudio_input_preset,
 			allowedCapturePolicy: aaudio_allowed_capture_policy,
 			noAutoStartAfterReroute: b32,
+			enableCompatibilityWorkarounds: b32,
+			allowSetBufferCapacity: b32,
 		} when SUPPORT_AAUDIO else struct {}),
 
 		opensl: (struct {

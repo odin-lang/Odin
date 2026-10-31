@@ -2,7 +2,7 @@
 Bindings for [[ miniaudio ; https://miniaud.io/docs ]] audio playback and capture library.
 
 Choice of public domain or MIT-0. See license statements at the end of this file.\
-miniaudio - v0.11.25 - 2026-03-04
+miniaudio - v0.11.26 - 2026-10-31
 
 David Reid - mackron@gmail.com
 
