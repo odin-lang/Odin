@@ -296,6 +296,8 @@ texture :: struct {
 	sampler:          ^sampler,
 	has_basisu:       b32 ,
 	basisu_image:     ^image,
+	has_webp:         b32,
+	webp_image:       ^image,
 	extras:           extras_t,
 	extensions_count: uint,
 	extensions:       [^]extension `fmt:"v,extensions_count"`,
@@ -397,6 +399,13 @@ dispersion :: struct {
 	dispersion: f32,
 }
 
+diffuse_transmission :: struct {
+	diffuse_transmission_texture:       texture_view,
+	diffuse_transmission_factor:        f32,
+	diffuse_transmission_color_factor:  [3]f32,
+	diffuse_transmission_color_texture: texture_view,
+}
+
 material :: struct {
 	name: cstring,
 	has_pbr_metallic_roughness:  b32,
@@ -409,6 +418,7 @@ material :: struct {
 	has_sheen:                   b32,
 	has_emissive_strength:       b32,
 	has_iridescence:             b32,
+	has_diffuse_transmission:    b32,
 	has_anisotropy:              b32,
 	has_dispersion:              b32,
 	pbr_metallic_roughness:      pbr_metallic_roughness,
@@ -421,6 +431,7 @@ material :: struct {
 	volume:                      volume,
 	emissive_strength:           emissive_strength,
 	iridescence:                 iridescence,
+	diffuse_transmission:        diffuse_transmission,
 	anisotropy:                  anisotropy,
 	dispersion:                  dispersion,
 	normal_texture:              texture_view,
@@ -704,6 +715,9 @@ foreign lib {
 
 	@(require_results)
 	buffer_view_data :: proc(view: ^/*const*/buffer_view) -> [^]byte ---
+
+	@(require_results)
+	find_accessor :: proc(prim: ^/*const*/primitive, type: attribute_type, index: c.int) -> ^/*const*/accessor ---
 
 	@(require_results)
 	accessor_read_float :: proc(accessor: ^/*const*/accessor, index: uint, out: [^]f32,    element_size: uint) -> b32 ---

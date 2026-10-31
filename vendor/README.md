@@ -12,7 +12,7 @@ Presently, the `vendor:` collection comprises the following packages. Each name 
 |---|---|---|---|---|
 | [box2d](https://pkg.odin-lang.org/vendor/box2d/) | 2D physics engine | 3.2.0 | MIT | https://github.com/erincatto/box2d |
 | [box3d](https://pkg.odin-lang.org/vendor/box3d/) | 3D physics engine | master snapshot | MIT | https://github.com/erincatto/box3d |
-| [cgltf](https://pkg.odin-lang.org/vendor/cgltf/) | glTF 2.0 loader and writer | 1.14 | MIT | https://github.com/jkuhlmann/cgltf |
+| [cgltf](https://pkg.odin-lang.org/vendor/cgltf/) | glTF 2.0 loader and writer | 1.15 | MIT | https://github.com/jkuhlmann/cgltf |
 | [commonmark](https://pkg.odin-lang.org/vendor/commonmark/) | CommonMark (Markdown) parser and renderer | 0.31.2 | BSD-2-Clause | https://github.com/commonmark/cmark |
 | [compress/lz4](https://pkg.odin-lang.org/vendor/compress/lz4/) | Fast lossless compression | 1.10.0 | BSD-2-Clause | https://github.com/lz4/lz4 |
 | [curl](https://pkg.odin-lang.org/vendor/curl/) | URL transfers over HTTP(S) and more, with libcurl | 8.23.0 | curl[^curl] | https://curl.se |
