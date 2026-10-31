@@ -3,6 +3,7 @@ package os
 import "base:runtime"
 
 import "core:time"
+import "core:unicode/utf16"
 
 /*
 In procedures that explicitly state this as one of the allowed values,
@@ -18,24 +19,69 @@ An Android app has one: its package name.
 args := get_args()
 
 @(private="file")
-internal_args_to_free: []string
+internal_args_block: []byte
 
 @(private="file")
-get_args :: proc "contextless" () -> []string {
+get_args :: proc "contextless" () -> (result: []string) {
 	context = runtime.default_context()
-	result := make([]string, len(runtime.args__), heap_allocator())
-	for rt_arg, i in runtime.args__ {
-		result[i] = string(rt_arg)
+
+	switch rt_args in runtime.args__ {
+	case []cstring:
+		result = make([]string, len(rt_args), heap_allocator())
+		for rt_arg, i in rt_args {
+			result[i] = string(rt_arg)
+		}
+		internal_args_block = ([^]byte)(raw_data(result))[:len(result)*size_of(string)]
+
+	case []cstring16:
+		utf8_len :: proc "contextless" (s: []u16) -> (n: int) {
+			for i, len_s := 0, len(s); i < len_s; i += 1 {
+				switch c := s[i]; {
+				case c < 0x80:
+					n += 1
+				case c < 0x800:
+					n += 2
+				case 0xd800 <= c && c < 0xdc00 &&
+				     i+1 < len_s &&
+				     0xdc00 <= s[i+1] && s[i+1] < 0xe000:
+					n += 4
+					i += 1
+				case:
+					n += 3
+				}
+			}
+			return
+		}
+
+		header_len := len(rt_args)*size_of(string)
+		text_len   := 0
+		for rt_arg in rt_args {
+			text_len += utf8_len(transmute([]u16)string16(rt_arg)) + 1
+		}
+
+		block, err := runtime.mem_alloc_non_zeroed(header_len+text_len, align_of(string), heap_allocator())
+		if err != nil {
+			return
+		}
+
+		result = ([^]string)(raw_data(block))[:len(rt_args)]
+		text := block[header_len:]
+		for rt_arg, i in rt_args {
+			n := utf16.decode_to_utf8(text, transmute([]u16)string16(rt_arg))
+			text[n] = 0
+			result[i] = string(text[:n])
+			text = text[n+1:]
+		}
+		internal_args_block = block
 	}
-	internal_args_to_free = result
-	return result
+	return
 }
 
 @(fini, private="file")
 delete_args :: proc "contextless" () {
-	if internal_args_to_free != nil {
+	if internal_args_block != nil {
 		context = runtime.default_context()
-		delete(internal_args_to_free, heap_allocator())
+		delete(internal_args_block, heap_allocator())
 	}
 }
 
@@ -434,7 +480,7 @@ process_exec :: proc(
 		stderr_b.allocator = allocator
 
 		buf: [1024]u8 = ---
-		
+
 		stdout_done, stderr_done, has_data: bool
 		for err == nil && (!stdout_done || !stderr_done) {
 			n := 0

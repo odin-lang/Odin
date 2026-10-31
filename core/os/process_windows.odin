@@ -122,7 +122,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 	// conditions. Once the handle is open, the process will be kept alive by
 	// the OS.
 	ph := win32.INVALID_HANDLE_VALUE
-	if selection & {.Command_Line, .Environment, .Working_Dir, .Username} != {} {
+	if selection & {.Command_Line, .Command_Args, .Environment, .Working_Dir, .Username} != {} {
 		ph = win32.OpenProcess(
 			win32.PROCESS_QUERY_LIMITED_INFORMATION | win32.PROCESS_VM_READ,
 			false,
@@ -166,7 +166,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		info.executable_path = exe_path
 		info.fields += {.Executable_Path}
 	}
-	read_peb: if selection & {.Command_Line, .Environment, .Working_Dir} != {} {
+	read_peb: if selection & {.Command_Line, .Command_Args, .Environment, .Working_Dir} != {} {
 		process_info_size: u32
 		process_info: win32.PROCESS_BASIC_INFORMATION
 		status := win32.NtQueryInformationProcess(ph, .ProcessBasicInformation, &process_info, size_of(process_info), &process_info_size)
@@ -277,7 +277,7 @@ _process_info_by_handle :: proc(process: Process, selection: Process_Info_Fields
 		info.fields += {.Executable_Path}
 	}
 	ph := win32.HANDLE(process.handle)
-	read_peb: if selection & {.Command_Line, .Environment, .Working_Dir} != {} {
+	read_peb: if selection & {.Command_Line, .Command_Args, .Environment, .Working_Dir} != {} {
 		process_info_size: u32
 		process_info: win32.PROCESS_BASIC_INFORMATION
 		status := win32.NtQueryInformationProcess(ph, .ProcessBasicInformation, &process_info, size_of(process_info), &process_info_size)
@@ -722,11 +722,14 @@ _get_process_user :: proc(process_handle: win32.HANDLE, allocator: runtime.Alloc
 }
 
 _parse_command_line :: proc(cmd_line_w: cstring16, allocator: runtime.Allocator) -> (argv: []string, err: Error) {
-	argc: i32
-	argv_w := win32.CommandLineToArgvW(cmd_line_w, &argc)
-	if argv_w == nil {
-		return nil, _get_platform_error()
-	}
+	cmd_line := ([^]u16)(cmd_line_w)
+	argc, text_len := runtime._windows_split_command_line(cmd_line, nil, nil)
+
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
+	argv_w := make([]cstring16, argc,     temp_allocator) or_return
+	text_w := make([]u16,       text_len, temp_allocator) or_return
+	runtime._windows_split_command_line(cmd_line, raw_data(argv_w), raw_data(text_w))
+
 	argv = make([]string, argc, allocator) or_return
 	defer if err != nil {
 		for arg in argv {
@@ -734,8 +737,13 @@ _parse_command_line :: proc(cmd_line_w: cstring16, allocator: runtime.Allocator)
 		}
 		delete(argv, allocator)
 	}
-	for arg_w, i in argv_w[:argc] {
-		argv[i] = win32_wstring_to_utf8(arg_w, allocator) or_return
+	for arg_w, i in argv_w {
+		// NOTE(bill): Without `WC_ERR_INVALID_CHARS`, a lone surrogate becomes U+FFFD. `os.args` does the same.
+		arg_len := i32(len(arg_w))
+		n       := win32.WideCharToMultiByte(win32.CP_UTF8, 0, arg_w, arg_len, nil, 0, nil, nil)
+		buf     := make([]byte, n, allocator) or_return
+		win32.WideCharToMultiByte(win32.CP_UTF8, 0, arg_w, arg_len, raw_data(buf), n, nil, nil)
+		argv[i] = string(buf)
 	}
 	return
 }

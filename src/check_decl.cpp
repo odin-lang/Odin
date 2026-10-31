@@ -1297,9 +1297,10 @@ gb_internal void check_link_name_uses(Checker *c) {
 			continue;
 		}
 		String name = u->name;
-		if (name == "main" && u->kind != LinkNameUse_Variable) {
+		bool is_entry_name = name == "main" || (name == "wmain" && build_context.metrics.os == TargetOs_windows);
+		if (is_entry_name && u->kind != LinkNameUse_Variable) {
 			if (u->kind == LinkNameUse_ForeignProcedure || u->entity->pkg->kind != Package_Runtime) {
-				error(u->decl->proc_lit, "The link name 'main' is reserved for internal use");
+				error(u->decl->proc_lit, "The link name '%.*s' is reserved for internal use", LIT(name));
 			}
 			continue;
 		}
