@@ -29,6 +29,7 @@ Arena :: struct {
 	minimum_block_size:  uint, // block size == total reservation
 
 	temp_count:          uint,
+	reset_count:         uint,
 	mutex:               sync.Mutex,
 }
 
@@ -233,8 +234,11 @@ arena_free_all :: proc(arena: ^Arena, loc := #caller_location) {
 			// sanitizer.address_poison(arena.curr_block.base[:arena.curr_block.committed])
 		}
 		arena.total_used = 0
+		arena.reset_count += 1
 	case .Static, .Buffer:
 		arena_static_reset_to(arena, 0)
+		sync.mutex_guard(&arena.mutex)
+		arena.reset_count += 1
 	}
 	arena.total_used = 0
 }
@@ -421,9 +425,10 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 // An `Arena_Temp` is a way to produce temporary watermarks to reset an arena to a previous state.
 // All uses of an `Arena_Temp` must be handled by ending them with `arena_temp_end` or ignoring them with `arena_temp_ignore`.
 Arena_Temp :: struct {
-	arena: ^Arena,
-	block: ^Memory_Block,
-	used:  uint,
+	arena:       ^Arena,
+	block:       ^Memory_Block,
+	used:        uint,
+	reset_count: uint,
 }
 
 // Begins the section of temporary arena memory.
@@ -438,7 +443,24 @@ arena_temp_begin :: proc(arena: ^Arena, loc := #caller_location) -> (temp: Arena
 		temp.used = arena.curr_block.used
 	}
 	arena.temp_count += 1
+	temp.reset_count = arena.reset_count
 	return
+}
+
+// Rewinds the arena to empty, keeping the first memory block.
+@(no_sanitize_address)
+_arena_temp_rewind_to_empty :: proc(arena: ^Arena, loc := #caller_location) {
+	if arena.curr_block == nil {
+		return
+	}
+
+	for arena.curr_block.prev != nil {
+		arena_growing_free_last_memory_block(arena, loc)
+	}
+	block := arena.curr_block
+	mem.zero_slice(block.base[:block.used])
+	block.used = 0
+	arena.total_used = 0
 }
 
 // Ends the section of temporary arena memory by resetting the memory to the stored position.
@@ -448,7 +470,9 @@ arena_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
 	arena := temp.arena
 	sync.mutex_guard(&arena.mutex)
 
-	if temp.block != nil {
+	if temp.reset_count != arena.reset_count {
+		_arena_temp_rewind_to_empty(arena, loc)
+	} else if temp.block != nil {
 		memory_block_found := false
 		for block := arena.curr_block; block != nil; block = block.prev {
 			if block == temp.block {
@@ -471,17 +495,10 @@ arena_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
 			block.used = temp.used
 			arena.total_used -= amount_to_zero
 		}
-	} else if arena.curr_block != nil {
-
-		for arena.curr_block.prev != nil {
-			arena_growing_free_last_memory_block(arena, loc)
-		}
-		
-		block := arena.curr_block
-		mem.zero_slice(block.base[:block.used])
-		block.used = 0
-		arena.total_used = 0
- 	}
+	} else {
+		// The arena was empty at `arena_temp_begin`, so rewind is to empty
+		_arena_temp_rewind_to_empty(arena, loc)
+	}
 
 	assert(arena.temp_count > 0, "double-use of arena_temp_end", loc)
 	arena.temp_count -= 1

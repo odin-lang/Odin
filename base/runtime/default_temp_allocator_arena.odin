@@ -22,7 +22,7 @@ Arena :: struct {
 	total_capacity:     uint,
 	minimum_block_size: uint,
 	temp_count:         uint,
-	reset_count:		uint,
+	reset_count:        uint,
 }
 
 @(private, require_results)
@@ -266,7 +266,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 Arena_Temp :: struct {
 	arena:       ^Arena,
 	block:       ^Memory_Block,
-	used:  	     uint,
+	used:        uint,
 	reset_count: uint,
 }
 
