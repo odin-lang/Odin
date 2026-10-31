@@ -64,6 +64,7 @@ engine_node :: struct {
 	panner:                      panner,
 	volumeGainer:                gainer,              /* This will only be used if volumeSmoothTimeInPCMFrames is > 0. */
 	volume:                      f32, /*atomic*/      /* Defaults to 1. */
+	oldVolume:                   f32,                 /* The volume last applied by the mixing thread. */
 	pitch:                       f32, /*atomic*/
 	oldPitch:                    f32,                 /* For determining whether or not the resampler needs to be updated to reflect the new pitch. The resampler will be updated on the mixing thread. */
 	oldDopplerPitch:             f32,                 /* For determining whether or not the resampler needs to be updated to take a new doppler pitch into account. */
