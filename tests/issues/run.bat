@@ -93,6 +93,9 @@ set ODIN=..\..\..\odin
 @rem #########################################################################################################
 
 @rem "odin run" tests:
+%ODIN% run "..\test_issue_7442" %COMMON% || exit /b
+%ODIN% run "..\test_issue_7442" %COMMON% -no-crt -no-thread-local || exit /b
+%ODIN% run "..\test_issue_7442" %COMMON% -subsystem:windows || exit /b
 %ODIN% run "..\test_issue_7482" %COMMON% || exit /b
 %ODIN% run "..\test_issue_7562" %COMMON% -no-crt -no-thread-local || exit /b
 %ODIN% run "..\test_issue_7562" %COMMON% -no-crt -no-thread-local -o:speed || exit /b
