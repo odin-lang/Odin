@@ -139,7 +139,8 @@ ODIN_ANDROID_STDIO_TO_LOGCAT :: #config(ODIN_ANDROID_STDIO_TO_LOGCAT, true)
 @(init, private)
 init_stdio :: proc "contextless" () {
 	when ODIN_ANDROID_STDIO_TO_LOGCAT {
-		tag := string(runtime.args__[0]) if len(runtime.args__) > 0 else "Odin"
+		args := runtime.args__.([]cstring)
+		tag  := string(args[0]) if len(args) > 0 else "Odin"
 		android.redirect_stdio_to_logcat(tag)
 	}
 }

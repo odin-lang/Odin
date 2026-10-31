@@ -6,10 +6,9 @@ The following example shows a simple `cat` program implementation using the pack
 Example:
 	package main
 
-	import "base:runtime"
-
 	import "core:fmt"
 	import "core:os"
+	import "core:strings"
 	import "core:sys/linux"
 	import "core:sys/linux/uring"
 
@@ -35,7 +34,7 @@ Example:
 		defer uring.destroy(&ring)
 
 		for &request, i in requests {
-			request.path = runtime.args__[i+1]
+			request.path = strings.unsafe_string_to_cstring(os.args[i+1])
 			// sets up a read requests and adds it to the ring buffer.
 			submit_read_request(request.path, &request.buffer, &ring)
 		}
