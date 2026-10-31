@@ -212,13 +212,13 @@ has_long_path_support :: proc "contextless" () -> bool {
 }
 
 @(require_results)
-_fix_long_path_slice :: proc(path: string, allocator: runtime.Allocator) -> ([]u16, runtime.Allocator_Error) {
+_fix_long_path_slice :: proc(path: string, allocator: runtime.Allocator) -> (res: []u16, err: Error) {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({allocator})
 	return win32_utf8_to_utf16(_fix_long_path_internal(path, temp_allocator), allocator)
 }
 
 @(require_results)
-_fix_long_path :: proc(path: string, allocator: runtime.Allocator) -> (win32.wstring, runtime.Allocator_Error) {
+_fix_long_path :: proc(path: string, allocator: runtime.Allocator) -> (res: win32.wstring, err: Error) {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({allocator})
 	return win32_utf8_to_wstring(_fix_long_path_internal(path, temp_allocator), allocator)
 }
