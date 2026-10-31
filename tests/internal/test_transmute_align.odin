@@ -1,5 +1,6 @@
 package test_internal
 
+import "base:intrinsics"
 import "core:testing"
 
 @(test)
@@ -157,4 +158,27 @@ transmute_from_less_aligned_ptr_as_parameter :: proc(t: ^testing.T) {
 	f := (^[8]f32)(&buf[4])  // only 4 aligned
 	f^ = {1, 2, 3, 4, 5, 6, 7, 8}
 	testing.expect_value(t, transmute([4]f32)transmute_wide_simd_param(transmute([2]#simd[4]f32)f^), [4]f32{6, 8, 10, 12})
+}
+
+@(export)
+transmute_unaligned_halves :: #force_no_inline proc (p: ^#simd[8]f32) -> #simd[4]f32 {
+	x := transmute([2]#simd[4]f32)intrinsics.unaligned_load(p)
+	return x[0] + x[1]
+}
+
+@(export)
+unaligned_simd_from_any :: #force_no_inline proc (a: any) -> #simd[8]f32 {
+	return (^#simd[8]f32)(a.data)^
+}
+
+// The result of `intrinsics.unaligned_load` is transmuted or put in an `any`.
+// Neither may assume the pointer it was loaded from is aligned.
+@(test)
+transmute_unaligned_load :: proc(t: ^testing.T) {
+	@(align=32) buf: [64]u8
+
+	p := (^#simd[8]f32)(&buf[4])  // only 4 aligned
+	(^[8]f32)(p)^ = {1, 2, 3, 4, 5, 6, 7, 8}
+	testing.expect_value(t, transmute([4]f32)transmute_unaligned_halves(p), [4]f32{6, 8, 10, 12})
+	testing.expect_value(t, transmute([8]f32)unaligned_simd_from_any(intrinsics.unaligned_load(p)), [8]f32{1, 2, 3, 4, 5, 6, 7, 8})
 }

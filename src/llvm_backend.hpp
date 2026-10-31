@@ -558,6 +558,8 @@ gb_internal void lb_add_foreign_library_path(lbModule *m, Entity *e);
 gb_internal lbValue lb_typeid(lbModule *m, Type *type);
 
 gb_internal lbValue lb_address_from_load_or_generate_local(lbProcedure *p, lbValue value);
+gb_internal i64     lb_known_value_address_alignment(lbProcedure *p, lbValue value, lbValue ptr, i64 assumed);
+gb_internal lbValue lb_aligned_address_from_load_or_generate_local(lbProcedure *p, lbValue value);
 gb_internal lbValue lb_address_from_load(lbProcedure *p, lbValue value);
 gb_internal void    lb_add_defer_node(lbProcedure *p, isize scope_index, Ast *stmt);
 gb_internal lbAddr lb_add_local_generated(lbProcedure *p, Type *type, bool zero_init);

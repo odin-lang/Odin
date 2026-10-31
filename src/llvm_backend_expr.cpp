@@ -3422,7 +3422,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 
 		Type *st = default_type(src_type);
 
-		lbValue data = lb_address_from_load_or_generate_local(p, value);
+		lbValue data = lb_aligned_address_from_load_or_generate_local(p, value);
 		GB_ASSERT_MSG(is_type_pointer(data.type), "%s", type_to_string(data.type));
 		GB_ASSERT_MSG(is_type_typed(st), "%s", type_to_string(st));
 		data = lb_emit_conv(p, data, t_rawptr);

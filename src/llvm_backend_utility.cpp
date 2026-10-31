@@ -362,11 +362,12 @@ gb_internal lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 		i64 dst_align = type_align_of(dst);
 
 		lbValue s = lb_address_from_load_or_generate_local(p, value);
+		i64 s_align = lb_known_value_address_alignment(p, value, s, src_align);
 
-		// NOTE(bill): The address of the result can be taken again (e.g. passed by pointer or put in an `any`)
-		// and is then assumed to be aligned for `t`. Copy it when the source might be less aligned.
+		// NOTE(bill): The address of the result can be taken again (e.g. passed by pointer or put in an `any`) and is then assumed to be aligned for `t`.
+		// Copy it when the source might be less aligned.
 		if (dst_align > src_align &&
-		    cast(i64)lb_known_address_alignment(m, s.value, src_align) < dst_align &&
+		    s_align < dst_align &&
 		    !lb_try_update_alignment(s, cast(unsigned)dst_align)) {
 			lbAddr addr = lb_add_local_generated(p, t, false);
 			lbValue ap = lb_addr_get_ptr(p, addr);
@@ -376,8 +377,9 @@ gb_internal lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 		}
 
 		lbValue d = lb_emit_transmute(p, s, alloc_type_pointer(t));
-		// s is only guaranteed type_align_of(src) alignment
-		res.value = OdinLLVMBuildLoadAligned(p, lb_type(m, t), d.value, src_align);
+
+		// NOTE(bill): `s` is only guaranteed `type_align_of(src)` alignment, or less (e.g. `intrinsics.unaligned_load`)
+		res.value = OdinLLVMBuildLoadAligned(p, lb_type(m, t), d.value, gb_min(src_align, s_align));
 		return res;
 	}
 
@@ -1098,6 +1100,25 @@ gb_internal lbValue lb_address_from_load_or_generate_local(lbProcedure *p, lbVal
 	lbAddr res = lb_add_local_generated(p, value.type, false);
 	lb_addr_store(p, res, value);
 	return res.addr;
+}
+gb_internal i64 lb_known_value_address_alignment(lbProcedure *p, lbValue value, lbValue ptr, i64 assumed) {
+	i64 known = cast(i64)lb_known_address_alignment(p->module, ptr.value, cast(u64)assumed);
+	if (LLVMIsALoadInst(value.value) && ptr.value == LLVMGetOperand(value.value, 0)) {
+		i64 load_align = LLVMGetAlignment(value.value);
+		if (load_align < gb_min(type_align_of(value.type), lb_alignof(LLVMTypeOf(value.value)))) {
+			known = gb_min(known, load_align);
+		}
+	}
+	return known;
+}
+
+gb_internal lbValue lb_aligned_address_from_load_or_generate_local(lbProcedure *p, lbValue value) {
+	lbValue ptr = lb_address_from_load_or_generate_local(p, value);
+	i64 align = type_align_of(value.type);
+	if (lb_known_value_address_alignment(p, value, ptr, align) < align) {
+		ptr = lb_copy_value_to_ptr(p, value, value.type, align);
+	}
+	return ptr;
 }
 gb_internal lbValue lb_address_from_load(lbProcedure *p, lbValue value) {
 	if (LLVMIsALoadInst(value.value)) {
