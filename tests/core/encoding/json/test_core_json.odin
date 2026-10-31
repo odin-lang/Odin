@@ -798,6 +798,19 @@ unmarshal_duplicate_fields :: proc(t: ^testing.T) {
 }
 
 @(test)
+unmarshal_ignored_fields :: proc(t: ^testing.T) {
+	Skipped :: struct { deep: int }
+	T :: struct {
+		secret:  int `json:"-"`,
+		using _: Skipped `json:"-"`,
+	}
+	v: T
+	testing.expect_value(t, json.unmarshal_string(`{"-": 1, "deep": 2}`, &v), nil)
+	testing.expect_value(t, v.secret, 0)
+	testing.expect_value(t, v.deep, 0)
+}
+
+@(test)
 unmarshal_many_unknown_keys :: proc(t: ^testing.T) {
 	// Each key used to grow the stack by a bitset as large as the struct, which overflowed it.
 	Big :: struct {
