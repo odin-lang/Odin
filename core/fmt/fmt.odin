@@ -1177,8 +1177,8 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 	flags: strconv.Int_Flags
 	if fi.hash && !_zero_pad(fi) && start == 0 { flags += {.Prefix} }
 	if fi.plus                                 { flags += {.Plus}   }
-	s := strconv.write_bits(buf[start:], u, base, is_signed, bit_size, digits, flags)
-	_pad(fi, s)
+
+	_pad(fi, strconv.write_bits(buf[start:], u, base, is_signed, bit_size, digits, flags))
 }
 // Formats an int128 value based on the provided formatting options.
 //
@@ -1255,7 +1255,6 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 	flags: strconv.Int_Flags
 	if fi.hash && !_zero_pad(fi) && start == 0 { flags += {.Prefix} }
 	if fi.plus                                 { flags += {.Plus}   }
-	s := strconv.write_bits_128(buf[start:], u, base, is_signed, bit_size, digits, flags)
 
 	if fi.hash && _zero_pad(fi) && start == 0 && fi.indent == 0 {
 		c: byte = 0
@@ -1271,7 +1270,7 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 		}
 	}
 
-	_pad(fi, s)
+	_pad(fi, strconv.write_bits_128(buf[start:], u, base, is_signed, bit_size, digits, flags))
 }
 // Units of measurements:
 @(rodata) __MEMORY_LOWER := " b kib mib gib tib pib eib"

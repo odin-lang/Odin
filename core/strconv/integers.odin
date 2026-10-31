@@ -1,5 +1,7 @@
 package strconv
 
+import "base:intrinsics"
+
 Int_Flag :: enum {
 	// Prefixes the integer depending on the base:
 	// - `0b`: base 2
@@ -76,15 +78,9 @@ write_bits :: proc(buf: []byte, x: u64, base: int, is_signed: bool, bit_size: in
 		panic("strconv: illegal base passed to write_bits")
 	}
 
-	a: [129]byte
-	i := len(a)
+	a: [129]byte = ---
 	u, neg := is_integer_negative(x, is_signed, bit_size)
-	b := u64(base)
-	for u >= b {
-		i-=1; a[i] = digits[u % b]
-		u /= b
-	}
-	i-=1; a[i] = digits[u % b]
+	i := _write_digits(a[:], u, base, digits)
 
 	if .Prefix in flags {
 		ok := true
@@ -174,22 +170,9 @@ write_bits_128 :: proc(buf: []byte, x: u128, base: int, is_signed: bool, bit_siz
 		panic("strconv: illegal base passed to write_bits")
 	}
 
-	a: [140]byte
-	i := len(a)
+	a: [140]byte = ---
 	u, neg := is_integer_negative_128(x, is_signed, bit_size)
-	b := u128(base)
-	for u >= b && i >= 0 {
-		i-=1
-		// rem: u128;
-		// u = runtime.udivmod128(u, b, &rem);
-		// u /= b;
-		rem := u % b
-		u /= b
-
-		idx := u32(rem)
-		a[i] = digits[idx]
-	}
-	i-=1; a[i] = digits[u64(u % b)]
+	i := _write_digits_128(a[:], u, base, digits)
 
 	if .Prefix in flags {
 		ok := true
@@ -216,4 +199,90 @@ write_bits_128 :: proc(buf: []byte, x: u128, base: int, is_signed: bool, bit_siz
 	out := a[i:]
 	copy(buf, out)
 	return string(buf[0:len(out)])
+}
+
+@(private, require_results)
+_write_digits :: proc(a: []byte, u: u64, base: int, digits: string) -> (i: int) {
+	i = len(a)
+	u := u
+	b := u64(base)
+	switch {
+	case base == 10:
+		// NOTE(bill): Two digits per step. Dividing by a constant compiles to a multiply.
+		for u >= 100 {
+			r := u % 100
+			u /= 100
+			i -= 2
+			a[i]   = digits[r / 10]
+			a[i+1] = digits[r % 10]
+		}
+		if u >= 10 {
+			i -= 2
+			a[i]   = digits[u / 10]
+			a[i+1] = digits[u % 10]
+			return
+		}
+	case base & (base-1) == 0:
+		shift := uint(intrinsics.count_trailing_zeros(base))
+		for u >= b {
+			i -= 1
+			a[i] = digits[u & (b-1)]
+			u >>= shift
+		}
+	case:
+		for u >= b {
+			i -= 1
+			a[i] = digits[u % b]
+			u /= b
+		}
+	}
+	i -= 1
+	a[i] = digits[u]
+	return
+}
+
+// Writes the digits of `u` to the end of `a` and returns the index of the first digit.
+@(private, require_results)
+_write_digits_128 :: proc(a: []byte, u: u128, base: int, digits: string) -> (i: int) {
+	i = len(a)
+	u := u
+	if base == 10 {
+		// NOTE(bill): One 128-bit division per 19 digits rather than one per digit
+		TEN_19 :: 10_000_000_000_000_000_000
+		for u > u128(max(u64)) {
+			q := u / TEN_19
+			r := u64(u - q*TEN_19)
+			u = q
+			for _ in 0..<9 {
+				d := r % 100
+				r /= 100
+				i -= 2
+				a[i]   = digits[d / 10]
+				a[i+1] = digits[d % 10]
+			}
+			i -= 1
+			a[i] = digits[r]
+		}
+	}
+	if u <= u128(max(u64)) {
+		return _write_digits(a[:i], u64(u), base, digits)
+	}
+	b := u128(base)
+	if base & (base-1) == 0 {
+		shift := uint(intrinsics.count_trailing_zeros(base))
+		for u >= b {
+			i -= 1
+			a[i] = digits[u64(u & (b-1))]
+			u >>= shift
+		}
+	} else {
+		for u >= b {
+			i -= 1
+			a[i] = digits[u64(u % b)]
+			u /= b
+		}
+	}
+	i -= 1
+	a[i] = digits[u64(u)]
+	return
 }
