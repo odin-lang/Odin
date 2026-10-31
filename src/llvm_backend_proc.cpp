@@ -85,6 +85,104 @@ gb_internal void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValu
 }
 
 
+gb_internal bool lb_can_inline_small_mem_copy(lbProcedure *p, lbValue len) {
+	if (p->is_startup || LLVMIsConstant(len.value)) {
+		return false;
+	}
+	if (build_context.optimization_level < OptimizationLevel_Speed) {
+		return false;
+	}
+	switch (build_context.metrics.arch) {
+	case TargetArch_amd64:
+	case TargetArch_i386:
+	case TargetArch_arm64:
+		return true;
+	}
+	return false;
+}
+
+gb_internal void lb_mem_copy_head_and_tail(lbProcedure *p, LLVMValueRef dst, LLVMValueRef src, LLVMValueRef len, unsigned bits) {
+	LLVMTypeRef i8_type  = LLVMInt8TypeInContext(p->module->ctx);
+	LLVMTypeRef int_type = LLVMIntTypeInContext(p->module->ctx, bits);
+
+	LLVMValueRef tail     = LLVMBuildSub(p->builder, len, LLVMConstInt(LLVMTypeOf(len), bits/8, false), "");
+	LLVMValueRef src_tail = LLVMBuildGEP2(p->builder, i8_type, src, &tail, 1, "");
+	LLVMValueRef dst_tail = LLVMBuildGEP2(p->builder, i8_type, dst, &tail, 1, "");
+
+	LLVMValueRef head_value = LLVMBuildLoad2(p->builder, int_type, src,      "");
+	LLVMValueRef tail_value = LLVMBuildLoad2(p->builder, int_type, src_tail, "");
+	LLVMSetAlignment(head_value, 1);
+	LLVMSetAlignment(tail_value, 1);
+	LLVMSetAlignment(LLVMBuildStore(p->builder, head_value, dst),      1);
+	LLVMSetAlignment(LLVMBuildStore(p->builder, tail_value, dst_tail), 1);
+}
+
+gb_internal void lb_mem_copy_small_inline(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool overlapping) {
+	lbModule *m = p->module;
+	dst = lb_emit_conv(p, dst, t_rawptr);
+	src = lb_emit_conv(p, src, t_rawptr);
+	len = lb_emit_conv(p, len, t_uintptr);
+
+	lbBlock *up_to_16 = lb_create_block(p, "copy.up_to_16");
+	lbBlock *over_16  = lb_create_block(p, "copy.over_16");
+	lbBlock *from_8   = lb_create_block(p, "copy.8_16");
+	lbBlock *below_8  = lb_create_block(p, "copy.below_8");
+	lbBlock *from_4   = lb_create_block(p, "copy.4_7");
+	lbBlock *below_4  = lb_create_block(p, "copy.below_4");
+	lbBlock *from_1   = lb_create_block(p, "copy.1_3");
+	lbBlock *done     = lb_create_block(p, "copy.done");
+
+	lb_emit_if(p, lb_emit_comp(p, Token_LtEq, len, lb_const_int(m, t_uintptr, 16)), up_to_16, over_16);
+
+	lb_start_block(p, over_16);
+	if (overlapping) {
+		lb_mem_copy_overlapping(p, dst, src, len, false);
+	} else {
+		lb_mem_copy_non_overlapping(p, dst, src, len, false);
+	}
+	lb_emit_jump(p, done);
+
+	lb_start_block(p, up_to_16);
+	lb_emit_if(p, lb_emit_comp(p, Token_GtEq, len, lb_const_int(m, t_uintptr, 8)), from_8, below_8);
+
+	lb_start_block(p, from_8);
+	lb_mem_copy_head_and_tail(p, dst.value, src.value, len.value, 64);
+	lb_emit_jump(p, done);
+
+	lb_start_block(p, below_8);
+	lb_emit_if(p, lb_emit_comp(p, Token_GtEq, len, lb_const_int(m, t_uintptr, 4)), from_4, below_4);
+
+	lb_start_block(p, from_4);
+	lb_mem_copy_head_and_tail(p, dst.value, src.value, len.value, 32);
+	lb_emit_jump(p, done);
+
+	lb_start_block(p, below_4);
+	lb_emit_if(p, lb_emit_comp(p, Token_NotEq, len, lb_const_int(m, t_uintptr, 0)), from_1, done);
+
+	lb_start_block(p, from_1);
+	{
+		LLVMTypeRef i8_type = LLVMInt8TypeInContext(m->ctx);
+		LLVMValueRef one    = LLVMConstInt(LLVMTypeOf(len.value), 1, false);
+		LLVMValueRef offsets[3] = {
+			LLVMConstInt(LLVMTypeOf(len.value), 0, false),
+			LLVMBuildLShr(p->builder, len.value, one, ""),
+			LLVMBuildSub(p->builder, len.value, one, ""),
+		};
+		LLVMValueRef bytes[3] = {};
+		for (isize i = 0; i < 3; i++) {
+			LLVMValueRef ptr = LLVMBuildGEP2(p->builder, i8_type, src.value, &offsets[i], 1, "");
+			bytes[i] = LLVMBuildLoad2(p->builder, i8_type, ptr, "");
+		}
+		for (isize i = 0; i < 3; i++) {
+			LLVMValueRef ptr = LLVMBuildGEP2(p->builder, i8_type, dst.value, &offsets[i], 1, "");
+			LLVMBuildStore(p->builder, bytes[i], ptr);
+		}
+	}
+	lb_emit_jump(p, done);
+
+	lb_start_block(p, done);
+}
+
 gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) {
 	GB_ASSERT(entity != nullptr);
 	GB_ASSERT(entity->kind == Entity_Procedure);
@@ -4028,7 +4126,11 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			lbValue src = lb_build_expr(p, ce->args[1]);
 			lbValue len = lb_build_expr(p, ce->args[2]);
 
-			lb_mem_copy_overlapping(p, dst, src, len, false);
+			if (lb_can_inline_small_mem_copy(p, len)) {
+				lb_mem_copy_small_inline(p, dst, src, len, true);
+			} else {
+				lb_mem_copy_overlapping(p, dst, src, len, false);
+			}
 			return {};
 		}
 	case BuiltinProc_mem_copy_non_overlapping:
@@ -4037,7 +4139,11 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			lbValue src = lb_build_expr(p, ce->args[1]);
 			lbValue len = lb_build_expr(p, ce->args[2]);
 
-			lb_mem_copy_non_overlapping(p, dst, src, len, false);
+			if (lb_can_inline_small_mem_copy(p, len)) {
+				lb_mem_copy_small_inline(p, dst, src, len, false);
+			} else {
+				lb_mem_copy_non_overlapping(p, dst, src, len, false);
+			}
 			return {};
 		}
 
