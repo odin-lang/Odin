@@ -9,38 +9,23 @@ import "core:io"
 import "core:bufio"
 
 // NOTE(Jeroen): The other option is to deprecate `fprint*` and make it an alias for `wprint*`, using File.stream directly.
-// NOTE(bill): The `bufio.Writer` only lives for one call. It is always flushed, whatever `flush` says. Otherwise the output would be lost.
+// NOTE(bill): `fprint`, `fprintln`, and `fprintf` pass the file to `wprint*`. Those stage the output and write it to the
+// file in large pieces. `fprint_type*` buffer with a `bufio.Writer` that only lives for one call.
+// None of them flushes the file itself, whatever `flush` says.
 
 // Formats using the default print settings and writes to ^os.File.
 fprint :: proc(f: ^os.File, args: ..any, sep := " ", flush := true) -> (bytes_written: int) {
-	buf: [1024]byte
-	b: bufio.Writer
-
-	bufio.writer_init_with_buf(&b, os.to_stream(f), buf[:])
-	w := bufio.writer_to_writer(&b)
-	return wprint(w, ..args, sep=sep, flush=true)
+	return wprint(os.to_stream(f), ..args, sep=sep, flush=false)
 }
 
 // Formats using the default print settings and writes to ^os.File.
 fprintln :: proc(f: ^os.File, args: ..any, sep := " ", flush := true) -> (bytes_written: int) {
-	buf: [1024]byte
-	b: bufio.Writer
-
-	bufio.writer_init_with_buf(&b, os.to_stream(f), buf[:])
-
-	w := bufio.writer_to_writer(&b)
-	return wprintln(w, ..args, sep=sep, flush=true)
+	return wprintln(os.to_stream(f), ..args, sep=sep, flush=false)
 }
 
 // Formats according to the specified format string and writes to ^os.File.
 fprintf :: proc(f: ^os.File, fmt: string, args: ..any, flush := true, newline := false) -> (bytes_written: int) {
-	buf: [1024]byte
-	b: bufio.Writer
-
-	bufio.writer_init_with_buf(&b, os.to_stream(f), buf[:])
-
-	w := bufio.writer_to_writer(&b)
-	return wprintf(w, fmt, ..args, flush=true, newline=newline)
+	return wprintf(os.to_stream(f), fmt, ..args, flush=false, newline=newline)
 }
 
 // Formats according to the specified format string and writes to ^os.File, followed by a newline.

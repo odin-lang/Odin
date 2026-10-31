@@ -156,7 +156,6 @@ builder_init :: proc{
 	builder_init_len,
 	builder_init_len_cap,
 }
-@(private)
 _builder_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
 	b := (^Builder)(stream_data)
 	#partial switch mode {
