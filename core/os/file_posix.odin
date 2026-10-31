@@ -400,6 +400,9 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte
 		return
 
 	case .Read_At:
+		p := p
+		offset := offset
+
 		if len(p) <= 0 {
 			return
 		}
@@ -409,15 +412,21 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte
 			return
 		}
 
-		to_read := uint(min(len(p), MAX_RW))
-		_n := i64(posix.pread(fd, raw_data(p), to_read, posix.off_t(offset)))
-		switch {
-		case _n == 0:
-			err = .EOF
-		case _n < 0:
-			err = .Unknown
-		case:
-			n = _n
+		for len(p) > 0 {
+			to_read := uint(min(len(p), MAX_RW))
+			_n := i64(posix.pread(fd, raw_data(p), to_read, posix.off_t(offset)))
+			switch {
+			case _n == 0:
+				err = .EOF
+				return
+			case _n < 0:
+				err = .Unknown
+				return
+			case:
+				p = p[_n:]
+				n += _n
+				offset += _n
+			}
 		}
 		return
 
