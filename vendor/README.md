@@ -38,7 +38,7 @@ Presently, the `vendor:` collection comprises the following packages. Each name 
 | [OpenEXRCore](https://pkg.odin-lang.org/vendor/OpenEXRCore/) | Reading and writing EXR images | 3.5.3 | BSD-3-Clause[^exr] | https://github.com/AcademySoftwareFoundation/openexr |
 | [OpenGL](https://pkg.odin-lang.org/vendor/OpenGL/) | OpenGL bindings with a loader and helpers | Generated with glad | MIT | https://github.com/Dav1dde/glad |
 | [portmidi](https://pkg.odin-lang.org/vendor/portmidi/) | Real-time MIDI input and output | 2.0.8 | MIT | https://github.com/PortMidi/portmidi |
-| [raylib](https://pkg.odin-lang.org/vendor/raylib/) (with raygui) | Simple library for making games, with raygui | 6.0 (raygui 4.0) | zlib | https://github.com/raysan5/raylib |
+| [raylib](https://pkg.odin-lang.org/vendor/raylib/) (with raygui) | Simple library for making games, with raygui | 6.2 (raygui 5.0) | zlib | https://github.com/raysan5/raylib |
 | [sdl2](https://pkg.odin-lang.org/vendor/sdl2/) | Windows, input, audio and graphics | 2.32.10 | zlib | https://github.com/libsdl-org/SDL |
 | [sdl2/image](https://pkg.odin-lang.org/vendor/sdl2/image/) | SDL2 image loading | 2.8.12 | zlib[^sdl2-image] | https://github.com/libsdl-org/SDL_image |
 | [sdl2/mixer](https://pkg.odin-lang.org/vendor/sdl2/mixer/) | SDL2 audio mixing and music | 2.8.2 | zlib[^sdl2-mixer] | https://github.com/libsdl-org/SDL_mixer |
