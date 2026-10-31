@@ -1126,11 +1126,33 @@ _stage_end :: proc(s: ^io.Stage_Writer, out: io.Writer, fi: ^Info) {
 
 @(private, require_results)
 _write_fast :: proc(fi: ^Info, p: []byte) -> bool {
+	// NOTE(bill): Most writes are a few bytes, too short to be worth a call to `memcpy`
+	copy_bytes :: #force_inline proc "contextless" (dst: [^]byte, p: []byte) {
+		n, src := len(p), raw_data(p)
+		switch {
+		case n > 16:
+			intrinsics.mem_copy(dst, src, n)
+		case n >= 8:
+			a := intrinsics.unaligned_load((^u64)(&src[0]))
+			b := intrinsics.unaligned_load((^u64)(&src[n-8]))
+			intrinsics.unaligned_store((^u64)(&dst[0]),   a)
+			intrinsics.unaligned_store((^u64)(&dst[n-8]), b)
+		case n >= 4:
+			a := intrinsics.unaligned_load((^u32)(&src[0]))
+			b := intrinsics.unaligned_load((^u32)(&src[n-4]))
+			intrinsics.unaligned_store((^u32)(&dst[0]),   a)
+			intrinsics.unaligned_store((^u32)(&dst[n-4]), b)
+		case n > 0:
+			a, b, c := src[0], src[n/2], src[n-1]
+			dst[0], dst[n/2], dst[n-1] = a, b, c
+		}
+	}
+
 	switch fi.writer.procedure {
 	case io._stage_writer_proc:
 		s := (^io.Stage_Writer)(fi.writer.data)
 		if len(p) <= len(s.buf)-s.len {
-			copy(s.buf[s.len:], p)
+			copy_bytes(raw_data(s.buf)[s.len:], p)
 			s.len += len(p)
 			fi.n  += len(p)
 			return true
@@ -1139,7 +1161,7 @@ _write_fast :: proc(fi: ^Info, p: []byte) -> bool {
 		b := (^strings.Builder)(fi.writer.data)
 		if n := len(b.buf); len(p) <= cap(b.buf)-n {
 			(^runtime.Raw_Dynamic_Array)(&b.buf).len = n + len(p)
-			copy(b.buf[n:], p)
+			copy_bytes(raw_data(b.buf)[n:], p)
 			fi.n += len(p)
 			return true
 		}
@@ -2197,6 +2219,25 @@ fmt_write_indent :: proc(fi: ^Info) {
 // - verb: The formatting verb to be used for the array elements.
 //
 fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: int, elem_id: typeid, verb: rune) {
+	// NOTE(bill): `_fmt_arg` would reach `fmt_int` for each of these. Plain integers are resolved once per array.
+	fmt_elem :: #force_inline proc(fi: ^Info, data: rawptr, elem_id: typeid, elem_info: ^runtime.Type_Info, int_info: ^runtime.Type_Info_Integer, elem_size: int, verb: rune) {
+		if int_info == nil {
+			_fmt_arg(fi, data, elem_id, elem_info, verb)
+			return
+		}
+		u: u64
+		switch elem_size {
+		case 1: u = u64((^i8) (data)^) if int_info.signed else u64((^u8) (data)^)
+		case 2: u = u64((^i16)(data)^) if int_info.signed else u64((^u16)(data)^)
+		case 4: u = u64((^i32)(data)^) if int_info.signed else u64((^u32)(data)^)
+		case 8: u = (^u64)(data)^
+		}
+		prev_arg := fi.arg
+		fi.arg = any{data, elem_id}
+		fmt_int(fi, u, int_info.signed, 8*elem_size, verb)
+		fi.arg = prev_arg
+	}
+
 	_write_byte(fi, '[' if verb != 'w' else '{')
 	defer _write_byte(fi, ']' if verb != 'w' else '}')
 
@@ -2207,6 +2248,12 @@ fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: in
 	defer fi.record_level -= 1
 
 	elem_info := type_info_of(elem_id)
+
+	int_info, is_int := &elem_info.variant.(runtime.Type_Info_Integer)
+	if !is_int || int_info.endianness != .Platform || elem_size > 8 || verb == 'T' ||
+	   (_user_formatters != nil && _user_formatters[elem_id] != nil) {
+		int_info = nil
+	}
 
 	if fi.hash {
 		_write_byte(fi, '\n')
@@ -2220,7 +2267,7 @@ fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: in
 			fmt_write_indent(fi)
 
 			data := uintptr(array_data) + uintptr(i*elem_size)
-			_fmt_arg(fi, rawptr(data), elem_id, elem_info, verb)
+			fmt_elem(fi, rawptr(data), elem_id, elem_info, int_info, elem_size, verb)
 
 			_write_string(fi, ",\n")
 		}
@@ -2229,7 +2276,7 @@ fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: in
 			if i > 0 { _write_string(fi, ", ") }
 
 			data := uintptr(array_data) + uintptr(i*elem_size)
-			_fmt_arg(fi, rawptr(data), elem_id, elem_info, verb)
+			fmt_elem(fi, rawptr(data), elem_id, elem_info, int_info, elem_size, verb)
 		}
 	}
 }
@@ -2632,11 +2679,15 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 			use_nul_termination: bool = false
 			verb := the_verb if the_verb == 'w' else 'v'
 
-			new_state := fi.state
-			new_state.parent_struct = v
-
-			if handle_tag(&new_state, v.data, info, i, &verb, &optional_len, &use_nul_termination) {
-				continue
+			// NOTE(bill): Most fields have no tag. Those only need `parent_struct` set while they are formatted.
+			has_tag := info.tags[i] != ""
+			new_state: Info_State = ---
+			if has_tag {
+				new_state = fi.state
+				new_state.parent_struct = v
+				if handle_tag(&new_state, v.data, info, i, &verb, &optional_len, &use_nul_termination) {
+					continue
+				}
 			}
 			field_count += 1
 
@@ -2663,7 +2714,11 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 				_write_string(fi, "any{}")
 			} else {
 				prev_state := fi.state
-				fi.state = new_state
+				if has_tag {
+					fi.state = new_state
+				} else {
+					fi.parent_struct = v
+				}
 				data := rawptr(uintptr(v.data) + info.offsets[i])
 				_fmt_arg(fi, data, t.id, t, verb)
 				fi.state = prev_state
