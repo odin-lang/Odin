@@ -36,6 +36,7 @@ when ODIN_BUILD_MODE == .Dynamic {
 	when ODIN_NO_CRT {
 		@(link_name="mainCRTStartup", linkage="strong", require)
 		mainCRTStartup :: proc "system" () -> i32 {
+			_windows_setup_args()
 			context = default_context()
 			when !ODIN_BEDROCK { #force_no_inline _startup_runtime() }
 			when ODIN_CODEPAGE_MAGIC {
