@@ -736,7 +736,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 	stage: io.Stage_Writer = ---
 	out := _stage_begin(&stage, w, stage_buf[:])
 
-	fi: Info
+	fi := Info{writer = out}
 	end := len(fmt)
 	unused_args := transmute(bit_set[0..<MAX_CHECKED_ARGS])(u64(1)<<uint(len(args)) - 1)
 
@@ -882,7 +882,6 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 	}
 
 	if newline {
-		fi.writer = out
 		_write_byte(&fi, '\n')
 	}
 	_stage_end(&stage, out, &fi)

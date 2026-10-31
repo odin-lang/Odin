@@ -200,6 +200,11 @@ test_fmt_arg_errors :: proc(t: ^testing.T) {
 	check(t, "%!(BAD ARGUMENT NUMBER)%!(NO VERB)%!(EXTRA 0)", "%[1]", 0)
 
 	check(t, "3.1%!(EXTRA 3.14)", "%.1f", 3.14, 3.14)
+
+	// An empty format still reports its arguments
+	check(t, "%!(EXTRA 1, 2)", "", 1, 2)
+	check(t, "%!(EXTRA <nil>)", "", nil)
+	testing.expect_value(t, fmt.tprintfln("", 1), "%!(EXTRA 1)\n")
 }
 
 @(test)
