@@ -63,6 +63,10 @@ _pipe_has_data :: proc(r: ^File) -> (ok: bool, err: Error) {
 		return false, nil
 	}
 	pipe_events := poll_fds[0].revents
+	if pipe_events >= {.NVAL} {
+		// The descriptor is not open: no pipe to wait on, not an empty one.
+		return false, .Invalid_File
+	}
 	if pipe_events >= {.IN} {
 		return true, nil
 	}
