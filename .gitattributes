@@ -18,16 +18,14 @@ vendor/wgpu/lib/wgpu-windows-x86_64-msvc-release/lib/wgpu_native.dll filter=lfs 
 vendor/wgpu/lib/wgpu-windows-x86_64-msvc-release/lib/wgpu_native.dll.lib filter=lfs diff=lfs merge=lfs -text
 vendor/wgpu/lib/wgpu-windows-x86_64-msvc-release/lib/wgpu_native.lib filter=lfs diff=lfs merge=lfs -text
 vendor/wgpu/lib/wgpu-windows-x86_64-msvc-release/lib/wgpu_native.pdb filter=lfs diff=lfs merge=lfs -text
-vendor/raylib/linux/libraygui.so filter=lfs diff=lfs merge=lfs -text
-vendor/raylib/linux/libraygui.a filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/linux/libraylib.a filter=lfs diff=lfs merge=lfs -text
-vendor/raylib/linux/libraylib.so.600 filter=lfs diff=lfs merge=lfs -text
+vendor/raylib/linux/libraylib.so.620 filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/linux-arm64/libraylib.a filter=lfs diff=lfs merge=lfs -text
-vendor/raylib/linux-arm64/libraylib.so.600 filter=lfs diff=lfs merge=lfs -text
+vendor/raylib/linux-arm64/libraylib.so.620 filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/macos/libraygui-arm64.dylib filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/macos/libraygui.dylib filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/macos/libraylib.a filter=lfs diff=lfs merge=lfs -text
-vendor/raylib/macos/libraylib.600.dylib filter=lfs diff=lfs merge=lfs -text
+vendor/raylib/macos/libraylib.620.dylib filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/wasm/libraylib.web.a filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/windows/raylib.dll filter=lfs diff=lfs merge=lfs -text
 vendor/raylib/windows/raylib.lib filter=lfs diff=lfs merge=lfs -text
@@ -53,3 +51,5 @@ vendor/sdl3/*.dll filter=lfs diff=lfs merge=lfs -text
 vendor/sdl3/*/*.dll filter=lfs diff=lfs merge=lfs -text
 vendor/sdl3/*.lib filter=lfs diff=lfs merge=lfs -text
 vendor/sdl3/*/*.lib filter=lfs diff=lfs merge=lfs -text
+vendor/directx/dxc/dxcompiler.dll filter=lfs diff=lfs merge=lfs -text
+vendor/directx/dxc/dxil.dll filter=lfs diff=lfs merge=lfs -text

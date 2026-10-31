@@ -17,7 +17,7 @@ Presently, the `vendor:` collection comprises the following packages. Each name 
 | [compress/lz4](https://pkg.odin-lang.org/vendor/compress/lz4/) | Fast lossless compression | 1.10.0 | BSD-2-Clause | https://github.com/lz4/lz4 |
 | [curl](https://pkg.odin-lang.org/vendor/curl/) | URL transfers over HTTP(S) and more, with libcurl | 8.23.0 | curl[^curl] | https://curl.se |
 | [darwin](https://pkg.odin-lang.org/vendor/darwin/) | macOS and iOS frameworks, such as AppKit and Metal | macOS 26.2 and iOS 26.2 SDKs | [Odin's](../LICENSE), platform bindings only | https://developer.apple.com/documentation/ |
-| [directx/dxc](https://pkg.odin-lang.org/vendor/directx/dxc/) | DirectX shader compiler | 1.6.2112 | LLVM Release License (UIUC/NCSA)[^dxc] | https://github.com/microsoft/DirectXShaderCompiler |
+| [directx/dxc](https://pkg.odin-lang.org/vendor/directx/dxc/) | DirectX shader compiler | 1.9.2609 | LLVM Release License (UIUC/NCSA)[^dxc] | https://github.com/microsoft/DirectXShaderCompiler |
 | directx: [d3d11](https://pkg.odin-lang.org/vendor/directx/d3d11/), [d3d12](https://pkg.odin-lang.org/vendor/directx/d3d12/), [dxgi](https://pkg.odin-lang.org/vendor/directx/dxgi/), [d3d_compiler](https://pkg.odin-lang.org/vendor/directx/d3d_compiler/) | Direct3D 11 and 12, DXGI and the D3D shader compiler | Windows API | [Odin's](../LICENSE), platform bindings only | https://learn.microsoft.com/en-us/windows/win32/direct3d12/direct3d-12-graphics |
 | [egl](https://pkg.odin-lang.org/vendor/egl/) | EGL, the Khronos platform graphics interface | EGL 1.5 | [Odin's](../LICENSE), platform bindings only | https://registry.khronos.org/EGL/ |
 | [ENet](https://pkg.odin-lang.org/vendor/ENet/) | Reliable UDP networking | 1.3.18 | MIT | https://github.com/lsalzman/enet |
