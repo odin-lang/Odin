@@ -34,6 +34,11 @@ test_find :: proc(t: ^testing.T) {
 		{ "heo", "el+", 0, {} },
 		{ "helelo", "h.+l", 0, { 0, 5, true } },
 		{ "helelo", "h.-l", 0, { 0, 3, true } },
+
+		// multi-byte runes before the match
+		{ "ą 1", "%d", 0, { 3, 4, true } },
+		{ "€ 12", "%d+", 0, { 4, 6, true } },
+		{ "🦉x1", "%d", 0, { 5, 6, true } },
 	}
 
 	for entry in ENTRIES {
@@ -150,6 +155,12 @@ test_match :: proc(t: ^testing.T) {
 		{ "testing athisz out", "%baz", "athisz", true },
 		{ "testing _this_ out", "%b__", "_this_", true },
 		{ "testing _this_ out", "%b_", "", false },
+
+		// multi-byte runes before the match
+		{ "aeaąęą 5", "5", "5", true },
+		{ "ąę 12 x", "%d+", "12", true },
+		{ "€ x", "%a", "x", true },
+		{ "🦉!", "%p", "!", true },
 	}
 
 	for entry in ENTRIES {
@@ -273,6 +284,10 @@ test_gsub :: proc(t: ^testing.T) {
 	testing.expect(t, result == "testing sup testing", "GSUB 0: failed")
 	result = match.gsub("testing123testing", "%a+", "345", context.temp_allocator)
 	testing.expect(t, result == "345123345", "GSUB 1: failed")
+	result = match.gsub("aeaąęą 5", "5", "4", context.temp_allocator)
+	testing.expectf(t, result == "aeaąęą 4", "GSUB 2: failed, got %q", result)
+	result = match.gsub("ąb 12 cd 34", "%d+", "N", context.temp_allocator)
+	testing.expectf(t, result == "ąb N cd N", "GSUB 3: failed, got %q", result)
 }
 
 @test
@@ -336,6 +351,17 @@ test_utf8 :: proc(t: ^testing.T) {
 	for match, index in match.matcher_gmatch(&matcher) {
 		gmatch_check(t, index, output[:], match)
 	}
+
+	// failed attempts have to step over the whole rune
+	matcher = match.matcher_init("ąb 12 ćd 34", "%d+")
+	digits := [?]string { "12", "34" }
+	count: int
+
+	for match, index in match.matcher_gmatch(&matcher) {
+		gmatch_check(t, index, digits[:], match)
+		count += 1
+	}
+	testing.expectf(t, count == len(digits), "GMATCH found %d matches, wanted %d", count, len(digits))
 }
 
 @test
