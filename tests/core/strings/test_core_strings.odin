@@ -282,3 +282,98 @@ test_compare_empty :: proc(t: ^testing.T) {
 	testing.expect_value(t, strings.compare(empty, ""), 0)
 	testing.expect(t, !("" < empty) && !(empty < ""), "two empty strings must not order before each other")
 }
+
+@test
+test_non_zeroed_allocations :: proc(t: ^testing.T) {
+	backing := make([]byte, 64 * mem.Kilobyte)
+	defer delete(backing)
+	// backing memory filled with 0xAA, so any byte left unwritten shows up
+	mem.set(raw_data(backing), 0xAA, len(backing))
+
+	arena: mem.Arena
+	mem.arena_init(&arena, backing)
+	a := mem.arena_allocator(&arena)
+
+	expect_strings :: proc(t: ^testing.T, got, want: []string, loc := #caller_location) {
+		if !testing.expectf(t, len(got) == len(want), "expected %v, got %v", want, got, loc = loc) {
+			return
+		}
+		for _, i in want {
+			testing.expectf(t, got[i] == want[i], "expected %v, got %v", want, got, loc = loc)
+		}
+	}
+
+	testing.expect_value(t, strings.clone("Hello", a), "Hello")
+	testing.expect_value(t, strings.clone("", a), "")
+
+	cstr := strings.clone_to_cstring("Hello", a)
+	testing.expect_value(t, string(cstr), "Hello")
+
+	from_bytes := strings.clone_from_bytes(transmute([]byte)string("Hello"), a)
+	testing.expect_value(t, from_bytes, "Hello")
+	testing.expect_value(t, raw_data(from_bytes)[len(from_bytes)], 0)
+
+	testing.expect_value(t, strings.join({"a", "bc", "def"}, ", ", a), "a, bc, def")
+	testing.expect_value(t, strings.join({"a"}, ", ", a), "a")
+	testing.expect_value(t, strings.concatenate({"a", "", "bc", "def"}, a), "abcdef")
+
+	expect_strings(t, strings.split("anb", "", a), {"a", "n", "b"})
+	expect_strings(t, strings.split_n("anb", "", 2, a), {"a", "nb"})
+	expect_strings(t, strings.split_n("a,b", ",", 5, a), {"a", "b"})
+	expect_strings(t, strings.split_multi("a,b;;c", {",", ";"}, a), {"a", "b", "", "c"})
+	expect_strings(t, strings.fields("  a bb\t ccc ", a), {"a", "bb", "ccc"})
+	// non-ASCII input goes to fields_proc
+	expect_strings(t, strings.fields("  a bb\t ccc ñ ", a), {"a", "bb", "ccc", "ñ"})
+	many := strings.fields(strings.repeat("ñ ", 40, a), a)
+	testing.expect_value(t, len(many), 40)
+	for field in many {
+		testing.expect_value(t, field, "ñ")
+	}
+
+	testing.expect_value(t, strings.repeat("abc", 5, a), "abcabcabcabcabc")
+	testing.expect_value(t, strings.repeat("abc", 0, a), "")
+
+	replaced, _ := strings.replace("aXbXc", "X", "YYY", -1, a)
+	testing.expect_value(t, replaced, "aYYYbYYYc")
+	replaced, _ = strings.replace("aXXbXXc", "XX", "Y", 1, a)
+	testing.expect_value(t, replaced, "aYbXXc")
+	replaced, _ = strings.replace("añb", "", "-", -1, a)
+	testing.expect_value(t, replaced, "-a-ñ-b-")
+
+	testing.expect_value(t, strings.reverse("anb", a), "bna")
+	testing.expect_value(t, strings.reverse("\xffa", a), "a\xff")
+
+	long_a := strings.concatenate({strings.repeat("a", 80, a), "b"}, a)
+	long_b := strings.concatenate({strings.repeat("a", 80, a), "c"}, a)
+	testing.expect_value(t, strings.levenshtein_distance(long_a, long_b, a), 1)
+	testing.expect_value(t, strings.levenshtein_distance("cat", long_b, a), 80)
+
+	{
+		m: strings.Intern
+		strings.intern_init(&m, a)
+		defer strings.intern_destroy(&m)
+
+		hi, _ := strings.intern_get(&m, "Hi")
+		testing.expect_value(t, hi, "Hi")
+		empty, _ := strings.intern_get(&m, "")
+		testing.expect_value(t, empty, "")
+		interned_cstr, _ := strings.intern_get_cstring(&m, "Hi")
+		testing.expect_value(t, string(interned_cstr), "Hi")
+		testing.expect_value(t, raw_data(hi), (^byte)(interned_cstr))
+	}
+
+	{
+		b := strings.builder_make_none(a)
+		strings.builder_grow(&b, 8)
+		strings.write_string(&b, "aXbXc")
+		strings.builder_grow(&b, 32)
+		strings.builder_replace_all(&b, "X", "YYY")
+		testing.expect_value(t, strings.to_string(b), "aYYYbYYYc")
+		strings.builder_replace_all(&b, "YYY", "Z")
+		testing.expect_value(t, strings.to_string(b), "aZbZc")
+		strings.builder_replace(&b, "", "-", -1)
+		testing.expect_value(t, strings.to_string(b), "-a-Z-b-Z-c-")
+		strings.builder_replace(&b, "-", "+++", 2)
+		testing.expect_value(t, strings.to_string(b), "+++a+++Z-b-Z-c-")
+	}
+}
