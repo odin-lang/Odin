@@ -9,6 +9,7 @@ import "core:io"
 import "core:bufio"
 
 // NOTE(Jeroen): The other option is to deprecate `fprint*` and make it an alias for `wprint*`, using File.stream directly.
+// NOTE(bill): The `bufio.Writer` only lives for one call. It is always flushed, whatever `flush` says. Otherwise the output would be lost.
 
 // Formats using the default print settings and writes to ^os.File.
 fprint :: proc(f: ^os.File, args: ..any, sep := " ", flush := true) -> (bytes_written: int) {
@@ -17,7 +18,7 @@ fprint :: proc(f: ^os.File, args: ..any, sep := " ", flush := true) -> (bytes_wr
 
 	bufio.writer_init_with_buf(&b, os.to_stream(f), buf[:])
 	w := bufio.writer_to_writer(&b)
-	return wprint(w, ..args, sep=sep, flush=flush)
+	return wprint(w, ..args, sep=sep, flush=true)
 }
 
 // Formats using the default print settings and writes to ^os.File.
@@ -28,7 +29,7 @@ fprintln :: proc(f: ^os.File, args: ..any, sep := " ", flush := true) -> (bytes_
 	bufio.writer_init_with_buf(&b, os.to_stream(f), buf[:])
 
 	w := bufio.writer_to_writer(&b)
-	return wprintln(w, ..args, sep=sep, flush=flush)
+	return wprintln(w, ..args, sep=sep, flush=true)
 }
 
 // Formats according to the specified format string and writes to ^os.File.
@@ -39,7 +40,7 @@ fprintf :: proc(f: ^os.File, fmt: string, args: ..any, flush := true, newline :=
 	bufio.writer_init_with_buf(&b, os.to_stream(f), buf[:])
 
 	w := bufio.writer_to_writer(&b)
-	return wprintf(w, fmt, ..args, flush=flush, newline=newline)
+	return wprintf(w, fmt, ..args, flush=true, newline=newline)
 }
 
 // Formats according to the specified format string and writes to ^os.File, followed by a newline.
@@ -55,7 +56,7 @@ fprint_type :: proc(f: ^os.File, info: ^runtime.Type_Info, flush := true) -> (by
 	bufio.writer_init_with_buf(&b, os.to_stream(f), buf[:])
 
 	w := bufio.writer_to_writer(&b)
-	return wprint_type(w, info, flush=flush)
+	return wprint_type(w, info, flush=true)
 }
 
 // Writes a typeid value to a ^os.File.
@@ -66,7 +67,7 @@ fprint_typeid :: proc(f: ^os.File, id: typeid, flush := true) -> (bytes_written:
 	bufio.writer_init_with_buf(&b, os.to_stream(f), buf[:])
 
 	w := bufio.writer_to_writer(&b)
-	return wprint_typeid(w, id, flush=flush)
+	return wprint_typeid(w, id, flush=true)
 }
 
 // Formats using the default print settings and writes to os.stdout.

@@ -5,6 +5,7 @@ import "base:runtime"
 import "core:fmt"
 import "core:math"
 import "core:mem"
+import "core:strings"
 import "core:testing"
 
 @(test)
@@ -478,6 +479,39 @@ test_fmt_integer_precision_and_prefix_padding :: proc(t: ^testing.T) {
 	// check(t, " -042", "%05.3d", -42)
 
 	// check(t, "0x0000ff", "%#08x", u64(255))
+}
+
+// The byte count `wprint*` returns covers every byte written
+@(test)
+test_fmt_bytes_written :: proc(t: ^testing.T) {
+	Point :: struct {
+		x, y: int,
+	}
+	Flags :: bit_field u8 {
+		a: u8 | 4,
+		b: u8 | 4,
+	}
+
+	p := Point{3, 4}
+	m := map[string]int{"a" = 1, "b" = 2}
+	defer delete(m)
+	nil_data := transmute([]int)runtime.Raw_Slice{nil, 2}
+
+	check_count(t, "%v",  Point{1, 2})
+	check_count(t, "%v",  Flags{a = 1, b = 2})
+	check_count(t, "%v",  &p)
+	check_count(t, "%v",  m)
+	check_count(t, "%#v", m)
+	check_count(t, "%v",  nil_data)
+	check_count(t, "%v",  []any{nil, 1})
+	check_count(t, "%v",  typeid_of(#soa[2]Point))
+}
+
+@(private)
+check_count :: proc(t: ^testing.T, format: string, args: ..any, loc := #caller_location) {
+	sb := strings.builder_make(context.temp_allocator)
+	n := fmt.wprintf(strings.to_writer(&sb), format, ..args)
+	testing.expectf(t, n == strings.builder_len(sb), "(%q, %v): counted %v bytes of %q", format, args, n, strings.to_string(sb), loc = loc)
 }
 
 @(private)

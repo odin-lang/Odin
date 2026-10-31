@@ -2548,7 +2548,9 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 			fi.use_nul_termination = use_nul_termination
 			defer fi.use_nul_termination = false
 
-			if !do_trailing_comma && field_count > 0 { io.write_string(fi.writer, ", ") }
+			if !do_trailing_comma && field_count > 0 {
+				io.write_string(fi.writer, ", ", &fi.n)
+			}
 			if hash {
 				fmt_write_indent(fi)
 			}
@@ -2619,7 +2621,7 @@ fmt_array_nul_terminated :: proc(fi: ^Info, data: rawptr, max_n: int, elem_size:
 //
 fmt_array :: proc(fi: ^Info, data: rawptr, n: int, elem_size: int, elem: ^reflect.Type_Info, verb: rune) {
 	if data == nil && n > 0 {
-		io.write_string(fi.writer, "nil")
+		io.write_string(fi.writer, "nil", &fi.n)
 		return
 	}
 	if verb == 's' || verb == 'q' {
@@ -3070,7 +3072,7 @@ fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit
 		field_count += 1
 
 		if !do_trailing_comma && field_count > 0 {
-			io.write_string(fi.writer, ", ")
+			io.write_string(fi.writer, ", ", &fi.n)
 		}
 		if hash {
 			fmt_write_indent(fi)
@@ -3124,7 +3126,7 @@ fmt_pointer_from_value :: proc(fi: ^Info, v: any, info: runtime.Type_Info_Pointe
 					if fi.indirection_level < 1 {
 						fi.indirection_level += 1
 						defer fi.indirection_level -= 1
-						io.write_byte(fi.writer, '&')
+						io.write_byte(fi.writer, '&', &fi.n)
 						fmt_value(fi, a, verb)
 						return
 					}
@@ -3304,7 +3306,7 @@ fmt_map :: proc(fi: ^Info, v: any, info: runtime.Type_Info_Map, verb: rune) {
 			for bucket_index in 0..<map_cap {
 				runtime.map_hash_is_valid(hs[bucket_index]) or_continue
 
-				if !do_trailing_comma && j > 0 { io.write_string(fi.writer, ", ") }
+				if !do_trailing_comma && j > 0 { io.write_string(fi.writer, ", ", &fi.n) }
 				if hash {
 					fmt_write_indent(fi)
 				}
@@ -3313,7 +3315,9 @@ fmt_map :: proc(fi: ^Info, v: any, info: runtime.Type_Info_Map, verb: rune) {
 				key   := runtime.map_cell_index_dynamic(ks, info.map_info.ks, bucket_index)
 				value := runtime.map_cell_index_dynamic(vs, info.map_info.vs, bucket_index)
 
-				_fmt_arg(&Info{writer = fi.writer}, rawptr(key), info.key.id, info.key, verb)
+				key_fi := Info{writer = fi.writer}
+				_fmt_arg(&key_fi, rawptr(key), info.key.id, info.key, verb)
+				fi.n += key_fi.n
 				if info.value.size > 0 {
 					if hash {
 						io.write_string(fi.writer, " = ", &fi.n)
@@ -3617,7 +3621,7 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 @(private)
 _fmt_arg :: proc(fi: ^Info, data: rawptr, id: typeid, arg_info: ^runtime.Type_Info, verb: rune) {
 	if data == nil || id == nil {
-		io.write_string(fi.writer, "<nil>")
+		io.write_string(fi.writer, "<nil>", &fi.n)
 		return
 	}
 	prev_arg := fi.arg
