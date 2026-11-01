@@ -163,6 +163,11 @@ run_test_task :: proc(task: thread.Task) {
 
 	data.it.p(&data.t)
 
+	if local_test_expected_failures.signal != 0 ||
+	   local_test_expected_failures.message_count + local_test_expected_failures.location_count > 0 {
+		log.errorf("`%s.%s` returned without the assertion or signal it expected.", data.it.pkg, data.it.name)
+	}
+
 	end_t(&data.t)
 
 	when TRACKING_MEMORY && FAIL_ON_BAD_MEMORY {
@@ -807,8 +812,6 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 
 		if test_index, reason, ok := should_stop_test(); ok {
-			passed := reason == .Successful_Stop
-			#no_bounds_check report.all_test_states[test_index] = .Successful if passed else .Failed
 			#no_bounds_check it := internal_tests[test_index]
 			#no_bounds_check pkg := report.packages_by_name[it.pkg]
 			pkg.frame_ready = false
@@ -828,6 +831,9 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 			fmt.assertf(task_data != nil, "A signal (%v) was raised to stop test #%i %s.%s, but its task data is missing.",
 				reason, test_index, it.pkg, it.name)
+
+			passed := reason == .Successful_Stop && !failed(&task_data.t)
+			#no_bounds_check report.all_test_states[test_index] = .Successful if passed else .Failed
 
 			if !passed && !task_data.t._fail_now_called {
 				if test_index not_in failed_test_reason_map {
