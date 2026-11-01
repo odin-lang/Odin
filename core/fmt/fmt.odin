@@ -2,6 +2,7 @@ package fmt
 
 import "base:intrinsics"
 import "base:runtime"
+import "core:bufio"
 import "core:math"
 import "core:math/bits"
 import "core:mem"
@@ -525,7 +526,7 @@ sbprintfln :: proc(buf: ^strings.Builder, format: string, args: ..any) -> string
 //
 wprint :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> (bytes_written: int) {
 	stage_buf: [STAGE_SIZE]byte = ---
-	stage: io.Stage_Writer = ---
+	stage: bufio.Writer
 	fi: Info
 	fi.writer = _stage_begin(&stage, w, stage_buf[:])
 
@@ -569,7 +570,7 @@ wprint :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> (bytes_w
 //
 wprintln :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> (bytes_written: int) {
 	stage_buf: [STAGE_SIZE]byte = ---
-	stage: io.Stage_Writer = ---
+	stage: bufio.Writer
 	fi: Info
 	fi.writer = _stage_begin(&stage, w, stage_buf[:])
 
@@ -734,7 +735,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 	}
 
 	stage_buf: [STAGE_SIZE]byte = ---
-	stage: io.Stage_Writer = ---
+	stage: bufio.Writer
 	out := _stage_begin(&stage, w, stage_buf[:])
 
 	fi := Info{writer = out}
@@ -1105,35 +1106,37 @@ _write_repeated_byte :: proc(fi: ^Info, c: byte, count: int) {
 @(private)
 STAGE_SIZE :: 1024
 
-// NOTE(bill): `wprint*` collect their output in an `io.Stage_Writer` on the stack. It is written out when the stage
+// NOTE(bill): `wprint*` collect their output in a `bufio.Writer` on the stack. It is written out when the buffer
 // fills and at the end. While they run, it is `fi.writer`. User formatters write through it and stay in order.
+// Bytes still buffered after the last flush never reached `w` and are taken off the count.
 
 @(private, require_results)
-_stage_begin :: proc(s: ^io.Stage_Writer, w: io.Writer, buf: []byte) -> io.Writer {
+_stage_begin :: proc(b: ^bufio.Writer, w: io.Writer, buf: []byte) -> io.Writer {
 	switch w.procedure {
-	case io._stage_writer_proc, strings._builder_stream_proc:
+	case bufio._writer_proc, strings._builder_stream_proc:
 		return w
 	}
-	return io.stage_writer_init(s, w, buf)
+	bufio.writer_init_with_buf(b, w, buf)
+	return bufio.writer_to_writer(b)
 }
 
 @(private)
-_stage_end :: proc(s: ^io.Stage_Writer, out: io.Writer, fi: ^Info) {
-	if out.data == s {
-		io.stage_writer_flush(s)
-		fi.n = max(fi.n - s.lost, 0)
+_stage_end :: proc(b: ^bufio.Writer, out: io.Writer, fi: ^Info) {
+	if out.data == b {
+		bufio.writer_flush(b)
+		fi.n = max(fi.n - bufio.writer_buffered(b), 0)
 	}
 }
 
 @(private, require_results)
 _write_fast :: proc(fi: ^Info, p: []byte) -> bool {
 	switch fi.writer.procedure {
-	case io._stage_writer_proc:
-		s := (^io.Stage_Writer)(fi.writer.data)
-		if len(p) <= len(s.buf)-s.len {
-			intrinsics.mem_copy(raw_data(s.buf)[s.len:], raw_data(p), len(p))
-			s.len += len(p)
-			fi.n  += len(p)
+	case bufio._writer_proc:
+		bw := (^bufio.Writer)(fi.writer.data)
+		if bw.err == nil && len(p) <= len(bw.buf)-bw.n {
+			intrinsics.mem_copy(raw_data(bw.buf)[bw.n:], raw_data(p), len(p))
+			bw.n += len(p)
+			fi.n += len(p)
 			return true
 		}
 	case strings._builder_stream_proc:
@@ -1158,12 +1161,12 @@ _write_string :: proc(fi: ^Info, s: string) {
 @(private)
 _write_byte :: proc(fi: ^Info, c: byte) {
 	switch fi.writer.procedure {
-	case io._stage_writer_proc:
-		s := (^io.Stage_Writer)(fi.writer.data)
-		if s.len < len(s.buf) {
-			s.buf[s.len] = c
-			s.len += 1
-			fi.n  += 1
+	case bufio._writer_proc:
+		bw := (^bufio.Writer)(fi.writer.data)
+		if bw.err == nil && bw.n < len(bw.buf) {
+			bw.buf[bw.n] = c
+			bw.n += 1
+			fi.n += 1
 			return
 		}
 	case strings._builder_stream_proc:

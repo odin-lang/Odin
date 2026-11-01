@@ -1,6 +1,7 @@
 package test_core_fmt
 
 import "base:runtime"
+import "core:bufio"
 import "core:fmt"
 import "core:io"
 import "core:strings"
@@ -130,4 +131,49 @@ test_fmt_stage_short_writer :: proc(t: ^testing.T) {
 		testing.expectf(t, n == len(r.buf), "limit %v: counted %v of %v", limit, n, len(r.buf))
 		delete(r.buf)
 	}
+}
+
+// A caller's `bufio.Writer` is written to directly, and nothing more goes in once it has failed
+@(test)
+test_fmt_stage_caller_bufio :: proc(t: ^testing.T) {
+	r := Recorder{limit = 8}
+	defer delete(r.buf)
+
+	buf: [4]byte
+	b: bufio.Writer
+	bufio.writer_init_with_buf(&b, io.Stream{procedure = recorder_proc, data = &r}, buf[:])
+	w := bufio.writer_to_writer(&b)
+
+	n := fmt.wprintf(w, "%d", 12, flush=false)
+	testing.expect_value(t, n, 2)
+	testing.expect_value(t, bufio.writer_buffered(&b), 2)
+	testing.expect_value(t, len(r.buf), 0)
+
+	n = fmt.wprintf(w, "%s", "abcdefghij")
+	testing.expect_value(t, n, 6)
+	testing.expect_value(t, string(r.buf[:]), "12abcdef")
+
+	n = fmt.wprintf(w, "%d", 3)
+	testing.expect_value(t, n, 0)
+	testing.expect_value(t, string(r.buf[:]), "12abcdef")
+}
+
+@(private="file")
+stuck_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	#partial switch mode {
+	case .Write, .Flush:
+		return 0, nil
+	case .Query:
+		return io.query_utility({.Write, .Flush, .Query})
+	}
+	return 0, .Unsupported
+}
+
+// A writer that takes nothing without an error loses the output instead of stalling
+@(test)
+test_fmt_stage_stuck_writer :: proc(t: ^testing.T) {
+	long := strings.repeat("w", 3000, context.temp_allocator)
+	w := io.Stream{procedure = stuck_proc}
+	testing.expect_value(t, fmt.wprintf(w, "%s", long), 0)
+	testing.expect_value(t, fmt.wprintf(w, "%d", 5), 0)
 }
