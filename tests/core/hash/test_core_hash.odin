@@ -2,6 +2,7 @@
 package test_core_hash
 
 import "core:hash"
+import "core:math/rand"
 import "core:testing"
 import "base:intrinsics"
 
@@ -227,6 +228,57 @@ test_crc32_vectors :: proc(t: ^testing.T) {
 	testing.expect_value(t, #hash(vectors[3].s, "crc32"), int(vectors[3].h))
 	testing.expect_value(t, #hash(vectors[4].s, "crc32"), int(vectors[4].h))
 	testing.expect_value(t, #hash(vectors[5].s, "crc32"), int(vectors[5].h))
+}
+
+crc32_bitwise :: proc(data: []byte, seed: u32) -> u32 {
+	crc := ~seed
+	for b in data {
+		crc ~= u32(b)
+		for _ in 0..<8 {
+			crc = (crc >> 1) ~ (0xedb88320 if crc & 1 != 0 else 0)
+		}
+	}
+	return ~crc
+}
+
+@test
+test_crc32_lengths :: proc(t: ^testing.T) {
+	data := make([]byte, 4096 + 16)
+	defer delete(data)
+	for &b in data {
+		b = byte(rand.uint32())
+	}
+
+	for length in 0..=1100 {
+		for offset in 0..<16 {
+			seed := rand.uint32() if offset & 1 != 0 else 0
+			input := data[offset:][:length]
+			got  := hash.crc32(input, seed)
+			want := crc32_bitwise(input, seed)
+			testing.expectf(t, got == want, "CRC-32 length %v, offset %v, seed 0x%08x: expected 0x%08x, got 0x%08x", length, offset, seed, want, got)
+		}
+	}
+
+	whole := hash.crc32(data)
+	testing.expect_value(t, whole, crc32_bitwise(data, 0))
+	testing.expect_value(t, hash.crc32(data[1234:], hash.crc32(data[:1234])), whole)
+}
+
+@test
+test_crc32_combine :: proc(t: ^testing.T) {
+	data := make([]byte, 3000)
+	defer delete(data)
+	for &b in data {
+		b = byte(rand.uint32())
+	}
+
+	whole := hash.crc32(data)
+	for split in ([?]int{0, 1, 15, 16, 17, 64, 255, 1024, 2999, 3000}) {
+		a := hash.crc32(data[:split])
+		b := hash.crc32(data[split:])
+		testing.expectf(t, hash.crc32_combine(a, b, len(data) - split) == whole, "crc32_combine at split %v", split)
+	}
+	testing.expect_value(t, hash.crc32_combine(0x352441c2, 0, 0), 0x352441c2)
 }
 
 @test
