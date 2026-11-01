@@ -53,11 +53,11 @@ gb_internal lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, As
 	incoming_blocks[done->preds.count] = p->curr_block->block;
 
 	lb_emit_jump(p, done);
-	lb_start_block(p, done);	
-	
+	lb_start_block(p, done);
+
 	LLVMTypeRef dst_type = lb_type(m, t_llvm_bool);
 	LLVMValueRef phi = nullptr;
-	
+
 	GB_ASSERT(incoming_values.count == incoming_blocks.count);
 	GB_ASSERT(incoming_values.count > 0);
 
@@ -70,7 +70,7 @@ gb_internal lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, As
 	}
 
 	lbValue res = {};
-	
+
 	if (phi_type == nullptr) {
 		phi = LLVMBuildPhi(p->builder, dst_type, "");
 		LLVMAddIncoming(phi, incoming_values.data, incoming_blocks.data, cast(unsigned)incoming_values.count);
@@ -360,7 +360,7 @@ gb_internal LLVMValueRef lb_sdiv_wrapping(lbProcedure *p, LLVMValueRef lhs, LLVM
 
 // implements %% (the remainder/floored mod operator) on signed integers;
 // this is branchless and vectorizable, so it also covers vectors
-gb_internal LLVMValueRef lb_emit_signed_floor_mod(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs) {	
+gb_internal LLVMValueRef lb_emit_signed_floor_mod(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs) {
 	// constants implement this as srem(srem(x, y) + y, y), which is mathematically correct,
 	// and works for arbitrary precision integers, but the add can wrap at finite precision
 
@@ -760,16 +760,16 @@ gb_internal lbValue lb_emit_arith_array(lbProcedure *p, TokenKind op, lbValue lh
 gb_internal bool lb_is_matrix_simdable(Type *t, bool ignore_layout=false) {
 	Type *mt = base_type(t);
 	GB_ASSERT(mt->kind == Type_Matrix);
-	
+
 	Type *elem = core_type(mt->Matrix.elem);
 	if (is_type_complex(elem)) {
 		return false;
 	}
-	
+
 	if (is_type_different_to_arch_endianness(elem)) {
 		return false;
 	}
-	
+
 	switch (build_context.metrics.arch) {
 	default:
 		return false;
@@ -791,7 +791,7 @@ gb_internal bool lb_is_matrix_simdable(Type *t, bool ignore_layout=false) {
 			return false;
 		}
 	}
-	
+
 	if (elem->kind == Type_Basic) {
 		switch (elem->Basic.kind) {
 		case Basic_f16:
@@ -810,7 +810,7 @@ gb_internal bool lb_is_matrix_simdable(Type *t, bool ignore_layout=false) {
 			}
 		}
 	}
-	
+
 	return true;
 }
 
@@ -6118,6 +6118,13 @@ gb_internal void lb_build_struct_compound_lit_field_assignment(lbProcedure *p, l
 	}
 }
 
+gb_internal void lb_build_addr_compound_lit_store_constant(lbProcedure *p, lbAddr v, Type *type, Ast *expr) {
+	lbValue value = lb_const_value(p->module, type, exact_value_compound(expr));
+	if (!LLVMIsNull(value.value)) {
+		lb_addr_store(p, v, value);
+	}
+}
+
 gb_internal void lb_build_addr_struct_compound_lit_populate(lbProcedure *p, Ast *expr, Type *type, lbAddr v) {
 	ast_node(cl, CompoundLit, expr);
 
@@ -6134,7 +6141,7 @@ gb_internal void lb_build_addr_struct_compound_lit_populate(lbProcedure *p, Ast 
 
 	bool is_raw_union = st->is_raw_union;
 
-	lb_addr_store(p, v, lb_const_value(p->module, type, exact_value_compound(expr)));
+	lb_build_addr_compound_lit_store_constant(p, v, type, expr);
 	lbValue comp_lit_ptr = lb_addr_get_ptr(p, v);
 
 	if (cl->elems[0]->kind == Ast_FieldValue) {
@@ -6462,7 +6469,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 			if (cl->elems.count == 0) {
 				break;
 			}
-			lb_addr_store(p, v, lb_const_value(p->module, type, exact_value_compound(expr)));
+			lb_build_addr_compound_lit_store_constant(p, v, type, expr);
 
 			auto temp_data = array_make<lbCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
 			lb_build_addr_compound_lit_populate(p, cl->elems, &temp_data, type);
@@ -6509,7 +6516,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 	case Type_Array: {
 		if (cl->elems.count > 0) {
-			lb_addr_store(p, v, lb_const_value(p->module, type, exact_value_compound(expr)));
+			lb_build_addr_compound_lit_store_constant(p, v, type, expr);
 
 			auto temp_data = array_make<lbCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
 
@@ -6527,7 +6534,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 	}
 	case Type_EnumeratedArray: {
 		if (cl->elems.count > 0) {
-			lb_addr_store(p, v, lb_const_value(p->module, type, exact_value_compound(expr)));
+			lb_build_addr_compound_lit_store_constant(p, v, type, expr);
 
 			auto temp_data = array_make<lbCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
 
@@ -6647,7 +6654,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 	case Type_Basic: {
 		GB_ASSERT(is_type_any(bt));
 		if (cl->elems.count > 0) {
-			lb_addr_store(p, v, lb_const_value(p->module, type, exact_value_compound(expr)));
+			lb_build_addr_compound_lit_store_constant(p, v, type, expr);
 			String field_names[2] = {
 				str_lit("data"),
 				str_lit("id"),
@@ -6745,7 +6752,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 	case Type_Matrix: {
 		if (cl->elems.count > 0) {
-			lb_addr_store(p, v, lb_const_value(p->module, type, exact_value_compound(expr)));
+			lb_build_addr_compound_lit_store_constant(p, v, type, expr);
 
 			auto temp_data = array_make<lbCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
 

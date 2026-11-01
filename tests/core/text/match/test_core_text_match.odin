@@ -93,6 +93,14 @@ test_match :: proc(t: ^testing.T) {
 		{ "abcd", "%D+", "abcd", true },
 		{ "ab23", "%d+", "23", true },
 
+		// %g printable characters except space
+		{ "hello world", "%g+", "hello", true },
+		{ "  a-b!", "%g+", "a-b!", true },
+		{ "\t\n ", "%g", "", false },
+		{ "xy z", "%G", " ", true },
+		{ "ąę€ x", "%g+", "ąę€", true },
+		{ "e\u0301x y", "%g+", "e\u0301x", true },
+
 		// %l lower characters (a-z)
 		{ "lowerCASE", "%l+", "lower", true }, 
 		{ "LOWERcase", "%l+", "case", true }, 

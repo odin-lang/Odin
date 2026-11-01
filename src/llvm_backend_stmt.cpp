@@ -3591,7 +3591,8 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 				if (!is_blank_ident(name) && !lvals_preused[i]) {
 					Entity *e = entity_of_node(name);
 					bool zero_init = values.count == 0;
-					lvals[i] = lb_add_local(p, e->type, e, zero_init);
+					bool force_no_init = lb_emit_store_writes_every_byte(p, e->type, inits[i]);
+					lvals[i] = lb_add_local(p, e->type, e, zero_init, force_no_init);
 				}
 			}
 
