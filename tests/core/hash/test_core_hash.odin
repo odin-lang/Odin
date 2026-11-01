@@ -41,6 +41,51 @@ test_adler32_vectors :: proc(t: ^testing.T) {
 	testing.expect_value(t, #hash(vectors[5].s, "adler32"), int(vectors[5].h))
 }
 
+adler32_reference :: proc(data: []byte, seed: u32) -> u32 {
+	a, b := u64(seed & 0xFFFF), u64(seed >> 16)
+	for v in data {
+		a = (a + u64(v)) % 65521
+		b = (b + a) % 65521
+	}
+	return u32(b) << 16 | u32(a)
+}
+
+@test
+test_adler32_lengths :: proc(t: ^testing.T) {
+	state := u64(0x9E3779B97F4A7C15)
+	data := make([]byte, 3 * 65536 + 64)
+	defer delete(data)
+	for &v in data {
+		state ~= state << 13
+		state ~= state >> 7
+		state ~= state << 17
+		v = u8(state >> 32)
+	}
+
+	for n in 0..<600 {
+		for offset in 0..<3 {
+			chunk := data[offset:][:n]
+			testing.expectf(t, hash.adler32(chunk) == adler32_reference(chunk, 1), "adler32 of %v bytes at offset %v", n, offset)
+		}
+	}
+
+	seeds := [?]u32{1, 0x12345678, 0xFFF0FFF0}
+	for n in ([?]int{5551, 5552, 5553, 65535, 65536, 65537, 65551, 65552, 2 * 65536 + 7, len(data)}) {
+		for seed in seeds {
+			testing.expectf(t, hash.adler32(data[:n], seed) == adler32_reference(data[:n], seed), "adler32 of %v bytes with seed 0x%08x", n, seed)
+		}
+	}
+
+	ones := make([]byte, 3 * 65536 + 5)
+	defer delete(ones)
+	for &v in ones {
+		v = 0xFF
+	}
+	for seed in seeds {
+		testing.expectf(t, hash.adler32(ones, seed) == adler32_reference(ones, seed), "adler32 of %v 0xFF bytes with seed 0x%08x", len(ones), seed)
+	}
+}
+
 @test
 test_djb2_vectors :: proc(t: ^testing.T) {
 	vectors :: []V32{
