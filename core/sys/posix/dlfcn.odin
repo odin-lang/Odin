@@ -5,8 +5,10 @@ import "core:c"
 
 when ODIN_OS == .Darwin {
 	foreign import lib "system:System"
-} else when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD {
+} else when ODIN_OS == .FreeBSD {
 	foreign import lib "system:dl"
+} else when ODIN_OS == .NetBSD {
+	foreign import lib "system:c"
 } else {
 	foreign import lib {
 		"system:c",
