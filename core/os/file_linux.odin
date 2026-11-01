@@ -235,14 +235,22 @@ _read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (i64, Error) {
 	if offset < 0 {
 		return 0, .Invalid_Offset
 	}
-	n, errno := linux.pread(f.fd, p[:min(len(p), MAX_RW)], offset)
-	if errno != .NONE {
-		return 0, _get_platform_error(errno)
+
+	nt: i64
+	p, offset := p, offset
+	for len(p) > 0 {
+		n, errno := linux.pread(f.fd, p[:min(len(p), MAX_RW)], offset)
+		if errno != .NONE {
+			return nt, _get_platform_error(errno)
+		}
+		if n == 0 {
+			return nt, .EOF
+		}
+		p = p[n:]
+		nt += i64(n)
+		offset += i64(n)
 	}
-	if n == 0 {
-		return 0, .EOF
-	}
-	return i64(n), nil
+	return nt, nil
 }
 
 _write :: proc(f: ^File_Impl, p: []byte) -> (nt: i64, err: Error) {
