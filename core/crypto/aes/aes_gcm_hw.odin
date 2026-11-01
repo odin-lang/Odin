@@ -150,15 +150,20 @@ gctr_hw :: proc(
 
 	blks: [CTR_STRIDE_HW]simd.u8x16 = ---
 	nr_blocks := len(src) / BLOCK_SIZE
-	for nr_blocks >= CTR_STRIDE_HW {
-		if !is_seal {
-			when aes_hw.HAS_GHASH {
-				aes_hw.ghash(s[:], h[:], src[:CTR_STRIDE_BYTES_HW])
-			} else {
-				ct64.ghash(s[:], h[:], src[:CTR_STRIDE_BYTES_HW])
-			}
-		}
 
+	// Note: The hardware GHASH implementations calculate the powers of H
+	// on every call, so it is a lot faster to hash all of the full strides
+	// in one go.
+	strides := dst[:nr_blocks / CTR_STRIDE_HW * CTR_STRIDE_BYTES_HW]
+	if !is_seal {
+		when aes_hw.HAS_GHASH {
+			aes_hw.ghash(s[:], h[:], src[:len(strides)])
+		} else {
+			ct64.ghash(s[:], h[:], src[:len(strides)])
+		}
+	}
+
+	for nr_blocks >= CTR_STRIDE_HW {
 		#unroll for i in 0 ..< CTR_STRIDE_HW {
 			blks[i], ctr = hw_inc_ctr32(&ctr_blk, ctr)
 		}
@@ -198,17 +203,17 @@ gctr_hw :: proc(
 
 		xor_blocks_hw(dst, src, blks[:])
 
-		if is_seal {
-			when aes_hw.HAS_GHASH {
-				aes_hw.ghash(s[:], h[:], dst[:CTR_STRIDE_BYTES_HW])
-			} else {
-				ct64.ghash(s[:], h[:], dst[:CTR_STRIDE_BYTES_HW])
-			}
-		}
-
 		src = src[CTR_STRIDE_BYTES_HW:]
 		dst = dst[CTR_STRIDE_BYTES_HW:]
 		nr_blocks -= CTR_STRIDE_HW
+	}
+
+	if is_seal {
+		when aes_hw.HAS_GHASH {
+			aes_hw.ghash(s[:], h[:], strides)
+		} else {
+			ct64.ghash(s[:], h[:], strides)
+		}
 	}
 
 	// Handle the remainder.
