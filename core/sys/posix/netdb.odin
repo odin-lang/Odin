@@ -22,7 +22,7 @@ foreign lib {
 		// The program then loops through each of the address structures attempting to create and bind
 		// a socket to the address, until it performs a successful bind().
 
-		args := runtime.args__
+		args := os.args
 		if len(args) != 2 {
 			fmt.eprintfln("Usage: %s port", args[0])
 			posix.exit(1)
@@ -33,7 +33,7 @@ foreign lib {
 		hints.ai_flags    = { .PASSIVE }
 
 		result: ^posix.addrinfo
-		s := posix.getaddrinfo(nil, args[1], &hints, &result)
+		s := posix.getaddrinfo(nil, strings.unsafe_string_to_cstring(args[1]), &hints, &result)
 		if s != .NONE {
 			fmt.eprintfln("getaddrinfo: %s", posix.gai_strerror(s))
 			posix.exit(1)

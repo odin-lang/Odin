@@ -421,12 +421,11 @@ try_cross_linking:;
 				if (build_context.no_entry_point) {
 					link_settings = gb_string_append_fmt(link_settings, " /NOENTRY");
 				}
+			} else if (build_context.no_crt || build_context.no_entry_point) {
+				link_settings = gb_string_append_fmt(link_settings, " /ENTRY:mainCRTStartup");
 			} else {
-				// For i386 with CRT, libcmt provides the entry point
-				// For other cases or no_crt, we need to specify the entry point
-				if (!(build_context.metrics.arch == TargetArch_i386 && !build_context.no_crt)) {
-					link_settings = gb_string_append_fmt(link_settings, " /ENTRY:mainCRTStartup");
-				}
+				// NOTE(bill): The CRT's `wmainCRTStartup` passes the arguments to the runtime's `wmain` in UTF-16
+				link_settings = gb_string_append_fmt(link_settings, " /ENTRY:wmainCRTStartup");
 			}
 
 			if (build_context.build_paths[BuildPath_Symbols].name != "") {

@@ -75,4 +75,5 @@ package tests_issues
 @(require) import "test_issue_poly_proc_dollar_param"
 @(require) import "test_issue_procedure_of_specialized"
 @(require) import "test_issue_statics_across_modules"
+@(require) import "test_issue_any_constant_conversion"
 

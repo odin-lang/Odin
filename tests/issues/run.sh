@@ -48,6 +48,13 @@ else
 	exit 1
 fi
 
+if [[ $($ODIN check ../test_issue_5335 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 if [[ $($ODIN check ../test_issue_7421_tagged_duplicate $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error: Duplicate case") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
@@ -319,6 +326,10 @@ fi
 # "odin run" tests:
 #
 
+# 7442 is Windows only. TODO: Being in run.sh doesn't necessarily mean we're not on Windows.
+#$ODIN run ../test_issue_7442 $COMMON
+#$ODIN run ../test_issue_7442 $COMMON -no-crt -no-thread-local
+#$ODIN run ../test_issue_7442 $COMMON -subsystem:windows
 $ODIN run ../test_issue_7482 $COMMON
 # 7562 is Windows only. TODO: Being in run.sh doesn't necessarily mean we're not on Windows.
 #$ODIN run ../test_issue_7562 $COMMON -no-crt -no-thread-local

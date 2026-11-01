@@ -10,9 +10,8 @@ when ODIN_OS == .Windows {
 		"windows/rayguidll.lib" when RAYGUI_SHARED else "windows/raygui.lib",
 	}
 } else when ODIN_OS == .Linux  {
-	foreign import lib {
-		"linux/libraygui.so" when RAYGUI_SHARED else "linux/libraygui.a",
-	}
+	// No raygui libs are shipped for Linux: they depend on the glibc of the machine that builds them.
+	foreign import lib "system:raygui"
 } else when ODIN_OS == .Darwin {
 	when ODIN_ARCH == .arm64 {
 		foreign import lib {
@@ -31,7 +30,16 @@ when ODIN_OS == .Windows {
 	foreign import lib "system:raygui"
 }
 
-RAYGUI_VERSION :: "4.0"
+RAYGUI_VERSION :: "5.0"
+
+// Gui control result
+GuiResult :: enum c.int {
+	RESULT_NONE      = 0,
+	RESULT_PRESSED   = 1,
+	RESULT_CHANGED   = 2,
+
+	RESULT_TAB_CLOSE = 4, // GuiTabBar(), tab close request
+}
 
 // Gui control state
 GuiState :: enum c.int {
@@ -68,14 +76,14 @@ GuiControl :: enum c.int {
 	LABEL,          // Used also for: LABELBUTTON
 	BUTTON,
 	TOGGLE,         // Used also for: TOGGLEGROUP
-	SLIDER,         // Used also for: SLIDERBAR
+	SLIDER,         // Used also for: SLIDERBAR, TOGGLESLIDER
 	PROGRESSBAR,
 	CHECKBOX,
 	COMBOBOX,
 	DROPDOWNBOX,
 	TEXTBOX,        // Used also for: TEXTBOXMULTI
 	VALUEBOX,
-	SPINNER,        // Uses: BUTTON, VALUEBOX
+	TABBAR,
 	LISTVIEW,
 	COLORPICKER,
 	SCROLLBAR,
@@ -100,7 +108,7 @@ GuiControlProperty :: enum c.int {
 	BORDER_WIDTH,
 	TEXT_PADDING,
 	TEXT_ALIGNMENT,
-	RESERVED,
+	BASEPROP16,                 // Not used yet...
 }
 
 // Gui extended properties depend on control
@@ -117,6 +125,7 @@ GuiDefaultProperty :: enum c.int {
 	TEXT_LINE_SPACING,          // Text spacing between lines
 	TEXT_ALIGNMENT_VERTICAL,    // Text vertical alignment inside text bounds (after border and padding)
 	TEXT_WRAP_MODE,             // Text wrap-mode inside text bounds
+	EXTPROP08,                  // Not used yet...
 }
 
 // Label
@@ -128,6 +137,7 @@ GuiDefaultProperty :: enum c.int {
 // Toggle/ToggleGroup
 GuiToggleProperty :: enum c.int {
 	GROUP_PADDING = 16,         // ToggleGroup separation between toggles
+	GROUP_WIDTH_FULL,           // ToggleGroup bounds width considers all items: 0-Width per item, 1-Full width
 }
 
 // Slider/SliderBar
@@ -139,6 +149,7 @@ GuiSliderProperty :: enum c.int {
 // ProgressBar
 GuiProgressBarProperty :: enum c.int {
 	PROGRESS_PADDING = 16,      // ProgressBar internal padding
+	PROGRESS_SIDE,              // ProgressBar increment side: 0-Left->Right, 1-Right->Left
 }
 
 // ScrollBar
@@ -166,6 +177,8 @@ GuiComboBoxProperty :: enum c.int {
 GuiDropdownBoxProperty :: enum c.int {
 	ARROW_PADDING = 16,         // DropdownBox arrow separation from border and items
 	DROPDOWN_ITEMS_SPACING,     // DropdownBox items separation
+	DROPDOWN_ARROW_HIDDEN,      // DropdownBox arrow hidden
+	DROPDOWN_ROLL_UP,           // DropdownBox roll up flag: 0-Roll down, 1-Roll up
 }
 
 // TextBox/TextBoxMulti/ValueBox/Spinner
@@ -173,10 +186,17 @@ GuiTextBoxProperty :: enum c.int {
 	TEXT_READONLY = 16,         // TextBox in read-only mode: 0-text editable, 1-text no-editable
 }
 
-// Spinner
-GuiSpinnerProperty :: enum c.int {
-	SPIN_BUTTON_WIDTH = 16,     // Spinner left/right buttons width
-	SPIN_BUTTON_SPACING,        // Spinner buttons separation
+// ValueBox/Spinner
+GuiValueBoxProperty :: enum c.int {
+	SPINNER_BUTTON_WIDTH = 16,  // Spinner left/right buttons width
+	SPINNER_BUTTON_SPACING,     // Spinner buttons separation
+}
+
+// TabBar
+GuiTabBarProperty :: enum c.int {
+	TAB_ITEMS_WIDTH = 16,       // TabBar tab items width
+	TAB_CLOSE_BUTTON,           // TabBar tab close button: 0-Not shown, 1-Shown
+	TAB_LINE_SIDE,              // TabBar tabs side: 0-Bottom, 1-Top
 }
 
 // ListView
@@ -185,6 +205,8 @@ GuiListViewProperty :: enum c.int {
 	LIST_ITEMS_SPACING,         // ListView items separation
 	SCROLLBAR_WIDTH,            // ListView scrollbar size (usually width)
 	SCROLLBAR_SIDE,             // ListView scrollbar side (0-left, 1-right)
+	LIST_ITEMS_BORDER_NORMAL,   // ListView items border enabled in normal state
+	LIST_ITEMS_BORDER_WIDTH,    // ListView items border width
 }
 
 // ColorPicker
@@ -238,6 +260,7 @@ foreign lib {
 	// Styles loading functions
 	
 	GuiLoadStyle        :: proc(fileName: cstring) ---                                                        // Load style file over global style variable (.rgs)
+	GuiLoadStyleFromMemory :: proc(fileData: [^]byte, dataSize: c.int) ---                                    // Load style from memory (binary only)
 	GuiLoadStyleDefault :: proc() ---                                                                         // Load style default over global style
 	
 	// Tooltips management functions
@@ -252,7 +275,12 @@ foreign lib {
 	GuiSetIconScale     :: proc(scale: c.int) ---                                                             // Set default icon drawing size
 	GuiGetIcons         :: proc() -> [^]u32 ---                                                               // Get raygui icons data pointer
 	GuiLoadIcons        :: proc(fileName: cstring, loadIconsName: bool) -> [^]cstring ---                     // Load raygui icons file (.rgi) into internal icons data
+	GuiLoadIconsFromMemory :: proc(fileData: [^]byte, dataSize: c.int, loadIconsName: bool) -> [^]cstring --- // Load raygui icons file (.rgi) from memory into internal icons data
 	GuiDrawIcon         :: proc(iconId: GuiIconName, posX, posY: c.int, pixelSize: c.int, color: Color) ---   // Draw icon using pixel size at specified position
+
+	// Utils functions
+
+	GuiGetTextWidth     :: proc(text: cstring) -> c.int ---                                                   // Get text width considering gui style and icon size (if required)
 	
 	
 	// Controls
@@ -263,7 +291,8 @@ foreign lib {
 	GuiGroupBox         :: proc(bounds: Rectangle, text: cstring) -> c.int ---                                // Group Box control with text name
 	GuiLine             :: proc(bounds: Rectangle, text: cstring) -> c.int ---                                // Line separator control, could contain text
 	GuiPanel            :: proc(bounds: Rectangle, text: cstring) -> c.int ---                                // Panel control, useful to group controls
-	GuiTabBar           :: proc(bounds: Rectangle, text: [^]cstring, count: c.int, active: ^c.int) -> c.int --- // Tab Bar control, returns TAB to be closed or -1
+	GuiTabBar           :: proc(bounds: Rectangle, text: cstring, hscroll: ^c.int, active: ^c.int) -> c.int --- // Tab Bar control, returns RESULT_TAB_CLOSE when a tab close was requested
+	GuiTabBarEx         :: proc(bounds: Rectangle, text: [^]cstring, count: c.int, hscroll: ^c.int, active: ^c.int, focus: ^c.int) -> c.int --- // Tab Bar control, using text entries list and returning focus entry
 	GuiScrollPanel      :: proc(bounds: Rectangle, text: cstring, content: Rectangle, scroll: ^Vector2, view: ^Rectangle) -> c.int --- // Scroll Panel control
 	
 	// Basic controls set
@@ -274,12 +303,13 @@ foreign lib {
 	GuiToggle           :: proc(bounds: Rectangle, text: cstring, active: ^bool) -> c.int ---                 // Toggle Button control, returns true when active
 	GuiToggleGroup      :: proc(bounds: Rectangle, text: cstring, active: ^c.int) -> c.int ---                // Toggle Group control, returns active toggle index
 	GuiToggleSlider     :: proc(bounds: Rectangle, text: cstring, active: ^c.int) -> c.int ---
-	GuiCheckBox         :: proc(bounds: Rectangle, text: cstring, checked: ^bool) -> bool ---                 // Check Box control, returns true when active
+	GuiCheckBox         :: proc(bounds: Rectangle, text: cstring, checked: ^bool) -> c.int ---                // Check Box control, returns a GuiResult (RESULT_CHANGED when toggled)
 	GuiComboBox         :: proc(bounds: Rectangle, text: cstring, active: ^c.int) -> c.int ---                // Combo Box control, returns selected item index
 	
-	GuiDropdownBox      :: proc(bounds: Rectangle, text: cstring, active: ^c.int, editMode: bool) -> bool --- // Dropdown Box control, returns selected item
+	GuiDropdownBox      :: proc(bounds: Rectangle, text: cstring, active: ^c.int, editMode: bool) -> c.int --- // Dropdown Box control, returns a GuiResult (RESULT_CHANGED when the selection changed)
 	GuiSpinner          :: proc(bounds: Rectangle, text: cstring, value: ^c.int, minValue, maxValue: c.int, editMode: bool) -> c.int --- // Spinner control, returns selected value
 	GuiValueBox         :: proc(bounds: Rectangle, text: cstring, value: ^c.int, minValue, maxValue: c.int, editMode: bool) -> c.int --- // Value Box control, updates input text with numbers
+	GuiValueBoxFloat    :: proc(bounds: Rectangle, text: cstring, textValue: cstring, value: ^f32, editMode: bool) -> c.int --- // Value box control for float values (textValue is a writable buffer)
 	GuiTextBox          :: proc(bounds: Rectangle, text: cstring, textSize: c.int, editMode: bool) -> bool --- // Text Box control, updates input text
 	
 	GuiSlider           :: proc(bounds: Rectangle, textLeft: cstring, textRight: cstring, value: ^f32, minValue: f32, maxValue: f32) -> c.int --- // Slider control, returns selected value
@@ -292,8 +322,8 @@ foreign lib {
 	// Advance controls set
 	GuiListView         :: proc(bounds: Rectangle, text: cstring, scrollIndex: ^c.int, active: ^c.int) -> c.int --- // List View control, returns selected list item index
 	GuiListViewEx       :: proc(bounds: Rectangle, text:[^]cstring, count: c.int, scrollIndex: ^c.int, active: ^c.int, focus: ^c.int) -> c.int --- // List View with extended parameters
-	GuiMessageBox       :: proc(bounds: Rectangle, title: cstring, message: cstring, buttons: cstring) -> c.int --- // Message Box control, displays a message
-	GuiTextInputBox     :: proc(bounds: Rectangle, title: cstring, message: cstring, buttons: cstring, text: cstring, textMaxSize: c.int, secretViewActive: ^bool) -> c.int --- // Text Input Box control, ask for text, supports secret
+	GuiMessageBox       :: proc(bounds: Rectangle, title: cstring, message: cstring, btnText: cstring, btnActive: ^c.int) -> c.int --- // Message Box control, displays a message
+	GuiTextInputBox     :: proc(bounds: Rectangle, title: cstring, message: cstring, text: cstring, textSize: c.int, btnText: cstring, btnActive: ^c.int, secretViewActive: ^bool) -> c.int --- // Text Input Box control, ask for text, supports secret (text is a writable buffer)
 	GuiColorPicker      :: proc(bounds: Rectangle, text: cstring, color: ^Color) -> c.int ---                 // Color Picker control (multiple color controls)
 	GuiColorPanel       :: proc(bounds: Rectangle, text: cstring, color: ^Color) -> c.int ---                 // Color Panel control
 	GuiColorBarAlpha    :: proc(bounds: Rectangle, text: cstring, alpha: ^f32) -> c.int ---                   // Color Bar Alpha control
@@ -527,40 +557,41 @@ GuiIconName :: enum c.int {
 	ICON_FOLDER                   = 217,
 	ICON_FILE                     = 218,
 	ICON_SAND_TIMER               = 219,
-	ICON_220                      = 220,
-	ICON_221                      = 221,
-	ICON_222                      = 222,
-	ICON_223                      = 223,
-	ICON_224                      = 224,
-	ICON_225                      = 225,
-	ICON_226                      = 226,
-	ICON_227                      = 227,
-	ICON_228                      = 228,
-	ICON_229                      = 229,
-	ICON_230                      = 230,
-	ICON_231                      = 231,
-	ICON_232                      = 232,
-	ICON_233                      = 233,
-	ICON_234                      = 234,
-	ICON_235                      = 235,
-	ICON_236                      = 236,
-	ICON_237                      = 237,
-	ICON_238                      = 238,
-	ICON_239                      = 239,
-	ICON_240                      = 240,
-	ICON_241                      = 241,
-	ICON_242                      = 242,
-	ICON_243                      = 243,
-	ICON_244                      = 244,
-	ICON_245                      = 245,
-	ICON_246                      = 246,
-	ICON_247                      = 247,
-	ICON_248                      = 248,
-	ICON_249                      = 249,
-	ICON_250                      = 250,
-	ICON_251                      = 251,
-	ICON_252                      = 252,
-	ICON_253                      = 253,
-	ICON_254                      = 254,
-	ICON_255                      = 255,
+	ICON_WARNING                  = 220,
+	ICON_HELP_BOX                 = 221,
+	ICON_INFO_BOX                 = 222,
+	ICON_PRIORITY                 = 223,
+	ICON_LAYERS_ISO               = 224,
+	ICON_LAYERS2                  = 225,
+	ICON_MLAYERS                  = 226,
+	ICON_MAPS                     = 227,
+	ICON_HOT                      = 228,
+	ICON_LABEL                    = 229,
+	ICON_NAME_ID                  = 230,
+	ICON_SLICING                  = 231,
+	ICON_MANUAL_CONTROL           = 232,
+	ICON_COLLISION                = 233,
+	ICON_CIRCLE_ADD               = 234,
+	ICON_CIRCLE_ADD_FILL          = 235,
+	ICON_CIRCLE_WARNING           = 236,
+	ICON_CIRCLE_WARNING_FILL      = 237,
+	ICON_BOX_MORE                 = 238,
+	ICON_BOX_MORE_FILL            = 239,
+	ICON_BOX_MINUS                = 240,
+	ICON_BOX_MINUS_FILL           = 241,
+	ICON_UNION                    = 242,
+	ICON_INTERSECTION             = 243,
+	ICON_DIFFERENCE               = 244,
+	ICON_SPHERE                   = 245,
+	ICON_CYLINDER                 = 246,
+	ICON_CONE                     = 247,
+	ICON_ELLIPSOID                = 248,
+	ICON_CAPSULE                  = 249,
+	ICON_FILETYPE_FONT            = 250,
+	ICON_FILETYPE_3D              = 251,
+	ICON_FILETYPE_CODE_XML        = 252,
+	ICON_FILETYPE_CODE_C          = 253,
+	ICON_FILETYPE_CODE_PYTHON     = 254,
+	ICON_FILETYPE_CODE_JS         = 255,
+	ICON_FILETYPE_ICON            = 256,
 }

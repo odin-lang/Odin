@@ -3352,7 +3352,7 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 	Type *params  = alloc_type_tuple();
 	Type *results = alloc_type_tuple();
 
-	Type *t_ptr_cstring = alloc_type_pointer(t_cstring);
+	Type *t_argv = alloc_type_pointer(t_cstring);
 
 	bool call_cleanup = true;
 
@@ -3369,21 +3369,21 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 		call_cleanup = false;
 	} else if (build_context.metrics.os == TargetOs_windows && build_context.no_crt) {
 		name = str_lit("mainCRTStartup");
-	} else if (build_context.metrics.os == TargetOs_windows && build_context.metrics.arch == TargetArch_i386 && !build_context.no_crt) {
-		// Windows i386 with CRT: libcmt expects _main (main with underscore prefix)
-		name = str_lit("main");
+	} else if (build_context.metrics.os == TargetOs_windows) {
+		name = str_lit("wmain");
+		t_argv = alloc_type_pointer(t_cstring16);
 		has_args = true;
 		slice_init(&params->Tuple.variables, permanent_allocator(), 2);
-		params->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("argc"), t_i32, false, true);
-		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("argv"), t_ptr_cstring, false, true);
+		params->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("argc"), t_i32,  false, true);
+		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("argv"), t_argv, false, true);
 	} else if (is_arch_wasm()) {
 		name = str_lit("_start");
 		call_cleanup = false;
 	} else {
 		has_args = true;
 		slice_init(&params->Tuple.variables, permanent_allocator(), 2);
-		params->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("argc"), t_i32, false, true);
-		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("argv"), t_ptr_cstring, false, true);
+		params->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("argc"), t_i32,  false, true);
+		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("argv"), t_argv, false, true);
 	}
 
 	slice_init(&results->Tuple.variables, permanent_allocator(), 1);
@@ -3401,12 +3401,16 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 
 	if (has_args) { // initialize `runtime.args__`
 		lbValue argc = {LLVMGetParam(p->value, 0), t_i32};
-		lbValue argv = {LLVMGetParam(p->value, 1), t_ptr_cstring};
+		lbValue argv = {LLVMGetParam(p->value, 1), t_argv};
 		LLVMSetValueName2(argc.value, "argc", 4);
 		LLVMSetValueName2(argv.value, "argv", 4);
 		argc = lb_emit_conv(p, argc, t_int);
-		lbAddr args = lb_addr(lb_find_runtime_value(p->module, str_lit("args__")));
+
+		Type *t_args = alloc_type_slice(type_deref(t_argv));
+		lbAddr args = lb_add_local_generated(p, t_args, false);
 		lb_fill_slice(p, args, argv, argc);
+		lbValue rt_args = lb_find_runtime_value(p->module, str_lit("args__"));
+		lb_emit_store_union_variant(p, rt_args, lb_addr_load(p, args), t_args);
 	}
 
 	lbValue startup_runtime_value = {startup_runtime->value, startup_runtime->type};
@@ -3909,6 +3913,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				if (e->pkg->kind == Package_Runtime) {
 					if (link_name == "main"           ||
 					    link_name == "_main"          ||
+					    link_name == "wmain"          ||
 					    link_name == "DllMain"        ||
 					    link_name == "WinMain"        ||
 					    link_name == "wWinMain"       ||

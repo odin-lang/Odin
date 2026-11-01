@@ -19,6 +19,8 @@ foreign kernel32 {
 	GetLastError         :: proc() -> u32 ---
 
 	ExitProcess          :: proc(code: u32) -> ! ---
+
+	GetCommandLineW      :: proc() -> [^]u16 ---
 }
 
 @(private="file")
@@ -87,4 +89,38 @@ _rand_bytes :: proc "contextless" (dst: []byte) {
 
 _exit :: proc "contextless" (code: int) -> ! {
 	ExitProcess(u32(code))
+}
+
+when ODIN_NO_CRT {
+	@(private="file")
+	windows_args_block: [^]byte
+
+	_windows_setup_args :: proc "contextless" () {
+		cmd_line := GetCommandLineW()
+		if cmd_line == nil {
+			return
+		}
+
+		argc, text_len := _windows_split_command_line(cmd_line, nil, nil)
+
+		header_len := argc*size_of(cstring16)
+		block := ([^]byte)(heap_alloc(header_len + text_len*size_of(u16), zero_memory=false))
+		if block == nil {
+			return
+		}
+
+		argv := ([^]cstring16)(block)
+		text := ([^]u16)(&block[header_len])
+		_windows_split_command_line(cmd_line, argv, text)
+
+		windows_args_block = block
+		args__ = argv[:argc]
+	}
+
+	@(fini, private="file")
+	windows_delete_args :: proc "contextless" () {
+		if windows_args_block != nil {
+			heap_free(windows_args_block)
+		}
+	}
 }

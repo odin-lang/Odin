@@ -12,18 +12,18 @@ Presently, the `vendor:` collection comprises the following packages. Each name 
 |---|---|---|---|---|
 | [box2d](https://pkg.odin-lang.org/vendor/box2d/) | 2D physics engine | 3.2.0 | MIT | https://github.com/erincatto/box2d |
 | [box3d](https://pkg.odin-lang.org/vendor/box3d/) | 3D physics engine | master snapshot | MIT | https://github.com/erincatto/box3d |
-| [cgltf](https://pkg.odin-lang.org/vendor/cgltf/) | glTF 2.0 loader and writer | 1.14 | MIT | https://github.com/jkuhlmann/cgltf |
+| [cgltf](https://pkg.odin-lang.org/vendor/cgltf/) | glTF 2.0 loader and writer | 1.15 | MIT | https://github.com/jkuhlmann/cgltf |
 | [commonmark](https://pkg.odin-lang.org/vendor/commonmark/) | CommonMark (Markdown) parser and renderer | 0.31.2 | BSD-2-Clause | https://github.com/commonmark/cmark |
 | [compress/lz4](https://pkg.odin-lang.org/vendor/compress/lz4/) | Fast lossless compression | 1.10.0 | BSD-2-Clause | https://github.com/lz4/lz4 |
 | [curl](https://pkg.odin-lang.org/vendor/curl/) | URL transfers over HTTP(S) and more, with libcurl | 8.23.0 | curl[^curl] | https://curl.se |
 | [darwin](https://pkg.odin-lang.org/vendor/darwin/) | macOS and iOS frameworks, such as AppKit and Metal | macOS 26.2 and iOS 26.2 SDKs | [Odin's](../LICENSE), platform bindings only | https://developer.apple.com/documentation/ |
-| [directx/dxc](https://pkg.odin-lang.org/vendor/directx/dxc/) | DirectX shader compiler | 1.6.2112 | LLVM Release License (UIUC/NCSA)[^dxc] | https://github.com/microsoft/DirectXShaderCompiler |
+| [directx/dxc](https://pkg.odin-lang.org/vendor/directx/dxc/) | DirectX shader compiler | 1.9.2609 | LLVM Release License (UIUC/NCSA)[^dxc] | https://github.com/microsoft/DirectXShaderCompiler |
 | directx: [d3d11](https://pkg.odin-lang.org/vendor/directx/d3d11/), [d3d12](https://pkg.odin-lang.org/vendor/directx/d3d12/), [dxgi](https://pkg.odin-lang.org/vendor/directx/dxgi/), [d3d_compiler](https://pkg.odin-lang.org/vendor/directx/d3d_compiler/) | Direct3D 11 and 12, DXGI and the D3D shader compiler | Windows API | [Odin's](../LICENSE), platform bindings only | https://learn.microsoft.com/en-us/windows/win32/direct3d12/direct3d-12-graphics |
 | [egl](https://pkg.odin-lang.org/vendor/egl/) | EGL, the Khronos platform graphics interface | EGL 1.5 | [Odin's](../LICENSE), platform bindings only | https://registry.khronos.org/EGL/ |
 | [ENet](https://pkg.odin-lang.org/vendor/ENet/) | Reliable UDP networking | 1.3.18 | MIT | https://github.com/lsalzman/enet |
 | [fontstash](https://pkg.odin-lang.org/vendor/fontstash/) | Font texture atlas builder | Port | zlib | https://github.com/memononen/fontstash |
 | [ggpo](https://pkg.odin-lang.org/vendor/ggpo/) | Rollback networking for peer-to-peer games | 7ddadef (no releases) | MIT | https://github.com/pond3r/ggpo |
-| [glfw](https://pkg.odin-lang.org/vendor/glfw/) | Windows, input, and OpenGL and Vulkan contexts | 3.4.0 | zlib | https://github.com/glfw/glfw |
+| [glfw](https://pkg.odin-lang.org/vendor/glfw/) | Windows, input, and OpenGL and Vulkan contexts | 3.5.1 | zlib | https://github.com/glfw/glfw |
 | [kb_text_shape](https://pkg.odin-lang.org/vendor/kb_text_shape/) | Unicode text segmentation and OpenType shaping | 2.28g | zlib | https://github.com/JimmyLefevre/kb |
 | [libc](https://pkg.odin-lang.org/vendor/libc/) | C standard library |  | [Odin's](../LICENSE), platform bindings only | https://en.cppreference.com/w/c/header |
 | [libc-shim](https://pkg.odin-lang.org/vendor/libc-shim/) | Minimal libc for building C libraries to WASM |  | [Odin's](../LICENSE), platform bindings only |  |
@@ -33,12 +33,12 @@ Presently, the `vendor:` collection comprises the following packages. Each name 
 | [lua/5.4](https://pkg.odin-lang.org/vendor/lua/5.4/) | Lua 5.4 scripting language | 5.4.9 | MIT | https://www.lua.org |
 | [lua/5.5](https://pkg.odin-lang.org/vendor/lua/5.5/) | Lua 5.5 scripting language | 5.5.1 | MIT | https://www.lua.org |
 | [microui](https://pkg.odin-lang.org/vendor/microui/) | Tiny immediate-mode UI library | Port | MIT | https://github.com/rxi/microui |
-| [miniaudio](https://pkg.odin-lang.org/vendor/miniaudio/) | Audio playback and capture | 0.11.25 | Public domain or MIT-0 | https://github.com/mackron/miniaudio |
+| [miniaudio](https://pkg.odin-lang.org/vendor/miniaudio/) | Audio playback and capture | 0.11.26 | Public domain or MIT-0 | https://github.com/mackron/miniaudio |
 | [nanovg](https://pkg.odin-lang.org/vendor/nanovg/) | Antialiased 2D vector graphics | Port | zlib | https://github.com/memononen/nanovg |
-| [OpenEXRCore](https://pkg.odin-lang.org/vendor/OpenEXRCore/) | Reading and writing EXR images | 3.5.2 | BSD-3-Clause[^exr] | https://github.com/AcademySoftwareFoundation/openexr |
+| [OpenEXRCore](https://pkg.odin-lang.org/vendor/OpenEXRCore/) | Reading and writing EXR images | 3.5.3 | BSD-3-Clause[^exr] | https://github.com/AcademySoftwareFoundation/openexr |
 | [OpenGL](https://pkg.odin-lang.org/vendor/OpenGL/) | OpenGL bindings with a loader and helpers | Generated with glad | MIT | https://github.com/Dav1dde/glad |
 | [portmidi](https://pkg.odin-lang.org/vendor/portmidi/) | Real-time MIDI input and output | 2.0.8 | MIT | https://github.com/PortMidi/portmidi |
-| [raylib](https://pkg.odin-lang.org/vendor/raylib/) (with raygui) | Simple library for making games, with raygui | 6.0 (raygui 4.0) | zlib | https://github.com/raysan5/raylib |
+| [raylib](https://pkg.odin-lang.org/vendor/raylib/) (with raygui) | Simple library for making games, with raygui | 6.2 (raygui 5.0) | zlib | https://github.com/raysan5/raylib |
 | [sdl2](https://pkg.odin-lang.org/vendor/sdl2/) | Windows, input, audio and graphics | 2.32.10 | zlib | https://github.com/libsdl-org/SDL |
 | [sdl2/image](https://pkg.odin-lang.org/vendor/sdl2/image/) | SDL2 image loading | 2.8.12 | zlib[^sdl2-image] | https://github.com/libsdl-org/SDL_image |
 | [sdl2/mixer](https://pkg.odin-lang.org/vendor/sdl2/mixer/) | SDL2 audio mixing and music | 2.8.2 | zlib[^sdl2-mixer] | https://github.com/libsdl-org/SDL_mixer |

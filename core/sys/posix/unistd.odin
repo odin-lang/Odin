@@ -456,14 +456,14 @@ foreign lib {
 	Example:
 		// The following code fragment shows how you might process the arguments for a utility that
 		// can take the mutually-exclusive options a and b and the options f and o, both of which
-		// require arguments.
+		// require arguments. `argc` and `argv` are the arguments of a C `main`.
 
 		bflg, aflg, errflg: bool
 		ifile: string
 		ofile: string
 
 		for {
-			c := posix.getopt(i32(len(runtime.args__)), raw_data(runtime.args__), ":abf:o:")
+			c := posix.getopt(argc, argv, ":abf:o:")
 			(c != -1) or_break
 
 			switch c {
@@ -498,8 +498,8 @@ foreign lib {
 		}
 
 		// Loop through remaining arguments:
-		for ; posix.optind < i32(len(runtime.args__)); posix.optind += 1 {
-			fmt.println(runtime.args__[posix.optind])
+		for ; posix.optind < argc; posix.optind += 1 {
+			fmt.println(argv[posix.optind])
 		}
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/getopt.html ]]
