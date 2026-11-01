@@ -250,3 +250,38 @@ test_write_bits_128_matches_reference :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+// A digit table shorter than the base works for values that only use its low digits
+@(test)
+test_write_bits_short_digits :: proc(t: ^testing.T) {
+	state := u64(0x2545F4914F6CDD1D)
+	failures := 0
+
+	for base in 2..=32 {
+		for n in 1..<base {
+			digits := DIGIT_SETS[0][:n]
+			for _ in 0..<20 {
+				v: u128
+				for _ in 0..<next_random(&state) % 40 {
+					d := u128(next_random(&state) % u64(n))
+					if v > (max(u128) - d) / u128(base) {
+						break
+					}
+					v = v*u128(base) + d
+				}
+
+				if v <= u128(max(u64)) {
+					if !check_u64(t, &failures, u64(v), base, {false, 64}, digits, {}) { return }
+				}
+				if !check_u128(t, &failures, v, base, {false, 128}, digits, {}) { return }
+			}
+		}
+	}
+}
+
+@(test)
+test_write_bits_short_digits_panic :: proc(t: ^testing.T) {
+	buf: [140]byte
+	testing.expect_assert(t, "10 is out of range 0..<10")
+	_ = strconv.write_bits(buf[:], 10, 16, false, 64, "0123456789", {})
+}

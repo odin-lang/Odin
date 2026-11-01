@@ -597,12 +597,13 @@ wprintln :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> (bytes
 //
 // Returns: The number of bytes written
 //
-wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline := false) -> (bytes_written: int) {
+wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline := false) -> (bytes_written: int) #no_bounds_check {
 	MAX_CHECKED_ARGS :: 64
 	assert(len(args) <= MAX_CHECKED_ARGS, "number of args > 64 is unsupported")
 
-	parse_options :: proc(fi: ^Info, fmt: string, index, end: int, unused_args: ^bit_set[0..<MAX_CHECKED_ARGS], args: ..any) -> int {
-		i := index
+	parse_options :: proc(fi: ^Info, fmt: string, index: int, unused_args: ^bit_set[0..<MAX_CHECKED_ARGS], args: ..any) -> int #no_bounds_check {
+		i   := index
+		end := len(fmt)
 
 		// Prefix
 		prefix_loop: for ; i < end; i += 1 {
@@ -725,7 +726,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 	}
 
 	@(require_results)
-	next_rune :: #force_inline proc "contextless" (s: string) -> (rune, int) {
+	next_rune :: #force_inline proc "contextless" (s: string) -> (rune, int) #no_bounds_check {
 		if s[0] < utf8.RUNE_SELF {
 			return rune(s[0]), 1
 		}
@@ -779,7 +780,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 				continue loop
 			}
 
-			i = parse_options(&fi, fmt, i, end, &unused_args, ..args)
+			i = parse_options(&fi, fmt, i, &unused_args, ..args)
 
 			arg_index, arg_parsed, index_ok := _arg_number(fmt, &i, len(args))
 
@@ -823,7 +824,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 
 			if i < end && fmt[i] == ':' {
 				i += 1
-				i = parse_options(&fi, fmt, i, end, &unused_args, ..args)
+				i = parse_options(&fi, fmt, i, &unused_args, ..args)
 
 				if i >= end {
 					_write_string(&fi, "%!(NO VERB)")

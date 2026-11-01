@@ -206,7 +206,18 @@ _write_digits :: proc(a: []byte, u: u64, base: int, digits: string) -> (i: int) 
 	i = len(a)
 	u := u
 	b := u64(base)
-	switch {
+	if !(2 <= base && base <= len(digits) && 64 <= len(a)) {
+		for {
+			i -= 1
+			a[i] = digits[u % b]
+			u /= b
+			if u == 0 {
+				return
+			}
+		}
+	}
+
+	#no_bounds_check switch {
 	case base == 10:
 		// NOTE(bill): Two digits per step. Dividing by a constant compiles to a multiply.
 		for u >= 100 {
@@ -237,7 +248,7 @@ _write_digits :: proc(a: []byte, u: u64, base: int, digits: string) -> (i: int) 
 		}
 	}
 	i -= 1
-	a[i] = digits[u]
+	#no_bounds_check a[i] = digits[u]
 	return
 }
 
@@ -246,7 +257,19 @@ _write_digits :: proc(a: []byte, u: u64, base: int, digits: string) -> (i: int) 
 _write_digits_128 :: proc(a: []byte, u: u128, base: int, digits: string) -> (i: int) {
 	i = len(a)
 	u := u
-	if base == 10 {
+	b := u128(base)
+	if !(2 <= base && base <= len(digits) && 128 <= len(a)) {
+		for {
+			i -= 1
+			a[i] = digits[u64(u % b)]
+			u /= b
+			if u == 0 {
+				return
+			}
+		}
+	}
+
+	#no_bounds_check if base == 10 {
 		// NOTE(bill): One 128-bit division per 19 digits rather than one per digit
 		TEN_19 :: 10_000_000_000_000_000_000
 		for u > u128(max(u64)) {
@@ -267,8 +290,7 @@ _write_digits_128 :: proc(a: []byte, u: u128, base: int, digits: string) -> (i: 
 	if u <= u128(max(u64)) {
 		return _write_digits(a[:i], u64(u), base, digits)
 	}
-	b := u128(base)
-	if base & (base-1) == 0 {
+	#no_bounds_check if base & (base-1) == 0 {
 		shift := uint(intrinsics.count_trailing_zeros(base))
 		for u >= b {
 			i -= 1
@@ -283,6 +305,6 @@ _write_digits_128 :: proc(a: []byte, u: u128, base: int, digits: string) -> (i: 
 		}
 	}
 	i -= 1
-	a[i] = digits[u64(u)]
+	#no_bounds_check a[i] = digits[u64(u)]
 	return
 }
