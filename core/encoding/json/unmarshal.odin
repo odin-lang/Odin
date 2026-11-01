@@ -690,7 +690,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind, flags: Unmar
 						json_names[field_idx], _ = #force_inline json_name_from_tag_value(reflect.struct_tag_get(fields[field_idx].tag, "json"))
 						json_resolved += 1
 					}
-					if key == json_names[field_idx] {
+					if key == json_names[field_idx] && key != "-" {
 						use_field_idx = field_idx
 						break
 					}
@@ -726,6 +726,13 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind, flags: Unmar
 				fields := reflect.struct_fields_zipped(parent)
 				index = first + len(fields)
 				for field, field_idx in fields {
+					tag_value, tagged := reflect.struct_tag_lookup(field.tag, "json")
+					json_name, _ := json_name_from_tag_value(tag_value)
+					if json_name == "-" {
+						// Skipped by marshal, so never written by unmarshal either
+						continue
+					}
+
 					if field.is_using && field.name == "_" {
 						offset, type, index, found = check_children_using_fields(key, field.type.id, index)
 						if found {
@@ -734,8 +741,6 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind, flags: Unmar
 						}
 					}
 
-					tag_value, tagged := reflect.struct_tag_lookup(field.tag, "json")
-					json_name, _ := json_name_from_tag_value(tag_value)
 					if key == "" {
 						found = tagged && tag_value == ""
 					} else {
