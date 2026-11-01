@@ -688,7 +688,12 @@ find_aux :: proc(haystack, pattern: string, offset: int, allow_memfind: bool, ma
 			return
 		}
 
-		s += 1
+		// offset can be past the end of the haystack
+		if s >= len(ms.src) {
+			break
+		}
+		_, size := utf8.decode_rune_in_string(ms.src[s:])
+		s += size
 
 		if !(s < len(ms.src) && !anchor) {
 			break
