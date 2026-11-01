@@ -152,10 +152,13 @@ This is a dire bug and should be reported to the Odin developers.
 		intrinsics.atomic_store(&stop_test_passed, passed)
 		intrinsics.atomic_store(&stop_test_alert, 1)
 
+		for {
+			// Idle until the runner terminates this thread.
+			// Passing the exception on would end the whole process.
+			win32.Sleep(win32.INFINITE)
+		}
 	}
 
-	// Pass on the exeption to the next handler. As we don't wont to recover from it.
-	// This also allows debuggers handle it properly.
 	return win32.EXCEPTION_CONTINUE_SEARCH
 }
 
