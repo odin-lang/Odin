@@ -56,7 +56,7 @@ sort_by_indices :: proc{ sort_by_indices_allocate, _sort_by_indices}
 
 sort_by_indices_allocate :: proc(data: $T/[]$E, indices: []int, allocator := context.allocator, loc := #caller_location) -> (sorted: T) {
 	assert(len(data) == len(indices))
-	sorted = make(T, len(data), allocator, loc)
+	sorted = non_zero_make(T, len(data), allocator, loc)
 	for v, i in indices {
 		sorted[i] = data[v]
 	}
@@ -73,7 +73,7 @@ _sort_by_indices :: proc(data, sorted: $T/[]$E, indices: []int) {
 
 sort_by_indices_overwrite :: proc(data: $T/[]$E, indices: []int) {
 	assert(len(data) == len(indices))
-	temp := make([]E, len(data), context.allocator)
+	temp := non_zero_make([]E, len(data), context.allocator)
 	defer delete(temp)
 	for v, i in indices {
 		temp[i] = data[v]
