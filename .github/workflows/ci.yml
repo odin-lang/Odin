@@ -8,7 +8,28 @@ jobs:
     env:
       PKGSRC_BRANCH: 2026Q3
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
+
+      # Persist apt package cache across runs (see NOTE at end of file).
+    - name: Get apt cache week
+      id: apt-cache-week
+      run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+    - name: Cache apt package archives
+      uses: actions/cache@v5
+      with:
+        path: ${{ runner.temp }}/apt-cache/*.deb
+        key: ${{ runner.os }}-${{ runner.arch }}-netbsd-apt-${{ steps.apt-cache-week.outputs.week }}-${{ hashFiles('.github/workflows/ci.yml') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-netbsd-apt-
+
+    - name: Restore apt package archives
+      run: |
+        mkdir -p "$RUNNER_TEMP/apt-cache"
+        if compgen -G "$RUNNER_TEMP/apt-cache/*.deb" > /dev/null; then
+          sudo cp -n "$RUNNER_TEMP"/apt-cache/*.deb /var/cache/apt/archives/
+        fi
+
     - name: Build, Check, and Test
       timeout-minutes: 15
       uses: vmactions/netbsd-vm@v1
@@ -46,11 +67,36 @@ jobs:
           (cd tests/abi; ABI_CFLAGS=-O2 ./run.sh "" "" -o:speed)
           ./odin check tests/benchmark -vet -strict-style -no-entry-point
 
+      # Need to save all downloaded apt packages in "$RUNNER_TEMP/apt-cache/" so that actions/cache@v5 will pick them up
+    - name: Save apt package archives
+      run: sudo cp /var/cache/apt/archives/*.deb "$RUNNER_TEMP/apt-cache/"
+
   build_freebsd:
     name: FreeBSD Build, Check, and Test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
+
+      # Persist apt package cache across runs (see NOTE at end of file).
+    - name: Get apt cache week
+      id: apt-cache-week
+      run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+    - name: Cache apt package archives
+      uses: actions/cache@v5
+      with:
+        path: ${{ runner.temp }}/apt-cache/*.deb
+        key: ${{ runner.os }}-${{ runner.arch }}-freebsd-apt-${{ steps.apt-cache-week.outputs.week }}-${{ hashFiles('.github/workflows/ci.yml') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-freebsd-apt-
+
+    - name: Restore apt package archives
+      run: |
+        mkdir -p "$RUNNER_TEMP/apt-cache"
+        if compgen -G "$RUNNER_TEMP/apt-cache/*.deb" > /dev/null; then
+          sudo cp -n "$RUNNER_TEMP"/apt-cache/*.deb /var/cache/apt/archives/
+        fi
+
     - name: Build, Check, and Test
       timeout-minutes: 15
       uses: vmactions/freebsd-vm@v1
@@ -81,6 +127,11 @@ jobs:
           (cd tests/abi; ./run.sh)
           (cd tests/abi; ABI_CFLAGS=-O2 ./run.sh "" "" -o:speed)
           ./odin check tests/benchmark -vet -strict-style -no-entry-point
+
+      # Need to save all downloaded apt packages in "$RUNNER_TEMP/apt-cache/" so that actions/cache@v5 will pick them up
+    - name: Save apt package archives
+      run: sudo cp /var/cache/apt/archives/*.deb "$RUNNER_TEMP/apt-cache/"
+
   ci:
     strategy:
       fail-fast: false
@@ -91,21 +142,9 @@ jobs:
     timeout-minutes: 15
     steps:
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      # Persist apt package cache across runs.
-      #
-      # This is needed especially for riscv64 because the apt package servers can be slow.
-      # On a cache miss, actions/cache saves the configured .deb files at job completion.
-      # It restores the exact key if available, otherwise one cache matching the restore-key prefix.
-      # Cache entries are immutable, so an exact-key hit will not be updated with new archives.
-      # The cache action runs as the runner user, so we use a runner-writable directory
-      # "$RUNNER_TEMP/apt-cache/", and copy archives to (and later from) apt's root-owned
-      # "/var/cache/apt/archives" directory.
-      # We also want to rotate the key weekly to ensure that we occasionally get a fresh
-      # archive even if ci.yml never changes. This is a bit of a hack, maybe this could be done better.
-      # Note that out of date packages in the cache aren't a problem because apt will automatically
-      # download the newest version if necessary.
+        # Persist apt package cache across runs (see NOTE at end of file).
       - name: Get apt cache week
         if: matrix.os != 'macos-latest'
         id: apt-cache-week
@@ -113,7 +152,7 @@ jobs:
 
       - name: Cache apt package archives
         if: matrix.os != 'macos-latest'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/apt-cache/*.deb
           key: ${{ runner.os }}-${{ runner.arch }}-matrix-apt-${{ steps.apt-cache-week.outputs.week }}-${{ hashFiles('.github/workflows/ci.yml') }}
@@ -165,7 +204,7 @@ jobs:
         run: |
           brew install curl mbedtls
 
-      # Need to save all downloaded apt packages in "$RUNNER_TEMP/apt-cache/" so that actions/checkout@v4 will pick them up
+      # Need to save all downloaded apt packages in "$RUNNER_TEMP/apt-cache/" so that actions/cache@v5 will pick them up
       - name: Save apt package archives
         if: matrix.os != 'macos-latest'
         run: sudo cp /var/cache/apt/archives/*.deb "$RUNNER_TEMP/apt-cache/"
@@ -317,7 +356,7 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Fetch vendor libraries under test from Git LFS
         run: git lfs pull --include="vendor/lua/*/windows/*,vendor/OpenEXRCore/*.lib,vendor/sdl2/,vendor/sdl3/"
       - name: build Odin
@@ -443,27 +482,15 @@ jobs:
     name: Linux riscv64 (emulated) Build, Check and Test
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      # Persist apt package cache across runs.
-      #
-      # This is needed especially for riscv64 because the apt package servers can be slow.
-      # On a cache miss, actions/cache saves the configured .deb files at job completion.
-      # It restores the exact key if available, otherwise one cache matching the restore-key prefix.
-      # Cache entries are immutable, so an exact-key hit will not be updated with new archives.
-      # The cache action runs as the runner user, so we use a runner-writable directory
-      # "$RUNNER_TEMP/apt-cache/", and copy archives to (and later from) apt's root-owned
-      # "/var/cache/apt/archives" directory.
-      # We also want to rotate the key weekly to ensure that we occasionally get a fresh
-      # archive even if ci.yml never changes. This is a bit of a hack, maybe this could be done better.
-      # Note that out of date packages in the cache aren't a problem because apt will automatically
-      # download the newest version if necessary.
+        # Persist apt package cache across runs (see NOTE at end of file).
       - name: Get apt cache week
         id: apt-cache-week
         run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
 
       - name: Cache apt package archives
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/apt-cache/*.deb
           key: ${{ runner.os }}-${{ runner.arch }}-riscv64-apt-${{ steps.apt-cache-week.outputs.week }}-${{ hashFiles('.github/workflows/ci.yml') }}
@@ -491,7 +518,7 @@ jobs:
       - name: Install riscv64 toolchain and qemu
         run: sudo apt-get install -y qemu-user qemu-user-static gcc-12-riscv64-linux-gnu libc6-riscv64-cross
 
-      # Need to save all downloaded apt packages in "$RUNNER_TEMP/apt-cache/" so that actions/checkout@v4 will pick them up
+        # Need to save all downloaded apt packages in "$RUNNER_TEMP/apt-cache/" so that actions/cache@v5 will pick them up
       - name: Save apt package archives
         run: sudo cp /var/cache/apt/archives/*.deb "$RUNNER_TEMP/apt-cache/"
 
@@ -538,3 +565,17 @@ jobs:
           cd tests/abi
           ./run.sh linux_riscv64 riscv64-linux-gnu "-extra-linker-flags:-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
           ABI_CFLAGS=-O2 ./run.sh linux_riscv64 riscv64-linux-gnu "-extra-linker-flags:-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath -o:speed
+
+# NOTE: Persisting apt package cache across runs.
+#
+# This is needed especially for riscv64 because the apt package servers can be slow.
+# On a cache miss, actions/cache saves the configured .deb files at job completion.
+# It restores the exact key if available, otherwise one cache matching the restore-key prefix.
+# Cache entries are immutable, so an exact-key hit will not be updated with new archives.
+# The cache action runs as the runner user, so we use a runner-writable directory
+# "$RUNNER_TEMP/apt-cache/", and copy archives to (and later from) apt's root-owned
+# "/var/cache/apt/archives" directory.
+# We also want to rotate the key weekly to ensure that we occasionally get a fresh
+# archive even if ci.yml never changes. This is a bit of a hack, maybe this could be done better.
+# Note that out of date packages in the cache aren't a problem because apt will automatically
+# download the newest version if necessary.
