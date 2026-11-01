@@ -117,46 +117,62 @@ This is a dire bug and should be reported to the Odin developers.
 		win32.TerminateProcess(win32.GetCurrentProcess(), 1)
 	}
 
-	if sync.mutex_guard(&stop_test_gate) {
-		intrinsics.atomic_store(&stop_test_index, local_test_index)
-		intrinsics.atomic_store(&stop_test_signal, code)
-		passed: bool
-		check_passing: {
-			if location := local_test_assertion_raised.location; location != {} {
-				for i in 0..<local_test_expected_failures.location_count {
-					if local_test_expected_failures.locations[i] == location {
-						passed = true
-						break check_passing
-					}
-				}
-			}
-			if message := local_test_assertion_raised.message; message != "" {
-				for i in 0..<local_test_expected_failures.message_count {
-					if local_test_expected_failures.messages[i] == message {
-						passed = true
-						break check_passing
-					}
-				}
-			}
-			signal := local_test_expected_failures.signal
-			switch signal {
-			case libc.SIGILL:  passed = code == win32.EXCEPTION_ILLEGAL_INSTRUCTION || code == win32.EXCEPTION_ARRAY_BOUNDS_EXCEEDED
-			case libc.SIGSEGV: passed = code == win32.EXCEPTION_ACCESS_VIOLATION
-			case libc.SIGFPE:
-				switch code {
-				case win32.EXCEPTION_FLT_DENORMAL_OPERAND ..= win32.EXCEPTION_INT_OVERFLOW:
+	stop_test(code)
+}
+
+@(private="file")
+stop_test_signal_callback :: proc "c" (sig: libc.int) {
+	context = runtime.default_context()
+
+	switch sig {
+	case libc.SIGILL:  stop_test(win32.EXCEPTION_ILLEGAL_INSTRUCTION)
+	case libc.SIGFPE:  stop_test(win32.EXCEPTION_INT_DIVIDE_BY_ZERO)
+	case libc.SIGSEGV: stop_test(win32.EXCEPTION_ACCESS_VIOLATION)
+	}
+}
+
+@(private="file")
+stop_test :: proc(code: win32.DWORD) -> ! {
+	sync.mutex_lock(&stop_test_gate)
+
+	intrinsics.atomic_store(&stop_test_index, local_test_index)
+	intrinsics.atomic_store(&stop_test_signal, code)
+	passed: bool
+	check_passing: {
+		if location := local_test_assertion_raised.location; location != {} {
+			for i in 0..<local_test_expected_failures.location_count {
+				if local_test_expected_failures.locations[i] == location {
 					passed = true
+					break check_passing
 				}
 			}
 		}
-		intrinsics.atomic_store(&stop_test_passed, passed)
-		intrinsics.atomic_store(&stop_test_alert, 1)
-
+		if message := local_test_assertion_raised.message; message != "" {
+			for i in 0..<local_test_expected_failures.message_count {
+				if local_test_expected_failures.messages[i] == message {
+					passed = true
+					break check_passing
+				}
+			}
+		}
+		signal := local_test_expected_failures.signal
+		switch signal {
+		case libc.SIGILL:  passed = code == win32.EXCEPTION_ILLEGAL_INSTRUCTION || code == win32.EXCEPTION_ARRAY_BOUNDS_EXCEEDED
+		case libc.SIGSEGV: passed = code == win32.EXCEPTION_ACCESS_VIOLATION
+		case libc.SIGFPE:
+			switch code {
+			case win32.EXCEPTION_FLT_DENORMAL_OPERAND ..= win32.EXCEPTION_INT_OVERFLOW:
+				passed = true
+			}
+		}
 	}
+	intrinsics.atomic_store(&stop_test_passed, passed)
+	intrinsics.atomic_store(&stop_test_alert, 1)
 
-	// Pass on the exeption to the next handler. As we don't wont to recover from it.
-	// This also allows debuggers handle it properly.
-	return win32.EXCEPTION_CONTINUE_SEARCH
+	for {
+		// Idle until the runner terminates this thread.
+		win32.Sleep(win32.INFINITE)
+	}
 }
 
 _setup_signal_handler :: proc() {
@@ -178,6 +194,11 @@ _setup_signal_handler :: proc() {
 _setup_task_signal_handler :: proc(test_index: int) {
 	local_test_index = test_index
 	local_test_index_set = true
+
+	// Catch `libc.raise`. The C runtime keeps these handlers per thread.
+	libc.signal(libc.SIGILL,  stop_test_signal_callback)
+	libc.signal(libc.SIGFPE,  stop_test_signal_callback)
+	libc.signal(libc.SIGSEGV, stop_test_signal_callback)
 }
 
 _should_stop_runner :: proc() -> bool {

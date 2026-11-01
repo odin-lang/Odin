@@ -39,7 +39,8 @@ Stop_Reason :: enum {
 }
 
 test_assertion_failure_proc :: proc(prefix, message: string, loc: runtime.Source_Code_Location) -> ! {
-	if local_test_expected_failures.message_count + local_test_expected_failures.location_count > 0 {
+	if local_test_expected_failures.signal != 0 ||
+	   local_test_expected_failures.message_count + local_test_expected_failures.location_count > 0 {
 		local_test_assertion_raised = { message, loc }
 		log.debugf("%s\n\tmessage: %q\n\tlocation: %w", prefix, message, loc)
 	} else {
@@ -53,6 +54,8 @@ setup_signal_handler :: proc() {
 }
 
 setup_task_signal_handler :: proc(test_index: int) {
+	local_test_expected_failures = {}
+	local_test_assertion_raised  = {}
 	_setup_task_signal_handler(test_index)
 }
 
