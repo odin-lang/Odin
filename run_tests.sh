@@ -58,7 +58,8 @@ cp "$here"/vendor/lua/5.4/linux/*.so "$vendor_build"/
 cp "$here"/vendor/lua/5.4/windows/*.dll "$vendor_build"/
 (
 	cd "$vendor_build"
-	LD_LIBRARY_PATH="$vendor_build${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" "$ODIN" test .. -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
+	# NOTE: Using -file with all.odin is a workaround for a bug - you cannot build or test `..` on Linux for some reason.
+	LD_LIBRARY_PATH="$vendor_build${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" "$ODIN" test ../all.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
 )
 rm -rf "$vendor_build"
 
@@ -75,7 +76,7 @@ if [[ -z "${ODIN_TESTS_NO_CLANG:-}" ]]; then
 	(
 		cd "$here/tests/abi"
 		ABI_CFLAGS= ./run.sh
-		ABI_CFLAGS=-O2 ./run.sh -o:speed
+		ABI_CFLAGS=-O2 ./run.sh "" "" -o:speed
 	)
 fi
 
