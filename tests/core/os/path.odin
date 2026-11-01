@@ -6,6 +6,8 @@ import "core:log"
 import "core:testing"
 import "core:slice"
 import "core:strings"
+import "core:sync"
+import "core:thread"
 
 @(test)
 test_executable :: proc(t: ^testing.T) {
@@ -586,4 +588,78 @@ delete_split :: proc(s: []string) {
 		delete(part)
 	}
 	delete(s)
+}
+
+@(test)
+test_make_directory_all :: proc(t: ^testing.T) {
+	root, err_temp := os.make_directory_temp("", "mkdir_all_*", context.allocator)
+	testing.expect_value(t, err_temp, nil)
+	defer delete(root)
+	defer os.remove_all(root)
+
+	nested, _ := os.join_path({root, "a", "b", "c"}, context.allocator)
+	defer delete(nested)
+	testing.expect_value(t, os.make_directory_all(nested), nil)
+	testing.expect(t, os.is_dir(nested))
+	// Windows reports an existing directory as success; the other targets report `.Exist`.
+	when ODIN_OS == .Windows {
+		testing.expect_value(t, os.make_directory_all(nested), nil)
+	} else {
+		testing.expect_value(t, os.make_directory_all(nested), os.General_Error.Exist)
+	}
+
+	file, _ := os.join_path({root, "file"}, context.allocator)
+	defer delete(file)
+	testing.expect_value(t, os.write_entire_file(file, "x"), nil)
+
+	under_file, _ := os.join_path({file, "sub"}, context.allocator)
+	defer delete(under_file)
+	testing.expect(t, os.make_directory_all(under_file) != nil)
+	testing.expect(t, !os.is_dir(under_file))
+}
+
+// Several threads make directories that share their missing parents, so they
+// race to create each parent. Losing that race must not fail the call.
+@(test)
+test_make_directory_all_concurrently :: proc(t: ^testing.T) {
+	THREADS :: 8
+	ROUNDS  :: 50
+
+	Job :: struct {
+		path:    string,
+		barrier: ^sync.Barrier,
+		err:     os.Error,
+	}
+
+	root, err_temp := os.make_directory_temp("", "mkdir_all_*", context.allocator)
+	testing.expect_value(t, err_temp, nil)
+	defer delete(root)
+	defer os.remove_all(root)
+
+	for round in 0..<ROUNDS {
+		barrier: sync.Barrier
+		sync.barrier_init(&barrier, THREADS)
+
+		jobs:    [THREADS]Job
+		threads: [THREADS]^thread.Thread
+		for &job, i in jobs {
+			job.path, _ = os.join_path({root, fmt.tprintf("r%d", round), "shared", "a", "b", fmt.tprintf("t%d", i)}, context.allocator)
+			job.barrier = &barrier
+		}
+		for &job, i in jobs {
+			threads[i] = thread.create_and_start_with_poly_data(&job, proc(job: ^Job) {
+				sync.barrier_wait(job.barrier)
+				job.err = os.make_directory_all(job.path)
+			})
+		}
+		for th in threads {
+			thread.join(th)
+			thread.destroy(th)
+		}
+		for job in jobs {
+			testing.expectf(t, job.err == nil, "make_directory_all(%q) = %v", job.path, job.err)
+			testing.expectf(t, os.is_dir(job.path), "%q was not created", job.path)
+			delete(job.path)
+		}
+	}
 }
