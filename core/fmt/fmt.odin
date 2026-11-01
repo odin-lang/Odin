@@ -1126,33 +1126,11 @@ _stage_end :: proc(s: ^io.Stage_Writer, out: io.Writer, fi: ^Info) {
 
 @(private, require_results)
 _write_fast :: proc(fi: ^Info, p: []byte) -> bool {
-	// NOTE(bill): Most writes are a few bytes, too short to be worth a call to `memcpy`
-	copy_bytes :: #force_inline proc "contextless" (dst: [^]byte, p: []byte) {
-		n, src := len(p), raw_data(p)
-		switch {
-		case n > 16:
-			intrinsics.mem_copy(dst, src, n)
-		case n >= 8:
-			a := intrinsics.unaligned_load((^u64)(&src[0]))
-			b := intrinsics.unaligned_load((^u64)(&src[n-8]))
-			intrinsics.unaligned_store((^u64)(&dst[0]),   a)
-			intrinsics.unaligned_store((^u64)(&dst[n-8]), b)
-		case n >= 4:
-			a := intrinsics.unaligned_load((^u32)(&src[0]))
-			b := intrinsics.unaligned_load((^u32)(&src[n-4]))
-			intrinsics.unaligned_store((^u32)(&dst[0]),   a)
-			intrinsics.unaligned_store((^u32)(&dst[n-4]), b)
-		case n > 0:
-			a, b, c := src[0], src[n/2], src[n-1]
-			dst[0], dst[n/2], dst[n-1] = a, b, c
-		}
-	}
-
 	switch fi.writer.procedure {
 	case io._stage_writer_proc:
 		s := (^io.Stage_Writer)(fi.writer.data)
 		if len(p) <= len(s.buf)-s.len {
-			copy_bytes(raw_data(s.buf)[s.len:], p)
+			intrinsics.mem_copy(raw_data(s.buf)[s.len:], raw_data(p), len(p))
 			s.len += len(p)
 			fi.n  += len(p)
 			return true
@@ -1161,7 +1139,7 @@ _write_fast :: proc(fi: ^Info, p: []byte) -> bool {
 		b := (^strings.Builder)(fi.writer.data)
 		if n := len(b.buf); len(p) <= cap(b.buf)-n {
 			(^runtime.Raw_Dynamic_Array)(&b.buf).len = n + len(p)
-			copy_bytes(raw_data(b.buf)[n:], p)
+			intrinsics.mem_copy(raw_data(b.buf)[n:], raw_data(p), len(p))
 			fi.n += len(p)
 			return true
 		}
