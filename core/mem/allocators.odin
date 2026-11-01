@@ -1892,9 +1892,6 @@ _dynamic_arena_cycle_new_block :: proc(a: ^Dynamic_Arena, alignment: int, loc :=
 	if a.block_allocator.procedure == nil {
 		panic("You must call `dynamic_arena_init` on a Dynamic Arena before using it.", loc)
 	}
-	if a.current_block != nil {
-		append(&a.used_blocks, a.current_block, loc=loc)
-	}
 	new_block: rawptr
 	if len(a.unused_blocks) > 0 {
 		new_block = pop(&a.unused_blocks)
@@ -1908,8 +1905,17 @@ _dynamic_arena_cycle_new_block :: proc(a: ^Dynamic_Arena, alignment: int, loc :=
 			nil,
 			0,
 		)
+		if err != nil {
+			return
+		}
+		if data == nil {
+			return .Out_Of_Memory
+		}
 		// sanitizer.address_poison(data)
 		new_block = raw_data(data)
+	}
+	if a.current_block != nil {
+		append(&a.used_blocks, a.current_block, loc=loc)
 	}
 	a.bytes_left    = a.block_size
 	a.current_pos   = new_block
