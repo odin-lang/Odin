@@ -51,8 +51,9 @@ when NO_DEFAULT_TEMP_ALLOCATOR {
 
 	@(require_results)
 	default_temp_allocator_temp_begin :: proc(loc := #caller_location) -> (temp: Arena_Temp) {
-		if context.temp_allocator.data == &global_default_temp_allocator_data {
-			temp = arena_temp_begin(&global_default_temp_allocator_data.arena, loc)
+		if context.temp_allocator.procedure == default_temp_allocator_proc && context.temp_allocator.data != nil {
+			s := (^Default_Temp_Allocator)(context.temp_allocator.data)
+			temp = arena_temp_begin(&s.arena, loc)
 		}
 		return
 	}

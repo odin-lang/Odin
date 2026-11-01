@@ -75,13 +75,12 @@ Thread :: struct {
 	// **IMPORTANT**:
 	// By default, the thread proc will get the same context as `main()` gets.
 	// In this situation, the thread will get a new temporary allocator which
-	// will be cleaned up when the thread dies. ***This does NOT happen when
-	// `init_context` field is initialized***.
+	// will be cleaned up when the thread dies.
 	//
-	// If `init_context` is initialized, and `temp_allocator` field is set to
-	// the default temp allocator, then `runtime.default_temp_allocator_destroy()`
-	// procedure needs to be called from the thread procedure, in order to prevent
-	// any memory leaks.
+	// If `init_context` is initialized, and its `temp_allocator` field is set to
+	// the default temp allocator, the thread uses its own thread-local temp
+	// allocator instead, which is also cleaned up when the thread dies. All other
+	// allocators in `init_context` are the caller's responsibility.
 	init_context: Maybe(runtime.Context),
 	// The allocator used to allocate data for the thread.
 	creation_allocator: mem.Allocator,
@@ -197,9 +196,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 Optionally specify the thread's name/description.
 the name/description will be truncated to fit the OS's limit.
 
-**IMPORTANT**: If `init_context` is specified and the default temporary allocator
-is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
-in order to free the resources associated with the temporary allocations.
+**IMPORTANT**: If `init_context` is specified and its `temp_allocator` is the default
+temporary allocator, the thread gets its own thread-local temporary allocator, which is
+destroyed automatically when the thread exits. Any other allocators in `init_context`
+are the caller's responsibility.
 */
 @(synchronizes=.Release)
 run :: proc(fn: proc(), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, name: Maybe(string) = nil) {
@@ -216,9 +216,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 Optionally specify the thread's name/description.
 the name/description will be truncated to fit the OS's limit.
 
-**IMPORTANT**: If `init_context` is specified and the default temporary allocator
-is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
-in order to free the resources associated with the temporary allocations.
+**IMPORTANT**: If `init_context` is specified and its `temp_allocator` is the default
+temporary allocator, the thread gets its own thread-local temporary allocator, which is
+destroyed automatically when the thread exits. Any other allocators in `init_context`
+are the caller's responsibility.
 */
 @(synchronizes=.Release)
 run_with_data :: proc(data: rawptr, fn: proc(data: rawptr), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, name: Maybe(string) = nil) {
@@ -235,9 +236,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 Optionally specify the thread's name/description.
 the name/description will be truncated to fit the OS's limit.
 
-**IMPORTANT**: If `init_context` is specified and the default temporary allocator
-is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
-in order to free the resources associated with the temporary allocations.
+**IMPORTANT**: If `init_context` is specified and its `temp_allocator` is the default
+temporary allocator, the thread gets its own thread-local temporary allocator, which is
+destroyed automatically when the thread exits. Any other allocators in `init_context`
+are the caller's responsibility.
 */
 @(synchronizes=.Release)
 run_with_poly_data :: proc(data: $T, fn: proc(data: T), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, name: Maybe(string) = nil)
@@ -255,9 +257,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 Optionally specify the thread's name/description.
 the name/description will be truncated to fit the OS's limit.
 
-**IMPORTANT**: If `init_context` is specified and the default temporary allocator
-is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
-in order to free the resources associated with the temporary allocations.
+**IMPORTANT**: If `init_context` is specified and its `temp_allocator` is the default
+temporary allocator, the thread gets its own thread-local temporary allocator, which is
+destroyed automatically when the thread exits. Any other allocators in `init_context`
+are the caller's responsibility.
 */
 @(synchronizes=.Release)
 run_with_poly_data2 :: proc(arg1: $T1, arg2: $T2, fn: proc(T1, T2), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, name: Maybe(string) = nil)
@@ -275,9 +278,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 Optionally specify the thread's name/description.
 the name/description will be truncated to fit the OS's limit.
 
-**IMPORTANT**: If `init_context` is specified and the default temporary allocator
-is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
-in order to free the resources associated with the temporary allocations.
+**IMPORTANT**: If `init_context` is specified and its `temp_allocator` is the default
+temporary allocator, the thread gets its own thread-local temporary allocator, which is
+destroyed automatically when the thread exits. Any other allocators in `init_context`
+are the caller's responsibility.
 */
 @(synchronizes=.Release)
 run_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: proc(arg1: T1, arg2: T2, arg3: T3), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, name: Maybe(string) = nil)
@@ -295,9 +299,10 @@ to execute. The thread will have priority specified by the `priority` parameter.
 Optionally specify the thread's name/description.
 the name/description will be truncated to fit the OS's limit.
 
-**IMPORTANT**: If `init_context` is specified and the default temporary allocator
-is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
-in order to free the resources associated with the temporary allocations.
+**IMPORTANT**: If `init_context` is specified and its `temp_allocator` is the default
+temporary allocator, the thread gets its own thread-local temporary allocator, which is
+destroyed automatically when the thread exits. Any other allocators in `init_context`
+are the caller's responsibility.
 */
 @(synchronizes=.Release)
 run_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: $T4, fn: proc(arg1: T1, arg2: T2, arg3: T3, arg4: T4), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, name: Maybe(string) = nil)
@@ -322,9 +327,10 @@ the name/description will be truncated to fit the OS's limit.
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
 
-**IMPORTANT**: If `init_context` is specified and the default temporary allocator
-is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
-in order to free the resources associated with the temporary allocations.
+**IMPORTANT**: If `init_context` is specified and its `temp_allocator` is the default
+temporary allocator, the thread gets its own thread-local temporary allocator, which is
+destroyed automatically when the thread exits. Any other allocators in `init_context`
+are the caller's responsibility.
 */
 @(synchronizes=.Release)
 create_and_start :: proc(fn: proc(), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false, name: Maybe(string) = nil) -> (t: ^Thread) {
@@ -361,9 +367,10 @@ the name/description will be truncated to fit the OS's limit.
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
 
-**IMPORTANT**: If `init_context` is specified and the default temporary allocator
-is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
-in order to free the resources associated with the temporary allocations.
+**IMPORTANT**: If `init_context` is specified and its `temp_allocator` is the default
+temporary allocator, the thread gets its own thread-local temporary allocator, which is
+destroyed automatically when the thread exits. Any other allocators in `init_context`
+are the caller's responsibility.
 */
 @(synchronizes=.Release)
 create_and_start_with_data :: proc(data: rawptr, fn: proc(data: rawptr), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false, name: Maybe(string) = nil) -> (t: ^Thread) {
@@ -404,9 +411,10 @@ the name/description will be truncated to fit the OS's limit.
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
 
-**IMPORTANT**: If `init_context` is specified and the default temporary allocator
-is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
-in order to free the resources associated with the temporary allocations.
+**IMPORTANT**: If `init_context` is specified and its `temp_allocator` is the default
+temporary allocator, the thread gets its own thread-local temporary allocator, which is
+destroyed automatically when the thread exits. Any other allocators in `init_context`
+are the caller's responsibility.
 */
 @(synchronizes=.Release)
 create_and_start_with_poly_data :: proc(data: $T, fn: proc(data: T), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false, name: Maybe(string) = nil) -> (t: ^Thread)
@@ -453,9 +461,10 @@ the name/description will be truncated to fit the OS's limit.
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
 
-**IMPORTANT**: If `init_context` is specified and the default temporary allocator
-is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
-in order to free the resources associated with the temporary allocations.
+**IMPORTANT**: If `init_context` is specified and its `temp_allocator` is the default
+temporary allocator, the thread gets its own thread-local temporary allocator, which is
+destroyed automatically when the thread exits. Any other allocators in `init_context`
+are the caller's responsibility.
 */
 @(synchronizes=.Release)
 create_and_start_with_poly_data2 :: proc(arg1: $T1, arg2: $T2, fn: proc(T1, T2), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false, name: Maybe(string) = nil) -> (t: ^Thread)
@@ -508,9 +517,10 @@ the name/description will be truncated to fit the OS's limit.
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
 
-**IMPORTANT**: If `init_context` is specified and the default temporary allocator
-is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
-in order to free the resources associated with the temporary allocations.
+**IMPORTANT**: If `init_context` is specified and its `temp_allocator` is the default
+temporary allocator, the thread gets its own thread-local temporary allocator, which is
+destroyed automatically when the thread exits. Any other allocators in `init_context`
+are the caller's responsibility.
 */
 @(synchronizes=.Release)
 create_and_start_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: proc(arg1: T1, arg2: T2, arg3: T3), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false, name: Maybe(string) = nil) -> (t: ^Thread)
@@ -565,9 +575,10 @@ the name/description will be truncated to fit the OS's limit.
 **Do not** dereference the `^Thread` pointer, if this flag is specified.
 That includes calling `join`, which needs to dereference ^Thread`.
 
-**IMPORTANT**: If `init_context` is specified and the default temporary allocator
-is used, the thread procedure needs to call `runtime.default_temp_allocator_destroy()`
-in order to free the resources associated with the temporary allocations.
+**IMPORTANT**: If `init_context` is specified and its `temp_allocator` is the default
+temporary allocator, the thread gets its own thread-local temporary allocator, which is
+destroyed automatically when the thread exits. Any other allocators in `init_context`
+are the caller's responsibility.
 */
 @(synchronizes=.Release)
 create_and_start_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: $T4, fn: proc(arg1: T1, arg2: T2, arg3: T3, arg4: T4), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, self_cleanup := false, name: Maybe(string) = nil) -> (t: ^Thread)
@@ -630,6 +641,13 @@ _maybe_destroy_default_temp_allocator :: proc(init_context: Maybe(runtime.Contex
 	if init_context != nil {
 		// NOTE(tetra, 2023-05-31): If the user specifies a custom context for the thread,
 		// then it's entirely up to them to handle whatever allocators they're using.
+		// The exception is the thread-local default temp allocator.
+		when !ODIN_DEFAULT_TO_NIL_ALLOCATOR {
+			if context.temp_allocator.procedure == runtime.default_temp_allocator_proc &&
+			   context.temp_allocator.data == &runtime.global_default_temp_allocator_data {
+				runtime.default_temp_allocator_destroy(&runtime.global_default_temp_allocator_data)
+			}
+		}
 		return
 	}
 
