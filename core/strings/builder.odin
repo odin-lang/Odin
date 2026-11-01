@@ -156,7 +156,6 @@ builder_init :: proc{
 	builder_init_len,
 	builder_init_len_cap,
 }
-@(private)
 _builder_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
 	b := (^Builder)(stream_data)
 	#partial switch mode {
@@ -452,10 +451,7 @@ Example:
 
 */
 write_bytes :: proc(b: ^Builder, x: []byte, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
-	n0 := len(b.buf)
-	append(&b.buf, ..x, loc=loc) or_return
-	n1 := len(b.buf)
-	return n1-n0, nil
+	return append(&b.buf, ..x, loc=loc)
 }
 
 
@@ -496,15 +492,11 @@ Output:
 
 */
 write_rune :: proc(b: ^Builder, r: rune, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
-	n0 := len(b.buf)
 	if r < utf8.RUNE_SELF {
-		append(&b.buf, cast(byte)r, loc) or_return
-	} else {
-		buf, w := utf8.encode_rune(r)
-		append(&b.buf, ..buf[:w], loc=loc) or_return
+		return append(&b.buf, cast(byte)r, loc)
 	}
-	n1 := len(b.buf)
-	return n1-n0, nil
+	buf, w := utf8.encode_rune(r)
+	return append(&b.buf, ..buf[:w], loc=loc)
 }
 
 
@@ -611,8 +603,9 @@ distinguish malformed sequences from literal replacement characters, so both are
 The backing dynamic array may be fixed in capacity or fail to resize; `n` states the number actually written.
 */
 write_string16 :: proc(b: ^Builder, str: string16, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
-	result := strconv.write_string16_dynamic_array(&b.buf, str, loc=loc) or_return
-	return len(result), nil
+	n0 := len(b.buf)
+	_, err = strconv.write_string16_dynamic_array(&b.buf, str, loc=loc)
+	return len(b.buf)-n0, err
 }
 
 
@@ -704,8 +697,9 @@ Output:
 
 */
 write_quoted_string :: proc(b: ^Builder, str: string, quote: byte = '"', options: strconv.Rune_Escaping_Options = nil, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
-	result := strconv.quote_string_dynamic_array(&b.buf, str, quote, options = options, loc = loc) or_return
-	return len(result), nil
+	n0 := len(b.buf)
+	_, err = strconv.quote_string_dynamic_array(&b.buf, str, quote, options = options, loc = loc)
+	return len(b.buf)-n0, err
 }
 
 
@@ -737,8 +731,9 @@ distinguish malformed sequences from literal replacement characters, so both are
 The backing dynamic array may be fixed in capacity or fail to resize; `n` states the number actually written.
 */
 write_quoted_string16 :: proc(b: ^Builder, str: string16, quote: byte = '"', options: strconv.Rune_Escaping_Options = nil, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
-	result := strconv.quote_string16_dynamic_array(&b.buf, str, quote, options = options, loc = loc) or_return
-	return len(result), nil
+	n0 := len(b.buf)
+	_, err = strconv.quote_string16_dynamic_array(&b.buf, str, quote, options = options, loc = loc)
+	return len(b.buf)-n0, err
 }
 
 

@@ -1,6 +1,7 @@
 package io
 
 import "core:strconv"
+import "core:unicode"
 import "core:unicode/utf8"
 import "core:unicode/utf16"
 
@@ -74,7 +75,7 @@ write_f32 :: proc(w: Writer, val: f32, n_written: ^int = nil) -> (n: int, err: E
 	buf: [386]byte
 	str := strconv.write_float(buf[:], f64(val), 'f', 2*size_of(val), 8*size_of(val), nil)
 	return write_string(w, str, n_written)
-}	
+}
 write_f64 :: proc(w: Writer, val: f64, n_written: ^int = nil) -> (n: int, err: Error) {
 	// COMPAT: Previously, this used to strip the '+' sign from "+Inf",
 	//         unlike all other float formatting functions in core.
@@ -196,44 +197,63 @@ Invalid UTF-8 bytes in `str` are written as hexadecimal byte escapes. If the Wri
 output before returning an error, `n` reports the number of bytes written.
 */
 write_quoted_string :: proc(w: Writer, str: string, quote: byte = '"', n_written: ^int = nil, options: strconv.Rune_Escaping_Options = nil) -> (n: int, err: Error) {
+	@(require_results)
+	quotes_as_itself :: proc(r: rune, width: int, quote: byte, options: strconv.Rune_Escaping_Options) -> bool {
+		switch {
+		case width == 1 && r == utf8.RUNE_ERROR:
+			return false
+		case r == '\\' || (quote != 0 && r == rune(quote)):
+			return false
+		case .html_safe in options && (r == '<' || r == '>' || r == '&'):
+			return false
+		}
+		return unicode.is_printable(r) && (r < utf8.RUNE_SELF || .ascii_compatible not_in options)
+	}
+
 	defer if n_written != nil {
 		n_written^ += n
 	}
 
 	write_byte(w, quote, &n) or_return
 
-	s := str
+	// NOTE(bill): A run of runes that encode as themselves is written in one go
+	run := 0
+	for i := 0; i < len(str); /**/ {
+		r, width := rune(str[i]), 1
+		if r >= utf8.RUNE_SELF {
+			r, width = utf8.decode_rune_in_string(str[i:])
+		}
+		if quotes_as_itself(r, width, quote, options) {
+			i += width
+			continue
+		}
 
-	for len(s) > 0 {
-		r := cast(rune)s[0]
-		width := 1
-		if r < utf8.RUNE_SELF {
-			// r contains the entire UTF-8 codepoint already.
-		} else {
-			// Multi-byte codepoint. Must decode.
-			r, width = utf8.decode_rune_in_string(s)
-			assert(width > 0)
+		if run < i {
+			write_string(w, str[run:i], &n) or_return
 		}
 		if width == 1 && r == utf8.RUNE_ERROR {
-			// Indicates UTF-8 encoding error.
 			// Encode the byte exactly as it was found in the input string: `\x##`
-			write_string(w, `\x`, &n)                     or_return
-			write_byte(w, strconv.digits[s[0] >> 4], &n)  or_return
-			write_byte(w, strconv.digits[s[0] & 0xf], &n) or_return
+			write_string(w, `\x`, &n)                       or_return
+			write_byte(w, strconv.digits[str[i] >> 4], &n)  or_return
+			write_byte(w, strconv.digits[str[i] & 0xf], &n) or_return
 		} else {
 			encoded_rune_buf: [strconv.ESCAPED_RUNE_MAX_NEEDED_BYTES]byte
 			encoded_rune, encode_rune_ok := strconv.encode_and_escape_rune(encoded_rune_buf[:], r, quote, options = options)
 			assert(encode_rune_ok == true)
 			write_string(w, encoded_rune, &n) or_return
 		}
-		// Advance input cursor to the next codepoint.
-		s = s[width:]
+		i  += width
+		run = i
+	}
+	if run < len(str) {
+		write_string(w, str[run:], &n) or_return
 	}
 
 	write_byte(w, quote, &n) or_return
 
 	return
 }
+
 
 /*
 Writes `str` to the Writer `w`, enclosed in `quote` characters, escaping runes as needed.

@@ -2776,7 +2776,7 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 		// No return values
 
 		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr, pos);
-		
+
 		// Check for terminator in the defer stmts
 		LLVMValueRef instr = LLVMGetLastInstruction(p->curr_block->block);
 		if (!lb_is_instr_terminating(instr)) {
