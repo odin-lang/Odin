@@ -55,7 +55,9 @@ _get_current_thread_id :: proc "contextless" () -> int {
 _get_processor_core_count :: proc() -> (core_count: int) {
 	cpu_set: [128]u64
 	if n, err := linux.sched_getaffinity(0, size_of(cpu_set), &cpu_set); err == nil {
-		for set in cpu_set[:n / 8] {
+		// n counts bytes in whole `long`s, so 4 on a 32-bit kernel with up to 32 CPUs. Round up, as the rest of
+		// cpu_set is still zero.
+		for set in cpu_set[:(n + 7) / 8] {
 			core_count += int(intrinsics.count_ones(set))
 		}
 	}
