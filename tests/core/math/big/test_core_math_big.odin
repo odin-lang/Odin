@@ -417,6 +417,55 @@ atoi :: proc(t: ^testing.T, i: ^big.Int, a: string, loc := #caller_location) -> 
 }
 
 @(test)
+test_atoi :: proc(t: ^testing.T) {
+	a, b := &big.Int{}, &big.Int{}
+	defer big.destroy(a, b)
+
+	// Read back what `_itoa_raw_old` writes, in every radix, from a single input digit up to
+	// several chunks, and for negative numbers.
+	sizes := [?]int{8, 64, 200, 2048}
+	for bits in sizes {
+		for negative in ([?]bool{false, true}) {
+			big.random(a, bits)
+			if negative {
+				big.neg(a, a)
+			}
+			for radix in 2..=64 {
+				size, _ := big.radix_size(a, i8(radix), false)
+				buffer := make([]u8, size)
+				defer delete(buffer)
+				written, _ := big._itoa_raw_old(a, i8(radix), buffer, false)
+				input := string(buffer[:written])
+
+				testing.expect_value(t, big.atoi(b, input, i8(radix)), nil)
+				equal, _ := big.equals(a, b)
+				testing.expectf(t, equal, "radix %v: atoi(%q) read back a different number", radix, input)
+			}
+		}
+	}
+
+	// A trailing '\r' or '\n' ends the number, also in the middle of a chunk.
+	Case :: struct {
+		input:    string,
+		radix:    i8,
+		expected: string,
+	}
+	cases := [?]Case{
+		{"1F\n", 16, "31"},
+		{"-ff\r\n", 16, "-255"},
+		{"123\r\n", 10, "123"},
+		{"1234567890123456789012345\n", 10, "1234567890123456789012345"},
+		{"00000000000000000000000000000000000012", 10, "12"},
+	}
+	for c in cases {
+		testing.expect_value(t, big.atoi(b, c.input, c.radix), nil)
+		str, _ := big.itoa(b, 10)
+		defer delete(str)
+		testing.expectf(t, str == c.expected, "atoi(%q, %v) = %v, expected %v", c.input, c.radix, str, c.expected)
+	}
+}
+
+@(test)
 test_itoa :: proc(t: ^testing.T) {
 	a := &big.Int{}
 	big.random(a, 2048)

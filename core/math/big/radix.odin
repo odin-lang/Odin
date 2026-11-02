@@ -221,17 +221,7 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 		return written, nil
 	}
 
-	// NOTE(Jeroen): The new method is faster for an `Int` up to ~32768 bits in size with optimizations.
-	//               At `.None` or `.Minimal`, it appears to always be faster.
-	//               If we optimize `itoa` further, this needs to be evaluated.
-	itoa_method := _itoa_raw_full
-
-	when ODIN_OPTIMIZATION_MODE >= .Size {
-		if count >= 32768 {
-			itoa_method = _itoa_raw_old
-		}
-	}
-	return itoa_method(a, radix, buffer, zero_terminate)
+	return _itoa_raw_full(a, radix, buffer, zero_terminate)
 }
 
 itoa :: proc{int_itoa_string, int_itoa_raw}
@@ -331,7 +321,7 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context
 			chunk_count += 1
 			input = input[1:]
 
-			if chunk_count == digits_per_chunk || len(input) == 0 {
+			if chunk_count == digits_per_chunk {
 				// Submit chunk.
 				// NOTE(bplu4t2f): Maybe this could be optimized further. For any given input digit,
 				//                 we can predict exactly where it will go in the output, eliminating
@@ -347,11 +337,47 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context
 			}
 		}
 
+		/*
+			Submit the last, partial chunk. The loop can also stop early at a trailing '\r' or '\n'.
+		*/
+		if chunk_count > 0 {
+			if res.used == 0 {
+				internal_set(res, chunk_value) or_return
+			} else {
+				internal_shl(res, res, bits_per_digit * chunk_count) or_return
+				internal_add(res, res, chunk_value) or_return
+			}
+		}
+
 	} else {
 
 		/*
 			Path for non-power-of-two bases.
+
+			Like above, collect as many input digits as fit into one DIGIT and fold them into the
+			result with one multiply and one add, instead of one of each per input digit.
+			For radix 10 that is 18 digits per chunk.
 		*/
+
+		digits_per_chunk := 0
+		chunk_limit      := DIGIT(1)
+		for chunk_limit < (DIGIT(1) << _DIGIT_BITS) / DIGIT(radix) {
+			chunk_limit      *= DIGIT(radix)
+			digits_per_chunk += 1
+		}
+
+		/*
+			Preallocate for ceil(log2(radix)) bits per input digit, which is a slight overestimate.
+		*/
+		bits_per_digit := 1
+		for (1 << uint(bits_per_digit)) < int(radix) {
+			bits_per_digit += 1
+		}
+		internal_grow(res, max(1, (len(input) * bits_per_digit + _DIGIT_BITS - 1) / _DIGIT_BITS + 1)) or_return
+
+		chunk_value := DIGIT(0)
+		chunk_scale := DIGIT(1) // radix^chunk_count
+		chunk_count := 0
 
 		for len(input) > 0 {
 			/*
@@ -379,10 +405,26 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context
 				break
 			}
 
-			internal_mul(res, res, DIGIT(radix)) or_return
-			internal_add(res, res, DIGIT(y))     or_return
-
+			chunk_value  = chunk_value * DIGIT(radix) + DIGIT(y)
+			chunk_scale *= DIGIT(radix)
+			chunk_count += 1
 			input = input[1:]
+
+			if chunk_count == digits_per_chunk {
+				internal_mul(res, res, chunk_scale) or_return
+				internal_add(res, res, chunk_value) or_return
+				chunk_value = 0
+				chunk_scale = 1
+				chunk_count = 0
+			}
+		}
+
+		/*
+			Submit the last, partial chunk.
+		*/
+		if chunk_count > 0 {
+			internal_mul(res, res, chunk_scale) or_return
+			internal_add(res, res, chunk_value) or_return
 		}
 	}
 
