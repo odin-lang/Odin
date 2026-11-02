@@ -890,6 +890,11 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 							}
 						}
 
+						bool realign =arg_type->is_byval && type_align_of(e->type) > arg_type->byval_alignment;
+						if (realign) {
+							do_callee_copy = true;
+						}
+
 						lbValue ptr = {};
 						ptr.value = LLVMGetParam(p->value, param_offset+llvm_param_index);
 						ptr.type = alloc_type_pointer(e->type);
@@ -897,7 +902,7 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 
 						if (do_callee_copy) {
 							lbValue new_ptr = lb_add_local_generated(p, e->type, false).addr;
-							if (sz <= 16) {
+							if (sz <= 16 && !realign) {
 								lb_copy_small_parameter(p, new_ptr, ptr, e->type);
 							} else {
 								lb_mem_copy_non_overlapping(p, new_ptr, ptr, lb_const_int(p->module, t_uint, sz));
@@ -3219,6 +3224,23 @@ gb_internal lbValue lb_emit_aapcs64_va_arg(lbProcedure *p, lbValue list, Type *t
 	return lb_emit_load(p, arg_ptr);
 }
 
+gb_internal lbValue lb_emit_i386_va_arg(lbProcedure *p, lbValue list, Type *type) {
+	lbModule *m = p->module;
+	i64 slot_size = align_formula(type_size_of(type), 4);
+
+	lbValue ap_ptr = lb_emit_conv(p, list, alloc_type_pointer(t_uintptr));
+	lbValue ap = lb_emit_load(p, ap_ptr);
+	lbValue next_ap = lb_emit_arith(p, Token_Add, ap, lb_const_int(m, t_uintptr, slot_size), t_uintptr);
+	lb_emit_store(p, ap_ptr, next_ap);
+
+	lbValue arg_ptr = lb_emit_conv(p, ap, alloc_type_pointer(type));
+	lbValue value = {};
+	value.type  = type;
+	value.value = LLVMBuildLoad2(p->builder, lb_type(m, type), arg_ptr.value, "");
+	LLVMSetAlignment(value.value, 4);
+	return value;
+}
+
 gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv, BuiltinProcId id) {
 	ast_node(ce, CallExpr, expr);
 
@@ -4988,6 +5010,8 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			bool is_win64 = build_context.metrics.os == TargetOs_windows && build_context.metrics.arch == TargetArch_amd64;
 			if (lb_is_aapcs64_va_list()) {
 				value = lb_emit_aapcs64_va_arg(p, ptr, promoted);
+			} else if (build_context.metrics.arch == TargetArch_i386) {
+				value = lb_emit_i386_va_arg(p, ptr, promoted);
 			} else if (is_win64 && LLVMGetTypeKind(llvm_type) == LLVMIntegerTypeKind && LLVMGetIntTypeWidth(llvm_type) < 64) {
 				LLVMValueRef slot = LLVMBuildVAArg(p->builder, ptr.value, lb_type(p->module, t_u64), "");
 				value.value = LLVMBuildTrunc(p->builder, slot, llvm_type, "");

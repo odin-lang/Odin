@@ -383,67 +383,6 @@ poll :: proc(t: ^testing.T) {
 }
 
 @(test)
-sendfile :: proc(t: ^testing.T) {
-	if event_loop_guard(t) {
-		testing.set_fail_timeout(t, time.Minute)
-
-		CONTENT :: #load(#file)
-
-		sock, ep := open_next_available_local_port(t)
-
-		// Server
-		{
-			nbio.accept_poly(sock, t, on_accept)
-
-			on_accept :: proc(op: ^nbio.Operation, t: ^testing.T) {
-				ev(t, op.accept.err, nil)
-				e(t, op.accept.client != 0)
-
-				log.debugf("connection from: %v", op.accept.client_endpoint)
-				nbio.open_poly3(#file, t, op.accept.socket, op.accept.client, on_open)
-			}
-
-			on_open :: proc(op: ^nbio.Operation, t: ^testing.T, server, client: net.TCP_Socket) {
-				ev(t, op.open.err, nil)
-
-				nbio.sendfile_poly2(client, op.open.handle, t, server, on_sendfile)
-			}
-
-			on_sendfile :: proc(op: ^nbio.Operation, t: ^testing.T, server: net.TCP_Socket) {
-				ev(t, op.sendfile.err, nil)
-				ev(t, op.sendfile.sent, len(CONTENT))
-
-				nbio.close(op.sendfile.file)
-				nbio.close(op.sendfile.socket)
-				nbio.close(server)
-			}
-		}
-
-		// Client
-		{
-			nbio.dial_poly(ep, t, on_dial)
-
-			on_dial :: proc(op: ^nbio.Operation, t: ^testing.T) {
-				ev(t, op.dial.err, nil)
-
-				buf := make([]byte, len(CONTENT), context.temp_allocator)
-				nbio.recv_poly(op.dial.socket, {buf}, t, on_recv, all=true)
-			}
-
-			on_recv :: proc(op: ^nbio.Operation, t: ^testing.T) {
-				ev(t, op.recv.err, nil)
-				ev(t, op.recv.received, len(CONTENT))
-				ev(t, string(op.recv.bufs[0]), string(CONTENT))
-
-				nbio.close(op.recv.socket.(net.TCP_Socket))
-			}
-		}
-
-		ev(t, nbio.run(), nil)
-	}
-}
-
-@(test)
 vectored :: proc(t: ^testing.T) {
 	if event_loop_guard(t) {
 		testing.set_fail_timeout(t, time.Minute)

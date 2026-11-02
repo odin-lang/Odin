@@ -18,10 +18,12 @@ test_fmt_memory :: proc(t: ^testing.T) {
 	check(t, "3KiB",      "%.0M",  mem.Kilobyte * 3)
 	check(t, "3.000 mib", "%#.3m", mem.Megabyte * 3)
 	check(t, "3.50 gib",  "%#m",   u32(mem.Gigabyte * 3.5))
-	check(t, " 1tib",     "%5.0m", mem.Terabyte)
-	check(t, "-1tib",     "%5.0m", -mem.Terabyte)
-	check(t, "2 pib",     "%#5.m", uint(mem.Petabyte * 2.5))
-	check(t, "1.00 EiB",  "%#M",   mem.Exabyte)
+	when size_of(int) == 8 {
+		check(t, " 1tib",     "%5.0m", mem.Terabyte)
+		check(t, "-1tib",     "%5.0m", -mem.Terabyte)
+		check(t, "2 pib",     "%#5.m", uint(mem.Petabyte * 2.5))
+		check(t, "1.00 EiB",  "%#M",   mem.Exabyte)
+	}
 	check(t, "255 B",     "%#M",   u8(255))
 	check(t, "0b",        "%m",    u8(0))
 }
@@ -413,7 +415,9 @@ test_fmt_left_justified_padding :: proc(t: ^testing.T) {
 	check(t, "3.140   ",       "%-8f",    3.14)
 	check(t, "3.0e+02   ",     "%-10.1e", 300.0)
 	check(t, "3.000000e+00  ", "%-14e",   3.0)
-	check(t, "1tib    ",       "%-8.0m",  mem.Terabyte)
+	when size_of(int) == 8 {
+		check(t, "1tib    ",       "%-8.0m",  mem.Terabyte)
+	}
 	check(t, "0    ",          "%-5.0d",  0)
 	check(t, "0    ",          "%-5d",    0)
 	check(t, "ab   ",          "%-5s",    "ab")
@@ -427,7 +431,9 @@ test_fmt_left_justified_padding :: proc(t: ^testing.T) {
 	check(t, "00042",  "%05d",  42)
 	check(t, " 3.140", "%6f",   3.14)
 	check(t, "   -42", "%6d",   -42)
-	check(t, " 1tib",  "%5.0m", mem.Terabyte)
+	when size_of(int) == 8 {
+		check(t, " 1tib",  "%5.0m", mem.Terabyte)
+	}
 	check(t, "   ab",  "%5s",   "ab")
 	check(t, "    0",  "% 5.0d", 0)
 	check(t, "    0",  "% 5d",   0)

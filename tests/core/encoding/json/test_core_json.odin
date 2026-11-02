@@ -92,7 +92,7 @@ out_of_memory_in_parse_json :: proc(t: ^testing.T) {
 @test
 out_of_memory_in_unmarshal :: proc(t: ^testing.T) {
 	arena: virtual.Arena
-	arena_buffer: [128]byte
+	arena_buffer: [16 * size_of(rawptr)]byte
 	arena_init_error := virtual.arena_init_buffer(&arena, arena_buffer[:])
 	testing.expectf(t, arena_init_error == nil, "Expected arena initialization to not return error, got: %v\n", arena_init_error)
 
