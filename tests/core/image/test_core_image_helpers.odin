@@ -107,8 +107,8 @@ image_blend_partial_alpha :: proc(t: ^testing.T) {
 	for fg := 0; fg < 65536; fg += 4099 {
 		for bg := 0; bg < 65536; bg += 5003 {
 			for a := 0; a < 65536; a += 97 {
-				got  := int(image.blend(u16(fg), u16(a), u16(bg)))
-				want := (fg * a + bg * (65535 - a)) / 65535
+				got  := i64(image.blend(u16(fg), u16(a), u16(bg)))
+				want := (i64(fg) * i64(a) + i64(bg) * i64(65535 - a)) / 65535
 				if abs(got - want) > 1 {
 					testing.expectf(t, false, "blend(%v, %v, %v) = %v, expected %v", fg, a, bg, got, want)
 					return

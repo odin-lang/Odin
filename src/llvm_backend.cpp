@@ -45,6 +45,8 @@ gb_internal String get_default_microarchitecture() {
 		} else {
 			default_march = str_lit("x86-64-v2");
 		}
+	} else if (build_context.metrics.arch == TargetArch_i386) {
+		default_march = str_lit("pentium4");
 	} else if (build_context.metrics.arch == TargetArch_riscv64) {
 		default_march = str_lit("generic-rv64");
 	} else if (build_context.metrics.arch == TargetArch_arm32) {

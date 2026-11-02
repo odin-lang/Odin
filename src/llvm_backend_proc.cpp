@@ -609,6 +609,7 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 
 	Type *pt = p->type;
 	LLVMSetFunctionCallConv(p->value, lb_calling_convention_kind(pt->Proc.calling_convention));
+	lb_add_function_type_attributes(p->value, lb_get_function_type(m, p->type), pt->Proc.calling_convention);
 	lbValue proc_value = {p->value, p->type};
 	lb_add_member(m, p->name, proc_value);
 	lb_add_procedure_value(m, p);
