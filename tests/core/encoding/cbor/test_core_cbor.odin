@@ -436,7 +436,11 @@ test_lying_length_array :: proc(t: ^testing.T) {
 	// Input says this is an array of length max(u64), this should not allocate that amount.
 	input := []byte{0x9B, 0x00, 0x00, 0x42, 0xFA, 0x42, 0xFA, 0x42, 0xFA, 0x42}
 	_, err := cbor.decode(string(input))
-	testing.expect_value(t, err, io.Error.Unexpected_EOF) // .Out_Of_Memory would be bad.
+	expected: cbor.Decode_Error = io.Error.Unexpected_EOF
+	when size_of(int) < 8 {
+		expected = cbor.Decode_Data_Error.Length_Too_Big
+	}
+	testing.expect_value(t, err, expected) // .Out_Of_Memory would be bad.
 }
 
 @(test)

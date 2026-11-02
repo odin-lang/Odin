@@ -32,7 +32,7 @@ scribble :: #force_no_inline proc() {
 @(private="file")
 expect_zero_padding :: proc(t: ^testing.T, p: rawptr, name: string, loc := #caller_location) {
 	bytes := ([^]byte)(p)
-	for i in 1..<8 {
+	for i in 1..<align_of(int) {
 		testing.expectf(t, bytes[i] == 0, "%s: padding byte %d is %x", name, i, bytes[i], loc=loc)
 	}
 }

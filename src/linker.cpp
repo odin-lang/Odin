@@ -420,6 +420,8 @@ try_cross_linking:;
 				link_settings = gb_string_append_fmt(link_settings, " /DLL");
 				if (build_context.no_entry_point) {
 					link_settings = gb_string_append_fmt(link_settings, " /NOENTRY");
+				} else if (build_context.no_crt) {
+					link_settings = gb_string_append_fmt(link_settings, " /ENTRY:DllMain");
 				}
 			} else if (build_context.no_crt || build_context.no_entry_point) {
 				link_settings = gb_string_append_fmt(link_settings, " /ENTRY:mainCRTStartup");

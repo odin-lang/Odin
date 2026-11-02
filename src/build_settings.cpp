@@ -2375,6 +2375,16 @@ gb_internal bool init_build_paths(String init_filename) {
 			}
 		}
 
+		if (bc->metrics.arch == TargetArch_i386) {
+			if (build_context.linker_choice == Linker_radlink) {
+				gb_printf_err("radlink does not support Windows i386, use -linker:msvc or -linker:lld instead.\n");
+				return false;
+			}
+			if (build_context.linker_choice == Linker_Default) {
+				build_context.linker_choice = Linker_msvc;
+			}
+		}
+
 		if ((bc->command_kind & Command__does_build) && (!bc->ignore_microsoft_magic)) {
 			// NOTE(ic): It would be nice to extend this so that we could specify the Visual Studio version that we want instead of defaulting to the latest.
 			Find_Result find_result = find_visual_studio_and_windows_sdk();
@@ -2649,6 +2659,10 @@ gb_internal bool init_build_paths(String init_filename) {
 			break;
 		default:
 			gb_printf_err("-sanitize:address is only supported on Windows, Linux, Darwin, and FreeBSD\n");
+			return false;
+		}
+		if (build_context.metrics.os == TargetOs_windows && build_context.metrics.arch != TargetArch_amd64) {
+			gb_printf_err("-sanitize:address is only supported on Windows for amd64\n");
 			return false;
 		}
 	}
