@@ -2661,6 +2661,10 @@ gb_internal bool init_build_paths(String init_filename) {
 			gb_printf_err("-sanitize:address is only supported on Windows, Linux, Darwin, and FreeBSD\n");
 			return false;
 		}
+		if (build_context.metrics.os == TargetOs_windows && build_context.metrics.arch != TargetArch_amd64) {
+			gb_printf_err("-sanitize:address is only supported on Windows for amd64\n");
+			return false;
+		}
 	}
 
 	if (build_context.sanitizer_flags & SanitizerFlag_Memory) {
