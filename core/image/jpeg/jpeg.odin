@@ -1,13 +1,11 @@
 // Reader for baseline `JPEG` images.
 package jpeg
 
-import "core:bytes"
 import "core:compress"
 import "core:math"
 import "core:mem"
 import "core:image"
 import "core:slice"
-import "core:strings"
 
 Image :: image.Image
 Error :: image.Error
@@ -53,18 +51,18 @@ Block :: [Component][COEFFICIENT_COUNT]i16
 
 @(private="file")
 zigzag := [?]byte{
-    0,   1,  8, 16,  9,  2,  3, 10,
-    17, 24, 32, 25, 18, 11,  4,  5,
-    12, 19, 26, 33, 40, 48, 41, 34,
-    27, 20, 13,  6,  7, 14, 21, 28,
-    35, 42, 49, 56, 57, 50, 43, 36,
-    29, 22, 15, 23, 30, 37, 44, 51,
-    58, 59, 52, 45, 38, 31, 39, 46,
-    53, 60, 61, 54, 47, 55, 62, 63,
+	0,   1,  8, 16,  9,  2,  3, 10,
+	17, 24, 32, 25, 18, 11,  4,  5,
+	12, 19, 26, 33, 40, 48, 41, 34,
+	27, 20, 13,  6,  7, 14, 21, 28,
+	35, 42, 49, 56, 57, 50, 43, 36,
+	29, 22, 15, 23, 30, 37, 44, 51,
+	58, 59, 52, 45, 38, 31, 39, 46,
+	53, 60, 61, 54, 47, 55, 62, 63,
 }
 
 @(optimization_mode="favor_size", private="file")
-refill_msb :: #force_inline proc(z: ^compress.Context_Memory_Input, width := i8(48)) {
+refill_msb :: #force_inline proc(z: ^compress.Context, width := i8(48)) {
 	refill := u64(width)
 	b      := u64(0)
 
@@ -72,28 +70,32 @@ refill_msb :: #force_inline proc(z: ^compress.Context_Memory_Input, width := i8(
 		return
 	}
 
+	input := &z.window
 	for {
-		if len(z.input_data) != 0 {
-			b = u64(z.input_data[0])
+		if len(input) < 3 {
+			compress.refill_window(z, 3)
+		}
+		if len(input) != 0 {
+			b = u64(input[0])
 
-			if len(z.input_data) > 1 && b == 0xFF {
-				next := u64(z.input_data[1])
+			if len(input) > 1 && b == 0xFF {
+				next := u64(input[1])
 
 				if next == 0x00 {
 					// 0x00 is used as a stuffing to indicate that the 0xFF is part of the data and not
 					// the beginning of a marker
-					z.input_data = z.input_data[2:]
+					input^ = input[2:]
 				} else if next >= cast(u64)image.JPEG_Marker.RST0 && next <= cast(u64)image.JPEG_Marker.RST7 {
 					// Skip any RSTn markers if we encounter them
-					if len(z.input_data) > 2 {
-						b = u64(z.input_data[2])
-						z.input_data = z.input_data[3:]
+					if len(input) > 2 {
+						b = u64(input[2])
+						input^ = input[3:]
 					} else {
 						b = 0
 					}
 				}
 			} else {
-				z.input_data = z.input_data[1:]
+				input^ = input[1:]
 			}
 		} else {
 			b = 0
@@ -108,19 +110,19 @@ refill_msb :: #force_inline proc(z: ^compress.Context_Memory_Input, width := i8(
 }
 
 @(optimization_mode="favor_size", private="file")
-consume_bits_msb :: #force_inline proc(z: ^compress.Context_Memory_Input, width: u8) {
+consume_bits_msb :: #force_inline proc(z: ^compress.Context, width: u8) {
 	z.code_buffer <<= width
 	z.num_bits -= u64(width)
 }
 
 @(private="file")
-byte_align :: #force_inline proc(z: ^compress.Context_Memory_Input) {
+byte_align :: #force_inline proc(z: ^compress.Context) {
 	skip := z.num_bits % 8
 	consume_bits_msb(z, cast(u8)skip)
 }
 
 @(optimization_mode="favor_size", private="file")
-peek_bits_msb :: #force_inline proc(z: ^compress.Context_Memory_Input, width: u8) -> u32 {
+peek_bits_msb :: #force_inline proc(z: ^compress.Context, width: u8) -> u32 {
 	if z.num_bits < u64(width) {
 		refill_msb(z)
 	}
@@ -128,23 +130,14 @@ peek_bits_msb :: #force_inline proc(z: ^compress.Context_Memory_Input, width: u8
 }
 
 @(optimization_mode="favor_size", private="file")
-read_bits_msb :: #force_inline proc(z: ^compress.Context_Memory_Input, width: u8) -> u32 {
+read_bits_msb :: #force_inline proc(z: ^compress.Context, width: u8) -> u32 {
 	k := #force_inline peek_bits_msb(z, width)
 	#force_inline consume_bits_msb(z, width)
 	return k
 }
 
-load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
-	ctx := &compress.Context_Memory_Input{
-		input_data = data,
-	}
-
-	img, err = load_from_context(ctx, options, allocator)
-	return img, err
-}
-
 @(private="file")
-get_symbol :: proc(ctx: ^$C, huffman_table: Huffman_Table) -> byte {
+get_symbol :: proc(ctx: ^compress.Context, huffman_table: Huffman_Table) -> byte {
 	possible_code: u32 = 0
 
 	for i in 0..<HUFFMAN_MAX_BITS {
@@ -161,7 +154,26 @@ get_symbol :: proc(ctx: ^$C, huffman_table: Huffman_Table) -> byte {
 	return 0
 }
 
-load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
+load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
+	data := data
+	ctx  := compress.init_context_from_slice(&data)
+	return load_from_context(&ctx, options, allocator)
+}
+
+read_ident :: proc(ctx: ^compress.Context) -> (ident: [16]byte, ident_len: int, err: Error) {
+	for {
+		b := compress.read_u8(ctx) or_return
+		if b == 0x00 {
+			return
+		}
+		if ident_len < len(ident) {
+			ident[ident_len] = b
+		}
+		ident_len += 1
+	}
+}
+
+load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	context.allocator = allocator
 	options := options
 
@@ -235,29 +247,23 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		case .SOI:
 			return img, .Duplicate_SOI_Marker
 		case .APP0:
-			ident := make([dynamic]byte, 0, 16, context.temp_allocator) or_return
 			length := cast(int)((compress.read_data(ctx, u16be) or_return) - 2)
-			for {
-				b := compress.read_u8(ctx) or_return
-				if b == 0x00 {
-					break
-				}
-				append(&ident, b) or_return
-			}
-			if slice.equal(ident[:], image.JFIF_Magic[:]) {
+			ident_buf, ident_len := read_ident(ctx) or_return
+			ident := ident_buf[:min(ident_len, len(ident_buf))]
+			if slice.equal(ident, image.JFIF_Magic[:]) {
 				if length != 14 {
 					// Malformed APP0. Skip it
-					compress.read_slice(ctx, max(0, length - len(ident) - 1)) or_return
+					skip_length := i64(length - ident_len - 1)
+					compress.skip(ctx, skip_length) or_return
 					continue
 				}
 
-				version := compress.read_data(ctx, u16be) or_return
-				units := cast(image.JFIF_Unit)(compress.read_u8(ctx) or_return)
-				x_density := compress.read_data(ctx, u16be) or_return
-				y_density := compress.read_data(ctx, u16be) or_return
+				version     := compress.read_data(ctx, u16be) or_return
+				units       := cast(image.JFIF_Unit)(compress.read_u8(ctx) or_return)
+				x_density   := compress.read_data(ctx, u16be) or_return
+				y_density   := compress.read_data(ctx, u16be) or_return
 				x_thumbnail := cast(int)compress.read_u8(ctx) or_return
 				y_thumbnail := cast(int)compress.read_u8(ctx) or_return
-				thumbnail: []image.RGB_Pixel
 
 				if x_thumbnail * y_thumbnail != 0 {
 					greyscale_thumbnail := false
@@ -270,11 +276,15 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					} else {
 						return img, .Invalid_Thumbnail_Size
 					}
-					thumb_pixels := slice.reinterpret([]image.RGB_Pixel, compress.read_slice_from_memory(ctx, x_thumbnail * y_thumbnail) or_return)
 
-					if .return_metadata in options {
-						thumbnail = make([]image.RGB_Pixel, x_thumbnail * y_thumbnail) or_return
-						copy(thumbnail, thumb_pixels)
+					if .return_metadata not_in options {
+						compress.skip(ctx, i64(thumbnail_size)) or_return
+					} else {
+						thumbnail := make([]byte, thumbnail_size) or_return
+						if err = compress.read_slice(ctx, thumbnail); err != nil {
+							delete(thumbnail)
+							return img, err
+						}
 
 						info: ^image.JPEG_Info
 						if img.metadata == nil {
@@ -295,9 +305,8 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 						img.metadata = info
 					}
 				}
-			} else if slice.equal(ident[:], image.JFXX_Magic[:]) {
+			} else if slice.equal(ident, image.JFXX_Magic[:]) {
 				extension_code := cast(image.JFXX_Extension_Code)compress.read_u8(ctx) or_return
-				thumbnail: []byte
 
 				switch extension_code {
 				// We return the JPEG-compressed bytes for this type of thumbnail.
@@ -306,12 +315,16 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				// Not sure where to document that though, maybe it's better if the thumbnail is always raw pixel data.
 				case .Thumbnail_JPEG:
 					// +1 for the NUL byte
-					thumbnail_len := length - (size_of(image.JFXX_Magic) + 1 + size_of(image.JFXX_Extension_Code))
-					thumbnail_jpeg := compress.read_slice(ctx, thumbnail_len) or_return
+					thumbnail_size := length - (size_of(image.JFXX_Magic) + 1 + size_of(image.JFXX_Extension_Code))
 
-					if .return_metadata in options {
-						thumbnail = make([]byte, thumbnail_len) or_return
-						copy(thumbnail, thumbnail_jpeg)
+					if .return_metadata not_in options {
+						compress.skip(ctx, i64(thumbnail_size)) or_return
+					} else {
+						thumbnail := make([]byte, thumbnail_size) or_return
+						if err = compress.read_slice(ctx, thumbnail); err != nil {
+							delete(thumbnail)
+							return img, err
+						}
 
 						info: ^image.JPEG_Info
 						if img.metadata == nil {
@@ -328,13 +341,18 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 						img.metadata = info
 					}
 				case .Thumbnail_3_Byte_RGB:
-					x_thumbnail := cast(int)compress.read_u8(ctx) or_return
-					y_thumbnail := cast(int)compress.read_u8(ctx) or_return
-					pixels := compress.read_slice(ctx, x_thumbnail * y_thumbnail * 3) or_return
+					x_thumbnail    := cast(int)compress.read_u8(ctx) or_return
+					y_thumbnail    := cast(int)compress.read_u8(ctx) or_return
+					thumbnail_size := x_thumbnail * y_thumbnail * 3
 
-					if .return_metadata in options {
-						thumbnail = make([]byte, x_thumbnail * y_thumbnail * 3) or_return
-						copy(thumbnail, pixels)
+					if .return_metadata not_in options {
+						compress.skip(ctx, i64(thumbnail_size)) or_return
+					} else {
+						thumbnail := make([]byte, thumbnail_size) or_return
+						if err = compress.read_slice(ctx, thumbnail); err != nil {
+							delete(thumbnail)
+							return img, err
+						}
 
 						info: ^image.JPEG_Info
 						if img.metadata == nil {
@@ -353,44 +371,22 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				case .Thumbnail_1_Byte_Palette: // NOTE(illusionman1212): NOT TESTED. Couldn't find a jpeg to test this with.
 					x_thumbnail := cast(int)compress.read_u8(ctx) or_return
 					y_thumbnail := cast(int)compress.read_u8(ctx) or_return
-					palette := slice.reinterpret([]image.RGB_Pixel, compress.read_slice(ctx, THUMBNAIL_PALETTE_SIZE / 3) or_return)
-					old_pixels := compress.read_slice(ctx, x_thumbnail * y_thumbnail) or_return
 
-					if .return_metadata in options {
-						pixels := make([]byte, x_thumbnail * y_thumbnail * 3) or_return
-						for i in 0..<x_thumbnail*y_thumbnail {
-							pixel := palette[old_pixels[i]]
-							pixels[i] = pixel.r
-							pixels[i + 1] = pixel.g
-							pixels[i + 2] = pixel.b
-						}
-
-						info: ^image.JPEG_Info
-						if img.metadata == nil {
-							info = new(image.JPEG_Info) or_return
-						} else {
-							info = img.metadata.(^image.JPEG_Info)
-						}
-						info.jfxx_app0 = image.JFXX_APP0{
-							extension_code,
-							cast(u8)x_thumbnail,
-							cast(u8)y_thumbnail,
-							pixels,
-						}
-						img.metadata = info
-					}
+					skip_length := THUMBNAIL_PALETTE_SIZE + x_thumbnail * y_thumbnail
+					compress.skip(ctx, i64(skip_length)) or_return
 				case:
 					return img, .Invalid_JFXX_Extension_Code
 				}
 			} else {
 				// - 1 for the NUL byte
-				compress.read_slice(ctx, length - len(ident) - 1) or_return
+				skip_length := i64(length - ident_len - 1)
+				compress.skip(ctx, skip_length) or_return
 				continue
 			}
 		case .APP1: // Metadata
 			length := cast(int)((compress.read_data(ctx, u16be) or_return) - 2)
 			if .return_metadata not_in options {
-				compress.read_slice(ctx, length) or_return
+				compress.skip(ctx, i64(length)) or_return
 				continue
 			}
 			info: ^image.JPEG_Info
@@ -400,16 +396,10 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				info = img.metadata.(^image.JPEG_Info)
 			}
 
-			ident := make([dynamic]byte, 0, 16, context.temp_allocator) or_return
-			for {
-				b := compress.read_u8(ctx) or_return
-				if b == 0x00 {
-					break
-				}
-				append(&ident, b) or_return
-			}
+			ident_buf, ident_len := read_ident(ctx) or_return
+			ident := ident_buf[:min(ident_len, len(ident_buf))]
 
-			if slice.equal(ident[:], image.Exif_Magic[:]) {
+			if slice.equal(ident, image.Exif_Magic[:]) {
 				// Padding byte according to section 4.7.2.2 in Exif spec 3.0
 				compress.read_u8(ctx) or_return
 
@@ -419,13 +409,15 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					exif.byte_order = .big_endian
 					if peek[2] != 0 || peek[3] != 42 {
 						// - 2 for the NUL byte and padding byte
-						compress.read_slice(ctx, length - len(ident) - 2) or_return
+						skip_length := i64(length - ident_len - 2)
+						compress.skip(ctx, skip_length) or_return
 						continue
 					}
 				} else if peek[0] == 'I' && peek[1] == 'I' {
 					exif.byte_order = .little_endian
 					if peek[2] != 42 || peek[3] != 0 {
-						compress.read_slice(ctx, length - len(ident) - 2) or_return
+						skip_length := i64(length - ident_len - 2)
+						compress.skip(ctx, skip_length) or_return
 						continue
 					}
 				} else {
@@ -433,32 +425,35 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					// APP1 Exif data
 
 					// We only treat it as such if a previous Exif entry exists and its data length is the max
-					if len(info.exif) > 0 && len(info.exif[len(info.exif) - 1].data) == SEGMENT_MAX_SIZE - len(ident) - 2 {
+					if len(info.exif) > 0 && len(info.exif[len(info.exif) - 1].data) == SEGMENT_MAX_SIZE - ident_len - 2 {
 						exif.byte_order = info.exif[len(info.exif) - 1].byte_order
 					} else {
-						compress.read_slice(ctx, length - len(ident) - 2) or_return
+						skip_length := i64(length - ident_len - 2)
+						compress.skip(ctx, skip_length) or_return
 						continue
 					}
 				}
 
 				// - 2 for the NUL byte and padding byte
-				data := compress.read_slice(ctx, length - len(ident) - 2) or_return
-				exif.data = make([]byte, len(data)) or_return
-				copy(exif.data, data)
-
+				exif.data = make([]byte, length - ident_len - 2) or_return
+				compress.read_slice(ctx, exif.data) or_return
 				append(&info.exif, exif) or_return
 				img.metadata = info
 			} else {
 				// - 1 for the NUL byte
-				compress.read_slice(ctx, length - len(ident) - 1) or_return
+				skip_length := i64(length - ident_len - 1)
+				compress.skip(ctx, skip_length) or_return
 				continue
 			}
 		case .COM:
 			length := (compress.read_data(ctx, u16be) or_return) - 2
-			comment := string(compress.read_slice(ctx, cast(int)length) or_return)
-			if .return_metadata in options {
+			if .return_metadata not_in options {
+				compress.skip(ctx, i64(length)) or_return
+			} else {
 				if info, ok := img.metadata.(^image.JPEG_Info); ok {
-					append(&info.comments, strings.clone(comment)) or_return
+					comment := make([]byte, length)         or_return
+					compress.read_slice(ctx, comment)       or_return
+					append(&info.comments, string(comment)) or_return
 				}
 			}
 		case .DQT:
@@ -479,21 +474,21 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 				// When precision is 0, we read 64 u8s.
 				// when it's 1, we read 64 u16s.
-				table_bytes := 64
 				if precision == 1 {
-					table_bytes = 128
-					table := compress.read_slice(ctx, table_bytes) or_return
-					for v, i in slice.reinterpret([]u16be, table) {
+					table: [128]u8 = ---
+					compress.read_slice(ctx, table[:]) or_return
+					for v, i in slice.reinterpret([]u16be, table[:]) {
 						quantization[index][i] = v
 					}
+					length -= size_of(table) + 1
 				} else {
-					table := compress.read_slice(ctx, table_bytes) or_return
-					for v, i in table {
+					table: [64]u8 = ---
+					compress.read_slice(ctx, table[:]) or_return
+					for v, i in table[:] {
 						quantization[index][i] = cast(u16be)v
 					}
+					length -= size_of(table) + 1
 				}
-
-				length -= table_bytes + 1
 			}
 		case .DHT:
 			length := (compress.read_data(ctx, u16be) or_return) - 2
@@ -511,7 +506,8 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					return img, .Invalid_Huffman_Table_Index
 				}
 
-				lengths := compress.read_slice(ctx, HUFFMAN_MAX_BITS) or_return
+				lengths: [HUFFMAN_MAX_BITS]u8
+				compress.read_slice(ctx, lengths[:]) or_return
 				num_symbols: u8 = 0
 				for length, i in lengths {
 					num_symbols += length
@@ -522,8 +518,9 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					return img, .Huffman_Symbols_Exceeds_Max
 				}
 
-				symbols := compress.read_slice(ctx, cast(int)num_symbols) or_return
-				copy(huffman[type][index].symbols[:], symbols)
+				symbols: [HUFFMAN_MAX_SYMBOLS]u8
+				compress.read_slice(ctx, symbols[:num_symbols]) or_return
+				copy(huffman[type][index].symbols[:], symbols[:num_symbols])
 
 				length -= cast(u16be)(1 + HUFFMAN_MAX_BITS + num_symbols)
 
@@ -649,16 +646,16 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				color_components[id].h_sampling_factor = cast(int)horizontal_sampling
 			}
 		case .SOF2,  // Progressive DCT
-		     .SOF3,  // Lossless (sequential)
-		     .SOF5,  // Differential sequential DCT
-		     .SOF6,  // Differential progressive DCT
-		     .SOF7,  // Differential lossless (sequential)
-		     .SOF9,  // Extended sequential DCT, Arithmetic coding
-		     .SOF10, // Progressive DCT, Arithmetic coding
-		     .SOF11, // Lossless (sequential), Arithmetic coding
-		     .SOF13, // Differential sequential DCT, Arithmetic coding
-		     .SOF14, // Differential progressive DCT, Arithmetic coding
-		     .SOF15: // Differential lossless (sequential), Arithmetic coding
+			 .SOF3,  // Lossless (sequential)
+			 .SOF5,  // Differential sequential DCT
+			 .SOF6,  // Differential progressive DCT
+			 .SOF7,  // Differential lossless (sequential)
+			 .SOF9,  // Extended sequential DCT, Arithmetic coding
+			 .SOF10, // Progressive DCT, Arithmetic coding
+			 .SOF11, // Lossless (sequential), Arithmetic coding
+			 .SOF13, // Differential sequential DCT, Arithmetic coding
+			 .SOF14, // Differential progressive DCT, Arithmetic coding
+			 .SOF15: // Differential lossless (sequential), Arithmetic coding
 			if img.metadata != nil {
 				info := img.metadata.(^image.JPEG_Info)
 				info.frame_type = marker
@@ -959,13 +956,13 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				orig_channels += 1
 			}
 
-			if resize(&img.pixels.buf, img.width * img.height * img.channels) != nil {
+			if resize(&img.pixels, img.width * img.height * img.channels) != nil {
 				return img, .Unable_To_Allocate_Or_Resize
 			}
 
 			switch orig_channels {
 			case 1: // Grayscale JPEG expanded to RGB
-				out     := mem.slice_data_cast([]image.RGB_Pixel, img.pixels.buf[:])
+				out     := mem.slice_data_cast([]image.RGB_Pixel, img.pixels[:])
 				out_idx := 0
 				for y in 0..<img.height {
 					mcu_row   := y / BLOCK_SIZE
@@ -984,7 +981,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				}
 
 			case 2: // Grayscale JPEG expanded to RGBA
-				out     := mem.slice_data_cast([]image.RGBA_Pixel, img.pixels.buf[:])
+				out     := mem.slice_data_cast([]image.RGBA_Pixel, img.pixels[:])
 				out_idx := 0
 				for y in 0..<img.height {
 					mcu_row   := y / BLOCK_SIZE
@@ -1003,7 +1000,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				}
 
 			case 3:
-				out     := mem.slice_data_cast([]image.RGB_Pixel, img.pixels.buf[:])
+				out     := mem.slice_data_cast([]image.RGB_Pixel, img.pixels[:])
 				out_idx := 0
 				for y in 0..<img.height {
 					mcu_row   := y / BLOCK_SIZE
@@ -1025,7 +1022,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				}
 
 			case 4:
-				out     := mem.slice_data_cast([]image.RGBA_Pixel, img.pixels.buf[:])
+				out     := mem.slice_data_cast([]image.RGBA_Pixel, img.pixels[:])
 				out_idx := 0
 				for y in 0..<img.height {
 					mcu_row   := y / BLOCK_SIZE
@@ -1053,8 +1050,8 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		case .TEM:
 			// TEM doesn't have a length, continue to next marker
 		case:
-			length := (compress.read_data(ctx, u16be) or_return) - 2
-			compress.read_slice_from_memory(ctx, cast(int)length) or_return
+			length := i64(compress.read_data(ctx, u16be) or_return) - 2
+			compress.skip(ctx, length) or_return
 		}
 	}
 
@@ -1066,7 +1063,7 @@ destroy :: proc(img: ^Image) {
 		return
 	}
 
-	bytes.buffer_destroy(&img.pixels)
+	delete(img.pixels)
 
 	if v, ok := img.metadata.(^image.JPEG_Info); ok {
 		if jfxx, jfxx_ok := v.jfxx_app0.?; jfxx_ok {
@@ -1093,5 +1090,5 @@ destroy :: proc(img: ^Image) {
 
 @(init, private)
 _register :: proc "contextless" () {
-	image.register(.JPEG, load_from_bytes, destroy)
+	image.register(.JPEG, load_from_bytes, destroy, load_from_context)
 }
