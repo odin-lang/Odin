@@ -5,3 +5,5 @@
 *.qoi
 *.pbm
 math_big_test_library.*
+*.bng
+assets/BNG/*.txt

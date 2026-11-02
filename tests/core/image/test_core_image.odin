@@ -29,6 +29,7 @@ import "core:time"
 TEST_SUITE_PATH_PNG :: ODIN_ROOT + "tests/core/assets/PNG"
 TEST_SUITE_PATH_BMP :: ODIN_ROOT + "tests/core/assets/BMP"
 TEST_SUITE_PATH_JPG :: ODIN_ROOT + "tests/core/assets/JPG"
+TEST_SUITE_PATH_BNG :: ODIN_ROOT + "tests/core/assets/BNG"
 
 I_Error :: image.Error
 

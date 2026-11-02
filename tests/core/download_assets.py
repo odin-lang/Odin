@@ -12,7 +12,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 # The OpenSSL CLI tool installed can be used to easily generate digests:
 # $ openssl sha3-512 -mac HMAC -macopt key:"$HMAC_KEY" $FILE_NAME
-TEST_SUITES        = ['PNG', 'XML', 'BMP', 'JPG', 'Wycheproof', 'Noise', 'X509-Limbo']
+TEST_SUITES        = ['PNG', 'XML', 'BMP', 'JPG', 'BNG', 'Wycheproof', 'Noise', 'X509-Limbo']
 ASSETS_BASE_URL    = "https://raw.githubusercontent.com/odin-lang/test-assets/master/{}/{}"
 HMAC_KEY           = "https://odin-lang.org"
 HMAC_HASH          = hashlib.sha3_512
@@ -371,6 +371,34 @@ HMAC_DIGESTS = {
 	'seq-separate.ref.png':        "9e19ff38342a40bf3310d17ee8e9f98a749741842e3c20c9ae2fefac41f6a8951323852145af39fa5077d3a70abe7127a21bca20354fbd8bb16eadbdac283600",
 	'seq-y-cbcr.jpg':              "22825424be63dc2784b2f255f5319c2303c8e34defae96841c4193aba4a2328f2246927075532898542fbc1516f98bfb6929674e61af5365babf2cc07831eb28",
 	'seq-y-cbcr.ref.png':          "90388e814550b4939d66e23ef68db66d09c1987ce970f96424cf7419de997b631abc1cd35135cab9f5fd1a59ddfcc49fe93cba374697e0806abefe17a707f2f7",
+
+	'LICENSE-pngimg.txt':                               "693b4b4c81fde4fe65610b8b0d207b952ba7d4c1609eb63433213c2658f7d9f7c74f582368df3eb9a4a685cd4f34cab887696169d36fa8cb724953ba60e44dda",
+	'LICENSE-tango.txt':                                "0b7249d6c88f0044b8d8ab16f36c178a21b6417a8b8924cd0715aa736c04e9f405b35228707fc69574e5fdef9f120042041e5b7280680e55c7c9df0f194319c7",
+	'LICENSE-tecnick.txt':                              "ce2b08014de14835ef43f7f4276b4dfcc9df66849d6fb75f12548a953ef622aebe689fd126cb281b4d4094e3fa1d33ef03493efbd0176e2a2b3620974ffa0f53",
+	'pngimg-crab_PNG40.bng':                            "82abfe1a036e7c1a305eb5a7579759f3e2106033f1136d7f865cbc98da119e41a160912a6733032d9d48699be2cece86418d6e89973382741bb9fcd0dd19f5f2",
+	'pngimg-crab_PNG40.png':                            "440e42600925caa95e7f595b0b63a7e74240d12a8fab2599098815ebaef2d6302968e40969b807c736782a9ba4b524b52e8d09a02b920685d1b308e5dc62ff05",
+	'pngimg-jam_PNG63.bng':                             "7e35af9e936c0f5ae33cdd1db75901e96efd7b741b3e3f161faabe2626b2da052f395e6584b905e2472a0bce4637db3fe66535033f8d25d82f4f336ca7a908d8",
+	'pngimg-jam_PNG63.png':                             "ae189001597a4ed307deee18bbffc4d91816bb7dcd1821f39bd6427e5dca5337bf07576c52ca7b75fff1342d6383b82cf89c42181ef4d924adde7c8d7525bbbd",
+	'pngimg-lollipop_PNG98263.bng':                     "49851ad283c9ba52f6cd1f5bbf3f520f8bf5fba1c037e4439d1b04c501791b00d55b36be0c0c7f5a2a1d4df1d72d18ade2c4756923a9c7f54699414915fc8890",
+	'pngimg-lollipop_PNG98263.png':                     "f38f5d71cc016e3d26b18b92bc1eeb9c67ff91b146df6de64e8b3328bea58a206d2b689a95ab04fcd98ccae91944426af5a5939c0f00382fdbb4c9e9b101e5e7",
+	'pngimg-peacock_PNG22.bng':                         "4ff2879fef6364ed9b24591793ab2205b5e2a84e0af0deeba9c67bae5d76d4c993fbec611717af41c63f2d444a0a9c124bf95155f55d2f7802f0eadeb7a2862b",
+	'pngimg-peacock_PNG22.png':                         "8f9c1ba41f0b9caa292f6f6b9be13c733d243207f4f51182d90058dd86338a345de5f8c8d047c14155076fda0fa2a9f0458cd366bd547724d1591bbccf479756",
+	'tango-actions-edit-delete.bng':                    "e66d4996bb5665d7dbb6ac2fdd84080698eafc2073624a4b484f48716e5cd0c8438b26973f22dda7460b49336192c6a77a1e102fc955778f8c8162f722a1ed20",
+	'tango-actions-edit-delete.png':                    "5476e63f08d607bdcf9d2d2ec5947b069690709db24ad867a92c6af7b72ad25b13e6a0f04d2b784a01b546eaf963b85257ad0fe7b0a9de650495fa7a29c140ca",
+	'tango-actions-list-remove.bng':                    "efc21ce9ed51cd8e161c86afef6ddf5a01b7bdcaa78878edce652c2568acf51ee0f4947df88d40022b240491cc169052f7e84cd3c93352825bec314bac1daa69",
+	'tango-actions-list-remove.png':                    "4d86613449d2111254728da626dcbce34f52862083870907c20a9cee3ee79b63b89b77d33636add229ac09a9a7a90ff156f8b0021be8c2781cccb51e01323e32",
+	'tango-apps-preferences-system-windows.bng':        "fae0e1a32f5d213605fd57ea6d403565d7d40b95dabd954407fce7bf546c75d87d169e63e22c07d0488e53a8714980406b3b6a889580850c59e926178cc5b542",
+	'tango-apps-preferences-system-windows.png':        "336ba3e9c3774c61533343e6828430000ed479f9f8c67bdf14839ddf1bc7dcdb3b7eb255519d9496dda65804c060ae77c6a9d460c49238416b6d3bd39a03068a",
+	'tango-categories-applications-internet.bng':       "0dd7ac566755ea28cbf6215d3e0487ba9ca9690643849e49feb30796224267662848849fe03ffd7f6c513a4b707a9525f975014e1357975917a080153220950d",
+	'tango-categories-applications-internet.png':       "aaaa91edcdf2fe89eb4281349f17101ff766c6b049c149d899aacf4d2bac35ef30a747b75c19532948e2808f5121a0a6ffd6fce0ae74e2dbb1a7832cd3c39e12",
+	'tango-mimetypes-x-office-spreadsheet-template.bng':"dfe1f8b6c2e9de0c6545405d4e78faefb66443ed67b3188884f37ed94d304280d4766cb087aad87ab06bcdd236cc590798a812f658bfc7466a17edb4bc921498",
+	'tango-mimetypes-x-office-spreadsheet-template.png':"6f294f8ca4af56add792b1aa8ffb06641906d6f101a8eeff0fb91b3e0bc438f1f6da6890d3ca60c5105ba8806f4658d4cc861503a272c7248b42ef60f003f372",
+	'tango-places-network-server.bng':                  "0a4b69d5952bf76801130cdff4a21a161f48db5d94f4f469e3c9d04c5699c7f24dabcdbbf873fea54c751bb2f77073139aa08b71162c615495e71a14435a15f0",
+	'tango-places-network-server.png':                  "27a33e58cf8fbf9d2f473c9e78d72b3e904f3d0426b1cacd3b0d200b6d78f0f09b96df71986955790b3b204bdf9621df8d899b25d66aa89b233d8f127c36b3fd",
+	'tecnick-RGB_OR_1200x1200_062.bng':                 "be0cf471cbcbac0553c322550c9d1ff2c85bad569d7023b220a84e1e26be8f17ea02a15b852c0270f40342ca76e8c29c84886980d603bba5e2a6f9427de9a207",
+	'tecnick-RGB_OR_1200x1200_062.png':                 "ce5a8b93f2bded2a574b069940c5d80e79d82625456e512e2d951bcc13bc4abfbdcc9782b9794f9f42de10e2cef326f29ee46c68507f670bbf279e989fa67509",
+	'tecnick-RGB_OR_1200x1200_100.bng':                 "0ff2e11a0926cd069b4b3fb2b659168409d8af64e7f42066c6582be8a8b6753df5cd8347e59ba84a1592df518af3826c3ffee9b25c1ad5f523cbda28036abd66",
+	'tecnick-RGB_OR_1200x1200_100.png':                 "be4bf14f4bbf44cbe76ed8ea88a4aa9895568bde6e70fb38ad79106924c12baf94ad5a5c495ba7d6f541b233375a8bfaac09e44d6c41e5a1e0f975614faec145",
 
 	'unicode.xml':                 "ba3a0f730efd6cbb89a54dafddf8902ace1b4e22e96d5c8e47cfcd1b9b79705d1985ea4abd25c5ede1c47a5a7d9456b25b093c1ec9d7705f0c6bf52a515c9aa9",
 

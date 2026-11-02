@@ -85,6 +85,7 @@ package all
 
 @(require) import "core:image"
 @(require) import "core:image/bmp"
+@(require) import "core:image/bng"
 @(require) import "core:image/netpbm"
 @(require) import "core:image/png"
 @(require) import "core:image/qoi"
