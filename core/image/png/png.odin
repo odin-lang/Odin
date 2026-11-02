@@ -1,4 +1,3 @@
-#+feature using-stmt
 // Reader for `PNG` images.
 // The PNG specification is at [[ https://www.w3.org/TR/PNG/ ]].
 package png
@@ -31,11 +30,10 @@ _MAX_IDAT         :: (65535 /* Width */ * 65535 /* Height */ * 2 /* 16-bit */) +
 MAX_IDAT_SIZE     :: min(#config(PNG_MAX_IDAT_SIZE, _MAX_IDAT_DEFAULT), _MAX_IDAT)
 
 /*
-	For chunks other than IDAT with a variable size like `zTXT` and `eXIf`,
+	Chunks other than `IDAT` with a variable size like `zTXT` and `eXIf`
 	limit their size to 16 MiB each by default. Max of 256 MiB each.
 */
 MAX_CHUNK_SIZE    :: min(#config(PNG_MAX_CHUNK_SIZE, 16_777_216), 268_435_456)
-
 
 Error     :: image.Error
 Image     :: image.Image
@@ -241,29 +239,28 @@ read_header :: proc(ctx: ^compress.Context, allocator := context.temp_allocator)
 
 	header := (^image.PNG_IHDR)(raw_data(c.data))^
 	// Validate IHDR
-	using header
-	if width == 0 || height == 0 {
+	if header.width == 0 || header.height == 0 {
 		return {}, .Invalid_Image_Dimensions
 	}
 
-	if u128(width) * u128(height) > image.MAX_DIMENSIONS {
+	if u128(header.width) * u128(header.height) > image.MAX_DIMENSIONS {
 		return {}, .Image_Dimensions_Too_Large
 	}
 
-	if compression_method != 0 {
+	if header.compression_method != 0 {
 		return {}, compress.General_Error.Unknown_Compression_Method
 	}
 
-	if filter_method != 0 {
+	if header.filter_method != 0 {
 		return {}, .Unknown_Filter_Method
 	}
 
-	if interlace_method != .None && interlace_method != .Adam7 {
+	if header.interlace_method != .None && header.interlace_method != .Adam7 {
 		return {}, .Unknown_Interlace_Method
 
 	}
 
-	switch transmute(u8)color_type {
+	switch transmute(u8)header.color_type {
 	case 0:
 		/*
 			Grayscale.
@@ -271,7 +268,7 @@ read_header :: proc(ctx: ^compress.Context, allocator := context.temp_allocator)
 		*/
 		allowed := false
 		for i in ([]u8{1, 2, 4, 8, 16}) {
-			if bit_depth == i {
+			if header.bit_depth == i {
 				allowed = true
 				break
 			}
@@ -284,7 +281,7 @@ read_header :: proc(ctx: ^compress.Context, allocator := context.temp_allocator)
 			RGB, Grayscale+Alpha, RGBA.
 			Allowed bit depths: 8 and 16
 		*/
-		if bit_depth != 8 && bit_depth != 16 {
+		if header.bit_depth != 8 && header.bit_depth != 16 {
 			return {}, .Invalid_Color_Bit_Depth_Combo
 		}
 	case 3:
@@ -294,7 +291,7 @@ read_header :: proc(ctx: ^compress.Context, allocator := context.temp_allocator)
 		*/
 		allowed := false
 		for i in ([]u8{1, 2, 4, 8}) {
-			if bit_depth == i {
+			if header.bit_depth == i {
 				allowed = true
 				break
 			}
@@ -739,10 +736,11 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 		if resize(&t, dest_raw_size) != nil {
 			return {}, .Unable_To_Allocate_Or_Resize
 		}
+		img.pixels = t
 
 		// If we don't have transparency or drop it without applying it, we can do this:
 		if (!seen_trns || (seen_trns && .alpha_drop_if_present in options && .alpha_premultiply not_in options)) && .alpha_add_if_missing not_in options {
-			output := mem.slice_data_cast([]image.RGB_Pixel, t[:])
+			output, _ := image.to_rgb(img)
 			for pal_idx, idx in temp {
 				output[idx] = _plte.entries[pal_idx]
 			}
@@ -753,11 +751,11 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 				bg = {u8(c16.r), u8(c16.g), u8(c16.b)}
 			}
 
-			no_alpha := (.alpha_drop_if_present in options || premultiply) && .alpha_add_if_missing not_in options
+			no_alpha := out_image_channels == 3
 			blend_background := seen_bkgd && .blend_background in options
 
 			if no_alpha {
-				output := mem.slice_data_cast([]image.RGB_Pixel, t[:])
+				output, _ := image.to_rgb(img)
 				for orig, idx in temp {
 					c := _plte.entries[orig]
 					a := int(orig) < len(trns.data) ? trns.data[orig] : 255
@@ -765,11 +763,11 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 					if blend_background {
 						output[idx] = image.blend(c, a, bg)
 					} else if premultiply {
-						output[idx] = image.blend(PLTE_Entry{}, a, c)
+						output[idx] = image.blend(c, a, PLTE_Entry{})
 					}
 				}
 			} else {
-				output := mem.slice_data_cast([]image.RGBA_Pixel, t[:])
+				output, _ := image.to_rgba(img)
 				for orig, idx in temp {
 					c := _plte.entries[orig]
 					a := int(orig) < len(trns.data) ? trns.data[orig] : 255
@@ -778,7 +776,7 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 						c = image.blend(c, a, bg)
 						a = 255
 					} else if premultiply {
-						c = image.blend(PLTE_Entry{}, a, c)
+						c = image.blend(c, a, PLTE_Entry{})
 					}
 
 					output[idx] = {c.r, c.g, c.b, u8(a)}
@@ -787,8 +785,6 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 		} else {
 			unreachable()
 		}
-
-		img.pixels = t
 
 	} else if img.depth == 16 {
 		// Check if we need to do something.
@@ -1222,7 +1218,8 @@ depth_scale_table :: []u8{0, 0xff, 0x55, 0, 0x11, 0,0,0, 0x01}
 
 defilter_8 :: proc(params: ^Filter_Params) -> (ok: bool) {
 
-	using params
+	src, dest               := params.src, params.dest
+	width, height, channels := params.width, params.height, params.channels
 	row_stride := channels * width
 
 	// TODO: See about doing a Duff's #unroll where practicable
@@ -1282,7 +1279,9 @@ defilter_8 :: proc(params: ^Filter_Params) -> (ok: bool) {
 
 defilter_less_than_8 :: proc(params: ^Filter_Params) -> bool #no_bounds_check {
 
-	using params
+	src, dest               := params.src, params.dest
+	width, height, channels := params.width, params.height, params.channels
+	depth, rescale          := params.depth, params.rescale
 
 	row_stride_in  := ((channels * width * depth) + 7) >> 3
 	row_stride_out := channels * width
@@ -1443,7 +1442,8 @@ defilter_less_than_8 :: proc(params: ^Filter_Params) -> bool #no_bounds_check {
 }
 
 defilter_16 :: proc(params: ^Filter_Params) -> bool {
-	using params
+	src, dest               := params.src, params.dest
+	width, height, channels := params.width, params.height, params.channels
 
 	stride := channels * 2
 	row_stride := width * stride
