@@ -1,10 +1,9 @@
-#+feature using-stmt
 // Reader for `PNG` images.
 // The PNG specification is at [[ https://www.w3.org/TR/PNG/ ]].
 package png
 
 /*
-	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2026 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's license.
 
 	List of contributors:
@@ -12,16 +11,14 @@ package png
 		Ginger Bill:     Cosmetic changes.
 */
 
-import "core:compress"
-import "core:compress/zlib"
-import "core:image"
-
-import "core:hash"
-import "core:bytes"
-import "core:io"
-import "core:mem"
 import "base:intrinsics"
 import "base:runtime"
+import "core:compress"
+import "core:compress/deflate"
+import "core:hash"
+import "core:image"
+import "core:io"
+import "core:mem"
 
 // Limit chunk sizes.
 // By default: IDAT = 8k x 8k x 16-bits + 8k filter bytes.
@@ -33,11 +30,10 @@ _MAX_IDAT         :: (65535 /* Width */ * 65535 /* Height */ * 2 /* 16-bit */) +
 MAX_IDAT_SIZE     :: min(#config(PNG_MAX_IDAT_SIZE, _MAX_IDAT_DEFAULT), _MAX_IDAT)
 
 /*
-	For chunks other than IDAT with a variable size like `zTXT` and `eXIf`,
+	Chunks other than `IDAT` with a variable size like `zTXT` and `eXIf`
 	limit their size to 16 MiB each by default. Max of 256 MiB each.
 */
 MAX_CHUNK_SIZE    :: min(#config(PNG_MAX_CHUNK_SIZE, 16_777_216), 268_435_456)
-
 
 Error     :: image.Error
 Image     :: image.Image
@@ -162,16 +158,14 @@ ADAM7_Y_SPACING := []int{ 8,8,8,4,4,2,2 }
 
 // Implementation starts here
 
-read_chunk :: proc(ctx: ^$C) -> (chunk: image.PNG_Chunk, err: Error) {
+read_chunk :: proc(ctx: ^compress.Context, allocator := context.temp_allocator, loc := #caller_location) -> (chunk: image.PNG_Chunk, err: Error) {
 	ch, e := compress.read_data(ctx, image.PNG_Chunk_Header)
 	if e != .None {
 		return {}, compress.General_Error.Stream_Too_Short
 	}
 	chunk.header = ch
 
-	/*
-		Sanity check chunk size
-	*/
+	// Sanity check chunk size
 	#partial switch ch.type {
 	case .IDAT:
 		if ch.length > MAX_IDAT_SIZE {
@@ -183,21 +177,24 @@ read_chunk :: proc(ctx: ^$C) -> (chunk: image.PNG_Chunk, err: Error) {
 		}
 	}
 
-	chunk.data, e = compress.read_slice(ctx, int(ch.length))
-	if e != .None {
-		return {}, compress.General_Error.Stream_Too_Short
+	if compress.is_memory_context(ctx) {
+		length := int(ch.length)
+		data := &ctx.window
+		if len(data) < length {
+			return {}, io.Error.Short_Buffer
+		}
+		chunk.data = data[:length]
+		data^ = data[length:]
+	} else {
+		chunk.data = make([]byte, int(ch.length), allocator=allocator, loc=loc) or_return
+		compress.read_slice(ctx, chunk.data) or_return
 	}
 
 	// Compute CRC over chunk type + data
 	type := (^[4]byte)(&ch.type)^
 	computed_crc := hash.crc32(type[:])
 	computed_crc =  hash.crc32(chunk.data, computed_crc)
-
-	crc, e3 := compress.read_data(ctx, u32be)
-	if e3 != .None {
-		return {}, compress.General_Error.Stream_Too_Short
-	}
-	chunk.crc = crc
+	chunk.crc    = compress.read_data(ctx, u32be) or_return
 
 	if chunk.crc != u32be(computed_crc) {
 		return {}, compress.General_Error.Checksum_Failed
@@ -234,37 +231,36 @@ append_chunk :: proc(list: ^[dynamic]image.PNG_Chunk, src: image.PNG_Chunk, allo
 	return
 }
 
-read_header :: proc(ctx: ^$C) -> (image.PNG_IHDR, Error) {
-	c, e := read_chunk(ctx)
+read_header :: proc(ctx: ^compress.Context, allocator := context.temp_allocator) -> (image.PNG_IHDR, Error) {
+	c, e := read_chunk(ctx, allocator)
 	if e != nil {
 		return {}, e
 	}
 
 	header := (^image.PNG_IHDR)(raw_data(c.data))^
 	// Validate IHDR
-	using header
-	if width == 0 || height == 0 {
+	if header.width == 0 || header.height == 0 {
 		return {}, .Invalid_Image_Dimensions
 	}
 
-	if u128(width) * u128(height) > image.MAX_DIMENSIONS {
+	if u128(header.width) * u128(header.height) > image.MAX_DIMENSIONS {
 		return {}, .Image_Dimensions_Too_Large
 	}
 
-	if compression_method != 0 {
+	if header.compression_method != 0 {
 		return {}, compress.General_Error.Unknown_Compression_Method
 	}
 
-	if filter_method != 0 {
+	if header.filter_method != 0 {
 		return {}, .Unknown_Filter_Method
 	}
 
-	if interlace_method != .None && interlace_method != .Adam7 {
+	if header.interlace_method != .None && header.interlace_method != .Adam7 {
 		return {}, .Unknown_Interlace_Method
 
 	}
 
-	switch transmute(u8)color_type {
+	switch transmute(u8)header.color_type {
 	case 0:
 		/*
 			Grayscale.
@@ -272,7 +268,7 @@ read_header :: proc(ctx: ^$C) -> (image.PNG_IHDR, Error) {
 		*/
 		allowed := false
 		for i in ([]u8{1, 2, 4, 8, 16}) {
-			if bit_depth == i {
+			if header.bit_depth == i {
 				allowed = true
 				break
 			}
@@ -285,7 +281,7 @@ read_header :: proc(ctx: ^$C) -> (image.PNG_IHDR, Error) {
 			RGB, Grayscale+Alpha, RGBA.
 			Allowed bit depths: 8 and 16
 		*/
-		if bit_depth != 8 && bit_depth != 16 {
+		if header.bit_depth != 8 && header.bit_depth != 16 {
 			return {}, .Invalid_Color_Bit_Depth_Combo
 		}
 	case 3:
@@ -295,7 +291,7 @@ read_header :: proc(ctx: ^$C) -> (image.PNG_IHDR, Error) {
 		*/
 		allowed := false
 		for i in ([]u8{1, 2, 4, 8}) {
-			if bit_depth == i {
+			if header.bit_depth == i {
 				allowed = true
 				break
 			}
@@ -316,23 +312,21 @@ chunk_type_to_name :: proc(type: ^image.PNG_Chunk_Type) -> string {
 }
 
 load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
-	ctx := &compress.Context_Memory_Input{
-		input_data = data,
-	}
-
 	/*
 		TODO: Add a flag to tell the PNG loader that the stream is backed by a slice.
 		This way the stream reader could avoid the copy into the temp memory returned by it,
 		and instead return a slice into the original memory that's already owned by the caller.
 	*/
-	img, err = load_from_context(ctx, options, allocator)
-
-	return img, err
+	data := data
+	ctx  := compress.init_context_from_slice(&data)
+	return load_from_context(&ctx, options, allocator)
 }
 
-load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
+load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	context.allocator = allocator
 	options := options
+
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 
 	if .info in options {
 		options += {.return_metadata, .do_not_decompress_image}
@@ -365,9 +359,9 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	}
 
 	idat: []u8
-	idat_b: bytes.Buffer
-	defer bytes.buffer_destroy(&idat_b)
-
+	idat_b: [dynamic]u8
+	defer delete(idat_b)
+	expected_size: int // Expected size of pixel buffer
 	idat_length := u64(0)
 
 	c:	image.PNG_Chunk
@@ -454,6 +448,32 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				return img, nil
 			}
 
+			/*
+				Calculate the expected output size, to help `inflate` make better decisions about the output buffer.
+				We'll also use it to check the returned buffer size is what we expected it to be.
+
+				Let's calcalate the expected size of the IDAT based on its dimensions, and whether or not it's interlaced.
+			*/
+			if header.interlace_method != .Adam7 {
+				expected_size = compute_buffer_size(int(header.width), int(header.height), int(img.channels), int(header.bit_depth), 1)
+			} else {
+				/*
+					Because Adam7 divides the image up into sub-images, and each scanline must start
+					with a filter byte, Adam7 interlaced images can have a larger raw size.
+				*/
+				for p := 0; p < 7; p += 1 {
+					x := (int(header.width)  - ADAM7_X_ORIG[p] + ADAM7_X_SPACING[p] - 1) / ADAM7_X_SPACING[p]
+					y := (int(header.height) - ADAM7_Y_ORIG[p] + ADAM7_Y_SPACING[p] - 1) / ADAM7_Y_SPACING[p]
+					if x > 0 && y > 0 {
+						expected_size += compute_buffer_size(int(x), int(y), int(img.channels), int(header.bit_depth), 1)
+					}
+				}
+			}
+
+			if expected_size > image.MAX_DIMENSIONS {
+				return {}, .Image_Dimensions_Too_Large
+			}
+
 		case .PLTE:
 			seen_plte = true
 			// PLTE must appear before IDAT and can't appear for color types 0, 4.
@@ -479,10 +499,15 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 		case .IDAT:
 			// If we only want image metadata and don't want the pixel data, we can early out.
+			if !seen_ihdr {
+				return {}, .IHDR_Not_First_Chunk
+			}
+
 			if .return_metadata not_in options && .do_not_decompress_image in options {
 				img.channels = final_image_channels
 				return img, nil
 			}
+
 			// There must be at least 1 IDAT, contiguous if more.
 			if seen_idat {
 				return img, .IDAT_Must_Be_Contiguous
@@ -496,7 +521,15 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			for next == .IDAT {
 				c = read_chunk(ctx) or_return
 
-				bytes.buffer_write(&idat_b, c.data)
+				if len(idat) == 0 {
+					idat = c.data
+				} else {
+					if len(idat_b) == 0 {
+						append(&idat_b, ..idat)
+					}
+					append(&idat_b, ..c.data)
+					idat = idat_b[:]
+				}
 				idat_length += u64(c.header.length)
 
 				if idat_length > MAX_IDAT_SIZE {
@@ -510,7 +543,6 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				next = ch.type
 			}
 
-			idat = bytes.buffer_to_bytes(&idat_b)
 			if int(idat_length) != len(idat) {
 				return {}, .IDAT_Corrupt
 			}
@@ -612,9 +644,9 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			if .return_metadata in options {
 				append_chunk(&info.chunks, c) or_return
 			}
-
-			first = false
 		}
+
+		first = false
 	}
 
 	if .do_not_decompress_image in options {
@@ -630,39 +662,15 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		return img, .PLTE_Missing
 	}
 
-	/*
-		Calculate the expected output size, to help `inflate` make better decisions about the output buffer.
-		We'll also use it to check the returned buffer size is what we expected it to be.
-
-		Let's calcalate the expected size of the IDAT based on its dimensions, and whether or not it's interlaced.
-	*/
-	expected_size: int
-
-	if header.interlace_method != .Adam7 {
-		expected_size = compute_buffer_size(int(header.width), int(header.height), int(img.channels), int(header.bit_depth), 1)
-	} else {
-		/*
-			Because Adam7 divides the image up into sub-images, and each scanline must start
-			with a filter byte, Adam7 interlaced images can have a larger raw size.
-		*/
-		for p := 0; p < 7; p += 1 {
-			x := (int(header.width)  - ADAM7_X_ORIG[p] + ADAM7_X_SPACING[p] - 1) / ADAM7_X_SPACING[p]
-			y := (int(header.height) - ADAM7_Y_ORIG[p] + ADAM7_Y_SPACING[p] - 1) / ADAM7_Y_SPACING[p]
-			if x > 0 && y > 0 {
-				expected_size += compute_buffer_size(int(x), int(y), int(img.channels), int(header.bit_depth), 1)
-			}
-		}
-	}
-
-	buf: bytes.Buffer
-	zlib_error := zlib.inflate(idat, &buf, false, expected_size)
-	defer bytes.buffer_destroy(&buf)
+	buf: [dynamic]u8
+	zlib_error := deflate.inflate_zlib(&buf, idat, expected_size)
+	defer delete(buf)
 
 	if zlib_error != nil {
 		return {}, zlib_error
 	}
 
-	buf_len := len(buf.buf)
+	buf_len := len(buf)
 	if expected_size != buf_len {
 		return {}, .IDAT_Corrupt
 	}
@@ -672,9 +680,9 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		So, we'll save the old value of img.channels we return to the user
 		as metadata, and set it instead to the raw number of channels.
 	*/
-	defilter_error := defilter(img, &buf, &header, options)
+	defilter_error := defilter(img, buf[:], &header, options)
 	if defilter_error != nil {
-		bytes.buffer_destroy(&img.pixels)
+		delete(img.pixels)
 		return {}, defilter_error
 	}
 
@@ -720,19 +728,20 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	if .Paletted in header.color_type {
 		temp := img.pixels
-		defer bytes.buffer_destroy(&temp)
+		defer delete(temp)
 
 		// We need to create a new image buffer
 		dest_raw_size := compute_buffer_size(int(header.width), int(header.height), out_image_channels, 8)
-		t := bytes.Buffer{}
-		if resize(&t.buf, dest_raw_size) != nil {
+		t := [dynamic]u8{}
+		if resize(&t, dest_raw_size) != nil {
 			return {}, .Unable_To_Allocate_Or_Resize
 		}
+		img.pixels = t
 
 		// If we don't have transparency or drop it without applying it, we can do this:
 		if (!seen_trns || (seen_trns && .alpha_drop_if_present in options && .alpha_premultiply not_in options)) && .alpha_add_if_missing not_in options {
-			output := mem.slice_data_cast([]image.RGB_Pixel, t.buf[:])
-			for pal_idx, idx in temp.buf {
+			output, _ := image.to_rgb(img)
+			for pal_idx, idx in temp {
 				output[idx] = _plte.entries[pal_idx]
 			}
 		} else if add_alpha || .alpha_drop_if_present in options {
@@ -742,24 +751,24 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				bg = {u8(c16.r), u8(c16.g), u8(c16.b)}
 			}
 
-			no_alpha := (.alpha_drop_if_present in options || premultiply) && .alpha_add_if_missing not_in options
+			no_alpha := out_image_channels == 3
 			blend_background := seen_bkgd && .blend_background in options
 
 			if no_alpha {
-				output := mem.slice_data_cast([]image.RGB_Pixel, t.buf[:])
-				for orig, idx in temp.buf {
+				output, _ := image.to_rgb(img)
+				for orig, idx in temp {
 					c := _plte.entries[orig]
 					a := int(orig) < len(trns.data) ? trns.data[orig] : 255
 
 					if blend_background {
 						output[idx] = image.blend(c, a, bg)
 					} else if premultiply {
-						output[idx] = image.blend(PLTE_Entry{}, a, c)
+						output[idx] = image.blend(c, a, PLTE_Entry{})
 					}
 				}
 			} else {
-				output := mem.slice_data_cast([]image.RGBA_Pixel, t.buf[:])
-				for orig, idx in temp.buf {
+				output, _ := image.to_rgba(img)
+				for orig, idx in temp {
 					c := _plte.entries[orig]
 					a := int(orig) < len(trns.data) ? trns.data[orig] : 255
 
@@ -767,7 +776,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 						c = image.blend(c, a, bg)
 						a = 255
 					} else if premultiply {
-						c = image.blend(PLTE_Entry{}, a, c)
+						c = image.blend(c, a, PLTE_Entry{})
 					}
 
 					output[idx] = {c.r, c.g, c.b, u8(a)}
@@ -776,8 +785,6 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		} else {
 			unreachable()
 		}
-
-		img.pixels = t
 
 	} else if img.depth == 16 {
 		// Check if we need to do something.
@@ -790,17 +797,17 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		}
 
 		temp := img.pixels
-		defer bytes.buffer_destroy(&temp)
+		defer delete(temp)
 
 		// We need to create a new image buffer
 		dest_raw_size := compute_buffer_size(int(header.width), int(header.height), out_image_channels, 16)
-		t := bytes.Buffer{}
-		if resize(&t.buf, dest_raw_size) != nil {
+		t := [dynamic]u8{}
+		if resize(&t, dest_raw_size) != nil {
 			return {}, .Unable_To_Allocate_Or_Resize
 		}
 
-		p16 := mem.slice_data_cast([]u16, temp.buf[:])
-		o16 := mem.slice_data_cast([]u16, t.buf[:])
+		p16 := mem.slice_data_cast([]u16, temp[:])
+		o16 := mem.slice_data_cast([]u16, t[:])
 
 		switch raw_image_channels {
 		case 1:
@@ -989,17 +996,17 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		}
 
 		temp := img.pixels
-		defer bytes.buffer_destroy(&temp)
+		defer delete(temp)
 
 		// We need to create a new image buffer
 		dest_raw_size := compute_buffer_size(int(header.width), int(header.height), out_image_channels, 8)
-		t := bytes.Buffer{}
-		if resize(&t.buf, dest_raw_size) != nil {
+		t := [dynamic]u8{}
+		if resize(&t, dest_raw_size) != nil {
 			return {}, .Unable_To_Allocate_Or_Resize
 		}
 
-		p := temp.buf[:]
-		o := t.buf[:]
+		p := temp[:]
+		o := t[:]
 
 		switch raw_image_channels {
 		case 1:
@@ -1211,7 +1218,8 @@ depth_scale_table :: []u8{0, 0xff, 0x55, 0, 0x11, 0,0,0, 0x01}
 
 defilter_8 :: proc(params: ^Filter_Params) -> (ok: bool) {
 
-	using params
+	src, dest               := params.src, params.dest
+	width, height, channels := params.width, params.height, params.channels
 	row_stride := channels * width
 
 	// TODO: See about doing a Duff's #unroll where practicable
@@ -1271,7 +1279,9 @@ defilter_8 :: proc(params: ^Filter_Params) -> (ok: bool) {
 
 defilter_less_than_8 :: proc(params: ^Filter_Params) -> bool #no_bounds_check {
 
-	using params
+	src, dest               := params.src, params.dest
+	width, height, channels := params.width, params.height, params.channels
+	depth, rescale          := params.depth, params.rescale
 
 	row_stride_in  := ((channels * width * depth) + 7) >> 3
 	row_stride_out := channels * width
@@ -1432,7 +1442,8 @@ defilter_less_than_8 :: proc(params: ^Filter_Params) -> bool #no_bounds_check {
 }
 
 defilter_16 :: proc(params: ^Filter_Params) -> bool {
-	using params
+	src, dest               := params.src, params.dest
+	width, height, channels := params.width, params.height, params.channels
 
 	stride := channels * 2
 	row_stride := width * stride
@@ -1491,8 +1502,8 @@ defilter_16 :: proc(params: ^Filter_Params) -> bool {
 	return true
 }
 
-defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IHDR, options: Options) -> (err: Error) {
-	input    := bytes.buffer_to_bytes(filter_bytes)
+defilter :: proc(img: ^Image, filter_bytes: []u8, header: ^image.PNG_IHDR, options: Options) -> (err: Error) {
+	input    := filter_bytes
 	width    := int(header.width)
 	height   := int(header.height)
 	channels := int(img.channels)
@@ -1502,7 +1513,7 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 	bytes_per_channel := depth == 16 ? 2 : 1
 
 	num_bytes := compute_buffer_size(width, height, channels, depth == 16 ? 16 : 8)
-	if resize(&img.pixels.buf, num_bytes) != nil {
+	if resize(&img.pixels, num_bytes) != nil {
 		return .Unable_To_Allocate_Or_Resize
 	}
 
@@ -1516,7 +1527,7 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 			channels = channels,
 			depth    = depth,
 			rescale  = rescale,
-			dest     = img.pixels.buf[:],
+			dest     = img.pixels[:],
 		}
 
 		if depth == 8 {
@@ -1542,9 +1553,9 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 			x = (width  - ADAM7_X_ORIG[p] + ADAM7_X_SPACING[p] - 1) / ADAM7_X_SPACING[p]
 			y = (height - ADAM7_Y_ORIG[p] + ADAM7_Y_SPACING[p] - 1) / ADAM7_Y_SPACING[p]
 			if x > 0 && y > 0 {
-				temp: bytes.Buffer
+				temp: [dynamic]u8
 				temp_len := compute_buffer_size(x, y, channels, depth == 16 ? 16 : 8)
-				if resize(&temp.buf, temp_len) != nil {
+				if resize(&temp, temp_len) != nil {
 					return .Unable_To_Allocate_Or_Resize
 				}
 
@@ -1555,7 +1566,7 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 					channels = channels,
 					depth    = depth,
 					rescale  = rescale,
-					dest     = temp.buf[:],
+					dest     = temp[:],
 				}
 
 				if depth == 8 {
@@ -1572,7 +1583,7 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 					return .Unknown_Filter_Method
 				}
 
-				t := temp.buf[:]
+				t := temp[:]
 				for j = 0; j < y; j += 1 {
 					for i = 0; i < x; i += 1 {
 						out_y := j * ADAM7_Y_SPACING[p] + ADAM7_Y_ORIG[p]
@@ -1582,12 +1593,12 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 						out_off += out_x * channels * bytes_per_channel
 
 						for z := 0; z < channels * bytes_per_channel; z += 1 {
-							img.pixels.buf[out_off + z] = t[z]
+							img.pixels[out_off + z] = t[z]
 						}
 						t = t[channels * bytes_per_channel:]
 					}
 				}
-				bytes.buffer_destroy(&temp)
+				delete(temp)
 				input_stride := compute_buffer_size(x, y, channels, depth, 1)
 				input = input[input_stride:]
 			}
@@ -1596,8 +1607,8 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 	when ODIN_ENDIAN == .Little {
 		if img.depth == 16 {
 			// The pixel components are in Big Endian. Let's byteswap.
-			input  := mem.slice_data_cast([]u16be, img.pixels.buf[:])
-			output := mem.slice_data_cast([]u16  , img.pixels.buf[:])
+			input  := mem.slice_data_cast([]u16be, img.pixels[:])
+			output := mem.slice_data_cast([]u16  , img.pixels[:])
 			#no_bounds_check for v, i in input {
 				output[i] = u16(v)
 			}
@@ -1609,5 +1620,5 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 
 @(init, private)
 _register :: proc "contextless" () {
-	image.register(.PNG, load_from_bytes, destroy)
+	image.register(.PNG, load_from_bytes, destroy, load_from_context)
 }
