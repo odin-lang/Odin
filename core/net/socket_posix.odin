@@ -291,8 +291,7 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 		// .Dont_Linger:
 			switch x in value {
 			case bool, b8:
-				x2 := x
-				bool_value = b32((^bool)(&x2)^)
+				bool_value = b32((^bool)(x.data)^)
 			case b16:
 				bool_value = b32(x)
 			case b32:
@@ -321,12 +320,12 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 		.Send_Buffer_Size:
 			// TODO: check for out of range values and return .Value_Out_Of_Range?
 			switch i in value {
-			case i8, u8:   i2 := i; int_value = posix.socklen_t((^u8)(&i2)^)
-			case i16, u16: i2 := i; int_value = posix.socklen_t((^u16)(&i2)^)
-			case i32, u32: i2 := i; int_value = posix.socklen_t((^u32)(&i2)^)
-			case i64, u64: i2 := i; int_value = posix.socklen_t((^u64)(&i2)^)
-			case i128, u128: i2 := i; int_value = posix.socklen_t((^u128)(&i2)^)
-			case int, uint: i2 := i; int_value = posix.socklen_t((^uint)(&i2)^)
+			case i8, u8:   int_value = posix.socklen_t((^u8)(i.data)^)
+			case i16, u16: int_value = posix.socklen_t((^u16)(i.data)^)
+			case i32, u32: int_value = posix.socklen_t((^u32)(i.data)^)
+			case i64, u64: int_value = posix.socklen_t((^u64)(i.data)^)
+			case i128, u128: int_value = posix.socklen_t((^u128)(i.data)^)
+			case int, uint: int_value = posix.socklen_t((^uint)(i.data)^)
 			case:
 				panic("set_option() value must be an integer here", loc)
 			}
