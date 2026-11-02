@@ -25,7 +25,7 @@ import win32 "core:sys/windows"
 
 @(private="file") stop_runner_flag: int
 
-@(private="file") stop_test_gate:   sync.Mutex
+@(private="file") stop_test_gate:   sync.Atomic_Mutex
 @(private="file") stop_test_index:  int
 @(private="file") stop_test_signal: win32.DWORD
 @(private="file") stop_test_passed: bool
@@ -133,7 +133,7 @@ stop_test_signal_callback :: proc "c" (sig: libc.int) {
 
 @(private="file")
 stop_test :: proc(code: win32.DWORD) -> ! {
-	sync.mutex_lock(&stop_test_gate)
+	sync.atomic_mutex_lock(&stop_test_gate)
 
 	intrinsics.atomic_store(&stop_test_index, local_test_index)
 	intrinsics.atomic_store(&stop_test_signal, code)
@@ -208,7 +208,7 @@ _should_stop_runner :: proc() -> bool {
 @(private="file")
 unlock_stop_test_gate :: proc(_: int, _: Stop_Reason, ok: bool) {
 	if ok {
-		sync.mutex_unlock(&stop_test_gate)
+		sync.atomic_mutex_unlock(&stop_test_gate)
 	}
 }
 
