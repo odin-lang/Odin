@@ -606,6 +606,12 @@ JPEG_Error :: enum {
 	Extra_Data_After_SOS, // Image seemed to have decoded okay, but there's more data after SOS
 	Invalid_Thumbnail_Size,
 	Huffman_Symbols_Exceeds_Max,
+	Invalid_Huffman_Table,
+	Missing_Huffman_Table,
+	Missing_Quantization_Table,
+	Invalid_Scan_Parameters,
+	Invalid_Component,
+	Missing_Image_Data,
 }
 
 JFIF_Unit :: enum byte {
