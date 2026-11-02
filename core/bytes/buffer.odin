@@ -152,14 +152,24 @@ buffer_write_at :: proc(b: ^Buffer, p: []byte, offset: int, loc := #caller_locat
 		err = .Invalid_Offset
 		return
 	}
-	_, ok := _buffer_try_grow(b, offset+len(p), loc=loc)
-	if !ok {
-		_ = _buffer_grow(b, offset+len(p), loc=loc)
+	end := offset + len(p)
+	if end > len(b.buf) {
+		if end > cap(b.buf) {
+			// geometric grow to ammortize repeated writes after the end;
+			// on failure the resize below retries exact size
+			reserve(&b.buf, max(end, 2*cap(b.buf)), loc=loc)
+		}
+		// also clears the gap between the old end and offset
+		resize(&b.buf, end, loc=loc)
 	}
 	if len(b.buf) <= offset {
 		return 0, .Short_Write
 	}
-	return copy(b.buf[offset:], p), nil
+	n = copy(b.buf[offset:], p)
+	if n < len(p) {
+		err = .Short_Write
+	}
+	return
 }
 
 
@@ -401,7 +411,7 @@ buffer_read_from :: proc(b: ^Buffer, r: io.Reader) -> (n: i64, err: io.Error) #n
 			return
 		}
 
-		resize(&b.buf, i+m)
+		non_zero_resize(&b.buf, i+m)
 		n += i64(m)
 		if e == .EOF {
 			return
