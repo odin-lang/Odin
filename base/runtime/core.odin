@@ -401,6 +401,14 @@ Allocator_Mode :: enum byte {
 	Query_Info,
 	Alloc_Non_Zeroed,
 	Resize_Non_Zeroed,
+	
+	// When the allocator proc is called with this mode, then the old_memory pointer fed into it
+	// will be of type `(^Allocator)` so that the allocator proc can set the data to something else.
+	//
+	// This is used for making the default temp allocator thread safe. 
+	Thread_Attach,
+	
+	Thread_Detach,
 }
 
 Allocator_Mode_Set :: distinct bit_set[Allocator_Mode]
