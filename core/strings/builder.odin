@@ -315,7 +315,7 @@ Returns:
 */
 @(require_results)
 unsafe_to_cstring :: proc(b: ^Builder, loc := #caller_location) -> (res: cstring, err: runtime.Allocator_Error) #optional_allocator_error {
-	append(&b.buf, 0, loc) or_return
+	non_zero_append(&b.buf, 0, loc) or_return
 	pop(&b.buf)
 	return cstring(raw_data(b.buf)), nil
 }
@@ -331,7 +331,7 @@ Returns:
 */
 @(require_results)
 to_cstring :: proc(b: ^Builder, loc := #caller_location) -> (res: cstring, err: runtime.Allocator_Error) #optional_allocator_error {
-	n := append(&b.buf, 0, loc) or_return
+	n := non_zero_append(&b.buf, 0, loc) or_return
 	if n != 1 {
 		return nil, .Out_Of_Memory
 	}
@@ -416,7 +416,7 @@ Output:
 */
 write_byte :: proc(b: ^Builder, x: byte, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	n0 := len(b.buf)
-	append(&b.buf, x, loc) or_return
+	non_zero_append(&b.buf, x, loc) or_return
 	n1 := len(b.buf)
 	return n1-n0, nil
 }
@@ -451,7 +451,7 @@ Example:
 
 */
 write_bytes :: proc(b: ^Builder, x: []byte, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
-	return append(&b.buf, ..x, loc=loc)
+	return non_zero_append(&b.buf, ..x, loc=loc)
 }
 
 
@@ -493,10 +493,10 @@ Output:
 */
 write_rune :: proc(b: ^Builder, r: rune, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	if r < utf8.RUNE_SELF {
-		return append(&b.buf, cast(byte)r, loc)
+		return non_zero_append(&b.buf, cast(byte)r, loc)
 	}
 	buf, w := utf8.encode_rune(r)
-	return append(&b.buf, ..buf[:w], loc=loc)
+	return non_zero_append(&b.buf, ..buf[:w], loc=loc)
 }
 
 
@@ -578,7 +578,7 @@ Output:
 
 */
 write_string :: proc(b: ^Builder, s: string, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
-	return append(&b.buf, s, loc=loc)
+	return non_zero_append(&b.buf, s, loc=loc)
 }
 
 
