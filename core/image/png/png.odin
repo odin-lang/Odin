@@ -202,6 +202,14 @@ read_chunk :: proc(ctx: ^compress.Context, allocator := context.temp_allocator, 
 	return chunk, nil
 }
 
+read_ancillary_chunk :: proc(ctx: ^compress.Context, type: image.PNG_Chunk_Type, allocator := context.temp_allocator, loc := #caller_location) -> (chunk: image.PNG_Chunk, skip: bool, err: Error) {
+	chunk, err = read_chunk(ctx, allocator, loc)
+	if err == compress.General_Error.Checksum_Failed && (transmute([4]u8)type)[0] & 0x20 != 0 {
+		return {}, true, nil
+	}
+	return
+}
+
 copy_chunk :: proc(src: image.PNG_Chunk, allocator := context.allocator) -> (dest: image.PNG_Chunk, err: Error) {
 	if int(src.header.length) != len(src.data) {
 		return {}, .Invalid_Chunk_Length
@@ -366,6 +374,7 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 
 	c:	image.PNG_Chunk
 	ch:     image.PNG_Chunk_Header
+	skip_chunk: bool
 	e:      io.Error
 
 	header:	image.PNG_IHDR
@@ -470,10 +479,6 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 				}
 			}
 
-			if expected_size > image.MAX_DIMENSIONS {
-				return {}, .Image_Dimensions_Too_Large
-			}
-
 		case .PLTE:
 			seen_plte = true
 			// PLTE must appear before IDAT and can't appear for color types 0, 4.
@@ -553,7 +558,10 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 			seen_iend = true
 
 		case .bKGD:
-			c = read_chunk(ctx) or_return
+			c, skip_chunk = read_ancillary_chunk(ctx, ch.type) or_return
+			if skip_chunk {
+				break
+			}
 			seen_bkgd = true
 			if .return_metadata in options {
 				append_chunk(&info.chunks, c) or_return
@@ -586,7 +594,10 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 			}
 
 		case .tRNS:
-			c = read_chunk(ctx) or_return
+			c, skip_chunk = read_ancillary_chunk(ctx, ch.type) or_return
+			if skip_chunk {
+				break
+			}
 
 			if .Alpha in info.header.color_type {
 				return img, .TRNS_Encountered_Unexpectedly
@@ -640,7 +651,10 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 
 		case:
 			// Unhandled type
-			c = read_chunk(ctx) or_return
+			c, skip_chunk = read_ancillary_chunk(ctx, ch.type) or_return
+			if skip_chunk {
+				break
+			}
 			if .return_metadata in options {
 				append_chunk(&info.chunks, c) or_return
 			}
