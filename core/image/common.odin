@@ -56,6 +56,7 @@ Image :: struct {
 }
 
 Image_Metadata :: union #shared_nil {
+	^BNG_Info,
 	^Netpbm_Info,
 	^PNG_Info,
 	^QOI_Info,
@@ -163,6 +164,7 @@ Options :: distinct bit_set[Option]
 
 Error :: union #shared_nil {
 	General_Image_Error,
+	BNG_Error,
 	Netpbm_Error,
 	PNG_Error,
 	QOI_Error,
@@ -480,6 +482,34 @@ PNG_Color_Type :: distinct bit_set[PNG_Color_Value; u8]
 PNG_Interlace_Method :: enum u8 {
 	None  = 0,
 	Adam7 = 1,
+}
+
+BNG_Error :: enum {
+	None = 0,
+	Unsupported_Version,
+	Body_Length_Exceeds_Input,
+	Invalid_Raw_Body_Length,
+	Invalid_Zero_Run,
+	Body_Ends_Too_Early,
+}
+
+BNG_Magic :: [7]u8{0xFF, 0x0E, 0x38, 0x30, 0x2A, 0x1A, 0x18}
+
+BNG_Version :: 0x01
+
+BNG_Raw_Flag :: u32le(0x8000_0000)
+
+BNG_Header :: struct #packed {
+	magic:             [7]u8,
+	version:           u8,
+	width:             u32le,
+	height:            u32le,
+	stream_byte_count: u32le,
+}
+#assert(size_of(BNG_Header) == 20)
+
+BNG_Info :: struct {
+	header: BNG_Header,
 }
 
 /*
