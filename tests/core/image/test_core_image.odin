@@ -1486,6 +1486,29 @@ run_png_suite :: proc(t: ^testing.T, suite: []Test) {
 				passed &= test.hash == png_hash
 
 				if passed {
+					// Roundtrip through PNG to test the PNG encoder and decoder.
+					if img.channels >= 1 && img.channels <= 4 && (img.depth == 8 || img.depth == 16) {
+						png_buffer: [dynamic]u8
+						defer delete(png_buffer)
+						png_save_err := png.save(&png_buffer, img)
+
+						testing.expectf(t, png_save_err == nil, "%v test %v PNG save failed with %v", file.file, count, png_save_err)
+						if png_save_err == nil {
+							png_img, png_load_err := png.load(png_buffer[:], {.do_not_expand_channels})
+							defer png.destroy(png_img)
+							expect_stream_loads(t, file.file, png_buffer[:], png_context_loader, {.do_not_expand_channels}, png_img, png_load_err)
+
+							testing.expectf(t, png_load_err == nil, "%v test %v PNG load failed with %v", file.file, count, png_load_err)
+							if png_load_err == nil {
+								png_dims := Dims{png_img.width, png_img.height, png_img.channels, png_img.depth}
+								testing.expectf(t, png_dims == dims, "%v test %v PNG load has %v, expected %v", file.file, count, png_dims, dims)
+
+								png_rt_hash := hash.crc32(png_img.pixels[:])
+								testing.expectf(t, png_rt_hash == png_hash, "%v test %v PNG load hash is %08x, expected it match PNG's %08x with %v", file.file, count, png_rt_hash, png_hash, test.options)
+							}
+						}
+					}
+
 					// Roundtrip through QOI to test the QOI encoder and decoder.
 					if img.depth == 8 && (img.channels == 3 || img.channels == 4) {
 						qoi_buffer: [dynamic]u8
