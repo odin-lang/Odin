@@ -54,6 +54,8 @@ image_load_with_temp_allocator :: proc(t: ^testing.T) {
 	expect_survives_temp_allocator_file(t, "bmp",  TEST_SUITE_PATH_BMP + "/rgb24.bmp",        bmp_context_loader)
 	expect_survives_temp_allocator_file(t, "bmp8", TEST_SUITE_PATH_BMP + "/pal8.bmp",         bmp_context_loader)
 	expect_survives_temp_allocator_file(t, "jpeg", TEST_SUITE_PATH_JPG + "/emblem-1024.jpg",  jpeg_context_loader)
+	expect_survives_temp_allocator_file(t, "jpeg_progressive", TEST_SUITE_PATH_JPG + "/emblem-1024-progressive.jpg", jpeg_context_loader)
+	expect_survives_temp_allocator_file(t, "jpeg_gray",        TEST_SUITE_PATH_JPG + "/emblem-1024-gray.jpg",        jpeg_context_loader)
 
 	src, src_err := png.load(TEST_SUITE_PATH_PNG + "/basn2c08.png")
 	defer png.destroy(src)
