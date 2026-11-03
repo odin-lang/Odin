@@ -39,7 +39,7 @@ load_from_context :: proc(ctx: ^compress.Context, options := Default_Options, al
 	}
 
 	if header.version != image.BNG_Version {
-		return img, .Unsupported_Version
+		return img, image.BNG_Error.Unsupported_Version
 	}
 
 	if header.width == 0 || header.height == 0 {

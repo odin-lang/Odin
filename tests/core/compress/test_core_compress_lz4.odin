@@ -107,7 +107,7 @@ lz4_test_unpack_frame :: proc(t: ^testing.T, name: string, packed: []byte, want:
 		ctx := stream_test_context(kind, &input, &br, &tr, &output)
 		defer compress.destroy_context(&ctx)
 
-		err := lz4.decompress_frame(&ctx, -1, dictionary)
+		err := lz4.decompress_frame(&ctx, dictionary = dictionary)
 		testing.expectf(t, err == nil, "%v, %v: decompress_frame returned %v", name, kind, err)
 		testing.expectf(t, bytes.equal(output[:], want), "%v, %v: output differs (%v vs %v bytes)", name, kind, len(output), len(want))
 
