@@ -110,7 +110,7 @@ lz4_content_size_is_a_limit :: proc(t: ^testing.T) {
 lz4_block_allocation_bound :: proc(t: ^testing.T) {
 	output: [dynamic]byte
 	defer delete(output)
-	testing.expect_value(t, lz4.decompress_block(&output, []byte{0x10, 'x'}, 1 << 30), nil)
+	testing.expect_value(t, lz4.decompress_block(&output, []byte{0x10, 'x'}, compress.COMPRESS_OUTPUT_ALLOCATE_MAX), nil)
 	testing.expect_value(t, len(output), 1)
 	testing.expectf(t, cap(output) <= 255 * 2, "capacity %v for a 2 byte block", cap(output))
 }
