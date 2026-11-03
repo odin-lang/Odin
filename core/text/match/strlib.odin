@@ -757,7 +757,8 @@ gsub_builder :: proc(builder: ^strings.Builder, haystack, pattern, replace: stri
 @(require_results)
 gsub_allocator :: proc(haystack, pattern, replace: string, allocator := context.allocator) -> string {
 	builder := strings.builder_make(0, 256, context.temp_allocator)
-	return gsub_builder(&builder, haystack, pattern, replace)
+	res := gsub_builder(&builder, haystack, pattern, replace)
+	return strings.clone(res, allocator)
 }
 
 Gsub_Proc :: proc(

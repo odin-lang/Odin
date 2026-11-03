@@ -610,6 +610,8 @@ internal_int_prime_frobenius_underwood :: proc(N: ^Int, allocator := context.all
 	(If that name sounds familiar, he is the guy who found the fdiv bug in the Pentium CPU.)
 */
 internal_int_prime_strong_lucas_selfridge :: proc(a: ^Int, allocator := context.allocator) -> (lucas_selfridge: bool, err: Error) {
+	context.allocator = allocator
+
 	// TODO: choose better variable names!
 
 	Dz, gcd, Np1, Uz, Vz, U2mz, V2mz, Qmz, Q2mz, Qkdz, T1z, T2z, T3z, T4z, Q2kdz := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}
@@ -853,7 +855,7 @@ internal_prime_fermat :: proc(a, b: ^Int, allocator := context.allocator) -> (fe
 	/*
 		Compute `t` = `b`**`a` mod `a`
 	*/
-	internal_int_exponent_mod(t, b, a, a) or_return
+	internal_int_exponent_mod(t, b, a, a, allocator) or_return
 
 	/*
 		Is it equal to b?

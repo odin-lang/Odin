@@ -9,8 +9,8 @@ import "core:encoding/hex"
 Hex_Bytes :: string
 
 hexbytes_compare :: proc(x: Hex_Bytes, b: []byte, allocator := context.allocator) -> bool {
-	dst := hexbytes_decode(x)
-	defer delete(dst)
+	dst := hexbytes_decode(x, allocator)
+	defer delete(dst, allocator)
 
 	return bytes.equal(dst, b)
 }
@@ -27,7 +27,7 @@ hexbytes_decode :: proc(x: Hex_Bytes, allocator := context.allocator) -> []byte 
 Jwk_Bytes :: string
 
 jwkbytes_decode :: proc(s: Jwk_Bytes, allocator := context.allocator) -> []byte {
-	dst, err := base64.decode(s, base64.DEC_URL_TABLE, allocator = allocator)
+	dst, err := base64.decode(s, base64.DEC_URL_TABLE, allocator)
 	if err != nil {
 		panic("Jwk_Bytes: invalid hex encoding")
 	}
