@@ -98,6 +98,12 @@ LZ4_FAST_HASH_LOG      :: 12
 LZ4_FAST_HASH_SIZE     :: 1 << LZ4_FAST_HASH_LOG
 @(private)
 LZ4_INPUT_MAX          :: int(max(u32) >> 1)
+@(private)
+LZ4_EXPANSION_MAX      :: 255
+@(private)
+LZ4_INITIAL_SIZE_MAX   :: 16 << 20
+@(private)
+LZ4_GROWTH_STEP        :: 16 << 20
 
 @(private)
 LZ4_Level_Parameters :: struct {
