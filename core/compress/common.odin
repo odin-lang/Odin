@@ -1,26 +1,19 @@
 // A collection of utilities to aid with other `compress`ion packages.
 package compress
 
+import "base:runtime"
+import "core:io"
+
 /*
 	Copyright 2021-2026 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's license.
 
 	List of contributors:
 		Jeroen van Rijn: Initial implementation, optimization.
-*/
 
-import "base:runtime"
-import "core:io"
-
-// TODO-UPDATE-COMMENT: COMPRESS_OUTPUT_ALLOCATE_MIN was removed, COMPRESS_OUTPUT_ALLOCATE_MAX is the only setting left
-// ---
-/*
 	These settings bound how much compression algorithms will allocate for their output buffer.
 	If streaming their output, these are unnecessary and will be ignored.
 
-*/
-
-/*
 	This bounds the maximum a buffer will resize to as needed, or the maximum we'll
 	pre-allocate if you inform the decompression routine you know the payload size.
 
@@ -38,12 +31,12 @@ when size_of(uintptr) == 8 {
 	COMPRESS_OUTPUT_ALLOCATE_MAX :: int(#config(COMPRESS_OUTPUT_ALLOCATE_MAX, 1 << 29))
 }
 
-
 Error :: union #shared_nil {
 	General_Error,
 	Deflate_Error,
 	ZLIB_Error,
 	GZIP_Error,
+	LZ4_Error,
 	io.Error,
 	runtime.Allocator_Error,
 }
@@ -82,6 +75,24 @@ GZIP_Error :: enum {
 
 	Output_Exceeds_COMPRESS_OUTPUT_ALLOCATE_MAX,
 
+}
+
+LZ4_Error :: enum {
+	None = 0,
+	Invalid_Magic,
+	Unsupported_Version,
+	Reserved_Bit_Set,
+	Invalid_Block_Max_Size,
+	Header_Checksum_Failed,
+	Block_Checksum_Failed,
+	Content_Checksum_Failed,
+	Content_Size_Mismatch,
+	Block_Too_Large,
+	Dictionary_Required,
+	Invalid_Offset,
+	Offset_Out_Of_Range,
+	Literal_Overrun,
+	Input_Too_Large,
 }
 
 ZLIB_Error :: enum {

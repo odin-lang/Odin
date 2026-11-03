@@ -3,6 +3,7 @@
 # These files must always have *nix line-endings
 Makefile text eol=lf
 *.sh text eol=lf
+tests/core/compress/lz4_vector_*.bin binary
 vendor/box2d/lib/box2d_windows_amd64.lib filter=lfs diff=lfs merge=lfs -text
 vendor/box2d/lib/box2d_darwin.a filter=lfs diff=lfs merge=lfs -text
 vendor/box2d/lib/box2d_wasm.o filter=lfs diff=lfs merge=lfs -text
