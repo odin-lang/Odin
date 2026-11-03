@@ -10462,6 +10462,10 @@ gb_internal bool check_is_operand_compound_lit_constant(CheckerContext *c, Opera
 			return true;
 		}
 	}
+	if (field_type != nullptr && o->type != nullptr && !are_types_identical(o->type, field_type) &&
+	    check_is_assignable_to_using_subtype(o->type, field_type) > 0) {
+		return false;
+	}
 
 	Ast *expr = unparen_expr(o->expr);
 	if (expr != nullptr) {
