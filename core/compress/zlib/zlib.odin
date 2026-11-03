@@ -27,14 +27,14 @@ Deflate_Error :: compress.Deflate_Error
 @(deprecated="Use `deflate.inflate_zlib` or `deflate.inflate_raw` from `core:compress/deflate`")
 inflate_from_context :: proc(ctx: ^compress.Context, raw := false, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
 	if raw {
-		return deflate.inflate_raw_from_context(ctx, expected_output_size, allocator)
+		return deflate.inflate_raw_from_context(ctx, expected_output_size, allocator=allocator)
 	}
-	return deflate.inflate_zlib_from_context(ctx, expected_output_size, allocator)
+	return deflate.inflate_zlib_from_context(ctx, expected_output_size, allocator=allocator)
 }
 
 @(deprecated="Use `deflate.inflate_raw` from `core:compress/deflate`")
 inflate_raw :: proc(z: ^compress.Context, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
-	return deflate.inflate_raw_from_context(z, expected_output_size, allocator)
+	return deflate.inflate_raw_from_context(z, expected_output_size, allocator=allocator)
 }
 
 @(deprecated="Use `deflate.inflate_zlib` or `deflate.inflate_raw` from `core:compress/deflate`")
