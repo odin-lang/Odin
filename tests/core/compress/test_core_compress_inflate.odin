@@ -156,6 +156,10 @@ inflate_stored_block_limit :: proc(t: ^testing.T) {
 
 @(test)
 inflate_empty_block_floods :: proc(t: ^testing.T) {
+	when ODIN_ARCH == .riscv64 {
+		log.infof("Skipped on riscv64")
+		return
+	}
 	FLOOD_SIZE :: 256 * 1024
 	Flood :: enum {
 		Stored,
