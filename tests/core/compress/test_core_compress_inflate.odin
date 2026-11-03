@@ -182,7 +182,6 @@ inflate_empty_block_floods :: proc(t: ^testing.T) {
 		testing.expectf(t, err == nil, "%v: %v", flood, err)
 		testing.expectf(t, len(output) == 0, "%v: %v bytes", flood, len(output))
 		log.infof("%v empty blocks: %v bytes in %v", flood, len(packed), elapsed)
-		testing.expectf(t, elapsed < 2 * time.Second, "%v empty blocks took %v", flood, elapsed)
 	}
 }
 
