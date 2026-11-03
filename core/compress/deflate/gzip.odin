@@ -6,21 +6,26 @@ import "core:io"
 
 inflate_gzip :: proc{inflate_gzip_from_context, inflate_gzip_from_bytes}
 
-inflate_gzip_from_context :: proc(z: ^compress.Context, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
+inflate_gzip_from_context :: proc(z: ^compress.Context, expected_output_size := -1, max_output_size := compress.COMPRESS_OUTPUT_ALLOCATE_MAX, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
 	expected_output_size := expected_output_size
 	if expected_output_size <= 0 && z.size_unpacked > 0 {
 		expected_output_size = int(min(z.size_unpacked, i64(max(int))))
 	}
-	if expected_output_size > compress.COMPRESS_OUTPUT_ALLOCATE_MAX {
+	if expected_output_size > max_output_size {
 		return GZIP_Error.Output_Exceeds_COMPRESS_OUTPUT_ALLOCATE_MAX
+	}
+
+	size_hint := -1
+	if expected_output_size <= 0 && compress.is_memory_context(z) && len(z.window) >= size_of(Gzip_Trailer) {
+		size_hint = int((^u32le)(raw_data(z.window[len(z.window) - 4:]))^)
 	}
 
 	start := 0
 	for {
 		inflate_gzip_header(z) or_return
-		output := inflate_to_buffer(z, expected_output_size, start) or_return
+		output := inflate_to_buffer(z, expected_output_size, max_output_size, start, size_hint) or_return
 		member := output[start:]
 
 		trailer, trailer_err := compress.read_data(z, Gzip_Trailer)
@@ -42,10 +47,10 @@ inflate_gzip_from_context :: proc(z: ^compress.Context, expected_output_size := 
 	}
 }
 
-inflate_gzip_from_bytes :: proc(output: ^[dynamic]u8, input: []u8, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
+inflate_gzip_from_bytes :: proc(output: ^[dynamic]u8, input: []u8, expected_output_size := -1, max_output_size := compress.COMPRESS_OUTPUT_ALLOCATE_MAX, allocator := context.allocator) -> (err: Error) {
 	input := input
 	ctx   := compress.init_context_from_slice(&input, output=output)
-	return inflate_gzip_from_context(&ctx, expected_output_size, allocator)
+	return inflate_gzip_from_context(&ctx, expected_output_size, max_output_size, allocator)
 }
 
 @(private)

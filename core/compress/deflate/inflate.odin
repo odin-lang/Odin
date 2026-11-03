@@ -9,13 +9,13 @@ import "core:simd"
 inflate_raw  :: proc{inflate_raw_from_context, inflate_raw_from_bytes}
 inflate_zlib :: proc{inflate_zlib_from_context, inflate_zlib_from_bytes}
 
-inflate_raw_from_context :: proc(z: ^compress.Context, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
+inflate_raw_from_context :: proc(z: ^compress.Context, expected_output_size := -1, max_output_size := compress.COMPRESS_OUTPUT_ALLOCATE_MAX, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
-	_, err = inflate_to_buffer(z, expected_output_size)
+	_, err = inflate_to_buffer(z, expected_output_size, max_output_size)
 	return
 }
 
-inflate_zlib_from_context :: proc(z: ^compress.Context, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
+inflate_zlib_from_context :: proc(z: ^compress.Context, expected_output_size := -1, max_output_size := compress.COMPRESS_OUTPUT_ALLOCATE_MAX, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
 	header, header_err := compress.read_data(z, [2]u8)
@@ -36,7 +36,7 @@ inflate_zlib_from_context :: proc(z: ^compress.Context, expected_output_size := 
 		return ZLIB_Error.Code_Buffer_Malformed
 	}
 
-	output := inflate_to_buffer(z, expected_output_size) or_return
+	output := inflate_to_buffer(z, expected_output_size, max_output_size) or_return
 
 	adler, adler_err := compress.read_data(z, u32be)
 	if adler_err != nil {
@@ -48,16 +48,16 @@ inflate_zlib_from_context :: proc(z: ^compress.Context, expected_output_size := 
 	return nil
 }
 
-inflate_raw_from_bytes :: proc(output: ^[dynamic]u8, input: []u8, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
+inflate_raw_from_bytes :: proc(output: ^[dynamic]u8, input: []u8, expected_output_size := -1, max_output_size := compress.COMPRESS_OUTPUT_ALLOCATE_MAX, allocator := context.allocator) -> (err: Error) {
 	input := input
 	ctx   := compress.init_context_from_slice(&input, output=output)
-	return inflate_raw_from_context(&ctx, expected_output_size, allocator)
+	return inflate_raw_from_context(&ctx, expected_output_size, max_output_size, allocator)
 }
 
-inflate_zlib_from_bytes :: proc(output: ^[dynamic]u8, input: []u8, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
+inflate_zlib_from_bytes :: proc(output: ^[dynamic]u8, input: []u8, expected_output_size := -1, max_output_size := compress.COMPRESS_OUTPUT_ALLOCATE_MAX, allocator := context.allocator) -> (err: Error) {
 	input := input
 	ctx   := compress.init_context_from_slice(&input, output=output)
-	return inflate_zlib_from_context(&ctx, expected_output_size, allocator)
+	return inflate_zlib_from_context(&ctx, expected_output_size, max_output_size, allocator)
 }
 
 @(private)
@@ -358,19 +358,22 @@ inflate_decode :: proc(s: ^Inflate, table: []u32, bit_length: i32) -> i32 #no_bo
 }
 
 @(private)
-inflate_grow :: proc(grow: ^[dynamic]u8, start, need: int) -> (output: []u8, err: Error) #no_bounds_check {
-	if grow == nil || start + need > compress.COMPRESS_OUTPUT_ALLOCATE_MAX {
+inflate_grow :: proc(grow: ^[dynamic]u8, start, need, limit: int) -> (output: []u8, err: Error) #no_bounds_check {
+	if grow == nil || need > limit {
 		return nil, General_Error.Output_Too_Short
 	}
-	new_length := min(max(len(grow) * 2, start + need), compress.COMPRESS_OUTPUT_ALLOCATE_MAX)
-	non_zero_resize(grow, new_length) or_return
+	capacity := len(grow) - start
+	step     := capacity if capacity < INFLATE_GROWTH_STEP else max(INFLATE_GROWTH_STEP, capacity / 4)
+	non_zero_resize(grow, start + min(max(capacity + step, need), limit)) or_return
 	return grow[start:], nil
 }
 
 @(private)
-inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic]u8, start: int, $STREAM: bool) -> (written: int, err: Error) #no_bounds_check {
+inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic]u8, start, limit: int, $STREAM: bool) -> (written: int, err: Error) #no_bounds_check {
 	output   := output
 	capacity := len(output)
+
+	fixed_loaded := false
 
 	Inflate_State :: enum {Header, Stored, Fixed, Dynamic, Block}
 	state := Inflate_State.Header
@@ -435,7 +438,7 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 					}
 					n := min(remaining, builtin.len(s.input) - s.position)
 					if n > capacity - written {
-						output   = inflate_grow(grow, start, written + n) or_return
+						output   = inflate_grow(grow, start, written + n, limit) or_return
 						capacity = builtin.len(output)
 					}
 					copy(output[written:], s.input[s.position:][:n])
@@ -448,7 +451,7 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 					return written, General_Error.Stream_Too_Short
 				}
 				if int(len) > capacity - written {
-					output   = inflate_grow(grow, start, written + int(len)) or_return
+					output   = inflate_grow(grow, start, written + int(len), limit) or_return
 					capacity = builtin.len(output)
 				}
 				copy(output[written:], s.input[s.position:][:len])
@@ -460,8 +463,11 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 
 		case .Fixed:
 			// fixed huffman codes
-			intrinsics.mem_copy_non_overlapping(&s.literals, &INFLATE_FIXED_LITERALS, size_of(INFLATE_FIXED_LITERALS))
-			intrinsics.mem_copy_non_overlapping(&s.distances, &INFLATE_FIXED_DISTANCES, size_of(INFLATE_FIXED_DISTANCES))
+			if !fixed_loaded {
+				intrinsics.mem_copy_non_overlapping(&s.literals, &INFLATE_FIXED_LITERALS, size_of(INFLATE_FIXED_LITERALS))
+				intrinsics.mem_copy_non_overlapping(&s.distances, &INFLATE_FIXED_DISTANCES, size_of(INFLATE_FIXED_DISTANCES))
+				fixed_loaded = true
+			}
 			state = .Block
 
 		case .Dynamic:
@@ -519,6 +525,7 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 				if !inflate_build(s.distances[:], lengths[literal_count:][:distance_count], 8, 15, INFLATE_BAD_DISTANCE) {
 					return written, Deflate_Error.Huffman_Bad_Code_Lengths
 				}
+				fixed_loaded = false
 				state = .Block
 			}
 
@@ -531,7 +538,7 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 				if symbol < 256 {
 					// literal
 					if intrinsics.expect(written >= capacity, false) {
-						output   = inflate_grow(grow, start, written + 1) or_return
+						output   = inflate_grow(grow, start, written + 1, limit) or_return
 						capacity = builtin.len(output)
 					}
 					output[written] = u8(symbol)
@@ -539,7 +546,7 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 					symbol = inflate_decode(&s, s.literals[:], 10)
 					if symbol < 256 {
 						if intrinsics.expect(written >= capacity, false) {
-							output   = inflate_grow(grow, start, written + 1) or_return
+							output   = inflate_grow(grow, start, written + 1, limit) or_return
 							capacity = builtin.len(output)
 						}
 						output[written] = u8(symbol)
@@ -571,7 +578,7 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 					if intrinsics.expect(int(distance) > written, false) { return written, Deflate_Error.Bad_Distance }
 					match_end := written + int(len)
 					if intrinsics.expect(match_end > capacity, false) {
-						output   = inflate_grow(grow, start, match_end) or_return
+						output   = inflate_grow(grow, start, match_end, limit) or_return
 						capacity = builtin.len(output)
 					}
 					destination := raw_data(output)[written:]
@@ -630,7 +637,16 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 }
 
 @(private)
-inflate_initial_size :: proc(expected_output_size, input_size: int) -> (size: int) #no_bounds_check {
+inflate_initial_size :: proc(size_hint, input_size: int) -> (size: int) #no_bounds_check {
+	bound := -1
+	if input_size >= 0 && input_size < max(int) / INFLATE_EXPANSION_MAX {
+		bound = INFLATE_EXPANSION_MAX * input_size
+	}
+	if size_hint > 0 {
+		size = min(size_hint, bound) if bound >= 0 else min(size_hint, INFLATE_INITIAL_SIZE_MAX)
+		return max(size, INFLATE_INITIAL_SIZE_MIN)
+	}
+
 	size = INFLATE_STREAM_INITIAL_SIZE
 	if input_size >= 0 {
 		size = deflate_bound(input_size)
@@ -638,17 +654,14 @@ inflate_initial_size :: proc(expected_output_size, input_size: int) -> (size: in
 			size = INFLATE_INITIAL_SIZE_MAX
 		}
 	}
-	if expected_output_size > 0 {
-		size = expected_output_size
-	}
-	if input_size >= 0 && input_size < INFLATE_INITIAL_SIZE_MAX / INFLATE_EXPANSION_MAX {
-		size = min(size, INFLATE_EXPANSION_MAX * input_size)
+	if bound >= 0 {
+		size = min(size, bound)
 	}
 	return clamp(size, INFLATE_INITIAL_SIZE_MIN, INFLATE_INITIAL_SIZE_MAX)
 }
 
 @(private)
-inflate_to_buffer :: proc(z: ^compress.Context, expected_output_size: int, start := 0) -> (output: []u8, err: Error) #no_bounds_check {
+inflate_to_buffer :: proc(z: ^compress.Context, expected_output_size, max_output_size: int, start := 0, size_hint := -1) -> (output: []u8, err: Error) #no_bounds_check {
 	if z.output == nil {
 		return nil, General_Error.Incompatible_Options
 	}
@@ -656,7 +669,20 @@ inflate_to_buffer :: proc(z: ^compress.Context, expected_output_size: int, start
 	if expected_output_size <= 0 && z.size_unpacked > 0 && z.size_unpacked <= i64(max(int)) {
 		expected_output_size = int(z.size_unpacked)
 	}
-	expected_output_size = expected_output_size - start if expected_output_size > start else -1
+
+	limit := max_output_size
+	hint  := size_hint - start if size_hint > start else -1
+	if expected_output_size > 0 {
+		if expected_output_size > limit {
+			return nil, General_Error.Output_Too_Short
+		}
+		limit = expected_output_size
+		hint  = expected_output_size - start
+	}
+	limit -= start
+	if limit < 0 {
+		return nil, General_Error.Output_Too_Short
+	}
 
 	input_size := -1
 	if compress.is_memory_context(z) {
@@ -666,13 +692,13 @@ inflate_to_buffer :: proc(z: ^compress.Context, expected_output_size: int, start
 	}
 
 	buffer := z.output
-	non_zero_resize(buffer, start + inflate_initial_size(expected_output_size, input_size)) or_return
+	non_zero_resize(buffer, start + min(inflate_initial_size(hint, input_size), limit)) or_return
 
 	written: int
 	if compress.is_memory_context(z) {
-		written, err = inflate_decompress(z, buffer[start:], buffer, start, false)
+		written, err = inflate_decompress(z, buffer[start:], buffer, start, limit, false)
 	} else {
-		written, err = inflate_decompress(z, buffer[start:], buffer, start, true)
+		written, err = inflate_decompress(z, buffer[start:], buffer, start, limit, true)
 	}
 	non_zero_resize(buffer, start + written)
 	z.bytes_written = i64(start + written)
