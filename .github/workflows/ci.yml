@@ -8,7 +8,7 @@ jobs:
     env:
       PKGSRC_BRANCH: 2026Q3
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Build, Check, and Test
       timeout-minutes: 15
       uses: vmactions/netbsd-vm@v1
@@ -50,7 +50,7 @@ jobs:
     name: FreeBSD Build, Check, and Test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Build, Check, and Test
       timeout-minutes: 15
       uses: vmactions/freebsd-vm@v1
@@ -91,7 +91,7 @@ jobs:
     timeout-minutes: 15
     steps:
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Persist apt package cache across runs.
       #
@@ -113,7 +113,7 @@ jobs:
 
       - name: Cache apt package archives
         if: matrix.os != 'macos-latest'
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/apt-cache/*.deb
           key: ${{ runner.os }}-${{ runner.arch }}-matrix-apt-${{ steps.apt-cache-week.outputs.week }}-${{ hashFiles('.github/workflows/ci.yml') }}
@@ -165,7 +165,7 @@ jobs:
         run: |
           brew install curl mbedtls
 
-      # Need to save all downloaded apt packages in "$RUNNER_TEMP/apt-cache/" so that actions/checkout@v4 will pick them up
+      # Need to save all downloaded apt packages in "$RUNNER_TEMP/apt-cache/" so that actions/checkout@v7 will pick them up
       - name: Save apt package archives
         if: matrix.os != 'macos-latest'
         run: sudo cp /var/cache/apt/archives/*.deb "$RUNNER_TEMP/apt-cache/"
@@ -261,7 +261,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Download LLVM
         run: |
           wget https://apt.llvm.org/llvm.sh
@@ -324,7 +324,7 @@ jobs:
       ODIN_TARGET: -target:windows_${{ matrix.arch }}
       ODIN_ASAN: ${{ matrix.arch == 'amd64' && '-sanitize:address' || '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Fetch vendor libraries under test from Git LFS
         if: matrix.arch == 'amd64'
         run: git lfs pull --include="vendor/lua/*/windows/*,vendor/OpenEXRCore/*.lib,vendor/sdl2/,vendor/sdl3/"
@@ -452,7 +452,7 @@ jobs:
     name: Linux riscv64 (emulated) Build, Check and Test
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Persist apt package cache across runs.
       #
@@ -472,7 +472,7 @@ jobs:
         run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
 
       - name: Cache apt package archives
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ runner.temp }}/apt-cache/*.deb
           key: ${{ runner.os }}-${{ runner.arch }}-riscv64-apt-${{ steps.apt-cache-week.outputs.week }}-${{ hashFiles('.github/workflows/ci.yml') }}
@@ -500,7 +500,7 @@ jobs:
       - name: Install riscv64 toolchain and qemu
         run: sudo apt-get install -y qemu-user qemu-user-binfmt gcc-12-riscv64-linux-gnu libc6-riscv64-cross
 
-      # Need to save all downloaded apt packages in "$RUNNER_TEMP/apt-cache/" so that actions/checkout@v4 will pick them up
+      # Need to save all downloaded apt packages in "$RUNNER_TEMP/apt-cache/" so that actions/checkout@v7 will pick them up
       - name: Save apt package archives
         run: sudo cp /var/cache/apt/archives/*.deb "$RUNNER_TEMP/apt-cache/"
 
