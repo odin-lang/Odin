@@ -153,6 +153,9 @@ class Error(Enum):
 	Buffer_Overflow         = 12
 	Integer_Overflow        = 13
 	Integer_Underflow       = 14
+	Empty_Input             = 20
+	Invalid_Character       = 21
+	Trailing_Whitespace     = 22
 	Division_by_Zero        = 30
 	Math_Domain_Error       = 31
 	Cannot_Open_File        = 50

@@ -444,48 +444,64 @@ test_atoi :: proc(t: ^testing.T) {
 		}
 	}
 
-	// A trailing '\r' or '\n' ends the number, also in the middle of a chunk.
+	// What follows the number decides the error. `res` keeps the number read before it, sign
+	// included, and `n` is how many characters that number took up. Both paths, with a partial
+	// chunk and with a full one.
 	Case :: struct {
 		input:    string,
 		radix:    i8,
+		err:      big.Error,
 		expected: string,
+		n:        int,
 	}
 	cases := [?]Case{
-		{"1F\n", 16, "31"},
-		{"-ff\r\n", 16, "-255"},
-		{"123\r\n", 10, "123"},
-		{"1234567890123456789012345\n", 10, "1234567890123456789012345"},
-		{"00000000000000000000000000000000000012", 10, "12"},
+		{"1F",                                     16, nil,                  "31",                        2},
+		{"-0",                                     10, nil,                  "0",                         2},
+		{"+1",                                     64, nil,                  "3969",                      2},
+		{"00000000000000000000000000000000000012", 10, nil,                  "12",                        38},
+
+		{"1F\n",                                   16, .Trailing_Whitespace, "31",                        2},
+		{"-ff\r\n",                                16, .Trailing_Whitespace, "-255",                      3},
+		{"123456789abcdef\n",                      16, .Trailing_Whitespace, "81985529216486895",         15},
+		{"123456789abcdef0123 ",                   16, .Trailing_Whitespace, "5373003642731685151011",    19},
+		{"123 \t\v\f\r\n",                         10, .Trailing_Whitespace, "123",                       3},
+		{"-12\x00\x00",                            10, .Trailing_Whitespace, "-12",                       3},
+		{"1234567890123456789012345\n",            10, .Trailing_Whitespace, "1234567890123456789012345", 25},
+
+		{"1Fg",                                    16, .Invalid_Character,   "31",                        2},
+		{"f.f",                                    16, .Invalid_Character,   "15",                        1},
+		{"-1x",                                    16, .Invalid_Character,   "-1",                        2},
+		{"123456789abcdef0123x",                   16, .Invalid_Character,   "5373003642731685151011",    19},
+		{"101012",                                 2,  .Invalid_Character,   "21",                        5},
+		{"123x",                                   10, .Invalid_Character,   "123",                       3},
+		{"12.3",                                   10, .Invalid_Character,   "12",                        2},
+		{"-12x",                                   10, .Invalid_Character,   "-12",                       3},
+		{"123456789012345678x",                    10, .Invalid_Character,   "123456789012345678",        18},
+		{"1234567890123456789012345x",             10, .Invalid_Character,   "1234567890123456789012345", 25},
+		{"12a",                                    10, .Invalid_Character,   "12",                        2},
+		{"1\n23",                                  10, .Invalid_Character,   "1",                         1},
+		{"12 \nx",                                 10, .Invalid_Character,   "12",                        2},
+		{" 12",                                    10, .Invalid_Character,   "0",                         0},
+		{"-x",                                     10, .Invalid_Character,   "0",                         0},
+		{"+1",                                     10, .Invalid_Character,   "0",                         0},
+
+		{"",                                       10, .Empty_Input,         "0",                         0},
+		{"-",                                      16, .Empty_Input,         "0",                         0},
+		{"\n",                                     10, .Empty_Input,         "0",                         0},
+		{"- \r\n",                                 16, .Empty_Input,         "0",                         0},
 	}
 	for c in cases {
-		testing.expect_value(t, big.atoi(b, c.input, c.radix), nil)
+		n := -1
+		err := big.atoi(b, c.input, c.radix, &n)
 		str, _ := big.itoa(b, 10)
 		defer delete(str)
-		testing.expectf(t, str == c.expected, "atoi(%q, %v) = %v, expected %v", c.input, c.radix, str, c.expected)
+		testing.expectf(t, err == c.err && str == c.expected && n == c.n,
+			"atoi(%q, %v) = %v, %v, n = %v, expected %v, %v, n = %v", c.input, c.radix, err, str, n, c.err, c.expected, c.n)
 	}
 
-	// Any other character that isn't a digit in the radix is an error, at the end or in the
-	// middle, and before or after a full chunk.
-	Invalid :: struct {
-		input: string,
-		radix: i8,
-	}
-	invalid := [?]Invalid{
-		{"1Fg", 16},
-		{"f.f", 16},
-		{"-1x", 16},
-		{"123456789abcdef0123x", 16},
-		{"101012", 2},
-		{"123x", 10},
-		{"12.3", 10},
-		{"-1x", 10},
-		{"1234567890123456789012345x", 10},
-		{"12a", 10},
-	}
-	for c in invalid {
-		err := big.atoi(b, c.input, c.radix)
-		testing.expectf(t, err == .Invalid_Argument, "atoi(%q, %v) = %v, expected .Invalid_Argument", c.input, c.radix, err)
-	}
+	n := -1
+	testing.expect_value(t, big.atoi(b, "12", 65, &n), big.Error.Invalid_Argument)
+	testing.expect_value(t, n, 0)
 }
 
 @(test)
