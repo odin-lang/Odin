@@ -492,7 +492,7 @@ test_atoi :: proc(t: ^testing.T) {
 	}
 	for c in cases {
 		n := -1
-		err := big.atoi(b, c.input, c.radix, &n)
+		err := big.atoi(b, c.input, c.radix, n = &n)
 		str, _ := big.itoa(b, 10)
 		defer delete(str)
 		testing.expectf(t, err == c.err && str == c.expected && n == c.n,
@@ -500,7 +500,7 @@ test_atoi :: proc(t: ^testing.T) {
 	}
 
 	n := -1
-	testing.expect_value(t, big.atoi(b, "12", 65, &n), big.Error.Invalid_Argument)
+	testing.expect_value(t, big.atoi(b, "12", 65, n = &n), big.Error.Invalid_Argument)
 	testing.expect_value(t, n, 0)
 }
 
