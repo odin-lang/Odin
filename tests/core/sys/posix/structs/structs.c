@@ -44,6 +44,7 @@ int main(int argc, char *argv[])
     printf("pthread_t %zu %zu\n", sizeof(pthread_t), _Alignof(pthread_t));
     printf("pthread_attr_t %zu %zu\n", sizeof(pthread_attr_t), _Alignof(pthread_attr_t));
     printf("pthread_key_t %zu %zu\n", sizeof(pthread_key_t), _Alignof(pthread_key_t));
+    printf("pthread_mutex_t %zu %zu\n", sizeof(pthread_mutex_t), _Alignof(pthread_mutex_t));
 
 #ifndef __linux__
     printf("sched_param %zu %zu\n", sizeof(struct sched_param), _Alignof(struct sched_param));
