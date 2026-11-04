@@ -414,16 +414,22 @@ gb_internal void semantics_attribute_elems(Array<SemanticsAttribute> *elems, Arr
 	}
 }
 
-gb_internal void semantics_type_strings(SemanticsEntity *items, isize count) {
+struct SemanticsTypeString {
+	Type * type;
+	String string;
+};
+
+gb_internal Type *semantics_entity_shown_type(Entity *e) {
+	Type *type = semantics_declared_entity(e)->type;
+	if (e->kind == Entity_TypeName && type != nullptr) {
+		type = base_type(type);
+	}
+	return type == t_invalid ? nullptr : type;
+}
+
+gb_internal void semantics_type_strings(SemanticsTypeString *items, isize count) {
 	for (isize i = 0; i < count; i++) {
-		Entity *e = items[i].e;
-		Type *type = semantics_declared_entity(e)->type;
-		if (e->kind == Entity_TypeName && type != nullptr) {
-			type = base_type(type);
-		}
-		if (type != nullptr && type != t_invalid) {
-			items[i].type = make_string_c(type_to_string(type, permanent_allocator()));
-		}
+		items[i].string = make_string_c(type_to_string(items[i].type, permanent_allocator()));
 	}
 }
 
@@ -532,7 +538,35 @@ gb_internal void export_semantics(Checker *c) {
 		array_add(&exported_idents, ident);
 	}
 
-	thread_pool_for_chunks(entities.data, entities.count, 256, semantics_type_strings);
+	{ // entities share types, so write each type's string once
+		auto type_strings       = array_make<SemanticsTypeString>(heap_allocator());
+		auto entity_type_string = array_make<i32>(heap_allocator(), entities.count);
+		PtrMap<Type *, i32> type_string_index = {};
+		map_init(&type_string_index);
+		defer (array_free(&type_strings));
+		defer (array_free(&entity_type_string));
+		defer (map_destroy(&type_string_index));
+		for_array(i, entities) {
+			entity_type_string[i] = -1;
+			Type *type = semantics_entity_shown_type(entities[i].e);
+			if (type == nullptr) {
+				continue;
+			}
+			if (i32 *found = map_get(&type_string_index, type)) {
+				entity_type_string[i] = *found;
+			} else {
+				entity_type_string[i] = cast(i32)type_strings.count;
+				map_set(&type_string_index, type, entity_type_string[i]);
+				array_add(&type_strings, SemanticsTypeString{type, {}});
+			}
+		}
+		thread_pool_for_chunks(type_strings.data, type_strings.count, 256, semantics_type_strings);
+		for_array(i, entities) {
+			if (entity_type_string[i] >= 0) {
+				entities[i].type = type_strings[entity_type_string[i]].string;
+			}
+		}
+	}
 
 	{ // rank the entities' files by path
 		auto file_rank = array_make<i32>(heap_allocator(), global_files.count);

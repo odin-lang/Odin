@@ -134,6 +134,21 @@ gb_internal void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
 	return ptr;	
 }
 
+// grows the arena's last allocation where it is, if its block has room
+gb_internal bool arena_grow_in_place(Arena *arena, void *old_memory, isize old_size, isize size) {
+	GB_ASSERT(arena->custom_arena || arena->parent_thread == get_current_thread());
+
+	MemoryBlock *block = arena->curr_block;
+	if (block == nullptr || cast(u8 *)old_memory + old_size != block->base + block->used) {
+		return false;
+	}
+	if (block->used + (size - old_size) > block->size) {
+		return false;
+	}
+	block->used += size - old_size;
+	return true;
+}
+
 gb_internal void *platform_virtual_memory_alloc_internal(isize total_size, bool commit);
 gb_internal bool  platform_virtual_memory_commit_internal(void *data, isize commit_amount);
 
@@ -486,7 +501,7 @@ gb_internal GB_ALLOCATOR_PROC(arena_allocator_proc) {
 	case gbAllocation_Resize:
 		if (size == 0) {
 			ptr = nullptr;
-		} else if (size <= old_size) {
+		} else if (size <= old_size || arena_grow_in_place(arena, old_memory, old_size, size)) {
 			ptr = old_memory;
 		} else {
 			ptr = arena_alloc(arena, size, alignment);
@@ -584,7 +599,7 @@ gb_internal GB_ALLOCATOR_PROC(thread_arena_allocator_proc) {
 	case gbAllocation_Resize:
 		if (size == 0) {
 			ptr = nullptr;
-		} else if (size <= old_size) {
+		} else if (size <= old_size || arena_grow_in_place(arena, old_memory, old_size, size)) {
 			ptr = old_memory;
 		} else {
 			ptr = arena_alloc(arena, size, alignment);
