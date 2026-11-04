@@ -725,9 +725,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ExportDefineables,       str_lit("export-defineables"),        BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_Overlay,                 str_lit("overlay"),                   BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_Workspace,               str_lit("workspace"),                 BuildFlagParam_None,    Command_check);
-	add_flag(&build_flags, BuildFlag_ExportSemantics,         str_lit("export-semantics"),          BuildFlagParam_String,  Command_check);
-	add_flag(&build_flags, BuildFlag_ExportSemanticsFile,     str_lit("export-semantics-file"),     BuildFlagParam_String,  Command_check);
-	add_flag(&build_flags, BuildFlag_ExportSemanticsFor,      str_lit("export-semantics-for"),      BuildFlagParam_String,  Command_check, true);
+	add_flag(&build_flags, BuildFlag_ExportSemantics,         str_lit("export-semantics"),          BuildFlagParam_String,  Command_check | Command_test);
+	add_flag(&build_flags, BuildFlag_ExportSemanticsFile,     str_lit("export-semantics-file"),     BuildFlagParam_String,  Command_check | Command_test);
+	add_flag(&build_flags, BuildFlag_ExportSemanticsFor,      str_lit("export-semantics-for"),      BuildFlagParam_String,  Command_check | Command_test, true);
 	add_flag(&build_flags, BuildFlag_IgnoreUnusedDefineables, str_lit("ignore-unused-defineables"), BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_Vet,                     str_lit("vet"),                       BuildFlagParam_None,    Command__does_check);
@@ -3182,13 +3182,14 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 	}
 
-	if (check_only) {
+	if (check_only || test_only) {
 		if (print_flag("-export-semantics:<format>")) {
 			print_usage_line(2, "Exports what each identifier refers to, its entity's kind, type, and definition, for editors and other tools.");
 			print_usage_line(2, "Also exports type layouts and the branches of 'when' statements not taken. Requires `-export-semantics-file`.");
 			print_usage_line(2, "It covers the packages named on the command line, or only the files given with `-export-semantics-for`.");
 			print_usage_line(2, "It is written once type checking finishes, even with type errors, but not when the errors reach `-max-error-count`.");
 			print_usage_line(2, "Tools should raise that, and remove the file before each run, as a previous one is otherwise left in place.");
+			print_usage_line(2, "With `odin test`, it exports the test build, where ODIN_TEST is true and `#+test` files are included, then stops without building or running the tests.");
 			print_usage_line(2, "Available options:");
 				print_usage_line(3, "-export-semantics:json   Exports in JSON format");
 				print_usage_line(3, "-export-semantics:cbor   Exports in CBOR format");
@@ -4467,6 +4468,10 @@ int main(int arg_count, char const **arg_ptr) {
 	    (build_context.export_semantics_file.len != 0 || build_context.export_semantics_for.count != 0)) {
 		gb_printf_err("`-export-semantics-file` and `-export-semantics-for` need `-export-semantics:<format>`\n");
 		return 1;
+	}
+	if (build_context.command_kind == Command_test && build_context.export_semantics_format != SemanticsFormat_Invalid) {
+		// The test build is checked and exported, as `odin check` would, but not built or run.
+		build_context.no_output_files = true;
 	}
 
 	if (build_context.command_kind == Command_check && build_context.extra_packages.count > 0 && !build_context.workspace) {
