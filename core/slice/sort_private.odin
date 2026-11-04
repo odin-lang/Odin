@@ -196,8 +196,25 @@ _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, 
 
 		for gap in gaps {
 			for i := gap ; i < length; i += 1 {
-				for j := i; j >= gap && cmp(data[(j - gap) * width:], data[j * width:], arg) == .Greater; j -= gap {
-					ptr_swap_non_overlapping(data[(j - gap) * width:], data[j * width:], width)
+				if !(cmp(data[(i - gap) * width:], data[i * width:], arg) == .Greater) {
+					continue
+				}
+				j := i - gap
+
+				for ; j >= gap && cmp(data[(j - gap) * width:], data[i * width:], arg) == .Greater; j -= gap {}
+				
+				buf: [256]u8 = ---
+				w := width
+				d := data
+				for w != 0 {
+					l := builtin.min(size_of(buf), w)
+					copy(buf[:l], d[i*width:][:l])
+					for e := i; e > j; e -= gap {
+						copy(d[(e)*width:][:l], d[(e - gap)*width:][:l])
+					}
+					copy(d[j*width:][:l], buf[:l])
+					d = d[l:]
+					w -= l
 				}
 			}
 		}
