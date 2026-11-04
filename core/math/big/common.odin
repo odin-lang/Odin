@@ -126,6 +126,10 @@ Error :: enum byte {
 	Integer_Overflow        = 13,
 	Integer_Underflow       = 14,
 
+	Empty_Input             = 20,
+	Invalid_Character       = 21,
+	Trailing_Whitespace     = 22,
+
 	Division_by_Zero        = 30,
 	Math_Domain_Error       = 31,
 
@@ -153,6 +157,10 @@ Error_String :: #sparse[Error]string{
 	.Buffer_Overflow         = "Buffer overflow",
 	.Integer_Overflow        = "Integer overflow",
 	.Integer_Underflow       = "Integer underflow",
+
+	.Empty_Input             = "Empty input",
+	.Invalid_Character       = "Invalid character",
+	.Trailing_Whitespace     = "Trailing whitespace",
 
 	.Division_by_Zero        = "Division by zero",
 	.Math_Domain_Error       = "Math domain error",

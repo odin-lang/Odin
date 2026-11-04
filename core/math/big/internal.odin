@@ -561,6 +561,15 @@ where intrinsics.type_is_integer(T), T != DIGIT {
 }
 
 /*
+	`platform_int_is_power_of_two` for a `DIGIT`. Converting a `DIGIT` to `int` would keep only
+	its low 32 bits on 32-bit targets.
+*/
+@(private)
+_digit_is_power_of_two :: #force_inline proc "contextless" (a: DIGIT) -> bool {
+	return a != 0 && (a & (a - 1)) == 0
+}
+
+/*
 	Multiply by a DIGIT.
 */
 internal_int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT, allocator := context.allocator) -> (err: Error) {
@@ -580,7 +589,7 @@ internal_int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT, allocator := 
 	if multiplier == 2 {
 		return #force_inline internal_int_shl1(dest, src)
 	}
-	if #force_inline platform_int_is_power_of_two(int(multiplier)) {
+	if _digit_is_power_of_two(multiplier) {
 		ix := internal_log(multiplier, 2) or_return
 		return internal_shl(dest, src, ix)
 	}
@@ -793,7 +802,7 @@ internal_int_divmod_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT,
 	}
 
 	ix: int
-	if platform_int_is_power_of_two(int(denominator)) {
+	if _digit_is_power_of_two(denominator) {
 		ix = 1
 		for ix < _DIGIT_BITS && denominator != (1 << uint(ix)) {
 			ix += 1
@@ -1097,7 +1106,7 @@ internal_int_is_power_of_two :: #force_inline proc(a: ^Int) -> (power_of_two: bo
 	/*
 		For an `Int` to be a power of two, its bottom limb has to be a power of two.
 	*/
-	if ! #force_inline platform_int_is_power_of_two(int(a.digit[a.used - 1])) { return false }
+	if ! _digit_is_power_of_two(a.digit[a.used - 1]) { return false }
 
 	/*
 		We've established that the bottom limb is a power of two.
@@ -1447,7 +1456,7 @@ internal_int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
 	/*
 		Fast path for bases that are a power of two.
 	*/
-	if platform_int_is_power_of_two(int(base)) { return _private_log_power_of_two(a, base) }
+	if _digit_is_power_of_two(base) { return _private_log_power_of_two(a, base) }
 
 	/*
 		Fast path for `Int`s that fit within a single `DIGIT`.
