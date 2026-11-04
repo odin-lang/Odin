@@ -2,7 +2,6 @@
 package core_image_bmp
 
 import "core:os"
-import "core:bytes"
 
 load :: proc{load_from_file, load_from_bytes, load_from_context}
 
@@ -24,11 +23,11 @@ save :: proc{save_to_buffer, save_to_file}
 save_to_file :: proc(output: string, img: ^Image, options := Options{}, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
-	out := &bytes.Buffer{}
-	defer bytes.buffer_destroy(out)
+	out: [dynamic]byte
+	defer delete(out)
 
-	save_to_buffer(out, img, options) or_return
-	write_err := os.write_entire_file(output, out.buf[:])
+	save_to_buffer(&out, img, options) or_return
+	write_err := os.write_entire_file(output, out[:])
 
 	return nil if write_err == nil else .Unable_To_Write_File
 }

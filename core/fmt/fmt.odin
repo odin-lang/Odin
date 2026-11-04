@@ -2,6 +2,7 @@ package fmt
 
 import "base:intrinsics"
 import "base:runtime"
+import "core:bufio"
 import "core:math"
 import "core:math/bits"
 import "core:mem"
@@ -116,16 +117,16 @@ register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Regist
 	_user_formatters[id] = formatter
 	return .None
 }
-// 	Creates a formatted string
+// Creates a formatted string
 //
-// 	*Allocates Using Provided Allocator*
+// *Allocates Using Provided Allocator*
 //
-// 	Inputs:
-// 	- args: A variadic list of arguments to be formatted.
-// 	- sep: An optional separator string (default is a single space).
-// 	- allocator: (default: context.allocator)
+// Inputs:
+// - args: A variadic list of arguments to be formatted.
+// - sep: An optional separator string (default is a single space).
+// - allocator: (default: context.allocator)
 //
-// 	Returns: A formatted string.
+// Returns: A formatted string.
 //
 @(require_results)
 aprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> string {
@@ -133,16 +134,16 @@ aprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> strin
 	strings.builder_init(&str, allocator)
 	return sbprint(&str, ..args, sep=sep)
 }
-// 	Creates a formatted string with a newline character at the end
+// Creates a formatted string with a newline character at the end
 //
-// 	*Allocates Using Provided Allocator*
+// *Allocates Using Provided Allocator*
 //
-// 	Inputs:
-// 	- args: A variadic list of arguments to be formatted.
-// 	- sep: An optional separator string (default is a single space).
-// 	- allocator: (default: context.allocator)
+// Inputs:
+// - args: A variadic list of arguments to be formatted.
+// - sep: An optional separator string (default is a single space).
+// - allocator: (default: context.allocator)
 //
-// 	Returns: A formatted string with a newline character at the end.
+// Returns: A formatted string with a newline character at the end.
 //
 @(require_results)
 aprintln :: proc(args: ..any, sep := " ", allocator := context.allocator) -> string {
@@ -150,17 +151,17 @@ aprintln :: proc(args: ..any, sep := " ", allocator := context.allocator) -> str
 	strings.builder_init(&str, allocator)
 	return sbprintln(&str, ..args, sep=sep)
 }
-// 	Creates a formatted string using a format string and arguments
+// Creates a formatted string using a format string and arguments
 //
-// 	*Allocates Using Provided Allocator*
+// *Allocates Using Provided Allocator*
 //
-// 	Inputs:
-//	- fmt: A format string with placeholders for the provided arguments.
-//	- args: A variadic list of arguments to be formatted.
-//	- allocator: (default: context.allocator)
-//	- newline: Whether the string should end with a newline. (See `aprintfln`.)
+// Inputs:
+// - fmt: A format string with placeholders for the provided arguments.
+// - args: A variadic list of arguments to be formatted.
+// - allocator: (default: context.allocator)
+// - newline: Whether the string should end with a newline. (See `aprintfln`.)
 //
-// 	Returns: A formatted string. The returned string must be freed accordingly.
+// Returns: A formatted string. The returned string must be freed accordingly.
 //
 @(require_results)
 aprintf :: proc(fmt: string, args: ..any, allocator := context.allocator, newline := false) -> string {
@@ -168,30 +169,30 @@ aprintf :: proc(fmt: string, args: ..any, allocator := context.allocator, newlin
 	strings.builder_init(&str, allocator)
 	return sbprintf(&str, fmt, ..args, newline=newline)
 }
-// 	Creates a formatted string using a format string and arguments, followed by a newline.
+// Creates a formatted string using a format string and arguments, followed by a newline.
 //
-// 	*Allocates Using Provided Allocator*
+// *Allocates Using Provided Allocator*
 //
-// 	Inputs:
-// 	- fmt: A format string with placeholders for the provided arguments.
-// 	- args: A variadic list of arguments to be formatted.
-// 	- allocator: (default: context.allocator)
+// Inputs:
+// - fmt: A format string with placeholders for the provided arguments.
+// - args: A variadic list of arguments to be formatted.
+// - allocator: (default: context.allocator)
 //
-// 	Returns: A formatted string. The returned string must be freed accordingly.
+// Returns: A formatted string. The returned string must be freed accordingly.
 //
 @(require_results)
 aprintfln :: proc(fmt: string, args: ..any, allocator := context.allocator) -> string {
 	return aprintf(fmt, ..args, allocator=allocator, newline=true)
 }
-// 	Creates a formatted string
+// Creates a formatted string
 //
-// 	*Allocates Using Context's Temporary Allocator*
+// *Allocates Using Context's Temporary Allocator*
 //
-// 	Inputs:
-// 	- args: A variadic list of arguments to be formatted.
-// 	- sep: An optional separator string (default is a single space).
+// Inputs:
+// - args: A variadic list of arguments to be formatted.
+// - sep: An optional separator string (default is a single space).
 //
-// 	Returns: A formatted string.
+// Returns: A formatted string.
 //
 @(require_results)
 tprint :: proc(args: ..any, sep := " ") -> string {
@@ -199,15 +200,15 @@ tprint :: proc(args: ..any, sep := " ") -> string {
 	strings.builder_init(&str, context.temp_allocator)
 	return sbprint(&str, ..args, sep=sep)
 }
-// 	Creates a formatted string with a newline character at the end
+// Creates a formatted string with a newline character at the end
 //
-// 	*Allocates Using Context's Temporary Allocator*
+// *Allocates Using Context's Temporary Allocator*
 //
-// 	Inputs:
-// 	- args: A variadic list of arguments to be formatted.
-// 	- sep: An optional separator string (default is a single space).
+// Inputs:
+// - args: A variadic list of arguments to be formatted.
+// - sep: An optional separator string (default is a single space).
 //
-// 	Returns: A formatted string with a newline character at the end.
+// Returns: A formatted string with a newline character at the end.
 //
 @(require_results)
 tprintln :: proc(args: ..any, sep := " ") -> string {
@@ -215,16 +216,16 @@ tprintln :: proc(args: ..any, sep := " ") -> string {
 	strings.builder_init(&str, context.temp_allocator)
 	return sbprintln(&str, ..args, sep=sep)
 }
-// 	Creates a formatted string using a format string and arguments
+// Creates a formatted string using a format string and arguments
 //
-// 	*Allocates Using Context's Temporary Allocator*
+// *Allocates Using Context's Temporary Allocator*
 //
-// 	Inputs:
-//	- fmt: A format string with placeholders for the provided arguments.
-//	- args: A variadic list of arguments to be formatted.
-//	- newline: Whether the string should end with a newline. (See `tprintfln`.)
+// Inputs:
+// - fmt: A format string with placeholders for the provided arguments.
+// - args: A variadic list of arguments to be formatted.
+// - newline: Whether the string should end with a newline. (See `tprintfln`.)
 //
-// 	Returns: A formatted string.
+// Returns: A formatted string.
 //
 @(require_results)
 tprintf :: proc(fmt: string, args: ..any, newline := false) -> string {
@@ -232,15 +233,15 @@ tprintf :: proc(fmt: string, args: ..any, newline := false) -> string {
 	strings.builder_init(&str, context.temp_allocator)
 	return sbprintf(&str, fmt, ..args, newline=newline)
 }
-// 	Creates a formatted string using a format string and arguments, followed by a newline.
+// Creates a formatted string using a format string and arguments, followed by a newline.
 //
-// 	*Allocates Using Context's Temporary Allocator*
+// *Allocates Using Context's Temporary Allocator*
 //
-// 	Inputs:
-// 	- fmt: A format string with placeholders for the provided arguments.
-// 	- args: A variadic list of arguments to be formatted.
+// Inputs:
+// - fmt: A format string with placeholders for the provided arguments.
+// - args: A variadic list of arguments to be formatted.
 //
-// 	Returns: A formatted string.
+// Returns: A formatted string.
 //
 @(require_results)
 tprintfln :: proc(fmt: string, args: ..any) -> string {
@@ -363,16 +364,16 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 	p("panic", message, loc)
 }
 
-// 	Creates a formatted C string
+// Creates a formatted C string
 //
-// 	*Allocates Using Provided Allocator*
+// *Allocates Using Provided Allocator*
 //
-// 	Inputs:
-// 	- args: A variadic list of arguments to be formatted.
-// 	- sep: An optional separator string (default is a single space).
-// 	- allocator: (default: context.allocator)
+// Inputs:
+// - args: A variadic list of arguments to be formatted.
+// - sep: An optional separator string (default is a single space).
+// - allocator: (default: context.allocator)
 //
-// 	Returns: A formatted C string.
+// Returns: A formatted C string.
 //
 @(require_results)
 caprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> cstring {
@@ -420,15 +421,15 @@ caprintf :: proc(format: string, args: ..any, allocator := context.allocator, ne
 caprintfln :: proc(format: string, args: ..any, allocator := context.allocator) -> cstring {
 	return caprintf(format, ..args, allocator=allocator, newline=true)
 }
-// 	Creates a formatted C string
+// Creates a formatted C string
 //
-// 	*Allocates Using Context's Temporary Allocator*
+// *Allocates Using Context's Temporary Allocator*
 //
-// 	Inputs:
-// 	- args: A variadic list of arguments to be formatted.
-// 	- sep: An optional separator string (default is a single space).
+// Inputs:
+// - args: A variadic list of arguments to be formatted.
+// - sep: An optional separator string (default is a single space).
 //
-// 	Returns: A formatted C string.
+// Returns: A formatted C string.
 //
 @(require_results)
 ctprint :: proc(args: ..any, sep := " ") -> cstring {
@@ -524,8 +525,10 @@ sbprintfln :: proc(buf: ^strings.Builder, format: string, args: ..any) -> string
 // Returns: The number of bytes written
 //
 wprint :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> (bytes_written: int) {
+	stage_buf: [STAGE_SIZE]byte = ---
+	stage: bufio.Writer
 	fi: Info
-	fi.writer = w
+	fi.writer = _stage_begin(&stage, w, stage_buf[:])
 
 	// NOTE(bill): Old approach
 	// prev_string := false;
@@ -544,11 +547,12 @@ wprint :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> (bytes_w
 
 	for _, i in args {
 		if i > 0 {
-			io.write_string(fi.writer, sep, &fi.n)
+			_write_string(&fi, sep)
 		}
 
-		fmt_value(&fi, args[i], 'v')
+		_fmt_value(&fi, args[i].data, args[i].id, nil, 'v')
 	}
+	_stage_end(&stage, fi.writer, &fi)
 	if flush {
 		io.flush(w)
 	}
@@ -565,17 +569,20 @@ wprint :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> (bytes_w
 // Returns: The number of bytes written
 //
 wprintln :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> (bytes_written: int) {
+	stage_buf: [STAGE_SIZE]byte = ---
+	stage: bufio.Writer
 	fi: Info
-	fi.writer = w
+	fi.writer = _stage_begin(&stage, w, stage_buf[:])
 
 	for _, i in args {
 		if i > 0 {
-			io.write_string(fi.writer, sep, &fi.n)
+			_write_string(&fi, sep)
 		}
 
-		fmt_value(&fi, args[i], 'v')
+		_fmt_value(&fi, args[i].data, args[i].id, nil, 'v')
 	}
-	io.write_byte(fi.writer, '\n', &fi.n)
+	_write_byte(&fi, '\n')
+	_stage_end(&stage, fi.writer, &fi)
 	if flush {
 		io.flush(w)
 	}
@@ -591,12 +598,13 @@ wprintln :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> (bytes
 //
 // Returns: The number of bytes written
 //
-wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline := false) -> (bytes_written: int) {
+wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline := false) -> (bytes_written: int) #no_bounds_check {
 	MAX_CHECKED_ARGS :: 64
 	assert(len(args) <= MAX_CHECKED_ARGS, "number of args > 64 is unsupported")
 
-	parse_options :: proc(fi: ^Info, fmt: string, index, end: int, unused_args: ^bit_set[0 ..< MAX_CHECKED_ARGS], args: ..any) -> int {
-		i := index
+	parse_options :: proc(fi: ^Info, fmt: string, index: int, unused_args: ^bit_set[0..<MAX_CHECKED_ARGS], args: ..any) -> int #no_bounds_check {
+		i   := index
+		end := len(fmt)
 
 		// Prefix
 		prefix_loop: for ; i < end; i += 1 {
@@ -631,7 +639,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 
 				fi.width, _, fi.width_set = int_from_arg(args, width_index)
 				if !fi.width_set {
-					io.write_string(fi.writer, "%!(BAD WIDTH)", &fi.n)
+					_write_string(fi, "%!(BAD WIDTH)")
 				}
 
 				if fi.width < 0 {
@@ -663,7 +671,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 						fi.prec_set = false
 					}
 					if !fi.prec_set {
-						io.write_string(fi.writer, "%!(BAD PRECISION)", &fi.n)
+						_write_string(fi, "%!(BAD PRECISION)")
 					}
 				}
 			} else {
@@ -679,35 +687,68 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 		return i
 	}
 
-	error_check_arg :: proc(fi: ^Info, arg_parsed: bool, unused_args: bit_set[0 ..< MAX_CHECKED_ARGS]) -> (int, bool) {
+	error_check_arg :: proc(fi: ^Info, arg_parsed: bool, unused_args: bit_set[0..<MAX_CHECKED_ARGS]) -> (int, bool) {
 		if !arg_parsed {
 			for index in unused_args {
 				return index, true
 			}
-			io.write_string(fi.writer, "%!(MISSING ARGUMENT)", &fi.n)
+			_write_string(fi, "%!(MISSING ARGUMENT)")
 		} else {
-			io.write_string(fi.writer, "%!(BAD ARGUMENT NUMBER)", &fi.n)
+			_write_string(fi, "%!(BAD ARGUMENT NUMBER)")
 		}
 
 		return 0, false
 	}
 
-	fi: Info
-	end := len(fmt)
-	unused_args: bit_set[0 ..< MAX_CHECKED_ARGS]
-	for _, i in args {
-		unused_args += {i}
+	@(require_results)
+	scan_literal :: proc "contextless" (s: string, i: int) -> int #no_bounds_check {
+		i := i
+		when ODIN_ENDIAN == .Little {
+			ONES  :: 0x0101010101010101
+			HIGHS :: 0x8080808080808080
+			for /**/; i+8 <= len(s); i += 8 {
+				x := intrinsics.unaligned_load((^u64)(raw_data(s[i:])))
+				a := x ~ (ONES * '%')
+				b := x ~ (ONES * '{')
+				c := x ~ (ONES * '}')
+				m := ((a - ONES) &~ a | (b - ONES) &~ b | (c - ONES) &~ c) & HIGHS
+				if m != 0 {
+					return i + int(intrinsics.count_trailing_zeros(m) >> 3)
+				}
+			}
+		}
+		for /**/; i < len(s); i += 1 {
+			switch s[i] {
+			case '%', '{', '}':
+				return i
+			}
+		}
+		return i
 	}
 
+	@(require_results)
+	next_rune :: #force_inline proc "contextless" (s: string) -> (rune, int) #no_bounds_check {
+		if s[0] < utf8.RUNE_SELF {
+			return rune(s[0]), 1
+		}
+		return utf8.decode_rune_in_string(s)
+	}
+
+	stage_buf: [STAGE_SIZE]byte = ---
+	stage: bufio.Writer
+	out := _stage_begin(&stage, w, stage_buf[:])
+
+	fi := Info{writer = out}
+	end := len(fmt)
+	unused_args := transmute(bit_set[0..<MAX_CHECKED_ARGS])(u64(1)<<uint(len(args)) - 1)
+
 	loop: for i := 0; i < end; /**/ {
-		fi = Info{writer = w, n = fi.n}
+		fi = Info{writer = out, n = fi.n}
 
 		prev_i := i
-		for i < end && !(fmt[i] == '%' || fmt[i] == '{' || fmt[i] == '}') {
-			i += 1
-		}
+		i = scan_literal(fmt, i)
 		if i > prev_i {
-			io.write_string(fi.writer, fmt[prev_i:i], &fi.n)
+			_write_string(&fi, fmt[prev_i:i])
 		}
 		if i >= end {
 			break loop
@@ -722,25 +763,25 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 				// Skip extra one
 				i += 1
 			}
-			io.write_byte(fi.writer, char, &fi.n)
+			_write_byte(&fi, char)
 			continue loop
 		} else if char == '{' {
 			if i < end && fmt[i] == char {
 				// Skip extra one
 				i += 1
-				io.write_byte(fi.writer, char, &fi.n)
+				_write_byte(&fi, char)
 				continue loop
 			}
 		}
 
 		if char == '%' {
 			if i < end && fmt[i] == '%' {
-				io.write_byte(fi.writer, '%', &fi.n)
+				_write_byte(&fi, '%')
 				i += 1
 				continue loop
 			}
 
-			i = parse_options(&fi, fmt, i, end, &unused_args, ..args)
+			i = parse_options(&fi, fmt, i, &unused_args, ..args)
 
 			arg_index, arg_parsed, index_ok := _arg_number(fmt, &i, len(args))
 
@@ -749,19 +790,19 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 			}
 
 			if i >= end {
-				io.write_string(fi.writer, "%!(NO VERB)", &fi.n)
+				_write_string(&fi, "%!(NO VERB)")
 				break loop
 			} else if fmt[i] == ' ' {
-				io.write_string(fi.writer, "%!(NO VERB)", &fi.n)
+				_write_string(&fi, "%!(NO VERB)")
 				continue loop
 			}
 
-			verb, w := utf8.decode_rune_in_string(fmt[i:])
+			verb, w := next_rune(fmt[i:])
 			i += w
 
 			if index_ok {
 				unused_args -= {arg_index}
-				fmt_arg(&fi, args[arg_index], verb)
+				_fmt_arg(&fi, args[arg_index].data, args[arg_index].id, nil, verb)
 			}
 
 
@@ -784,35 +825,35 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 
 			if i < end && fmt[i] == ':' {
 				i += 1
-				i = parse_options(&fi, fmt, i, end, &unused_args, ..args)
+				i = parse_options(&fi, fmt, i, &unused_args, ..args)
 
 				if i >= end {
-					io.write_string(fi.writer, "%!(NO VERB)", &fi.n)
+					_write_string(&fi, "%!(NO VERB)")
 					break loop
 				} else if fmt[i] == '}' {
 					i += 1
-					io.write_string(fi.writer, "%!(NO VERB)", &fi.n)
+					_write_string(&fi, "%!(NO VERB)")
 					continue
 				}
 
 				w: int = 1
-				verb, w = utf8.decode_rune_in_string(fmt[i:])
+				verb, w = next_rune(fmt[i:])
 				i += w
 			}
 
 			if i >= end {
-				io.write_string(fi.writer, "%!(MISSING CLOSE BRACE)", &fi.n)
+				_write_string(&fi, "%!(MISSING CLOSE BRACE)")
 				break loop
 			}
 
-			brace, w := utf8.decode_rune_in_string(fmt[i:])
+			brace, w := next_rune(fmt[i:])
 			i += w
 
 			switch {
 			case brace != '}':
-				io.write_string(fi.writer, "%!(MISSING CLOSE BRACE)", &fi.n)
+				_write_string(&fi, "%!(MISSING CLOSE BRACE)")
 			case index_ok:
-				fmt_arg(&fi, args[arg_index], verb)
+				_fmt_arg(&fi, args[arg_index].data, args[arg_index].id, nil, verb)
 				unused_args -= {arg_index}
 			}
 		}
@@ -822,29 +863,30 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 		// Use default options when formatting extra arguments.
 		extra_fi := Info { writer = fi.writer, n = fi.n }
 
-		io.write_string(extra_fi.writer, "%!(EXTRA ", &extra_fi.n)
+		_write_string(&extra_fi, "%!(EXTRA ")
 		first_printed := false
 		for index in unused_args {
 			if first_printed {
-				io.write_string(extra_fi.writer, ", ", &extra_fi.n)
+				_write_string(&extra_fi, ", ")
 			}
 
 			arg := args[index]
 			if arg == nil {
-				io.write_string(extra_fi.writer, "<nil>", &extra_fi.n)
+				_write_string(&extra_fi, "<nil>")
 			} else {
 				fmt_arg(&extra_fi, arg, 'v')
 			}
 			first_printed = true
 		}
-		io.write_byte(extra_fi.writer, ')', &extra_fi.n)
+		_write_byte(&extra_fi, ')')
 
 		fi.n = extra_fi.n
 	}
 
 	if newline {
-		io.write_byte(w, '\n', &fi.n)
+		_write_byte(&fi, '\n')
 	}
+	_stage_end(&stage, out, &fi)
 	if flush {
 		io.flush(w)
 	}
@@ -998,17 +1040,17 @@ fmt_bad_verb :: proc(fi: ^Info, verb: rune) {
 	defer fi.in_bad = prev_in_bad
 	fi.in_bad = true
 
-	io.write_string(fi.writer, "%!", &fi.n)
-	io.write_rune(fi.writer, verb, &fi.n)
-	io.write_byte(fi.writer, '(', &fi.n)
+	_write_string(fi, "%!")
+	_write_rune(fi, verb)
+	_write_byte(fi, '(')
 	if arg := fi.arg; arg != nil {
 		reflect.write_typeid(fi.writer, arg.id, &fi.n)
-		io.write_byte(fi.writer, '=', &fi.n)
+		_write_byte(fi, '=')
 		fmt_value(fi, arg, 'v')
 	} else {
-		io.write_string(fi.writer, "<nil>", &fi.n)
+		_write_string(fi, "<nil>")
 	}
-	io.write_byte(fi.writer, ')', &fi.n)
+	_write_byte(fi, ')')
 }
 // Formats a boolean value according to the specified format verb
 //
@@ -1041,8 +1083,115 @@ fmt_write_padding :: proc(fi: ^Info, width: int) {
 		pad_byte = '0'
 	}
 
-	for i := 0; i < width; i += 1 {
-		io.write_byte(fi.writer, pad_byte, &fi.n)
+	_write_repeated_byte(fi, pad_byte, width)
+}
+// Writes the byte `c` to the Info's writer `count` times, in chunks
+//
+// Inputs:
+// - fi: A pointer to an Info structure
+// - c: The byte to write
+// - count: The number of times to write it
+//
+_write_repeated_byte :: proc(fi: ^Info, c: byte, count: int) {
+	buf: [64]byte = ---
+	chunk := min(count, len(buf))
+	for i in 0..<chunk {
+		buf[i] = c
+	}
+	for remaining := count; remaining > 0; remaining -= chunk {
+		_write_string(fi, string(buf[:min(remaining, chunk)]))
+	}
+}
+
+@(private)
+STAGE_SIZE :: 1024
+
+// NOTE(bill): `wprint*` collect their output in a `bufio.Writer` on the stack. It is written out when the buffer
+// fills and at the end. While they run, it is `fi.writer`. User formatters write through it and stay in order.
+// Bytes still buffered after the last flush never reached `w` and are taken off the count.
+
+@(private, require_results)
+_stage_begin :: proc(b: ^bufio.Writer, w: io.Writer, buf: []byte) -> io.Writer {
+	switch w.procedure {
+	case bufio._writer_proc, strings._builder_stream_proc:
+		return w
+	}
+	bufio.writer_init_with_buf(b, w, buf)
+	return bufio.writer_to_writer(b)
+}
+
+@(private)
+_stage_end :: proc(b: ^bufio.Writer, out: io.Writer, fi: ^Info) {
+	if out.data == b {
+		bufio.writer_flush(b)
+		fi.n = max(fi.n - bufio.writer_buffered(b), 0)
+	}
+}
+
+@(private, require_results)
+_write_fast :: proc(fi: ^Info, p: []byte) -> bool {
+	switch fi.writer.procedure {
+	case bufio._writer_proc:
+		bw := (^bufio.Writer)(fi.writer.data)
+		if bw.err == nil && len(p) <= len(bw.buf)-bw.n {
+			intrinsics.mem_copy(raw_data(bw.buf)[bw.n:], raw_data(p), len(p))
+			bw.n += len(p)
+			fi.n += len(p)
+			return true
+		}
+	case strings._builder_stream_proc:
+		b := (^strings.Builder)(fi.writer.data)
+		if n := len(b.buf); len(p) <= cap(b.buf)-n {
+			(^runtime.Raw_Dynamic_Array)(&b.buf).len = n + len(p)
+			intrinsics.mem_copy(raw_data(b.buf)[n:], raw_data(p), len(p))
+			fi.n += len(p)
+			return true
+		}
+	}
+	return false
+}
+
+@(private)
+_write_string :: proc(fi: ^Info, s: string) {
+	if !_write_fast(fi, transmute([]byte)s) {
+		io.write_string(fi.writer, s, &fi.n)
+	}
+}
+
+@(private)
+_write_byte :: proc(fi: ^Info, c: byte) {
+	switch fi.writer.procedure {
+	case bufio._writer_proc:
+		bw := (^bufio.Writer)(fi.writer.data)
+		if bw.err == nil && bw.n < len(bw.buf) {
+			bw.buf[bw.n] = c
+			bw.n += 1
+			fi.n += 1
+			return
+		}
+	case strings._builder_stream_proc:
+		b := (^strings.Builder)(fi.writer.data)
+		if n := len(b.buf); n < cap(b.buf) {
+			(^runtime.Raw_Dynamic_Array)(&b.buf).len = n + 1
+			b.buf[n] = c
+			fi.n += 1
+			return
+		}
+	}
+	io.write_byte(fi.writer, c, &fi.n)
+}
+
+@(private)
+_write_rune :: proc(fi: ^Info, r: rune) {
+	buf: [4]byte = ---
+	w := 1
+	if r < utf8.RUNE_SELF {
+		buf[0] = byte(r)
+	} else {
+		buf, w = utf8.encode_rune(r)
+	}
+	if !_write_fast(fi, buf[:w]) {
+		io.write_rune(fi.writer, r, &fi.n)
 	}
 }
 
@@ -1073,29 +1222,29 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 		}
 	}
 
-	buf: [BUF_SIZE]byte
+	buf: [BUF_SIZE]byte = ---
 	start := 0
 
 	if fi.hash && !is_signed && _zero_pad(fi) {
 		switch base {
 		case 2:
-			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, 'b', &fi.n)
+			_write_byte(fi, '0')
+			_write_byte(fi, 'b')
 			start = 2
 
 		case 8:
-			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, 'o', &fi.n)
+			_write_byte(fi, '0')
+			_write_byte(fi, 'o')
 			start = 2
 
 		case 12:
-			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, 'z', &fi.n)
+			_write_byte(fi, '0')
+			_write_byte(fi, 'z')
 			start = 2
 
 		case 16:
-			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, 'x', &fi.n)
+			_write_byte(fi, '0')
+			_write_byte(fi, 'x')
 			start = 2
 		}
 	}
@@ -1105,11 +1254,11 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 		prec = fi.prec
 		if prec == 0 && u == 0 {
 			if fi.minus {
-				io.write_byte(fi.writer, '0', &fi.n)
+				_write_byte(fi, '0')
 				fmt_write_padding(fi, fi.width - 1)
 			} else {
 				fmt_write_padding(fi, fi.width - 1)
-				io.write_byte(fi.writer, '0', &fi.n)
+				_write_byte(fi, '0')
 			}
 			return
 		}
@@ -1117,6 +1266,8 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 		prec = fi.width
 		if neg || fi.plus {
 			// There needs to be space for the "sign"
+			// TODO xxxx clamp?
+			// TODO xxxx this value is not used. Pretty sure this has to do with bill's whitespace padding change
 			prec -= 1
 		}
 	}
@@ -1131,8 +1282,8 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 	flags: strconv.Int_Flags
 	if fi.hash && !_zero_pad(fi) && start == 0 { flags += {.Prefix} }
 	if fi.plus                                 { flags += {.Plus}   }
-	s := strconv.write_bits(buf[start:], u, base, is_signed, bit_size, digits, flags)
-	_pad(fi, s)
+
+	_pad(fi, strconv.write_bits(buf[start:], u, base, is_signed, bit_size, digits, flags))
 }
 // Formats an int128 value based on the provided formatting options.
 //
@@ -1158,28 +1309,28 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 		}
 	}
 
-	buf: [256]byte
+	buf: [256]byte = ---
 	start := 0
 	if fi.hash && !is_signed && _zero_pad(fi) {
 		switch base {
 		case 2:
-			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, 'b', &fi.n)
+			_write_byte(fi, '0')
+			_write_byte(fi, 'b')
 			start = 2
 
 		case 8:
-			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, 'o', &fi.n)
+			_write_byte(fi, '0')
+			_write_byte(fi, 'o')
 			start = 2
 
 		case 12:
-			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, 'z', &fi.n)
+			_write_byte(fi, '0')
+			_write_byte(fi, 'z')
 			start = 2
 
 		case 16:
-			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, 'x', &fi.n)
+			_write_byte(fi, '0')
+			_write_byte(fi, 'x')
 			start = 2
 		}
 	}
@@ -1209,7 +1360,6 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 	flags: strconv.Int_Flags
 	if fi.hash && !_zero_pad(fi) && start == 0 { flags += {.Prefix} }
 	if fi.plus                                 { flags += {.Plus}   }
-	s := strconv.write_bits_128(buf[start:], u, base, is_signed, bit_size, digits, flags)
 
 	if fi.hash && _zero_pad(fi) && start == 0 && fi.indent == 0 {
 		c: byte = 0
@@ -1220,12 +1370,12 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 		case 16: c = 'x'
 		}
 		if c != 0 {
-			io.write_byte(fi.writer, '0', &fi.n)
-			io.write_byte(fi.writer, c, &fi.n)
+			_write_byte(fi, '0')
+			_write_byte(fi, c)
 		}
 	}
 
-	_pad(fi, s)
+	_pad(fi, strconv.write_bits_128(buf[start:], u, base, is_signed, bit_size, digits, flags))
 }
 // Units of measurements:
 @(rodata) __MEMORY_LOWER := " b kib mib gib tib pib eib"
@@ -1270,19 +1420,22 @@ _fmt_memory :: proc(fi: ^Info, u: u64, is_signed: bool, bit_size: int, units: st
 		amt = -amt
 	}
 
+	flags: strconv.Float_Flags
+	if fi.plus {
+		flags |= { .Plus }
+	}
 	buf: [256]byte
-	str := strconv.write_float(buf[:], amt, 'f', prec, 64)
+	// NOTE(bplu4t2f):
+	//     This is currently the only instance of strconv.write_float in core which assumes
+	//     that `&str[0] == &buf[0]`. This assumption is not formally part of the API contract.
+	//     This may be relevant because an implementation could decide to strip or trim
+	//     something from the beginning by simply offseting the returned slice's start index.
+	//     Currently, this works only because no implementation does that.
+	str := strconv.write_float(buf[:], amt, 'f', prec, 64, flags)
 
 	// Add the unit at the end.
 	copy(buf[len(str):], units[off:off+unit_len])
 	str = string(buf[:len(str)+unit_len])
-
-	if !fi.plus {
-		// Strip sign from "+<value>" but not "+Inf".
-		if str[0] == '+' && str[1] != 'I' {
-			str = str[1:]
-		}
-	}
 
 	_pad(fi, str)
 }
@@ -1299,9 +1452,10 @@ _fmt_memory :: proc(fi: ^Info, u: u64, is_signed: bool, bit_size: int, units: st
 fmt_rune :: proc(fi: ^Info, r: rune, verb: rune) {
 	switch verb {
 	case 'c', 'r', 'v':
-		io.write_rune(fi.writer, r, &fi.n)
+		_write_rune(fi, r)
 	case 'q', 'w':
-		fi.n += io.write_quoted_rune(fi.writer, r)
+		n, _ := io.write_quoted_rune(fi.writer, r)
+		fi.n += n
 	case:
 		fmt_int(fi, u64(u32(r)), false, 32, verb)
 	}
@@ -1332,7 +1486,7 @@ fmt_int :: proc(fi: ^Info, u: u64, is_signed: bool, bit_size: int, verb: rune) {
 		if r < 0 || r > utf8.MAX_RUNE {
 			fmt_bad_verb(fi, verb)
 		} else {
-			io.write_string(fi.writer, "U+", &fi.n)
+			_write_string(fi, "U+")
 			_fmt_int(fi, u, 16, false, bit_size, __DIGITS_UPPER)
 		}
 	case 'm': _fmt_memory(fi, u, is_signed, bit_size, __MEMORY_LOWER)
@@ -1368,7 +1522,7 @@ fmt_int_128 :: proc(fi: ^Info, u: u128, is_signed: bool, bit_size: int, verb: ru
 		if r < 0 || r > utf8.MAX_RUNE {
 			fmt_bad_verb(fi, verb)
 		} else {
-			io.write_string(fi.writer, "U+", &fi.n)
+			_write_string(fi, "U+")
 			_fmt_int_128(fi, u, 16, false, bit_size, __DIGITS_UPPER)
 		}
 
@@ -1384,23 +1538,23 @@ fmt_int_128 :: proc(fi: ^Info, u: u128, is_signed: bool, bit_size: int, verb: ru
 //
 _pad :: proc(fi: ^Info, s: string) {
 	if !fi.width_set {
-		io.write_string(fi.writer, s, &fi.n)
+		_write_string(fi, s)
 		return
 	}
 
 
 	width := fi.width - utf8.rune_count_in_string(s)
 	if fi.minus { // right pad
-		io.write_string(fi.writer, s, &fi.n)
+		_write_string(fi, s)
 		fmt_write_padding(fi, width)
 	} else if _zero_pad(fi) && s != "" && (s[0] == '-' || s[0] == '+') {
 		// left pad accounting for zero pad of negative number
-		io.write_byte(fi.writer, s[0], &fi.n)
+		_write_byte(fi, s[0])
 		fmt_write_padding(fi, width)
-		io.write_string(fi.writer, s[1:], &fi.n)
+		_write_string(fi, s[1:])
 	} else { // left pad
 		fmt_write_padding(fi, width)
-		io.write_string(fi.writer, s, &fi.n)
+		_write_string(fi, s)
 	}
 }
 // Formats a floating-point number with a specific format and precision.
@@ -1411,26 +1565,22 @@ _pad :: proc(fi: ^Info, s: string) {
 // - bit_size: The size of the floating-point number in bits (16, 32, or 64).
 // - verb: The format specifier character.
 // - float_fmt: The byte format used for formatting the float (either 'f' or 'e').
+// - default_prec: Precision used if `fi` does not specify anything.
 //
-// NOTE: Can return "NaN", "+Inf", "-Inf", "+<value>", or "-<value>".
+// NOTE: Can return "NaN", "+Inf", "-Inf", "<value>", "+<value>", or "-<value>".
 //
-_fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: byte, prec: int) {
-	prec := prec
-	if fi.prec_set {
-		prec = fi.prec
+_fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: byte, default_prec: int) {
+	prec := fi.prec if fi.prec_set else default_prec
+
+	flags: strconv.Float_Flags
+	if fi.plus {
+		flags |= { .Plus }
 	}
 
-	buf: [386]byte
+	buf: [386]byte = ---
 
-	// Can return "NaN", "+Inf", "-Inf", "+<value>", "-<value>".
-	str := strconv.write_float(buf[:], v, float_fmt, prec, bit_size)
-
-	if !fi.plus {
-		// Strip sign from "+<value>" but not "+Inf".
-		if str[0] == '+' && str[1] != 'I' {
-			str = str[1:]
-		}
-	}
+	// Can return "NaN", "+Inf", "-Inf", "<value>", "+<value>", "-<value>".
+	str := strconv.write_float(buf[:], v, float_fmt, prec, bit_size, flags)
 
 	_pad(fi, str)
 }
@@ -1482,7 +1632,7 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 		case: panic("Unhandled float size")
 		}
 
-		io.write_string(fi.writer, "0h", &fi.n)
+		_write_string(fi, "0h")
 		_fmt_int(fi, u, 16, false, bit_size, __DIGITS_LOWER if verb == 'h' else __DIGITS_UPPER)
 
 
@@ -1512,21 +1662,19 @@ fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
 			rune_count := utf8.rune_count(s)
 			if fi.width > rune_count {
 				if fi.minus {
-					io.write_string(fi.writer, s, &fi.n)
+					_write_string(fi, s)
 				}
 
-				for _ in 0..<fi.width - rune_count {
-					io.write_byte(fi.writer, ' ', &fi.n)
-				}
+				_write_repeated_byte(fi, ' ', fi.width - rune_count)
 
 				if !fi.minus {
-					io.write_string(fi.writer, s, &fi.n)
+					_write_string(fi, s)
 				}
 			} else {
-				io.write_string(fi.writer, s, &fi.n)
+				_write_string(fi, s)
 			}
 		} else {
-			io.write_string(fi.writer, s, &fi.n)
+			_write_string(fi, s)
 		}
 
 	case 'q', 'w': // quoted string
@@ -1539,7 +1687,7 @@ fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
 
 		for i in 0..<len(s) {
 			if i > 0 && space {
-				io.write_byte(fi.writer, ' ', &fi.n)
+				_write_byte(fi, ' ')
 			}
 			char_set := __DIGITS_UPPER
 			if verb == 'x' {
@@ -1587,9 +1735,7 @@ fmt_string16 :: proc(fi: ^Info, s: string16, verb: rune) {
 					io.write_string16(fi.writer, s, &fi.n)
 				}
 
-				for _ in 0..<fi.width - len(s) {
-					io.write_byte(fi.writer, ' ', &fi.n)
-				}
+				_write_repeated_byte(fi, ' ', fi.width - len(s))
 
 				if !fi.minus {
 					io.write_string16(fi.writer, s, &fi.n)
@@ -1611,7 +1757,7 @@ fmt_string16 :: proc(fi: ^Info, s: string16, verb: rune) {
 
 		for i in 0..<len(s) {
 			if i > 0 && space {
-				io.write_byte(fi.writer, ' ', &fi.n)
+				_write_byte(fi, ' ')
 			}
 			char_set := __DIGITS_UPPER
 			if verb == 'x' {
@@ -1651,7 +1797,7 @@ fmt_pointer :: proc(fi: ^Info, p: rawptr, verb: rune) {
 		fi.zero = true
 
 		if !fi.hash {
-			io.write_string(fi.writer, "0x", &fi.n)
+			_write_string(fi, "0x")
 		}
 		_fmt_int(fi, u, 16, false, 8*size_of(rawptr), __DIGITS_UPPER)
 
@@ -1674,11 +1820,11 @@ fmt_pointer :: proc(fi: ^Info, p: rawptr, verb: rune) {
 // - verb: The format specifier character.
 //
 fmt_soa_pointer :: proc(fi: ^Info, p: runtime.Raw_Soa_Pointer, verb: rune) {
-	io.write_string(fi.writer, "#soa{data=0x", &fi.n)
+	_write_string(fi, "#soa{data=0x")
 	_fmt_int(fi, u64(uintptr(p.data)), 16, false, 8*size_of(rawptr), __DIGITS_UPPER)
-	io.write_string(fi.writer, ", index=", &fi.n)
+	_write_string(fi, ", index=")
 	_fmt_int(fi, u64(p.index), 10, false, 8*size_of(rawptr), __DIGITS_UPPER)
-	io.write_string(fi.writer, "}", &fi.n)
+	_write_string(fi, "}")
 }
 // String representation of an enum value.
 //
@@ -1721,37 +1867,89 @@ string_to_enum_value :: proc($T: typeid, s: string) -> (T, bool) {
 //
 fmt_enum :: proc(fi: ^Info, v: any, verb: rune) {
 	if v.id == nil || v.data == nil {
-		io.write_string(fi.writer, "<nil>", &fi.n)
+		_write_string(fi, "<nil>")
 		return
 	}
+	_fmt_enum(fi, v.data, type_info_of(v.id), verb)
+}
 
-	type_info := type_info_of(v.id)
+@(private)
+_fmt_enum :: proc(fi: ^Info, data: rawptr, type_info: ^runtime.Type_Info, verb: rune) {
 	#partial switch &e in type_info.variant {
 	case: fmt_bad_verb(fi, verb)
 	case runtime.Type_Info_Enum:
+		base := runtime.type_info_base(e.base)
 		switch verb {
 		case: fmt_bad_verb(fi, verb)
 		case 'i', 'd', 'f':
-			fmt_arg(fi, any{v.data, runtime.type_info_base(e.base).id}, verb)
+			_fmt_arg(fi, data, base.id, base, verb)
 		case 's', 'v', 'q':
-			if str, ok := enum_value_to_string(v); ok {
+			if str, ok := _enum_value_name(data, e); ok {
 				fmt_string(fi, str, verb)
 			} else {
-				io.write_string(fi.writer, "%!(BAD ENUM VALUE=", &fi.n)
-				fmt_arg(fi, any{v.data, runtime.type_info_base(e.base).id}, 'i')
-				io.write_string(fi.writer, ")", &fi.n)
+				_write_string(fi, "%!(BAD ENUM VALUE=")
+				_fmt_arg(fi, data, base.id, base, 'i')
+				_write_string(fi, ")")
 			}
 		case 'w':
-			if str, ok := enum_value_to_string(v); ok {
-				io.write_byte(fi.writer, '.', &fi.n)
-				io.write_string(fi.writer, str, &fi.n)
+			if str, ok := _enum_value_name(data, e); ok {
+				_write_byte(fi, '.')
+				_write_string(fi, str)
 			} else {
-				io.write_string(fi.writer, "%!(BAD ENUM VALUE=", &fi.n)
-				fmt_arg(fi, any{v.data, runtime.type_info_base(e.base).id}, 'i')
-				io.write_string(fi.writer, ")", &fi.n)
+				_write_string(fi, "%!(BAD ENUM VALUE=")
+				_fmt_arg(fi, data, base.id, base, 'i')
+				_write_string(fi, ")")
 			}
 		}
 	}
+}
+
+// Equivalent to `enum_value_to_string`. Reads the value as `reflect.as_i64` does.
+@(private, require_results)
+_enum_value_name :: proc(data: rawptr, e: runtime.Type_Info_Enum) -> (name: string, ok: bool) {
+	if len(e.values) == 0 {
+		return
+	}
+
+	core := runtime.type_info_core(e.base)
+	value: i64
+	if info, is_integer := core.variant.(runtime.Type_Info_Integer); is_integer {
+		swap := info.endianness == .Little && ODIN_ENDIAN == .Big ||
+		        info.endianness == .Big    && ODIN_ENDIAN == .Little
+		switch core.size {
+		case 1:
+			x := (^u8)(data)^
+			value = i64(i8(x)) if info.signed else i64(x)
+		case 2:
+			x := (^u16)(data)^
+			if swap { x = intrinsics.byte_swap(x) }
+			value = i64(i16(x)) if info.signed else i64(x)
+		case 4:
+			x := (^u32)(data)^
+			if swap { x = intrinsics.byte_swap(x) }
+			value = i64(i32(x)) if info.signed else i64(x)
+		case 8:
+			x := (^u64)(data)^
+			if swap { x = intrinsics.byte_swap(x) }
+			value = i64(x)
+		case 16:
+			x := (^u128)(data)^
+			if swap { x = intrinsics.byte_swap(x) }
+			value = i64(x)
+		case:
+			return
+		}
+	} else {
+		value = reflect.as_i64(any{data, core.id}) or_return
+	}
+
+	ev := runtime.Type_Info_Enum_Value(value)
+	for val, idx in e.values {
+		if val == ev {
+			return e.names[idx], true
+		}
+	}
+	return
 }
 // Converts a stored enum value to a string representation
 //
@@ -1892,20 +2090,20 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 
 		if verb != 'w' {
 			if name != "" {
-				io.write_string(fi.writer, name, &fi.n)
+				_write_string(fi, name)
 			} else {
 				reflect.write_type(fi.writer, type_info, &fi.n)
 			}
 		}
-		io.write_byte(fi.writer, '{', &fi.n)
-		defer io.write_byte(fi.writer, '}', &fi.n)
+		_write_byte(fi, '{')
+		defer _write_byte(fi, '}')
 
 		e, is_enum := et.variant.(runtime.Type_Info_Enum)
 		commas := 0
 		loop: for i in transmute(bit_set[0..<128])bits {
 			i := i64(i) + info.lower
 			if commas > 0 {
-				io.write_string(fi.writer, ", ", &fi.n)
+				_write_string(fi, ", ")
 			}
 
 			if is_enum {
@@ -1917,10 +2115,10 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 					v := u64(ev)
 					if v == u64(i) {
 						if verb == 'w' {
-							io.write_string(fi.writer, enum_name, &fi.n)
-							io.write_byte(fi.writer, '.', &fi.n)
+							_write_string(fi, enum_name)
+							_write_byte(fi, '.')
 						}
-						io.write_string(fi.writer, e.names[evi], &fi.n)
+						_write_string(fi, e.names[evi])
 						commas += 1
 						continue loop
 					}
@@ -1944,13 +2142,13 @@ fmt_bit_set_array :: proc(fi: ^Info, v: any, type_info: ^runtime.Type_Info, name
 
 	if verb != 'w' {
 		if name != "" {
-			io.write_string(fi.writer, name, &fi.n)
+			_write_string(fi, name)
 		} else {
 			reflect.write_type(fi.writer, type_info, &fi.n)
 		}
 	}
-	io.write_byte(fi.writer, '{', &fi.n)
-	defer io.write_byte(fi.writer, '}', &fi.n)
+	_write_byte(fi, '{')
+	defer _write_byte(fi, '}')
 
 	bytes := ([^]u8)(v.data)
 	commas := 0
@@ -1960,7 +2158,7 @@ fmt_bit_set_array :: proc(fi: ^Info, v: any, type_info: ^runtime.Type_Info, name
 		}
 		i := i64(bit_index) + info.lower
 		if commas > 0 {
-			io.write_string(fi.writer, ", ", &fi.n)
+			_write_string(fi, ", ")
 		}
 		if is_enum {
 			enum_name: string
@@ -1970,10 +2168,10 @@ fmt_bit_set_array :: proc(fi: ^Info, v: any, type_info: ^runtime.Type_Info, name
 			for ev, evi in e.values {
 				if u64(ev) == u64(i) {
 					if verb == 'w' {
-						io.write_string(fi.writer, enum_name, &fi.n)
-						io.write_byte(fi.writer, '.', &fi.n)
+						_write_string(fi, enum_name)
+						_write_byte(fi, '.')
 					}
-					io.write_string(fi.writer, e.names[evi], &fi.n)
+					_write_string(fi, e.names[evi])
 					commas += 1
 					continue loop
 				}
@@ -1990,9 +2188,7 @@ fmt_bit_set_array :: proc(fi: ^Info, v: any, type_info: ^runtime.Type_Info, name
 // - fi: A pointer to the Info structure where the indents will be written.
 //
 fmt_write_indent :: proc(fi: ^Info) {
-	for _ in 0..<fi.indent {
-		io.write_byte(fi.writer, '\t', &fi.n)
-	}
+	_write_repeated_byte(fi, '\t', fi.indent)
 }
 // Formats an array and writes it to the provided Info structure
 //
@@ -2005,8 +2201,27 @@ fmt_write_indent :: proc(fi: ^Info) {
 // - verb: The formatting verb to be used for the array elements.
 //
 fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: int, elem_id: typeid, verb: rune) {
-	io.write_byte(fi.writer, '[' if verb != 'w' else '{', &fi.n)
-	defer io.write_byte(fi.writer, ']' if verb != 'w' else '}', &fi.n)
+	// NOTE(bill): `_fmt_arg` would reach `fmt_int` for each of these. Plain integers are resolved once per array.
+	fmt_elem :: #force_inline proc(fi: ^Info, data: rawptr, elem_id: typeid, elem_info: ^runtime.Type_Info, int_info: ^runtime.Type_Info_Integer, elem_size: int, verb: rune) {
+		if int_info == nil {
+			_fmt_arg(fi, data, elem_id, elem_info, verb)
+			return
+		}
+		u: u64
+		switch elem_size {
+		case 1: u = u64((^i8) (data)^) if int_info.signed else u64((^u8) (data)^)
+		case 2: u = u64((^i16)(data)^) if int_info.signed else u64((^u16)(data)^)
+		case 4: u = u64((^i32)(data)^) if int_info.signed else u64((^u32)(data)^)
+		case 8: u = (^u64)(data)^
+		}
+		prev_arg := fi.arg
+		fi.arg = any{data, elem_id}
+		fmt_int(fi, u, int_info.signed, 8*elem_size, verb)
+		fi.arg = prev_arg
+	}
+
+	_write_byte(fi, '[' if verb != 'w' else '{')
+	defer _write_byte(fi, ']' if verb != 'w' else '}')
 
 	if count <= 0 {
 		return
@@ -2014,8 +2229,16 @@ fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: in
 	fi.record_level += 1
 	defer fi.record_level -= 1
 
+	elem_info := type_info_of(elem_id)
+
+	int_info, is_int := &elem_info.variant.(runtime.Type_Info_Integer)
+	if !is_int || int_info.endianness != .Platform || elem_size > 8 || verb == 'T' ||
+	   (_user_formatters != nil && _user_formatters[elem_id] != nil) {
+		int_info = nil
+	}
+
 	if fi.hash {
-		io.write_byte(fi.writer, '\n', &fi.n)
+		_write_byte(fi, '\n')
 		defer fmt_write_indent(fi)
 
 		indent := fi.indent
@@ -2026,16 +2249,16 @@ fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: in
 			fmt_write_indent(fi)
 
 			data := uintptr(array_data) + uintptr(i*elem_size)
-			fmt_arg(fi, any{rawptr(data), elem_id}, verb)
+			fmt_elem(fi, rawptr(data), elem_id, elem_info, int_info, elem_size, verb)
 
-			io.write_string(fi.writer, ",\n", &fi.n)
+			_write_string(fi, ",\n")
 		}
 	} else {
 		for i in 0..<count {
-			if i > 0 { io.write_string(fi.writer, ", ", &fi.n) }
+			if i > 0 { _write_string(fi, ", ") }
 
 			data := uintptr(array_data) + uintptr(i*elem_size)
-			fmt_arg(fi, any{rawptr(data), elem_id}, verb)
+			fmt_elem(fi, rawptr(data), elem_id, elem_info, int_info, elem_size, verb)
 		}
 	}
 }
@@ -2203,9 +2426,9 @@ __handle_raw_union_tag :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.
 				}
 
 				if tail_name == tag_string {
-					io.write_string(fi.writer, "#raw_union(.", &fi.n)
-					io.write_string(fi.writer, tag_string, &fi.n)
-					io.write_string(fi.writer, ") ", &fi.n)
+					_write_string(fi, "#raw_union(.")
+					_write_string(fi, tag_string)
+					_write_string(fi, ") ")
 					fmt_arg(fi, any{v.data, info.types[index].id}, the_verb)
 					return true
 				}
@@ -2231,9 +2454,9 @@ __handle_raw_union_tag :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.
 				tail_value := strconv.parse_i64(tail_name) or_continue
 
 				if tail_value == tag_value {
-					io.write_string(fi.writer, "#raw_union(.", &fi.n)
+					_write_string(fi, "#raw_union(.")
 					io.write_i64(fi.writer, tag_value, 10, &fi.n)
-					io.write_string(fi.writer, ") ", &fi.n)
+					_write_string(fi, ") ")
 					fmt_arg(fi, any{v.data, info.types[index].id}, the_verb)
 					return true
 				}
@@ -2260,9 +2483,9 @@ __handle_raw_union_tag :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.
 				tail_value := strconv.parse_bool(tail_name) or_continue
 
 				if tail_value == tag_value {
-					io.write_string(fi.writer, "#raw_union(.", &fi.n)
-					io.write_string(fi.writer, "true" if tag_value else "false", &fi.n)
-					io.write_string(fi.writer, ") ", &fi.n)
+					_write_string(fi, "#raw_union(.")
+					_write_string(fi, "true" if tag_value else "false")
+					_write_string(fi, ") ")
 					fmt_arg(fi, any{v.data, info.types[index].id}, the_verb)
 					return true
 				}
@@ -2301,32 +2524,32 @@ fmt_soa_struct_internal :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime
 	}
 
 	if hash && n > 0 {
-		io.write_byte(fi.writer, '\n', &fi.n)
+		_write_byte(fi, '\n')
 	}
 
 	for index in 0..<n {
-		if !hash && index > 0 { io.write_string(fi.writer, ", ", &fi.n) }
+		if !hash && index > 0 { _write_string(fi, ", ") }
 
 		field_count := -1
 
-		if !hash && field_count > 0 { io.write_string(fi.writer, ", ", &fi.n) }
+		if !hash && field_count > 0 { _write_string(fi, ", ") }
 
 		if hash {
 			fi.indent -= 1
 			fmt_write_indent(fi)
 			fi.indent += 1
 		}
-		io.write_string(fi.writer, base_type_name, &fi.n)
-		io.write_byte(fi.writer, '{', &fi.n)
-		if hash && !is_empty { io.write_byte(fi.writer, '\n', &fi.n) }
+		_write_string(fi, base_type_name)
+		_write_byte(fi, '{')
+		if hash && !is_empty { _write_byte(fi, '\n') }
 		defer {
 			if hash && !is_empty {
 				fi.indent -= 1
 				fmt_write_indent(fi)
 				fi.indent += 1
 			}
-			io.write_byte(fi.writer, '}', &fi.n)
-			if hash { io.write_string(fi.writer, ",\n", &fi.n) }
+			_write_byte(fi, '}')
+			if hash { _write_string(fi, ",\n") }
 		}
 		fi.record_level += 1
 		defer fi.record_level -= 1
@@ -2336,19 +2559,19 @@ fmt_soa_struct_internal :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime
 			name := info.names[i]
 			field_count += 1
 
-			if !hash && field_count > 0 { io.write_string(fi.writer, ", ", &fi.n) }
+			if !hash && field_count > 0 { _write_string(fi, ", ") }
 			if hash {
 				fmt_write_indent(fi)
 			}
 
-			io.write_string(fi.writer, name, &fi.n)
-			io.write_string(fi.writer, " = ", &fi.n)
+			_write_string(fi, name)
+			_write_string(fi, " = ")
 
 			if info.soa_kind == .Fixed {
 				t := info.types[i].variant.(runtime.Type_Info_Array).elem
 				t_size := uintptr(t.size)
 				if reflect.is_any(t) {
-					io.write_string(fi.writer, "any{}", &fi.n)
+					_write_string(fi, "any{}")
 				} else {
 					data := rawptr(uintptr(v.data) + info.offsets[i] + index*t_size)
 					fmt_arg(fi, any{data, t.id}, verb)
@@ -2357,7 +2580,7 @@ fmt_soa_struct_internal :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime
 				t := info.types[i].variant.(runtime.Type_Info_Multi_Pointer).elem
 				t_size := uintptr(t.size)
 				if reflect.is_any(t) {
-					io.write_string(fi.writer, "any{}", &fi.n)
+					_write_string(fi, "any{}")
 				} else {
 					field_ptr := (^^byte)(uintptr(v.data) + info.offsets[i])^
 					data := rawptr(uintptr(field_ptr) + index*t_size)
@@ -2365,12 +2588,12 @@ fmt_soa_struct_internal :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime
 				}
 			}
 
-			if hash { io.write_string(fi.writer, ",\n", &fi.n) }
+			if hash { _write_string(fi, ",\n") }
 		}
 	}
 
 	if hash && n > 0 {
-		for _ in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
+		_write_repeated_byte(fi, '\t', indent)
 	}
 }
 
@@ -2395,18 +2618,18 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 			return
 		}
 		if type_name == "" {
-			io.write_string(fi.writer, "(#raw_union)", &fi.n)
+			_write_string(fi, "(#raw_union)")
 		} else {
-			io.write_string(fi.writer, type_name, &fi.n)
-			io.write_string(fi.writer, "{}", &fi.n)
+			_write_string(fi, type_name)
+			_write_string(fi, "{}")
 		}
 		return
 	}
 
 	is_soa := info.soa_kind != .None
 
-	io.write_string(fi.writer, type_name, &fi.n)
-	io.write_byte(fi.writer, '[' if is_soa && the_verb == 'v' else '{', &fi.n)
+	_write_string(fi, type_name)
+	_write_byte(fi, '[' if is_soa && the_verb == 'v' else '{')
 	fi.record_level += 1
 	defer fi.record_level -= 1
 
@@ -2420,13 +2643,13 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 	is_empty := info.field_count == 0
 
 	if !is_soa && hash && !is_empty {
-		io.write_byte(fi.writer, '\n', &fi.n)
+		_write_byte(fi, '\n')
 	}
 	defer {
 		if !is_soa && hash && !is_empty {
-			for _ in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
+			_write_repeated_byte(fi, '\t', indent)
 		}
-		io.write_byte(fi.writer, ']' if is_soa && the_verb == 'v' else '}', &fi.n)
+		_write_byte(fi, ']' if is_soa && the_verb == 'v' else '}')
 	}
 
 	if is_soa {
@@ -2438,11 +2661,15 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 			use_nul_termination: bool = false
 			verb := the_verb if the_verb == 'w' else 'v'
 
-			new_state := fi.state
-			new_state.parent_struct = v
-
-			if handle_tag(&new_state, v.data, info, i, &verb, &optional_len, &use_nul_termination) {
-				continue
+			// NOTE(bill): Most fields have no tag. Those only need `parent_struct` set while they are formatted.
+			has_tag := info.tags[i] != ""
+			new_state: Info_State = ---
+			if has_tag {
+				new_state = fi.state
+				new_state.parent_struct = v
+				if handle_tag(&new_state, v.data, info, i, &verb, &optional_len, &use_nul_termination) {
+					continue
+				}
 			}
 			field_count += 1
 
@@ -2455,25 +2682,31 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 			fi.use_nul_termination = use_nul_termination
 			defer fi.use_nul_termination = false
 
-			if !do_trailing_comma && field_count > 0 { io.write_string(fi.writer, ", ") }
+			if !do_trailing_comma && field_count > 0 {
+				_write_string(fi, ", ")
+			}
 			if hash {
 				fmt_write_indent(fi)
 			}
 
-			io.write_string(fi.writer, name, &fi.n)
-			io.write_string(fi.writer, " = ", &fi.n)
+			_write_string(fi, name)
+			_write_string(fi, " = ")
 
 			if t := info.types[i]; reflect.is_any(t) {
-				io.write_string(fi.writer, "any{}", &fi.n)
+				_write_string(fi, "any{}")
 			} else {
 				prev_state := fi.state
-				fi.state = new_state
+				if has_tag {
+					fi.state = new_state
+				} else {
+					fi.parent_struct = v
+				}
 				data := rawptr(uintptr(v.data) + info.offsets[i])
-				fmt_arg(fi, any{data, t.id}, verb)
+				_fmt_arg(fi, data, t.id, t, verb)
 				fi.state = prev_state
 			}
 
-			if do_trailing_comma { io.write_string(fi.writer, ",\n", &fi.n) }
+			if do_trailing_comma { _write_string(fi, ",\n") }
 		}
 	}
 }
@@ -2508,7 +2741,7 @@ search_nul_termination :: proc(ptr: rawptr, elem_size: int, max_n: int) -> (n: i
 //
 fmt_array_nul_terminated :: proc(fi: ^Info, data: rawptr, max_n: int, elem_size: int, elem: ^reflect.Type_Info, verb: rune) {
 	if data == nil {
-		io.write_string(fi.writer, "<nil>", &fi.n)
+		_write_string(fi, "<nil>")
 		return
 	}
 	n := search_nul_termination(data, elem_size, max_n)
@@ -2526,7 +2759,7 @@ fmt_array_nul_terminated :: proc(fi: ^Info, data: rawptr, max_n: int, elem_size:
 //
 fmt_array :: proc(fi: ^Info, data: rawptr, n: int, elem_size: int, elem: ^reflect.Type_Info, verb: rune) {
 	if data == nil && n > 0 {
-		io.write_string(fi.writer, "nil")
+		_write_string(fi, "nil")
 		return
 	}
 	if verb == 's' || verb == 'q' {
@@ -2551,13 +2784,13 @@ fmt_array :: proc(fi: ^Info, data: rawptr, n: int, elem_size: int, elem: ^reflec
 					}
 					i += 1
 				}
-				io.write_rune(fi.writer, r, &fi.n)
+				_write_rune(fi, r)
 			}
 		}
 
 		print_utf32 :: proc(fi: ^Info, s: []$T) where size_of(T) == 4 {
 			for r in s {
-				io.write_rune(fi.writer, rune(r), &fi.n)
+				_write_rune(fi, rune(r))
 			}
 		}
 
@@ -2584,24 +2817,24 @@ fmt_array :: proc(fi: ^Info, data: rawptr, n: int, elem_size: int, elem: ^reflec
 fmt_named_buitlin_custom_formatters :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) -> bool {
 	switch a in v {
 	case runtime.Source_Code_Location:
-		io.write_string(fi.writer, a.file_path, &fi.n)
+		_write_string(fi, a.file_path)
 
 		when ODIN_ERROR_POS_STYLE == .Default {
-			io.write_byte(fi.writer, '(', &fi.n)
+			_write_byte(fi, '(')
 			io.write_int(fi.writer, int(a.line), 10, &fi.n)
 			if a.column != 0 {
-				io.write_byte(fi.writer, ':', &fi.n)
+				_write_byte(fi, ':')
 				io.write_int(fi.writer, int(a.column), 10, &fi.n)
 			}
-			io.write_byte(fi.writer, ')', &fi.n)
+			_write_byte(fi, ')')
 		} else when ODIN_ERROR_POS_STYLE == .Unix {
-			io.write_byte(fi.writer, ':', &fi.n)
+			_write_byte(fi, ':')
 			io.write_int(fi.writer, int(a.line), 10, &fi.n)
 			if a.column != 0 {
-				io.write_byte(fi.writer, ':', &fi.n)
+				_write_byte(fi, ':')
 				io.write_int(fi.writer, int(a.column), 10, &fi.n)
 			}
-			io.write_byte(fi.writer, ':', &fi.n)
+			_write_byte(fi, ':')
 		} else {
 			#panic("Unhandled ODIN_ERROR_POS_STYLE")
 		}
@@ -2658,7 +2891,7 @@ fmt_named_buitlin_custom_formatters :: proc(fi: ^Info, v: any, verb: rune, info:
 			w -= 1
 			switch {
 			case u == 0:
-				io.write_string(fi.writer, "0s", &fi.n)
+				_write_string(fi, "0s")
 				return true
 			case u < u64(time.Microsecond):
 				prec = 0
@@ -2705,7 +2938,7 @@ fmt_named_buitlin_custom_formatters :: proc(fi: ^Info, v: any, verb: rune, info:
 			w -= 1
 			buf[w] = '-'
 		}
-		io.write_string(fi.writer, string(buf[w:]), &fi.n)
+		_write_string(fi, string(buf[w:]))
 		return true
 
 	case time.Time:
@@ -2714,9 +2947,7 @@ fmt_named_buitlin_custom_formatters :: proc(fi: ^Info, v: any, verb: rune, info:
 			for x := i; x >= 10; x /= 10 {
 				n -= 1
 			}
-			for _ in 0..<n {
-				io.write_byte(fi.writer, '0', &fi.n)
-			}
+			_write_repeated_byte(fi, '0', n)
 			io.write_i64(fi.writer, i, 10, &fi.n)
 		}
 
@@ -2726,20 +2957,20 @@ fmt_named_buitlin_custom_formatters :: proc(fi: ^Info, v: any, verb: rune, info:
 		h, min, s := time.clock(t)
 		ns := (t._nsec - (t._nsec/1e9 + time.UNIX_TO_ABSOLUTE)*1e9) % 1e9
 		write_padded_number(fi, i64(y), 4)
-		io.write_byte(fi.writer, '-', &fi.n)
+		_write_byte(fi, '-')
 		write_padded_number(fi, i64(mon), 2)
-		io.write_byte(fi.writer, '-', &fi.n)
+		_write_byte(fi, '-')
 		write_padded_number(fi, i64(d), 2)
-		io.write_byte(fi.writer, ' ', &fi.n)
+		_write_byte(fi, ' ')
 
 		write_padded_number(fi, i64(h), 2)
-		io.write_byte(fi.writer, ':', &fi.n)
+		_write_byte(fi, ':')
 		write_padded_number(fi, i64(min), 2)
-		io.write_byte(fi.writer, ':', &fi.n)
+		_write_byte(fi, ':')
 		write_padded_number(fi, i64(s), 2)
-		io.write_byte(fi.writer, '.', &fi.n)
+		_write_byte(fi, '.')
 		write_padded_number(fi, (ns), 9)
-		io.write_string(fi.writer, " +0000 UTC", &fi.n)
+		_write_string(fi, " +0000 UTC")
 		return true
 	}
 
@@ -2757,18 +2988,29 @@ fmt_named_buitlin_custom_formatters :: proc(fi: ^Info, v: any, verb: rune, info:
 // NOTE: This procedure supports built-in custom formatters for core library types such as runtime.Source_Code_Location, time.Duration, and time.Time.
 //
 fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) {
+	_fmt_named(fi, v.data, v.id, verb, info)
+}
+
+@(private)
+_fmt_named :: proc(fi: ^Info, data: rawptr, id: typeid, verb: rune, info: runtime.Type_Info_Named) {
 	// Built-in Custom Formatters for core library types
-	if verb != 'w' && fmt_named_buitlin_custom_formatters(fi, v, verb, info) {
-		return
+	if verb != 'w' {
+		if id == runtime.Source_Code_Location ||
+		   id == time.Duration                ||
+		   id == time.Time {
+			if fmt_named_buitlin_custom_formatters(fi, any{data, id}, verb, info) {
+				return
+			}
+		}
 	}
 
 	#partial switch &b in info.base.variant {
 	case runtime.Type_Info_Struct:
-		fmt_struct(fi, v, verb, b, info.name)
+		fmt_struct(fi, any{data, id}, verb, b, info.name)
 	case runtime.Type_Info_Bit_Field:
-		fmt_bit_field(fi, v, verb, b, info.name)
+		fmt_bit_field(fi, any{data, id}, verb, b, info.name)
 	case runtime.Type_Info_Bit_Set:
-		fmt_bit_set(fi, v, verb = verb)
+		fmt_bit_set(fi, any{data, id}, verb = verb)
 	case:
 		if verb == 'w' {
 			#partial switch _ in info.base.variant {
@@ -2783,10 +3025,10 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 			     runtime.Type_Info_Simd_Vector,
 			     runtime.Type_Info_Matrix,
 			     runtime.Type_Info_Bit_Field:
-				io.write_string(fi.writer, info.name, &fi.n)
+				_write_string(fi, info.name)
 			}
 		}
-		fmt_value(fi, any{v.data, info.base.id}, verb)
+		_fmt_value(fi, data, info.base.id, info.base, verb)
 	}
 }
 // Formats a union type into a string representation
@@ -2800,13 +3042,13 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 //
 fmt_union :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Union, type_size: int) {
 	if type_size == 0 {
-		io.write_string(fi.writer, "nil", &fi.n)
+		_write_string(fi, "nil")
 		return
 	}
 
 	if reflect.type_info_union_is_pure_maybe(info) {
 		if v.data == nil {
-			io.write_string(fi.writer, "nil", &fi.n)
+			_write_string(fi, "nil")
 		} else {
 			id := info.variants[0].id
 			fmt_arg(fi, any{v.data, id}, verb)
@@ -2832,12 +3074,12 @@ fmt_union :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Union, 
 	assert(tag >= 0)
 
 	if v.data == nil {
-		io.write_string(fi.writer, "nil", &fi.n)
+		_write_string(fi, "nil")
 	} else if info.no_nil {
 		id := info.variants[tag].id
 		fmt_arg(fi, any{v.data, id}, verb)
 	} else if tag == 0 {
-		io.write_string(fi.writer, "nil", &fi.n)
+		_write_string(fi, "nil")
 	} else {
 		id := info.variants[tag-1].id
 		fmt_arg(fi, any{v.data, id}, verb)
@@ -2853,22 +3095,22 @@ fmt_union :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Union, 
 //
 fmt_matrix :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Matrix) {
 	if verb == 'w' {
-		io.write_byte(fi.writer, '{', &fi.n)
+		_write_byte(fi, '{')
 	} else {
-		io.write_string(fi.writer, "matrix", &fi.n)
-		io.write_byte(fi.writer, '[', &fi.n)
+		_write_string(fi, "matrix")
+		_write_byte(fi, '[')
 	}
-	defer io.write_byte(fi.writer, ']' if verb != 'w' else '}', &fi.n)
+	defer _write_byte(fi, ']' if verb != 'w' else '}')
 
 	fi.indent += 1
 
 	if fi.hash {
 		// Printed as it is written
-		io.write_byte(fi.writer, '\n', &fi.n)
+		_write_byte(fi, '\n')
 		for row in 0..<info.row_count {
 			fmt_write_indent(fi)
 			for col in 0..<info.column_count {
-				if col > 0 { io.write_string(fi.writer, ", ", &fi.n) }
+				if col > 0 { _write_string(fi, ", ") }
 
 				offset: int
 				switch info.layout {
@@ -2879,15 +3121,15 @@ fmt_matrix :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Matrix
 				data := uintptr(v.data) + uintptr(offset)
 				fmt_arg(fi, any{rawptr(data), info.elem.id}, verb)
 			}
-			io.write_string(fi.writer, ",\n", &fi.n)
+			_write_string(fi, ",\n")
 		}
 	} else {
 		// Printed in Row-Major layout to match text layout
 		row_separator := ", " if verb == 'w' else "; "
 		for row in 0..<info.row_count {
-			if row > 0 { io.write_string(fi.writer, row_separator, &fi.n) }
+			if row > 0 { _write_string(fi, row_separator) }
 			for col in 0..<info.column_count {
-				if col > 0 { io.write_string(fi.writer, ", ", &fi.n) }
+				if col > 0 { _write_string(fi, ", ") }
 
 				offset: int
 				switch info.layout {
@@ -2938,8 +3180,8 @@ fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit
 		return false
 	}
 
-	io.write_string(fi.writer, type_name if len(type_name) != 0 || verb == 'w' else "bit_field", &fi.n)
-	io.write_byte(fi.writer, '{', &fi.n)
+	_write_string(fi, type_name if len(type_name) != 0 || verb == 'w' else "bit_field")
+	_write_byte(fi, '{')
 
 	hash   := fi.hash;   defer fi.hash = hash
 	indent := fi.indent; defer fi.indent -= 1
@@ -2948,13 +3190,13 @@ fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit
 	fi.indent += 1
 
 	if hash	{
-		io.write_byte(fi.writer, '\n', &fi.n)
+		_write_byte(fi, '\n')
 	}
 	defer {
 		if hash {
-			for _ in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
+			_write_repeated_byte(fi, '\t', indent)
 		}
-		io.write_byte(fi.writer, '}', &fi.n)
+		_write_byte(fi, '}')
 	}
 
 
@@ -2968,14 +3210,14 @@ fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit
 		field_count += 1
 
 		if !do_trailing_comma && field_count > 0 {
-			io.write_string(fi.writer, ", ")
+			_write_string(fi, ", ")
 		}
 		if hash {
 			fmt_write_indent(fi)
 		}
 
-		io.write_string(fi.writer, name, &fi.n)
-		io.write_string(fi.writer, " = ", &fi.n)
+		_write_string(fi, name)
+		_write_string(fi, " = ")
 
 		bit_offset := info.bit_offsets[i]
 		bit_size := info.bit_sizes[i]
@@ -2993,7 +3235,7 @@ fmt_bit_field :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Bit
 		}
 
 		fmt_value(fi, any{&value, type.id}, field_verb)
-		if do_trailing_comma { io.write_string(fi.writer, ",\n", &fi.n) }
+		if do_trailing_comma { _write_string(fi, ",\n") }
 
 	}
 }
@@ -3016,13 +3258,13 @@ fmt_pointer_from_value :: proc(fi: ^Info, v: any, info: runtime.Type_Info_Pointe
 				     runtime.Type_Info_Dynamic_Array,
 				     runtime.Type_Info_Map:
 					if ptr == nil {
-						io.write_string(fi.writer, "<nil>", &fi.n)
+						_write_string(fi, "<nil>")
 						return
 					}
 					if fi.indirection_level < 1 {
 						fi.indirection_level += 1
 						defer fi.indirection_level -= 1
-						io.write_byte(fi.writer, '&')
+						_write_byte(fi, '&')
 						fmt_value(fi, a, verb)
 						return
 					}
@@ -3031,13 +3273,13 @@ fmt_pointer_from_value :: proc(fi: ^Info, v: any, info: runtime.Type_Info_Pointe
 				     runtime.Type_Info_Union,
 				     runtime.Type_Info_Bit_Field:
 					if ptr == nil {
-						io.write_string(fi.writer, "<nil>", &fi.n)
+						_write_string(fi, "<nil>")
 						return
 					}
 					if fi.indirection_level < 1 {
 						fi.indirection_level += 1
 						defer fi.indirection_level -= 1
-						io.write_byte(fi.writer, '&', &fi.n)
+						_write_byte(fi, '&')
 						fmt_value(fi, a, verb)
 						return
 					}
@@ -3052,7 +3294,7 @@ fmt_pointer_from_value :: proc(fi: ^Info, v: any, info: runtime.Type_Info_Pointe
 fmt_multi_pointer :: proc(fi: ^Info, v: any, info: runtime.Type_Info_Multi_Pointer, verb: rune) {
 	ptr := (^rawptr)(v.data)^
 	if ptr == nil {
-		io.write_string(fi.writer, "<nil>", &fi.n)
+		_write_string(fi, "<nil>")
 		return
 	}
 	if verb != 'p' && info.elem != nil {
@@ -3092,7 +3334,7 @@ fmt_multi_pointer :: proc(fi: ^Info, v: any, info: runtime.Type_Info_Multi_Point
 				if fi.indirection_level < 1 {
 					fi.indirection_level += 1
 					defer fi.indirection_level -= 1
-					io.write_byte(fi.writer, '&', &fi.n)
+					_write_byte(fi, '&')
 					fmt_value(fi, a, verb)
 					return
 				}
@@ -3102,7 +3344,7 @@ fmt_multi_pointer :: proc(fi: ^Info, v: any, info: runtime.Type_Info_Multi_Point
 				if fi.indirection_level < 1 {
 					fi.indirection_level += 1
 					defer fi.indirection_level -= 1
-					io.write_byte(fi.writer, '&', &fi.n)
+					_write_byte(fi, '&')
 					fmt_value(fi, a, verb)
 					return
 				}
@@ -3117,11 +3359,11 @@ fmt_enumerated_array :: proc(fi: ^Info, v: any, info: runtime.Type_Info_Enumerat
 	defer fi.record_level -= 1
 
 	if fi.hash {
-		io.write_byte(fi.writer, '[' if verb != 'w' else '{', &fi.n)
-		io.write_byte(fi.writer, '\n', &fi.n)
+		_write_byte(fi, '[' if verb != 'w' else '{')
+		_write_byte(fi, '\n')
 		defer {
 			fmt_write_indent(fi)
-			io.write_byte(fi.writer, ']' if verb != 'w' else '}', &fi.n)
+			_write_byte(fi, ']' if verb != 'w' else '}')
 		}
 		indent := fi.indent
 		fi.indent += 1
@@ -3132,32 +3374,32 @@ fmt_enumerated_array :: proc(fi: ^Info, v: any, info: runtime.Type_Info_Enumerat
 
 			idx, ok := stored_enum_value_to_string(info.index, info.min_value, i)
 			if ok {
-				io.write_byte(fi.writer, '.', &fi.n)
-				io.write_string(fi.writer, idx, &fi.n)
+				_write_byte(fi, '.')
+				_write_string(fi, idx)
 			} else {
 				io.write_i64(fi.writer, i64(info.min_value)+i64(i), 10, &fi.n)
 			}
-			io.write_string(fi.writer, " = ", &fi.n)
+			_write_string(fi, " = ")
 
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
 			fmt_arg(fi, any{rawptr(data), info.elem.id}, verb)
 
-			io.write_string(fi.writer, ",\n", &fi.n)
+			_write_string(fi, ",\n")
 		}
 	} else {
-		io.write_byte(fi.writer, '[' if verb != 'w' else '{', &fi.n)
-		defer io.write_byte(fi.writer, ']' if verb != 'w' else '}', &fi.n)
+		_write_byte(fi, '[' if verb != 'w' else '{')
+		defer _write_byte(fi, ']' if verb != 'w' else '}')
 		for i in 0..<info.count {
-			if i > 0 { io.write_string(fi.writer, ", ", &fi.n) }
+			if i > 0 { _write_string(fi, ", ") }
 
 			idx, ok := stored_enum_value_to_string(info.index, info.min_value, i)
 			if ok {
-				io.write_byte(fi.writer, '.', &fi.n)
-				io.write_string(fi.writer, idx, &fi.n)
+				_write_byte(fi, '.')
+				_write_string(fi, idx)
 			} else {
 				io.write_i64(fi.writer, i64(info.min_value)+i64(i), 10, &fi.n)
 			}
-			io.write_string(fi.writer, " = ", &fi.n)
+			_write_string(fi, " = ")
 
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
 			fmt_arg(fi, any{rawptr(data), info.elem.id}, verb)
@@ -3171,10 +3413,10 @@ fmt_map :: proc(fi: ^Info, v: any, info: runtime.Type_Info_Map, verb: rune) {
 		fmt_bad_verb(fi, verb)
 	case 'v', 'w':
 		if verb == 'v' {
-			io.write_string(fi.writer, "map", &fi.n)
+			_write_string(fi, "map")
 		}
-		io.write_byte(fi.writer, '[' if verb != 'w' else '{', &fi.n)
-		defer io.write_byte(fi.writer, ']' if verb != 'w' else '}', &fi.n)
+		_write_byte(fi, '[' if verb != 'w' else '{')
+		defer _write_byte(fi, ']' if verb != 'w' else '}')
 
 
 		hash   := fi.hash;   defer fi.hash = hash
@@ -3183,11 +3425,11 @@ fmt_map :: proc(fi: ^Info, v: any, info: runtime.Type_Info_Map, verb: rune) {
 
 		fi.indent += 1
 		if hash	{
-			io.write_byte(fi.writer, '\n', &fi.n)
+			_write_byte(fi, '\n')
 		}
 		defer {
 			if hash {
-				for _ in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
+				_write_repeated_byte(fi, '\t', indent)
 			}
 		}
 
@@ -3202,7 +3444,7 @@ fmt_map :: proc(fi: ^Info, v: any, info: runtime.Type_Info_Map, verb: rune) {
 			for bucket_index in 0..<map_cap {
 				runtime.map_hash_is_valid(hs[bucket_index]) or_continue
 
-				if !do_trailing_comma && j > 0 { io.write_string(fi.writer, ", ") }
+				if !do_trailing_comma && j > 0 { _write_string(fi, ", ") }
 				if hash {
 					fmt_write_indent(fi)
 				}
@@ -3211,17 +3453,19 @@ fmt_map :: proc(fi: ^Info, v: any, info: runtime.Type_Info_Map, verb: rune) {
 				key   := runtime.map_cell_index_dynamic(ks, info.map_info.ks, bucket_index)
 				value := runtime.map_cell_index_dynamic(vs, info.map_info.vs, bucket_index)
 
-				fmt_arg(&Info{writer = fi.writer}, any{rawptr(key), info.key.id}, verb)
+				key_fi := Info{writer = fi.writer}
+				_fmt_arg(&key_fi, rawptr(key), info.key.id, info.key, verb)
+				fi.n += key_fi.n
 				if info.value.size > 0 {
 					if hash {
-						io.write_string(fi.writer, " = ", &fi.n)
+						_write_string(fi, " = ")
 					} else {
-						io.write_string(fi.writer, "=", &fi.n)
+						_write_string(fi, "=")
 					}
-					fmt_arg(fi, any{rawptr(value), info.value.id}, verb)
+					_fmt_arg(fi, rawptr(value), info.value.id, info.value, verb)
 				}
 
-				if do_trailing_comma { io.write_string(fi.writer, ",\n", &fi.n) }
+				if do_trailing_comma { _write_string(fi, ",\n") }
 			}
 		}
 	}
@@ -3238,24 +3482,56 @@ fmt_map :: proc(fi: ^Info, v: any, info: runtime.Type_Info_Map, verb: rune) {
 // NOTE: Uses user formatters if available and not ignored.
 //
 fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
-	if v.data == nil || v.id == nil {
-		io.write_string(fi.writer, "<nil>", &fi.n)
+	_fmt_value(fi, v.data, v.id, nil, verb)
+}
+
+// NOTE(bill): The internal procedures take the parts of an `any`, not the `any` itself.
+// Passing an `any` parameter on copies it with one 16-byte load. That load stalls when the caller wrote the two halves separately (every element and field `any`).
+
+// A nil `type_info` is looked up from `id`
+@(private)
+_fmt_value :: proc(fi: ^Info, data: rawptr, id: typeid, type_info: ^runtime.Type_Info, verb: rune) {
+	if data == nil || id == nil {
+		_write_string(fi, "<nil>")
 		return
 	}
 
 	if _user_formatters != nil && !fi.ignore_user_formatters {
-		formatter := _user_formatters[v.id]
+		formatter := _user_formatters[id]
 		if formatter != nil {
-			if ok := formatter(fi, v, verb); !ok {
+			if ok := formatter(fi, any{data, id}, verb); !ok {
 				fi.ignore_user_formatters = true
 				fmt_bad_verb(fi, verb)
 			}
 			return
 		}
 	}
+	type_info := type_info
+	if type_info == nil {
+		type_info = type_info_of(id)
+	}
+
+	// Basic types skip the heavier frame of `_fmt_value_info`. It only passes them to `_fmt_arg`.
+	#partial switch _ in type_info.variant {
+	case runtime.Type_Info_Boolean,
+	     runtime.Type_Info_Integer,
+	     runtime.Type_Info_Rune,
+	     runtime.Type_Info_Float,
+	     runtime.Type_Info_Complex,
+	     runtime.Type_Info_Quaternion,
+	     runtime.Type_Info_String:
+		fi.ignore_user_formatters = false
+		_fmt_arg(fi, data, id, type_info, verb)
+		return
+	}
+	_fmt_value_info(fi, data, id, type_info, verb)
+}
+
+@(private)
+_fmt_value_info :: proc(fi: ^Info, data: rawptr, id: typeid, type_info: ^runtime.Type_Info, verb: rune) {
 	fi.ignore_user_formatters = false
 
-	type_info := type_info_of(v.id)
+	v := any{data, id}
 	switch &info in type_info.variant {
 	case runtime.Type_Info_Any:
 		// Ignore
@@ -3263,7 +3539,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		// Ignore
 
 	case runtime.Type_Info_Named:
-		fmt_named(fi, v, verb, info)
+		_fmt_named(fi, data, id, verb, info)
 
 	case runtime.Type_Info_Boolean,
 	     runtime.Type_Info_Integer,
@@ -3272,7 +3548,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 	     runtime.Type_Info_Complex,
 	     runtime.Type_Info_Quaternion,
 	     runtime.Type_Info_String:
-		fmt_arg(fi, v, verb)
+		_fmt_arg(fi, data, id, type_info, verb)
 
 	case runtime.Type_Info_Pointer:
 		fmt_pointer_from_value(fi, v, info, verb)
@@ -3344,10 +3620,10 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		fmt_array(fi, ptr, n, info.elem_size, info.elem, verb)
 
 	case runtime.Type_Info_Simd_Vector:
-		io.write_byte(fi.writer, '<', &fi.n)
-		defer io.write_byte(fi.writer, '>', &fi.n)
+		_write_byte(fi, '<')
+		defer _write_byte(fi, '>')
 		for i in 0..<info.count {
-			if i > 0 { io.write_string(fi.writer, ", ", &fi.n) }
+			if i > 0 { _write_string(fi, ", ") }
 
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
 			fmt_arg(fi, any{rawptr(data), info.elem.id}, verb)
@@ -3364,21 +3640,20 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		fmt_union(fi, v, verb, info, type_info.size)
 
 	case runtime.Type_Info_Enum:
-		fmt_enum(fi, v, verb)
+		_fmt_enum(fi, data, type_info, verb)
 
 	case runtime.Type_Info_Procedure:
 		ptr := (^rawptr)(v.data)^
 		if ptr == nil {
-			io.write_string(fi.writer, "nil", &fi.n)
+			_write_string(fi, "nil")
 		} else {
 			reflect.write_typeid(fi.writer, v.id, &fi.n)
-			io.write_string(fi.writer, " @ ", &fi.n)
+			_write_string(fi, " @ ")
 			fmt_pointer(fi, ptr, 'p')
 		}
 
 	case runtime.Type_Info_Type_Id:
-		id := (^typeid)(v.data)^
-		reflect.write_typeid(fi.writer, id, &fi.n)
+		reflect.write_typeid(fi.writer, (^typeid)(v.data)^, &fi.n)
 
 	case runtime.Type_Info_Bit_Set:
 		fmt_bit_set(fi, v, verb = verb)
@@ -3419,10 +3694,10 @@ fmt_complex :: proc(fi: ^Info, c: complex128, bits: int, verb: rune) {
 		r, i := real(c), imag(c)
 		fmt_float(fi, r, bits/2, verb)
 		if _cq_should_print_intermediate_plus(fi, i) {
-			io.write_rune(fi.writer, '+', &fi.n)
+			_write_rune(fi, '+')
 		}
 		fmt_float(fi, i, bits/2, verb)
-		io.write_rune(fi.writer, 'i', &fi.n)
+		_write_rune(fi, 'i')
 
 	case:
 		fmt_bad_verb(fi, verb)
@@ -3445,22 +3720,22 @@ fmt_quaternion  :: proc(fi: ^Info, q: quaternion256, bits: int, verb: rune) {
 		fmt_float(fi, r, bits/4, verb)
 
 		if _cq_should_print_intermediate_plus(fi, i) {
-			io.write_rune(fi.writer, '+', &fi.n)
+			_write_rune(fi, '+')
 		}
 		fmt_float(fi, i, bits/4, verb)
-		io.write_rune(fi.writer, 'i', &fi.n)
+		_write_rune(fi, 'i')
 
 		if _cq_should_print_intermediate_plus(fi, j) {
-			io.write_rune(fi.writer, '+', &fi.n)
+			_write_rune(fi, '+')
 		}
 		fmt_float(fi, j, bits/4, verb)
-		io.write_rune(fi.writer, 'j', &fi.n)
+		_write_rune(fi, 'j')
 
 		if _cq_should_print_intermediate_plus(fi, k) {
-			io.write_rune(fi.writer, '+', &fi.n)
+			_write_rune(fi, '+')
 		}
 		fmt_float(fi, k, bits/4, verb)
-		io.write_rune(fi.writer, 'k', &fi.n)
+		_write_rune(fi, 'k')
 
 	case:
 		fmt_bad_verb(fi, verb)
@@ -3477,41 +3752,51 @@ fmt_quaternion  :: proc(fi: ^Info, q: quaternion256, bits: int, verb: rune) {
 // NOTE: Uses user formatters if available and not ignored.
 //
 fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
-	if arg == nil {
-		io.write_string(fi.writer, "<nil>")
+	_fmt_arg(fi, arg.data, arg.id, nil, verb)
+}
+
+// A nil `arg_info` is looked up from `id`
+@(private)
+_fmt_arg :: proc(fi: ^Info, data: rawptr, id: typeid, arg_info: ^runtime.Type_Info, verb: rune) {
+	if data == nil || id == nil {
+		_write_string(fi, "<nil>")
 		return
 	}
 	prev_arg := fi.arg
 	defer fi.arg = prev_arg
-	fi.arg = arg
+	fi.arg = any{data, id}
+
+	arg_info := arg_info
+	if arg_info == nil {
+		arg_info = type_info_of(id)
+	}
 
 	if verb == 'T' {
-		ti := type_info_of(arg.id)
-		switch a in arg {
-		case ^runtime.Type_Info: ti = a
+		ti := arg_info
+		if id == typeid_of(^runtime.Type_Info) {
+			ti = (^^runtime.Type_Info)(data)^
 		}
 		reflect.write_type(fi.writer, ti, &fi.n)
 		return
 	}
 
 	if _user_formatters != nil {
-		formatter := _user_formatters[arg.id]
+		formatter := _user_formatters[id]
 		if formatter != nil {
-			if ok := formatter(fi, arg, verb); !ok {
+			if ok := formatter(fi, any{data, id}, verb); !ok {
 				fmt_bad_verb(fi, verb)
 			}
 			return
 		}
 	}
 
-	arg_info := type_info_of(arg.id)
 	if info, ok := arg_info.variant.(runtime.Type_Info_Named); ok {
-		fmt_named(fi, arg, verb, info)
+		_fmt_named(fi, data, id, verb, info)
 		return
 	}
 
-	base_arg := arg
-	base_arg.id = runtime.typeid_base(base_arg.id)
+	// Named types returned above: `id` is its own base type
+	base_arg := any{data, id}
 	switch &a in base_arg {
 	case bool:       fmt_bool(fi, a, verb)
 	case b8:         fmt_bool(fi, bool(a), verb)
@@ -3519,7 +3804,7 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 	case b32:        fmt_bool(fi, bool(a), verb)
 	case b64:        fmt_bool(fi, bool(a), verb)
 
-	case any:        fmt_arg(fi,  a, verb)
+	case any:        _fmt_arg(fi, a.data, a.id, nil, verb)
 	case rune:       fmt_rune(fi, a, verb)
 
 	case f16:        fmt_float(fi, f64(a), 16, verb)
@@ -3585,7 +3870,7 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 	case i128be:   fmt_int_128(fi, u128(a), true,  128, verb)
 	case u128be:   fmt_int_128(fi, u128(a), false, 128, verb)
 
-	case: fmt_value(fi, arg, verb)
+	case: _fmt_value_info(fi, data, id, arg_info, verb)
 	}
 
 }

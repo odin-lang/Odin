@@ -324,40 +324,73 @@ read_rune :: proc(br: Reader, n_read: ^int = nil) -> (ch: rune, size: int, err: 
 	return
 }
 
-// write_string writes the contents of the string s to w.
+/*
+Writes the UTF-8 bytes of `str` to the Writer `w` without modification.
+
+**Inputs:**
+- `w`:          The Writer to write to.
+- `str`:        The string whose bytes are written.
+- `n_written`:  Optional pointer to a counter to which the number of bytes written is added.
+
+**Returns:**
+- `n`:          The number of bytes written.
+- `err`:        An error encountered while writing, or `nil` on success.
+
+If the Writer writes only part of the string before returning an error, `n` reports the number of bytes written.
+*/
 write_string :: proc(s: Writer, str: string, n_written: ^int = nil) -> (n: int, err: Error) {
 	return write(s, transmute([]byte)str, n_written)
 }
 
-// write_string16 writes the contents of the string16 s to w reencoded as utf-8
-write_string16 :: proc(s: Writer, str: string16, n_written: ^int = nil) -> (n: int, err: Error) {
-	for i := 0; i < len(str); i += 1 {
-		r := rune(utf16.REPLACEMENT_CHAR)
-		switch c := str[i]; {
-		case c < utf16._surr1, utf16._surr3 <= c:
-			r = rune(c)
-		case utf16._surr1 <= c && c < utf16._surr2 && i+1 < len(str) &&
-		     utf16._surr2 <= str[i+1] && str[i+1] < utf16._surr3:
-			r = utf16.decode_surrogate_pair(rune(c), rune(str[i+1]))
-			i += 1
-		}
+/*
+Writes the UTF-16 string `str` to the Writer `w`, encoded as UTF-8.
 
-		w: int
-		w, err = write_rune(s, r, n_written)
-		n += w
+**Inputs:**
+- `w`:          The Writer to write to.
+- `str`:        The UTF-16 string to encode and write.
+- `n_written`:  Optional pointer to a counter to which the number of bytes written is added for each successfully written rune.
+
+**Returns:**
+- `n`:          The number of UTF-8 bytes written.
+- `err`:        An error encountered while writing, or `nil` on success.
+
+Unpaired UTF-16 surrogates are encoded as the Unicode replacement character. The UTF-16 decoder does not
+distinguish malformed sequences from literal replacement characters, so both are written identically.
+*/
+write_string16 :: proc(w: Writer, str: string16, n_written: ^int = nil) -> (n: int, err: Error) {
+	s := str
+	for len(s) > 0 {
+		r, decoded_width := utf16.decode_rune_in_string(s)
+		assert(decoded_width > 0)
+		encoded_width: int
+		encoded_width, err = write_rune(w, r, n_written)
+		n += encoded_width
 		if err != nil {
 			return
 		}
+		// Advance input cursor to the next codepoint.
+		s = s[decoded_width:]
 	}
 	return
 }
 
 // write_rune writes a UTF-8 encoded rune to w.
 write_rune :: proc(s: Writer, r: rune, n_written: ^int = nil) -> (size: int, err: Error) {
-	defer if err == nil && n_written != nil {
+	defer if n_written != nil {
 		n_written^ += size
 	}
 	if r < utf8.RUNE_SELF {
+		// TODO (BUG - bplu4t2f):
+		//     I think this is subtly buggy.
+		//     write_byte does not return the number of bytes written. That has 2 consequences:
+		//     - Writing exactly 1 input byte, might not necessarily mean that the underlying
+		//       thing writes exactly one output byte, so `n` may be greater than 1.
+		//       Although I'm not sure if that's within the rules of IO Writer.
+		//     - If write returns an error inside of write_byte, we still don't exactly
+		//       know if any bytes have been written to the Writer. It might have still
+		//       written one byte, *and also* returned an error. This is *especially* true
+		//       if the previous point is in fact within spec.
+		//     write_byte should return the number of bytes written, like most other procs here.
 		err = write_byte(s, byte(r))
 		if err == nil {
 			size = 1

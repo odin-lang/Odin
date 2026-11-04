@@ -22,7 +22,7 @@ foreign lib {
 		// The program then loops through each of the address structures attempting to create and bind
 		// a socket to the address, until it performs a successful bind().
 
-		args := runtime.args__
+		args := os.args
 		if len(args) != 2 {
 			fmt.eprintfln("Usage: %s port", args[0])
 			posix.exit(1)
@@ -33,7 +33,7 @@ foreign lib {
 		hints.ai_flags    = { .PASSIVE }
 
 		result: ^posix.addrinfo
-		s := posix.getaddrinfo(nil, args[1], &hints, &result)
+		s := posix.getaddrinfo(nil, strings.unsafe_string_to_cstring(args[1]), &hints, &result)
 		if s != .NONE {
 			fmt.eprintfln("getaddrinfo: %s", posix.gai_strerror(s))
 			posix.exit(1)
@@ -352,7 +352,8 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	// The highest reserved port number.
 	IPPORT_RESERVED :: 1024
 
-	when ODIN_OS == .Linux || ODIN_OS == .OpenBSD {
+	// Bionic (Android) uses the BSD order.
+	when (ODIN_OS == .Linux && ODIN_PLATFORM_SUBTARGET != .Android) || ODIN_OS == .OpenBSD {
 		addrinfo :: struct {
 			ai_flags:     Addrinfo_Flags, /* [PSX] input flags */
 			ai_family:    AF,             /* [PSX] address family of socket */
@@ -427,6 +428,23 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		NI_NUMERICSCOPE :: 32
 		NI_DGRAM        :: 16
 
+	} else when ODIN_PLATFORM_SUBTARGET == .Android {
+
+		AI_PASSIVE     :: 0x00000001
+		AI_CANONNAME   :: 0x00000002
+		AI_NUMERICHOST :: 0x00000004
+		AI_NUMERICSERV :: 0x00000008
+		AI_V4MAPPED    :: 0x00000800
+		AI_ALL         :: 0x00000100
+		AI_ADDRCONFIG  :: 0x00000400
+
+		NI_NOFQDN       :: 0x00000001
+		NI_NUMERICHOST  :: 0x00000002
+		NI_NAMEREQD     :: 0x00000004
+		NI_NUMERICSERV  :: 0x00000008
+		NI_NUMERICSCOPE :: 0x00000100 // NOTE: not implemented
+		NI_DGRAM        :: 0x00000010
+
 	} else when ODIN_OS == .Linux {
 
 		AI_PASSIVE     :: 0x001
@@ -459,7 +477,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 		EAI_SYSTEM   :: -11
 		EAI_OVERFLOW :: -14
 
-	} else when ODIN_OS == .Linux {
+	} else when ODIN_OS == .Linux && ODIN_PLATFORM_SUBTARGET != .Android {
 
 		EAI_AGAIN    :: -3
 		EAI_BADFLAGS :: -1

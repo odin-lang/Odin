@@ -75,7 +75,7 @@ is_alnum :: proc(c: rune) -> bool {
 
 @(require_results)
 is_graph :: proc(c: rune) -> bool {
-	return (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') || unicode.is_digit(c)
+	return unicode.is_graphic(c) && !unicode.is_space(c)
 }
 
 @(require_results)

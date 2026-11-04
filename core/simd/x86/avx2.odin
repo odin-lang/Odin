@@ -2449,7 +2449,7 @@ _mm256_mask_i64gather_ps :: #force_inline proc "c" (src: __m128, slice: ^f32, of
 	)
 }
 
-@(private, default_calling_convention="none")
+@(private="file", default_calling_convention="none")
 foreign _ {
 	@(link_name="llvm.x86.avx2.psign.b")         llvm_psignb      :: proc(a: simd.i8x32, b: simd.i8x32) -> simd.i8x32 ---
 	@(link_name="llvm.x86.avx2.psign.w")         llvm_psignw      :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.i16x16 ---

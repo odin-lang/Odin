@@ -23,6 +23,11 @@ GameControllerType :: enum c.int {
 	PS5,
 	AMAZON_LUNA,
 	GOOGLE_STADIA,
+	NVIDIA_SHIELD,
+	NINTENDO_SWITCH_JOYCON_LEFT,
+	NINTENDO_SWITCH_JOYCON_RIGHT,
+	NINTENDO_SWITCH_JOYCON_PAIR,
+	MAX,
 }
 
 GameControllerBindType :: enum c.int {
@@ -111,6 +116,15 @@ foreign lib {
 	GameControllerGetProduct            :: proc(gamecontroller: ^GameController) -> u16 ---
 	GameControllerGetProductVersion     :: proc(gamecontroller: ^GameController) -> u16 ---
 	GameControllerGetSerial             :: proc(gamecontroller: ^GameController) -> cstring ---
+	GameControllerPathForIndex          :: proc(joystick_index: c.int) -> cstring ---
+	GameControllerPath                  :: proc(gamecontroller: ^GameController) -> cstring ---
+	GameControllerGetFirmwareVersion    :: proc(gamecontroller: ^GameController) -> u16 ---
+	GameControllerGetSteamHandle        :: proc(gamecontroller: ^GameController) -> u64 ---
+	GameControllerGetSensorDataWithTimestamp :: proc(gamecontroller: ^GameController, type: SensorType, timestamp: ^u64, data: [^]f32, num_values: c.int) -> c.int ---
+	GameControllerHasRumble             :: proc(gamecontroller: ^GameController) -> bool ---
+	GameControllerHasRumbleTriggers     :: proc(gamecontroller: ^GameController) -> bool ---
+	GameControllerGetAppleSFSymbolsNameForButton :: proc(gamecontroller: ^GameController, button: GameControllerButton) -> cstring ---
+	GameControllerGetAppleSFSymbolsNameForAxis   :: proc(gamecontroller: ^GameController, axis: GameControllerAxis) -> cstring ---
 	GameControllerGetAttached           :: proc(gamecontroller: ^GameController) -> bool ---
 	GameControllerGetJoystick           :: proc(gamecontroller: ^GameController) -> ^Joystick ---
 	GameControllerEventState            :: proc(state: c.int) -> c.int ---

@@ -160,20 +160,20 @@ test_map_get :: proc(t: ^testing.T) {
 
 	// small keys; value bigger than a chacheline
 	{
-		m := map[int][9]int{
-			1 = [9]int{10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000},
-			2 = [9]int{20, 200, 2000, 20000, 200000, 2000000, 20000000, 200000000, 2000000000},
-			3 = [9]int{30, 300, 3000, 30000, 300000, 3000000, 30000000, 300000000, 3000000000},
+		m := map[int][9]i64{
+			1 = [9]i64{10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000},
+			2 = [9]i64{20, 200, 2000, 20000, 200000, 2000000, 20000000, 200000000, 2000000000},
+			3 = [9]i64{30, 300, 3000, 30000, 300000, 3000000, 30000000, 300000000, 3000000000},
 		}
 		defer delete(m)
 		check(t, m)
 	}
 	// keys bigger than a chacheline; small values
 	{
-		m := map[[9]int]int{
-			[9]int{10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000} = 1,
-			[9]int{20, 200, 2000, 20000, 200000, 2000000, 20000000, 200000000, 2000000000} = 2,
-			[9]int{30, 300, 3000, 30000, 300000, 3000000, 30000000, 300000000, 3000000000} = 3,
+		m := map[[9]i64]int{
+			[9]i64{10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000} = 1,
+			[9]i64{20, 200, 2000, 20000, 200000, 2000000, 20000000, 200000000, 2000000000} = 2,
+			[9]i64{30, 300, 3000, 30000, 300000, 3000000, 30000000, 300000000, 3000000000} = 3,
 		}
 		defer delete(m)
 		check(t, m)
@@ -1192,6 +1192,14 @@ test_memory_compare :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_memory_compare_empty :: proc(t: ^testing.T) {
+	data: [1]u8
+
+	testing.expect_value(t, runtime.memory_compare(nil, &data[0], 0), 0)
+	testing.expect_value(t, runtime.memory_compare(&data[0], nil, 0), 0)
+}
+
+@(test)
 test_memory_compare_zero :: proc(t: ^testing.T) {
 	data: [256]u8
 
@@ -1467,4 +1475,88 @@ test_soa_array_append_inject_remove :: proc(t: ^testing.T) {
 			u8(i*3),
 		}
 	})
+}
+
+@(test)
+test_non_zero_make :: proc(t: ^testing.T) {
+	// counts allocation requests by mode and serves .Alloc_Non_Zeroed ones
+	// filled with a pattern, so that the test can see whether the returned
+	// memory was left untouched
+	Counting_Allocator :: struct {
+		base:       runtime.Allocator,
+		zeroed:     int, // .Alloc requests seen
+		non_zeroed: int, // .Alloc_Non_Zeroed requests seen
+	}
+	counting_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
+	                                size, alignment: int,
+	                                old_memory: rawptr, old_size: int,
+	                                loc := #caller_location) -> (data: []byte, err: runtime.Allocator_Error) {
+		c := (^Counting_Allocator)(allocator_data)
+		data, err = c.base.procedure(c.base.data, mode, size, alignment, old_memory, old_size, loc)
+		#partial switch mode {
+		case .Alloc:
+			c.zeroed += 1
+		case .Alloc_Non_Zeroed:
+			c.non_zeroed += 1
+			if err == nil {
+				for &b in data {
+					b = 0xAA
+				}
+			}
+		}
+		return
+	}
+
+	c := Counting_Allocator{base = context.allocator}
+	allocator := runtime.Allocator{procedure = counting_allocator_proc, data = &c}
+
+	s := non_zero_make([]u8, 7, allocator)
+	defer delete(s, allocator)
+	testing.expect_value(t, len(s), 7)
+	testing.expect_value(t, s[6], 0xAA)
+	testing.expect_value(t, c.non_zeroed, 1)
+
+	d1 := non_zero_make([dynamic]u8, 3, allocator)
+	defer delete(d1)
+	testing.expect_value(t, len(d1), 3)
+	testing.expect_value(t, cap(d1), 3)
+	testing.expect_value(t, d1[2], 0xAA)
+	testing.expect(t, d1.allocator.procedure == allocator.procedure)
+	testing.expect_value(t, c.non_zeroed, 2)
+
+	d2 := non_zero_make([dynamic]u8, 3, 10, allocator)
+	defer delete(d2)
+	testing.expect_value(t, len(d2), 3)
+	testing.expect_value(t, cap(d2), 10)
+	testing.expect_value(t, d2[2], 0xAA)
+	testing.expect_value(t, raw_data(d2)[9], 0xAA) // the spare capacity is not zeroed either
+	testing.expect_value(t, c.non_zeroed, 3)
+
+	mp := non_zero_make([^]u8, 5, allocator)
+	defer free(mp, allocator)
+	testing.expect(t, mp != nil)
+	testing.expect_value(t, mp[4], 0xAA)
+	testing.expect_value(t, c.non_zeroed, 4)
+
+	// a zero-len allocation doesn't reach the allocator
+	e := non_zero_make([]u8, 0, allocator)
+	testing.expect_value(t, len(e), 0)
+	testing.expect_value(t, c.non_zeroed, 4)
+	testing.expect_value(t, c.zeroed, 0)
+
+	// make still asks for zeroed memory
+	z1 := make([]u8, 7, allocator)
+	defer delete(z1, allocator)
+	z2 := make([dynamic]u8, 3, 10, allocator)
+	defer delete(z2)
+	z3 := make([^]u8, 5, allocator)
+	defer free(z3, allocator)
+	z4 := make_aligned([]u8, 7, 16, allocator)
+	defer delete(z4, allocator)
+	testing.expect_value(t, c.zeroed, 4)
+	testing.expect_value(t, c.non_zeroed, 4)
+	testing.expect_value(t, z1[6], 0)
+	testing.expect_value(t, z2[2], 0)
+	testing.expect_value(t, z3[4], 0)
+	testing.expect_value(t, z4[6], 0)
 }

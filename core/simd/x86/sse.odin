@@ -1078,7 +1078,7 @@ when ODIN_ARCH == .amd64 {
 	}
 }
 
-@(private, default_calling_convention="none")
+@(private="file", default_calling_convention="none")
 foreign _ {
 	@(link_name="llvm.x86.sse.rcp.ss")      llvm_rcpss       :: proc(a: simd.f32x4) -> simd.f32x4 ---
 	@(link_name="llvm.x86.sse.rcp.ps")      llvm_rcpps       :: proc(a: simd.f32x4) -> simd.f32x4 ---
@@ -1111,7 +1111,7 @@ foreign _ {
 }
 
 when ODIN_ARCH == .amd64 {
-	@(private, default_calling_convention="none")
+	@(private="file", default_calling_convention="none")
 	foreign _ {
 		@(link_name="llvm.x86.sse.cvtss2si64")  llvm_cvtss2si64  :: proc(a: simd.f32x4) -> i64 ---
 		@(link_name="llvm.x86.sse.cvttss2si64") llvm_cvttss2si64 :: proc(a: simd.f32x4) -> i64 ---

@@ -261,7 +261,7 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 			}
 		}
 	}
-	
+
 	*fields = slice_from_array(fields_array);
 	*tags = tags_array.data;
 }
@@ -728,6 +728,8 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	struct_type->Struct.checking_thread.store(cast(i32)current_thread_index() + 1);
 	defer (struct_type->Struct.checking_thread.store(0));
 
+	i64 errors_before = error_thread_count();
+
 	String context = str_lit("struct");
 
 	isize min_field_count = 0;
@@ -826,6 +828,8 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 			bool where_clause_ok = evaluate_where_clauses(ctx, node, ctx->scope, &st->where_clauses, true);
 			gb_unused(where_clause_ok);
 		}
+
+		struct_type->Struct.has_errors.store(error_thread_count() != errors_before);
 		check_struct_fields(ctx, node, &struct_type->Struct.fields, &struct_type->Struct.tags, st->fields, min_field_count, struct_type, context);
 
 		if (st->is_simple) {
@@ -842,6 +846,7 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 			}
 		}
 
+		struct_type->Struct.has_errors.store(error_thread_count() != errors_before);
 		wait_signal_set(&struct_type->Struct.fields_wait_signal);
 	}
 
@@ -853,6 +858,7 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 	union_type->Union.checking_thread.store(cast(i32)current_thread_index() + 1);
 	defer (union_type->Union.checking_thread.store(0));
 
+	i64 errors_before = error_thread_count();
 
 	union_type->Union.node  = node;
 	union_type->Union.scope = ctx->scope;
@@ -884,6 +890,7 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 			bool where_clause_ok = evaluate_where_clauses(ctx, node, ctx->scope, &ut->where_clauses, true);
 			gb_unused(where_clause_ok);
 		}
+		union_type->Union.has_errors.store(error_thread_count() != errors_before);
 	}
 
 	auto variants = array_make<Type *>(permanent_allocator(), 0, ut->variants.count);
@@ -989,6 +996,7 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 		}
 	}
 
+	union_type->Union.has_errors.store(error_thread_count() != errors_before);
 	wait_signal_set(&union_type->Union.variants_wait_signal);
 }
 
@@ -3562,9 +3570,31 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					}
 					if (is_poly_name) {
 						bool valid = false;
-						if (is_type_proc(op.type)) {
+						// NOTE: a polymorphic procedure passed to a `$f: proc(...)` parameter is specialized
+						// to that parameter's type, and the specialization becomes the constant value
+						Entity *specialized_proc_entity = nullptr;
+						bool poly_proc_failed = false;
+						if (is_type_proc(op.type) && is_type_polymorphic(op.type)) {
+							if (is_type_proc(type) && !is_type_polymorphic(type)) {
+								PolyProcData ppd = {};
+								if (check_polymorphic_procedure_assignment(ctx, &op, type, op.expr, &ppd)) {
+									specialized_proc_entity = ppd.gen_entity;
+									op.type = specialized_proc_entity->type;
+								}
+							}
+							if (specialized_proc_entity == nullptr) {
+								// NOTE: the assignability check below reports the error
+								valid = true;
+								success = false;
+								poly_proc_failed = true;
+							}
+						}
+						if (!poly_proc_failed && is_type_proc(op.type)) {
 							Ast *expr = unparen_expr(op.expr);
-							Entity *proc_entity = strip_entity_wrapping(expr);
+							Entity *proc_entity = specialized_proc_entity;
+							if (proc_entity == nullptr) {
+								proc_entity = strip_entity_wrapping(expr);
+							}
 							if (proc_entity) {
 								proc_entity->flags |= EntityFlag_PolyConstArg;
 								poly_const = exact_value_procedure(proc_entity->identifier.load() ? proc_entity->identifier.load() : op.expr);
@@ -4518,24 +4548,24 @@ gb_internal void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 
 gb_internal void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) {
 	ast_node(mt, MatrixType, node);
-	
+
 	Operand row = {};
 	Operand column = {};
-	
+
 	i64 row_count = check_array_count(ctx, &row, mt->row_count);
 	i64 column_count = check_array_count(ctx, &column, mt->column_count);
 
 	Type *generic_row = nullptr;
 	Type *generic_column = nullptr;
-	
+
 	if (row.mode == Addressing_Type && row.type->kind == Type_Generic) {
 		generic_row = row.type;
 	}
-	
+
 	if (column.mode == Addressing_Type && column.type->kind == Type_Generic) {
 		generic_column = column.type;
 	}
-	
+
 	if (generic_row == nullptr && row_count < MATRIX_ELEMENT_COUNT_MIN) {
 		if (row.expr == nullptr) {
 			error(node, "Invalid matrix row count, got nothing");
@@ -4545,7 +4575,7 @@ gb_internal void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) 
 			gb_string_free(s);
 		}
 	}
-	
+
 	if (generic_column == nullptr && column_count < MATRIX_ELEMENT_COUNT_MIN) {
 		if (column.expr == nullptr) {
 			error(node, "Invalid matrix column count, got nothing");
@@ -4555,7 +4585,7 @@ gb_internal void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) 
 			gb_string_free(s);
 		}
 	}
-	
+
 	if (generic_row == nullptr && generic_column == nullptr) {
 		// row_count*column_count can overflow and wrap back under the limit, so test the
 		// dimensions first; each is at least MATRIX_ELEMENT_COUNT_MIN. Either one exceeding
@@ -4593,7 +4623,7 @@ gb_internal void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) 
 	}
 
 	*type = alloc_type_matrix(elem, row_count, column_count, generic_row, generic_column, mt->is_row_major);
-	
+
 	return;
 }
 
@@ -5438,8 +5468,8 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 			return true;
 		}
 	case_end;
-	
-	
+
+
 	case_ast_node(mt, MatrixType, e);
 		check_matrix_type(ctx, type, e);
 		set_base_type(named_type, *type);

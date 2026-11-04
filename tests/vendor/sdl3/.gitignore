@@ -1,0 +1,11 @@
+# what test.bat copies and builds here
+*.dll
+*.exe
+*.pdb
+*.ilk
+*.exp
+*.lib
+
+# tests/.gitignore ignores scripts in general, these two are the point of this directory
+!test.bat
+!test.sh

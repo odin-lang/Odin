@@ -8,16 +8,18 @@ jobs:
     env:
       PKGSRC_BRANCH: 2026Q3
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Build, Check, and Test
       timeout-minutes: 15
       uses: vmactions/netbsd-vm@v1
       with:
         release: "10.0"
         envs: PKGSRC_BRANCH
+        sync: scp
         usesh: true
         copyback: false
         prepare: |
+          set -e -x
           PKG_PATH="https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/amd64/$(uname -r | cut -d_ -f1)${PKGSRC_BRANCH:+_${PKGSRC_BRANCH}}/All" /usr/sbin/pkg_add pkgin
           pkgin -y in gmake git bash python311 llvm clang || cat /var/db/pkgin/pkg_install-err.log
           ln -s /usr/pkg/bin/python3.11 /usr/bin/python3
@@ -36,9 +38,9 @@ jobs:
           ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:netbsd_arm64
           ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:netbsd_amd64 -no-entry-point
           ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:netbsd_arm64 -no-entry-point
-          ./odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -microarch:native
-          ./odin test tests/core/speed.odin -file -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -o:speed -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -microarch:native
-          ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -microarch:native
+          ./odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:ODIN_TEST_LOG_STATE_CHANGES=true -microarch:native
+          ./odin test tests/core/speed.odin -file -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -o:speed -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:ODIN_TEST_LOG_STATE_CHANGES=true -microarch:native
+          ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:ODIN_TEST_LOG_STATE_CHANGES=true -microarch:native
           (cd tests/issues; ./run.sh)
           (cd tests/abi; ./run.sh)
           (cd tests/abi; ABI_CFLAGS=-O2 ./run.sh "" "" -o:speed)
@@ -48,7 +50,7 @@ jobs:
     name: FreeBSD Build, Check, and Test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
     - name: Build, Check, and Test
       timeout-minutes: 15
       uses: vmactions/freebsd-vm@v1
@@ -56,6 +58,7 @@ jobs:
         usesh: true
         copyback: false
         prepare: |
+          set -e -x
           pkg install -y gmake git bash python3 libxml2 llvm18
         run: |
           # `set -e` is needed for test failures to register. https://github.com/vmactions/freebsd-vm/issues/72
@@ -88,13 +91,56 @@ jobs:
     timeout-minutes: 15
     steps:
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+
+      # Persist apt package cache across runs.
+      #
+      # This is needed especially for riscv64 because the apt package servers can be slow.
+      # On a cache miss, actions/cache saves the configured .deb files at job completion.
+      # It restores the exact key if available, otherwise one cache matching the restore-key prefix.
+      # Cache entries are immutable, so an exact-key hit will not be updated with new archives.
+      # The cache action runs as the runner user, so we use a runner-writable directory
+      # "$RUNNER_TEMP/apt-cache/", and copy archives to (and later from) apt's root-owned
+      # "/var/cache/apt/archives" directory.
+      # We also want to rotate the key weekly to ensure that we occasionally get a fresh
+      # archive even if ci.yml never changes. This is a bit of a hack, maybe this could be done better.
+      # Note that out of date packages in the cache aren't a problem because apt will automatically
+      # download the newest version if necessary.
+      - name: Get apt cache week
+        if: matrix.os != 'macos-latest'
+        id: apt-cache-week
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache apt package archives
+        if: matrix.os != 'macos-latest'
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/apt-cache/*.deb
+          key: ${{ runner.os }}-${{ runner.arch }}-matrix-apt-${{ steps.apt-cache-week.outputs.week }}-${{ hashFiles('.github/workflows/ci.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-matrix-apt-
+
+      - name: Restore apt package archives
+        if: matrix.os != 'macos-latest'
+        run: |
+          mkdir -p "$RUNNER_TEMP/apt-cache"
+          if compgen -G "$RUNNER_TEMP/apt-cache/*.deb" > /dev/null; then
+            sudo cp -n "$RUNNER_TEMP"/apt-cache/*.deb /var/cache/apt/archives/
+          fi
+
+      - name: Fetch the Lua libraries from Git LFS
+        if: matrix.os == 'ubuntu-latest'
+        run: git lfs pull --include="vendor/lua/*/linux/*"
+
+      - name: Fetch the OpenEXRCore library from Git LFS
+        if: matrix.os == 'macos-latest'
+        run: git lfs pull --include="vendor/OpenEXRCore/darwin/*"
 
       - name: Download LLVM (MacOS ARM)
         if: matrix.os == 'macos-latest'
         run: |
           brew update
-          brew install llvm@22 wasmtime lua@5.4 lld
+          brew install llvm@22 wasmtime lua lld
           echo "$(brew --prefix llvm@22)/bin" >> $GITHUB_PATH
 
       - name: Download LLVM (Ubuntu)
@@ -104,23 +150,32 @@ jobs:
           chmod +x llvm.sh
           sudo ./llvm.sh 22
           echo "/usr/lib/llvm-22/bin" >> $GITHUB_PATH
+
+      - name: Get needed vendor libs
+        if: matrix.os == 'ubuntu-24.04-arm'
+        run: sudo apt-get install -y liblua5.4-dev
+
+      - name: Install libcurl (Ubuntu)
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-24.04-arm'
+        run: |
+          sudo apt-get install libcurl4-openssl-dev libmbedtls-dev
+
+      - name: Install libcurl (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install curl mbedtls
+
+      # Need to save all downloaded apt packages in "$RUNNER_TEMP/apt-cache/" so that actions/checkout@v7 will pick them up
+      - name: Save apt package archives
+        if: matrix.os != 'macos-latest'
+        run: sudo cp /var/cache/apt/archives/*.deb "$RUNNER_TEMP/apt-cache/"
+
       - name: Build Odin
         run: ./build_odin.sh release
       - name: Odin version
         run: ./odin version
       - name: Odin report
         run: ./odin report
-      - name: Get needed vendor libs
-        if: matrix.os == 'ubuntu-24.04-arm'
-        run: sudo apt-get install -y liblua5.4-dev
-      - name: Install libcurl (Ubuntu)
-        if: matrix.os == 'ubuntu-latest' || matrix.os == 'ubuntu-24.04-arm'
-        run: |
-          sudo apt-get install libcurl4-openssl-dev libmbedtls-dev
-      - name: Install libcurl (macOS)
-        if: matrix.os == 'macos-latest'
-        run: |
-          brew install curl mbedtls
       - name: Compile needed Vendor
         run: |
           export ODIN_ROOT="$(pwd)"
@@ -155,7 +210,7 @@ jobs:
         run: ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
         if: matrix.os != 'macos-latest'
       - name: Vendor library tests (MacOS ARM)
-        run: ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address -extra-linker-flags:"-L/opt/homebrew/opt/lua@5.4/lib"
+        run: ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address -extra-linker-flags:"-L/opt/homebrew/opt/lua/lib"
         if: matrix.os == 'macos-latest'
 
       - name: Internals tests
@@ -201,12 +256,78 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point -target:openbsd_amd64
 
+  build_android:
+    name: Android Check, Build, and Bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download LLVM
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 22
+          echo "/usr/lib/llvm-22/bin" >> $GITHUB_PATH
+      - name: Build Odin
+        run: ./build_odin.sh release
+      - name: Find the NDK, SDK, and JDK
+        run: |
+          ndk=$(ls -d "$ANDROID_HOME"/ndk/30.* | sort -V | tail -n 1)
+          test -d "$ndk"
+          echo "ODIN_ANDROID_NDK=$ndk" >> $GITHUB_ENV
+          echo "ODIN_ANDROID_SDK=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "JAVA_HOME=$JAVA_HOME_21_X64" >> $GITHUB_ENV
+      - name: Compile needed Vendor
+        run: |
+          export ODIN_ROOT="$(pwd)"
+          ./vendor/stb/src/build_stb.sh
+          ./vendor/cgltf/src/build_cgltf.sh
+          ./vendor/kb_text_shape/src/build_unix.sh
+          ./vendor/miniaudio/src/build_miniaudio_android.sh
+      - name: Odin check examples/all for Android
+        run: |
+          for target in linux_arm64 linux_arm32 linux_amd64 linux_i386; do
+            ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:$target -subtarget:android -minimum-os-version:29
+          done
+      - name: Build examples/android for every ABI
+        run: |
+          for pair in arm64-v8a:linux_arm64 armeabi-v7a:linux_arm32 x86:linux_i386 x86_64:linux_amd64; do
+            abi=${pair%%:*}
+            target=${pair#*:}
+            mkdir -p examples/android/app/lib/$abi
+            ./odin build examples/android -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:$target -subtarget:android -minimum-os-version:29 -build-mode:shared -out:examples/android/app/lib/$abi/libexample.so
+          done
+      - name: Bundle examples/android as an APK and an AAB
+        run: |
+          mkdir -p ~/.android
+          "$JAVA_HOME/bin/keytool" -genkeypair -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          wget -q https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar
+          echo "a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29  bundletool-all-1.18.3.jar" | sha256sum -c
+          ./odin bundle android examples/android/app -minimum-os-version:29 -out:examples/android/example.apk
+          ODIN_ANDROID_BUNDLETOOL="$(pwd)/bundletool-all-1.18.3.jar" ./odin bundle android examples/android/app -minimum-os-version:29 -out:examples/android/example.aab
+      - name: Verify the APK and AAB
+        run: |
+          build_tools=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)
+          "$build_tools/apksigner" verify --print-certs examples/android/example.apk
+          "$build_tools/zipalign" -c -P 16 4 examples/android/example.apk
+          "$JAVA_HOME/bin/java" -jar bundletool-all-1.18.3.jar validate --bundle=examples/android/example.aab
+
   build_windows:
-    name: Windows Build, Check, and Test
+    name: Windows ${{ matrix.arch }} Build, Check, and Test
     runs-on: windows-2022
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, i386]
+    env:
+      ODIN_TARGET: -target:windows_${{ matrix.arch }}
+      ODIN_ASAN: ${{ matrix.arch == 'amd64' && '-sanitize:address' || '' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - name: Fetch vendor libraries under test from Git LFS
+        if: matrix.arch == 'amd64'
+        run: git lfs pull --include="vendor/lua/*/windows/*,vendor/OpenEXRCore/*.lib,vendor/sdl2/,vendor/sdl3/"
       - name: build Odin
         shell: cmd
         run: |
@@ -220,70 +341,92 @@ jobs:
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          odin check examples/demo -vet
+          odin check examples/demo -vet %ODIN_TARGET%
       - name: Odin run
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          odin run examples/demo
+          odin run examples/demo %ODIN_TARGET%
       - name: Odin run -debug
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          odin run examples/demo -debug -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do
+          odin run examples/demo -debug -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do %ODIN_TARGET%
       - name: Odin check examples/all
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do
+          odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do %ODIN_TARGET%
       - name: Odin check examples/all/sdl3
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point
+          odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point %ODIN_TARGET%
       - name: Core library tests
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
+          odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true %ODIN_ASAN% %ODIN_TARGET%
       - name: Optimized core library tests
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          odin test tests/core/speed.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+          odin test tests/core/speed.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true %ODIN_TARGET%
       - name: Wycheproof tests
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          odin test tests/core/crypto/wycheproof -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed
+          odin test tests/core/crypto/wycheproof -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed %ODIN_TARGET%
       - name: Noise Protocol Framework tests
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          odin test tests/core/crypto/noise -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed
+          odin test tests/core/crypto/noise -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed %ODIN_TARGET%
       - name: X.509 limbo tests
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          odin test tests/core/crypto/x509_limbo -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed
+          odin test tests/core/crypto/x509_limbo -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed %ODIN_TARGET%
       - name: Vendor library tests
+        if: matrix.arch == 'amd64'
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           copy vendor\lua\5.4\windows\*.dll .
           odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
+      - name: Vendor Lua 5.5 tests
+        if: matrix.arch == 'amd64'
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          copy vendor\lua\5.5\windows\*.dll .
+          odin test tests/vendor/lua/5.5 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
+      - name: Vendor SDL2 and SDL3 tests
+        if: matrix.arch == 'amd64'
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          set "PATH=%CD%;%PATH%"
+          pushd tests\vendor\sdl2
+          call test.bat || exit /b 1
+          popd
+          pushd tests\vendor\sdl3
+          call test.bat || exit /b 1
+          popd
       - name: Odin internals tests
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          odin test tests/internal -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
+          odin test tests/internal -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true %ODIN_ASAN% %ODIN_TARGET%
       - name: Check issues
+        if: matrix.arch == 'amd64'
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           cd tests/issues
           call run.bat
       - name: Run ABI tests
+        if: matrix.arch == 'amd64'
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
@@ -295,36 +438,71 @@ jobs:
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          odin check tests/benchmark -vet -strict-style -no-entry-point
+          odin check tests/benchmark -vet -strict-style -no-entry-point %ODIN_TARGET%
       - name: Odin documentation tests
+        if: matrix.arch == 'amd64'
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           cd tests\documentation
           call build.bat
-      - name: Odin check examples/all for Windows 32bits
-        shell: cmd
-        run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          odin check examples/all -strict-style -target:windows_i386
 
   build_linux_riscv64:
     runs-on: ubuntu-latest
     name: Linux riscv64 (emulated) Build, Check and Test
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+
+      # Persist apt package cache across runs.
+      #
+      # This is needed especially for riscv64 because the apt package servers can be slow.
+      # On a cache miss, actions/cache saves the configured .deb files at job completion.
+      # It restores the exact key if available, otherwise one cache matching the restore-key prefix.
+      # Cache entries are immutable, so an exact-key hit will not be updated with new archives.
+      # The cache action runs as the runner user, so we use a runner-writable directory
+      # "$RUNNER_TEMP/apt-cache/", and copy archives to (and later from) apt's root-owned
+      # "/var/cache/apt/archives" directory.
+      # We also want to rotate the key weekly to ensure that we occasionally get a fresh
+      # archive even if ci.yml never changes. This is a bit of a hack, maybe this could be done better.
+      # Note that out of date packages in the cache aren't a problem because apt will automatically
+      # download the newest version if necessary.
+      - name: Get apt cache week
+        id: apt-cache-week
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache apt package archives
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/apt-cache/*.deb
+          key: ${{ runner.os }}-${{ runner.arch }}-riscv64-apt-${{ steps.apt-cache-week.outputs.week }}-${{ hashFiles('.github/workflows/ci.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-riscv64-apt-
+
+      - name: Restore apt package archives
+        run: |
+          mkdir -p "$RUNNER_TEMP/apt-cache"
+          if compgen -G "$RUNNER_TEMP/apt-cache/*.deb" > /dev/null; then
+            sudo cp -n "$RUNNER_TEMP"/apt-cache/*.deb /var/cache/apt/archives/
+          fi
 
       - name: Download LLVM (Linux)
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 18
-          echo "/usr/lib/llvm-18/bin" >> $GITHUB_PATH
+          sudo ./llvm.sh 22
+          echo "/usr/lib/llvm-22/bin" >> $GITHUB_PATH
 
       - name: Install libcurl
         run: |
           sudo apt-get install libcurl4-openssl-dev libmbedtls-dev
+
+      - name: Install riscv64 toolchain and qemu
+        run: sudo apt-get install -y qemu-user qemu-user-binfmt gcc-12-riscv64-linux-gnu libc6-riscv64-cross
+
+      # Need to save all downloaded apt packages in "$RUNNER_TEMP/apt-cache/" so that actions/checkout@v7 will pick them up
+      - name: Save apt package archives
+        run: sudo cp /var/cache/apt/archives/*.deb "$RUNNER_TEMP/apt-cache/"
 
       - name: Build Odin
         run: ./build_odin.sh release
@@ -349,26 +527,23 @@ jobs:
       - name: Odin check examples/all/sdl3
         run: ./odin check examples/all/sdl3 -target:linux_riscv64 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point
 
-      - name: Install riscv64 toolchain and qemu
-        run: sudo apt-get install -y qemu-user qemu-user-static gcc-12-riscv64-linux-gnu libc6-riscv64-cross
-
       - name: Odin run
-        run: ./odin run examples/demo -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
+        run: ./odin run examples/demo -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
 
       - name: Odin run -debug
-        run: ./odin run examples/demo -debug -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
+        run: ./odin run examples/demo -debug -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
 
       - name: Normal Core library tests
-        run: ./odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
+        run: ./odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
 
       - name: Optimized Core library tests
-        run: ./odin test tests/core/speed.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
+        run: ./odin test tests/core/speed.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
 
       - name: Internals tests
-        run: ./odin test tests/internal -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
+        run: ./odin test tests/internal -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
 
       - name: ABI comparator
         run: |
           cd tests/abi
-          ./run.sh linux_riscv64 riscv64-linux-gnu "-extra-linker-flags:-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
-          ABI_CFLAGS=-O2 ./run.sh linux_riscv64 riscv64-linux-gnu "-extra-linker-flags:-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath -o:speed
+          ./run.sh linux_riscv64 riscv64-linux-gnu "-extra-linker-flags:--target=riscv64-linux-gnu -static" -no-rpath
+          ABI_CFLAGS=-O2 ./run.sh linux_riscv64 riscv64-linux-gnu "-extra-linker-flags:--target=riscv64-linux-gnu -static" -no-rpath -o:speed

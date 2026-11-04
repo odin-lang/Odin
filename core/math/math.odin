@@ -246,10 +246,8 @@ pow2_f16 :: proc "contextless" (#any_int exp: int) -> (res: f16) {
 	switch {
 	case exp >= -14 && exp <= 15:    // Normal
 		return transmute(f16)(u16(exp + F16_BIAS) << F16_SHIFT)
-	case exp < -25:                  // Underflow
+	case exp < -24:                  // Underflow
 		return 0h0000
-	case exp == -25:                 // Underflow
-		return 0h0001
 	case exp < -14:                  // Denormal
 		x := u16(exp + (F16_SHIFT + 1) + F16_BIAS) << F16_SHIFT
 		return f16(1) / (1 << (F16_SHIFT + 1)) * transmute(f16)x

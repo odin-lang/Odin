@@ -172,7 +172,7 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 	case Type_Info_Simd_Vector:
 		y := b.variant.(Type_Info_Simd_Vector) or_return
 		return x.count == y.count && x.elem == y.elem
-		
+
 	case Type_Info_Matrix:
 		y := b.variant.(Type_Info_Matrix)  or_return
 		(x.row_count    == y.row_count)    or_return
@@ -556,7 +556,7 @@ write_type_writer :: #force_no_inline proc(w: io.Writer, ti: ^Type_Info, n_writt
 		io.write_string(w, "nil", &n) or_return
 		return
 	}
-	
+
 	switch info in ti.variant {
 	case Type_Info_Named:
 		io.write_string(w, info.name, &n) or_return
@@ -646,8 +646,8 @@ write_type_writer :: #force_no_inline proc(w: io.Writer, ti: ^Type_Info, n_writt
 		}
 	case Type_Info_Parameters:
 		count := len(info.names)
-		if count != 1 { 
-			io.write_string(w, "(", &n) or_return 
+		if count != 1 {
+			io.write_string(w, "(", &n) or_return
 		}
 		for name, i in info.names {
 			if i > 0 { io.write_string(w, ", ", &n) or_return }
@@ -660,8 +660,8 @@ write_type_writer :: #force_no_inline proc(w: io.Writer, ti: ^Type_Info, n_writt
 			}
 			write_type(w, t, &n) or_return
 		}
-		if count != 1 { 
-			io.write_string(w, ")", &n) or_return 
+		if count != 1 {
+			io.write_string(w, ")", &n) or_return
 		}
 
 	case Type_Info_Array:
@@ -702,10 +702,10 @@ write_type_writer :: #force_no_inline proc(w: io.Writer, ti: ^Type_Info, n_writt
 		switch info.soa_kind {
 		case .None: // Ignore
 		case .Fixed:
-			io.write_string(w, "#soa[",           &n) or_return
-			io.write_i64(w, i64(info.soa_len),    10) or_return
-			io.write_byte(w, ']',                 &n) or_return
-			write_type(w, info.soa_base_type,     &n) or_return
+			io.write_string(w, "#soa[",            &n) or_return
+			io.write_i64(w, i64(info.soa_len), 10, &n) or_return
+			io.write_byte(w, ']',                  &n) or_return
+			write_type(w, info.soa_base_type,      &n) or_return
 			return
 		case .Slice:
 			io.write_string(w, "#soa[]",      &n) or_return
@@ -801,7 +801,7 @@ write_type_writer :: #force_no_inline proc(w: io.Writer, ti: ^Type_Info, n_writt
 		io.write_i64(w, i64(info.count), 10, &n) or_return
 		io.write_byte(w, ']',                &n) or_return
 		write_type(w, info.elem,             &n) or_return
-		
+
 	case Type_Info_Matrix:
 		if info.layout == .Row_Major {
 			io.write_string(w, "#row_major ",   &n) or_return

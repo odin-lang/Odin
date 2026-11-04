@@ -279,7 +279,76 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD {
 	YESEXPR :: 47
 	NOEXPR  :: 49
 
-	CRNCYSTR :: 50	
+	CRNCYSTR :: 50
+
+} else when ODIN_PLATFORM_SUBTARGET == .Android {
+
+	// NOTE: declared with `_t` so we can enumerate the real `nl_info`.
+	nl_item_t :: distinct c.int
+
+	CODESET    :: 1
+	D_T_FMT    :: 2
+	D_FMT      :: 3
+	T_FMT      :: 4
+	T_FMT_AMPM :: 5
+	AM_STR     :: 6
+	PM_STR     :: 7
+
+	DAY_1 :: 8
+	DAY_2 :: 9
+	DAY_3 :: 10
+	DAY_4 :: 11
+	DAY_5 :: 12
+	DAY_6 :: 13
+	DAY_7 :: 14
+
+	ABDAY_1 :: 15
+	ABDAY_2 :: 16
+	ABDAY_3 :: 17
+	ABDAY_4 :: 18
+	ABDAY_5 :: 19
+	ABDAY_6 :: 20
+	ABDAY_7 :: 21
+
+	MON_1  :: 22
+	MON_2  :: 23
+	MON_3  :: 24
+	MON_4  :: 25
+	MON_5  :: 26
+	MON_6  :: 27
+	MON_7  :: 28
+	MON_8  :: 29
+	MON_9  :: 30
+	MON_10 :: 31
+	MON_11 :: 32
+	MON_12 :: 33
+
+	ABMON_1  :: 34
+	ABMON_2  :: 35
+	ABMON_3  :: 36
+	ABMON_4  :: 37
+	ABMON_5  :: 38
+	ABMON_6  :: 39
+	ABMON_7  :: 40
+	ABMON_8  :: 41
+	ABMON_9  :: 42
+	ABMON_10 :: 43
+	ABMON_11 :: 44
+	ABMON_12 :: 45
+
+	ERA         :: 46
+	ERA_D_FMT   :: 47
+	ERA_D_T_FMT :: 48
+	ERA_T_FMT   :: 49
+	ALT_DIGITS  :: 50
+
+	RADIXCHAR :: 51
+	THOUSEP   :: 52
+
+	YESEXPR :: 53
+	NOEXPR  :: 54
+
+	CRNCYSTR :: 55
 
 } else when ODIN_OS == .Linux {
 
@@ -290,7 +359,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD {
 	// Some depend on locale.h contants (bits/locale.h to be precise).
 
 	// NOTE: ABDAY_1 is set to LC_TIME << 16 (LC_TIME is 2) on the enum group of
-	// the Linux implementation.
+	// the Linux implementation. The rest of LC_TIME counts up from there.
 	ABDAY_1 :: 0x20_000
 	ABDAY_2 :: 0x20_001
 	ABDAY_3 :: 0x20_002
@@ -308,48 +377,49 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD {
 	DAY_7 :: 0x20_00D
 
 	ABMON_1  :: 0x20_00E
-	ABMON_2  :: 0x20_010
-	ABMON_3  :: 0x20_011
-	ABMON_4  :: 0x20_012
-	ABMON_5  :: 0x20_013
-	ABMON_6  :: 0x20_014
-	ABMON_7  :: 0x20_015
-	ABMON_8  :: 0x20_016
-	ABMON_9  :: 0x20_017
-	ABMON_10 :: 0x20_018
-	ABMON_11 :: 0x20_019
-	ABMON_12 :: 0x20_01A
+	ABMON_2  :: 0x20_00F
+	ABMON_3  :: 0x20_010
+	ABMON_4  :: 0x20_011
+	ABMON_5  :: 0x20_012
+	ABMON_6  :: 0x20_013
+	ABMON_7  :: 0x20_014
+	ABMON_8  :: 0x20_015
+	ABMON_9  :: 0x20_016
+	ABMON_10 :: 0x20_017
+	ABMON_11 :: 0x20_018
+	ABMON_12 :: 0x20_019
 
-	MON_1  :: 0x20_01B
-	MON_2  :: 0x20_01C
-	MON_3  :: 0x20_01D
-	MON_4  :: 0x20_01E
-	MON_5  :: 0x20_020
-	MON_6  :: 0x20_021
-	MON_7  :: 0x20_022
-	MON_8  :: 0x20_023
-	MON_9  :: 0x20_024
-	MON_10 :: 0x20_025
-	MON_11 :: 0x20_026
-	MON_12 :: 0x20_027
+	MON_1  :: 0x20_01A
+	MON_2  :: 0x20_01B
+	MON_3  :: 0x20_01C
+	MON_4  :: 0x20_01D
+	MON_5  :: 0x20_01E
+	MON_6  :: 0x20_01F
+	MON_7  :: 0x20_020
+	MON_8  :: 0x20_021
+	MON_9  :: 0x20_022
+	MON_10 :: 0x20_023
+	MON_11 :: 0x20_024
+	MON_12 :: 0x20_025
 
-	AM_STR :: 0x20_028
-	PM_STR :: 0x20_029
+	AM_STR :: 0x20_026
+	PM_STR :: 0x20_027
 
-	D_T_FMT    :: 0x20_02A
-	D_FMT      :: 0x20_02B
-	T_FMT      :: 0x20_02C
-	T_FMT_AMPM :: 0x20_02D
+	D_T_FMT    :: 0x20_028
+	D_FMT      :: 0x20_029
+	T_FMT      :: 0x20_02A
+	T_FMT_AMPM :: 0x20_02B
 
-	ERA         :: 0x20_02E
-	ERA_D_FMT   :: 0x20_030
-	ALT_DIGITS  :: 0x20_031
-	ERA_D_T_FMT :: 0x20_032
-	ERA_T_FMT   :: 0x20_033
+	// NOTE: 0x20_02D is the internal `__ERA_YEAR`.
+	ERA         :: 0x20_02C
+	ERA_D_FMT   :: 0x20_02E
+	ALT_DIGITS  :: 0x20_02F
+	ERA_D_T_FMT :: 0x20_030
+	ERA_T_FMT   :: 0x20_031
 
-	// NOTE: CODESET is the 16th member of the enum group starting with value
+	// NOTE: CODESET is the 15th member of the enum group starting with value
 	// LC_CTYPE << 16, LC_CTYPE is 0.
-	CODESET :: 0x0F
+	CODESET :: 0x0E
 
 	// NOTE: CRNCYSTR is the 16th member of the enum group starting with value
 	// LC_MONETARY << 16, LC_MONETARY is 4.

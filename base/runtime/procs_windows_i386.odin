@@ -27,5 +27,7 @@ windows_trap_type_assertion :: proc "contextless" () -> ! {
 
 @(private, export, link_name="_fltused") _fltused: i32 = 0x9875
 
-@(private, export, link_name="_tls_index") _tls_index: u32
-@(private, export, link_name="_tls_array") _tls_array: u32
+when ODIN_NO_CRT {
+	@(private, export, link_name="_tls_index") _tls_index: u32
+	@(private, export, link_name="_tls_array") _tls_array: u32
+}

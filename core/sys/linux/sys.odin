@@ -4,6 +4,14 @@ package linux
 
 import "base:intrinsics"
 
+/*
+	arm64 and riscv64 have only the newer forms of many system calls (`openat`, `ppoll`, `dup3`, `clone`).
+	Android's seccomp filter kills an app making a system call bionic does not make, and bionic makes only those
+	newer forms on every architecture, so on Android every architecture uses them.
+*/
+@(private)
+NO_LEGACY_SYSCALLS :: ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 || ODIN_PLATFORM_SUBTARGET == .Android
+
 
 /*
 	Read data from file into the buffer
@@ -40,7 +48,7 @@ write :: proc "contextless" (fd: Fd, buf: []u8) -> (int, Errno) {
 	On ARM64 available since Linux 2.6.16.
 */
 open :: proc "contextless" (name: cstring, flags: Open_Flags, mode: Mode = {}) -> (Fd, Errno) {
-	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+	when NO_LEGACY_SYSCALLS {
 		ret := syscall(SYS_openat, AT_FDCWD, transmute(uintptr) name, transmute(u32) flags, transmute(u32) mode)
 		return errno_unwrap(ret, Fd)
 	} else {
@@ -68,14 +76,11 @@ close :: proc "contextless" (fd: Fd) -> (Errno) {
 	Not available on ARM64.
 */
 stat :: proc "contextless" (filename: cstring, stat: ^Stat) -> (Errno) {
-	when size_of(int) == 8 {
-		when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
-			ret := syscall(SYS_fstatat, AT_FDCWD, cast(rawptr) filename, stat, 0)
-			return Errno(-ret)
-		} else {
-			ret := syscall(SYS_stat, cast(rawptr) filename, stat)
-			return Errno(-ret)
-		}
+	when NO_LEGACY_SYSCALLS {
+		return fstatat(AT_FDCWD, filename, stat, {})
+	} else when size_of(int) == 8 {
+		ret := syscall(SYS_stat, cast(rawptr) filename, stat)
+		return Errno(-ret)
 	} else {
 		ret := syscall(SYS_stat64, cast(rawptr) filename, stat)
 		return Errno(-ret)
@@ -111,13 +116,11 @@ fstat :: proc "contextless" (fd: Fd, stat: ^Stat) -> (Errno) {
 	Not available on arm64.
 */
 lstat :: proc "contextless" (filename: cstring, stat: ^Stat) -> (Errno) {
-	when size_of(int) == 8 {
-		when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
-			return fstatat(AT_FDCWD, filename, stat, {.SYMLINK_NOFOLLOW})
-		} else {
-			ret := syscall(SYS_lstat, cast(rawptr) filename, stat)
-			return Errno(-ret)
-		}
+	when NO_LEGACY_SYSCALLS {
+		return fstatat(AT_FDCWD, filename, stat, {.SYMLINK_NOFOLLOW})
+	} else when size_of(int) == 8 {
+		ret := syscall(SYS_lstat, cast(rawptr) filename, stat)
+		return Errno(-ret)
 	} else {
 		ret := syscall(SYS_lstat64, cast(rawptr) filename, stat)
 		return Errno(-ret)
@@ -129,11 +132,12 @@ lstat :: proc "contextless" (filename: cstring, stat: ^Stat) -> (Errno) {
 	Available since Linux 2.2.
 */
 poll :: proc "contextless" (fds: []Poll_Fd, timeout: i32) -> (i32, Errno) {
-	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+	when NO_LEGACY_SYSCALLS {
+		// A negative timeout waits forever, which `ppoll` takes as no timeout at all.
 		seconds := cast(uint) timeout / 1000
 		nanoseconds := cast(uint) (timeout % 1000) * 1_000_000
 		timeout_spec := Time_Spec{seconds, nanoseconds}
-		ret := syscall(SYS_ppoll, raw_data(fds), len(fds), &timeout_spec, 0, 0)
+		ret := syscall(SYS_ppoll, raw_data(fds), len(fds), &timeout_spec if timeout >= 0 else nil, 0, 0)
 		return errno_unwrap(ret, i32)
 	} else {
 		ret := syscall(SYS_poll, raw_data(fds), len(fds), timeout)
@@ -301,7 +305,7 @@ writev :: proc "contextless" (fd: Fd, iov: []IO_Vec) -> (int, Errno) {
 	For ARM64 available since Linux 2.6.16.
 */
 access :: proc "contextless" (name: cstring, mode: Mode = F_OK) -> (Errno) {
-	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+	when NO_LEGACY_SYSCALLS {
 		ret := syscall(SYS_faccessat, AT_FDCWD, cast(rawptr) name, transmute(u32) mode)
 		return Errno(-ret)
 	} else {
@@ -417,7 +421,7 @@ dup :: proc "contextless" (fd: Fd) -> (Fd, Errno) {
 	On ARM64 available since Linux 2.6.27.
 */
 dup2 :: proc "contextless" (old: Fd, new: Fd) -> (Fd, Errno) {
-	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+	when NO_LEGACY_SYSCALLS {
 		ret := syscall(SYS_dup3, old, new, 0)
 
 		// Differences between dup2 and dup3 are:
@@ -440,7 +444,7 @@ dup2 :: proc "contextless" (old: Fd, new: Fd) -> (Fd, Errno) {
 	On ARM64 available since Linux 2.6.16.
 */
 pause :: proc "contextless" () {
-	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+	when NO_LEGACY_SYSCALLS {
 		syscall(SYS_ppoll, 0, 0, 0, 0)
 	} else {
 		syscall(SYS_pause)
@@ -470,7 +474,7 @@ getitimer :: proc "contextless" (which: ITimer_Which, cur: ^ITimer_Val) -> (Errn
 	Available since Linux 1.0.
 */
 alarm :: proc "contextless" (seconds: u32) -> u32 {
-	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+	when NO_LEGACY_SYSCALLS {
 		new := ITimer_Val { value = { seconds = cast(int) seconds } }
 		old := ITimer_Val {}
 		syscall(SYS_setitimer, ITimer_Which.REAL, &new, &old)
@@ -783,8 +787,8 @@ getsockopt :: proc {
 	Available since Linux 1.0.
 */
 fork :: proc "contextless" () -> (Pid, Errno) {
-	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
-		ret := syscall(SYS_clone, u64(Signal.SIGCHLD), cast(rawptr) nil, cast(rawptr) nil, cast(rawptr) nil, u64(0))
+	when NO_LEGACY_SYSCALLS {
+		ret := syscall(SYS_clone, uintptr(Signal.SIGCHLD), cast(rawptr) nil, cast(rawptr) nil, cast(rawptr) nil, uintptr(0))
 		return errno_unwrap(ret, Pid)
 	} else {
 		ret := syscall(SYS_fork)
@@ -797,7 +801,7 @@ fork :: proc "contextless" () -> (Pid, Errno) {
 	Available since Linux 2.2.
 */
 vfork :: proc "contextless" () -> Pid {
-	when ODIN_ARCH != .arm64 && ODIN_ARCH != .riscv64 {
+	when !NO_LEGACY_SYSCALLS {
 		return Pid(syscall(SYS_vfork))
 	} else {
 		return Pid(syscall(SYS_clone, Signal.SIGCHLD))
@@ -810,7 +814,7 @@ vfork :: proc "contextless" () -> Pid {
 	On ARM64 available since Linux 3.19.
 */
 execve :: proc "contextless" (name: cstring, argv: [^]cstring, envp: [^]cstring) -> (Errno) {
-	when ODIN_ARCH != .arm64 && ODIN_ARCH != .riscv64 {
+	when !NO_LEGACY_SYSCALLS {
 		ret := syscall(SYS_execve, cast(rawptr) name, cast(rawptr) argv, cast(rawptr) envp)
 		return Errno(-ret)
 	} else {
@@ -1217,7 +1221,7 @@ fchdir :: proc "contextless" (fd: Fd) -> (Errno) {
 	On ARM64 available since Linux 2.6.16.
 */
 rename :: proc "contextless" (old: cstring, new: cstring) -> (Errno) {
-	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+	when NO_LEGACY_SYSCALLS {
 		ret := syscall(SYS_renameat, AT_FDCWD, cast(rawptr) old, AT_FDCWD, cast(rawptr) new)
 		return Errno(-ret)
 	} else {
@@ -1232,7 +1236,7 @@ rename :: proc "contextless" (old: cstring, new: cstring) -> (Errno) {
 	On ARM64 available since Linux 2.6.16.
 */
 mkdir :: proc "contextless" (name: cstring, mode: Mode) -> (Errno) {
-	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+	when NO_LEGACY_SYSCALLS {
 		ret := syscall(SYS_mkdirat, AT_FDCWD, cast(rawptr) name, transmute(u32) mode)
 		return Errno(-ret)
 	} else {
@@ -1247,7 +1251,7 @@ mkdir :: proc "contextless" (name: cstring, mode: Mode) -> (Errno) {
 	On ARM64 available since Linux 2.6.16.
 */
 rmdir :: proc "contextless" (name: cstring) -> (Errno) {
-	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+	when NO_LEGACY_SYSCALLS {
 		ret := syscall(SYS_unlinkat, AT_FDCWD, cast(rawptr) name, transmute(i32) FD_Flags{.REMOVEDIR})
 		return Errno(-ret)
 	} else {
@@ -1262,7 +1266,7 @@ rmdir :: proc "contextless" (name: cstring) -> (Errno) {
 	On ARM64 available since Linux 2.6.16.
 */
 creat :: proc "contextless" (name: cstring, mode: Mode) -> (Fd, Errno) {
-	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+	when NO_LEGACY_SYSCALLS {
 		return openat(AT_FDCWD, name, {.CREAT, .WRONLY,.TRUNC}, mode)
 	} else {
 		ret := syscall(SYS_creat, cast(rawptr) name, transmute(u32) mode)
@@ -1276,7 +1280,7 @@ creat :: proc "contextless" (name: cstring, mode: Mode) -> (Fd, Errno) {
 	On ARM64 available since Linux 2.6.16.
 */
 link :: proc "contextless" (target: cstring, linkpath: cstring) -> (Errno) {
-	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+	when NO_LEGACY_SYSCALLS {
 		ret := syscall(SYS_linkat, AT_FDCWD, cast(rawptr) target, AT_FDCWD, cast(rawptr) linkpath, 0)
 		return Errno(-ret)
 	} else {
@@ -1291,7 +1295,7 @@ link :: proc "contextless" (target: cstring, linkpath: cstring) -> (Errno) {
 	On ARM64 available since Linux 2.6.16.
 */
 unlink :: proc "contextless" (name: cstring) -> (Errno) {
-	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+	when NO_LEGACY_SYSCALLS {
 		ret := syscall(SYS_unlinkat, AT_FDCWD, cast(rawptr) name, 0)
 		return Errno(-ret)
 	} else {
@@ -1306,7 +1310,7 @@ unlink :: proc "contextless" (name: cstring) -> (Errno) {
 	On arm64 available since Linux 2.6.16.
 */
 symlink :: proc "contextless" (target: cstring, linkpath: cstring) -> (Errno) {
-	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+	when NO_LEGACY_SYSCALLS {
 		ret := syscall(SYS_symlinkat, cast(rawptr) target, AT_FDCWD, cast(rawptr) linkpath)
 		return Errno(-ret)
 	} else {
@@ -1321,7 +1325,7 @@ symlink :: proc "contextless" (target: cstring, linkpath: cstring) -> (Errno) {
 	On arm64 available since Linux 2.6.16.
 */
 readlink :: proc "contextless" (name: cstring, buf: []u8) -> (int, Errno) {
-	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+	when NO_LEGACY_SYSCALLS {
 		ret := syscall(SYS_readlinkat, AT_FDCWD, cast(rawptr) name, raw_data(buf), len(buf))
 		return errno_unwrap(ret, int)
 	} else {
@@ -1336,7 +1340,7 @@ readlink :: proc "contextless" (name: cstring, buf: []u8) -> (int, Errno) {
 	On ARM64 available since Linux 2.6.16.
 */
 chmod :: proc "contextless" (name: cstring, mode: Mode) -> (Errno) {
-	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+	when NO_LEGACY_SYSCALLS {
 		ret := syscall(SYS_fchmodat, AT_FDCWD, cast(rawptr) name, transmute(u32) mode)
 		return Errno(-ret)
 	} else {
@@ -1361,11 +1365,11 @@ fchmod :: proc "contextless" (fd: Fd, mode: Mode) -> (Errno) {
 	On ARM64 available since Linux 2.6.16.
 */
 chown :: proc "contextless" (name: cstring, uid: Uid, gid: Gid) -> (Errno) {
-	when size_of(int) == 4 {
-		ret := syscall(SYS_chown32, cast(rawptr) name, uid, gid)
-		return Errno(-ret)
-	} else when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+	when NO_LEGACY_SYSCALLS {
 		ret := syscall(SYS_fchownat, AT_FDCWD, cast(rawptr) name, uid, gid, 0)
+		return Errno(-ret)
+	} else when size_of(int) == 4 {
+		ret := syscall(SYS_chown32, cast(rawptr) name, uid, gid)
 		return Errno(-ret)
 	} else {
 		ret := syscall(SYS_chown, cast(rawptr) name, uid, gid)
@@ -1395,11 +1399,11 @@ fchown :: proc "contextless" (fd: Fd, uid: Uid, gid: Gid) -> (Errno) {
 	On ARM64 available since Linux 2.6.16.
 */
 lchown :: proc "contextless" (name: cstring, uid: Uid, gid: Gid) -> (Errno) {
-	when size_of(int) == 4 {
-		ret := syscall(SYS_lchown32, cast(rawptr) name, uid, gid)
-		return Errno(-ret)
-	} else when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+	when NO_LEGACY_SYSCALLS {
 		ret := syscall(SYS_fchownat, AT_FDCWD, cast(rawptr) name, uid, gid, transmute(i32) FD_Flags{.SYMLINK_NOFOLLOW})
+		return Errno(-ret)
+	} else when size_of(int) == 4 {
+		ret := syscall(SYS_lchown32, cast(rawptr) name, uid, gid)
 		return Errno(-ret)
 	} else {
 		ret := syscall(SYS_lchown, cast(rawptr) name, uid, gid)
@@ -1430,8 +1434,14 @@ gettimeofday :: proc "contextless" (tv: ^Time_Val) -> (Errno) {
 	Available since Linux 1.0.
 */
 getrlimit :: proc "contextless" (kind: RLimit_Kind, resource: ^RLimit) -> (Errno) {
-	ret := syscall(SYS_getrlimit, kind, resource)
-	return Errno(-ret)
+	// Android's filter allows only `ugetrlimit` on 32-bit architectures, which bionic makes.
+	when ODIN_PLATFORM_SUBTARGET == .Android && size_of(int) == 4 {
+		ret := syscall(SYS_ugetrlimit, kind, resource)
+		return Errno(-ret)
+	} else {
+		ret := syscall(SYS_getrlimit, kind, resource)
+		return Errno(-ret)
+	}
 }
 
 /*
@@ -1752,7 +1762,7 @@ getppid :: proc "contextless" () -> Pid {
 	Available since Linux 1.0.
 */
 getpgrp :: proc "contextless" () -> (Pid, Errno) {
-	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+	when NO_LEGACY_SYSCALLS {
 		ret := syscall(SYS_getpgid, 0)
 		return errno_unwrap(ret, Pid)
 	} else {
@@ -1975,7 +1985,7 @@ sigaltstack :: proc "contextless" (stack: ^Sig_Stack, old_stack: ^Sig_Stack) -> 
 	On ARM64 available since Linux 2.6.16.
 */
 mknod :: proc "contextless" (name: cstring, mode: Mode, dev: Dev) -> (Errno) {
-	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+	when NO_LEGACY_SYSCALLS {
 		ret := syscall(SYS_mknodat, AT_FDCWD, cast(rawptr) name, transmute(u32) mode, cast(uint) dev)
 		return Errno(-ret)
 	} else {
@@ -2517,13 +2527,15 @@ fremovexattr :: proc "contextless" (fd: Fd, name: cstring) -> (Errno) {
 	Available since Linux 1.0.
 */
 time :: proc "contextless" (tloc: ^uint) -> (Errno) {
-	when ODIN_ARCH != .arm64 && ODIN_ARCH != .riscv64 {
+	when !NO_LEGACY_SYSCALLS {
 		ret := syscall(SYS_time, tloc)
 		return Errno(-ret)
 	} else {
 		ts: Time_Spec
 		ret := syscall(SYS_clock_gettime, Clock_Id.REALTIME, &ts)
-		tloc^ = ts.time_sec
+		if tloc != nil {
+			tloc^ = ts.time_sec
+		}
 		return Errno(-ret)
 	}
 }
@@ -2669,7 +2681,7 @@ sched_getaffinity :: proc "contextless" (pid: Pid, cpusetsize: uint, mask: rawpt
 	Available since Linux 2.6.
 */
 epoll_create :: proc(size: i32 = 1) -> (Fd, Errno) {
-	when ODIN_ARCH != .arm64 && ODIN_ARCH != .riscv64 {
+	when !NO_LEGACY_SYSCALLS {
 		ret := syscall(SYS_epoll_create, i32(1))
 		return errno_unwrap(ret, Fd)
 	} else {
@@ -2794,16 +2806,12 @@ exit_group :: proc "contextless" (code: i32) -> ! {
 	Available since Linux 2.6.
 */
 epoll_wait :: proc(epfd: Fd, events: [^]EPoll_Event, count: i32, timeout: i32) -> (i32, Errno) {
-	when ODIN_ARCH != .arm64 && ODIN_ARCH != .riscv64 {
+	when !NO_LEGACY_SYSCALLS {
 		ret := syscall(SYS_epoll_wait, epfd, events, count, timeout)
 		return errno_unwrap(ret, i32)
 	} else {
-		// Convert milliseconds to nanosecond timespec
-		timeout_ns := Time_Spec {
-			time_sec = uint(timeout * 1000),
-			time_nsec = 0,
-		}
-		ret := syscall(SYS_epoll_pwait, epfd, events, count, &timeout_ns, rawptr(nil))
+		// `epoll_pwait` takes the timeout in milliseconds too. Without a signal mask, it is `epoll_wait`.
+		ret := syscall(SYS_epoll_pwait, epfd, events, count, timeout, rawptr(nil), uint(0))
 		return errno_unwrap(ret, i32)
 	}
 }
@@ -2870,7 +2878,7 @@ waitid :: proc "contextless" (id_type: Id_Type, id: Id, sig_info: ^Sig_Info, opt
 // TODO(flysand): ioprio_get
 
 inotify_init :: proc "contextless" () -> (Fd, Errno) {
-	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
+	when NO_LEGACY_SYSCALLS {
 		ret := syscall(SYS_inotify_init1, 0)
 		return errno_unwrap(ret, Fd)
 	} else {
@@ -3286,8 +3294,44 @@ execveat :: proc "contextless" (dirfd: Fd, name: cstring, argv: [^]cstring, envp
 	Available since Linux 4.11
 */
 statx :: proc "contextless" (dir: Fd, pathname: cstring, flags: FD_Flags, mask: Statx_Mask, statx: ^Statx) -> (Errno) {
-	ret := syscall(SYS_statx, dir, transmute(uintptr) pathname, transmute(i32) flags, transmute(u32) mask, statx)
-	return Errno(-ret)
+	// Android's filter allows `statx` from API level 30. Below it, `fstatat` fills in all but the birth time.
+	when ODIN_PLATFORM_SUBTARGET == .Android && ODIN_MINIMUM_OS_VERSION < 30_00_00 {
+		s: Stat
+		if errno := fstatat(dir, pathname, &s, flags & {.SYMLINK_NOFOLLOW, .NO_AUTOMOUNT, .EMPTY_PATH}); errno != .NONE {
+			return errno
+		}
+		timestamp :: proc "contextless" (t: Time_Spec) -> Statx_Timestamp {
+			return {sec = i64(t.time_sec), nsec = u32(t.time_nsec)}
+		}
+		major :: proc "contextless" (dev: Dev) -> u32 {
+			return u32((u64(dev) >> 8) & 0xfff | (u64(dev) >> 32) & ~u64(0xfff))
+		}
+		minor :: proc "contextless" (dev: Dev) -> u32 {
+			return u32(u64(dev) & 0xff | (u64(dev) >> 12) & ~u64(0xff))
+		}
+		statx^ = {
+			mask       = {.TYPE, .MODE, .NLINK, .UID, .GID, .ATIME, .MTIME, .CTIME, .INO, .SIZE, .BLOCKS},
+			blksize    = u32(s.blksize),
+			nlink      = u32(s.nlink),
+			uid        = s.uid,
+			gid        = s.gid,
+			mode       = s.mode,
+			ino        = s.ino,
+			size       = u64(s.size),
+			blocks     = u64(s.blocks),
+			atime      = timestamp(s.atime),
+			ctime      = timestamp(s.ctime),
+			mtime      = timestamp(s.mtime),
+			rdev_major = major(s.rdev),
+			rdev_minor = minor(s.rdev),
+			dev_major  = major(s.dev),
+			dev_minor  = minor(s.dev),
+		}
+		return .NONE
+	} else {
+		ret := syscall(SYS_statx, dir, transmute(uintptr) pathname, transmute(i32) flags, transmute(u32) mask, statx)
+		return Errno(-ret)
+	}
 }
 
 // TODO(flysand): io_pgetevents
@@ -3302,8 +3346,13 @@ statx :: proc "contextless" (dir: Fd, pathname: cstring, flags: FD_Flags, mask: 
 	Available since Linux 5.1
 */
 io_uring_setup :: proc "contextless" (entries: u32, params: ^IO_Uring_Params) -> (Fd, Errno) {
-	ret := syscall(SYS_io_uring_setup, entries, params)
-	return errno_unwrap(ret, Fd)
+	// Android's filter kills an app using io_uring, so it is unavailable there.
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		return Fd(-1), .ENOSYS
+	} else {
+		ret := syscall(SYS_io_uring_setup, entries, params)
+		return errno_unwrap(ret, Fd)
+	}
 }
 
 /*
@@ -3312,8 +3361,12 @@ io_uring_setup :: proc "contextless" (entries: u32, params: ^IO_Uring_Params) ->
 	Available since Linux 5.1
 */
 io_uring_enter :: proc "contextless" (fd: Fd, to_submit: u32, min_complete: u32, flags: IO_Uring_Enter_Flags, sig: ^Sig_Set) -> (int, Errno) {
-	ret := syscall(SYS_io_uring_enter, fd, to_submit, min_complete, transmute(u32)flags, sig, size_of(Sig_Set) if sig != nil else 0)
-	return errno_unwrap(ret, int)
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		return 0, .ENOSYS
+	} else {
+		ret := syscall(SYS_io_uring_enter, fd, to_submit, min_complete, transmute(u32)flags, sig, size_of(Sig_Set) if sig != nil else 0)
+		return errno_unwrap(ret, int)
+	}
 }
 
 /*
@@ -3323,8 +3376,12 @@ io_uring_enter :: proc "contextless" (fd: Fd, to_submit: u32, min_complete: u32,
 */
 io_uring_enter2 :: proc "contextless" (fd: Fd, to_submit: u32, min_complete: u32, flags: IO_Uring_Enter_Flags, arg: ^IO_Uring_Getevents_Arg) -> (int, Errno) {
 	assert_contextless(.EXT_ARG in flags)
-	ret := syscall(SYS_io_uring_enter, fd, to_submit, min_complete, transmute(u32)flags, arg, size_of(IO_Uring_Getevents_Arg))
-	return errno_unwrap(ret, int)
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		return 0, .ENOSYS
+	} else {
+		ret := syscall(SYS_io_uring_enter, fd, to_submit, min_complete, transmute(u32)flags, arg, size_of(IO_Uring_Getevents_Arg))
+		return errno_unwrap(ret, int)
+	}
 }
 
 /*
@@ -3333,8 +3390,12 @@ io_uring_enter2 :: proc "contextless" (fd: Fd, to_submit: u32, min_complete: u32
 	Available since Linux 5.1
 */
 io_uring_register :: proc "contextless" (fd: Fd, opcode: IO_Uring_Register_Opcode, arg: rawptr, nr_args: u32) -> Errno {
-	ret := syscall(SYS_io_uring_register, fd, opcode, arg, nr_args)
-	return Errno(-ret)
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		return .ENOSYS
+	} else {
+		ret := syscall(SYS_io_uring_register, fd, opcode, arg, nr_args)
+		return Errno(-ret)
+	}
 }
 
 // TODO(flysand): open_tree
@@ -3356,8 +3417,13 @@ io_uring_register :: proc "contextless" (fd: Fd, opcode: IO_Uring_Register_Opcod
 	Available since Linux 5.3.
 */
 pidfd_open :: proc "contextless" (pid: Pid, flags: Pid_FD_Flags) -> (Pid_FD, Errno) {
-	ret := syscall(SYS_pidfd_open, pid, transmute(i32) flags)
-	return errno_unwrap(ret, Pid_FD)
+	// Android's filter allows `pidfd_open` from API level 30, and kills an app calling it before.
+	when ODIN_PLATFORM_SUBTARGET == .Android && ODIN_MINIMUM_OS_VERSION < 30_00_00 {
+		return Pid_FD(-1), .ENOSYS
+	} else {
+		ret := syscall(SYS_pidfd_open, pid, transmute(i32) flags)
+		return errno_unwrap(ret, Pid_FD)
+	}
 }
 
 // TODO(flysand): clone3 (probably not this PR)
@@ -3390,8 +3456,18 @@ pidfd_getfd :: proc "contextless" (pidfd: Pid_FD, fd: Fd, flags: i32 = 0) -> (Fd
 	Available since Linux 5.8.
 */
 faccessat2 :: proc "contextless" (dirfd: Fd, name: cstring, mode: Mode = F_OK, flags: FD_Flags = FD_Flags{}) -> (Errno) {
-	ret := syscall(SYS_faccessat2, dirfd, cast(rawptr) name, transmute(u32) mode, transmute(i32) flags)
-	return Errno(-ret)
+	// Android's filter kills an app calling `faccessat2`. Without flags it is `faccessat`; with them it is
+	// unavailable, as on kernels before 5.8.
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		if flags != {} {
+			return .ENOSYS
+		}
+		ret := syscall(SYS_faccessat, dirfd, cast(rawptr) name, transmute(u32) mode)
+		return Errno(-ret)
+	} else {
+		ret := syscall(SYS_faccessat2, dirfd, cast(rawptr) name, transmute(u32) mode, transmute(i32) flags)
+		return Errno(-ret)
+	}
 }
 
 // TODO(flysand): process_madvise

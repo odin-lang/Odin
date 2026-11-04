@@ -221,17 +221,7 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 		return written, nil
 	}
 
-	// NOTE(Jeroen): The new method is faster for an `Int` up to ~32768 bits in size with optimizations.
-	//               At `.None` or `.Minimal`, it appears to always be faster.
-	//               If we optimize `itoa` further, this needs to be evaluated.
-	itoa_method := _itoa_raw_full
-
-	when ODIN_OPTIMIZATION_MODE >= .Size {
-		if count >= 32768 {
-			itoa_method = _itoa_raw_old
-		}
-	}
-	return itoa_method(a, radix, buffer, zero_terminate)
+	return _itoa_raw_full(a, radix, buffer, zero_terminate)
 }
 
 itoa :: proc{int_itoa_string, int_itoa_raw}
@@ -240,11 +230,29 @@ int_to_cstring :: int_itoa_cstring
 
 /*
 	Read a string [ASCII] in a given radix.
+
+	If `n` isn't nil, it's set to the number of characters read, the same as `strconv`'s `n`: the
+	digits, and a leading '-' if anything follows it. So `input[n:]` is whatever comes after them.
+
+	Returns:
+	- `nil` if `input` is just the number.
+	- `.Trailing_Whitespace` if only whitespace (`' '`, `'\t'`, `'\n'`, `'\v'`, `'\f'`, `'\r'`) or NUL
+	  follows the number. `res` holds the number, so callers that don't mind trailing whitespace can
+	  treat this as success. Other callers can trim `input` first.
+	- `.Invalid_Character` if anything else follows the number, or `input` doesn't start with one,
+	  e.g. `"12x"`, `"x"` or `"- \n"`. `res` holds whatever was read before that character.
+	- `.Empty_Input` if `input` is `""`, `"-"` or only whitespace. `res` is zero.
+	- `.Invalid_Argument` if `radix` isn't in 2..=64.
 */
-int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context.allocator) -> (err: Error) {
+int_atoi :: proc(res: ^Int, input: string, radix := i8(10), n: ^int = nil, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(res)
+	input_len := len(input)
 	input := input
 	context.allocator = allocator
+
+	if n != nil {
+		n^ = 0
+	}
 
 	/*
 		Make sure the radix is ok.
@@ -258,27 +266,25 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context
 	internal_zero(res) or_return
 
 	/*
-		We'll interpret an empty string as zero.
-	*/
-	if len(input) == 0 {
-		return nil
-	}
-
-	/*
 		If the leading digit is a minus set the sign to negative.
-		Given the above early out, the length should be at least 1.
 	*/
 	sign := Sign.Zero_or_Positive
-	if input[0] == '-' {
+	if len(input) > 0 && input[0] == '-' {
 		input = input[1:]
 		sign = .Negative
 	}
 
 	/*
+		There has to be at least one digit.
+	*/
+	if len(input) == 0 {
+		return .Empty_Input
+	}
+	digits_start := len(input)
+
+	/*
 		Process each digit of the string.
 	*/
-
-	ch: rune
 
 	if platform_int_is_power_of_two(int(radix)) {
 
@@ -313,7 +319,7 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context
 		chunk_value: DIGIT
 		chunk_count := 0  // Number of input digits we have already processed in the current chunk_value DIGIT
 		for len(input) > 0 {
-			ch = rune(input[0])
+			ch := rune(input[0])
 			if radix <= 36 && ch >= 'a' && ch <= 'z' {
 				ch -= 32
 			}
@@ -331,7 +337,7 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context
 			chunk_count += 1
 			input = input[1:]
 
-			if chunk_count == digits_per_chunk || len(input) == 0 {
+			if chunk_count == digits_per_chunk {
 				// Submit chunk.
 				// NOTE(bplu4t2f): Maybe this could be optimized further. For any given input digit,
 				//                 we can predict exactly where it will go in the output, eliminating
@@ -347,11 +353,48 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context
 			}
 		}
 
+		/*
+			Submit the last, partial chunk. The loop can also stop early, at the first character that
+			isn't a digit in the radix.
+		*/
+		if chunk_count > 0 {
+			if res.used == 0 {
+				internal_set(res, chunk_value) or_return
+			} else {
+				internal_shl(res, res, bits_per_digit * chunk_count) or_return
+				internal_add(res, res, chunk_value) or_return
+			}
+		}
+
 	} else {
 
 		/*
 			Path for non-power-of-two bases.
+
+			Like above, collect as many input digits as fit into one DIGIT and fold them into the
+			result with one multiply and one add, instead of one of each per input digit.
+			For radix 10 that is 18 digits per chunk.
 		*/
+
+		digits_per_chunk := 0
+		chunk_limit      := DIGIT(1)
+		for chunk_limit < (DIGIT(1) << _DIGIT_BITS) / DIGIT(radix) {
+			chunk_limit      *= DIGIT(radix)
+			digits_per_chunk += 1
+		}
+
+		/*
+			Preallocate for ceil(log2(radix)) bits per input digit, which is a slight overestimate.
+		*/
+		bits_per_digit := 1
+		for (1 << uint(bits_per_digit)) < int(radix) {
+			bits_per_digit += 1
+		}
+		internal_grow(res, max(1, (len(input) * bits_per_digit + _DIGIT_BITS - 1) / _DIGIT_BITS + 1)) or_return
+
+		chunk_value := DIGIT(0)
+		chunk_scale := DIGIT(1) // radix^chunk_count
+		chunk_count := 0
 
 		for len(input) > 0 {
 			/*
@@ -360,7 +403,7 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context
 				[e.g. in hex]
 			*/
 
-			ch = rune(input[0])
+			ch := rune(input[0])
 			if radix <= 36 && ch >= 'a' && ch <= 'z' {
 				ch -= 32 // 'a' - 'A'
 			}
@@ -379,27 +422,78 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context
 				break
 			}
 
-			internal_mul(res, res, DIGIT(radix)) or_return
-			internal_add(res, res, DIGIT(y))     or_return
-
+			chunk_value  = chunk_value * DIGIT(radix) + DIGIT(y)
+			chunk_scale *= DIGIT(radix)
+			chunk_count += 1
 			input = input[1:]
+
+			if chunk_count == digits_per_chunk {
+				internal_mul(res, res, chunk_scale) or_return
+				internal_add(res, res, chunk_value) or_return
+				chunk_value = 0
+				chunk_scale = 1
+				chunk_count = 0
+			}
+		}
+
+		/*
+			Submit the last, partial chunk.
+		*/
+		if chunk_count > 0 {
+			internal_mul(res, res, chunk_scale) or_return
+			internal_add(res, res, chunk_value) or_return
 		}
 	}
 
 	/*
-		If an illegal character was found, fail.
+		`input` now starts at the first character that isn't a digit in the radix, if there is one.
+		Like `strconv`, `n` counts a leading '-' even when no digit follows it.
 	*/
-	if len(input) > 0 && ch != 0 && ch != '\r' && ch != '\n' {
-		return .Invalid_Argument
+	if n != nil {
+		n^ = input_len - len(input)
 	}
+
+	/*
+		Without digits, whitespace alone is an empty input, but a '-' followed by whitespace is a
+		number that was cut short.
+	*/
+	if len(input) == digits_start {
+		if sign == .Zero_or_Positive && _is_whitespace_or_nul(input) {
+			return .Empty_Input
+		}
+		return .Invalid_Character
+	}
+
 	/*
 		Set the sign only if res != 0.
 	*/
 	if res.used > 0 {
 		res.sign = sign
 	}
+	internal_clamp(res) or_return
 
-	return internal_clamp(res)
+	if len(input) == 0 {
+		return nil
+	}
+	if _is_whitespace_or_nul(input) {
+		return .Trailing_Whitespace
+	}
+	return .Invalid_Character
+}
+
+/*
+	Whether `s` only has the ASCII characters `strings.is_space` accepts, and NUL.
+*/
+@(private)
+_is_whitespace_or_nul :: proc "contextless" (s: string) -> bool {
+	for i in 0..<len(s) {
+		switch s[i] {
+		case ' ', '\t', '\n', '\v', '\f', '\r', 0:
+		case:
+			return false
+		}
+	}
+	return true
 }
 
 

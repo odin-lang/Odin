@@ -31,7 +31,7 @@ AudioDecoder :: struct {}
 
 MAJOR_VERSION :: 3
 MINOR_VERSION :: 2
-MICRO_VERSION :: 0
+MICRO_VERSION :: 4
 
 PROP_MIXER_DEVICE_NUMBER :: "SDL_mixer.mixer.device"
 
@@ -40,6 +40,7 @@ PROP_AUDIO_LOAD_CLOSEIO_BOOLEAN            :: "SDL_mixer.audio.load.closeio"
 PROP_AUDIO_LOAD_PREDECODE_BOOLEAN          :: "SDL_mixer.audio.load.predecode"
 PROP_AUDIO_LOAD_PREFERRED_MIXER_POINTER    :: "SDL_mixer.audio.load.preferred_mixer"
 PROP_AUDIO_LOAD_SKIP_METADATA_TAGS_BOOLEAN :: "SDL_mixer.audio.load.skip_metadata_tags"
+PROP_AUDIO_LOAD_IGNORE_LOOPS_BOOLEAN       :: "SDL_mixer.audio.load.ignore_loops"
 PROP_AUDIO_DECODER_STRING                  :: "SDL_mixer.audio.decoder"
 
 PROP_METADATA_TITLE_STRING              :: "SDL_mixer.metadata.title"
@@ -57,6 +58,7 @@ PROP_PLAY_MAX_FRAME_NUMBER                   :: "SDL_mixer.play.max_frame"
 PROP_PLAY_MAX_MILLISECONDS_NUMBER            :: "SDL_mixer.play.max_milliseconds"
 PROP_PLAY_START_FRAME_NUMBER                 :: "SDL_mixer.play.start_frame"
 PROP_PLAY_START_MILLISECOND_NUMBER           :: "SDL_mixer.play.start_millisecond"
+PROP_PLAY_START_ORDER_NUMBER                 :: "SDL_mixer.play.start_order"
 PROP_PLAY_LOOP_START_FRAME_NUMBER            :: "SDL_mixer.play.loop_start_frame"
 PROP_PLAY_LOOP_START_MILLISECOND_NUMBER      :: "SDL_mixer.play.loop_start_millisecond"
 PROP_PLAY_FADE_IN_FRAMES_NUMBER              :: "SDL_mixer.play.fade_in_frames"

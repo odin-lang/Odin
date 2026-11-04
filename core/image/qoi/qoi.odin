@@ -4,7 +4,7 @@
 package qoi
 
 /*
-	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2022-2026 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's license.
 
 	List of contributors:
@@ -13,7 +13,6 @@ package qoi
 
 import "core:image"
 import "core:compress"
-import "core:bytes"
 
 Error   :: image.Error
 Image   :: image.Image
@@ -22,7 +21,7 @@ Options :: image.Options
 RGB_Pixel  :: image.RGB_Pixel
 RGBA_Pixel :: image.RGBA_Pixel
 
-save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}, allocator := context.allocator) -> (err: Error) {
+save_to_buffer  :: proc(output: ^[dynamic]byte, img: ^Image, options := Options{}, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
 	if img == nil {
@@ -43,7 +42,7 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 		return .Invalid_Input_Image
 	}
 
-	if img.channels * pixels != len(img.pixels.buf) {
+	if img.channels * pixels != len(img.pixels) {
 		return .Invalid_Input_Image
 	}
 
@@ -52,7 +51,7 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 	// Calculate and allocate maximum size. We'll reclaim space to actually written output at the end.
 	max_size := pixels * (img.channels + 1) + size_of(image.QOI_Header) + size_of(u64be)
 
-	if resize(&output.buf, max_size) != nil {
+	if resize(output, max_size) != nil {
 		return .Unable_To_Allocate_Or_Resize
 	}
 
@@ -65,7 +64,7 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 	}
 	header_bytes := transmute([size_of(image.QOI_Header)]u8)header
 
-	copy(output.buf[written:], header_bytes[:])
+	copy(output[written:], header_bytes[:])
 	written += size_of(image.QOI_Header)
 
 	/*
@@ -75,7 +74,7 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 	pix  := RGBA_Pixel{0, 0, 0, 255}
 	prev := pix
 
-	input := img.pixels.buf[:]
+	input := img.pixels[:]
 	run   := u8(0)
 
 	for len(input) > 0 {
@@ -92,7 +91,7 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 			// If we reach the max run length or the end of the image, write the run.
 			if run == 62 || len(input) == 0 {
 				// Encode and write run
-				output.buf[written] = u8(QOI_Opcode_Tag.RUN) | (run - 1)
+				output[written] = u8(QOI_Opcode_Tag.RUN) | (run - 1)
 				written += 1
 				run = 0
 			}
@@ -100,7 +99,7 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 			if run > 0 {
 				// The pixel differs from the previous one, but we still need to write the pending run.
 				// Encode and write run
-				output.buf[written] = u8(QOI_Opcode_Tag.RUN) | (run - 1)
+				output[written] = u8(QOI_Opcode_Tag.RUN) | (run - 1)
 				written += 1
 				run = 0
 			}
@@ -109,7 +108,7 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 
 			if seen[index] == pix {
 				// Write indexed pixel
-				output.buf[written] = u8(QOI_Opcode_Tag.INDEX) | index
+				output[written] = u8(QOI_Opcode_Tag.INDEX) | index
 				written += 1
 			} else {
 				// Add pixel to index
@@ -128,23 +127,23 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 
 					if _d.r < 4 && _d.g < 4 && _d.b < 4 {
 						// Delta is between -2 and 1 inclusive
-						output.buf[written] = u8(QOI_Opcode_Tag.DIFF) | _d.r << 4 | _d.g << 2 | _d.b
+						output[written] = u8(QOI_Opcode_Tag.DIFF) | _d.r << 4 | _d.g << 2 | _d.b
 						written += 1
 					} else if _l.r < 16 && _l.g < 64 && _l.b < 16 {
 						// Biased luma is between {-8..7, -32..31, -8..7}
-						output.buf[written    ] = u8(QOI_Opcode_Tag.LUMA) | _l.g
-						output.buf[written + 1] = _l.r << 4 | _l.b
+						output[written    ] = u8(QOI_Opcode_Tag.LUMA) | _l.g
+						output[written + 1] = _l.r << 4 | _l.b
 						written += 2
 					} else {
 						// Write RGB literal
-						output.buf[written] = u8(QOI_Opcode_Tag.RGB)
-						copy(output.buf[written + 1:], pix[:3])
+						output[written] = u8(QOI_Opcode_Tag.RGB)
+						copy(output[written + 1:], pix[:3])
 						written += 4
 					}
 				} else {
 					// Write RGBA literal
-					output.buf[written] = u8(QOI_Opcode_Tag.RGBA)
-					copy(output.buf[written + 1:], pix[:])
+					output[written] = u8(QOI_Opcode_Tag.RGBA)
+					copy(output[written + 1:], pix[:])
 					written += 5
 				}
 			}
@@ -153,24 +152,23 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 	}
 
 	trailer := []u8{0, 0, 0, 0, 0, 0, 0, 1}
-	copy(output.buf[written:], trailer[:])
+	copy(output[written:], trailer[:])
 	written += len(trailer)
 
-	resize(&output.buf, written)
+	resize(output, written)
 	return nil
 }
 
 load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
-	ctx := &compress.Context_Memory_Input{
-		input_data = data,
-	}
+	// TODO: Copy `load_from_context` implementation and directly read the bytes instead
 
-	img, err = load_from_context(ctx, options, allocator)
-	return img, err
+	data := data
+	ctx  := compress.init_context_from_slice(&data)
+	return load_from_context(&ctx, options, allocator)
 }
 
 @(optimization_mode="favor_size")
-load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
+load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	context.allocator = allocator
 	options := options
 
@@ -183,7 +181,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		options -= {.return_header}
 	}
 
-	header := image.read_data(ctx, image.QOI_Header) or_return
+	header := compress.read_data(ctx, image.QOI_Header) or_return
 	if header.magic != image.QOI_Magic {
 		return img, .Invalid_Signature
 	}
@@ -228,7 +226,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	bytes_needed := image.compute_buffer_size(int(header.width), int(header.height), img.channels, 8)
 
-	if resize(&img.pixels.buf, bytes_needed) != nil {
+	if resize(&img.pixels, bytes_needed) != nil {
 		return img, .Unable_To_Allocate_Or_Resize
 	}
 
@@ -237,22 +235,22 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	*/
 	seen: [64]RGBA_Pixel
 	pix    := RGBA_Pixel{0, 0, 0, 255}
-	pixels := img.pixels.buf[:]
+	pixels := img.pixels[:]
 
 	decode: for len(pixels) > 0 {
-		data := image.read_u8(ctx) or_return
+		data := compress.read_u8(ctx) or_return
 
 		tag := QOI_Opcode_Tag(data)
 		#partial switch tag {
 		case .RGB:
-			pix.rgb = image.read_data(ctx, RGB_Pixel) or_return
+			pix.rgb = compress.read_data(ctx, RGB_Pixel) or_return
 
 			#no_bounds_check {
-				seen[qoi_hash(pix)] = pix	
+				seen[qoi_hash(pix)] = pix
 			}
 
 		case .RGBA:
-			pix = image.read_data(ctx, RGBA_Pixel) or_return
+			pix = compress.read_data(ctx, RGBA_Pixel) or_return
 
 			#no_bounds_check {
 				seen[qoi_hash(pix)] = pix	
@@ -277,7 +275,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					}
 
 				case .LUMA:
-					data2 := image.read_u8(ctx) or_return
+					data2 := compress.read_u8(ctx) or_return
 
 					diff_g := (data & 63) - 32
 					diff_r := diff_g - 8 + ((data2 >> 4) & 15)
@@ -337,7 +335,7 @@ destroy :: proc(img: ^Image) {
 		return
 	}
 
-	bytes.buffer_destroy(&img.pixels)
+	delete(img.pixels)
 
 	if v, ok := img.metadata.(^image.QOI_Info); ok {
 		free(v)
@@ -371,5 +369,5 @@ qoi_hash :: #force_inline proc(pixel: RGBA_Pixel) -> (index: u8) {
 
 @(init, private)
 _register :: proc "contextless" () {
-	image.register(.QOI, load_from_bytes, destroy)
+	image.register(.QOI, load_from_bytes, destroy, load_from_context)
 }

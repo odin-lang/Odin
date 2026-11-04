@@ -2,6 +2,7 @@
 package test_core_hash
 
 import "core:hash"
+import "core:math/rand"
 import "core:testing"
 import "base:intrinsics"
 
@@ -33,12 +34,57 @@ test_adler32_vectors :: proc(t: ^testing.T) {
 		testing.expectf(t, adler == vector.h, "\n\t[ADLER-32(%v)] Expected: 0x%08x, got: 0x%08x", vector.s, vector.h, adler)
 	}
 
-	testing.expect_value(t, #hash(vectors[0].s, "adler32"), int(vectors[0].h))
-	testing.expect_value(t, #hash(vectors[1].s, "adler32"), int(vectors[1].h))
-	testing.expect_value(t, #hash(vectors[2].s, "adler32"), int(vectors[2].h))
-	testing.expect_value(t, #hash(vectors[3].s, "adler32"), int(vectors[3].h))
-	testing.expect_value(t, #hash(vectors[4].s, "adler32"), int(vectors[4].h))
-	testing.expect_value(t, #hash(vectors[5].s, "adler32"), int(vectors[5].h))
+	testing.expect_value(t, u32(#hash(vectors[0].s, "adler32")), vectors[0].h)
+	testing.expect_value(t, u32(#hash(vectors[1].s, "adler32")), vectors[1].h)
+	testing.expect_value(t, u32(#hash(vectors[2].s, "adler32")), vectors[2].h)
+	testing.expect_value(t, u32(#hash(vectors[3].s, "adler32")), vectors[3].h)
+	testing.expect_value(t, u32(#hash(vectors[4].s, "adler32")), vectors[4].h)
+	testing.expect_value(t, u32(#hash(vectors[5].s, "adler32")), vectors[5].h)
+}
+
+adler32_reference :: proc(data: []byte, seed: u32) -> u32 {
+	a, b := u64(seed & 0xFFFF), u64(seed >> 16)
+	for v in data {
+		a = (a + u64(v)) % 65521
+		b = (b + a) % 65521
+	}
+	return u32(b) << 16 | u32(a)
+}
+
+@test
+test_adler32_lengths :: proc(t: ^testing.T) {
+	state := u64(0x9E3779B97F4A7C15)
+	data := make([]byte, 3 * 65536 + 64)
+	defer delete(data)
+	for &v in data {
+		state ~= state << 13
+		state ~= state >> 7
+		state ~= state << 17
+		v = u8(state >> 32)
+	}
+
+	for n in 0..<600 {
+		for offset in 0..<3 {
+			chunk := data[offset:][:n]
+			testing.expectf(t, hash.adler32(chunk) == adler32_reference(chunk, 1), "adler32 of %v bytes at offset %v", n, offset)
+		}
+	}
+
+	seeds := [?]u32{1, 0x12345678, 0xFFF0FFF0}
+	for n in ([?]int{5551, 5552, 5553, 65535, 65536, 65537, 65551, 65552, 2 * 65536 + 7, len(data)}) {
+		for seed in seeds {
+			testing.expectf(t, hash.adler32(data[:n], seed) == adler32_reference(data[:n], seed), "adler32 of %v bytes with seed 0x%08x", n, seed)
+		}
+	}
+
+	ones := make([]byte, 3 * 65536 + 5)
+	defer delete(ones)
+	for &v in ones {
+		v = 0xFF
+	}
+	for seed in seeds {
+		testing.expectf(t, hash.adler32(ones, seed) == adler32_reference(ones, seed), "adler32 of %v 0xFF bytes with seed 0x%08x", len(ones), seed)
+	}
 }
 
 @test
@@ -76,12 +122,12 @@ test_fnv32_vectors :: proc(t: ^testing.T) {
 		testing.expectf(t, fnv == vector.h, "\n\t[FNV-32(%v)] Expected: 0x%08x, got: 0x%08x", vector.s, vector.h, fnv)
 	}
 
-	testing.expect_value(t, #hash(vectors[0].s, "fnv32"), int(vectors[0].h))
-	testing.expect_value(t, #hash(vectors[1].s, "fnv32"), int(vectors[1].h))
-	testing.expect_value(t, #hash(vectors[2].s, "fnv32"), int(vectors[2].h))
-	testing.expect_value(t, #hash(vectors[3].s, "fnv32"), int(vectors[3].h))
-	testing.expect_value(t, #hash(vectors[4].s, "fnv32"), int(vectors[4].h))
-	testing.expect_value(t, #hash(vectors[5].s, "fnv32"), int(vectors[5].h))
+	testing.expect_value(t, u32(#hash(vectors[0].s, "fnv32")), vectors[0].h)
+	testing.expect_value(t, u32(#hash(vectors[1].s, "fnv32")), vectors[1].h)
+	testing.expect_value(t, u32(#hash(vectors[2].s, "fnv32")), vectors[2].h)
+	testing.expect_value(t, u32(#hash(vectors[3].s, "fnv32")), vectors[3].h)
+	testing.expect_value(t, u32(#hash(vectors[4].s, "fnv32")), vectors[4].h)
+	testing.expect_value(t, u32(#hash(vectors[5].s, "fnv32")), vectors[5].h)
 }
 
 @test
@@ -126,12 +172,12 @@ test_fnv32a_vectors :: proc(t: ^testing.T) {
 		testing.expectf(t, fnv == vector.h, "\n\t[FNV-32a(%v)] Expected: 0x%08x, got: 0x%08x", vector.s, vector.h, fnv)
 	}
 
-	testing.expect_value(t, #hash(vectors[0].s, "fnv32a"), int(vectors[0].h))
-	testing.expect_value(t, #hash(vectors[1].s, "fnv32a"), int(vectors[1].h))
-	testing.expect_value(t, #hash(vectors[2].s, "fnv32a"), int(vectors[2].h))
-	testing.expect_value(t, #hash(vectors[3].s, "fnv32a"), int(vectors[3].h))
-	testing.expect_value(t, #hash(vectors[4].s, "fnv32a"), int(vectors[4].h))
-	testing.expect_value(t, #hash(vectors[5].s, "fnv32a"), int(vectors[5].h))
+	testing.expect_value(t, u32(#hash(vectors[0].s, "fnv32a")), vectors[0].h)
+	testing.expect_value(t, u32(#hash(vectors[1].s, "fnv32a")), vectors[1].h)
+	testing.expect_value(t, u32(#hash(vectors[2].s, "fnv32a")), vectors[2].h)
+	testing.expect_value(t, u32(#hash(vectors[3].s, "fnv32a")), vectors[3].h)
+	testing.expect_value(t, u32(#hash(vectors[4].s, "fnv32a")), vectors[4].h)
+	testing.expect_value(t, u32(#hash(vectors[5].s, "fnv32a")), vectors[5].h)
 }
 
 @test
@@ -176,12 +222,63 @@ test_crc32_vectors :: proc(t: ^testing.T) {
 		testing.expectf(t, crc == vector.h, "\n\t[CRC-32(%v)] Expected: 0x%08x, got: 0x%08x", vector.s, vector.h, crc)
 	}
 
-	testing.expect_value(t, #hash(vectors[0].s, "crc32"), int(vectors[0].h))
-	testing.expect_value(t, #hash(vectors[1].s, "crc32"), int(vectors[1].h))
-	testing.expect_value(t, #hash(vectors[2].s, "crc32"), int(vectors[2].h))
-	testing.expect_value(t, #hash(vectors[3].s, "crc32"), int(vectors[3].h))
-	testing.expect_value(t, #hash(vectors[4].s, "crc32"), int(vectors[4].h))
-	testing.expect_value(t, #hash(vectors[5].s, "crc32"), int(vectors[5].h))
+	testing.expect_value(t, u32(#hash(vectors[0].s, "crc32")), vectors[0].h)
+	testing.expect_value(t, u32(#hash(vectors[1].s, "crc32")), vectors[1].h)
+	testing.expect_value(t, u32(#hash(vectors[2].s, "crc32")), vectors[2].h)
+	testing.expect_value(t, u32(#hash(vectors[3].s, "crc32")), vectors[3].h)
+	testing.expect_value(t, u32(#hash(vectors[4].s, "crc32")), vectors[4].h)
+	testing.expect_value(t, u32(#hash(vectors[5].s, "crc32")), vectors[5].h)
+}
+
+crc32_bitwise :: proc(data: []byte, seed: u32) -> u32 {
+	crc := ~seed
+	for b in data {
+		crc ~= u32(b)
+		for _ in 0..<8 {
+			crc = (crc >> 1) ~ (0xedb88320 if crc & 1 != 0 else 0)
+		}
+	}
+	return ~crc
+}
+
+@test
+test_crc32_lengths :: proc(t: ^testing.T) {
+	data := make([]byte, 4096 + 16)
+	defer delete(data)
+	for &b in data {
+		b = byte(rand.uint32())
+	}
+
+	for length in 0..=1100 {
+		for offset in 0..<16 {
+			seed := rand.uint32() if offset & 1 != 0 else 0
+			input := data[offset:][:length]
+			got  := hash.crc32(input, seed)
+			want := crc32_bitwise(input, seed)
+			testing.expectf(t, got == want, "CRC-32 length %v, offset %v, seed 0x%08x: expected 0x%08x, got 0x%08x", length, offset, seed, want, got)
+		}
+	}
+
+	whole := hash.crc32(data)
+	testing.expect_value(t, whole, crc32_bitwise(data, 0))
+	testing.expect_value(t, hash.crc32(data[1234:], hash.crc32(data[:1234])), whole)
+}
+
+@test
+test_crc32_combine :: proc(t: ^testing.T) {
+	data := make([]byte, 3000)
+	defer delete(data)
+	for &b in data {
+		b = byte(rand.uint32())
+	}
+
+	whole := hash.crc32(data)
+	for split in ([?]int{0, 1, 15, 16, 17, 64, 255, 1024, 2999, 3000}) {
+		a := hash.crc32(data[:split])
+		b := hash.crc32(data[split:])
+		testing.expectf(t, hash.crc32_combine(a, b, len(data) - split) == whole, "crc32_combine at split %v", split)
+	}
+	testing.expect_value(t, hash.crc32_combine(0x352441c2, 0, 0), 0x352441c2)
 }
 
 @test
@@ -233,12 +330,12 @@ test_murmur32_vectors :: proc(t: ^testing.T) {
 		testing.expectf(t, murmur == vector.h, "\n\t[MURMUR-32(%v)] Expected: 0x%08x, got: 0x%08x", vector.s, vector.h, murmur)
 	}
 
-	testing.expect_value(t, #hash(vectors[0].s, "murmur32"), int(vectors[0].h))
-	testing.expect_value(t, #hash(vectors[1].s, "murmur32"), int(vectors[1].h))
-	testing.expect_value(t, #hash(vectors[2].s, "murmur32"), int(vectors[2].h))
-	testing.expect_value(t, #hash(vectors[3].s, "murmur32"), int(vectors[3].h))
-	testing.expect_value(t, #hash(vectors[4].s, "murmur32"), int(vectors[4].h))
-	testing.expect_value(t, #hash(vectors[5].s, "murmur32"), int(vectors[5].h))
+	testing.expect_value(t, u32(#hash(vectors[0].s, "murmur32")), vectors[0].h)
+	testing.expect_value(t, u32(#hash(vectors[1].s, "murmur32")), vectors[1].h)
+	testing.expect_value(t, u32(#hash(vectors[2].s, "murmur32")), vectors[2].h)
+	testing.expect_value(t, u32(#hash(vectors[3].s, "murmur32")), vectors[3].h)
+	testing.expect_value(t, u32(#hash(vectors[4].s, "murmur32")), vectors[4].h)
+	testing.expect_value(t, u32(#hash(vectors[5].s, "murmur32")), vectors[5].h)
 }
 
 @test
