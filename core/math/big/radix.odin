@@ -245,7 +245,7 @@ int_to_cstring :: int_itoa_cstring
 	  `res` is zero.
 	- `.Invalid_Argument` if `radix` isn't in 2..=64.
 */
-int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context.allocator, n: ^int = nil) -> (err: Error) {
+int_atoi :: proc(res: ^Int, input: string, radix := i8(10), n: ^int = nil, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(res)
 	input_len := len(input)
 	input := input
