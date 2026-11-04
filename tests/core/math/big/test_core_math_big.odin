@@ -445,8 +445,8 @@ test_atoi :: proc(t: ^testing.T) {
 	}
 
 	// What follows the number decides the error. `res` keeps the number read before it, sign
-	// included, and `n` is how many characters that number took up. Both paths, with a partial
-	// chunk and with a full one.
+	// included, and `n` counts the characters read the way `strconv` does. Both paths, with a
+	// partial chunk and with a full one.
 	Case :: struct {
 		input:    string,
 		radix:    i8,
@@ -482,13 +482,16 @@ test_atoi :: proc(t: ^testing.T) {
 		{"1\n23",                                  10, .Invalid_Character,   "1",                         1},
 		{"12 \nx",                                 10, .Invalid_Character,   "12",                        2},
 		{" 12",                                    10, .Invalid_Character,   "0",                         0},
-		{"-x",                                     10, .Invalid_Character,   "0",                         0},
+		{"-x",                                     10, .Invalid_Character,   "0",                         1},
+		{"--1",                                    10, .Invalid_Character,   "0",                         1},
+		{"-\n",                                    10, .Invalid_Character,   "0",                         1},
+		{"- \r\n",                                 16, .Invalid_Character,   "0",                         1},
 		{"+1",                                     10, .Invalid_Character,   "0",                         0},
 
 		{"",                                       10, .Empty_Input,         "0",                         0},
 		{"-",                                      16, .Empty_Input,         "0",                         0},
 		{"\n",                                     10, .Empty_Input,         "0",                         0},
-		{"- \r\n",                                 16, .Empty_Input,         "0",                         0},
+		{" \t\x00",                                16, .Empty_Input,         "0",                         0},
 	}
 	for c in cases {
 		n := -1
@@ -497,6 +500,14 @@ test_atoi :: proc(t: ^testing.T) {
 		defer delete(str)
 		testing.expectf(t, err == c.err && str == c.expected && n == c.n,
 			"atoi(%q, %v) = %v, %v, n = %v, expected %v, %v, n = %v", c.input, c.radix, err, str, n, c.err, c.expected, c.n)
+	}
+
+	// `strconv` sets the same `n` for input that both of them read.
+	for input in ([?]string{"12", "-12", "12x", "-12x", "12 \n", "-12\n", "-", "-x", "- \r\n", "--1", "x", " 12", "\n", ""}) {
+		n, strconv_n := -1, -1
+		_ = big.atoi(b, input, 10, n = &n)
+		_, _ = strconv.parse_i64_of_base(input, 10, &strconv_n)
+		testing.expectf(t, n == strconv_n, "atoi(%q) set n = %v, strconv sets %v", input, n, strconv_n)
 	}
 
 	n := -1

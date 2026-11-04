@@ -231,18 +231,17 @@ int_to_cstring :: int_itoa_cstring
 /*
 	Read a string [ASCII] in a given radix.
 
-	If `n` isn't nil, it's set to the number of characters the number takes up, the sign included,
-	or 0 if there's no number, so `input[n:]` is whatever follows it.
+	If `n` isn't nil, it's set to the number of characters read, the same as `strconv`'s `n`: the
+	digits, and a leading '-' if anything follows it. So `input[n:]` is whatever comes after them.
 
 	Returns:
 	- `nil` if `input` is just the number.
 	- `.Trailing_Whitespace` if only whitespace (`' '`, `'\t'`, `'\n'`, `'\v'`, `'\f'`, `'\r'`) or NUL
 	  follows the number. `res` holds the number, so callers that don't mind trailing whitespace can
 	  treat this as success. Other callers can trim `input` first.
-	- `.Invalid_Character` if anything else follows the number, or `input` doesn't start with one.
-	  `res` holds whatever was read before that character.
-	- `.Empty_Input` if there are no digits before the whitespace, e.g. `""`, `"-"` or `"\n"`.
-	  `res` is zero.
+	- `.Invalid_Character` if anything else follows the number, or `input` doesn't start with one,
+	  e.g. `"12x"`, `"x"` or `"- \n"`. `res` holds whatever was read before that character.
+	- `.Empty_Input` if `input` is `""`, `"-"` or only whitespace. `res` is zero.
 	- `.Invalid_Argument` if `radix` isn't in 2..=64.
 */
 int_atoi :: proc(res: ^Int, input: string, radix := i8(10), n: ^int = nil, allocator := context.allocator) -> (err: Error) {
@@ -448,16 +447,21 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), n: ^int = nil, alloc
 
 	/*
 		`input` now starts at the first character that isn't a digit in the radix, if there is one.
+		Like `strconv`, `n` counts a leading '-' even when no digit follows it.
+	*/
+	if n != nil {
+		n^ = input_len - len(input)
+	}
+
+	/*
+		Without digits, whitespace alone is an empty input, but a '-' followed by whitespace is a
+		number that was cut short.
 	*/
 	if len(input) == digits_start {
-		if _is_whitespace_or_nul(input) {
+		if sign == .Zero_or_Positive && _is_whitespace_or_nul(input) {
 			return .Empty_Input
 		}
 		return .Invalid_Character
-	}
-
-	if n != nil {
-		n^ = input_len - len(input)
 	}
 
 	/*
