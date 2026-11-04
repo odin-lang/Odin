@@ -141,14 +141,12 @@ _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, 
 				return
 			}
 
-			log2 :: proc(n: int) -> (log: int) {
-				for n := n; n > 0; n >>= 1 {
-					log += 1
-				}
-				return log
+			log2 := 0
+			for n := length; n > 0; n >>= 1 {
+				log2 += 1
 			}
 
-			median_3_depth := log2(length) / 5
+			median_3_depth := log2 / 5
 			rand := 0
 			if unbalanced >= 3 {
 				unbalanced -= 1
@@ -158,7 +156,8 @@ _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, 
 
 			if !leftmost {
 				if cmp(data[pivot_index * width:], data[-width:], arg) == .Equal {
-					left := partition_lomuto_reverse(data, length, width, cmp, arg, pivot_index)
+					left := partition_hoare_reverse(data, length, width, cmp, arg, pivot_index)
+
 					data = data[left * width:]
 					length = length - left
 					leftmost = false
@@ -166,8 +165,7 @@ _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, 
 				}
 			}
 
-
-			left := partition_lomuto_block(data, length, width, cmp, arg, pivot_index)
+			left := partition_hoare(data, length, width, cmp, arg, pivot_index)
 			right := length - left
 
 			if left < right {
@@ -189,30 +187,23 @@ _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, 
 		
 	}
 
-	shell_sort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr) {
+	shell_sort :: #force_inline proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr) #no_bounds_check {
 		if length < 2 {
 			return
 		}
 
 		gaps := []int{51, 23, 10, 4, 1}
 
-		k := 0
-		for gaps[k] > length {
-			k += 1
-		}
-		for ; k < 5; k += 1 {
-			gap := gaps[k]
+		for gap in gaps {
 			for i := gap ; i < length; i += 1 {
-				j := i
-				for j >= gap && cmp(data[(j - gap) * width:], data[j * width:], arg) == .Greater {
+				for j := i; j >= gap && cmp(data[(j - gap) * width:], data[j * width:], arg) == .Greater; j -= gap {
 					ptr_swap_non_overlapping(data[(j - gap) * width:], data[j * width:], width)
-					j -= gap
 				}
 			}
 		}
 	}
 
-	median_3 :: proc(data: [^]byte, start, end, width: int, cmp: Generic_Cmp, arg: rawptr, depth: int) -> int #no_bounds_check {
+	median_3 :: proc(data: [^]byte, start, end, width: int, cmp: Generic_Cmp, arg: rawptr, depth: int) -> (piv: int) #no_bounds_check {
 		if depth == 0 {
 			return start
 		}
@@ -224,75 +215,76 @@ _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, 
 			median_3(data, start + div    , start + div * 2, width, cmp, arg, depth - 1),
 			median_3(data, start + div * 2, end            , width, cmp, arg, depth - 1),
 		}
-		
-		x := cmp(data[swap[0] * width:], data[swap[1] * width:], arg) == .Less
-		y := cmp(data[swap[0] * width:], data[swap[2] * width:], arg) == .Less
-		z := cmp(data[swap[1] * width:], data[swap[2] * width:], arg) == .Less
 
-		return swap[(int)(x == y) + (int)(y ~ z)]
+		x := cast(int)(cmp(data[swap[0] * width:], data[swap[1] * width:], arg) == .Less)
+		y := cast(int)(cmp(data[swap[1] * width:], data[swap[2] * width:], arg) == .Less)
+
+		switch x + 2*y {
+		case 0, 3: piv = swap[1]
+		case 1: 
+			if cmp(data[swap[0] * width:], data[swap[2] * width:], arg) == .Less {
+				piv = swap[2]
+			} else {
+				piv = swap[0]
+			}
+		case 2: 
+			if cmp(data[swap[0] * width:], data[swap[2] * width:], arg) == .Less {
+				piv = swap[0]
+			} else {
+				piv = swap[2]
+			}
+		}
+		
+		return piv
 	}
 
-	partition_lomuto_block :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr, pivot_index: int) -> (left: int) #no_bounds_check {
-		if pivot_index != 0 {
-			ptr_swap_non_overlapping(data[0:], data[pivot_index * width:], width)
-		}
-		pivot := data[0:]
+	// [ < |p| >= ]
+	partition_hoare :: #force_inline proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr, pivot_index: int) -> (left: int) {
+		ptr_swap_non_overlapping(data[0:], data[pivot_index * width:], width)
+
 		left = 1
+		right := length - 1
 
-		BLOCK_SIZE :: 64
-		block : [BLOCK_SIZE]u8 = ---
-		read := 1
-		block_base := 1
-
-		for {
-			unkown := length - read
-			less := 0
-			if unkown >= BLOCK_SIZE {
-				#unroll(8) for i in u8(0)..<BLOCK_SIZE {
-					block[less] = i 
-					less += cast(int)(cmp(data[read * width:], pivot, arg) == .Less)
-					read += 1
-				}
-			} else {
-				for i in 0..<unkown {
-					block[less] = u8(i) 
-					less += cast(int)(cmp(data[read * width:], pivot, arg) == .Less)
-					read += 1
-				}
-			}
-			for i in 0..<less {
-				ptr_swap_non_overlapping(data[(block_base + int(block[i])) * width:], data[left * width:], width)
-				left += 1
-			}
-			if unkown <= BLOCK_SIZE {break}
-			block_base = read
+		for { 
+			for left <= right && cmp(data[left * width:], data[0:], arg) == .Less { left += 1 }
+			for left <= right && cmp(data[right * width:], data[0:], arg) != .Less { right -= 1 }
 			
+			if left >= right {
+				break
+			}
+
+			ptr_swap_non_overlapping(data[left * width:], data[right * width:], width)
+			left += 1
+			right -= 1
 		}
-
 		left -= 1
-
 		ptr_swap_non_overlapping(data[0:], data[left * width:], width)
+
 		return left
 	}
 
-	partition_lomuto_reverse :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr, pivot_index: int) -> (right: int) #no_bounds_check {
-		if pivot_index != length - 1 {
-			ptr_swap_non_overlapping(data[(length - 1) * width:], data[pivot_index * width:], width)
-		}
-		pivot := data[(length - 1) * width:]
-		right = length - 2
+	// [ <= |p| > ]
+	partition_hoare_reverse :: #force_inline proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr, pivot_index: int) -> (left: int) {
+		ptr_swap_non_overlapping(data[0:], data[pivot_index * width:], width)
 
+		left = 1
+		right := length - 1
 
-		for read := length - 2; read >= 0; read -= 1 {
-			if cmp(data[read * width:], pivot, arg) == .Greater {
-				ptr_swap_non_overlapping(data[right * width:], data[read * width:], width)
-				right -= 1
+		for {
+			for left <= right && cmp(data[left * width:], data[0:], arg) != .Greater { left += 1 }
+			for left <= right && cmp(data[right * width:], data[0:], arg) == .Greater { right -= 1 }
+
+			if left >= right {
+				break
 			}
+
+			ptr_swap_non_overlapping(data[left * width:], data[right * width:], width)
+			left += 1
+			right -= 1
 		}
-		right += 1
+		left -= 1
+		ptr_swap_non_overlapping(data[0:], data[left * width:], width)
 
-		ptr_swap_non_overlapping(data[(length - 1) * width:], data[right * width:], width)
-
-		return right
+		return left
 	}
 }
