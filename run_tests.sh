@@ -51,16 +51,17 @@ fi
 )
 
 # Vendor library tests
-vendor_build="$here/tests/vendor/build"
+vendor_build="$here/tests/vendor"
 mkdir -p "$vendor_build"
 cp "$here"/vendor/lua/5.4/linux/*.so "$vendor_build"/
+cp "$here"/vendor/lua/5.5/linux/*.so "$vendor_build"/
 # We are possibly on Windows, so copy the DLLs as well.
 cp "$here"/vendor/lua/5.4/windows/*.dll "$vendor_build"/
+cp "$here"/vendor/lua/5.5/windows/*.dll "$vendor_build"/
 (
 	cd "$vendor_build"
-	LD_LIBRARY_PATH="$vendor_build${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" "$ODIN" test .. -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
+	LD_LIBRARY_PATH="$vendor_build${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" "$ODIN" test . -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
 )
-rm -rf "$vendor_build"
 
 # Check issues
 (
