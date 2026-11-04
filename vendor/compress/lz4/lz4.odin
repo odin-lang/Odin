@@ -2,8 +2,7 @@
 package vendor_compress_lz4
 
 when ODIN_OS == .Windows {
-	@(extra_linker_flags="/NODEFAULTLIB:libcmt")
-	foreign import lib { "lib/liblz4_static.lib", "system:ucrt.lib" }
+	foreign import lib "lib/liblz4_static.lib"
 } else {
 	foreign import lib "system:lz4"
 }
@@ -11,16 +10,19 @@ when ODIN_OS == .Windows {
 import "core:c"
 
 VERSION_MAJOR   ::  1    /* for breaking interface changes  */
-VERSION_MINOR   :: 10    /* for new (non-breaking) interface capabilities */
+VERSION_MINOR   :: 11    /* for new (non-breaking) interface capabilities */
 VERSION_RELEASE ::  0    /* for tweaks, bug-fixes, or development */
 
-VERSION_NUMBER  :: VERSION_MAJOR *100*100 + VERSION_MINOR *100 + VERSION_RELEASE
+VERSION_NUMBER  :: VERSION_MAJOR * 10_000 + VERSION_MINOR * 100 + VERSION_RELEASE
 
 MEMORY_USAGE_MIN     :: 10
 MEMORY_USAGE_DEFAULT :: 14
 MEMORY_USAGE_MAX     :: 20
 
 MEMORY_USAGE :: MEMORY_USAGE_DEFAULT
+
+ACCELERATION_DEFAULT :: 1
+ACCELERATION_MAX     :: 65537
 
 MAX_INPUT_SIZE :: 0x7E000000   /* 2_113_929_216 bytes */
 
@@ -31,7 +33,7 @@ COMPRESSBOUND :: #force_inline proc "c" (isize: c.int) -> c.int {
 
 
 DECODER_RING_BUFFER_SIZE :: #force_inline proc "c" (maxBlockSize: c.int) -> c.int {
-	return 65536 + 14 + maxBlockSize  /* for static allocation; maxBlockSize presumed valid */
+	return 65536 + 64 + maxBlockSize  /* for static allocation; maxBlockSize presumed valid */
 }
 
 @(default_calling_convention="c", link_prefix="LZ4_")
@@ -89,8 +91,8 @@ foreign lib {
 	    The larger the acceleration value, the faster the algorithm, but also the lesser the compression.
 	    It's a trade-off. It can be fine tuned, with each successive value providing roughly +~3% to speed.
 	    An acceleration value of "1" is the same as regular LZ4_compress_default()
-	    Values <= 0 will be replaced by LZ4_ACCELERATION_DEFAULT (currently == 1, see lz4.c).
-	    Values > LZ4_ACCELERATION_MAX will be replaced by LZ4_ACCELERATION_MAX (currently == 65537, see lz4.c).
+	    Values <= 0 will be replaced by ACCELERATION_DEFAULT (currently == 1).
+	    	    Values > ACCELERATION_MAX will be replaced by ACCELERATION_MAX (currently == 65537).
 	*/
 	compress_fast :: proc(src, dst: [^]byte, srcSize, dstCapacity: c.int, acceleration: c.int) -> c.int ---
 
@@ -533,11 +535,12 @@ streamHC_internal_t :: struct {
 	compressionLevel: c.short,
 	favorDecSpeed:    i8,       /* favor decompression speed if this flag set,
 	                               otherwise, favor compression ratio */
-	dirty:            i8,       /* stream has to be fully reset if this flag is set */
+	hasWorkspace:     i8,       /* the state is followed by the temporary buffer of levels >= 10 (STREAMHC_EXTSIZE) */
 	dictCtx:          ^streamHC_internal_t,
 }
 
 STREAMHC_MINSIZE :: 262200
+STREAMHC_EXTSIZE :: STREAMHC_MINSIZE + 65584
 
 streamHC_t :: struct #raw_union {
 	minStateSize:      [STREAMHC_MINSIZE]byte,
