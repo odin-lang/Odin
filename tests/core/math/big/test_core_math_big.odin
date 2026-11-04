@@ -463,6 +463,29 @@ test_atoi :: proc(t: ^testing.T) {
 		defer delete(str)
 		testing.expectf(t, str == c.expected, "atoi(%q, %v) = %v, expected %v", c.input, c.radix, str, c.expected)
 	}
+
+	// Any other character that isn't a digit in the radix is an error, at the end or in the
+	// middle, and before or after a full chunk.
+	Invalid :: struct {
+		input: string,
+		radix: i8,
+	}
+	invalid := [?]Invalid{
+		{"1Fg", 16},
+		{"f.f", 16},
+		{"-1x", 16},
+		{"123456789abcdef0123x", 16},
+		{"101012", 2},
+		{"123x", 10},
+		{"12.3", 10},
+		{"-1x", 10},
+		{"1234567890123456789012345x", 10},
+		{"12a", 10},
+	}
+	for c in invalid {
+		err := big.atoi(b, c.input, c.radix)
+		testing.expectf(t, err == .Invalid_Argument, "atoi(%q, %v) = %v, expected .Invalid_Argument", c.input, c.radix, err)
+	}
 }
 
 @(test)
