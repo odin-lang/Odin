@@ -489,6 +489,41 @@ test_atoi :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_digit_power_of_two :: proc(t: ^testing.T) {
+	// `int` is 32 bits on 32-bit targets, so these used to see only the low 32 bits of a `DIGIT`.
+	// The low 32 bits of `D` are a power of two, but `D` isn't one.
+	D :: big.DIGIT(1 << 32 | 1 << 30)
+
+	a, b, q := &big.Int{}, &big.Int{}, &big.Int{}
+	defer big.destroy(a, b, q)
+
+	big.set(a, 3)
+	testing.expect_value(t, big.int_mul_digit(b, a, D), nil)
+	product, _ := big.get(b, u64)
+	testing.expect_value(t, product, 3 * u64(D))
+
+	remainder, err := big.int_divmod_digit(q, b, D)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, remainder, 0)
+	quotient, _ := big.get(q, u64)
+	testing.expect_value(t, quotient, 3)
+
+	big.set(a, u64(1) << 40)
+	power_of_two, _ := big.int_is_power_of_two(a)
+	testing.expect(t, power_of_two, "1 << 40 is a power of two")
+
+	big.set(a, u64(1) << 32 | 1)
+	power_of_two, _ = big.int_is_power_of_two(a)
+	testing.expect(t, !power_of_two, "1 << 32 | 1 isn't a power of two")
+
+	// D^1 <= 1 << 64 < D^2
+	big.set(a, 1)
+	big.int_shl(a, a, 64)
+	log_d, _ := big.int_log(a, D)
+	testing.expect_value(t, log_d, 1)
+}
+
+@(test)
 test_itoa :: proc(t: ^testing.T) {
 	a := &big.Int{}
 	big.random(a, 2048)
