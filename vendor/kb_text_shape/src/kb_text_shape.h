@@ -1,4 +1,4 @@
-/*  kb_text_shape - v2.28g - text segmentation and shaping
+/*  kb_text_shape - v2.29 - text segmentation and shaping
     by Jimmy Lefevre
 
     SECURITY
@@ -1560,6 +1560,9 @@
      .                       .                  .                    .
 
    VERSION HISTORY
+     2.29  - Some important bug fixes. I apologize to anyone who was disturbed by the 2.28 release.
+             Many robustness improvements. The library will detect a lot more malformed fonts. It is still not hardened, though.
+             Reduce scratch size for loading fonts.
      2.28g - Fix GCC 15.2 warnings. Fix typo in version history.
      2.28f - Removed many UB unaligned memory accesses.
      2.28e - Fix word and line break positions with heterogenous-sized strings.
@@ -5048,11 +5051,11 @@ KBTS_INLINE kbts_u32 kbts__LsbPositionOrBitWidth32(kbts_u32 X)
 // #define KBTS_SANITY_CHECK
 // #define KBTS_DUMP
 
-#  ifdef KBTS_DUMP
-#    define KBTS_DUMPF(...) printf(__VA_ARGS__), fflush(stdout)
-#  else
-#    define KBTS_DUMPF(...)
-#  endif
+#ifdef KBTS_DUMP
+  #define KBTS_DUMPF(...) printf(__VA_ARGS__), fflush(stdout)
+#else
+  #define KBTS_DUMPF(...)
+#endif
 
 #ifndef KBTS_INSTRUMENT_BLOCK_BEGIN
 #define KBTS_INSTRUMENT_BLOCK_BEGIN(Name)
@@ -13905,6 +13908,8 @@ typedef struct kbts__context_font_block_header
 {
   struct kbts__context_font_block_header *Prev;
   struct kbts__context_font_block_header *Next;
+
+  kbts_b32 Visited;
 } kbts__context_font_block_header;
 
 #ifndef KBTS_CONTEXT_FONTS_PER_BLOCK
@@ -14158,32 +14163,54 @@ static kbts__indic_script_properties kbts__IndicScriptProperties(kbts_u32 Script
   return Result;
 }
 
-KBTS_INLINE kbts_u32 kbts__ReadU32Unaligned(kbts_u32 *Data)
+KBTS_INLINE kbts_u32 kbts__ReadU32Unaligned_(kbts_u32 *Data)
 {
   kbts_u32 Result;
   KBTS_MEMCPY(&Result, (void *)Data, sizeof(kbts_u32));
   return Result;
 }
-KBTS_INLINE kbts_u16 kbts__ReadU16Unaligned(const kbts_u16 *Data)
+KBTS_INLINE kbts_u16 kbts__ReadU16Unaligned_(const kbts_u16 *Data)
 {
   kbts_u16 Result;
   KBTS_MEMCPY(&Result, (void *)Data, sizeof(kbts_u16));
   return Result;
 }
-KBTS_INLINE kbts_s16 kbts__ReadS16Unaligned(kbts_s16 *Data)
+KBTS_INLINE kbts_s16 kbts__ReadS16Unaligned_(kbts_s16 *Data)
 {
   kbts_s16 Result;
   KBTS_MEMCPY(&Result, (void *)Data, sizeof(kbts_s16));
   return Result;
 }
-KBTS_INLINE void kbts__WriteU32Unaligned(kbts_u32 *Dest, kbts_u32 Value)
+KBTS_INLINE void kbts__WriteU32Unaligned_(kbts_u32 *Dest, kbts_u32 Value)
 {
   KBTS_MEMCPY((void *)Dest, &Value, sizeof(kbts_u32));
 }
-KBTS_INLINE void kbts__WriteU16Unaligned(kbts_u16 *Dest, kbts_u16 Value)
+KBTS_INLINE void kbts__WriteU16Unaligned_(kbts_u16 *Dest, kbts_u16 Value)
 {
   KBTS_MEMCPY((void *)Dest, &Value, sizeof(kbts_u16));
 }
+
+#ifndef kbts__ReadU16Unaligned
+#define kbts__ReadU16Unaligned(Pointer) kbts__ReadU16Unaligned_(Pointer)
+#endif
+#ifndef kbts__ReadU32Unaligned
+#define kbts__ReadU32Unaligned(Pointer) kbts__ReadU32Unaligned_(Pointer)
+#endif
+#ifndef kbts__ReadS16Unaligned
+#define kbts__ReadS16Unaligned(Pointer) kbts__ReadS16Unaligned_(Pointer)
+#endif
+#ifndef kbts__WriteU16Unaligned
+#define kbts__WriteU16Unaligned(Pointer, Value) kbts__WriteU16Unaligned_(Pointer, Value)
+#endif
+#ifndef kbts__OverwriteU16Unaligned
+#define kbts__OverwriteU16Unaligned(Pointer, Value) kbts__WriteU16Unaligned_(Pointer, Value)
+#endif
+#ifndef kbts__WriteU32Unaligned
+#define kbts__WriteU32Unaligned(Pointer, Value) kbts__WriteU32Unaligned_(Pointer, Value)
+#endif
+#ifndef kbts__MarkOkToRead
+#define kbts__MarkOkToRead(Pointer, Size)
+#endif
 
 KBTS_INLINE kbts_u32 kbts__ReadU32UnalignedEndOfBuffer(void *Data, kbts_un Left)
 {
@@ -14203,50 +14230,25 @@ static void kbts__ByteSwapArray16Unchecked(kbts_u16 *Array, kbts_un Count)
   }
 }
 
-static int kbts__ByteSwapArray16(kbts_u16 *Array, kbts_un Count, char *End)
-{
-  int Result = 0;
-  if((char *)(Array + Count) <= End)
-  {
-    kbts__ByteSwapArray16Unchecked(Array, Count);
-    Result = 1;
-  }
-
-  return Result;
-}
-
 static void kbts__ByteSwapArray32Unchecked(kbts_u32 *Array, kbts_un Count)
 {
-  // This is doing byte iteration to work with unaligned arrays.
-  char *At = (char *)Array;
   KBTS__FOR(WordIndex, 0, Count)
   {
-    char Byte0 = At[0];
-    char Byte1 = At[1];
-    char Byte2 = At[2];
-    char Byte3 = At[3];
-
-    At[0] = Byte3;
-    At[1] = Byte2;
-    At[2] = Byte1;
-    At[3] = Byte0;
-
-    At += sizeof(kbts_u32);
+    kbts_u32 Word = kbts__ReadU32Unaligned(&Array[WordIndex]);
+    Word = kbts__ByteSwap32(Word);
+    kbts__WriteU32Unaligned(&Array[WordIndex], Word);
   }
 }
 
-static int kbts__ByteSwapArray32(kbts_u32 *Array, kbts_un Count, char *End)
+KBTS_INLINE kbts_u16 kbts__ReadU16Be(kbts_u16 *Pointer)
 {
-  int Result = 0;
-  if((char *)(Array + Count) <= End)
-  {
-    kbts__ByteSwapArray32Unchecked(Array, Count);
-    Result = 1;
-  }
+  // We use ReadU16Unaligned_ instead of the wrapper macro because validation only happens once we
+  // start byteswapping.
+  kbts_u16 Result = kbts__ByteSwap16(kbts__ReadU16Unaligned_(Pointer));
   return Result;
 }
 
-static kbts_u16 kbts__ByteSwap16InPlace(kbts_u16 *X)
+static kbts_u16 kbts__ByteSwap16InPlaceUnchecked(kbts_u16 *X)
 {
   kbts_u16 Result = kbts__ReadU16Unaligned(X);
   Result = kbts__ByteSwap16(Result);
@@ -14254,7 +14256,7 @@ static kbts_u16 kbts__ByteSwap16InPlace(kbts_u16 *X)
   return Result;
 }
 
-static kbts_u32 kbts__ByteSwap32InPlace(kbts_u32 *X)
+static kbts_u32 kbts__ByteSwap32InPlaceUnchecked(kbts_u32 *X)
 {
   kbts_u32 Result = kbts__ReadU32Unaligned(X);
   Result = kbts__ByteSwap32(Result);
@@ -15328,6 +15330,8 @@ struct kbts__maxp
 {
   kbts_u16 Major;
   kbts_u16 Minor;
+
+  // If "version 0.5" (Major == 0, Minor == 0x5000):
   kbts_u16 GlyphCount;
 
   // If Major == 1:
@@ -15939,7 +15943,6 @@ static kbts__lookup *kbts__GetLookup(kbts__lookup_list *List, kbts_un Index)
 
 static kbts__sequence_rule_set *kbts__GetSequenceRuleSet(kbts__sequence_context_1 *Context, kbts_un Index)
 {
-  KBTS_ASSERT(Index < kbts__ReadU16Unaligned(&Context->SeqRuleSetCount));
   kbts_u16 *Offsets = (kbts_u16 *)(Context + 1);
   kbts_u16 Offset = kbts__ReadU16Unaligned(&Offsets[Index]);
 
@@ -16133,25 +16136,245 @@ typedef struct kbts__byteswap_context
 {
   char *FileBase;
   char *FileEnd;
-  kbts_u32 *Pointers;
-  kbts_un PointerCapacity;
-  kbts_un PointerCount;
+
+  kbts_u32 *MarkedBytesBitfield; // [IDIV_ROUND_UP(FileEnd - FileBase, 32) * sizeof(kbts_u32)]
+
+  char *BoundsStart;
+  char *BoundsEnd;
 
   int Error;
 } kbts__byteswap_context;
 
-static int kbts__ByteSwapArray16Context(kbts_u16 *Array, kbts_un Count, kbts__byteswap_context *Context)
+typedef struct kbts__bounds
 {
-  int Result = kbts__ByteSwapArray16(Array, Count, Context->FileEnd);
-  Context->Error |= !Result;
+  char *Start;
+  char *End;
+} kbts__bounds;
+
+static kbts__bounds kbts__BeginBounds(kbts__byteswap_context *Context, void *Start, void *End)
+{
+  kbts__bounds Result;
+  Result.Start = Context->BoundsStart;
+  Result.End = Context->BoundsEnd;
+
+  Context->BoundsStart = (char *)Start;
+  Context->BoundsEnd = (char *)End;
+
   return Result;
 }
 
-static int kbts__ByteSwapArray32Context(kbts_u32 *Array, kbts_un Count, kbts__byteswap_context *Context)
+static void kbts__EndBounds(kbts__byteswap_context *Context, kbts__bounds *Bounds)
 {
-  int Result = kbts__ByteSwapArray32(Array, Count, Context->FileEnd);
-  Context->Error |= !Result;
+  Context->BoundsStart = Bounds->Start;
+  Context->BoundsEnd = Bounds->End;
+}
+
+typedef kbts_u32 kbts__check_and_mark_region_result_flags;
+enum kbts__check_and_mark_region_result_flags_enum
+{
+  KBTS__CHECK_AND_MARK_REGION_RESULT_FLAG_NONE = 0,
+  KBTS__CHECK_AND_MARK_REGION_RESULT_FLAG_IN_BOUNDS = 1,
+  KBTS__CHECK_AND_MARK_REGION_RESULT_FLAG_NEEDS_BYTESWAP = 2,
+};
+
+static kbts_b32 kbts__AddressIsMarked(kbts__byteswap_context *Context, void *Pointer)
+{
+  kbts_b32 Result = 1;
+
+  if(!Context->Error && Pointer)
+  {
+    if(((char *)Pointer >= Context->BoundsStart) && ((char *)Pointer < Context->BoundsEnd))
+    {
+      // @Incomplete: Make this table-local.
+      char *OnePastHeader = Context->FileBase + sizeof(kbts_blob_header);
+      kbts_un Offset = (char *)Pointer - OnePastHeader;
+
+      kbts_un WordOffset = Offset / 32;
+      kbts_un BitOffset = Offset % 32;
+
+      Result = Context->MarkedBytesBitfield[WordOffset] & (1u << BitOffset);
+    }
+    else
+    {
+      Context->Error = 1;
+    }
+  }
+
   return Result;
+}
+
+static kbts_b32 kbts__SpanIsInBounds(kbts__byteswap_context *Context, void *Start, void *End)
+{
+  kbts_b32 Result = ((char *)Start >= Context->BoundsStart) && ((char *)End <= (char *)Context->BoundsEnd);
+  return Result;
+}
+
+static kbts__check_and_mark_region_result_flags kbts__CheckAndMarkRegion(kbts__byteswap_context *Context, void *Start, void *End)
+{
+  kbts__check_and_mark_region_result_flags Result = 0;
+
+  if(!Context->Error)
+  {
+    if(((char *)Start <= (char *)End) &&
+       ((char *)Start >= Context->BoundsStart) && ((char *)End <= (char *)Context->BoundsEnd))
+    {
+      Result |= KBTS__CHECK_AND_MARK_REGION_RESULT_FLAG_IN_BOUNDS;
+
+      // @Incomplete: Make this table-local.
+      char *OnePastHeader = Context->FileBase + sizeof(kbts_blob_header);
+      kbts_un StartOffset = (char *)Start - OnePastHeader;
+      kbts_un EndOffset = (char *)End - OnePastHeader;
+
+      kbts_un StartWordOffset = StartOffset / 32;
+      kbts_un StartWordBitOffset = StartOffset % 32;
+      kbts_un OnePastLastWordOffset = ((EndOffset - 1) / 32) + 1;
+      kbts_un EndWordBitOffset = EndOffset % 32;
+
+      // We expect the whole range to be either fully marked or fully unmarked.
+      kbts_u32 ExpectedBitsMask = (Context->MarkedBytesBitfield[StartWordOffset] & (1u << StartWordBitOffset)) ? 0xFFFFFFFFu : 0;
+
+      kbts_u32 StartWordMask = 0xFFFFFFFFu << StartWordBitOffset;
+      kbts_u32 EndWordMask = 0xFFFFFFFFu;
+      if(EndWordBitOffset)
+      {
+        EndWordMask >>= 32 - EndWordBitOffset;
+      }
+
+      for(kbts_un WordOffset = StartWordOffset;
+          WordOffset < OnePastLastWordOffset;
+          ++WordOffset)
+      {
+        kbts_u32 UnexpectedBits = Context->MarkedBytesBitfield[WordOffset] ^ ExpectedBitsMask;
+        if(WordOffset == StartWordOffset)
+        {
+          UnexpectedBits &= StartWordMask;
+        }
+        if((WordOffset + 1) == OnePastLastWordOffset)
+        {
+          UnexpectedBits &= EndWordMask;
+        }
+
+        if(UnexpectedBits)
+        {
+          Context->Error = 1;
+
+          break;
+        }
+      }
+
+      if(!Context->Error & !ExpectedBitsMask)
+      {
+        // All good. We can mark.
+        Result |= KBTS__CHECK_AND_MARK_REGION_RESULT_FLAG_NEEDS_BYTESWAP;
+
+        for(kbts_un WordOffset = StartWordOffset;
+            WordOffset < OnePastLastWordOffset;
+            ++WordOffset)
+        {
+          kbts_u32 Mask = 0xFFFFFFFFu;
+          if(WordOffset == StartWordOffset)
+          {
+            Mask &= StartWordMask;
+          }
+          if((WordOffset + 1) == OnePastLastWordOffset)
+          {
+            Mask &= EndWordMask;
+          }
+
+          Context->MarkedBytesBitfield[WordOffset] |= Mask;
+        }
+      }
+    }
+    else
+    {
+      Context->Error = 1;
+    }
+  }
+
+  return Result;
+}
+
+static kbts_b32 kbts__MarkOkToReadContext(kbts__byteswap_context *Context, void *Pointer, kbts_un Size)
+{
+  kbts__check_and_mark_region_result_flags Flags = kbts__CheckAndMarkRegion(Context, Pointer, (char *)Pointer + Size);
+  if(Flags & KBTS__CHECK_AND_MARK_REGION_RESULT_FLAG_NEEDS_BYTESWAP)
+  {
+    kbts__MarkOkToRead(Pointer, Size);
+  }
+
+  return !Context->Error;
+}
+
+static kbts_b32 kbts__ByteSwapArray16Context(kbts__byteswap_context *Context, kbts_u16 *Array, kbts_un Count)
+{
+  kbts__check_and_mark_region_result_flags Flags = kbts__CheckAndMarkRegion(Context, Array, Array + Count);
+  if(Flags & KBTS__CHECK_AND_MARK_REGION_RESULT_FLAG_NEEDS_BYTESWAP)
+  {
+    kbts__ByteSwapArray16Unchecked(Array, Count);
+  }
+
+  return !Context->Error;
+}
+
+static kbts_b32 kbts__ByteSwapArray32Context(kbts__byteswap_context *Context, kbts_u32 *Array, kbts_un Count)
+{
+  kbts__check_and_mark_region_result_flags Flags = kbts__CheckAndMarkRegion(Context, Array, Array + Count);
+  if(Flags & KBTS__CHECK_AND_MARK_REGION_RESULT_FLAG_NEEDS_BYTESWAP)
+  {
+    kbts__ByteSwapArray32Unchecked(Array, Count);
+  }
+
+  return !Context->Error;
+}
+
+static kbts_b32 kbts__ByteSwap16InPlaceContext(kbts__byteswap_context *Context, kbts_u16 *Pointer, kbts_un *ByteSwappedValue)
+{
+  kbts__check_and_mark_region_result_flags Flags = kbts__CheckAndMarkRegion(Context, Pointer, Pointer + 1);
+  kbts_u16 Value = 0;
+
+  if(Flags & KBTS__CHECK_AND_MARK_REGION_RESULT_FLAG_IN_BOUNDS)
+  {
+    Value = kbts__ReadU16Unaligned(Pointer);
+
+    if(Flags & KBTS__CHECK_AND_MARK_REGION_RESULT_FLAG_NEEDS_BYTESWAP)
+    {
+      Value = kbts__ByteSwap16(Value);
+
+      kbts__WriteU16Unaligned(Pointer, Value);
+    }
+  }
+
+  if(ByteSwappedValue)
+  {
+    *ByteSwappedValue = Value;
+  }
+
+  return !Context->Error;
+}
+
+static kbts_b32 kbts__ByteSwap32InPlaceContext(kbts__byteswap_context *Context, kbts_u32 *Pointer, kbts_un *ByteSwappedValue)
+{
+  kbts__check_and_mark_region_result_flags Flags = kbts__CheckAndMarkRegion(Context, Pointer, Pointer + 1);
+  kbts_u32 Value = 0;
+
+  if(Flags & KBTS__CHECK_AND_MARK_REGION_RESULT_FLAG_IN_BOUNDS)
+  {
+    Value = kbts__ReadU32Unaligned(Pointer);
+
+    if(Flags & KBTS__CHECK_AND_MARK_REGION_RESULT_FLAG_NEEDS_BYTESWAP)
+    {
+      Value = kbts__ByteSwap32(Value);
+
+      kbts__WriteU32Unaligned(Pointer, Value);
+    }
+  }
+
+  if(ByteSwappedValue)
+  {
+    *ByteSwappedValue = Value;
+  }
+
+  return !Context->Error;
 }
 
 typedef struct kbts__cover_glyph_result
@@ -16187,166 +16410,137 @@ KBTS_INLINE int kbts__GposLookupBeginsWithCoverage(kbts_u16 LookupType, kbts_u16
   return Result;
 }
 
-static int kbts__AlreadyVisited(kbts__byteswap_context *Context, void *Pointer)
-{
-  int Result = !Pointer || Context->Error;
-
-  if(!Result)
-  {
-    kbts_u32 *Pointers = Context->Pointers;
-    kbts_u32 Pointer32 = KBTS__POINTER_DIFF32(Pointer, Context->FileBase);
-
-    kbts_un Index = 0;
-    if(Context->PointerCount)
-    {
-      kbts_un PointerCount = Context->PointerCount;
-      if(PointerCount)
-      {
-        while(PointerCount > 1)
-        {
-          kbts_un HalfCount = PointerCount / 2;
-          Index = (Pointers[Index + HalfCount - 1] < Pointer32) ? (Index + HalfCount) : Index;
-          PointerCount -= HalfCount;
-        }
-        Result = (Pointer32 == Pointers[Index]);
-      }
-    }
-
-    if(!Result && (Context->PointerCount < Context->PointerCapacity))
-    {
-      while((Index < Context->PointerCount) && (Pointers[Index] < Pointer32)) ++Index;
-
-      for(kbts_un GrowIndex = Context->PointerCount; GrowIndex > Index; --GrowIndex)
-      {
-        Pointers[GrowIndex] = Pointers[GrowIndex - 1];
-      }
-      Pointers[Index] = Pointer32;
-      Context->PointerCount += 1;
-    }
-  }
-
-  return Result;
-}
-
 static void kbts__ByteSwapFeature(kbts__byteswap_context *Context, kbts__feature *Feature)
 {
-  if(!kbts__AlreadyVisited(Context, Feature))
+  kbts_u16 *LookupIndices = KBTS__POINTER_AFTER(kbts_u16, Feature);
+  if(!kbts__AddressIsMarked(Context, Feature) &&
+     kbts__ByteSwapArray16Context(Context, &Feature->FeatureParamsOffset, 2))
   {
-    kbts_u16 *LookupIndices = KBTS__POINTER_AFTER(kbts_u16, Feature);
-    Context->Error |= !kbts__ByteSwapArray16(&Feature->FeatureParamsOffset, 2, Context->FileEnd);
     kbts_un Feature_LookupIndexCount = kbts__ReadU16Unaligned(&Feature->LookupIndexCount);
-    Context->Error |= !kbts__ByteSwapArray16(LookupIndices, Feature_LookupIndexCount, Context->FileEnd);
-
-    // We require lookup indices to be sorted per feature for the lookup application order to match Harfbuzz.
-    // Lookup indices are _typically_ sorted per feature, but we can't assume it is always the case.
-    KBTS__FOR(Iter, 0, Feature_LookupIndexCount)
+    if(kbts__ByteSwapArray16Context(Context, LookupIndices, Feature_LookupIndexCount))
     {
-      KBTS__FOR(IndexIndex, 1, Feature_LookupIndexCount)
+      // We require lookup indices to be sorted per feature for the lookup application order to match Harfbuzz.
+      // Lookup indices are _typically_ sorted per feature, but we can't assume it is always the case.
+      KBTS__FOR(Iter, 0, Feature_LookupIndexCount)
       {
-        kbts_u16 Left = kbts__ReadU16Unaligned(&LookupIndices[IndexIndex - 1]);
-        kbts_u16 Right = kbts__ReadU16Unaligned(&LookupIndices[IndexIndex]);
-
-        if(Left > Right)
+        KBTS__FOR(IndexIndex, 1, Feature_LookupIndexCount)
         {
-          kbts__WriteU16Unaligned(&LookupIndices[IndexIndex - 1], Right);
-          kbts__WriteU16Unaligned(&LookupIndices[IndexIndex], Left);
+          kbts_u16 Left = kbts__ReadU16Unaligned(&LookupIndices[IndexIndex - 1]);
+          kbts_u16 Right = kbts__ReadU16Unaligned(&LookupIndices[IndexIndex]);
+
+          if(Left > Right)
+          {
+            kbts__WriteU16Unaligned_(&LookupIndices[IndexIndex - 1], Right);
+            kbts__WriteU16Unaligned_(&LookupIndices[IndexIndex], Left);
+          }
         }
       }
+
+      #ifdef KBTS_DUMP
+      KBTS__FOR(LookupIndexIndex, 0, Feature_LookupIndexCount)
+      {
+        KBTS_DUMPF("  Lookup index %u\n", kbts__ReadU16Unaligned(&LookupIndices[LookupIndexIndex]));
+      }
+      #endif
     }
   }
-
-#  ifdef KBTS_DUMP
-  kbts_u16 *LookupIndices = KBTS__POINTER_AFTER(kbts_u16, Feature);
-  kbts_un Feature_LookupIndexCount = kbts__ReadU16Unaligned(&Feature->LookupIndexCount);
-  KBTS__FOR(LookupIndexIndex, 0, Feature_LookupIndexCount)
-  {
-    KBTS_DUMPF("  Lookup index %u\n", kbts__ReadU16Unaligned(&LookupIndices[LookupIndexIndex]));
-  }
-#  endif
 }
 
 static void kbts__ByteSwapGsubGposCommon(kbts__byteswap_context *Context, kbts__gsub_gpos *Header)
 {
-  kbts__ByteSwapArray16Context(&Header->Major, 5, Context);
+  kbts__ByteSwapArray16Context(Context, &Header->Major, 5);
   kbts_u16 Header_Minor = kbts__ReadU16Unaligned(&Header->Minor);
 
   if(Header_Minor == 1)
   {
-    kbts__ByteSwap32InPlace(&Header->FeatureVariationsOffset);
+    kbts__ByteSwap32InPlaceContext(Context, &Header->FeatureVariationsOffset, 0);
   }
 
   kbts__script_list *ScriptList = KBTS__POINTER_OFFSET(kbts__script_list, Header, kbts__ReadU16Unaligned(&Header->ScriptListOffset));
-  if(!kbts__AlreadyVisited(Context, ScriptList))
+  kbts_un ScriptListScriptCount;
+  if(kbts__ByteSwap16InPlaceContext(Context, &ScriptList->Count, &ScriptListScriptCount))
   {
-    kbts_un ScriptListScriptCount = kbts__ByteSwap16InPlace(&ScriptList->Count);
-
     kbts__script_record *ScriptRecords = KBTS__POINTER_AFTER(kbts__script_record, ScriptList);
+
+    if((char *)(ScriptRecords + ScriptListScriptCount) > Context->BoundsEnd)
+    {
+      Context->Error = 1;
+      return;
+    }
+
     KBTS__FOR(It, 0, ScriptListScriptCount)
     {
       kbts__script_record *Record = &ScriptRecords[It];
-      kbts_un RecordScriptOffset = kbts__ByteSwap16InPlace(&Record->Offset);
+      kbts__MarkOkToReadContext(Context, &Record->Tag, sizeof(Record->Tag));
 
-      KBTS_DUMPF("Script %.4s\n", (char *)&Record->Tag);
-
-      kbts__ot_script *Script = KBTS__POINTER_OFFSET(kbts__ot_script, ScriptList, RecordScriptOffset);
-      if(!kbts__AlreadyVisited(Context, Script))
+      kbts_un RecordScriptOffset;
+      if(kbts__ByteSwap16InPlaceContext(Context, &Record->Offset, &RecordScriptOffset))
       {
-        kbts__ByteSwap16InPlace(&Script->DefaultLangsysOffset);
-        kbts_un ScriptLangsysCount = kbts__ByteSwap16InPlace(&Script->Count);
+        KBTS_DUMPF("Script %.4s\n", (char *)&Record->Tag);
 
-        kbts__langsys *DefaultLangsys = kbts__GetDefaultLangsys(Script);
+        kbts__ot_script *Script = KBTS__POINTER_OFFSET(kbts__ot_script, ScriptList, RecordScriptOffset);
 
-        if(DefaultLangsys && !kbts__AlreadyVisited(Context, DefaultLangsys))
+        kbts_un ScriptLangsysCount;
+        if(kbts__ByteSwap16InPlaceContext(Context, &Script->DefaultLangsysOffset, 0) &&
+           kbts__ByteSwap16InPlaceContext(Context, &Script->Count, &ScriptLangsysCount))
         {
-          kbts__ByteSwapArray16Context(&DefaultLangsys->LookupOrderOffset, 3, Context);
-          kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, DefaultLangsys), kbts__ReadU16Unaligned(&DefaultLangsys->FeatureIndexCount), Context);
-        }
+          kbts__langsys *DefaultLangsys = kbts__GetDefaultLangsys(Script);
 
-        kbts__langsys_record *LangsysRecords = KBTS__POINTER_AFTER(kbts__langsys_record, Script);
-        KBTS__FOR(LangsysIndex, 0, ScriptLangsysCount)
-        {
-          kbts__langsys_record *LangsysRecord = &LangsysRecords[LangsysIndex];
-          kbts_un LangsysRecord_Offset = kbts__ByteSwap16InPlace(&LangsysRecord->Offset);
-
-          kbts__langsys *Langsys = KBTS__POINTER_OFFSET(kbts__langsys, Script, LangsysRecord_Offset);
-          if(!kbts__AlreadyVisited(Context, Langsys))
+          if(DefaultLangsys &&
+             kbts__ByteSwapArray16Context(Context, &DefaultLangsys->LookupOrderOffset, 3))
           {
-            kbts__ByteSwapArray16Context(&Langsys->LookupOrderOffset, 3, Context);
-            kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Langsys), kbts__ReadU16Unaligned(&Langsys->FeatureIndexCount), Context);
+            kbts_un FeatureIndexCount = kbts__ReadU16Unaligned(&DefaultLangsys->FeatureIndexCount);
+            kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, DefaultLangsys), FeatureIndexCount);
           }
-        }
+
+          kbts__langsys_record *LangsysRecords = KBTS__POINTER_AFTER(kbts__langsys_record, Script);
+          KBTS__FOR(LangsysIndex, 0, ScriptLangsysCount)
+          {
+            kbts__langsys_record *LangsysRecord = &LangsysRecords[LangsysIndex];
+            kbts__MarkOkToReadContext(Context, &LangsysRecord->Tag, sizeof(LangsysRecord->Tag));
+            kbts_un LangsysRecord_Offset;
+            if(kbts__ByteSwap16InPlaceContext(Context, &LangsysRecord->Offset, &LangsysRecord_Offset))
+            {
+              kbts__langsys *Langsys = KBTS__POINTER_OFFSET(kbts__langsys, Script, LangsysRecord_Offset);
+              if(kbts__ByteSwapArray16Context(Context, &Langsys->LookupOrderOffset, 3))
+              {
+                kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, Langsys), kbts__ReadU16Unaligned(&Langsys->FeatureIndexCount));
+              }
+            }
+          }
 
 #  ifdef KBTS_DUMP
-        if(DefaultLangsys)
-        {
-          KBTS_DUMPF("  Default langsys @ %zu\n", (char *)DefaultLangsys - Context->FileBase);
-          KBTS_DUMPF("    Lookup order offset %u\n", kbts__ReadU16Unaligned(&DefaultLangsys->LookupOrderOffset));
-          KBTS_DUMPF("    Required feature %u\n", kbts__ReadU16Unaligned(&DefaultLangsys->RequiredFeatureIndex));
-          kbts_u16 *FeatureIndices = KBTS__POINTER_AFTER(kbts_u16, DefaultLangsys);
-          KBTS__FOR(FeatureIndexIndex, 0, kbts__ReadU16Unaligned(&DefaultLangsys->FeatureIndexCount))
+          if(DefaultLangsys)
           {
-            KBTS_DUMPF("      Feature %u\n", kbts__ReadU16Unaligned(&FeatureIndices[FeatureIndexIndex]));
+            KBTS_DUMPF("  Default langsys @ %zu\n", (char *)DefaultLangsys - Context->FileBase);
+            KBTS_DUMPF("    Lookup order offset %u\n", kbts__ReadU16Unaligned(&DefaultLangsys->LookupOrderOffset));
+            KBTS_DUMPF("    Required feature %u\n", kbts__ReadU16Unaligned(&DefaultLangsys->RequiredFeatureIndex));
+            kbts_u16 *FeatureIndices = KBTS__POINTER_AFTER(kbts_u16, DefaultLangsys);
+            KBTS__FOR(FeatureIndexIndex, 0, kbts__ReadU16Unaligned(&DefaultLangsys->FeatureIndexCount))
+            {
+              KBTS_DUMPF("      Feature %u\n", kbts__ReadU16Unaligned(&FeatureIndices[FeatureIndexIndex]));
+            }
           }
-        }
 
-        KBTS__FOR(LangsysIndex, 0, ScriptLangsysCount)
-        {
-          kbts__langsys_record *LangsysRecord = &LangsysRecords[LangsysIndex];
-          kbts_un LangsysRecord_Offset = kbts__ReadU16Unaligned(&LangsysRecord->Offset);
-
-          kbts__langsys *Langsys = KBTS__POINTER_OFFSET(kbts__langsys, Script, LangsysRecord_Offset);
-          KBTS_DUMPF("    Langsys %.4s @ %zu\n", (char *)&LangsysRecord->Tag, (char *)Script + LangsysRecord_Offset - Context->FileBase);
-          KBTS_DUMPF("    Lookup order offset %u\n"
-                     "    Required feature %u\n",
-                     kbts__ReadU16Unaligned(&Langsys->LookupOrderOffset), kbts__ReadU16Unaligned(&Langsys->RequiredFeatureIndex));
-          kbts_u16 *FeatureIndices = KBTS__POINTER_AFTER(kbts_u16, Langsys);
-          kbts_un Langsys_FeatureIndexCount = kbts__ReadU16Unaligned(&Langsys->FeatureIndexCount);
-          KBTS__FOR(FeatureIndexIndex, 0, Langsys_FeatureIndexCount)
+          KBTS__FOR(LangsysIndex, 0, ScriptLangsysCount)
           {
-            KBTS_DUMPF("      Feature %u\n", kbts__ReadU16Unaligned(&FeatureIndices[FeatureIndexIndex]));
+            kbts__langsys_record *LangsysRecord = &LangsysRecords[LangsysIndex];
+            kbts_un LangsysRecord_Offset = kbts__ReadU16Unaligned(&LangsysRecord->Offset);
+
+            kbts__langsys *Langsys = KBTS__POINTER_OFFSET(kbts__langsys, Script, LangsysRecord_Offset);
+            KBTS_DUMPF("    Langsys %.4s @ %zu\n", (char *)&LangsysRecord->Tag, (char *)Script + LangsysRecord_Offset - Context->FileBase);
+            KBTS_DUMPF("    Lookup order offset %u\n"
+                       "    Required feature %u\n",
+                       kbts__ReadU16Unaligned(&Langsys->LookupOrderOffset), kbts__ReadU16Unaligned(&Langsys->RequiredFeatureIndex));
+            kbts_u16 *FeatureIndices = KBTS__POINTER_AFTER(kbts_u16, Langsys);
+            kbts_un Langsys_FeatureIndexCount = kbts__ReadU16Unaligned(&Langsys->FeatureIndexCount);
+            KBTS__FOR(FeatureIndexIndex, 0, Langsys_FeatureIndexCount)
+            {
+              KBTS_DUMPF("      Feature %u\n", kbts__ReadU16Unaligned(&FeatureIndices[FeatureIndexIndex]));
+            }
           }
+  #  endif
         }
-#  endif
       }
     }
 
@@ -16355,51 +16549,54 @@ static void kbts__ByteSwapGsubGposCommon(kbts__byteswap_context *Context, kbts__
     {
       kbts__feature_variations *FeatureVariations = KBTS__POINTER_OFFSET(kbts__feature_variations, Header, Header_FeatureVariationsOffset);
 
-      if(!kbts__AlreadyVisited(Context, FeatureVariations))
+      kbts_un FeatureVariations_RecordCount;
+      if(kbts__ByteSwapArray16Context(Context, &FeatureVariations->Major, 2) &&
+         kbts__ByteSwap32InPlaceContext(Context, &FeatureVariations->RecordCount, &FeatureVariations_RecordCount))
       {
-        kbts__ByteSwapArray16Context(&FeatureVariations->Major, 2, Context);
-        kbts_un FeatureVariations_RecordCount = kbts__ByteSwap32InPlace(&FeatureVariations->RecordCount);
-
         kbts__feature_variation_record *Records = KBTS__POINTER_AFTER(kbts__feature_variation_record, FeatureVariations);
+
         KBTS__FOR(VariationIndex, 0, FeatureVariations_RecordCount)
         {
           kbts__feature_variation_record *Record = &Records[VariationIndex];
 
-          kbts__ByteSwapArray32Context(&Record->ConditionSetOffset, 2, Context);
-
-          kbts__condition_set *Set = KBTS__POINTER_OFFSET(kbts__condition_set, FeatureVariations, kbts__ReadU32Unaligned(&Record->ConditionSetOffset));
-          if(!kbts__AlreadyVisited(Context, Set))
+          if(kbts__ByteSwapArray32Context(Context, &Record->ConditionSetOffset, 2))
           {
-            kbts_un Set_Count = kbts__ByteSwap16InPlace(&Set->Count);
-
-            kbts_u32 *ConditionOffsets = KBTS__POINTER_AFTER(kbts_u32, Set);
-            kbts__ByteSwapArray32Context(ConditionOffsets, Set_Count, Context);
-
-            KBTS__FOR(ConditionIndex, 0, Set_Count)
+            kbts_un ConditionSetOffset = kbts__ReadU32Unaligned(&Record->ConditionSetOffset);
+            kbts__condition_set *Set = KBTS__POINTER_OFFSET(kbts__condition_set, FeatureVariations, ConditionSetOffset);
+            kbts_un Set_Count;
+            if(kbts__ByteSwap16InPlaceContext(Context, &Set->Count, &Set_Count))
             {
-              kbts__condition_1 *Condition = KBTS__POINTER_OFFSET(kbts__condition_1, Set, kbts__ReadU32Unaligned(&ConditionOffsets[ConditionIndex]));
-
-              if(!kbts__AlreadyVisited(Context, Condition))
+              kbts_u32 *ConditionOffsets = KBTS__POINTER_AFTER(kbts_u32, Set);
+              if(kbts__ByteSwapArray32Context(Context, ConditionOffsets, Set_Count))
               {
-                kbts__ByteSwapArray16Context(&Condition->Format, 4, Context);
+                KBTS__FOR(ConditionIndex, 0, Set_Count)
+                {
+                  kbts_un ConditionOffset = kbts__ReadU32Unaligned(&ConditionOffsets[ConditionIndex]);
+                  kbts__condition_1 *Condition = KBTS__POINTER_OFFSET(kbts__condition_1, Set, ConditionOffset);
+
+                  kbts__ByteSwapArray16Context(Context, &Condition->Format, 4);
+                }
               }
-            }
 
-            kbts__feature_table_substitution *FeatureSubst = KBTS__POINTER_OFFSET(kbts__feature_table_substitution, FeatureVariations, kbts__ReadU32Unaligned(&Record->FeatureTableSubstitutionOffset));
-            if(!kbts__AlreadyVisited(Context, FeatureSubst))
-            {
-              kbts__ByteSwapArray16Context(&FeatureSubst->Major, 3, Context);
-
-              kbts__feature_table_substitution_record *SubstRecords = KBTS__POINTER_AFTER(kbts__feature_table_substitution_record, FeatureSubst);
-              kbts_un FeatureSubst_Count = kbts__ReadU16Unaligned(&FeatureSubst->Count);
-              KBTS__FOR(SubstRecordIndex, 0, FeatureSubst_Count)
+              kbts_un FeatureTableSubstitutionOffset = kbts__ReadU32Unaligned(&Record->FeatureTableSubstitutionOffset);
+              kbts__feature_table_substitution *FeatureSubst = KBTS__POINTER_OFFSET(kbts__feature_table_substitution, FeatureVariations, FeatureTableSubstitutionOffset);
+              if(kbts__ByteSwapArray16Context(Context, &FeatureSubst->Major, 3))
               {
-                kbts__feature_table_substitution_record *SubstRecord = &SubstRecords[SubstRecordIndex];
-                kbts__ByteSwap16InPlace(&SubstRecord->FeatureIndex);
-                kbts_un SubstRecord_AlternateFeatureOffset = kbts__ByteSwap32InPlace(&SubstRecord->AlternateFeatureOffset);
-
-                kbts__feature *Feature = KBTS__POINTER_OFFSET(kbts__feature, FeatureSubst, SubstRecord_AlternateFeatureOffset);
-                kbts__ByteSwapFeature(Context, Feature);
+                kbts__feature_table_substitution_record *SubstRecords = KBTS__POINTER_AFTER(kbts__feature_table_substitution_record, FeatureSubst);
+                kbts_un FeatureSubst_Count = kbts__ReadU16Unaligned(&FeatureSubst->Count);
+                KBTS__FOR(SubstRecordIndex, 0, FeatureSubst_Count)
+                {
+                  kbts__feature_table_substitution_record *SubstRecord = &SubstRecords[SubstRecordIndex];
+                  if(kbts__ByteSwap16InPlaceContext(Context, &SubstRecord->FeatureIndex, 0))
+                  {
+                    kbts_un SubstRecord_AlternateFeatureOffset;
+                    if(kbts__ByteSwap32InPlaceContext(Context, &SubstRecord->AlternateFeatureOffset, &SubstRecord_AlternateFeatureOffset))
+                    {
+                      kbts__feature *Feature = KBTS__POINTER_OFFSET(kbts__feature, FeatureSubst, SubstRecord_AlternateFeatureOffset);
+                      kbts__ByteSwapFeature(Context, Feature);
+                    }
+                  }
+                }
               }
             }
           }
@@ -16409,9 +16606,9 @@ static void kbts__ByteSwapGsubGposCommon(kbts__byteswap_context *Context, kbts__
   }
 
   kbts__feature_list *FeatureList = KBTS__POINTER_OFFSET(kbts__feature_list, Header, kbts__ReadU16Unaligned(&Header->FeatureListOffset));
-  if(!kbts__AlreadyVisited(Context, FeatureList))
+  kbts_un FeatureList_Count;
+  if(kbts__ByteSwap16InPlaceContext(Context, &FeatureList->Count, &FeatureList_Count))
   {
-    kbts_un FeatureList_Count = kbts__ByteSwap16InPlace(&FeatureList->Count);
     kbts__feature_record *FeatureRecords = KBTS__POINTER_AFTER(kbts__feature_record, FeatureList);
     KBTS__FOR(FeatureRecordIndex, 0, FeatureList_Count)
     {
@@ -16419,10 +16616,10 @@ static void kbts__ByteSwapGsubGposCommon(kbts__byteswap_context *Context, kbts__
 
       KBTS_DUMPF("Feature %llu %.4s\n", FeatureRecordIndex, (char *)&FeatureRecord->Tag);
 
-      if(!kbts__AlreadyVisited(Context, FeatureRecord))
+      kbts__MarkOkToReadContext(Context, &FeatureRecord->Tag, 4);
+      kbts_un FeatureRecord_Offset;
+      if(kbts__ByteSwap16InPlaceContext(Context, &FeatureRecord->Offset, &FeatureRecord_Offset))
       {
-        kbts_un FeatureRecord_Offset = kbts__ByteSwap16InPlace(&FeatureRecord->Offset);
-
         kbts__feature *Feature = KBTS__POINTER_OFFSET(kbts__feature, FeatureList, FeatureRecord_Offset);
         kbts__ByteSwapFeature(Context, Feature);
       }
@@ -16430,15 +16627,15 @@ static void kbts__ByteSwapGsubGposCommon(kbts__byteswap_context *Context, kbts__
   }
 }
 
-static int kbts__ByteSwapLookup(kbts__byteswap_context *Context, kbts__lookup *Lookup)
+static kbts_b32 kbts__ByteSwapLookup(kbts__byteswap_context *Context, kbts__lookup *Lookup)
 {
-  int Result = 0;
+  kbts_b32 Result = 0;
 
-  if(!kbts__AlreadyVisited(Context, Lookup))
+  if(!kbts__AddressIsMarked(Context, Lookup))
   {
     Result = 1;
 
-    kbts__ByteSwapArray16Context(&Lookup->Type, 3, Context);
+    kbts__ByteSwapArray16Context(Context, &Lookup->Type, 3);
     kbts_u16 *SubtableOffsets = KBTS__POINTER_AFTER(kbts_u16, Lookup);
 
     kbts_un U16Count = kbts__ReadU16Unaligned(&Lookup->SubtableCount);
@@ -16446,7 +16643,8 @@ static int kbts__ByteSwapLookup(kbts__byteswap_context *Context, kbts__lookup *L
     {
       U16Count += 1;
     }
-    kbts__ByteSwapArray16Context(SubtableOffsets, U16Count, Context);
+
+    kbts__ByteSwapArray16Context(Context, SubtableOffsets, U16Count);
   }
 
   return Result;
@@ -16459,9 +16657,9 @@ static int kbts__ByteSwapLookup(kbts__byteswap_context *Context, kbts__lookup *L
 
 static void kbts__ByteSwapCoverage(kbts__byteswap_context *Context, kbts__coverage *Coverage)
 {
-  if(!kbts__AlreadyVisited(Context, Coverage))
+  if(!kbts__AddressIsMarked(Context, Coverage))
   {
-    kbts__ByteSwapArray16Context(&Coverage->Format, 2, Context);
+    kbts__ByteSwapArray16Context(Context, &Coverage->Format, 2);
 
     kbts_un U16Count = 0;
     kbts_u16 Coverage_Format = kbts__ReadU16Unaligned(&Coverage->Format);
@@ -16476,16 +16674,32 @@ static void kbts__ByteSwapCoverage(kbts__byteswap_context *Context, kbts__covera
       U16Count = Coverage_Count * 3;
     }
 
-    kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Coverage), U16Count, Context);
+    kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, Coverage), U16Count);
+  }
+}
+
+static void kbts__ByteSwapDevice(kbts__byteswap_context *Context, kbts__device *Device)
+{
+  if(!kbts__AddressIsMarked(Context, Device))
+  {
+
+    if(kbts__ByteSwapArray16Context(Context, &Device->U.Device.StartSize, 3))
+    {
+      /* @Incomplete
+      if(kbts__ReadU16Unaligned(&Device->DeltaFormat) <= 3)
+      {
+      }
+      */
+    }
   }
 }
 
 static void kbts__ByteSwapAnchor(kbts__byteswap_context *Context, kbts__anchor *Anchor)
 {
-  if(!kbts__AlreadyVisited(Context, Anchor))
+  kbts_un Anchor_Format;
+  if(!kbts__AddressIsMarked(Context, Anchor) &&
+     kbts__ByteSwap16InPlaceContext(Context, &Anchor->Format, &Anchor_Format))
   {
-    kbts_un Anchor_Format = kbts__ByteSwap16InPlace(&Anchor->Format);
-
     kbts_un U16Count = 2;
     if(Anchor_Format == 2)
     {
@@ -16496,40 +16710,39 @@ static void kbts__ByteSwapAnchor(kbts__byteswap_context *Context, kbts__anchor *
       U16Count = 4;
     }
 
-    kbts__ByteSwapArray16Context((kbts_u16 *)&Anchor->X, U16Count, Context);
+    kbts__ByteSwapArray16Context(Context, (kbts_u16 *)&Anchor->X, U16Count);
+
+    if(Anchor_Format == 3)
+    {
+      kbts__device *XDevice = KBTS__POINTER_OFFSET(kbts__device, Anchor, Anchor->U.XDeviceOffset);
+      kbts__ByteSwapDevice(Context, XDevice);
+
+      kbts__device *YDevice = KBTS__POINTER_OFFSET(kbts__device, Anchor, Anchor->YDeviceOffset);
+      kbts__ByteSwapDevice(Context, YDevice);
+    }
   }
 }
 
 static void kbts__ByteSwapBaseArray(kbts__byteswap_context *Context, kbts_u16 MarkClassCount, kbts__base_array *Array)
 {
-  if(!kbts__AlreadyVisited(Context, Array))
+  if(!kbts__AddressIsMarked(Context, Array))
   {
-    kbts_un Array_BaseCount = kbts__ByteSwap16InPlace(&Array->BaseCount);
-
-    kbts_u16 *BaseAnchorOffsets = KBTS__POINTER_AFTER(kbts_u16, Array);
-    kbts__ByteSwapArray16Context(BaseAnchorOffsets, Array_BaseCount * MarkClassCount, Context);
-
-    KBTS__FOR(OffsetIndex, 0, Array_BaseCount * MarkClassCount)
+    kbts_un Array_BaseCount;
+    if(kbts__ByteSwap16InPlaceContext(Context, &Array->BaseCount, &Array_BaseCount))
     {
-      kbts_u16 Offset = kbts__ReadU16Unaligned(&BaseAnchorOffsets[OffsetIndex]);
-
-      if(Offset)
+      kbts_u16 *BaseAnchorOffsets = KBTS__POINTER_AFTER(kbts_u16, Array);
+      if(kbts__ByteSwapArray16Context(Context, BaseAnchorOffsets, Array_BaseCount * MarkClassCount))
       {
-        kbts__ByteSwapAnchor(Context, KBTS__POINTER_OFFSET(kbts__anchor, Array, Offset));
+        KBTS__FOR(OffsetIndex, 0, Array_BaseCount * MarkClassCount)
+        {
+          kbts_u16 Offset = kbts__ReadU16Unaligned(&BaseAnchorOffsets[OffsetIndex]);
+
+          if(Offset)
+          {
+            kbts__ByteSwapAnchor(Context, KBTS__POINTER_OFFSET(kbts__anchor, Array, Offset));
+          }
+        }
       }
-    }
-  }
-}
-
-static void kbts__ByteSwapDevice(kbts__byteswap_context *Context, kbts__device *Device)
-{
-  if(!kbts__AlreadyVisited(Context, Device))
-  {
-    kbts__ByteSwapArray16Context(&Device->U.Device.StartSize, 3, Context);
-
-    if(kbts__ReadU16Unaligned(&Device->DeltaFormat) <= 3)
-    {
-      // @Incomplete
     }
   }
 }
@@ -16538,11 +16751,12 @@ static kbts__unpacked_value_record kbts__ByteSwapValueRecord(kbts__byteswap_cont
 {
   kbts__unpacked_value_record Result = KBTS__ZERO;
 
-  if(ValueFormat)
+  if(ValueFormat &&
+     !kbts__AddressIsMarked(Context, Record))
   {
     kbts_un U16Count = kbts__PopCount32(ValueFormat);
 
-    kbts__ByteSwapArray16Context(Record, U16Count, Context);
+    kbts__ByteSwapArray16Context(Context, Record, U16Count);
 
     Result = kbts__UnpackValueRecord(Parent, ValueFormat, Record);
 
@@ -16569,7 +16783,8 @@ KBTS_INLINE kbts_un kbts__DeltaSetIndexMapBitsPerInnerIndex(kbts__delta_set_inde
 
 static void kbts__ByteSwapDeltaSetIndexMap(kbts__byteswap_context *Context, kbts__delta_set_index_map *Map)
 {
-  if(!kbts__AlreadyVisited(Context, Map))
+  if(!kbts__AddressIsMarked(Context, Map) &&
+     kbts__MarkOkToReadContext(Context, Map, 2))
   {
     kbts_un MinimumSize = sizeof(*Map) + ((Map->Format == 0) ? sizeof(kbts_u16) : sizeof(kbts_u32));
     kbts_un BytesPerEntry = kbts__DeltaSetIndexMapBytesPerEntry(Map);
@@ -16584,19 +16799,23 @@ static void kbts__ByteSwapDeltaSetIndexMap(kbts__byteswap_context *Context, kbts
       case 0:
       {
         kbts_u16 *MapCount = KBTS__POINTER_AFTER(kbts_u16, Map);
-        kbts_un MapCount_ = kbts__ByteSwap16InPlace(MapCount);
-
-        Entries = KBTS__POINTER_AFTER(char, MapCount);
-        EntryCount = MapCount_;
+        kbts_un MapCount_;
+        if(kbts__ByteSwap16InPlaceContext(Context, MapCount, &MapCount_))
+        {
+          Entries = KBTS__POINTER_AFTER(char, MapCount);
+          EntryCount = MapCount_;
+        }
       } break;
 
       case 1:
       {
         kbts_u32 *MapCount = KBTS__POINTER_AFTER(kbts_u32, Map);
-        kbts_un MapCount_ = kbts__ByteSwap32InPlace(MapCount);
-
-        Entries = KBTS__POINTER_AFTER(char, MapCount);
-        EntryCount = MapCount_;
+        kbts_un MapCount_;
+        if(kbts__ByteSwap32InPlaceContext(Context, MapCount, &MapCount_))
+        {
+          Entries = KBTS__POINTER_AFTER(char, MapCount);
+          EntryCount = MapCount_;
+        }
       } break;
       }
 
@@ -16612,12 +16831,12 @@ static void kbts__ByteSwapDeltaSetIndexMap(kbts__byteswap_context *Context, kbts
 
       case 2:
       {
-        kbts__ByteSwapArray16Context((kbts_u16 *)Entries, EntryCount, Context);
+        kbts__ByteSwapArray16Context(Context, (kbts_u16 *)Entries, EntryCount);
       } break;
 
       case 4:
       {
-        kbts__ByteSwapArray32Context((kbts_u32 *)Entries, EntryCount, Context);
+        kbts__ByteSwapArray32Context(Context, (kbts_u32 *)Entries, EntryCount);
       } break;
 
       default: Context->Error |= 1; break;
@@ -16632,65 +16851,67 @@ static void kbts__ByteSwapDeltaSetIndexMap(kbts__byteswap_context *Context, kbts
 
 static void kbts__ByteSwapItemVariationStore(kbts__byteswap_context *Context, kbts__item_variation_store *Store)
 {
-  if(!kbts__AlreadyVisited(Context, Store))
+  if(!kbts__AddressIsMarked(Context, Store))
   {
     kbts_u32 *Store_VariationRegionListOffset = kbts__item_variation_store_VariationRegionListOffset(Store);
     kbts_u16 *Store_ItemVariationDataCount = kbts__item_variation_store_ItemVariationDataCount(Store);
     kbts_u32 *Store_ItemVariationDataOffsets = kbts__item_variation_store_ItemVariationDataOffsets(Store);
 
-    kbts__ByteSwap16InPlace(&Store->Format);
-    kbts_un VariationRegionListOffset = kbts__ByteSwap32InPlace(Store_VariationRegionListOffset);
-    kbts_un ItemVariationDataCount = kbts__ByteSwap16InPlace(Store_ItemVariationDataCount);
-
-    kbts__variation_region_list *VariationRegionList = KBTS__POINTER_OFFSET(kbts__variation_region_list, Store, VariationRegionListOffset);
-    if(!kbts__AlreadyVisited(Context, VariationRegionList))
+    if(kbts__ByteSwap16InPlaceContext(Context, &Store->Format, 0))
     {
-      kbts__region_axis_coordinates *RegionAxes = KBTS__POINTER_AFTER(kbts__region_axis_coordinates, VariationRegionList);
-      
-      kbts__ByteSwapArray16Context(&VariationRegionList->AxisCount, 2, Context);
-
-      kbts_un VariationRegionList_RegionCount = kbts__ReadU16Unaligned(&VariationRegionList->RegionCount);
-      kbts_un VariationRegionList_AxisCount = kbts__ReadU16Unaligned(&VariationRegionList->AxisCount);
-
-      kbts__ByteSwapArray16Context((kbts_u16 *)RegionAxes, VariationRegionList_RegionCount * VariationRegionList_AxisCount * 3, Context);
-    }
-
-    if(kbts__ByteSwapArray32Context(Store_ItemVariationDataOffsets, ItemVariationDataCount, Context))
-    {
-      KBTS__FOR(ItemVariationDataIndex, 0, ItemVariationDataCount)
+      kbts_un VariationRegionListOffset;
+      kbts_un ItemVariationDataCount;
+      if(kbts__ByteSwap32InPlaceContext(Context, Store_VariationRegionListOffset, &VariationRegionListOffset) &&
+         kbts__ByteSwap16InPlaceContext(Context, Store_ItemVariationDataCount, &ItemVariationDataCount))
       {
-        kbts_un Offset = kbts__ReadU32Unaligned(&Store_ItemVariationDataOffsets[ItemVariationDataIndex]);
-
-        if(Offset)
+        kbts__variation_region_list *VariationRegionList = KBTS__POINTER_OFFSET(kbts__variation_region_list, Store, VariationRegionListOffset);
+        kbts__region_axis_coordinates *RegionAxes = KBTS__POINTER_AFTER(kbts__region_axis_coordinates, VariationRegionList);
+        
+        if(kbts__ByteSwapArray16Context(Context, &VariationRegionList->AxisCount, 2))
         {
-          kbts__item_variation_data *Data = KBTS__POINTER_OFFSET(kbts__item_variation_data, Store, Offset);
+          kbts_un VariationRegionList_RegionCount = kbts__ReadU16Unaligned(&VariationRegionList->RegionCount);
+          kbts_un VariationRegionList_AxisCount = kbts__ReadU16Unaligned(&VariationRegionList->AxisCount);
 
-          if(!kbts__AlreadyVisited(Context, Data))
+          kbts__ByteSwapArray16Context(Context, (kbts_u16 *)RegionAxes, VariationRegionList_RegionCount * VariationRegionList_AxisCount * 3);
+        }
+
+        if(!Context->Error &&
+           kbts__ByteSwapArray32Context(Context, Store_ItemVariationDataOffsets, ItemVariationDataCount))
+        {
+          KBTS__FOR(ItemVariationDataIndex, 0, ItemVariationDataCount)
           {
-            kbts__ByteSwapArray16Context(&Data->ItemCount, 3, Context);
+            kbts_un Offset = kbts__ReadU32Unaligned(&Store_ItemVariationDataOffsets[ItemVariationDataIndex]);
 
-            kbts_u16 *RegionIndices = KBTS__POINTER_AFTER(kbts_u16, Data);
-            kbts_un Data_RegionIndexCount = kbts__ReadU16Unaligned(&Data->RegionIndexCount);
-            if(kbts__ByteSwapArray16Context(RegionIndices, Data_RegionIndexCount, Context))
+            if(Offset)
             {
-              // From the Microsoft docs:
-              //   The LONG_WORDS flag should only be used in top-level tables that include
-              //   32-bit values that can be variable - currently, only the COLR table.
-              // As such, we do not care about (Data->WordDeltaCount & 0x8000).
+              kbts__item_variation_data *Data = KBTS__POINTER_OFFSET(kbts__item_variation_data, Store, Offset);
 
-              kbts_un WordDeltaCount = kbts__ReadU16Unaligned(&Data->WordDeltaCount) & 0x7FFF;
-
-              char *DeltaRow = (char *)(RegionIndices + Data_RegionIndexCount);
-              kbts_un DeltaRowSize = Data_RegionIndexCount + WordDeltaCount;
-              kbts_un Data_ItemCount = kbts__ReadU16Unaligned(&Data->ItemCount);
-              KBTS__FOR(DataItemIndex, 0, Data_ItemCount)
+              if(kbts__ByteSwapArray16Context(Context, &Data->ItemCount, 3))
               {
-                if(!kbts__ByteSwapArray16Context((kbts_u16 *)DeltaRow, WordDeltaCount, Context))
+                kbts_u16 *RegionIndices = KBTS__POINTER_AFTER(kbts_u16, Data);
+                kbts_un Data_RegionIndexCount = kbts__ReadU16Unaligned(&Data->RegionIndexCount);
+                if(kbts__ByteSwapArray16Context(Context, RegionIndices, Data_RegionIndexCount))
                 {
-                  break;
-                }
+                  // From the Microsoft docs:
+                  //   The LONG_WORDS flag should only be used in top-level tables that include
+                  //   32-bit values that can be variable - currently, only the COLR table.
+                  // As such, we do not care about (Data->WordDeltaCount & 0x8000).
 
-                DeltaRow += DeltaRowSize;
+                  kbts_un WordDeltaCount = kbts__ReadU16Unaligned(&Data->WordDeltaCount) & 0x7FFF;
+
+                  char *DeltaRow = (char *)(RegionIndices + Data_RegionIndexCount);
+                  kbts_un DeltaRowSize = Data_RegionIndexCount + WordDeltaCount;
+                  kbts_un Data_ItemCount = kbts__ReadU16Unaligned(&Data->ItemCount);
+                  KBTS__FOR(DataItemIndex, 0, Data_ItemCount)
+                  {
+                    if(!kbts__ByteSwapArray16Context(Context, (kbts_u16 *)DeltaRow, WordDeltaCount))
+                    {
+                      break;
+                    }
+
+                    DeltaRow += DeltaRowSize;
+                  }
+                }
               }
             }
           }
@@ -16702,11 +16923,11 @@ static void kbts__ByteSwapItemVariationStore(kbts__byteswap_context *Context, kb
 
 static void kbts__ByteSwapMarkArray(kbts__byteswap_context *Context, kbts__mark_array *MarkArray)
 {
-  if(!kbts__AlreadyVisited(Context, MarkArray))
+  kbts_un MarkArray_Count;
+  if(!kbts__AddressIsMarked(Context, MarkArray) &&
+     kbts__ByteSwap16InPlaceContext(Context, &MarkArray->Count, &MarkArray_Count) &&
+     kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, MarkArray), MarkArray_Count * 2))
   {
-    kbts_un MarkArray_Count = kbts__ByteSwap16InPlace(&MarkArray->Count);
-    kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, MarkArray), MarkArray_Count * 2, Context);
-
     kbts__mark_record *MarkRecords = KBTS__POINTER_AFTER(kbts__mark_record, MarkArray);
     KBTS__FOR(MarkRecordIndex, 0, MarkArray_Count)
     {
@@ -16720,21 +16941,49 @@ static void kbts__ByteSwapMarkArray(kbts__byteswap_context *Context, kbts__mark_
 
 static void kbts__ByteSwapChainedSequenceRuleSet(kbts__byteswap_context *Context, kbts__chained_sequence_rule_set *Set)
 {
-  if(Set && !kbts__AlreadyVisited(Context, Set))
+  if(!kbts__AddressIsMarked(Context, Set))
   {
-    kbts_un Set_Count = kbts__ByteSwap16InPlace(&Set->Count);
-    kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Set), Set_Count, Context);
-
-    KBTS__FOR(RuleIndex, 0, Set_Count)
+    kbts_un Set_Count;
+    if(kbts__ByteSwap16InPlaceContext(Context, &Set->Count, &Set_Count) &&
+       kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, Set), Set_Count))
     {
-      kbts__chained_sequence_rule *Rule = kbts__GetChainedSequenceRule(Set, RuleIndex);
-
-      if(!kbts__AlreadyVisited(Context, Rule))
+      KBTS__FOR(RuleIndex, 0, Set_Count)
       {
-        kbts__unpacked_chained_sequence_rule Unpacked = kbts__UnpackChainedSequenceRule(Rule, 1);
+        kbts__chained_sequence_rule *Rule = kbts__GetChainedSequenceRule(Set, RuleIndex);
 
-        kbts_un U16Count = Unpacked.BacktrackCount + Unpacked.InputCount + Unpacked.LookaheadCount + Unpacked.RecordCount * 2 + 3;
-        kbts__ByteSwapArray16Context(&Rule->BacktrackGlyphCount, U16Count, Context);
+        if(!kbts__AddressIsMarked(Context, Rule))
+        {
+          kbts_un BacktrackCount;
+          if(kbts__ByteSwap16InPlaceContext(Context, &Rule->BacktrackGlyphCount, &BacktrackCount))
+          {
+            kbts_u16 *Backtrack = KBTS__POINTER_AFTER(kbts_u16, Rule);
+            if(kbts__ByteSwapArray16Context(Context, Backtrack, BacktrackCount))
+            {
+              kbts_un InputCount;
+              if(kbts__ByteSwap16InPlaceContext(Context, &Backtrack[BacktrackCount], &InputCount))
+              {
+                kbts_u16 *Input = Backtrack + BacktrackCount + 1;
+                if(kbts__ByteSwapArray16Context(Context, Input, InputCount))
+                {
+                  kbts_un LookaheadCount;
+                  if(kbts__ByteSwap16InPlaceContext(Context, &Input[InputCount - 1], &LookaheadCount))
+                  {
+                    kbts_u16 *Lookahead = Input + InputCount;
+                    if(kbts__ByteSwapArray16Context(Context, Lookahead, LookaheadCount))
+                    {
+                      kbts_un RecordCount;
+                      if(kbts__ByteSwap16InPlaceContext(Context, &Lookahead[LookaheadCount], &RecordCount))
+                      {
+                        kbts__sequence_lookup_record *Records = (kbts__sequence_lookup_record *)(Lookahead + LookaheadCount + 1);
+                        kbts__ByteSwapArray16Context(Context, &Records->SequenceIndex, RecordCount * 2);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -16772,22 +17021,28 @@ static void kbts__DumpClassDefinition(kbts_u16 *Base)
 
 static void kbts__ByteSwapClassDefinition(kbts__byteswap_context *Context, kbts_u16 *Base)
 {
-  if(!kbts__AlreadyVisited(Context, Base))
+  if(!kbts__AddressIsMarked(Context, Base))
   {
-    kbts_u16 Format = kbts__ByteSwap16InPlace(Base);
-
-    if(Format == 1)
+    kbts_un Format;
+    if(kbts__ByteSwap16InPlaceContext(Context, Base, &Format))
     {
-      kbts__class_definition_1 *ClassDef = (kbts__class_definition_1 *)Base;
-      kbts__ByteSwapArray16Context(&ClassDef->StartGlyphId, 2, Context);
-      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, ClassDef), kbts__ReadU16Unaligned(&ClassDef->GlyphCount), Context);
-    }
-    else if(Format == 2)
-    {
-      kbts__class_definition_2 *ClassDef = (kbts__class_definition_2 *)Base;
-      kbts_un ClassDef_Count = kbts__ByteSwap16InPlace(&ClassDef->Count);
-
-      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, ClassDef), ClassDef_Count * 3, Context);
+      if(Format == 1)
+      {
+        kbts__class_definition_1 *ClassDef = (kbts__class_definition_1 *)Base;
+        if(kbts__ByteSwapArray16Context(Context, &ClassDef->StartGlyphId, 2))
+        {
+          kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, ClassDef), kbts__ReadU16Unaligned(&ClassDef->GlyphCount));
+        }
+      }
+      else if(Format == 2)
+      {
+        kbts__class_definition_2 *ClassDef = (kbts__class_definition_2 *)Base;
+        kbts_un ClassDef_Count;
+        if(kbts__ByteSwap16InPlaceContext(Context, &ClassDef->Count, &ClassDef_Count))
+        {
+          kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, ClassDef), ClassDef_Count * 3);
+        }
+      }
     }
   }
 }
@@ -16912,28 +17167,31 @@ static void kbts__ByteSwapSequenceContextSubtable(kbts__byteswap_context *Contex
   if(Format == 1)
   {
     kbts__sequence_context_1 *Subst = (kbts__sequence_context_1 *)Base;
-    kbts_un Subst_SeqRuleSetCount = kbts__ByteSwap16InPlace(&Subst->SeqRuleSetCount);
-    kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst_SeqRuleSetCount, Context);
-
-    KBTS__FOR(SetIndex, 0, Subst_SeqRuleSetCount)
+    kbts_un Subst_SeqRuleSetCount;
+    if(kbts__ByteSwap16InPlaceContext(Context, &Subst->SeqRuleSetCount, &Subst_SeqRuleSetCount) &&
+       kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, Subst), Subst_SeqRuleSetCount))
     {
-      kbts__sequence_rule_set *Set = kbts__GetSequenceRuleSet(Subst, SetIndex);
-
-      if(Set && !kbts__AlreadyVisited(Context, Set))
+      KBTS__FOR(SetIndex, 0, Subst_SeqRuleSetCount)
       {
-        kbts_un SetRuleCount = kbts__ByteSwap16InPlace(&Set->Count);
-        kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Set), SetRuleCount, Context);
+        kbts__sequence_rule_set *Set = kbts__GetSequenceRuleSet(Subst, SetIndex);
 
-        KBTS__FOR(RuleIndex, 0, SetRuleCount)
+        if(Set)
         {
-          kbts__sequence_rule *Rule = kbts__GetSequenceRule(Set, RuleIndex);
-
-          if(!kbts__AlreadyVisited(Context, Rule))
+          kbts_un SetRuleCount;
+          if(kbts__ByteSwap16InPlaceContext(Context, &Set->Count, &SetRuleCount) &&
+             kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, Set), SetRuleCount))
           {
-            kbts__ByteSwapArray16Context(&Rule->GlyphCount, 2, Context);
-            kbts_un Rule_GlyphCount = kbts__ReadU16Unaligned(&Rule->GlyphCount);
-            kbts_un Rule_SequenceLookupCount = kbts__ReadU16Unaligned(&Rule->SequenceLookupCount);
-            kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Rule), Rule_GlyphCount - 1 + Rule_SequenceLookupCount * 2, Context);
+            KBTS__FOR(RuleIndex, 0, SetRuleCount)
+            {
+              kbts__sequence_rule *Rule = kbts__GetSequenceRule(Set, RuleIndex);
+
+              if(kbts__ByteSwapArray16Context(Context, &Rule->GlyphCount, 2))
+              {
+                kbts_un Rule_GlyphCount = kbts__ReadU16Unaligned(&Rule->GlyphCount);
+                kbts_un Rule_SequenceLookupCount = kbts__ReadU16Unaligned(&Rule->SequenceLookupCount);
+                kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, Rule), Rule_GlyphCount - 1 + Rule_SequenceLookupCount * 2);
+              }
+            }
           }
         }
       }
@@ -16942,92 +17200,102 @@ static void kbts__ByteSwapSequenceContextSubtable(kbts__byteswap_context *Contex
   else if(Format == 2)
   {
     kbts__sequence_context_2 *Subst = (kbts__sequence_context_2 *)Base;
-    kbts__ByteSwapArray16Context(&Subst->ClassDefOffset, 2, Context);
-    kbts_un Subst_ClassSequenceRuleSetCount = kbts__ReadU16Unaligned(&Subst->ClassSequenceRuleSetCount);
-    kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst_ClassSequenceRuleSetCount, Context);
-
-    kbts_un Subst_ClassDefOffset = kbts__ReadU16Unaligned(&Subst->ClassDefOffset);
-    kbts_u16 *ClassDefBase = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst_ClassDefOffset);
-    kbts__ByteSwapClassDefinition(Context, ClassDefBase);
-
-    KBTS__FOR(SetIndex, 0, Subst_ClassSequenceRuleSetCount)
+    if(kbts__ByteSwapArray16Context(Context, &Subst->ClassDefOffset, 2))
     {
-      kbts__class_sequence_rule_set *Set = kbts__GetClassSequenceRuleSet(Subst, SetIndex);
-
-      if(Set && !kbts__AlreadyVisited(Context, Set))
+      kbts_un Subst_ClassSequenceRuleSetCount = kbts__ReadU16Unaligned(&Subst->ClassSequenceRuleSetCount);
+      if(kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, Subst), Subst_ClassSequenceRuleSetCount))
       {
-        kbts_un Set_Count = kbts__ByteSwap16InPlace(&Set->Count);
-        kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Set), Set_Count, Context);
+        kbts_un Subst_ClassDefOffset = kbts__ReadU16Unaligned(&Subst->ClassDefOffset);
+        kbts_u16 *ClassDefBase = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst_ClassDefOffset);
+        kbts__ByteSwapClassDefinition(Context, ClassDefBase);
 
-        KBTS__FOR(RuleIndex, 0, Set_Count)
+        if(!Context->Error)
         {
-          kbts__class_sequence_rule *Rule = kbts__GetClassSequenceRule(Set, RuleIndex);
-
-          if(!kbts__AlreadyVisited(Context, Rule))
+          KBTS__FOR(SetIndex, 0, Subst_ClassSequenceRuleSetCount)
           {
-            kbts__ByteSwapArray16Context(&Rule->GlyphCount, 2, Context);
+            kbts__class_sequence_rule_set *Set = kbts__GetClassSequenceRuleSet(Subst, SetIndex);
 
-            kbts_un Rule_GlyphCount = kbts__ReadU16Unaligned(&Rule->GlyphCount);
-            kbts_un Rule_SequenceLookupCount = kbts__ReadU16Unaligned(&Rule->SequenceLookupCount);
+            if(Set)
+            {
+              kbts_un Set_Count;
+              if(kbts__ByteSwap16InPlaceContext(Context, &Set->Count, &Set_Count) &&
+                 kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, Set), Set_Count))
+              {
+                KBTS__FOR(RuleIndex, 0, Set_Count)
+                {
+                  kbts__class_sequence_rule *Rule = kbts__GetClassSequenceRule(Set, RuleIndex);
 
-            kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Rule), Rule_GlyphCount - 1 + 2 * Rule_SequenceLookupCount, Context);
+                  if(kbts__ByteSwapArray16Context(Context, &Rule->GlyphCount, 2))
+                  {
+                    kbts_un Rule_GlyphCount = kbts__ReadU16Unaligned(&Rule->GlyphCount);
+                    kbts_un Rule_SequenceLookupCount = kbts__ReadU16Unaligned(&Rule->SequenceLookupCount);
+
+                    kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, Rule), Rule_GlyphCount - 1 + 2 * Rule_SequenceLookupCount);
+                  }
+                }
+              }
+            }
           }
+
+          #ifdef KBTS_DUMP
+          if(!Context->Error)
+          {
+            kbts__DumpClassDefinition(ClassDefBase);
+            KBTS__FOR(SetIndex, 0, Subst_ClassSequenceRuleSetCount)
+            {
+              kbts__class_sequence_rule_set *Set = kbts__GetClassSequenceRuleSet(Subst, SetIndex);
+
+              if(Set)
+              {
+                kbts_un Set_Count = kbts__ReadU16Unaligned(&Set->Count);
+
+                KBTS__FOR(RuleIndex, 0, Set_Count)
+                {
+                  kbts__class_sequence_rule *Rule = kbts__GetClassSequenceRule(Set, RuleIndex);
+                  kbts_u16 *InputSequence = KBTS__POINTER_AFTER(kbts_u16, Rule);
+                  kbts_un Rule_GlyphCount = kbts__ReadU16Unaligned(&Rule->GlyphCount);
+                  kbts__sequence_lookup_record *Records = (kbts__sequence_lookup_record *)(InputSequence + Rule_GlyphCount - 1);
+                  KBTS_DUMPF("Input: [");
+                  KBTS__FOR(GlyphIndex, 1, Rule_GlyphCount)
+                  {
+                    KBTS_DUMPF(", %x", kbts__ReadU16Unaligned(&InputSequence[GlyphIndex - 1]));
+                  }
+                  KBTS_DUMPF("]\nRecords: [");
+                  kbts_un Rule_SequenceLookupCount = kbts__ReadU16Unaligned(&Rule->SequenceLookupCount);
+                  KBTS__FOR(RecordIndex, 0, Rule_SequenceLookupCount)
+                  {
+                    kbts__sequence_lookup_record *Record = &Records[RecordIndex];
+                    if(RecordIndex) KBTS_DUMPF(", ");
+                    KBTS_DUMPF("%u@%u", kbts__ReadU16Unaligned(&Record->LookupListIndex), kbts__ReadU16Unaligned(&Record->SequenceIndex));
+                  }
+                  KBTS_DUMPF("]\n");
+                }
+              }
+            }
+          }
+          #endif
         }
       }
     }
-
-    #ifdef KBTS_DUMP
-    kbts__DumpClassDefinition(ClassDefBase);
-    kbts_un Subst_ClassSequenceRuleSetCount = kbts__ReadU16Unaligned(&Subst->ClassSequenceRuleSetCount);
-    KBTS__FOR(SetIndex, 0, Subst_ClassSequenceRuleSetCount)
-    {
-      kbts__class_sequence_rule_set *Set = kbts__GetClassSequenceRuleSet(Subst, SetIndex);
-
-      if(Set)
-      {
-        kbts_un Set_Count = kbts__ReadU16Unaligned(&Set->Count);
-
-        KBTS__FOR(RuleIndex, 0, Set_Count)
-        {
-          kbts__class_sequence_rule *Rule = kbts__GetClassSequenceRule(Set, RuleIndex);
-          kbts_u16 *InputSequence = KBTS__POINTER_AFTER(kbts_u16, Rule);
-          kbts_un Rule_GlyphCount = kbts__ReadU16Unaligned(&Rule->GlyphCount);
-          kbts__sequence_lookup_record *Records = (kbts__sequence_lookup_record *)(InputSequence + Rule_GlyphCount - 1);
-          KBTS_DUMPF("Input: [");
-          KBTS__FOR(GlyphIndex, 1, Rule_GlyphCount)
-          {
-            KBTS_DUMPF(", %x", kbts__ReadU16Unaligned(&InputSequence[GlyphIndex - 1]));
-          }
-          KBTS_DUMPF("]\nRecords: [");
-          kbts_un Rule_SequenceLookupCount = kbts__ReadU16Unaligned(&Rule->SequenceLookupCount);
-          KBTS__FOR(RecordIndex, 0, Rule_SequenceLookupCount)
-          {
-            kbts__sequence_lookup_record *Record = &Records[RecordIndex];
-            if(RecordIndex) KBTS_DUMPF(", ");
-            KBTS_DUMPF("%u@%u", kbts__ReadU16Unaligned(&Record->LookupListIndex), kbts__ReadU16Unaligned(&Record->SequenceIndex));
-          }
-          KBTS_DUMPF("]\n");
-        }
-      }
-    }
-    #endif
   }
   else if(Format == 3)
   {
     kbts__sequence_context_3 *Subst = (kbts__sequence_context_3 *)Base;
-    kbts__ByteSwapArray16Context(&Subst->GlyphCount, 2, Context);
-
-    kbts_un Subst_GlyphCount = kbts__ReadU16Unaligned(&Subst->GlyphCount);
-    kbts_un Subst_SequenceLookupCount = kbts__ReadU16Unaligned(&Subst->SequenceLookupCount);
-
-    kbts_u16 *CoverageOffsets = KBTS__POINTER_AFTER(kbts_u16, Subst);
-    kbts__ByteSwapArray16Context(CoverageOffsets, Subst_GlyphCount + 2 * Subst_SequenceLookupCount, Context);
-
-    KBTS__FOR(CoverageIndex, 0, Subst_GlyphCount)
+    if(kbts__ByteSwapArray16Context(Context, &Subst->GlyphCount, 2))
     {
-      kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&CoverageOffsets[CoverageIndex]));
+      kbts_un Subst_GlyphCount = kbts__ReadU16Unaligned(&Subst->GlyphCount);
+      kbts_un Subst_SequenceLookupCount = kbts__ReadU16Unaligned(&Subst->SequenceLookupCount);
 
-      kbts__ByteSwapCoverage(Context, Coverage);
+      kbts_u16 *CoverageOffsets = KBTS__POINTER_AFTER(kbts_u16, Subst);
+      if(kbts__ByteSwapArray16Context(Context, CoverageOffsets, Subst_GlyphCount + 2 * Subst_SequenceLookupCount))
+      {
+        KBTS__FOR(CoverageIndex, 0, Subst_GlyphCount)
+        {
+          kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&CoverageOffsets[CoverageIndex]));
+
+          kbts__ByteSwapCoverage(Context, Coverage);
+        }
+      }
     }
   }
 }
@@ -17214,6 +17482,7 @@ typedef struct kbts__matrix_index
 {
   kbts_un WordIndex;
   kbts_un BitIndex;
+  kbts_b32 Valid;
 } kbts__matrix_index;
 
 static kbts__matrix_index kbts__GlyphLookupMatrixIndex(kbts_un LookupIndex, kbts_un GlyphIndex, kbts_un GlyphCount)
@@ -17223,6 +17492,7 @@ static kbts__matrix_index kbts__GlyphLookupMatrixIndex(kbts_un LookupIndex, kbts
   kbts__matrix_index Result = KBTS__ZERO;
   Result.WordIndex = FlatIndex / 32;
   Result.BitIndex = FlatIndex % 32;
+  Result.Valid = (GlyphIndex < GlyphCount);
 
   return Result;
 }
@@ -17246,6 +17516,7 @@ static kbts__matrix_index kbts__GlyphLookupSubtableMatrixIndex(kbts_un SubtableI
   kbts__matrix_index Result = KBTS__ZERO;
   Result.WordIndex = FlatIndex / 32;
   Result.BitIndex = FlatIndex % 32;
+  Result.Valid = (SubtableIndex < SubtableCount) && (GlyphIndex < GlyphCount);
 
   return Result;
 }
@@ -17325,86 +17596,95 @@ static void kbts__ByteSwapChainedSequenceContextSubtable(kbts__byteswap_context 
   if(Format == 1)
   {
     kbts__chained_sequence_context_1 *Subst = (kbts__chained_sequence_context_1 *)Base;
-    kbts_un Subst_ChainedSequenceRuleSetCount = kbts__ByteSwap16InPlace(&Subst->ChainedSequenceRuleSetCount);
-    kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst_ChainedSequenceRuleSetCount, Context);
+    kbts_un Subst_ChainedSequenceRuleSetCount;
 
-    KBTS__FOR(SetIndex, 0, Subst_ChainedSequenceRuleSetCount)
+    if(kbts__ByteSwap16InPlaceContext(Context, &Subst->ChainedSequenceRuleSetCount, &Subst_ChainedSequenceRuleSetCount) &&
+       kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, Subst), Subst_ChainedSequenceRuleSetCount))
     {
-      kbts__ByteSwapChainedSequenceRuleSet(Context, kbts__GetChainedSequenceRuleSet(Subst, SetIndex));
+      KBTS__FOR(SetIndex, 0, Subst_ChainedSequenceRuleSetCount)
+      {
+        kbts__ByteSwapChainedSequenceRuleSet(Context, kbts__GetChainedSequenceRuleSet(Subst, SetIndex));
+      }
     }
   }
   else if(Format == 2)
   {
     kbts__chained_sequence_context_2 *Subst = (kbts__chained_sequence_context_2 *)Base;
-    kbts__ByteSwapArray16Context(&Subst->BacktrackClassDefOffset, 4, Context);
-    kbts_un Subst_ChainedClassSequenceRuleSetCount = kbts__ReadU16Unaligned(&Subst->ChainedClassSequenceRuleSetCount);
-    kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst_ChainedClassSequenceRuleSetCount, Context);
-
-    kbts_u16 *BacktrackClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, kbts__ReadU16Unaligned(&Subst->BacktrackClassDefOffset));
-    kbts__ByteSwapClassDefinition(Context, BacktrackClassDefinition);
-
-    kbts_u16 *InputClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, kbts__ReadU16Unaligned(&Subst->InputClassDefOffset));
-    kbts__ByteSwapClassDefinition(Context, InputClassDefinition);
-
-    kbts_u16 *LookaheadClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, kbts__ReadU16Unaligned(&Subst->LookaheadClassDefOffset));
-    kbts__ByteSwapClassDefinition(Context, LookaheadClassDefinition);
-
-    #ifdef KBTS_DUMP
-    KBTS_DUMPF("Backtrack classes:\n");
-    // kbts__DumpClassDefinition(BacktrackClassDefinition);
-    KBTS_DUMPF("Input classes:\n");
-    // kbts__DumpClassDefinition(InputClassDefinition);
-    KBTS_DUMPF("Lookahead classes:\n");
-    // kbts__DumpClassDefinition(LookaheadClassDefinition);
-    #endif
-
-    KBTS__FOR(SetIndex, 0, Subst_ChainedClassSequenceRuleSetCount)
+    if(kbts__ByteSwapArray16Context(Context, &Subst->BacktrackClassDefOffset, 4))
     {
-      kbts__chained_sequence_rule_set *Set = kbts__GetChainedClassSequenceRuleSet(Subst, SetIndex);
-      kbts__ByteSwapChainedSequenceRuleSet(Context, Set);
-
-      #ifdef KBTS_DUMP
-      if(Set)
+      kbts_un Subst_ChainedClassSequenceRuleSetCount = kbts__ReadU16Unaligned(&Subst->ChainedClassSequenceRuleSetCount);
+      if(kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, Subst), Subst_ChainedClassSequenceRuleSetCount))
       {
-        kbts_un Set_Count = kbts__ReadU16Unaligned(&Set->Count);
+        kbts_u16 *BacktrackClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, kbts__ReadU16Unaligned(&Subst->BacktrackClassDefOffset));
+        kbts__ByteSwapClassDefinition(Context, BacktrackClassDefinition);
 
-        KBTS__FOR(RuleIndex, 0, Set_Count)
+        kbts_u16 *InputClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, kbts__ReadU16Unaligned(&Subst->InputClassDefOffset));
+        kbts__ByteSwapClassDefinition(Context, InputClassDefinition);
+
+        kbts_u16 *LookaheadClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, kbts__ReadU16Unaligned(&Subst->LookaheadClassDefOffset));
+        kbts__ByteSwapClassDefinition(Context, LookaheadClassDefinition);
+
+        if(!Context->Error)
         {
-          kbts__chained_sequence_rule *Rule = kbts__GetChainedClassSequenceRule(Set, RuleIndex);
-          kbts__unpacked_chained_sequence_rule Unpacked = kbts__UnpackChainedSequenceRule(Rule, 0);
+          #ifdef KBTS_DUMP
+          KBTS_DUMPF("Backtrack classes:\n");
+          // kbts__DumpClassDefinition(BacktrackClassDefinition);
+          KBTS_DUMPF("Input classes:\n");
+          // kbts__DumpClassDefinition(InputClassDefinition);
+          KBTS_DUMPF("Lookahead classes:\n");
+          // kbts__DumpClassDefinition(LookaheadClassDefinition);
+          #endif
 
-          KBTS_DUMPF("Backtrack: [");
-          KBTS__FOR(BacktrackIndex, 0, Unpacked.BacktrackCount)
+          KBTS__FOR(SetIndex, 0, Subst_ChainedClassSequenceRuleSetCount)
           {
-            if(BacktrackIndex) KBTS_DUMPF(", ");
-            KBTS_DUMPF("%u", kbts__ReadU16Unaligned(&Unpacked.Backtrack[BacktrackIndex]));
+            kbts__chained_sequence_rule_set *Set = kbts__GetChainedClassSequenceRuleSet(Subst, SetIndex);
+            kbts__ByteSwapChainedSequenceRuleSet(Context, Set);
+
+            #ifdef KBTS_DUMP
+            if(!Context->Error && Set)
+            {
+              kbts_un Set_Count = kbts__ReadU16Unaligned(&Set->Count);
+
+              KBTS__FOR(RuleIndex, 0, Set_Count)
+              {
+                kbts__chained_sequence_rule *Rule = kbts__GetChainedClassSequenceRule(Set, RuleIndex);
+                kbts__unpacked_chained_sequence_rule Unpacked = kbts__UnpackChainedSequenceRule(Rule, 0);
+
+                KBTS_DUMPF("Backtrack: [");
+                KBTS__FOR(BacktrackIndex, 0, Unpacked.BacktrackCount)
+                {
+                  if(BacktrackIndex) KBTS_DUMPF(", ");
+                  KBTS_DUMPF("%u", kbts__ReadU16Unaligned(&Unpacked.Backtrack[BacktrackIndex]));
+                }
+                KBTS_DUMPF("]\n"
+                           "Input: [");
+                KBTS__FOR(InputIndex, 1, Unpacked.InputCount)
+                {
+                  if(InputIndex) KBTS_DUMPF(", ");
+                  KBTS_DUMPF("%u", kbts__ReadU16Unaligned(&Unpacked.Input[InputIndex - 1]));
+                }
+                KBTS_DUMPF("]\n"
+                           "Lookahead: [");
+                KBTS__FOR(LookaheadIndex, 0, Unpacked.LookaheadCount)
+                {
+                  if(LookaheadIndex) KBTS_DUMPF(", ");
+                  KBTS_DUMPF("%u", kbts__ReadU16Unaligned(&Unpacked.Lookahead[LookaheadIndex]));
+                }
+                KBTS_DUMPF("]\n"
+                           "Records: [");
+                KBTS__FOR(RecordIndex, 0, Unpacked.RecordCount)
+                {
+                  kbts__sequence_lookup_record *Record = &Unpacked.Records[RecordIndex];
+                  if(RecordIndex) KBTS_DUMPF(", ");
+                  KBTS_DUMPF("%u@%u", kbts__ReadU16Unaligned(&Record->LookupListIndex), kbts__ReadU16Unaligned(&Record->SequenceIndex));
+                }
+                KBTS_DUMPF("]\n");
+              }
+            }
+            #endif
           }
-          KBTS_DUMPF("]\n"
-                     "Input: [");
-          KBTS__FOR(InputIndex, 1, Unpacked.InputCount)
-          {
-            if(InputIndex) KBTS_DUMPF(", ");
-            KBTS_DUMPF("%u", kbts__ReadU16Unaligned(&Unpacked.Input[InputIndex - 1]));
-          }
-          KBTS_DUMPF("]\n"
-                     "Lookahead: [");
-          KBTS__FOR(LookaheadIndex, 0, Unpacked.LookaheadCount)
-          {
-            if(LookaheadIndex) KBTS_DUMPF(", ");
-            KBTS_DUMPF("%u", kbts__ReadU16Unaligned(&Unpacked.Lookahead[LookaheadIndex]));
-          }
-          KBTS_DUMPF("]\n"
-                     "Records: [");
-          KBTS__FOR(RecordIndex, 0, Unpacked.RecordCount)
-          {
-            kbts__sequence_lookup_record *Record = &Unpacked.Records[RecordIndex];
-            if(RecordIndex) KBTS_DUMPF(", ");
-            KBTS_DUMPF("%u@%u", kbts__ReadU16Unaligned(&Record->LookupListIndex), kbts__ReadU16Unaligned(&Record->SequenceIndex));
-          }
-          KBTS_DUMPF("]\n");
         }
       }
-      #endif
     }
   }
   else if(Format == 3)
@@ -17413,512 +17693,561 @@ static void kbts__ByteSwapChainedSequenceContextSubtable(kbts__byteswap_context 
     kbts__unpacked_chained_sequence_context_3 Unpacked = kbts__UnpackChainedSequenceContext3(Subst, 1);
 
     kbts_un U16Count = Unpacked.BacktrackCount + Unpacked.InputCount + Unpacked.LookaheadCount + Unpacked.RecordCount * 2 + 4;
-    kbts__ByteSwapArray16Context(&Subst->BacktrackGlyphCount, U16Count, Context);
-
-    KBTS__FOR(BacktrackCoverageIndex, 0, Unpacked.BacktrackCount)
+    if(kbts__ByteSwapArray16Context(Context, &Subst->BacktrackGlyphCount, U16Count))
     {
-      kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.BacktrackCoverageOffsets[BacktrackCoverageIndex]));
+      KBTS__FOR(BacktrackCoverageIndex, 0, Unpacked.BacktrackCount)
+      {
+        kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.BacktrackCoverageOffsets[BacktrackCoverageIndex]));
 
-      kbts__ByteSwapCoverage(Context, Coverage);
-    }
+        kbts__ByteSwapCoverage(Context, Coverage);
+      }
 
-    KBTS__FOR(InputCoverageIndex, 0, Unpacked.InputCount)
-    {
-      kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.InputCoverageOffsets[InputCoverageIndex]));
+      KBTS__FOR(InputCoverageIndex, 0, Unpacked.InputCount)
+      {
+        kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.InputCoverageOffsets[InputCoverageIndex]));
 
-      kbts__ByteSwapCoverage(Context, Coverage);
-    }
+        kbts__ByteSwapCoverage(Context, Coverage);
+      }
 
-    KBTS__FOR(LookaheadCoverageIndex, 0, Unpacked.LookaheadCount)
-    {
-      kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.LookaheadCoverageOffsets[LookaheadCoverageIndex]));
+      KBTS__FOR(LookaheadCoverageIndex, 0, Unpacked.LookaheadCount)
+      {
+        kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.LookaheadCoverageOffsets[LookaheadCoverageIndex]));
 
-      kbts__ByteSwapCoverage(Context, Coverage);
-    }
+        kbts__ByteSwapCoverage(Context, Coverage);
+      }
 
-#  ifdef KBTS_DUMP
-    KBTS_DUMPF("      Backtrack: ");
-    KBTS__FOR(BacktrackCoverageIndex, 0, Unpacked.BacktrackCount)
-    {
-      kbts__DumpCoverage(KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.BacktrackCoverageOffsets[BacktrackCoverageIndex])));
-    }
-    KBTS_DUMPF("\n      Input: ");
-    KBTS__FOR(InputCoverageIndex, 0, Unpacked.InputCount)
-    {
-      kbts__DumpCoverage(KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.InputCoverageOffsets[InputCoverageIndex])));
-    }
-    KBTS_DUMPF("\n      Lookahead: ");
-    KBTS__FOR(LookaheadCoverageIndex, 0, Unpacked.LookaheadCount)
-    {
-      kbts__DumpCoverage(KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.LookaheadCoverageOffsets[LookaheadCoverageIndex])));
-    }
-    KBTS_DUMPF("\n      Lookups: [");
-    KBTS__FOR(RecordIndex, 0, Unpacked.RecordCount)
-    {
-      kbts__sequence_lookup_record *Record = &Unpacked.Records[RecordIndex];
+  #  ifdef KBTS_DUMP
+      KBTS_DUMPF("      Backtrack: ");
+      KBTS__FOR(BacktrackCoverageIndex, 0, Unpacked.BacktrackCount)
+      {
+        kbts__DumpCoverage(KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.BacktrackCoverageOffsets[BacktrackCoverageIndex])));
+      }
+      KBTS_DUMPF("\n      Input: ");
+      KBTS__FOR(InputCoverageIndex, 0, Unpacked.InputCount)
+      {
+        kbts__DumpCoverage(KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.InputCoverageOffsets[InputCoverageIndex])));
+      }
+      KBTS_DUMPF("\n      Lookahead: ");
+      KBTS__FOR(LookaheadCoverageIndex, 0, Unpacked.LookaheadCount)
+      {
+        kbts__DumpCoverage(KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.LookaheadCoverageOffsets[LookaheadCoverageIndex])));
+      }
+      KBTS_DUMPF("\n      Lookups: [");
+      KBTS__FOR(RecordIndex, 0, Unpacked.RecordCount)
+      {
+        kbts__sequence_lookup_record *Record = &Unpacked.Records[RecordIndex];
 
-      KBTS_DUMPF("%u@%u,", kbts__ReadU16Unaligned(&Record->LookupListIndex), kbts__ReadU16Unaligned(&Record->SequenceIndex));
+        KBTS_DUMPF("%u@%u,", kbts__ReadU16Unaligned(&Record->LookupListIndex), kbts__ReadU16Unaligned(&Record->SequenceIndex));
+      }
+      KBTS_DUMPF("]\n");
+  #  endif
     }
-    KBTS_DUMPF("]\n");
-#  endif
   }
 }
 
-static void kbts__ByteSwapGsubLookupSubtable(kbts__byteswap_context *Context, kbts_u16 LookupType, kbts_u16 *Base)
+static void kbts__ByteSwapGsubLookupSubtable(kbts__byteswap_context *Context, kbts_un LookupType, kbts_u16 *Base)
 {
-  int Swap = !kbts__AlreadyVisited(Context, Base);
-  while(Swap && (LookupType == 7))
+  if(!kbts__AddressIsMarked(Context, Base))
   {
-    kbts__extension *Subst = (kbts__extension *)Base;
-    kbts__ByteSwap16InPlace(&Subst->Format);
-    kbts_u16 Subst_LookupType = kbts__ByteSwap16InPlace(&Subst->LookupType);
-    kbts_u32 Subst_Offset = kbts__ByteSwap32InPlace(&Subst->Offset);
-
-    KBTS_DUMPF("    Type 7.1\n"
-               "    Offset %zu\n"
-               "    -> %zu\n",
-               (char *)Base - Context->FileBase, (char *)Subst + Subst_Offset - Context->FileBase);
-
-    Base = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst_Offset);
-    LookupType = Subst_LookupType;
-
-    Swap = !kbts__AlreadyVisited(Context, Base);
-  }
-
-  if(Swap)
-  {
-    kbts_u16 LookupFormat = kbts__ByteSwap16InPlace(Base);
-
-    KBTS_DUMPF("    Type %u.%u\n"
-               "    Offset %zu\n",
-               LookupType, LookupFormat, (char *)Base - Context->FileBase);
-
-    if(kbts__GsubLookupBeginsWithCoverage(LookupType, LookupFormat))
+    while(LookupType == 7)
     {
-      kbts_u16 LookupCoverageOffset = kbts__ByteSwap16InPlace(&Base[1]);
-      kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Base, LookupCoverageOffset);
+      kbts__extension *Subst = (kbts__extension *)Base;
+      kbts__ByteSwap16InPlaceContext(Context, &Subst->Format, 0);
 
-      kbts__ByteSwapCoverage(Context, Coverage);
-
-#  ifdef KBTS_DUMP
-      kbts_u16 Coverage_Format = kbts__ReadU16Unaligned(&Coverage->Format);
-      kbts_un Coverage_Count = kbts__ReadU16Unaligned(&Coverage->Count);
-
-      KBTS_DUMPF("    Coverage %u\n", Coverage_Format);
-      if(Coverage_Format == 1)
+      kbts_un Subst_LookupType;
+      kbts_un Subst_Offset;
+      if(kbts__ByteSwap16InPlaceContext(Context, &Subst->LookupType, &Subst_LookupType) &&
+         kbts__ByteSwap32InPlaceContext(Context, &Subst->Offset, &Subst_Offset))
       {
-        kbts_u16 *GlyphIds = KBTS__POINTER_AFTER(kbts_u16, Coverage);
-        KBTS__FOR(GlyphIndex, 0, Coverage_Count)
-        {
-          KBTS_DUMPF("      %x\n", kbts__ReadU16Unaligned(&GlyphIds[GlyphIndex]));
-        }
-      }
-      else if(Coverage_Format == 2)
-      {
-        kbts__range_record *Ranges = KBTS__POINTER_AFTER(kbts__range_record, Coverage);
-        KBTS__FOR(RangeIndex, 0, Coverage_Count)
-        {
-          kbts__range_record *Range = &Ranges[RangeIndex];
-          kbts_u16 Range_StartGlyphId = kbts__ReadU16Unaligned(&Range->StartGlyphId);
-          kbts_u16 Range_EndGlyphId = kbts__ReadU16Unaligned(&Range->EndGlyphId);
-          kbts_u16 Range_StartCoverageIndex = kbts__ReadU16Unaligned(&Range->StartCoverageIndex);
-          KBTS_DUMPF("        %x..%x@%u..%u\n", Range_StartGlyphId, Range_EndGlyphId, Range_StartCoverageIndex, Range_StartCoverageIndex + (Range_EndGlyphId - Range_StartGlyphId));
-        }
-      }
-#  endif
-    }
+        KBTS_DUMPF("    Type 7.1\n"
+                   "    Offset %zu\n"
+                   "    -> %zu\n",
+                   (char *)Base - Context->FileBase, (char *)Subst + Subst_Offset - Context->FileBase);
 
-    switch(LookupType)
-    {
-    case 1:
-    {
-      kbts__single_substitution *Subst = (kbts__single_substitution *)Base;
-      kbts_un Subst_GlyphCount = kbts__ByteSwap16InPlace(&Subst->DeltaOrCount.GlyphCount);
-
-#  ifdef KBTS_DUMP
-      if(LookupFormat == 1)
-      {
-        KBTS_DUMPF("    += %d\n", kbts__ReadS16Unaligned(&Subst->DeltaOrCount.DeltaGlyphId));
-      }
-#  endif
-
-      if(LookupFormat == 2)
-      {
-        kbts_u16 *GlyphIds = KBTS__POINTER_AFTER(kbts_u16, Subst);
-        kbts__ByteSwapArray16Context(GlyphIds, Subst_GlyphCount, Context);
-
-        #ifdef KBTS_DUMP
-        KBTS_DUMPF("    [");
-        KBTS__FOR(IdIndex, 0, Subst_GlyphCount)
-        {
-          if(IdIndex) KBTS_DUMPF(" ");
-          KBTS_DUMPF("%x", kbts__ReadU16Unaligned(&GlyphIds[IdIndex]));
-        }
-        KBTS_DUMPF("]\n");
-        #endif
+        Base = KBTS__POINTER_OFFSET(kbts_u16, Subst, Subst_Offset);
+        LookupType = Subst_LookupType;
       }
     }
-    break;
 
-    case 2:
+    kbts_un LookupFormat;
+    if(!Context->Error &&
+       kbts__ByteSwap16InPlaceContext(Context, Base, &LookupFormat))
     {
-      kbts__multiple_substitution *Subst = (kbts__multiple_substitution *)Base;
-      kbts_un Subst_SequenceCount = kbts__ByteSwap16InPlace(&Subst->SequenceCount);
-      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst_SequenceCount, Context);
+      KBTS_DUMPF("    Type %llu.%llu\n"
+                 "    Offset %zu\n",
+                 LookupType, LookupFormat, (char *)Base - Context->FileBase);
 
-      KBTS__FOR(SequenceIndex, 0, Subst_SequenceCount)
+      kbts_un LookupCoverageOffset;
+      if(kbts__GsubLookupBeginsWithCoverage((kbts_u16)LookupType, (kbts_u16)LookupFormat) &&
+         kbts__ByteSwap16InPlaceContext(Context, &Base[1], &LookupCoverageOffset))
       {
-        kbts__sequence *Sequence = kbts__GetSequence(Subst, SequenceIndex);
+        kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Base, LookupCoverageOffset);
 
-        if(!kbts__AlreadyVisited(Context, Sequence))
+        kbts__ByteSwapCoverage(Context, Coverage);
+
+  #  ifdef KBTS_DUMP
+        if(!Context->Error)
         {
-          kbts_un Sequence_GlyphCount = kbts__ByteSwap16InPlace(&Sequence->GlyphCount);
+          kbts_u16 Coverage_Format = kbts__ReadU16Unaligned(&Coverage->Format);
+          kbts_un Coverage_Count = kbts__ReadU16Unaligned(&Coverage->Count);
 
-          kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Sequence), Sequence_GlyphCount, Context);
-        }
-
-        #ifdef KBTS_DUMP
-        KBTS_DUMPF("    [");
-        kbts_u16 *SequenceGlyphIds = KBTS__POINTER_AFTER(kbts_u16, Sequence);
-        kbts_un Sequence_GlyphCount = kbts__ReadU16Unaligned(&Sequence->GlyphCount);
-        KBTS__FOR(SequenceGlyphIndex, 0, Sequence_GlyphCount)
-        {
-          if(SequenceGlyphIndex) KBTS_DUMPF(" ");
-          KBTS_DUMPF("%x", kbts__ReadU16Unaligned(&SequenceGlyphIds[SequenceGlyphIndex]));
-        }
-        KBTS_DUMPF("]\n");
-        #endif
-      }
-    }
-    break;
-
-    case 3:
-    {
-      kbts__alternate_substitution *Subst = (kbts__alternate_substitution *)Base;
-      kbts_un Subst_AlternateSetCount = kbts__ByteSwap16InPlace(&Subst->AlternateSetCount);
-      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst_AlternateSetCount, Context);
-
-      KBTS__FOR(SetIndex, 0, Subst_AlternateSetCount)
-      {
-        kbts__alternate_set *Set = kbts__GetAlternateSet(Subst, SetIndex);
-
-        if(!kbts__AlreadyVisited(Context, Set))
-        {
-          kbts_un Set_GlyphCount = kbts__ByteSwap16InPlace(&Set->GlyphCount);
-
-          kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Set), Set_GlyphCount, Context);
-        }
-
-        #ifdef KBTS_DUMP
-        KBTS_DUMPF("    [");
-        kbts_u16 *SetGlyphIds = KBTS__POINTER_AFTER(kbts_u16, Set);
-        kbts_un Set_GlyphCount = kbts__ReadU16Unaligned(&Set->GlyphCount);
-        KBTS__FOR(SetGlyphIndex, 0, Set_GlyphCount)
-        {
-          if(SetGlyphIndex) KBTS_DUMPF(" ");
-          KBTS_DUMPF("%x", kbts__ReadU16Unaligned(&SetGlyphIds[SetGlyphIndex]));
-        }
-        KBTS_DUMPF("]\n");
-        #endif
-      }
-    }
-    break;
-
-    case 4:
-    {
-      kbts__ligature_substitution *Subst = (kbts__ligature_substitution *)Base;
-      kbts_un Subst_LigatureSetCount = kbts__ByteSwap16InPlace(&Subst->LigatureSetCount);
-      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Subst), Subst_LigatureSetCount, Context);
-
-      KBTS__FOR(SetIndex, 0, Subst_LigatureSetCount)
-      {
-        kbts__ligature_set *Set = kbts__GetLigatureSet(Subst, SetIndex);
-
-        if(!kbts__AlreadyVisited(Context, Set))
-        {
-          kbts_un Set_Count = kbts__ByteSwap16InPlace(&Set->Count);
-          kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Set), Set_Count, Context);
-
-          KBTS__FOR(LigatureIndex, 0, Set_Count)
+          KBTS_DUMPF("    Coverage %u\n", Coverage_Format);
+          if(Coverage_Format == 1)
           {
-            kbts__ligature *Ligature = kbts__GetLigature(Set, LigatureIndex);
-
-            if(!kbts__AlreadyVisited(Context, Ligature))
+            kbts_u16 *GlyphIds = KBTS__POINTER_AFTER(kbts_u16, Coverage);
+            KBTS__FOR(GlyphIndex, 0, Coverage_Count)
             {
-              kbts__ByteSwapArray16Context(&Ligature->Glyph, 2, Context);
-              kbts_un Ligature_ComponentCount = kbts__ReadU16Unaligned(&Ligature->ComponentCount);
-              kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Ligature), Ligature_ComponentCount - 1, Context);
+              KBTS_DUMPF("      %x\n", kbts__ReadU16Unaligned(&GlyphIds[GlyphIndex]));
+            }
+          }
+          else if(Coverage_Format == 2)
+          {
+            kbts__range_record *Ranges = KBTS__POINTER_AFTER(kbts__range_record, Coverage);
+            KBTS__FOR(RangeIndex, 0, Coverage_Count)
+            {
+              kbts__range_record *Range = &Ranges[RangeIndex];
+              kbts_u16 Range_StartGlyphId = kbts__ReadU16Unaligned(&Range->StartGlyphId);
+              kbts_u16 Range_EndGlyphId = kbts__ReadU16Unaligned(&Range->EndGlyphId);
+              kbts_u16 Range_StartCoverageIndex = kbts__ReadU16Unaligned(&Range->StartCoverageIndex);
+              KBTS_DUMPF("        %x..%x@%u..%u\n", Range_StartGlyphId, Range_EndGlyphId, Range_StartCoverageIndex, Range_StartCoverageIndex + (Range_EndGlyphId - Range_StartGlyphId));
+            }
+          }
+        }
+  #  endif
+      }
 
-#  ifdef KBTS_DUMP
-              KBTS_DUMPF("ligature: [");
-              kbts_u16 *ComponentIds = KBTS__POINTER_AFTER(kbts_u16, Ligature);
-              KBTS__FOR(ComponentIndex, 1, Ligature_ComponentCount)
+      switch(LookupType)
+      {
+      case 1:
+      {
+        kbts__single_substitution *Subst = (kbts__single_substitution *)Base;
+        kbts_un Subst_GlyphCount;
+        if(kbts__ByteSwap16InPlaceContext(Context, &Subst->DeltaOrCount.GlyphCount, &Subst_GlyphCount))
+        {
+          #ifdef KBTS_DUMP
+          if(LookupFormat == 1)
+          {
+            KBTS_DUMPF("    += %d\n", kbts__ReadS16Unaligned(&Subst->DeltaOrCount.DeltaGlyphId));
+          }
+          #endif
+
+          if(LookupFormat == 2)
+          {
+            kbts_u16 *GlyphIds = KBTS__POINTER_AFTER(kbts_u16, Subst);
+            kbts__ByteSwapArray16Context(Context, GlyphIds, Subst_GlyphCount);
+
+            #ifdef KBTS_DUMP
+            if(!Context->Error)
+            {
+              KBTS_DUMPF("    [");
+              KBTS__FOR(IdIndex, 0, Subst_GlyphCount)
               {
-                KBTS_DUMPF("%x,", kbts__ReadU16Unaligned(&ComponentIds[ComponentIndex - 1]));
+                if(IdIndex) KBTS_DUMPF(" ");
+                KBTS_DUMPF("%x", kbts__ReadU16Unaligned(&GlyphIds[IdIndex]));
               }
-              KBTS_DUMPF("] -> %x\n", kbts__ReadU16Unaligned(&Ligature->Glyph));
-#  endif
+              KBTS_DUMPF("]\n");
+            }
+            #endif
+          }
+        }
+      }
+      break;
+
+      case 2:
+      {
+        kbts__multiple_substitution *Subst = (kbts__multiple_substitution *)Base;
+        kbts_un Subst_SequenceCount;
+        if(kbts__ByteSwap16InPlaceContext(Context, &Subst->SequenceCount, &Subst_SequenceCount) &&
+           kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, Subst), Subst_SequenceCount))
+        {
+          KBTS__FOR(SequenceIndex, 0, Subst_SequenceCount)
+          {
+            kbts__sequence *Sequence = kbts__GetSequence(Subst, SequenceIndex);
+
+            kbts_un Sequence_GlyphCount;
+            if(kbts__ByteSwap16InPlaceContext(Context, &Sequence->GlyphCount, &Sequence_GlyphCount))
+            {
+              kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, Sequence), Sequence_GlyphCount);
+            }
+
+            #ifdef KBTS_DUMP
+            if(!Context->Error)
+            {
+              KBTS_DUMPF("    [");
+              kbts_u16 *SequenceGlyphIds = KBTS__POINTER_AFTER(kbts_u16, Sequence);
+              KBTS__FOR(SequenceGlyphIndex, 0, Sequence_GlyphCount)
+              {
+                if(SequenceGlyphIndex) KBTS_DUMPF(" ");
+                KBTS_DUMPF("%x", kbts__ReadU16Unaligned(&SequenceGlyphIds[SequenceGlyphIndex]));
+              }
+              KBTS_DUMPF("]\n");
+            }
+            #endif
+          }
+        }
+      }
+      break;
+
+      case 3:
+      {
+        kbts__alternate_substitution *Subst = (kbts__alternate_substitution *)Base;
+        kbts_un Subst_AlternateSetCount;
+        if(kbts__ByteSwap16InPlaceContext(Context, &Subst->AlternateSetCount, &Subst_AlternateSetCount) &&
+           kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, Subst), Subst_AlternateSetCount))
+        {
+          KBTS__FOR(SetIndex, 0, Subst_AlternateSetCount)
+          {
+            kbts__alternate_set *Set = kbts__GetAlternateSet(Subst, SetIndex);
+            kbts_un Set_GlyphCount;
+
+            if(kbts__ByteSwap16InPlaceContext(Context, &Set->GlyphCount, &Set_GlyphCount))
+            {
+              kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, Set), Set_GlyphCount);
+            }
+
+            #ifdef KBTS_DUMP
+            if(!Context->Error)
+            {
+              KBTS_DUMPF("    [");
+              kbts_u16 *SetGlyphIds = KBTS__POINTER_AFTER(kbts_u16, Set);
+              KBTS__FOR(SetGlyphIndex, 0, Set_GlyphCount)
+              {
+                if(SetGlyphIndex) KBTS_DUMPF(" ");
+                KBTS_DUMPF("%x", kbts__ReadU16Unaligned(&SetGlyphIds[SetGlyphIndex]));
+              }
+              KBTS_DUMPF("]\n");
+            }
+            #endif
+          }
+        }
+      }
+      break;
+
+      case 4:
+      {
+        kbts__ligature_substitution *Subst = (kbts__ligature_substitution *)Base;
+        kbts_un Subst_LigatureSetCount;
+        if(kbts__ByteSwap16InPlaceContext(Context, &Subst->LigatureSetCount, &Subst_LigatureSetCount) &&
+           kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, Subst), Subst_LigatureSetCount))
+        {
+          KBTS__FOR(SetIndex, 0, Subst_LigatureSetCount)
+          {
+            kbts__ligature_set *Set = kbts__GetLigatureSet(Subst, SetIndex);
+
+            kbts_un Set_Count;
+
+            if(kbts__ByteSwap16InPlaceContext(Context, &Set->Count, &Set_Count) &&
+               kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, Set), Set_Count))
+            {
+              KBTS__FOR(LigatureIndex, 0, Set_Count)
+              {
+                kbts__ligature *Ligature = kbts__GetLigature(Set, LigatureIndex);
+
+                if(kbts__ByteSwapArray16Context(Context, &Ligature->Glyph, 2))
+                {
+                  kbts_un Ligature_ComponentCount = kbts__ReadU16Unaligned(&Ligature->ComponentCount);
+                  if(Ligature_ComponentCount)
+                  {
+                    kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, Ligature), Ligature_ComponentCount - 1);
+
+                    #ifdef KBTS_DUMP
+                    if(!Context->Error)
+                    {
+                      KBTS_DUMPF("ligature: [");
+                      kbts_u16 *ComponentIds = KBTS__POINTER_AFTER(kbts_u16, Ligature);
+                      KBTS__FOR(ComponentIndex, 1, Ligature_ComponentCount)
+                      {
+                        KBTS_DUMPF("%x,", kbts__ReadU16Unaligned(&ComponentIds[ComponentIndex - 1]));
+                      }
+                      KBTS_DUMPF("] -> %x\n", kbts__ReadU16Unaligned(&Ligature->Glyph));
+                    }
+                    #endif
+                  }
+                  else
+                  {
+                    Context->Error = 1;
+                  }
+                }
+              }
             }
           }
         }
       }
+      break;
 
-#  ifdef KBTS_DUMP
-
-#  endif
-    }
-    break;
-
-    case 5:
-    {
-      kbts__ByteSwapSequenceContextSubtable(Context, Base);
-    }
-    break;
-
-    case 6:
-    {
-      kbts__ByteSwapChainedSequenceContextSubtable(Context, Base);
-    }
-    break;
-
-    case 8:
-    {
-      kbts__reverse_chain_substitution *Subst = (kbts__reverse_chain_substitution *)Base;
-      kbts__unpacked_reverse_chain_substitution Unpacked = kbts__UnpackReverseChainSubstitution(Subst, 1);
-
-      kbts_un U16Count = Unpacked.BacktrackCount + Unpacked.GlyphCount + Unpacked.LookaheadCount + 3;
-      kbts__ByteSwapArray16Context(&Subst->BacktrackGlyphCount, U16Count, Context);
-
-      KBTS__FOR(BacktrackCoverageIndex, 0, Unpacked.BacktrackCount)
+      case 5:
       {
-        kbts_un BacktrackCoverageOffset = kbts__ReadU16Unaligned(&Unpacked.BacktrackCoverageOffsets[BacktrackCoverageIndex]);
-        kbts__ByteSwapCoverage(Context, KBTS__POINTER_OFFSET(kbts__coverage, Subst, BacktrackCoverageOffset));
+        kbts__ByteSwapSequenceContextSubtable(Context, Base);
       }
-      KBTS__FOR(LookaheadCoverageIndex, 0, Unpacked.LookaheadCount)
+      break;
+
+      case 6:
       {
-        kbts_un LookaheadCoverageOffset = kbts__ReadU16Unaligned(&Unpacked.LookaheadCoverageOffsets[LookaheadCoverageIndex]);
-        kbts__ByteSwapCoverage(Context, KBTS__POINTER_OFFSET(kbts__coverage, Subst, LookaheadCoverageOffset));
+        kbts__ByteSwapChainedSequenceContextSubtable(Context, Base);
       }
-    }
-    break;
+      break;
+
+      case 8:
+      {
+        kbts__reverse_chain_substitution *Subst = (kbts__reverse_chain_substitution *)Base;
+        kbts__unpacked_reverse_chain_substitution Unpacked = kbts__UnpackReverseChainSubstitution(Subst, 1);
+
+        kbts_un U16Count = Unpacked.BacktrackCount + Unpacked.GlyphCount + Unpacked.LookaheadCount + 3;
+        if(kbts__ByteSwapArray16Context(Context, &Subst->BacktrackGlyphCount, U16Count))
+        {
+          KBTS__FOR(BacktrackCoverageIndex, 0, Unpacked.BacktrackCount)
+          {
+            kbts_un BacktrackCoverageOffset = kbts__ReadU16Unaligned(&Unpacked.BacktrackCoverageOffsets[BacktrackCoverageIndex]);
+            kbts__ByteSwapCoverage(Context, KBTS__POINTER_OFFSET(kbts__coverage, Subst, BacktrackCoverageOffset));
+          }
+
+          KBTS__FOR(LookaheadCoverageIndex, 0, Unpacked.LookaheadCount)
+          {
+            kbts_un LookaheadCoverageOffset = kbts__ReadU16Unaligned(&Unpacked.LookaheadCoverageOffsets[LookaheadCoverageIndex]);
+            kbts__ByteSwapCoverage(Context, KBTS__POINTER_OFFSET(kbts__coverage, Subst, LookaheadCoverageOffset));
+          }
+        }
+      }
+      break;
+      }
     }
   }
 }
 
 static void kbts__ByteSwapGposLookupSubtable(kbts__byteswap_context *Context, kbts__lookup_list *LookupList, kbts_u16 LookupType, kbts_u16 *Base)
 {
-  if(!kbts__AlreadyVisited(Context, Base))
+  if(!kbts__AddressIsMarked(Context, Base))
   {
-    kbts_u16 LookupFormat = kbts__ByteSwap16InPlace(Base);
-
-    KBTS_DUMPF("  GPOS subtable %u.%u\n", LookupType, LookupFormat);
-
-    if(kbts__GposLookupBeginsWithCoverage(LookupType, LookupFormat))
+    kbts_un LookupFormat;
+    if(kbts__ByteSwap16InPlaceContext(Context, Base, &LookupFormat))
     {
-      kbts_u16 CoverageOffset = kbts__ByteSwap16InPlace(&Base[1]);
+      KBTS_DUMPF("  GPOS subtable %u.%llu\n", LookupType, LookupFormat);
 
-      kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Base, CoverageOffset);
-      kbts__ByteSwapCoverage(Context, Coverage);
-    }
-
-    switch(LookupType)
-    {
-    case 1:
-    {
-      kbts__single_adjustment_1 *Adjust = (kbts__single_adjustment_1 *)Base;
-      kbts_u16 Adjust_ValueFormat = kbts__ByteSwap16InPlace(&Adjust->ValueFormat);
-
-      if(LookupFormat == 1)
+      if(kbts__GposLookupBeginsWithCoverage(LookupType, (kbts_u16)LookupFormat))
       {
-        kbts__ByteSwapValueRecord(Context, Adjust, Adjust_ValueFormat, KBTS__POINTER_AFTER(kbts_u16, Adjust));
-      }
-      else if(LookupFormat == 2)
-      {
-        kbts__single_adjustment_2 *Adjust2 = (kbts__single_adjustment_2 *)Base;
-        kbts_un Adjust2_RecordCount = kbts__ByteSwap16InPlace(&Adjust2->RecordCount);
-
-        kbts_u16 *At = KBTS__POINTER_AFTER(kbts_u16, Adjust2);
-        KBTS__FOR(RecordIndex, 0, Adjust2_RecordCount)
+        kbts_un CoverageOffset;
+        if(kbts__ByteSwap16InPlaceContext(Context, &Base[1], &CoverageOffset))
         {
-          kbts__unpacked_value_record Unpacked = kbts__ByteSwapValueRecord(Context, Adjust2, Adjust_ValueFormat, At);
-
-          At += Unpacked.Size;
+          kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Base, CoverageOffset);
+          kbts__ByteSwapCoverage(Context, Coverage);
         }
       }
-    } break;
 
-    case 2:
-    {
-      if(LookupFormat == 1)
+      if(!Context->Error)
       {
-        kbts__pair_adjustment_1 *Adjust = (kbts__pair_adjustment_1 *)Base;
-        kbts__ByteSwapArray16Context(&Adjust->ValueFormat1, 3, Context);
-        kbts_un Adjust_SetCount = kbts__ReadU16Unaligned(&Adjust->SetCount);
-
-        kbts_u16 *SetOffsets = KBTS__POINTER_AFTER(kbts_u16, Adjust);
-        kbts__ByteSwapArray16Context(SetOffsets, Adjust_SetCount, Context);
-
-        kbts_u16 Adjust_ValueFormat1 = kbts__ReadU16Unaligned(&Adjust->ValueFormat1);
-        kbts_u16 Adjust_ValueFormat2 = kbts__ReadU16Unaligned(&Adjust->ValueFormat2);
-
-        kbts_un Size1 = kbts__PopCount32(Adjust_ValueFormat1);
-        kbts_un Size2 = kbts__PopCount32(Adjust_ValueFormat2);
-        kbts_un PairRecordSize = Size1 + Size2 + 1;
-
-        KBTS__FOR(SetIndex, 0, Adjust_SetCount)
+        switch(LookupType)
         {
-          kbts__pair_set *Set = KBTS__POINTER_OFFSET(kbts__pair_set, Adjust, kbts__ReadU16Unaligned(&SetOffsets[SetIndex]));
-
-          if(!kbts__AlreadyVisited(Context, Set))
+        case 1:
+        {
+          kbts__single_adjustment_1 *Adjust = (kbts__single_adjustment_1 *)Base;
+          kbts_un Adjust_ValueFormat;
+          if(kbts__ByteSwap16InPlaceContext(Context, &Adjust->ValueFormat, &Adjust_ValueFormat))
           {
-            kbts_un Set_Count = kbts__ByteSwap16InPlace(&Set->Count);
-
-            kbts_u16 *At = KBTS__POINTER_AFTER(kbts_u16, Set);
-
-            KBTS__FOR(RecordIndex, 0, Set_Count)
+            if(LookupFormat == 1)
             {
-              kbts__pair_value_record *PairRecord = (kbts__pair_value_record *)(At + RecordIndex * PairRecordSize);
-
-              kbts__ByteSwap16InPlace(&PairRecord->SecondGlyph);
-              kbts_u16 *Record = KBTS__POINTER_AFTER(kbts_u16, PairRecord);
-
-              kbts__unpacked_value_record Unpacked1 = kbts__ByteSwapValueRecord(Context, Set, Adjust_ValueFormat1, Record);
-              Record += Unpacked1.Size;
-              kbts__ByteSwapValueRecord(Context, Set, Adjust_ValueFormat2, Record);
+              kbts__ByteSwapValueRecord(Context, Adjust, (kbts_u16)Adjust_ValueFormat, KBTS__POINTER_AFTER(kbts_u16, Adjust));
             }
-          }
-        }
-      }
-      else if(LookupFormat == 2)
-      {
-        kbts__pair_adjustment_2 *Adjust = (kbts__pair_adjustment_2 *)Base;
-        kbts__ByteSwapArray16Context(&Adjust->ValueFormat1, 6, Context);
-
-        kbts_un Adjust_ClassDefinition1Offset = kbts__ReadU16Unaligned(&Adjust->ClassDefinition1Offset);
-        kbts_un Adjust_ClassDefinition2Offset = kbts__ReadU16Unaligned(&Adjust->ClassDefinition2Offset);
-
-        kbts__ByteSwapClassDefinition(Context, KBTS__POINTER_OFFSET(kbts_u16, Adjust, Adjust_ClassDefinition1Offset));
-        kbts__ByteSwapClassDefinition(Context, KBTS__POINTER_OFFSET(kbts_u16, Adjust, Adjust_ClassDefinition2Offset));
-
-        kbts_u16 *Records = KBTS__POINTER_AFTER(kbts_u16, Adjust);
-
-        kbts_u16 Adjust_ValueFormat1 = kbts__ReadU16Unaligned(&Adjust->ValueFormat1);
-        kbts_u16 Adjust_ValueFormat2 = kbts__ReadU16Unaligned(&Adjust->ValueFormat2);
-
-        kbts_un Size1 = kbts__PopCount32(Adjust_ValueFormat1);
-        kbts_un Size2 = kbts__PopCount32(Adjust_ValueFormat2);
-
-        kbts_un Adjust_Class1Count = kbts__ReadU16Unaligned(&Adjust->Class1Count);
-        kbts_un Adjust_Class2Count = kbts__ReadU16Unaligned(&Adjust->Class2Count);
-
-        kbts_u16 *RecordPair = Records;
-        KBTS__FOR(RecordIndex, 0, Adjust_Class1Count * Adjust_Class2Count)
-        {
-          kbts__ByteSwapValueRecord(Context, Adjust, Adjust_ValueFormat1, RecordPair);
-          RecordPair += Size1;
-
-          kbts__ByteSwapValueRecord(Context, Adjust, Adjust_ValueFormat2, RecordPair);
-          RecordPair += Size2;
-        }
-      }
-    } break;
-
-    case 3:
-    {
-      kbts__cursive_attachment *Adjust = (kbts__cursive_attachment *)Base;
-      kbts_un Adjust_EntryExitCount = kbts__ByteSwap16InPlace(&Adjust->EntryExitCount);
-      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, Adjust), Adjust_EntryExitCount * 2, Context);
-
-      kbts__entry_exit *EntryExits = KBTS__POINTER_AFTER(kbts__entry_exit, Adjust);
-      KBTS__FOR(EntryExitIndex, 0, Adjust_EntryExitCount)
-      {
-        kbts__entry_exit *EntryExit = &EntryExits[EntryExitIndex];
-        kbts_un EntryExit_EntryAnchorOffset = kbts__ReadU16Unaligned(&EntryExit->EntryAnchorOffset);
-        kbts_un EntryExit_ExitAnchorOffset = kbts__ReadU16Unaligned(&EntryExit->ExitAnchorOffset);
-
-        if(EntryExit_EntryAnchorOffset)
-        {
-          kbts__ByteSwapAnchor(Context, KBTS__POINTER_OFFSET(kbts__anchor, Adjust, EntryExit_EntryAnchorOffset));
-        }
-
-        if(EntryExit_ExitAnchorOffset)
-        {
-          kbts__ByteSwapAnchor(Context, KBTS__POINTER_OFFSET(kbts__anchor, Adjust, EntryExit_ExitAnchorOffset));
-        }
-      }
-    } break;
-
-    case 4:
-    case 6:
-    {
-      kbts__mark_to_base_attachment *Adjust = (kbts__mark_to_base_attachment *)Base;
-      kbts__ByteSwapArray16Context(&Adjust->BaseCoverageOffset, 4, Context);
-
-      kbts__ByteSwapCoverage(Context, KBTS__POINTER_OFFSET(kbts__coverage, Adjust, kbts__ReadU16Unaligned(&Adjust->BaseCoverageOffset)));
-      kbts__ByteSwapMarkArray(Context, KBTS__POINTER_OFFSET(kbts__mark_array, Adjust, kbts__ReadU16Unaligned(&Adjust->MarkArrayOffset)));
-      kbts__ByteSwapBaseArray(Context, kbts__ReadU16Unaligned(&Adjust->MarkClassCount), KBTS__POINTER_OFFSET(kbts__base_array, Adjust, kbts__ReadU16Unaligned(&Adjust->BaseArrayOffset)));
-    } break;
-
-    case 5:
-    {
-      kbts__mark_to_ligature_attachment *Adjust = (kbts__mark_to_ligature_attachment *)Base;
-      kbts__ByteSwapArray16Context(&Adjust->LigatureCoverageOffset, 4, Context);
-
-      kbts__ByteSwapCoverage(Context, KBTS__POINTER_OFFSET(kbts__coverage, Adjust, kbts__ReadU16Unaligned(&Adjust->LigatureCoverageOffset)));
-      kbts__ByteSwapMarkArray(Context, KBTS__POINTER_OFFSET(kbts__mark_array, Adjust, kbts__ReadU16Unaligned(&Adjust->MarkArrayOffset)));
-
-      kbts__ligature_array *LigatureArray = KBTS__POINTER_OFFSET(kbts__ligature_array, Adjust, kbts__ReadU16Unaligned(&Adjust->LigatureArrayOffset));
-      if(!kbts__AlreadyVisited(Context, LigatureArray))
-      {
-        kbts_un LigatureArray_Count = kbts__ByteSwap16InPlace(&LigatureArray->Count);
-        kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, LigatureArray), LigatureArray_Count, Context);
-
-        KBTS__FOR(AttachIndex, 0, LigatureArray_Count)
-        {
-          kbts__ligature_attach *Attach = kbts__GetLigatureAttach(LigatureArray, AttachIndex);
-
-          if(!kbts__AlreadyVisited(Context, Attach))
-          {
-            kbts_un Attach_Count = kbts__ByteSwap16InPlace(&Attach->Count);
-            kbts_un Adjust_MarkClassCount = kbts__ReadU16Unaligned(&Adjust->MarkClassCount);
-
-            kbts_u16 *AttachAnchorOffsets = KBTS__POINTER_AFTER(kbts_u16, Attach);
-            kbts__ByteSwapArray16Context(AttachAnchorOffsets, Attach_Count * Adjust_MarkClassCount, Context);
-
-            KBTS__FOR(ComponentIndex, 0, Attach_Count)
+            else if(LookupFormat == 2)
             {
-              KBTS__FOR(MarkClass, 0, Adjust_MarkClassCount)
+              kbts__single_adjustment_2 *Adjust2 = (kbts__single_adjustment_2 *)Base;
+              kbts_un Adjust2_RecordCount;
+              if(kbts__ByteSwap16InPlaceContext(Context, &Adjust2->RecordCount, &Adjust2_RecordCount))
               {
-                kbts__anchor *Anchor = kbts__GetLigatureAttachAnchor(Adjust, Attach, (kbts_u16)MarkClass, ComponentIndex);
+                kbts_u16 *At = KBTS__POINTER_AFTER(kbts_u16, Adjust2);
+                KBTS__FOR(RecordIndex, 0, Adjust2_RecordCount)
+                {
+                  kbts__unpacked_value_record Unpacked = kbts__ByteSwapValueRecord(Context, Adjust2, (kbts_u16)Adjust_ValueFormat, At);
 
-                kbts__ByteSwapAnchor(Context, Anchor);
+                  At += Unpacked.Size;
+                }
               }
             }
           }
+        } break;
+
+        case 2:
+        {
+          if(LookupFormat == 1)
+          {
+            kbts__pair_adjustment_1 *Adjust = (kbts__pair_adjustment_1 *)Base;
+            if(kbts__ByteSwapArray16Context(Context, &Adjust->ValueFormat1, 3))
+            {
+              kbts_un Adjust_SetCount = kbts__ReadU16Unaligned(&Adjust->SetCount);
+
+              kbts_u16 *SetOffsets = KBTS__POINTER_AFTER(kbts_u16, Adjust);
+              if(kbts__ByteSwapArray16Context(Context, SetOffsets, Adjust_SetCount))
+              {
+                kbts_u16 Adjust_ValueFormat1 = kbts__ReadU16Unaligned(&Adjust->ValueFormat1);
+                kbts_u16 Adjust_ValueFormat2 = kbts__ReadU16Unaligned(&Adjust->ValueFormat2);
+
+                kbts_un Size1 = kbts__PopCount32(Adjust_ValueFormat1);
+                kbts_un Size2 = kbts__PopCount32(Adjust_ValueFormat2);
+                kbts_un PairRecordSize = Size1 + Size2 + 1;
+
+                KBTS__FOR(SetIndex, 0, Adjust_SetCount)
+                {
+                  kbts__pair_set *Set = KBTS__POINTER_OFFSET(kbts__pair_set, Adjust, kbts__ReadU16Unaligned(&SetOffsets[SetIndex]));
+
+                  kbts_un Set_Count;
+                  if(kbts__ByteSwap16InPlaceContext(Context, &Set->Count, &Set_Count))
+                  {
+                    kbts_u16 *At = KBTS__POINTER_AFTER(kbts_u16, Set);
+
+                    KBTS__FOR(RecordIndex, 0, Set_Count)
+                    {
+                      kbts__pair_value_record *PairRecord = (kbts__pair_value_record *)(At + RecordIndex * PairRecordSize);
+
+                      if(kbts__ByteSwap16InPlaceContext(Context, &PairRecord->SecondGlyph, 0))
+                      {
+                        kbts_u16 *Record = KBTS__POINTER_AFTER(kbts_u16, PairRecord);
+
+                        kbts__unpacked_value_record Unpacked1 = kbts__ByteSwapValueRecord(Context, Set, Adjust_ValueFormat1, Record);
+                        Record += Unpacked1.Size;
+                        kbts__ByteSwapValueRecord(Context, Set, Adjust_ValueFormat2, Record);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+          else if(LookupFormat == 2)
+          {
+            kbts__pair_adjustment_2 *Adjust = (kbts__pair_adjustment_2 *)Base;
+            kbts__ByteSwapArray16Context(Context, &Adjust->ValueFormat1, 6);
+
+            kbts_un Adjust_ClassDefinition1Offset = kbts__ReadU16Unaligned(&Adjust->ClassDefinition1Offset);
+            kbts_un Adjust_ClassDefinition2Offset = kbts__ReadU16Unaligned(&Adjust->ClassDefinition2Offset);
+
+            kbts__ByteSwapClassDefinition(Context, KBTS__POINTER_OFFSET(kbts_u16, Adjust, Adjust_ClassDefinition1Offset));
+            kbts__ByteSwapClassDefinition(Context, KBTS__POINTER_OFFSET(kbts_u16, Adjust, Adjust_ClassDefinition2Offset));
+
+            kbts_u16 *Records = KBTS__POINTER_AFTER(kbts_u16, Adjust);
+
+            kbts_u16 Adjust_ValueFormat1 = kbts__ReadU16Unaligned(&Adjust->ValueFormat1);
+            kbts_u16 Adjust_ValueFormat2 = kbts__ReadU16Unaligned(&Adjust->ValueFormat2);
+
+            kbts_un Size1 = kbts__PopCount32(Adjust_ValueFormat1);
+            kbts_un Size2 = kbts__PopCount32(Adjust_ValueFormat2);
+
+            kbts_un Adjust_Class1Count = kbts__ReadU16Unaligned(&Adjust->Class1Count);
+            kbts_un Adjust_Class2Count = kbts__ReadU16Unaligned(&Adjust->Class2Count);
+
+            kbts_u16 *RecordPair = Records;
+            KBTS__FOR(RecordIndex, 0, Adjust_Class1Count * Adjust_Class2Count)
+            {
+              kbts__ByteSwapValueRecord(Context, Adjust, Adjust_ValueFormat1, RecordPair);
+              RecordPair += Size1;
+
+              kbts__ByteSwapValueRecord(Context, Adjust, Adjust_ValueFormat2, RecordPair);
+              RecordPair += Size2;
+            }
+          }
+        } break;
+
+        case 3:
+        {
+          kbts__cursive_attachment *Adjust = (kbts__cursive_attachment *)Base;
+          kbts_un Adjust_EntryExitCount;
+          if(kbts__ByteSwap16InPlaceContext(Context, &Adjust->EntryExitCount, &Adjust_EntryExitCount) &&
+             kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, Adjust), Adjust_EntryExitCount * 2))
+          {
+            kbts__entry_exit *EntryExits = KBTS__POINTER_AFTER(kbts__entry_exit, Adjust);
+            KBTS__FOR(EntryExitIndex, 0, Adjust_EntryExitCount)
+            {
+              kbts__entry_exit *EntryExit = &EntryExits[EntryExitIndex];
+              kbts_un EntryExit_EntryAnchorOffset = kbts__ReadU16Unaligned(&EntryExit->EntryAnchorOffset);
+              kbts_un EntryExit_ExitAnchorOffset = kbts__ReadU16Unaligned(&EntryExit->ExitAnchorOffset);
+
+              if(EntryExit_EntryAnchorOffset)
+              {
+                kbts__ByteSwapAnchor(Context, KBTS__POINTER_OFFSET(kbts__anchor, Adjust, EntryExit_EntryAnchorOffset));
+              }
+
+              if(EntryExit_ExitAnchorOffset)
+              {
+                kbts__ByteSwapAnchor(Context, KBTS__POINTER_OFFSET(kbts__anchor, Adjust, EntryExit_ExitAnchorOffset));
+              }
+            }
+          }
+        } break;
+
+        case 4:
+        case 6:
+        {
+          kbts__mark_to_base_attachment *Adjust = (kbts__mark_to_base_attachment *)Base;
+          kbts__ByteSwapArray16Context(Context, &Adjust->BaseCoverageOffset, 4);
+
+          kbts__ByteSwapCoverage(Context, KBTS__POINTER_OFFSET(kbts__coverage, Adjust, kbts__ReadU16Unaligned(&Adjust->BaseCoverageOffset)));
+          kbts__ByteSwapMarkArray(Context, KBTS__POINTER_OFFSET(kbts__mark_array, Adjust, kbts__ReadU16Unaligned(&Adjust->MarkArrayOffset)));
+          kbts__ByteSwapBaseArray(Context, kbts__ReadU16Unaligned(&Adjust->MarkClassCount), KBTS__POINTER_OFFSET(kbts__base_array, Adjust, kbts__ReadU16Unaligned(&Adjust->BaseArrayOffset)));
+        } break;
+
+        case 5:
+        {
+          kbts__mark_to_ligature_attachment *Adjust = (kbts__mark_to_ligature_attachment *)Base;
+          kbts__ByteSwapArray16Context(Context, &Adjust->LigatureCoverageOffset, 4);
+
+          kbts__ByteSwapCoverage(Context, KBTS__POINTER_OFFSET(kbts__coverage, Adjust, kbts__ReadU16Unaligned(&Adjust->LigatureCoverageOffset)));
+          kbts__ByteSwapMarkArray(Context, KBTS__POINTER_OFFSET(kbts__mark_array, Adjust, kbts__ReadU16Unaligned(&Adjust->MarkArrayOffset)));
+
+          kbts__ligature_array *LigatureArray = KBTS__POINTER_OFFSET(kbts__ligature_array, Adjust, kbts__ReadU16Unaligned(&Adjust->LigatureArrayOffset));
+          kbts_un LigatureArray_Count;
+          if(kbts__ByteSwap16InPlaceContext(Context, &LigatureArray->Count, &LigatureArray_Count) &&
+             kbts__ByteSwapArray16Context(Context, KBTS__POINTER_AFTER(kbts_u16, LigatureArray), LigatureArray_Count))
+          {
+            KBTS__FOR(AttachIndex, 0, LigatureArray_Count)
+            {
+              kbts__ligature_attach *Attach = kbts__GetLigatureAttach(LigatureArray, AttachIndex);
+
+              kbts_un Attach_Count;
+              if(kbts__ByteSwap16InPlaceContext(Context, &Attach->Count, &Attach_Count))
+              {
+                kbts_un Adjust_MarkClassCount = kbts__ReadU16Unaligned(&Adjust->MarkClassCount);
+
+                kbts_u16 *AttachAnchorOffsets = KBTS__POINTER_AFTER(kbts_u16, Attach);
+                if(kbts__ByteSwapArray16Context(Context, AttachAnchorOffsets, Attach_Count * Adjust_MarkClassCount))
+                {
+                  KBTS__FOR(ComponentIndex, 0, Attach_Count)
+                  {
+                    KBTS__FOR(MarkClass, 0, Adjust_MarkClassCount)
+                    {
+                      kbts__anchor *Anchor = kbts__GetLigatureAttachAnchor(Adjust, Attach, (kbts_u16)MarkClass, ComponentIndex);
+
+                      kbts__ByteSwapAnchor(Context, Anchor);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } break;
+
+        case 7:
+        {
+          kbts__ByteSwapSequenceContextSubtable(Context, Base);
+        } break;
+
+        case 8:
+        {
+          kbts__ByteSwapChainedSequenceContextSubtable(Context, Base);
+        } break;
+
+        case 9:
+        {
+          // @Cleanup: Replace recursion with a loop at the start of this function!
+          kbts__extension *Adjust = (kbts__extension *)Base;
+
+          kbts_un Adjust_LookupType;
+          kbts_un Adjust_Offset;
+          if(kbts__ByteSwap16InPlaceContext(Context, &Adjust->LookupType, &Adjust_LookupType) &&
+             kbts__ByteSwap32InPlaceContext(Context, &Adjust->Offset, &Adjust_Offset))
+          {
+            kbts__ByteSwapGposLookupSubtable(Context, LookupList, (kbts_u16)Adjust_LookupType, KBTS__POINTER_OFFSET(kbts_u16, Adjust, Adjust_Offset));
+          }
+        } break;
         }
       }
-    } break;
-
-    case 7:
-    {
-      kbts__ByteSwapSequenceContextSubtable(Context, Base);
-    } break;
-
-    case 8:
-    {
-      kbts__ByteSwapChainedSequenceContextSubtable(Context, Base);
-    } break;
-
-    case 9:
-    {
-      // @Cleanup: Replace recursion with a loop at the start of this function!
-      kbts__extension *Adjust = (kbts__extension *)Base;
-
-      kbts_u16 Adjust_LookupType = kbts__ByteSwap16InPlace(&Adjust->LookupType);
-      kbts_un Adjust_Offset = kbts__ByteSwap32InPlace(&Adjust->Offset);
-
-      kbts__ByteSwapGposLookupSubtable(Context, LookupList, Adjust_LookupType, KBTS__POINTER_OFFSET(kbts_u16, Adjust, Adjust_Offset));
-    } break;
     }
   }
 }
@@ -17937,7 +18266,7 @@ static void *kbts__BlobTableData(kbts_blob_header *Header, kbts_blob_table_id Ta
 }
 #define kbts__BlobTableDataType(Header, TableId, Type) (Type *)kbts__BlobTableData((Header), (TableId))
 
-static void *kbts__BlobTableHeaderChecked_(kbts_blob_header *Header, kbts_blob_table_id TableId, kbts_un HeaderSize, char **TableEnd, kbts_load_font_error *Error)
+static void *kbts__BlobTableHeaderCheckedManualSize(kbts_blob_header *Header, kbts_blob_table_id TableId, kbts_un HeaderSize, char **TableEnd, kbts_load_font_error *Error)
 {
   void *Result = 0;
   kbts_blob_table *Table = &Header->Tables[TableId];
@@ -17950,7 +18279,7 @@ static void *kbts__BlobTableHeaderChecked_(kbts_blob_header *Header, kbts_blob_t
       Result = KBTS__POINTER_OFFSET(void, Header, Table->OffsetFromStartOfFile);
       *TableEnd = KBTS__POINTER_OFFSET(char, Result, TableLength);
     }
-    else
+    else if(Error)
     {
       *Error = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
     }
@@ -17958,7 +18287,7 @@ static void *kbts__BlobTableHeaderChecked_(kbts_blob_header *Header, kbts_blob_t
 
   return Result;
 }
-#define kbts__BlobTableHeaderChecked(Header, TableId, HeaderType, TableEnd, Error) (HeaderType *)kbts__BlobTableHeaderChecked_((Header), (TableId), sizeof(HeaderType), (TableEnd), (Error))
+#define kbts__BlobTableHeaderChecked(Header, TableId, HeaderType, TableEnd, Error) (HeaderType *)kbts__BlobTableHeaderCheckedManualSize((Header), (TableId), sizeof(HeaderType), (TableEnd), (Error))
 
 static kbts_glyph_classes kbts__GlyphClasses(kbts_font *Font, kbts_u32 Id)
 {
@@ -18067,38 +18396,39 @@ KBTS_EXPORT int kbts_CodepointToGlyphId(kbts_font *Font, int ICodepoint)
     {
       kbts__cmap_4 *Cmap4 = (kbts__cmap_4 *)CmapBase;
       kbts_un SegmentCount = kbts__ReadU16Unaligned(&Cmap4->SegmentCountTimesTwo) / 2;
-      kbts_u16 *EndCodes = KBTS__POINTER_AFTER(kbts_u16, Cmap4);
-      kbts_u16 *StartCodes = EndCodes + SegmentCount + 1;
-      kbts_s16 *IdDeltas = (kbts_s16 *)(StartCodes + SegmentCount);
-      kbts_u16 *IdRangeOffsets = (kbts_u16 *)(IdDeltas + SegmentCount);
-      kbts_un SegmentIndexOffset = 0;
 
       if(SegmentCount)
       {
+        kbts_u16 *EndCodes = KBTS__POINTER_AFTER(kbts_u16, Cmap4);
+        kbts_u16 *StartCodes = EndCodes + SegmentCount + 1;
+        kbts_s16 *IdDeltas = (kbts_s16 *)(StartCodes + SegmentCount);
+        kbts_u16 *IdRangeOffsets = (kbts_u16 *)(IdDeltas + SegmentCount);
+        kbts_un SegmentIndexOffset = 0;
+
         while(SegmentCount > 1)
         {
           kbts_un HalfCount = SegmentCount / 2;
           SegmentIndexOffset = (kbts__ReadU16Unaligned(&EndCodes[SegmentIndexOffset + HalfCount - 1]) < Codepoint) ? (SegmentIndexOffset + HalfCount) : SegmentIndexOffset;
           SegmentCount -= HalfCount;
         }
-      }
 
-      kbts_u16 Start = kbts__ReadU16Unaligned(&StartCodes[SegmentIndexOffset]);
-      if((Codepoint >= Start) && (Codepoint <= kbts__ReadU16Unaligned(&EndCodes[SegmentIndexOffset])))
-      {
-        kbts_s16 Delta = kbts__ReadS16Unaligned(&IdDeltas[SegmentIndexOffset]);
-        kbts_u16 RangeOffset = kbts__ReadU16Unaligned(&IdRangeOffsets[SegmentIndexOffset]);
+        kbts_u16 Start = kbts__ReadU16Unaligned(&StartCodes[SegmentIndexOffset]);
+        if((Codepoint >= Start) && (Codepoint <= kbts__ReadU16Unaligned(&EndCodes[SegmentIndexOffset])))
+        {
+          kbts_s16 Delta = kbts__ReadS16Unaligned(&IdDeltas[SegmentIndexOffset]);
+          kbts_u16 RangeOffset = kbts__ReadU16Unaligned(&IdRangeOffsets[SegmentIndexOffset]);
 
-        kbts_u16 GlyphId = (kbts_u16)Delta;
-        if(RangeOffset)
-        {
-          GlyphId += *(&IdRangeOffsets[SegmentIndexOffset] + (Codepoint - Start) + RangeOffset / 2);
+          kbts_u16 GlyphId = (kbts_u16)Delta;
+          if(RangeOffset)
+          {
+            GlyphId += *(&IdRangeOffsets[SegmentIndexOffset] + (Codepoint - Start) + RangeOffset / 2);
+          }
+          else
+          {
+            GlyphId += (kbts_u16)(Codepoint);
+          }
+          Result = GlyphId;
         }
-        else
-        {
-          GlyphId += (kbts_u16)(Codepoint);
-        }
-        Result = GlyphId;
       }
     } break;
 
@@ -19372,14 +19702,16 @@ static kbts__sequence_match kbts__MatchCoverageSequence(kbts_glyph_storage *Stor
   return Result;
 }
 
-static int kbts__BranchlessCompareArray16(kbts_u16 *A, kbts_u16 *B, kbts_un Count)
+static kbts_b32 kbts__BranchlessCompareArray16(kbts_u16 *A, kbts_u16 *B, kbts_un Count)
 {
   kbts_u16 DifferenceMask = 0;
   KBTS__FOR(Index, 0, Count)
   {
-    DifferenceMask |= kbts__ReadU16Unaligned(&A[Index]) ^ kbts__ReadU16Unaligned(&B[Index]);
+    // It turns out we always read aligned data from 'A' so far.
+    // This is a bit subtle and error-prone, but it's useful to distinguish the two for validation purposes.
+    DifferenceMask |= A[Index] ^ kbts__ReadU16Unaligned(&B[Index]);
   }
-  return (int)DifferenceMask;
+  return (kbts_b32)DifferenceMask;
 }
 
 static kbts__sequence_lookup_result kbts__DoSequenceLookup(kbts_glyph_storage *Storage, kbts__unpacked_lookup *Lookup, kbts_u16 *Base, kbts__cover_glyph_result Cover,
@@ -19395,7 +19727,7 @@ static kbts__sequence_lookup_result kbts__DoSequenceLookup(kbts_glyph_storage *S
   kbts_glyph *BacktrackGlyph = AtGlyph->Prev;
 
   kbts_u16 LookupFormat = kbts__ReadU16Unaligned(Base);
-  kbts_u16 Lookup_Type = kbts__ReadU16Unaligned(&Lookup->Type);
+  kbts_u16 Lookup_Type = Lookup->Type;
 
   // Lookup types 7 and 8 are dispatch mechanisms. They do not substitute anything by themselves, they only point to
   // other rules.
@@ -19906,7 +20238,7 @@ static kbts_b32 kbts__DoSingleAdjustment(kbts_shape_scratchpad *Scratchpad, kbts
     // CAREFUL: We want kbts__unpacked_lookup to be a useful bag-of-arguments type, but, for extension
     // lookups, each subtable may specify its own lookup type, so we save it here and restore it at
     // the end of this function.
-    kbts_u16 OriginalLookupType = kbts__ReadU16Unaligned(&Lookup->Type);
+    kbts_u16 OriginalLookupType = Lookup->Type;
     kbts_u16 Lookup_Type = OriginalLookupType;
 
     while(Lookup_Type == 9)
@@ -22382,6 +22714,7 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
       kbts_s16 *VariationVectorNormalized = Scratchpad->VariationVectorNormalized;
 
       kbts_un Hea_MetricCount = Hea ? kbts__ReadU16Unaligned(&Hea->MetricCount) : 0;
+      kbts_un Mtx_MetricCapacity = 0;
 
       kbts__long_mtx *LongMetrics = 0;
       // :LeftSideBearing
@@ -22391,7 +22724,11 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
         LongMetrics = (kbts__long_mtx *)Mtx;
         // :LeftSideBearing
         // ShortMetrics = (kbts_s16 *)(LongMetrics + Hea->MetricCount);
+
+        Mtx_MetricCapacity = Font->Blob->Tables[MtxTableId].Length / sizeof(kbts__long_mtx);
       }
+
+      kbts_un MetricCapacity = KBTS__MIN(Hea_MetricCount, Mtx_MetricCapacity);
 
       kbts__long_mtx DefaultMetric = {1024, 0};
       kbts__head *Head = kbts__BlobTableDataType(Font->Blob, KBTS_BLOB_TABLE_ID_HEAD, kbts__head);
@@ -22431,15 +22768,15 @@ static void kbts__ExecuteOp(kbts_shape_scratchpad *Scratchpad, kbts_glyph_storag
             // :LeftSideBearing
             // Metric.PreviousSideBearing = 0;
           }
-          else if(Id < Hea_MetricCount)
+          else if(Id < MetricCapacity)
           {
             KBTS_MEMCPY(&Metric, &LongMetrics[Id], sizeof(Metric));
           }
-          else
+          else if(MetricCapacity)
           {
-            Metric.Advance = kbts__ReadU16Unaligned(&LongMetrics[Hea_MetricCount - 1].Advance);
+            Metric.Advance = kbts__ReadU16Unaligned(&LongMetrics[MetricCapacity - 1].Advance);
             // :LeftSideBearing
-            // Metric.PreviousSideBearing = ShortMetrics[Id - Hea_MetricCount];
+            // Metric.PreviousSideBearing = ShortMetrics[Id - MetricCapacity];
           }
         }
 
@@ -22893,33 +23230,40 @@ static kbts_glyph *kbts__BeginCluster(kbts_shape_scratchpad *Scratchpad, kbts_gl
       kbts_un State = 0;
       kbts_un Broken = 1;
       kbts_un BrokenState = 0;
-      kbts_glyph *FirstGlyphs[3];
+      kbts_glyph *FirstGlyphs[3] = KBTS__ZERO;
 
       while(kbts__GlyphIsValid(Storage, Glyph) &&
             (State < KBTS_INDIC_SYLLABIC_STATE_COUNT))
       {
         kbts_un Class = Glyph->SyllabicClass;
 
-        if(KBTS__IN_SET(Class, KBTS__SET32((KBTS_INDIC_SYLLABIC_CLASS_RA)
-                                         (KBTS_INDIC_SYLLABIC_CLASS_CONSONANT)
-                                         (KBTS_INDIC_SYLLABIC_CLASS_VOWEL)
-                                         (KBTS_INDIC_SYLLABIC_CLASS_DOTTED_CIRCLE)
-                                         (KBTS_INDIC_SYLLABIC_CLASS_PLACEHOLDER)
-                                         (KBTS_INDIC_SYLLABIC_CLASS_SYMBOL))))
+        if(Class < KBTS_INDIC_SYLLABIC_CLASS_COUNT)
         {
-          Broken = 0;
-        }
-        BrokenState = (BrokenState << 1) | Broken;
+          if(KBTS__IN_SET(Class, KBTS__SET32((KBTS_INDIC_SYLLABIC_CLASS_RA)
+                                           (KBTS_INDIC_SYLLABIC_CLASS_CONSONANT)
+                                           (KBTS_INDIC_SYLLABIC_CLASS_VOWEL)
+                                           (KBTS_INDIC_SYLLABIC_CLASS_DOTTED_CIRCLE)
+                                           (KBTS_INDIC_SYLLABIC_CLASS_PLACEHOLDER)
+                                           (KBTS_INDIC_SYLLABIC_CLASS_SYMBOL))))
+          {
+            Broken = 0;
+          }
+          BrokenState = (BrokenState << 1) | Broken;
 
-        if(ScanGlyphIndex < KBTS__ARRAY_LENGTH(FirstGlyphs))
+          if(ScanGlyphIndex < KBTS__ARRAY_LENGTH(FirstGlyphs))
+          {
+            FirstGlyphs[ScanGlyphIndex] = Glyph;
+          }
+
+          State = kbts_IndicSyllabicTransition[Class][State];
+          State -= 1; // @Incomplete @Cleanup: Decrement every state by 1 in the transition table.
+          Glyph = Glyph->Next;
+          ScanGlyphIndex += 1;
+        }
+        else
         {
-          FirstGlyphs[ScanGlyphIndex] = Glyph;
+          break;
         }
-
-        State = kbts_IndicSyllabicTransition[Class][State];
-        State -= 1; // @Incomplete @Cleanup: Decrement every state by 1 in the transition table.
-        Glyph = Glyph->Next;
-        ScanGlyphIndex += 1;
       }
 
       if(State > KBTS_INDIC_SYLLABIC_STATE_COUNT)
@@ -23483,10 +23827,17 @@ static kbts_glyph *kbts__BeginCluster(kbts_shape_scratchpad *Scratchpad, kbts_gl
       while(kbts__GlyphIsValid(Storage, Glyph) &&
             (State < KBTS_USE_STATE_s0))
       {
-        State = kbts_UseTransition[Glyph->UseClass][State];
-        // @Incomplete: Remove this!!!
-        State -= 1;
-        Glyph = Glyph->Next;
+        if(Glyph->UseClass < KBTS_USE_SYLLABIC_CLASS_COUNT)
+        {
+          State = kbts_UseTransition[Glyph->UseClass][State];
+          // @Incomplete: Remove this!!!
+          State -= 1;
+          Glyph = Glyph->Next;
+        }
+        else
+        {
+          break;
+        }
       }
 
       if(State >= KBTS_USE_STATE_s0)
@@ -23533,10 +23884,17 @@ static kbts_glyph *kbts__BeginCluster(kbts_shape_scratchpad *Scratchpad, kbts_gl
       {
         kbts_indic_syllabic_class Class = Glyph->SyllabicClass;
 
-        State = kbts_KhmerSyllabicTransition[Class][State];
-        // @Incomplete: Remove this!
-        State -= 1;
-        Glyph = Glyph->Next;
+        if(Class < KBTS_KHMER_SYLLABIC_CLASS_COUNT)
+        {
+          State = kbts_KhmerSyllabicTransition[Class][State];
+          // @Incomplete: Remove this!
+          State -= 1;
+          Glyph = Glyph->Next;
+        }
+        else
+        {
+          break;
+        }
       }
 
       if(State >= KBTS_KHMER_SYLLABIC_STATE_COUNT)
@@ -23652,11 +24010,18 @@ static kbts_glyph *kbts__BeginCluster(kbts_shape_scratchpad *Scratchpad, kbts_gl
       {
         kbts_indic_syllabic_class Class = Glyph->SyllabicClass;
 
-        State = kbts_MyanmarSyllabicTransition[Class][State];
-        // @Incomplete: Remove this!
-        State -= 1;
+        if(Class < KBTS_MYANMAR_SYLLABIC_CLASS_COUNT)
+        {
+          State = kbts_MyanmarSyllabicTransition[Class][State];
+          // @Incomplete: Remove this!
+          State -= 1;
 
-        Glyph = Glyph->Next;
+          Glyph = Glyph->Next;
+        }
+        else
+        {
+          break;
+        }
       }
 
       if(State >= KBTS_MYANMAR_SYLLABIC_STATE_COUNT)
@@ -25238,13 +25603,13 @@ static kbts__context_font *kbts__ShapePushFont(kbts_shape_context *Context, kbts
     if(!(Context->FontCount & (KBTS__CONTEXT_FONTS_PER_BLOCK - 1)))
     {
       kbts__context_font_block *NewBlock = kbts__PushType(&Context->FontArena, kbts__context_font_block);
+      KBTS_MEMSET(NewBlock, 0, sizeof(*NewBlock));
 
       if(NewBlock)
       {
         kbts__context_font_block_header *NewBlockHeader = &NewBlock->Header;
-        NewBlockHeader->Prev = LastBlockHeader;
-        NewBlockHeader->Next = &Context->FontBlockSentinel;
-        NewBlockHeader->Prev->Next = NewBlockHeader->Next->Prev = NewBlockHeader;
+
+        KBTS__DLLIST_INSERT_BEFORE(NewBlockHeader, &Context->FontBlockSentinel);
 
         KBTS__FOR(FontIndex, 0, KBTS__CONTEXT_FONTS_PER_BLOCK)
         {
@@ -25330,15 +25695,13 @@ KBTS_EXPORT void kbts_NormalizeVariationVector(kbts_font *Font, float *Variation
       kbts__variation_axis_record *Axes = KBTS__POINTER_OFFSET(kbts__variation_axis_record, Fvar, kbts__ReadU16Unaligned(&Fvar->AxesArrayOffset));
       kbts_un AxisCount = kbts__ReadU16Unaligned(&Fvar->AxisCount);
 
-      kbts__segment_maps DummySegmentMaps = KBTS__ZERO;
-      kbts__segment_maps *SegmentMaps = Avar ? KBTS__POINTER_AFTER(kbts__segment_maps, Avar) : &DummySegmentMaps;
+      kbts__segment_maps *SegmentMaps = Avar ? KBTS__POINTER_AFTER(kbts__segment_maps, Avar) : 0;
 
       KBTS__FOR(AxisIndex, 0, AxisCount)
       {
         kbts__variation_axis_record *Axis = &Axes[AxisIndex];
 
-        kbts__axis_value_map *AxisValueMaps = KBTS__POINTER_AFTER(kbts__axis_value_map, SegmentMaps);
-        kbts_un PositionMapCount = kbts__ReadU16Unaligned(&SegmentMaps->PositionMapCount);
+        kbts_un PositionMapCount = SegmentMaps ? kbts__ReadU16Unaligned(&SegmentMaps->PositionMapCount) : 0;
 
         float AxisMin = kbts__Fixed16_16ToFloatFromMemory(&Axis->MinValue);
         float AxisDefault = kbts__Fixed16_16ToFloatFromMemory(&Axis->DefaultValue);
@@ -25378,6 +25741,8 @@ KBTS_EXPORT void kbts_NormalizeVariationVector(kbts_font *Font, float *Variation
 
         if(PositionMapCount)
         {
+          kbts__axis_value_map *AxisValueMaps = KBTS__POINTER_AFTER(kbts__axis_value_map, SegmentMaps);
+
           // @Speed: Binary search?
           kbts_s16 Last_From = kbts__ReadS16Unaligned(&AxisValueMaps[0].FromCoordinate);
           kbts_s16 Last_To = kbts__ReadS16Unaligned(&AxisValueMaps[0].ToCoordinate);
@@ -25445,7 +25810,11 @@ KBTS_EXPORT void kbts_NormalizeVariationVector(kbts_font *Font, float *Variation
           VariationVectorNormalized[AxisIndex] = NormalizedInputFixed;
         }
 
-        SegmentMaps = Avar ? (kbts__segment_maps *)(AxisValueMaps + PositionMapCount) : &DummySegmentMaps;
+        if(SegmentMaps)
+        {
+          kbts__axis_value_map *AxisValueMaps = KBTS__POINTER_AFTER(kbts__axis_value_map, SegmentMaps);
+          SegmentMaps = (kbts__segment_maps *)(AxisValueMaps + PositionMapCount);
+        }
       }
     }
   }
@@ -25695,6 +26064,7 @@ KBTS_EXPORT int kbts_ShapeSetFontVariations(kbts_shape_context *Context, kbts_u3
 
 static void kbts__InitializeContextFont(kbts_shape_context *Context, kbts__context_font *ContextFont, kbts_font *Font)
 {
+  KBTS_ASSERT(Font->Blob);
   ContextFont->Info.Font = Font;
 
   int AxisCount;
@@ -25706,7 +26076,7 @@ KBTS_EXPORT kbts_font *kbts_ShapePushFont2(kbts_shape_context *Context, kbts_fon
 {
   kbts_u32 ContextFontHandle = 0xFFFF0000u;
 
-  if(!Context->Error)
+  if(!Context->Error && Font && Font->Blob)
   {
     kbts__context_font *ContextFont = kbts__ShapePushFont(Context, &ContextFontHandle);
 
@@ -25738,7 +26108,7 @@ KBTS_EXPORT kbts_font *kbts_ShapePopFont(kbts_shape_context *Context)
 
   if(!Context->Error && Context->FontCount)
   {
-    kbts__context_font_block *Block = (kbts__context_font_block *)&Context->FontBlockSentinel.Prev;
+    kbts__context_font_block *Block = (kbts__context_font_block *)Context->FontBlockSentinel.Prev;
     kbts_un BlockFontIndex = (Context->FontCount - 1) & (KBTS__CONTEXT_FONTS_PER_BLOCK - 1);
     kbts__context_font *Font = &Block->Fonts[BlockFontIndex];
     Result = Font->Info.Font;
@@ -25750,7 +26120,6 @@ KBTS_EXPORT kbts_font *kbts_ShapePopFont(kbts_shape_context *Context)
     }
 
     kbts__EndLifetime(&Font->Lifetime);
-
     Context->FontCount -= 1;
   }
 
@@ -26987,6 +27356,7 @@ static void kbts__ShapeDirect(kbts_shape_scratchpad *Scratchpad, kbts_glyph_stor
   KBTS_INSTRUMENT_FUNCTION_BEGIN;
 
   Scratchpad->VariationVectorNormalized = VariationVectorNormalized;
+  kbts__EnsureGlyphStorageInitialized(Storage);
 
   if(kbts__GlyphIsValid(Storage, Storage->GlyphSentinel.Next))
   {
@@ -27757,7 +28127,7 @@ KBTS_EXPORT int kbts_FontCount(void *Data, int Size)
   return Result;
 }
 
-static kbts__cmap_subtable_pointer kbts__SelectCmapSubtable(kbts__cmap *Cmap, char *TableEnd, kbts__cmap_14 **Cmap14, kbts_u16 *ResultFormat)
+static kbts__cmap_subtable_pointer kbts__SelectCmapSubtable(kbts__cmap *Cmap, kbts_b32 ByteSwap, char *TableEnd, kbts__cmap_14 **Cmap14, kbts_u16 *ResultFormat)
 {
   kbts__cmap_subtable_pointer Result = KBTS__ZERO;
 
@@ -27770,14 +28140,9 @@ static kbts__cmap_subtable_pointer kbts__SelectCmapSubtable(kbts__cmap *Cmap, ch
     {
       kbts_u16 Format = kbts__ReadU16Unaligned(Subtable.Subtable);
 
-      // This is kind of iffy, but the statelessness is useful for selecting
-      // the cmap from an already-prepared blob without having to deal with
-      // the byteswap context.
-      if((Format > 0xFF) && 
-         ((Format >> 8) <= 14))
+      if(ByteSwap)
       {
         Format = kbts__ByteSwap16(Format);
-        kbts__WriteU16Unaligned(Subtable.Subtable, Format);
       }
 
       if(Format == 14)
@@ -27823,7 +28188,7 @@ static kbts__cmap_subtable_pointer kbts__SelectCmapSubtableFromBlob(kbts_blob_he
     char *TableEnd = KBTS__POINTER_OFFSET(char, Header, CmapTable->OffsetFromStartOfFile + CmapTable->Length);
     kbts__cmap *Cmap = KBTS__POINTER_OFFSET(kbts__cmap, Header, CmapTable->OffsetFromStartOfFile);
 
-    Result = kbts__SelectCmapSubtable(Cmap, TableEnd, Cmap14, ResultFormat);
+    Result = kbts__SelectCmapSubtable(Cmap, 0, TableEnd, Cmap14, ResultFormat);
   }
 
   return Result;
@@ -27868,7 +28233,12 @@ KBTS_EXPORT kbts_load_font_error kbts_LoadFont(kbts_font *Font, kbts_load_font_s
       State->FontDataSize = (kbts_u32)FontDataSize;
 
       kbts__table_directory *Directory = KBTS__POINTER_OFFSET(kbts__table_directory, FontData, DirectoryOffset);
-      kbts_un DirectoryTableCount = kbts__ByteSwap16(kbts__ReadU16Unaligned(&Directory->TableCount));
+      if((char *)(Directory + 1) > FileEnd)
+      {
+        return KBTS_LOAD_FONT_ERROR_INVALID_FONT;
+      }
+
+      kbts_un DirectoryTableCount = kbts__ReadU16Be(&Directory->TableCount);
 
       kbts__table_record *Tables = KBTS__POINTER_AFTER(kbts__table_record, Directory);
 
@@ -27931,39 +28301,66 @@ KBTS_EXPORT kbts_load_font_error kbts_LoadFont(kbts_font *Font, kbts_load_font_s
           if(Table->Length)
           {
             kbts__gsub_gpos *GsubGpos = KBTS__POINTER_OFFSET(kbts__gsub_gpos, FontData, Table->OffsetFromStartOfFile);
-            kbts_u16 ScriptListOffset = kbts__ByteSwap16(kbts__ReadU16Unaligned(&GsubGpos->ScriptListOffset));
-            kbts_u16 FeatureListOffset = kbts__ByteSwap16(kbts__ReadU16Unaligned(&GsubGpos->FeatureListOffset));
-            kbts_u16 LookupListOffset = kbts__ByteSwap16(kbts__ReadU16Unaligned(&GsubGpos->LookupListOffset));
+            char *TableEnd = (char *)GsubGpos + Table->Length;
 
-            if(!ScriptListOffset &&
-               !FeatureListOffset &&
-               !LookupListOffset)
+            if(Table->Length >= 10)
             {
-              // Apparently, this is a valid way of specifying an empty table.
-              kbts_blob_table_id TableId = GsubGposTableIds[GsubGposTableIndex];
-
-              KBTS__ZERO_TYPE(&State->Tables[TableId]);
-            }
-            else if(((ScriptListOffset + sizeof(kbts__script_list)) > Table->Length) ||
-                    ((FeatureListOffset + sizeof(kbts__feature_list)) > Table->Length) ||
-                    ((LookupListOffset + sizeof(kbts__lookup_list)) > Table->Length))
-            {
-              return KBTS_LOAD_FONT_ERROR_INVALID_FONT;
-            }
-            else
-            {
-              kbts__lookup_list *LookupList = KBTS__POINTER_OFFSET(kbts__lookup_list, GsubGpos, kbts__ByteSwap16(kbts__ReadU16Unaligned(&GsubGpos->LookupListOffset)));
-              kbts_u16 *LookupOffsets = KBTS__POINTER_AFTER(kbts_u16, LookupList);
-              kbts_un LookupCount = kbts__ByteSwap16(kbts__ReadU16Unaligned(&LookupList->Count));
-
-              KBTS__FOR(LookupIndex, 0, LookupCount)
+              if((kbts__ReadU16Be(&GsubGpos->Major) == 1) &&
+                 (kbts__ReadU16Be(&GsubGpos->Minor) == 1) &&
+                 (Table->Length < 14))
               {
-                kbts__lookup *Lookup = KBTS__POINTER_OFFSET(kbts__lookup, LookupList, kbts__ByteSwap16(kbts__ReadU16Unaligned(&LookupOffsets[LookupIndex])));
-
-                TotalSubtableCount += kbts__ByteSwap16(kbts__ReadU16Unaligned(&Lookup->SubtableCount));
+                return KBTS_LOAD_FONT_ERROR_INVALID_FONT;
               }
 
-              TotalLookupCount += LookupCount;
+              kbts_u16 ScriptListOffset = kbts__ReadU16Be(&GsubGpos->ScriptListOffset);
+              kbts_u16 FeatureListOffset = kbts__ReadU16Be(&GsubGpos->FeatureListOffset);
+              kbts_u16 LookupListOffset = kbts__ReadU16Be(&GsubGpos->LookupListOffset);
+
+              if(!ScriptListOffset &&
+                 !FeatureListOffset &&
+                 !LookupListOffset)
+              {
+                // Apparently, this is a valid way of specifying an empty table.
+                kbts_blob_table_id TableId = GsubGposTableIds[GsubGposTableIndex];
+
+                KBTS__ZERO_TYPE(&State->Tables[TableId]);
+              }
+              else if(((ScriptListOffset + sizeof(kbts__script_list)) > Table->Length) ||
+                      ((FeatureListOffset + sizeof(kbts__feature_list)) > Table->Length) ||
+                      ((LookupListOffset + sizeof(kbts__lookup_list)) > Table->Length))
+              {
+                return KBTS_LOAD_FONT_ERROR_INVALID_FONT;
+              }
+              else
+              {
+                kbts__lookup_list *LookupList = KBTS__POINTER_OFFSET(kbts__lookup_list, GsubGpos, kbts__ReadU16Be(&GsubGpos->LookupListOffset));
+                kbts_u16 *LookupOffsets = KBTS__POINTER_AFTER(kbts_u16, LookupList);
+                kbts_un LookupCount = kbts__ReadU16Be(&LookupList->Count);
+
+                if((char *)(LookupOffsets + LookupCount) <= TableEnd)
+                {
+                  KBTS__FOR(LookupIndex, 0, LookupCount)
+                  {
+                    kbts_un LookupOffset = kbts__ReadU16Be(&LookupOffsets[LookupIndex]);
+                    kbts__lookup *Lookup = KBTS__POINTER_OFFSET(kbts__lookup, LookupList, LookupOffset);
+
+                    if((char *)(Lookup + 1) <= TableEnd)
+                    {
+                      TotalSubtableCount += kbts__ReadU16Be(&Lookup->SubtableCount);
+                    }
+                    else
+                    {
+                      return KBTS_LOAD_FONT_ERROR_INVALID_FONT;
+                    }
+                  }
+
+                  TotalLookupCount += LookupCount;
+                }
+                else
+                {
+                  return KBTS_LOAD_FONT_ERROR_INVALID_FONT;
+                }
+              }
             }
           }
         }
@@ -27980,15 +28377,16 @@ KBTS_EXPORT kbts_load_font_error kbts_LoadFont(kbts_font *Font, kbts_load_font_s
         {
           kbts__maxp *Maxp = KBTS__POINTER_OFFSET(kbts__maxp, FontData, MaxpTable->OffsetFromStartOfFile);
 
-          GlyphCount = kbts__ByteSwap16(kbts__ReadU16Unaligned(&Maxp->GlyphCount));
+          if((char *)(Maxp + 1) > FileEnd)
+          {
+            return KBTS_LOAD_FONT_ERROR_INVALID_FONT;
+          }
+
+          GlyphCount = kbts__ReadU16Be(&Maxp->GlyphCount);
         }
 
         State->GlyphCount = (kbts_u32)GlyphCount;
       }
-
-      kbts_un ScratchSize = (State->Tables[KBTS_BLOB_TABLE_ID_GSUB].Length +
-                             State->Tables[KBTS_BLOB_TABLE_ID_GPOS].Length +
-                             State->Tables[KBTS_BLOB_TABLE_ID_GDEF].Length) * sizeof(kbts_u32) / 2;
 
       kbts_un GlyphLookupMatrixSizeInWords = 0;
       if(State->LookupCount &&
@@ -28022,6 +28420,15 @@ KBTS_EXPORT kbts_load_font_error kbts_LoadFont(kbts_font *Font, kbts_load_font_s
       // Add the align just to make sure we can accept any pointer.
       kbts_un OutputSize = Bump.At + KBTS_ALIGNOF(kbts_blob_header);
 
+      kbts_un BlobSizeExcludingHeader = OutputSize - sizeof(kbts_blob_header);
+      kbts_un ScratchSize = (kbts_un)KBTS__IDIV_ROUND_UP(BlobSizeExcludingHeader, 32) * sizeof(kbts_u32);
+
+      if((ScratchSize > 0x7FFFFFFF) ||
+         (OutputSize > 0x7FFFFFFF))
+      {
+        return KBTS_LOAD_FONT_ERROR_INVALID_FONT;
+      }
+
       *ScratchSize_ = (int)ScratchSize;
       *OutputSize_ = (int)OutputSize;
 
@@ -28032,18 +28439,43 @@ KBTS_EXPORT kbts_load_font_error kbts_LoadFont(kbts_font *Font, kbts_load_font_s
     }
     else if(Magic == KBTS_FOURCC('k', 'b', 't', 's'))
     {
-      kbts_blob_header *Header = (kbts_blob_header *)FontData;
-
-      if(Header->Version != KBTS_BLOB_VERSION_CURRENT)
+      if((kbts_un)FontDataSize >= sizeof(kbts_blob_header))
       {
-        Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
+        kbts_blob_header *Header = (kbts_blob_header *)FontData;
+
+        if(Header->Version != KBTS_BLOB_VERSION_CURRENT)
+        {
+          return KBTS_LOAD_FONT_ERROR_INVALID_FONT;
+        }
+
+        KBTS__FOR(BlobTableId, 0, KBTS_BLOB_TABLE_ID_COUNT)
+        {
+          kbts_blob_table *Table = &Header->Tables[BlobTableId];
+
+          if((Table->OffsetFromStartOfFile + Table->Length) > (kbts_un)FontDataSize)
+          {
+            return KBTS_LOAD_FONT_ERROR_INVALID_FONT;
+          }
+        }
+
+        Font->Blob = Header;
+
+        kbts__cmap_subtable_pointer PreferredSubtable = KBTS__ZERO;
+        {
+          char *TableEnd;
+          kbts__cmap *Cmap = kbts__BlobTableHeaderChecked(Header, KBTS_BLOB_TABLE_ID_CMAP, kbts__cmap, &TableEnd, &Result);
+          if(Cmap)
+          {
+            PreferredSubtable = kbts__SelectCmapSubtable(Cmap, 0, TableEnd, &Font->Cmap14, 0);
+          }
+        }
+
+        Font->Cmap = PreferredSubtable.Subtable;
       }
-
-      // @Incomplete: Bounds check or something.
-
-      Font->Blob = Header;
-      kbts__cmap_subtable_pointer PreferredSubtable = kbts__SelectCmapSubtableFromBlob(Header, &Header->Tables[KBTS_BLOB_TABLE_ID_CMAP], &Font->Cmap14, 0);
-      Font->Cmap = PreferredSubtable.Subtable;
+      else
+      {
+        return KBTS_LOAD_FONT_ERROR_INVALID_FONT;
+      }
     }
   }
 
@@ -28078,6 +28510,7 @@ static void kbts__MarkMatrixCoverage(kbts_u32 *Matrix, kbts_un TableIndex, kbts_
         {
           Matrix[MatrixIndex.WordIndex] |= 1u << MatrixIndex.BitIndex;
         }
+        // We do not record a font error here, because some test fonts have a Maxp.GlyphCount fixed to 100.
       }
     }
     else if(Coverage_Format == 2)
@@ -28127,8 +28560,11 @@ static void kbts__MarkMatrixClassDef(kbts_u32 *Matrix, kbts_un SubtableIndex, kb
         if((GlyphId >= (ClassesIncludedLength * 64)) ||
            (ClassesIncluded[GlyphClass / 64] & (1ull << (GlyphClass % 64))))
         {
-          kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(SubtableIndex, SubtableCount, GlyphId, GlyphCount);
-          Matrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
+          if(GlyphId < GlyphCount)
+          {
+            kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(SubtableIndex, SubtableCount, GlyphId, GlyphCount);
+            Matrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
+          }
         }
       }
     }
@@ -28157,8 +28593,11 @@ static void kbts__MarkMatrixClassDef(kbts_u32 *Matrix, kbts_un SubtableIndex, kb
 
           KBTS__FOR(GlyphId, Range_StartGlyphId, OnePastLastGlyphId)
           {
-            kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(SubtableIndex, SubtableCount, GlyphId, GlyphCount);
-            Matrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
+            if(GlyphId < GlyphCount)
+            {
+              kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(SubtableIndex, SubtableCount, GlyphId, GlyphCount);
+              Matrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
+            }
           }
         }
       }
@@ -28207,12 +28646,27 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
       KBTS_MEMCPY(TableBase, InData, InTable.Length);
     }
 
+    Font->Blob = Header;
+
     // Byteswap it.
+
+    kbts__byteswap_context ByteSwapContext = KBTS__ZERO;
+    // We don't need to track our own header.
+    ByteSwapContext.FileBase = (char *)Header;
+    ByteSwapContext.FileEnd = (char *)Header + State->TotalSize;
+
+    kbts_un FileSizeExcludingHeader = (kbts_un)(ByteSwapContext.FileEnd - ByteSwapContext.FileBase) - sizeof(kbts_blob_header);
+    kbts_un MarkedBytesBitfieldSize = KBTS__IDIV_ROUND_UP(FileSizeExcludingHeader, 32) * sizeof(kbts_u32);
+    ByteSwapContext.MarkedBytesBitfield = (kbts_u32 *)ScratchMemory;
+    KBTS_MEMSET(ByteSwapContext.MarkedBytesBitfield, 0, MarkedBytesBitfieldSize);
+
+    kbts__BeginBounds(&ByteSwapContext, ByteSwapContext.FileBase, ByteSwapContext.FileEnd);
 
     {
       char *TableEnd;
       kbts__head *Head = kbts__BlobTableHeaderChecked(Header, KBTS_BLOB_TABLE_ID_HEAD, kbts__head, &TableEnd, &Result);
-      if(Head)
+      if(Head &&
+         ((kbts_un)(TableEnd - (char *)Head) >= sizeof(kbts__head)))
       {
         kbts__ByteSwapArray16Unchecked(&Head->Major, 2);
         kbts__ByteSwapArray32Unchecked(&Head->Revision, 2);
@@ -28223,160 +28677,175 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
       }
     }
 
-    Font->Blob = Header;
-
     {
       char *TableEnd;
       kbts__cmap *Cmap = kbts__BlobTableHeaderChecked(Header, KBTS_BLOB_TABLE_ID_CMAP, kbts__cmap, &TableEnd, &Result);
       if(Cmap)
       {
+        kbts__bounds Bounds = kbts__BeginBounds(&ByteSwapContext, Cmap, TableEnd);
+
         int TableValid = 0;
-        kbts__ByteSwap16InPlace(&Cmap->Version);
-        kbts__ByteSwap16InPlace(&Cmap->TableCount);
 
-        kbts__encoding_record *Records = KBTS__POINTER_AFTER(kbts__encoding_record, Cmap);
-        kbts_un Cmap_TableCount = kbts__ReadU16Unaligned(&Cmap->TableCount);
-
-        if((char *)(Records + Cmap_TableCount) <= TableEnd)
+        if(kbts__ByteSwap16InPlaceContext(&ByteSwapContext, &Cmap->Version, 0) &&
+           kbts__ByteSwap16InPlaceContext(&ByteSwapContext, &Cmap->TableCount, 0))
         {
-          KBTS__FOR(It, 0, Cmap_TableCount)
-          {
-            kbts__encoding_record *Record = &Records[It];
-            kbts__ByteSwap16InPlace(&Record->EncodingId);
-            kbts__ByteSwap16InPlace(&Record->PlatformId);
-            kbts__ByteSwap32InPlace(&Record->SubtableOffset);
-          }
+          kbts__encoding_record *Records = KBTS__POINTER_AFTER(kbts__encoding_record, Cmap);
+          kbts_un Cmap_TableCount = kbts__ReadU16Unaligned(&Cmap->TableCount);
 
-          kbts_u16 PreferredFormat = 1;
-
-          kbts__cmap_subtable_pointer PreferredSubtable = kbts__SelectCmapSubtable(Cmap, TableEnd, &Font->Cmap14, &PreferredFormat);
-          if(PreferredSubtable.Subtable)
+          if((char *)(Records + Cmap_TableCount) <= TableEnd)
           {
-            kbts_u16 SubtableFormat = kbts__ReadU16Unaligned(PreferredSubtable.Subtable);
-            switch(SubtableFormat)
+            KBTS__FOR(It, 0, Cmap_TableCount)
             {
-            case 0:
-            {
-              kbts__cmap_0 *Cmap0 = (kbts__cmap_0 *)PreferredSubtable.Subtable;
-              if((char *)(Cmap0 + 1) <= TableEnd)
-              {
-                kbts__ByteSwap16InPlace(&Cmap0->Length);
-                kbts__ByteSwap16InPlace(&Cmap0->Language);
-                TableValid = 1;
-              }
+              kbts__encoding_record *Record = &Records[It];
+              kbts__ByteSwap16InPlaceContext(&ByteSwapContext, &Record->EncodingId, 0);
+              kbts__ByteSwap16InPlaceContext(&ByteSwapContext, &Record->PlatformId, 0);
+              kbts__ByteSwap32InPlaceContext(&ByteSwapContext, &Record->SubtableOffset, 0);
             }
-            break;
 
-            case 2:
+            kbts_u16 PreferredFormat = 1;
+
+            kbts__cmap_subtable_pointer PreferredSubtable = kbts__SelectCmapSubtable(Cmap, 1, TableEnd, &Font->Cmap14, &PreferredFormat);
+
+            kbts__cmap_14 *Cmap14 = Font->Cmap14;
+            if(Cmap14)
             {
-              kbts__cmap_2 *Cmap2 = (kbts__cmap_2 *)PreferredSubtable.Subtable;
-              if(kbts__ByteSwapArray16(&Cmap2->Length, 258, TableEnd))
+              kbts__ByteSwap16InPlaceContext(&ByteSwapContext, &Cmap14->Format, 0);
+              kbts__ByteSwap32InPlaceContext(&ByteSwapContext, &Cmap14->Length, 0);
+              kbts__ByteSwap32InPlaceContext(&ByteSwapContext, &Cmap14->SelectorCount, 0);
+            }
+
+            if(PreferredSubtable.Subtable)
+            {
+              kbts_un SubtableFormat;
+              if(kbts__ByteSwap16InPlaceContext(&ByteSwapContext, PreferredSubtable.Subtable, &SubtableFormat))
               {
-                kbts_un SubHeaderCount = 0;
-                KBTS__FOR(It, 0, 256)
+                switch(SubtableFormat)
                 {
-                  kbts_un SubHeaderIndex = kbts__ReadU16Unaligned(&Cmap2->SubHeaderKeys[It]);
-                  SubHeaderCount = KBTS__MAX(SubHeaderCount, SubHeaderIndex + 1);
-                }
-
-                kbts__sub_header *SubHeaders = KBTS__POINTER_AFTER(kbts__sub_header, Cmap2);
-                if(kbts__ByteSwapArray16(&SubHeaders->FirstCode, 4 * SubHeaderCount, TableEnd))
+                case 0:
                 {
-                  kbts_u16 *GlyphIds = (kbts_u16 *)(SubHeaders + SubHeaderCount);
-
-                  kbts_sn GlyphIdCount = 0;
-                  KBTS__FOR(It, 0, SubHeaderCount)
+                  kbts__cmap_0 *Cmap0 = (kbts__cmap_0 *)PreferredSubtable.Subtable;
+                  if(kbts__ByteSwap16InPlaceContext(&ByteSwapContext, &Cmap0->Length, 0) &&
+                     kbts__ByteSwap16InPlaceContext(&ByteSwapContext, &Cmap0->Language, 0))
                   {
-                    kbts__sub_header *SubHeader = &SubHeaders[It];
-                    kbts_u16 SubHeader_IdRangeOffset = kbts__ReadU16Unaligned(&SubHeader->IdRangeOffset);
-                    kbts_u16 SubHeader_EntryCount = kbts__ReadU16Unaligned(&SubHeader->EntryCount);
+                    TableValid = 1;
 
-                    kbts_u16 *OnePastLastGlyphId = &SubHeader->IdRangeOffset + SubHeader_IdRangeOffset / 2 + SubHeader_EntryCount;
-                    GlyphIdCount = KBTS__MAX(GlyphIdCount, OnePastLastGlyphId - GlyphIds);
+                    kbts__MarkOkToReadContext(&ByteSwapContext, Cmap0->GlyphIdArray, sizeof(Cmap0->GlyphIdArray));
                   }
+                }
+                break;
 
-                  if(kbts__ByteSwapArray16(GlyphIds, (kbts_un)GlyphIdCount, TableEnd))
+                case 2:
+                {
+                  kbts__cmap_2 *Cmap2 = (kbts__cmap_2 *)PreferredSubtable.Subtable;
+                  if(kbts__ByteSwapArray16Context(&ByteSwapContext, &Cmap2->Length, 258))
+                  {
+                    kbts_un SubHeaderCount = 0;
+                    KBTS__FOR(It, 0, 256)
+                    {
+                      kbts_un SubHeaderIndex = kbts__ReadU16Unaligned(&Cmap2->SubHeaderKeys[It]);
+                      SubHeaderCount = KBTS__MAX(SubHeaderCount, SubHeaderIndex + 1);
+                    }
+
+                    kbts__sub_header *SubHeaders = KBTS__POINTER_AFTER(kbts__sub_header, Cmap2);
+                    if(kbts__ByteSwapArray16Context(&ByteSwapContext, &SubHeaders->FirstCode, 4 * SubHeaderCount))
+                    {
+                      kbts_u16 *GlyphIds = (kbts_u16 *)(SubHeaders + SubHeaderCount);
+
+                      kbts_sn GlyphIdCount = 0;
+                      KBTS__FOR(It, 0, SubHeaderCount)
+                      {
+                        kbts__sub_header *SubHeader = &SubHeaders[It];
+                        kbts_u16 SubHeader_IdRangeOffset = kbts__ReadU16Unaligned(&SubHeader->IdRangeOffset);
+                        kbts_u16 SubHeader_EntryCount = kbts__ReadU16Unaligned(&SubHeader->EntryCount);
+
+                        kbts_u16 *OnePastLastGlyphId = &SubHeader->IdRangeOffset + SubHeader_IdRangeOffset / 2 + SubHeader_EntryCount;
+                        GlyphIdCount = KBTS__MAX(GlyphIdCount, OnePastLastGlyphId - GlyphIds);
+                      }
+
+                      if(kbts__ByteSwapArray16Context(&ByteSwapContext, GlyphIds, (kbts_un)GlyphIdCount))
+                      {
+                        TableValid = 1;
+                      }
+                    }
+                  }
+                }
+                break;
+
+                case 4:
+                {
+                  kbts__cmap_4 *Cmap4 = (kbts__cmap_4 *)PreferredSubtable.Subtable;
+
+                  if(kbts__ByteSwapArray16Context(&ByteSwapContext, &Cmap4->Length, 5))
+                  {
+                    kbts_u16 Cmap4_SegmentCountTimesTwo = kbts__ReadU16Unaligned(&Cmap4->SegmentCountTimesTwo);
+
+                    if(kbts__ByteSwapArray16Context(&ByteSwapContext, KBTS__POINTER_AFTER(kbts_u16, Cmap4), Cmap4_SegmentCountTimesTwo * 2 + 1))
+                    {
+                      kbts_un SegmentCount = Cmap4_SegmentCountTimesTwo / 2;
+                      kbts_u16 *EndCodes = KBTS__POINTER_AFTER(kbts_u16, Cmap4);
+                      kbts_u16 *StartCodes = EndCodes + SegmentCount + 1;
+                      kbts_s16 *IdDeltas = (kbts_s16 *)(StartCodes + SegmentCount);
+                      kbts_u16 *IdRangeOffsets = (kbts_u16 *)(IdDeltas + SegmentCount);
+                      kbts_u16 *GlyphIds = IdRangeOffsets + SegmentCount;
+
+                      kbts_sn GlyphIdCount = 0;
+
+                      KBTS__FOR(SegmentIndex, 0, SegmentCount)
+                      {
+                        kbts_u16 Offset = kbts__ReadU16Unaligned(&IdRangeOffsets[SegmentIndex]);
+                        kbts_u16 StartCode = kbts__ReadU16Unaligned(&StartCodes[SegmentIndex]);
+                        kbts_u16 EndCode = kbts__ReadU16Unaligned(&EndCodes[SegmentIndex]);
+
+                        if((StartCode == 0xFFFF) && (EndCode == 0xFFFF))
+                        {
+                          kbts__OverwriteU16Unaligned(&IdRangeOffsets[SegmentIndex], 0);
+
+                          Offset = 0;
+                        }
+
+                        if(Offset)
+                        {
+                          kbts_u16 *OnePastIdLookup = &IdRangeOffsets[SegmentIndex] + (EndCode - StartCode + 1) + Offset / 2;
+
+                          GlyphIdCount = KBTS__MAX(GlyphIdCount, (kbts_sn)(OnePastIdLookup - GlyphIds));
+                        }
+                      }
+
+                      if(kbts__ByteSwapArray16Context(&ByteSwapContext, GlyphIds, (kbts_un)GlyphIdCount))
+                      {
+                        TableValid = 1;
+                      }
+                    }
+                  }
+                }
+                break;
+
+                case 6:
+                {
+                  kbts__cmap_6 *Cmap6 = (kbts__cmap_6 *)PreferredSubtable.Subtable;
+                  if(kbts__ByteSwapArray16Context(&ByteSwapContext, &Cmap6->Length, 4) &&
+                     kbts__ByteSwapArray16Context(&ByteSwapContext, KBTS__POINTER_AFTER(kbts_u16, Cmap6), kbts__ReadU16Unaligned(&Cmap6->EntryCount)))
                   {
                     TableValid = 1;
                   }
                 }
-              }
-            }
-            break;
+                break;
 
-            case 4:
-            {
-              kbts__cmap_4 *Cmap4 = (kbts__cmap_4 *)PreferredSubtable.Subtable;
-
-              if(kbts__ByteSwapArray16(&Cmap4->Length, 5, TableEnd))
-              {
-                kbts_u16 Cmap4_SegmentCountTimesTwo = kbts__ReadU16Unaligned(&Cmap4->SegmentCountTimesTwo);
-
-                if(kbts__ByteSwapArray16(KBTS__POINTER_AFTER(kbts_u16, Cmap4), Cmap4_SegmentCountTimesTwo * 2 + 1, TableEnd))
+                case 12:
                 {
-                  kbts_un SegmentCount = Cmap4_SegmentCountTimesTwo / 2;
-                  kbts_u16 *EndCodes = KBTS__POINTER_AFTER(kbts_u16, Cmap4);
-                  kbts_u16 *StartCodes = EndCodes + SegmentCount + 1;
-                  kbts_s16 *IdDeltas = (kbts_s16 *)(StartCodes + SegmentCount);
-                  kbts_u16 *IdRangeOffsets = (kbts_u16 *)(IdDeltas + SegmentCount);
-                  kbts_u16 *GlyphIds = IdRangeOffsets + SegmentCount;
-
-                  kbts_sn GlyphIdCount = 0;
-
-                  KBTS__FOR(SegmentIndex, 0, SegmentCount)
-                  {
-                    kbts_u16 Offset = kbts__ReadU16Unaligned(&IdRangeOffsets[SegmentIndex]);
-                    kbts_u16 StartCode = kbts__ReadU16Unaligned(&StartCodes[SegmentIndex]);
-                    kbts_u16 EndCode = kbts__ReadU16Unaligned(&EndCodes[SegmentIndex]);
-
-                    if((StartCode == 0xFFFF) && (EndCode == 0xFFFF))
-                    {
-                      kbts__WriteU16Unaligned(&IdRangeOffsets[SegmentIndex], 0);
-
-                      Offset = 0;
-                    }
-
-                    if(Offset)
-                    {
-                      kbts_u16 *OnePastIdLookup = &IdRangeOffsets[SegmentIndex] + (EndCode - StartCode + 1) + Offset / 2;
-
-                      GlyphIdCount = KBTS__MAX(GlyphIdCount, (kbts_sn)(OnePastIdLookup - GlyphIds));
-                    }
-                  }
-
-                  if(kbts__ByteSwapArray16(GlyphIds, (kbts_un)GlyphIdCount, TableEnd))
+                  kbts__cmap_12_13 *Cmap12 = (kbts__cmap_12_13 *)PreferredSubtable.Subtable;
+                  if(kbts__ByteSwapArray32Context(&ByteSwapContext, &Cmap12->Length, 3) &&
+                     kbts__ByteSwapArray32Context(&ByteSwapContext, KBTS__POINTER_AFTER(kbts_u32, Cmap12), kbts__ReadU32Unaligned(&Cmap12->GroupCount) * 3))
                   {
                     TableValid = 1;
                   }
                 }
+                break;
+                }
               }
-            }
-            break;
 
-            case 6:
-            {
-              kbts__cmap_6 *Cmap6 = (kbts__cmap_6 *)PreferredSubtable.Subtable;
-              if(kbts__ByteSwapArray16(&Cmap6->Length, 4, TableEnd) &&
-                 kbts__ByteSwapArray16(KBTS__POINTER_AFTER(kbts_u16, Cmap6), kbts__ReadU16Unaligned(&Cmap6->EntryCount), TableEnd))
-              {
-                TableValid = 1;
-              }
+              Font->Cmap = PreferredSubtable.Subtable;
             }
-            break;
-
-            case 12:
-            {
-              kbts__cmap_12_13 *Cmap12 = (kbts__cmap_12_13 *)PreferredSubtable.Subtable;
-              if(kbts__ByteSwapArray32(&Cmap12->Length, 3, TableEnd) &&
-                 kbts__ByteSwapArray32(KBTS__POINTER_AFTER(kbts_u32, Cmap12), kbts__ReadU32Unaligned(&Cmap12->GroupCount) * 3, TableEnd))
-              {
-                TableValid = 1;
-              }
-            }
-            break;
-            }
-
-            Font->Cmap = PreferredSubtable.Subtable;
           }
         }
 
@@ -28384,42 +28853,32 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
         {
           Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
         }
+
+        kbts__EndBounds(&ByteSwapContext, &Bounds);
       }
     }
 
-    {
-      kbts_blob_table *GdefTable = &Header->Tables[KBTS_BLOB_TABLE_ID_GDEF];
+    kbts__gdef *Gdef;
+    { // @Cleanup: Merge this with the other GDEF pass.
+      char *TableEnd;
+      Gdef = (kbts__gdef *)kbts__BlobTableHeaderCheckedManualSize(Header, KBTS_BLOB_TABLE_ID_GDEF, 12, &TableEnd, &Result);
 
-      if(GdefTable->Length)
+      if(Gdef)
       {
-        kbts__gdef *Gdef = KBTS__POINTER_OFFSET(kbts__gdef, Header, GdefTable->OffsetFromStartOfFile);
-        char *TableEnd = KBTS__POINTER_OFFSET(char, Header, GdefTable->OffsetFromStartOfFile + GdefTable->Length);
+        kbts__bounds Bounds = kbts__BeginBounds(&ByteSwapContext, Gdef, TableEnd);
 
-        if(kbts__ByteSwapArray16(&Gdef->Major, 6, TableEnd))
+        if(kbts__ByteSwapArray16Context(&ByteSwapContext, &Gdef->Major, 6))
         {
           kbts_u16 Gdef_Minor = kbts__ReadU16Unaligned(&Gdef->Minor);
 
           if(Gdef_Minor >= 2)
           {
-            if(GdefTable->Length >= 14)
+            if(kbts__ByteSwap16InPlaceContext(&ByteSwapContext, &Gdef->MarkGlyphSetsDefinitionOffset, 0))
             {
-              kbts__ByteSwap16InPlace(&Gdef->MarkGlyphSetsDefinitionOffset);
-
-              if(Gdef_Minor == 3)
+              if(Gdef_Minor >= 3)
               {
-                if(GdefTable->Length >= sizeof(kbts__gdef))
-                {
-                  kbts__ByteSwap32InPlace(&Gdef->ItemVariationStoreOffset);
-                }
-                else
-                {
-                  Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
-                }
+                kbts__ByteSwap32InPlaceContext(&ByteSwapContext, &Gdef->ItemVariationStoreOffset, 0);
               }
-            }
-            else
-            {
-              Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
             }
           }
         }
@@ -28427,6 +28886,66 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
         {
           Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
         }
+
+        kbts_un Gdef_ClassDefinitionOffset = kbts__ReadU16Unaligned(&Gdef->ClassDefinitionOffset);
+        if(Gdef_ClassDefinitionOffset)
+        {
+          kbts_u16 *ClassDefBase = KBTS__POINTER_OFFSET(kbts_u16, Gdef, Gdef_ClassDefinitionOffset);
+          kbts__ByteSwapClassDefinition(&ByteSwapContext, ClassDefBase);
+        }
+
+        kbts_un Gdef_MarkAttachmentClassDefinitionOffset = kbts__ReadU16Unaligned(&Gdef->MarkAttachmentClassDefinitionOffset);
+        if(Gdef_MarkAttachmentClassDefinitionOffset)
+        {
+          kbts_u16 *ClassDefBase = KBTS__POINTER_OFFSET(kbts_u16, Gdef, Gdef_MarkAttachmentClassDefinitionOffset);
+          kbts__ByteSwapClassDefinition(&ByteSwapContext, ClassDefBase);
+        }
+
+        kbts_u16 Gdef_Minor = kbts__ReadU16Unaligned(&Gdef->Minor);
+        if(Gdef_Minor >= 2)
+        {
+          kbts_un Gdef_MarkGlyphSetsDefinitionOffset = kbts__ReadU16Unaligned(&Gdef->MarkGlyphSetsDefinitionOffset);
+
+          if(Gdef_MarkGlyphSetsDefinitionOffset)
+          {
+            kbts__mark_glyph_sets *MarkGlyphSets = KBTS__POINTER_OFFSET(kbts__mark_glyph_sets, Gdef, Gdef_MarkGlyphSetsDefinitionOffset);
+            if(kbts__ByteSwapArray16Context(&ByteSwapContext, &MarkGlyphSets->Format, 2))
+            {
+              if(kbts__ReadU16Unaligned(&MarkGlyphSets->Format) == 1)
+              {
+                kbts_un MarkGlyphSets_MarkGlyphSetCount = kbts__ReadU16Unaligned(&MarkGlyphSets->MarkGlyphSetCount);
+
+                kbts_u32 *CoverageOffsets = KBTS__POINTER_AFTER(kbts_u32, MarkGlyphSets);
+                if(kbts__ByteSwapArray32Context(&ByteSwapContext, CoverageOffsets, MarkGlyphSets_MarkGlyphSetCount))
+                {
+                  KBTS__FOR(MarkGlyphSetIndex, 0, MarkGlyphSets_MarkGlyphSetCount)
+                  {
+                    kbts_un CoverageOffset = kbts__ReadU32Unaligned(&CoverageOffsets[MarkGlyphSetIndex]);
+                    kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, MarkGlyphSets, CoverageOffset);
+                    kbts__ByteSwapCoverage(&ByteSwapContext, Coverage);
+
+                    if(ByteSwapContext.Error)
+                    {
+                      goto InvalidFont;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        if(Gdef_Minor >= 3)
+        {
+          kbts_un Gdef_ItemVariationStoreOffset = kbts__ReadU32Unaligned(&Gdef->ItemVariationStoreOffset);
+
+          if(Gdef_ItemVariationStoreOffset)
+          {
+            kbts__ByteSwapItemVariationStore(&ByteSwapContext, KBTS__POINTER_OFFSET(kbts__item_variation_store, Gdef, Gdef_ItemVariationStoreOffset));
+          }
+        }
+
+        kbts__EndBounds(&ByteSwapContext, &Bounds);
       }
     }
 
@@ -28434,17 +28953,19 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
       kbts_blob_table_id HeaTableIds[2] = {KBTS_BLOB_TABLE_ID_HHEA, KBTS_BLOB_TABLE_ID_VHEA};
       KBTS__FOR(HeaTableIndex, 0, KBTS__ARRAY_LENGTH(HeaTableIds))
       {
-        kbts_blob_table *HeaTable = &Header->Tables[HeaTableIds[HeaTableIndex]];
+        char *TableEnd;
+        kbts__hea *Hea = kbts__BlobTableHeaderChecked(Header, HeaTableIds[HeaTableIndex], kbts__hea, &TableEnd, &Result);
 
-        if(HeaTable->Length)
+        if(Hea)
         {
-          kbts__hea *Hea = KBTS__POINTER_OFFSET(kbts__hea, Header, HeaTable->OffsetFromStartOfFile);
-          char *TableEnd = KBTS__POINTER_OFFSET(char, Header, HeaTable->OffsetFromStartOfFile + HeaTable->Length);
+          kbts__bounds Bounds = kbts__BeginBounds(&ByteSwapContext, Hea, TableEnd);
 
-          if(!kbts__ByteSwapArray16((kbts_u16 *)Hea, sizeof(kbts__hea) / sizeof(kbts_u16), TableEnd))
+          if(!kbts__ByteSwapArray16Context(&ByteSwapContext, (kbts_u16 *)Hea, sizeof(kbts__hea) / sizeof(kbts_u16)))
           {
             Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
           }
+
+          kbts__EndBounds(&ByteSwapContext, &Bounds);
         }
       }
     }
@@ -28454,12 +28975,12 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
 
       KBTS__FOR(MtxTableIndex, 0, KBTS__ARRAY_LENGTH(MtxTableIds))
       {
-        kbts_blob_table *MtxTable = &Header->Tables[MtxTableIds[MtxTableIndex]];
+        char *TableEnd;
+        kbts_u16 *Mtx = kbts__BlobTableHeaderChecked(Header, MtxTableIds[MtxTableIndex], kbts_u16, &TableEnd, &Result);
 
-        if(MtxTable->Length)
+        if(Mtx)
         {
-          kbts_u16 *Mtx = KBTS__POINTER_OFFSET(kbts_u16, Header, MtxTable->OffsetFromStartOfFile);
-          kbts__ByteSwapArray16Unchecked(Mtx, MtxTable->Length / sizeof(kbts_u16));
+          kbts__ByteSwapArray16Unchecked(Mtx, (kbts_un)(TableEnd - (char *)Mtx) / sizeof(kbts_u16));
         }
       }
     }
@@ -28474,27 +28995,38 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
           kbts__maxp *Maxp = KBTS__POINTER_OFFSET(kbts__maxp, Header, MaxpTable->OffsetFromStartOfFile);
           char *TableEnd = KBTS__POINTER_OFFSET(char, Header, MaxpTable->OffsetFromStartOfFile + MaxpTable->Length);
 
-          kbts_u16 Maxp_Major = kbts__ByteSwap16InPlace(&Maxp->Major);
-          kbts_u16 Maxp_Minor = kbts__ByteSwap16InPlace(&Maxp->Minor);
+          kbts__bounds Bounds = kbts__BeginBounds(&ByteSwapContext, Maxp, TableEnd);
 
-          kbts_un U16Count = 0;
-          if(!Maxp_Major && (Maxp_Minor == 0x5000))
+          kbts_un Maxp_Major;
+          kbts_un Maxp_Minor;
+          if(kbts__ByteSwap16InPlaceContext(&ByteSwapContext, &Maxp->Major, &Maxp_Major) &&
+             kbts__ByteSwap16InPlaceContext(&ByteSwapContext, &Maxp->Minor, &Maxp_Minor))
           {
-            U16Count = 1;
-          }
-          else if((Maxp_Major == 1) && !Maxp_Minor)
-          {
-            U16Count = 14;
+            kbts_un U16Count = 0;
+            if(!Maxp_Major && (Maxp_Minor == 0x5000))
+            {
+              U16Count = 1;
+            }
+            else if((Maxp_Major == 1) && !Maxp_Minor)
+            {
+              U16Count = 14;
+            }
+            else
+            {
+              goto InvalidFont;
+            }
+
+            if(kbts__ByteSwapArray16Context(&ByteSwapContext, &Maxp->GlyphCount, U16Count))
+            {
+              Header->GlyphCount = kbts__ReadU16Unaligned(&Maxp->GlyphCount);
+            }
+            else
+            {
+              Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
+            }
           }
 
-          if(kbts__ByteSwapArray16(&Maxp->GlyphCount, U16Count, TableEnd))
-          {
-            Header->GlyphCount = kbts__ReadU16Unaligned(&Maxp->GlyphCount);
-          }
-          else
-          {
-            Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
-          }
+          kbts__EndBounds(&ByteSwapContext, &Bounds);
         }
         else
         {
@@ -28574,49 +29106,54 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
       kbts__name *Name = kbts__BlobTableHeaderChecked(Header, KBTS_BLOB_TABLE_ID_NAME, kbts__name, &TableEnd, &Result);  
       if(Name)
       {
-        kbts__ByteSwapArray16Unchecked(&Name->Version, 3);
+        kbts__bounds Bounds = kbts__BeginBounds(&ByteSwapContext, Name, TableEnd);
 
-        kbts__name_record *NameRecords = KBTS__POINTER_AFTER(kbts__name_record, Name);
-
-        kbts_un U16Count = kbts__ReadU16Unaligned(&Name->Count) * 6;
-        if(!kbts__ByteSwapArray16(&NameRecords->PlatformId, U16Count, TableEnd))
+        if(kbts__ByteSwapArray16Context(&ByteSwapContext, &Name->Version, 3))
         {
-          Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
-        }
-      }
+          kbts__name_record *NameRecords = KBTS__POINTER_AFTER(kbts__name_record, Name);
 
+          kbts_un Name_Count = kbts__ReadU16Unaligned(&Name->Count);
+          if(kbts__ByteSwapArray16Context(&ByteSwapContext, &NameRecords->PlatformId, Name_Count * 6))
+          {
+            kbts__MarkOkToReadContext(&ByteSwapContext, NameRecords + Name_Count, TableEnd - (char *)(NameRecords + Name_Count));
+          }
+        }
+
+        kbts__EndBounds(&ByteSwapContext, &Bounds);
+      }
+    
       // We should normally set Result to INVALID_FONT if there is no name table.
       // However, one Harfbuzz test has a font with no name table.
     }
-
-    kbts__byteswap_context ByteSwapContext = KBTS__ZERO;
-    ByteSwapContext.FileBase = (char *)Header;
-    ByteSwapContext.FileEnd = (char *)Header + State->TotalSize;
-    ByteSwapContext.PointerCapacity = State->ScratchSize / sizeof(kbts_u32);
-    ByteSwapContext.Pointers = (kbts_u32 *)ScratchMemory;
 
     {
       char *TableEnd;
       kbts__fvar *Fvar = kbts__BlobTableHeaderChecked(Header, KBTS_BLOB_TABLE_ID_FVAR, kbts__fvar, &TableEnd, &Result);
       if(Fvar)
       {
-        kbts__ByteSwapArray16Unchecked(&Fvar->Major, 8);
+        kbts__bounds Bounds = kbts__BeginBounds(&ByteSwapContext, Fvar, TableEnd);
 
-        kbts__variation_axis_record *Axes = KBTS__POINTER_OFFSET(kbts__variation_axis_record, Fvar, kbts__ReadU16Unaligned(&Fvar->AxesArrayOffset));
-        kbts_un AxisCount = kbts__ReadU16Unaligned(&Fvar->AxisCount);
-
-        kbts__instance_record *Instances = (kbts__instance_record *)(Axes + AxisCount);
-        kbts_un InstanceCount = kbts__ReadU16Unaligned(&Fvar->InstanceCount);
-        kbts_un InstanceSize = kbts__ReadU16Unaligned(&Fvar->InstanceSize);
-
-        if(((char *)Instances + InstanceCount * InstanceSize) <= TableEnd)
+        if(kbts__ByteSwapArray16Context(&ByteSwapContext, &Fvar->Major, 8))
         {
+          kbts__variation_axis_record *Axes = KBTS__POINTER_OFFSET(kbts__variation_axis_record, Fvar, kbts__ReadU16Unaligned(&Fvar->AxesArrayOffset));
+          kbts_un AxisCount = kbts__ReadU16Unaligned(&Fvar->AxisCount);
+
+          kbts__instance_record *Instances = (kbts__instance_record *)(Axes + AxisCount);
+          kbts_un InstanceCount = kbts__ReadU16Unaligned(&Fvar->InstanceCount);
+          kbts_un InstanceSize = kbts__ReadU16Unaligned(&Fvar->InstanceSize);
+
+          if((char *)(Axes + AxisCount) > TableEnd)
+          {
+            goto InvalidFont;
+          }
+
           KBTS__FOR(AxisIndex, 0, AxisCount)
           {
             kbts__variation_axis_record *Axis = &Axes[AxisIndex];
 
-            kbts__ByteSwapArray32Unchecked((kbts_u32 *)&Axis->MinValue, 3);
-            kbts__ByteSwapArray16Unchecked(&Axis->Flags, 2);
+            kbts__MarkOkToReadContext(&ByteSwapContext, &Axis->Tag, sizeof(Axis->Tag));
+            kbts__ByteSwapArray32Context(&ByteSwapContext, (kbts_u32 *)&Axis->MinValue, 3);
+            kbts__ByteSwapArray16Context(&ByteSwapContext, &Axis->Flags, 2);
           }
 
           kbts_b32 InstancesContainPostscriptNameId = (InstanceSize >= (sizeof(kbts__instance_record) + sizeof(kbts__fixed16_16) * AxisCount + sizeof(kbts_u16)));
@@ -28626,20 +29163,18 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
             kbts__instance_record *Instance = KBTS__POINTER_OFFSET(kbts__instance_record, Instances, InstanceIndex * InstanceSize);
             kbts__fixed16_16 *InstanceCoordinates = KBTS__POINTER_AFTER(kbts__fixed16_16, Instance);
 
-            kbts__ByteSwap16InPlace(&Instance->SubfamilyNameId);
-            kbts__ByteSwapArray32Unchecked((kbts_u32 *)InstanceCoordinates, AxisCount);
+            kbts__ByteSwap16InPlaceContext(&ByteSwapContext, &Instance->SubfamilyNameId, 0);
+            kbts__ByteSwapArray32Context(&ByteSwapContext, (kbts_u32 *)InstanceCoordinates, AxisCount);
 
             if(InstancesContainPostscriptNameId)
             {
               kbts_u16 *InstancePostscriptNameId = (kbts_u16 *)(InstanceCoordinates + AxisCount);
-              kbts__ByteSwap16InPlace(InstancePostscriptNameId);
+              kbts__ByteSwap16InPlaceContext(&ByteSwapContext, InstancePostscriptNameId, 0);
             }
           }
         }
-        else
-        {
-          Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
-        }
+
+        kbts__EndBounds(&ByteSwapContext, &Bounds);
       }
     }
 
@@ -28648,37 +29183,41 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
       kbts__avar *Avar = kbts__BlobTableHeaderChecked(Header, KBTS_BLOB_TABLE_ID_AVAR, kbts__avar, &TableEnd, &Result);
       if(Avar)
       {
-        kbts__ByteSwapArray16Unchecked(&Avar->Major, 4);
+        kbts__bounds Bounds = kbts__BeginBounds(&ByteSwapContext, Avar, TableEnd);
 
-        char *At = KBTS__POINTER_AFTER(char, Avar);
-        kbts_un Avar_AxisCount = kbts__ReadU16Unaligned(&Avar->AxisCount);
-        KBTS__FOR(AxisIndex, 0, Avar_AxisCount)
+        if(kbts__ByteSwapArray16Context(&ByteSwapContext, &Avar->Major, 4))
         {
-          kbts__segment_maps *SegmentMaps = (kbts__segment_maps *)At;
+          char *At = KBTS__POINTER_AFTER(char, Avar);
+          kbts_un Avar_AxisCount = kbts__ReadU16Unaligned(&Avar->AxisCount);
 
-          if((char *)(SegmentMaps + 1) <= TableEnd)
+          KBTS__FOR(AxisIndex, 0, Avar_AxisCount)
           {
-            kbts_un SegmentMaps_PositionMapCount = kbts__ByteSwap16InPlace(&SegmentMaps->PositionMapCount);
+            kbts__segment_maps *SegmentMaps = (kbts__segment_maps *)At;
 
-            kbts__axis_value_map *AxisValueMaps = KBTS__POINTER_AFTER(kbts__axis_value_map, SegmentMaps);
-            if(kbts__ByteSwapArray16((kbts_u16 *)&AxisValueMaps->FromCoordinate, 2 * SegmentMaps_PositionMapCount, TableEnd))
+            if((char *)(SegmentMaps + 1) <= TableEnd)
             {
-              At = (char *)(AxisValueMaps + SegmentMaps_PositionMapCount);
+              kbts_un SegmentMaps_PositionMapCount;
+              if(kbts__ByteSwap16InPlaceContext(&ByteSwapContext, &SegmentMaps->PositionMapCount, &SegmentMaps_PositionMapCount))
+              {
+                kbts__axis_value_map *AxisValueMaps = KBTS__POINTER_AFTER(kbts__axis_value_map, SegmentMaps);
+                if(kbts__ByteSwapArray16Context(&ByteSwapContext, (kbts_u16 *)&AxisValueMaps->FromCoordinate, 2 * SegmentMaps_PositionMapCount))
+                {
+                  At = (char *)(AxisValueMaps + SegmentMaps_PositionMapCount);
+                }
+                else
+                {
+                  goto InvalidFont;
+                }
+              }
+              else
+              {
+                goto InvalidFont;
+              }
             }
-            else
-            {
-              Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
-
-              break;
-            }
-          }
-          else
-          {
-            Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
-
-            break;
           }
         }
+
+        kbts__EndBounds(&ByteSwapContext, &Bounds);
       }
     }
 
@@ -28692,12 +29231,14 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
         kbts_un HeaderSize = HeaderSizes[TableIdIndex];
 
         char *TableEnd;
-        kbts__hvar_vvar_common *HvarVvar = (kbts__hvar_vvar_common *)kbts__BlobTableHeaderChecked_(Header, TableId, HeaderSize, &TableEnd, &Result);
+        kbts__hvar_vvar_common *HvarVvar = (kbts__hvar_vvar_common *)kbts__BlobTableHeaderCheckedManualSize(Header, TableId, HeaderSize, &TableEnd, &Result);
 
         if(HvarVvar)
         {
-          kbts__ByteSwapArray16Unchecked(&HvarVvar->Major, 2);
-          kbts__ByteSwapArray32Unchecked(&HvarVvar->ItemVariationStoreOffset, 4);
+          kbts__bounds Bounds = kbts__BeginBounds(&ByteSwapContext, HvarVvar, TableEnd);
+
+          kbts__ByteSwapArray16Context(&ByteSwapContext, &HvarVvar->Major, 2);
+          kbts__ByteSwapArray32Context(&ByteSwapContext, &HvarVvar->ItemVariationStoreOffset, 4);
 
           kbts__ByteSwapItemVariationStore(&ByteSwapContext, KBTS__POINTER_OFFSET(kbts__item_variation_store, HvarVvar, kbts__ReadU32Unaligned(&HvarVvar->ItemVariationStoreOffset)));
 
@@ -28722,13 +29263,15 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
           if(TableId == KBTS_BLOB_TABLE_ID_VVAR)
           {
             kbts__vvar *Vvar = (kbts__vvar *)(HvarVvar);
-            kbts_un Vvar_OriginMappingOffset = kbts__ByteSwap32InPlace(&Vvar->OriginMappingOffset);
-
-            if(Vvar_OriginMappingOffset)
+            kbts_un Vvar_OriginMappingOffset;
+            if(kbts__ByteSwap32InPlaceContext(&ByteSwapContext, &Vvar->OriginMappingOffset, &Vvar_OriginMappingOffset) &&
+               Vvar_OriginMappingOffset)
             {
               kbts__ByteSwapDeltaSetIndexMap(&ByteSwapContext, KBTS__POINTER_OFFSET(kbts__delta_set_index_map, Vvar, Vvar_OriginMappingOffset));
             }
           }
+
+          kbts__EndBounds(&ByteSwapContext, &Bounds);
         }
       }
     }
@@ -28739,154 +29282,157 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
 
       if(Mvar)
       {
-        kbts__ByteSwapArray16Unchecked(&Mvar->Major, 6);
+        kbts__bounds Bounds = kbts__BeginBounds(&ByteSwapContext, Mvar, TableEnd);
 
-        kbts_un ValueRecordCount = kbts__ReadU16Unaligned(&Mvar->ValueRecordCount);
-        kbts_un ValueRecordSize = kbts__ReadU16Unaligned(&Mvar->ValueRecordSize);
-
-        char *ValueRecordAt = KBTS__POINTER_AFTER(char, Mvar);
-        if((ValueRecordSize >= sizeof(kbts__mvar_value_record)) &&
-           ((ValueRecordAt + ValueRecordCount * ValueRecordSize) <= TableEnd))
+        if(kbts__ByteSwapArray16Context(&ByteSwapContext, &Mvar->Major, 6))
         {
-          KBTS__FOR(ValueRecordIndex, 0, ValueRecordCount)
+          kbts_un ValueRecordCount = kbts__ReadU16Unaligned(&Mvar->ValueRecordCount);
+          kbts_un ValueRecordSize = kbts__ReadU16Unaligned(&Mvar->ValueRecordSize);
+
+          char *ValueRecordAt = KBTS__POINTER_AFTER(char, Mvar);
+          if((ValueRecordSize >= sizeof(kbts__mvar_value_record)) &&
+             ((ValueRecordAt + ValueRecordCount * ValueRecordSize) <= TableEnd))
           {
-            kbts__mvar_value_record *ValueRecord = (kbts__mvar_value_record *)ValueRecordAt;
-            kbts__ByteSwapArray16Unchecked(&ValueRecord->DeltaSetOuterIndex, 2);
+            KBTS__FOR(ValueRecordIndex, 0, ValueRecordCount)
+            {
+              kbts__mvar_value_record *ValueRecord = (kbts__mvar_value_record *)ValueRecordAt;
+              kbts__MarkOkToReadContext(&ByteSwapContext, &ValueRecord->Tag, sizeof(ValueRecord->Tag));
 
-            ValueRecordAt += ValueRecordSize;
+              if(kbts__ByteSwapArray16Context(&ByteSwapContext, &ValueRecord->DeltaSetOuterIndex, 2))
+              {
+                ValueRecordAt += ValueRecordSize;
+              }
+              else
+              {
+                goto InvalidFont;
+              }
+            }
+
+            kbts__ByteSwapItemVariationStore(&ByteSwapContext, KBTS__POINTER_OFFSET(kbts__item_variation_store, Mvar, kbts__ReadU16Unaligned(&Mvar->ItemVariationStoreOffset)));
           }
-
-          kbts__ByteSwapItemVariationStore(&ByteSwapContext, KBTS__POINTER_OFFSET(kbts__item_variation_store, Mvar, kbts__ReadU16Unaligned(&Mvar->ItemVariationStoreOffset)));
+          else
+          {
+            goto InvalidFont;
+          }
         }
         else
         {
-          Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
+          goto InvalidFont;
         }
+
+        kbts__EndBounds(&ByteSwapContext, &Bounds);
       }
     }
 
-    kbts_blob_table *GdefTable = &Header->Tables[KBTS_BLOB_TABLE_ID_GDEF];
-    if(GdefTable->Length)
+    char *GsubTableEnd;
+    kbts__gsub_gpos *Gsub = (kbts__gsub_gpos *)kbts__BlobTableHeaderCheckedManualSize(Header, KBTS_BLOB_TABLE_ID_GSUB, 10, &GsubTableEnd, 0);
+    if(Gsub)
     {
-      kbts__gdef *Gdef = KBTS__POINTER_OFFSET(kbts__gdef, Header, GdefTable->OffsetFromStartOfFile);
+      kbts__bounds Bounds = kbts__BeginBounds(&ByteSwapContext, Gsub, GsubTableEnd);
 
-      kbts_un Gdef_ClassDefinitionOffset = kbts__ReadU16Unaligned(&Gdef->ClassDefinitionOffset);
-      if(Gdef_ClassDefinitionOffset)
+      kbts__ByteSwapGsubGposCommon(&ByteSwapContext, Gsub);
+      if(ByteSwapContext.Error)
       {
-        kbts_u16 *ClassDefBase = KBTS__POINTER_OFFSET(kbts_u16, Gdef, Gdef_ClassDefinitionOffset);
-        kbts__ByteSwapClassDefinition(&ByteSwapContext, ClassDefBase);
+        goto InvalidFont;
       }
 
-      kbts_un Gdef_MarkAttachmentClassDefinitionOffset = kbts__ReadU16Unaligned(&Gdef->MarkAttachmentClassDefinitionOffset);
-      if(Gdef_MarkAttachmentClassDefinitionOffset)
-      {
-        kbts_u16 *ClassDefBase = KBTS__POINTER_OFFSET(kbts_u16, Gdef, Gdef_MarkAttachmentClassDefinitionOffset);
-        kbts__ByteSwapClassDefinition(&ByteSwapContext, ClassDefBase);
-      }
+      kbts_u16 LookupListOffset = kbts__ReadU16Unaligned(&Gsub->LookupListOffset);
+      kbts_u16 ScriptListOffset = kbts__ReadU16Unaligned(&Gsub->ScriptListOffset);
+      kbts_u16 FeatureListOffset = kbts__ReadU16Unaligned(&Gsub->FeatureListOffset);
 
-      kbts_u16 Gdef_Minor = kbts__ReadU16Unaligned(&Gdef->Minor);
-      if(Gdef_Minor >= 2)
+      // @Robustness: Is this enough?
+      if((LookupListOffset >= 10) &&
+         (LookupListOffset != ScriptListOffset) &&
+         (LookupListOffset != FeatureListOffset))
       {
-        kbts_un Gdef_MarkGlyphSetsDefinitionOffset = kbts__ReadU16Unaligned(&Gdef->MarkGlyphSetsDefinitionOffset);
+        kbts__lookup_list *LookupList = kbts__GetLookupList(Gsub);
 
-        if(Gdef_MarkGlyphSetsDefinitionOffset)
+        kbts_un LookupList_Count;
+        if(!kbts__ByteSwap16InPlaceContext(&ByteSwapContext, &LookupList->Count, &LookupList_Count))
         {
-          kbts__mark_glyph_sets *MarkGlyphSets = KBTS__POINTER_OFFSET(kbts__mark_glyph_sets, Gdef, Gdef_MarkGlyphSetsDefinitionOffset);
-          kbts__ByteSwapArray16Context(&MarkGlyphSets->Format, 2, &ByteSwapContext);
+          goto InvalidFont;
+        }
 
-          if(kbts__ReadU16Unaligned(&MarkGlyphSets->Format) == 1)
+        kbts_u16 *LookupList_Offsets = KBTS__POINTER_AFTER(kbts_u16, LookupList);
+        if(!kbts__ByteSwapArray16Context(&ByteSwapContext, LookupList_Offsets, LookupList_Count))
+        {
+          goto InvalidFont;
+        }
+
+        KBTS__FOR(LookupIndex, 0, LookupList_Count)
+        {
+          kbts__lookup *PackedLookup = kbts__GetLookup(LookupList, LookupIndex);
+
+          KBTS_DUMPF("GSUB Lookup %llu:\n", LookupIndex);
+
+          if(kbts__ByteSwapLookup(&ByteSwapContext, PackedLookup) &&
+             !ByteSwapContext.Error)
           {
-            kbts_un MarkGlyphSets_MarkGlyphSetCount = kbts__ReadU16Unaligned(&MarkGlyphSets->MarkGlyphSetCount);
+            kbts__unpacked_lookup Lookup = kbts__UnpackLookup(Gdef, PackedLookup);
+            KBTS_DUMPF("  Flags %u\n", Lookup.Flags);
 
-            kbts_u32 *CoverageOffsets = KBTS__POINTER_AFTER(kbts_u32, MarkGlyphSets);
-            kbts__ByteSwapArray32Context(CoverageOffsets, MarkGlyphSets_MarkGlyphSetCount, &ByteSwapContext);
-
-            KBTS__FOR(MarkGlyphSetIndex, 0, MarkGlyphSets_MarkGlyphSetCount)
+            KBTS__FOR(SubstitutionIndex, 0, Lookup.SubtableCount)
             {
-              kbts_un CoverageOffset = kbts__ReadU32Unaligned(&CoverageOffsets[MarkGlyphSetIndex]);
-              kbts__coverage *Coverage = KBTS__POINTER_OFFSET(kbts__coverage, MarkGlyphSets, CoverageOffset);
-              kbts__ByteSwapCoverage(&ByteSwapContext, Coverage);
+              kbts_u16 *Base = KBTS__POINTER_OFFSET(kbts_u16, PackedLookup, kbts__ReadU16Unaligned(&Lookup.SubtableOffsets[SubstitutionIndex]));
+
+              KBTS_DUMPF("  Subtable %llu:\n", SubstitutionIndex);
+
+              kbts__ByteSwapGsubLookupSubtable(&ByteSwapContext, Lookup.Type, Base);
             }
           }
         }
-      }
 
-      if(Gdef_Minor >= 3)
-      {
-        kbts_un Gdef_ItemVariationStoreOffset = kbts__ReadU32Unaligned(&Gdef->ItemVariationStoreOffset);
-
-        if(Gdef_ItemVariationStoreOffset)
-        {
-          kbts__ByteSwapItemVariationStore(&ByteSwapContext, KBTS__POINTER_OFFSET(kbts__item_variation_store, Gdef, Gdef_ItemVariationStoreOffset));
-        }
+        kbts__EndBounds(&ByteSwapContext, &Bounds);
       }
     }
 
-    kbts__gsub_gpos *Gsub = kbts__BlobTableDataType(Header, KBTS_BLOB_TABLE_ID_GSUB, kbts__gsub_gpos);
-    kbts__gsub_gpos *Gpos = kbts__BlobTableDataType(Header, KBTS_BLOB_TABLE_ID_GPOS, kbts__gsub_gpos);
-    kbts__gdef *Gdef = kbts__BlobTableDataType(Header, KBTS_BLOB_TABLE_ID_GDEF, kbts__gdef);
-
-    if(Gsub)
     {
-      kbts__ByteSwapGsubGposCommon(&ByteSwapContext, Gsub);
+      char *TableEnd;
+      kbts__gsub_gpos *Gpos = (kbts__gsub_gpos *)kbts__BlobTableHeaderCheckedManualSize(Header, KBTS_BLOB_TABLE_ID_GPOS, 10, &TableEnd, 0);
 
-      kbts__lookup_list *LookupList = kbts__GetLookupList(Gsub);
-      kbts_un LookupList_Count = kbts__ByteSwap16InPlace(&LookupList->Count);
-      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, LookupList), LookupList_Count, &ByteSwapContext);
-
-      KBTS__FOR(LookupIndex, 0, LookupList_Count)
+      if(Gpos)
       {
-        kbts__lookup *PackedLookup = kbts__GetLookup(LookupList, LookupIndex);
+        kbts__bounds Bounds = kbts__BeginBounds(&ByteSwapContext, Gpos, TableEnd);
 
-        KBTS_DUMPF("GSUB Lookup %llu:\n", LookupIndex);
+        kbts__ByteSwapGsubGposCommon(&ByteSwapContext, Gpos);
 
-        if(kbts__ByteSwapLookup(&ByteSwapContext, PackedLookup))
+        kbts__lookup_list *LookupList = kbts__GetLookupList(Gpos);
+        kbts_un LookupList_Count;
+        if(kbts__ByteSwap16InPlaceContext(&ByteSwapContext, &LookupList->Count, &LookupList_Count) &&
+           kbts__ByteSwapArray16Context(&ByteSwapContext, KBTS__POINTER_AFTER(kbts_u16, LookupList), LookupList_Count))
         {
-          kbts__unpacked_lookup Lookup = kbts__UnpackLookup(Gdef, PackedLookup);
-          KBTS_DUMPF("  Flags %u\n", Lookup.Flags);
-
-          KBTS__FOR(SubstitutionIndex, 0, Lookup.SubtableCount)
+          KBTS__FOR(LookupIndex, 0, LookupList_Count)
           {
-            kbts_u16 *Base = KBTS__POINTER_OFFSET(kbts_u16, PackedLookup, kbts__ReadU16Unaligned(&Lookup.SubtableOffsets[SubstitutionIndex]));
+            kbts__lookup *PackedLookup = kbts__GetLookup(LookupList, LookupIndex);
 
-            KBTS_DUMPF("  Subtable %llu:\n", SubstitutionIndex);
+            KBTS_DUMPF("GPOS Lookup %llu:\n", LookupIndex);
 
-            kbts__ByteSwapGsubLookupSubtable(&ByteSwapContext, Lookup.Type, Base);
+            if(kbts__ByteSwapLookup(&ByteSwapContext, PackedLookup) &&
+               !ByteSwapContext.Error)
+            {
+              kbts__unpacked_lookup Lookup = kbts__UnpackLookup(Gdef, PackedLookup);
+
+              KBTS_DUMPF("  Flags %x\n", Lookup.Flags);
+
+              KBTS__FOR(SubstitutionIndex, 0, Lookup.SubtableCount)
+              {
+                kbts_u16 *Base = KBTS__POINTER_OFFSET(kbts_u16, PackedLookup, kbts__ReadU16Unaligned(&Lookup.SubtableOffsets[SubstitutionIndex]));
+                
+                KBTS_DUMPF("  Subtable %llu:\n", (kbts_un)SubstitutionIndex);
+
+                kbts__ByteSwapGposLookupSubtable(&ByteSwapContext, LookupList, Lookup.Type, Base);
+              }
+            }
           }
         }
+
+        kbts__EndBounds(&ByteSwapContext, &Bounds);
       }
     }
 
-    if(Gpos)
+    if(ByteSwapContext.Error)
     {
-      kbts__ByteSwapGsubGposCommon(&ByteSwapContext, Gpos);
-
-      kbts__lookup_list *LookupList = kbts__GetLookupList(Gpos);
-      kbts_un LookupList_Count = kbts__ByteSwap16InPlace(&LookupList->Count);
-      kbts__ByteSwapArray16Context(KBTS__POINTER_AFTER(kbts_u16, LookupList), LookupList_Count, &ByteSwapContext);
-
-      KBTS__FOR(LookupIndex, 0, LookupList_Count)
-      {
-        kbts__lookup *PackedLookup = kbts__GetLookup(LookupList, LookupIndex);
-
-        KBTS_DUMPF("GPOS Lookup %llu:\n", LookupIndex);
-
-        if(kbts__ByteSwapLookup(&ByteSwapContext, PackedLookup))
-        {
-          kbts__unpacked_lookup Lookup = kbts__UnpackLookup(Gdef, PackedLookup);
-
-          KBTS_DUMPF("  Flags %x\n", Lookup.Flags);
-
-          KBTS__FOR(SubstitutionIndex, 0, Lookup.SubtableCount)
-          {
-            kbts_u16 *Base = KBTS__POINTER_OFFSET(kbts_u16, PackedLookup, kbts__ReadU16Unaligned(&Lookup.SubtableOffsets[SubstitutionIndex]));
-            
-            KBTS_DUMPF("  Subtable %llu:\n", (kbts_un)SubstitutionIndex);
-
-            kbts__ByteSwapGposLookupSubtable(&ByteSwapContext, LookupList, Lookup.Type, Base);
-          }
-        }
-      }
+      goto InvalidFont;
     }
 
     // At this point, we are done byteswapping the file, so we can start reusing scratch memory.
@@ -28925,13 +29471,31 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
 
           if(ShapingTable)
           {
+            kbts__bounds Bounds = kbts__BeginBounds(&ByteSwapContext, ShapingTable, (char *)ShapingTable + Table->Length);
+
             kbts__lookup_list *LookupList = kbts__GetLookupList(ShapingTable);
+            if(!kbts__SpanIsInBounds(&ByteSwapContext, LookupList, LookupList + 1))
+            {
+              goto InvalidFont;
+            }
+
             kbts_un LookupList_Count = kbts__ReadU16Unaligned(&LookupList->Count);
 
             KBTS__FOR(LookupIndex, 0, LookupList_Count)
             {
               kbts__lookup *PackedLookup = kbts__GetLookup(LookupList, LookupIndex);
+              if(!kbts__SpanIsInBounds(&ByteSwapContext, PackedLookup, PackedLookup + 1))
+              {
+                goto InvalidFont;
+              }
+
+              // @Incomplete :UnpackRobustness: These UnpackXXX functions don't do any bounds checking.
+              // We need to replace them.
               kbts__unpacked_lookup Lookup = kbts__UnpackLookup(Gdef, PackedLookup);
+              if(!kbts__SpanIsInBounds(&ByteSwapContext, Lookup.SubtableOffsets, Lookup.SubtableOffsets + Lookup.SubtableCount))
+              {
+                goto InvalidFont;
+              }
 
               LookupSubtableIndexOffsets[RunningLookupIndex] = (kbts_u32)RunningSubtableIndex;
 
@@ -28944,6 +29508,10 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                       (InGpos && (LookupType == 9)))
                 {
                   kbts__extension *Extension = (kbts__extension *)Base;
+                  if(!kbts__SpanIsInBounds(&ByteSwapContext, Extension, Extension + 1))
+                  {
+                    goto InvalidFont;
+                  }
 
                   // CAREFUL: Here, we remap LookupType only.
                   // Do not use Lookup.Type beyond this point!
@@ -28953,6 +29521,11 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
 
                 kbts__coverage *Coverage = 0;
 
+                if(!kbts__SpanIsInBounds(&ByteSwapContext, Base, Base + 1))
+                {
+                  goto InvalidFont;
+                }
+
                 if(kbts__LookupBeginsWithCoverage(ShapingTableId, LookupType, kbts__ReadU16Unaligned(&Base[0])))
                 {
                   Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Base, kbts__ReadU16Unaligned(&Base[1]));
@@ -28961,25 +29534,56 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                 if(!InGpos && (LookupType == 4))
                 {
                   kbts__ligature_substitution *Subst = (kbts__ligature_substitution *)Base;
+                  if(!kbts__SpanIsInBounds(&ByteSwapContext, Subst, Subst + 1))
+                  {
+                    goto InvalidFont;
+                  }
+
                   kbts_un Subst_LigatureSetCount = kbts__ReadU16Unaligned(&Subst->LigatureSetCount);
 
                   KBTS__FOR(SetIndex, 0, Subst_LigatureSetCount)
                   {
                     kbts__ligature_set *Set = kbts__GetLigatureSet(Subst, SetIndex);
+                    if(!kbts__SpanIsInBounds(&ByteSwapContext, Set, Set + 1))
+                    {
+                      goto InvalidFont;
+                    }
+
                     kbts_un Set_Count = kbts__ReadU16Unaligned(&Set->Count);
+                    kbts_u16 *LigatureOffsets = KBTS__POINTER_AFTER(kbts_u16, Set);
+                    if(!kbts__SpanIsInBounds(&ByteSwapContext, LigatureOffsets, LigatureOffsets + Set_Count))
+                    {
+                      goto InvalidFont;
+                    }
 
                     KBTS__FOR(LigatureIndex, 0, Set_Count)
                     {
                       kbts__ligature *Ligature = kbts__GetLigature(Set, LigatureIndex);
+                      if(!kbts__SpanIsInBounds(&ByteSwapContext, Ligature, Ligature + 1))
+                      {
+                        goto InvalidFont;
+                      }
+
                       kbts_un Ligature_ComponentCount = kbts__ReadU16Unaligned(&Ligature->ComponentCount);
                       kbts_u16 *Ids = KBTS__POINTER_AFTER(kbts_u16, Ligature);
+                      if(!kbts__SpanIsInBounds(&ByteSwapContext, Ids, Ids + Ligature_ComponentCount - 1))
+                      {
+                        goto InvalidFont;
+                      }
 
                       KBTS__FOR(IdIndex, 1, Ligature_ComponentCount)
                       {
                         kbts_un GlyphId = kbts__ReadU16Unaligned(&Ids[IdIndex - 1]);
 
                         kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(RunningSubtableIndex, SubtableCount, GlyphId, GlyphCount);
-                        GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
+                        if(SubtableMatrixIndex.Valid)
+                        {
+                          GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
+                        }
+                        else
+                        {
+                          goto InvalidFont;
+                        }
                       }
                     }
                   }
@@ -28992,7 +29596,17 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                   case 1:
                   {
                     kbts__sequence_context_1 *Subst = (kbts__sequence_context_1 *)Base;
+                    if(!kbts__SpanIsInBounds(&ByteSwapContext, Subst, Subst + 1))
+                    {
+                      goto InvalidFont;
+                    }
                     kbts_un Subst_SeqRuleSetCount = kbts__ReadU16Unaligned(&Subst->SeqRuleSetCount);
+
+                    kbts_u16 *SequenceRuleSetOffsets = KBTS__POINTER_AFTER(kbts_u16, Subst);
+                    if(!kbts__SpanIsInBounds(&ByteSwapContext, SequenceRuleSetOffsets, SequenceRuleSetOffsets + Subst_SeqRuleSetCount))
+                    {
+                      goto InvalidFont;
+                    }
 
                     KBTS__FOR(SetIndex, 0, Subst_SeqRuleSetCount)
                     {
@@ -29000,20 +29614,40 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
 
                       if(Set)
                       {
+                        if(!kbts__SpanIsInBounds(&ByteSwapContext, Set, Set + 1))
+                        {
+                          goto InvalidFont;
+                        }
                         kbts_un Set_Count = kbts__ReadU16Unaligned(&Set->Count);
 
                         KBTS__FOR(RuleIndex, 0, Set_Count)
                         {
                           kbts__sequence_rule *Rule = kbts__GetSequenceRule(Set, RuleIndex);
+                          if(!kbts__SpanIsInBounds(&ByteSwapContext, Rule, Rule + 1))
+                          {
+                            goto InvalidFont;
+                          }
                           kbts_un Rule_GlyphCount = kbts__ReadU16Unaligned(&Rule->GlyphCount);
 
                           kbts_u16 *SequenceGlyphIds = KBTS__POINTER_AFTER(kbts_u16, Rule);
+                          if(!kbts__SpanIsInBounds(&ByteSwapContext, SequenceGlyphIds, SequenceGlyphIds + Rule_GlyphCount))
+                          {
+                            goto InvalidFont;
+                          }
+
                           KBTS__FOR(InputIndex, 1, Rule_GlyphCount)
                           {
                             kbts_un GlyphId = kbts__ReadU16Unaligned(&SequenceGlyphIds[InputIndex - 1]);
 
                             kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(RunningSubtableIndex, SubtableCount, GlyphId, GlyphCount);
-                            GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
+                            if(SubtableMatrixIndex.Valid)
+                            {
+                              GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
+                            }
+                            else
+                            {
+                              goto InvalidFont;
+                            }
                           }
                         }
                       }
@@ -29023,22 +29657,45 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                   case 2:
                   {
                     kbts__sequence_context_2 *Subst = (kbts__sequence_context_2 *)Base;
-                    kbts_u16 *ClassDefBase = KBTS__POINTER_OFFSET(kbts_u16, Subst, kbts__ReadU16Unaligned(&Subst->ClassDefOffset));
+                    if(!kbts__SpanIsInBounds(&ByteSwapContext, Subst, Subst + 1))
+                    {
+                      goto InvalidFont;
+                    }
+                    kbts_un Subst_ClassSequenceRuleSetCount = kbts__ReadU16Unaligned(&Subst->ClassSequenceRuleSetCount);
+
+                    kbts_u16 *ClassSequenceRuleSetOffsets = KBTS__POINTER_AFTER(kbts_u16, Subst);
+                    if(!kbts__SpanIsInBounds(&ByteSwapContext, ClassSequenceRuleSetOffsets, ClassSequenceRuleSetOffsets + Subst_ClassSequenceRuleSetCount))
+                    {
+                      goto InvalidFont;
+                    }
 
                     kbts_u64 ClassesIncluded[16] = KBTS__ZERO;
 
-                    KBTS__FOR(SetIndex, 0, kbts__ReadU16Unaligned(&Subst->ClassSequenceRuleSetCount))
+                    KBTS__FOR(SetIndex, 0, Subst_ClassSequenceRuleSetCount)
                     {
                       kbts__class_sequence_rule_set *Set = kbts__GetClassSequenceRuleSet(Subst, SetIndex);
                       if(Set)
                       {
+                        if(!kbts__SpanIsInBounds(&ByteSwapContext, Set, Set + 1))
+                        {
+                          goto InvalidFont;
+                        }
                         kbts_un Set_Count = kbts__ReadU16Unaligned(&Set->Count);
 
                         KBTS__FOR(RuleIndex, 0, Set_Count)
                         {
                           kbts__class_sequence_rule *Rule = kbts__GetClassSequenceRule(Set, RuleIndex);
+                          if(!kbts__SpanIsInBounds(&ByteSwapContext, Rule, Rule + 1))
+                          {
+                            goto InvalidFont;
+                          }
                           kbts_un Rule_GlyphCount = kbts__ReadU16Unaligned(&Rule->GlyphCount);
+
                           kbts_u16 *SequenceClasses = KBTS__POINTER_AFTER(kbts_u16, Rule);
+                          if(!kbts__SpanIsInBounds(&ByteSwapContext, SequenceClasses, SequenceClasses + Rule_GlyphCount - 1))
+                          {
+                            goto InvalidFont;
+                          }
 
                           KBTS__FOR(SequenceIndex, 1, Rule_GlyphCount)
                           {
@@ -29053,14 +29710,24 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                       }
                     }
 
+                    kbts_u16 *ClassDefBase = KBTS__POINTER_OFFSET(kbts_u16, Subst, kbts__ReadU16Unaligned(&Subst->ClassDefOffset));
                     kbts__MarkMatrixClassDef(GlyphLookupSubtableMatrix, RunningSubtableIndex, SubtableCount, GlyphCount, ClassDefBase, ClassesIncluded, KBTS__ARRAY_LENGTH(ClassesIncluded));
                   } break;
 
                   case 3:
                   {
                     kbts__sequence_context_3 *Subst = (kbts__sequence_context_3 *)Base;
+                    if(!kbts__SpanIsInBounds(&ByteSwapContext, Subst, Subst + 1))
+                    {
+                      goto InvalidFont;
+                    }
                     kbts_un Subst_GlyphCount = kbts__ReadU16Unaligned(&Subst->GlyphCount);
+
                     kbts_u16 *CoverageOffsets = KBTS__POINTER_AFTER(kbts_u16, Subst);
+                    if(!kbts__SpanIsInBounds(&ByteSwapContext, CoverageOffsets, CoverageOffsets + Subst_GlyphCount))
+                    {
+                      goto InvalidFont;
+                    }
 
                     KBTS__FOR(CoverageIndex, 1, Subst_GlyphCount)
                     {
@@ -29081,38 +29748,77 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                   case 1:
                   {
                     kbts__chained_sequence_context_1 *Subst = (kbts__chained_sequence_context_1 *)Base;
+                    if(!kbts__SpanIsInBounds(&ByteSwapContext, Subst, Subst + 1))
+                    {
+                      goto InvalidFont;
+                    }
                     kbts_un Subst_ChainedSequenceRuleSetCount = kbts__ReadU16Unaligned(&Subst->ChainedSequenceRuleSetCount);
+
                     kbts_u16 *ChainedSequenceRuleSetOffsets = KBTS__POINTER_AFTER(kbts_u16, Subst);
+                    if(!kbts__SpanIsInBounds(&ByteSwapContext, ChainedSequenceRuleSetOffsets, ChainedSequenceRuleSetOffsets + Subst_ChainedSequenceRuleSetCount))
+                    {
+                      goto InvalidFont;
+                    }
 
                     KBTS__FOR(SetIndex, 0, Subst_ChainedSequenceRuleSetCount)
                     {
                       kbts__chained_sequence_rule_set *Set = KBTS__POINTER_OFFSET(kbts__chained_sequence_rule_set, Subst, kbts__ReadU16Unaligned(&ChainedSequenceRuleSetOffsets[SetIndex]));
+                      if(!kbts__SpanIsInBounds(&ByteSwapContext, Set, Set + 1))
+                      {
+                        goto InvalidFont;
+                      }
                       kbts_un Set_Count = kbts__ReadU16Unaligned(&Set->Count);
+
+                      kbts_u16 *ChainedClassSequenceRuleOffsets = KBTS__POINTER_AFTER(kbts_u16, Set);
+                      if(!kbts__SpanIsInBounds(&ByteSwapContext, ChainedClassSequenceRuleOffsets, ChainedClassSequenceRuleOffsets + Set_Count))
+                      {
+                        goto InvalidFont;
+                      }
 
                       KBTS__FOR(RuleIndex, 0, Set_Count)
                       {
                         kbts__chained_sequence_rule *Rule = kbts__GetChainedClassSequenceRule(Set, RuleIndex);
+                        if(!kbts__SpanIsInBounds(&ByteSwapContext, Rule, Rule + 1))
+                        {
+                          goto InvalidFont;
+                        }
+
+                        // @Incomplete :UnpackRobustness: These UnpackXXX functions don't do any bounds checking.
+                        // We need to replace them.
                         kbts__unpacked_chained_sequence_rule Unpacked = kbts__UnpackChainedSequenceRule(Rule, 0);
+                        if(!kbts__SpanIsInBounds(&ByteSwapContext, Unpacked.Lookahead, Unpacked.Lookahead + Unpacked.LookaheadCount))
+                        {
+                          goto InvalidFont;
+                        }
 
                         KBTS__FOR(BacktrackIndex, 0, Unpacked.BacktrackCount)
                         {
                           kbts_un GlyphId = kbts__ReadU16Unaligned(&Unpacked.Backtrack[BacktrackIndex]);
                           kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(RunningSubtableIndex, SubtableCount, GlyphId, GlyphCount);
-                          GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
+                          if(SubtableMatrixIndex.Valid)
+                          {
+                            GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
+                          }
                         }
 
                         KBTS__FOR(InputIndex, 1, Unpacked.InputCount)
                         {
                           kbts_un GlyphId = kbts__ReadU16Unaligned(&Unpacked.Input[InputIndex - 1]);
                           kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(RunningSubtableIndex, SubtableCount, GlyphId, GlyphCount);
-                          GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
+                          if(SubtableMatrixIndex.Valid)
+                          {
+                            GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
+                          }
                         }
 
                         KBTS__FOR(LookaheadIndex, 0, Unpacked.LookaheadCount)
                         {
                           kbts_un GlyphId = kbts__ReadU16Unaligned(&Unpacked.Lookahead[LookaheadIndex]);
                           kbts__matrix_index SubtableMatrixIndex = kbts__GlyphLookupSubtableMatrixIndex(RunningSubtableIndex, SubtableCount, GlyphId, GlyphCount);
-                          GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
+                          if(SubtableMatrixIndex.Valid)
+                          {
+                            GlyphLookupSubtableMatrix[SubtableMatrixIndex.WordIndex] |= 1u << SubtableMatrixIndex.BitIndex;
+                          }
                         }
                       }
                     }
@@ -29121,19 +29827,27 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                   case 2:
                   {
                     kbts__chained_sequence_context_2 *Subst = (kbts__chained_sequence_context_2 *)Base;
+                    if(!kbts__SpanIsInBounds(&ByteSwapContext, Subst, Subst + 1))
+                    {
+                      goto InvalidFont;
+                    }
+
                     kbts_un BacktrackClassDefOffset = kbts__ReadU16Unaligned(&Subst->BacktrackClassDefOffset);
                     kbts_un InputClassDefOffset = kbts__ReadU16Unaligned(&Subst->InputClassDefOffset);
                     kbts_un LookaheadClassDefOffset = kbts__ReadU16Unaligned(&Subst->LookaheadClassDefOffset);
+
                     kbts_u16 *BacktrackClassDefinition = 0;
                     if(BacktrackClassDefOffset)
                     {
                       BacktrackClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, BacktrackClassDefOffset);
                     }
+
                     kbts_u16 *InputClassDefinition = 0;
                     if(InputClassDefOffset)
                     {
                       InputClassDefinition = KBTS__POINTER_OFFSET(kbts_u16, Subst, InputClassDefOffset);
                     }
+
                     kbts_u16 *LookaheadClassDefinition = 0;
                     if(LookaheadClassDefOffset)
                     {
@@ -29145,17 +29859,41 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                     kbts_u64 LookaheadClassesIncluded[16] = KBTS__ZERO;
 
                     kbts_un Subst_ChainedClassSequenceRuleSetCount = kbts__ReadU16Unaligned(&Subst->ChainedClassSequenceRuleSetCount);
+                    kbts_u16 *ChainedClassSequenceRuleSetOffsets = KBTS__POINTER_AFTER(kbts_u16, Subst);
+                    if(!kbts__SpanIsInBounds(&ByteSwapContext, ChainedClassSequenceRuleSetOffsets, ChainedClassSequenceRuleSetOffsets + Subst_ChainedClassSequenceRuleSetCount))
+                    {
+                      goto InvalidFont;
+                    }
+
                     KBTS__FOR(SetIndex, 0, Subst_ChainedClassSequenceRuleSetCount)
                     {
                       kbts__chained_sequence_rule_set *Set = kbts__GetChainedClassSequenceRuleSet(Subst, SetIndex);
                       if(Set)
                       {
+                        if(!kbts__SpanIsInBounds(&ByteSwapContext, Set, Set + 1))
+                        {
+                          goto InvalidFont;
+                        }
+
                         kbts_un Set_Count = kbts__ReadU16Unaligned(&Set->Count);
+
+                        kbts_u16 *ChainedSequenceRuleOffsets = KBTS__POINTER_AFTER(kbts_u16, Set);
+                        if(!kbts__SpanIsInBounds(&ByteSwapContext, ChainedSequenceRuleOffsets, ChainedSequenceRuleOffsets + Set_Count))
+                        {
+                          goto InvalidFont;
+                        }
 
                         KBTS__FOR(RuleIndex, 0, Set_Count)
                         {
                           kbts__chained_sequence_rule *Rule = kbts__GetChainedSequenceRule(Set, RuleIndex);
+                          
+                          // @Incomplete :UnpackRobustness: These UnpackXXX functions don't do any bounds checking.
+                          // We need to replace them.
                           kbts__unpacked_chained_sequence_rule Unpacked = kbts__UnpackChainedSequenceRule(Rule, 0);
+                          if(!kbts__SpanIsInBounds(&ByteSwapContext, Unpacked.Lookahead, Unpacked.Lookahead + Unpacked.LookaheadCount))
+                          {
+                            goto InvalidFont;
+                          }
 
                           KBTS__FOR(BacktrackIndex, 0, Unpacked.BacktrackCount)
                           {
@@ -29195,7 +29933,18 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                   case 3:
                   {
                     kbts__chained_sequence_context_3 *Subst = (kbts__chained_sequence_context_3 *)Base;
+                    if(!kbts__SpanIsInBounds(&ByteSwapContext, Subst, Subst + 1))
+                    {
+                      goto InvalidFont;
+                    }
+
+                    // @Incomplete :UnpackRobustness: These UnpackXXX functions don't do any bounds checking.
+                    // We need to replace them.
                     kbts__unpacked_chained_sequence_context_3 Unpacked = kbts__UnpackChainedSequenceContext3(Subst, 0);
+                    if(!kbts__SpanIsInBounds(&ByteSwapContext, Unpacked.Records, Unpacked.Records + Unpacked.RecordCount))
+                    {
+                      goto InvalidFont;
+                    }
 
                     Coverage = KBTS__POINTER_OFFSET(kbts__coverage, Subst, kbts__ReadU16Unaligned(&Unpacked.InputCoverageOffsets[0]));
 
@@ -29223,7 +29972,18 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
                 else if(!InGpos && (LookupType == 8))
                 {
                   kbts__reverse_chain_substitution *Subst = (kbts__reverse_chain_substitution *)Base;
+                  if(!kbts__SpanIsInBounds(&ByteSwapContext, Subst, Subst + 1))
+                  {
+                    goto InvalidFont;
+                  }
+
+                  // @Incomplete :UnpackRobustness: These UnpackXXX functions don't do any bounds checking.
+                  // We need to replace them.
                   kbts__unpacked_reverse_chain_substitution Unpacked = kbts__UnpackReverseChainSubstitution(Subst, 0);
+                  if(!kbts__SpanIsInBounds(&ByteSwapContext, Unpacked.SubstituteGlyphIds, Unpacked.SubstituteGlyphIds + Unpacked.GlyphCount))
+                  {
+                    goto InvalidFont;
+                  }
 
                   KBTS__FOR(BacktrackIndex, 0, Unpacked.BacktrackCount)
                   {
@@ -29246,6 +30006,8 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
 
               RunningLookupIndex += 1;
             }
+
+            kbts__EndBounds(&ByteSwapContext, &Bounds);
           }
 
           if(!InGpos)
@@ -29260,6 +30022,12 @@ KBTS_EXPORT kbts_load_font_error kbts_PlaceBlob(kbts_font *Font, kbts_load_font_
       Header->GlyphLookupSubtableMatrixOffsetFromStartOfFile = KBTS__POINTER_DIFF32(GlyphLookupSubtableMatrix, Header);
       Header->LookupSubtableIndexOffsetsOffsetFromStartOfFile = KBTS__POINTER_DIFF32(LookupSubtableIndexOffsets, Header);
     }
+  }
+
+  if(0)
+  {
+    InvalidFont:;
+    Result = KBTS_LOAD_FONT_ERROR_INVALID_FONT;
   }
 
   if(Result != KBTS_LOAD_FONT_ERROR_NONE)
