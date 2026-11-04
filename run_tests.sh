@@ -76,7 +76,7 @@ if [[ -z "${ODIN_TESTS_NO_CLANG:-}" ]]; then
 	(
 		cd "$here/tests/abi"
 		ABI_CFLAGS= ./run.sh
-		ABI_CFLAGS=-O2 ./run.sh -o:speed
+		ABI_CFLAGS=-O2 ./run.sh "" "" -o:speed
 	)
 fi
 
