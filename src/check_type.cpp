@@ -676,7 +676,7 @@ gb_internal Entity *find_polymorphic_record_entity(GenTypesData *found_gen_types
 };
 
 
-// Set the instantiation's canonical name (e.g. `Foo($T=int)`) before it is published, so a
+// Set the instantiation's canonical name (e.g. `Foo(T=int)`) before it is published, so a
 // concurrent finder never observes a torn Named.name.
 gb_internal void set_polymorphic_record_instantiation_name(Type *named_type, Type *original_type) {
 	Type *bt = base_type(named_type);
@@ -697,7 +697,7 @@ gb_internal void set_polymorphic_record_instantiation_name(Type *named_type, Typ
 		if (i > 0) {
 			s = gb_string_append_fmt(s, ", ");
 		}
-		s = gb_string_append_fmt(s, "$%.*s", LIT(name));
+		s = gb_string_append_fmt(s, "%.*s", LIT(name));
 
 		if (v->kind == Entity_TypeName) {
 			if (v->type != nullptr && v->type->kind != Type_Generic) {
