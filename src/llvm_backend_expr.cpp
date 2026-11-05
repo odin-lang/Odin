@@ -919,16 +919,16 @@ gb_internal lbValue lb_emit_matrix_transpose(lbProcedure *p, lbValue m, Type *ty
 			return LLVMConstInt(lb_type(p->module, t_u32), val, false);
 		};
 
-		unsigned stride = cast(unsigned)matrix_type_stride_in_elems(mt);
 		unsigned row_count    = cast(unsigned)mt->Matrix.row_count;
 		unsigned column_count = cast(unsigned)mt->Matrix.column_count;
-		unsigned other_stride = (row_count*column_count)/stride;
 
 		LLVMValueRef vector = lb_matrix_to_vector(p, m);
 		auto mask_elems = slice_make<LLVMValueRef>(permanent_allocator(), row_count * column_count);
 		for (unsigned i = 0; i < row_count; i++) {
 			for (unsigned j = 0; j < column_count; j++) {
-				mask_elems[other_stride*i + j] = do_u32(p, stride*j + i);
+				i64 dst = matrix_indices_to_offset(rt, j, i);
+				i64 src = matrix_indices_to_offset(mt, i, j);
+				mask_elems[dst] = do_u32(p, cast(u32)src);
 			}
 		}
 		LLVMValueRef mask = LLVMConstVector(mask_elems.data, cast(unsigned)mask_elems.count);
@@ -1094,14 +1094,11 @@ gb_internal lbValue lb_emit_matrix_mul(lbProcedure *p, lbValue lhs, lbValue rhs,
 				}
 
 				lbAddr res = lb_add_local_generated(p, type, false);
-				LLVMValueRef dest_ptr = res.addr.value;
-
-				LLVMTypeRef dest_ptr_type = LLVMPointerType(LLVMTypeOf(z_columns[0]), 0);
-				dest_ptr = LLVMBuildPointerCast(p->builder, dest_ptr, dest_ptr_type, "");
+				unsigned res_align = cast(unsigned)type_align_of(type);
 				for (unsigned i = 0; i < N; i++) {
-					LLVMValueRef indices[] = {do_u32(p, i)};
-	 				LLVMValueRef dst = LLVMBuildInBoundsGEP2(p->builder, LLVMTypeOf(z_columns[0]), dest_ptr, indices, 1, "");
-	 				LLVMBuildStore(p->builder, z_columns[i], dst);
+					lbValue dst = lb_emit_matrix_epi(p, res.addr, 0, i);
+					LLVMValueRef store = LLVMBuildStore(p->builder, z_columns[i], dst.value);
+					LLVMSetAlignment(store, res_align);
 				}
 
 				return lb_addr_load(p, res);
@@ -1180,14 +1177,11 @@ gb_internal lbValue lb_emit_matrix_mul(lbProcedure *p, lbValue lhs, lbValue rhs,
 				}
 
 				lbAddr res = lb_add_local_generated(p, type, false);
-				LLVMValueRef dest_ptr = res.addr.value;
-
-				LLVMTypeRef dest_ptr_type = LLVMPointerType(LLVMTypeOf(z_rows[0]), 0);
-				dest_ptr = LLVMBuildPointerCast(p->builder, dest_ptr, dest_ptr_type, "");
+				unsigned res_align = cast(unsigned)type_align_of(type);
 				for (unsigned i = 0; i < N; i++) {
-					LLVMValueRef indices[] = {do_u32(p, i)};
-	 				LLVMValueRef dst = LLVMBuildInBoundsGEP2(p->builder, LLVMTypeOf(z_rows[0]), dest_ptr, indices, 1, "");
-	 				LLVMBuildStore(p->builder, z_rows[i], dst);
+					lbValue dst = lb_emit_matrix_epi(p, res.addr, i, 0);
+					LLVMValueRef store = LLVMBuildStore(p->builder, z_rows[i], dst.value);
+					LLVMSetAlignment(store, res_align);
 				}
 
 				return lb_addr_load(p, res);
@@ -1205,7 +1199,7 @@ gb_internal lbValue lb_emit_matrix_mul(lbProcedure *p, lbValue lhs, lbValue rhs,
 			auto mask_elems = slice_make<LLVMValueRef>(permanent_allocator(), inner);
 			for (unsigned i = 0; i < outer_columns; i++) {
 				for (unsigned j = 0; j < inner; j++) {
-					unsigned offset = x_stride*j + i;
+					unsigned offset = y_stride*j + i;
 					mask_elems[j] = do_u32(p, offset);
 				}
 
