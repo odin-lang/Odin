@@ -196,21 +196,33 @@ arena_alloc_fast :: #force_inline proc "contextless" (arena: ^Arena, size, align
 		sync.atomic_store_explicit(&arena._state, next, .Relaxed)
 		return base[offset:][:size], true
 	} else {
-		spins := 1
-		for {
-			state := sync.atomic_load_explicit(&arena._state, .Acquire)
-			base  := sync.atomic_load_explicit(&arena._base,  .Acquire)
-			end   := sync.atomic_load_explicit(&arena._end,   .Acquire)
+		state := sync.atomic_load_explicit(&arena._state, .Acquire)
+		base  := sync.atomic_load_explicit(&arena._base,  .Acquire)
+		end   := sync.atomic_load_explicit(&arena._end,   .Acquire)
 
-			offset, next := arena_fit(state, base, end, size, alignment) or_return
-			if _, swapped := sync.atomic_compare_exchange_weak_explicit(&arena._state, state, next, .Acq_Rel, .Relaxed); swapped {
-				return base[offset:][:size], true
-			}
+		offset, next := arena_fit(state, base, end, size, alignment) or_return
+		if _, swapped := sync.atomic_compare_exchange_weak_explicit(&arena._state, state, next, .Acq_Rel, .Relaxed); swapped {
+			return base[offset:][:size], true
+		}
+		return arena_alloc_contended(arena, size, alignment)
+	}
+}
 
-			for _ in 0..<spins {
-				sync.cpu_relax()
-			}
-			spins = min(spins*2, ARENA_BACKOFF)
+// Retries the fast path, backing off between attempts, after another thread got there first.
+@(private, require_results, no_sanitize_address)
+arena_alloc_contended :: #force_no_inline proc "contextless" (arena: ^Arena, size, alignment: uint) -> (data: []byte, ok: bool) #no_bounds_check {
+	for spins := 1; /**/; spins = min(spins*2, ARENA_BACKOFF) {
+		for _ in 0..<spins {
+			sync.cpu_relax()
+		}
+
+		state := sync.atomic_load_explicit(&arena._state, .Acquire)
+		base  := sync.atomic_load_explicit(&arena._base,  .Acquire)
+		end   := sync.atomic_load_explicit(&arena._end,   .Acquire)
+
+		offset, next := arena_fit(state, base, end, size, alignment) or_return
+		if _, swapped := sync.atomic_compare_exchange_weak_explicit(&arena._state, state, next, .Acq_Rel, .Relaxed); swapped {
+			return base[offset:][:size], true
 		}
 	}
 }
@@ -223,8 +235,8 @@ arena_fit :: #force_inline proc "contextless" (state: u64, base: [^]byte, end, s
 		return
 	}
 
-	offset = used + pad
-	return offset, state&~ARENA_OFFSET_MASK | u64(offset+size), true
+	// The new offset stays below `ARENA_CLOSED`, so adding to the whole word keeps the generation.
+	return used + pad, state + u64(pad+size), true
 }
 
 // Commits more memory, or moves to a new memory block, then allocates.
