@@ -43,35 +43,34 @@ _capture :: #force_no_inline proc(buf: Capture, skip: int) -> (n: int) {
 }
 
 @(private="package")
-_locations_destroy :: proc(locations: []Location, allocator: runtime.Allocator) {
-	for location in locations {
-		delete(location.file_path, allocator)
-		delete(location.procedure, allocator)
+_locations_destroy :: proc(locations: []Resolved_Location, allocator: runtime.Allocator) {
+	for entry in locations {
+		if entry.location.file_path != OOM_MARKER { delete(entry.location.file_path, allocator) }
+		if entry.location.procedure != OOM_MARKER { delete(entry.location.procedure, allocator) }
 	}
 	delete(locations, allocator)
 }
 
 @(private="package")
-_resolve :: proc(bt: Capture, allocator, _: runtime.Allocator) -> (out: []Location, err: Resolve_Error) {
-	out = make([]Location, len(bt), allocator)
-	defer if err != nil { _locations_destroy(out, allocator) }
+_resolve :: proc(bt: Capture, allocator, _: runtime.Allocator) -> (out: []Resolved_Location, err: runtime.Allocator_Error) {
+	out = make([]Resolved_Location, len(bt), allocator) or_return
 
 	symbolicator := CSSymbolicatorCreateWithPid(posix.getpid())
 	defer CSRelease(symbolicator)
 
-	for &location, i in out {
+	for &entry, i in out {
 		symbol := CSSymbolicatorGetSymbolWithAddressAtTime(symbolicator, uintptr(bt[i]), CSNow)
 		info   := CSSymbolicatorGetSourceInfoWithAddressAtTime(symbolicator, uintptr(bt[i]), CSNow)
 
-		location.procedure = clone_or_oom_marker(CSSymbolGetName(symbol), allocator)
+		entry.location.procedure = clone_or_oom_marker(CSSymbolGetName(symbol), allocator)
 
 		// No debug info.
 		if CSIsNull(info) {
 			owner := CSSymbolGetSymbolOwner(symbol)
-			location.file_path = clone_or_oom_marker(CSSymbolOwnerGetPath(owner), allocator)
+			entry.location.file_path = clone_or_oom_marker(CSSymbolOwnerGetPath(owner), allocator)
 		} else {
-			location.file_path = clone_or_oom_marker(CSSourceInfoGetPath(info), allocator)
-			location.line      = CSSourceInfoGetLineNumber(info)
+			entry.location.file_path = clone_or_oom_marker(CSSourceInfoGetPath(info), allocator)
+			entry.location.line      = CSSourceInfoGetLineNumber(info)
 		}
 	}
 

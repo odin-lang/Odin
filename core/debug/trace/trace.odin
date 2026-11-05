@@ -81,7 +81,6 @@ capture_fill :: #force_no_inline proc(buf: Capture, skip := 0) -> int {
 
 Resolve_Error :: enum {
 	None,
-	Allocator_Error,
 	Parse_Address_Failed,
 	Resolve_Aborted,
 }
@@ -89,7 +88,6 @@ Resolve_Error :: enum {
 resolve_err_string :: proc(err: Resolve_Error) -> string {
 	switch err {
 	case .None:                 return "none"
-	case .Allocator_Error:      return "allocator error"
 	case .Parse_Address_Failed: return "parse address failed"
 	case .Resolve_Aborted:      return "resolve aborted"
 	case:                       return "unknown"
@@ -97,6 +95,14 @@ resolve_err_string :: proc(err: Resolve_Error) -> string {
 }
 
 Location :: runtime.Source_Code_Location
+
+/*
+A single resolved stack frame: best-effort location plus its own error.
+*/
+Resolved_Location :: struct {
+	location: Location,
+	error:    Resolve_Error,
+}
 
 /*
 Resolve the back trace into source code locations, if possible.
@@ -113,19 +119,19 @@ resolve :: proc {
 /*
 See the procedure group `resolve`.
 */
-resolve_n :: proc(bt: Capture, allocator := context.allocator, temp_allocator := context.temp_allocator) -> (out: []Location, err: Resolve_Error) {
+resolve_n :: proc(bt: Capture, allocator := context.allocator, temp_allocator := context.temp_allocator) -> (out: []Resolved_Location, err: runtime.Allocator_Error) #optional_allocator_error {
 	return _resolve(bt, allocator, temp_allocator)
 }
 
 /*
 See the procedure group `resolve`.
 */
-resolve_const :: proc(bt: Capture_Const, allocator := context.allocator, temp_allocator := context.temp_allocator) -> (out: []Location, err: Resolve_Error) {
+resolve_const :: proc(bt: Capture_Const, allocator := context.allocator, temp_allocator := context.temp_allocator) -> (out: []Resolved_Location, err: runtime.Allocator_Error) #optional_allocator_error {
 	bt := bt
 	return _resolve(bt.trace[:bt.len], allocator, temp_allocator)
 }
 
-locations_destroy :: proc(locations: []Location, allocator := context.allocator) {
+locations_destroy :: proc(locations: []Resolved_Location, allocator := context.allocator) {
 	_locations_destroy(locations, allocator)
 }
 
@@ -142,9 +148,7 @@ assertion_failure_proc :: proc(prefix, message: string, loc: runtime.Source_Code
 
 		lines, err := resolve(capture(skip=1), context.temp_allocator, context.temp_allocator)
 		if err != nil {
-			runtime.print_string("could not get backtrace for assertion failure: ")
-			runtime.print_string(resolve_err_string(err))
-			runtime.print_string("\n")
+			runtime.print_string("could not allocate backtrace for assertion failure\n")
 		} else {
 			runtime.print_string("[back trace]\n")
 			print(lines)
@@ -162,8 +166,9 @@ Inputs:
 - locations: the result of a `resolve` call.
 - padding:   padding to print before each line, defaults to a tab.
 */
-print :: proc(locations: []Location, padding := "\t") {
-	for location, i in locations {
+print :: proc(locations: []Resolved_Location, padding := "\t") {
+	for entry, i in locations {
+		location := entry.location
 		runtime.print_string(padding)
 		runtime.print_string("#")
 		runtime.print_int(i)
@@ -190,6 +195,12 @@ print :: proc(locations: []Location, padding := "\t") {
 			} else {
 				#panic("unhandled ODIN_ERROR_POS_STYLE")
 			}
+		}
+
+		if entry.error != .None {
+			runtime.print_string(" [error: ")
+			runtime.print_string(resolve_err_string(entry.error))
+			runtime.print_string("]")
 		}
 
 		runtime.print_string("\n")
