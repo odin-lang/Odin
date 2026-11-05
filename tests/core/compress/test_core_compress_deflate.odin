@@ -3,6 +3,7 @@ package test_core_compress
 import "core:bytes"
 import "core:compress"
 import "core:compress/deflate"
+import "core:hash"
 import "core:math/rand"
 import "core:testing"
 
@@ -161,6 +162,108 @@ compress_gzip_bad_trailer :: proc(t: ^testing.T) {
 		err := deflate.inflate_gzip(&output, raw)
 		testing.expectf(t, err == c.want, "corrupt byte %v: inflate_gzip returned %v, expected %v", c.offset, err, c.want)
 		raw[c.offset] ~= 0x55
+	}
+}
+
+@(test)
+compress_gzip_header_crc :: proc(t: ^testing.T) {
+	packed := [?]byte{
+		0x1f, 0x8b, 0x08, 0x1e, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x07, 0x00, 0x4f, 0x64, 0x03, 0x00,
+		0x78, 0x79, 0x7a, 0x6e, 0x61, 0x6d, 0x65, 0x2e, 0x74, 0x78, 0x74, 0x00, 0x48, 0x65, 0x6c, 0x6c,
+		0x6f, 0x70, 0x65, 0x21, 0x00, 0x1f, 0x1c, 0xf3, 0x48, 0xcd, 0xc9, 0xc9, 0x2f, 0x48, 0xd5, 0x51,
+		0x70, 0xf3, 0x70, 0x0e, 0x72, 0x56, 0x04, 0x00, 0x11, 0x81, 0x1d, 0xe1, 0x0f, 0x00, 0x00, 0x00,
+	}
+	expected := "Hellope, FHCRC!"
+
+	for kind in Stream_Kind {
+		input := packed[:]
+		br: bytes.Reader
+		tr: Trickle_Reader
+		output: [dynamic]byte
+		defer delete(output)
+		ctx := stream_test_context(kind, &input, &br, &tr, &output)
+		defer compress.destroy_context(&ctx)
+
+		err := deflate.inflate_gzip(&ctx)
+		testing.expectf(t, err == nil, "%v: inflate_gzip returned %v", kind, err)
+		testing.expectf(t, string(output[:]) == expected, "%v: output was %q", kind, string(output[:]))
+	}
+
+	for offset in ([]int{4, 9, 12, 17, 22, 30, 37, 38}) {
+		packed[offset] ~= 0x55
+		output: [dynamic]byte
+		defer delete(output)
+		err := deflate.inflate_gzip(&output, packed[:])
+		testing.expectf(t, err == compress.GZIP_Error.Header_CRC_Invalid, "corrupt byte %v: inflate_gzip returned %v", offset, err)
+		packed[offset] ~= 0x55
+	}
+
+	unchecked: [dynamic]byte
+	defer delete(unchecked)
+	append(&unchecked, ..packed[:37])
+	append(&unchecked, ..packed[39:])
+	unchecked[3] &~= 0x02
+	for offset in ([]int{4, 12, 17, 22, 30}) {
+		unchecked[offset] ~= 0x55
+		output: [dynamic]byte
+		defer delete(output)
+		err := deflate.inflate_gzip(&output, unchecked[:])
+		testing.expectf(t, err == nil, "unchecked, corrupt byte %v: inflate_gzip returned %v", offset, err)
+		testing.expectf(t, string(output[:]) == expected, "unchecked, corrupt byte %v: output was %q", offset, string(output[:]))
+		unchecked[offset] ~= 0x55
+	}
+}
+
+@(test)
+compress_gzip_header_max_extra :: proc(t: ^testing.T) {
+	match_data := stream_match_data()
+	defer delete(match_data)
+	data := match_data[:10_000]
+
+	body: [dynamic]byte
+	defer delete(body)
+	testing.expect_value(t, deflate.deflate_raw(&body, data), nil)
+
+	for checked in ([]bool{false, true}) {
+		packed: [dynamic]byte
+		defer delete(packed)
+		flags: u8 = 0x04 | 0x08 | (0x02 if checked else 0)
+		append(&packed, 0x1f, 0x8b, 0x08, flags, 0, 0, 0, 0, 0, 0xff)
+		append(&packed, 0xff, 0xff, 'O', 'd', 0xfb, 0xff)
+		for i in 0..<65531 {
+			append(&packed, byte(i * 7))
+		}
+		append(&packed, ..transmute([]byte)string("big-extra.bin\x00"))
+		if checked {
+			crc := hash.crc32(packed[:])
+			append(&packed, byte(crc), byte(crc >> 8))
+		}
+		append(&packed, ..body[:])
+		crc  := hash.crc32(data)
+		size := u32(len(data))
+		append(&packed, byte(crc), byte(crc >> 8), byte(crc >> 16), byte(crc >> 24))
+		append(&packed, byte(size), byte(size >> 8), byte(size >> 16), byte(size >> 24))
+
+		for kind in Stream_Kind {
+			input := packed[:]
+			br: bytes.Reader
+			tr: Trickle_Reader
+			output: [dynamic]byte
+			defer delete(output)
+			ctx := stream_test_context(kind, &input, &br, &tr, &output)
+			defer compress.destroy_context(&ctx)
+
+			err := deflate.inflate_gzip(&ctx)
+			testing.expectf(t, err == nil, "checked %v, %v: inflate_gzip returned %v", checked, kind, err)
+			testing.expectf(t, bytes.equal(output[:], data), "checked %v, %v: output differs", checked, kind)
+		}
+
+		packed[40_000] ~= 0x55
+		output: [dynamic]byte
+		defer delete(output)
+		err := deflate.inflate_gzip(&output, packed[:])
+		want := compress.Error(compress.GZIP_Error.Header_CRC_Invalid) if checked else nil
+		testing.expectf(t, err == want, "checked %v, corrupt extra: inflate_gzip returned %v", checked, err)
 	}
 }
 
