@@ -26,7 +26,7 @@ LPCWSTR  :: windows.LPCWSTR
 RECT :: dxgi.RECT
 SIZE :: dxgi.SIZE
 
-IBlob           :: d3d_common.ID3DBlob
+IBlob :: d3d_common.ID3DBlob
 
 @(default_calling_convention="system", link_prefix="D3D11")
 foreign d3d11 {
@@ -702,16 +702,16 @@ SRV_DIMENSION :: enum i32 {
 PFN_DESTRUCTION_CALLBACK :: #type proc "c" (a0: rawptr)
 
 
-ID3DDestructionNotifier_UUID_STRING :: "A06EB39A-50DA-425B-8C31-4EECD6C270F3"
-ID3DDestructionNotifier_UUID := &IID{0xA06EB39A, 0x50DA, 0x425B, {0x8C, 0x31, 0x4E, 0xEC, 0xD6, 0xC2, 0x70, 0xF3}}
-ID3DDestructionNotifier :: struct #raw_union {
+IDestructionNotifier_UUID_STRING :: "A06EB39A-50DA-425B-8C31-4EECD6C270F3"
+IDestructionNotifier_UUID := &IID{0xA06EB39A, 0x50DA, 0x425B, {0x8C, 0x31, 0x4E, 0xEC, 0xD6, 0xC2, 0x70, 0xF3}}
+IDestructionNotifier :: struct #raw_union {
 	#subtype iunknown: IUnknown,
-	using id3ddestructionnotifier_vtable: ^ID3DDestructionNotifier_VTable,
+	using id3ddestructionnotifier_vtable: ^IDestructionNotifier_VTable,
 }
-ID3DDestructionNotifier_VTable :: struct {
+IDestructionNotifier_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	RegisterDestructionCallback: proc "system" (this: ^ID3DDestructionNotifier, callbackFn: PFN_DESTRUCTION_CALLBACK, pData: rawptr, pCallbackID: ^u32) -> HRESULT,
-	UnregisterDestructionCallback: proc "system" (this: ^ID3DDestructionNotifier, callbackID: u32) -> HRESULT,
+	RegisterDestructionCallback: proc "system" (this: ^IDestructionNotifier, callbackFn: PFN_DESTRUCTION_CALLBACK, pData: rawptr, pCallbackID: ^u32) -> HRESULT,
+	UnregisterDestructionCallback: proc "system" (this: ^IDestructionNotifier, callbackID: u32) -> HRESULT,
 }
 
 
@@ -2471,6 +2471,45 @@ IDeviceContext_VTable :: struct {
 }
 
 
+IDeviceContextState_UUID_STRING :: "5c1e0d8a-7c23-48f9-8c59-a92958ceff11"
+IDeviceContextState_UUID := &dxgi.IID{0x5c1e0d8a, 0x7c23, 0x48f9, {0x8c, 0x59, 0xa9, 0x29, 0x58, 0xce, 0xff, 0x11}}
+
+IDeviceContextState :: struct #raw_union {
+	#subtype id3d11devicechild: IDeviceChild,
+	using id3d11devicechild_vtable: ^IDeviceChild_VTable,
+}
+
+IDeviceContext1_UUID_STRING :: "bb2c6faa-b5fb-4082-8e6b-388b8cfa90e1"
+IDeviceContext1_UUID := &dxgi.IID{0xbb2c6faa, 0xb5fb, 0x4082, {0x8e, 0x6b, 0x38, 0x8b, 0x8c, 0xfa, 0x90, 0xe1}}
+IDeviceContext1 :: struct #raw_union {
+	#subtype id3d11devicecontext: IDeviceContext,
+	using id3d11devicecontext1_vtable: ^IDeviceContext1_VTable,
+}
+IDeviceContext1_VTable :: struct {
+	using id3d11devicecontext_vtable: IDeviceContext_VTable,
+
+	CopySubresourceRegion1:		proc "system" (this: ^IDeviceContext1, pDstResource: ^IResource, DstSubresource: u32, DstX: u32, DstY: u32, DstZ: u32, pSrcResource: ^IResource, SrcSubresource: u32, pSrcBox: ^BOX, CopyFlags: u32),
+	UpdateSubresource1:			proc "system" (this: ^IDeviceContext1, pDstResource: ^IResource, DstSubresource: u32, pDstBox: ^BOX, pSrcData: rawptr, SrcRowPitch: u32, SrcDepthPitch: u32, CopyFlags: u32),
+	DiscardResource:			proc "system" (this: ^IDeviceContext1, pResource: ^IResource),
+	DiscardView:				proc "system" (this: ^IDeviceContext1, pResourceView: ^IView),
+	VSSetConstantBuffers1:		proc "system" (this: ^IDeviceContext1, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: [^]^IBuffer, pFirstConstant: ^u32, pNumConstants: ^u32),
+	HSSetConstantBuffers1:		proc "system" (this: ^IDeviceContext1, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: [^]^IBuffer, pFirstConstant: ^u32, pNumConstants: ^u32),
+	DSSetConstantBuffers1:		proc "system" (this: ^IDeviceContext1, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: [^]^IBuffer, pFirstConstant: ^u32, pNumConstants: ^u32),
+	GSSetConstantBuffers1:		proc "system" (this: ^IDeviceContext1, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: [^]^IBuffer, pFirstConstant: ^u32, pNumConstants: ^u32),
+	PSSetConstantBuffers1:		proc "system" (this: ^IDeviceContext1, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: [^]^IBuffer, pFirstConstant: ^u32, pNumConstants: ^u32),
+	CSSetConstantBuffers1:		proc "system" (this: ^IDeviceContext1, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: [^]^IBuffer, pFirstConstant: ^u32, pNumConstants: ^u32),
+	VSGetConstantBuffers1:		proc "system" (this: ^IDeviceContext1, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: [^]^IBuffer, pFirstConstant: ^u32, pNumConstants: ^u32),
+	HSGetConstantBuffers1:		proc "system" (this: ^IDeviceContext1, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: [^]^IBuffer, pFirstConstant: ^u32, pNumConstants: ^u32),
+	DSGetConstantBuffers1:		proc "system" (this: ^IDeviceContext1, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: [^]^IBuffer, pFirstConstant: ^u32, pNumConstants: ^u32),
+	GSGetConstantBuffers1:		proc "system" (this: ^IDeviceContext1, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: [^]^IBuffer, pFirstConstant: ^u32, pNumConstants: ^u32),
+	PSGetConstantBuffers1:		proc "system" (this: ^IDeviceContext1, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: [^]^IBuffer, pFirstConstant: ^u32, pNumConstants: ^u32),
+	CSGetConstantBuffers1:		proc "system" (this: ^IDeviceContext1, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: [^]^IBuffer, pFirstConstant: ^u32, pNumConstants: ^u32),
+	SwapDeviceContextState:		proc "system" (this: ^IDeviceContext1, pState: ^IDeviceContextState, ppPreviousState: ^^IDeviceContextState),
+	ClearView:					proc "system" (this: ^IDeviceContext1, pView: ^IView, Color: ^[4]f32, pRect: ^RECT, NumRects: u32),
+	DiscardView1:				proc "system" (this: ^IDeviceContext1, pResourceView: ^IView, pRects: ^RECT, NumRects: u32),
+}
+
+
 CVIDEO_DEFAULT :: struct {
 	_: u8,
 }
@@ -3595,8 +3634,8 @@ IModuleInstance_VTable :: struct {
 }
 
 
-ID3D11ShaderReflectionType_UUID_STRING :: "6E6FFA6A-9BAE-4613-A51E-91652D508C21"
-ID3D11ShaderReflectionType_UUID := &IID{0x6E6FFA6A, 0x9BAE, 0x4613, {0xA5, 0x1E, 0x91, 0x65, 0x2D, 0x50, 0x8C, 0x21}}
+IShaderReflectionType_UUID_STRING :: "6E6FFA6A-9BAE-4613-A51E-91652D508C21"
+IShaderReflectionType_UUID := &IID{0x6E6FFA6A, 0x9BAE, 0x4613, {0xA5, 0x1E, 0x91, 0x65, 0x2D, 0x50, 0x8C, 0x21}}
 IShaderReflectionType :: struct {
 	using vtable: ^IShaderReflectionType_VTable,
 }
@@ -3614,8 +3653,8 @@ IShaderReflectionType_VTable :: struct {
 	ImplementsInterface:  proc "system" (this: ^IShaderReflectionType, pBase: ^IShaderReflectionType) -> HRESULT,
 }
 
-ID3D11ShaderReflectionVariable_UUID_STRING :: "51F23923-F3E5-4BD1-91CB-606177D8DB4C"
-ID3D11ShaderReflectionVariable_UUID := &IID{0x51F23923, 0xF3E5, 0x4BD1, {0x91, 0xCB, 0x60, 0x61, 0x77, 0xD8, 0xDB, 0x4C}}
+IShaderReflectionVariable_UUID_STRING :: "51F23923-F3E5-4BD1-91CB-606177D8DB4C"
+IShaderReflectionVariable_UUID := &IID{0x51F23923, 0xF3E5, 0x4BD1, {0x91, 0xCB, 0x60, 0x61, 0x77, 0xD8, 0xDB, 0x4C}}
 IShaderReflectionVariable :: struct {
 	using vtable: ^IShaderReflectionVariable_VTable,
 }
@@ -3626,8 +3665,8 @@ IShaderReflectionVariable_VTable :: struct {
 	GetInterfaceSlot: proc "system" (this: ^IShaderReflectionVariable, uArrayIndex: u32) -> u32,
 }
 
-ID3D11ShaderReflectionConstantBuffer_UUID_STRING :: "EB62D63D-93DD-4318-8AE8-C6F83AD371B8"
-ID3D11ShaderReflectionConstantBuffer_UUID := &IID{0xEB62D63D, 0x93DD, 0x4318, {0x8A, 0xE8, 0xC6, 0xF8, 0x3A, 0xD3, 0x71, 0xB8}}
+IShaderReflectionConstantBuffer_UUID_STRING :: "EB62D63D-93DD-4318-8AE8-C6F83AD371B8"
+IShaderReflectionConstantBuffer_UUID := &IID{0xEB62D63D, 0x93DD, 0x4318, {0x8A, 0xE8, 0xC6, 0xF8, 0x3A, 0xD3, 0x71, 0xB8}}
 IShaderReflectionConstantBuffer :: struct {
 	using vtable: ^IShaderReflectionConstantBuffer_VTable,
 }
@@ -3638,8 +3677,8 @@ IShaderReflectionConstantBuffer_VTable :: struct {
 }
 
 
-ID3D11ShaderReflection_UUID_STRING :: "8D536CA1-0CCA-4956-A837-786963755584"
-ID3D11ShaderReflection_UUID := &IID{0x8D536CA1, 0x0CCA, 0x4956, {0xA8, 0x37, 0x78, 0x69, 0x63, 0x75, 0x55, 0x84}}
+IShaderReflection_UUID_STRING :: "8D536CA1-0CCA-4956-A837-786963755584"
+IShaderReflection_UUID := &IID{0x8D536CA1, 0x0CCA, 0x4956, {0xA8, 0x37, 0x78, 0x69, 0x63, 0x75, 0x55, 0x84}}
 IShaderReflection :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using id3d11shaderreflection_vtable: ^IShaderReflection_VTable,
@@ -3668,8 +3707,8 @@ IShaderReflection_VTable :: struct {
 }
 
 
-ID3D11LibraryReflection_UUID_STRING :: "54384F1B-5B3E-4BB7-AE01-60BA3097CBB6"
-ID3D11LibraryReflection_UUID := &IID{0x54384F1B, 0x5B3E, 0x4BB7, {0xAE, 0x1, 0x60, 0xBA, 0x30, 0x97, 0xCD, 0xB6}}
+ILibraryReflection_UUID_STRING :: "54384F1B-5B3E-4BB7-AE01-60BA3097CBB6"
+ILibraryReflection_UUID := &IID{0x54384F1B, 0x5B3E, 0x4BB7, {0xAE, 0x1, 0x60, 0xBA, 0x30, 0x97, 0xCD, 0xB6}}
 ILibraryReflection :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using id3d11libraryreflection_vtable: ^ILibraryReflection_VTable,
@@ -3680,8 +3719,8 @@ ILibraryReflection_VTable :: struct {
 	GetFunctionByIndex: proc "system" (this: ^ILibraryReflection, FunctionIndex: i32) -> ^IFunctionReflection,
 }
 
-ID3D11FunctionReflection_UUID_STRING :: "207BCECB-D683-4A06-A8A3-9B149B9F73A4"
-ID3D11FunctionReflection_UUID := &IID{0x207BCECB, 0xD683, 0x4A06, {0xA8, 0xA3, 0x9B, 0x14, 0x9B, 0x9F, 0x73, 0xA4}}
+IFunctionReflection_UUID_STRING :: "207BCECB-D683-4A06-A8A3-9B149B9F73A4"
+IFunctionReflection_UUID := &IID{0x207BCECB, 0xD683, 0x4A06, {0xA8, 0xA3, 0x9B, 0x14, 0x9B, 0x9F, 0x73, 0xA4}}
 IFunctionReflection :: struct {
 	using vtable: ^IFunctionReflection_VTable,
 }
@@ -3695,8 +3734,8 @@ IFunctionReflection_VTable :: struct {
 	GetFunctionParameter:         proc "system" (this: ^IFunctionReflection, ParameterIndex: i32) -> ^IFunctionParameterReflection,
 }
 
-ID3D11FunctionParameterReflection_UUID_STRING :: "42757488-334F-47FE-982E-1A65D08CC462"
-ID3D11FunctionParameterReflection_UUID := &IID{0x42757488, 0x334f, 0x47FE, {0x98, 0x2E, 0x1A, 0x65, 0xD0, 0x8C, 0xC4, 0x62}}
+IFunctionParameterReflection_UUID_STRING :: "42757488-334F-47FE-982E-1A65D08CC462"
+IFunctionParameterReflection_UUID := &IID{0x42757488, 0x334f, 0x47FE, {0x98, 0x2E, 0x1A, 0x65, 0xD0, 0x8C, 0xC4, 0x62}}
 IFunctionParameterReflection :: struct {
 	using vtable: ^IFunctionParameterReflection_VTable,
 }
@@ -5195,18 +5234,4 @@ MESSAGE_ID :: enum u32 {
 
 CalcSubresource :: #force_inline proc "contextless" (MipSlice: UINT, ArraySlice: UINT, MipLevels: UINT) -> UINT {
 	return MipSlice + ArraySlice * MipLevels
-}
-
-ID3DUserDefinedAnnotation_UUID_STRING :: "B2DAAD8B-03D4-4DBF-95EB-32AB4B63D0AB"
-ID3DUserDefinedAnnotation_UUID := &IID{0xB2DAAD8B, 0x03D4, 0x4DBF, {0x95, 0xEB, 0x32, 0xAB, 0x4B, 0x63, 0xD0, 0xAB}}
-ID3DUserDefinedAnnotation :: struct #raw_union {
-	#subtype iunknown: IUnknown,
-	using vtable: ^ID3DUserDefinedAnnotation_VTable,
-}
-ID3DUserDefinedAnnotation_VTable :: struct {
-	using iunknown_vtable: IUnknown_VTable,
-	BeginEvent: proc "system" (this: ^ID3DUserDefinedAnnotation, Name: windows.LPCWSTR) -> INT,
-	EndEvent:   proc "system" (this: ^ID3DUserDefinedAnnotation) -> INT,
-	SetMarker:  proc "system" (this: ^ID3DUserDefinedAnnotation, Name: windows.LPCWSTR),
-	GetStatus:  proc "system" (this: ^ID3DUserDefinedAnnotation) -> BOOL,
 }
