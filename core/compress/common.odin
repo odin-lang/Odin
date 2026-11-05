@@ -57,6 +57,13 @@ General_Error :: enum {
 	// Memory errors
 
 	Allocation_Failed,
+
+	// For buffered instead of streamed output, the payload size can't exceed
+	// the max set by the `COMPRESS_OUTPUT_ALLOCATE_MAX` switch in compress/common.odin.
+	//
+	// You can tweak this setting using `-define:COMPRESS_OUTPUT_ALLOCATE_MAX=size_in_bytes`
+
+	Output_Exceeds_COMPRESS_OUTPUT_ALLOCATE_MAX,
 }
 
 GZIP_Error :: enum {
@@ -66,16 +73,9 @@ GZIP_Error :: enum {
 	Invalid_Extra_Data,
 	Original_Name_Too_Long,
 	Comment_Too_Long,
+	Header_CRC_Invalid,
 	Payload_Length_Invalid,
 	Payload_CRC_Invalid,
-
-	// For buffered instead of streamed output, the payload size can't exceed
-	// the max set by the `COMPRESS_OUTPUT_ALLOCATE_MAX` switch in compress/common.odin.
-	//
-	// You can tweak this setting using `-define:COMPRESS_OUTPUT_ALLOCATE_MAX=size_in_bytes`
-
-	Output_Exceeds_COMPRESS_OUTPUT_ALLOCATE_MAX,
-
 }
 
 LZ4_Error :: enum {
