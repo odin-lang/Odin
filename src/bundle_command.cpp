@@ -271,9 +271,63 @@ gb_internal bool android_has_native_library(String lib_dir) {
 	return false;
 }
 
-// The newest version under `dir`, e.g. "37.0.0" in build-tools or "android-37.2" in platforms.
-// Names that do not start with `prefix` and a number are skipped.
-gb_internal String android_newest_sdk_dir(String dir, String prefix, i32 *major_) {
+// A version such as "37.2" or "37.0.0". Anything after it is ignored, e.g. "-rc1" or " rc1".
+gb_internal bool android_parse_sdk_version(String s, i64 version[3]) {
+	if (s.len == 0 || !gb_char_is_digit(s[0])) {
+		return false;
+	}
+	isize part = 0;
+	for (isize i = 0; i < s.len && part < 3; i++) {
+		if (gb_char_is_digit(s[i])) {
+			version[part] = version[part]*10 + (s[i]-'0');
+		} else if (s[i] == '.') {
+			part += 1;
+		} else {
+			break;
+		}
+	}
+	return true;
+}
+
+// The version of the SDK package in `package_dir`, from the `key` line of its source.properties.
+// Every package ships that file, also when unzipped by hand. Without it, the folder name after
+// `prefix` is the version. Returns false for a preview (one with a codename).
+gb_internal bool android_sdk_package_version(FileInfo const &package_dir, String prefix, String key, i64 version[3]) {
+	String path = concatenate_strings(temporary_allocator(), package_dir.fullpath, str_lit("/source.properties"));
+	gbFileContents fc = gb_file_read_contents(temporary_allocator(), false, alloc_cstring(temporary_allocator(), path));
+	String contents = make_string(cast(u8 *)fc.data, fc.size);
+
+	String value    = {};
+	String codename = {};
+
+	String          line = {};
+	String_Iterator it   = {contents, 0};
+	while (string_split_iterator_next(&it, '\n', &line)) {
+		isize eq = string_index_byte(line, '=');
+		if (eq < 0) {
+			continue;
+		}
+		String name = string_trim_whitespace(substring(line, 0, eq));
+		if (name == key) {
+			value = string_trim_whitespace(substring(line, eq+1, line.len));
+		} else if (name == "AndroidVersion.CodeName") {
+			codename = string_trim_whitespace(substring(line, eq+1, line.len));
+		}
+	}
+
+	if (codename.len != 0) {
+		return false;
+	}
+	if (value.len != 0) {
+		return android_parse_sdk_version(value, version);
+	}
+	return string_starts_with(package_dir.name, prefix) && android_parse_sdk_version(substring(package_dir.name, prefix.len, package_dir.name.len), version);
+}
+
+// The newest package under `dir`, e.g. "37.0.0" in build-tools or "android-37.2" in platforms.
+// The version comes from the package's source.properties, not its folder name. A platform
+// unzipped by hand is named after its Android release: "android-16" holds API 36.
+gb_internal String android_newest_sdk_dir(String dir, String prefix, String key, i32 *major_) {
 	Array<FileInfo> list = {};
 	defer (array_free(&list));
 	if (read_directory(dir, &list) != ReadDirectory_None) {
@@ -283,23 +337,9 @@ gb_internal String android_newest_sdk_dir(String dir, String prefix, i32 *major_
 	String best = {};
 	i64 best_version[3] = {-1, -1, -1};
 	for (FileInfo const &fi : list) {
-		if (!fi.is_dir || !string_starts_with(fi.name, prefix)) {
-			continue;
-		}
-		String s = substring(fi.name, prefix.len, fi.name.len);
-		if (s.len == 0 || !gb_char_is_digit(s[0])) {
-			continue;
-		}
 		i64 version[3] = {};
-		isize part = 0;
-		for (isize i = 0; i < s.len && part < 3; i++) {
-			if (gb_char_is_digit(s[i])) {
-				version[part] = version[part]*10 + (s[i]-'0');
-			} else if (s[i] == '.') {
-				part += 1;
-			} else {
-				break; // e.g. "-rc1"
-			}
+		if (!fi.is_dir || !android_sdk_package_version(fi, prefix, key, version)) {
+			continue;
 		}
 		bool newer = false;
 		for (isize i = 0; i < 3; i++) {
@@ -354,21 +394,22 @@ i32 bundle_android(String original_init_directory) {
 	String sdk = normalize_path(temporary_allocator(), build_context.ODIN_ANDROID_SDK, NIX_SEPARATOR_STRING);
 
 	// Any recent build-tools work, so use the newest. The newest platform is the target SDK.
-	String build_tools = android_newest_sdk_dir(concatenate_strings(temporary_allocator(), sdk, str_lit("build-tools/")), str_lit(""), nullptr);
+	String build_tools = android_newest_sdk_dir(concatenate_strings(temporary_allocator(), sdk, str_lit("build-tools/")), str_lit(""), str_lit("Pkg.Revision"), nullptr);
 	if (build_tools.len == 0) {
 		gb_printf_err("Error: no build-tools found in %.*sbuild-tools/\n", LIT(sdk));
 		gb_printf_err("\tSet ODIN_ANDROID_SDK to the Android SDK, and install build-tools with sdkmanager\n");
 		return 1;
 	}
 	i32 target_api_level = 0;
-	String platform = android_newest_sdk_dir(concatenate_strings(temporary_allocator(), sdk, str_lit("platforms/")), str_lit("android-"), &target_api_level);
+	String platform = android_newest_sdk_dir(concatenate_strings(temporary_allocator(), sdk, str_lit("platforms/")), str_lit("android-"), str_lit("AndroidVersion.ApiLevel"), &target_api_level);
 	if (platform.len == 0) {
 		gb_printf_err("Error: no platforms found in %.*splatforms/\n", LIT(sdk));
 		gb_printf_err("\tInstall one with sdkmanager, e.g. \"platforms;android-%d\"\n", ODIN_ANDROID_API_LEVEL);
 		return 1;
 	}
 	if (target_api_level < ODIN_ANDROID_API_LEVEL) {
-		gb_printf_err("Error: the newest platform, %.*s, is older than the minimum API level of %d\n", LIT(platform), ODIN_ANDROID_API_LEVEL);
+		gb_printf_err("Error: the newest platform, %.*s (API %d), is older than the minimum API level of %d\n", LIT(platform), target_api_level, ODIN_ANDROID_API_LEVEL);
+		gb_printf_err("\tInstall a newer one with sdkmanager, e.g. \"platforms;android-%d\"\n", ODIN_ANDROID_API_LEVEL);
 		return 1;
 	}
 	String android_jar = concatenate_strings(temporary_allocator(), platform, str_lit("android.jar"));
