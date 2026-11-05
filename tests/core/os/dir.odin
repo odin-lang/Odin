@@ -143,12 +143,7 @@ make_walker_tree :: proc(t: ^testing.T) -> (root: string, ok: bool) {
 expect_rename_d :: proc(t: ^testing.T, root: string, loc := #caller_location) {
 	d, _ := os.join_path({root, "D"}, context.temp_allocator)
 	e, _ := os.join_path({root, "E"}, context.temp_allocator)
-	err := os.rename(d, e)
-	if err == .Unsupported {
-		log.warn("os.rename is unsupported, skipping the rename check")
-		return
-	}
-	testing.expect_value(t, err, nil, loc)
+	testing.expect_value(t, os.rename(d, e), nil, loc)
 }
 
 @(test)

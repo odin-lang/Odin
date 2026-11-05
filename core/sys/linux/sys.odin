@@ -1219,9 +1219,14 @@ fchdir :: proc "contextless" (fd: Fd) -> (Errno) {
 	Rename (move) the file.
 	Available since Linux 1.0.
 	On ARM64 available since Linux 2.6.16.
+	On riscv64 uses renameat2 because that arch never got renameat.
 */
 rename :: proc "contextless" (old: cstring, new: cstring) -> (Errno) {
-	when NO_LEGACY_SYSCALLS {
+	when ODIN_ARCH == .riscv64 {
+		// riscv64 never defined __ARCH_WANT_RENAMEAT, so only renameat2 exists.
+		ret := syscall(SYS_renameat2, AT_FDCWD, cast(rawptr) old, AT_FDCWD, cast(rawptr) new, u32(0))
+		return Errno(-ret)
+	} else when NO_LEGACY_SYSCALLS {
 		ret := syscall(SYS_renameat, AT_FDCWD, cast(rawptr) old, AT_FDCWD, cast(rawptr) new)
 		return Errno(-ret)
 	} else {
@@ -2971,8 +2976,14 @@ unlinkat :: proc "contextless" (dirfd: Fd, name: cstring, flags: FD_Flags) -> (E
 	Available since Linux 2.6.16.
 */
 renameat :: proc "contextless" (oldfd: Fd, old: cstring, newfd: Fd, new: cstring) -> (Errno) {
-	ret := syscall(SYS_renameat, oldfd, cast(rawptr) old, newfd, cast(rawptr) new)
-	return Errno(-ret)
+	when ODIN_ARCH == .riscv64 {
+		// Same as rename: riscv64 only has renameat2.
+		ret := syscall(SYS_renameat2, oldfd, cast(rawptr) old, newfd, cast(rawptr) new, u32(0))
+		return Errno(-ret)
+	} else {
+		ret := syscall(SYS_renameat, oldfd, cast(rawptr) old, newfd, cast(rawptr) new)
+		return Errno(-ret)
+	}
 }
 
 /*
