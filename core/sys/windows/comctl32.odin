@@ -1151,6 +1151,16 @@ NMLVSCROLL :: struct {
 }
 LPNMLVSCROLL :: ^NMLVSCROLL
 
+// ToolTip Icons (Set with `TTM_SETTITLE` or `EDITBALLOONTIP.ttiIcon`)
+
+TTI_NONE                :: 0
+TTI_INFO                :: 1
+TTI_WARNING             :: 2
+TTI_ERROR               :: 3
+TTI_INFO_LARGE          :: 4
+TTI_WARNING_LARGE       :: 5
+TTI_ERROR_LARGE         :: 6
+
 PFNLVCOMPARE      :: #type proc "system" (lpItem1,lpItem2: LPARAM, lpUser: LPARAM) -> c_int
 PFNLVGROUPCOMPARE :: #type proc "system" (item1,item2: c_int, user: rawptr) -> c_int
 
