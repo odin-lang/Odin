@@ -11,6 +11,11 @@ Arena_Kind :: enum uint {
 	Buffer  = 2, // Uses a fixed sized buffer.
 }
 
+Arena_Flag :: enum u32 {
+	Single_Thread, // Only one thread uses the arena at a time: allocation takes no atomic read-modify-write.
+}
+Arena_Flags :: distinct bit_set[Arena_Flag; u32]
+
 /*
 	Arena is a generalized arena allocator that supports 3 different variants.
 
@@ -30,6 +35,7 @@ Arena :: struct {
 	_state:              u64,
 
 	kind:                Arena_Kind,
+	flags:               Arena_Flags,
 	curr_block:          ^Memory_Block,
 
 	total_used:          uint,
@@ -89,7 +95,7 @@ arena_open :: #force_inline proc "contextless" (arena: ^Arena) {
 }
 
 // Allocates a memory block whose offsets fit in `_state`.
-@(require_results, no_sanitize_address, private)
+@(private, require_results, no_sanitize_address)
 arena_memory_block_alloc :: proc(committed, reserved: uint, alignment: uint = 0) -> (block: ^Memory_Block, err: Allocator_Error) {
 	block = memory_block_alloc(committed, reserved, alignment) or_return
 	if u64(block.reserved) >= ARENA_CLOSED {
@@ -166,43 +172,66 @@ arena_alloc :: #force_inline proc(arena: ^Arena, size: uint, alignment: uint, lo
 		return nil, nil
 	}
 
-	if fast, ok := arena_alloc_fast(arena, size, max(alignment, 1)); ok {
+	fast: []byte
+	ok:   bool
+	if .Single_Thread in arena.flags {
+		fast, ok = arena_alloc_fast(arena, size, max(alignment, 1), true)
+	} else {
+		fast, ok = arena_alloc_fast(arena, size, max(alignment, 1), false)
+	}
+	if ok {
 		return fast, nil
 	}
 	return arena_alloc_slow(arena, size, alignment, loc)
 }
 
 @(private, require_results, no_sanitize_address)
-arena_alloc_fast :: #force_inline proc "contextless" (arena: ^Arena, size, alignment: uint) -> (data: []byte, ok: bool) #no_bounds_check {
-	spins := 1
-	for {
-		state := sync.atomic_load_explicit(&arena._state, .Acquire)
-		base  := sync.atomic_load_explicit(&arena._base,  .Acquire)
-		end   := sync.atomic_load_explicit(&arena._end,   .Acquire)
+arena_alloc_fast :: #force_inline proc "contextless" (arena: ^Arena, size, alignment: uint, $SINGLE_THREAD: bool) -> (data: []byte, ok: bool) #no_bounds_check {
+	when SINGLE_THREAD {
+		state := sync.atomic_load_explicit(&arena._state, .Relaxed)
+		base  := sync.atomic_load_explicit(&arena._base,  .Relaxed)
+		end   := sync.atomic_load_explicit(&arena._end,   .Relaxed)
 
-		used := uint(state & ARENA_OFFSET_MASK)
-		pad  := (alignment - ((uint(uintptr(base)) + used) & (alignment-1))) & (alignment-1)
-		if used > end || pad > end-used || size > end-used-pad {
-			return
-		}
+		offset, next := arena_fit(state, base, end, size, alignment) or_return
+		sync.atomic_store_explicit(&arena._state, next, .Relaxed)
+		return base[offset:][:size], true
+	} else {
+		spins := 1
+		for {
+			state := sync.atomic_load_explicit(&arena._state, .Acquire)
+			base  := sync.atomic_load_explicit(&arena._base,  .Acquire)
+			end   := sync.atomic_load_explicit(&arena._end,   .Acquire)
 
-		next := state&~ARENA_OFFSET_MASK | u64(used+pad+size)
-		if _, swapped := sync.atomic_compare_exchange_weak_explicit(&arena._state, state, next, .Acq_Rel, .Relaxed); swapped {
-			return base[used+pad:][:size], true
-		}
+			offset, next := arena_fit(state, base, end, size, alignment) or_return
+			if _, swapped := sync.atomic_compare_exchange_weak_explicit(&arena._state, state, next, .Acq_Rel, .Relaxed); swapped {
+				return base[offset:][:size], true
+			}
 
-		for _ in 0..<spins {
-			sync.cpu_relax()
+			for _ in 0..<spins {
+				sync.cpu_relax()
+			}
+			spins = min(spins*2, ARENA_BACKOFF)
 		}
-		spins = min(spins*2, ARENA_BACKOFF)
 	}
+}
+
+@(private, require_results, no_sanitize_address)
+arena_fit :: #force_inline proc "contextless" (state: u64, base: [^]byte, end, size, alignment: uint) -> (offset: uint, next: u64, ok: bool) {
+	used := uint(state & ARENA_OFFSET_MASK)
+	pad  := (alignment - ((uint(uintptr(base)) + used) & (alignment-1))) & (alignment-1)
+	if used > end || pad > end-used || size > end-used-pad {
+		return
+	}
+
+	offset = used + pad
+	return offset, state&~ARENA_OFFSET_MASK | u64(offset+size), true
 }
 
 // Commits more memory, or moves to a new memory block, then allocates.
 @(private, cold, require_results, no_sanitize_address)
 arena_alloc_slow :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	sync.mutex_guard(&arena.mutex)
-	if fast, ok := arena_alloc_fast(arena, size, max(alignment, 1)); ok {
+	if fast, ok := arena_alloc_fast(arena, size, max(alignment, 1), false); ok {
 		return fast, nil
 	}
 
@@ -314,7 +343,7 @@ arena_growing_free_last_memory_block :: proc(arena: ^Arena, loc := #caller_locat
 	arena_free_last_memory_block(arena, loc)
 }
 
-@(no_sanitize_address, private)
+@(private, no_sanitize_address)
 arena_free_last_memory_block :: proc(arena: ^Arena, loc := #caller_location) {
 	if free_block := arena.curr_block; free_block != nil {
 		assert(arena.kind == .Growing, "expected a .Growing arena", loc)
@@ -337,7 +366,7 @@ arena_free_all :: proc(arena: ^Arena, loc := #caller_location) {
 	arena_free_all_unguarded(arena, loc)
 }
 
-@(no_sanitize_address, private)
+@(private, no_sanitize_address)
 arena_free_all_unguarded :: proc(arena: ^Arena, loc := #caller_location) {
 	// NOTE(bill): Free all but the first memory block (if it exists)
 	for arena.curr_block != nil && arena.curr_block.prev != nil {
@@ -482,7 +511,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 	return
 }
 
-@(no_sanitize_address, private)
+@(private, no_sanitize_address)
 arena_resize :: #force_no_inline proc(arena: ^Arena, old_memory: rawptr, old_size, size, alignment: uint, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	old_data := ([^]byte)(old_memory)
 

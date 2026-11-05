@@ -140,6 +140,43 @@ test_virtual_arena_threads :: proc(t: ^testing.T) {
 	}
 }
 
+@(test)
+test_virtual_arena_single_thread_flag :: proc(t: ^testing.T) {
+	buffer := make([]byte, 16*mem.Megabyte)
+	defer delete(buffer)
+
+	for kind in virtual.Arena_Kind {
+		arena: virtual.Arena
+		testing.expect_value(t, init_virtual_arena(&arena, kind, buffer), nil)
+		arena.flags = {.Single_Thread}
+		defer virtual.arena_destroy(&arena)
+
+		barrier: sync.Barrier
+		sync.barrier_init(&barrier, 1)
+
+		w := Arena_Worker{
+			allocator = virtual.arena_allocator(&arena),
+			barrier   = &barrier,
+			rng       = t.seed | 1,
+			allocs    = make([]Arena_Thread_Alloc, ARENA_THREAD_ALLOCS),
+		}
+		defer delete(w.allocs)
+
+		for round in 0..<3 {
+			arena_worker_proc(&w)
+			if !testing.expectf(t, w.problem == "", "%v arena, round %d: %s", kind, round, w.problem) {
+				return
+			}
+			for a in w.allocs {
+				if !testing.expectf(t, count_byte(a.data, a.pattern) == len(a.data), "%v arena, round %d: allocations overlap", kind, round) {
+					return
+				}
+			}
+			virtual.arena_free_all(&arena)
+		}
+	}
+}
+
 Arena_Racer :: struct {
 	allocator: mem.Allocator,
 	stop:      ^bool,
