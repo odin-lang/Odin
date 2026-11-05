@@ -199,12 +199,8 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 
 	// Initialize arena allocator for small strings.
 	// Estimate the block size based on input size, but don't splurge on memory for very small XML documents.
-	// Whatever doesn't fit a block goes out of band: the arena refuses a request bigger than its block size
-	// and smaller than its out-of-band size, such as an element's attributes growing past a block.
-	// Every request rounds up to the minimum alignment, so the block size is a multiple of it.
-	dynamic_arena_alignment  := mem.DEFAULT_ALIGNMENT
-	dynamic_arena_block_size := mem.align_forward_int(max(256, len(data) / 4), dynamic_arena_alignment)
-	mem.dynamic_arena_init(&doc.extra_strings_arena, allocator, allocator, dynamic_arena_block_size, out_band_size = dynamic_arena_block_size, minimum_alignment = dynamic_arena_alignment)
+	dynamic_arena_block_size := max(256, len(data) / 4)
+	mem.dynamic_arena_init(&doc.extra_strings_arena, allocator, allocator, dynamic_arena_block_size)
 	doc.extra_strings_allocator = mem.dynamic_arena_allocator(&doc.extra_strings_arena)
 
 	if doc.elements, alloc_err = make([dynamic]Element, 1024, 1024, allocator); alloc_err != nil {
