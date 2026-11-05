@@ -103,7 +103,10 @@ walker_set_error :: proc(w: ^Walker, path: string, err: Error) {
 
 @(private)
 walker_clear :: proc(w: ^Walker) {
-	w.iter.f = nil
+	if w.iter.f != nil {
+		close(w.iter.f)
+		w.iter.f = nil
+	}
 	w.skip_dir = false
 
 	w.err.path.allocator = file_allocator()
