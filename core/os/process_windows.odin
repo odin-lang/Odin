@@ -502,6 +502,13 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	}
 
 	working_dir_w := (win32_utf8_to_wstring(desc.working_dir, temp_allocator) or_else nil) if len(desc.working_dir) > 0 else nil
+
+	// NOTE: Without a console to share, a console child would open an empty console window
+	creation_flags: win32.DWORD = win32.CREATE_UNICODE_ENVIRONMENT|win32.NORMAL_PRIORITY_CLASS
+	if console_pid: win32.DWORD; win32.GetConsoleProcessList(&console_pid, 1) == 0 {
+		creation_flags |= win32.CREATE_NO_WINDOW
+	}
+
 	process_info: win32.PROCESS_INFORMATION
 	ok := win32.CreateProcessW(
 		nil,
@@ -509,7 +516,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		nil,
 		nil,
 		true,
-		win32.CREATE_UNICODE_ENVIRONMENT|win32.NORMAL_PRIORITY_CLASS,
+		creation_flags,
 		raw_data(environment_block_w),
 		working_dir_w,
 		&win32.STARTUPINFOW{

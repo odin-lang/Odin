@@ -377,6 +377,7 @@ glob_tests := []Glob_Test{
 			ODIN_ROOT + "tests/core/os/file.odin",
 			ODIN_ROOT + "tests/core/os/path.odin",
 			ODIN_ROOT + "tests/core/os/process.odin",
+			ODIN_ROOT + "tests/core/os/process_console_windows.odin",
 		},
 		err     = {},
 	},
