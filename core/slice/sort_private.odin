@@ -155,7 +155,7 @@ _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, 
 			pivot_index := median_3(data, rand * width, length, width, cmp, arg, median_3_depth)
 
 			if !leftmost {
-				if cmp(data[pivot_index * width:], data[-width:], arg) == .Equal {
+				if cmp(data[pivot_index * width:], data[-width:], arg) != .Greater {
 					left := partition_hoare_reverse(data, length, width, cmp, arg, pivot_index)
 
 					data = data[left * width:]
