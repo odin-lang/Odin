@@ -37,6 +37,7 @@ Error :: union #shared_nil {
 	ZLIB_Error,
 	GZIP_Error,
 	LZ4_Error,
+	BZip2_Error,
 	io.Error,
 	runtime.Allocator_Error,
 }
@@ -92,6 +93,25 @@ LZ4_Error :: enum {
 	Invalid_Offset,
 	Offset_Out_Of_Range,
 	Literal_Overrun,
+	Input_Too_Large,
+}
+
+BZip2_Error :: enum {
+	None = 0,
+	Invalid_Magic,
+	Invalid_Block_Magic,
+	Invalid_Original_Pointer,
+	No_Symbols_In_Use,
+	Invalid_Group_Count,
+	Invalid_Selector_Count,
+	Invalid_Selector,
+	Invalid_Code_Length,
+	Invalid_Huffman_Code,
+	Selectors_Exhausted,
+	Run_Too_Long,
+	Block_Too_Large,
+	Block_Checksum_Failed,
+	Stream_Checksum_Failed,
 	Input_Too_Large,
 }
 
