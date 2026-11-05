@@ -25,6 +25,70 @@ foreign libsystem {
 	// For older versions there is `syscall(SYS_thread_selfid)`, but not really
 	// the same thing apparently.
 	pthread_threadid_np :: proc "c" (rawptr, ^u64) -> i32 ---
+
+	posix_spawn_file_actions_init    :: proc "c" (actions: ^posix_spawn_file_actions_t) -> posix.Errno ---
+	posix_spawn_file_actions_destroy :: proc "c" (actions: ^posix_spawn_file_actions_t) -> posix.Errno ---
+	posix_spawn_file_actions_adddup2 :: proc "c" (actions: ^posix_spawn_file_actions_t, fd, new_fd: posix.FD) -> posix.Errno ---
+	// NOTE: available from macOS 10.15.
+	posix_spawn_file_actions_addchdir_np :: proc "c" (actions: ^posix_spawn_file_actions_t, path: cstring) -> posix.Errno ---
+}
+
+posix_spawn_file_actions_t :: distinct rawptr
+
+// Not fork and exec: a fork in a process with threads runs libSystem's fork
+// handlers in the child, and those abort it when another thread was inside
+// a once they wait on, so the child dies by SIGKILL before the exec. The
+// spawn runs no code of this process in a child, and returns exec's error.
+_process_spawn :: proc(desc: Process_Desc, exe: cstring, argv, envp: [^]cstring, cwd: cstring) -> (pid: posix.pid_t, err: Error) {
+	null := posix.open("/dev/null", {.RDWR, .CLOEXEC})
+	if null == -1 {
+		return 0, _get_platform_error()
+	}
+	defer posix.close(null)
+
+	// The actions run in order: a source that is another stream's number
+	// moves above them first, or an earlier action overwrites it.
+	sources := [3]posix.FD{null, null, null}
+	moved   := [3]posix.FD{-1, -1, -1}
+	defer for fd in moved {
+		if fd != -1 {
+			posix.close(fd)
+		}
+	}
+	for file, target in ([3]^File{desc.stdin, desc.stdout, desc.stderr}) {
+		if file != nil {
+			sources[target] = (^File_Impl)(file.impl).fd
+		}
+		if sources[target] >= 0 && sources[target] <= 2 && int(sources[target]) != target {
+			moved[target] = posix.FD(posix.fcntl(sources[target], .DUPFD_CLOEXEC, i32(3)))
+			if moved[target] == -1 {
+				return 0, _get_platform_error()
+			}
+			sources[target] = moved[target]
+		}
+	}
+
+	actions: posix_spawn_file_actions_t
+	if errno := posix_spawn_file_actions_init(&actions); errno != nil {
+		return 0, errno
+	}
+	defer posix_spawn_file_actions_destroy(&actions)
+
+	for source, target in sources {
+		if errno := posix_spawn_file_actions_adddup2(&actions, source, posix.FD(target)); errno != nil {
+			return 0, errno
+		}
+	}
+	if cwd != nil {
+		if errno := posix_spawn_file_actions_addchdir_np(&actions, cwd); errno != nil {
+			return 0, errno
+		}
+	}
+
+	if errno := posix.posix_spawn(&pid, exe, &actions, nil, argv, envp); errno != nil {
+		return 0, errno
+	}
+	return pid, nil
 }
 
 _get_current_thread_id :: proc "contextless" () -> int {
