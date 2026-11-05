@@ -36,6 +36,10 @@ gb_internal bool lb_is_elem_const(Ast *elem, Type *elem_type) {
 	}
 	TypeAndValue tav = type_and_value_of_expr(elem);
 	GB_ASSERT_MSG(tav.mode != Addressing_Invalid, "%s %s", expr_to_string(elem), type_to_string(tav.type));
+	if (tav.type != nullptr && !are_types_identical(tav.type, elem_type) &&
+	    check_is_assignable_to_using_subtype(tav.type, elem_type) > 0) {
+		return false;
+	}
 	return tav.value.kind != ExactValue_Invalid;
 }
 
@@ -1524,6 +1528,13 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		return res;
 
 	case ExactValue_Compound:
+		if (value.value_compound != nullptr) {
+			Type *literal_type = type_of_expr(value.value_compound);
+			if (literal_type != nullptr && !are_types_identical(literal_type, original_type) &&
+			    check_is_assignable_to_using_subtype(literal_type, original_type) > 0) {
+				return lb_const_nil(m, original_type);
+			}
+		}
 		if (is_type_bit_field(original_type)) {
 			return lb_const_value_bit_field(m, original_type, value.value_compound);
 		} else if (is_type_slice(type)) {
