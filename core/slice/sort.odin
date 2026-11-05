@@ -1,5 +1,7 @@
 package slice
 
+import "base:intrinsics"
+
 Ordering :: enum {
 	Less    = -1,
 	Equal   =  0,
@@ -35,7 +37,12 @@ cmp_proc :: proc($E: typeid) -> (proc(E, E) -> Ordering) where ORD(E) {
 // sort sorts a slice
 // This sort is not guaranteed to be stable
 sort :: proc(data: $T/[]$E) where ORD(E) {
-	when size_of(E) != 0 {
+	Core :: intrinsics.type_core_type(E)
+	when intrinsics.type_is_integer(Core) || intrinsics.type_is_float(Core) {
+		// Only use quick sort on basic types not to bloat the executable code size.
+		// Devs who need the performance can call quick_sort explicitly.
+		quick_sort(data)
+	} else when size_of(E) != 0 {
 		if n := len(data); n > 1 {
 			raw := ([^]byte)(raw_data(data))
 			_smoothsort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
@@ -81,7 +88,7 @@ sort_by_indices_overwrite :: proc(data: $T/[]$E, indices: []int) {
 	swap_with_slice(data, temp)
 }
 
-sort_from_permutation_indices :: proc(data: $T/[]$E, indices: []int) {
+sort_from_permutation_indices :: proc(data: $T/[]$E, indices: []int) #no_bounds_check {
 	assert(len(data) == len(indices))
 	if len(indices) <= 1 {
 		return
@@ -277,6 +284,37 @@ sort_by_generic_cmp :: proc(data: $T/[]$E, cmp: Generic_Cmp, user_data: rawptr) 
 		if n := len(data); n > 1 {
 			raw := ([^]byte)(raw_data(data))
 			_smoothsort(raw, uint(len(data)), size_of(E), cmp, user_data)
+		}
+	}
+}
+
+
+/*
+Sort for performance sensitive tasks. The default sorting algorithm prioritizes broad compatibility and small (generated) code size.
+Keep in mind calling this polymorphic procedure instantiates an entire quicksort implementation for each type!
+*/
+quick_sort :: proc(data: $T/[]$E) where ORD(E) {
+	when size_of(E) != 0 {
+		if n := len(data); n > 1 {
+			// NOTE(jakub): using the backing type allows for one implementation to be shared by multiple
+			// distinct types. That's especially useful for built-in float and integer types.
+			_quick_sort_general(transmute([]intrinsics.type_core_type(E))data, 0, n, _quick_sort_max_depth(n), struct{}{}, .Ordered)
+		}
+	}
+}
+
+quick_sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) where ORD(E) {
+	when size_of(E) != 0 {
+		if n := len(data); n > 1 {
+			_quick_sort_general(data, 0, n, _quick_sort_max_depth(n), less, .Less)
+		}
+	}
+}
+
+quick_sort_by_cmp :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) where ORD(E) {
+	when size_of(E) != 0 {
+		if n := len(data); n > 1 {
+			_quick_sort_general(data, 0, n, _quick_sort_max_depth(n), cmp, .Cmp)
 		}
 	}
 }
