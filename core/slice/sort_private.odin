@@ -152,11 +152,12 @@ _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, 
 				unbalanced -= 1
 				rand = cast(int)intrinsics.read_cycle_counter() & (63 if length > 2048 else 3)
 			}
-			pivot_index := median_3(data, rand * width, length, width, cmp, arg, median_3_depth)
+			pivot_index := median_3(data, rand, length, width, cmp, arg, median_3_depth)
 
 			if !leftmost {
 				if cmp(data[pivot_index * width:], data[-width:], arg) != .Greater {
 					left := partition_hoare_reverse(data, length, width, cmp, arg, pivot_index)
+					left += 1
 
 					data = data[left * width:]
 					length = length - left
