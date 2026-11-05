@@ -64,6 +64,10 @@ log_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
                            old_memory: rawptr, old_size: int, location := #caller_location) -> ([]byte, runtime.Allocator_Error)  {
 	la := (^Log_Allocator)(allocator_data)
 
+	if mode == .Thread_Attach || mode == .Thread_Detach {
+		return nil, .Mode_Not_Implemented
+	}
+
 	if context.logger.procedure == nil || la.level < context.logger.lowest_level {
 		return la.allocator.procedure(la.allocator.data, mode, size, alignment, old_memory, old_size, location)
 	}
@@ -135,6 +139,9 @@ log_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 	case .Query_Info:
 		str := fmt.bprintf(buf[:], "%s%sALLOCATOR(mode=.Query_Info)", la.prefix, padding)
 		context.logger.procedure(context.logger.data, la.level, str, context.logger.options, location)
+
+	case .Thread_Attach, .Thread_Detach:
+		unreachable()
 	}
 	sync.unlock(&la.lock)
 

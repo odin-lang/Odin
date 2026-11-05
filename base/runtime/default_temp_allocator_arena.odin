@@ -250,7 +250,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		if set != nil {
 			set^ = {.Alloc, .Alloc_Non_Zeroed, .Free_All, .Resize, .Query_Features}
 		}
-	case .Query_Info:
+	case .Query_Info, .Thread_Attach, .Thread_Detach:
 		err = .Mode_Not_Implemented
 	}
 

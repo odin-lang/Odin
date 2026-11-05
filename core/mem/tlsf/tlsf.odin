@@ -173,7 +173,7 @@ allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 		}
 		return nil, nil
 
-	case .Query_Info:
+	case .Query_Info, .Thread_Attach, .Thread_Detach:
 		return nil, .Mode_Not_Implemented
 	}
 
