@@ -181,16 +181,21 @@ arena_alloc_unguarded :: proc(arena: ^Arena, size: uint, alignment: uint, loc :=
 arena_static_reset_to :: proc(arena: ^Arena, pos: uint, loc := #caller_location) -> bool {
 	sync.mutex_guard(&arena.mutex)
 
-	if arena.curr_block != nil {
+	if block := arena.curr_block; block != nil {
 		assert(arena.kind != .Growing, "expected a non .Growing arena", loc)
 
-		prev_pos := arena.curr_block.used
-		arena.curr_block.used = clamp(pos, 0, arena.curr_block.reserved)
-
-		if prev_pos > pos {
-			mem.zero_slice(arena.curr_block.base[arena.curr_block.used:][:prev_pos-pos])
+		new_pos := min(pos, block.reserved)
+		switch {
+		case new_pos < block.used:
+			mem.zero_slice(block.base[new_pos:block.used])
+			block.used = new_pos
+		case new_pos > block.used:
+			// Moving forward commits the memory in between.
+			if _, err := alloc_from_memory_block(block, new_pos-block.used, 1, arena.default_commit_size); err != nil {
+				return false
+			}
 		}
-		arena.total_used = arena.curr_block.used
+		arena.total_used = block.used
 		// sanitizer.address_poison(arena.curr_block.base[:arena.curr_block.committed])
 		return true
 	} else if pos == 0 {
@@ -217,24 +222,23 @@ arena_growing_free_last_memory_block :: proc(arena: ^Arena, loc := #caller_locat
 // Deallocates all but the first memory block of the arena and resets the allocator's usage to 0.
 @(no_sanitize_address)
 arena_free_all :: proc(arena: ^Arena, loc := #caller_location) {
-	switch arena.kind {
-	case .Growing:
-		sync.mutex_guard(&arena.mutex)
-		// NOTE(bill): Free all but the first memory block (if it exists)
-		for arena.curr_block != nil && arena.curr_block.prev != nil {
-			arena_growing_free_last_memory_block(arena, loc)
-		}
-		// Zero the first block's memory
-		if arena.curr_block != nil {
-			curr_block_used := int(arena.curr_block.used)
-			arena.curr_block.used = 0
-			// sanitizer.address_unpoison(arena.curr_block.base[:curr_block_used])
-			mem.zero(arena.curr_block.base, curr_block_used)
-			// sanitizer.address_poison(arena.curr_block.base[:arena.curr_block.committed])
-		}
-		arena.total_used = 0
-	case .Static, .Buffer:
-		arena_static_reset_to(arena, 0)
+	sync.mutex_guard(&arena.mutex)
+	arena_free_all_unguarded(arena, loc)
+}
+
+@(no_sanitize_address, private)
+arena_free_all_unguarded :: proc(arena: ^Arena, loc := #caller_location) {
+	// NOTE(bill): Free all but the first memory block (if it exists)
+	for arena.curr_block != nil && arena.curr_block.prev != nil {
+		arena_growing_free_last_memory_block(arena, loc)
+	}
+	// Zero the first block's memory
+	if arena.curr_block != nil {
+		curr_block_used := int(arena.curr_block.used)
+		arena.curr_block.used = 0
+		// sanitizer.address_unpoison(arena.curr_block.base[:curr_block_used])
+		mem.zero(arena.curr_block.base, curr_block_used)
+		// sanitizer.address_poison(arena.curr_block.base[:arena.curr_block.committed])
 	}
 	arena.total_used = 0
 }
@@ -471,6 +475,9 @@ arena_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
 			block.used = temp.used
 			arena.total_used -= amount_to_zero
 		}
+	} else {
+		// The arena had no memory block when the temp began: everything in it is newer.
+		arena_free_all_unguarded(arena, loc)
 	}
 
 	assert(arena.temp_count > 0, "double-use of arena_temp_end", loc)
