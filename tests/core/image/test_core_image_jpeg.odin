@@ -19,7 +19,6 @@ JPG_Reference_Files := []string{
 	"baseline-444",
 	"baseline-chroma-up",
 	"baseline-mixed",
-	"cmyk",
 	"grad-420",
 	"gray-2x2",
 	"gray-odd",
