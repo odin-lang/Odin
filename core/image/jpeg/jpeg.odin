@@ -1,9 +1,19 @@
-// Reader for `JPEG` images.
+// Reader and writer for `JPEG` images.
 //
 // Loading supports baseline, extended sequential and progressive encoding,
 // as well as 12-bit DCT, lossless (SOF3), DNL and 2-component (gray + alpha) images,
 // arithmetic coding (SOF9-11, DAC), and hierarchical mode (DHP, EXP, SOF5-7, SOF13-15),
 // decoded at full resolution.
+//
+// Saving writes 8-bit baseline, extended sequential and progressive JPEG
+// (standard or optimized Huffman tables, optional restart intervals),
+// as greyscale, greyscale + alpha, YCbCr (4:4:4, 4:2:2 or 4:2:0), RGB, CMYK or YCCK,
+// with a JFIF or Adobe header.
+//
+// 16-bit input saves as 12-bit extended sequential or progressive JPEG.
+// Lossless (SOF3) saving writes 8- or 16-bit greyscale, greyscale + alpha, RGB or CMYK,
+// using any of the seven predictors or the best one per image.
+// Arithmetic coding (SOF9-11, default conditioning) is available for all but baseline.
 package jpeg
 
 import "base:intrinsics"

@@ -17,3 +17,17 @@ load_from_file :: proc(filename: string, options := Options{}, allocator := cont
 		return nil, .Unable_To_Read_File
 	}
 }
+
+save :: proc{save_to_buffer, save_to_file}
+
+save_to_file :: proc(output: string, img: ^Image, options := Options{}, quality := DEFAULT_QUALITY, subsampling := DEFAULT_SUBSAMPLING, profile := DEFAULT_PROFILE, save_options := Save_Options{}, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator
+
+	out: [dynamic]byte
+	defer delete(out)
+
+	save_to_buffer(&out, img, options, quality, subsampling, profile, save_options) or_return
+	write_err := os.write_entire_file(output, out[:])
+
+	return nil if write_err == nil else .Unable_To_Write_File
+}

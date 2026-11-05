@@ -762,6 +762,46 @@ JPEG_Color_Space :: enum u8 {
 	YCCK,
 }
 
+JPEG_Subsampling :: enum u8 {
+	S444,
+	S422,
+	S420,
+}
+
+// NOTE(Jeroen): Support for saving images using the hierarchical profile was left out on purpose.
+//               Our JPEG loader decodes it, but the profile is only of historical interest as
+//               far as creating them is.
+JPEG_Profile :: enum u8 {
+	Baseline,
+	Extended,
+	Progressive,
+	Lossless,
+}
+
+JPEG_Entropy_Coding :: enum u8 {
+	Huffman,
+	Huffman_Optimized,
+	Arithmetic,
+}
+
+JPEG_Lossless_Predictor :: enum u8 {
+	Left,
+	Above,
+	Above_Left,
+	Planar,
+	Left_Planar,
+	Above_Planar,
+	Average,
+	Best,
+}
+
+JPEG_Save_Options :: struct {
+	entropy_coding:        JPEG_Entropy_Coding,
+	lossless_predictor:    JPEG_Lossless_Predictor,
+	restart_interval_rows: u16,
+	color_space:           Maybe(JPEG_Color_Space),
+}
+
 Channel :: enum u8 {
 	R = 1,
 	G = 2,

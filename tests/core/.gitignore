@@ -4,6 +4,9 @@
 *.jpg
 *.qoi
 *.pbm
+*.pgm
+*.ppm
+*.pam
 math_big_test_library.*
 *.bng
 assets/BNG/*.txt
