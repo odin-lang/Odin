@@ -8,9 +8,11 @@ Dial_Error     :: net.Dial_Error
 Send_Error     :: net.Send_Error
 TCP_Send_Error :: net.TCP_Send_Error
 UDP_Send_Error :: net.UDP_Send_Error
+Unix_Send_Error :: net.Unix_Send_Error
 Recv_Error     :: net.Recv_Error
 TCP_Recv_Error :: net.TCP_Recv_Error
 UDP_Recv_Error :: net.UDP_Recv_Error
+Unix_Recv_Error :: net.Unix_Recv_Error
 Listen_Error   :: net.Listen_Error
 Create_Socket_Error :: net.Create_Socket_Error
 
@@ -25,6 +27,7 @@ Endpoint :: net.Endpoint
 
 TCP_Socket :: net.TCP_Socket
 UDP_Socket :: net.UDP_Socket
+Unix_Socket :: net.Unix_Socket
 Any_Socket :: net.Any_Socket
 
 IP4_Any      :: net.IP4_Any

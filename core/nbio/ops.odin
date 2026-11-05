@@ -547,8 +547,9 @@ prep_recv :: #force_inline proc(
 
 	if err := bufs_init(&op.recv._impl.bufs, &op.recv.bufs, op.l.allocator); err != nil {
 		switch _ in op.recv.socket {
-		case TCP_Socket: op.recv.err = TCP_Recv_Error.Insufficient_Resources
-		case UDP_Socket: op.recv.err = UDP_Recv_Error.Insufficient_Resources
+		case TCP_Socket:  op.recv.err = TCP_Recv_Error.Insufficient_Resources
+		case UDP_Socket:  op.recv.err = UDP_Recv_Error.Insufficient_Resources
+		case Unix_Socket: op.recv.err = Unix_Recv_Error.Insufficient_Resources
 		case:            unreachable()
 		}
 	}
@@ -769,8 +770,9 @@ prep_send :: proc(
 
 	if err := bufs_init(&op.send._impl.bufs, &op.send.bufs, op.l.allocator); err != nil {
 		switch _ in op.send.socket {
-		case TCP_Socket: op.send.err = TCP_Send_Error.Insufficient_Resources
-		case UDP_Socket: op.send.err = UDP_Send_Error.Insufficient_Resources
+		case TCP_Socket:  op.send.err = TCP_Send_Error.Insufficient_Resources
+		case UDP_Socket:  op.send.err = UDP_Send_Error.Insufficient_Resources
+		case Unix_Socket: op.send.err = Unix_Send_Error.Insufficient_Resources
 		case:            unreachable()
 		}
 	}
