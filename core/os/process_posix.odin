@@ -159,7 +159,9 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			posix.exit(126)
 		}
 
-		null := posix.open("/dev/null", {.RDWR})
+		// Close-on-exec: dup2 passes on the copies it makes, the original
+		// would stay open in the program run.
+		null := posix.open("/dev/null", {.RDWR, .CLOEXEC})
 		if null == -1 { abort(pipe[WRITE]) }
 
 		stderr := (^File_Impl)(desc.stderr.impl).fd if desc.stderr != nil else null
