@@ -3,7 +3,6 @@ package debug_trace
 
 import "base:runtime"
 
-import "core:fmt"
 import "core:sync"
 
 // Size of a constant backtrace, as used by the tracking allocator for example.
@@ -87,6 +86,16 @@ Resolve_Error :: enum {
 	Resolve_Aborted,
 }
 
+resolve_err_string :: proc(err: Resolve_Error) -> string {
+	switch err {
+	case .None:                 return "none"
+	case .Allocator_Error:      return "allocator error"
+	case .Parse_Address_Failed: return "parse address failed"
+	case .Resolve_Aborted:      return "resolve aborted"
+	case:                       return "unknown"
+	}
+}
+
 Location :: runtime.Source_Code_Location
 
 /*
@@ -133,9 +142,11 @@ assertion_failure_proc :: proc(prefix, message: string, loc: runtime.Source_Code
 
 		lines, err := resolve(capture(skip=1), context.temp_allocator, context.temp_allocator)
 		if err != nil {
-			fmt.eprintfln("could not get backtrace for assertion failure: %v", err)
+			runtime.print_string("could not get backtrace for assertion failure: ")
+			runtime.print_string(resolve_err_string(err))
+			runtime.print_string("\n")
 		} else {
-			fmt.eprintfln("[back trace]")
+			runtime.print_string("[back trace]\n")
 			print(lines)
 			locations_destroy(lines, context.temp_allocator)
 		}
@@ -153,26 +164,35 @@ Inputs:
 */
 print :: proc(locations: []Location, padding := "\t") {
 	for location, i in locations {
-		fmt.eprintf("%s#%v %v at %v", padding, i, location.procedure, location.file_path)
+		runtime.print_string(padding)
+		runtime.print_string("#")
+		runtime.print_int(i)
+		runtime.print_string(" ")
+		runtime.print_string(location.procedure)
+		runtime.print_string(" at ")
+		runtime.print_string(location.file_path)
 		if location.line > 0 {
 			when ODIN_ERROR_POS_STYLE == .Default {
-				fmt.eprintf("(%v", location.line)
+				runtime.print_string("(")
+				runtime.print_i64(i64(location.line))
 				if location.column > 0 {
-					fmt.eprintf(":%v)", location.column)
-				} else {
-					fmt.eprint(")")
+					runtime.print_string(":")
+					runtime.print_i64(i64(location.column))
 				}
+				runtime.print_string(")")
 			} else when ODIN_ERROR_POS_STYLE == .Unix {
-				fmt.eprintf(":%v", location.line)
+				runtime.print_string(":")
+				runtime.print_i64(i64(location.line))
 				if location.column > 0 {
-					fmt.eprintf(":%v", location.column)
+					runtime.print_string(":")
+					runtime.print_i64(i64(location.column))
 				}
 			} else {
 				#panic("unhandled ODIN_ERROR_POS_STYLE")
 			}
 		}
 
-		fmt.eprintln()
+		runtime.print_string("\n")
 	}
 }
 

@@ -1,8 +1,9 @@
-#define STRING_INTERNER_CELL_WIDTH 8
+// TODO(bill): is this AMD64 specific or does this also improve things on ARM64 too?
+#define STRING_INTERNER_CELL_WIDTH         7 /*one cache line per cell*/
 #define STRING_INTERNER_MUTEX_STRIPE_COUNT 1024
-#define STRING_INTERNER_MUTEX_STRIPE_MASK (STRING_INTERNER_MUTEX_STRIPE_COUNT - 1)
-#define STRING_INTERNER_THREAD_LOCAL_SIZE (1024 * 1024 * 2)
-#define STRING_INTERN_CACHE_LINE (2*GB_CACHE_LINE_SIZE)
+#define STRING_INTERNER_MUTEX_STRIPE_MASK  (STRING_INTERNER_MUTEX_STRIPE_COUNT - 1)
+#define STRING_INTERNER_THREAD_LOCAL_SIZE  (1024 * 1024 * 2)
+#define STRING_INTERN_CACHE_LINE           (2*GB_CACHE_LINE_SIZE)
 
 struct InternedString {
 	u32 value;
@@ -16,8 +17,8 @@ struct InternedString {
 
 	bool is_blank() const;
 };
-struct alignas(STRING_INTERN_CACHE_LINE) StringInternCell {
-	std::atomic<u64>                hashes [STRING_INTERNER_CELL_WIDTH];
+struct alignas(GB_CACHE_LINE_SIZE) StringInternCell {
+	std::atomic<u32>                hashes [STRING_INTERNER_CELL_WIDTH];
 	InternedString                  offsets[STRING_INTERNER_CELL_WIDTH];
 	std::atomic<StringInternCell *> next;
 };
@@ -62,7 +63,8 @@ gb_internal void init_string_interner() {
 
 	StringInterner *interner = cast(StringInterner *)static_arena_alloc(&arena, gb_size_of(StringInterner), STRING_INTERN_CACHE_LINE);
 	interner->arena = arena;
-	u64 cell_size = 1llu << 17llu;
+
+	u64 cell_size = 1llu << 16llu; // TODO(bill): is this AMD64 specific or does this also improve things on ARM64 too?
 	u64 cell_mask = cell_size - 1;
 	interner->cell_mask = cell_mask;
 	interner->cells = cast(StringInternCell *)static_arena_alloc(&interner->arena, cell_size * gb_size_of(StringInternCell), STRING_INTERN_CACHE_LINE);
@@ -179,7 +181,7 @@ gb_internal InternedString string_interner_insert(String str, u32 hash, u32 *new
 		}
 	}
 
-	StringInternCell *new_cell = cast(StringInternCell *)string_interner_thread_local_arena_alloc(&g_interner_arena, gb_size_of(StringInternCell), STRING_INTERN_CACHE_LINE);
+	StringInternCell *new_cell = cast(StringInternCell *)string_interner_thread_local_arena_alloc(&g_interner_arena, gb_size_of(StringInternCell), alignof(StringInternCell));
 	new_cell->offsets[0] = offset;
 	new_cell->hashes[0].store(hash, std::memory_order_relaxed);
 	load_cell->next.store(new_cell, std::memory_order_release);

@@ -15,6 +15,7 @@ GamepadState :: glfw.GamepadState
 Allocator :: glfw.Allocator
 
 /*** Procedure type declarations ***/
+
 WindowIconifyProc      :: glfw.WindowIconifyProc
 WindowRefreshProc      :: glfw.WindowRefreshProc
 WindowFocusProc        :: glfw.WindowFocusProc

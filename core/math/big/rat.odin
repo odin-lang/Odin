@@ -262,7 +262,7 @@ rat_mul_rat :: proc(dst, x, y: ^Rat, allocator := context.allocator) -> (err: Er
 		if internal_is_zero(&x.b) {
 			internal_set(&dst.b, 1)    or_return
 		} else {
-			internal_sqr(&dst.a, &x.b) or_return
+			internal_sqr(&dst.b, &x.b) or_return
 		}
 		return
 	}

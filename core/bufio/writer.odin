@@ -101,6 +101,9 @@ writer_write :: proc(b: ^Writer, p: []byte) -> (n: int, err: io.Error) {
 				b.err = .Negative_Write
 				break
 			}
+			if m == 0 && b.err == nil {
+				b.err = .Short_Write
+			}
 		} else {
 			m = copy(b.buf[b.n:], p)
 			b.n += m

@@ -297,7 +297,7 @@ shape_inst_body :: proc(sb: ^strings.Builder, e: Proc_Entry) {
 
 // emit_ body: append the corresponding inst_ result.
 shape_emit_body :: proc(sb: ^strings.Builder, e: Proc_Entry) {
-	strings.write_string(sb, "append(instructions, ")
+	strings.write_string(sb, "append_elem(instructions, ")
 	shape_inst_body(sb, e)
 	strings.write_string(sb, ")")
 }

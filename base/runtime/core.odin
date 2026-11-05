@@ -283,7 +283,7 @@ Type_Info :: struct {
 // This will be set by the compiler
 type_table: []^Type_Info
 
-args__: []cstring
+args__: union #no_nil {[]cstring, []cstring16}
 
 when ODIN_OS == .Windows {
 	// NOTE(Jeroen): If we're a Windows DLL, fwdReason will be populated.

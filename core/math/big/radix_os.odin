@@ -49,7 +49,15 @@ internal_int_read_from_ascii_file :: proc(a: ^Int, filename: string, radix := i8
 	}
 
 	as := string(res)
-	return atoi(a, as, radix)
+
+	/*
+		A file usually ends with a newline, so trailing whitespace isn't an error here.
+	*/
+	err = atoi(a, as, radix)
+	if err == .Trailing_Whitespace {
+		err = nil
+	}
+	return err
 }
 
 /*

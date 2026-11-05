@@ -12,44 +12,50 @@ _os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (
 
 	b := strings.builder_make_none(allocator = allocator, loc = loc)
 
-	// Try to parse `/etc/os-release` for `PRETTY_NAME="Ubuntu 20.04.3 LTS`
-	pretty_parse: {
-		fd, errno := linux.open("/etc/os-release", {})
-		if errno != .NONE {
-			strings.write_string(&b, "Unknown Linux Distro")
-			break pretty_parse
-		}
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		// Android has no `/etc/os-release`. It reports its version in system properties.
+		res.platform = .Android
+		res.os = _android_version(&b)
+	} else {
+		// Try to parse `/etc/os-release` for `PRETTY_NAME="Ubuntu 20.04.3 LTS`
+		pretty_parse: {
+			fd, errno := linux.open("/etc/os-release", {})
+			if errno != .NONE {
+				strings.write_string(&b, "Unknown Linux Distro")
+				break pretty_parse
+			}
 
-		defer linux.close(fd)
+			defer linux.close(fd)
 
-		os_release_buf: [2048]u8
-		n, read_errno := linux.read(fd, os_release_buf[:])
-		if read_errno != .NONE {
-			strings.write_string(&b, "Unknown Linux Distro")
-			break pretty_parse
-		}
-		release := string(os_release_buf[:n])
+			os_release_buf: [2048]u8
+			n, read_errno := linux.read(fd, os_release_buf[:])
+			if read_errno != .NONE {
+				strings.write_string(&b, "Unknown Linux Distro")
+				break pretty_parse
+			}
+			release := string(os_release_buf[:n])
 
-		{
-			// Search the line in the file until we find "PRETTY_NAME="
-			_, _, post := strings.partition(release, `PRETTY_NAME="`)
-			if len(post) > 0 {
-				end := strings.index_any(post, "\"\n")
-				if end > -1 && post[end] == '"' {
-					strings.write_string(&b, post[:end])
+			{
+				// Search the line in the file until we find "PRETTY_NAME="
+				_, _, post := strings.partition(release, `PRETTY_NAME="`)
+				if len(post) > 0 {
+					end := strings.index_any(post, "\"\n")
+					if end > -1 && post[end] == '"' {
+						strings.write_string(&b, post[:end])
+					}
+				}
+				if strings.builder_len(b) == 0 {
+					strings.write_string(&b, "Unknown Linux Distro")
 				}
 			}
-			if strings.builder_len(b) == 0 {
-				strings.write_string(&b, "Unknown Linux Distro")
-			}
-		}
 
-		{
-			// Search the line in the file until we find "VERSION="
-			_, _, post := strings.partition(release, `VERSION="`)
-			if len(post) > 0 {
-				pre, _, _ := strings.partition(post, ` `)
-				res.os = _parse_version(pre)
+			{
+				// Search the line in the file until we find "VERSION="
+				_, _, post := strings.partition(release, `VERSION="`)
+				if len(post) > 0 {
+					pre, _, _ := strings.partition(post, ` `)
+					res.os = _parse_version(pre)
+				}
 			}
 		}
 	}

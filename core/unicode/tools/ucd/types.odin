@@ -532,9 +532,9 @@ Char :: struct {
 	nv:    Numberic_Value,
 	bm:    bool,
 	name1: string,
-	sum:   string, // Simple uppercase mapping
-	slm:   string, // Simple lowercase mapping
-	stm:   string, // Simple titlecase_mapping
+	sum:   rune, // Simple uppercase mapping, 0 if none
+	slm:   rune, // Simple lowercase mapping, 0 if none
+	stm:   rune, // Simple titlecase mapping, 0 if none
 }
 
 Char_Range :: struct {
@@ -685,6 +685,26 @@ destroy_dynamic_range :: proc(dr: Dynamic_Range) {
 	delete(dr.ranges_32)
 	delete(dr.single_16)
 	delete(dr.single_32)
+}
+
+Case_Mapping :: enum {
+	Upper,
+	Lower,
+	Title,
+}
+
+/*
+A simple case mapping table. Runs of consecutive code points that share the
+same delta are stored as `{first, last, delta}` and the remainder as `{cp, delta}`.
+*/
+Case_Table :: struct {
+	ranges:   [dynamic][3]i32,
+	singlets: [dynamic][2]i32,
+}
+
+destroy_case_table :: proc(ct: Case_Table) {
+	delete(ct.ranges)
+	delete(ct.singlets)
 }
 
 destroy_general_category_ranges :: proc(gcr: [General_Category]Dynamic_Range) {

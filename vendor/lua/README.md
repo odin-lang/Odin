@@ -5,7 +5,10 @@ Lua packages
 * `vendor:lua/5.1` (version 5.1.5)
 * `vendor:lua/5.2` (version 5.2.4)
 * `vendor:lua/5.3` (version 5.3.6)
-* `vendor:lua/5.4` (version 5.4.2)
+* `vendor:lua/5.4` (version 5.4.9)
+* `vendor:lua/5.5` (version 5.5.1)
+
+Use one of them per program: they declare the same C symbols, so two can not be imported together.
 
 With custom context-based allocator:
 

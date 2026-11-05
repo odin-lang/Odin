@@ -4,7 +4,7 @@
 Where AEAD stands for Authenticated Encryption with Additional Data.
 
 See:
-- [[ https://www.ietf.org/archive/id/draft-irtf-cfrg-aegis-aead-12.txt ]]
+- [[ https://www.rfc-editor.org/rfc/rfc10032 ]]
 */
 package aegis
 

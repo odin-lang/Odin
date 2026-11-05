@@ -28,6 +28,8 @@ gb_internal Token ast_token(Ast *node) {
 		return ast_token(node->AsmInstruction.name);
 	case Ast_AsmMemoryOperand:
 		return node->AsmMemoryOperand.open;
+	case Ast_AsmRegisterGroup:
+		return node->AsmRegisterGroup.open;
 	case Ast_AsmDirective:
 		return node->AsmDirective.token;
 
@@ -139,11 +141,14 @@ gb_internal Token ast_token(Ast *node) {
 
 TokenPos token_pos_end(Token const &token) {
 	TokenPos pos = token.pos;
+	if (token.flags & TokenFlag_Synthesized) {
+		return pos;
+	}
 	pos.offset += cast(i32)token.string.len;
-	for (isize i = 0; i < token.string.len; i++) {
-		// TODO(bill): This assumes ASCII
-		char c = token.string[i];
-		if (c == '\n') {
+	for (isize i = 0; i < token.string.len; /**/) {
+		Rune r = 0;
+		i += utf8_decode(token.string.text+i, token.string.len-i, &r);
+		if (r == '\n') {
 			pos.line += 1;
 			pos.column = 1;
 		} else {
@@ -211,6 +216,11 @@ Token ast_end_token(Ast *node) {
 			return ast_end_token(node->AsmMemoryOperand.type);
 		}
 		return node->AsmMemoryOperand.close;
+	case Ast_AsmRegisterGroup:
+		if (node->AsmRegisterGroup.type) {
+			return ast_end_token(node->AsmRegisterGroup.type);
+		}
+		return node->AsmRegisterGroup.close;
 
 	case Ast_BadExpr:       return node->BadExpr.end;
 	case Ast_TagExpr:

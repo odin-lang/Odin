@@ -6,6 +6,8 @@ set -eu
 # Every check is "Odin agrees with the platform C compiler"
 #
 #   ./run.sh
+# TODO-UPDATE-COMMENT: CI now links riscv64 with "--target=riscv64-linux-gnu -static"
+# ---
 #   ./run.sh linux_riscv64 riscv64-linux-gnu \
 #       "-extra-linker-flags:-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
 #
@@ -25,7 +27,9 @@ here=$(cd "$(dirname "$0")" && pwd)
 COMMON="-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused-defineables"
 
 CC_TARGET=""; [ -n "$TRIPLE" ] && CC_TARGET="--target=$TRIPLE"
-ODIN_TARGET=""; [ -n "$TARGET" ] && ODIN_TARGET="-target:$TARGET"
+
+HOST_MARCH=""; case "$(uname -m)" in x86_64|amd64) HOST_MARCH="-microarch:x86-64" ;; esac
+ODIN_TARGET="$HOST_MARCH"; [ -n "$TARGET" ] && ODIN_TARGET="-target:$TARGET"
 
 
 # Cleaned BEFORE, not after: the generated corpus is left in place so it can be
@@ -36,7 +40,7 @@ pushd "$here/build" > /dev/null
 
 set -x
 
-$ODIN run ../gen.odin -file -- .
+$ODIN run ../gen.odin -file $HOST_MARCH -- .
 
 # Ask the C compiler which tiers it has, by preprocessing the generated `build-cross/tiers.c`. 
 # The Odin side must use the same tiers or it references symbols C never emitted.

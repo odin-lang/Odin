@@ -166,7 +166,6 @@ Comp_Lit :: struct {
 	tag:   ^Expr, // possibly nil
 }
 
-
 Tag_Expr :: struct {
 	using node: Expr,
 	op:      tokenizer.Token,
@@ -324,27 +323,6 @@ Auto_Cast :: struct {
 	using node: Expr,
 	op:   tokenizer.Token,
 	expr: ^Expr,
-}
-
-Inline_Asm_Dialect :: enum u8 {
-	Default = 0,
-	ATT     = 1,
-	Intel   = 2,
-}
-
-
-Inline_Asm_Expr :: struct {
-	using node: Expr,
-	tok:                tokenizer.Token,
-	param_types:        []^Expr,
-	return_type:        ^Expr,
-	has_side_effects:   bool,
-	is_align_stack:     bool,
-	dialect:            Inline_Asm_Dialect,
-	open:               tokenizer.Pos,
-	constraints_string: ^Expr,
-	asm_string:         ^Expr,
-	close:              tokenizer.Pos,
 }
 
 
@@ -893,6 +871,95 @@ Bit_Field_Field :: struct {
 	comments:   ^Comment_Group, // possibly nil
 }
 
+
+Asm_Template :: struct {
+	using node: Expr,
+	token:        tokenizer.Token,
+	type:         ^Proc_Type,
+	specs:        []^Asm_Spec,
+	clobbers:     []^Asm_Clobber,
+	instructions: []^Stmt,
+}
+
+Asm_Spec :: struct {
+	using node: Stmt,
+	name:       ^Ident,
+	tied_name:  ^Ident,
+	type:       ^Expr,
+	value:      ^Expr,
+	directives: []^Expr,
+}
+
+Asm_Register :: struct {
+	using node: Expr,
+	token: tokenizer.Token,
+	name:  string,
+	flag:  string, // %flags.z
+}
+
+Asm_Clobber :: struct {
+	using node: Stmt,
+	token: tokenizer.Token,
+	name:  string,
+	value: ^Expr,
+}
+
+Asm_Label :: struct {
+	using node: Expr,
+	token: tokenizer.Token,
+	name:  string,
+}
+
+Asm_Label_Decl :: struct {
+	using node: Stmt,
+	label: ^Asm_Label,
+}
+
+Asm_Instruction :: struct {
+	using node: Stmt,
+	name:     ^Ident,
+	operands: []^Expr,
+}
+
+Asm_Memory_Operand_Kind :: enum u8 {
+	Default,
+	Pre,
+	Post,
+}
+
+Asm_Memory_Operand :: struct {
+	using node: Expr,
+	kind:             Asm_Memory_Operand_Kind,
+	open:             tokenizer.Token,
+	segment_override: ^Expr,
+	base:             ^Expr,
+	index_op:         tokenizer.Token,
+	index:            ^Expr,
+	scale_op:         tokenizer.Token,
+	scale:            ^Expr,
+	disp_op:          tokenizer.Token,
+	disp:             ^Expr,
+	close:            tokenizer.Token,
+	type:             ^Expr,
+}
+
+Asm_Register_Group :: struct {
+	using node: Expr,
+	open:        tokenizer.Token,
+	registers:   []^Expr,
+	range_token: tokenizer.Token,
+	close:       tokenizer.Token,
+	type:        ^Expr,
+}
+
+Asm_Directive :: struct {
+	using node: Stmt,
+	token:    tokenizer.Token,
+	name:     string,
+	operands: []^Expr,
+}
+
+
 Any_Node :: union {
 	^Package,
 	^File,
@@ -928,7 +995,6 @@ Any_Node :: union {
 	^Type_Assertion,
 	^Type_Cast,
 	^Auto_Cast,
-	^Inline_Asm_Expr,
 
 	^Proc_Group,
 
@@ -981,6 +1047,17 @@ Any_Node :: union {
 	^Field,
 	^Field_List,
 	^Bit_Field_Field,
+
+	^Asm_Template,
+	^Asm_Spec,
+	^Asm_Register,
+	^Asm_Clobber,
+	^Asm_Label,
+	^Asm_Label_Decl,
+	^Asm_Instruction,
+	^Asm_Memory_Operand,
+	^Asm_Register_Group,
+	^Asm_Directive,
 }
 
 
@@ -1015,7 +1092,6 @@ Any_Expr :: union {
 	^Type_Assertion,
 	^Type_Cast,
 	^Auto_Cast,
-	^Inline_Asm_Expr,
 
 	^Proc_Group,
 
@@ -1037,6 +1113,12 @@ Any_Expr :: union {
 	^Relative_Type,
 	^Matrix_Type,
 	^Bit_Field_Type,
+
+	^Asm_Template,
+	^Asm_Register,
+	^Asm_Label,
+	^Asm_Memory_Operand,
+	^Asm_Register_Group,
 }
 
 
@@ -1066,4 +1148,10 @@ Any_Stmt :: union {
 	^Import_Decl,
 	^Foreign_Block_Decl,
 	^Foreign_Import_Decl,
+
+	^Asm_Spec,
+	^Asm_Clobber,
+	^Asm_Instruction,
+	^Asm_Label_Decl,
+	^Asm_Directive,
 }

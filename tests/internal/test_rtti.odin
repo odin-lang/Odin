@@ -8,7 +8,8 @@ Buggy_Struct :: struct {
 	b: bool,
 	c: [3]^string,
 }
-#assert(size_of(Buggy_Struct) == 40)
+BUGGY_STRUCT_SIZE :: 5 * size_of(rawptr)
+#assert(size_of(Buggy_Struct) == BUGGY_STRUCT_SIZE)
 
 g_buggy: Buggy_Struct = {}
 
@@ -35,9 +36,9 @@ rtti_test :: proc(t: ^testing.T) {
 		testing.expectf(t, checksum == 0, "Expected l_b to be zero-initialized, got %v", l_b)
 	}
 
-	testing.expectf(t, size_of(Buggy_Struct) == 40, "Expected size_of(Buggy_Struct) == 40, got %v", size_of(Buggy_Struct))
-	testing.expectf(t, size_of(g_buggy)      == 40, "Expected size_of(g_buggy) == 40, got %v", size_of(g_buggy))
-	testing.expectf(t, size_of(l_buggy)      == 40, "Expected size_of(l_buggy) == 40, got %v", size_of(l_buggy))
+	testing.expectf(t, size_of(Buggy_Struct) == BUGGY_STRUCT_SIZE, "Expected size_of(Buggy_Struct) == %v, got %v", BUGGY_STRUCT_SIZE, size_of(Buggy_Struct))
+	testing.expectf(t, size_of(g_buggy)      == BUGGY_STRUCT_SIZE, "Expected size_of(g_buggy) == %v, got %v", BUGGY_STRUCT_SIZE, size_of(g_buggy))
+	testing.expectf(t, size_of(l_buggy)      == BUGGY_STRUCT_SIZE, "Expected size_of(l_buggy) == %v, got %v", BUGGY_STRUCT_SIZE, size_of(l_buggy))
 
 	g_s := fmt.tprintf("%s", g_buggy)
 	l_s := fmt.tprintf("%s", l_buggy)

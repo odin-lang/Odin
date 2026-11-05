@@ -25,6 +25,7 @@ mpsc_destroy :: proc(mpscq: ^Multi_Producer_Single_Consumer, allocator: runtime.
 	delete(mpscq.buffer, allocator)
 }
 
+@(synchronizes=.Release)
 mpsc_enqueue :: proc(mpscq: ^Multi_Producer_Single_Consumer, obj: rawptr) -> bool {
 	count := sync.atomic_add_explicit(&mpscq.count, 1, .Acquire)
 	if count >= len(mpscq.buffer) {
@@ -32,13 +33,14 @@ mpsc_enqueue :: proc(mpscq: ^Multi_Producer_Single_Consumer, obj: rawptr) -> boo
 		return false
 	}
 
-	head := sync.atomic_add_explicit(&mpscq.head, 1, .Acquire)
+	head := sync.atomic_add_explicit(&mpscq.head, 1, .Relaxed)
 	assert(mpscq.buffer[head & mpscq.mask] == nil)
 	rv := sync.atomic_exchange_explicit(&mpscq.buffer[head & mpscq.mask], obj, .Release)
 	assert(rv == nil)
 	return true
 }
 
+@(synchronizes=.Acquire)
 mpsc_dequeue :: proc(mpscq: ^Multi_Producer_Single_Consumer) -> rawptr {
 	ret := sync.atomic_exchange_explicit(&mpscq.buffer[mpscq.tail], nil, .Acquire)
 	if ret == nil {

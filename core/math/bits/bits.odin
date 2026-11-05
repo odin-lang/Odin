@@ -79,7 +79,7 @@ Example:
 
 	log2_example :: proc() {
 		for i in u8(1)..=8 {
-			fmt.printfln("{0} ({0:4b}): {1}", i, bits.log2(i))
+			fmt.printfln("{0} ({0:04b}): {1}", i, bits.log2(i))
 		}
 		assert(bits.log2(  u8(0)) == max(u8))
 		assert(bits.log2( u16(0)) == max(u16))
@@ -127,7 +127,7 @@ Example:
 	rotate_left8_example :: proc() {
 		x := u8(13)
 		for k in 0..<8 {
-			fmt.printfln("{0:8b}: {1}", bits.rotate_left8(x, k), k)
+			fmt.printfln("{0:08b}: {1}", bits.rotate_left8(x, k), k)
 		}
 	}
 

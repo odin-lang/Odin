@@ -24,7 +24,7 @@ type_assertion_trap_contextless :: proc "contextless" () -> ! {
 
 
 @(disabled=ODIN_NO_BOUNDS_CHECK)
-bounds_check_error :: proc "contextless" (file: string, line, column: i32, index, count: int) {
+bounds_check_error_contextless :: proc "contextless" (file: string, line, column: i32, index, count: int) {
 	if uint(index) < uint(count) {
 		return
 	}
@@ -41,8 +41,30 @@ bounds_check_error :: proc "contextless" (file: string, line, column: i32, index
 	handle_error(file, line, column, index, count)
 }
 
+@(disabled=ODIN_NO_BOUNDS_CHECK)
+bounds_check_error_with_context :: proc (file: string, line, column: i32, index, count: int) {
+	if uint(index) < uint(count) {
+		return
+	}
+	@(cold, no_instrumentation)
+	handle_error :: proc (file: string, line, column: i32, index, count: int) -> ! {
+		buf: [128]byte = ---
+		i := 0
+		_ = write_i64(&i, buf[:], i64(index))
+		_ = write_string(&i, buf[:], " is out of range 0..<")
+		_ = write_i64(&i, buf[:], i64(count))
+
+		p := context.assertion_failure_proc
+		if p == nil {
+			p = default_assertion_failure_proc
+		}
+		p("Bounds check failed", string(buf[:i]), Source_Code_Location{file, line, column, ""})
+	}
+	handle_error(file, line, column, index, count)
+}
+
 @(no_instrumentation)
-slice_handle_error :: proc "contextless" (file: string, line, column: i32, lo, hi: int, len: int) -> ! {
+slice_handle_error_contextless :: proc "contextless" (file: string, line, column: i32, lo, hi: int, len: int) -> ! {
 	print_caller_location(Source_Code_Location{file, line, column, ""})
 	print_string(" Invalid slice indices ")
 	print_i64(i64(lo))
@@ -54,8 +76,25 @@ slice_handle_error :: proc "contextless" (file: string, line, column: i32, lo, h
 	bounds_trap()
 }
 
+@(disabled=ODIN_NO_BOUNDS_CHECK)
+slice_handle_error_with_context :: proc (file: string, line, column: i32, lo, hi: int, len: int) -> ! {
+	buf: [128]byte = ---
+	i := 0
+	_ = write_i64(&i, buf[:], i64(lo))
+	_ = write_string(&i, buf[:], ":")
+	_ = write_i64(&i, buf[:], i64(hi))
+	_ = write_string(&i, buf[:], " is out of range 0..<")
+	_ = write_i64(&i, buf[:], i64(len))
+
+	p := context.assertion_failure_proc
+	if p == nil {
+		p = default_assertion_failure_proc
+	}
+	p("Invalid slice indices", string(buf[:i]), Source_Code_Location{file, line, column, ""})
+}
+
 @(no_instrumentation)
-multi_pointer_slice_handle_error :: proc "contextless" (file: string, line, column: i32, lo, hi: int) -> ! {
+multi_pointer_slice_handle_error_contextless :: proc "contextless" (file: string, line, column: i32, lo, hi: int) -> ! {
 	print_caller_location(Source_Code_Location{file, line, column, ""})
 	print_string(" Invalid slice indices ")
 	print_i64(i64(lo))
@@ -65,54 +104,73 @@ multi_pointer_slice_handle_error :: proc "contextless" (file: string, line, colu
 	bounds_trap()
 }
 
+@(no_instrumentation)
+multi_pointer_slice_handle_error_with_context :: proc (file: string, line, column: i32, lo, hi: int) -> ! {
+	buf: [64]byte = ---
+	i := 0
+	_ = write_i64(&i, buf[:], i64(lo))
+	_ = write_string(&i, buf[:], ":")
+	_ = write_i64(&i, buf[:], i64(hi))
+
+	p := context.assertion_failure_proc
+	if p == nil {
+		p = default_assertion_failure_proc
+	}
+	p("Invalid slice indices", string(buf[:i]), Source_Code_Location{file, line, column, ""})
+}
+
 
 @(disabled=ODIN_NO_BOUNDS_CHECK)
-multi_pointer_slice_expr_error :: proc "contextless" (file: string, line, column: i32, lo, hi: int) {
+multi_pointer_slice_expr_error_contextless :: proc "contextless" (file: string, line, column: i32, lo, hi: int) {
 	if lo <= hi {
 		return
 	}
-	multi_pointer_slice_handle_error(file, line, column, lo, hi)
+	multi_pointer_slice_handle_error_contextless(file, line, column, lo, hi)
 }
 
 @(disabled=ODIN_NO_BOUNDS_CHECK)
-slice_expr_error_hi :: proc "contextless" (file: string, line, column: i32, hi: int, len: int) {
+multi_pointer_slice_expr_error_with_context :: proc (file: string, line, column: i32, lo, hi: int) {
+	if lo <= hi {
+		return
+	}
+	multi_pointer_slice_handle_error_with_context(file, line, column, lo, hi)
+}
+
+@(disabled=ODIN_NO_BOUNDS_CHECK)
+slice_expr_error_hi_contextless :: proc "contextless" (file: string, line, column: i32, hi: int, len: int) {
 	if 0 <= hi && hi <= len {
 		return
 	}
-	slice_handle_error(file, line, column, 0, hi, len)
+	slice_handle_error_contextless(file, line, column, 0, hi, len)
 }
 
 @(disabled=ODIN_NO_BOUNDS_CHECK)
-slice_expr_error_lo_hi :: proc "contextless" (file: string, line, column: i32, lo, hi: int, len: int) {
+slice_expr_error_hi_with_context :: proc (file: string, line, column: i32, hi: int, len: int) {
+	if 0 <= hi && hi <= len {
+		return
+	}
+	slice_handle_error_with_context(file, line, column, 0, hi, len)
+}
+
+@(disabled=ODIN_NO_BOUNDS_CHECK)
+slice_expr_error_lo_hi_contextless :: proc "contextless" (file: string, line, column: i32, lo, hi: int, len: int) {
 	if 0 <= lo && lo <= len && lo <= hi && hi <= len {
 		return
 	}
-	slice_handle_error(file, line, column, lo, hi, len)
+	slice_handle_error_contextless(file, line, column, lo, hi, len)
 }
 
 @(disabled=ODIN_NO_BOUNDS_CHECK)
-dynamic_array_expr_error :: proc "contextless" (file: string, line, column: i32, low, high, max: int) {
-	if 0 <= low && low <= high && high <= max {
+slice_expr_error_lo_hi_with_context :: proc (file: string, line, column: i32, lo, hi: int, len: int) {
+	if 0 <= lo && lo <= len && lo <= hi && hi <= len {
 		return
 	}
-	@(cold, no_instrumentation)
-	handle_error :: proc "contextless" (file: string, line, column: i32, low, high, max: int) -> ! {
-		print_caller_location(Source_Code_Location{file, line, column, ""})
-		print_string(" Invalid dynamic array indices ")
-		print_i64(i64(low))
-		print_string(":")
-		print_i64(i64(high))
-		print_string(" is out of range 0..<")
-		print_i64(i64(max))
-		print_byte('\n')
-		bounds_trap()
-	}
-	handle_error(file, line, column, low, high, max)
+	slice_handle_error_with_context(file, line, column, lo, hi, len)
 }
 
 
 @(disabled=ODIN_NO_BOUNDS_CHECK)
-matrix_bounds_check_error :: proc "contextless" (file: string, line, column: i32, row_index, column_index, row_count, column_count: int) {
+matrix_bounds_check_error_contextless :: proc "contextless" (file: string, line, column: i32, row_index, column_index, row_count, column_count: int) {
 	if uint(row_index) < uint(row_count) &&
 	   uint(column_index) < uint(column_count) {
 		return
@@ -124,13 +182,42 @@ matrix_bounds_check_error :: proc "contextless" (file: string, line, column: i32
 		print_i64(i64(row_index))
 		print_string(", ")
 		print_i64(i64(column_index))
-		print_string(" is out of range [0..<")
+		print_string("] is out of range [0..<")
 		print_i64(i64(row_count))
 		print_string(", 0..<")
 		print_i64(i64(column_count))
 		print_string("]")
 		print_byte('\n')
 		bounds_trap()
+	}
+	handle_error(file, line, column, row_index, column_index, row_count, column_count)
+}
+
+@(disabled=ODIN_NO_BOUNDS_CHECK)
+matrix_bounds_check_error_with_context :: proc (file: string, line, column: i32, row_index, column_index, row_count, column_count: int) {
+	if uint(row_index) < uint(row_count) &&
+	   uint(column_index) < uint(column_count) {
+		return
+	}
+	@(cold, no_instrumentation)
+	handle_error :: proc (file: string, line, column: i32, row_index, column_index, row_count, column_count: int) -> ! {
+		buf: [128]u8 = ---
+		i := 0
+		_ = write_string(&i, buf[:], "[")
+		_ = write_i64(&i, buf[:], i64(row_index))
+		_ = write_string(&i, buf[:], ", ")
+		_ = write_i64(&i, buf[:], i64(column_index))
+		_ = write_string(&i, buf[:], "] is out of range [0..<")
+		_ = write_i64(&i, buf[:], i64(row_count))
+		_ = write_string(&i, buf[:], ", 0..<")
+		_ = write_i64(&i, buf[:], i64(column_count))
+		_ = write_string(&i, buf[:], "]")
+
+		p := context.assertion_failure_proc
+		if p == nil {
+			p = default_assertion_failure_proc
+		}
+		p("Invalid matrix indices", string(buf[:i]), Source_Code_Location{file, line, column, ""})
 	}
 	handle_error(file, line, column, row_index, column_index, row_count, column_count)
 }
@@ -393,20 +480,16 @@ make_map_expr_error_loc :: #force_inline proc "contextless" (loc := #caller_loca
 
 @(disabled=ODIN_NO_BOUNDS_CHECK)
 bounds_check_error_loc :: #force_inline proc "contextless" (loc := #caller_location, index, count: int) {
-	bounds_check_error(loc.file_path, loc.line, loc.column, index, count)
+	bounds_check_error_contextless(loc.file_path, loc.line, loc.column, index, count)
 }
 
 @(disabled=ODIN_NO_BOUNDS_CHECK)
 slice_expr_error_hi_loc :: #force_inline proc "contextless" (loc := #caller_location, hi: int, len: int) {
-	slice_expr_error_hi(loc.file_path, loc.line, loc.column, hi, len)
+	slice_expr_error_hi_contextless(loc.file_path, loc.line, loc.column, hi, len)
 }
 
 @(disabled=ODIN_NO_BOUNDS_CHECK)
 slice_expr_error_lo_hi_loc :: #force_inline proc "contextless" (loc := #caller_location, lo, hi: int, len: int) {
-	slice_expr_error_lo_hi(loc.file_path, loc.line, loc.column, lo, hi, len)
+	slice_expr_error_lo_hi_contextless(loc.file_path, loc.line, loc.column, lo, hi, len)
 }
 
-@(disabled=ODIN_NO_BOUNDS_CHECK)
-dynamic_array_expr_error_loc :: #force_inline proc "contextless" (loc := #caller_location, low, high, max: int) {
-	dynamic_array_expr_error(loc.file_path, loc.line, loc.column, low, high, max)
-}

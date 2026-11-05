@@ -267,6 +267,9 @@ emit_decode_tables :: proc() -> (n_legacy, n_vex, n_evex: int) {
 			}
 		}
 	}
+	drop_aliased(&legacy)
+	drop_aliased(&vex)
+	drop_aliased(&evex)
 	slice.sort_by(legacy[:], entry_less)
 	slice.sort_by(vex[:],    entry_less)
 	slice.sort_by(evex[:],   entry_less)
@@ -288,6 +291,73 @@ emit_decode_tables :: proc() -> (n_legacy, n_vex, n_evex: int) {
 
 	emit_file(DIR_GEN + "decode_tables.odin", &sb)
 	return len(legacy), len(vex), len(evex)
+}
+
+/*
+	Several mnemonics can name ONE encoding (SHL and SAL are both /4 in the shift
+	group; JE and JZ are both 0x74). The decoder reads bytes, so it cannot tell
+	them apart and must simply print one name -- which means the choice has to be
+	declared, or it falls out of wherever the entry lands in the sort below.
+
+	lib.MNEMONIC_ALIASES declares it. An alias entry is dropped here, before the
+	tables are written, so the name never reaches the decoder at all; it stays
+	fully encodable, since ENCODE_FORMS is built from the same table separately.
+
+	The drop is CONDITIONAL on the canonical name covering the byte-identical
+	encoding. That is what keeps the rule safe for a mnemonic that is an alias at
+	one opcode and the only name at another: MOV aliases MOVABS at the `A0`-`A3`
+	moffs and `B8+r` imm64 forms, and dropping it unconditionally would leave
+	`88`/`89` -- ordinary register MOV -- with no decode entry at all.
+*/
+drop_aliased :: proc(entries: ^[dynamic]Collected_Entry) {
+	Key :: struct {
+		esc:    lib.Escape,
+		prefix: u8,
+		opcode: u8,
+		ext:    u8,
+		ops:    [4]lib.Operand_Type,
+		enc:    [4]lib.Operand_Encoding,
+		flags:  lib.Encoding_Flags,
+		vex_w:  lib.VEX_W,
+		vex_l:  lib.VEX_L,
+	}
+	key_of :: proc(e: Collected_Entry) -> Key {
+		return Key{e.esc, e.prefix, e.opcode, e.ext, e.ops, e.enc, e.flags, e.vex_w, e.vex_l}
+	}
+	/* Which mnemonics each indistinguishable encoding is spelled by. */
+	names := make(map[Key][dynamic]lib.Mnemonic)
+	defer {
+		for _, list in names { delete(list) }
+		delete(names)
+	}
+	for e in entries {
+		key := key_of(e)
+		list, present := &names[key]
+		if !present {
+			names[key] = make([dynamic]lib.Mnemonic)
+			list = &names[key]
+		}
+		append(list, e.mnemonic)
+	}
+
+	kept := 0
+	for e in entries {
+		drop := false
+		for entry in lib.MNEMONIC_ALIASES {
+			if entry.alias != e.mnemonic { continue }
+			for spelling in names[key_of(e)] {
+				if spelling == entry.canonical {
+					drop = true
+					break
+				}
+			}
+			if drop { break }
+		}
+		if drop { continue }
+		entries[kept] = e
+		kept += 1
+	}
+	resize(entries, kept)
 }
 
 entry_less :: proc(a, b: Collected_Entry) -> bool {
@@ -470,6 +540,12 @@ write_flags :: proc(sb: ^strings.Builder, enc: union{lib.Encoding, Collected_Ent
 	if flags.rep_ok                { append(&parts, "rep_ok=true") }
 	if flags.modrm_reg_ext         { append(&parts, "modrm_reg_ext=true") }
 	if flags.mode_32_only          { append(&parts, "mode_32_only=true") }
+	if flags.addr_size != .DEFAULT { append(&parts, fmt.tprintf("addr_size=.%v", flags.addr_size)) }
+	/* EVERY Encoding_Flags field must be listed above. This enumerates the
+	   struct by hand, so a field added there and forgotten here is silently
+	   dropped from the generated tables -- the flag reads back as its zero value
+	   and the instruction is quietly mis-modelled, with nothing to see in the
+	   diff but its absence. `addr_size` was added and did exactly that. */
 
 	switch e in enc {
 	case lib.Encoding:

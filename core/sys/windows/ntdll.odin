@@ -7,6 +7,19 @@ foreign import ntdll_lib "system:ntdll.lib"
 foreign ntdll_lib {
 	RtlGetVersion :: proc(lpVersionInformation: ^OSVERSIONINFOEXW) -> NTSTATUS ---
 
+	NtDeviceIoControlFile :: proc(
+		FileHandle:         HANDLE,
+		Event:              HANDLE,
+		ApcRoutine:         PIO_APC_ROUTINE,
+		ApcContext:         rawptr,
+		IoStatusBlock:      PIO_STATUS_BLOCK,
+		IoControlCode:      ULONG,
+		InputBuffer:        rawptr,
+		InputBufferLength:  ULONG,
+		OutputBuffer:       rawptr,
+		OutputBufferLength: ULONG,
+	) -> NTSTATUS ---
+
 
 	NtQueryInformationProcess :: proc(
 		ProcessHandle:            HANDLE,

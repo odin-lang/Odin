@@ -4153,11 +4153,31 @@ gbString gb_string_append_rune(gbString str, Rune r) {
 gbString gb_string_append_fmt(gbString str, char const *fmt, ...) {
 	isize res;
 	char buf[4096] = {0};
+	char *text = buf;
+	isize cap = gb_count_of(buf);
 	va_list va;
 	va_start(va, fmt);
-	res = gb_snprintf_va(buf, gb_count_of(buf)-1, fmt, va)-1;
+	for (;;) {
+		va_list args;
+		va_copy(args, va);
+		res = gb_snprintf_va(text, cap, fmt, args);
+		va_end(args);
+		if (res >= 0) {
+			break;
+		}
+		// it did not fit, and gb_snprintf_va does not say how much space it needs
+		if (text != buf) {
+			gb_free(gb_heap_allocator(), text);
+		}
+		cap *= 2;
+		text = gb_alloc_array(gb_heap_allocator(), char, cap);
+	}
 	va_end(va);
-	return gb_string_append_length(str, buf, res);
+	str = gb_string_append_length(str, text, res-1);
+	if (text != buf) {
+		gb_free(gb_heap_allocator(), text);
+	}
+	return str;
 }
 
 

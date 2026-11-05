@@ -59,9 +59,9 @@ name_test :: proc(_t: ^testing.T) {
 	name_test_t = _t
 
 	t := thread.create_and_start(name = "test_name", fn = proc() {
-		main_wait = false
+		intrinsics.atomic_store(&main_wait, false)
 
-		for (child_wait) {}
+		for intrinsics.atomic_load(&child_wait) {}
 
 		n, err  := thread.get_name()
 		defer if err != nil {
@@ -73,7 +73,7 @@ name_test :: proc(_t: ^testing.T) {
 	})
 	defer free(t)
 
-	for (main_wait) {}
+	for intrinsics.atomic_load(&main_wait) {}
 
 	n, err := thread.get_name(t)
 	defer if err != nil {
@@ -82,7 +82,7 @@ name_test :: proc(_t: ^testing.T) {
 	testing.expect(name_test_t, err == nil, "thread name allocation failed")
 	testing.expectf(name_test_t, n == "test_name","thread name on main did not match : got %v", n)
 
-	child_wait = false
+	intrinsics.atomic_store(&child_wait, false)
 
 	thread.join(t)
 }

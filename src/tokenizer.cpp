@@ -154,15 +154,28 @@ GB_STATIC_ASSERT(Token__KeywordEnd-Token__KeywordBegin <= gb_count_of(keyword_ha
 gb_global isize const min_keyword_size = 2;
 gb_global isize max_keyword_size = 11;
 gb_global bool keyword_indices[16] = {};
+gb_global u32  keyword_first_letters = 0; // a bit for each letter from 'a' which a keyword starts with
 
 
 gb_internal gb_inline u32 keyword_hash(u8 const *text, isize len) {
-	return fnv32a(text, len);
+	return cast(u32)len + text[0] + 3*text[1] + 26*text[len-1];
 }
+
+gb_internal gb_inline bool could_be_keyword(String const &s) {
+	if (s.len < min_keyword_size || s.len > max_keyword_size || !keyword_indices[s.len]) {
+		return false;
+	}
+	u32 first = cast(u32)s[0] - 'a';
+	return first < 26 && (keyword_first_letters & (1u<<first)) != 0;
+}
+
 gb_internal void add_keyword_hash_entry(String const &s, TokenKind kind) {
 	max_keyword_size = gb_max(max_keyword_size, s.len);
 
 	keyword_indices[s.len] = true;
+
+	GB_ASSERT('a' <= s[0] && s[0] <= 'z');
+	keyword_first_letters |= 1u<<(s[0]-'a');
 
 	u32 hash = keyword_hash(s.text, s.len);
 
@@ -235,8 +248,9 @@ TokenPos token_pos_add_column(TokenPos pos) {
 }
 
 enum TokenFlag : u8 {
-	TokenFlag_Remove  = 1<<1,
-	TokenFlag_Replace = 1<<2,
+	TokenFlag_Remove      = 1<<1,
+	TokenFlag_Replace     = 1<<2,
+	TokenFlag_Synthesized = 1<<3, // NOTE(bill): `string` is not the source text at `pos`
 };
 
 struct Token {
@@ -247,14 +261,14 @@ struct Token {
 };
 
 Token empty_token = {Token_Invalid};
-Token blank_token = {Token_Ident, 0, {cast(u8 *)"_", 1}};
+Token blank_token = {Token_Ident, TokenFlag_Synthesized, {cast(u8 *)"_", 1}};
 
 gb_internal Token make_token_ident(String s) {
-	Token t = {Token_Ident, 0, s};
+	Token t = {Token_Ident, TokenFlag_Synthesized, s};
 	return t;
 }
 gb_internal Token make_token_ident(char const *s) {
-	Token t = {Token_Ident, 0, make_string_c(s)};
+	Token t = {Token_Ident, TokenFlag_Synthesized, make_string_c(s)};
 	return t;
 }
 
@@ -348,18 +362,14 @@ gb_internal void tokenizer_err(Tokenizer *t, TokenPos const &pos, char const *ms
 	t->error_count++;
 }
 
-gb_internal void advance_to_next_rune(Tokenizer *t) {
-	if (t->curr_rune == '\n') {
-		t->column_minus_one = -1;
-		t->line_count++;
-	}
+gb_internal void advance_to_next_rune_slow(Tokenizer *t) {
 	if (t->read_curr < t->end) {
 		t->curr = t->read_curr;
 		Rune rune = *t->read_curr;
 		if (rune == 0) {
 			tokenizer_err(t, "Illegal character NUL");
 			t->read_curr++;
-		} else if (rune & 0x80) { // not ASCII
+		} else { // not ASCII
 			isize width = utf8_decode(t->read_curr, t->end-t->read_curr, &rune);
 			t->read_curr += width;
 			if (rune == GB_RUNE_INVALID && width == 1) {
@@ -367,14 +377,40 @@ gb_internal void advance_to_next_rune(Tokenizer *t) {
 			} else if (rune == GB_RUNE_BOM && t->curr-t->start > 0){
 				tokenizer_err(t, "Illegal byte order mark");
 			}
-		} else {
-			t->read_curr++;
 		}
 		t->curr_rune = rune;
 		t->column_minus_one++;
 	} else {
 		t->curr = t->end;
 		t->curr_rune = GB_RUNE_EOF;
+	}
+}
+
+gb_internal gb_inline void advance_to_next_rune(Tokenizer *t) {
+	if (t->curr_rune == '\n') {
+		t->column_minus_one = -1;
+		t->line_count++;
+	}
+	if (t->read_curr < t->end) {
+		u8 c = *t->read_curr;
+		if (c != 0 && c < 0x80) {
+			t->curr = t->read_curr;
+			t->read_curr++;
+			t->curr_rune = c;
+			t->column_minus_one++;
+			return;
+		}
+	}
+	advance_to_next_rune_slow(t);
+}
+
+// Skips over the characters before `p`, which are ASCII and not newlines, as `advance_to_next_rune` would one at a time
+gb_internal gb_inline void tokenizer_skip_ascii_to(Tokenizer *t, u8 *p) {
+	if (p > t->read_curr) {
+		t->column_minus_one += cast(i32)(p - t->read_curr);
+		t->curr      = p-1;
+		t->curr_rune = p[-1];
+		t->read_curr = p;
 	}
 }
 
@@ -403,8 +439,13 @@ gb_global TokenizerInitError loaded_file_error_map_to_tokenizer[LoadedFile_COUNT
 };
 
 gb_internal TokenizerInitError init_tokenizer_from_fullpath(Tokenizer *t, String const &fullpath, bool copy_file_contents) {
+	String load_path = fullpath;
+	OverlayEntry *overlay = overlay_find(fullpath);
+	if (overlay != nullptr && overlay->replacement.len != 0) {
+		load_path = overlay->replacement;
+	}
 	LoadedFileError file_err = load_file_32(
-		alloc_cstring(temporary_allocator(), fullpath), 
+		alloc_cstring(temporary_allocator(), load_path),
 		&t->loaded_file,
 		copy_file_contents
 	);
@@ -651,8 +692,22 @@ gb_internal bool scan_escape(Tokenizer *t) {
 
 gb_internal gb_inline void tokenizer_skip_line(Tokenizer *t) {
 	while (t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
+		u8 *p = t->read_curr;
+		while (p < t->end && *p != '\n' && *p != 0 && *p < 0x80) {
+			p++;
+		}
+		tokenizer_skip_ascii_to(t, p);
 		advance_to_next_rune(t);
 	}
+}
+
+gb_internal gb_inline void tokenizer_skip_spaces(Tokenizer *t) {
+	u8 *p = t->read_curr;
+	while (p < t->end && (*p == ' ' || *p == '\t' || *p == '\r')) {
+		p++;
+	}
+	tokenizer_skip_ascii_to(t, p);
+	advance_to_next_rune(t);
 }
 
 gb_internal gb_inline void tokenizer_skip_whitespace(Tokenizer *t, bool on_newline) {
@@ -662,7 +717,7 @@ gb_internal gb_inline void tokenizer_skip_whitespace(Tokenizer *t, bool on_newli
 			case ' ':
 			case '\t':
 			case '\r':
-				advance_to_next_rune(t);
+				tokenizer_skip_spaces(t);
 				continue;
 			}
 			break;
@@ -671,10 +726,12 @@ gb_internal gb_inline void tokenizer_skip_whitespace(Tokenizer *t, bool on_newli
 		for (;;) {
 			switch (t->curr_rune) {
 			case '\n':
+				advance_to_next_rune(t);
+				continue;
 			case ' ':
 			case '\t':
 			case '\r':
-				advance_to_next_rune(t);
+				tokenizer_skip_spaces(t);
 				continue;
 			}
 			break;
@@ -698,6 +755,11 @@ gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 	Rune curr_rune = t->curr_rune;
 	if (rune_is_letter(curr_rune)) {
 		token->kind = Token_Ident;
+		u8 *p = t->read_curr;
+		while (p < t->end && *p < 0x80 && rune_is_letter_or_digit(*p)) {
+			p++;
+		}
+		tokenizer_skip_ascii_to(t, p);
 		while (rune_is_letter_or_digit(t->curr_rune)) {
 			advance_to_next_rune(t);
 		}
@@ -705,7 +767,7 @@ gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 		token->string.len = t->curr - token->string.text;
 
 		// NOTE(bill): Heavily optimize to make it faster to find keywords
-		if (1 < token->string.len && token->string.len <= max_keyword_size && keyword_indices[token->string.len]) {
+		if (could_be_keyword(token->string)) {
 			u32 hash = keyword_hash(token->string.text, token->string.len);
 			u32 index = hash & KEYWORD_HASH_TABLE_MASK;
 			KeywordHashEntry *entry = &keyword_hash_table[index];

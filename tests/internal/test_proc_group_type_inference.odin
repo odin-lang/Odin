@@ -309,3 +309,20 @@ test_type_inference_on_literals_for_various_types :: proc(t: ^testing.T) {
 	testing.expect_value(t, group_matrix({1, 2, 3, 4}),               matrix[2,2]f32{1, 2, 3, 4})
 	testing.expect_value(t, group_matrix({}),                         matrix[2,2]f32{})
 }
+
+@test
+test_type_inference_on_address_of_literals :: proc(t: ^testing.T) {
+	S :: struct {x, y: int}
+	T :: struct {a: f32}
+	proc_s      :: proc(p: ^S) -> int { return p.y }
+	proc_t      :: proc(p: ^T) -> int { return int(p.a) }
+	proc_string :: proc(s: string) -> int { return -1 }
+	group :: proc{proc_s, proc_t, proc_string}
+
+	testing.expect_value(t, group(&{1, 2}),  2)
+	testing.expect_value(t, group(&{y = 3}), 3)
+	testing.expect_value(t, group(&{a = 4}), 4)
+
+	poly :: proc(a: $E, p: ^E) -> E { return p^ }
+	testing.expect_value(t, poly(S{}, &{5, 6}), S{5, 6})
+}

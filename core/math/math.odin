@@ -246,10 +246,8 @@ pow2_f16 :: proc "contextless" (#any_int exp: int) -> (res: f16) {
 	switch {
 	case exp >= -14 && exp <= 15:    // Normal
 		return transmute(f16)(u16(exp + F16_BIAS) << F16_SHIFT)
-	case exp < -25:                  // Underflow
+	case exp < -24:                  // Underflow
 		return 0h0000
-	case exp == -25:                 // Underflow
-		return 0h0001
 	case exp < -14:                  // Denormal
 		x := u16(exp + (F16_SHIFT + 1) + F16_BIAS) << F16_SHIFT
 		return f16(1) / (1 << (F16_SHIFT + 1)) * transmute(f16)x
@@ -388,11 +386,11 @@ tan :: proc{
 	tan_f64, tan_f64le, tan_f64be,
 }
 
-@(require_results) lerp :: proc "contextless" (a, b: $T, t: $E) -> (x: T) { return a*(1-t) + b*t }
-@(require_results) saturate :: proc "contextless" (a: $T) -> (x: T) { return clamp(a, 0, 1) }
+@(require_results) lerp     :: #force_inline proc "contextless" (a, b: $T, t: $E) -> (x: T) { return a*(1-t) + b*t }
+@(require_results) saturate :: #force_inline proc "contextless" (a: $T) -> (x: T) { return clamp(a, 0, 1) }
 
 @(require_results)
-unlerp :: proc "contextless" (a, b, x: $T) -> (t: T) where intrinsics.type_is_float(T), !intrinsics.type_is_array(T) {
+unlerp :: #force_inline proc "contextless" (a, b, x: $T) -> (t: T) where intrinsics.type_is_float(T), !intrinsics.type_is_array(T) {
 	return (x-a)/(b-a)
 }
 
@@ -424,7 +422,6 @@ wrap :: proc "contextless" (x, y: $T) -> T where intrinsics.type_is_numeric(T), 
 }
 @(require_results)
 angle_diff :: proc "contextless" (a, b: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
-
 	dist := wrap(b - a, TAU)
 	return wrap(dist*2, TAU) - dist
 }

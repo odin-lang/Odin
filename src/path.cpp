@@ -330,20 +330,19 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 		return ReadDirectory_InvalidPath;
 	}
 	{
-		char *c_str = alloc_cstring(temporary_allocator(), path);
-		gbFile f = {};
-		gbFileError file_err = gb_file_open(&f, c_str);
-		defer (gb_file_close(&f));
-
-		switch (file_err) {
-		case gbFileError_Invalid:    return ReadDirectory_InvalidPath;
-		case gbFileError_NotExists:  return ReadDirectory_NotExists;
-		// case gbFileError_Permission: return ReadDirectory_Permission;
+		// NOTE(bill): whether it exists and whether it is a directory, can be expressed in one query
+		String16 wpath = string_to_string16(temporary_allocator(), path);
+		DWORD attributes = GetFileAttributesW(cast(wchar_t *)wpath.text);
+		if (attributes == INVALID_FILE_ATTRIBUTES) {
+			switch (GetLastError()) {
+			case ERROR_FILE_NOT_FOUND: return ReadDirectory_NotExists;
+			case ERROR_ACCESS_DENIED:  return ReadDirectory_NotDir;
+			}
+			return ReadDirectory_InvalidPath;
 		}
-	}
-
-	if (!path_is_directory(path)) {
-		return ReadDirectory_NotDir;
+		if ((attributes & FILE_ATTRIBUTE_DIRECTORY) == 0) {
+			return ReadDirectory_NotDir;
+		}
 	}
 
 
@@ -360,7 +359,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 	defer (gb_free(a, wstr.text));
 
 	WIN32_FIND_DATAW file_data = {};
-	HANDLE find_file = FindFirstFileW(cast(wchar_t *)wstr.text, &file_data);
+	HANDLE find_file = FindFirstFileExW(cast(wchar_t *)wstr.text, FindExInfoBasic, &file_data, FindExSearchNameMatch, nullptr, FIND_FIRST_EX_LARGE_FETCH);
 	if (find_file == INVALID_HANDLE_VALUE) {
 		return ReadDirectory_Unknown;
 	}
@@ -515,3 +514,67 @@ gb_internal bool write_directory(String path) {
 	return true;
 }
 #endif
+
+
+struct OverlayEntry {
+	String path;
+	String replacement; // empty when the file is deleted
+};
+
+gb_global Array<OverlayEntry> global_overlays;
+
+gb_internal bool overlay_path_eq(String const &a, String const &b) {
+#if defined(GB_SYSTEM_WINDOWS)
+	return str_eq_ignore_case(a, b);
+#else
+	return a == b;
+#endif
+}
+
+gb_internal OverlayEntry *overlay_find(String const &fullpath) {
+	for (OverlayEntry &e : global_overlays) {
+		if (overlay_path_eq(e.path, fullpath)) {
+			return &e;
+		}
+	}
+	return nullptr;
+}
+
+gb_internal void overlay_directory(String dir, Array<FileInfo> *list) {
+	if (global_overlays.count == 0) {
+		return;
+	}
+	while (dir.len > 0 && (dir[dir.len-1] == '/' || dir[dir.len-1] == '\\')) {
+		dir.len -= 1;
+	}
+	for (isize i = list->count-1; i >= 0; i--) {
+		OverlayEntry *e = overlay_find((*list)[i].fullpath);
+		if (e == nullptr) {
+			continue;
+		}
+		if (e->replacement.len == 0) {
+			array_ordered_remove(list, i);
+		} else {
+			(*list)[i].size = get_file_size(e->replacement);
+		}
+	}
+	for (OverlayEntry const &e : global_overlays) {
+		if (e.replacement.len == 0 || !overlay_path_eq(directory_from_path(e.path), dir)) {
+			continue;
+		}
+		bool on_disk = false;
+		for (FileInfo const &fi : *list) {
+			if (overlay_path_eq(fi.fullpath, e.path)) {
+				on_disk = true;
+				break;
+			}
+		}
+		if (!on_disk) {
+			FileInfo fi = {};
+			fi.name     = filename_without_directory(e.path);
+			fi.fullpath = concatenate3_strings(permanent_allocator(), dir, str_lit("/"), fi.name);
+			fi.size     = get_file_size(e.replacement);
+			array_add(list, fi);
+		}
+	}
+}

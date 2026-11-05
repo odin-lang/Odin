@@ -837,32 +837,68 @@ test_verify_chain_bad_issuers :: proc(t: ^testing.T) {
 	}
 }
 
+// PERF: Tamper sweeps are in separate tests.
+//       These take very long and there isn't an easy way to optimize.
+//       The least we can do is allow the test runner to multithread them.
+
+@(test)
+test_verify_signature_tamper_sweep_ECDSA_1 :: proc(t: ^testing.T) {
+	check_tamper_sweep(t, EC_CHAIN_LEAF, EC_CHAIN_INTER, .low)
+}
+
+@(test)
+test_verify_signature_tamper_sweep_ECDSA_2 :: proc(t: ^testing.T) {
+	check_tamper_sweep(t, EC_CHAIN_LEAF, EC_CHAIN_INTER, .high)
+}
+
+@(test)
+test_verify_signature_tamper_sweep_Ed25519_1 :: proc(t: ^testing.T) {
+	check_tamper_sweep(t, ED_CHAIN_LEAF, ED_CHAIN_ROOT, .low)
+}
+
+@(test)
+test_verify_signature_tamper_sweep_Ed25519_2 :: proc(t: ^testing.T) {
+	check_tamper_sweep(t, ED_CHAIN_LEAF, ED_CHAIN_ROOT, .high)
+}
+
+@(private="file")
+check_tamper_sweep_range :: enum {
+	low,
+	high,
+}
+
 // Single-byte tamper sweep: no one-byte mutation of a signed certificate
 // may BOTH parse cleanly AND verify against its true issuer. The whole
 // TBSCertificate is signature-covered and the framing/algorithm/signature
 // bytes are structurally checked, so every flip must be caught by parse
 // or by the signature. A survivor would mean a trusted region the
 // signature does not actually protect.
-@(test)
-test_verify_signature_tamper_sweep :: proc(t: ^testing.T) {
-	check :: proc(t: ^testing.T, der, issuer_der: []byte) {
-		issuer, ierr := x509.parse(issuer_der)
-		defer x509.destroy(&issuer)
-		testing.expect_value(t, ierr, x509.Error.None)
+@(private="file")
+check_tamper_sweep :: proc(t: ^testing.T, der, issuer_der: []byte, range: check_tamper_sweep_range) {
+	issuer, ierr := x509.parse(issuer_der)
+	defer x509.destroy(&issuer)
+	testing.expect_value(t, ierr, x509.Error.None)
 
-		buf := make([]byte, len(der))
-		defer delete(buf)
-		for pos in 0 ..< len(der) {
-			copy(buf, der)
-			buf[pos] ~= 0x01
-			cert, perr := x509.parse(buf)
-			if perr == .None {
-				accepted := x509.verify_signature(&cert, &issuer) == .None
-				x509.destroy(&cert)
-				testing.expectf(t, !accepted, "tampered byte %d parsed and verified", pos)
-			}
+	buf := make([]byte, len(der))
+	defer delete(buf)
+
+	// Divide the sweep range in 2 parts to allow for more threads running these tests.
+	pivot := len(der) / 2
+	min, max: int
+	switch range {
+	case .low:   min, max = 0, pivot
+	case .high:  min, max = pivot, len(der)
+	case: unreachable()
+	}
+
+	for pos in min ..< max {
+		copy(buf, der)
+		buf[pos] ~= 0x01
+		cert, perr := x509.parse(buf)
+		if perr == .None {
+			accepted := x509.verify_signature(&cert, &issuer) == .None
+			x509.destroy(&cert)
+			testing.expectf(t, !accepted, "tampered byte %d parsed and verified", pos)
 		}
 	}
-	check(t, EC_CHAIN_LEAF, EC_CHAIN_INTER)
-	check(t, ED_CHAIN_LEAF, ED_CHAIN_ROOT)
 }

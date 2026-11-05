@@ -27,15 +27,19 @@ TLSDestructorCallback :: #type proc "c" (value: rawptr)
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
+	@(synchronizes=.Release)
 	CreateThreadRuntime :: proc(fn: ThreadFunction, name: cstring, data: rawptr, pfnBeginThread: FunctionPointer, pfnEndThread: FunctionPointer) -> ^Thread ---
+	@(synchronizes=.Release)
 	CreateThreadWithPropertiesRuntime :: proc(props: PropertiesID, pfnBeginThread: FunctionPointer, pfnEndThread: FunctionPointer) -> ^Thread ---
 }
 
 @(require_results)
+@(synchronizes=.Release)
 CreateThread :: proc "c" (fn: ThreadFunction, name: cstring, data: rawptr) -> ^Thread {
 	return CreateThreadRuntime(fn, name, data, BeginThreadFunction(), EndThreadFunction())
 }
 @(require_results)
+@(synchronizes=.Release)
 CreateThreadWithProperties :: proc "c" (props: PropertiesID) -> ^Thread {
 	return CreateThreadWithPropertiesRuntime(props, BeginThreadFunction(), EndThreadFunction())
 }
@@ -88,6 +92,7 @@ foreign lib {
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
 	SetCurrentThreadPriority :: proc(priority: ThreadPriority) -> bool ---
+	@(synchronizes=.Acquire)
 	WaitThread               :: proc(thread: ^Thread, status: ^c.int) ---
 	DetachThread             :: proc(thread: ^Thread) ---
 	CleanupTLS               :: proc() ---

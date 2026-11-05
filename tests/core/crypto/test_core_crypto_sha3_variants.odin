@@ -66,6 +66,27 @@ test_shake :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_shake_reused_context :: proc(t: ^testing.T) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	// TurboSHAKE runs reduced rounds; init must restore all 24 for SHAKE.
+	ctx: shake.Context
+	turboshake.init_128((^turboshake.Context)(&ctx))
+	shake.init_128(&ctx)
+
+	dst: [16]byte
+	shake.read(&ctx, dst[:])
+
+	dst_str := string(hex.encode(dst[:], context.temp_allocator))
+	testing.expectf(
+		t,
+		dst_str == "7f9c2ba4e88f827d616045507605853e",
+		"SHAKE128 after TurboSHAKE128: Expected: 7f9c2ba4e88f827d616045507605853e, but got %s instead",
+		dst_str,
+	)
+}
+
+@(test)
 test_cshake :: proc(t: ^testing.T) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 

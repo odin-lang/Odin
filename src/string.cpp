@@ -293,6 +293,20 @@ gb_internal String string_split_iterator(String_Iterator *it, const char sep) {
 	return substring(it->str, start, end);
 }
 
+// NOTE: `string_split_iterator` returns a zero-length `String` both for an empty element and at
+// exhaustion, so a loop that stops on an empty result stops at the first empty element instead.
+// This skips empty elements and stops only once the iterator is exhausted.
+gb_internal bool string_split_iterator_next(String_Iterator *it, char const sep, String *str_) {
+	while (it->pos < it->str.len) {
+		String str = string_split_iterator(it, sep);
+		if (str.len != 0) {
+			*str_ = str;
+			return true;
+		}
+	}
+	return false;
+}
+
 gb_internal gb_inline bool is_separator(u8 const &ch) {
 	return (ch == '/' || ch == '\\');
 }

@@ -549,7 +549,7 @@ test_p256_scalar_mul :: proc(t: ^testing.T) {
 		y_bytes, _ := hex.decode(transmute([]byte)(v.y), context.temp_allocator)
 
 		k_big: big.Int
-		err := big.set(&k_big, v.scalar, 10, context.temp_allocator)
+		err := big.set(&k_big, v.scalar, 10, allocator = context.temp_allocator)
 		testing.expectf(t, err == nil, "failed to parse k", err)
 
 		k_sz: int
@@ -852,7 +852,7 @@ test_p384_scalar_mul :: proc(t: ^testing.T) {
 		y_bytes, _ := hex.decode(transmute([]byte)(v.y), context.temp_allocator)
 
 		k_big: big.Int
-		err := big.set(&k_big, v.scalar, 10, context.temp_allocator)
+		err := big.set(&k_big, v.scalar, 10, allocator = context.temp_allocator)
 		testing.expectf(t, err == nil, "failed to parse k", err)
 
 		k_sz: int
@@ -916,6 +916,42 @@ test_p256_s11n_sec_generator :: proc(t: ^testing.T) {
 
 	ok = ec.pt_set_sec_bytes(&p, b[:])
 	testing.expectf(t, ok, "%s", s)
+	testing.expect(t, ec.pt_equal(&g, &p) == 1)
+}
+
+@(test)
+test_p256_fe_sqrt_quadratic_residue :: proc(t: ^testing.T) {
+	for xv in u64(1) ..= u64(1024) {
+		xb: [32]byte
+		xb[30] = byte(xv >> 8)
+		xb[31] = byte(xv)
+
+		x, yy, root, check: ec.Field_Element_p256r1
+		ok := ec.fe_set_bytes(&x, xb[:])
+		testing.expect(t, ok)
+
+		ec.fe_square(&yy, &x)
+		root_ok := ec.fe_sqrt(&root, &yy)
+		testing.expectf(t, root_ok == 1, "fe_sqrt failed for x = %v", xv)
+
+		ec.fe_square(&check, &root)
+		testing.expectf(t, ec.fe_equal(&check, &yy) == 1, "root^2 != x^2 for x = %v", xv)
+	}
+}
+
+@(test)
+test_p256_s11n_sec_compressed_generator :: proc(t: ^testing.T) {
+	p, g: ec.Point_p256r1
+
+	ec.pt_generator(&g)
+
+	b: [33]byte
+	ok := ec.pt_sec_bytes(b[:], &g, true)
+	testing.expect(t, ok)
+	testing.expect(t, b[0] == 0x03)
+
+	ok = ec.pt_set_sec_bytes(&p, b[:])
+	testing.expect(t, ok)
 	testing.expect(t, ec.pt_equal(&g, &p) == 1)
 }
 

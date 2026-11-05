@@ -70,7 +70,7 @@ MAX_SHIFT :: PLATFORM_BITS>>1
 		}
 */
 Array :: struct($T: typeid, $SHIFT: uint) where 0 < SHIFT, SHIFT <= MAX_SHIFT {
-	chunks:    [(1 << (_LOG2_PLATFORM_BITS - intrinsics.constant_log2(SHIFT))) + 1][^]T,
+	chunks:    [PLATFORM_BITS - SHIFT + 1][^]T,
 	len:       int,
 	allocator: runtime.Allocator,
 }

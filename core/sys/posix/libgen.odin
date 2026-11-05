@@ -75,7 +75,8 @@ foreign lib {
 	dirname :: proc(path: cstring) -> cstring ---
 }
 
-when ODIN_OS == .Linux {
+// Bionic's `basename` is already the POSIX one.
+when ODIN_OS == .Linux && ODIN_PLATFORM_SUBTARGET != .Android {
 	@(private) LBASENAME :: "__xpg_basename"
 } else {
 	@(private) LBASENAME :: "basename"

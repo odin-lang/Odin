@@ -5444,6 +5444,8 @@ AccelerationStructureMotionInfoFlagsNV               :: distinct bit_set[Acceler
 AccelerationStructureMotionInfoFlagNV                :: enum u32 {}
 AccelerationStructureMotionInstanceFlagsNV           :: distinct bit_set[AccelerationStructureMotionInstanceFlagNV; Flags]
 AccelerationStructureMotionInstanceFlagNV            :: enum u32 {}
+AndroidSurfaceCreateFlagsKHR                         :: distinct bit_set[AndroidSurfaceCreateFlagKHR; Flags]
+AndroidSurfaceCreateFlagKHR                          :: enum u32 {}
 BufferViewCreateFlags                                :: distinct bit_set[BufferViewCreateFlag; Flags]
 BufferViewCreateFlag                                 :: enum u32 {}
 CommandPoolTrimFlags                                 :: distinct bit_set[CommandPoolTrimFlag; Flags]

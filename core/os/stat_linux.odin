@@ -32,6 +32,7 @@ _fstat_internal :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> (fi: File
 		fullpath          = _get_full_path(fd, allocator) or_return,
 		name              = "",
 		inode             = u128(u64(s.ino)),
+		device            = u64(linux.makedev(s.dev_major, s.dev_minor)),
 		size              = i64(s.size),
 		mode              = mode,
 		type              = type,
@@ -46,6 +47,12 @@ _fstat_internal :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> (fi: File
 
 // NOTE: _stat and _lstat are using _fstat to avoid a race condition when populating fullpath
 _stat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, err: Error) {
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		if _is_asset_name(name) {
+			return _stat_asset(name, allocator)
+		}
+	}
+
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 	name_cstr := clone_to_cstring(name, temp_allocator) or_return
 
@@ -58,6 +65,12 @@ _stat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, err
 }
 
 _lstat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, err: Error) {
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		if _is_asset_name(name) {
+			return _stat_asset(name, allocator)
+		}
+	}
+
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 	name_cstr := clone_to_cstring(name, temp_allocator) or_return
 

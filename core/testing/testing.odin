@@ -160,7 +160,8 @@ set_fail_timeout :: proc(t: ^T, duration: time.Duration, loc := #caller_location
 
 /*
 Let the test runner know that it should expect an assertion failure from a
-specific location in the source code for this test.
+specific location in the source code for this test. The test fails if it
+returns without one.
 
 In the event that an assertion fails, a debug message will be logged with its
 exact message and location in a copyable format to make it convenient to write
@@ -183,7 +184,7 @@ expect_assert_from :: proc(t: ^T, expected_place: runtime.Source_Code_Location, 
 
 /*
 Let the test runner know that it should expect an assertion failure with a
-specific message for this test.
+specific message for this test. The test fails if it returns without one.
 
 In the event that an assertion fails, a debug message will be logged with its
 exact message and location in a copyable format to make it convenient to write
@@ -211,7 +212,7 @@ expect_assert :: proc {
 
 /*
 Let the test runner know that it should expect a signal to be raised within
-this test.
+this test. The test fails if it returns without one.
 
 This API is for advanced users, as arbitrary signals will not be caught; only
 the ones already handled by the test runner, such as

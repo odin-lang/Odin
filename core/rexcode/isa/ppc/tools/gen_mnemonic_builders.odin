@@ -364,7 +364,7 @@ generate_inst_proc :: proc(sb: ^strings.Builder, entry: Proc_Entry, pad: int) {
 	strings.write_string(sb, " }\n")
 }
 
-// emit_<mnem>_<suffix> :: #force_inline proc(instructions, params) { append(instructions, inst_<...>(args)) }
+// emit_<mnem>_<suffix> :: #force_inline proc(instructions, params) { append_elem(instructions, inst_<...>(args)) }
 generate_emit_proc :: proc(sb: ^strings.Builder, entry: Proc_Entry, pad: int) {
 	ops := entry.ops
 	names := param_names(ops[:entry.count])
@@ -380,7 +380,7 @@ generate_emit_proc :: proc(sb: ^strings.Builder, entry: Proc_Entry, pad: int) {
 		strings.write_string(sb, ": ")
 		strings.write_string(sb, op_param_type(entry.ops[i]))
 	}
-	strings.write_string(sb, ") { append(instructions, ")
+	strings.write_string(sb, ") { append_elem(instructions, ")
 	strings.write_string(sb, entry.proc_name)
 	strings.write_string(sb, "(")
 	for i in 0..<entry.count {

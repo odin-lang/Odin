@@ -392,12 +392,14 @@ ArenaTemp arena_temp_begin(Arena *arena) {
 	GB_ASSERT(arena);
 	GB_ASSERT(arena->parent_thread == get_current_thread());
 
+	if (arena->curr_block == nullptr) {
+		arena_alloc(arena, 0, 1);
+	}
+
 	ArenaTemp temp = {};
 	temp.arena = arena;
 	temp.block = arena->curr_block;
-	if (arena->curr_block != nullptr) {
-		temp.used = arena->curr_block->used;
-	}
+	temp.used  = arena->curr_block->used;
 	arena->temp_count += 1;
 	return temp;
 }
@@ -428,8 +430,8 @@ void arena_temp_end(ArenaTemp const &temp) {
 		MemoryBlock *block = arena->curr_block;
 		if (block) {
 			GB_ASSERT_MSG(block->used >= temp.used, "out of order use of arena_temp_end");
-			isize amount_to_zero = gb_min(block->used - temp.used, block->size - block->used);
-			gb_zero_size(block->base + temp.used, amount_to_zero);
+			// `arena_alloc` expects the memory to be zeroed already
+			gb_zero_size(block->base + temp.used, block->used - temp.used);
 			block->used = temp.used;
 		}
 	}
@@ -605,16 +607,14 @@ gb_internal gbAllocator permanent_allocator() {
 }
 
 gb_internal gbAllocator temporary_allocator() {
-	// return {thread_arena_allocator_proc, cast(void *)cast(uintptr)ThreadArena_Temporary};
-	return permanent_allocator();
+	return {thread_arena_allocator_proc, cast(void *)cast(uintptr)ThreadArena_Temporary};
 }
 
 
 #define TEMP_ARENA_GUARD(arena) ArenaTempGuard GB_DEFER_3(_arena_guard_){arena}
 
 
-// #define TEMPORARY_ALLOCATOR_GUARD() TEMP_ARENA_GUARD(get_arena(ThreadArena_Temporary))
-#define TEMPORARY_ALLOCATOR_GUARD()
+#define TEMPORARY_ALLOCATOR_GUARD() TEMP_ARENA_GUARD(get_arena(ThreadArena_Temporary))
 #define PERMANENT_ALLOCATOR_GUARD()
 
 

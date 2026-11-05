@@ -41,22 +41,9 @@ struct Asm_riscv {
 	enum PrefixKind : u8 { PrefixKind_None };
 	
 
-	static const u16 REG_CLASS_NONE  = 0x000;
-	static const u16 REG_CLASS_GPR64 = 0x100;
-	static const u16 REG_CLASS_GPR32 = 0x200;
-	static const u16 REG_CLASS_GPR16 = 0x300;
-	static const u16 REG_CLASS_GPR8  = 0x400;
-	static const u16 REG_CLASS_GPR8H = 0x500;  // AH, CH, DH, BH - legacy high byte regs
-	static const u16 REG_CLASS_XMM   = 0x600;
-	static const u16 REG_CLASS_YMM   = 0x700;
-	static const u16 REG_CLASS_ZMM   = 0x800;
-	static const u16 REG_CLASS_K     = 0x900;  // opmask
-	static const u16 REG_CLASS_SEG   = 0xA00;  // segment
-	static const u16 REG_CLASS_CR    = 0xB00;  // control
-	static const u16 REG_CLASS_DR    = 0xC00;  // debug
-	static const u16 REG_CLASS_BND   = 0xD00;  // bound
-	static const u16 REG_CLASS_MM    = 0xE00;  // MMX
-	static const u16 REG_CLASS_ST    = 0xF00;  // x87 FPU
+	static const u16 REG_CLASS_NONE = 0x0000;
+	static const u16 REG_CLASS_GPR  = 0x0100; // x0..x31
+	static const u16 REG_CLASS_FPR  = 0x0200; // f0..f31
 	
 	enum Register : u16 {
 		REG_INVALID, REG_ZERO, REG_RA, REG_SP, REG_GP, REG_TP, REG_T0, REG_T1, REG_T2, REG_S0, REG_S1, REG_A0, REG_A1, REG_A2, REG_A3, REG_A4, 
@@ -66,188 +53,6 @@ struct Asm_riscv {
 		REG_FT11, 
 		REG_COUNT
 	};
-
-
-	enum ClobberFFlags : u8 {
-		ClobberFFlag_NV = 1<<0, // invalid operation
-		ClobberFFlag_DZ = 1<<1, // divide by zero
-		ClobberFFlag_OF = 1<<2, // overflow
-		ClobberFFlag_UF = 1<<3, // underflow
-		ClobberFFlag_NX = 1<<4, // inexact
-	};
-
-	enum ClobberRegs : u8 {
-		ClobberReg_RA = 1<<0, // x1, implicit link on C.JAL / C.JALR
-		ClobberReg_SP = 1<<1, // x2, implicit base on the *SP compressed forms
-	};
-
-	static u8 const CLOBBER_REGS_NAMED = ClobberReg_RA|ClobberReg_SP;
-
-	enum SideEffectFlags : u8 {
-		SideEffectFlag_CONTROL     = 1<<0, // writes pc: branches, jumps, and trap redirects
-		SideEffectFlag_TRAP        = 1<<1, // synchronous environment trap (ECALL / EBREAK)
-		SideEffectFlag_FENCE       = 1<<2, // explicit memory-ordering barrier (FENCE)
-		SideEffectFlag_IFENCE      = 1<<3, // instruction-fetch synchronization (FENCE.I)
-		SideEffectFlag_ATOMIC      = 1<<4, // indivisible memory RMW (AMO*, and the LR/SC pair)
-		SideEffectFlag_RESERVATION = 1<<5, // sets or tests an LR/SC reservation
-	};
-
-	enum OperandSet : u8 {
-		OperandSet_OP0 = 1<<0,
-		OperandSet_OP1 = 1<<1,
-		OperandSet_OP2 = 1<<2,
-		OperandSet_OP3 = 1<<3,
-	};
-
-	u16 clobber_bit_for_reg_name(String const &pin) {
-		static const struct { String name; u16 bit; } table[] = {
-			{str_lit("ra"),  ClobberReg_RA},
-			{str_lit("sp"),  ClobberReg_SP},
-			{str_lit("x1"),  ClobberReg_RA},
-			{str_lit("x2"),  ClobberReg_SP},
-		};
-		for (auto const &t : table) {
-			if (pin == t.name) {
-				return t.bit;
-			}
-		}
-		return 0;
-	}
-
-	char const *clobber_reg_bit_name(u16 bit) {
-		switch (bit) {
-		case ClobberReg_RA: return "ra";
-		case ClobberReg_SP: return "sp";
-		}
-		return "<reg>";
-	}
-
-	i32 flag_bit_from_name(String const &name, i32 *width_) {
-		static const struct { String name; i32 bit; } table[] = {
-			// fflags: accrued FP exception flags (fcsr[4:0])
-			{str_lit("nx"),  0}, // Inexact
-			{str_lit("uf"),  1}, // Underflow
-			{str_lit("of"),  2}, // Overflow
-			{str_lit("dz"),  3}, // Divide by Zero
-			{str_lit("nv"),  4}, // Invalid Operation
-			// frm: rounding mode (fcsr[7:5], 3-bit field, low bit)
-			{str_lit("frm"), 5}, // Rounding Mode
-		};
-
-		for (auto const &t : table) {
-			if (name == t.name) {
-				if (width_) {
-					if (t.name == "frm") {
-						*width_ = 3;
-					} else {
-						*width_ = 1;
-					}
-				}
-				return t.bit;
-			}
-		}
-		return -1;
-	}
-
-
-	struct Clobber {
-		OperandSet         written;     // operand slots whose register/CSR is written
-		OperandSet         read;        // operand slots whose register/CSR/mem-base is read
-		ClobberRegs        implicit_wr; // implicit reg writes (ra on C.JAL/C.JALR)
-		ClobberRegs        implicit_rd; // implicit reg reads (sp on the *SP forms)
-		ClobberFFlags      fflags_wr;   // accrued exception flags this op may raise
-		bool               reads_frm;   // consumes the dynamic rounding mode from fcsr
-		bool               writes_mem;
-		bool               reads_mem;
-		SideEffectFlags side_effects;
-
-		bool implies_clobber_flags() const {
-			return (fflags_wr != 0);
-		}
-		bool implies_clobber_memory() const {
-			return writes_mem || reads_mem ||
-				(side_effects & (SideEffectFlag_FENCE|SideEffectFlag_ATOMIC)) != 0;
-		}
-		bool implies_side_effects() const {
-			return side_effects != 0;
-		}
-		u8 is_call_or_mem() const {
-			return (cast(u16)side_effects & SideEffectFlag_CONTROL) != 0 ||
-				(cast(u16)implicit_wr & ClobberReg_SP) != 0;
-		}
-		bool has_control() const {
-			return (cast(u16)side_effects & SideEffectFlag_CONTROL) != 0;
-		}
-		bool has_halt() const {
-			return (cast(u16)side_effects & SideEffectFlag_TRAP) != 0;
-		}
-		bool is_conditional() const {
-			return has_control();
-		}
-	};
-
-	void clobber_implicit_regs(StringSet *clobber_registers_set, u16 implicit_regs) {
-		u8 regs = cast(u8)implicit_regs;
-
-		for (u8 bit = 1; bit != 0; bit <<= 1) {
-			if ((regs & bit) == 0) {
-				continue;
-			}
-			char const *rname = clobber_reg_bit_name(bit);
-			string_set_update(clobber_registers_set, make_string_c(rname));
-		}
-	}
-
-	enum AliasSrc : u8 {
-		AliasSrc_NONE,    // slot unused
-		AliasSrc_ARG0,    // user's 1st operand
-		AliasSrc_ARG1,    // user's 2nd operand
-		AliasSrc_ARG2,    // user's 3rd operand
-		AliasSrc_ZERO,    // hardwired zero (x0)
-		AliasSrc_LINK,    // link register (ra / x1)
-		AliasSrc_LIT,     // the `lit` field below (immediate literal)
-		AliasSrc_CSR_LIT, // the `csr` field below (fixed 12-bit CSR address)
-	};
-
-	struct PseudoAlias {
-		Mnemonic target;    // real instruction emitted
-		AliasSrc src[4];    // how to fill target's four operand slots
-		i16      lit;       // immediate when a src slot is AliasSrc_LIT
-		u16      csr;       // CSR address when a src slot is AliasSrc_CSR_LIT
-		u8       nargs;     // operands the user supplies (ARG0..<ARGn)
-		bool     rv32_only; // base gate (the *h counter reads)
-	};
-
-	enum PseudoMnemonic : u16 {
-		PM_INVALID, PM_NOP, PM_MV, PM_NOT, 
-		PM_NEG, PM_NEGW, PM_SEXT_W, PM_ZEXT_B, 
-		PM_SEQZ, PM_SNEZ, PM_SLTZ, PM_SGTZ, 
-		PM_BEQZ, PM_BNEZ, PM_BLEZ, PM_BGEZ, 
-		PM_BLTZ, PM_BGTZ, PM_BGT, PM_BLE, 
-		PM_BGTU, PM_BLEU, PM_J, PM_JAL_RA, 
-		PM_JR, PM_JALR_RA, PM_RET, PM_CSRR, 
-		PM_CSRW, PM_CSRS, PM_CSRC, PM_CSRWI, 
-		PM_CSRSI, PM_CSRCI, PM_RDCYCLE, PM_RDTIME, 
-		PM_RDINSTRET, PM_RDCYCLEH, PM_RDTIMEH, PM_RDINSTRETH, 
-		PM_FRCSR, PM_FSCSR, PM_FRRM, PM_FSRM, 
-		PM_FRFLAGS, PM_FSFLAGS, PM_FSRMI, PM_FSFLAGSI, 
-		PM_FMV_S, PM_FABS_S, PM_FNEG_S, PM_FMV_D, 
-		PM_FABS_D, PM_FNEG_D, PM_FMV_H, PM_FABS_H, 
-		PM_FNEG_H, PM_FENCE_ALL, 
-		PSEUDO_MNEMONIC_COUNT
-	};
-	PseudoMnemonic pseudo_mnemonic_lookup(String const &name) {
-		PseudoMnemonic *found = string_map_get(&pseudo_mnemonic_map, name);
-		return found ? *found : PM_INVALID;
-	}
-
-	PseudoAlias pseudo_alias(u16 pm) {
-		PseudoAlias *pa = (PseudoAlias *)raw_pseudo_aliases;
-		return pa[pm];
-	}	static String const pseudo_mnemonic_strings[PSEUDO_MNEMONIC_COUNT];
-
-	static u16    const register_codes  [REG_COUNT];
-	static String const register_strings[REG_COUNT];
 
 
 	enum OperandType : u8 {
@@ -365,6 +170,281 @@ struct Asm_riscv {
 	};
 	#pragma pack(pop)
 	GB_STATIC_ASSERT(gb_size_of(Encoding) == 21);
+
+
+	enum ClobberFlags : u8 {
+		ClobberFlag_NV = 1<<0, // invalid operation
+		ClobberFlag_DZ = 1<<1, // divide by zero
+		ClobberFlag_OF = 1<<2, // overflow
+		ClobberFlag_UF = 1<<3, // underflow
+		ClobberFlag_NX = 1<<4, // inexact
+	};
+
+	char const *clobber_flag_bit_name(u16 bit) {
+		switch (bit) {
+		case ClobberFlag_NV: return "nv";
+		case ClobberFlag_DZ: return "dz";
+		case ClobberFlag_OF: return "of";
+		case ClobberFlag_UF: return "uf";
+		case ClobberFlag_NX: return "nx";
+		}
+		return "?";
+	}
+
+	enum ClobberRegs : u8 {
+		ClobberReg_RA = 1<<0, // x1, implicit link on C.JAL / C.JALR
+		ClobberReg_SP = 1<<1, // x2, implicit base on the *SP compressed forms
+	};
+
+	static u8 const CLOBBER_REGS_NAMED = ClobberReg_RA|ClobberReg_SP;
+
+	enum SideEffectFlags : u8 {
+		SideEffectFlag_CONTROL     = 1<<0, // writes pc: branches, jumps, and trap redirects
+		SideEffectFlag_TRAP        = 1<<1, // synchronous environment trap (ECALL / EBREAK)
+		SideEffectFlag_FENCE       = 1<<2, // explicit memory-ordering barrier (FENCE)
+		SideEffectFlag_IFENCE      = 1<<3, // instruction-fetch synchronization (FENCE.I)
+		SideEffectFlag_ATOMIC      = 1<<4, // indivisible memory RMW (AMO*, and the LR/SC pair)
+		SideEffectFlag_RESERVATION = 1<<5, // sets or tests an LR/SC reservation
+	};
+
+	enum OperandSet : u8 {
+		OperandSet_OP0 = 1<<0,
+		OperandSet_OP1 = 1<<1,
+		OperandSet_OP2 = 1<<2,
+		OperandSet_OP3 = 1<<3,
+	};
+
+	u16 clobber_bit_for_reg_name(String const &pin) {
+		static const struct { String name; u16 bit; } table[] = {
+			{str_lit("ra"),  ClobberReg_RA},
+			{str_lit("sp"),  ClobberReg_SP},
+			{str_lit("x1"),  ClobberReg_RA},
+			{str_lit("x2"),  ClobberReg_SP},
+		};
+		for (auto const &t : table) {
+			if (pin == t.name) {
+				return t.bit;
+			}
+		}
+		return 0;
+	}
+
+	char const *clobber_reg_bit_name(u16 bit) {
+		switch (bit) {
+		case ClobberReg_RA: return "ra";
+		case ClobberReg_SP: return "sp";
+		}
+		return "<reg>";
+	}
+
+
+	u16 flag_from_name(String const &name) {
+		static const struct {String name; ClobberFlags flag; } table[] = {
+			{str_lit("nv"), ClobberFlag_NV},
+			{str_lit("dz"), ClobberFlag_DZ},
+			{str_lit("of"), ClobberFlag_OF},
+			{str_lit("uf"), ClobberFlag_UF},
+			{str_lit("nx"), ClobberFlag_NX},
+		};
+
+		for (auto const &t : table) {
+			if (name == t.name) {
+				return cast(u16)t.flag;
+			}
+		}
+		return 0;
+	}
+
+	u16 flags_from_name(String const &name) {
+		static const struct { String name; ClobberFlags flag; } table[] = {
+			// flags: accrued FP exception flags (fcsr[4:0])
+			{str_lit("nx"),  ClobberFlag_NX}, // Inexact
+			{str_lit("uf"),  ClobberFlag_UF}, // Underflow
+			{str_lit("of"),  ClobberFlag_OF}, // Overflow
+			{str_lit("dz"),  ClobberFlag_DZ}, // Divide by Zero
+			{str_lit("nv"),  ClobberFlag_NV}, // Invalid Operation
+		};
+
+		for (auto const &t : table) {
+			if (name == t.name) {
+				return cast(u16)t.flag;
+			}
+		}
+		return 0;
+	}
+
+
+	i32 flag_bit_from_name(String const &name, i32 *width_) {
+		static const struct { String name; i32 bit; } table[] = {
+			// flags: accrued FP exception flags (fcsr[4:0])
+			{str_lit("nx"),  0}, // Inexact
+			{str_lit("uf"),  1}, // Underflow
+			{str_lit("of"),  2}, // Overflow
+			{str_lit("dz"),  3}, // Divide by Zero
+			{str_lit("nv"),  4}, // Invalid Operation
+			// frm: rounding mode (fcsr[7:5], 3-bit field, low bit)
+			{str_lit("frm"), 5}, // Rounding Mode
+		};
+
+		for (auto const &t : table) {
+			if (name == t.name) {
+				if (width_) {
+					if (t.name == "frm") {
+						*width_ = 3;
+					} else {
+						*width_ = 1;
+					}
+				}
+				return t.bit;
+			}
+		}
+		return -1;
+	}
+
+
+	struct Clobber {
+		OperandSet         written;     // operand slots whose register/CSR is written
+		OperandSet         read;        // operand slots whose register/CSR/mem-base is read
+		ClobberRegs        implicit_wr; // implicit reg writes (ra on C.JAL/C.JALR)
+		ClobberRegs        implicit_rd; // implicit reg reads (sp on the *SP forms)
+		ClobberFlags       flags_wr;   // accrued exception flags this op may raise
+		bool               reads_frm;   // consumes the dynamic rounding mode from fcsr
+		bool               writes_mem;
+		bool               reads_mem;
+		SideEffectFlags side_effects;
+
+		ClobberFlags flags_rd_call() const {
+			return {};
+		}
+		ClobberFlags flags_wr_call() const {
+			return flags_wr;
+		}
+
+		bool implies_clobber_flags() const {
+			return (flags_wr != 0);
+		}
+		bool implies_clobber_memory() const {
+			return writes_mem || reads_mem ||
+				(side_effects & (SideEffectFlag_FENCE|SideEffectFlag_ATOMIC)) != 0;
+		}
+		bool implies_side_effects() const {
+			return side_effects != 0;
+		}
+		u8 is_call_or_mem() const {
+			return (cast(u16)side_effects & SideEffectFlag_CONTROL) != 0 ||
+				(cast(u16)implicit_wr & ClobberReg_SP) != 0;
+		}
+		bool has_control() const {
+			return (cast(u16)side_effects & SideEffectFlag_CONTROL) != 0;
+		}
+		bool has_halt() const {
+			return (cast(u16)side_effects & SideEffectFlag_TRAP) != 0;
+		}
+		bool is_conditional(struct Encoding const &valid_form) const {
+			return has_control();
+		}
+		bool is_nondeterministic() const {
+			return false;
+		}
+		bool has_implicit_mem() const {
+			if (!writes_mem && !reads_mem) {
+				return false;
+			}
+			u16 implicit = cast(u16)implicit_rd | cast(u16)implicit_wr;
+			bool is_atomic = false; // TODO(bill): Add ATOMIC flag to SideEffectFlags in the original INSTRUCTION_TABLE
+			return (implicit & (ClobberReg_SP)) != 0 || is_atomic;
+		}
+		bool is_status_snapshot() const {
+			// RiscV64 has no architectural condition flags: branches compare two GPRs
+			// directly (beq/bltu/…) and slt/sltu materialise a 0/1 into a GPR, so nothing
+			// ever consumes status as an implicit condition — flags_rd_call() is always
+			// empty and the flag read-before-write check is already vacuous here.
+			//
+			// The only status that exists — the accrued fcsr exception flags (fflags[4:0])
+			// and the frm rounding field — is read solely through an explicit CSR access
+			// (csrr* / frflags / frrm), which pulls the register out as an opaque value
+			// into a GPR. That is a snapshot by construction and must never require a
+			// producer, so every status read that RV64 can express qualifies.
+			return true;
+		}
+	};
+
+	void clobber_implicit_regs(StringSet *clobber_registers_set, u16 implicit_regs) {
+		u8 regs = cast(u8)implicit_regs;
+
+		for (u8 bit = 1; bit != 0; bit <<= 1) {
+			if ((regs & bit) == 0) {
+				continue;
+			}
+			char const *rname = clobber_reg_bit_name(bit);
+			string_set_update(clobber_registers_set, make_string_c(rname));
+		}
+	}
+
+	enum AliasSrc : u8 {
+		AliasSrc_NONE,    // slot unused
+		AliasSrc_ARG0,    // user's 1st operand
+		AliasSrc_ARG1,    // user's 2nd operand
+		AliasSrc_ARG2,    // user's 3rd operand
+		AliasSrc_ZERO,    // hardwired zero (x0)
+		AliasSrc_LINK,    // link register (ra / x1)
+		AliasSrc_LIT,     // the `lit` field below (immediate literal)
+		AliasSrc_CSR_LIT, // the `csr` field below (fixed 12-bit CSR address)
+	};
+
+	struct PseudoAlias {
+		Mnemonic target;    // real instruction emitted
+		AliasSrc src[4];    // how to fill target's four operand slots
+		i16      lit;       // immediate when a src slot is AliasSrc_LIT
+		u16      csr;       // CSR address when a src slot is AliasSrc_CSR_LIT
+		u8       nargs;     // operands the user supplies (ARG0..<ARGn)
+		bool     rv32_only; // base gate (the *h counter reads)
+
+
+		// Nondeterministic iff this is a CSR access whose CSR operand names a counter/timer/entropy register (extension-gated; absent CSRs never match)
+		bool is_nondeterministic() const {
+			if (csr == 0x015) return true;                 // seed (Zkr)
+			if (0xC00 <= csr && csr <= 0xC1F) return true; // cycle/time/instret + hpm (unpriv)
+			if (0xC80 <= csr && csr <= 0xC9F) return true; // rv32 high halves (unpriv)
+			if (0xB00 <= csr && csr <= 0xB1F) return true; // mcycle/minstret + mhpm
+			if (0xB80 <= csr && csr <= 0xB9F) return true; // rv32 high halves (machine)
+			return false;
+		}
+	};
+
+	enum PseudoMnemonic : u16 {
+		PM_INVALID, PM_NOP, PM_MV, PM_NOT, 
+		PM_NEG, PM_NEGW, PM_SEXT_W, PM_ZEXT_B, 
+		PM_SEQZ, PM_SNEZ, PM_SLTZ, PM_SGTZ, 
+		PM_BEQZ, PM_BNEZ, PM_BLEZ, PM_BGEZ, 
+		PM_BLTZ, PM_BGTZ, PM_BGT, PM_BLE, 
+		PM_BGTU, PM_BLEU, PM_J, PM_JAL_RA, 
+		PM_JR, PM_JALR_RA, PM_RET, PM_CSRR, 
+		PM_CSRW, PM_CSRS, PM_CSRC, PM_CSRWI, 
+		PM_CSRSI, PM_CSRCI, PM_RDCYCLE, PM_RDTIME, 
+		PM_RDINSTRET, PM_RDCYCLEH, PM_RDTIMEH, PM_RDINSTRETH, 
+		PM_FRCSR, PM_FSCSR, PM_FRRM, PM_FSRM, 
+		PM_FRFLAGS, PM_FSFLAGS, PM_FSRMI, PM_FSFLAGSI, 
+		PM_FMV_S, PM_FABS_S, PM_FNEG_S, PM_FMV_D, 
+		PM_FABS_D, PM_FNEG_D, PM_FMV_H, PM_FABS_H, 
+		PM_FNEG_H, PM_FENCE_ALL, 
+		PSEUDO_MNEMONIC_COUNT
+	};
+	PseudoMnemonic pseudo_mnemonic_lookup(String const &name) {
+		PseudoMnemonic *found = string_map_get(&pseudo_mnemonic_map, name);
+		return found ? *found : PM_INVALID;
+	}
+
+	PseudoAlias pseudo_alias(u16 pm) {
+		PseudoAlias *pa = (PseudoAlias *)raw_pseudo_aliases;
+		return pa[pm];
+	}
+
+	static String const pseudo_mnemonic_strings[PSEUDO_MNEMONIC_COUNT];
+	
+
+	static u16    const register_codes  [REG_COUNT];
+	static String const register_strings[REG_COUNT];
 
 
 	// Companion run index: ENCODE_RUNS[mnemonic] -> contiguous run in ENCODE_FORMS.
@@ -499,23 +579,14 @@ struct Asm_riscv {
 	// size in bits for register
 	u16 reg_size(Register r) const {
 		switch (reg_class(register_codes[r])) {
-		case REG_CLASS_GPR64: return 64;
-		case REG_CLASS_GPR32: return 32;
-		case REG_CLASS_GPR16: return 16;
-		case REG_CLASS_GPR8:  return 8;
-		case REG_CLASS_GPR8H: return 8;
-		case REG_CLASS_XMM:   return 128;
-		case REG_CLASS_YMM:   return 256;
-		case REG_CLASS_ZMM:   return 512;
-		case REG_CLASS_K:     return 64;
-		case REG_CLASS_MM:    return 64;
-		case REG_CLASS_ST:    return 80;
-		case REG_CLASS_SEG:   return 16;
-		case REG_CLASS_CR:    return 64;
-		case REG_CLASS_DR:    return 64;
-		case REG_CLASS_BND:   return 128;
+		case REG_CLASS_GPR: return XLEN;
+		case REG_CLASS_FPR: return FLEN;
 		}
 		return 0;
+	}
+
+	bool reg_is_segment(/*Register*/ u16 r) {
+		return false;
 	}
 
 	bool integer_reg_width_is_exact() const {
@@ -525,6 +596,14 @@ struct Asm_riscv {
 		return false;
 	}
 	bool supports_memory_index_not_just_disp() const {
+		return false;
+	}
+
+	bool reg_is_non_allocateable(Register r) const {
+		switch (r) {
+		case REG_ZERO:
+			return true;
+		}
 		return false;
 	}
 
@@ -612,10 +691,40 @@ struct Asm_riscv {
 		}
 	}
 
+	String implicit_reg_name(OperandType t) const {
+		gb_unused(t);
+		return {};
+	}
+
+	bool operand_type_is_cond_code(OperandType t) const {
+		return false;
+	}
+
+	bool is_cond_code_name(String name, u32 *bit_code_) const {
+		return false;
+	}
+
+	String required_vector_feature(i32 w) const {
+		// The base ISA has no vector registers; any vector operand needs the V extension.
+		if (w > 0) return str_lit("v");
+		return str_lit("");
+	}
+
 	AsmRegClass operand_type_reg_class(OperandType t) const {
 		// Same mapping as reg_class_from_operand_type — these two look
 		// redundant; consider collapsing them into one.
 		return reg_class_from_operand_type(t);
+	}
+
+	// RISC-V has no slot that only one named hardware register can fill.
+	u16 operand_type_named_reg_class(OperandType t) const {
+		gb_unused(t);
+		return REG_CLASS_NONE;
+	}
+
+	String named_reg_class_string(u16 reg_class) const {
+		gb_unused(reg_class);
+		return str_lit("hardware");
 	}
 
 	u16 operand_type_bit_width(OperandType t) const {
@@ -687,6 +796,24 @@ struct Asm_riscv {
 		return 0;
 	}
 
+	bool target_has_feature(u64 enabled_features, u32 f) const {
+		return true;
+	}
+	char const *feature_name(u32 f) const {
+		return "";
+	}
+	u16 operand_type_transfer_bytes(OperandType t) const {
+		gb_unused(t);
+		return 0;
+	}
+	bool operand_type_is_lane(OperandType t) const {
+		return false;
+	}
+
+	String feature_name_from_form(Encoding const &form) const {
+		return {};
+	}
+
 	int form_explicit_slot(Encoding const &form, int explicit_index) const {
 		int seen = 0;
 		for (int j = 0; j < gb_count_of(form.ops); j++) {
@@ -705,8 +832,51 @@ struct Asm_riscv {
 		return -1;
 	}
 
+	// Transfer size (bytes) a memory form's scaled index must match:
+	// shift == log2(bytes). Derived from the widest register operand in the form
+	// (the data being loaded/stored). 0 => no such constraint. Generic across ISAs.
+	u16 form_transfer_bytes(Encoding const &form) const {
+		u16 widest = 0;
+		for (int j = 0; j < gb_count_of(form.ops); j++) {
+			auto t = form.ops[j];
+			if (!t) {
+				break;
+			}
+			AsmOperandKind k = kind_from_operand_type(t);
+			if (k == AsmOperand_Register) {
+				u16 w = operand_type_bit_width(t);
+				if (w > widest) {
+					widest = w;
+				}
+			}
+		}
+		return cast(u16)(widest / 8);
+	}
+
 	bool prefix_kind_okay(u8 prefix, Encoding const &form, bool *requires_memory_dest_) const {
 		// RISC-V does not have prefixes
+		return false;
+	}
+	AsmOperandConstraint operand_value_constraint(u16 m, int op) const {
+		switch (m) {
+		case M_SLLI: case M_SRLI: case M_SRAI:
+			if (op == 2) return {AsmOperandConstraint_ShiftCount, /*XLEN*/-1};
+			break;
+		case M_DIV: case M_DIVU: case M_REM: case M_REMU:
+			if (op == 2) return {AsmOperandConstraint_NonZeroDivisor, -1};
+			break;
+		}
+		return {AsmOperandConstraint_None, -1};
+	}	bool is_self_zeroing_idiom(u16 m) const {
+		switch (m) {
+		case M_XOR:
+		case M_SUB:
+		case M_SUBW:
+		case M_SLT:
+		case M_SLTU:
+		case M_ANDN:
+			return true;
+		}
 		return false;
 	}
 };

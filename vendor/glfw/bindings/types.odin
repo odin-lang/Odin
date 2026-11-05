@@ -38,6 +38,7 @@ Allocator :: struct {
 }
 
 /*** Procedure type declarations ***/
+
 WindowIconifyProc      :: #type proc "c" (window: WindowHandle, iconified: c.int)
 WindowRefreshProc      :: #type proc "c" (window: WindowHandle)
 WindowFocusProc        :: #type proc "c" (window: WindowHandle, focused: c.int)

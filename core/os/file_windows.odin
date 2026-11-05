@@ -913,6 +913,39 @@ win32_utf8_to_utf16 :: proc(s: string, allocator: runtime.Allocator) -> (ws: []u
 	return
 }
 
+// Used for `SHFILEOPSTRUCTW`, which requires double-null-terminated strings (`PCZZWSTR`).
+@(private="package", require_results)
+win32_utf8_to_pczzwstr :: proc(s: string, allocator: runtime.Allocator) -> (ws: win32.PCZZWSTR, err: Error) {
+	if len(s) < 1 {
+		// We still need to provide a double-null-terminated empty string.
+		t := make([]u16, 2, allocator) or_return
+		ws = cast(win32.PCZZWSTR)raw_data(t)
+		return
+	}
+
+	b := transmute([]byte)s
+	cstr := raw_data(b)
+	n := win32.MultiByteToWideChar(win32.CP_UTF8, win32.MB_ERR_INVALID_CHARS, cstr, i32(len(s)), nil, 0)
+	if n == 0 {
+		err = _get_platform_error()
+		return
+	}
+
+	text := make([]u16, n+2, allocator) or_return
+
+	n1 := win32.MultiByteToWideChar(win32.CP_UTF8, win32.MB_ERR_INVALID_CHARS, cstr, i32(len(s)), raw_data(text), n)
+	if n1 == 0 {
+		err = _get_platform_error()
+		delete(text, allocator)
+		return
+	}
+
+	text[n+1] = 0
+	text[n] = 0
+	ws = cast(win32.PCZZWSTR)raw_data(text)
+	return
+}
+
 @(private="package", require_results)
 win32_wstring_to_utf8 :: proc(s: cstring16, allocator: runtime.Allocator) -> (res: string, err: runtime.Allocator_Error) {
 	if s == nil || s == "" {

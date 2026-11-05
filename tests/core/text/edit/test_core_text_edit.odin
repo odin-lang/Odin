@@ -86,7 +86,7 @@ test_translate_by_word :: proc(t: ^testing.T) {
 	state_init(&s, WORD_SAMPLE, false)
 	defer state_destroy(&s)
 
-	expect_walk(t, &s, 0, .Word_Right, {4, 9, 12})
+	expect_walk(t, &s, 0, .Word_Right, {3, 7, 12})
 	expect_walk(t, &s, len(WORD_SAMPLE), .Word_Left, {9, 4, 0})
 
 	// From inside "bar", to the edges of that word.

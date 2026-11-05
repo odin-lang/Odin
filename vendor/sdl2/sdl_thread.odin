@@ -26,12 +26,15 @@ ThreadFunction :: proc "c" (data: rawptr) -> c.int
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
+	@(synchronizes=.Release)
 	CreateThread              :: proc(fn: ThreadFunction, name: cstring, data: rawptr) -> ^Thread ---
+	@(synchronizes=.Release)
 	CreateThreadWithStackSize :: proc(fn: ThreadFunction, name: cstring, stacksize: c.size_t, data: rawptr) -> ^Thread ---
 	GetThreadName             :: proc(thread: ^Thread) -> cstring ---
 	ThreadID                  :: proc() -> threadID ---
 	GetThreadID               :: proc(thread: ^Thread) -> threadID ---
 	SetThreadPriority         :: proc(priority: ThreadPriority) -> c.int ---
+	@(synchronizes=.Acquire)
 	WaitThread                :: proc(thread: ^Thread, status: ^c.int) ---
 	DetachThread              :: proc(thread: ^Thread) ---
 	TLSCreate                 :: proc() -> TLSID ---

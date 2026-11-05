@@ -155,7 +155,9 @@ cmp_mag :: compare_magnitude
 
 destroy :: proc {
 	/*
-		Clears one or more `Int`s and dellocates their backing memory.
+		Zeros the full backing storage of one or more `Int`s and deallocates it
+		using each dynamic array's own allocator. Resets each `Int` to its zero
+		value, so repeated destruction is safe and the `Int` can be reused.
 
 		int_destroy :: proc(integers: ..^Int)
 	*/

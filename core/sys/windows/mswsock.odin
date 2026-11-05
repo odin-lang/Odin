@@ -3,6 +3,7 @@ package sys_windows
 
 foreign import mswsock "system:mswsock.lib"
 
+@(default_calling_convention="system")
 foreign mswsock {
 	TransmitFile :: proc(
 		hSocket: SOCKET,

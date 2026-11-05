@@ -302,13 +302,6 @@ ENCODING_TABLE:= #partial [Mnemonic][]Encoding{
 		{.LAX, {.MEM_IND_Y, .NONE, .NONE, .NONE}, {.BYTE_1_ADDR, .NONE, .NONE, .NONE}, 0xB3, 2, .NMOS_UNDOC, {page_cross=true}},
 	},
 
-	// SAX_NMOS (A & X -> mem)
-	.SAX_NMOS = {
-		{.SAX_NMOS, {.MEM_ZP, .NONE, .NONE, .NONE}, {.BYTE_1_ADDR, .NONE, .NONE, .NONE}, 0x87, 2, .NMOS_UNDOC, {}},
-		{.SAX_NMOS, {.MEM_ZP_Y, .NONE, .NONE, .NONE}, {.BYTE_1_ADDR, .NONE, .NONE, .NONE}, 0x97, 2, .NMOS_UNDOC, {}},
-		{.SAX_NMOS, {.MEM_ABS, .NONE, .NONE, .NONE}, {.WORD_1_ADDR, .NONE, .NONE, .NONE}, 0x8F, 3, .NMOS_UNDOC, {}},
-		{.SAX_NMOS, {.MEM_IND_X, .NONE, .NONE, .NONE}, {.BYTE_1_ADDR, .NONE, .NONE, .NONE}, 0x83, 2, .NMOS_UNDOC, {}},
-	},
 
 	// DCP (DEC + CMP)
 	.DCP = {
@@ -502,7 +495,16 @@ ENCODING_TABLE:= #partial [Mnemonic][]Encoding{
 
 	// Register swap / clear
 	.SXY = { {.SXY, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x02, 1, .HUC6280, {}} },
-	.SAX = { {.SAX, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x22, 1, .HUC6280, {}} },
+	// SAX: the HuC6280 register swap (no operand) and the NMOS undocumented
+	// store-A&X (memory operand). One assembler mnemonic; the operand shape
+	// picks the form.
+	.SAX = {
+		{.SAX, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x22, 1, .HUC6280, {}},
+		{.SAX,      {.MEM_ZP, .NONE, .NONE, .NONE}, {.BYTE_1_ADDR, .NONE, .NONE, .NONE}, 0x87, 2, .NMOS_UNDOC, {}},
+		{.SAX,      {.MEM_ZP_Y, .NONE, .NONE, .NONE}, {.BYTE_1_ADDR, .NONE, .NONE, .NONE}, 0x97, 2, .NMOS_UNDOC, {}},
+		{.SAX,      {.MEM_ABS, .NONE, .NONE, .NONE}, {.WORD_1_ADDR, .NONE, .NONE, .NONE}, 0x8F, 3, .NMOS_UNDOC, {}},
+		{.SAX,      {.MEM_IND_X, .NONE, .NONE, .NONE}, {.BYTE_1_ADDR, .NONE, .NONE, .NONE}, 0x83, 2, .NMOS_UNDOC, {}},
+	},
 	.SAY = { {.SAY, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x42, 1, .HUC6280, {}} },
 	.CLA = { {.CLA, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x62, 1, .HUC6280, {}} },
 	.CLX = { {.CLX, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x82, 1, .HUC6280, {}} },

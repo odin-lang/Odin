@@ -17,6 +17,8 @@
 *.pdb
 *.sh
 
+!core/compress/lz4_vector_*.bin
+
 # Ignore documentation-related files.
 /documentation/verify/
 /documentation/all.odin-doc

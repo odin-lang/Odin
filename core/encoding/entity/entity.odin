@@ -81,21 +81,32 @@ XML_Decode_Options :: bit_set[XML_Decode_Option; u8]
 // Decode a string that may include SGML/XML/HTML entities.
 // The caller has to free the result.
 decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := context.allocator) -> (decoded: string, err: Error) {
+	builder := strings.builder_make(allocator)
+	defer strings.builder_destroy(&builder)
+	decoded, err = decode_xml_sb(&builder, input, options, allocator)
+	decoded = strings.clone(decoded, allocator)
+	return
+}
+
+// Decode a string that may include SGML/XML/HTML entities into an existing `builder`.
+// The returned `decoded` string is a reference into the builder's buffer, and therefore does not need to be freed individually.
+decode_xml_sb :: proc(builder: ^strings.Builder, input: string, options := XML_Decode_Options{}, allocator := context.allocator) -> (decoded: string, err: Error) {
 	context.allocator = allocator
 
 	l := len(input)
 	if l == 0 { return "", .None }
 
-	builder := strings.builder_make()
-	defer strings.builder_destroy(&builder)
+	string_start_in_builder := len(builder.buf)
 
 	t := Tokenizer{src=input}
 	in_data := false
 
 	prev: rune = ' '
 
+	// PERF: Hot
 	loop: for {
 		advance(&t) or_return
+
 		if t.r < 0 { break loop }
 
 		// Below here we're never inside a CDATA tag. At most we'll see the start of one,
@@ -112,39 +123,34 @@ decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := 
 				If so, write `<` as a literal and continue.
 			*/
 			if in_data {
-				write_rune(&builder, '<')
+				write_rune(builder, '<')
 				continue
 			}
-			in_data = _handle_xml_special(&t, &builder, options) or_return
+			in_data = _handle_xml_special(&t, builder, options) or_return
 
 		case ']':
 			// If we're unboxing _and_ decoding CDATA, we'll have to check for the end tag.
-			if in_data {
-				if strings.has_prefix(t.src[t.offset:], CDATA_END) {
-					in_data = false
-					t.read_offset += len(CDATA_END) - 1
-				}
+			if in_data && strings.has_prefix(t.src[t.offset:], CDATA_END) {
+				in_data = false
+				t.read_offset += len(CDATA_END) - 1
 				continue
-			} else {
-				write_rune(&builder, ']')
 			}
+			write_rune(builder, ']')
 
 		case:
 			if in_data && .Decode_CDATA not_in options {
 				// Unboxed, but undecoded.
-				write_rune(&builder, t.r)
+				write_rune(builder, t.r)
 				continue
 			}
 
 			if t.r == '&' {
-				if entity, entity_err := _extract_xml_entity(&t); entity_err != .None {
-					// We read to the end of the string without closing the entity. Pass through as-is.
-					write_string(&builder, entity)
-				} else {
+				entity, entity_err := _extract_xml_entity(&t)
+				if entity_err == nil {
 					if .No_Entity_Decode not_in options {
 						if decoded, count, ok := xml_decode_entity(entity); ok {
 							for i in 0..<count {
-								write_rune(&builder, decoded[i])
+								write_rune(builder, decoded[i])
 							}
 							prev = decoded[count - 1]
 							continue
@@ -152,9 +158,14 @@ decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := 
 					}
 
 					// Literal passthrough because the decode failed or we want entities not decoded.
-					write_string(&builder, "&")
-					write_string(&builder, entity)
-					write_string(&builder, ";")
+					// PERF: Cold
+					write_string(builder, "&")
+					write_string(builder, entity)
+					write_string(builder, ";")
+				} else {
+					// PERF: Cold
+					// We read to the end of the string without closing the entity. Pass through as-is.
+					write_string(builder, entity)
 				}
 			} else {
 				// Handle AV Normalization: https://www.w3.org/TR/2006/REC-xml11-20060816/#AVNormalize
@@ -162,31 +173,31 @@ decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := 
 					switch t.r {
 					case ' ', '\r', '\n', '\t':
 						if prev != ' ' {
-							write_rune(&builder, ' ')
+							write_rune(builder, ' ')
 							prev = ' '
 						}
 					case:
-						write_rune(&builder, t.r)
+						write_rune(builder, t.r)
 						prev = t.r
 					}
 				} else {
 					// https://www.w3.org/TR/2006/REC-xml11-20060816/#sec-line-ends
 					switch t.r {
 					case '\n', 0x85, 0x2028:
-						write_rune(&builder, '\n')
+						write_rune(builder, '\n')
 					case '\r': // Do nothing until next character
 					case:
 						if prev == '\r' { // Turn a single carriage return into a \n
-							write_rune(&builder, '\n')
+							write_rune(builder, '\n')
 						}
-						write_rune(&builder, t.r)
+						write_rune(builder, t.r)
 					}
 					prev = t.r
 				}
 			}
 		}
 	}
-	return strings.clone(strings.to_string(builder), allocator), err
+	return transmute(string)builder.buf[string_start_in_builder:], err
 }
 
 advance :: proc(t: ^Tokenizer) -> (err: Error) {
@@ -553,7 +564,7 @@ _handle_xml_special :: proc(t: ^Tokenizer, builder: ^strings.Builder, options: X
 
 		// CDATA is passed through. Scan until end of CDATA.
 		start_offset  := t.offset
-		t.read_offset += len(CDATA_START)
+		t.read_offset += len(CDATA_START) - 1
 		for {
 			advance(t)
 			if t.r < 0 {
@@ -562,8 +573,8 @@ _handle_xml_special :: proc(t: ^Tokenizer, builder: ^strings.Builder, options: X
 			}
 
 			// Scan until the end of a CDATA tag.
-			if s = string(t.src[t.read_offset:]); strings.has_prefix(s, CDATA_END) {
-				t.read_offset += len(CDATA_END)
+			if strings.has_prefix(t.src[t.offset:], CDATA_END) {
+				t.read_offset = t.offset + len(CDATA_END)
 				cdata := string(t.src[start_offset:t.read_offset])
 
 				if .Unbox_CDATA in options {

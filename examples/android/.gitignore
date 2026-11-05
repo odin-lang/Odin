@@ -1,0 +1,5 @@
+# Built by `odin build`, one library per ABI.
+app/lib/
+*.apk
+*.apk.idsig
+*.aab

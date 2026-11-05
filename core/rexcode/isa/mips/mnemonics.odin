@@ -138,9 +138,9 @@ Mnemonic :: enum u16 {
 	JIC, JIALC,
 
 	// R6 mul/div (replaces MULT/MULTU/DIV/DIVU; results in single GPR)
-	MUL_R6, MUH, MULU, MUHU, DIV_R6, MOD, DIVU_R6, MODU,
-	DMUL_R6, DMUH, DMULU, DMUHU,
-	DDIV_R6, DMOD, DDIVU_R6, DMODU,
+	MUH, MULU, MUHU, MOD, MODU,
+	DMUL, DMUH, DMULU, DMUHU,
+	DMOD, DMODU,
 
 	// R6 PC-relative immediates
 	AUI, AUIPC, ALUIPC, DAUI, DAHI, DATI,
@@ -263,9 +263,9 @@ Mnemonic :: enum u16 {
 	CDP,  CC,
 	NCLIP,
 	AVSZ3, AVSZ4,
-	OP_GTE,                         // "OP" (cross product) — disambiguated from MIPS R6 OP
+	OP,                         // "OP" (cross product) — disambiguated from MIPS R6 OP
 	GPF, GPL,
-	SQR_GTE,                        // "SQR" — disambiguated from generic
+	SQR,                        // "SQR" — disambiguated from generic
 	DCPL,                           // depth-cue per light
 
 	// -------------------------------------------------------------------------
@@ -281,7 +281,6 @@ Mnemonic :: enum u16 {
 	// Second HI/LO pair (R5900 dual MAC)
 	MFHI1, MFLO1, MTHI1, MTLO1,
 	MULT1, MULTU1, DIV1, DIVU1,
-	MADD_EE, MADDU_EE, MSUB_EE, MSUBU_EE,
 	MADD1, MADDU1, MSUB1, MSUBU1,
 
 	// Packed pack/unpack HI:LO

@@ -1,21 +1,33 @@
 #+build arm64,arm32
 package simd_arm
 
+// AES single round encryption.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vaeseq_u8)
 @(require_results, enable_target_feature = "aes")
 vaeseq_u8 :: #force_inline proc "c" (data, key: uint8x16_t) -> uint8x16_t {
 	return _vaeseq_u8(data, key)
 }
 
+// AES single round decryption.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vaesdq_u8)
 @(require_results, enable_target_feature = "aes")
 vaesdq_u8 :: #force_inline proc "c" (data, key: uint8x16_t) -> uint8x16_t {
 	return _vaesdq_u8(data, key)
 }
 
+// AES mix columns.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vaesmcq_u8)
 @(require_results, enable_target_feature = "aes")
 vaesmcq_u8 :: #force_inline proc "c" (data: uint8x16_t) -> uint8x16_t {
 	return _vaesmcq_u8(data)
 }
 
+// AES inverse mix columns.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vaesimcq_u8)
 @(require_results,enable_target_feature = "aes")
 vaesimcq_u8 :: #force_inline proc "c" (data: uint8x16_t) -> uint8x16_t {
 	return _vaesimcq_u8(data)

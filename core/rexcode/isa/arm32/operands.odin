@@ -31,6 +31,12 @@ Operand_Kind :: enum u8 {
 	MEMORY,
 	RELATIVE,
 	REG_LIST,    // LDM/STM/PUSH/POP bitmask (low 16 bits = R0..R15)
+	// A modified immediate is a bit pattern an 8-bit field expands into, and
+	// assemblers write it as one: in hex, or as a float when the expansion
+	// produced one. The value is stored expanded either way -- for the float
+	// it is the 32-bit pattern, which is what the encoder needs back.
+	HEX_IMMEDIATE,
+	FLOAT_IMMEDIATE,
 }
 
 // ---- Shift / addressing-mode helpers ---------------------------------------
@@ -57,16 +63,25 @@ Index_Mode :: enum u8 {
 	POST_INDEX = 2,   // [Rn], #imm      -- writeback, base = Rn pre-update
 }
 
-Memory :: struct #packed {
-	base:       Register,    // GPR base register
-	index:      Register,    // GPR or .NONE for imm-only forms
-	shift_type: Shift_Type,
-	shift_amt:  u8,          // 0..31 immediate shift
-	mode:       Index_Mode,
-	sign:       i8,          // +1 or -1 (U bit)
-	disp:       i32,         // immediate displacement (sign-extended)
+// Packed into one word: this sits in every Operand, so its width is
+// multiplied by four in every Instruction. Field syntax and composite
+// literals are unchanged, so this is invisible to callers.
+//
+// A memory base or index is always a GPR, whose raw value never exceeds
+// REG_GPR|15 = 0x100F, so 15 bits hold one losslessly (index uses
+// Register(0), not a high sentinel, for "absent").
+// `disp` gets 19 bits (+/-262,143) against a worst case of 4,095 -- the imm12
+// of an A32 load -- so there is ~64x headroom.
+Memory :: bit_field u64 {
+	base:       Register   | 15,  // GPR base register
+	index:      Register   | 15,  // GPR, or Register(0) for imm-only forms
+	shift_type: Shift_Type | 4,
+	shift_amt:  u8         | 6,   // 0..32 -- LSR and ASR reach 32 through a zero field
+	mode:       Index_Mode | 2,
+	sign:       i8         | 3,   // +1 or -1 (U bit)
+	disp:       i32        | 19,  // immediate displacement (sign-extended)
 }
-#assert(size_of(Memory) == 12)
+#assert(size_of(Memory) == 8)
 
 @(require_results)
 mem_imm     :: #force_inline proc "contextless" (base: Register, disp: i32) -> Memory {
@@ -95,57 +110,96 @@ mem_reg_shift :: #force_inline proc "contextless" (
 
 Operand :: struct #packed {
 	using _: struct #raw_union #packed {
-		reg:       Register,
+		// A register operand's shift and lane ride WITH the register instead
+		// of in the tail -- that is what keeps Operand at 10 bytes, and they
+		// only ever apply to a register anyway. `using` means op.reg,
+		// op.shift_type, op.shift_amt and op.lane still read and write
+		// exactly as they did when these were separate fields.
+		using _: bit_field u32 {
+			// Sixteen bits, not fifteen: the class nibble reaches 0x9000 for
+			// the endian tokens and 0x8000 for the coprocessor registers,
+			// and both were silently truncating.
+			reg:        Register   | 16,
+			shift_type: Shift_Type | 4,   // GPR_SHIFTED; .LSL/0 when plain
+			shift_amt:  u8         | 6,   // 0..32, or the Rs index for RSR
+			lane:       u8         | 5,   // SIMD lane for DPR_ELEM / QPR_ELEM
+			// Whether `lane` means anything. Lane 0 is a real index -- `d0[0]`
+			// is not `d0` -- so it cannot be spelled by lane == 0.
+			has_lane:   bool       | 1,
+		},
 		mem:       Memory,
 		immediate: i64,
 		relative:  i64,        // label id (pre) or signed byte offset (post)
 	},
 	kind:       Operand_Kind,
 	size:       u8,
-	shift_type: Shift_Type,   // for GPR_SHIFTED operands (otherwise NONE)
-	shift_amt:  u8,           // immediate shift amount 0..31 (or Rs index for RSR)
-	lane:       u8,           // SIMD lane index for DPR_ELEM / QPR_ELEM
-	cond:       u8,           // condition code 0..15 (default = AL = 14)
+	// How the syntax writes this register as a list. `count` 0 means a plain
+	// register. NEON structure loads also come in a spaced form that steps two
+	// registers at a time -- `{d2, d4}` -- and a to-all-lanes form written
+	// `{d2[]}`. A GPR list (`{r4, lr}`) is not a run at all and stays a
+	// bitmask under REG_LIST.
+	list: List_Shape,
 }
-#assert(size_of(Operand) == 18)
+
+List_Shape :: bit_field u8 {
+	count:     u8   | 3,   // 0 = not a list, else 1..4
+	stride:    u8   | 3,   // 1 for {d2, d3}, 2 for {d2, d4}
+	all_lanes: bool | 1,   // `{d2[]}` -- loaded to every lane
+}
+#assert(size_of(Operand) == 11)
 
 // ---- Operand builders ------------------------------------------------------
 
 @(require_results)
 op_reg :: #force_inline proc "contextless" (r: Register) -> Operand {
-	return Operand{reg = r, kind = .REGISTER, size = 4, cond = 14}
+	return Operand{reg = r, kind = .REGISTER, size = 4}
 }
 @(require_results)
 op_reg_shifted :: #force_inline proc "contextless" (
 	r: Register, st: Shift_Type, amt: u8,
 ) -> Operand {
-	return Operand{reg = r, kind = .REGISTER, size = 4, shift_type = st, shift_amt = amt, cond = 14}
+	return Operand{reg = r, kind = .REGISTER, size = 4, shift_type = st, shift_amt = amt}
 }
 @(require_results)
 op_imm :: #force_inline proc "contextless" (v: i64, size: u8 = 4) -> Operand {
-	return Operand{immediate = v, kind = .IMMEDIATE, size = size, cond = 14}
+	return Operand{immediate = v, kind = .IMMEDIATE, size = size}
+}
+@(require_results)
+op_hex_imm :: #force_inline proc "contextless" (v: u32) -> Operand {
+	return Operand{immediate = i64(v), kind = .HEX_IMMEDIATE, size = 4}
+}
+@(require_results)
+op_float_imm :: #force_inline proc "contextless" (bits: u32) -> Operand {
+	return Operand{immediate = i64(bits), kind = .FLOAT_IMMEDIATE, size = 4}
 }
 @(require_results)
 op_mem :: #force_inline proc "contextless" (m: Memory) -> Operand {
-	return Operand{mem = m, kind = .MEMORY, size = 4, cond = 14}
+	return Operand{mem = m, kind = .MEMORY, size = 4}
 }
 @(require_results)
 op_label :: #force_inline proc "contextless" (label_id: u32, size: u8 = 4) -> Operand {
-	return Operand{relative = i64(label_id), kind = .RELATIVE, size = size, cond = 14}
+	return Operand{relative = i64(label_id), kind = .RELATIVE, size = size}
 }
 @(require_results)
 op_rel_offset :: #force_inline proc "contextless" (off: i64) -> Operand {
-	return Operand{relative = off, kind = .RELATIVE, size = 4, cond = 14}
+	return Operand{relative = off, kind = .RELATIVE, size = 4}
 }
 @(require_results)
 op_reg_list :: #force_inline proc "contextless" (mask: u16) -> Operand {
-	return Operand{immediate = i64(mask), kind = .REG_LIST, size = 2, cond = 14}
+	return Operand{immediate = i64(mask), kind = .REG_LIST, size = 2}
+}
+
+// The head of a register list, written `{d1, d2, d3}` (stride 1) or
+// `{d2, d4}` (stride 2).
+@(require_results)
+op_reg_run :: #force_inline proc "contextless" (first: Register, count: u8, stride: u8 = 1, all_lanes := false) -> Operand {
+	return Operand{reg = first, kind = .REGISTER, list = {count = count, stride = stride, all_lanes = all_lanes}}
 }
 @(require_results)
 op_dpr_lane :: #force_inline proc "contextless" (d: Register, idx: u8) -> Operand {
-	return Operand{reg = d, kind = .REGISTER, size = 4, lane = idx, cond = 14}
+	return Operand{reg = d, kind = .REGISTER, size = 4, lane = idx, has_lane = true}
 }
 @(require_results)
 op_qpr_lane :: #force_inline proc "contextless" (q: Register, idx: u8) -> Operand {
-	return Operand{reg = q, kind = .REGISTER, size = 4, lane = idx, cond = 14}
+	return Operand{reg = q, kind = .REGISTER, size = 4, lane = idx, has_lane = true}
 }

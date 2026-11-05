@@ -96,6 +96,14 @@ decode_one_inline :: #force_inline proc "contextless" (
 	for i in 0..<cnt {
 		e := &DECODE_ENTRIES[base + i]
 		if (word & e.mask) == e.bits {
+			// RN_RM is one operand filling both source slots, which is what
+			// makes cinc/cinv/cneg an alias at all -- the encoding is only
+			// theirs when the two register fields actually agree. No mask can
+			// say that, so it is checked here; the branch costs nothing,
+			// since it is only reached on a match.
+			if e.enc[1] == .RN_RM && ((word >> 16) & 0x1F) != ((word >> 5) & 0x1F) {
+				continue
+			}
 			matched_idx = base + i
 			break
 		}
@@ -120,6 +128,10 @@ decode_one_inline :: #force_inline proc "contextless" (
 				if entry.ops[3] != .NONE {
 					inst.ops[3] = extract_operand_inline(word, pc, entry.ops[3], entry.enc[3])
 					cnt_used = 4
+					if entry.ops[4] != .NONE {
+						inst.ops[4] = extract_operand_inline(word, pc, entry.ops[4], entry.enc[4])
+						cnt_used = 5
+					}
 				}
 			}
 		}
@@ -142,7 +154,7 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	// ---- Register slots ----------------------------------------------------
 	case .RD, .RT:
 		return reg_from_field(word, 0, ot)
-	case .RN:
+	case .RN, .RN_RM:
 		return reg_from_field(word, 5, ot)
 	case .RT2, .RA:
 		return reg_from_field(word, 10, ot)
@@ -188,12 +200,14 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	case .EXT_IMM3: return Operand{immediate = i64((word >> 10) & 0x7),     kind = .IMMEDIATE, size = 1}
 	case .COND_HI:
 		return Operand{cond = u8((word >> 12) & 0xF), kind = .COND, size = 1}
+	case .COND_HI_INV:
+		return Operand{cond = u8(((word >> 12) & 0xF) ~ 1), kind = .COND, size = 1}
 	case .COND_LO:
 		return Operand{cond = u8(word & 0xF), kind = .COND, size = 1}
 	case .NZCV_FIELD:
 		return Operand{immediate = i64(word & 0xF), kind = .IMMEDIATE, size = 1}
 	case .SYS_FIELD:
-		return Operand{immediate = i64((word >> 5) & 0x7FFF), kind = .IMMEDIATE, size = 2}
+		return Operand{reg = sysreg_from_bits((word >> 5) & 0x7FFF), kind = .REGISTER, size = 4}
 	case .HINT_FIELD:
 		return Operand{immediate = i64((word >> 5) & 0x7F), kind = .IMMEDIATE, size = 1}
 	case .BARRIER_FIELD:
@@ -213,7 +227,7 @@ extract_operand_inline :: #force_inline proc "contextless" (
 
 	// ---- NEON copy/permute index fields ------------------------------------
 	case .VN_VM_DUP:
-		return Operand{reg = Register(REG_V | u16((word >> 5) & 0x1F)), kind = .REGISTER, size = 4}
+		return Operand{reg = Register(REG_V | u16((word >> 5) & 0x1F)), kind = .REGISTER, size = reg_size_for_type(ot)}
 	case .NEON_IDX5:
 		// imm5 = index << (markerbit+1) | (1 << markerbit); marker = lowest set bit.
 		imm5 := (word >> 16) & 0x1F
@@ -222,7 +236,7 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		else if imm5 & 0x2 != 0 { mb = 1 }
 		else if imm5 & 0x4 != 0 { mb = 2 }
 		else                    { mb = 3 }
-		return Operand{immediate = i64(imm5 >> (mb + 1)), kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64(imm5 >> (mb + 1)), kind = .IMMEDIATE, size = LANE_INDEX}
 	case .NEON_IDX4:
 		// imm4 = index << markerbit; recover markerbit from imm5 in the word.
 		imm5 := (word >> 16) & 0x1F
@@ -231,7 +245,7 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		else if imm5 & 0x2 != 0 { mb = 1 }
 		else if imm5 & 0x4 != 0 { mb = 2 }
 		else                    { mb = 3 }
-		return Operand{immediate = i64(((word >> 11) & 0xF) >> mb), kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64(((word >> 11) & 0xF) >> mb), kind = .IMMEDIATE, size = LANE_INDEX}
 	case .NEON_EXT_IDX:
 		return Operand{immediate = i64((word >> 11) & 0xF), kind = .IMMEDIATE, size = 1}
 	case .IMM5_HI:
@@ -246,33 +260,26 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	case .PN_PM_DUP, .PN_PG_PM_DUP:
 		return Operand{reg = Register(REG_P | u16((word >> 5) & 0xF)), kind = .REGISTER, size = 4}
 	case .ZD_ZM_DUP:
-		return Operand{reg = Register(REG_Z | u16(word & 0x1F)), kind = .REGISTER, size = 4}
+		return Operand{reg = Register(REG_Z | u16(word & 0x1F)), kind = .REGISTER, size = reg_size_for_type(ot)}
 	case .SVE_EXT_IMM:
 		v := ((word >> 16) & 0x1F) << 3 | ((word >> 10) & 0x7)
 		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
 	case .ZA_TILE_LOW:
-		return Operand{immediate = i64(word & 0x7), kind = .IMMEDIATE, size = 1}
+		return Operand{reg = Register(REG_ZA | u16(word & 0x7)), kind = .REGISTER,
+		               size = za_elem_for_type(ot)}
 	case .NEON_LANE_B:
 		i := ((word >> 30) & 0x1) << 3 | ((word >> 12) & 0x1) << 2 | ((word >> 10) & 0x3)
-		return Operand{immediate = i64(i), kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64(i), kind = .IMMEDIATE, size = LANE_INDEX}
 	case .NEON_LANE_H:
 		i := ((word >> 30) & 0x1) << 2 | ((word >> 12) & 0x1) << 1 | ((word >> 11) & 0x1)
-		return Operand{immediate = i64(i), kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64(i), kind = .IMMEDIATE, size = LANE_INDEX}
 	case .NEON_LANE_S:
 		i := ((word >> 30) & 0x1) << 1 | ((word >> 12) & 0x1)
-		return Operand{immediate = i64(i), kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64(i), kind = .IMMEDIATE, size = LANE_INDEX}
 	case .NEON_LANE_D:
-		return Operand{immediate = i64((word >> 30) & 0x1), kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64((word >> 30) & 0x1), kind = .IMMEDIATE, size = LANE_INDEX}
 	case .SVE_XAR_SHIFT:
-		tszh := (word >> 22) & 0x3
-		tszl := (word >> 19) & 0x3
-		v    := i64((tszh << 5) | (tszl << 3) | ((word >> 16) & 0x7))
-		tsize := (tszh << 2) | tszl
-		esize: i64 = 8
-		if      tsize >= 8 { esize = 64 }
-		else if tsize >= 4 { esize = 32 }
-		else if tsize >= 2 { esize = 16 }
-		return Operand{immediate = 2 * esize - v, kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64(sve_tsz_shift(sve_tsz_field(word))), kind = .IMMEDIATE, size = 1}
 
 	// ---- Memory operand variants ------------------------------------------
 	case .OFFSET_BASE_U12:
@@ -338,20 +345,60 @@ extract_operand_inline :: #force_inline proc "contextless" (
 			},
 			kind = .MEMORY, size = 4,
 		}
+	case .OFFSET_PAIR_4, .OFFSET_PAIR_8, .OFFSET_PAIR_16:
+		// LDP/STP: signed imm7 at 21:15, scaled by the transfer size. The
+		// addressing mode is bits[24:23] of the word (01 post, 11 pre,
+		// 10 signed offset / 00 no-allocate), not part of the encoding.
+		base_hw := u8((word >> 5) & 0x1F)
+		imm7    := i32((word >> 15) & 0x7F)
+		if imm7 & (1 << 6) != 0 {
+			imm7 |= ~i32(0x7F)
+		}
+		scale := i32(4)
+		if en == .OFFSET_PAIR_8 {
+			scale = 8
+		} else if en == .OFFSET_PAIR_16 {
+			scale = 16
+		}
+		mode := Address_Mode.OFFSET
+		switch (word >> 23) & 0x3 {
+		case 0b01: mode = .POST_INDEXED
+		case 0b11: mode = .PRE_INDEXED
+		}
+		return Operand{
+			mem = Memory{
+				base = Register(REG_X | u16(base_hw)),
+				index = NONE,
+				disp = imm7 * scale,
+				mode = mode,
+			},
+			kind = .MEMORY, size = 4,
+		}
 	case .OFFSET_REG, .OFFSET_EXT:
 		base_hw := u8((word >> 5) & 0x1F)
 		idx_hw  := u8((word >> 16) & 0x1F)
 		option  := Extend((word >> 13) & 0x7)
-		s       := u8((word >> 12) & 0x1)
 		idx_cls := u16(REG_X)
 		if option == .UXTW || option == .SXTW { idx_cls = REG_W }
+		// S (bit 12) is one bit; the amount it stands for is log2 of the
+		// transfer size -- size (31:30), plus opc<1> (23) for SIMD (V at 26).
+		// A byte access with S set means an explicit `#0`, which Memory
+		// cannot hold apart from no amount; it decodes as no amount.
+		scale := u8((word >> 30) & 0x3)
+		if (word >> 26) & 1 == 1 {
+			scale |= u8((word >> 23) & 0x1) << 2
+		}
+		shift := (word >> 12) & 1 == 1 ? scale : 0
+		// Option 011 is LSL -- a plain register offset; the other three
+		// options are extended-register offsets.
+		mode := option == .UXTX ? Address_Mode.REG_OFFSET : .EXT_REG_OFFSET
 		return Operand{
 			mem = Memory{
 				base   = Register(REG_X | u16(base_hw)),
 				index  = Register(idx_cls | u16(idx_hw)),
 				extend = option,
-				shift  = s,
-				mode   = en == .OFFSET_EXT ? .EXT_REG_OFFSET : .REG_OFFSET,
+				shift  = shift,
+				mode   = mode,
 			},
 			kind = .MEMORY, size = 4,
 		}
@@ -406,18 +453,33 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		return Operand{immediate = i64(value), kind = .IMMEDIATE, size = is_64 ? 8 : 4}
 
 	// ---- NEON / SIMD register slots ----
+	// The class comes from the operand TYPE, not from the encoding: SVE forms
+	// use these same Vd/Vn/Vm slots with Z_REG_* operands, so hardcoding
+	// REG_V here decoded `add z0.d, z0.d, z0.d` as a V register.
 	case .VD:
-		hw := u16(word & 0x1F)
-		return Operand{reg = Register(REG_V | hw), kind = .REGISTER, size = 4}
+		return reg_from_field(word, 0, ot)
+	// The element size is not in the static pattern -- it shares the tsz field
+	// with the shift -- so it has to be read out of the word.
+	case .VD_TSZ:
+		return Operand{reg = Register(REG_Z | u16(word & 0x1F)), kind = .REGISTER,
+		               size = sve_esize_code(sve_tsz_esize(sve_tsz_field(word)))}
+	case .VN_TSZ:
+		return Operand{reg = Register(REG_Z | u16((word >> 5) & 0x1F)), kind = .REGISTER,
+		               size = sve_esize_code(sve_tsz_esize(sve_tsz_field(word)))}
 	case .VN:
-		hw := u16((word >> 5) & 0x1F)
-		return Operand{reg = Register(REG_V | hw), kind = .REGISTER, size = 4}
+		return reg_from_field(word, 5, ot)
+	case .VD_LIST1, .VD_LIST2, .VD_LIST3, .VD_LIST4:
+		op := reg_from_field(word, 0, ot)
+		op.list_count = u8(int(en) - int(Operand_Encoding.VD_LIST1)) + 1
+		return op
+	case .VN_LIST1, .VN_LIST2, .VN_LIST3, .VN_LIST4:
+		op := reg_from_field(word, 5, ot)
+		op.list_count = u8(int(en) - int(Operand_Encoding.VN_LIST1)) + 1
+		return op
 	case .VM:
-		hw := u16((word >> 16) & 0x1F)
-		return Operand{reg = Register(REG_V | hw), kind = .REGISTER, size = 4}
+		return reg_from_field(word, 16, ot)
 	case .VA:
-		hw := u16((word >> 10) & 0x1F)
-		return Operand{reg = Register(REG_V | hw), kind = .REGISTER, size = 4}
+		return reg_from_field(word, 10, ot)
 
 	// ---- NEON / SVE indexed/immediate fields ----
 	case .NEON_IMM8_FMOV:
@@ -451,38 +513,65 @@ extract_operand_inline :: #force_inline proc "contextless" (
 
 	// ---- SVE predicate slots ----
 	case .PD:
-		return Operand{reg = Register(REG_P | u16(word & 0xF)), kind = .REGISTER, size = 4}
+		return Operand{reg = Register(REG_P | u16(word & 0xF)), kind = .REGISTER, size = pqual_for_type(ot)}
 	case .PN:
-		return Operand{reg = Register(REG_P | u16((word >> 5) & 0xF)), kind = .REGISTER, size = 4}
+		return Operand{reg = Register(REG_P | u16((word >> 5) & 0xF)), kind = .REGISTER, size = pqual_for_type(ot)}
 	case .PM:
-		return Operand{reg = Register(REG_P | u16((word >> 16) & 0xF)), kind = .REGISTER, size = 4}
+		return Operand{reg = Register(REG_P | u16((word >> 16) & 0xF)), kind = .REGISTER, size = pqual_for_type(ot)}
+	case .SME_ZA_MASK:
+		return Operand{immediate = i64(word & 0xFF), kind = .IMMEDIATE, size = ZA_TILE_MASK}
+	case .SME_ZA_ARRAY:
+		// elem 0 marks it as an array vector rather than a tile slice.
+		return op_za_slice(0, u8((word >> 13) & 0x3), u8(word & 0xF), 0)
+	case .ENC_ZT0:
+		return Operand{reg = ZT0, kind = .REGISTER, size = 0}
+	case .LUTI_IDX:
+		return Operand{immediate = i64((word >> 15) & 0x3), kind = .IMMEDIATE, size = LANE_INDEX}
+	case .PNG:
+		return Operand{reg = Register(REG_PN | u16(8 + ((word >> 10) & 0x7))), kind = .REGISTER, size = pqual_for_type(ot)}
 	case .PG:
-		return Operand{reg = Register(REG_P | u16((word >> 10) & 0x7)), kind = .REGISTER, size = 4}
+		return Operand{reg = Register(REG_P | u16((word >> 10) & 0x7)), kind = .REGISTER, size = pqual_for_type(ot)}
 	case .PG4:
-		return Operand{reg = Register(REG_P | u16((word >> 10) & 0xF)), kind = .REGISTER, size = 4}
+		return Operand{reg = Register(REG_P | u16((word >> 10) & 0xF)), kind = .REGISTER, size = pqual_for_type(ot)}
 	case .PM3:
-		return Operand{reg = Register(REG_P | u16((word >> 13) & 0x7)), kind = .REGISTER, size = 4}
+		return Operand{reg = Register(REG_P | u16((word >> 13) & 0x7)), kind = .REGISTER, size = pqual_for_type(ot)}
 
 	// ---- SVE immediates ----
 	case .SVE_IMM8:
 		v := i32((word >> 5) & 0xFF)
 		if v & 0x80 != 0 { v |= ~i32(0xFF) }
 		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
+	case .SVE_IMM5A:
+		v := i64((word >> 5) & 0x1F)
+		if v & 0x10 != 0 { v |= ~i64(0x1F) }
+		return Operand{immediate = v, kind = .IMMEDIATE, size = 1}
 	case .SVE_IMM5:
 		return Operand{immediate = i64((word >> 16) & 0x1F), kind = .IMMEDIATE, size = 1}
 	case .SVE_SHIFT_TSZ_IMM:
 		return Operand{immediate = i64((word >> 16) & 0x7F), kind = .IMMEDIATE, size = 1}
 	case .SVE_PATTERN:
-		return Operand{immediate = i64((word >> 5) & 0x1F), kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64((word >> 5) & 0x1F), kind = .IMMEDIATE, size = SVE_PATTERN_IMM}
+	case .IMM_MUL4:
+		// The field holds the multiplier minus one.
+		return Operand{immediate = i64(((word >> 16) & 0xF) + 1), kind = .IMMEDIATE, size = SVE_MUL_IMM}
 
 	// ---- SVE memory operands ----
-	case .SVE_OFFSET_BASE_SS:
+	case .SVE_OFFSET_BASE_SS, .SVE_OFFSET_BASE_SS1, .SVE_OFFSET_BASE_SS2, .SVE_OFFSET_BASE_SS3,
+	     .SVE_OFFSET_BASE_SS4:
 		base_hw := u8((word >> 5) & 0x1F)
 		idx_hw  := u8((word >> 16) & 0x1F)
+		shift: u8 = 0
+		#partial switch en {
+		case .SVE_OFFSET_BASE_SS1: shift = 1
+		case .SVE_OFFSET_BASE_SS2: shift = 2
+		case .SVE_OFFSET_BASE_SS3: shift = 3
+		case .SVE_OFFSET_BASE_SS4: shift = 4
+		}
 		return Operand{
 			mem = Memory{
 				base = Register(REG_X | u16(base_hw)),
 				index = Register(REG_X | u16(idx_hw)),
+				shift = shift,
 				mode = .REG_OFFSET,
 			},
 			kind = .MEMORY, size = 4,
@@ -503,28 +592,45 @@ extract_operand_inline :: #force_inline proc "contextless" (
 
 	// ---- SME ZA tile fields ----
 	case .ZA_TILE_NUM_B:
-		return Operand{immediate = 0, kind = .IMMEDIATE, size = 1}
+		return Operand{reg = Register(REG_ZA | u16(word & 0x0)), kind = .REGISTER,
+		               size = za_elem_for_type(ot)}
 	case .ZA_TILE_NUM_H:
-		return Operand{immediate = i64((word >> 22) & 0x1), kind = .IMMEDIATE, size = 1}
+		return Operand{reg = Register(REG_ZA | u16(word & 0x1)), kind = .REGISTER,
+		               size = za_elem_for_type(ot)}
 	case .ZA_TILE_NUM_S:
-		return Operand{immediate = i64((word >> 22) & 0x3), kind = .IMMEDIATE, size = 1}
+		return Operand{reg = Register(REG_ZA | u16(word & 0x3)), kind = .REGISTER,
+		               size = za_elem_for_type(ot)}
 	case .ZA_TILE_NUM_D:
-		return Operand{immediate = i64((word >> 21) & 0x7), kind = .IMMEDIATE, size = 1}
+		return Operand{reg = Register(REG_ZA | u16(word & 0x7)), kind = .REGISTER,
+		               size = za_elem_for_type(ot)}
 	case .SME_PATTERN_FIELD:
 		return Operand{immediate = i64((word >> 5) & 0xF), kind = .IMMEDIATE, size = 1}
 
 	// ---- SVE gather/scatter + vector-base memory ----
-	case .SVE_OFFSET_BASE_VEC:
+	case .SVE_OFFSET_BASE_VEC, .SVE_OFFSET_BASE_VEC_S, .SVE_OFFSET_BASE_VEC_D,
+	     .SVE_OFFSET_BASE_VECST_S, .SVE_OFFSET_BASE_VECST_D:
 		base_hw := u8((word >> 5)  & 0x1F)
 		idx_hw  := u8((word >> 16) & 0x1F)
-		return Operand{
-			mem = Memory{
-				base  = Register(REG_X | u16(base_hw)),
-				index = Register(REG_Z | u16(idx_hw)),
-				mode  = .REG_OFFSET,
-			},
-			kind = .MEMORY, size = 4,
+		m := Memory{
+			base  = Register(REG_X | u16(base_hw)),
+			index = Register(REG_Z | u16(idx_hw)),
+			mode  = .REG_OFFSET,
 		}
+		// These forms all extend a 32-bit-wide index, and bit 22 says which way.
+		// The index's own element size is not derivable from the word, so it
+		// travels in the operand's size -- Memory has no bits left.
+		shape := u8(4)
+		#partial switch en {
+		case .SVE_OFFSET_BASE_VEC_S, .SVE_OFFSET_BASE_VEC_D:
+			m.mode   = .EXT_REG_OFFSET
+			m.extend = (word >> 22) & 1 != 0 ? .SXTW : .UXTW
+			shape    = en == .SVE_OFFSET_BASE_VEC_D ? ZSHAPE_D : ZSHAPE_S
+		case .SVE_OFFSET_BASE_VECST_S, .SVE_OFFSET_BASE_VECST_D:
+			m.mode   = .EXT_REG_OFFSET
+			m.extend = (word >> 14) & 1 != 0 ? .SXTW : .UXTW
+			shape    = en == .SVE_OFFSET_BASE_VECST_D ? ZSHAPE_D : ZSHAPE_S
+		}
+		return Operand{mem = m, kind = .MEMORY, size = shape}
 	case .SVE_OFFSET_VEC_BASE:
 		base_hw := u8((word >> 5) & 0x1F)
 		imm     := i32((word >> 16) & 0x1F)
@@ -540,13 +646,13 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	// ---- SVE indexed lane field ----
 	case .SVE_FMLA_IDX_H:
 		v := ((word >> 22) & 0x1) << 2 | ((word >> 19) & 0x3)
-		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = LANE_INDEX}
 	case .SVE_FMLA_IDX_S:
 		v := (word >> 19) & 0x3
-		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = LANE_INDEX}
 	case .SVE_FMLA_IDX_D:
 		v := (word >> 20) & 0x1
-		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = LANE_INDEX}
 
 	// ---- SME tile slice descriptor (round-trip back to the packed form) ----
 	//
@@ -554,40 +660,32 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	// instruction bits 3:0 (packed per element size), Ws at bits 14:13,
 	// V flag at bit 15.
 	case .SME_SLICE_B:
-		vflag := (word >> 15) & 0x1
-		ws    := (word >> 13) & 0x3
-		imm   := word & 0xF
-		v := imm | (vflag << 4) | (ws << 5)
-		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 2}
+		// The tile number and the offset share the low nibble; how it
+		// splits follows the element size.
+		return op_za_slice(u8((word >> 4) & 0x0), u8((word >> 13) & 0x3),
+		                   u8(word & 0xF), ZSHAPE_B, (word >> 15) & 0x1 != 0)
 	case .SME_SLICE_H:
-		vflag := (word >> 15) & 0x1
-		ws    := (word >> 13) & 0x3
-		imm   := word & 0x7
-		tile  := (word >> 3) & 0x1
-		v := imm | (vflag << 4) | (ws << 5) | (tile << 7)
-		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 2}
+		// The tile number and the offset share the low nibble; how it
+		// splits follows the element size.
+		return op_za_slice(u8((word >> 3) & 0x1), u8((word >> 13) & 0x3),
+		                   u8(word & 0x7), ZSHAPE_H, (word >> 15) & 0x1 != 0)
 	case .SME_SLICE_W:
-		vflag := (word >> 15) & 0x1
-		ws    := (word >> 13) & 0x3
-		imm   := word & 0x3
-		tile  := (word >> 2) & 0x3
-		v := imm | (vflag << 4) | (ws << 5) | (tile << 7)
-		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 2}
+		// The tile number and the offset share the low nibble; how it
+		// splits follows the element size.
+		return op_za_slice(u8((word >> 2) & 0x3), u8((word >> 13) & 0x3),
+		                   u8(word & 0x3), ZSHAPE_S, (word >> 15) & 0x1 != 0)
 	case .SME_SLICE_D:
-		vflag := (word >> 15) & 0x1
-		ws    := (word >> 13) & 0x3
-		imm   := word & 0x1
-		tile  := (word >> 1) & 0x7
-		v := imm | (vflag << 4) | (ws << 5) | (tile << 7)
-		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 2}
+		// The tile number and the offset share the low nibble; how it
+		// splits follows the element size.
+		return op_za_slice(u8((word >> 1) & 0x7), u8((word >> 13) & 0x3),
+		                   u8(word & 0x1), ZSHAPE_D, (word >> 15) & 0x1 != 0)
 	case .SME_SLICE_Q:
-		vflag := (word >> 15) & 0x1
-		ws    := (word >> 13) & 0x3
-		tile  := word & 0xF
-		v := (vflag << 4) | (ws << 5) | (tile << 7)
-		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 2}
-
-	// ---- Batch 3 misc immediates ----
+		// The tile number and the offset share the low nibble; how it
+		// splits follows the element size.
+		return op_za_slice(u8((word >> 0) & 0xF), u8((word >> 13) & 0x3),
+		                   u8(word & 0x0), ZSHAPE_Q, (word >> 15) & 0x1 != 0)
+	case .NEON_IDX2:
+		return Operand{immediate = i64((word >> 12) & 0x3), kind = .IMMEDIATE, size = LANE_INDEX}
 	case .ENC_FCMLA_ROT:
 		return Operand{immediate = i64((word >> 12) & 0x3), kind = .IMMEDIATE, size = 1}
 	case .ENC_FCADD_ROT:
@@ -607,17 +705,30 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	case .ENC_LSL_IMM_X:
 		imms := (word >> 10) & 0x3F
 		return Operand{immediate = i64((63 - imms) & 0x3F), kind = .IMMEDIATE, size = 1}
+	case .ENC_IMM6_LO:
+		v := i32((word >> 5) & 0x3F)
+		if v & (1 << 5) != 0 { v |= ~i32(0x3F) }   // sign-extend from bit 5
+		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
+	case .ENC_SHIFT_IMMR:
+		// LSR/ASR immediate: the shift is immr verbatim (bits 21:16).
+		return Operand{immediate = i64((word >> 16) & 0x3F), kind = .IMMEDIATE, size = 1}
 	case .ENC_DUAL_RN_RM:
 		// Take the Rn slot (9:5) as the source register.
 		return Operand{reg = Register(REG_X | u16((word >> 5) & 0x1F)), kind = .REGISTER, size = 4}
 	case .ENC_ROR_SHIFT:
 		return Operand{immediate = i64((word >> 10) & 0x3F), kind = .IMMEDIATE, size = 1}
 	case .ENC_Z_PAIR_VD, .ENC_Z_QUAD_VD:
-		return Operand{reg = Register(REG_Z | u16(word & 0x1F)), kind = .REGISTER, size = 4}
+		// A pair starts on an even register and a quad on a multiple of four,
+		// so the bits below that are not part of the field -- ZIP and UZP tell
+		// themselves apart with them.
+		pair := en == .ENC_Z_PAIR_VD
+		return Operand{reg = Register(REG_Z | u16(word & (pair ? 0x1E : 0x1C))), kind = .REGISTER,
+		               size = reg_size_for_type(ot), list_count = pair ? 2 : 4}
 	case .ENC_Z_PAIR_VN, .ENC_Z_QUAD_VN:
-		return Operand{reg = Register(REG_Z | u16((word >> 5) & 0x1F)), kind = .REGISTER, size = 4}
+		return Operand{reg = Register(REG_Z | u16((word >> 5) & 0x1F)), kind = .REGISTER,
+		               size = reg_size_for_type(ot), list_count = en == .ENC_Z_PAIR_VN ? 2 : 4}
 	case .ENC_Z_PAIR_VM, .ENC_Z_QUAD_VM:
-		return Operand{reg = Register(REG_Z | u16((word >> 16) & 0x1F)), kind = .REGISTER, size = 4}
+		return Operand{reg = Register(REG_Z | u16((word >> 16) & 0x1F)), kind = .REGISTER, size = reg_size_for_type(ot)}
 	}
 	return {}
 }
@@ -643,20 +754,92 @@ reg_from_field :: #force_inline proc "contextless" (
 	case .Q_REG:    cls = REG_Q
 	case .V_REG,
 		 .V_8B, .V_16B, .V_4H, .V_8H, .V_2S, .V_4S, .V_1D, .V_2D,
-		 .V_4H_FP16, .V_8H_FP16,
+		 .V_4H_FP16, .V_8H_FP16, .V_1Q,
 		 .V_ELEM_B, .V_ELEM_H, .V_ELEM_S, .V_ELEM_D:
 		cls = REG_V
-	case .Z_REG_B, .Z_REG_H, .Z_REG_S, .Z_REG_D:
+	case .Z_REG_B, .Z_REG_H, .Z_REG_S, .Z_REG_D, .Z_REG_ANY,
+	     .Z_LIST1_B, .Z_LIST1_H, .Z_LIST1_S, .Z_LIST1_D, .Z_LIST2_B:
 		cls = REG_Z
-	case .P_REG, .P_REG_MERGE, .P_REG_ZERO:
+	case .P_REG, .P_REG_MERGE, .P_REG_ZERO, .P_REG_GOV,
+	     .P_REG_B, .P_REG_H, .P_REG_S, .P_REG_D:
 		cls = REG_P
+	case .PN_REG, .PN_REG_ZERO:
+		cls = REG_PN
+	case .ZT_REG:
+		cls = REG_ZT
+	case .ZA_ARRAY:
+		cls = REG_ZA
+	case .Z_PAIR_B, .Z_PAIR_H, .Z_PAIR_S, .Z_PAIR_D,
+	     .Z_QUAD_B, .Z_QUAD_H, .Z_QUAD_S, .Z_QUAD_D:
+		cls = REG_Z
 	}
 	// SP class needs the special hw=31 marker; everything else uses the
 	// raw hw with the chosen class.
 	if (ot == .WSP_REG && hw == 31) || (ot == .XSP_REG && hw == 31) {
 		return Operand{reg = Register(cls | 31), kind = .REGISTER, size = 4}
 	}
-	return Operand{reg = Register(cls | hw), kind = .REGISTER, size = 4}
+	// Vector operands carry their arrangement / element view in `size`, using
+	// the same codes op_v_*/op_z_* produce (see operands.odin). Without this a
+	// decoded V register would come back as a bare `v0` with no `.4s`, so a
+	// disassembly could not be fed back to an assembler.
+	return Operand{reg = Register(cls | hw), kind = .REGISTER, size = reg_size_for_type(ot)}
+}
+
+// The `size` marker an operand of this type carries: the NEON arrangement
+// (multiples of 8), an element view (odd), or an SVE element width. 4 is the
+// neutral "no vector shape" value used by every scalar class.
+@(private="file", require_results)
+reg_size_for_type :: #force_inline proc "contextless" (ot: Operand_Type) -> u8 {
+	#partial switch ot {
+	case .V_8B:                 return 8
+	case .V_16B:                return 16
+	case .V_4H, .V_4H_FP16:     return 24
+	case .V_8H, .V_8H_FP16:     return 32
+	case .V_2S:                 return 40
+	case .V_4S:                 return 48
+	case .V_1D:                 return 56
+	case .V_2D:                 return 64
+	case .V_1Q:                 return 72
+	case .V_ELEM_B:             return 1
+	case .V_ELEM_H:             return 3
+	case .V_ELEM_S:             return 5
+	case .V_ELEM_D:             return 7
+	case .Z_REG_B:              return 1
+	case .Z_REG_H:              return 2
+	case .Z_REG_S:              return 4
+	case .Z_REG_D:              return 8
+	case .Z_REG_ANY:            return 0   // no element size in the syntax
+	case .Z_LIST1_B, .Z_LIST2_B: return 1
+	case .Z_LIST1_H:            return 2
+	case .Z_LIST1_S:            return 4
+	case .Z_LIST1_D:            return 8
+	case .P_REG_ZERO, .PN_REG_ZERO: return PQUAL_ZERO
+	case .P_REG_MERGE:          return PQUAL_MERGE
+	case .P_REG_B:              return PSHAPE_B
+	case .P_REG_H:              return PSHAPE_H
+	case .P_REG_S:              return PSHAPE_S
+	case .P_REG_D:              return PSHAPE_D
+	case .Z_PAIR_B, .Z_QUAD_B:  return 1
+	case .Z_PAIR_H, .Z_QUAD_H:  return 2
+	case .Z_PAIR_S, .Z_QUAD_S:  return 4
+	case .Z_PAIR_D, .Z_QUAD_D:  return 8
+	}
+	return 4
+}
+
+// A predicate operand's governing qualifier, which the form -- not the caller
+// -- decides: an SVE load zeroes, a predicated add merges.
+@(private="file", require_results)
+pqual_for_type :: #force_inline proc "contextless" (ot: Operand_Type) -> u8 {
+	#partial switch ot {
+	case .P_REG_ZERO, .PN_REG_ZERO: return PQUAL_ZERO
+	case .P_REG_MERGE: return PQUAL_MERGE
+	case .P_REG_B:     return PSHAPE_B
+	case .P_REG_H:     return PSHAPE_H
+	case .P_REG_S:     return PSHAPE_S
+	case .P_REG_D:     return PSHAPE_D
+	}
+	return PQUAL_NONE
 }
 
 // -----------------------------------------------------------------------------
@@ -683,4 +866,21 @@ decode_reserve :: proc(instructions: ^[dynamic]Instruction, inst_info: ^[dynamic
 	if instructions != nil { reserve(instructions, len(instructions) + n) }
 	if inst_info    != nil { reserve(inst_info,    len(inst_info)    + n) }
 	if label_defs   != nil { reserve(label_defs,   len(label_defs)   + n) }
+}
+
+// The packed tszh:tszl:imm3 value an SVE shift-by-immediate carries.
+@(private="file", require_results)
+sve_tsz_field :: #force_inline proc "contextless" (word: u32) -> u32 {
+	return ((word >> 22) & 0x3) << 5 | ((word >> 19) & 0x3) << 3 | ((word >> 16) & 0x7)
+}
+
+// The element width a ZA tile operand is viewed at.
+@(private="file", require_results)
+za_elem_for_type :: #force_inline proc "contextless" (ot: Operand_Type) -> u8 {
+	#partial switch ot {
+	case .ZA_TILE_H: return ZSHAPE_H
+	case .ZA_TILE_S: return ZSHAPE_S
+	case .ZA_TILE_D: return ZSHAPE_D
+	}
+	return ZSHAPE_B
 }

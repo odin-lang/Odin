@@ -75,6 +75,38 @@ _rand_bytes :: proc "contextless" (dst: []byte) {
 	}
 }
 
+when ODIN_PLATFORM_SUBTARGET == .Android {
+	// An Android app's arguments: its package name. zygote writes it over the process's own arguments, but a native
+	// bridge passes a library the originals. `/proc/self/cmdline` has the name either way.
+	_android_args :: proc "contextless" () -> []cstring {
+		GENERIC :: ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64
+
+		SYS_openat :: 257 when ODIN_ARCH == .amd64 else 56 when GENERIC else 295 when ODIN_ARCH == .i386 else 322
+		SYS_read   :: 0   when ODIN_ARCH == .amd64 else 63 when GENERIC else 3
+		SYS_close  :: 3   when ODIN_ARCH == .amd64 else 57 when GENERIC else 6
+
+		AT_FDCWD  :: ~uintptr(99) // -100
+		O_CLOEXEC :: 0o2000000
+
+		@(static) name: [256]byte
+		@(static) args: [1]cstring
+
+		path: cstring = "/proc/self/cmdline"
+		fd := int(intrinsics.syscall(SYS_openat, AT_FDCWD, uintptr(rawptr(path)), O_CLOEXEC))
+		if fd < 0 {
+			return nil
+		}
+		// The last byte stays 0, ending a name that does not fit.
+		n := int(intrinsics.syscall(SYS_read, uintptr(fd), uintptr(&name[0]), len(name)-1))
+		intrinsics.syscall(SYS_close, uintptr(fd))
+		if n <= 0 || name[0] == 0 {
+			return nil
+		}
+		args[0] = cstring(&name[0])
+		return args[:]
+	}
+}
+
 _exit :: proc "contextless" (code: int) -> ! {
 	SYS_exit_group ::
 		231 when ODIN_ARCH == .amd64 else

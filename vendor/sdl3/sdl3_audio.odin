@@ -120,7 +120,9 @@ foreign lib {
 	PauseAudioStreamDevice         :: proc(stream: ^AudioStream) -> bool ---
 	ResumeAudioStreamDevice        :: proc(stream: ^AudioStream) -> bool ---
 	AudioStreamDevicePaused        :: proc(stream: ^AudioStream) -> bool ---
+	@(synchronizes=.Acquire)
 	LockAudioStream                :: proc(stream: ^AudioStream) -> bool ---
+	@(synchronizes=.Release)
 	UnlockAudioStream              :: proc(stream: ^AudioStream) -> bool ---
 	SetAudioStreamGetCallback      :: proc(stream: ^AudioStream, callback: AudioStreamCallback, userdata: rawptr) -> bool ---
 	SetAudioStreamPutCallback      :: proc(stream: ^AudioStream, callback: AudioStreamCallback, userdata: rawptr) -> bool ---

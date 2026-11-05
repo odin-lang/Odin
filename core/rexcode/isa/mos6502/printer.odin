@@ -252,16 +252,8 @@ wprintln :: proc(
 
 @(private="file")
 write_mnemonic :: proc(sb: ^strings.Builder, m: Mnemonic, uppercase: bool) {
-	// SAX_NMOS prints as "sax" in conventional disassembly (the suffix is
-	// just our internal disambiguator vs the HuC6280 SAX).
-	name: string
-	#partial switch m {
-	case .SAX_NMOS: name = "SAX"
-	case:
-		n, ok := reflect.enum_name_from_value(m)
-		if !ok { strings.write_string(sb, "<?>"); return }
-		name = n
-	}
+	name, ok := reflect.enum_name_from_value(m)
+	if !ok { strings.write_string(sb, "<?>"); return }
 	for i in 0..<len(name) {
 		c := name[i]
 		if !uppercase && c >= 'A' && c <= 'Z' {

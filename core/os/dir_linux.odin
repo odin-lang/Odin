@@ -31,6 +31,12 @@ _read_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: File_Info
 		return -1, ""
 	}
 
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		if _is_asset_file(it.f) {
+			return _read_asset_directory_iterator(it)
+		}
+	}
+
 	index = it.index
 	it.index += 1
 
@@ -95,6 +101,13 @@ _read_directory_iterator_init :: proc(it: ^Read_Directory_Iterator, f: ^File) {
 	if f == nil || f.impl == nil {
 		read_directory_iterator_set_error(it, "", .Invalid_File)
 		return
+	}
+
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		if _is_asset_file(f) {
+			_init_asset_directory_iterator(it, f)
+			return
+		}
 	}
 
 	stat: linux.Statx

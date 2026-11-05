@@ -297,6 +297,9 @@ _read_record :: proc(r: ^Reader, dst: ^[dynamic]string, allocator := context.all
 				append(&r.raw_buffer, ..rune_buf[:rune_len])
 			}
 
+			if err == .EOF && len(r.raw_buffer) > 0 {
+				err = nil
+			}
 			return r.raw_buffer[:], err
 		}
 		unreachable()

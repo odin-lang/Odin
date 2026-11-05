@@ -135,7 +135,7 @@ when ODIN_OS == .Windows {
 			// multiple copies of raylib.so, but since these bindings are for
 			// particular version of the library, I better specify it. Ideally,
 			// though, it's best specified in terms of major (.so.4)
-			"../linux-arm64/libraylib.so.600" when RAYLIB_SHARED else "../linux-arm64/libraylib.a",
+			"../linux-arm64/libraylib.so.620" when RAYLIB_SHARED else "../linux-arm64/libraylib.a",
 			"system:dl",
 			"system:pthread",
 			"system:X11",
@@ -146,7 +146,7 @@ when ODIN_OS == .Windows {
 			// multiple copies of raylib.so, but since these bindings are for
 			// particular version of the library, I better specify it. Ideally,
 			// though, it's best specified in terms of major (.so.4)
-			"../linux/libraylib.so.600" when RAYLIB_SHARED else "../linux/libraylib.a",
+			"../linux/libraylib.so.620" when RAYLIB_SHARED else "../linux/libraylib.a",
 			"system:dl",
 			"system:pthread",
 			"system:X11",
@@ -154,10 +154,11 @@ when ODIN_OS == .Windows {
 	}
 } else when ODIN_OS == .Darwin {
 	foreign import lib {
-		"../macos/libraylib.600.dylib" when RAYLIB_SHARED else "../macos/libraylib.a",
+		"../macos/libraylib.620.dylib" when RAYLIB_SHARED else "../macos/libraylib.a",
 		"system:Cocoa.framework",
 		"system:OpenGL.framework",
 		"system:IOKit.framework",
+		"system:QuartzCore.framework", // CAMetalLayer, used by raylib 6.2's GLFW
 	}
 } else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
 	foreign import lib {

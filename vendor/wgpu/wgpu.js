@@ -30,7 +30,7 @@ const ENUMS = {
 	PowerPreference: [undefined, "low-power", "high-performance", ],
 	CompositeAlphaMode: ["auto", "opaque", "premultiplied", "unpremultiplied", "inherit", ],
 	StencilOperation: [undefined, "keep", "zero", "replace", "invert", "increment-clamp", "decrement-clamp", "increment-wrap", "decrement-wrap", ],
-	BlendOperation: ["add", "subtract", "reverse-subtract", "min", "max", ],
+	BlendOperation: [undefined, "add", "subtract", "reverse-subtract", "min", "max", ],
 	BlendFactor: [undefined, "zero", "one", "src", "one-minus-src", "src-alpha", "one-minus-src-alpha", "dst", "one-minus-dst", "dst-alpha", "one-minus-dst-alpha", "src-alpha-saturated", "constant", "one-minus-constant", "src1", "one-minus-src1", "src1-alpha", "one-minus-src1-alpha" ],
 	PresentMode: [undefined, "fifo", "fifo-relaxed", "immediate", "mailbox", ],
 	TextureAspect: [undefined, "all", "stencil-only", "depth-only"],

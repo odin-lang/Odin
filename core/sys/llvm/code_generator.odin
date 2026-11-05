@@ -4,29 +4,37 @@ package sys_llvm
 
 @(default_calling_convention="none")
 foreign _ {
+	// not supported on wasm
 	@(link_name="llvm.returnaddress")
 	return_address :: proc(#const level: u32 = 0) -> rawptr ---
 
-	@(link_name="llvm.addressofreturnaddress")
+	// x86 and AArch64 only
+	@(link_name="llvm.addressofreturnaddress.p0")
 	address_of_return_address :: proc() -> rawptr ---
 
-	@(link_name="llvm.sponentry")
+	// ARM and AArch64 only
+	@(link_name="llvm.sponentry.p0")
 	stack_pointer_on_entry :: proc() -> rawptr ---
 
-	@(link_name="llvm.frameaddress")
+	// a level above 0 is ignored on Windows amd64, and gives nil on wasm
+	@(link_name="llvm.frameaddress.p0")
 	frame_address :: proc(#const level: u32 = 0) -> rawptr ---
 
-	@(link_name="llvm.stacksave")
+	// LLVM 18+, LLVM 17 names these without the `.p0`
+	@(link_name="llvm.stacksave.p0")
 	stack_save :: proc() -> rawptr ---
 
-	@(link_name="llvm.stackrestore")
+	@(link_name="llvm.stackrestore.p0")
 	stack_restore :: proc(ptr: rawptr) ---
 
-	@(link_name="llvm.get.dynamic.area.offset.i32")
-	get_dynamic_area_offset_i32 :: proc() -> i32 ---
-
-	@(link_name="llvm.get.dynamic.area.offset.i64")
-	get_dynamic_area_offset_i64 :: proc() -> i64 ---
+	// the result is pointer sized
+	when size_of(rawptr) == 4 {
+		@(link_name="llvm.get.dynamic.area.offset.i32")
+		get_dynamic_area_offset_i32 :: proc() -> i32 ---
+	} else {
+		@(link_name="llvm.get.dynamic.area.offset.i64")
+		get_dynamic_area_offset_i64 :: proc() -> i64 ---
+	}
 }
 
 
@@ -50,7 +58,7 @@ Prefetch_Cache :: enum i32 {
 
 @(default_calling_convention="none")
 foreign _ {
-	@(link_name="llvm.prefetch")
+	@(link_name="llvm.prefetch.p0")
 	prefetch :: proc(address: rawptr, #const rw: Prefetch_Read_Write, #const locality: Prefetch_Locality, #const cache: Prefetch_Cache) ---
 }
 
@@ -58,15 +66,18 @@ foreign _ {
 
 @(default_calling_convention="none")
 foreign _ {
-	@(link_name="llvm.pcmarker")
-	pc_marker :: proc(id: i32) ---
-
 	@(link_name="llvm.readcyclecounter")
 	read_cycle_counter :: proc() -> u64 ---
 
-	@(link_name="llvm.clear_cache")
-	clear_cache :: proc(rawptr, rawptr) ---
+	// LLVM 19+, 0 on targets without one
+	@(link_name="llvm.readsteadycounter")
+	read_steady_counter :: proc() -> u64 ---
 
+	// not supported on wasm
+	@(link_name="llvm.clear_cache")
+	clear_cache :: proc(begin, end: rawptr) ---
+
+	// not supported on Windows, nor on Darwin amd64
 	@(link_name="llvm.thread.pointer")
 	thread_pointer :: proc() -> rawptr ---
 }

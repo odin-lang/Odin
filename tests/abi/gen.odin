@@ -805,7 +805,8 @@ build :: proc() {
 	)
 
 	// --- matrix, which lowers to an array with its own alignment
-	// a matrix aligns to its element, so the counterpart is a plain array
+	// a matrix aligns to the largest power of two dividing its column (row if
+	// #row_major) up to 16, so the counterpart is an over-aligned plain array
 	{
 		fields := make([]Leaf, 4)
 		for i in 0 ..< 4 {
@@ -819,9 +820,46 @@ build :: proc() {
 		add(
 			"m22_f32",
 			"struct { m: matrix[2,2]f32 }",
-			"struct { float m[4]; }",
+			"struct { _Alignas(8) float m[4]; }",
 			fields,
-			tier = TIER_GNU,
+		)
+	}
+	// NOT at offset 0, where the alignment moves the matrix and changes `size_of`
+	{
+		fields := make([]Leaf, 17)
+		fields[0] = leaf("a", "f32", 0)
+		for i in 0 ..< 16 {
+			fields[i + 1] = leaf2(
+				tp("m[%d, %d]", i % 4, i / 4),
+				tp("m[%d]", i),
+				"f32",
+				val(i + 1, "f32"),
+			)
+		}
+		add(
+			"m44_off",
+			"struct { a: f32, m: matrix[4,4]f32 }",
+			"struct { float a; _Alignas(16) float m[16]; }",
+			fields,
+		)
+	}
+	// #row_major: a 16-byte row aligns where a 12-byte column would not
+	{
+		fields := make([]Leaf, 13)
+		fields[0] = leaf("a", "f32", 0)
+		for i in 0 ..< 12 {
+			fields[i + 1] = leaf2(
+				tp("m[%d, %d]", i / 4, i % 4),
+				tp("m[%d]", i),
+				"f32",
+				val(i + 1, "f32"),
+			)
+		}
+		add(
+			"mr34_off",
+			"struct { a: f32, m: #row_major matrix[3,4]f32 }",
+			"struct { float a; _Alignas(16) float m[12]; }",
+			fields,
 		)
 	}
 

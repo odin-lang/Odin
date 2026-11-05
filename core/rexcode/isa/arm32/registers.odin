@@ -35,6 +35,12 @@ REG_SREG   :: u16(0x5000)
 REG_FPSC   :: u16(0x6000)
 REG_BANKED :: u16(0x7000)
 REG_COPROC :: u16(0x8000)
+// SETEND names its argument `le` or `be`. That is a bare token in the syntax,
+// which is what the special-register classes above already model.
+REG_ENDIAN :: u16(0x9000)
+// A coprocessor number is written `p15`, not as a plain number, and it is a
+// different thing from the CRn/CRm registers REG_COPROC names.
+REG_COPROC_NUM :: u16(0xA000)
 
 REG_CLASS_MASK :: u16(0xF000)
 REG_HW_MASK    :: u16(0x0FFF)
@@ -160,6 +166,9 @@ SPSR  :: Register(REG_SREG | 2)
 // values rather than expanding the Register set.
 
 // FPSCR / FPSID and friends
+LE :: Register(REG_ENDIAN | 0)
+BE :: Register(REG_ENDIAN | 1)
+
 FPSID :: Register(REG_FPSC | 0)
 FPSCR :: Register(REG_FPSC | 1)
 MVFR2 :: Register(REG_FPSC | 5)
