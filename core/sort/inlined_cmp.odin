@@ -66,7 +66,7 @@ This sort is not guaranteed to be stable
 	}
 */
 sort_inlined_with_indices :: proc(arr: $T/[]$E, allocator := context.allocator) -> (indices: []int) where ORD(E) {
-	indices = make([]int, len(arr), allocator)
+	indices = non_zero_make([]int, len(arr), allocator)
 
 	when size_of(E) != 0 {
 		if len(arr) > 1 {
@@ -101,7 +101,7 @@ This sort is not guaranteed to be stable
 	}
 */
 sort_inlined_by_with_indices :: proc(arr: $T/[]$E, $LESS: proc(l, r: E) -> bool, allocator := context.allocator) -> (indices: []int) {
-	indices = make([]int, len(arr), allocator)
+	indices = non_zero_make([]int, len(arr), allocator)
 
 	when size_of(E) != 0 {
 		if len(arr) > 1 {
@@ -167,7 +167,7 @@ This sort is not guaranteed to be stable
 	}
 */
 sort_inlined_by_with_indices_with_data :: proc(arr: $T/[]$E, $LESS: proc(l, r: E, user_data: ^$D) -> bool, user_data: ^D, allocator := context.allocator) -> (indices: []int) {
-	indices = make([]int, len(arr), allocator)
+	indices = non_zero_make([]int, len(arr), allocator)
 	
 	when size_of(E) != 0 {
 		if len(arr) > 1 {
