@@ -20,12 +20,14 @@ Arena_Kind :: enum uint {
 
 	`total_used` and `curr_block.used` are only brought up to date when the arena changes or resets a block.
 	`arena_total_used` gives the live value.
+
+	A memory block can be at most 1 TiB.
 */
 Arena :: struct {
-	// The current block's base, committed size, and used size, for the fast path
+	// The current block's base and committed size, and a generation with the used size, for the fast path
 	_base:               [^]byte,
 	_end:                uint,
-	_offset:             uint,
+	_state:              u64,
 
 	kind:                Arena_Kind,
 	curr_block:          ^Memory_Block,
@@ -50,27 +52,51 @@ DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE :: DEFAULT_ARENA_STATIC_COMMIT_SIZE
 DEFAULT_ARENA_STATIC_RESERVE_SIZE :: mem.Gigabyte when size_of(uintptr) == 8 else 128 * mem.Megabyte
 
 
-// Writes the fast path's offset back to the current block, so block-level code sees it.
+@(private) ARENA_OFFSET_BITS :: 40
+@(private) ARENA_OFFSET_MASK :: u64(1)<<ARENA_OFFSET_BITS - 1
+@(private) ARENA_CLOSED      :: ARENA_OFFSET_MASK
+@(private) ARENA_BACKOFF     :: 16
+
+// Stops the fast path and writes its offset back to the current block, so block-level code sees it.
+// The caller holds `mutex` until `arena_open`.
 @(private, no_sanitize_address)
 arena_close :: #force_inline proc "contextless" (arena: ^Arena) {
+	generation := sync.atomic_load_explicit(&arena._state, .Relaxed)>>ARENA_OFFSET_BITS + 1
+	state      := sync.atomic_exchange_explicit(&arena._state, generation<<ARENA_OFFSET_BITS | ARENA_CLOSED, .Seq_Cst)
 	if block := arena.curr_block; block != nil {
-		arena.total_used += arena._offset - block.used
-		block.used = arena._offset
+		used := uint(state & ARENA_OFFSET_MASK)
+		arena.total_used += used - block.used
+		block.used = used
 	}
 }
 
 // Hands the current block to the fast path.
 @(private, no_sanitize_address)
 arena_open :: #force_inline proc "contextless" (arena: ^Arena) {
+	base: [^]byte
+	end:  uint
+	used: uint
 	if block := arena.curr_block; block != nil {
-		arena._base   = block.base
-		arena._end    = block.committed
-		arena._offset = block.used
-	} else {
-		arena._base   = nil
-		arena._end    = 0
-		arena._offset = 0
+		base = block.base
+		end  = block.committed
+		used = block.used
 	}
+
+	generation := sync.atomic_load_explicit(&arena._state, .Relaxed)>>ARENA_OFFSET_BITS + 1
+	sync.atomic_store_explicit(&arena._base,  base, .Release)
+	sync.atomic_store_explicit(&arena._end,   end,  .Release)
+	sync.atomic_store_explicit(&arena._state, generation<<ARENA_OFFSET_BITS | u64(used), .Seq_Cst)
+}
+
+// Allocates a memory block whose offsets fit in `_state`.
+@(require_results, no_sanitize_address, private)
+arena_memory_block_alloc :: proc(committed, reserved: uint, alignment: uint = 0) -> (block: ^Memory_Block, err: Allocator_Error) {
+	block = memory_block_alloc(committed, reserved, alignment) or_return
+	if u64(block.reserved) >= ARENA_CLOSED {
+		memory_block_dealloc(block)
+		return nil, .Out_Of_Memory
+	}
+	return
 }
 
 
@@ -79,7 +105,7 @@ arena_open :: #force_inline proc "contextless" (arena: ^Arena) {
 @(require_results, no_sanitize_address)
 arena_init_growing :: proc(arena: ^Arena, reserved: uint = DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE) -> (err: Allocator_Error) {
 	arena.kind           = .Growing
-	arena.curr_block     = memory_block_alloc(0, reserved, {}) or_return
+	arena.curr_block     = arena_memory_block_alloc(0, reserved) or_return
 	arena.total_used     = 0
 	arena.total_reserved = arena.curr_block.reserved
 
@@ -97,7 +123,7 @@ arena_init_growing :: proc(arena: ^Arena, reserved: uint = DEFAULT_ARENA_GROWING
 @(require_results, no_sanitize_address)
 arena_init_static :: proc(arena: ^Arena, reserved: uint = DEFAULT_ARENA_STATIC_RESERVE_SIZE, commit_size: uint = DEFAULT_ARENA_STATIC_COMMIT_SIZE) -> (err: Allocator_Error) {
 	arena.kind           = .Static
-	arena.curr_block     = memory_block_alloc(commit_size, reserved, {}) or_return
+	arena.curr_block     = arena_memory_block_alloc(commit_size, reserved) or_return
 	arena.total_used     = 0
 	arena.total_reserved = arena.curr_block.reserved
 	arena_open(arena)
@@ -109,7 +135,7 @@ arena_init_static :: proc(arena: ^Arena, reserved: uint = DEFAULT_ARENA_STATIC_R
 // A buffer arena contains single `Memory_Block` created from a user provided []byte.
 @(require_results, no_sanitize_address)
 arena_init_buffer :: proc(arena: ^Arena, buffer: []byte) -> (err: Allocator_Error) {
-	if len(buffer) < size_of(Memory_Block) {
+	if len(buffer) < size_of(Memory_Block) || u64(len(buffer)) >= ARENA_CLOSED {
 		return .Out_Of_Memory
 	}
 
@@ -136,46 +162,58 @@ arena_init_buffer :: proc(arena: ^Arena, buffer: []byte) -> (err: Allocator_Erro
 arena_alloc :: #force_inline proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	assert(alignment & (alignment-1) == 0, "non-power of two alignment", loc)
 
-	size := size
 	if size == 0 {
 		return nil, nil
 	}
 
-	sync.mutex_guard(&arena.mutex)
-	return arena_alloc_unguarded(arena, size, alignment, loc)
-}
-
-// Allocates memory from the provided arena.
-@(require_results, no_sanitize_address, private)
-arena_alloc_unguarded :: #force_inline proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
-	if size == 0 {
-		return nil, nil
-	}
 	if fast, ok := arena_alloc_fast(arena, size, max(alignment, 1)); ok {
 		return fast, nil
 	}
 	return arena_alloc_slow(arena, size, alignment, loc)
 }
 
-@(require_results, no_sanitize_address, private)
+@(private, require_results, no_sanitize_address)
 arena_alloc_fast :: #force_inline proc "contextless" (arena: ^Arena, size, alignment: uint) -> (data: []byte, ok: bool) #no_bounds_check {
-	used := arena._offset
-	end  := arena._end
-	pad  := (alignment - ((uint(uintptr(arena._base)) + used) & (alignment-1))) & (alignment-1)
-	if pad > end-used || size > end-used-pad {
-		return
-	}
+	spins := 1
+	for {
+		state := sync.atomic_load_explicit(&arena._state, .Acquire)
+		base  := sync.atomic_load_explicit(&arena._base,  .Acquire)
+		end   := sync.atomic_load_explicit(&arena._end,   .Acquire)
 
-	arena._offset = used + pad + size
-	return arena._base[used+pad:][:size], true
+		used := uint(state & ARENA_OFFSET_MASK)
+		pad  := (alignment - ((uint(uintptr(base)) + used) & (alignment-1))) & (alignment-1)
+		if used > end || pad > end-used || size > end-used-pad {
+			return
+		}
+
+		next := state&~ARENA_OFFSET_MASK | u64(used+pad+size)
+		if _, swapped := sync.atomic_compare_exchange_weak_explicit(&arena._state, state, next, .Acq_Rel, .Relaxed); swapped {
+			return base[used+pad:][:size], true
+		}
+
+		for _ in 0..<spins {
+			sync.cpu_relax()
+		}
+		spins = min(spins*2, ARENA_BACKOFF)
+	}
 }
 
 // Commits more memory, or moves to a new memory block, then allocates.
-@(cold, require_results, no_sanitize_address, private)
+@(private, cold, require_results, no_sanitize_address)
 arena_alloc_slow :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
+	sync.mutex_guard(&arena.mutex)
+	if fast, ok := arena_alloc_fast(arena, size, max(alignment, 1)); ok {
+		return fast, nil
+	}
+
 	arena_close(arena)
 	defer arena_open(arena)
 
+	return arena_alloc_closed(arena, size, alignment, loc)
+}
+
+@(private, require_results, no_sanitize_address)
+arena_alloc_closed :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	switch arena.kind {
 	case .Growing:
 		prev_used := 0 if arena.curr_block == nil else arena.curr_block.used
@@ -199,7 +237,7 @@ arena_alloc_slow :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #cal
 			needed := max(size, arena.default_commit_size)
 			block_size := max(needed, arena.minimum_block_size)
 
-			new_block := memory_block_alloc(needed, block_size, alignment) or_return
+			new_block := arena_memory_block_alloc(needed, block_size, alignment) or_return
 			new_block.prev = arena.curr_block
 			arena.curr_block = new_block
 			arena.total_reserved += new_block.reserved
@@ -214,6 +252,8 @@ arena_alloc_slow :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #cal
 				arena.minimum_block_size = DEFAULT_ARENA_STATIC_RESERVE_SIZE
 			}
 			arena_init_static(arena, reserved=arena.minimum_block_size, commit_size=DEFAULT_ARENA_STATIC_COMMIT_SIZE) or_return
+			// `arena_init_static` opens the arena: close it again before using the block.
+			arena_close(arena)
 		}
 		if arena.curr_block == nil {
 			return nil, .Out_Of_Memory
@@ -267,9 +307,15 @@ arena_static_reset_to :: proc(arena: ^Arena, pos: uint, loc := #caller_location)
 // Frees the last memory block of a Growing Arena
 @(no_sanitize_address)
 arena_growing_free_last_memory_block :: proc(arena: ^Arena, loc := #caller_location) {
+	sync.mutex_guard(&arena.mutex)
 	arena_close(arena)
 	defer arena_open(arena)
 
+	arena_free_last_memory_block(arena, loc)
+}
+
+@(no_sanitize_address, private)
+arena_free_last_memory_block :: proc(arena: ^Arena, loc := #caller_location) {
 	if free_block := arena.curr_block; free_block != nil {
 		assert(arena.kind == .Growing, "expected a .Growing arena", loc)
 		arena.total_used -= free_block.used
@@ -295,7 +341,7 @@ arena_free_all :: proc(arena: ^Arena, loc := #caller_location) {
 arena_free_all_unguarded :: proc(arena: ^Arena, loc := #caller_location) {
 	// NOTE(bill): Free all but the first memory block (if it exists)
 	for arena.curr_block != nil && arena.curr_block.prev != nil {
-		arena_growing_free_last_memory_block(arena, loc)
+		arena_free_last_memory_block(arena, loc)
 	}
 	// Zero the first block's memory
 	if arena.curr_block != nil {
@@ -313,10 +359,12 @@ arena_free_all_unguarded :: proc(arena: ^Arena, loc := #caller_location) {
 @(no_sanitize_address)
 arena_destroy :: proc(arena: ^Arena, loc := #caller_location) {
 	sync.mutex_guard(&arena.mutex)
+	arena_close(arena)
+
 	switch arena.kind {
 	case .Growing:
 		for arena.curr_block != nil {
-			arena_growing_free_last_memory_block(arena, loc)
+			arena_free_last_memory_block(arena, loc)
 		}
 	case .Static:
 		memory_block_dealloc(arena.curr_block)
@@ -334,10 +382,12 @@ arena_destroy :: proc(arena: ^Arena, loc := #caller_location) {
 @(require_results, no_sanitize_address)
 arena_total_used :: proc(arena: ^Arena) -> uint {
 	sync.mutex_guard(&arena.mutex)
-	arena_close(arena)
-	defer arena_open(arena)
-
-	return arena.total_used
+	block := arena.curr_block
+	if block == nil {
+		return arena.total_used
+	}
+	used := uint(sync.atomic_load_explicit(&arena._state, .Relaxed) & ARENA_OFFSET_MASK)
+	return arena.total_used + used - block.used
 }
 
 // Ability to bootstrap allocate a struct with an arena within the struct itself using the growing variant strategy.
@@ -490,7 +540,7 @@ arena_resize :: #force_no_inline proc(arena: ^Arena, old_memory: rawptr, old_siz
 		}
 	}
 
-	new_memory := arena_alloc_slow(arena, size, alignment, loc) or_return
+	new_memory := arena_alloc_closed(arena, size, alignment, loc) or_return
 	if new_memory == nil {
 		return
 	}
@@ -549,7 +599,7 @@ arena_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
 		}
 
 		for arena.curr_block != temp.block {
-			arena_growing_free_last_memory_block(arena)
+			arena_free_last_memory_block(arena)
 		}
 
 		if block := arena.curr_block; block != nil {
