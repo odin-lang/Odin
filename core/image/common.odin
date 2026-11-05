@@ -111,6 +111,8 @@ Image_Option:
 
 	`.do_not_expand_channels`
 		Applies both `.do_not_expand_grayscale` and `.do_not_expand_indexed`.
+		This also applies to JPEG 12-bit images, in which case it returns
+		samples in the range of 0..=4095, instead of expanding them to 0..=65535.
 
 	`.alpha_add_if_missing`
 		If the image has no alpha channel, it'll add one set to max(type).
@@ -123,7 +125,7 @@ Image_Option:
 		NOTE: For PNG, this also skips handling of the tRNS chunk, if present,
 		unless you select `alpha_premultiply`.
 		In this case it'll premultiply the specified pixels in question only,
-		as the others are implicitly fully opaque.	
+		as the others are implicitly fully opaque.
 
 	`.alpha_premultiply`
 		If the image has an alpha channel, returns image data as follows:
@@ -151,11 +153,9 @@ Option :: enum {
 	alpha_drop_if_present,         // Unimplemented for QOI. Returns error.
 	alpha_premultiply,             // Unimplemented for QOI. Returns error.
 	blend_background,              // Ignored for non-PNG formats
-
-	// Unimplemented
-	do_not_expand_grayscale,
-	do_not_expand_indexed,
-	do_not_expand_channels,
+	do_not_expand_grayscale,       // Used in `jpeg`, `tga`, and `png`
+	do_not_expand_indexed,         // Used in `png`
+	do_not_expand_channels,        // Used in `jpeg` and `png`
 
 	// SAVE OPTIONS
 	qoi_all_channels_linear,       // QOI, informative only. If not set, defaults to sRGB with linear alpha.
@@ -642,6 +642,8 @@ JPEG_Error :: enum {
 	Invalid_Scan_Parameters,
 	Invalid_Component,
 	Missing_Image_Data,
+	Missing_DNL_Marker,
+	DNL_Requires_Seekable_Stream,
 }
 
 JFIF_Unit :: enum byte {
@@ -748,6 +750,16 @@ JPEG_Info :: struct {
 	comments: [dynamic]string,
 	exif: [dynamic]Exif,
 	frame_type: JPEG_Marker,
+	color_space: JPEG_Color_Space,
+}
+
+JPEG_Color_Space :: enum u8 {
+	Gray,
+	Gray_Alpha,
+	YCbCr,
+	RGB,
+	CMYK,
+	YCCK,
 }
 
 Channel :: enum u8 {
