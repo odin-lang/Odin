@@ -1,5 +1,6 @@
 package mem_virtual
 
+import "base:intrinsics"
 import "core:mem"
 import "core:sync"
 
@@ -63,12 +64,60 @@ DEFAULT_ARENA_STATIC_RESERVE_SIZE :: mem.Gigabyte when size_of(uintptr) == 8 els
 @(private) ARENA_CLOSED      :: ARENA_OFFSET_MASK
 @(private) ARENA_BACKOFF     :: 16
 
+// Without lock-free 64-bit atomics (such as `linux_i386`, where `u64` is 4-byte aligned), `_state` is
+// accessed plainly and every allocation that is not `.Single_Thread` takes `mutex`.
+@(private)
+ARENA_LOCK_FREE :: intrinsics.atomic_type_is_lock_free(u64)
+
+@(private, require_results)
+arena_state_load :: #force_inline proc "contextless" (arena: ^Arena, $ORDER: sync.Atomic_Memory_Order) -> u64 {
+	when ARENA_LOCK_FREE {
+		return sync.atomic_load_explicit(&arena._state, ORDER)
+	} else {
+		return arena._state
+	}
+}
+
+@(private)
+arena_state_store :: #force_inline proc "contextless" (arena: ^Arena, value: u64, $ORDER: sync.Atomic_Memory_Order) {
+	when ARENA_LOCK_FREE {
+		sync.atomic_store_explicit(&arena._state, value, ORDER)
+	} else {
+		arena._state = value
+	}
+}
+
+@(private, require_results)
+arena_state_exchange :: #force_inline proc "contextless" (arena: ^Arena, value: u64) -> (old: u64) {
+	when ARENA_LOCK_FREE {
+		return sync.atomic_exchange_explicit(&arena._state, value, .Seq_Cst)
+	} else {
+		old = arena._state
+		arena._state = value
+		return
+	}
+}
+
+@(private, require_results)
+arena_state_swap :: #force_inline proc "contextless" (arena: ^Arena, old, new: u64) -> bool {
+	when ARENA_LOCK_FREE {
+		_, swapped := sync.atomic_compare_exchange_weak_explicit(&arena._state, old, new, .Acq_Rel, .Relaxed)
+		return swapped
+	} else {
+		if arena._state != old {
+			return false
+		}
+		arena._state = new
+		return true
+	}
+}
+
 // Stops the fast path and writes its offset back to the current block, so block-level code sees it.
 // The caller holds `mutex` until `arena_open`.
 @(private, no_sanitize_address)
 arena_close :: #force_inline proc "contextless" (arena: ^Arena) {
-	generation := sync.atomic_load_explicit(&arena._state, .Relaxed)>>ARENA_OFFSET_BITS + 1
-	state      := sync.atomic_exchange_explicit(&arena._state, generation<<ARENA_OFFSET_BITS | ARENA_CLOSED, .Seq_Cst)
+	generation := arena_state_load(arena, .Relaxed)>>ARENA_OFFSET_BITS + 1
+	state      := arena_state_exchange(arena, generation<<ARENA_OFFSET_BITS | ARENA_CLOSED)
 	if block := arena.curr_block; block != nil {
 		used := uint(state & ARENA_OFFSET_MASK)
 		arena.total_used += used - block.used
@@ -88,10 +137,10 @@ arena_open :: #force_inline proc "contextless" (arena: ^Arena) {
 		used = block.used
 	}
 
-	generation := sync.atomic_load_explicit(&arena._state, .Relaxed)>>ARENA_OFFSET_BITS + 1
-	sync.atomic_store_explicit(&arena._base,  base, .Release)
-	sync.atomic_store_explicit(&arena._end,   end,  .Release)
-	sync.atomic_store_explicit(&arena._state, generation<<ARENA_OFFSET_BITS | u64(used), .Seq_Cst)
+	generation := arena_state_load(arena, .Relaxed)>>ARENA_OFFSET_BITS + 1
+	sync.atomic_store_explicit(&arena._base, base, .Release)
+	sync.atomic_store_explicit(&arena._end,  end,  .Release)
+	arena_state_store(arena, generation<<ARENA_OFFSET_BITS | u64(used), .Seq_Cst)
 }
 
 // Allocates a memory block whose offsets fit in `_state`.
@@ -177,7 +226,13 @@ arena_alloc :: #force_inline proc(arena: ^Arena, size: uint, alignment: uint, lo
 	if .Single_Thread in arena.flags {
 		fast, ok = arena_alloc_fast(arena, size, max(alignment, 1), true)
 	} else {
-		fast, ok = arena_alloc_fast(arena, size, max(alignment, 1), false)
+		when ARENA_LOCK_FREE {
+			fast, ok = arena_alloc_fast(arena, size, max(alignment, 1), false)
+		} else {
+			sync.mutex_lock(&arena.mutex)
+			fast, ok = arena_alloc_fast(arena, size, max(alignment, 1), false)
+			sync.mutex_unlock(&arena.mutex)
+		}
 	}
 	if ok {
 		return fast, nil
@@ -188,20 +243,20 @@ arena_alloc :: #force_inline proc(arena: ^Arena, size: uint, alignment: uint, lo
 @(private, require_results, no_sanitize_address)
 arena_alloc_fast :: #force_inline proc "contextless" (arena: ^Arena, size, alignment: uint, $SINGLE_THREAD: bool) -> (data: []byte, ok: bool) #no_bounds_check {
 	when SINGLE_THREAD {
-		state := sync.atomic_load_explicit(&arena._state, .Relaxed)
-		base  := sync.atomic_load_explicit(&arena._base,  .Relaxed)
-		end   := sync.atomic_load_explicit(&arena._end,   .Relaxed)
+		state := arena_state_load(arena, .Relaxed)
+		base  := sync.atomic_load_explicit(&arena._base, .Relaxed)
+		end   := sync.atomic_load_explicit(&arena._end,  .Relaxed)
 
 		offset, next := arena_fit(state, base, end, size, alignment) or_return
-		sync.atomic_store_explicit(&arena._state, next, .Relaxed)
+		arena_state_store(arena, next, .Relaxed)
 		return base[offset:][:size], true
 	} else {
-		state := sync.atomic_load_explicit(&arena._state, .Acquire)
-		base  := sync.atomic_load_explicit(&arena._base,  .Acquire)
-		end   := sync.atomic_load_explicit(&arena._end,   .Acquire)
+		state := arena_state_load(arena, .Acquire)
+		base  := sync.atomic_load_explicit(&arena._base, .Acquire)
+		end   := sync.atomic_load_explicit(&arena._end,  .Acquire)
 
 		offset, next := arena_fit(state, base, end, size, alignment) or_return
-		if _, swapped := sync.atomic_compare_exchange_weak_explicit(&arena._state, state, next, .Acq_Rel, .Relaxed); swapped {
+		if arena_state_swap(arena, state, next) {
 			return base[offset:][:size], true
 		}
 		return arena_alloc_contended(arena, size, alignment)
@@ -216,12 +271,12 @@ arena_alloc_contended :: #force_no_inline proc "contextless" (arena: ^Arena, siz
 			sync.cpu_relax()
 		}
 
-		state := sync.atomic_load_explicit(&arena._state, .Acquire)
-		base  := sync.atomic_load_explicit(&arena._base,  .Acquire)
-		end   := sync.atomic_load_explicit(&arena._end,   .Acquire)
+		state := arena_state_load(arena, .Acquire)
+		base  := sync.atomic_load_explicit(&arena._base, .Acquire)
+		end   := sync.atomic_load_explicit(&arena._end,  .Acquire)
 
 		offset, next := arena_fit(state, base, end, size, alignment) or_return
-		if _, swapped := sync.atomic_compare_exchange_weak_explicit(&arena._state, state, next, .Acq_Rel, .Relaxed); swapped {
+		if arena_state_swap(arena, state, next) {
 			return base[offset:][:size], true
 		}
 	}
@@ -427,7 +482,7 @@ arena_total_used :: proc(arena: ^Arena) -> uint {
 	if block == nil {
 		return arena.total_used
 	}
-	used := uint(sync.atomic_load_explicit(&arena._state, .Relaxed) & ARENA_OFFSET_MASK)
+	used := uint(arena_state_load(arena, .Relaxed) & ARENA_OFFSET_MASK)
 	return arena.total_used + used - block.used
 }
 
