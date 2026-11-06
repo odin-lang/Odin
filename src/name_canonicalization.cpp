@@ -579,7 +579,16 @@ gb_internal void write_canonical_exact_value(TypeWriter *w, ExactValue const &v)
 		return;
 	}
 	gbString s = exact_value_to_string(v, 1<<16);
-	type_writer_append(w, s, gb_string_length(s));
+	isize len = gb_string_length(s);
+	isize start = 0;
+	for (isize i = 0; i < len; i++) {
+		if (s[i] == '@') {
+			type_writer_append(w, s+start, i-start);
+			type_writer_appendc(w, "\\x40");
+			start = i+1;
+		}
+	}
+	type_writer_append(w, s+start, len-start);
 	gb_string_free(s);
 }
 
