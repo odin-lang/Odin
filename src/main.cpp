@@ -245,8 +245,26 @@ int run_subprocess(String const &exe_name, wchar_t *after_double_dash_raw) {
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 	} else {
+		DWORD err_code = GetLastError();
+		char *err_msg = nullptr;
+		FormatMessageA(
+			FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+			nullptr,
+			err_code,
+			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+			cast(LPSTR)&err_msg,
+			0,
+			nullptr
+		);
+
 		String cmd_line_utf8 = string16_to_string(a, make_string16(cast(u16 *)cmd_line, n));
 		gb_printf_err("Failed to execute command:\n\t%.*s\n", LIT(cmd_line_utf8));
+
+		if (err_msg) {
+			gb_printf_err("Windows Error [%lu]: %s\n", err_code, err_msg);
+			LocalFree(err_msg);
+		}
+
 		gb_free(a, cmd_line_utf8.text);
 		exit_code = -1;
 	}
