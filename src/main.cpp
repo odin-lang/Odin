@@ -4803,7 +4803,7 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	if (build_context.command_kind == Command_test && checker->info.testing_procedures.count == 0) {
-		gb_printf_err("Cannot test package; no test procedures found.");
+		gb_printf_err("Cannot test package; no procedures with @(test) attribute found.");
 		gb_exit(1);
 	}
 
