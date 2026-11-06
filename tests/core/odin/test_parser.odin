@@ -575,73 +575,77 @@ test_collect_package_path_with_meta :: proc(t: ^testing.T) {
 		}
 	}
 
-	meta_character_asterisk: {
-		PKG_DIR            :: ROOT + "path*"
-		PKG_DIR_UNEXPECTED :: ROOT + "path-unexpected"
+	when ODIN_OS != .Windows {
+		meta_character_asterisk: {
+			PKG_DIR            :: ROOT + "path*"
+			PKG_DIR_UNEXPECTED :: ROOT + "path-unexpected"
 
-		FULLPATH            :: PKG_DIR + "/asterisk.odin"
-		FULLPATH_UNEXPECTED :: PKG_DIR_UNEXPECTED + "/unexpected.odin"
+			FULLPATH            :: PKG_DIR + "/asterisk.odin"
+			FULLPATH_UNEXPECTED :: PKG_DIR_UNEXPECTED + "/unexpected.odin"
 
-		os.make_directory(PKG_DIR)
-		os.make_directory(PKG_DIR_UNEXPECTED)
+			os.make_directory(PKG_DIR)
+			os.make_directory(PKG_DIR_UNEXPECTED)
 
-		if err := os.write_entire_file(FULLPATH, `package asterisk`); err != nil {
-			testing.fail(t)
-			break meta_character_asterisk
-		}
-		if err := os.write_entire_file(FULLPATH_UNEXPECTED, `package unexpected`); err != nil {
-			testing.fail(t)
-			break meta_character_asterisk
-		}
+			if err := os.write_entire_file(FULLPATH, `package asterisk`); err != nil {
+				testing.fail(t)
+				break meta_character_asterisk
+			}
+			if err := os.write_entire_file(FULLPATH_UNEXPECTED, `package unexpected`); err != nil {
+				testing.fail(t)
+				break meta_character_asterisk
+			}
 
-		/* Collect package */
+			/* Collect package */
 
-		pkg, collected := parser.collect_package(PKG_DIR)
-		testing.expectf(t, collected, "Could not parse package: %v", PKG_DIR)
+			pkg, collected := parser.collect_package(PKG_DIR)
+			testing.expectf(t, collected, "Could not parse package: %v", PKG_DIR)
 
-		if collected {
-			testing.expect_value(t, len(pkg.files), 1)
+			if collected {
+				testing.expect_value(t, len(pkg.files), 1)
 
-			_, exists := pkg.files[FULLPATH]
-			testing.expect_value(t, exists, true)
+				_, exists := pkg.files[FULLPATH]
+				testing.expect_value(t, exists, true)
 
-			_, uexists := pkg.files[FULLPATH_UNEXPECTED]
-			testing.expect_value(t, uexists, false)
+				_, uexists := pkg.files[FULLPATH_UNEXPECTED]
+				testing.expect_value(t, uexists, false)
+			}
 		}
 	}
 
-	meta_character_question_mark: {
-		PKG_DIR            :: ROOT + "path?"
-		PKG_DIR_UNEXPECTED :: ROOT + "pathU"
+	when ODIN_OS != .Windows {
+		meta_character_question_mark: {
+			PKG_DIR            :: ROOT + "path?"
+			PKG_DIR_UNEXPECTED :: ROOT + "pathU"
 
-		FULLPATH            :: PKG_DIR + "/question_mark.odin"
-		FULLPATH_UNEXPECTED :: PKG_DIR_UNEXPECTED + "/unexpected.odin"
+			FULLPATH            :: PKG_DIR + "/question_mark.odin"
+			FULLPATH_UNEXPECTED :: PKG_DIR_UNEXPECTED + "/unexpected.odin"
 
-		os.make_directory(PKG_DIR)
-		os.make_directory(PKG_DIR_UNEXPECTED)
+			os.make_directory(PKG_DIR)
+			os.make_directory(PKG_DIR_UNEXPECTED)
 
-		if err := os.write_entire_file(FULLPATH, `package question_mark`); err != nil {
-			testing.fail(t)
-			break meta_character_question_mark
-		}
-		if err := os.write_entire_file(FULLPATH_UNEXPECTED, `package unexpected`); err != nil {
-			testing.fail(t)
-			break meta_character_question_mark
-		}
+			if err := os.write_entire_file(FULLPATH, `package question_mark`); err != nil {
+				testing.fail(t)
+				break meta_character_question_mark
+			}
+			if err := os.write_entire_file(FULLPATH_UNEXPECTED, `package unexpected`); err != nil {
+				testing.fail(t)
+				break meta_character_question_mark
+			}
 
-		/* Collect package */
+			/* Collect package */
 
-		pkg, collected := parser.collect_package(PKG_DIR)
-		testing.expectf(t, collected, "Could not parse package: %v", PKG_DIR)
+			pkg, collected := parser.collect_package(PKG_DIR)
+			testing.expectf(t, collected, "Could not parse package: %v", PKG_DIR)
 
-		if collected {
-			testing.expect_value(t, len(pkg.files), 1)
+			if collected {
+				testing.expect_value(t, len(pkg.files), 1)
 
-			_, exists := pkg.files[FULLPATH]
-			testing.expect_value(t, exists, true)
+				_, exists := pkg.files[FULLPATH]
+				testing.expect_value(t, exists, true)
 
-			_, uexists := pkg.files[FULLPATH_UNEXPECTED]
-			testing.expect_value(t, uexists, false)
+				_, uexists := pkg.files[FULLPATH_UNEXPECTED]
+				testing.expect_value(t, uexists, false)
+			}
 		}
 	}
 
