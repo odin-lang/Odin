@@ -36,13 +36,14 @@ inflate_zlib_from_context :: proc(z: ^compress.Context, expected_output_size := 
 		return ZLIB_Error.Code_Buffer_Malformed
 	}
 
-	output := inflate_to_buffer(z, expected_output_size, max_output_size) or_return
+	digest := u32(1)
+	inflate_to_buffer(z, expected_output_size, max_output_size, checksum = .Adler32, digest = &digest) or_return
 
 	adler, adler_err := compress.read_data(z, u32be)
 	if adler_err != nil {
 		return General_Error.Stream_Too_Short
 	}
-	if hash.adler32(output) != u32(adler) {
+	if digest != u32(adler) {
 		return General_Error.Checksum_Failed
 	}
 	return nil
@@ -369,15 +370,63 @@ inflate_grow :: proc(grow: ^[dynamic]u8, start, need, limit: int) -> (output: []
 }
 
 @(private)
-inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic]u8, start, limit: int, $STREAM: bool) -> (written: int, err: Error) #no_bounds_check {
+inflate_copy_match :: #force_inline proc(destination, source, out: [^]u8, distance: i32) #no_bounds_check {
+	destination, source := destination, source
+	if distance >= 16 {
+		// SIMD copy match
+		inflate_copy128(&destination, &source)
+		inflate_copy128(&destination, &source)
+		for {
+			inflate_copy128(&destination, &source)
+			if !(uintptr(destination) < uintptr(out)) { break }
+		}
+	} else if distance >= 8 {
+		// Word copy match
+		inflate_copy64(&destination, &source)
+		inflate_copy64(&destination, &source)
+		for {
+			inflate_copy64(&destination, &source)
+			if !(uintptr(destination) < uintptr(out)) { break }
+		}
+	} else if distance == 1 {
+		// RLE match copying
+		w := inflate_splat_u8x16(source[0])
+		destination = inflate_write128(destination, w)
+		destination = inflate_write128(destination, w)
+		for {
+			destination = inflate_write128(destination, w)
+			if !(uintptr(destination) < uintptr(out)) { break }
+		}
+	} else {
+		// Distances 2-7 replicate an 8-byte pattern instead of copying bytes
+		pattern := u64(intrinsics.unaligned_load((^u64le)(source)))
+		shift   := u64(distance) << 3
+		pattern &= (u64(1) << shift) - 1
+		pattern |= pattern << shift
+		pattern |= pattern << (shift << 1)
+		pattern |= pattern << (shift << 2)
+		stride  := int(INFLATE_PATTERN_STRIDE[distance])
+		for {
+			intrinsics.unaligned_store((^u64le)(destination), u64le(pattern))
+			destination = destination[stride:]
+			if !(uintptr(destination) < uintptr(out)) { break }
+		}
+	}
+}
+
+@(private)
+inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic]u8, start, limit: int, checksum: Inflate_Checksum, digest: ^u32, $STREAM: bool) -> (written: int, err: Error) #no_bounds_check {
 	output   := output
 	capacity := len(output)
+	checked  := 0
 
 	fixed_loaded := false
 
 	Inflate_State :: enum {Header, Stored, Fixed, Dynamic, Block}
 	state := Inflate_State.Header
 	s: Inflate
+	literals:  [INFLATE_LITERAL_TABLE_SIZE]u32
+	distances: [INFLATE_DISTANCE_TABLE_SIZE]u32
 	last: i32 = 0
 
 	s.ctx   = ctx
@@ -390,10 +439,15 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 		ctx.code_buffer = 0
 		ctx.num_bits    = 0
 	}
+	defer if err == nil {
+		inflate_update_checksum(checksum, digest, output[checked:written])
+	}
 
 	for {
 		switch state {
 		case .Header:
+			inflate_update_checksum(checksum, digest, output[checked:written])
+			checked = written
 			// block header
 			type: i32 = 0
 			if inflate_refill(&s, STREAM) { return written, General_Error.Stream_Too_Short }
@@ -464,8 +518,8 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 		case .Fixed:
 			// fixed huffman codes
 			if !fixed_loaded {
-				intrinsics.mem_copy_non_overlapping(&s.literals, &INFLATE_FIXED_LITERALS, size_of(INFLATE_FIXED_LITERALS))
-				intrinsics.mem_copy_non_overlapping(&s.distances, &INFLATE_FIXED_DISTANCES, size_of(INFLATE_FIXED_DISTANCES))
+				intrinsics.mem_copy_non_overlapping(&literals, &INFLATE_FIXED_LITERALS, size_of(INFLATE_FIXED_LITERALS))
+				intrinsics.mem_copy_non_overlapping(&distances, &INFLATE_FIXED_DISTANCES, size_of(INFLATE_FIXED_DISTANCES))
 				fixed_loaded = true
 			}
 			state = .Block
@@ -519,10 +573,10 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 				if lengths[256] == 0 {
 					return written, Deflate_Error.Huffman_Bad_Code_Lengths
 				}
-				if !inflate_build(s.literals[:], lengths[:literal_count], 10, 15, INFLATE_BAD_LITERAL) {
+				if !inflate_build(literals[:], lengths[:literal_count], 10, 15, INFLATE_BAD_LITERAL) {
 					return written, Deflate_Error.Huffman_Bad_Code_Lengths
 				}
-				if !inflate_build(s.distances[:], lengths[literal_count:][:distance_count], 8, 15, INFLATE_BAD_DISTANCE) {
+				if !inflate_build(distances[:], lengths[literal_count:][:distance_count], 8, 15, INFLATE_BAD_DISTANCE) {
 					return written, Deflate_Error.Huffman_Bad_Code_Lengths
 				}
 				fixed_loaded = false
@@ -532,9 +586,51 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 		case .Block:
 			// decompress block
 			block_loop: for {
+				fast_end := capacity - INFLATE_FAST_MARGIN
+				for written <= fast_end {
+					if inflate_refill(&s, STREAM) { return written, General_Error.Stream_Too_Short }
+					symbol := inflate_decode(&s, literals[:], 10)
+					if symbol < 256 {
+						output[written] = u8(symbol)
+						written += 1
+						symbol = inflate_decode(&s, literals[:], 10)
+						if symbol < 256 {
+							output[written] = u8(symbol)
+							written += 1
+							symbol = inflate_decode(&s, literals[:], 10)
+							if symbol < 256 {
+								output[written] = u8(symbol)
+								written += 1
+								continue
+							}
+						}
+						if inflate_refill(&s, STREAM) { return written, General_Error.Stream_Too_Short }
+					}
+					if intrinsics.expect(symbol == 256, false) {
+						if last != 0 {
+							if inflate_overrun(&s) { return written, General_Error.Stream_Too_Short }
+							return written, nil
+						}
+						state = .Header
+						break block_loop
+					}
+					if intrinsics.expect(symbol >= 286, false) {
+						return written, Deflate_Error.Bad_Huffman_Code
+					}
+					symbol -= 257
+					len             := inflate_get_no_refill(&s, i32(DEFLATE_LENGTH_EXTRA_BITS[symbol])) + i32(DEFLATE_LENGTH_BASE[symbol])
+					distance_symbol := inflate_decode(&s, distances[:], 8)
+					if intrinsics.expect(distance_symbol >= 30, false) { return written, Deflate_Error.Bad_Huffman_Code }
+					distance        := inflate_get_no_refill(&s, i32(DEFLATE_DISTANCE_EXTRA_BITS[distance_symbol])) + i32(DEFLATE_DISTANCE_BASE[distance_symbol])
+					if intrinsics.expect(int(distance) > written, false) { return written, Deflate_Error.Bad_Distance }
+					match_end := written + int(len)
+					inflate_copy_match(raw_data(output)[written:], raw_data(output)[written - int(distance):], raw_data(output)[match_end:], distance)
+					written = match_end
+				}
+
 				symbol: i32
 				if inflate_refill(&s, STREAM) { return written, General_Error.Stream_Too_Short }
-				symbol = inflate_decode(&s, s.literals[:], 10)
+				symbol = inflate_decode(&s, literals[:], 10)
 				if symbol < 256 {
 					// literal
 					if intrinsics.expect(written >= capacity, false) {
@@ -543,7 +639,7 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 					}
 					output[written] = u8(symbol)
 					written += 1
-					symbol = inflate_decode(&s, s.literals[:], 10)
+					symbol = inflate_decode(&s, literals[:], 10)
 					if symbol < 256 {
 						if intrinsics.expect(written >= capacity, false) {
 							output   = inflate_grow(grow, start, written + 1, limit) or_return
@@ -572,7 +668,7 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 				symbol -= 257
 				{
 					len             := inflate_get_no_refill(&s, i32(DEFLATE_LENGTH_EXTRA_BITS[symbol])) + i32(DEFLATE_LENGTH_BASE[symbol])
-					distance_symbol := inflate_decode(&s, s.distances[:], 8)
+					distance_symbol := inflate_decode(&s, distances[:], 8)
 					if intrinsics.expect(distance_symbol >= 30, false) { return written, Deflate_Error.Bad_Huffman_Code }
 					distance        := inflate_get_no_refill(&s, i32(DEFLATE_DISTANCE_EXTRA_BITS[distance_symbol])) + i32(DEFLATE_DISTANCE_BASE[distance_symbol])
 					if intrinsics.expect(int(distance) > written, false) { return written, Deflate_Error.Bad_Distance }
@@ -587,40 +683,7 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 					written = match_end
 
 					if intrinsics.expect(capacity - match_end >= 16 * 3, true) {
-						if distance >= 16 {
-							// simd copy match
-							inflate_copy128(&destination, &source)
-							inflate_copy128(&destination, &source)
-							for {
-								inflate_copy128(&destination, &source)
-								if !(uintptr(destination) < uintptr(out)) { break }
-							}
-						} else if distance >= 8 {
-							// word copy match
-							inflate_copy64(&destination, &source)
-							inflate_copy64(&destination, &source)
-							for {
-								inflate_copy64(&destination, &source)
-								if !(uintptr(destination) < uintptr(out)) { break }
-							}
-						} else if distance == 1 {
-							// rle match copying
-							w := inflate_splat_u8x16(source[0])
-							destination = inflate_write128(destination, w)
-							destination = inflate_write128(destination, w)
-							for {
-								destination = inflate_write128(destination, w)
-								if !(uintptr(destination) < uintptr(out)) { break }
-							}
-						} else {
-							// byte copy match
-							destination[0] = source[0]; destination = destination[1:]; source = source[1:]
-							destination[0] = source[0]; destination = destination[1:]; source = source[1:]
-							for {
-								destination[0] = source[0]; destination = destination[1:]; source = source[1:]
-								if !(uintptr(destination) < uintptr(out)) { break }
-							}
-						}
+						inflate_copy_match(destination, source, out, distance)
 					} else {
 						destination[0] = source[0]; destination = destination[1:]; source = source[1:]
 						destination[0] = source[0]; destination = destination[1:]; source = source[1:]
@@ -634,6 +697,15 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 		}
 	}
 	return written, nil
+}
+
+@(private)
+inflate_update_checksum :: #force_inline proc(checksum: Inflate_Checksum, digest: ^u32, data: []u8) #no_bounds_check {
+	switch checksum {
+	case .None:
+	case .Adler32: digest^ = hash.adler32(data, digest^)
+	case .CRC32:   digest^ = hash.crc32(data, digest^)
+	}
 }
 
 @(private)
@@ -661,7 +733,7 @@ inflate_initial_size :: proc(size_hint, input_size: int) -> (size: int) #no_boun
 }
 
 @(private)
-inflate_to_buffer :: proc(z: ^compress.Context, expected_output_size, max_output_size: int, start := 0, size_hint := -1) -> (output: []u8, err: Error) #no_bounds_check {
+inflate_to_buffer :: proc(z: ^compress.Context, expected_output_size, max_output_size: int, start := 0, size_hint := -1, checksum := Inflate_Checksum.None, digest: ^u32 = nil) -> (output: []u8, err: Error) #no_bounds_check {
 	if z.output == nil {
 		return nil, General_Error.Incompatible_Options
 	}
@@ -696,9 +768,9 @@ inflate_to_buffer :: proc(z: ^compress.Context, expected_output_size, max_output
 
 	written: int
 	if compress.is_memory_context(z) {
-		written, err = inflate_decompress(z, buffer[start:], buffer, start, limit, false)
+		written, err = inflate_decompress(z, buffer[start:], buffer, start, limit, checksum, digest, false)
 	} else {
-		written, err = inflate_decompress(z, buffer[start:], buffer, start, limit, true)
+		written, err = inflate_decompress(z, buffer[start:], buffer, start, limit, checksum, digest, true)
 	}
 	non_zero_resize(buffer, start + written)
 	z.bytes_written = i64(start + written)
