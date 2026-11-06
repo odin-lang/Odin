@@ -12,6 +12,7 @@ package all
 @(require) import "core:compress/shoco"
 // @(require) import "core:compress/gzip"
 @(require) import "core:compress/zlib"
+@(require) import "core:compress/bzip2"
 
 @(require) import "core:container/avl"
 @(require) import "core:container/bit_array"

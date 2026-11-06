@@ -4,6 +4,9 @@ and RFC 1952 (gzip).
 
 This is a hardened, extended, and optimized port of Micha Mettke's `sinfl.h` + `sdefl.h`,
 which we based this work on, with thanks.
+
+We also incorporate some additional speedups from [zlib-ng](https://github.com/zlib-ng/zlib-ng).
+Its license is the same as Odin's: ZLib, and can be found in this package as `LICENSE-zlib-ng.md`.
 */
 package compress_deflate
 
@@ -13,6 +16,8 @@ package compress_deflate
 
 	List of contributors:
 		Jeroen van Rijn: Initial implementation, optimization.
+
+		Thanks to Micha Mettke (vurtun), and the zlib-ng contributors.
 */
 
 import "base:intrinsics"
@@ -40,6 +45,8 @@ DEFLATE_WINDOW_MASK      :: DEFLATE_WINDOW_SIZE - 1
 DEFLATE_HASH_BITS        :: 15
 DEFLATE_HASH_SIZE        :: 1 << DEFLATE_HASH_BITS
 DEFLATE_HASH_MASK        :: DEFLATE_HASH_SIZE - 1
+DEFLATE_HASH_SLIDE       :: 32000
+DEFLATE_HASH_SLIDE_AT    :: DEFLATE_WINDOW_SIZE - 1 + DEFLATE_HASH_SLIDE
 
 DEFLATE_MATCH_MIN        :: 4
 DEFLATE_MATCH3_MIN       :: 3
@@ -51,6 +58,17 @@ DEFLATE_MATCH3_DISTANCE  :: 4096
 DEFLATE_MATCH3_MARGIN    :: 2
 
 DEFLATE_SPLIT_SEGMENTS   :: 16
+
+DEFLATE64_DISTANCE_MAX   :: 1 << 16
+DEFLATE64_WINDOW_SIZE    :: DEFLATE64_DISTANCE_MAX
+DEFLATE64_WINDOW_MASK    :: DEFLATE64_WINDOW_SIZE - 1
+DEFLATE64_MATCH_MAX      :: 65538
+DEFLATE64_LONG_MATCH     :: 258
+DEFLATE64_DISTANCE_LIMIT :: DEFLATE64_DISTANCE_MAX + 1
+DEFLATE64_HASH_BITS      :: 16
+DEFLATE64_HASH_SIZE      :: 1 << DEFLATE64_HASH_BITS
+DEFLATE64_HASH_SLIDE     :: 1 << 30
+DEFLATE64_HASH_SLIDE_AT  :: DEFLATE64_WINDOW_SIZE - 1 + DEFLATE64_HASH_SLIDE
 
 DEFLATE_LITERAL_SYMBOLS  :: 288
 DEFLATE_DISTANCE_SYMBOLS :: 32
@@ -95,17 +113,32 @@ Deflate_Sequence :: struct {
 	distance, length: i32,
 }
 
-// This struct is ~540kiB: allocate it with `new` rather than on the stack.
+// This struct is ~400kiB: allocate it with `new` rather than on the stack.
 Deflate :: struct {
-	bit_buffer, bit_count: i32,
-	hash_head:  [DEFLATE_HASH_SIZE]i32,
-	hash_chain: [DEFLATE_WINDOW_SIZE]i32,
+	bit_buffer: u64,
+	bit_count:  i32,
+	hash_head:  [DEFLATE_HASH_SIZE]u16,
+	hash_chain: [DEFLATE_WINDOW_SIZE]u16,
 
 	sequence_count: i32,
 	sequences:      [DEFLATE_SEQUENCE_SIZE]Deflate_Sequence,
 	frequencies:    Deflate_Frequency,
 	codes:          Deflate_Codes,
-	hash3_head:     [DEFLATE_HASH3_SIZE]i32,
+	hash3_head:     [DEFLATE_HASH3_SIZE]u16,
+}
+
+// This struct is ~800kiB: allocate it with `new` rather than on the stack.
+Deflate64 :: struct {
+	bit_buffer: u64,
+	bit_count:  i32,
+	hash_head:  [DEFLATE64_HASH_SIZE]u32,
+	hash_chain: [DEFLATE64_WINDOW_SIZE]u32,
+
+	sequence_count: i32,
+	sequences:      [DEFLATE_SEQUENCE_SIZE]Deflate_Sequence,
+	frequencies:    Deflate_Frequency,
+	codes:          Deflate_Codes,
+	hash3_head:     [DEFLATE_HASH3_SIZE]u32,
 }
 
 DEFLATE_NO_POSITION              :: -1
@@ -143,19 +176,27 @@ Deflate_Match :: struct {
 	length:   i32,
 }
 
-Deflate_To_Slice :: #type proc(s: ^Deflate, output, input: []u8, level: Deflate_Level) -> (written: int, err: Error)
+Deflate_To_Slice   :: #type proc(s: ^Deflate,   output, input: []u8, level: Deflate_Level) -> (written: int, err: Error)
+Deflate64_To_Slice :: #type proc(s: ^Deflate64, output, input: []u8, level: Deflate_Level) -> (written: int, err: Error)
 
 INFLATE_PRECODE_TABLE_SIZE  :: 128
 INFLATE_LITERAL_TABLE_SIZE :: 1334
 INFLATE_DISTANCE_TABLE_SIZE  :: 402
 INFLATE_BAD_LITERAL        :: 286
 INFLATE_BAD_DISTANCE       :: 31
+INFLATE64_BAD_DISTANCE     :: 32
 
 INFLATE_EXPANSION_MAX       :: 1032
+INFLATE64_EXPANSION_MAX     :: 29128
 INFLATE_INITIAL_SIZE_MIN    :: 256
 INFLATE_INITIAL_SIZE_MAX    :: 16 * 1024 * 1024
 INFLATE_STREAM_INITIAL_SIZE :: 64 * 1024
 INFLATE_GROWTH_STEP         :: 16 * 1024 * 1024
+INFLATE_PATTERN_STRIDE      := [8]u8{0, 8, 8, 6, 8, 5, 6, 7}
+INFLATE_FAST_MARGIN         :: 2 + DEFLATE_MATCH_MAX + 16 * 3
+INFLATE_COPY_MARGIN         :: 16 * 3
+
+Inflate_Checksum :: enum u8 {None, Adler32, CRC32}
 
 Inflate :: struct {
 	input:      []u8,
@@ -164,9 +205,6 @@ Inflate :: struct {
 	bit_count:  i32,
 	eof:        bool,
 	ctx:        ^compress.Context,
-
-	literals:  [INFLATE_LITERAL_TABLE_SIZE]u32,
-	distances: [INFLATE_DISTANCE_TABLE_SIZE]u32,
 }
 
 Inflate_Table_Builder :: struct {
@@ -273,15 +311,23 @@ DEFLATE_LENGTH_EXTRA_BITS := [29]u8{0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2,
 	3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0}
 
 @(rodata)
-DEFLATE_DISTANCE_BASE := [30]i16{1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257,
-	385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577}
+DEFLATE64_LENGTH_BASE := [29]i16{3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43,
+	51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 3}
 
 @(rodata)
-DEFLATE_DISTANCE_EXTRA_BITS := [30]u8{0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6,
-	7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13}
+DEFLATE64_LENGTH_EXTRA_BITS := [29]u8{0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2,
+	3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 16}
 
 @(rodata)
-DEFLATE_DISTANCE_EXTRA_MAX := [14]i16{0, 6, 12, 24, 48, 96, 192, 384, 768, 1536, 3072, 6144, 12288, 24576}
+DEFLATE_DISTANCE_BASE := [32]u16{1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257,
+	385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577, 32769, 49153}
+
+@(rodata)
+DEFLATE_DISTANCE_EXTRA_BITS := [32]u8{0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6,
+	7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14}
+
+@(rodata)
+DEFLATE_DISTANCE_EXTRA_MAX := [15]u16{0, 6, 12, 24, 48, 96, 192, 384, 768, 1536, 3072, 6144, 12288, 24576, 49152}
 
 @(rodata)
 DEFLATE_LENGTH_SLOT := [258 + 1]u8{

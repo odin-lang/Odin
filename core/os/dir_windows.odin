@@ -104,10 +104,14 @@ _read_directory_iterator_init :: proc(it: ^Read_Directory_Iterator, f: ^File) {
 
 	// NOTE: Allow calling `init` to target a new directory with the same iterator - reset idx.
 	if it.impl.find_handle != nil {
-		win32.FindClose(it.impl.find_handle)
+		if it.impl.find_handle != win32.INVALID_HANDLE_VALUE {
+			win32.FindClose(it.impl.find_handle)
+		}
+		it.impl.find_handle = nil
 	}
 	if it.impl.path != "" {
 		delete(it.impl.path, file_allocator())
+		it.impl.path = ""
 	}
 
 	if !is_directory(impl.name) {
@@ -131,6 +135,7 @@ _read_directory_iterator_init :: proc(it: ^Read_Directory_Iterator, f: ^File) {
 	}
 	defer if it.err.err != nil {
 		win32.FindClose(it.impl.find_handle)
+		it.impl.find_handle = nil
 	}
 
 	err: Error
@@ -143,10 +148,14 @@ _read_directory_iterator_init :: proc(it: ^Read_Directory_Iterator, f: ^File) {
 }
 
 _read_directory_iterator_destroy :: proc(it: ^Read_Directory_Iterator) {
-	if it.f == nil {
-		return
-	}
 	file_info_delete(it.impl.prev_fi, file_allocator())
+	it.impl.prev_fi = {}
+
 	delete(it.impl.path, file_allocator())
-	win32.FindClose(it.impl.find_handle)
+	it.impl.path = ""
+
+	if it.impl.find_handle != nil && it.impl.find_handle != win32.INVALID_HANDLE_VALUE {
+		win32.FindClose(it.impl.find_handle)
+	}
+	it.impl.find_handle = nil
 }

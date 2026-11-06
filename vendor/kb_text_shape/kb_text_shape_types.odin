@@ -1236,6 +1236,7 @@ shape_error :: enum u32 {
 	INVALID_FONT,
 	GAVE_TEXT_BEFORE_CALLING_BEGIN,
 	OUT_OF_MEMORY,
+	GENERATED_TOO_MANY_GLYPHS,
 }
 
 allocator_op_kind :: enum u32 {

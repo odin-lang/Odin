@@ -41,7 +41,7 @@ SYS_mkdirat                      :: uintptr(34)
 SYS_unlinkat                     :: uintptr(35)
 SYS_symlinkat                    :: uintptr(36)
 SYS_linkat                       :: uintptr(37)
-SYS_renameat                     :: uintptr(38)
+// SYS_renameat (38) is absent on riscv64: no __ARCH_WANT_RENAMEAT. Use SYS_renameat2.
 SYS_umount2                      :: uintptr(39)
 SYS_mount                        :: uintptr(40)
 SYS_pivot_root                   :: uintptr(41)

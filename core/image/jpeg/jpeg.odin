@@ -1,9 +1,25 @@
-// Reader for `JPEG` images. Supports baseline, extended sequential and progressive encoding.
+// Reader and writer for `JPEG` images.
+//
+// Loading supports baseline, extended sequential and progressive encoding,
+// as well as 12-bit DCT, lossless (SOF3), DNL and 2-component (gray + alpha) images,
+// arithmetic coding (SOF9-11, DAC), and hierarchical mode (DHP, EXP, SOF5-7, SOF13-15),
+// decoded at full resolution.
+//
+// Saving writes 8-bit baseline, extended sequential and progressive JPEG
+// (standard or optimized Huffman tables, optional restart intervals),
+// as greyscale, greyscale + alpha, YCbCr (4:4:4, 4:2:2 or 4:2:0), RGB, CMYK or YCCK,
+// with a JFIF or Adobe header.
+//
+// 16-bit input saves as 12-bit extended sequential or progressive JPEG.
+// Lossless (SOF3) saving writes 8- or 16-bit greyscale, greyscale + alpha, RGB or CMYK,
+// using any of the seven predictors or the best one per image.
+// Arithmetic coding (SOF9-11, default conditioning) is available for all but baseline.
 package jpeg
 
 import "base:intrinsics"
 import "core:compress"
 import "core:image"
+import "core:io"
 import "core:slice"
 
 load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
@@ -39,10 +55,16 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 		for &c in d.components {
 			delete(c.coefficients)
 			delete(c.plane)
+			delete(c.plane16)
+		}
+		for &r in d.references {
+			delete(r.plane)
 		}
 		free(d)
 	}
-	d.ctx = ctx
+	d.ctx      = ctx
+	d.arith_u  = 1
+	d.arith_kx = 5
 
 	frame_seen := false
 	loop: for {
@@ -120,29 +142,45 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 			}
 			d.restart_interval = int(compress.read_data(ctx, u16be) or_return)
 			compress.skip(ctx, i64(length - 2)) or_return
-		case .SOF0, .SOF1, .SOF2:
-			if frame_seen {
+		case .SOF0, .SOF1, .SOF2, .SOF3, .SOF5, .SOF6, .SOF7, .SOF9, .SOF10, .SOF11, .SOF13, .SOF14, .SOF15:
+			if frame_seen && !d.hierarchical {
 				return img, .Multiple_SOS_Markers
 			}
+			finish_frame(d) or_return
 			parse_frame(d, img, marker, options) or_return
+			set_color_space(d, img, options) or_return
 			frame_seen = true
-			if .do_not_decompress_image in options && .return_metadata not_in options {
-				return img, nil
+			if .do_not_decompress_image in options {
+				if d.hierarchical {
+					img.width    = d.final_width
+					img.height   = d.final_height
+					img.channels = d.reference_count
+				}
+				if .return_metadata not_in options {
+					return img, nil
+				}
 			}
-		case .SOF3, .SOF5, .SOF6, .SOF7, .SOF9, .SOF10, .SOF11, .SOF13, .SOF14, .SOF15:
-			if .return_metadata in options {
-				info := get_info(img) or_return
-				info.frame_type = marker
+		case .DHP:
+			if frame_seen || d.hierarchical {
+				return img, .Corrupt
 			}
-			return img, .Unsupported_Frame_Type
+			parse_hierarchy(d) or_return
+		case .EXP:
+			if !d.hierarchical {
+				return img, .Corrupt
+			}
+			parse_expand(d) or_return
+		case .DAC:
+			parse_arithmetic_conditioning(d) or_return
 		case .SOS:
 			if !frame_seen {
 				return img, .Encountered_SOS_Before_SOF
 			}
 			if .do_not_decompress_image in options {
+				set_color_space(d, img, options) or_return
 				return img, nil
 			}
-			parse_scan(d) or_return
+			parse_scan(d, img) or_return
 		case:
 			skip_segment(ctx) or_return
 		}
@@ -154,8 +192,23 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 		}
 		return img, .Missing_Image_Data
 	}
+	if d.hierarchical {
+		finish_frame(d) or_return
+		finish_hierarchy(d, img) or_return
+	}
+	set_color_space(d, img, options) or_return
 	produce_image(d, img, options) or_return
 	return img, nil
+}
+
+@(private="file")
+set_color_space :: proc(d: ^Decoder, img: ^Image, options: Options) -> (err: Error) {
+	space := color_space(d)
+	if .return_metadata in options || space == .CMYK || space == .YCCK {
+		info := get_info(img) or_return
+		info.color_space = space
+	}
+	return nil
 }
 
 destroy :: proc(img: ^Image) {
@@ -203,32 +256,279 @@ fill_bits :: proc(d: ^Decoder) #no_bounds_check {
 		}
 	}
 	for d.count <= 56 {
-		b: u64
-		if !d.stopped {
-			if len(z.window) < 2 {
-				compress.refill_window(z, 2)
-			}
-			if len(z.window) == 0 {
-				d.stopped = true
-			} else if z.window[0] != 0xFF {
-				b = u64(z.window[0])
-				z.window = z.window[1:]
-			} else if len(z.window) == 1 {
-				z.window = z.window[1:]
-				d.stopped = true
-			} else if z.window[1] == 0x00 {
-				b = 0xFF
-				z.window = z.window[2:]
-			} else if z.window[1] == 0xFF {
-				z.window = z.window[1:]
-				continue
-			} else {
-				d.stopped = true
-			}
-		}
-		d.bits  |= b << (56 - d.count)
+		d.bits  |= next_byte(d) << (56 - d.count)
 		d.count += 8
 	}
+}
+
+@(private="file")
+next_byte :: #force_inline proc(d: ^Decoder) -> u64 #no_bounds_check {
+	z := d.ctx
+	for !d.stopped {
+		if len(z.window) < 2 {
+			compress.refill_window(z, 2)
+		}
+		if len(z.window) == 0 {
+			d.stopped = true
+			break
+		}
+		b := z.window[0]
+		if b != 0xFF {
+			z.window = z.window[1:]
+			return u64(b)
+		}
+		if len(z.window) == 1 {
+			z.window = z.window[1:]
+			d.stopped = true
+			break
+		}
+		switch z.window[1] {
+		case 0x00:
+			z.window = z.window[2:]
+			return 0xFF
+		case 0xFF:
+			z.window = z.window[1:]
+		case:
+			d.stopped = true
+		}
+	}
+	return 0
+}
+
+@(private="file")
+arith_fill :: proc(d: ^Decoder) #no_bounds_check {
+	z := d.ctx
+	for d.arith_ct <= 24 {
+		b: u64
+		if !d.stopped && len(z.window) > 0 && z.window[0] != 0xFF {
+			b = u64(z.window[0])
+			z.window = z.window[1:]
+		} else {
+			b = next_byte(d)
+		}
+		d.arith_c  |= b << (24 - d.arith_ct)
+		d.arith_ct += 8
+	}
+}
+
+@(private="file")
+arith_reset :: proc(d: ^Decoder, scan: []^Component) {
+	for c in scan {
+		d.dc_stats[c.dc_table] = {}
+		d.ac_stats[c.ac_table] = {}
+		c.dc_context = 0
+	}
+	d.arith_c  = 0
+	d.arith_ct = 0
+	arith_fill(d)
+	d.arith_c  <<= 16
+	d.arith_ct  -= 16
+	d.arith_a    = 0x10000
+}
+
+@(private="file")
+arith_decode :: #force_inline proc(d: ^Decoder, st: ^u8) -> int #no_bounds_check {
+	s   := st^
+	e   := ARITH_STATES[s]
+	a   := d.arith_a - e.qe
+	bit := int(s >> 7)
+	if u32(d.arith_c >> 32) < a {
+		if a >= 0x8000 {
+			d.arith_a = a
+			return bit
+		}
+		if a < e.qe {
+			bit ~= 1
+			st^ = e.lps
+		} else {
+			st^ = e.mps
+		}
+	} else {
+		d.arith_c -= u64(a) << 32
+		if a < e.qe {
+			st^ = e.mps
+		} else {
+			bit ~= 1
+			st^ = e.lps
+		}
+		a = e.qe
+	}
+	shift := intrinsics.count_leading_zeros(a) - 16
+	if d.arith_ct < shift {
+		arith_fill(d)
+	}
+	d.arith_c  <<= shift
+	d.arith_ct  -= shift
+	d.arith_a    = a << shift
+	return bit
+}
+
+@(private="file")
+arith_decode_fixed :: #force_inline proc(d: ^Decoder) -> int {
+	st: u8
+	return arith_decode(d, &st)
+}
+
+@(private="file")
+arith_bounds :: #force_inline proc(d: ^Decoder, table: u8) -> (lower, upper: i32) {
+	l := d.arith_l[table]
+	if l > 0 {
+		lower = i32(1) << (l - 1)
+	}
+	upper = i32(1) << d.arith_u[table]
+	return
+}
+
+@(private="file")
+arith_category :: #force_inline proc(v, lower, upper: i32) -> int {
+	m := abs(v)
+	if m <= lower {
+		return 0
+	}
+	return (1 if m <= upper else 3) + int(v < 0)
+}
+
+@(private="file")
+arith_magnitude :: #force_inline proc(d: ^Decoder, stats: []u8, x2: int) -> (sz: i32, ok: bool) #no_bounds_check {
+	m  := i32(2)
+	st := x2
+	for arith_decode(d, &stats[st]) != 0 {
+		m <<= 1
+		st += 1
+		if st == x2 + 14 {
+			return 0, false
+		}
+	}
+	st += 14
+	sz = m
+	for bit := m >> 1; bit != 0; bit >>= 1 {
+		if arith_decode(d, &stats[st]) != 0 {
+			sz |= bit
+		}
+	}
+	return sz, true
+}
+
+@(private="file")
+arith_decode_difference :: #force_inline proc(d: ^Decoder, stats: []u8, s0, x1: int) -> (v: i32, ok: bool) #no_bounds_check {
+	if arith_decode(d, &stats[s0]) == 0 {
+		return 0, true
+	}
+	sign := arith_decode(d, &stats[s0 + 1])
+	sz: i32
+	if arith_decode(d, &stats[s0 + 2 + sign]) != 0 {
+		sz = 1
+		if arith_decode(d, &stats[x1]) != 0 {
+			sz = arith_magnitude(d, stats, x1 + 1) or_return
+		}
+	}
+	v = sz + 1
+	return -v if sign != 0 else v, true
+}
+
+@(private="file")
+arith_decode_dc :: #force_inline proc(d: ^Decoder, c: ^Component) -> (diff: i32, ok: bool) {
+	diff = arith_decode_difference(d, d.dc_stats[c.dc_table][:], c.dc_context, 20) or_return
+	lower, upper := arith_bounds(d, c.dc_table)
+	c.dc_context = 4 * arith_category(diff, lower, upper)
+	return diff, true
+}
+
+@(private="file")
+arith_decode_ac_first :: proc(d: ^Decoder, c: ^Component, block: []i16, ss, se: int, al: u32) -> bool #no_bounds_check {
+	stats := d.ac_stats[c.ac_table][:]
+	kx    := int(d.arith_kx[c.ac_table])
+	for k := ss; k <= se; k += 1 {
+		st := 3 * (k - 1)
+		if arith_decode(d, &stats[st]) != 0 {
+			break
+		}
+		for arith_decode(d, &stats[st + 1]) == 0 {
+			k  += 1
+			st += 3
+			if k > se {
+				return false
+			}
+		}
+		sign := arith_decode_fixed(d)
+		sz: i32
+		if arith_decode(d, &stats[st + 2]) != 0 {
+			sz = 1
+			if arith_decode(d, &stats[st + 2]) != 0 {
+				ok: bool
+				sz, ok = arith_magnitude(d, stats, 189 if k <= kx else 217)
+				if !ok {
+					return false
+				}
+			}
+		}
+		v := sz + 1
+		if sign != 0 {
+			v = -v
+		}
+		block[zigzag[k]] = i16(v * (i32(1) << al))
+	}
+	return true
+}
+
+@(private="file")
+arith_decode_ac_refine :: proc(d: ^Decoder, c: ^Component, block: []i16, ss, se: int, al: u32) -> bool #no_bounds_check {
+	stats := d.ac_stats[c.ac_table][:]
+	p1 := i16(1) << al
+	m1 := -p1
+	eob := ss
+	if mask := nonzero_mask(block) & span(ss, se); mask != 0 {
+		eob = 64 - int(intrinsics.count_leading_zeros(mask))
+	}
+	for k := ss; k <= se; k += 1 {
+		st := 3 * (k - 1)
+		if k >= eob && arith_decode(d, &stats[st]) != 0 {
+			break
+		}
+		for {
+			coefficient := &block[zigzag[k]]
+			if coefficient^ != 0 {
+				if arith_decode(d, &stats[st + 2]) != 0 {
+					coefficient^ += m1 if coefficient^ < 0 else p1
+				}
+				break
+			}
+			if arith_decode(d, &stats[st + 1]) != 0 {
+				coefficient^ = m1 if arith_decode_fixed(d) != 0 else p1
+				break
+			}
+			k  += 1
+			st += 3
+			if k > se {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+@(private="file")
+decode_block_arith :: proc(d: ^Decoder, c: ^Component, block: []i16, ss, se, ah, al: int) -> bool #no_bounds_check {
+	if ss == 0 {
+		if ah == 0 {
+			diff, ok := arith_decode_dc(d, c)
+			if !ok {
+				return false
+			}
+			c.dc_pred += diff
+			block[0] = i16(c.dc_pred * (i32(1) << u32(al)))
+		} else if arith_decode_fixed(d) != 0 {
+			block[0] |= i16(1) << u32(al)
+		}
+		if d.progressive {
+			return true
+		}
+		return arith_decode_ac_first(d, c, block, 1, 63, 0)
+	}
+	if ah == 0 {
+		return arith_decode_ac_first(d, c, block, ss, se, u32(al))
+	}
+	return arith_decode_ac_refine(d, c, block, ss, se, u32(al))
 }
 
 @(private="file")
@@ -315,7 +615,7 @@ build_huffman :: proc(t: ^Huffman_Table, counts: [17]i32, symbols: []u8) -> bool
 @(private="file")
 decode_block_sequential :: proc(d: ^Decoder, c: ^Component, block: []i16) -> bool #no_bounds_check {
 	t := decode_huffman(d, &d.huffman[0][c.dc_table])
-	if t < 0 || t > 11 {
+	if t < 0 || t > d.dc_limit {
 		return false
 	}
 	c.dc_pred += receive_extend(d, u32(t))
@@ -349,7 +649,7 @@ decode_block_sequential :: proc(d: ^Decoder, c: ^Component, block: []i16) -> boo
 @(private="file")
 decode_block_dc_first :: proc(d: ^Decoder, c: ^Component, block: []i16, al: u32) -> bool #no_bounds_check {
 	t := decode_huffman(d, &d.huffman[0][c.dc_table])
-	if t < 0 || t > 11 {
+	if t < 0 || t > d.dc_limit {
 		return false
 	}
 	c.dc_pred += receive_extend(d, u32(t))
@@ -560,23 +860,343 @@ handle_restart :: proc(d: ^Decoder, scan: []^Component) {
 		c.dc_pred = 0
 	}
 	d.eobrun = 0
+	if d.arithmetic {
+		arith_reset(d, scan)
+	}
 }
 
 @(private="file")
 decode_block_at :: #force_inline proc(d: ^Decoder, c: ^Component, bx, by: int, local: []i16, ss, se, ah, al: int) -> (err: Error) #no_bounds_check {
+	if d.differential {
+		c.dc_pred = 0
+	}
 	if d.progressive {
 		block := c.coefficients[(by * c.stride + bx) * COEFFICIENT_COUNT:][:COEFFICIENT_COUNT]
-		if !decode_block(d, c, block, ss, se, ah, al) {
+		ok := decode_block_arith(d, c, block, ss, se, ah, al) if d.arithmetic else decode_block(d, c, block, ss, se, ah, al)
+		if !ok {
 			return .Corrupt
 		}
 		return nil
 	}
 	intrinsics.mem_zero(raw_data(local), COEFFICIENT_COUNT * size_of(i16))
-	if !decode_block_sequential(d, c, local) {
+	ok := decode_block_arith(d, c, local, 0, 63, 0, 0) if d.arithmetic else decode_block_sequential(d, c, local)
+	if !ok {
 		return .Corrupt
 	}
 	if bx < c.blocks_w && by < c.blocks_h {
-		idct_block(local, &c.quant, c.plane[by * BLOCK_SIZE * c.plane_stride + bx * BLOCK_SIZE:], c.plane_stride)
+		if d.wide {
+			center, maxval, flip := idct_wide_parameters(d)
+			idct_block_wide(local, &c.quant, c.plane16[by * BLOCK_SIZE * c.plane_stride + bx * BLOCK_SIZE:], c.plane_stride, center, maxval, flip)
+		} else {
+			idct_block(local, &c.quant, c.plane[by * BLOCK_SIZE * c.plane_stride + bx * BLOCK_SIZE:], c.plane_stride)
+		}
+	}
+	return nil
+}
+
+@(private="file")
+decode_difference :: #force_inline proc(d: ^Decoder, t: ^Huffman_Table) -> (difference: u16, ok: bool) #no_bounds_check {
+	if d.count < 32 {
+		fill_bits(d)
+	}
+	s: u32
+	entry := t.lookup[d.bits >> (64 - HUFFMAN_LOOKAHEAD)]
+	if entry != 0 {
+		length := u32(entry >> 8)
+		d.bits <<= length
+		d.count -= length
+		s = u32(entry & 0xFF)
+	} else {
+		symbol := decode_huffman(d, t)
+		if symbol < 0 {
+			return 0, false
+		}
+		s = u32(symbol)
+	}
+	if s == 0 {
+		return 0, true
+	}
+	if s >= LOSSLESS_DIFFERENCE_32768 {
+		return 32768, s == LOSSLESS_DIFFERENCE_32768
+	}
+	v := i32(d.bits >> (64 - s))
+	d.bits <<= s
+	d.count -= s
+	if v < i32(1) << (s - 1) {
+		v += 1 - (i32(1) << s)
+	}
+	return u16(v), true
+}
+
+@(private="file")
+undifference_row :: #force_inline proc(c: ^Component, y, width: int, reset: bool, predictor: int, initial: u16) #no_bounds_check {
+	stride := c.plane_stride
+	row    := c.plane16[y * stride:][:width]
+	if reset {
+		row[0] += initial
+		for x in 1..<width {
+			row[x] += row[x - 1]
+		}
+		return
+	}
+	above := c.plane16[(y - 1) * stride:][:width]
+	row[0] += above[0]
+	switch predictor {
+	case 1:
+		for x in 1..<width {
+			row[x] += row[x - 1]
+		}
+	case 2:
+		for x in 1..<width {
+			row[x] += above[x]
+		}
+	case 3:
+		for x in 1..<width {
+			row[x] += above[x - 1]
+		}
+	case 4:
+		for x in 1..<width {
+			row[x] += row[x - 1] + above[x] - above[x - 1]
+		}
+	case 5:
+		for x in 1..<width {
+			row[x] += u16(i32(row[x - 1]) + ((i32(above[x]) - i32(above[x - 1])) >> 1))
+		}
+	case 6:
+		for x in 1..<width {
+			row[x] += u16(i32(above[x]) + ((i32(row[x - 1]) - i32(above[x - 1])) >> 1))
+		}
+	case 7:
+		for x in 1..<width {
+			row[x] += u16((u32(row[x - 1]) + u32(above[x])) >> 1)
+		}
+	}
+}
+
+@(private="file")
+scale_lossless_row :: #force_inline proc(c: ^Component, y, width, pt: int, maxval: u16) #no_bounds_check {
+	row := c.plane16[y * c.plane_stride:][:width]
+	x := 0
+	if pt == 0 {
+		top: #simd[8]u16 = maxval
+		for ; x + 8 <= width; x += 8 {
+			v := intrinsics.unaligned_load((^#simd[8]u16)(&row[x]))
+			intrinsics.unaligned_store((^#simd[8]u16)(&row[x]), intrinsics.simd_min(v, top))
+		}
+	}
+	for ; x < width; x += 1 {
+		row[x] = u16(min(u32(row[x]) << u32(pt), u32(maxval)))
+	}
+}
+
+@(private="file")
+finish_lossless_row :: #force_inline proc(c: ^Component, y, interval_rows: int, l: Lossless_Rows) {
+	if y >= c.height {
+		return
+	}
+	if l.differential {
+		if l.pt > 0 {
+			for &v in c.plane16[y * c.plane_stride:][:c.width] {
+				v <<= u32(l.pt)
+			}
+		}
+		return
+	}
+	reset := y == 0 || (interval_rows > 0 && y % interval_rows == 0)
+	undifference_row(c, y, c.width, reset, l.predictor, l.initial)
+	if l.needs_scale && y > 0 {
+		scale_lossless_row(c, y - 1, c.width, l.pt, l.maxval)
+	}
+	if l.needs_scale && y == c.height - 1 {
+		scale_lossless_row(c, y, c.width, l.pt, l.maxval)
+	}
+}
+
+@(private="file")
+decode_scan_lossless :: proc(d: ^Decoder, scan: []^Component, predictor, pt: int) -> (err: Error) #no_bounds_check {
+	d.bits    = 0
+	d.count   = 0
+	d.stopped = false
+
+	l := Lossless_Rows{
+		predictor    = predictor,
+		pt           = pt,
+		initial      = u16(1) << u32(d.precision - pt - 1),
+		maxval       = u16(u32(1) << u32(d.precision) - 1),
+		needs_scale  = pt > 0 || d.precision < 16,
+		differential = d.differential,
+	}
+	ri := d.restart_interval
+
+	if d.arithmetic {
+		return decode_scan_lossless_arith(d, scan, l)
+	}
+
+	if len(scan) == 1 {
+		c := scan[0]
+		t := &d.huffman[0][c.dc_table]
+		interval_rows := ri / c.width
+		for y in 0..<c.height {
+			if ri > 0 && y > 0 && y % interval_rows == 0 {
+				handle_restart(d, scan)
+			}
+			row := c.plane16[y * c.plane_stride:][:c.width]
+			for x in 0..<c.width {
+				ok: bool
+				row[x], ok = decode_difference(d, t)
+				if !ok {
+					return .Corrupt
+				}
+			}
+			finish_lossless_row(c, y, interval_rows, l)
+		}
+		return nil
+	}
+
+	tables: [MAX_COMPONENTS]^Huffman_Table
+	unit := true
+	for c, i in scan {
+		tables[i] = &d.huffman[0][c.dc_table]
+		unit &&= c.h == 1 && c.v == 1
+	}
+	mcu_rows := ri / d.mcux
+	for my in 0..<d.mcuy {
+		if ri > 0 && my > 0 && my % mcu_rows == 0 {
+			handle_restart(d, scan)
+		}
+		if unit {
+			rows: [MAX_COMPONENTS][]u16
+			for c, i in scan {
+				rows[i] = c.plane16[my * c.plane_stride:][:d.mcux]
+			}
+			for mx in 0..<d.mcux {
+				for i in 0..<len(scan) {
+					ok: bool
+					rows[i][mx], ok = decode_difference(d, tables[i])
+					if !ok {
+						return .Corrupt
+					}
+				}
+			}
+		} else {
+			for mx in 0..<d.mcux {
+				for c, i in scan {
+					for v in 0..<c.v {
+						row := c.plane16[(my * c.v + v) * c.plane_stride + mx * c.h:][:c.h]
+						for h in 0..<c.h {
+							ok: bool
+							row[h], ok = decode_difference(d, tables[i])
+							if !ok {
+								return .Corrupt
+							}
+						}
+					}
+				}
+			}
+		}
+		for c in scan {
+			for v in 0..<c.v {
+				finish_lossless_row(c, my * c.v + v, mcu_rows * c.v, l)
+			}
+		}
+	}
+	return nil
+}
+
+@(private="file")
+decode_scan_lossless_arith :: proc(d: ^Decoder, scan: []^Component, l: Lossless_Rows) -> (err: Error) #no_bounds_check {
+	ri := d.restart_interval
+
+	widths: [MAX_COMPONENTS]int
+	lines:  [MAX_COMPONENTS]int
+	total := 0
+	for c, i in scan {
+		widths[i] = c.width if len(scan) == 1 else d.mcux * c.h
+		lines[i]  = 2 if len(scan) == 1 else c.v + 1
+		total += widths[i] * lines[i]
+	}
+	buffer := non_zero_make([]u8, total) or_return
+	defer delete(buffer)
+	categories: [MAX_COMPONENTS][]u8
+	offset := 0
+	for i in 0..<len(scan) {
+		categories[i] = buffer[offset:][:widths[i] * lines[i]]
+		offset += widths[i] * lines[i]
+	}
+
+	arith_reset(d, scan)
+
+	if len(scan) == 1 {
+		c := scan[0]
+		stats := d.dc_stats[c.dc_table][:]
+		lower, upper := arith_bounds(d, c.dc_table)
+		width := c.width
+		interval_rows := ri / width
+		first := 0
+		for y in 0..<c.height {
+			if ri > 0 && y > 0 && y % interval_rows == 0 {
+				handle_restart(d, scan)
+				first = y
+			}
+			row     := c.plane16[y * c.plane_stride:][:width]
+			current := categories[0][(y & 1) * width:][:width]
+			above   := categories[0][((y + 1) & 1) * width:][:width]
+			left    := 0
+			for x in 0..<width {
+				up := 0 if y == first else int(above[x])
+				v, ok := arith_decode_difference(d, stats, 20 * left + 4 * up, 100 if up <= 2 else 129)
+				if !ok {
+					return .Corrupt
+				}
+				row[x] = u16(v)
+				left = arith_category(v, lower, upper)
+				current[x] = u8(left)
+			}
+			finish_lossless_row(c, y, interval_rows, l)
+		}
+		return nil
+	}
+
+	lefts: [MAX_COMPONENTS][4]int
+	mcu_rows := ri / d.mcux
+	first_row := 0
+	for my in 0..<d.mcuy {
+		if ri > 0 && my > 0 && my % mcu_rows == 0 {
+			handle_restart(d, scan)
+			first_row = my
+		}
+		lefts = {}
+		for mx in 0..<d.mcux {
+			for c, i in scan {
+				stats := d.dc_stats[c.dc_table][:]
+				lower, upper := arith_bounds(d, c.dc_table)
+				width := widths[i]
+				for v in 0..<c.v {
+					y       := my * c.v + v
+					row     := c.plane16[y * c.plane_stride + mx * c.h:][:c.h]
+					current := categories[i][(y % lines[i]) * width + mx * c.h:][:c.h]
+					above   := categories[i][((y + lines[i] - 1) % lines[i]) * width + mx * c.h:][:c.h]
+					top     := my == first_row && v == 0
+					for h in 0..<c.h {
+						up := 0 if top else int(above[h])
+						left := lefts[i][v]
+						value, ok := arith_decode_difference(d, stats, 20 * left + 4 * up, 100 if up <= 2 else 129)
+						if !ok {
+							return .Corrupt
+						}
+						row[h] = u16(value)
+						category := arith_category(value, lower, upper)
+						lefts[i][v] = category
+						current[h] = u8(category)
+					}
+				}
+			}
+		}
+		for c in scan {
+			for v in 0..<c.v {
+				finish_lossless_row(c, my * c.v + v, mcu_rows * c.v, l)
+			}
+		}
 	}
 	return nil
 }
@@ -589,6 +1209,9 @@ decode_scan :: proc(d: ^Decoder, scan: []^Component, ss, se, ah, al: int) -> (er
 	d.eobrun  = 0
 	for c in scan {
 		c.dc_pred = 0
+	}
+	if d.arithmetic {
+		arith_reset(d, scan)
 	}
 
 	local: [COEFFICIENT_COUNT]i16
@@ -628,9 +1251,6 @@ decode_scan :: proc(d: ^Decoder, scan: []^Component, ss, se, ah, al: int) -> (er
 }
 
 @(private="file")
-Lanes :: #simd[8]i32
-
-@(private="file")
 idct_1d :: #force_inline proc(x: [8]Lanes, $SHIFT: u32, $BIAS: i32) -> (y: [8]Lanes) {
 	C1 :: 8035
 	C2 :: 7568
@@ -666,7 +1286,7 @@ idct_1d :: #force_inline proc(x: [8]Lanes, $SHIFT: u32, $BIAS: i32) -> (y: [8]La
 }
 
 @(private="file")
-transpose :: #force_inline proc(r: [8]Lanes) -> (c: [8]Lanes) {
+transpose :: #force_inline proc(r: [8]$T) -> (c: [8]T) {
 	t0 := intrinsics.simd_shuffle(r[0], r[1], 0, 8, 1, 9, 4, 12, 5, 13)
 	t1 := intrinsics.simd_shuffle(r[0], r[1], 2, 10, 3, 11, 6, 14, 7, 15)
 	t2 := intrinsics.simd_shuffle(r[2], r[3], 0, 8, 1, 9, 4, 12, 5, 13)
@@ -694,6 +1314,84 @@ transpose :: #force_inline proc(r: [8]Lanes) -> (c: [8]Lanes) {
 	c[3] = intrinsics.simd_shuffle(u3, u7, 0, 1, 2, 3, 8, 9, 10, 11)
 	c[7] = intrinsics.simd_shuffle(u3, u7, 4, 5, 6, 7, 12, 13, 14, 15)
 	return
+}
+
+@(private="file")
+idct_pass_wide :: #force_inline proc(x: [8]F8) -> (y: [8]F8) #no_bounds_check {
+	A  :: 0.353553391
+	C1 :: 0.490392640
+	C2 :: 0.461939766
+	C3 :: 0.415734806
+	C5 :: 0.277785117
+	C6 :: 0.191341716
+	C7 :: 0.097545161
+
+	t0 := (x[0] + x[4]) * A
+	t1 := (x[0] - x[4]) * A
+	t2 := x[2] * C2 + x[6] * C6
+	t3 := x[2] * C6 - x[6] * C2
+	e0 := t0 + t2
+	e1 := t1 + t3
+	e2 := t1 - t3
+	e3 := t0 - t2
+	o0 := x[1] * C1 + x[3] * C3 + x[5] * C5 + x[7] * C7
+	o1 := x[1] * C3 - x[3] * C7 - x[5] * C1 - x[7] * C5
+	o2 := x[1] * C5 - x[3] * C1 + x[5] * C7 + x[7] * C3
+	o3 := x[1] * C7 - x[3] * C5 + x[5] * C3 - x[7] * C1
+	y[0] = e0 + o0
+	y[7] = e0 - o0
+	y[1] = e1 + o1
+	y[6] = e1 - o1
+	y[2] = e2 + o2
+	y[5] = e2 - o2
+	y[3] = e3 + o3
+	y[4] = e3 - o3
+	return
+}
+
+@(private="file")
+idct_wide_parameters :: #force_inline proc(d: ^Decoder) -> (center, maxval: f32, flip: u16) {
+	if d.differential {
+		return 32768.5, 65535, 0x8000
+	}
+	return f32(int(1) << u32(d.precision - 1)) + 0.5, f32(int(1) << u32(d.precision) - 1), 0
+}
+
+@(private="file")
+idct_block_wide :: proc(coefficients: []i16, quant: ^[COEFFICIENT_COUNT]u16, output: []u16, stride: int, center_value, maxval_value: f32, flip_value: u16) #no_bounds_check {
+	center: F8 = center_value
+	maxval: F8 = maxval_value
+	flip: #simd[8]u16 = flip_value
+
+	ac_mask := #simd[8]i16{0, -1, -1, -1, -1, -1, -1, -1}
+	ac: #simd[8]i16
+	x: [8]F8
+	for i in 0..<BLOCK_SIZE {
+		c := intrinsics.unaligned_load((^#simd[8]i16)(&coefficients[i * 8]))
+		q := intrinsics.unaligned_load((^#simd[8]u16)(&quant[i * 8]))
+		ac |= c & ac_mask
+		ac_mask = -1
+		x[i] = cast(F8)c * cast(F8)q
+	}
+
+	if intrinsics.simd_reduce_or(ac) == 0 {
+		dc := intrinsics.simd_clamp(F8(f32(coefficients[0]) * f32(quant[0]) * 0.125) + center, 0, maxval)
+		v  := cast(#simd[8]u16)cast(#simd[8]i32)dc ~ flip
+		for row in 0..<BLOCK_SIZE {
+			intrinsics.unaligned_store((^#simd[8]u16)(&output[row * stride]), v)
+		}
+		return
+	}
+
+	y := idct_pass_wide(x)
+	y  = transpose(y)
+	y  = idct_pass_wide(y)
+	y  = transpose(y)
+
+	for row in 0..<BLOCK_SIZE {
+		v := intrinsics.simd_clamp(y[row] + center, 0, maxval)
+		intrinsics.unaligned_store((^#simd[8]u16)(&output[row * stride]), cast(#simd[8]u16)cast(#simd[8]i32)v ~ flip)
+	}
 }
 
 @(private="file")
@@ -806,6 +1504,86 @@ upsample_row :: proc(d: ^Decoder, c: ^Component, y: int, output: []u8, colsum: [
 }
 
 @(private="file")
+upsample_row16 :: proc(d: ^Decoder, c: ^Component, y: int, output: []u16, colsum: []u32, width: int) -> []u16 #no_bounds_check {
+	plane := c.plane16
+	ps    := c.plane_stride
+	if d.hmax % c.h != 0 || d.vmax % c.v != 0 {
+		sy  := min(y * c.v / d.vmax, c.height - 1)
+		row := plane[sy * ps:]
+		for x in 0..<width {
+			output[x] = row[min(x * c.h / d.hmax, c.width - 1)]
+		}
+		return output
+	}
+
+	hr := d.hmax / c.h
+	vr := d.vmax / c.v
+	switch {
+	case hr == 1 && vr == 1:
+		return plane[y * ps:][:width]
+
+	case d.lossless:
+		row := plane[(y / vr) * ps:]
+		for x in 0..<width {
+			output[x] = row[x / hr]
+		}
+
+	case hr == 2 && vr == 1:
+		row := plane[y * ps:]
+		n   := c.width
+		if n == 1 {
+			output[0] = row[0]
+			output[1] = row[0]
+			return output
+		}
+		output[0] = row[0]
+		output[1] = u16((3 * u32(row[0]) + u32(row[1]) + 2) >> 2)
+		for i in 1..<n - 1 {
+			s := 3 * u32(row[i])
+			output[2 * i]     = u16((s + u32(row[i - 1]) + 1) >> 2)
+			output[2 * i + 1] = u16((s + u32(row[i + 1]) + 2) >> 2)
+		}
+		output[2 * n - 2] = u16((3 * u32(row[n - 1]) + u32(row[n - 2]) + 1) >> 2)
+		output[2 * n - 1] = row[n - 1]
+
+	case hr == 1 && vr == 2:
+		j    := y >> 1
+		far  := clamp(j - 1 if y & 1 == 0 else j + 1, 0, c.height - 1)
+		bias := u32(1 if y & 1 == 0 else 2)
+		near_row := plane[j * ps:][:width]
+		far_row  := plane[far * ps:][:width]
+		for x in 0..<width {
+			output[x] = u16((3 * u32(near_row[x]) + u32(far_row[x]) + bias) >> 2)
+		}
+
+	case hr == 2 && vr == 2:
+		j   := y >> 1
+		far := clamp(j - 1 if y & 1 == 0 else j + 1, 0, c.height - 1)
+		n   := c.width
+		near_row := plane[j * ps:][:n]
+		far_row  := plane[far * ps:][:n]
+		sums     := colsum[:n + 2]
+		for i in 0..<n {
+			sums[i + 1] = 3 * u32(near_row[i]) + u32(far_row[i])
+		}
+		sums[0]     = sums[1]
+		sums[n + 1] = sums[n]
+		for i in 0..<n {
+			current := 3 * sums[i + 1]
+			output[2 * i]     = u16((current + sums[i]     + 8) >> 4)
+			output[2 * i + 1] = u16((current + sums[i + 2] + 7) >> 4)
+		}
+
+	case:
+		row := plane[(y / vr) * ps:]
+		for x in 0..<width {
+			output[x] = row[x / hr]
+		}
+	}
+	return output
+}
+
+@(private="file")
 ycc_row :: proc(luma, cb, cr: []u8, out: []u8, width: int, $CHANNELS: int) #no_bounds_check {
 	x := 0
 	for ; x + 8 + (CHANNELS == 3 ? 3 : 0) <= width; x += 8 {
@@ -845,9 +1623,17 @@ ycc_row :: proc(luma, cb, cr: []u8, out: []u8, width: int, $CHANNELS: int) #no_b
 
 @(private="file")
 color_space :: proc(d: ^Decoder) -> Color_Space {
-	switch d.component_count {
+	count := d.component_count
+	ids   := [3]u8{d.components[0].id, d.components[1].id, d.components[2].id}
+	if d.hierarchical {
+		count = d.reference_count
+		ids   = {d.references[0].id, d.references[1].id, d.references[2].id}
+	}
+	switch count {
 	case 1:
 		return .Gray
+	case 2:
+		return .Gray_Alpha
 	case 3:
 		if d.adobe {
 			return .RGB if d.adobe_transform == 0 else .YCbCr
@@ -855,8 +1641,10 @@ color_space :: proc(d: ^Decoder) -> Color_Space {
 		if d.jfif {
 			return .YCbCr
 		}
-		c := d.components
-		if c[0].id == 'R' && c[1].id == 'G' && c[2].id == 'B' {
+		if ids == {'R', 'G', 'B'} {
+			return .RGB
+		}
+		if d.lossless {
 			return .RGB
 		}
 		return .YCbCr
@@ -870,7 +1658,30 @@ color_space :: proc(d: ^Decoder) -> Color_Space {
 }
 
 @(private="file")
+output_layout :: proc(d: ^Decoder, options: Options) -> (space: Color_Space, gray_out, has_alpha, premultiply: bool, channels: int) {
+	space     = color_space(d)
+	if space == .CMYK || space == .YCCK {
+		return space, false, false, false, 4
+	}
+	gray      := space == .Gray || space == .Gray_Alpha
+	gray_out   = gray && (.do_not_expand_grayscale in options || .do_not_expand_channels in options)
+	has_alpha  = .alpha_add_if_missing in options
+	if space == .Gray_Alpha {
+		has_alpha   = gray_out || .alpha_drop_if_present not_in options
+		premultiply = !gray_out && .alpha_premultiply in options
+	}
+	channels = 1 if gray_out else 3
+	if has_alpha {
+		channels += 1
+	}
+	return
+}
+
+@(private="file")
 produce_image :: proc(d: ^Decoder, img: ^Image, options: Options) -> (err: Error) {
+	if d.wide {
+		return produce_image_wide(d, img, options)
+	}
 	for &c in d.components[:d.component_count] {
 		if c.coefficients == nil {
 			if c.plane == nil {
@@ -878,7 +1689,7 @@ produce_image :: proc(d: ^Decoder, img: ^Image, options: Options) -> (err: Error
 			}
 			continue
 		}
-		c.plane = make([]u8, c.plane_stride * c.blocks_h * BLOCK_SIZE) or_return
+		c.plane = non_zero_make([]u8, c.plane_stride * c.blocks_h * BLOCK_SIZE) or_return
 		for by in 0..<c.blocks_h {
 			for bx in 0..<c.blocks_w {
 				block := c.coefficients[(by * c.stride + bx) * COEFFICIENT_COUNT:][:COEFFICIENT_COUNT]
@@ -889,16 +1700,10 @@ produce_image :: proc(d: ^Decoder, img: ^Image, options: Options) -> (err: Error
 		c.coefficients = nil
 	}
 
-	space     := color_space(d)
-	gray_out  := space == .Gray && (.do_not_expand_grayscale in options || .do_not_expand_channels in options)
-	has_alpha := .alpha_add_if_missing in options
-	channels  := 1 if gray_out else 3
-	if has_alpha {
-		channels += 1
-	}
+	space, gray_out, has_alpha, premultiply, channels := output_layout(d, options)
 
 	width, height := img.width, img.height
-	resize(&img.pixels, width * height * channels) or_return
+	non_zero_resize(&img.pixels, width * height * channels) or_return
 	img.channels = channels
 	img.depth    = 8
 
@@ -931,6 +1736,26 @@ produce_image :: proc(d: ^Decoder, img: ^Image, options: Options) -> (err: Error
 					out[x * channels + 2] = g
 				}
 			}
+		case .Gray_Alpha:
+			for x in 0..<width {
+				g := rows[0][x]
+				a := rows[1][x]
+				if gray_out {
+					out[x * 2 + 0] = g
+					out[x * 2 + 1] = a
+					continue
+				}
+				if premultiply {
+					g = u8((u32(g) * u32(a) + 127) / 255)
+				}
+				out[x * channels + 0] = g
+				out[x * channels + 1] = g
+				out[x * channels + 2] = g
+				if has_alpha {
+					out[x * channels + 3] = a
+				}
+			}
+			continue
 		case .YCbCr:
 			if channels == 4 {
 				ycc_row(rows[0], rows[1], rows[2], out, width, 4)
@@ -945,28 +1770,344 @@ produce_image :: proc(d: ^Decoder, img: ^Image, options: Options) -> (err: Error
 			}
 		case .CMYK:
 			for x in 0..<width {
-				k := i32(rows[3][x])
-				out[x * channels + 0] = u8((i32(rows[0][x]) * k + 127) / 255)
-				out[x * channels + 1] = u8((i32(rows[1][x]) * k + 127) / 255)
-				out[x * channels + 2] = u8((i32(rows[2][x]) * k + 127) / 255)
+				out[x * 4 + 0] = rows[0][x]
+				out[x * 4 + 1] = rows[1][x]
+				out[x * 4 + 2] = rows[2][x]
+				out[x * 4 + 3] = rows[3][x]
 			}
 		case .YCCK:
 			for x in 0..<width {
 				luma := i32(rows[0][x])
 				cb   := i32(rows[1][x]) - 128
 				cr   := i32(rows[2][x]) - 128
-				k    := i32(rows[3][x])
-				r := clamp(luma + ((91881 * cr + 32768) >> 16), 0, 255)
-				g := clamp(luma + ((-22554 * cb - 46802 * cr + 32768) >> 16), 0, 255)
-				b := clamp(luma + ((116130 * cb + 32768) >> 16), 0, 255)
-				out[x * channels + 0] = u8(((255 - r) * k + 127) / 255)
-				out[x * channels + 1] = u8(((255 - g) * k + 127) / 255)
-				out[x * channels + 2] = u8(((255 - b) * k + 127) / 255)
+				out[x * 4 + 0] = u8(255 - clamp(luma + ((91881 * cr + 32768) >> 16), 0, 255))
+				out[x * 4 + 1] = u8(255 - clamp(luma + ((-22554 * cb - 46802 * cr + 32768) >> 16), 0, 255))
+				out[x * 4 + 2] = u8(255 - clamp(luma + ((116130 * cb + 32768) >> 16), 0, 255))
+				out[x * 4 + 3] = rows[3][x]
 			}
 		}
 		if has_alpha {
 			for x in 0..<width {
 				out[x * channels + channels - 1] = 255
+			}
+		}
+	}
+	return nil
+}
+
+@(private="file")
+replicate_bits :: proc(v: u32, from, to: int) -> (out: u32) {
+	bits := to
+	for bits > 0 {
+		if bits >= from {
+			out  |= v << u32(bits - from)
+			bits -= from
+		} else {
+			out  |= v >> u32(from - bits)
+			bits  = 0
+		}
+	}
+	return
+}
+
+@(private="file")
+ycc_to_rgb_wide :: proc(luma, cb, cr: []u16, rgb: [3][]u16, center, maxval: i32) #no_bounds_check {
+	I8 :: #simd[8]i32
+	U8 :: #simd[8]u16
+	width := len(luma)
+	c:    I8 = center
+	top:  I8 = maxval
+	half: I8 = 32768
+	sh:   #simd[8]u32 = 16
+	x := 0
+	for ; x + 8 <= width; x += 8 {
+		l  := cast(I8)intrinsics.unaligned_load((^U8)(&luma[x]))
+		vb := cast(I8)intrinsics.unaligned_load((^U8)(&cb[x])) - c
+		vr := cast(I8)intrinsics.unaligned_load((^U8)(&cr[x])) - c
+		r  := intrinsics.simd_clamp(l + intrinsics.simd_shr(91881 * vr + half, sh), 0, top)
+		g  := intrinsics.simd_clamp(l + intrinsics.simd_shr(-22554 * vb - 46802 * vr + half, sh), 0, top)
+		b  := intrinsics.simd_clamp(l + intrinsics.simd_shr(116130 * vb + half, sh), 0, top)
+		intrinsics.unaligned_store((^U8)(&rgb[0][x]), cast(U8)r)
+		intrinsics.unaligned_store((^U8)(&rgb[1][x]), cast(U8)g)
+		intrinsics.unaligned_store((^U8)(&rgb[2][x]), cast(U8)b)
+	}
+	for ; x < width; x += 1 {
+		l  := i32(luma[x])
+		vb := i32(cb[x]) - center
+		vr := i32(cr[x]) - center
+		rgb[0][x] = u16(clamp(l + ((91881 * vr + 32768) >> 16), 0, maxval))
+		rgb[1][x] = u16(clamp(l + ((-22554 * vb - 46802 * vr + 32768) >> 16), 0, maxval))
+		rgb[2][x] = u16(clamp(l + ((116130 * vb + 32768) >> 16), 0, maxval))
+	}
+}
+
+@(private="file")
+store_rgb_wide :: proc(img: ^Image, y, channels: int, rgb: [3][]u16, scale: []u16, alpha: u16) #no_bounds_check {
+	width := img.width
+	r, g, b := rgb[0], rgb[1], rgb[2]
+	if img.depth == 16 {
+		out := slice.reinterpret([]u16, img.pixels[:])[y * width * channels:][:width * channels]
+		if scale != nil {
+			if channels == 4 {
+				for x in 0..<width {
+					out[x * 4 + 0] = scale[r[x]]
+					out[x * 4 + 1] = scale[g[x]]
+					out[x * 4 + 2] = scale[b[x]]
+					out[x * 4 + 3] = scale[alpha]
+				}
+			} else {
+				for x in 0..<width {
+					out[x * 3 + 0] = scale[r[x]]
+					out[x * 3 + 1] = scale[g[x]]
+					out[x * 3 + 2] = scale[b[x]]
+				}
+			}
+		} else {
+			if channels == 4 {
+				for x in 0..<width {
+					out[x * 4 + 0] = r[x]
+					out[x * 4 + 1] = g[x]
+					out[x * 4 + 2] = b[x]
+					out[x * 4 + 3] = alpha
+				}
+			} else {
+				for x in 0..<width {
+					out[x * 3 + 0] = r[x]
+					out[x * 3 + 1] = g[x]
+					out[x * 3 + 2] = b[x]
+				}
+			}
+		}
+		return
+	}
+	out := img.pixels[y * width * channels:][:width * channels]
+	if scale != nil {
+		for x in 0..<width {
+			out[x * channels + 0] = u8(scale[r[x]])
+			out[x * channels + 1] = u8(scale[g[x]])
+			out[x * channels + 2] = u8(scale[b[x]])
+			if channels == 4 {
+				out[x * 4 + 3] = u8(scale[alpha])
+			}
+		}
+	} else {
+		for x in 0..<width {
+			out[x * channels + 0] = u8(r[x])
+			out[x * channels + 1] = u8(g[x])
+			out[x * channels + 2] = u8(b[x])
+			if channels == 4 {
+				out[x * 4 + 3] = u8(alpha)
+			}
+		}
+	}
+}
+
+@(private="file")
+store_gray_wide :: proc(img: ^Image, y: int, gray: []u16, scale: []u16) #no_bounds_check {
+	width := img.width
+	if img.depth == 16 {
+		out := slice.reinterpret([]u16, img.pixels[:])[y * width:][:width]
+		if scale != nil {
+			for x in 0..<width {
+				out[x] = scale[gray[x]]
+			}
+		} else {
+			copy(out, gray[:width])
+		}
+		return
+	}
+	out := img.pixels[y * width:][:width]
+	if scale != nil {
+		for x in 0..<width {
+			out[x] = u8(scale[gray[x]])
+		}
+	} else {
+		for x in 0..<width {
+			out[x] = u8(gray[x])
+		}
+	}
+}
+
+@(private="file")
+idct_coefficients_wide :: proc(d: ^Decoder) -> (err: Error) {
+	center, maxval, flip := idct_wide_parameters(d)
+	for &c in d.components[:d.component_count] {
+		if c.coefficients == nil {
+			if c.plane16 == nil {
+				return .Missing_Image_Data
+			}
+			continue
+		}
+		c.plane16 = non_zero_make([]u16, c.plane_stride * c.blocks_h * BLOCK_SIZE) or_return
+		for by in 0..<c.blocks_h {
+			for bx in 0..<c.blocks_w {
+				block := c.coefficients[(by * c.stride + bx) * COEFFICIENT_COUNT:][:COEFFICIENT_COUNT]
+				idct_block_wide(block, &c.quant, c.plane16[by * BLOCK_SIZE * c.plane_stride + bx * BLOCK_SIZE:], c.plane_stride, center, maxval, flip)
+			}
+		}
+		delete(c.coefficients)
+		c.coefficients = nil
+	}
+	return nil
+}
+
+@(private="file")
+produce_image_wide :: proc(d: ^Decoder, img: ^Image, options: Options) -> (err: Error) {
+	idct_coefficients_wide(d) or_return
+	space, gray_out, has_alpha, premultiply, channels := output_layout(d, options)
+
+	precision := d.precision
+	depth     := 8 if precision <= 8 else 16
+	maxval    := u32(1) << u32(precision) - 1
+	center    := i64(1) << u32(precision - 1)
+
+	scale: []u16
+	if precision != depth && .do_not_expand_channels not_in options {
+		scale = make([]u16, maxval + 1) or_return
+		for &v, i in scale {
+			v = u16(replicate_bits(u32(i), precision, depth))
+		}
+	}
+	defer delete(scale)
+
+	width, height := img.width, img.height
+	non_zero_resize(&img.pixels, width * height * channels * depth / 8) or_return
+	img.channels = channels
+	img.depth    = depth
+
+	row_buffer := make([]u16, (width + 8) * (d.component_count + 3) + width * channels) or_return
+	defer delete(row_buffer)
+	buffers: [MAX_COMPONENTS][]u16
+	rows:    [MAX_COMPONENTS][]u16
+	for i in 0..<d.component_count {
+		buffers[i] = row_buffer[i * (width + 8):][:width + 8]
+	}
+	rgb: [3][]u16
+	for i in 0..<3 {
+		rgb[i] = row_buffer[(d.component_count + i) * (width + 8):][:width]
+	}
+	line := row_buffer[(d.component_count + 3) * (width + 8):][:width * channels]
+	colsum := make([]u32, width + 16) or_return
+	defer delete(colsum)
+
+	pixels16 := slice.reinterpret([]u16, img.pixels[:])
+	alpha    := u16(maxval)
+
+	#no_bounds_check for y in 0..<height {
+		for i in 0..<d.component_count {
+			rows[i] = upsample_row16(d, &d.components[i], y, buffers[i], colsum, width)
+		}
+		#partial switch space {
+		case .YCbCr:
+			if precision <= 12 {
+				ycc_to_rgb_wide(rows[0][:width], rows[1][:width], rows[2][:width], rgb, i32(center), i32(maxval))
+				store_rgb_wide(img, y, channels, rgb, scale, alpha)
+				continue
+			}
+		case .RGB:
+			store_rgb_wide(img, y, channels, {rows[0][:width], rows[1][:width], rows[2][:width]}, scale, alpha)
+			continue
+		case .Gray:
+			if gray_out && !has_alpha {
+				store_gray_wide(img, y, rows[0][:width], scale)
+				continue
+			}
+		}
+		switch space {
+		case .Gray:
+			for x in 0..<width {
+				g := rows[0][x]
+				if gray_out {
+					line[x * channels] = g
+				} else {
+					line[x * channels + 0] = g
+					line[x * channels + 1] = g
+					line[x * channels + 2] = g
+				}
+				if has_alpha {
+					line[x * channels + channels - 1] = alpha
+				}
+			}
+		case .Gray_Alpha:
+			for x in 0..<width {
+				g := rows[0][x]
+				a := rows[1][x]
+				if gray_out {
+					line[x * 2 + 0] = g
+					line[x * 2 + 1] = a
+					continue
+				}
+				if premultiply {
+					g = u16((u32(g) * u32(a) + maxval / 2) / maxval)
+				}
+				line[x * channels + 0] = g
+				line[x * channels + 1] = g
+				line[x * channels + 2] = g
+				if has_alpha {
+					line[x * channels + 3] = a
+				}
+			}
+		case .YCbCr:
+			top := i64(maxval)
+			for x in 0..<width {
+				luma := i64(rows[0][x])
+				cb   := i64(rows[1][x]) - center
+				cr   := i64(rows[2][x]) - center
+				line[x * channels + 0] = u16(clamp(luma + ((91881 * cr + 32768) >> 16), 0, top))
+				line[x * channels + 1] = u16(clamp(luma + ((-22554 * cb - 46802 * cr + 32768) >> 16), 0, top))
+				line[x * channels + 2] = u16(clamp(luma + ((116130 * cb + 32768) >> 16), 0, top))
+				if has_alpha {
+					line[x * channels + 3] = alpha
+				}
+			}
+		case .RGB:
+			for x in 0..<width {
+				line[x * channels + 0] = rows[0][x]
+				line[x * channels + 1] = rows[1][x]
+				line[x * channels + 2] = rows[2][x]
+				if has_alpha {
+					line[x * channels + 3] = alpha
+				}
+			}
+		case .CMYK:
+			for x in 0..<width {
+				line[x * 4 + 0] = rows[0][x]
+				line[x * 4 + 1] = rows[1][x]
+				line[x * 4 + 2] = rows[2][x]
+				line[x * 4 + 3] = rows[3][x]
+			}
+		case .YCCK:
+			top := i64(maxval)
+			for x in 0..<width {
+				luma := i64(rows[0][x])
+				cb   := i64(rows[1][x]) - center
+				cr   := i64(rows[2][x]) - center
+				line[x * 4 + 0] = u16(top - clamp(luma + ((91881 * cr + 32768) >> 16), 0, top))
+				line[x * 4 + 1] = u16(top - clamp(luma + ((-22554 * cb - 46802 * cr + 32768) >> 16), 0, top))
+				line[x * 4 + 2] = u16(top - clamp(luma + ((116130 * cb + 32768) >> 16), 0, top))
+				line[x * 4 + 3] = rows[3][x]
+			}
+		}
+
+		if depth == 16 {
+			out := pixels16[y * width * channels:][:width * channels]
+			if scale != nil {
+				for v, i in line {
+					out[i] = scale[v]
+				}
+			} else {
+				copy(out, line)
+			}
+		} else {
+			out := img.pixels[y * width * channels:][:width * channels]
+			if scale != nil {
+				for v, i in line {
+					out[i] = u8(scale[v])
+				}
+			} else {
+				for v, i in line {
+					out[i] = u8(v)
+				}
 			}
 		}
 	}
@@ -1127,28 +2268,65 @@ parse_frame :: proc(d: ^Decoder, img: ^Image, marker: image.JPEG_Marker, options
 	width      := int(compress.read_data(ctx, u16be) or_return)
 	components := int(compress.read_u8(ctx)      or_return)
 
-	if .return_metadata in options {
+	if .return_metadata in options && (!d.hierarchical || d.scans == 0) {
 		info := get_info(img) or_return
 		info.frame_type = marker
 	}
 
-	if precision == 12 {
-		return .Unsupported_12_Bit_Depth
+	#partial switch marker {
+	case .SOF5, .SOF6, .SOF7, .SOF13, .SOF14, .SOF15:
+		if !d.hierarchical {
+			return .Unsupported_Frame_Type
+		}
+		if d.scans == 0 {
+			return .Corrupt
+		}
 	}
-	if precision != 8 {
-		return .Invalid_Frame_Bit_Depth_Combo
+	differential := marker >= .SOF5 && marker <= .SOF7 || marker >= .SOF13
+	lossless     := marker == .SOF3 || marker == .SOF7 || marker == .SOF11 || marker == .SOF15
+	switch {
+	case lossless:
+		if precision < 2 || precision > 16 {
+			return .Invalid_Frame_Bit_Depth_Combo
+		}
+	case marker == .SOF0:
+		if precision != 8 {
+			return .Invalid_Frame_Bit_Depth_Combo
+		}
+	case:
+		if precision != 8 && precision != 12 {
+			return .Invalid_Frame_Bit_Depth_Combo
+		}
 	}
-	if width == 0 || height == 0 {
+	if width == 0 {
 		return .Invalid_Image_Dimensions
 	}
-	if u128(width) * u128(height) > image.MAX_DIMENSIONS {
-		return .Image_Dimensions_Too_Large
-	}
-	if components != 1 && components != 3 && components != 4 {
+	if components < 1 || components > MAX_COMPONENTS {
 		return .Invalid_Number_Of_Channels
 	}
 	if length < 6 + 3 * components {
 		return .Corrupt
+	}
+	if d.hierarchical {
+		if int(precision) != d.precision {
+			return .Invalid_Frame_Bit_Depth_Combo
+		}
+		if width > d.final_width || (d.final_height > 0 && height > d.final_height) {
+			return .Invalid_Image_Dimensions
+		}
+		if differential {
+			if d.hier_lossless && !lossless {
+				return .Corrupt
+			}
+		} else {
+			if d.scans > 0 && d.hier_lossless != lossless {
+				return .Corrupt
+			}
+			d.hier_lossless = lossless
+			if d.expand_h || d.expand_v {
+				return .Corrupt
+			}
+		}
 	}
 
 	d.hmax, d.vmax = 1, 1
@@ -1170,34 +2348,402 @@ parse_frame :: proc(d: ^Decoder, img: ^Image, marker: image.JPEG_Marker, options
 				return .Invalid_Component
 			}
 		}
+		if d.hierarchical {
+			r := find_reference(d, c.id)
+			if r == nil || r.closed || (differential && r.plane == nil) || (!differential && r.plane != nil) {
+				return .Invalid_Component
+			}
+			r.closed = differential && lossless && !d.hier_lossless
+		}
 		d.hmax = max(d.hmax, c.h)
 		d.vmax = max(d.vmax, c.v)
 	}
 	compress.skip(ctx, i64(length - 6 - 3 * components)) or_return
 
 	d.component_count = components
-	d.progressive     = marker == .SOF2
-	d.mcux = (width  + 8 * d.hmax - 1) / (8 * d.hmax)
-	d.mcuy = (height + 8 * d.vmax - 1) / (8 * d.vmax)
-	for &c in d.components[:components] {
-		c.width    = (width  * c.h + d.hmax - 1) / d.hmax
-		c.height   = (height * c.v + d.vmax - 1) / d.vmax
-		c.blocks_w = (c.width  + 7) / 8
-		c.blocks_h = (c.height + 7) / 8
-		c.stride   = d.mcux * c.h
-		c.rows     = d.mcuy * c.v
-		c.plane_stride = c.blocks_w * BLOCK_SIZE
-	}
+	d.progressive     = marker == .SOF2 || marker == .SOF6 || marker == .SOF10 || marker == .SOF14
+	d.lossless        = lossless
+	d.arithmetic      = marker >= .SOF9
+	d.differential    = differential
+	d.precision       = int(precision)
+	d.wide            = lossless || precision != 8 || d.hierarchical
+	d.dc_limit        = 11 if precision == 8 && !differential else 15
+	d.frame_open      = true
 
 	img.width    = width
-	img.height   = height
-	img.depth    = 8
+	img.height   = 0
+	img.depth    = 8 if precision <= 8 else 16
 	img.channels = components
+	if differential {
+		d.frame_expand_h, d.frame_expand_v = d.expand_h, d.expand_v
+		d.expand_h, d.expand_v = false, false
+	}
+	if height == 0 {
+		d.height_from_dnl = true
+		return
+	}
+	return setup_geometry(d, img, height)
+}
+
+@(private="file")
+find_reference :: proc(d: ^Decoder, id: u8) -> ^Reference {
+	for &r in d.references[:d.reference_count] {
+		if r.id == id {
+			return &r
+		}
+	}
+	return nil
+}
+
+@(private="file")
+add_reference_row :: proc "contextless" (dst, a, b: []u16, w: int, expand_h, blend: bool) #no_bounds_check {
+	n := len(dst)
+	if !expand_h {
+		if blend {
+			for x in 0..<n {
+				dst[x] += u16((u32(a[x]) + u32(b[x])) >> 1)
+			}
+		} else {
+			for x in 0..<n {
+				dst[x] += a[x]
+			}
+		}
+		return
+	}
+	half := min(n / 2, w - 1)
+	if blend {
+		for sx in 0..<half {
+			a0, a1 := u32(a[sx]), u32(a[sx + 1])
+			b0, b1 := u32(b[sx]), u32(b[sx + 1])
+			dst[2 * sx]     += u16((a0 + b0) >> 1)
+			dst[2 * sx + 1] += u16((((a0 + a1) >> 1) + ((b0 + b1) >> 1)) >> 1)
+		}
+	} else {
+		for sx in 0..<half {
+			a0, a1 := u32(a[sx]), u32(a[sx + 1])
+			dst[2 * sx]     += u16(a0)
+			dst[2 * sx + 1] += u16((a0 + a1) >> 1)
+		}
+	}
+	for x in 2 * half..<n {
+		sx := x >> 1
+		s1 := min(sx + 1, w - 1)
+		va, vb := u32(a[sx]), u32(b[sx])
+		if x & 1 != 0 {
+			va = (va + u32(a[s1])) >> 1
+			vb = (vb + u32(b[s1])) >> 1
+		}
+		dst[x] += u16((va + vb) >> 1) if blend else u16(va)
+	}
+}
+
+@(private="file")
+finish_frame :: proc(d: ^Decoder) -> (err: Error) #no_bounds_check {
+	if !d.frame_open {
+		return nil
+	}
+	d.frame_open = false
+	idct_coefficients_wide(d) or_return
+	for &c in d.components[:d.component_count] {
+		r := find_reference(d, c.id)
+		if d.differential {
+			expand_h, expand_v := d.frame_expand_h, d.frame_expand_v
+			width  := 2 * r.width  if expand_h else r.width
+			height := 2 * r.height if expand_v else r.height
+			if width < c.width || height < c.height {
+				return .Corrupt
+			}
+			for y in 0..<c.height {
+				sy    := y >> 1 if expand_v else y
+				blend := expand_v && y & 1 != 0
+				a := r.plane[sy * r.stride:][:r.width]
+				b := r.plane[min(sy + 1, r.height - 1) * r.stride:][:r.width] if blend else a
+				add_reference_row(c.plane16[y * c.plane_stride:][:c.width], a, b, r.width, expand_h, blend)
+			}
+		}
+		delete(r.plane)
+		r.plane  = c.plane16
+		r.stride = c.plane_stride
+		r.width, r.height = c.width, c.height
+		c = {}
+	}
+	d.component_count = 0
+	return nil
+}
+
+@(private="file")
+finish_hierarchy :: proc(d: ^Decoder, img: ^Image) -> (err: Error) #no_bounds_check {
+	width  := d.final_width
+	height := d.final_height
+	if height == 0 {
+		height = img.height
+	}
+	if u128(width) * u128(height) > image.MAX_DIMENSIONS {
+		return .Image_Dimensions_Too_Large
+	}
+	img.width    = width
+	img.height   = height
+	img.channels = d.reference_count
+	img.depth    = 8 if d.precision <= 8 else 16
+
+	d.component_count = d.reference_count
+	d.hmax, d.vmax    = d.final_hmax, d.final_vmax
+	d.lossless        = d.hier_lossless
+	d.differential    = false
+	d.progressive     = false
+	d.wide            = true
+
+	maxval := i32(1) << u32(d.precision) - 1
+	for i in 0..<d.reference_count {
+		r := &d.references[i]
+		c := &d.components[i]
+		c^ = {}
+		c.id, c.h, c.v = r.id, r.h, r.v
+		c.width  = (width  * c.h + d.hmax - 1) / d.hmax
+		c.height = (height * c.v + d.vmax - 1) / d.vmax
+		if r.plane == nil || r.width < c.width || r.height < c.height {
+			return .Missing_Image_Data
+		}
+		if d.precision < 16 {
+			for y in 0..<c.height {
+				for &v in r.plane[y * r.stride:][:c.width] {
+					v = u16(clamp(i32(i16(v)), 0, maxval))
+				}
+			}
+		}
+		c.plane16      = r.plane
+		c.plane_stride = r.stride
+		r.plane        = nil
+	}
+	return nil
+}
+
+@(private="file")
+parse_hierarchy :: proc(d: ^Decoder) -> (err: Error) {
+	ctx := d.ctx
+	length     := read_length(ctx)                   or_return
+	precision  := compress.read_u8(ctx)              or_return
+	height     := int(compress.read_data(ctx, u16be) or_return)
+	width      := int(compress.read_data(ctx, u16be) or_return)
+	components := int(compress.read_u8(ctx)          or_return)
+	if precision < 2 || precision > 16 {
+		return .Invalid_Frame_Bit_Depth_Combo
+	}
+	if width == 0 {
+		return .Invalid_Image_Dimensions
+	}
+	if u128(width) * u128(max(height, 1)) > image.MAX_DIMENSIONS {
+		return .Image_Dimensions_Too_Large
+	}
+	if components < 1 || components > MAX_COMPONENTS {
+		return .Invalid_Number_Of_Channels
+	}
+	if length < 6 + 3 * components {
+		return .Corrupt
+	}
+	d.final_hmax, d.final_vmax = 1, 1
+	for i in 0..<components {
+		r := &d.references[i]
+		r.id = compress.read_u8(ctx) or_return
+		sampling := compress.read_u8(ctx) or_return
+		compress.read_u8(ctx) or_return
+		r.h = int(sampling >> 4)
+		r.v = int(sampling & 15)
+		if r.h < 1 || r.h > 4 || r.v < 1 || r.v > 4 {
+			return .Invalid_Sampling_Factor
+		}
+		for j in 0..<i {
+			if d.references[j].id == r.id {
+				return .Invalid_Component
+			}
+		}
+		d.final_hmax = max(d.final_hmax, r.h)
+		d.final_vmax = max(d.final_vmax, r.v)
+	}
+	compress.skip(ctx, i64(length - 6 - 3 * components)) or_return
+	d.hierarchical    = true
+	d.precision       = int(precision)
+	d.final_width     = width
+	d.final_height    = height
+	d.reference_count = components
+	return nil
+}
+
+@(private="file")
+parse_expand :: proc(d: ^Decoder) -> (err: Error) {
+	ctx := d.ctx
+	length := read_length(ctx) or_return
+	if length < 1 {
+		return .Corrupt
+	}
+	e := compress.read_u8(ctx) or_return
+	if e & 0xEE != 0 {
+		return .Corrupt
+	}
+	d.expand_h = e >> 4 != 0
+	d.expand_v = e & 1 != 0
+	return compress.skip(ctx, i64(length - 1))
+}
+
+@(private="file")
+parse_arithmetic_conditioning :: proc(d: ^Decoder) -> (err: Error) {
+	ctx := d.ctx
+	length := read_length(ctx) or_return
+	if length % 2 != 0 {
+		return .Corrupt
+	}
+	for _ in 0..<length / 2 {
+		tb := compress.read_u8(ctx) or_return
+		cs := compress.read_u8(ctx) or_return
+		class, table := tb >> 4, tb & 15
+		if class > 1 || table > 3 {
+			return .Corrupt
+		}
+		if class == 0 {
+			l, u := cs & 15, cs >> 4
+			if l > u {
+				return .Corrupt
+			}
+			d.arith_l[table] = l
+			d.arith_u[table] = u
+		} else {
+			if cs < 1 || cs > 63 {
+				return .Corrupt
+			}
+			d.arith_kx[table] = cs
+		}
+	}
+	return nil
+}
+
+@(private="file")
+setup_geometry :: proc(d: ^Decoder, img: ^Image, height: int) -> (err: Error) {
+	width := img.width
+	if u128(width) * u128(height) > image.MAX_DIMENSIONS {
+		return .Image_Dimensions_Too_Large
+	}
+	unit := 1 if d.lossless else BLOCK_SIZE
+	d.mcux = (width  + unit * d.hmax - 1) / (unit * d.hmax)
+	d.mcuy = (height + unit * d.vmax - 1) / (unit * d.vmax)
+	for &c in d.components[:d.component_count] {
+		c.width  = (width  * c.h + d.hmax - 1) / d.hmax
+		c.height = (height * c.v + d.vmax - 1) / d.vmax
+		c.stride = d.mcux * c.h
+		c.rows   = d.mcuy * c.v
+		if d.lossless {
+			c.blocks_w     = c.width
+			c.blocks_h     = c.height
+			c.plane_stride = c.stride
+		} else {
+			c.blocks_w     = (c.width  + 7) / 8
+			c.blocks_h     = (c.height + 7) / 8
+			c.plane_stride = c.blocks_w * BLOCK_SIZE
+		}
+	}
+	img.height = height
+	return nil
+}
+
+@(private="file")
+scan_for_dnl :: proc(data: []u8, state: ^int, nl: ^[4]u8) -> (done: bool, err: Error) {
+	for b in data {
+		switch state^ {
+		case 0:
+			if b == 0xFF {
+				state^ = 1
+			}
+		case 1:
+			switch {
+			case b == 0xFF:
+			case b == 0x00, b >= u8(image.JPEG_Marker.RST0) && b <= u8(image.JPEG_Marker.RST7):
+				state^ = 0
+			case b == u8(image.JPEG_Marker.DNL):
+				state^ = 2
+			case:
+				return false, .Missing_DNL_Marker
+			}
+		case:
+			nl[state^ - 2] = b
+			state^ += 1
+			if state^ == 6 {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+@(private="file")
+find_dnl_height :: proc(d: ^Decoder) -> (height: int, err: Error) {
+	z := d.ctx
+	state := 0
+	nl: [4]u8
+	done := scan_for_dnl(z.window, &state, &nl) or_return
+	if !done {
+		if compress.is_memory_context(z) {
+			return 0, .Missing_DNL_Marker
+		}
+		position, seek_err := io.seek(z.input, 0, .Current)
+		if seek_err != nil {
+			return 0, .DNL_Requires_Seekable_Stream
+		}
+		chunk: [DNL_SCAN_CHUNK]u8
+		stalled := 0
+		for !done {
+			n, read_err := io.read(z.input, chunk[:])
+			if n > 0 {
+				stalled = 0
+				done, err = scan_for_dnl(chunk[:n], &state, &nl)
+				if err != nil {
+					break
+				}
+				continue
+			}
+			if read_err != nil {
+				err = .Missing_DNL_Marker
+				break
+			}
+			stalled += 1
+			if stalled > 100 {
+				err = .Missing_DNL_Marker
+				break
+			}
+		}
+		if _, back_err := io.seek(z.input, position, .Start); back_err != nil && err == nil {
+			err = .DNL_Requires_Seekable_Stream
+		}
+		if err != nil {
+			return 0, err
+		}
+	}
+	if u16(nl[0]) << 8 | u16(nl[1]) != 4 {
+		return 0, .Corrupt
+	}
+	height = int(u16(nl[2]) << 8 | u16(nl[3]))
+	if height == 0 {
+		return 0, .Invalid_Image_Dimensions
+	}
 	return
 }
 
 @(private="file")
-parse_scan :: proc(d: ^Decoder) -> (err: Error) {
+remaining_input :: proc(z: ^compress.Context) -> (n: i64, known: bool) {
+	if compress.is_memory_context(z) {
+		return i64(len(z.window)), true
+	}
+	size, size_err := io.size(z.input)
+	if size_err != nil || size <= 0 {
+		return 0, false
+	}
+	position, position_err := io.seek(z.input, 0, .Current)
+	if position_err != nil {
+		return 0, false
+	}
+	return size - position + i64(len(z.window)), true
+}
+
+@(private="file")
+parse_scan :: proc(d: ^Decoder, img: ^Image) -> (err: Error) {
 	ctx := d.ctx
 	length := read_length(ctx)              or_return
 	count  := int(compress.read_u8(ctx)     or_return)
@@ -1239,7 +2785,14 @@ parse_scan :: proc(d: ^Decoder) -> (err: Error) {
 	al := int(a & 15)
 	compress.skip(ctx, i64(length - 4 - 2 * count)) or_return
 
-	if d.progressive {
+	switch {
+	case d.lossless:
+		lowest := 0 if d.differential else 1
+		highest := 0 if d.differential else 7
+		if ss < lowest || ss > highest || se != 0 || ah != 0 || al >= d.precision {
+			return .Invalid_Scan_Parameters
+		}
+	case d.progressive:
 		if ss == 0 && se != 0 {
 			return .Invalid_Scan_Parameters
 		}
@@ -1249,7 +2802,7 @@ parse_scan :: proc(d: ^Decoder) -> (err: Error) {
 		if ah > 13 || al > 13 {
 			return .Invalid_Scan_Parameters
 		}
-	} else {
+	case:
 		ss, se, ah, al = 0, 63, 0, 0
 	}
 
@@ -1263,8 +2816,20 @@ parse_scan :: proc(d: ^Decoder) -> (err: Error) {
 		}
 	}
 
-	needs_dc := !d.progressive || (ss == 0 && ah == 0)
-	needs_ac := !d.progressive || ss > 0
+	if d.height_from_dnl && img.height == 0 {
+		height := find_dnl_height(d) or_return
+		setup_geometry(d, img, height) or_return
+	}
+
+	if d.lossless && d.restart_interval > 0 {
+		per_row := d.mcux if count > 1 else scan[0].width
+		if d.restart_interval % per_row != 0 {
+			return .Invalid_Scan_Parameters
+		}
+	}
+
+	needs_dc := !d.arithmetic && (!d.progressive || (ss == 0 && ah == 0))
+	needs_ac := !d.arithmetic && !d.lossless && (!d.progressive || ss > 0)
 	for c in scan {
 		if needs_dc && !d.huffman[0][c.dc_table].defined {
 			return .Missing_Huffman_Table
@@ -1272,7 +2837,7 @@ parse_scan :: proc(d: ^Decoder) -> (err: Error) {
 		if needs_ac && !d.huffman[1][c.ac_table].defined {
 			return .Missing_Huffman_Table
 		}
-		if !c.quant_latched {
+		if !d.lossless && !c.quant_latched {
 			if !d.quant_defined[c.quant_index] {
 				return .Missing_Quantization_Table
 			}
@@ -1281,16 +2846,42 @@ parse_scan :: proc(d: ^Decoder) -> (err: Error) {
 		}
 	}
 
-	for &c in d.components[:d.component_count] {
-		if d.progressive && c.coefficients == nil {
-			c.coefficients = make([]i16, c.stride * c.rows * COEFFICIENT_COUNT) or_return
+	if d.lossless && !d.arithmetic && d.components[0].plane16 == nil {
+		samples: i64
+		for c in d.components[:d.component_count] {
+			samples += i64(c.width) * i64(c.height)
 		}
-		if !d.progressive && c.plane == nil {
-			c.plane = make([]u8, c.plane_stride * c.blocks_h * BLOCK_SIZE) or_return
+		if remaining, known := remaining_input(d.ctx); known && remaining < (samples + 7) / 8 {
+			return .Missing_Image_Data
 		}
 	}
 
-	decode_scan(d, scan, ss, se, ah, al) or_return
+	for &c in d.components[:d.component_count] {
+		switch {
+		case d.lossless:
+			if c.plane16 == nil {
+				c.plane16 = make([]u16, c.stride * c.rows) or_return
+			}
+		case d.progressive:
+			if c.coefficients == nil {
+				c.coefficients = make([]i16, c.stride * c.rows * COEFFICIENT_COUNT) or_return
+			}
+		case d.wide:
+			if c.plane16 == nil {
+				c.plane16 = make([]u16, c.plane_stride * c.blocks_h * BLOCK_SIZE) or_return
+			}
+		case:
+			if c.plane == nil {
+				c.plane = make([]u8, c.plane_stride * c.blocks_h * BLOCK_SIZE) or_return
+			}
+		}
+	}
+
+	if d.lossless {
+		decode_scan_lossless(d, scan, ss, al) or_return
+	} else {
+		decode_scan(d, scan, ss, se, ah, al) or_return
+	}
 	d.scans += 1
 	return
 }

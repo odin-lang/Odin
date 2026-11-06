@@ -73,7 +73,7 @@ inflate_max_output_size :: proc(t: ^testing.T) {
 			defer delete(output)
 			err := inflate_test_unpack_bytes(format, &output, packed[:], 2 * len(data), len(data))
 			if format == .GZIP {
-				testing.expectf(t, err == compress.GZIP_Error.Output_Exceeds_COMPRESS_OUTPUT_ALLOCATE_MAX, "%v: %v", format, err)
+				testing.expectf(t, err == compress.General_Error.Output_Exceeds_COMPRESS_OUTPUT_ALLOCATE_MAX, "%v: %v", format, err)
 			} else {
 				testing.expectf(t, err == compress.General_Error.Output_Too_Short, "%v: %v", format, err)
 			}
