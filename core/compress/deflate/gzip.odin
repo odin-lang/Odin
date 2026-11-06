@@ -19,20 +19,21 @@ inflate_gzip_from_context :: proc(z: ^compress.Context, expected_output_size := 
 
 	size_hint := -1
 	if expected_output_size <= 0 && compress.is_memory_context(z) && len(z.window) >= size_of(Gzip_Trailer) {
-		size_hint = int((^u32le)(raw_data(z.window[len(z.window) - 4:]))^)
+		size_hint = min(int((^u32le)(raw_data(z.window[len(z.window) - 4:]))^), INFLATE_INITIAL_SIZE_MAX)
 	}
 
 	start := 0
 	for {
 		inflate_gzip_header(z) or_return
-		output := inflate_to_buffer(z, expected_output_size, max_output_size, start, size_hint) or_return
+		digest := u32(0)
+		output := inflate_to_buffer(z, expected_output_size, max_output_size, start, size_hint, .CRC32, &digest) or_return
 		member := output[start:]
 
 		trailer, trailer_err := compress.read_data(z, Gzip_Trailer)
 		if trailer_err != nil {
 			return General_Error.Stream_Too_Short
 		}
-		if u32le(hash.crc32(member)) != trailer.crc32 {
+		if u32le(digest) != trailer.crc32 {
 			return GZIP_Error.Payload_CRC_Invalid
 		}
 		if u32le(u32(len(member))) != trailer.size {

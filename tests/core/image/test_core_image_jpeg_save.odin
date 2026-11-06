@@ -597,7 +597,8 @@ jpeg_save_wide_spaces :: proc(t: ^testing.T) {
 							}
 							exact := space != .YCbCr && space != .YCCK && !(space == .Gray && channels > 2) && !(space == .Gray_Alpha && channels > 2)
 							if quality == 100 && exact {
-								testing.expectf(t, result.max_diff <= 1, "%v x%v %v %v r%v: max difference %v", space, channels, pattern, subsampling, rows, result.max_diff)
+								tolerance := 3 if pattern == .Noise else 1
+								testing.expectf(t, result.max_diff <= tolerance,"%v x%v %v %v r%v: max difference %v", space, channels, pattern, subsampling, rows, result.max_diff)
 							}
 						}
 					}

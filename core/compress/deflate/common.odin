@@ -4,6 +4,9 @@ and RFC 1952 (gzip).
 
 This is a hardened, extended, and optimized port of Micha Mettke's `sinfl.h` + `sdefl.h`,
 which we based this work on, with thanks.
+
+We also incorporate some additional speedups from [zlib-ng](https://github.com/zlib-ng/zlib-ng).
+Its license is the same as Odin's: ZLib, and can be found in this package as `LICENSE-zlib-ng.md`.
 */
 package compress_deflate
 
@@ -13,6 +16,8 @@ package compress_deflate
 
 	List of contributors:
 		Jeroen van Rijn: Initial implementation, optimization.
+
+		Thanks to Micha Mettke (vurtun), and the zlib-ng contributors.
 */
 
 import "base:intrinsics"
@@ -40,6 +45,8 @@ DEFLATE_WINDOW_MASK      :: DEFLATE_WINDOW_SIZE - 1
 DEFLATE_HASH_BITS        :: 15
 DEFLATE_HASH_SIZE        :: 1 << DEFLATE_HASH_BITS
 DEFLATE_HASH_MASK        :: DEFLATE_HASH_SIZE - 1
+DEFLATE_HASH_SLIDE       :: 32000
+DEFLATE_HASH_SLIDE_AT    :: DEFLATE_WINDOW_SIZE - 1 + DEFLATE_HASH_SLIDE
 
 DEFLATE_MATCH_MIN        :: 4
 DEFLATE_MATCH3_MIN       :: 3
@@ -95,17 +102,18 @@ Deflate_Sequence :: struct {
 	distance, length: i32,
 }
 
-// This struct is ~540kiB: allocate it with `new` rather than on the stack.
+// This struct is ~400kiB: allocate it with `new` rather than on the stack.
 Deflate :: struct {
-	bit_buffer, bit_count: i32,
-	hash_head:  [DEFLATE_HASH_SIZE]i32,
-	hash_chain: [DEFLATE_WINDOW_SIZE]i32,
+	bit_buffer: u64,
+	bit_count:  i32,
+	hash_head:  [DEFLATE_HASH_SIZE]u16,
+	hash_chain: [DEFLATE_WINDOW_SIZE]u16,
 
 	sequence_count: i32,
 	sequences:      [DEFLATE_SEQUENCE_SIZE]Deflate_Sequence,
 	frequencies:    Deflate_Frequency,
 	codes:          Deflate_Codes,
-	hash3_head:     [DEFLATE_HASH3_SIZE]i32,
+	hash3_head:     [DEFLATE_HASH3_SIZE]u16,
 }
 
 DEFLATE_NO_POSITION              :: -1
@@ -156,6 +164,10 @@ INFLATE_INITIAL_SIZE_MIN    :: 256
 INFLATE_INITIAL_SIZE_MAX    :: 16 * 1024 * 1024
 INFLATE_STREAM_INITIAL_SIZE :: 64 * 1024
 INFLATE_GROWTH_STEP         :: 16 * 1024 * 1024
+INFLATE_PATTERN_STRIDE      := [8]u8{0, 8, 8, 6, 8, 5, 6, 7}
+INFLATE_FAST_MARGIN         :: 2 + DEFLATE_MATCH_MAX + 16 * 3
+
+Inflate_Checksum :: enum u8 {None, Adler32, CRC32}
 
 Inflate :: struct {
 	input:      []u8,
@@ -164,9 +176,6 @@ Inflate :: struct {
 	bit_count:  i32,
 	eof:        bool,
 	ctx:        ^compress.Context,
-
-	literals:  [INFLATE_LITERAL_TABLE_SIZE]u32,
-	distances: [INFLATE_DISTANCE_TABLE_SIZE]u32,
 }
 
 Inflate_Table_Builder :: struct {
