@@ -134,6 +134,31 @@ test_dynamic_arena_alloc_out_of_band :: proc(t: ^testing.T) {
 	expect_arena_allocation_out_of_band(t, num_bytes = 513, block_size = 512, out_band_size = 128)
 }
 
+// https://github.com/odin-lang/Odin/issues/8103
+@(test)
+test_dynamic_arena_failed_block_allocation :: proc(t: ^testing.T) {
+	arena: mem.Dynamic_Arena
+	mem.dynamic_arena_init(&arena, block_size = 256)
+	defer mem.dynamic_arena_destroy(&arena)
+	_, err := mem.dynamic_arena_alloc(&arena, 100)
+	testing.expect_value(t, err, nil)
+
+	// `nil_allocator` never returns memory, so the arena cannot get a new block.
+	// Each allocation that needs one must fail rather than return address 0.
+	arena.block_allocator = mem.nil_allocator()
+	for _ in 0..<2 {
+		_, err = mem.dynamic_arena_alloc(&arena, 200)
+		testing.expect_value(t, err, mem.Allocator_Error.Out_Of_Memory)
+	}
+
+	// With real blocks available again the arena recovers, and the first block
+	// is retired once, not once per failed attempt.
+	arena.block_allocator = context.allocator
+	_, err = mem.dynamic_arena_alloc(&arena, 200)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, len(arena.used_blocks), 1)
+}
+
 @(test)
 test_intentional_leaks :: proc(t: ^testing.T) {
 	testing.expect_leaks(t, intentionally_leaky_test, leak_verifier)
