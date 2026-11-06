@@ -31,6 +31,9 @@ HASHES :: []hash.Algorithm{
 
 @(test)
 test_supported_protocols :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	if !crypto.HAS_RAND_BYTES {
 		log.info("rand_bytes not supported - skipping")
 		return

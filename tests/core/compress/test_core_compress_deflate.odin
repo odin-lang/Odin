@@ -83,6 +83,9 @@ compress_deflate_round_trip_random :: proc(t: ^testing.T) {
 
 @(test)
 compress_deflate_round_trip_matches :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	data := stream_match_data()
 	defer delete(data)
 	deflate_test_round_trip(t, "matches", data)
@@ -269,6 +272,9 @@ compress_gzip_header_max_extra :: proc(t: ^testing.T) {
 
 @(test)
 compress_deflate_round_trip_mixed :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	words := [?]string{"deflate ", "odin ", "huffman ", "window ", "match ", "literal ", "block "}
 	data: [dynamic]byte
 	defer delete(data)
