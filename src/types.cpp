@@ -694,6 +694,7 @@ gb_global Type *t_string_slice = nullptr;
 gb_global Type *t_type_info                      = nullptr;
 gb_global Type *t_type_info_enum_value           = nullptr;
 gb_global Type *t_type_info_ptr                  = nullptr;
+gb_global Type *t_type_info_variant              = nullptr;
 gb_global Type *t_type_info_enum_value_ptr       = nullptr;
 
 gb_global Type *t_type_info_string_encoding_kind = nullptr;
@@ -3718,6 +3719,28 @@ gb_internal bool union_is_variant_of(Type *u, Type *v) {
 		}
 	}
 	return false;
+}
+
+// NOTE(bill): deprecated `case Type_Info_X:` and `.(Type_Info_X)` on `runtime.Type_Info.variant`, which now holds `^Type_Info_X`
+gb_internal Type *type_info_variant_shim_type(Type *u, Type *t) {
+	if (t_type_info_variant == nullptr) {
+		return nullptr;
+	}
+	if (u == nullptr || t == nullptr) {
+		return nullptr;
+	}
+	if (base_type(u) != t_type_info_variant) {
+		return nullptr;
+	}
+	if (union_is_variant_of(t_type_info_variant, t)) {
+		return nullptr;
+	}
+	for (Type *vt : t_type_info_variant->Union.variants) {
+		if (are_types_identical(type_deref(vt), t)) {
+			return vt;
+		}
+	}
+	return nullptr;
 }
 
 

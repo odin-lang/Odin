@@ -4468,6 +4468,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 				}
 				Type *src_type = type_deref(v.type);
 				Type *dst_type = type;
+				Type *vt = type_info_variant_shim_type(src_type, dst_type);
 
 				lbValue src_tag = {};
 				lbValue dst_tag = {};
@@ -4476,12 +4477,17 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 					dst_tag = lb_const_bool(p->module, t_bool, true);
 				} else {
 					src_tag = lb_emit_load(p, lb_emit_union_tag_ptr(p, v));
-					dst_tag = lb_const_union_tag(p->module, src_type, dst_type);
+					dst_tag = lb_const_union_tag(p->module, src_type, vt ? vt : dst_type);
 				}
 
 				lbValue ok = lb_emit_comp(p, Token_CmpEq, src_tag, dst_tag);
 
-				lbValue data_ptr = lb_emit_conv(p, v, ptr_type);
+				lbValue data_ptr = {};
+				if (vt != nullptr) {
+					data_ptr = lb_emit_conv(p, lb_emit_load(p, lb_emit_union_variant_ptr(p, v, vt)), ptr_type);
+				} else {
+					data_ptr = lb_emit_conv(p, v, ptr_type);
+				}
 				lbAddr res = lb_add_local_generated(p, tuple, true);
 				lbValue gep0 = lb_emit_struct_ep(p, res.addr, 0);
 				lbValue gep1 = lb_emit_struct_ep(p, res.addr, 1);
@@ -4538,6 +4544,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 				}
 				Type *src_type = type_deref(v.type);
 				Type *dst_type = type;
+				Type *vt = type_info_variant_shim_type(src_type, dst_type);
 
 
 				if (do_type_check) {
@@ -4548,7 +4555,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 						dst_tag = lb_const_bool(p->module, t_bool, true);
 					} else {
 						src_tag = lb_emit_load(p, lb_emit_union_tag_ptr(p, v));
-						dst_tag = lb_const_union_tag(p->module, src_type, dst_type);
+						dst_tag = lb_const_union_tag(p->module, src_type, vt ? vt : dst_type);
 					}
 
 
@@ -4565,7 +4572,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 
 					if (!build_context.no_rtti) {
 						args[4] = lb_typeid(p->module, src_type);
-						args[5] = lb_typeid(p->module, dst_type);
+						args[5] = lb_typeid(p->module, vt ? vt : dst_type);
 					}
 
 					char const *name = "type_assertion_check_contextless";
@@ -4576,6 +4583,9 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 				}
 
 				lbValue data_ptr = v;
+				if (vt != nullptr) {
+					data_ptr = lb_emit_load(p, lb_emit_union_variant_ptr(p, v, vt));
+				}
 				return lb_emit_conv(p, data_ptr, tv.type);
 			} else if (is_type_any(t)) {
 				lbValue v = e;
