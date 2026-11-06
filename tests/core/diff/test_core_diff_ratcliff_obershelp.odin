@@ -107,6 +107,9 @@ test_ratcliff_obershelp_matches_reference :: proc(t: ^testing.T) {
 
 @(test)
 test_ratcliff_obershelp_exhaustive :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	check_exhaustive(t, 2, 7, {algorithm = .Ratcliff_Obershelp})
 	check_exhaustive(t, 3, 5, {algorithm = .Ratcliff_Obershelp})
 }

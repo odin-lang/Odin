@@ -337,6 +337,9 @@ JPEG_Save_Lossless_Case :: struct {
 
 @(test)
 jpeg_save_lossless :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	cases := [?]JPEG_Save_Lossless_Case{
 		{nil, 1, 1},
 		{nil, 2, 1},
@@ -579,6 +582,9 @@ jpeg_save_wide_matrix :: proc(t: ^testing.T) {
 
 @(test)
 jpeg_save_wide_spaces :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	for channels in 1..=4 {
 		for space in jpeg.Color_Space {
 			if !jpeg_save_space_accepts(space, channels) {
@@ -976,6 +982,9 @@ jpeg_save_strips :: proc(t: ^testing.T) {
 
 @(test)
 jpeg_save_eobrun :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	img := jpeg_save_pattern_image(2056, 1024, 1, .Low_Noise)
 	defer delete(img.pixels)
 

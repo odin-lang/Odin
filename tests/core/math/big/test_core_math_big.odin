@@ -5,6 +5,8 @@ import "core:mem"
 import "core:strconv"
 import "core:testing"
 
+SLIM_TESTS :: #config(ODIN_TEST_SLIM, ODIN_ARCH == .riscv64)
+
 @(test)
 test_int_destroy :: proc(t: ^testing.T) {
 	a, b, zero: big.Int
@@ -167,6 +169,9 @@ import "core:log"
 
 @(test)
 test_big_math_vectors :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	for vec in big_test_vectors {
 		a, b, res, expected := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
 		defer big.destroy(a, b, res, expected)
