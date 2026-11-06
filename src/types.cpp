@@ -3721,6 +3721,20 @@ gb_internal bool union_is_variant_of(Type *u, Type *v) {
 	return false;
 }
 
+// NOTE(bill): must match `runtime.__type_info_of`
+gb_internal isize type_info_table_home_index(u64 hash, isize table_len) {
+	GB_ASSERT(0 < table_len && cast(u64)table_len <= 0xffffffffull);
+
+	if (build_context.ptr_size == 8) {
+		u64 lo = 0;
+		u64 hi = 0;
+		mul_overflow_u64(hash << 1, cast(u64)table_len, &lo, &hi);
+		return cast(isize)hi;
+	}
+
+	return cast(isize)((((hash << 1) >> 32) * cast(u64)table_len) >> 32);
+}
+
 // NOTE(bill): deprecated `case Type_Info_X:` and `.(Type_Info_X)` on `runtime.Type_Info.variant`, which now holds `^Type_Info_X`
 gb_internal Type *type_info_variant_shim_type(Type *u, Type *t) {
 	if (t_type_info_variant == nullptr) {

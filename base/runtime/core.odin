@@ -846,11 +846,19 @@ type_info_base_without_enum :: type_info_core
 
 @(require_results)
 __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check {
-	n := u64(len(type_table))
-	i := transmute(u64)id % n
+	n := uint(len(type_table))
+	i: uint
+	when size_of(uintptr) == 8 {
+		i = uint((u128(transmute(u64)id << 1) * u128(n)) >> 64)
+	} else {
+		i = uint((((transmute(u64)id << 1) >> 32) * u64(n)) >> 32)
+	}
 	for _ in 0..<n {
 		ptr := type_table[i]
-		if ptr != nil && ptr.id == id {
+		if ptr == nil {
+			break
+		}
+		if ptr.id == id {
 			return ptr
 		}
 		i = i+1 if i+1 < n else 0

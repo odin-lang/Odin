@@ -1152,8 +1152,10 @@ gb_internal void lb_setup_type_info_data_giant_array(lbModule *m, i64 global_typ
 	if (!is_default_module) {
 		return;
 	}
+	GB_ASSERT(giant_const_values[0] != nullptr);
 	for (isize i = 0; i < global_type_info_data_entity_count; i++) {
 		auto *ptr = &giant_const_values[i];
+		GB_ASSERT_MSG(*ptr != nullptr || info->type_info_types_hash_map[i].hash == 0, "type info slot %td is occupied but has no entry", i);
 		if (*ptr != nullptr) {
 			*ptr = LLVMConstPointerCast(*ptr, lb_type(m, t_type_info_ptr));
 		} else {

@@ -8460,7 +8460,7 @@ gb_internal void check_parsed_files(Checker *c) {
 
 		isize hash_map_len = c->info.type_info_types_hash_map.count;
 		for (auto const &tt : type_info_types) {
-			isize index = tt.hash % hash_map_len;
+			isize index = type_info_table_home_index(tt.hash, hash_map_len);
 			// NOTE(bill): no need for a sanity check since there
 			// will always be enough space for the entries
 			for (;;) {
