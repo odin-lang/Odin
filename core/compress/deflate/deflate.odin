@@ -126,9 +126,9 @@ deflate_first_difference :: proc(x: u64) -> i32 #no_bounds_check {
 }
 
 @(private)
-deflate_hash32 :: proc(b: []u8) -> u32 #no_bounds_check {
+deflate_hash32 :: proc(b: []u8, $BITS: u32) -> u32 #no_bounds_check {
 	n := deflate_load_u32(b)
-	return (n * 0x9E377989) >> (32 - DEFLATE_HASH_BITS)
+	return (n * 0x9E377989) >> (32 - BITS)
 }
 
 @(private)
@@ -138,7 +138,7 @@ deflate_hash24 :: proc(b: []u8) -> u32 #no_bounds_check {
 }
 
 @(private)
-deflate_put_bits :: proc(destination: ^[]u8, s: ^Deflate, code: i32, bit_count: i32) #no_bounds_check {
+deflate_put_bits :: proc(destination: ^[]u8, s: ^$S, code: i32, bit_count: i32) #no_bounds_check {
 	deflate_put_bits_u64(destination, &s.bit_buffer, &s.bit_count, u64(u32(code)), bit_count)
 }
 
@@ -414,10 +414,22 @@ deflate_precode :: proc(count: ^Deflate_Symbol_Count, frequencies: []u32, items:
 }
 
 @(private)
-deflate_match_codes :: proc(match_codes: ^Deflate_Match_Codes, distance: i32, len: i32) #no_bounds_check {
-	assert(len <= 258)
-	assert(distance <= 32768)
-	match_codes.length_slot = i32(DEFLATE_LENGTH_SLOT[len])
+deflate_match_codes :: proc(match_codes: ^Deflate_Match_Codes, distance: i32, len: i32, $D64: bool) #no_bounds_check {
+	when D64 {
+		assert(len <= DEFLATE64_MATCH_MAX)
+		assert(distance <= DEFLATE64_DISTANCE_MAX)
+		if len > DEFLATE64_LONG_MATCH {
+			match_codes.length_slot = 28
+		} else if len == DEFLATE64_LONG_MATCH {
+			match_codes.length_slot = 27
+		} else {
+			match_codes.length_slot = i32(DEFLATE_LENGTH_SLOT[len])
+		}
+	} else {
+		assert(len <= 258)
+		assert(distance <= 32768)
+		match_codes.length_slot = i32(DEFLATE_LENGTH_SLOT[len])
+	}
 	match_codes.length_code = 257 + match_codes.length_slot
 	assert(match_codes.length_code <= 285)
 
@@ -426,8 +438,8 @@ deflate_match_codes :: proc(match_codes: ^Deflate_Match_Codes, distance: i32, le
 }
 
 @(private)
-deflate_block_type :: proc(frequencies: ^Deflate_Frequency, lengths: ^Deflate_Lengths, block_length: i32, precode_count: i32, precode_frequencies: []u32, precode_lengths: []u8) -> Deflate_Block_Type #no_bounds_check {
-	dynamic_cost, stored_cost, fixed_cost := deflate_block_costs(frequencies, lengths, block_length, precode_count, precode_frequencies, precode_lengths)
+deflate_block_type :: proc(frequencies: ^Deflate_Frequency, lengths: ^Deflate_Lengths, block_length: i32, precode_count: i32, precode_frequencies: []u32, precode_lengths: []u8, $D64: bool) -> Deflate_Block_Type #no_bounds_check {
+	dynamic_cost, stored_cost, fixed_cost := deflate_block_costs(frequencies, lengths, block_length, precode_count, precode_frequencies, precode_lengths, D64)
 	when !SMALL_INPUT_OPTIMIZATION {
 		_ = fixed_cost
 	} else {
@@ -439,7 +451,13 @@ deflate_block_type :: proc(frequencies: ^Deflate_Frequency, lengths: ^Deflate_Le
 }
 
 @(private)
-deflate_block_costs :: proc(frequencies: ^Deflate_Frequency, lengths: ^Deflate_Lengths, block_length: i32, precode_count: i32, precode_frequencies: []u32, precode_lengths: []u8) -> (dynamic_cost, stored_cost, fixed_cost: i32) #no_bounds_check {
+deflate_block_costs :: proc(frequencies: ^Deflate_Frequency, lengths: ^Deflate_Lengths, block_length: i32, precode_count: i32, precode_frequencies: []u32, precode_lengths: []u8, $D64: bool) -> (dynamic_cost, stored_cost, fixed_cost: i32) #no_bounds_check {
+	DISTANCE_SYMBOLS :: 32 when D64 else 30
+	when D64 {
+		length_extra_bits := &DEFLATE64_LENGTH_EXTRA_BITS
+	} else {
+		length_extra_bits := &DEFLATE_LENGTH_EXTRA_BITS
+	}
 	symbol: i32 = 0
 
 	dynamic_cost += 5 + 5 + 4 + (3 * precode_count)
@@ -451,9 +469,9 @@ deflate_block_costs :: proc(frequencies: ^Deflate_Frequency, lengths: ^Deflate_L
 	}
 	dynamic_cost += i32(lengths.literal[DEFLATE_END_OF_BLOCK])
 	for symbol = 257; symbol < 286; symbol += 1 {
-		dynamic_cost += i32(frequencies.literal[symbol] * u32(i32(DEFLATE_LENGTH_EXTRA_BITS[symbol - 257]) + i32(lengths.literal[symbol])))
+		dynamic_cost += i32(frequencies.literal[symbol] * u32(i32(length_extra_bits[symbol - 257]) + i32(lengths.literal[symbol])))
 	}
-	for symbol = 0; symbol < 30; symbol += 1 {
+	for symbol = 0; symbol < DISTANCE_SYMBOLS; symbol += 1 {
 		dynamic_cost += i32(frequencies.distance[symbol] * u32(i32(DEFLATE_DISTANCE_EXTRA_BITS[symbol]) + i32(lengths.distance[symbol])))
 	}
 
@@ -465,9 +483,9 @@ deflate_block_costs :: proc(frequencies: ^Deflate_Frequency, lengths: ^Deflate_L
 			fixed_cost += i32(frequencies.literal[symbol] * u32(DEFLATE_FIXED_LITERAL_LENGTH[symbol]))
 		}
 		for symbol = 257; symbol < 286; symbol += 1 {
-			fixed_cost += i32(frequencies.literal[symbol] * u32(i32(DEFLATE_LENGTH_EXTRA_BITS[symbol - 257]) + i32(DEFLATE_FIXED_LITERAL_LENGTH[symbol])))
+			fixed_cost += i32(frequencies.literal[symbol] * u32(i32(length_extra_bits[symbol - 257]) + i32(DEFLATE_FIXED_LITERAL_LENGTH[symbol])))
 		}
-		for symbol = 0; symbol < 30; symbol += 1 {
+		for symbol = 0; symbol < DISTANCE_SYMBOLS; symbol += 1 {
 			fixed_cost += i32(frequencies.distance[symbol] * u32(i32(DEFLATE_DISTANCE_EXTRA_BITS[symbol]) + 5))
 		}
 	} else {
@@ -484,13 +502,21 @@ deflate_put_u16 :: proc(destination: ^[]u8, x: u16) #no_bounds_check {
 }
 
 @(private)
-deflate_match :: #force_inline proc(s: ^Deflate, distance: i32, len: i32) -> (bits: u64, count: i32) #no_bounds_check {
+deflate_match :: #force_inline proc(s: ^$S, distance: i32, len: i32) -> (bits: u64, count: i32) #no_bounds_check {
+	D64 :: S == Deflate64
+	when D64 {
+		length_base       := &DEFLATE64_LENGTH_BASE
+		length_extra_bits := &DEFLATE64_LENGTH_EXTRA_BITS
+	} else {
+		length_base       := &DEFLATE_LENGTH_BASE
+		length_extra_bits := &DEFLATE_LENGTH_EXTRA_BITS
+	}
 	match_codes: Deflate_Match_Codes
-	deflate_match_codes(&match_codes, distance, len)
+	deflate_match_codes(&match_codes, distance, len, D64)
 	bits   = u64(s.codes.words.literal[match_codes.length_code])
 	count  = i32(s.codes.lengths.literal[match_codes.length_code])
-	bits  |= u64(u32(len - i32(DEFLATE_LENGTH_BASE[match_codes.length_slot]))) << u64(count)
-	count += i32(DEFLATE_LENGTH_EXTRA_BITS[match_codes.length_slot])
+	bits  |= u64(u32(len - i32(length_base[match_codes.length_slot]))) << u64(count)
+	count += i32(length_extra_bits[match_codes.length_slot])
 	bits  |= u64(s.codes.words.distance[match_codes.distance_code]) << u64(count)
 	count += i32(s.codes.lengths.distance[match_codes.distance_code])
 	bits  |= u64(u32(distance - i32(DEFLATE_DISTANCE_BASE[match_codes.distance_code]))) << u64(count)
@@ -499,7 +525,7 @@ deflate_match :: #force_inline proc(s: ^Deflate, distance: i32, len: i32) -> (bi
 }
 
 @(private)
-deflate_store :: proc(destination: ^[]u8, s: ^Deflate, is_last: bool, input: []u8, block_begin: i32, block_end: i32) #no_bounds_check {
+deflate_store :: proc(destination: ^[]u8, s: ^$S, is_last: bool, input: []u8, block_begin: i32, block_end: i32) #no_bounds_check {
 	block_length := block_end - block_begin
 	n := max(deflate_round_up_divide(block_length, DEFLATE_RAW_BLOCK_SIZE), 1)
 	for i: i32 = 0; i < n; i += 1 {
@@ -520,7 +546,7 @@ deflate_store :: proc(destination: ^[]u8, s: ^Deflate, is_last: bool, input: []u
 }
 
 @(private)
-deflate_put_sequences :: proc(destination: ^[]u8, s: ^Deflate, input: []u8, sequences: []Deflate_Sequence) #no_bounds_check {
+deflate_put_sequences :: proc(destination: ^[]u8, s: ^$S, input: []u8, sequences: []Deflate_Sequence) #no_bounds_check {
 	// block sequences
 	q := destination^
 	bit_buffer := s.bit_buffer
@@ -532,6 +558,12 @@ deflate_put_sequences :: proc(destination: ^[]u8, s: ^Deflate, input: []u8, sequ
 				deflate_put_bits_u64(&q, &bit_buffer, &bit_count, u64(s.codes.words.literal[c]), i32(s.codes.lengths.literal[c]))
 			}
 		} else {
+			when S == Deflate64 {
+				if intrinsics.expect(sequence.length > DEFLATE64_LONG_MATCH, false) {
+					deflate64_put_long_match(&q, &bit_buffer, &bit_count, s, -sequence.distance, sequence.length)
+					continue
+				}
+			}
 			bits, count := deflate_match(s, -sequence.distance, sequence.length)
 			deflate_put_bits_u64(&q, &bit_buffer, &bit_count, bits, count)
 		}
@@ -540,6 +572,22 @@ deflate_put_sequences :: proc(destination: ^[]u8, s: ^Deflate, input: []u8, sequ
 	s.bit_buffer = bit_buffer
 	s.bit_count  = bit_count
 	destination^ = q
+}
+
+@(private)
+deflate64_put_long_match :: proc(destination: ^[]u8, bit_buffer: ^u64, bit_count: ^i32, s: ^Deflate64, distance: i32, len: i32) #no_bounds_check {
+	match_codes: Deflate_Match_Codes
+	deflate_match_codes(&match_codes, distance, len, true)
+	bits  := u64(s.codes.words.literal[match_codes.length_code])
+	count := i32(s.codes.lengths.literal[match_codes.length_code])
+	bits  |= u64(u32(len - i32(DEFLATE64_LENGTH_BASE[match_codes.length_slot]))) << u64(count)
+	count += i32(DEFLATE64_LENGTH_EXTRA_BITS[match_codes.length_slot])
+	deflate_put_bits_u64(destination, bit_buffer, bit_count, bits, count)
+	bits   = u64(s.codes.words.distance[match_codes.distance_code])
+	count  = i32(s.codes.lengths.distance[match_codes.distance_code])
+	bits  |= u64(u32(distance - i32(DEFLATE_DISTANCE_BASE[match_codes.distance_code]))) << u64(count)
+	count += match_codes.distance_extra
+	deflate_put_bits_u64(destination, bit_buffer, bit_count, bits, count)
 }
 
 @(private)
@@ -553,7 +601,7 @@ deflate_precode_count :: proc(lengths: []u8) -> (precode_count: i32) #no_bounds_
 }
 
 @(private)
-deflate_flush :: proc(destination: ^[]u8, s: ^Deflate, is_last: bool, input: []u8, block_begin: i32, block_end: i32, sequences: []Deflate_Sequence) #no_bounds_check {
+deflate_flush :: proc(destination: ^[]u8, s: ^$S, is_last: bool, input: []u8, block_begin: i32, block_end: i32, sequences: []Deflate_Sequence) #no_bounds_check {
 	block_length := block_end - block_begin
 	i, precode_count: i32
 	symbol_count: Deflate_Symbol_Count
@@ -564,13 +612,18 @@ deflate_flush :: proc(destination: ^[]u8, s: ^Deflate, is_last: bool, input: []u
 
 	// calculate huffman codes
 	s.frequencies.literal[DEFLATE_END_OF_BLOCK] += 1
+	when S == Deflate64 {
+		if s.frequencies.distance == {} {
+			s.frequencies.distance[0] = 1
+		}
+	}
 	deflate_huffman(s.codes.lengths.literal[:], s.codes.words.literal[:], s.frequencies.literal[:], DEFLATE_LITERAL_MAX_CODE_LENGTH)
 	deflate_huffman(s.codes.lengths.distance[:], s.codes.words.distance[:], s.frequencies.distance[:], DEFLATE_DISTANCE_MAX_CODE_LENGTH)
 	deflate_precode(&symbol_count, frequencies[:], items[:], s.codes.lengths.literal[:], s.codes.lengths.distance[:])
 	deflate_huffman(lengths[:], codes[:], frequencies[:], DEFLATE_PRECODE_MAX_CODE_LENGTH)
 	precode_count = deflate_precode_count(lengths[:])
 	// write block
-	switch deflate_block_type(&s.frequencies, &s.codes.lengths, block_length, precode_count, frequencies[:], lengths[:]) {
+	switch deflate_block_type(&s.frequencies, &s.codes.lengths, block_length, precode_count, frequencies[:], lengths[:], S == Deflate64) {
 	case .Stored:
 		deflate_store(destination, s, is_last, input, block_begin, block_end)
 	case .Dynamic:
@@ -616,14 +669,14 @@ deflate_flush :: proc(destination: ^[]u8, s: ^Deflate, is_last: bool, input: []u
 }
 
 @(private)
-deflate_add_sequence :: #force_inline proc(s: ^Deflate, count: ^i32, distance: i32, length: i32) #no_bounds_check {
+deflate_add_sequence :: #force_inline proc(s: ^$S, count: ^i32, distance: i32, length: i32) #no_bounds_check {
 	assert(count^ + 2 < DEFLATE_SEQUENCE_SIZE)
 	s.sequences[count^] = {distance = distance, length = length}
 	count^ += 1
 }
 
 @(private)
-deflate_add_sequence_field :: proc(s: ^Deflate, distance: i32, length: i32) #no_bounds_check {
+deflate_add_sequence_field :: proc(s: ^$S, distance: i32, length: i32) #no_bounds_check {
 	assert(s.sequence_count + 2 < DEFLATE_SEQUENCE_SIZE)
 	s.sequences[s.sequence_count].distance = distance
 	s.sequences[s.sequence_count].length = length
@@ -631,9 +684,9 @@ deflate_add_sequence_field :: proc(s: ^Deflate, distance: i32, length: i32) #no_
 }
 
 @(private)
-deflate_register_match :: proc(s: ^Deflate, distance: i32, length: i32) #no_bounds_check {
+deflate_register_match :: proc(s: ^$S, distance: i32, length: i32) #no_bounds_check {
 	match_codes: Deflate_Match_Codes
-	deflate_match_codes(&match_codes, distance, length)
+	deflate_match_codes(&match_codes, distance, length, S == Deflate64)
 
 	assert(match_codes.length_code < DEFLATE_LITERAL_SYMBOLS)
 	assert(match_codes.distance_code < DEFLATE_DISTANCE_SYMBOLS)
@@ -643,7 +696,7 @@ deflate_register_match :: proc(s: ^Deflate, distance: i32, length: i32) #no_boun
 }
 
 @(private)
-deflate_block_cost :: proc(frequencies: ^Deflate_Frequency, block_length: i32) -> i32 #no_bounds_check {
+deflate_block_cost :: proc(frequencies: ^Deflate_Frequency, block_length: i32, $D64: bool) -> i32 #no_bounds_check {
 	block_frequencies := frequencies^
 	block_frequencies.literal[DEFLATE_END_OF_BLOCK] += 1
 
@@ -660,19 +713,19 @@ deflate_block_cost :: proc(frequencies: ^Deflate_Frequency, block_length: i32) -
 	deflate_huffman(precode_lengths[:], precode_codes[:], precode_frequencies[:], DEFLATE_PRECODE_MAX_CODE_LENGTH)
 	precode_count := deflate_precode_count(precode_lengths[:])
 
-	dynamic_cost, stored_cost, fixed_cost := deflate_block_costs(&block_frequencies, &codes.lengths, block_length, precode_count, precode_frequencies[:], precode_lengths[:])
+	dynamic_cost, stored_cost, fixed_cost := deflate_block_costs(&block_frequencies, &codes.lengths, block_length, precode_count, precode_frequencies[:], precode_lengths[:], D64)
 	return 3 + min(dynamic_cost, stored_cost, fixed_cost)
 }
 
 @(private)
-deflate_count_sequence :: proc(frequencies: ^Deflate_Frequency, input: []u8, sequence: Deflate_Sequence) #no_bounds_check {
+deflate_count_sequence :: proc(frequencies: ^Deflate_Frequency, input: []u8, sequence: Deflate_Sequence, $D64: bool) #no_bounds_check {
 	if sequence.distance >= 0 {
 		for c in input[sequence.distance:][:sequence.length] {
 			frequencies.literal[c] += 1
 		}
 	} else {
 		match_codes: Deflate_Match_Codes
-		deflate_match_codes(&match_codes, -sequence.distance, sequence.length)
+		deflate_match_codes(&match_codes, -sequence.distance, sequence.length, D64)
 		frequencies.literal[match_codes.length_code] += 1
 		frequencies.distance[match_codes.distance_code] += 1
 	}
@@ -689,7 +742,7 @@ deflate_frequency_range :: proc(range: ^Deflate_Frequency, from, to: ^Deflate_Fr
 }
 
 @(private)
-deflate_flush_split :: proc(destination: ^[]u8, s: ^Deflate, is_last: bool, input: []u8, block_begin: i32, block_end: i32) #no_bounds_check {
+deflate_flush_split :: proc(destination: ^[]u8, s: ^$S, is_last: bool, input: []u8, block_begin: i32, block_end: i32) #no_bounds_check {
 	sequences    := s.sequences[:s.sequence_count]
 	block_length := block_end - block_begin
 
@@ -708,7 +761,7 @@ deflate_flush_split :: proc(destination: ^[]u8, s: ^Deflate, is_last: bool, inpu
 			positions[segments]  = position
 			prefix[segments + 1] = prefix[segments]
 		}
-		deflate_count_sequence(&prefix[segments + 1], input, sequence)
+		deflate_count_sequence(&prefix[segments + 1], input, sequence, S == Deflate64)
 		position += sequence.length
 	}
 	segments += 1
@@ -722,7 +775,7 @@ deflate_flush_split :: proc(destination: ^[]u8, s: ^Deflate, is_last: bool, inpu
 		best[j] = max(i64)
 		for i in 0..<j {
 			deflate_frequency_range(&range, &prefix[i], &prefix[j])
-			cost := best[i] + i64(deflate_block_cost(&range, positions[j] - positions[i]))
+			cost := best[i] + i64(deflate_block_cost(&range, positions[j] - positions[i], S == Deflate64))
 			if cost < best[j] {
 				best[j]     = cost
 				previous[j] = i
@@ -746,11 +799,14 @@ deflate_flush_split :: proc(destination: ^[]u8, s: ^Deflate, is_last: bool, inpu
 }
 
 @(private)
-deflate_find_match :: #force_inline proc(m: ^Deflate_Match, s: ^Deflate, chain_length: i32, max_match: i32, input: []u8, p: i32, hash_base: i32) #no_bounds_check {
+deflate_find_match :: #force_inline proc(m: ^Deflate_Match, s: ^$S, chain_length: i32, max_match: i32, input: []u8, p: i32, hash_base: i32) #no_bounds_check {
+	WINDOW_MASK    :: DEFLATE64_WINDOW_MASK when S == Deflate64 else DEFLATE_WINDOW_MASK
+	DISTANCE_LIMIT :: DEFLATE64_DISTANCE_LIMIT when S == Deflate64 else DEFLATE_WINDOW_SIZE
+	HASH_BITS      :: DEFLATE64_HASH_BITS when S == Deflate64 else DEFLATE_HASH_BITS
 	chain_length := chain_length
 	e := i32(len(input))
-	i := deflate_unwrap_position(hash_base, s.hash_head[deflate_hash32(input[p:])])
-	limit: i32 = DEFLATE_NO_POSITION if (p - DEFLATE_WINDOW_SIZE) < DEFLATE_NO_POSITION else (p - DEFLATE_WINDOW_SIZE)
+	i := deflate_unwrap_position(hash_base, s.hash_head[deflate_hash32(input[p:], HASH_BITS)])
+	limit: i32 = DEFLATE_NO_POSITION if (p - DISTANCE_LIMIT) < DEFLATE_NO_POSITION else (p - DISTANCE_LIMIT)
 	scan_start := deflate_load_u32(input[p:])
 	scan_end: u64
 	if m.length >= 8 {
@@ -799,17 +855,17 @@ deflate_find_match :: #force_inline proc(m: ^Deflate_Match, s: ^Deflate, chain_l
 		}
 		chain_length -= 1
 		if chain_length == 0 { break }
-		i = deflate_unwrap_position(hash_base, s.hash_chain[i & DEFLATE_WINDOW_MASK])
+		i = deflate_unwrap_position(hash_base, s.hash_chain[i & WINDOW_MASK])
 	}
 }
 
 @(private)
-deflate_unwrap_position :: #force_inline proc "contextless" (hash_base: i32, stored: u16) -> i32 {
+deflate_unwrap_position :: #force_inline proc "contextless" (hash_base: i32, stored: $T) -> i32 {
 	return hash_base + i32(stored) - 1
 }
 
 @(private)
-deflate_find_match3 :: proc(m: ^Deflate_Match, s: ^Deflate, max_match: i32, input: []u8, p: i32, hash_base: i32) #no_bounds_check {
+deflate_find_match3 :: proc(m: ^Deflate_Match, s: ^$S, max_match: i32, input: []u8, p: i32, hash_base: i32) #no_bounds_check {
 	i := deflate_unwrap_position(hash_base, s.hash3_head[deflate_hash24(input[p:])])
 	if i <= DEFLATE_NO_POSITION || p - i > DEFLATE_MATCH3_DISTANCE {
 		return
@@ -826,7 +882,7 @@ deflate_find_match3 :: proc(m: ^Deflate_Match, s: ^Deflate, max_match: i32, inpu
 			return i32(length) if length != 0 else 12
 		}
 		match_codes: Deflate_Match_Codes
-		deflate_match_codes(&match_codes, p - i, n)
+		deflate_match_codes(&match_codes, p - i, n, S == Deflate64)
 		match_cost := code_cost(s.codes.lengths.literal[match_codes.length_code]) + code_cost(s.codes.lengths.distance[match_codes.distance_code]) + match_codes.distance_extra
 		literal_cost := code_cost(s.codes.lengths.literal[input[p]]) + code_cost(s.codes.lengths.literal[input[p + 1]]) + code_cost(s.codes.lengths.literal[input[p + 2]])
 		if match_cost + DEFLATE_MATCH3_MARGIN >= literal_cost {
@@ -838,7 +894,7 @@ deflate_find_match3 :: proc(m: ^Deflate_Match, s: ^Deflate, max_match: i32, inpu
 }
 
 @(private)
-deflate_compress :: proc(s: ^Deflate, output: []u8, input: []u8, requested_level: Deflate_Level) -> int #no_bounds_check {
+deflate_compress :: proc(s: ^$S, output: []u8, input: []u8, requested_level: Deflate_Level) -> int #no_bounds_check {
 	level := clamp(requested_level, Deflate_Level.Stored, Deflate_Level.Best)
 	if level == .Level_10 {
 		return deflate_compress_level(s, output, input, level, true)
@@ -850,19 +906,28 @@ deflate_compress :: proc(s: ^Deflate, output: []u8, input: []u8, requested_level
 }
 
 @(private)
-deflate_compress_quick :: proc(s: ^Deflate, output: []u8, input: []u8) -> int #no_bounds_check {
+deflate_compress_quick :: proc(s: ^$S, output: []u8, input: []u8) -> int #no_bounds_check {
+	D64            :: S == Deflate64
+	WINDOW_SIZE    :: DEFLATE64_WINDOW_SIZE when D64 else DEFLATE_WINDOW_SIZE
+	WINDOW_MASK    :: DEFLATE64_WINDOW_MASK when D64 else DEFLATE_WINDOW_MASK
+	DISTANCE_LIMIT :: DEFLATE64_DISTANCE_LIMIT when D64 else DEFLATE_WINDOW_SIZE
+	HASH_BITS      :: DEFLATE64_HASH_BITS when D64 else DEFLATE_HASH_BITS
+	HASH_SLIDE     :: DEFLATE64_HASH_SLIDE when D64 else DEFLATE_HASH_SLIDE
+	HASH_SLIDE_AT  :: DEFLATE64_HASH_SLIDE_AT when D64 else DEFLATE_HASH_SLIDE_AT
+	MATCH_MAX      :: DEFLATE64_MATCH_MAX when D64 else DEFLATE_MATCH_MAX
+	Position       :: u32 when D64 else u16
 	q := output
 	total := len(input)
 	s.sequence_count = 0
 	s.frequencies = {}
 	s.hash_head = {}
-	hash_base, i, literal_run: i32
+	hash_base, i, literal_run, last_distance: i32
 	base   := 0
 	window := input[:min(total, DEFLATE_SLIDE_SIZE + DEFLATE_BLOCK_MAX)]
 	input_length := i32(len(window))
 	for {
 		if i >= DEFLATE_SLIDE_SIZE {
-			delta := (i - DEFLATE_WINDOW_SIZE) &~ DEFLATE_WINDOW_MASK
+			delta := (i - WINDOW_SIZE) &~ WINDOW_MASK
 			base      += int(delta)
 			i         -= delta
 			hash_base -= delta
@@ -873,17 +938,23 @@ deflate_compress_quick :: proc(s: ^Deflate, output: []u8, input: []u8) -> int #n
 		block_end   := min(i + DEFLATE_BLOCK_MAX, input_length)
 		is_last     := base + int(block_end) == total
 		for i < block_end {
-			if intrinsics.expect(i - hash_base >= DEFLATE_HASH_SLIDE_AT, false) {
+			if intrinsics.expect(i - hash_base >= HASH_SLIDE_AT, false) {
 				deflate_slide(s, false)
-				hash_base += DEFLATE_HASH_SLIDE
+				hash_base += HASH_SLIDE
 			}
 			left := block_end - i
 			if left > DEFLATE_MATCH_MIN {
-				h         := deflate_hash32(window[i:])
+				h         := deflate_hash32(window[i:], HASH_BITS)
 				candidate := deflate_unwrap_position(hash_base, s.hash_head[h])
-				s.hash_head[h] = u16(i - hash_base + 1)
-				if candidate >= 0 && i - candidate < DEFLATE_WINDOW_SIZE && deflate_load_u32(window[candidate:]) == deflate_load_u32(window[i:]) {
-					max_match: i32 = DEFLATE_MATCH_MAX if left > DEFLATE_MATCH_MAX else left
+				s.hash_head[h] = Position(i - hash_base + 1)
+				if last_distance != 0 {
+					if deflate_load_u32(window[i - last_distance:]) == deflate_load_u32(window[i:]) {
+						candidate = i - last_distance
+					}
+					last_distance = 0
+				}
+				if candidate >= 0 && i - candidate < DISTANCE_LIMIT && deflate_load_u32(window[candidate:]) == deflate_load_u32(window[i:]) {
+					max_match: i32 = MATCH_MAX if left > MATCH_MAX else left
 					n: i32 = DEFLATE_MATCH_MIN
 					for n + 8 <= max_match {
 						x := deflate_load_u64(window[candidate + n:]) ~ deflate_load_u64(window[i + n:])
@@ -902,6 +973,12 @@ deflate_compress_quick :: proc(s: ^Deflate, output: []u8, input: []u8) -> int #n
 					}
 					deflate_add_sequence_field(s, candidate - i, n)
 					deflate_register_match(s, i - candidate, n)
+					last_distance = i - candidate
+					when D64 {
+						for k := i + DEFLATE64_LONG_MATCH; k + DEFLATE_MATCH_MIN < i + n; k += DEFLATE64_LONG_MATCH {
+							s.hash_head[deflate_hash32(window[k:], HASH_BITS)] = Position(k - hash_base + 1)
+						}
+					}
 					i += n
 					continue
 				}
@@ -909,6 +986,7 @@ deflate_compress_quick :: proc(s: ^Deflate, output: []u8, input: []u8) -> int #n
 			s.frequencies.literal[window[i]] += 1
 			literal_run += 1
 			i += 1
+			last_distance = 0
 		}
 		if literal_run != 0 {
 			deflate_add_sequence_field(s, i - literal_run, literal_run)
@@ -925,7 +1003,15 @@ deflate_compress_quick :: proc(s: ^Deflate, output: []u8, input: []u8) -> int #n
 }
 
 @(private)
-deflate_compress_level :: proc(s: ^Deflate, output: []u8, input: []u8, level: Deflate_Level, $BEST: bool) -> int #no_bounds_check {
+deflate_compress_level :: proc(s: ^$S, output: []u8, input: []u8, level: Deflate_Level, $BEST: bool) -> int #no_bounds_check {
+	D64           :: S == Deflate64
+	WINDOW_SIZE   :: DEFLATE64_WINDOW_SIZE when D64 else DEFLATE_WINDOW_SIZE
+	WINDOW_MASK   :: DEFLATE64_WINDOW_MASK when D64 else DEFLATE_WINDOW_MASK
+	HASH_BITS     :: DEFLATE64_HASH_BITS when D64 else DEFLATE_HASH_BITS
+	HASH_SLIDE    :: DEFLATE64_HASH_SLIDE when D64 else DEFLATE_HASH_SLIDE
+	HASH_SLIDE_AT :: DEFLATE64_HASH_SLIDE_AT when D64 else DEFLATE_HASH_SLIDE_AT
+	MATCH_MAX     :: DEFLATE64_MATCH_MAX when D64 else DEFLATE_MATCH_MAX
+	Position      :: u32 when D64 else u16
 	q := output
 	total := len(input)
 	s.sequence_count = 0
@@ -946,7 +1032,7 @@ deflate_compress_level :: proc(s: ^Deflate, output: []u8, input: []u8, level: De
 	input_length := i32(len(window))
 	max_chain: i32 = (1 << u32(level)) if level < .Level_9 else (1 << 12) if level == .Level_9 else (1 << 13)
 	match_min: i32 = DEFLATE_MATCH3_MIN if BEST else DEFLATE_MATCH_MIN
-	i, literal_run, hash_base, sequence_count: i32
+	i, literal_run, hash_base, sequence_count, last_distance: i32
 	s.hash_head = {}
 	if BEST {
 		s.hash3_head = {}
@@ -957,7 +1043,7 @@ deflate_compress_level :: proc(s: ^Deflate, output: []u8, input: []u8, level: De
 	}
 	for { // do {...} while (i < in_len);
 		if i >= DEFLATE_SLIDE_SIZE {
-			delta := (i - DEFLATE_WINDOW_SIZE) &~ DEFLATE_WINDOW_MASK
+			delta := (i - WINDOW_SIZE) &~ WINDOW_MASK
 			hash_base -= delta
 			base += int(delta)
 			i    -= delta
@@ -970,25 +1056,51 @@ deflate_compress_level :: proc(s: ^Deflate, output: []u8, input: []u8, level: De
 		next: Deflate_Match
 		have_next := false
 		for i < block_end {
-			if i - hash_base >= DEFLATE_HASH_SLIDE_AT {
+			if i - hash_base >= HASH_SLIDE_AT {
 				deflate_slide(s, BEST)
-				hash_base += DEFLATE_HASH_SLIDE
+				hash_base += HASH_SLIDE
 			}
 			m: Deflate_Match
 			left := block_end - i
-			max_match: i32 = DEFLATE_MATCH_MAX if left > DEFLATE_MATCH_MAX else left
+			max_match: i32 = MATCH_MAX if left > MATCH_MAX else left
 			nice_match: i32 = i32(DEFLATE_LEVEL_NICE[level]) if i32(DEFLATE_LEVEL_NICE[level]) < max_match else max_match
+			when D64 {
+				if level == .Best {
+					nice_match = max_match
+				}
+			}
 			run, step, advance: i32 = 1, 1, 0
 			if have_next {
 				m = next
 				have_next = false
 			} else if max_match > DEFLATE_MATCH_MIN {
 				deflate_find_match(&m, s, max_chain, max_match, window, i, hash_base)
+				if last_distance != 0 && m.length < max_match {
+					candidate := i - last_distance
+					n: i32
+					for n + 8 <= max_match {
+						x := deflate_load_u64(window[candidate + n:]) ~ deflate_load_u64(window[i + n:])
+						if x != 0 {
+							n += deflate_first_difference(x)
+							break
+						}
+						n += 8
+					}
+					if n + 8 > max_match {
+						for n < max_match && window[candidate + n] == window[i + n] {
+							n += 1
+						}
+					}
+					if n > m.length && n >= DEFLATE_MATCH_MIN {
+						m.length   = n
+						m.distance = last_distance
+					}
+				}
 				if BEST && m.length < DEFLATE_MATCH_MIN {
 					deflate_find_match3(&m, s, max_match, window, i, hash_base)
 				}
 			}
-			next_max: i32 = DEFLATE_MATCH_MAX if left - 1 > DEFLATE_MATCH_MAX else left - 1
+			next_max: i32 = MATCH_MAX if left - 1 > MATCH_MAX else left - 1
 			if level >= DEFLATE_LEVEL_LAZY && m.length >= match_min && m.length + 1 < nice_match && next_max > DEFLATE_MATCH_MIN {
 				lazy_chain := max_chain
 				if level >= .Level_9 && m.length >= DEFLATE_GOOD_MATCH {
@@ -1008,32 +1120,45 @@ deflate_compress_level :: proc(s: ^Deflate, output: []u8, input: []u8, level: De
 				}
 				deflate_add_sequence(s, &sequence_count, -m.distance, m.length)
 				deflate_register_match(s, m.distance, m.length)
-				if level < .Level_3 && m.length >= nice_match {
-					step = m.length
+				if level < .Level_3 {
+					last_distance = m.distance
+					if m.length >= nice_match {
+						step = m.length
+						when D64 {
+							for k := i + DEFLATE64_LONG_MATCH; k + DEFLATE_MATCH_MIN < i + m.length; k += DEFLATE64_LONG_MATCH {
+								h := deflate_hash32(window[k:], HASH_BITS)
+								s.hash_chain[k & WINDOW_MASK] = s.hash_head[h]
+								s.hash_head[h] = Position(k - hash_base + 1)
+							}
+						}
+					} else {
+						run = m.length
+					}
 				} else {
 					run = m.length
 				}
 			} else {
 				s.frequencies.literal[window[i]] += 1
 				literal_run += 1
+				last_distance = 0
 			}
 			advance = run * step
 			if BEST && input_length - (i + advance) > DEFLATE_MATCH_MIN {
 				for run > 0 {
 					run -= 1
-					h := deflate_hash32(window[i:])
-					s.hash_chain[i & DEFLATE_WINDOW_MASK] = s.hash_head[h]
-					s.hash_head[h] = u16(i - hash_base + 1)
-					s.hash3_head[deflate_hash24(window[i:])] = u16(i - hash_base + 1)
+					h := deflate_hash32(window[i:], HASH_BITS)
+					s.hash_chain[i & WINDOW_MASK] = s.hash_head[h]
+					s.hash_head[h] = Position(i - hash_base + 1)
+					s.hash3_head[deflate_hash24(window[i:])] = Position(i - hash_base + 1)
 					i += step
 					assert(i <= block_end)
 				}
 			} else if input_length - (i + advance) > DEFLATE_MATCH_MIN {
 				for run > 0 { // while (run-- > 0)
 					run -= 1
-					h := deflate_hash32(window[i:])
-					s.hash_chain[i & DEFLATE_WINDOW_MASK] = s.hash_head[h]
-					s.hash_head[h] = u16(i - hash_base + 1)
+					h := deflate_hash32(window[i:], HASH_BITS)
+					s.hash_chain[i & WINDOW_MASK] = s.hash_head[h]
+					s.hash_head[h] = Position(i - hash_base + 1)
 					i += step
 					assert(i <= block_end)
 				}
@@ -1063,22 +1188,23 @@ deflate_compress_level :: proc(s: ^Deflate, output: []u8, input: []u8, level: De
 }
 
 @(private)
-deflate_slide :: proc(s: ^Deflate, $BEST: bool) #no_bounds_check {
+deflate_slide :: proc(s: ^$S, $BEST: bool) #no_bounds_check {
+	HASH_SLIDE :: DEFLATE64_HASH_SLIDE when S == Deflate64 else DEFLATE_HASH_SLIDE
 	for &position in s.hash_head {
-		position = position - DEFLATE_HASH_SLIDE if position > DEFLATE_HASH_SLIDE else 0
+		position = position - HASH_SLIDE if position > HASH_SLIDE else 0
 	}
 	for &position in s.hash_chain {
-		position = position - DEFLATE_HASH_SLIDE if position > DEFLATE_HASH_SLIDE else 0
+		position = position - HASH_SLIDE if position > HASH_SLIDE else 0
 	}
 	when BEST {
 		for &position in s.hash3_head {
-			position = position - DEFLATE_HASH_SLIDE if position > DEFLATE_HASH_SLIDE else 0
+			position = position - HASH_SLIDE if position > HASH_SLIDE else 0
 		}
 	}
 }
 
 @(private)
-deflate_check_arguments ::proc(s: ^Deflate, output_size, bound: int) -> Error #no_bounds_check {
+deflate_check_arguments ::proc(s: ^$S, output_size, bound: int) -> Error #no_bounds_check {
 	if bound < 0 || s == nil {
 		return General_Error.Incompatible_Options
 	}
@@ -1089,14 +1215,14 @@ deflate_check_arguments ::proc(s: ^Deflate, output_size, bound: int) -> Error #n
 }
 
 @(private)
-deflate_to_dynamic :: proc(output: ^[dynamic]u8, input: []u8, level: Deflate_Level, bound: int, compressor: Deflate_To_Slice) -> (err: Error) #no_bounds_check {
+deflate_to_dynamic :: proc(output: ^[dynamic]u8, input: []u8, level: Deflate_Level, bound: int, compressor: proc(s: ^$S, output, input: []u8, level: Deflate_Level) -> (written: int, err: Error)) -> (err: Error) #no_bounds_check {
 	if output == nil || bound < 0 {
 		return General_Error.Incompatible_Options
 	}
 	if bound > compress.COMPRESS_OUTPUT_ALLOCATE_MAX {
 		return General_Error.Output_Too_Short
 	}
-	s := new(Deflate) or_return
+	s := new(S) or_return
 	defer free(s)
 
 	non_zero_resize(output, bound) or_return
