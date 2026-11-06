@@ -3171,10 +3171,12 @@ perf_event_open :: proc "contextless" (attr: ^Perf_Event_Attr, pid: Pid, cpu: in
 
 /*
 	Receive multiple messages from a socket.
+	If `timeout` is not nil, the call returns once it expires, though the kernel only checks it after each message
+	it receives (see BUGS in recvmmsg(2)).
 	Available since Linux 2.6.33.
 */
-recvmmsg :: proc "contextless" (sock: Fd, msg_vec: []MMsg_Hdr, flags: Socket_Msg) -> (int, Errno) {
-	ret := syscall(SYS_recvmmsg, sock, raw_data(msg_vec), len(msg_vec), transmute(i32) flags)
+recvmmsg :: proc "contextless" (sock: Fd, msg_vec: []MMsg_Hdr, flags: Socket_Msg, timeout: ^Time_Spec = nil) -> (int, Errno) {
+	ret := syscall(SYS_recvmmsg, sock, raw_data(msg_vec), len(msg_vec), transmute(i32) flags, timeout)
 	return errno_unwrap(ret, int)
 }
 
