@@ -12,7 +12,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 # The OpenSSL CLI tool installed can be used to easily generate digests:
 # $ openssl sha3-512 -mac HMAC -macopt key:"$HMAC_KEY" $FILE_NAME
-TEST_SUITES        = ['PNG', 'XML', 'BMP', 'JPG', 'BNG', 'Wycheproof', 'Noise', 'X509-Limbo']
+TEST_SUITES        = ['PNG', 'XML', 'BMP', 'JPG', 'BNG', 'Wycheproof', 'Noise', 'X509-Limbo', 'Fonts']
 ASSETS_BASE_URL    = "https://raw.githubusercontent.com/odin-lang/test-assets/master/{}/{}"
 HMAC_KEY           = "https://odin-lang.org"
 HMAC_HASH          = hashlib.sha3_512
@@ -902,6 +902,14 @@ HMAC_DIGESTS = {
 	'snow.txt':                "35088303de90e6bac22656e1e0ac4a5ea73d8cdb5ada23a078d703e14714ffe19e08437bf46108e0419acd8b5be6fa797a68a621c20cdd063d94a4a970aa8634",
 
 	'limbo.json':              "640a07beb54c7b409d54a7250854c735e92ebddc648c108c053c34d01fa249d844f659e2beadf0cfd583fbe3cda5acda8148e98cdef5388a5387d25316ceaee3",
+
+	'LICENSE.txt':                 "55f816e43c1021304223eea303554f008da416c5229a887739dcb7afeb8a80cdcc37a3643a3635f6647d022e550b45d06023af8944513e27963514d2805943d0",
+	'NotoSans-Regular.ttf':        "817129be9c977525c34f752c305409b201c5a747a342106f67226411166021b4ea932184612da5ad0097b18265e6cbf28829bf8d0f8b86a29f2165b4c43ea22e",
+	'NotoSans-Variable.ttf':       "b74dee76652554552843b9b15b67ae55ad3f1ca2055e4f3cfb58fde6ea606832cc8940bf6ac1534469b7078561e0345c7c58b024c337e543ceaef0ae15eacdc1",
+	'NotoSansArabic-Regular.ttf':  "62980afaf956aa8165d97b17759073429b7f7dfae1e00e86b61c8fed1f4393141412a50905cc6788275cb3ec2b5b5c9798e9837bb151b965d39de0cc4d0aa12e",
+	'NotoSansDevanagari-Regular.ttf':"e6d416fae321b9cb2c97e83e224c3482ba5caa6d6f7269cc386f8b3c0ce37305bb85a9ee8803a24bb27001c4b0987f47407268ee34e8aa9b3c6b5020c931d845",
+	'NotoSansThai-Regular.ttf':    "5fdbd762e3cd4deeed434a6d1cb3876e5aa68f932970fe8797a5c8dd1c8c51226c40cff576fb9dd466e59caf40b916b8c35c68cf270b129a9c87bf9cc018b22e",
+	'NotoSansMono-Regular.ttf':    "1d0ff9ab4ec1bef4f700d29b609e247b9c9749c5f989cf0c90292c49fd92ae3f1e9c02405da57a52322e497254de80468b3a4369ce40fb44923d4752a92614ae",
 }
 
 def try_download_file(url, out_file):
