@@ -24,7 +24,7 @@ Presently, the `vendor:` collection comprises the following packages. Each name 
 | [fontstash](https://pkg.odin-lang.org/vendor/fontstash/) | Font texture atlas builder | Port | zlib | https://github.com/memononen/fontstash |
 | [ggpo](https://pkg.odin-lang.org/vendor/ggpo/) | Rollback networking for peer-to-peer games | 7ddadef (no releases) | MIT | https://github.com/pond3r/ggpo |
 | [glfw](https://pkg.odin-lang.org/vendor/glfw/) | Windows, input, and OpenGL and Vulkan contexts | 3.5.1 | zlib | https://github.com/glfw/glfw |
-| [kb_text_shape](https://pkg.odin-lang.org/vendor/kb_text_shape/) | Unicode text segmentation and OpenType shaping | 2.28g | zlib | https://github.com/JimmyLefevre/kb |
+| [kb_text_shape](https://pkg.odin-lang.org/vendor/kb_text_shape/) | Unicode text segmentation and OpenType shaping | 2.31 | zlib | https://github.com/JimmyLefevre/kb |
 | [libc](https://pkg.odin-lang.org/vendor/libc/) | C standard library |  | [Odin's](../LICENSE), platform bindings only | https://en.cppreference.com/w/c/header |
 | [libc-shim](https://pkg.odin-lang.org/vendor/libc-shim/) | Minimal libc for building C libraries to WASM |  | [Odin's](../LICENSE), platform bindings only |  |
 | [lua/5.1](https://pkg.odin-lang.org/vendor/lua/5.1/) | Lua 5.1 scripting language | 5.1.5 | MIT | https://www.lua.org |
