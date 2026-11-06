@@ -52,14 +52,10 @@ if not defined ODIN_TESTS_NO_CLANG (
 @popd
 
 @rem Vendor library tests
-@pushd .
-cd tests\vendor
-mkdir build
-pushd build
-copy ..\..\..\vendor\lua\5.4\windows\*.dll .
-..\..\..\odin test ..\ -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address || exit /b
-popd
-rmdir /S /Q build
+@pushd tests\vendor
+copy ..\..\vendor\lua\5.4\windows\*.dll .
+copy ..\..\vendor\lua\5.5\windows\*.dll .
+..\..\odin test . -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address || exit /b
 @popd
 
 @rem Check issues
