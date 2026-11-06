@@ -4802,6 +4802,11 @@ int main(int arg_count, char const **arg_ptr) {
 		check_defines(&build_context, checker);
 	}
 
+	if (build_context.command_kind == Command_test && checker->info.testing_procedures.count == 0) {
+		gb_printf_err("Cannot test package; no test procedures found.");
+		gb_exit(1);
+	}
+
 	if (build_context.export_semantics_format != SemanticsFormat_Invalid) {
 		MAIN_TIME_SECTION("export semantics");
 		export_semantics(checker);
