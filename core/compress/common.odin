@@ -38,6 +38,7 @@ Error :: union #shared_nil {
 	GZIP_Error,
 	LZ4_Error,
 	BZip2_Error,
+	PKZIP_Legacy_Error,
 	io.Error,
 	runtime.Allocator_Error,
 }
@@ -113,6 +114,17 @@ BZip2_Error :: enum {
 	Block_Checksum_Failed,
 	Stream_Checksum_Failed,
 	Input_Too_Large,
+}
+
+PKZIP_Legacy_Error :: enum {
+	None = 0,
+	Invalid_First_Code,
+	Invalid_Control_Code,
+	Code_Size_Too_Large,
+	Invalid_Code,
+	Invalid_Follower_Set,
+	Invalid_Follower_Index,
+	Invalid_Tree,
 }
 
 ZLIB_Error :: enum {
