@@ -2,8 +2,6 @@ package odin_parser
 
 import "core:odin/tokenizer"
 import "core:odin/ast"
-import "core:path/filepath"
-import "core:fmt"
 import "core:os"
 import "core:slice"
 import "core:strings"
@@ -16,34 +14,25 @@ collect_package :: proc(path: string) -> (pkg: ^ast.Package, success: bool) {
 		return
 	}
 
-	b := strings.builder_make(context.allocator)
-
-	for r in pkg_path {
-		switch r {
-		case '*', '?', '[':
-			strings.write_byte(&b, '\\')
-			strings.write_rune(&b, r)
-		case '\\':
-			when ODIN_OS != .Windows {
-				strings.write_byte(&b, '\\')
-				strings.write_rune(&b, r)
-		}
-		case:
-			strings.write_rune(&b, r)
-		}
-	}
-
-	escaped_pkg_path, clone_err := strings.clone(strings.to_string(b))
-	if clone_err != nil {
-		return
-	}
-
-	path_pattern := fmt.tprintf("%s/*.odin", escaped_pkg_path)
-	matches, err := filepath.glob(path_pattern)
+	matches := make([dynamic]string, context.allocator)
 	defer delete(matches)
 
-	if err != nil {
-		return
+	w := os.walker_create(path)
+	defer os.walker_destroy(&w)
+
+	for info in os.walker_walk(&w) {
+		if os.is_directory(info.fullpath) {
+			os.walker_skip_dir(&w)
+			continue
+		}
+
+		if os.is_file(info.fullpath) && os.ext(info.name) == ".odin" {
+			cloned_path, clone_err := strings.clone(info.fullpath, context.allocator)
+			if clone_err != nil {
+				return
+			}
+			append(&matches, cloned_path)
+		}
 	}
 
 	pkg = ast.new(ast.Package, NO_POS, NO_POS)

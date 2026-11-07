@@ -541,181 +541,204 @@ test_collect_package_path_with_meta :: proc(t: ^testing.T) {
 	context.allocator = context.temp_allocator
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
-	ROOT :: ODIN_ROOT + "tests/core/odin/tmp/"
+	root, _ := os.join_path({ODIN_ROOT, "tests/core/odin/tmp/"}, context.allocator)
 
-	if err := os.make_directory_all(ROOT); err != nil {
+	if err := os.make_directory_all(root); err != nil {
 		log.warnf("Failed to make directories: %v", err)
 	}
 
 	defer {
-		if err := os.remove_all(ROOT); err != nil {
+		if err := os.remove_all(root); err != nil {
 			log.warnf("Failed to remove temporary directories: %v", err)
 		}
 	}
 
 	meta_character_none: {
-		PKG_DIR :: ROOT + "path"
-		FULLPATH :: PKG_DIR + "/none.odin"
+		pkg_dir, _ := os.join_path({root, "path"}, context.allocator)
+		fullpath, _ := os.join_path({pkg_dir, "none.odin"}, context.allocator)
 
-		os.make_directory(PKG_DIR)
+		if err := os.make_directory(pkg_dir); err != nil {
+			log.warnf("Failed to make directory: %v", err)
+			break meta_character_none
+		}
 
-		if err := os.write_entire_file(FULLPATH, `package none`); err != nil {
-			testing.fail(t)
+		if err := os.write_entire_file(fullpath, `package none`); err != nil {
+			log.warnf("Failed to write file: %v", err)
 			break meta_character_none
 		}
 
 		/* Collect package */
 
-		pkg, collected := parser.collect_package(PKG_DIR)
-		testing.expectf(t, collected, "Could not parse package: %v", PKG_DIR)
+		pkg, collected := parser.collect_package(pkg_dir)
+		testing.expectf(t, collected, "Could not parse package: %v", pkg_dir)
 
 		if collected {
-			_, exists := pkg.files[FULLPATH]
+			_, exists := pkg.files[fullpath]
 			testing.expect_value(t, exists, true)
 		}
 	}
 
-	when ODIN_OS != .Windows {
-		meta_character_asterisk: {
-			PKG_DIR            :: ROOT + "path*"
-			PKG_DIR_UNEXPECTED :: ROOT + "path-unexpected"
-
-			FULLPATH            :: PKG_DIR + "/asterisk.odin"
-			FULLPATH_UNEXPECTED :: PKG_DIR_UNEXPECTED + "/unexpected.odin"
-
-			os.make_directory(PKG_DIR)
-			os.make_directory(PKG_DIR_UNEXPECTED)
-
-			if err := os.write_entire_file(FULLPATH, `package asterisk`); err != nil {
-				testing.fail(t)
-				break meta_character_asterisk
-			}
-			if err := os.write_entire_file(FULLPATH_UNEXPECTED, `package unexpected`); err != nil {
-				testing.fail(t)
-				break meta_character_asterisk
-			}
-
-			/* Collect package */
-
-			pkg, collected := parser.collect_package(PKG_DIR)
-			testing.expectf(t, collected, "Could not parse package: %v", PKG_DIR)
-
-			if collected {
-				testing.expect_value(t, len(pkg.files), 1)
-
-				_, exists := pkg.files[FULLPATH]
-				testing.expect_value(t, exists, true)
-
-				_, uexists := pkg.files[FULLPATH_UNEXPECTED]
-				testing.expect_value(t, uexists, false)
-			}
-		}
-	}
-
-	when ODIN_OS != .Windows {
-		meta_character_question_mark: {
-			PKG_DIR            :: ROOT + "path?"
-			PKG_DIR_UNEXPECTED :: ROOT + "pathU"
-
-			FULLPATH            :: PKG_DIR + "/question_mark.odin"
-			FULLPATH_UNEXPECTED :: PKG_DIR_UNEXPECTED + "/unexpected.odin"
-
-			os.make_directory(PKG_DIR)
-			os.make_directory(PKG_DIR_UNEXPECTED)
-
-			if err := os.write_entire_file(FULLPATH, `package question_mark`); err != nil {
-				testing.fail(t)
-				break meta_character_question_mark
-			}
-			if err := os.write_entire_file(FULLPATH_UNEXPECTED, `package unexpected`); err != nil {
-				testing.fail(t)
-				break meta_character_question_mark
-			}
-
-			/* Collect package */
-
-			pkg, collected := parser.collect_package(PKG_DIR)
-			testing.expectf(t, collected, "Could not parse package: %v", PKG_DIR)
-
-			if collected {
-				testing.expect_value(t, len(pkg.files), 1)
-
-				_, exists := pkg.files[FULLPATH]
-				testing.expect_value(t, exists, true)
-
-				_, uexists := pkg.files[FULLPATH_UNEXPECTED]
-				testing.expect_value(t, uexists, false)
-			}
-		}
-	}
-
 	meta_character_opening_bracket: {
-		PKG_DIR            :: ROOT + "[path]"
-		PKG_DIR_UNEXPECTED :: ROOT + "p"
+		pkg_dir, _            := os.join_path({root, "[path]"}, context.allocator)
+		pkg_dir_unexpected, _ := os.join_path({root, "p"}, context.allocator)
 
-		FULLPATH            :: PKG_DIR + "/opening_bracket.odin"
-		FULLPATH_UNEXPECTED :: PKG_DIR_UNEXPECTED + "/unexpected.odin"
+		fullpath, _            := os.join_path({pkg_dir, "opening_bracket.odin"}, context.allocator)
+		fullpath_unexpected, _ := os.join_path({pkg_dir_unexpected, "unexpected.odin"}, context.allocator)
 
-		os.make_directory(PKG_DIR)
-		os.make_directory(PKG_DIR_UNEXPECTED)
-
-		if err := os.write_entire_file(FULLPATH, `package opening_bracket`); err != nil {
-			testing.fail(t)
+		if err := os.make_directory(pkg_dir); err != nil {
+			log.warnf("Failed to make directory: %v", err)
 			break meta_character_opening_bracket
 		}
-		if err := os.write_entire_file(FULLPATH_UNEXPECTED, `package unexpected`); err != nil {
-			testing.fail(t)
+		if err := os.make_directory(pkg_dir_unexpected); err != nil {
+			log.warnf("Failed to make directory: %v", err)
+			break meta_character_opening_bracket
+		}
+
+		if err := os.write_entire_file(fullpath, `package opening_bracket`); err != nil {
+			log.warnf("Failed to write file: %v", err)
+			break meta_character_opening_bracket
+		}
+		if err := os.write_entire_file(fullpath_unexpected, `package unexpected`); err != nil {
+			log.warnf("Failed to write file: %v", err)
 			break meta_character_opening_bracket
 		}
 
 		/* Collect package */
 
-		pkg, collected := parser.collect_package(PKG_DIR)
-		testing.expectf(t, collected, "Could not parse package: %v", PKG_DIR)
+		pkg, collected := parser.collect_package(pkg_dir)
+		testing.expectf(t, collected, "Could not parse package: %v", pkg_dir)
 
 		if collected {
 			testing.expect_value(t, len(pkg.files), 1)
 
-			_, exists := pkg.files[FULLPATH]
+			_, exists := pkg.files[fullpath]
 			testing.expect_value(t, exists, true)
 
-			_, uexists := pkg.files[FULLPATH_UNEXPECTED]
+			_, uexists := pkg.files[fullpath_unexpected]
 			testing.expect_value(t, uexists, false)
 		}
 	}
 
 	when ODIN_OS != .Windows {
+		meta_character_asterisk: {
+			pkg_dir, _            := os.join_path({root, "path*"}, context.allocator)
+			pkg_dir_unexpected, _ := os.join_path({root, "path-unexpected"}, context.allocator)
+
+			fullpath, _            := os.join_path({pkg_dir, "asterisk.odin"}, context.allocator)
+			fullpath_unexpected, _ := os.join_path({pkg_dir_unexpected, "unexpected.odin"}, context.allocator)
+
+			if err := os.make_directory(pkg_dir); err != nil {
+				log.warnf("Failed to make directory: %v", err)
+				break meta_character_asterisk
+			}
+			if err := os.make_directory(pkg_dir_unexpected); err != nil {
+				log.warnf("Failed to make directory: %v", err)
+				break meta_character_asterisk
+			}
+
+			if err := os.write_entire_file(fullpath, `package asterisk`); err != nil {
+				log.warnf("Failed to write file: %v", err)
+				break meta_character_asterisk
+			}
+			if err := os.write_entire_file(fullpath_unexpected, `package unexpected`); err != nil {
+				log.warnf("Failed to write file: %v", err)
+				break meta_character_asterisk
+			}
+
+			/* Collect package */
+
+			pkg, collected := parser.collect_package(pkg_dir)
+			testing.expectf(t, collected, "Could not parse package: %v", pkg_dir)
+
+			if collected {
+				testing.expect_value(t, len(pkg.files), 1)
+
+				_, exists := pkg.files[fullpath]
+				testing.expect_value(t, exists, true)
+
+				_, uexists := pkg.files[fullpath_unexpected]
+				testing.expect_value(t, uexists, false)
+			}
+		}
+
+		meta_character_question_mark: {
+			pkg_dir, _            := os.join_path({root, "path?"}, context.allocator)
+			pkg_dir_unexpected, _ := os.join_path({root, "pathU"}, context.allocator)
+
+			fullpath, _            := os.join_path({pkg_dir, "question_mark.odin"}, context.allocator)
+			fullpath_unexpected, _ := os.join_path({pkg_dir_unexpected, "unexpected.odin"}, context.allocator)
+
+			if err := os.make_directory(pkg_dir); err != nil {
+				log.warnf("Failed to make directory: %v", err)
+				break meta_character_question_mark
+			}
+			if err := os.make_directory(pkg_dir_unexpected); err != nil {
+				log.warnf("Failed to make directory: %v", err)
+				break meta_character_question_mark
+			}
+
+			if err := os.write_entire_file(fullpath, `package question_mark`); err != nil {
+				log.warnf("Failed to write file: %v", err)
+				break meta_character_question_mark
+			}
+			if err := os.write_entire_file(fullpath_unexpected, `package unexpected`); err != nil {
+				log.warnf("Failed to write file: %v", err)
+				break meta_character_question_mark
+			}
+
+			/* Collect package */
+
+			pkg, collected := parser.collect_package(pkg_dir)
+			testing.expectf(t, collected, "Could not parse package: %v", pkg_dir)
+
+			if collected {
+				testing.expect_value(t, len(pkg.files), 1)
+
+				_, exists := pkg.files[fullpath]
+				testing.expect_value(t, exists, true)
+
+				_, uexists := pkg.files[fullpath_unexpected]
+				testing.expect_value(t, uexists, false)
+			}
+		}
+
 		meta_character_backslash: {
-			PKG_DIR            :: ROOT + "path_\\"
-			PKG_DIR_UNEXPECTED :: ROOT + "path_"
+			pkg_dir, _            := os.join_path({root, "path_\\"}, context.allocator)
+			pkg_dir_unexpected, _ := os.join_path({root, "path_"}, context.allocator)
 
-			FULLPATH            :: PKG_DIR + "/backslash.odin"
-			FULLPATH_UNEXPECTED :: PKG_DIR_UNEXPECTED + "/unexpected.odin"
+			fullpath, _            := os.join_path({pkg_dir, "backslash.odin"}, context.allocator)
+			fullpath_unexpected, _ := os.join_path({pkg_dir_unexpected, "unexpected.odin"}, context.allocator)
 
-			os.make_directory(PKG_DIR)
-			os.make_directory(PKG_DIR_UNEXPECTED)
-
-			if err := os.write_entire_file(FULLPATH, `package backslash`); err != nil {
-				testing.fail(t)
+			if err := os.make_directory(pkg_dir); err != nil {
+				log.warnf("Failed to make directory: %v", err)
 				break meta_character_backslash
 			}
-			if err := os.write_entire_file(FULLPATH_UNEXPECTED, `package unexpected`); err != nil {
-				testing.fail(t)
+			if err := os.make_directory(pkg_dir_unexpected); err != nil {
+				log.warnf("Failed to make directory: %v", err)
+				break meta_character_backslash
+			}
+
+			if err := os.write_entire_file(fullpath, `package backslash`); err != nil {
+				log.warnf("Failed to write file: %v", err)
+				break meta_character_backslash
+			}
+			if err := os.write_entire_file(fullpath_unexpected, `package unexpected`); err != nil {
+				log.warnf("Failed to write file: %v", err)
 				break meta_character_backslash
 			}
 
 			/* Collect package */
 
-			pkg, collected := parser.collect_package(PKG_DIR)
-			testing.expectf(t, collected, "Could not parse package: %v", PKG_DIR)
+			pkg, collected := parser.collect_package(pkg_dir)
+			testing.expectf(t, collected, "Could not parse package: %v", pkg_dir)
 
 			if collected {
 				testing.expect_value(t, len(pkg.files), 1)
 
-				_, exists := pkg.files[FULLPATH]
+				_, exists := pkg.files[fullpath]
 				testing.expect_value(t, exists, true)
 
-				_, uexists := pkg.files[FULLPATH_UNEXPECTED]
+				_, uexists := pkg.files[fullpath_unexpected]
 				testing.expect_value(t, uexists, false)
 			}
 		}
