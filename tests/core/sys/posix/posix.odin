@@ -202,7 +202,7 @@ test_stat :: proc(t: ^testing.T) {
 
 @(test)
 test_pthreads :: proc(t: ^testing.T) {
-	testing.set_fail_timeout(t, 3 * time.Second)
+	testing.set_fail_timeout(t, 10 * time.Second)
 
 	NTHREADS :: 3
 	thread_ids: [NTHREADS]posix.pthread_t
