@@ -71,10 +71,7 @@ decompress_frame_from_context :: proc(z: ^compress.Context, expected_output_size
 		limit = expected
 	}
 
-	input_size := -1
-	if n, size_err := compress.size(z); size_err == nil && n <= i64(max(int)) {
-		input_size = int(n)
-	}
+	input_size := compress.input_size(z)
 	if expected > 0 {
 		non_zero_reserve(z.output, lz4_initial_size(expected, input_size)) or_return
 	}

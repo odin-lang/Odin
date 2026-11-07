@@ -169,6 +169,14 @@ size :: proc(z: ^Context) -> (res: i64, err: io.Error) {
 	return total - position + i64(len(z.window)), nil
 }
 
+input_size :: #force_inline proc(z: ^Context) -> (res: int) {
+	n, err := size(z)
+	if err != nil || n > i64(max(int)) {
+		return -1
+	}
+	return int(n)
+}
+
 @(optimization_mode="favor_size")
 read_ptr :: proc(z: ^Context, ptr: ^$T) -> (err: io.Error) #no_bounds_check {
 	return read_slice(z, ([^]byte)(ptr)[:size_of(T)])
