@@ -1788,3 +1788,67 @@ Sched_Attr :: struct {
 Sched_Attr_Flags :: bit_set[Sched_Attr_Flag_Bits; u32]
 
 Memfd_Create_Flags :: bit_set[Memfd_Create_Flag_Bits; u32]
+
+Netlink_Message_Flags :: bit_set[Netlink_Message_Flags_Bits; u16]
+
+Netlink_Message_Header :: struct {
+	len:   u32,
+	type:  Netlink_Message_Type,
+	flags: Netlink_Message_Flags,
+	seq:   u32,
+	pid:   u32,
+}
+
+Netlink_Message_Error :: struct {
+	error: i32,
+	msg:   Netlink_Message_Header,
+}
+
+Rtnetlink_Attribute :: struct {
+	len:  u16,
+	type: u16,
+}
+
+Rtnetlink_Generic_Message :: struct {
+	family: u8,
+}
+
+Interface_Flags :: bit_set[Interface_Flags_Bits; u32]
+
+Interface_Info_Message :: struct {
+	family: u8,
+	_:      u8,
+	type:   u16,
+	index:  i32,
+	flags:  Interface_Flags,
+	change: Interface_Flags,
+}
+
+Interface_Address_Message :: struct {
+	family:    u8,
+	prefixlen: u8,
+	flags:     u8,
+	scope:     u8,
+	index:     u32,
+}
+
+Route_Message_Flags :: bit_set[Route_Message_Flags_Bits; u32]
+
+Route_Message :: struct {
+	family:   u8,
+	dst_len:  u8,
+	src_len:  u8,
+	tos:      u8,
+	table:    u8,
+	protocol: u8,
+	scope:    u8,
+	type:     Route_Type,
+	flags:    Route_Message_Flags,
+}
+
+Route_Next_Hop :: struct {
+	len:     u16,
+	flags:   u8,
+	hops:    u8,
+	ifindex: i32,
+}
