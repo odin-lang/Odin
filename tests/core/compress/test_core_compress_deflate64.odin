@@ -833,7 +833,7 @@ deflate64_expansion_reservation :: proc(t: ^testing.T) {
 
 @(test)
 deflate64_7zip_vector :: proc(t: ^testing.T) {
-	packed, err := os.read_entire_file(#directory + "deflate64_vector_7zip.bin", context.allocator)
+	packed, err := os.read_entire_file(ODIN_ROOT + "tests/core/assets/ZIP/deflate64_vector_7zip.bin", context.allocator)
 	testing.expectf(t, err == nil, "cannot read vector: %v", err)
 	if err != nil {
 		return
