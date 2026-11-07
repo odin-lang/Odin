@@ -828,6 +828,14 @@ Sock_Addr_Any :: struct #raw_union {
 }
 
 /*
+	Struct for the `SO_LINGER` socket option.
+*/
+Linger :: struct {
+	l_onoff:  i32,
+	l_linger: i32,
+}
+
+/*
 	Message header for sendmsg/recvmsg
 */
 Msg_Hdr :: struct {
