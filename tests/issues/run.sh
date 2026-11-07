@@ -200,6 +200,21 @@ else
 	exit 1
 fi
 
+$ODIN test ../test_issue_type_info_variant_shim $COMMON
+if [[ $($ODIN check ../test_issue_type_info_variant_shim -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Warning:") -eq 11 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_type_info_variant_shim_duplicate -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 if [[ $($ODIN check ../test_issue_8074 -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 34 ]]; then
 	echo "SUCCESSFUL 1/1"
 else

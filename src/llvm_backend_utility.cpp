@@ -871,8 +871,9 @@ gb_internal lbValue lb_emit_union_cast_only_ok_check(lbProcedure *p, lbValue val
 		lbValue data = lb_emit_transmute(p, value, dst);
 		cond = lb_emit_comp_against_nil(p, Token_NotEq, data);
 	} else {
+		Type *vt = type_info_variant_shim_type(src, dst);
 		lbValue tag = lb_emit_union_tag_value(p, value);
-		lbValue dst_tag = lb_const_union_tag(m, src, dst);
+		lbValue dst_tag = lb_const_union_tag(m, src, vt ? vt : dst);
 		cond = lb_emit_comp(p, Token_CmpEq, tag, dst_tag);
 	}
 
@@ -906,8 +907,14 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 
 	lbValue value_  = lb_address_from_load_or_generate_local(p, value);
 
+	Type *vt = type_info_variant_shim_type(src, dst);
+
 	if ((p->state_flags & StateFlag_no_type_assert) != 0 && !is_tuple) {
 		// no tag check, just load the variant data at the front
+		if (vt != nullptr) {
+			lbValue stored = lb_emit_load(p, lb_emit_union_variant_ptr(p, value_, vt));
+			return lb_emit_load(p, stored);
+		}
 		lbValue ptr = lb_emit_union_variant_ptr(p, value_, dst);
 		return lb_emit_load(p, ptr);
 	}
@@ -924,7 +931,7 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 		data = lb_emit_load(p, lb_emit_union_variant_ptr(p, value_, dst));
 	} else {
 		tag     = lb_emit_load(p, lb_emit_union_tag_ptr(p, value_));
-		dst_tag = lb_const_union_tag(m, src, dst);
+		dst_tag = lb_const_union_tag(m, src, vt ? vt : dst);
 	}
 
 	lbBlock *ok_block = lb_create_block(p, "union_cast.ok");
@@ -943,7 +950,12 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 
 
 	if (data.value == nullptr) {
-		data = lb_emit_load(p, lb_emit_union_variant_ptr(p, value_, dst));
+		if (vt != nullptr) {
+			lbValue stored = lb_emit_load(p, lb_emit_union_variant_ptr(p, value_, vt));
+			data = lb_emit_load(p, stored);
+		} else {
+			data = lb_emit_load(p, lb_emit_union_variant_ptr(p, value_, dst));
+		}
 	}
 	lb_emit_store(p, gep0, data);
 	lb_emit_store(p, gep1, lb_const_bool(m, t_bool, true));
@@ -970,7 +982,7 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 
 			if (!build_context.no_rtti) {
 				args[4] = lb_typeid(m, src_type);
-				args[5] = lb_typeid(m, dst_type);
+				args[5] = lb_typeid(m, vt ? vt : dst_type);
 				args[6] = lb_emit_conv(p, value_, t_rawptr);
 			}
 

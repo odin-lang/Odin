@@ -127,7 +127,7 @@ unmarshal_any :: proc(data: []byte, v: any, spec := DEFAULT_SPECIFICATION, alloc
 	}
 	p := make_parser(data, spec, PARSE_INTEGERS, allocator)
 
-	data := any{(^rawptr)(v.data)^, ti.variant.(reflect.Type_Info_Pointer).elem.id}
+	data := any{(^rawptr)(v.data)^, ti.variant.(^reflect.Type_Info_Pointer).elem.id}
 	if v.data == nil {
 		return .Invalid_Parameter
 	}
@@ -207,7 +207,7 @@ assign_int :: proc(val: any, i: $T) -> bool {
 			}
 			t := runtime.type_info_base(ti)
 			#partial switch info in t.variant {
-			case runtime.Type_Info_Integer:
+			case ^runtime.Type_Info_Integer:
 				switch info.endianness {
 				case .Platform: return false
 				case .Little:   return ODIN_ENDIAN != .Little
@@ -218,7 +218,7 @@ assign_int :: proc(val: any, i: $T) -> bool {
 		}
 
 		ti := type_info_of(v.id)
-		if info, ok := ti.variant.(runtime.Type_Info_Bit_Set); ok {
+		if info, ok := ti.variant.(^runtime.Type_Info_Bit_Set); ok {
 			do_byte_swap := is_bit_set_different_endian_to_platform(info.underlying)
 			switch ti.size * 8 {
 			case 0: // no-op.
@@ -321,7 +321,7 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, token: Token, ti: ^reflect.
 	}
 
 	#partial switch variant in ti.variant {
-	case reflect.Type_Info_Enum:
+	case ^reflect.Type_Info_Enum:
 		for name, i in variant.names {
 			if name == str {
 				assign_int(val, variant.values[i])
@@ -331,7 +331,7 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, token: Token, ti: ^reflect.
 		// TODO(bill): should this be an error or not?
 		return true, nil
 
-	case reflect.Type_Info_Integer:
+	case ^reflect.Type_Info_Integer:
 		i, pok := strconv.parse_i128(str)
 		if !pok {
 			return false, nil
@@ -342,7 +342,7 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, token: Token, ti: ^reflect.
 		if assign_float(val, i) {
 			return true, nil
 		}
-	case reflect.Type_Info_Float:
+	case ^reflect.Type_Info_Float:
 		f, pok := strconv.parse_f64(str)
 		if !pok {
 			return false, nil
@@ -371,7 +371,7 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 
 	v := v
 	ti := reflect.type_info_base(type_info_of(v.id))
-	if u, ok := ti.variant.(reflect.Type_Info_Union); ok && token.kind != .Null {
+	if u, ok := ti.variant.(^reflect.Type_Info_Union); ok && token.kind != .Null {
 		// NOTE: If it's a union with only one variant, then treat it as that variant
 		if len(u.variants) == 1 {
 			variant := u.variants[0]
@@ -532,7 +532,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 	ti := reflect.type_info_base(type_info_of(v.id))
 
 	#partial switch t in ti.variant {
-	case reflect.Type_Info_Struct:
+	case ^reflect.Type_Info_Struct:
 		if .raw_union in t.flags {
 			return UNSUPPORTED_TYPE
 		}
@@ -642,7 +642,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			}
 		}
 
-	case reflect.Type_Info_Map:
+	case ^reflect.Type_Info_Map:
 		if !reflect.is_string(t.key) && !reflect.is_integer(t.key) {
 			return UNSUPPORTED_TYPE
 		}
@@ -672,7 +672,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			key_int:  i128
 
 			#partial switch tk in t.key.variant {
-				case runtime.Type_Info_String:
+				case ^runtime.Type_Info_String:
 					assert(tk.encoding == .UTF_8)
 
 					key_ptr = rawptr(&key)
@@ -680,7 +680,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 						key_cstr = cstring(raw_data(key))
 						key_ptr = &key_cstr
 					}
-				case runtime.Type_Info_Integer:
+				case ^runtime.Type_Info_Integer:
 					ok: bool
 					key_int, ok = strconv.parse_i128(key)
 					if !ok	{ return UNSUPPORTED_TYPE }
@@ -703,9 +703,9 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			}
 		}
 
-	case reflect.Type_Info_Enumerated_Array:
+	case ^reflect.Type_Info_Enumerated_Array:
 		index_type := reflect.type_info_base(t.index)
-		enum_type := index_type.variant.(reflect.Type_Info_Enum)
+		enum_type := index_type.variant.(^reflect.Type_Info_Enum)
 
 		enumerated_array_loop: for p.curr_token.kind != end_token {
 			key, _ := parse_object_key(p, p.allocator)
@@ -792,7 +792,7 @@ unmarshal_array :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 	length := unmarshal_count_array(p)
 
 	#partial switch t in ti.variant {
-	case reflect.Type_Info_Slice:
+	case ^reflect.Type_Info_Slice:
 		raw := (^mem.Raw_Slice)(v.data)
 		data := bytes_make(t.elem.size * int(length), t.elem.align, p.allocator) or_return
 		raw.data = raw_data(data)
@@ -800,7 +800,7 @@ unmarshal_array :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 
 		return assign_array(p, raw.data, t.elem, length)
 
-	case reflect.Type_Info_Dynamic_Array:
+	case ^reflect.Type_Info_Dynamic_Array:
 		raw := (^mem.Raw_Dynamic_Array)(v.data)
 		data := bytes_make(t.elem.size * int(length), t.elem.align, p.allocator) or_return
 		raw.data = raw_data(data)
@@ -810,7 +810,7 @@ unmarshal_array :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 
 		return assign_array(p, raw.data, t.elem, length)
 
-	case reflect.Type_Info_Fixed_Capacity_Dynamic_Array:
+	case ^reflect.Type_Info_Fixed_Capacity_Dynamic_Array:
 		if int(length) > t.capacity {
 			return UNSUPPORTED_TYPE
 		}
@@ -820,7 +820,7 @@ unmarshal_array :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		len_val^ = int(length)
 		return assign_array(p, rawptr(base_ptr), t.elem, length)
 
-	case reflect.Type_Info_Array:
+	case ^reflect.Type_Info_Array:
 		// NOTE(bill): Allow lengths which are less than the dst array
 		if int(length) > t.count {
 			return UNSUPPORTED_TYPE
@@ -828,7 +828,7 @@ unmarshal_array :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 
 		return assign_array(p, v.data, t.elem, length)
 
-	case reflect.Type_Info_Enumerated_Array:
+	case ^reflect.Type_Info_Enumerated_Array:
 		// NOTE(bill): Allow lengths which are less than the dst array
 		if int(length) > t.count {
 			return UNSUPPORTED_TYPE
@@ -836,7 +836,7 @@ unmarshal_array :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 
 		return assign_array(p, v.data, t.elem, length)
 
-	case reflect.Type_Info_Complex:
+	case ^reflect.Type_Info_Complex:
 		// NOTE(bill): Allow lengths which are less than the dst array
 		if int(length) > 2 {
 			return UNSUPPORTED_TYPE

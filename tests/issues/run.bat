@@ -62,6 +62,9 @@ set ODIN=..\..\..\odin
 %ODIN% check "..\test_issue_atomic_errors" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
 %ODIN% check "..\test_issue_atomic_access" -no-entry-point -vet-atomic-access %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
 %ODIN% check "..\test_issue_escape_stored_field" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "3" || exit /b
+%ODIN% test "..\test_issue_type_info_variant_shim" %COMMON% || exit /b
+%ODIN% check "..\test_issue_type_info_variant_shim" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "11" || exit /b
+%ODIN% check "..\test_issue_type_info_variant_shim_duplicate" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_8074" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "34" || exit /b
 @rem Objective-C tests target darwin, which can be checked and built for from any host
 %ODIN% check "..\test_issue_objc_import_missing_selector" -no-entry-point -target:darwin_arm64 %COMMON% 2>&1 | find /c "is required for imported Objective-C methods" | findstr /x "1" || exit /b

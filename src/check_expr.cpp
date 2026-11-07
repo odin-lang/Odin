@@ -12949,6 +12949,19 @@ gb_internal ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *no
 			}
 
 			if (!ok) {
+				Type *vt = type_info_variant_shim_type(bsrc, dst);
+				if (vt != nullptr) {
+					gbString type_str = expr_to_string(ta->type);
+					warning(ta->type, "'.(%s)' on 'runtime.Type_Info.variant' is deprecated as it now holds pointers; use '.(^%s)'", type_str, type_str);
+					gb_string_free(type_str);
+
+					add_type_info_for_union_type_assertion(c, node, o->type, vt);
+
+					o->type = t;
+					o->mode = Addressing_OptionalOk;
+					goto end;
+				}
+
 				gbString expr_str = expr_to_string(o->expr);
 				gbString dst_type_str = type_to_string(t);
 				defer (gb_string_free(expr_str));
