@@ -16,7 +16,29 @@ collect_package :: proc(path: string) -> (pkg: ^ast.Package, success: bool) {
 		return
 	}
 
-	path_pattern := fmt.tprintf("%s/*.odin", pkg_path)
+	b := strings.builder_make(context.allocator)
+
+	for r in pkg_path {
+		switch r {
+		case '*', '?', '[':
+			strings.write_byte(&b, '\\')
+			strings.write_rune(&b, r)
+		case '\\':
+			when ODIN_OS != .Windows {
+				strings.write_byte(&b, '\\')
+				strings.write_rune(&b, r)
+		}
+		case:
+			strings.write_rune(&b, r)
+		}
+	}
+
+	escaped_pkg_path, clone_err := strings.clone(strings.to_string(b))
+	if clone_err != nil {
+		return
+	}
+
+	path_pattern := fmt.tprintf("%s/*.odin", escaped_pkg_path)
 	matches, err := filepath.glob(path_pattern)
 	defer delete(matches)
 

@@ -17,7 +17,7 @@ test_parse_demo :: proc(t: ^testing.T) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	pkg, ok := parser.parse_package_from_path(ODIN_ROOT + "examples/demo")
-	
+
 	testing.expect(t, ok, "parser.parse_package_from_path failed")
 
 	for key, value in pkg.files {
@@ -534,4 +534,190 @@ test_parse_multiline_triple_ticked_string :: proc(t: ^testing.T) {
 	ok := parser.parse_file(&p, &file)
 	testing.expect(t, ok, "bad parse")
 	testing.expect(t, file.syntax_error_count == 0, "should contain zero errors")
+}
+
+@test
+test_collect_package_path_with_meta :: proc(t: ^testing.T) {
+	context.allocator = context.temp_allocator
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	ROOT :: ODIN_ROOT + "tests/core/odin/tmp/"
+
+	if err := os.make_directory_all(ROOT); err != nil {
+		log.warnf("Failed to make directories: %v", err)
+	}
+
+	defer {
+		if err := os.remove_all(ROOT); err != nil {
+			log.warnf("Failed to remove temporary directories: %v", err)
+		}
+	}
+
+	meta_character_none: {
+		PKG_DIR :: ROOT + "path"
+		FULLPATH :: PKG_DIR + "/none.odin"
+
+		os.make_directory(PKG_DIR)
+
+		if err := os.write_entire_file(FULLPATH, `package none`); err != nil {
+			testing.fail(t)
+			break meta_character_none
+		}
+
+		/* Collect package */
+
+		pkg, collected := parser.collect_package(PKG_DIR)
+		testing.expectf(t, collected, "Could not parse package: %v", PKG_DIR)
+
+		if collected {
+			_, exists := pkg.files[FULLPATH]
+			testing.expect_value(t, exists, true)
+		}
+	}
+
+	when ODIN_OS != .Windows {
+		meta_character_asterisk: {
+			PKG_DIR            :: ROOT + "path*"
+			PKG_DIR_UNEXPECTED :: ROOT + "path-unexpected"
+
+			FULLPATH            :: PKG_DIR + "/asterisk.odin"
+			FULLPATH_UNEXPECTED :: PKG_DIR_UNEXPECTED + "/unexpected.odin"
+
+			os.make_directory(PKG_DIR)
+			os.make_directory(PKG_DIR_UNEXPECTED)
+
+			if err := os.write_entire_file(FULLPATH, `package asterisk`); err != nil {
+				testing.fail(t)
+				break meta_character_asterisk
+			}
+			if err := os.write_entire_file(FULLPATH_UNEXPECTED, `package unexpected`); err != nil {
+				testing.fail(t)
+				break meta_character_asterisk
+			}
+
+			/* Collect package */
+
+			pkg, collected := parser.collect_package(PKG_DIR)
+			testing.expectf(t, collected, "Could not parse package: %v", PKG_DIR)
+
+			if collected {
+				testing.expect_value(t, len(pkg.files), 1)
+
+				_, exists := pkg.files[FULLPATH]
+				testing.expect_value(t, exists, true)
+
+				_, uexists := pkg.files[FULLPATH_UNEXPECTED]
+				testing.expect_value(t, uexists, false)
+			}
+		}
+	}
+
+	when ODIN_OS != .Windows {
+		meta_character_question_mark: {
+			PKG_DIR            :: ROOT + "path?"
+			PKG_DIR_UNEXPECTED :: ROOT + "pathU"
+
+			FULLPATH            :: PKG_DIR + "/question_mark.odin"
+			FULLPATH_UNEXPECTED :: PKG_DIR_UNEXPECTED + "/unexpected.odin"
+
+			os.make_directory(PKG_DIR)
+			os.make_directory(PKG_DIR_UNEXPECTED)
+
+			if err := os.write_entire_file(FULLPATH, `package question_mark`); err != nil {
+				testing.fail(t)
+				break meta_character_question_mark
+			}
+			if err := os.write_entire_file(FULLPATH_UNEXPECTED, `package unexpected`); err != nil {
+				testing.fail(t)
+				break meta_character_question_mark
+			}
+
+			/* Collect package */
+
+			pkg, collected := parser.collect_package(PKG_DIR)
+			testing.expectf(t, collected, "Could not parse package: %v", PKG_DIR)
+
+			if collected {
+				testing.expect_value(t, len(pkg.files), 1)
+
+				_, exists := pkg.files[FULLPATH]
+				testing.expect_value(t, exists, true)
+
+				_, uexists := pkg.files[FULLPATH_UNEXPECTED]
+				testing.expect_value(t, uexists, false)
+			}
+		}
+	}
+
+	meta_character_opening_bracket: {
+		PKG_DIR            :: ROOT + "[path]"
+		PKG_DIR_UNEXPECTED :: ROOT + "p"
+
+		FULLPATH            :: PKG_DIR + "/opening_bracket.odin"
+		FULLPATH_UNEXPECTED :: PKG_DIR_UNEXPECTED + "/unexpected.odin"
+
+		os.make_directory(PKG_DIR)
+		os.make_directory(PKG_DIR_UNEXPECTED)
+
+		if err := os.write_entire_file(FULLPATH, `package opening_bracket`); err != nil {
+			testing.fail(t)
+			break meta_character_opening_bracket
+		}
+		if err := os.write_entire_file(FULLPATH_UNEXPECTED, `package unexpected`); err != nil {
+			testing.fail(t)
+			break meta_character_opening_bracket
+		}
+
+		/* Collect package */
+
+		pkg, collected := parser.collect_package(PKG_DIR)
+		testing.expectf(t, collected, "Could not parse package: %v", PKG_DIR)
+
+		if collected {
+			testing.expect_value(t, len(pkg.files), 1)
+
+			_, exists := pkg.files[FULLPATH]
+			testing.expect_value(t, exists, true)
+
+			_, uexists := pkg.files[FULLPATH_UNEXPECTED]
+			testing.expect_value(t, uexists, false)
+		}
+	}
+
+	when ODIN_OS != .Windows {
+		meta_character_backslash: {
+			PKG_DIR            :: ROOT + "path_\\"
+			PKG_DIR_UNEXPECTED :: ROOT + "path_"
+
+			FULLPATH            :: PKG_DIR + "/backslash.odin"
+			FULLPATH_UNEXPECTED :: PKG_DIR_UNEXPECTED + "/unexpected.odin"
+
+			os.make_directory(PKG_DIR)
+			os.make_directory(PKG_DIR_UNEXPECTED)
+
+			if err := os.write_entire_file(FULLPATH, `package backslash`); err != nil {
+				testing.fail(t)
+				break meta_character_backslash
+			}
+			if err := os.write_entire_file(FULLPATH_UNEXPECTED, `package unexpected`); err != nil {
+				testing.fail(t)
+				break meta_character_backslash
+			}
+
+			/* Collect package */
+
+			pkg, collected := parser.collect_package(PKG_DIR)
+			testing.expectf(t, collected, "Could not parse package: %v", PKG_DIR)
+
+			if collected {
+				testing.expect_value(t, len(pkg.files), 1)
+
+				_, exists := pkg.files[FULLPATH]
+				testing.expect_value(t, exists, true)
+
+				_, uexists := pkg.files[FULLPATH_UNEXPECTED]
+				testing.expect_value(t, uexists, false)
+			}
+		}
+	}
 }
