@@ -1,5 +1,4 @@
 #+build linux
-#+private file
 package net
 
 /*
@@ -23,286 +22,337 @@ package net
 	This file uses netlink/rtnetlink kernel interfaces to list available network interfaces
 */
 
-import "core:c"
-import "core:mem"
+import "base:intrinsics"
 import "core:strings"
 import "core:sys/linux"
 
-Ifs :: map[c.int]Network_Interface
+@(private="file")
+NETLINK_BUFFER_SIZE :: 32768
+
+@(private="file")
+NETLINK_ATTRIBUTE_TYPE_MASK :: 0x3fff
+
+@(private="file")
+NETLINK_DUMPS :: [?]linux.Netlink_Message_Type{.GETLINK, .GETADDR, .GETROUTE}
+
+@(private="file")
+Netlink_Dump_Request :: struct {
+	header:  linux.Netlink_Message_Header,
+	message: linux.Rtnetlink_Generic_Message,
+}
+
+@(private="file")
+Interface_Builder :: struct {
+	interfaces: [dynamic]Network_Interface,
+	positions:  map[i32]int,
+}
 
 @(private)
-_enumerate_interfaces :: proc(
-	allocator := context.allocator,
-) -> (
-	interfaces: []Network_Interface,
-	err: Interfaces_Error,
-) {
+_enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []Network_Interface, err: Interfaces_Error) {
 	context.allocator = allocator
 
-	/*
-	 * Interfaces are id-ed with their idx since it is easier to get
-	 * from `nlmsghdr` messages
-	 */
-	idx_to_interface := make(Ifs)
-	defer delete(idx_to_interface)
+	fd, errno := linux.socket(.NETLINK, .RAW, {.CLOEXEC}, linux.Protocol(linux.Netlink_Protocol.ROUTE))
+	if errno != .NONE {
+		return nil, .Unable_To_Enumerate_Network_Interfaces
+	}
+	defer linux.close(fd)
 
-	/*
-	 * Use rtnetlink to enumerate interfaces, the callback will populate
-	 * `idx_to_interface` incrementally
-	 */
-	if err := _rtnetlink_enumerate(
-		&idx_to_interface,
-		_handle_newlink,
-		_handle_newaddr,
-		_handle_newroute,
-	); err != .NONE {
-		return nil, Interfaces_Error.Unable_To_Enumerate_Network_Interfaces
+	buf: [NETLINK_BUFFER_SIZE]u8 = ---
+	builder: Interface_Builder
+	defer delete(builder.positions)
+
+	seq: u32
+	for _ in 0..<MAX_INTERFACE_ENUMERATION_TRIES {
+		_destroy_builder(&builder)
+
+		interrupted := false
+		for type in NETLINK_DUMPS {
+			seq += 1
+			dump_interrupted, dump_err := _netlink_dump(fd, buf[:], type, seq, &builder)
+			if dump_err != nil {
+				_destroy_builder(&builder)
+				return nil, dump_err
+			}
+			if dump_interrupted {
+				interrupted = true
+			}
+		}
+		if !interrupted {
+			break
+		}
 	}
 
-	// Dump the interfaces into a slice
-	// NOTE: the order isn't stable
-	interfaces = make([]Network_Interface, len(idx_to_interface))
-	idx := 0
-	for _, intf in idx_to_interface {
-		interfaces[idx] = intf
-		idx += 1
+	if _, shrink_err := shrink(&builder.interfaces); shrink_err != nil {
+		_destroy_builder(&builder)
+		return nil, .Allocation_Failure
 	}
-	return
+	return builder.interfaces[:], nil
 }
 
-// from /usr/include/linux/netlink.h
-nlmsghdr :: struct {
-	nlmsg_len:            u32,
-	nlmsg_type:           u16,
-	nlmsg_flags:          NLM_Flags,
-	nlmsg_seq, nlmsg_pid: u32,
-}
-
-NLMSG :: enum u16 {
-	NOOP = 1,
-	ERROR,
-	DONE,
-	OVERRUN,
-}
-
-NLM_FLAG :: enum {
-	REQUEST,
-	MULTI,
-	ACK,
-	ECHO,
-	DUMP_INTR,
-	DUMP_FILTERED,
-	ROOT = 8,
-	MATCH,
-	ATOMIC,
-}
-NLM_Flags :: bit_set[NLM_FLAG;c.ushort]
-NLM_F_DUMP :: NLM_Flags{.ROOT, .MATCH}
-
-// from /usr/include/linux/if_link.h
-IFLA :: enum u16 {
-	UNSPEC,
-	ADDRESS,
-	BROADCAST,
-	IFNAME,
-	MTU,
-	LINK,
-	QDISC,
-	STATS,
-	PERM_ADDRESS,
-}
-
-// from /usr/include/linux/if_addr.h
-ifaddrmsg :: struct {
-	fa_family:                        AF,
-	fa_prefixlen, fa_flags, fa_scope: u8,
-	fa_index:                         u32,
-}
-
-IFA :: enum u16 {
-	UNSPEC,
-	ADDRESS,
-	LOCAL,
-	LABEL,
-	BROADCAST,
-	ANYCAST,
-	CACHEINFO,
-}
-
-// from /usr/include/net/if.h
-IFF :: enum {
-	UP,
-	BROADCAST,
-	DEBUG,
-	LOOPBACK,
-	POINTOPOINT,
-	RUNNING,
-	NOARP,
-	PROMISC,
-	NOTRAILERS,
-	ALLMULTI,
-	MASTER,
-	SLAVE,
-	MULTICAST,
-	PORTSEL,
-	AUTOMEDIA,
-	DYNAMIC,
-	LOWER_UP,
-	DORMANT,
-	ECHO,
-}
-IFF_Flags :: bit_set[IFF;c.uint]
-
-// from /usr/include/linux/rtnetlink.h
-rtgenmsg :: struct {
-	rtgen_family: AF,
-}
-
-rtattr :: struct {
-	rta_len, rta_type: c.ushort,
-}
-
-RTM :: enum {
-	NEWLINK  = 16,
-	GETLINK  = 18,
-	NEWADDR  = 20,
-	GETADDR  = 22,
-	NEWROUTE = 24,
-	GETROUTE = 26,
-	// ...
-}
-
-// from /usr/include/bits/socket.h
-AF :: enum u8 {
-	UNSPEC,
-	INET = 2,
-	INET6 = 10,
-	// ...
-}
-
-_nlmsg_align :: #force_inline proc(#any_int len: uintptr) -> uintptr {
-	NLMSG_ALIGNTO :: uintptr(4)
-	// return (len + NLMSG_ALIGNTO - 1) & ~(NLMSG_ALIGNTO - 1)
-	return mem.align_forward_uintptr(len, NLMSG_ALIGNTO)
-}
-
-_rta_align :: _nlmsg_align
-
-_buffer_after :: #force_inline proc(header: ^$T) -> [^]byte {
-	return transmute([^]byte)(uintptr(header) + size_of(T))
-}
-
-_buffer_end :: #force_inline proc(slice: []byte) -> uintptr {
-	return uintptr(raw_data(slice)) + uintptr(len(slice))
-}
-
-_nlmsg_payload :: #force_inline proc(nlh: ^nlmsghdr) -> []byte {
-	return _buffer_after(nlh)[:nlh.nlmsg_len - size_of(nlmsghdr)]
-}
-
-_nlmsg_iter :: proc(iter: ^^nlmsghdr, buf: []u8) -> (h: ^nlmsghdr, cont: bool) {
-	if iter^ == nil {
-		iter^ = cast(^nlmsghdr)raw_data(buf)
-	} else {
-		iter^ = transmute(^nlmsghdr)(uintptr(iter^) + _nlmsg_align(iter^.nlmsg_len))
-	}
-	(_buffer_end(buf) >= size_of(nlmsghdr) + uintptr(iter^)) or_return
-	return iter^, true
-}
-
-_rta_iter :: proc(
-	iter: ^^rtattr,
-	nlh: ^nlmsghdr,
-	len: uintptr,
-	$rta_types: typeid,
-) -> (
-	type: rta_types,
-	data: []u8,
-	cont: bool,
-) where size_of(rta_types) ==
-	size_of(c.ushort) {
-	if iter^ == nil {
-		iter^ = transmute(^rtattr)(uintptr(nlh) + size_of(nlmsghdr) + _rta_align(len))
-	} else {
-		iter^ = transmute(^rtattr)(uintptr(iter^) + _rta_align(iter^.rta_len))
-	}
-	(_buffer_end(_nlmsg_payload(nlh)) >= size_of(rtattr) + uintptr(iter^)) or_return
-	return transmute(rta_types)iter^.rta_type, _rta_payload(iter^), true
-}
-
-_rta_payload :: #force_inline proc(rta: ^rtattr) -> []byte {
-	return _buffer_after(rta)[:rta.rta_len - size_of(rtattr)]
-}
-
-Nlmsghdr_Callback :: proc(ifs: ^Ifs, h: ^nlmsghdr) -> linux.Errno
-
-_netlink_enumerate :: proc(
-	fd: linux.Fd,
-	seq: u32,
-	type: u16,
-	cb: Nlmsghdr_Callback,
-	ifs: ^Ifs,
-) -> linux.Errno {
-	Request :: struct {
-		header: nlmsghdr,
-		msg:    rtgenmsg,
-	}
-
-	req := Request {
+@(private="file")
+_netlink_dump :: proc(fd: linux.Fd, buf: []u8, type: linux.Netlink_Message_Type, seq: u32, builder: ^Interface_Builder) -> (interrupted: bool, err: Interfaces_Error) {
+	request := Netlink_Dump_Request{
 		header = {
-			nlmsg_len = size_of(Request),
-			nlmsg_type = type,
-			nlmsg_flags = NLM_F_DUMP | {.REQUEST},
-			nlmsg_seq = seq,
+			len   = size_of(Netlink_Dump_Request),
+			type  = type,
+			flags = linux.NLM_F_DUMP + {.REQUEST},
+			seq   = seq,
 		},
-		msg = {rtgen_family = .UNSPEC},
+		message = {family = u8(linux.Address_Family.UNSPEC)},
+	}
+	sent, errno := linux.send(fd, ([^]u8)(&request)[:size_of(request)], {})
+	if errno != .NONE || sent != size_of(request) {
+		return false, .Unable_To_Enumerate_Network_Interfaces
 	}
 
-	linux.send(fd, mem.any_to_bytes(req), {}) or_return
-
-	buf: [8192]byte
 	for {
-		read := linux.recv(fd, buf[:], {.DONTWAIT}) or_return
-		iter: ^nlmsghdr
-		for h in _nlmsg_iter(&iter, buf[:read]) {
-			#partial switch NLMSG(h.nlmsg_type) {
+		received: int
+		received, errno = linux.recv(fd, buf, {.TRUNC})
+		if errno == .EINTR {
+			continue
+		}
+		if errno != .NONE || received <= 0 || received > len(buf) {
+			return false, .Unable_To_Enumerate_Network_Interfaces
+		}
+
+		messages := buf[:received]
+		for len(messages) > 0 {
+			header, payload, ok := _next_message(&messages)
+			if !ok {
+				return false, .Unable_To_Enumerate_Network_Interfaces
+			}
+			if header.seq != seq {
+				continue
+			}
+			if .DUMP_INTR in header.flags {
+				interrupted = true
+			}
+
+			#partial switch header.type {
 			case .DONE:
-				return .NONE
+				status, _ := _read(payload, i32)
+				if status < 0 {
+					return false, .Unable_To_Enumerate_Network_Interfaces
+				}
+				return
 			case .ERROR:
-				err := -_read_T(_nlmsg_payload(h), linux.Errno)
-				return linux.Errno(err)
-			case:
-				cb(ifs, h) or_return
+				return false, .Unable_To_Enumerate_Network_Interfaces
+			case .NEWLINK:
+				err = _parse_link(payload, builder)
+			case .NEWADDR:
+				err = _parse_address(payload, builder)
+			case .NEWROUTE:
+				err = _parse_route(payload, builder)
+			}
+			if err != nil {
+				return false, err
 			}
 		}
 	}
-	return .NONE
 }
 
-_rtnetlink_enumerate :: proc(
-	ifs: ^Ifs,
-	newlink_cb, newaddr_cb, newroute_cb: Nlmsghdr_Callback,
-) -> linux.Errno {
-	fd := linux.socket(.NETLINK, .RAW, {.CLOEXEC}, nil) or_return
-	defer linux.close(fd)
+@(private="file")
+_parse_link :: proc(payload: []u8, builder: ^Interface_Builder) -> Interfaces_Error {
+	message, ok := _read(payload, linux.Interface_Info_Message)
+	if !ok {
+		return .Unable_To_Enumerate_Network_Interfaces
+	}
 
-	_netlink_enumerate(fd, 1, u16(RTM.GETLINK), newlink_cb, ifs) or_return
-	_netlink_enumerate(fd, 2, u16(RTM.GETADDR), newaddr_cb, ifs) or_return
-	_netlink_enumerate(fd, 3, u16(RTM.GETROUTE), newroute_cb, ifs) or_return
+	iface := _add_interface(builder, message.index) or_return
+	iface.link.state = _link_state(message.flags)
 
-	return .NONE
+	attributes := _attributes(payload, size_of(message))
+	for type, value in _next_attribute(&attributes) {
+		#partial switch linux.Interface_Link_Attribute(type) {
+		case .IFNAME:
+			name, alloc_err := strings.clone(strings.truncate_to_byte(string(value), 0))
+			if alloc_err != nil {
+				return .Allocation_Failure
+			}
+			delete(iface.adapter_name)
+			iface.adapter_name = name
+		case .ADDRESS:
+			delete(iface.physical_address)
+			iface.physical_address = physical_address_to_string(value)
+		case .MTU:
+			iface.mtu, _ = _read(value, u32)
+		}
+	}
+	return _attributes_end(attributes)
 }
 
-// reinterpret_copy first bytes as T
-_read_T :: proc(slice: []byte, $T: typeid) -> T {
-	assert(size_of(T) <= len(slice))
-	return mem.reinterpret_copy(T, raw_data(slice))
+@(private="file")
+_parse_address :: proc(payload: []u8, builder: ^Interface_Builder) -> Interfaces_Error {
+	message, ok := _read(payload, linux.Interface_Address_Message)
+	if !ok {
+		return .Unable_To_Enumerate_Network_Interfaces
+	}
+
+	family := linux.Address_Family(message.family)
+	iface  := _find_interface(builder, i32(message.index))
+	if iface == nil || (family != .INET && family != .INET6) {
+		return nil
+	}
+
+	address, local, broadcast: Address
+	attributes := _attributes(payload, size_of(message))
+	for type, value in _next_attribute(&attributes) {
+		#partial switch linux.Interface_Address_Attribute(type) {
+		case .ADDRESS:
+			address = _netlink_address(value, family)
+		case .LOCAL:
+			local = _netlink_address(value, family)
+		case .BROADCAST:
+			broadcast = _netlink_address(value, family)
+		}
+	}
+	_attributes_end(attributes) or_return
+
+	if local != nil {
+		address = local
+	}
+	if address == nil {
+		return nil
+	}
+
+	lease := Lease{
+		address = address,
+		netmask = _prefix_to_netmask(message.prefixlen, family),
+	}
+	if _, alloc_err := append(&iface.unicast, lease); alloc_err != nil {
+		return .Allocation_Failure
+	}
+	return _append_unique(&iface.multicast, broadcast)
 }
 
-_flags_to_link_state :: proc(flags: IFF_Flags) -> (state: Link_State) {
-	/*
-		TODO: Refine this based on the type of adapter.
-	*/
+@(private="file")
+_parse_route :: proc(payload: []u8, builder: ^Interface_Builder) -> Interfaces_Error {
+	message, ok := _read(payload, linux.Route_Message)
+	if !ok {
+		return .Unable_To_Enumerate_Network_Interfaces
+	}
+
+	family := linux.Address_Family(message.family)
+	if family != .INET && family != .INET6 {
+		return nil
+	}
+	if message.type != .UNICAST || message.dst_len != 0 || .CLONED in message.flags {
+		return nil
+	}
+
+	table := linux.Route_Table(message.table)
+	gateway: Address
+	output: i32
+	multipath: []u8
+
+	attributes := _attributes(payload, size_of(message))
+	for type, value in _next_attribute(&attributes) {
+		#partial switch linux.Route_Attribute(type) {
+		case .TABLE:
+			if value_table, table_ok := _read(value, linux.Route_Table); table_ok {
+				table = value_table
+			}
+		case .OIF:
+			output, _ = _read(value, i32)
+		case .GATEWAY:
+			gateway = _netlink_address(value, family)
+		case .MULTIPATH:
+			multipath = value
+		}
+	}
+	_attributes_end(attributes) or_return
+
+	if table != .MAIN {
+		return nil
+	}
+	_add_gateway(builder, output, gateway) or_return
+
+	for len(multipath) > 0 {
+		hop, hop_ok := _read(multipath, linux.Route_Next_Hop)
+		length := int(hop.len)
+		if !hop_ok || length < size_of(hop) || length > len(multipath) {
+			return .Unable_To_Enumerate_Network_Interfaces
+		}
+		hop_attributes := multipath[size_of(hop):length]
+		multipath = multipath[min(_netlink_align(length), len(multipath)):]
+
+		hop_gateway: Address
+		for type, value in _next_attribute(&hop_attributes) {
+			if linux.Route_Attribute(type) == .GATEWAY {
+				hop_gateway = _netlink_address(value, family)
+			}
+		}
+		_attributes_end(hop_attributes) or_return
+		_add_gateway(builder, hop.ifindex, hop_gateway) or_return
+	}
+	return nil
+}
+
+@(private="file")
+_add_interface :: proc(builder: ^Interface_Builder, index: i32) -> (^Network_Interface, Interfaces_Error) {
+	if position, found := builder.positions[index]; found {
+		return &builder.interfaces[position], nil
+	}
+	if _, alloc_err := append(&builder.interfaces, Network_Interface{}); alloc_err != nil {
+		return nil, .Allocation_Failure
+	}
+	_, position, _, alloc_err := map_entry(&builder.positions, index)
+	if alloc_err != nil {
+		return nil, .Allocation_Failure
+	}
+	position^ = len(builder.interfaces) - 1
+	return &builder.interfaces[position^], nil
+}
+
+@(private="file")
+_find_interface :: proc(builder: ^Interface_Builder, index: i32) -> ^Network_Interface {
+	if position, found := builder.positions[index]; found {
+		return &builder.interfaces[position]
+	}
+	return nil
+}
+
+@(private="file")
+_add_gateway :: proc(builder: ^Interface_Builder, index: i32, gateway: Address) -> Interfaces_Error {
+	iface := _find_interface(builder, index)
+	if iface == nil {
+		return nil
+	}
+	return _append_unique(&iface.gateways, gateway)
+}
+
+@(private="file")
+_append_unique :: proc(list: ^[dynamic]Address, address: Address) -> Interfaces_Error {
+	if address == nil {
+		return nil
+	}
+	for existing in list {
+		if existing == address {
+			return nil
+		}
+	}
+	if _, alloc_err := append(list, address); alloc_err != nil {
+		return .Allocation_Failure
+	}
+	return nil
+}
+
+@(private="file")
+_destroy_builder :: proc(builder: ^Interface_Builder) {
+	for iface in builder.interfaces {
+		delete(iface.adapter_name)
+		delete(iface.physical_address)
+		delete(iface.unicast)
+		delete(iface.multicast)
+		delete(iface.gateways)
+	}
+	delete(builder.interfaces)
+	builder.interfaces = nil
+	clear(&builder.positions)
+}
+
+@(private="file")
+_link_state :: proc(flags: linux.Interface_Flags) -> (state: Link_State) {
 	if .UP in flags {
 		state += {.Up}
 	} else {
@@ -320,224 +370,88 @@ _flags_to_link_state :: proc(flags: IFF_Flags) -> (state: Link_State) {
 	return
 }
 
-_handle_newlink: Nlmsghdr_Callback : proc(ifs: ^Ifs, h: ^nlmsghdr) -> linux.Errno {
-	// from /usr/include/linux/rtnetlink.h
-	ifinfomsg :: struct {
-		ifi_family: AF,
-		__ifi_pad:  u8,
-		ifi_type:   c.ushort,
-		ifi_index:  c.int,
-		ifi_flags:  IFF_Flags,
-		ifi_change: c.uint,
-	}
-
-	// from /usr/include/linux/if_link.h
-	IFLA :: enum u16 {
-		UNSPEC,
-		ADDRESS,
-		BROADCAST,
-		IFNAME,
-		MTU,
-		LINK,
-		QDISC,
-		STATS,
-		PERM_ADDRESS,
-	}
-
-
-	if RTM(h.nlmsg_type) != .NEWLINK {
-		return .EPROTO
-	}
-	ifi := _read_T(_nlmsg_payload(h), ifinfomsg)
-
-	ifs[ifi.ifi_index] = {
-		unicast = make([dynamic]Lease),
-		link = {state = _flags_to_link_state(ifi.ifi_flags)},
-	}
-
-	// we can do this because we add elements only in the previous line
-	ifs0 := &ifs[ifi.ifi_index]
-
-	iter: ^rtattr
-	for type, data in _rta_iter(&iter, h, size_of(ifinfomsg), IFLA) {
-		#partial switch type {
-		case .IFNAME:
-			ifs0.adapter_name = strings.clone_from(data[:len(data) - 1])
-		case .ADDRESS:
-			ifs0.physical_address = physical_address_to_string(data[:6])
-		case .MTU:
-			ifs0.mtu = _read_T(data, c.uint)
-		// there could be something interesting in `case .STATS:`
-		}
-	}
-
-	return .NONE
-}
-
-_to_addr :: proc(bytes: []u8, af: AF) -> Address {
-	#partial switch af {
+@(private="file")
+_netlink_address :: proc(value: []u8, family: linux.Address_Family) -> Address {
+	#partial switch family {
 	case .INET:
-		return _read_T(bytes, IP4_Address)
+		if address, ok := _read(value, IP4_Address); ok {
+			return address
+		}
 	case .INET6:
-		return _read_T(bytes, IP6_Address)
-	case:
-		return nil
+		if address, ok := _read(value, IP6_Address); ok {
+			return address
+		}
 	}
+	return nil
 }
 
-_handle_newaddr: Nlmsghdr_Callback : proc(ifs: ^Ifs, h: ^nlmsghdr) -> linux.Errno {
-
-	prefix_to_netmask :: proc(prefixlen: u8, family: AF) -> Netmask {
-		#partial switch family {
-		case .INET:
-			return transmute(IP4_Address)(~((u32be(1) << (32 - prefixlen)) - 1))
-		case .INET6:
-			return transmute(IP6_Address)(~((u128be(1) << (128 - prefixlen)) - 1))
+@(private="file")
+_prefix_to_netmask :: proc(prefix: u8, family: linux.Address_Family) -> Netmask {
+	#partial switch family {
+	case .INET:
+		bits := min(u32(prefix), 32)
+		mask: u32be
+		if bits > 0 {
+			mask = ~u32be(0) << (32 - bits)
 		}
-		assert(false)
-		return nil
-	}
-
-	// from /usr/include/linux/if_addr.h
-	ifaddrmsg :: struct {
-		fa_family:                        AF,
-		fa_prefixlen, fa_flags, fa_scope: u8,
-		fa_index:                         u32,
-	}
-
-	IFA :: enum u16 {
-		UNSPEC,
-		ADDRESS,
-		LOCAL,
-		LABEL,
-		BROADCAST,
-		ANYCAST,
-		CACHEINFO,
-	}
-
-
-	if RTM(h.nlmsg_type) != .NEWADDR {
-		return .EPROTO
-	}
-
-	ifa := _read_T(_nlmsg_payload(h), ifaddrmsg)
-	ifs0, ok := &ifs[c.int(ifa.fa_index)]
-
-	if !ok {
-		// this branch is a last resort, interfaces should first be created by
-		// a .NEWLINK nlmsghdr
-		ifs[c.int(ifa.fa_index)] = {
-			unicast = make([dynamic]Lease),
+		return transmute(IP4_Address)mask
+	case .INET6:
+		bits := min(u32(prefix), 128)
+		mask: u128be
+		if bits > 0 {
+			mask = ~u128be(0) << (128 - bits)
 		}
-		ifs0 = &ifs[c.int(ifa.fa_index)]
+		return transmute(IP6_Address)mask
 	}
-
-	iter: ^rtattr
-	lease: Lease
-	for type, data in _rta_iter(&iter, h, size_of(ifaddrmsg), IFA) {
-		#partial switch type {
-		case .ADDRESS:
-			lease.address = _to_addr(data, ifa.fa_family)
-		case .LABEL:
-			if ifs0.adapter_name == "" {
-				ifs0.adapter_name = strings.clone_from(data[:len(data) - 1])
-			}
-		/*
-		 * we can read broadcast addresses from the GETROUTE netlink request
-		 * case .BROADCAST:
-		 * 	append(&ifs0.multicast, _to_addr(data, ifa.fa_family))
-		*/
-		}
-	}
-	lease.netmask = prefix_to_netmask(ifa.fa_prefixlen, ifa.fa_family)
-	append(&ifs0.unicast, lease)
-	return .NONE
+	return nil
 }
 
-_handle_newroute: Nlmsghdr_Callback : proc(ifs: ^Ifs, h: ^nlmsghdr) -> linux.Errno {
-	// from /usr/include/linux/rtnetlink.h
-	RTN :: enum u8 {
-		UNSPEC,
-		UNICAST,
-		LOCAL,
-		BROADCAST,
-		// we could get a bit more info if we use .ANYCAST and .MULTICAST properly
-		ANYCAST,
-		MULTICAST,
-		BLACKHOLE,
-		UNREACHABLE,
-		PROHIBIT,
-		THROW,
-		NAT,
-		XRESOLVE,
+@(private="file")
+_next_message :: proc(data: ^[]u8) -> (header: linux.Netlink_Message_Header, payload: []u8, ok: bool) {
+	header = _read(data^, linux.Netlink_Message_Header) or_return
+	length := int(header.len)
+	if length < size_of(header) || length > len(data) {
+		return
 	}
+	payload = data[size_of(header):length]
+	data^ = data[min(_netlink_align(length), len(data)):]
+	return header, payload, true
+}
 
-	rtmsg :: struct {
-		rtm_family:                      AF,
-		rtm_dst_len:                     u8,
-		rtm_src_len, rtm_tos, rtm_table: u8,
-		// rtm_prot can be RTPROT_DHCP (16), which signals that it's
-		// coming from a dhcp client, might be useful
-		rtm_protocol, rtm_scope:         u8,
-		rtm_type:                        RTN,
-		rtm_flags:                       u32, // RTM_Flags,
+@(private="file")
+_next_attribute :: proc(data: ^[]u8) -> (type: u16, value: []u8, ok: bool) {
+	header := _read(data^, linux.Rtnetlink_Attribute) or_return
+	length := int(header.len)
+	if length < size_of(header) || length > len(data) {
+		return
 	}
+	value = data[size_of(header):length]
+	data^ = data[min(_netlink_align(length), len(data)):]
+	return header.type & NETLINK_ATTRIBUTE_TYPE_MASK, value, true
+}
 
-	RTA :: enum u16 {
-		UNSPEC,
-		DST,
-		SRC,
-		IIF,
-		OIF,
-		GATEWAY,
-		PRIORITY,
-		PREFSRC,
-		METRICS,
-		MULTIPATH,
-		PROTOINFO,
-		FLOW,
-		CACHEINFO,
-		SESSION,
-		MP_ALGO,
-		TABLE,
-		MARK,
-		MFC_STATS,
-		VIA,
-		NEWDST,
-		PREF,
-		ENCAP_TYPE,
-		ENCAP,
-		EXPIRES,
+@(private="file")
+_attributes :: proc(payload: []u8, header_size: int) -> []u8 {
+	return payload[min(_netlink_align(header_size), len(payload)):]
+}
+
+@(private="file")
+_attributes_end :: proc(attributes: []u8) -> Interfaces_Error {
+	if len(attributes) >= size_of(linux.Rtnetlink_Attribute) {
+		return .Unable_To_Enumerate_Network_Interfaces
 	}
+	return nil
+}
 
+@(private="file")
+_netlink_align :: proc(length: int) -> int {
+	return (length + 3) &~ 3
+}
 
-	msg := _read_T(_nlmsg_payload(h), rtmsg)
-
-	iter: ^rtattr
-	gateways := make([dynamic]Address)
-	defer delete(gateways)
-	broadcasts := make([dynamic]Address)
-	defer delete(broadcasts)
-	intf_idx: Maybe(i32) = nil
-
-	for type, data in _rta_iter(&iter, h, size_of(rtmsg), RTA) {
-		#partial switch type {
-		case .DST:
-			if msg.rtm_type == .BROADCAST {
-				append(&broadcasts, _to_addr(data, msg.rtm_family))
-			}
-		case .OIF:
-			intf_idx = _read_T(data, i32)
-		case .GATEWAY:
-			append(&gateways, _to_addr(data, msg.rtm_family))
-		}
+@(private="file")
+_read :: proc(data: []u8, $T: typeid) -> (value: T, ok: bool) {
+	if len(data) < size_of(T) {
+		return
 	}
-
-	if intf_idx, ok := intf_idx.(i32); ok {
-		ifs0 := &ifs[intf_idx]
-		append(&ifs0.gateways, ..gateways[:])
-		append(&ifs0.multicast, ..broadcasts[:])
-	}
-
-	return .NONE
+	return intrinsics.unaligned_load((^T)(raw_data(data))), true
 }
