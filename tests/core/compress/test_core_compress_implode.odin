@@ -180,6 +180,7 @@ implode_test_malformed :: proc(t: ^testing.T) {
 		{"too many symbols", {4, 0xf5, 0xf5, 0xf5, 0xf5, 0xf5}, pkzip_legacy.PKZIP_Legacy_Error.Invalid_Tree},
 		{"too few symbols",  {2, 0xf5, 0xf5, 0xf5},             pkzip_legacy.PKZIP_Legacy_Error.Invalid_Tree},
 		{"oversubscribed",   {3, 0xf0, 0xf0, 0xf0, 0xf0},       pkzip_legacy.PKZIP_Legacy_Error.Invalid_Tree},
+		{"incomplete",       {3, 0xf6, 0xf6, 0xf6, 0xf6},       pkzip_legacy.PKZIP_Legacy_Error.Invalid_Tree},
 		{"truncated",        {3, 0xf5, 0xf5},                   compress.General_Error.Stream_Too_Short},
 		{"empty",            {},                                compress.General_Error.Stream_Too_Short},
 	}
@@ -205,8 +206,8 @@ implode_test_malformed :: proc(t: ^testing.T) {
 		output: [dynamic]u8
 		defer delete(output)
 		err := pkzip_legacy.explode(&output, implode_finish(&w), {}, 100)
-		testing.expect_value(t, err, pkzip_legacy.PKZIP_Legacy_Error.Invalid_Code)
-		testing.expect_value(t, string(output[:]), "a")
+		testing.expect_value(t, err, pkzip_legacy.PKZIP_Legacy_Error.Invalid_Tree)
+		testing.expect_value(t, len(output), 0)
 	}
 }
 
@@ -405,8 +406,10 @@ implode_finish :: proc(w: ^Implode_Writer) -> []u8 {
 implode_bomb :: proc(w: ^Implode_Writer, matches: int) {
 	lengths   := implode_uniform(64, 7)
 	distances := implode_uniform(64, 7)
-	lengths[63]  = 1
-	distances[0] = 1
+	lengths[63]   = 1
+	lengths[0]    = 6
+	distances[0]  = 1
+	distances[63] = 6
 	implode_writer_init(w, {}, lengths = lengths, distances = distances)
 	implode_literal(w, 'a')
 	for _ in 0..<matches {

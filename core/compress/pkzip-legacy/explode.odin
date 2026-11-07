@@ -124,7 +124,7 @@ explode_read_tree :: proc(z: ^compress.Context, t: ^Implode_Tree, symbol_count: 
 			}
 		}
 	}
-	if code > 1 << IMPLODE_MAX_CODE_LENGTH {
+	if code != 1 << IMPLODE_MAX_CODE_LENGTH {
 		return PKZIP_Legacy_Error.Invalid_Tree
 	}
 
