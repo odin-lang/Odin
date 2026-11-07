@@ -497,25 +497,23 @@ test_virtual_arena_resize_in_place :: proc(t: ^testing.T) {
 
 		data, _ := mem.alloc_bytes(4096, 16, allocator)
 		mem.set(raw_data(data), 0xAA, len(data))
-		used  := arena.curr_block.used
-		total := arena.total_used
+		used := virtual.arena_total_used(&arena)
 
 		// Shrinking the last allocation gives its tail back, zeroed.
 		shrunk, err := mem.resize_bytes(data, 1000, 16, allocator)
 		testing.expect_value(t, err, nil)
 		testing.expect(t, raw_data(shrunk) == raw_data(data), "the last allocation did not shrink in place")
 		testing.expect_value(t, count_byte(shrunk, 0xAA), 1000)
-		testing.expect_value(t, arena.curr_block.used, used-3096)
-		testing.expect_value(t, arena.total_used,      total-3096)
+		testing.expect_value(t, virtual.arena_total_used(&arena), used-3096)
 
 		next, _ := mem.alloc_bytes(3000, 1, allocator)
 		testing.expect(t, raw_data(next) == raw_data(shrunk[1000:]), "the tail was not given back")
 		testing.expect_value(t, count_byte(next, 0), 3000)
 
 		// An earlier allocation shrinks in place, keeping its tail.
-		used = arena.curr_block.used
+		used = virtual.arena_total_used(&arena)
 		_, _ = mem.resize_bytes(shrunk, 500, 16, allocator)
-		testing.expect_value(t, arena.curr_block.used, used)
+		testing.expect_value(t, virtual.arena_total_used(&arena), used)
 	}
 }
 
@@ -529,15 +527,15 @@ test_virtual_arena_shrink_in_temp :: proc(t: ^testing.T) {
 		allocator := virtual.arena_allocator(&arena)
 
 		data, _ := mem.alloc_bytes(4096, 16, allocator)
-		used := arena.curr_block.used
+		used := virtual.arena_total_used(&arena)
 
 		// The temporary region saved the end of the allocation, so it keeps its tail.
 		temp := virtual.arena_temp_begin(&arena)
 		shrunk, err := mem.resize_bytes(data, 1000, 16, allocator)
 		testing.expect_value(t, err, nil)
 		testing.expect(t, raw_data(shrunk) == raw_data(data), "the last allocation did not shrink in place")
-		testing.expect_value(t, arena.curr_block.used, used)
+		testing.expect_value(t, virtual.arena_total_used(&arena), used)
 		virtual.arena_temp_end(temp)
-		testing.expect_value(t, arena.curr_block.used, used)
+		testing.expect_value(t, virtual.arena_total_used(&arena), used)
 	}
 }

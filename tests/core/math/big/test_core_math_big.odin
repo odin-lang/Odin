@@ -5,6 +5,8 @@ import "core:mem"
 import "core:strconv"
 import "core:testing"
 
+SLIM_TESTS :: #config(ODIN_TEST_SLIM, ODIN_ARCH == .riscv64)
+
 @(test)
 test_int_destroy :: proc(t: ^testing.T) {
 	a, b, zero: big.Int
@@ -167,6 +169,9 @@ import "core:log"
 
 @(test)
 test_big_math_vectors :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	for vec in big_test_vectors {
 		a, b, res, expected := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
 		defer big.destroy(a, b, res, expected)
@@ -414,6 +419,140 @@ atoi :: proc(t: ^testing.T, i: ^big.Int, a: string, loc := #caller_location) -> 
 	err := big.atoi(i, a, 16)
 	testing.expect(t, err == nil, loc=loc)
 	return err == nil
+}
+
+@(test)
+test_atoi :: proc(t: ^testing.T) {
+	a, b := &big.Int{}, &big.Int{}
+	defer big.destroy(a, b)
+
+	// Read back what `_itoa_raw_old` writes, in every radix, from a single input digit up to
+	// several chunks, and for negative numbers.
+	sizes := [?]int{8, 64, 200, 2048}
+	for bits in sizes {
+		for negative in ([?]bool{false, true}) {
+			big.random(a, bits)
+			if negative {
+				big.neg(a, a)
+			}
+			for radix in 2..=64 {
+				size, _ := big.radix_size(a, i8(radix), false)
+				buffer := make([]u8, size)
+				defer delete(buffer)
+				written, _ := big._itoa_raw_old(a, i8(radix), buffer, false)
+				input := string(buffer[:written])
+
+				testing.expect_value(t, big.atoi(b, input, i8(radix)), nil)
+				equal, _ := big.equals(a, b)
+				testing.expectf(t, equal, "radix %v: atoi(%q) read back a different number", radix, input)
+			}
+		}
+	}
+
+	// What follows the number decides the error. `res` keeps the number read before it, sign
+	// included, and `n` counts the characters read the way `strconv` does. Both paths, with a
+	// partial chunk and with a full one.
+	Case :: struct {
+		input:    string,
+		radix:    i8,
+		err:      big.Error,
+		expected: string,
+		n:        int,
+	}
+	cases := [?]Case{
+		{"1F",                                     16, nil,                  "31",                        2},
+		{"-0",                                     10, nil,                  "0",                         2},
+		{"+1",                                     64, nil,                  "3969",                      2},
+		{"00000000000000000000000000000000000012", 10, nil,                  "12",                        38},
+
+		{"1F\n",                                   16, .Trailing_Whitespace, "31",                        2},
+		{"-ff\r\n",                                16, .Trailing_Whitespace, "-255",                      3},
+		{"123456789abcdef\n",                      16, .Trailing_Whitespace, "81985529216486895",         15},
+		{"123456789abcdef0123 ",                   16, .Trailing_Whitespace, "5373003642731685151011",    19},
+		{"123 \t\v\f\r\n",                         10, .Trailing_Whitespace, "123",                       3},
+		{"-12\x00\x00",                            10, .Trailing_Whitespace, "-12",                       3},
+		{"1234567890123456789012345\n",            10, .Trailing_Whitespace, "1234567890123456789012345", 25},
+
+		{"1Fg",                                    16, .Invalid_Character,   "31",                        2},
+		{"f.f",                                    16, .Invalid_Character,   "15",                        1},
+		{"-1x",                                    16, .Invalid_Character,   "-1",                        2},
+		{"123456789abcdef0123x",                   16, .Invalid_Character,   "5373003642731685151011",    19},
+		{"101012",                                 2,  .Invalid_Character,   "21",                        5},
+		{"123x",                                   10, .Invalid_Character,   "123",                       3},
+		{"12.3",                                   10, .Invalid_Character,   "12",                        2},
+		{"-12x",                                   10, .Invalid_Character,   "-12",                       3},
+		{"123456789012345678x",                    10, .Invalid_Character,   "123456789012345678",        18},
+		{"1234567890123456789012345x",             10, .Invalid_Character,   "1234567890123456789012345", 25},
+		{"12a",                                    10, .Invalid_Character,   "12",                        2},
+		{"1\n23",                                  10, .Invalid_Character,   "1",                         1},
+		{"12 \nx",                                 10, .Invalid_Character,   "12",                        2},
+		{" 12",                                    10, .Invalid_Character,   "0",                         0},
+		{"-x",                                     10, .Invalid_Character,   "0",                         1},
+		{"--1",                                    10, .Invalid_Character,   "0",                         1},
+		{"-\n",                                    10, .Invalid_Character,   "0",                         1},
+		{"- \r\n",                                 16, .Invalid_Character,   "0",                         1},
+		{"+1",                                     10, .Invalid_Character,   "0",                         0},
+
+		{"",                                       10, .Empty_Input,         "0",                         0},
+		{"-",                                      16, .Empty_Input,         "0",                         0},
+		{"\n",                                     10, .Empty_Input,         "0",                         0},
+		{" \t\x00",                                16, .Empty_Input,         "0",                         0},
+	}
+	for c in cases {
+		n := -1
+		err := big.atoi(b, c.input, c.radix, n = &n)
+		str, _ := big.itoa(b, 10)
+		defer delete(str)
+		testing.expectf(t, err == c.err && str == c.expected && n == c.n,
+			"atoi(%q, %v) = %v, %v, n = %v, expected %v, %v, n = %v", c.input, c.radix, err, str, n, c.err, c.expected, c.n)
+	}
+
+	// `strconv` sets the same `n` for input that both of them read.
+	for input in ([?]string{"12", "-12", "12x", "-12x", "12 \n", "-12\n", "-", "-x", "- \r\n", "--1", "x", " 12", "\n", ""}) {
+		n, strconv_n := -1, -1
+		_ = big.atoi(b, input, 10, n = &n)
+		_, _ = strconv.parse_i64_of_base(input, 10, &strconv_n)
+		testing.expectf(t, n == strconv_n, "atoi(%q) set n = %v, strconv sets %v", input, n, strconv_n)
+	}
+
+	n := -1
+	testing.expect_value(t, big.atoi(b, "12", 65, n = &n), big.Error.Invalid_Argument)
+	testing.expect_value(t, n, 0)
+}
+
+@(test)
+test_digit_power_of_two :: proc(t: ^testing.T) {
+	// `int` is 32 bits on 32-bit targets, so these used to see only the low 32 bits of a `DIGIT`.
+	// The low 32 bits of `D` are a power of two, but `D` isn't one.
+	D :: big.DIGIT(1 << 32 | 1 << 30)
+
+	a, b, q := &big.Int{}, &big.Int{}, &big.Int{}
+	defer big.destroy(a, b, q)
+
+	big.set(a, 3)
+	testing.expect_value(t, big.int_mul_digit(b, a, D), nil)
+	product, _ := big.get(b, u64)
+	testing.expect_value(t, product, 3 * u64(D))
+
+	remainder, err := big.int_divmod_digit(q, b, D)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, remainder, 0)
+	quotient, _ := big.get(q, u64)
+	testing.expect_value(t, quotient, 3)
+
+	big.set(a, u64(1) << 40)
+	power_of_two, _ := big.int_is_power_of_two(a)
+	testing.expect(t, power_of_two, "1 << 40 is a power of two")
+
+	big.set(a, u64(1) << 32 | 1)
+	power_of_two, _ = big.int_is_power_of_two(a)
+	testing.expect(t, !power_of_two, "1 << 32 | 1 isn't a power of two")
+
+	// D^1 <= 1 << 64 < D^2
+	big.set(a, 1)
+	big.int_shl(a, a, 64)
+	log_d, _ := big.int_log(a, D)
+	testing.expect_value(t, log_d, 1)
 }
 
 @(test)

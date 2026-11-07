@@ -8,6 +8,8 @@ extern "C" {
 
 void *malloc(size_t size);
 
+void *calloc(size_t num, size_t size);
+
 void *aligned_alloc(size_t alignment, size_t size);
 
 void free(void *);
