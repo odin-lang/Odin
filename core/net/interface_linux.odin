@@ -215,9 +215,10 @@ _parse_address :: proc(payload: []u8, builder: ^Interface_Builder) -> Interfaces
 		return nil
 	}
 
+	prefix, _ := prefix_from_address(address, int(message.prefixlen))
 	lease := Lease{
 		address = address,
-		netmask = _prefix_to_netmask(message.prefixlen, family),
+		netmask = prefix_netmask(prefix),
 	}
 	if _, alloc_err := append(&iface.unicast, lease); alloc_err != nil {
 		return .Allocation_Failure
@@ -381,27 +382,6 @@ _netlink_address :: proc(value: []u8, family: linux.Address_Family) -> Address {
 		if address, ok := _read(value, IP6_Address); ok {
 			return address
 		}
-	}
-	return nil
-}
-
-@(private="file")
-_prefix_to_netmask :: proc(prefix: u8, family: linux.Address_Family) -> Netmask {
-	#partial switch family {
-	case .INET:
-		bits := min(u32(prefix), 32)
-		mask: u32be
-		if bits > 0 {
-			mask = ~u32be(0) << (32 - bits)
-		}
-		return transmute(IP4_Address)mask
-	case .INET6:
-		bits := min(u32(prefix), 128)
-		mask: u128be
-		if bits > 0 {
-			mask = ~u128be(0) << (128 - bits)
-		}
-		return transmute(IP6_Address)mask
 	}
 	return nil
 }
