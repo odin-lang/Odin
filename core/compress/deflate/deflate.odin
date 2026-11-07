@@ -328,7 +328,13 @@ deflate_huffman :: proc(lengths: []u8, codes: []u32, frequencies: []u32, max_cod
 	items := codes
 	length_counts: [DEFLATE_CODE_LENGTH_MAX + 1]u32
 	used_symbols := deflate_sort_symbols(frequencies, lengths, items)
-	if used_symbols == 0 { return }
+	if used_symbols == 0 {
+		codes[0]   = 0
+		lengths[0] = 1
+		codes[1]   = 1
+		lengths[1] = 1
+		return
+	}
 	if used_symbols == 1 {
 		s := items[0] & DEFLATE_SYMBOL_MASK
 		i := s if s != 0 else 1
