@@ -13,6 +13,7 @@ foreign gdi32 {
 	SetBkMode      :: proc(hdc: HDC, mode: BKMODE) -> INT ---
 
 	CreateCompatibleDC :: proc(hdc: HDC) -> HDC ---
+	CreateDCW          :: proc(pwszDriver: LPCWSTR, pwszDevice: LPCWSTR, pszPort: LPCWSTR, pdm: ^DEVMODEW) -> HDC ---
 	DeleteDC           :: proc(hdc: HDC) -> BOOL ---
 	CancelDC           :: proc(hdc: HDC) -> BOOL ---
 	SaveDC             :: proc(hdc: HDC) -> INT ---
