@@ -2316,6 +2316,8 @@ _private_dr_is_modulus :: proc(a: ^Int) -> (res: bool) {
 	Assumes `x` and `n` to not be `nil` and to have been initialized.
 */
 _private_int_dr_reduce :: proc(x, n: ^Int, k: DIGIT, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator
+
 	/*
 		m = digits in modulus.
 	*/

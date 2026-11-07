@@ -975,6 +975,8 @@ internal_int_lcm :: proc(res_lcm, a, b: ^Int, allocator := context.allocator) ->
 	Assumes `remainder` and `numerator` both not to be `nil` and `bits` to be >= 0.
 */
 internal_int_mod_bits :: proc(remainder, numerator: ^Int, bits: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator
+
 	/*
 		Everything is divisible by 1 << 0 == 1, so this returns 0.
 	*/
