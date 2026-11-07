@@ -804,12 +804,7 @@ inflate_to_buffer :: proc(z: ^compress.Context, expected_output_size, max_output
 		return nil, General_Error.Output_Too_Short
 	}
 
-	input_size := -1
-	if compress.is_memory_context(z) {
-		input_size = len(z.window)
-	} else if n, size_err := compress.size(z); size_err == nil && n <= i64(max(int)) {
-		input_size = int(n)
-	}
+	input_size := compress.input_size(z)
 
 	buffer := z.output
 	non_zero_resize(buffer, start + min(inflate_initial_size(hint, input_size, INFLATE64_EXPANSION_MAX if D64 else INFLATE_EXPANSION_MAX), limit)) or_return

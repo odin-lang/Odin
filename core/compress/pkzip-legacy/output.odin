@@ -16,12 +16,7 @@ output_limit :: proc(z: ^compress.Context, expected_output_size, max_output_size
 		return expected, General_Error.Output_Too_Short
 	}
 
-	input_size := -1
-	if compress.is_memory_context(z) {
-		input_size = len(z.window)
-	} else if n, size_err := compress.size(z); size_err == nil && n <= i64(max(int)) {
-		input_size = int(n)
-	}
+	input_size := compress.input_size(z)
 
 	reservation := expected
 	if input_size < 0 {
