@@ -1,15 +1,18 @@
 @rem This file runs most of the tests that the CI would run.
-@rem When the "slim" argument is provided, it omits time-intensive optimized core library tests and Wycheproof tests.
+@rem When the "slim" argument is provided, it omits time-intensive optimized core library tests and Wycheproof tests,
+@rem as well as some other tests that don't add coverage on and across architectures. Enabled on RISC-V by default.
 
 setlocal EnableDelayedExpansion
 
 @echo off
 
 set SLIM=
+set SLIM_DEFINE=
 
 for %%A in (%*) do (
 	if "%%A"=="slim" (
 		set SLIM=1
+		set SLIM_DEFINE=-define:ODIN_TEST_SLIM=true
 	) else if "%%A"=="no-clang" (
 		set ODIN_TESTS_NO_CLANG=1
 	) else (
@@ -48,7 +51,7 @@ if not defined ODIN_TESTS_NO_CLANG (
 
 @rem Normal Core library tests
 @pushd tests\core
-..\..\odin test normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address || exit /b
+..\..\odin test normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address %SLIM_DEFINE% || exit /b
 @popd
 
 @rem Vendor library tests

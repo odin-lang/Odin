@@ -410,6 +410,9 @@ d64_round_trip :: proc(t: ^testing.T, name: string, data: []byte) {
 
 @(test)
 deflate64_round_trip :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	shapes := [?]string{"random", "zeros", "periodic", "mixed"}
 	sizes  := [?]int{0, 1, 10, 100, 70000, 300000}
 	for shape, kind in shapes {
@@ -1265,6 +1268,9 @@ d64_differential :: proc(t: ^testing.T, format: D64_Format, stream: []byte, labe
 
 @(test)
 deflate64_fuzz_crafted :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	ok_count: [D64_Format]int
 	for i in 0..<D64_FUZZ_CRAFTED {
 		format := D64_Format.Deflate64 if i % 4 != 3 else D64_Format.Deflate
@@ -1288,6 +1294,9 @@ deflate64_fuzz_crafted :: proc(t: ^testing.T) {
 
 @(test)
 deflate64_fuzz_packed :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	for _ in 0..<D64_FUZZ_PACKED {
 		data: [dynamic]byte
 		defer delete(data)

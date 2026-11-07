@@ -239,6 +239,9 @@ test_edits_simple :: proc(t: ^testing.T) {
 
 @(test)
 test_edits_exhaustive :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	a_buf: [6]i32
 	b_buf: [6]i32
 	for len_a in 0..=len(a_buf) {
@@ -260,6 +263,9 @@ test_edits_exhaustive :: proc(t: ^testing.T) {
 
 @(test)
 test_edits_random :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	rand.reset(t.seed)
 	for _ in 0..<200 {
 		alphabet := 1 + rand.int_max(10)

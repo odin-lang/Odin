@@ -118,6 +118,9 @@ inflate_gzip_size_hint :: proc(t: ^testing.T) {
 
 @(test)
 inflate_growth_overshoot :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	data := make([]byte, 40 << 20)
 	defer delete(data)
 	packed: [dynamic]byte
