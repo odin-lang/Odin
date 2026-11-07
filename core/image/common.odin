@@ -156,6 +156,8 @@ Option :: enum {
 	do_not_expand_grayscale,       // Used in `jpeg`, `tga`, and `png`
 	do_not_expand_indexed,         // Used in `png`
 	do_not_expand_channels,        // Used in `jpeg` and `png`
+	ignore_duplicate_chunks,       // Used in `png`, applies `libpng`'s more forgiving approach.
+	                               // By default we follow the spec strictly.
 
 	// SAVE OPTIONS
 	qoi_all_channels_linear,       // QOI, informative only. If not set, defaults to sRGB with linear alpha.
@@ -393,6 +395,9 @@ PNG_Error :: enum {
 	Requested_Channel_Not_Present,
 	Post_Processing_Error,
 	Invalid_Chunk_Length,
+	Unknown_Critical_Chunk,
+	Duplicate_Chunk,
+	Chunk_Out_Of_Order,
 }
 
 PNG_Info :: struct {
@@ -434,6 +439,13 @@ PNG_Chunk_Type :: enum u32be {
 	hIST = 'h' << 24 | 'I' << 16 | 'S' << 8 | 'T',
 	cHRM = 'c' << 24 | 'H' << 16 | 'R' << 8 | 'M',
 	sBIT = 's' << 24 | 'B' << 16 | 'I' << 8 | 'T',
+	cICP = 'c' << 24 | 'I' << 16 | 'C' << 8 | 'P',
+	mDCV = 'm' << 24 | 'D' << 16 | 'C' << 8 | 'V',
+	cLLI = 'c' << 24 | 'L' << 16 | 'L' << 8 | 'I',
+
+	acTL = 'a' << 24 | 'c' << 16 | 'T' << 8 | 'L',
+	fcTL = 'f' << 24 | 'c' << 16 | 'T' << 8 | 'L',
+	fdAT = 'f' << 24 | 'd' << 16 | 'A' << 8 | 'T',
 
 	/*
 		eXIf tags are not part of the core spec, but have been ratified
