@@ -1047,7 +1047,7 @@ To partly mitigate this, redirect STDERR to a file or use the -define:ODIN_TEST_
 		json_report.success  = total_success_count
 		json_report.duration = finished_in
 
-		json_err := json.marshal_to_writer(os.to_stream(json_fd), json_report, &{ pretty = true })
+		json_err := json.marshal_to_writer(os.to_stream(json_fd), json_report, { pretty = true })
 		fmt.assertf(json_err == nil, "Error writing JSON report: %v", json_err)
 	}
 
