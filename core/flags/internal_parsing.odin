@@ -2,6 +2,7 @@
 package flags
 
 import "core:container/bit_array"
+@require import "core:fmt"
 import "core:strconv"
 import "core:strings"
 
@@ -84,12 +85,14 @@ parse_one_unix_arg :: proc(model: ^$T, parser: ^Parser, arg: string) -> (
 	arg := arg
 
 	if strings.has_prefix(arg, "-") {
-		// -flag
+		// -short or --flag
 		arg = arg[1:]
+		is_short := true
 
 		if strings.has_prefix(arg, "-") {
-			// Allow `--` to function as `-`.
+			// --flag
 			arg = arg[1:]
+			is_short = false
 
 			if len(arg) == 0 {
 				// `--`, and only `--`.
@@ -100,20 +103,25 @@ parse_one_unix_arg :: proc(model: ^$T, parser: ^Parser, arg: string) -> (
 			}
 		}
 
+		if is_short {
+			return parse_unix_short_arg(model, parser, arg)
+		}
+
 		flag: string
 		find_assignment: for r, i in arg {
 			if r == '=' {
 				// --flag=option
 				flag = arg[:i]
 				arg = arg[1 + i:]
+				flag = resolve_unix_flag_name(model, flag, is_short) or_return
 				error = set_option(model, parser, flag, arg)
 				return
 			}
 		}
 
 		// --flag option, potentially
-		future_args = set_unix_flag(model, parser, arg) or_return
-		current_flag = arg
+		current_flag = resolve_unix_flag_name(model, arg, is_short) or_return
+		future_args = set_unix_flag(model, parser, current_flag, false) or_return
 
 	} else {
 		// positional
@@ -121,6 +129,61 @@ parse_one_unix_arg :: proc(model: ^$T, parser: ^Parser, arg: string) -> (
 	}
 
 	return
+}
+
+// Parse one or more declared single-dash short options. Every option before
+// the last must be boolean; the final option may consume a value.
+parse_unix_short_arg :: proc(model: ^$T, parser: ^Parser, arg: string) -> (
+	future_args: int,
+	current_flag: string,
+	error: Error,
+) {
+	shorts := arg
+	option: string
+	has_option: bool
+
+	if equals := strings.index_byte(arg, '='); equals >= 0 {
+		shorts = arg[:equals]
+		option = arg[equals + 1:]
+		has_option = true
+	}
+
+	if len(shorts) == 0 {
+		current_flag = resolve_unix_flag_name(model, shorts, true) or_return
+		return
+	}
+
+	for i in 0 ..< len(shorts) {
+		#no_bounds_check short := shorts[i:i + 1]
+		is_last := i == len(shorts) - 1
+		current_flag = resolve_unix_flag_name(model, short, true) or_return
+
+		if is_last && has_option {
+			error = set_option(model, parser, current_flag, option)
+			return
+		}
+
+		future_args = set_unix_flag(model, parser, current_flag, !is_last) or_return
+	}
+
+	return
+}
+
+// Resolve a declared single-dash short name to the field's canonical long name.
+// Double-dash names are already canonical and pass through unchanged.
+resolve_unix_flag_name :: proc(model: ^$T, name: string, is_short: bool) -> (resolved_name: string, error: Error) {
+	if !is_short || name == RESERVED_HELP_FLAG_SHORT {
+		return name, nil
+	}
+
+	if field, _, ok := get_field_by_short(model, name); ok {
+		return get_field_name(field), nil
+	}
+
+	return "", Parse_Error {
+		.Missing_Flag,
+		fmt.tprintf("Unable to find any short flag named `%s`.", name),
+	}
 }
 
 // Parse a number of requirements specifier.

@@ -15,6 +15,8 @@ package flags
 validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_location) {
 	positionals_assigned_so_far: bit_array.Bit_Array
 	defer bit_array.destroy(&positionals_assigned_so_far)
+	shorts_assigned_so_far: [dynamic]string
+	defer delete(shorts_assigned_so_far)
 
 	check_fields: for field in reflect.struct_fields_zipped(T) {
 		if style == .Unix {
@@ -56,6 +58,17 @@ validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_
 				continue check_fields
 			case:
 				name_is_safe = true
+			}
+		}
+
+		if style == .Unix {
+			if short, has_short := get_field_short(field); has_short {
+				fmt.assertf(len(short) == 1, "%T.%s has `%s` defined as %q, but it must contain exactly one character.", model_type, field.name, SUBTAG_SHORT, short, loc = loc)
+				fmt.assertf(short != RESERVED_HELP_FLAG_SHORT, "%T.%s has `%s` defined as %q, but that short name is reserved.", model_type, field.name, SUBTAG_SHORT, short, loc = loc)
+				for assigned_short in shorts_assigned_so_far {
+					fmt.assertf(short != assigned_short, "%T.%s has `%s` defined as %q, but that short name has already been assigned to another flag.", model_type, field.name, SUBTAG_SHORT, short, loc = loc)
+				} 
+				append(&shorts_assigned_so_far, short)
 			}
 		}
 
