@@ -299,7 +299,7 @@ memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
 			}
 		}
 
-		m = (n-i) / 16 * 16
+		m = i + (n-i) / 16 * 16
 		for /**/; i < m; i += 16 {
 			load_a := intrinsics.unaligned_load(cast(^#simd[16]u8)&a[i])
 			load_b := intrinsics.unaligned_load(cast(^#simd[16]u8)&b[i])
@@ -309,7 +309,7 @@ memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
 			}
 		}
 
-		m = (n-i) / size_of(uintptr) * size_of(uintptr)
+		m = i + (n-i) / size_of(uintptr) * size_of(uintptr)
 		for /**/; i < m; i += size_of(uintptr) {
 			if intrinsics.unaligned_load(cast(^uintptr)&a[i]) != intrinsics.unaligned_load(cast(^uintptr)&b[i]) {
 				return false
@@ -356,7 +356,7 @@ memory_compare :: proc "contextless" (x, y: rawptr, n: int) -> int #no_bounds_ch
 		}
 	}
 
-	m = (n-i) / 16 * 16
+	m = i + (n-i) / 16 * 16
 	for /**/; i < m; i += 16 {
 		load_a := intrinsics.unaligned_load(cast(^#simd[16]u8)&a[i])
 		load_b := intrinsics.unaligned_load(cast(^#simd[16]u8)&b[i])
@@ -372,7 +372,7 @@ memory_compare :: proc "contextless" (x, y: rawptr, n: int) -> int #no_bounds_ch
 
 	// 64-bit SIMD is faster than using a `uintptr` to detect a difference then
 	// re-iterating with the byte-by-byte loop, at least on AMD64.
-	m = (n-i) / 8 * 8
+	m = i + (n-i) / 8 * 8
 	for /**/; i < m; i += 8 {
 		load_a := intrinsics.unaligned_load(cast(^#simd[8]u8)&a[i])
 		load_b := intrinsics.unaligned_load(cast(^#simd[8]u8)&b[i])
@@ -422,7 +422,7 @@ memory_compare_zero :: proc "contextless" (a: rawptr, n: int) -> int #no_bounds_
 		}
 
 		scanner16: #simd[16]u8
-		m = (n-i) / 16 * 16
+		m = i + (n-i) / 16 * 16
 		for /**/; i < m; i += 16 {
 			load := intrinsics.unaligned_load(cast(^#simd[16]u8)&bytes[i])
 			ne := intrinsics.simd_lanes_ne(scanner16, load)
@@ -431,7 +431,7 @@ memory_compare_zero :: proc "contextless" (a: rawptr, n: int) -> int #no_bounds_
 			}
 		}
 
-		m = (n-i) / size_of(uintptr) * size_of(uintptr)
+		m = i + (n-i) / size_of(uintptr) * size_of(uintptr)
 		for /**/; i < m; i += size_of(uintptr) {
 			if intrinsics.unaligned_load(cast(^uintptr)&bytes[i]) != 0 {
 				return 1
@@ -477,7 +477,7 @@ memory_prefix_length :: proc "contextless" (x, y: rawptr, n: int) -> (idx: int) 
 		}
 	}
 
-	m = (n-i) / 16 * 16
+	m = i + (n-i) / 16 * 16
 	for /**/; i < m; i += 16 {
 		load_a := intrinsics.unaligned_load(cast(^#simd[16]u8)&a[i])
 		load_b := intrinsics.unaligned_load(cast(^#simd[16]u8)&b[i])
@@ -493,7 +493,7 @@ memory_prefix_length :: proc "contextless" (x, y: rawptr, n: int) -> (idx: int) 
 
 	// 64-bit SIMD is faster than using a `uintptr` to detect a difference then
 	// re-iterating with the byte-by-byte loop, at least on AMD64.
-	m = (n-i) / 8 * 8
+	m = i + (n-i) / 8 * 8
 	for /**/; i < m; i += 8 {
 		load_a := intrinsics.unaligned_load(cast(^#simd[8]u8)&a[i])
 		load_b := intrinsics.unaligned_load(cast(^#simd[8]u8)&b[i])
