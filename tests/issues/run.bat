@@ -103,6 +103,7 @@ set ODIN=..\..\..\odin
 %ODIN% run "..\test_issue_7564" %COMMON% || exit /b
 %ODIN% run "..\test_issue_7596" %COMMON% || exit /b
 %ODIN% run "..\test_issue_7798" %COMMON% || exit /b
+%ODIN% run "..\test_issue_windows_process_start" %COMMON% || exit /b
 
 @rem #########################################################################################################
 
