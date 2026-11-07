@@ -10,3 +10,8 @@
 math_big_test_library.*
 *.bng
 assets/BNG/*.txt
+assets/ZIP/
+assets/HXA/
+assets/I18N/
+assets/UCD/
+assets/XML/
