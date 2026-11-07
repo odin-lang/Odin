@@ -87,6 +87,10 @@ O_SPARSE  :: File_Flags{.Sparse}
 
 	**Note**: The standard file handles (stderr, stdout and stdin) are always
 	initialized as inheritable.
+
+	**Note(windows)**: `process_start` passes a child only its standard
+	handles. Other inheritable handles reach only the children created by
+	other means, such as `CreateProcessW`.
 */
 O_INHERITABLE :: File_Flags{.Inheritable}
 
