@@ -32,14 +32,14 @@ Derived :: struct {
 
 @(private="file")
 Untagged_Bits :: bit_field u16 {
-	lo: u8 | 4,
+	lo: u8  | 4,
 	hi: u16 | 12,
 }
 
 @(private="file")
 Tagged_Bits :: bit_field u16 {
-	lo: u8  | 3 `tag:"low"`,
-	hi: u16 | 13,
+	lo: u8  | 4 `tag:"low"`,
+	hi: u16 | 12,
 }
 
 @(private="file")
@@ -105,6 +105,9 @@ test_type_info_member_tags :: proc(t: ^testing.T) {
 	tagged_bits := bit_field_info(Tagged_Bits)
 	testing.expect_value(t, tagged_bits.tags[0], `tag:"low"`)
 	testing.expect_value(t, tagged_bits.tags[1], "")
+
+	testing.expect(t, untagged_bits.id != tagged_bits.id)
+	testing.expect(t, untagged_bits != tagged_bits)
 }
 
 @test
