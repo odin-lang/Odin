@@ -10,10 +10,10 @@ package encoding_xml
 */
 
 import    "base:runtime"
-import    "core:bytes"
 import    "core:encoding/entity"
 import    "base:intrinsics"
 import    "core:mem"
+import    "core:slice"
 import    "core:strings"
 
 likely :: intrinsics.expect
@@ -165,6 +165,9 @@ Error :: enum {
 
 	Duplicate_Attribute,
 	Conflicting_Options,
+
+	// An allocation failed.
+	Allocation_Failed,
 }
 
 parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_handler := default_error_handler, allocator := context.allocator) -> (doc: ^Document, err: Error) {
@@ -173,18 +176,26 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 
 	opts := validate_options(options) or_return
 
+	// Everything below is owned by `doc`, so `destroy` frees whatever was allocated before a failure.
+	alloc_err: mem.Allocator_Error
+	if doc, alloc_err = new(Document); alloc_err != nil {
+		return nil, .Allocation_Failed
+	}
+	doc.allocator = allocator
+
 	// If `.Input_May_Be_Modified` is not specified, we duplicate the input so that we can modify it in-place.
 	if .Input_May_Be_Modified not_in opts.flags {
-		data = bytes.clone(data)
+		if data, alloc_err = slice.clone(data); alloc_err != nil {
+			return doc, .Allocation_Failed
+		}
 	}
+	doc.input = data
 
-	t := new(Tokenizer)
+	if doc.tokenizer, alloc_err = new(Tokenizer); alloc_err != nil {
+		return doc, .Allocation_Failed
+	}
+	t := doc.tokenizer
 	init(t, string(data), path, error_handler)
-
-	doc = new(Document)
-	doc.allocator = allocator
-	doc.tokenizer = t
-	doc.input     = data
 
 	// Initialize arena allocator for small strings.
 	// Estimate the block size based on input size, but don't splurge on memory for very small XML documents.
@@ -192,7 +203,9 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 	mem.dynamic_arena_init(&doc.extra_strings_arena, allocator, allocator, dynamic_arena_block_size)
 	doc.extra_strings_allocator = mem.dynamic_arena_allocator(&doc.extra_strings_arena)
 
-	doc.elements = make([dynamic]Element, 1024, 1024, allocator)
+	if doc.elements, alloc_err = make([dynamic]Element, 1024, 1024, allocator); alloc_err != nil {
+		return doc, .Allocation_Failed
+	}
 
 	err = .Unexpected_Token
 	element, parent: Element_ID
@@ -213,11 +226,11 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 			// NOTE(Jeroen): We're not using a switch because this if-else chain ordered by likelihood is 2.5% faster at -o:size and -o:speed.
 			if likely(open.kind, Token_Kind.Ident) == .Ident {
 				// e.g. <odin - Start of new element.
-				element = new_element(doc)
+				element = new_element(doc) or_return
 				if element == 0 { // First Element
 					parent = element
-				} else {
-					append(&doc.elements[parent].value, element)
+				} else if _, alloc_err = append(&doc.elements[parent].value, element); alloc_err != nil {
+					return doc, .Allocation_Failed
 				}
 
 				doc.elements[element].parent = parent
@@ -305,13 +318,19 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 
 					if .Intern_Comments in opts.flags {
 						if doc.element_count == 0 {
-							append(&doc.comments, comment)
+							if _, alloc_err = append(&doc.comments, comment); alloc_err != nil {
+								return doc, .Allocation_Failed
+							}
 						} else {
-							el := new_element(doc)
+							el := new_element(doc) or_return
 							doc.elements[el].parent = element
 							doc.elements[el].kind   = .Comment
-							append(&doc.elements[el].value, comment)
-							append(&doc.elements[element].value, el)
+							if _, alloc_err = append(&doc.elements[el].value, comment); alloc_err != nil {
+								return doc, .Allocation_Failed
+							}
+							if _, alloc_err = append(&doc.elements[element].value, el); alloc_err != nil {
+								return doc, .Allocation_Failed
+							}
 						}
 					}
 
@@ -434,7 +453,10 @@ parse_attribute :: proc(doc: ^Document) -> (attr: Attribute, offset: int, err: E
 	value  := expect(t, .String, multiline_string=true) or_return
 
 	// Estimate decoded size based on input text.
-	builder := strings.builder_make_len_cap(0, len(value.text) + 10, doc.extra_strings_allocator)
+	builder, builder_err := strings.builder_make_len_cap(0, len(value.text) + 10, doc.extra_strings_allocator)
+	if builder_err != nil {
+		return attr, offset, .Allocation_Failed
+	}
 	normalized, normalize_err := entity.decode_xml_sb(&builder, value.text, {.Normalize_Whitespace}, doc.allocator)
 	if normalize_err == .None {
 		value.text = normalized
@@ -469,7 +491,9 @@ parse_attributes :: proc(doc: ^Document, attribs: ^Attributes) -> (err: Error) {
 		if attribs^ == nil {
 			attribs^ = make_dynamic_array(Attributes, doc.extra_strings_allocator)
 		}
-		append(attribs, attr)
+		if _, alloc_err := append(attribs, attr); alloc_err != nil {
+			return .Allocation_Failed
+		}
 	}
 
 	skip_whitespace(t)
@@ -579,7 +603,9 @@ parse_body :: proc(doc: ^Document, element: Element_ID, opts: Options) -> (err: 
 	needs_processing |= .Decode_SGML_Entities in opts.flags
 
 	if !needs_processing {
-		append(&doc.elements[element].value, body_text)
+		if _, alloc_err := append(&doc.elements[element].value, body_text); alloc_err != nil {
+			return .Allocation_Failed
+		}
 		return
 	}
 
@@ -599,12 +625,16 @@ parse_body :: proc(doc: ^Document, element: Element_ID, opts: Options) -> (err: 
 		}
 	}
 
-	builder := strings.builder_make_len_cap(0, len(body_text) + 10, doc.extra_strings_allocator)
+	builder, builder_err := strings.builder_make_len_cap(0, len(body_text) + 10, doc.extra_strings_allocator)
+	if builder_err != nil {
+		return .Allocation_Failed
+	}
 	decoded, decode_err := entity.decode_xml_sb(&builder, body_text, decode_opts)
-	if decode_err == .None {
-		append(&doc.elements[element].value, decoded)
-	} else {
-		append(&doc.elements[element].value, body_text)
+	if decode_err != .None {
+		decoded = body_text
+	}
+	if _, alloc_err := append(&doc.elements[element].value, decoded); alloc_err != nil {
+		return .Allocation_Failed
 	}
 
 	return
@@ -612,7 +642,7 @@ parse_body :: proc(doc: ^Document, element: Element_ID, opts: Options) -> (err: 
 
 Element_ID :: u32
 
-new_element :: proc(doc: ^Document) -> (id: Element_ID) {
+new_element :: proc(doc: ^Document) -> (id: Element_ID, err: Error) {
 	element_space := len(doc.elements)
 
 	// Need to resize
@@ -622,10 +652,12 @@ new_element :: proc(doc: ^Document) -> (id: Element_ID) {
 		} else {
 			element_space += 65536
 		}
-		resize(&doc.elements, element_space)
+		if resize(&doc.elements, element_space) != nil {
+			return 0, .Allocation_Failed
+		}
 	}
 
 	cur := doc.element_count
 	doc.element_count += 1
-	return cur
+	return cur, .None
 }
