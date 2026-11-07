@@ -299,7 +299,9 @@ implode_test_large_output :: proc(t: ^testing.T) {
 	testing.expect_value(t, err, nil)
 	testing.expect_value(t, len(output), 1 + 100_000 * (63 + 255 + 2))
 	log.infof("large output: %v bytes in, %v bytes out, %v", len(data), len(output), elapsed)
-	testing.expectf(t, elapsed < 2 * time.Second, "large output took %v", elapsed)
+	if !SLIM_TESTS {
+		testing.expectf(t, elapsed < 2 * time.Second, "large output took %v", elapsed)
+	}
 }
 
 implode_table :: proc(lengths: []u8) -> (t: Implode_Code_Table) {

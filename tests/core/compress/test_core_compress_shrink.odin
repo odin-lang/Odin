@@ -287,7 +287,9 @@ shrink_test_clear_flood :: proc(t: ^testing.T) {
 	elapsed := time.tick_since(start)
 	testing.expect_value(t, err, nil)
 	log.infof("clear flood: %v bytes in, %v bytes out, %v", len(data), len(output), elapsed)
-	testing.expectf(t, elapsed < 2 * time.Second, "clear flood took %v", elapsed)
+	if !SLIM_TESTS {
+		testing.expectf(t, elapsed < 2 * time.Second, "clear flood took %v", elapsed)
+	}
 }
 
 shrink_writer_init :: proc(w: ^Shrink_Writer) {
