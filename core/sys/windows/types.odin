@@ -523,6 +523,13 @@ BROADCAST_QUERY_DENY :: 0x424D5144
 HWND_BROADCAST :: HWND(uintptr(0xffff))
 HWND_MESSAGE   :: HWND(~uintptr(0) - 2) // -3
 
+// SendMessageTimeout() flags
+SMTO_NORMAL           :: 0x0000
+SMTO_BLOCK              :: 0x0001
+SMTO_ABORTIFHUNG        :: 0x0002
+SMTO_NOTIMEOUTIFNOTHUNG :: 0x0008
+SMTO_ERRORONEXIT        :: 0x0020
+
 // Color Types
 CTLCOLOR_MSGBOX    :: 0
 CTLCOLOR_EDIT      :: 1
@@ -2339,6 +2346,8 @@ MONITORINFO :: struct {
 }
 LPMONITORINFO :: ^MONITORINFO
 
+MONITORINFOF_PRIMARY :: 0x00000001
+
 CCHDEVICENAME :: 32
 MONITORINFOEXW :: struct {
 	using _: MONITORINFO,
@@ -2541,6 +2550,12 @@ DEFAULT_GUI_FONT    :: 17
 DC_BRUSH            :: 18
 DC_PEN              :: 19
 STOCK_LAST          :: 19
+
+// GetDeviceCaps() indices
+HORZSIZE   :: 4
+VERTSIZE   :: 6
+LOGPIXELSX :: 88
+LOGPIXELSY :: 90
 
 CLR_INVALID :: 0xFFFFFFFF
 
