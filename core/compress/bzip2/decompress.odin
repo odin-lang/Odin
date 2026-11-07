@@ -35,13 +35,8 @@ decompress_from_context :: proc(z: ^compress.Context, expected_output_size := -1
 		br.z = z
 	}
 
-	if expected > 0 {
-		if memory {
-			non_zero_reserve(z.output, min(expected, bzip2_decompress_bound(len(z.window)))) or_return
-		} else {
-			non_zero_reserve(z.output, min(expected, BZIP2_GROWTH_STEP)) or_return
-		}
-	}
+	input_size := len(z.window) if memory else compress.input_size(z)
+	non_zero_reserve(z.output, min(compress.output_reservation(expected, bzip2_decompress_bound(input_size) if input_size >= 0 else -1, input_size), limit)) or_return
 
 	written := 0
 	defer {
@@ -140,10 +135,10 @@ decompress_from_context :: proc(z: ^compress.Context, expected_output_size := -1
 @(private)
 bzip2_decompress_bound :: proc "contextless" (input_size: int) -> int {
 	payload := max(input_size - BZIP2_STREAM_OVERHEAD, 0)
-	if payload > max(int) / BZIP2_EXPANSION_MAX {
+	if payload > max(int) / compress.BZIP2_EXPANSION_MAX {
 		return max(int)
 	}
-	return BZIP2_EXPANSION_MAX * payload
+	return compress.BZIP2_EXPANSION_MAX * payload
 }
 
 @(private)
@@ -621,9 +616,7 @@ bzip2_grow :: proc(output: ^[dynamic]u8, need, limit: int) -> (err: Error) {
 		return General_Error.Output_Too_Short
 	}
 	if need > cap(output) {
-		capacity := cap(output)
-		step     := capacity if capacity < BZIP2_GROWTH_STEP else max(BZIP2_GROWTH_STEP, capacity / 4)
-		non_zero_reserve(output, min(max(capacity + step, need), limit)) or_return
+		non_zero_reserve(output, compress.output_grow_capacity(cap(output), need, limit)) or_return
 	}
 	non_zero_resize(output, cap(output)) or_return
 	return nil

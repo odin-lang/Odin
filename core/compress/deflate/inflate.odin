@@ -363,9 +363,7 @@ inflate_grow :: proc(grow: ^[dynamic]u8, start, need, limit: int) -> (output: []
 	if grow == nil || need > limit {
 		return nil, General_Error.Output_Too_Short
 	}
-	capacity := len(grow) - start
-	step     := capacity if capacity < INFLATE_GROWTH_STEP else max(INFLATE_GROWTH_STEP, capacity / 4)
-	non_zero_resize(grow, start + min(max(capacity + step, need), limit)) or_return
+	non_zero_resize(grow, start + compress.output_grow_capacity(len(grow) - start, need, limit)) or_return
 	return grow[start:], nil
 }
 
@@ -757,27 +755,12 @@ inflate_update_checksum :: #force_inline proc(checksum: Inflate_Checksum, digest
 }
 
 @(private)
-inflate_initial_size :: proc(size_hint, input_size: int, expansion_max := INFLATE_EXPANSION_MAX) -> (size: int) #no_bounds_check {
+inflate_initial_size :: proc(size_hint, input_size: int, expansion_max := compress.DEFLATE_EXPANSION_MAX) -> (size: int) #no_bounds_check {
 	bound := -1
 	if input_size >= 0 && input_size < max(int) / expansion_max {
 		bound = expansion_max * input_size
 	}
-	if size_hint > 0 {
-		size = min(size_hint, bound) if bound >= 0 else min(size_hint, INFLATE_INITIAL_SIZE_MAX)
-		return max(size, INFLATE_INITIAL_SIZE_MIN)
-	}
-
-	size = INFLATE_STREAM_INITIAL_SIZE
-	if input_size >= 0 {
-		size = deflate_bound(input_size)
-		if size < 0 {
-			size = INFLATE_INITIAL_SIZE_MAX
-		}
-	}
-	if bound >= 0 {
-		size = min(size, bound)
-	}
-	return clamp(size, INFLATE_INITIAL_SIZE_MIN, INFLATE_INITIAL_SIZE_MAX)
+	return max(compress.output_reservation(size_hint, bound, input_size), INFLATE_INITIAL_SIZE_MIN)
 }
 
 @(private)
@@ -807,7 +790,7 @@ inflate_to_buffer :: proc(z: ^compress.Context, expected_output_size, max_output
 	input_size := compress.input_size(z)
 
 	buffer := z.output
-	non_zero_resize(buffer, start + min(inflate_initial_size(hint, input_size, INFLATE64_EXPANSION_MAX if D64 else INFLATE_EXPANSION_MAX), limit)) or_return
+	non_zero_resize(buffer, start + min(inflate_initial_size(hint, input_size, compress.DEFLATE64_EXPANSION_MAX if D64 else compress.DEFLATE_EXPANSION_MAX), limit)) or_return
 
 	written: int
 	if compress.is_memory_context(z) {

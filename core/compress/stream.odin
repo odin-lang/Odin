@@ -177,6 +177,29 @@ input_size :: #force_inline proc(z: ^Context) -> (res: int) {
 	return int(n)
 }
 
+output_reservation :: #force_inline proc "contextless" (declared, bound, input_size: int) -> (size: int) {
+	size = declared
+	if declared <= 0 {
+		size = COMPRESS_RESERVE_DEFAULT
+		if input_size >= 0 {
+			size = INITIAL_RESERVATION
+			if input_size <= INITIAL_RESERVATION / INITIAL_RESERVATION_RATIO {
+				size = input_size * INITIAL_RESERVATION_RATIO
+			}
+		}
+	}
+	size = min(size, INITIAL_RESERVATION)
+	if bound >= 0 {
+		size = min(size, bound)
+	}
+	return
+}
+
+output_grow_capacity :: #force_inline proc "contextless" (capacity, need, limit: int) -> (new_capacity: int) {
+	step := max(capacity, COMPRESS_GROWTH_MIN) if capacity < COMPRESS_GROWTH_STEP else max(COMPRESS_GROWTH_STEP, capacity / 4)
+	return min(max(capacity + step, need), limit)
+}
+
 @(optimization_mode="favor_size")
 read_ptr :: proc(z: ^Context, ptr: ^$T) -> (err: io.Error) #no_bounds_check {
 	return read_slice(z, ([^]byte)(ptr)[:size_of(T)])

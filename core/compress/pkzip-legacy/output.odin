@@ -18,21 +18,19 @@ output_limit :: proc(z: ^compress.Context, expected_output_size, max_output_size
 
 	input_size := compress.input_size(z)
 
-	reservation := expected
-	if input_size < 0 {
-		reservation = min(reservation, RESERVE_STREAM)
-	} else if input_size < max(int) / expansion_max {
-		reservation = min(reservation, input_size * expansion_max)
+	bound := -1
+	if input_size >= 0 && input_size < max(int) / expansion_max {
+		bound = input_size * expansion_max
 	}
-	non_zero_reserve(z.output, len(z.output) + reservation) or_return
+	if expected > 0 {
+		non_zero_reserve(z.output, len(z.output) + compress.output_reservation(expected, bound, input_size)) or_return
+	}
 	return
 }
 
 @(private)
 grow :: proc(z: ^compress.Context, start, limit, need: int) -> (err: Error) {
-	capacity := cap(z.output) - start
-	step     := max(capacity, GROWTH_MIN) if capacity < GROWTH_STEP else max(GROWTH_STEP, capacity / 4)
-	non_zero_reserve(z.output, start + min(max(capacity + step, need), limit)) or_return
+	non_zero_reserve(z.output, start + compress.output_grow_capacity(cap(z.output) - start, need, limit)) or_return
 	return nil
 }
 

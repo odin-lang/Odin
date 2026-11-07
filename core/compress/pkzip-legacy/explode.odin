@@ -16,7 +16,7 @@ explode_from_context :: proc(z: ^compress.Context, options: Implode_Options, exp
 		return General_Error.Incompatible_Options
 	}
 
-	expected := output_limit(z, expected_output_size, max_output_size, IMPLODE_EXPANSION_MAX) or_return
+	expected := output_limit(z, expected_output_size, max_output_size, compress.IMPLODE_EXPANSION_MAX) or_return
 	if expected == 0 {
 		return nil
 	}

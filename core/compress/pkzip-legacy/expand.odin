@@ -16,7 +16,7 @@ expand_from_context :: proc(z: ^compress.Context, factor: int, expected_output_s
 		return General_Error.Incompatible_Options
 	}
 
-	expected := output_limit(z, expected_output_size, max_output_size, REDUCE_EXPANSION_MAX) or_return
+	expected := output_limit(z, expected_output_size, max_output_size, compress.REDUCE_EXPANSION_MAX) or_return
 	if expected == 0 {
 		return nil
 	}
