@@ -352,6 +352,8 @@ $ODIN run ../test_issue_7482 $COMMON
 $ODIN run ../test_issue_7564 $COMMON
 $ODIN run ../test_issue_7596 $COMMON
 $ODIN run ../test_issue_7798 $COMMON
+# windows_process_start is Windows only. TODO: Being in run.sh doesn't necessarily mean we're not on Windows.
+#$ODIN run ../test_issue_windows_process_start $COMMON
 
 #########################################################################################################
 
