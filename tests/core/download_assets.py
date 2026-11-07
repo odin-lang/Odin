@@ -262,10 +262,6 @@ def main():
 				return r
 		return 0
 
-	if "ODIN_DONT_DOWNLOAD_TEST_ASSETS" in os.environ:
-		print("WARNING:  Downloading test assets skipped (ODIN_DONT_DOWNLOAD_TEST_ASSETS set).\n")
-		return 0
-
 	for suite in TEST_SUITES:
 		base_path = os.path.join(args[0], suite)
 		os.makedirs(base_path, exist_ok=True)
