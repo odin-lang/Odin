@@ -114,6 +114,8 @@ lzma_vectors :: proc(t: ^testing.T) {
 	lzma_test_unpack(t, "lzma2", LZMA_VECTOR_LZMA2, inputs.mixed, .Lzma2, {dict_size = 64 << 10})
 	lzma_test_unpack(t, "lzma2 chunks", LZMA_VECTOR_LZMA2_CHUNKS, inputs.chunks, .Lzma2, {dict_size = 64 << 10})
 	lzma_test_unpack(t, "lzma2 empty", {0}, nil, .Lzma2, {dict_size = 64 << 10})
+	lzma_test_unpack(t, "lzma2 4 GiB dict", LZMA_VECTOR_LZMA2, inputs.mixed, .Lzma2, {dict_size = max(u32)})
+	lzma_test_unpack(t, "raw 3 GiB dict", LZMA_VECTOR_RAW_LC0LP2, inputs.text, .Raw, {lc = 0, lp = 2, pb = 0, dict_size = 3 << 30})
 
 	sdk     := LZMA_VECTOR_SDK
 	sdk_raw := sdk[lzma.HEADER_SIZE:]
