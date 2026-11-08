@@ -5,6 +5,7 @@ import "core:compress"
 import "core:compress/lzma"
 import "core:hash"
 import "core:math/rand"
+import "core:mem"
 import "core:testing"
 
 LZMA_TEST_TRAILER :: [5]byte{'O', 'd', 'i', 'n', '!'}
@@ -319,6 +320,45 @@ lzma_invalid :: proc(t: ^testing.T) {
 	testing.expect_value(t, lzma.decompress_lzma2(&output, pieces, 64 << 10), compress.LZMA_Error.Invalid_Chunk)
 }
 
+@(test)
+lzma_lclp_rejects_before_allocating :: proc(t: ^testing.T) {
+	track: mem.Tracking_Allocator
+	mem.tracking_allocator_init(&track, context.allocator)
+	defer mem.tracking_allocator_destroy(&track)
+	tracked := mem.tracking_allocator(&track)
+
+	output := make([dynamic]byte, 0, 1024)
+	defer delete(output)
+
+	stream := [lzma.HEADER_SIZE + 5]byte{(4 * 9) + 8, 0, 0, 1, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 1, 0, 0, 0, 0}
+	testing.expect_value(t, lzma.decompress(&output, stream[:], allocator = tracked), compress.LZMA_Error.Corrupt_Range_Coder)
+	testing.expect_value(t, track.total_memory_allocated, 0)
+
+	stream[lzma.HEADER_SIZE] = 0
+	for i in 1..<5 {
+		stream[lzma.HEADER_SIZE + i] = 0xff
+	}
+	testing.expect_value(t, lzma.decompress(&output, stream[:], allocator = tracked), compress.LZMA_Error.Corrupt_Range_Coder)
+	testing.expect_value(t, track.total_memory_allocated, 0)
+
+	testing.expect_value(t, lzma.decompress(&output, stream[:lzma.HEADER_SIZE], allocator = tracked), compress.General_Error.Stream_Too_Short)
+	testing.expect_value(t, track.total_memory_allocated, 0)
+
+	props := lzma.Properties{lc = 8, lp = 4, dict_size = 1 << 16}
+	testing.expect_value(t, lzma.decompress_raw(&output, stream[lzma.HEADER_SIZE:], props, allocator = tracked), compress.LZMA_Error.Corrupt_Range_Coder)
+	testing.expect_value(t, track.total_memory_allocated, 0)
+
+	for i in 0..<8 {
+		stream[lzma.PROPERTIES_SIZE + i] = 0
+	}
+	for i in 0..<5 {
+		stream[lzma.HEADER_SIZE + i] = 0
+	}
+	testing.expect_value(t, lzma.decompress(&output, stream[:], allocator = tracked), nil)
+	testing.expect(t, track.peak_memory_allocated >= 6 << 20)
+	testing.expect_value(t, track.current_memory_allocated, 0)
+}
+
 LZMA_Reference :: struct {
 	name:       string,
 	level:      lzma.Level,
@@ -405,6 +445,66 @@ lzma_compress_matches_reference :: proc(t: ^testing.T) {
 		testing.expectf(t, serr == nil && written == r.lzma2_size && bytes.equal(slice2, packed2[:]), "%v %v: exact lzma2 slice %v", r.name, r.level, serr)
 		_, _, serr = lzma.compress_lzma2(slice2[:r.lzma2_size - 1], input, options)
 		testing.expectf(t, serr == compress.General_Error.Output_Too_Short, "%v %v: short lzma2 slice %v", r.name, r.level, serr)
+	}
+}
+
+LZMA_Normalize_Reference :: struct {
+	level:      lzma.Level,
+	size:       int,
+	crc:        u32,
+	lzma2_size: int,
+	lzma2_crc:  u32,
+}
+
+@(rodata)
+LZMA_NORMALIZE_REFERENCES := []LZMA_Normalize_Reference{
+	{.Level_1, 57533, 0x9371061c, 57549, 0x557c855c},
+	{.Level_6, 37179, 0x0a08763a, 37186, 0x41fd158b},
+}
+
+lzma_test_normalize_input :: proc() -> []byte {
+	g := Lz4_Test_Lcg{state = 0x4e4f524d}
+	text := lz4_test_lcg_text(&g, 384 << 10)
+	defer delete(text)
+	repeat := lz4_test_lcg_repeat(&g, 128 << 10)
+	defer delete(repeat)
+
+	data := make([]byte, len(text) + len(repeat))
+	copy(data, text)
+	copy(data[len(text):], repeat)
+	return data
+}
+
+@(test)
+lzma_normalize :: proc(t: ^testing.T) {
+	if SLIM_TESTS {
+		return
+	}
+	input := lzma_test_normalize_input()
+	defer delete(input)
+
+	for r in LZMA_NORMALIZE_REFERENCES {
+		options := lzma.level_options(r.level)
+		options.dict_size = 64 << 10
+
+		packed: [dynamic]byte
+		defer delete(packed)
+		props, err := lzma.compress_raw(&packed, input, options)
+		testing.expectf(t, err == nil && len(packed) == r.size && hash.crc32(packed[:]) == r.crc, "%v: raw %v, %v bytes, crc %x, want %v bytes, crc %x", r.level, err, len(packed), hash.crc32(packed[:]), r.size, r.crc)
+
+		output: [dynamic]byte
+		defer delete(output)
+		err = lzma.decompress_raw(&output, packed[:], props, len(input))
+		testing.expectf(t, err == nil && bytes.equal(output[:], input), "%v: raw round trip %v", r.level, err)
+
+		packed2: [dynamic]byte
+		defer delete(packed2)
+		props, err = lzma.compress_lzma2(&packed2, input, options)
+		testing.expectf(t, err == nil && len(packed2) == r.lzma2_size && hash.crc32(packed2[:]) == r.lzma2_crc, "%v: lzma2 %v, %v bytes, crc %x, want %v bytes, crc %x", r.level, err, len(packed2), hash.crc32(packed2[:]), r.lzma2_size, r.lzma2_crc)
+
+		clear(&output)
+		err = lzma.decompress_lzma2(&output, packed2[:], props.dict_size, len(input))
+		testing.expectf(t, err == nil && bytes.equal(output[:], input), "%v: lzma2 round trip %v", r.level, err)
 	}
 }
 
