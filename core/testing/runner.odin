@@ -119,10 +119,11 @@ when TRACKING_MEMORY && FAIL_ON_BAD_MEMORY {
 	}
 }
 
-Task_Timeout :: struct {
+Task_Timeout :: struct #all_or_none {
 	test_index: int,
 	at_time: time.Time,
 	location: runtime.Source_Code_Location,
+	duration: time.Duration,
 }
 
 run_test_task :: proc(task: thread.Task) {
@@ -258,14 +259,21 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	RESERVED_LOG_MESSAGES       :: 64
 	RESERVED_TEST_FAILURES      :: 64
 
-	ERROR_STRING_TIMEOUT : string : "Test timed out."
-	ERROR_STRING_UNKNOWN : string : "Test failed for unknown reasons."
-	OSC_WINDOW_TITLE     : string : ansi.OSC + ansi.WINDOW_TITLE + ";Odin test runner (%i/%i)" + ansi.ST
+	ERROR_STRING_UNKNOWN        : string : "Test failed for unknown reasons."
+	OSC_WINDOW_TITLE            : string : ansi.OSC + ansi.WINDOW_TITLE + ";Odin test runner (%i/%i)" + ansi.ST
+
+	// Formats the message that will be printed (summary + logging) when a test has timed out.
+	// This will return an empty string on allocation failure (`fmt.aprintf` does not return
+	// allocation errors at the time of writing).
+	format_test_timeout_message :: proc(timeout: Task_Timeout, allocator: runtime.Allocator) -> string {
+		// TODO: I want to know which other tests have been running at this time.
+		return fmt.aprintf("Test timed out after %v.", timeout.duration, allocator = allocator)
+	}
 
 	safe_delete_string :: proc(s: string, allocator := context.allocator) {
 		// Guard against bad frees on static strings.
 		switch raw_data(s) {
-		case raw_data(ERROR_STRING_TIMEOUT), raw_data(ERROR_STRING_UNKNOWN):
+		case raw_data(ERROR_STRING_UNKNOWN):
 			return
 		case:
 			delete(s, allocator)
@@ -721,7 +729,9 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 						}
 					}
 
-					if event.disable_timeout {
+					disable_timeout := event.duration == time.MAX_DURATION
+
+					if disable_timeout {
 						if existing_timeout_index >= 0 {
 							unordered_remove(&task_timeouts, existing_timeout_index)
 						} // else: nothing to be disabled
@@ -734,6 +744,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 							test_index = task_channel.test_index,
 							at_time = event.at_time,
 							location = event.location,
+							duration = event.duration,
 						})
 						fmt.assertf(alloc_error == nil, "Error appending to task timeouts: %v", alloc_error)
 					}
@@ -854,8 +865,11 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 			pkg.frame_ready = false
 
+			timeout_message := format_test_timeout_message(timeout^, context.allocator)
+			assert(len(timeout_message) > 0, "Error formatting test timeout message.")
+
 			if timeout.test_index not_in failed_test_reason_map {
-				failed_test_reason_map[timeout.test_index] = ERROR_STRING_TIMEOUT
+				failed_test_reason_map[timeout.test_index] = timeout_message
 			}
 
 			total_failure_count += 1
@@ -864,7 +878,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			now := time.now()
 			_, alloc_error = append(&log_messages, Log_Message {
 				level = .Error,
-				text = format_log_text(.Error, ERROR_STRING_TIMEOUT, Default_Test_Logger_Opts, timeout.location, now),
+				text = format_log_text(.Error, timeout_message, Default_Test_Logger_Opts, timeout.location, now),
 				time = now,
 				allocator = context.allocator,
 			})

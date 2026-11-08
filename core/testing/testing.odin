@@ -174,7 +174,7 @@ set_fail_timeout :: proc(t: ^T, duration: time.Duration, loc := #caller_location
 	chan.send(t.channel, Event_Set_Fail_Timeout {
 		at_time = at_time,
 		location = loc,
-		disable_timeout = disabled,
+		duration = duration,
 	})
 }
 
