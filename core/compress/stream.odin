@@ -182,13 +182,13 @@ output_reservation :: #force_inline proc "contextless" (declared, bound, input_s
 	if declared <= 0 {
 		size = COMPRESS_RESERVE_DEFAULT
 		if input_size >= 0 {
-			size = INITIAL_RESERVATION
-			if input_size <= INITIAL_RESERVATION / INITIAL_RESERVATION_RATIO {
-				size = input_size * INITIAL_RESERVATION_RATIO
+			size = COMPRESS_INITIAL_RESERVATION
+			if input_size <= COMPRESS_INITIAL_RESERVATION / COMPRESS_INITIAL_RESERVATION_RATIO {
+				size = input_size * COMPRESS_INITIAL_RESERVATION_RATIO
 			}
 		}
 	}
-	size = min(size, INITIAL_RESERVATION)
+	size = min(size, COMPRESS_INITIAL_RESERVATION)
 	if bound >= 0 {
 		size = min(size, bound)
 	}

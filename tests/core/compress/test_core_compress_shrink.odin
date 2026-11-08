@@ -261,7 +261,7 @@ shrink_test_reservation :: proc(t: ^testing.T) {
 		err := pkzip_legacy.unshrink(&ctx)
 		compress.destroy_context(&ctx)
 		testing.expect_value(t, err, compress.General_Error.Stream_Too_Short)
-		testing.expectf(t, cap(output) <= compress.INITIAL_RESERVATION, "reserved %v bytes for an unsized stream", cap(output))
+		testing.expectf(t, cap(output) <= compress.COMPRESS_INITIAL_RESERVATION, "reserved %v bytes for an unsized stream", cap(output))
 	}
 }
 
