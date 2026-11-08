@@ -333,8 +333,7 @@ output_ensure :: #force_inline proc(o: ^Output, need: int) -> (err: Error) {
 	if need <= len(o.buf^) {
 		return nil
 	}
-	non_zero_resize(o.buf, compress.output_grow_capacity(len(o.buf^), need, o.limit)) or_return
-	return nil
+	return non_zero_resize(o.buf, compress.output_grow_capacity(len(o.buf^), need, o.limit))
 }
 
 @(private)

@@ -15,6 +15,11 @@ package all
 @(require) import "core:compress/gzip"
 @(require) import "core:compress/zlib"
 @(require) import "core:compress/bzip2"
+@(require) import "core:compress/deflate"
+@(require) import "core:compress/filters"
+@(require) import "core:compress/lz4"
+@(require) import "core:compress/lzma"
+@(require) import "core:compress/ppmd"
 @(require) import pkzip_legacy "core:compress/pkzip-legacy"
 
 @(require) import "core:container/avl"

@@ -76,8 +76,7 @@ output_grow :: proc(o: ^Output) -> (err: Error) {
 	if o.written >= o.limit {
 		return General_Error.Output_Too_Short
 	}
-	non_zero_resize(o.buf, compress.output_grow_capacity(len(o.buf^), o.written + 1, o.limit)) or_return
-	return nil
+	return non_zero_resize(o.buf, compress.output_grow_capacity(len(o.buf^), o.written + 1, o.limit))
 }
 
 @(private)

@@ -70,6 +70,7 @@ Error :: union #shared_nil {
 	PKZIP_Legacy_Error,
 	LZMA_Error,
 	PPMd_Error,
+	BCJ2_Error,
 	io.Error,
 	runtime.Allocator_Error,
 }
@@ -176,6 +177,12 @@ PPMd_Error :: enum {
 	Corrupt_Data,
 	Unexpected_End_Marker,
 	Memory_Limit_Exceeded,
+}
+
+BCJ2_Error :: enum {
+	None = 0,
+	Corrupt_Data,
+	Size_Mismatch,
 }
 
 ZLIB_Error :: enum {
