@@ -383,7 +383,7 @@ MF_CRC_POLY              :: u32(0xEDB8_8320)
 @(private)
 MF_EMPTY_HASH            :: u32(0)
 @(private)
-MF_MAX_VAL_FOR_NORMALIZE :: u32(0)
+MF_MAX_VAL_FOR_NORMALIZE :: u32(#config(LZMA_NORMALIZE_AT, 0))
 
 @(private)
 BAD_REP_CODE             :: u32(0xC000_0000 - 0x400)

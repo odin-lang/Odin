@@ -1945,7 +1945,11 @@ mf_check_limits :: proc "contextless" (mf: ^Match_Finder) {
 	if mf.keep_size_after == mf_avail(mf) {
 		mf_read_block(mf)
 	}
-	if mf.pos == MF_MAX_VAL_FOR_NORMALIZE && mf_avail(mf) >= mf.num_hash_bytes {
+	normalize := mf.pos == MF_MAX_VAL_FOR_NORMALIZE && mf_avail(mf) >= mf.num_hash_bytes
+	when MF_MAX_VAL_FOR_NORMALIZE != 0 {
+		normalize = normalize && mf.pos > mf.history_size + 1
+	}
+	if normalize {
 		sub := mf.pos - mf.history_size - 1
 		mf.pos        -= sub
 		mf.stream_pos -= sub

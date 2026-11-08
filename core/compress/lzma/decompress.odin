@@ -132,14 +132,13 @@ Output :: struct {
 @(private)
 decompress_lzma :: proc(z: ^compress.Context, props: Properties, size: int, from_format: bool, max_output_size: int) -> (err: Error) {
 	d: Decoder
-	decoder_init(&d, props, int(props.lc) + int(props.lp)) or_return
-	defer delete(d.probs)
-
 	o := output_begin(z, size, max_output_size)
 	defer output_end(z, &o)
 
-	decoder_reset_state(&d)
 	rc_init(&d, z) or_return
+	decoder_init(&d, props, int(props.lc) + int(props.lp)) or_return
+	defer delete(d.probs)
+	decoder_reset_state(&d)
 
 	target := size if size >= 0 else o.limit
 	packed := -1
