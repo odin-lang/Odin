@@ -452,7 +452,7 @@ jobs:
   build_linux_riscv64:
     runs-on: ubuntu-latest
     name: Linux riscv64 (emulated) Build, Check and Test
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
 
