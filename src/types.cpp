@@ -3604,6 +3604,18 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 				if (x->BitField.bit_offsets[i] != y->BitField.bit_offsets[i]) {
 					return false;
 				}
+
+				String a_tag = {};
+				String b_tag = {};
+				if (x->BitField.tags != nullptr) {
+					a_tag = x->BitField.tags[i];
+				}
+				if (y->BitField.tags != nullptr) {
+					b_tag = y->BitField.tags[i];
+				}
+				if (a_tag != b_tag) {
+					return false;
+				}
 			}
 			return true;
 		}

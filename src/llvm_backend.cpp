@@ -3842,10 +3842,19 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			// NOTE(bill): Removes need for heap allocation by making it global memory
 			// for each module which defines type info entries
 			isize part_count = gen->type_info_modules.count;
-			auto counts        = array_make<isize>(heap_allocator(), part_count);
-			auto offsets_extra = array_make<isize>(heap_allocator(), part_count);
+
+			struct MemberCounts {
+				isize types;
+				isize names;
+				isize offsets;
+				isize usings;
+				isize tags;
+				isize empty_usings;
+				isize empty_tags;
+				isize enum_indices;
+			};
+			auto counts = array_make<MemberCounts>(heap_allocator(), part_count);
 			defer (array_free(&counts));
-			defer (array_free(&offsets_extra));
 
 			for (auto const &tt : m->info->type_info_types_hash_map) {
 				Type *t = tt.type;
@@ -3857,21 +3866,48 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 					continue;
 				}
 
-				isize part = index % part_count;
+				MemberCounts &c = counts[index % part_count];
 				switch (t->kind) {
 				case Type_Union:
-					counts[part] += t->Union.variants.count;
+					c.types += t->Union.variants.count;
 					break;
-				case Type_Struct:
-					counts[part] += t->Struct.fields.count;
+				case Type_Struct: {
+					isize n = t->Struct.fields.count;
+					c.types   += n;
+					c.names   += n;
+					c.offsets += n;
+					if (lb_type_info_struct_has_usings(t)) {
+						c.usings += n;
+					} else {
+						c.empty_usings = gb_max(c.empty_usings, n);
+					}
+					if (lb_type_info_has_tags(t)) {
+						c.tags += n;
+					} else {
+						c.empty_tags = gb_max(c.empty_tags, n);
+					}
 					break;
+				}
 				case Type_Tuple:
-					counts[part] += t->Tuple.variables.count;
+					c.types += t->Tuple.variables.count;
+					c.names += t->Tuple.variables.count;
 					break;
-				case Type_BitField:
-					counts[part] += t->BitField.fields.count;
-					// Twice is needed for the bit_offsets
-					offsets_extra[part] += t->BitField.fields.count;
+				case Type_BitField: {
+					isize n = t->BitField.fields.count;
+					c.types   += n;
+					c.names   += n;
+					c.offsets += 2*n; // bit_sizes and bit_offsets
+					if (lb_type_info_has_tags(t)) {
+						c.tags += n;
+					} else {
+						c.empty_tags = gb_max(c.empty_tags, n);
+					}
+					break;
+				}
+				case Type_Enum:
+					if (lb_type_info_enum_values_are_indices(t)) {
+						c.enum_indices = gb_max(c.enum_indices, t->Enum.fields.count);
+					}
 					break;
 				}
 			}
@@ -3887,13 +3923,30 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			};
 
 			for (lbModule *tm : gen->type_info_modules) {
-				isize count = counts[tm->type_info_part];
+				MemberCounts const &c = counts[tm->type_info_part];
 				lbTypeInfoMembers *members = permanent_alloc_item<lbTypeInfoMembers>();
-				members->types   = global_type_info_make(tm, LB_TYPE_INFO_TYPES_NAME,   t_type_info_ptr, count);
-				members->names   = global_type_info_make(tm, LB_TYPE_INFO_NAMES_NAME,   t_string,        count);
-				members->offsets = global_type_info_make(tm, LB_TYPE_INFO_OFFSETS_NAME, t_uintptr,       count+offsets_extra[tm->type_info_part]);
-				members->usings  = global_type_info_make(tm, LB_TYPE_INFO_USINGS_NAME,  t_bool,          count);
-				members->tags    = global_type_info_make(tm, LB_TYPE_INFO_TAGS_NAME,    t_string,        count);
+				members->types   = global_type_info_make(tm, LB_TYPE_INFO_TYPES_NAME,   t_type_info_ptr, c.types);
+				members->names   = global_type_info_make(tm, LB_TYPE_INFO_NAMES_NAME,   t_string,        c.names);
+				members->offsets = global_type_info_make(tm, LB_TYPE_INFO_OFFSETS_NAME, t_uintptr,       c.offsets);
+				members->usings  = global_type_info_make(tm, LB_TYPE_INFO_USINGS_NAME,  t_bool,          c.empty_usings + c.usings);
+				members->tags    = global_type_info_make(tm, LB_TYPE_INFO_TAGS_NAME,    t_string,        c.empty_tags   + c.tags);
+
+				members->empty_usings_count = c.empty_usings;
+				members->empty_tags_count   = c.empty_tags;
+				members->usings_index       = c.empty_usings;
+				members->tags_index         = c.empty_tags;
+
+				if (c.enum_indices > 0) {
+					members->enum_indices       = global_type_info_make(tm, LB_TYPE_INFO_ENUM_INDICES_NAME, t_type_info_enum_value, c.enum_indices);
+					members->enum_indices_count = c.enum_indices;
+
+					LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, c.enum_indices);
+					for (isize i = 0; i < c.enum_indices; i++) {
+						values[i] = lb_const_int(tm, t_type_info_enum_value, i).value;
+					}
+					LLVMSetInitializer(members->enum_indices.addr.value, llvm_const_array(tm, lb_type(tm, t_type_info_enum_value), values, c.enum_indices));
+				}
+
 				tm->type_info_members = members;
 			}
 		}
