@@ -81,16 +81,20 @@ get_log_level :: #force_inline proc() -> runtime.Logger_Level {
 @(private) global_log_colors_disabled: bool
 @(private) global_ansi_disabled: bool
 
-JSON :: struct {
+JSON :: struct #all_or_none {
 	total:    int,
 	success:  int,
-	duration: time.Duration,
+	duration: i64, // format: nanoseconds
 	packages: map[string][dynamic]JSON_Test,
 }
 
-JSON_Test :: struct {
-	success: bool,
-	name:    string,
+JSON_Test :: struct #all_or_none {
+	success:     bool,
+	name:        string,
+	start_time:  Maybe(i64), // format: Unix timestamp, nanoseconds
+	end_time:    Maybe(i64), // format: Unix timestamp, nanoseconds
+	runtime:     Maybe(i64), // format: nanoseconds
+	fail_reason: Maybe(string),
 }
 
 end_t :: proc(t: ^T) {
@@ -200,7 +204,8 @@ run_test_task :: proc(task: thread.Task) {
 	new_state : Test_State = .Failed if failed(&data.t) else .Successful
 
 	chan.send(data.t.channel, Event_State_Change {
-		new_state = new_state,
+		new_state   = new_state,
+		finished_at = time.now(),
 	})
 }
 
@@ -436,6 +441,12 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	// -- Allocate.
 
+	// NOTE(Feoramund): This is the allocator that will be used by threads to
+	// persist log messages past their lifetimes. It has its own variable name
+	// in the event it needs to be changed from `context.allocator` without
+	// digging through the source to divine everywhere it is used for that.
+	shared_log_allocator := context.allocator
+
 	pool_stack: mem.Rollback_Stack
 	alloc_error = mem.rollback_stack_init(&pool_stack, POOL_BLOCK_SIZE)
 	fmt.assertf(alloc_error == nil, "Error allocating memory for thread pool: %v", alloc_error)
@@ -541,10 +552,22 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	fmt.assertf(alloc_error == nil, "Error allocating memory for test start times: %v", alloc_error)
 	defer delete(test_start_times)
 
+	// Used to record the total runtimes of tests.
+	test_end_times: []time.Time = ---
+	test_end_times, alloc_error = make([]time.Time, total_test_count)
+	fmt.assertf(alloc_error == nil, "Error allocating memory for test end times: %v", alloc_error)
+	defer delete(test_end_times)
+
+	// NOTE: All strings that go in this map are expected to be allocated with shared_log_allocator.
 	failed_test_reason_map: map[int]string = ---
 	failed_test_reason_map, alloc_error = make(map[int]string, RESERVED_TEST_FAILURES)
 	fmt.assertf(alloc_error == nil, "Error allocating memory for failed test reasons: %v", alloc_error)
-	defer delete(failed_test_reason_map)
+	defer {
+		for _, fail_reason in failed_test_reason_map {
+			safe_delete_string(fail_reason, shared_log_allocator)
+		}
+		delete(failed_test_reason_map)
+	}
 
 	log_messages: [dynamic]Log_Message = ---
 	log_messages, alloc_error = make([dynamic]Log_Message, 0, RESERVED_LOG_MESSAGES)
@@ -569,12 +592,6 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	}
 
 	// -- Setup initial tasks.
-
-	// NOTE(Feoramund): This is the allocator that will be used by threads to
-	// persist log messages past their lifetimes. It has its own variable name
-	// in the event it needs to be changed from `context.allocator` without
-	// digging through the source to divine everywhere it is used for that.
-	shared_log_allocator := context.allocator
 
 	logger_options := Default_Test_Logger_Opts - {.Short_File_Path, .Line, .Procedure}
 	if global_log_colors_disabled {
@@ -737,6 +754,10 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 				case Event_State_Change:
 					#no_bounds_check report.all_test_states[task_channel.test_index] = event.new_state
+					#partial switch event.new_state {
+					case .Successful, .Failed:
+						#no_bounds_check test_end_times[task_channel.test_index] = event.finished_at
+					}
 
 					#no_bounds_check it := internal_tests[task_channel.test_index]
 					#no_bounds_check pkg := report.packages_by_name[it.pkg]
@@ -858,6 +879,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 			passed := reason == .Successful_Stop && !failed(&task_data.t)
 			#no_bounds_check report.all_test_states[test_index] = .Successful if passed else .Failed
+			#no_bounds_check test_end_times[test_index] = time.now()
 
 			if !passed && !task_data.t._fail_now_called {
 				if test_index not_in failed_test_reason_map {
@@ -902,14 +924,16 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				continue check_timeouts
 			}
 
+			now := time.now()
+
 			#no_bounds_check report.all_test_states[timeout.test_index] = .Failed
+			#no_bounds_check test_end_times[timeout.test_index] = now
 
 			#no_bounds_check it  := internal_tests[timeout.test_index]
 			#no_bounds_check pkg := report.packages_by_name[it.pkg]
 
 			pkg.frame_ready = false
-
-			now := time.now()
+			
 			timeout_message_short, timeout_message_full := format_test_timeout_message(
 				timeout^,
 				it,
@@ -917,16 +941,16 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				report.all_test_states,
 				test_start_times,
 				now,
-				context.allocator,
+				shared_log_allocator,
 			)
-			defer delete(timeout_message_full, context.allocator)
+			defer delete(timeout_message_full, shared_log_allocator)
 			assert(len(timeout_message_short) > 0, "Error formatting test timeout message (short).")
 			assert(len(timeout_message_full) > 0, "Error formatting test timeout message (full).")
 
 			if timeout.test_index not_in failed_test_reason_map {
 				failed_test_reason_map[timeout.test_index] = timeout_message_short
 			} else {
-				delete(timeout_message_short, context.allocator)
+				delete(timeout_message_short, shared_log_allocator)
 			}
 
 			total_failure_count += 1
@@ -936,7 +960,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				level = .Error,
 				text = format_log_text(.Error, timeout_message_full, Default_Test_Logger_Opts, timeout.location, now),
 				time = now,
-				allocator = context.allocator,
+				allocator = shared_log_allocator,
 			})
 			fmt.assertf(alloc_error == nil, "Error appending to log messages: %v", alloc_error)
 
@@ -1056,14 +1080,13 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		slice.sort(sorted_failed_test_reasons[:])
 
 		for test_index in sorted_failed_test_reasons {
-			#no_bounds_check last_error := failed_test_reason_map[test_index]
+			#no_bounds_check fail_reason := failed_test_reason_map[test_index]
 			#no_bounds_check it := internal_tests[test_index]
 			pkg_and_name := fmt.tprintf("%s.%s", it.pkg, it.name)
 			fmt.wprintfln(batch_writer, " - %- *[1]s\t%s",
 				pkg_and_name,
 				report.pkg_column_len + report.test_column_len,
-				last_error)
-			safe_delete_string(last_error, shared_log_allocator)
+				fail_reason)
 		}
 
 		if total_success_count > 0 {
@@ -1120,20 +1143,35 @@ To partly mitigate this, redirect STDERR to a file or use the -define:ODIN_TEST_
 
 		for test, i in report.all_tests {
 			#no_bounds_check state := report.all_test_states[i]
+			test_start_time := test_start_times[i]
+			test_end_time := test_end_times[i]
+			test_runtime_seconds: Maybe(i64)
+			if test_start_time != {} && test_end_time != {} {
+				test_runtime_seconds = time.duration_nanoseconds(time.diff(test_start_time, test_end_time))
+			}
+			fail_reason, fail_reason_ok := failed_test_reason_map[i]
 
 			if test.pkg not_in json_report.packages {
 				json_report.packages[test.pkg] = {}
 			}
 
 			tests := &json_report.packages[test.pkg]
-			append(tests, JSON_Test{name = test.name, success = state == .Successful})
+
+			append(tests, JSON_Test {
+				name         = test.name,
+				success      = state == .Successful,
+				start_time   = test_start_time == {} ? nil : time.time_to_unix_nano(test_start_time),
+				end_time     = test_end_time == {} ? nil : time.time_to_unix_nano(test_end_time),
+				runtime      = test_runtime_seconds,
+				fail_reason  = fail_reason_ok ? fail_reason : nil,
+			})
 		}
 
-		json_report.total    = len(internal_tests)
-		json_report.success  = total_success_count
-		json_report.duration = finished_in
+		json_report.total     = len(internal_tests)
+		json_report.success   = total_success_count
+		json_report.duration  = time.duration_nanoseconds(finished_in)
 
-		json_err := json.marshal_to_writer(os.to_stream(json_fd), json_report, &{ pretty = true })
+		json_err := json.marshal_to_writer(os.to_stream(json_fd), json_report, { pretty = true })
 		fmt.assertf(json_err == nil, "Error writing JSON report: %v", json_err)
 	}
 
