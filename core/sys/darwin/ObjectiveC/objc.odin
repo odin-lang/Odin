@@ -5,6 +5,7 @@ package darwin_ObjectiveC
 import "base:intrinsics"
 import "core:c"
 
+@(ignore_duplicates)
 foreign import lib "system:objc"
 
 id    :: ^intrinsics.objc_object
