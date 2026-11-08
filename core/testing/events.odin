@@ -34,7 +34,8 @@ Event_New_Test :: struct {
 }
 
 Event_State_Change :: struct {
-	new_state: Test_State,
+	new_state:  Test_State,
+	finished_at: time.Time,
 }
 
 Event_Set_Fail_Timeout :: struct {
