@@ -4,8 +4,6 @@ package compress
 import "base:runtime"
 import "core:io"
 
-// TODO-UPDATE-COMMENT: `INITIAL_RESERVATION` and `INITIAL_RESERVATION_RATIO` were renamed to `COMPRESS_INITIAL_RESERVATION` and `COMPRESS_INITIAL_RESERVATION_RATIO`
-// ---
 /*
 	Copyright 2021-2026 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's license.
@@ -18,9 +16,9 @@ import "core:io"
 
 	`COMPRESS_OUTPUT_ALLOCATE_MAX` bounds the maximum a buffer will grow to as needed.
 
-	`INITIAL_RESERVATION` bounds what we'll pre-allocate up front. If you pass the payload size,
+	`COMPRESS_INITIAL_RESERVATION` bounds what we'll pre-allocate up front. If you pass the payload size,
 	we reserve up to that size. If you don't, but the input size is known, we reserve up to
-	`INITIAL_RESERVATION_RATIO` times the input size, otherwise 64 KiB. The reservation never
+	`COMPRESS_INITIAL_RESERVATION_RATIO` times the input size, otherwise 64 KiB. The reservation never
 	exceeds what the input could decompress to.
 
 	These defaults are deliberately conservative: a hostile payload can't make us allocate far

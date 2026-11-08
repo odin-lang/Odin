@@ -367,9 +367,9 @@ decode_segment :: proc(d: ^Decoder, z: ^compress.Context, o: ^Output, limit: int
 		output_ensure(o, o.written + 1) or_return
 		cur_limit := min(len(o.buf^), limit)
 		if d.check_dict == 0 {
-			rem := int(d.dict_size - d.processed)
-			if cur_limit - o.written > rem {
-				cur_limit = o.written + rem
+			rem := uint(d.dict_size - d.processed)
+			if uint(cur_limit - o.written) > rem {
+				cur_limit = o.written + int(rem)
 			}
 		}
 
