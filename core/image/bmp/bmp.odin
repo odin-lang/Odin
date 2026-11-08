@@ -1,6 +1,14 @@
 // Reader and writer for Microsoft `BMP` images.
 package core_image_bmp
 
+/*
+	Copyright 2024 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+*/
+
 import "core:image"
 import "core:compress"
 import "core:mem"

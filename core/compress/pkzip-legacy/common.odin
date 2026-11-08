@@ -1,6 +1,21 @@
+// Decoders for PKZIP's legacy compression methods: Shrink (1), Reduce (2-5) and Implode (6).
 package compress_pkzip_legacy
 
 import "core:compress"
+
+/*
+	Copyright 2026 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+
+	Format: PKWARE's APPNOTE.TXT, sections 5.1-5.3 (UnShrinking, Expanding, Imploding):
+		https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
+
+	Fuzzed against hwzip, Hans Wennborg's public domain zip implementation:
+		https://www.hanshq.net/zip.html
+*/
 
 Error              :: compress.Error
 General_Error      :: compress.General_Error
