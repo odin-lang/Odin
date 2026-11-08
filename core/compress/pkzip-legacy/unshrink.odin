@@ -18,7 +18,7 @@ unshrink_from_context :: proc(z: ^compress.Context, expected_output_size := -1, 
 		return General_Error.Incompatible_Options
 	}
 
-	expected := output_limit(z, expected_output_size, max_output_size, SHRINK_EXPANSION_MAX) or_return
+	expected := output_limit(z, expected_output_size, max_output_size, compress.SHRINK_EXPANSION_MAX) or_return
 	if expected == 0 {
 		return nil
 	}

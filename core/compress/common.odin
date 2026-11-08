@@ -4,6 +4,8 @@ package compress
 import "base:runtime"
 import "core:io"
 
+// TODO-UPDATE-COMMENT: `INITIAL_RESERVATION` and `INITIAL_RESERVATION_RATIO` were renamed to `COMPRESS_INITIAL_RESERVATION` and `COMPRESS_INITIAL_RESERVATION_RATIO`
+// ---
 /*
 	Copyright 2021-2026 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's license.
@@ -14,8 +16,21 @@ import "core:io"
 	These settings bound how much compression algorithms will allocate for their output buffer.
 	If streaming their output, these are unnecessary and will be ignored.
 
-	This bounds the maximum a buffer will resize to as needed, or the maximum we'll
-	pre-allocate if you inform the decompression routine you know the payload size.
+	`COMPRESS_OUTPUT_ALLOCATE_MAX` bounds the maximum a buffer will grow to as needed.
+
+	`INITIAL_RESERVATION` bounds what we'll pre-allocate up front. If you pass the payload size,
+	we reserve up to that size. If you don't, but the input size is known, we reserve up to
+	`INITIAL_RESERVATION_RATIO` times the input size, otherwise 64 KiB. The reservation never
+	exceeds what the input could decompress to.
+
+	These defaults are deliberately conservative: a hostile payload can't make us allocate far
+	ahead of the data it actually produces. All three can be tuned at compile time with `-define`.
+
+	The caller still has the final say. Pass in a dynamic array that's already reserved, and if
+	its capacity exceeds what we'd reserve, we use it as is and only grow it once the output
+	outgrows it. Reserve the full expected size up front and the buffer never needs to regrow
+	or be copied, which wins back the throughput the conservative defaults give up, at whatever
+	memory cost you're willing to bear.
 
 	For reference, the largest payload size of a GZIP file is 4 GiB.
 
@@ -31,6 +46,22 @@ when size_of(uintptr) == 8 {
 	COMPRESS_OUTPUT_ALLOCATE_MAX :: int(#config(COMPRESS_OUTPUT_ALLOCATE_MAX, 1 << 29))
 }
 
+COMPRESS_RESERVE_DEFAULT           :: 64 * 1024
+COMPRESS_INITIAL_RESERVATION       :: int(#config(COMPRESS_INITIAL_RESERVATION, 16 * 1024 * 1024))
+COMPRESS_INITIAL_RESERVATION_RATIO :: int(#config(COMPRESS_INITIAL_RESERVATION_RATIO, 4))
+COMPRESS_GROWTH_MIN                :: 4 * 1024
+COMPRESS_GROWTH_STEP               :: 16 * 1024 * 1024
+#assert(COMPRESS_INITIAL_RESERVATION_RATIO >= 1 && COMPRESS_INITIAL_RESERVATION_RATIO <= 4)
+
+DEFLATE_EXPANSION_MAX   :: 1032
+DEFLATE64_EXPANSION_MAX :: 29128
+LZ4_EXPANSION_MAX       :: 255
+BZIP2_EXPANSION_MAX     :: 2_331_000
+SHRINK_EXPANSION_MAX    :: 8192
+REDUCE_EXPANSION_MAX    :: 512
+IMPLODE_EXPANSION_MAX   :: 256
+LZMA_EXPANSION_MAX      :: 7168
+
 Error :: union #shared_nil {
 	General_Error,
 	Deflate_Error,
@@ -39,6 +70,7 @@ Error :: union #shared_nil {
 	LZ4_Error,
 	BZip2_Error,
 	PKZIP_Legacy_Error,
+	LZMA_Error,
 	io.Error,
 	runtime.Allocator_Error,
 }
@@ -113,6 +145,18 @@ BZip2_Error :: enum {
 	Block_Too_Large,
 	Block_Checksum_Failed,
 	Stream_Checksum_Failed,
+	Input_Too_Large,
+}
+
+LZMA_Error :: enum {
+	None = 0,
+	Invalid_Properties,
+	Invalid_Header,
+	Corrupt_Range_Coder,
+	Invalid_Distance,
+	Unexpected_End_Marker,
+	Size_Mismatch,
+	Invalid_Chunk,
 	Input_Too_Large,
 }
 
