@@ -58,6 +58,7 @@ BZIP2_EXPANSION_MAX     :: 2_331_000
 SHRINK_EXPANSION_MAX    :: 8192
 REDUCE_EXPANSION_MAX    :: 512
 IMPLODE_EXPANSION_MAX   :: 256
+LZMA_EXPANSION_MAX      :: 7168
 
 Error :: union #shared_nil {
 	General_Error,
@@ -67,6 +68,7 @@ Error :: union #shared_nil {
 	LZ4_Error,
 	BZip2_Error,
 	PKZIP_Legacy_Error,
+	LZMA_Error,
 	io.Error,
 	runtime.Allocator_Error,
 }
@@ -141,6 +143,18 @@ BZip2_Error :: enum {
 	Block_Too_Large,
 	Block_Checksum_Failed,
 	Stream_Checksum_Failed,
+	Input_Too_Large,
+}
+
+LZMA_Error :: enum {
+	None = 0,
+	Invalid_Properties,
+	Invalid_Header,
+	Corrupt_Range_Coder,
+	Invalid_Distance,
+	Unexpected_End_Marker,
+	Size_Mismatch,
+	Invalid_Chunk,
 	Input_Too_Large,
 }
 
