@@ -320,7 +320,7 @@ XXH3_64_digest :: proc(state: ^XXH3_state) -> (hash: XXH64_hash) {
 	}
 
 	/* totalLen <= XXH3_MIDSIZE_MAX: digesting a short input */
-	if state.seed == 0 {
+	if state.seed != 0 {
 		return XXH3_64_with_seed(state.buffer[:state.total_length], state.seed)
 	}
 	return XXH3_64_with_secret(state.buffer[:state.total_length], secret[:state.secret_limit + XXH_STRIPE_LEN])
