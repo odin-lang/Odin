@@ -30,6 +30,7 @@ Task_Channel :: struct {
 
 Event_New_Test :: struct {
 	test_index: int,
+	started_at: time.Time,
 }
 
 Event_State_Change :: struct {
@@ -39,7 +40,10 @@ Event_State_Change :: struct {
 Event_Set_Fail_Timeout :: struct {
 	at_time: time.Time,
 	location: runtime.Source_Code_Location,
-	disable_timeout: bool,
+	// `duration` is the original timeout duration set by the test.
+	// When set to `time.MAX_DURATION`, the timeout should be disabled.
+	// This value is printed in the output if the test times out.
+	duration: time.Duration,
 }
 
 Event_Log_Message :: struct {
