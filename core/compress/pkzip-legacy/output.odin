@@ -30,8 +30,7 @@ output_limit :: proc(z: ^compress.Context, expected_output_size, max_output_size
 
 @(private)
 grow :: proc(z: ^compress.Context, start, limit, need: int) -> (err: Error) {
-	non_zero_reserve(z.output, start + compress.output_grow_capacity(cap(z.output) - start, need, limit)) or_return
-	return nil
+	return non_zero_reserve(z.output, start + compress.output_grow_capacity(cap(z.output) - start, need, limit))
 }
 
 @(private)

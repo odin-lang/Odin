@@ -618,8 +618,7 @@ bzip2_grow :: proc(output: ^[dynamic]u8, need, limit: int) -> (err: Error) {
 	if need > cap(output) {
 		non_zero_reserve(output, compress.output_grow_capacity(cap(output), need, limit)) or_return
 	}
-	non_zero_resize(output, cap(output)) or_return
-	return nil
+	return non_zero_resize(output, cap(output))
 }
 
 @(private)
