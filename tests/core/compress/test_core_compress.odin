@@ -49,6 +49,9 @@ zlib_test :: proc(t: ^testing.T) {
 	testing.expect(t, s[68] == 240 && s[69] == 159 && s[70] == 152, "ZLIB result should've contained 😃 at position 68.")
 	testing.expect(t, len(s) == 438, "ZLIB result has an unexpected length.")
 	delete(buf)
+	for kind in Stream_Kind {
+		sinks_check(t, "ODIN_DEMO", .Zlib, kind, ODIN_DEMO)
+	}
 
 	expect_truncated_fails(t, "ODIN_DEMO", .ZLIB, ODIN_DEMO)
 }
@@ -74,6 +77,9 @@ gzip_test :: proc(t: ^testing.T) {
 	testing.expect(t, string(buf[:]) == "payload", "GZIP result wasn't 'payload'")
 
 	delete(buf)
+	for kind in Stream_Kind {
+		sinks_check(t, "TEST", .Gzip, kind, TEST)
+	}
 
 	expect_truncated_fails(t, "TEST", .GZIP, TEST)
 }
@@ -106,6 +112,7 @@ expect_slice_fails :: proc(t: ^testing.T, name, kept: string, format: Deflate_Fo
 		compress.destroy_context(&ctx)
 		delete(output)
 		testing.expectf(t, ctx_err != nil, "%v, %v, %v: %v %v of %v bytes decompressed without error", name, format, kind, kept, len(data), full)
+		sinks_check(t, name, sinks_format(format), kind, data)
 	}
 }
 

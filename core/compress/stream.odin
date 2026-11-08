@@ -200,6 +200,14 @@ output_grow_capacity :: #force_inline proc "contextless" (capacity, need, limit:
 	return min(max(capacity + step, need), limit)
 }
 
+output_limit :: #force_inline proc "contextless" (options: Options) -> (limit: int) {
+	return COMPRESS_OUTPUT_ALLOCATE_MAX if options.max_output_size == 0 else options.max_output_size
+}
+
+memory_limit :: #force_inline proc "contextless" (options: Options) -> (limit: int) {
+	return COMPRESS_MEMORY_MAX if options.max_memory == 0 else options.max_memory
+}
+
 @(optimization_mode="favor_size")
 read_ptr :: proc(z: ^Context, ptr: ^$T) -> (err: io.Error) #no_bounds_check {
 	return read_slice(z, ([^]byte)(ptr)[:size_of(T)])

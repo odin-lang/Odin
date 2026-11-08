@@ -330,15 +330,17 @@ d64_ref_inflate :: proc(data: []byte, format: D64_Format, out: ^[dynamic]byte, s
 	}
 }
 
-d64_unpack :: proc(format: D64_Format, kind: Stream_Kind, input: []byte, output: ^[dynamic]byte, expected := -1, limit := compress.COMPRESS_OUTPUT_ALLOCATE_MAX) -> compress.Error {
+d64_unpack :: proc(t: ^testing.T, format: D64_Format, kind: Stream_Kind, input: []byte, output: ^[dynamic]byte, expected := -1, limit := compress.COMPRESS_OUTPUT_ALLOCATE_MAX) -> compress.Error {
+	options := compress.Options{max_output_size = limit}
+	sinks_check(t, "d64", .Raw64 if format == .Deflate64 else .Raw, kind, input, expected, options)
 	input := input
 	br: bytes.Reader
 	tr: Trickle_Reader
 	ctx := stream_test_context(kind, &input, &br, &tr, output)
 	defer compress.destroy_context(&ctx)
 	switch format {
-	case .Deflate:   return deflate.inflate_raw(&ctx, expected, limit)
-	case .Deflate64: return deflate.inflate64_raw(&ctx, expected, limit)
+	case .Deflate:   return deflate.inflate_raw(&ctx, expected, options)
+	case .Deflate64: return deflate.inflate64_raw(&ctx, expected, options)
 	}
 	return nil
 }
@@ -397,7 +399,7 @@ d64_round_trip :: proc(t: ^testing.T, name: string, data: []byte) {
 		for kind in Stream_Kind {
 			output: [dynamic]byte
 			defer delete(output)
-			unpack_err := d64_unpack(.Deflate64, kind, packed[:], &output)
+			unpack_err := d64_unpack(t, .Deflate64, kind, packed[:], &output)
 			testing.expectf(t, unpack_err == nil, "%v, %v, %v: inflate64 returned %v", name, level, kind, unpack_err)
 			testing.expectf(t, bytes.equal(output[:], data), "%v, %v, %v: output differs", name, level, kind)
 		}
@@ -499,7 +501,7 @@ d64_check_both :: proc(t: ^testing.T, name: string, stream: []byte, expected_64:
 	for kind in Stream_Kind {
 		output: [dynamic]byte
 		defer delete(output)
-		err := d64_unpack(.Deflate64, kind, stream, &output)
+		err := d64_unpack(t, .Deflate64, kind, stream, &output)
 		testing.expectf(t, err == err_64, "%v, %v: inflate64 returned %v, expected %v", name, kind, err, err_64)
 		if err_64 == nil {
 			testing.expectf(t, bytes.equal(output[:], expected_64), "%v, %v: inflate64 output differs, %v bytes", name, kind, len(output))
@@ -507,7 +509,7 @@ d64_check_both :: proc(t: ^testing.T, name: string, stream: []byte, expected_64:
 		if check_8 {
 			output_8: [dynamic]byte
 			defer delete(output_8)
-			err8 := d64_unpack(.Deflate, kind, stream, &output_8)
+			err8 := d64_unpack(t, .Deflate, kind, stream, &output_8)
 			testing.expectf(t, err8 == err_8, "%v, %v: inflate returned %v, expected %v", name, kind, err8, err_8)
 		}
 	}
@@ -746,7 +748,7 @@ deflate64_truncated :: proc(t: ^testing.T) {
 		for kind in ([]Stream_Kind{.Memory, .Bytes_Reader}) {
 			output: [dynamic]byte
 			defer delete(output)
-			err := d64_unpack(.Deflate64, kind, packed[:n], &output)
+			err := d64_unpack(t, .Deflate64, kind, packed[:n], &output)
 			testing.expectf(t, err != nil, "%v bytes of %v, %v: truncated stream accepted", n, len(packed), kind)
 		}
 	}
@@ -764,7 +766,7 @@ deflate64_limits :: proc(t: ^testing.T) {
 		for expected in ([]int{len(data), 100, 65537}) {
 			output: [dynamic]byte
 			defer delete(output)
-			err := d64_unpack(.Deflate64, kind, packed[:], &output, expected)
+			err := d64_unpack(t, .Deflate64, kind, packed[:], &output, expected)
 			if expected == len(data) {
 				testing.expectf(t, err == nil, "%v: %v", kind, err)
 				testing.expectf(t, len(output) == len(data), "%v: %v bytes", kind, len(output))
@@ -779,7 +781,7 @@ deflate64_limits :: proc(t: ^testing.T) {
 		for limit in ([]int{64 * 1024, 64 * 1024 + 1}) {
 			output: [dynamic]byte
 			defer delete(output)
-			err := d64_unpack(.Deflate64, kind, packed[:], &output, -1, limit)
+			err := d64_unpack(t, .Deflate64, kind, packed[:], &output, -1, limit)
 			testing.expectf(t, err == compress.General_Error.Output_Too_Short, "%v, limit %v: %v", kind, limit, err)
 			testing.expectf(t, cap(output) <= limit, "%v: capacity %v for a maximum of %v", kind, cap(output), limit)
 		}
@@ -788,10 +790,10 @@ deflate64_limits :: proc(t: ^testing.T) {
 	{
 		output: [dynamic]byte
 		defer delete(output)
-		err_64 := d64_unpack(.Deflate64, .Memory, packed[:], &output, -1, -1)
+		err_64 := d64_unpack(t, .Deflate64, .Memory, packed[:], &output, -1, -1)
 		output_8: [dynamic]byte
 		defer delete(output_8)
-		err_8 := d64_unpack(.Deflate, .Memory, packed[:], &output_8, -1, -1)
+		err_8 := d64_unpack(t, .Deflate, .Memory, packed[:], &output_8, -1, -1)
 		testing.expectf(t, err_64 == err_8 && err_64 != nil, "negative limit gave %v and %v", err_64, err_8)
 	}
 }
@@ -846,7 +848,7 @@ deflate64_7zip_vector :: proc(t: ^testing.T) {
 	for kind in Stream_Kind {
 		output: [dynamic]byte
 		defer delete(output)
-		unpack_err := d64_unpack(.Deflate64, kind, packed, &output)
+		unpack_err := d64_unpack(t, .Deflate64, kind, packed, &output)
 		testing.expectf(t, unpack_err == nil, "%v: %v", kind, unpack_err)
 		testing.expectf(t, len(output) == len(data) && hash.crc32(output[:]) == hash.crc32(data[:]), "%v: output differs, %v bytes", kind, len(output))
 	}
@@ -1241,7 +1243,7 @@ d64_differential :: proc(t: ^testing.T, format: D64_Format, stream: []byte, labe
 	for k in ([]Stream_Kind{.Memory, kind}) {
 		output: [dynamic]byte
 		defer delete(output)
-		err := d64_unpack(format, k, stream, &output)
+		err := d64_unpack(t, format, k, stream, &output)
 		if ok != (err == nil) {
 			testing.expectf(t, false, "%v %v %v: reference ok %v, ours %v (%v bytes in, %v out)", label, format, k, ok, err, len(stream), len(reference))
 			return
@@ -1256,7 +1258,7 @@ d64_differential :: proc(t: ^testing.T, format: D64_Format, stream: []byte, labe
 		expected := 1 + rand.int_max(len(reference) - 1) if rand.int_max(2) == 0 else len(reference)
 		output: [dynamic]byte
 		defer delete(output)
-		err := d64_unpack(format, .Memory, stream, &output, expected)
+		err := d64_unpack(t, format, .Memory, stream, &output, expected)
 		if expected == len(reference) {
 			testing.expectf(t, err == nil && cap(output) == expected, "%v %v: exact size %v gave %v, capacity %v", label, format, expected, err, cap(output))
 		} else {

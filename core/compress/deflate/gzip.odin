@@ -6,14 +6,14 @@ import "core:io"
 
 inflate_gzip :: proc{inflate_gzip_from_context, inflate_gzip_from_bytes}
 
-inflate_gzip_from_context :: proc(z: ^compress.Context, expected_output_size := -1, max_output_size := compress.COMPRESS_OUTPUT_ALLOCATE_MAX, allocator := context.allocator) -> (err: Error) {
+inflate_gzip_from_context :: proc(z: ^compress.Context, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
 	expected_output_size := expected_output_size
 	if expected_output_size <= 0 && z.size_unpacked > 0 {
 		expected_output_size = int(min(z.size_unpacked, i64(max(int))))
 	}
-	if expected_output_size > max_output_size {
+	if expected_output_size > compress.output_limit(options) {
 		return General_Error.Output_Exceeds_COMPRESS_OUTPUT_ALLOCATE_MAX
 	}
 
@@ -26,7 +26,7 @@ inflate_gzip_from_context :: proc(z: ^compress.Context, expected_output_size := 
 	for {
 		inflate_gzip_header(z) or_return
 		digest := u32(0)
-		output := inflate_to_buffer(z, expected_output_size, max_output_size, start, size_hint, .CRC32, &digest, false) or_return
+		output := inflate_to_buffer(z, expected_output_size, compress.output_limit(options), start, size_hint, .CRC32, &digest, false) or_return
 		member := output[start:]
 
 		trailer, trailer_err := compress.read_data(z, Gzip_Trailer)
@@ -48,10 +48,14 @@ inflate_gzip_from_context :: proc(z: ^compress.Context, expected_output_size := 
 	}
 }
 
-inflate_gzip_from_bytes :: proc(output: ^[dynamic]u8, input: []u8, expected_output_size := -1, max_output_size := compress.COMPRESS_OUTPUT_ALLOCATE_MAX, allocator := context.allocator) -> (err: Error) {
+inflate_gzip_from_bytes :: proc(output: ^[dynamic]u8, input: []u8, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
 	input := input
 	ctx   := compress.init_context_from_slice(&input, output=output)
-	return inflate_gzip_from_context(&ctx, expected_output_size, max_output_size, allocator)
+	return inflate_gzip_from_context(&ctx, expected_output_size, options, allocator)
+}
+
+inflate_gzip_to_writer :: proc(w: io.Writer, z: ^compress.Context, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
+	return inflate_stream_to_writer(w, z, .Gzip, expected_output_size, options, allocator)
 }
 
 @(private)

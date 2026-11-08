@@ -38,6 +38,8 @@ zip_deflate_test_reference :: proc(t: ^testing.T) {
 		testing.expectf(t, err == nil, "%v: %v", m.name, err)
 		testing.expectf(t, len(output) == m.unpacked, "%v: size %v, expected %v", m.name, len(output), m.unpacked)
 		testing.expectf(t, hash.crc32(output[:]) == m.crc, "%v: CRC mismatch", m.name)
+		sinks_check(t, m.name, .Raw if u16(m.method) == 8 else .Raw64, .Memory, m.data, m.unpacked)
+		sinks_check(t, m.name, .Raw if u16(m.method) == 8 else .Raw64, .Odd_Chunks_Seekable, m.data)
 	}
 	testing.expectf(t, found[0] >= 20, "expected at least 20 Deflated members, found %v", found[0])
 	testing.expectf(t, found[1] >= 10, "expected at least 10 Deflate64 members, found %v", found[1])

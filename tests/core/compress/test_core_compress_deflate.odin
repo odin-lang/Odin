@@ -63,6 +63,7 @@ deflate_test_round_trip :: proc(t: ^testing.T, name: string, data: []byte) {
 				rest: [5]byte
 				rest_err := compress.read_slice(&ctx, rest[:])
 				testing.expectf(t, rest_err == nil && rest == DEFLATE_TEST_TRAILER, "%v, %v, %v, %v: bytes after the stream were %v, %v", name, format, level, kind, rest, rest_err)
+				sinks_check(t, name, sinks_format(format), kind, packed[:])
 			}
 		}
 	}
@@ -138,6 +139,7 @@ compress_gzip_multiple_members :: proc(t: ^testing.T) {
 		rest: [5]byte
 		rest_err := compress.read_slice(&ctx, rest[:])
 		testing.expectf(t, rest_err == nil && rest == DEFLATE_TEST_TRAILER, "%v: bytes after the stream were %v, %v", kind, rest, rest_err)
+		sinks_check(t, "multiple members", .Gzip, kind, packed[:])
 	}
 }
 
@@ -164,6 +166,9 @@ compress_gzip_bad_trailer :: proc(t: ^testing.T) {
 		defer delete(output)
 		err := deflate.inflate_gzip(&output, raw)
 		testing.expectf(t, err == c.want, "corrupt byte %v: inflate_gzip returned %v, expected %v", c.offset, err, c.want)
+		for kind in Stream_Kind {
+			sinks_check(t, "bad trailer", .Gzip, kind, raw)
+		}
 		raw[c.offset] ~= 0x55
 	}
 }
@@ -190,6 +195,7 @@ compress_gzip_header_crc :: proc(t: ^testing.T) {
 		err := deflate.inflate_gzip(&ctx)
 		testing.expectf(t, err == nil, "%v: inflate_gzip returned %v", kind, err)
 		testing.expectf(t, string(output[:]) == expected, "%v: output was %q", kind, string(output[:]))
+		sinks_check(t, "header crc", .Gzip, kind, packed[:])
 	}
 
 	for offset in ([]int{4, 9, 12, 17, 22, 30, 37, 38}) {
@@ -198,6 +204,7 @@ compress_gzip_header_crc :: proc(t: ^testing.T) {
 		defer delete(output)
 		err := deflate.inflate_gzip(&output, packed[:])
 		testing.expectf(t, err == compress.GZIP_Error.Header_CRC_Invalid, "corrupt byte %v: inflate_gzip returned %v", offset, err)
+		sinks_check(t, "header crc", .Gzip, .One_Byte_No_Seek, packed[:])
 		packed[offset] ~= 0x55
 	}
 
@@ -259,6 +266,7 @@ compress_gzip_header_max_extra :: proc(t: ^testing.T) {
 			err := deflate.inflate_gzip(&ctx)
 			testing.expectf(t, err == nil, "checked %v, %v: inflate_gzip returned %v", checked, kind, err)
 			testing.expectf(t, bytes.equal(output[:], data), "checked %v, %v: output differs", checked, kind)
+			sinks_check(t, "max extra", .Gzip, kind, packed[:])
 		}
 
 		packed[40_000] ~= 0x55

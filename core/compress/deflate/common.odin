@@ -21,7 +21,9 @@ package compress_deflate
 */
 
 import "base:intrinsics"
+import "base:runtime"
 import "core:compress"
+import "core:io"
 
 // `SMALL_INPUT_OPTIMIZATIONS` improves compression on inputs smaller than about 1kiB,
 // at the cost of compression speed, especially on Apple silicon, so it's not enabled by default.
@@ -191,6 +193,7 @@ INFLATE_INITIAL_SIZE_MAX    :: 16 * 1024 * 1024
 INFLATE_PATTERN_STRIDE      := [8]u8{0, 8, 8, 6, 8, 5, 6, 7}
 INFLATE_FAST_MARGIN         :: 2 + DEFLATE_MATCH_MAX + 16 * 3
 INFLATE_COPY_MARGIN         :: 16 * 3
+INFLATE_CHUNK_SIZE          :: 256 * 1024
 
 Inflate_Checksum :: enum u8 {None, Adler32, CRC32}
 
@@ -201,6 +204,39 @@ Inflate :: struct {
 	bit_count:  i32,
 	eof:        bool,
 	ctx:        ^compress.Context,
+}
+
+Inflate_State :: enum u8 {Header, Stored, Copy, Fixed, Dynamic, Block, Done}
+
+Inflate_Decoder :: struct {
+	literals:     [INFLATE_LITERAL_TABLE_SIZE]u32,
+	distances:    [INFLATE_DISTANCE_TABLE_SIZE]u32,
+	s:            Inflate,
+	stored:       int,
+	last:         i32,
+	state:        Inflate_State,
+	fixed_loaded: bool,
+}
+
+Inflate_Format :: enum u8 {Raw, Zlib, Gzip, Raw64}
+
+Inflate_Reader :: struct {
+	decoder:     Inflate_Decoder,
+	z:           ^compress.Context,
+	window:      []u8,
+	written:     int,
+	flushed:     int,
+	high_water:  int,
+	history:     int,
+	limit:       i64,
+	total:       i64,
+	member:      i64,
+	err:         Error,
+	allocator:   runtime.Allocator,
+	digest:      u32,
+	format:      Inflate_Format,
+	done:        bool,
+	owns_window: bool,
 }
 
 Inflate_Table_Builder :: struct {
@@ -574,4 +610,200 @@ log2 :: proc(n: u32) -> u32 #no_bounds_check {
 @(private)
 deflate_round_up_divide :: proc(n, d: i32) -> i32 #no_bounds_check {
 	return (n + (d - 1)) / d
+}
+
+@(private)
+inflate_zlib_header :: proc(z: ^compress.Context) -> (err: Error) {
+	header, header_err := compress.read_data(z, [2]u8)
+	if header_err != nil {
+		return General_Error.Stream_Too_Short
+	}
+	cmf, flg := u32(header[0]), u32(header[1])
+	if cmf & 0x0f != 8 {
+		return General_Error.Unknown_Compression_Method
+	}
+	if cmf >> 4 > 7 {
+		return ZLIB_Error.Unsupported_Window_Size
+	}
+	if flg & 0x20 != 0 {
+		return ZLIB_Error.FDICT_Unsupported
+	}
+	if (cmf << 8 | flg) % 31 != 0 {
+		return ZLIB_Error.Code_Buffer_Malformed
+	}
+	return nil
+}
+
+@(private)
+inflate_stream_init :: proc(r: ^Inflate_Reader, z: ^compress.Context, format: Inflate_Format, expected_output_size: int, options: compress.Options, allocator: runtime.Allocator) -> (err: Error) {
+	r^ = {}
+	r.z         = z
+	r.format    = format
+	r.allocator = allocator
+	r.limit     = -1
+
+	if options.max_output_size < 0 {
+		return General_Error.Output_Too_Short
+	}
+	if options.max_memory < 0 || options.chunk_size < 0 {
+		return General_Error.Incompatible_Options
+	}
+	expected := i64(expected_output_size)
+	if expected <= 0 && z.size_unpacked > 0 {
+		expected = z.size_unpacked
+	}
+	if options.max_output_size > 0 {
+		r.limit = i64(options.max_output_size)
+	}
+	if expected > 0 {
+		if r.limit >= 0 && expected > r.limit {
+			return General_Error.Output_Exceeds_COMPRESS_OUTPUT_ALLOCATE_MAX if format == .Gzip else General_Error.Output_Too_Short
+		}
+		r.limit = expected
+	}
+
+	switch format {
+	case .Raw, .Raw64:
+	case .Zlib:
+		inflate_zlib_header(z) or_return
+		r.digest = 1
+	case .Gzip:
+		inflate_gzip_header(z) or_return
+	}
+	inflate_decoder_init(&r.decoder, z)
+
+	history := i64(DEFLATE64_WINDOW_SIZE if format == .Raw64 else DEFLATE_WINDOW_SIZE)
+	slack   := i64((DEFLATE64_MATCH_MAX if format == .Raw64 else DEFLATE_MATCH_MAX) + INFLATE_COPY_MARGIN)
+	size    := history + i64(options.chunk_size if options.chunk_size > 0 else INFLATE_CHUNK_SIZE) + slack
+	sliding := true
+	if r.limit >= 0 && r.limit <= size {
+		size    = r.limit
+		sliding = false
+	}
+	if options.buffer != nil {
+		if sliding || i64(len(options.buffer)) < size {
+			size    = i64(len(options.buffer))
+			sliding = true
+		}
+	} else if size > i64(compress.memory_limit(options)) {
+		size    = i64(compress.memory_limit(options))
+		sliding = true
+	}
+
+	r.history    = int(history)
+	r.high_water = max(int)
+	if sliding {
+		if size - slack <= history {
+			return General_Error.Incompatible_Options if options.buffer != nil else General_Error.Memory_Limit_Exceeded
+		}
+		r.high_water = int(size - slack)
+	}
+	if options.buffer != nil {
+		r.window = options.buffer[:size]
+	} else {
+		r.window      = non_zero_make([]u8, int(size), allocator) or_return
+		r.owns_window = true
+	}
+	return nil
+}
+
+@(private)
+inflate_stream_fill :: proc(r: ^Inflate_Reader) -> (err: Error) {
+	if r.decoder.state == .Done {
+		inflate_gzip_header(r.z) or_return
+		inflate_decoder_init(&r.decoder, r.z)
+		r.written = 0
+		r.flushed = 0
+		r.member  = 0
+		r.digest  = 0
+	} else if r.written >= r.high_water {
+		keep := min(r.written, r.history)
+		copy(r.window, r.window[r.written - keep:r.written])
+		r.written = keep
+		r.flushed = keep
+	}
+
+	from     := r.written
+	capacity := len(r.window)
+	if r.limit >= 0 && r.limit - r.total < i64(capacity - from) {
+		capacity = from + int(r.limit - r.total)
+	}
+	checksum := Inflate_Checksum.None
+	switch r.format {
+	case .Raw, .Raw64:
+	case .Zlib: checksum = .Adler32
+	case .Gzip: checksum = .CRC32
+	}
+
+	written: int
+	output := r.window[:capacity]
+	if compress.is_memory_context(r.z) {
+		if r.format == .Raw64 {
+			written, err = inflate_decompress(&r.decoder, output, nil, 0, 0, from, r.high_water, checksum, &r.digest, false, true, true)
+		} else {
+			written, err = inflate_decompress(&r.decoder, output, nil, 0, 0, from, r.high_water, checksum, &r.digest, false, false, true)
+		}
+	} else {
+		if r.format == .Raw64 {
+			written, err = inflate_decompress(&r.decoder, output, nil, 0, 0, from, r.high_water, checksum, &r.digest, true, true, true)
+		} else {
+			written, err = inflate_decompress(&r.decoder, output, nil, 0, 0, from, r.high_water, checksum, &r.digest, true, false, true)
+		}
+	}
+	if err != nil && inflate_overrun(&r.decoder.s) {
+		err = General_Error.Stream_Too_Short
+	}
+	r.written          = written
+	r.total           += i64(written - from)
+	r.member          += i64(written - from)
+	r.z.bytes_written  = r.total
+	if err != nil || r.decoder.state != .Done {
+		return
+	}
+
+	switch r.format {
+	case .Raw, .Raw64:
+		r.done = true
+	case .Zlib:
+		adler, adler_err := compress.read_data(r.z, u32be)
+		if adler_err != nil {
+			return General_Error.Stream_Too_Short
+		}
+		if r.digest != u32(adler) {
+			return General_Error.Checksum_Failed
+		}
+		r.done = true
+	case .Gzip:
+		trailer, trailer_err := compress.read_data(r.z, Gzip_Trailer)
+		if trailer_err != nil {
+			return General_Error.Stream_Too_Short
+		}
+		if u32le(r.digest) != trailer.crc32 {
+			return GZIP_Error.Payload_CRC_Invalid
+		}
+		if u32le(u32(r.member)) != trailer.size {
+			return GZIP_Error.Payload_Length_Invalid
+		}
+		magic, magic_err := compress.peek_data(r.z, Gzip_Magic)
+		r.done = magic_err != nil || magic != .GZIP
+	}
+	return
+}
+
+@(private)
+inflate_stream_to_writer :: proc(w: io.Writer, z: ^compress.Context, format: Inflate_Format, expected_output_size: int, options: compress.Options, allocator: runtime.Allocator) -> (err: Error) {
+	r: Inflate_Reader
+	defer inflate_reader_destroy(&r)
+	inflate_stream_init(&r, z, format, expected_output_size, options, allocator) or_return
+	for !r.done {
+		inflate_stream_fill(&r) or_return
+		if r.written > r.flushed {
+			_, write_err := io.write_full(w, r.window[r.flushed:r.written])
+			if write_err != nil {
+				return write_err
+			}
+			r.flushed = r.written
+		}
+	}
+	return nil
 }

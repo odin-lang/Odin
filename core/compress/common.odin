@@ -12,7 +12,6 @@ import "core:io"
 		Jeroen van Rijn: Initial implementation, optimization.
 
 	These settings bound how much compression algorithms will allocate for their output buffer.
-	If streaming their output, these are unnecessary and will be ignored.
 
 	`COMPRESS_OUTPUT_ALLOCATE_MAX` bounds the maximum a buffer will grow to as needed.
 
@@ -21,8 +20,19 @@ import "core:io"
 	`COMPRESS_INITIAL_RESERVATION_RATIO` times the input size, otherwise 64 KiB. The reservation never
 	exceeds what the input could decompress to.
 
+	When streaming the output to an `io.Writer` or through a reader, no output buffer is allocated,
+	so these don't apply. Instead, `COMPRESS_MEMORY_MAX` bounds the working memory a decoder may
+	allocate, such as its history window.
+
 	These defaults are deliberately conservative: a hostile payload can't make us allocate far
-	ahead of the data it actually produces. All three can be tuned at compile time with `-define`.
+	ahead of the data it actually produces. All of them can be tuned at compile time with `-define`.
+
+	`Options` overrides them at runtime, per call. A zero field means the default:
+	- `max_output_size` caps the output size. In memory, zero means `COMPRESS_OUTPUT_ALLOCATE_MAX`.
+	  When streaming, zero means no limit.
+	- `max_memory` caps the working memory when streaming. Zero means `COMPRESS_MEMORY_MAX`.
+	- `chunk_size` is how much a streaming decoder produces per step, on top of its history window.
+	- `buffer` lets a streaming decoder use the caller's memory for its window instead of allocating it.
 
 	The caller still has the final say. Pass in a dynamic array that's already reserved, and if
 	its capacity exceeds what we'd reserve, we use it as is and only grow it once the output
@@ -50,6 +60,15 @@ COMPRESS_INITIAL_RESERVATION_RATIO :: int(#config(COMPRESS_INITIAL_RESERVATION_R
 COMPRESS_GROWTH_MIN                :: 4 * 1024
 COMPRESS_GROWTH_STEP               :: 16 * 1024 * 1024
 #assert(COMPRESS_INITIAL_RESERVATION_RATIO >= 1 && COMPRESS_INITIAL_RESERVATION_RATIO <= 4)
+
+COMPRESS_MEMORY_MAX :: int(#config(COMPRESS_MEMORY_MAX, COMPRESS_OUTPUT_ALLOCATE_MAX))
+
+Options :: struct {
+	max_output_size: int,
+	max_memory:      int,
+	chunk_size:      int,
+	buffer:          []u8,
+}
 
 DEFLATE_EXPANSION_MAX   :: 1032
 DEFLATE64_EXPANSION_MAX :: 29128
@@ -90,6 +109,7 @@ General_Error :: enum {
 	// Memory errors
 
 	Allocation_Failed,
+	Memory_Limit_Exceeded,
 
 	// For buffered instead of streamed output, the payload size can't exceed
 	// the max set by the `COMPRESS_OUTPUT_ALLOCATE_MAX` switch in compress/common.odin.

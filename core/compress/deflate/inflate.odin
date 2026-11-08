@@ -4,40 +4,25 @@ import "base:builtin"
 import "base:intrinsics"
 import "core:compress"
 import "core:hash"
+import "core:io"
 import "core:simd"
 
 inflate_raw  :: proc{inflate_raw_from_context, inflate_raw_from_bytes}
 inflate_zlib :: proc{inflate_zlib_from_context, inflate_zlib_from_bytes}
 
-inflate_raw_from_context :: proc(z: ^compress.Context, expected_output_size := -1, max_output_size := compress.COMPRESS_OUTPUT_ALLOCATE_MAX, allocator := context.allocator) -> (err: Error) {
+inflate_raw_from_context :: proc(z: ^compress.Context, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
-	_, err = inflate_to_buffer(z, expected_output_size, max_output_size, D64 = false)
+	_, err = inflate_to_buffer(z, expected_output_size, compress.output_limit(options), D64 = false)
 	return
 }
 
-inflate_zlib_from_context :: proc(z: ^compress.Context, expected_output_size := -1, max_output_size := compress.COMPRESS_OUTPUT_ALLOCATE_MAX, allocator := context.allocator) -> (err: Error) {
+inflate_zlib_from_context :: proc(z: ^compress.Context, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
-	header, header_err := compress.read_data(z, [2]u8)
-	if header_err != nil {
-		return General_Error.Stream_Too_Short
-	}
-	cmf, flg := u32(header[0]), u32(header[1])
-	if cmf & 0x0f != 8 {
-		return General_Error.Unknown_Compression_Method
-	}
-	if cmf >> 4 > 7 {
-		return ZLIB_Error.Unsupported_Window_Size
-	}
-	if flg & 0x20 != 0 {
-		return ZLIB_Error.FDICT_Unsupported
-	}
-	if (cmf << 8 | flg) % 31 != 0 {
-		return ZLIB_Error.Code_Buffer_Malformed
-	}
+	inflate_zlib_header(z) or_return
 
 	digest := u32(1)
-	inflate_to_buffer(z, expected_output_size, max_output_size, checksum = .Adler32, digest = &digest, D64 = false) or_return
+	inflate_to_buffer(z, expected_output_size, compress.output_limit(options), checksum = .Adler32, digest = &digest, D64 = false) or_return
 
 	adler, adler_err := compress.read_data(z, u32be)
 	if adler_err != nil {
@@ -49,16 +34,67 @@ inflate_zlib_from_context :: proc(z: ^compress.Context, expected_output_size := 
 	return nil
 }
 
-inflate_raw_from_bytes :: proc(output: ^[dynamic]u8, input: []u8, expected_output_size := -1, max_output_size := compress.COMPRESS_OUTPUT_ALLOCATE_MAX, allocator := context.allocator) -> (err: Error) {
+inflate_raw_from_bytes :: proc(output: ^[dynamic]u8, input: []u8, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
 	input := input
 	ctx   := compress.init_context_from_slice(&input, output=output)
-	return inflate_raw_from_context(&ctx, expected_output_size, max_output_size, allocator)
+	return inflate_raw_from_context(&ctx, expected_output_size, options, allocator)
 }
 
-inflate_zlib_from_bytes :: proc(output: ^[dynamic]u8, input: []u8, expected_output_size := -1, max_output_size := compress.COMPRESS_OUTPUT_ALLOCATE_MAX, allocator := context.allocator) -> (err: Error) {
+inflate_zlib_from_bytes :: proc(output: ^[dynamic]u8, input: []u8, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
 	input := input
 	ctx   := compress.init_context_from_slice(&input, output=output)
-	return inflate_zlib_from_context(&ctx, expected_output_size, max_output_size, allocator)
+	return inflate_zlib_from_context(&ctx, expected_output_size, options, allocator)
+}
+
+inflate_raw_to_writer :: proc(w: io.Writer, z: ^compress.Context, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
+	return inflate_stream_to_writer(w, z, .Raw, expected_output_size, options, allocator)
+}
+
+inflate_zlib_to_writer :: proc(w: io.Writer, z: ^compress.Context, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
+	return inflate_stream_to_writer(w, z, .Zlib, expected_output_size, options, allocator)
+}
+
+inflate_reader_init :: proc(r: ^Inflate_Reader, z: ^compress.Context, format: Inflate_Format, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
+	err   = inflate_stream_init(r, z, format, expected_output_size, options, allocator)
+	r.err = err
+	return
+}
+
+inflate_reader_read :: proc(r: ^Inflate_Reader, p: []u8) -> (n: int, err: Error) {
+	for n < len(p) && r.err == nil {
+		if r.flushed < r.written {
+			copied   := copy(p[n:], r.window[r.flushed:r.written])
+			r.flushed += copied
+			n         += copied
+		} else if r.done {
+			break
+		} else {
+			r.err = inflate_stream_fill(r)
+		}
+	}
+	if r.err != nil {
+		return n, r.err
+	}
+	if n == 0 && len(p) > 0 && r.done {
+		return 0, io.Error.EOF
+	}
+	return n, nil
+}
+
+inflate_reader_to_stream :: proc(r: ^Inflate_Reader) -> (s: io.Stream) {
+	s.data      = r
+	s.procedure = inflate_reader_stream_proc
+	return
+}
+
+inflate_reader_destroy :: proc(r: ^Inflate_Reader) {
+	if r.owns_window {
+		delete(r.window, r.allocator)
+	}
+	r.window      = nil
+	r.written     = 0
+	r.flushed     = 0
+	r.owns_window = false
 }
 
 @(private)
@@ -434,7 +470,16 @@ inflate_copy_match_checked :: proc(output: []u8, capacity: int, grow: ^[dynamic]
 }
 
 @(private)
-inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic]u8, start, limit: int, checksum: Inflate_Checksum, digest: ^u32, $STREAM, $D64: bool) -> (written: int, err: Error) #no_bounds_check {
+inflate_decoder_init :: proc(d: ^Inflate_Decoder, ctx: ^compress.Context) {
+	d.s            = {input = ctx.window, eof = compress.is_memory_context(ctx), ctx = ctx}
+	d.stored       = 0
+	d.last         = 0
+	d.state        = .Header
+	d.fixed_loaded = false
+}
+
+@(private)
+inflate_decompress :: proc(d: ^Inflate_Decoder, output: []u8, grow: ^[dynamic]u8, start, limit, from, high_water: int, checksum: Inflate_Checksum, digest: ^u32, $STREAM, $D64, $WINDOWED: bool) -> (written: int, err: Error) #no_bounds_check {
 	DISTANCE_SYMBOLS   :: 32 when D64 else 30
 	BAD_DISTANCE       :: INFLATE64_BAD_DISTANCE when D64 else INFLATE_BAD_DISTANCE
 	when D64 {
@@ -447,26 +492,34 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 
 	output   := output
 	capacity := len(output)
-	checked  := 0
+	written   = from
+	checked  := from
 
-	fixed_loaded := false
-
-	Inflate_State :: enum {Header, Stored, Fixed, Dynamic, Block}
-	state := Inflate_State.Header
-	s: Inflate
-	literals:  [INFLATE_LITERAL_TABLE_SIZE]u32
-	distances: [INFLATE_DISTANCE_TABLE_SIZE]u32
-	last: i32 = 0
-
-	s.ctx   = ctx
-	s.input = ctx.window
-	s.eof   = !STREAM
+	s            := d.s
+	state        := d.state
+	last         := d.last
+	stored       := d.stored
+	fixed_loaded := d.fixed_loaded
+	literals     := &d.literals
+	distances    := &d.distances
 
 	defer {
-		input, consumed := inflate_rewind(ctx, s.input, s.position - int(s.bit_count >> 3))
-		ctx.window      = input[min(consumed, len(input)):]
-		ctx.code_buffer = 0
-		ctx.num_bits    = 0
+		when WINDOWED {
+			d.s, d.state, d.last, d.stored, d.fixed_loaded = s, state, last, stored, fixed_loaded
+			finished := err != nil || state == .Done
+		} else {
+			if err != nil {
+				d.s = s
+			}
+			finished := true
+		}
+		if finished {
+			ctx := s.ctx
+			input, consumed := inflate_rewind(ctx, s.input, s.position - int(s.bit_count >> 3))
+			ctx.window      = input[min(consumed, len(input)):]
+			ctx.code_buffer = 0
+			ctx.num_bits    = 0
+		}
 	}
 	defer if err == nil {
 		inflate_update_checksum(checksum, digest, output[checked:written])
@@ -509,17 +562,30 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 			if s.position > builtin.len(s.input) {
 				return written, General_Error.Stream_Too_Short
 			}
+			when !STREAM {
+				if int(len) > builtin.len(s.input) - s.position {
+					return written, General_Error.Stream_Too_Short
+				}
+			}
+			stored = int(len)
+			state  = .Copy
 
+		case .Copy:
 			when STREAM {
-				remaining := int(len)
-				for remaining > 0 {
+				for stored > 0 {
+					when WINDOWED {
+						if written >= high_water { return written, nil }
+					}
 					if s.position == builtin.len(s.input) {
 						s.input, s.position, s.eof = inflate_fill(s.ctx, s.input, s.position, s.eof, 1)
 						if s.position == builtin.len(s.input) {
 							return written, General_Error.Stream_Too_Short
 						}
 					}
-					n := min(remaining, builtin.len(s.input) - s.position)
+					n := min(stored, builtin.len(s.input) - s.position)
+					when WINDOWED {
+						n = min(n, high_water - written)
+					}
 					if n > capacity - written {
 						output   = inflate_grow(grow, start, written + n, limit) or_return
 						capacity = builtin.len(output)
@@ -527,28 +593,42 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 					copy(output[written:], s.input[s.position:][:n])
 					s.position += n
 					written    += n
-					remaining  -= n
+					stored     -= n
+				}
+			} else when WINDOWED {
+				for stored > 0 {
+					if written >= high_water { return written, nil }
+					n := min(stored, high_water - written)
+					if n > capacity - written {
+						output   = inflate_grow(grow, start, written + n, limit) or_return
+						capacity = builtin.len(output)
+					}
+					copy(output[written:], s.input[s.position:][:n])
+					s.position += n
+					written    += n
+					stored     -= n
 				}
 			} else {
-				if int(len) > builtin.len(s.input) - s.position {
-					return written, General_Error.Stream_Too_Short
-				}
-				if int(len) > capacity - written {
-					output   = inflate_grow(grow, start, written + int(len), limit) or_return
+				if stored > capacity - written {
+					output   = inflate_grow(grow, start, written + stored, limit) or_return
 					capacity = builtin.len(output)
 				}
-				copy(output[written:], s.input[s.position:][:len])
-				s.position += int(len)
-				written    += int(len)
+				copy(output[written:], s.input[s.position:][:stored])
+				s.position += stored
+				written    += stored
+				stored      = 0
 			}
-			if last != 0 { return written, nil }
+			if last != 0 {
+				state = .Done
+				return written, nil
+			}
 			state = .Header
 
 		case .Fixed:
 			// fixed huffman codes
 			if !fixed_loaded {
-				intrinsics.mem_copy_non_overlapping(&literals, &INFLATE_FIXED_LITERALS, size_of(INFLATE_FIXED_LITERALS))
-				intrinsics.mem_copy_non_overlapping(&distances, &INFLATE_FIXED_DISTANCES, size_of(INFLATE_FIXED_DISTANCES))
+				intrinsics.mem_copy_non_overlapping(literals, &INFLATE_FIXED_LITERALS, size_of(INFLATE_FIXED_LITERALS))
+				intrinsics.mem_copy_non_overlapping(distances, &INFLATE_FIXED_DISTANCES, size_of(INFLATE_FIXED_DISTANCES))
 				fixed_loaded = true
 			}
 			state = .Block
@@ -615,7 +695,11 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 		case .Block:
 			// decompress block
 			block_loop: for {
-				fast_end := capacity - INFLATE_FAST_MARGIN
+				when WINDOWED {
+					fast_end := min(capacity, high_water) - INFLATE_FAST_MARGIN
+				} else {
+					fast_end := capacity - INFLATE_FAST_MARGIN
+				}
 				for written <= fast_end {
 					if inflate_refill(&s, STREAM) { return written, General_Error.Stream_Too_Short }
 					symbol := inflate_decode(&s, literals[:], 10)
@@ -638,6 +722,7 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 					if intrinsics.expect(symbol == 256, false) {
 						if last != 0 {
 							if inflate_overrun(&s) { return written, General_Error.Stream_Too_Short }
+							state = .Done
 							return written, nil
 						}
 						state = .Header
@@ -669,6 +754,9 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 					written = match_end
 				}
 
+				when WINDOWED {
+					if written >= high_water { return written, nil }
+				}
 				symbol: i32
 				if inflate_refill(&s, STREAM) { return written, General_Error.Stream_Too_Short }
 				symbol = inflate_decode(&s, literals[:], 10)
@@ -696,6 +784,7 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 				if intrinsics.expect(symbol == 256, false) {
 					if last != 0 {
 						if inflate_overrun(&s) { return written, General_Error.Stream_Too_Short }
+						state = .Done
 						return written, nil
 					}
 					state = .Header
@@ -740,6 +829,9 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 					}
 				}
 			}
+
+		case .Done:
+			return written, nil
 		}
 	}
 	return written, nil
@@ -792,13 +884,39 @@ inflate_to_buffer :: proc(z: ^compress.Context, expected_output_size, max_output
 	buffer := z.output
 	non_zero_resize(buffer, start + min(inflate_initial_size(hint, input_size, compress.DEFLATE64_EXPANSION_MAX if D64 else compress.DEFLATE_EXPANSION_MAX), limit)) or_return
 
+	d: Inflate_Decoder
+	inflate_decoder_init(&d, z)
 	written: int
 	if compress.is_memory_context(z) {
-		written, err = inflate_decompress(z, buffer[start:], buffer, start, limit, checksum, digest, false, D64)
+		written, err = inflate_decompress(&d, buffer[start:], buffer, start, limit, 0, 0, checksum, digest, false, D64, false)
 	} else {
-		written, err = inflate_decompress(z, buffer[start:], buffer, start, limit, checksum, digest, true, D64)
+		written, err = inflate_decompress(&d, buffer[start:], buffer, start, limit, 0, 0, checksum, digest, true, D64, false)
+	}
+	if err != nil && inflate_overrun(&d.s) {
+		err = General_Error.Stream_Too_Short
 	}
 	non_zero_resize(buffer, start + written)
 	z.bytes_written = i64(start + written)
 	return buffer[:start + written], err
+}
+
+@(private)
+inflate_reader_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	r := (^Inflate_Reader)(stream_data)
+	#partial switch mode {
+	case .Read:
+		read, read_err := inflate_reader_read(r, p)
+		n = i64(read)
+		if read_err != nil {
+			io_err, is_io := read_err.(io.Error)
+			err = io_err if is_io else .Unknown
+		}
+		return
+	case .Destroy:
+		inflate_reader_destroy(r)
+		return 0, nil
+	case .Query:
+		return io.query_utility({.Read, .Destroy, .Query})
+	}
+	return 0, .Unsupported
 }
