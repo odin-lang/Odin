@@ -38,6 +38,9 @@ decompress_from_context :: proc(z: ^compress.Context, expected_output_size := -1
 			return LZMA_Error.Size_Mismatch
 		}
 	} else if expected_output_size >= 0 {
+		if expected_output_size > max_output_size {
+			return General_Error.Output_Too_Short
+		}
 		declared = expected_output_size
 	}
 	return decompress_lzma(z, props, declared, size != UNKNOWN_SIZE, max_output_size)

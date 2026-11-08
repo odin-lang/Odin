@@ -1624,6 +1624,9 @@ code_one_block :: proc(e: ^Encoder, max_pack_size, max_unpack_size: u32) #no_bou
 					if processed + NUM_OPTS + 300 >= max_unpack_size || re_processed(rc) + PACK_RESERVE >= int(max_pack_size) {
 						break
 					}
+				} else if processed >= 1 << 17 {
+					e.now_pos64 += u64(processed)
+					return
 				}
 			}
 		}
@@ -1642,7 +1645,9 @@ encode_lzma :: proc(rc: ^Range_Encoder, input: []u8, opts: Options, allocator: r
 	e.rc = rc^
 	encoder_create(e, opts, input, false) or_return
 
-	code_one_block(e, 0, 0)
+	for !e.finished && e.rc.grow_err == nil && e.rc.pos <= e.rc.cap {
+		code_one_block(e, 0, 0)
+	}
 	rc^ = e.rc
 
 	if rc.grow_err != nil {

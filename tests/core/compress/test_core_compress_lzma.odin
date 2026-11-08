@@ -4,6 +4,7 @@ import "core:bytes"
 import "core:compress"
 import "core:compress/lzma"
 import "core:hash"
+import "core:math/rand"
 import "core:testing"
 
 LZMA_TEST_TRAILER :: [5]byte{'O', 'd', 'i', 'n', '!'}
@@ -83,22 +84,28 @@ lzma_test_unpack :: proc(t: ^testing.T, name: string, packed: []byte, want: []by
 	tail := LZMA_TEST_TRAILER
 	append(&data, ..tail[:])
 
-	for kind in Stream_Kind {
+	for i in 0..=len(Stream_Kind) {
 		input := data[:]
 		br: bytes.Reader
 		tr: Trickle_Reader
 		output: [dynamic]byte
 		defer delete(output)
-		ctx := stream_test_context(kind, &input, &br, &tr, &output)
+		ctx: compress.Context
+		if i < len(Stream_Kind) {
+			ctx = stream_test_context(Stream_Kind(i), &input, &br, &tr, &output)
+		} else {
+			tr = {data = input, chunk = 1 + rand.int_max(8192), seekable = rand.int_max(2) == 0}
+			ctx = compress.init_context(trickle_stream(&tr), &output)
+		}
 		defer compress.destroy_context(&ctx)
 
 		err := lzma_test_decode(&ctx, format, props)
-		testing.expectf(t, err == nil, "%v, %v: decompress returned %v", name, kind, err)
-		testing.expectf(t, bytes.equal(output[:], want), "%v, %v: output differs (%v vs %v bytes)", name, kind, len(output), len(want))
+		testing.expectf(t, err == nil, "%v, kind %v, chunk %v: decompress returned %v", name, i, tr.chunk, err)
+		testing.expectf(t, bytes.equal(output[:], want), "%v, kind %v, chunk %v: output differs (%v vs %v bytes)", name, i, tr.chunk, len(output), len(want))
 
 		rest: [5]byte
 		rest_err := compress.read_slice(&ctx, rest[:])
-		testing.expectf(t, rest_err == nil && rest == LZMA_TEST_TRAILER, "%v, %v: bytes after the stream were %v, %v", name, kind, rest, rest_err)
+		testing.expectf(t, rest_err == nil && rest == LZMA_TEST_TRAILER, "%v, kind %v, chunk %v: bytes after the stream were %v, %v", name, i, tr.chunk, rest, rest_err)
 	}
 }
 
@@ -190,6 +197,46 @@ lzma_corrupt :: proc(t: ^testing.T) {
 			}
 		}
 		testing.expectf(t, accepted < len(c.packed), "%v: %v of %v corruptions accepted", c.name, accepted, 3 * len(c.packed))
+
+		for _ in 0..<300 {
+			mutated: [dynamic]byte
+			defer delete(mutated)
+			append(&mutated, ..c.packed)
+			for _ in 0..<1 + rand.int_max(4) {
+				n := len(mutated)
+				if n == 0 {
+					break
+				}
+				switch rand.int_max(4) {
+				case 0:
+					mutated[rand.int_max(n)] ~= 1 << uint(rand.int_max(8))
+				case 1:
+					mutated[rand.int_max(n)] = u8(rand.uint32())
+				case 2:
+					resize(&mutated, rand.int_max(n))
+				case 3:
+					resize(&mutated, rand.int_max(n))
+					append(&mutated, ..c.packed[rand.int_max(len(c.packed)):])
+				}
+			}
+
+			kind := Stream_Kind(1 + rand.int_max(len(Stream_Kind) - 1))
+			outputs: [2][dynamic]byte
+			errs: [2]lzma.Error
+			for k in 0..<2 {
+				input := mutated[:]
+				br: bytes.Reader
+				tr: Trickle_Reader
+				ctx := stream_test_context(.Memory if k == 0 else kind, &input, &br, &tr, &outputs[k])
+				errs[k] = lzma_test_decode(&ctx, c.format, c.props, max_output = limit)
+				compress.destroy_context(&ctx)
+				testing.expectf(t, len(outputs[k]) <= limit, "%v, %v: random corruption wrote %v bytes", c.name, kind, len(outputs[k]))
+			}
+			same := (errs[0] == nil) == (errs[1] == nil) && (errs[0] != nil || bytes.equal(outputs[0][:], outputs[1][:]))
+			testing.expectf(t, same, "%v: random corruption, memory %v, %v %v", c.name, errs[0], kind, errs[1])
+			delete(outputs[0])
+			delete(outputs[1])
+		}
 	}
 }
 
@@ -204,6 +251,8 @@ lzma_limits :: proc(t: ^testing.T) {
 	testing.expect_value(t, lzma.decompress(&output, LZMA_VECTOR_SDK, max_output_size = len(inputs.text) - 1), compress.General_Error.Output_Too_Short)
 	testing.expect_value(t, lzma.decompress(&output, LZMA_VECTOR_SDK, len(inputs.text) + 1), compress.LZMA_Error.Size_Mismatch)
 	testing.expect_value(t, lzma.decompress(&output, LZMA_VECTOR_XZ, max_output_size = len(inputs.repeat) - 1), compress.General_Error.Output_Too_Short)
+	testing.expect(t, len(output) <= len(inputs.repeat) - 1)
+	testing.expect_value(t, lzma.decompress(&output, LZMA_VECTOR_XZ, len(inputs.repeat), len(inputs.repeat) - 1), compress.General_Error.Output_Too_Short)
 	testing.expect(t, len(output) <= len(inputs.repeat) - 1)
 	testing.expect_value(t, lzma.decompress(&output, LZMA_VECTOR_XZ, len(inputs.repeat) + 1), compress.LZMA_Error.Unexpected_End_Marker)
 	testing.expect(t, lzma.decompress(&output, LZMA_VECTOR_XZ, len(inputs.repeat) - 1) != nil)
@@ -385,9 +434,10 @@ lzma_round_trip :: proc(t: ^testing.T) {
 		append(&inputs, mixed[:])
 	}
 	{
-		g := Lz4_Test_Lcg{state = 0x6f64696e}
-		append(&inputs, lz4_test_lcg_bytes(&g, 150_000))
-		append(&inputs, lz4_test_lcg_text(&g, 100_000))
+		g := Lz4_Test_Lcg{state = rand.uint64()}
+		append(&inputs, lz4_test_lcg_bytes(&g, 100_000 + rand.int_max(100_000)))
+		append(&inputs, lz4_test_lcg_text(&g, 50_000 + rand.int_max(100_000)))
+		append(&inputs, lz4_test_lcg_text(&g, rand.int_max(5000)))
 	}
 
 	Variant :: struct {
@@ -453,16 +503,17 @@ lzma_round_trip :: proc(t: ^testing.T) {
 
 @(test)
 lzma2_chunks :: proc(t: ^testing.T) {
-	g := Lz4_Test_Lcg{state = 0x4c5a3220}
+	g := Lz4_Test_Lcg{state = rand.uint64()}
 	input: [dynamic]byte
 	defer delete(input)
 	text := lz4_test_lcg_text(&g, 3 << 20)
 	defer delete(text)
-	noise := lz4_test_lcg_bytes(&g, 200_000)
+	noise := lz4_test_lcg_bytes(&g, 150_000 + rand.int_max(100_000))
 	defer delete(noise)
-	append(&input, ..text[:1 << 20])
+	split := (1 << 19) + rand.int_max(2 << 20)
+	append(&input, ..text[:split])
 	append(&input, ..noise)
-	append(&input, ..text[1 << 20:])
+	append(&input, ..text[split:])
 
 	options := lzma.level_options(.Level_1)
 	packed: [dynamic]byte
