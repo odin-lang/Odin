@@ -747,11 +747,8 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 					})
 					fmt.assertf(alloc_error == nil, "Error appending to log messages: %v", alloc_error)
 
-					if event.level >= .Error {
+					if event.level >= .Error && task_channel.test_index not_in failed_test_reason_map {
 						// Save the message for the final summary.
-						if old_error, ok := failed_test_reason_map[task_channel.test_index]; ok {
-							safe_delete_string(old_error, shared_log_allocator)
-						}
 						failed_test_reason_map[task_channel.test_index] = event.text
 					} else {
 						delete(event.text, shared_log_allocator)
@@ -857,11 +854,10 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 			pkg.frame_ready = false
 
-			if old_error, ok := failed_test_reason_map[timeout.test_index]; ok {
-				safe_delete_string(old_error, shared_log_allocator)
+			if timeout.test_index not_in failed_test_reason_map {
+				failed_test_reason_map[timeout.test_index] = ERROR_STRING_TIMEOUT
 			}
 
-			failed_test_reason_map[timeout.test_index] = ERROR_STRING_TIMEOUT
 			total_failure_count += 1
 			total_done_count    += 1
 
