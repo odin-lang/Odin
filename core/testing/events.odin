@@ -30,6 +30,7 @@ Task_Channel :: struct {
 
 Event_New_Test :: struct {
 	test_index: int,
+	started_at: time.Time,
 }
 
 Event_State_Change :: struct {
