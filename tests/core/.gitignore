@@ -11,6 +11,9 @@ math_big_test_library.*
 *.bng
 assets/BNG/*.txt
 assets/ZIP/
+assets/XZ/
+assets/7Z/
+assets/TAR/
 assets/HXA/
 assets/I18N/
 assets/UCD/
