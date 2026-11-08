@@ -69,6 +69,7 @@ Error :: union #shared_nil {
 	BZip2_Error,
 	PKZIP_Legacy_Error,
 	LZMA_Error,
+	PPMd_Error,
 	io.Error,
 	runtime.Allocator_Error,
 }
@@ -167,6 +168,14 @@ PKZIP_Legacy_Error :: enum {
 	Invalid_Follower_Set,
 	Invalid_Follower_Index,
 	Invalid_Tree,
+}
+
+PPMd_Error :: enum {
+	None = 0,
+	Invalid_Properties,
+	Corrupt_Data,
+	Unexpected_End_Marker,
+	Memory_Limit_Exceeded,
 }
 
 ZLIB_Error :: enum {
