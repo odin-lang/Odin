@@ -6,6 +6,19 @@ package compress_bzip2
 
 import "core:compress"
 
+/*
+	Copyright 2026 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+
+	The compressor is ported from libbzip2 1.0.8 by Julian R Seward, under the license in `LICENSE-libbzip2`:
+		https://sourceware.org/bzip2/
+
+	Many thanks to Julian Seward for bzip2.
+*/
+
 Error         :: compress.Error
 General_Error :: compress.General_Error
 BZip2_Error   :: compress.BZip2_Error

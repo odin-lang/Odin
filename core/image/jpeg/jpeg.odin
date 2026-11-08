@@ -22,6 +22,17 @@ import "core:image"
 import "core:io"
 import "core:slice"
 
+/*
+	Copyright 2025 Hisham Aburaqibah.
+	Copyright 2025-2026 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's license.
+
+	List of contributors:
+		Hisham Aburaqibah: Initial implementation: baseline and extended sequential decoding.
+		IllusionMan1212:   Exif extraction, zero-based component IDs.
+		Jeroen van Rijn:   Decoder rewrite (progressive, lossless, arithmetic and hierarchical modes), saving.
+*/
+
 load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	data := data
 	ctx  := compress.init_context_from_slice(&data)
