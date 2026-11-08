@@ -39,6 +39,7 @@ Event_State_Change :: struct {
 Event_Set_Fail_Timeout :: struct {
 	at_time: time.Time,
 	location: runtime.Source_Code_Location,
+	disable_timeout: bool,
 }
 
 Event_Log_Message :: struct {
