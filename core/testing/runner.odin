@@ -711,12 +711,32 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 					pkg.frame_ready = false
 
 				case Event_Set_Fail_Timeout:
-					_, alloc_error = append(&task_timeouts, Task_Timeout {
-						test_index = task_channel.test_index,
-						at_time = event.at_time,
-						location = event.location,
-					})
-					fmt.assertf(alloc_error == nil, "Error appending to task timeouts: %v", alloc_error)
+					// See if the source test already has a timeout set.
+					existing_timeout_index := -1
+					for i := len(task_timeouts) - 1; i >= 0; i -= 1 {
+						#no_bounds_check timeout := &task_timeouts[i]
+						if timeout.test_index == task_channel.test_index {
+							existing_timeout_index = i
+							break
+						}
+					}
+
+					if event.disable_timeout {
+						if existing_timeout_index >= 0 {
+							unordered_remove(&task_timeouts, existing_timeout_index)
+						} // else: nothing to be disabled
+					} else if existing_timeout_index >= 0 {
+						#no_bounds_check timeout := &task_timeouts[existing_timeout_index]
+						timeout.at_time = event.at_time
+						timeout.location = event.location
+					} else {
+						_, alloc_error = append(&task_timeouts, Task_Timeout {
+							test_index = task_channel.test_index,
+							at_time = event.at_time,
+							location = event.location,
+						})
+						fmt.assertf(alloc_error == nil, "Error appending to task timeouts: %v", alloc_error)
+					}
 
 				case Event_Log_Message:
 					_, alloc_error = append(&log_messages, Log_Message {
