@@ -61,24 +61,27 @@ inflate_reader_init :: proc(r: ^Inflate_Reader, z: ^compress.Context, format: In
 }
 
 inflate_reader_read :: proc(r: ^Inflate_Reader, p: []u8) -> (n: int, err: Error) {
-	for n < len(p) && r.err == nil {
+	for n < len(p) {
 		if r.flushed < r.written {
 			copied   := copy(p[n:], r.window[r.flushed:r.written])
 			r.flushed += copied
 			n         += copied
-		} else if r.done {
+		} else if r.done || r.err != nil {
 			break
 		} else {
 			r.err = inflate_stream_fill(r)
 		}
 	}
-	if r.err != nil {
-		return n, r.err
+	if n > 0 {
+		return n, nil
 	}
-	if n == 0 && len(p) > 0 && r.done {
+	if r.err != nil {
+		return 0, r.err
+	}
+	if len(p) > 0 && r.done {
 		return 0, io.Error.EOF
 	}
-	return n, nil
+	return 0, nil
 }
 
 inflate_reader_to_stream :: proc(r: ^Inflate_Reader) -> (s: io.Stream) {
@@ -140,7 +143,7 @@ inflate_copy128 :: proc(destination, source: ^[^]u8) #no_bounds_check {
 }
 
 @(private)
-inflate_refill :: proc(s: ^Inflate, $STREAM: bool) -> (overrun: bool) #no_bounds_check {
+inflate_refill :: proc(s: ^Inflate, written: int, $STREAM: bool) -> (overrun: bool) #no_bounds_check {
 	if intrinsics.expect(len(s.input) - s.position >= 8, true) {
 		s.bit_buffer |= inflate_load_u64(raw_data(s.input)[s.position:]) << u64(s.bit_count)
 		s.position += int((63 - s.bit_count) >> 3)
@@ -160,7 +163,11 @@ inflate_refill :: proc(s: ^Inflate, $STREAM: bool) -> (overrun: bool) #no_bounds
 			s.bit_count += 8
 		}
 	}
-	return inflate_overrun(s)
+	overrun = inflate_overrun(s)
+	if !overrun {
+		s.checkpoint = written
+	}
+	return
 }
 
 @(private, cold)
@@ -236,8 +243,8 @@ inflate_get_no_refill :: proc(s: ^Inflate, count: i32) -> i32 #no_bounds_check {
 }
 
 @(private)
-inflate_get :: proc(s: ^Inflate, count: i32, $STREAM: bool) -> i32 #no_bounds_check {
-	inflate_refill(s, STREAM)
+inflate_get :: proc(s: ^Inflate, written: int, count: i32, $STREAM: bool) -> i32 #no_bounds_check {
+	inflate_refill(s, written, STREAM)
 	return inflate_get_no_refill(s, count)
 }
 
@@ -496,6 +503,7 @@ inflate_decompress :: proc(d: ^Inflate_Decoder, output: []u8, grow: ^[dynamic]u8
 	checked  := from
 
 	s            := d.s
+	s.checkpoint  = from
 	state        := d.state
 	last         := d.last
 	stored       := d.stored
@@ -532,7 +540,7 @@ inflate_decompress :: proc(d: ^Inflate_Decoder, output: []u8, grow: ^[dynamic]u8
 			checked = written
 			// block header
 			type: i32 = 0
-			if inflate_refill(&s, STREAM) { return written, General_Error.Stream_Too_Short }
+			if inflate_refill(&s, written, STREAM) { return written, General_Error.Stream_Too_Short }
 			last = inflate_get_no_refill(&s, 1)
 			type = inflate_get_no_refill(&s, 2)
 
@@ -561,11 +569,6 @@ inflate_decompress :: proc(d: ^Inflate_Decoder, output: []u8, grow: ^[dynamic]u8
 			}
 			if s.position > builtin.len(s.input) {
 				return written, General_Error.Stream_Too_Short
-			}
-			when !STREAM {
-				if int(len) > builtin.len(s.input) - s.position {
-					return written, General_Error.Stream_Too_Short
-				}
 			}
 			stored = int(len)
 			state  = .Copy
@@ -598,7 +601,8 @@ inflate_decompress :: proc(d: ^Inflate_Decoder, output: []u8, grow: ^[dynamic]u8
 			} else when WINDOWED {
 				for stored > 0 {
 					if written >= high_water { return written, nil }
-					n := min(stored, high_water - written)
+					if s.position == builtin.len(s.input) { return written, General_Error.Stream_Too_Short }
+					n := min(stored, high_water - written, builtin.len(s.input) - s.position)
 					if n > capacity - written {
 						output   = inflate_grow(grow, start, written + n, limit) or_return
 						capacity = builtin.len(output)
@@ -609,14 +613,16 @@ inflate_decompress :: proc(d: ^Inflate_Decoder, output: []u8, grow: ^[dynamic]u8
 					stored     -= n
 				}
 			} else {
-				if stored > capacity - written {
-					output   = inflate_grow(grow, start, written + stored, limit) or_return
+				n := min(stored, builtin.len(s.input) - s.position)
+				if n > capacity - written {
+					output   = inflate_grow(grow, start, written + n, limit) or_return
 					capacity = builtin.len(output)
 				}
-				copy(output[written:], s.input[s.position:][:stored])
-				s.position += stored
-				written    += stored
-				stored      = 0
+				copy(output[written:], s.input[s.position:][:n])
+				s.position += n
+				written    += n
+				stored     -= n
+				if stored > 0 { return written, General_Error.Stream_Too_Short }
 			}
 			if last != 0 {
 				state = .Done
@@ -640,7 +646,7 @@ inflate_decompress :: proc(d: ^Inflate_Decoder, output: []u8, grow: ^[dynamic]u8
 			precode_lengths: [19]u8
 			lengths:         [288 + 32]u8 = ---
 
-			inflate_refill(&s, STREAM)
+			inflate_refill(&s, written, STREAM)
 			{
 				literal_count  := 257 + inflate_get_no_refill(&s, 5)
 				distance_count := 1 + inflate_get_no_refill(&s, 5)
@@ -649,7 +655,7 @@ inflate_decompress :: proc(d: ^Inflate_Decoder, output: []u8, grow: ^[dynamic]u8
 					return written, Deflate_Error.Huffman_Bad_Sizes
 				}
 				for n = 0; n < precode_count; n += 1 {
-					precode_lengths[DEFLATE_PRECODE_ORDER[n]] = u8(inflate_get(&s, 3, STREAM))
+					precode_lengths[DEFLATE_PRECODE_ORDER[n]] = u8(inflate_get(&s, written, 3, STREAM))
 				}
 				if !inflate_build(precode_table[:], precode_lengths[:], 7, 7, -1) {
 					return written, Deflate_Error.Huffman_Bad_Code_Lengths
@@ -658,19 +664,19 @@ inflate_decompress :: proc(d: ^Inflate_Decoder, output: []u8, grow: ^[dynamic]u8
 				// decode code lengths
 				for n = 0; n < literal_count + distance_count; {
 					symbol: i32 = 0
-					inflate_refill(&s, STREAM)
+					inflate_refill(&s, written, STREAM)
 					symbol = inflate_decode(&s, precode_table[:], 7)
 					switch symbol {
 					case 16:
-						i = 3 + inflate_get(&s, 2, STREAM)
+						i = 3 + inflate_get(&s, written, 2, STREAM)
 						if n == 0 || n + i > literal_count + distance_count { return written, Deflate_Error.Huffman_Bad_Code_Lengths }
 						for ; i != 0; i, n = i - 1, n + 1 { lengths[n] = lengths[n - 1] }
 					case 17:
-						i = 3 + inflate_get(&s, 3, STREAM)
+						i = 3 + inflate_get(&s, written, 3, STREAM)
 						if n + i > literal_count + distance_count { return written, Deflate_Error.Huffman_Bad_Code_Lengths }
 						for ; i != 0; i, n = i - 1, n + 1 { lengths[n] = 0 }
 					case 18:
-						i = 11 + inflate_get(&s, 7, STREAM)
+						i = 11 + inflate_get(&s, written, 7, STREAM)
 						if n + i > literal_count + distance_count { return written, Deflate_Error.Huffman_Bad_Code_Lengths }
 						for ; i != 0; i, n = i - 1, n + 1 { lengths[n] = 0 }
 					case:
@@ -701,7 +707,7 @@ inflate_decompress :: proc(d: ^Inflate_Decoder, output: []u8, grow: ^[dynamic]u8
 					fast_end := capacity - INFLATE_FAST_MARGIN
 				}
 				for written <= fast_end {
-					if inflate_refill(&s, STREAM) { return written, General_Error.Stream_Too_Short }
+					if inflate_refill(&s, written, STREAM) { return written, General_Error.Stream_Too_Short }
 					symbol := inflate_decode(&s, literals[:], 10)
 					if symbol < 256 {
 						output[written] = u8(symbol)
@@ -717,7 +723,7 @@ inflate_decompress :: proc(d: ^Inflate_Decoder, output: []u8, grow: ^[dynamic]u8
 								continue
 							}
 						}
-						if inflate_refill(&s, STREAM) { return written, General_Error.Stream_Too_Short }
+						if inflate_refill(&s, written, STREAM) { return written, General_Error.Stream_Too_Short }
 					}
 					if intrinsics.expect(symbol == 256, false) {
 						if last != 0 {
@@ -735,7 +741,7 @@ inflate_decompress :: proc(d: ^Inflate_Decoder, output: []u8, grow: ^[dynamic]u8
 					len             := inflate_get_no_refill(&s, i32(length_extra_bits[symbol])) + i32(length_base[symbol])
 					when D64 {
 						if intrinsics.expect(symbol == 28, false) {
-							if inflate_refill(&s, STREAM) { return written, General_Error.Stream_Too_Short }
+							if inflate_refill(&s, written, STREAM) { return written, General_Error.Stream_Too_Short }
 						}
 					}
 					distance_symbol := inflate_decode(&s, distances[:], 8)
@@ -758,7 +764,7 @@ inflate_decompress :: proc(d: ^Inflate_Decoder, output: []u8, grow: ^[dynamic]u8
 					if written >= high_water { return written, nil }
 				}
 				symbol: i32
-				if inflate_refill(&s, STREAM) { return written, General_Error.Stream_Too_Short }
+				if inflate_refill(&s, written, STREAM) { return written, General_Error.Stream_Too_Short }
 				symbol = inflate_decode(&s, literals[:], 10)
 				if symbol < 256 {
 					// literal
@@ -778,7 +784,7 @@ inflate_decompress :: proc(d: ^Inflate_Decoder, output: []u8, grow: ^[dynamic]u8
 						written += 1
 						continue block_loop
 					}
-					if inflate_refill(&s, STREAM) { return written, General_Error.Stream_Too_Short }
+					if inflate_refill(&s, written, STREAM) { return written, General_Error.Stream_Too_Short }
 				}
 				// end of block
 				if intrinsics.expect(symbol == 256, false) {
@@ -800,7 +806,7 @@ inflate_decompress :: proc(d: ^Inflate_Decoder, output: []u8, grow: ^[dynamic]u8
 					len             := inflate_get_no_refill(&s, i32(length_extra_bits[symbol])) + i32(length_base[symbol])
 					when D64 {
 						if intrinsics.expect(symbol == 28, false) {
-							if inflate_refill(&s, STREAM) { return written, General_Error.Stream_Too_Short }
+							if inflate_refill(&s, written, STREAM) { return written, General_Error.Stream_Too_Short }
 						}
 					}
 					distance_symbol := inflate_decode(&s, distances[:], 8)
@@ -893,7 +899,8 @@ inflate_to_buffer :: proc(z: ^compress.Context, expected_output_size, max_output
 		written, err = inflate_decompress(&d, buffer[start:], buffer, start, limit, 0, 0, checksum, digest, true, D64, false)
 	}
 	if err != nil && inflate_overrun(&d.s) {
-		err = General_Error.Stream_Too_Short
+		err     = General_Error.Stream_Too_Short
+		written = min(written, d.s.checkpoint)
 	}
 	non_zero_resize(buffer, start + written)
 	z.bytes_written = i64(start + written)

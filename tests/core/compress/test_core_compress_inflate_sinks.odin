@@ -146,8 +146,54 @@ inflate_reader_as_stream :: proc(t: ^testing.T) {
 	defer deflate.inflate_reader_destroy(&broken)
 	testing.expect_value(t, deflate.inflate_reader_init(&broken, &bad, .Gzip), nil)
 	n, err = io.read_full(deflate.inflate_reader_to_stream(&broken), output)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, n, len(data))
+	n, err = io.read(deflate.inflate_reader_to_stream(&broken), extra[:])
+	testing.expect_value(t, n, 0)
 	testing.expect_value(t, err, io.Error.Unknown)
 	testing.expect_value(t, broken.err, compress.Error(compress.GZIP_Error.Payload_CRC_Invalid))
+}
+
+@(test)
+inflate_truncated_prefix :: proc(t: ^testing.T) {
+	data := stream_match_data()
+	defer delete(data)
+
+	cuts := 8 if SLIM_TESTS else 48
+	for format in deflate.Inflate_Format {
+		slack := 2 + (65_538 if format == .Raw64 else 258)
+		for level in ([]deflate.Deflate_Level{.Stored, .Level_1, .Level_6}) {
+			packed: [dynamic]byte
+			defer delete(packed)
+			testing.expect_value(t, sinks_pack(format, data, &packed, level), nil)
+
+			for step in 0..<cuts + 8 {
+				cut := len(packed) * step / cuts if step < cuts else len(packed) - 1 - (step - cuts)
+				for kind in Stream_Kind {
+					if kind == .One_Byte_No_Seek && step % 16 != 3 {
+						continue
+					}
+					want: [dynamic]byte
+					defer delete(want)
+					rest: [5]byte
+					want_err, _ := sinks_memory_unpack(format, kind, packed[:cut], &want, -1, {}, &rest)
+					testing.expectf(t, want_err != nil, "%v, %v, %v, cut %v of %v: no error", format, level, kind, cut, len(packed))
+					testing.expectf(t, len(want) <= len(data) && bytes.equal(want[:], data[:len(want)]), "%v, %v, %v, cut %v of %v: one-shot output is not a prefix", format, level, kind, cut, len(packed))
+					if cut >= len(packed) / 2 {
+						testing.expectf(t, len(want) >= len(data) / 4, "%v, %v, %v, cut %v of %v: only %v bytes", format, level, kind, cut, len(packed), len(want))
+					}
+					for sink in Sink {
+						got: [dynamic]byte
+						defer delete(got)
+						err, _, _ := sinks_unpack(sink, format, kind, packed[:cut], &got, -1, {chunk_size = sinks_chunk(len(data))}, &rest)
+						testing.expectf(t, err == want_err, "%v, %v, %v, %v, cut %v of %v: %v, one-shot gave %v", format, level, kind, sink, cut, len(packed), err, want_err)
+						testing.expectf(t, len(got) <= len(data) && bytes.equal(got[:], data[:len(got)]), "%v, %v, %v, %v, cut %v of %v: output is not a prefix", format, level, kind, sink, cut, len(packed))
+						testing.expectf(t, abs(len(got) - len(want)) <= slack, "%v, %v, %v, %v, cut %v of %v: %v bytes, one-shot gave %v", format, level, kind, sink, cut, len(packed), len(got), len(want))
+					}
+				}
+			}
+		}
+	}
 }
 
 @(test)

@@ -200,6 +200,7 @@ Inflate_Checksum :: enum u8 {None, Adler32, CRC32}
 Inflate :: struct {
 	input:      []u8,
 	position:   int,
+	checkpoint: int,
 	bit_buffer: u64,
 	bit_count:  i32,
 	eof:        bool,
@@ -750,8 +751,9 @@ inflate_stream_fill :: proc(r: ^Inflate_Reader) -> (err: Error) {
 			written, err = inflate_decompress(&r.decoder, output, nil, 0, 0, from, r.high_water, checksum, &r.digest, true, false, true)
 		}
 	}
-	if err != nil && inflate_overrun(&r.decoder.s) {
-		err = General_Error.Stream_Too_Short
+	if inflate_overrun(&r.decoder.s) {
+		err     = General_Error.Stream_Too_Short
+		written = min(written, r.decoder.s.checkpoint)
 	}
 	r.written          = written
 	r.total           += i64(written - from)
@@ -796,13 +798,16 @@ inflate_stream_to_writer :: proc(w: io.Writer, z: ^compress.Context, format: Inf
 	defer inflate_reader_destroy(&r)
 	inflate_stream_init(&r, z, format, expected_output_size, options, allocator) or_return
 	for !r.done {
-		inflate_stream_fill(&r) or_return
+		fill_err := inflate_stream_fill(&r)
 		if r.written > r.flushed {
 			_, write_err := io.write_full(w, r.window[r.flushed:r.written])
 			if write_err != nil {
 				return write_err
 			}
 			r.flushed = r.written
+		}
+		if fill_err != nil {
+			return fill_err
 		}
 	}
 	return nil
