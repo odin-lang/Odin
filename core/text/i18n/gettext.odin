@@ -81,9 +81,10 @@ parse_mo_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTIONS, plur
 			return translation, .MO_File_Incorrect_Plural_Count
 		}
 
+		// The context is stored with the singular key and also applies to the plural key.
+		section_name := ""
 		for k in keys {
-			section_name := ""
-			key          := string(k)
+			key := string(k)
 
 			// Scan for <context>EOT<key>
 			for ch, i in k {
