@@ -13,7 +13,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 # The OpenSSL CLI tool installed can be used to easily generate digests:
 # $ openssl sha3-512 -mac HMAC -macopt key:"$HMAC_KEY" $FILE_NAME
 TEST_SUITES      = ['PNG', 'XML', 'BMP', 'JPG', 'BNG', 'Wycheproof', 'Noise', 'X509-Limbo', 'Fonts', 'ZIP', 'XZ', '7Z', 'TAR', 'HXA', 'I18N', 'UCD']
-ASSETS_COMMIT    = "0e890b4839f54ff336b198554e70c832f07b87ff"
+ASSETS_COMMIT    = "0b1477159b58b3d7bf88a35d580d059e087dbe67"
 ASSETS_BASE_URL  = "https://raw.githubusercontent.com/odin-lang/test-assets/{}/{}/{}"
 MANIFEST_DIR     = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 HMAC_KEY         = "https://odin-lang.org"

@@ -85,6 +85,22 @@ test_mixed_context_dupe :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_mo_contextual_plurals :: proc(t: ^testing.T) {
+	test(t, {
+		file   = TEST_SUITE_PATH + "contextual_plurals.mo",
+		loader = i18n.parse_mo_file,
+		plural = nil,
+		tests  = {
+			{"A", "item",  "A items",           2},
+			{"A", "items", "A items",           2},
+			{"B", "items", "B items",           2},
+			{"",  "items", "items",             2},
+			{"",  "plain", "Plain translation", -1},
+		},
+	})
+}
+
+@(test)
 test_nl_mo :: proc(t: ^testing.T) {
 	test(t, {
 		file   = TEST_SUITE_PATH + "nl_NL.mo",
