@@ -1,7 +1,10 @@
 package compress_lz4
 
 import "base:intrinsics"
+import "base:runtime"
 import "core:compress"
+import "core:hash/xxhash"
+import "core:io"
 
 Error         :: compress.Error
 General_Error :: compress.General_Error
@@ -63,6 +66,80 @@ LEGACY_BLOCK_SIZE    :: 8 << 20
 FRAME_HEADER_MAX     :: 4 + 2 + 8 + 4 + 1
 FRAME_DESCRIPTOR_MAX :: 2 + 8 + 4
 FRAME_FOOTER_MAX     :: 4 + 4
+
+CHUNK_SIZE :: 256 * 1024
+
+Frame_Reader :: struct {
+	z:            ^compress.Context,
+	window:       []u8,
+	buffer:       []u8,
+	dictionary:   []u8,
+	scratch:      [dynamic]u8,
+	written:      int,
+	flushed:      int,
+	base:         int,
+	block_max:    int,
+	history:      int,
+	chunk:        int,
+	memory_max:   int,
+	limit:        i64,
+	total:        i64,
+	frame_limit:  i64,
+	frame_start:  i64,
+	content_size: i64,
+	frames:       int,
+	digest:       xxhash.XXH32_state,
+	err:          Error,
+	allocator:    runtime.Allocator,
+	state:        LZ4_Stream_State,
+	independent:  bool,
+	checksummed:  bool,
+	content_hash: bool,
+	done:         bool,
+	owns_window:  bool,
+}
+
+WRITER_CHUNK_SIZE :: 1024 * 1024
+
+Frame_Writer :: struct {
+	w:            io.Writer,
+	state:        ^LZ4,
+	window:       []u8,
+	out:          []u8,
+	dictionary:   []u8,
+	filled:       int,
+	start:        int,
+	history:      int,
+	out_len:      int,
+	block_max:    int,
+	total:        i64,
+	content_size: i64,
+	digest:       xxhash.XXH32_state,
+	err:          Error,
+	allocator:    runtime.Allocator,
+	level:        Level,
+	flags:        Frame_Flags,
+	needs_index:  bool,
+	finished:     bool,
+	owns_window:  bool,
+}
+
+@(private)
+LZ4_Stream_State :: enum u8 {
+	Magic,
+	Frame,
+	Legacy,
+	Done,
+}
+
+@(private)
+LZ4_Frame_Header :: struct {
+	block_max:        int,
+	content_size:     i64,
+	independent:      bool,
+	block_checksum:   bool,
+	content_checksum: bool,
+}
 
 @(private)
 LZ4_Descriptor_Flag :: enum u8 {

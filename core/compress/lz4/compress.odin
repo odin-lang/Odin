@@ -6,6 +6,7 @@ import "base:intrinsics"
 import "base:runtime"
 import "core:compress"
 import "core:hash/xxhash"
+import "core:io"
 
 // One exception to the cleanroom principle is present only for the highest
 // compression modes:
@@ -58,27 +59,7 @@ compress_frame_to_slice :: proc(s: ^LZ4, output, input: []u8, level := Level.Def
 	lz4_reset(s, level)
 
 	block_max := LZ4_BLOCK_MAX_BYTES[options.block_max_size]
-	_, has_dictionary_id := options.dictionary_id.?
-
-	dst := raw_data(output)
-	lz4_store_u32(dst, FRAME_MAGIC)
-	flg := transmute(LZ4_Descriptor_Flags)options.flags + {.Version_Low}
-	if has_dictionary_id {
-		flg += {.Dictionary_ID}
-	}
-	dst[4] = transmute(u8)flg
-	dst[5] = LZ4_BLOCK_MAX_CODE[options.block_max_size] << 4
-	op := 6
-	if .Content_Size in options.flags {
-		lz4_store_u64(dst[op:], u64(len(input)))
-		op += 8
-	}
-	if has_dictionary_id {
-		lz4_store_u32(dst[op:], options.dictionary_id.?)
-		op += 4
-	}
-	dst[op] = u8(xxhash.XXH32(output[4:op]) >> 8)
-	op += 1
+	op := lz4_write_frame_header(output, options, u64(len(input)))
 
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
@@ -91,37 +72,10 @@ compress_frame_to_slice :: proc(s: ^LZ4, output, input: []u8, level := Level.Def
 
 	for offset := 0; offset < len(input); offset += block_max {
 		block_end := min(offset + block_max, len(input))
-		size      := block_end - offset
-		header    := op
-		op += 4
-
-		compressed: int
-		switch {
-		case len(dictionary) > 0 && .Independent_Blocks in options.flags:
-			block, block_history := lz4_prefix_dictionary(dictionary, input[offset:block_end]) or_return
-			lz4_reset(s, level)
-			lz4_index(s, block, 0, block_history, level)
-			compressed = lz4_compress_range(s, output[op:], block, block_history, len(block), 0, level)
-		case .Independent_Blocks in options.flags:
-			compressed = lz4_compress_range(s, output[op:], data, offset, block_end, offset, level)
-		case:
-			compressed = lz4_compress_range(s, output[op:], data, history + offset, history + block_end, max(0, history + offset - LZ4_MAX_OFFSET), level)
-		}
-
-		if compressed >= size {
-			intrinsics.mem_copy_non_overlapping(dst[op:], raw_data(input[offset:]), size)
-			lz4_store_u32(dst[header:], u32(size) | 0x8000_0000)
-			compressed = size
-		} else {
-			lz4_store_u32(dst[header:], u32(compressed))
-		}
-		if .Block_Checksum in options.flags {
-			lz4_store_u32(dst[op + compressed:], xxhash.XXH32(output[op:op + compressed]))
-			compressed += 4
-		}
-		op += compressed
+		op += lz4_encode_block(s, output[op:], data, history + offset, history + block_end, level, options.flags, dictionary) or_return
 	}
 
+	dst := raw_data(output)
 	lz4_store_u32(dst[op:], 0)
 	op += 4
 	if .Content_Checksum in options.flags {
@@ -134,6 +88,135 @@ compress_frame_to_slice :: proc(s: ^LZ4, output, input: []u8, level := Level.Def
 compress_frame_to_dynamic :: proc(output: ^[dynamic]u8, input: []u8, level := Level.Default, options := Frame_Options{flags = DEFAULT_FRAME_FLAGS}, dictionary: []u8 = nil, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 	return lz4_to_dynamic(output, input, compress_frame_bound(len(input), options), level, options, dictionary, true)
+}
+
+frame_writer_init :: proc(fw: ^Frame_Writer, w: io.Writer, level := Level.Default, frame_options := Frame_Options{flags = DEFAULT_FRAME_FLAGS}, content_size: i64 = -1, options: compress.Options = {}, dictionary: []u8 = nil, allocator := context.allocator) -> (err: Error) {
+	fw^ = {}
+	fw.w            = w
+	fw.level        = level
+	fw.content_size = content_size
+	fw.dictionary   = dictionary
+	fw.allocator    = allocator
+	fw.block_max    = LZ4_BLOCK_MAX_BYTES[frame_options.block_max_size]
+	defer fw.err = err
+
+	if options.max_output_size < 0 || options.max_memory < 0 || options.chunk_size < 0 || content_size < -1 {
+		return General_Error.Incompatible_Options
+	}
+	header_options := frame_options
+	if content_size < 0 {
+		header_options.flags -= {.Content_Size}
+	}
+	fw.flags = header_options.flags
+
+	minimum   := 2 * LZ4_WINDOW_SIZE + fw.block_max + 4
+	out_size  := FRAME_HEADER_MAX + compress_block_bound(fw.block_max) + 8 + FRAME_FOOTER_MAX
+	available := compress.memory_limit(options) - size_of(LZ4) - out_size
+	if options.buffer != nil {
+		if len(options.buffer) < minimum {
+			return General_Error.Incompatible_Options
+		}
+		fw.window = options.buffer
+	} else if available < minimum {
+		return General_Error.Memory_Limit_Exceeded
+	}
+
+	state := runtime.mem_alloc_non_zeroed(size_of(LZ4), align_of(LZ4), allocator) or_return
+	fw.state = (^LZ4)(raw_data(state))
+	lz4_reset(fw.state, level)
+	fw.out = non_zero_make([]u8, out_size, allocator) or_return
+	if fw.window == nil {
+		size := min(minimum + (options.chunk_size if options.chunk_size > 0 else WRITER_CHUNK_SIZE), available)
+		fw.window      = non_zero_make([]u8, size, allocator) or_return
+		fw.owns_window = true
+	}
+
+	fw.out_len = lz4_write_frame_header(fw.out, header_options, u64(max(content_size, 0)))
+	if len(dictionary) > 0 && .Independent_Blocks not_in fw.flags {
+		tail := dictionary[max(0, len(dictionary) - LZ4_MAX_OFFSET):]
+		copy(fw.window, tail)
+		fw.filled      = len(tail)
+		fw.start       = len(tail)
+		fw.history     = len(tail)
+		fw.needs_index = true
+	}
+	if .Content_Checksum in fw.flags {
+		xxhash.XXH32_reset_state(&fw.digest)
+	}
+	return nil
+}
+
+frame_writer_write :: proc(fw: ^Frame_Writer, p: []u8) -> (n: int, err: Error) {
+	if fw.err != nil {
+		return 0, fw.err
+	}
+	if fw.finished {
+		return 0, io.Error.Closed
+	}
+	defer fw.err = err
+	if fw.content_size >= 0 && i64(len(p)) > fw.content_size - fw.total {
+		return 0, LZ4_Error.Content_Size_Mismatch
+	}
+	for n < len(p) {
+		if fw.filled == len(fw.window) {
+			lz4_writer_slide(fw)
+		}
+		k := copy(fw.window[fw.filled:], p[n:])
+		if .Content_Checksum in fw.flags {
+			xxhash.XXH32_update(&fw.digest, p[n:n + k])
+		}
+		fw.filled += k
+		fw.total  += i64(k)
+		n         += k
+		for fw.filled - fw.start >= fw.block_max + 4 {
+			lz4_writer_block(fw, fw.block_max) or_return
+		}
+	}
+	return
+}
+
+frame_writer_finish :: proc(fw: ^Frame_Writer) -> (err: Error) {
+	if fw.err != nil {
+		return fw.err
+	}
+	if fw.finished {
+		return nil
+	}
+	defer fw.err = err
+	if fw.content_size >= 0 && fw.total != fw.content_size {
+		return LZ4_Error.Content_Size_Mismatch
+	}
+	for fw.start < fw.filled {
+		lz4_writer_block(fw, min(fw.block_max, fw.filled - fw.start)) or_return
+	}
+	dst := raw_data(fw.out)
+	lz4_store_u32(dst[fw.out_len:], 0)
+	fw.out_len += 4
+	if .Content_Checksum in fw.flags {
+		lz4_store_u32(dst[fw.out_len:], u32(xxhash.XXH32_digest(&fw.digest)))
+		fw.out_len += 4
+	}
+	lz4_writer_flush(fw) or_return
+	fw.finished = true
+	return nil
+}
+
+frame_writer_to_stream :: proc(fw: ^Frame_Writer) -> (s: io.Stream) {
+	s.data      = fw
+	s.procedure = lz4_writer_stream_proc
+	return
+}
+
+frame_writer_destroy :: proc(fw: ^Frame_Writer) {
+	if fw.owns_window {
+		delete(fw.window, fw.allocator)
+	}
+	delete(fw.out, fw.allocator)
+	free(fw.state, fw.allocator)
+	fw.state       = nil
+	fw.window      = nil
+	fw.out         = nil
+	fw.owns_window = false
 }
 
 @(private)
@@ -737,6 +820,125 @@ lz4_gather :: proc(s: ^LZ4, src: [^]u8, ip, low, length_limit: int, depth, nice:
 		depth     -= 1
 	}
 	return
+}
+
+@(private)
+lz4_write_frame_header :: proc(output: []u8, options: Frame_Options, content_size: u64) -> int #no_bounds_check {
+	_, has_dictionary_id := options.dictionary_id.?
+	dst := raw_data(output)
+	lz4_store_u32(dst, FRAME_MAGIC)
+	flg := transmute(LZ4_Descriptor_Flags)options.flags + {.Version_Low}
+	if has_dictionary_id {
+		flg += {.Dictionary_ID}
+	}
+	dst[4] = transmute(u8)flg
+	dst[5] = LZ4_BLOCK_MAX_CODE[options.block_max_size] << 4
+	op := 6
+	if .Content_Size in options.flags {
+		lz4_store_u64(dst[op:], content_size)
+		op += 8
+	}
+	if has_dictionary_id {
+		lz4_store_u32(dst[op:], options.dictionary_id.?)
+		op += 4
+	}
+	dst[op] = u8(xxhash.XXH32(output[4:op]) >> 8)
+	return op + 1
+}
+
+@(private)
+lz4_encode_block :: proc(s: ^LZ4, output, data: []u8, start, end: int, level: Level, flags: Frame_Flags, dictionary: []u8) -> (written: int, err: Error) #no_bounds_check {
+	dst  := raw_data(output)
+	size := end - start
+	compressed: int
+	switch {
+	case len(dictionary) > 0 && .Independent_Blocks in flags:
+		runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+		block, block_history := lz4_prefix_dictionary(dictionary, data[start:end]) or_return
+		lz4_reset(s, level)
+		lz4_index(s, block, 0, block_history, level)
+		compressed = lz4_compress_range(s, output[4:], block, block_history, len(block), 0, level)
+	case .Independent_Blocks in flags:
+		compressed = lz4_compress_range(s, output[4:], data, start, end, start, level)
+	case:
+		compressed = lz4_compress_range(s, output[4:], data, start, end, max(0, start - LZ4_MAX_OFFSET), level)
+	}
+
+	if compressed >= size {
+		intrinsics.mem_copy_non_overlapping(dst[4:], raw_data(data[start:]), size)
+		lz4_store_u32(dst, u32(size) | 0x8000_0000)
+		compressed = size
+	} else {
+		lz4_store_u32(dst, u32(compressed))
+	}
+	if .Block_Checksum in flags {
+		lz4_store_u32(dst[4 + compressed:], xxhash.XXH32(output[4:4 + compressed]))
+		compressed += 4
+	}
+	return 4 + compressed, nil
+}
+
+@(private)
+lz4_writer_block :: proc(fw: ^Frame_Writer, size: int) -> (err: Error) {
+	data := fw.window[:fw.filled]
+	if fw.needs_index {
+		lz4_index(fw.state, data, 0, fw.history, fw.level)
+		fw.needs_index = false
+	}
+	fw.out_len += lz4_encode_block(fw.state, fw.out[fw.out_len:], data, fw.start, fw.start + size, fw.level, fw.flags, fw.dictionary) or_return
+	fw.start   += size
+	return lz4_writer_flush(fw)
+}
+
+@(private)
+lz4_writer_flush :: proc(fw: ^Frame_Writer) -> (err: Error) {
+	if fw.out_len > 0 {
+		_, write_err := io.write_full(fw.w, fw.out[:fw.out_len])
+		if write_err != nil {
+			return write_err
+		}
+		fw.out_len = 0
+	}
+	return nil
+}
+
+@(private)
+lz4_writer_slide :: proc(fw: ^Frame_Writer) {
+	shift := (fw.start - LZ4_WINDOW_SIZE) &~ (LZ4_WINDOW_SIZE - 1)
+	copy(fw.window, fw.window[shift:fw.filled])
+	fw.filled -= shift
+	fw.start  -= shift
+	table := fw.state.fast[:] if LZ4_LEVELS[clamp(fw.level, Level.Fastest, Level.Best)].strategy == .Fast else fw.state.head[:]
+	for &position in table {
+		position = position - u32(shift) if int(position) >= shift else 0
+	}
+}
+
+@(private)
+lz4_writer_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	fw := (^Frame_Writer)(stream_data)
+	#partial switch mode {
+	case .Write:
+		written, write_err := frame_writer_write(fw, p)
+		n = i64(written)
+		if write_err != nil {
+			io_err, is_io := write_err.(io.Error)
+			err = io_err if is_io else .Unknown
+		}
+		return
+	case .Close:
+		if finish_err := frame_writer_finish(fw); finish_err != nil {
+			io_err, is_io := finish_err.(io.Error)
+			err = io_err if is_io else .Unknown
+		}
+		return
+	case .Destroy:
+		frame_writer_destroy(fw)
+		return 0, nil
+	case .Query:
+		return io.query_utility({.Write, .Close, .Destroy, .Query})
+	}
+	return 0, .Unsupported
 }
 
 /*

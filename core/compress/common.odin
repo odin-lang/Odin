@@ -30,9 +30,14 @@ import "core:io"
 	`Options` overrides them at runtime, per call. A zero field means the default:
 	- `max_output_size` caps the output size. In memory, zero means `COMPRESS_OUTPUT_ALLOCATE_MAX`.
 	  When streaming, zero means no limit.
-	- `max_memory` caps the working memory when streaming. Zero means `COMPRESS_MEMORY_MAX`.
-	- `chunk_size` is how much a streaming decoder produces per step, on top of its history window.
-	- `buffer` lets a streaming decoder use the caller's memory for its window instead of allocating it.
+	- `max_memory` caps the working memory: a streaming decoder's history window, and a model such as
+	  PPMd's in memory mode too. Zero means `COMPRESS_MEMORY_MAX`.
+	- `chunk_size` is how much a streaming decoder produces per step, on top of its history window,
+	  or how much a stream writer buffers.
+	- `buffer` lets a streaming decoder or writer use the caller's memory instead of allocating it.
+	- `progress` is called with `progress_data` as the work goes on: once per chunk when streaming,
+	  and about every `progress_interval` bytes in memory, where zero means `PROGRESS_INTERVAL_DEFAULT`.
+	  Returning `true` cancels the call, which then returns `.Canceled`.
 
 	The caller still has the final say. Pass in a dynamic array that's already reserved, and if
 	its capacity exceeds what we'd reserve, we use it as is and only grow it once the output
@@ -64,11 +69,27 @@ COMPRESS_GROWTH_STEP               :: 16 * 1024 * 1024
 COMPRESS_MEMORY_MAX :: int(#config(COMPRESS_MEMORY_MAX, COMPRESS_OUTPUT_ALLOCATE_MAX))
 
 Options :: struct {
-	max_output_size: int,
-	max_memory:      int,
-	chunk_size:      int,
-	buffer:          []u8,
+	max_output_size:   int,
+	max_memory:        int,
+	chunk_size:        int,
+	buffer:            []u8,
+	progress:          Progress_Proc,
+	progress_data:     rawptr,
+	progress_interval: int,
 }
+
+Progress :: struct {
+	bytes_in, bytes_out:          i64,
+	total_in, total_out:          i64,
+	member:                       string,
+	member_index:                 int,
+	member_count:                 int,
+	archive_in, archive_total_in: i64,
+}
+
+Progress_Proc :: #type proc(progress: Progress, user_data: rawptr) -> (cancel: bool)
+
+PROGRESS_INTERVAL_DEFAULT :: 1 << 20
 
 DEFLATE_EXPANSION_MAX   :: 1032
 DEFLATE64_EXPANSION_MAX :: 29128
@@ -105,6 +126,7 @@ General_Error :: enum {
 	Checksum_Failed,
 	Incompatible_Options,
 	Unimplemented,
+	Canceled,
 
 	// Memory errors
 
@@ -196,7 +218,7 @@ PPMd_Error :: enum {
 	Invalid_Properties,
 	Corrupt_Data,
 	Unexpected_End_Marker,
-	Memory_Limit_Exceeded,
+	Unsupported_Restore_Method,
 }
 
 BCJ2_Error :: enum {

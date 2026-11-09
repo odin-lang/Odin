@@ -208,6 +208,29 @@ memory_limit :: #force_inline proc "contextless" (options: Options) -> (limit: i
 	return COMPRESS_MEMORY_MAX if options.max_memory == 0 else options.max_memory
 }
 
+progress_interval :: #force_inline proc "contextless" (options: Options) -> (interval: int) {
+	return PROGRESS_INTERVAL_DEFAULT if options.progress_interval == 0 else options.progress_interval
+}
+
+report_progress :: proc(options: Options, bytes_in, bytes_out, total_in, total_out: i64) -> (err: Error) {
+	if options.progress == nil {
+		return nil
+	}
+	progress := Progress{
+		bytes_in         = bytes_in,
+		bytes_out        = bytes_out,
+		total_in         = total_in,
+		total_out        = total_out,
+		member_index     = -1,
+		member_count     = -1,
+		archive_total_in = -1,
+	}
+	if options.progress(progress, options.progress_data) {
+		return General_Error.Canceled
+	}
+	return nil
+}
+
 @(optimization_mode="favor_size")
 read_ptr :: proc(z: ^Context, ptr: ^$T) -> (err: io.Error) #no_bounds_check {
 	return read_slice(z, ([^]byte)(ptr)[:size_of(T)])
