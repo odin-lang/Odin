@@ -4,6 +4,9 @@ package all
 // Imports every package
 // This is useful for knowing what exists and producing documentation with `odin doc`
 
+@(require) import "core:archive"
+@(require) import "core:archive/tar"
+
 @(require) import "core:bufio"
 @(require) import "core:bytes"
 

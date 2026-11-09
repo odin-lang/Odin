@@ -70,6 +70,21 @@ Options :: struct {
 	buffer:          []u8,
 }
 
+Stream_Format :: enum u8 {
+	Unknown,
+	Gzip,
+	Zlib,
+	BZip2,
+	LZ4_Frame,
+	XZ,
+	LZMA_Alone,
+}
+
+LZMA_ALONE_HEADER_SIZE    :: 13
+LZMA_ALONE_PROPERTIES_MAX :: (4 * 5 + 4) * 9 + 8
+LZMA_ALONE_UNPACKED_MAX   :: u64(1) << 38
+LZMA_ALONE_DICTIONARY_MIN :: u32(1) << 12
+
 DEFLATE_EXPANSION_MAX   :: 1032
 DEFLATE64_EXPANSION_MAX :: 29128
 LZ4_EXPANSION_MAX       :: 255
