@@ -236,6 +236,13 @@ else
 	exit 1
 fi
 
+if [[ $($ODIN check ../test_issue_poly_record_unspecialized_field $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 # Objective-C tests target darwin, which can be checked and built for from any host
 if [[ $($ODIN check ../test_issue_objc_import_missing_selector -no-entry-point -target:darwin_arm64 $COMMON_CHECK 2>&1 >/dev/null | grep -c "is required for imported Objective-C methods") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"

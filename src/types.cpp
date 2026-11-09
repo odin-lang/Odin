@@ -2540,6 +2540,38 @@ gb_internal bool is_type_polymorphic_record_unspecialized(Type *t) {
 	return false;
 }
 
+gb_internal Type *find_polymorphic_record_unspecialized(Type *t) {
+	while (t != nullptr && base_type(t) != nullptr) {
+		if (is_type_polymorphic_record_unspecialized(t)) {
+			return t;
+		}
+		switch (t->kind) {
+		case Type_Pointer:                   t = t->Pointer.elem;                   break;
+		case Type_MultiPointer:              t = t->MultiPointer.elem;              break;
+		case Type_SoaPointer:                t = t->SoaPointer.elem;                break;
+		case Type_Array:                     t = t->Array.elem;                     break;
+		case Type_EnumeratedArray:           t = t->EnumeratedArray.elem;           break;
+		case Type_Slice:                     t = t->Slice.elem;                     break;
+		case Type_DynamicArray:              t = t->DynamicArray.elem;              break;
+		case Type_FixedCapacityDynamicArray: t = t->FixedCapacityDynamicArray.elem; break;
+		case Type_SimdVector:                t = t->SimdVector.elem;                break;
+		case Type_Matrix:                    t = t->Matrix.elem;                    break;
+		case Type_BitSet:                    t = t->BitSet.elem;                    break;
+		case Type_Map: {
+			Type *key = find_polymorphic_record_unspecialized(t->Map.key);
+			if (key != nullptr) {
+				return key;
+			}
+			t = t->Map.value;
+			break;
+		}
+		default:
+			return nullptr;
+		}
+	}
+	return nullptr;
+}
+
 
 gb_internal TypeTuple *get_record_polymorphic_params(Type *t) {
 	t = base_type(t);
