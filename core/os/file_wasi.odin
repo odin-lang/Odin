@@ -138,7 +138,7 @@ match_preopen :: proc(path: string) -> (wasi.fd_t, string, bool) {
 		for i > 0 && prefix[i-1] == '/' {
 			i -= 1
 		}
-		return path[i] == '/'
+		return i == len(path) || path[i] == '/'
 	}
 
 	path := path
@@ -334,21 +334,25 @@ _link :: proc(old_name, new_name: string) -> Error {
 }
 
 _symlink :: proc(old_name, new_name: string) -> Error {
-	src_dir_fd, src_relative, src_ok := match_preopen(old_name)
-	if !src_ok {
-		return .Invalid_Path
-	}
-
 	new_dir_fd, new_relative, new_ok := match_preopen(new_name)
 	if !new_ok {
 		return .Invalid_Path
 	}
 
-	if src_dir_fd != new_dir_fd {
+	if len(old_name) == 0 || old_name[0] != '/' {
+		return _get_platform_error(wasi.path_symlink(old_name, new_dir_fd, new_relative))
+	}
+
+	src_dir_fd, src_relative, src_ok := match_preopen(old_name)
+	if !src_ok || src_dir_fd != new_dir_fd {
 		return .Invalid_Path
 	}
 
-	return _get_platform_error(wasi.path_symlink(src_relative, src_dir_fd, new_relative))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	base := clean_path(dir(new_relative), temp_allocator) or_return
+	target := clean_path(src_relative, temp_allocator) or_return
+	contents := get_relative_path(base, target, temp_allocator) or_return
+	return _get_platform_error(wasi.path_symlink(contents, new_dir_fd, new_relative))
 }
 
 _read_link :: proc(name: string, allocator: runtime.Allocator) -> (s: string, err: Error) {
@@ -357,18 +361,20 @@ _read_link :: proc(name: string, allocator: runtime.Allocator) -> (s: string, er
 		return "", .Invalid_Path
 	}
 
-	n, _err := wasi.path_readlink(dir_fd, relative, nil)
-	if _err != nil {
-		err = _get_platform_error(_err)
-		return
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
+	buf := make([]byte, 256, temp_allocator) or_return
+	for {
+		n, errno := wasi.path_readlink(dir_fd, relative, buf)
+		if errno != .SUCCESS {
+			err = _get_platform_error(errno)
+			return
+		}
+		if int(n) < len(buf) {
+			s = clone_string(string(buf[:n]), allocator) or_return
+			return
+		}
+		buf = make([]byte, 2 * len(buf), temp_allocator) or_return
 	}
-
-	buf := make([]byte, n, allocator) or_return
-
-	_, _err = wasi.path_readlink(dir_fd, relative, buf)
-	s = string(buf)
-	err = _get_platform_error(_err)
-	return
 }
 
 _chdir :: proc(name: string) -> Error {

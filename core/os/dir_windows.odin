@@ -119,8 +119,12 @@ _read_directory_iterator_init :: proc(it: ^Read_Directory_Iterator, f: ^File) {
 		return
 	}
 
-	wpath := string16(impl.wname)
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	wpath, wpath_err := _fix_long_path_slice(impl.name, temp_allocator)
+	if wpath_err != nil {
+		read_directory_iterator_set_error(it, impl.name, wpath_err)
+		return
+	}
 
 	wpath_search := make([]u16, len(wpath)+3, temp_allocator)
 	copy(wpath_search, wpath)

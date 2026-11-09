@@ -3,7 +3,6 @@ package os
 
 import "base:runtime"
 
-import "core:strings"
 import "core:strconv"
 import "core:sys/linux"
 
@@ -77,74 +76,85 @@ _mkdir_all :: proc(path: string, perm: Permissions) -> Error {
 	return nil if has_created else .Exist
 }
 
-_remove_all :: proc(path: string) -> Error {
-	remove_all_dir :: proc(dfd: linux.Fd) -> Error {
-		n := 64
-		buf := make([]u8, n)
-		defer delete(buf)
+_Remove_All_Dir :: linux.Fd
 
-		loop: for {
-			buflen, errno := linux.getdents(dfd, buf[:])
-			#partial switch errno {
-			case .EINVAL:
-				delete(buf)
-				n *= 2
-				buf = make([]u8, n)
-				continue loop
-			case .NONE:
-				if buflen == 0 { break loop }
-			case:
-				return _get_platform_error(errno)
-			}
+@(private="file")
+_REMOVE_ALL_OPEN_FLAGS :: linux.Open_Flags{.NONBLOCK, .DIRECTORY, .LARGEFILE, .CLOEXEC, .NOFOLLOW}
 
-			offset: int
-			for d in linux.dirent_iterate_buf(buf[:buflen], &offset) {
-				d_name_str := linux.dirent_name(d)
-				d_name_cstr := strings.unsafe_string_to_cstring(d_name_str)
-
-				/* check for current or parent directory (. or ..) */
-				if d_name_str == "." || d_name_str == ".." {
-					continue
-				}
-
-				#partial switch d.type {
-				case .DIR:
-					new_dfd: linux.Fd
-					new_dfd, errno = linux.openat(dfd, d_name_cstr, _OPENDIR_FLAGS)
-					if errno != .NONE {
-						return _get_platform_error(errno)
-					}
-					defer linux.close(new_dfd)
-					remove_all_dir(new_dfd) or_return
-					errno = linux.unlinkat(dfd, d_name_cstr, {.REMOVEDIR})
-				case:
-					errno = linux.unlinkat(dfd, d_name_cstr, nil)
-				}
-
-				if errno != .NONE {
-					return _get_platform_error(errno)
-				}
-			}
-		}
-		return nil
+_remove_all_root :: proc(path: string, allocator: runtime.Allocator) -> (parent: _Remove_All_Dir, name: []u8, err: Error) {
+	root := path
+	for len(root) > 1 && root[len(root)-1] == '/' {
+		root = root[:len(root)-1]
 	}
+	croot := clone_to_cstring(root, allocator) or_return
+	return linux.AT_FDCWD, ([^]u8)(croot)[:len(root)], nil
+}
 
-	temp_allocator := TEMP_ALLOCATOR_GUARD({})
-	path_cstr := clone_to_cstring(path, temp_allocator) or_return
+_remove_all_open :: proc(parent: _Remove_All_Dir, name: []u8) -> (dir: _Remove_All_Dir, is_dir: bool, err: Error) {
+	cname := cstring(raw_data(name))
+	fd, errno := linux.openat(parent, cname, _REMOVE_ALL_OPEN_FLAGS)
+	if errno == .NONE {
+		return fd, true, nil
+	}
+	if errno == .ENOENT {
+		return -1, false, .Not_Exist
+	}
+	st: linux.Stat
+	if stat_errno := linux.fstatat(parent, cname, &st, {.SYMLINK_NOFOLLOW}); stat_errno != .NONE {
+		return -1, false, _get_platform_error(stat_errno)
+	}
+	if !linux.S_ISDIR(st.mode) {
+		return -1, false, _get_platform_error(linux.unlinkat(parent, cname, {}))
+	}
+	if linux.unlinkat(parent, cname, {.REMOVEDIR}) == .NONE {
+		return -1, false, nil
+	}
+	return -1, false, _get_platform_error(errno)
+}
 
-	fd, errno := linux.open(path_cstr, _OPENDIR_FLAGS)
-	#partial switch errno {
-	case .NONE:
-		break
-	case .ENOTDIR:
-		return _get_platform_error(linux.unlink(path_cstr))
-	case:
+_remove_all_read :: proc(dir: _Remove_All_Dir, names: ^[dynamic]u8, entries: ^[dynamic]_Remove_All_Entry) -> Error {
+	if _, errno := linux.lseek(dir, 0, .SET); errno != .NONE {
 		return _get_platform_error(errno)
 	}
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	buf := make([]u8, 8192, temp_allocator) or_return
+	for {
+		n, errno := linux.getdents(dir, buf)
+		if errno == .EINVAL {
+			buf = make([]u8, 2 * len(buf), temp_allocator) or_return
+			continue
+		}
+		if errno != .NONE {
+			return _get_platform_error(errno)
+		}
+		if n == 0 {
+			return nil
+		}
+		offset: int
+		for d in linux.dirent_iterate_buf(buf[:n], &offset) {
+			name := linux.dirent_name(d)
+			if name == "." || name == ".." {
+				continue
+			}
+			kind := _Remove_All_Kind.Other
+			if d.type == .DIR || d.type == .UNKNOWN {
+				kind = .Directory
+			}
+			_remove_all_add(names, entries, transmute([]u8)name, kind) or_return
+		}
+	}
+}
 
-	defer linux.close(fd)
-	remove_all_dir(fd) or_return
-	return _get_platform_error(linux.rmdir(path_cstr))
+_remove_all_unlink :: proc(parent: _Remove_All_Dir, name: []u8, kind: _Remove_All_Kind) -> Error {
+	flags: linux.FD_Flags
+	if kind == .Directory {
+		flags = {.REMOVEDIR}
+	}
+	return _get_platform_error(linux.unlinkat(parent, cstring(raw_data(name)), flags))
+}
+
+_remove_all_close :: proc(dir: _Remove_All_Dir) {
+	linux.close(dir)
 }
 
 _get_working_directory :: proc(allocator: runtime.Allocator) -> (path: string, err: Error) {
