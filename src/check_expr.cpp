@@ -1619,6 +1619,79 @@ gb_internal AstPackage *get_package_of_type(Type *type) {
 	}
 }
 
+gb_internal Type *check_using_subtype_value_cut(Type *src, Type *dst) {
+	if (src == nullptr || dst == nullptr || is_type_untyped(src) || is_type_pointer(src) || are_types_identical(src, dst)) {
+		return nullptr;
+	}
+
+	Type *embedded = nullptr;
+	if (check_is_assignable_to_using_subtype(src, dst) > 0) {
+		embedded = dst;
+	} else {
+		Type *bdst = base_type(dst);
+		if (bdst == nullptr || bdst->kind != Type_Union) {
+			return nullptr;
+		}
+		wait_for_record_signal(&bdst->Union.variants_wait_signal, &bdst->Union.checking_thread);
+		for (Type *vt : bdst->Union.variants) {
+			if (are_types_identical(vt, src)) {
+				return nullptr;
+			}
+		}
+		for (Type *vt : bdst->Union.variants) {
+			if (check_is_assignable_to_using_subtype(src, vt) > 0) {
+				embedded = vt;
+				break;
+			}
+		}
+	}
+	if (embedded == nullptr || is_type_pointer(embedded)) {
+		return nullptr;
+	}
+	return embedded;
+}
+
+gb_internal void error_using_subtype_value_cut(Ast *expr, Type *src, Type *expected, Type *embedded, char const *role, String where, char const *where_type) {
+	gbString src_str      = type_to_string(src);
+	gbString expected_str = type_to_string(expected);
+	gbString embedded_str = type_to_string(embedded);
+
+	ERROR_BLOCK();
+	error(expr, "Wrong %s type '%s' in %.*s of type '%s', expected '%s'", role, src_str, LIT(where), where_type, expected_str);
+	error_line("\t'%s' embeds '%s' through 'using', but is a different type and does not fit in it\n", src_str, embedded_str);
+
+	gb_string_free(embedded_str);
+	gb_string_free(expected_str);
+	gb_string_free(src_str);
+}
+
+gb_internal bool check_compound_literal_elem_fits(CheckerContext *c, Operand *o, Type *elem_type, Type *literal_type, char const *role, String context_name) {
+	if (o->mode == Addressing_Invalid || o->mode == Addressing_Type) {
+		return true;
+	}
+	Type *embedded = check_using_subtype_value_cut(o->type, elem_type);
+	if (embedded == nullptr) {
+		return true;
+	}
+
+	gbString literal_str = nullptr;
+	Type *blt = base_type(literal_type);
+	if (blt->kind == Type_Array && blt->Array.count < 0) {
+		gbString elem_str = type_to_string(blt->Array.elem);
+		literal_str = gb_string_make(heap_allocator(), "[?]");
+		literal_str = gb_string_append_length(literal_str, elem_str, gb_string_length(elem_str));
+		gb_string_free(elem_str);
+	} else {
+		literal_str = type_to_string(literal_type);
+	}
+
+	error_using_subtype_value_cut(o->expr, o->type, elem_type, embedded, role, context_name, literal_str);
+	gb_string_free(literal_str);
+
+	o->mode = Addressing_Invalid;
+	return false;
+}
+
 
 // NOTE(bill): 'context_name' is for debugging and error messages
 gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *type, String context_name) {
@@ -7718,6 +7791,25 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 					}
 					return CallArgumentError_MultipleVariadicExpand;
 				}
+			} else if (o->mode != Addressing_Invalid && o->mode != Addressing_Type) {
+				Type *embedded = check_using_subtype_value_cut(o->type, t);
+				if (embedded != nullptr) {
+					if (show_error) {
+						gbString elem_str = type_to_string(t);
+						gbString param_str = gb_string_make(heap_allocator(), "..");
+						param_str = gb_string_append_length(param_str, elem_str, gb_string_length(elem_str));
+						gbString where_str = gb_string_make(heap_allocator(), "variadic parameter '");
+						where_str = gb_string_append_length(where_str, var_entity->token.string.text, var_entity->token.string.len);
+						where_str = gb_string_appendc(where_str, "'");
+						String where = make_string(cast(u8 *)where_str, gb_string_length(where_str));
+						error_using_subtype_value_cut(o->expr, o->type, t, embedded, "argument", where, param_str);
+						gb_string_free(where_str);
+						gb_string_free(param_str);
+						gb_string_free(elem_str);
+					}
+					err = CallArgumentError_WrongTypes;
+					continue;
+				}
 			}
 			score += eval_param_and_score(c, o, t, err, true, var_entity, show_error);
 		}
@@ -11636,6 +11728,7 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 			c->bit_field_bit_size = field->Variable.bit_field_bit_size;
 		}
 
+		check_compound_literal_elem_fits(c, &o, field->type, type, "field", assignment_str);
 		check_assignment(c, &o, field->type, assignment_str);
 
 		c->bit_field_bit_size = prev_bit_field_bit_size;
@@ -11977,6 +12070,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 						is_constant = false;
 
 						TypeTuple *tt = &o.type->Tuple;
+						bool tuple_fits = true;
 						isize jj = 0;
 						for (Entity *src_field : tt->variables) {
 							Operand src_o = o;
@@ -11986,6 +12080,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 								continue ;
 							field = t->Struct.fields[index + (jj++)];
 
+							if (tuple_fits) {
+								tuple_fits = check_compound_literal_elem_fits(c, &src_o, field->type, type, "field", str_lit("structure literal"));
+							}
 							check_assignment(c, &src_o, field->type, str_lit("structure literal"));
 						}
 
@@ -12002,6 +12099,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 							is_constant = check_is_operand_compound_lit_constant(c, &o, field->type);
 						}
 
+						check_compound_literal_elem_fits(c, &o, field->type, type, "field", str_lit("structure literal"));
 						check_assignment(c, &o, field->type, str_lit("structure literal"));
 
 						handled_elem_count += 1;
@@ -12157,6 +12255,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 					Operand operand = {};
 					check_expr_with_type_hint(c, &operand, fv->value, elem_type);
+					check_compound_literal_elem_fits(c, &operand, elem_type, type, "element", context_name);
 					check_assignment(c, &operand, elem_type, context_name);
 
 					if (is_constant) {
@@ -12191,6 +12290,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 					Operand operand = {};
 					check_expr_with_type_hint(c, &operand, fv->value, elem_type);
+					check_compound_literal_elem_fits(c, &operand, elem_type, type, "element", context_name);
 					check_assignment(c, &operand, elem_type, context_name);
 
 					if (is_constant) {
@@ -12224,9 +12324,13 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				if (is_type_tuple(operand.type)) {
 					is_constant = false;
 					TypeTuple *tt = &operand.type->Tuple;
+					bool tuple_fits = true;
 					for_array(jj, tt->variables) {
 						Operand oo = operand;
 						oo.type = tt->variables[jj]->type;
+						if (tuple_fits) {
+							tuple_fits = check_compound_literal_elem_fits(c, &oo, elem_type, type, "element", context_name);
+						}
 						check_assignment(c, &oo, elem_type, context_name);
 					}
 
@@ -12235,6 +12339,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 						error(e, "Expansion reaches index %lld which goes out of bounds (>= %lld) for %.*s", cast(long long)max, cast(long long)max_type_count, LIT(context_name));
 					}
 				} else {
+					check_compound_literal_elem_fits(c, &operand, elem_type, type, "element", context_name);
 					check_assignment(c, &operand, elem_type, context_name);
 
 					if (is_constant) {
@@ -12426,6 +12531,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 					Operand operand = {};
 					check_expr_with_type_hint(c, &operand, fv->value, elem_type);
+					check_compound_literal_elem_fits(c, &operand, elem_type, type, "element", context_name);
 					check_assignment(c, &operand, elem_type, context_name);
 
 					if (is_constant) {
@@ -12469,6 +12575,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 					Operand operand = {};
 					check_expr_with_type_hint(c, &operand, fv->value, elem_type);
+					check_compound_literal_elem_fits(c, &operand, elem_type, type, "element", context_name);
 					check_assignment(c, &operand, elem_type, context_name);
 
 					if (is_constant) {
@@ -12501,6 +12608,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 				Operand operand = {};
 				check_expr_with_type_hint(c, &operand, e, elem_type);
+				check_compound_literal_elem_fits(c, &operand, elem_type, type, "element", context_name);
 				check_assignment(c, &operand, elem_type, context_name);
 
 				if (is_constant) {
@@ -12675,6 +12783,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				} else {
 					check_expr_with_type_hint(c, o, fv->field, t->Map.key);
 				}
+				check_compound_literal_elem_fits(c, o, t->Map.key, type, "key", str_lit("map literal"));
 				check_assignment(c, o, t->Map.key, str_lit("map literal"));
 				if (o->mode == Addressing_Invalid) {
 					continue;
@@ -12685,6 +12794,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				} else {
 					check_expr_with_type_hint(c, o, fv->value, t->Map.value);
 				}
+				check_compound_literal_elem_fits(c, o, t->Map.value, type, "value", str_lit("map literal"));
 				check_assignment(c, o, t->Map.value, str_lit("map literal"));
 			}
 		}

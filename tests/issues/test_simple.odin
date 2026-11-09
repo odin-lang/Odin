@@ -16,6 +16,7 @@ package tests_issues
 @(require) import "test_issue_2666"
 @(require) import "test_issue_2694"
 @(require) import "test_issue_3435"
+@(require) import "test_issue_3973_valid"
 @(require) import "test_issue_4210"
 @(require) import "test_issue_4364"
 @(require) import "test_issue_4584"
