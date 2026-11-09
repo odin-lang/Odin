@@ -1,6 +1,9 @@
 package test_core_text_i18n
 
 import "base:runtime"
+import "core:encoding/endian"
+import "core:os"
+import "core:slice"
 import "core:testing"
 import "core:text/i18n"
 
@@ -100,6 +103,53 @@ test_nl_mo :: proc(t: ^testing.T) {
 			{"", "There are %d leaves.\n",        "Er zijn %d bladeren.\n",        42},
 
 			// This isn't in the catalog, so should ruturn the key.
+			{"", "Come visit us on Discord!",     "Come visit us on Discord!",     -1},
+		},
+	})
+}
+
+@(test)
+test_nl_mo_byte_swapped :: proc(t: ^testing.T) {
+	load_byte_swapped :: proc(filename: string, options: i18n.Parse_Options, pluralizer: proc(int) -> int, allocator: runtime.Allocator) -> (^i18n.Translation, i18n.Error) {
+		data, err := os.read_entire_file(filename, allocator)
+		if err != nil {
+			return nil, .File_Error
+		}
+		defer delete(data, allocator)
+
+		if len(data) < 28 {
+			return nil, .MO_File_Invalid
+		}
+		count             := endian.unchecked_get_u32le(data[ 8:])
+		original_offset   := endian.unchecked_get_u32le(data[12:])
+		translated_offset := endian.unchecked_get_u32le(data[16:])
+		hash_size         := endian.unchecked_get_u32le(data[20:])
+		hash_offset       := endian.unchecked_get_u32le(data[24:])
+
+		for offset := u32(0); offset < 28; offset += 4 {
+			slice.reverse(data[offset:][:4])
+		}
+		for offset := u32(0); offset < 8 * count; offset += 4 {
+			slice.reverse(data[original_offset + offset:][:4])
+			slice.reverse(data[translated_offset + offset:][:4])
+		}
+		for offset := u32(0); offset < 4 * hash_size; offset += 4 {
+			slice.reverse(data[hash_offset + offset:][:4])
+		}
+		return i18n.parse_mo_from_bytes(data, options, pluralizer, allocator)
+	}
+
+	test(t, {
+		file   = TEST_SUITE_PATH + "nl_NL.mo",
+		loader = load_byte_swapped,
+		plural = nil,
+		tests  = {
+			{"", "There are 69,105 leaves here.", "Er zijn hier 69.105 bladeren.", -1},
+			{"", "Hellope, World!",               "Hallo, Wereld!",                -1},
+			{"", "There is %d leaf.\n",           "Er is %d blad.\n",               1},
+			{"", "There are %d leaves.\n",        "Er is %d blad.\n",               1},
+			{"", "There is %d leaf.\n",           "Er zijn %d bladeren.\n",        42},
+			{"", "There are %d leaves.\n",        "Er zijn %d bladeren.\n",        42},
 			{"", "Come visit us on Discord!",     "Come visit us on Discord!",     -1},
 		},
 	})

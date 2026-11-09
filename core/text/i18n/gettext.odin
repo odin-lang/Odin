@@ -2,7 +2,7 @@ package i18n
 /*
 	A parser for GNU GetText .MO files.
 
-	Copyright 2021-2022 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2021-2026 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's license.
 
 	A from-scratch implementation based after the specification found here:
@@ -13,6 +13,7 @@ package i18n
 
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
+		Damien Petrilli: Contextual plurals fix.
 */
 import "core:strings"
 import "core:bytes"
@@ -38,12 +39,12 @@ parse_mo_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTIONS, plur
 	}
 
 	// We can ignore version_minor at offset 6.
-	version_major := read_u16(data[4:]) or_return
-	if version_major > 1 { return {}, .MO_File_Unsupported_Version }
+	revision := read_u32(data[4:], native) or_return
+	if revision >> 16 > 1 { return {}, .MO_File_Unsupported_Version }
 
-	count             := read_u32(data[ 8:]) or_return
-	original_offset   := read_u32(data[12:]) or_return
-	translated_offset := read_u32(data[16:]) or_return
+	count             := read_u32(data[ 8:], native) or_return
+	original_offset   := read_u32(data[12:], native) or_return
+	translated_offset := read_u32(data[16:], native) or_return
 
 	if count == 0 { return {}, .Empty_Translation_Catalog }
 
@@ -138,23 +139,6 @@ read_u32 :: proc(data: []u8, native_endian := true) -> (res: u32, err: Error) {
 			return u32(transmute(u32be)val), .None
 		} else {
 			return u32(transmute(u32le)val), .None
-		}
-	}
-}
-
-@(private)
-read_u16 :: proc(data: []u8, native_endian := true) -> (res: u16, err: Error) {
-	if len(data) < size_of(u16) { return 0, .Premature_EOF }
-
-	val := (^u16)(raw_data(data))^
-
-	if native_endian {
-		return val, .None
-	} else {
-		when ODIN_ENDIAN == .Little {
-			return u16(transmute(u16be)val), .None
-		} else {
-			return u16(transmute(u16le)val), .None
 		}
 	}
 }
