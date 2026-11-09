@@ -3755,7 +3755,11 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		skip_possible_newline_for_literal(f);
 		Token open = expect_token(f, Token_OpenBrace);
 
+		bool prev_allow_type = f->allow_type;
+		f->allow_type = false;
 		Array<Ast *> values = parse_enum_field_list(f);
+		f->allow_type = prev_allow_type;
+
 		Token close = expect_closing_brace_of_field_list(f);
 
 		return ast_enum_type(f, token, base_type, values);
