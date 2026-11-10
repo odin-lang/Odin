@@ -3267,7 +3267,13 @@ gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_
 		if (in_type != nullptr) {
 			*out_type_ = in_type;
 		} else {
-			*out_type_ = default_type(o.type);
+			Type *t = default_type(o.type);
+			if (t != nullptr && is_type_polymorphic(t)) {
+				gbString str = type_to_string(t);
+				error(expr, "Cannot determine parameter type from a non-specialized polymorphic type '%s'", str);
+				gb_string_free(str);
+			}
+			*out_type_ = t;
 		}
 	}
 
