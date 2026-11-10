@@ -119,6 +119,25 @@ gb_internal bool does_field_type_allow_using(Type *t) {
 	return false;
 }
 
+gb_internal Type *check_record_member_type_polymorphism(CheckerContext *ctx, Ast *type_expr, Type *type, i64 errors_before) {
+	if (ctx->allow_polymorphic_types || !is_type_polymorphic(type)) {
+		return type;
+	}
+	if (error_thread_count() == errors_before) {
+		Type *record = find_polymorphic_record_unspecialized(type);
+		if (record != nullptr) {
+			gbString str = type_to_string(record);
+			error(type_expr, "Invalid use of a non-specialized polymorphic type '%s'", str);
+			gb_string_free(str);
+		} else {
+			gbString str = type_to_string(type);
+			error(type_expr, "Invalid use of a polymorphic type '%s'", str);
+			gb_string_free(str);
+		}
+	}
+	return t_invalid;
+}
+
 gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entity *> *fields, String **tags, Slice<Ast *> const &params,
                                      isize init_field_capacity, Type *struct_type, String context) {
 	GB_ASSERT(node->kind == Ast_StructType);
@@ -161,7 +180,9 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 		CommentGroup *comment = p->comment;
 
 		if (type_expr != nullptr) {
+			i64 field_errors_before = error_thread_count();
 			type = check_type_expr(ctx, type_expr, nullptr);
+			type = check_record_member_type_polymorphism(ctx, type_expr, type, field_errors_before);
 			if (is_type_polymorphic(type)) {
 				// A field-level polymorphic type (e.g. `struct{x: $T}`) makes the struct polymorphic;
 				// keep the field's generic type so it can be substituted, rather than rejecting it.
@@ -721,6 +742,31 @@ gb_internal void set_polymorphic_record_instantiation_name(Type *named_type, Typ
 	}
 }
 
+gb_internal bool poly_operands_have_errors(Array<Operand> *poly_operands) {
+	if (poly_operands == nullptr) {
+		return false;
+	}
+	for (Operand const &o : *poly_operands) {
+		if (o.mode != Addressing_Type || o.type == nullptr) {
+			continue;
+		}
+		Type *bt = base_type(o.type);
+		if (bt == nullptr) {
+			continue;
+		}
+		if (bt == t_invalid) {
+			return true;
+		}
+		if (bt->kind == Type_Struct && bt->Struct.has_errors.load()) {
+			return true;
+		}
+		if (bt->kind == Type_Union && bt->Union.has_errors.load()) {
+			return true;
+		}
+	}
+	return false;
+}
+
 gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<Operand> *poly_operands, Type *named_type, Type *original_type_for_poly, GenTypesData *poly_gen_types_to_unlock) {
 	GB_ASSERT(is_type_struct(struct_type));
 	ast_node(st, StructType, node);
@@ -825,7 +871,7 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 		if (st->where_clauses.count > 0 && st->polymorphic_params == nullptr) {
 			error(st->where_clauses[0], "'where' clauses can only be used on structures with polymorphic parameters");
 		} else {
-			bool where_clause_ok = evaluate_where_clauses(ctx, node, ctx->scope, &st->where_clauses, true);
+			bool where_clause_ok = evaluate_where_clauses(ctx, node, ctx->scope, &st->where_clauses, !poly_operands_have_errors(poly_operands));
 			gb_unused(where_clause_ok);
 		}
 
@@ -845,11 +891,10 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 				struct_type->Struct.is_simple = true;
 			}
 		}
-
-		struct_type->Struct.has_errors.store(error_thread_count() != errors_before);
-		wait_signal_set(&struct_type->Struct.fields_wait_signal);
 	}
 
+	struct_type->Struct.has_errors.store(error_thread_count() != errors_before);
+	wait_signal_set(&struct_type->Struct.fields_wait_signal);
 }
 gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Operand> *poly_operands, Type *named_type, Type *original_type_for_poly, GenTypesData *poly_gen_types_to_unlock) {
 	GB_ASSERT(is_type_union(union_type));
@@ -887,7 +932,7 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 		if (ut->where_clauses.count > 0 && ut->polymorphic_params == nullptr) {
 			error(ut->where_clauses[0], "'where' clauses can only be used on unions with polymorphic parameters");
 		} else {
-			bool where_clause_ok = evaluate_where_clauses(ctx, node, ctx->scope, &ut->where_clauses, true);
+			bool where_clause_ok = evaluate_where_clauses(ctx, node, ctx->scope, &ut->where_clauses, !poly_operands_have_errors(poly_operands));
 			gb_unused(where_clause_ok);
 		}
 		union_type->Union.has_errors.store(error_thread_count() != errors_before);
@@ -903,7 +948,9 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 			// polymorphic union and recurse unboundedly. Mirrors check_struct_type.
 			continue;
 		}
+		i64 variant_errors_before = error_thread_count();
 		Type *t = check_type_expr(ctx, node, nullptr);
+		t = check_record_member_type_polymorphism(ctx, node, t, variant_errors_before);
 		if (t != nullptr && t != t_invalid) {
 			bool ok = true;
 			t = default_type(t);
@@ -3220,7 +3267,13 @@ gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_
 		if (in_type != nullptr) {
 			*out_type_ = in_type;
 		} else {
-			*out_type_ = default_type(o.type);
+			Type *t = default_type(o.type);
+			if (t != nullptr && is_type_polymorphic(t)) {
+				gbString str = type_to_string(t);
+				error(expr, "Cannot determine parameter type from a non-specialized polymorphic type '%s'", str);
+				gb_string_free(str);
+			}
+			*out_type_ = t;
 		}
 	}
 

@@ -3975,6 +3975,7 @@ gb_internal void init_core_type_info(Checker *c) {
 	Entity *type_info_variant = tis->fields[4];
 	Type *tiv_type = type_info_variant->type;
 	GB_ASSERT(is_type_union(tiv_type));
+	t_type_info_variant = base_type(tiv_type);
 
 	t_type_info_named            = find_core_type(c, str_lit("Type_Info_Named"));
 	t_type_info_integer          = find_core_type(c, str_lit("Type_Info_Integer"));
@@ -4033,6 +4034,55 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_soa_pointer_ptr      = alloc_type_pointer(t_type_info_soa_pointer);
 	t_type_info_bit_field_ptr        = alloc_type_pointer(t_type_info_bit_field);
 	t_type_info_fixed_capacity_dynamic_array_ptr = alloc_type_pointer(t_type_info_fixed_capacity_dynamic_array);
+
+	Type *variant_types[] = {
+		t_type_info_named,
+		t_type_info_integer,
+		t_type_info_rune,
+		t_type_info_float,
+		t_type_info_complex,
+		t_type_info_quaternion,
+		t_type_info_string,
+		t_type_info_boolean,
+		t_type_info_any,
+		t_type_info_typeid,
+		t_type_info_pointer,
+		t_type_info_multi_pointer,
+		t_type_info_procedure,
+		t_type_info_array,
+		t_type_info_enumerated_array,
+		t_type_info_dynamic_array,
+		t_type_info_slice,
+		t_type_info_parameters,
+		t_type_info_struct,
+		t_type_info_union,
+		t_type_info_enum,
+		t_type_info_map,
+		t_type_info_bit_set,
+		t_type_info_simd_vector,
+		t_type_info_matrix,
+		t_type_info_soa_pointer,
+		t_type_info_bit_field,
+		t_type_info_fixed_capacity_dynamic_array,
+	};
+	GB_ASSERT(gb_count_of(variant_types) == Typeid__COUNT);
+
+	wait_for_record_signal(&t_type_info_variant->Union.variants_wait_signal, &t_type_info_variant->Union.checking_thread);
+	auto const &variants = t_type_info_variant->Union.variants;
+	GB_ASSERT_MSG(variants.count == Typeid__COUNT, "%td", variants.count);
+	for_array(i, variants) {
+		Type *vt = variants[i];
+		GB_ASSERT_MSG(is_type_pointer(vt), "runtime.Type_Info.variant must be a union of pointers, got %s", type_to_string(vt));
+		GB_ASSERT_MSG(are_types_identical(type_deref(vt), variant_types[i]), "%s vs %s", type_to_string(type_deref(vt)), type_to_string(variant_types[i]));
+
+		Type *rec = base_type(variant_types[i]);
+		GB_ASSERT(rec->kind == Type_Struct);
+		wait_for_struct_fields(rec);
+		GB_ASSERT(rec->Struct.fields.count >= 1);
+		Entity *header = rec->Struct.fields[0];
+		GB_ASSERT_MSG((header->flags & EntityFlag_Using) != 0, "%s", type_to_string(variant_types[i]));
+		GB_ASSERT(are_types_identical(header->type, t_type_info));
+	}
 }
 
 gb_internal void init_mem_allocator(Checker *c) {
@@ -4317,6 +4367,10 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 	} else if (name == "test") {
 		if (value != nullptr) {
 			error(value, "Expected no value for '%.*s'", LIT(name));
+		}
+		if (c->decl != nullptr && (c->decl->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
+			error(elem, "@(test) procedures must be declared at the file scope");
+			return true;
 		}
 		ac->test = true;
 		return true;
@@ -5608,7 +5662,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				init_decl_info_proc(d, init);
 				d->init_expr = init;
 
-				if (is_test) {
+				if (is_test && (c->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) != 0) {
 					e->flags |= EntityFlag_Test;
 				}
 				if (is_init && is_fini) {
@@ -8410,7 +8464,7 @@ gb_internal void check_parsed_files(Checker *c) {
 
 		isize hash_map_len = c->info.type_info_types_hash_map.count;
 		for (auto const &tt : type_info_types) {
-			isize index = tt.hash % hash_map_len;
+			isize index = type_info_table_home_index(tt.hash, hash_map_len);
 			// NOTE(bill): no need for a sanity check since there
 			// will always be enough space for the entries
 			for (;;) {

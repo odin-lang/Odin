@@ -3,6 +3,18 @@ package container_dynamic_bit_array
 import "base:builtin"
 import "base:intrinsics"
 
+/*
+	Copyright 2021-2026 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+		Jon Lipstate:    `unsafe_get`/`unsafe_set`, a `set` overload, documentation.
+		Andrea Piseri:   Iterators.
+		Feoramund:       `shrink`, zero-length and biased array fixes.
+		Laytan Laats:    `init`.
+*/
+
 // Note that these constants are dependent on the backing being a u64.
 @(private="file")
 INDEX_SHIFT :: 6

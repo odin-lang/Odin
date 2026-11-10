@@ -694,6 +694,7 @@ gb_global Type *t_string_slice = nullptr;
 gb_global Type *t_type_info                      = nullptr;
 gb_global Type *t_type_info_enum_value           = nullptr;
 gb_global Type *t_type_info_ptr                  = nullptr;
+gb_global Type *t_type_info_variant              = nullptr;
 gb_global Type *t_type_info_enum_value_ptr       = nullptr;
 
 gb_global Type *t_type_info_string_encoding_kind = nullptr;
@@ -2539,6 +2540,38 @@ gb_internal bool is_type_polymorphic_record_unspecialized(Type *t) {
 	return false;
 }
 
+gb_internal Type *find_polymorphic_record_unspecialized(Type *t) {
+	while (t != nullptr && base_type(t) != nullptr) {
+		if (is_type_polymorphic_record_unspecialized(t)) {
+			return t;
+		}
+		switch (t->kind) {
+		case Type_Pointer:                   t = t->Pointer.elem;                   break;
+		case Type_MultiPointer:              t = t->MultiPointer.elem;              break;
+		case Type_SoaPointer:                t = t->SoaPointer.elem;                break;
+		case Type_Array:                     t = t->Array.elem;                     break;
+		case Type_EnumeratedArray:           t = t->EnumeratedArray.elem;           break;
+		case Type_Slice:                     t = t->Slice.elem;                     break;
+		case Type_DynamicArray:              t = t->DynamicArray.elem;              break;
+		case Type_FixedCapacityDynamicArray: t = t->FixedCapacityDynamicArray.elem; break;
+		case Type_SimdVector:                t = t->SimdVector.elem;                break;
+		case Type_Matrix:                    t = t->Matrix.elem;                    break;
+		case Type_BitSet:                    t = t->BitSet.elem;                    break;
+		case Type_Map: {
+			Type *key = find_polymorphic_record_unspecialized(t->Map.key);
+			if (key != nullptr) {
+				return key;
+			}
+			t = t->Map.value;
+			break;
+		}
+		default:
+			return nullptr;
+		}
+	}
+	return nullptr;
+}
+
 
 gb_internal TypeTuple *get_record_polymorphic_params(Type *t) {
 	t = base_type(t);
@@ -3603,6 +3636,18 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 				if (x->BitField.bit_offsets[i] != y->BitField.bit_offsets[i]) {
 					return false;
 				}
+
+				String a_tag = {};
+				String b_tag = {};
+				if (x->BitField.tags != nullptr) {
+					a_tag = x->BitField.tags[i];
+				}
+				if (y->BitField.tags != nullptr) {
+					b_tag = y->BitField.tags[i];
+				}
+				if (a_tag != b_tag) {
+					return false;
+				}
 			}
 			return true;
 		}
@@ -3718,6 +3763,42 @@ gb_internal bool union_is_variant_of(Type *u, Type *v) {
 		}
 	}
 	return false;
+}
+
+// NOTE(bill): must match `runtime.__type_info_of`
+gb_internal isize type_info_table_home_index(u64 hash, isize table_len) {
+	GB_ASSERT(0 < table_len && cast(u64)table_len <= 0xffffffffull);
+
+	if (build_context.ptr_size == 8) {
+		u64 lo = 0;
+		u64 hi = 0;
+		mul_overflow_u64(hash << 1, cast(u64)table_len, &lo, &hi);
+		return cast(isize)hi;
+	}
+
+	return cast(isize)((((hash << 1) >> 32) * cast(u64)table_len) >> 32);
+}
+
+// NOTE(bill): deprecated `case Type_Info_X:` and `.(Type_Info_X)` on `runtime.Type_Info.variant`, which now holds `^Type_Info_X`
+gb_internal Type *type_info_variant_shim_type(Type *u, Type *t) {
+	if (t_type_info_variant == nullptr) {
+		return nullptr;
+	}
+	if (u == nullptr || t == nullptr) {
+		return nullptr;
+	}
+	if (base_type(u) != t_type_info_variant) {
+		return nullptr;
+	}
+	if (union_is_variant_of(t_type_info_variant, t)) {
+		return nullptr;
+	}
+	for (Type *vt : t_type_info_variant->Union.variants) {
+		if (are_types_identical(type_deref(vt), t)) {
+			return vt;
+		}
+	}
+	return nullptr;
 }
 
 

@@ -1,6 +1,20 @@
+// An implementation of the [BNG](https://bngformat.org)
 package bng
 
 import "core:image"
+
+/*
+	Copyright 2026 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+
+	Implements the BNG specification by Sam H. Smith, released along with its reference code under the Unlicense:
+		https://bngformat.org
+
+	Many thanks to Sam H. Smith for BNG.
+*/
 
 Error   :: image.Error
 Image   :: image.Image

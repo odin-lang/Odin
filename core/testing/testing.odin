@@ -151,10 +151,30 @@ expect_leaks :: proc(t: ^T, client_test: proc(t: ^T), verifier: Memory_Verifier_
 	}
 }
 
+/*
+Set a timeout after which the currently running test will fail.
+
+Passing `time.MAX_DURATION` disables the timeout.
+
+**Remarks:**
+
+Each call restarts the timeout from the time of the call; this can be used
+to implement watchdog-reset semantics for a test.
+
+When the timeout elapses, the test will be aborted immediately. When this
+happens, deferred statements will not run in the current implementation.
+*/
 set_fail_timeout :: proc(t: ^T, duration: time.Duration, loc := #caller_location) {
+	disabled := duration == time.MAX_DURATION
+	at_time: time.Time
+	if !disabled {
+		at_time = time.time_add(time.now(), duration)
+	}
+
 	chan.send(t.channel, Event_Set_Fail_Timeout {
-		at_time = time.time_add(time.now(), duration),
+		at_time = at_time,
 		location = loc,
+		duration = duration,
 	})
 }
 

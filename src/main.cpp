@@ -245,8 +245,26 @@ int run_subprocess(String const &exe_name, wchar_t *after_double_dash_raw) {
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 	} else {
+		DWORD err_code = GetLastError();
+		char *err_msg = nullptr;
+		FormatMessageA(
+			FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+			nullptr,
+			err_code,
+			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+			cast(LPSTR)&err_msg,
+			0,
+			nullptr
+		);
+
 		String cmd_line_utf8 = string16_to_string(a, make_string16(cast(u16 *)cmd_line, n));
 		gb_printf_err("Failed to execute command:\n\t%.*s\n", LIT(cmd_line_utf8));
+
+		if (err_msg) {
+			gb_printf_err("Windows Error [%lu]: %s\n", err_code, err_msg);
+			LocalFree(err_msg);
+		}
+
 		gb_free(a, cmd_line_utf8.text);
 		exit_code = -1;
 	}
@@ -4818,6 +4836,11 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 	if (any_warnings()) {
 		print_all_errors();
+	}
+
+	if (build_context.command_kind == Command_test && checker->info.testing_procedures.count == 0) {
+		gb_printf_err("Cannot test package; no procedures with @(test) attribute found.\n");
+		return 1;
 	}
 
 	if (build_context.show_defineables || build_context.export_defineables_file != "") {

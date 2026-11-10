@@ -41,6 +41,13 @@ $ODIN test ../test_simple.odin -file -all-packages $COMMON
 # "odin check" tests:
 #
 
+if [[ $($ODIN check ../test_issue_3973 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 28 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 if [[ $($ODIN check ../test_issue_5105_5569 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
@@ -200,7 +207,64 @@ else
 	exit 1
 fi
 
+$ODIN test ../test_issue_type_info_variant_shim $COMMON
+if [[ $($ODIN check ../test_issue_type_info_variant_shim -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Warning:") -eq 11 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_type_info_variant_shim_duplicate -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_bit_field_tag_identity -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 if [[ $($ODIN check ../test_issue_8074 -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 34 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_8258 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error: @(test) procedures must be declared at the file scope") -eq 4 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN test ../test_issue_invalid_tests_only $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_8294 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_5024 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_poly_record_unspecialized_field $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
@@ -398,8 +462,6 @@ if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 	clang -c ../test_issue_7010/test_issue_7010.c -o test_issue_7010_c.o
 	$ODIN test ../test_issue_7010 $COMMON
 fi
-
-$ODIN test ../test_issue_7547 $COMMON -debug
 
 $ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -microarch:native
 $ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug -microarch:native

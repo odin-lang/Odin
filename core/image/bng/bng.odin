@@ -1,4 +1,3 @@
-// An implementation of the [BNG](https://bngformat.org)
 package bng
 
 import "base:intrinsics"

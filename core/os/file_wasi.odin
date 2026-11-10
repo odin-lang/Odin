@@ -138,7 +138,7 @@ match_preopen :: proc(path: string) -> (wasi.fd_t, string, bool) {
 		for i > 0 && prefix[i-1] == '/' {
 			i -= 1
 		}
-		return path[i] == '/'
+		return i == len(path) || path[i] == '/'
 	}
 
 	path := path
@@ -334,21 +334,25 @@ _link :: proc(old_name, new_name: string) -> Error {
 }
 
 _symlink :: proc(old_name, new_name: string) -> Error {
-	src_dir_fd, src_relative, src_ok := match_preopen(old_name)
-	if !src_ok {
-		return .Invalid_Path
-	}
-
 	new_dir_fd, new_relative, new_ok := match_preopen(new_name)
 	if !new_ok {
 		return .Invalid_Path
 	}
 
-	if src_dir_fd != new_dir_fd {
+	if len(old_name) == 0 || old_name[0] != '/' {
+		return _get_platform_error(wasi.path_symlink(old_name, new_dir_fd, new_relative))
+	}
+
+	src_dir_fd, src_relative, src_ok := match_preopen(old_name)
+	if !src_ok || src_dir_fd != new_dir_fd {
 		return .Invalid_Path
 	}
 
-	return _get_platform_error(wasi.path_symlink(src_relative, src_dir_fd, new_relative))
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	base := clean_path(dir(new_relative), temp_allocator) or_return
+	target := clean_path(src_relative, temp_allocator) or_return
+	contents := get_relative_path(base, target, temp_allocator) or_return
+	return _get_platform_error(wasi.path_symlink(contents, new_dir_fd, new_relative))
 }
 
 _read_link :: proc(name: string, allocator: runtime.Allocator) -> (s: string, err: Error) {
@@ -357,18 +361,20 @@ _read_link :: proc(name: string, allocator: runtime.Allocator) -> (s: string, er
 		return "", .Invalid_Path
 	}
 
-	n, _err := wasi.path_readlink(dir_fd, relative, nil)
-	if _err != nil {
-		err = _get_platform_error(_err)
-		return
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
+	buf := make([]byte, 256, temp_allocator) or_return
+	for {
+		n, errno := wasi.path_readlink(dir_fd, relative, buf)
+		if errno != .SUCCESS {
+			err = _get_platform_error(errno)
+			return
+		}
+		if int(n) < len(buf) {
+			s = clone_string(string(buf[:n]), allocator) or_return
+			return
+		}
+		buf = make([]byte, 2 * len(buf), temp_allocator) or_return
 	}
-
-	buf := make([]byte, n, allocator) or_return
-
-	_, _err = wasi.path_readlink(dir_fd, relative, buf)
-	s = string(buf)
-	err = _get_platform_error(_err)
-	return
 }
 
 _chdir :: proc(name: string) -> Error {
@@ -447,7 +453,7 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte
 		n = i64(_n)
 
 		if _err != nil {
-			err = .Unknown
+			err = _get_platform_error(_err)
 		} else if n == 0 {
 			err = .EOF
 		}
@@ -464,16 +470,23 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte
 			return
 		}
 
-		to_read := min(len(p), MAX_RW)
-		_n, _err := wasi.fd_pread(fd, {p[:to_read]}, wasi.filesize_t(offset))
-		n = i64(_n)
-
-		if _err != nil {
-			err = .Unknown
-		} else if n == 0 {
-			err = .EOF
+		p := p
+		offset := offset
+		for len(p) > 0 {
+			to_read := min(len(p), MAX_RW)
+			_n, _err := wasi.fd_pread(fd, {p[:to_read]}, wasi.filesize_t(offset))
+			if _err != nil {
+				err = _get_platform_error(_err)
+				return
+			}
+			if _n == 0 {
+				err = .EOF
+				return
+			}
+			p = p[_n:]
+			n += i64(_n)
+			offset += i64(_n)
 		}
-
 		return
 
 	case .Write:
@@ -482,7 +495,11 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte
 			to_write := min(len(p), MAX_RW)
 			_n, _err := wasi.fd_write(fd, {p[:to_write]})
 			if _err != nil {
-				err = .Unknown
+				err = _get_platform_error(_err)
+				return
+			}
+			if _n == 0 {
+				err = .Short_Write
 				return
 			}
 			p = p[_n:]
@@ -503,7 +520,11 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte
 			to_write := min(len(p), MAX_RW)
 			_n, _err := wasi.fd_pwrite(fd, {p[:to_write]}, wasi.filesize_t(offset))
 			if _err != nil {
-				err = .Unknown
+				err = _get_platform_error(_err)
+				return
+			}
+			if _n == 0 {
+				err = .Short_Write
 				return
 			}
 

@@ -348,28 +348,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	}
 
 	if (pt->Proc.enable_target_feature.len != 0) {
-		gbString feature_str = gb_string_make(temporary_allocator(), "");
-
-		String_Iterator it = {pt->Proc.enable_target_feature, 0};
-		String str = {};
-		bool first = true;
-		while (string_split_iterator_next(&it, ',', &str)) {
-			bool add_prefix = !(string_starts_with(str, '+') || string_starts_with(str, '-'));
-			if (!first) {
-				feature_str = gb_string_appendc(feature_str, ",");
-			}
-			first = false;
-
-			if (add_prefix) {
-				feature_str = gb_string_appendc(feature_str, "+");
-			}
-			feature_str = gb_string_append_length(feature_str, str.text, str.len);
-		}
-		if (lb_x86_features_need_evex512(pt->Proc.enable_target_feature)) {
-			feature_str = gb_string_appendc(feature_str, ",+evex512");
-		}
-
-		lb_add_attribute_to_proc_with_string(m, p->value, make_string_c("target-features"), make_string_c(feature_str));
+		lb_add_target_features_to_proc(m, p->value, pt->Proc.enable_target_feature);
 	}
 
 	if (entity->flags & EntityFlag_Cold) {
@@ -2437,25 +2416,25 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 						// x86/x86-64 function attributes
 						if (count == 16) {
 							// SSE/SSSE3 for 128-bit vectors
-							lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("target-features"), str_lit("+ssse3"));
+							lb_add_target_features_to_proc(p->module, p->value, str_lit("+ssse3"));
 							lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("min-legal-vector-width"), str_lit("128"));
 						} else if (count == 32) {
-							lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("target-features"), str_lit("+avx,+avx2,+ssse3"));
+							lb_add_target_features_to_proc(p->module, p->value, str_lit("+avx,+avx2,+ssse3"));
 							lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("min-legal-vector-width"), str_lit("256"));
 						} else if (count == 64) {
-							lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("target-features"), str_lit("+avx,+avx2,+avx512f,+avx512bw,+ssse3"));
+							lb_add_target_features_to_proc(p->module, p->value, str_lit("+avx,+avx2,+avx512f,+avx512bw,+ssse3"));
 							lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("min-legal-vector-width"), str_lit("512"));
 						}
 					} else if (build_context.metrics.arch == TargetArch_arm64) {
 						// ARM64 function attributes - enable NEON for swizzle instructions
-						lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("target-features"), str_lit("+neon"));
+						lb_add_target_features_to_proc(p->module, p->value, str_lit("+neon"));
 						// Set appropriate vector width for multi-swizzle operations
 						if (count >= 32) {
 							lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("min-legal-vector-width"), str_lit("256"));
 						}
 					} else if (build_context.metrics.arch == TargetArch_arm32) {
 						// ARM32 function attributes - enable NEON for swizzle instructions
-						lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("target-features"), str_lit("+neon"));
+						lb_add_target_features_to_proc(p->module, p->value, str_lit("+neon"));
 					}
 
 					// Handle ARM's multi-swizzle intrinsics by splitting the src vector.
@@ -2801,7 +2780,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 
 
 			if (lb_llvm_simd_bulk_op_unary(p, arg0, &res.value, intrinsic_name, default_width, extra_args, extra_args_count)) {
-				if (features_to_enable.len > 0)     lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("target-features"),        features_to_enable);
+				if (features_to_enable.len > 0)     lb_add_target_features_to_proc(p->module, p->value, features_to_enable);
 				if (min_legal_vector_width.len > 0) lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("min-legal-vector-width"), min_legal_vector_width);
 
 				return res;
@@ -2875,7 +2854,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			}
 
 			if (lb_llvm_simd_bulk_op_unary(p, arg0, &res.value, intrinsic_name, default_width, extra_args, extra_args_count)) {
-				if (features_to_enable.len > 0)     lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("target-features"),        features_to_enable);
+				if (features_to_enable.len > 0)     lb_add_target_features_to_proc(p->module, p->value, features_to_enable);
 				if (min_legal_vector_width.len > 0) lb_add_attribute_to_proc_with_string(p->module, p->value, str_lit("min-legal-vector-width"), min_legal_vector_width);
 
 				return res;

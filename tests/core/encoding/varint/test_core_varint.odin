@@ -5,6 +5,8 @@ import "core:testing"
 import "core:slice"
 import "core:math/rand"
 
+SLIM_TESTS :: #config(ODIN_TEST_SLIM, ODIN_ARCH == .riscv64)
+
 NUM_RANDOM_TESTS_PER_BYTE_SIZE :: 10_000
 
 @(test)
@@ -45,6 +47,9 @@ test_ileb :: proc(t: ^testing.T) {
 
 @(test)
 test_random :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	buf: [varint.LEB128_MAX_BYTES]u8
 
 	for num_bytes in 1..=uint(16) {

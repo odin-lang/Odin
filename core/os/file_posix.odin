@@ -101,6 +101,14 @@ _new_file :: proc(handle: uintptr, name: string, allocator: runtime.Allocator) -
 	return f, nil
 }
 
+_posix_absolute_path_from_name :: proc(name: string, allocator: runtime.Allocator) -> (path: cstring, err: Error) {
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
+	if abs_path, abs_err := _get_absolute_path(name, temp_allocator); abs_err == nil {
+		return clone_to_cstring(abs_path, allocator)
+	}
+	return clone_to_cstring(name, allocator)
+}
+
 __new_file :: proc(handle: posix.FD, allocator: runtime.Allocator) -> ^File {
 	impl := new(File_Impl, allocator)
 	impl.file.impl = impl
@@ -388,16 +396,22 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte
 		}
 
 		to_read := uint(min(len(p), MAX_RW))
-		_n := i64(posix.read(fd, raw_data(p), to_read))
-		switch {
-		case _n == 0:
-			err = .EOF
-		case _n < 0:
-			err = .Unknown
-		case:
-			n = _n
+		for {
+			_n := i64(posix.read(fd, raw_data(p), to_read))
+			switch {
+			case _n == 0:
+				err = .EOF
+			case _n < 0:
+				errno := posix.errno()
+				if errno == .EINTR {
+					continue
+				}
+				err = _get_platform_error(errno)
+			case:
+				n = _n
+			}
+			return
 		}
-		return
 
 	case .Read_At:
 		if len(p) <= 0 {
@@ -409,15 +423,26 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte
 			return
 		}
 
-		to_read := uint(min(len(p), MAX_RW))
-		_n := i64(posix.pread(fd, raw_data(p), to_read, posix.off_t(offset)))
-		switch {
-		case _n == 0:
-			err = .EOF
-		case _n < 0:
-			err = .Unknown
-		case:
-			n = _n
+		p := p
+		offset := offset
+		for len(p) > 0 {
+			to_read := uint(min(len(p), MAX_RW))
+			_n := i64(posix.pread(fd, raw_data(p), to_read, posix.off_t(offset)))
+			switch {
+			case _n == 0:
+				err = .EOF
+				return
+			case _n < 0:
+				errno := posix.errno()
+				if errno == .EINTR {
+					continue
+				}
+				err = _get_platform_error(errno)
+				return
+			}
+			p = p[_n:]
+			n += _n
+			offset += _n
 		}
 		return
 
@@ -425,13 +450,21 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte
 		p := p
 		for len(p) > 0 {
 			to_write := uint(min(len(p), MAX_RW))
-			if _n := i64(posix.write(fd, raw_data(p), to_write)); _n <= 0 {
-				err = .Unknown
+			_n := i64(posix.write(fd, raw_data(p), to_write))
+			switch {
+			case _n == 0:
+				err = .Short_Write
 				return
-			} else {
-				p = p[_n:]
-				n += _n
+			case _n < 0:
+				errno := posix.errno()
+				if errno == .EINTR {
+					continue
+				}
+				err = _get_platform_error(errno)
+				return
 			}
+			p = p[_n:]
+			n += _n
 		}
 		return
 
@@ -446,14 +479,22 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte
 
 		for len(p) > 0 {
 			to_write := uint(min(len(p), MAX_RW))
-			if _n := i64(posix.pwrite(fd, raw_data(p), to_write, posix.off_t(offset))); _n <= 0 {
-				err = .Unknown
+			_n := i64(posix.pwrite(fd, raw_data(p), to_write, posix.off_t(offset)))
+			switch {
+			case _n == 0:
+				err = .Short_Write
 				return
-			} else {
-				p = p[_n:]
-				n += _n
-				offset += _n
+			case _n < 0:
+				errno := posix.errno()
+				if errno == .EINTR {
+					continue
+				}
+				err = _get_platform_error(errno)
+				return
 			}
+			p = p[_n:]
+			n += _n
+			offset += _n
 		}
 		return
 

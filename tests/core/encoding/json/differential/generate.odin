@@ -465,41 +465,41 @@ gen_value :: proc(g: ^Gen, ti: ^reflect.Type_Info) {
 
 	base := reflect.type_info_base(ti)
 	#partial switch info in base.variant {
-	case reflect.Type_Info_Integer:
+	case ^reflect.Type_Info_Integer:
 		switch {
 		case odd(g, 10): gen_quoted_number(g, true)
 		case odd(g, 10): gen_float(g)
 		case:            gen_integer(g)
 		}
-	case reflect.Type_Info_Float:
+	case ^reflect.Type_Info_Float:
 		switch {
 		case odd(g, 10):  gen_quoted_number(g, chance(50))
 		case chance(30): gen_integer(g)
 		case:            gen_float(g)
 		}
-	case reflect.Type_Info_Rune:
+	case ^reflect.Type_Info_Rune:
 		if odd(g, 30) {
 			gen_quoted(g, pick({"", "ab", "a🦉"}))
 		} else {
 			gen_quoted(g, pick({"a", "é", "🦉", "\n", "A"}))
 		}
-	case reflect.Type_Info_Complex:
+	case ^reflect.Type_Info_Complex:
 		switch {
 		case odd(g, 10): gen_array(g, type_info_of(f64), 3)
 		case chance(50): gen_number(g)
 		case:            gen_array(g, type_info_of(f64), 2)
 		}
-	case reflect.Type_Info_Quaternion:
+	case ^reflect.Type_Info_Quaternion:
 		gen_number(g)
-	case reflect.Type_Info_Boolean:
+	case ^reflect.Type_Info_Boolean:
 		write(g, pick({"true", "false"}))
-	case reflect.Type_Info_String:
+	case ^reflect.Type_Info_String:
 		switch {
 		case g.spec == .MJSON && chance(10): write(g, pick(IDENTS[:]))
 		case odd(g, 5):                       gen_number(g)
 		case:                                 gen_string(g)
 		}
-	case reflect.Type_Info_Enum:
+	case ^reflect.Type_Info_Enum:
 		switch rand.int_max(10) {
 		case 0..=6:
 			name := rand.choice(info.names) if len(info.names) > 0 else "x"
@@ -512,17 +512,17 @@ gen_value :: proc(g: ^Gen, ti: ^reflect.Type_Info) {
 		case:
 			gen_integer(g)
 		}
-	case reflect.Type_Info_Bit_Set, reflect.Type_Info_Bit_Field:
+	case ^reflect.Type_Info_Bit_Set, ^reflect.Type_Info_Bit_Field:
 		if chance(70) {
 			fmt.sbprintf(&g.b, "%d", rand.int_max(1 << 16))
 		} else {
 			gen_integer(g)
 		}
-	case reflect.Type_Info_Array:
+	case ^reflect.Type_Info_Array:
 		gen_array(g, info.elem, rand.int_max(info.count+(1 if g.exact else 2)))
-	case reflect.Type_Info_Enumerated_Array:
+	case ^reflect.Type_Info_Enumerated_Array:
 		if chance(70) {
-			index := reflect.type_info_base(info.index).variant.(reflect.Type_Info_Enum)
+			index := reflect.type_info_base(info.index).variant.(^reflect.Type_Info_Enum)
 			entries := make([dynamic]Entry, 0, len(index.names)+1, context.temp_allocator)
 			for name in index.names {
 				if chance(70) {
@@ -536,27 +536,27 @@ gen_value :: proc(g: ^Gen, ti: ^reflect.Type_Info) {
 		} else {
 			gen_array(g, info.elem, rand.int_max(info.count+(1 if g.exact else 2)))
 		}
-	case reflect.Type_Info_Slice:
+	case ^reflect.Type_Info_Slice:
 		gen_array(g, info.elem, rand.int_max(5) if chance(90) else rand.int_max(12))
-	case reflect.Type_Info_Dynamic_Array:
+	case ^reflect.Type_Info_Dynamic_Array:
 		gen_array(g, info.elem, rand.int_max(5) if chance(90) else rand.int_max(12))
-	case reflect.Type_Info_Fixed_Capacity_Dynamic_Array:
+	case ^reflect.Type_Info_Fixed_Capacity_Dynamic_Array:
 		gen_array(g, info.elem, rand.int_max(info.capacity+(1 if g.exact else 2)))
-	case reflect.Type_Info_Map:
+	case ^reflect.Type_Info_Map:
 		gen_object(g, random_entries(g, info.value, info.key))
-	case reflect.Type_Info_Struct:
+	case ^reflect.Type_Info_Struct:
 		switch {
 		case .raw_union not_in info.flags: gen_object(g, gen_struct_entries(g, base))
 		case g.exact:                       write(g, "null")
 		case:                               gen_random_value(g)
 		}
-	case reflect.Type_Info_Union:
+	case ^reflect.Type_Info_Union:
 		if len(info.variants) == 0 || chance(5) {
 			write(g, "null")
 		} else {
 			gen_value(g, rand.choice(info.variants))
 		}
-	case reflect.Type_Info_Pointer:
+	case ^reflect.Type_Info_Pointer:
 		if odd(g, 10) {
 			gen_random_value(g)
 		} else {
@@ -581,12 +581,12 @@ generate :: proc(ti: ^reflect.Type_Info, spec: json.Specification, chaos, noise:
 	root_object := false
 	if spec == .MJSON && base != nil && chance(50) {
 		#partial switch info in base.variant {
-		case reflect.Type_Info_Struct:
+		case ^reflect.Type_Info_Struct:
 			root_object = .raw_union not_in info.flags
 			if root_object {
 				gen_object_body(&g, gen_struct_entries(&g, base))
 			}
-		case reflect.Type_Info_Map:
+		case ^reflect.Type_Info_Map:
 			root_object = true
 			gen_object_body(&g, random_entries(&g, info.value, info.key))
 		}

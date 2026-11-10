@@ -11,7 +11,7 @@ when ODIN_OS == .Windows {
 	foreign import zlib "system:z"
 }
 
-VERSION         :: "1.3.2"
+VERSION         :: "1.4"
 VERNUM          :: 0x1320
 VER_MAJOR       :: 1
 VER_MINOR       :: 3
