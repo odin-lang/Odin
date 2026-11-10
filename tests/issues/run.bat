@@ -72,6 +72,7 @@ set ODIN=..\..\..\odin
 %ODIN% test "..\test_issue_invalid_tests_only" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
 %ODIN% check "..\test_issue_8294" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
 %ODIN% check "..\test_issue_5024" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_4578_unspecialized" %COMMON% 2>&1 | find /c "Error: Unspecialized polymorphic procedure" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_7502_cycle" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_poly_record_unspecialized_field" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
 @rem Objective-C tests target darwin, which can be checked and built for from any host

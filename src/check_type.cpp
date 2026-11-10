@@ -1,4 +1,4 @@
-gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type **out_type_, Ast *expr, bool allow_caller_location);
+gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type **out_type_, Ast *expr, bool allow_caller_location, bool allow_polymorphic_type=false);
 gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Operand const &operand);
 gb_internal bool subst_check_specialization(CheckerContext *ctx, Type *specialization, Type *type, bool modify_type);
 gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is_variadic_, isize *variadic_index_, bool *success_, isize *specialization_count_, Array<Operand> const *operands);
@@ -3151,7 +3151,7 @@ gb_internal bool is_caller_expression(Ast *expr) {
 	return name == "caller_expression";
 }
 
-gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type **out_type_, Ast *expr, bool allow_caller_location) {
+gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type **out_type_, Ast *expr, bool allow_caller_location, bool allow_polymorphic_type) {
 	ParameterValue param_value = {};
 	param_value.original_ast_expr = expr;
 	if (expr == nullptr) {
@@ -3257,7 +3257,11 @@ gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_
 			*out_type_ = in_type;
 		} else {
 			Type *t = default_type(o.type);
-			if (t != nullptr && is_type_polymorphic(t)) {
+			bool declares_polymorphic_params = false;
+			if (t != nullptr && t->kind == Type_Proc && t->Proc.node != nullptr && t->Proc.node->kind == Ast_ProcType) {
+				declares_polymorphic_params = t->Proc.node->ProcType.generic;
+			}
+			if (t != nullptr && (!allow_polymorphic_type || declares_polymorphic_params) && is_type_polymorphic(t)) {
 				gbString str = type_to_string(t);
 				error(expr, "Cannot determine parameter type from a non-specialized polymorphic type '%s'", str);
 				gb_string_free(str);
@@ -3269,6 +3273,15 @@ gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_
 	return param_value;
 }
 
+
+gb_internal bool are_params_polymorphic(Slice<Entity *> const &variables) {
+	for (Entity *e : variables) {
+		if (e->kind != Entity_Variable || is_type_polymorphic(e->type)) {
+			return true;
+		}
+	}
+	return false;
+}
 
 gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is_variadic_, isize *variadic_index_, bool *success_, isize *specialization_count_, Array<Operand> const *operands) {
 	if (_params == nullptr) {
@@ -3325,6 +3338,9 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 		Ast *type_expr = unparen_expr(p->type);
 		Type *type = nullptr;
 		Ast *default_value = unparen_expr(p->default_value);
+		if (operands != nullptr && default_value != nullptr) {
+			default_value = clone_ast(default_value);
+		}
 		ParameterValue param_value = {};
 
 		bool is_type_param = false;
@@ -3344,7 +3360,8 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 		}
 
 		if (type_expr == nullptr) {
-			param_value = handle_parameter_value(ctx, nullptr, &type, default_value, true);
+			bool allow_polymorphic_type = operands == nullptr && are_params_polymorphic(slice_from_array(variables));
+			param_value = handle_parameter_value(ctx, nullptr, &type, default_value, true, allow_polymorphic_type);
 		} else {
 			Ast *original_type_expr = type_expr;
 			if (type_expr->kind == Ast_Ellipsis) {
@@ -3938,7 +3955,7 @@ gb_internal bool ast_references_poly_params(Scope *scope, Ast *node) {
 	return false;
 }
 
-gb_internal Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results) {
+gb_internal Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results, Array<Operand> const *operands, bool params_are_polymorphic) {
 	if (_results == nullptr) {
 		return nullptr;
 	}
@@ -3969,11 +3986,14 @@ gb_internal Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_res
 
 		ast_node(field, Field, results[i]);
 		Ast *default_value = unparen_expr(field->default_value);
+		if (operands != nullptr && default_value != nullptr) {
+			default_value = clone_ast(default_value);
+		}
 		ParameterValue param_value = {};
 
 		Type *type = nullptr;
 		if (field->type == nullptr) {
-			param_value = handle_parameter_value(ctx, nullptr, &type, default_value, false);
+			param_value = handle_parameter_value(ctx, nullptr, &type, default_value, false, operands == nullptr && params_are_polymorphic);
 		} else {
 			if (ctx->allow_polymorphic_types && ast_references_poly_params(ctx->scope, field->type)) {
 				gbString name = expr_to_string(field->type);
@@ -4151,7 +4171,8 @@ gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc
 	bool no_poly_return = c->disallow_polymorphic_return_types;
 	c->disallow_polymorphic_return_types = c->scope == c->polymorphic_scope;
 	// NOTE(zen3ger): if the parapoly scope is the current proc's scope, then the return types shall not declare new poly vars
-	Type *results = check_get_results(c, c->scope, pt->results);
+	bool params_are_polymorphic = params != nullptr && are_params_polymorphic(params->Tuple.variables);
+	Type *results = check_get_results(c, c->scope, pt->results, operands, params_are_polymorphic);
 	c->disallow_polymorphic_return_types = no_poly_return;
 
 	isize param_count = 0;
