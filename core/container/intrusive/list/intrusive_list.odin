@@ -59,6 +59,118 @@ push_back :: proc "contextless" (list: ^List, node: ^Node) {
 }
 
 /*
+Inserts a new element before another with O(1) time complexity.
+
+**Inputs**
+- list: The container list
+- node: The node member of the user-defined element structure
+- before: The node to insert in front of, or `nil` to push to the back
+
+Example:
+
+	import "core:fmt"
+	import "core:container/intrusive/list"
+
+	insert_before_example :: proc() {
+		l: list.List
+
+		one   := My_Insert_Before_Struct{value=1}
+		two   := My_Insert_Before_Struct{value=2}
+		three := My_Insert_Before_Struct{value=3}
+
+		list.push_back(&l, &one.node)
+		list.push_back(&l, &three.node)
+		list.insert_before(&l, &two.node, &three.node)
+
+		it := list.iterator_head(l, My_Insert_Before_Struct, "node")
+		for num in list.iterate_next(&it) {
+			fmt.println(num.value)
+		}
+	}
+
+	My_Insert_Before_Struct :: struct {
+		node : list.Node,
+		value: int,
+	}
+
+Output:
+
+	1
+	2
+	3
+
+*/
+insert_before :: proc "contextless" (list: ^List, node, before: ^Node) {
+	if before == nil {
+		push_back(list, node)
+		return
+	}
+	node.prev, node.next = before.prev, before
+	if before.prev != nil {
+		before.prev.next = node
+	} else {
+		list.head = node
+	}
+	before.prev = node
+}
+
+/*
+Inserts a new element after another with O(1) time complexity.
+
+**Inputs**
+- list: The container list
+- node: The node member of the user-defined element structure
+- after: The node to insert behind, or `nil` to push to the front
+
+Example:
+
+	import "core:fmt"
+	import "core:container/intrusive/list"
+
+	insert_after_example :: proc() {
+		l: list.List
+
+		one   := My_Insert_After_Struct{value=1}
+		two   := My_Insert_After_Struct{value=2}
+		three := My_Insert_After_Struct{value=3}
+
+		list.push_back(&l, &one.node)
+		list.push_back(&l, &three.node)
+		list.insert_after(&l, &two.node, &one.node)
+
+		it := list.iterator_head(l, My_Insert_After_Struct, "node")
+		for num in list.iterate_next(&it) {
+			fmt.println(num.value)
+		}
+	}
+
+	My_Insert_After_Struct :: struct {
+		node : list.Node,
+		value: int,
+	}
+
+Output:
+
+	1
+	2
+	3
+
+*/
+insert_after :: proc "contextless" (list: ^List, node, after: ^Node) {
+	if after == nil {
+		push_front(list, node)
+		return
+	}
+	node.prev, node.next = after, after.next
+	if after.next != nil {
+		after.next.prev = node
+	} else {
+		list.tail = node
+	}
+	after.next = node
+}
+
+/*
 Removes an element from a list with O(1) time complexity.
 
 **Inputs**
@@ -263,7 +375,7 @@ iterator_from_node :: proc "contextless" (node: ^Node, $T: typeid, $field_name: 
 /*
 Retrieves the next element in a list and advances the iterator.
 
-**Inputs**  
+**Inputs**
 - it: The iterator
 
 **Returns**
@@ -313,7 +425,7 @@ iterate_next :: proc "contextless" (it: ^Iterator($T)) -> (ptr: ^T, ok: bool) {
 /*
 Retrieves the previous element in a list and recede the iterator.
 
-**Inputs**  
+**Inputs**
 - it: The iterator
 
 **Returns**
