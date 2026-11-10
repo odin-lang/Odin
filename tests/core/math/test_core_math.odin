@@ -1579,3 +1579,35 @@ test_modf :: proc(t: ^testing.T) {
 	ni16, nf16 := math.modf(math.nan_f16())
 	testing.expectf(t, math.is_nan(ni16) && math.is_nan(nf16), "modf(f16 NaN) = %v, %v, want NaN, NaN", ni16, nf16)
 }
+
+@test
+test_pow10 :: proc(t: ^testing.T) {
+	for n in ([]f64{-7.5, -2.25, -0.5, 0.5, 1.5, 2.5, 3.75}) {
+		d := math.pow10(n)
+		testing.expectf(t, d == math.pow(f64(10), n), "pow10(%v) = %v, want %v", n, d, math.pow(f64(10), n))
+		f := math.pow10(f32(n))
+		testing.expectf(t, f == math.pow(f32(10), f32(n)), "pow10(f32(%v)) = %v, want %v", n, f, math.pow(f32(10), f32(n)))
+		h := math.pow10(f16(n))
+		testing.expectf(t, h == math.pow(f16(10), f16(n)), "pow10(f16(%v)) = %v, want %v", n, h, math.pow(f16(10), f16(n)))
+	}
+
+	p := math.pow10(f64(2.5))
+	testing.expectf(t, p > 316.2277 && p < 316.2278, "pow10(2.5) = %v, want ~316.22777", p)
+
+	testing.expect_value(t, math.pow10(f64(0)), 1)
+	testing.expect_value(t, math.pow10(f64(2)), 100)
+	testing.expect_value(t, math.pow10(f64(-1)), 0.1)
+	testing.expect_value(t, math.pow10(f32(3)), 1000)
+	testing.expect_value(t, math.pow10(f16(-2)), 0.01)
+
+	testing.expect_value(t, math.pow10(f64(309)), math.inf_f64(1))
+	testing.expect_value(t, math.pow10(f64(-400)), 0)
+	testing.expect_value(t, math.pow10(math.inf_f64(1)), math.inf_f64(1))
+	testing.expect_value(t, math.pow10(math.inf_f64(-1)), 0)
+	testing.expect_value(t, math.pow10(math.inf_f32(1)), math.inf_f32(1))
+	testing.expect_value(t, math.pow10(math.inf_f16(-1)), 0)
+
+	testing.expect(t, math.is_nan(math.pow10(math.nan_f64())), "pow10(NaN) is not NaN")
+	testing.expect(t, math.is_nan(math.pow10(math.nan_f32())), "pow10(f32 NaN) is not NaN")
+	testing.expect(t, math.is_nan(math.pow10(math.nan_f16())), "pow10(f16 NaN) is not NaN")
+}

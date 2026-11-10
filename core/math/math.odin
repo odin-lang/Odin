@@ -138,6 +138,9 @@ pow10_f16 :: proc "contextless" (n: f16) -> f16 {
 		1e-00, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05, 1e-06, 1e-07,
 	}
 
+	if trunc(n) != n {
+		return pow(10, n)
+	}
 	if 0 <= n && n <= 4 {
 		return pow10_pos_tab[uint(n)]
 	}
@@ -166,6 +169,9 @@ pow10_f32 :: proc "contextless" (n: f32) -> f32 {
 		1e-40, 1e-41, 1e-42, 1e-43, 1e-44, 1e-45,
 	}
 
+	if trunc(n) != n {
+		return pow(10, n)
+	}
 	if 0 <= n && n <= 38 {
 		return pow10_pos_tab[uint(n)]
 	}
@@ -193,6 +199,9 @@ pow10_f64 :: proc "contextless" (n: f64) -> f64 {
 		1e-00, 1e-32, 1e-64, 1e-96, 1e-128, 1e-160, 1e-192, 1e-224, 1e-256, 1e-288, 1e-320,
 	}
 
+	if trunc(n) != n {
+		return pow(10, n)
+	}
 	if 0 <= n && n <= 308 {
 		return pow10_pos_tab32[uint(n)/32] * pow10_tab[uint(n)%32]
 	}
