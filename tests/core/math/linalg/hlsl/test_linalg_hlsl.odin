@@ -36,3 +36,56 @@ test_normalize_scalar :: proc(t: ^testing.T) {
 		testing.expectf(t, h == hlsl.half(e), "normalize(half(%v)) = %v, want %v", v, h, e)
 	}
 }
+
+@test
+test_isinf_isfinite :: proc(t: ^testing.T) {
+	Datum :: struct {
+		v:      hlsl.double,
+		inf:    bool,
+		finite: bool,
+	}
+	@(static, rodata)
+	data := [?]Datum{
+		{0h0000_0000_0000_0000, false, true},
+		{0h8000_0000_0000_0000, false, true},
+		{1,                     false, true},
+		{-1,                    false, true},
+		{0h7ff0_0000_0000_0000, true,  false},
+		{0hfff0_0000_0000_0000, true,  false},
+		{0h7ff8_0000_0000_0000, false, false},
+		{0hfff8_0000_0000_0000, false, false},
+	}
+
+	for d in data {
+		testing.expectf(t, hlsl.isinf(d.v) == d.inf, "isinf(%v) = %v, want %v", d.v, hlsl.isinf(d.v), d.inf)
+		testing.expectf(t, hlsl.isfinite(d.v) == d.finite, "isfinite(%v) = %v, want %v", d.v, hlsl.isfinite(d.v), d.finite)
+
+		f := hlsl.float(d.v)
+		testing.expectf(t, hlsl.isinf(f) == d.inf, "isinf(float(%v)) = %v, want %v", d.v, hlsl.isinf(f), d.inf)
+		testing.expectf(t, hlsl.isfinite(f) == d.finite, "isfinite(float(%v)) = %v, want %v", d.v, hlsl.isfinite(f), d.finite)
+
+		h := hlsl.half(d.v)
+		testing.expectf(t, hlsl.isinf(h) == d.inf, "isinf(half(%v)) = %v, want %v", d.v, hlsl.isinf(h), d.inf)
+		testing.expectf(t, hlsl.isfinite(h) == d.finite, "isfinite(half(%v)) = %v, want %v", d.v, hlsl.isfinite(h), d.finite)
+	}
+
+	finite_d := [?]hlsl.double{0h0000_0000_0000_0001, 0h8000_0000_0000_0001, 0h7fef_ffff_ffff_ffff}
+	for v in finite_d {
+		testing.expectf(t, !hlsl.isinf(v), "isinf(%h) = true, want false", v)
+		testing.expectf(t, hlsl.isfinite(v), "isfinite(%h) = false, want true", v)
+	}
+	finite_f := [?]hlsl.float{0h0000_0001, 0h8000_0001, 0h7f7f_ffff}
+	for v in finite_f {
+		testing.expectf(t, !hlsl.isinf(v), "isinf(%h) = true, want false", v)
+		testing.expectf(t, hlsl.isfinite(v), "isfinite(%h) = false, want true", v)
+	}
+	finite_h := [?]hlsl.half{0h0001, 0h8001, 0h7bff}
+	for v in finite_h {
+		testing.expectf(t, !hlsl.isinf(v), "isinf(%h) = true, want false", v)
+		testing.expectf(t, hlsl.isfinite(v), "isfinite(%h) = false, want true", v)
+	}
+
+	v4 := hlsl.float4{0, 0h7f80_0000, 0h7fc0_0000, 1}
+	testing.expect_value(t, hlsl.isinf(v4), hlsl.bool4{false, true, false, false})
+	testing.expect_value(t, hlsl.isfinite(v4), hlsl.bool4{true, false, false, true})
+}

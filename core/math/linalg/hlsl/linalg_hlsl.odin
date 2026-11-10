@@ -795,20 +795,20 @@ ceil :: proc{
 @(require_results) ceil_double4 :: proc "c" (x: double4) -> double4 { return {ceil(x.x), ceil(x.y), ceil(x.z), ceil(x.w)} }
 
 
-@(require_results) isfinite_half  :: proc "c" (x: half)  -> bool  { return !isinf_half(x) }
+@(require_results) isfinite_half  :: proc "c" (x: half)  -> bool  { return !isinf_half(x) && !isnan_half(x) }
 @(require_results) isfinite_half2 :: proc "c" (x: half2) -> bool2 { return {isfinite_half(x.x), isfinite_half(x.y)} }
 @(require_results) isfinite_half3 :: proc "c" (x: half3) -> bool3 { return {isfinite_half(x.x), isfinite_half(x.y), isfinite_half(x.z)} }
 @(require_results) isfinite_half4 :: proc "c" (x: half4) -> bool4 { return {isfinite_half(x.x), isfinite_half(x.y), isfinite_half(x.z), isfinite_half(x.w)} }
-@(require_results) isfinite_float  :: proc "c" (x: float)  -> bool  { return !isinf_float(x) }
+@(require_results) isfinite_float  :: proc "c" (x: float)  -> bool  { return !isinf_float(x) && !isnan_float(x) }
 @(require_results) isfinite_float2 :: proc "c" (x: float2) -> bool2 { return {isfinite_float(x.x), isfinite_float(x.y)} }
 @(require_results) isfinite_float3 :: proc "c" (x: float3) -> bool3 { return {isfinite_float(x.x), isfinite_float(x.y), isfinite_float(x.z)} }
 @(require_results) isfinite_float4 :: proc "c" (x: float4) -> bool4 { return {isfinite_float(x.x), isfinite_float(x.y), isfinite_float(x.z), isfinite_float(x.w)} }
-@(require_results) isfinite_double  :: proc "c" (x: double)  -> bool  { return !isinf_double(x) }
+@(require_results) isfinite_double  :: proc "c" (x: double)  -> bool  { return !isinf_double(x) && !isnan_double(x) }
 @(require_results) isfinite_double2 :: proc "c" (x: double2) -> bool2 { return {isfinite_double(x.x), isfinite_double(x.y)} }
 @(require_results) isfinite_double3 :: proc "c" (x: double3) -> bool3 { return {isfinite_double(x.x), isfinite_double(x.y), isfinite_double(x.z)} }
 @(require_results) isfinite_double4 :: proc "c" (x: double4) -> bool4 { return {isfinite_double(x.x), isfinite_double(x.y), isfinite_double(x.z), isfinite_double(x.w)} }
 
-// isfinite is the opposite of isinf and returns true if the number is neither positive-infinite or negative-infinite
+// isfinite returns true if the number is neither positive-infinite, negative-infinite, nor Not-A-Number
 isfinite :: proc{
 	isfinite_half,
 	isfinite_half2,
@@ -825,20 +825,20 @@ isfinite :: proc{
 }
 
 
-@(require_results) isinf_half  :: proc "c" (x: half)  -> bool  { return x * 0.5 == x }
+@(require_results) isinf_half  :: proc "c" (x: half)  -> bool  { return x != 0 && x * 0.5 == x }
 @(require_results) isinf_half2 :: proc "c" (x: half2) -> bool2 { return {isinf_half(x.x), isinf_half(x.y)} }
 @(require_results) isinf_half3 :: proc "c" (x: half3) -> bool3 { return {isinf_half(x.x), isinf_half(x.y), isinf_half(x.z)} }
 @(require_results) isinf_half4 :: proc "c" (x: half4) -> bool4 { return {isinf_half(x.x), isinf_half(x.y), isinf_half(x.z), isinf_half(x.w)} }
-@(require_results) isinf_float  :: proc "c" (x: float)  -> bool  { return x * 0.5 == x }
+@(require_results) isinf_float  :: proc "c" (x: float)  -> bool  { return x != 0 && x * 0.5 == x }
 @(require_results) isinf_float2 :: proc "c" (x: float2) -> bool2 { return {isinf_float(x.x), isinf_float(x.y)} }
 @(require_results) isinf_float3 :: proc "c" (x: float3) -> bool3 { return {isinf_float(x.x), isinf_float(x.y), isinf_float(x.z)} }
 @(require_results) isinf_float4 :: proc "c" (x: float4) -> bool4 { return {isinf_float(x.x), isinf_float(x.y), isinf_float(x.z), isinf_float(x.w)} }
-@(require_results) isinf_double  :: proc "c" (x: double)  -> bool  { return x * 0.5 == x }
+@(require_results) isinf_double  :: proc "c" (x: double)  -> bool  { return x != 0 && x * 0.5 == x }
 @(require_results) isinf_double2 :: proc "c" (x: double2) -> bool2 { return {isinf_double(x.x), isinf_double(x.y)} }
 @(require_results) isinf_double3 :: proc "c" (x: double3) -> bool3 { return {isinf_double(x.x), isinf_double(x.y), isinf_double(x.z)} }
 @(require_results) isinf_double4 :: proc "c" (x: double4) -> bool4 { return {isinf_double(x.x), isinf_double(x.y), isinf_double(x.z), isinf_double(x.w)} }
 
-// isinf is the opposite of isfinite and returns true if the number is either positive-infinite or negative-infinite
+// isinf returns true if the number is either positive-infinite or negative-infinite
 isinf :: proc{
 	isinf_half,
 	isinf_half2,
