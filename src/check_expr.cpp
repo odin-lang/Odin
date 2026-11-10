@@ -9769,13 +9769,12 @@ gb_internal ExprKind check_call_expr_as_type_cast(CheckerContext *c, Operand *op
 			}
 			check_expr_with_type_hint(c, operand, arg, t);
 			if (operand->mode != Addressing_Invalid) {
-				if (is_type_polymorphic(t)) {
-					error(call, "A polymorphic type cannot be used in a type conversion");
-				} else {
-					// NOTE(bill): Otherwise the compiler can override the polymorphic type
-					// as it assumes it is determining the type
-					check_cast(c, operand, t);
-				}
+				// NOTE: with a polymorphic type, `no_polymorphic_errors` stops the cast from
+				// determining that type from the value being converted, see #713
+				bool prev_no_polymorphic_errors = c->no_polymorphic_errors;
+				c->no_polymorphic_errors = prev_no_polymorphic_errors || is_type_polymorphic(t);
+				check_cast(c, operand, t);
+				c->no_polymorphic_errors = prev_no_polymorphic_errors;
 			}
 			operand->type = t;
 			operand->expr = call;
