@@ -1551,67 +1551,67 @@ refract_double  :: proc "c" (i, n, eta: double) -> double {
 	return t * double(int(cost2 > 0))
 }
 @(require_results)
-refract_half2  :: proc "c" (i, n, eta: half2) -> half2 {
+refract_half2  :: proc "c" (i, n: half2, eta: half) -> half2 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * half2{half(int(cost2.x > 0)), half(int(cost2.y > 0))}
+	return t * half(int(cost2 > 0))
 }
 @(require_results)
-refract_half3  :: proc "c" (i, n, eta: half3) -> half3 {
+refract_half3  :: proc "c" (i, n: half3, eta: half) -> half3 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * half3{half(int(cost2.x > 0)), half(int(cost2.y > 0)), half(int(cost2.z > 0))}
+	return t * half(int(cost2 > 0))
 }
 @(require_results)
-refract_half4  :: proc "c" (i, n, eta: half4) -> half4 {
+refract_half4  :: proc "c" (i, n: half4, eta: half) -> half4 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * half4{half(int(cost2.x > 0)), half(int(cost2.y > 0)), half(int(cost2.z > 0)), half(int(cost2.w > 0))}
+	return t * half(int(cost2 > 0))
 }
 @(require_results)
-refract_float2  :: proc "c" (i, n, eta: float2) -> float2 {
+refract_float2  :: proc "c" (i, n: float2, eta: float) -> float2 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * float2{float(int(cost2.x > 0)), float(int(cost2.y > 0))}
+	return t * float(int(cost2 > 0))
 }
 @(require_results)
-refract_float3  :: proc "c" (i, n, eta: float3) -> float3 {
+refract_float3  :: proc "c" (i, n: float3, eta: float) -> float3 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * float3{float(int(cost2.x > 0)), float(int(cost2.y > 0)), float(int(cost2.z > 0))}
+	return t * float(int(cost2 > 0))
 }
 @(require_results)
-refract_float4  :: proc "c" (i, n, eta: float4) -> float4 {
+refract_float4  :: proc "c" (i, n: float4, eta: float) -> float4 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * float4{float(int(cost2.x > 0)), float(int(cost2.y > 0)), float(int(cost2.z > 0)), float(int(cost2.w > 0))}
+	return t * float(int(cost2 > 0))
 }
 @(require_results)
-refract_double2  :: proc "c" (i, n, eta: double2) -> double2 {
+refract_double2  :: proc "c" (i, n: double2, eta: double) -> double2 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * double2{double(int(cost2.x > 0)), double(int(cost2.y > 0))}
+	return t * double(int(cost2 > 0))
 }
 @(require_results)
-refract_double3  :: proc "c" (i, n, eta: double3) -> double3 {
+refract_double3  :: proc "c" (i, n: double3, eta: double) -> double3 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * double3{double(int(cost2.x > 0)), double(int(cost2.y > 0)), double(int(cost2.z > 0))}
+	return t * double(int(cost2 > 0))
 }
 @(require_results)
-refract_double4  :: proc "c" (i, n, eta: double4) -> double4 {
+refract_double4  :: proc "c" (i, n: double4, eta: double) -> double4 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * double4{double(int(cost2.x > 0)), double(int(cost2.y > 0)), double(int(cost2.z > 0)), double(int(cost2.w > 0))}
+	return t * double(int(cost2 > 0))
 }
 
 scalarTripleProduct :: proc{

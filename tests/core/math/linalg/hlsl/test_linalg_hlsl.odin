@@ -89,3 +89,35 @@ test_isinf_isfinite :: proc(t: ^testing.T) {
 	testing.expect_value(t, hlsl.isinf(v4), hlsl.bool4{false, true, false, false})
 	testing.expect_value(t, hlsl.isfinite(v4), hlsl.bool4{true, false, false, true})
 }
+
+@test
+test_refract :: proc(t: ^testing.T) {
+	i := hlsl.normalize(hlsl.double4{1, -1, 0.5, 0.25})
+	n := hlsl.double4{0, 1, 0, 0}
+	ni := hlsl.dot(n, i)
+
+	for eta in ([]hlsl.double{0.5, 0.75, 1, 1.25, 1.5, 2}) {
+		k := 1 - eta*eta*(1 - ni*ni)
+		e: hlsl.double4
+		if k > 0 {
+			e = eta*i - (eta*ni + hlsl.sqrt(k))*n
+		}
+
+		d4 := hlsl.refract(i, n, eta)
+		testing.expectf(t, hlsl.length(d4 - e) < 1e-12, "refract(%v, %v, %v) = %v, want %v", i, n, eta, d4, e)
+		d3 := hlsl.refract(i.xyz, n.xyz, eta)
+		testing.expectf(t, hlsl.length(d3 - e.xyz) < 1e-12, "refract(%v, %v, %v) = %v, want %v", i.xyz, n.xyz, eta, d3, e.xyz)
+		d2 := hlsl.refract(i.xy, n.xy, eta)
+		testing.expectf(t, hlsl.length(d2 - e.xy) < 1e-12, "refract(%v, %v, %v) = %v, want %v", i.xy, n.xy, eta, d2, e.xy)
+
+		f4 := hlsl.refract(hlsl.float4(i), hlsl.float4(n), hlsl.float(eta))
+		testing.expectf(t, hlsl.length(f4 - hlsl.float4(e)) < 1e-6, "refract(%v, %v, %v) = %v, want %v", i, n, eta, f4, e)
+		f3 := hlsl.refract(hlsl.float3(i.xyz), hlsl.float3(n.xyz), hlsl.float(eta))
+		testing.expectf(t, hlsl.length(f3 - hlsl.float3(e.xyz)) < 1e-6, "refract(%v, %v, %v) = %v, want %v", i.xyz, n.xyz, eta, f3, e.xyz)
+		f2 := hlsl.refract(hlsl.float2(i.xy), hlsl.float2(n.xy), hlsl.float(eta))
+		testing.expectf(t, hlsl.length(f2 - hlsl.float2(e.xy)) < 1e-6, "refract(%v, %v, %v) = %v, want %v", i.xy, n.xy, eta, f2, e.xy)
+
+		h3 := hlsl.refract(hlsl.half3(i.xyz), hlsl.half3(n.xyz), hlsl.half(eta))
+		testing.expectf(t, hlsl.length(h3 - hlsl.half3(e.xyz)) < 0.01, "refract(%v, %v, %v) = %v, want %v", i.xyz, n.xyz, eta, h3, e.xyz)
+	}
+}
