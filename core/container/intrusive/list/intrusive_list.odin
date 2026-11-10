@@ -171,6 +171,166 @@ insert_after :: proc "contextless" (list: ^List, node, after: ^Node) {
 }
 
 /*
+Moves an element before another with O(1) time complexity.
+
+**Inputs**
+- list: The container list
+- node: The node member of the user-defined element structure
+- before: The node to move in front of, or `nil` to move to the back
+
+Example:
+
+	import "core:fmt"
+	import "core:container/intrusive/list"
+
+	move_before_example :: proc() {
+		l: list.List
+
+		one   := My_Move_Before_Struct{value=1}
+		two   := My_Move_Before_Struct{value=2}
+		three := My_Move_Before_Struct{value=3}
+
+		list.push_back(&l, &two.node)
+		list.push_back(&l, &three.node)
+		list.push_back(&l, &one.node)
+		list.move_before(&l, &one.node, &two.node)
+
+		it := list.iterator_head(l, My_Move_Before_Struct, "node")
+		for num in list.iterate_next(&it) {
+			fmt.println(num.value)
+		}
+	}
+
+	My_Move_Before_Struct :: struct {
+		node : list.Node,
+		value: int,
+	}
+
+Output:
+
+	1
+	2
+	3
+
+*/
+move_before :: proc "contextless" (list: ^List, node, before: ^Node) {
+	if node == before {
+		return
+	}
+	remove(list, node)
+	insert_before(list, node, before)
+}
+
+/*
+Moves an element after another with O(1) time complexity.
+
+**Inputs**
+- list: The container list
+- node: The node member of the user-defined element structure
+- after: The node to move behind, or `nil` to move to the front
+
+Example:
+
+	import "core:fmt"
+	import "core:container/intrusive/list"
+
+	move_after_example :: proc() {
+		l: list.List
+
+		one   := My_Move_After_Struct{value=1}
+		two   := My_Move_After_Struct{value=2}
+		three := My_Move_After_Struct{value=3}
+
+		list.push_back(&l, &one.node)
+		list.push_back(&l, &three.node)
+		list.push_back(&l, &two.node)
+		list.move_after(&l, &two.node, &one.node)
+
+		it := list.iterator_head(l, My_Move_After_Struct, "node")
+		for num in list.iterate_next(&it) {
+			fmt.println(num.value)
+		}
+	}
+
+	My_Move_After_Struct :: struct {
+		node : list.Node,
+		value: int,
+	}
+
+Output:
+
+	1
+	2
+	3
+
+*/
+move_after :: proc "contextless" (list: ^List, node, after: ^Node) {
+	if node == after {
+		return
+	}
+	remove(list, node)
+	insert_after(list, node, after)
+}
+
+/*
+Replaces an element of the list with a new element with O(1) time complexity.
+
+**Inputs**
+- list: The container list
+- old: The node to take out of the list
+- new: The node to put in its place
+
+Example:
+
+	import "core:fmt"
+	import "core:container/intrusive/list"
+
+	replace_example :: proc() {
+		l: list.List
+
+		one   := My_Replace_Struct{value=1}
+		two   := My_Replace_Struct{value=2}
+		three := My_Replace_Struct{value=3}
+		four  := My_Replace_Struct{value=4}
+
+		list.push_back(&l, &one.node)
+		list.push_back(&l, &four.node)
+		list.push_back(&l, &three.node)
+		list.replace(&l, &four.node, &two.node)
+
+		it := list.iterator_head(l, My_Replace_Struct, "node")
+		for num in list.iterate_next(&it) {
+			fmt.println(num.value)
+		}
+	}
+
+	My_Replace_Struct :: struct {
+		node : list.Node,
+		value: int,
+	}
+
+Output:
+
+	1
+	2
+	3
+
+*/
+replace :: proc "contextless" (list: ^List, old, new: ^Node) {
+	new.prev, new.next = old.prev, old.next
+	if old.prev != nil {
+		old.prev.next = new
+	} else {
+		list.head = new
+	}
+	if old.next != nil {
+		old.next.prev = new
+	} else {
+		list.tail = new
+	}
+}
+
+/*
 Removes an element from a list with O(1) time complexity.
 
 **Inputs**
