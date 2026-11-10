@@ -453,7 +453,7 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte
 		n = i64(_n)
 
 		if _err != nil {
-			err = .Unknown
+			err = _get_platform_error(_err)
 		} else if n == 0 {
 			err = .EOF
 		}
@@ -470,16 +470,23 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte
 			return
 		}
 
-		to_read := min(len(p), MAX_RW)
-		_n, _err := wasi.fd_pread(fd, {p[:to_read]}, wasi.filesize_t(offset))
-		n = i64(_n)
-
-		if _err != nil {
-			err = .Unknown
-		} else if n == 0 {
-			err = .EOF
+		p := p
+		offset := offset
+		for len(p) > 0 {
+			to_read := min(len(p), MAX_RW)
+			_n, _err := wasi.fd_pread(fd, {p[:to_read]}, wasi.filesize_t(offset))
+			if _err != nil {
+				err = _get_platform_error(_err)
+				return
+			}
+			if _n == 0 {
+				err = .EOF
+				return
+			}
+			p = p[_n:]
+			n += i64(_n)
+			offset += i64(_n)
 		}
-
 		return
 
 	case .Write:
@@ -488,7 +495,11 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte
 			to_write := min(len(p), MAX_RW)
 			_n, _err := wasi.fd_write(fd, {p[:to_write]})
 			if _err != nil {
-				err = .Unknown
+				err = _get_platform_error(_err)
+				return
+			}
+			if _n == 0 {
+				err = .Short_Write
 				return
 			}
 			p = p[_n:]
@@ -509,7 +520,11 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte
 			to_write := min(len(p), MAX_RW)
 			_n, _err := wasi.fd_pwrite(fd, {p[:to_write]}, wasi.filesize_t(offset))
 			if _err != nil {
-				err = .Unknown
+				err = _get_platform_error(_err)
+				return
+			}
+			if _n == 0 {
+				err = .Short_Write
 				return
 			}
 

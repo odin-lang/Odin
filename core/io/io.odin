@@ -234,8 +234,14 @@ read_at :: proc(r: Reader_At, p: []byte, offset: i64, n_read: ^int = nil) -> (n:
 		if err != .Unsupported {
 			n = int(n64)
 		} else {
-			curr := seek(r, offset, .Current) or_return
-			n, err = read(r, p)
+			curr := seek(r, 0, .Current) or_return
+			if _, err = seek(r, offset, .Start); err == nil {
+				for n < len(p) && err == nil {
+					nn: int
+					nn, err = read(r, p[n:])
+					n += nn
+				}
+			}
 			_, err1 := seek(r, curr, .Start)
 			if err1 != nil && err == nil {
 				err = err1
@@ -260,8 +266,14 @@ write_at :: proc(w: Writer_At, p: []byte, offset: i64, n_written: ^int = nil) ->
 		if err != .Unsupported {
 			n = int(n64)
 		} else {
-			curr := seek(w, offset, .Current) or_return
-			n, err = write(w, p)
+			curr := seek(w, 0, .Current) or_return
+			if _, err = seek(w, offset, .Start); err == nil {
+				for n < len(p) && err == nil {
+					nn: int
+					nn, err = write(w, p[n:])
+					n += nn
+				}
+			}
 			_, err1 := seek(w, curr, .Start)
 			if err1 != nil && err == nil {
 				err = err1
@@ -405,6 +417,21 @@ write_rune :: proc(s: Writer, r: rune, n_written: ^int = nil) -> (size: int, err
 // read_full expected exactly len(buf) bytes from r into buf.
 read_full :: proc(r: Reader, buf: []byte) -> (n: int, err: Error) {
 	return read_at_least(r, buf, len(buf))
+}
+
+read_full_at :: proc(r: Reader_At, buf: []byte, offset: i64) -> (n: int, err: Error) {
+	for n < len(buf) && err == nil {
+		nn: int
+		nn, err = read_at(r, buf[n:], offset + i64(n))
+		n += nn
+	}
+
+	if n >= len(buf) {
+		err = nil
+	} else if n > 0 && err == .EOF {
+		err = .Unexpected_EOF
+	}
+	return
 }
 
 
