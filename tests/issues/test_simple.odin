@@ -60,6 +60,7 @@ package tests_issues
 @(require) import "test_issue_7975_7976"
 @(require) import "test_issue_8102"
 @(require) import "test_issue_8188"
+@(require) import "test_issue_8194"
 @(require) import "test_issue_fast_isel_lowering"
 @(require) import "test_issue_omitted_field_union"
 @(require) import "test_issue_equal_proc_dependencies"
