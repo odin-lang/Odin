@@ -137,6 +137,18 @@ read_full :: proc(f: ^File, buf: []byte) -> (n: int, err: Error) {
 	return read_at_least(f, buf, len(buf))
 }
 
+read_full_at :: proc(f: ^File, buf: []byte, offset: i64) -> (n: int, err: Error) {
+	nn := max(int)
+	for nn > 0 && n < len(buf) && err == nil {
+		nn, err = read_at(f, buf[n:], offset + i64(n))
+		n += nn
+	}
+	if n >= len(buf) {
+		err = nil
+	}
+	return
+}
+
 
 
 read_entire_file :: proc{

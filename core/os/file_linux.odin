@@ -221,36 +221,63 @@ _read :: proc(f: ^File_Impl, p: []byte) -> (i64, Error) {
 		return 0, nil
 	}
 
-	n, errno := linux.read(f.fd, p[:min(len(p), MAX_RW)])
-	if errno != .NONE {
-		return 0, _get_platform_error(errno)
+	for {
+		n, errno := linux.read(f.fd, p[:min(len(p), MAX_RW)])
+		if errno == .EINTR {
+			continue
+		}
+		if errno != .NONE {
+			return 0, _get_platform_error(errno)
+		}
+		return i64(n), io.Error.EOF if n == 0 else nil
 	}
-	return i64(n), io.Error.EOF if n == 0 else nil
 }
 
-_read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (i64, Error) {
+_read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (nt: i64, err: Error) {
 	if len(p) <= 0 {
 		return 0, nil
 	}
 	if offset < 0 {
 		return 0, .Invalid_Offset
 	}
-	n, errno := linux.pread(f.fd, p[:min(len(p), MAX_RW)], offset)
-	if errno != .NONE {
-		return 0, _get_platform_error(errno)
+
+	p := p
+	offset := offset
+	for len(p) > 0 {
+		n, errno := linux.pread(f.fd, p[:min(len(p), MAX_RW)], offset)
+		if errno == .EINTR {
+			continue
+		}
+		if errno != .NONE {
+			err = _get_platform_error(errno)
+			return
+		}
+		if n == 0 {
+			err = .EOF
+			return
+		}
+
+		p = p[n:]
+		nt += i64(n)
+		offset += i64(n)
 	}
-	if n == 0 {
-		return 0, .EOF
-	}
-	return i64(n), nil
+
+	return
 }
 
 _write :: proc(f: ^File_Impl, p: []byte) -> (nt: i64, err: Error) {
 	p := p
 	for len(p) > 0 {
 		n, errno := linux.write(f.fd, p[:min(len(p), MAX_RW)])
+		if errno == .EINTR {
+			continue
+		}
 		if errno != .NONE {
 			err = _get_platform_error(errno)
+			return
+		}
+		if n == 0 {
+			err = .Short_Write
 			return
 		}
 
@@ -270,8 +297,15 @@ _write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (nt: i64, err: Error
 	offset := offset
 	for len(p) > 0 {
 		n, errno := linux.pwrite(f.fd, p[:min(len(p), MAX_RW)], offset)
+		if errno == .EINTR {
+			continue
+		}
 		if errno != .NONE {
 			err = _get_platform_error(errno)
+			return
+		}
+		if n == 0 {
+			err = .Short_Write
 			return
 		}
 
