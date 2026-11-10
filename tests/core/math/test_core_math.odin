@@ -1486,3 +1486,15 @@ test_remap :: proc(t: ^testing.T) {
 	testing.expect_value(t, math.remap(2.5, 0.0, 10.0, 100.0, 200.0), 125.0)
 	testing.expect_value(t, math.remap(25, 0, 100, 100, 200), 125)
 }
+
+@test
+test_bias_gain :: proc(t: ^testing.T) {
+	testing.expect_value(t, math.bias(0.5, 0.5), 0.5)
+	testing.expect_value(t, math.bias(f32(0.5), 0.25), 0.25)
+	testing.expect_value(t, math.bias(f16(0), 0.75), 0)
+	testing.expect_value(t, math.bias(f64(1), 0.75), 1)
+	testing.expectf(t, abs(math.bias(0.5, 0.75) - 0.75) < 1e-15, "bias(0.5, 0.75) = %v, want 0.75", math.bias(0.5, 0.75))
+
+	testing.expect_value(t, math.gain(0.5, 0.25), 0.5)
+	testing.expect_value(t, math.gain(f32(0.25), 0.25), 0.125)
+}

@@ -443,7 +443,7 @@ smoothstep :: proc "contextless" (edge0, edge1, x: $T) -> T where intrinsics.typ
 }
 
 @(require_results)
-bias :: proc "contextless" (t, b: $T) -> T where intrinsics.type_is_numeric(T) {
+bias :: proc "contextless" (t, b: $T) -> T where intrinsics.type_is_float(T) {
 	return t / (((1/b) - 2) * (1 - t) + 1)
 }
 @(require_results)
