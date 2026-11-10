@@ -992,3 +992,37 @@ test_bit_set_endianness :: proc(t: ^testing.T) {
 	check(t, u64le, "\x1b\x00\x00\x00\x00\x00\x00\x12\x01")
 	check(t, u64be, "\x1b\x00\x00\x00\x00\x00\x00\x12\x01")
 }
+
+@(test)
+test_unmarshal_epoch_time_range :: proc(t: ^testing.T) {
+	Case :: struct {
+		data:  string,
+		nsec:  i64,
+		valid: bool,
+	}
+	cases := [?]Case{
+		{"\xc1\x1a\x51\x4b\x67\xb0",                 1363896240 * 1e9,       true},
+		{"\xc1\xfb\x41\xd4\x52\xd9\xec\x20\x00\x00", 1363896240 * 1e9 + 5e8, true},
+		{"\xc1\xfb\xc0\x04\x00\x00\x00\x00\x00\x00", -25e8,                  true},
+		{"\xc1\x1b\x00\x00\x00\x02\x25\xc1\x7d\x04", 9223372036 * 1e9,       true},
+		{"\xc1\x3b\x00\x00\x00\x02\x25\xc1\x7d\x03", -9223372036 * 1e9,      true},
+		{"\xc1\x1b\x00\x00\x00\x02\x25\xc1\x7d\x05", 0,                      false},
+		{"\xc1\x3b\x00\x00\x00\x02\x25\xc1\x7d\x04", 0,                      false},
+		{"\xc1\x1b\xff\xff\xff\xff\xff\xff\xff\xff", 0,                      false},
+		{"\xc1\x3b\xff\xff\xff\xff\xff\xff\xff\xff", 0,                      false},
+		{"\xc1\xfb\x7f\xf8\x00\x00\x00\x00\x00\x00", 0,                      false},
+		{"\xc1\xfb\x7f\xf0\x00\x00\x00\x00\x00\x00", 0,                      false},
+		{"\xc1\xfb\xff\xf0\x00\x00\x00\x00\x00\x00", 0,                      false},
+		{"\xc1\xfb\x7e\x37\xe4\x3c\x88\x00\x75\x9c", 0,                      false},
+		{"\xc1\xf9\x7c\x00",                         0,                      false},
+	}
+	for c in cases {
+		v: time.Time
+		err := cbor.unmarshal(c.data, &v)
+		if c.valid {
+			testing.expectf(t, err == nil && v._nsec == c.nsec, "% x: expected %v, got %v (%v)", c.data, c.nsec, v._nsec, err)
+		} else {
+			testing.expectf(t, err == cbor.Decode_Data_Error.Bad_Tag_Value, "% x: expected Bad_Tag_Value, got %v (%v)", c.data, v._nsec, err)
+		}
+	}
+}
