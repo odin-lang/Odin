@@ -4368,6 +4368,10 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		if (value != nullptr) {
 			error(value, "Expected no value for '%.*s'", LIT(name));
 		}
+		if (c->decl != nullptr && (c->decl->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
+			error(elem, "@(test) procedures must be declared at the file scope");
+			return true;
+		}
 		ac->test = true;
 		return true;
 	} else if (name == "export") {
@@ -5658,7 +5662,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				init_decl_info_proc(d, init);
 				d->init_expr = init;
 
-				if (is_test) {
+				if (is_test && (c->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) != 0) {
 					e->flags |= EntityFlag_Test;
 				}
 				if (is_init && is_fini) {
