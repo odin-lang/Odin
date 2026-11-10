@@ -331,6 +331,131 @@ replace :: proc "contextless" (list: ^List, old, new: ^Node) {
 }
 
 /*
+Moves all elements of another list before an element with O(1) time complexity, leaving the other list empty.
+
+**Inputs**
+- list: The container list
+- other: The list to move the elements from
+- before: The node to move them in front of, or `nil` to move them to the back
+
+Example:
+
+	import "core:fmt"
+	import "core:container/intrusive/list"
+
+	splice_before_example :: proc() {
+		l, other: list.List
+
+		one   := My_Splice_Before_Struct{value=1}
+		two   := My_Splice_Before_Struct{value=2}
+		three := My_Splice_Before_Struct{value=3}
+		four  := My_Splice_Before_Struct{value=4}
+
+		list.push_back(&l, &one.node)
+		list.push_back(&l, &four.node)
+		list.push_back(&other, &two.node)
+		list.push_back(&other, &three.node)
+		list.splice_before(&l, &other, &four.node)
+
+		it := list.iterator_head(l, My_Splice_Before_Struct, "node")
+		for num in list.iterate_next(&it) {
+			fmt.println(num.value)
+		}
+	}
+
+	My_Splice_Before_Struct :: struct {
+		node : list.Node,
+		value: int,
+	}
+
+Output:
+
+	1
+	2
+	3
+	4
+
+*/
+splice_before :: proc "contextless" (list, other: ^List, before: ^Node) {
+	if other.head == nil {
+		return
+	}
+	first, last := other.head, other.tail
+	other^ = {}
+
+	prev := list.tail
+	if before != nil {
+		prev = before.prev
+	}
+	first.prev = prev
+	last.next = before
+	if prev != nil {
+		prev.next = first
+	} else {
+		list.head = first
+	}
+	if before != nil {
+		before.prev = last
+	} else {
+		list.tail = last
+	}
+}
+
+/*
+Moves all elements of another list after an element with O(1) time complexity, leaving the other list empty.
+
+**Inputs**
+- list: The container list
+- other: The list to move the elements from
+- after: The node to move them behind, or `nil` to move them to the front
+
+Example:
+
+	import "core:fmt"
+	import "core:container/intrusive/list"
+
+	splice_after_example :: proc() {
+		l, other: list.List
+
+		one   := My_Splice_After_Struct{value=1}
+		two   := My_Splice_After_Struct{value=2}
+		three := My_Splice_After_Struct{value=3}
+		four  := My_Splice_After_Struct{value=4}
+
+		list.push_back(&l, &one.node)
+		list.push_back(&l, &four.node)
+		list.push_back(&other, &two.node)
+		list.push_back(&other, &three.node)
+		list.splice_after(&l, &other, &one.node)
+
+		it := list.iterator_head(l, My_Splice_After_Struct, "node")
+		for num in list.iterate_next(&it) {
+			fmt.println(num.value)
+		}
+	}
+
+	My_Splice_After_Struct :: struct {
+		node : list.Node,
+		value: int,
+	}
+
+Output:
+
+	1
+	2
+	3
+	4
+
+*/
+splice_after :: proc "contextless" (list, other: ^List, after: ^Node) {
+	before := list.head
+	if after != nil {
+		before = after.next
+	}
+	splice_before(list, other, before)
+}
+
+/*
 Removes an element from a list with O(1) time complexity.
 
 **Inputs**
