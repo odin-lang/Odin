@@ -509,8 +509,8 @@ unmarshal_value :: proc(p: ^Parser, v: any, flags := Unmarshal_Flags{}) -> (err:
 		if assign_float(v, f) {
 			return
 		}
-		if i, fract := math.modf(f); fract == 0 && !math.is_inf(f) {
-			if assign_int(v, i) {
+		if i, fract := math.modf(f); fract == 0 && -(1 << 127) <= i && i < 1 << 127 {
+			if assign_int(v, i128(i)) {
 				return
 			}
 			if assign_float(v, i) {
