@@ -456,6 +456,146 @@ splice_after :: proc "contextless" (list, other: ^List, after: ^Node) {
 }
 
 /*
+Splits off all elements before an element into a new list with O(1) time complexity.
+
+**Inputs**
+- list: The container list
+- before: The node to split in front of, or `nil` to split off the whole list
+
+**Returns** The elements that were in front of `before`, as a new list
+
+Example:
+
+	import "core:fmt"
+	import "core:container/intrusive/list"
+
+	split_before_example :: proc() {
+		l: list.List
+
+		one   := My_Split_Before_Struct{value=1}
+		two   := My_Split_Before_Struct{value=2}
+		three := My_Split_Before_Struct{value=3}
+		four  := My_Split_Before_Struct{value=4}
+
+		list.push_back(&l, &one.node)
+		list.push_back(&l, &two.node)
+		list.push_back(&l, &three.node)
+		list.push_back(&l, &four.node)
+		front := list.split_before(&l, &three.node)
+
+		it := list.iterator_head(front, My_Split_Before_Struct, "node")
+		for num in list.iterate_next(&it) {
+			fmt.println("front", num.value)
+		}
+		it = list.iterator_head(l, My_Split_Before_Struct, "node")
+		for num in list.iterate_next(&it) {
+			fmt.println("list", num.value)
+		}
+	}
+
+	My_Split_Before_Struct :: struct {
+		node : list.Node,
+		value: int,
+	}
+
+Output:
+
+	front 1
+	front 2
+	list 3
+	list 4
+
+*/
+split_before :: proc "contextless" (list: ^List, before: ^Node) -> (front: List) {
+	last := list.tail
+	if before != nil {
+		last = before.prev
+	}
+	if last == nil {
+		return
+	}
+	front = {list.head, last}
+	last.next = nil
+	list.head = before
+	if before != nil {
+		before.prev = nil
+	} else {
+		list.tail = nil
+	}
+	return
+}
+
+/*
+Splits off all elements after an element into a new list with O(1) time complexity.
+
+**Inputs**
+- list: The container list
+- after: The node to split behind, or `nil` to split off the whole list
+
+**Returns** The elements that were behind `after`, as a new list
+
+Example:
+
+	import "core:fmt"
+	import "core:container/intrusive/list"
+
+	split_after_example :: proc() {
+		l: list.List
+
+		one   := My_Split_After_Struct{value=1}
+		two   := My_Split_After_Struct{value=2}
+		three := My_Split_After_Struct{value=3}
+		four  := My_Split_After_Struct{value=4}
+
+		list.push_back(&l, &one.node)
+		list.push_back(&l, &two.node)
+		list.push_back(&l, &three.node)
+		list.push_back(&l, &four.node)
+		back := list.split_after(&l, &two.node)
+
+		it := list.iterator_head(l, My_Split_After_Struct, "node")
+		for num in list.iterate_next(&it) {
+			fmt.println("list", num.value)
+		}
+		it = list.iterator_head(back, My_Split_After_Struct, "node")
+		for num in list.iterate_next(&it) {
+			fmt.println("back", num.value)
+		}
+	}
+
+	My_Split_After_Struct :: struct {
+		node : list.Node,
+		value: int,
+	}
+
+Output:
+
+	list 1
+	list 2
+	back 3
+	back 4
+
+*/
+split_after :: proc "contextless" (list: ^List, after: ^Node) -> (back: List) {
+	first := list.head
+	if after != nil {
+		first = after.next
+	}
+	if first == nil {
+		return
+	}
+	back = {first, list.tail}
+	first.prev = nil
+	list.tail = after
+	if after != nil {
+		after.next = nil
+	} else {
+		list.head = nil
+	}
+	return
+}
+
+/*
 Removes an element from a list with O(1) time complexity.
 
 **Inputs**
