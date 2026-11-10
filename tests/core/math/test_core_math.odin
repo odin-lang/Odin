@@ -1498,3 +1498,42 @@ test_bias_gain :: proc(t: ^testing.T) {
 	testing.expect_value(t, math.gain(0.5, 0.25), 0.5)
 	testing.expect_value(t, math.gain(f32(0.25), 0.25), 0.125)
 }
+
+@test
+test_count_digits_limits :: proc(t: ^testing.T) {
+	_run_signed :: proc(t: ^testing.T, $T: typeid, $base: int) {
+		buf: [72]u8
+		for n in ([]T{min(T), min(T) + 1, -1, 0, 1, max(T) - 1, max(T)}) {
+			count := math.count_digits_of_base(n, base)
+			str := strconv.write_int(buf[:], i64(n), base)
+			want := len(str) - 1 if n < 0 else len(str)
+			testing.expectf(t, count == want, "%v %v in base-%i digit count is %i, want %i (%q)", typeid_of(T), n, base, count, want, str)
+		}
+	}
+	_run_unsigned :: proc(t: ^testing.T, $T: typeid, $base: int) {
+		buf: [72]u8
+		for n in ([]T{0, 1, max(T) - 1, max(T)}) {
+			count := math.count_digits_of_base(n, base)
+			str := strconv.write_uint(buf[:], u64(n), base)
+			testing.expectf(t, count == len(str), "%v %v in base-%i digit count is %i, want %i (%q)", typeid_of(T), n, base, count, len(str), str)
+		}
+	}
+	_run :: proc(t: ^testing.T, $base: int) {
+		_run_signed(t, i8, base)
+		_run_signed(t, i16, base)
+		_run_signed(t, i32, base)
+		_run_signed(t, i64, base)
+		_run_unsigned(t, u8, base)
+		_run_unsigned(t, u16, base)
+		_run_unsigned(t, u32, base)
+		_run_unsigned(t, u64, base)
+	}
+
+	_run(t, 2)
+	_run(t, 3)
+	_run(t, 7)
+	_run(t, 8)
+	_run(t, 10)
+	_run(t, 16)
+	_run(t, 32)
+}
