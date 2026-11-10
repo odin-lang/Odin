@@ -3324,7 +3324,7 @@ gb_internal WORKER_TASK_PROC(add_definitions_to_set_worker) {
 				add_dependency_to_set_threaded(c, e);
 			}
 		} else if (e->kind == Entity_Procedure) {
-			if (e->Procedure.is_export) {
+			if (e->Procedure.is_export && (e->flags & EntityFlag_Overridden) == 0) {
 				add_dependency_to_set_threaded(c, e);
 			}
 		} else if (e->kind == Entity_Variable) {
@@ -3361,7 +3361,7 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 			}
 			break;
 		case Entity_Procedure:
-			if (e->Procedure.is_export) {
+			if (e->Procedure.is_export && (e->flags & EntityFlag_Overridden) == 0) {
 				add_to_set(c, e);
 			} else if (e->flags & EntityFlag_Require) {
 				add_to_set(c, e);
