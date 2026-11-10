@@ -572,7 +572,7 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 						if (is_type_proc(type)) {
 							t = determine_type_from_polymorphic(ctx, type, operand);
 						}
-						if (is_type_polymorphic(base_type(t))) {
+						if (operand.mode == Addressing_Invalid || is_type_polymorphic(base_type(t))) {
 							*is_polymorphic_ = true;
 							can_check_fields = false;
 						}
@@ -619,7 +619,7 @@ gb_internal bool check_record_poly_operand_specialization(CheckerContext *ctx, T
 	}
 	for (isize i = 0; i < poly_operands->count; i++) {
 		Operand o = (*poly_operands)[i];
-		if (is_type_polymorphic(o.type)) {
+		if (o.mode == Addressing_Invalid || is_type_polymorphic(o.type)) {
 			return false;
 		}
 		if (record_type == o.type) {
