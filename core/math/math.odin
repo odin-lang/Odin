@@ -993,6 +993,9 @@ modf_f16   :: proc "contextless" (x: f16) -> (int: f16, frac: f16) {
 		}
 		return 0, x
 	}
+	if is_inf(x) {
+		return x, 0
+	}
 
 	i := transmute(u16)x
 	e := uint(i>>shift)&mask - bias
@@ -1030,6 +1033,9 @@ modf_f32 :: proc "contextless" (x: f32) -> (int: f32, frac: f32) {
 		}
 		return 0, x
 	}
+	if is_inf(x) {
+		return x, 0
+	}
 
 	i := transmute(u32)x
 	e := uint(i>>shift)&mask - bias
@@ -1066,6 +1072,9 @@ modf_f64 :: proc "contextless" (x: f64) -> (int: f64, frac: f64) {
 			return x, x
 		}
 		return 0, x
+	}
+	if is_inf(x) {
+		return x, 0
 	}
 
 	i := transmute(u64)x

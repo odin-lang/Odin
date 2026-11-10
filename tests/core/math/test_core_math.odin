@@ -1537,3 +1537,45 @@ test_count_digits_limits :: proc(t: ^testing.T) {
 	_run(t, 16)
 	_run(t, 32)
 }
+
+@test
+test_modf :: proc(t: ^testing.T) {
+	Datum :: struct {
+		x, i, f: f64,
+	}
+	@(static, rodata)
+	data := [?]Datum{
+		{0h7ff0_0000_0000_0000, 0h7ff0_0000_0000_0000, 0h0000_0000_0000_0000},
+		{0hfff0_0000_0000_0000, 0hfff0_0000_0000_0000, 0h8000_0000_0000_0000},
+		{0h0000_0000_0000_0000, 0h0000_0000_0000_0000, 0h0000_0000_0000_0000},
+		{0h8000_0000_0000_0000, 0h8000_0000_0000_0000, 0h8000_0000_0000_0000},
+		{ 1.5,     1,    0.5},
+		{-1.5,    -1,   -0.5},
+		{ 0.25,    0,    0.25},
+		{-0.25,   -0.0, -0.25},
+		{ 3,       3,    0},
+		{-3,      -3,   -0.0},
+		{ 100.75,  100,  0.75},
+	}
+
+	for d in data {
+		i, f := math.modf(d.x)
+		testing.expectf(t, transmute(u64)i == transmute(u64)d.i && transmute(u64)f == transmute(u64)d.f,
+			"modf(%v) = %v, %v, want %v, %v", d.x, i, f, d.i, d.f)
+
+		fi, ff := math.modf(f32(d.x))
+		testing.expectf(t, transmute(u32)fi == transmute(u32)f32(d.i) && transmute(u32)ff == transmute(u32)f32(d.f),
+			"modf(f32(%v)) = %v, %v, want %v, %v", d.x, fi, ff, d.i, d.f)
+
+		hi, hf := math.modf(f16(d.x))
+		testing.expectf(t, transmute(u16)hi == transmute(u16)f16(d.i) && transmute(u16)hf == transmute(u16)f16(d.f),
+			"modf(f16(%v)) = %v, %v, want %v, %v", d.x, hi, hf, d.i, d.f)
+	}
+
+	ni, nf := math.modf(math.nan_f64())
+	testing.expectf(t, math.is_nan(ni) && math.is_nan(nf), "modf(NaN) = %v, %v, want NaN, NaN", ni, nf)
+	ni32, nf32 := math.modf(math.nan_f32())
+	testing.expectf(t, math.is_nan(ni32) && math.is_nan(nf32), "modf(f32 NaN) = %v, %v, want NaN, NaN", ni32, nf32)
+	ni16, nf16 := math.modf(math.nan_f16())
+	testing.expectf(t, math.is_nan(ni16) && math.is_nan(nf16), "modf(f16 NaN) = %v, %v, want NaN, NaN", ni16, nf16)
+}
