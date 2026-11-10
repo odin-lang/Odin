@@ -83,7 +83,7 @@ outer_product :: intrinsics.outer_product
 @(require_results)
 quaternion_inverse :: proc "contextless" (q: $Q) -> Q where IS_QUATERNION(Q) {
 	q_length2 := length2(q)
-	if is_approx_zero(q_length2) {
+	if math.is_approx_zero(q_length2) {
 		return 0
 	}
 	return conj(q) * quaternion(w=1.0/q_length2, x=0, y=0, z=0)
@@ -131,12 +131,12 @@ normalize_unchecked :: proc{vector_normalize_unchecked, quaternion_normalize_unc
 @(require_results)
 vector_normalize :: proc "contextless" (v: $T/[$N]$E) -> T where IS_FLOAT(E) {
 	m := length(v)
-	return 0 if is_approx_zero(m) else v/m
+	return 0 if math.is_approx_zero(m) else v/m
 }
 @(require_results)
 quaternion_normalize :: proc "contextless" (q: $Q) -> Q  where IS_QUATERNION(Q) {
 	m := quaternion_length(q)
-	return 0 if is_approx_zero(m) else q/Q(m)
+	return 0 if math.is_approx_zero(m) else q/Q(m)
 }
 normalize :: proc{vector_normalize, quaternion_normalize}
 
@@ -149,11 +149,6 @@ quaternion_normalize0 :: proc "contextless" (q: $Q) -> Q  where IS_QUATERNION(Q)
 	return quaternion_normalize(q)
 }
 normalize0 :: proc{vector_normalize0, quaternion_normalize0}
-
-@(require_results) is_approx_zero_f16 :: proc "contextless" (x: f16) -> bool { return abs(x) <= F16_EPSILON }
-@(require_results) is_approx_zero_f32 :: proc "contextless" (x: f32) -> bool { return abs(x) <= F32_EPSILON }
-@(require_results) is_approx_zero_f64 :: proc "contextless" (x: f64) -> bool { return abs(x) <= F64_EPSILON }
-is_approx_zero :: proc{is_approx_zero_f16, is_approx_zero_f32, is_approx_zero_f64}
 
 @(require_results)
 vector_length :: proc "contextless" (v: $T/[$N]$E) -> E where IS_FLOAT(E) {
@@ -209,7 +204,7 @@ clamp_length :: proc "contextless" (v: $T/[$N]$E, a: E) -> T where IS_FLOAT(E) {
 @(require_results)
 projection :: proc "contextless" (x, normal: $T/[$N]$E) -> T where IS_NUMERIC(E) {
 	normal_length := length2(normal)
-	return 0 if is_approx_zero(normal_length) else (dot(x, normal) / normal_length) * normal
+	return 0 if math.is_approx_zero(normal_length) else (dot(x, normal) / normal_length) * normal
 }
 
 @(require_results)
@@ -336,7 +331,7 @@ angle_between :: proc{
 vector_slerp :: proc "contextless" (x, y: $T/[$N]$E, a: E) -> T #no_bounds_check {
 	x_length := length(x)
 	y_length := length(y)
-	if is_approx_zero(x_length) || is_approx_zero(y_length) {
+	if math.is_approx_zero(x_length) || math.is_approx_zero(y_length) {
 		return lerp(x, y, a)
 	}
 	
@@ -1025,7 +1020,7 @@ matrix2x2_inverse :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) #no_bou
 		y[1, 0] = -x[1, 0] / d
 		y[1, 1] = +x[0, 0] / d
 	} else {
-		if is_approx_zero(d) {
+		if math.is_approx_zero(d) {
 			return {}
 		}
 		id := 1 / d
@@ -1051,7 +1046,7 @@ matrix3x3_inverse :: proc "contextless" (x: $M/matrix[3, 3]$T) -> (y: M) #no_bou
 			}
 		}
 	} else {
-		if is_approx_zero(d) {
+		if math.is_approx_zero(d) {
 			return {}
 		}
 		id := 1/d
@@ -1081,7 +1076,7 @@ matrix4x4_inverse :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bou
 			}
 		}
 	} else {
-		if is_approx_zero(d) {
+		if math.is_approx_zero(d) {
 			return {}
 		}
 		id := 1/d
