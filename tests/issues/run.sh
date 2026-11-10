@@ -264,7 +264,7 @@ else
 	exit 1
 fi
 
-if [[ $($ODIN check ../test_issue_4578_unspecialized $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error: Unspecialized polymorphic procedure") -eq 1 ]]; then
+if [[ $($ODIN check ../test_issue_7947 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error: Unspecialized polymorphic procedure literal") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"

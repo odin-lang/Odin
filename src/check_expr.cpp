@@ -13860,7 +13860,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 
 			pl->decl = decl;
 			bool declares_polymorphic_params = pl->type->kind == Ast_ProcType && pl->type->ProcType.generic;
-			if (!type->Proc.is_polymorphic || declares_polymorphic_params) {
+			if (!type->Proc.is_polymorphic || (declares_polymorphic_params && !c->in_proc_sig)) {
 				check_procedure_later(ctx.checker, ctx.file, empty_token, decl, type, pl->body, pl->tags);
 			}
 		}
