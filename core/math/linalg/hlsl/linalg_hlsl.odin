@@ -1182,13 +1182,13 @@ lerp :: proc{
 @(require_results) lerp_double  :: proc "c" (x, y, t: double) -> double   { return x*(1-t) + y*t }
 @(require_results) lerp_half2 :: proc "c" (x, y, t: half2) -> half2 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y)} }
 @(require_results) lerp_half3 :: proc "c" (x, y, t: half3) -> half3 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y), lerp(x.z, y.z, t.z)} }
-@(require_results) lerp_half4 :: proc "c" (x, y, t: half4) -> half4 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, y.y), lerp(x.z, y.z, t.z), lerp(x.w, y.w, t.w)} }
+@(require_results) lerp_half4 :: proc "c" (x, y, t: half4) -> half4 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y), lerp(x.z, y.z, t.z), lerp(x.w, y.w, t.w)} }
 @(require_results) lerp_float2 :: proc "c" (x, y, t: float2) -> float2 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y)} }
 @(require_results) lerp_float3 :: proc "c" (x, y, t: float3) -> float3 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y), lerp(x.z, y.z, t.z)} }
-@(require_results) lerp_float4 :: proc "c" (x, y, t: float4) -> float4 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, y.y), lerp(x.z, y.z, t.z), lerp(x.w, y.w, t.w)} }
+@(require_results) lerp_float4 :: proc "c" (x, y, t: float4) -> float4 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y), lerp(x.z, y.z, t.z), lerp(x.w, y.w, t.w)} }
 @(require_results) lerp_double2 :: proc "c" (x, y, t: double2) -> double2 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y)} }
 @(require_results) lerp_double3 :: proc "c" (x, y, t: double3) -> double3 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y), lerp(x.z, y.z, t.z)} }
-@(require_results) lerp_double4 :: proc "c" (x, y, t: double4) -> double4 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, y.y), lerp(x.z, y.z, t.z), lerp(x.w, y.w, t.w)} }
+@(require_results) lerp_double4 :: proc "c" (x, y, t: double4) -> double4 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y), lerp(x.z, y.z, t.z), lerp(x.w, y.w, t.w)} }
 
 
 step :: proc{
