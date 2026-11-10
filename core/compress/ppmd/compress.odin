@@ -242,11 +242,13 @@ encode_all :: proc(m: ^$M, rc: ^$R, w: ^Sink, input: []u8, end_marker: bool, opt
 
 @(private)
 encode_input :: proc(m: ^$M, rc: ^$R, w: ^Sink, input: []u8) -> (n: int) {
+	r := rc^
+	defer rc^ = r
 	for b, i in input {
 		when M == Model_H {
-			#force_inline h_encode_symbol(m, rc, w, int(b))
+			#force_inline h_encode_symbol(m, &r, w, int(b))
 		} else {
-			#force_inline i_encode_symbol(m, rc, w, int(b))
+			#force_inline i_encode_symbol(m, &r, w, int(b))
 		}
 		if w.stop {
 			return i + 1
