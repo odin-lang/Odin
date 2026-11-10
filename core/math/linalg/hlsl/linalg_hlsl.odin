@@ -1443,9 +1443,9 @@ normalize :: proc{
 	normalize_double3,
 	normalize_double4,
 }
-@(require_results) normalize_half  :: proc "c" (x: half)  -> half  { return 1.0 }
-@(require_results) normalize_float  :: proc "c" (x: float)  -> float  { return 1.0 }
-@(require_results) normalize_double  :: proc "c" (x: double)  -> double  { return 1.0 }
+@(require_results) normalize_half  :: proc "c" (x: half)  -> half  { return x / abs(x) }
+@(require_results) normalize_float  :: proc "c" (x: float)  -> float  { return x / abs(x) }
+@(require_results) normalize_double  :: proc "c" (x: double)  -> double  { return x / abs(x) }
 @(require_results) normalize_half2 :: proc "c" (x: half2) -> half2 { return x / length(x) }
 @(require_results) normalize_half3 :: proc "c" (x: half3) -> half3 { return x / length(x) }
 @(require_results) normalize_half4 :: proc "c" (x: half4) -> half4 { return x / length(x) }
