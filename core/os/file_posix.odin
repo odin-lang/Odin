@@ -101,6 +101,14 @@ _new_file :: proc(handle: uintptr, name: string, allocator: runtime.Allocator) -
 	return f, nil
 }
 
+_posix_absolute_path_from_name :: proc(name: string, allocator: runtime.Allocator) -> (path: cstring, err: Error) {
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
+	if abs_path, abs_err := _get_absolute_path(name, temp_allocator); abs_err == nil {
+		return clone_to_cstring(abs_path, allocator)
+	}
+	return clone_to_cstring(name, allocator)
+}
+
 __new_file :: proc(handle: posix.FD, allocator: runtime.Allocator) -> ^File {
 	impl := new(File_Impl, allocator)
 	impl.file.impl = impl
