@@ -1,0 +1,6 @@
+# Size   HMAC-SHA3-512 keyed with "https://odin-lang.org"                                                                                 Path relative to the suite directory
+619301   dfc5c1c353b001b9bd580d11f2ba42a670e1365f30392e93b890df09250525dd67a0d09131ce17ad2614280e4343651147f10922d6bb5a98c68ecfce5b524236 XML.zip
+192      480bf05bb2577b66d5d523329fca3fe7bca861a930007beab34a390b48c1c4bcf0e94010d60f7c20e28c4ff8fcabfe13301c4febd3a64bbdc02cef19d11dbbe6 attribute-whitespace.xml
+1060     b888a767bec78ce67205bf6d86ac1d3bda945c78fc02b93c3dcda4aa13da73f12b68315567168abaab17c387ac8ec5f484a9ce7fb7c9cc1ffc93d729af666d29 entities.html
+10773789 ba3a0f730efd6cbb89a54dafddf8902ace1b4e22e96d5c8e47cfcd1b9b79705d1985ea4abd25c5ede1c47a5a7d9456b25b093c1ec9d7705f0c6bf52a515c9aa9 unicode.xml
+438      9e4374376c6bb302746c7b38b4334ee4856c9c6f0f1ba27a7ef29b32734e4d0dd54a84cd1017c65b3cfe8e1f4ef7e2109372d906039a7dc0436df1fe689ae42d utf8.xml

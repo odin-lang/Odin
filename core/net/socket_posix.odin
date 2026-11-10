@@ -274,6 +274,7 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 	bool_value: b32
 	int_value: posix.socklen_t
 	timeval_value: posix.timeval
+	linger_value: posix.linger
 
 	ptr: rawptr
 	len: posix.socklen_t
@@ -304,8 +305,20 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 			}
 			ptr = &bool_value
 			len = size_of(bool_value)
+	case .Linger:
+			t := value.(time.Duration) or_else panic("set_option() value must be a time.Duration here", loc)
+
+			num_secs := time.duration_seconds(t)
+			if num_secs < 0 || num_secs > f64(max(i32)) {
+				return .Invalid_Value
+			}
+			// NOTE: `SO_LINGER` expects a `struct linger`, not a `struct timeval`.
+			linger_value.l_onoff  = 1
+			linger_value.l_linger = i32(num_secs)
+
+			ptr = &linger_value
+			len = size_of(linger_value)
 	case
-		.Linger,
 		.Send_Timeout,
 		.Receive_Timeout:
 			t := value.(time.Duration) or_else panic("set_option() value must be a time.Duration here", loc)

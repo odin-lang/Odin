@@ -1528,3 +1528,16 @@ foreign kernel32 {
 }
 
 
+EXECUTION_STATE_FLAG :: enum DWORD {
+	System_Required   = 0,
+	Display_Required  = 1,
+	User_Present      = 2,
+	AwayMode_Required = 6,
+	Continuous        = 31,
+}
+EXECUTION_STATE :: distinct bit_set[EXECUTION_STATE_FLAG; DWORD]
+
+@(default_calling_convention = "system")
+foreign kernel32 {
+	SetThreadExecutionState :: proc(esFlags: EXECUTION_STATE) -> EXECUTION_STATE ---
+}

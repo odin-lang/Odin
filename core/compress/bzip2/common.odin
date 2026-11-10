@@ -6,6 +6,19 @@ package compress_bzip2
 
 import "core:compress"
 
+/*
+	Copyright 2026 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+
+	The compressor is ported from libbzip2 1.0.8 by Julian R Seward, under the license in `LICENSE-libbzip2`:
+		https://sourceware.org/bzip2/
+
+	Many thanks to Julian Seward for bzip2.
+*/
+
 Error         :: compress.Error
 General_Error :: compress.General_Error
 BZip2_Error   :: compress.BZip2_Error
@@ -36,12 +49,9 @@ BZIP2_BLOCK_MAX        :: 9 * BZIP2_BLOCK_UNIT
 BZIP2_BLOCK_OUTPUT_MAX :: BZIP2_BLOCK_MAX / 5 * (4 + 255)
 @(private)
 BZIP2_BLOCK_INPUT_MIN  :: 20
-@(private)
-BZIP2_EXPANSION_MAX    :: BZIP2_BLOCK_OUTPUT_MAX / BZIP2_BLOCK_INPUT_MIN
+#assert(compress.BZIP2_EXPANSION_MAX == BZIP2_BLOCK_OUTPUT_MAX / BZIP2_BLOCK_INPUT_MIN)
 @(private)
 BZIP2_STREAM_OVERHEAD  :: 4 + 6 + 4
-@(private)
-BZIP2_GROWTH_STEP      :: 16 << 20
 
 @(private)
 BZIP2_RUNA           :: 0

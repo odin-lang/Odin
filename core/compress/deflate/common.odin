@@ -59,6 +59,17 @@ DEFLATE_MATCH3_MARGIN    :: 2
 
 DEFLATE_SPLIT_SEGMENTS   :: 16
 
+DEFLATE64_DISTANCE_MAX   :: 1 << 16
+DEFLATE64_WINDOW_SIZE    :: DEFLATE64_DISTANCE_MAX
+DEFLATE64_WINDOW_MASK    :: DEFLATE64_WINDOW_SIZE - 1
+DEFLATE64_MATCH_MAX      :: 65538
+DEFLATE64_LONG_MATCH     :: 258
+DEFLATE64_DISTANCE_LIMIT :: DEFLATE64_DISTANCE_MAX + 1
+DEFLATE64_HASH_BITS      :: 16
+DEFLATE64_HASH_SIZE      :: 1 << DEFLATE64_HASH_BITS
+DEFLATE64_HASH_SLIDE     :: 1 << 30
+DEFLATE64_HASH_SLIDE_AT  :: DEFLATE64_WINDOW_SIZE - 1 + DEFLATE64_HASH_SLIDE
+
 DEFLATE_LITERAL_SYMBOLS  :: 288
 DEFLATE_DISTANCE_SYMBOLS :: 32
 DEFLATE_PRECODE_SYMBOLS  :: 19
@@ -116,6 +127,20 @@ Deflate :: struct {
 	hash3_head:     [DEFLATE_HASH3_SIZE]u16,
 }
 
+// This struct is ~800kiB: allocate it with `new` rather than on the stack.
+Deflate64 :: struct {
+	bit_buffer: u64,
+	bit_count:  i32,
+	hash_head:  [DEFLATE64_HASH_SIZE]u32,
+	hash_chain: [DEFLATE64_WINDOW_SIZE]u32,
+
+	sequence_count: i32,
+	sequences:      [DEFLATE_SEQUENCE_SIZE]Deflate_Sequence,
+	frequencies:    Deflate_Frequency,
+	codes:          Deflate_Codes,
+	hash3_head:     [DEFLATE_HASH3_SIZE]u32,
+}
+
 DEFLATE_NO_POSITION              :: -1
 DEFLATE_MATCH_MAX                :: 258
 DEFLATE_GOOD_MATCH               :: 32
@@ -151,21 +176,21 @@ Deflate_Match :: struct {
 	length:   i32,
 }
 
-Deflate_To_Slice :: #type proc(s: ^Deflate, output, input: []u8, level: Deflate_Level) -> (written: int, err: Error)
+Deflate_To_Slice   :: #type proc(s: ^Deflate,   output, input: []u8, level: Deflate_Level) -> (written: int, err: Error)
+Deflate64_To_Slice :: #type proc(s: ^Deflate64, output, input: []u8, level: Deflate_Level) -> (written: int, err: Error)
 
 INFLATE_PRECODE_TABLE_SIZE  :: 128
 INFLATE_LITERAL_TABLE_SIZE :: 1334
 INFLATE_DISTANCE_TABLE_SIZE  :: 402
 INFLATE_BAD_LITERAL        :: 286
 INFLATE_BAD_DISTANCE       :: 31
+INFLATE64_BAD_DISTANCE     :: 32
 
-INFLATE_EXPANSION_MAX       :: 1032
 INFLATE_INITIAL_SIZE_MIN    :: 256
 INFLATE_INITIAL_SIZE_MAX    :: 16 * 1024 * 1024
-INFLATE_STREAM_INITIAL_SIZE :: 64 * 1024
-INFLATE_GROWTH_STEP         :: 16 * 1024 * 1024
 INFLATE_PATTERN_STRIDE      := [8]u8{0, 8, 8, 6, 8, 5, 6, 7}
 INFLATE_FAST_MARGIN         :: 2 + DEFLATE_MATCH_MAX + 16 * 3
+INFLATE_COPY_MARGIN         :: 16 * 3
 
 Inflate_Checksum :: enum u8 {None, Adler32, CRC32}
 
@@ -282,15 +307,23 @@ DEFLATE_LENGTH_EXTRA_BITS := [29]u8{0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2,
 	3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0}
 
 @(rodata)
-DEFLATE_DISTANCE_BASE := [30]i16{1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257,
-	385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577}
+DEFLATE64_LENGTH_BASE := [29]i16{3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43,
+	51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 3}
 
 @(rodata)
-DEFLATE_DISTANCE_EXTRA_BITS := [30]u8{0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6,
-	7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13}
+DEFLATE64_LENGTH_EXTRA_BITS := [29]u8{0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2,
+	3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 16}
 
 @(rodata)
-DEFLATE_DISTANCE_EXTRA_MAX := [14]i16{0, 6, 12, 24, 48, 96, 192, 384, 768, 1536, 3072, 6144, 12288, 24576}
+DEFLATE_DISTANCE_BASE := [32]u16{1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257,
+	385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577, 32769, 49153}
+
+@(rodata)
+DEFLATE_DISTANCE_EXTRA_BITS := [32]u8{0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6,
+	7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14}
+
+@(rodata)
+DEFLATE_DISTANCE_EXTRA_MAX := [15]u16{0, 6, 12, 24, 48, 96, 192, 384, 768, 1536, 3072, 6144, 12288, 24576, 49152}
 
 @(rodata)
 DEFLATE_LENGTH_SLOT := [258 + 1]u8{

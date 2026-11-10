@@ -29,7 +29,7 @@ pp_map_use :: proc(m: ^map[$K]$V, k: K, v: V) -> (V, bool, int) {
 }
 pp_sparse :: proc(a: #sparse[PP_E]$T) -> (T, bool) {
 	info := type_info_of(type_of(a))
-	ea := info.variant.(reflect.Type_Info_Enumerated_Array)
+	ea := info.variant.(^reflect.Type_Info_Enumerated_Array)
 	return a[.C], ea.is_sparse
 }
 pp_union_first :: proc(u: union{$T, int}) -> T { v, _ := u.(T); return v }
@@ -225,7 +225,7 @@ parapoly_deferred_or_else :: proc(t: ^testing.T) { // or_else default self-types
 
 pp_is_sparse :: proc(x: $T) -> bool {
 	#partial switch v in type_info_of(T).variant {
-	case reflect.Type_Info_Enumerated_Array: return v.is_sparse
+	case ^reflect.Type_Info_Enumerated_Array: return v.is_sparse
 	}
 	return false
 }

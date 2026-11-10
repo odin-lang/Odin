@@ -1150,10 +1150,12 @@ gb_internal lbValue lb_enum_values_slice(lbProcedure *p, Type *enum_type, i64 *e
 
 	if (enum_count_) *enum_count_ = enum_count;
 
-	lbValue ti       = lb_type_info(p, t);
-	lbValue variant  = lb_emit_struct_ep(p, ti, 4);
-	lbValue eti_ptr  = lb_emit_conv(p, variant, t_type_info_enum_ptr);
-	lbValue values   = lb_emit_load(p, lb_emit_struct_ep(p, eti_ptr, 2));
+	Selection sel = lookup_field(t_type_info_enum, string_interner_insert(str_lit("values")), false);
+	GB_ASSERT(sel.entity != nullptr);
+
+	lbValue ti      = lb_type_info(p, t);
+	lbValue eti_ptr = lb_emit_conv(p, ti, t_type_info_enum_ptr);
+	lbValue values  = lb_emit_load(p, lb_emit_deep_field_gep(p, eti_ptr, sel));
 	return values;
 }
 
@@ -2466,7 +2468,8 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 					saw_nil = true;
 					on_val = lb_const_int(m, union_tag_type(ut), 0);
 				} else {
-					on_val = lb_const_union_tag(m, ut, case_type);
+					Type *vt = type_info_variant_shim_type(ut, case_type);
+					on_val = lb_const_union_tag(m, ut, vt ? vt : case_type);
 				}
 
 			} else if (switch_kind == TypeSwitch_Any) {
@@ -2498,6 +2501,15 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 			Type *ct = case_entity->type;
 			Type *ct_ptr = alloc_type_pointer(ct);
 
+			lbValue stored = {};
+			if (switch_kind == TypeSwitch_Union) {
+				Type *vt = type_info_variant_shim_type(base_type(parent_base_type), ct);
+				if (vt != nullptr) {
+					stored = lb_emit_load(p, lb_emit_union_variant_ptr(p, parent_ptr, vt));
+					data = stored;
+				}
+			}
+
 			lbValue ptr = {};
 
 			if (backing_data.addr.value) { // by value
@@ -2511,7 +2523,9 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 
 			} else { // by reference
 				GB_ASSERT(by_reference);
-				if (switch_kind == TypeSwitch_Union) {
+				if (stored.value != nullptr) {
+					ptr = stored;
+				} else if (switch_kind == TypeSwitch_Union) {
 					ptr = lb_emit_union_variant_ptr(p, parent_ptr, ct);
 				} else {
 					ptr = lb_emit_conv(p, data, ct_ptr);

@@ -1552,6 +1552,9 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 	TypeSet seen = {};
 	defer (type_set_destroy(&seen));
 
+	Ast *first_shim_case = nullptr;
+	isize shim_case_count = 0;
+
 	for (Ast *stmt : bs->stmts) {
 		if (stmt->kind != Ast_CaseClause) {
 			// NOTE(bill): error handled by above multiple default checker
@@ -1597,6 +1600,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 					continue;
 				}
 
+				Type *seen_type = y.type;
 				if (switch_kind == TypeSwitch_Union) {
 					GB_ASSERT(is_type_union(bt));
 					bool tag_type_found = false;
@@ -1607,13 +1611,25 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 						}
 					}
 					if (!tag_type_found) {
+						Type *vt = type_info_variant_shim_type(bt, y.type);
+						if (vt != nullptr) {
+							tag_type_found = true;
+							seen_type = vt;
+
+							if (first_shim_case == nullptr) {
+								first_shim_case = type_expr;
+							}
+							shim_case_count += 1;
+						}
+					}
+					if (!tag_type_found) {
 						gbString type_str = type_to_string(y.type);
 						error(y.expr, "Unknown variant type, got '%s'", type_str);
 						gb_string_free(type_str);
 						continue;
 					}
 					case_type = y.type;
-					add_type_info_type(ctx, y.type);
+					add_type_info_type(ctx, seen_type);
 				} else if (switch_kind == TypeSwitch_Any) {
 					case_type = y.type;
 					add_type_info_type(ctx, y.type);
@@ -1621,7 +1637,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 					GB_PANIC("Unknown type to type switch statement");
 				}
 
-				if (type_set_update(&seen, y.type)) {
+				if (type_set_update(&seen, seen_type)) {
 					TokenPos pos = cc->token.pos;
 					gbString expr_str = expr_to_string(y.expr);
 					error(y.expr,
@@ -1663,6 +1679,16 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		}
 		check_stmt_list(ctx, cc->stmts, mod_flags);
 		check_close_scope(ctx);
+	}
+
+	if (first_shim_case != nullptr) {
+		gbString type_str = expr_to_string(first_shim_case);
+		if (shim_case_count == 1) {
+			warning(first_shim_case, "'case %s' on 'runtime.Type_Info.variant' is deprecated as it now holds pointers; use 'case ^%s'", type_str, type_str);
+		} else {
+			warning(first_shim_case, "'case %s' and %td other value cases on 'runtime.Type_Info.variant' are deprecated as it now holds pointers; use 'case ^%s' and so on", type_str, shim_case_count-1, type_str);
+		}
+		gb_string_free(type_str);
 	}
 
 	if (!is_partial && is_type_union(type_deref(x.type))) {

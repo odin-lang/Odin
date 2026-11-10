@@ -536,6 +536,43 @@ map_to_ip6 :: proc(addr: Address) -> Address {
 	return addr6
 }
 
+is_ip4_mapped :: proc(address: Address) -> bool {
+	v, is_ip6 := address.(IP6_Address)
+	return is_ip6 && v[0] == 0 && v[1] == 0 && v[2] == 0 && v[3] == 0 && v[4] == 0 && v[5] == 0xffff
+}
+
+unmap_ip4 :: proc(address: IP6_Address) -> (unmapped: IP4_Address, ok: bool) {
+	if !is_ip4_mapped(address) {
+		return
+	}
+	return ip4_from_u32(u32(ip6_to_u128(address))), true
+}
+
+address_unmapped :: proc(address: Address) -> Address {
+	if v, is_ip6 := address.(IP6_Address); is_ip6 {
+		if unmapped, ok := unmap_ip4(v); ok {
+			return unmapped
+		}
+	}
+	return address
+}
+
+map_prefix_to_ip6 :: proc(prefix: IP4_Prefix) -> (mapped: IP6_Prefix, ok: bool) {
+	if prefix.length > 32 {
+		return
+	}
+	address := ip6_from_u128(u128(0xffff) << 32 | u128(ip4_to_u32(prefix.address)))
+	return IP6_Prefix{address, prefix.length + 96}, true
+}
+
+unmap_prefix :: proc(prefix: IP6_Prefix) -> (unmapped: IP4_Prefix, ok: bool) {
+	if prefix.length < 96 || prefix.length > 128 {
+		return
+	}
+	address := unmap_ip4(prefix.address) or_return
+	return IP4_Prefix{address, prefix.length - 96}, true
+}
+
 /*
 	Returns a temporarily-allocated string representation of the address.
 
@@ -562,6 +599,12 @@ address_to_string_builder :: proc(addr: Address, b: ^strings.Builder) -> string 
 		strings.write_byte(b, '.')
 		strings.write_uint(b, uint(v[3]))
 	case IP6_Address:
+		if unmapped, is_mapped := unmap_ip4(v); is_mapped {
+			strings.write_string(b, "::ffff:")
+			address_to_string_builder(unmapped, b)
+			break
+		}
+
 		// First find the longest run of zeroes.
 		Zero_Run :: struct {
 			start: int,
@@ -668,7 +711,7 @@ endpoint_to_string_builder :: proc(ep: Endpoint, b: ^strings.Builder) -> string 
 
 endpoint_to_string :: proc{endpoint_to_string_allocator, endpoint_to_string_builder}
 
-to_string :: proc{address_to_string_allocator, address_to_string_builder, endpoint_to_string_allocator, endpoint_to_string_builder}
+to_string :: proc{address_to_string_allocator, address_to_string_builder, endpoint_to_string_allocator, endpoint_to_string_builder, prefix_to_string_allocator, prefix_to_string_builder, range_to_string_allocator, range_to_string_builder}
 
 family_from_address :: proc(addr: Address) -> Address_Family {
 	switch _ in addr {

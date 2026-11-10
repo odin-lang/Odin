@@ -26,7 +26,7 @@ inflate_gzip_from_context :: proc(z: ^compress.Context, expected_output_size := 
 	for {
 		inflate_gzip_header(z) or_return
 		digest := u32(0)
-		output := inflate_to_buffer(z, expected_output_size, max_output_size, start, size_hint, .CRC32, &digest) or_return
+		output := inflate_to_buffer(z, expected_output_size, max_output_size, start, size_hint, .CRC32, &digest, false) or_return
 		member := output[start:]
 
 		trailer, trailer_err := compress.read_data(z, Gzip_Trailer)

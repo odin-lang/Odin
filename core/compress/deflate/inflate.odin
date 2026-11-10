@@ -11,7 +11,7 @@ inflate_zlib :: proc{inflate_zlib_from_context, inflate_zlib_from_bytes}
 
 inflate_raw_from_context :: proc(z: ^compress.Context, expected_output_size := -1, max_output_size := compress.COMPRESS_OUTPUT_ALLOCATE_MAX, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
-	_, err = inflate_to_buffer(z, expected_output_size, max_output_size)
+	_, err = inflate_to_buffer(z, expected_output_size, max_output_size, D64 = false)
 	return
 }
 
@@ -37,7 +37,7 @@ inflate_zlib_from_context :: proc(z: ^compress.Context, expected_output_size := 
 	}
 
 	digest := u32(1)
-	inflate_to_buffer(z, expected_output_size, max_output_size, checksum = .Adler32, digest = &digest) or_return
+	inflate_to_buffer(z, expected_output_size, max_output_size, checksum = .Adler32, digest = &digest, D64 = false) or_return
 
 	adler, adler_err := compress.read_data(z, u32be)
 	if adler_err != nil {
@@ -363,9 +363,7 @@ inflate_grow :: proc(grow: ^[dynamic]u8, start, need, limit: int) -> (output: []
 	if grow == nil || need > limit {
 		return nil, General_Error.Output_Too_Short
 	}
-	capacity := len(grow) - start
-	step     := capacity if capacity < INFLATE_GROWTH_STEP else max(INFLATE_GROWTH_STEP, capacity / 4)
-	non_zero_resize(grow, start + min(max(capacity + step, need), limit)) or_return
+	non_zero_resize(grow, start + compress.output_grow_capacity(len(grow) - start, need, limit)) or_return
 	return grow[start:], nil
 }
 
@@ -415,7 +413,38 @@ inflate_copy_match :: #force_inline proc(destination, source, out: [^]u8, distan
 }
 
 @(private)
-inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic]u8, start, limit: int, checksum: Inflate_Checksum, digest: ^u32, $STREAM: bool) -> (written: int, err: Error) #no_bounds_check {
+inflate_copy_match_checked :: proc(output: []u8, capacity: int, grow: ^[dynamic]u8, start, limit, written, match_end: int, distance: i32) -> (new_output: []u8, new_capacity: int, err: Error) #no_bounds_check {
+	new_output, new_capacity = output, capacity
+	if match_end > new_capacity {
+		new_output   = inflate_grow(grow, start, match_end, limit) or_return
+		new_capacity = len(new_output)
+	}
+	destination := raw_data(new_output)[written:]
+	source      := raw_data(new_output)[written - int(distance):]
+	out         := raw_data(new_output)[match_end:]
+	if new_capacity - match_end >= INFLATE_COPY_MARGIN {
+		inflate_copy_match(destination, source, out, distance)
+		return
+	}
+	for {
+		destination[0] = source[0]; destination = destination[1:]; source = source[1:]
+		if !(uintptr(destination) < uintptr(out)) { break }
+	}
+	return
+}
+
+@(private)
+inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic]u8, start, limit: int, checksum: Inflate_Checksum, digest: ^u32, $STREAM, $D64: bool) -> (written: int, err: Error) #no_bounds_check {
+	DISTANCE_SYMBOLS   :: 32 when D64 else 30
+	BAD_DISTANCE       :: INFLATE64_BAD_DISTANCE when D64 else INFLATE_BAD_DISTANCE
+	when D64 {
+		length_base       := &DEFLATE64_LENGTH_BASE
+		length_extra_bits := &DEFLATE64_LENGTH_EXTRA_BITS
+	} else {
+		length_base       := &DEFLATE_LENGTH_BASE
+		length_extra_bits := &DEFLATE_LENGTH_EXTRA_BITS
+	}
+
 	output   := output
 	capacity := len(output)
 	checked  := 0
@@ -536,7 +565,7 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 				literal_count  := 257 + inflate_get_no_refill(&s, 5)
 				distance_count := 1 + inflate_get_no_refill(&s, 5)
 				precode_count  := 4 + inflate_get_no_refill(&s, 4)
-				if literal_count > 286 || distance_count > 30 {
+				if literal_count > 286 || distance_count > DISTANCE_SYMBOLS {
 					return written, Deflate_Error.Huffman_Bad_Sizes
 				}
 				for n = 0; n < precode_count; n += 1 {
@@ -576,7 +605,7 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 				if !inflate_build(literals[:], lengths[:literal_count], 10, 15, INFLATE_BAD_LITERAL) {
 					return written, Deflate_Error.Huffman_Bad_Code_Lengths
 				}
-				if !inflate_build(distances[:], lengths[literal_count:][:distance_count], 8, 15, INFLATE_BAD_DISTANCE) {
+				if !inflate_build(distances[:], lengths[literal_count:][:distance_count], 8, 15, BAD_DISTANCE) {
 					return written, Deflate_Error.Huffman_Bad_Code_Lengths
 				}
 				fixed_loaded = false
@@ -618,12 +647,24 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 						return written, Deflate_Error.Bad_Huffman_Code
 					}
 					symbol -= 257
-					len             := inflate_get_no_refill(&s, i32(DEFLATE_LENGTH_EXTRA_BITS[symbol])) + i32(DEFLATE_LENGTH_BASE[symbol])
+					len             := inflate_get_no_refill(&s, i32(length_extra_bits[symbol])) + i32(length_base[symbol])
+					when D64 {
+						if intrinsics.expect(symbol == 28, false) {
+							if inflate_refill(&s, STREAM) { return written, General_Error.Stream_Too_Short }
+						}
+					}
 					distance_symbol := inflate_decode(&s, distances[:], 8)
-					if intrinsics.expect(distance_symbol >= 30, false) { return written, Deflate_Error.Bad_Huffman_Code }
+					if intrinsics.expect(distance_symbol >= DISTANCE_SYMBOLS, false) { return written, Deflate_Error.Bad_Huffman_Code }
 					distance        := inflate_get_no_refill(&s, i32(DEFLATE_DISTANCE_EXTRA_BITS[distance_symbol])) + i32(DEFLATE_DISTANCE_BASE[distance_symbol])
 					if intrinsics.expect(int(distance) > written, false) { return written, Deflate_Error.Bad_Distance }
 					match_end := written + int(len)
+					when D64 {
+						if intrinsics.expect(symbol == 28, false) {
+							output, capacity = inflate_copy_match_checked(output, capacity, grow, start, limit, written, match_end, distance) or_return
+							written = match_end
+							continue
+						}
+					}
 					inflate_copy_match(raw_data(output)[written:], raw_data(output)[written - int(distance):], raw_data(output)[match_end:], distance)
 					written = match_end
 				}
@@ -667,9 +708,14 @@ inflate_decompress :: proc(ctx: ^compress.Context, output: []u8, grow: ^[dynamic
 				}
 				symbol -= 257
 				{
-					len             := inflate_get_no_refill(&s, i32(DEFLATE_LENGTH_EXTRA_BITS[symbol])) + i32(DEFLATE_LENGTH_BASE[symbol])
+					len             := inflate_get_no_refill(&s, i32(length_extra_bits[symbol])) + i32(length_base[symbol])
+					when D64 {
+						if intrinsics.expect(symbol == 28, false) {
+							if inflate_refill(&s, STREAM) { return written, General_Error.Stream_Too_Short }
+						}
+					}
 					distance_symbol := inflate_decode(&s, distances[:], 8)
-					if intrinsics.expect(distance_symbol >= 30, false) { return written, Deflate_Error.Bad_Huffman_Code }
+					if intrinsics.expect(distance_symbol >= DISTANCE_SYMBOLS, false) { return written, Deflate_Error.Bad_Huffman_Code }
 					distance        := inflate_get_no_refill(&s, i32(DEFLATE_DISTANCE_EXTRA_BITS[distance_symbol])) + i32(DEFLATE_DISTANCE_BASE[distance_symbol])
 					if intrinsics.expect(int(distance) > written, false) { return written, Deflate_Error.Bad_Distance }
 					match_end := written + int(len)
@@ -709,31 +755,16 @@ inflate_update_checksum :: #force_inline proc(checksum: Inflate_Checksum, digest
 }
 
 @(private)
-inflate_initial_size :: proc(size_hint, input_size: int) -> (size: int) #no_bounds_check {
+inflate_initial_size :: proc(size_hint, input_size: int, expansion_max := compress.DEFLATE_EXPANSION_MAX) -> (size: int) #no_bounds_check {
 	bound := -1
-	if input_size >= 0 && input_size < max(int) / INFLATE_EXPANSION_MAX {
-		bound = INFLATE_EXPANSION_MAX * input_size
+	if input_size >= 0 && input_size < max(int) / expansion_max {
+		bound = expansion_max * input_size
 	}
-	if size_hint > 0 {
-		size = min(size_hint, bound) if bound >= 0 else min(size_hint, INFLATE_INITIAL_SIZE_MAX)
-		return max(size, INFLATE_INITIAL_SIZE_MIN)
-	}
-
-	size = INFLATE_STREAM_INITIAL_SIZE
-	if input_size >= 0 {
-		size = deflate_bound(input_size)
-		if size < 0 {
-			size = INFLATE_INITIAL_SIZE_MAX
-		}
-	}
-	if bound >= 0 {
-		size = min(size, bound)
-	}
-	return clamp(size, INFLATE_INITIAL_SIZE_MIN, INFLATE_INITIAL_SIZE_MAX)
+	return max(compress.output_reservation(size_hint, bound, input_size), INFLATE_INITIAL_SIZE_MIN)
 }
 
 @(private)
-inflate_to_buffer :: proc(z: ^compress.Context, expected_output_size, max_output_size: int, start := 0, size_hint := -1, checksum := Inflate_Checksum.None, digest: ^u32 = nil) -> (output: []u8, err: Error) #no_bounds_check {
+inflate_to_buffer :: proc(z: ^compress.Context, expected_output_size, max_output_size: int, start := 0, size_hint := -1, checksum := Inflate_Checksum.None, digest: ^u32 = nil, $D64: bool) -> (output: []u8, err: Error) #no_bounds_check {
 	if z.output == nil {
 		return nil, General_Error.Incompatible_Options
 	}
@@ -756,21 +787,16 @@ inflate_to_buffer :: proc(z: ^compress.Context, expected_output_size, max_output
 		return nil, General_Error.Output_Too_Short
 	}
 
-	input_size := -1
-	if compress.is_memory_context(z) {
-		input_size = len(z.window)
-	} else if n, size_err := compress.size(z); size_err == nil && n <= i64(max(int)) {
-		input_size = int(n)
-	}
+	input_size := compress.input_size(z)
 
 	buffer := z.output
-	non_zero_resize(buffer, start + min(inflate_initial_size(hint, input_size), limit)) or_return
+	non_zero_resize(buffer, start + min(inflate_initial_size(hint, input_size, compress.DEFLATE64_EXPANSION_MAX if D64 else compress.DEFLATE_EXPANSION_MAX), limit)) or_return
 
 	written: int
 	if compress.is_memory_context(z) {
-		written, err = inflate_decompress(z, buffer[start:], buffer, start, limit, checksum, digest, false)
+		written, err = inflate_decompress(z, buffer[start:], buffer, start, limit, checksum, digest, false, D64)
 	} else {
-		written, err = inflate_decompress(z, buffer[start:], buffer, start, limit, checksum, digest, true)
+		written, err = inflate_decompress(z, buffer[start:], buffer, start, limit, checksum, digest, true, D64)
 	}
 	non_zero_resize(buffer, start + written)
 	z.bytes_written = i64(start + written)

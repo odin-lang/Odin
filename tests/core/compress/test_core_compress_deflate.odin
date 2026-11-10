@@ -83,6 +83,9 @@ compress_deflate_round_trip_random :: proc(t: ^testing.T) {
 
 @(test)
 compress_deflate_round_trip_matches :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	data := stream_match_data()
 	defer delete(data)
 	deflate_test_round_trip(t, "matches", data)
@@ -269,6 +272,9 @@ compress_gzip_header_max_extra :: proc(t: ^testing.T) {
 
 @(test)
 compress_deflate_round_trip_mixed :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	words := [?]string{"deflate ", "odin ", "huffman ", "window ", "match ", "literal ", "block "}
 	data: [dynamic]byte
 	defer delete(data)
@@ -287,4 +293,63 @@ compress_deflate_round_trip_mixed :: proc(t: ^testing.T) {
 		}
 	}
 	deflate_test_round_trip(t, "mixed", data[:])
+}
+
+De_Bruijn :: struct {
+	k, n:     int,
+	a:        [8]int,
+	sequence: [dynamic]byte,
+}
+
+de_bruijn_step :: proc(d: ^De_Bruijn, t, p: int) {
+	if t > d.n {
+		if d.n % p == 0 {
+			for i in 1..=p {
+				append(&d.sequence, byte('a' + d.a[i]))
+			}
+		}
+		return
+	}
+	d.a[t] = d.a[t - p]
+	de_bruijn_step(d, t + 1, p)
+	for j := d.a[t - p] + 1; j < d.k; j += 1 {
+		d.a[t] = j
+		de_bruijn_step(d, t + 1, t)
+	}
+}
+
+@(test)
+compress_deflate_literal_only_blocks :: proc(t: ^testing.T) {
+	for k in ([]int{4, 8, 16}) {
+		d := De_Bruijn{k = k, n = 3}
+		defer delete(d.sequence)
+		de_bruijn_step(&d, 1, 1)
+		append(&d.sequence, d.sequence[0], d.sequence[1])
+
+		for level in deflate.Deflate_Level {
+			if level == .Stored {
+				continue
+			}
+			for format in 0..<2 {
+				packed: [dynamic]byte
+				defer delete(packed)
+				err := deflate.deflate_raw(&packed, d.sequence[:], level) if format == 0 else deflate.deflate64_raw(&packed, d.sequence[:], level)
+				testing.expectf(t, err == nil, "k=%v %v format %v: %v", k, level, format, err)
+				if err != nil || len(packed) < 2 {
+					continue
+				}
+
+				header := u32(packed[0]) | u32(packed[1]) << 8
+				block_type := (header >> 1) & 3
+				distances  := (header >> 8 & 31) + 1
+				testing.expectf(t, block_type == 2, "k=%v %v format %v: block type %v, expected dynamic", k, level, format, block_type)
+				testing.expectf(t, distances >= 2, "k=%v %v format %v: %v distance code lengths, expected at least 2", k, level, format, distances)
+
+				unpacked: [dynamic]byte
+				defer delete(unpacked)
+				unpack_err := deflate.inflate_raw(&unpacked, packed[:], len(d.sequence)) if format == 0 else deflate.inflate64_raw(&unpacked, packed[:], len(d.sequence))
+				testing.expectf(t, unpack_err == nil && bytes.equal(unpacked[:], d.sequence[:]), "k=%v %v format %v: round trip failed: %v", k, level, format, unpack_err)
+			}
+		}
+	}
 }

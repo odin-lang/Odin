@@ -303,7 +303,7 @@ when ODIN_OS == .Darwin {
 
 	O_CLOEXEC   :: 0x00400000
 	O_CREAT     :: 0x0200
-	O_DIRECTORY :: 0x0020000
+	O_DIRECTORY :: 0x00200000
 	O_EXCL      :: 0x0800
 	O_NOCTTY    :: 0x8000
 	O_NOFOLLOW  :: 0x0100
@@ -317,7 +317,7 @@ when ODIN_OS == .Darwin {
 	O_NONBLOCK :: 0x0004
 	O_SYNC     :: 0x0080
 
-	_O_RSYNC :: 0x0002
+	_O_RSYNC :: 0x00020000
 	O_RSYNC  :: O_Flags{O_Flag_Bits(log2(_O_RSYNC))}
 
 

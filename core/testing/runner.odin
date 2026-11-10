@@ -81,16 +81,20 @@ get_log_level :: #force_inline proc() -> runtime.Logger_Level {
 @(private) global_log_colors_disabled: bool
 @(private) global_ansi_disabled: bool
 
-JSON :: struct {
+JSON :: struct #all_or_none {
 	total:    int,
 	success:  int,
-	duration: time.Duration,
+	duration: i64, // format: nanoseconds
 	packages: map[string][dynamic]JSON_Test,
 }
 
-JSON_Test :: struct {
-	success: bool,
-	name:    string,
+JSON_Test :: struct #all_or_none {
+	success:     bool,
+	name:        string,
+	start_time:  Maybe(i64), // format: Unix timestamp, nanoseconds
+	end_time:    Maybe(i64), // format: Unix timestamp, nanoseconds
+	runtime:     Maybe(i64), // format: nanoseconds
+	fail_reason: Maybe(string),
 }
 
 end_t :: proc(t: ^T) {
@@ -119,10 +123,11 @@ when TRACKING_MEMORY && FAIL_ON_BAD_MEMORY {
 	}
 }
 
-Task_Timeout :: struct {
+Task_Timeout :: struct #all_or_none {
 	test_index: int,
 	at_time: time.Time,
 	location: runtime.Source_Code_Location,
+	duration: time.Duration,
 }
 
 run_test_task :: proc(task: thread.Task) {
@@ -132,6 +137,7 @@ run_test_task :: proc(task: thread.Task) {
 
 	chan.send(data.t.channel, Event_New_Test {
 		test_index = task.user_index,
+		started_at = time.now(),
 	})
 
 	chan.send(data.t.channel, Event_State_Change {
@@ -198,7 +204,8 @@ run_test_task :: proc(task: thread.Task) {
 	new_state : Test_State = .Failed if failed(&data.t) else .Successful
 
 	chan.send(data.t.channel, Event_State_Change {
-		new_state = new_state,
+		new_state   = new_state,
+		finished_at = time.now(),
 	})
 }
 
@@ -249,6 +256,49 @@ parse_cli_options :: proc(argv: []string, opts: ^Options, stdout, stderr: io.Wri
 	opts.test_names = strings.to_string(test_names)
 }
 
+/*
+Formats the message that will be printed (summary + logging) when a test has timed out.
+*/
+format_test_timeout_message :: proc(
+	timeout: Task_Timeout,
+	test: Internal_Test,
+	internal_tests: []Internal_Test,
+	test_states: []Test_State,
+	test_start_times: []time.Time,
+	now: time.Time,
+	allocator: runtime.Allocator,
+) -> (
+	short_message: string,
+	full_message: string,
+) {
+	total_runtime := time.diff(test_start_times[timeout.test_index], now)
+	short_message = fmt.aprintf("Test timed out after %v total runtime (timeout setpoint: %v).", total_runtime, timeout.duration, allocator = allocator)
+
+	full_message_sb := strings.builder_make(allocator)
+
+	strings.write_string(&full_message_sb, short_message)
+
+	// Append other tests that have been running at this time.
+	// A timeout can hint at the CPU being overburdened with too many threads, or too much parallel I/O.
+	other_tests_started := false
+	for other_test, index in internal_tests {
+		if index == timeout.test_index || test_states[index] != .Running {
+			continue
+		}
+
+		if !other_tests_started {
+			fmt.sbprintf(&full_message_sb, "\n  Other tests running at this time:")
+			other_tests_started = true
+		}
+
+		runtime := time.diff(test_start_times[index], now)
+		fmt.sbprintf(&full_message_sb, "\n  - %s.%s - (has been running for %v)", other_test.pkg, other_test.name, runtime)
+	}
+
+	full_message = strings.to_string(full_message_sb)
+	return
+}
+
 runner :: proc(internal_tests: []Internal_Test) -> bool {
 	BATCH_BUFFER_SIZE     :: 32 * mem.Kilobyte
 	POOL_BLOCK_SIZE       :: 16 * mem.Kilobyte
@@ -258,14 +308,13 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	RESERVED_LOG_MESSAGES       :: 64
 	RESERVED_TEST_FAILURES      :: 64
 
-	ERROR_STRING_TIMEOUT : string : "Test timed out."
-	ERROR_STRING_UNKNOWN : string : "Test failed for unknown reasons."
-	OSC_WINDOW_TITLE     : string : ansi.OSC + ansi.WINDOW_TITLE + ";Odin test runner (%i/%i)" + ansi.ST
+	ERROR_STRING_UNKNOWN        : string : "Test failed for unknown reasons."
+	OSC_WINDOW_TITLE            : string : ansi.OSC + ansi.WINDOW_TITLE + ";Odin test runner (%i/%i)" + ansi.ST
 
 	safe_delete_string :: proc(s: string, allocator := context.allocator) {
 		// Guard against bad frees on static strings.
 		switch raw_data(s) {
-		case raw_data(ERROR_STRING_TIMEOUT), raw_data(ERROR_STRING_UNKNOWN):
+		case raw_data(ERROR_STRING_UNKNOWN):
 			return
 		case:
 			delete(s, allocator)
@@ -392,6 +441,12 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	// -- Allocate.
 
+	// NOTE(Feoramund): This is the allocator that will be used by threads to
+	// persist log messages past their lifetimes. It has its own variable name
+	// in the event it needs to be changed from `context.allocator` without
+	// digging through the source to divine everywhere it is used for that.
+	shared_log_allocator := context.allocator
+
 	pool_stack: mem.Rollback_Stack
 	alloc_error = mem.rollback_stack_init(&pool_stack, POOL_BLOCK_SIZE)
 	fmt.assertf(alloc_error == nil, "Error allocating memory for thread pool: %v", alloc_error)
@@ -491,10 +546,28 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	fmt.assertf(alloc_error == nil, "Error allocating memory for task timeouts: %v", alloc_error)
 	defer delete(task_timeouts)
 
+	// Used to record the total runtimes of tests.
+	test_start_times: []time.Time = ---
+	test_start_times, alloc_error = make([]time.Time, total_test_count)
+	fmt.assertf(alloc_error == nil, "Error allocating memory for test start times: %v", alloc_error)
+	defer delete(test_start_times)
+
+	// Used to record the total runtimes of tests.
+	test_end_times: []time.Time = ---
+	test_end_times, alloc_error = make([]time.Time, total_test_count)
+	fmt.assertf(alloc_error == nil, "Error allocating memory for test end times: %v", alloc_error)
+	defer delete(test_end_times)
+
+	// NOTE: All strings that go in this map are expected to be allocated with shared_log_allocator.
 	failed_test_reason_map: map[int]string = ---
 	failed_test_reason_map, alloc_error = make(map[int]string, RESERVED_TEST_FAILURES)
 	fmt.assertf(alloc_error == nil, "Error allocating memory for failed test reasons: %v", alloc_error)
-	defer delete(failed_test_reason_map)
+	defer {
+		for _, fail_reason in failed_test_reason_map {
+			safe_delete_string(fail_reason, shared_log_allocator)
+		}
+		delete(failed_test_reason_map)
+	}
 
 	log_messages: [dynamic]Log_Message = ---
 	log_messages, alloc_error = make([dynamic]Log_Message, 0, RESERVED_LOG_MESSAGES)
@@ -519,12 +592,6 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	}
 
 	// -- Setup initial tasks.
-
-	// NOTE(Feoramund): This is the allocator that will be used by threads to
-	// persist log messages past their lifetimes. It has its own variable name
-	// in the event it needs to be changed from `context.allocator` without
-	// digging through the source to divine everywhere it is used for that.
-	shared_log_allocator := context.allocator
 
 	logger_options := Default_Test_Logger_Opts - {.Short_File_Path, .Line, .Procedure}
 	if global_log_colors_disabled {
@@ -683,9 +750,14 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				switch event in ev {
 				case Event_New_Test:
 					task_channel.test_index = event.test_index
+					test_start_times[event.test_index] = event.started_at
 
 				case Event_State_Change:
 					#no_bounds_check report.all_test_states[task_channel.test_index] = event.new_state
+					#partial switch event.new_state {
+					case .Successful, .Failed:
+						#no_bounds_check test_end_times[task_channel.test_index] = event.finished_at
+					}
 
 					#no_bounds_check it := internal_tests[task_channel.test_index]
 					#no_bounds_check pkg := report.packages_by_name[it.pkg]
@@ -711,12 +783,36 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 					pkg.frame_ready = false
 
 				case Event_Set_Fail_Timeout:
-					_, alloc_error = append(&task_timeouts, Task_Timeout {
-						test_index = task_channel.test_index,
-						at_time = event.at_time,
-						location = event.location,
-					})
-					fmt.assertf(alloc_error == nil, "Error appending to task timeouts: %v", alloc_error)
+					// See if the source test already has a timeout set.
+					existing_timeout_index := -1
+					for i := len(task_timeouts) - 1; i >= 0; i -= 1 {
+						#no_bounds_check timeout := &task_timeouts[i]
+						if timeout.test_index == task_channel.test_index {
+							existing_timeout_index = i
+							break
+						}
+					}
+
+					disable_timeout := event.duration == time.MAX_DURATION
+
+					if disable_timeout {
+						if existing_timeout_index >= 0 {
+							unordered_remove(&task_timeouts, existing_timeout_index)
+						} // else: nothing to be disabled
+					} else if existing_timeout_index >= 0 {
+						#no_bounds_check timeout := &task_timeouts[existing_timeout_index]
+						timeout.at_time = event.at_time
+						timeout.location = event.location
+						timeout.duration = event.duration
+					} else {
+						_, alloc_error = append(&task_timeouts, Task_Timeout {
+							test_index = task_channel.test_index,
+							at_time = event.at_time,
+							location = event.location,
+							duration = event.duration,
+						})
+						fmt.assertf(alloc_error == nil, "Error appending to task timeouts: %v", alloc_error)
+					}
 
 				case Event_Log_Message:
 					_, alloc_error = append(&log_messages, Log_Message {
@@ -727,11 +823,8 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 					})
 					fmt.assertf(alloc_error == nil, "Error appending to log messages: %v", alloc_error)
 
-					if event.level >= .Error {
+					if event.level >= .Error && task_channel.test_index not_in failed_test_reason_map {
 						// Save the message for the final summary.
-						if old_error, ok := failed_test_reason_map[task_channel.test_index]; ok {
-							safe_delete_string(old_error, shared_log_allocator)
-						}
 						failed_test_reason_map[task_channel.test_index] = event.text
 					} else {
 						delete(event.text, shared_log_allocator)
@@ -786,6 +879,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 			passed := reason == .Successful_Stop && !failed(&task_data.t)
 			#no_bounds_check report.all_test_states[test_index] = .Successful if passed else .Failed
+			#no_bounds_check test_end_times[test_index] = time.now()
 
 			if !passed && !task_data.t._fail_now_called {
 				if test_index not_in failed_test_reason_map {
@@ -830,27 +924,43 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				continue check_timeouts
 			}
 
+			now := time.now()
+
 			#no_bounds_check report.all_test_states[timeout.test_index] = .Failed
+			#no_bounds_check test_end_times[timeout.test_index] = now
 
 			#no_bounds_check it  := internal_tests[timeout.test_index]
 			#no_bounds_check pkg := report.packages_by_name[it.pkg]
 
 			pkg.frame_ready = false
+			
+			timeout_message_short, timeout_message_full := format_test_timeout_message(
+				timeout^,
+				it,
+				internal_tests,
+				report.all_test_states,
+				test_start_times,
+				now,
+				shared_log_allocator,
+			)
+			defer delete(timeout_message_full, shared_log_allocator)
+			assert(len(timeout_message_short) > 0, "Error formatting test timeout message (short).")
+			assert(len(timeout_message_full) > 0, "Error formatting test timeout message (full).")
 
-			if old_error, ok := failed_test_reason_map[timeout.test_index]; ok {
-				safe_delete_string(old_error, shared_log_allocator)
+			if timeout.test_index not_in failed_test_reason_map {
+				failed_test_reason_map[timeout.test_index] = timeout_message_short
+			} else {
+				delete(timeout_message_short, shared_log_allocator)
 			}
 
-			failed_test_reason_map[timeout.test_index] = ERROR_STRING_TIMEOUT
 			total_failure_count += 1
 			total_done_count    += 1
 
-			now := time.now()
 			_, alloc_error = append(&log_messages, Log_Message {
 				level = .Error,
-				text = format_log_text(.Error, ERROR_STRING_TIMEOUT, Default_Test_Logger_Opts, timeout.location, now),
+				text = format_log_text(.Error, timeout_message_full, Default_Test_Logger_Opts, timeout.location, now),
 				time = now,
-				allocator = context.allocator,
+				allocator = shared_log_allocator,
 			})
 			fmt.assertf(alloc_error == nil, "Error appending to log messages: %v", alloc_error)
 
@@ -970,14 +1080,13 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		slice.sort(sorted_failed_test_reasons[:])
 
 		for test_index in sorted_failed_test_reasons {
-			#no_bounds_check last_error := failed_test_reason_map[test_index]
+			#no_bounds_check fail_reason := failed_test_reason_map[test_index]
 			#no_bounds_check it := internal_tests[test_index]
 			pkg_and_name := fmt.tprintf("%s.%s", it.pkg, it.name)
 			fmt.wprintfln(batch_writer, " - %- *[1]s\t%s",
 				pkg_and_name,
 				report.pkg_column_len + report.test_column_len,
-				last_error)
-			safe_delete_string(last_error, shared_log_allocator)
+				fail_reason)
 		}
 
 		if total_success_count > 0 {
@@ -1034,20 +1143,35 @@ To partly mitigate this, redirect STDERR to a file or use the -define:ODIN_TEST_
 
 		for test, i in report.all_tests {
 			#no_bounds_check state := report.all_test_states[i]
+			test_start_time := test_start_times[i]
+			test_end_time := test_end_times[i]
+			test_runtime_seconds: Maybe(i64)
+			if test_start_time != {} && test_end_time != {} {
+				test_runtime_seconds = time.duration_nanoseconds(time.diff(test_start_time, test_end_time))
+			}
+			fail_reason, fail_reason_ok := failed_test_reason_map[i]
 
 			if test.pkg not_in json_report.packages {
 				json_report.packages[test.pkg] = {}
 			}
 
 			tests := &json_report.packages[test.pkg]
-			append(tests, JSON_Test{name = test.name, success = state == .Successful})
+
+			append(tests, JSON_Test {
+				name         = test.name,
+				success      = state == .Successful,
+				start_time   = test_start_time == {} ? nil : time.time_to_unix_nano(test_start_time),
+				end_time     = test_end_time == {} ? nil : time.time_to_unix_nano(test_end_time),
+				runtime      = test_runtime_seconds,
+				fail_reason  = fail_reason_ok ? fail_reason : nil,
+			})
 		}
 
-		json_report.total    = len(internal_tests)
-		json_report.success  = total_success_count
-		json_report.duration = finished_in
+		json_report.total     = len(internal_tests)
+		json_report.success   = total_success_count
+		json_report.duration  = time.duration_nanoseconds(finished_in)
 
-		json_err := json.marshal_to_writer(os.to_stream(json_fd), json_report, &{ pretty = true })
+		json_err := json.marshal_to_writer(os.to_stream(json_fd), json_report, { pretty = true })
 		fmt.assertf(json_err == nil, "Error writing JSON report: %v", json_err)
 	}
 
