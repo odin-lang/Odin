@@ -263,6 +263,8 @@ struct lbGenerator : LinkerData {
 
 	bool modules_in_parallel;
 
+	String target_features;
+
 	lbProcedure *startup_runtime;
 	lbProcedure *cleanup_runtime;
 	lbProcedure *objc_names;
