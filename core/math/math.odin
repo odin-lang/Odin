@@ -138,6 +138,9 @@ pow10_f16 :: proc "contextless" (n: f16) -> f16 {
 		1e-00, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05, 1e-06, 1e-07,
 	}
 
+	if trunc(n) != n {
+		return pow(10, n)
+	}
 	if 0 <= n && n <= 4 {
 		return pow10_pos_tab[uint(n)]
 	}
@@ -166,6 +169,9 @@ pow10_f32 :: proc "contextless" (n: f32) -> f32 {
 		1e-40, 1e-41, 1e-42, 1e-43, 1e-44, 1e-45,
 	}
 
+	if trunc(n) != n {
+		return pow(10, n)
+	}
 	if 0 <= n && n <= 38 {
 		return pow10_pos_tab[uint(n)]
 	}
@@ -193,6 +199,9 @@ pow10_f64 :: proc "contextless" (n: f64) -> f64 {
 		1e-00, 1e-32, 1e-64, 1e-96, 1e-128, 1e-160, 1e-192, 1e-224, 1e-256, 1e-288, 1e-320,
 	}
 
+	if trunc(n) != n {
+		return pow(10, n)
+	}
 	if 0 <= n && n <= 308 {
 		return pow10_pos_tab32[uint(n)/32] * pow10_tab[uint(n)%32]
 	}
@@ -399,7 +408,7 @@ remap :: proc "contextless" (old_value, old_min, old_max, new_min, new_max: $T) 
 	old_range := old_max - old_min
 	new_range := new_max - new_min
 	if old_range == 0 {
-		return new_range / 2
+		return new_min + new_range / 2
 	}
 
 	when intrinsics.type_is_integer(T) {
@@ -443,7 +452,7 @@ smoothstep :: proc "contextless" (edge0, edge1, x: $T) -> T where intrinsics.typ
 }
 
 @(require_results)
-bias :: proc "contextless" (t, b: $T) -> T where intrinsics.type_is_numeric(T) {
+bias :: proc "contextless" (t, b: $T) -> T where intrinsics.type_is_float(T) {
 	return t / (((1/b) - 2) * (1 - t) + 1)
 }
 @(require_results)
@@ -969,7 +978,7 @@ floor_divmod :: #force_inline proc "contextless" (x, y: $T) -> (div, mod: T)
 	where intrinsics.type_is_integer(T) {
 	div = x / y
 	mod = x % y
-	if (div > 0 && y < 0) || (mod < 0 && y > 0) {
+	if (mod > 0 && y < 0) || (mod < 0 && y > 0) {
 		div -= 1
 		mod += y
 	}
@@ -992,6 +1001,9 @@ modf_f16   :: proc "contextless" (x: f16) -> (int: f16, frac: f16) {
 			return x, x
 		}
 		return 0, x
+	}
+	if is_inf(x) {
+		return x, 0
 	}
 
 	i := transmute(u16)x
@@ -1030,6 +1042,9 @@ modf_f32 :: proc "contextless" (x: f32) -> (int: f32, frac: f32) {
 		}
 		return 0, x
 	}
+	if is_inf(x) {
+		return x, 0
+	}
 
 	i := transmute(u32)x
 	e := uint(i>>shift)&mask - bias
@@ -1066,6 +1081,9 @@ modf_f64 :: proc "contextless" (x: f64) -> (int: f64, frac: f64) {
 			return x, x
 		}
 		return 0, x
+	}
+	if is_inf(x) {
+		return x, 0
 	}
 
 	i := transmute(u64)x
@@ -2451,15 +2469,17 @@ hypot :: proc{
 count_digits_of_base :: proc "contextless" (value: $T, $base: int) -> (digits: int) where intrinsics.type_is_integer(T) {
 	#assert(base >= 2, "base must be 2 or greater.")
 
-	value := value
-	when !intrinsics.type_is_unsigned(T) {
-		value = abs(value)
+	when intrinsics.type_is_unsigned(T) {
+		U :: T
+	} else {
+		U :: intrinsics.type_integer_to_unsigned(T)
 	}
+	magnitude := U(abs(value))
 
 	when base == 2 {
-		digits = max(1, 8 * size_of(T) - int(intrinsics.count_leading_zeros(value)))
+		digits = max(1, 8 * size_of(T) - int(intrinsics.count_leading_zeros(magnitude)))
 	} else when intrinsics.count_ones(base) == 1 {
-		free_bits := 8 * size_of(T) - int(intrinsics.count_leading_zeros(value))
+		free_bits := 8 * size_of(T) - int(intrinsics.count_leading_zeros(magnitude))
 		digits, free_bits = divmod(free_bits, intrinsics.constant_log2(base))
 		if free_bits > 0 {
 			digits += 1
@@ -2467,9 +2487,9 @@ count_digits_of_base :: proc "contextless" (value: $T, $base: int) -> (digits: i
 		digits = max(1, digits)
 	} else {
 		digits = 1
-		base := cast(T)base
-		for value >= base {
-			value /= base
+		base := cast(U)base
+		for magnitude >= base {
+			magnitude /= base
 			digits += 1
 		}
 	}

@@ -29,14 +29,28 @@ Fixed32_32 :: distinct Fixed(i64, 32)
 Fixed52_12 :: distinct Fixed(i64, 12)
 
 
-init_from_f64 :: proc "contextless" (x: ^$T/Fixed($Backing, $Fraction_Width), val: f64) {
-	i, f := math.modf(math.abs(val))
-	x.i  = Backing(f * (1<<Fraction_Width))
-	x.i &= 1<<Fraction_Width - 1
-	x.i |= Backing(i) << Fraction_Width
-	if val < 0 {
-		x.i *= -1
+init_from_f64 :: proc "contextless" (x: ^$T/Fixed($Backing, $Fraction_Width), val: f64) -> (ok: bool) {
+	when intrinsics.type_is_unsigned(Backing) {
+		LOWER :: 0.0
+		UPPER :: f64(1 << (8*size_of(Backing)))
+	} else {
+		LOWER :: -f64(1 << (8*size_of(Backing) - 1))
+		UPPER :: f64(1 << (8*size_of(Backing) - 1))
 	}
+
+	scaled := math.trunc(val * (1<<Fraction_Width))
+	switch {
+	case math.is_nan(scaled):
+		x.i = 0
+	case scaled < LOWER:
+		x.i = min(Backing)
+	case scaled >= UPPER:
+		x.i = max(Backing)
+	case:
+		x.i = Backing(scaled)
+		return true
+	}
+	return false
 }
 
 init_from_parts :: proc "contextless" (x: ^$T/Fixed($Backing, $Fraction_Width), integer, fraction: Backing) {
@@ -46,11 +60,7 @@ init_from_parts :: proc "contextless" (x: ^$T/Fixed($Backing, $Fraction_Width), 
 }
 
 to_f64 :: proc "contextless" (x: $T/Fixed($Backing, $Fraction_Width)) -> f64 {
-	sign := -1.0 if x.i < 0 else 1.0
-	num := math.abs(x.i)
-	res := f64(num >> Fraction_Width)
-	res += f64(num & (1<<Fraction_Width-1)) / f64(1<<Fraction_Width)
-	return res * sign
+	return f64(x.i) / (1<<Fraction_Width)
 }
 
 

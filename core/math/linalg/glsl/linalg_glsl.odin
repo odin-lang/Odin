@@ -985,8 +985,8 @@ normalize :: proc{
 	normalize_quat,
 	normalize_dquat,
 }
-@(require_results) normalize_f32  :: proc "c" (x: f32)  -> f32  { return 1.0 }
-@(require_results) normalize_f64  :: proc "c" (x: f64)  -> f64  { return 1.0 }
+@(require_results) normalize_f32  :: proc "c" (x: f32)  -> f32  { return x / abs(x) }
+@(require_results) normalize_f64  :: proc "c" (x: f64)  -> f64  { return x / abs(x) }
 @(require_results) normalize_vec2 :: proc "c" (x: vec2) -> vec2 { return x / length(x) }
 @(require_results) normalize_vec3 :: proc "c" (x: vec3) -> vec3 { return x / length(x) }
 @(require_results) normalize_vec4 :: proc "c" (x: vec4) -> vec4 { return x / length(x) }
@@ -1061,41 +1061,41 @@ refract :: proc{
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
 	return t * f64(i32(cost2 > 0))
 }
-@(require_results) refract_vec2  :: proc "c" (i, n, eta: vec2) -> vec2 {
+@(require_results) refract_vec2  :: proc "c" (i, n: vec2, eta: f32) -> vec2 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * vec2{f32(i32(cost2.x > 0)), f32(i32(cost2.y > 0))}
+	return t * f32(i32(cost2 > 0))
 }
-@(require_results) refract_vec3  :: proc "c" (i, n, eta: vec3) -> vec3 {
+@(require_results) refract_vec3  :: proc "c" (i, n: vec3, eta: f32) -> vec3 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * vec3{f32(i32(cost2.x > 0)), f32(i32(cost2.y > 0)), f32(i32(cost2.z > 0))}
+	return t * f32(i32(cost2 > 0))
 }
-@(require_results) refract_vec4  :: proc "c" (i, n, eta: vec4) -> vec4 {
+@(require_results) refract_vec4  :: proc "c" (i, n: vec4, eta: f32) -> vec4 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * vec4{f32(i32(cost2.x > 0)), f32(i32(cost2.y > 0)), f32(i32(cost2.z > 0)), f32(i32(cost2.w > 0))}
+	return t * f32(i32(cost2 > 0))
 }
-@(require_results) refract_dvec2  :: proc "c" (i, n, eta: dvec2) -> dvec2 {
+@(require_results) refract_dvec2  :: proc "c" (i, n: dvec2, eta: f64) -> dvec2 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * dvec2{f64(i32(cost2.x > 0)), f64(i32(cost2.y > 0))}
+	return t * f64(i32(cost2 > 0))
 }
-@(require_results) refract_dvec3  :: proc "c" (i, n, eta: dvec3) -> dvec3 {
+@(require_results) refract_dvec3  :: proc "c" (i, n: dvec3, eta: f64) -> dvec3 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * dvec3{f64(i32(cost2.x > 0)), f64(i32(cost2.y > 0)), f64(i32(cost2.z > 0))}
+	return t * f64(i32(cost2 > 0))
 }
-@(require_results) refract_dvec4  :: proc "c" (i, n, eta: dvec4) -> dvec4 {
+@(require_results) refract_dvec4  :: proc "c" (i, n: dvec4, eta: f64) -> dvec4 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * dvec4{f64(i32(cost2.x > 0)), f64(i32(cost2.y > 0)), f64(i32(cost2.z > 0)), f64(i32(cost2.w > 0))}
+	return t * f64(i32(cost2 > 0))
 }
 
 scalarTripleProduct :: proc{
@@ -1464,10 +1464,16 @@ mat4Orientation :: proc "c" (normal, up: vec3) -> mat4 {
 	if normal == up {
 		return 1
 	}
-	
+
 	rotation_axis := cross(up, normal)
-	angle := acos(dot(normal, up))
-	
+	if dot(rotation_axis, rotation_axis) == 0 {
+		rotation_axis = cross(up, vec3{1, 0, 0})
+		if dot(rotation_axis, rotation_axis) == 0 {
+			rotation_axis = cross(up, vec3{0, 1, 0})
+		}
+	}
+	angle := acos(clamp(dot(normal, up), -1, 1))
+
 	return mat4Rotate(rotation_axis, angle)
 }
 @(require_results)
@@ -1591,10 +1597,16 @@ dmat4Orientation :: proc "c" (normal, up: dvec3) -> dmat4 {
 	if normal == up {
 		return 1
 	}
-	
+
 	rotation_axis := cross(up, normal)
-	angle := acos(dot(normal, up))
-	
+	if dot(rotation_axis, rotation_axis) == 0 {
+		rotation_axis = cross(up, dvec3{1, 0, 0})
+		if dot(rotation_axis, rotation_axis) == 0 {
+			rotation_axis = cross(up, dvec3{0, 1, 0})
+		}
+	}
+	angle := acos(clamp(dot(normal, up), -1, 1))
+
 	return dmat4Rotate(rotation_axis, angle)
 }
 @(require_results)

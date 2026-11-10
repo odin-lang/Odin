@@ -795,20 +795,20 @@ ceil :: proc{
 @(require_results) ceil_double4 :: proc "c" (x: double4) -> double4 { return {ceil(x.x), ceil(x.y), ceil(x.z), ceil(x.w)} }
 
 
-@(require_results) isfinite_half  :: proc "c" (x: half)  -> bool  { return !isinf_half(x) }
+@(require_results) isfinite_half  :: proc "c" (x: half)  -> bool  { return !isinf_half(x) && !isnan_half(x) }
 @(require_results) isfinite_half2 :: proc "c" (x: half2) -> bool2 { return {isfinite_half(x.x), isfinite_half(x.y)} }
 @(require_results) isfinite_half3 :: proc "c" (x: half3) -> bool3 { return {isfinite_half(x.x), isfinite_half(x.y), isfinite_half(x.z)} }
 @(require_results) isfinite_half4 :: proc "c" (x: half4) -> bool4 { return {isfinite_half(x.x), isfinite_half(x.y), isfinite_half(x.z), isfinite_half(x.w)} }
-@(require_results) isfinite_float  :: proc "c" (x: float)  -> bool  { return !isinf_float(x) }
+@(require_results) isfinite_float  :: proc "c" (x: float)  -> bool  { return !isinf_float(x) && !isnan_float(x) }
 @(require_results) isfinite_float2 :: proc "c" (x: float2) -> bool2 { return {isfinite_float(x.x), isfinite_float(x.y)} }
 @(require_results) isfinite_float3 :: proc "c" (x: float3) -> bool3 { return {isfinite_float(x.x), isfinite_float(x.y), isfinite_float(x.z)} }
 @(require_results) isfinite_float4 :: proc "c" (x: float4) -> bool4 { return {isfinite_float(x.x), isfinite_float(x.y), isfinite_float(x.z), isfinite_float(x.w)} }
-@(require_results) isfinite_double  :: proc "c" (x: double)  -> bool  { return !isinf_double(x) }
+@(require_results) isfinite_double  :: proc "c" (x: double)  -> bool  { return !isinf_double(x) && !isnan_double(x) }
 @(require_results) isfinite_double2 :: proc "c" (x: double2) -> bool2 { return {isfinite_double(x.x), isfinite_double(x.y)} }
 @(require_results) isfinite_double3 :: proc "c" (x: double3) -> bool3 { return {isfinite_double(x.x), isfinite_double(x.y), isfinite_double(x.z)} }
 @(require_results) isfinite_double4 :: proc "c" (x: double4) -> bool4 { return {isfinite_double(x.x), isfinite_double(x.y), isfinite_double(x.z), isfinite_double(x.w)} }
 
-// isfinite is the opposite of isinf and returns true if the number is neither positive-infinite or negative-infinite
+// isfinite returns true if the number is neither positive-infinite, negative-infinite, nor Not-A-Number
 isfinite :: proc{
 	isfinite_half,
 	isfinite_half2,
@@ -825,20 +825,20 @@ isfinite :: proc{
 }
 
 
-@(require_results) isinf_half  :: proc "c" (x: half)  -> bool  { return x * 0.5 == x }
+@(require_results) isinf_half  :: proc "c" (x: half)  -> bool  { return x != 0 && x * 0.5 == x }
 @(require_results) isinf_half2 :: proc "c" (x: half2) -> bool2 { return {isinf_half(x.x), isinf_half(x.y)} }
 @(require_results) isinf_half3 :: proc "c" (x: half3) -> bool3 { return {isinf_half(x.x), isinf_half(x.y), isinf_half(x.z)} }
 @(require_results) isinf_half4 :: proc "c" (x: half4) -> bool4 { return {isinf_half(x.x), isinf_half(x.y), isinf_half(x.z), isinf_half(x.w)} }
-@(require_results) isinf_float  :: proc "c" (x: float)  -> bool  { return x * 0.5 == x }
+@(require_results) isinf_float  :: proc "c" (x: float)  -> bool  { return x != 0 && x * 0.5 == x }
 @(require_results) isinf_float2 :: proc "c" (x: float2) -> bool2 { return {isinf_float(x.x), isinf_float(x.y)} }
 @(require_results) isinf_float3 :: proc "c" (x: float3) -> bool3 { return {isinf_float(x.x), isinf_float(x.y), isinf_float(x.z)} }
 @(require_results) isinf_float4 :: proc "c" (x: float4) -> bool4 { return {isinf_float(x.x), isinf_float(x.y), isinf_float(x.z), isinf_float(x.w)} }
-@(require_results) isinf_double  :: proc "c" (x: double)  -> bool  { return x * 0.5 == x }
+@(require_results) isinf_double  :: proc "c" (x: double)  -> bool  { return x != 0 && x * 0.5 == x }
 @(require_results) isinf_double2 :: proc "c" (x: double2) -> bool2 { return {isinf_double(x.x), isinf_double(x.y)} }
 @(require_results) isinf_double3 :: proc "c" (x: double3) -> bool3 { return {isinf_double(x.x), isinf_double(x.y), isinf_double(x.z)} }
 @(require_results) isinf_double4 :: proc "c" (x: double4) -> bool4 { return {isinf_double(x.x), isinf_double(x.y), isinf_double(x.z), isinf_double(x.w)} }
 
-// isinf is the opposite of isfinite and returns true if the number is either positive-infinite or negative-infinite
+// isinf returns true if the number is either positive-infinite or negative-infinite
 isinf :: proc{
 	isinf_half,
 	isinf_half2,
@@ -1182,13 +1182,13 @@ lerp :: proc{
 @(require_results) lerp_double  :: proc "c" (x, y, t: double) -> double   { return x*(1-t) + y*t }
 @(require_results) lerp_half2 :: proc "c" (x, y, t: half2) -> half2 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y)} }
 @(require_results) lerp_half3 :: proc "c" (x, y, t: half3) -> half3 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y), lerp(x.z, y.z, t.z)} }
-@(require_results) lerp_half4 :: proc "c" (x, y, t: half4) -> half4 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, y.y), lerp(x.z, y.z, t.z), lerp(x.w, y.w, t.w)} }
+@(require_results) lerp_half4 :: proc "c" (x, y, t: half4) -> half4 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y), lerp(x.z, y.z, t.z), lerp(x.w, y.w, t.w)} }
 @(require_results) lerp_float2 :: proc "c" (x, y, t: float2) -> float2 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y)} }
 @(require_results) lerp_float3 :: proc "c" (x, y, t: float3) -> float3 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y), lerp(x.z, y.z, t.z)} }
-@(require_results) lerp_float4 :: proc "c" (x, y, t: float4) -> float4 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, y.y), lerp(x.z, y.z, t.z), lerp(x.w, y.w, t.w)} }
+@(require_results) lerp_float4 :: proc "c" (x, y, t: float4) -> float4 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y), lerp(x.z, y.z, t.z), lerp(x.w, y.w, t.w)} }
 @(require_results) lerp_double2 :: proc "c" (x, y, t: double2) -> double2 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y)} }
 @(require_results) lerp_double3 :: proc "c" (x, y, t: double3) -> double3 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y), lerp(x.z, y.z, t.z)} }
-@(require_results) lerp_double4 :: proc "c" (x, y, t: double4) -> double4 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, y.y), lerp(x.z, y.z, t.z), lerp(x.w, y.w, t.w)} }
+@(require_results) lerp_double4 :: proc "c" (x, y, t: double4) -> double4 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y), lerp(x.z, y.z, t.z), lerp(x.w, y.w, t.w)} }
 
 
 step :: proc{
@@ -1443,9 +1443,9 @@ normalize :: proc{
 	normalize_double3,
 	normalize_double4,
 }
-@(require_results) normalize_half  :: proc "c" (x: half)  -> half  { return 1.0 }
-@(require_results) normalize_float  :: proc "c" (x: float)  -> float  { return 1.0 }
-@(require_results) normalize_double  :: proc "c" (x: double)  -> double  { return 1.0 }
+@(require_results) normalize_half  :: proc "c" (x: half)  -> half  { return x / abs(x) }
+@(require_results) normalize_float  :: proc "c" (x: float)  -> float  { return x / abs(x) }
+@(require_results) normalize_double  :: proc "c" (x: double)  -> double  { return x / abs(x) }
 @(require_results) normalize_half2 :: proc "c" (x: half2) -> half2 { return x / length(x) }
 @(require_results) normalize_half3 :: proc "c" (x: half3) -> half3 { return x / length(x) }
 @(require_results) normalize_half4 :: proc "c" (x: half4) -> half4 { return x / length(x) }
@@ -1551,67 +1551,67 @@ refract_double  :: proc "c" (i, n, eta: double) -> double {
 	return t * double(int(cost2 > 0))
 }
 @(require_results)
-refract_half2  :: proc "c" (i, n, eta: half2) -> half2 {
+refract_half2  :: proc "c" (i, n: half2, eta: half) -> half2 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * half2{half(int(cost2.x > 0)), half(int(cost2.y > 0))}
+	return t * half(int(cost2 > 0))
 }
 @(require_results)
-refract_half3  :: proc "c" (i, n, eta: half3) -> half3 {
+refract_half3  :: proc "c" (i, n: half3, eta: half) -> half3 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * half3{half(int(cost2.x > 0)), half(int(cost2.y > 0)), half(int(cost2.z > 0))}
+	return t * half(int(cost2 > 0))
 }
 @(require_results)
-refract_half4  :: proc "c" (i, n, eta: half4) -> half4 {
+refract_half4  :: proc "c" (i, n: half4, eta: half) -> half4 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * half4{half(int(cost2.x > 0)), half(int(cost2.y > 0)), half(int(cost2.z > 0)), half(int(cost2.w > 0))}
+	return t * half(int(cost2 > 0))
 }
 @(require_results)
-refract_float2  :: proc "c" (i, n, eta: float2) -> float2 {
+refract_float2  :: proc "c" (i, n: float2, eta: float) -> float2 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * float2{float(int(cost2.x > 0)), float(int(cost2.y > 0))}
+	return t * float(int(cost2 > 0))
 }
 @(require_results)
-refract_float3  :: proc "c" (i, n, eta: float3) -> float3 {
+refract_float3  :: proc "c" (i, n: float3, eta: float) -> float3 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * float3{float(int(cost2.x > 0)), float(int(cost2.y > 0)), float(int(cost2.z > 0))}
+	return t * float(int(cost2 > 0))
 }
 @(require_results)
-refract_float4  :: proc "c" (i, n, eta: float4) -> float4 {
+refract_float4  :: proc "c" (i, n: float4, eta: float) -> float4 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * float4{float(int(cost2.x > 0)), float(int(cost2.y > 0)), float(int(cost2.z > 0)), float(int(cost2.w > 0))}
+	return t * float(int(cost2 > 0))
 }
 @(require_results)
-refract_double2  :: proc "c" (i, n, eta: double2) -> double2 {
+refract_double2  :: proc "c" (i, n: double2, eta: double) -> double2 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * double2{double(int(cost2.x > 0)), double(int(cost2.y > 0))}
+	return t * double(int(cost2 > 0))
 }
 @(require_results)
-refract_double3  :: proc "c" (i, n, eta: double3) -> double3 {
+refract_double3  :: proc "c" (i, n: double3, eta: double) -> double3 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * double3{double(int(cost2.x > 0)), double(int(cost2.y > 0)), double(int(cost2.z > 0))}
+	return t * double(int(cost2 > 0))
 }
 @(require_results)
-refract_double4  :: proc "c" (i, n, eta: double4) -> double4 {
+refract_double4  :: proc "c" (i, n: double4, eta: double) -> double4 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * double4{double(int(cost2.x > 0)), double(int(cost2.y > 0)), double(int(cost2.z > 0)), double(int(cost2.w > 0))}
+	return t * double(int(cost2 > 0))
 }
 
 scalarTripleProduct :: proc{
