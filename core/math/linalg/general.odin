@@ -82,7 +82,11 @@ outer_product :: intrinsics.outer_product
 
 @(require_results)
 quaternion_inverse :: proc "contextless" (q: $Q) -> Q where IS_QUATERNION(Q) {
-	return conj(q) * quaternion(w=1.0/dot(q, q), x=0, y=0, z=0)
+	q_length2 := length2(q)
+	if is_approx_zero(q_length2) {
+		return 0
+	}
+	return conj(q) * quaternion(w=1.0/q_length2, x=0, y=0, z=0)
 }
 
 
@@ -114,27 +118,42 @@ vector_cross :: proc{scalar_cross, vector_cross2, vector_cross3}
 cross :: proc{scalar_cross, vector_cross2, vector_cross3, quaternion_cross}
 
 @(require_results)
-vector_normalize :: proc "contextless" (v: $T/[$N]$E) -> T where IS_FLOAT(E) {
+vector_normalize_unchecked :: proc "contextless" (v: $T/[$N]$E) -> T where IS_FLOAT(E) {
 	return v / length(v)
 }
 @(require_results)
-quaternion_normalize :: proc "contextless" (q: $Q) -> Q where IS_QUATERNION(Q) {
-	return q/abs(q)
+quaternion_normalize_unchecked :: proc "contextless" (q: $Q) -> Q where IS_QUATERNION(Q) {
+	return q / length(q)
+}
+normalize_unchecked :: proc{vector_normalize_unchecked, quaternion_normalize_unchecked}
+
+
+@(require_results)
+vector_normalize :: proc "contextless" (v: $T/[$N]$E) -> T where IS_FLOAT(E) {
+	m := length(v)
+	return 0 if is_approx_zero(m) else v/m
+}
+@(require_results)
+quaternion_normalize :: proc "contextless" (q: $Q) -> Q  where IS_QUATERNION(Q) {
+	m := quaternion_length(q)
+	return 0 if is_approx_zero(m) else q/Q(m)
 }
 normalize :: proc{vector_normalize, quaternion_normalize}
 
-@(require_results)
+@(require_results, deprecated="Use normalize() instead")
 vector_normalize0 :: proc "contextless" (v: $T/[$N]$E) -> T where IS_FLOAT(E) {
-	m := length(v)
-	return 0 if m == 0 else v/m
+	return vector_normalize(v)
 }
-@(require_results)
+@(require_results, deprecated="Use normalize() instead")
 quaternion_normalize0 :: proc "contextless" (q: $Q) -> Q  where IS_QUATERNION(Q) {
-	m := abs(q)
-	return 0 if m == 0 else q/m
+	return quaternion_normalize(q)
 }
 normalize0 :: proc{vector_normalize0, quaternion_normalize0}
 
+@(require_results) is_approx_zero_f16 :: proc "contextless" (x: f16) -> bool { return abs(x) <= F16_EPSILON }
+@(require_results) is_approx_zero_f32 :: proc "contextless" (x: f32) -> bool { return abs(x) <= F32_EPSILON }
+@(require_results) is_approx_zero_f64 :: proc "contextless" (x: f64) -> bool { return abs(x) <= F64_EPSILON }
+is_approx_zero :: proc{is_approx_zero_f16, is_approx_zero_f32, is_approx_zero_f64}
 
 @(require_results)
 vector_length :: proc "contextless" (v: $T/[$N]$E) -> E where IS_FLOAT(E) {
@@ -147,12 +166,12 @@ vector_length2 :: proc "contextless" (v: $T/[$N]$E) -> E where IS_NUMERIC(E) {
 }
 
 @(require_results)
-quaternion_length :: proc "contextless" (q: $Q) -> Q where IS_QUATERNION(Q) {
-	return abs(q)
+quaternion_length :: proc "contextless" (q: $Q) -> intrinsics.type_elem_type(Q) where IS_QUATERNION(Q) {
+	return math.sqrt(dot(q, q))
 }
 
 @(require_results)
-quaternion_length2 :: proc "contextless" (q: $Q) -> Q where IS_QUATERNION(Q) {
+quaternion_length2 :: proc "contextless" (q: $Q) -> intrinsics.type_elem_type(Q) where IS_QUATERNION(Q) {
 	return dot(q, q)
 }
 
@@ -189,7 +208,8 @@ clamp_length :: proc "contextless" (v: $T/[$N]$E, a: E) -> T where IS_FLOAT(E) {
 
 @(require_results)
 projection :: proc "contextless" (x, normal: $T/[$N]$E) -> T where IS_NUMERIC(E) {
-	return dot(x, normal) / dot(normal, normal) * normal
+	normal_length := length2(normal)
+	return 0 if is_approx_zero(normal_length) else (dot(x, normal) / normal_length) * normal
 }
 
 @(require_results)
@@ -284,22 +304,22 @@ to_ptr :: proc{vector_to_ptr, matrix_to_ptr}
 
 
 vector_angle_between :: proc "contextless" (a, b: $V/[$N]$E) -> E {
-	a0 := normalize0(a)
-	b0 := normalize0(b)
+	a0 := normalize(a)
+	b0 := normalize(b)
 	d  := clamp(dot(a0, b0), -1, +1)
 	return math.acos(d)
 }
 quaternion64_angle_between :: proc "contextless" (a, b: $Q/quaternion64) -> f16 {
-	c := normalize0(conj(a) * b)
-	return math.acos(c.w)
+	c := normalize(conj(a) * b)
+	return math.acos(clamp(c.w, -1, 1))
 }
 quaternion128_angle_between :: proc "contextless" (a, b: $Q/quaternion128) -> f32 {
-	c := normalize0(conj(a) * b)
-	return math.acos(c.w)
+	c := normalize(conj(a) * b)
+	return math.acos(clamp(c.w, -1, 1))
 }
 quaternion256_angle_between :: proc "contextless" (a, b: $Q/quaternion256) -> f64 {
-	c := normalize0(conj(a) * b)
-	return math.acos(c.w)
+	c := normalize(conj(a) * b)
+	return math.acos(clamp(c.w, -1, 1))
 }
 angle_between :: proc{
 	vector_angle_between,
@@ -314,14 +334,28 @@ angle_between :: proc{
 
 @(require_results)
 vector_slerp :: proc "contextless" (x, y: $T/[$N]$E, a: E) -> T #no_bounds_check {
-	cos_alpha := dot(x, y)
+	x_length := length(x)
+	y_length := length(y)
+	if is_approx_zero(x_length) || is_approx_zero(y_length) {
+		return lerp(x, y, a)
+	}
+	
+	x_dir := x / x_length
+	y_dir := y / y_length
+	
+	cos_alpha := dot(x_dir, y_dir)
+	
+	if abs(cos_alpha) > 0.9999 { // Nearly parallel
+		return lerp(x, y, a)
+	}
+	
 	alpha := math.acos(cos_alpha)
 	sin_alpha := math.sin(alpha)
 
 	t1 := math.sin((1 - a) * alpha) / sin_alpha
 	t2 := math.sin(a * alpha) / sin_alpha
-
-	return x * t1 + y * t2
+	
+	return (x_dir * t1 + y_dir * t2) * lerp(x_length, y_length, a)
 }
 
 @(require_results)
@@ -337,6 +371,35 @@ catmull_rom :: proc "contextless" (v1, v2, v3, v4: $T/[$N]$E, s: E) -> T #no_bou
 	return (f1 * v1 + f2 * v2 + f3 * v3 + f4 * v4) * 0.5
 }
 
+// Catmull rom with configurable smoothing tension. Straight when scale=0.
+@(require_results)
+cardinal :: proc "contextless" (v1, v2, v3, v4: $T/[$N]$E, s: E, scale: E) -> T #no_bounds_check {
+	s2 := s * s
+	s3 := s2 * s
+
+	f1 := -scale * s3 + 2 * scale * s2 - scale * s
+	f2 := (2 - scale) * s3 + (scale - 3) * s2 + 1
+	f3 := (scale - 2) * s3 + (3 - 2 * scale) * s2 + scale * s
+	f4 := scale * s3 - scale * s2
+
+	return f1 * v1 + f2 * v2 + f3 * v3 + f4 * v4
+}
+
+// Uniform cubic B-spline. Good for animations, camera paths. C2 continuity.
+@(require_results)
+b_spline :: proc "contextless" (v1, v2, v3, v4: $T/[$N]$E, s: E) -> T #no_bounds_check {
+	s2 := s * s
+	s3 := s2 * s
+
+	f1 := -1 * s3 + 3 * s2 - 3 * s + 1
+	f2 :=  3 * s3 - 6 * s2 + 4
+	f3 := -3 * s3 + 3 * s2 + 3 * s + 1
+	f4 :=  1 * s3
+
+	return (f1 * v1 + f2 * v2 + f3 * v3 + f4 * v4) * (1.0 / 6.0)
+}
+
+// Good for animation, physics sim, interpolation. C1 continuity.
 @(require_results)
 hermite :: proc "contextless" (v1, t1, v2, t2: $T/[$N]$E, s: E) -> T #no_bounds_check {
 	s2 := s*s
@@ -350,6 +413,21 @@ hermite :: proc "contextless" (v1, t1, v2, t2: $T/[$N]$E, s: E) -> T #no_bounds_
 	return f1 * v1 + f2 * v2 + f3 * t1 + f4 * t2
 }
 
+// Good for shapes, fonts, vector graphics. C1 continuity.
+@(require_results)
+bezier :: proc "contextless" (v1, v2, v3, v4: $T/[$N]$E, s: E) -> T #no_bounds_check {
+	s2 := s * s
+	s3 := s2 * s
+	
+	f1 := -1 * s3 + 3 * s2 - 3 * s + 1
+	f2 :=  3 * s3 - 6 * s2 + 3 * s
+	f3 := -3 * s3 + 3 * s2
+	f4 :=  1 * s3
+	
+	return f1 * v1 + f2 * v2 + f3 * v3 + f4 * v4
+}
+
+// Evaluates a cubic polynomial. Parameters are coefficients, not spline control points.
 @(require_results)
 cubic :: proc "contextless" (v1, v2, v3, v4: $T/[$N]$E, s: E) -> T #no_bounds_check {
 	return ((v1 * s + v2) * s + v3) * s + v4
@@ -939,11 +1017,17 @@ matrix1x1_inverse :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) #no_bou
 matrix2x2_inverse :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) #no_bounds_check {
 	d := x[0, 0]*x[1, 1] - x[0, 1]*x[1, 0]
 	when intrinsics.type_is_integer(T) {
+		if d == 0 {
+			return {}
+		}
 		y[0, 0] = +x[1, 1] / d
 		y[0, 1] = -x[0, 1] / d
 		y[1, 0] = -x[1, 0] / d
 		y[1, 1] = +x[0, 0] / d
 	} else {
+		if is_approx_zero(d) {
+			return {}
+		}
 		id := 1 / d
 		y[0, 0] = +x[1, 1] * id
 		y[0, 1] = -x[0, 1] * id
@@ -958,12 +1042,18 @@ matrix3x3_inverse :: proc "contextless" (x: $M/matrix[3, 3]$T) -> (y: M) #no_bou
 	c := cofactor(x)
 	d := determinant(x)
 	when intrinsics.type_is_integer(T) {
+		if d == 0 {
+			return {}
+		}
 		for i in 0..<3 {
 			for j in 0..<3 {
 				y[i, j] = c[j, i] / d
 			}
 		}
 	} else {
+		if is_approx_zero(d) {
+			return {}
+		}
 		id := 1/d
 		for i in 0..<3 {
 			for j in 0..<3 {
@@ -982,12 +1072,18 @@ matrix4x4_inverse :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bou
 		d += x[0, i] * c[0, i]
 	}
 	when intrinsics.type_is_integer(T) {
+		if d == 0 {
+			return {}
+		}
 		for i in 0..<4 {
 			for j in 0..<4 {
 				y[i, j] = c[j, i] / d
 			}
 		}
 	} else {
+		if is_approx_zero(d) {
+			return {}
+		}
 		id := 1/d
 		for i in 0..<4 {
 			for j in 0..<4 {

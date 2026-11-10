@@ -153,7 +153,7 @@ Vector2Divide :: proc "c" (v1, v2: Vector2) -> Vector2 {
 // Normalize provided vector
 @(require_results)
 Vector2Normalize :: proc "c" (v: Vector2) -> Vector2 {
-	return linalg.normalize0(v)
+	return linalg.normalize(v)
 }
 // Transforms a Vector2 by a given Matrix
 @(require_results)
@@ -343,7 +343,7 @@ Vector3Divide :: proc "c" (v1, v2: Vector3) -> Vector3 {
 // Normalize provided vector
 @(require_results)
 Vector3Normalize :: proc "c" (v: Vector3) -> Vector3 {
-	return linalg.normalize0(v)
+	return linalg.normalize(v)
 }
 
 // Calculate the projection of the vector v1 on to v2
@@ -363,8 +363,8 @@ Vector3Reject :: proc "c" (v1, v2: Vector3) -> Vector3 {
 // Makes vectors normalized and orthogonal to each other
 // Gram-Schmidt function implementation
 Vector3OrthoNormalize :: proc "c" (v1, v2: ^Vector3) {
-	v1^ = linalg.normalize0(v1^)
-	v3 := linalg.normalize0(linalg.cross(v1^, v2^))
+	v1^ = linalg.normalize(v1^)
+	v3 := linalg.normalize(linalg.cross(v1^, v2^))
 	v2^ = linalg.cross(v3, v1^)
 }
 
@@ -379,7 +379,7 @@ Vector3RotateByQuaternion :: proc "c" (v: Vector3, q: Quaternion) -> Vector3 {
 Vector3RotateByAxisAngle :: proc "c" (v: Vector3, axis: Vector3, angle: f32) -> Vector3 {
 	axis, angle := axis, angle
 
-	axis = linalg.normalize0(axis)
+	axis = linalg.normalize(axis)
 
 	angle *= 0.5
 	a := math.sin(angle)
@@ -722,7 +722,7 @@ QuaternionLength :: proc "c" (q: Quaternion) -> f32 {
 // Normalize provided quaternion
 @(require_results)
 QuaternionNormalize :: proc "c" (q: Quaternion) -> Quaternion {
-	return linalg.normalize0(q)
+	return linalg.normalize(q)
 }
 // Invert provided quaternion
 @(require_results, deprecated="Prefer 1/q")
