@@ -1453,3 +1453,24 @@ test_nextafter :: proc(t: ^testing.T) {
 			"%h, %h -> %h != %h", datum.x, datum.y, r, datum.r)
 	}
 }
+
+@test
+test_floor_divmod :: proc(t: ^testing.T) {
+	for x in -50..=50 {
+		for y in -9..=9 {
+			if y == 0 {
+				continue
+			}
+			want_div := int(math.floor(f64(x) / f64(y)))
+			want_mod := x - want_div*y
+
+			div, mod := math.floor_divmod(x, y)
+			testing.expectf(t, div == want_div && mod == want_mod, "floor_divmod(%v, %v) = %v, %v, want %v, %v", x, y, div, mod, want_div, want_mod)
+			testing.expectf(t, math.floor_div(x, y) == want_div, "floor_div(%v, %v) = %v, want %v", x, y, math.floor_div(x, y), want_div)
+			testing.expectf(t, math.floor_mod(x, y) == want_mod, "floor_mod(%v, %v) = %v, want %v", x, y, math.floor_mod(x, y), want_mod)
+
+			div8, mod8 := math.floor_divmod(i8(x), i8(y))
+			testing.expectf(t, int(div8) == want_div && int(mod8) == want_mod, "floor_divmod(i8(%v), i8(%v)) = %v, %v, want %v, %v", x, y, div8, mod8, want_div, want_mod)
+		}
+	}
+}
