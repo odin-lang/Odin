@@ -399,7 +399,7 @@ remap :: proc "contextless" (old_value, old_min, old_max, new_min, new_max: $T) 
 	old_range := old_max - old_min
 	new_range := new_max - new_min
 	if old_range == 0 {
-		return new_range / 2
+		return new_min + new_range / 2
 	}
 
 	when intrinsics.type_is_integer(T) {

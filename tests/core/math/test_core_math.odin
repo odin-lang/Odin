@@ -1474,3 +1474,15 @@ test_floor_divmod :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@test
+test_remap :: proc(t: ^testing.T) {
+	testing.expect_value(t, math.remap(5.0, 5.0, 5.0, 10.0, 20.0), 15.0)
+	testing.expect_value(t, math.remap(f32(5), 5, 5, -20, -10), -15)
+	testing.expect_value(t, math.remap(5, 5, 5, 100, 200), 150)
+	testing.expect_value(t, math.remap(i8(-3), -3, -3, -50, 50), 0)
+	testing.expect_value(t, math.remap_clamped(5.0, 5.0, 5.0, 10.0, 20.0), 15.0)
+
+	testing.expect_value(t, math.remap(2.5, 0.0, 10.0, 100.0, 200.0), 125.0)
+	testing.expect_value(t, math.remap(25, 0, 100, 100, 200), 125)
+}
