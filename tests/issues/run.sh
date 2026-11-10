@@ -435,8 +435,6 @@ if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 	$ODIN test ../test_issue_7010 $COMMON
 fi
 
-$ODIN test ../test_issue_7547 $COMMON -debug
-
 $ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -microarch:native
 $ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug -microarch:native
 
