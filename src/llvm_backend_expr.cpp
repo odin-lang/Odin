@@ -6129,7 +6129,48 @@ gb_internal void lb_build_addr_compound_lit_store_constant(lbProcedure *p, lbAdd
 	}
 }
 
-gb_internal void lb_build_addr_struct_compound_lit_populate(lbProcedure *p, Ast *expr, Type *type, lbAddr v) {
+// How a struct literal's constant elements are written into its temporary.
+// (the temporary is then copied to wherever the value goes; with optimizations on
+// LLVM usually removes it and the literal is written directly to the destination)
+//
+// When struct size <= LB_MAX_STORE_SIZE, or when the constant part is not sparse (see lb_const_is_sparse),
+// the whole struct is stored as one constant (with the runtime elements zeroed),
+// and the runtime elements are then stored over it (when the struct is small LLVM splits the aggregate store).
+// For non-sparse structs with size > LB_MAX_STORE_SIZE the store is a copy of a private global
+// and writes over every byte, so the temporary is not zeroed first.
+// Otherwise, the constant elements are stored one by one (same as the runtime ones) over the zeroed temporary.
+
+enum lbStructLitConstsKind {
+	lbStructLitConsts_PerElement, // stored one by one with the runtime elements (also empty literal)
+	lbStructLitConsts_ZeroInit,   // all zero, so the zero-initialized temporary already holds them
+	lbStructLitConsts_Whole,      // the whole value is stored first, with the runtime elements over it
+};
+
+struct lbStructLitConsts {
+	lbValue               value; // the literal's constant part as one value, with runtime elements zeroed
+	lbStructLitConstsKind kind;
+};
+
+gb_internal lbStructLitConsts lb_struct_lit_consts(lbProcedure *p, Ast *expr, Type *type) {
+	lbStructLitConsts consts = {};
+	ast_node(cl, CompoundLit, expr);
+	if (cl->elems.count == 0) {
+		return consts;
+	}
+	consts.value = lb_const_value(p->module, type, exact_value_compound(expr));
+	LLVMValueRef c = consts.value.value;
+	if (LLVMIsNull(c)) {
+		consts.kind = lbStructLitConsts_ZeroInit;
+	} else if (!LLVMIsConstant(c)) {
+		// not a constant the sparse test can walk, so store it whole
+		consts.kind = lbStructLitConsts_Whole;
+	} else if (lb_sizeof(LLVMTypeOf(c)) <= LB_MAX_STORE_SIZE || !lb_const_is_sparse(c)) {
+		consts.kind = lbStructLitConsts_Whole;
+	}
+	return consts;
+}
+
+gb_internal void lb_build_addr_struct_compound_lit_populate(lbProcedure *p, Ast *expr, Type *type, lbAddr v, lbStructLitConsts const &consts) {
 	ast_node(cl, CompoundLit, expr);
 
 	// TODO(bill): "constant" '#raw_union's are not initialized constantly at the moment.
@@ -6145,7 +6186,9 @@ gb_internal void lb_build_addr_struct_compound_lit_populate(lbProcedure *p, Ast 
 
 	bool is_raw_union = st->is_raw_union;
 
-	lb_build_addr_compound_lit_store_constant(p, v, type, expr);
+	if (consts.kind == lbStructLitConsts_Whole) {
+		lb_addr_store(p, v, consts.value);
+	}
 	lbValue comp_lit_ptr = lb_addr_get_ptr(p, v);
 
 	if (cl->elems[0]->kind == Ast_FieldValue) {
@@ -6160,7 +6203,7 @@ gb_internal void lb_build_addr_struct_compound_lit_populate(lbProcedure *p, Ast 
 
 			elem = fv->value;
 			if (sel.index.count > 1) {
-				if (lb_is_nested_possibly_constant(type, sel, elem)) {
+				if (consts.kind != lbStructLitConsts_PerElement && lb_is_nested_possibly_constant(type, sel, elem)) {
 					continue;
 				}
 				field_expr = lb_build_expr(p, elem);
@@ -6190,7 +6233,7 @@ gb_internal void lb_build_addr_struct_compound_lit_populate(lbProcedure *p, Ast 
 
 			field = st->fields[index];
 			Type *ft = field->type;
-			if (!is_raw_union && !is_type_typeid(ft) && lb_is_elem_const(elem, ft)) {
+			if (consts.kind != lbStructLitConsts_PerElement && !is_raw_union && !is_type_typeid(ft) && lb_is_elem_const(elem, ft)) {
 				continue;
 			}
 
@@ -6237,7 +6280,7 @@ gb_internal void lb_build_addr_struct_compound_lit_populate(lbProcedure *p, Ast 
 
 		Entity *field = st->fields[index];
 		Type *ft = field->type;
-		if (!is_type_typeid(ft) && lb_is_elem_const(elem, ft)) {
+		if (consts.kind != lbStructLitConsts_PerElement && !is_type_typeid(ft) && lb_is_elem_const(elem, ft)) {
 			continue;
 		}
 
@@ -6253,7 +6296,16 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 	Type *type = type_of_expr(expr);
 	Type *bt = base_type(type);
 
-	lbAddr v = lb_add_local_generated(p, type, true);
+	lbStructLitConsts struct_consts = {};
+	bool zero_init = true;
+	if (bt->kind == Type_Struct && !is_type_soa_struct(type)) {
+		struct_consts = lb_struct_lit_consts(p, expr, type);
+		if (struct_consts.kind == lbStructLitConsts_Whole && lb_emit_store_writes_every_byte(p, type, struct_consts.value)) {
+			// storing the whole constant writes every byte of the temporary, no need to zero
+			zero_init = false;
+		}
+	}
+	lbAddr v = lb_add_local_generated(p, type, zero_init);
 
 	TEMPORARY_ALLOCATOR_GUARD();
 
@@ -6495,7 +6547,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 				}
 			}
 		} else {
-			lb_build_addr_struct_compound_lit_populate(p, expr, type, v);
+			lb_build_addr_struct_compound_lit_populate(p, expr, type, v, struct_consts);
 		}
 		break;
 
