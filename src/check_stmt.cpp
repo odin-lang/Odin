@@ -1600,6 +1600,13 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 					continue;
 				}
 
+				if (is_type_polymorphic(y.type)) {
+					gbString str = type_to_string(y.type);
+					error(type_expr, "Invalid use of a polymorphic type '%s' in a type switch case", str);
+					gb_string_free(str);
+					continue;
+				}
+
 				Type *seen_type = y.type;
 				if (switch_kind == TypeSwitch_Union) {
 					GB_ASSERT(is_type_union(bt));
