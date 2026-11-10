@@ -173,6 +173,8 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 @rem 	@echo "!!! WARNING !!! test_issue_7010 is not compatible with MSVC."
 @rem )
 
+%ODIN% test "..\test_issue_7547" %COMMON% || exit /b
+
 %ODIN% test "..\test_issue_split_globals" -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables || exit /b
 %ODIN% test "..\test_issue_split_globals" -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug || exit /b
 
