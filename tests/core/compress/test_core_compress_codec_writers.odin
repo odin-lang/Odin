@@ -6,6 +6,7 @@ import "core:compress/bzip2"
 import "core:compress/lz4"
 import "core:io"
 import "core:math/rand"
+import "core:mem"
 import "core:testing"
 
 CODEC_WRITERS_FUZZ :: #config(CODEC_WRITERS_FUZZ, 60)
@@ -121,6 +122,67 @@ codec_writer_lz4_identity :: proc(t: ^testing.T) {
 	for chunk in ([]int{0, 1, 70_000}) {
 		setup := Codec_Writer_Setup{lz4_level = .Level_4, frame_options = {block_max_size = .Max_1MiB, flags = lz4.DEFAULT_FRAME_FLAGS}, content_size = 3 << 20, options = {chunk_size = chunk}}
 		codec_writer_check(t, "lz4 1 MiB blocks", .LZ4, big[:3 << 20], .Random, setup)
+	}
+}
+
+@(test)
+codec_writer_lz4_reset :: proc(t: ^testing.T) {
+	data := stream_match_data()
+	defer delete(data)
+	g := Lz4_Test_Lcg{state = 0x52e}
+	text := lz4_test_lcg_text(&g, 150_000 if !SLIM_TESTS else 80_000)
+	defer delete(text)
+	inputs := lz4_test_inputs()
+	defer lz4_test_inputs_destroy(inputs)
+
+	sources := [][]byte{text, {}, data[:13], inputs.random[:min(len(inputs.random), 20_000)], data[:min(len(data), 30_000)], {1, 2, 3}, text[:70_000], text}
+	flag_sets := []lz4.Frame_Flags{{}, lz4.DEFAULT_FRAME_FLAGS, {.Independent_Blocks, .Block_Checksum}, {.Content_Checksum, .Block_Checksum, .Content_Size, .Independent_Blocks}}
+	for level in ([]lz4.Level{.Level_1, .Level_2, .Level_4, .Level_9, .Level_12}) {
+		for flags, f in flag_sets {
+			if (level == .Level_9 || level == .Level_12) && f % 2 == 0 {
+				continue
+			}
+			for dictionary in ([][]byte{nil, inputs.dictionary}) {
+				block := lz4.Block_Max_Size.Max_256KiB if f == 1 && dictionary == nil else .Max_64KiB
+				setup := Codec_Writer_Setup{lz4_level = level, frame_options = {block_max_size = block, flags = flags}, options = {chunk_size = 1}, dictionary = dictionary}
+				codec_writer_reset_check(t, sources, setup)
+			}
+		}
+	}
+
+	big := lz4_test_lcg_text(&g, 5 << 20 if !SLIM_TESTS else 3 << 20)
+	defer delete(big)
+	setup := Codec_Writer_Setup{lz4_level = .Level_1, frame_options = {block_max_size = .Max_4MiB, flags = lz4.DEFAULT_FRAME_FLAGS}}
+	codec_writer_reset_check(t, {big, data, big[:70_000], big}, setup)
+
+	{
+		fw: lz4.Frame_Writer
+		sink: [dynamic]byte
+		defer delete(sink)
+		aw := Append_Writer{out = &sink, fail_at = -1}
+		testing.expect_value(t, lz4.frame_writer_reset(&fw, append_writer(&aw)), compress.Error(compress.General_Error.Incompatible_Options))
+
+		testing.expect_value(t, lz4.frame_writer_init(&fw, append_writer(&aw), .Level_1, content_size = 100), nil)
+		defer lz4.frame_writer_destroy(&fw)
+		_, err := lz4.frame_writer_write(&fw, data[:101])
+		testing.expect_value(t, err, compress.Error(compress.LZ4_Error.Content_Size_Mismatch))
+		testing.expect_value(t, lz4.frame_writer_reset(&fw, append_writer(&aw), -2), compress.Error(compress.General_Error.Incompatible_Options))
+		_, err = lz4.frame_writer_write(&fw, data[:1])
+		testing.expect_value(t, err, compress.Error(compress.General_Error.Incompatible_Options))
+
+		got: [dynamic]byte
+		defer delete(got)
+		gw := Append_Writer{out = &got, fail_at = -1}
+		testing.expect_value(t, lz4.frame_writer_reset(&fw, append_writer(&gw)), nil)
+		n: int
+		n, err = lz4.frame_writer_write(&fw, data[:5000])
+		testing.expect_value(t, n, 5000)
+		testing.expect_value(t, err, nil)
+		testing.expect_value(t, lz4.frame_writer_finish(&fw), nil)
+		want: [dynamic]byte
+		defer delete(want)
+		codec_writer_oneshot(.LZ4, data[:5000], {lz4_level = .Level_1, frame_options = {flags = lz4.DEFAULT_FRAME_FLAGS}, content_size = -1}, &want)
+		testing.expectf(t, bytes.equal(got[:], want[:]), "lz4 reset after error: output differs, %v vs %v bytes", len(got), len(want))
 	}
 }
 
@@ -451,6 +513,65 @@ codec_writer_pack :: proc(codec: Codec, w: io.Writer, data: []byte, pattern: Wri
 	case .LZ4:   err = lz4.frame_writer_finish(fw)
 	}
 	return
+}
+
+codec_writer_reset_check :: proc(t: ^testing.T, sources: [][]byte, setup: Codec_Writer_Setup) {
+	track: mem.Tracking_Allocator
+	mem.tracking_allocator_init(&track, context.allocator)
+	defer mem.tracking_allocator_destroy(&track)
+
+	got: [dynamic]byte
+	defer delete(got)
+	want: [dynamic]byte
+	defer delete(want)
+	abandoned: [dynamic]byte
+	defer delete(abandoned)
+	aw := Append_Writer{out = &got, fail_at = -1}
+	dw := Append_Writer{out = &abandoned, fail_at = -1}
+
+	fw: lz4.Frame_Writer
+	frame := setup
+	frame.content_size = i64(len(sources[0])) if .Content_Size in setup.frame_options.flags else -1
+	err := lz4.frame_writer_init(&fw, append_writer(&aw), setup.lz4_level, setup.frame_options, frame.content_size, setup.options, setup.dictionary, mem.tracking_allocator(&track))
+	testing.expectf(t, err == nil, "lz4 reset, level %v, %v: init failed: %v", int(setup.lz4_level), setup.frame_options, err)
+	if err != nil {
+		lz4.frame_writer_destroy(&fw)
+		return
+	}
+	allocations := track.total_allocation_count
+
+	for input, i in sources {
+		if i > 0 {
+			frame.content_size = i64(len(input)) if .Content_Size in setup.frame_options.flags && i % 3 != 2 else -1
+			if i % 4 == 3 && len(input) > 1 {
+				testing.expect_value(t, lz4.frame_writer_reset(&fw, append_writer(&dw), -1), nil)
+				_, _ = lz4.frame_writer_write(&fw, input[:len(input) / 2])
+			}
+			clear(&got)
+			testing.expect_value(t, lz4.frame_writer_reset(&fw, append_writer(&aw), frame.content_size), nil)
+		}
+		rest := input
+		for len(rest) > 0 && err == nil {
+			k := min(codec_pattern_sizes(.Random, len(rest)), len(rest))
+			n: int
+			n, err = lz4.frame_writer_write(&fw, rest[:k])
+			if err == nil && n != k {
+				err = compress.General_Error.Output_Too_Short
+			}
+			rest = rest[k:]
+		}
+		if err == nil {
+			err = lz4.frame_writer_finish(&fw)
+		}
+		clear(&want)
+		codec_writer_oneshot(.LZ4, input, frame, &want)
+		testing.expectf(t, err == nil, "lz4 reset, frame %v, %v bytes, level %v, %v: %v", i, len(input), int(setup.lz4_level), setup.frame_options, err)
+		testing.expectf(t, bytes.equal(got[:], want[:]), "lz4 reset, frame %v, %v bytes, level %v, %v, dictionary %v: output differs, %v vs %v bytes", i, len(input), int(setup.lz4_level), setup.frame_options, len(setup.dictionary) > 0, len(got), len(want))
+		err = nil
+	}
+	testing.expectf(t, track.total_allocation_count == allocations, "lz4 reset, level %v, %v: %v allocations after init, %v after %v frames", int(setup.lz4_level), setup.frame_options, allocations, track.total_allocation_count, len(sources))
+	lz4.frame_writer_destroy(&fw)
+	testing.expectf(t, len(track.allocation_map) == 0, "lz4 reset, level %v: %v allocations leaked", int(setup.lz4_level), len(track.allocation_map))
 }
 
 codec_writer_check :: proc(t: ^testing.T, label: string, codec: Codec, data: []byte, pattern: Write_Pattern, setup: Codec_Writer_Setup) {
