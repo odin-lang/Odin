@@ -372,20 +372,28 @@ gb_internal void check_scope_decls(CheckerContext *c, Slice<Ast *> const &nodes,
 
 	check_collect_entities(c, nodes);
 
+	auto entities = array_make<Entity *>(heap_allocator(), 0, s->elements.count);
+	defer (array_free(&entities));
+
+	// TODO-UPDATE-COMMENT: the entities are now copied out of `s->elements` and sorted by source position before any is checked
+	// ---
 	// NOTE: checking a declaration can insert entities into this very scope - a procedure alias
 	// goes through `override_entity_in_scope`, which inserts into the scope being iterated - so
 	// the iteration must not be invalidated by `s->elements` growing; see ScopeMapIterator.
 	for (auto const &entry : s->elements) {
-		Entity *e = entry.value;\
+		Entity *e = entry.value;
 		switch (e->kind) {
 		case Entity_Constant:
 		case Entity_TypeName:
 		case Entity_Procedure:
 		case Entity_AsmTemplate:
+			array_add(&entities, e);
 			break;
-		default:
-			continue;
 		}
+	}
+	array_sort(entities, entity_variable_pos_cmp);
+
+	for (Entity *e : entities) {
 		DeclInfo *d = decl_info_of_entity(e);
 		if (d != nullptr) {
 			check_entity_decl(c, e, d, nullptr);
