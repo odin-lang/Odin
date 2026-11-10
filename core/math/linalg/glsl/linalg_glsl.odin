@@ -1464,10 +1464,16 @@ mat4Orientation :: proc "c" (normal, up: vec3) -> mat4 {
 	if normal == up {
 		return 1
 	}
-	
+
 	rotation_axis := cross(up, normal)
-	angle := acos(dot(normal, up))
-	
+	if dot(rotation_axis, rotation_axis) == 0 {
+		rotation_axis = cross(up, vec3{1, 0, 0})
+		if dot(rotation_axis, rotation_axis) == 0 {
+			rotation_axis = cross(up, vec3{0, 1, 0})
+		}
+	}
+	angle := acos(clamp(dot(normal, up), -1, 1))
+
 	return mat4Rotate(rotation_axis, angle)
 }
 @(require_results)
@@ -1591,10 +1597,16 @@ dmat4Orientation :: proc "c" (normal, up: dvec3) -> dmat4 {
 	if normal == up {
 		return 1
 	}
-	
+
 	rotation_axis := cross(up, normal)
-	angle := acos(dot(normal, up))
-	
+	if dot(rotation_axis, rotation_axis) == 0 {
+		rotation_axis = cross(up, dvec3{1, 0, 0})
+		if dot(rotation_axis, rotation_axis) == 0 {
+			rotation_axis = cross(up, dvec3{0, 1, 0})
+		}
+	}
+	angle := acos(clamp(dot(normal, up), -1, 1))
+
 	return dmat4Rotate(rotation_axis, angle)
 }
 @(require_results)

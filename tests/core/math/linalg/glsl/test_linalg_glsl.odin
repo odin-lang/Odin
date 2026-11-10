@@ -43,3 +43,28 @@ test_refract :: proc(t: ^testing.T) {
 		testing.expectf(t, glsl.length(f2 - glsl.vec2(e.xy)) < 1e-6, "refract(%v, %v, %v) = %v, want %v", i.xy, n.xy, eta, f2, e.xy)
 	}
 }
+
+@test
+test_orientation :: proc(t: ^testing.T) {
+	ups := [?]glsl.dvec3{{0, 1, 0}, {1, 0, 0}, {0, 0, 1}, {0, -1, 0}, glsl.normalize(glsl.dvec3{1, 2, 3})}
+	for up in ups {
+		normals := [?]glsl.dvec3{
+			up,
+			-up,
+			glsl.normalize(up + {1e-9, 0, 0}),
+			glsl.normalize(-up + {1e-9, 0, 0}),
+			up + {1e-30, 0, 0},
+			-up + {1e-30, 0, 0},
+			glsl.normalize(up + {0.5, -0.25, 1}),
+		}
+		for normal in normals {
+			d := glsl.dmat4Orientation(normal, up)
+			r := (d * glsl.dvec4{up.x, up.y, up.z, 0}).xyz
+			testing.expectf(t, glsl.length(r - normal) < 1e-6, "dmat4Orientation(%v, %v) * up = %v, want %v", normal, up, r, normal)
+
+			f := glsl.mat4Orientation(glsl.vec3(normal), glsl.vec3(up))
+			rf := (f * glsl.vec4{f32(up.x), f32(up.y), f32(up.z), 0}).xyz
+			testing.expectf(t, glsl.length(rf - glsl.vec3(normal)) < 1e-3, "mat4Orientation(%v, %v) * up = %v, want %v", normal, up, rf, normal)
+		}
+	}
+}
