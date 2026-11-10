@@ -34,6 +34,7 @@ package tests_issues
 @(require) import "test_issue_6951_5214"
 @(require) import "test_issue_7008"
 @(require) import "test_issue_7089"
+@(require) import "test_issue_7120_7699"
 @(require) import "test_issue_7316"
 @(require) import "test_issue_7336"
 @(require) import "test_issue_7356"
