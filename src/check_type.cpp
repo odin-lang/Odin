@@ -626,17 +626,6 @@ gb_internal bool check_record_poly_operand_specialization(CheckerContext *ctx, T
 			// NOTE(bill): Cycle
 			return false;
 		}
-		if (o.mode == Addressing_Type) {
-			// NOTE(bill): ANNOYING EDGE CASE FOR `where` clauses
-			// TODO(bill, 2021-03-27): Is this even a valid HACK?!
-			Entity *entity = entity_of_node(o.expr);
-			if (entity != nullptr &&
-			    entity->kind == Entity_TypeName &&
-			    entity->type == t_typeid) {
-			    	*is_polymorphic_ = true;
-				return false;
-			}
-		}
 	}
 	return true;
 }
