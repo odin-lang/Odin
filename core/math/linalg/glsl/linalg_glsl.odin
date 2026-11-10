@@ -985,8 +985,8 @@ normalize :: proc{
 	normalize_quat,
 	normalize_dquat,
 }
-@(require_results) normalize_f32  :: proc "c" (x: f32)  -> f32  { return 1.0 }
-@(require_results) normalize_f64  :: proc "c" (x: f64)  -> f64  { return 1.0 }
+@(require_results) normalize_f32  :: proc "c" (x: f32)  -> f32  { return x / abs(x) }
+@(require_results) normalize_f64  :: proc "c" (x: f64)  -> f64  { return x / abs(x) }
 @(require_results) normalize_vec2 :: proc "c" (x: vec2) -> vec2 { return x / length(x) }
 @(require_results) normalize_vec3 :: proc "c" (x: vec3) -> vec3 { return x / length(x) }
 @(require_results) normalize_vec4 :: proc "c" (x: vec4) -> vec4 { return x / length(x) }
