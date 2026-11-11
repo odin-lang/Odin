@@ -103,3 +103,24 @@ test_sinh_cosh :: proc(t: ^testing.T) {
 	expect_sinh_cosh(t, f32(89.4), 3.34886272e38, 3.34886272e38)
 	expect_sinh_cosh(t, f16(11.09), 32864, 32864)
 }
+
+@test
+test_atan2_quadrant :: proc(t: ^testing.T) {
+	neg_zero := math.copy_sign(f64(0), -1)
+
+	Case :: struct {
+		y, x, want: f64,
+	}
+	cases := []Case{
+		{-1e-300, -1e300, -math.PI},
+		{1e-300, -1e300, math.PI},
+		{-1, -1, -3*math.PI/4},
+		{1, -1, 3*math.PI/4},
+		{0, -1, math.PI},
+		{neg_zero, -1, -math.PI},
+	}
+	for c in cases {
+		got := math.atan2(c.y, c.x)
+		testing.expectf(t, close(got, c.want), "atan2(%v, %v) = %v, want %v", c.y, c.x, got, c.want)
+	}
+}

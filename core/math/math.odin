@@ -1786,7 +1786,7 @@ atan2_f64 :: proc "contextless" (y, x: f64) -> f64 {
 
 	q := atan(y / x)
 	if x < 0 {
-		if q <= 0 {
+		if y > 0 {
 			return q + PI
 		}
 		return q - PI
