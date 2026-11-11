@@ -649,7 +649,7 @@ _decode :: proc(r: ^Reader, rec: ^Record, method: Method, flags: Flags, crc: u32
 		}
 		decode_err = legacy.explode_from_bytes(out, input, options, expected, limit, r.allocator)
 	case .BZip2:
-		decode_err = bzip2.decompress_from_bytes(out, input, expected, limit, r.allocator)
+		decode_err = bzip2.decompress_from_bytes(out, input, expected, r.options, r.allocator)
 	case .LZMA:
 		if len(input) < 4 {
 			return Zip_Error.Truncated
@@ -671,7 +671,7 @@ _decode :: proc(r: ^Reader, rec: ^Record, method: Method, flags: Flags, crc: u32
 		if props_err != nil {
 			return props_err
 		}
-		decode_err = ppmd.decompress_from_bytes(out, input[ppmd.PROPERTIES_ZIP_SIZE:], props, expected, limit, r.allocator)
+		decode_err = ppmd.decompress_from_bytes(out, input[ppmd.PROPERTIES_ZIP_SIZE:], props, expected, r.options, r.allocator)
 	case:
 		return archive.General_Error.Unsupported_Method
 	}

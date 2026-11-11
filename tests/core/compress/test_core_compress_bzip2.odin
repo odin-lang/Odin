@@ -341,7 +341,7 @@ bzip2_max_output_size :: proc(t: ^testing.T) {
 	for c in cases {
 		output: [dynamic]u8
 		defer delete(output)
-		err := bzip2.decompress(&output, packed[:], c.expected, c.limit)
+		err := bzip2.decompress(&output, packed[:], c.expected, {max_output_size = c.limit})
 		testing.expectf(t, err == c.want, "%v: %v, want %v", c, err, c.want)
 		testing.expectf(t, cap(output) <= max(c.limit, 0), "%v: capacity %v", c, cap(output))
 	}
@@ -365,14 +365,14 @@ bzip2_bomb_growth :: proc(t: ^testing.T) {
 	for expected in ([]int{want, max(int)}) {
 		claimed: [dynamic]u8
 		defer delete(claimed)
-		err = bzip2.decompress(&claimed, stream[:], expected, max(int))
+		err = bzip2.decompress(&claimed, stream[:], expected, {max_output_size = max(int)})
 		testing.expectf(t, err == nil, "expected %v: %v", expected, err)
 		testing.expectf(t, cap(claimed) <= max(want, min(expected, bound)), "expected %v: capacity %v, bound %v", expected, cap(claimed), bound)
 	}
 
 	empty: [dynamic]u8
 	defer delete(empty)
-	testing.expect_value(t, bzip2.decompress(&empty, transmute([]u8)string("BZh9\x17\x72\x45\x38\x50\x90\x00\x00\x00\x00"), 1 << 30, max(int)), nil)
+	testing.expect_value(t, bzip2.decompress(&empty, transmute([]u8)string("BZh9\x17\x72\x45\x38\x50\x90\x00\x00\x00\x00"), 1 << 30, {max_output_size = max(int)}), nil)
 	testing.expect_value(t, len(empty), 0)
 	testing.expect_value(t, cap(empty), 0)
 }
@@ -413,7 +413,7 @@ bzip2_bit_flips :: proc(t: ^testing.T) {
 		}
 		output: [dynamic]u8
 		defer delete(output)
-		err := bzip2.decompress(&output, corrupt, -1, 1 << 20)
+		err := bzip2.decompress(&output, corrupt, -1, {max_output_size = 1 << 20})
 		testing.expectf(t, cap(output) <= 1 << 20, "capacity %v", cap(output))
 		if err == nil {
 			testing.expect(t, bytes.equal(output[:], data))

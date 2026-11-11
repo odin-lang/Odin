@@ -3,6 +3,7 @@ package compress_bzip2
 import "base:intrinsics"
 import "base:runtime"
 import "core:compress"
+import "core:io"
 
 compress :: proc{compress_to_slice, compress_to_dynamic}
 
@@ -51,19 +52,115 @@ compress_to_dynamic :: proc(output: ^[dynamic]u8, input: []u8, level := Level.De
 	return
 }
 
+writer_init :: proc(bw: ^Writer, w: io.Writer, level := Level.Default, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
+	bw^ = {}
+	bw.w         = w
+	bw.allocator = allocator
+	bw.crc       = 0xffff_ffff
+	defer bw.err = err
+
+	if level < .Level_1 || level > .Level_9 || options.max_output_size < 0 || options.max_memory < 0 || options.chunk_size < 0 {
+		return General_Error.Incompatible_Options
+	}
+	nblock_max := int(level) * BZIP2_BLOCK_UNIT - 19
+	out_size   := bzip2_block_bound(nblock_max)
+	memory     := size_of(BZip2)
+	if options.buffer != nil {
+		if len(options.buffer) < out_size {
+			return General_Error.Incompatible_Options
+		}
+		bw.out = options.buffer
+	} else {
+		memory += out_size
+	}
+	if memory > compress.memory_limit(options) {
+		return General_Error.Memory_Limit_Exceeded
+	}
+
+	state := runtime.mem_alloc_non_zeroed(size_of(BZip2), align_of(BZip2), allocator) or_return
+	bw.state = (^BZip2)(raw_data(state))
+	if bw.out == nil {
+		bw.out      = non_zero_make([]u8, out_size, allocator) or_return
+		bw.owns_out = true
+	}
+	e := bw.state
+	e.nblock_max = nblock_max
+	e.nblock     = 0
+	e.in_use     = {}
+	bzip2_begin(e, bw.out, level)
+	return nil
+}
+
+writer_write :: proc(bw: ^Writer, p: []u8) -> (n: int, err: Error) {
+	if bw.err != nil {
+		return 0, bw.err
+	}
+	if bw.finished {
+		return 0, io.Error.Closed
+	}
+	defer bw.err = err
+	e     := bw.state
+	start := bw.total
+	for c, i in p {
+		if e.nblock >= e.nblock_max {
+			bzip2_writer_crc(bw, p, start, start + i64(i) - i64(e.in_len))
+			if block_err := bzip2_writer_block(bw); block_err != nil {
+				return i, block_err
+			}
+		}
+		bzip2_add_char(e, c)
+	}
+	bw.total += i64(len(p))
+	bzip2_writer_crc(bw, p, start, bw.total - i64(e.in_len))
+	if e.in_ch < 256 {
+		bw.carried = u8(e.in_ch)
+	}
+	return len(p), nil
+}
+
+writer_finish :: proc(bw: ^Writer) -> (err: Error) {
+	if bw.err != nil {
+		return bw.err
+	}
+	if bw.finished {
+		return nil
+	}
+	defer bw.err = err
+	e := bw.state
+	if e.in_ch < 256 {
+		bzip2_add_run(e)
+		e.in_ch  = 256
+		e.in_len = 0
+	}
+	bzip2_writer_crc(bw, nil, bw.total, bw.total)
+	if e.nblock > 0 {
+		bzip2_writer_block(bw) or_return
+	}
+	bzip2_end(e, bw.combined)
+	bzip2_writer_flush(bw) or_return
+	bw.finished = true
+	return nil
+}
+
+writer_to_stream :: proc(bw: ^Writer) -> (s: io.Stream) {
+	s.data      = bw
+	s.procedure = bzip2_writer_stream_proc
+	return
+}
+
+writer_destroy :: proc(bw: ^Writer) {
+	if bw.owns_out {
+		delete(bw.out, bw.allocator)
+	}
+	free(bw.state, bw.allocator)
+	bw.state    = nil
+	bw.out      = nil
+	bw.owns_out = false
+}
+
 @(private)
 bzip2_compress :: proc(e: ^BZip2, output, input: []u8, level: Level) -> (written: int) {
-	e.out     = output
-	e.out_pos = 0
-	e.bits    = 0
-	e.live    = 0
-	e.in_ch   = 256
-	e.in_len  = 0
-
-	bzip2_put_bits(e, 8, 'B')
-	bzip2_put_bits(e, 8, 'Z')
-	bzip2_put_bits(e, 8, 'h')
-	bzip2_put_bits(e, 8, '0' + u32(level))
+	bzip2_begin(e, output, level)
 
 	combined := u32(0)
 	in_pos   := 0
@@ -90,16 +187,7 @@ bzip2_compress :: proc(e: ^BZip2, output, input: []u8, level: Level) -> (written
 			block_crc := ~bzip2_crc(0xffff_ffff, input[start:end])
 			start = end
 			combined = ((combined << 1) | (combined >> 31)) ~ block_crc
-
-			bzip2_block_sort(e)
-
-			bzip2_put_bits(e, 24, u32(BLOCK_MAGIC >> 24))
-			bzip2_put_bits(e, 24, u32(BLOCK_MAGIC & 0xff_ffff))
-			bzip2_put_u32(e, block_crc)
-			bzip2_put_bits(e, 1, 0)
-			bzip2_put_bits(e, 24, u32(e.orig_ptr))
-			bzip2_generate_mtf_values(e)
-			bzip2_send_mtf_values(e)
+			bzip2_encode_block(e, block_crc)
 		}
 
 		if last {
@@ -107,6 +195,40 @@ bzip2_compress :: proc(e: ^BZip2, output, input: []u8, level: Level) -> (written
 		}
 	}
 
+	bzip2_end(e, combined)
+	return e.out_pos
+}
+
+@(private)
+bzip2_begin :: proc(e: ^BZip2, output: []u8, level: Level) {
+	e.out     = output
+	e.out_pos = 0
+	e.bits    = 0
+	e.live    = 0
+	e.in_ch   = 256
+	e.in_len  = 0
+
+	bzip2_put_bits(e, 8, 'B')
+	bzip2_put_bits(e, 8, 'Z')
+	bzip2_put_bits(e, 8, 'h')
+	bzip2_put_bits(e, 8, '0' + u32(level))
+}
+
+@(private)
+bzip2_encode_block :: proc(e: ^BZip2, block_crc: u32) {
+	bzip2_block_sort(e)
+
+	bzip2_put_bits(e, 24, u32(BLOCK_MAGIC >> 24))
+	bzip2_put_bits(e, 24, u32(BLOCK_MAGIC & 0xff_ffff))
+	bzip2_put_u32(e, block_crc)
+	bzip2_put_bits(e, 1, 0)
+	bzip2_put_bits(e, 24, u32(e.orig_ptr))
+	bzip2_generate_mtf_values(e)
+	bzip2_send_mtf_values(e)
+}
+
+@(private)
+bzip2_end :: proc(e: ^BZip2, combined: u32) {
 	bzip2_put_bits(e, 24, u32(END_MAGIC >> 24))
 	bzip2_put_bits(e, 24, u32(END_MAGIC & 0xff_ffff))
 	bzip2_put_u32(e, combined)
@@ -116,7 +238,80 @@ bzip2_compress :: proc(e: ^BZip2, output, input: []u8, level: Level) -> (written
 		e.bits   <<= 8
 		e.live     = e.live - 8 if e.live > 8 else 0
 	}
-	return e.out_pos
+}
+
+@(private)
+bzip2_block_bound :: proc "contextless" (nblock_max: int) -> int {
+	return (BZIP2_ENCODE_MAX_LEN * (nblock_max + 64) + 7) / 8 + 32 * 1024
+}
+
+@(private)
+bzip2_writer_crc :: proc(bw: ^Writer, p: []u8, start, target: i64) {
+	if bw.done < start {
+		run: [255]u8
+		k := int(min(target, start) - bw.done)
+		for &b in run[:k] {
+			b = bw.carried
+		}
+		bw.crc   = bzip2_crc(bw.crc, run[:k])
+		bw.done += i64(k)
+	}
+	if target > bw.done {
+		bw.crc  = bzip2_crc(bw.crc, p[bw.done - start:target - start])
+		bw.done = target
+	}
+}
+
+@(private)
+bzip2_writer_block :: proc(bw: ^Writer) -> (err: Error) {
+	e := bw.state
+	block_crc  := ~bw.crc
+	bw.crc      = 0xffff_ffff
+	bw.combined = ((bw.combined << 1) | (bw.combined >> 31)) ~ block_crc
+	bzip2_encode_block(e, block_crc)
+	e.nblock = 0
+	e.in_use = {}
+	return bzip2_writer_flush(bw)
+}
+
+@(private)
+bzip2_writer_flush :: proc(bw: ^Writer) -> (err: Error) {
+	e := bw.state
+	if e.out_pos > 0 {
+		_, write_err := io.write_full(bw.w, e.out[:e.out_pos])
+		if write_err != nil {
+			return write_err
+		}
+		e.out_pos = 0
+	}
+	return nil
+}
+
+@(private)
+bzip2_writer_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	bw := (^Writer)(stream_data)
+	#partial switch mode {
+	case .Write:
+		written, write_err := writer_write(bw, p)
+		n = i64(written)
+		if write_err != nil {
+			io_err, is_io := write_err.(io.Error)
+			err = io_err if is_io else .Unknown
+		}
+		return
+	case .Close:
+		if finish_err := writer_finish(bw); finish_err != nil {
+			io_err, is_io := finish_err.(io.Error)
+			err = io_err if is_io else .Unknown
+		}
+		return
+	case .Destroy:
+		writer_destroy(bw)
+		return 0, nil
+	case .Query:
+		return io.query_utility({.Write, .Close, .Destroy, .Query})
+	}
+	return 0, .Unsupported
 }
 
 @(private)

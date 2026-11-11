@@ -328,10 +328,10 @@ _decode_whole :: proc(r: ^Reader, sniffed: Sniffed) -> (err: Error) {
 		#partial switch sniffed {
 		case .BZip2:
 			r.compression = .BZip2
-			decode_err = bzip2.decompress_from_bytes(&r.decoded, r.input_data, -1, limit, r.allocator)
+			decode_err = bzip2.decompress_from_bytes(&r.decoded, r.input_data, -1, r.options, r.allocator)
 		case .LZ4:
 			r.compression = .LZ4
-			decode_err = lz4.decompress_frame_from_bytes(&r.decoded, r.input_data, -1, limit, nil, r.allocator)
+			decode_err = lz4.decompress_frame_from_bytes(&r.decoded, r.input_data, -1, r.options, nil, r.allocator)
 		case .LZMA:
 			r.compression = .LZMA
 			decode_err = lzma.decompress_from_bytes(&r.decoded, r.input_data, -1, limit, r.allocator)
@@ -342,10 +342,10 @@ _decode_whole :: proc(r: ^Reader, sniffed: Sniffed) -> (err: Error) {
 		#partial switch sniffed {
 		case .BZip2:
 			r.compression = .BZip2
-			decode_err = bzip2.decompress_from_context(&r.ctx, -1, limit, r.allocator)
+			decode_err = bzip2.decompress_from_context(&r.ctx, -1, r.options, r.allocator)
 		case .LZ4:
 			r.compression = .LZ4
-			decode_err = lz4.decompress_frame_from_context(&r.ctx, -1, limit, nil, r.allocator)
+			decode_err = lz4.decompress_frame_from_context(&r.ctx, -1, r.options, nil, r.allocator)
 		case .LZMA:
 			r.compression = .LZMA
 			decode_err = lzma.decompress_from_context(&r.ctx, -1, limit, r.allocator)

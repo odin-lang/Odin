@@ -57,7 +57,7 @@ lz4_max_output_size :: proc(t: ^testing.T) {
 	for limit in ([]int{64 * 1024, len(data)}) {
 		output: [dynamic]byte
 		defer delete(output)
-		err := lz4.decompress_frame(&output, packed[:], max_output_size = limit)
+		err := lz4.decompress_frame(&output, packed[:], options = {max_output_size = limit})
 		if limit == len(data) {
 			testing.expectf(t, err == nil, "%v", err)
 			testing.expectf(t, len(output) == len(data), "%v bytes", len(output))
@@ -69,7 +69,7 @@ lz4_max_output_size :: proc(t: ^testing.T) {
 
 	output: [dynamic]byte
 	defer delete(output)
-	testing.expect_value(t, lz4.decompress_frame(&output, packed[:], 2 * len(data), len(data)), compress.Error(compress.General_Error.Output_Too_Short))
+	testing.expect_value(t, lz4.decompress_frame(&output, packed[:], 2 * len(data), {max_output_size = len(data)}), compress.Error(compress.General_Error.Output_Too_Short))
 	testing.expect_value(t, cap(output), 0)
 }
 
