@@ -61,40 +61,40 @@ atanh :: proc{
 
 
 acos_complex32 :: proc "contextless" (x: complex32) -> complex32 {
-	return complex32(acos_complex64(complex64(x)))
+	return complex32(acos_complex128(complex128(x)))
 }
 acos_complex64 :: proc "contextless" (x: complex64) -> complex64 {
-	w := asin(x)
-	return complex(math.PI/2 - real(w), -imag(w))
+	return complex64(acos_complex128(complex128(x)))
 }
 acos_complex128 :: proc "contextless" (x: complex128) -> complex128 {
-	w := asin(x)
-	return complex(math.PI/2 - real(w), -imag(w))
+	re, im := real(x), imag(x)
+	if math.is_inf(re, 0) || math.is_nan(re) || math.is_inf(im, 0) || math.is_nan(im) {
+		w := asin(x)
+		return complex(math.PI/2 - real(w), -imag(w))
+	}
+	_, cr, ci := _asin_core_f64(abs(re), abs(im))
+	if math.sign_bit(re) {
+		cr = math.PI - cr
+	}
+	return complex(cr, -math.copy_sign(ci, im))
 }
 
 
 acosh_complex32 :: proc "contextless" (x: complex32) -> complex32 {
-	return complex32(acosh_complex64(complex64(x)))
+	return complex32(acosh_complex128(complex128(x)))
 }
 acosh_complex64 :: proc "contextless" (x: complex64) -> complex64 {
-	if x == 0 {
-		return complex(0, math.copy_sign(math.PI/2, imag(x)))
-	}
-	w := acos(x)
-	if imag(w) <= 0 {
-		return complex(-imag(w), real(w))
-	}
-	return complex(imag(w), -real(w))
+	return complex64(acosh_complex128(complex128(x)))
 }
 acosh_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	if x == 0 {
 		return complex(0, math.copy_sign(math.PI/2, imag(x)))
 	}
-	w := acos(x)
-	if imag(w) <= 0 {
-		return complex(-imag(w), real(w))
+	if math.is_nan(imag(x)) && !math.is_inf(real(x), 0) {
+		return complex(imag(x), imag(x))
 	}
-	return complex(imag(w), -real(w))
+	w := acos(x)
+	return complex(abs(imag(w)), math.copy_sign(real(w), imag(x)))
 }
 
 asin_complex32 :: proc "contextless" (x: complex32) -> complex32 {
@@ -130,12 +130,8 @@ asin_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	case math.is_inf(re, 0):
 		return complex(math.copy_sign(math.PI/2, re), math.copy_sign(re, im))
 	}
-	ct := complex(-imag(x), real(x)) // i * x
-	xx := x * x
-	x1 := complex(1-real(xx), -imag(xx)) // 1 - x*x
-	x2 := sqrt(x1)                       // x2 = sqrt(1 - x*x)
-	w  := ln(ct + x2)
-	return complex(imag(w), -real(w)) // -i * w
+	ar, _, ai := _asin_core_f64(abs(real(x)), abs(imag(x)))
+	return complex(math.copy_sign(ar, real(x)), math.copy_sign(ai, imag(x)))
 }
 
 asinh_complex32 :: proc "contextless" (x: complex32) -> complex32 {
@@ -171,9 +167,8 @@ asinh_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	case math.is_inf(im, 0):
 		return complex(math.copy_sign(im, re), math.copy_sign(math.PI/2, im))
 	}
-	xx := x * x
-	x1 := complex(1+real(xx), imag(xx)) // 1 + x*x
-	return ln(x + sqrt(x1))            // log(x + sqrt(1 + x*x))
+	ar, _, ai := _asin_core_f64(abs(imag(x)), abs(real(x)))
+	return complex(math.copy_sign(ai, real(x)), math.copy_sign(ar, imag(x)))
 }
 
 
@@ -192,72 +187,129 @@ atan_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	//     z = x + iy,
 	//
 	// then
-	//          1       (    2x     )
-	// Re w  =  - arctan(-----------)  +  k PI
-	//          2       (     2    2)
-	//                  (1 - x  - y )
 	//
-	//               ( 2         2)
-	//          1    (x  +  (y+1) )
-	// Im w  =  - log(------------)
-	//          4    ( 2         2)
-	//               (x  +  (y-1) )
+	//     Re w  =  1/2 atan2(2x, 1 - x^2 - y^2),
 	//
-	// Where k is an arbitrary integer.
+	//                     x^2 + (y + 1)^2
+	//     Im w  =  1/4 ln ---------------.
+	//                     x^2 + (y - 1)^2
 	//
-	// catan(z) = -i catanh(iz).
+	// atan2 gives the principal value, so Re w lies in [-PI/2, PI/2].
+	// 1 - y^2 is evaluated as (1 - |y|)(1 + |y|), and Im w as
+	// 1/4 log1p(4|y| / (x^2 + (1 - |y|)^2)) with the sign of y, which
+	// avoids cancellation when |y| is near 1 and when y is small.
+	// When |x| or |y| exceeds 2^500, Re w is PI/2 with the sign of x
+	// and Im w is y/|z|^2, scaled so that |z|^2 does not overflow.
+	// For |y| = 1 and |x| below 2^-500, where x^2 would underflow,
+	// Im w is (ln 2 - ln|x|)/2 with the sign of y.
+	//
+	// It is computed as catan(z) = -i catanh(iz), the identity C99 Annex G
+	// defines catan by, so it shares catanh's special values.
 	//
 	// ACCURACY:
 	//
 	//                      Relative error:
 	// arithmetic   domain     # trials      peak         rms
-	//    DEC       -10,+10      5900       1.3e-16     7.8e-18
-	//    IEEE      -10,+10     30000       2.3e-15     8.5e-17
-	// The check catan( ctan(z) )  =  z, with |x| and |y| < PI/2,
-	// had peak relative error 1.5e-16, rms relative error
-	// 2.9e-17.  See also clog().
+	//    IEEE      -10,+10     30000       1.9e-16     6.1e-17
 
-	switch re, im := real(x), imag(x); {
-	case im == 0:
-		return complex(math.atan(re), im)
-	case re == 0 && abs(im) <= 1:
-		return complex(re, math.atanh(im))
-	case math.is_inf(im, 0) || math.is_inf(re, 0):
-		if math.is_nan(re) {
-			return complex(math.nan_f64(), math.copy_sign(0, im))
-		}
-		return complex(math.copy_sign(math.PI/2, re), math.copy_sign(0, im))
-	case math.is_nan(re) || math.is_nan(im):
-		return nan_complex128()
-	}
-	x2 := real(x) * real(x)
-	a := 1 - x2 - imag(x)*imag(x)
-	if a == 0 {
-		return nan_complex128()
-	}
-	t := 0.5 * math.atan2(2*real(x), a)
-	w := _reduce_pi_f64(t)
-
-	t = imag(x) - 1
-	b := x2 + t*t
-	if b == 0 {
-		return nan_complex128()
-	}
-	t = imag(x) + 1
-	c := (x2 + t*t) / b
-	return complex(w, 0.25*math.ln(c))
+	w := atanh_complex128(complex(-imag(x), real(x)))
+	return complex(imag(w), -real(w))
 }
 
 atanh_complex32 :: proc "contextless" (x: complex32) -> complex32 {
-	return complex32(atanh_complex64(complex64(x)))
+	return complex32(atanh_complex128(complex128(x)))
 }
 atanh_complex64 :: proc "contextless" (x: complex64) -> complex64 {
-	z := complex(-imag(x), real(x)) // z = i * x
-	z = atan(z)
-	return complex(imag(z), -real(z)) // z = -i * z
+	return complex64(atanh_complex128(complex128(x)))
 }
 atanh_complex128 :: proc "contextless" (x: complex128) -> complex128 {
-	z := complex(-imag(x), real(x)) // z = i * x
-	z = atan(z)
-	return complex(imag(z), -real(z)) // z = -i * z
+	LARGE :: f64(1 << 500)
+	TINY  :: 1.0 / (1 << 500)
+
+	re, im := real(x), imag(x)
+	ax, ay := abs(re), abs(im)
+	rr, ri: f64
+	switch {
+	case math.is_inf(ax, 0) || math.is_inf(ay, 0):
+		rr = 0
+		ri = math.PI/2
+		if math.is_nan(ay) {
+			ri = ay
+		}
+	case math.is_nan(ax) || math.is_nan(ay):
+		if ax == 0 {
+			rr, ri = 0, ay
+		} else {
+			rr, ri = math.nan_f64(), math.nan_f64()
+		}
+	case ax > LARGE || ay > LARGE:
+		p := max(ax, ay)
+		q := min(ax, ay) / p
+		rr = ((ax/p) / (1 + q*q)) / p
+		ri = math.PI/2
+	case:
+		if ax == 1 && ay < TINY {
+			rr = 0.5 * (math.LN2 - math.ln(ay))
+		} else {
+			d := (1 - ax)*(1 - ax) + ay*ay
+			rr = 0.25 * math.log1p(4*ax/d)
+		}
+		ri = 0.5 * math.atan2(2*ay, (1 - ax)*(1 + ax) - ay*ay)
+	}
+	return complex(math.copy_sign(rr, re), math.copy_sign(ri, im))
+}
+
+
+@(private="file")
+_asin_core_f64 :: proc "contextless" (x, y: f64) -> (asin_re, acos_re, im: f64) {
+	A_CROSS   :: 1.5
+	B_CROSS   :: 0.6417
+	LARGE     :: f64(1 << 500)
+	NEAR_ZERO :: 1.0 / (1 << 27)
+	TINY      :: 1.0 / (1 << 511)
+
+	if x > LARGE || y > LARGE {
+		return math.atan2(x, y), math.atan2(y, x), math.LN2 + _ln_abs_f64(x, y)
+	}
+	if x < NEAR_ZERO && y < NEAR_ZERO {
+		return x, math.PI/2 - x, y
+	}
+
+	xp1 := x + 1
+	xm1 := x - 1
+	r := math.hypot(xp1, y)
+	s := math.hypot(xm1, y)
+	a := 0.5 * (r + s)
+	b := x / a
+	y2 := y * y
+
+	if x < 1 && y < TINY {
+		im = y / math.sqrt((1 - x)*(1 + x))
+	} else if a <= A_CROSS {
+		t: f64
+		if x < 1 {
+			t = y2/(r + xp1) + y2/(s + (1 - x))
+		} else {
+			t = y2/(r + xp1) + (s + xm1)
+		}
+		im = math.log1p(0.5*t + math.sqrt(t*(a + 1)*0.5))
+	} else {
+		im = math.ln(a + math.sqrt(a*a - 1))
+	}
+
+	if b <= B_CROSS {
+		asin_re = math.asin(b)
+		acos_re = math.acos(b)
+	} else {
+		apx := a + x
+		d: f64
+		if x <= 1 {
+			d = math.sqrt(0.5 * apx * (y2/(r + xp1) + (s + (1 - x))))
+		} else {
+			d = y * math.sqrt(0.5 * (apx/(r + xp1) + apx/(s + xm1)))
+		}
+		asin_re = math.atan2(x, d)
+		acos_re = math.atan2(d, x)
+	}
+	return
 }

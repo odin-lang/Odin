@@ -1786,7 +1786,7 @@ atan2_f64 :: proc "contextless" (y, x: f64) -> f64 {
 
 	q := atan(y / x)
 	if x < 0 {
-		if q <= 0 {
+		if y > 0 {
 			return q + PI
 		}
 		return q - PI
@@ -2068,13 +2068,55 @@ acos :: proc{
 }
 
 @(require_results)
-sinh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return copy_sign(((exp(x) - exp(-x))*0.5), x)
+sinh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
+	NEAR_ZERO :: 1.0 / (1 << 27)
+
+	x := f64(y)
+	a := abs(x)
+	r: f64
+	switch {
+	case a < NEAR_ZERO:
+		return y
+	case a < 1:
+		z := a*a
+		p := 1.0/121645100408832000
+		p = p*z + 1.0/355687428096000
+		p = p*z + 1.0/1307674368000
+		p = p*z + 1.0/6227020800
+		p = p*z + 1.0/39916800
+		p = p*z + 1.0/362880
+		p = p*z + 1.0/5040
+		p = p*z + 1.0/120
+		p = p*z + 1.0/6
+		r = a + a*z*p
+	case a < 22:
+		e := exp(a)
+		r = 0.5*(e - 1/e)
+	case a < 709:
+		r = 0.5*exp(a)
+	case:
+		h := exp(0.5*a)
+		r = (0.5*h)*h
+	}
+	return T(copy_sign(r, x))
 }
 
 @(require_results)
-cosh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return ((exp(x) + exp(-x))*0.5)
+cosh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
+	NEAR_ZERO :: 1.0 / (1 << 27)
+
+	a := abs(f64(y))
+	switch {
+	case a < NEAR_ZERO:
+		return 1
+	case a < 22:
+		e := exp(a)
+		return T(0.5*(e + 1/e))
+	case a < 709:
+		return T(0.5*exp(a))
+	}
+	h := exp(0.5*a)
+	return T((0.5*h)*h)
 }
 
 @(require_results)
