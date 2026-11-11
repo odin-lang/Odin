@@ -13,7 +13,7 @@ jobs:
       timeout-minutes: 15
       uses: vmactions/netbsd-vm@v1
       with:
-        release: "10.0"
+        release: "11.0"
         envs: PKGSRC_BRANCH
         sync: scp
         usesh: true
