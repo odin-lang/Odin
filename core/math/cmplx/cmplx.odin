@@ -310,40 +310,10 @@ exp_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 
 
 pow_complex32 :: proc "contextless" (x, y: complex32) -> complex32 {
-	return complex32(pow_complex64(complex64(x), complex64(y)))
+	return complex32(pow_complex128(complex128(x), complex128(y)))
 }
 pow_complex64 :: proc "contextless" (x, y: complex64) -> complex64 {
-	if x == 0 { // Guaranteed also true for x == -0.
-		if is_nan(y) {
-			return nan_complex64()
-		}
-		r, i := real(y), imag(y)
-		switch {
-		case r == 0:
-			return 1
-		case r < 0:
-			if i == 0 {
-				return complex(math.inf_f32(1), 0)
-			}
-			return inf_complex64()
-		case r > 0:
-			return 0
-		}
-		return nan_complex64()
-	}
-	modulus := abs(x)
-	if modulus == 0 {
-		return complex(0, 0)
-	}
-	r := math.pow(modulus, real(y))
-	arg := phase(x)
-	theta := real(y) * arg
-	if imag(y) != 0 {
-		r *= math.exp(-imag(y) * arg)
-		theta += imag(y) * math.ln(modulus)
-	}
-	s, c := math.sincos(theta)
-	return complex(r*c, r*s)
+	return complex64(pow_complex128(complex128(x), complex128(y)))
 }
 pow_complex128 :: proc "contextless" (x, y: complex128) -> complex128 {
 	if x == 0 { // Guaranteed also true for x == -0.
@@ -374,6 +344,9 @@ pow_complex128 :: proc "contextless" (x, y: complex128) -> complex128 {
 	if imag(y) != 0 {
 		r *= math.exp(-imag(y) * arg)
 		theta += imag(y) * math.ln(modulus)
+	}
+	if theta == 0 {
+		return complex(r, theta)
 	}
 	s, c := math.sincos(theta)
 	return complex(r*c, r*s)

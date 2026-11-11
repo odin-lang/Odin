@@ -231,3 +231,32 @@ test_pow_zero_base_nan_exponent :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@test
+test_pow_real_result :: proc(t: ^testing.T) {
+	inf := math.inf_f64(1)
+	nan := math.nan_f64()
+
+	Case :: struct {
+		x, y, want: complex128,
+	}
+	cases := []Case{
+		{2, 3, 8},
+		{1e200, 2, complex(inf, 0)},
+		// Deliberate: an infinite real base gives a real result; pow(Inf, 0) = 1 as in FreeBSD's cpow.
+		// glibc's cexp(y*clog(x)) gives NaN or (Inf, NaN) here, from 0*Inf inside its complex multiply.
+		{complex(inf, 0), 2, complex(inf, 0)},
+		{complex(inf, 0), 0.5, complex(inf, 0)},
+		{complex(inf, 0), 0, 1},
+		// As in C, not Python: pow(NaN, 0) and rect(0, Inf) are NaN.
+		{complex(nan, 0), 0, complex(nan, nan)},
+	}
+	for c in cases {
+		got := cmplx.pow(c.x, c.y)
+		testing.expectf(t, same_complex(got, c.want), "pow(%v, %v) = %v, want %v", c.x, c.y, got, c.want)
+	}
+
+	got64 := cmplx.pow(complex64(1e-30), complex64(-2))
+	want64 := complex(math.inf_f32(1), math.copy_sign(f32(0), -1))
+	testing.expectf(t, same_complex(got64, want64), "pow(complex64(1e-30), -2) = %v, want %v", got64, want64)
+}
