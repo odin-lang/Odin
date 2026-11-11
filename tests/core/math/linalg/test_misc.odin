@@ -13,6 +13,11 @@ vector_close :: proc(a, b: $V/[$N]$E, eps: f64) -> bool {
 	return true
 }
 
+@(private="file")
+quaternion_close :: proc(a, b: $Q, eps: f64) -> bool {
+	return abs(f64(a.w) - f64(b.w)) <= eps && abs(f64(a.x) - f64(b.x)) <= eps && abs(f64(a.y) - f64(b.y)) <= eps && abs(f64(a.z) - f64(b.z)) <= eps
+}
+
 @test
 test_matrix2_inverse_transpose :: proc(t: ^testing.T) {
 	{
@@ -73,4 +78,19 @@ test_matrix1x1_adjugate_and_cofactor :: proc(t: ^testing.T) {
 		testing.expectf(t, a == 1, "adjugate(%v) = %v, want [1]", m, a)
 		testing.expectf(t, c == 1, "cofactor(%v) = %v, want [1]", m, c)
 	}
+}
+
+@test
+test_quaternion_from_forward_and_up :: proc(t: ^testing.T) {
+	fwd := linalg.Vector3f64{1, 0, 0}
+	up := linalg.Vector3f64{0, 1, 0}
+	q := linalg.quaternion_from_forward_and_up(fwd, up)
+
+	f := linalg.quaternion_mul_vector3(q, linalg.Vector3f64{0, 0, -1})
+	testing.expectf(t, vector_close(f, fwd, 1e-12), "q * -Z = %v, want %v", f, fwd)
+	u := linalg.quaternion_mul_vector3(q, linalg.Vector3f64{0, 1, 0})
+	testing.expectf(t, vector_close(u, up, 1e-12), "q * +Y = %v, want %v", u, up)
+
+	look := linalg.quaternion_look_at(linalg.Vector3f64{}, fwd, up)
+	testing.expectf(t, quaternion_close(q, conj(look), 1e-12), "quaternion_from_forward_and_up = %v, want conj(quaternion_look_at) = %v", q, conj(look))
 }
