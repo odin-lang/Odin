@@ -32,13 +32,16 @@ _get_dns_records_os :: proc(hostname: string, type: DNS_Record_Type, allocator :
 		}
 	}
 
-	name_servers, resolve_ok := load_resolv_conf(dns_configuration.resolv_conf)
-	defer delete(name_servers)
-	if !resolve_ok {
-		return nil, .Invalid_Resolv_Config_Error
-	}
-	if len(name_servers) == 0 {
-		return
+	// Android has no resolv.conf: its resolver is netd.
+	when ODIN_PLATFORM_SUBTARGET != .Android {
+		name_servers, resolve_ok := load_resolv_conf(dns_configuration.resolv_conf)
+		defer delete(name_servers)
+		if !resolve_ok {
+			return nil, .Invalid_Resolv_Config_Error
+		}
+		if len(name_servers) == 0 {
+			return
+		}
 	}
 
 	hosts, hosts_ok := load_hosts(dns_configuration.hosts_file)
@@ -83,5 +86,9 @@ _get_dns_records_os :: proc(hostname: string, type: DNS_Record_Type, allocator :
 		return host_overrides[:], nil
 	}
 
-	return get_dns_records_from_nameservers(hostname, type, name_servers, host_overrides[:])
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		return get_dns_records_from_netd(hostname, type)
+	} else {
+		return get_dns_records_from_nameservers(hostname, type, name_servers, host_overrides[:])
+	}
 }

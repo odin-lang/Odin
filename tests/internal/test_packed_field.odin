@@ -321,12 +321,51 @@ test_packed_field_zero_store :: proc(t: ^testing.T) {
 }
 
 
+// a #packed field put in an `any`;
+// the `any` data must be aligned for the field type
+
+Packed_Any :: struct #packed {
+	_: u8,
+	w: [2]u128,     // offs 1
+	v: #simd[4]f32, // offs 33
+}
+
+@(export)
+p7: Packed_Any
+
+@(private="file")
+xor_any_wide :: proc(a: any) -> u128 {
+	w := (^[2]u128)(a.data)^
+	return w[0] ~ w[1]
+}
+
+@(private="file")
+any_simd_to_array :: proc(a: any) -> [4]f32 {
+	return simd.to_array((^#simd[4]f32)(a.data)^)
+}
+
+@(private="file")
+xor_field_wide :: proc(p: ^Packed_Any) -> u128 {
+	return xor_any_wide(p.w)
+}
+
+@(test)
+test_packed_field_in_any :: proc(t: ^testing.T) {
+	p7.w = {3, 5}
+	p7.v = {1, 2, 3, 4}
+
+	testing.expect(t, #force_no_inline xor_any_wide(p7.w) == 6) // folded const GEP
+	testing.expect(t, #force_no_inline any_simd_to_array(p7.v) == [4]f32{1, 2, 3, 4})
+	testing.expect(t, #force_no_inline xor_field_wide(&p7) == 6) // GEP with packed metadata
+}
+
+
 // field access through ^runtime.Unaligned must compile to misalignment safe code
 
 import "base:runtime"
 
 @(export)
-p7: Packed_Small
+p8: Packed_Small
 
 @(private="file")
 read_wrapped :: proc(u: ^runtime.Unaligned(#simd[4]f32)) -> #simd[4]f32 {
@@ -340,12 +379,12 @@ write_wrapped :: proc(u: ^runtime.Unaligned(#simd[4]f32), x: #simd[4]f32) {
 
 @(test)
 test_packed_field_unaligned_wrapper :: proc(t: ^testing.T) {
-	p7.v = {1, 2, 3, 4}
+	p8.v = {1, 2, 3, 4}
 
-	u := (^runtime.Unaligned(#simd[4]f32))(&p7.v) // addr of field at offset 1
+	u := (^runtime.Unaligned(#simd[4]f32))(&p8.v) // addr of field at offset 1
 	y := #force_no_inline read_wrapped(u)
 	testing.expect(t, simd.to_array(y) == [4]f32{1, 2, 3, 4})
 
 	#force_no_inline write_wrapped(u, {5, 6, 7, 8})
-	testing.expect(t, simd.to_array(p7.v) == [4]f32{5, 6, 7, 8})
+	testing.expect(t, simd.to_array(p8.v) == [4]f32{5, 6, 7, 8})
 }

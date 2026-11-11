@@ -220,7 +220,7 @@ gb_internal isize ast_node_size(AstKind kind) {
 gb_internal Ast *alloc_ast_node(AstFile *f, AstKind kind) {
 	isize size = ast_node_size(kind);
 
-	Ast *node = cast(Ast *)arena_alloc(get_arena(ThreadArena_Permanent), size, 16);
+	Ast *node = cast(Ast *)arena_alloc(get_arena(ThreadArena_Permanent), size, 8);
 	node->kind = kind;
 	node->file_id = f ? f->id : 0;
 
@@ -993,7 +993,7 @@ gb_internal Ast *ast_basic_lit(AstFile *f, Token basic_lit) {
 	Ast *result = alloc_ast_node(f, Ast_BasicLit);
 	result->BasicLit.token = basic_lit;
 	result->tav.mode = Addressing_Constant;
-	result->tav.value = exact_value_from_token(f, basic_lit);
+	result->tav.set_value(exact_value_from_token(f, basic_lit));
 	return result;
 }
 

@@ -1,12 +1,18 @@
 // Reader and writer for Microsoft `BMP` images.
 package core_image_bmp
 
+/*
+	Copyright 2024 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+*/
+
 import "core:image"
-import "core:bytes"
 import "core:compress"
 import "core:mem"
 import "base:intrinsics"
-import "base:runtime"
 
 Error   :: image.Error
 Image   :: image.Image
@@ -18,7 +24,7 @@ RGBA_Pixel :: image.RGBA_Pixel
 FILE_HEADER_SIZE :: 14
 INFO_STUB_SIZE   :: FILE_HEADER_SIZE + size_of(image.BMP_Version)
 
-save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}, allocator := context.allocator) -> (err: Error) {
+save_to_buffer  :: proc(output: ^[dynamic]byte, img: ^Image, options := Options{}, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
 	if img == nil {
@@ -40,7 +46,7 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 		return .Invalid_Input_Image
 	}
 
-	if img.channels * pixels != len(img.pixels.buf) {
+	if img.channels * pixels != len(img.pixels) {
 		return .Invalid_Input_Image
 	}
 
@@ -70,41 +76,41 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 	}
 	written := 0
 
-	if resize(&output.buf, int(header.size)) != nil {
+	if resize(output, int(header.size)) != nil {
 		return .Unable_To_Allocate_Or_Resize
 	}
 
 	header_bytes := transmute([size_of(image.BMP_Header)]u8)header
 	written += int(total_header_size)
-	copy(output.buf[:], header_bytes[:written])
+	copy(output[:], header_bytes[:written])
 
 	switch img.channels {
 	case 3:
 		row_bytes  := img.width * img.channels
 		row_padded := align4(row_bytes)
-		pixels := mem.slice_data_cast([]RGB_Pixel, img.pixels.buf[:])
+		pixels := mem.slice_data_cast([]RGB_Pixel, img.pixels[:])
 		for y in 0..<img.height {
 			row_offset := row_padded * (img.height - y - 1) + written
 			for x in 0..<img.width {
 				pix_offset := 3 * x
-				output.buf[row_offset + pix_offset + 0] = pixels[0].b
-				output.buf[row_offset + pix_offset + 1] = pixels[0].g
-				output.buf[row_offset + pix_offset + 2] = pixels[0].r
+				output[row_offset + pix_offset + 0] = pixels[0].b
+				output[row_offset + pix_offset + 1] = pixels[0].g
+				output[row_offset + pix_offset + 2] = pixels[0].r
 				pixels = pixels[1:]
 			}
 		}
 
 	case 4:
 		row_bytes  := img.width * img.channels
-		pixels := mem.slice_data_cast([]RGBA_Pixel, img.pixels.buf[:])
+		pixels := mem.slice_data_cast([]RGBA_Pixel, img.pixels[:])
 		for y in 0..<img.height {
 			row_offset := row_bytes * (img.height - y - 1) + written
 			for x in 0..<img.width {
 				pix_offset := 4 * x
-				output.buf[row_offset + pix_offset + 0] = pixels[0].b
-				output.buf[row_offset + pix_offset + 1] = pixels[0].g
-				output.buf[row_offset + pix_offset + 2] = pixels[0].r
-				output.buf[row_offset + pix_offset + 3] = pixels[0].a
+				output[row_offset + pix_offset + 0] = pixels[0].b
+				output[row_offset + pix_offset + 1] = pixels[0].g
+				output[row_offset + pix_offset + 2] = pixels[0].r
+				output[row_offset + pix_offset + 3] = pixels[0].a
 				pixels = pixels[1:]
 			}
 		}
@@ -114,21 +120,15 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 
 
 load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
-	ctx := &compress.Context_Memory_Input{
-		input_data = data,
-	}
-
-	img, err = load_from_context(ctx, options, allocator)
-	return img, err
+	data := data
+	ctx  := compress.init_context_from_slice(&data)
+	return load_from_context(&ctx, options, allocator)
 }
 
 @(optimization_mode="favor_size")
-load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
+load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	context.allocator = allocator
 	options := options
-
-	// For compress.read_slice(), until that's rewritten to not use temp allocator
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	if .info in options {
 		options += {.return_metadata, .do_not_decompress_image}
@@ -140,10 +140,11 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	}
 
 	info_buf: [size_of(image.BMP_Header)]u8
+	stub_buf: [INFO_STUB_SIZE]u8
 
 	// Read file header (14) + info size (4)
-	stub_data := compress.read_slice(ctx, INFO_STUB_SIZE) or_return
-	copy(info_buf[:], stub_data[:])
+	compress.read_ptr(ctx, &stub_buf) or_return
+	copy(info_buf[:], stub_buf[:])
 	stub_info := transmute(image.BMP_Header)info_buf
 
 	if stub_info.magic != .Bitmap {
@@ -178,13 +179,17 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		// Sometimes called BITMAPV2INFOHEADER or BITMAPV3INFOHEADER.
 		// Let's just try to process it.
 
-		to_read   := int(stub_info.info_size) - size_of(image.BMP_Version)
-		info_data := compress.read_slice(ctx, to_read) or_return
-		copy(info_buf[INFO_STUB_SIZE:], info_data[:])
+		buf_to_read := info_buf[INFO_STUB_SIZE:]
+
+		to_read := int(stub_info.info_size) - size_of(image.BMP_Version)
+		if to_read > len(buf_to_read) {
+			return img, .Unsupported_BMP_Version
+		}
+		buf_to_read = buf_to_read[:to_read]
+		compress.read_slice(ctx, buf_to_read) or_return
 
 		// Update info struct with the rest of the data we read
 		info = transmute(image.BMP_Header)info_buf
-
 	case:
 		return img, .Unsupported_BMP_Version
 	}
@@ -244,7 +249,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	// Flipped vertically
 	if info.height < 0 {
-		pixels := mem.slice_data_cast([]RGB_Pixel, img.pixels.buf[:])
+		pixels := mem.slice_data_cast([]RGB_Pixel, img.pixels[:])
 		for y in 0..<img.height / 2 {
 			for x in 0..<img.width {
 				top := y * img.width + x
@@ -267,8 +272,8 @@ is_os2 :: proc(version: image.BMP_Version) -> (res: bool) {
 make_output :: proc(img: ^Image, allocator := context.allocator) -> (err: Error) {
 	assert(img != nil)
 	bytes_needed := img.channels * img.height * img.width
-	img.pixels.buf = make([dynamic]u8, bytes_needed, allocator)
-	if len(img.pixels.buf) != bytes_needed {
+	img.pixels = make([dynamic]u8, bytes_needed, allocator)
+	if len(img.pixels) != bytes_needed {
 		return .Unable_To_Allocate_Or_Resize
 	}
 	return
@@ -278,7 +283,7 @@ write :: proc(img: ^Image, x, y: int, pix: RGB_Pixel) -> (err: Error) {
 	if y >= img.height || x >= img.width {
 		return .Corrupt
 	}
-	out := mem.slice_data_cast([]RGB_Pixel, img.pixels.buf[:])
+	out := mem.slice_data_cast([]RGB_Pixel, img.pixels[:])
 	assert(img.height >= 1 && img.width >= 1)
 	out[(img.height - y - 1) * img.width + x] = pix
 	return
@@ -290,7 +295,7 @@ Bitmask :: struct {
 	bits:  [4]u32le,
 }
 
-read_or_make_bit_masks :: proc(ctx: ^$C, info: image.BMP_Header) -> (res: Bitmask, read: int, err: Error) {
+read_or_make_bit_masks :: proc(ctx: ^compress.Context, info: image.BMP_Header) -> (res: Bitmask, read: int, err: Error) {
 	ctz :: intrinsics.count_trailing_zeros
 	c1s :: intrinsics.count_ones
 
@@ -386,7 +391,7 @@ scale :: proc(val: $T, mask, shift, bits: u32le) -> (res: u8) {
 	return u8(v * 255 / mask_in)
 }
 
-decode_rgb :: proc(ctx: ^$C, img: ^Image, info: image.BMP_Header, allocator := context.allocator) -> (err: Error) {
+decode_rgb :: proc(ctx: ^compress.Context, img: ^Image, info: image.BMP_Header, allocator := context.allocator) -> (err: Error) {
 	pixel_offset := int(info.pixel_offset)
 	pixel_offset -= int(info.info_size) + FILE_HEADER_SIZE
 
@@ -402,20 +407,23 @@ decode_rgb :: proc(ctx: ^$C, img: ^Image, info: image.BMP_Header, allocator := c
 		if info.info_size == .OS2_v1 {
 			// 2 x RGB palette of instead of variable RGBA palette
 			for i in 0..<colors_used {
-				palette[i].rgb = image.read_data(ctx, RGB_Pixel) or_return
+				palette[i].rgb = compress.read_data(ctx, RGB_Pixel) or_return
 			}
 			pixel_offset -= int(3 * colors_used)
 		} else {
 			for i in 0..<colors_used {
-				palette[i] = image.read_data(ctx, RGBA_Pixel) or_return
+				palette[i] = compress.read_data(ctx, RGBA_Pixel) or_return
 			}
 			pixel_offset -= int(4 * colors_used)
 		}
 		skip_space(ctx, pixel_offset)
 
-		stride := (img.width + 7) / 8
+		// TODO(Jeroen): if in memory, don't bother with `read_buf`
+		data := make([]byte, (img.width + 7) / 8, allocator)
+		defer delete(data, allocator)
+
 		for y in 0..<img.height {
-			data := compress.read_slice(ctx, stride) or_return
+			compress.read_slice(ctx, data) or_return
 			for x in 0..<img.width {
 				shift := u8(7 - (x & 0x07))
 				p := (data[x / 8] >> shift) & 0x01
@@ -425,14 +433,16 @@ decode_rgb :: proc(ctx: ^$C, img: ^Image, info: image.BMP_Header, allocator := c
 
 	case 2: // Non-standard on modern Windows, but was allowed on WinCE
 		for i in 0..<colors_used {
-			palette[i] = image.read_data(ctx, RGBA_Pixel) or_return
+			palette[i] = compress.read_data(ctx, RGBA_Pixel) or_return
 		}
 		pixel_offset -= int(4 * colors_used)
 		skip_space(ctx, pixel_offset)
 
-		stride := (img.width + 3) / 4
+		data := make([]byte, (img.width + 3) / 4, allocator)
+		defer delete(data, allocator)
+
 		for y in 0..<img.height {
-			data := compress.read_slice(ctx, stride) or_return
+			compress.read_slice(ctx, data) or_return
 			for x in 0..<img.width {
 				shift := 6 - (x & 0x03) << 1
 				p := (data[x / 4] >> u8(shift)) & 0x03
@@ -444,20 +454,22 @@ decode_rgb :: proc(ctx: ^$C, img: ^Image, info: image.BMP_Header, allocator := c
 		if info.info_size == .OS2_v1 {
 			// 16 x RGB palette of instead of variable RGBA palette
 			for i in 0..<colors_used {
-				palette[i].rgb = image.read_data(ctx, RGB_Pixel) or_return
+				palette[i].rgb = compress.read_data(ctx, RGB_Pixel) or_return
 			}
 			pixel_offset -= int(3 * colors_used)
 		} else {
 			for i in 0..<colors_used {
-				palette[i] = image.read_data(ctx, RGBA_Pixel) or_return
+				palette[i] = compress.read_data(ctx, RGBA_Pixel) or_return
 			}
 			pixel_offset -= int(4 * colors_used)
 		}
 		skip_space(ctx, pixel_offset)
 
-		stride := (img.width + 1) / 2
+		data := make([]byte, (img.width + 1) / 2, allocator)
+		defer delete(data, allocator)
+
 		for y in 0..<img.height {
-			data := compress.read_slice(ctx, stride) or_return
+			compress.read_slice(ctx, data) or_return
 			for x in 0..<img.width {
 				p := data[x / 2] >> 4 if x & 1 == 0 else data[x / 2]
 				write(img, x, y, palette[p & 0x0f].bgr) or_return
@@ -468,20 +480,22 @@ decode_rgb :: proc(ctx: ^$C, img: ^Image, info: image.BMP_Header, allocator := c
 		if info.info_size == .OS2_v1 {
 			// 256 x RGB palette of instead of variable RGBA palette
 			for i in 0..<colors_used {
-				palette[i].rgb = image.read_data(ctx, RGB_Pixel) or_return
+				palette[i].rgb = compress.read_data(ctx, RGB_Pixel) or_return
 			}
 			pixel_offset -= int(3 * colors_used)
 		} else {
 			for i in 0..<colors_used {
-				palette[i] = image.read_data(ctx, RGBA_Pixel) or_return
+				palette[i] = compress.read_data(ctx, RGBA_Pixel) or_return
 			}
 			pixel_offset -= int(4 * colors_used)
 		}
 		skip_space(ctx, pixel_offset)
 
-		stride := align4(img.width)
+		data := make([]byte, align4(img.width), allocator)
+		defer delete(data, allocator)
+
 		for y in 0..<img.height {
-			data := compress.read_slice(ctx, stride) or_return
+			compress.read_slice(ctx, data) or_return
 			for x in 0..<img.width {
 				write(img, x, y, palette[data[x]].bgr) or_return
 			}
@@ -493,9 +507,11 @@ decode_rgb :: proc(ctx: ^$C, img: ^Image, info: image.BMP_Header, allocator := c
 		pixel_offset -= read
 		skip_space(ctx, pixel_offset)
 
-		stride := align4(img.width * 2)
+		data := make([]byte, align4(img.width * 2), allocator)
+		defer delete(data, allocator)
+
 		for y in 0..<img.height {
-			data   := compress.read_slice(ctx, stride) or_return
+			compress.read_slice(ctx, data) or_return
 			pixels := mem.slice_data_cast([]u16le, data)
 			for x in 0..<img.width {
 				v := pixels[x]
@@ -510,9 +526,11 @@ decode_rgb :: proc(ctx: ^$C, img: ^Image, info: image.BMP_Header, allocator := c
 		// Eat useless palette and other padding
 		skip_space(ctx, pixel_offset)
 
-		stride := align4(img.width * 3)
+		data := make([]byte, align4(img.width * 3), allocator)
+		defer delete(data, allocator)
+
 		for y in 0..<img.height {
-			data   := compress.read_slice(ctx, stride) or_return
+			compress.read_slice(ctx, data) or_return
 			pixels := mem.slice_data_cast([]RGB_Pixel, data)
 			for x in 0..<img.width {
 				write(img, x, y, pixels[x].bgr) or_return
@@ -525,8 +543,11 @@ decode_rgb :: proc(ctx: ^$C, img: ^Image, info: image.BMP_Header, allocator := c
 		pixel_offset -= read
 		skip_space(ctx, pixel_offset)
 
+		data := make([]byte, img.width * size_of(RGBA_Pixel), allocator)
+		defer delete(data, allocator)
+
 		for y in 0..<img.height {
-			data   := compress.read_slice(ctx, img.width * size_of(RGBA_Pixel)) or_return
+			compress.read_slice(ctx, data) or_return
 			pixels := mem.slice_data_cast([]u32le, data)
 			for x in 0..<img.width {
 				v := pixels[x]
@@ -543,15 +564,15 @@ decode_rgb :: proc(ctx: ^$C, img: ^Image, info: image.BMP_Header, allocator := c
 	return nil
 }
 
-decode_rle :: proc(ctx: ^$C, img: ^Image, info: image.BMP_Header, allocator := context.allocator) -> (err: Error) {
+decode_rle :: proc(ctx: ^compress.Context, img: ^Image, info: image.BMP_Header, allocator := context.allocator) -> (err: Error) {
 	pixel_offset := int(info.pixel_offset)
 	pixel_offset -= int(info.info_size) + FILE_HEADER_SIZE
 
 	bytes_needed := size_of(RGB_Pixel) * img.height * img.width
-	if resize(&img.pixels.buf, bytes_needed) != nil {
+	if resize(&img.pixels, bytes_needed) != nil {
 		return .Unable_To_Allocate_Or_Resize
 	}
-	out := mem.slice_data_cast([]RGB_Pixel, img.pixels.buf[:])
+	out := mem.slice_data_cast([]RGB_Pixel, img.pixels[:])
 	assert(len(out) == img.height * img.width)
 
 	palette: [256]RGBA_Pixel
@@ -562,22 +583,21 @@ decode_rle :: proc(ctx: ^$C, img: ^Image, info: image.BMP_Header, allocator := c
 		colors_used  = min(colors_used, 16)
 
 		for i in 0..<colors_used {
-			palette[i] = image.read_data(ctx, RGBA_Pixel) or_return
+			palette[i] = compress.read_data(ctx, RGBA_Pixel) or_return
 			pixel_offset -= size_of(RGBA_Pixel)
 		}
 		skip_space(ctx, pixel_offset)
 
 		pixel_size := info.size - info.pixel_offset
-		remaining  := compress.input_size(ctx) or_return
-		if remaining < i64(pixel_size) {
+		if remaining, size_err := compress.size(ctx); size_err == nil && remaining < i64(pixel_size) {
 			return .Corrupt
 		}
 
 		data := make([]u8, int(pixel_size) + 4)
 		defer delete(data)
 
-		for i in 0..<pixel_size {
-			data[i] = image.read_u8(ctx) or_return
+		if compress.read_slice(ctx, data[:pixel_size]) != nil {
+			return .Corrupt
 		}
 
 		y, x := 0, 0
@@ -636,22 +656,21 @@ decode_rle :: proc(ctx: ^$C, img: ^Image, info: image.BMP_Header, allocator := c
 		colors_used  = min(colors_used, 256)
 
 		for i in 0..<colors_used {
-			palette[i] = image.read_data(ctx, RGBA_Pixel) or_return
+			palette[i] = compress.read_data(ctx, RGBA_Pixel) or_return
 			pixel_offset -= size_of(RGBA_Pixel)
 		}
 		skip_space(ctx, pixel_offset)
 
 		pixel_size := info.size - info.pixel_offset
-		remaining  := compress.input_size(ctx) or_return
-		if remaining < i64(pixel_size) {
+		if remaining, size_err := compress.size(ctx); size_err == nil && remaining < i64(pixel_size) {
 			return .Corrupt
 		}
 
 		data := make([]u8, int(pixel_size) + 4)
 		defer delete(data)
 
-		for i in 0..<pixel_size {
-			data[i] = image.read_u8(ctx) or_return
+		if compress.read_slice(ctx, data[:pixel_size]) != nil {
+			return .Corrupt
 		}
 
 		y, x := 0, 0
@@ -716,12 +735,12 @@ align4 :: proc(width: int) -> (stride: int) {
 	return
 }
 
-skip_space :: proc(ctx: ^$C, bytes_to_skip: int) -> (err: Error) {
+skip_space :: proc(ctx: ^compress.Context, bytes_to_skip: int) -> (err: Error) {
 	if bytes_to_skip < 0 {
 		return .Corrupt
 	}
 	for _ in 0..<bytes_to_skip {
-		image.read_u8(ctx) or_return
+		compress.read_u8(ctx) or_return
 	}
 	return
 }
@@ -733,7 +752,7 @@ destroy :: proc(img: ^Image) {
 		return
 	}
 
-	bytes.buffer_destroy(&img.pixels)
+	delete(img.pixels)
 	if v, ok := img.metadata.(^image.BMP_Info); ok {
 		free(v)
 	}
@@ -742,5 +761,5 @@ destroy :: proc(img: ^Image) {
 
 @(init, private)
 _register :: proc "contextless" () {
-	image.register(.BMP, load_from_bytes, destroy)
+	image.register(.BMP, load_from_bytes, destroy, load_from_context)
 }

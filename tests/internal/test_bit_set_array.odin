@@ -187,3 +187,21 @@ bit_set_array_formatting :: proc(t: ^testing.T) {
 	testing.expect_value(t, sa, si)
 	testing.expect_value(t, sa, "{Bsa_E.A, Bsa_E.C, Bsa_E.H}")
 }
+
+@(test)
+bit_set_complement_of_bits_outside_the_set :: proc(t: ^testing.T) {
+	// `~x` complements within the set: bits of `x` which no element names are cleared, both when it
+	// is folded at compile time and in the generated code.
+	Gap_E :: enum u8 { A = 0, C = 2 }
+	Gap   :: bit_set[Gap_E; u8]
+
+	X :: transmute(Gap)u8(0b1110) // .C, plus bits 1 and 3 which no element names
+	#assert(~X == Gap{.A})
+
+	x := X
+	testing.expect_value(t, ~x, Gap{.A})
+	testing.expect_value(t, ~x, ~X)
+
+	a := transmute(Bsa_Arr)[4]u64{0b1_0000_0100, 1 << 63, 0, 0} // .C, plus bits 8 and 127
+	testing.expect_value(t, ~a, Bsa_Arr{.A, .B, .D, .E, .F, .G, .H})
+}

@@ -63,7 +63,7 @@ _ROT_8R: simd.u32x4 : {24, 24, 24, 24}
 _ROT_16: simd.u32x4 : {16, 16, 16, 16}
 
 when ODIN_ENDIAN == .Big {
-	@(private = "file")
+	@(private = "file", enable_target_feature = TARGET_SIMD_FEATURES)
 	_increment_counter :: #force_inline proc "contextless" (ctx: ^_chacha20.Context) -> simd.u32x4 {
 		// In the Big Endian case, the low and high portions in the vector
 		// are flipped, so the 64-bit addition can't be done with a simple
@@ -79,7 +79,7 @@ when ODIN_ENDIAN == .Big {
 
 	// Convert the endian-ness of the components of a u32x4 vector, for
 	// the purposes of output.
-	@(private = "file")
+	@(private = "file", enable_target_feature = TARGET_SIMD_FEATURES)
 	_byteswap_u32x4 :: #force_inline proc "contextless" (v: simd.u32x4) -> simd.u32x4 {
 		return(
 			transmute(simd.u32x4)simd.shuffle(
@@ -94,7 +94,7 @@ when ODIN_ENDIAN == .Big {
 	_VEC_ONE: simd.u64x2 : {1, 0}
 }
 
-@(private = "file")
+@(private = "file", enable_target_feature = TARGET_SIMD_FEATURES)
 _dq_round_simd128 :: #force_inline proc "contextless" (
 	v0, v1, v2, v3: simd.u32x4,
 ) -> (
@@ -158,7 +158,7 @@ _dq_round_simd128 :: #force_inline proc "contextless" (
 	return v0, v1, v2, v3
 }
 
-@(private = "file")
+@(private = "file", enable_target_feature = TARGET_SIMD_FEATURES)
 _add_state_simd128 :: #force_inline proc "contextless" (
 	v0, v1, v2, v3, s0, s1, s2, s3: simd.u32x4,
 ) -> (
@@ -184,7 +184,7 @@ _add_state_simd128 :: #force_inline proc "contextless" (
 	return v0, v1, v2, v3
 }
 
-@(private = "file")
+@(private = "file", enable_target_feature = TARGET_SIMD_FEATURES)
 _xor_simd128 :: #force_inline proc "contextless" (
 	src: [^]simd.u32x4,
 	v0, v1, v2, v3: simd.u32x4,
@@ -204,7 +204,7 @@ _xor_simd128 :: #force_inline proc "contextless" (
 	return v0, v1, v2, v3
 }
 
-@(private = "file")
+@(private = "file", enable_target_feature = TARGET_SIMD_FEATURES)
 _store_simd128 :: #force_inline proc "contextless" (
 	dst: [^]simd.u32x4,
 	v0, v1, v2, v3: simd.u32x4,

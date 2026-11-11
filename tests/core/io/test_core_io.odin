@@ -695,3 +695,146 @@ test_bufio_buffered_read_writer :: proc(t: ^testing.T) {
 
 	log.debugf("%#v", results)
 }
+
+@test
+test_counting_stream :: proc(t: ^testing.T) {
+	buf: [32]u8
+	for i in 0..<u8(len(buf)) {
+		buf[i] = 'A' + i
+	}
+
+	// Wrapped, a stream must still pass every test of what it supports
+	cs: io.Counting_Stream
+	br: bytes.Reader
+
+	results: Passed_Tests
+	ok: bool
+
+	for end in 0..<i64(len(buf)) {
+		results, ok = _test_stream(t, io.counting_stream_init(&cs, bytes.reader_init(&br, buf[:end])), buf[:end])
+		if !ok {
+			log.debugf("buffer[:%i] := %v", end, buf[:end])
+			return
+		}
+	}
+
+	for end in 0..<i64(len(buf)) {
+		bb: bytes.Buffer
+		bytes.buffer_init(&bb, buf[:end])
+
+		results, ok = _test_stream(t, io.counting_stream_init(&cs, bytes.buffer_to_stream(&bb)), buf[:end],
+			reading_consumes = true, resets_on_empty = true)
+		if !ok {
+			log.debugf("buffer[:%i] := %v", end, buf[:end])
+			return
+		}
+	}
+
+	log.debugf("%#v", results)
+}
+
+@test
+test_counting_stream_counts :: proc(t: ^testing.T) {
+	bb: bytes.Buffer
+	defer bytes.buffer_destroy(&bb)
+
+	cs: io.Counting_Stream
+	s := io.counting_stream_init(&cs, bytes.buffer_to_stream(&bb))
+
+	io.write_string(s, "hello, ")
+	io.write_string(s, "world")
+	read_buf: [5]u8
+	n, err := io.read(s, read_buf[:])
+	testing.expect_value(t, n, 5)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, string(read_buf[:]), "hello")
+	testing.expect_value(t, bytes.buffer_to_string(&bb), ", world")
+
+	testing.expect_value(t, cs.bytes_written, 12)
+	testing.expect_value(t, cs.bytes_read, 5)
+	testing.expect_value(t, cs.calls[.Write], 2)
+	testing.expect_value(t, cs.calls[.Read], 1)
+	testing.expect_value(t, cs.calls[.Seek], 0)
+
+	// Initialising it again starts the counts over
+	io.counting_stream_init(&cs, bytes.buffer_to_stream(&bb))
+	testing.expect_value(t, cs.bytes_written, 0)
+	testing.expect_value(t, cs.calls[.Write], 0)
+
+	// A short write counts what went through, and its error comes back as it was
+	small: [4]u8
+	sb := strings.builder_from_bytes(small[:])
+	s = io.counting_stream_init(&cs, strings.to_stream(&sb))
+	n, err = io.write_string(s, "hello")
+	testing.expectf(t, n < 5 && err != nil, "a short write gave %v, %v", n, err)
+	testing.expect_value(t, cs.bytes_written, i64(n))
+}
+
+/*
+	With no underlying stream, every write is taken and discarded. It seeks as a file would, so its size is where the
+	furthest write ended, overwrites and writes at an offset included; reads give .EOF, and the rest does nothing.
+*/
+@test
+test_counting_stream_discard :: proc(t: ^testing.T) {
+	cs: io.Counting_Stream
+	s := io.counting_stream_init(&cs, {})
+	testing.expect_value(t, io.query(s), io.Stream_Mode_Set{.Write, .Write_At, .Read, .Read_At, .Seek, .Size, .Flush, .Close, .Destroy, .Query})
+
+	n, err := io.write_string(s, "hello")
+	testing.expect_value(t, n, 5)
+	testing.expect_value(t, err, nil)
+
+	// Writing at an offset moves the end but not the position
+	n, err = io.write_at(s, transmute([]u8)string("abc"), 100)
+	testing.expect_value(t, n, 3)
+	testing.expect_value(t, err, nil)
+	pos, seek_err := io.seek(s, 0, .Current)
+	testing.expect_value(t, pos, 5)
+	testing.expect_value(t, seek_err, nil)
+
+	// Overwriting from before the end counts the bytes but leaves the size
+	pos, seek_err = io.seek(s, -2, .End)
+	testing.expect_value(t, pos, 101)
+	testing.expect_value(t, seek_err, nil)
+	io.write_string(s, "xy")
+	size, size_err := io.size(s)
+	testing.expect_value(t, size, 103)
+	testing.expect_value(t, size_err, nil)
+
+	// Seeking past the end and writing there makes it larger
+	pos, seek_err = io.seek(s, 200, .Start)
+	testing.expect_value(t, pos, 200)
+	io.write_string(s, "z")
+	size, _ = io.size(s)
+	testing.expect_value(t, size, 201)
+	testing.expect_value(t, cs.bytes_written, 11)
+
+	// What a file would refuse
+	_, seek_err = io.seek(s, -1, .Start)
+	testing.expect_value(t, seek_err, io.Error.Invalid_Offset)
+	_, seek_err = io.seek(s, 0, io.Seek_From(-1))
+	testing.expect_value(t, seek_err, io.Error.Invalid_Whence)
+	_, err = io.write_at(s, transmute([]u8)string("abc"), -1)
+	testing.expect_value(t, err, io.Error.Invalid_Offset)
+	pos, _ = io.seek(s, 0, .Current)
+	testing.expect_value(t, pos, 201)
+
+	// Nothing written is kept to read back
+	read_buf: [4]u8
+	n, err = io.read(s, read_buf[:])
+	testing.expect_value(t, n, 0)
+	testing.expect_value(t, err, io.Error.EOF)
+	n, err = io.read_at(s, read_buf[:], 0)
+	testing.expect_value(t, n, 0)
+	testing.expect_value(t, err, io.Error.EOF)
+	testing.expect_value(t, cs.bytes_read, 0)
+
+	testing.expect_value(t, io.flush(s), nil)
+	testing.expect_value(t, io.close(s), nil)
+	testing.expect_value(t, io.destroy(s), nil)
+
+	testing.expect_value(t, cs.calls[.Write], 3)
+	testing.expect_value(t, cs.calls[.Write_At], 2)
+	testing.expect_value(t, cs.calls[.Seek], 6)
+	testing.expect_value(t, cs.calls[.Read], 1)
+}

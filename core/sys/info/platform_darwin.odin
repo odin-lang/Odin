@@ -1,9 +1,43 @@
 package sysinfo
 
-import    "base:runtime"
-import    "core:strings"
-import    "core:sys/unix"
-import NS "core:sys/darwin/Foundation"
+import "base:intrinsics"
+import "base:runtime"
+import "core:strings"
+import "core:sys/unix"
+
+// NOTE: Only the few Foundation messages needed here are sent directly, rather than importing
+// `core:sys/darwin/Foundation`, as this package is imported by `core:crypto`.
+@(require)
+foreign import "system:Foundation.framework"
+
+@(private="file", objc_class="NSAutoreleasePool")
+NSAutoreleasePool :: struct {using _: intrinsics.objc_object}
+
+@(private="file", objc_class="NSProcessInfo")
+NSProcessInfo :: struct {using _: intrinsics.objc_object}
+
+@(private="file")
+NSOperatingSystemVersion :: struct #align(8) {
+	majorVersion: int,
+	minorVersion: int,
+	patchVersion: int,
+}
+
+@(private="file", deferred_out=autoreleasepool_drain)
+scoped_autoreleasepool :: proc "contextless" () -> ^NSAutoreleasePool {
+	pool := intrinsics.objc_send(^NSAutoreleasePool, NSAutoreleasePool, "alloc")
+	return intrinsics.objc_send(^NSAutoreleasePool, pool, "init")
+}
+
+@(private="file")
+autoreleasepool_drain :: proc "contextless" (pool: ^NSAutoreleasePool) {
+	intrinsics.objc_send(nil, pool, "drain")
+}
+
+@(private="file")
+process_info :: proc "contextless" () -> ^NSProcessInfo {
+	return intrinsics.objc_send(^NSProcessInfo, NSProcessInfo, "processInfo")
+}
 
 @(private)
 _os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (res: OS_Version, ok: bool) {
@@ -12,12 +46,11 @@ _os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (
 
 	b := strings.builder_make_none(allocator = allocator, loc = loc)
 
-	version: NS.OperatingSystemVersion
+	version: NSOperatingSystemVersion
 	{
-		NS.scoped_autoreleasepool() 
+		scoped_autoreleasepool()
 
-		info    := NS.ProcessInfo.processInfo()
-		version  = info->operatingSystemVersion()
+		version = intrinsics.objc_send(NSOperatingSystemVersion, process_info(), "operatingSystemVersion")
 	}
 
 	res.os = {int(version.majorVersion), int(version.minorVersion), int(version.patchVersion)}
@@ -94,7 +127,6 @@ _os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (
 
 @(private)
 _ram_stats :: proc "contextless" () -> (total_ram, free_ram, total_swap, free_swap: i64, ok: bool) {
-	NS.scoped_autoreleasepool()
-	info := NS.ProcessInfo.processInfo()
-	return i64(info->physicalMemory()), 0, 0, 0, true
+	scoped_autoreleasepool()
+	return i64(intrinsics.objc_send(u64, process_info(), "physicalMemory")), 0, 0, 0, true
 }

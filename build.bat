@@ -20,7 +20,7 @@ if "%VSCMD_ARG_TGT_ARCH%" neq "x64" (
 )
 
 where /Q git.exe || goto skip_git_hash
-if not exist .git\ goto skip_git_hash
+if not exist .git goto skip_git_hash
 for /f "tokens=1,2" %%i IN ('git -c "log.showSignature=false" show "--pretty=%%cd %%h" "--date=format:%%Y-%%m-%%d" --no-patch --no-notes HEAD') do (
 	set CURR_DATE_TIME=%%i
 	set GIT_SHA=%%j
@@ -31,7 +31,7 @@ if %ERRORLEVEL% equ 0 (
 :skip_git_hash
 pushd misc
 cl /nologo get-date.c
-for /f %%i in ('get-date') do (
+for /f %%i in ('.\get-date') do (
 	set CURR_DATE_TIME=%%i
 	rem Don't set GIT_SHA
 )

@@ -1290,8 +1290,9 @@ extern "C" {
 /**
  * Free memory previously allocated with SDL_stack_alloc.
  *
- * If SDL used alloca() to allocate this memory, this macro does nothing and
- * the allocated memory will be automatically released when the function that
+ * If SDL used alloca() to allocate this memory, this macro does nothing (other
+ * than insert `((void)(data)` so the compiler sees an expression) and the
+ * allocated memory will be automatically released when the function that
  * called SDL_stack_alloc() returns. If SDL used SDL_malloc(), it will
  * SDL_free the memory immediately.
  *
@@ -1303,10 +1304,10 @@ extern "C" {
  *
  * \sa SDL_stack_alloc
  */
-#define SDL_stack_free(data)
+#define SDL_stack_free(data) ((void)(data))
 #elif !defined(SDL_DISABLE_ALLOCA)
 #define SDL_stack_alloc(type, count)    (type*)alloca(sizeof(type)*(count))
-#define SDL_stack_free(data)
+#define SDL_stack_free(data)            ((void)(data))
 #else
 #define SDL_stack_alloc(type, count)    (type*)SDL_malloc(sizeof(type)*(count))
 #define SDL_stack_free(data)            SDL_free(data)
@@ -1796,6 +1797,8 @@ extern SDL_DECLSPEC void SDLCALL SDL_DestroyEnvironment(SDL_Environment *env);
 /**
  * Get the value of a variable in the environment.
  *
+ * The name of the variable is case sensitive on all platforms.
+ *
  * This function uses SDL's cached copy of the environment and is thread-safe.
  *
  * \param name the name of the variable to get.
@@ -1813,6 +1816,11 @@ extern SDL_DECLSPEC const char * SDLCALL SDL_getenv(const char *name);
  *
  * This function bypasses SDL's cached copy of the environment and is not
  * thread-safe.
+ *
+ * On some platforms, this may make case-insensitive matches, while other
+ * platforms are case-sensitive. It is best to be precise with strings used
+ * for queries through this interface. SDL_getenv is always case-sensitive,
+ * however.
  *
  * \param name the name of the variable to get.
  * \returns a pointer to the value of the variable or NULL if it can't be

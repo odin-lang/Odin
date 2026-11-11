@@ -32,6 +32,9 @@ foreign lib {
 	IsTextInputActive       :: proc() -> bool ---
 	StopTextInput           :: proc() ---
 	SetTextInputRect        :: proc(rect: ^Rect) ---
+	ResetKeyboard           :: proc() ---
+	ClearComposition        :: proc() ---
+	IsTextInputShown        :: proc() -> bool ---
 	HasScreenKeyboardSupport:: proc() -> bool ---
 	IsScreenKeyboardShown   :: proc(window: ^Window) -> bool ---
 }

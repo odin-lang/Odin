@@ -3,6 +3,12 @@ package vendor_box2d
 import "core:c"
 import "core:math"
 
+// The math types are Odin types with the layout of Box2D's own: `Vec2` is `[2]f32` so it has the vector operators and
+// swizzles, and `Mat22` is a column major matrix, which is how b2Mat22 stores its two column vectors.
+//
+// The functions that Box2D implements for cross-platform determinism (Atan2, ComputeCosSin, ...) and the validity
+// checks are in math_foreign.odin and link to the library. The rest of the header only functions are here.
+
 EPSILON :: math.F32_EPSILON
 
 Vec2 :: [2]f32
@@ -24,6 +30,12 @@ Transform :: struct {
 	q: Rot,
 }
 
+// A world position. This is an alias in single precision, and the bindings only support single precision.
+Pos :: Vec2
+
+// A world transform. This is an alias in single precision, and the bindings only support single precision.
+WorldTransform :: Transform
+
 Mat22 :: matrix[2, 2]f32
 AABB :: struct {
 	lowerBound: Vec2,
@@ -38,10 +50,12 @@ Plane :: struct {
 
 PI :: math.PI
 
-Vec2_zero          :: Vec2{0, 0}
-Rot_identity       :: Rot{1, 0}
-Transform_identity :: Transform{{0, 0}, {1, 0}}
-Mat22_zero         :: Mat22{0, 0, 0, 0}
+Vec2_zero               :: Vec2{0, 0}
+Rot_identity            :: Rot{1, 0}
+Transform_identity      :: Transform{{0, 0}, {1, 0}}
+Mat22_zero              :: Mat22{0, 0, 0, 0}
+Pos_zero                :: Pos{0, 0}
+WorldTransform_identity :: WorldTransform{{0, 0}, {1, 0}}
 
 // @return the minimum of two integers
 @(deprecated="Prefer the built-in 'min(a, b)'", require_results)
@@ -67,6 +81,12 @@ ClampInt :: proc "c" (a, lower, upper: c.int) -> c.int {
 	return clamp(a, lower, upper)
 }
 
+// https://en.wikipedia.org/wiki/Floor_and_ceiling_functions
+@(require_results)
+CeilingInt :: proc "c" (numerator, denominator: c.int) -> c.int {
+	assert_contextless(denominator > 0 && numerator >= 0)
+	return (numerator + denominator - 1) / denominator
+}
 
 // @return the minimum of two floats
 @(deprecated="Prefer the built-in 'min(a, b)'", require_results)
@@ -90,17 +110,6 @@ AbsFloat :: proc "c" (a: f32) -> f32 {
 @(deprecated="Prefer the built-in 'clamp(a, lower, upper)'", require_results)
 ClampFloat :: proc "c" (a, lower, upper: f32) -> f32 {
 	return clamp(a, lower, upper)
-}
-
-@(require_results)
-Atan2 :: proc "c" (y, x: f32) -> f32 {
-	return math.atan2(y, x)
-}
-
-@(require_results)
-ComputeCosSin :: proc "c" (radians: f32) -> (res: CosSin) {
-	res.sine, res.cosine = math.sincos(radians)
-	return
 }
 
 // Vector dot product
@@ -234,16 +243,18 @@ Distance :: proc "c" (a, b: Vec2) -> f32 {
 	return math.sqrt(dx * dx + dy * dy)
 }
 
+// Convert a vector into a unit vector if possible, otherwise returns the zero vector.
 @(require_results)
-Normalize :: proc "c" (v: Vec2) -> Vec2 {
-	length := Length(v)
-	if length < EPSILON {
-		return Vec2_zero
+Normalize :: proc "c" (a: Vec2) -> Vec2 {
+	lengthSquared := a.x * a.x + a.y * a.y
+	if lengthSquared > 1000 * math.F32_MIN {
+		s := 1 / math.sqrt(lengthSquared)
+		return {s * a.x, s * a.y}
 	}
-	invLength := 1 / length
-	return invLength * v
+	return Vec2_zero
 }
 
+// Determines if the provided vector is normalized (norm(a) == 1).
 @(require_results)
 IsNormalized :: proc "c" (v: Vec2) -> bool {
 	aa := Dot(v, v)
@@ -260,14 +271,15 @@ NormalizeChecked :: proc "odin" (v: Vec2) -> Vec2 {
 	return invLength * v
 }
 
+// Convert a vector into a unit vector if possible, otherwise returns the zero vector. Also returns the length.
 @(require_results)
-GetLengthAndNormalize :: proc "c" (v: Vec2) -> (length: f32, vn: Vec2) {
-	length = Length(v)
-	if length < 1e-23 {
-		return
+GetLengthAndNormalize :: proc "c" (a: Vec2) -> (length: f32, vn: Vec2) {
+	lengthSquared := a.x * a.x + a.y * a.y
+	if lengthSquared > 1000 * math.F32_MIN {
+		length = math.sqrt(lengthSquared)
+		s := 1 / length
+		vn = {s * a.x, s * a.y}
 	}
-	invLength := 1 / length
-	vn = invLength * v
 	return
 }
 
@@ -301,18 +313,16 @@ DistanceSquared :: proc "c" (a, b: Vec2) -> f32 {
 
 // Make a rotation using an angle in radians
 @(require_results)
-MakeRot :: proc "c" (angle: f32) -> Rot {
-	cs := ComputeCosSin(angle)
+MakeRot :: proc "c" (radians: f32) -> Rot {
+	cs := ComputeCosSin(radians)
 	return Rot{c=cs.cosine, s=cs.sine}
 }
 
-// Compute the rotation between two unit vectors
+// Make a rotation using a unit vector
 @(require_results)
-ComputeRotationBetweenUnitVectors :: proc(v1, v2: Vec2) -> Rot {
-	return NormalizeRot({
-		c = Dot(v1, v2),
-		s = Cross(v1, v2),
-	})
+MakeRotFromUnitVector :: proc "c" (unitVector: Vec2) -> Rot {
+	assert_contextless(IsNormalized(unitVector))
+	return Rot{c=unitVector.x, s=unitVector.y}
 }
 
 // Is this rotation normalized?
@@ -321,6 +331,12 @@ IsNormalizedRot :: proc "c" (q: Rot) -> bool {
 	// larger tolerance due to failure on mingw 32-bit
 	qq := q.s * q.s + q.c * q.c
 	return 1.0 - 0.0006 < qq && qq < 1 + 0.0006
+}
+
+// Get the inverse of a rotation
+@(require_results)
+InvertRot :: proc "c" (a: Rot) -> Rot {
+	return {a.c, -a.s}
 }
 
 // Normalize rotation
@@ -343,7 +359,7 @@ NLerp :: proc "c" (q1: Rot, q2: Rot, t: f32) -> Rot {
 	})
 }
 
-// Compute the angular velocity necessary to rotate between two rotations over a give time
+// Compute the angular velocity necessary to rotate between two rotations over a given time
 //	@param q1 initial rotation
 //	@param q2 final rotation
 //	@param inv_h inverse time step
@@ -393,32 +409,44 @@ MulRot :: proc "c" (q, r: Rot) -> (qr: Rot) {
 	return
 }
 
-// Transpose multiply two rotations: qT * r
+// Transpose multiply two rotations: inv(a) * b
+// This rotates a vector local in frame b into a vector local in frame a
 @(require_results)
-InvMulRot :: proc "c" (q, r: Rot) -> (qr: Rot) {
-	// [ qc qs] * [rc -rs] = [qc*rc+qs*rs -qc*rs+qs*rc]
-	// [-qs qc]   [rs  rc]   [-qs*rc+qc*rs qs*rs+qc*rc]
-	// s(q - r) = qc * rs - qs * rc
-	// c(q - r) = qc * rc + qs * rs
-	qr.s = q.c * r.s - q.s * r.c
-	qr.c = q.c * r.c + q.s * r.s
+InvMulRot :: proc "c" (a, b: Rot) -> (r: Rot) {
+	// [ ac as] * [bc -bs] = [ac*bc+as*bs -ac*bs+as*bc]
+	// [-as ac]   [bs  bc]   [-as*bc+ac*bs as*bs+ac*bc]
+	// s(b - a) = ac * bs - as * bc
+	// c(b - a) = ac * bc + as * bs
+	r.s = a.c * b.s - a.s * b.c
+	r.c = a.c * b.c + a.s * b.s
 	return
 }
 
-// relative angle between b and a (rot_b * inv(rot_a))
+// The angle of rotation b relative to rotation a. Radians.
 @(require_results)
-RelativeAngle :: proc "c" (b, a: Rot) -> f32 {
+RelativeAngle :: proc "c" (a, b: Rot) -> f32 {
 	// sin(b - a) = bs * ac - bc * as
 	// cos(b - a) = bc * ac + bs * as
-	s := b.s * a.c - b.c * a.s
-	c := b.c * a.c + b.s * a.s
+	s := a.c * b.s - a.s * b.c
+	c := a.c * b.c + a.s * b.s
 	return Atan2(s, c)
 }
 
-// Convert any angle into the range [-pi, pi]
+// Convert any angle into the range [-pi, pi].
+// This does not work well with huge angles, so unwind your angles regularly.
 @(require_results)
 UnwindAngle :: proc "c" (radians: f32) -> f32 {
-	return math.remainder(radians, 2. * PI)
+	// This function can be implemented using remainderf. However that is a libc dependency not present in WASM.
+	assert_contextless(abs(radians) < 1.0e4)
+	x := clamp(radians, -1.0e6, 1.0e6)
+
+	// Work in doubles. Adding and removing this constant rounds to the nearest integer.
+	// https://stackoverflow.com/questions/17035464/a-fast-method-to-round-a-double-to-a-32-bit-int-explained
+	twoPi := f64(2.0 * f32(PI))
+	roundToNearest := f64(6755399441055744.0)
+	a := f64(x)
+	k := (a / twoPi + roundToNearest) - roundToNearest
+	return f32(a - k * twoPi)
 }
 
 // Rotate a vector
@@ -469,6 +497,97 @@ InvMulTransforms :: proc "c" (A, B: Transform) -> (C: Transform) {
 	C.q = InvMulRot(A.q, B.q)
 	C.p = InvRotateVector(A.q, B.p-A.p)
 	return
+}
+
+// Convert a vector to a world position. No-op in single precision.
+@(require_results)
+ToPos :: proc "c" (v: Vec2) -> Pos {
+	return v
+}
+
+// Lossy conversion of a world position to a float vector. No-op in single precision.
+@(require_results)
+ToVec2 :: proc "c" (p: Pos) -> Vec2 {
+	return p
+}
+
+// Narrow a world coordinate to float, rounding toward negative infinity. With large world mode off this is a plain
+// conversion.
+@(require_results)
+RoundDownFloat :: proc "c" (x: f64) -> f32 {
+	return f32(x)
+}
+
+// Narrow a world coordinate to float, rounding toward positive infinity. With large world mode off this is a plain
+// conversion.
+@(require_results)
+RoundUpFloat :: proc "c" (x: f64) -> f32 {
+	return f32(x)
+}
+
+// a - b, demoted to float. The primary precision boundary operation.
+@(require_results)
+SubPos :: proc "c" (a, b: Pos) -> Vec2 {
+	return {a.x - b.x, a.y - b.y}
+}
+
+// p + d
+@(require_results)
+OffsetPos :: proc "c" (p: Pos, d: Vec2) -> Pos {
+	return {p.x + d.x, p.y + d.y}
+}
+
+// World position interpolation for sweeps and sampling.
+@(require_results)
+LerpPos :: proc "c" (a, b: Pos, t: f32) -> Pos {
+	return {(1 - t) * a.x + t * b.x, (1 - t) * a.y + t * b.y}
+}
+
+// Transform a local point to a world position. Rotation in float, translation in double.
+@(require_results)
+TransformWorldPoint :: proc "c" (t: WorldTransform, p: Vec2) -> Pos {
+	rx := t.q.c * p.x - t.q.s * p.y
+	ry := t.q.s * p.x + t.q.c * p.y
+	return {t.p.x + rx, t.p.y + ry}
+}
+
+// Transform a world position to a local point. One double subtraction, then float.
+@(require_results)
+InvTransformWorldPoint :: proc "c" (t: WorldTransform, p: Pos) -> Vec2 {
+	vx := p.x - t.p.x
+	vy := p.y - t.p.y
+	return {t.q.c * vx + t.q.s * vy, -t.q.s * vx + t.q.c * vy}
+}
+
+// Relative transform of frame B in frame A.
+@(require_results)
+InvMulWorldTransforms :: proc "c" (A, B: WorldTransform) -> (C: Transform) {
+	C.q = InvMulRot(A.q, B.q)
+	d := Vec2{B.p.x - A.p.x, B.p.y - A.p.y}
+	C.p = InvRotateVector(A.q, d)
+	return
+}
+
+// Convert a local transform B into world space using world transform A.
+@(require_results)
+MulWorldTransforms :: proc "c" (A: WorldTransform, B: Transform) -> (C: WorldTransform) {
+	C.q = MulRot(A.q, B.q)
+	C.p = OffsetPos(A.p, RotateVector(A.q, B.p))
+	return
+}
+
+// Shift a world transform into the frame of a base position.
+@(require_results)
+ToRelativeTransform :: proc "c" (t: WorldTransform, base: Pos) -> (r: Transform) {
+	r.q = t.q
+	r.p = {t.p.x - base.x, t.p.y - base.y}
+	return
+}
+
+// Promote a float transform to a world transform. Lossless.
+@(require_results)
+MakeWorldTransform :: proc "c" (t: Transform) -> WorldTransform {
+	return {ToPos(t.p), t.q}
 }
 
 // Multiply a 2-by-2 matrix times a 2D vector
@@ -575,54 +694,13 @@ PlaneSeparation :: proc "c" (plane: Plane, point: Vec2) -> f32 {
 	return Dot(plane.normal, point) - plane.offset
 }
 
-@(require_results)
-IsValidFloat :: proc "c" (a: f32) -> bool {
-	#partial switch math.classify(a) {
-	case .NaN, .Inf, .Neg_Inf: return false
-	case:                      return true
-	}
-}
-
-@(require_results)
-IsValidVec2 :: proc "c" (v: Vec2) -> bool {
-	IsValidFloat(v.x) or_return
-	IsValidFloat(v.y) or_return
-	return true
-}
-
-@(require_results)
-IsValidRotation :: proc "c" (q: Rot) -> bool {
-	IsValidFloat(q.s) or_return
-	IsValidFloat(q.c) or_return
-	return IsNormalizedRot(q)
-}
-
-// Is this a valid bounding box? Not Nan or infinity. Upper bound greater than or equal to lower bound.
-@(require_results)
-IsValidAABB :: proc "c" (aabb: AABB) -> bool {
-	IsValidVec2(aabb.lowerBound) or_return
-	IsValidVec2(aabb.upperBound) or_return
-	(aabb.upperBound.x >= aabb.lowerBound.x) or_return
-	(aabb.upperBound.y >= aabb.lowerBound.y) or_return
-	return true
-}
-
-// Is this a valid plane? Normal is a unit vector. Not Nan or infinity.
-@(require_results)
-IsValidPlane :: proc "c" (plane: Plane) -> bool {
-	IsValidFloat(plane.offset) or_return
-	IsValidVec2(plane.normal)  or_return
-	IsNormalized(plane.normal) or_return
-	return true
-}
-
 // One-dimensional mass-spring-damper simulation. Returns the new velocity given the position and time step.
 // You can then compute the new position using:
 // position += timeStep * newVelocity
 // This drives towards a zero position. By using implicit integration we get a stable solution
 // that doesn't require transcendental functions.
 @(require_results)
-b2SpringDamper :: proc "c" (hertz, dampingRatio, position, velocity, timeStep: f32) -> f32 {
+SpringDamper :: proc "c" (hertz, dampingRatio, position, velocity, timeStep: f32) -> f32 {
 	omega  := 2. * PI * hertz
 	omegaH := omega * timeStep
 	return (velocity - omega * omegaH * position) / (1. + 2. * dampingRatio * omegaH + omegaH * omegaH)

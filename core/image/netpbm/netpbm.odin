@@ -1,6 +1,6 @@
 package netpbm
 
-import "core:bytes"
+import "core:compress"
 import "core:fmt"
 import "core:image"
 import "core:mem"
@@ -47,6 +47,20 @@ load_from_bytes :: proc(data: []byte, allocator := context.allocator) -> (img: ^
 	img.metadata = info
 
 	return img, nil
+}
+
+load_from_context :: proc(ctx: ^compress.Context, allocator := context.allocator) -> (img: ^Image, err: Error) {
+	context.allocator = allocator
+
+	if compress.is_memory_context(ctx) {
+		data := ctx.window
+		ctx.window = ctx.window[len(ctx.window):]
+		return load_from_bytes(data)
+	}
+
+	data := compress.read_remaining(ctx) or_return
+	defer delete(data)
+	return load_from_bytes(data[:])
 }
 
 save_to_buffer :: proc(img: ^Image, custom_info: Info = {}, allocator := context.allocator) -> (buffer: []byte, err: Error) {
@@ -121,7 +135,7 @@ save_to_buffer :: proc(img: ^Image, custom_info: Info = {}, allocator := context
 	// Compressed binary
 	case .P4:
 		header_buf := data.buf[:]
-		pixels := img.pixels.buf[:]
+		pixels := img.pixels[:]
 
 		p4_buffer_size := (img.width / 8 + 1) * img.height
 		reserve(&data.buf, len(header_buf) + p4_buffer_size)
@@ -152,7 +166,7 @@ save_to_buffer :: proc(img: ^Image, custom_info: Info = {}, allocator := context
 	// Simple binary
 	case .P5, .P6, .P7, .Pf, .PF:
 		header_buf := data.buf[:]
-		pixels := img.pixels.buf[:]
+		pixels := img.pixels[:]
 
 		resize(&data.buf, len(header_buf) + len(pixels))
 		mem.copy(raw_data(data.buf[len(header_buf):]), raw_data(pixels), len(pixels))
@@ -179,7 +193,7 @@ save_to_buffer :: proc(img: ^Image, custom_info: Info = {}, allocator := context
 
 	// If-it-looks-like-a-bitmap ASCII
 	case .P1:
-		pixels := img.pixels.buf[:]
+		pixels := img.pixels[:]
 		for y in 0 ..< img.height {
 			for x in 0 ..< img.width {
 				i := y * img.width + x
@@ -192,7 +206,7 @@ save_to_buffer :: proc(img: ^Image, custom_info: Info = {}, allocator := context
 	case .P2, .P3:
 		switch img.depth {
 		case 8:
-			pixels := img.pixels.buf[:]
+			pixels := img.pixels[:]
 			for y in 0 ..< img.height {
 				for x in 0 ..< img.width {
 					i := y * img.width + x
@@ -206,7 +220,7 @@ save_to_buffer :: proc(img: ^Image, custom_info: Info = {}, allocator := context
 			}
 
 		case 16:
-			pixels := mem.slice_data_cast([]u16, img.pixels.buf[:])
+			pixels := mem.slice_data_cast([]u16, img.pixels[:])
 			for y in 0 ..< img.height {
 				for x in 0 ..< img.width {
 					i := y * img.width + x
@@ -339,7 +353,6 @@ _parse_header_pnm :: proc(data: []byte) -> (header: Header, length: int, err: Er
 	if header.width < 1 \
 	|| header.height < 1 \
 	|| header.maxval < 1 || header.maxval > int(max(u16)) {
-		fmt.printf("[pnm] Header: {{width = %v, height = %v, maxval: %v}}\n", header.width, header.height, header.maxval)
 		err = .Invalid_Header_Value
 		return
 	}
@@ -436,7 +449,6 @@ _parse_header_pam :: proc(data: []byte, allocator := context.allocator) -> (head
 	|| header.height < 1 \
 	|| header.maxval < 1 \
 	|| header.maxval > int(max(u16)) {
-		fmt.printf("[pam] Header: {{width = %v, height = %v, maxval: %v}}\n", header.width, header.height, header.maxval)
 		err = Format_Error.Invalid_Header_Value
 		return
 	}
@@ -515,7 +527,6 @@ _parse_header_pfm :: proc(data: []byte) -> (header: Header, length: int, err: Er
 	if header.width < 1 \
 	|| header.height < 1 \
 	|| header.scale == 0.0 {
-		fmt.printf("[pfm] Header: {{width = %v, height = %v, scale: %v}}\n", header.width, header.height, header.scale)
 		err = .Invalid_Header_Value
 		return
 	}
@@ -538,7 +549,6 @@ decode_image :: proc(img: ^Image, header: Header, data: []byte, allocator := con
 	// we can check data size for binary formats
 	if header.format in BINARY {
 		if len(data) < buffer_size {
-			fmt.printf("len(data): %v, buffer size: %v\n", len(data), buffer_size)
 			return .Buffer_Too_Small
 		}
 	}
@@ -546,9 +556,9 @@ decode_image :: proc(img: ^Image, header: Header, data: []byte, allocator := con
 	// for ASCII and P4, we use length for the termination condition, so start at 0
 	// BINARY will be a simple memcopy so the buffer length should also be initialised
 	if header.format in ASCII || header.format == .P4 {
-		bytes.buffer_init_allocator(&img.pixels, 0, buffer_size)
+		img.pixels = make([dynamic]u8, 0, buffer_size)
 	} else {
-		bytes.buffer_init_allocator(&img.pixels, buffer_size, buffer_size)
+		img.pixels = make([dynamic]u8, buffer_size, buffer_size)
 	}
 
 	switch header.format {
@@ -558,24 +568,24 @@ decode_image :: proc(img: ^Image, header: Header, data: []byte, allocator := con
 			for b in 1 ..= 8 {
 				bit := byte(8 - b)
 				pix := (d >> bit) & 1
-				bytes.buffer_write_byte(&img.pixels, pix)
-				if len(img.pixels.buf) % img.width == 0 {
+				append(&img.pixels, pix)
+				if len(img.pixels) % img.width == 0 {
 					break
 				}
 			}
 
-			if len(img.pixels.buf) == cap(img.pixels.buf) {
+			if len(img.pixels) == cap(img.pixels) {
 				break
 			}
 		}
 
 	// Simple binary
 	case .P5, .P6, .P7, .Pf, .PF:
-		copy(img.pixels.buf[:], data[:])
+		copy(img.pixels[:], data[:])
 
 		// convert to native endianness
 		if header.format in PFM {
-			pixels := mem.slice_data_cast([]f32, img.pixels.buf[:])
+			pixels := mem.slice_data_cast([]f32, img.pixels[:])
 			if header.little_endian {
 				for &p in pixels {
 					p = f32(transmute(f32le) p)
@@ -587,7 +597,7 @@ decode_image :: proc(img: ^Image, header: Header, data: []byte, allocator := con
 			}
 		} else {
 			if img.depth == 16 {
-				pixels := mem.slice_data_cast([]u16, img.pixels.buf[:])
+				pixels := mem.slice_data_cast([]u16, img.pixels[:])
 				for &p in pixels {
 					p = u16(transmute(u16be) p)
 				}
@@ -599,15 +609,15 @@ decode_image :: proc(img: ^Image, header: Header, data: []byte, allocator := con
 		for c in data {
 			switch c {
 			case '0', '1':
-				bytes.buffer_write_byte(&img.pixels, c - '0')
+				append(&img.pixels, c - '0')
 			}
 
-			if len(img.pixels.buf) == cap(img.pixels.buf) {
+			if len(img.pixels) == cap(img.pixels) {
 				break
 			}
 		}
 
-		if len(img.pixels.buf) < cap(img.pixels.buf) {
+		if len(img.pixels) < cap(img.pixels) {
 			err = Format_Error.Buffer_Too_Small
 			return
 		}
@@ -630,18 +640,18 @@ decode_image :: proc(img: ^Image, header: Header, data: []byte, allocator := con
 
 			switch img.depth {
 			case 8:
-				bytes.buffer_write_byte(&img.pixels, u8(value))
+				append(&img.pixels, u8(value))
 			case 16:
 				vb := transmute([2]u8) u16(value)
-				bytes.buffer_write(&img.pixels, vb[:])
+				append(&img.pixels, ..vb[:])
 			}
 
-			if len(img.pixels.buf) == cap(img.pixels.buf) {
+			if len(img.pixels) == cap(img.pixels) {
 				break
 			}
 		}
 
-		if len(img.pixels.buf) < cap(img.pixels.buf) {
+		if len(img.pixels) < cap(img.pixels) {
 			err = Format_Error.Buffer_Too_Small
 			return
 		}
@@ -722,8 +732,11 @@ _register :: proc "contextless" () {
 	loader :: proc(data: []byte, options: image.Options, allocator: mem.Allocator) -> (img: ^Image, err: Error) {
 		return load_from_bytes(data, allocator)
 	}
+	context_loader :: proc(ctx: ^compress.Context, options: image.Options, allocator: mem.Allocator) -> (img: ^Image, err: Error) {
+		return load_from_context(ctx, allocator)
+	}
 	destroyer :: proc(img: ^Image) {
 		_ = destroy(img)
 	}
-	image.register(.NetPBM, loader, destroyer)
+	image.register(.NetPBM, loader, destroyer, context_loader)
 }

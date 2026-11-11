@@ -3,20 +3,17 @@ package test_internal
 import "core:simd"
 import "core:testing"
 
-// #align below the natural alignment
+// #align(N) below the type alignment;
+// the struct only guarantees N for fields
 
-// Odin allocates and places the struct at align 1, so field accesses
-// must not assume the field type natural alignment (here 16)
 Under_Aligned :: struct #align(1) {
 	v: #simd[4]f32,
 }
 
-// forces the global var below to align 16, this puts the
-// underaligned member at a guaranteed misaligned offset
 Under_Helper :: struct {
-	force: #simd[4]f32,  // force align to 16
+	force: #simd[4]f32,   // force align to 16
 	_:     u8,
-	s:     Under_Aligned, // offset 17
+	s:     Under_Aligned, // offs 17, guaranteed misaligned
 }
 
 @(export)
@@ -31,7 +28,7 @@ swap_under :: proc(s: ^Under_Aligned, x: #simd[4]f32) -> #simd[4]f32 {
 
 @(test)
 test_align_lowered_struct_access :: proc(t: ^testing.T) {
-	u1.s.v = {1, 2, 3, 4} // store through a constant GEP
+	u1.s.v = {1, 2, 3, 4} // store through const GEP
 
 	y := #force_no_inline swap_under(&u1.s, {5, 6, 7, 8})
 	testing.expect(t, simd.to_array(y) == [4]f32{1, 2, 3, 4})
@@ -39,10 +36,39 @@ test_align_lowered_struct_access :: proc(t: ^testing.T) {
 }
 
 
-// #align union below the natural alignment;
-// variant loads and stores go through a pointer cast of the union base,
-// and not a GEP; these + the tag accesses must
-// not assume more than the union's #align(N) alignment
+// pass by val, the callee gets a ptr to the caller's storage;
+// there is no temp copy, the struct only requires align 1
+
+// big enough to get passed indirect
+Under_Aligned_Big :: struct #align(1) {
+	v: #simd[4]f32,
+	w: #simd[4]f32,
+}
+
+Big_Helper :: struct {
+	force: #simd[4]f32,        // force align to 16
+	_:     u8,
+	s:     Under_Aligned_Big, // offs 17, guaranteed misaligned
+}
+
+@(export)
+u5: Big_Helper
+
+@(private="file")
+sum_fields :: proc(s: Under_Aligned_Big) -> #simd[4]f32 {
+	return s.v + s.w
+}
+
+@(test)
+test_align_lowered_struct_by_value :: proc(t: ^testing.T) {
+	u5.s = {v = {1, 2, 3, 4}, w = {5, 6, 7, 8}}
+
+	y := #force_no_inline sum_fields(u5.s)
+	testing.expect(t, simd.to_array(y) == [4]f32{6, 8, 10, 12})
+}
+
+
+// #align(N) union below the variant alignment
 
 Under_Union :: union #align(1) {
 	#simd[4]f32,
@@ -50,9 +76,9 @@ Under_Union :: union #align(1) {
 }
 
 Union_Helper :: struct {
-	force: #simd[4]f32,  // force align to 16
+	force: #simd[4]f32, // force align to 16
 	_:     u8,
-	u:     Under_Union,  // offset 17
+	u:     Under_Union, // offs 17, guaranteed misaligned
 }
 
 @(export)
@@ -81,9 +107,8 @@ test_align_lowered_union_variant :: proc(t: ^testing.T) {
 }
 
 
-// by-reference type switch on an underaligned union;
-// the case variable is a raw variant pointer;
-// accesses through it must not assume more than the union's #align(N)
+// by-ref type switch on #align(N) union
+// the case variable only gets the union's align N
 
 @(export)
 u4: Union_Helper
@@ -112,9 +137,7 @@ test_align_lowered_union_type_switch_ref :: proc(t: ^testing.T) {
 }
 
 
-// #align #raw_union below the natural alignment
-// (field pointers are zero-offset GEPs);
-// accesses must not assume more than the union's #align(N) alignment
+// #align(N) #raw_union below the type alignment
 
 Under_Raw :: struct #raw_union #align(1) {
 	v: #simd[4]f32,
@@ -122,9 +145,9 @@ Under_Raw :: struct #raw_union #align(1) {
 }
 
 Raw_Helper :: struct {
-	force: #simd[4]f32,  // force align to 16
+	force: #simd[4]f32, // force align to 16
 	_:     u8,
-	r:     Under_Raw,    // offset 17
+	r:     Under_Raw,   // offs 17, guaranteed misaligned
 }
 
 @(export)

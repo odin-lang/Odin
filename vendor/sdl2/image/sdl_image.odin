@@ -13,8 +13,8 @@ when ODIN_OS == .Windows {
 bool :: SDL.bool
 
 MAJOR_VERSION :: 2
-MINOR_VERSION :: 0
-PATCHLEVEL    :: 5
+MINOR_VERSION :: 8
+PATCHLEVEL    :: 12
 
 @(default_calling_convention="c", link_prefix="IMG_")
 foreign lib {
@@ -26,6 +26,8 @@ InitFlag :: enum c.int {
 	PNG  = 1,
 	TIF  = 2,
 	WEBP = 3,
+	JXL  = 4,
+	AVIF = 5,
 }
 
 InitFlags :: distinct bit_set[InitFlag; c.int]
@@ -34,9 +36,11 @@ INIT_JPG  :: InitFlags{.JPG}
 INIT_PNG  :: InitFlags{.PNG}
 INIT_TIF  :: InitFlags{.TIF}
 INIT_WEBP :: InitFlags{.WEBP}
+INIT_JXL  :: InitFlags{.JXL}
+INIT_AVIF :: InitFlags{.AVIF}
 
 /* Animated image support
-   Currently only animated GIFs are supported.
+   Currently only animated GIFs and WebPs are supported.
  */
 Animation :: struct {
 	w, h:   c.int,
@@ -87,6 +91,9 @@ foreign lib {
 	isXPM  :: proc(src: ^SDL.RWops) -> bool ---
 	isXV   :: proc(src: ^SDL.RWops) -> bool ---
 	isWEBP :: proc(src: ^SDL.RWops) -> bool ---
+	isAVIF :: proc(src: ^SDL.RWops) -> bool ---
+	isJXL  :: proc(src: ^SDL.RWops) -> bool ---
+	isQOI  :: proc(src: ^SDL.RWops) -> bool ---
 
 	/* Individual loading functions */
 	LoadICO_RW  :: proc(src: ^SDL.RWops) -> ^SDL.Surface ---
@@ -105,8 +112,15 @@ foreign lib {
 	LoadXPM_RW  :: proc(src: ^SDL.RWops) -> ^SDL.Surface ---
 	LoadXV_RW   :: proc(src: ^SDL.RWops) -> ^SDL.Surface ---
 	LoadWEBP_RW :: proc(src: ^SDL.RWops) -> ^SDL.Surface ---
+	LoadAVIF_RW :: proc(src: ^SDL.RWops) -> ^SDL.Surface ---
+	LoadJXL_RW  :: proc(src: ^SDL.RWops) -> ^SDL.Surface ---
+	LoadQOI_RW  :: proc(src: ^SDL.RWops) -> ^SDL.Surface ---
 
-	ReadXPMFromArray :: proc(xpm: [^]cstring) -> ^SDL.Surface ---
+	/* Load an SVG scaled to the given size, in pixels. A width or height of zero keeps the aspect ratio. */
+	LoadSizedSVG_RW :: proc(src: ^SDL.RWops, width, height: c.int) -> ^SDL.Surface ---
+
+	ReadXPMFromArray            :: proc(xpm: [^]cstring) -> ^SDL.Surface ---
+	ReadXPMFromArrayToRGB888    :: proc(xpm: [^]cstring) -> ^SDL.Surface ---
 
 	/* Individual saving functions */
 	SavePNG    :: proc(surface: ^SDL.Surface, file: cstring) -> c.int ---
@@ -120,5 +134,6 @@ foreign lib {
 	FreeAnimation         :: proc(anim: ^Animation) ---
 
 	/* Individual loading functions */
-	LoadGIFAnimation_RW :: proc(src: ^SDL.RWops) -> ^Animation ---
+	LoadGIFAnimation_RW  :: proc(src: ^SDL.RWops) -> ^Animation ---
+	LoadWEBPAnimation_RW :: proc(src: ^SDL.RWops) -> ^Animation ---
 }

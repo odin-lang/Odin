@@ -1,5 +1,6 @@
-#define LB_ENABLE_BASIC_RVO    true
-#define LB_ENABLE_ADVANCED_RVO build_context.enable_rvo
+#define LB_ENABLE_BASIC_RVO       true                     // `return call()`
+#define LB_ENABLE_DECLARATION_RVO true                     // `x := call()`
+#define LB_ENABLE_ADVANCED_RVO    build_context.enable_rvo // `x = call()`
 
 // NOTE(bill): Orders entities by their canonical type
 gb_internal i32 lb_entity_type_cmp(Entity *x, Entity *y) {
@@ -33,6 +34,21 @@ gb_internal lbFunctionType *lb_call_sret_eligible(lbProcedure *p, Ast *call_expr
 	TypeAndValue proc_tv = type_and_value_of_expr(proc_expr);
 	if (proc_tv.mode == Addressing_Type || proc_tv.mode == Addressing_Builtin) {
 		return nullptr;
+	}
+	Entity *proc_entity = entity_of_node(proc_expr);
+	if (proc_entity != nullptr) {
+		// NOTE(bill): Objective-C sends and asm templates return their value and ignore the sret destination
+		if (proc_entity->kind == Entity_AsmTemplate) {
+			return nullptr;
+		}
+		if (proc_entity->kind == Entity_Procedure && proc_entity->Procedure.is_objc_impl_or_import) {
+			return nullptr;
+		}
+		// NOTE(bill): A deferred procedure takes the result as it was when the call returned.
+		// It must not see later changes to `x`, and `return call()` would skip running it.
+		if (entity_has_deferred_procedure(proc_entity)) {
+			return nullptr;
+		}
 	}
 	Type *pt = base_type(proc_tv.type);
 	if (pt == nullptr || pt->kind != Type_Proc || pt->Proc.results == nullptr) {
@@ -634,6 +650,20 @@ gb_internal lbValue lb_map_hash_is_valid(lbProcedure *p, lbValue hash) {
 	return lb_emit_arith(p, Token_And, not_deleted, not_empty, t_uintptr);
 }
 
+// The address of the value a range statement iterates over.
+// For a map index (`for x in m[key]`) the map lookup gives nil when the key is missing;
+// iterate over a zeroed local instead, as reading `m[key]` would give the zero value.
+// A found value is iterated in place, without a copy.
+gb_internal lbValue lb_range_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
+	lbValue ptr = lb_addr_get_ptr(p, addr);
+	if (addr.kind == lbAddr_Map) {
+		lbValue zero  = lb_add_local_generated(p, type_deref(ptr.type), true).addr;
+		lbValue found = lb_emit_comp_against_nil(p, Token_NotEq, ptr);
+		ptr = lb_emit_select(p, found, ptr, zero);
+	}
+	return ptr;
+}
+
 gb_internal void lb_build_range_map(lbProcedure *p, lbValue expr, Type *val_type,
                                     lbValue *val_, lbValue *key_, lbBlock **loop_, lbBlock **done_) {
 	lbModule *m = p->module;
@@ -772,35 +802,62 @@ gb_internal void lb_build_range_string(lbProcedure *p, lbValue expr, Type *val_t
 	lb_start_block(p, body);
 
 
-	lbValue rune_and_len = {};
+	lbAddr rune_ = lb_add_local_generated(p, t_rune, false);
+	lbAddr width_ = lb_add_local_generated(p, t_int, false);
+	lbBlock *ascii_block   = lb_create_block(p, "for.string.ascii");
+	lbBlock *decode_block  = lb_create_block(p, "for.string.decode");
+	lbBlock *decoded_block = lb_create_block(p, "for.string.decoded");
+
+	lbValue str_elem = lb_string_elem(p, expr);
+	lbValue byte_ptr = {};
 	if (!is_reverse) {
-		lbValue str_elem = lb_emit_ptr_offset(p, lb_string_elem(p, expr), offset);
-		lbValue str_len  = lb_emit_arith(p, Token_Sub, count, offset, t_int);
+		byte_ptr = lb_emit_ptr_offset(p, str_elem, offset);
+	} else {
+		byte_ptr = lb_emit_ptr_offset(p, str_elem, lb_emit_arith(p, Token_Sub, offset, lb_const_int(m, t_int, 1), t_int));
+	}
+	lbValue first_byte = lb_emit_load(p, byte_ptr);
+	lbValue is_ascii = lb_emit_comp(p, Token_Lt, first_byte, lb_const_int(m, t_u8, 0x80));
+	// Only decode a byte that is not ASCII
+	lb_emit_if(p, is_ascii, ascii_block, decode_block);
+
+	lb_start_block(p, ascii_block);
+	lb_addr_store(p, rune_, lb_emit_conv(p, first_byte, t_rune));
+	lb_addr_store(p, width_, lb_const_int(m, t_int, 1));
+	lb_emit_jump(p, decoded_block);
+
+	lb_start_block(p, decode_block);
+	{
 		auto args = array_make<lbValue>(permanent_allocator(), 1);
-		args[0] = lb_emit_string(p, str_elem, str_len);
+		if (!is_reverse) {
+			args[0] = lb_emit_string(p, byte_ptr, lb_emit_arith(p, Token_Sub, count, offset, t_int));
+		} else {
+			// NOTE(bill): REVERSED LOGIC
+			args[0] = lb_emit_string(p, str_elem, offset);
+		}
+		// At -o:speed and above, inline the forward decoder here so that multi-byte runes also do not pay for a call.
+		// LLVM already inlines string_decode_last_rune where it helps. Forcing it inline makes #reverse slower.
+		ProcInlining inlining = (!is_reverse && build_context.optimization_level >= OptimizationLevel_Speed) ? ProcInlining_inline : ProcInlining_none;
+		lbValue decode_proc = lb_lookup_runtime_procedure(m, make_string_c(is_reverse ? "string_decode_last_rune" : "string_decode_rune"));
+		lbValue rune_and_len = lb_emit_call(p, decode_proc, args, inlining);
+		lb_addr_store(p, rune_,  lb_emit_struct_ev(p, rune_and_len, 0));
+		lb_addr_store(p, width_, lb_emit_struct_ev(p, rune_and_len, 1));
+	}
+	lb_emit_jump(p, decoded_block);
 
-		rune_and_len = lb_emit_runtime_call(p, "string_decode_rune", args);
-		lbValue len  = lb_emit_struct_ev(p, rune_and_len, 1);
+	lb_start_block(p, decoded_block);
+	lbValue decoded_rune = lb_addr_load(p, rune_);
+	lbValue len          = lb_addr_load(p, width_);
+	if (!is_reverse) {
 		lb_addr_store(p, offset_, lb_emit_arith(p, Token_Add, offset, len, t_int));
-
 		idx = offset;
 	} else {
-		// NOTE(bill): REVERSED LOGIC
-		lbValue str_elem = lb_string_elem(p, expr);
-		lbValue str_len  = offset;
-		auto args = array_make<lbValue>(permanent_allocator(), 1);
-		args[0] = lb_emit_string(p, str_elem, str_len);
-
-		rune_and_len = lb_emit_runtime_call(p, "string_decode_last_rune", args);
-		lbValue len  = lb_emit_struct_ev(p, rune_and_len, 1);
 		lb_addr_store(p, offset_, lb_emit_arith(p, Token_Sub, offset, len, t_int));
-
 		idx = lb_addr_load(p, offset_);
 	}
 
 
 	if (val_type != nullptr) {
-		val = lb_emit_struct_ev(p, rune_and_len, 0);
+		val = decoded_rune;
 	}
 
 	if (val_)  *val_  = val;
@@ -886,35 +943,59 @@ gb_internal void lb_build_range_string16(lbProcedure *p, lbValue expr, Type *val
 	lb_start_block(p, body);
 
 
-	lbValue rune_and_len = {};
+	lbAddr rune_ = lb_add_local_generated(p, t_rune, false);
+	lbAddr width_ = lb_add_local_generated(p, t_int, false);
+	lbBlock *single_block  = lb_create_block(p, "for.string16.single");
+	lbBlock *decode_block  = lb_create_block(p, "for.string16.decode");
+	lbBlock *decoded_block = lb_create_block(p, "for.string16.decoded");
+
+	lbValue str_elem = lb_string_elem(p, expr);
+	lbValue unit_ptr = {};
 	if (!is_reverse) {
-		lbValue str_elem = lb_emit_ptr_offset(p, lb_string_elem(p, expr), offset);
-		lbValue str_len  = lb_emit_arith(p, Token_Sub, count, offset, t_int);
+		unit_ptr = lb_emit_ptr_offset(p, str_elem, offset);
+	} else {
+		unit_ptr = lb_emit_ptr_offset(p, str_elem, lb_emit_arith(p, Token_Sub, offset, lb_const_int(m, t_int, 1), t_int));
+	}
+	lbValue unit = lb_emit_load(p, unit_ptr);
+	lbValue surrogate_offset = lb_emit_arith(p, Token_Sub, unit, lb_const_int(m, t_u16, 0xD800), t_u16);
+	lbValue is_single = lb_emit_comp(p, Token_GtEq, surrogate_offset, lb_const_int(m, t_u16, 0x800));
+	// Only decode a surrogate
+	lb_emit_if(p, is_single, single_block, decode_block);
+
+	lb_start_block(p, single_block);
+	lb_addr_store(p, rune_, lb_emit_conv(p, unit, t_rune));
+	lb_addr_store(p, width_, lb_const_int(m, t_int, 1));
+	lb_emit_jump(p, decoded_block);
+
+	lb_start_block(p, decode_block);
+	{
 		auto args = array_make<lbValue>(permanent_allocator(), 1);
-		args[0] = lb_emit_string16(p, str_elem, str_len);
+		if (!is_reverse) {
+			args[0] = lb_emit_string16(p, unit_ptr, lb_emit_arith(p, Token_Sub, count, offset, t_int));
+		} else {
+			// NOTE(bill): REVERSED LOGIC
+			args[0] = lb_emit_string16(p, str_elem, offset);
+		}
+		lbValue rune_and_len = lb_emit_runtime_call(p, is_reverse ? "string16_decode_last_rune" : "string16_decode_rune", args);
+		lb_addr_store(p, rune_,  lb_emit_struct_ev(p, rune_and_len, 0));
+		lb_addr_store(p, width_, lb_emit_struct_ev(p, rune_and_len, 1));
+	}
+	lb_emit_jump(p, decoded_block);
 
-		rune_and_len = lb_emit_runtime_call(p, "string16_decode_rune", args);
-		lbValue len  = lb_emit_struct_ev(p, rune_and_len, 1);
+	lb_start_block(p, decoded_block);
+	lbValue decoded_rune = lb_addr_load(p, rune_);
+	lbValue len          = lb_addr_load(p, width_);
+	if (!is_reverse) {
 		lb_addr_store(p, offset_, lb_emit_arith(p, Token_Add, offset, len, t_int));
-
 		idx = offset;
 	} else {
-		// NOTE(bill): REVERSED LOGIC
-		lbValue str_elem = lb_string_elem(p, expr);
-		lbValue str_len  = offset;
-		auto args = array_make<lbValue>(permanent_allocator(), 1);
-		args[0] = lb_emit_string16(p, str_elem, str_len);
-
-		rune_and_len = lb_emit_runtime_call(p, "string16_decode_last_rune", args);
-		lbValue len  = lb_emit_struct_ev(p, rune_and_len, 1);
 		lb_addr_store(p, offset_, lb_emit_arith(p, Token_Sub, offset, len, t_int));
-
 		idx = lb_addr_load(p, offset_);
 	}
 
 
 	if (val_type != nullptr) {
-		val = lb_emit_struct_ev(p, rune_and_len, 0);
+		val = decoded_rune;
 	}
 
 	if (val_)  *val_  = val;
@@ -1069,10 +1150,12 @@ gb_internal lbValue lb_enum_values_slice(lbProcedure *p, Type *enum_type, i64 *e
 
 	if (enum_count_) *enum_count_ = enum_count;
 
-	lbValue ti       = lb_type_info(p, t);
-	lbValue variant  = lb_emit_struct_ep(p, ti, 4);
-	lbValue eti_ptr  = lb_emit_conv(p, variant, t_type_info_enum_ptr);
-	lbValue values   = lb_emit_load(p, lb_emit_struct_ep(p, eti_ptr, 2));
+	Selection sel = lookup_field(t_type_info_enum, string_interner_insert(str_lit("values")), false);
+	GB_ASSERT(sel.entity != nullptr);
+
+	lbValue ti      = lb_type_info(p, t);
+	lbValue eti_ptr = lb_emit_conv(p, ti, t_type_info_enum_ptr);
+	lbValue values  = lb_emit_load(p, lb_emit_deep_field_gep(p, eti_ptr, sel));
 	return values;
 }
 
@@ -1394,7 +1477,7 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 		switch (et->kind) {
 		case Type_Map: {
 			is_map = true;
-			lbValue map = lb_build_addr_ptr(p, expr);
+			lbValue map = lb_range_addr_get_ptr(p, lb_build_addr(p, expr));
 			if (is_type_pointer(type_deref(map.type))) {
 				map = lb_emit_load(p, map);
 			}
@@ -1425,7 +1508,7 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 				soa_elem = &addr;
 				break;
 			default:
-				array = lb_addr_get_ptr(p, addr);
+				array = lb_range_addr_get_ptr(p, addr);
 				if (is_type_soa_pointer(type_deref(array.type))) {
 					// for v in p, where p is an #soa element ptr (e.g. p := &soa[i]);
 					// we need to build the soa variable from the soa ptr
@@ -1445,7 +1528,7 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 			break;
 		}
 		case Type_EnumeratedArray: {
-			lbValue array = lb_build_addr_ptr(p, expr);
+			lbValue array = lb_range_addr_get_ptr(p, lb_build_addr(p, expr));
 			if (is_type_pointer(type_deref(array.type))) {
 				array = lb_emit_load(p, array);
 			}
@@ -1455,7 +1538,7 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 			break;
 		}
 		case Type_FixedCapacityDynamicArray: {
-			lbValue array = lb_build_addr_ptr(p, expr);
+			lbValue array = lb_range_addr_get_ptr(p, lb_build_addr(p, expr));
 			if (is_type_pointer(type_deref(array.type))) {
 				array = lb_emit_load(p, array);
 			}
@@ -1465,7 +1548,7 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 		}
 		case Type_DynamicArray: {
 			lbValue count_ptr = {};
-			lbValue array = lb_build_addr_ptr(p, expr);
+			lbValue array = lb_range_addr_get_ptr(p, lb_build_addr(p, expr));
 			if (is_type_pointer(type_deref(array.type))) {
 				array = lb_emit_load(p, array);
 			}
@@ -1631,8 +1714,8 @@ gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *
 		GB_ASSERT(start_expr->tav.mode == Addressing_Constant);
 		GB_ASSERT(end_expr->tav.mode == Addressing_Constant);
 
-		ExactValue start = start_expr->tav.value;
-		ExactValue end   = end_expr->tav.value;
+		ExactValue start = start_expr->tav.value();
+		ExactValue end   = end_expr->tav.value();
 		if (op != Token_RangeHalf) { // .. [start, end] (or ..=)
 			ExactValue index = exact_value_i64(0);
 			for (ExactValue val = start;
@@ -1683,7 +1766,7 @@ gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *
 
 		ExactValue unroll_count_ev = {};
 		if (rs->args.count != 0) {
-			unroll_count_ev = rs->args[0]->tav.value;
+			unroll_count_ev = rs->args[0]->tav.value();
 		}
 
 
@@ -1697,7 +1780,7 @@ gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *
 
 				GB_ASSERT(is_type_string(t));
 				{
-					ExactValue value = expr->tav.value;
+					ExactValue value = expr->tav.value();
 					GB_ASSERT(value.kind == ExactValue_String);
 					String str = value.value_string;
 					Rune codepoint = 0;
@@ -2017,7 +2100,7 @@ gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *
 				if (expr->tav.mode == Addressing_Type) {
 					bn = write_type_to_string(bn, expr->tav.type, false);
 				} else {
-					ExactValue value = expr->tav.value;
+					ExactValue value = expr->tav.value();
 					if (is_type_rune(expr->tav.type) && value.kind == ExactValue_Integer) {
 						Rune r = cast(Rune)exact_value_to_i64(value);
 						u8 rune_temp[6] = {};
@@ -2385,7 +2468,8 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 					saw_nil = true;
 					on_val = lb_const_int(m, union_tag_type(ut), 0);
 				} else {
-					on_val = lb_const_union_tag(m, ut, case_type);
+					Type *vt = type_info_variant_shim_type(ut, case_type);
+					on_val = lb_const_union_tag(m, ut, vt ? vt : case_type);
 				}
 
 			} else if (switch_kind == TypeSwitch_Any) {
@@ -2417,6 +2501,15 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 			Type *ct = case_entity->type;
 			Type *ct_ptr = alloc_type_pointer(ct);
 
+			lbValue stored = {};
+			if (switch_kind == TypeSwitch_Union) {
+				Type *vt = type_info_variant_shim_type(base_type(parent_base_type), ct);
+				if (vt != nullptr) {
+					stored = lb_emit_load(p, lb_emit_union_variant_ptr(p, parent_ptr, vt));
+					data = stored;
+				}
+			}
+
 			lbValue ptr = {};
 
 			if (backing_data.addr.value) { // by value
@@ -2430,23 +2523,12 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 
 			} else { // by reference
 				GB_ASSERT(by_reference);
-				ptr = lb_emit_conv(p, data, ct_ptr);
-				if (switch_kind == TypeSwitch_Union) {
-					Type *ut = base_type(type_deref(parent_ptr.type));
-					GB_ASSERT(ut->kind == Type_Union);
-					if (ut->Union.custom_align > 0) {
-						// union #align(N) can lower alignment below the variant type alignment;
-						// the variant ptr is a cast (not a GEP), so bind the case variable to a
-						// zero-offset GEP for the max-align metadata to attach to;
-						// (a constant base folds the GEP, but a nested union recovers via the ConstantExpr GEP)
-						// TODO: direct access to a whole global union is not handled
-						LLVMValueRef zero = lb_const_int(m, t_int, 0).value;
-						LLVMValueRef gep = LLVMBuildInBoundsGEP2(p->builder, LLVMInt8TypeInContext(m->ctx), ptr.value, &zero, 1, "");
-						if (LLVMIsAInstruction(gep)) {
-							lb_set_metadata_custom_u64(m, gep, ODIN_METADATA_MAX_ALIGN, cast(u64)type_align_of(ut));
-						}
-						ptr.value = gep;
-					}
+				if (stored.value != nullptr) {
+					ptr = stored;
+				} else if (switch_kind == TypeSwitch_Union) {
+					ptr = lb_emit_union_variant_ptr(p, parent_ptr, ct);
+				} else {
+					ptr = lb_emit_conv(p, data, ct_ptr);
 				}
 			}
 			GB_ASSERT(are_types_identical(case_entity->type, type_deref(ptr.type)));
@@ -2502,7 +2584,7 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 			if (e->Variable.is_rodata) {
 				cc.is_rodata = true;
 			}
-			value = lb_const_value(p->module, is_type_any(e->type) ? ast_value->tav.type : e->type, ast_value->tav.value, cc);
+			value = lb_const_value(p->module, is_type_any(e->type) ? ast_value->tav.type : e->type, ast_value->tav.value(), cc);
 		}
 
 		String mangled_name = {};
@@ -2652,10 +2734,10 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, Toke
 				lbValue ptr = lb_address_from_load_or_generate_local(p, res);
 				lb_mem_copy_non_overlapping(p, p->return_ptr.addr, ptr, lb_const_int(p->module, t_int, sz));
 			} else {
-				OdinLLVMBuildStore(p, res_val, p->return_ptr.addr.value);
+				LLVMBuildStore(p->builder, res_val, p->return_ptr.addr.value);
 			}
 		} else {
-			OdinLLVMBuildStore(p, LLVMConstNull(p->abi_function_type->ret.type), p->return_ptr.addr.value);
+			LLVMBuildStore(p->builder, LLVMConstNull(p->abi_function_type->ret.type), p->return_ptr.addr.value);
 		}
 
 		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr, pos);
@@ -2684,7 +2766,7 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, Toke
 			// reuse the temp return value memory where possible
 			LLVMValueRef ptr = p->temp_callee_return_struct_memory;
 			LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(src_type, 0), "");
-			OdinLLVMBuildStore(p, ret_val, nptr);
+			LLVMBuildStore(p->builder, ret_val, nptr);
 			ret_val = OdinLLVMBuildLoad(p, ret_type, ptr);
 		} else {
 			ret_val = OdinLLVMBuildTransmute(p, ret_val, ret_type);
@@ -2708,7 +2790,7 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 		// No return values
 
 		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr, pos);
-		
+
 		// Check for terminator in the defer stmts
 		LLVMValueRef instr = LLVMGetLastInstruction(p->curr_block->block);
 		if (!lb_is_instr_terminating(instr)) {
@@ -3322,7 +3404,11 @@ gb_internal void lb_build_assign_stmt(lbProcedure *p, AstAssignStmt *as) {
 			lbValue old_value = lb_addr_load(p, lhs);
 			Type *type = old_value.type;
 
-			lbValue change = lb_emit_conv(p, value, type);
+			// NOTE: A typed shift amount is converted by `lb_emit_arith`, as it may be wider than `type`
+			lbValue change = value;
+			if (!(op == Token_Shl || op == Token_Shr) || lb_is_expr_untyped_const(as->rhs[0])) {
+				change = lb_emit_conv(p, value, type);
+			}
 			lbValue new_value = lb_emit_arith(p, op, old_value, change, type);
 			lb_addr_store(p, lhs, new_value);
 		}
@@ -3459,7 +3545,7 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 				}
 			}
 		} else {
-			if (LB_ENABLE_ADVANCED_RVO) {
+			if (LB_ENABLE_DECLARATION_RVO) {
 				// @RVO: for `x := call()`
 				if (vd->names.count == 1 && values.count == 1 && !is_blank_ident(vd->names[0])) {
 					Ast *rhs_expr = unparen_expr(values[0]);
@@ -3519,7 +3605,8 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 				if (!is_blank_ident(name) && !lvals_preused[i]) {
 					Entity *e = entity_of_node(name);
 					bool zero_init = values.count == 0;
-					lvals[i] = lb_add_local(p, e->type, e, zero_init);
+					bool force_no_init = lb_emit_store_writes_every_byte(p, e->type, inits[i]);
+					lvals[i] = lb_add_local(p, e->type, e, zero_init, force_no_init);
 				}
 			}
 
@@ -3648,6 +3735,19 @@ gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlo
 	}
 	defer (p->branch_location_pos = prev_token_pos);
 
+	// NOTE: a `musttail` call must be directly followed by the `ret`, so with no deferred
+	// statements to run after it, the asan unpoisoning and lifetime ends go before the call
+	LLVMValueRef must_tail_call = nullptr;
+#if LLVM_VERSION_MAJOR > 17
+	if (p->defer_stmts.count == 0 && p->curr_block != nullptr) {
+		LLVMValueRef last = LLVMGetLastInstruction(p->curr_block->block);
+		if (last != nullptr && LLVMIsACallInst(last) && LLVMGetTailCallKind(last) == LLVMTailCallKindMustTail) {
+			must_tail_call = last;
+			LLVMPositionBuilderBefore(p->builder, must_tail_call);
+		}
+	}
+#endif
+
 	// TODO(lucas): In LLVM 21 use the 'use-after-scope' asan option which does this for us.
 	if (kind == lbDeferExit_Return) {
 		for_array(i, p->asan_stack_locals) {
@@ -3687,6 +3787,10 @@ gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlo
 
 	// end lifetimes after the defer bodies, a defer may reference the locals
 	lb_emit_lifetime_ends(p, kind, block);
+
+	if (must_tail_call != nullptr) {
+		LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);
+	}
 }
 
 gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block, Ast *node) {

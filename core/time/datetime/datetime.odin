@@ -1,12 +1,21 @@
-/*
-Calendrical conversions using a proleptic Gregorian calendar.
-
-Implemented using formulas from: Calendrical Calculations Ultimate Edition,
-Reingold & Dershowitz
-*/
+// Calendrical conversions using a proleptic Gregorian calendar.
 package datetime
 
 import "base:intrinsics"
+
+/*
+	Copyright 2024 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+		flysand7:        Documentation.
+		Colin Davidson:  Additions for `core:time/timezone`.
+
+	Implemented using formulas from:
+		Edward M. Reingold and Nachum Dershowitz, Calendrical Calculations: The Ultimate Edition,
+		Cambridge University Press, 2018.
+*/
 
 /*
 Obtain an ordinal from a date.
@@ -188,7 +197,7 @@ Add delta to datetime.
 
 This procedure adds a delta to a datetime, and returns a new datetime. The new
 datetime would have happened the time specified by `delta` after the specified
-datetime. 
+datetime.
 */
 add_delta_to_datetime :: proc "contextless" (a: DateTime, delta: Delta) -> (datetime: DateTime, err: Error) {
 	days   := date_to_ordinal(a) or_return

@@ -245,8 +245,26 @@ int run_subprocess(String const &exe_name, wchar_t *after_double_dash_raw) {
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 	} else {
+		DWORD err_code = GetLastError();
+		char *err_msg = nullptr;
+		FormatMessageA(
+			FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+			nullptr,
+			err_code,
+			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+			cast(LPSTR)&err_msg,
+			0,
+			nullptr
+		);
+
 		String cmd_line_utf8 = string16_to_string(a, make_string16(cast(u16 *)cmd_line, n));
 		gb_printf_err("Failed to execute command:\n\t%.*s\n", LIT(cmd_line_utf8));
+
+		if (err_msg) {
+			gb_printf_err("Windows Error [%lu]: %s\n", err_code, err_msg);
+			LocalFree(err_msg);
+		}
+
 		gb_free(a, cmd_line_utf8.text);
 		exit_code = -1;
 	}
@@ -681,7 +699,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	auto build_flags = array_make<BuildFlag>(heap_allocator(), 0, BuildFlag_COUNT);
 	add_flag(&build_flags, BuildFlag_Help,                    str_lit("help"),                      BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_SingleFile,              str_lit("file"),                      BuildFlagParam_None,    Command__does_build | Command__does_check);
-	add_flag(&build_flags, BuildFlag_OutFile,                 str_lit("out"),                       BuildFlagParam_String,  Command__does_build | Command_test | Command_doc);
+	add_flag(&build_flags, BuildFlag_OutFile,                 str_lit("out"),                       BuildFlagParam_String,  Command__does_build | Command_test | Command_doc | Command_bundle_android);
 	add_flag(&build_flags, BuildFlag_OptimizationMode,        str_lit("o"),                         BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_ShowTimings,             str_lit("show-timings"),              BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowMoreTimings,         str_lit("show-more-timings"),         BuildFlagParam_None,    Command__does_check);
@@ -757,7 +775,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Microarch,               str_lit("microarch"),                 BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_TargetFeatures,          str_lit("target-features"),           BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_StrictTargetFeatures,    str_lit("strict-target-features"),    BuildFlagParam_None,    Command__does_build);
-	add_flag(&build_flags, BuildFlag_MinimumOSVersion,        str_lit("minimum-os-version"),        BuildFlagParam_String,  Command__does_build | Command_bundle_android);
+	add_flag(&build_flags, BuildFlag_MinimumOSVersion,        str_lit("minimum-os-version"),        BuildFlagParam_String,  Command__does_check | Command_bundle_android);
 
 	add_flag(&build_flags, BuildFlag_RelocMode,               str_lit("reloc-mode"),                BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_StackProtector,          str_lit("stack-protector"),           BuildFlagParam_String,  Command__does_build);
@@ -839,7 +857,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_AndroidKeystorePassword, str_lit("android-keystore-password"), BuildFlagParam_String,  Command_bundle_android);
 
 #if !defined(GB_SYSTEM_WINDOWS)
-	add_flag(&build_flags, BuildFlag_WindowsSDKRoot,          str_lit("windows-sdk-root"),          BuildFlagParam_String,  Command_build);
+	add_flag(&build_flags, BuildFlag_WindowsSDKRoot,          str_lit("windows-sdk-root"),          BuildFlagParam_String,  Command__does_build);
 #endif
 
 
@@ -2849,8 +2867,8 @@ gb_internal void export_linked_libraries(LinkerData *gen) {
 			gb_fprintf(&f, "\t");
 
 			Ast *file_path = imp->filepaths[i];
-			GB_ASSERT(file_path->tav.mode == Addressing_Constant && file_path->tav.value.kind == ExactValue_String);
-			String file_path_str = file_path->tav.value.value_string;
+			GB_ASSERT(file_path->tav.mode == Addressing_Constant && file_path->tav.value().kind == ExactValue_String);
+			String file_path_str = file_path->tav.value().value_string;
 
 			if (string_starts_with(file_path_str, str_lit("system:"))) {
 				gb_fprintf(&f, "system");
@@ -2967,6 +2985,15 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		print_usage_line(1, "bundle <platform>   Bundles a directory in a specific layout for that platform");
 		print_usage_line(2, "Supported platforms:");
 		print_usage_line(3, "android");
+		print_usage_line(0, "");
+		print_usage_line(2, "odin bundle android <dir> makes an .apk, or an Android App Bundle with -out:<name>.aab, from:");
+		print_usage_line(3, "<dir>/AndroidManifest.xml");
+		print_usage_line(3, "<dir>/res/      (optional) resources, compiled with aapt2");
+		print_usage_line(3, "<dir>/assets/   (optional)");
+		print_usage_line(3, "<dir>/lib/<abi>/*.so, e.g. lib/arm64-v8a/libmain.so");
+		print_usage_line(2, "It adds Odin's classes.dex, with the activity org.odin_lang.OdinActivity, and signs the result.");
+		print_usage_line(2, "Needs ODIN_ANDROID_SDK (build-tools and a platform), a JDK (JAVA_HOME or PATH),");
+		print_usage_line(2, "and for an .aab, ODIN_ANDROID_BUNDLETOOL set to bundletool's .jar.");
 	} else if (command == "report") {
 		print_usage_header_once();
 		print_usage_line(1, "report  Prints information useful to reporting a bug.");
@@ -3102,7 +3129,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 
 		if (print_flag("-define:<name>=<value>")) {
-			print_usage_line(2, "Defines a scalar boolean, integer or string as global constant.");
+			print_usage_line(2, "Defines a scalar boolean, integer, string or enum as global constant.");
 			print_usage_line(2, "Example: -define:SPAM=123");
 			print_usage_line(2, "Usage in code:");
 				print_usage_line(3, "#config(SPAM, default_value)");
@@ -3350,10 +3377,10 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 	}
 
-	if (run_or_build || bundle) {
+	if (check || bundle) {
 		if (print_flag("-minimum-os-version:<string>")) {
-			print_usage_line(2, "Sets the minimum OS version targeted by the application.");
-			print_usage_line(2, "Default: -minimum-os-version:11.0.0");
+			print_usage_line(2, "Sets the minimum OS version targeted by the application, and so ODIN_MINIMUM_OS_VERSION.");
+			print_usage_line(2, "Default: 11.0.0 for macOS, 17.4.0 for iOS, and 34 for Android (29 is the lowest).");
 			print_usage_line(2, "Only used when target is Darwin or subtarget is Android, if given, linking mismatched versions will emit a warning.");
 		}
 	}
@@ -3608,7 +3635,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	}
 
 #if !defined(GB_SYSTEM_WINDOWS)
-	if (build) {
+	if (run_or_build) {
 		if (print_flag("-windows-sdk-root:<string>")) {
 			print_usage_line(2, "Path to the root directory of the Windows SDK for cross-linking.");
 			print_usage_line(2, "Requires '-linker:lld' flag and 'lld-link' installation.");
@@ -3763,16 +3790,23 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	}
 
 	if (bundle) {
+		if (print_flag("-out:<filepath>")) {
+			print_usage_line(2, "Sets the file name of the .apk or .aab.");
+			print_usage_line(2, "The default is the directory's name with .apk.");
+			print_usage_line(2, "Example: -out:game.aab");
+		}
+
 		print_usage_line(0, "");
 		print_usage_line(1, "Android-specific flags");
 		print_usage_line(0, "");
 		if (print_flag("-android-keystore:<string>")) {
-			print_usage_line(2, "Specifies the keystore file to use to sign the apk.");
+			print_usage_line(2, "Specifies the keystore file to use to sign the apk or aab.");
+			print_usage_line(2, "The default is the debug keystore, ~/.android/debug.keystore.");
 		}
 
 		if (print_flag("-android-keystore-alias:<string>")) {
-			print_usage_line(2, "Specifies the key alias to use when signing the apk");
-			print_usage_line(2, "Can be omitted if the keystore only contains one key");
+			print_usage_line(2, "Specifies the key alias to use when signing the apk or aab");
+			print_usage_line(2, "Can be omitted for an apk if the keystore only contains one key");
 		}
 
 		if (print_flag("-android-keystore-password:<string>")) {
@@ -4586,16 +4620,18 @@ int main(int arg_count, char const **arg_ptr) {
 	// }
 
 #if !defined(GB_SYSTEM_WINDOWS)
-	if (build_context.metrics.os == TargetOs_windows && build_context.windows_sdk_root.len == 0) {
-		gb_printf_err("-windows-sdk-root:<path> must be used to target Windows\n");
-		gb_exit(1);
+	if (build_context.metrics.os == TargetOs_windows && build_context.windows_sdk_root.len == 0 &&
+	    (build_context.command_kind & Command__does_build) != 0) {
+		switch (build_context.build_mode) {
+		case BuildMode_Executable:
+		case BuildMode_StaticLibrary:
+		case BuildMode_DynamicLibrary:
+			gb_printf_err("-windows-sdk-root:<path> must be used to target Windows\n");
+			gb_exit(1);
+			break;
+		}
 	}
 #endif
-
-	// Warn about Windows i386 thread-local storage limitations
-	if (build_context.metrics.arch == TargetArch_i386 && build_context.metrics.os == TargetOs_windows) {
-		gb_printf_err("Warning: Thread-local storage is disabled on Windows i386.\n");
-	}
 
 	// Check chosen microarchitecture. If not found or ?, print list.
 	bool print_microarch_list = true;
@@ -4805,6 +4841,11 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 	if (any_warnings()) {
 		print_all_errors();
+	}
+
+	if (build_context.command_kind == Command_test && checker->info.testing_procedures.count == 0) {
+		gb_printf_err("Cannot test package; no procedures with @(test) attribute found.\n");
+		return 1;
 	}
 
 	if (build_context.show_defineables || build_context.export_defineables_file != "") {

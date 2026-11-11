@@ -1723,8 +1723,8 @@ gb_internal gbString lb_debug_append_proc_name(gbString s, DeclInfo *decl) {
 		Entity *named = nullptr;
 		if (!is_literal) {
 			named = e;
-			if (decl->para_poly_original != nullptr) {
-				named = decl->para_poly_original;
+			if (decl->proc->para_poly_original != nullptr) {
+				named = decl->proc->para_poly_original;
 			}
 		}
 		s = lb_debug_append_name_prefix(s, decl->proc_lit->file(), named);

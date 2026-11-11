@@ -23,7 +23,7 @@ gb_internal void lb_exit_if_worker_failed(void) {
 }
 
 // Without a handler installed, LLVM prints an error of its own and calls exit(1) from whichever
-// thread it is on. 
+// thread it is on.
 gb_internal void lb_llvm_diagnostic_handler(LLVMDiagnosticInfoRef di, void *) {
 	char *description = LLVMGetDiagInfoDescription(di);
 	defer (LLVMDisposeMessage(description));
@@ -98,13 +98,13 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 	if (build_context.no_plt) {
 		LLVMAddModuleFlag(m->mod,
 			LLVMModuleFlagBehaviorWarning,
-			"RtLibUseGOT", 11, 
+			"RtLibUseGOT", 11,
 			LLVMValueAsMetadata(LLVMConstInt(LLVMInt32TypeInContext(m->ctx), 1, true)));
 	}
-	
+
 	LLVMAddModuleFlag(m->mod,
 		LLVMModuleFlagBehaviorWarning,
-		"PIC Level", 9, 
+		"PIC Level", 9,
 		LLVMValueAsMetadata(LLVMConstInt(LLVMInt32TypeInContext(m->ctx), get_reloc_mode(), true)));
 
 	if (build_context.ODIN_DEBUG) {
@@ -401,7 +401,7 @@ gb_internal void lb_split_instances_into_modules(lbGenerator *gen, Checker *c, P
 			}
 			loads[best] += inst.size;
 			if (best != 0) {
-				inst.e->decl_info->code_gen_module.store(parts[best], std::memory_order_relaxed);
+				inst.e->decl_info->proc->code_gen_module.store(parts[best], std::memory_order_relaxed);
 			}
 		}
 	}
@@ -870,7 +870,7 @@ gb_internal lbModule *lb_module_of_entity_internal(lbGenerator *gen, Entity *e, 
 	lbModule **found = nullptr;
 
 	if (e->kind == Entity_Procedure && e->decl_info) {
-	    	lbModule *mod = e->decl_info->code_gen_module.load(std::memory_order_relaxed);
+	    	lbModule *mod = e->decl_info->proc->code_gen_module.load(std::memory_order_relaxed);
 		if (mod) {
 			return mod;
 		}
@@ -986,13 +986,13 @@ gb_internal lbValue lb_soa_array_component_elem_ptr(lbProcedure *p, lbValue soa_
 		return lb_const_nil(p->module, alloc_type_pointer(base_type(t->Struct.soa_elem)->Array.elem));
 	}
 	// do chain select between the component pointers;
-	// an element array holds at most 4 components, so this is at most 3 compares and 3 selects (branchless), 
+	// an element array holds at most 4 components, so this is at most 3 compares and 3 selects (branchless),
 	// and it is folded if j is resolved to constant after inlining/unrolling;
 	// TODO: more efficient codegen can be done, most definitely for fixed kind, possibly for slice/dynamic,
 	// (but this works for both kinds)
 	//
 	// lb_emit_select evaluates both arms, so every candidate address is
-	// formed; only the selected one is dereferenced	
+	// formed; only the selected one is dereferenced
 	lbValue ptr = lb_soa_field_elem_ptr(p, soa_ptr, 0, elem_index);
 	for (i64 component = 1; component < component_count; component++) {
 		lbValue candidate = lb_soa_field_elem_ptr(p, soa_ptr, cast(i32)component, elem_index);
@@ -1674,25 +1674,10 @@ gb_internal void lb_adjust_access_alignment_from_addr(lbModule *m, LLVMValueRef 
 	}
 }
 
-// cap a load/store alignment to max_align if over that;
-// for callers that have a limit on the addr alignment
-// but the metadata approach can't be used
-// (e.g. addr is not a GEP, so metadata can't attach)
-gb_internal void lb_cap_access_alignment(LLVMValueRef access, i64 max_align) {
-	GB_ASSERT(max_align > 0);
-	if ((LLVMIsALoadInst(access) || LLVMIsAStoreInst(access)) &&
-	    cast(i64)LLVMGetAlignment(access) > max_align) {
-		LLVMSetAlignment(access, cast(unsigned)max_align);
-	}
-}
-
 gb_internal LLVMValueRef OdinLLVMBuildLoad(lbProcedure *p, LLVMTypeRef type, LLVMValueRef value) {
+	// LLVMBuildLoad2 sets the type's ABI alignment from the module datalayout
+	// (which caps vectors at max_simd_align, see lb_generate_code)
 	LLVMValueRef result = LLVMBuildLoad2(p->builder, type, value, "");
-	// LLVMBuildLoad2 set the type's ABI alignment according to LLVM,
-	// but that ignores max_simd_align; a 32-byte vector is 32-aligned
-	// to LLVM but only 16-aligned on darwin (amd64/arm64) and other arm64 targets;
-	// lb_alignof applies the max_simd_align cap
-	LLVMSetAlignment(result, cast(unsigned)lb_alignof(type));
 	lb_adjust_access_alignment_from_addr(p->module, result, value);
 	return result;
 }
@@ -1707,12 +1692,9 @@ gb_internal LLVMValueRef OdinLLVMBuildLoadAligned(lbProcedure *p, LLVMTypeRef ty
 }
 
 gb_internal LLVMValueRef OdinLLVMBuildStore(lbProcedure *p, LLVMValueRef value, LLVMValueRef ptr) {
+	// LLVMBuildStore sets the type's ABI alignment from the module datalayout
+	// (which caps vectors at max_simd_align, see lb_generate_code)
 	LLVMValueRef result = LLVMBuildStore(p->builder, value, ptr);
-	// LLVMBuildStore set the type's ABI alignment according to LLVM,
-	// but that ignores max_simd_align; a 32-byte vector is 32-aligned
-	// to LLVM but only 16-aligned on darwin (amd64/arm64) and other arm64 targets;
-	// lb_alignof applies the max_simd_align cap
-	LLVMSetAlignment(result, cast(unsigned)lb_alignof(LLVMTypeOf(value)));
 	lb_adjust_access_alignment_from_addr(p->module, result, ptr);
 	return result;
 }
@@ -2195,7 +2177,41 @@ gb_internal bool lb_const_has_misaligned_pointer(LLVMTargetDataRef td, LLVMValue
 	return false;
 }
 
-gb_internal void lb_emit_store_with_max_align(lbProcedure *p, lbValue ptr, lbValue value, i64 max_align) {
+enum {LB_MAX_STORE_SIZE = 64};
+
+gb_internal bool lb_emit_store_writes_every_byte(lbProcedure *p, Type *type, lbValue value) {
+	if (!are_types_identical(type, value.type) || LLVMIsUndef(value.value)) {
+		return false;
+	}
+	i64 size = lb_sizeof(lb_type(p->module, type));
+	if (size != type_size_of(type)) {
+		return false;
+	}
+	if (LLVMIsNull(value.value)) {
+		return !is_type_proc(type) && size > lb_max_zero_init_size();
+	}
+	if (size <= LB_MAX_STORE_SIZE) {
+		return false;
+	}
+	if (lb_sizeof(LLVMTypeOf(value.value)) != size) {
+		return false;
+	}
+	if (!p->in_multi_assignment && LLVMIsALoadInst(value.value)) {
+		return true;
+	}
+	if (!LLVMIsConstant(value.value)) {
+		return false;
+	}
+
+	return !lb_const_has_misaligned_pointer(
+		LLVMGetModuleDataLayout(p->module->mod),
+		value.value,
+		/*offset*/0,
+		/*base_align*/cast(u64)type_align_of(value.type)
+	);
+}
+
+gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 	GB_ASSERT(value.value != nullptr);
 
 	if (LLVMIsUndef(value.value)) {
@@ -2204,14 +2220,11 @@ gb_internal void lb_emit_store_with_max_align(lbProcedure *p, lbValue ptr, lbVal
 
 	Type *a = type_deref(ptr.type, true);
 	// claim the alignment Odin allocates and places a value of the stored type at;
-	// the LLVM lowered type alignment ignores #align (up) and max_simd_align (down);
-	// max_align caps it when the caller knows the addr is less aligned than this
-	// and lb_adjust_access_alignment_from_addr can't recover the fact
-	// (e.g. a union variant ptr)
+	// the LLVM lowered type alignment ignores #align and can be above Odin's
+	// (e.g. u128 on i386: 16 vs 4);
+	// lb_adjust_access_alignment_from_addr lowers it to what the address proves
+	// (e.g. a #packed field GEP proves 1)
 	i64 dst_align = type_align_of(a);
-	if (max_align > 0) {
-		dst_align = gb_min(dst_align, max_align);
-	}
 	if (LLVMIsNull(value.value)) {
 		// used to be llvm_addr_type: for a multi-pointer typed ptr the latter is `ptr`,
 		// and ConstNull of it would store 8 bytes over an element of any size
@@ -2238,9 +2251,7 @@ gb_internal void lb_emit_store_with_max_align(lbProcedure *p, lbValue ptr, lbVal
 		GB_ASSERT_MSG(are_types_identical(ca, core_type(value.type)), "%s != %s", type_to_string(a), type_to_string(value.type));
 	}
 
-	enum {MAX_STORE_SIZE = 64};
-
-	if (lb_sizeof(LLVMTypeOf(value.value)) > MAX_STORE_SIZE) {
+	if (lb_sizeof(LLVMTypeOf(value.value)) > LB_MAX_STORE_SIZE) {
 		if (!p->in_multi_assignment && LLVMIsALoadInst(value.value)) {
 			LLVMValueRef dst_ptr = ptr.value;
 			LLVMValueRef src_ptr_original = LLVMGetOperand(value.value, 0);
@@ -2296,10 +2307,6 @@ gb_internal void lb_emit_store_with_max_align(lbProcedure *p, lbValue ptr, lbVal
 		instr = OdinLLVMBuildStoreAligned(p, value.value, ptr.value, dst_align);
 	}
 	// LLVMSetVolatile(instr, p->in_multi_assignment);
-}
-
-gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
-	lb_emit_store_with_max_align(p, ptr, value, 0);
 }
 
 gb_internal LLVMTypeRef llvm_addr_type(lbModule *module, lbValue addr_val) {
@@ -2541,7 +2548,7 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 			LLVMSetAlignment(res.addr.value, cast(unsigned)lb_alignof(LLVMTypeOf(sv)));
 
 			LLVMValueRef dst = LLVMBuildPointerCast(p->builder, ptr.value, LLVMPointerType(LLVMTypeOf(sv), 0), "");
-			OdinLLVMBuildStore(p, sv, dst);
+			LLVMBuildStore(p->builder, sv, dst);
 		} else {
 			for (u8 i = 0; i < addr.swizzle.count; i++) {
 				u8 index = addr.swizzle.indices[i];
@@ -2616,11 +2623,6 @@ gb_internal lbValue lb_emit_union_tag_ptr(lbProcedure *p, lbValue u) {
 	lbValue tag_ptr = {};
 	tag_ptr.value = LLVMBuildStructGEP2(p->builder, uvt, ptr, 1, "");
 	tag_ptr.type = alloc_type_pointer(tag_type);
-	// union #align(N) may guarantee less than the tag offset suggests;
-	// the tag ptr is a GEP, so the max-align metadata chain check will cap it
-	if (base_type(ut)->Union.custom_align > 0 && LLVMIsAInstruction(tag_ptr.value)) {
-		lb_set_metadata_custom_u64(p->module, tag_ptr.value, ODIN_METADATA_MAX_ALIGN, cast(u64)type_align_of(ut));
-	}
 	tag_ptr.value = LLVMBuildPointerCast(p->builder, tag_ptr.value, lb_type(p->module, tag_ptr.type), "");
 	return tag_ptr;
 }
@@ -2629,6 +2631,30 @@ gb_internal lbValue lb_emit_union_tag_value(lbProcedure *p, lbValue u) {
 	lbValue ptr = lb_address_from_load_or_generate_local(p, u);
 	lbValue tag_ptr = lb_emit_union_tag_ptr(p, ptr);
 	return lb_emit_load(p, tag_ptr);
+}
+
+// pointer to the variant data at the start of the union
+gb_internal lbValue lb_emit_union_variant_ptr(lbProcedure *p, lbValue u, Type *variant_type) {
+	Type *ut = base_type(type_deref(u.type));
+	GB_ASSERT(ut->kind == Type_Union);
+	Type *ptr_type = alloc_type_pointer(variant_type);
+
+	// constant GEPs can't have metadata,
+	// lb_known_address_alignment resolves it from the global's alignment and the GEP offsets
+	if (ut->Union.custom_align == 0 || lb_is_const(u)) {
+		return lb_emit_conv(p, u, ptr_type);
+	}
+
+	// a union #align(N) can be below the variant's alignment,
+	// so the ptr is a zero-offset GEP with N as its max align metadata
+	// (a ptr cast wouldn't work, no instruction to put the metadata on)
+	lbModule *m = p->module;
+	LLVMValueRef indices[1] = {llvm_zero(m)};
+	lbValue res = {};
+	res.type = ptr_type;
+	res.value = LLVMBuildGEP2(p->builder, lb_type(m, t_u8), u.value, indices, 1, "");
+	lb_set_metadata_custom_u64(m, res.value, ODIN_METADATA_MAX_ALIGN, cast(u64)ut->Union.custom_align);
+	return res;
 }
 
 
@@ -2667,8 +2693,7 @@ gb_internal void lb_emit_store_union_variant(lbProcedure *p, lbValue parent, lbV
 
 		lb_start_block(p, if_not_nil);
 		lbValue underlying = lb_emit_conv(p, parent, alloc_type_pointer(variant_type));
-		// union #align(N) can lower alignment below the variant type alignment
-		lb_emit_store_with_max_align(p, underlying, variant, type_align_of(pt));
+		lb_emit_store(p, underlying, variant);
 		lb_emit_store_union_variant_tag(p, parent, variant_type);
 		lb_emit_jump(p, done);
 
@@ -2681,8 +2706,7 @@ gb_internal void lb_emit_store_union_variant(lbProcedure *p, lbValue parent, lbV
 			lb_mem_zero_ptr_internal(p, parent.value, pt->Union.variant_block_size, alignment, false);
 		} else {
 			lbValue underlying = lb_emit_conv(p, parent, alloc_type_pointer(variant_type));
-			// union #align(N) can lower alignment below the variant type alignment
-			lb_emit_store_with_max_align(p, underlying, variant, type_align_of(pt));
+			lb_emit_store(p, underlying, variant);
 		}
 		lb_emit_store_union_variant_tag(p, parent, variant_type);
 	}
@@ -2707,7 +2731,7 @@ gb_internal DeclInfo *lb_enclosing_proc_decl(DeclInfo *decl) {
 }
 
 gb_internal String lb_local_proc_name(lbModule *m, DeclInfo *decl) {
-	String *cached = decl->local_proc_name.load();
+	String *cached = decl->proc->local_proc_name.load();
 	if (cached != nullptr) {
 		return *cached;
 	}
@@ -2730,7 +2754,7 @@ gb_internal String lb_local_proc_name(lbModule *m, DeclInfo *decl) {
 		isize name_len = prefix.len + 1 + pd_name.len + 1 + 10 + 1 + 16 + 1;
 		char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
 		i32 guid = e->token.pos.offset;
-		if (decl->para_poly_original != nullptr) {
+		if (decl->proc->para_poly_original != nullptr) {
 			name_len = gb_snprintf(name_text, name_len, "%.*s" ABI_PKG_NAME_SEPARATOR "%.*s-%d-%llx", LIT(prefix), LIT(pd_name), guid,
 			                       cast(unsigned long long)type_hash_canonical_type(proc_entity_full_type(e)));
 		} else {
@@ -2739,19 +2763,27 @@ gb_internal String lb_local_proc_name(lbModule *m, DeclInfo *decl) {
 		name = make_string(cast(u8 *)name_text, name_len-1);
 	} else {
 		// NOTE(bill): parent$anon-pkg:file:offset, named by position rather than a counter, as the order these are generated in varies
+		// A literal in a specialized polymorphic signature (e.g. a parameter's default) also gets that signature's type hash,
+		// as every specialization checks its own copy of it at the same position
 		TokenPos pos = ast_token(decl->proc_lit).pos;
 		AstFile *lit_file = decl->proc_lit->file();
 		String lit_pkg  = (lit_file && lit_file->pkg) ? lit_file->pkg->name : str_lit("");
 		String lit_name = lit_file ? filename_without_directory(lit_file->fullpath) : str_lit("");
-		isize name_len = prefix.len + lit_pkg.len + lit_name.len + 6 + 2 + 11 + 1;
+		isize name_len = prefix.len + lit_pkg.len + lit_name.len + 6 + 2 + 11 + 1 + 16 + 1;
 		char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
-		name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%.*s:%.*s:%d", LIT(prefix), LIT(lit_pkg), LIT(lit_name), pos.offset);
+		Type *signature = decl->proc->enclosing_signature;
+		if (signature != nullptr && signature->kind == Type_Proc && signature->Proc.is_poly_specialized) {
+			name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%.*s:%.*s:%d-%llx", LIT(prefix), LIT(lit_pkg), LIT(lit_name), pos.offset,
+			                       cast(unsigned long long)type_hash_canonical_type(signature));
+		} else {
+			name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%.*s:%.*s:%d", LIT(prefix), LIT(lit_pkg), LIT(lit_name), pos.offset);
+		}
 		name = make_string(cast(u8 *)name_text, name_len-1);
 	}
 
 	String *s = permanent_alloc_item<String>();
 	*s = name;
-	if (!decl->local_proc_name.compare_exchange_strong(cached, s)) {
+	if (!decl->proc->local_proc_name.compare_exchange_strong(cached, s)) {
 		return *cached;
 	}
 	return name;
@@ -3604,7 +3636,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				}
 				is_packed = true;
 			}
-			
+
 			return LLVMStructTypeInContext(ctx, fields.data, cast(unsigned)fields.count, is_packed);
 		}
 		break;
@@ -3618,7 +3650,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		} else {
 			m->internal_type_level += 1;
 			defer (m->internal_type_level -= 1);
-			
+
 			unsigned field_count = cast(unsigned)(type->Tuple.variables.count);
 			LLVMTypeRef *fields = gb_alloc_array(temporary_allocator(), LLVMTypeRef, field_count);
 
@@ -3645,7 +3677,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 	case Type_SimdVector:
 		return LLVMVectorType(lb_type(m, type->SimdVector.elem), cast(unsigned)type->SimdVector.count);
-		
+
 	case Type_Matrix:
 		{
 			i64 size = type_size_of(type);
@@ -3653,12 +3685,12 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			GB_ASSERT(elem_size > 0);
 			i64 elem_count = size/elem_size;
 			GB_ASSERT_MSG(elem_count > 0, "%s", type_to_string(type));
-			
+
 			m->internal_type_level -= 1;
-			
+
 			LLVMTypeRef elem = lb_type(m, type->Matrix.elem);
 			LLVMTypeRef t = llvm_array_type(elem, elem_count);
-			
+
 			m->internal_type_level += 1;
 			return t;
 		}
@@ -3682,7 +3714,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 	case Type_BitField:
 		return lb_type_internal(m, type->BitField.backing_type);
-        
+
 	case Type_Generic:
 		if (type->Generic.specialized) {
 			return lb_type_internal(m, type->Generic.specialized);
@@ -4037,11 +4069,11 @@ general_end:;
 	if (src_size > dst_size) {
 		GB_ASSERT(p->decl_block != p->curr_block);
 		// NOTE(laytan): src is bigger than dst, need to memcpy the part of src we want.
-		
+
 		LLVMTypeRef llvm_src_type = LLVMPointerType(src_type, 0);
 		LLVMTypeRef llvm_dst_type = LLVMPointerType(dst_type, 0);
 
-		LLVMValueRef val_ptr; 
+		LLVMValueRef val_ptr;
 		if (LLVMIsALoadInst(val)) {
 			val_ptr = LLVMGetOperand(val, 0);
 		} else if (LLVMIsAAllocaInst(val)) {
@@ -4050,7 +4082,7 @@ general_end:;
 			// NOTE(laytan): we need a pointer to memcpy from.
 			LLVMValueRef val_copy = llvm_alloca(p, src_type, src_align);
 			val_ptr = LLVMBuildPointerCast(p->builder, val_copy, llvm_src_type, "");
-			OdinLLVMBuildStore(p, val, val_ptr);
+			LLVMBuildStore(p->builder, val, val_ptr);
 		}
 
 		i64 max_align = gb_max(lb_alignof(src_type), lb_alignof(dst_type));
@@ -4096,7 +4128,7 @@ general_end:;
 		}
 
 		LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(src_type, 0), "");
-		OdinLLVMBuildStore(p, val, nptr);
+		LLVMBuildStore(p->builder, val, nptr);
 
 		return OdinLLVMBuildLoad(p, dst_type, ptr);
 	}
@@ -4479,7 +4511,7 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, Ast *expr, lbPro
 		// NOTE: another module may be making one for the same literal at the same time
 		if (pl->decl->entity.compare_exchange_strong(e, new_e)) {
 			e = new_e;
-			pl->decl->code_gen_module = target_module;
+			pl->decl->proc->code_gen_module = target_module;
 		}
 	}
 
@@ -4745,7 +4777,7 @@ gb_internal lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block
 // 2) locals declared by a statement outside its body (e.g. for i:=0; ..., or if x := f()),
 //    see comment on lb_open_scope;
 // 3) temps made by lb_add_local_generated (these have no syntactic scope);
-// 4) a constant literal that needs backing storage (slice, or a struct containing a slice) 
+// 4) a constant literal that needs backing storage (slice, or a struct containing a slice)
 //    gets it from lb_const_value, not lb_add_local, so v := []i8{...} gets no markers
 //    (TODO: this can be handled in lb_const_value)
 //

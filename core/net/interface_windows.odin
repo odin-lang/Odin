@@ -91,10 +91,12 @@ _enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []
 		}
 
 		for u_addr := (^sys.IP_ADAPTER_UNICAST_ADDRESS_LH)(adapter.FirstUnicastAddress); u_addr != nil; u_addr = u_addr.Next {
-			win_addr := parse_socket_address(u_addr.Address)
+			win_addr  := parse_socket_address(u_addr.Address)
+			prefix, _ := prefix_from_address(win_addr.address, int(u_addr.OnLinkPrefixLength))
 
 			lease := Lease{
 				address = win_addr.address,
+				netmask = prefix_netmask(prefix),
 				origin  = {
 					prefix = Prefix_Origin(u_addr.PrefixOrigin),
 					suffix = Suffix_Origin(u_addr.SuffixOrigin),

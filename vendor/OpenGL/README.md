@@ -12,6 +12,15 @@ gl.load_up_to(4, 5, proc(p: rawptr, name: cstring) do (cast(^rawptr)p)^ = glfw.G
 gl.load_up_to(4, 5, glfw.gl_set_proc_address);
 ```
 
+## OpenGL ES
+
+`load_gles_up_to` loads OpenGL ES 2.0 to 3.2 into the same procedures, requesting only names that exist in OpenGL ES.
+Use it for GLES contexts, such as on Android, where `eglGetProcAddress` has room for only a few hundred unknown names:
+```go
+gl.load_gles_up_to(3, 2, egl.gl_set_proc_address)
+```
+The ES-only `BlendBarrier` and `PrimitiveBoundingBox` and the ES 3.2 constants (advanced blend modes, ASTC formats) are in `gles.odin` and `constants.odin`.
+
 ## Extra utility procedures (Outdated. See the end of `gl.odin`)
 
 Some useful helper procedures can be found in `helpers.odin`, for tasks such as:

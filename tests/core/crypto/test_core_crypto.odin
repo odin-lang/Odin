@@ -24,6 +24,8 @@ import chacha_simd256 "core:crypto/_chacha20/simd256"
 import "core:crypto/chacha20"
 import "core:crypto/sha2"
 
+SLIM_TESTS :: #config(ODIN_TEST_SLIM, ODIN_ARCH == .riscv64)
+
 @(private)
 _PLAINTEXT_SUNSCREEN_STR := "Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it."
 

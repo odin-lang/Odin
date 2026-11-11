@@ -259,7 +259,7 @@ void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_type, Slice<T
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend_stret");
 
 	Slice<Ast *> args = call->CallExpr.args;
-	if (args.count > 0 && args[0]->tav.objc_super_target) {
+	if (args.count > 0 && args[0]->kind == Ast_CallExpr && args[0]->CallExpr.objc_super_target) {
 		try_to_add_package_dependency(c, "runtime", "objc_msgSendSuper2");
 		try_to_add_package_dependency(c, "runtime", "objc_msgSendSuper2_stret");
 	}
@@ -734,7 +734,7 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 
 		// NOTE(harold) Track original type before transforming it to the superclass.
 		//              This is needed because objc_msgSendSuper2 must start its search on the subclass, not the superclass.
-		call->tav.objc_super_target = obj_type;
+		call->CallExpr.objc_super_target = obj_type;
 
 		// The superclass type must be known at compile time. We require this so that the selector method expressions
 		// methods are resolved to the superclass's methods instead of the subclass's.
@@ -2043,22 +2043,20 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 	return false;
 }
 
-// NOTE(bill, 2026-10-02) The cache entry of `path` loaded to at least `tier`.
-// The map is only locked to find or add the entry, and the file is loaded under the entry's own mutex, so different files load at once.
-gb_internal LoadFileCache *load_file_cache_entry(CheckerInfo *info, String const &path, LoadFileTier tier) {
-	LoadFileCache *cache = nullptr;
-	mutex_lock(&info->load_file_mutex);
-	LoadFileCache **cache_ptr = string_map_get(&info->load_file_cache, path);
+// NOTE(bill): `info->load_file_mutex` must be held
+gb_internal LoadFileCache *load_file_cache_find_or_add(CheckerInfo *info, StringHashKey const &key) {
+	LoadFileCache **cache_ptr = string_map_get(&info->load_file_cache, key);
 	if (cache_ptr != nullptr) {
-		cache = *cache_ptr;
-	} else {
-		cache = permanent_alloc_item<LoadFileCache>();
-		cache->path = path;
-		string_map_init(&cache->hashes, 32);
-		string_map_set(&info->load_file_cache, path, cache);
+		return *cache_ptr;
 	}
-	mutex_unlock(&info->load_file_mutex);
+	LoadFileCache *cache = permanent_alloc_item<LoadFileCache>();
+	cache->path = key.string;
+	string_map_set(&info->load_file_cache, key, cache);
+	return cache;
+}
 
+gb_internal void load_file_cache_load(LoadFileCache *cache, LoadFileTier tier) {
+	String const &path = cache->path;
 	MUTEX_GUARD(&cache->mutex);
 	if (tier > cache->tier) {
 		cache->tier = tier;
@@ -2066,8 +2064,13 @@ gb_internal LoadFileCache *load_file_cache_entry(CheckerInfo *info, String const
 		TEMPORARY_ALLOCATOR_GUARD();
 		char *c_str = alloc_cstring(temporary_allocator(), path);
 
+		// NOTE(bill): not `gb_file_open`, whose `gb_file_last_write_time` looks the path up a second time
 		gbFile f = {};
-		cache->file_error = gb_file_open(&f, c_str);
+	#if defined(GB_SYSTEM_WINDOWS)
+		cache->file_error = gb__win32_file_open(&f.fd, &f.ops, gbFileMode_Read, c_str);
+	#else
+		cache->file_error = gb__posix_file_open(&f.fd, &f.ops, gbFileMode_Read, c_str);
+	#endif
 		defer (gb_file_close(&f));
 
 		if (cache->file_error == gbFileError_None) {
@@ -2094,6 +2097,16 @@ gb_internal LoadFileCache *load_file_cache_entry(CheckerInfo *info, String const
 			};
 		}
 	}
+}
+
+// NOTE(bill, 2026-10-02) The cache entry of `path` loaded to at least `tier`.
+gb_internal LoadFileCache *load_file_cache_entry(CheckerInfo *info, String const &path, LoadFileTier tier) {
+	StringHashKey key = string_hash_string(path);
+	mutex_lock(&info->load_file_mutex);
+	LoadFileCache *cache = load_file_cache_find_or_add(info, key);
+	mutex_unlock(&info->load_file_mutex);
+
+	load_file_cache_load(cache, tier);
 	return cache;
 }
 
@@ -2237,7 +2250,7 @@ gb_internal i64 check_atomic_address_alignment(Ast *x) {
 		i64 align = check_atomic_address_alignment(ie->expr);
 		i64 offset = type_size_of(t->Array.elem);
 		if (ie->index->tav.mode == Addressing_Constant) {
-			offset *= exact_value_to_i64(ie->index->tav.value);
+			offset *= exact_value_to_i64(ie->index->tav.value());
 		}
 		if (offset != 0) {
 			align = gb_min(align, offset & -offset);
@@ -2418,20 +2431,19 @@ gb_internal int file_cache_sort_cmp(void const *x, void const *y) {
 // This thread and a few helper tasks take them in turn and this thread only waits for the ones a running helper has taken,
 // and the job is freed by whichever of them finishes with it last.
 struct LoadDirectoryPrefetch {
-	CheckerInfo *      info;
-	Array<String>      paths;
-	std::atomic<isize> next;
-	std::atomic<isize> done;
-	std::atomic<i32>   refs;
+	Array<LoadFileCache *> files;
+	std::atomic<isize>     next;
+	std::atomic<isize>     done;
+	std::atomic<i32>       refs;
 };
 
 gb_internal void load_directory_prefetch_run(LoadDirectoryPrefetch *job) {
-	for (isize i = job->next.fetch_add(1); i < job->paths.count; i = job->next.fetch_add(1)) {
-		load_file_cache_entry(job->info, job->paths[i], LoadFileTier_Contents);
+	for (isize i = job->next.fetch_add(1); i < job->files.count; i = job->next.fetch_add(1)) {
+		load_file_cache_load(job->files[i], LoadFileTier_Contents);
 		job->done.fetch_add(1);
 	}
 	if (job->refs.fetch_sub(1) == 1) {
-		array_free(&job->paths);
+		array_free(&job->files);
 		gb_free(heap_allocator(), job);
 	}
 }
@@ -2445,16 +2457,21 @@ gb_internal void load_directory_prefetch(CheckerInfo *info, Array<FileInfo> cons
 	isize const FILES_PER_HELPER = 64;
 
 	LoadDirectoryPrefetch *job = gb_alloc_item(heap_allocator(), LoadDirectoryPrefetch);
-	job->info = info;
-	array_init(&job->paths, heap_allocator(), 0, list.count);
+	array_init(&job->files, heap_allocator(), 0, list.count);
+
+	mutex_lock(&info->load_file_mutex);
 	for (FileInfo const &fi : list) {
 		if (!fi.is_dir) {
-			array_add(&job->paths, fi.fullpath);
+			array_add(&job->files, load_file_cache_find_or_add(info, string_hash_string(fi.fullpath)));
 		}
 	}
-	isize count = job->paths.count;
+	mutex_unlock(&info->load_file_mutex);
+
+	isize count   = job->files.count;
 	isize helpers = gb_min(global_thread_pool.threads.count - 1, count/FILES_PER_HELPER);
+
 	job->refs.store(cast(i32)(helpers + 1));
+
 	for (isize i = 0; i < helpers; i++) {
 		thread_pool_add_task(load_directory_prefetch_worker, job);
 	}
@@ -2464,8 +2481,9 @@ gb_internal void load_directory_prefetch(CheckerInfo *info, Array<FileInfo> cons
 	while (job->done.load() < count) {
 		yield_thread();
 	}
+
 	if (job->refs.fetch_sub(1) == 1) {
-		array_free(&job->paths);
+		array_free(&job->files);
 		gb_free(heap_allocator(), job);
 	}
 }
@@ -2993,12 +3011,46 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 			if (found->kind != Entity_Constant) {
 				error(arg, "'#config' entity '%.*s' found but expected a constant", LIT(name));
 			} else {
-				operand->type = found->type;
-				operand->mode = Addressing_Constant;
-				operand->value = found->Constant.value;
+				Operand config_value = {};
+				config_value.type = found->type;
+				config_value.mode = Addressing_Constant;
+				config_value.value = found->Constant.value;
+				config_value.expr = arg;
+
+				if (is_type_enum(def.type)) {
+					Type *enum_type = base_type(def.type);
+					if (config_value.value.kind != ExactValue_String) {
+						gbString type_str = type_to_string(def.type);
+						error(arg, "'#config' enum value for '%.*s' must name a field of '%s'", LIT(name), type_str);
+						gb_string_free(type_str);
+						config_value.mode = Addressing_Invalid;
+					} else {
+						String value_name = config_value.value.value_string;
+						InternedString value_interned = string_interner_insert(value_name);
+						Entity *enum_value = scope_lookup_current(enum_type->Enum.scope, value_interned);
+						if (enum_value == nullptr || enum_value->kind != Entity_Constant || !are_types_identical(enum_value->type, def.type)) {
+							gbString type_str = type_to_string(def.type);
+							error(arg, "Unknown enum value '%.*s' for '#config' '%.*s' of type '%s'", LIT(value_name), LIT(name), type_str);
+							gb_string_free(type_str);
+							check_did_you_mean_type(value_name, enum_type->Enum.fields);
+							config_value.mode = Addressing_Invalid;
+						} else {
+							config_value.type = enum_value->type;
+							config_value.value = enum_value->Constant.value;
+						}
+					}
+				}
+
+				if (config_value.mode != Addressing_Invalid) {
+					check_assignment(c, &config_value, def.type, str_lit("#config"));
+					if (config_value.mode != Addressing_Invalid) {
+						operand->type = config_value.type;
+						operand->mode = config_value.mode;
+						operand->value = config_value.value;
+					}
+				}
 			}
 		}
-
 		Defineable defineable    = {};
 		defineable.docs          = nullptr;
 		defineable.name          = name;
@@ -3447,6 +3499,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			gb_string_free(type_str);
 			return false;
 		}
+		add_semantic_ident(c->info, field_arg, sel.entity, false);
 
 		operand->mode = Addressing_Constant;
 		operand->value = exact_value_i64(type_offset_of_from_selection(type, sel));
@@ -4553,61 +4606,56 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 		}
 
+		for_array(i, operands) {
+			Operand *a = &operands[i];
+			for_array(j, operands) {
+				if (i == j) {
+					continue;
+				}
+				Operand *b = &operands[j];
+
+				convert_to_typed(c, a, b->type);
+				if (a->mode == Addressing_Invalid) {
+					return false;
+				}
+				convert_to_typed(c, b, a->type);
+				if (b->mode == Addressing_Invalid) {
+					return false;
+				}
+			}
+		}
+
+		for (isize i = 0; i < operands.count-1; i++) {
+			Operand *a = &operands[i];
+			Operand *b = &operands[i+1];
+
+			if (!are_types_identical(a->type, b->type)) {
+				gbString type_a = type_to_string(a->type);
+				gbString type_b = type_to_string(b->type);
+				error(a->expr,
+				      "Mismatched types to 'min', '%s' vs '%s'",
+				      type_a, type_b);
+				gb_string_free(type_b);
+				gb_string_free(type_a);
+				return false;
+			}
+		}
+
 		if (all_constant) {
 			ExactValue value = operands[0].value;
-			Type *type = operands[0].type;
 			for (isize i = 1; i < operands.count; i++) {
 				Operand y = operands[i];
 				if (compare_exact_values(Token_Lt, value, y.value)) {
 					// okay
 				} else {
 					value = y.value;
-					type = y.type;
 				}
 			}
 			operand->value = value;
-			operand->type = type;
 		} else {
 			operand->mode = Addressing_Value;
-			operand->type = original_type;
-
-			for_array(i, operands) {
-				Operand *a = &operands[i];
-				for_array(j, operands) {
-					if (i == j) {
-						continue;
-					}
-					Operand *b = &operands[j];
-
-					convert_to_typed(c, a, b->type);
-					if (a->mode == Addressing_Invalid) {
-						return false;
-					}
-					convert_to_typed(c, b, a->type);
-					if (b->mode == Addressing_Invalid) {
-						return false;
-					}
-				}
-			}
-
-			for (isize i = 0; i < operands.count-1; i++) {
-				Operand *a = &operands[i];
-				Operand *b = &operands[i+1];
-
-				if (!are_types_identical(a->type, b->type)) {
-					gbString type_a = type_to_string(a->type);
-					gbString type_b = type_to_string(b->type);
-					error(a->expr,
-					      "Mismatched types to 'min', '%s' vs '%s'",
-					      type_a, type_b);
-					gb_string_free(type_b);
-					gb_string_free(type_a);
-					return false;
-				}
-			}
-
-			operand->type = operands[0].type;
 		}
+		operand->type = operands[0].type;
 		break;
 	}
 
@@ -4750,61 +4798,56 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 		}
 
+		for_array(i, operands) {
+			Operand *a = &operands[i];
+			for_array(j, operands) {
+				if (i == j) {
+					continue;
+				}
+				Operand *b = &operands[j];
+
+				convert_to_typed(c, a, b->type);
+				if (a->mode == Addressing_Invalid) {
+					return false;
+				}
+				convert_to_typed(c, b, a->type);
+				if (b->mode == Addressing_Invalid) {
+					return false;
+				}
+			}
+		}
+
+		for (isize i = 0; i < operands.count-1; i++) {
+			Operand *a = &operands[i];
+			Operand *b = &operands[i+1];
+
+			if (!are_types_identical(a->type, b->type)) {
+				gbString type_a = type_to_string(a->type);
+				gbString type_b = type_to_string(b->type);
+				error(a->expr,
+				      "Mismatched types to 'max', '%s' vs '%s'",
+				      type_a, type_b);
+				gb_string_free(type_b);
+				gb_string_free(type_a);
+				return false;
+			}
+		}
+
 		if (all_constant) {
 			ExactValue value = operands[0].value;
-			Type *type = operands[0].type;
 			for (isize i = 1; i < operands.count; i++) {
 				Operand y = operands[i];
 				if (compare_exact_values(Token_Gt, value, y.value)) {
 					// okay
 				} else {
-					type  = y.type;
 					value = y.value;
 				}
 			}
 			operand->value = value;
-			operand->type = type;
 		} else {
 			operand->mode = Addressing_Value;
-			operand->type = original_type;
-
-			for_array(i, operands) {
-				Operand *a = &operands[i];
-				for_array(j, operands) {
-					if (i == j) {
-						continue;
-					}
-					Operand *b = &operands[j];
-
-					convert_to_typed(c, a, b->type);
-					if (a->mode == Addressing_Invalid) {
-						return false;
-					}
-					convert_to_typed(c, b, a->type);
-					if (b->mode == Addressing_Invalid) {
-						return false;
-					}
-				}
-			}
-
-			for (isize i = 0; i < operands.count-1; i++) {
-				Operand *a = &operands[i];
-				Operand *b = &operands[i+1];
-
-				if (!are_types_identical(a->type, b->type)) {
-					gbString type_a = type_to_string(a->type);
-					gbString type_b = type_to_string(b->type);
-					error(a->expr,
-					      "Mismatched types to 'max', '%s' vs '%s'",
-					      type_a, type_b);
-					gb_string_free(type_b);
-					gb_string_free(type_a);
-					return false;
-				}
-			}
-
-			operand->type = operands[0].type;
 		}
+		operand->type = operands[0].type;
 		break;
 	}
 
@@ -4913,7 +4956,32 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 		}
 
-		Type *type = x.type;
+		for (isize i = 0; i < 3; i++) {
+			Operand *a = ops[i];
+			for (isize j = 0; j < 3; j++) {
+				if (i == j) {
+					continue;
+				}
+				Operand *b = ops[j];
+				convert_to_typed(c, a, b->type);
+				if (a->mode == Addressing_Invalid) {
+					return false;
+				}
+			}
+		}
+
+		if (!are_types_identical(x.type, y.type) || !are_types_identical(x.type, z.type)) {
+			gbString type_x = type_to_string(x.type);
+			gbString type_y = type_to_string(y.type);
+			gbString type_z = type_to_string(z.type);
+			error(call,
+			      "Mismatched types to 'clamp', '%s', '%s', '%s'",
+			      type_x, type_y, type_z);
+			gb_string_free(type_z);
+			gb_string_free(type_y);
+			gb_string_free(type_x);
+			return false;
+		}
 
 		if (x.mode == Addressing_Constant &&
 		    y.mode == Addressing_Constant &&
@@ -4925,47 +4993,15 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->mode = Addressing_Constant;
 			if (compare_exact_values(Token_Lt, a, b)) {
 				operand->value = b;
-				operand->type = y.type;
 			} else if (compare_exact_values(Token_Gt, a, c)) {
 				operand->value = c;
-				operand->type = z.type;
 			} else {
 				operand->value = a;
-				operand->type = x.type;
 			}
 		} else {
 			operand->mode = Addressing_Value;
-			operand->type = type;
-
-			for (isize i = 0; i < 3; i++) {
-				Operand *a = ops[i];
-				for (isize j = 0; j < 3; j++) {
-					if (i == j) {
-						continue;
-					}
-					Operand *b = ops[j];
-					convert_to_typed(c, a, b->type);
-					if (a->mode == Addressing_Invalid) {
-						return false;
-					}
-				}
-			}
-
-			if (!are_types_identical(x.type, y.type) || !are_types_identical(x.type, z.type)) {
-				gbString type_x = type_to_string(x.type);
-				gbString type_y = type_to_string(y.type);
-				gbString type_z = type_to_string(z.type);
-				error(call,
-				      "Mismatched types to 'clamp', '%s', '%s', '%s'",
-				      type_x, type_y, type_z);
-				gb_string_free(type_z);
-				gb_string_free(type_y);
-				gb_string_free(type_x);
-				return false;
-			}
-
-			operand->type = ops[0]->type;
 		}
+		operand->type = x.type;
 
 		break;
 	}
@@ -5746,7 +5782,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		isize count_needed = 0;
 
 		for (Ast *arg : ce->args) {
-			ExactValue value = arg->tav.value;
+			ExactValue value = arg->tav.value();
 			GB_ASSERT(value.kind == ExactValue_Compound);
 			ast_node(cl, CompoundLit, value.value_compound);
 			count_needed += is_type_array(arg->tav.type)
@@ -5761,7 +5797,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		zero_context.type_hint_expr = nullptr;
 
 		for (Ast *arg : ce->args) {
-			ExactValue value = arg->tav.value;
+			ExactValue value = arg->tav.value();
 			GB_ASSERT(value.kind == ExactValue_Compound);
 			ast_node(cl, CompoundLit, value.value_compound);
 			array_add_elems(&new_elems, cl->elems.data, cl->elems.count);
@@ -5859,6 +5895,13 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		break;
 
 	case BuiltinProc_unreachable:
+		if (ce->args.count > 1) {
+			error(ce->args[1], "'%.*s' expects either 0 or 1 arguments, got %td", LIT(builtin_name), ce->args.count);
+			return false;
+		}
+		operand->mode = Addressing_NoValue;
+		break;
+
 	case BuiltinProc_trap:
 	case BuiltinProc_debug_trap:
 		operand->mode = Addressing_NoValue;
@@ -8837,7 +8880,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
-			TypeAndValue tav = proc->tav;
+			TypeAndValue tav = type_and_value_of_expr(proc);
 
 
 			operand->type       = e->type;

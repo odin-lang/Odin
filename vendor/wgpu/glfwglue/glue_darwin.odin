@@ -1,3 +1,4 @@
+#+build darwin:default
 package wgpu_glfw_glue
 
 import    "vendor:glfw"
@@ -7,7 +8,7 @@ import CA "vendor:darwin/QuartzCore"
 GetSurface :: proc(instance: wgpu.Instance, window: glfw.WindowHandle) -> wgpu.Surface {
 	ns_window := glfw.GetCocoaWindow(window)
 	ns_window->contentView()->setWantsLayer(true)
-	metal_layer := CA.MetalLayer_layer()
+	metal_layer := CA.MetalLayer.layer()
 	ns_window->contentView()->setLayer(metal_layer)
 	return wgpu.InstanceCreateSurface(
 		instance,

@@ -109,6 +109,12 @@ IBlobUtf16_VTable :: struct {
 	GetStringLength:  proc "system" (this: ^IBlobUtf16) -> SIZE_T,
 }
 
+// Upstream calls this IDxcBlobWide since 1.7: the string is UTF-16 on Windows and UTF-32 elsewhere.
+IBlobWide_UUID_STRING :: IBlobUtf16_UUID_STRING
+IBlobWide_UUID        := IBlobUtf16_UUID
+IBlobWide             :: IBlobUtf16
+IBlobWide_VTable      :: IBlobUtf16_VTable
+
 IBlobUtf8_UUID_STRING :: "3DA636C9-BA71-4024-A301-30CBF125305B"
 IBlobUtf8_UUID := &IID{0x3DA636C9, 0xBA71, 0x4024, {0xA3, 0x01, 0x30, 0xCB, 0xF1, 0x25, 0x30, 0x5B}}
 IBlobUtf8 :: struct #raw_union {
@@ -169,7 +175,10 @@ ILibrary_VTable :: struct {
 	CreateIncludeHandler:             proc "system" (this: ^ILibrary, ppResult: ^^IIncludeHandler) -> HRESULT,
 	CreateStreamFromBlobReadOnly:     proc "system" (this: ^ILibrary, pBlob: ^IBlob, ppStream: ^^IStream) -> HRESULT,
 	GetBlobAsUtf8:                    proc "system" (this: ^ILibrary, pBlob: ^IBlob, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
-	GetBlobAsUtf16:                   proc "system" (this: ^ILibrary, pBlob: ^IBlob, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
+	using _: struct #raw_union {
+		GetBlobAsWide:  proc "system" (this: ^ILibrary, pBlob: ^IBlob, pBlobEncoding: ^^IBlobEncoding) -> HRESULT,
+		GetBlobAsUtf16: proc "system" (this: ^ILibrary, pBlob: ^IBlob, pBlobEncoding: ^^IBlobEncoding) -> HRESULT, // Before 1.7
+	},
 }
 
 IOperationResult_UUID_STRING :: "CEDB484A-D4E9-445A-B991-CA21CA157DC2"
@@ -284,7 +293,10 @@ IUtils_VTable :: struct {
 	CreateReadOnlyStreamFromBlob: proc "system" (this: ^IUtils, pBlob: ^IBlob, ppStream: ^^IStream) -> HRESULT,
 	CreateDefaultIncludeHandler:  proc "system" (this: ^IUtils, ppResult: ^^IIncludeHandler) -> HRESULT,
 	GetBlobAsUtf8:                proc "system" (this: ^IUtils, pBlob: ^IBlob, pBlobEncoding: ^^IBlobUtf8) -> HRESULT,
-	GetBlobAsUtf16:               proc "system" (this: ^IUtils, pBlob: ^IBlob, pBlobEncoding: ^^IBlobUtf16) -> HRESULT,
+	using _: struct #raw_union {
+		GetBlobAsWide:  proc "system" (this: ^IUtils, pBlob: ^IBlob, pBlobEncoding: ^^IBlobWide) -> HRESULT,
+		GetBlobAsUtf16: proc "system" (this: ^IUtils, pBlob: ^IBlob, pBlobEncoding: ^^IBlobUtf16) -> HRESULT, // Before 1.7
+	},
 	GetDxilContainerPart:         proc "system" (this: ^IUtils, pShader: ^Buffer, Part: u32, ppPartData: rawptr, pPartSizeInBytes: ^u32) -> HRESULT,
 	CreateReflection:             proc "system" (this: ^IUtils, pData: ^Buffer, iid: ^IID, ppvReflection: rawptr) -> HRESULT,
 	BuildArguments:               proc "system" (this: ^IUtils, pSourceName: wstring, pEntryPoint: wstring, pTargetProfile: wstring, pArguments: [^]wstring, argCount: u32, pDefines: [^]Define, defineCount: u32, ppArgs: [^]^ICompilerArgs) -> HRESULT,
@@ -303,6 +315,9 @@ DXC_OUT_KIND :: enum u32 {
 	REFLECTION      = 8,
 	ROOT_SIGNATURE  = 9,
 	EXTRA_OUTPUTS   = 10,
+	REMARKS         = 11,
+	TIME_REPORT     = 12,
+	TIME_TRACE      = 13,
 }
 
 IResult_UUID_STRING :: "58346CDA-DDE7-4497-9461-6F87AF5E0659"
@@ -514,6 +529,41 @@ IPdbUtils_VTable :: struct {
 	OverrideRootSignature: proc "system" (this: ^IPdbUtils, pRootSignature: wstring) -> HRESULT,
 }
 
+IPdbUtils2_UUID_STRING :: "4315D938-F369-4F93-95A2-252017CC3807"
+IPdbUtils2_UUID := &IID{0x4315D938, 0xF369, 0x4F93, {0x95, 0xA2, 0x25, 0x20, 0x17, 0xCC, 0x38, 0x07}}
+IPdbUtils2 :: struct #raw_union {
+	#subtype iunknown: IUnknown,
+	using idxcpdbutils2_vtable: ^IPdbUtils2_VTable,
+}
+IPdbUtils2_VTable :: struct {
+	using iunknown_vtable: IUnknown_VTable,
+	Load:                   proc "system" (this: ^IPdbUtils2, pPdbOrDxil: ^IBlob) -> HRESULT,
+	GetSourceCount:         proc "system" (this: ^IPdbUtils2, pCount: ^u32) -> HRESULT,
+	GetSource:              proc "system" (this: ^IPdbUtils2, uIndex: u32, ppResult: ^^IBlobEncoding) -> HRESULT,
+	GetSourceName:          proc "system" (this: ^IPdbUtils2, uIndex: u32, ppResult: ^^IBlobWide) -> HRESULT,
+	GetLibraryPDBCount:     proc "system" (this: ^IPdbUtils2, pCount: ^u32) -> HRESULT,
+	GetLibraryPDB:          proc "system" (this: ^IPdbUtils2, uIndex: u32, ppOutPdbUtils: ^^IPdbUtils2, ppLibraryName: ^^IBlobWide) -> HRESULT,
+	GetFlagCount:           proc "system" (this: ^IPdbUtils2, pCount: ^u32) -> HRESULT,
+	GetFlag:                proc "system" (this: ^IPdbUtils2, uIndex: u32, ppResult: ^^IBlobWide) -> HRESULT,
+	GetArgCount:            proc "system" (this: ^IPdbUtils2, pCount: ^u32) -> HRESULT,
+	GetArg:                 proc "system" (this: ^IPdbUtils2, uIndex: u32, ppResult: ^^IBlobWide) -> HRESULT,
+	GetArgPairCount:        proc "system" (this: ^IPdbUtils2, pCount: ^u32) -> HRESULT,
+	GetArgPair:             proc "system" (this: ^IPdbUtils2, uIndex: u32, ppName: ^^IBlobWide, ppValue: ^^IBlobWide) -> HRESULT,
+	GetDefineCount:         proc "system" (this: ^IPdbUtils2, pCount: ^u32) -> HRESULT,
+	GetDefine:              proc "system" (this: ^IPdbUtils2, uIndex: u32, ppResult: ^^IBlobWide) -> HRESULT,
+	GetTargetProfile:       proc "system" (this: ^IPdbUtils2, ppResult: ^^IBlobWide) -> HRESULT,
+	GetEntryPoint:          proc "system" (this: ^IPdbUtils2, ppResult: ^^IBlobWide) -> HRESULT,
+	GetMainFileName:        proc "system" (this: ^IPdbUtils2, ppResult: ^^IBlobWide) -> HRESULT,
+	GetHash:                proc "system" (this: ^IPdbUtils2, ppResult: ^^IBlob) -> HRESULT,
+	GetName:                proc "system" (this: ^IPdbUtils2, ppResult: ^^IBlobWide) -> HRESULT,
+	GetVersionInfo:         proc "system" (this: ^IPdbUtils2, ppVersionInfo: ^^IVersionInfo) -> HRESULT,
+	GetCustomToolchainID:   proc "system" (this: ^IPdbUtils2, pID: ^u32) -> HRESULT,
+	GetCustomToolchainData: proc "system" (this: ^IPdbUtils2, ppBlob: ^^IBlob) -> HRESULT,
+	GetWholeDxil:           proc "system" (this: ^IPdbUtils2, ppResult: ^^IBlob) -> HRESULT,
+	IsFullPDB:              proc "system" (this: ^IPdbUtils2) -> BOOL,
+	IsPDBRef:               proc "system" (this: ^IPdbUtils2) -> BOOL,
+}
+
 
 Compiler_CLSID_STRING :: "73E22D93-E6CE-47F3-B5BF-F0664F39C1B0"
 Compiler_CLSID := &CLSID{0x73E22D93, 0xE6CE, 0x47F3, {0xB5, 0xBF, 0xF0, 0x66, 0x4F, 0x39, 0xC1, 0xB0}}
@@ -553,7 +603,9 @@ PdbUtils_CLSID := &CLSID{0x54621DFB, 0xF2CE, 0x457E, {0xAE, 0x8C, 0xEC, 0x35, 0x
 
 CP_UTF8  :: 65001
 CP_UTF16 :: 1200
+CP_UTF32 :: 12000
 CP_ACP   :: 0
+CP_WIDE  :: CP_UTF16 when ODIN_OS == .Windows else CP_UTF32
 
 make_fourcc :: proc "contextless" (ch0, ch1, ch2, ch3: u32) -> u32 {
 	return ch0 | (ch1 << 8) | (ch2 << 16) | (ch3 << 24)

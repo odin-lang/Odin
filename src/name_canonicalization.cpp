@@ -528,7 +528,7 @@ gb_internal void write_canonical_exact_value(TypeWriter *w, ExactValue const &v)
 
 gb_internal void write_canonical_constant_expr(TypeWriter *w, Ast *expr) {
 	if (expr->tav.mode == Addressing_Constant) {
-		write_canonical_exact_value(w, expr->tav.value);
+		write_canonical_exact_value(w, expr->tav.value());
 		return;
 	}
 	gbString s = write_expr_to_string(gb_string_make(heap_allocator(), ""), expr, false);
@@ -566,11 +566,11 @@ gb_internal void write_canonical_exact_value(TypeWriter *w, ExactValue const &v)
 	}
 	if (v.kind == ExactValue_Variant && v.value_variant != nullptr) {
 		Ast *expr = v.value_variant;
-		bool is_self = expr->tav.value.kind == ExactValue_Variant && expr->tav.value.value_variant == expr;
+		bool is_self = expr->tav.value().kind == ExactValue_Variant && expr->tav.value().value_variant == expr;
 		if (expr->tav.mode == Addressing_Constant && !is_self) {
 			write_type_to_canonical_string(w, expr->tav.type);
 			type_writer_appendc(w, "=");
-			write_canonical_exact_value(w, expr->tav.value);
+			write_canonical_exact_value(w, expr->tav.value());
 			return;
 		}
 	}
@@ -579,7 +579,16 @@ gb_internal void write_canonical_exact_value(TypeWriter *w, ExactValue const &v)
 		return;
 	}
 	gbString s = exact_value_to_string(v, 1<<16);
-	type_writer_append(w, s, gb_string_length(s));
+	isize len = gb_string_length(s);
+	isize start = 0;
+	for (isize i = 0; i < len; i++) {
+		if (s[i] == '@') {
+			type_writer_append(w, s+start, i-start);
+			type_writer_appendc(w, "\\x40");
+			start = i+1;
+		}
+	}
+	type_writer_append(w, s+start, len-start);
 	gb_string_free(s);
 }
 
@@ -1052,6 +1061,15 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 			write_type_to_canonical_string(w, f->type);
 			type_writer_appendc(w, CANONICAL_BIT_FIELD_SEPARATOR);
 			type_writer_append_fmt(w, "%u", type->BitField.bit_sizes[i]);
+			String tag = {};
+			if (type->BitField.tags != nullptr) {
+				tag = type->BitField.tags[i];
+			}
+			if (tag.len != 0) {
+				String s = quote_to_ascii(heap_allocator(), tag);
+				type_writer_append(w, s.text, s.len);
+				gb_free(heap_allocator(), s.text);
+			}
 		}
 		type_writer_appendc(w, " }");
 		return;

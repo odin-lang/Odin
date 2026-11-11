@@ -73,8 +73,6 @@ compare :: proc(lhs, rhs: []byte) -> int {
 	res := runtime.memory_compare(raw_data(lhs), raw_data(rhs), min(len(lhs), len(rhs)))
 	if res == 0 && len(lhs) != len(rhs) {
 		return len(lhs) <= len(rhs) ? -1 : +1
-	} else if len(lhs) == 0 && len(rhs) == 0 {
-		return 0
 	}
 	return res
 }

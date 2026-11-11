@@ -52,6 +52,7 @@ struct ErrorRecordInstantiation {
 	ErrorRecordInstantiation *prev;
 	struct Ast *              site;
 	struct Type *             named_type;
+	i64                       errors_before; // see `error_thread_count`
 };
 
 // The polymorphic instantiations the code being checked is within, see `error_out_instantiations`
@@ -66,6 +67,7 @@ struct ErrorContext {
 
 	i32 mute_depth;
 	i64 mute_count;
+	i64 error_count;
 
 	ErrorInstantiations instantiations;
 	ErrorCaret          caret;
@@ -84,6 +86,16 @@ gb_internal void end_error_mute(void) {
 }
 gb_internal i64 error_mute_count(void) {
 	return global_error_context.mute_count;
+}
+gb_internal i64 error_thread_count(void) {
+	return global_error_context.error_count + global_error_context.mute_count;
+}
+gb_internal void error_count_again(void) {
+	if (global_error_context.mute_depth > 0) {
+		global_error_context.mute_count += 1;
+	} else {
+		global_error_context.error_count += 1;
+	}
 }
 gb_internal bool is_error_muted(void) {
 	return global_error_context.mute_depth > 0;
@@ -263,7 +275,6 @@ gb_internal bool has_ansi_terminal_colours(void);
 gb_internal gbString get_file_line_as_string(TokenPos const &pos, i32 *offset);
 TokenPos token_pos_end(Token const &token);
 
-// Let the compiler check these against their arguments. 
 #if defined(__GNUC__) || defined(__clang__)
 	#define ODIN_FMT_LIKE(fmt_idx, va_idx) __attribute__((format(printf, fmt_idx, va_idx)))
 #else
@@ -758,6 +769,7 @@ gb_internal void error_va(TokenPos const &pos, TokenPos end, char const *fmt, va
 		global_error_context.mute_count += 1;
 		return;
 	}
+	global_error_context.error_count += 1;
 	(global_error_context.hold ? global_error_collector.held_count : global_error_collector.count).fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
@@ -843,6 +855,7 @@ gb_internal void error_no_newline_va(TokenPos const &pos, char const *fmt, va_li
 		global_error_context.mute_count += 1;
 		return;
 	}
+	global_error_context.error_count += 1;
 	(global_error_context.hold ? global_error_collector.held_count : global_error_collector.count).fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.count.load() > MAX_ERROR_COLLECTOR_COUNT()) {
@@ -879,6 +892,7 @@ gb_internal void syntax_error_va(TokenPos const &pos, TokenPos end, char const *
 		global_error_context.mute_count += 1;
 		return;
 	}
+	global_error_context.error_count += 1;
 	global_error_collector.count.fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
@@ -915,6 +929,7 @@ gb_internal void syntax_error_with_verbose_va(TokenPos const &pos, TokenPos end,
 		global_error_context.mute_count += 1;
 		return;
 	}
+	global_error_context.error_count += 1;
 	global_error_collector.count.fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {

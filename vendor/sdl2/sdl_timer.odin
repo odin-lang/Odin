@@ -20,6 +20,7 @@ TICKS_PASSED :: #force_inline proc "c" (A, B: u32) -> bool {
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
 	GetTicks                :: proc() -> u32 ---
+	GetTicks64              :: proc() -> u64 ---
 	GetPerformanceCounter   :: proc() -> u64 ---
 	GetPerformanceFrequency :: proc() -> u64 ---
 	Delay                   :: proc(ms: u32) ---

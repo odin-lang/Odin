@@ -1,5 +1,5 @@
 /*
-Gathers system information on `Windows`, `Linux`, `macOS`, `FreeBSD` & `OpenBSD`.
+Gathers system information on `Windows`, `Linux`, `Android`, `macOS`, `FreeBSD` & `OpenBSD`.
 
 Simply import the package and you'll have access to the OS version, RAM amount
 and CPU information.

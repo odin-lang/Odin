@@ -5,6 +5,7 @@ import "base:runtime"
 import "core:fmt"
 import "core:math"
 import "core:mem"
+import "core:strings"
 import "core:testing"
 
 @(test)
@@ -17,10 +18,12 @@ test_fmt_memory :: proc(t: ^testing.T) {
 	check(t, "3KiB",      "%.0M",  mem.Kilobyte * 3)
 	check(t, "3.000 mib", "%#.3m", mem.Megabyte * 3)
 	check(t, "3.50 gib",  "%#m",   u32(mem.Gigabyte * 3.5))
-	check(t, " 1tib",     "%5.0m", mem.Terabyte)
-	check(t, "-1tib",     "%5.0m", -mem.Terabyte)
-	check(t, "2 pib",     "%#5.m", uint(mem.Petabyte * 2.5))
-	check(t, "1.00 EiB",  "%#M",   mem.Exabyte)
+	when size_of(int) == 8 {
+		check(t, " 1tib",     "%5.0m", mem.Terabyte)
+		check(t, "-1tib",     "%5.0m", -mem.Terabyte)
+		check(t, "2 pib",     "%#5.m", uint(mem.Petabyte * 2.5))
+		check(t, "1.00 EiB",  "%#M",   mem.Exabyte)
+	}
 	check(t, "255 B",     "%#M",   u8(255))
 	check(t, "0b",        "%m",    u8(0))
 }
@@ -167,6 +170,12 @@ test_fmt_width_precision :: proc(t: ^testing.T) {
 	check(t, "3.140", "%*[1].*[2][0]f", 3.14, 5, 3)
 	check(t, "3.140", "%*[2].*[1]f",    3.14, 3, 5)
 	check(t, "3.140", "%5.*[1]f",       3.14, 3)
+
+	// Width in runes, not bytes
+	check(t, "|     naive|", "|%10s|", "naive")
+	check(t, "|     naïve|", "|%10s|", "naïve")
+	check(t, "|naive     |", "|%-10s|", "naive")
+	check(t, "|naïve     |", "|%-10s|", "naïve")
 }
 
 @(test)
@@ -193,6 +202,11 @@ test_fmt_arg_errors :: proc(t: ^testing.T) {
 	check(t, "%!(BAD ARGUMENT NUMBER)%!(NO VERB)%!(EXTRA 0)", "%[1]", 0)
 
 	check(t, "3.1%!(EXTRA 3.14)", "%.1f", 3.14, 3.14)
+
+	// An empty format still reports its arguments
+	check(t, "%!(EXTRA 1, 2)", "", 1, 2)
+	check(t, "%!(EXTRA <nil>)", "", nil)
+	testing.expect_value(t, fmt.tprintfln("", 1), "%!(EXTRA 1)\n")
 }
 
 @(test)
@@ -401,7 +415,9 @@ test_fmt_left_justified_padding :: proc(t: ^testing.T) {
 	check(t, "3.140   ",       "%-8f",    3.14)
 	check(t, "3.0e+02   ",     "%-10.1e", 300.0)
 	check(t, "3.000000e+00  ", "%-14e",   3.0)
-	check(t, "1tib    ",       "%-8.0m",  mem.Terabyte)
+	when size_of(int) == 8 {
+		check(t, "1tib    ",       "%-8.0m",  mem.Terabyte)
+	}
 	check(t, "0    ",          "%-5.0d",  0)
 	check(t, "0    ",          "%-5d",    0)
 	check(t, "ab   ",          "%-5s",    "ab")
@@ -415,7 +431,9 @@ test_fmt_left_justified_padding :: proc(t: ^testing.T) {
 	check(t, "00042",  "%05d",  42)
 	check(t, " 3.140", "%6f",   3.14)
 	check(t, "   -42", "%6d",   -42)
-	check(t, " 1tib",  "%5.0m", mem.Terabyte)
+	when size_of(int) == 8 {
+		check(t, " 1tib",  "%5.0m", mem.Terabyte)
+	}
 	check(t, "   ab",  "%5s",   "ab")
 	check(t, "    0",  "% 5.0d", 0)
 	check(t, "    0",  "% 5d",   0)
@@ -458,6 +476,53 @@ test_fmt_zero_flag :: proc(t: ^testing.T) {
 	// an implied width always zero fills
 	check(t, "0h3c00",   "%h", f16(1))
 	check(t, "00000101", "%b", bit_set[0..<8; u8]{0, 2})
+}
+
+@(test)
+test_fmt_integer_precision_and_prefix_padding :: proc(t: ^testing.T) {
+	// TODO(bplu4t2f): I am not sure what the intended output here is;
+	//                 bill's whitespace padding rework has changed
+	//                 what is happening in `_fmt_int` and it is not
+	//                 clear to me what the intent is.
+	// check(t, "  042", "%5.3d",  42)
+	// check(t, "  042", "%05.3d", 42)
+	// check(t, " -042", "%5.3d",  -42)
+	// check(t, " -042", "%05.3d", -42)
+
+	// check(t, "0x0000ff", "%#08x", u64(255))
+}
+
+// The byte count `wprint*` returns covers every byte written
+@(test)
+test_fmt_bytes_written :: proc(t: ^testing.T) {
+	Point :: struct {
+		x, y: int,
+	}
+	Flags :: bit_field u8 {
+		a: u8 | 4,
+		b: u8 | 4,
+	}
+
+	p := Point{3, 4}
+	m := map[string]int{"a" = 1, "b" = 2}
+	defer delete(m)
+	nil_data := transmute([]int)runtime.Raw_Slice{nil, 2}
+
+	check_count(t, "%v",  Point{1, 2})
+	check_count(t, "%v",  Flags{a = 1, b = 2})
+	check_count(t, "%v",  &p)
+	check_count(t, "%v",  m)
+	check_count(t, "%#v", m)
+	check_count(t, "%v",  nil_data)
+	check_count(t, "%v",  []any{nil, 1})
+	check_count(t, "%v",  typeid_of(#soa[2]Point))
+}
+
+@(private)
+check_count :: proc(t: ^testing.T, format: string, args: ..any, loc := #caller_location) {
+	sb := strings.builder_make(context.temp_allocator)
+	n := fmt.wprintf(strings.to_writer(&sb), format, ..args)
+	testing.expectf(t, n == strings.builder_len(sb), "(%q, %v): counted %v bytes of %q", format, args, n, strings.to_string(sb), loc = loc)
 }
 
 @(private)
