@@ -3,6 +3,7 @@ package test_core_math_big
 import "core:math"
 import "core:math/big"
 import "core:mem"
+import "core:slice"
 import "core:testing"
 
 @(private="file")
@@ -1486,6 +1487,261 @@ test_fix_logical_immutable_dest :: proc(t: ^testing.T) {
 	testing.expect_value(t, big.shl(x, a, 1), IMM)
 	testing.expect_value(t, big.shl(x, x, 1), IMM)
 
+	x.flags = {}
+	fix_expect(t, x, "1")
+}
+
+@(test)
+test_fix_to_bytes_and_copy_digits_stay_below_used :: proc(t: ^testing.T) {
+	storage: [4096]byte
+	for &b in storage {
+		b = 0xFF
+	}
+	arena: mem.Arena
+	mem.arena_init(&arena, storage[:])
+
+	src := &big.Int{}
+	defer big.destroy(src)
+	big.power_of_two(src, 189)
+	big.sub(src, src, 1)
+
+	b := &big.Int{}
+	testing.expect_value(t, big.copy(b, src, true, mem.arena_allocator(&arena)), nil)
+	testing.expect_value(t, b.used, 3)
+	testing.expect_value(t, len(b.digit), 3)
+
+	buf: [24]u8
+	testing.expect_value(t, big.int_to_bytes_big(b, buf[:]), nil)
+	testing.expect_value(t, buf[0], 31)
+	testing.expect_value(t, buf[23], 255)
+
+	testing.expect_value(t, big.int_to_bytes_little(b, buf[:]), nil)
+	testing.expect_value(t, buf[0], 255)
+	testing.expect_value(t, buf[23], 31)
+
+	e := &big.Int{}
+	defer big.destroy(e)
+	testing.expect_value(t, big.copy_digits(e, src, 1), nil)
+	testing.expect_value(t, e.digit[0], big._MASK)
+}
+
+@(test)
+test_fix_minus_inf :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	defer big.destroy(a)
+
+	testing.expect_value(t, big.minus_inf(a), nil)
+	testing.expect_value(t, a.sign, big.Sign.Negative)
+	testing.expect_value(t, a.flags, big.Flags{.Inf})
+
+	big.set(a, 5)
+	testing.expect_value(t, big.int_minus_inf(a), nil)
+	testing.expect_value(t, a.sign, big.Sign.Negative)
+	testing.expect_value(t, a.flags, big.Flags{.Inf})
+}
+
+@(test)
+test_fix_swap_immutable_asserts :: proc(t: ^testing.T) {
+	storage: [1024]byte
+	arena: mem.Arena
+	mem.arena_init(&arena, storage[:])
+	context.allocator = mem.arena_allocator(&arena)
+
+	c, x := &big.Int{}, &big.Int{}
+	big.set(c, 1)
+	c.flags = {.Immutable}
+	big.set(x, 6)
+	testing.expect_assert(t, "Assignment to immutable")
+	big.swap(x, c)
+}
+
+@(test)
+test_fix_to_bytes_fills_buffer :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	defer big.destroy(a)
+
+	Case :: struct {
+		value:  string,
+		little: bool,
+		bytes:  []u8,
+	}
+	cases := []Case{
+		{"-1",                              true,  {255, 255}},
+		{"-1",                              false, {255, 255, 255, 255}},
+		{"-128",                            true,  {128, 255, 255, 255}},
+		{"-256",                            true,  {0, 255, 255}},
+		{"-256",                            false, {255, 255, 0}},
+		{"-257",                            false, {255, 255, 255, 254, 255}},
+		{"-18446744073709551616",           false, {255, 255, 0, 0, 0, 0, 0, 0, 0, 0}},
+		{"-123456789012345678901234567890", false, {255, 255, 255, 254, 113, 22, 240, 9, 60, 140, 31, 17, 177, 192, 245, 46}},
+		{"5",                               true,  {5, 0, 0, 0}},
+		{"5",                               false, {0, 0, 0, 5}},
+	}
+	for c in cases {
+		fix_set(t, a, c.value)
+		buf := make([]u8, len(c.bytes))
+		defer delete(buf)
+		for &v in buf {
+			v = 170
+		}
+		err: big.Error
+		if c.little {
+			err = big.int_to_bytes_little_python(a, buf, true)
+		} else {
+			err = big.int_to_bytes_big_python(a, buf, true)
+		}
+		testing.expect_value(t, err, nil)
+		testing.expectf(t, slice.equal(buf, c.bytes), "to_bytes_python(%v, little = %v) = %v; want %v", c.value, c.little, buf, c.bytes)
+	}
+
+	big.set(a, 5)
+	buf: [4]u8 = {170, 170, 170, 170}
+	testing.expect_value(t, big.int_to_bytes_little(a, buf[:]), nil)
+	testing.expect_value(t, buf, [4]u8{5, 0, 0, 0})
+
+	buf = {170, 170, 170, 170}
+	testing.expect_value(t, big.int_to_bytes_big(a, buf[:]), nil)
+	testing.expect_value(t, buf, [4]u8{0, 0, 0, 5})
+
+	big.set(a, -5)
+	buf = {170, 170, 170, 170}
+	testing.expect_value(t, big.int_to_bytes_big(a, buf[:], true), nil)
+	testing.expect_value(t, buf, [4]u8{1, 0, 0, 5})
+}
+
+@(test)
+test_fix_from_bytes_python_signed :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	defer big.destroy(a)
+
+	Case :: struct {
+		bytes:  []u8,
+		little: bool,
+		value:  string,
+	}
+	cases := []Case{
+		{{128},           false, "-128"},
+		{{127},           false, "127"},
+		{{1},             true,  "1"},
+		{{255},           false, "-1"},
+		{{1, 0},          false, "256"},
+		{{255, 0},        false, "-256"},
+		{{128, 0},        false, "-32768"},
+		{{128, 0, 0},     false, "-8388608"},
+		{{255, 255, 254}, true,  "-65537"},
+		{{0, 0, 128},     true,  "-8388608"},
+		{{128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, false, "-3138550867693340381917894711603833208051177722232017256448"},
+		{{127, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255}, false, "3138550867693340381917894711603833208051177722232017256447"},
+	}
+	for c in cases {
+		err: big.Error
+		if c.little {
+			err = big.int_from_bytes_little_python(a, c.bytes, true)
+		} else {
+			err = big.int_from_bytes_big_python(a, c.bytes, true)
+		}
+		testing.expect_value(t, err, nil)
+		fix_expect(t, a, c.value)
+	}
+}
+
+@(test)
+test_fix_from_bytes_empty :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	defer big.destroy(a)
+
+	for signed in ([]bool{false, true}) {
+		big.set(a, -7)
+		testing.expect_value(t, big.int_from_bytes_big(a, nil, signed), nil)
+		fix_expect(t, a, "0")
+		big.set(a, -7)
+		testing.expect_value(t, big.int_from_bytes_little(a, nil, signed), nil)
+		fix_expect(t, a, "0")
+		big.set(a, -7)
+		testing.expect_value(t, big.int_from_bytes_big_python(a, nil, signed), nil)
+		fix_expect(t, a, "0")
+		big.set(a, -7)
+		testing.expect_value(t, big.int_from_bytes_little_python(a, nil, signed), nil)
+		fix_expect(t, a, "0")
+	}
+}
+
+@(test)
+test_fix_bytes_round_trip :: proc(t: ^testing.T) {
+	a, b := &big.Int{}, &big.Int{}
+	defer big.destroy(a, b)
+
+	sizes := []int{1, 7, 8, 9, 55, 56, 57, 62, 63, 64, 65, 118, 119, 120, 126, 127, 128, 189, 190, 500, 1000}
+	for bits in sizes {
+		for delta in -1..=1 {
+			for negative in ([]bool{false, true}) {
+				big.power_of_two(a, bits)
+				if delta < 0 {
+					big.sub(a, a, big.DIGIT(1))
+				} else if delta > 0 {
+					big.add(a, a, big.DIGIT(1))
+				}
+				if negative {
+					big.neg(a, a)
+				}
+
+				for signed in ([]bool{false, true}) {
+					if negative && !signed {
+						continue
+					}
+					size, _ := big.int_to_bytes_size(a, signed)
+					buf := make([]u8, size)
+					defer delete(buf)
+
+					for format in 0..<4 {
+						err: big.Error
+						switch format {
+						case 0:
+							testing.expect_value(t, big.int_to_bytes_big(a, buf, signed), nil)
+							err = big.int_from_bytes_big(b, buf, signed)
+						case 1:
+							testing.expect_value(t, big.int_to_bytes_little(a, buf, signed), nil)
+							err = big.int_from_bytes_little(b, buf, signed)
+						case 2:
+							testing.expect_value(t, big.int_to_bytes_big_python(a, buf, signed), nil)
+							err = big.int_from_bytes_big_python(b, buf, signed)
+						case 3:
+							testing.expect_value(t, big.int_to_bytes_little_python(a, buf, signed), nil)
+							err = big.int_from_bytes_little_python(b, buf, signed)
+						}
+						same, _ := big.equals(a, b)
+						if !testing.expectf(t, err == nil && same, "2^%v%+v negative = %v signed = %v format %v: round trip failed: %v", bits, delta, negative, signed, format, err) {
+							return
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+@(test)
+test_fix_helpers_immutable_dest :: proc(t: ^testing.T) {
+	x := &big.Int{}
+	defer big.destroy(x)
+
+	fix_set(t, x, "1")
+	x.flags = {.Immutable}
+	bytes := [?]u8{18, 52}
+
+	IMM :: big.Error.Assignment_To_Immutable
+	testing.expect_value(t, big.clear(x), IMM)
+	testing.expect_value(t, big.zero(x), IMM)
+	testing.expect_value(t, big.power_of_two(x, 5), IMM)
+	testing.expect_value(t, big.random(x, 30), IMM)
+	testing.expect_value(t, big.init_multi(x), IMM)
+	testing.expect_value(t, big.int_from_bytes_big(x, bytes[:]), IMM)
+	testing.expect_value(t, big.int_from_bytes_little(x, bytes[:]), IMM)
+	testing.expect_value(t, big.int_from_bytes_big_python(x, bytes[:], true), IMM)
+	testing.expect_value(t, big.int_from_bytes_little_python(x, bytes[:], true), IMM)
+	testing.expect_value(t, big.int_from_bytes_big(x, nil), IMM)
+
+	testing.expect_value(t, x.flags, big.Flags{.Immutable})
 	x.flags = {}
 	fix_expect(t, x, "1")
 }
