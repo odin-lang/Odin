@@ -290,3 +290,32 @@ test_rect_real_result :: proc(t: ^testing.T) {
 		testing.expectf(t, same_complex(got32, complex32(c.want)), "rect(f16(%v), f16(%v)) = %v, want %v", c.r, c.θ, got32, complex32(c.want))
 	}
 }
+
+@test
+test_sqrt_imaginary_axis :: proc(t: ^testing.T) {
+	nan := math.nan_f64()
+	neg_zero := math.copy_sign(f64(0), -1)
+	tiny := math.ldexp(f64(1), -1074)
+	tiny_root := 1.5717277847026288e-162
+	small := math.ldexp(f64(1), -1031)
+	small_root := math.ldexp(f64(1), -516)
+
+	Case :: struct {
+		x, want: complex128,
+	}
+	cases := []Case{
+		{complex(0, tiny), complex(tiny_root, tiny_root)},
+		{complex(neg_zero, tiny), complex(tiny_root, tiny_root)},
+		{complex(0, -tiny), complex(tiny_root, -tiny_root)},
+		{complex(neg_zero, -tiny), complex(tiny_root, -tiny_root)},
+		{complex(0, small), complex(small_root, small_root)},
+		{complex(0, 8), complex(2, 2)},
+		{complex(0, -8), complex(2, -2)},
+		{complex(nan, 0), complex(nan, nan)},
+		{complex(nan, neg_zero), complex(nan, nan)},
+	}
+	for c in cases {
+		got := cmplx.sqrt(c.x)
+		testing.expectf(t, same_complex(got, c.want), "sqrt(%v) = %v, want %v", c.x, got, c.want)
+	}
+}

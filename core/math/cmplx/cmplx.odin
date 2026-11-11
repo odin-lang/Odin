@@ -207,17 +207,22 @@ sqrt_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 		if real(x) < 0 {
 			return complex(0, math.copy_sign(math.sqrt(-real(x)), imag(x)))
 		}
+		if math.is_nan(real(x)) {
+			return complex(real(x), real(x))
+		}
 		return complex(math.sqrt(real(x)), imag(x))
 	} else if math.is_inf(imag(x), 0) {
 		return complex(math.inf_f64(1.0), imag(x))
 	}
 	if real(x) == 0 {
-		if imag(x) < 0 {
-			r := math.sqrt(-0.5 * imag(x))
-			return complex(r, -r)
+		y := abs(imag(x))
+		r: f64
+		if y >= 2*math.F64_MIN {
+			r = math.sqrt(0.5 * y)
+		} else {
+			r = math.sqrt(0.5 * (y * (1 << 52))) / (1 << 26)
 		}
-		r := math.sqrt(0.5 * imag(x))
-		return complex(r, r)
+		return complex(r, math.copy_sign(r, imag(x)))
 	}
 	a := real(x)
 	b := imag(x)
