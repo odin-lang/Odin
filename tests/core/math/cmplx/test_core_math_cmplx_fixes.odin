@@ -156,3 +156,21 @@ test_log10 :: proc(t: ^testing.T) {
 		testing.expectf(t, close_complex(got32, complex32(c.want)), "log10(complex32(%v)) = %v, want %v", c.x, got32, complex32(c.want))
 	}
 }
+
+@test
+test_rect_group :: proc(t: ^testing.T) {
+	zs := []complex128{complex(3, 4), complex(-5, 12), complex(-8, -15), complex(7, -24)}
+	for z in zs {
+		r, θ := cmplx.polar(z)
+		w: complex128 = cmplx.rect(r, θ)
+		testing.expectf(t, close_complex(w, z), "rect(polar(%v)) = %v", z, w)
+
+		r64, θ64 := cmplx.polar(complex64(z))
+		w64: complex64 = cmplx.rect(r64, θ64)
+		testing.expectf(t, close_complex(w64, complex64(z)), "rect(polar(complex64(%v))) = %v", z, w64)
+
+		r32, θ32 := cmplx.polar(complex32(z))
+		w32: complex32 = cmplx.rect(r32, θ32)
+		testing.expectf(t, close_complex(w32, complex32(z)), "rect(polar(complex32(%v))) = %v", z, w32)
+	}
+}

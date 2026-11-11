@@ -102,6 +102,12 @@ polar :: proc{
 	polar_complex128,
 }
 
+rect :: proc{
+	rect_complex32,
+	rect_complex64,
+	rect_complex128,
+}
+
 is_inf :: proc{
 	is_inf_complex32,
 	is_inf_complex64,
