@@ -55,3 +55,22 @@ test_polar_from_euclidean_radius :: proc(t: ^testing.T) {
 		testing.expectf(t, p == {0, 0, 5}, "polar_from_euclidean(%v) = %v, want [0, 0, 5]", v, p)
 	}
 }
+
+@test
+test_matrix1x1_adjugate_and_cofactor :: proc(t: ^testing.T) {
+	{
+		m := matrix[1, 1]f32{5}
+		a := linalg.adjugate(m)
+		c := linalg.cofactor(m)
+		testing.expectf(t, a == 1, "adjugate(%v) = %v, want [1]", m, a)
+		testing.expectf(t, c == 1, "cofactor(%v) = %v, want [1]", m, c)
+		testing.expectf(t, m * a == linalg.determinant(m), "m * adjugate(m) = %v, want det(m)", m * a)
+	}
+	{
+		m := matrix[1, 1]int{-7}
+		a := linalg.adjugate(m)
+		c := linalg.cofactor(m)
+		testing.expectf(t, a == 1, "adjugate(%v) = %v, want [1]", m, a)
+		testing.expectf(t, c == 1, "cofactor(%v) = %v, want [1]", m, c)
+	}
+}

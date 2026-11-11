@@ -595,7 +595,7 @@ matrix_determinant_generic :: proc "contextless" (a: $M/matrix[$N, N]$T) -> T #n
 
 @(require_results)
 matrix1x1_adjugate :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) #no_bounds_check {
-	y = x
+	y[0, 0] = 1
 	return
 }
 
@@ -716,7 +716,7 @@ matrix_adjugate_general :: proc "contextless" (x: $M/matrix[$N, N]$T) -> (y: M) 
 
 @(require_results)
 matrix1x1_cofactor :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) #no_bounds_check {
-	y = x
+	y[0, 0] = 1
 	return
 }
 
