@@ -9,8 +9,10 @@ package text_edit
 
 import "base:runtime"
 import "core:time"
+import "core:hash"
 import "core:mem"
 import "core:strings"
+import "core:unicode"
 import "core:unicode/utf8"
 
 DEFAULT_UNDO_TIMEOUT :: 300 * time.Millisecond
@@ -31,10 +33,17 @@ State :: struct {
 
 	translate_by_grapheme: bool, // translates by codepoint by default
 
+	// classifies runes for word moves and selection.
+	// nil: only spaces, tabs, and newlines separate words
+	word_class: proc(r: rune) -> Word_Class,
+
+	options: Option_Set, // opt-in behaviours
+
 	// undo
 	undo: [dynamic]^Undo_State,
 	redo: [dynamic]^Undo_State,
 	undo_text_allocator: runtime.Allocator,
+	undo_breaks: Undo_Break_Set, // what starts a new undo step, besides a pause of `undo_timeout`
 
 	id: u64, // useful for immediate mode GUIs
 
@@ -47,6 +56,14 @@ State :: struct {
 	set_clipboard: proc(user_data: rawptr, text: string) -> (ok: bool),
 	get_clipboard: proc(user_data: rawptr) -> (text: string, ok: bool),
 	clipboard_user_data: rawptr,
+
+	// owned by the package
+	_last_edit:           Edit_Kind,
+	_last_caret:          int,
+	_edit_depth:          int,
+	_undo_groups:         int,
+	_undo_break:          bool,
+	_clipboard_line_hash: u64,
 }
 
 Undo_State :: struct {
@@ -79,6 +96,40 @@ Translation :: enum u32 {
 Translation_Set :: distinct bit_set[Translation; u32]
 
 VERTICAL_TRANSLATIONS :: Translation_Set{.Up, .Down, .Page_Up, .Page_Down}
+
+// a rune's class for word moves: a word is a run of one class, and word moves skip `Space`
+Word_Class :: enum u32 {
+	Space,
+	Punctuation,
+	Word,
+}
+
+// opt-in behaviours, for `State.options`
+Option :: enum u32 {
+	Keep_Indent,    // `New_Line` copies the hard line's leading spaces and tabs, up to the caret
+	Line_Clipboard, // with nothing selected, `Copy` and `Cut` take the caret's hard line; `Paste` puts such a line above the caret's
+}
+
+Option_Set :: distinct bit_set[Option; u32]
+
+// what starts a new undo step, besides a pause of `State.undo_timeout`
+Undo_Break :: enum u32 {
+	Kind,       // switching between typing, deleting, pasting, and cutting; every paste and cut is its own step
+	Word,       // typing the first rune of a word, by `State.word_class`
+	Caret_Move, // editing away from where the last edit left the caret
+	Every_Edit,
+}
+
+Undo_Break_Set :: distinct bit_set[Undo_Break; u32]
+
+@(private)
+Edit_Kind :: enum u32 {
+	None,
+	Insert,
+	Remove,
+	Paste,
+	Cut,
+}
 
 // init the state to some timeout and set the respective allocators
 // - undo_state_allocator dictates the dynamic undo|redo arrays allocators
@@ -178,6 +229,7 @@ undo :: proc(s: ^State, undo, redo: ^[dynamic]^Undo_State) {
 		item := pop(undo)
 		s.selection = item.selection
 		s.moved_vertically = false
+		s._undo_break = true
 		#no_bounds_check if s.builder != nil {
 			strings.builder_reset(s.builder)
 			strings.write_string(s.builder, string(item.text[:item.len]))
@@ -203,11 +255,118 @@ undo_check :: proc(s: ^State) {
 	s.last_edit_time = s.current_time
 }
 
+// Starts a group of edits that undo as one step until the matching `undo_group_end`
+undo_group_begin :: proc(s: ^State) {
+	if s._undo_groups == 0 {
+		s._undo_break = true
+	}
+	s._undo_groups += 1
+}
+
+// Ends a group of edits started by `undo_group_begin`
+undo_group_end :: proc(s: ^State) {
+	assert(s._undo_groups > 0, "undo_group_end without undo_group_begin")
+	s._undo_groups -= 1
+	if s._undo_groups == 0 {
+		s._undo_break = true
+	}
+}
+
+@(private)
+undo_step :: proc(s: ^State, kind: Edit_Kind, at: int, first: rune) {
+	@(require_results)
+	starts_word :: proc(s: ^State, at: int, first: rune) -> bool {
+		if word_class_of(s, first) == .Space {
+			return false
+		}
+		before, _ := word_class_before(s, at)
+		return before == .Space
+	}
+
+	@(require_results)
+	starts_step :: proc(s: ^State, kind: Edit_Kind, at: int, first: rune) -> bool {
+		if s._undo_break {
+			return true
+		}
+
+		if time.tick_diff(s.last_edit_time, s.current_time) > s.undo_timeout {
+			return true
+		}
+
+		if .Every_Edit in s.undo_breaks {
+			return true
+		}
+
+		if .Kind in s.undo_breaks {
+			if kind != s._last_edit {
+				return true
+			}
+			// every paste and cut is a step of its own
+			if kind == .Cut || kind == .Paste {
+				return true
+			}
+		}
+
+		if .Caret_Move in s.undo_breaks {
+			caret_moved := s.selection != [2]int{s._last_caret, s._last_caret}
+			if caret_moved {
+				return true
+			}
+		}
+
+		if .Word in s.undo_breaks && kind == .Insert {
+			if starts_word(s, at, first) {
+				return true
+			}
+		}
+
+		return false
+	}
+
+	undo_clear(s, &s.redo)
+	defer s.last_edit_time = s.current_time
+
+	// The rest of a compound edit joins the step its first edit decided on
+	if s._edit_depth > 0 {
+		return
+	}
+
+	// After its first edit, the rest of an undo group joins its step
+	if s._undo_groups > 0 && !s._undo_break {
+		return
+	}
+
+	if starts_step(s, kind, at, first) {
+		undo_state_push(s, &s.undo)
+	}
+	s._undo_break = false
+	s._last_edit  = kind
+}
+
+// A compound edit, such as typing over a selection, is one undo step
+@(private)
+edit_begin :: proc(s: ^State, kind: Edit_Kind, first: rune) {
+	lo, _ := sorted_selection(s)
+	undo_step(s, kind, lo, first)
+	s._edit_depth += 1
+}
+
+@(private)
+edit_end :: proc(s: ^State) {
+	s._edit_depth -= 1
+	s._last_caret  = s.selection[0]
+}
+
 // insert text into the edit state - deletes the current selection
 input_text :: proc(s: ^State, text: string) -> int {
 	if len(text) == 0 {
 		return 0
 	}
+
+	first, _ := utf8.decode_rune(text)
+	edit_begin(s, .Insert, first)
+	defer edit_end(s)
+
 	if has_selection(s) {
 		selection_delete(s)
 	}
@@ -222,6 +381,10 @@ input_runes :: proc(s: ^State, text: []rune) {
 	if len(text) == 0 {
 		return
 	}
+
+	edit_begin(s, .Insert, text[0])
+	defer edit_end(s)
+
 	if has_selection(s) {
 		selection_delete(s)
 	}
@@ -239,6 +402,9 @@ input_runes :: proc(s: ^State, text: []rune) {
 
 // insert a single rune into the edit state - deletes the current selection
 input_rune :: proc(s: ^State, r: rune) {
+	edit_begin(s, .Insert, r)
+	defer edit_end(s)
+
 	if has_selection(s) {
 		selection_delete(s)
 	}
@@ -249,9 +415,51 @@ input_rune :: proc(s: ^State, r: rune) {
 	s.selection = {offset, offset}
 }
 
+// Inserts a line break, followed by the hard line's indentation with `.Keep_Indent`
+new_line :: proc(s: ^State) {
+	if .Keep_Indent not_in s.options || s.builder == nil {
+		input_text(s, "\n")
+		return
+	}
+
+	edit_begin(s, .Insert, '\n')
+	defer edit_end(s)
+
+	if has_selection(s) {
+		selection_delete(s)
+	}
+
+	// The indentation is the hard line's leading spaces and tabs, up to the caret
+	caret, _     := sorted_selection(s)
+	indent_start := translate_position(s, .Hard_Line_Start)
+	indent_end   := indent_start
+	for indent_end < caret && is_blank(s.builder.buf[indent_end]) {
+		indent_end += 1
+	}
+
+	at := caret + insert(s, caret, "\n")
+
+	// Copy the indentation through a small buffer: the builder's own bytes move when it grows
+	for i := indent_start; i < indent_end; /**/ {
+		chunk: [64]byte
+		n := runtime.copy(chunk[:], s.builder.buf[i:indent_end])
+
+		inserted := insert(s, at, string(chunk[:n]))
+		at += inserted
+		if inserted < n {
+			break // the builder is full
+		}
+
+		i += n
+	}
+
+	s.selection = {at, at}
+}
+
 // insert a single rune into the edit state - deletes the current selection
 insert :: proc(s: ^State, at: int, text: string) -> int {
-	undo_check(s)
+	first, _ := utf8.decode_rune(text)
+	undo_step(s, .Insert, at, first)
 	s.moved_vertically = false
 	if s.builder != nil {
 		if ok, _ := inject_at(&s.builder.buf, at, text); !ok {
@@ -272,7 +480,7 @@ insert :: proc(s: ^State, at: int, text: string) -> int {
 
 // remove the wanted range withing, usually the selection within byte indices
 remove :: proc(s: ^State, lo, hi: int) {
-	undo_check(s)
+	undo_step(s, .Remove, lo, 0)
 	s.moved_vertically = false
 	if s.builder != nil {
 		remove_range(&s.builder.buf, lo, hi)
@@ -297,6 +505,9 @@ sorted_selection :: proc(s: ^State) -> (lo, hi: int) {
 
 // delete the current selection range and set the proper selection afterwards
 selection_delete :: proc(s: ^State) {
+	edit_begin(s, .Remove, 0)
+	defer edit_end(s)
+
 	lo, hi := sorted_selection(s)
 	remove(s, lo, hi)
 	s.selection = {lo, lo}
@@ -311,14 +522,7 @@ is_continuation_byte :: proc(b: byte) -> bool {
 // - hard line: the caret's line as written, up to a `\n` or `\r\n`
 // - smart start/end: skip the soft line's leading/trailing spaces and tabs, or go to its start/end if already there or the line is blank
 translate_position :: proc(s: ^State, t: Translation) -> int {
-	is_space :: proc(b: byte) -> bool {
-		return b == ' ' || b == '\t' || b == '\n'
-	}
-
-	buf: []byte
-	if s.builder != nil {
-		buf = s.builder.buf[:]
-	}
+	buf := text_bytes(s)
 	pos := clamp(s.selection[0], 0, len(buf))
 
 	switch t {
@@ -363,26 +567,23 @@ translate_position :: proc(s: ^State, t: Translation) -> int {
 	case .Page_Down:
 		pos = s.page_down_index
 	case .Word_Left:
-		for pos > 0 && is_space(buf[pos-1]) {
-			pos -= 1
-		}
-		for pos > 0 && !is_space(buf[pos-1]) {
-			pos -= 1
-		}
+		// Skip the spaces, then the word or punctuation before them
+		pos = word_run_start(s, pos, .Space)
+		class, _ := word_class_before(s, pos)
+		pos = word_run_start(s, pos, class)
 	case .Word_Right:
-		for pos < len(buf) && is_space(buf[pos]) {
-			pos += 1
-		}
-		for pos < len(buf) && !is_space(buf[pos]) {
-			pos += 1
-		}
+		pos = word_run_end(s, pos, .Space)
+		class, _ := word_class_after(s, pos)
+		pos = word_run_end(s, pos, class)
 	case .Word_Start:
-		for pos > 0 && !is_space(buf[pos-1]) {
-			pos -= 1
+		class, _ := word_class_before(s, pos)
+		if class != .Space {
+			pos = word_run_start(s, pos, class)
 		}
 	case .Word_End:
-		for pos < len(buf) && !is_space(buf[pos]) {
-			pos += 1
+		class, _ := word_class_after(s, pos)
+		if class != .Space {
+			pos = word_run_end(s, pos, class)
 		}
 	case .Soft_Line_Start:
 		pos = s.line_start
@@ -424,6 +625,152 @@ is_blank :: proc(b: byte) -> bool {
 	return b == ' ' || b == '\t'
 }
 
+// Word classes for code: ASCII punctuation separates words, except `_`
+@(require_results)
+word_class_ascii :: proc(r: rune) -> Word_Class {
+	switch r {
+	case ' ', '\t', '\n', '\v', '\f', '\r':
+		return .Space
+	case '!'..='/', ':'..='@', '['..='^', '`', '{'..='~':
+		return .Punctuation
+	}
+	return .Word
+}
+
+// Word classes for any text: Unicode spaces, punctuation, and symbols separate words, except `_`
+@(require_results)
+word_class_unicode :: proc(r: rune) -> Word_Class {
+	switch {
+	case r < utf8.RUNE_SELF:
+		return word_class_ascii(r)
+	case unicode.is_space(r):
+		return .Space
+	case unicode.is_punct(r), unicode.is_symbol(r):
+		return .Punctuation
+	}
+	return .Word
+}
+
+@(private, require_results)
+text_bytes :: proc(s: ^State) -> []byte {
+	if s.builder == nil {
+		return nil
+	}
+	return s.builder.buf[:]
+}
+
+@(private, require_results)
+word_class_of :: proc(s: ^State, r: rune) -> Word_Class {
+	if s.word_class != nil {
+		return s.word_class(r)
+	}
+
+	switch r {
+	case ' ', '\t', '\n':
+		return .Space
+	}
+	return .Word
+}
+
+// Combining marks, joiners, and emoji modifiers: runes that extend the rune before them
+@(private, require_results)
+is_extender :: proc(r: rune) -> bool {
+	if r < utf8.RUNE_SELF {
+		return false
+	}
+	if r == unicode.ZERO_WIDTH_JOINER {
+		return true
+	}
+	return unicode.is_gcb_extend_class(r) || unicode.is_spacing_mark(r)
+}
+
+// The class of the character before `pos`, and where it starts
+// - a character is a rune and the extenders after it
+@(private, require_results)
+word_class_before :: proc(s: ^State, pos: int) -> (class: Word_Class, start: int) {
+	if pos <= 0 {
+		return .Space, pos
+	}
+	buf := text_bytes(s)
+
+	// Step back over the extenders first: they take the class of the rune before them
+	start = pos
+	extender: rune
+	for start > 0 {
+		r, w := utf8.decode_last_rune(buf[:start])
+		if !is_extender(r) {
+			break
+		}
+		extender = r
+		start   -= w
+	}
+	if start == 0 {
+		return word_class_of(s, extender), start
+	}
+
+	r, w := utf8.decode_last_rune(buf[:start])
+
+	// Extenders after a line break or other control stand alone
+	if start < pos && unicode.is_control(r) {
+		return word_class_of(s, extender), start
+	}
+	return word_class_of(s, r), start-w
+}
+
+// The class of the character at `pos`, and where it ends
+@(private, require_results)
+word_class_after :: proc(s: ^State, pos: int) -> (class: Word_Class, end: int) {
+	buf := text_bytes(s)
+	if pos >= len(buf) {
+		return .Space, pos
+	}
+
+	r, w := utf8.decode_rune(buf[pos:])
+	end = pos + w
+
+	// Extenders after a line break or other control stand alone
+	if unicode.is_control(r) {
+		return word_class_of(s, r), end
+	}
+
+	for end < len(buf) {
+		next, next_w := utf8.decode_rune(buf[end:])
+		if !is_extender(next) {
+			break
+		}
+		end += next_w
+	}
+	return word_class_of(s, r), end
+}
+
+// The start of the run of `class` that ends at `pos`
+@(private, require_results)
+word_run_start :: proc(s: ^State, pos: int, class: Word_Class) -> int {
+	start := pos
+	for start > 0 {
+		before, before_start := word_class_before(s, start)
+		if before != class {
+			break
+		}
+		start = before_start
+	}
+	return start
+}
+
+// The end of the run of `class` that starts at `pos`
+@(private, require_results)
+word_run_end :: proc(s: ^State, pos: int, class: Word_Class) -> int {
+	end := pos
+	for end < len(text_bytes(s)) {
+		after, after_end := word_class_after(s, end)
+		if after != class {
+			break
+		}
+		end = after_end
+	}
+	return end
+}
+
 // Moves the position of the caret (both sides of the selection)
 move_to :: proc(s: ^State, t: Translation) {
 	s.moved_vertically = t in VERTICAL_TRANSLATIONS
@@ -451,19 +798,30 @@ select_all :: proc(s: ^State) {
 	s.moved_vertically = false
 }
 
-// Selects the word at the caret, or the spaces and tabs around it if there is no word
+// Selects the word at the caret, or the spaces around it if there is no word
 select_word :: proc(s: ^State) {
-	lo := translate_position(s, .Word_Start)
-	hi := translate_position(s, .Word_End)
-	if lo == hi && s.builder != nil {
-		buf := s.builder.buf[:]
-		for lo > 0 && is_blank(buf[lo-1]) {
-			lo -= 1
-		}
-		for hi < len(buf) && is_blank(buf[hi]) {
-			hi += 1
-		}
+	pos := clamp(s.selection[0], 0, len(text_bytes(s)))
+
+	// Prefer a word to punctuation, and either to spaces
+	before, _ := word_class_before(s, pos)
+	after,  _ := word_class_after(s, pos)
+	class: Word_Class
+	switch {
+	case before == .Word || after == .Word:
+		class = .Word
+	case before == .Punctuation || after == .Punctuation:
+		class = .Punctuation
+	case:
+		class = .Space
 	}
+
+	lo := word_run_start(s, pos, class)
+	hi := word_run_end(s, pos, class)
+
+	// Stay on the caret's line: a run of spaces can cross line breaks
+	lo = max(lo, translate_position(s, .Hard_Line_Start))
+	hi = min(hi, translate_position(s, .Hard_Line_End))
+
 	s.selection = {hi, lo}
 	s.moved_vertically = false
 }
@@ -500,6 +858,9 @@ skip_line_break :: proc(s: ^State, pos: int) -> int {
 
 // Deletes everything between the caret and resultant position
 delete_to :: proc(s: ^State, t: Translation) {
+	edit_begin(s, .Remove, 0)
+	defer edit_end(s)
+
 	if has_selection(s) {
 		selection_delete(s)
 	} else {
@@ -522,29 +883,93 @@ current_selected_text :: proc(s: ^State) -> string {
 
 // copy & delete the current selection when copy() succeeds
 cut :: proc(s: ^State) -> bool {
-	if copy(s) {
-		selection_delete(s)
-		return true
+	if !copy(s) {
+		return false
 	}
-	return false
+
+	edit_begin(s, .Cut, 0)
+	defer edit_end(s)
+
+	lo, hi, _ := clipboard_range(s)
+	remove(s, lo, hi)
+	s.selection = {lo, lo}
+	return true
 }
 
 // try and copy the currently selected text to the clipboard
 // State.set_clipboard needs to be assigned
 copy :: proc(s: ^State) -> bool {
-	if s.set_clipboard != nil {
-		return s.set_clipboard(s.clipboard_user_data, current_selected_text(s))
+	if s.set_clipboard == nil {
+		return false
 	}
-	return s.set_clipboard != nil
+
+	lo, hi, whole_line := clipboard_range(s)
+	text := text_bytes(s)[lo:hi]
+
+	// Remember a copied line by its hash: `paste` puts it back as a line
+	s._clipboard_line_hash = 0
+	if whole_line {
+		s._clipboard_line_hash = hash.fnv64a(text)
+	}
+
+	return s.set_clipboard(s.clipboard_user_data, string(text))
 }
 
 // reinsert whatever the get_clipboard would return
 // State.get_clipboard needs to be assigned
 paste :: proc(s: ^State) -> bool {
-	if s.get_clipboard != nil {
-		input_text(s, s.get_clipboard(s.clipboard_user_data) or_return)
+	@(require_results)
+	is_copied_line :: proc(s: ^State, text: string) -> bool {
+		if .Line_Clipboard not_in s.options {
+			return false
+		}
+		if has_selection(s) {
+			return false
+		}
+		if s._clipboard_line_hash == 0 {
+			return false
+		}
+		return s._clipboard_line_hash == hash.fnv64a(transmute([]byte)text)
 	}
-	return s.get_clipboard != nil
+
+	if s.get_clipboard == nil {
+		return false
+	}
+	text := s.get_clipboard(s.clipboard_user_data) or_return
+	if len(text) == 0 {
+		return true
+	}
+
+	edit_begin(s, .Paste, 0)
+	defer edit_end(s)
+
+	if !is_copied_line(s, text) {
+		input_text(s, text)
+		return true
+	}
+
+	// Put the line above the caret's line, and keep the caret on its own text
+	caret, _ := sorted_selection(s)
+	at := translate_position(s, .Hard_Line_Start)
+	n  := insert(s, at, text)
+	if n == len(text) && !strings.has_suffix(text, "\n") {
+		n += insert(s, at+n, "\n")
+	}
+	s.selection = {caret+n, caret+n}
+	return true
+}
+
+// What `copy` and `cut` take: the selection, or with `.Line_Clipboard` and nothing selected, the caret's hard line
+@(private, require_results)
+clipboard_range :: proc(s: ^State) -> (lo, hi: int, whole_line: bool) {
+	if has_selection(s) || .Line_Clipboard not_in s.options {
+		lo, hi = sorted_selection(s)
+		return
+	}
+
+	lo = translate_position(s, .Hard_Line_Start)
+	hi = skip_line_break(s, translate_position(s, .Hard_Line_End))
+	return lo, hi, true
 }
 
 
@@ -611,7 +1036,7 @@ perform_command :: proc(s: ^State, cmd: Command) {
 	case .None:                    /**/
 	case .Undo:                    undo(s, &s.undo, &s.redo)
 	case .Redo:                    undo(s, &s.redo, &s.undo)
-	case .New_Line:                input_text(s, "\n")
+	case .New_Line:                new_line(s)
 	case .Cut:                     cut(s)
 	case .Copy:                    copy(s)
 	case .Paste:                   paste(s)
