@@ -2868,6 +2868,7 @@ internal_int_random :: proc(dest: ^Int, bits: int, allocator := context.allocato
 		dest.digit[digits - 1] &= ((1 << uint(bits)) - 1)
 	}
 	dest.used = digits
+	dest.sign = .Zero_or_Positive
 	internal_zero_unused(dest, old_used)
 	return internal_clamp(dest)
 }
