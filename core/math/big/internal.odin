@@ -2860,6 +2860,7 @@ internal_int_random :: proc(dest: ^Int, bits: int, allocator := context.allocato
 
 	#force_inline internal_grow(dest, digits) or_return
 
+	old_used := dest.used
 	for i := 0; i < digits; i += 1 {
 		dest.digit[i] = int_random_digit() & _MASK
 	}
@@ -2867,6 +2868,7 @@ internal_int_random :: proc(dest: ^Int, bits: int, allocator := context.allocato
 		dest.digit[digits - 1] &= ((1 << uint(bits)) - 1)
 	}
 	dest.used = digits
+	internal_zero_unused(dest, old_used)
 	return internal_clamp(dest)
 }
 internal_random :: proc { internal_int_random, }
