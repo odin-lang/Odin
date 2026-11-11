@@ -32,6 +32,11 @@ close :: proc(got, want: $T) -> bool where intrinsics.type_is_float(T) {
 }
 
 @(private="file")
+close_complex :: proc(got, want: $T) -> bool where intrinsics.type_is_complex(T) {
+	return close(real(got), real(want)) && close(imag(got), imag(want))
+}
+
+@(private="file")
 expect_sinh_cosh :: proc(t: ^testing.T, x, want_sinh, want_cosh: $T, loc := #caller_location) where intrinsics.type_is_float(T) {
 	s := math.sinh(x)
 	testing.expectf(t, close(s, want_sinh), "sinh(%v) = %v, want %v", x, s, want_sinh, loc = loc)
@@ -122,5 +127,32 @@ test_atan2_quadrant :: proc(t: ^testing.T) {
 	for c in cases {
 		got := math.atan2(c.y, c.x)
 		testing.expectf(t, close(got, c.want), "atan2(%v, %v) = %v, want %v", c.y, c.x, got, c.want)
+	}
+}
+
+@test
+test_log10 :: proc(t: ^testing.T) {
+	inf := math.inf_f64(1)
+	neg_zero := math.copy_sign(f64(0), -1)
+
+	Case :: struct {
+		x, want: complex128,
+	}
+	cases := []Case{
+		{10, 1},
+		{complex(0, 100), complex(2, math.PI/(2*math.LN10))},
+		{-1, complex(0, math.PI/math.LN10)},
+		{complex(0, 0), complex(-inf, 0)},
+		{complex(0, neg_zero), complex(-inf, neg_zero)},
+		{complex(neg_zero, 0), complex(-inf, math.PI/math.LN10)},
+		{complex(neg_zero, neg_zero), complex(-inf, -math.PI/math.LN10)},
+	}
+	for c in cases {
+		got128 := cmplx.log10(c.x)
+		testing.expectf(t, close_complex(got128, c.want), "log10(%v) = %v, want %v", c.x, got128, c.want)
+		got64 := cmplx.log10(complex64(c.x))
+		testing.expectf(t, close_complex(got64, complex64(c.want)), "log10(complex64(%v)) = %v, want %v", c.x, got64, complex64(c.want))
+		got32 := cmplx.log10(complex32(c.x))
+		testing.expectf(t, close_complex(got32, complex32(c.want)), "log10(complex32(%v)) = %v, want %v", c.x, got32, complex32(c.want))
 	}
 }

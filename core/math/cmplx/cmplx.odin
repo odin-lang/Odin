@@ -362,13 +362,14 @@ pow_complex128 :: proc "contextless" (x, y: complex128) -> complex128 {
 
 
 log10_complex32 :: proc "contextless" (x: complex32) -> complex32 {
-	return complex32(log10_complex64(complex64(x)))
+	return complex32(log10_complex128(complex128(x)))
 }
 log10_complex64 :: proc "contextless" (x: complex64) -> complex64 {
-	return math.LN10*ln(x)
+	return complex64(log10_complex128(complex128(x)))
 }
 log10_complex128 :: proc "contextless" (x: complex128) -> complex128 {
-	return math.LN10*ln(x)
+	z := ln(x)
+	return complex(real(z)/math.LN10, imag(z)/math.LN10)
 }
 
 
