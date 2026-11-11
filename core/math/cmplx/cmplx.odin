@@ -365,10 +365,10 @@ log10_complex32 :: proc "contextless" (x: complex32) -> complex32 {
 	return complex32(log10_complex64(complex64(x)))
 }
 log10_complex64 :: proc "contextless" (x: complex64) -> complex64 {
-	return math.LN10*ln(x)
+	return ln(x)/math.LN10
 }
 log10_complex128 :: proc "contextless" (x: complex128) -> complex128 {
-	return math.LN10*ln(x)
+	return ln(x)/math.LN10
 }
 
 
