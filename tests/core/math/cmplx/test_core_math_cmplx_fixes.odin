@@ -473,3 +473,76 @@ test_sin_cos_sinh_cosh :: proc(t: ^testing.T) {
 		testing.expectf(t, close_complex(got, c.want), "%s(%v) = %v, want %v", c.name, c.x, got, c.want)
 	}
 }
+
+@test
+test_tan_tanh_cot :: proc(t: ^testing.T) {
+	inf := math.inf_f64(1)
+	nan := math.nan_f64()
+	neg_zero := math.copy_sign(f64(0), -1)
+
+	tanh_cases := []Special{
+		{0, 0, complex(0, 0), false, false},
+		{0, inf, complex(nan, nan), false, false},
+		{0, nan, complex(nan, nan), false, false},
+		{1, inf, complex(nan, nan), false, false},
+		{1, nan, complex(nan, nan), false, false},
+		{inf, 0, complex(1, 0), false, false},
+		{inf, 1, complex(1, 0), false, false},
+		{inf, 2, complex(1, neg_zero), false, false},
+		{inf, inf, complex(1, 0), false, true},
+		{inf, nan, complex(1, 0), false, true},
+		{nan, 0, complex(nan, 0), false, false},
+		{nan, 1, complex(nan, nan), false, false},
+		{nan, nan, complex(nan, nan), false, false},
+	}
+	signs := [2]f64{1, -1}
+	for c in tanh_cases {
+		for sx in signs {
+			for sy in signs {
+				z := complex(sx*c.x, sy*c.y)
+				want := complex(sx*real(c.want), sy*imag(c.want))
+				got := cmplx.tanh(z)
+				testing.expectf(t, same_special(got, want, c.any_re_sign, c.any_im_sign), "tanh(%v) = %v, want %v", z, got, want)
+
+				zt := complex(imag(z), -real(z))
+				want_tan := complex(imag(want), -real(want))
+				got = cmplx.tan(zt)
+				testing.expectf(t, same_special(got, want_tan, c.any_im_sign, c.any_re_sign), "tan(%v) = %v, want %v", zt, got, want_tan)
+
+				if c.x == 0 && c.y == 0 {
+					continue
+				}
+				want_cot := complex(imag(want), real(want))
+				got = cmplx.cot(zt)
+				testing.expectf(t, same_special(got, want_cot, c.any_im_sign, c.any_re_sign), "cot(%v) = %v, want %v", zt, got, want_cot)
+			}
+		}
+	}
+
+	Case :: struct {
+		name: string,
+		f:    proc "contextless" (complex128) -> complex128,
+		x:    complex128,
+		want: complex128,
+	}
+	cases := []Case{
+		{"tan", cmplx.tan, complex(1, 400), complex(0, 1)},
+		{"tanh", cmplx.tanh, complex(400, 1), complex(1, 0)},
+		{"tan", cmplx.tan, complex(1.7e308, 0), complex(-0.74079573698442525, 0)},
+		{"cot", cmplx.cot, complex(1e-20, 0), complex(1e20, neg_zero)},
+	}
+	for c in cases {
+		got := c.f(c.x)
+		testing.expectf(t, close_complex(got, c.want), "%s(%v) = %v, want %v", c.name, c.x, got, c.want)
+	}
+
+	got := cmplx.tanh(complex(0, math.PI/2))
+	want := complex(0, 16331239353195370)
+	testing.expectf(t, close_complex(got, want, 16), "tanh(0+πi/2) = %v, want %v", got, want)
+
+	zs := []complex128{complex(0.5, 0.25), complex(-1.25, 2), complex(3, -0.75)}
+	for z in zs {
+		p := cmplx.tan(z) * cmplx.cot(z)
+		testing.expectf(t, cmplx.abs(p - 1) < 4*math.F64_EPSILON, "tan(%v)*cot(%v) = %v, want 1", z, z, p)
+	}
+}

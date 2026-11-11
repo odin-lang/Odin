@@ -193,42 +193,26 @@ tan_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	//
 	// then
 	//
-	//           sin 2x  +  i sinh 2y
-	//     w  =  --------------------.
-	//            cos 2x  +  cosh 2y
+	//           sin x cos x  +  i sinh y cosh y
+	//     w  =  -------------------------------.
+	//                cos^2 x  +  sinh^2 y
 	//
-	// On the real axis the denominator is zero at odd multiples
-	// of PI/2. The denominator is evaluated by its Taylor
-	// series near these points.
+	// This is Kahan's form of (sin 2x + i sinh 2y)/(cos 2x + cosh 2y).
+	// It needs no doubled arguments, which can overflow, and it avoids
+	// Inf/Inf once cosh 2y overflows. The denominator is zero only at
+	// the poles, odd multiples of PI/2 on the real axis.
 	//
-	// ctan(z) = -i ctanh(iz).
+	// It is computed as ctan(z) = -i ctanh(iz), the identity C99 Annex G
+	// defines ctan by, so it shares ctanh's special values.
 	//
 	// ACCURACY:
 	//
 	//                      Relative error:
 	// arithmetic   domain     # trials      peak         rms
-	//    DEC       -10,+10      5200       7.1e-17     1.6e-17
-	//    IEEE      -10,+10     30000       7.2e-16     1.2e-16
-	// Also tested by ctan * ccot = 1 and catan(ctan(z))  =  z.
+	//    IEEE      -10,+10     30000       5.4e-16     1.3e-16
 
-	switch re, im := real(x), imag(x); {
-	case math.is_inf(im, 0):
-		switch {
-		case math.is_inf(re, 0) || math.is_nan(re):
-			return complex(math.copy_sign(0, re), math.copy_sign(1, im))
-		}
-		return complex(math.copy_sign(0, math.sin(2*re)), math.copy_sign(1, im))
-	case re == 0 && math.is_nan(im):
-		return x
-	}
-	d := math.cos(2*real(x)) + math.cosh(2*imag(x))
-	if abs(d) < 0.25 {
-		d = _tan_series_f64(x)
-	}
-	if d == 0 {
-		return inf_complex128()
-	}
-	return complex(math.sin(2*real(x))/d, math.sinh(2*imag(x))/d)
+	w := tanh_complex128(complex(-imag(x), real(x)))
+	return complex(imag(w), -real(w))
 }
 
 tanh_complex32 :: proc "contextless" (x: complex32) -> complex32 {
@@ -238,21 +222,25 @@ tanh_complex64 :: proc "contextless" (x: complex64) -> complex64 {
 	return complex64(tanh_complex128(complex128(x)))
 }
 tanh_complex128 :: proc "contextless" (x: complex128) -> complex128 {
-	switch re, im := real(x), imag(x); {
-	case math.is_inf(re, 0):
-		switch {
-		case math.is_inf(im, 0) || math.is_nan(im):
+	re, im := real(x), imag(x)
+	if math.is_inf(re, 0) {
+		if math.is_inf(im, 0) || math.is_nan(im) {
 			return complex(math.copy_sign(1, re), math.copy_sign(0, im))
 		}
-		return complex(math.copy_sign(1, re), math.copy_sign(0, math.sin(2*im)))
-	case im == 0 && math.is_nan(re):
-		return x
+	} else if math.is_nan(re) || math.is_inf(im, 0) || math.is_nan(im) {
+		if im == 0 {
+			return x
+		}
+		return complex(math.nan_f64(), math.nan_f64())
 	}
-	d := math.cosh(2*real(x)) + math.cos(2*imag(x))
-	if d == 0 {
-		return inf_complex128()
+	s, c := math.sincos(im)
+	if abs(re) > 22 {
+		e := math.exp(-2 * abs(re))
+		return complex(math.copy_sign(1, re), 4*s*c*e)
 	}
-	return complex(math.sinh(2*real(x))/d, math.sin(2*imag(x))/d)
+	sh, ch := _sinhcosh_f64(re)
+	d := sh*sh + c*c
+	return complex(sh*ch/d, s*c/d)
 }
 
 cot_complex32 :: proc "contextless" (x: complex32) -> complex32 {
@@ -262,16 +250,44 @@ cot_complex64 :: proc "contextless" (x: complex64) -> complex64 {
 	return complex64(cot_complex128(complex128(x)))
 }
 cot_complex128 :: proc "contextless" (x: complex128) -> complex128 {
-	d := math.cosh(2*imag(x)) - math.cos(2*real(x))
-	if abs(d) < 0.25 {
-		d = _tan_series_f64(x)
-	}
-	if d == 0 {
-		return inf_complex128()
-	}
-	return complex(math.sin(2*real(x))/d, -math.sinh(2*imag(x))/d)
+	w := _coth_f64(complex(-imag(x), real(x)))
+	return complex(-imag(w), real(w))
 }
 
+
+@(private="file")
+_coth_f64 :: proc "contextless" (x: complex128) -> complex128 {
+	NEAR_ZERO :: 1.0 / (1 << 27)
+
+	re, im := real(x), imag(x)
+	if math.is_inf(re, 0) {
+		if math.is_inf(im, 0) || math.is_nan(im) {
+			return complex(math.copy_sign(1, re), math.copy_sign(0, -im))
+		}
+	} else if math.is_nan(re) || math.is_inf(im, 0) || math.is_nan(im) {
+		if im == 0 {
+			return complex(re, -im)
+		}
+		return complex(math.nan_f64(), math.nan_f64())
+	}
+	p := max(abs(re), abs(im))
+	if p < NEAR_ZERO {
+		if p == 0 {
+			return inf_complex128()
+		}
+		a, b := re/p, im/p
+		d := p * (a*a + b*b)
+		return complex(a/d, -b/d)
+	}
+	s, c := math.sincos(im)
+	if abs(re) > 22 {
+		e := math.exp(-2 * abs(re))
+		return complex(math.copy_sign(1, re), -4*s*c*e)
+	}
+	sh, ch := _sinhcosh_f64(re)
+	d := sh*sh + s*s
+	return complex(sh*ch/d, -s*c/d)
+}
 
 @(private="file")
 _sinhcosh_f64 :: proc "contextless" (x: f64) -> (sh, ch: f64) {
@@ -284,45 +300,6 @@ _sinhcosh_f64 :: proc "contextless" (x: f64) -> (sh, ch: f64) {
 	return e - ei, e + ei
 }
 
-
-// taylor series of cosh(2y) - cos(2x)
-@(private)
-_tan_series_f64 :: proc "contextless" (z: complex128) -> f64 {
-	MACH_EPSILON :: 1.0 / (1 << 53)
-
-	x := abs(2 * real(z))
-	y := abs(2 * imag(z))
-	x = _reduce_pi_f64(x)
-	x, y = x * x, y * y
-	x2, y2 := 1.0, 1.0
-	f, rn, d := 1.0, 0.0, 0.0
-
-	for {
-		rn += 1
-		f *= rn
-		rn += 1
-		f *= rn
-		x2 *= x
-		y2 *= y
-		t := y2 + x2
-		t /= f
-		d += t
-
-		rn += 1
-		f *= rn
-		rn += 1
-		f *= rn
-		x2 *= x
-		y2 *= y
-		t = y2 - x2
-		t /= f
-		d += t
-		if !(abs(t/d) > MACH_EPSILON) { // don't use <=, because of floating point nonsense and NaN
-			break
-		}
-	}
-	return d
-}
 
 // _reduce_pi_f64 reduces the input argument x to the range (-PI/2, PI/2].
 // x must be greater than or equal to 0. For small arguments it
