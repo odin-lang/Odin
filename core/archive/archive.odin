@@ -148,6 +148,10 @@ open_member :: proc(a: ^Archive, handle: Handle) -> (r: io.Reader, err: Error) {
 	return _procs[a.format].open_member(a, handle)
 }
 
+close_member :: proc(r: io.Reader) {
+	io.destroy(r)
+}
+
 clean_member_path :: proc "contextless" (path: string) -> (cleaned: string) {
 	cleaned = path
 	for len(cleaned) >= 2 && cleaned[0] == '.' && cleaned[1] == '/' {

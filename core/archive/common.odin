@@ -6,6 +6,14 @@ import "core:io"
 import "core:os"
 import "core:time"
 
+/*
+	Copyright 2026 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+*/
+
 Format :: enum u8 {
 	Unknown,
 	Tar,
@@ -191,9 +199,24 @@ Tar_Error :: enum u32 {
 	Unsupported_GNU_Extension,
 }
 
+Zip_Error :: enum u32 {
+	None,
+	End_Not_Found,
+	Invalid_End,
+	Invalid_Zip64_End,
+	Invalid_Central_Directory,
+	Invalid_Local_Header,
+	Invalid_Extra_Field,
+	Split_Archive,
+	CRC_Mismatch,
+	Size_Mismatch,
+	Truncated,
+}
+
 Error :: union #shared_nil {
 	General_Error,
 	Tar_Error,
+	Zip_Error,
 	compress.Error,
 	io.Error,
 	os.Error,

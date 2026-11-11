@@ -7,6 +7,17 @@ import "core:compress/deflate"
 import "core:io"
 import "core:os"
 
+/*
+	Copyright 2026 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+
+	Formats: v7, ustar and pax, as specified by POSIX.1-2024 (IEEE Std 1003.1-2024), `pax`:
+		https://pubs.opengroup.org/onlinepubs/9799919799/utilities/pax.html
+*/
+
 BLOCK_SIZE         :: 512
 BUFFER_SIZE        :: 64 * 1024
 HEAD_SIZE          :: 1024

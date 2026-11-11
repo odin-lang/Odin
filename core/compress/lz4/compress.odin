@@ -7,6 +7,18 @@ import "base:runtime"
 import "core:compress"
 import "core:hash/xxhash"
 
+/*
+	Copyright 2026 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+
+	Formats: Yann Collet's LZ4 block and frame format specifications:
+		https://github.com/lz4/lz4/blob/dev/doc/lz4_Block_format.md
+		https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md
+*/
+
 // One exception to the cleanroom principle is present only for the highest
 // compression modes:
 //
