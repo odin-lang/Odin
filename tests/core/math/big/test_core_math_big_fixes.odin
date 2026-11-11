@@ -1326,3 +1326,134 @@ test_fix_random_prime_size_and_flags :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@(test)
+test_fix_choose_k_out_of_range :: proc(t: ^testing.T) {
+	x := &big.Int{}
+	defer big.destroy(x)
+
+	testing.expect_value(t, big.choose(x, 5, -1), nil)
+	fix_expect(t, x, "0")
+
+	testing.expect_value(t, big.choose(x, 5, min(int)), nil)
+	fix_expect(t, x, "0")
+
+	testing.expect_value(t, big.choose(x, 5, 6), nil)
+	fix_expect(t, x, "0")
+
+	testing.expect_value(t, big.choose(x, 100, 30), nil)
+	fix_expect(t, x, "29372339821610944823963760")
+}
+
+@(test)
+test_fix_is_power_of_two :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	defer big.destroy(a)
+
+	Case :: struct {
+		a:    string,
+		pow2: bool,
+	}
+	cases := []Case{
+		{"0",                                                             false},
+		{"1",                                                             true},
+		{"-1",                                                            false},
+		{"-4",                                                            false},
+		{"-9223372036854775808",                                          false},
+		{"212676479325586539664609129644855132160",                       false},
+		{"9223372036854775808",                                           true},
+		{"1606938044258990275541962092341162602522202993782792835301376", true},
+	}
+	for c in cases {
+		fix_set(t, a, c.a)
+		pow2, err := big.is_power_of_two(a)
+		testing.expectf(t, pow2 == c.pow2 && err == nil, "is_power_of_two(%v) = %v, %v", c.a, pow2, err)
+	}
+
+	testing.expect(t, !big.platform_int_is_power_of_two(min(int)))
+	testing.expect(t, !big.platform_int_is_power_of_two(0))
+	testing.expect(t, !big.platform_int_is_power_of_two(-2))
+	testing.expect(t, big.platform_int_is_power_of_two(1))
+	testing.expect(t, big.platform_int_is_power_of_two(1 << 20))
+}
+
+@(test)
+test_fix_mod_digit_floored :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	defer big.destroy(a)
+
+	Case :: struct {
+		a:   string,
+		d:   big.DIGIT,
+		rem: big.DIGIT,
+	}
+	cases := []Case{
+		{"7",                     3,                    1},
+		{"-7",                    3,                    2},
+		{"-6",                    3,                    0},
+		{"-1",                    max(big.DIGIT),       max(big.DIGIT) - 1},
+		{"-18446744073709551616", 7,                    5},
+		{"-36893488147419103232", 9223372036854775807,  9223372036854775803},
+	}
+	for c in cases {
+		fix_set(t, a, c.a)
+		rem, err := big.mod(a, c.d)
+		testing.expectf(t, rem == c.rem && err == nil, "mod(%v, %v) = %v, %v; want %v", c.a, c.d, rem, err, c.rem)
+	}
+
+	z := &big.Int{}
+	defer big.destroy(z)
+	rem, err := big.int_mod_digit(z, 3)
+	testing.expectf(t, rem == 0 && err == nil, "mod(zero value, 3) = %v, %v", rem, err)
+}
+
+@(test)
+test_fix_public_immutable_dest :: proc(t: ^testing.T) {
+	a, b, m, x := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
+	defer big.destroy(a, b, m, x)
+
+	fix_set(t, a, "12345")
+	fix_set(t, b, "678")
+	fix_set(t, m, "1009")
+	fix_set(t, x, "1")
+	x.flags = {.Immutable}
+
+	IMM :: big.Error.Assignment_To_Immutable
+	testing.expect_value(t, big.add(x, a, b), IMM)
+	testing.expect_value(t, big.add(x, a, big.DIGIT(5)), IMM)
+	testing.expect_value(t, big.sub(x, a, b), IMM)
+	testing.expect_value(t, big.sub(x, a, big.DIGIT(5)), IMM)
+	testing.expect_value(t, big.halve(x, a), IMM)
+	testing.expect_value(t, big.halve(x, x), IMM)
+	testing.expect_value(t, big.double(x, a), IMM)
+	testing.expect_value(t, big.double(x, x), IMM)
+	testing.expect_value(t, big.mul(x, a, big.DIGIT(7)), IMM)
+	testing.expect_value(t, big.mul(x, a, b), IMM)
+	testing.expect_value(t, big.sqr(x, a), IMM)
+	testing.expect_value(t, big.int_divmod(x, nil, a, b), IMM)
+	testing.expect_value(t, big.int_divmod(nil, x, a, b), IMM)
+	_, err := big.divmod(x, a, big.DIGIT(7))
+	testing.expect_value(t, err, IMM)
+	testing.expect_value(t, big.div(x, a, b), IMM)
+	testing.expect_value(t, big.div(x, a, big.DIGIT(7)), IMM)
+	testing.expect_value(t, big.mod(x, a, b), IMM)
+	testing.expect_value(t, big.addmod(x, a, b, m), IMM)
+	testing.expect_value(t, big.submod(x, a, b, m), IMM)
+	testing.expect_value(t, big.mulmod(x, a, b, m), IMM)
+	testing.expect_value(t, big.sqrmod(x, a, m), IMM)
+	testing.expect_value(t, big.factorial(x, 5), IMM)
+	testing.expect_value(t, big.choose(x, 5, 2), IMM)
+	testing.expect_value(t, big.choose(x, 5, 6), IMM)
+	testing.expect_value(t, big.gcd_lcm(x, nil, a, b), IMM)
+	testing.expect_value(t, big.gcd_lcm(nil, x, a, b), IMM)
+	testing.expect_value(t, big.gcd(x, a, b), IMM)
+	testing.expect_value(t, big.lcm(x, a, b), IMM)
+	testing.expect_value(t, big.mod_bits(x, a, 3), IMM)
+	testing.expect_value(t, big.pow(x, a, 2), IMM)
+	testing.expect_value(t, big.int_pow_int(x, 3, 2), IMM)
+	testing.expect_value(t, big.sqrt(x, a), IMM)
+	testing.expect_value(t, big.root_n(x, a, 3), IMM)
+
+	x.flags = {}
+	fix_expect(t, x, "1")
+}
