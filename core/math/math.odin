@@ -427,7 +427,10 @@ remap_clamped :: proc "contextless" (old_value, old_min, old_max, new_min, new_m
 @(require_results)
 wrap :: proc "contextless" (x, y: $T) -> T where intrinsics.type_is_numeric(T), intrinsics.type_is_float(T), !intrinsics.type_is_array(T) {
 	tmp := mod(x, y)
-	return y + tmp if tmp < 0 else tmp
+	if tmp < 0 {
+		tmp += y
+	}
+	return 0 if tmp == y else tmp
 }
 @(require_results)
 angle_diff :: proc "contextless" (a, b: $T) -> T where intrinsics.type_is_numeric(T), !intrinsics.type_is_array(T) {
