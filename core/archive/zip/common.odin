@@ -29,6 +29,7 @@ import "core:compress/deflate"
 import "core:compress/ppmd"
 import "core:io"
 import "core:os"
+import "core:time/datetime"
 
 /*
 	Copyright 2026 Jeroen van Rijn <nom@duclavier.com>.
@@ -285,6 +286,7 @@ Reader :: struct {
 	base:        i64,
 	zip64:       bool,
 	generation:  u32,
+	zone:        ^datetime.TZ_Region,
 }
 
 Member_Mode :: enum u8 {
@@ -371,6 +373,7 @@ Writer :: struct {
 	err:        Error,
 	committed:  bool,
 	active:     bool,
+	zone:       ^datetime.TZ_Region,
 }
 
 Pending_Entry :: struct {

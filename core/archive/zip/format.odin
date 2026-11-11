@@ -6,6 +6,8 @@ import "core:archive"
 import "core:encoding/endian"
 import "core:hash"
 import "core:time"
+import "core:time/datetime"
+import "core:time/timezone"
 import "core:unicode/utf8"
 
 find_extra :: proc "contextless" (extra: []u8, want: Extra_ID) -> (data: []u8, ok: bool) {
@@ -170,7 +172,7 @@ append_text :: proc(dst: ^[dynamic]u8, raw: []u8, is_utf8: bool) -> (err: runtim
 	return
 }
 
-fill_info :: proc "contextless" (fi: ^archive.File_Info, header: Central_Header, name, central_extra, local_extra: []u8) {
+fill_info :: proc(fi: ^archive.File_Info, header: Central_Header, name, central_extra, local_extra: []u8, zone: ^datetime.TZ_Region) {
 	method      := header.method
 	aes_version := u16(0)
 	if header.method == .AES {
@@ -218,11 +220,11 @@ fill_info :: proc "contextless" (fi: ^archive.File_Info, header: Central_Header,
 		fi.unix_mode = archive.unix_mode_from_dos(attributes)
 	}
 
-	_fill_times(fi, header, central_extra, local_extra)
+	_fill_times(fi, header, central_extra, local_extra, zone)
 	_fill_owner(fi, central_extra, local_extra)
 }
 
-dos_time :: proc "contextless" (dos_time, dos_date: u16) -> (t: time.Time) {
+dos_time :: proc(dos_time, dos_date: u16, zone: ^datetime.TZ_Region = nil) -> (t: time.Time) {
 	if dos_date == 0 {
 		return
 	}
@@ -234,8 +236,20 @@ dos_time :: proc "contextless" (dos_time, dos_date: u16) -> (t: time.Time) {
 	second := int(dos_time & 31) * 2
 	ok: bool
 	t, ok = time.components_to_time(year, month, day, hour, minute, min(second, 59))
-	if !ok {
-		return {}
+	if !ok || zone == nil {
+		return
+	}
+	wall, wall_ok := time.time_to_datetime(t)
+	if !wall_ok {
+		return
+	}
+	wall.tz = zone
+	utc, utc_ok := timezone.datetime_to_utc(wall)
+	if !utc_ok {
+		return
+	}
+	if converted, converted_ok := time.datetime_to_time(utc); converted_ok {
+		t = converted
 	}
 	return
 }
@@ -248,7 +262,7 @@ Time_Field :: enum u8 {
 
 Time_Fields :: bit_set[Time_Field; u8]
 
-_fill_times :: proc "contextless" (fi: ^archive.File_Info, header: Central_Header, central_extra, local_extra: []u8) {
+_fill_times :: proc(fi: ^archive.File_Info, header: Central_Header, central_extra, local_extra: []u8, zone: ^datetime.TZ_Region) {
 	targets := [Time_Field]^time.Time{
 		.Modification = &fi.modification_time,
 		.Access       = &fi.access_time,
@@ -274,7 +288,7 @@ _fill_times :: proc "contextless" (fi: ^archive.File_Info, header: Central_Heade
 		}
 	}
 	if .Modification not_in set {
-		fi.modification_time = dos_time(u16(header.dos_time), u16(header.dos_date))
+		fi.modification_time = dos_time(u16(header.dos_time), u16(header.dos_date), zone)
 	}
 }
 

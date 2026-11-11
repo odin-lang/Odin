@@ -13,6 +13,7 @@ import "core:io"
 import "core:os"
 import "core:slice"
 import "core:strings"
+import "core:time/timezone"
 import "core:unicode/utf8"
 
 open_from_bytes :: proc(r: ^Reader, data: []u8, options := compress.Options{}, allocator := context.allocator) -> (err: Error) {
@@ -70,6 +71,7 @@ close_reader :: proc(r: ^Reader) {
 	if r.file != nil {
 		os.close(r.file)
 	}
+	timezone.region_destroy(r.zone, r.allocator)
 	r^ = {}
 }
 
@@ -217,6 +219,7 @@ _init :: proc(r: ^Reader, options: compress.Options, allocator: runtime.Allocato
 	r^ = {}
 	r.allocator = allocator
 	r.options   = options
+	r.zone, _   = timezone.region_load("local", allocator)
 }
 
 @(private)
@@ -486,7 +489,7 @@ _info :: proc(r: ^Reader, index: int, entry: ^Entry) -> (fi: archive.File_Info) 
 	fi.comment         = string(r.names[rec.comment:][:rec.comment_length])
 	fi.size            = rec.size
 	fi.compressed_size = rec.compressed_size
-	fill_info(&fi, entry.central, entry.name, entry.central_extra, entry.local_extra)
+	fill_info(&fi, entry.central, entry.name, entry.central_extra, entry.local_extra, r.zone)
 	fi.extended_metadata = len(entry.central_extra) > 0 || len(entry.local_extra) > 0 || len(entry.comment) > 0
 	fi.handle = {index, r.generation}
 	return
@@ -693,7 +696,7 @@ _decode :: proc(r: ^Reader, rec: ^Record, method: Method, flags: Flags, crc: u32
 _read_link :: proc(r: ^Reader, index: int, allocator: runtime.Allocator) -> (target: string, err: Error) {
 	header, name, extra := _central(r, index)
 	fi: archive.File_Info
-	fill_info(&fi, header, name, extra, nil)
+	fill_info(&fi, header, name, extra, nil, r.zone)
 	if fi.type != .Symlink {
 		return "", nil
 	}

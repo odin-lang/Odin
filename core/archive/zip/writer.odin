@@ -13,6 +13,8 @@ import "core:os"
 import "core:slice"
 import "core:strings"
 import "core:time"
+import "core:time/datetime"
+import "core:time/timezone"
 
 create_from_path :: proc(zw: ^Writer, path: string, options: Writer_Options = {}, allocator := context.allocator) -> (err: Error) {
 	zw^ = {}
@@ -224,6 +226,7 @@ close_writer :: proc(zw: ^Writer) {
 	delete(zw.name)
 	delete(zw.walk_name)
 	delete(zw.chunk, zw.allocator)
+	timezone.region_destroy(zw.zone, zw.allocator)
 	zw^ = {}
 }
 
@@ -248,6 +251,9 @@ _writer_init :: proc(zw: ^Writer, s: io.Stream, options: Writer_Options) -> (err
 			zw.offset   = position
 			zw.end      = position
 		}
+	}
+	if !options.deterministic {
+		zw.zone, _ = timezone.region_load("local", zw.allocator)
 	}
 	zw.active = true
 	return nil
@@ -374,7 +380,7 @@ _prepare :: proc(zw: ^Writer, p: ^Pending_Entry, fi: archive.File_Info, data: En
 		atime = {}
 		ctime = {}
 	}
-	p.dos_time, p.dos_date = _dos_time(mtime)
+	p.dos_time, p.dos_date = _dos_time(mtime, zw.zone)
 	seconds := time.time_to_unix(mtime)
 	if seconds >= i64(min(i32)) && seconds <= i64(max(i32)) {
 		p.unix_time     = i32(seconds)
@@ -1187,9 +1193,20 @@ _progress :: proc(zw: ^Writer, p: ^Pending_Entry, bytes_in, bytes_out: i64) -> (
 }
 
 @(private)
-_dos_time :: proc "contextless" (t: time.Time) -> (dos_time, dos_date: u16) {
-	year, month, day     := time.date(t)
-	hour, minute, second := time.clock_from_time(t)
+_dos_time :: proc(t: time.Time, zone: ^datetime.TZ_Region) -> (dos_time, dos_date: u16) {
+	local := t
+	if zone != nil {
+		if utc, utc_ok := time.time_to_datetime(t); utc_ok {
+			if wall, wall_ok := timezone.datetime_to_tz(utc, zone); wall_ok {
+				wall.tz = nil
+				if converted, converted_ok := time.datetime_to_time(wall); converted_ok {
+					local = converted
+				}
+			}
+		}
+	}
+	year, month, day     := time.date(local)
+	hour, minute, second := time.clock_from_time(local)
 	switch {
 	case year < 1980:
 		return 0, 1 << 5 | 1

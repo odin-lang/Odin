@@ -11,6 +11,8 @@ import "core:path/filepath"
 import "core:strings"
 import "core:testing"
 import "core:time"
+import "core:time/datetime"
+import "core:time/timezone"
 
 TEST_SUITE_PATH_ZIP :: ODIN_ROOT + "tests/core/assets/ZIP/"
 SLIM_TESTS          :: #config(ODIN_TEST_SLIM, ODIN_ARCH == .riscv64)
@@ -19,6 +21,19 @@ LICENSE_CRC :: 0xb047bfa7
 SMALL_CRC   :: 0x917123cb
 TEXT_CRC    :: 0x61c54dab
 SAME_CRC    :: 0x6733dede
+
+CET := datetime.TZ_Region{
+	name  = "CET",
+	rrule = {
+		has_dst    = true,
+		std_name   = "CET",
+		std_offset = 3600,
+		std_date   = {type = .Month_Week_Day, month = 3,  week = 5, day = 0, time = 7200},
+		dst_name   = "CEST",
+		dst_offset = 7200,
+		dst_date   = {type = .Month_Week_Day, month = 10, week = 5, day = 0, time = 10800},
+	},
+}
 
 Source_Kind :: enum u8 {
 	Path,
@@ -220,12 +235,13 @@ test_times :: proc(t: ^testing.T) {
 		archive: string,
 		path:    string,
 		time:    i64,
+		cet:     bool,
 	}
 	wants := [?]Want{
-		{"archives/7z-utf8.zip",          "unicode/emoji 😀 file.txt", 1_794_014_043_022_204_500},
-		{"archives/iz-unix.zip",          "unix/LICENSE",              1_794_014_097_000_000_000},
-		{"archives/ditto.zip",            "mac/LICENSE",               1_794_014_097_000_000_000},
-		{"archives/pkzip204-paths.zip",   "TREE/LICENSE",              1_793_669_414_000_000_000},
+		{"archives/7z-utf8.zip",          "unicode/emoji 😀 file.txt", 1_794_014_043_022_204_500, false},
+		{"archives/iz-unix.zip",          "unix/LICENSE",              1_794_014_097_000_000_000, false},
+		{"archives/ditto.zip",            "mac/LICENSE",               1_794_014_097_000_000_000, false},
+		{"archives/pkzip204-paths.zip",   "TREE/LICENSE",              1_793_665_814_000_000_000, true},
 	}
 	for w in wants {
 		r: zip.Reader
@@ -233,9 +249,16 @@ test_times :: proc(t: ^testing.T) {
 		if !testing.expectf(t, err == nil, "%s: open %v", w.archive, err) {
 			continue
 		}
+		if w.cet {
+			timezone.region_destroy(r.zone, r.allocator)
+			r.zone = &CET
+		}
 		fi, _, ok, _ := zip.find(&r, w.path)
 		testing.expectf(t, ok, "%s: %q not found", w.archive, w.path)
 		testing.expectf(t, time.to_unix_nanoseconds(fi.modification_time) == w.time, "%s/%s: mtime %v", w.archive, w.path, fi.modification_time)
+		if w.cet {
+			r.zone = nil
+		}
 		zip.close(&r)
 	}
 }

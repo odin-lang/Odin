@@ -12,6 +12,7 @@ import "core:os"
 import "core:strings"
 import "core:testing"
 import "core:time"
+import "core:time/timezone"
 
 WRITE_TEXT :: "The central directory lists every member, and each local header repeats its name and sizes.\n"
 
@@ -261,6 +262,68 @@ test_write_deterministic :: proc(t: ^testing.T) {
 	testing.expect_value(t, fi.modification_time, time.unix(315_532_800, 0))
 	testing.expect_value(t, fi.uid, 0)
 	testing.expect_value(t, fi.gid, 0)
+	dos := central_dos_times(outputs[0].data[:])
+	defer delete(dos)
+	if testing.expect_value(t, len(dos), 2) {
+		testing.expect_value(t, dos[1], [2]u16{0, 1 << 5 | 1})
+	}
+}
+
+@(test)
+test_dos_time_local :: proc(t: ^testing.T) {
+	winter := time.unix(1_700_000_000, 0)
+	summer := time.unix(1_688_212_800, 0)
+	winter_dos := [2]u16{23 << 11 | 13 << 5 | 10, 43 << 9 | 11 << 5 | 14}
+	summer_dos := [2]u16{14 << 11, 43 << 9 | 7 << 5 | 1}
+
+	out: Memory_File
+	defer delete(out.data)
+	out.seekable = true
+	zw: zip.Writer
+	if !testing.expect_value(t, zip.create(&zw, memory_stream(&out)), nil) {
+		return
+	}
+	timezone.region_destroy(zw.zone, zw.allocator)
+	zw.zone = &CET
+	testing.expect_value(t, zip.write_entry(&zw, archive.File_Info{path = "winter.txt", modification_time = winter}), nil)
+	testing.expect_value(t, zip.write_entry(&zw, archive.File_Info{path = "summer.txt", modification_time = summer}), nil)
+	testing.expect_value(t, zip.commit(&zw), nil)
+	zw.zone = nil
+	zip.close(&zw)
+
+	dos := central_dos_times(out.data[:])
+	defer delete(dos)
+	if testing.expect_value(t, len(dos), 2) {
+		testing.expect_value(t, dos[0], winter_dos)
+		testing.expect_value(t, dos[1], summer_dos)
+	}
+	r: zip.Reader
+	if testing.expect_value(t, zip.open(&r, out.data[:]), nil) {
+		fi, _, ok, _ := zip.find(&r, "summer.txt")
+		testing.expect(t, ok, "find summer.txt")
+		testing.expect_value(t, fi.modification_time, summer)
+		zip.close(&r)
+	}
+
+	Case :: struct {
+		dos:  [2]u16,
+		want: time.Time,
+	}
+	for c in ([2]Case{{winter_dos, winter}, {summer_dos, summer}}) {
+		data := dos_only_zip(c.dos[0], c.dos[1])
+		defer delete(data)
+		dr: zip.Reader
+		if !testing.expect_value(t, zip.open(&dr, data[:]), nil) {
+			continue
+		}
+		timezone.region_destroy(dr.zone, dr.allocator)
+		dr.zone = &CET
+		fi, _, ok, _ := zip.find(&dr, "a")
+		testing.expect(t, ok, "find a")
+		testing.expect_value(t, fi.modification_time, c.want)
+		dr.zone = nil
+		zip.close(&dr)
+	}
 }
 
 @(test)
@@ -668,6 +731,83 @@ write_progress :: proc(progress: compress.Progress, user_data: rawptr) -> (cance
 	log.last_out = progress.bytes_out
 	log.member   = progress.member_index
 	return log.cancel_at > 0 && log.calls >= log.cancel_at
+}
+
+put_u16 :: proc(b: ^[dynamic]u8, v: u16) {
+	append(b, u8(v), u8(v >> 8))
+}
+
+put_u32 :: proc(b: ^[dynamic]u8, v: u32) {
+	append(b, u8(v), u8(v >> 8), u8(v >> 16), u8(v >> 24))
+}
+
+get_u16 :: proc(b: []u8, at: int) -> u16 {
+	return u16(b[at]) | u16(b[at + 1]) << 8
+}
+
+get_u32 :: proc(b: []u8, at: int) -> u32 {
+	return u32(get_u16(b, at)) | u32(get_u16(b, at + 2)) << 16
+}
+
+dos_only_zip :: proc(dos_time, dos_date: u16) -> (b: [dynamic]u8) {
+	put_u32(&b, 0x04034b50)
+	put_u16(&b, 10)
+	put_u16(&b, 0)
+	put_u16(&b, 0)
+	put_u16(&b, dos_time)
+	put_u16(&b, dos_date)
+	put_u32(&b, 0)
+	put_u32(&b, 0)
+	put_u32(&b, 0)
+	put_u16(&b, 1)
+	put_u16(&b, 0)
+	append(&b, 'a')
+	central := len(b)
+	put_u32(&b, 0x02014b50)
+	put_u16(&b, 20)
+	put_u16(&b, 10)
+	put_u16(&b, 0)
+	put_u16(&b, 0)
+	put_u16(&b, dos_time)
+	put_u16(&b, dos_date)
+	put_u32(&b, 0)
+	put_u32(&b, 0)
+	put_u32(&b, 0)
+	put_u16(&b, 1)
+	put_u16(&b, 0)
+	put_u16(&b, 0)
+	put_u16(&b, 0)
+	put_u16(&b, 0)
+	put_u32(&b, 0)
+	put_u32(&b, 0)
+	append(&b, 'a')
+	size := len(b) - central
+	put_u32(&b, 0x06054b50)
+	put_u16(&b, 0)
+	put_u16(&b, 0)
+	put_u16(&b, 1)
+	put_u16(&b, 1)
+	put_u32(&b, u32(size))
+	put_u32(&b, u32(central))
+	put_u16(&b, 0)
+	return
+}
+
+central_dos_times :: proc(data: []u8) -> (times: [dynamic][2]u16) {
+	end := len(data) - 22
+	if end < 0 || get_u32(data, end) != 0x06054b50 {
+		return
+	}
+	count := int(get_u16(data, end + 10))
+	pos := int(get_u32(data, end + 16))
+	for _ in 0..<count {
+		if pos + 46 > len(data) || get_u32(data, pos) != 0x02014b50 {
+			break
+		}
+		append(&times, [2]u16{get_u16(data, pos + 12), get_u16(data, pos + 14)})
+		pos += 46 + int(get_u16(data, pos + 28)) + int(get_u16(data, pos + 30)) + int(get_u16(data, pos + 32))
+	}
+	return
 }
 
 memory_stream :: proc(m: ^Memory_File) -> (s: io.Stream) {
