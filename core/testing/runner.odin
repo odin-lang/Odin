@@ -113,6 +113,7 @@ when TRACKING_MEMORY && FAIL_ON_BAD_MEMORY {
 		it: Internal_Test,
 		t: T,
 		allocator_index: int,
+		stopped: bool,
 		tracking_allocator: ^mem.Tracking_Allocator,
 	}
 } else {
@@ -120,6 +121,40 @@ when TRACKING_MEMORY && FAIL_ON_BAD_MEMORY {
 		it: Internal_Test,
 		t: T,
 		allocator_index: int,
+		stopped: bool,
+	}
+}
+
+Task_Allocator :: struct {
+	stack:   mem.Rollback_Stack,
+	tracker: mem.Tracking_Allocator,
+}
+
+new_task_allocator :: proc() -> ^Task_Allocator {
+	ta, alloc_error := new(Task_Allocator)
+	fmt.assertf(alloc_error == nil, "Error allocating memory for a task allocator: %v", alloc_error)
+	alloc_error = mem.rollback_stack_init(&ta.stack, PER_THREAD_MEMORY)
+	fmt.assertf(alloc_error == nil, "Error allocating memory for a task allocator: %v", alloc_error)
+	when TRACKING_MEMORY {
+		mem.tracking_allocator_init(&ta.tracker, mem.rollback_stack_allocator(&ta.stack))
+		ta.tracker.bad_free_callback = mem.tracking_allocator_bad_free_callback_add_to_array
+	}
+	return ta
+}
+
+destroy_task_allocator :: proc(ta: ^Task_Allocator) {
+	when TRACKING_MEMORY {
+		mem.tracking_allocator_destroy(&ta.tracker)
+	}
+	mem.rollback_stack_destroy(&ta.stack)
+	free(ta)
+}
+
+task_allocator_interface :: proc(ta: ^Task_Allocator) -> mem.Allocator {
+	when TRACKING_MEMORY {
+		return mem.tracking_allocator(&ta.tracker)
+	} else {
+		return mem.rollback_stack_allocator(&ta.stack)
 	}
 }
 
@@ -513,32 +548,17 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	defer delete(task_data_slots)
 
 	// Tests rotate through these allocators as they finish.
-	task_allocators: []mem.Rollback_Stack = ---
-	task_allocators, alloc_error = make([]mem.Rollback_Stack, thread_count)
+	task_allocators: []^Task_Allocator = ---
+	task_allocators, alloc_error = make([]^Task_Allocator, thread_count)
 	fmt.assertf(alloc_error == nil, "Error allocating memory for task allocators: %v", alloc_error)
 	defer delete(task_allocators)
 
-	when TRACKING_MEMORY {
-		task_memory_trackers: []mem.Tracking_Allocator = ---
-		task_memory_trackers, alloc_error = make([]mem.Tracking_Allocator, thread_count)
-		fmt.assertf(alloc_error == nil, "Error allocating memory for memory trackers: %v", alloc_error)
-		defer delete(task_memory_trackers)
-	}
-
 	#no_bounds_check for i in 0 ..< thread_count {
-		alloc_error = mem.rollback_stack_init(&task_allocators[i], PER_THREAD_MEMORY)
-		fmt.assertf(alloc_error == nil, "Error allocating memory for task allocator #%i: %v", i, alloc_error)
-		when TRACKING_MEMORY {
-			mem.tracking_allocator_init(&task_memory_trackers[i], mem.rollback_stack_allocator(&task_allocators[i]))
-			task_memory_trackers[i].bad_free_callback = mem.tracking_allocator_bad_free_callback_add_to_array
-		}
+		task_allocators[i] = new_task_allocator()
 	}
 
-	defer #no_bounds_check for i in 0 ..< thread_count {
-		when TRACKING_MEMORY {
-			mem.tracking_allocator_destroy(&task_memory_trackers[i])
-		}
-		mem.rollback_stack_destroy(&task_allocators[i])
+	defer for ta in task_allocators {
+		destroy_task_allocator(ta)
 	}
 
 	task_timeouts: [dynamic]Task_Timeout = ---
@@ -618,16 +638,12 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			data.t._log_allocator = shared_log_allocator
 			data.allocator_index = task_index
 
-			#no_bounds_check when TRACKING_MEMORY {
-				task_allocator := mem.tracking_allocator(&task_memory_trackers[task_index])
-				when FAIL_ON_BAD_MEMORY {
-					data.tracking_allocator = &task_memory_trackers[task_index]
-				}
-			} else {
-				task_allocator := mem.rollback_stack_allocator(&task_allocators[task_index])
+			#no_bounds_check ta := task_allocators[task_index]
+			when TRACKING_MEMORY && FAIL_ON_BAD_MEMORY {
+				data.tracking_allocator = &ta.tracker
 			}
 
-			thread.pool_add_task(&pool, task_allocator, run_test_task, &data, run_index)
+			thread.pool_add_task(&pool, task_allocator_interface(ta), run_test_task, &data, run_index)
 
 			continue setup_tasks
 		}
@@ -706,7 +722,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			data := cast(^Task_Data)(task.data)
 
 			when TRACKING_MEMORY {
-				#no_bounds_check tracker := &task_memory_trackers[data.allocator_index]
+				#no_bounds_check tracker := &task_allocators[data.allocator_index].tracker
 
 				memory_is_in_bad_state := len(tracker.allocation_map) + len(tracker.bad_free_array) > 0
 
@@ -727,10 +743,25 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 					bytes.buffer_reset(&batch_buffer)
 				}
 
-				mem.tracking_allocator_reset(tracker)
+				if !data.stopped {
+					mem.tracking_allocator_reset(tracker)
+				}
 			}
 
-			free_all(task.allocator)
+			if data.stopped {
+				data.stopped = false
+				// Leaked on purpose: a stopped test may have left threads
+				// running that still use this memory, so its slot gets a fresh
+				// allocator instead of reusing this one.
+				#no_bounds_check task_allocators[data.allocator_index] = new_task_allocator()
+			} else {
+				free_all(task.allocator)
+			}
+
+			#no_bounds_check ta := task_allocators[data.allocator_index]
+			when TRACKING_MEMORY && FAIL_ON_BAD_MEMORY {
+				data.tracking_allocator = &ta.tracker
+			}
 
 			if run_index < total_test_count {
 				#no_bounds_check it := internal_tests[run_index]
@@ -741,7 +772,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				data.t.error_count = 0
 				data.t._fail_now_called = false
 
-				thread.pool_add_task(&pool, task.allocator, run_test_task, data, run_index)
+				thread.pool_add_task(&pool, task_allocator_interface(ta), run_test_task, data, run_index)
 			}
 		}
 
@@ -877,6 +908,8 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			fmt.assertf(task_data != nil, "A signal (%v) was raised to stop test #%i %s.%s, but its task data is missing.",
 				reason, test_index, it.pkg, it.name)
 
+			task_data.stopped = true
+
 			passed := reason == .Successful_Stop && !failed(&task_data.t)
 			#no_bounds_check report.all_test_states[test_index] = .Successful if passed else .Failed
 			#no_bounds_check test_end_times[test_index] = time.now()
@@ -966,6 +999,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 			find_task_data_for_timeout: for &data in task_data_slots {
 				if data.it.pkg == it.pkg && data.it.name == it.name {
+					data.stopped = true
 					end_t(&data.t)
 					break find_task_data_for_timeout
 				}

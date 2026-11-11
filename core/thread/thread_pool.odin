@@ -56,8 +56,9 @@ Pool :: struct {
 }
 
 Pool_Thread_Data :: struct {
-	pool: ^Pool,
-	task: Task,
+	pool:      ^Pool,
+	task:      Task,
+	abandoned: bool,
 }
 
 @(private="file")
@@ -74,8 +75,15 @@ pool_thread_runner :: proc(t: ^Thread) {
 
 		if task, ok := pool_pop_waiting(pool); ok {
 			data.task = task
-			pool_do_work(pool, task)
+			{
+				context.allocator = task.allocator
+				task.procedure(task)
+			}
 			sync.guard(&pool.mutex)
+			if data.abandoned {
+				return
+			}
+			pool_task_done(pool, task)
 			data.task = {}
 		}
 	}
@@ -223,24 +231,7 @@ pool_stop_task :: proc(pool: ^Pool, user_index: int, exit_code: int = 1) -> bool
 	for t, i in pool.threads {
 		data := cast(^Pool_Thread_Data)t.data
 		if data.task.user_index == user_index && data.task.procedure != nil {
-			terminate(t, exit_code)
-
-			append(&pool.tasks_done, data.task)
-			intrinsics.atomic_add(&pool.num_done, 1)
-			intrinsics.atomic_sub(&pool.num_outstanding, 1)
-			intrinsics.atomic_sub(&pool.num_in_processing, 1)
-
-			old_thread_user_index := t.user_index
-
-			destroy(t)
-
-			replacement := create(pool_thread_runner)
-			replacement.user_index = old_thread_user_index
-			replacement.data = data
-			data.task = {}
-			pool.threads[i] = replacement
-
-			start(replacement)
+			pool_abandon_thread(pool, i, exit_code)
 			return true
 		}
 	}
@@ -257,26 +248,41 @@ pool_stop_all_tasks :: proc(pool: ^Pool, exit_code: int = 1) {
 	for t, i in pool.threads {
 		data := cast(^Pool_Thread_Data)t.data
 		if data.task.procedure != nil {
-			terminate(t, exit_code)
-
-			append(&pool.tasks_done, data.task)
-			intrinsics.atomic_add(&pool.num_done, 1)
-			intrinsics.atomic_sub(&pool.num_outstanding, 1)
-			intrinsics.atomic_sub(&pool.num_in_processing, 1)
-
-			old_thread_user_index := t.user_index
-
-			destroy(t)
-
-			replacement := create(pool_thread_runner)
-			replacement.user_index = old_thread_user_index
-			replacement.data = data
-			data.task = {}
-			pool.threads[i] = replacement
-
-			start(replacement)
+			pool_abandon_thread(pool, i, exit_code)
 		}
 	}
+}
+
+@(private="file")
+pool_abandon_thread :: proc(pool: ^Pool, index: int, exit_code: int) {
+	t := pool.threads[index]
+	data := cast(^Pool_Thread_Data)t.data
+
+	terminate(t, exit_code)
+	pool_task_done(pool, data.task)
+
+	// Leaked on purpose: the cancelled thread may still be running (the BSDs
+	// and Darwin only cancel at a cancellation point), so its `Thread` can't
+	// be freed here, and joining it would block the pool.
+	data.abandoned = true
+
+	replacement_data := new(Pool_Thread_Data, pool.allocator)
+	replacement_data.pool = pool
+
+	replacement := create(pool_thread_runner)
+	replacement.user_index = t.user_index
+	replacement.data = replacement_data
+	pool.threads[index] = replacement
+
+	start(replacement)
+}
+
+@(private="file")
+pool_task_done :: proc(pool: ^Pool, task: Task) {
+	append(&pool.tasks_done, task)
+	intrinsics.atomic_add(&pool.num_done, 1)
+	intrinsics.atomic_sub(&pool.num_outstanding, 1)
+	intrinsics.atomic_sub(&pool.num_in_processing, 1)
 }
 
 // Force the pool to stop all of its threads and put it into a state where
@@ -378,11 +384,7 @@ pool_do_work :: proc(pool: ^Pool, task: Task) {
 	}
 
 	sync.guard(&pool.mutex)
-
-	append(&pool.tasks_done, task)
-	intrinsics.atomic_add(&pool.num_done, 1)
-	intrinsics.atomic_sub(&pool.num_outstanding, 1)
-	intrinsics.atomic_sub(&pool.num_in_processing, 1)
+	pool_task_done(pool, task)
 }
 
 // Process the rest of the tasks, also use this thread for processing, then join
