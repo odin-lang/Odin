@@ -1080,3 +1080,249 @@ test_fix_private_copy_digits_bounds :: proc(t: ^testing.T) {
 	testing.expect_value(t, big._private_copy_digits(dest, src, 1, -1), big.Error.Invalid_Argument)
 	testing.expect_value(t, big._private_copy_digits(dest, src, -1, 0), big.Error.Invalid_Argument)
 }
+
+@(test)
+test_fix_powmod_modulus_one :: proc(t: ^testing.T) {
+	g, x, p, r := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
+	defer big.destroy(g, x, p, r)
+
+	Case :: struct {
+		g, x: int,
+	}
+	cases := []Case{
+		{10,  0},
+		{ 0,  0},
+		{ 3,  5},
+		{-5,  0},
+		{-5, -1},
+		{ 7, -3},
+	}
+	big.set(p, 1)
+	for c in cases {
+		big.set(g, c.g)
+		big.set(x, c.x)
+		big.set(r, 42)
+		testing.expectf(t, big.internal_int_power_modulo(r, g, x, p) == nil, "powmod(%v, %v, 1) failed", c.g, c.x)
+		fix_expect(t, r, "0")
+	}
+}
+
+@(test)
+test_fix_miller_rabin_base_at_most_one :: proc(t: ^testing.T) {
+	a, b := &big.Int{}, &big.Int{}
+	defer big.destroy(a, b)
+
+	big.set(a, 7)
+	for base in ([]int{1, 0, -1, -5}) {
+		big.set(b, base)
+		probably_prime, err := big.internal_int_prime_miller_rabin(a, b)
+		testing.expectf(t, !probably_prime && err == .Invalid_Argument, "miller_rabin(7, %v) = %v, %v", base, probably_prime, err)
+	}
+}
+
+@(test)
+test_fix_is_prime_negative :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	defer big.destroy(a)
+
+	values := []string{"-1", "-2", "-3", "-7", "-1619", "-1621", "-1000003", "-2305843009213693951", "-170141183460469231731687303715884105727"}
+	for v in values {
+		fix_set(t, a, v)
+		is_prime, err := big.internal_int_is_prime(a)
+		testing.expectf(t, !is_prime && err == nil, "is_prime(%v) = %v, %v", v, is_prime, err)
+	}
+}
+
+@(test)
+test_fix_is_prime_random_bases :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	defer big.destroy(a)
+
+	Case :: struct {
+		n:       string,
+		trials:  int,
+		mr_only: bool,
+		prime:   bool,
+	}
+	cases := []Case{
+		{"1000003",                    1, false, true},
+		{"1000001",                    1, false, false},
+		{"2305843009213693951",        0, false, true},
+		{"9223372036854775783",        3, true,  true},
+		{"18446744073709551557",       5, false, true},
+		{"3825123056546413051",       20, true,  false},
+		{"318665857834031151167461",  20, true,  false},
+		{"3317044064679887385961981", 20, true,  false},
+	}
+	for c in cases {
+		fix_set(t, a, c.n)
+		is_prime, err := big.internal_int_is_prime(a, c.trials, c.mr_only)
+		testing.expectf(t, is_prime == c.prime && err == nil, "is_prime(%v, %v, %v) = %v, %v", c.n, c.trials, c.mr_only, is_prime, err)
+	}
+}
+
+@(test)
+test_fix_strong_lucas_selfridge :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	defer big.destroy(a)
+
+	Case :: struct {
+		n:     string,
+		lucas: bool,
+	}
+	cases := []Case{
+		{"3",                                       true},
+		{"7",                                       true},
+		{"19",                                      true},
+		{"1000003",                                 true},
+		{"170141183460469231731687303715884105727", true},
+		{"5459",                                    true},
+		{"5777",                                    true},
+		{"187",                                     false},
+		{"10403",                                   false},
+	}
+	for c in cases {
+		fix_set(t, a, c.n)
+		lucas, err := big.internal_int_prime_strong_lucas_selfridge(a)
+		testing.expectf(t, lucas == c.lucas && err == nil, "strong_lucas_selfridge(%v) = %v, %v", c.n, lucas, err)
+	}
+}
+
+@(test)
+test_fix_prime_allocator_argument :: proc(t: ^testing.T) {
+	ctx_track, arg_track: mem.Tracking_Allocator
+	mem.tracking_allocator_init(&ctx_track, context.allocator)
+	mem.tracking_allocator_init(&arg_track, context.allocator)
+	defer mem.tracking_allocator_destroy(&ctx_track)
+	defer mem.tracking_allocator_destroy(&arg_track)
+	arg_alloc := mem.tracking_allocator(&arg_track)
+
+	a, b := &big.Int{}, &big.Int{}
+	defer big.destroy(a, b)
+	testing.expect_value(t, big.set(a, 1000003, false, arg_alloc), nil)
+	testing.expect_value(t, big.set(b, 2, false, arg_alloc), nil)
+
+	{
+		context.allocator = mem.tracking_allocator(&ctx_track)
+		fermat, fermat_err := big.internal_prime_fermat(a, b, arg_alloc)
+		testing.expect(t, fermat && fermat_err == nil)
+		lucas, lucas_err := big.internal_int_prime_strong_lucas_selfridge(a, arg_alloc)
+		testing.expect(t, lucas && lucas_err == nil)
+	}
+	testing.expect_value(t, ctx_track.total_allocation_count, 0)
+	testing.expect(t, arg_track.total_allocation_count > 0)
+}
+
+@(test)
+test_fix_sqrtmod_prime_one_mod_four :: proc(t: ^testing.T) {
+	n, p, r, root, other := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
+	defer big.destroy(n, p, r, root, other)
+
+	Case :: struct {
+		n, p, root: string,
+	}
+	cases := []Case{
+		{"4",  "5",                                       "3"},
+		{"1",  "5",                                       "1"},
+		{"10", "13",                                      "7"},
+		{"2",  "17",                                      "6"},
+		{"3",  "1000000009",                              "742473516"},
+		{"2",  "998244353",                               "882049182"},
+		{"6",  "18446744073709551557",                    "14656824951921807778"},
+		{"2",  "340282366920938463463374607431768211297", "173542385485469432711201807038307517008"},
+		{"2",  "7",                                       "4"},
+	}
+	for c in cases {
+		fix_set(t, n, c.n)
+		fix_set(t, p, c.p)
+		fix_set(t, root, c.root)
+		big.sub(other, p, root)
+		big.zero(r)
+		err := big.internal_int_sqrtmod_prime(r, n, p)
+		is_root, _  := big.equals(r, root)
+		is_other, _ := big.equals(r, other)
+		testing.expectf(t, err == nil && (is_root || is_other), "sqrtmod_prime(%v, %v) = %v; want %v or p - %v", c.n, c.p, err, c.root, c.root)
+	}
+
+	big.set(n, 5)
+	big.set(p, 13)
+	testing.expect_value(t, big.internal_int_sqrtmod_prime(r, n, p), big.Error.Invalid_Argument)
+}
+
+@(test)
+test_fix_next_prime_sieve :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	defer big.destroy(a)
+
+	Case :: struct {
+		n:     string,
+		bbs:   bool,
+		prime: string,
+	}
+	cases := []Case{
+		{"1618",                      false, "1619"},
+		{"1619",                      false, "1621"},
+		{"1637",                      false, "1657"},
+		{"1627",                      true,  "1663"},
+		{"2600000",                   false, "2600011"},
+		{"36275199311",               true,  "36275199431"},
+		{"1000000000000000000000000", false, "1000000000000000000000007"},
+	}
+	for c in cases {
+		fix_set(t, a, c.n)
+		testing.expectf(t, big.internal_int_prime_next_prime(a, -1, c.bbs) == nil, "next_prime(%v, bbs = %v) failed", c.n, c.bbs)
+		fix_expect(t, a, c.prime)
+	}
+}
+
+@(test)
+test_fix_random_prime_size_and_flags :: proc(t: ^testing.T) {
+	a, h := &big.Int{}, &big.Int{}
+	defer big.destroy(a, h)
+
+	Case :: struct {
+		bits:   int,
+		flags:  big.Primality_Flags,
+		rounds: int,
+	}
+	cases := []Case{
+		{ 2, {},                64},
+		{ 2, {.Blum_Blum_Shub}, 64},
+		{ 2, {.Second_MSB_On},  64},
+		{ 3, {.Second_MSB_On},  64},
+		{10, {.Second_MSB_On},  64},
+		{16, {},                64},
+		{32, {},                16},
+		{63, {},                16},
+		{64, {.Blum_Blum_Shub}, 16},
+		{65, {.Second_MSB_On},  16},
+		{64, {.Safe},            4},
+	}
+	for c in cases {
+		for _ in 0..<c.rounds {
+			big.set(a, -5)
+			trials := 0 if c.bits == 32 else -1
+			testing.expect_value(t, big.internal_random_prime(a, c.bits, trials, c.flags), nil)
+			testing.expect_value(t, big.internal_count_bits(a), c.bits)
+			testing.expect(t, !big.internal_is_negative(a))
+			if .Blum_Blum_Shub in c.flags || .Safe in c.flags {
+				testing.expect_value(t, a.digit[0] & 3, 3)
+			}
+			if .Second_MSB_On in c.flags {
+				bit, _ := big.internal_int_bitfield_extract_bool(a, c.bits - 2)
+				testing.expect(t, bit)
+			}
+			is_prime, err := big.internal_int_is_prime(a)
+			testing.expect(t, is_prime && err == nil)
+			if .Safe in c.flags {
+				big.sub(h, a, 1)
+				big.shr(h, h, 1)
+				is_prime, err = big.internal_int_is_prime(h)
+				testing.expect(t, is_prime && err == nil)
+			}
+			if testing.failed(t) {
+				return
+			}
+		}
+	}
+}
