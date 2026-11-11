@@ -255,13 +255,13 @@ sqrt_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 }
 
 ln_complex32 :: proc "contextless" (x: complex32) -> complex32 {
-	return complex32(ln_complex64(complex64(x)))
+	return complex32(ln_complex128(complex128(x)))
 }
 ln_complex64 :: proc "contextless" (x: complex64) -> complex64 {
-	return complex(math.ln(abs(x)), phase(x))
+	return complex64(ln_complex128(complex128(x)))
 }
 ln_complex128 :: proc "contextless" (x: complex128) -> complex128 {
-	return complex(math.ln(abs(x)), phase(x))
+	return complex(_ln_abs_f64(real(x), imag(x)), phase(x))
 }
 
 
@@ -450,4 +450,59 @@ is_nan_complex128 :: proc "contextless" (x: complex128) -> bool {
 		return false
 	}
 	return math.is_nan(real(x)) || math.is_nan(imag(x))
+}
+
+
+@(private)
+_ln_abs_f64 :: proc "contextless" (re, im: f64) -> f64 {
+	p, q := abs(re), abs(im)
+	if math.is_inf(p, 0) || math.is_inf(q, 0) {
+		return math.inf_f64(1)
+	}
+	if math.is_nan(p) || math.is_nan(q) {
+		return p + q
+	}
+	if p < q {
+		p, q = q, p
+	}
+	if p == 0 {
+		return math.inf_f64(-1)
+	}
+	if p >= 0.5 && p <= 1 {
+		return 0.5 * math.log1p(_x2y2m1_f64(p, q))
+	}
+	r := q / p
+	return math.ln(p) + 0.5*math.log1p(r*r)
+}
+
+@(private="file")
+_x2y2m1_f64 :: proc "contextless" (p, q: f64) -> f64 {
+	SPLIT :: (1 << 27) + 1
+
+	t := SPLIT * p
+	ph := t - (t - p)
+	pl := p - ph
+	t = SPLIT * q
+	qh := t - (t - q)
+	ql := q - qh
+
+	terms := [6]f64{ph*ph - 1, qh*qh, 2*ph*pl, 2*qh*ql, pl*pl, ql*ql}
+	e: [6]f64
+	n := 0
+	for term in terms {
+		v := term
+		for i in 0..<n {
+			sum := v + e[i]
+			bv := sum - v
+			e[i] = (v - (sum - bv)) + (e[i] - bv)
+			v = sum
+		}
+		e[n] = v
+		n += 1
+	}
+	r := 0.0
+	for i in 0..<n {
+		r += e[i]
+	}
+	return r
 }

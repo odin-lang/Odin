@@ -348,3 +348,29 @@ test_exp_overflow :: proc(t: ^testing.T) {
 	want64 := complex(math.inf_f32(1), f32(0))
 	testing.expectf(t, same_complex(got64, want64), "exp(complex64(89+0i)) = %v, want %v", got64, want64)
 }
+
+@test
+test_ln_without_abs :: proc(t: ^testing.T) {
+	inf := math.inf_f64(1)
+	nan := math.nan_f64()
+	neg_zero := math.copy_sign(f64(0), -1)
+	eps := math.ldexp(f64(1), -30)
+
+	Case :: struct {
+		x, want: complex128,
+	}
+	cases := []Case{
+		{complex(1.7e308, 1.7e308), complex(710.07341048350827, math.PI/4)},
+		{complex(1, 1e-8), complex(4.9999999999999999e-17, 1e-8)},
+		{complex(0.6, 0.8), complex(2.2204460492503132e-17, 0.9272952180016123)},
+		{complex(1, eps), complex(4.3368086899420177e-19, 9.3132257461547852e-10)},
+		{complex(1e-310, 1e-310), complex(-713.45480523787421, math.PI/4)},
+		{-1, complex(0, math.PI)},
+		{complex(neg_zero, neg_zero), complex(-inf, -math.PI)},
+		{complex(nan, inf), complex(inf, nan)},
+	}
+	for c in cases {
+		got := cmplx.ln(c.x)
+		testing.expectf(t, close_complex(got, c.want), "ln(%v) = %v, want %v", c.x, got, c.want)
+	}
+}
