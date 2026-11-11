@@ -378,13 +378,15 @@ phase_complex128 :: proc "contextless" (x:  complex128) -> f64 {
 
 
 rect_complex32 :: proc "contextless" (r, θ: f16) -> complex32 {
-	return complex32(rect_complex64(f32(r), f32(θ)))
+	return complex32(rect_complex128(f64(r), f64(θ)))
 }
 rect_complex64 :: proc "contextless" (r, θ: f32) -> complex64 {
-	s, c := math.sincos(θ)
-	return complex(r*c, r*s)
+	return complex64(rect_complex128(f64(r), f64(θ)))
 }
 rect_complex128 :: proc "contextless" (r, θ: f64) -> complex128 {
+	if θ == 0 {
+		return complex(r, θ * math.copy_sign(1, r))
+	}
 	s, c := math.sincos(θ)
 	return complex(r*c, r*s)
 }

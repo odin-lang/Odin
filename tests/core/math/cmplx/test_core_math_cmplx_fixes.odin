@@ -260,3 +260,33 @@ test_pow_real_result :: proc(t: ^testing.T) {
 	want64 := complex(math.inf_f32(1), math.copy_sign(f32(0), -1))
 	testing.expectf(t, same_complex(got64, want64), "pow(complex64(1e-30), -2) = %v, want %v", got64, want64)
 }
+
+@test
+test_rect_real_result :: proc(t: ^testing.T) {
+	inf := math.inf_f64(1)
+	nan := math.nan_f64()
+	neg_zero := math.copy_sign(f64(0), -1)
+
+	Case :: struct {
+		r, θ: f64,
+		want: complex128,
+	}
+	cases := []Case{
+		// Deliberate: rect(Inf, 0) = (Inf, +0), not Inf*cis(0) = (Inf, NaN); sin(0) is an exact zero.
+		{inf, 0, complex(inf, 0)},
+		{-inf, 0, complex(-inf, neg_zero)},
+		{inf, neg_zero, complex(inf, neg_zero)},
+		// As in C, not Python: pow(NaN, 0) and rect(0, Inf) are NaN.
+		{0, inf, complex(nan, nan)},
+		{0, -inf, complex(nan, nan)},
+		{0, nan, complex(nan, nan)},
+	}
+	for c in cases {
+		got128 := cmplx.rect(c.r, c.θ)
+		testing.expectf(t, same_complex(got128, c.want), "rect(%v, %v) = %v, want %v", c.r, c.θ, got128, c.want)
+		got64 := cmplx.rect(f32(c.r), f32(c.θ))
+		testing.expectf(t, same_complex(got64, complex64(c.want)), "rect(f32(%v), f32(%v)) = %v, want %v", c.r, c.θ, got64, complex64(c.want))
+		got32 := cmplx.rect(f16(c.r), f16(c.θ))
+		testing.expectf(t, same_complex(got32, complex32(c.want)), "rect(f16(%v), f16(%v)) = %v, want %v", c.r, c.θ, got32, complex32(c.want))
+	}
+}
