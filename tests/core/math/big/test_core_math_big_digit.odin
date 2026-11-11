@@ -126,10 +126,14 @@ check_divmod_digit :: proc(t: ^testing.T, a: ^big.Int, d: big.DIGIT, loc := #cal
 		big.neg(&want_q, &want_q)
 	}
 	want_rem, _ := big.get(&want_r, u64)
+	want_mod := want_rem
+	if a.sign == .Negative && want_rem != 0 {
+		want_mod = u64(d) - want_rem
+	}
 
 	rem, err := big.int_mod_digit(a, d)
-	if err != nil || u64(rem) != want_rem {
-		return testing.expectf(t, false, "int_mod_digit(%s, %d) = %d, %v; want %d", str(a), d, rem, err, want_rem, loc=loc)
+	if err != nil || u64(rem) != want_mod {
+		return testing.expectf(t, false, "int_mod_digit(%s, %d) = %d, %v; want %d", str(a), d, rem, err, want_mod, loc=loc)
 	}
 
 	rem = big._private_int_mod_digit(a, d)
