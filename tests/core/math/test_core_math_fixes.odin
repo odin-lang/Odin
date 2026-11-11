@@ -4,7 +4,6 @@ import "base:intrinsics"
 import "core:math"
 import "core:testing"
 
-@(private="file")
 same :: proc(got, want: $T) -> bool where intrinsics.type_is_float(T) {
 	if math.is_nan(want) {
 		return math.is_nan(got)
@@ -12,7 +11,6 @@ same :: proc(got, want: $T) -> bool where intrinsics.type_is_float(T) {
 	return got == want && math.sign_bit(got) == math.sign_bit(want)
 }
 
-@(private="file")
 within_ulps :: proc(got, want: $T, max_ulps: i64 = 2) -> bool where intrinsics.type_is_float(T) {
 	if math.is_nan(want) || math.is_inf(want) || want == 0 {
 		return same(got, want)
