@@ -1603,11 +1603,6 @@ nan_f64be :: proc "contextless" () -> f64be {
 	return f64be(nan_f64())
 }
 
-@(require_results) is_approx_zero_f16 :: proc "contextless" (x: f16) -> bool { return abs(x) <= F16_EPSILON }
-@(require_results) is_approx_zero_f32 :: proc "contextless" (x: f32) -> bool { return abs(x) <= F32_EPSILON }
-@(require_results) is_approx_zero_f64 :: proc "contextless" (x: f64) -> bool { return abs(x) <= F64_EPSILON }
-is_approx_zero :: proc{is_approx_zero_f16, is_approx_zero_f32, is_approx_zero_f64}
-
 @(require_results)
 is_power_of_two :: proc "contextless" (x: int) -> bool {
 	return x > 0 && (x & (x-1)) == 0

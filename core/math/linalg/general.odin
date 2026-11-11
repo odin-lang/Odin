@@ -83,7 +83,7 @@ outer_product :: intrinsics.outer_product
 @(require_results)
 quaternion_inverse :: proc "contextless" (q: $Q) -> Q where IS_QUATERNION(Q) {
 	q_length2 := length2(q)
-	if math.is_approx_zero(q_length2) {
+	if q_length2 == 0 {
 		return 0
 	}
 	return conj(q) * quaternion(w=1.0/q_length2, x=0, y=0, z=0)
@@ -123,7 +123,7 @@ vector_normalize_unchecked :: proc "contextless" (v: $T/[$N]$E) -> T where IS_FL
 }
 @(require_results)
 quaternion_normalize_unchecked :: proc "contextless" (q: $Q) -> Q where IS_QUATERNION(Q) {
-	return q / length(q)
+	return q / Q(length(q))
 }
 normalize_unchecked :: proc{vector_normalize_unchecked, quaternion_normalize_unchecked}
 
@@ -131,12 +131,12 @@ normalize_unchecked :: proc{vector_normalize_unchecked, quaternion_normalize_unc
 @(require_results)
 vector_normalize :: proc "contextless" (v: $T/[$N]$E) -> T where IS_FLOAT(E) {
 	m := length(v)
-	return 0 if math.is_approx_zero(m) else v/m
+	return 0 if m == 0 else v/m
 }
 @(require_results)
 quaternion_normalize :: proc "contextless" (q: $Q) -> Q  where IS_QUATERNION(Q) {
 	m := quaternion_length(q)
-	return 0 if math.is_approx_zero(m) else q/Q(m)
+	return 0 if m == 0 else q/Q(m)
 }
 normalize :: proc{vector_normalize, quaternion_normalize}
 
@@ -204,7 +204,7 @@ clamp_length :: proc "contextless" (v: $T/[$N]$E, a: E) -> T where IS_FLOAT(E) {
 @(require_results)
 projection :: proc "contextless" (x, normal: $T/[$N]$E) -> T where IS_NUMERIC(E) {
 	normal_length := length2(normal)
-	return 0 if math.is_approx_zero(normal_length) else (dot(x, normal) / normal_length) * normal
+	return 0 if normal_length == 0 else (dot(x, normal) / normal_length) * normal
 }
 
 @(require_results)
@@ -331,25 +331,22 @@ angle_between :: proc{
 vector_slerp :: proc "contextless" (x, y: $T/[$N]$E, a: E) -> T #no_bounds_check {
 	x_length := length(x)
 	y_length := length(y)
-	if math.is_approx_zero(x_length) || math.is_approx_zero(y_length) {
+	if x_length == 0 || y_length == 0 {
 		return lerp(x, y, a)
 	}
-	
+
 	x_dir := x / x_length
 	y_dir := y / y_length
-	
-	cos_alpha := dot(x_dir, y_dir)
-	
-	if abs(cos_alpha) > 0.9999 { // Nearly parallel
+
+	alpha := math.acos(clamp(dot(x_dir, y_dir), -1, 1))
+	sin_alpha := math.sin(alpha)
+	if sin_alpha < 1e-4 { // Nearly parallel or antiparallel
 		return lerp(x, y, a)
 	}
-	
-	alpha := math.acos(cos_alpha)
-	sin_alpha := math.sin(alpha)
 
 	t1 := math.sin((1 - a) * alpha) / sin_alpha
 	t2 := math.sin(a * alpha) / sin_alpha
-	
+
 	return (x_dir * t1 + y_dir * t2) * lerp(x_length, y_length, a)
 }
 
@@ -413,12 +410,12 @@ hermite :: proc "contextless" (v1, t1, v2, t2: $T/[$N]$E, s: E) -> T #no_bounds_
 bezier :: proc "contextless" (v1, v2, v3, v4: $T/[$N]$E, s: E) -> T #no_bounds_check {
 	s2 := s * s
 	s3 := s2 * s
-	
+
 	f1 := -1 * s3 + 3 * s2 - 3 * s + 1
 	f2 :=  3 * s3 - 6 * s2 + 3 * s
 	f3 := -3 * s3 + 3 * s2
 	f4 :=  1 * s3
-	
+
 	return f1 * v1 + f2 * v2 + f3 * v3 + f4 * v4
 }
 
@@ -1011,18 +1008,15 @@ matrix1x1_inverse :: proc "contextless" (x: $M/matrix[1, 1]$T) -> (y: M) #no_bou
 @(require_results)
 matrix2x2_inverse :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) #no_bounds_check {
 	d := x[0, 0]*x[1, 1] - x[0, 1]*x[1, 0]
+	if d == 0 {
+		return {}
+	}
 	when intrinsics.type_is_integer(T) {
-		if d == 0 {
-			return {}
-		}
 		y[0, 0] = +x[1, 1] / d
 		y[0, 1] = -x[0, 1] / d
 		y[1, 0] = -x[1, 0] / d
 		y[1, 1] = +x[0, 0] / d
 	} else {
-		if math.is_approx_zero(d) {
-			return {}
-		}
 		id := 1 / d
 		y[0, 0] = +x[1, 1] * id
 		y[0, 1] = -x[0, 1] * id
@@ -1036,19 +1030,16 @@ matrix2x2_inverse :: proc "contextless" (x: $M/matrix[2, 2]$T) -> (y: M) #no_bou
 matrix3x3_inverse :: proc "contextless" (x: $M/matrix[3, 3]$T) -> (y: M) #no_bounds_check {
 	c := cofactor(x)
 	d := determinant(x)
+	if d == 0 {
+		return {}
+	}
 	when intrinsics.type_is_integer(T) {
-		if d == 0 {
-			return {}
-		}
 		for i in 0..<3 {
 			for j in 0..<3 {
 				y[i, j] = c[j, i] / d
 			}
 		}
 	} else {
-		if math.is_approx_zero(d) {
-			return {}
-		}
 		id := 1/d
 		for i in 0..<3 {
 			for j in 0..<3 {
@@ -1066,19 +1057,16 @@ matrix4x4_inverse :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bou
 	for i in 0..<4 {
 		d += x[0, i] * c[0, i]
 	}
+	if d == 0 {
+		return {}
+	}
 	when intrinsics.type_is_integer(T) {
-		if d == 0 {
-			return {}
-		}
 		for i in 0..<4 {
 			for j in 0..<4 {
 				y[i, j] = c[j, i] / d
 			}
 		}
 	} else {
-		if math.is_approx_zero(d) {
-			return {}
-		}
 		id := 1/d
 		for i in 0..<4 {
 			for j in 0..<4 {
