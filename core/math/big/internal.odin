@@ -782,11 +782,6 @@ internal_int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, a
 		return _private_int_div_recursive(quotient, remainder, numerator, denominator)
 	} else {
 		return #force_inline _private_int_div_school(quotient, remainder, numerator, denominator)
-		/*
-			NOTE(Jeroen): We no longer need or use `_private_int_div_small`.
-			We'll keep it around for a bit until we're reasonably certain div_school is bug free.
-		*/
-		// err = _private_int_div_small(quotient, remainder, numerator, denominator)
 	}
 }
 

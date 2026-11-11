@@ -123,6 +123,9 @@ _private_int_mul_toom :: proc(dest, a, b: ^Int, allocator := context.allocator) 
 		B
 	*/
 	B := min(a.used, b.used) / 3
+	if B == 0 {
+		return _private_int_mul(dest, a, b, a.used + b.used + 1)
+	}
 
 	/*
 		a = a2 * x^2 + a1 * x + a0;
@@ -263,6 +266,9 @@ _private_int_mul_karatsuba :: proc(dest, a, b: ^Int, allocator := context.alloca
 		min # of digits, divided by two.
 	*/
 	B := min(a.used, b.used) >> 1
+	if B == 0 {
+		return _private_int_mul(dest, a, b, a.used + b.used + 1)
+	}
 
 	/*
 		Init all the temps.
@@ -407,6 +413,7 @@ _private_int_mul_comba :: proc(dest, a, b: ^Int, digits: int, allocator := conte
 	*/
 	old_used := dest.used
 	dest.used = pa
+	dest.sign = .Zero_or_Positive
 
 	/*
 		Now extract the previous digit [below the carry].
@@ -453,7 +460,7 @@ _private_int_mul_high :: proc(dest, a, b: ^Int, digits: int, allocator := contex
 	for ix := 0; ix < pa; ix += 1 {
 		carry := DIGIT(0)
 
-		for iy := digits - ix; iy < pb; iy += 1 {
+		for iy := max(digits - ix, 0); iy < pb; iy += 1 {
 			/*
 				Calculate the double precision result.
 			*/
@@ -535,6 +542,7 @@ _private_int_mul_high_comba :: proc(dest, a, b: ^Int, digits: int, allocator := 
 	*/
 	old_used := dest.used
 	dest.used = pa
+	dest.sign = .Zero_or_Positive
 
 	for ix = digits; ix < pa; ix += 1 {
 		/*
@@ -778,6 +786,7 @@ _private_int_sqr_comba :: proc(dest, src: ^Int, allocator := context.allocator) 
 	*/
 	old_used := dest.used
 	dest.used = src.used + src.used
+	dest.sign = .Zero_or_Positive
 
 	#no_bounds_check for ix = 0; ix < pa; ix += 1 {
 		dest.digit[ix] = W[ix] & _MASK
@@ -807,6 +816,9 @@ _private_int_sqr_karatsuba :: proc(dest, src: ^Int, allocator := context.allocat
 		Min # of digits, divided by two.
 	*/
 	B := src.used >> 1
+	if B == 0 {
+		return _private_int_sqr(dest, src)
+	}
 
 	/*
 		Init temps.
@@ -878,6 +890,9 @@ _private_int_sqr_toom :: proc(dest, src: ^Int, allocator := context.allocator) -
 		B
 	*/
 	B := src.used / 3
+	if B == 0 {
+		return _private_int_sqr(dest, src)
+	}
 
 	/*
 		a = a2 * x^2 + a1 * x + a0;
@@ -1175,7 +1190,7 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 	if quotient != nil {
 		internal_clamp(q)
 		internal_swap(q, quotient)
-		quotient.sign = .Negative if neg else .Zero_or_Positive
+		quotient.sign = .Negative if neg && quotient.used > 0 else .Zero_or_Positive
 	}
 
 	if remainder != nil {
@@ -1204,7 +1219,7 @@ _private_div_recursion :: proc(quotient, remainder, a, b: ^Int, allocator := con
 	m := a.used - b.used
 	k := m / 2
 
-	if m < MUL_KARATSUBA_CUTOFF {
+	if m < max(MUL_KARATSUBA_CUTOFF, 2) {
 		return _private_int_div_school(quotient, remainder, a, b)
 	}
 
@@ -1276,6 +1291,16 @@ _private_div_recursion :: proc(quotient, remainder, a, b: ^Int, allocator := con
 
 _private_int_div_recursive :: proc(quotient, remainder, a, b: ^Int, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
+
+	if internal_lt_abs(a, b) {
+		if remainder != nil {
+			internal_copy(remainder, a) or_return
+		}
+		if quotient != nil {
+			internal_zero(quotient) or_return
+		}
+		return nil
+	}
 
 	A, B, Q, Q1, R, A_div, A_mod := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}
 	defer internal_destroy(A, B, Q, Q1, R, A_div, A_mod)
@@ -1356,7 +1381,7 @@ _private_int_div_recursive :: proc(quotient, remainder, a, b: ^Int, allocator :=
 	/*
 		Get sign before writing to dest.
 	*/
-	R.sign = .Zero_or_Positive if internal_is_zero(Q) else a.sign
+	R.sign = .Zero_or_Positive if internal_is_zero(R) else a.sign
 
 	if quotient != nil {
 		swap(quotient, Q)
@@ -1371,63 +1396,6 @@ _private_int_div_recursive :: proc(quotient, remainder, a, b: ^Int, allocator :=
 	}
 	return nil
 }
-
-/*
-	Slower bit-bang division... also smaller.
-	Prefer `_int_div_school` for speed.
-*/
-_private_int_div_small :: proc(quotient, remainder, numerator, denominator: ^Int) -> (err: Error) {
-
-	ta, tb, tq, q := &Int{}, &Int{}, &Int{}, &Int{}
-
-	defer internal_destroy(ta, tb, tq, q)
-
-	for {
-		internal_one(tq) or_return
-
-		num_bits, _ := count_bits(numerator)
-		den_bits, _ := count_bits(denominator)
-		n := num_bits - den_bits
-
-		abs(ta, numerator)   or_return
-		abs(tb, denominator) or_return
-		shl(tb, tb, n)       or_return
-		shl(tq, tq, n)       or_return
-
-		for n >= 0 {
-			if internal_gte(ta, tb) {
-				// ta -= tb
-				sub(ta, ta, tb) or_return
-				//  q += tq
-				add( q, q,  tq) or_return
-			}
-			shr1(tb, tb) or_return
-			shr1(tq, tq) or_return
-
-			n -= 1
-		}
-
-		/*
-			Now q == quotient and ta == remainder.
-		*/
-		neg := numerator.sign != denominator.sign
-		if quotient != nil {
-			swap(quotient, q)
-			z, _ := is_zero(quotient)
-			quotient.sign = .Negative if neg && !z else .Zero_or_Positive
-		}
-		if remainder != nil {
-			swap(remainder, ta)
-			z, _ := is_zero(numerator)
-			remainder.sign = .Zero_or_Positive if z else numerator.sign
-		}
-
-		break
-	}
-	return err
-}
-
-
 
 /*
 	Binary split factorial algo due to: http://www.luschny.de/math/factorial/binarysplitfact.html
@@ -1495,8 +1463,8 @@ _private_int_recursive_product :: proc(res: ^Int, start, stop: int, level := int
 }
 
 /*
-	Internal function computing both GCD using the binary method,
-		and, if target isn't `nil`, also LCM.
+	Internal function computing the GCD using Lehmer's method (`_private_int_gcd_lehmer`),
+		and, if target isn't `nil`, also the LCM.
 
 	Expects the `a` and `b` to have been initialized
 		and one or both of `res_gcd` or `res_lcm` not to be `nil`.
@@ -2367,6 +2335,10 @@ _private_int_reduce_is_2k :: proc(a: ^Int) -> (reducible: bool, err: Error) {
 	} else if a.used == 1 {
 		return true, nil
 	} else if a.used  > 1 {
+		if a.digit[0] == 0 {
+			return false, nil
+		}
+
 		iy := internal_count_bits(a)
 		iw := 1
 		iz := DIGIT(1)
@@ -2466,106 +2438,6 @@ _private_int_reduce_setup :: proc(mu, P: ^Int, allocator := context.allocator) -
 
 	internal_int_power_of_two(mu, P.used * 2 * _DIGIT_BITS)           or_return
 	return internal_int_div(mu, mu, P)
-}
-
-/*
-	Determines the setup value.
-	Assumes `a` to not be `nil` and to have been initialized.
-*/
-_private_int_dr_setup :: proc(a: ^Int) -> (d: DIGIT) {
-	/*
-		The casts are required if _DIGIT_BITS is one less than
-		the number of bits in a DIGIT [e.g. _DIGIT_BITS==31].
-	*/
-	return DIGIT((1 << _DIGIT_BITS) - a.digit[0])
-}
-
-/*
-	Determines if a number is a valid DR modulus.
-	Assumes `a` to not be `nil` and to have been initialized.
-*/
-_private_dr_is_modulus :: proc(a: ^Int) -> (res: bool) {
-	/*
-		Must be at least two digits.
-	*/
-	if a.used < 2 { return false }
-
-	/*
-		Must be of the form b**k - a [a <= b] so all but the first digit must be equal to -1 (mod b).
-	*/
-	for ix := 1; ix < a.used; ix += 1 {
-		if a.digit[ix] != _MASK {
-			return false
-		}
-	}
-	return true
-}
-
-/*
-	Reduce "x" in place modulo "n" using the Diminished Radix algorithm.
-	Based on algorithm from the paper
-
-		"Generating Efficient Primes for Discrete Log Cryptosystems"
-					Chae Hoon Lim, Pil Joong Lee,
-			POSTECH Information Research Laboratories
-
-	The modulus must be of a special format [see manual].
-	Has been modified to use algorithm 7.10 from the LTM book instead
-
-	Input x must be in the range 0 <= x <= (n-1)**2
-	Assumes `x` and `n` to not be `nil` and to have been initialized.
-*/
-_private_int_dr_reduce :: proc(x, n: ^Int, k: DIGIT, allocator := context.allocator) -> (err: Error) {
-	/*
-		m = digits in modulus.
-	*/
-	m := n.used
-
-	/*
-		Ensure that "x" has at least 2m digits.
-	*/
-	internal_grow(x, m + m)                                          or_return
-
-	/*
-		Top of loop, this is where the code resumes if another reduction pass is required.
-	*/
-	for {
-		i: int
-		mu := DIGIT(0)
-
-		/*
-			Compute (x mod B**m) + k * [x/B**m] inline and inplace.
-		*/
-		for i = 0; i < m; i += 1 {
-			r         := _WORD(x.digit[i + m]) * _WORD(k) + _WORD(x.digit[i] + mu)
-			x.digit[i] = DIGIT(r & _WORD(_MASK))
-			mu         = DIGIT(r >> _WORD(_DIGIT_BITS))
-		}
-
-		/*
-			Set final carry.
-		*/
-		x.digit[i] = mu
-
-		/*
-			Zero words above m.
-		*/
-		_zero(x.digit[m + 1:][:x.used - m])
-
-		/*
-			Clamp, sub and return.
-		*/
-		internal_clamp(x)                                            or_return
-
-		/*
-			If x >= n then subtract and reduce again.
-			Each successive "recursion" makes the input smaller and smaller.
-		*/
-		if internal_lt_abs(x, n) { break }
-
-		internal_sub(x, x, n)                                        or_return
-	}
-	return nil
 }
 
 /*
@@ -2683,7 +2555,9 @@ _private_int_exponent_mod :: proc(res, G, X, P: ^Int, redmode: int, allocator :=
 	/*
 		Setup result.
 	*/
-	internal_one(res)                                                or_return
+	acc := &Int{}
+	defer internal_destroy(acc)
+	internal_one(acc)                                                or_return
 
 	/*
 		Set initial mode and bit cnt.
@@ -2734,8 +2608,8 @@ _private_int_exponent_mod :: proc(res, G, X, P: ^Int, redmode: int, allocator :=
 			If the bit is zero and mode == 1 then we square.
 		*/
 		if mode == 1 && y == 0 {
-			internal_sqr(res, res)                                   or_return
-			redux(res, P, mu)                                        or_return
+			internal_sqr(acc, acc)                                   or_return
+			redux(acc, P, mu)                                        or_return
 			continue
 		}
 
@@ -2752,15 +2626,15 @@ _private_int_exponent_mod :: proc(res, G, X, P: ^Int, redmode: int, allocator :=
 				Square first.
 			*/
 			for x = 0; x < int(winsize); x += 1 {
-				internal_sqr(res, res)                               or_return
-				redux(res, P, mu)                                    or_return
+				internal_sqr(acc, acc)                               or_return
+				redux(acc, P, mu)                                    or_return
 			}
 
 			/*
 				Then multiply.
 			*/
-			internal_mul(res, res, &M[bitbuf])                       or_return
-			redux(res, P, mu)                                        or_return
+			internal_mul(acc, acc, &M[bitbuf])                       or_return
+			redux(acc, P, mu)                                        or_return
 
 			/*
 				Empty window and reset.
@@ -2779,20 +2653,20 @@ _private_int_exponent_mod :: proc(res, G, X, P: ^Int, redmode: int, allocator :=
 			Square then multiply if the bit is set.
 		*/
 		for x = 0; x < int(bitcpy); x += 1 {
-			internal_sqr(res, res)                                   or_return
-			redux(res, P, mu)                                        or_return
+			internal_sqr(acc, acc)                                   or_return
+			redux(acc, P, mu)                                        or_return
 
 			bitbuf <<= 1
 			if ((bitbuf & (1 << winsize)) != 0) {
 				/*
 					Then multiply.
 				*/
-				internal_mul(res, res, &M[1])                        or_return
-				redux(res, P, mu)                                    or_return
+				internal_mul(acc, acc, &M[1])                        or_return
+				redux(acc, P, mu)                                    or_return
 			}
 		}
 	}
-	return err
+	return internal_copy(res, acc)
 }
 
 /*
@@ -2883,12 +2757,6 @@ _private_int_exponent_mod_fast :: proc(res, G, X, P: ^Int, redmode: int, allocat
 			*/
 			redux = _private_int_montgomery_reduce
 		}
-	} else if redmode == 1 {
-		/*
-			Setup DR reduction for moduli of the form B**k - b.
-		*/
-		rho = _private_int_dr_setup(P)
-		redux = _private_int_dr_reduce
 	} else {
 		/*
 			Setup DR reduction for moduli of the form 2**k - b.
@@ -2900,7 +2768,9 @@ _private_int_exponent_mod_fast :: proc(res, G, X, P: ^Int, redmode: int, allocat
 	/*
 		Setup result.
 	*/
-	internal_grow(res, cap)                                          or_return
+	acc := &Int{}
+	defer internal_destroy(acc)
+	internal_grow(acc, cap)                                          or_return
 
 	/*
 		Create M table
@@ -2911,14 +2781,14 @@ _private_int_exponent_mod_fast :: proc(res, G, X, P: ^Int, redmode: int, allocat
 		/*
 			Now we need R mod m.
 		*/
-		_private_int_montgomery_calc_normalization(res, P)           or_return
+		_private_int_montgomery_calc_normalization(acc, P)           or_return
 
 		/*
 			Now set M[1] to G * R mod m.
 		*/
-		internal_mulmod(&M[1], G, res, P)                            or_return
+		internal_mulmod(&M[1], G, acc, P)                            or_return
 	} else {
-		internal_one(res)                                            or_return
+		internal_one(acc)                                            or_return
 		internal_mod(&M[1], G, P)                                    or_return
 	}
 
@@ -2987,8 +2857,8 @@ _private_int_exponent_mod_fast :: proc(res, G, X, P: ^Int, redmode: int, allocat
 			If the bit is zero and mode == 1 then we square.
 		*/
 		if mode == 1 && y == 0 {
-			internal_sqr(res, res)                                   or_return
-			redux(res, P, rho)                                       or_return
+			internal_sqr(acc, acc)                                   or_return
+			redux(acc, P, rho)                                       or_return
 			continue
 		}
 
@@ -3005,15 +2875,15 @@ _private_int_exponent_mod_fast :: proc(res, G, X, P: ^Int, redmode: int, allocat
 				Square first.
 			*/
 			for x = 0; x < int(winsize); x += 1 {
-				internal_sqr(res, res)                               or_return
-				redux(res, P, rho)                                   or_return
+				internal_sqr(acc, acc)                               or_return
+				redux(acc, P, rho)                                   or_return
 			}
 
 			/*
 				Then multiply.
 			*/
-			internal_mul(res, res, &M[bitbuf])                       or_return
-			redux(res, P, rho)                                       or_return
+			internal_mul(acc, acc, &M[bitbuf])                       or_return
+			redux(acc, P, rho)                                       or_return
 
 			/*
 				Empty window and reset.
@@ -3032,8 +2902,8 @@ _private_int_exponent_mod_fast :: proc(res, G, X, P: ^Int, redmode: int, allocat
 			Square then multiply if the bit is set.
 		*/
 		for x = 0; x < bitcpy; x += 1 {
-			internal_sqr(res, res)                                   or_return
-			redux(res, P, rho)                                       or_return
+			internal_sqr(acc, acc)                                   or_return
+			redux(acc, P, rho)                                       or_return
 
 			/*
 				Get next bit of the window.
@@ -3043,8 +2913,8 @@ _private_int_exponent_mod_fast :: proc(res, G, X, P: ^Int, redmode: int, allocat
 				/*
 					Then multiply.
 				*/
-				internal_mul(res, res, &M[1])                        or_return
-				redux(res, P, rho)                                   or_return
+				internal_mul(acc, acc, &M[1])                        or_return
+				redux(acc, P, rho)                                   or_return
 			}
 		}
 	}
@@ -3055,10 +2925,10 @@ _private_int_exponent_mod_fast :: proc(res, G, X, P: ^Int, redmode: int, allocat
 			Recall that any value in a Montgomery system is actually multiplied by R mod n.
 			So we have to reduce one more time to cancel out the factor of R.
 		*/
-		redux(res, P, rho)                                           or_return
+		redux(acc, P, rho)                                           or_return
 	}
 
-	return nil
+	return internal_copy(res, acc)
 }
 
 /*
@@ -3177,8 +3047,6 @@ _private_inverse_modulo_odd :: proc(dest, a, b: ^Int, allocator := context.alloc
 	x, y, u, v, B, D := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}
 	defer internal_destroy(x, y, u, v, B, D)
 
-	sign: Sign
-
 	/*
 		2. [modified] `b` must be odd.
 	*/
@@ -3195,7 +3063,7 @@ _private_inverse_modulo_odd :: proc(dest, a, b: ^Int, allocator := context.alloc
 	internal_copy(x, b) or_return
 
 	/*
-		We need `y` = `|a|`.
+		We need `y` = `a` mod `b`, which is non-negative, so the inverse is too.
 	*/
 	internal_mod(y, a, b) or_return
 
@@ -3297,9 +3165,8 @@ _private_inverse_modulo_odd :: proc(dest, a, b: ^Int, allocator := context.alloc
 	}
 
 	/*
-		`b` is now the inverse.
+		`D` is now the inverse.
 	*/
-	sign = a.sign
 	for internal_int_is_negative(D) {
 		internal_add(D, D, b) or_return
 	}
@@ -3312,7 +3179,6 @@ _private_inverse_modulo_odd :: proc(dest, a, b: ^Int, allocator := context.alloc
 	}
 
 	swap(dest, D)
-	dest.sign = sign
 	return nil
 }
 
@@ -3346,7 +3212,11 @@ _private_copy_digits :: proc(dest, src: ^Int, digits: int, offset := int(0)) -> 
 		return nil
 	}
 
-	digits = min(digits, len(src.digit), len(dest.digit))
+	if offset < 0 || digits < 0 { return .Invalid_Argument }
+
+	digits = min(digits, len(src.digit) - offset, len(dest.digit))
+	if digits <= 0 { return nil }
+
 	intrinsics.mem_copy_non_overlapping(&dest.digit[0], &src.digit[offset], size_of(DIGIT) * digits)
 	return nil
 }
