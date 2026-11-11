@@ -68,6 +68,13 @@ set ODIN=..\..\..\odin
 %ODIN% check "..\test_issue_type_info_variant_shim_duplicate" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_bit_field_tag_identity" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_8074" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "34" || exit /b
+%ODIN% check "..\test_issue_8258" %COMMON% 2>&1 | find /c "Error: @(test) procedures must be declared at the file scope" | findstr /x "4" || exit /b
+%ODIN% test "..\test_issue_invalid_tests_only" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_8294" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_5024" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_7947" %COMMON% 2>&1 | find /c "Error: Unspecialized polymorphic procedure literal" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_7502_cycle" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_8097" -no-entry-point %COMMON% 2>&1 | find /c "Error: Invalid use of a polymorphic type" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_poly_record_unspecialized_field" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
 @rem Objective-C tests target darwin, which can be checked and built for from any host
 %ODIN% check "..\test_issue_objc_import_missing_selector" -no-entry-point -target:darwin_arm64 %COMMON% 2>&1 | find /c "is required for imported Objective-C methods" | findstr /x "1" || exit /b
@@ -171,6 +178,8 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 @rem ) else (
 @rem 	@echo "!!! WARNING !!! test_issue_7010 is not compatible with MSVC."
 @rem )
+
+%ODIN% test "..\test_issue_7547" %COMMON% || exit /b
 
 %ODIN% test "..\test_issue_split_globals" -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables || exit /b
 %ODIN% test "..\test_issue_split_globals" -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug || exit /b

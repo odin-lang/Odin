@@ -16,7 +16,7 @@ LDFLAGS="$LDFLAGS -pthread -lm"
 OS_ARCH="$(uname -m)"
 OS_NAME="$(uname -s)"
 
-if [ -d ".git" ] && [ -n "$(command -v git)" ]; then
+if [ -e ".git" ] && [ -n "$(command -v git)" ]; then
 	# Counter the user's git config to show the signature in logs.
 	gitnosig="-c log.showSignature=false"
 	GIT_SHA=$(git $gitnosig show --pretty='%h' --no-patch --no-notes HEAD)

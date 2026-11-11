@@ -372,20 +372,26 @@ gb_internal void check_scope_decls(CheckerContext *c, Slice<Ast *> const &nodes,
 
 	check_collect_entities(c, nodes);
 
-	// NOTE: checking a declaration can insert entities into this very scope - a procedure alias
-	// goes through `override_entity_in_scope`, which inserts into the scope being iterated - so
-	// the iteration must not be invalidated by `s->elements` growing; see ScopeMapIterator.
+	auto entities = array_make<Entity *>(heap_allocator(), 0, s->elements.count);
+	defer (array_free(&entities));
+
+	// NOTE: the declarations are copied out of `s->elements` and sorted by source position before any is checked,
+	// so they are checked in the order they were written, and checking one cannot invalidate the iteration when it
+	// inserts into this very scope (a procedure alias goes through `override_entity_in_scope`).
 	for (auto const &entry : s->elements) {
-		Entity *e = entry.value;\
+		Entity *e = entry.value;
 		switch (e->kind) {
 		case Entity_Constant:
 		case Entity_TypeName:
 		case Entity_Procedure:
 		case Entity_AsmTemplate:
+			array_add(&entities, e);
 			break;
-		default:
-			continue;
 		}
+	}
+	array_sort(entities, entity_variable_pos_cmp);
+
+	for (Entity *e : entities) {
 		DeclInfo *d = decl_info_of_entity(e);
 		if (d != nullptr) {
 			check_entity_decl(c, e, d, nullptr);
@@ -7537,12 +7543,11 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				if (!context_allocator_error) {
 					if (is_type_polymorphic(e->type) && e->Variable.param_value.kind == ParameterValue_Constant) {
 						// NOTE(bill): The parameter type is still polymorphic, so a constant default (e.g. `y: T = 0`) cannot be typed as '$T' here.
-						// Defer it like an untyped argument: determination resolves the parameter from the other arguments,
-						// then the default is materialized against the concrete type (reporting a clear error if it does not fit).
+						// Defer it like an untyped argument: determination resolves the parameter from the other arguments, then the default
+						// is taken from the instantiated procedure's parameter, which was checked in the callee's scope against the concrete type.
 						ordered_operands[i].mode = Addressing_Invalid;
 						ordered_operands[i].type = t_invalid;
-						// NOTE(bill): Check a clone, as the callee's default expression is shared by every call site.
-						ordered_operands[i].expr = clone_ast(e->Variable.param_value.original_ast_expr);
+						ordered_operands[i].expr = e->Variable.param_value.original_ast_expr;
 						ordered_operands[i].deferred_untyped_arg = true;
 					} else {
 						ordered_operands[i].mode = Addressing_Value;
@@ -7708,8 +7713,28 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 
 		for (isize i = 0; i < pt->param_count; i++) {
 			Operand *o = &ordered_operands[i];
+			Entity *param = pt->params->Tuple.variables[i];
+			if (o->deferred_untyped_arg && !visited[i] && param->kind == Entity_Variable && !is_type_polymorphic(param->type)) {
+				o->deferred_untyped_arg = false;
+				o->mode = Addressing_Value;
+				o->type = param->type;
+				o->expr = param->Variable.param_value.original_ast_expr;
+				switch (param->Variable.param_value.kind) {
+				case ParameterValue_Nil:
+					o->type = t_untyped_nil;
+					break;
+				case ParameterValue_Constant:
+					o->mode  = Addressing_Constant;
+					o->value = param->Variable.param_value.value;
+					break;
+				case ParameterValue_Invalid:
+					o->mode = Addressing_Invalid;
+					err = CallArgumentError_WrongTypes;
+					break;
+				}
+			}
 			if (o->deferred_untyped_arg) {
-				materialize_deferred_untyped_arg(c, o, pt->params->Tuple.variables[i]->type, show_error);
+				materialize_deferred_untyped_arg(c, o, param->type, show_error);
 				if (o->mode == Addressing_Invalid) {
 					err = CallArgumentError_WrongTypes;
 				}
@@ -9761,13 +9786,12 @@ gb_internal ExprKind check_call_expr_as_type_cast(CheckerContext *c, Operand *op
 			}
 			check_expr_with_type_hint(c, operand, arg, t);
 			if (operand->mode != Addressing_Invalid) {
-				if (is_type_polymorphic(t)) {
-					error(call, "A polymorphic type cannot be used in a type conversion");
-				} else {
-					// NOTE(bill): Otherwise the compiler can override the polymorphic type
-					// as it assumes it is determining the type
-					check_cast(c, operand, t);
-				}
+				// NOTE: with a polymorphic type, `no_polymorphic_errors` stops the cast from
+				// determining that type from the value being converted, see #713
+				bool prev_no_polymorphic_errors = c->no_polymorphic_errors;
+				c->no_polymorphic_errors = prev_no_polymorphic_errors || is_type_polymorphic(t);
+				check_cast(c, operand, t);
+				c->no_polymorphic_errors = prev_no_polymorphic_errors;
 			}
 			operand->type = t;
 			operand->expr = call;
@@ -13809,6 +13833,9 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 			poly_dep_capture_unreplayable(c);
 			decl = make_decl_info(ctx.scope, ctx.decl);
 			init_decl_info_proc(decl, node);
+			if (c->in_proc_sig) {
+				decl->proc->enclosing_signature = c->curr_proc_sig;
+			}
 			ctx.decl = decl;
 			defer (ctx.decl = ctx.decl->parent);
 
@@ -13832,7 +13859,10 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 			}
 
 			pl->decl = decl;
-			check_procedure_later(ctx.checker, ctx.file, empty_token, decl, type, pl->body, pl->tags);
+			bool declares_polymorphic_params = pl->type->kind == Ast_ProcType && pl->type->ProcType.generic;
+			if (!type->Proc.is_polymorphic || (declares_polymorphic_params && !c->in_proc_sig)) {
+				check_procedure_later(ctx.checker, ctx.file, empty_token, decl, type, pl->body, pl->tags);
+			}
 		}
 		check_close_scope(&ctx);
 

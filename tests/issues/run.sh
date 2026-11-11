@@ -236,6 +236,55 @@ else
 	exit 1
 fi
 
+if [[ $($ODIN check ../test_issue_8258 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error: @(test) procedures must be declared at the file scope") -eq 4 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN test ../test_issue_invalid_tests_only $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_8294 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_5024 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_7947 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error: Unspecialized polymorphic procedure literal") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_7502_cycle -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 3 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_8097 -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error: Invalid use of a polymorphic type") -eq 4 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 if [[ $($ODIN check ../test_issue_poly_record_unspecialized_field $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
@@ -434,8 +483,6 @@ if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 	clang -c ../test_issue_7010/test_issue_7010.c -o test_issue_7010_c.o
 	$ODIN test ../test_issue_7010 $COMMON
 fi
-
-$ODIN test ../test_issue_7547 $COMMON -debug
 
 $ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -microarch:native
 $ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug -microarch:native

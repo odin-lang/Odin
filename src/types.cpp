@@ -4645,6 +4645,22 @@ gb_internal void wait_for_record_signal(Wait_Signal *signal, Futex *checking_thr
 	}
 }
 
+gb_internal bool struct_fields_are_being_checked_here(Type *t) {
+	return t->Struct.checking_thread.load() == cast(i32)current_thread_index() + 1;
+}
+
+gb_internal bool type_path_struct_is_incomplete(TypePath *path, Type *t) {
+	if (!struct_fields_are_being_checked_here(t) || path->path.count == 0) {
+		return false;
+	}
+	if (!path->failure) {
+		Entity *e = path->path[path->path.count-1];
+		error(e->token, "Illegal type declaration cycle of `%.*s`, its size is needed before all of its fields are known", LIT(e->token.string));
+		path->failure = true;
+	}
+	return true;
+}
+
 gb_internal void wait_for_struct_fields(Type *t) {
 	if (t->Struct.polymorphic_parent != nullptr) {
 		wait_for_record_signal(&t->Struct.fields_wait_signal, &t->Struct.checking_thread);
@@ -4783,6 +4799,9 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 
 	case Type_Struct: {
 		wait_for_struct_fields(t);
+		if (type_path_struct_is_incomplete(path, t)) {
+			return FAILURE_ALIGNMENT;
+		}
 		if (t->Struct.custom_align > 0) {
 			return gb_max(t->Struct.custom_align, 1);
 		}
@@ -4906,7 +4925,7 @@ gb_internal bool type_set_offsets(Type *t) {
 			t->Struct.are_offsets_being_processed.store(true);
 			t->Struct.offsets = type_set_offsets_of(t->Struct.fields, t->Struct.is_packed, t->Struct.is_raw_union, t->Struct.custom_min_field_align, t->Struct.custom_max_field_align);
 			t->Struct.are_offsets_being_processed.store(false);
-			t->Struct.are_offsets_set = true;
+			t->Struct.are_offsets_set = !struct_fields_are_being_checked_here(t);
 		}
 		return true;
 	} else if (is_type_tuple(t)) {
@@ -5104,6 +5123,9 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 
 	case Type_Struct: {
 		wait_for_struct_fields(t);
+		if (type_path_struct_is_incomplete(path, t)) {
+			return FAILURE_SIZE;
+		}
 		if (t->Struct.is_raw_union) {
 			i64 count = t->Struct.fields.count;
 			i64 align = type_align_of_internal(t, path);

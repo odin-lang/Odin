@@ -3324,7 +3324,7 @@ gb_internal WORKER_TASK_PROC(add_definitions_to_set_worker) {
 				add_dependency_to_set_threaded(c, e);
 			}
 		} else if (e->kind == Entity_Procedure) {
-			if (e->Procedure.is_export) {
+			if (e->Procedure.is_export && (e->flags & EntityFlag_Overridden) == 0) {
 				add_dependency_to_set_threaded(c, e);
 			}
 		} else if (e->kind == Entity_Variable) {
@@ -3361,7 +3361,7 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 			}
 			break;
 		case Entity_Procedure:
-			if (e->Procedure.is_export) {
+			if (e->Procedure.is_export && (e->flags & EntityFlag_Overridden) == 0) {
 				add_to_set(c, e);
 			} else if (e->flags & EntityFlag_Require) {
 				add_to_set(c, e);
@@ -4367,6 +4367,10 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 	} else if (name == "test") {
 		if (value != nullptr) {
 			error(value, "Expected no value for '%.*s'", LIT(name));
+		}
+		if (c->decl != nullptr && (c->decl->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
+			error(elem, "@(test) procedures must be declared at the file scope");
+			return true;
 		}
 		ac->test = true;
 		return true;
@@ -5658,7 +5662,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				init_decl_info_proc(d, init);
 				d->init_expr = init;
 
-				if (is_test) {
+				if (is_test && (c->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) != 0) {
 					e->flags |= EntityFlag_Test;
 				}
 				if (is_init && is_fini) {
@@ -7069,7 +7073,11 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 		if (pi->poly_def_node != nullptr) {
 			token = ast_token(pi->poly_def_node);
 		}
-		error(token, "Unspecialized polymorphic procedure '%.*s'", LIT(name));
+		if (name.len == 0 && pi->decl->proc_lit != nullptr) {
+			error(pi->decl->proc_lit, "Unspecialized polymorphic procedure literal");
+		} else {
+			error(token, "Unspecialized polymorphic procedure '%.*s'", LIT(name));
+		}
 		pi->decl->proc->proc_checked_state.store(ProcCheckedState_Unchecked);
 		return false;
 	}

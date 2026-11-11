@@ -1453,3 +1453,161 @@ test_nextafter :: proc(t: ^testing.T) {
 			"%h, %h -> %h != %h", datum.x, datum.y, r, datum.r)
 	}
 }
+
+@test
+test_floor_divmod :: proc(t: ^testing.T) {
+	for x in -50..=50 {
+		for y in -9..=9 {
+			if y == 0 {
+				continue
+			}
+			want_div := int(math.floor(f64(x) / f64(y)))
+			want_mod := x - want_div*y
+
+			div, mod := math.floor_divmod(x, y)
+			testing.expectf(t, div == want_div && mod == want_mod, "floor_divmod(%v, %v) = %v, %v, want %v, %v", x, y, div, mod, want_div, want_mod)
+			testing.expectf(t, math.floor_div(x, y) == want_div, "floor_div(%v, %v) = %v, want %v", x, y, math.floor_div(x, y), want_div)
+			testing.expectf(t, math.floor_mod(x, y) == want_mod, "floor_mod(%v, %v) = %v, want %v", x, y, math.floor_mod(x, y), want_mod)
+
+			div8, mod8 := math.floor_divmod(i8(x), i8(y))
+			testing.expectf(t, int(div8) == want_div && int(mod8) == want_mod, "floor_divmod(i8(%v), i8(%v)) = %v, %v, want %v, %v", x, y, div8, mod8, want_div, want_mod)
+		}
+	}
+}
+
+@test
+test_remap :: proc(t: ^testing.T) {
+	testing.expect_value(t, math.remap(5.0, 5.0, 5.0, 10.0, 20.0), 15.0)
+	testing.expect_value(t, math.remap(f32(5), 5, 5, -20, -10), -15)
+	testing.expect_value(t, math.remap(5, 5, 5, 100, 200), 150)
+	testing.expect_value(t, math.remap(i8(-3), -3, -3, -50, 50), 0)
+	testing.expect_value(t, math.remap_clamped(5.0, 5.0, 5.0, 10.0, 20.0), 15.0)
+
+	testing.expect_value(t, math.remap(2.5, 0.0, 10.0, 100.0, 200.0), 125.0)
+	testing.expect_value(t, math.remap(25, 0, 100, 100, 200), 125)
+}
+
+@test
+test_bias_gain :: proc(t: ^testing.T) {
+	testing.expect_value(t, math.bias(0.5, 0.5), 0.5)
+	testing.expect_value(t, math.bias(f32(0.5), 0.25), 0.25)
+	testing.expect_value(t, math.bias(f16(0), 0.75), 0)
+	testing.expect_value(t, math.bias(f64(1), 0.75), 1)
+	testing.expectf(t, abs(math.bias(0.5, 0.75) - 0.75) < 1e-15, "bias(0.5, 0.75) = %v, want 0.75", math.bias(0.5, 0.75))
+
+	testing.expect_value(t, math.gain(0.5, 0.25), 0.5)
+	testing.expect_value(t, math.gain(f32(0.25), 0.25), 0.125)
+}
+
+@test
+test_count_digits_limits :: proc(t: ^testing.T) {
+	_run_signed :: proc(t: ^testing.T, $T: typeid, $base: int) {
+		buf: [72]u8
+		for n in ([]T{min(T), min(T) + 1, -1, 0, 1, max(T) - 1, max(T)}) {
+			count := math.count_digits_of_base(n, base)
+			str := strconv.write_int(buf[:], i64(n), base)
+			want := len(str) - 1 if n < 0 else len(str)
+			testing.expectf(t, count == want, "%v %v in base-%i digit count is %i, want %i (%q)", typeid_of(T), n, base, count, want, str)
+		}
+	}
+	_run_unsigned :: proc(t: ^testing.T, $T: typeid, $base: int) {
+		buf: [72]u8
+		for n in ([]T{0, 1, max(T) - 1, max(T)}) {
+			count := math.count_digits_of_base(n, base)
+			str := strconv.write_uint(buf[:], u64(n), base)
+			testing.expectf(t, count == len(str), "%v %v in base-%i digit count is %i, want %i (%q)", typeid_of(T), n, base, count, len(str), str)
+		}
+	}
+	_run :: proc(t: ^testing.T, $base: int) {
+		_run_signed(t, i8, base)
+		_run_signed(t, i16, base)
+		_run_signed(t, i32, base)
+		_run_signed(t, i64, base)
+		_run_unsigned(t, u8, base)
+		_run_unsigned(t, u16, base)
+		_run_unsigned(t, u32, base)
+		_run_unsigned(t, u64, base)
+	}
+
+	_run(t, 2)
+	_run(t, 3)
+	_run(t, 7)
+	_run(t, 8)
+	_run(t, 10)
+	_run(t, 16)
+	_run(t, 32)
+}
+
+@test
+test_modf :: proc(t: ^testing.T) {
+	Datum :: struct {
+		x, i, f: f64,
+	}
+	@(static, rodata)
+	data := [?]Datum{
+		{0h7ff0_0000_0000_0000, 0h7ff0_0000_0000_0000, 0h0000_0000_0000_0000},
+		{0hfff0_0000_0000_0000, 0hfff0_0000_0000_0000, 0h8000_0000_0000_0000},
+		{0h0000_0000_0000_0000, 0h0000_0000_0000_0000, 0h0000_0000_0000_0000},
+		{0h8000_0000_0000_0000, 0h8000_0000_0000_0000, 0h8000_0000_0000_0000},
+		{ 1.5,     1,    0.5},
+		{-1.5,    -1,   -0.5},
+		{ 0.25,    0,    0.25},
+		{-0.25,   -0.0, -0.25},
+		{ 3,       3,    0},
+		{-3,      -3,   -0.0},
+		{ 100.75,  100,  0.75},
+	}
+
+	for d in data {
+		i, f := math.modf(d.x)
+		testing.expectf(t, transmute(u64)i == transmute(u64)d.i && transmute(u64)f == transmute(u64)d.f,
+			"modf(%v) = %v, %v, want %v, %v", d.x, i, f, d.i, d.f)
+
+		fi, ff := math.modf(f32(d.x))
+		testing.expectf(t, transmute(u32)fi == transmute(u32)f32(d.i) && transmute(u32)ff == transmute(u32)f32(d.f),
+			"modf(f32(%v)) = %v, %v, want %v, %v", d.x, fi, ff, d.i, d.f)
+
+		hi, hf := math.modf(f16(d.x))
+		testing.expectf(t, transmute(u16)hi == transmute(u16)f16(d.i) && transmute(u16)hf == transmute(u16)f16(d.f),
+			"modf(f16(%v)) = %v, %v, want %v, %v", d.x, hi, hf, d.i, d.f)
+	}
+
+	ni, nf := math.modf(math.nan_f64())
+	testing.expectf(t, math.is_nan(ni) && math.is_nan(nf), "modf(NaN) = %v, %v, want NaN, NaN", ni, nf)
+	ni32, nf32 := math.modf(math.nan_f32())
+	testing.expectf(t, math.is_nan(ni32) && math.is_nan(nf32), "modf(f32 NaN) = %v, %v, want NaN, NaN", ni32, nf32)
+	ni16, nf16 := math.modf(math.nan_f16())
+	testing.expectf(t, math.is_nan(ni16) && math.is_nan(nf16), "modf(f16 NaN) = %v, %v, want NaN, NaN", ni16, nf16)
+}
+
+@test
+test_pow10 :: proc(t: ^testing.T) {
+	for n in ([]f64{-7.5, -2.25, -0.5, 0.5, 1.5, 2.5, 3.75}) {
+		d := math.pow10(n)
+		testing.expectf(t, d == math.pow(f64(10), n), "pow10(%v) = %v, want %v", n, d, math.pow(f64(10), n))
+		f := math.pow10(f32(n))
+		testing.expectf(t, f == math.pow(f32(10), f32(n)), "pow10(f32(%v)) = %v, want %v", n, f, math.pow(f32(10), f32(n)))
+		h := math.pow10(f16(n))
+		testing.expectf(t, h == math.pow(f16(10), f16(n)), "pow10(f16(%v)) = %v, want %v", n, h, math.pow(f16(10), f16(n)))
+	}
+
+	p := math.pow10(f64(2.5))
+	testing.expectf(t, p > 316.2277 && p < 316.2278, "pow10(2.5) = %v, want ~316.22777", p)
+
+	testing.expect_value(t, math.pow10(f64(0)), 1)
+	testing.expect_value(t, math.pow10(f64(2)), 100)
+	testing.expect_value(t, math.pow10(f64(-1)), 0.1)
+	testing.expect_value(t, math.pow10(f32(3)), 1000)
+	testing.expect_value(t, math.pow10(f16(-2)), 0.01)
+
+	testing.expect_value(t, math.pow10(f64(309)), math.inf_f64(1))
+	testing.expect_value(t, math.pow10(f64(-400)), 0)
+	testing.expect_value(t, math.pow10(math.inf_f64(1)), math.inf_f64(1))
+	testing.expect_value(t, math.pow10(math.inf_f64(-1)), 0)
+	testing.expect_value(t, math.pow10(math.inf_f32(1)), math.inf_f32(1))
+	testing.expect_value(t, math.pow10(math.inf_f16(-1)), 0)
+
+	testing.expect(t, math.is_nan(math.pow10(math.nan_f64())), "pow10(NaN) is not NaN")
+	testing.expect(t, math.is_nan(math.pow10(math.nan_f32())), "pow10(f32 NaN) is not NaN")
+	testing.expect(t, math.is_nan(math.pow10(math.nan_f16())), "pow10(f16 NaN) is not NaN")
+}
