@@ -1457,3 +1457,35 @@ test_fix_public_immutable_dest :: proc(t: ^testing.T) {
 	x.flags = {}
 	fix_expect(t, x, "1")
 }
+
+@(test)
+test_fix_logical_immutable_dest :: proc(t: ^testing.T) {
+	a, b, q, x := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
+	defer big.destroy(a, b, q, x)
+
+	fix_set(t, a, "12345")
+	fix_set(t, b, "-678")
+	fix_set(t, x, "1")
+	x.flags = {.Immutable}
+
+	IMM :: big.Error.Assignment_To_Immutable
+	testing.expect_value(t, big.bit_and(x, a, b), IMM)
+	testing.expect_value(t, big.bit_and(x, x, a), IMM)
+	testing.expect_value(t, big.bit_or(x, a, b), IMM)
+	testing.expect_value(t, big.bit_or(x, x, a), IMM)
+	testing.expect_value(t, big.bit_xor(x, a, b), IMM)
+	testing.expect_value(t, big.bit_xor(x, x, a), IMM)
+	testing.expect_value(t, big.bit_complement(x, a), IMM)
+	testing.expect_value(t, big.bit_complement(x, x), IMM)
+	testing.expect_value(t, big.shrmod(x, nil, a, 3), IMM)
+	testing.expect_value(t, big.shrmod(q, x, a, 3), IMM)
+	testing.expect_value(t, big.shr(x, a, 1), IMM)
+	testing.expect_value(t, big.shr(x, x, 1), IMM)
+	testing.expect_value(t, big.shr_signed(x, b, 1), IMM)
+	testing.expect_value(t, big.shr_signed(x, x, 1), IMM)
+	testing.expect_value(t, big.shl(x, a, 1), IMM)
+	testing.expect_value(t, big.shl(x, x, 1), IMM)
+
+	x.flags = {}
+	fix_expect(t, x, "1")
+}
