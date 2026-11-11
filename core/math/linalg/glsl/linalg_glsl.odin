@@ -1660,6 +1660,10 @@ quatAxisAngle :: proc "c" (axis: vec3, radians: f32) -> (q: quat) {
 }
 @(require_results)
 quatNlerp :: proc "c" (a, b: quat, t: f32) -> (c: quat) {
+	b := b
+	if dot(a, b) < 0 {
+		b = -b
+	}
 	c.x = a.x + (b.x-a.x)*t
 	c.y = a.y + (b.y-a.y)*t
 	c.z = a.z + (b.z-a.z)*t
@@ -1768,6 +1772,10 @@ dquatAxisAngle :: proc "c" (axis: dvec3, radians: f64) -> (q: dquat) {
 }
 @(require_results)
 dquatNlerp :: proc "c" (a, b: dquat, t: f64) -> (c: dquat) {
+	b := b
+	if dot(a, b) < 0 {
+		b = -b
+	}
 	c.x = a.x + (b.x-a.x)*t
 	c.y = a.y + (b.y-a.y)*t
 	c.z = a.z + (b.z-a.z)*t

@@ -68,3 +68,13 @@ test_orientation :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@test
+test_quat_nlerp_shortest_path :: proc(t: ^testing.T) {
+	q := glsl.quat(1)
+	n := glsl.nlerp(q, -q, 0.5)
+	testing.expectf(t, n == q, "nlerp(q, -q, 0.5) = %v, want %v", n, q)
+	d := glsl.dquat(1)
+	dn := glsl.nlerp(d, -d, 0.5)
+	testing.expectf(t, dn == d, "nlerp(d, -d, 0.5) = %v, want %v", dn, d)
+}

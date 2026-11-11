@@ -761,6 +761,10 @@ quaternion_look_at :: proc{
 
 @(require_results)
 quaternion_nlerp_f16 :: proc "contextless" (a, b: Quaternionf16, t: f16) -> (c: Quaternionf16) {
+	b := b
+	if dot(a, b) < 0 {
+		b = -b
+	}
 	c.x = a.x + (b.x-a.x)*t
 	c.y = a.y + (b.y-a.y)*t
 	c.z = a.z + (b.z-a.z)*t
@@ -769,6 +773,10 @@ quaternion_nlerp_f16 :: proc "contextless" (a, b: Quaternionf16, t: f16) -> (c: 
 }
 @(require_results)
 quaternion_nlerp_f32 :: proc "contextless" (a, b: Quaternionf32, t: f32) -> (c: Quaternionf32) {
+	b := b
+	if dot(a, b) < 0 {
+		b = -b
+	}
 	c.x = a.x + (b.x-a.x)*t
 	c.y = a.y + (b.y-a.y)*t
 	c.z = a.z + (b.z-a.z)*t
@@ -777,6 +785,10 @@ quaternion_nlerp_f32 :: proc "contextless" (a, b: Quaternionf32, t: f32) -> (c: 
 }
 @(require_results)
 quaternion_nlerp_f64 :: proc "contextless" (a, b: Quaternionf64, t: f64) -> (c: Quaternionf64) {
+	b := b
+	if dot(a, b) < 0 {
+		b = -b
+	}
 	c.x = a.x + (b.x-a.x)*t
 	c.y = a.y + (b.y-a.y)*t
 	c.z = a.z + (b.z-a.z)*t
