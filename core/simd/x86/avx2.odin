@@ -1752,7 +1752,7 @@ _mm256_mpsadbw_epu8 :: #force_inline proc "c" (a, b: __m256i, $IMM8: i32) -> __m
 	return transmute(__m256i)llvm_mpsadbw(
 		transmute(simd.u8x32)a,
 		transmute(simd.u8x32)b,
-		transmute(i8)(cast(u8)IMM8),
+		cast(u8)IMM8,
 	)
 }
 
@@ -2449,6 +2449,17 @@ _mm256_mask_i64gather_ps :: #force_inline proc "c" (src: __m128, slice: ^f32, of
 	)
 }
 
+when ODIN_ARCH == .amd64 {
+	// Load 256-bits of integer data from memory into `dst` using a non-temporal memory hint.
+	// `mem_addr` must be aligned on a 32-byte boundary or a general-protection exception may be generated.
+	//
+	// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_stream_load_si256)
+	// @(enable_target_feature="avx,avx2")
+	// _mm256_stream_load_si256 :: asm (mem_addr: ^__m256i) -> (dst: __m256i) {
+	// 	vmovntdqa dst, [mem_addr]
+	// }
+}
+
 @(private="file", default_calling_convention="none")
 foreign _ {
 	@(link_name="llvm.x86.avx2.psign.b")         llvm_psignb      :: proc(a: simd.i8x32, b: simd.i8x32) -> simd.i8x32 ---
@@ -2471,7 +2482,7 @@ foreign _ {
 	@(link_name="llvm.x86.avx2.psra.d")          llvm_psrad       :: proc(a: simd.i32x8, count: simd.i32x4) -> simd.i32x8 ---
 	@(link_name="llvm.x86.avx2.pmadd.wd")        llvm_pmaddwd     :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.i32x8 ---
 	@(link_name="llvm.x86.avx2.pmadd.ub.sw")     llvm_pmaddubsw   :: proc(a: simd.u8x32, b: simd.i8x32) -> simd.i16x16 ---
-	@(link_name="llvm.x86.avx2.mpsadbw")         llvm_mpsadbw     :: proc(a: simd.u8x32, b: simd.u8x32, imm8: i8) -> simd.u16x16 ---
+	@(link_name="llvm.x86.avx2.mpsadbw")         llvm_mpsadbw     :: proc(a: simd.u8x32, b: simd.u8x32, imm8: u8) -> simd.u16x16 ---
 	@(link_name="llvm.x86.avx2.permd")           llvm_permd       :: proc(a: simd.u32x8, b: simd.u32x8) -> simd.u32x8 ---
 	@(link_name="llvm.x86.avx2.permps")          llvm_permps      :: proc(a: simd.f32x8, b: simd.i32x8) -> simd.f32x8 ---
 	@(link_name="llvm.x86.avx2.gather.d.d")      llvm_pgatherdd   :: proc(src: simd.i32x4, slice: rawptr, offsets: simd.i32x4, mask: simd.i32x4, scale: i8) -> simd.i32x4 ---
