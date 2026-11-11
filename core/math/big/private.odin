@@ -1559,71 +1559,8 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.
 
 	/*
 		If neither `a` or `b` was zero, we need to compute `gcd`.
-		Get copies of `a` and `b` we can modify.
 	*/
-	u, v := &Int{}, &Int{}
-	defer internal_destroy(u, v)
-	internal_copy(u, a) or_return
-	internal_copy(v, b) or_return
-
-	/*
-		Must be positive for the remainder of the algorithm.
-	*/
-	u.sign = .Zero_or_Positive; v.sign = .Zero_or_Positive
-
-	/*
-		B1.  Find the common power of two for `u` and `v`.
-	*/
-	u_lsb, _ := internal_count_lsb(u)
-	v_lsb, _ := internal_count_lsb(v)
-	k        := min(u_lsb, v_lsb)
-
-	if k > 0 {
-		/*
-			Divide the power of two out.
-		*/
-		internal_shr(u, u, k) or_return
-		internal_shr(v, v, k) or_return
-	}
-
-	/*
-		Divide any remaining factors of two out.
-	*/
-	if u_lsb != k {
-		internal_shr(u, u, u_lsb - k) or_return
-	}
-	if v_lsb != k {
-		internal_shr(v, v, v_lsb - k) or_return
-	}
-
-	for v.used != 0 {
-		/*
-			Make sure `v` is the largest.
-		*/
-		if internal_gt(u, v) {
-			/*
-				Swap `u` and `v` to make sure `v` is >= `u`.
-			*/
-			internal_swap(u, v)
-		}
-
-		/*
-			Subtract smallest from largest.
-		*/
-		internal_sub(v, v, u) or_return
-
-		/*
-			Divide out all factors of two.
-		*/
-		b, _ := internal_count_lsb(v)
-		internal_shr(v, v, b) or_return
-	}
-
-	/*
-		Multiply by 2**k which we divided out at the beginning.
-	*/
-	internal_shl(temp_gcd_res, u, k) or_return
-	temp_gcd_res.sign = .Zero_or_Positive
+	_private_int_gcd_lehmer(temp_gcd_res, a, b) or_return
 
 	/*
 		We've computed `gcd`, either the long way, or because one of the inputs was zero.
@@ -1635,22 +1572,19 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.
 	}
 
 	/*
-		Computes least common multiple as `|a*b|/gcd(a,b)`
-		Divide the smallest by the GCD.
+		Computes least common multiple as `|a*b|/gcd(a,b)`: the smaller divided by the GCD, times the larger.
+		The quotient needs its own `Int`: `res_lcm` may be the larger.
 	*/
-	if internal_lt_abs(a, b) {
-		/*
-			Store quotient in `t2` such that `t2 * b` is the LCM.
-		*/
-		internal_div(res_lcm, a, temp_gcd_res) or_return
-		err = internal_mul(res_lcm, res_lcm, b)
-	} else {
-		/*
-			Store quotient in `t2` such that `t2 * a` is the LCM.
-		*/
-		internal_div(res_lcm, b, temp_gcd_res) or_return
-		err = internal_mul(res_lcm, res_lcm, a)
+	smaller, larger := a, b
+	if internal_lt_abs(b, a) {
+		smaller, larger = b, a
 	}
+
+	quotient := &Int{}
+	defer internal_destroy(quotient)
+
+	internal_div(quotient, smaller, temp_gcd_res) or_return
+	err = internal_mul(res_lcm, quotient, larger)
 
 	if res_gcd != nil {
 		internal_swap(temp_gcd_res, res_gcd)
@@ -1661,6 +1595,204 @@ _private_int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.
 	*/
 	res_lcm.sign = .Zero_or_Positive
 	return err
+}
+
+/*
+	Sets `dest` to gcd(|x|, |y|) for nonzero `x` and `y`. `dest` must not be `x` or `y`.
+
+	Lehmer's method, as Algorithm L in Knuth, The Art of Computer Programming, Volume 2, 4.5.2.
+	Euclid's algorithm runs on the leading bits of `u` and `v` for as long as its quotients are certain.
+	Then all of `u` and `v` take those steps at once. A full division covers the rest.
+*/
+_private_int_gcd_lehmer :: proc(dest, x, y: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator
+
+	if x.used == 1 || y.used == 1 {
+		// One side fits in a digit: one pass for the remainder, then a digit gcd.
+		x, y := x, y
+		if y.used != 1 {
+			x, y = y, x
+		}
+		rest := x.digit[0]
+		if x.used > 1 {
+			rest = _private_int_mod_digit(x, y.digit[0])
+		}
+		return internal_set(dest, _private_gcd_u64(u64(rest), u64(y.digit[0])))
+	}
+
+	u, v, r := &Int{}, &Int{}, &Int{}
+	defer internal_destroy(u, v, r)
+
+	internal_copy(u, x) or_return
+	internal_copy(v, y) or_return
+	u.sign = .Zero_or_Positive
+	v.sign = .Zero_or_Positive
+	if internal_lt_abs(u, v) {
+		internal_swap(u, v)
+	}
+
+	for v.used > 1 {
+		u_hat, v_hat := _private_int_lehmer_leading_bits(u, v)
+		a, b, c, d   := _private_int_lehmer_cosequence(u_hat, v_hat)
+		if b == 0 {
+			// No quotient was certain: u, v = v, u mod v.
+			internal_int_divmod(nil, r, u, v) or_return
+			internal_swap(u, v)
+			internal_swap(v, r)
+			continue
+		}
+
+		internal_grow(v, u.used) or_return
+		_private_int_lehmer_update(u, v, a, b, c, d)
+	}
+
+	if v.used == 1 {
+		rest := u.digit[0]
+		if u.used > 1 {
+			rest = _private_int_mod_digit(u, v.digit[0])
+		}
+		internal_set(u, _private_gcd_u64(u64(rest), u64(v.digit[0]))) or_return
+	}
+	internal_swap(dest, u)
+	return nil
+}
+
+/*
+	The leading `_LEHMER_BITS` bits of `u`, and the bits of `v` in the same place, for `u >= v` and `u.used >= 2`.
+*/
+_LEHMER_BITS :: 62
+
+@(require_results)
+_private_int_lehmer_leading_bits :: proc "contextless" (u, v: ^Int) -> (u_hat, v_hat: i64) {
+	window :: proc "contextless" (hi, lo: DIGIT, shift: int) -> i64 {
+		if shift < 0 {
+			return i64(hi >> uint(-shift))
+		}
+		return i64(hi << uint(shift) | lo >> uint(_DIGIT_BITS - shift))
+	}
+
+	// Moves the top bit of `u` to bit `_LEHMER_BITS - 1`.
+	n     := u.used
+	shift := int(intrinsics.count_leading_zeros(u.digit[n-1])) - (_DIGIT_TYPE_BITS - _LEHMER_BITS)
+
+	u_hat = window(u.digit[n-1], u.digit[n-2], shift)
+	switch v.used {
+	case n:   v_hat = window(v.digit[n-1], v.digit[n-2], shift)
+	case n-1: v_hat = window(0, v.digit[n-2], shift)
+	}
+	return
+}
+
+/*
+	Knuth's steps L2 and L3: Euclid's algorithm on `u_hat` and `v_hat`.
+	A quotient is kept only if both ends of the range holding `u/v` give it.
+	Returns the cosequence for `u, v = a*u + b*v, c*u + d*v`. `b == 0` means no quotient was kept.
+*/
+@(require_results)
+_private_int_lehmer_cosequence :: proc "contextless" (u_hat, v_hat: i64) -> (a, b, c, d: i64) {
+	a = 1
+	d = 1
+
+	// The ends are (u_hat + a) / (v_hat + c) and (u_hat + b) / (v_hat + d).
+	// Each pair takes the same Euclid steps as `u_hat` and `v_hat`: they are tracked directly.
+	num_a, den_c := u_hat + 1, v_hat
+	num_b, den_d := u_hat, v_hat + 1
+	for den_c > 0 && den_d > 0 && num_a >= den_c {
+		// Most quotients are 1 or 2.
+		q     := i64(1)
+		rem_c := num_a - den_c
+		if rem_c >= den_c {
+			q      = 2
+			rem_c -= den_c
+			if rem_c >= den_c {
+				q     = i64(u64(num_a) / u64(den_c))
+				rem_c = i64(u64(num_a) % u64(den_c))
+			}
+		}
+
+		// The other end must have the same quotient.
+		rem_d := i128(num_b) - i128(q)*i128(den_d)
+		if rem_d < 0 || rem_d >= i128(den_d) {
+			break
+		}
+
+		num_a, den_c = den_c, rem_c
+		num_b, den_d = den_d, i64(rem_d)
+		a, c = c, a - q*c
+		b, d = d, b - q*d
+	}
+	return
+}
+
+/*
+	u, v = a*u + b*v, c*u + d*v in one pass. Both results are below `u` and not negative.
+	`v` must have room for `u.used` digits.
+*/
+_private_int_lehmer_update :: proc(u, v: ^Int, a, b, c, d: i64) {
+	n  := u.used
+	m  := v.used
+	ud := raw_data(u.digit)
+	vd := raw_data(v.digit)
+
+	carry_u, carry_v: i128
+	for i in 0..<n {
+		x := i64(ud[i])
+		y := i64(0)
+		if i < m {
+			y = i64(vd[i])
+		}
+
+		next_u := i128(a)*i128(x) + i128(b)*i128(y) + carry_u
+		next_v := i128(c)*i128(x) + i128(d)*i128(y) + carry_v
+		ud[i] = DIGIT(next_u) & _MASK
+		vd[i] = DIGIT(next_v) & _MASK
+		carry_u = next_u >> _DIGIT_BITS
+		carry_v = next_v >> _DIGIT_BITS
+	}
+
+	u.used = n
+	v.used = n
+	internal_clamp(u)
+	internal_clamp(v)
+}
+
+/*
+	|a| mod `d` for a nonzero digit `d`, without a quotient.
+*/
+@(require_results)
+_private_int_mod_digit :: proc "contextless" (a: ^Int, d: DIGIT) -> (remainder: DIGIT) {
+	w: _WORD
+	#no_bounds_check for i := a.used - 1; i >= 0; i -= 1 {
+		w = (w << _DIGIT_BITS | _WORD(a.digit[i])) % _WORD(d)
+	}
+	return DIGIT(w)
+}
+
+/*
+	gcd(a, b) by the binary algorithm.
+*/
+@(require_results)
+_private_gcd_u64 :: proc "contextless" (a, b: u64) -> u64 {
+	if a == 0 {
+		return b
+	}
+	if b == 0 {
+		return a
+	}
+
+	a, b := a, b
+	shift := intrinsics.count_trailing_zeros(a | b)
+	a >>= intrinsics.count_trailing_zeros(a)
+	for {
+		b >>= intrinsics.count_trailing_zeros(b)
+		if a > b {
+			a, b = b, a
+		}
+		b -= a
+		if b == 0 {
+			return a << shift
+		}
+	}
 }
 
 /*

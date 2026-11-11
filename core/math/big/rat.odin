@@ -84,7 +84,7 @@ rat_set_frac_digit :: proc(dst: ^Rat, a, b: DIGIT, allocator := context.allocato
 	}
 	context.allocator = allocator
 
-	g := DIGIT(_rat_gcd_word(u64(a), u64(b)))
+	g := DIGIT(_private_gcd_u64(u64(a), u64(b)))
 	_rat_set_u128(&dst.a, u128(a / g), false) or_return
 	return _rat_set_u128(&dst.b, u128(b / g), false)
 }
@@ -175,7 +175,7 @@ internal_rat_norm :: proc(z: ^Rat, allocator := context.allocator) -> (err: Erro
 	case _rat_is_one(&z.b):
 
 	case z.a.used == 1 && z.b.used == 1:
-		g := DIGIT(_rat_gcd_word(u64(z.a.digit[0]), u64(z.b.digit[0])))
+		g := DIGIT(_private_gcd_u64(u64(z.a.digit[0]), u64(z.b.digit[0])))
 		z.a.digit[0] /= g
 		z.b.digit[0] /= g
 
@@ -679,7 +679,7 @@ _rat_add_sub :: proc(dst, x, y: ^Rat, subtract: bool) -> (err: Error) {
 
 	g2_digit: DIGIT
 	if g_digit != 0 {
-		g2_digit = DIGIT(_rat_gcd_word(u64(_rat_mod_digit(&dst.a, g_digit)), u64(g_digit)))
+		g2_digit = DIGIT(_private_gcd_u64(u64(_private_int_mod_digit(&dst.a, g_digit)), u64(g_digit)))
 	} else {
 		g2_digit = _rat_gcd(&g2, &dst.a, &g) or_return
 	}
@@ -843,7 +843,7 @@ _rat_compare_magnitude :: proc(x, y: ^Rat) -> (comparison: int, err: Error) {
 
 // dst = a/b + c/d with separate signs, for one-digit parts (Knuth 4.5.1). The products stay below 2^127.
 _rat_add_words :: proc(dst: ^Rat, a, b: u64, a_negative: bool, c, d: u64, c_negative: bool) -> (err: Error) {
-	g     := _rat_gcd_word(b, d)
+	g     := _private_gcd_u64(b, d)
 	b_cut := b / g
 	d_cut := d / g
 
@@ -870,7 +870,7 @@ _rat_add_words :: proc(dst: ^Rat, a, b: u64, a_negative: bool, c, d: u64, c_nega
 
 	den := u128(b_cut) * u128(d)
 	if g != 1 {
-		g2 := _rat_gcd_word(u64(num % u128(g)), g)
+		g2 := _private_gcd_u64(u64(num % u128(g)), g)
 		num /= u128(g2)
 		den  = u128(b_cut) * u128(d / g2)
 	}
@@ -883,8 +883,8 @@ _rat_mul_words :: proc(dst: ^Rat, p, q, r, s: u64, negative: bool) -> (err: Erro
 		return _rat_set_zero(dst)
 	}
 
-	g1 := _rat_gcd_word(p, s)
-	g2 := _rat_gcd_word(r, q)
+	g1 := _private_gcd_u64(p, s)
+	g2 := _private_gcd_u64(r, q)
 	num := u128(p / g1) * u128(r / g2)
 	den := u128(q / g2) * u128(s / g1)
 	return _rat_set_words(dst, num, negative, den)
@@ -894,13 +894,13 @@ _rat_mul_words :: proc(dst: ^Rat, p, q, r, s: u64, negative: bool) -> (err: Erro
 _rat_gcd :: proc(g: ^Int, a, b: ^Int) -> (g_digit: DIGIT, err: Error) {
 	switch {
 	case a.used == 1 && b.used == 1:
-		return DIGIT(_rat_gcd_word(u64(a.digit[0]), u64(b.digit[0]))), nil
+		return DIGIT(_private_gcd_u64(u64(a.digit[0]), u64(b.digit[0]))), nil
 	case a.used == 1:
-		r := _rat_mod_digit(b, a.digit[0])
-		return DIGIT(_rat_gcd_word(u64(r), u64(a.digit[0]))), nil
+		r := _private_int_mod_digit(b, a.digit[0])
+		return DIGIT(_private_gcd_u64(u64(r), u64(a.digit[0]))), nil
 	case b.used == 1:
-		r := _rat_mod_digit(a, b.digit[0])
-		return DIGIT(_rat_gcd_word(u64(r), u64(b.digit[0]))), nil
+		r := _private_int_mod_digit(a, b.digit[0])
+		return DIGIT(_private_gcd_u64(u64(r), u64(b.digit[0]))), nil
 	}
 
 	internal_int_gcd(g, a, b) or_return
@@ -938,39 +938,6 @@ _rat_div_digit :: proc(dst, src: ^Int, d: DIGIT) -> (err: Error) {
 	dst.sign = src.sign
 	internal_zero_unused(dst, old_used)
 	return internal_clamp(dst)
-}
-
-@(require_results)
-_rat_mod_digit :: proc(a: ^Int, d: DIGIT) -> DIGIT {
-	w: _WORD
-	#no_bounds_check for i := a.used - 1; i >= 0; i -= 1 {
-		w = (w << _DIGIT_BITS | _WORD(a.digit[i])) % _WORD(d)
-	}
-	return DIGIT(w)
-}
-
-@(require_results)
-_rat_gcd_word :: proc "contextless" (a, b: u64) -> u64 {
-	if a == 0 {
-		return b
-	}
-	if b == 0 {
-		return a
-	}
-
-	a, b := a, b
-	shift := intrinsics.count_trailing_zeros(a | b)
-	a >>= intrinsics.count_trailing_zeros(a)
-	for {
-		b >>= intrinsics.count_trailing_zeros(b)
-		if a > b {
-			a, b = b, a
-		}
-		b -= a
-		if b == 0 {
-			return a << shift
-		}
-	}
 }
 
 // dst = x * y. A one-digit side uses the digit product: no temporary.
