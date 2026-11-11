@@ -19,7 +19,7 @@ same_complex :: proc(got, want: $T) -> bool where intrinsics.type_is_complex(T) 
 }
 
 @(private="file")
-close :: proc(got, want: $T) -> bool where intrinsics.type_is_float(T) {
+close :: proc(got, want: $T, max_ulps: i64 = 2) -> bool where intrinsics.type_is_float(T) {
 	if math.is_nan(want) || math.is_inf(want) || want == 0 {
 		return same(got, want)
 	}
@@ -33,12 +33,12 @@ close :: proc(got, want: $T) -> bool where intrinsics.type_is_float(T) {
 	} else {
 		g, w := i64(transmute(u64)abs(got)), i64(transmute(u64)abs(want))
 	}
-	return abs(g - w) <= 2
+	return abs(g - w) <= max_ulps
 }
 
 @(private="file")
-close_complex :: proc(got, want: $T) -> bool where intrinsics.type_is_complex(T) {
-	return close(real(got), real(want)) && close(imag(got), imag(want))
+close_complex :: proc(got, want: $T, max_ulps: i64 = 2) -> bool where intrinsics.type_is_complex(T) {
+	return close(real(got), real(want), max_ulps) && close(imag(got), imag(want), max_ulps)
 }
 
 @(private="file")
@@ -318,4 +318,33 @@ test_sqrt_imaginary_axis :: proc(t: ^testing.T) {
 		got := cmplx.sqrt(c.x)
 		testing.expectf(t, same_complex(got, c.want), "sqrt(%v) = %v, want %v", c.x, got, c.want)
 	}
+}
+
+@test
+test_exp_overflow :: proc(t: ^testing.T) {
+	inf := math.inf_f64(1)
+	neg_zero := math.copy_sign(f64(0), -1)
+
+	Case :: struct {
+		x, want: complex128,
+	}
+	cases := []Case{
+		{complex(710, 0), complex(inf, 0)},
+		{complex(710, neg_zero), complex(inf, neg_zero)},
+		{complex(-746, 1), complex(0, 0)},
+		{complex(-746, 2), complex(neg_zero, 0)},
+		{complex(1, 1), complex(1.4686939399158851, 2.2873552871788423)},
+	}
+	for c in cases {
+		got := cmplx.exp(c.x)
+		testing.expectf(t, close_complex(got, c.want), "exp(%v) = %v, want %v", c.x, got, c.want)
+	}
+
+	got := cmplx.exp(complex(710, 0.8))
+	want := complex(1.5564391422313159e308, 1.6025697525437586e308)
+	testing.expectf(t, close_complex(got, want, 4), "exp(710+0.8i) = %v, want %v", got, want)
+
+	got64 := cmplx.exp(complex64(complex(89, 0)))
+	want64 := complex(math.inf_f32(1), f32(0))
+	testing.expectf(t, same_complex(got64, want64), "exp(complex64(89+0i)) = %v, want %v", got64, want64)
 }

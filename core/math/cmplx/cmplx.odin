@@ -266,29 +266,10 @@ ln_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 
 
 exp_complex32 :: proc "contextless" (x: complex32) -> complex32 {
-	return complex32(exp_complex64(complex64(x)))
+	return complex32(exp_complex128(complex128(x)))
 }
 exp_complex64 :: proc "contextless" (x: complex64) -> complex64 {
-	switch re, im := real(x), imag(x); {
-	case math.is_inf(re, 0):
-		switch {
-		case re > 0 && im == 0:
-			return x
-		case math.is_inf(im, 0) || math.is_nan(im):
-			if re < 0 {
-				return complex(0, math.copy_sign(0, im))
-			} else {
-				return complex(math.inf_f32(1.0), math.nan_f32())
-			}
-		}
-	case math.is_nan(re):
-		if im == 0 {
-			return complex(math.nan_f32(), im)
-		}
-	}
-	r := math.exp(real(x))
-	s, c := math.sincos(imag(x))
-	return complex(r*c, r*s)
+	return complex64(exp_complex128(complex128(x)))
 }
 exp_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	switch re, im := real(x), imag(x); {
@@ -308,8 +289,15 @@ exp_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 			return complex(math.nan_f64(), im)
 		}
 	}
-	r := math.exp(real(x))
+	if imag(x) == 0 {
+		return complex(math.exp(real(x)), imag(x))
+	}
 	s, c := math.sincos(imag(x))
+	if real(x) > 709 {
+		h := math.exp(0.5 * real(x))
+		return complex((h*c)*h, (h*s)*h)
+	}
+	r := math.exp(real(x))
 	return complex(r*c, r*s)
 }
 
