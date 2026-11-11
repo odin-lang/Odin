@@ -13,6 +13,32 @@ same :: proc(got, want: $T) -> bool where intrinsics.type_is_float(T) {
 	return got == want && math.sign_bit(got) == math.sign_bit(want)
 }
 
+@(private="file")
+close :: proc(got, want: $T) -> bool where intrinsics.type_is_float(T) {
+	if math.is_nan(want) || math.is_inf(want) || want == 0 {
+		return same(got, want)
+	}
+	if math.is_nan(got) || math.is_inf(got) || math.sign_bit(got) != math.sign_bit(want) {
+		return false
+	}
+	when size_of(T) == 2 {
+		g, w := i64(transmute(u16)abs(got)), i64(transmute(u16)abs(want))
+	} else when size_of(T) == 4 {
+		g, w := i64(transmute(u32)abs(got)), i64(transmute(u32)abs(want))
+	} else {
+		g, w := i64(transmute(u64)abs(got)), i64(transmute(u64)abs(want))
+	}
+	return abs(g - w) <= 2
+}
+
+@(private="file")
+expect_sinh_cosh :: proc(t: ^testing.T, x, want_sinh, want_cosh: $T, loc := #caller_location) where intrinsics.type_is_float(T) {
+	s := math.sinh(x)
+	testing.expectf(t, close(s, want_sinh), "sinh(%v) = %v, want %v", x, s, want_sinh, loc = loc)
+	c := math.cosh(x)
+	testing.expectf(t, close(c, want_cosh), "cosh(%v) = %v, want %v", x, c, want_cosh, loc = loc)
+}
+
 @test
 test_abs_non_finite :: proc(t: ^testing.T) {
 	inf := math.inf_f64(1)
@@ -44,4 +70,36 @@ test_abs_non_finite :: proc(t: ^testing.T) {
 
 	r, θ := cmplx.polar(complex(0, nan))
 	testing.expectf(t, math.is_nan(r) && math.is_nan(θ), "polar(0+NaN i) = (%v, %v), want (NaN, NaN)", r, θ)
+}
+
+@test
+test_sinh_cosh :: proc(t: ^testing.T) {
+	inf := math.inf_f64(1)
+	nan := math.nan_f64()
+	neg_zero := math.copy_sign(f64(0), -1)
+
+	Case :: struct {
+		x, sinh, cosh: f64,
+	}
+	cases := []Case{
+		{0, 0, 1},
+		{neg_zero, neg_zero, 1},
+		{inf, inf, inf},
+		{-inf, -inf, inf},
+		{nan, nan, nan},
+		{1e-20, 1e-20, 1},
+		{1e-10, 1e-10, 1},
+		{0.5, 0.52109530549374738, 1.1276259652063807},
+		{-0.5, -0.52109530549374738, 1.1276259652063807},
+		{1, 1.1752011936438014, 1.5430806348152437},
+		{21.9, 1621881641.7888238, 1621881641.7888238},
+		{710.4, 1.6663642832806496e308, 1.6663642832806496e308},
+		{-710.4, -1.6663642832806496e308, 1.6663642832806496e308},
+	}
+	for c in cases {
+		expect_sinh_cosh(t, c.x, c.sinh, c.cosh)
+	}
+
+	expect_sinh_cosh(t, f32(89.4), 3.34886272e38, 3.34886272e38)
+	expect_sinh_cosh(t, f16(11.09), 32864, 32864)
 }
