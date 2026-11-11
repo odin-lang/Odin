@@ -13,6 +13,24 @@ same :: proc(got, want: $T) -> bool where intrinsics.type_is_float(T) {
 }
 
 @(private="file")
+within_ulps :: proc(got, want: $T, max_ulps: i64 = 2) -> bool where intrinsics.type_is_float(T) {
+	if math.is_nan(want) || math.is_inf(want) || want == 0 {
+		return same(got, want)
+	}
+	if math.is_nan(got) || math.is_inf(got) || math.sign_bit(got) != math.sign_bit(want) {
+		return false
+	}
+	when size_of(T) == 2 {
+		g, w := i64(transmute(u16)abs(got)), i64(transmute(u16)abs(want))
+	} else when size_of(T) == 4 {
+		g, w := i64(transmute(u32)abs(got)), i64(transmute(u32)abs(want))
+	} else {
+		g, w := i64(transmute(u64)abs(got)), i64(transmute(u64)abs(want))
+	}
+	return abs(g - w) <= max_ulps
+}
+
+@(private="file")
 Binary_Case :: struct {
 	x, y, want: f64,
 }
@@ -152,4 +170,27 @@ test_remainder_narrow :: proc(t: ^testing.T) {
 	testing.expect(t, same(math.remainder(f16le(5), 2), f16le(1)))
 	testing.expect(t, same(math.remainder(f64le(1e17), 3), f64le(1)))
 	testing.expect(t, same(math.remainder(f64be(5), 2), f64be(1)))
+}
+
+@test
+test_wrap_stays_below_y :: proc(t: ^testing.T) {
+	testing.expect(t, same(math.wrap(f64(-1e-20), math.TAU), f64(0)))
+	testing.expect(t, same(math.wrap(f32(-1e-10), f32(math.TAU)), f32(0)))
+	testing.expect(t, same(math.wrap(f64(-3), 2), f64(1)))
+	testing.expect(t, same(math.wrap(f64(1e17), 3), f64(1)))
+	testing.expect(t, same(math.wrap(f64(7.5), 2), f64(1.5)))
+	testing.expect(t, within_ulps(math.wrap(f64(-6), math.TAU), f64(0.28318530717958623)))
+}
+
+@test
+test_angle_diff_near_zero :: proc(t: ^testing.T) {
+	d64 := math.angle_diff(f64(1e-20), 0)
+	testing.expectf(t, abs(d64) < 1e-15, "angle_diff(1e-20, 0) = %v, want about 0", d64)
+	d32 := math.angle_diff(f32(1e-10), 0)
+	testing.expectf(t, abs(d32) < 1e-6, "angle_diff(f32(1e-10), 0) = %v, want about 0", d32)
+	l64 := math.angle_lerp(f64(1e-20), 0, 0.5)
+	testing.expectf(t, abs(l64) < 1e-15, "angle_lerp(1e-20, 0, 0.5) = %v, want about 0", l64)
+	l32 := math.angle_lerp(f32(1e-10), 0, 0.5)
+	testing.expectf(t, abs(l32) < 1e-6, "angle_lerp(f32(1e-10), 0, 0.5) = %v, want about 0", l32)
+	testing.expect(t, within_ulps(math.angle_diff(f64(3), -3), f64(0.28318530717958623)))
 }
