@@ -422,16 +422,21 @@ dup :: proc "contextless" (fd: Fd) -> (Fd, Errno) {
 */
 dup2 :: proc "contextless" (old: Fd, new: Fd) -> (Fd, Errno) {
 	when NO_LEGACY_SYSCALLS {
-		ret := syscall(SYS_dup3, old, new, 0)
-
 		// Differences between dup2 and dup3 are:
 		//   - dup3 takes a flags argument
 		//   - dup2 does not return EINVAL
-		fd, errno := errno_unwrap(ret, Fd)
-		if errno == .EINVAL {
-			errno = .NONE
+		//   - if old == new dup3 returns EINVAL, dup2 returns new if it is a valid file descriptor
+		if old == new {
+			_, err := fcntl(new, F_GETFD)
+			if err == nil {
+				return new, .NONE
+			} else {
+				default_fd: Fd
+				return default_fd, .EBADF
+			}
 		}
-		return fd, errno
+		ret := syscall(SYS_dup3, old, new, 0)
+		return errno_unwrap(ret, Fd)
 	} else {
 		ret := syscall(SYS_dup2, old, new)
 		return errno_unwrap(ret, Fd)
