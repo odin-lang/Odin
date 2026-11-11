@@ -33,7 +33,7 @@ _mm_cmpistrm :: #force_inline proc "c" (a, b: __m128i, $IMM8: i32) -> __m128i wh
 	return transmute(__m128i)llvm_pcmpistrm128(
 		transmute(simd.i8x16)a,
 		transmute(simd.i8x16)b,
-		cast(i8)IMM8,
+		cast(u8)IMM8,
 	)
 }
 
@@ -46,7 +46,7 @@ _mm_cmpistri :: #force_inline proc "c" (a, b: __m128i, $IMM8: i32) -> i32 where 
 	return llvm_pcmpistri128(
 		transmute(simd.i8x16)a,
 		transmute(simd.i8x16)b,
-		cast(i8)IMM8,
+		cast(u8)IMM8,
 	)
 }
 
@@ -59,7 +59,7 @@ _mm_cmpistrz :: #force_inline proc "c" (a, b: __m128i, $IMM8: i32) -> i32 where 
 	return llvm_pcmpistriz128(
 		transmute(simd.i8x16)a,
 		transmute(simd.i8x16)b,
-		cast(i8)IMM8,
+		cast(u8)IMM8,
 	)
 }
 
@@ -72,7 +72,7 @@ _mm_cmpistrc :: #force_inline proc "c" (a, b: __m128i, $IMM8: i32) -> i32 where 
 	return llvm_pcmpistric128(
 		transmute(simd.i8x16)a,
 		transmute(simd.i8x16)b,
-		cast(i8)IMM8,
+		cast(u8)IMM8,
 	)
 }
 
@@ -85,7 +85,7 @@ _mm_cmpistrs :: #force_inline proc "c" (a, b: __m128i, $IMM8: i32) -> i32 where 
 	return llvm_pcmpistris128(
 		transmute(simd.i8x16)a,
 		transmute(simd.i8x16)b,
-		cast(i8)IMM8,
+		cast(u8)IMM8,
 	)
 }
 
@@ -98,7 +98,7 @@ _mm_cmpistro :: #force_inline proc "c" (a, b: __m128i, $IMM8: i32) -> i32 where 
 	return llvm_pcmpistrio128(
 		transmute(simd.i8x16)a,
 		transmute(simd.i8x16)b,
-		cast(i8)IMM8,
+		cast(u8)IMM8,
 	)
 }
 
@@ -111,7 +111,7 @@ _mm_cmpistra :: #force_inline proc "c" (a, b: __m128i, $IMM8: i32) -> i32 where 
 	return llvm_pcmpistria128(
 		transmute(simd.i8x16)a,
 		transmute(simd.i8x16)b,
-		cast(i8)IMM8,
+		cast(u8)IMM8,
 	)
 }
 
@@ -124,7 +124,7 @@ _mm_cmpestrm :: #force_inline proc "c" (a: __m128i, la: i32, b: __m128i, lb: i32
 	return transmute(__m128i)llvm_pcmpestrm128(
 		transmute(simd.i8x16)a, la,
 		transmute(simd.i8x16)b, lb,
-		cast(i8)IMM8,
+		cast(u8)IMM8,
 	)
 }
 
@@ -137,7 +137,7 @@ _mm_cmpestri :: #force_inline proc "c" (a: __m128i, la: i32, b: __m128i, lb: i32
 	return llvm_pcmpestri128(
 		transmute(simd.i8x16)a, la,
 		transmute(simd.i8x16)b, lb,
-		cast(i8)IMM8,
+		cast(u8)IMM8,
 	)
 }
 
@@ -150,7 +150,7 @@ _mm_cmpestrz :: #force_inline proc "c" (a: __m128i, la: i32, b: __m128i, lb: i32
 	return llvm_pcmpestriz128(
 		transmute(simd.i8x16)a, la,
 		transmute(simd.i8x16)b, lb,
-		cast(i8)IMM8,
+		cast(u8)IMM8,
 	)
 }
 
@@ -163,7 +163,7 @@ _mm_cmpestrc :: #force_inline proc "c" (a: __m128i, la: i32, b: __m128i, lb: i32
 	return llvm_pcmpestric128(
 		transmute(simd.i8x16)a, la,
 		transmute(simd.i8x16)b, lb,
-		cast(i8)IMM8,
+		cast(u8)IMM8,
 	)
 }
 
@@ -176,7 +176,7 @@ _mm_cmpestrs :: #force_inline proc "c" (a: __m128i, la: i32, b: __m128i, lb: i32
 	return llvm_pcmpestris128(
 		transmute(simd.i8x16)a, la,
 		transmute(simd.i8x16)b, lb,
-		cast(i8)IMM8,
+		cast(u8)IMM8,
 	)
 }
 
@@ -189,7 +189,7 @@ _mm_cmpestro :: #force_inline proc "c" (a: __m128i, la: i32, b: __m128i, lb: i32
 	return llvm_pcmpestrio128(
 		transmute(simd.i8x16)a, la,
 		transmute(simd.i8x16)b, lb,
-		cast(i8)IMM8,
+		cast(u8)IMM8,
 	)
 }
 
@@ -202,7 +202,7 @@ _mm_cmpestra :: #force_inline proc "c" (a: __m128i, la: i32, b: __m128i, lb: i32
 	return llvm_pcmpestria128(
 		transmute(simd.i8x16)a, la,
 		transmute(simd.i8x16)b, lb,
-		cast(i8)IMM8,
+		cast(u8)IMM8,
 	)
 }
 
@@ -254,20 +254,20 @@ when ODIN_ARCH == .amd64 {
 
 @(private="file", default_calling_convention="none")
 foreign _ {
-	@(link_name="llvm.x86.sse42.pcmpestrm128")  llvm_pcmpestrm128  :: proc(a: simd.i8x16, la: i32, b: simd.i8x16, lb: i32, imm8: i8) -> simd.u8x16 ---
-	@(link_name="llvm.x86.sse42.pcmpestri128")  llvm_pcmpestri128  :: proc(a: simd.i8x16, la: i32, b: simd.i8x16, lb: i32, imm8: i8) -> i32 ---
-	@(link_name="llvm.x86.sse42.pcmpestriz128") llvm_pcmpestriz128 :: proc(a: simd.i8x16, la: i32, b: simd.i8x16, lb: i32, imm8: i8) -> i32 ---
-	@(link_name="llvm.x86.sse42.pcmpestric128") llvm_pcmpestric128 :: proc(a: simd.i8x16, la: i32, b: simd.i8x16, lb: i32, imm8: i8) -> i32 ---
-	@(link_name="llvm.x86.sse42.pcmpestris128") llvm_pcmpestris128 :: proc(a: simd.i8x16, la: i32, b: simd.i8x16, lb: i32, imm8: i8) -> i32 ---
-	@(link_name="llvm.x86.sse42.pcmpestrio128") llvm_pcmpestrio128 :: proc(a: simd.i8x16, la: i32, b: simd.i8x16, lb: i32, imm8: i8) -> i32 ---
-	@(link_name="llvm.x86.sse42.pcmpestria128") llvm_pcmpestria128 :: proc(a: simd.i8x16, la: i32, b: simd.i8x16, lb: i32, imm8: i8) -> i32 ---
-	@(link_name="llvm.x86.sse42.pcmpistrm128")  llvm_pcmpistrm128  :: proc(a, b: simd.i8x16, imm8: i8) -> simd.i8x16 ---
-	@(link_name="llvm.x86.sse42.pcmpistri128")  llvm_pcmpistri128  :: proc(a, b: simd.i8x16, imm8: i8) -> i32 ---
-	@(link_name="llvm.x86.sse42.pcmpistriz128") llvm_pcmpistriz128 :: proc(a, b: simd.i8x16, imm8: i8) -> i32 ---
-	@(link_name="llvm.x86.sse42.pcmpistric128") llvm_pcmpistric128 :: proc(a, b: simd.i8x16, imm8: i8) -> i32 ---
-	@(link_name="llvm.x86.sse42.pcmpistris128") llvm_pcmpistris128 :: proc(a, b: simd.i8x16, imm8: i8) -> i32 ---
-	@(link_name="llvm.x86.sse42.pcmpistrio128") llvm_pcmpistrio128 :: proc(a, b: simd.i8x16, imm8: i8) -> i32 ---
-	@(link_name="llvm.x86.sse42.pcmpistria128") llvm_pcmpistria128 :: proc(a, b: simd.i8x16, imm8: i8) -> i32 ---
+	@(link_name="llvm.x86.sse42.pcmpestrm128")  llvm_pcmpestrm128  :: proc(a: simd.i8x16, la: i32, b: simd.i8x16, lb: i32, imm8: u8) -> simd.u8x16 ---
+	@(link_name="llvm.x86.sse42.pcmpestri128")  llvm_pcmpestri128  :: proc(a: simd.i8x16, la: i32, b: simd.i8x16, lb: i32, imm8: u8) -> i32 ---
+	@(link_name="llvm.x86.sse42.pcmpestriz128") llvm_pcmpestriz128 :: proc(a: simd.i8x16, la: i32, b: simd.i8x16, lb: i32, imm8: u8) -> i32 ---
+	@(link_name="llvm.x86.sse42.pcmpestric128") llvm_pcmpestric128 :: proc(a: simd.i8x16, la: i32, b: simd.i8x16, lb: i32, imm8: u8) -> i32 ---
+	@(link_name="llvm.x86.sse42.pcmpestris128") llvm_pcmpestris128 :: proc(a: simd.i8x16, la: i32, b: simd.i8x16, lb: i32, imm8: u8) -> i32 ---
+	@(link_name="llvm.x86.sse42.pcmpestrio128") llvm_pcmpestrio128 :: proc(a: simd.i8x16, la: i32, b: simd.i8x16, lb: i32, imm8: u8) -> i32 ---
+	@(link_name="llvm.x86.sse42.pcmpestria128") llvm_pcmpestria128 :: proc(a: simd.i8x16, la: i32, b: simd.i8x16, lb: i32, imm8: u8) -> i32 ---
+	@(link_name="llvm.x86.sse42.pcmpistrm128")  llvm_pcmpistrm128  :: proc(a, b: simd.i8x16, imm8: u8) -> simd.i8x16 ---
+	@(link_name="llvm.x86.sse42.pcmpistri128")  llvm_pcmpistri128  :: proc(a, b: simd.i8x16, imm8: u8) -> i32 ---
+	@(link_name="llvm.x86.sse42.pcmpistriz128") llvm_pcmpistriz128 :: proc(a, b: simd.i8x16, imm8: u8) -> i32 ---
+	@(link_name="llvm.x86.sse42.pcmpistric128") llvm_pcmpistric128 :: proc(a, b: simd.i8x16, imm8: u8) -> i32 ---
+	@(link_name="llvm.x86.sse42.pcmpistris128") llvm_pcmpistris128 :: proc(a, b: simd.i8x16, imm8: u8) -> i32 ---
+	@(link_name="llvm.x86.sse42.pcmpistrio128") llvm_pcmpistrio128 :: proc(a, b: simd.i8x16, imm8: u8) -> i32 ---
+	@(link_name="llvm.x86.sse42.pcmpistria128") llvm_pcmpistria128 :: proc(a, b: simd.i8x16, imm8: u8) -> i32 ---
 	@(link_name="llvm.x86.sse42.crc32.32.8")    llvm_crc32_32_8    :: proc(crc: u32, v: u8) -> u32 ---
 	@(link_name="llvm.x86.sse42.crc32.32.16")   llvm_crc32_32_16   :: proc(crc: u32, v: u16) -> u32 ---
 	@(link_name="llvm.x86.sse42.crc32.32.32")   llvm_crc32_32_32   :: proc(crc: u32, v: u32) -> u32 ---
