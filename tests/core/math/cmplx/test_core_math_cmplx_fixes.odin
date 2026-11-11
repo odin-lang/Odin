@@ -14,6 +14,11 @@ same :: proc(got, want: $T) -> bool where intrinsics.type_is_float(T) {
 }
 
 @(private="file")
+same_complex :: proc(got, want: $T) -> bool where intrinsics.type_is_complex(T) {
+	return same(real(got), real(want)) && same(imag(got), imag(want))
+}
+
+@(private="file")
 close :: proc(got, want: $T) -> bool where intrinsics.type_is_float(T) {
 	if math.is_nan(want) || math.is_inf(want) || want == 0 {
 		return same(got, want)
@@ -172,5 +177,36 @@ test_rect_group :: proc(t: ^testing.T) {
 		r32, θ32 := cmplx.polar(complex32(z))
 		w32: complex32 = cmplx.rect(r32, θ32)
 		testing.expectf(t, close_complex(w32, complex32(z)), "rect(polar(complex32(%v))) = %v", z, w32)
+	}
+}
+
+@test
+test_trig_groups :: proc(t: ^testing.T) {
+	Fn :: struct {
+		name: string,
+		c128: proc "contextless" (complex128) -> complex128,
+		c64:  proc "contextless" (complex64) -> complex64,
+		c32:  proc "contextless" (complex32) -> complex32,
+	}
+	fns := []Fn{
+		{"sin", cmplx.sin, cmplx.sin, cmplx.sin},
+		{"cos", cmplx.cos, cmplx.cos, cmplx.cos},
+		{"tan", cmplx.tan, cmplx.tan, cmplx.tan},
+		{"cot", cmplx.cot, cmplx.cot, cmplx.cot},
+		{"sinh", cmplx.sinh, cmplx.sinh, cmplx.sinh},
+		{"cosh", cmplx.cosh, cmplx.cosh, cmplx.cosh},
+		{"tanh", cmplx.tanh, cmplx.tanh, cmplx.tanh},
+	}
+	zs := []complex128{complex(0.5, -0.25), complex(-1.25, 2), complex(0.75, 1.5)}
+	for f in fns {
+		for z in zs {
+			z64 := complex64(z)
+			got64, want64 := f.c64(z64), complex64(f.c128(complex128(z64)))
+			testing.expectf(t, same_complex(got64, want64), "%s(complex64(%v)) = %v, want %v", f.name, z, got64, want64)
+
+			z32 := complex32(z)
+			got32, want32 := f.c32(z32), complex32(f.c128(complex128(z32)))
+			testing.expectf(t, same_complex(got32, want32), "%s(complex32(%v)) = %v, want %v", f.name, z, got32, want32)
+		}
 	}
 }

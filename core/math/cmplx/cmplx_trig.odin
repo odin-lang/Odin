@@ -25,6 +25,12 @@ import "core:math/bits"
 //   Stephen L. Moshier
 //   moshier@na-net.ornl.gov
 
+sin_complex32 :: proc "contextless" (x: complex32) -> complex32 {
+	return complex32(sin_complex128(complex128(x)))
+}
+sin_complex64 :: proc "contextless" (x: complex64) -> complex64 {
+	return complex64(sin_complex128(complex128(x)))
+}
 sin_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	// Complex circular sine
 	//
@@ -65,6 +71,12 @@ sin_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	return complex(s*ch, c*sh)
 }
 
+cos_complex32 :: proc "contextless" (x: complex32) -> complex32 {
+	return complex32(cos_complex128(complex128(x)))
+}
+cos_complex64 :: proc "contextless" (x: complex64) -> complex64 {
+	return complex64(cos_complex128(complex128(x)))
+}
 cos_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	// Complex circular cosine
 	//
@@ -102,6 +114,12 @@ cos_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	return complex(c*ch, -s*sh)
 }
 
+sinh_complex32 :: proc "contextless" (x: complex32) -> complex32 {
+	return complex32(sinh_complex128(complex128(x)))
+}
+sinh_complex64 :: proc "contextless" (x: complex64) -> complex64 {
+	return complex64(sinh_complex128(complex128(x)))
+}
 sinh_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	// Complex hyperbolic sine
 	//
@@ -134,6 +152,12 @@ sinh_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	return complex(c*sh, s*ch)
 }
 
+cosh_complex32 :: proc "contextless" (x: complex32) -> complex32 {
+	return complex32(cosh_complex128(complex128(x)))
+}
+cosh_complex64 :: proc "contextless" (x: complex64) -> complex64 {
+	return complex64(cosh_complex128(complex128(x)))
+}
 cosh_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	// Complex hyperbolic cosine
 	//
@@ -165,6 +189,12 @@ cosh_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	return complex(c*ch, s*sh)
 }
 
+tan_complex32 :: proc "contextless" (x: complex32) -> complex32 {
+	return complex32(tan_complex128(complex128(x)))
+}
+tan_complex64 :: proc "contextless" (x: complex64) -> complex64 {
+	return complex64(tan_complex128(complex128(x)))
+}
 tan_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	// Complex circular tangent
 	//
@@ -213,6 +243,12 @@ tan_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	return complex(math.sin(2*real(x))/d, math.sinh(2*imag(x))/d)
 }
 
+tanh_complex32 :: proc "contextless" (x: complex32) -> complex32 {
+	return complex32(tanh_complex128(complex128(x)))
+}
+tanh_complex64 :: proc "contextless" (x: complex64) -> complex64 {
+	return complex64(tanh_complex128(complex128(x)))
+}
 tanh_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	switch re, im := real(x), imag(x); {
 	case math.is_inf(re, 0):
@@ -231,6 +267,12 @@ tanh_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	return complex(math.sinh(2*real(x))/d, math.sin(2*imag(x))/d)
 }
 
+cot_complex32 :: proc "contextless" (x: complex32) -> complex32 {
+	return complex32(cot_complex128(complex128(x)))
+}
+cot_complex64 :: proc "contextless" (x: complex64) -> complex64 {
+	return complex64(cot_complex128(complex128(x)))
+}
 cot_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	d := math.cosh(2*imag(x)) - math.cos(2*real(x))
 	if abs(d) < 0.25 {

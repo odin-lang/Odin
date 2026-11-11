@@ -35,26 +35,40 @@ kmag :: builtin.kmag
 
 
 sin :: proc{
+	sin_complex32,
+	sin_complex64,
 	sin_complex128,
 }
 cos :: proc{
+	cos_complex32,
+	cos_complex64,
 	cos_complex128,
 }
 tan :: proc{
+	tan_complex32,
+	tan_complex64,
 	tan_complex128,
 }
 cot :: proc{
+	cot_complex32,
+	cot_complex64,
 	cot_complex128,
 }
 
 
 sinh :: proc{
+	sinh_complex32,
+	sinh_complex64,
 	sinh_complex128,
 }
 cosh :: proc{
+	cosh_complex32,
+	cosh_complex64,
 	cosh_complex128,
 }
 tanh :: proc{
+	tanh_complex32,
+	tanh_complex64,
 	tanh_complex128,
 }
 
