@@ -218,3 +218,23 @@ test_sincos_near_multiples_of_half_pi :: proc(t: ^testing.T) {
 		testing.expectf(t, j == c.j && within_ulps(z, c.z, 1), "_trig_reduce_f64(%v) = %v, %v, want %v, %v", c.x, j, z, c.j, c.z)
 	}
 }
+
+@test
+test_cbrt_subnormal :: proc(t: ^testing.T) {
+	Case :: struct {
+		x, want: f64,
+	}
+	cases := [?]Case{
+		{5e-324, 1.7031839360032603e-108},
+		{1e-320, 2.1544266950262728e-107},
+		{1e-310, 4.641588833612774e-104},
+		{-1e-310, -4.641588833612774e-104},
+		{-math.F64_MIN, -2.812644285236262e-103},
+		{-0.0, -0.0},
+		{0, 0},
+	}
+	for c in cases {
+		got := math.cbrt(c.x)
+		testing.expectf(t, within_ulps(got, c.want), "cbrt(%v) = %v, want %v", c.x, got, c.want)
+	}
+}
