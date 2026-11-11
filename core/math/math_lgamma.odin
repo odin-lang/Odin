@@ -215,10 +215,13 @@ lgamma_f64 :: proc "contextless" (x: f64) -> (lgamma: f64, sign: int) {
 		lgamma = x
 		return
 	case is_inf(x):
-		lgamma = x
+		lgamma = inf_f64(1)
 		return
 	case x == 0:
 		lgamma = inf_f64(1)
+		if sign_bit(x) {
+			sign = -1
+		}
 		return
 	}
 
@@ -266,7 +269,7 @@ lgamma_f64 :: proc "contextless" (x: f64) -> (lgamma: f64, sign: int) {
 			case x >= (Y_MIN - 1 + 0.27): // 0.7316 <= x <=  0.9
 				y = 1 - x
 				i = 0
-			case x >= (Y_MIN - 1 - 0.27): // 0.2316 <= x < 0.7316
+			case x >= (Y_MIN - 1 - 0.23): // 0.2316 <= x < 0.7316
 				y = x - (Tc - 1)
 				i = 1
 			case: // 0 < x < 0.2316
@@ -279,7 +282,7 @@ lgamma_f64 :: proc "contextless" (x: f64) -> (lgamma: f64, sign: int) {
 			case x >= (Y_MIN + 0.27): // 1.7316 <= x < 2
 				y = 2 - x
 				i = 0
-			case x >= (Y_MIN - 0.27): // 1.2316 <= x < 1.7316
+			case x >= (Y_MIN - 0.23): // 1.2316 <= x < 1.7316
 				y = x - Tc
 				i = 1
 			case: // 0.9 < x < 1.2316
