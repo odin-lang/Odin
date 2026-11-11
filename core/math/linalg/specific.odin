@@ -2256,6 +2256,8 @@ matrix4_look_at_from_fru :: proc{
 
 @(require_results)
 matrix4_perspective_f16 :: proc "contextless" (fovy, aspect, near, far: f16, flip_z_axis := true) -> (m: Matrix4f16) #no_bounds_check {
+	fovy := fovy
+	fovy = clamp(fovy, F16_EPSILON, math.PI - F16_EPSILON)
 	tan_half_fovy := math.tan(0.5 * fovy)
 	m[0, 0] = 1 / (aspect*tan_half_fovy)
 	m[1, 1] = 1 / (tan_half_fovy)
@@ -2271,6 +2273,8 @@ matrix4_perspective_f16 :: proc "contextless" (fovy, aspect, near, far: f16, fli
 }
 @(require_results)
 matrix4_perspective_f32 :: proc "contextless" (fovy, aspect, near, far: f32, flip_z_axis := true) -> (m: Matrix4f32) #no_bounds_check {
+	fovy := fovy
+	fovy = clamp(fovy, F32_EPSILON, math.PI - F32_EPSILON)
 	tan_half_fovy := math.tan(0.5 * fovy)
 	m[0, 0] = 1 / (aspect*tan_half_fovy)
 	m[1, 1] = 1 / (tan_half_fovy)
@@ -2286,6 +2290,8 @@ matrix4_perspective_f32 :: proc "contextless" (fovy, aspect, near, far: f32, fli
 }
 @(require_results)
 matrix4_perspective_f64 :: proc "contextless" (fovy, aspect, near, far: f64, flip_z_axis := true) -> (m: Matrix4f64) #no_bounds_check {
+	fovy := fovy
+	fovy = clamp(fovy, F64_EPSILON, math.PI - F64_EPSILON)
 	tan_half_fovy := math.tan(0.5 * fovy)
 	m[0, 0] = 1 / (aspect*tan_half_fovy)
 	m[1, 1] = 1 / (tan_half_fovy)
