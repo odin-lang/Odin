@@ -504,6 +504,8 @@ string_to_int :: int_atoi
 	We size for `string` by default.
 */
 radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false, allocator := context.allocator) -> (size: int, err: Error) {
+	context.allocator = allocator
+
 	a := a
 	assert_if_nil(a)
 

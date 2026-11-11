@@ -67,7 +67,7 @@ encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocato
 }
 
 @private
-_encode :: proc(out, data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocator) {
+_encode :: proc(out, data: []byte, ENC_TBL := ENC_TABLE) {
 	out := out
 	data := data
 
