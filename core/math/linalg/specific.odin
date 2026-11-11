@@ -1181,8 +1181,8 @@ matrix2_inverse_transpose_f16 :: proc "contextless" (m: Matrix2f16) -> (c: Matri
 	d := m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 	id := 1.0/d
 	c[0, 0] = +m[1, 1] * id
-	c[1, 0] = -m[1, 0] * id
-	c[0, 1] = -m[0, 1] * id
+	c[1, 0] = -m[0, 1] * id
+	c[0, 1] = -m[1, 0] * id
 	c[1, 1] = +m[0, 0] * id
 	return c
 }
@@ -1191,8 +1191,8 @@ matrix2_inverse_transpose_f32 :: proc "contextless" (m: Matrix2f32) -> (c: Matri
 	d := m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 	id := 1.0/d
 	c[0, 0] = +m[1, 1] * id
-	c[1, 0] = -m[1, 0] * id
-	c[0, 1] = -m[0, 1] * id
+	c[1, 0] = -m[0, 1] * id
+	c[0, 1] = -m[1, 0] * id
 	c[1, 1] = +m[0, 0] * id
 	return c
 }
@@ -1201,8 +1201,8 @@ matrix2_inverse_transpose_f64 :: proc "contextless" (m: Matrix2f64) -> (c: Matri
 	d := m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 	id := 1.0/d
 	c[0, 0] = +m[1, 1] * id
-	c[1, 0] = -m[1, 0] * id
-	c[0, 1] = -m[0, 1] * id
+	c[1, 0] = -m[0, 1] * id
+	c[0, 1] = -m[1, 0] * id
 	c[1, 1] = +m[0, 0] * id
 	return c
 }
@@ -2933,12 +2933,10 @@ polar_from_euclidean_f16 :: proc "contextless" (euclidean: Vector3f16) -> Vector
 	n := length(euclidean)
 	tmp := euclidean / n
 
-	xz_dist := math.sqrt(tmp.x*tmp.x + tmp.z*tmp.z)
-
 	return {
 		math.asin(tmp.y),
 		math.atan2(tmp.x, tmp.z),
-		xz_dist,
+		n,
 	}
 }
 @(require_results)
@@ -2946,12 +2944,10 @@ polar_from_euclidean_f32 :: proc "contextless" (euclidean: Vector3f32) -> Vector
 	n := length(euclidean)
 	tmp := euclidean / n
 
-	xz_dist := math.sqrt(tmp.x*tmp.x + tmp.z*tmp.z)
-
 	return {
 		math.asin(tmp.y),
 		math.atan2(tmp.x, tmp.z),
-		xz_dist,
+		n,
 	}
 }
 @(require_results)
@@ -2959,12 +2955,10 @@ polar_from_euclidean_f64 :: proc "contextless" (euclidean: Vector3f64) -> Vector
 	n := length(euclidean)
 	tmp := euclidean / n
 
-	xz_dist := math.sqrt(tmp.x*tmp.x + tmp.z*tmp.z)
-
 	return {
 		math.asin(tmp.y),
 		math.atan2(tmp.x, tmp.z),
-		xz_dist,
+		n,
 	}
 }
 polar_from_euclidean :: proc{
