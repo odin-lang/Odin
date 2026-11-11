@@ -210,3 +210,24 @@ test_trig_groups :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@test
+test_pow_zero_base_nan_exponent :: proc(t: ^testing.T) {
+	inf := math.inf_f64(1)
+	nan := math.nan_f64()
+	neg_zero := math.copy_sign(f64(0), -1)
+
+	xs := []complex128{complex(0, 0), complex(neg_zero, 0), complex(0, neg_zero), complex(neg_zero, neg_zero)}
+	ys := []complex128{complex(nan, inf), complex(nan, -inf)}
+	want := complex(nan, nan)
+	for x in xs {
+		for y in ys {
+			got128 := cmplx.pow(x, y)
+			testing.expectf(t, same_complex(got128, want), "pow(%v, %v) = %v, want NaN", x, y, got128)
+			got64 := cmplx.pow(complex64(x), complex64(y))
+			testing.expectf(t, same_complex(got64, complex64(want)), "pow(complex64(%v), complex64(%v)) = %v, want NaN", x, y, got64)
+			got32 := cmplx.pow(complex32(x), complex32(y))
+			testing.expectf(t, same_complex(got32, complex32(want)), "pow(complex32(%v), complex32(%v)) = %v, want NaN", x, y, got32)
+		}
+	}
+}

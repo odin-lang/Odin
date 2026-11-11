@@ -329,7 +329,7 @@ pow_complex64 :: proc "contextless" (x, y: complex64) -> complex64 {
 		case r > 0:
 			return 0
 		}
-		unreachable()
+		return nan_complex64()
 	}
 	modulus := abs(x)
 	if modulus == 0 {
@@ -362,7 +362,7 @@ pow_complex128 :: proc "contextless" (x, y: complex128) -> complex128 {
 		case r > 0:
 			return 0
 		}
-		unreachable()
+		return nan_complex128()
 	}
 	modulus := abs(x)
 	if modulus == 0 {
