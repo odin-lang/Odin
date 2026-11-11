@@ -4905,8 +4905,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			{
 				Type *bt = base_type(operand->type);
+				if (are_types_identical(bt, t_complex32))  add_package_dependency(c, "runtime", "abs_complex32");
 				if (are_types_identical(bt, t_complex64))  add_package_dependency(c, "runtime", "abs_complex64");
 				if (are_types_identical(bt, t_complex128)) add_package_dependency(c, "runtime", "abs_complex128");
+				if (are_types_identical(bt, t_quaternion64))  add_package_dependency(c, "runtime", "abs_quaternion64");
 				if (are_types_identical(bt, t_quaternion128)) add_package_dependency(c, "runtime", "abs_quaternion128");
 				if (are_types_identical(bt, t_quaternion256)) add_package_dependency(c, "runtime", "abs_quaternion256");
 			}
