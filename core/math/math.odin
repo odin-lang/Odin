@@ -1115,23 +1115,13 @@ split_decimal :: modf
 
 @(require_results)
 mod_f16 :: proc "contextless" (x, y: f16) -> (n: f16) {
-	z := abs(y)
-	n = remainder(abs(x), z)
-	if sign(n) < 0 {
-		n += z
-	}
-	return copy_sign(n, x)
+	return f16(mod_f64(f64(x), f64(y)))
 }
 @(require_results) mod_f16le :: proc "contextless" (x, y: f16le) -> (n: f16le) { return #force_inline f16le(mod_f16(f16(x), f16(y))) }
 @(require_results) mod_f16be :: proc "contextless" (x, y: f16be) -> (n: f16be) { return #force_inline f16be(mod_f16(f16(x), f16(y))) }
 @(require_results)
 mod_f32 :: proc "contextless" (x, y: f32)   -> (n: f32) {
-	z := abs(y)
-	n = remainder(abs(x), z)
-	if sign(n) < 0 {
-		n += z
-	}
-	return copy_sign(n, x)
+	return f32(mod_f64(f64(x), f64(y)))
 }
 @(require_results)
 mod_f32le :: proc "contextless" (x, y: f32le) -> (n: f32le) { return #force_inline f32le(mod_f32(f32(x), f32(y))) }
@@ -1139,12 +1129,32 @@ mod_f32le :: proc "contextless" (x, y: f32le) -> (n: f32le) { return #force_inli
 mod_f32be :: proc "contextless" (x, y: f32be) -> (n: f32be) { return #force_inline f32be(mod_f32(f32(x), f32(y))) }
 @(require_results)
 mod_f64 :: proc "contextless" (x, y: f64)   -> (n: f64) {
-	z := abs(y)
-	n = remainder(abs(x), z)
-	if sign(n) < 0 {
-		n += z
+	switch {
+	case is_nan(x) || is_nan(y) || is_inf(x) || y == 0:
+		return nan_f64()
+	case is_inf(y) || abs(x) < abs(y):
+		return x
 	}
-	return copy_sign(n, x)
+	ux, uy := transmute(u64)abs(x), transmute(u64)abs(y)
+	ex, ey := int(ux >> F64_SHIFT), int(uy >> F64_SHIFT)
+	mx, my := ux & (1<<F64_SHIFT - 1), uy & (1<<F64_SHIFT - 1)
+	if ex == 0 {
+		ex = 1
+	} else {
+		mx |= 1 << F64_SHIFT
+	}
+	if ey == 0 {
+		ey = 1
+	} else {
+		my |= 1 << F64_SHIFT
+	}
+	for ex > ey {
+		step := min(ex - ey, 63 - F64_SHIFT)
+		mx = (mx << uint(step)) % my
+		ex -= step
+	}
+	mx %= my
+	return copy_sign(ldexp(f64(mx), ey - F64_BIAS - F64_SHIFT), x)
 }
 @(require_results)
 mod_f64le :: proc "contextless" (x, y: f64le) -> (n: f64le) { return #force_inline f64le(mod_f64(f64(x), f64(y))) }
