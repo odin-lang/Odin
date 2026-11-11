@@ -206,10 +206,8 @@ test_unix :: proc(t: ^testing.T) {
 		ids: [dynamic]zip.Extra_ID
 		defer delete(ids)
 		extra := entry.local_extra
-		for len(extra) >= 4 {
-			size := int(extra[2]) | int(extra[3]) << 8
-			append(&ids, zip.Extra_ID(u16(extra[0]) | u16(extra[1]) << 8))
-			extra = extra[min(4 + size, len(extra)):]
+		for id in zip.next_extra(&extra) {
+			append(&ids, id)
 		}
 		testing.expectf(t, len(ids) == 2 && ids[0] == .Timestamp && ids[1] == .Unix, "%s: local extras %v", fi.path, ids[:])
 	}

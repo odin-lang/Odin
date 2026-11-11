@@ -8,21 +8,6 @@ import "core:hash"
 import "core:time"
 import "core:unicode/utf8"
 
-next_extra :: proc "contextless" (extra: ^[]u8) -> (id: Extra_ID, data: []u8, ok: bool) {
-	e := extra^
-	if len(e) < 4 {
-		return
-	}
-	size := int(_u16(e, 2))
-	if 4 + size > len(e) {
-		return
-	}
-	id     = Extra_ID(_u16(e, 0))
-	data   = e[4:][:size]
-	extra^ = e[4 + size:]
-	return id, data, true
-}
-
 find_extra :: proc "contextless" (extra: []u8, want: Extra_ID) -> (data: []u8, ok: bool) {
 	extra := extra
 	for id, found in next_extra(&extra) {

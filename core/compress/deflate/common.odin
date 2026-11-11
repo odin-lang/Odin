@@ -39,6 +39,8 @@ DEFLATE_RAW_BLOCK_SIZE :: 65535
 DEFLATE_BLOCK_MAX      :: DEFLATE_RAW_BLOCK_SIZE
 DEFLATE_INPUT_MAX      :: max(int) - (max(int) >> 8)
 DEFLATE_SLIDE_SIZE     :: 1 << 30
+DEFLATE_LOOKAHEAD      :: DEFLATE_MATCH_MIN + 1
+DEFLATE_CHUNK_SIZE     :: 256 * 1024
 
 DEFLATE_DISTANCE_MAX     :: 1 << 15
 DEFLATE_WINDOW_SIZE      :: DEFLATE_DISTANCE_MAX
@@ -117,10 +119,13 @@ Deflate_Sequence :: struct {
 
 // This struct is ~400kiB: allocate it with `new` rather than on the stack.
 Deflate :: struct {
-	bit_buffer: u64,
-	bit_count:  i32,
-	hash_head:  [DEFLATE_HASH_SIZE]u16,
-	hash_chain: [DEFLATE_WINDOW_SIZE]u16,
+	bit_buffer:    u64,
+	bit_count:     i32,
+	position:      i32,
+	hash_base:     i32,
+	last_distance: i32,
+	hash_head:     [DEFLATE_HASH_SIZE]u16,
+	hash_chain:    [DEFLATE_WINDOW_SIZE]u16,
 
 	sequence_count: i32,
 	sequences:      [DEFLATE_SEQUENCE_SIZE]Deflate_Sequence,
@@ -131,10 +136,13 @@ Deflate :: struct {
 
 // This struct is ~800kiB: allocate it with `new` rather than on the stack.
 Deflate64 :: struct {
-	bit_buffer: u64,
-	bit_count:  i32,
-	hash_head:  [DEFLATE64_HASH_SIZE]u32,
-	hash_chain: [DEFLATE64_WINDOW_SIZE]u32,
+	bit_buffer:    u64,
+	bit_count:     i32,
+	position:      i32,
+	hash_base:     i32,
+	last_distance: i32,
+	hash_head:     [DEFLATE64_HASH_SIZE]u32,
+	hash_chain:    [DEFLATE64_WINDOW_SIZE]u32,
 
 	sequence_count: i32,
 	sequences:      [DEFLATE_SEQUENCE_SIZE]Deflate_Sequence,
@@ -176,6 +184,26 @@ Deflate_Block_Type :: enum {
 Deflate_Match :: struct {
 	distance: i32,
 	length:   i32,
+}
+
+Deflate_Format :: enum u8 {Raw, Zlib, Gzip, Raw64}
+
+Deflate_Writer :: struct {
+	w:           io.Writer,
+	state:       ^Deflate,
+	state64:     ^Deflate64,
+	window:      []u8,
+	out:         []u8,
+	filled:      int,
+	out_len:     int,
+	total:       i64,
+	digest:      u32,
+	err:         Error,
+	allocator:   runtime.Allocator,
+	level:       Deflate_Level,
+	format:      Deflate_Format,
+	finished:    bool,
+	owns_window: bool,
 }
 
 Deflate_To_Slice   :: #type proc(s: ^Deflate,   output, input: []u8, level: Deflate_Level) -> (written: int, err: Error)
