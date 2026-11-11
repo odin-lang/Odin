@@ -61,40 +61,40 @@ atanh :: proc{
 
 
 acos_complex32 :: proc "contextless" (x: complex32) -> complex32 {
-	return complex32(acos_complex64(complex64(x)))
+	return complex32(acos_complex128(complex128(x)))
 }
 acos_complex64 :: proc "contextless" (x: complex64) -> complex64 {
-	w := asin(x)
-	return complex(math.PI/2 - real(w), -imag(w))
+	return complex64(acos_complex128(complex128(x)))
 }
 acos_complex128 :: proc "contextless" (x: complex128) -> complex128 {
-	w := asin(x)
-	return complex(math.PI/2 - real(w), -imag(w))
+	re, im := real(x), imag(x)
+	if math.is_inf(re, 0) || math.is_nan(re) || math.is_inf(im, 0) || math.is_nan(im) {
+		w := asin(x)
+		return complex(math.PI/2 - real(w), -imag(w))
+	}
+	_, cr, ci := _asin_core_f64(abs(re), abs(im))
+	if math.sign_bit(re) {
+		cr = math.PI - cr
+	}
+	return complex(cr, -math.copy_sign(ci, im))
 }
 
 
 acosh_complex32 :: proc "contextless" (x: complex32) -> complex32 {
-	return complex32(acosh_complex64(complex64(x)))
+	return complex32(acosh_complex128(complex128(x)))
 }
 acosh_complex64 :: proc "contextless" (x: complex64) -> complex64 {
-	if x == 0 {
-		return complex(0, math.copy_sign(math.PI/2, imag(x)))
-	}
-	w := acos(x)
-	if imag(w) <= 0 {
-		return complex(-imag(w), real(w))
-	}
-	return complex(imag(w), -real(w))
+	return complex64(acosh_complex128(complex128(x)))
 }
 acosh_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	if x == 0 {
 		return complex(0, math.copy_sign(math.PI/2, imag(x)))
 	}
-	w := acos(x)
-	if imag(w) <= 0 {
-		return complex(-imag(w), real(w))
+	if math.is_nan(imag(x)) && !math.is_inf(real(x), 0) {
+		return complex(imag(x), imag(x))
 	}
-	return complex(imag(w), -real(w))
+	w := acos(x)
+	return complex(abs(imag(w)), math.copy_sign(real(w), imag(x)))
 }
 
 asin_complex32 :: proc "contextless" (x: complex32) -> complex32 {
@@ -130,12 +130,8 @@ asin_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	case math.is_inf(re, 0):
 		return complex(math.copy_sign(math.PI/2, re), math.copy_sign(re, im))
 	}
-	ct := complex(-imag(x), real(x)) // i * x
-	xx := x * x
-	x1 := complex(1-real(xx), -imag(xx)) // 1 - x*x
-	x2 := sqrt(x1)                       // x2 = sqrt(1 - x*x)
-	w  := ln(ct + x2)
-	return complex(imag(w), -real(w)) // -i * w
+	ar, _, ai := _asin_core_f64(abs(real(x)), abs(imag(x)))
+	return complex(math.copy_sign(ar, real(x)), math.copy_sign(ai, imag(x)))
 }
 
 asinh_complex32 :: proc "contextless" (x: complex32) -> complex32 {
@@ -171,9 +167,8 @@ asinh_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	case math.is_inf(im, 0):
 		return complex(math.copy_sign(im, re), math.copy_sign(math.PI/2, im))
 	}
-	xx := x * x
-	x1 := complex(1+real(xx), imag(xx)) // 1 + x*x
-	return ln(x + sqrt(x1))            // log(x + sqrt(1 + x*x))
+	ar, _, ai := _asin_core_f64(abs(imag(x)), abs(real(x)))
+	return complex(math.copy_sign(ai, real(x)), math.copy_sign(ar, imag(x)))
 }
 
 
@@ -260,4 +255,59 @@ atanh_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	z := complex(-imag(x), real(x)) // z = i * x
 	z = atan(z)
 	return complex(imag(z), -real(z)) // z = -i * z
+}
+
+
+@(private="file")
+_asin_core_f64 :: proc "contextless" (x, y: f64) -> (asin_re, acos_re, im: f64) {
+	A_CROSS   :: 1.5
+	B_CROSS   :: 0.6417
+	LARGE     :: f64(1 << 500)
+	NEAR_ZERO :: 1.0 / (1 << 27)
+	TINY      :: 1.0 / (1 << 511)
+
+	if x > LARGE || y > LARGE {
+		return math.atan2(x, y), math.atan2(y, x), math.LN2 + _ln_abs_f64(x, y)
+	}
+	if x < NEAR_ZERO && y < NEAR_ZERO {
+		return x, math.PI/2 - x, y
+	}
+
+	xp1 := x + 1
+	xm1 := x - 1
+	r := math.hypot(xp1, y)
+	s := math.hypot(xm1, y)
+	a := 0.5 * (r + s)
+	b := x / a
+	y2 := y * y
+
+	if x < 1 && y < TINY {
+		im = y / math.sqrt((1 - x)*(1 + x))
+	} else if a <= A_CROSS {
+		t: f64
+		if x < 1 {
+			t = y2/(r + xp1) + y2/(s + (1 - x))
+		} else {
+			t = y2/(r + xp1) + (s + xm1)
+		}
+		im = math.log1p(0.5*t + math.sqrt(t*(a + 1)*0.5))
+	} else {
+		im = math.ln(a + math.sqrt(a*a - 1))
+	}
+
+	if b <= B_CROSS {
+		asin_re = math.asin(b)
+		acos_re = math.acos(b)
+	} else {
+		apx := a + x
+		d: f64
+		if x <= 1 {
+			d = math.sqrt(0.5 * apx * (y2/(r + xp1) + (s + (1 - x))))
+		} else {
+			d = y * math.sqrt(0.5 * (apx/(r + xp1) + apx/(s + xm1)))
+		}
+		asin_re = math.atan2(x, d)
+		acos_re = math.atan2(d, x)
+	}
+	return
 }

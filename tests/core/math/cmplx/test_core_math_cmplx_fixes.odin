@@ -546,3 +546,160 @@ test_tan_tanh_cot :: proc(t: ^testing.T) {
 		testing.expectf(t, cmplx.abs(p - 1) < 4*math.F64_EPSILON, "tan(%v)*cot(%v) = %v, want 1", z, z, p)
 	}
 }
+
+@test
+test_asin_acos_asinh_acosh :: proc(t: ^testing.T) {
+	inf := math.inf_f64(1)
+	nan := math.nan_f64()
+	neg_zero := math.copy_sign(f64(0), -1)
+	signs := [2]f64{1, -1}
+
+	asinh_cases := []Special{
+		{0, 0, complex(0, 0), false, false},
+		{0, inf, complex(inf, math.PI/2), false, false},
+		{1, inf, complex(inf, math.PI/2), false, false},
+		{0, nan, complex(nan, nan), false, false},
+		{1, nan, complex(nan, nan), false, false},
+		{inf, 0, complex(inf, 0), false, false},
+		{inf, 1, complex(inf, 0), false, false},
+		{inf, inf, complex(inf, math.PI/4), false, false},
+		{inf, nan, complex(inf, nan), false, false},
+		{nan, 0, complex(nan, 0), false, false},
+		{nan, 1, complex(nan, nan), false, false},
+		{nan, inf, complex(inf, nan), true, false},
+		{nan, nan, complex(nan, nan), false, false},
+	}
+	for c in asinh_cases {
+		for sx in signs {
+			for sy in signs {
+				z := complex(sx*c.x, sy*c.y)
+				want := complex(sx*real(c.want), sy*imag(c.want))
+				got := cmplx.asinh(z)
+				testing.expectf(t, same_special(got, want, c.any_re_sign, c.any_im_sign), "asinh(%v) = %v, want %v", z, got, want)
+
+				zs := complex(imag(z), -real(z))
+				want_asin := complex(imag(want), -real(want))
+				got = cmplx.asin(zs)
+				testing.expectf(t, same_special(got, want_asin, c.any_im_sign, c.any_re_sign), "asin(%v) = %v, want %v", zs, got, want_asin)
+			}
+		}
+	}
+
+	acos_cases := []Special{
+		{0, 0, complex(math.PI/2, neg_zero), false, false},
+		{neg_zero, 0, complex(math.PI/2, neg_zero), false, false},
+		{0, nan, complex(math.PI/2, nan), false, false},
+		{neg_zero, nan, complex(math.PI/2, nan), false, false},
+		{0, inf, complex(math.PI/2, -inf), false, false},
+		{1, inf, complex(math.PI/2, -inf), false, false},
+		{-1, inf, complex(math.PI/2, -inf), false, false},
+		{1, nan, complex(nan, nan), false, false},
+		{-inf, 0, complex(math.PI, -inf), false, false},
+		{-inf, 1, complex(math.PI, -inf), false, false},
+		{inf, 0, complex(0, -inf), false, false},
+		{inf, 1, complex(0, -inf), false, false},
+		{-inf, inf, complex(3*math.PI/4, -inf), false, false},
+		{inf, inf, complex(math.PI/4, -inf), false, false},
+		{-inf, nan, complex(nan, inf), false, true},
+		{inf, nan, complex(nan, inf), false, true},
+		{nan, 0, complex(nan, nan), false, false},
+		{nan, 1, complex(nan, nan), false, false},
+		{nan, inf, complex(nan, -inf), false, false},
+		{nan, nan, complex(nan, nan), false, false},
+	}
+	acosh_cases := []Special{
+		{0, 0, complex(0, math.PI/2), false, false},
+		{neg_zero, 0, complex(0, math.PI/2), false, false},
+		{0, inf, complex(inf, math.PI/2), false, false},
+		{1, inf, complex(inf, math.PI/2), false, false},
+		{-1, inf, complex(inf, math.PI/2), false, false},
+		{0, nan, complex(nan, nan), false, false},
+		{1, nan, complex(nan, nan), false, false},
+		{-inf, 0, complex(inf, math.PI), false, false},
+		{-inf, 1, complex(inf, math.PI), false, false},
+		{inf, 0, complex(inf, 0), false, false},
+		{inf, 1, complex(inf, 0), false, false},
+		{-inf, inf, complex(inf, 3*math.PI/4), false, false},
+		{inf, inf, complex(inf, math.PI/4), false, false},
+		{-inf, nan, complex(inf, nan), false, false},
+		{inf, nan, complex(inf, nan), false, false},
+		{nan, 0, complex(nan, nan), false, false},
+		{nan, 1, complex(nan, nan), false, false},
+		{nan, inf, complex(inf, nan), false, false},
+		{nan, nan, complex(nan, nan), false, false},
+	}
+	for c in acos_cases {
+		for sy in signs {
+			z := complex(c.x, sy*c.y)
+			want := complex(real(c.want), sy*imag(c.want))
+			got := cmplx.acos(z)
+			testing.expectf(t, same_special(got, want, c.any_re_sign, c.any_im_sign), "acos(%v) = %v, want %v", z, got, want)
+		}
+	}
+	for c in acosh_cases {
+		for sy in signs {
+			z := complex(c.x, sy*c.y)
+			want := complex(real(c.want), sy*imag(c.want))
+			got := cmplx.acosh(z)
+			testing.expectf(t, same_special(got, want, c.any_re_sign, c.any_im_sign), "acosh(%v) = %v, want %v", z, got, want)
+		}
+	}
+
+	E :: 1.0 / (1 << 30)
+	Case :: struct {
+		name: string,
+		f:    proc "contextless" (complex128) -> complex128,
+		x:    complex128,
+		want: complex128,
+	}
+	cases := []Case{
+		{"asin", cmplx.asin, complex(0, 1e10), complex(0, 23.7189981105004)},
+		{"asin", cmplx.asin, complex(1e200, 1), complex(math.PI/2, 461.2101657793691)},
+		{"acos", cmplx.acos, complex(1e200, 1), complex(1e-200, -461.2101657793691)},
+		{"asin", cmplx.asin, complex(0, 1e4), complex(0, 9.903487555036127)},
+		{"asin", cmplx.asin, complex(0.5, 1e-20), complex(0.5235987755982989, 1.1547005383792515e-20)},
+		{"asinh", cmplx.asinh, complex(1e-20, 0.8), complex(1.6666666666666668e-20, 0.9272952180016123)},
+		{"acosh", cmplx.acosh, complex(0.5, neg_zero), complex(0, -1.0471975511965979)},
+
+		{"asin", cmplx.asin, complex(1 + E, 0), complex(math.PI/2, 4.315837287180596e-05)},
+		{"asin", cmplx.asin, complex(1 - E, E), complex(1.5707489093762534, 1.964093789905154e-05)},
+		{"asin", cmplx.asin, complex(1 + E, E), complex(1.570776685857008, 4.741741863889765e-05)},
+		{"asin", cmplx.asin, complex(-1 - E, -E), complex(-1.570776685857008, -4.741741863889765e-05)},
+		{"acos", cmplx.acos, complex(1 + E, 0), complex(0, -4.315837287180596e-05)},
+		{"acos", cmplx.acos, complex(1 - E, E), complex(4.7417418643209126e-05, -1.964093789905154e-05)},
+		{"acos", cmplx.acos, complex(-1 + E, E), complex(3.14154523617115, -1.964093789905154e-05)},
+		{"acos", cmplx.acos, complex(-1 - E, -E), complex(3.1415730126519046, 4.741741863889765e-05)},
+		{"asinh", cmplx.asinh, complex(0, 1 + E), complex(4.315837287180596e-05, math.PI/2)},
+		{"asinh", cmplx.asinh, complex(E, 1 - E), complex(1.964093789905154e-05, 1.5707489093762534)},
+		{"asinh", cmplx.asinh, complex(-E, -1 - E), complex(-4.741741863889765e-05, -1.570776685857008)},
+		{"acosh", cmplx.acosh, complex(1 + E, 0), complex(4.315837287180596e-05, 0)},
+		{"acosh", cmplx.acosh, complex(1 - E, E), complex(1.964093789905154e-05, 4.7417418643209126e-05)},
+		{"acosh", cmplx.acosh, complex(-1 + E, -E), complex(1.964093789905154e-05, -3.14154523617115)},
+		{"acosh", cmplx.acosh, complex(-1 - E, E), complex(4.741741863889765e-05, 3.1415730126519046)},
+
+		{"asin", cmplx.asin, complex(2, 0), complex(math.PI/2, 1.3169578969248168)},
+		{"asin", cmplx.asin, complex(2, neg_zero), complex(math.PI/2, -1.3169578969248168)},
+		{"asin", cmplx.asin, complex(-2, 0), complex(-math.PI/2, 1.3169578969248168)},
+		{"asin", cmplx.asin, complex(-2, neg_zero), complex(-math.PI/2, -1.3169578969248168)},
+		{"acos", cmplx.acos, complex(2, 0), complex(0, -1.3169578969248168)},
+		{"acos", cmplx.acos, complex(2, neg_zero), complex(0, 1.3169578969248168)},
+		{"acos", cmplx.acos, complex(-2, 0), complex(math.PI, -1.3169578969248168)},
+		{"acos", cmplx.acos, complex(-2, neg_zero), complex(math.PI, 1.3169578969248168)},
+		{"asinh", cmplx.asinh, complex(0, 2), complex(1.3169578969248168, math.PI/2)},
+		{"asinh", cmplx.asinh, complex(neg_zero, 2), complex(-1.3169578969248168, math.PI/2)},
+		{"asinh", cmplx.asinh, complex(0, -2), complex(1.3169578969248168, -math.PI/2)},
+		{"asinh", cmplx.asinh, complex(neg_zero, -2), complex(-1.3169578969248168, -math.PI/2)},
+		{"acosh", cmplx.acosh, complex(0.5, 0), complex(0, 1.0471975511965979)},
+		{"acosh", cmplx.acosh, complex(-2, 0), complex(1.3169578969248168, math.PI)},
+		{"acosh", cmplx.acosh, complex(-2, neg_zero), complex(1.3169578969248168, -math.PI)},
+
+		{"asin", cmplx.asin, complex(6e299, 8e299), complex(0.6435011087932844, 691.4686750787737)},
+		{"acos", cmplx.acos, complex(-6e299, 8e299), complex(2.214297435588181, -691.4686750787737)},
+		{"asinh", cmplx.asinh, complex(6e299, -8e299), complex(691.4686750787737, -0.9272952180016122)},
+		{"acosh", cmplx.acosh, complex(-6e299, -8e299), complex(691.4686750787737, -2.214297435588181)},
+	}
+	for c in cases {
+		got := c.f(c.x)
+		testing.expectf(t, close_complex(got, c.want), "%s(%v) = %v, want %v", c.name, c.x, got, c.want)
+	}
+}
