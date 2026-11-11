@@ -85,17 +85,11 @@ internal_int_power_modulo :: proc(res, G, X, P: ^Int, allocator := context.alloc
 	}
 
 	/*
-		Is it a DR modulus? default to no.
+		Is it an unrestricted DR modulus, of the form `2**k - b`?
+		`_private_int_reduce_is_2k_l` above has already claimed the restricted DR moduli.
 	*/
-	dr = 1 if _private_dr_is_modulus(P) else 0
-
-	/*
-		If not, is it a unrestricted DR modulus?
-	*/
-	if dr == 0 {
-		reduce_is_2k := _private_int_reduce_is_2k(P) or_return
-		dr = 2 if reduce_is_2k else 0
-	}
+	reduce_is_2k := _private_int_reduce_is_2k(P) or_return
+	dr = 2 if reduce_is_2k else 0
 
 	/*
 		If the modulus is odd or dr != 0 use the montgomery method.

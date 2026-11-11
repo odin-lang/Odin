@@ -789,3 +789,294 @@ test_fix_copy_digits_bounds :: proc(t: ^testing.T) {
 	testing.expect_value(t, big.copy_digits(b, a, 1, -1), big.Error.Invalid_Argument)
 	testing.expect_value(t, big.copy_digits(b, a, 1, 4), big.Error.Invalid_Argument)
 }
+
+@(private="file")
+fix_expect_hex :: proc(t: ^testing.T, got: ^big.Int, expected: string, loc := #caller_location) {
+	s, err := big.int_itoa_string(got, 16, false, context.temp_allocator)
+	testing.expect_value(t, err, nil, loc=loc)
+	testing.expect_value(t, s, expected, loc=loc)
+}
+
+@(private="file")
+fix_ones :: proc(a: ^big.Int, limbs: int) {
+	big.power_of_two(a, limbs * big._DIGIT_BITS)
+	big.sub(a, a, 1)
+}
+
+@(private="file")
+fix_ones_product :: proc(e, tmp: ^big.Int, m, n: int) {
+	big.power_of_two(e, (m + n) * big._DIGIT_BITS)
+	big.add(e, e, 1)
+	big.power_of_two(tmp, m * big._DIGIT_BITS)
+	big.sub(e, e, tmp)
+	big.power_of_two(tmp, n * big._DIGIT_BITS)
+	big.sub(e, e, tmp)
+}
+
+@(test)
+test_fix_cutoffs_below_minimum :: proc(t: ^testing.T) {
+	mk, sk, mt, st := big.MUL_KARATSUBA_CUTOFF, big.SQR_KARATSUBA_CUTOFF, big.MUL_TOOM_CUTOFF, big.SQR_TOOM_CUTOFF
+	defer big.MUL_KARATSUBA_CUTOFF, big.SQR_KARATSUBA_CUTOFF, big.MUL_TOOM_CUTOFF, big.SQR_TOOM_CUTOFF = mk, sk, mt, st
+
+	a, b, c, e, tmp, q, r := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
+	defer big.destroy(a, b, c, e, tmp, q, r)
+
+	settings := [?][4]int{{0, 0, 0, 0}, {1, 1, 2, 2}, {2, 2, 3, 3}}
+	shapes   := [?][2]int{{1, 1}, {1, 2}, {2, 2}, {2, 3}, {3, 3}, {3, 7}, {5, 5}, {9, 4}}
+
+	for s in settings {
+		big.MUL_KARATSUBA_CUTOFF, big.SQR_KARATSUBA_CUTOFF, big.MUL_TOOM_CUTOFF, big.SQR_TOOM_CUTOFF = s[0], s[1], s[2], s[3]
+
+		for shape in shapes {
+			fix_ones(a, shape[0])
+			fix_ones(b, shape[1])
+
+			fix_ones_product(e, tmp, shape[0], shape[1])
+			testing.expect_value(t, big.mul(c, a, b), nil)
+			equal, _ := big.equals(c, e)
+			testing.expectf(t, equal, "cutoffs %v: mul of %v and %v limbs of ones is wrong", s, shape[0], shape[1])
+
+			fix_ones_product(e, tmp, shape[0], shape[0])
+			testing.expect_value(t, big.sqr(c, a), nil)
+			equal, _ = big.equals(c, e)
+			testing.expectf(t, equal, "cutoffs %v: sqr of %v limbs of ones is wrong", s, shape[0])
+		}
+
+		fix_ones(a, 3)
+		fix_ones(b, 2)
+		testing.expect_value(t, big._private_int_div_recursive(q, r, a, b), nil)
+		fix_expect_hex(t, q, "8000000000000000")
+		fix_expect_hex(t, r, "7FFFFFFFFFFFFFFF")
+
+		fix_ones(a, 30)
+		fix_ones(b, 9)
+		testing.expect_value(t, big.divmod(q, r, a, b), nil)
+		big.mul(c, q, b)
+		big.add(c, c, r)
+		equal, _ := big.equals(c, a)
+		testing.expectf(t, equal, "cutoffs %v: divmod doesn't round-trip", s)
+		less, _ := big.lt(r, b)
+		testing.expectf(t, less, "cutoffs %v: divmod remainder isn't below the divisor", s)
+	}
+}
+
+@(test)
+test_fix_mul_high_small_digits :: proc(t: ^testing.T) {
+	a, c := &big.Int{}, &big.Int{}
+	defer big.destroy(a, c)
+
+	fix_ones(a, 5)
+	testing.expect_value(t, big._private_int_mul_high(c, a, a, 1), nil)
+	fix_expect_hex(t, c, "3FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC0000000000000010000000000000000")
+}
+
+@(test)
+test_fix_comba_result_is_non_negative :: proc(t: ^testing.T) {
+	a, b := &big.Int{}, &big.Int{}
+	defer big.destroy(a, b)
+
+	big.set(a, -3)
+	big.set(b, 5)
+	testing.expect_value(t, big._private_int_mul(a, a, b, 4), nil)
+	fix_expect(t, a, "15")
+
+	big.set(a, -3)
+	testing.expect_value(t, big._private_int_sqr_comba(a, a), nil)
+	fix_expect(t, a, "9")
+
+	big.set(a, -3)
+	testing.expect_value(t, big._private_int_mul_high(a, a, b, 0), nil)
+	fix_expect(t, a, "15")
+}
+
+@(test)
+test_fix_private_division_numerator_smaller :: proc(t: ^testing.T) {
+	a, b, q, r := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
+	defer big.destroy(a, b, q, r)
+
+	big.set(a, -5)
+	big.set(b, 7)
+	testing.expect_value(t, big._private_int_div_school(q, r, a, b), nil)
+	fix_expect(t, q, "0")
+	fix_expect(t, r, "-5")
+
+	big.power_of_two(a, 130)
+	big.add(a, a, 5)
+	big.neg(a, a)
+	big.power_of_two(b, 130)
+	big.add(b, b, 7)
+	testing.expect_value(t, big._private_int_div_recursive(q, r, a, b), nil)
+	fix_expect(t, q, "0")
+	fix_expect(t, r, "-1361129467683753853853498429727072845829")
+
+	big.set(a, 5)
+	testing.expect_value(t, big._private_int_div_recursive(q, r, a, b), nil)
+	fix_expect(t, q, "0")
+	fix_expect(t, r, "5")
+}
+
+@(test)
+test_fix_invmod_negative :: proc(t: ^testing.T) {
+	a, m, r := &big.Int{}, &big.Int{}, &big.Int{}
+	defer big.destroy(a, m, r)
+
+	Case :: struct {
+		a, m, inv: string,
+	}
+	cases := []Case{
+		{"-1",                    "3",                                       "2"},
+		{"-2",                    "3",                                       "1"},
+		{"-3",                    "7",                                       "2"},
+		{"-3",                    "8",                                       "5"},
+		{"-2",                    "1073741821",                              "536870910"},
+		{"-50400527088052790036", "1706537743302510733",                     "602917333812113116"},
+		{"-10",                   "170141183460469231731687303715884105727", "51042355038140769519506191114765231718"},
+		{"3",                     "7",                                       "5"},
+	}
+	for c in cases {
+		fix_set(t, a, c.a)
+		fix_set(t, m, c.m)
+		testing.expect_value(t, big.internal_int_inverse_modulo(r, a, m), nil)
+		fix_expect(t, r, c.inv)
+	}
+
+	g, x, p := &big.Int{}, &big.Int{}, &big.Int{}
+	defer big.destroy(g, x, p)
+
+	Pow_Case :: struct {
+		g, x, p, pow: int,
+	}
+	pow_cases := []Pow_Case{
+		{-3, -1,  7,  2},
+		{-2, -1,  5,  2},
+		{-7, -3, 97, 69},
+	}
+	for c in pow_cases {
+		big.set(g, c.g)
+		big.set(x, c.x)
+		big.set(p, c.p)
+		testing.expect_value(t, big.internal_int_power_modulo(r, g, x, p), nil)
+		equal, _ := big.equals(r, big.DIGIT(c.pow))
+		testing.expectf(t, equal, "powmod(%v, %v, %v) is wrong", c.g, c.x, c.p)
+	}
+}
+
+@(test)
+test_fix_powmod_2k_modulus_with_zero_low_digit :: proc(t: ^testing.T) {
+	Case :: struct {
+		g, x, p, pow: string,
+	}
+	cases := []Case{
+		{"2",                         "46",    "18000000000000000",                "10000000000000000"},
+		{"123456789ABCDEF0123456789", "10001", "1FFFFFFFFFFFFFFF8000000000000000", "4BDF16062556D4D32256B2357ED6789"},
+	}
+	g, x, p, r := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
+	defer big.destroy(g, x, p, r)
+	for c in cases {
+		testing.expect_value(t, big.atoi(g, c.g, 16), nil)
+		testing.expect_value(t, big.atoi(x, c.x, 16), nil)
+		testing.expect_value(t, big.atoi(p, c.p, 16), nil)
+		reducible, _ := big._private_int_reduce_is_2k(p)
+		testing.expect(t, !reducible)
+		testing.expect_value(t, big.internal_int_power_modulo(r, g, x, p), nil)
+		fix_expect_hex(t, r, c.pow)
+	}
+}
+
+@(test)
+test_fix_powmod_aliasing :: proc(t: ^testing.T) {
+	Case :: struct {
+		p, pow: string,
+	}
+	cases := []Case{
+		{"8FC686F9FD800FF",                                                 "8F688E472CB1AFC"},
+		{"10000000000000001",                                               "9B016010E3B29A07"},
+		{"95506A7A4B402C9E740B6578A96AB462BFD9A7F2C5882369CFCDD00F7A3D667", "4053233023EB85D46542AEC472FF5B3A696B3D1A7A853F4A8D9FA028ECAE348"},
+		{"1FFFFFFFFFFFFFFFFFFFFFFD",                                        "13E79A13BADC724D57973CBB"},
+		{"B01B03F9BC6ACEC627A855ADB434B24",                                 "AF3C05700C011C289BD1B705F387F07"},
+	}
+	g, x, p, r := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
+	defer big.destroy(g, x, p, r)
+	for c in cases {
+		testing.expect_value(t, big.atoi(g, "1234567890ABCDEF1234567", 16), nil)
+		testing.expect_value(t, big.atoi(x, "10001", 16), nil)
+		testing.expect_value(t, big.atoi(p, c.p, 16), nil)
+
+		testing.expect_value(t, big.internal_int_power_modulo(r, g, x, p), nil)
+		fix_expect_hex(t, r, c.pow)
+
+		big.copy(r, g)
+		testing.expect_value(t, big.internal_int_power_modulo(r, r, x, p), nil)
+		fix_expect_hex(t, r, c.pow)
+
+		big.copy(r, x)
+		testing.expect_value(t, big.internal_int_power_modulo(r, g, r, p), nil)
+		fix_expect_hex(t, r, c.pow)
+
+		big.copy(r, p)
+		testing.expect_value(t, big.internal_int_power_modulo(r, g, x, r), nil)
+		fix_expect_hex(t, r, c.pow)
+	}
+
+	big.set(g, 3)
+	big.set(x, 5)
+	big.set(p, 97)
+	testing.expect_value(t, big.internal_int_power_modulo(x, g, x, p), nil)
+	fix_expect(t, x, "49")
+
+	big.set(x, 5)
+	testing.expect_value(t, big.internal_int_power_modulo(p, g, x, p), nil)
+	fix_expect(t, p, "49")
+
+	fix_set(t, p, "18446744073709551557")
+	testing.expect_value(t, big.internal_int_power_modulo(g, g, x, p), nil)
+	fix_expect(t, g, "243")
+}
+
+@(test)
+test_fix_powmod_diminished_radix_moduli :: proc(t: ^testing.T) {
+	g, x, p, r := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
+	defer big.destroy(g, x, p, r)
+
+	big.set(g, 3)
+	big.power_of_two(x, 100)
+	big.add(x, x, 1)
+	big.power_of_two(p, 126)
+	big.sub(p, p, 5)
+	testing.expect_value(t, big.internal_int_power_modulo(r, g, x, p), nil)
+	fix_expect(t, r, "76175742892888567509066520953182919715")
+
+	testing.expect_value(t, big.atoi(g, "1234567890ABCDEF1234567", 16), nil)
+	testing.expect_value(t, big.atoi(x, "10001", 16), nil)
+	big.power_of_two(p, 189)
+	big.sub(p, p, 1257)
+	testing.expect_value(t, big.internal_int_power_modulo(r, g, x, p), nil)
+	fix_expect(t, r, "458875556025950998708974390212727194273531641410459905588")
+}
+
+@(test)
+test_fix_private_copy_digits_bounds :: proc(t: ^testing.T) {
+	buf: [1024]byte
+	arena: mem.Arena
+	mem.arena_init(&arena, buf[:])
+	arena_allocator := mem.arena_allocator(&arena)
+
+	src, dest := &big.Int{}, &big.Int{}
+	testing.expect_value(t, big.internal_grow(src, 4, true, arena_allocator), nil)
+	after := make([]big.DIGIT, 4, arena_allocator)
+	for i in 0..<4 {
+		src.digit[i] = big.DIGIT(i + 1)
+		after[i]     = 24158
+	}
+	src.used = 4
+	testing.expect_value(t, big.internal_grow(dest, 8, true, arena_allocator), nil)
+
+	testing.expect_value(t, big._private_copy_digits(dest, src, 4, 2), nil)
+	testing.expect_value(t, dest.digit[0], 3)
+	testing.expect_value(t, dest.digit[1], 4)
+	testing.expect_value(t, dest.digit[2], 0)
+	testing.expect_value(t, dest.digit[3], 0)
+
+	testing.expect_value(t, big._private_copy_digits(dest, src, 1, -1), big.Error.Invalid_Argument)
+	testing.expect_value(t, big._private_copy_digits(dest, src, -1, 0), big.Error.Invalid_Argument)
+}
