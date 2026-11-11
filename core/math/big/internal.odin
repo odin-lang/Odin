@@ -816,40 +816,38 @@ internal_int_divmod_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT,
 	}
 
 	/*
-		Three?
+		One digit: a plain division.
 	*/
-	if denominator == 3 {
-		return _private_int_div_3(quotient, numerator)
+	if numerator.used == 1 {
+		n    := numerator.digit[0]
+		sign := numerator.sign
+		if quotient != nil {
+			internal_set(quotient, n / denominator) or_return
+			if quotient.used > 0 {
+				quotient.sign = sign
+			}
+		}
+		return n % denominator, nil
 	}
 
 	/*
-		No easy answer [c'est la vie].  Just division.
+		No easy answer [c'est la vie].  Just division, by a reciprocal of the denominator.
 	*/
-	q := &Int{}
-
-	internal_grow(q, numerator.used) or_return
-
-	q.used = numerator.used
-	q.sign = numerator.sign
-
-	w := _WORD(0)
-
-	for ix = numerator.used - 1; ix >= 0; ix -= 1 {
-		t := DIGIT(0)
-		w = (w << _WORD(_DIGIT_BITS) | _WORD(numerator.digit[ix]))
-		if w >= _WORD(denominator) {
-			t = DIGIT(w / _WORD(denominator))
-			w -= _WORD(t) * _WORD(denominator)
-		}
-		q.digit[ix] = t
+	reciprocal := _private_digit_reciprocal(denominator)
+	if quotient == nil {
+		return _private_divmod_digits(nil, raw_data(numerator.digit), numerator.used, reciprocal), nil
 	}
-	remainder = DIGIT(w)
 
-	if quotient != nil {
-		internal_clamp(q)
-		internal_swap(q, quotient)
+	if quotient != numerator {
+		internal_grow(quotient, numerator.used) or_return
 	}
-	internal_destroy(q)
+	old_used := quotient.used
+	remainder = _private_divmod_digits(raw_data(quotient.digit), raw_data(numerator.digit), numerator.used, reciprocal)
+
+	quotient.used = numerator.used
+	quotient.sign = numerator.sign
+	internal_zero_unused(quotient, old_used)
+	internal_clamp(quotient)
 	return remainder, nil
 }
 
@@ -1891,7 +1889,8 @@ internal_int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, al
 
 	temp := src
 
-	is_maximally_negative := src == min(T)
+	// For an unsigned `T`, `min(T)` is zero.
+	is_maximally_negative := !intrinsics.type_is_unsigned(T) && src == min(T)
 	if is_maximally_negative {
 		/*
 			Prevent overflow on abs()
@@ -1906,10 +1905,10 @@ internal_int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, al
 		temp >>= _DIGIT_BITS
 	}
 
+	internal_zero_unused(dest)
 	if is_maximally_negative {
 		return internal_sub(dest, dest, 1)
 	}
-	internal_zero_unused(dest)
 	return nil
 }
 
@@ -2684,7 +2683,7 @@ internal_int_shrmod :: proc(quotient, remainder, numerator: ^Int, bits: int, all
 		}
 
 	}
-	return internal_clamp(numerator)
+	return internal_clamp(quotient)
 }
 internal_shrmod :: proc { internal_int_shrmod, }
 

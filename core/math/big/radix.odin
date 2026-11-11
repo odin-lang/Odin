@@ -758,30 +758,12 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 		temp.sign = .Zero_or_Positive
 	}
 
-	q := &Int{}
-	defer internal_destroy(q)
+	reciprocal := _private_digit_reciprocal(DIGIT(divisor))
 
 	remainder: DIGIT
 	for {
-		internal_grow(q, temp.used) or_return
-		q.used = temp.used
-		q.sign = temp.sign
-
-		w := _WORD(0)
-
-		for ix := temp.used - 1; ix >= 0; ix -= 1 {
-			t := DIGIT(0)
-			w = (w << _WORD(_DIGIT_BITS) | _WORD(temp.digit[ix]))
-			if w >= divisor {
-				t = DIGIT(w / divisor)
-				w -= _WORD(t) * divisor
-			}
-			q.digit[ix] = t
-		}
-		remainder = DIGIT(w)
-
-		internal_clamp(q)
-		q, temp = temp, q
+		remainder = _private_divmod_digits(raw_data(temp.digit), raw_data(temp.digit), temp.used, reciprocal)
+		internal_clamp(temp)
 
 		count := digit_count
 		for available > 0 && count > 0 {

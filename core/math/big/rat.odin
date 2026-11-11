@@ -916,28 +916,8 @@ _rat_div_gcd :: proc(dst, src: ^Int, g_digit: DIGIT, g: ^Int) -> (err: Error) {
 	case 0: return internal_int_div(dst, src, g)
 	case 1: return internal_copy(dst, src)
 	}
-	return _rat_div_digit(dst, src, g_digit)
-}
-
-// dst = src / d, truncated. `dst` may be `src`.
-_rat_div_digit :: proc(dst, src: ^Int, d: DIGIT) -> (err: Error) {
-	if dst != src {
-		internal_grow(dst, src.used) or_return
-	}
-
-	old_used := dst.used
-	w: _WORD
-	#no_bounds_check for i := src.used - 1; i >= 0; i -= 1 {
-		w = w << _DIGIT_BITS | _WORD(src.digit[i])
-		q := w / _WORD(d)
-		w -= q * _WORD(d)
-		dst.digit[i] = DIGIT(q)
-	}
-
-	dst.used = src.used
-	dst.sign = src.sign
-	internal_zero_unused(dst, old_used)
-	return internal_clamp(dst)
+	_, err = internal_int_divmod_digit(dst, src, g_digit)
+	return
 }
 
 // dst = x * y. A one-digit side uses the digit product: no temporary.

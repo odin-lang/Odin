@@ -1761,11 +1761,79 @@ _private_int_lehmer_update :: proc(u, v: ^Int, a, b, c, d: i64) {
 */
 @(require_results)
 _private_int_mod_digit :: proc "contextless" (a: ^Int, d: DIGIT) -> (remainder: DIGIT) {
-	w: _WORD
-	#no_bounds_check for i := a.used - 1; i >= 0; i -= 1 {
-		w = (w << _DIGIT_BITS | _WORD(a.digit[i])) % _WORD(d)
+	switch a.used {
+	case 0: return 0
+	case 1: return a.digit[0] % d
 	}
-	return DIGIT(w)
+	return _private_divmod_digits(nil, raw_data(a.digit), a.used, _private_digit_reciprocal(d))
+}
+
+/*
+	A divisor of one digit, ready to divide by with multiplications instead of a hardware divide.
+	`divisor` is shifted left by `shift` until its top bit is set. `reciprocal` is floor((2^128 - 1) / divisor) - 2^64.
+
+	Möller and Granlund, "Improved division by invariant integers", IEEE Transactions on Computers 60(2), 2011.
+*/
+_Digit_Reciprocal :: struct {
+	divisor:    u64,
+	reciprocal: u64,
+	shift:      uint,
+}
+
+@(require_results)
+_private_digit_reciprocal :: proc "contextless" (d: DIGIT) -> (r: _Digit_Reciprocal) {
+	r.shift      = uint(intrinsics.count_leading_zeros(d))
+	r.divisor    = u64(d) << r.shift
+	// floor(((2^128 - 1) - 2^64 * divisor) / divisor)
+	r.reciprocal = u64((u128(~r.divisor) << 64 | u128(max(u64))) / u128(r.divisor))
+	return
+}
+
+/*
+	(rem * 2^_DIGIT_BITS + digit) / d, for the remainder `rem` of the previous step, kept shifted like `r.divisor`.
+	Algorithm 4 of Möller and Granlund: two multiplications and two rare corrections.
+*/
+@(require_results)
+_private_digit_divmod :: #force_inline proc "contextless" (r: _Digit_Reciprocal, rem: u64, digit: DIGIT) -> (quotient: DIGIT, remainder: u64) {
+	// The dividend, shifted like the divisor, as two words.
+	hi := rem >> 1 | u64(digit) >> 1 >> ((63 - r.shift) & 63)
+	lo := rem << 63 | u64(digit) << (r.shift & 63)
+
+	p    := u128(r.reciprocal)*u128(hi) + (u128(hi) << 64 | u128(lo))
+	q    := u64(p >> 64) + 1
+	rest := lo - q*r.divisor
+	if rest > u64(p) {
+		q    -= 1
+		rest += r.divisor
+	}
+	if intrinsics.expect(rest >= r.divisor, false) {
+		q    += 1
+		rest -= r.divisor
+	}
+	return DIGIT(q), rest
+}
+
+/*
+	Divides the `n` digits of `src` by `r`. The quotient digits go to `dst`, which may be `src`, or nil.
+	Returns the remainder.
+*/
+@(require_results)
+_private_divmod_digits :: proc "contextless" (dst, src: [^]DIGIT, n: int, r: _Digit_Reciprocal) -> (remainder: DIGIT) {
+	r := r
+
+	rem: u64
+	if dst == nil {
+		for i := n - 1; i >= 0; i -= 1 {
+			_, rem = _private_digit_divmod(r, rem, src[i])
+		}
+	} else {
+		for i := n - 1; i >= 0; i -= 1 {
+			q: DIGIT
+			q, rem = _private_digit_divmod(r, rem, src[i])
+			dst[i] = q
+		}
+	}
+	return DIGIT(rem >> r.shift)
 }
 
 /*
