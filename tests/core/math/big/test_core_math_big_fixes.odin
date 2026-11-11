@@ -1745,3 +1745,86 @@ test_fix_helpers_immutable_dest :: proc(t: ^testing.T) {
 	x.flags = {}
 	fix_expect(t, x, "1")
 }
+
+@(test)
+test_fix_combinatorics_edges :: proc(t: ^testing.T) {
+	Proc :: enum { Perm, Comb, Comb_Rep, Perm_Rep }
+	Case :: struct {
+		p:        Proc,
+		n, r:     int,
+		err:      big.Error,
+		expected: string,
+	}
+	cases := [?]Case{
+		{.Perm,      5,         2,         nil,               "20"},
+		{.Perm,      5,         0,         nil,               "1"},
+		{.Perm,      5,         5,         nil,               "120"},
+		{.Perm,      0,         0,         nil,               "1"},
+		{.Perm,      20,        10,        nil,               "670442572800"},
+		{.Perm,      3,         5,         nil,               "0"},
+		{.Perm,      0,         3,         nil,               "0"},
+		{.Perm,      5,         2_000_000, nil,               "0"},
+		{.Perm,      5,         -1,        .Invalid_Argument, "123"},
+		{.Perm,      -1,        0,         .Invalid_Argument, "123"},
+		{.Perm,      min(int),  min(int),  .Invalid_Argument, "123"},
+		{.Comb,      5,         2,         nil,               "10"},
+		{.Comb,      0,         0,         nil,               "1"},
+		{.Comb,      20,        10,        nil,               "184756"},
+		{.Comb,      3,         5,         nil,               "0"},
+		{.Comb,      2_000_000, 2_000_001, nil,               "0"},
+		{.Comb,      5,         -1,        .Invalid_Argument, "123"},
+		{.Comb,      -1,        0,         .Invalid_Argument, "123"},
+		{.Comb_Rep,  3,         2,         nil,               "6"},
+		{.Comb_Rep,  3,         0,         nil,               "1"},
+		{.Comb_Rep,  0,         0,         nil,               "1"},
+		{.Comb_Rep,  0,         3,         nil,               "0"},
+		{.Comb_Rep,  1,         5,         nil,               "1"},
+		{.Comb_Rep,  20,        10,        nil,               "20030010"},
+		{.Comb_Rep,  5,         -1,        .Invalid_Argument, "123"},
+		{.Comb_Rep,  -1,        2,         .Invalid_Argument, "123"},
+		{.Comb_Rep,  -1,        0,         .Invalid_Argument, "123"},
+		{.Perm_Rep,  2,         10,        nil,               "1024"},
+		{.Perm_Rep,  0,         0,         nil,               "1"},
+		{.Perm_Rep,  0,         3,         nil,               "0"},
+		{.Perm_Rep,  20,        10,        nil,               "10240000000000"},
+		{.Perm_Rep,  5,         -1,        .Invalid_Argument, "123"},
+		{.Perm_Rep,  -3,        2,         .Invalid_Argument, "123"},
+	}
+	for c in cases {
+		x := &big.Int{}
+		defer big.destroy(x)
+
+		fix_set(t, x, "123")
+		err: big.Error
+		switch c.p {
+		case .Perm:     err = big.permutations_without_repetition(x, c.n, c.r)
+		case .Comb:     err = big.combinations_without_repetition(x, c.n, c.r)
+		case .Comb_Rep: err = big.combinations_with_repetition(x, c.n, c.r)
+		case .Perm_Rep: err = big.permutations_with_repetition(x, c.n, c.r)
+		}
+		testing.expectf(t, err == c.err, "%v(%v, %v): err %v, expected %v", c.p, c.n, c.r, err, c.err)
+		fix_expect(t, x, c.expected)
+	}
+}
+
+@(test)
+test_fix_combinatorics_immutable_dest :: proc(t: ^testing.T) {
+	x := &big.Int{}
+	defer big.destroy(x)
+
+	fix_set(t, x, "7")
+	x.flags = {.Immutable}
+
+	IMM :: big.Error.Assignment_To_Immutable
+	args := [?][2]int{{5, 2}, {5, 5}, {3, 5}, {0, 0}, {0, 3}}
+	for a in args {
+		testing.expect_value(t, big.permutations_without_repetition(x, a[0], a[1]), IMM)
+		testing.expect_value(t, big.combinations_without_repetition(x, a[0], a[1]), IMM)
+		testing.expect_value(t, big.combinations_with_repetition(x, a[0], a[1]), IMM)
+		testing.expect_value(t, big.permutations_with_repetition(x, a[0], a[1]), IMM)
+	}
+
+	testing.expect_value(t, x.flags, big.Flags{.Immutable})
+	x.flags = {}
+	fix_expect(t, x, "7")
+}
