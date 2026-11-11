@@ -72,6 +72,7 @@ set ODIN=..\..\..\odin
 %ODIN% test "..\test_issue_invalid_tests_only" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
 %ODIN% check "..\test_issue_8294" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
 %ODIN% check "..\test_issue_5024" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_7947" %COMMON% 2>&1 | find /c "Error: Unspecialized polymorphic procedure literal" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_7502_cycle" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_8097" -no-entry-point %COMMON% 2>&1 | find /c "Error: Invalid use of a polymorphic type" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_poly_record_unspecialized_field" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b

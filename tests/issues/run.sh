@@ -264,6 +264,13 @@ else
 	exit 1
 fi
 
+if [[ $($ODIN check ../test_issue_7947 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error: Unspecialized polymorphic procedure literal") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 if [[ $($ODIN check ../test_issue_7502_cycle -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 3 ]]; then
 	echo "SUCCESSFUL 1/1"
 else

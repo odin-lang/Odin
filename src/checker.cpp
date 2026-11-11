@@ -7073,7 +7073,11 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 		if (pi->poly_def_node != nullptr) {
 			token = ast_token(pi->poly_def_node);
 		}
-		error(token, "Unspecialized polymorphic procedure '%.*s'", LIT(name));
+		if (name.len == 0 && pi->decl->proc_lit != nullptr) {
+			error(pi->decl->proc_lit, "Unspecialized polymorphic procedure literal");
+		} else {
+			error(token, "Unspecialized polymorphic procedure '%.*s'", LIT(name));
+		}
 		pi->decl->proc->proc_checked_state.store(ProcCheckedState_Unchecked);
 		return false;
 	}
