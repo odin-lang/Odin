@@ -193,6 +193,10 @@ test_rect_group :: proc(t: ^testing.T) {
 		w32: complex32 = cmplx.rect(r32, θ32)
 		testing.expectf(t, close_complex(w32, complex32(z)), "rect(polar(complex32(%v))) = %v", z, w32)
 	}
+
+	got := cmplx.rect(f64(2), math.PI/2)
+	want := complex(1.2246467991473532e-16, 2)
+	testing.expectf(t, close_complex(got, want), "rect(2, π/2) = %v, want %v", got, want)
 }
 
 @test
@@ -349,6 +353,7 @@ test_exp_overflow :: proc(t: ^testing.T) {
 		{complex(-746, 1), complex(0, 0)},
 		{complex(-746, 2), complex(neg_zero, 0)},
 		{complex(1, 1), complex(1.4686939399158851, 2.2873552871788423)},
+		{complex(1, math.PI/2), complex(1.664467570201392e-16, math.E)},
 	}
 	for c in cases {
 		got := cmplx.exp(c.x)
@@ -538,7 +543,7 @@ test_tan_tanh_cot :: proc(t: ^testing.T) {
 
 	got := cmplx.tanh(complex(0, math.PI/2))
 	want := complex(0, 16331239353195370)
-	testing.expectf(t, close_complex(got, want, 16), "tanh(0+πi/2) = %v, want %v", got, want)
+	testing.expectf(t, close_complex(got, want), "tanh(0+πi/2) = %v, want %v", got, want)
 
 	zs := []complex128{complex(0.5, 0.25), complex(-1.25, 2), complex(3, -0.75)}
 	for z in zs {

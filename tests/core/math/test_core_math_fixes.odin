@@ -194,3 +194,27 @@ test_angle_diff_near_zero :: proc(t: ^testing.T) {
 	testing.expectf(t, abs(l32) < 1e-6, "angle_lerp(f32(1e-10), 0, 0.5) = %v, want about 0", l32)
 	testing.expect(t, within_ulps(math.angle_diff(f64(3), -3), f64(0.28318530717958623)))
 }
+
+@(private="file")
+Sincos_Case :: struct {
+	x, sin, cos: f64,
+	j:           u64,
+	z:           f64,
+}
+
+@test
+test_sincos_near_multiples_of_half_pi :: proc(t: ^testing.T) {
+	cases := [?]Sincos_Case{
+		{1.5707963267948966, 1, 6.123233995736766e-17, 2, -6.123233995736766e-17},
+		{6731237.680638236, -1, -1.4871569277433705e-14, 6, -1.4871569277433705e-14},
+		{1e22, -0.8522008497671888, 0.523214785395139, 6, 0.5506189342358097},
+		{math.F64_MAX, 0.004961954789184062, -0.9999876894265599, 4, -0.004961975150787273},
+		{5.319372648326541e255, 1, -4.687165924254628e-19, 2, 4.687165924254628e-19},
+	}
+	for c in cases {
+		s, co := math.sincos(c.x)
+		testing.expectf(t, within_ulps(s, c.sin) && within_ulps(co, c.cos), "sincos(%v) = %v, %v, want %v, %v", c.x, s, co, c.sin, c.cos)
+		j, z := math._trig_reduce_f64(c.x)
+		testing.expectf(t, j == c.j && within_ulps(z, c.z, 1), "_trig_reduce_f64(%v) = %v, %v, want %v, %v", c.x, j, z, c.j, c.z)
+	}
+}
