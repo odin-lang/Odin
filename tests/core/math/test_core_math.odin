@@ -1267,6 +1267,7 @@ test_count_digits :: proc(t: ^testing.T) {
 
 @test
 test_nextafter :: proc(t: ^testing.T) {
+	// As in C, not Go: nextafter(x, y) returns y when x == y.
 	Datum :: struct($F: typeid) {
 		x, y, r: F,
 	}
@@ -1282,16 +1283,22 @@ test_nextafter :: proc(t: ^testing.T) {
 		{0h7c42, 0hbc00, 0h7e00}, // +NaN -> -1 = +canonical NaN
 		{0hfc42, 0hbc00, 0h7e00}, // -NaN -> -1 = +canonical NaN
 
-		{0h0000, 0h8000, 0h0000}, // +0 -> -0 = +0
+		// TODO-UPDATE-COMMENT: nextafter(x, y) now returns y when x == y, as in C, so the result here is y
+		// ---
+		{0h0000, 0h8000, 0h8000}, // +0 -> -0 = +0
 		{0h0000,     +1, 0h0001}, // +0 -> +1 = +smallest subnormal
 		{0h0000,     -1, 0h8001}, // +0 -> -1 = -smallest subnormal
 
 		{0h0000, 0h0000, 0h0000}, // +0 -> +0 = +0
-		{0h0000, 0h8000, 0h0000}, // +0 -> -0 = +0
+		// TODO-UPDATE-COMMENT: nextafter(x, y) now returns y when x == y, as in C, so the result here is y
+		// ---
+		{0h0000, 0h8000, 0h8000}, // +0 -> -0 = +0
 		{0h0000,     +1, 0h0001}, // +0 -> +1 = +smallest subnormal
 		{0h0000,     -1, 0h8001}, // +0 -> -1 = -smallest subnormal
 
-		{0h8000, 0h0000, 0h8000}, // -0 -> +0 = -0
+		// TODO-UPDATE-COMMENT: nextafter(x, y) now returns y when x == y, as in C, so the result here is y
+		// ---
+		{0h8000, 0h0000, 0h0000}, // -0 -> +0 = -0
 		{0h8000, 0h8000, 0h8000}, // -0 -> -0 = -0
 		{0h8000,     +1, 0h0001}, // -0 -> +1 = +smallest subnormal
 		{0h8000,     -1, 0h8001}, // -0 -> -1 = -smallest subnormal
@@ -1343,16 +1350,22 @@ test_nextafter :: proc(t: ^testing.T) {
 		{0h7f842000,         -1, 0h7fc00000}, // +NaN -> -1 = +canonical NaN
 		{0hff842000,         -1, 0h7fc00000}, // -NaN -> -1 = +canonical NaN
 
-		{0h00000000, 0h80000000, 0h00000000}, // +0 -> -0 = +0
+		// TODO-UPDATE-COMMENT: nextafter(x, y) now returns y when x == y, as in C, so the result here is y
+		// ---
+		{0h00000000, 0h80000000, 0h80000000}, // +0 -> -0 = +0
 		{0h00000000,         +1, 0h00000001}, // +0 -> +1 = +smallest subnormal
 		{0h00000000,         -1, 0h80000001}, // +0 -> -1 = -smallest subnormal
 
 		{0h00000000, 0h00000000, 0h00000000}, // +0 -> +0 = +0
-		{0h00000000, 0h80000000, 0h00000000}, // +0 -> -0 = +0
+		// TODO-UPDATE-COMMENT: nextafter(x, y) now returns y when x == y, as in C, so the result here is y
+		// ---
+		{0h00000000, 0h80000000, 0h80000000}, // +0 -> -0 = +0
 		{0h00000000,         +1, 0h00000001}, // +0 -> +1 = +smallest subnormal
 		{0h00000000,         -1, 0h80000001}, // +0 -> -1 = -smallest subnormal
 
-		{0h80000000, 0h00000000, 0h80000000}, // -0 -> +0 = -0
+		// TODO-UPDATE-COMMENT: nextafter(x, y) now returns y when x == y, as in C, so the result here is y
+		// ---
+		{0h80000000, 0h00000000, 0h00000000}, // -0 -> +0 = -0
 		{0h80000000, 0h80000000, 0h80000000}, // -0 -> -0 = -0
 		{0h80000000,         +1, 0h00000001}, // -0 -> +1 = +smallest subnormal
 		{0h80000000,         -1, 0h80000001}, // -0 -> -1 = -smallest subnormal
@@ -1404,16 +1417,22 @@ test_nextafter :: proc(t: ^testing.T) {
 		{0h7ff4200000000000, 0hbc00000000000000, 0h7ff8000000000001}, // +NaN -> -1 = +canonical NaN
 		{0hfff4200000000000, 0hbc00000000000000, 0h7ff8000000000001}, // -NaN -> -1 = +canonical NaN
 
-		{0h0000000000000000, 0h8000000000000000, 0h0000000000000000}, // +0 -> -0 = +0
+		// TODO-UPDATE-COMMENT: nextafter(x, y) now returns y when x == y, as in C, so the result here is y
+		// ---
+		{0h0000000000000000, 0h8000000000000000, 0h8000000000000000}, // +0 -> -0 = +0
 		{0h0000000000000000,                 +1, 0h0000000000000001}, // +0 -> +1 = +smallest subnormal
 		{0h0000000000000000,                 -1, 0h8000000000000001}, // +0 -> -1 = -smallest subnormal
 
 		{0h0000000000000000, 0h0000000000000000, 0h0000000000000000}, // +0 -> +0 = +0
-		{0h0000000000000000, 0h8000000000000000, 0h0000000000000000}, // +0 -> -0 = +0
+		// TODO-UPDATE-COMMENT: nextafter(x, y) now returns y when x == y, as in C, so the result here is y
+		// ---
+		{0h0000000000000000, 0h8000000000000000, 0h8000000000000000}, // +0 -> -0 = +0
 		{0h0000000000000000,                 +1, 0h0000000000000001}, // +0 -> +1 = +smallest subnormal
 		{0h0000000000000000,                 -1, 0h8000000000000001}, // +0 -> -1 = -smallest subnormal
 
-		{0h8000000000000000, 0h0000000000000000, 0h8000000000000000}, // -0 -> +0 = -0
+		// TODO-UPDATE-COMMENT: nextafter(x, y) now returns y when x == y, as in C, so the result here is y
+		// ---
+		{0h8000000000000000, 0h0000000000000000, 0h0000000000000000}, // -0 -> +0 = -0
 		{0h8000000000000000, 0h8000000000000000, 0h8000000000000000}, // -0 -> -0 = -0
 		{0h8000000000000000,                 +1, 0h0000000000000001}, // -0 -> +1 = +smallest subnormal
 		{0h8000000000000000,                 -1, 0h8000000000000001}, // -0 -> -1 = -smallest subnormal
