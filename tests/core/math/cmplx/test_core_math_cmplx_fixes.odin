@@ -42,6 +42,21 @@ close_complex :: proc(got, want: $T, max_ulps: i64 = 2) -> bool where intrinsics
 }
 
 @(private="file")
+Special :: struct {
+	x, y:        f64,
+	want:        complex128,
+	any_re_sign: bool,
+	any_im_sign: bool,
+}
+
+@(private="file")
+same_special :: proc(got, want: complex128, any_re_sign, any_im_sign: bool) -> bool {
+	re_ok := same(abs(real(got)), abs(real(want))) if any_re_sign else same(real(got), real(want))
+	im_ok := same(abs(imag(got)), abs(imag(want))) if any_im_sign else same(imag(got), imag(want))
+	return re_ok && im_ok
+}
+
+@(private="file")
 expect_sinh_cosh :: proc(t: ^testing.T, x, want_sinh, want_cosh: $T, loc := #caller_location) where intrinsics.type_is_float(T) {
 	s := math.sinh(x)
 	testing.expectf(t, close(s, want_sinh), "sinh(%v) = %v, want %v", x, s, want_sinh, loc = loc)
@@ -372,5 +387,89 @@ test_ln_without_abs :: proc(t: ^testing.T) {
 	for c in cases {
 		got := cmplx.ln(c.x)
 		testing.expectf(t, close_complex(got, c.want), "ln(%v) = %v, want %v", c.x, got, c.want)
+	}
+}
+
+@test
+test_sin_cos_sinh_cosh :: proc(t: ^testing.T) {
+	inf := math.inf_f64(1)
+	nan := math.nan_f64()
+	neg_zero := math.copy_sign(f64(0), -1)
+
+	sinh_cases := []Special{
+		{0, 0, complex(0, 0), false, false},
+		{0, inf, complex(0, nan), true, false},
+		{0, nan, complex(0, nan), true, false},
+		{1, inf, complex(nan, nan), false, false},
+		{1, nan, complex(nan, nan), false, false},
+		{inf, 0, complex(inf, 0), false, false},
+		{inf, 1, complex(inf, inf), false, false},
+		{inf, 2, complex(-inf, inf), false, false},
+		{inf, inf, complex(inf, nan), true, false},
+		{inf, nan, complex(inf, nan), true, false},
+		{nan, 0, complex(nan, 0), false, false},
+		{nan, 1, complex(nan, nan), false, false},
+		{nan, nan, complex(nan, nan), false, false},
+	}
+	cosh_cases := []Special{
+		{0, 0, complex(1, 0), false, false},
+		{0, inf, complex(nan, 0), false, true},
+		{0, nan, complex(nan, 0), false, true},
+		{1, inf, complex(nan, nan), false, false},
+		{1, nan, complex(nan, nan), false, false},
+		{inf, 0, complex(inf, 0), false, false},
+		{inf, 1, complex(inf, inf), false, false},
+		{inf, 2, complex(-inf, inf), false, false},
+		{inf, inf, complex(inf, nan), true, false},
+		{inf, nan, complex(inf, nan), false, false},
+		{nan, 0, complex(nan, 0), false, true},
+		{nan, 1, complex(nan, nan), false, false},
+		{nan, nan, complex(nan, nan), false, false},
+	}
+	signs := [2]f64{1, -1}
+	for c in sinh_cases {
+		for sx in signs {
+			for sy in signs {
+				z := complex(sx*c.x, sy*c.y)
+				want := complex(sx*real(c.want), sy*imag(c.want))
+				got := cmplx.sinh(z)
+				testing.expectf(t, same_special(got, want, c.any_re_sign, c.any_im_sign), "sinh(%v) = %v, want %v", z, got, want)
+				got = cmplx.sin(complex(imag(z), -real(z)))
+				want_sin := complex(imag(want), -real(want))
+				testing.expectf(t, same_special(got, want_sin, c.any_im_sign, c.any_re_sign), "sin(%v) = %v, want %v", complex(imag(z), -real(z)), got, want_sin)
+			}
+		}
+	}
+	for c in cosh_cases {
+		for sx in signs {
+			for sy in signs {
+				z := complex(sx*c.x, sy*c.y)
+				want := complex(real(c.want), sx*sy*imag(c.want))
+				got := cmplx.cosh(z)
+				testing.expectf(t, same_special(got, want, c.any_re_sign, c.any_im_sign), "cosh(%v) = %v, want %v", z, got, want)
+				got = cmplx.cos(complex(imag(z), -real(z)))
+				testing.expectf(t, same_special(got, want, c.any_re_sign, c.any_im_sign), "cos(%v) = %v, want %v", complex(imag(z), -real(z)), got, want)
+			}
+		}
+	}
+
+	Case :: struct {
+		name: string,
+		f:    proc "contextless" (complex128) -> complex128,
+		x:    complex128,
+		want: complex128,
+	}
+	cases := []Case{
+		{"sin", cmplx.sin, complex(0, 710), complex(0, 1.1169973830808555e308)},
+		{"cos", cmplx.cos, complex(0, 710), complex(1.1169973830808555e308, neg_zero)},
+		{"sinh", cmplx.sinh, complex(710.4, 0.5), complex(1.4623722367640471e308, 7.9889759402263215e307)},
+		{"sinh", cmplx.sinh, complex(-710.4, -0.5), complex(-1.4623722367640471e308, -7.9889759402263215e307)},
+		{"cosh", cmplx.cosh, complex(710.4, 0.5), complex(1.4623722367640471e308, 7.9889759402263215e307)},
+		{"sin", cmplx.sin, complex(0, 1e-20), complex(0, 1e-20)},
+		{"sinh", cmplx.sinh, complex(1e-10, 1), complex(5.4030230586813976e-11, 0.8414709848078965)},
+	}
+	for c in cases {
+		got := c.f(c.x)
+		testing.expectf(t, close_complex(got, c.want), "%s(%v) = %v, want %v", c.name, c.x, got, c.want)
 	}
 }

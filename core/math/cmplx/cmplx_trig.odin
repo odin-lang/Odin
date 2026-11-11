@@ -43,32 +43,17 @@ sin_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	//
 	//     w = sin x  cosh y  +  i cos x sinh y.
 	//
-	// csin(z) = -i csinh(iz).
+	// It is computed as csin(z) = -i csinh(iz), the identity C99 Annex G
+	// defines csin by, so it shares csinh's special values.
 	//
 	// ACCURACY:
 	//
 	//                      Relative error:
 	// arithmetic   domain     # trials      peak         rms
-	//    DEC       -10,+10      8400       5.3e-17     1.3e-17
-	//    IEEE      -10,+10     30000       3.8e-16     1.0e-16
-	// Also tested by csin(casin(z)) = z.
+	//    IEEE      -10,+10     30000       4.1e-16     1.0e-16
 
-	switch re, im := real(x), imag(x); {
-	case im == 0 && (math.is_inf(re, 0) || math.is_nan(re)):
-		return complex(math.nan_f64(), im)
-	case math.is_inf(im, 0):
-		switch {
-		case re == 0:
-			return x
-		case math.is_inf(re, 0) || math.is_nan(re):
-			return complex(math.nan_f64(), im)
-		}
-	case re == 0 && math.is_nan(im):
-		return x
-	}
-	s, c := math.sincos(real(x))
-	sh, ch := _sinhcosh_f64(imag(x))
-	return complex(s*ch, c*sh)
+	w := sinh_complex128(complex(-imag(x), real(x)))
+	return complex(imag(w), -real(w))
 }
 
 cos_complex32 :: proc "contextless" (x: complex32) -> complex32 {
@@ -89,29 +74,16 @@ cos_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	//
 	//     w = cos x  cosh y  -  i sin x sinh y.
 	//
+	// It is computed as ccos(z) = ccosh(iz), the identity C99 Annex G
+	// defines ccos by, so it shares ccosh's special values.
+	//
 	// ACCURACY:
 	//
 	//                      Relative error:
 	// arithmetic   domain     # trials      peak         rms
-	//    DEC       -10,+10      8400       4.5e-17     1.3e-17
-	//    IEEE      -10,+10     30000       3.8e-16     1.0e-16
+	//    IEEE      -10,+10     30000       3.7e-16     1.1e-16
 
-	switch re, im := real(x), imag(x); {
-	case im == 0 && (math.is_inf(re, 0) || math.is_nan(re)):
-		return complex(math.nan_f64(), -im*math.copy_sign(0, re))
-	case math.is_inf(im, 0):
-		switch {
-		case re == 0:
-			return complex(math.inf_f64(1), -re*math.copy_sign(0, im))
-		case math.is_inf(re, 0) || math.is_nan(re):
-			return complex(math.inf_f64(1), math.nan_f64())
-		}
-	case re == 0 && math.is_nan(im):
-		return complex(math.nan_f64(), 0)
-	}
-	s, c := math.sincos(real(x))
-	sh, ch := _sinhcosh_f64(imag(x))
-	return complex(c*ch, -s*sh)
+	return cosh_complex128(complex(-imag(x), real(x)))
 }
 
 sinh_complex32 :: proc "contextless" (x: complex32) -> complex32 {
@@ -147,7 +119,15 @@ sinh_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	case im == 0 && math.is_nan(re):
 		return complex(math.nan_f64(), im)
 	}
+	if imag(x) == 0 {
+		return complex(math.sinh(real(x)), imag(x))
+	}
 	s, c := math.sincos(imag(x))
+	if abs(real(x)) > 709 {
+		h := math.exp(0.5 * abs(real(x)))
+		v := 0.5 * h
+		return complex(math.copy_sign(1, real(x)) * ((v*c)*h), (v*s)*h)
+	}
 	sh, ch := _sinhcosh_f64(real(x))
 	return complex(c*sh, s*ch)
 }
@@ -184,7 +164,15 @@ cosh_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	case im == 0 && math.is_nan(re):
 		return complex(math.nan_f64(), im)
 	}
+	if imag(x) == 0 {
+		return complex(math.cosh(real(x)), imag(x) * math.copy_sign(1, real(x)))
+	}
 	s, c := math.sincos(imag(x))
+	if abs(real(x)) > 709 {
+		h := math.exp(0.5 * abs(real(x)))
+		v := 0.5 * h
+		return complex((v*c)*h, math.copy_sign(1, real(x)) * ((v*s)*h))
+	}
 	sh, ch := _sinhcosh_f64(real(x))
 	return complex(c*ch, s*sh)
 }
