@@ -2921,12 +2921,10 @@ polar_from_euclidean_f16 :: proc "contextless" (euclidean: Vector3f16) -> Vector
 	n := length(euclidean)
 	tmp := euclidean / n
 
-	xz_dist := math.sqrt(tmp.x*tmp.x + tmp.z*tmp.z)
-
 	return {
 		math.asin(tmp.y),
 		math.atan2(tmp.x, tmp.z),
-		xz_dist,
+		n,
 	}
 }
 @(require_results)
@@ -2934,12 +2932,10 @@ polar_from_euclidean_f32 :: proc "contextless" (euclidean: Vector3f32) -> Vector
 	n := length(euclidean)
 	tmp := euclidean / n
 
-	xz_dist := math.sqrt(tmp.x*tmp.x + tmp.z*tmp.z)
-
 	return {
 		math.asin(tmp.y),
 		math.atan2(tmp.x, tmp.z),
-		xz_dist,
+		n,
 	}
 }
 @(require_results)
@@ -2947,12 +2943,10 @@ polar_from_euclidean_f64 :: proc "contextless" (euclidean: Vector3f64) -> Vector
 	n := length(euclidean)
 	tmp := euclidean / n
 
-	xz_dist := math.sqrt(tmp.x*tmp.x + tmp.z*tmp.z)
-
 	return {
 		math.asin(tmp.y),
 		math.atan2(tmp.x, tmp.z),
-		xz_dist,
+		n,
 	}
 }
 polar_from_euclidean :: proc{
