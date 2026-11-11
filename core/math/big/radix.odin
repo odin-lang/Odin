@@ -23,10 +23,10 @@ import "base:intrinsics"
 */
 int_itoa_string :: proc(a: ^Int, radix := i8(10), zero_terminate := false, allocator := context.allocator) -> (res: string, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
-
 	a := a; radix := radix
 	clear_if_uninitialized(a) or_return
+
+	context.allocator = allocator
 
 	/*
 		TODO: If we want to write a prefix for some of the radixes, we can oversize the buffer.
@@ -53,8 +53,12 @@ int_itoa_string :: proc(a: ^Int, radix := i8(10), zero_terminate := false, alloc
 	*/
 	written: int
 	written, err = int_itoa_raw(a, radix, buffer, size, zero_terminate)
+	if err != nil {
+		delete(buffer)
+		return "", err
+	}
 
-	return string(buffer[:written]), err
+	return string(buffer[:written]), nil
 }
 
 /*
@@ -63,10 +67,10 @@ int_itoa_string :: proc(a: ^Int, radix := i8(10), zero_terminate := false, alloc
 */
 int_itoa_cstring :: proc(a: ^Int, radix := i8(10), allocator := context.allocator) -> (res: cstring, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
-
 	a := a; radix := radix
 	clear_if_uninitialized(a) or_return
+
+	context.allocator = allocator
 
 	s: string
 	s, err = int_itoa_string(a, radix, true)
@@ -77,21 +81,17 @@ int_itoa_cstring :: proc(a: ^Int, radix := i8(10), allocator := context.allocato
 	A low-level `itoa` using a caller-provided buffer. `itoa_string` and `itoa_cstring` use this.
 	You can use also use it if you want to pre-allocate a buffer and optionally reuse it.
 
-	Use `radix_size` or `radix_size_estimate` to determine a buffer size big enough.
+	Use `radix_size` to determine a buffer size big enough.
 
 	You can pass the output of `radix_size` to `size` if you've previously called it to size
 	the output buffer. If you haven't, this routine will call it. This way it knows if the buffer
 	is the appropriate size, and we can write directly in place without a reverse step at the end.
 
-					=== === === IMPORTANT === === ===
+	The digits are written backwards from the end of `buffer` and then moved to the front,
+	so the result is always `buffer[:written]`, however much larger than `size` the buffer is.
 
-	If you determined the buffer size using `radix_size_estimate`, or have a buffer
-	that you reuse that you know is large enough, don't pass this size unless you know what you are doing,
-	because we will always write backwards starting at last byte of the buffer.
-
-	Keep in mind that if you set `size` yourself and it's smaller than the buffer,
-	it'll result in buffer overflows, as we use it to avoid reversing at the end
-	and having to perform a buffer overflow check each character.
+	`size` is only checked against `len(buffer)`. Don't pass a `size` smaller than what `radix_size` returns:
+	the check then passes for a buffer that's too small, and the write fails the bounds check.
 */
 int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_terminate := false) -> (written: int, err: Error) {
 	assert_if_nil(a)
@@ -131,7 +131,7 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 		available -= 1
 		buffer[available] = RADIX_TABLE[a.digit[0]]
 
-		if n, _ := is_neg(a); n {
+		if n, _ := is_neg(a); n && !z {
 			available -= 1
 			buffer[available] = '-'
 		}
@@ -140,9 +140,8 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 			If we overestimated the size, we need to move the buffer left.
 		*/
 		written = len(buffer) - available
-		if written < size {
-			diff := size - written
-			intrinsics.mem_copy(&buffer[0], &buffer[diff], written)
+		if available > 0 {
+			intrinsics.mem_copy(&buffer[0], &buffer[available], written)
 		}
 		return written, nil
 	}
@@ -173,9 +172,8 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 			If we overestimated the size, we need to move the buffer left.
 		*/
 		written = len(buffer) - available
-		if written < size {
-			diff := size - written
-			intrinsics.mem_copy(&buffer[0], &buffer[diff], written)
+		if available > 0 {
+			intrinsics.mem_copy(&buffer[0], &buffer[available], written)
 		}
 		return written, nil
 	}
@@ -214,9 +212,8 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 			If we overestimated the size, we need to move the buffer left.
 		*/
 		written = len(buffer) - available
-		if written < size {
-			diff := size - written
-			intrinsics.mem_copy(&buffer[0], &buffer[diff], written)
+		if available > 0 {
+			intrinsics.mem_copy(&buffer[0], &buffer[available], written)
 		}
 		return written, nil
 	}
@@ -259,6 +256,7 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), n: ^int = nil, alloc
 	*/
 
 	if radix < 2 || radix > 64 { return .Invalid_Argument }
+	internal_error_if_immutable(res) or_return
 
 	/*
 		Set the integer to the default of zero.
@@ -506,6 +504,7 @@ string_to_int :: int_atoi
 radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false, allocator := context.allocator) -> (size: int, err: Error) {
 	a := a
 	assert_if_nil(a)
+	context.allocator = allocator
 
 	if radix < 2 || radix > 64                     { return -1, .Invalid_Argument }
 	clear_if_uninitialized(a) or_return
@@ -621,7 +620,14 @@ internal_int_pack :: proc(a: ^Int, buf: []$T, nails := 0, order := Order.LSB_Fir
 		}
 
 		bits_to_get := min(type_bits, bit_count - bit_offset)
-		W := internal_int_bitfield_extract(a, bit_offset, bits_to_get) or_return
+		W: _WORD
+		got := 0
+		for got < bits_to_get {
+			n := min(bits_to_get - got, _WORD_BITS)
+			part := internal_int_bitfield_extract(a, bit_offset + got, n) or_return
+			W |= part << uint(got)
+			got += n
+		}
 		buf[word_offset] = T(W)
 	}
 
@@ -649,6 +655,7 @@ internal_int_unpack :: proc(a: ^Int, buf: []$T, nails := 0, order := Order.LSB_F
 	/*
 		Pre-size output Int.
 	*/
+	internal_zero(a) or_return
 	internal_grow(a, digit_count) or_return
 
 	t := &Int{}
@@ -766,7 +773,7 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 		internal_clamp(temp)
 
 		count := digit_count
-		for available > 0 && count > 0 {
+		for available > 0 && count > 0 && (temp.used > 0 || remainder > 0) {
 			available -= 1
 			buffer[available] = RADIX_TABLE[remainder % _radix]
 			remainder /= _radix
@@ -776,11 +783,6 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 		if temp.used == 0 {
 			break
 		}
-	}
-
-	// Remove leading zero if we ended up with one.
-	if buffer[available] == '0' {
-		available += 1
 	}
 
 	if a.sign == .Negative {
