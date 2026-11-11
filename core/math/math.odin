@@ -1166,15 +1166,37 @@ mod :: proc{
 	mod_f64, mod_f64le, mod_f64be,
 }
 
-@(require_results) remainder_f16   :: proc "contextless" (x, y: f16  ) -> f16   { return x - round(x/y) * y }
-@(require_results) remainder_f16le :: proc "contextless" (x, y: f16le) -> f16le { return x - round(x/y) * y }
-@(require_results) remainder_f16be :: proc "contextless" (x, y: f16be) -> f16be { return x - round(x/y) * y }
-@(require_results) remainder_f32   :: proc "contextless" (x, y: f32  ) -> f32   { return x - round(x/y) * y }
-@(require_results) remainder_f32le :: proc "contextless" (x, y: f32le) -> f32le { return x - round(x/y) * y }
-@(require_results) remainder_f32be :: proc "contextless" (x, y: f32be) -> f32be { return x - round(x/y) * y }
-@(require_results) remainder_f64   :: proc "contextless" (x, y: f64  ) -> f64   { return x - round(x/y) * y }
-@(require_results) remainder_f64le :: proc "contextless" (x, y: f64le) -> f64le { return x - round(x/y) * y }
-@(require_results) remainder_f64be :: proc "contextless" (x, y: f64be) -> f64be { return x - round(x/y) * y }
+@(require_results) remainder_f16   :: proc "contextless" (x, y: f16  ) -> f16   { return f16(remainder_f64(f64(x), f64(y))) }
+@(require_results) remainder_f16le :: proc "contextless" (x, y: f16le) -> f16le { return f16le(remainder_f64(f64(x), f64(y))) }
+@(require_results) remainder_f16be :: proc "contextless" (x, y: f16be) -> f16be { return f16be(remainder_f64(f64(x), f64(y))) }
+@(require_results) remainder_f32   :: proc "contextless" (x, y: f32  ) -> f32   { return f32(remainder_f64(f64(x), f64(y))) }
+@(require_results) remainder_f32le :: proc "contextless" (x, y: f32le) -> f32le { return f32le(remainder_f64(f64(x), f64(y))) }
+@(require_results) remainder_f32be :: proc "contextless" (x, y: f32be) -> f32be { return f32be(remainder_f64(f64(x), f64(y))) }
+@(require_results)
+remainder_f64 :: proc "contextless" (x, y: f64) -> f64 {
+	switch {
+	case is_nan(x) || is_nan(y) || is_inf(x) || y == 0:
+		return nan_f64()
+	case is_inf(y):
+		return x
+	}
+	ay := abs(y)
+	r := abs(x)
+	if ay <= F64_MAX/2 {
+		r = mod(r, 2*ay)
+	}
+	odd := false
+	if r >= ay {
+		r -= ay
+		odd = true
+	}
+	if r > ay - r || (r == ay - r && odd) {
+		r -= ay
+	}
+	return -r if sign_bit(x) else r
+}
+@(require_results) remainder_f64le :: proc "contextless" (x, y: f64le) -> f64le { return f64le(remainder_f64(f64(x), f64(y))) }
+@(require_results) remainder_f64be :: proc "contextless" (x, y: f64be) -> f64be { return f64be(remainder_f64(f64(x), f64(y))) }
 remainder :: proc{
 	remainder_f16, remainder_f16le, remainder_f16be,
 	remainder_f32, remainder_f32le, remainder_f32be,
