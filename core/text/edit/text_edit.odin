@@ -22,7 +22,12 @@ State :: struct {
 	// initialized each "frame" with `begin`
 	builder: ^strings.Builder, // let the caller store the text buffer data
 
-	up_index, down_index: int, // multi-lines
+	up_index, down_index:           int, // multi-lines
+	page_up_index, page_down_index: int, // multi-lines
+
+	// set by up, down, and page moves: while set, keep aiming them at the same column (multi-lines)
+	// - edits and other moves clear it; clear it yourself on a click
+	moved_vertically: bool,
 
 	translate_by_grapheme: bool, // translates by codepoint by default
 
@@ -57,13 +62,23 @@ Translation :: enum u32 {
 	Right,
 	Up,
 	Down,
+	Page_Up,
+	Page_Down,
 	Word_Left,
 	Word_Right,
 	Word_Start,
 	Word_End,
 	Soft_Line_Start,
 	Soft_Line_End,
+	Hard_Line_Start,
+	Hard_Line_End,
+	Smart_Line_Start,
+	Smart_Line_End,
 }
+
+Translation_Set :: distinct bit_set[Translation; u32]
+
+VERTICAL_TRANSLATIONS :: Translation_Set{.Up, .Down, .Page_Up, .Page_Down}
 
 // init the state to some timeout and set the respective allocators
 // - undo_state_allocator dictates the dynamic undo|redo arrays allocators
@@ -95,6 +110,7 @@ begin :: proc(s: ^State, id: u64, builder: ^strings.Builder) {
 	}
 	s.id = id
 	s.selection = {len(builder.buf), 0}
+	s.moved_vertically = false
 	s.builder = builder
 	update_time(s)
 	undo_clear(s, &s.undo)
@@ -119,6 +135,7 @@ update_time :: proc(s: ^State) {
 setup_once :: proc(s: ^State, builder: ^strings.Builder) {
 	s.builder = builder
 	s.selection = { len(builder.buf), 0 }
+	s.moved_vertically = false
 	undo_clear(s, &s.undo)
 	undo_clear(s, &s.redo)
 }
@@ -129,6 +146,7 @@ clear_all :: proc(s: ^State) -> (cleared: bool) {
 	if s.builder != nil && len(s.builder.buf) > 0 {
 		clear(&s.builder.buf)
 		s.selection = {}
+		s.moved_vertically = false
 		cleared = true
 	}
 
@@ -159,6 +177,7 @@ undo :: proc(s: ^State, undo, redo: ^[dynamic]^Undo_State) {
 		undo_state_push(s, redo)
 		item := pop(undo)
 		s.selection = item.selection
+		s.moved_vertically = false
 		#no_bounds_check if s.builder != nil {
 			strings.builder_reset(s.builder)
 			strings.write_string(s.builder, string(item.text[:item.len]))
@@ -233,6 +252,7 @@ input_rune :: proc(s: ^State, r: rune) {
 // insert a single rune into the edit state - deletes the current selection
 insert :: proc(s: ^State, at: int, text: string) -> int {
 	undo_check(s)
+	s.moved_vertically = false
 	if s.builder != nil {
 		if ok, _ := inject_at(&s.builder.buf, at, text); !ok {
 			n := cap(s.builder.buf) - len(s.builder.buf)
@@ -253,6 +273,7 @@ insert :: proc(s: ^State, at: int, text: string) -> int {
 // remove the wanted range withing, usually the selection within byte indices
 remove :: proc(s: ^State, lo, hi: int) {
 	undo_check(s)
+	s.moved_vertically = false
 	if s.builder != nil {
 		remove_range(&s.builder.buf, lo, hi)
 	}
@@ -285,7 +306,10 @@ is_continuation_byte :: proc(b: byte) -> bool {
 	return b >= 0x80 && b < 0xc0
 }
 
-// translates the caret position 
+// translates the caret position
+// - soft line: the caret's line as laid out, from `State.line_start` to `State.line_end`
+// - hard line: the caret's line as written, up to a `\n` or `\r\n`
+// - smart start/end: skip the soft line's leading/trailing spaces and tabs, or go to its start/end if already there or the line is blank
 translate_position :: proc(s: ^State, t: Translation) -> int {
 	is_space :: proc(b: byte) -> bool {
 		return b == ' ' || b == '\t' || b == '\n'
@@ -334,6 +358,10 @@ translate_position :: proc(s: ^State, t: Translation) -> int {
 		pos = s.up_index
 	case .Down:
 		pos = s.down_index
+	case .Page_Up:
+		pos = s.page_up_index
+	case .Page_Down:
+		pos = s.page_down_index
 	case .Word_Left:
 		for pos > 0 && is_space(buf[pos-1]) {
 			pos -= 1
@@ -360,12 +388,45 @@ translate_position :: proc(s: ^State, t: Translation) -> int {
 		pos = s.line_start
 	case .Soft_Line_End:
 		pos = s.line_end
+	case .Hard_Line_Start:
+		for pos > 0 && buf[pos-1] != '\n' {
+			pos -= 1
+		}
+	case .Hard_Line_End:
+		for pos < len(buf) && buf[pos] != '\n' {
+			pos += 1
+		}
+		if 0 < pos && pos < len(buf) && buf[pos-1] == '\r' {
+			pos -= 1
+		}
+	case .Smart_Line_Start:
+		lo := clamp(s.line_start, 0, len(buf))
+		hi := clamp(s.line_end, lo, len(buf))
+		text_start := lo
+		for text_start < hi && is_blank(buf[text_start]) {
+			text_start += 1
+		}
+		pos = lo if text_start == hi || text_start == pos else text_start
+	case .Smart_Line_End:
+		lo := clamp(s.line_start, 0, len(buf))
+		hi := clamp(s.line_end, lo, len(buf))
+		text_end := hi
+		for text_end > lo && is_blank(buf[text_end-1]) {
+			text_end -= 1
+		}
+		pos = hi if text_end == lo || text_end == pos else text_end
 	}
 	return clamp(pos, 0, len(buf))
 }
 
+@(private, require_results)
+is_blank :: proc(b: byte) -> bool {
+	return b == ' ' || b == '\t'
+}
+
 // Moves the position of the caret (both sides of the selection)
 move_to :: proc(s: ^State, t: Translation) {
+	s.moved_vertically = t in VERTICAL_TRANSLATIONS
 	if t == .Left && has_selection(s) {
 		lo, _ := sorted_selection(s)
 		s.selection = {lo, lo}
@@ -380,7 +441,61 @@ move_to :: proc(s: ^State, t: Translation) {
 
 // Moves only the head of the selection and leaves the tail uneffected
 select_to :: proc(s: ^State, t: Translation) {
+	s.moved_vertically = t in VERTICAL_TRANSLATIONS
 	s.selection[0] = translate_position(s, t)
+}
+
+// Selects all the text
+select_all :: proc(s: ^State) {
+	s.selection = {len(s.builder.buf) if s.builder != nil else 0, 0}
+	s.moved_vertically = false
+}
+
+// Selects the word at the caret, or the spaces and tabs around it if there is no word
+select_word :: proc(s: ^State) {
+	lo := translate_position(s, .Word_Start)
+	hi := translate_position(s, .Word_End)
+	if lo == hi && s.builder != nil {
+		buf := s.builder.buf[:]
+		for lo > 0 && is_blank(buf[lo-1]) {
+			lo -= 1
+		}
+		for hi < len(buf) && is_blank(buf[hi]) {
+			hi += 1
+		}
+	}
+	s.selection = {hi, lo}
+	s.moved_vertically = false
+}
+
+// Selects the caret's soft line and its line break
+select_line :: proc(s: ^State) {
+	lo := translate_position(s, .Soft_Line_Start)
+	hi := translate_position(s, .Soft_Line_End)
+	s.selection = {skip_line_break(s, hi), lo}
+	s.moved_vertically = false
+}
+
+// Selects the caret's hard line and its line break
+select_hard_line :: proc(s: ^State) {
+	lo := translate_position(s, .Hard_Line_Start)
+	hi := translate_position(s, .Hard_Line_End)
+	s.selection = {skip_line_break(s, hi), lo}
+	s.moved_vertically = false
+}
+
+@(private, require_results)
+skip_line_break :: proc(s: ^State, pos: int) -> int {
+	if s.builder == nil {
+		return pos
+	}
+
+	rest := string(s.builder.buf[pos:])
+	switch {
+	case strings.has_prefix(rest, "\n"):   return pos+1
+	case strings.has_prefix(rest, "\r\n"): return pos+2
+	}
+	return pos
 }
 
 // Deletes everything between the caret and resultant position
@@ -433,78 +548,112 @@ paste :: proc(s: ^State) -> bool {
 }
 
 
-Command_Set :: distinct bit_set[Command; u32]
+Command_Set :: distinct bit_set[Command; u64]
 
 Command :: enum u32 {
 	None,
 	Undo,
 	Redo,
-	New_Line,    // multi-lines
+	New_Line,         // multi-lines
 	Cut,
 	Copy,
 	Paste,
 	Select_All,
+	Select_Word,
+	Select_Line,
+	Select_Hard_Line,
 	Backspace,
 	Delete,
 	Delete_Word_Left,
 	Delete_Word_Right,
 	Left,
 	Right,
-	Up,          // multi-lines
-	Down,        // multi-lines
+	Up,               // multi-lines
+	Down,             // multi-lines
+	Page_Up,          // multi-lines
+	Page_Down,        // multi-lines
 	Word_Left,
 	Word_Right,
 	Start,
 	End,
 	Line_Start,
 	Line_End,
+	Hard_Line_Start,
+	Hard_Line_End,
+	Smart_Line_Start,
+	Smart_Line_End,
 	Select_Left,
 	Select_Right,
-	Select_Up,   // multi-lines
-	Select_Down, // multi-lines
+	Select_Up,        // multi-lines
+	Select_Down,      // multi-lines
+	Select_Page_Up,   // multi-lines
+	Select_Page_Down, // multi-lines
 	Select_Word_Left,
 	Select_Word_Right,
 	Select_Start,
 	Select_End,
 	Select_Line_Start,
 	Select_Line_End,
+	Select_Hard_Line_Start,
+	Select_Hard_Line_End,
+	Select_Smart_Line_Start,
+	Select_Smart_Line_End,
 }
 
-MULTILINE_COMMANDS :: Command_Set{.New_Line, .Up, .Down, .Select_Up, .Select_Down}
+MULTILINE_COMMANDS :: Command_Set{
+	.New_Line,
+	.Up, .Down, .Page_Up, .Page_Down,
+	.Select_Up, .Select_Down, .Select_Page_Up, .Select_Page_Down,
+}
 
 perform_command :: proc(s: ^State, cmd: Command) {
 	switch cmd {
-	case .None:              /**/
-	case .Undo:              undo(s, &s.undo, &s.redo)
-	case .Redo:              undo(s, &s.redo, &s.undo)
-	case .New_Line:          input_text(s, "\n")
-	case .Cut:               cut(s)
-	case .Copy:              copy(s)
-	case .Paste:             paste(s)
-	case .Select_All:        s.selection = {len(s.builder.buf) if s.builder != nil else 0, 0}
-	case .Backspace:         delete_to(s, .Left)
-	case .Delete:            delete_to(s, .Right)
-	case .Delete_Word_Left:  delete_to(s, .Word_Left)
-	case .Delete_Word_Right: delete_to(s, .Word_Right)
-	case .Left:              move_to(s, .Left)
-	case .Right:             move_to(s, .Right)
-	case .Up:                move_to(s, .Up)
-	case .Down:              move_to(s, .Down)
-	case .Word_Left:         move_to(s, .Word_Left)
-	case .Word_Right:        move_to(s, .Word_Right)
-	case .Start:             move_to(s, .Start)
-	case .End:               move_to(s, .End)
-	case .Line_Start:        move_to(s, .Soft_Line_Start)
-	case .Line_End:          move_to(s, .Soft_Line_End)
-	case .Select_Left:       select_to(s, .Left)
-	case .Select_Right:      select_to(s, .Right)
-	case .Select_Up:         select_to(s, .Up)
-	case .Select_Down:       select_to(s, .Down)
-	case .Select_Word_Left:  select_to(s, .Word_Left)
-	case .Select_Word_Right: select_to(s, .Word_Right)
-	case .Select_Start:      select_to(s, .Start)
-	case .Select_End:        select_to(s, .End)
-	case .Select_Line_Start: select_to(s, .Soft_Line_Start)
-	case .Select_Line_End:   select_to(s, .Soft_Line_End)
+	case .None:                    /**/
+	case .Undo:                    undo(s, &s.undo, &s.redo)
+	case .Redo:                    undo(s, &s.redo, &s.undo)
+	case .New_Line:                input_text(s, "\n")
+	case .Cut:                     cut(s)
+	case .Copy:                    copy(s)
+	case .Paste:                   paste(s)
+	case .Select_All:              select_all(s)
+	case .Select_Word:             select_word(s)
+	case .Select_Line:             select_line(s)
+	case .Select_Hard_Line:        select_hard_line(s)
+	case .Backspace:               delete_to(s, .Left)
+	case .Delete:                  delete_to(s, .Right)
+	case .Delete_Word_Left:        delete_to(s, .Word_Left)
+	case .Delete_Word_Right:       delete_to(s, .Word_Right)
+	case .Left:                    move_to(s, .Left)
+	case .Right:                   move_to(s, .Right)
+	case .Up:                      move_to(s, .Up)
+	case .Down:                    move_to(s, .Down)
+	case .Page_Up:                 move_to(s, .Page_Up)
+	case .Page_Down:               move_to(s, .Page_Down)
+	case .Word_Left:               move_to(s, .Word_Left)
+	case .Word_Right:              move_to(s, .Word_Right)
+	case .Start:                   move_to(s, .Start)
+	case .End:                     move_to(s, .End)
+	case .Line_Start:              move_to(s, .Soft_Line_Start)
+	case .Line_End:                move_to(s, .Soft_Line_End)
+	case .Hard_Line_Start:         move_to(s, .Hard_Line_Start)
+	case .Hard_Line_End:           move_to(s, .Hard_Line_End)
+	case .Smart_Line_Start:        move_to(s, .Smart_Line_Start)
+	case .Smart_Line_End:          move_to(s, .Smart_Line_End)
+	case .Select_Left:             select_to(s, .Left)
+	case .Select_Right:            select_to(s, .Right)
+	case .Select_Up:               select_to(s, .Up)
+	case .Select_Down:             select_to(s, .Down)
+	case .Select_Page_Up:          select_to(s, .Page_Up)
+	case .Select_Page_Down:        select_to(s, .Page_Down)
+	case .Select_Word_Left:        select_to(s, .Word_Left)
+	case .Select_Word_Right:       select_to(s, .Word_Right)
+	case .Select_Start:            select_to(s, .Start)
+	case .Select_End:              select_to(s, .End)
+	case .Select_Line_Start:       select_to(s, .Soft_Line_Start)
+	case .Select_Line_End:         select_to(s, .Soft_Line_End)
+	case .Select_Hard_Line_Start:  select_to(s, .Hard_Line_Start)
+	case .Select_Hard_Line_End:    select_to(s, .Hard_Line_End)
+	case .Select_Smart_Line_Start: select_to(s, .Smart_Line_Start)
+	case .Select_Smart_Line_End:   select_to(s, .Smart_Line_End)
 	}
 }
