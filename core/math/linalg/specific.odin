@@ -1272,24 +1272,24 @@ matrix2_inverse :: proc{
 @(require_results)
 matrix2_adjoint_f16 :: proc "contextless" (m: Matrix2f16) -> (c: Matrix2f16) #no_bounds_check {
 	c[0, 0] = +m[1, 1]
-	c[1, 0] = -m[0, 1]
-	c[0, 1] = -m[1, 0]
+	c[1, 0] = -m[1, 0]
+	c[0, 1] = -m[0, 1]
 	c[1, 1] = +m[0, 0]
 	return c
 }
 @(require_results)
 matrix2_adjoint_f32 :: proc "contextless" (m: Matrix2f32) -> (c: Matrix2f32) #no_bounds_check {
 	c[0, 0] = +m[1, 1]
-	c[1, 0] = -m[0, 1]
-	c[0, 1] = -m[1, 0]
+	c[1, 0] = -m[1, 0]
+	c[0, 1] = -m[0, 1]
 	c[1, 1] = +m[0, 0]
 	return c
 }
 @(require_results)
 matrix2_adjoint_f64 :: proc "contextless" (m: Matrix2f64) -> (c: Matrix2f64) #no_bounds_check {
 	c[0, 0] = +m[1, 1]
-	c[1, 0] = -m[0, 1]
-	c[0, 1] = -m[1, 0]
+	c[1, 0] = -m[1, 0]
+	c[0, 1] = -m[0, 1]
 	c[1, 1] = +m[0, 0]
 	return c
 }
@@ -1469,39 +1469,39 @@ matrix3_determinant :: proc{
 @(require_results)
 matrix3_adjoint_f16 :: proc "contextless" (m: Matrix3f16) -> (adjoint: Matrix3f16) #no_bounds_check {
 	adjoint[0, 0] = +(m[1, 1] * m[2, 2] - m[2, 1] * m[1, 2])
-	adjoint[0, 1] = -(m[1, 0] * m[2, 2] - m[2, 0] * m[1, 2])
-	adjoint[0, 2] = +(m[1, 0] * m[2, 1] - m[2, 0] * m[1, 1])
-	adjoint[1, 0] = -(m[0, 1] * m[2, 2] - m[2, 1] * m[0, 2])
+	adjoint[0, 1] = -(m[0, 1] * m[2, 2] - m[2, 1] * m[0, 2])
+	adjoint[0, 2] = +(m[0, 1] * m[1, 2] - m[1, 1] * m[0, 2])
+	adjoint[1, 0] = -(m[1, 0] * m[2, 2] - m[2, 0] * m[1, 2])
 	adjoint[1, 1] = +(m[0, 0] * m[2, 2] - m[2, 0] * m[0, 2])
-	adjoint[1, 2] = -(m[0, 0] * m[2, 1] - m[2, 0] * m[0, 1])
-	adjoint[2, 0] = +(m[0, 1] * m[1, 2] - m[1, 1] * m[0, 2])
-	adjoint[2, 1] = -(m[0, 0] * m[1, 2] - m[1, 0] * m[0, 2])
+	adjoint[1, 2] = -(m[0, 0] * m[1, 2] - m[1, 0] * m[0, 2])
+	adjoint[2, 0] = +(m[1, 0] * m[2, 1] - m[2, 0] * m[1, 1])
+	adjoint[2, 1] = -(m[0, 0] * m[2, 1] - m[2, 0] * m[0, 1])
 	adjoint[2, 2] = +(m[0, 0] * m[1, 1] - m[1, 0] * m[0, 1])
 	return adjoint
 }
 @(require_results)
 matrix3_adjoint_f32 :: proc "contextless" (m: Matrix3f32) -> (adjoint: Matrix3f32) #no_bounds_check {
 	adjoint[0, 0] = +(m[1, 1] * m[2, 2] - m[2, 1] * m[1, 2])
-	adjoint[0, 1] = -(m[1, 0] * m[2, 2] - m[2, 0] * m[1, 2])
-	adjoint[0, 2] = +(m[1, 0] * m[2, 1] - m[2, 0] * m[1, 1])
-	adjoint[1, 0] = -(m[0, 1] * m[2, 2] - m[2, 1] * m[0, 2])
+	adjoint[0, 1] = -(m[0, 1] * m[2, 2] - m[2, 1] * m[0, 2])
+	adjoint[0, 2] = +(m[0, 1] * m[1, 2] - m[1, 1] * m[0, 2])
+	adjoint[1, 0] = -(m[1, 0] * m[2, 2] - m[2, 0] * m[1, 2])
 	adjoint[1, 1] = +(m[0, 0] * m[2, 2] - m[2, 0] * m[0, 2])
-	adjoint[1, 2] = -(m[0, 0] * m[2, 1] - m[2, 0] * m[0, 1])
-	adjoint[2, 0] = +(m[0, 1] * m[1, 2] - m[1, 1] * m[0, 2])
-	adjoint[2, 1] = -(m[0, 0] * m[1, 2] - m[1, 0] * m[0, 2])
+	adjoint[1, 2] = -(m[0, 0] * m[1, 2] - m[1, 0] * m[0, 2])
+	adjoint[2, 0] = +(m[1, 0] * m[2, 1] - m[2, 0] * m[1, 1])
+	adjoint[2, 1] = -(m[0, 0] * m[2, 1] - m[2, 0] * m[0, 1])
 	adjoint[2, 2] = +(m[0, 0] * m[1, 1] - m[1, 0] * m[0, 1])
 	return adjoint
 }
 @(require_results)
 matrix3_adjoint_f64 :: proc "contextless" (m: Matrix3f64) -> (adjoint: Matrix3f64) #no_bounds_check {
 	adjoint[0, 0] = +(m[1, 1] * m[2, 2] - m[2, 1] * m[1, 2])
-	adjoint[0, 1] = -(m[1, 0] * m[2, 2] - m[2, 0] * m[1, 2])
-	adjoint[0, 2] = +(m[1, 0] * m[2, 1] - m[2, 0] * m[1, 1])
-	adjoint[1, 0] = -(m[0, 1] * m[2, 2] - m[2, 1] * m[0, 2])
+	adjoint[0, 1] = -(m[0, 1] * m[2, 2] - m[2, 1] * m[0, 2])
+	adjoint[0, 2] = +(m[0, 1] * m[1, 2] - m[1, 1] * m[0, 2])
+	adjoint[1, 0] = -(m[1, 0] * m[2, 2] - m[2, 0] * m[1, 2])
 	adjoint[1, 1] = +(m[0, 0] * m[2, 2] - m[2, 0] * m[0, 2])
-	adjoint[1, 2] = -(m[0, 0] * m[2, 1] - m[2, 0] * m[0, 1])
-	adjoint[2, 0] = +(m[0, 1] * m[1, 2] - m[1, 1] * m[0, 2])
-	adjoint[2, 1] = -(m[0, 0] * m[1, 2] - m[1, 0] * m[0, 2])
+	adjoint[1, 2] = -(m[0, 0] * m[1, 2] - m[1, 0] * m[0, 2])
+	adjoint[2, 0] = +(m[1, 0] * m[2, 1] - m[2, 0] * m[1, 1])
+	adjoint[2, 1] = -(m[0, 0] * m[2, 1] - m[2, 0] * m[0, 1])
 	adjoint[2, 2] = +(m[0, 0] * m[1, 1] - m[1, 0] * m[0, 1])
 	return adjoint
 }
@@ -1887,7 +1887,7 @@ matrix4_cofactor :: proc{
 matrix4_adjoint_f16 :: proc "contextless" (m: Matrix4f16) -> (adjoint: Matrix4f16) #no_bounds_check {
 	for i in 0..<4 {
 		for j in 0..<4 {
-			adjoint[i][j] = matrix4_cofactor(m, i, j)
+			adjoint[j][i] = matrix4_cofactor(m, i, j)
 		}
 	}
 	return
@@ -1896,7 +1896,7 @@ matrix4_adjoint_f16 :: proc "contextless" (m: Matrix4f16) -> (adjoint: Matrix4f1
 matrix4_adjoint_f32 :: proc "contextless" (m: Matrix4f32) -> (adjoint: Matrix4f32) #no_bounds_check {
 	for i in 0..<4 {
 		for j in 0..<4 {
-			adjoint[i][j] = matrix4_cofactor(m, i, j)
+			adjoint[j][i] = matrix4_cofactor(m, i, j)
 		}
 	}
 	return
@@ -1905,7 +1905,7 @@ matrix4_adjoint_f32 :: proc "contextless" (m: Matrix4f32) -> (adjoint: Matrix4f3
 matrix4_adjoint_f64 :: proc "contextless" (m: Matrix4f64) -> (adjoint: Matrix4f64) #no_bounds_check {
 	for i in 0..<4 {
 		for j in 0..<4 {
-			adjoint[i][j] = matrix4_cofactor(m, i, j)
+			adjoint[j][i] = matrix4_cofactor(m, i, j)
 		}
 	}
 	return
@@ -1921,7 +1921,7 @@ matrix4_adjoint :: proc{
 matrix4_determinant_f16 :: proc "contextless" (m: Matrix4f16) -> (determinant: f16) #no_bounds_check {
 	adjoint := matrix4_adjoint(m)
 	for i in 0..<4 {
-		determinant += m[i][0] * adjoint[i][0]
+		determinant += m[i][0] * adjoint[0][i]
 	}
 	return
 }
@@ -1929,7 +1929,7 @@ matrix4_determinant_f16 :: proc "contextless" (m: Matrix4f16) -> (determinant: f
 matrix4_determinant_f32 :: proc "contextless" (m: Matrix4f32) -> (determinant: f32) #no_bounds_check {
 	adjoint := matrix4_adjoint(m)
 	for i in 0..<4 {
-		determinant += m[i][0] * adjoint[i][0]
+		determinant += m[i][0] * adjoint[0][i]
 	}
 	return
 }
@@ -1937,7 +1937,7 @@ matrix4_determinant_f32 :: proc "contextless" (m: Matrix4f32) -> (determinant: f
 matrix4_determinant_f64 :: proc "contextless" (m: Matrix4f64) -> (determinant: f64) #no_bounds_check {
 	adjoint := matrix4_adjoint(m)
 	for i in 0..<4 {
-		determinant += m[i][0] * adjoint[i][0]
+		determinant += m[i][0] * adjoint[0][i]
 	}
 	return
 }
@@ -1953,12 +1953,12 @@ matrix4_inverse_transpose_f16 :: proc "contextless" (m: Matrix4f16) -> (inverse_
 	adjoint := matrix4_adjoint(m)
 	determinant: f16 = 0
 	for i in 0..<4 {
-		determinant += m[i][0] * adjoint[i][0]
+		determinant += m[i][0] * adjoint[0][i]
 	}
 	inv_determinant := 1.0 / determinant
 	for i in 0..<4 {
 		for j in 0..<4 {
-			inverse_transpose[i][j] = adjoint[i][j] * inv_determinant
+			inverse_transpose[i][j] = adjoint[j][i] * inv_determinant
 		}
 	}
 	return
@@ -1968,12 +1968,12 @@ matrix4_inverse_transpose_f32 :: proc "contextless" (m: Matrix4f32) -> (inverse_
 	adjoint := matrix4_adjoint(m)
 	determinant: f32 = 0
 	for i in 0..<4 {
-		determinant += m[i][0] * adjoint[i][0]
+		determinant += m[i][0] * adjoint[0][i]
 	}
 	inv_determinant := 1.0 / determinant
 	for i in 0..<4 {
 		for j in 0..<4 {
-			inverse_transpose[i][j] = adjoint[i][j] * inv_determinant
+			inverse_transpose[i][j] = adjoint[j][i] * inv_determinant
 		}
 	}
 	return
@@ -1983,12 +1983,12 @@ matrix4_inverse_transpose_f64 :: proc "contextless" (m: Matrix4f64) -> (inverse_
 	adjoint := matrix4_adjoint(m)
 	determinant: f64 = 0
 	for i in 0..<4 {
-		determinant += m[i][0] * adjoint[i][0]
+		determinant += m[i][0] * adjoint[0][i]
 	}
 	inv_determinant := 1.0 / determinant
 	for i in 0..<4 {
 		for j in 0..<4 {
-			inverse_transpose[i][j] = adjoint[i][j] * inv_determinant
+			inverse_transpose[i][j] = adjoint[j][i] * inv_determinant
 		}
 	}
 	return
