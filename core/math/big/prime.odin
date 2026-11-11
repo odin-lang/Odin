@@ -51,6 +51,8 @@ internal_int_power_modulo :: proc(res, G, X, P: ^Int, allocator := context.alloc
 	*/
 	if internal_is_negative(P) { return .Invalid_Argument }
 
+	if internal_eq(P, 1) { return internal_zero(res) }
+
 	/*
 		If exponent X is negative we have to recurse.
 	*/
@@ -221,7 +223,7 @@ internal_int_prime_miller_rabin :: proc(a, b: ^Int, allocator := context.allocat
 	/*
 		Ensure `b` > 1.
 	*/
-	if internal_lte(b, 1) { return false, nil }
+	if internal_lte(b, 1) { return false, .Invalid_Argument }
 
 	/*
 		Get `n1` = `a` - 1.
@@ -316,6 +318,8 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 
 	b, res := &Int{}, &Int{}
 	defer internal_destroy(b, res)
+
+	if internal_is_negative(a) { return }
 
 	// Some shortcuts
 	// `N` > 3
@@ -471,7 +475,7 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 				ix -= 1
 				continue
 			}
-			internal_random(b, l) or_return
+			internal_random(b, l * _DIGIT_BITS) or_return
 
 			// That number might got too big and the witness has to be smaller than "a"
 			l = internal_count_bits(b)
@@ -604,6 +608,8 @@ internal_int_prime_frobenius_underwood :: proc(N: ^Int, allocator := context.all
 	(If that name sounds familiar, he is the guy who found the fdiv bug in the Pentium CPU.)
 */
 internal_int_prime_strong_lucas_selfridge :: proc(a: ^Int, allocator := context.allocator) -> (lucas_selfridge: bool, err: Error) {
+	context.allocator = allocator
+
 	// TODO: choose better variable names!
 
 	Dz, gcd, Np1, Uz, Vz, U2mz, V2mz, Qmz, Q2mz, Qkdz, T1z, T2z, T3z, T4z, Q2kdz := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}
@@ -805,7 +811,7 @@ internal_int_prime_strong_lucas_selfridge :: proc(a: ^Int, allocator := context.
 	*/
 
 	/* Initialize 2*Q^(d*2^r) for V_2m */
-	internal_int_shr1(Q2kdz, Qkdz) or_return
+	internal_int_shl1(Q2kdz, Qkdz) or_return
 
 	for r := 1; r < s; r += 1 {
 		internal_sqr(Vz, Vz) or_return
@@ -836,6 +842,8 @@ internal_int_prime_strong_lucas_selfridge :: proc(a: ^Int, allocator := context.
 	Assumes `a` and `b` not to be `nil` and to have been initialized.
 */
 internal_prime_fermat :: proc(a, b: ^Int, allocator := context.allocator) -> (fermat: bool, err: Error) {
+	context.allocator = allocator
+
 	t := &Int{}
 	defer internal_destroy(t)
 
@@ -983,7 +991,7 @@ internal_int_sqrtmod_prime :: proc(res, n, prime: ^Int, allocator := context.all
 
 		i = 0
 		for {
-			if internal_eq(T, 1)                                     { break }
+			if internal_eq(t1, 1)                                    { break }
 
 			/*
 				No exponent in the range 0 < i < M found.
@@ -996,7 +1004,7 @@ internal_int_sqrtmod_prime :: proc(res, n, prime: ^Int, allocator := context.all
 		}
 
 		if i == 0 {
-			internal_copy(res, R)                                    or_return
+			return internal_copy(res, R)
 		}
 
 		/*
@@ -1104,7 +1112,7 @@ internal_int_prime_next_prime :: proc(a: ^Int, trials: int, bbs_style: bool, all
 		Generate the restable.
 	*/
 	for x := 1; x < _PRIME_TAB_SIZE; x += 1 {
-		res_tab = cast(type_of(res_tab))(internal_mod(a, _private_prime_table[x]) or_return)
+		res_tab[x] = internal_mod(a, _private_prime_table[x]) or_return
 	}
 
 	for {
@@ -1218,6 +1226,10 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 
 		internal_int_random(a, size_in_bits)                         or_return
 
+		top := (size_in_bits - 1) / _DIGIT_BITS
+		a.used = top + 1
+		a.digit[top] |= DIGIT(1) << uint((size_in_bits - 1) % _DIGIT_BITS)
+
 		/*
 			Make sure it's odd.
 		*/
@@ -1225,10 +1237,12 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 			a.digit[0] |= 1
 		} else {
 			/*
-				A 2-bit prime can be either 2 (0b10) or 3 (0b11).
-				So, let's force the top bit to 1 and return early.
+				A 2-bit prime can be either 2 (0b10) or 3 (0b11), and the top bit is already set.
+				`.Blum_Blum_Shub` and `.Second_MSB_On` both need 3, so set the low bit for those and return early.
 			*/
-			a.digit[0] |= 2
+			if .Blum_Blum_Shub in flags || .Second_MSB_On in flags {
+				a.digit[0] |= 1
+			}
 			return nil
 		}
 
@@ -1236,20 +1250,6 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 			a.digit[0] |= 3
 		}
 		if .Second_MSB_On in flags {
-			/*
-				Ensure there's enough space for the bit to be set.
-			*/
-			if a.used * _DIGIT_BITS < size_in_bits - 1 {
-				new_size := (size_in_bits - 1) / _DIGIT_BITS
-
-				if new_size % _DIGIT_BITS > 0 {
-					new_size += 1
-				}
-
-				internal_grow(a, new_size) or_return
-				a.used = new_size
-			}
-
 			internal_int_bitfield_set_single(a, size_in_bits - 2) or_return
 		}
 
