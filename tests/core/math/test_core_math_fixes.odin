@@ -238,3 +238,44 @@ test_cbrt_subnormal :: proc(t: ^testing.T) {
 		testing.expectf(t, within_ulps(got, c.want), "cbrt(%v) = %v, want %v", c.x, got, c.want)
 	}
 }
+
+@test
+test_lgamma_interval_bounds :: proc(t: ^testing.T) {
+	Case :: struct {
+		x, want: f64,
+	}
+	cases := [?]Case{
+		{0.2, 1.5240638224307845},
+		{0.21, 1.4724463831599772},
+		{0.7, 0.26086724653166654},
+		{1.1934, -0.083438752131070423},
+		{1.2, -0.085374090003315833},
+		{1.22, -0.090903361844300284},
+		{1.5, -0.12078223763524522},
+	}
+	for c in cases {
+		got, sign := math.lgamma(c.x)
+		testing.expectf(t, within_ulps(got, c.want) && sign == 1, "lgamma(%v) = %v, %v, want %v, 1", c.x, got, sign, c.want)
+	}
+}
+
+@test
+test_lgamma_specials :: proc(t: ^testing.T) {
+	Case :: struct {
+		x, want: f64,
+		sign:    int,
+	}
+	cases := [?]Case{
+		{0, math.INF_F64, 1},
+		{-0.0, math.INF_F64, -1},
+		{math.INF_F64, math.INF_F64, 1},
+		// As in C, not Go: lgamma(-Inf) = +Inf.
+		{math.NEG_INF_F64, math.INF_F64, 1},
+	}
+	for c in cases {
+		got, sign := math.lgamma(c.x)
+		testing.expectf(t, same(got, c.want) && sign == c.sign, "lgamma(%v) = %v, %v, want %v, %v", c.x, got, sign, c.want, c.sign)
+	}
+	got, _ := math.lgamma(math.QNAN_F64)
+	testing.expectf(t, math.is_nan(got), "lgamma(NaN) = %v, want NaN", got)
+}
