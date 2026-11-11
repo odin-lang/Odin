@@ -3,6 +3,13 @@ package math
 
 import "base:intrinsics"
 
+// On windows_i386 the CRT's sin and cos reduce large arguments with x87 fsin: from about
+// |x| = 9e4 the error near multiples of pi exceeds 2 ulp, and from 2^63 the result is garbage.
+// sincos_f64 reduces exactly and stays within 1.5 ulp everywhere, at the cost of about 1 ulp
+// more than the CRT below 9e4.
+@(private="file")
+TRIG_VIA_SINCOS :: ODIN_OS == .Windows && ODIN_ARCH == .i386
+
 @(default_calling_convention="none", private="file")
 foreign _ {
 	@(link_name="llvm.sin.f16", require_results)
@@ -43,28 +50,58 @@ foreign _ {
 
 @(require_results)
 sin_f16 :: proc "contextless" (θ: f16) -> f16 {
-	return _sin_f16(θ)
+	when TRIG_VIA_SINCOS {
+		s, _ := sincos_f64(f64(θ))
+		return f16(s)
+	} else {
+		return _sin_f16(θ)
+	}
 }
 @(require_results)
 sin_f32 :: proc "contextless" (θ: f32) -> f32 {
-	return _sin_f32(θ)
+	when TRIG_VIA_SINCOS {
+		s, _ := sincos_f64(f64(θ))
+		return f32(s)
+	} else {
+		return _sin_f32(θ)
+	}
 }
 @(require_results)
 sin_f64 :: proc "contextless" (θ: f64) -> f64 {
-	return _sin_f64(θ)
+	when TRIG_VIA_SINCOS {
+		s, _ := sincos_f64(θ)
+		return s
+	} else {
+		return _sin_f64(θ)
+	}
 }
 
 @(require_results)
 cos_f16 :: proc "contextless" (θ: f16) -> f16 {
-	return _cos_f16(θ)
+	when TRIG_VIA_SINCOS {
+		_, c := sincos_f64(f64(θ))
+		return f16(c)
+	} else {
+		return _cos_f16(θ)
+	}
 }
 @(require_results)
 cos_f32 :: proc "contextless" (θ: f32) -> f32 {
-	return _cos_f32(θ)
+	when TRIG_VIA_SINCOS {
+		_, c := sincos_f64(f64(θ))
+		return f32(c)
+	} else {
+		return _cos_f32(θ)
+	}
 }
 @(require_results)
 cos_f64 :: proc "contextless" (θ: f64) -> f64 {
-	return _cos_f64(θ)
+	when TRIG_VIA_SINCOS {
+		_, c := sincos_f64(θ)
+		return c
+	} else {
+		return _cos_f64(θ)
+	}
 }
 
 @(require_results)
