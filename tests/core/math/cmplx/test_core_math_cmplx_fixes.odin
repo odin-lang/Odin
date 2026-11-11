@@ -703,3 +703,78 @@ test_asin_acos_asinh_acosh :: proc(t: ^testing.T) {
 		testing.expectf(t, close_complex(got, c.want), "%s(%v) = %v, want %v", c.name, c.x, got, c.want)
 	}
 }
+
+@test
+test_atan_atanh :: proc(t: ^testing.T) {
+	inf := math.inf_f64(1)
+	nan := math.nan_f64()
+	neg_zero := math.copy_sign(f64(0), -1)
+	signs := [2]f64{1, -1}
+
+	atanh_cases := []Special{
+		{0, 0, complex(0, 0), false, false},
+		{0, nan, complex(0, nan), false, false},
+		{1, 0, complex(inf, 0), false, false},
+		{0, inf, complex(0, math.PI/2), false, false},
+		{1, inf, complex(0, math.PI/2), false, false},
+		{1, nan, complex(nan, nan), false, false},
+		{inf, 0, complex(0, math.PI/2), false, false},
+		{inf, 1, complex(0, math.PI/2), false, false},
+		{inf, inf, complex(0, math.PI/2), false, false},
+		{inf, nan, complex(0, nan), false, false},
+		{nan, 0, complex(nan, nan), false, false},
+		{nan, 1, complex(nan, nan), false, false},
+		{nan, inf, complex(0, math.PI/2), true, false},
+		{nan, nan, complex(nan, nan), false, false},
+	}
+	for c in atanh_cases {
+		for sx in signs {
+			for sy in signs {
+				z := complex(sx*c.x, sy*c.y)
+				want := complex(sx*real(c.want), sy*imag(c.want))
+				got := cmplx.atanh(z)
+				testing.expectf(t, same_special(got, want, c.any_re_sign, c.any_im_sign), "atanh(%v) = %v, want %v", z, got, want)
+
+				zs := complex(imag(z), -real(z))
+				want_atan := complex(imag(want), -real(want))
+				got = cmplx.atan(zs)
+				testing.expectf(t, same_special(got, want_atan, c.any_im_sign, c.any_re_sign), "atan(%v) = %v, want %v", zs, got, want_atan)
+			}
+		}
+	}
+
+	Case :: struct {
+		name: string,
+		f:    proc "contextless" (complex128) -> complex128,
+		x:    complex128,
+		want: complex128,
+	}
+	cases := []Case{
+		{"atan", cmplx.atan, complex(0, 2), complex(math.PI/2, 0.5493061443340549)},
+		{"atan", cmplx.atan, complex(neg_zero, 2), complex(-math.PI/2, 0.5493061443340549)},
+		{"atan", cmplx.atan, complex(0, -2), complex(math.PI/2, -0.5493061443340549)},
+		{"atan", cmplx.atan, complex(neg_zero, -2), complex(-math.PI/2, -0.5493061443340549)},
+		{"atanh", cmplx.atanh, complex(2, 0), complex(0.5493061443340549, math.PI/2)},
+		{"atanh", cmplx.atanh, complex(2, neg_zero), complex(0.5493061443340549, -math.PI/2)},
+		{"atanh", cmplx.atanh, complex(-2, 0), complex(-0.5493061443340549, math.PI/2)},
+		{"atanh", cmplx.atanh, complex(-2, neg_zero), complex(-0.5493061443340549, -math.PI/2)},
+
+		{"atan", cmplx.atan, complex(0.28, 0.96), complex(math.PI/4, 0.9729550745276566)},
+		{"atan", cmplx.atan, complex(1e-200, 1), complex(math.PI/4, 230.60508288968455)},
+		{"atan", cmplx.atan, complex(2e154, 0.5), complex(math.PI/2, 1.25e-309)},
+		{"atanh", cmplx.atanh, complex(1, 1e-10), complex(11.8594990552502, 0.7853981634224483)},
+		{"atanh", cmplx.atanh, complex(0.5, 0), complex(0.5493061443340549, 0)},
+		{"atanh", cmplx.atanh, complex(1e-20, 1e-20), complex(1e-20, 1e-20)},
+
+		{"atanh", cmplx.atanh, complex(0.6, 0.8), complex(0.34657359027997264, math.PI/4)},
+		{"atanh", cmplx.atanh, complex(-0.6, -0.8), complex(-0.34657359027997264, -math.PI/4)},
+		{"atan", cmplx.atan, complex(0.6, 0.8), complex(math.PI/4, 0.5493061443340549)},
+
+		{"atanh", cmplx.atanh, complex(6e299, 8e299), complex(6e-301, math.PI/2)},
+		{"atan", cmplx.atan, complex(-6e299, 8e299), complex(-math.PI/2, 7.999999999999999e-301)},
+	}
+	for c in cases {
+		got := c.f(c.x)
+		testing.expectf(t, close_complex(got, c.want), "%s(%v) = %v, want %v", c.name, c.x, got, c.want)
+	}
+}

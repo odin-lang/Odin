@@ -187,74 +187,76 @@ atan_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	//     z = x + iy,
 	//
 	// then
-	//          1       (    2x     )
-	// Re w  =  - arctan(-----------)  +  k PI
-	//          2       (     2    2)
-	//                  (1 - x  - y )
 	//
-	//               ( 2         2)
-	//          1    (x  +  (y+1) )
-	// Im w  =  - log(------------)
-	//          4    ( 2         2)
-	//               (x  +  (y-1) )
+	//     Re w  =  1/2 atan2(2x, 1 - x^2 - y^2),
 	//
-	// Where k is an arbitrary integer.
+	//                     x^2 + (y + 1)^2
+	//     Im w  =  1/4 ln ---------------.
+	//                     x^2 + (y - 1)^2
 	//
-	// catan(z) = -i catanh(iz).
+	// atan2 gives the principal value, so Re w lies in [-PI/2, PI/2].
+	// 1 - y^2 is evaluated as (1 - |y|)(1 + |y|), and Im w as
+	// 1/4 log1p(4|y| / (x^2 + (1 - |y|)^2)) with the sign of y, which
+	// avoids cancellation when |y| is near 1 and when y is small.
+	// When |x| or |y| exceeds 2^500, Re w is PI/2 with the sign of x
+	// and Im w is y/|z|^2, scaled so that |z|^2 does not overflow.
+	// For |y| = 1 and |x| below 2^-500, where x^2 would underflow,
+	// Im w is (ln 2 - ln|x|)/2 with the sign of y.
+	//
+	// It is computed as catan(z) = -i catanh(iz), the identity C99 Annex G
+	// defines catan by, so it shares catanh's special values.
 	//
 	// ACCURACY:
 	//
 	//                      Relative error:
 	// arithmetic   domain     # trials      peak         rms
-	//    DEC       -10,+10      5900       1.3e-16     7.8e-18
-	//    IEEE      -10,+10     30000       2.3e-15     8.5e-17
-	// The check catan( ctan(z) )  =  z, with |x| and |y| < PI/2,
-	// had peak relative error 1.5e-16, rms relative error
-	// 2.9e-17.  See also clog().
+	//    IEEE      -10,+10     30000       1.9e-16     6.1e-17
 
-	switch re, im := real(x), imag(x); {
-	case im == 0:
-		return complex(math.atan(re), im)
-	case re == 0 && abs(im) <= 1:
-		return complex(re, math.atanh(im))
-	case math.is_inf(im, 0) || math.is_inf(re, 0):
-		if math.is_nan(re) {
-			return complex(math.nan_f64(), math.copy_sign(0, im))
-		}
-		return complex(math.copy_sign(math.PI/2, re), math.copy_sign(0, im))
-	case math.is_nan(re) || math.is_nan(im):
-		return nan_complex128()
-	}
-	x2 := real(x) * real(x)
-	a := 1 - x2 - imag(x)*imag(x)
-	if a == 0 {
-		return nan_complex128()
-	}
-	t := 0.5 * math.atan2(2*real(x), a)
-	w := _reduce_pi_f64(t)
-
-	t = imag(x) - 1
-	b := x2 + t*t
-	if b == 0 {
-		return nan_complex128()
-	}
-	t = imag(x) + 1
-	c := (x2 + t*t) / b
-	return complex(w, 0.25*math.ln(c))
+	w := atanh_complex128(complex(-imag(x), real(x)))
+	return complex(imag(w), -real(w))
 }
 
 atanh_complex32 :: proc "contextless" (x: complex32) -> complex32 {
-	return complex32(atanh_complex64(complex64(x)))
+	return complex32(atanh_complex128(complex128(x)))
 }
 atanh_complex64 :: proc "contextless" (x: complex64) -> complex64 {
-	z := complex(-imag(x), real(x)) // z = i * x
-	z = atan(z)
-	return complex(imag(z), -real(z)) // z = -i * z
+	return complex64(atanh_complex128(complex128(x)))
 }
 atanh_complex128 :: proc "contextless" (x: complex128) -> complex128 {
-	z := complex(-imag(x), real(x)) // z = i * x
-	z = atan(z)
-	return complex(imag(z), -real(z)) // z = -i * z
+	LARGE :: f64(1 << 500)
+	TINY  :: 1.0 / (1 << 500)
+
+	re, im := real(x), imag(x)
+	ax, ay := abs(re), abs(im)
+	rr, ri: f64
+	switch {
+	case math.is_inf(ax, 0) || math.is_inf(ay, 0):
+		rr = 0
+		ri = math.PI/2
+		if math.is_nan(ay) {
+			ri = ay
+		}
+	case math.is_nan(ax) || math.is_nan(ay):
+		if ax == 0 {
+			rr, ri = 0, ay
+		} else {
+			rr, ri = math.nan_f64(), math.nan_f64()
+		}
+	case ax > LARGE || ay > LARGE:
+		p := max(ax, ay)
+		q := min(ax, ay) / p
+		rr = ((ax/p) / (1 + q*q)) / p
+		ri = math.PI/2
+	case:
+		if ax == 1 && ay < TINY {
+			rr = 0.5 * (math.LN2 - math.ln(ay))
+		} else {
+			d := (1 - ax)*(1 - ax) + ay*ay
+			rr = 0.25 * math.log1p(4*ax/d)
+		}
+		ri = 0.5 * math.atan2(2*ay, (1 - ax)*(1 + ax) - ay*ay)
+	}
+	return complex(math.copy_sign(rr, re), math.copy_sign(ri, im))
 }
 
 
