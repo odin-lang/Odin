@@ -53,9 +53,14 @@ stop_test_callback :: proc "c" (sig: libc.int) {
 	if !local_test_index_set {
 		// We're a thread created by a test thread.
 		//
-		// There's nothing we can do to inform the test runner about who
-		// signalled, so hopefully the test will handle their own sub-threads.
-		return
+		// The runner can't tell which test started us, and returning would
+		// re-execute the trap forever, so abort the whole process instead.
+		advisory_a := `
+A thread started by a test has caught an unrecoverable error (signal `
+		advisory_b := `).
+The test runner can't tell which test started it, and will now forcibly terminate.
+`
+		abort_with_advisory(sig, advisory_a, advisory_b)
 	}
 	if local_test_index == -1 {
 		// We're the test runner, and we ourselves have caught a signal from
@@ -63,42 +68,12 @@ stop_test_callback :: proc "c" (sig: libc.int) {
 		//
 		// The most we can do now is make sure the user's cursor is visible,
 		// nuke the entire processs, and hope a useful core dump survives.
-
-		// NOTE(Feoramund): Using these write calls in a signal handler is
-		// undefined behavior in C99 but possibly tolerated in POSIX 2008.
-		// Either way, we may as well try to salvage what we can.
-		if !global_ansi_disabled {
-			show_cursor := ansi.CSI + ansi.DECTCEM_SHOW
-			libc.fwrite(raw_data(show_cursor), size_of(byte), len(show_cursor), libc.stdout)
-			libc.fflush(libc.stdout)
-		}
-
-		// This is an attempt at being compliant by avoiding printf.
-		sigbuf: [8]byte
-		sigstr: string
-		{
-			signum := cast(int)sig
-			i := len(sigbuf) - 2
-			for signum > 0 {
-				m := signum % 10
-				signum /= 10
-				sigbuf[i] = cast(u8)('0' + m)
-				i -= 1
-			}
-			sigstr = cast(string)sigbuf[1 + i:len(sigbuf) - 1]
-		}
-
 		advisory_a := `
 The test runner's main thread has caught an unrecoverable error (signal `
 		advisory_b := `) and will now forcibly terminate.
 Unless you terminated the tests yourself, this could be a dire bug and should be reported to the Odin developers.
 `
-		libc.fwrite(raw_data(advisory_a), size_of(byte), len(advisory_a), libc.stderr)
-		libc.fwrite(raw_data(sigstr), size_of(byte), len(sigstr), libc.stderr)
-		libc.fwrite(raw_data(advisory_b), size_of(byte), len(advisory_b), libc.stderr)
-
-		// Try to get a core dump.
-		libc.abort()
+		abort_with_advisory(sig, advisory_a, advisory_b)
 	}
 
 	if sync.mutex_guard(&stop_test_gate) {
@@ -137,6 +112,40 @@ Unless you terminated the tests yourself, this could be a dire bug and should be
 			_test_thread_cancel()
 		}
 	}
+}
+
+@(private="file")
+abort_with_advisory :: proc "contextless" (sig: libc.int, advisory_a, advisory_b: string) -> ! {
+	// NOTE(Feoramund): Using these write calls in a signal handler is
+	// undefined behavior in C99 but possibly tolerated in POSIX 2008.
+	// Either way, we may as well try to salvage what we can.
+	if !global_ansi_disabled {
+		show_cursor := ansi.CSI + ansi.DECTCEM_SHOW
+		libc.fwrite(raw_data(show_cursor), size_of(byte), len(show_cursor), libc.stdout)
+		libc.fflush(libc.stdout)
+	}
+
+	// This is an attempt at being compliant by avoiding printf.
+	sigbuf: [8]byte
+	sigstr: string
+	{
+		signum := cast(int)sig
+		i := len(sigbuf) - 2
+		for signum > 0 {
+			m := signum % 10
+			signum /= 10
+			sigbuf[i] = cast(u8)('0' + m)
+			i -= 1
+		}
+		sigstr = cast(string)sigbuf[1 + i:len(sigbuf) - 1]
+	}
+
+	libc.fwrite(raw_data(advisory_a), size_of(byte), len(advisory_a), libc.stderr)
+	libc.fwrite(raw_data(sigstr), size_of(byte), len(sigstr), libc.stderr)
+	libc.fwrite(raw_data(advisory_b), size_of(byte), len(advisory_b), libc.stderr)
+
+	// Try to get a core dump.
+	libc.abort()
 }
 
 _setup_signal_handler :: proc() {
