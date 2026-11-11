@@ -2747,6 +2747,7 @@ internal_int_shl :: proc(dest, src: ^Int, bits: int, allocator := context.alloca
 	*/
 	digits_needed := dest.used + (bits / _DIGIT_BITS) + 1
 	internal_grow(dest, digits_needed) or_return
+	dest.used = digits_needed
 	/*
 		Shift by as many digits in the bit count as we have.
 	*/
