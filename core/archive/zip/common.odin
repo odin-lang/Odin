@@ -1,3 +1,5 @@
+// TODO-UPDATE-COMMENT: the package now also writes archives (`create`, `write_entry`, `write_directory`, `commit`, `close`); "Reads" and "Writing (planned)" are stale
+// ---
 /*
 Reads ZIP archives, as specified by [PKWARE's APPNOTE.TXT, version 6.3.10, November 2022](https://pkware.cachefly.net/webdocs/APPNOTE/APPNOTE-6.3.10.TXT).
 
@@ -22,7 +24,9 @@ package archive_zip
 import "base:runtime"
 import "core:archive"
 import "core:compress"
+import "core:compress/bzip2"
 import "core:compress/deflate"
+import "core:compress/ppmd"
 import "core:io"
 import "core:os"
 
@@ -53,6 +57,15 @@ Signature :: enum u32le {
 
 END_SEARCH_MAX  :: size_of(End_Record) + 0xFFFF + size_of(Zip64_Locator)
 COPY_CHUNK_SIZE :: 64 * 1024
+
+ONE_SHOT_MAX      :: i64(#config(ZIP_ONE_SHOT_MAX, 16 * 1024 * 1024))
+WRITE_CHUNK_SIZE  :: 256 * 1024
+ZIP16_MAX         :: 0xFFFF
+ZIP32_MAX         :: 0xFFFF_FFFF
+ZIP64_LOCAL_LIMIT :: 0xF000_0000
+MADE_BY_VERSION   :: 63
+DOS_EPOCH         :: 315_532_800
+LZMA_SDK_VERSION  :: [2]u8{19, 0}
 
 // General purpose bit flags, APPNOTE v6.3.10 section 4.4.4: bits 1 and 2 depend on the method.
 Flag :: enum u16 {
@@ -319,6 +332,98 @@ Check_Writer :: struct {
 	w:     io.Writer,
 	crc:   u32,
 	count: i64,
+}
+
+Entry_Data :: union {
+	[]u8,
+	io.Reader,
+}
+
+Entry_Options :: struct {
+	method: archive.Method,
+	level:  Maybe(int),
+}
+
+Writer_Options :: struct {
+	method:        archive.Method,
+	level:         Maybe(int),
+	deterministic: bool,
+	comment:       string,
+	options:       compress.Options,
+}
+
+Writer :: struct {
+	allocator:  runtime.Allocator,
+	options:    Writer_Options,
+	stream:     io.Stream,
+	file:       ^os.File,
+	path:       string,
+	seekable:   bool,
+	offset:     i64,
+	end:        i64,
+	count:      i64,
+	archive_in: i64,
+	central:    [dynamic]u8,
+	header:     [dynamic]u8,
+	name:       [dynamic]u8,
+	walk_name:  [dynamic]u8,
+	chunk:      []u8,
+	err:        Error,
+	committed:  bool,
+	active:     bool,
+}
+
+Pending_Entry :: struct {
+	name:          []u8,
+	comment:       string,
+	link_target:   string,
+	type:          archive.Entry_Type,
+	method:        Method,
+	level:         int,
+	flags:         Flags,
+	utf8:          bool,
+	external:      u32,
+	dos_time:      u16,
+	dos_date:      u16,
+	unix_time:     i32,
+	has_unix_time: bool,
+	ntfs:          [3]u64,
+	has_ntfs:      bool,
+	uid:           i64,
+	gid:           i64,
+	has_owner:     bool,
+	crc:           u32,
+	size:          i64,
+	compressed:    i64,
+	header:        i64,
+	local_zip64:   bool,
+	final:         bool,
+}
+
+Member_Sink :: struct {
+	writer: ^Writer,
+	count:  i64,
+}
+
+Source :: struct {
+	data:       []u8,
+	reader:     io.Reader,
+	position:   int,
+	start:      i64,
+	rewindable: bool,
+}
+
+Encoder :: struct {
+	method:  Method,
+	w:       io.Writer,
+	deflate: deflate.Deflate_Writer,
+	bzip2:   bzip2.Writer,
+	ppmd:    ppmd.Writer,
+}
+
+Walked_Entry :: struct {
+	name: string,
+	info: os.File_Info,
 }
 
 @(rodata)

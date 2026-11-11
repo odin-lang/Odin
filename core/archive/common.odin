@@ -211,6 +211,9 @@ Zip_Error :: enum u32 {
 	CRC_Mismatch,
 	Size_Mismatch,
 	Truncated,
+	Invalid_Name,
+	Field_Too_Long,
+	Too_Large,
 }
 
 Error :: union #shared_nil {

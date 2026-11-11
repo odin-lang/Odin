@@ -56,7 +56,9 @@ open_from_path :: proc(r: ^Reader, path: string, options := compress.Options{}, 
 
 open :: proc{open_from_path, open_from_bytes, open_from_stream}
 
-close :: proc(r: ^Reader) {
+close :: proc{close_reader, close_writer}
+
+close_reader :: proc(r: ^Reader) {
 	if r.owns_dir {
 		delete(r.directory, r.allocator)
 	}
