@@ -5,7 +5,7 @@ import "core:math"
 import "core:math/cmplx"
 import "core:testing"
 
-@(private="file")
+@(private)
 same :: proc(got, want: $T) -> bool where intrinsics.type_is_float(T) {
 	if math.is_nan(want) {
 		return math.is_nan(got)
@@ -18,7 +18,7 @@ same_complex :: proc(got, want: $T) -> bool where intrinsics.type_is_complex(T) 
 	return same(real(got), real(want)) && same(imag(got), imag(want))
 }
 
-@(private="file")
+@(private)
 close :: proc(got, want: $T, max_ulps: i64 = 2) -> bool where intrinsics.type_is_float(T) {
 	if math.is_nan(want) || math.is_inf(want) || want == 0 {
 		return same(got, want)
@@ -36,12 +36,12 @@ close :: proc(got, want: $T, max_ulps: i64 = 2) -> bool where intrinsics.type_is
 	return abs(g - w) <= max_ulps
 }
 
-@(private="file")
+@(private)
 close_complex :: proc(got, want: $T, max_ulps: i64 = 2) -> bool where intrinsics.type_is_complex(T) {
 	return close(real(got), real(want), max_ulps) && close(imag(got), imag(want), max_ulps)
 }
 
-@(private="file")
+@(private)
 Special :: struct {
 	x, y:        f64,
 	want:        complex128,
@@ -49,7 +49,7 @@ Special :: struct {
 	any_im_sign: bool,
 }
 
-@(private="file")
+@(private)
 same_special :: proc(got, want: complex128, any_re_sign, any_im_sign: bool) -> bool {
 	re_ok := same(abs(real(got)), abs(real(want))) if any_re_sign else same(real(got), real(want))
 	im_ok := same(abs(imag(got)), abs(imag(want))) if any_im_sign else same(imag(got), imag(want))
