@@ -290,16 +290,16 @@ vector_angle_between :: proc "contextless" (a, b: $V/[$N]$E) -> E {
 	return math.acos(d)
 }
 quaternion64_angle_between :: proc "contextless" (a, b: $Q/quaternion64) -> f16 {
-	c := normalize0(conj(a) * b)
-	return math.acos(c.w)
+	c := conj(a) * b
+	return 2 * math.atan2(math.sqrt(c.x*c.x + c.y*c.y + c.z*c.z), abs(c.w))
 }
 quaternion128_angle_between :: proc "contextless" (a, b: $Q/quaternion128) -> f32 {
-	c := normalize0(conj(a) * b)
-	return math.acos(c.w)
+	c := conj(a) * b
+	return 2 * math.atan2(math.sqrt(c.x*c.x + c.y*c.y + c.z*c.z), abs(c.w))
 }
 quaternion256_angle_between :: proc "contextless" (a, b: $Q/quaternion256) -> f64 {
-	c := normalize0(conj(a) * b)
-	return math.acos(c.w)
+	c := conj(a) * b
+	return 2 * math.atan2(math.sqrt(c.x*c.x + c.y*c.y + c.z*c.z), abs(c.w))
 }
 angle_between :: proc{
 	vector_angle_between,

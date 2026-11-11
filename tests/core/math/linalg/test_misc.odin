@@ -1,5 +1,6 @@
 package test_core_math_linalg
 
+import "core:math"
 import "core:math/linalg"
 import "core:testing"
 
@@ -93,4 +94,45 @@ test_quaternion_from_forward_and_up :: proc(t: ^testing.T) {
 
 	look := linalg.quaternion_look_at(linalg.Vector3f64{}, fwd, up)
 	testing.expectf(t, quaternion_close(q, conj(look), 1e-12), "quaternion_from_forward_and_up = %v, want conj(quaternion_look_at) = %v", q, conj(look))
+}
+
+@test
+test_quaternion_angle_between :: proc(t: ^testing.T) {
+	{
+		id := linalg.QUATERNIONF64_IDENTITY
+		z90 := linalg.quaternion_angle_axis(f64(math.PI/2), linalg.Vector3f64{0, 0, 1})
+		z270 := linalg.quaternion_angle_axis(f64(3*math.PI/2), linalg.Vector3f64{0, 0, 1})
+		x180 := linalg.quaternion_angle_axis(f64(math.PI), linalg.Vector3f64{1, 0, 0})
+
+		Case :: struct {
+			a, b: linalg.Quaternionf64,
+			want: f64,
+		}
+		for c in ([]Case{
+			{id,     id,   0},
+			{id,     -id,  0},
+			{id,     z90,  math.PI/2},
+			{id,     -z90, math.PI/2},
+			{2 * id, z90,  math.PI/2},
+			{id,     z270, math.PI/2},
+			{id,     x180, math.PI},
+			{z90,    z270, math.PI},
+		}) {
+			got := linalg.angle_between(c.a, c.b)
+			testing.expectf(t, abs(got - c.want) <= 1e-12, "angle_between(%v, %v) = %v, want %v", c.a, c.b, got, c.want)
+		}
+	}
+	{
+		id := linalg.QUATERNIONF32_IDENTITY
+		z90 := linalg.quaternion_angle_axis(f32(math.PI/2), linalg.Vector3f32{0, 0, 1})
+		got := linalg.angle_between(id, z90)
+		testing.expectf(t, abs(got - math.PI/2) <= 1e-6, "angle_between(id, z90) = %v, want %v", got, math.PI/2)
+		got = linalg.angle_between(id, -id)
+		testing.expectf(t, got == 0, "angle_between(id, -id) = %v, want 0", got)
+	}
+	{
+		id := linalg.QUATERNIONF16_IDENTITY
+		got := linalg.angle_between(id, -id)
+		testing.expectf(t, got == 0, "angle_between(id, -id) = %v, want 0", got)
+	}
 }
