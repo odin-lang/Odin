@@ -2124,3 +2124,78 @@ test_fix_clear_drops_nan_inf :: proc(t: ^testing.T) {
 	a.flags = {}
 	fix_expect(t, a, "0")
 }
+
+@(test)
+test_fix_pack_unpack_zero :: proc(t: ^testing.T) {
+	x := &big.Int{}
+	defer big.destroy(x)
+
+	fix_set(t, x, "0")
+	testing.expect_value(t, big.internal_int_pack_count(x, u128, 0), 0)
+	words: [1]u128
+	written, err := big.internal_int_pack(x, words[:], 0, .LSB_First)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, written, 0)
+
+	fix_set(t, x, "-5")
+	testing.expect_value(t, big.internal_int_unpack(x, words[:written], 0, .LSB_First), nil)
+	fix_expect(t, x, "0")
+
+	bytes: []u8
+	testing.expect_value(t, big.nan(x), nil)
+	testing.expect_value(t, big.internal_int_unpack(x, bytes, 0, .MSB_First), nil)
+	testing.expect_value(t, x.flags, big.Flags{})
+	fix_expect(t, x, "0")
+}
+
+@(test)
+test_fix_itoa_raw_small_buffer :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	defer big.destroy(a)
+
+	Case :: struct {
+		decimal:  string,
+		radix:    i8,
+		expected: string,
+	}
+	cases := [?]Case{
+		{"0",                                         10, "0"},
+		{"-0",                                        10, "0"},
+		{"7",                                         10, "7"},
+		{"-7",                                        10, "-7"},
+		{"-123",                                      10, "-123"},
+		{"18446744073709551616",                      10, "18446744073709551616"},
+		{"-18446744073709551616",                     7,  "-45012021522523134134602"},
+		{"-1361129467683753853853498429727072845825", 16, "-400000000000000000000000000000001"},
+		{"1361129467683753853853498429727072845825",  32, "100000000000000000000000001"},
+		{"1361129467683753853853498429727072845825",  10, "1361129467683753853853498429727072845825"},
+		{"-1361129467683753853853498429727072845825", 7,  "-15501652041535445035004034651000412123144600523"},
+	}
+	for c in cases {
+		fix_set(t, a, c.decimal)
+		if c.decimal == "-0" {
+			a.sign = .Negative
+		}
+
+		for zero_terminate in ([?]bool{false, true}) {
+			exact := len(c.expected) + (1 if zero_terminate else 0)
+			storage: [64]u8
+
+			for l in 0..<exact {
+				written, err := big.int_itoa_raw(a, c.radix, storage[:l], l, zero_terminate)
+				testing.expectf(t, err == .Buffer_Overflow && written == 0, "%v radix %v, %v bytes, size passed: %v, %v", c.decimal, c.radix, l, written, err)
+
+				written, err = big.int_itoa_raw(a, c.radix, storage[:l], -1, zero_terminate)
+				testing.expectf(t, err == .Buffer_Overflow && written == 0, "%v radix %v, %v bytes: %v, %v", c.decimal, c.radix, l, written, err)
+			}
+
+			written, err := big.int_itoa_raw(a, c.radix, storage[:exact], exact, zero_terminate)
+			testing.expect_value(t, err, nil)
+			testing.expect_value(t, written, exact)
+			testing.expect_value(t, string(storage[:len(c.expected)]), c.expected)
+			if zero_terminate {
+				testing.expect_value(t, storage[len(c.expected)], 0)
+			}
+		}
+	}
+}

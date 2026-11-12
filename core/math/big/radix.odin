@@ -90,8 +90,7 @@ int_itoa_cstring :: proc(a: ^Int, radix := i8(10), allocator := context.allocato
 	The digits are written backwards from the end of `buffer` and then moved to the front,
 	so the result is always `buffer[:written]`, however much larger than `size` the buffer is.
 
-	`size` is only checked against `len(buffer)`. Don't pass a `size` smaller than what `radix_size` returns:
-	the check then passes for a buffer that's too small, and the write fails the bounds check.
+	`size` only saves the `radix_size` call. A buffer too small for the result gives `.Buffer_Overflow`.
 */
 int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_terminate := false) -> (written: int, err: Error) {
 	assert_if_nil(a)
@@ -124,6 +123,14 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 	*/
 	z, _ := is_zero(a)
 	if z || (a.used == 1 && a.digit[0] < DIGIT(radix)) {
+		n, _ := is_neg(a)
+		needed := 1
+		if zero_terminate { needed += 1 }
+		if n && !z        { needed += 1 }
+		if available < needed {
+			return 0, .Buffer_Overflow
+		}
+
 		if zero_terminate {
 			available -= 1
 			buffer[available] = 0
@@ -131,7 +138,7 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 		available -= 1
 		buffer[available] = RADIX_TABLE[a.digit[0]]
 
-		if n, _ := is_neg(a); n && !z {
+		if n && !z {
 			available -= 1
 			buffer[available] = '-'
 		}
@@ -151,12 +158,18 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 	*/
 	if a.used == 1 || a.used == 2 {
 		if zero_terminate {
+			if available == 0 {
+				return 0, .Buffer_Overflow
+			}
 			available -= 1
 			buffer[available] = 0
 		}
 
 		val := _WORD(a.digit[1]) << _DIGIT_BITS + _WORD(a.digit[0])
 		for val > 0 {
+			if available == 0 {
+				return 0, .Buffer_Overflow
+			}
 			q := val / _WORD(radix)
 			available -= 1
 			buffer[available] = RADIX_TABLE[val - (q * _WORD(radix))]
@@ -164,6 +177,9 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 			val = q
 		}
 		if n, _ := is_neg(a); n {
+			if available == 0 {
+				return 0, .Buffer_Overflow
+			}
 			available -= 1
 			buffer[available] = '-'
 		}
@@ -184,12 +200,20 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 	count := count_bits(a) or_return
 
 	if is_power_of_two(int(radix)) {
+		shift := log(DIGIT(radix), 2) or_return
+		n, _ := is_neg(a)
+		needed := (count + shift - 1) / shift
+		if zero_terminate { needed += 1 }
+		if n              { needed += 1 }
+		if available < needed {
+			return 0, .Buffer_Overflow
+		}
+
 		if zero_terminate {
 			available -= 1
 			buffer[available] = 0
 		}
 
-		shift := log(DIGIT(radix), 2) or_return
 		digit: _WORD
 
 		for offset := 0; offset < count; offset += shift {
@@ -203,7 +227,7 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 			buffer[available] = RADIX_TABLE[digit]
 		}
 
-		if n, _ := is_neg(a); n {
+		if n {
 			available -= 1
 			buffer[available] = '-'
 		}
@@ -646,7 +670,7 @@ internal_int_unpack :: proc(a: ^Int, buf: []$T, nails := 0, order := Order.LSB_F
 	type_mask  := T(1 << uint(type_bits)) - 1
 
 	if len(buf) == 0 {
-		return .Invalid_Argument
+		return internal_zero(a)
 	}
 
 	bit_count   := type_bits * len(buf)
@@ -728,8 +752,8 @@ RADIX_TABLE_REVERSE := [RADIX_TABLE_REVERSE_SIZE]u8{
 RADIX_TABLE_REVERSE_SIZE :: 80
 
 /*
-	Stores a bignum as a ASCII string in a given radix (2..64)
-	The buffer must be appropriately sized. This routine doesn't check.
+	Stores a bignum as an ASCII string in a given radix (2..64).
+	Returns `.Buffer_Overflow` if the buffer is too small.
 */
 
 _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false, allocator := context.allocator) -> (written: int, err: Error) {
@@ -757,6 +781,9 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 
 	available := len(buffer)
 	if zero_terminate {
+		if available == 0 {
+			return 0, .Buffer_Overflow
+		}
 		available -= 1
 		buffer[available] = 0
 	}
@@ -773,7 +800,10 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 		internal_clamp(temp)
 
 		count := digit_count
-		for available > 0 && count > 0 && (temp.used > 0 || remainder > 0) {
+		for count > 0 && (temp.used > 0 || remainder > 0) {
+			if available == 0 {
+				return 0, .Buffer_Overflow
+			}
 			available -= 1
 			buffer[available] = RADIX_TABLE[remainder % _radix]
 			remainder /= _radix
@@ -786,6 +816,9 @@ _itoa_raw_full :: proc(a: ^Int, radix: i8, buffer: []u8, zero_terminate := false
 	}
 
 	if a.sign == .Negative {
+		if available == 0 {
+			return 0, .Buffer_Overflow
+		}
 		available -= 1
 		buffer[available] = '-'
 	}
