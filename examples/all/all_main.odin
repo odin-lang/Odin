@@ -66,6 +66,7 @@ package all
 @(require) import "core:crypto/sha3"
 @(require) import "core:crypto/shake"
 @(require) import "core:crypto/sm3"
+@(require) import "core:crypto/tls"
 @(require) import "core:crypto/tuplehash"
 @(require) import "core:crypto/x25519"
 @(require) import "core:crypto/x448"
