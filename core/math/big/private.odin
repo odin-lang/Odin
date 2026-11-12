@@ -1152,6 +1152,7 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 			t2.digit[1] = x.digit[i - 1] /* i >= 1 always holds */
 			t2.digit[2] = x.digit[i]
 			t2.used = 3
+			internal_clamp(t2)
 
 			if internal_lte(t1, t2) {
 				break

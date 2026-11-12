@@ -1260,8 +1260,6 @@ internal_cmp_digit :: internal_compare_digit
 */
 internal_int_compare_magnitude :: #force_inline proc(a, b: ^Int) -> (comparison: int) {
 	assert_if_nil(a, b)
-	internal_clamp(a)
-	internal_clamp(b)
 
 	// Compare based on used digits.
 	if a.used != b.used {
@@ -1534,7 +1532,6 @@ internal_int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
 	/*
 		Fast path for `Int`s that fit within a single `DIGIT`.
 	*/
-	internal_clamp(a)
 	if a.used == 1 { return internal_log(a.digit[0], DIGIT(base)) }
 
 	return _private_int_log(a, base)
