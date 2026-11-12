@@ -183,6 +183,15 @@ gb_internal void lb_mem_copy_small_inline(lbProcedure *p, lbValue dst, lbValue s
 	lb_start_block(p, done);
 }
 
+// NOTE: Fast stack walks on Windows arm64, such as `RtlCaptureStackBackTrace` (`core:debug/trace`) and ETW, follow
+// the chain of frame records that x29 points to rather than the unwind tables, and the ABI requires that chain.
+// LLVM leaves the frame records out unless asked, as clang does by default, which left every procedure out of them.
+gb_internal void lb_add_frame_record_attribute(lbModule *m, LLVMValueRef proc_value) {
+	if (build_context.metrics.os == TargetOs_windows && build_context.metrics.arch == TargetArch_arm64) {
+		lb_add_attribute_to_proc_with_string(m, proc_value, str_lit("frame-pointer"), str_lit("non-leaf"));
+	}
+}
+
 gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) {
 	GB_ASSERT(entity != nullptr);
 	GB_ASSERT(entity->kind == Entity_Procedure);
@@ -315,6 +324,10 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 
 	if (!entity->Procedure.is_foreign && build_context.disable_red_zone) {
 		lb_add_attribute_to_proc(m, p->value, "noredzone");
+	}
+
+	if (!entity->Procedure.is_foreign) {
+		lb_add_frame_record_attribute(m, p->value);
 	}
 
 	switch (p->inlining) {
@@ -591,6 +604,7 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 	Type *pt = p->type;
 	LLVMSetFunctionCallConv(p->value, lb_calling_convention_kind(pt->Proc.calling_convention));
 	lb_add_function_type_attributes(p->value, lb_get_function_type(m, p->type), pt->Proc.calling_convention);
+	lb_add_frame_record_attribute(m, p->value);
 	lbValue proc_value = {p->value, p->type};
 	lb_add_member(m, p->name, proc_value);
 	lb_add_procedure_value(m, p);

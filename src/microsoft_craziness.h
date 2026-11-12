@@ -91,6 +91,70 @@ gb_internal void mc_free(String16 str) {
 	if (str.len) gb_free(mc_allocator, str.text);
 }
 
+// The MSVC and Windows SDK directory name for the target architecture, e.g. `lib\arm64`, `um\x64`.
+gb_internal String mc_target_arch_dir(void) {
+	switch (build_context.metrics.arch) {
+	case TargetArch_amd64: return str_lit("x64");
+	case TargetArch_i386:  return str_lit("x86");
+	case TargetArch_arm64: return str_lit("arm64");
+	}
+	return {};
+}
+
+// The directory name for tools (link.exe, rc.exe) that run natively on the machine the compiler was built for.
+gb_internal String mc_host_arch_dir(void) {
+#if defined(GB_CPU_ARM)
+	return str_lit("arm64");
+#elif defined(GB_ARCH_64_BIT)
+	return str_lit("x64");
+#else
+	return str_lit("x86");
+#endif
+}
+
+// The MSVC `bin\Host<dir>` directory to look for tools in first: x86 for an i386 target, otherwise the
+// native one.
+gb_internal String mc_msvc_host_dir(void) {
+	return build_context.metrics.arch == TargetArch_i386 ? str_lit("x86") : mc_host_arch_dir();
+}
+
+// The Windows SDK `bin\<ver>\<dir>` directory holding rc.exe.
+gb_internal String mc_sdk_bin_arch_dir(void) {
+	// NOTE: rc.exe is a host tool and is not shipped for every target (e.g. arm64 on older SDKs).
+	return is_arch_x86() ? mc_target_arch_dir() : mc_host_arch_dir();
+}
+
+// Finds the MSVC `bin\Host<host>\<target>\` and `lib\<target>\` directories in an MSVC toolset folder
+// (e.g. `...\VC\Tools\MSVC\14.50.35717`). Prefers the tools of `mc_msvc_host_dir` and falls back to the
+// x64 hosted tools, which also run on Windows arm64 through emulation.
+gb_internal bool mc_msvc_toolset_paths(String toolset_dir, String *exe_path, String *lib_path) {
+	String target = mc_target_arch_dir();
+	if (target.len == 0) {
+		return false;
+	}
+
+	String root = string_ends_with(toolset_dir, str_lit("\\")) ? substring(toolset_dir, 0, toolset_dir.len-1) : toolset_dir;
+
+	String exe = {};
+	String hosts[2] = {mc_msvc_host_dir(), str_lit("x64")};
+	for (String host : hosts) {
+		mc_free(exe);
+		String host_target = mc_concat(host, str_lit("\\"), target);
+		defer (mc_free(host_target));
+		exe = mc_concat(root, str_lit("\\bin\\Host"), host_target, str_lit("\\"));
+
+		String link = mc_concat(exe, str_lit("link.exe"));
+		defer (mc_free(link));
+		if (host == "x64" || gb_file_exists((const char *)link.text)) {
+			break; // x64 is the last resort
+		}
+	}
+
+	*exe_path = exe;
+	*lib_path = mc_concat(root, str_lit("\\lib\\"), target, str_lit("\\"));
+	return true;
+}
+
 typedef struct _MC_Find_Data {
 	DWORD  file_attributes;
 	String filename;
@@ -347,17 +411,13 @@ gb_internal bool find_windows_kit_paths_in_kits_root10(Find_Result *result, Stri
 		return false;
 	}
 
-	if (build_context.metrics.arch == TargetArch_amd64) {
-		result->windows_sdk_um_library_path   = mc_concat(data_lib.best_name, str_lit("\\um\\x64\\"));
-		result->windows_sdk_ucrt_library_path = mc_concat(data_lib.best_name, str_lit("\\ucrt\\x64\\"));
-		result->windows_sdk_bin_path          = mc_concat(data_bin.best_name, str_lit("\\x64\\"));
-	} else if (build_context.metrics.arch == TargetArch_i386) {
-		result->windows_sdk_um_library_path   = mc_concat(data_lib.best_name, str_lit("\\um\\x86\\"));
-		result->windows_sdk_ucrt_library_path = mc_concat(data_lib.best_name, str_lit("\\ucrt\\x86\\"));
-		result->windows_sdk_bin_path          = mc_concat(data_bin.best_name, str_lit("\\x86\\"));
-	} else {
+	String target = mc_target_arch_dir();
+	if (target.len == 0) {
 		return false;
 	}
+	result->windows_sdk_um_library_path   = mc_concat(data_lib.best_name, str_lit("\\um\\"),   target, str_lit("\\"));
+	result->windows_sdk_ucrt_library_path = mc_concat(data_lib.best_name, str_lit("\\ucrt\\"), target, str_lit("\\"));
+	result->windows_sdk_bin_path          = mc_concat(data_bin.best_name, str_lit("\\"), mc_sdk_bin_arch_dir(), str_lit("\\"));
 
 	result->windows_sdk_version = 10;
 	return true;
@@ -414,13 +474,7 @@ gb_internal bool find_visual_studio_in_installation_path(Find_Result *result, St
 	String library_path = {};
 	String exe_path = {};
 
-	if (build_context.metrics.arch == TargetArch_amd64) {
-		library_path = mc_concat(base_path, str_lit("\\lib\\x64\\"));
-		exe_path = mc_concat(base_path, str_lit("\\bin\\Hostx64\\x64\\"));
-	} else if (build_context.metrics.arch == TargetArch_i386) {
-		library_path = mc_concat(base_path, str_lit("\\lib\\x86\\"));
-		exe_path = mc_concat(base_path, str_lit("\\bin\\Hostx86\\x86\\"));
-	} else {
+	if (!mc_msvc_toolset_paths(base_path, &exe_path, &library_path)) {
 		return false;
 	}
 
@@ -571,7 +625,8 @@ gb_internal bool find_visual_studio_by_fighting_through_microsoft_craziness(Find
 // NOTE(WalterPlinge): Environment variables can help to find Visual C++ and WinSDK paths for both
 // official and portable installations (like mmozeiko's portable msvc script).
 gb_internal void find_windows_kit_paths_from_env_vars(Find_Result *result) {
-	if (build_context.metrics.arch != TargetArch_amd64 && build_context.metrics.arch != TargetArch_i386) {
+	String target = mc_target_arch_dir();
+	if (target.len == 0) {
 		return;
 	}
 
@@ -626,13 +681,8 @@ gb_internal void find_windows_kit_paths_from_env_vars(Find_Result *result) {
 			bin = mc_concat(dir_bin, ver);
 		}
 
-		if (build_context.metrics.arch == TargetArch_amd64) {
-			result->windows_sdk_bin_path = mc_concat(bin, str_lit("x64\\"));
-			sdk_bin_found = true;
-		} else if (build_context.metrics.arch == TargetArch_i386) {
-			result->windows_sdk_bin_path = mc_concat(bin, str_lit("x86\\"));
-			sdk_bin_found = true;
-		} 
+		result->windows_sdk_bin_path = mc_concat(bin, mc_sdk_bin_arch_dir(), str_lit("\\"));
+		sdk_bin_found = true;
 	}
 
 	// NOTE(WalterPlinge): If any combination is found, let's just assume they are correct
@@ -646,15 +696,11 @@ gb_internal void find_windows_kit_paths_from_env_vars(Find_Result *result) {
 		defer (mc_free(dir));
 		defer (mc_free(ver));
 
-		if (build_context.metrics.arch == TargetArch_amd64) {
-			result->windows_sdk_um_library_path   = mc_concat(dir, str_lit("Lib\\"), ver, str_lit("um\\x64\\"));
-			result->windows_sdk_ucrt_library_path = mc_concat(dir, str_lit("Lib\\"), ver, str_lit("ucrt\\x64\\"));
-			sdk_lib_found = true;
-		} else if (build_context.metrics.arch == TargetArch_i386) {
-			result->windows_sdk_um_library_path   = mc_concat(dir, str_lit("Lib\\"), ver, str_lit("um\\x86\\"));
-			result->windows_sdk_ucrt_library_path = mc_concat(dir, str_lit("Lib\\"), ver, str_lit("ucrt\\x86\\"));
-			sdk_lib_found = true;
-		}
+		String lib_ver = mc_concat(dir, str_lit("Lib\\"), ver);
+		defer (mc_free(lib_ver));
+		result->windows_sdk_um_library_path   = mc_concat(lib_ver, str_lit("um\\"),   target, str_lit("\\"));
+		result->windows_sdk_ucrt_library_path = mc_concat(lib_ver, str_lit("ucrt\\"), target, str_lit("\\"));
+		sdk_lib_found = true;
 	}
 
 	// If we haven't found it yet, we can loop through LIB for specific folders
@@ -667,12 +713,10 @@ gb_internal void find_windows_kit_paths_from_env_vars(Find_Result *result) {
 			// NOTE(WalterPlinge): I don't know if there's a chance for the LIB variable
 			// to be set without a trailing '\' (apart from manually), so we can just
 			// check paths without it (see use of `String end` in the loop below)
-			String um_dir = build_context.metrics.arch == TargetArch_amd64
-				? str_lit("um\\x64")
-				: str_lit("um\\x86");
-			String ucrt_dir = build_context.metrics.arch == TargetArch_amd64
-				? str_lit("ucrt\\x64")
-				: str_lit("ucrt\\x86");
+			String um_dir   = mc_concat(str_lit("um\\"),   target);
+			String ucrt_dir = mc_concat(str_lit("ucrt\\"), target);
+			defer (mc_free(um_dir));
+			defer (mc_free(ucrt_dir));
 
 			isize lo = {0};
 			isize hi = {0};
@@ -721,7 +765,8 @@ gb_internal void find_windows_kit_paths_from_env_vars(Find_Result *result) {
 // official and portable installations (like mmozeiko's portable msvc script). This will only use
 // the first paths it finds, and won't overwrite any values that `result` already has.
 gb_internal void find_visual_studio_paths_from_env_vars(Find_Result *result) {
-	if (build_context.metrics.arch != TargetArch_amd64 && build_context.metrics.arch != TargetArch_i386) {
+	String target = mc_target_arch_dir();
+	if (target.len == 0) {
 		return;
 	}
 
@@ -732,22 +777,7 @@ gb_internal void find_visual_studio_paths_from_env_vars(Find_Result *result) {
 	defer (mc_free(vctid));
 
 	if (vctid.len) {
-		String exe = build_context.metrics.arch == TargetArch_amd64
-			? str_lit("bin\\Hostx64\\x64\\")
-			: str_lit("bin\\Hostx86\\x86\\");
-		String lib = build_context.metrics.arch == TargetArch_amd64
-			? str_lit("lib\\x64\\")
-			: str_lit("lib\\x86\\");
-
-		if (string_ends_with(vctid, str_lit("\\"))) {
-			result->vs_exe_path     = mc_concat(vctid, exe);
-			result->vs_library_path = mc_concat(vctid, lib);
-		} else {
-			result->vs_exe_path     = mc_concat(vctid, str_lit("\\"), exe);
-			result->vs_library_path = mc_concat(vctid, str_lit("\\"), lib);
-		}
-
-		vs_found = true;
+		vs_found = mc_msvc_toolset_paths(vctid, &result->vs_exe_path, &result->vs_library_path);
 	}
 
 	// If we haven't found it yet, we can loop through Path for specific folders
@@ -756,16 +786,12 @@ gb_internal void find_visual_studio_paths_from_env_vars(Find_Result *result) {
 		defer (mc_free(path));
 
 		if (path.len) {
-			String exe = build_context.metrics.arch == TargetArch_amd64
-				? str_lit("bin\\Hostx64\\x64")
-				: str_lit("bin\\Hostx86\\x86");
-			// The environment variable may have an uppercase X even though the folder is lowercase
-			String exe2 = build_context.metrics.arch == TargetArch_amd64
-				? str_lit("bin\\HostX64\\x64")
-				: str_lit("bin\\HostX86\\x86");
-			String lib = build_context.metrics.arch == TargetArch_amd64
-				? str_lit("lib\\x64")
-				: str_lit("lib\\x86");
+			// NOTE: Match `bin\Host<host>\<target>` case-insensitively, the environment variable may have
+			// e.g. `HostX64` or `HostARM64` even though the folder is lowercase.
+			String exe = mc_concat(str_lit("bin\\Host"), mc_msvc_host_dir(), str_lit("\\"), target);
+			String lib = mc_concat(str_lit("lib\\"), target);
+			defer (mc_free(exe));
+			defer (mc_free(lib));
 
 			isize lo = {0};
 			isize hi = {0};
@@ -795,7 +821,7 @@ gb_internal void find_visual_studio_paths_from_env_vars(Find_Result *result) {
 				defer (mc_free(cl));
 				defer (mc_free(link));
 
-				if (!string_ends_with(end, exe) && !string_ends_with(end, exe2)) {
+				if (end.len < exe.len || !str_eq_ignore_case(substring(end, end.len - exe.len, end.len), exe)) {
 					continue;
 				}
 				if (!gb_file_exists((char *)cl.text) || !gb_file_exists((char *)link.text)) {

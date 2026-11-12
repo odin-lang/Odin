@@ -355,6 +355,13 @@ try_cross_linking:;
 					if (has_asm_extension(lib)) {
 						if (!string_set_update(&asm_files, lib)) {
 							String asm_file = lib;
+
+							if (!is_arch_x86()) {
+								gb_printf_err("Cannot assemble '%.*s' for %.*s: foreign imports of .asm files are assembled with nasm, which only supports x86 targets\n",
+								              LIT(asm_file), LIT(target_arch_names[build_context.metrics.arch]));
+								return 1;
+							}
+
 							String obj_file = {};
 							String temp_dir = temporary_directory(temporary_allocator());
 							if (temp_dir.len != 0) {
@@ -370,10 +377,8 @@ try_cross_linking:;
 								obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".obj"));
 							}
 
-							String obj_format = str_lit("win64");
-						#if defined(GB_ARCH_32_BIT)
-							obj_format = str_lit("win32");
-						#endif
+							// NOTE: The object format follows the target, not the architecture the compiler runs on.
+							String obj_format = build_context.metrics.arch == TargetArch_i386 ? str_lit("win32") : str_lit("win64");
 
 						#if defined(GB_SYSTEM_WINDOWS)
 							char nasm_path[4096] = {0};

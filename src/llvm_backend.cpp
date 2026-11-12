@@ -4017,6 +4017,31 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
+	if (build_context.no_crt && build_context.metrics.os == TargetOs_windows && build_context.metrics.arch == TargetArch_arm64) {
+		// NOTE: Without the CRT nothing provides `__chkstk`, which LLVM calls in the prologue of procedures that
+		// allocate more than a page of stack. On arm64 it takes the allocation size divided by 16 in x15, and
+		// touches every page below sp down to the new stack pointer, preserving every register but x16 and x17.
+		// See `base/runtime/procs_windows_amd64.asm` for the amd64 version.
+		char const *chkstk =
+			".text\n"
+			".globl __chkstk\n"
+			".def __chkstk\n"
+			".scl 2\n"
+			".type 32\n"
+			".endef\n"
+			".p2align 2\n"
+			"__chkstk:\n"
+			"\tlsl x16, x15, #4\n"
+			"\tmov x17, sp\n"
+			"1:\n"
+			"\tsub x17, x17, #4096\n"
+			"\tsubs x16, x16, #4096\n"
+			"\tldr xzr, [x17]\n"
+			"\tb.gt 1b\n"
+			"\tret\n";
+		LLVMAppendModuleInlineAsm(default_module->mod, chkstk, gb_strlen(chkstk));
+	}
+
 	if (build_context.ODIN_DEBUG) {
 		// NOTE(bill): gdb runs the pretty printers of `base/runtime/odin_debugger.py` from the `.debug_gdb_scripts` section of an ELF binary,
 		// once the user trusts its directory; lldb reads no such section.

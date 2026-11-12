@@ -160,6 +160,10 @@ gb_internal lbCallingConventionKind lb_calling_convention_kind(ProcCallingConven
 	if (is_arch_wasm()) {
 		return lbCallingConvention_C;
 	}
+	if (!is_arch_x86() && (cc == ProcCC_StdCall || cc == ProcCC_FastCall)) {
+		// NOTE: "stdcall" and "fastcall" are only distinct on x86, MSVC ignores them elsewhere (e.g. Windows arm64).
+		return lbCallingConvention_C;
+	}
 	return lb_calling_convention_map[cc];
 }
 
