@@ -3,7 +3,9 @@ package tar
 import "base:runtime"
 import "core:archive"
 import "core:compress"
+import "core:compress/bzip2"
 import "core:compress/deflate"
+import "core:compress/lz4"
 import "core:io"
 import "core:os"
 
@@ -19,6 +21,13 @@ import "core:os"
 */
 
 BLOCK_SIZE         :: 512
+RECORD_SIZE        :: 20 * BLOCK_SIZE
+WRITE_CHUNK_SIZE   :: 64 * 1024
+USTAR_NAME_MAX     :: 100
+USTAR_PREFIX_MAX   :: 155
+USTAR_OWNER_MAX    :: 32
+USTAR_SIZE_MAX     :: 0o777_7777_7777
+USTAR_ID_MAX       :: 0o777_7777
 BUFFER_SIZE        :: 64 * 1024
 HEAD_SIZE          :: 1024
 HEADER_RECORD_MAX  :: 1 << 20
@@ -129,6 +138,54 @@ Reader :: struct {
 	broken:       Error,
 	pending:      Error,
 	fail_path:    [dynamic]u8,
+}
+
+Entry_Data :: union {
+	[]u8,
+	io.Reader,
+}
+
+Writer_Options :: struct {
+	compression:   archive.Method,
+	level:         Maybe(int),
+	deterministic: bool,
+	options:       compress.Options,
+}
+
+Writer :: struct {
+	allocator:  runtime.Allocator,
+	options:    Writer_Options,
+	stream:     io.Stream,
+	out:        io.Stream,
+	file:       ^os.File,
+	path:       string,
+	deflate:    deflate.Deflate_Writer,
+	bzip2:      bzip2.Writer,
+	lz4:        lz4.Frame_Writer,
+	block:      [BLOCK_SIZE]u8,
+	records:    [dynamic]u8,
+	name:       [dynamic]u8,
+	walk_name:  [dynamic]u8,
+	chunk:      []u8,
+	written:    i64,
+	count:      i64,
+	archive_in: i64,
+	err:        Error,
+	committed:  bool,
+	active:     bool,
+}
+
+Pending_Entry :: struct {
+	name:     string,
+	type:     archive.Entry_Type,
+	typeflag: u8,
+	size:     i64,
+	next:     i64,
+}
+
+Walked_Entry :: struct {
+	name: string,
+	info: os.File_Info,
 }
 
 Iterator :: struct {

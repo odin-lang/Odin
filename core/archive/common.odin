@@ -217,6 +217,8 @@ Tar_Error :: enum u32 {
 	Invalid_Pax_Record,
 	Header_Too_Large,
 	Unsupported_GNU_Extension,
+	Invalid_Name,
+	Size_Mismatch,
 }
 
 Zip_Error :: enum u32 {
