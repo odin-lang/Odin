@@ -19,6 +19,8 @@ if "%1" == "" (
 	odin check examples\all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:windows_i386
 	echo Checking windows_amd64
 	odin check examples\all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:windows_amd64
+	echo Checking windows_arm64
+	odin check examples\all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:windows_arm64
 	echo Checking freebsd_amd64
 	odin check examples\all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:freebsd_amd64
 	echo Checking freebsd_arm64

@@ -1,4 +1,4 @@
-#+build windows, darwin
+#+build windows !arm64, darwin
 package test_vendor_openexr
 
 import "core:c"

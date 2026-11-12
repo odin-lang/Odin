@@ -21,6 +21,16 @@ for %%A in (%*) do (
 	)
 )
 
+rem The tests target the compiler's own architecture, read from the machine field of odin.exe's PE header.
+rem The address sanitizer is only supported on amd64. The build tags of the vendor tests leave out the libraries
+rem that are only bundled as x64 builds for Windows.
+set ODIN_ARM64=
+for /f %%m in ('powershell -NoProfile -Command "$b = [IO.File]::ReadAllBytes('odin.exe'); [BitConverter]::ToUInt16($b, [BitConverter]::ToInt32($b, 0x3C) + 4)"') do (
+	if "%%m" == "43620" set ODIN_ARM64=1
+)
+set ASAN=-sanitize:address
+if defined ODIN_ARM64 set ASAN=
+
 rem Check if clang is present
 if not defined ODIN_TESTS_NO_CLANG (
 	clang --version
@@ -46,12 +56,12 @@ if not defined ODIN_TESTS_NO_CLANG (
 
 @rem Internals tests
 @pushd tests\internal
-..\..\odin test . -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address || exit /b
+..\..\odin test . -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true %ASAN% || exit /b
 @popd
 
 @rem Normal Core library tests
 @pushd tests\core
-..\..\odin test normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address %SLIM_DEFINE% || exit /b
+..\..\odin test normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true %ASAN% %SLIM_DEFINE% || exit /b
 @popd
 
 @rem Tests that need the unwind tables, which Windows keeps with -disable-unwind as well: setjmp and stack traces
@@ -66,7 +76,7 @@ cd tests\vendor
 mkdir build
 pushd build
 copy ..\..\..\vendor\lua\5.4\windows\*.dll .
-..\..\..\odin test ..\ -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address || exit /b
+..\..\..\odin test ..\ -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true %ASAN% || exit /b
 popd
 rmdir /S /Q build
 @popd
@@ -129,4 +139,8 @@ call run.bat || exit /b
 
 @if defined ODIN_TESTS_NO_CLANG (
 	@echo WARNING:  ODIN_TESTS_NO_CLANG specified - ABI tests have been skipped.
+)
+
+@if defined ODIN_ARM64 (
+	@echo WARNING:  arm64 - the address sanitizer and the tests of the x64 only vendor libraries have been skipped.
 )

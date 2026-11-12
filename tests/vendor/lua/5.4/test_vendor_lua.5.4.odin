@@ -1,4 +1,4 @@
-#+build windows, linux, darwin
+#+build windows !arm64, linux, darwin
 package test_vendor_lua_54
 
 import "core:testing"

@@ -1,4 +1,4 @@
-#+build windows
+#+build windows !arm64
 package test_vendor_commonmark
 
 import "core:c/libc"

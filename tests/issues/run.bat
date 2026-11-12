@@ -194,13 +194,13 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 
 %ODIN% test "..\test_issue_equal_proc_dependencies" %COMMON% -build-mode:obj 2>&1 | find /i /c "missing procedure" | findstr /x "0" || exit /b
 
-@rem `asm` templates are amd64-only, assuming this is going to work on Windows (ARM?)
-%ODIN% doc "..\test_issue_asm_doc_category" 2>&1 | find /c "asm templates" | findstr /x "1" || exit /b
-%ODIN% check "..\test_issue_asm_deferred_errors" %COMMON% 2>&1 | find /c "Unknown mnemonic" | findstr /x "5" || exit /b
-%ODIN% check "..\test_issue_asm_target_features" %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
-%ODIN% check "..\test_issue_asm_target_features" %COMMON% 2>&1 | find /c "enables target feature 'avx'" | findstr /x "3" || exit /b
-%ODIN% test "..\test_issue_asm_pinned_clobbers" %COMMON% -o:speed || exit /b
-%ODIN% check "..\test_issue_asm_clobber_pinned_output" %COMMON% 2>&1 | find /c "which '#clobber' also names" | findstr /x "3" || exit /b
+@rem These tests use amd64 `asm` templates, so they target windows_amd64 on any host (Windows on ARM runs the test through emulation)
+%ODIN% doc "..\test_issue_asm_doc_category" -target:windows_amd64 2>&1 | find /c "asm templates" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_asm_deferred_errors" -target:windows_amd64 %COMMON% 2>&1 | find /c "Unknown mnemonic" | findstr /x "5" || exit /b
+%ODIN% check "..\test_issue_asm_target_features" -target:windows_amd64 %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_asm_target_features" -target:windows_amd64 %COMMON% 2>&1 | find /c "enables target feature 'avx'" | findstr /x "3" || exit /b
+%ODIN% test "..\test_issue_asm_pinned_clobbers" -target:windows_amd64 %COMMON% -o:speed || exit /b
+%ODIN% check "..\test_issue_asm_clobber_pinned_output" -target:windows_amd64 %COMMON% 2>&1 | find /c "which '#clobber' also names" | findstr /x "3" || exit /b
 
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:size -lifetime-markers || exit /b
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:speed -lifetime-markers || exit /b

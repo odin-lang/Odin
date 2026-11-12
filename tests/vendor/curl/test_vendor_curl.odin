@@ -1,4 +1,4 @@
-#+build windows, linux, darwin
+#+build windows !arm64, linux, darwin
 package test_vendor_curl
 
 import "base:runtime"
