@@ -647,6 +647,7 @@ internal_int_prime_strong_lucas_selfridge :: proc(a: ^Int, allocator := context.
 		if j == -1 { break }
 
 		D += 2
+		if D == 23 && (internal_int_is_square(a) or_return) { return }
 		if D > max(int) - 2                              { return false, .Invalid_Argument }
 	}
 

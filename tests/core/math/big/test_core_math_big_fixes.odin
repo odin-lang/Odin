@@ -1109,6 +1109,29 @@ test_fix_strong_lucas_selfridge :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_fix_strong_lucas_selfridge_square :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	defer big.destroy(a)
+
+	squares := []string{
+		"0",
+		"1",
+		"4",
+		"9",
+		"25",
+		"2627641",
+		"1000072001494007128009801",
+		"5316911983139663487003542222693990401",
+		"28948022309329048855892746252171976962977213799489202546401021394546514198529",
+	}
+	for n in squares {
+		fix_set(t, a, n)
+		lucas, err := big.internal_int_prime_strong_lucas_selfridge(a)
+		testing.expectf(t, !lucas && err == nil, "strong_lucas_selfridge(%v) = %v, %v", n, lucas, err)
+	}
+}
+
+@(test)
 test_fix_prime_allocator_argument :: proc(t: ^testing.T) {
 	ctx_track, arg_track: mem.Tracking_Allocator
 	mem.tracking_allocator_init(&ctx_track, context.allocator)
