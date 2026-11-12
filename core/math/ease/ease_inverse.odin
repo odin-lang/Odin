@@ -24,6 +24,9 @@ _signed_pow :: proc "contextless" (x, exp: $T) -> T where intrinsics.type_is_flo
 // x = sqrt(y)
 @(require_results)
 quadratic_in_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
+	when size_of(T) < 8 {
+		return T(quadratic_in_inverse(f64(p)))
+	}
 	return math.sqrt(p)
 }
 
@@ -31,6 +34,9 @@ quadratic_in_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is
 // x = 1 - sqrt(1 - y)
 @(require_results)
 quadratic_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
+	when size_of(T) < 8 {
+		return T(quadratic_out_inverse(f64(p)))
+	}
 	return 1 - math.sqrt(1 - p)
 }
 
@@ -39,6 +45,9 @@ quadratic_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_i
 // x = 1 - sqrt((1-y)/2) ; [0.5, 1]
 @(require_results)
 quadratic_in_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
+	when size_of(T) < 8 {
+		return T(quadratic_in_out_inverse(f64(p)))
+	}
 	if p < 0.5 {
 		return math.sqrt(p * 0.5)
 	} else {
@@ -50,6 +59,9 @@ quadratic_in_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.typ
 // x = y^(1/3)
 @(require_results)
 cubic_in_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
+	when size_of(T) < 8 {
+		return T(cubic_in_inverse(f64(p)))
+	}
 	return math.pow(p, 1.0/3.0)
 }
 
@@ -57,6 +69,9 @@ cubic_in_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_flo
 // x = (y - 1)^(1/3) + 1
 @(require_results)
 cubic_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
+	when size_of(T) < 8 {
+		return T(cubic_out_inverse(f64(p)))
+	}
 	return _signed_pow(p - 1, 1.0/3.0) + 1
 }
 
@@ -65,6 +80,9 @@ cubic_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_fl
 // x = ((y-1)*2)^(1/3)/2 + 1 ; [0.5, 1]
 @(require_results)
 cubic_in_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
+	when size_of(T) < 8 {
+		return T(cubic_in_out_inverse(f64(p)))
+	}
 	if p < 0.5 {
 		return math.pow(p * 0.25, 1.0/3.0)
 	} else {
@@ -76,6 +94,9 @@ cubic_in_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is
 // x = y^(1/4)
 @(require_results)
 quartic_in_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
+	when size_of(T) < 8 {
+		return T(quartic_in_inverse(f64(p)))
+	}
 	return math.pow(p, 0.25)
 }
 
@@ -83,6 +104,9 @@ quartic_in_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_f
 // x = 1 - (1 - y)^(1/4)
 @(require_results)
 quartic_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
+	when size_of(T) < 8 {
+		return T(quartic_out_inverse(f64(p)))
+	}
 	return 1 - math.pow(1 - p, 0.25)
 }
 
@@ -91,6 +115,9 @@ quartic_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_
 // x = 1 - ((1-y)/8)^(1/4) ; [0.5, 1]
 @(require_results)
 quartic_in_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
+	when size_of(T) < 8 {
+		return T(quartic_in_out_inverse(f64(p)))
+	}
 	if p < 0.5 {
 		return math.pow(p * 0.125, 0.25)
 	} else {
@@ -102,6 +129,9 @@ quartic_in_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_
 // x = y^(1/5)
 @(require_results)
 quintic_in_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
+	when size_of(T) < 8 {
+		return T(quintic_in_inverse(f64(p)))
+	}
 	return math.pow(p, 0.2)
 }
 
@@ -109,6 +139,9 @@ quintic_in_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_f
 // x = (y - 1)^(1/5) + 1
 @(require_results)
 quintic_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
+	when size_of(T) < 8 {
+		return T(quintic_out_inverse(f64(p)))
+	}
 	return _signed_pow(p - 1, 0.2) + 1
 }
 
@@ -117,6 +150,9 @@ quintic_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_
 // x = ((y-1)*2)^(1/5)/2 + 1 ; [0.5, 1]
 @(require_results)
 quintic_in_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
+	when size_of(T) < 8 {
+		return T(quintic_in_out_inverse(f64(p)))
+	}
 	if p < 0.5 {
 		return math.pow(0.0625 * p, 0.2)
 	} else {
@@ -128,13 +164,23 @@ quintic_in_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_
 // x = asin(y - 1) * 2/π + 1
 @(require_results)
 sine_in_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
-	return math.asin(p - 1) * PI_2_INV + 1
+	when size_of(T) < 8 {
+		return T(sine_in_inverse(f64(p)))
+	}
+	if p < 0.5 {
+		return math.asin(math.sqrt(p * 0.5)) / (PI_2 * 0.5)
+	} else {
+		return math.acos(1 - p) / PI_2
+	}
 }
 
 // Inverse of sine_out
 // x = asin(y) * 2/π
 @(require_results)
 sine_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
+	when size_of(T) < 8 {
+		return T(sine_out_inverse(f64(p)))
+	}
 	return math.asin(p) * PI_2_INV
 }
 
@@ -142,21 +188,34 @@ sine_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_flo
 // x = acos(1 - 2y) / π
 @(require_results)
 sine_in_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
-	return math.acos(1 - 2*p) / math.PI
+	when size_of(T) < 8 {
+		return T(sine_in_out_inverse(f64(p)))
+	}
+	if p < 0.5 {
+		return math.asin(math.sqrt(p)) / PI_2
+	} else {
+		return 1 - math.asin(math.sqrt(1 - p)) / PI_2
+	}
 }
 
 // Inverse of circular_in
 // x = sqrt(2y - y²)
 @(require_results)
 circular_in_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
-	return math.sqrt(2*p - p*p)
+	when size_of(T) < 8 {
+		return T(circular_in_inverse(f64(p)))
+	}
+	return math.sqrt(p * (2 - p))
 }
 
 // Inverse of circular_out
 // x = 1 - sqrt(1 - y²)
 @(require_results)
 circular_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
-	return 1 - math.sqrt(1 - p*p)
+	when size_of(T) < 8 {
+		return T(circular_out_inverse(f64(p)))
+	}
+	return 1 - math.sqrt((1 - p) * (1 + p))
 }
 
 // Inverse of circular_in_out
@@ -164,12 +223,13 @@ circular_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is
 // x = 1 - sqrt(1 - (2y-1)²) / 2 ; [0.5, 1]
 @(require_results)
 circular_in_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
+	when size_of(T) < 8 {
+		return T(circular_in_out_inverse(f64(p)))
+	}
 	if p < 0.5 {
-		q := 1 - 2*p
-		return 0.5 * math.sqrt(1 - q*q)
+		return math.sqrt(p * (1 - p))
 	} else {
-		q := 2*p - 1
-		return 1 - 0.5 * math.sqrt(1 - q*q)
+		return 1 - math.sqrt(p * (1 - p))
 	}
 }
 
@@ -177,6 +237,9 @@ circular_in_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type
 // x = log₂(y) / 10 + 1
 @(require_results)
 exponential_in_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
+	when size_of(T) < 8 {
+		return T(exponential_in_inverse(f64(p)))
+	}
 	return p == 0.0 ? 0.0 : 0.1 * math.log2(p) + 1
 }
 
@@ -184,6 +247,9 @@ exponential_in_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_
 // x = -log₂(1 - y) / 10
 @(require_results)
 exponential_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
+	when size_of(T) < 8 {
+		return T(exponential_out_inverse(f64(p)))
+	}
 	return p == 1.0 ? 1.0 : 0.1 * -math.log2(1 - p)
 }
 
@@ -192,6 +258,9 @@ exponential_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type
 // x = (10 - log₂(2(1-y))) / 20 ; [0.5, 1]
 @(require_results)
 exponential_in_out_inverse :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
+	when size_of(T) < 8 {
+		return T(exponential_in_out_inverse(f64(p)))
+	}
 	if p == 0.0 || p == 1.0 {
 		return p
 	}
