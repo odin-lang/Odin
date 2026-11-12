@@ -703,23 +703,23 @@ sign :: proc{
 	sign_uint3,
 	sign_uint4,
 }
-@(require_results) sign_int :: proc "c" (x: int) -> int { return -1 if x < 0 else +1 if x > 0 else 0 }
-@(require_results) sign_uint :: proc "c" (x: uint) -> uint { return +1 if x > 0 else 0 }
-@(require_results) sign_half2 :: proc "c" (x: half2) -> half2 { return {sign(x.x), sign(x.y)} }
-@(require_results) sign_half3 :: proc "c" (x: half3) -> half3 { return {sign(x.x), sign(x.y), sign(x.z)} }
-@(require_results) sign_half4 :: proc "c" (x: half4) -> half4 { return {sign(x.x), sign(x.y), sign(x.z), sign(x.w)} }
-@(require_results) sign_float2 :: proc "c" (x: float2) -> float2 { return {sign(x.x), sign(x.y)} }
-@(require_results) sign_float3 :: proc "c" (x: float3) -> float3 { return {sign(x.x), sign(x.y), sign(x.z)} }
-@(require_results) sign_float4 :: proc "c" (x: float4) -> float4 { return {sign(x.x), sign(x.y), sign(x.z), sign(x.w)} }
-@(require_results) sign_double2 :: proc "c" (x: double2) -> double2 { return {sign(x.x), sign(x.y)} }
-@(require_results) sign_double3 :: proc "c" (x: double3) -> double3 { return {sign(x.x), sign(x.y), sign(x.z)} }
-@(require_results) sign_double4 :: proc "c" (x: double4) -> double4 { return {sign(x.x), sign(x.y), sign(x.z), sign(x.w)} }
-@(require_results) sign_int2 :: proc "c" (x: int2) -> int2 { return {sign(x.x), sign(x.y)} }
-@(require_results) sign_int3 :: proc "c" (x: int3) -> int3 { return {sign(x.x), sign(x.y), sign(x.z)} }
-@(require_results) sign_int4 :: proc "c" (x: int4) -> int4 { return {sign(x.x), sign(x.y), sign(x.z), sign(x.w)} }
-@(require_results) sign_uint2 :: proc "c" (x: uint2) -> uint2 { return {sign(x.x), sign(x.y)} }
-@(require_results) sign_uint3 :: proc "c" (x: uint3) -> uint3 { return {sign(x.x), sign(x.y), sign(x.z)} }
-@(require_results) sign_uint4 :: proc "c" (x: uint4) -> uint4 { return {sign(x.x), sign(x.y), sign(x.z), sign(x.w)} }
+@(require_results) sign_int     :: proc "c" (x: int)     -> int  { return -1 if x < 0 else +1 if x > 0 else 0 }
+@(require_results) sign_uint    :: proc "c" (x: uint)    -> int  { return +1 if x > 0 else 0 }
+@(require_results) sign_half2   :: proc "c" (x: half2)   -> int2 { return {sign(x.x), sign(x.y)} }
+@(require_results) sign_half3   :: proc "c" (x: half3)   -> int3 { return {sign(x.x), sign(x.y), sign(x.z)} }
+@(require_results) sign_half4   :: proc "c" (x: half4)   -> int4 { return {sign(x.x), sign(x.y), sign(x.z), sign(x.w)} }
+@(require_results) sign_float2  :: proc "c" (x: float2)  -> int2 { return {sign(x.x), sign(x.y)} }
+@(require_results) sign_float3  :: proc "c" (x: float3)  -> int3 { return {sign(x.x), sign(x.y), sign(x.z)} }
+@(require_results) sign_float4  :: proc "c" (x: float4)  -> int4 { return {sign(x.x), sign(x.y), sign(x.z), sign(x.w)} }
+@(require_results) sign_double2 :: proc "c" (x: double2) -> int2 { return {sign(x.x), sign(x.y)} }
+@(require_results) sign_double3 :: proc "c" (x: double3) -> int3 { return {sign(x.x), sign(x.y), sign(x.z)} }
+@(require_results) sign_double4 :: proc "c" (x: double4) -> int4 { return {sign(x.x), sign(x.y), sign(x.z), sign(x.w)} }
+@(require_results) sign_int2    :: proc "c" (x: int2)    -> int2 { return {sign(x.x), sign(x.y)} }
+@(require_results) sign_int3    :: proc "c" (x: int3)    -> int3 { return {sign(x.x), sign(x.y), sign(x.z)} }
+@(require_results) sign_int4    :: proc "c" (x: int4)    -> int4 { return {sign(x.x), sign(x.y), sign(x.z), sign(x.w)} }
+@(require_results) sign_uint2   :: proc "c" (x: uint2)   -> int2 { return {sign(x.x), sign(x.y)} }
+@(require_results) sign_uint3   :: proc "c" (x: uint3)   -> int3 { return {sign(x.x), sign(x.y), sign(x.z)} }
+@(require_results) sign_uint4   :: proc "c" (x: uint4)   -> int4 { return {sign(x.x), sign(x.y), sign(x.z), sign(x.w)} }
 
 floor :: proc{
 	floor_half,
@@ -946,18 +946,18 @@ radians :: proc{
 	radians_double3,
 	radians_double4,
 }
-@(require_results) radians_half  :: proc "c" (degrees: half)  -> half  { return degrees * TAU / 360.0 }
-@(require_results) radians_float  :: proc "c" (degrees: float)  -> float  { return degrees * TAU / 360.0 }
-@(require_results) radians_double  :: proc "c" (degrees: double)  -> double  { return degrees * TAU / 360.0 }
-@(require_results) radians_half2 :: proc "c" (degrees: half2) -> half2 { return degrees * TAU / 360.0 }
-@(require_results) radians_half3 :: proc "c" (degrees: half3) -> half3 { return degrees * TAU / 360.0 }
-@(require_results) radians_half4 :: proc "c" (degrees: half4) -> half4 { return degrees * TAU / 360.0 }
-@(require_results) radians_float2 :: proc "c" (degrees: float2) -> float2 { return degrees * TAU / 360.0 }
-@(require_results) radians_float3 :: proc "c" (degrees: float3) -> float3 { return degrees * TAU / 360.0 }
-@(require_results) radians_float4 :: proc "c" (degrees: float4) -> float4 { return degrees * TAU / 360.0 }
-@(require_results) radians_double2 :: proc "c" (degrees: double2) -> double2 { return degrees * TAU / 360.0 }
-@(require_results) radians_double3 :: proc "c" (degrees: double3) -> double3 { return degrees * TAU / 360.0 }
-@(require_results) radians_double4 :: proc "c" (degrees: double4) -> double4 { return degrees * TAU / 360.0 }
+@(require_results) radians_half    :: proc "c" (degrees: half)    -> half    { return degrees * (TAU / 360.0) }
+@(require_results) radians_float   :: proc "c" (degrees: float)   -> float   { return degrees * (TAU / 360.0) }
+@(require_results) radians_double  :: proc "c" (degrees: double)  -> double  { return degrees * (TAU / 360.0) }
+@(require_results) radians_half2   :: proc "c" (degrees: half2)   -> half2   { return degrees * (TAU / 360.0) }
+@(require_results) radians_half3   :: proc "c" (degrees: half3)   -> half3   { return degrees * (TAU / 360.0) }
+@(require_results) radians_half4   :: proc "c" (degrees: half4)   -> half4   { return degrees * (TAU / 360.0) }
+@(require_results) radians_float2  :: proc "c" (degrees: float2)  -> float2  { return degrees * (TAU / 360.0) }
+@(require_results) radians_float3  :: proc "c" (degrees: float3)  -> float3  { return degrees * (TAU / 360.0) }
+@(require_results) radians_float4  :: proc "c" (degrees: float4)  -> float4  { return degrees * (TAU / 360.0) }
+@(require_results) radians_double2 :: proc "c" (degrees: double2) -> double2 { return degrees * (TAU / 360.0) }
+@(require_results) radians_double3 :: proc "c" (degrees: double3) -> double3 { return degrees * (TAU / 360.0) }
+@(require_results) radians_double4 :: proc "c" (degrees: double4) -> double4 { return degrees * (TAU / 360.0) }
 
 
 degrees :: proc{
@@ -974,18 +974,18 @@ degrees :: proc{
 	degrees_double3,
 	degrees_double4,
 }
-@(require_results) degrees_half  :: proc "c" (radians: half)  -> half  { return radians * 360.0 / TAU }
-@(require_results) degrees_float  :: proc "c" (radians: float)  -> float  { return radians * 360.0 / TAU }
-@(require_results) degrees_double  :: proc "c" (radians: double)  -> double  { return radians * 360.0 / TAU }
-@(require_results) degrees_half2 :: proc "c" (radians: half2) -> half2 { return radians * 360.0 / TAU }
-@(require_results) degrees_half3 :: proc "c" (radians: half3) -> half3 { return radians * 360.0 / TAU }
-@(require_results) degrees_half4 :: proc "c" (radians: half4) -> half4 { return radians * 360.0 / TAU }
-@(require_results) degrees_float2 :: proc "c" (radians: float2) -> float2 { return radians * 360.0 / TAU }
-@(require_results) degrees_float3 :: proc "c" (radians: float3) -> float3 { return radians * 360.0 / TAU }
-@(require_results) degrees_float4 :: proc "c" (radians: float4) -> float4 { return radians * 360.0 / TAU }
-@(require_results) degrees_double2 :: proc "c" (radians: double2) -> double2 { return radians * 360.0 / TAU }
-@(require_results) degrees_double3 :: proc "c" (radians: double3) -> double3 { return radians * 360.0 / TAU }
-@(require_results) degrees_double4 :: proc "c" (radians: double4) -> double4 { return radians * 360.0 / TAU }
+@(require_results) degrees_half    :: proc "c" (radians: half)    -> half    { return radians * (360.0 / TAU) }
+@(require_results) degrees_float   :: proc "c" (radians: float)   -> float   { return radians * (360.0 / TAU) }
+@(require_results) degrees_double  :: proc "c" (radians: double)  -> double  { return radians * (360.0 / TAU) }
+@(require_results) degrees_half2   :: proc "c" (radians: half2)   -> half2   { return radians * (360.0 / TAU) }
+@(require_results) degrees_half3   :: proc "c" (radians: half3)   -> half3   { return radians * (360.0 / TAU) }
+@(require_results) degrees_half4   :: proc "c" (radians: half4)   -> half4   { return radians * (360.0 / TAU) }
+@(require_results) degrees_float2  :: proc "c" (radians: float2)  -> float2  { return radians * (360.0 / TAU) }
+@(require_results) degrees_float3  :: proc "c" (radians: float3)  -> float3  { return radians * (360.0 / TAU) }
+@(require_results) degrees_float4  :: proc "c" (radians: float4)  -> float4  { return radians * (360.0 / TAU) }
+@(require_results) degrees_double2 :: proc "c" (radians: double2) -> double2 { return radians * (360.0 / TAU) }
+@(require_results) degrees_double3 :: proc "c" (radians: double3) -> double3 { return radians * (360.0 / TAU) }
+@(require_results) degrees_double4 :: proc "c" (radians: double4) -> double4 { return radians * (360.0 / TAU) }
 
 min :: proc{
 	min_half,
@@ -1530,88 +1530,88 @@ refract :: proc{
 	refract_double4,
 }
 @(require_results)
-refract_half  :: proc "c" (i, n, eta: half) -> half {
+refract_half    :: proc "c" (i, n, eta: half) -> half {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * half(int(cost2 > 0))
+	return t * half(int(cost2 >= 0))
 }
 @(require_results)
-refract_float  :: proc "c" (i, n, eta: float) -> float {
+refract_float   :: proc "c" (i, n, eta: float) -> float {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * float(int(cost2 > 0))
+	return t * float(int(cost2 >= 0))
 }
 @(require_results)
 refract_double  :: proc "c" (i, n, eta: double) -> double {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * double(int(cost2 > 0))
+	return t * double(int(cost2 >= 0))
 }
 @(require_results)
-refract_half2  :: proc "c" (i, n: half2, eta: half) -> half2 {
+refract_half2   :: proc "c" (i, n: half2, eta: half) -> half2 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * half(int(cost2 > 0))
+	return t * half(int(cost2 >= 0))
 }
 @(require_results)
-refract_half3  :: proc "c" (i, n: half3, eta: half) -> half3 {
+refract_half3   :: proc "c" (i, n: half3, eta: half) -> half3 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * half(int(cost2 > 0))
+	return t * half(int(cost2 >= 0))
 }
 @(require_results)
-refract_half4  :: proc "c" (i, n: half4, eta: half) -> half4 {
+refract_half4   :: proc "c" (i, n: half4, eta: half) -> half4 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * half(int(cost2 > 0))
+	return t * half(int(cost2 >= 0))
 }
 @(require_results)
 refract_float2  :: proc "c" (i, n: float2, eta: float) -> float2 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * float(int(cost2 > 0))
+	return t * float(int(cost2 >= 0))
 }
 @(require_results)
 refract_float3  :: proc "c" (i, n: float3, eta: float) -> float3 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * float(int(cost2 > 0))
+	return t * float(int(cost2 >= 0))
 }
 @(require_results)
 refract_float4  :: proc "c" (i, n: float4, eta: float) -> float4 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * float(int(cost2 > 0))
+	return t * float(int(cost2 >= 0))
 }
 @(require_results)
-refract_double2  :: proc "c" (i, n: double2, eta: double) -> double2 {
+refract_double2 :: proc "c" (i, n: double2, eta: double) -> double2 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * double(int(cost2 > 0))
+	return t * double(int(cost2 >= 0))
 }
 @(require_results)
-refract_double3  :: proc "c" (i, n: double3, eta: double) -> double3 {
+refract_double3 :: proc "c" (i, n: double3, eta: double) -> double3 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * double(int(cost2 > 0))
+	return t * double(int(cost2 >= 0))
 }
 @(require_results)
-refract_double4  :: proc "c" (i, n: double4, eta: double) -> double4 {
+refract_double4 :: proc "c" (i, n: double4, eta: double) -> double4 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * double(int(cost2 > 0))
+	return t * double(int(cost2 >= 0))
 }
 
 scalarTripleProduct :: proc{
@@ -2281,176 +2281,19 @@ inverse_matrix4x4 :: proc "contextless" (x: $M/matrix[4, 4]$T) -> (y: M) #no_bou
 
 
 
-ashalf :: proc{
-	ashalf_half,
-	ashalf_float,
-	ashalf_double,
-	ashalf_int,
-	ashalf_uint,
-	ashalf_half1x1,
-	ashalf_half2x2,
-	ashalf_half3x3,
-	ashalf_half4x4,
-	ashalf_half1x2,
-	ashalf_half1x3,
-	ashalf_half1x4,
-	ashalf_half2x1,
-	ashalf_half2x3,
-	ashalf_half2x4,
-	ashalf_half3x1,
-	ashalf_half3x2,
-	ashalf_half3x4,
-	ashalf_half4x1,
-	ashalf_half4x2,
-	ashalf_half4x3,
-	ashalf_half2,
-	ashalf_half3,
-	ashalf_half4,
-	ashalf_float1x1,
-	ashalf_float2x2,
-	ashalf_float3x3,
-	ashalf_float4x4,
-	ashalf_float1x2,
-	ashalf_float1x3,
-	ashalf_float1x4,
-	ashalf_float2x1,
-	ashalf_float2x3,
-	ashalf_float2x4,
-	ashalf_float3x1,
-	ashalf_float3x2,
-	ashalf_float3x4,
-	ashalf_float4x1,
-	ashalf_float4x2,
-	ashalf_float4x3,
-	ashalf_float2,
-	ashalf_float3,
-	ashalf_float4,
-	ashalf_int2,
-	ashalf_int3,
-	ashalf_int4,
-	ashalf_uint2,
-	ashalf_uint3,
-	ashalf_uint4,
-	ashalf_bool2,
-	ashalf_bool3,
-	ashalf_bool4,
-	ashalf_double1x1,
-	ashalf_double2x2,
-	ashalf_double3x3,
-	ashalf_double4x4,
-	ashalf_double1x2,
-	ashalf_double1x3,
-	ashalf_double1x4,
-	ashalf_double2x1,
-	ashalf_double2x3,
-	ashalf_double2x4,
-	ashalf_double3x1,
-	ashalf_double3x2,
-	ashalf_double3x4,
-	ashalf_double4x1,
-	ashalf_double4x2,
-	ashalf_double4x3,
-	ashalf_double2,
-	ashalf_double3,
-	ashalf_double4,
-}
-@(require_results) ashalf_half     :: proc "c" (v: half)       -> half    { return half(v) }
-@(require_results) ashalf_float     :: proc "c" (v: float)     -> half    { return half(v) }
-@(require_results) ashalf_double    :: proc "c" (v: double)    -> half    { return half(v) }
-@(require_results) ashalf_int       :: proc "c" (v: int)       -> half    { return half(v) }
-@(require_results) ashalf_uint      :: proc "c" (v: uint)      -> half    { return half(v) }
-@(require_results) ashalf_half1x1  :: proc "c" (v: half1x1)   -> half1x1 { return half1x1(v) }
-@(require_results) ashalf_half2x2  :: proc "c" (v: half2x2)   -> half2x2 { return half2x2(v) }
-@(require_results) ashalf_half3x3  :: proc "c" (v: half3x3)   -> half3x3 { return half3x3(v) }
-@(require_results) ashalf_half4x4  :: proc "c" (v: half4x4)   -> half4x4 { return half4x4(v) }
-@(require_results) ashalf_half1x2  :: proc "c" (v: half1x2)   -> half1x2 { return half1x2(v) }
-@(require_results) ashalf_half1x3  :: proc "c" (v: half1x3)   -> half1x3 { return half1x3(v) }
-@(require_results) ashalf_half1x4  :: proc "c" (v: half1x4)   -> half1x4 { return half1x4(v) }
-@(require_results) ashalf_half2x1  :: proc "c" (v: half2x1)   -> half2x1 { return half2x1(v) }
-@(require_results) ashalf_half2x3  :: proc "c" (v: half2x3)   -> half2x3 { return half2x3(v) }
-@(require_results) ashalf_half2x4  :: proc "c" (v: half2x4)   -> half2x4 { return half2x4(v) }
-@(require_results) ashalf_half3x1  :: proc "c" (v: half3x1)   -> half3x1 { return half3x1(v) }
-@(require_results) ashalf_half3x2  :: proc "c" (v: half3x2)   -> half3x2 { return half3x2(v) }
-@(require_results) ashalf_half3x4  :: proc "c" (v: half3x4)   -> half3x4 { return half3x4(v) }
-@(require_results) ashalf_half4x1  :: proc "c" (v: half4x1)   -> half4x1 { return half4x1(v) }
-@(require_results) ashalf_half4x2  :: proc "c" (v: half4x2)   -> half4x2 { return half4x2(v) }
-@(require_results) ashalf_half4x3  :: proc "c" (v: half4x3)   -> half4x3 { return half4x3(v) }
-@(require_results) ashalf_half2    :: proc "c" (v: half2)     -> half2   { return half2(v) }
-@(require_results) ashalf_half3    :: proc "c" (v: half3)     -> half3   { return half3(v) }
-@(require_results) ashalf_half4    :: proc "c" (v: half4)     -> half4   { return half4(v) }
-@(require_results) ashalf_float1x1  :: proc "c" (v: float1x1)   -> half1x1 { return half1x1(v) }
-@(require_results) ashalf_float2x2  :: proc "c" (v: float2x2)   -> half2x2 { return half2x2(v) }
-@(require_results) ashalf_float3x3  :: proc "c" (v: float3x3)   -> half3x3 { return half3x3(v) }
-@(require_results) ashalf_float4x4  :: proc "c" (v: float4x4)   -> half4x4 { return half4x4(v) }
-@(require_results) ashalf_float1x2  :: proc "c" (v: float1x2)   -> half1x2 { return half1x2(v) }
-@(require_results) ashalf_float1x3  :: proc "c" (v: float1x3)   -> half1x3 { return half1x3(v) }
-@(require_results) ashalf_float1x4  :: proc "c" (v: float1x4)   -> half1x4 { return half1x4(v) }
-@(require_results) ashalf_float2x1  :: proc "c" (v: float2x1)   -> half2x1 { return half2x1(v) }
-@(require_results) ashalf_float2x3  :: proc "c" (v: float2x3)   -> half2x3 { return half2x3(v) }
-@(require_results) ashalf_float2x4  :: proc "c" (v: float2x4)   -> half2x4 { return half2x4(v) }
-@(require_results) ashalf_float3x1  :: proc "c" (v: float3x1)   -> half3x1 { return half3x1(v) }
-@(require_results) ashalf_float3x2  :: proc "c" (v: float3x2)   -> half3x2 { return half3x2(v) }
-@(require_results) ashalf_float3x4  :: proc "c" (v: float3x4)   -> half3x4 { return half3x4(v) }
-@(require_results) ashalf_float4x1  :: proc "c" (v: float4x1)   -> half4x1 { return half4x1(v) }
-@(require_results) ashalf_float4x2  :: proc "c" (v: float4x2)   -> half4x2 { return half4x2(v) }
-@(require_results) ashalf_float4x3  :: proc "c" (v: float4x3)   -> half4x3 { return half4x3(v) }
-@(require_results) ashalf_float2    :: proc "c" (v: float2)     -> half2   { return half2{half(v.x), half(v.y)} }
-@(require_results) ashalf_float3    :: proc "c" (v: float3)     -> half3   { return half3{half(v.x), half(v.y), half(v.z)}  }
-@(require_results) ashalf_float4    :: proc "c" (v: float4)     -> half4   { return half4{half(v.x), half(v.y), half(v.z), half(v.w)} }
-@(require_results) ashalf_int2      :: proc "c" (v: int2)      -> half2   { return half2{half(v.x), half(v.y)} }
-@(require_results) ashalf_int3      :: proc "c" (v: int3)      -> half3   { return half3{half(v.x), half(v.y), half(v.z)} }
-@(require_results) ashalf_int4      :: proc "c" (v: int4)      -> half4   { return half4{half(v.x), half(v.y), half(v.z), half(v.w)} }
-@(require_results) ashalf_uint2     :: proc "c" (v: uint2)     -> half2   { return half2{half(v.x), half(v.y)} }
-@(require_results) ashalf_uint3     :: proc "c" (v: uint3)     -> half3   { return half3{half(v.x), half(v.y), half(v.z)} }
-@(require_results) ashalf_uint4     :: proc "c" (v: uint4)     -> half4   { return half4{half(v.x), half(v.y), half(v.z), half(v.w)} }
-@(require_results) ashalf_bool2     :: proc "c" (v: bool2)     -> half2   { return half2{half(int(v.x)), half(int(v.y))} }
-@(require_results) ashalf_bool3     :: proc "c" (v: bool3)     -> half3   { return half3{half(int(v.x)), half(int(v.y)), half(int(v.z))} }
-@(require_results) ashalf_bool4     :: proc "c" (v: bool4)     -> half4   { return half4{half(int(v.x)), half(int(v.y)), half(int(v.z)), half(int(v.w))} }
-@(require_results) ashalf_double1x1 :: proc "c" (v: double1x1) -> half1x1 { return half1x1(v) }
-@(require_results) ashalf_double2x2 :: proc "c" (v: double2x2) -> half2x2 { return half2x2(v) }
-@(require_results) ashalf_double3x3 :: proc "c" (v: double3x3) -> half3x3 { return half3x3(v) }
-@(require_results) ashalf_double4x4 :: proc "c" (v: double4x4) -> half4x4 { return half4x4(v) }
-@(require_results) ashalf_double1x2 :: proc "c" (v: double1x2) -> half1x2 { return half1x2(v) }
-@(require_results) ashalf_double1x3 :: proc "c" (v: double1x3) -> half1x3 { return half1x3(v) }
-@(require_results) ashalf_double1x4 :: proc "c" (v: double1x4) -> half1x4 { return half1x4(v) }
-@(require_results) ashalf_double2x1 :: proc "c" (v: double2x1) -> half2x1 { return half2x1(v) }
-@(require_results) ashalf_double2x3 :: proc "c" (v: double2x3) -> half2x3 { return half2x3(v) }
-@(require_results) ashalf_double2x4 :: proc "c" (v: double2x4) -> half2x4 { return half2x4(v) }
-@(require_results) ashalf_double3x1 :: proc "c" (v: double3x1) -> half3x1 { return half3x1(v) }
-@(require_results) ashalf_double3x2 :: proc "c" (v: double3x2) -> half3x2 { return half3x2(v) }
-@(require_results) ashalf_double3x4 :: proc "c" (v: double3x4) -> half3x4 { return half3x4(v) }
-@(require_results) ashalf_double4x1 :: proc "c" (v: double4x1) -> half4x1 { return half4x1(v) }
-@(require_results) ashalf_double4x2 :: proc "c" (v: double4x2) -> half4x2 { return half4x2(v) }
-@(require_results) ashalf_double4x3 :: proc "c" (v: double4x3) -> half4x3 { return half4x3(v) }
-@(require_results) ashalf_double2   :: proc "c" (v: double2)   -> half2   { return half2{half(v.x), half(v.y)} }
-@(require_results) ashalf_double3   :: proc "c" (v: double3)   -> half3   { return half3{half(v.x), half(v.y), half(v.z)} }
-@(require_results) ashalf_double4   :: proc "c" (v: double4)   -> half4   { return half4{half(v.x), half(v.y), half(v.z), half(v.w)} }
-
 asfloat :: proc{
-	asfloat_half,
 	asfloat_float,
-	asfloat_double,
+	asfloat_float2,
+	asfloat_float3,
+	asfloat_float4,
 	asfloat_int,
+	asfloat_int2,
+	asfloat_int3,
+	asfloat_int4,
 	asfloat_uint,
-	asfloat_half1x1,
-	asfloat_half2x2,
-	asfloat_half3x3,
-	asfloat_half4x4,
-	asfloat_half1x2,
-	asfloat_half1x3,
-	asfloat_half1x4,
-	asfloat_half2x1,
-	asfloat_half2x3,
-	asfloat_half2x4,
-	asfloat_half3x1,
-	asfloat_half3x2,
-	asfloat_half3x4,
-	asfloat_half4x1,
-	asfloat_half4x2,
-	asfloat_half4x3,
-	asfloat_half2,
-	asfloat_half3,
-	asfloat_half4,
+	asfloat_uint2,
+	asfloat_uint3,
+	asfloat_uint4,
 	asfloat_float1x1,
 	asfloat_float2x2,
 	asfloat_float3x3,
@@ -2467,280 +2310,81 @@ asfloat :: proc{
 	asfloat_float4x1,
 	asfloat_float4x2,
 	asfloat_float4x3,
-	asfloat_float2,
-	asfloat_float3,
-	asfloat_float4,
-	asfloat_int2,
-	asfloat_int3,
-	asfloat_int4,
-	asfloat_uint2,
-	asfloat_uint3,
-	asfloat_uint4,
-	asfloat_bool2,
-	asfloat_bool3,
-	asfloat_bool4,
-	asfloat_double1x1,
-	asfloat_double2x2,
-	asfloat_double3x3,
-	asfloat_double4x4,
-	asfloat_double1x2,
-	asfloat_double1x3,
-	asfloat_double1x4,
-	asfloat_double2x1,
-	asfloat_double2x3,
-	asfloat_double2x4,
-	asfloat_double3x1,
-	asfloat_double3x2,
-	asfloat_double3x4,
-	asfloat_double4x1,
-	asfloat_double4x2,
-	asfloat_double4x3,
-	asfloat_double2,
-	asfloat_double3,
-	asfloat_double4,
+	asfloat_int1x1,
+	asfloat_int2x2,
+	asfloat_int3x3,
+	asfloat_int4x4,
+	asfloat_int1x2,
+	asfloat_int1x3,
+	asfloat_int1x4,
+	asfloat_int2x1,
+	asfloat_int2x3,
+	asfloat_int2x4,
+	asfloat_int3x1,
+	asfloat_int3x2,
+	asfloat_int3x4,
+	asfloat_int4x1,
+	asfloat_int4x2,
+	asfloat_int4x3,
 }
-@(require_results) asfloat_half     :: proc "c" (v: half)     -> float    { return float(v) }
-@(require_results) asfloat_float     :: proc "c" (v: float)     -> float    { return float(v) }
-@(require_results) asfloat_double    :: proc "c" (v: double)    -> float    { return float(v) }
-@(require_results) asfloat_int       :: proc "c" (v: int)       -> float    { return float(v) }
-@(require_results) asfloat_uint      :: proc "c" (v: uint)      -> float    { return float(v) }
-@(require_results) asfloat_half1x1  :: proc "c" (v: half1x1)  -> float1x1 { return float1x1(v) }
-@(require_results) asfloat_half2x2  :: proc "c" (v: half2x2)  -> float2x2 { return float2x2(v) }
-@(require_results) asfloat_half3x3  :: proc "c" (v: half3x3)  -> float3x3 { return float3x3(v) }
-@(require_results) asfloat_half4x4  :: proc "c" (v: half4x4)  -> float4x4 { return float4x4(v) }
-@(require_results) asfloat_half1x2  :: proc "c" (v: half1x2)  -> float1x2 { return float1x2(v) }
-@(require_results) asfloat_half1x3  :: proc "c" (v: half1x3)  -> float1x3 { return float1x3(v) }
-@(require_results) asfloat_half1x4  :: proc "c" (v: half1x4)  -> float1x4 { return float1x4(v) }
-@(require_results) asfloat_half2x1  :: proc "c" (v: half2x1)  -> float2x1 { return float2x1(v) }
-@(require_results) asfloat_half2x3  :: proc "c" (v: half2x3)  -> float2x3 { return float2x3(v) }
-@(require_results) asfloat_half2x4  :: proc "c" (v: half2x4)  -> float2x4 { return float2x4(v) }
-@(require_results) asfloat_half3x1  :: proc "c" (v: half3x1)  -> float3x1 { return float3x1(v) }
-@(require_results) asfloat_half3x2  :: proc "c" (v: half3x2)  -> float3x2 { return float3x2(v) }
-@(require_results) asfloat_half3x4  :: proc "c" (v: half3x4)  -> float3x4 { return float3x4(v) }
-@(require_results) asfloat_half4x1  :: proc "c" (v: half4x1)  -> float4x1 { return float4x1(v) }
-@(require_results) asfloat_half4x2  :: proc "c" (v: half4x2)  -> float4x2 { return float4x2(v) }
-@(require_results) asfloat_half4x3  :: proc "c" (v: half4x3)  -> float4x3 { return float4x3(v) }
-@(require_results) asfloat_half2    :: proc "c" (v: half2)    -> float2   { return float2{float(v.x), float(v.y)} }
-@(require_results) asfloat_half3    :: proc "c" (v: half3)    -> float3   { return float3{float(v.x), float(v.y), float(v.z)} }
-@(require_results) asfloat_half4    :: proc "c" (v: half4)    -> float4   { return float4{float(v.x), float(v.y), float(v.z), float(v.w)} }
-@(require_results) asfloat_float1x1  :: proc "c" (v: float1x1)  -> float1x1 { return float1x1(v) }
-@(require_results) asfloat_float2x2  :: proc "c" (v: float2x2)  -> float2x2 { return float2x2(v) }
-@(require_results) asfloat_float3x3  :: proc "c" (v: float3x3)  -> float3x3 { return float3x3(v) }
-@(require_results) asfloat_float4x4  :: proc "c" (v: float4x4)  -> float4x4 { return float4x4(v) }
-@(require_results) asfloat_float1x2  :: proc "c" (v: float1x2)  -> float1x2 { return float1x2(v) }
-@(require_results) asfloat_float1x3  :: proc "c" (v: float1x3)  -> float1x3 { return float1x3(v) }
-@(require_results) asfloat_float1x4  :: proc "c" (v: float1x4)  -> float1x4 { return float1x4(v) }
-@(require_results) asfloat_float2x1  :: proc "c" (v: float2x1)  -> float2x1 { return float2x1(v) }
-@(require_results) asfloat_float2x3  :: proc "c" (v: float2x3)  -> float2x3 { return float2x3(v) }
-@(require_results) asfloat_float2x4  :: proc "c" (v: float2x4)  -> float2x4 { return float2x4(v) }
-@(require_results) asfloat_float3x1  :: proc "c" (v: float3x1)  -> float3x1 { return float3x1(v) }
-@(require_results) asfloat_float3x2  :: proc "c" (v: float3x2)  -> float3x2 { return float3x2(v) }
-@(require_results) asfloat_float3x4  :: proc "c" (v: float3x4)  -> float3x4 { return float3x4(v) }
-@(require_results) asfloat_float4x1  :: proc "c" (v: float4x1)  -> float4x1 { return float4x1(v) }
-@(require_results) asfloat_float4x2  :: proc "c" (v: float4x2)  -> float4x2 { return float4x2(v) }
-@(require_results) asfloat_float4x3  :: proc "c" (v: float4x3)  -> float4x3 { return float4x3(v) }
-@(require_results) asfloat_float2    :: proc "c" (v: float2)    -> float2   { return float2(v) }
-@(require_results) asfloat_float3    :: proc "c" (v: float3)    -> float3   { return float3(v) }
-@(require_results) asfloat_float4    :: proc "c" (v: float4)    -> float4   { return float4(v) }
-@(require_results) asfloat_int2      :: proc "c" (v: int2)      -> float2   { return float2{float(v.x), float(v.y)} }
-@(require_results) asfloat_int3      :: proc "c" (v: int3)      -> float3   { return float3{float(v.x), float(v.y), float(v.z)} }
-@(require_results) asfloat_int4      :: proc "c" (v: int4)      -> float4   { return float4{float(v.x), float(v.y), float(v.z), float(v.w)} }
-@(require_results) asfloat_uint2     :: proc "c" (v: uint2)     -> float2   { return float2{float(v.x), float(v.y)} }
-@(require_results) asfloat_uint3     :: proc "c" (v: uint3)     -> float3   { return float3{float(v.x), float(v.y), float(v.z)} }
-@(require_results) asfloat_uint4     :: proc "c" (v: uint4)     -> float4   { return float4{float(v.x), float(v.y), float(v.z), float(v.w)} }
-@(require_results) asfloat_bool2     :: proc "c" (v: bool2)     -> float2   { return float2{float(int(v.x)), float(int(v.y))} }
-@(require_results) asfloat_bool3     :: proc "c" (v: bool3)     -> float3   { return float3{float(int(v.x)), float(int(v.y)), float(int(v.z))} }
-@(require_results) asfloat_bool4     :: proc "c" (v: bool4)     -> float4   { return float4{float(int(v.x)), float(int(v.y)), float(int(v.z)), float(int(v.w))} }
-@(require_results) asfloat_double1x1 :: proc "c" (v: double1x1) -> float1x1 { return float1x1(v) }
-@(require_results) asfloat_double2x2 :: proc "c" (v: double2x2) -> float2x2 { return float2x2(v) }
-@(require_results) asfloat_double3x3 :: proc "c" (v: double3x3) -> float3x3 { return float3x3(v) }
-@(require_results) asfloat_double4x4 :: proc "c" (v: double4x4) -> float4x4 { return float4x4(v) }
-@(require_results) asfloat_double1x2 :: proc "c" (v: double1x2) -> float1x2 { return float1x2(v) }
-@(require_results) asfloat_double1x3 :: proc "c" (v: double1x3) -> float1x3 { return float1x3(v) }
-@(require_results) asfloat_double1x4 :: proc "c" (v: double1x4) -> float1x4 { return float1x4(v) }
-@(require_results) asfloat_double2x1 :: proc "c" (v: double2x1) -> float2x1 { return float2x1(v) }
-@(require_results) asfloat_double2x3 :: proc "c" (v: double2x3) -> float2x3 { return float2x3(v) }
-@(require_results) asfloat_double2x4 :: proc "c" (v: double2x4) -> float2x4 { return float2x4(v) }
-@(require_results) asfloat_double3x1 :: proc "c" (v: double3x1) -> float3x1 { return float3x1(v) }
-@(require_results) asfloat_double3x2 :: proc "c" (v: double3x2) -> float3x2 { return float3x2(v) }
-@(require_results) asfloat_double3x4 :: proc "c" (v: double3x4) -> float3x4 { return float3x4(v) }
-@(require_results) asfloat_double4x1 :: proc "c" (v: double4x1) -> float4x1 { return float4x1(v) }
-@(require_results) asfloat_double4x2 :: proc "c" (v: double4x2) -> float4x2 { return float4x2(v) }
-@(require_results) asfloat_double4x3 :: proc "c" (v: double4x3) -> float4x3 { return float4x3(v) }
-@(require_results) asfloat_double2   :: proc "c" (v: double2)   -> float2   { return float2{float(v.x), float(v.y)} }
-@(require_results) asfloat_double3   :: proc "c" (v: double3)   -> float3   { return float3{float(v.x), float(v.y), float(v.z)} }
-@(require_results) asfloat_double4   :: proc "c" (v: double4)   -> float4   { return float4{float(v.x), float(v.y), float(v.z), float(v.w)} }
-
-asdouble :: proc{
-	asdouble_half,
-	asdouble_float,
-	asdouble_double,
-	asdouble_int,
-	asdouble_uint,
-	asdouble_half1x1,
-	asdouble_half2x2,
-	asdouble_half3x3,
-	asdouble_half4x4,
-	asdouble_half1x2,
-	asdouble_half1x3,
-	asdouble_half1x4,
-	asdouble_half2x1,
-	asdouble_half2x3,
-	asdouble_half2x4,
-	asdouble_half3x1,
-	asdouble_half3x2,
-	asdouble_half3x4,
-	asdouble_half4x1,
-	asdouble_half4x2,
-	asdouble_half4x3,
-	asdouble_half2,
-	asdouble_half3,
-	asdouble_half4,
-	asdouble_float1x1,
-	asdouble_float2x2,
-	asdouble_float3x3,
-	asdouble_float4x4,
-	asdouble_float1x2,
-	asdouble_float1x3,
-	asdouble_float1x4,
-	asdouble_float2x1,
-	asdouble_float2x3,
-	asdouble_float2x4,
-	asdouble_float3x1,
-	asdouble_float3x2,
-	asdouble_float3x4,
-	asdouble_float4x1,
-	asdouble_float4x2,
-	asdouble_float4x3,
-	asdouble_float2,
-	asdouble_float3,
-	asdouble_float4,
-	asdouble_int2,
-	asdouble_int3,
-	asdouble_int4,
-	asdouble_uint2,
-	asdouble_uint3,
-	asdouble_uint4,
-	asdouble_bool2,
-	asdouble_bool3,
-	asdouble_bool4,
-	asdouble_double1x1,
-	asdouble_double2x2,
-	asdouble_double3x3,
-	asdouble_double4x4,
-	asdouble_double1x2,
-	asdouble_double1x3,
-	asdouble_double1x4,
-	asdouble_double2x1,
-	asdouble_double2x3,
-	asdouble_double2x4,
-	asdouble_double3x1,
-	asdouble_double3x2,
-	asdouble_double3x4,
-	asdouble_double4x1,
-	asdouble_double4x2,
-	asdouble_double4x3,
-	asdouble_double2,
-	asdouble_double3,
-	asdouble_double4,
-}
-@(require_results) asdouble_half     :: proc "c" (v: half)     -> double    { return double(v) }
-@(require_results) asdouble_float     :: proc "c" (v: float)     -> double    { return double(v) }
-@(require_results) asdouble_double    :: proc "c" (v: double)    -> double    { return double(v) }
-@(require_results) asdouble_int       :: proc "c" (v: int)       -> double    { return double(v) }
-@(require_results) asdouble_uint      :: proc "c" (v: uint)      -> double    { return double(v) }
-@(require_results) asdouble_half1x1  :: proc "c" (v: half1x1)  -> double1x1 { return double1x1(v) }
-@(require_results) asdouble_half2x2  :: proc "c" (v: half2x2)  -> double2x2 { return double2x2(v) }
-@(require_results) asdouble_half3x3  :: proc "c" (v: half3x3)  -> double3x3 { return double3x3(v) }
-@(require_results) asdouble_half4x4  :: proc "c" (v: half4x4)  -> double4x4 { return double4x4(v) }
-@(require_results) asdouble_half1x2  :: proc "c" (v: half1x2)  -> double1x2 { return double1x2(v) }
-@(require_results) asdouble_half1x3  :: proc "c" (v: half1x3)  -> double1x3 { return double1x3(v) }
-@(require_results) asdouble_half1x4  :: proc "c" (v: half1x4)  -> double1x4 { return double1x4(v) }
-@(require_results) asdouble_half2x1  :: proc "c" (v: half2x1)  -> double2x1 { return double2x1(v) }
-@(require_results) asdouble_half2x3  :: proc "c" (v: half2x3)  -> double2x3 { return double2x3(v) }
-@(require_results) asdouble_half2x4  :: proc "c" (v: half2x4)  -> double2x4 { return double2x4(v) }
-@(require_results) asdouble_half3x1  :: proc "c" (v: half3x1)  -> double3x1 { return double3x1(v) }
-@(require_results) asdouble_half3x2  :: proc "c" (v: half3x2)  -> double3x2 { return double3x2(v) }
-@(require_results) asdouble_half3x4  :: proc "c" (v: half3x4)  -> double3x4 { return double3x4(v) }
-@(require_results) asdouble_half4x1  :: proc "c" (v: half4x1)  -> double4x1 { return double4x1(v) }
-@(require_results) asdouble_half4x2  :: proc "c" (v: half4x2)  -> double4x2 { return double4x2(v) }
-@(require_results) asdouble_half4x3  :: proc "c" (v: half4x3)  -> double4x3 { return double4x3(v) }
-@(require_results) asdouble_half2    :: proc "c" (v: half2)    -> double2   { return double2{double(v.x), double(v.y)} }
-@(require_results) asdouble_half3    :: proc "c" (v: half3)    -> double3   { return double3{double(v.x), double(v.y), double(v.z)} }
-@(require_results) asdouble_half4    :: proc "c" (v: half4)    -> double4   { return double4{double(v.x), double(v.y), double(v.z), double(v.w)} }
-@(require_results) asdouble_float1x1  :: proc "c" (v: float1x1)  -> double1x1 { return double1x1(v) }
-@(require_results) asdouble_float2x2  :: proc "c" (v: float2x2)  -> double2x2 { return double2x2(v) }
-@(require_results) asdouble_float3x3  :: proc "c" (v: float3x3)  -> double3x3 { return double3x3(v) }
-@(require_results) asdouble_float4x4  :: proc "c" (v: float4x4)  -> double4x4 { return double4x4(v) }
-@(require_results) asdouble_float1x2  :: proc "c" (v: float1x2)  -> double1x2 { return double1x2(v) }
-@(require_results) asdouble_float1x3  :: proc "c" (v: float1x3)  -> double1x3 { return double1x3(v) }
-@(require_results) asdouble_float1x4  :: proc "c" (v: float1x4)  -> double1x4 { return double1x4(v) }
-@(require_results) asdouble_float2x1  :: proc "c" (v: float2x1)  -> double2x1 { return double2x1(v) }
-@(require_results) asdouble_float2x3  :: proc "c" (v: float2x3)  -> double2x3 { return double2x3(v) }
-@(require_results) asdouble_float2x4  :: proc "c" (v: float2x4)  -> double2x4 { return double2x4(v) }
-@(require_results) asdouble_float3x1  :: proc "c" (v: float3x1)  -> double3x1 { return double3x1(v) }
-@(require_results) asdouble_float3x2  :: proc "c" (v: float3x2)  -> double3x2 { return double3x2(v) }
-@(require_results) asdouble_float3x4  :: proc "c" (v: float3x4)  -> double3x4 { return double3x4(v) }
-@(require_results) asdouble_float4x1  :: proc "c" (v: float4x1)  -> double4x1 { return double4x1(v) }
-@(require_results) asdouble_float4x2  :: proc "c" (v: float4x2)  -> double4x2 { return double4x2(v) }
-@(require_results) asdouble_float4x3  :: proc "c" (v: float4x3)  -> double4x3 { return double4x3(v) }
-@(require_results) asdouble_float2    :: proc "c" (v: float2)    -> double2   { return double2{double(v.x), double(v.y)} }
-@(require_results) asdouble_float3    :: proc "c" (v: float3)    -> double3   { return double3{double(v.x), double(v.y), double(v.z)} }
-@(require_results) asdouble_float4    :: proc "c" (v: float4)    -> double4   { return double4{double(v.x), double(v.y), double(v.z), double(v.w)} }
-@(require_results) asdouble_int2      :: proc "c" (v: int2)      -> double2   { return double2{double(v.x), double(v.y)} }
-@(require_results) asdouble_int3      :: proc "c" (v: int3)      -> double3   { return double3{double(v.x), double(v.y), double(v.z)} }
-@(require_results) asdouble_int4      :: proc "c" (v: int4)      -> double4   { return double4{double(v.x), double(v.y), double(v.z), double(v.w)} }
-@(require_results) asdouble_uint2     :: proc "c" (v: uint2)     -> double2   { return double2{double(v.x), double(v.y)} }
-@(require_results) asdouble_uint3     :: proc "c" (v: uint3)     -> double3   { return double3{double(v.x), double(v.y), double(v.z)} }
-@(require_results) asdouble_uint4     :: proc "c" (v: uint4)     -> double4   { return double4{double(v.x), double(v.y), double(v.z), double(v.w)} }
-@(require_results) asdouble_bool2     :: proc "c" (v: bool2)     -> double2   { return double2{double(int(v.x)), double(int(v.y))} }
-@(require_results) asdouble_bool3     :: proc "c" (v: bool3)     -> double3   { return double3{double(int(v.x)), double(int(v.y)), double(int(v.z))} }
-@(require_results) asdouble_bool4     :: proc "c" (v: bool4)     -> double4   { return double4{double(int(v.x)), double(int(v.y)), double(int(v.z)), double(int(v.w))} }
-@(require_results) asdouble_double1x1 :: proc "c" (v: double1x1) -> double1x1 { return double1x1(v) }
-@(require_results) asdouble_double2x2 :: proc "c" (v: double2x2) -> double2x2 { return double2x2(v) }
-@(require_results) asdouble_double3x3 :: proc "c" (v: double3x3) -> double3x3 { return double3x3(v) }
-@(require_results) asdouble_double4x4 :: proc "c" (v: double4x4) -> double4x4 { return double4x4(v) }
-@(require_results) asdouble_double1x2 :: proc "c" (v: double1x2) -> double1x2 { return double1x2(v) }
-@(require_results) asdouble_double1x3 :: proc "c" (v: double1x3) -> double1x3 { return double1x3(v) }
-@(require_results) asdouble_double1x4 :: proc "c" (v: double1x4) -> double1x4 { return double1x4(v) }
-@(require_results) asdouble_double2x1 :: proc "c" (v: double2x1) -> double2x1 { return double2x1(v) }
-@(require_results) asdouble_double2x3 :: proc "c" (v: double2x3) -> double2x3 { return double2x3(v) }
-@(require_results) asdouble_double2x4 :: proc "c" (v: double2x4) -> double2x4 { return double2x4(v) }
-@(require_results) asdouble_double3x1 :: proc "c" (v: double3x1) -> double3x1 { return double3x1(v) }
-@(require_results) asdouble_double3x2 :: proc "c" (v: double3x2) -> double3x2 { return double3x2(v) }
-@(require_results) asdouble_double3x4 :: proc "c" (v: double3x4) -> double3x4 { return double3x4(v) }
-@(require_results) asdouble_double4x1 :: proc "c" (v: double4x1) -> double4x1 { return double4x1(v) }
-@(require_results) asdouble_double4x2 :: proc "c" (v: double4x2) -> double4x2 { return double4x2(v) }
-@(require_results) asdouble_double4x3 :: proc "c" (v: double4x3) -> double4x3 { return double4x3(v) }
-@(require_results) asdouble_double2   :: proc "c" (v: double2)   -> double2   { return double2{double(v.x), double(v.y)} }
-@(require_results) asdouble_double3   :: proc "c" (v: double3)   -> double3   { return double3{double(v.x), double(v.y), double(v.z)} }
-@(require_results) asdouble_double4   :: proc "c" (v: double4)   -> double4   { return double4{double(v.x), double(v.y), double(v.z), double(v.w)} }
+@(require_results) asfloat_float    :: proc "c" (v: float)    -> float    { return v }
+@(require_results) asfloat_float2   :: proc "c" (v: float2)   -> float2   { return v }
+@(require_results) asfloat_float3   :: proc "c" (v: float3)   -> float3   { return v }
+@(require_results) asfloat_float4   :: proc "c" (v: float4)   -> float4   { return v }
+@(require_results) asfloat_int      :: proc "c" (v: int)      -> float    { return transmute(float)v }
+@(require_results) asfloat_int2     :: proc "c" (v: int2)     -> float2   { return transmute(float2)v }
+@(require_results) asfloat_int3     :: proc "c" (v: int3)     -> float3   { return transmute(float3)v }
+@(require_results) asfloat_int4     :: proc "c" (v: int4)     -> float4   { return transmute(float4)v }
+@(require_results) asfloat_uint     :: proc "c" (v: uint)     -> float    { return transmute(float)v }
+@(require_results) asfloat_uint2    :: proc "c" (v: uint2)    -> float2   { return transmute(float2)v }
+@(require_results) asfloat_uint3    :: proc "c" (v: uint3)    -> float3   { return transmute(float3)v }
+@(require_results) asfloat_uint4    :: proc "c" (v: uint4)    -> float4   { return transmute(float4)v }
+@(require_results) asfloat_float1x1 :: proc "c" (v: float1x1) -> float1x1 { return v }
+@(require_results) asfloat_float2x2 :: proc "c" (v: float2x2) -> float2x2 { return v }
+@(require_results) asfloat_float3x3 :: proc "c" (v: float3x3) -> float3x3 { return v }
+@(require_results) asfloat_float4x4 :: proc "c" (v: float4x4) -> float4x4 { return v }
+@(require_results) asfloat_float1x2 :: proc "c" (v: float1x2) -> float1x2 { return v }
+@(require_results) asfloat_float1x3 :: proc "c" (v: float1x3) -> float1x3 { return v }
+@(require_results) asfloat_float1x4 :: proc "c" (v: float1x4) -> float1x4 { return v }
+@(require_results) asfloat_float2x1 :: proc "c" (v: float2x1) -> float2x1 { return v }
+@(require_results) asfloat_float2x3 :: proc "c" (v: float2x3) -> float2x3 { return v }
+@(require_results) asfloat_float2x4 :: proc "c" (v: float2x4) -> float2x4 { return v }
+@(require_results) asfloat_float3x1 :: proc "c" (v: float3x1) -> float3x1 { return v }
+@(require_results) asfloat_float3x2 :: proc "c" (v: float3x2) -> float3x2 { return v }
+@(require_results) asfloat_float3x4 :: proc "c" (v: float3x4) -> float3x4 { return v }
+@(require_results) asfloat_float4x1 :: proc "c" (v: float4x1) -> float4x1 { return v }
+@(require_results) asfloat_float4x2 :: proc "c" (v: float4x2) -> float4x2 { return v }
+@(require_results) asfloat_float4x3 :: proc "c" (v: float4x3) -> float4x3 { return v }
+@(require_results) asfloat_int1x1   :: proc "c" (v: int1x1)   -> float1x1 { return transmute(float1x1)v }
+@(require_results) asfloat_int2x2   :: proc "c" (v: int2x2)   -> float2x2 { return transmute(float2x2)v }
+@(require_results) asfloat_int3x3   :: proc "c" (v: int3x3)   -> float3x3 { return transmute(float3x3)v }
+@(require_results) asfloat_int4x4   :: proc "c" (v: int4x4)   -> float4x4 { return transmute(float4x4)v }
+@(require_results) asfloat_int1x2   :: proc "c" (v: int1x2)   -> float1x2 { return transmute(float1x2)v }
+@(require_results) asfloat_int1x3   :: proc "c" (v: int1x3)   -> float1x3 { return transmute(float1x3)v }
+@(require_results) asfloat_int1x4   :: proc "c" (v: int1x4)   -> float1x4 { return transmute(float1x4)v }
+@(require_results) asfloat_int2x1   :: proc "c" (v: int2x1)   -> float2x1 { return transmute(float2x1)v }
+@(require_results) asfloat_int2x3   :: proc "c" (v: int2x3)   -> float2x3 { return transmute(float2x3)v }
+@(require_results) asfloat_int2x4   :: proc "c" (v: int2x4)   -> float2x4 { return transmute(float2x4)v }
+@(require_results) asfloat_int3x1   :: proc "c" (v: int3x1)   -> float3x1 { return transmute(float3x1)v }
+@(require_results) asfloat_int3x2   :: proc "c" (v: int3x2)   -> float3x2 { return transmute(float3x2)v }
+@(require_results) asfloat_int3x4   :: proc "c" (v: int3x4)   -> float3x4 { return transmute(float3x4)v }
+@(require_results) asfloat_int4x1   :: proc "c" (v: int4x1)   -> float4x1 { return transmute(float4x1)v }
+@(require_results) asfloat_int4x2   :: proc "c" (v: int4x2)   -> float4x2 { return transmute(float4x2)v }
+@(require_results) asfloat_int4x3   :: proc "c" (v: int4x3)   -> float4x3 { return transmute(float4x3)v }
 
 asint :: proc{
-	asint_half,
 	asint_float,
-	asint_double,
+	asint_float2,
+	asint_float3,
+	asint_float4,
 	asint_int,
+	asint_int2,
+	asint_int3,
+	asint_int4,
 	asint_uint,
-	asint_half1x1,
-	asint_half2x2,
-	asint_half3x3,
-	asint_half4x4,
-	asint_half1x2,
-	asint_half1x3,
-	asint_half1x4,
-	asint_half2x1,
-	asint_half2x3,
-	asint_half2x4,
-	asint_half3x1,
-	asint_half3x2,
-	asint_half3x4,
-	asint_half4x1,
-	asint_half4x2,
-	asint_half4x3,
-	asint_half2,
-	asint_half3,
-	asint_half4,
+	asint_uint2,
+	asint_uint3,
+	asint_uint4,
 	asint_float1x1,
 	asint_float2x2,
 	asint_float3x3,
@@ -2757,159 +2401,113 @@ asint :: proc{
 	asint_float4x1,
 	asint_float4x2,
 	asint_float4x3,
-	asint_float2,
-	asint_float3,
-	asint_float4,
-	asint_int2,
-	asint_int3,
-	asint_int4,
-	asint_uint2,
-	asint_uint3,
-	asint_uint4,
-	asint_bool2,
-	asint_bool3,
-	asint_bool4,
-	asint_double1x1,
-	asint_double2x2,
-	asint_double3x3,
-	asint_double4x4,
-	asint_double1x2,
-	asint_double1x3,
-	asint_double1x4,
-	asint_double2x1,
-	asint_double2x3,
-	asint_double2x4,
-	asint_double3x1,
-	asint_double3x2,
-	asint_double3x4,
-	asint_double4x1,
-	asint_double4x2,
-	asint_double4x3,
-	asint_double2,
-	asint_double3,
-	asint_double4,
+	asint_int1x1,
+	asint_int2x2,
+	asint_int3x3,
+	asint_int4x4,
+	asint_int1x2,
+	asint_int1x3,
+	asint_int1x4,
+	asint_int2x1,
+	asint_int2x3,
+	asint_int2x4,
+	asint_int3x1,
+	asint_int3x2,
+	asint_int3x4,
+	asint_int4x1,
+	asint_int4x2,
+	asint_int4x3,
 }
-@(require_results) asint_half     :: proc "c" (v: half)     -> int    { return int(v) }
-@(require_results) asint_float     :: proc "c" (v: float)     -> int    { return int(v) }
-@(require_results) asint_double    :: proc "c" (v: double)    -> int    { return int(v) }
-@(require_results) asint_int       :: proc "c" (v: int)       -> int    { return int(v) }
-@(require_results) asint_uint      :: proc "c" (v: uint)      -> int    { return int(v) }
-@(require_results) asint_half1x1  :: proc "c" (v: half1x1)  -> int1x1 { return int1x1(v) }
-@(require_results) asint_half2x2  :: proc "c" (v: half2x2)  -> int2x2 { return int2x2(v) }
-@(require_results) asint_half3x3  :: proc "c" (v: half3x3)  -> int3x3 { return int3x3(v) }
-@(require_results) asint_half4x4  :: proc "c" (v: half4x4)  -> int4x4 { return int4x4(v) }
-@(require_results) asint_half1x2  :: proc "c" (v: half1x2)  -> int1x2 { return int1x2(v) }
-@(require_results) asint_half1x3  :: proc "c" (v: half1x3)  -> int1x3 { return int1x3(v) }
-@(require_results) asint_half1x4  :: proc "c" (v: half1x4)  -> int1x4 { return int1x4(v) }
-@(require_results) asint_half2x1  :: proc "c" (v: half2x1)  -> int2x1 { return int2x1(v) }
-@(require_results) asint_half2x3  :: proc "c" (v: half2x3)  -> int2x3 { return int2x3(v) }
-@(require_results) asint_half2x4  :: proc "c" (v: half2x4)  -> int2x4 { return int2x4(v) }
-@(require_results) asint_half3x1  :: proc "c" (v: half3x1)  -> int3x1 { return int3x1(v) }
-@(require_results) asint_half3x2  :: proc "c" (v: half3x2)  -> int3x2 { return int3x2(v) }
-@(require_results) asint_half3x4  :: proc "c" (v: half3x4)  -> int3x4 { return int3x4(v) }
-@(require_results) asint_half4x1  :: proc "c" (v: half4x1)  -> int4x1 { return int4x1(v) }
-@(require_results) asint_half4x2  :: proc "c" (v: half4x2)  -> int4x2 { return int4x2(v) }
-@(require_results) asint_half4x3  :: proc "c" (v: half4x3)  -> int4x3 { return int4x3(v) }
-@(require_results) asint_half2    :: proc "c" (v: half2)    -> int2   { return int2{int(v.x), int(v.y)} }
-@(require_results) asint_half3    :: proc "c" (v: half3)    -> int3   { return int3{int(v.x), int(v.y), int(v.z)} }
-@(require_results) asint_half4    :: proc "c" (v: half4)    -> int4   { return int4{int(v.x), int(v.y), int(v.z), int(v.w)} }
-@(require_results) asint_float1x1  :: proc "c" (v: float1x1)  -> int1x1 { return int1x1(v) }
-@(require_results) asint_float2x2  :: proc "c" (v: float2x2)  -> int2x2 { return int2x2(v) }
-@(require_results) asint_float3x3  :: proc "c" (v: float3x3)  -> int3x3 { return int3x3(v) }
-@(require_results) asint_float4x4  :: proc "c" (v: float4x4)  -> int4x4 { return int4x4(v) }
-@(require_results) asint_float1x2  :: proc "c" (v: float1x2)  -> int1x2 { return int1x2(v) }
-@(require_results) asint_float1x3  :: proc "c" (v: float1x3)  -> int1x3 { return int1x3(v) }
-@(require_results) asint_float1x4  :: proc "c" (v: float1x4)  -> int1x4 { return int1x4(v) }
-@(require_results) asint_float2x1  :: proc "c" (v: float2x1)  -> int2x1 { return int2x1(v) }
-@(require_results) asint_float2x3  :: proc "c" (v: float2x3)  -> int2x3 { return int2x3(v) }
-@(require_results) asint_float2x4  :: proc "c" (v: float2x4)  -> int2x4 { return int2x4(v) }
-@(require_results) asint_float3x1  :: proc "c" (v: float3x1)  -> int3x1 { return int3x1(v) }
-@(require_results) asint_float3x2  :: proc "c" (v: float3x2)  -> int3x2 { return int3x2(v) }
-@(require_results) asint_float3x4  :: proc "c" (v: float3x4)  -> int3x4 { return int3x4(v) }
-@(require_results) asint_float4x1  :: proc "c" (v: float4x1)  -> int4x1 { return int4x1(v) }
-@(require_results) asint_float4x2  :: proc "c" (v: float4x2)  -> int4x2 { return int4x2(v) }
-@(require_results) asint_float4x3  :: proc "c" (v: float4x3)  -> int4x3 { return int4x3(v) }
-@(require_results) asint_float2    :: proc "c" (v: float2)    -> int2   { return int2{int(v.x), int(v.y)} }
-@(require_results) asint_float3    :: proc "c" (v: float3)    -> int3   { return int3{int(v.x), int(v.y), int(v.z)} }
-@(require_results) asint_float4    :: proc "c" (v: float4)    -> int4   { return int4{int(v.x), int(v.y), int(v.z), int(v.w)} }
-@(require_results) asint_int2      :: proc "c" (v: int2)      -> int2   { return int2{int(v.x), int(v.y)} }
-@(require_results) asint_int3      :: proc "c" (v: int3)      -> int3   { return int3{int(v.x), int(v.y), int(v.z)} }
-@(require_results) asint_int4      :: proc "c" (v: int4)      -> int4   { return int4{int(v.x), int(v.y), int(v.z), int(v.w)} }
-@(require_results) asint_uint2     :: proc "c" (v: uint2)     -> int2   { return int2{int(v.x), int(v.y)} }
-@(require_results) asint_uint3     :: proc "c" (v: uint3)     -> int3   { return int3{int(v.x), int(v.y), int(v.z)} }
-@(require_results) asint_uint4     :: proc "c" (v: uint4)     -> int4   { return int4{int(v.x), int(v.y), int(v.z), int(v.w)} }
-@(require_results) asint_bool2     :: proc "c" (v: bool2)     -> int2   { return int2{int(int(v.x)), int(int(v.y))} }
-@(require_results) asint_bool3     :: proc "c" (v: bool3)     -> int3   { return int3{int(int(v.x)), int(int(v.y)), int(int(v.z))} }
-@(require_results) asint_bool4     :: proc "c" (v: bool4)     -> int4   { return int4{int(int(v.x)), int(int(v.y)), int(int(v.z)), int(int(v.w))} }
-@(require_results) asint_double1x1 :: proc "c" (v: double1x1) -> int1x1 { return int1x1(v) }
-@(require_results) asint_double2x2 :: proc "c" (v: double2x2) -> int2x2 { return int2x2(v) }
-@(require_results) asint_double3x3 :: proc "c" (v: double3x3) -> int3x3 { return int3x3(v) }
-@(require_results) asint_double4x4 :: proc "c" (v: double4x4) -> int4x4 { return int4x4(v) }
-@(require_results) asint_double1x2 :: proc "c" (v: double1x2) -> int1x2 { return int1x2(v) }
-@(require_results) asint_double1x3 :: proc "c" (v: double1x3) -> int1x3 { return int1x3(v) }
-@(require_results) asint_double1x4 :: proc "c" (v: double1x4) -> int1x4 { return int1x4(v) }
-@(require_results) asint_double2x1 :: proc "c" (v: double2x1) -> int2x1 { return int2x1(v) }
-@(require_results) asint_double2x3 :: proc "c" (v: double2x3) -> int2x3 { return int2x3(v) }
-@(require_results) asint_double2x4 :: proc "c" (v: double2x4) -> int2x4 { return int2x4(v) }
-@(require_results) asint_double3x1 :: proc "c" (v: double3x1) -> int3x1 { return int3x1(v) }
-@(require_results) asint_double3x2 :: proc "c" (v: double3x2) -> int3x2 { return int3x2(v) }
-@(require_results) asint_double3x4 :: proc "c" (v: double3x4) -> int3x4 { return int3x4(v) }
-@(require_results) asint_double4x1 :: proc "c" (v: double4x1) -> int4x1 { return int4x1(v) }
-@(require_results) asint_double4x2 :: proc "c" (v: double4x2) -> int4x2 { return int4x2(v) }
-@(require_results) asint_double4x3 :: proc "c" (v: double4x3) -> int4x3 { return int4x3(v) }
-@(require_results) asint_double2   :: proc "c" (v: double2)   -> int2   { return int2{int(v.x), int(v.y)} }
-@(require_results) asint_double3   :: proc "c" (v: double3)   -> int3   { return int3{int(v.x), int(v.y), int(v.z)} }
-@(require_results) asint_double4   :: proc "c" (v: double4)   -> int4   { return int4{int(v.x), int(v.y), int(v.z), int(v.w)} }
-
+@(require_results) asint_float    :: proc "c" (v: float)    -> int    { return transmute(int)v }
+@(require_results) asint_float2   :: proc "c" (v: float2)   -> int2   { return transmute(int2)v }
+@(require_results) asint_float3   :: proc "c" (v: float3)   -> int3   { return transmute(int3)v }
+@(require_results) asint_float4   :: proc "c" (v: float4)   -> int4   { return transmute(int4)v }
+@(require_results) asint_int      :: proc "c" (v: int)      -> int    { return v }
+@(require_results) asint_int2     :: proc "c" (v: int2)     -> int2   { return v }
+@(require_results) asint_int3     :: proc "c" (v: int3)     -> int3   { return v }
+@(require_results) asint_int4     :: proc "c" (v: int4)     -> int4   { return v }
+@(require_results) asint_uint     :: proc "c" (v: uint)     -> int    { return int(v) }
+@(require_results) asint_uint2    :: proc "c" (v: uint2)    -> int2   { return transmute(int2)v }
+@(require_results) asint_uint3    :: proc "c" (v: uint3)    -> int3   { return transmute(int3)v }
+@(require_results) asint_uint4    :: proc "c" (v: uint4)    -> int4   { return transmute(int4)v }
+@(require_results) asint_float1x1 :: proc "c" (v: float1x1) -> int1x1 { return transmute(int1x1)v }
+@(require_results) asint_float2x2 :: proc "c" (v: float2x2) -> int2x2 { return transmute(int2x2)v }
+@(require_results) asint_float3x3 :: proc "c" (v: float3x3) -> int3x3 { return transmute(int3x3)v }
+@(require_results) asint_float4x4 :: proc "c" (v: float4x4) -> int4x4 { return transmute(int4x4)v }
+@(require_results) asint_float1x2 :: proc "c" (v: float1x2) -> int1x2 { return transmute(int1x2)v }
+@(require_results) asint_float1x3 :: proc "c" (v: float1x3) -> int1x3 { return transmute(int1x3)v }
+@(require_results) asint_float1x4 :: proc "c" (v: float1x4) -> int1x4 { return transmute(int1x4)v }
+@(require_results) asint_float2x1 :: proc "c" (v: float2x1) -> int2x1 { return transmute(int2x1)v }
+@(require_results) asint_float2x3 :: proc "c" (v: float2x3) -> int2x3 { return transmute(int2x3)v }
+@(require_results) asint_float2x4 :: proc "c" (v: float2x4) -> int2x4 { return transmute(int2x4)v }
+@(require_results) asint_float3x1 :: proc "c" (v: float3x1) -> int3x1 { return transmute(int3x1)v }
+@(require_results) asint_float3x2 :: proc "c" (v: float3x2) -> int3x2 { return transmute(int3x2)v }
+@(require_results) asint_float3x4 :: proc "c" (v: float3x4) -> int3x4 { return transmute(int3x4)v }
+@(require_results) asint_float4x1 :: proc "c" (v: float4x1) -> int4x1 { return transmute(int4x1)v }
+@(require_results) asint_float4x2 :: proc "c" (v: float4x2) -> int4x2 { return transmute(int4x2)v }
+@(require_results) asint_float4x3 :: proc "c" (v: float4x3) -> int4x3 { return transmute(int4x3)v }
+@(require_results) asint_int1x1   :: proc "c" (v: int1x1)   -> int1x1 { return v }
+@(require_results) asint_int2x2   :: proc "c" (v: int2x2)   -> int2x2 { return v }
+@(require_results) asint_int3x3   :: proc "c" (v: int3x3)   -> int3x3 { return v }
+@(require_results) asint_int4x4   :: proc "c" (v: int4x4)   -> int4x4 { return v }
+@(require_results) asint_int1x2   :: proc "c" (v: int1x2)   -> int1x2 { return v }
+@(require_results) asint_int1x3   :: proc "c" (v: int1x3)   -> int1x3 { return v }
+@(require_results) asint_int1x4   :: proc "c" (v: int1x4)   -> int1x4 { return v }
+@(require_results) asint_int2x1   :: proc "c" (v: int2x1)   -> int2x1 { return v }
+@(require_results) asint_int2x3   :: proc "c" (v: int2x3)   -> int2x3 { return v }
+@(require_results) asint_int2x4   :: proc "c" (v: int2x4)   -> int2x4 { return v }
+@(require_results) asint_int3x1   :: proc "c" (v: int3x1)   -> int3x1 { return v }
+@(require_results) asint_int3x2   :: proc "c" (v: int3x2)   -> int3x2 { return v }
+@(require_results) asint_int3x4   :: proc "c" (v: int3x4)   -> int3x4 { return v }
+@(require_results) asint_int4x1   :: proc "c" (v: int4x1)   -> int4x1 { return v }
+@(require_results) asint_int4x2   :: proc "c" (v: int4x2)   -> int4x2 { return v }
+@(require_results) asint_int4x3   :: proc "c" (v: int4x3)   -> int4x3 { return v }
 
 asuint :: proc{
-	asuint_half,
 	asuint_float,
-	asuint_double,
-	asuint_int,
-	asuint_uint,
-	asuint_half2,
-	asuint_half3,
-	asuint_half4,
 	asuint_float2,
 	asuint_float3,
 	asuint_float4,
+	asuint_int,
 	asuint_int2,
 	asuint_int3,
 	asuint_int4,
+	asuint_uint,
 	asuint_uint2,
 	asuint_uint3,
 	asuint_uint4,
-	asuint_bool2,
-	asuint_bool3,
-	asuint_bool4,
+	asuint_double,
 	asuint_double2,
-	asuint_double3,
-	asuint_double4,
 }
-@(require_results) asuint_half     :: proc "c" (v: half)     -> uint    { return uint(v) }
-@(require_results) asuint_float     :: proc "c" (v: float)     -> uint    { return uint(v) }
-@(require_results) asuint_double    :: proc "c" (v: double)    -> uint    { return uint(v) }
-@(require_results) asuint_int       :: proc "c" (v: int)       -> uint    { return uint(v) }
-@(require_results) asuint_uint      :: proc "c" (v: uint)      -> uint    { return uint(v) }
-@(require_results) asuint_half2    :: proc "c" (v: half2)    -> uint2   { return uint2{uint(v.x), uint(v.y)} }
-@(require_results) asuint_half3    :: proc "c" (v: half3)    -> uint3   { return uint3{uint(v.x), uint(v.y), uint(v.z)} }
-@(require_results) asuint_half4    :: proc "c" (v: half4)    -> uint4   { return uint4{uint(v.x), uint(v.y), uint(v.z), uint(v.w)} }
-@(require_results) asuint_float2    :: proc "c" (v: float2)    -> uint2   { return uint2{uint(v.x), uint(v.y)} }
-@(require_results) asuint_float3    :: proc "c" (v: float3)    -> uint3   { return uint3{uint(v.x), uint(v.y), uint(v.z)} }
-@(require_results) asuint_float4    :: proc "c" (v: float4)    -> uint4   { return uint4{uint(v.x), uint(v.y), uint(v.z), uint(v.w)} }
-@(require_results) asuint_int2      :: proc "c" (v: int2)      -> uint2   { return uint2{uint(v.x), uint(v.y)} }
-@(require_results) asuint_int3      :: proc "c" (v: int3)      -> uint3   { return uint3{uint(v.x), uint(v.y), uint(v.z)} }
-@(require_results) asuint_int4      :: proc "c" (v: int4)      -> uint4   { return uint4{uint(v.x), uint(v.y), uint(v.z), uint(v.w)} }
-@(require_results) asuint_uint2     :: proc "c" (v: uint2)     -> uint2   { return uint2{uint(v.x), uint(v.y)} }
-@(require_results) asuint_uint3     :: proc "c" (v: uint3)     -> uint3   { return uint3{uint(v.x), uint(v.y), uint(v.z)} }
-@(require_results) asuint_uint4     :: proc "c" (v: uint4)     -> uint4   { return uint4{uint(v.x), uint(v.y), uint(v.z), uint(v.w)} }
-@(require_results) asuint_bool2     :: proc "c" (v: bool2)     -> uint2   { return uint2{uint(uint(v.x)), uint(uint(v.y))} }
-@(require_results) asuint_bool3     :: proc "c" (v: bool3)     -> uint3   { return uint3{uint(uint(v.x)), uint(uint(v.y)), uint(uint(v.z))} }
-@(require_results) asuint_bool4     :: proc "c" (v: bool4)     -> uint4   { return uint4{uint(uint(v.x)), uint(uint(v.y)), uint(uint(v.z)), uint(uint(v.w))} }
-@(require_results) asuint_double2   :: proc "c" (v: double2)   -> uint2   { return uint2{uint(v.x), uint(v.y)} }
-@(require_results) asuint_double3   :: proc "c" (v: double3)   -> uint3   { return uint3{uint(v.x), uint(v.y), uint(v.z)} }
-@(require_results) asuint_double4   :: proc "c" (v: double4)   -> uint4   { return uint4{uint(v.x), uint(v.y), uint(v.z), uint(v.w)} }
+@(require_results) asuint_float  :: proc "c" (v: float)  -> uint  { return transmute(uint)v }
+@(require_results) asuint_float2 :: proc "c" (v: float2) -> uint2 { return transmute(uint2)v }
+@(require_results) asuint_float3 :: proc "c" (v: float3) -> uint3 { return transmute(uint3)v }
+@(require_results) asuint_float4 :: proc "c" (v: float4) -> uint4 { return transmute(uint4)v }
+@(require_results) asuint_int    :: proc "c" (v: int)    -> uint  { return uint(v) }
+@(require_results) asuint_int2   :: proc "c" (v: int2)   -> uint2 { return transmute(uint2)v }
+@(require_results) asuint_int3   :: proc "c" (v: int3)   -> uint3 { return transmute(uint3)v }
+@(require_results) asuint_int4   :: proc "c" (v: int4)   -> uint4 { return transmute(uint4)v }
+@(require_results) asuint_uint   :: proc "c" (v: uint)   -> uint  { return v }
+@(require_results) asuint_uint2  :: proc "c" (v: uint2)  -> uint2 { return v }
+@(require_results) asuint_uint3  :: proc "c" (v: uint3)  -> uint3 { return v }
+@(require_results) asuint_uint4  :: proc "c" (v: uint4)  -> uint4 { return v }
+@(require_results)
+asuint_double :: proc "c" (v: double) -> (lowbits, highbits: uint) {
+	bits := transmute(u64)v
+	return uint(bits), uint(bits >> 32)
+}
+@(require_results)
+asuint_double2 :: proc "c" (v: double2) -> (lowbits, highbits: uint2) {
+	lowbits.x, highbits.x = asuint_double(v.x)
+	lowbits.y, highbits.y = asuint_double(v.y)
+	return
+}
 
+asdouble :: proc{
+	asdouble_uint,
+	asdouble_uint2,
+}
+@(require_results) asdouble_uint  :: proc "c" (lowbits, highbits: uint)  -> double  { return transmute(double)(u64(highbits) << 32 | u64(lowbits)) }
+@(require_results) asdouble_uint2 :: proc "c" (lowbits, highbits: uint2) -> double2 { return {asdouble_uint(lowbits.x, highbits.x), asdouble_uint(lowbits.y, highbits.y)} }
 
 // TODO(bill): All of the `mul` procedures
