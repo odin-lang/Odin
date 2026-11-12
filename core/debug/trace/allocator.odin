@@ -303,9 +303,7 @@ tracking_allocator_print_results :: proc(t: ^Tracking_Allocator, temp_allocator 
 
 		trace, err := resolve(leak.backtrace, temp_allocator, temp_allocator)
 		if err != nil {
-			runtime.print_string("\tbacktrace error: ")
-			runtime.print_string(resolve_err_string(err))
-			runtime.print_string("\n")
+			runtime.print_string("\tbacktrace allocation failed\n")
 			continue
 		}
 		defer locations_destroy(trace, temp_allocator)
@@ -329,9 +327,7 @@ tracking_allocator_print_results :: proc(t: ^Tracking_Allocator, temp_allocator 
 
 		trace, err := resolve(bad_free.backtrace, temp_allocator, temp_allocator)
 		if err != nil {
-			runtime.print_string("\tbacktrace error: ")
-			runtime.print_string(resolve_err_string(err))
-			runtime.print_string("\n")
+			runtime.print_string("\tbacktrace allocation failed\n")
 			continue
 		}
 		defer locations_destroy(trace, temp_allocator)
