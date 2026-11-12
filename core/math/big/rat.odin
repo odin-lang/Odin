@@ -10,6 +10,7 @@ import "core:math"
 	Results are canonical: `b > 0`, `gcd(a, b) == 1`, and zero is `0/1`.
 	The zero value `Rat{}` is 0. A zero `b` with a nonzero `a` is invalid: procedures return `.Division_by_Zero`.
 	Operations expect canonical operands. `internal_rat_norm` makes a `Rat` canonical after setting `a` or `b` directly.
+	`rat_set_f64` stores +/-Inf and NaN as +/-1/1 with `.Inf` or `.NaN` in `a.flags`. `rat_to_f*` returns them as inexact +/-Inf or NaN, `rat_copy`, `rat_set_rat`, `rat_abs` and `rat_neg` keep them, and `rat_is_int` is false for them. Arithmetic, `rat_compare` and `rat_is_positive`, `rat_is_negative`, `rat_is_even` and `rat_is_odd` return `.Invalid_Argument` for them.
 */
 Rat :: struct {
 	a, b: Int,
@@ -18,6 +19,7 @@ Rat :: struct {
 rat_set_f64 :: proc(dst: ^Rat, f: f64, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(dst)
 	context.allocator = allocator
+	internal_error_if_immutable(&dst.a, &dst.b) or_return
 
 	EXP_MASK :: 1<<11 - 1
 
@@ -83,6 +85,7 @@ rat_set_frac_digit :: proc(dst: ^Rat, a, b: DIGIT, allocator := context.allocato
 		return .Division_by_Zero
 	}
 	context.allocator = allocator
+	internal_error_if_immutable(&dst.a, &dst.b) or_return
 
 	g := DIGIT(_private_gcd_u64(u64(a), u64(b)))
 	_rat_set_u128(&dst.a, u128(a / g), false) or_return
@@ -96,8 +99,17 @@ rat_set_frac_int :: proc(dst: ^Rat, a, b: ^Int, allocator := context.allocator) 
 		return .Division_by_Zero
 	}
 	context.allocator = allocator
-	_rat_copy_int(&dst.a, a) or_return
-	_rat_copy_int(&dst.b, b) or_return
+	internal_error_if_immutable(&dst.a, &dst.b) or_return
+	switch {
+	case b == &dst.a && a == &dst.b:
+		internal_swap(&dst.a, &dst.b)
+	case b == &dst.a:
+		_rat_copy_int(&dst.b, b) or_return
+		_rat_copy_int(&dst.a, a) or_return
+	case:
+		_rat_copy_int(&dst.a, a) or_return
+		_rat_copy_int(&dst.b, b) or_return
+	}
 	return internal_rat_norm(dst)
 }
 
@@ -105,6 +117,7 @@ rat_set_int :: proc(dst: ^Rat, a: ^Int, allocator := context.allocator) -> (err:
 	assert_if_nil(dst)
 	assert_if_nil(a)
 	context.allocator = allocator
+	internal_error_if_immutable(&dst.a, &dst.b) or_return
 	_rat_copy_int(&dst.a, a) or_return
 	return _rat_set_one(&dst.b)
 }
@@ -112,6 +125,7 @@ rat_set_int :: proc(dst: ^Rat, a: ^Int, allocator := context.allocator) -> (err:
 rat_set_digit :: proc(dst: ^Rat, a: DIGIT, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(dst)
 	context.allocator = allocator
+	internal_error_if_immutable(&dst.a, &dst.b) or_return
 	internal_set(&dst.a, a) or_return
 	return _rat_set_one(&dst.b)
 }
@@ -119,19 +133,22 @@ rat_set_digit :: proc(dst: ^Rat, a: DIGIT, allocator := context.allocator) -> (e
 rat_set_rat :: proc(dst, x: ^Rat, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(dst, x)
 	context.allocator = allocator
-	_rat_check(x) or_return
+	internal_error_if_immutable(&dst.a, &dst.b) or_return
+	_rat_check_denominator(x) or_return
 	return _rat_set_rat(dst, x, false)
 }
 
 rat_set_u64 :: proc(dst: ^Rat, x: u64, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(dst)
 	context.allocator = allocator
+	internal_error_if_immutable(&dst.a, &dst.b) or_return
 	internal_set(&dst.a, x) or_return
 	return _rat_set_one(&dst.b)
 }
 rat_set_i64 :: proc(dst: ^Rat, x: i64, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(dst)
 	context.allocator = allocator
+	internal_error_if_immutable(&dst.a, &dst.b) or_return
 	internal_set(&dst.a, x) or_return
 	return _rat_set_one(&dst.b)
 }
@@ -139,7 +156,8 @@ rat_set_i64 :: proc(dst: ^Rat, x: i64, allocator := context.allocator) -> (err: 
 rat_copy :: proc(dst, src: ^Rat, minimize := false, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(dst, src)
 	context.allocator = allocator
-	_rat_check(src) or_return
+	internal_error_if_immutable(&dst.a, &dst.b) or_return
+	_rat_check_denominator(src) or_return
 	if dst != src {
 		_rat_copy_int(&dst.a, &src.a, minimize) or_return
 		_rat_copy_int(&dst.b, &src.b, minimize) or_return
@@ -198,6 +216,7 @@ internal_rat_norm :: proc(z: ^Rat, allocator := context.allocator) -> (err: Erro
 
 rat_swap :: proc(a, b: ^Rat) {
 	assert_if_nil(a, b)
+	assert(.Immutable not_in a.a.flags && .Immutable not_in a.b.flags && .Immutable not_in b.a.flags && .Immutable not_in b.b.flags, "Assignment to immutable")
 	#force_inline internal_swap(a, b)
 }
 
@@ -215,6 +234,9 @@ rat_sign :: proc(z: ^Rat) -> Sign {
 
 rat_is_int :: proc(z: ^Rat) -> bool {
 	assert_if_nil(z)
+	if .NaN in z.a.flags || .Inf in z.a.flags {
+		return false
+	}
 	return internal_is_zero(&z.a) || _rat_is_one(&z.b)
 }
 
@@ -254,20 +276,24 @@ internal_int_scale_denom :: proc(dst, x, y: ^Int, allocator := context.allocator
 rat_add_rat :: proc(dst, x, y: ^Rat, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(dst, x, y)
 	context.allocator = allocator
+	internal_error_if_immutable(&dst.a, &dst.b) or_return
 	return _rat_add_sub(dst, x, y, false)
 }
 
 rat_sub_rat :: proc(dst, x, y: ^Rat, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(dst, x, y)
 	context.allocator = allocator
+	internal_error_if_immutable(&dst.a, &dst.b) or_return
 	return _rat_add_sub(dst, x, y, true)
 }
 
 rat_mul_rat :: proc(dst, x, y: ^Rat, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(dst, x, y)
 	context.allocator = allocator
+	internal_error_if_immutable(&dst.a, &dst.b) or_return
 	_rat_check(x) or_return
 	_rat_check(y) or_return
+	_rat_clear_non_finite(dst)
 
 	if internal_is_zero(&x.a) || internal_is_zero(&y.a) {
 		return _rat_set_zero(dst)
@@ -300,12 +326,14 @@ rat_mul_rat :: proc(dst, x, y: ^Rat, allocator := context.allocator) -> (err: Er
 rat_div_rat :: proc(dst, x, y: ^Rat, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(dst, x, y)
 	context.allocator = allocator
+	internal_error_if_immutable(&dst.a, &dst.b) or_return
 	_rat_check(x) or_return
 	_rat_check(y) or_return
 
 	if internal_rat_is_zero(y) {
 		return .Division_by_Zero
 	}
+	_rat_clear_non_finite(dst)
 	if internal_is_zero(&x.a) {
 		return _rat_set_zero(dst)
 	}
@@ -405,6 +433,13 @@ internal_rat_to_float :: proc($T: typeid, z: ^Rat, allocator := context.allocato
 
 	context.allocator = allocator
 
+	if .NaN in a.flags {
+		return T(math.nan_f64()), false, nil
+	}
+	if .Inf in a.flags {
+		return T(math.inf_f64(-1 if a.sign == .Negative else 1)), false, nil
+	}
+
 	alen := internal_count_bits(a)
 	if alen == 0 {
 		return 0, true, nil
@@ -485,7 +520,7 @@ internal_rat_to_float :: proc($T: typeid, z: ^Rat, allocator := context.allocato
 	mantissa >>= 1
 
 	f = T(math.ldexp(f64(mantissa), exp-MSIZE1))
-	if math.is_inf(f, 0) {
+	if math.is_inf(f, 0) || f == 0 {
 		exact = false
 	}
 	if has_sign {
@@ -519,6 +554,7 @@ rat_add_int :: proc(dst, x: ^Rat, y: ^Int, allocator := context.allocator) -> (e
 	assert_if_nil(dst, x)
 	assert_if_nil(y)
 	context.allocator = allocator
+	internal_error_if_immutable(&dst.a, &dst.b) or_return
 	return _rat_add_sub_int(dst, x, y, false, false)
 }
 
@@ -526,6 +562,7 @@ rat_sub_int :: proc(dst, x: ^Rat, y: ^Int, allocator := context.allocator) -> (e
 	assert_if_nil(dst, x)
 	assert_if_nil(y)
 	context.allocator = allocator
+	internal_error_if_immutable(&dst.a, &dst.b) or_return
 	return _rat_add_sub_int(dst, x, y, true, false)
 }
 
@@ -533,6 +570,7 @@ rat_mul_int :: proc(dst, x: ^Rat, y: ^Int, allocator := context.allocator) -> (e
 	assert_if_nil(dst, x)
 	assert_if_nil(y)
 	context.allocator = allocator
+	internal_error_if_immutable(&dst.a, &dst.b) or_return
 	return _rat_mul_int(dst, x, y, false)
 }
 
@@ -540,6 +578,7 @@ rat_div_int :: proc(dst, x: ^Rat, y: ^Int, allocator := context.allocator) -> (e
 	assert_if_nil(dst, x)
 	assert_if_nil(y)
 	context.allocator = allocator
+	internal_error_if_immutable(&dst.a, &dst.b) or_return
 	return _rat_mul_int(dst, x, y, true)
 }
 
@@ -548,6 +587,7 @@ int_add_rat :: proc(dst: ^Rat, x: ^Int, y: ^Rat, allocator := context.allocator)
 	assert_if_nil(x)
 	assert_if_nil(dst, y)
 	context.allocator = allocator
+	internal_error_if_immutable(&dst.a, &dst.b) or_return
 	return _rat_add_sub_int(dst, y, x, false, false)
 }
 
@@ -555,6 +595,7 @@ int_sub_rat :: proc(dst: ^Rat, x: ^Int, y: ^Rat, allocator := context.allocator)
 	assert_if_nil(x)
 	assert_if_nil(dst, y)
 	context.allocator = allocator
+	internal_error_if_immutable(&dst.a, &dst.b) or_return
 	return _rat_add_sub_int(dst, y, x, true, true)
 }
 
@@ -562,6 +603,7 @@ int_mul_rat :: proc(dst: ^Rat, x: ^Int, y: ^Rat, allocator := context.allocator)
 	assert_if_nil(x)
 	assert_if_nil(dst, y)
 	context.allocator = allocator
+	internal_error_if_immutable(&dst.a, &dst.b) or_return
 	return _rat_mul_int(dst, y, x, false)
 }
 
@@ -569,11 +611,13 @@ int_div_rat :: proc(dst: ^Rat, x: ^Int, y: ^Rat, allocator := context.allocator)
 	assert_if_nil(x)
 	assert_if_nil(dst, y)
 	context.allocator = allocator
+	internal_error_if_immutable(&dst.a, &dst.b) or_return
 	_rat_check(y) or_return
 
 	if internal_rat_is_zero(y) {
 		return .Division_by_Zero
 	}
+	_rat_clear_non_finite(dst)
 	if internal_is_zero(x) {
 		return _rat_set_zero(dst)
 	}
@@ -608,6 +652,7 @@ int_div_rat :: proc(dst: ^Rat, x: ^Int, y: ^Rat, allocator := context.allocator)
 _rat_add_sub :: proc(dst, x, y: ^Rat, subtract: bool) -> (err: Error) {
 	_rat_check(x) or_return
 	_rat_check(y) or_return
+	_rat_clear_non_finite(dst)
 
 	switch {
 	case internal_is_zero(&y.a): return _rat_set_rat(dst, x, false)
@@ -695,6 +740,7 @@ _rat_add_sub :: proc(dst, x, y: ^Rat, subtract: bool) -> (err: Error) {
 // dst = x +/- n, or n - x when `reverse` is set as well as `subtract`.
 _rat_add_sub_int :: proc(dst, x: ^Rat, n: ^Int, subtract, reverse: bool) -> (err: Error) {
 	_rat_check(x) or_return
+	_rat_clear_non_finite(dst)
 
 	if internal_is_zero(&x.a) {
 		// 0 + n, 0 - n, or n - 0.
@@ -741,6 +787,7 @@ _rat_mul_int :: proc(dst, x: ^Rat, n: ^Int, divide: bool) -> (err: Error) {
 	if divide && internal_is_zero(n) {
 		return .Division_by_Zero
 	}
+	_rat_clear_non_finite(dst)
 	if internal_is_zero(&x.a) || internal_is_zero(n) {
 		return _rat_set_zero(dst)
 	}
@@ -1000,11 +1047,24 @@ _rat_set_rat :: proc(dst, x: ^Rat, negate: bool) -> (err: Error) {
 }
 
 // The zero value `Rat{}` is 0. A zero `b` with a nonzero `a` is invalid.
-_rat_check :: #force_inline proc(x: ^Rat) -> (err: Error) {
+_rat_check_denominator :: #force_inline proc(x: ^Rat) -> (err: Error) {
 	if x.b.used == 0 && x.a.used != 0 {
 		return .Division_by_Zero
 	}
 	return nil
+}
+
+_rat_check :: #force_inline proc(x: ^Rat) -> (err: Error) {
+	_rat_check_denominator(x) or_return
+	if .NaN in x.a.flags || .Inf in x.a.flags {
+		return .Invalid_Argument
+	}
+	return nil
+}
+
+_rat_clear_non_finite :: #force_inline proc "contextless" (dst: ^Rat) {
+	dst.a.flags -= {.NaN, .Inf}
+	dst.b.flags -= {.NaN, .Inf}
 }
 
 @(require_results)

@@ -2199,3 +2199,349 @@ test_fix_itoa_raw_small_buffer :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@(private="file")
+FIX_RAT_X_N :: "1556BC09CB91215785D99773382DD301C8A91AFA5C7623C4DD"
+@(private="file")
+FIX_RAT_X_D :: "8FFA5FC6A29D1C6231C6A83B6087BE1D408D4D4BF75093B433"
+@(private="file")
+FIX_RAT_Y_N :: "748F79FFB25306DDF2B2AEADD8B86A08"
+@(private="file")
+FIX_RAT_Y_D :: "65545AFEFEC7612E319A2FBAF253374D802EF90D40B086AD6A0D"
+
+@(private="file")
+fix_rat_expect :: proc(t: ^testing.T, r: ^big.Rat, num, den: string, radix := i8(10), loc := #caller_location) -> bool {
+	a, _ := big.itoa(&r.a, radix)
+	b, _ := big.itoa(&r.b, radix)
+	defer delete(a)
+	defer delete(b)
+	return testing.expectf(t, a == num && b == den, "expected %s/%s, got %s/%s", num, den, a, b, loc = loc)
+}
+
+@(private="file")
+fix_rat_set_hex :: proc(r: ^big.Rat, num, den: string) {
+	big.destroy(r)
+	big.atoi(&r.a, num, 16)
+	big.atoi(&r.b, den, 16)
+}
+
+@(test)
+test_fix_rat_set_frac_int_aliasing :: proc(t: ^testing.T) {
+	x: big.Rat
+	defer big.destroy(&x)
+	n: big.Int
+	defer big.destroy(&n)
+	fix_set(t, &n, "5")
+
+	testing.expect_value(t, big.rat_set_frac_digit(&x, 2, 3), nil)
+	testing.expect_value(t, big.rat_set_frac_int(&x, &x.b, &x.a), nil)
+	fix_rat_expect(t, &x, "3", "2")
+
+	testing.expect_value(t, big.rat_set_frac_digit(&x, 2, 3), nil)
+	testing.expect_value(t, big.rat_set_frac_int(&x, &n, &x.a), nil)
+	fix_rat_expect(t, &x, "5", "2")
+
+	testing.expect_value(t, big.rat_set_frac_digit(&x, 2, 3), nil)
+	testing.expect_value(t, big.rat_set_frac_int(&x, &x.a, &x.a), nil)
+	fix_rat_expect(t, &x, "1", "1")
+
+	testing.expect_value(t, big.rat_set_frac_digit(&x, 2, 3), nil)
+	testing.expect_value(t, big.rat_set_frac_int(&x, &x.b, &n), nil)
+	fix_rat_expect(t, &x, "3", "5")
+
+	testing.expect_value(t, big.rat_set_frac_digit(&x, 2, 3), nil)
+	testing.expect_value(t, big.rat_set_frac_int(&x, &x.b, &x.b), nil)
+	fix_rat_expect(t, &x, "1", "1")
+
+	big.destroy(&x)
+	fix_set(t, &x.a, "-340282366920938463463374607431768211457")
+	fix_set(t, &x.b, "18446744073709551617")
+	testing.expect_value(t, big.rat_set_frac_int(&x, &x.b, &x.a), nil)
+	fix_rat_expect(t, &x, "-18446744073709551617", "340282366920938463463374607431768211457")
+
+	fix_set(t, &x.a, "6")
+	fix_set(t, &x.b, "35")
+	testing.expect_value(t, big.rat_set_frac_int(&x, &n, &x.a), nil)
+	fix_rat_expect(t, &x, "5", "6")
+}
+
+@(private="file")
+fix_rat_set_one_over_power_of_two :: proc(t: ^testing.T, r: ^big.Rat, negative: bool, k: int) {
+	big.destroy(r)
+	fix_set(t, &r.a, "-1" if negative else "1")
+	testing.expect_value(t, big.power_of_two(&r.b, k), nil)
+}
+
+@(test)
+test_fix_rat_to_float_underflow_is_inexact :: proc(t: ^testing.T) {
+	r: big.Rat
+	defer big.destroy(&r)
+
+	Case :: struct {
+		negative: bool,
+		k:        int,
+		bits:     u64,
+		exact:    bool,
+	}
+	f16_cases := [?]Case{
+		{false, 24, 0x0001, true},
+		{false, 25, 0x0000, false},
+		{false, 30, 0x0000, false},
+		{true,  30, 0x8000, false},
+	}
+	for c in f16_cases {
+		fix_rat_set_one_over_power_of_two(t, &r, c.negative, c.k)
+		f, exact, err := big.rat_to_f16(&r)
+		testing.expect_value(t, err, nil)
+		testing.expectf(t, u64(transmute(u16)f) == c.bits && exact == c.exact, "f16 1/2^%v: got %x %v", c.k, transmute(u16)f, exact)
+	}
+	f32_cases := [?]Case{
+		{false, 149, 0x00000001, true},
+		{false, 150, 0x00000000, false},
+		{false, 200, 0x00000000, false},
+		{true,  200, 0x80000000, false},
+	}
+	for c in f32_cases {
+		fix_rat_set_one_over_power_of_two(t, &r, c.negative, c.k)
+		f, exact, err := big.rat_to_f32(&r)
+		testing.expect_value(t, err, nil)
+		testing.expectf(t, u64(transmute(u32)f) == c.bits && exact == c.exact, "f32 1/2^%v: got %x %v", c.k, transmute(u32)f, exact)
+	}
+	f64_cases := [?]Case{
+		{false, 1074, 0x0000000000000001, true},
+		{false, 1075, 0x0000000000000000, false},
+		{false, 1200, 0x0000000000000000, false},
+		{true,  1200, 0x8000000000000000, false},
+	}
+	for c in f64_cases {
+		fix_rat_set_one_over_power_of_two(t, &r, c.negative, c.k)
+		f, exact, err := big.rat_to_f64(&r)
+		testing.expect_value(t, err, nil)
+		testing.expectf(t, transmute(u64)f == c.bits && exact == c.exact, "f64 1/2^%v: got %x %v", c.k, transmute(u64)f, exact)
+	}
+}
+
+@(test)
+test_fix_rat_immutable_dst :: proc(t: ^testing.T) {
+	x, y, d: big.Rat
+	defer big.destroy(&x, &y, &d)
+	n, m: big.Int
+	defer big.destroy(&n, &m)
+
+	fix_rat_set_hex(&x, FIX_RAT_X_N, FIX_RAT_X_D)
+	fix_rat_set_hex(&y, FIX_RAT_Y_N, FIX_RAT_Y_D)
+	fix_set(t, &n, "7")
+	fix_set(t, &m, "340282366920938463463374607431768211457")
+
+	Op :: enum {
+		Set_F64, Set_F32, Set_F16, Set_Frac_Digit, Set_Frac_Int, Set_Int, Set_Digit, Set_Rat, Set_U64, Set_I64,
+		Copy, Abs, Neg, Add, Sub, Mul_Self, Div, Div_Dst_Y,
+		Rat_Add_Int, Rat_Sub_Int, Rat_Mul_Int, Rat_Div_Int,
+		Int_Add_Rat, Int_Sub_Rat, Int_Mul_Rat, Int_Div_Rat, Int_Div_Rat_Dst_Y,
+	}
+	for b_only in ([?]bool{false, true}) {
+		for op in Op {
+			fix_rat_set_hex(&d, FIX_RAT_Y_N, FIX_RAT_Y_D)
+			d.a.flags = {} if b_only else {.Immutable}
+			d.b.flags = {.Immutable}
+
+			err: big.Error
+			switch op {
+			case .Set_F64:            err = big.rat_set_f64(&d, 0.5)
+			case .Set_F32:            err = big.rat_set_f32(&d, 0.25)
+			case .Set_F16:            err = big.rat_set_f16(&d, 0.75)
+			case .Set_Frac_Digit:     err = big.rat_set_frac_digit(&d, 5, 11)
+			case .Set_Frac_Int:       err = big.rat_set_frac_int(&d, &m, &n)
+			case .Set_Int:            err = big.rat_set_int(&d, &m)
+			case .Set_Digit:          err = big.rat_set_digit(&d, 9)
+			case .Set_Rat:            err = big.rat_set_rat(&d, &x)
+			case .Set_U64:            err = big.rat_set_u64(&d, 12345)
+			case .Set_I64:            err = big.rat_set_i64(&d, -12345)
+			case .Copy:               err = big.rat_copy(&d, &x)
+			case .Abs:                err = big.rat_abs(&d, &x)
+			case .Neg:                err = big.rat_neg(&d, &x)
+			case .Add:                err = big.rat_add_rat(&d, &x, &y)
+			case .Sub:                err = big.rat_sub_rat(&d, &x, &y)
+			case .Mul_Self:           err = big.rat_mul_rat(&d, &d, &d)
+			case .Div:                err = big.rat_div_rat(&d, &x, &y)
+			case .Div_Dst_Y:          err = big.rat_div_rat(&d, &x, &d)
+			case .Rat_Add_Int:        err = big.rat_add_int(&d, &x, &m)
+			case .Rat_Sub_Int:        err = big.rat_sub_int(&d, &x, &m)
+			case .Rat_Mul_Int:        err = big.rat_mul_int(&d, &x, &m)
+			case .Rat_Div_Int:        err = big.rat_div_int(&d, &x, &m)
+			case .Int_Add_Rat:        err = big.int_add_rat(&d, &m, &x)
+			case .Int_Sub_Rat:        err = big.int_sub_rat(&d, &m, &x)
+			case .Int_Mul_Rat:        err = big.int_mul_rat(&d, &m, &x)
+			case .Int_Div_Rat:        err = big.int_div_rat(&d, &m, &x)
+			case .Int_Div_Rat_Dst_Y:  err = big.int_div_rat(&d, &n, &d)
+			}
+			testing.expectf(t, err == .Assignment_To_Immutable, "%v (b only: %v): err = %v", op, b_only, err)
+			testing.expectf(t, d.b.flags == {.Immutable}, "%v (b only: %v): b.flags = %v", op, b_only, d.b.flags)
+
+			d.a.flags = {}
+			d.b.flags = {}
+			fix_rat_expect(t, &d, FIX_RAT_Y_N, FIX_RAT_Y_D, 16)
+		}
+	}
+}
+
+@(test)
+test_fix_rat_swap_immutable_asserts :: proc(t: ^testing.T) {
+	storage: [1024]byte
+	arena: mem.Arena
+	mem.arena_init(&arena, storage[:])
+	context.allocator = mem.arena_allocator(&arena)
+
+	c, x: big.Rat
+	big.rat_set_frac_digit(&c, 1, 2)
+	c.b.flags = {.Immutable}
+	big.rat_set_frac_digit(&x, 3, 4)
+	testing.expect_assert(t, "Assignment to immutable")
+	big.swap(&x, &c)
+}
+
+@(test)
+test_fix_rat_non_finite :: proc(t: ^testing.T) {
+	pinf, ninf, nan, x, y, d, e: big.Rat
+	defer big.destroy(&pinf, &ninf, &nan, &x, &y, &d, &e)
+	n: big.Int
+	defer big.destroy(&n)
+
+	testing.expect_value(t, big.rat_set_f64(&pinf, math.inf_f64(1)), nil)
+	testing.expect_value(t, big.rat_set_f64(&ninf, math.inf_f64(-1)), nil)
+	testing.expect_value(t, big.rat_set_f64(&nan, math.nan_f64()), nil)
+	fix_set(t, &n, "7")
+
+	{
+		f, exact, err := big.rat_to_f64(&pinf)
+		testing.expectf(t, math.is_inf(f, 1) && !exact && err == nil, "to_f64(+Inf): %v %v %v", f, exact, err)
+	}
+	{
+		f, exact, err := big.rat_to_f16(&ninf)
+		testing.expectf(t, math.is_inf(f64(f), -1) && !exact && err == nil, "to_f16(-Inf): %v %v %v", f, exact, err)
+	}
+	{
+		f, exact, err := big.rat_to_f32(&nan)
+		testing.expectf(t, math.is_nan(f) && !exact && err == nil, "to_f32(NaN): %v %v %v", f, exact, err)
+	}
+	testing.expect(t, !big.rat_is_int(&pinf), "rat_is_int(+Inf)")
+	testing.expect(t, !big.rat_is_int(&nan), "rat_is_int(NaN)")
+
+	Op :: enum {
+		Add_X, Add_Y, Sub_X, Sub_Y, Mul_X, Mul_Y, Div_X, Div_Y,
+		Rat_Add_Int, Rat_Sub_Int, Rat_Mul_Int, Rat_Div_Int,
+		Int_Add_Rat, Int_Sub_Rat, Int_Mul_Rat, Int_Div_Rat,
+		Compare_X, Compare_Y, Is_Positive, Is_Negative, Is_Even, Is_Odd,
+	}
+	for v in ([?]^big.Rat{&pinf, &ninf, &nan}) {
+		testing.expect_value(t, big.rat_set_frac_digit(&x, 5, 2), nil)
+		for op in Op {
+			testing.expect_value(t, big.rat_set_frac_digit(&d, 3, 4), nil)
+			err: big.Error
+			switch op {
+			case .Add_X:       err = big.rat_add_rat(&d, v, &x)
+			case .Add_Y:       err = big.rat_add_rat(&d, &x, v)
+			case .Sub_X:       err = big.rat_sub_rat(&d, v, &x)
+			case .Sub_Y:       err = big.rat_sub_rat(&d, &x, v)
+			case .Mul_X:       err = big.rat_mul_rat(&d, v, &x)
+			case .Mul_Y:       err = big.rat_mul_rat(&d, &x, v)
+			case .Div_X:       err = big.rat_div_rat(&d, v, &x)
+			case .Div_Y:       err = big.rat_div_rat(&d, &x, v)
+			case .Rat_Add_Int: err = big.rat_add_int(&d, v, &n)
+			case .Rat_Sub_Int: err = big.rat_sub_int(&d, v, &n)
+			case .Rat_Mul_Int: err = big.rat_mul_int(&d, v, &n)
+			case .Rat_Div_Int: err = big.rat_div_int(&d, v, &n)
+			case .Int_Add_Rat: err = big.int_add_rat(&d, &n, v)
+			case .Int_Sub_Rat: err = big.int_sub_rat(&d, &n, v)
+			case .Int_Mul_Rat: err = big.int_mul_rat(&d, &n, v)
+			case .Int_Div_Rat: err = big.int_div_rat(&d, &n, v)
+			case .Compare_X:   _, err = big.rat_compare(v, &x)
+			case .Compare_Y:   _, err = big.rat_compare(&x, v)
+			case .Is_Positive: _, err = big.rat_is_positive(v)
+			case .Is_Negative: _, err = big.rat_is_negative(v)
+			case .Is_Even:     _, err = big.rat_is_even(v)
+			case .Is_Odd:      _, err = big.rat_is_odd(v)
+			}
+			testing.expectf(t, err == .Invalid_Argument, "%v(%v): err = %v", op, v.a.flags, err)
+			fix_rat_expect(t, &d, "3", "4")
+		}
+	}
+
+	Copy_Op :: enum { Copy, Set_Rat, Abs, Neg }
+	Copy_Case :: struct {
+		op:  Copy_Op,
+		src: ^big.Rat,
+		inf: int,
+	}
+	copy_cases := [?]Copy_Case{
+		{.Copy, &ninf, -1}, {.Set_Rat, &pinf, 1}, {.Abs, &ninf, 1}, {.Neg, &pinf, -1},
+		{.Copy, &nan, 0}, {.Set_Rat, &nan, 0}, {.Abs, &nan, 0}, {.Neg, &nan, 0},
+	}
+	for c in copy_cases {
+		testing.expect_value(t, big.rat_set_frac_digit(&d, 3, 4), nil)
+		err: big.Error
+		switch c.op {
+		case .Copy:    err = big.rat_copy(&d, c.src)
+		case .Set_Rat: err = big.rat_set_rat(&d, c.src)
+		case .Abs:     err = big.rat_abs(&d, c.src)
+		case .Neg:     err = big.rat_neg(&d, c.src)
+		}
+		testing.expect_value(t, err, nil)
+		f, _, _ := big.rat_to_f64(&d)
+		ok := math.is_nan(f) if c.inf == 0 else math.is_inf(f, c.inf)
+		testing.expectf(t, ok, "%v(%v): %v", c.op, c.src.a.flags, f)
+	}
+
+	fix_rat_set_hex(&x, FIX_RAT_X_N, FIX_RAT_X_D)
+	fix_rat_set_hex(&y, FIX_RAT_Y_N, FIX_RAT_Y_D)
+	Write_Op :: enum {
+		Set_F64, Set_Frac_Digit, Set_Frac_Int, Set_Int, Set_Digit, Set_Rat, Set_U64, Set_I64,
+		Copy, Abs, Neg, Add_Small, Add, Sub, Mul, Div,
+		Rat_Add_Int, Rat_Sub_Int, Rat_Mul_Int, Rat_Div_Int,
+		Int_Add_Rat, Int_Sub_Rat, Int_Mul_Rat, Int_Div_Rat,
+	}
+	small: big.Rat
+	defer big.destroy(&small)
+	testing.expect_value(t, big.rat_set_frac_digit(&small, 5, 2), nil)
+	for stale in ([?]f64{math.nan_f64(), math.inf_f64(-1)}) {
+		for op in Write_Op {
+			big.destroy(&e)
+			for r in ([?]^big.Rat{&e, &d}) {
+				if r == &d {
+					testing.expect_value(t, big.rat_set_f64(&d, stale), nil)
+				}
+				err: big.Error
+				switch op {
+				case .Set_F64:        err = big.rat_set_f64(r, -0.375)
+				case .Set_Frac_Digit: err = big.rat_set_frac_digit(r, 6, 4)
+				case .Set_Frac_Int:   err = big.rat_set_frac_int(r, &n, &y.b)
+				case .Set_Int:        err = big.rat_set_int(r, &y.b)
+				case .Set_Digit:      err = big.rat_set_digit(r, 9)
+				case .Set_Rat:        err = big.rat_set_rat(r, &x)
+				case .Set_U64:        err = big.rat_set_u64(r, 12345)
+				case .Set_I64:        err = big.rat_set_i64(r, -12345)
+				case .Copy:           err = big.rat_copy(r, &x)
+				case .Abs:            err = big.rat_abs(r, &x)
+				case .Neg:            err = big.rat_neg(r, &x)
+				case .Add_Small:      err = big.rat_add_rat(r, &small, &small)
+				case .Add:            err = big.rat_add_rat(r, &x, &y)
+				case .Sub:            err = big.rat_sub_rat(r, &x, &y)
+				case .Mul:            err = big.rat_mul_rat(r, &x, &y)
+				case .Div:            err = big.rat_div_rat(r, &x, &y)
+				case .Rat_Add_Int:    err = big.rat_add_int(r, &x, &n)
+				case .Rat_Sub_Int:    err = big.rat_sub_int(r, &x, &n)
+				case .Rat_Mul_Int:    err = big.rat_mul_int(r, &x, &n)
+				case .Rat_Div_Int:    err = big.rat_div_int(r, &x, &n)
+				case .Int_Add_Rat:    err = big.int_add_rat(r, &n, &x)
+				case .Int_Sub_Rat:    err = big.int_sub_rat(r, &n, &x)
+				case .Int_Mul_Rat:    err = big.int_mul_rat(r, &n, &x)
+				case .Int_Div_Rat:    err = big.int_div_rat(r, &n, &x)
+				}
+				testing.expectf(t, err == nil, "%v: err = %v", op, err)
+			}
+			testing.expectf(t, d.a.flags == {} && d.b.flags == {}, "%v over %v: flags = %v, %v", op, stale, d.a.flags, d.b.flags)
+			c, err := big.rat_compare(&d, &e)
+			testing.expectf(t, c == 0 && err == nil, "%v over %v: compare = %v, %v", op, stale, c, err)
+		}
+	}
+}
