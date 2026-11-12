@@ -206,7 +206,7 @@ test_marshalling :: proc(t: ^testing.T) {
 	"biggest": 2(h'0f951a9fd3c158afdff08ab8e0'),
 	"smallie": -18446744073709551616,
 	"my_bytes": h'',
-	"smallest": 3(h'0f951a9fd3c158afdff08ab8e0'),
+	"smallest": 3(h'0f951a9fd3c158afdff08ab8df'),
 	"important": "!",
 	"onetwenty": 12345,
 	"renamed :)": 123123.12500000,
@@ -1025,4 +1025,56 @@ test_unmarshal_epoch_time_range :: proc(t: ^testing.T) {
 			testing.expectf(t, err == cbor.Decode_Data_Error.Bad_Tag_Value, "% x: expected Bad_Tag_Value, got %v (%v)", c.data, v._nsec, err)
 		}
 	}
+}
+
+@(test)
+test_big_tags :: proc(t: ^testing.T) {
+	expect_big_tag(t, "0", "\xc2\x40")
+	expect_big_tag(t, "1", "\xc2\x41\x01")
+	expect_big_tag(t, "18446744073709551616", "\xc2\x49\x01\x00\x00\x00\x00\x00\x00\x00\x00")
+	expect_big_tag(t, "-18446744073709551617", "\xc3\x49\x01\x00\x00\x00\x00\x00\x00\x00\x00")
+	expect_big_tag(t, "-18446744073709551616", "\xc3\x48\xff\xff\xff\xff\xff\xff\xff\xff")
+	expect_big_tag(t, "-1", "\xc3\x40")
+	expect_big_tag(t, "-2", "\xc3\x41\x01")
+	expect_big_tag(t, "-255", "\xc3\x41\xfe")
+	expect_big_tag(t, "-256", "\xc3\x41\xff")
+	expect_big_tag(t, "-257", "\xc3\x42\x01\x00")
+	expect_big_tag(t, "-512", "\xc3\x42\x01\xff")
+	expect_big_tag(t, "-65536", "\xc3\x42\xff\xff")
+	expect_big_tag(t, "-16777216", "\xc3\x43\xff\xff\xff")
+}
+
+@(test)
+test_big_tag_non_finite :: proc(t: ^testing.T) {
+	v: big.Int
+	defer big.destroy(&v)
+
+	for kind in 0..<3 {
+		switch kind {
+		case 0: big.nan(&v)
+		case 1: big.inf(&v)
+		case:   big.minus_inf(&v)
+		}
+		data, err := cbor.marshal(v)
+		defer delete(data)
+		e, ok := err.(cbor.Encode_Data_Error)
+		testing.expect(t, ok)
+		testing.expect_value(t, e, cbor.Encode_Data_Error.Bad_Tag_Value)
+	}
+}
+
+expect_big_tag :: proc(t: ^testing.T, value: string, encoded: string, loc := #caller_location) {
+	v, back: big.Int
+	defer big.destroy(&v, &back)
+	testing.expect_value(t, big.atoi(&v, value), nil, loc)
+
+	data, err := cbor.marshal(v)
+	defer delete(data)
+	testing.expect_value(t, err, nil, loc)
+	testing.expect_value(t, fmt.tprint(data), fmt.tprint(transmute([]byte)encoded), loc)
+
+	uerr := cbor.unmarshal(encoded, &back)
+	testing.expect_value(t, uerr, nil, loc)
+	s, _ := big.itoa(&back, 10, false, context.temp_allocator)
+	testing.expect_value(t, s, value, loc)
 }

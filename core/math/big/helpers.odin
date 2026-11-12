@@ -7,9 +7,13 @@ package math_big
 
 import "base:intrinsics"
 import "base:runtime"
+import "core:math"
 
 /*
-	TODO: Int.flags and Constants like ONE, NAN, etc, are not yet properly handled everywhere.
+	Public procs return `.Invalid_Argument` for NaN and +/-Inf operands, and clear `.NaN` and `.Inf` on their destinations.
+	Procs that only move or store an `Int` keep them: `copy`, `set` from an `Int`, `swap`, `abs`, `neg`, `shrink`, `grow` and `rat_set_int`.
+	`get_float` returns NaN or +/-Inf, and `itoa` writes "NaN", "+Inf" or "-Inf" in radix 2..=23.
+	`internal_*` procs don't check for them.
 */
 
 /*
@@ -148,6 +152,7 @@ int_bitfield_extract :: proc(a: ^Int, offset, count: int, allocator := context.a
 	context.allocator = allocator
 
 	#force_inline internal_clear_if_uninitialized(a) or_return
+	internal_error_if_non_finite(a) or_return
 	return #force_inline internal_int_bitfield_extract(a, offset, count)
 }
 
@@ -321,6 +326,7 @@ int_get :: proc(a: ^Int, $T: typeid, allocator := context.allocator) -> (res: T,
 	*/
 	assert_if_nil(a)
 	#force_inline internal_clear_if_uninitialized(a, allocator) or_return
+	internal_error_if_non_finite(a) or_return
 	return #force_inline internal_int_get(a, T)
 }
 get :: proc { int_get, }
@@ -331,6 +337,8 @@ int_get_float :: proc(a: ^Int, allocator := context.allocator) -> (res: f64, err
 	*/
 	assert_if_nil(a)
 	#force_inline internal_clear_if_uninitialized(a, allocator) or_return
+	if .NaN in a.flags { return math.nan_f64(), nil }
+	if .Inf in a.flags { return math.inf_f64(-1 if a.sign == .Negative else 1), nil }
 	return #force_inline internal_int_get_float(a)
 }
 
@@ -343,6 +351,7 @@ count_bits :: proc(a: ^Int, allocator := context.allocator) -> (count: int, err:
 	*/
 	assert_if_nil(a)
 	#force_inline internal_clear_if_uninitialized(a, allocator) or_return
+	internal_error_if_non_finite(a) or_return
 	return #force_inline internal_count_bits(a), nil
 }
 
@@ -356,6 +365,7 @@ int_count_lsb :: proc(a: ^Int, allocator := context.allocator) -> (count: int, e
 	*/
 	assert_if_nil(a)
 	#force_inline internal_clear_if_uninitialized(a, allocator) or_return
+	internal_error_if_non_finite(a) or_return
 	return #force_inline internal_int_count_lsb(a)
 }
 
@@ -374,6 +384,7 @@ int_random :: proc(dest: ^Int, bits: int, allocator := context.allocator) -> (er
 	*/
 	assert_if_nil(dest)
 	#force_inline internal_error_if_immutable(dest) or_return
+	internal_clear_non_finite(dest)
 	return #force_inline internal_int_random(dest, bits, allocator)
 
 }
@@ -447,6 +458,9 @@ copy_digits :: proc(dest, src: ^Int, digits: int, offset := int(0), allocator :=
 	*/
 	assert_if_nil(dest, src)
 	#force_inline internal_clear_if_uninitialized(dest, src) or_return
+	#force_inline internal_error_if_immutable(dest) or_return
+	internal_error_if_non_finite(src) or_return
+	internal_clear_non_finite(dest)
 
 	return #force_inline internal_copy_digits(dest, src, digits, offset)
 }
@@ -478,6 +492,7 @@ clamp :: proc(a: ^Int, allocator := context.allocator) -> (err: Error) {
 int_to_bytes_size :: proc(a: ^Int, signed := false, allocator := context.allocator) -> (size_in_bytes: int, err: Error) {
 	assert_if_nil(a)
 	#force_inline internal_clear_if_uninitialized(a, allocator) or_return
+	internal_error_if_non_finite(a) or_return
 
 	size_in_bits := internal_count_bits(a)
 

@@ -2934,6 +2934,30 @@ internal_error_if_immutable_multi :: proc "contextless" (args: ..^Int) -> (err: 
 }
 internal_error_if_immutable :: proc {internal_error_if_immutable_single, internal_error_if_immutable_multi, }
 
+internal_error_if_non_finite_single :: proc "contextless" (arg: ^Int) -> (err: Error) {
+	if arg != nil && (.NaN in arg.flags || .Inf in arg.flags) { return .Invalid_Argument }
+	return nil
+}
+
+internal_error_if_non_finite_multi :: proc "contextless" (args: ..^Int) -> (err: Error) {
+	for i in args {
+		if i != nil && (.NaN in i.flags || .Inf in i.flags) { return .Invalid_Argument }
+	}
+	return nil
+}
+internal_error_if_non_finite :: proc {internal_error_if_non_finite_single, internal_error_if_non_finite_multi, }
+
+internal_clear_non_finite_single :: proc "contextless" (arg: ^Int) {
+	if arg != nil { arg.flags -= {.NaN, .Inf} }
+}
+
+internal_clear_non_finite_multi :: proc "contextless" (args: ..^Int) {
+	for i in args {
+		if i != nil { i.flags -= {.NaN, .Inf} }
+	}
+}
+internal_clear_non_finite :: proc {internal_clear_non_finite_single, internal_clear_non_finite_multi, }
+
 /*
 	Allocates several `Int`s at once.
 */

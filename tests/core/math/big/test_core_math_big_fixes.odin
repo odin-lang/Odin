@@ -2545,3 +2545,467 @@ test_fix_rat_non_finite :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@(private="file")
+fix_non_finite :: proc(a: ^big.Int, kind: int) {
+	switch kind {
+	case 0: big.nan(a)
+	case 1: big.inf(a)
+	case:   big.minus_inf(a)
+	}
+}
+
+@(private="file")
+fix_same :: proc(t: ^testing.T, got_err, want_err: big.Error, got, want: ^big.Int, loc := #caller_location) {
+	testing.expect_value(t, got_err, nil, loc=loc)
+	testing.expect_value(t, want_err, nil, loc=loc)
+	testing.expect_value(t, got.flags, big.Flags{}, loc=loc)
+	g, _ := big.int_itoa_string(got,  10, false, context.temp_allocator)
+	w, _ := big.int_itoa_string(want, 10, false, context.temp_allocator)
+	testing.expect_value(t, g, w, loc=loc)
+}
+
+@(test)
+test_fix_non_finite_operands_rejected :: proc(t: ^testing.T) {
+	d, r, x, y, m := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
+	defer big.destroy(d, r, x, y, m)
+	q, p := &big.Rat{}, &big.Rat{}
+	defer big.destroy(q, p)
+	buf: [64]u8
+
+	INV :: big.Error.Invalid_Argument
+	for kind in 0..<3 {
+		fix_non_finite(x, kind)
+		fix_set(t, y, "12345678901234567890123")
+		fix_set(t, m, "1000003")
+		fix_set(t, d, "7")
+		fix_set(t, r, "9")
+		testing.expect_value(t, big.rat_set_i64(q, 5), nil)
+		testing.expect_value(t, big.rat_set_i64(p, 3), nil)
+
+		testing.expect_value(t, big.int_add(d, x, y), INV)
+		testing.expect_value(t, big.int_add(d, y, x), INV)
+		testing.expect_value(t, big.int_add_digit(d, x, 5), INV)
+		testing.expect_value(t, big.int_sub(d, x, y), INV)
+		testing.expect_value(t, big.int_sub(d, y, x), INV)
+		testing.expect_value(t, big.int_sub_digit(d, x, 5), INV)
+		testing.expect_value(t, big.int_halve(d, x), INV)
+		testing.expect_value(t, big.int_double(d, x), INV)
+		testing.expect_value(t, big.int_mul_digit(d, x, 3), INV)
+		testing.expect_value(t, big.int_mul(d, x, y), INV)
+		testing.expect_value(t, big.int_mul(d, y, x), INV)
+		testing.expect_value(t, big.int_divmod(d, r, x, y), INV)
+		testing.expect_value(t, big.int_divmod(d, r, y, x), INV)
+		_, err := big.int_divmod_digit(d, x, 3)
+		testing.expect_value(t, err, INV)
+		testing.expect_value(t, big.int_div(d, x, y), INV)
+		testing.expect_value(t, big.int_div(d, y, x), INV)
+		testing.expect_value(t, big.int_div_digit(d, x, 3), INV)
+		testing.expect_value(t, big.int_mod(d, x, m), INV)
+		testing.expect_value(t, big.int_mod(d, y, x), INV)
+		_, err = big.int_mod_digit(x, 3)
+		testing.expect_value(t, err, INV)
+		testing.expect_value(t, big.int_addmod(d, x, y, m), INV)
+		testing.expect_value(t, big.int_addmod(d, y, x, m), INV)
+		testing.expect_value(t, big.int_addmod(d, y, y, x), INV)
+		testing.expect_value(t, big.int_submod(d, x, y, m), INV)
+		testing.expect_value(t, big.int_submod(d, y, x, m), INV)
+		testing.expect_value(t, big.int_submod(d, y, y, x), INV)
+		testing.expect_value(t, big.int_mulmod(d, x, y, m), INV)
+		testing.expect_value(t, big.int_mulmod(d, y, x, m), INV)
+		testing.expect_value(t, big.int_mulmod(d, y, y, x), INV)
+		testing.expect_value(t, big.int_sqrmod(d, x, m), INV)
+		testing.expect_value(t, big.int_sqrmod(d, y, x), INV)
+		testing.expect_value(t, big.int_gcd_lcm(d, r, x, y), INV)
+		testing.expect_value(t, big.int_gcd_lcm(d, r, y, x), INV)
+		testing.expect_value(t, big.int_gcd(d, x, y), INV)
+		testing.expect_value(t, big.int_lcm(d, y, x), INV)
+		testing.expect_value(t, big.int_mod_bits(d, x, 5), INV)
+		testing.expect_value(t, big.int_pow(d, x, 3), INV)
+		testing.expect_value(t, big.int_sqrt(d, x), INV)
+		testing.expect_value(t, big.int_root_n(d, x, 3), INV)
+		testing.expect_value(t, big.int_bit_and(d, x, y), INV)
+		testing.expect_value(t, big.int_bit_and(d, y, x), INV)
+		testing.expect_value(t, big.int_bit_or(d, x, y), INV)
+		testing.expect_value(t, big.int_bit_xor(d, y, x), INV)
+		testing.expect_value(t, big.int_bit_complement(d, x), INV)
+		testing.expect_value(t, big.int_shrmod(d, r, x, 3), INV)
+		testing.expect_value(t, big.int_shr(d, x, 3), INV)
+		testing.expect_value(t, big.int_shr_signed(d, x, 3), INV)
+		testing.expect_value(t, big.int_shl(d, x, 3), INV)
+		testing.expect_value(t, big.copy_digits(d, x, 1), INV)
+		fix_expect(t, d, "7")
+		fix_expect(t, r, "9")
+
+		_, err = big.int_log(x, 10)
+		testing.expect_value(t, err, INV)
+		_, err = big.int_is_zero(x)
+		testing.expect_value(t, err, INV)
+		_, err = big.int_is_positive(x)
+		testing.expect_value(t, err, INV)
+		_, err = big.int_is_negative(x)
+		testing.expect_value(t, err, INV)
+		_, err = big.int_is_even(x)
+		testing.expect_value(t, err, INV)
+		_, err = big.int_is_odd(x)
+		testing.expect_value(t, err, INV)
+		_, err = big.int_is_power_of_two(x)
+		testing.expect_value(t, err, INV)
+		_, err = big.int_is_square(x)
+		testing.expect_value(t, err, INV)
+		_, err = big.int_compare(x, y)
+		testing.expect_value(t, err, INV)
+		_, err = big.int_compare(y, x)
+		testing.expect_value(t, err, INV)
+		_, err = big.int_compare(x, x)
+		testing.expect_value(t, err, INV)
+		_, err = big.int_compare_digit(x, 1)
+		testing.expect_value(t, err, INV)
+		_, err = big.int_compare_magnitude(y, x)
+		testing.expect_value(t, err, INV)
+		_, err = big.int_less_than(x, y)
+		testing.expect_value(t, err, INV)
+		_, err = big.int_equals(y, x)
+		testing.expect_value(t, err, INV)
+		_, err = big.int_greater_than_digit(x, 0)
+		testing.expect_value(t, err, INV)
+		_, err = big.int_get(x, i64)
+		testing.expect_value(t, err, INV)
+		_, err = big.int_get_u128(x)
+		testing.expect_value(t, err, INV)
+		_, err = big.count_bits(x)
+		testing.expect_value(t, err, INV)
+		_, err = big.int_count_lsb(x)
+		testing.expect_value(t, err, INV)
+		_, err = big.int_bitfield_extract(x, 0, 1)
+		testing.expect_value(t, err, INV)
+		_, err = big.int_to_bytes_size(x)
+		testing.expect_value(t, err, INV)
+		testing.expect_value(t, big.int_to_bytes_big(x, buf[:]), INV)
+		testing.expect_value(t, big.int_to_bytes_little_python(x, buf[:], true), INV)
+
+		testing.expect_value(t, big.rat_set_frac_int(q, x, y), INV)
+		testing.expect_value(t, big.rat_set_frac_int(q, y, x), INV)
+		testing.expect_value(t, big.rat_add_int(q, p, x), INV)
+		testing.expect_value(t, big.rat_sub_int(q, p, x), INV)
+		testing.expect_value(t, big.rat_mul_int(q, p, x), INV)
+		testing.expect_value(t, big.rat_div_int(q, p, x), INV)
+		testing.expect_value(t, big.int_add_rat(q, x, p), INV)
+		testing.expect_value(t, big.int_sub_rat(q, x, p), INV)
+		testing.expect_value(t, big.int_mul_rat(q, x, p), INV)
+		testing.expect_value(t, big.int_div_rat(q, x, p), INV)
+		f, _, _ := big.rat_to_f64(q)
+		testing.expect_value(t, f, 5.0)
+	}
+}
+
+@(test)
+test_fix_non_finite_destination_cleared :: proc(t: ^testing.T) {
+	d, r, e, g, x, y, m := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
+	defer big.destroy(d, r, e, g, x, y, m)
+
+	fix_set(t, x, "-12345678901234567890123456789")
+	fix_set(t, y, "98765432109876543210")
+	fix_set(t, m, "999983")
+
+	for kind in 0..<3 {
+		fix_non_finite(d, kind)
+		big.zero(e)
+		fix_same(t, big.int_add(d, x, y), big.int_add(e, x, y), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_add_digit(d, x, 5), big.int_add_digit(e, x, 5), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_sub(d, x, y), big.int_sub(e, x, y), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_sub_digit(d, x, 5), big.int_sub_digit(e, x, 5), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_halve(d, x), big.int_halve(e, x), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_double(d, x), big.int_double(e, x), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_mul_digit(d, x, 3), big.int_mul_digit(e, x, 3), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_mul(d, x, y), big.int_mul(e, x, y), d, e)
+
+		fix_non_finite(d, kind)
+		fix_non_finite(r, kind)
+		err_d := big.int_divmod(d, r, x, y)
+		err_e := big.int_divmod(e, g, x, y)
+		fix_same(t, err_d, err_e, d, e)
+		fix_same(t, err_d, err_e, r, g)
+
+		fix_non_finite(d, kind)
+		_, err_d = big.int_divmod_digit(d, x, 7)
+		_, err_e = big.int_divmod_digit(e, x, 7)
+		fix_same(t, err_d, err_e, d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_div(d, x, y), big.int_div(e, x, y), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_div_digit(d, x, 7), big.int_div_digit(e, x, 7), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_mod(d, x, m), big.int_mod(e, x, m), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_addmod(d, x, y, m), big.int_addmod(e, x, y, m), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_submod(d, x, y, m), big.int_submod(e, x, y, m), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_mulmod(d, x, y, m), big.int_mulmod(e, x, y, m), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_sqrmod(d, x, m), big.int_sqrmod(e, x, m), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_factorial(d, 25), big.int_factorial(e, 25), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_choose_digit(d, 30, 7), big.int_choose_digit(e, 30, 7), d, e)
+
+		fix_non_finite(d, kind)
+		fix_non_finite(r, kind)
+		err_d = big.int_gcd_lcm(d, r, x, y)
+		err_e = big.int_gcd_lcm(e, g, x, y)
+		fix_same(t, err_d, err_e, d, e)
+		fix_same(t, err_d, err_e, r, g)
+
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_gcd(d, x, y), big.int_gcd(e, x, y), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_lcm(d, x, y), big.int_lcm(e, x, y), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_mod_bits(d, x, 70), big.int_mod_bits(e, x, 70), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_pow(d, x, 3), big.int_pow(e, x, 3), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_pow_int(d, 7, 30), big.int_pow_int(e, 7, 30), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_sqrt(d, y), big.int_sqrt(e, y), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_root_n(d, y, 3), big.int_root_n(e, y, 3), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_bit_and(d, x, y), big.int_bit_and(e, x, y), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_bit_or(d, x, y), big.int_bit_or(e, x, y), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_bit_xor(d, x, y), big.int_bit_xor(e, x, y), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_bit_complement(d, x), big.int_bit_complement(e, x), d, e)
+
+		fix_non_finite(d, kind)
+		fix_non_finite(r, kind)
+		err_d = big.int_shrmod(d, r, x, 70)
+		err_e = big.int_shrmod(e, g, x, 70)
+		fix_same(t, err_d, err_e, d, e)
+		fix_same(t, err_d, err_e, r, g)
+
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_shr(d, x, 70), big.int_shr(e, x, 70), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_shr_signed(d, x, 70), big.int_shr_signed(e, x, 70), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.int_shl(d, x, 70), big.int_shl(e, x, 70), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.permutations_with_repetition(d, 5, 30), big.permutations_with_repetition(e, 5, 30), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.permutations_without_repetition(d, 30, 7), big.permutations_without_repetition(e, 30, 7), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.combinations_with_repetition(d, 30, 7), big.combinations_with_repetition(e, 30, 7), d, e)
+		fix_non_finite(d, kind)
+		fix_same(t, big.combinations_without_repetition(d, 30, 7), big.combinations_without_repetition(e, 30, 7), d, e)
+		fix_non_finite(d, kind)
+		testing.expect_value(t, big.copy_digits(d, x, 1), nil)
+		testing.expect_value(t, d.flags, big.Flags{})
+		testing.expect_value(t, d.digit[0], x.digit[0])
+
+		fix_non_finite(d, kind)
+		d.flags += {.Immutable}
+		flags := d.flags
+		testing.expect_value(t, big.int_add(d, x, y), big.Error.Assignment_To_Immutable)
+		testing.expect_value(t, big.copy_digits(d, x, 1), big.Error.Assignment_To_Immutable)
+		testing.expect_value(t, big.int_random(d, 64), big.Error.Assignment_To_Immutable)
+		testing.expect_value(t, big.int_shrmod(d, r, x, 3), big.Error.Assignment_To_Immutable)
+		testing.expect_value(t, big.combinations_without_repetition(d, 30, 7), big.Error.Assignment_To_Immutable)
+		testing.expect_value(t, d.flags, flags)
+		d.flags -= {.Immutable}
+	}
+}
+
+@(test)
+test_fix_non_finite_propagates :: proc(t: ^testing.T) {
+	a, b := &big.Int{}, &big.Int{}
+	defer big.destroy(a, b)
+
+	big.nan(a)
+	testing.expect_value(t, big.int_copy(b, a), nil)
+	testing.expect_value(t, b.flags, big.Flags{.NaN})
+
+	big.minus_inf(a)
+	testing.expect_value(t, big.int_abs(b, a), nil)
+	testing.expect_value(t, b.flags, big.Flags{.Inf})
+	testing.expect_value(t, b.sign, big.Sign.Zero_or_Positive)
+
+	testing.expect_value(t, big.int_neg(b, b), nil)
+	testing.expect_value(t, b.flags, big.Flags{.Inf})
+	testing.expect_value(t, b.sign, big.Sign.Negative)
+
+	testing.expect_value(t, big.set(b, 5), nil)
+	testing.expect_value(t, b.flags, big.Flags{})
+	fix_expect(t, b, "5")
+}
+
+@(test)
+test_fix_get_float_non_finite :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	defer big.destroy(a)
+
+	big.nan(a)
+	f, err := big.int_get_float(a)
+	testing.expect_value(t, err, nil)
+	testing.expect(t, math.is_nan(f))
+
+	big.inf(a)
+	f, err = big.int_get_float(a)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, f, math.inf_f64(1))
+
+	big.minus_inf(a)
+	f, err = big.int_get_float(a)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, f, math.inf_f64(-1))
+}
+
+@(test)
+test_fix_itoa_non_finite :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	defer big.destroy(a)
+	buf: [8]u8
+
+	for radix in i8(2)..=23 {
+		big.nan(a)
+		s, err := big.int_itoa_string(a, radix, false, context.temp_allocator)
+		testing.expect_value(t, err, nil)
+		testing.expect_value(t, s, "NaN")
+
+		big.inf(a)
+		s, err = big.int_itoa_string(a, radix, false, context.temp_allocator)
+		testing.expect_value(t, err, nil)
+		testing.expect_value(t, s, "+Inf")
+
+		big.minus_inf(a)
+		s, err = big.int_itoa_string(a, radix, false, context.temp_allocator)
+		testing.expect_value(t, err, nil)
+		testing.expect_value(t, s, "-Inf")
+	}
+
+	for radix in i8(24)..=64 {
+		for kind in 0..<3 {
+			fix_non_finite(a, kind)
+			_, err := big.int_itoa_string(a, radix, false, context.temp_allocator)
+			testing.expect_value(t, err, big.Error.Invalid_Argument)
+			_, err = big.radix_size(a, radix)
+			testing.expect_value(t, err, big.Error.Invalid_Argument)
+			_, err = big.int_itoa_raw(a, radix, buf[:], len(buf))
+			testing.expect_value(t, err, big.Error.Invalid_Argument)
+		}
+	}
+
+	big.minus_inf(a)
+	size, err := big.radix_size(a, 10, true)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, size, 5)
+
+	written: int
+	written, err = big.int_itoa_raw(a, 10, buf[:], -1, true)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, written, 5)
+	testing.expect_value(t, string(buf[:written]), "-Inf\x00")
+
+	_, err = big.int_itoa_raw(a, 10, buf[:4], 4, true)
+	testing.expect_value(t, err, big.Error.Buffer_Overflow)
+	_, err = big.int_itoa_raw(a, 10, buf[:4], -1, true)
+	testing.expect_value(t, err, big.Error.Buffer_Overflow)
+
+	cs: cstring
+	cs, err = big.int_itoa_cstring(a, 10, context.temp_allocator)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, string(cs), "-Inf")
+
+	big.nan(a)
+	size, err = big.radix_size(a, 16)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, size, 3)
+
+	written, err = big.int_itoa_raw(a, 0, buf[:])
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, string(buf[:written]), "NaN")
+}
+
+@(test)
+test_fix_atoi_non_finite :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	defer big.destroy(a)
+	n: int
+
+	for radix in i8(2)..=23 {
+		testing.expect_value(t, big.int_atoi(a, "NaN", radix, &n), nil)
+		testing.expect_value(t, a.flags, big.Flags{.NaN})
+		testing.expect_value(t, n, 3)
+
+		testing.expect_value(t, big.int_atoi(a, "+Inf", radix, &n), nil)
+		testing.expect_value(t, a.flags, big.Flags{.Inf})
+		testing.expect_value(t, a.sign, big.Sign.Zero_or_Positive)
+		testing.expect_value(t, n, 4)
+
+		testing.expect_value(t, big.int_atoi(a, "-Inf", radix, &n), nil)
+		testing.expect_value(t, a.flags, big.Flags{.Inf})
+		testing.expect_value(t, a.sign, big.Sign.Negative)
+		testing.expect_value(t, n, 4)
+
+		for kind in 0..<3 {
+			fix_non_finite(a, kind)
+			s, err := big.int_itoa_string(a, radix, false, context.temp_allocator)
+			testing.expect_value(t, err, nil)
+			flags, sign := a.flags, a.sign
+			testing.expect_value(t, big.int_atoi(a, s, radix), nil)
+			testing.expect_value(t, a.flags, flags)
+			testing.expect_value(t, a.sign, sign)
+		}
+	}
+
+	testing.expect_value(t, big.int_atoi(a, "NaN \n", 10, &n), big.Error.Trailing_Whitespace)
+	testing.expect_value(t, a.flags, big.Flags{.NaN})
+	testing.expect_value(t, n, 3)
+
+	testing.expect_value(t, big.int_atoi(a, "+Infinity", 10, &n), big.Error.Invalid_Character)
+	testing.expect_value(t, a.flags, big.Flags{.Inf})
+	testing.expect_value(t, n, 4)
+
+	testing.expect_value(t, big.int_atoi(a, "nan", 10, &n), big.Error.Invalid_Character)
+	testing.expect_value(t, a.flags, big.Flags{})
+	testing.expect_value(t, n, 0)
+
+	testing.expect_value(t, big.int_atoi(a, "Inf", 10, &n), big.Error.Invalid_Character)
+	testing.expect_value(t, a.flags, big.Flags{})
+	testing.expect_value(t, n, 0)
+
+	testing.expect_value(t, big.int_atoi(a, "-inf", 10, &n), big.Error.Invalid_Character)
+	testing.expect_value(t, a.flags, big.Flags{})
+	testing.expect_value(t, n, 1)
+
+	testing.expect_value(t, big.int_atoi(a, "-Inf", 19, &n), nil)
+	testing.expect_value(t, a.flags, big.Flags{.Inf})
+	testing.expect_value(t, a.sign, big.Sign.Negative)
+
+	testing.expect_value(t, big.int_atoi(a, "NaN", 24, &n), nil)
+	testing.expect_value(t, a.flags, big.Flags{})
+	fix_expect(t, a, "13511")
+
+	testing.expect_value(t, big.int_atoi(a, "NaN", 36, &n), nil)
+	testing.expect_value(t, a.flags, big.Flags{})
+	fix_expect(t, a, "30191")
+
+	testing.expect_value(t, big.int_atoi(a, "-Inf", 36, &n), nil)
+	testing.expect_value(t, a.flags, big.Flags{})
+	fix_expect(t, a, "-24171")
+
+	testing.expect_value(t, big.int_atoi(a, "+Inf", 64, &n), nil)
+	testing.expect_value(t, a.flags, big.Flags{})
+	testing.expect_value(t, n, 4)
+	fix_expect(t, a, "16329833")
+}

@@ -208,6 +208,8 @@ ITOA_DIVISOR :: DIGIT(1_000_000_000_000_000_000)
 ITOA_COUNT   :: 18
 #assert(size_of(_WORD) == 2 * size_of(DIGIT))
 
+_MAX_NON_FINITE_RADIX :: 23
+
 _DIGIT_TYPE_BITS :: 8 * size_of(DIGIT)
 _WORD_TYPE_BITS  :: 8 * size_of(_WORD)
 
