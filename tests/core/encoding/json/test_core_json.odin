@@ -1089,3 +1089,46 @@ keys_checked_like_values :: proc(t: ^testing.T) {
 	}
 	free_all(context.temp_allocator)
 }
+
+@(test)
+unmarshal_integral_floats_wrap_like_integers :: proc(t: ^testing.T) {
+	Pair :: struct {
+		integer, float: string,
+	}
+	pairs := [?]Pair{
+		{"300",                  "300.0"},
+		{"-129",                 "-129.0"},
+		{"127",                  "127.0"},
+		{"0",                    "-0.0"},
+		{"-1",                   "-1e0"},
+		{"18446744073709551616", "18446744073709551616.0"},
+		{"9223372036854775808",  "9.223372036854775808e18"},
+	}
+	for pair in pairs {
+		ai, af: [1]i8
+		ei := json.unmarshal_string(fmt.tprintf("[%s]", pair.integer), &ai, allocator = context.temp_allocator)
+		ef := json.unmarshal_string(fmt.tprintf("[%s]", pair.float), &af, allocator = context.temp_allocator)
+		testing.expectf(t, ei == nil && ef == nil && ai == af, "i8: %s -> %v (%v), %s -> %v (%v)", pair.integer, ai, ei, pair.float, af, ef)
+
+		bi, bf: [1]u64
+		ei = json.unmarshal_string(fmt.tprintf("[%s]", pair.integer), &bi, allocator = context.temp_allocator)
+		ef = json.unmarshal_string(fmt.tprintf("[%s]", pair.float), &bf, allocator = context.temp_allocator)
+		testing.expectf(t, ei == nil && ef == nil && bi == bf, "u64: %s -> %v (%v), %s -> %v (%v)", pair.integer, bi, ei, pair.float, bf, ef)
+	}
+
+	limits: [2]i128
+	err := json.unmarshal_string("[-1.7014118346046923e38, 1.7014118346046921e38]", &limits, allocator = context.temp_allocator)
+	testing.expectf(t, err == nil && limits[0] == min(i128) && limits[1] == 170141183460469212842221372237303250944, "i128 limits: %v (%v)", limits, err)
+
+	for s in ([?]string{"[1.7014118346046923e38]", "[-1.7014118346046926e38]", "[1e300]", "[-1e300]", "[1e999]", "[-1e999]"}) {
+		v: [1]i128
+		err = json.unmarshal_string(s, &v, allocator = context.temp_allocator)
+		_, unsupported := err.(json.Unsupported_Type_Error)
+		testing.expectf(t, unsupported, "%s into [1]i128: expected Unsupported_Type_Error, got %v (%v)", s, v, err)
+		w: [1]i8
+		err = json.unmarshal_string(s, &w, allocator = context.temp_allocator)
+		_, unsupported = err.(json.Unsupported_Type_Error)
+		testing.expectf(t, unsupported, "%s into [1]i8: expected Unsupported_Type_Error, got %v (%v)", s, w, err)
+	}
+	free_all(context.temp_allocator)
+}

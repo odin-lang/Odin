@@ -226,12 +226,12 @@ IP_Address_Parsing_Test_Vectors :: []IP_Address_Parsing_Test_Vector{
 @(test)
 two_servers_binding_same_endpoint :: proc(t: ^testing.T) {
 	skt1, err1 := net.listen_tcp({address=net.IP4_Address{127, 0, 0, 1}, port=0})
-	defer net.close(skt1)
+	defer if err1 == nil { net.close(skt1) }
 
 	ep, perr := net.bound_endpoint(skt1)
 
 	skt2, err2 := net.listen_tcp(ep)
-	defer net.close(skt2)
+	defer if err2 == nil { net.close(skt2) }
 
 	testing.expect(t, err1 == nil, "expected first server binding to endpoint to do so without error")
 	testing.expect_value(t, perr, nil)
@@ -642,6 +642,58 @@ test_dns_resolve :: proc(t: ^testing.T) {
 	valid_ip6_b := net.IP6_Address{0x2620, 0xfe, 0, 0, 0, 0, 0, 0xfe}
 	if ip6 != valid_ip6_a && ip6 != valid_ip6_b {
 		log.errorf("DNS resolved to invalid IP6: %v, expected %v or %v", ip6, valid_ip6_a, valid_ip6_b)
+	}
+}
+
+@(private)
+DNS_VALID_A :: [?]u8{
+	0, 0, 0x81, 0x80, 0, 1, 0, 1, 0, 0, 0, 0,
+	0, 0, 1, 0, 1,
+	0, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4, 127, 0, 0, 2,
+}
+
+@(private)
+DNS_QUESTION_TRUNCATED :: [?]u8{
+	0, 0, 0x80, 0, 0, 1, 0, 1, 0, 0, 0, 0,
+	0,
+}
+
+@(private)
+DNS_ANSWER_TRUNCATED :: [?]u8{
+	0, 0, 0x81, 0x80, 0, 1, 0, 1, 0, 0, 0, 0,
+	0, 0, 1, 0, 1,
+	0, 0, 1, 0, 1, 0, 0, 0, 60, 0xff, 0xff, 127, 0, 0, 2,
+}
+
+@test
+test_dns_parse_response_bounds :: proc(t: ^testing.T) {
+	{
+		packet := DNS_VALID_A
+		records, _, ok := net.parse_response(packet[:], .IP4)
+		defer net.destroy_dns_records(records)
+		if testing.expect(t, ok) && testing.expect_value(t, len(records), 1) {
+			testing.expect_value(t, records[0].(net.DNS_Record_IP4).address, net.IP4_Address{127, 0, 0, 2})
+		}
+	}
+	{
+		packet := DNS_QUESTION_TRUNCATED
+		records, _, ok := net.parse_response(packet[:], .IP4)
+		testing.expect(t, !ok)
+		testing.expect_value(t, len(records), 0)
+	}
+	{
+		packet := DNS_ANSWER_TRUNCATED
+		records, _, ok := net.parse_response(packet[:], .IP4)
+		testing.expect(t, !ok)
+		testing.expect_value(t, len(records), 0)
+	}
+	{
+		packet := DNS_VALID_A
+		for off in ([]int{-1, len(packet) + 1}) {
+			cur_off := off
+			_, ok := net.parse_record(packet[:], &cur_off, .IP4)
+			testing.expect(t, !ok)
+		}
 	}
 }
 

@@ -1537,7 +1537,8 @@ Output:
 - The resulting string after writing the signed integer value
 */
 write_int :: proc(buf: []byte, i: i64, base: int) -> string {
-	return write_bits(buf, u64(i), base, true, 8*size_of(int), digits, nil)
+	// `i` is an `i64`, so use `64` instead of `8*size_of(int)`, which would only write the low 32 bits on 32-bit platforms.
+	return write_bits(buf, u64(i), base, true, 64, digits, nil)
 }
 
 

@@ -570,6 +570,11 @@ _truncate :: proc(f: ^File, size: i64) -> Error {
 _remove :: proc(name: string) -> Error {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	p := _fix_long_path(name, temp_allocator) or_return
+	return _remove_wstring(p)
+}
+
+// Takes an already converted UTF-16 path so remove_all can delete names that have no UTF-8 form.
+_remove_wstring :: proc(p: win32.wstring) -> Error {
 	err, err1: Error
 	if !win32.DeleteFileW(p) {
 		err = _get_platform_error()
@@ -584,24 +589,31 @@ _remove :: proc(name: string) -> Error {
 		return nil
 	}
 
-	if err != err1 {
-		a := win32.GetFileAttributesW(p)
-		if a == win32.INVALID_FILE_ATTRIBUTES {
+	a := win32.GetFileAttributesW(p)
+	if a == win32.INVALID_FILE_ATTRIBUTES {
+		if err != err1 {
 			err = _get_platform_error()
-		} else {
-			if a & win32.FILE_ATTRIBUTE_DIRECTORY != 0 {
-				err = err1
-			} else if a & win32.FILE_ATTRIBUTE_READONLY != 0 {
-				if win32.SetFileAttributesW(p, a &~ win32.FILE_ATTRIBUTE_READONLY) {
-					err = nil
-					if !win32.DeleteFileW(p) {
-						err = _get_platform_error()
-					}
-				}
-			}
+		}
+		return err
+	}
+	is_dir := a & win32.FILE_ATTRIBUTE_DIRECTORY != 0
+	if is_dir {
+		err = err1
+	}
+	if a & win32.FILE_ATTRIBUTE_READONLY == 0 || !win32.SetFileAttributesW(p, a &~ win32.FILE_ATTRIBUTE_READONLY) {
+		return err
+	}
+	if is_dir {
+		if win32.RemoveDirectoryW(p) {
+			return nil
+		}
+	} else {
+		if win32.DeleteFileW(p) {
+			return nil
 		}
 	}
-
+	err = _get_platform_error()
+	win32.SetFileAttributesW(p, a)
 	return err
 }
 
@@ -910,39 +922,6 @@ win32_utf8_to_utf16 :: proc(s: string, allocator: runtime.Allocator) -> (ws: []u
 		n -= 1
 	}
 	ws = text[:n]
-	return
-}
-
-// Used for `SHFILEOPSTRUCTW`, which requires double-null-terminated strings (`PCZZWSTR`).
-@(private="package", require_results)
-win32_utf8_to_pczzwstr :: proc(s: string, allocator: runtime.Allocator) -> (ws: win32.PCZZWSTR, err: Error) {
-	if len(s) < 1 {
-		// We still need to provide a double-null-terminated empty string.
-		t := make([]u16, 2, allocator) or_return
-		ws = cast(win32.PCZZWSTR)raw_data(t)
-		return
-	}
-
-	b := transmute([]byte)s
-	cstr := raw_data(b)
-	n := win32.MultiByteToWideChar(win32.CP_UTF8, win32.MB_ERR_INVALID_CHARS, cstr, i32(len(s)), nil, 0)
-	if n == 0 {
-		err = _get_platform_error()
-		return
-	}
-
-	text := make([]u16, n+2, allocator) or_return
-
-	n1 := win32.MultiByteToWideChar(win32.CP_UTF8, win32.MB_ERR_INVALID_CHARS, cstr, i32(len(s)), raw_data(text), n)
-	if n1 == 0 {
-		err = _get_platform_error()
-		delete(text, allocator)
-		return
-	}
-
-	text[n+1] = 0
-	text[n] = 0
-	ws = cast(win32.PCZZWSTR)raw_data(text)
 	return
 }
 

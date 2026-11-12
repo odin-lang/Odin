@@ -803,9 +803,7 @@ _mm_load_ps :: #force_inline proc "c" (mem_addr: ^f32) -> __m128 {
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_loadu_ps)
 @(require_results, enable_target_feature="sse")
 _mm_loadu_ps :: #force_inline proc "c" (mem_addr: ^f32) -> __m128 {
-	dst := _mm_undefined_ps()
-	intrinsics.mem_copy_non_overlapping(&dst, mem_addr, size_of(__m128))
-	return dst
+	return intrinsics.unaligned_load((^__m128)(mem_addr))
 }
 
 // Load 4 single-precision (32-bit) floating-point elements from memory into `dst` in reverse order.
@@ -862,8 +860,7 @@ _mm_store_ps :: #force_inline proc "c" (mem_addr: ^f32, a: __m128) {
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_storeu_ps)
 @(enable_target_feature="sse")
 _mm_storeu_ps :: #force_inline proc "c" (mem_addr: ^f32, a: __m128) {
-	b := a
-	intrinsics.mem_copy_non_overlapping(mem_addr, &b, size_of(__m128))
+	intrinsics.unaligned_store((^__m128)(mem_addr), a)
 }
 
 // Store 4 single-precision (32-bit) floating-point elements from `a` into memory in reverse order.

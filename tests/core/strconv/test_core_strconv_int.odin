@@ -285,3 +285,29 @@ test_write_bits_short_digits_panic :: proc(t: ^testing.T) {
 	testing.expect_assert(t, "10 is out of range 0..<10")
 	_ = strconv.write_bits(buf[:], 10, 16, false, 64, "0123456789", {})
 }
+
+@(test)
+test_write_int_i64 :: proc(t: ^testing.T) {
+	Case :: struct {
+		value: i64,
+		base:  int,
+		str:   string,
+	}
+	cases := [?]Case{
+		{min(i64),        10, "-9223372036854775808"},
+		{min(i64) + 1,    10, "-9223372036854775807"},
+		{max(i64),        10, "9223372036854775807"},
+		{max(i64) - 1,    10, "9223372036854775806"},
+		{1 << 32,         10, "4294967296"},
+		{-(1 << 31) - 1,  10, "-2147483649"},
+		{-1,              10, "-1"},
+		{min(i64),        16, "-8000000000000000"},
+		{max(i64),        2,  "111111111111111111111111111111111111111111111111111111111111111"},
+		{min(i64),        32, "-8000000000000"},
+	}
+	buf: [72]byte
+	for c in cases {
+		s := strconv.write_int(buf[:], c.value, c.base)
+		testing.expectf(t, s == c.str, "write_int(%v, %v) = %q, want %q", c.value, c.base, s, c.str)
+	}
+}

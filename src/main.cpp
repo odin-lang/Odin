@@ -4833,6 +4833,11 @@ int main(int arg_count, char const **arg_ptr) {
 		print_all_errors();
 	}
 
+	if (build_context.command_kind == Command_test && checker->info.testing_procedures.count == 0) {
+		gb_printf_err("Cannot test package; no procedures with @(test) attribute found.\n");
+		return 1;
+	}
+
 	if (build_context.show_defineables || build_context.export_defineables_file != "") {
 		TEMPORARY_ALLOCATOR_GUARD();
 		temp_alloc_defineable_strings(checker);

@@ -3622,3 +3622,37 @@ gb_internal bool lb_x86_features_need_evex512(String features) {
 	return false;
 #endif
 }
+
+gb_internal void lb_add_target_features_to_proc(lbModule *m, LLVMValueRef proc_value, String const &features) {
+	gbString feature_str = gb_string_make(temporary_allocator(), "");
+
+	char const *attr_name = "target-features";
+	LLVMAttributeRef existing = LLVMGetStringAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, attr_name, cast(unsigned)gb_strlen(attr_name));
+	if (existing != nullptr) {
+		unsigned existing_len = 0;
+		char const *existing_str = LLVMGetStringAttributeValue(existing, &existing_len);
+		feature_str = gb_string_append_length(feature_str, existing_str, existing_len);
+	} else {
+		feature_str = gb_string_append_length(feature_str, m->gen->target_features.text, m->gen->target_features.len);
+	}
+
+	String_Iterator it = {features, 0};
+	String str = {};
+	while (string_split_iterator_next(&it, ',', &str)) {
+		if (str.len == 0) {
+			continue;
+		}
+		if (gb_string_length(feature_str) > 0) {
+			feature_str = gb_string_appendc(feature_str, ",");
+		}
+		if (!(string_starts_with(str, '+') || string_starts_with(str, '-'))) {
+			feature_str = gb_string_appendc(feature_str, "+");
+		}
+		feature_str = gb_string_append_length(feature_str, str.text, str.len);
+	}
+	if (lb_x86_features_need_evex512(features)) {
+		feature_str = gb_string_appendc(feature_str, gb_string_length(feature_str) > 0 ? ",+evex512" : "+evex512");
+	}
+
+	lb_add_attribute_to_proc_with_string(m, proc_value, str_lit("target-features"), make_string(cast(u8 const *)feature_str, gb_string_length(feature_str)));
+}

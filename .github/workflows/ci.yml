@@ -13,7 +13,7 @@ jobs:
       timeout-minutes: 15
       uses: vmactions/netbsd-vm@v1
       with:
-        release: "10.0"
+        release: "11.0"
         envs: PKGSRC_BRANCH
         sync: scp
         usesh: true
@@ -39,7 +39,7 @@ jobs:
           ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:netbsd_amd64 -no-entry-point
           ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:netbsd_arm64 -no-entry-point
           ./odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:ODIN_TEST_LOG_STATE_CHANGES=true -microarch:native
-          ./odin test tests/core/speed.odin -file -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -o:speed -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:ODIN_TEST_LOG_STATE_CHANGES=true -microarch:native
+          ./odin test tests/core/speed.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -o:speed -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:ODIN_TEST_LOG_STATE_CHANGES=true -microarch:native
           ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:ODIN_TEST_LOG_STATE_CHANGES=true -microarch:native
           (cd tests/issues; ./run.sh)
           (cd tests/abi; ./run.sh)
@@ -500,7 +500,7 @@ jobs:
           sudo apt-get install libcurl4-openssl-dev libmbedtls-dev
 
       - name: Install riscv64 toolchain and qemu
-        run: sudo apt-get install -y qemu-user qemu-user-binfmt gcc-12-riscv64-linux-gnu libc6-riscv64-cross
+        run: sudo apt-get install -y qemu-user qemu-user-binfmt gcc-14-riscv64-linux-gnu libc6-riscv64-cross
 
       # Need to save all downloaded apt packages in "$RUNNER_TEMP/apt-cache/" so that actions/checkout@v7 will pick them up
       - name: Save apt package archives

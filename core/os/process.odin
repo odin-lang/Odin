@@ -487,7 +487,7 @@ process_exec :: proc(
 
 			if !stdout_done {
 				has_data, err = pipe_has_data(stdout_r)
-				if has_data {
+				if has_data || err == .Broken_Pipe {
 					n, err = read(stdout_r, buf[:])
 				}
 
@@ -503,7 +503,7 @@ process_exec :: proc(
 			if err == nil && !stderr_done {
 				n = 0
 				has_data, err = pipe_has_data(stderr_r)
-				if has_data {
+				if has_data || err == .Broken_Pipe {
 					n, err = read(stderr_r, buf[:])
 				}
 

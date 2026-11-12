@@ -375,6 +375,59 @@ bug_rat_mul_rat_square :: proc(t: ^testing.T) {
 }
 
 
+@(test)
+bug_int_random_previous_value :: proc(t: ^testing.T) {
+	a, r: big.Int
+	defer big.destroy(&a, &r)
+
+	// -(2^1000 - 1), then a smaller random value in the same `Int`.
+	big.set(&a, 1)
+	big.shl(&a, &a, 1000)
+	big.sub(&a, &a, 1)
+	big.neg(&a, &a)
+	big.int_random(&a, 100)
+
+	testing.expect_value(t, a.sign, big.Sign.Zero_or_Positive)
+
+	for i in a.used..<len(a.digit) {
+		testing.expectf(t, a.digit[i] == 0, "digit %d above `used` is %x", i, a.digit[i])
+	}
+
+	big.int_copy(&r, &a)
+	big.shl(&a, &a, 70)
+	big.shl(&r, &r, 70)
+	equal, _ := big.equals(&a, &r)
+	testing.expect(t, equal)
+}
+
+@(test)
+bug_set_stale_digits :: proc(t: ^testing.T) {
+	a: big.Int
+	defer big.destroy(&a)
+
+	// An unsigned zero, and the most negative `i64`, into an `Int` that held 1000 one bits.
+	big.set(&a, 1)
+	big.shl(&a, &a, 1000)
+	big.sub(&a, &a, 1)
+	big.set(&a, u64(0))
+
+	testing.expect_value(t, a.used, 0)
+	for i in a.used..<len(a.digit) {
+		testing.expectf(t, a.digit[i] == 0, "after set(u64(0)), digit %d above `used` is %x", i, a.digit[i])
+	}
+
+	big.set(&a, 1)
+	big.shl(&a, &a, 1000)
+	big.sub(&a, &a, 1)
+	big.set(&a, min(i64))
+
+	value, _ := big.get(&a, i64)
+	testing.expect_value(t, value, min(i64))
+	for i in a.used..<len(a.digit) {
+		testing.expectf(t, a.digit[i] == 0, "after set(min(i64)), digit %d above `used` is %x", i, a.digit[i])
+	}
+}
+
 // Test helpers
 
 expect_a :: proc(t: ^testing.T, format: string, a, expected, res: ^big.Int, err: big.Error, loc := #caller_location) {

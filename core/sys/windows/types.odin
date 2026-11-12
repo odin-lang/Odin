@@ -1738,15 +1738,28 @@ NM_TVSTATEIMAGECHANGING :: NM_OUTOFMEMORY-23 // uses NMTVSTATEIMAGECHANGING stru
 // Special care must be taken when converting to this type.
 PCZZWSTR :: cstring16
 
-SHFILEOPSTRUCTW :: struct {
-	hwnd:                  HWND,
-	wFunc:                 UINT,
-	pFrom:                 PCZZWSTR,
-	pTo:                   PCZZWSTR,
-	fFlags:                FILEOP_FLAGS,
-	fAnyOperationsAborted: BOOL,
-	hNameMappings:         LPVOID,
-	lpszProgressTitle:     PCWSTR, // only used if FOF_SIMPLEPROGRESS
+when ODIN_ARCH == .i386 {
+	SHFILEOPSTRUCTW :: struct #packed {
+		hwnd:                  HWND,
+		wFunc:                 UINT,
+		pFrom:                 PCZZWSTR,
+		pTo:                   PCZZWSTR,
+		fFlags:                FILEOP_FLAGS,
+		fAnyOperationsAborted: BOOL,
+		hNameMappings:         LPVOID,
+		lpszProgressTitle:     PCWSTR,
+	}
+} else {
+	SHFILEOPSTRUCTW :: struct {
+		hwnd:                  HWND,
+		wFunc:                 UINT,
+		pFrom:                 PCZZWSTR,
+		pTo:                   PCZZWSTR,
+		fFlags:                FILEOP_FLAGS,
+		fAnyOperationsAborted: BOOL,
+		hNameMappings:         LPVOID,
+		lpszProgressTitle:     PCWSTR, // only used if FOF_SIMPLEPROGRESS
+	}
 }
 LPSHFILEOPSTRUCTW :: ^SHFILEOPSTRUCTW
 
@@ -2669,6 +2682,10 @@ FSCTL_GET_REPARSE_POINT: DWORD : 0x900a8
 IO_REPARSE_TAG_SYMLINK: DWORD : 0xa000000c
 IO_REPARSE_TAG_MOUNT_POINT: DWORD : 0xa0000003
 SYMLINK_FLAG_RELATIVE: DWORD : 0x00000001
+
+IsReparseTagNameSurrogate :: #force_inline proc "contextless" (tag: DWORD) -> bool {
+	return tag & 0x20000000 != 0
+}
 FSCTL_SET_REPARSE_POINT: DWORD : 0x900a4
 
 SYMBOLIC_LINK_FLAG_DIRECTORY: DWORD : 0x1

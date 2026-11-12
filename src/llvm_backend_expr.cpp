@@ -1607,20 +1607,24 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 	return res;
 }
 
-// LLVM legalizes a 64-bit [su]div.fix into a 128-bit division with remainder, which has no
-// library call, so it is built here from 128-bit division, rounded down like LLVM's expansion.
-gb_internal LLVMValueRef lb_fixed_point_div_128(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs, LLVMValueRef scale, bool is_signed, bool is_sat) {
+// Fixed-point mul and div at twice the width, rather than LLVM's [su]{mul,div}.fix: those can't
+// lower a 128-bit division, give wrong saturated results on i386, and leave rounding and overflow
+// unspecified. Here every result rounds down and wraps, or clamps for the saturating forms.
+gb_internal LLVMValueRef lb_fixed_point_wide(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs, LLVMValueRef scale, bool is_signed, bool is_sat, bool is_div) {
 	LLVMBuilderRef b = p->builder;
 	LLVMTypeRef type = LLVMTypeOf(lhs);
-	unsigned bits = LLVMGetIntTypeWidth(type);
-	LLVMTypeRef wide = LLVMIntTypeInContext(p->module->ctx, 128);
+	LLVMTypeRef wide = LLVMIntTypeInContext(p->module->ctx, 2*LLVMGetIntTypeWidth(type));
 	LLVMValueRef zero = LLVMConstNull(wide);
+	LLVMValueRef shift = LLVMConstInt(wide, LLVMConstIntGetZExtValue(scale), false);
 
 	LLVMValueRef x = is_signed ? LLVMBuildSExt(b, lhs, wide, "") : LLVMBuildZExt(b, lhs, wide, "");
 	LLVMValueRef y = is_signed ? LLVMBuildSExt(b, rhs, wide, "") : LLVMBuildZExt(b, rhs, wide, "");
-	LLVMValueRef n = LLVMBuildShl(b, x, LLVMConstInt(wide, LLVMConstIntGetZExtValue(scale), false), "");
 	LLVMValueRef q = nullptr;
-	if (is_signed) {
+	if (!is_div) {
+		LLVMValueRef m = LLVMBuildMul(b, x, y, "");
+		q = is_signed ? LLVMBuildAShr(b, m, shift, "") : LLVMBuildLShr(b, m, shift, "");
+	} else if (is_signed) {
+		LLVMValueRef n = LLVMBuildShl(b, x, shift, "");
 		// the quotient truncates, one less when a remainder is left and the signs differ
 		q = LLVMBuildSDiv(b, n, y, "");
 		LLVMValueRef r = LLVMBuildSRem(b, n, y, "");
@@ -1629,25 +1633,26 @@ gb_internal LLVMValueRef lb_fixed_point_div_128(lbProcedure *p, LLVMValueRef lhs
 		LLVMValueRef down = LLVMBuildAnd(b, inexact, differ, "");
 		q = LLVMBuildSub(b, q, LLVMBuildZExt(b, down, wide, ""), "");
 	} else {
-		q = LLVMBuildUDiv(b, n, y, "");
+		q = LLVMBuildUDiv(b, LLVMBuildShl(b, x, shift, ""), y, "");
 	}
 
 	if (is_sat) {
+		LLVMValueRef ones = LLVMConstAllOnes(type);
 		if (is_signed) {
-			u64 max = (1ull << (bits-1)) - 1;
-			LLVMValueRef hi = LLVMConstInt(wide, max, false);
-			LLVMValueRef lo = LLVMConstInt(wide, ~max, true);
+			LLVMValueRef max = LLVMBuildLShr(b, ones, LLVMConstInt(type, 1, false), "");
+			LLVMValueRef hi = LLVMBuildSExt(b, max, wide, "");
+			LLVMValueRef lo = LLVMBuildSExt(b, LLVMBuildNot(b, max, ""), wide, "");
 			q = LLVMBuildSelect(b, LLVMBuildICmp(b, LLVMIntSGT, q, hi, ""), hi, q, "");
 			q = LLVMBuildSelect(b, LLVMBuildICmp(b, LLVMIntSLT, q, lo, ""), lo, q, "");
 		} else {
-			LLVMValueRef hi = LLVMConstInt(wide, bits == 64 ? ~0ull : (1ull << bits) - 1, false);
+			LLVMValueRef hi = LLVMBuildZExt(b, ones, wide, "");
 			q = LLVMBuildSelect(b, LLVMBuildICmp(b, LLVMIntUGT, q, hi, ""), hi, q, "");
 		}
 	}
 	return LLVMBuildTrunc(b, q, type, "");
 }
 
-gb_internal LLVMValueRef lb_integer_division_fixed_point_intrinsics(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs, LLVMValueRef scale, Type *platform_type, char const *name) {
+gb_internal LLVMValueRef lb_integer_division_fixed_point_intrinsics(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs, LLVMValueRef scale, Type *platform_type, bool is_sat) {
 	LLVMTypeRef type = LLVMTypeOf(rhs);
 	GB_ASSERT(LLVMTypeOf(lhs) == type);
 
@@ -1656,18 +1661,7 @@ gb_internal LLVMValueRef lb_integer_division_fixed_point_intrinsics(lbProcedure 
 	auto behaviour = lb_check_for_integer_division_by_zero_behaviour(p);
 
 	auto const do_op = [&]() -> LLVMValueRef {
-		if (type_size_of(platform_type) == 8) {
-			bool is_sat = string_ends_with(make_string_c(name), str_lit(".sat"));
-			return lb_fixed_point_div_128(p, lhs, rhs, scale, !is_type_unsigned(platform_type), is_sat);
-		}
-		LLVMTypeRef types[1] = {lb_type(p->module, platform_type)};
-
-		LLVMValueRef args[3] = {
-			lhs,
-			rhs,
-			scale };
-
-		return lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+		return lb_fixed_point_wide(p, lhs, rhs, scale, !is_type_unsigned(platform_type), is_sat, true);
 	};
 
 	if (LLVMIsConstant(rhs)) {

@@ -130,9 +130,13 @@ tag_time_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, v:
 	case .U8, .U16, .U32, .U64, .Neg_U8, .Neg_U16, .Neg_U32, .Neg_U64:
 		switch &dst in v {
 		case time.Time:
-			secs: i64
+			secs: i128
 			_unmarshal_any_ptr(d, &secs, hdr) or_return
-			dst = time.unix(i64(secs), 0)
+			nsecs := secs * 1e9
+			if nsecs < i128(min(i64)) || nsecs > i128(max(i64)) {
+				return .Bad_Tag_Value
+			}
+			dst = time.from_nanoseconds(i64(nsecs))
 			return
 		case:
 			return _unmarshal_value(d, v, hdr)
@@ -144,7 +148,14 @@ tag_time_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, _: Tag_Number, v:
 			f: f64
 			_unmarshal_any_ptr(d, &f, hdr) or_return
 			whole, fract := math.modf(f)
-			dst = time.unix(i64(whole), i64(fract * 1e9))
+			if !(abs(whole) < 1 << 64) {
+				return .Bad_Tag_Value
+			}
+			nsecs := i128(whole) * 1e9 + i128(fract * 1e9)
+			if nsecs < i128(min(i64)) || nsecs > i128(max(i64)) {
+				return .Bad_Tag_Value
+			}
+			dst = time.from_nanoseconds(i64(nsecs))
 			return
 		case:
 			return _unmarshal_value(d, v, hdr)

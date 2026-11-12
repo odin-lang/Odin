@@ -1600,6 +1600,13 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 					continue;
 				}
 
+				if (is_type_polymorphic(y.type)) {
+					gbString str = type_to_string(y.type);
+					error(type_expr, "Invalid use of a polymorphic type '%s' in a type switch case", str);
+					gb_string_free(str);
+					continue;
+				}
+
 				Type *seen_type = y.type;
 				if (switch_kind == TypeSwitch_Union) {
 					GB_ASSERT(is_type_union(bt));
@@ -2304,12 +2311,10 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 		if (init_type == nullptr) {
 			init_type = t_invalid;
 		} else if (is_type_polymorphic(base_type(init_type))) {
-			/* DISABLED: This error seems too aggressive for instantiated generic types.
 			gbString str = type_to_string(init_type);
 			error(vd->type, "Invalid use of a polymorphic type '%s' in variable declaration", str);
 			gb_string_free(str);
 			init_type = t_invalid;
-			*/
 		}
 		if (init_type == t_invalid && entity_count == 1 && (mod_flags & (Stmt_BreakAllowed|Stmt_FallthroughAllowed))) {
 			Entity *e = entities[0];

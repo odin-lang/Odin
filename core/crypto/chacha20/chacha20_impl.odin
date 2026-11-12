@@ -33,6 +33,11 @@ init_impl :: proc(ctx: ^Context, impl: Implementation) {
 
 @(private)
 stream_blocks :: proc(ctx: ^Context, dst, src: []byte, nr_blocks: int) {
+	// The implementations increment the counter as a 64-bit value.
+	// With the IETF flavor, the counter is 32 bits, and the increment
+	// after the final block carries into the first word of the IV.
+	iv_0 := ctx._state._s[13]
+
 	switch ctx._impl {
 	case .Simd256:
 		simd256.stream_blocks(&ctx._state, dst, src, nr_blocks)
@@ -40,6 +45,10 @@ stream_blocks :: proc(ctx: ^Context, dst, src: []byte, nr_blocks: int) {
 		simd128.stream_blocks(&ctx._state, dst, src, nr_blocks)
 	case .Portable:
 		ref.stream_blocks(&ctx._state, dst, src, nr_blocks)
+	}
+
+	if ctx._state._is_ietf_flavor {
+		ctx._state._s[13] = iv_0
 	}
 }
 

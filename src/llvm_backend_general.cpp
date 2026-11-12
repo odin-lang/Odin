@@ -2601,13 +2601,21 @@ gb_internal String lb_local_proc_name(lbModule *m, DeclInfo *decl) {
 		name = make_string(cast(u8 *)name_text, name_len-1);
 	} else {
 		// NOTE(bill): parent$anon-pkg:file:offset, named by position rather than a counter, as the order these are generated in varies
+		// A literal in a specialized polymorphic signature (e.g. a parameter's default) also gets that signature's type hash,
+		// as every specialization checks its own copy of it at the same position
 		TokenPos pos = ast_token(decl->proc_lit).pos;
 		AstFile *lit_file = decl->proc_lit->file();
 		String lit_pkg  = (lit_file && lit_file->pkg) ? lit_file->pkg->name : str_lit("");
 		String lit_name = lit_file ? filename_without_directory(lit_file->fullpath) : str_lit("");
-		isize name_len = prefix.len + lit_pkg.len + lit_name.len + 6 + 2 + 11 + 1;
+		isize name_len = prefix.len + lit_pkg.len + lit_name.len + 6 + 2 + 11 + 1 + 16 + 1;
 		char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
-		name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%.*s:%.*s:%d", LIT(prefix), LIT(lit_pkg), LIT(lit_name), pos.offset);
+		Type *signature = decl->proc->enclosing_signature;
+		if (signature != nullptr && signature->kind == Type_Proc && signature->Proc.is_poly_specialized) {
+			name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%.*s:%.*s:%d-%llx", LIT(prefix), LIT(lit_pkg), LIT(lit_name), pos.offset,
+			                       cast(unsigned long long)type_hash_canonical_type(signature));
+		} else {
+			name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%.*s:%.*s:%d", LIT(prefix), LIT(lit_pkg), LIT(lit_name), pos.offset);
+		}
 		name = make_string(cast(u8 *)name_text, name_len-1);
 	}
 

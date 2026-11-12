@@ -1061,6 +1061,15 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 			write_type_to_canonical_string(w, f->type);
 			type_writer_appendc(w, CANONICAL_BIT_FIELD_SEPARATOR);
 			type_writer_append_fmt(w, "%u", type->BitField.bit_sizes[i]);
+			String tag = {};
+			if (type->BitField.tags != nullptr) {
+				tag = type->BitField.tags[i];
+			}
+			if (tag.len != 0) {
+				String s = quote_to_ascii(heap_allocator(), tag);
+				type_writer_append(w, s.text, s.len);
+				gb_free(heap_allocator(), s.text);
+			}
 		}
 		type_writer_appendc(w, " }");
 		return;

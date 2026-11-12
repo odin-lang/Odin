@@ -37,6 +37,7 @@ test_chacha20 :: proc(t: ^testing.T) {
 
 	for impl in impls {
 		test_chacha20_stream(t, impl)
+		test_chacha20_final_block(t, impl)
 	}
 }
 
@@ -182,6 +183,175 @@ test_chacha20_stream :: proc(t: ^testing.T, impl: chacha20.Implementation) {
 		expected_digest_str,
 		digest_str,
 	)
+}
+
+test_chacha20_final_block :: proc(t: ^testing.T, impl: chacha20.Implementation) {
+	// RFC 8439 allows the block with the counter 2^32 - 1.  Expected
+	// values are for the all-zero key and IV, at the counters
+	// 2^32 - 2 and 2^32 - 1.
+	PENULTIMATE_BLOCK_STR :: "032cc123482c31711f94c941af5ab1f4155784332ed5348fe79aec5ead4c06c3f13c280d8cc49925e4a6a5922ec80e13a4cdfa840c70a1427a3cb699166991a5"
+	FINAL_BLOCK_STR :: "ace4cd09e294d1912d4ad205d06f95d9c2f2bfcf453e8753f128765b62215f4d92c74f2f626c6a640c0b1284d839ec81f1696281dafc3e684593937023b58b1d"
+
+	key: [chacha20.KEY_SIZE]byte
+	iv: [chacha20.IV_SIZE]byte
+	xiv: [chacha20.XIV_SIZE]byte
+	block_0: [64]byte
+	blocks, other_blocks: [128]byte
+
+	ctx: chacha20.Context = ---
+	chacha20.init(&ctx, key[:], iv[:], impl)
+	chacha20.keystream_bytes(&ctx, block_0[:])
+	block_0_str := string(hex.encode(block_0[:], context.temp_allocator))
+
+	chacha20.seek(&ctx, 0xffffffff)
+	chacha20.keystream_bytes(&ctx, blocks[:64])
+	blocks_str := string(hex.encode(blocks[:64], context.temp_allocator))
+	testing.expectf(
+		t,
+		blocks_str == FINAL_BLOCK_STR,
+		"chacha20/%v: Expected %s for the final block, but got %s instead",
+		impl,
+		FINAL_BLOCK_STR,
+		blocks_str,
+	)
+
+	chacha20.seek(&ctx, 0xfffffffe)
+	chacha20.keystream_bytes(&ctx, blocks[:])
+	blocks_str = string(hex.encode(blocks[:], context.temp_allocator))
+	testing.expectf(
+		t,
+		blocks_str == PENULTIMATE_BLOCK_STR + FINAL_BLOCK_STR,
+		"chacha20/%v: Expected %s for the last two blocks, but got %s instead",
+		impl,
+		PENULTIMATE_BLOCK_STR + FINAL_BLOCK_STR,
+		blocks_str,
+	)
+
+	// The same, with the final block taken from the buffered keystream.
+	mem.zero(&blocks, size_of(blocks))
+	chacha20.seek(&ctx, 0xfffffffe)
+	chacha20.keystream_bytes(&ctx, blocks[:100])
+	chacha20.keystream_bytes(&ctx, blocks[100:])
+	blocks_str = string(hex.encode(blocks[:], context.temp_allocator))
+	testing.expectf(
+		t,
+		blocks_str == PENULTIMATE_BLOCK_STR + FINAL_BLOCK_STR,
+		"chacha20/%v: Expected %s for the last two blocks (buffered), but got %s instead",
+		impl,
+		PENULTIMATE_BLOCK_STR + FINAL_BLOCK_STR,
+		blocks_str,
+	)
+
+	// After the final block, seeking back must give the keystream of
+	// the same IV.
+	chacha20.seek(&ctx, 0)
+	chacha20.keystream_bytes(&ctx, blocks[:64])
+	blocks_str = string(hex.encode(blocks[:64], context.temp_allocator))
+	testing.expectf(
+		t,
+		blocks_str == block_0_str,
+		"chacha20/%v: Expected %s for block 0 after the final block, but got %s instead",
+		impl,
+		block_0_str,
+		blocks_str,
+	)
+
+	// XChaCha20 has a 64-bit counter.  The last two blocks in one
+	// call must match the last two blocks taken one at a time.
+	chacha20.init(&ctx, key[:], xiv[:], impl)
+	chacha20.keystream_bytes(&ctx, block_0[:])
+	block_0_str = string(hex.encode(block_0[:], context.temp_allocator))
+
+	chacha20.seek(&ctx, max(u64) - 1)
+	chacha20.keystream_bytes(&ctx, other_blocks[:64])
+	chacha20.seek(&ctx, max(u64))
+	chacha20.keystream_bytes(&ctx, other_blocks[64:])
+	other_blocks_str := string(hex.encode(other_blocks[:], context.temp_allocator))
+
+	chacha20.seek(&ctx, max(u64) - 1)
+	chacha20.keystream_bytes(&ctx, blocks[:])
+	blocks_str = string(hex.encode(blocks[:], context.temp_allocator))
+	testing.expectf(
+		t,
+		blocks_str == other_blocks_str,
+		"xchacha20/%v: Expected %s for the last two blocks, but got %s instead",
+		impl,
+		other_blocks_str,
+		blocks_str,
+	)
+
+	chacha20.seek(&ctx, 0)
+	chacha20.keystream_bytes(&ctx, blocks[:64])
+	blocks_str = string(hex.encode(blocks[:64], context.temp_allocator))
+	testing.expectf(
+		t,
+		blocks_str == block_0_str,
+		"xchacha20/%v: Expected %s for block 0 after the final block, but got %s instead",
+		impl,
+		block_0_str,
+		blocks_str,
+	)
+}
+
+@(private)
+_ERR_CHACHA20_EXHAUSTED :: "crypto/chacha20: maximum (X)ChaCha20 keystream per IV reached"
+
+@(test)
+test_chacha20_refuse_after_final_block :: proc(t: ^testing.T) {
+	key: [chacha20.KEY_SIZE]byte
+	iv: [chacha20.IV_SIZE]byte
+	block: [64]byte
+
+	ctx: chacha20.Context
+	chacha20.init(&ctx, key[:], iv[:])
+	chacha20.seek(&ctx, 0xffffffff)
+	chacha20.keystream_bytes(&ctx, block[:])
+
+	testing.expect_assert(t, _ERR_CHACHA20_EXHAUSTED)
+	chacha20.keystream_bytes(&ctx, block[:1])
+}
+
+@(test)
+test_chacha20_refuse_past_final_block :: proc(t: ^testing.T) {
+	key: [chacha20.KEY_SIZE]byte
+	iv: [chacha20.IV_SIZE]byte
+	blocks: [192]byte
+
+	ctx: chacha20.Context
+	chacha20.init(&ctx, key[:], iv[:])
+	chacha20.seek(&ctx, 0xfffffffe)
+
+	testing.expect_assert(t, _ERR_CHACHA20_EXHAUSTED)
+	chacha20.keystream_bytes(&ctx, blocks[:])
+}
+
+@(test)
+test_xchacha20_refuse_after_final_block :: proc(t: ^testing.T) {
+	key: [chacha20.KEY_SIZE]byte
+	iv: [chacha20.XIV_SIZE]byte
+	block: [64]byte
+
+	ctx: chacha20.Context
+	chacha20.init(&ctx, key[:], iv[:])
+	chacha20.seek(&ctx, max(u64))
+	chacha20.keystream_bytes(&ctx, block[:])
+
+	testing.expect_assert(t, _ERR_CHACHA20_EXHAUSTED)
+	chacha20.keystream_bytes(&ctx, block[:1])
+}
+
+@(test)
+test_xchacha20_refuse_past_final_block :: proc(t: ^testing.T) {
+	key: [chacha20.KEY_SIZE]byte
+	iv: [chacha20.XIV_SIZE]byte
+	blocks: [192]byte
+
+	ctx: chacha20.Context
+	chacha20.init(&ctx, key[:], iv[:])
+	chacha20.seek(&ctx, max(u64) - 1)
+
+	testing.expect_assert(t, _ERR_CHACHA20_EXHAUSTED)
+	chacha20.keystream_bytes(&ctx, blocks[:])
 }
 
 @(test)

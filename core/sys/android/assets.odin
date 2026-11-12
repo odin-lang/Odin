@@ -137,7 +137,12 @@ asset_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 			return 0, .Invalid_Offset
 		}
 		defer AAsset_seek64(asset, current, SEEK_SET)
-		return read(asset, p)
+		for n < i64(len(p)) && err == nil {
+			nn: i64
+			nn, err = read(asset, p[n:])
+			n += nn
+		}
+		return
 	case .Seek:
 		w: c.int
 		switch whence {

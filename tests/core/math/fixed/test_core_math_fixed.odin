@@ -39,10 +39,7 @@ test_fixed_4_4_signed :: proc(t: ^testing.T) {
 		if c < 128 {
 			i := raw >> I_SHIFT
 			expected = f64(i) + F_ULP * f64(f)
-		} else if c == 128 {
-			expected = 8.0
-
-		} else if c > 128 {
+		} else {
 			i := i8(-8)
 			i += (raw & 0b0111_0000) >> I_SHIFT
 			expected = f64(i) + F_ULP * f64(f)
@@ -86,5 +83,79 @@ test_fixed_point_div_64 :: proc(t: ^testing.T) {
 			testing.expect_value(t, intrinsics.fixed_point_div(ux, uy, 32),     udiv(ux, uy, 32, false))
 			testing.expect_value(t, intrinsics.fixed_point_div_sat(ux, uy, 32), udiv(ux, uy, 32, true))
 		}
+	}
+}
+
+@test
+test_init_from_f64 :: proc(t: ^testing.T) {
+	Case :: struct($B: typeid) {
+		val: f64,
+		raw: B,
+		ok:  bool,
+	}
+	check :: proc(t: ^testing.T, $B: typeid, $W: uint, cases: []Case(B)) {
+		for c in cases {
+			x: fixed.Fixed(B, W)
+			ok := fixed.init_from_f64(&x, c.val)
+			testing.expectf(t, x.i == c.raw && ok == c.ok, "Fixed(%v, %v) from %v: expected %v (%v), got %v (%v)", typeid_of(B), W, c.val, c.raw, c.ok, x.i, ok)
+		}
+	}
+
+	INF :: 0h7ff0_0000_0000_0000
+	NAN :: 0h7ff8_0000_0000_0000
+
+	check(t, i8, 4, {
+		{0,       0,    true},
+		{1.5,     24,   true},
+		{-1.5,    -24,  true},
+		{1.99,    31,   true},
+		{-1.99,   -31,  true},
+		{0.03,    0,    true},
+		{7.9375,  127,  true},
+		{-8,      -128, true},
+		{8,       127,  false},
+		{-8.0625, -128, false},
+		{1000,    127,  false},
+		{-1e300,  -128, false},
+		{INF,     127,  false},
+		{-INF,    -128, false},
+		{NAN,     0,    false},
+	})
+	check(t, u8, 4, {
+		{15.9375, 255, true},
+		{-0.03,   0,   true},
+		{16,      255, false},
+		{-0.0625, 0,   false},
+		{NAN,     0,   false},
+	})
+	check(t, i64, 32, {
+		{2147483647.5, 0x7fff_ffff_8000_0000, true},
+		{-2147483648,  min(i64),              true},
+		{2147483648,   max(i64),              false},
+		{1e10,         max(i64),              false},
+	})
+	check(t, i128, 64, {
+		{-9223372036854775808, min(i128), true},
+		{9223372036854775808,  max(i128), false},
+	})
+	check(t, u128, 0, {
+		{170141183460469231731687303715884105728, 170141183460469231731687303715884105728, true},
+		{340282366920938463463374607431768211456, max(u128),                               false},
+	})
+	check(t, i32be, 16, {
+		{1.5,    98304,     true},
+		{-32769, min(i32be), false},
+	})
+
+	for c in 0..<256 {
+		x := transmute(fixed.Fixed(i8, 4))i8(c)
+		y: fixed.Fixed(i8, 4)
+		ok := fixed.init_from_f64(&y, fixed.to_f64(x))
+		testing.expectf(t, ok && x == y, "Fixed(i8, 4) round trip of %v: got %v (%v)", x.i, y.i, ok)
+
+		ux := transmute(fixed.Fixed(u8, 4))u8(c)
+		uy: fixed.Fixed(u8, 4)
+		ok = fixed.init_from_f64(&uy, fixed.to_f64(ux))
+		testing.expectf(t, ok && ux == uy, "Fixed(u8, 4) round trip of %v: got %v (%v)", ux.i, uy.i, ok)
 	}
 }
