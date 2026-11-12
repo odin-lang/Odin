@@ -114,6 +114,8 @@ round :: proc "contextless" (x: $T/Fixed($Backing, $Fraction_Width)) -> Backing 
 	}
 }
 
+// Writes `x` as a decimal number into `dst` and returns the written part of `dst` as a string.
+// Returns "" if `dst` isn't large enough to hold the result.
 @(require_results)
 write :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
 	when size_of(Backing) < 16 && Fraction_Width <= 60 {
@@ -158,6 +160,9 @@ write :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
 		}
 	}
 
+	if len(dst) < i {
+		return ""
+	}
 	copy(dst, buf[:i])
 	return string(dst[:i])
 }
