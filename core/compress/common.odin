@@ -126,6 +126,7 @@ Error :: union #shared_nil {
 	LZMA_Error,
 	PPMd_Error,
 	BCJ2_Error,
+	XZ_Error,
 	io.Error,
 	runtime.Allocator_Error,
 }
@@ -240,6 +241,24 @@ BCJ2_Error :: enum {
 	None = 0,
 	Corrupt_Data,
 	Size_Mismatch,
+}
+
+XZ_Error :: enum {
+	None = 0,
+	Invalid_Magic,
+	Header_Checksum_Failed,
+	Reserved_Bit_Set,
+	Unsupported_Filter,
+	Invalid_Filter_Chain,
+	Invalid_Block_Header,
+	Invalid_Padding,
+	Size_Mismatch,
+	Block_Checksum_Failed,
+	Invalid_Index,
+	Index_Mismatch,
+	Footer_Mismatch,
+	Data_After_End,
+	Input_Too_Large,
 }
 
 ZLIB_Error :: enum {

@@ -129,7 +129,7 @@ zip_method :: proc "contextless" (method: Method) -> (m: archive.Method) {
 
 method_supported :: proc "contextless" (method: Method) -> bool {
 	#partial switch method {
-	case .Store, .Shrink, .Reduce_1, .Reduce_2, .Reduce_3, .Reduce_4, .Implode, .Deflate, .Deflate64, .BZip2, .LZMA, .PPMd:
+	case .Store, .Shrink, .Reduce_1, .Reduce_2, .Reduce_3, .Reduce_4, .Implode, .Deflate, .Deflate64, .BZip2, .LZMA, .PPMd, .XZ:
 		return true
 	}
 	return false

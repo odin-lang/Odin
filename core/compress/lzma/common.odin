@@ -26,11 +26,17 @@ package compress_lzma
 		https://tukaani.org/xz/
 */
 
+import "base:runtime"
 import "core:compress"
 
 Error         :: compress.Error
 General_Error :: compress.General_Error
 LZMA_Error    :: compress.LZMA_Error
+
+LZMA2_Decoder :: struct {
+	probs:     []u16,
+	allocator: runtime.Allocator,
+}
 
 Properties :: struct {
 	lc:        u8,

@@ -5,8 +5,8 @@ Reading:
 - Opens archives from a path, a byte slice or a seekable `io.Stream`
 - Lists members through `core:archive`'s shared iterator, in storage order, and finds them by path
 - Extracts one or more files; extracting several reads the archive in one forward pass
-- Streams members through an `io.Reader`: Store, Deflate, Deflate64, bzip2 and PPMd decode as they are read, LZMA and the pkzip-legacy methods are decoded in one shot first
-- Supported compression methods: Store, Shrink, Reduce, Implode, Deflate, Deflate64, bzip2, LZMA and PPMd; XZ planned
+- Streams members through an `io.Reader`: Store, Deflate, Deflate64, bzip2 and PPMd decode as they are read, LZMA, XZ and the pkzip-legacy methods are decoded in one shot first
+- Supported compression methods: Store, Shrink, Reduce, Implode, Deflate, Deflate64, bzip2, LZMA, PPMd and XZ
 - Decrypts WinZip AES (AE-1 and AE-2, 128, 192 and 256-bit keys, MAC checked) and ZipCrypto members, given the password in `archive.Read_Options`
 - ZIP64, data descriptors and self-extracting archives
 - UTF-8, Info-ZIP Unicode and code page 437 names
@@ -28,7 +28,7 @@ Writing:
 
 Planned:
 - Split and spanned archives
-- Streaming extraction for LZMA and the pkzip-legacy methods
+- Streaming extraction for LZMA, XZ and the pkzip-legacy methods
 - Copy-on-write updates, safe alongside concurrent readers
 */
 package archive_zip

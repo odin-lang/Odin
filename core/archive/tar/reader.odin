@@ -7,6 +7,7 @@ import "core:compress/bzip2"
 import "core:compress/deflate"
 import "core:compress/lz4"
 import "core:compress/lzma"
+import "core:compress/xz"
 import "core:io"
 import "core:os"
 import "core:strings"
@@ -24,9 +25,6 @@ open_from_bytes :: proc(r: ^Reader, data: []u8, options := compress.Options{}, a
 	switch sniffed {
 	case .Unknown:
 		return archive.General_Error.Unknown_Format
-	case .XZ:
-		r.compression = .XZ
-		return archive.General_Error.Unsupported_Method
 	case .Plain:
 		r.compression = .Store
 		r.source      = .Memory
@@ -34,7 +32,7 @@ open_from_bytes :: proc(r: ^Reader, data: []u8, options := compress.Options{}, a
 	case .Gzip:
 		r.compression = .Deflate
 		_start_gzip(r) or_return
-	case .BZip2, .LZ4, .LZMA:
+	case .BZip2, .LZ4, .LZMA, .XZ:
 		_decode_whole(r, sniffed) or_return
 	}
 	return
@@ -75,9 +73,6 @@ open_from_stream :: proc(r: ^Reader, s: io.Stream, options := compress.Options{}
 	switch sniffed {
 	case .Unknown:
 		return archive.General_Error.Unknown_Format
-	case .XZ:
-		r.compression = .XZ
-		return archive.General_Error.Unsupported_Method
 	case .Plain:
 		r.compression = .Store
 		r.source      = .Stream
@@ -91,7 +86,7 @@ open_from_stream :: proc(r: ^Reader, s: io.Stream, options := compress.Options{}
 	case .Gzip:
 		r.compression = .Deflate
 		_start_gzip(r) or_return
-	case .BZip2, .LZ4, .LZMA:
+	case .BZip2, .LZ4, .LZMA, .XZ:
 		_decode_whole(r, sniffed) or_return
 	}
 	return
@@ -337,6 +332,9 @@ _decode_whole :: proc(r: ^Reader, sniffed: Sniffed) -> (err: Error) {
 		case .LZMA:
 			r.compression = .LZMA
 			decode_err = lzma.decompress_from_bytes(&r.decoded, r.input_data, -1, limit, r.allocator)
+		case .XZ:
+			r.compression = .XZ
+			decode_err = xz.decompress_from_bytes(&r.decoded, r.input_data, {}, -1, limit, r.allocator)
 		}
 	} else {
 		r.ctx = compress.init_context_from_stream(_prefix_stream(r), &r.decoded, -1, nil, r.allocator)
@@ -351,6 +349,9 @@ _decode_whole :: proc(r: ^Reader, sniffed: Sniffed) -> (err: Error) {
 		case .LZMA:
 			r.compression = .LZMA
 			decode_err = lzma.decompress_from_context(&r.ctx, -1, limit, r.allocator)
+		case .XZ:
+			r.compression = .XZ
+			decode_err = xz.decompress_from_context(&r.ctx, {}, -1, limit, r.allocator)
 		}
 	}
 	if decode_err != nil {

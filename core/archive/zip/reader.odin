@@ -8,6 +8,7 @@ import "core:compress/deflate"
 import "core:compress/lzma"
 import legacy "core:compress/pkzip-legacy"
 import "core:compress/ppmd"
+import "core:compress/xz"
 import "core:hash"
 import "core:io"
 import "core:os"
@@ -904,6 +905,8 @@ _decode :: proc(r: ^Reader, rec: ^Record, method: Method, flags: Flags, crc: May
 			return props_err
 		}
 		decode_err = lzma.decompress_raw_from_bytes(out, input[4 + props_size:], props, expected, limit, r.allocator)
+	case .XZ:
+		decode_err = xz.decompress_from_bytes(out, input, {}, expected, limit, r.allocator)
 	case:
 		return archive.General_Error.Unsupported_Method
 	}

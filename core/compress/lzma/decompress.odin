@@ -98,6 +98,51 @@ decompress_lzma2_from_context :: proc(z: ^compress.Context, dict_size: u32, expe
 	return decode_lzma2_body(&d, z, &o, expected)
 }
 
+lzma2_decoder_init :: proc(dec: ^LZMA2_Decoder, allocator := context.allocator) {
+	dec^ = {allocator = allocator}
+}
+
+lzma2_decoder_destroy :: proc(dec: ^LZMA2_Decoder) {
+	delete(dec.probs, dec.allocator)
+	dec^ = {}
+}
+
+decompress_lzma2_append :: proc(dec: ^LZMA2_Decoder, output: ^[dynamic]u8, input: []u8, dict_size: u32, expected_size := -1, max_output_size := compress.COMPRESS_OUTPUT_ALLOCATE_MAX) -> (consumed: int, err: Error) {
+	start := len(output)
+	if max_output_size < 0 || start > max_output_size {
+		return 0, General_Error.Output_Too_Short
+	}
+	if expected_size > max_output_size - start {
+		return 0, General_Error.Output_Too_Short
+	}
+	if dec.probs == nil {
+		dec.probs = make([]u16, NUM_BASE_PROBS + int(LITERAL_CODER_SIZE) << uint(LZMA2_LCLP_MAX), dec.allocator) or_return
+	}
+	d := Decoder{
+		probs     = dec.probs,
+		props     = Properties{lc = LZMA2_LCLP_MAX},
+		dict_size = max(dict_size, DICT_SIZE_MIN),
+	}
+
+	data := input
+	ctx  := compress.init_context_from_slice(&data, output=output)
+	o    := Output{buf = output, written = start, limit = max_output_size}
+	bound := -1
+	if len(input) < max(int) / compress.LZMA_EXPANSION_MAX {
+		bound = len(input) * compress.LZMA_EXPANSION_MAX
+	}
+	reserve := min(compress.output_reservation(expected_size, bound, len(input)), max_output_size - start)
+	if start + reserve > len(output) {
+		if non_zero_resize(output, start + reserve) != nil {
+			non_zero_resize(output, start)
+		}
+	}
+	size := start + expected_size if expected_size >= 0 else -1
+	err = decode_lzma2_body(&d, &ctx, &o, size)
+	non_zero_resize(output, o.written)
+	return len(input) - len(ctx.window), err
+}
+
 @(private)
 Decoder :: struct {
 	probs:      []u16,

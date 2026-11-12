@@ -66,8 +66,8 @@ CORPUS :: [?]Corpus_Case{
 	{"archives/7z-ppmd.zip",                         6,  0, 0},
 	{"archives/7z-store.zip",                        13, 0, 0},
 	{"archives/7z-utf8.zip",                         7,  0, 0},
-	{"archives/7z-xz-code.zip",                      2,  0, 2},
-	{"archives/7z-xz.zip",                           4,  0, 1},
+	{"archives/7z-xz-code.zip",                      2,  0, 0},
+	{"archives/7z-xz.zip",                           4,  0, 0},
 	{"archives/7z-zipcrypto.zip",                    6,  6, 0},
 	{"archives/ditto-utf8.zip",                      13, 0, 0},
 	{"archives/ditto.zip",                           12, 0, 0},
@@ -99,8 +99,8 @@ CORPUS :: [?]Corpus_Case{
 	{"archives/pkzip204-zipcrypto-store.zip",        5,  5, 0},
 	{"archives/powershell51.zip",                    11, 0, 0},
 	{"archives/pwsh7.zip",                           11, 0, 0},
-	{"archives/xz-bcj.zip",                          3,  0, 3},
-	{"archives/xz-sha256-multiblock.zip",            1,  0, 1},
+	{"archives/xz-bcj.zip",                          3,  0, 0},
+	{"archives/xz-sha256-multiblock.zip",            1,  0, 0},
 	{"pkzip-legacy.zip",                             40, 0, 0},
 	{"deflate.zip",                                  39, 0, 0},
 }
@@ -556,12 +556,6 @@ check_reader :: proc(t: ^testing.T, c: Corpus_Case, r: ^zip.Reader) {
 		}
 		data, extract_err := extract_to_bytes(&it, options)
 		defer delete(data)
-		switch {
-		case fi.method == .XZ:
-			unsupported += 1
-			testing.expectf(t, extract_err == archive.General_Error.Unsupported_Method && !fi.supported, "%s/%s: %v", c.name, fi.path, extract_err)
-			continue
-		}
 		if !testing.expectf(t, extract_err == nil && fi.supported, "%s/%s: %v", c.name, fi.path, extract_err) {
 			continue
 		}

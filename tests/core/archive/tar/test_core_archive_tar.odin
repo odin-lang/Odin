@@ -54,6 +54,7 @@ TREE_ARCHIVES :: [?]string{
 	"gnu-posix.tar",
 	"gnu-posix.tar.bz2",
 	"gnu-posix.tar.gz",
+	"gnu-posix.tar.xz",
 	"gnu-posix.tar.lzma",
 	"gnu-ustar.tar",
 	"gnu-v7.tar",
@@ -63,6 +64,7 @@ TREE_ARCHIVES :: [?]string{
 	"bsd-mac-v7.tar",
 	"bsd-mac.tar.bz2",
 	"bsd-mac.tar.gz",
+	"bsd-mac.tar.xz",
 	"bsd-win-default.tar",
 	"bsd-win-pax.tar",
 	"bsd-win-ustar.tar",
@@ -259,13 +261,6 @@ test_unsupported :: proc(t: ^testing.T) {
 		testing.expectf(t, it_err == nil, "%s: %v", name, it_err)
 		testing.expectf(t, sparse_seen, "%s: no unsupported sparse member", name)
 		tar.iterator_destroy(&it)
-		tar.close(&r)
-	}
-
-	for name in ([?]string{"gnu-posix.tar.xz", "bsd-mac.tar.xz"}) {
-		r: tar.Reader
-		err := tar.open(&r, asset(name))
-		testing.expectf(t, err == archive.General_Error.Unsupported_Method, "%s: %v", name, err)
 		tar.close(&r)
 	}
 }
