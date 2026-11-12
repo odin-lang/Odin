@@ -223,7 +223,7 @@ get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type
 			if recv_sz < size_of(id) {
 				continue
 			}
-			if src != name_server {
+			if src != name_server && !(is_multicast(name_server.address) && src.port == name_server.port) {
 				continue
 			}
 
