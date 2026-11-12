@@ -64,6 +64,7 @@ close_reader :: proc(r: ^Reader) {
 		delete(r.directory, r.allocator)
 	}
 	delete(r.records, r.allocator)
+	delete(r.order, r.allocator)
 	delete(r.names, r.allocator)
 	delete(r.index, r.allocator)
 	delete(r.raw_comment, r.allocator)
@@ -84,8 +85,9 @@ info :: proc(r: ^Reader) -> (info: archive.Archive_Info) {
 }
 
 iterator_create :: proc(r: ^Reader) -> (it: Iterator) {
-	it.reader = r
-	it.index  = -1
+	it.reader   = r
+	it.position = -1
+	it.index    = -1
 	it.local_buf.allocator = r.allocator
 	it.err_path.allocator  = r.allocator
 	return
@@ -104,12 +106,14 @@ iterate :: proc(it: ^Iterator) -> (fi: archive.File_Info, index: int, ok: bool) 
 		return {}, -1, false
 	}
 	_member_destroy(&it.member)
-	if it.index + 1 >= len(r.records) {
-		it.index = len(r.records)
-		it.entry = {}
+	if it.position + 1 >= len(r.order) {
+		it.position = len(r.order)
+		it.index    = len(r.records)
+		it.entry    = {}
 		return {}, -1, false
 	}
-	it.index += 1
+	it.position += 1
+	it.index     = r.order[it.position]
 	_entry(r, it.index, &it.entry, &it.local_buf)
 	return _info(r, it.index, &it.entry), it.index, true
 }
@@ -130,7 +134,8 @@ extract_current :: proc(it: ^Iterator, w: io.Writer) -> (err: Error) {
 	if !_has_current(it) {
 		return archive.General_Error.No_Current_Member
 	}
-	return _extract(it.reader, it.index, w)
+	data_offset := _current_data_offset(it) or_return
+	return _extract(it.reader, it.index, data_offset, w)
 }
 
 open_current :: proc(it: ^Iterator) -> (reader: io.Reader, err: Error) {
@@ -138,7 +143,8 @@ open_current :: proc(it: ^Iterator) -> (reader: io.Reader, err: Error) {
 		return {}, archive.General_Error.No_Current_Member
 	}
 	_member_destroy(&it.member)
-	_member_init(&it.member, it.reader, it.index, it.reader.allocator) or_return
+	data_offset := _current_data_offset(it) or_return
+	_member_init(&it.member, it.reader, it.index, data_offset, it.reader.allocator) or_return
 	return _member_stream(&it.member), nil
 }
 
@@ -163,7 +169,7 @@ find :: proc(r: ^Reader, path: string) -> (fi: archive.File_Info, handle: archiv
 	if lo >= len(r.index) || r.index[lo].path != want {
 		return {}, {}, false, nil
 	}
-	index := r.index[lo].index
+	index := r.order[r.index[lo].position]
 	entry: Entry
 	local_buf: [dynamic]u8
 	local_buf.allocator = r.allocator
@@ -175,13 +181,15 @@ find :: proc(r: ^Reader, path: string) -> (fi: archive.File_Info, handle: archiv
 
 extract :: proc(r: ^Reader, handle: archive.Handle, w: io.Writer) -> (err: Error) {
 	index := _handle_index(r, handle) or_return
-	return _extract(r, index, w)
+	_, _, data_offset := _local(r, &r.records[index], nil) or_return
+	return _extract(r, index, data_offset, w)
 }
 
 open_member :: proc(r: ^Reader, handle: archive.Handle, allocator := context.allocator) -> (reader: io.Reader, err: Error) {
 	index := _handle_index(r, handle) or_return
+	_, _, data_offset := _local(r, &r.records[index], nil) or_return
 	m := new(Member, allocator) or_return
-	if err = _member_init(m, r, index, allocator); err != nil {
+	if err = _member_init(m, r, index, data_offset, allocator); err != nil {
 		free(m, allocator)
 		return
 	}
@@ -224,6 +232,9 @@ _init :: proc(r: ^Reader, options: compress.Options, allocator: runtime.Allocato
 
 @(private)
 _load :: proc(r: ^Reader) -> (err: Error) {
+	if r.options.progress_interval < 0 {
+		return archive.General_Error.Incompatible_Options
+	}
 	end := _read_end(r) or_return
 	r.zip64 = end.zip64
 	central_start := end.central_offset + r.base
@@ -350,9 +361,11 @@ _parse_directory :: proc(r: ^Reader, end: Directory_End) -> (err: Error) {
 	records.allocator = r.allocator
 	names: [dynamic]u8
 	names.allocator = r.allocator
+	order: []int
 	defer if err != nil {
 		delete(records)
 		delete(names)
+		delete(order, r.allocator)
 	}
 	reserve(&records, int(min(end.entry_count, i64(len(r.directory) / size_of(Central_Header))))) or_return
 
@@ -395,26 +408,27 @@ _parse_directory :: proc(r: ^Reader, end: Directory_End) -> (err: Error) {
 	if count != end.entry_count && (end.zip64 || (count & 0xFFFF != end.entry_count && end.entry_count != 0xFFFF)) {
 		return Zip_Error.Invalid_Central_Directory
 	}
-	_member_ends(records[:], end, r.base, r.allocator) or_return
+	order = _member_ends(records[:], end, r.base, r.allocator) or_return
 
 	r.records = records[:]
+	r.order   = order
 	r.names   = names[:]
 	r.index   = make([]Name_Index, len(r.records), r.allocator) or_return
-	for &e, i in r.index {
-		rec := &r.records[i]
-		e = {archive.clean_member_path(string(r.names[rec.path:][:rec.path_length])), i}
+	for &e, position in r.index {
+		rec := &r.records[r.order[position]]
+		e = {archive.clean_member_path(string(r.names[rec.path:][:rec.path_length])), position}
 	}
 	slice.sort_by(r.index, proc(a, b: Name_Index) -> bool {
 		if a.path != b.path {
 			return a.path < b.path
 		}
-		return a.index < b.index
+		return a.position < b.position
 	})
 	return
 }
 
 @(private)
-_member_ends :: proc(records: []Record, end: Directory_End, base: i64, allocator: runtime.Allocator) -> (err: runtime.Allocator_Error) {
+_member_ends :: proc(records: []Record, end: Directory_End, base: i64, allocator: runtime.Allocator) -> (order: []int, err: runtime.Allocator_Error) {
 	spans := make([]Member_Span, len(records), allocator) or_return
 	defer delete(spans, allocator)
 	for &span, i in spans {
@@ -443,6 +457,10 @@ _member_ends :: proc(records: []Record, end: Directory_End, base: i64, allocator
 			boundary = span.offset
 		}
 		records[span.index].end = boundary
+	}
+	order = make([]int, len(spans), allocator) or_return
+	for span, k in spans {
+		order[k] = span.index
 	}
 	return
 }
@@ -485,6 +503,16 @@ _store_read :: proc(s: ^Store, p: []u8, offset: i64) -> (err: Error) {
 @(private)
 _has_current :: #force_inline proc "contextless" (it: ^Iterator) -> bool {
 	return it.reader != nil && it.index >= 0 && it.index < len(it.reader.records)
+}
+
+@(private)
+_current_data_offset :: proc(it: ^Iterator) -> (data_offset: i64, err: Error) {
+	if it.entry.has_local {
+		return it.entry.data_offset, nil
+	}
+	r := it.reader
+	_, _, data_offset = _local(r, &r.records[it.index], nil) or_return
+	return
 }
 
 @(private)
@@ -630,51 +658,49 @@ _declared_limit :: #force_inline proc "contextless" (r: ^Reader, rec: ^Record) -
 }
 
 @(private)
-_extract :: proc(r: ^Reader, index: int, w: io.Writer) -> (err: Error) {
+_extract :: proc(r: ^Reader, index: int, data_offset: i64, w: io.Writer) -> (err: Error) {
 	rec := &r.records[index]
 	header, _, _ := _central(r, index)
 	method := _check_supported(header) or_return
-	_, _, data_offset := _local(r, rec, nil) or_return
+	rp := _read_progress(r, index, data_offset)
 
 	#partial switch method {
-	case .Store, .Deflate, .Deflate64:
+	case .Store, .Deflate, .Deflate64, .BZip2, .PPMd:
 	case:
 		buffer: [dynamic]u8
 		buffer.allocator = r.allocator
 		defer delete(buffer)
 		_decode(r, rec, method, header.flags, u32(header.crc32), data_offset, &buffer) or_return
-		if _, write_err := io.write_full(w, buffer[:]); write_err != nil {
-			return write_err
-		}
-		return nil
+		return _write_out(&rp, w, buffer[:], rec.compressed_size)
 	}
 
 	cw := Check_Writer{w = w, limit = rec.size}
 	out := _check_writer(&cw)
 	if method == .Store {
-		if rec.compressed_size != rec.size {
-			return Zip_Error.Size_Mismatch
-		}
-		if r.options.max_output_size > 0 && rec.size > i64(r.options.max_output_size) {
-			return compress.Error(compress.General_Error.Output_Too_Short)
-		}
-		_copy(r, data_offset, rec.size, out) or_return
+		_store_check(r, rec) or_return
+		_copy(r, &rp, data_offset, rec.size, out) or_return
 	} else {
-		decode_err: compress.Error
-		section := Section{store = &r.store, offset = data_offset, end = data_offset + rec.compressed_size}
-		input: []u8
-		ctx:   compress.Context
-		if r.store.memory {
-			input = r.store.data[data_offset:][:rec.compressed_size]
-			ctx   = compress.init_context_from_slice(&input)
-		} else {
-			ctx = compress.init_context_from_stream(_section_stream(&section), nil, -1, nil, r.allocator)
+		props: ppmd.Properties
+		if method == .PPMd {
+			props   = _ppmd_properties(r, rec, data_offset) or_return
+			rp.head = ppmd.PROPERTIES_ZIP_SIZE
 		}
+		section := Section{store = &r.store, offset = data_offset + rp.head, end = data_offset + rec.compressed_size}
+		input: []u8
+		ctx := _section_context(r, &section, &input, r.allocator)
 		defer compress.destroy_context(&ctx)
-		if method == .Deflate {
-			decode_err = deflate.inflate_raw_to_writer(out, &ctx, _expected_size(rec.size), r.options, r.allocator)
-		} else {
-			decode_err = deflate.inflate64_raw_to_writer(out, &ctx, _expected_size(rec.size), r.options, r.allocator)
+		options  := _decode_options(r, &rp)
+		expected := _expected_size(rec.size)
+		decode_err: compress.Error
+		#partial switch method {
+		case .Deflate:
+			decode_err = deflate.inflate_raw_to_writer(out, &ctx, expected, options, r.allocator)
+		case .Deflate64:
+			decode_err = deflate.inflate64_raw_to_writer(out, &ctx, expected, options, r.allocator)
+		case .BZip2:
+			decode_err = bzip2.decompress_to_writer(out, &ctx, expected, options, r.allocator)
+		case .PPMd:
+			decode_err = ppmd.decompress_to_writer(out, &ctx, props, expected, options, r.allocator)
 		}
 		if decode_err != nil {
 			if cw.over || (_declared_limit(r, rec) && decode_err == compress.General_Error.Output_Too_Short) {
@@ -693,27 +719,135 @@ _extract :: proc(r: ^Reader, index: int, w: io.Writer) -> (err: Error) {
 }
 
 @(private)
-_copy :: proc(r: ^Reader, offset, count: i64, w: io.Writer) -> (err: Error) {
+_store_check :: proc(r: ^Reader, rec: ^Record) -> (err: Error) {
+	if rec.compressed_size != rec.size {
+		return Zip_Error.Size_Mismatch
+	}
+	if r.options.max_output_size > 0 && rec.size > i64(r.options.max_output_size) {
+		return compress.Error(compress.General_Error.Output_Too_Short)
+	}
+	return nil
+}
+
+@(private)
+_ppmd_properties :: proc(r: ^Reader, rec: ^Record, data_offset: i64) -> (props: ppmd.Properties, err: Error) {
+	if rec.compressed_size < ppmd.PROPERTIES_ZIP_SIZE {
+		return {}, Zip_Error.Truncated
+	}
+	head: [ppmd.PROPERTIES_ZIP_SIZE]u8
+	_store_read(&r.store, head[:], data_offset) or_return
+	decoded, props_err := ppmd.decode_properties_zip(head[:])
+	if props_err != nil {
+		return {}, props_err
+	}
+	return decoded, nil
+}
+
+@(private)
+_section_context :: proc(r: ^Reader, section: ^Section, input: ^[]u8, allocator: runtime.Allocator) -> (ctx: compress.Context) {
 	if r.store.memory {
-		if _, write_err := io.write_full(w, r.store.data[offset:][:count]); write_err != nil {
+		input^ = r.store.data[section.offset:section.end]
+		return compress.init_context_from_slice(input)
+	}
+	return compress.init_context_from_stream(_section_stream(section), nil, -1, nil, allocator)
+}
+
+@(private)
+_read_progress :: proc(r: ^Reader, index: int, data_offset: i64) -> (rp: Read_Progress) {
+	return {reader = r, index = index, data_offset = data_offset, next = i64(compress.progress_interval(r.options))}
+}
+
+@(private)
+_decode_options :: proc(r: ^Reader, rp: ^Read_Progress) -> (options: compress.Options) {
+	options = r.options
+	if options.progress != nil {
+		options.progress      = _codec_progress
+		options.progress_data = rp
+	}
+	return
+}
+
+@(private)
+_codec_progress :: proc(progress: compress.Progress, user_data: rawptr) -> (cancel: bool) {
+	rp := (^Read_Progress)(user_data)
+	return _member_progress(rp, rp.head + progress.bytes_in, progress.bytes_out) != nil
+}
+
+@(private)
+_member_progress :: proc(rp: ^Read_Progress, bytes_in, bytes_out: i64) -> (err: Error) {
+	r := rp.reader
+	options := r.options
+	if options.progress == nil {
+		return nil
+	}
+	rec := &r.records[rp.index]
+	if bytes_out < rp.next && (bytes_out != rec.size || rp.next == max(i64)) {
+		return nil
+	}
+	interval := i64(compress.progress_interval(options))
+	switch {
+	case bytes_out >= rec.size:
+		rp.next = max(i64)
+	case interval < max(i64) - bytes_out:
+		rp.next = bytes_out + interval
+	case:
+		rp.next = max(i64)
+	}
+	progress := compress.Progress{
+		bytes_in         = bytes_in,
+		bytes_out        = bytes_out,
+		total_in         = rec.compressed_size,
+		total_out        = rec.size,
+		member           = string(r.names[rec.path:][:rec.path_length]),
+		member_index     = rp.index,
+		member_count     = len(r.records),
+		archive_in       = rp.data_offset + bytes_in,
+		archive_total_in = r.store.size,
+	}
+	if options.progress(progress, options.progress_data) {
+		return compress.Error(compress.General_Error.Canceled)
+	}
+	return nil
+}
+
+@(private)
+_write_out :: proc(rp: ^Read_Progress, w: io.Writer, data: []u8, bytes_in: i64) -> (err: Error) {
+	options := rp.reader.options
+	step := len(data)
+	if options.progress != nil {
+		step = max(compress.progress_interval(options), 1)
+	}
+	done := 0
+	for done < len(data) {
+		n := min(len(data) - done, step)
+		if _, write_err := io.write_full(w, data[done:][:n]); write_err != nil {
 			return write_err
 		}
-		return nil
+		done += n
+		_member_progress(rp, bytes_in if bytes_in >= 0 else i64(done), i64(done)) or_return
+	}
+	return nil
+}
+
+@(private)
+_copy :: proc(r: ^Reader, rp: ^Read_Progress, offset, count: i64, w: io.Writer) -> (err: Error) {
+	if r.store.memory {
+		return _write_out(rp, w, r.store.data[offset:][:count], -1)
 	}
 	if count == 0 {
 		return nil
 	}
 	buf := make([]u8, int(min(count, COPY_CHUNK_SIZE)), r.allocator) or_return
 	defer delete(buf, r.allocator)
-	offset, count := offset, count
-	for count > 0 {
-		n := int(min(count, i64(len(buf))))
-		_store_read(&r.store, buf[:n], offset) or_return
+	done: i64
+	for done < count {
+		n := int(min(count - done, i64(len(buf))))
+		_store_read(&r.store, buf[:n], offset + done) or_return
 		if _, write_err := io.write_full(w, buf[:n]); write_err != nil {
 			return write_err
 		}
-		offset += i64(n)
-		count  -= i64(n)
+		done += i64(n)
+		_member_progress(rp, done, done) or_return
 	}
 	return nil
 }
@@ -740,8 +874,6 @@ _decode :: proc(r: ^Reader, rec: ^Record, method: Method, flags: Flags, crc: u32
 	if capped {
 		limit = int(max(rec.size, 1))
 	}
-	options := r.options
-	options.max_output_size = limit
 	decode_err: compress.Error
 	#partial switch method {
 	case .Shrink:
@@ -757,8 +889,6 @@ _decode :: proc(r: ^Reader, rec: ^Record, method: Method, flags: Flags, crc: u32
 			options += {.Literal_Tree}
 		}
 		decode_err = legacy.explode_from_bytes(out, input, options, expected, limit, r.allocator)
-	case .BZip2:
-		decode_err = bzip2.decompress_from_bytes(out, input, expected, options, r.allocator)
 	case .LZMA:
 		if len(input) < 4 {
 			return Zip_Error.Truncated
@@ -772,15 +902,6 @@ _decode :: proc(r: ^Reader, rec: ^Record, method: Method, flags: Flags, crc: u32
 			return props_err
 		}
 		decode_err = lzma.decompress_raw_from_bytes(out, input[4 + props_size:], props, expected, limit, r.allocator)
-	case .PPMd:
-		if len(input) < ppmd.PROPERTIES_ZIP_SIZE {
-			return Zip_Error.Truncated
-		}
-		props, props_err := ppmd.decode_properties_zip(input[:ppmd.PROPERTIES_ZIP_SIZE])
-		if props_err != nil {
-			return props_err
-		}
-		decode_err = ppmd.decompress_from_bytes(out, input[ppmd.PROPERTIES_ZIP_SIZE:], props, expected, options, r.allocator)
 	case:
 		return archive.General_Error.Unsupported_Method
 	}
@@ -810,8 +931,9 @@ _read_link :: proc(r: ^Reader, index: int, allocator: runtime.Allocator) -> (tar
 	if r.records[index].size > LINK_TARGET_MAX {
 		return "", Zip_Error.Field_Too_Long
 	}
+	_, _, data_offset := _local(r, &r.records[index], nil) or_return
 	b := strings.builder_make_len_cap(0, int(r.records[index].size), allocator) or_return
-	if err = _extract(r, index, strings.to_writer(&b)); err != nil {
+	if err = _extract(r, index, data_offset, strings.to_writer(&b)); err != nil {
 		strings.builder_destroy(&b)
 		return "", err
 	}
@@ -819,39 +941,53 @@ _read_link :: proc(r: ^Reader, index: int, allocator: runtime.Allocator) -> (tar
 }
 
 @(private)
-_member_init :: proc(m: ^Member, r: ^Reader, index: int, allocator: runtime.Allocator) -> (err: Error) {
+_member_init :: proc(m: ^Member, r: ^Reader, index: int, data_offset: i64, allocator: runtime.Allocator) -> (err: Error) {
 	m^ = {}
 	m.reader    = r
 	m.allocator = allocator
 	rec := &r.records[index]
 	header, _, _ := _central(r, index)
 	method := _check_supported(header) or_return
-	_, _, data_offset := _local(r, rec, nil) or_return
 	m.size     = rec.size
 	m.declared = _declared_limit(r, rec)
 	m.expected = u32(header.crc32)
-	m.section  = {store = &r.store, offset = data_offset, end = data_offset + rec.compressed_size}
+	m.progress = _read_progress(r, index, data_offset)
 
 	#partial switch method {
 	case .Store:
-		if rec.compressed_size != rec.size {
-			return Zip_Error.Size_Mismatch
+		_store_check(r, rec) or_return
+		m.mode    = .Store
+		m.section = {store = &r.store, offset = data_offset, end = data_offset + rec.compressed_size}
+	case .Deflate, .Deflate64, .BZip2, .PPMd:
+		props: ppmd.Properties
+		if method == .PPMd {
+			props           = _ppmd_properties(r, rec, data_offset) or_return
+			m.progress.head = ppmd.PROPERTIES_ZIP_SIZE
 		}
-		if r.options.max_output_size > 0 && rec.size > i64(r.options.max_output_size) {
-			return compress.Error(compress.General_Error.Output_Too_Short)
+		m.section = {store = &r.store, offset = data_offset + m.progress.head, end = data_offset + rec.compressed_size}
+		m.ctx     = _section_context(r, &m.section, &m.input, allocator)
+		options  := _decode_options(r, &m.progress)
+		expected := _expected_size(rec.size)
+		init_err: compress.Error
+		#partial switch method {
+		case .Deflate, .Deflate64:
+			m.mode = .Inflate
+			format := deflate.Inflate_Format.Raw64 if method == .Deflate64 else .Raw
+			if init_err = deflate.inflate_reader_init(&m.inflate, &m.ctx, format, expected, options, allocator); init_err != nil {
+				deflate.inflate_reader_destroy(&m.inflate)
+			}
+		case .BZip2:
+			m.mode = .BZip2
+			if init_err = bzip2.reader_init(&m.bzip2, &m.ctx, expected, options, allocator); init_err != nil {
+				bzip2.reader_destroy(&m.bzip2)
+			}
+		case .PPMd:
+			m.mode = .PPMd
+			if init_err = ppmd.reader_init(&m.ppmd, &m.ctx, props, expected, options, allocator); init_err != nil {
+				ppmd.reader_destroy(&m.ppmd)
+			}
 		}
-		m.mode = .Store
-	case .Deflate, .Deflate64:
-		m.mode = .Inflate
-		if r.store.memory {
-			m.input = r.store.data[data_offset:][:rec.compressed_size]
-			m.ctx   = compress.init_context_from_slice(&m.input)
-		} else {
-			m.ctx = compress.init_context_from_stream(_section_stream(&m.section), nil, -1, nil, allocator)
-		}
-		format := deflate.Inflate_Format.Raw64 if method == .Deflate64 else .Raw
-		if init_err := deflate.inflate_reader_init(&m.inflate, &m.ctx, format, _expected_size(rec.size), r.options, allocator); init_err != nil {
-			deflate.inflate_reader_destroy(&m.inflate)
+		if init_err != nil {
 			compress.destroy_context(&m.ctx)
 			return init_err
 		}
@@ -877,6 +1013,12 @@ _member_destroy :: proc(m: ^Member) {
 	case .Inflate:
 		deflate.inflate_reader_destroy(&m.inflate)
 		compress.destroy_context(&m.ctx)
+	case .BZip2:
+		bzip2.reader_destroy(&m.bzip2)
+		compress.destroy_context(&m.ctx)
+	case .PPMd:
+		ppmd.reader_destroy(&m.ppmd)
+		compress.destroy_context(&m.ctx)
 	case .Buffer:
 		delete(m.buffer)
 	}
@@ -895,6 +1037,7 @@ _member_read :: proc(m: ^Member, p: []u8) -> (n: int, err: Error) {
 		}
 		n = copy(p, m.buffer[m.pos:])
 		m.pos += n
+		m.err  = _member_progress(&m.progress, m.reader.records[m.progress.index].compressed_size, i64(m.pos))
 		return n, nil
 	case .Store:
 		remaining := m.section.end - m.section.offset
@@ -908,19 +1051,26 @@ _member_read :: proc(m: ^Member, p: []u8) -> (n: int, err: Error) {
 		}
 		m.section.offset += i64(want)
 		n = want
-	case .Inflate:
-		inflate_err: compress.Error
-		n, inflate_err = deflate.inflate_reader_read(&m.inflate, p)
-		if inflate_err != nil {
-			if io_err, is_io := inflate_err.(io.Error); is_io && io_err == .EOF {
+	case .Inflate, .BZip2, .PPMd:
+		codec_err: compress.Error
+		#partial switch m.mode {
+		case .Inflate:
+			n, codec_err = deflate.inflate_reader_read(&m.inflate, p)
+		case .BZip2:
+			n, codec_err = bzip2.reader_read(&m.bzip2, p)
+		case .PPMd:
+			n, codec_err = ppmd.reader_read(&m.ppmd, p)
+		}
+		if codec_err != nil {
+			if io_err, is_io := codec_err.(io.Error); is_io && io_err == .EOF {
 				return 0, _member_finish(m)
 			}
-			if m.declared && inflate_err == compress.General_Error.Output_Too_Short {
+			if m.declared && codec_err == compress.General_Error.Output_Too_Short {
 				m.err = Zip_Error.Size_Mismatch
 				return 0, m.err
 			}
-			m.err = inflate_err
-			return 0, inflate_err
+			m.err = codec_err
+			return 0, codec_err
 		}
 	}
 	m.crc       = hash.crc32(p[:n], m.crc)
@@ -928,6 +1078,9 @@ _member_read :: proc(m: ^Member, p: []u8) -> (n: int, err: Error) {
 	if m.produced > m.size {
 		m.err = Zip_Error.Size_Mismatch
 		return 0, m.err
+	}
+	if m.mode == .Store && n > 0 {
+		m.err = _member_progress(&m.progress, m.produced, m.produced)
 	}
 	return n, nil
 }

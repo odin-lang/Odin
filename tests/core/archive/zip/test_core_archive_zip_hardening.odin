@@ -341,11 +341,7 @@ test_declared_size_binding :: proc(t: ^testing.T) {
 			res := results[0]
 			testing.expectf(t, res.extract == Zip_Error.Size_Mismatch, "%v, declared %d: extract %v", method, declared, res.extract)
 			testing.expectf(t, res.written <= i64(declared), "%v, declared %d: wrote %d", method, declared, res.written)
-			if method == .BZip2 {
-				testing.expectf(t, res.open == Zip_Error.Size_Mismatch, "%v, declared %d: open %v", method, declared, res.open)
-			} else {
-				testing.expectf(t, res.open == nil && res.read != nil, "%v, declared %d: open %v, read %v", method, declared, res.open, res.read)
-			}
+			testing.expectf(t, res.open == nil && res.read != nil, "%v, declared %d: open %v, read %v", method, declared, res.open, res.read)
 		}
 	}
 }

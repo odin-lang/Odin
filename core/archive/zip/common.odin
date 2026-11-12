@@ -1,3 +1,5 @@
+// TODO-UPDATE-COMMENT: the progress callback is done for reading and writing; members now stream for Store, Deflate, Deflate64, bzip2 and PPMd, while LZMA and the pkzip-legacy methods still decode in one shot; iteration and multi-extract follow storage order
+// ---
 /*
 Reads and writes ZIP archives, as specified by [PKWARE's APPNOTE.TXT, version 6.3.10, November 2022](https://pkware.cachefly.net/webdocs/APPNOTE/APPNOTE-6.3.10.TXT).
 
@@ -272,8 +274,8 @@ Record :: struct {
 }
 
 Name_Index :: struct {
-	path:  string,
-	index: int,
+	path:     string,
+	position: int,
 }
 
 Member_Span :: struct {
@@ -296,6 +298,7 @@ Reader :: struct {
 	directory:   []u8,
 	owns_dir:    bool,
 	records:     []Record,
+	order:       []int,
 	names:       []u8,
 	index:       []Name_Index,
 	comment:     string,
@@ -309,7 +312,17 @@ Reader :: struct {
 Member_Mode :: enum u8 {
 	Store,
 	Inflate,
+	BZip2,
+	PPMd,
 	Buffer,
+}
+
+Read_Progress :: struct {
+	reader:      ^Reader,
+	index:       int,
+	head:        i64,
+	data_offset: i64,
+	next:        i64,
 }
 
 Section :: struct {
@@ -326,6 +339,9 @@ Member :: struct {
 	input:     []u8,
 	ctx:       compress.Context,
 	inflate:   deflate.Inflate_Reader,
+	bzip2:     bzip2.Reader,
+	ppmd:      ppmd.Reader,
+	progress:  Read_Progress,
 	buffer:    [dynamic]u8,
 	pos:       int,
 	size:      i64,
@@ -340,6 +356,7 @@ Member :: struct {
 
 Iterator :: struct {
 	reader:     ^Reader,
+	position:   int,
 	index:      int,
 	entry:      Entry,
 	local_buf:  [dynamic]u8,
