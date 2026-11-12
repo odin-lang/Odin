@@ -226,12 +226,12 @@ IP_Address_Parsing_Test_Vectors :: []IP_Address_Parsing_Test_Vector{
 @(test)
 two_servers_binding_same_endpoint :: proc(t: ^testing.T) {
 	skt1, err1 := net.listen_tcp({address=net.IP4_Address{127, 0, 0, 1}, port=0})
-	defer net.close(skt1)
+	defer if err1 == nil { net.close(skt1) }
 
 	ep, perr := net.bound_endpoint(skt1)
 
 	skt2, err2 := net.listen_tcp(ep)
-	defer net.close(skt2)
+	defer if err2 == nil { net.close(skt2) }
 
 	testing.expect(t, err1 == nil, "expected first server binding to endpoint to do so without error")
 	testing.expect_value(t, perr, nil)
