@@ -101,7 +101,11 @@ foreign lib {
 	// otherwise. after a flush_pushdata() call, this may take a while before
 	// it becomes valid again.
 	// NOT WORKING YET after a seek with PULLDATA API
-	get_sample_offset :: proc(f: ^vorbis) -> c.int ---
+	get_sample_offset   :: proc(f: ^vorbis) -> c.int ---
+	get_sample_offset64 :: proc(f: ^vorbis) -> i64 ---
+
+	get_playback_sample_offset   :: proc(f: ^vorbis) -> c.int ---
+	get_playback_sample_offset64 :: proc(f: ^vorbis) -> i64 ---
 
 	// returns the current seek point within the file, or offset from the beginning
 	// of the memory buffer. In pushdata mode it returns 0.
@@ -247,11 +251,15 @@ foreign lib {
 	seek_frame :: proc(f: ^vorbis, sample_number: c.uint) -> c.int ---
 	seek       :: proc(f: ^vorbis, sample_number: c.uint) -> c.int ---
 
+	seek_frame64 :: proc(f: ^vorbis, sample_number: i64) -> c.int ---
+	seek64       :: proc(f: ^vorbis, sample_number: i64) -> c.int ---
+
 	// this function is equivalent to stb_vorbis_seek(f,0)
 	seek_start :: proc(f: ^vorbis) -> c.int ---
 
 	// these functions return the total length of the vorbis stream
-	stream_length_in_samples :: proc(f: ^vorbis) -> c.uint ---
+	stream_length_in_samples   :: proc(f: ^vorbis) -> c.uint ---
+	stream_length_in_samples64 :: proc(f: ^vorbis) -> i64 ---
 	stream_length_in_seconds :: proc(f: ^vorbis) -> f32 ---
 
 	// decode the next frame and return the number of samples. the number of

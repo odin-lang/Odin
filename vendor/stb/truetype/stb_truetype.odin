@@ -296,6 +296,8 @@ foreign stbtt {
 	// 'pixels' tall. This is probably what traditional APIs compute, but
 	// I'm not positive.
 	ScaleForMappingEmToPixels :: proc(info: ^fontinfo, pixels: f32) -> f32 ---
+
+	ScaleForPixelWidth :: proc(info: ^fontinfo, pixels: f32) -> f32 ---
 	
 	// ascent is the coordinate above the baseline the font extends; descent
 	// is the coordinate below the baseline the font extends (i.e. it is typically negative)
@@ -304,6 +306,10 @@ foreign stbtt {
 	//   these are expressed in unscaled coordinates, so you must multiply by
 	//   the scale factor for a given size
 	GetFontVMetrics :: proc(info: ^fontinfo, ascent, descent, lineGap: ^c.int) ---
+
+	GetFontHMetrics :: proc(info: ^fontinfo, vertTypoAscender, vertTypoDescender, vertTypoLineGap: ^c.int) ---
+
+	GetFontUnderlineMetrics :: proc(info: ^fontinfo, position, thickness: ^c.int) -> b32 ---
 	
 	// analogous to GetFontVMetrics, but returns the "typographic" values from the OS/2
 	// table (specific to MS/Windows TTF files).
@@ -318,6 +324,7 @@ foreign stbtt {
 	// advanceWidth is the offset from the current horizontal position to the next horizontal position
 	//   these are expressed in unscaled coordinates
 	GetCodepointHMetrics :: proc(info: ^fontinfo, codepoint: rune, advanceWidth, leftSideBearing: ^c.int) ---
+	GetCodepointVMetrics :: proc(info: ^fontinfo, codepoint: rune, advanceHeight, topSideBearing: ^c.int) ---
 	
 	// an additional amount to add to the 'advance' value between ch1 and ch2
 	GetCodepointKernAdvance :: proc(info: ^fontinfo, ch1, ch2: rune) -> (advance: c.int) ---
@@ -327,6 +334,7 @@ foreign stbtt {
 	
 	// as above, but takes one or more glyph indices for greater efficiency
 	GetGlyphHMetrics    :: proc(info: ^fontinfo, glyph_index: c.int, advanceWidth, leftSideBearing: ^c.int) ---
+	GetGlyphVMetrics    :: proc(info: ^fontinfo, glyph_index: c.int, advanceHeight, topSideBearing: ^c.int) ---
 	GetGlyphKernAdvance :: proc(info: ^fontinfo, glyph1, glyph2: c.int) -> c.int ---
 	GetGlyphBox         :: proc(info: ^fontinfo, glyph_index: c.int, x0, y0, x1, y1: ^c.int) -> c.int ---
 }
@@ -581,6 +589,8 @@ foreign stbtt {
 	//     http://developer.apple.com/textfonts/TTRefMan/RM06/Chap6name.html
 	//     http://www.microsoft.com/typography/otspec/name.htm
 	GetFontNameString :: proc(font: ^fontinfo, length: ^c.int, platformID: PLATFORM_ID, encodingID, languageID, nameID: c.int) -> cstring ---
+
+	GetFontNameDefault :: proc(font: ^fontinfo, output_buffer: [^]byte, output_buffer_len: c.size_t) -> c.int ---
 }
 
 
