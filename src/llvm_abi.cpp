@@ -1845,11 +1845,40 @@ namespace lbAbiArm64 {
 		}
 	}
     
+	// NOTE: Windows on arm64 passes every argument of a variadic procedure, named or not, by a separate set of
+	// rules: composites are never homogeneous aggregates, those of up to 16 bytes are passed as integers in
+	// general purpose registers or on the stack, and larger ones are passed by reference. LLVM moves floats
+	// to general purpose registers itself.
+	// https://learn.microsoft.com/en-us/cpp/build/arm64-windows-abi-conventions#addendum-variadic-functions
+	//
+	// No SIMD register is used either, but LLVM would put a vector in one, so vectors (MSVC's `__n64` and
+	// `__n128` are unions) are passed as composites.
+	gb_internal bool is_windows_variadic_register(LLVMTypeRef type) {
+		return is_register(type) && LLVMGetTypeKind(type) != LLVMVectorTypeKind;
+	}
+
+	gb_internal lbArgType windows_variadic_composite(LLVMContextRef c, LLVMTypeRef type, Type *ptype) {
+		i64 size = type_size_of(ptype);
+		if (size > 16) {
+			return lb_arg_type_indirect(type, nullptr);
+		}
+		if (size == 0) {
+			return lb_arg_type_direct(type, LLVMStructTypeInContext(c, nullptr, 0, false), nullptr, nullptr);
+		}
+		// Like clang, a 16 byte aligned composite is passed as an `i128`, so it starts in an even register.
+		i64 unit  = type_align_of(ptype) >= 16 ? 16 : 8;
+		i64 count = align_formula(size, unit) / unit;
+		LLVMTypeRef unit_type = LLVMIntTypeInContext(c, cast(unsigned)(unit*8));
+		LLVMTypeRef cast_type = count == 1 ? unit_type : llvm_array_type(unit_type, cast(unsigned)count);
+		return lb_arg_type_direct(type, cast_type, nullptr, nullptr);
+	}
+
 	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type* original_type) {
 		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 
 		GB_ASSERT(original_type->kind == Type_Proc);
 		auto const &params = original_type->Proc.params->Tuple.variables;
+		bool windows_variadic = build_context.metrics.os == TargetOs_windows && original_type->Proc.c_vararg;
 
 		for (unsigned i = 0, j = 0; i < arg_count; i++, j++) {
 			while (params[j]->kind != Entity_Variable) {
@@ -1867,7 +1896,9 @@ namespace lbAbiArm64 {
 			LLVMTypeRef src_base_type = nullptr;
 			unsigned src_member_count = 0;
 
-			if (is_register(type)) {
+			if (windows_variadic && !is_windows_variadic_register(type)) {
+				args[i] = windows_variadic_composite(c, type, ptype);
+			} else if (is_register(type)) {
 				args[i] = non_struct(c, type, ptype);
 			} else if (is_homogenous_aggregate(c, type, &homo_base_type, &homo_member_count) &&
 			           is_homogenous_aggregate_small_enough(homo_base_type, homo_member_count)) {

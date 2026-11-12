@@ -1356,6 +1356,21 @@ gb_internal lbValue lb_emit_conjugate(lbProcedure *p, lbValue val, Type *type) {
 	return lb_emit_load(p, res);
 }
 
+// The variadic part of a call has no lbFunctionType, so its composites are coerced here, see
+// `lbAbiArm64::windows_variadic_composite`.
+gb_internal lbValue lb_emit_windows_arm64_variadic_arg(lbProcedure *p, lbValue x) {
+	LLVMTypeRef type = lb_type(p->module, x.type);
+	if (lbAbiArm64::is_windows_variadic_register(type)) {
+		return x;
+	}
+	lbArgType arg = lbAbiArm64::windows_variadic_composite(p->module->ctx, type, x.type);
+	if (arg.kind == lbArg_Indirect) {
+		return lb_copy_value_to_ptr(p, x, x.type, gb_max(type_align_of(x.type), 8));
+	}
+	x.value = OdinLLVMBuildTransmute(p, x.value, arg.cast_type);
+	return x;
+}
+
 gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining, ProcTailing tailing, lbValue *sret_dst) {
 	lbModule *m = p->module;
 
@@ -1464,8 +1479,13 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 		}
 
 		if (is_c_vararg) {
+			bool windows_arm64 = build_context.metrics.os == TargetOs_windows && build_context.metrics.arch == TargetArch_arm64;
 			for (isize i = processed_args.count; i < args.count; i++) {
-				array_add(&processed_args, args[i]);
+				lbValue arg = args[i];
+				if (windows_arm64) {
+					arg = lb_emit_windows_arm64_variadic_arg(p, arg);
+				}
+				array_add(&processed_args, arg);
 			}
 		}
 
@@ -3217,6 +3237,37 @@ gb_internal lbValue lb_emit_aapcs64_va_arg(lbProcedure *p, lbValue list, Type *t
 		arg_ptr = lb_emit_conv(p, lb_emit_load(p, indirect_ptr), arg_ptr.type);
 	}
 	return lb_emit_load(p, arg_ptr);
+}
+
+// The Windows arm64 va_list is a `char *` walked in 8 byte slots, and composites over 16 bytes are passed
+// as a pointer to a copy, which LLVM's va_arg instruction knows nothing of.
+//
+// NOTE: A 16 byte aligned value starts at a 16 byte aligned slot, as that is where LLVM's (and so clang's)
+// callers put it, following the "imaginary stack" of the Windows arm64 variadic rules. clang's own `va_arg`
+// does not align it (see `EmitMSVAArg`), so clang cannot receive such a value from itself.
+gb_internal lbValue lb_emit_windows_arm64_va_arg(lbProcedure *p, lbValue list, Type *type) {
+	lbModule *m = p->module;
+	i64 size = type_size_of(type);
+	bool is_indirect = size > 16; // see `lbAbiArm64::windows_variadic_composite`
+	i64 slot_size = is_indirect ? 8 : align_formula(size, 8);
+
+	lbValue ap_ptr = lb_emit_conv(p, list, alloc_type_pointer(t_uintptr));
+	lbValue ap = lb_emit_load(p, ap_ptr);
+	// NOTE: A zero sized value is passed as nothing, so it must not move the slot either.
+	if (!is_indirect && size > 0 && type_align_of(type) >= 16) {
+		ap = lb_emit_arith(p, Token_Add, ap, lb_const_int(m, t_uintptr, 15), t_uintptr);
+		ap = lb_emit_arith(p, Token_And, ap, lb_const_int(m, t_uintptr, cast(u64)-16), t_uintptr);
+	}
+	lbValue next_ap = lb_emit_arith(p, Token_Add, ap, lb_const_int(m, t_uintptr, slot_size), t_uintptr);
+	lb_emit_store(p, ap_ptr, next_ap);
+
+	if (is_indirect) {
+		lbValue copy_ptr = lb_emit_load(p, lb_emit_conv(p, ap, alloc_type_pointer(t_rawptr)));
+		return lb_emit_load(p, lb_emit_conv(p, copy_ptr, alloc_type_pointer(type)));
+	}
+
+	// NOTE: The slot is aligned to the value, as anything aligned to over 16 bytes is over 16 bytes in size.
+	return lb_emit_load(p, lb_emit_conv(p, ap, alloc_type_pointer(type)));
 }
 
 gb_internal lbValue lb_emit_i386_va_arg(lbProcedure *p, lbValue list, Type *type) {
@@ -4984,6 +5035,8 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				value = lb_emit_aapcs64_va_arg(p, ptr, promoted);
 			} else if (build_context.metrics.arch == TargetArch_i386) {
 				value = lb_emit_i386_va_arg(p, ptr, promoted);
+			} else if (build_context.metrics.os == TargetOs_windows && build_context.metrics.arch == TargetArch_arm64) {
+				value = lb_emit_windows_arm64_va_arg(p, ptr, promoted);
 			} else if (is_win64 && LLVMGetTypeKind(llvm_type) == LLVMIntegerTypeKind && LLVMGetIntTypeWidth(llvm_type) < 64) {
 				LLVMValueRef slot = LLVMBuildVAArg(p->builder, ptr.value, lb_type(p->module, t_u64), "");
 				value.value = LLVMBuildTrunc(p->builder, slot, llvm_type, "");
