@@ -12,8 +12,10 @@ import "core:math"
 /*
 	Public procs return `.Invalid_Argument` for NaN and +/-Inf operands, and clear `.NaN` and `.Inf` on their destinations.
 	Procs that only move or store an `Int` keep them: `copy`, `set` from an `Int`, `swap`, `abs`, `neg`, `shrink`, `grow` and `rat_set_int`.
+	`inf`, `minus_inf` and `nan` set them, and so does `atoi` for "+Inf", "-Inf" and "NaN" in radix 2..=23.
 	`get_float` returns NaN or +/-Inf, and `itoa` writes "NaN", "+Inf" or "-Inf" in radix 2..=23.
-	`internal_*` procs don't check for them.
+	`is_initialized`, `destroy`, `clamp`, `zero_unused`, `clear_if_uninitialized`, `error_if_immutable` and `assert_initialized` don't reject them.
+	`internal_*` procs on `Int`s don't check for them, except `internal_error_if_non_finite`.
 */
 
 /*

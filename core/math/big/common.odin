@@ -45,7 +45,7 @@ FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS :: #config(MATH_BIG_FACTORIAL_BINARY_SPLIT
 /*
 	`internal_int_is_prime` switchables.
 
-	Use Frobenius-Underwood for primality testing, or use Lucas-Selfridge (default).
+	Use Frobenius-Underwood for primality testing (default), or Lucas-Selfridge with `-define:MATH_BIG_USE_LUCAS_SELFRIDGE_TEST=true`.
 */
 MATH_BIG_USE_LUCAS_SELFRIDGE_TEST :: #config(MATH_BIG_USE_LUCAS_SELFRIDGE_TEST, false)
 MATH_BIG_USE_FROBENIUS_TEST       :: !MATH_BIG_USE_LUCAS_SELFRIDGE_TEST

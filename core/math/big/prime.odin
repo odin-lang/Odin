@@ -499,7 +499,8 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 }
 
 /*
- * floor of positive solution of (2^16) - 1 = (a + 4) * (2 * a + 5)
+ * floor of positive solution of (2^31) - 1 = (a + 4) * (2 * a + 5),
+ * so the product below fits a 32-bit `int`.
  * TODO: Both values are smaller than N^(1/4), would have to use a bigint
  *       for `a` instead, but any `a` bigger than about 120 are already so rare that
  *       it is possible to ignore them and still get enough pseudoprimes.

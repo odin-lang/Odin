@@ -785,7 +785,8 @@ _log_bases := [65]u32{
 }
 
 /*
-	Characters used in radix conversions.
+	Characters used in radix conversions: digit `n` is written as `RADIX_TABLE[n]`, i.e. 0-9, A-Z, a-z, `+` and `/` for 0..=63.
+	That is not RFC 4648 base64, which starts with A-Z. `atoi` also accepts a-z as A-Z in radix 2..=36.
 */
 @(rodata)
 RADIX_TABLE := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/"

@@ -24,7 +24,7 @@ package math_big
 	We pass the custom allocator to procedures by default using the pattern `context.allocator = allocator`.
 	This way we don't have to add `, allocator` at the end of each call.
 
-	TODO: Handle +/- Infinity and NaN.
+	`internal_*` procs on `Int`s don't check for NaN or +/-Inf, except `internal_error_if_non_finite`, which the public procs call to reject them.
 */
 
 import "base:builtin"
@@ -714,10 +714,6 @@ internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.alloc
 			*/
 			err = _private_int_mul_balance(dest, src, multiplier)
 		} else if min_used >= MUL_TOOM_CUTOFF {
-			/*
-				Toom path commented out until it no longer fails Factorial 10k or 100k,
-				as reveaved in the long test.
-			*/
 			err = #force_inline _private_int_mul_toom(dest, src, multiplier)
 		} else if min_used >= MUL_KARATSUBA_CUTOFF {
 			err = #force_inline _private_int_mul_karatsuba(dest, src, multiplier)
