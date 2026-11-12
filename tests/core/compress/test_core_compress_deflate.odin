@@ -97,11 +97,16 @@ compress_deflate_output_too_short :: proc(t: ^testing.T) {
 	s := new(deflate.Deflate)
 	defer free(s)
 	input  := transmute([]byte)context_test_data
-	output := make([]byte, deflate.deflate_bound(len(input)) - 1)
+	packed: [dynamic]byte
+	defer delete(packed)
+	testing.expect_value(t, deflate.deflate_raw(&packed, input), nil)
+	output := make([]byte, len(packed))
 	defer delete(output)
 
-	_, err := deflate.deflate_raw(s, output, input)
-	testing.expect_value(t, err, compress.Error(compress.General_Error.Output_Too_Short))
+	n, err := deflate.deflate_raw(s, output, input)
+	testing.expectf(t, err == nil && n == len(packed) && bytes.equal(output, packed[:]), "exact size: %v, %v", n, err)
+	n, err = deflate.deflate_raw(s, output[:len(packed) - 1], input)
+	testing.expectf(t, n == 0 && err == compress.General_Error.Output_Too_Short, "one byte short: %v, %v", n, err)
 }
 
 @(test)

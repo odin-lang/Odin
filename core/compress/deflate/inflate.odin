@@ -12,26 +12,32 @@ inflate_zlib :: proc{inflate_zlib_from_context, inflate_zlib_from_bytes}
 
 inflate_raw_from_context :: proc(z: ^compress.Context, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
-	_, err = inflate_to_buffer(z, expected_output_size, compress.output_limit(options), D64 = false)
-	return
+	p: Inflate_Progress
+	inflate_progress_init(&p, z, expected_output_size, options) or_return
+	output := inflate_to_buffer(z, expected_output_size, &p, D64 = false) or_return
+	return inflate_progress_step(&p, p.bytes_in, i64(len(output)))
 }
 
 inflate_zlib_from_context :: proc(z: ^compress.Context, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
+	p: Inflate_Progress
+	inflate_progress_init(&p, z, expected_output_size, options) or_return
 
 	inflate_zlib_header(z) or_return
+	p.bytes_in = ZLIB_HEADER_SIZE
 
 	digest := u32(1)
-	inflate_to_buffer(z, expected_output_size, compress.output_limit(options), checksum = .Adler32, digest = &digest, D64 = false) or_return
+	output := inflate_to_buffer(z, expected_output_size, &p, checksum = .Adler32, digest = &digest, D64 = false) or_return
 
 	adler, adler_err := compress.read_data(z, u32be)
 	if adler_err != nil {
 		return General_Error.Stream_Too_Short
 	}
+	p.bytes_in += size_of(u32be)
 	if digest != u32(adler) {
 		return General_Error.Checksum_Failed
 	}
-	return nil
+	return inflate_progress_step(&p, p.bytes_in, i64(len(output)))
 }
 
 inflate_raw_from_bytes :: proc(output: ^[dynamic]u8, input: []u8, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
@@ -70,6 +76,11 @@ inflate_reader_read :: proc(r: ^Inflate_Reader, p: []u8) -> (n: int, err: Error)
 			break
 		} else {
 			r.err = inflate_stream_fill(r)
+		}
+	}
+	if n > 0 && r.err == nil {
+		if r.err = inflate_reader_progress(r); r.err != nil {
+			r.flushed = r.written
 		}
 	}
 	if n > 0 {
@@ -151,7 +162,7 @@ inflate_refill :: proc(s: ^Inflate, written: int, $STREAM: bool) -> (overrun: bo
 		return false
 	}
 	when STREAM {
-		s.input, s.position, s.bit_buffer, s.bit_count, s.eof = inflate_refill_stream(s.ctx, s.input, s.position, s.bit_buffer, s.bit_count, s.eof)
+		s.input, s.position, s.bit_buffer, s.bit_count, s.eof, s.base = inflate_refill_stream(s.ctx, s.input, s.position, s.bit_buffer, s.bit_count, s.eof, s.base)
 	} else {
 		for s.bit_count < 56 {
 			b: u64 = 0
@@ -171,10 +182,10 @@ inflate_refill :: proc(s: ^Inflate, written: int, $STREAM: bool) -> (overrun: bo
 }
 
 @(private, cold)
-inflate_refill_stream :: #force_no_inline proc(ctx: ^compress.Context, input: []u8, position: int, bit_buffer: u64, bit_count: i32, eof: bool) -> (new_input: []u8, new_position: int, new_bit_buffer: u64, new_bit_count: i32, new_eof: bool) #no_bounds_check {
-	new_input, new_position, new_bit_buffer, new_bit_count, new_eof = input, position, bit_buffer, bit_count, eof
+inflate_refill_stream :: #force_no_inline proc(ctx: ^compress.Context, input: []u8, position: int, bit_buffer: u64, bit_count: i32, eof: bool, base: i64) -> (new_input: []u8, new_position: int, new_bit_buffer: u64, new_bit_count: i32, new_eof: bool, new_base: i64) #no_bounds_check {
+	new_input, new_position, new_bit_buffer, new_bit_count, new_eof, new_base = input, position, bit_buffer, bit_count, eof, base
 	if !new_eof {
-		new_input, new_position, new_eof = inflate_fill(ctx, new_input, new_position, new_eof, 8)
+		new_input, new_position, new_eof, new_base = inflate_fill(ctx, new_input, new_position, new_eof, 8, new_base)
 		if len(new_input) - new_position >= 8 {
 			new_bit_buffer |= inflate_load_u64(raw_data(new_input)[new_position:]) << u64(new_bit_count)
 			new_position   += int((63 - new_bit_count) >> 3)
@@ -195,25 +206,25 @@ inflate_refill_stream :: #force_no_inline proc(ctx: ^compress.Context, input: []
 }
 
 @(private)
-inflate_fill :: proc(ctx: ^compress.Context, input: []u8, position: int, eof: bool, need: int) -> (new_input: []u8, new_position: int, new_eof: bool) #no_bounds_check {
+inflate_fill :: proc(ctx: ^compress.Context, input: []u8, position: int, eof: bool, need: int, base: i64) -> (new_input: []u8, new_position: int, new_eof: bool, new_base: i64) #no_bounds_check {
 	if eof || position > len(input) {
-		return input, position, true
+		return input, position, true, base
 	}
 	ctx.window = input[position:]
 	refill_error := compress.refill_window(ctx, need)
-	return ctx.window, 0, refill_error != nil
+	return ctx.window, 0, refill_error != nil, base + i64(position)
 }
 
 @(private)
-inflate_rewind :: proc(ctx: ^compress.Context, input: []u8, position: int) -> (new_input: []u8, new_position: int) #no_bounds_check {
+inflate_rewind :: proc(ctx: ^compress.Context, input: []u8, position: int, base: i64) -> (new_input: []u8, new_position: int, new_base: i64) #no_bounds_check {
 	if position >= 0 {
-		return input, position
+		return input, position, base
 	}
 	ctx.window = input
 	if !compress.rewind(ctx, -position) {
-		return input, 0
+		return input, 0, base
 	}
-	return ctx.window, 0
+	return ctx.window, 0, base + i64(position)
 }
 
 @(private)
@@ -516,14 +527,12 @@ inflate_decompress :: proc(d: ^Inflate_Decoder, output: []u8, grow: ^[dynamic]u8
 			d.s, d.state, d.last, d.stored, d.fixed_loaded = s, state, last, stored, fixed_loaded
 			finished := err != nil || state == .Done
 		} else {
-			if err != nil {
-				d.s = s
-			}
+			d.s = s
 			finished := true
 		}
 		if finished {
 			ctx := s.ctx
-			input, consumed := inflate_rewind(ctx, s.input, s.position - int(s.bit_count >> 3))
+			input, consumed, _ := inflate_rewind(ctx, s.input, s.position - int(s.bit_count >> 3), s.base)
 			ctx.window      = input[min(consumed, len(input)):]
 			ctx.code_buffer = 0
 			ctx.num_bits    = 0
@@ -538,6 +547,11 @@ inflate_decompress :: proc(d: ^Inflate_Decoder, output: []u8, grow: ^[dynamic]u8
 		case .Header:
 			inflate_update_checksum(checksum, digest, output[checked:written])
 			checked = written
+			when !WINDOWED {
+				if written >= d.mark {
+					inflate_progress_block(d, &s, written) or_return
+				}
+			}
 			// block header
 			type: i32 = 0
 			if inflate_refill(&s, written, STREAM) { return written, General_Error.Stream_Too_Short }
@@ -561,7 +575,7 @@ inflate_decompress :: proc(d: ^Inflate_Decoder, output: []u8, grow: ^[dynamic]u8
 			s.bit_buffer = 0
 			s.bit_count = 0
 			when STREAM {
-				s.input, s.position = inflate_rewind(s.ctx, s.input, s.position)
+				s.input, s.position, s.base = inflate_rewind(s.ctx, s.input, s.position, s.base)
 			}
 
 			if u16(len) != u16(~inverted_length) {
@@ -580,7 +594,7 @@ inflate_decompress :: proc(d: ^Inflate_Decoder, output: []u8, grow: ^[dynamic]u8
 						if written >= high_water { return written, nil }
 					}
 					if s.position == builtin.len(s.input) {
-						s.input, s.position, s.eof = inflate_fill(s.ctx, s.input, s.position, s.eof, 1)
+						s.input, s.position, s.eof, s.base = inflate_fill(s.ctx, s.input, s.position, s.eof, 1, s.base)
 						if s.position == builtin.len(s.input) {
 							return written, General_Error.Stream_Too_Short
 						}
@@ -862,7 +876,7 @@ inflate_initial_size :: proc(size_hint, input_size: int, expansion_max := compre
 }
 
 @(private)
-inflate_to_buffer :: proc(z: ^compress.Context, expected_output_size, max_output_size: int, start := 0, size_hint := -1, checksum := Inflate_Checksum.None, digest: ^u32 = nil, $D64: bool) -> (output: []u8, err: Error) #no_bounds_check {
+inflate_to_buffer :: proc(z: ^compress.Context, expected_output_size: int, p: ^Inflate_Progress, start := 0, size_hint := -1, checksum := Inflate_Checksum.None, digest: ^u32 = nil, $D64: bool) -> (output: []u8, err: Error) #no_bounds_check {
 	if z.output == nil {
 		return nil, General_Error.Incompatible_Options
 	}
@@ -871,7 +885,7 @@ inflate_to_buffer :: proc(z: ^compress.Context, expected_output_size, max_output
 		expected_output_size = int(z.size_unpacked)
 	}
 
-	limit := max_output_size
+	limit := compress.output_limit(p.options)
 	hint  := size_hint - start if size_hint > start else -1
 	if expected_output_size > 0 {
 		if expected_output_size > limit {
@@ -892,12 +906,16 @@ inflate_to_buffer :: proc(z: ^compress.Context, expected_output_size, max_output
 
 	d: Inflate_Decoder
 	inflate_decoder_init(&d, z)
+	p.start    = i64(start)
+	d.progress = p
+	d.mark     = inflate_progress_mark(p)
 	written: int
 	if compress.is_memory_context(z) {
 		written, err = inflate_decompress(&d, buffer[start:], buffer, start, limit, 0, 0, checksum, digest, false, D64, false)
 	} else {
 		written, err = inflate_decompress(&d, buffer[start:], buffer, start, limit, 0, 0, checksum, digest, true, D64, false)
 	}
+	p.bytes_in += inflate_consumed(&d.s)
 	if err != nil && inflate_overrun(&d.s) {
 		err     = General_Error.Stream_Too_Short
 		written = min(written, d.s.checkpoint)

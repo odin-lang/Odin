@@ -7,8 +7,10 @@ inflate64_raw :: proc{inflate64_raw_from_context, inflate64_raw_from_bytes}
 
 inflate64_raw_from_context :: proc(z: ^compress.Context, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
-	_, err = inflate_to_buffer(z, expected_output_size, compress.output_limit(options), D64 = true)
-	return
+	p: Inflate_Progress
+	inflate_progress_init(&p, z, expected_output_size, options) or_return
+	output := inflate_to_buffer(z, expected_output_size, &p, D64 = true) or_return
+	return inflate_progress_step(&p, p.bytes_in, i64(len(output)))
 }
 
 inflate64_raw_from_bytes :: proc(output: ^[dynamic]u8, input: []u8, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {

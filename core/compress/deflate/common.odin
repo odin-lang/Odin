@@ -197,17 +197,19 @@ Deflate_Writer :: struct {
 	filled:      int,
 	out_len:     int,
 	total:       i64,
+	flushed:     i64,
 	digest:      u32,
 	err:         Error,
 	allocator:   runtime.Allocator,
+	options:     compress.Options,
 	level:       Deflate_Level,
 	format:      Deflate_Format,
 	finished:    bool,
 	owns_window: bool,
 }
 
-Deflate_To_Slice   :: #type proc(s: ^Deflate,   output, input: []u8, level: Deflate_Level) -> (written: int, err: Error)
-Deflate64_To_Slice :: #type proc(s: ^Deflate64, output, input: []u8, level: Deflate_Level) -> (written: int, err: Error)
+Deflate_To_Slice   :: #type proc(s: ^Deflate,   output, input: []u8, level: Deflate_Level, options: compress.Options) -> (written: int, err: Error)
+Deflate64_To_Slice :: #type proc(s: ^Deflate64, output, input: []u8, level: Deflate_Level, options: compress.Options) -> (written: int, err: Error)
 
 INFLATE_PRECODE_TABLE_SIZE  :: 128
 INFLATE_LITERAL_TABLE_SIZE :: 1334
@@ -223,12 +225,15 @@ INFLATE_FAST_MARGIN         :: 2 + DEFLATE_MATCH_MAX + 16 * 3
 INFLATE_COPY_MARGIN         :: 16 * 3
 INFLATE_CHUNK_SIZE          :: 256 * 1024
 
+ZLIB_HEADER_SIZE :: 2
+
 Inflate_Checksum :: enum u8 {None, Adler32, CRC32}
 
 Inflate :: struct {
 	input:      []u8,
 	position:   int,
 	checkpoint: int,
+	base:       i64,
 	bit_buffer: u64,
 	bit_count:  i32,
 	eof:        bool,
@@ -237,11 +242,22 @@ Inflate :: struct {
 
 Inflate_State :: enum u8 {Header, Stored, Copy, Fixed, Dynamic, Block, Done}
 
+Inflate_Progress :: struct {
+	options:   compress.Options,
+	bytes_in:  i64,
+	start:     i64,
+	total_in:  i64,
+	total_out: i64,
+	next:      i64,
+}
+
 Inflate_Decoder :: struct {
 	literals:     [INFLATE_LITERAL_TABLE_SIZE]u32,
 	distances:    [INFLATE_DISTANCE_TABLE_SIZE]u32,
 	s:            Inflate,
 	stored:       int,
+	mark:         int,
+	progress:     ^Inflate_Progress,
 	last:         i32,
 	state:        Inflate_State,
 	fixed_loaded: bool,
@@ -260,6 +276,7 @@ Inflate_Reader :: struct {
 	limit:       i64,
 	total:       i64,
 	member:      i64,
+	progress:    Inflate_Progress,
 	err:         Error,
 	allocator:   runtime.Allocator,
 	digest:      u32,
@@ -643,7 +660,7 @@ deflate_round_up_divide :: proc(n, d: i32) -> i32 #no_bounds_check {
 
 @(private)
 inflate_zlib_header :: proc(z: ^compress.Context) -> (err: Error) {
-	header, header_err := compress.read_data(z, [2]u8)
+	header, header_err := compress.read_data(z, [ZLIB_HEADER_SIZE]u8)
 	if header_err != nil {
 		return General_Error.Stream_Too_Short
 	}
@@ -674,7 +691,7 @@ inflate_stream_init :: proc(r: ^Inflate_Reader, z: ^compress.Context, format: In
 	if options.max_output_size < 0 {
 		return General_Error.Output_Too_Short
 	}
-	if options.max_memory < 0 || options.chunk_size < 0 {
+	if options.max_memory < 0 || options.chunk_size < 0 || options.progress_interval < 0 {
 		return General_Error.Incompatible_Options
 	}
 	expected := i64(expected_output_size)
@@ -690,14 +707,17 @@ inflate_stream_init :: proc(r: ^Inflate_Reader, z: ^compress.Context, format: In
 		}
 		r.limit = expected
 	}
+	inflate_progress_init(&r.progress, z, expected_output_size, options) or_return
 
 	switch format {
 	case .Raw, .Raw64:
 	case .Zlib:
 		inflate_zlib_header(z) or_return
-		r.digest = 1
+		r.digest            = 1
+		r.progress.bytes_in = ZLIB_HEADER_SIZE
 	case .Gzip:
-		inflate_gzip_header(z) or_return
+		_, header_size := inflate_gzip_header(z) or_return
+		r.progress.bytes_in = i64(header_size)
 	}
 	inflate_decoder_init(&r.decoder, z)
 
@@ -739,7 +759,8 @@ inflate_stream_init :: proc(r: ^Inflate_Reader, z: ^compress.Context, format: In
 @(private)
 inflate_stream_fill :: proc(r: ^Inflate_Reader) -> (err: Error) {
 	if r.decoder.state == .Done {
-		inflate_gzip_header(r.z) or_return
+		_, header_size := inflate_gzip_header(r.z) or_return
+		r.progress.bytes_in += i64(header_size)
 		inflate_decoder_init(&r.decoder, r.z)
 		r.written = 0
 		r.flushed = 0
@@ -790,6 +811,7 @@ inflate_stream_fill :: proc(r: ^Inflate_Reader) -> (err: Error) {
 	if err != nil || r.decoder.state != .Done {
 		return
 	}
+	r.progress.bytes_in += inflate_consumed(&r.decoder.s)
 
 	switch r.format {
 	case .Raw, .Raw64:
@@ -799,6 +821,7 @@ inflate_stream_fill :: proc(r: ^Inflate_Reader) -> (err: Error) {
 		if adler_err != nil {
 			return General_Error.Stream_Too_Short
 		}
+		r.progress.bytes_in += size_of(u32be)
 		if r.digest != u32(adler) {
 			return General_Error.Checksum_Failed
 		}
@@ -808,6 +831,7 @@ inflate_stream_fill :: proc(r: ^Inflate_Reader) -> (err: Error) {
 		if trailer_err != nil {
 			return General_Error.Stream_Too_Short
 		}
+		r.progress.bytes_in += size_of(Gzip_Trailer)
 		if u32le(r.digest) != trailer.crc32 {
 			return GZIP_Error.Payload_CRC_Invalid
 		}
@@ -827,7 +851,8 @@ inflate_stream_to_writer :: proc(w: io.Writer, z: ^compress.Context, format: Inf
 	inflate_stream_init(&r, z, format, expected_output_size, options, allocator) or_return
 	for !r.done {
 		fill_err := inflate_stream_fill(&r)
-		if r.written > r.flushed {
+		produced := r.written > r.flushed
+		if produced {
 			_, write_err := io.write_full(w, r.window[r.flushed:r.written])
 			if write_err != nil {
 				return write_err
@@ -837,6 +862,66 @@ inflate_stream_to_writer :: proc(w: io.Writer, z: ^compress.Context, format: Inf
 		if fill_err != nil {
 			return fill_err
 		}
+		if produced {
+			inflate_reader_progress(&r) or_return
+		}
 	}
 	return nil
+}
+
+@(private)
+inflate_consumed :: #force_inline proc "contextless" (s: ^Inflate) -> (consumed: i64) {
+	return s.base + i64(min(s.position - int(s.bit_count >> 3), len(s.input)))
+}
+
+@(private)
+inflate_progress_init :: proc(p: ^Inflate_Progress, z: ^compress.Context, expected_output_size: int, options: compress.Options) -> (err: Error) {
+	p^ = {options = options, total_in = -1, total_out = -1, next = max(i64)}
+	if options.progress_interval < 0 {
+		return General_Error.Incompatible_Options
+	}
+	if options.progress == nil {
+		return nil
+	}
+	p.total_in = i64(compress.input_size(z))
+	if expected_output_size > 0 {
+		p.total_out = i64(expected_output_size)
+	} else if z.size_unpacked > 0 {
+		p.total_out = z.size_unpacked
+	}
+	p.next = i64(compress.progress_interval(options))
+	return nil
+}
+
+@(private)
+inflate_progress_step :: proc(p: ^Inflate_Progress, bytes_in, bytes_out: i64) -> (err: Error) {
+	if bytes_out < p.next {
+		return nil
+	}
+	compress.report_progress(p.options, bytes_in, bytes_out, p.total_in, p.total_out) or_return
+	interval := i64(compress.progress_interval(p.options))
+	p.next = bytes_out + interval if interval < max(i64) - bytes_out else max(i64)
+	return nil
+}
+
+@(private)
+inflate_progress_mark :: proc "contextless" (p: ^Inflate_Progress) -> (mark: int) {
+	return int(clamp(p.next - p.start, 0, i64(max(int))))
+}
+
+@(private, cold)
+inflate_progress_block :: #force_no_inline proc(d: ^Inflate_Decoder, s: ^Inflate, written: int) -> (err: Error) {
+	p := d.progress
+	inflate_progress_step(p, p.bytes_in + inflate_consumed(s), p.start + i64(written)) or_return
+	d.mark = inflate_progress_mark(p)
+	return nil
+}
+
+@(private)
+inflate_reader_progress :: proc(r: ^Inflate_Reader) -> (err: Error) {
+	bytes_in := r.progress.bytes_in
+	if r.decoder.state != .Done {
+		bytes_in += inflate_consumed(&r.decoder.s)
+	}
+	return compress.report_progress(r.progress.options, bytes_in, r.total - i64(r.written - r.flushed), r.progress.total_in, r.progress.total_out)
 }

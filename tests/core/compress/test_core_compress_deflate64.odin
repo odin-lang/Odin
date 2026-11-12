@@ -491,7 +491,9 @@ deflate64_slice_api :: proc(t: ^testing.T) {
 	testing.expect_value(t, deflate.inflate64_raw(&output, out[:written]), nil)
 	testing.expect(t, bytes.equal(output[:], data[:]))
 
-	_, short_err := deflate.deflate64_raw(s, out[:bound - 1], data[:], .Level_9)
+	exact, exact_err := deflate.deflate64_raw(s, out[:written], data[:], .Level_9)
+	testing.expectf(t, exact_err == nil && exact == written, "exact size: %v, %v", exact, exact_err)
+	_, short_err := deflate.deflate64_raw(s, out[:written - 1], data[:], .Level_9)
 	testing.expect_value(t, short_err, compress.General_Error.Output_Too_Short)
 	_, nil_err := deflate.deflate64_raw((^deflate.Deflate64)(nil), out, data[:], .Level_9)
 	testing.expect_value(t, nil_err, compress.General_Error.Incompatible_Options)

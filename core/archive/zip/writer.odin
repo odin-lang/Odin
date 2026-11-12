@@ -759,9 +759,9 @@ _chunk :: proc(zw: ^Writer) -> (chunk: []u8, err: Error) {
 _compress :: proc(zw: ^Writer, p: ^Pending_Entry, input: []u8, packed: ^[dynamic]u8, head: []u8) -> (head_len: int, err: Error) {
 	#partial switch p.method {
 	case .Deflate:
-		deflate.deflate_raw_to_dynamic(packed, input, deflate.Deflate_Level(p.level), zw.allocator) or_return
+		deflate.deflate_raw_to_dynamic(packed, input, deflate.Deflate_Level(p.level), _codec_options(zw), zw.allocator) or_return
 	case .Deflate64:
-		deflate.deflate64_raw_to_dynamic(packed, input, deflate.Deflate_Level(p.level), zw.allocator) or_return
+		deflate.deflate64_raw_to_dynamic(packed, input, deflate.Deflate_Level(p.level), _codec_options(zw), zw.allocator) or_return
 	case .BZip2:
 		bzip2.compress_to_dynamic(packed, input, bzip2.Level(p.level), _codec_options(zw), zw.allocator) or_return
 	case .LZMA:
