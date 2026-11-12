@@ -645,6 +645,58 @@ test_dns_resolve :: proc(t: ^testing.T) {
 	}
 }
 
+@(private)
+DNS_VALID_A :: [?]u8{
+	0, 0, 0x81, 0x80, 0, 1, 0, 1, 0, 0, 0, 0,
+	0, 0, 1, 0, 1,
+	0, 0, 1, 0, 1, 0, 0, 0, 60, 0, 4, 127, 0, 0, 2,
+}
+
+@(private)
+DNS_QUESTION_TRUNCATED :: [?]u8{
+	0, 0, 0x80, 0, 0, 1, 0, 1, 0, 0, 0, 0,
+	0,
+}
+
+@(private)
+DNS_ANSWER_TRUNCATED :: [?]u8{
+	0, 0, 0x81, 0x80, 0, 1, 0, 1, 0, 0, 0, 0,
+	0, 0, 1, 0, 1,
+	0, 0, 1, 0, 1, 0, 0, 0, 60, 0xff, 0xff, 127, 0, 0, 2,
+}
+
+@test
+test_dns_parse_response_bounds :: proc(t: ^testing.T) {
+	{
+		packet := DNS_VALID_A
+		records, _, ok := net.parse_response(packet[:], .IP4)
+		defer net.destroy_dns_records(records)
+		if testing.expect(t, ok) && testing.expect_value(t, len(records), 1) {
+			testing.expect_value(t, records[0].(net.DNS_Record_IP4).address, net.IP4_Address{127, 0, 0, 2})
+		}
+	}
+	{
+		packet := DNS_QUESTION_TRUNCATED
+		records, _, ok := net.parse_response(packet[:], .IP4)
+		testing.expect(t, !ok)
+		testing.expect_value(t, len(records), 0)
+	}
+	{
+		packet := DNS_ANSWER_TRUNCATED
+		records, _, ok := net.parse_response(packet[:], .IP4)
+		testing.expect(t, !ok)
+		testing.expect_value(t, len(records), 0)
+	}
+	{
+		packet := DNS_VALID_A
+		for off in ([]int{-1, len(packet) + 1}) {
+			cur_off := off
+			_, ok := net.parse_record(packet[:], &cur_off, .IP4)
+			testing.expect(t, !ok)
+		}
+	}
+}
+
 @test
 test_nonblocking_option :: proc(t: ^testing.T) {
 	server, listen_err := net.listen_tcp({address=net.IP4_Address{127, 0, 0, 1}, port=0})
