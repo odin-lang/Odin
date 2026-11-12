@@ -3302,6 +3302,65 @@ EXCEPTION_RECORD :: struct {
 }
 
 
+when ODIN_ARCH == .arm64 {
+
+ARM64_MAX_BREAKPOINTS :: 8
+ARM64_MAX_WATCHPOINTS :: 2
+
+// `ARM64_NT_CONTEXT` in winnt.h
+CONTEXT :: struct #align(16) {
+	ContextFlags: DWORD,
+	Cpsr:         DWORD,
+	using _: struct #raw_union {
+		using _: struct {
+			X0:  DWORD64,
+			X1:  DWORD64,
+			X2:  DWORD64,
+			X3:  DWORD64,
+			X4:  DWORD64,
+			X5:  DWORD64,
+			X6:  DWORD64,
+			X7:  DWORD64,
+			X8:  DWORD64,
+			X9:  DWORD64,
+			X10: DWORD64,
+			X11: DWORD64,
+			X12: DWORD64,
+			X13: DWORD64,
+			X14: DWORD64,
+			X15: DWORD64,
+			X16: DWORD64,
+			X17: DWORD64,
+			X18: DWORD64,
+			X19: DWORD64,
+			X20: DWORD64,
+			X21: DWORD64,
+			X22: DWORD64,
+			X23: DWORD64,
+			X24: DWORD64,
+			X25: DWORD64,
+			X26: DWORD64,
+			X27: DWORD64,
+			X28: DWORD64,
+			Fp:  DWORD64,
+			Lr:  DWORD64,
+		},
+		X: [31]DWORD64,
+	},
+	Sp:   DWORD64,
+	Pc:   DWORD64,
+	V:    [32]NEON128,
+	Fpcr: DWORD,
+	Fpsr: DWORD,
+	Bcr:  [ARM64_MAX_BREAKPOINTS]DWORD,
+	Bvr:  [ARM64_MAX_BREAKPOINTS]DWORD64,
+	Wcr:  [ARM64_MAX_WATCHPOINTS]DWORD,
+	Wvr:  [ARM64_MAX_WATCHPOINTS]DWORD64,
+}
+#assert(size_of(CONTEXT) == 0x390)
+
+} else {
+
 CONTEXT :: struct {
 	P1Home:       DWORD64,
 	P2Home:       DWORD64,
@@ -3374,6 +3433,8 @@ CONTEXT :: struct {
 	LastBranchFromRip:    DWORD64,
 	LastExceptionToRip:   DWORD64,
 	LastExceptionFromRip: DWORD64,
+}
+
 }
 
 PCONTEXT  :: ^CONTEXT

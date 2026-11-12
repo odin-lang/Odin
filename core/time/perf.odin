@@ -93,7 +93,7 @@ when ODIN_ARCH == .amd64 {
 	}
 }
 
-when ODIN_OS != .Darwin && ODIN_OS != .Linux && ODIN_OS != .FreeBSD {
+when ODIN_OS != .Darwin && ODIN_OS != .Linux && ODIN_OS != .FreeBSD && ODIN_OS != .Windows {
 	_get_tsc_frequency :: proc "contextless" () -> (u64, bool) {
 		return 0, false
 	}
