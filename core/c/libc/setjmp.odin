@@ -31,7 +31,12 @@ when ODIN_OS == .Windows {
 		// Win64 ABI. By giving our setjmp a second argument with the value of zero,
 		// the RDX register will contain zero and correctly set the flag to disable
 		// stack unwinding.
-		@(link_name="_setjmp")
+		//
+		// NOTE: Windows on arm64 has no `_setjmp`, compilers call `_setjmpex` with the stack pointer on entry
+		// to the caller as the second argument, which `longjmp` always unwinds the stack to (zero does not
+		// turn the unwinding off). Odin cannot get that stack pointer, so the compiler passes it in place of
+		// `hack` (see `lb_emit_call_internal`).
+		@(link_name=WINDOWS_SETJMP)
 		setjmp :: proc(env: ^jmp_buf, hack: rawptr = nil) -> int ---
 	}
 } else {
@@ -69,3 +74,5 @@ when ODIN_OS == .NetBSD {
 	@(private) LSETJMP  :: "setjmp"
 	@(private) LLONGJMP :: "longjmp"
 }
+
+@(private) WINDOWS_SETJMP :: "_setjmpex" when ODIN_ARCH == .arm64 else "_setjmp"

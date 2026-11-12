@@ -22,6 +22,13 @@ gb_internal void lb_call_va_intrinsic(lbProcedure *p, char const *name, LLVMValu
 #endif
 }
 
+// For intrinsics returning a pointer, whose overloading on the pointer type differs between LLVM versions
+gb_internal LLVMValueRef lb_call_ptr_intrinsic(lbProcedure *p, char const *name, LLVMValueRef *args, unsigned arg_count) {
+	LLVMTypeRef types[1] = {lb_type(p->module, t_rawptr)};
+	unsigned type_count = LLVMIntrinsicIsOverloaded(LLVMLookupIntrinsicID(name, gb_strlen(name))) ? 1 : 0;
+	return lb_call_intrinsic(p, name, args, arg_count, types, type_count);
+}
+
 gb_internal void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile) {
 	dst = lb_emit_conv(p, dst, t_rawptr);
 	src = lb_emit_conv(p, src, t_rawptr);
@@ -312,6 +319,13 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 
 	if (build_context.disable_unwind) {
 		lb_add_attribute_to_proc(m, p->value, "nounwind");
+		// NOTE: LLVM leaves the unwind tables out of a `nounwind` procedure unless it is also `uwtable`, as clang
+		// makes every function on Windows, whose amd64 and arm64 ABIs require them: debuggers walk the stack with
+		// them, as does `core:debug/trace` on amd64, and `longjmp` on arm64 always unwinds the stack with them.
+		if (build_context.metrics.os == TargetOs_windows &&
+		    (build_context.metrics.arch == TargetArch_amd64 || build_context.metrics.arch == TargetArch_arm64)) {
+			lb_add_attribute_to_proc(m, p->value, "uwtable", 2 /*UWTableKind::Async*/);
+		}
 	}
 
 	if (pt->Proc.diverging) {
@@ -1181,6 +1195,20 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 
 	GB_ASSERT(arg_index == arg_count);
 
+	// NOTE: On Windows arm64, `longjmp` always unwinds the stack to the frame given to `_setjmpex`, which has to
+	// be the stack pointer on entry to the procedure calling it, like clang passes. That cannot be written in Odin,
+	// so it is filled in here for `core:c/libc`'s `setjmp`, whose call must also be known to return twice.
+	bool is_windows_arm64_setjmp = false;
+	if (build_context.metrics.os == TargetOs_windows && build_context.metrics.arch == TargetArch_arm64 &&
+	    arg_count == 2 && LLVMIsAFunction(value.value)) {
+		size_t name_len = 0;
+		char const *name = LLVMGetValueName2(value.value, &name_len);
+		if (make_string(cast(u8 const *)name, name_len) == "_setjmpex") {
+			is_windows_arm64_setjmp = true;
+			args[1] = lb_call_ptr_intrinsic(p, "llvm.sponentry", nullptr, 0);
+		}
+	}
+
 	LLVMBasicBlockRef curr_block = LLVMGetInsertBlock(p->builder);
 	GB_ASSERT(curr_block != p->decl_block->block);
 
@@ -1237,6 +1265,10 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 		LLVMValueRef ret = LLVMBuildCall2(p->builder, fnp, fn, args, arg_count, "");
 
 		LLVMSetInstructionCallConv(ret, lb_calling_convention_kind(proc_type->Proc.calling_convention));
+
+		if (is_windows_arm64_setjmp) {
+			LLVMAddCallSiteAttribute(ret, LLVMAttributeIndex_FunctionIndex, lb_create_enum_attribute(p->module->ctx, "returns_twice"));
+		}
 
 		LLVMAttributeIndex param_offset = LLVMAttributeIndex_FirstArgIndex;
 		if (return_ptr.value != nullptr) {
@@ -4028,15 +4060,8 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				args[arg_count++] = LLVMConstInt(lb_type(p->module, t_u32), level, false);
 			}
 
-			// whether these are overloaded on their pointer type differs between LLVM versions
-			LLVMTypeRef types[1] = {lb_type(p->module, t_rawptr)};
-			unsigned type_count = 0;
-			if (LLVMIntrinsicIsOverloaded(LLVMLookupIntrinsicID(name, gb_strlen(name)))) {
-				type_count = 1;
-			}
-
 			lbValue res = {};
-			res.value = lb_call_intrinsic(p, name, args, arg_count, types, type_count);
+			res.value = lb_call_ptr_intrinsic(p, name, args, arg_count);
 			res.type = tv.type;
 			return res;
 		}

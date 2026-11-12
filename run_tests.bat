@@ -54,6 +54,12 @@ if not defined ODIN_TESTS_NO_CLANG (
 ..\..\odin test normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address %SLIM_DEFINE% || exit /b
 @popd
 
+@rem Tests that need the unwind tables, which Windows keeps with -disable-unwind as well: setjmp and stack traces
+@pushd tests\core
+..\..\odin test c\libc -disable-unwind -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true || exit /b
+..\..\odin test debug\trace -disable-unwind -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true || exit /b
+@popd
+
 @rem Vendor library tests
 @pushd .
 cd tests\vendor
