@@ -124,6 +124,7 @@ BZip2 :: struct {
 	selector:     [BZIP2_MAX_SELECTORS]u8,
 	selector_mtf: [BZIP2_MAX_SELECTORS]u8,
 }
+#assert((BZIP2_ENCODE_MAX_LEN * (BZIP2_BLOCK_MAX + 64) + 7) / 8 + 32 * 1024 <= (BZIP2_BLOCK_MAX + BZIP2_N_OVERSHOOT) * size_of(u32))
 
 BZIP2_INTERLEAVE     :: 4
 
@@ -136,6 +137,8 @@ Reader :: struct {
 	flushed:     int,
 	limit:       i64,
 	total:       i64,
+	total_in:    i64,
+	total_out:   i64,
 	br:          BZip2_Bit_Reader,
 	decoder:     ^BZip2_Decoder,
 	tts:         [BZIP2_INTERLEAVE][]u32,
@@ -155,6 +158,7 @@ Reader :: struct {
 	deferred:    Error,
 	err:         Error,
 	allocator:   runtime.Allocator,
+	options:     compress.Options,
 	state:       BZip2_Stream_State,
 	after:       BZip2_Stream_State,
 	run_byte:    u8,
@@ -170,10 +174,12 @@ Writer :: struct {
 	out:       []u8,
 	total:     i64,
 	done:      i64,
+	flushed:   i64,
 	crc:       u32,
 	combined:  u32,
 	err:       Error,
 	allocator: runtime.Allocator,
+	options:   compress.Options,
 	carried:   u8,
 	finished:  bool,
 	owns_out:  bool,
@@ -197,12 +203,13 @@ BZip2_Pending :: struct {
 
 @(private)
 BZip2_Bit_Reader :: struct {
-	data:  []u8,
-	pos:   int,
-	bits:  u64,
-	count: uint,
-	z:     ^compress.Context,
-	eof:   bool,
+	data:     []u8,
+	pos:      int,
+	bits:     u64,
+	count:    uint,
+	consumed: i64,
+	z:        ^compress.Context,
+	eof:      bool,
 }
 
 @(private)

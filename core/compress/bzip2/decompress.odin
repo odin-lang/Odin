@@ -16,7 +16,7 @@ decompress_from_bytes :: proc(output: ^[dynamic]u8, input: []u8, expected_output
 decompress_from_context :: proc(z: ^compress.Context, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 	max_output_size := compress.output_limit(options)
-	if z.output == nil || max_output_size < 0 {
+	if z.output == nil || max_output_size < 0 || options.progress_interval < 0 {
 		return General_Error.Incompatible_Options
 	}
 
@@ -40,6 +40,13 @@ decompress_from_context :: proc(z: ^compress.Context, expected_output_size := -1
 
 	input_size := len(z.window) if memory else compress.input_size(z)
 	non_zero_reserve(z.output, min(compress.output_reservation(expected, bzip2_decompress_bound(input_size) if input_size >= 0 else -1, input_size), limit)) or_return
+
+	total_out := i64(expected) if expected > 0 else -1
+	interval  := compress.progress_interval(options)
+	mark      := max(int)
+	if options.progress != nil {
+		mark = interval
+	}
 
 	written := 0
 	defer {
@@ -67,6 +74,10 @@ decompress_from_context :: proc(z: ^compress.Context, expected_output_size := -1
 		np := 0
 		block_err: Error
 		for {
+			if written >= mark {
+				compress.report_progress(options, bzip2_bytes_in(&br), i64(written), i64(input_size), total_out) or_return
+				mark = written + interval if interval < max(int) - written else max(int)
+			}
 			magic := u64(bzip2_bits(&br, 24)) << 24
 			magic |= u64(bzip2_bits(&br, 24))
 			stored_crc := bzip2_bits(&br, 32)
@@ -80,6 +91,10 @@ decompress_from_context :: proc(z: ^compress.Context, expected_output_size := -1
 				}
 				if stored_crc != combined {
 					return BZip2_Error.Stream_Checksum_Failed
+				}
+				if written >= mark {
+					compress.report_progress(options, bzip2_bytes_in(&br), i64(written), i64(input_size), total_out) or_return
+					mark = written + interval if interval < max(int) - written else max(int)
 				}
 				break
 			}
@@ -147,7 +162,8 @@ decompress_to_writer :: proc(w: io.Writer, z: ^compress.Context, expected_output
 	bzip2_stream_init(&r, z, expected_output_size, options, allocator) or_return
 	for !r.done {
 		fill_err := bzip2_stream_fill(&r)
-		if r.written > r.flushed {
+		produced := r.written > r.flushed
+		if produced {
 			_, write_err := io.write_full(w, r.window[r.flushed:r.written])
 			if write_err != nil {
 				return write_err
@@ -156,6 +172,9 @@ decompress_to_writer :: proc(w: io.Writer, z: ^compress.Context, expected_output
 		}
 		if fill_err != nil {
 			return fill_err
+		}
+		if produced {
+			bzip2_reader_progress(&r) or_return
 		}
 	}
 	return nil
@@ -177,6 +196,11 @@ reader_read :: proc(r: ^Reader, p: []u8) -> (n: int, err: Error) {
 			break
 		} else {
 			r.err = bzip2_stream_fill(r)
+		}
+	}
+	if n > 0 && r.err == nil {
+		if r.err = bzip2_reader_progress(r); r.err != nil {
+			r.flushed = r.written
 		}
 	}
 	if n > 0 {
@@ -246,8 +270,9 @@ bzip2_stream_end :: proc(z: ^compress.Context, br: ^BZip2_Bit_Reader) -> (err: E
 		if !compress.rewind(z, -next) {
 			return General_Error.Stream_Too_Short
 		}
-		br.data = z.window
-		next    = 0
+		br.data      = z.window
+		br.consumed += i64(next)
+		next         = 0
 	}
 	br.pos = next
 	return nil
@@ -296,7 +321,8 @@ bzip2_refill_slow :: proc(br: ^BZip2_Bit_Reader) #no_bounds_check {
 
 @(private)
 bzip2_fill :: proc(br: ^BZip2_Bit_Reader, need: int) {
-	br.z.window = br.data[br.pos:]
+	br.consumed += i64(br.pos)
+	br.z.window  = br.data[br.pos:]
 	if compress.refill_window(br.z, need) != nil {
 		br.eof = true
 	}
@@ -313,6 +339,16 @@ bzip2_bits :: #force_inline proc (br: ^BZip2_Bit_Reader, n: uint) -> u32 {
 	br.bits  <<= n
 	br.count  -= n
 	return v
+}
+
+@(private)
+bzip2_bytes_in :: proc "contextless" (br: ^BZip2_Bit_Reader) -> (n: i64) {
+	return br.consumed + i64(min(br.pos - int(br.count >> 3), len(br.data)))
+}
+
+@(private)
+bzip2_reader_progress :: proc(r: ^Reader) -> (err: Error) {
+	return compress.report_progress(r.options, bzip2_bytes_in(&r.br), r.total - i64(r.written - r.flushed), r.total_in, r.total_out)
 }
 
 @(private)
@@ -797,17 +833,26 @@ bzip2_stream_init :: proc(r: ^Reader, z: ^compress.Context, expected_output_size
 	r.limit      = -1
 	r.crc        = 0xffff_ffff
 	r.memory_max = compress.memory_limit(options)
+	r.options    = options
+	r.total_in   = -1
+	r.total_out  = -1
 	r.br         = BZip2_Bit_Reader{data = z.window}
 	if !compress.is_memory_context(z) {
 		r.br.z = z
 	}
 
-	if options.max_output_size < 0 || options.max_memory < 0 || options.chunk_size < 0 {
+	if options.max_output_size < 0 || options.max_memory < 0 || options.chunk_size < 0 || options.progress_interval < 0 {
 		return General_Error.Incompatible_Options
 	}
 	expected := i64(expected_output_size)
 	if expected <= 0 && z.size_unpacked > 0 {
 		expected = z.size_unpacked
+	}
+	if expected > 0 {
+		r.total_out = expected
+	}
+	if options.progress != nil {
+		r.total_in = i64(compress.input_size(z))
 	}
 	if options.max_output_size > 0 {
 		r.limit = i64(options.max_output_size)

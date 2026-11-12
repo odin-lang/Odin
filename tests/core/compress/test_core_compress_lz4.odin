@@ -265,10 +265,12 @@ compress_lz4_block_output_too_short :: proc(t: ^testing.T) {
 	s := new(lz4.LZ4)
 	defer free(s)
 	input  := transmute([]byte)context_test_data
-	output := make([]byte, lz4.compress_block_bound(len(input)) - 1)
+	output := make([]byte, lz4.compress_block_bound(len(input)))
 	defer delete(output)
 
-	_, err := lz4.compress_block(s, output, input)
+	n, err := lz4.compress_block(s, output, input)
+	testing.expect_value(t, err, nil)
+	_, err = lz4.compress_block(s, output[:n - 1], input)
 	testing.expect_value(t, err, compress.Error(compress.General_Error.Output_Too_Short))
 }
 
@@ -327,13 +329,13 @@ compress_lz4_dictionary_round_trip :: proc(t: ^testing.T) {
 		defer delete(plain)
 		defer delete(packed)
 		plain_n, _ := lz4.compress_block(s, plain, inputs.text, level)
-		n, err := lz4.compress_block(s, packed, inputs.text, level, inputs.dictionary)
+		n, err := lz4.compress_block(s, packed, inputs.text, level, dictionary = inputs.dictionary)
 		testing.expectf(t, err == nil, "%v: compress_block with dictionary returned %v", level, err)
 		testing.expectf(t, n < plain_n, "%v: dictionary did not help (%v vs %v)", level, n, plain_n)
 
 		output := make([]byte, len(inputs.text))
 		defer delete(output)
-		w, unpack_err := lz4.decompress_block_to_slice(output, packed[:n], inputs.dictionary)
+		w, unpack_err := lz4.decompress_block_to_slice(output, packed[:n], dictionary = inputs.dictionary)
 		testing.expectf(t, unpack_err == nil && w == len(output) && bytes.equal(output, inputs.text), "%v: dictionary round trip failed (%v)", level, unpack_err)
 
 		_, missing_err := lz4.decompress_block_to_slice(output, packed[:n])
@@ -351,7 +353,7 @@ compress_lz4_dictionary_round_trip :: proc(t: ^testing.T) {
 			packed: [dynamic]byte
 			defer delete(packed)
 			options := lz4.Frame_Options{block_max_size = .Max_64KiB, flags = lz4.DEFAULT_FRAME_FLAGS + ({.Independent_Blocks} if independent else {}), dictionary_id = 0x12345678}
-			err := lz4.compress_frame(&packed, data[:], level, options, inputs.dictionary)
+			err := lz4.compress_frame(&packed, data[:], level, options, dictionary = inputs.dictionary)
 			testing.expectf(t, err == nil, "%v, %v: compress_frame with dictionary returned %v", independent, level, err)
 			lz4_test_unpack_frame(t, "dictionary frame", packed[:], data[:], inputs.dictionary)
 		}

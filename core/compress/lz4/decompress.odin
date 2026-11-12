@@ -8,26 +8,29 @@ import "core:io"
 decompress_block :: proc{decompress_block_to_slice, decompress_block_from_bytes, decompress_block_from_context}
 decompress_frame :: proc{decompress_frame_from_bytes, decompress_frame_from_context}
 
-decompress_block_to_slice :: proc(output, input: []u8, dictionary: []u8 = nil) -> (written: int, err: Error) {
-	return lz4_decode(output, 0, 0, input, dictionary)
+decompress_block_to_slice :: proc(output, input: []u8, options: compress.Options = {}, dictionary: []u8 = nil) -> (written: int, err: Error) {
+	lz4_check_options(options) or_return
+	return lz4_decode_block(output[:lz4_output_size(len(output), options)], input, options, dictionary)
 }
 
-decompress_block_from_bytes :: proc(output: ^[dynamic]u8, input: []u8, max_output_size: int, dictionary: []u8 = nil, allocator := context.allocator) -> (err: Error) {
+decompress_block_from_bytes :: proc(output: ^[dynamic]u8, input: []u8, max_output_size: int, options: compress.Options = {}, dictionary: []u8 = nil, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 	if output == nil || max_output_size < 0 {
 		return General_Error.Incompatible_Options
 	}
-	if max_output_size > compress.COMPRESS_OUTPUT_ALLOCATE_MAX {
+	lz4_check_options(options) or_return
+	limit := lz4_output_size(max_output_size, options)
+	if limit > compress.COMPRESS_OUTPUT_ALLOCATE_MAX {
 		return General_Error.Output_Too_Short
 	}
-	non_zero_resize(output, min(max_output_size, lz4_decompress_bound(len(input)))) or_return
+	non_zero_resize(output, min(limit, lz4_decompress_bound(len(input)))) or_return
 	written: int
-	written, err = lz4_decode(output[:], 0, 0, input, dictionary)
+	written, err = lz4_decode_block(output[:], input, options, dictionary)
 	non_zero_resize(output, written)
 	return
 }
 
-decompress_block_from_context :: proc(z: ^compress.Context, max_output_size: int, dictionary: []u8 = nil, allocator := context.allocator) -> (err: Error) {
+decompress_block_from_context :: proc(z: ^compress.Context, max_output_size: int, options: compress.Options = {}, dictionary: []u8 = nil, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 	if z.output == nil {
 		return General_Error.Incompatible_Options
@@ -44,7 +47,7 @@ decompress_block_from_context :: proc(z: ^compress.Context, max_output_size: int
 		input     = remaining[:]
 	}
 
-	err = decompress_block_from_bytes(z.output, input, max_output_size, dictionary, allocator)
+	err = decompress_block_from_bytes(z.output, input, max_output_size, options, dictionary, allocator)
 	z.bytes_written = i64(len(z.output))
 	return
 }
@@ -60,6 +63,7 @@ decompress_frame_from_context :: proc(z: ^compress.Context, expected_output_size
 	if z.output == nil {
 		return General_Error.Incompatible_Options
 	}
+	lz4_check_options(options) or_return
 
 	expected := expected_output_size
 	if expected <= 0 && z.size_unpacked > 0 && z.size_unpacked <= i64(max(int)) {
@@ -87,7 +91,8 @@ decompress_frame_from_context :: proc(z: ^compress.Context, expected_output_size
 		z.bytes_written = i64(written)
 	}
 
-	frames := 0
+	progress := lz4_progress_init(options, 0, i64(input_size), i64(expected) if expected > 0 else -1)
+	frames   := 0
 	for {
 		if frames > 0 {
 			next, next_err := compress.peek_data(z, u32le)
@@ -99,9 +104,10 @@ decompress_frame_from_context :: proc(z: ^compress.Context, expected_output_size
 		if magic_err != nil {
 			return General_Error.Stream_Too_Short
 		}
+		progress.consumed += 4
 		switch {
 		case u32(magic) == FRAME_MAGIC:
-			written, err = lz4_decode_frame(z, written, limit, input_size, dictionary, &scratch)
+			written, err = lz4_decode_frame(z, written, limit, input_size, dictionary, &scratch, &progress)
 			if err != nil {
 				return
 			}
@@ -113,8 +119,9 @@ decompress_frame_from_context :: proc(z: ^compress.Context, expected_output_size
 			if compress.skip(z, i64(size)) != nil {
 				return General_Error.Stream_Too_Short
 			}
+			progress.consumed += 4 + i64(size)
 		case u32(magic) == LEGACY_MAGIC:
-			written, err = lz4_decode_legacy(z, written, limit, &scratch)
+			written, err = lz4_decode_legacy(z, written, limit, &scratch, &progress)
 			if err != nil {
 				return
 			}
@@ -131,7 +138,8 @@ decompress_frame_to_writer :: proc(w: io.Writer, z: ^compress.Context, expected_
 	lz4_stream_init(&r, z, expected_output_size, options, dictionary, allocator) or_return
 	for !r.done {
 		fill_err := lz4_stream_fill(&r)
-		if r.written > r.flushed {
+		produced := r.written > r.flushed
+		if produced {
 			_, write_err := io.write_full(w, r.window[r.flushed:r.written])
 			if write_err != nil {
 				return write_err
@@ -140,6 +148,9 @@ decompress_frame_to_writer :: proc(w: io.Writer, z: ^compress.Context, expected_
 		}
 		if fill_err != nil {
 			return fill_err
+		}
+		if produced {
+			lz4_reader_progress(&r) or_return
 		}
 	}
 	return nil
@@ -161,6 +172,11 @@ frame_reader_read :: proc(r: ^Frame_Reader, p: []u8) -> (n: int, err: Error) {
 			break
 		} else {
 			r.err = lz4_stream_fill(r)
+		}
+	}
+	if n > 0 && r.err == nil {
+		if r.err = lz4_reader_progress(r); r.err != nil {
+			r.flushed = r.written
 		}
 	}
 	if n > 0 {
@@ -191,6 +207,20 @@ frame_reader_destroy :: proc(r: ^Frame_Reader) {
 	r.written     = 0
 	r.flushed     = 0
 	r.owns_window = false
+}
+
+@(private)
+lz4_decode_block :: proc(output, input: []u8, options: compress.Options, dictionary: []u8) -> (written: int, err: Error) {
+	if options.progress == nil {
+		return lz4_decode(output, 0, 0, input, dictionary, false, nil)
+	}
+	progress := lz4_progress_init(options, 0, i64(len(input)), -1)
+	return lz4_decode(output, 0, 0, input, dictionary, true, &progress)
+}
+
+@(private)
+lz4_reader_progress :: proc(r: ^Frame_Reader) -> (err: Error) {
+	return compress.report_progress(r.options, r.consumed, r.total - i64(r.written - r.flushed), r.total_in, r.total_out)
 }
 
 @(private)
@@ -306,15 +336,17 @@ lz4_frame_header :: proc(z: ^compress.Context, dictionary: []u8) -> (h: LZ4_Fram
 	if u8(xxhash.XXH32(descriptor[:descriptor_len]) >> 8) != header_checksum {
 		return h, LZ4_Error.Header_Checksum_Failed
 	}
+	h.size = descriptor_len + 1
 	return h, nil
 }
 
 @(private)
-lz4_decode_frame :: proc(z: ^compress.Context, start, limit, input_size: int, dictionary: []u8, scratch: ^[dynamic]u8) -> (written: int, err: Error) {
+lz4_decode_frame :: proc(z: ^compress.Context, start, limit, input_size: int, dictionary: []u8, scratch: ^[dynamic]u8, progress: ^LZ4_Check) -> (written: int, err: Error) {
 	h, header_err := lz4_frame_header(z, dictionary)
 	if header_err != nil {
 		return start, header_err
 	}
+	progress.consumed += i64(h.size)
 	block_max        := h.block_max
 	independent      := h.independent
 	block_checksum   := h.block_checksum
@@ -342,10 +374,14 @@ lz4_decode_frame :: proc(z: ^compress.Context, start, limit, input_size: int, di
 
 	written = start
 	for {
+		if written >= progress.mark && lz4_progress_report(progress, written, progress.consumed, i64(written)) {
+			return written, progress.err
+		}
 		header, header_err := compress.read_data(z, u32le)
 		if header_err != nil {
 			return written, General_Error.Stream_Too_Short
 		}
+		progress.consumed += 4
 		if header == 0 {
 			break
 		}
@@ -355,11 +391,13 @@ lz4_decode_frame :: proc(z: ^compress.Context, start, limit, input_size: int, di
 			return written, LZ4_Error.Block_Too_Large
 		}
 		data := lz4_read_bytes(z, size, scratch) or_return
+		progress.consumed += i64(size)
 		if block_checksum {
 			expected, e := compress.read_data(z, u32le)
 			if e != nil {
 				return written, General_Error.Stream_Too_Short
 			}
+			progress.consumed += 4
 			if xxhash.XXH32(data) != u32(expected) {
 				return written, LZ4_Error.Block_Checksum_Failed
 			}
@@ -376,7 +414,7 @@ lz4_decode_frame :: proc(z: ^compress.Context, start, limit, input_size: int, di
 		window := min(block_max, frame_limit - written)
 		lz4_grow(z.output, written + window, frame_limit) or_return
 		history := start if !independent else written
-		end, decode_err := lz4_decode(z.output[:written + window], written, history, data, dictionary)
+		end, decode_err := lz4_decode(z.output[:written + window], written, history, data, dictionary, false, nil)
 		if decode_err != nil {
 			if decode_err == General_Error.Output_Too_Short {
 				return written, overflow if window < block_max else LZ4_Error.Block_Too_Large
@@ -391,6 +429,7 @@ lz4_decode_frame :: proc(z: ^compress.Context, start, limit, input_size: int, di
 		if e != nil {
 			return written, General_Error.Stream_Too_Short
 		}
+		progress.consumed += 4
 		if xxhash.XXH32(z.output[start:written]) != u32(expected) {
 			return written, LZ4_Error.Content_Checksum_Failed
 		}
@@ -402,9 +441,12 @@ lz4_decode_frame :: proc(z: ^compress.Context, start, limit, input_size: int, di
 }
 
 @(private)
-lz4_decode_legacy :: proc(z: ^compress.Context, start, limit: int, scratch: ^[dynamic]u8) -> (written: int, err: Error) {
+lz4_decode_legacy :: proc(z: ^compress.Context, start, limit: int, scratch: ^[dynamic]u8, progress: ^LZ4_Check) -> (written: int, err: Error) {
 	written = start
 	for {
+		if written >= progress.mark && lz4_progress_report(progress, written, progress.consumed, i64(written)) {
+			return written, progress.err
+		}
 		if lz4_at_end(z) {
 			return written, nil
 		}
@@ -421,9 +463,10 @@ lz4_decode_legacy :: proc(z: ^compress.Context, start, limit: int, scratch: ^[dy
 			return written, LZ4_Error.Block_Too_Large
 		}
 		data := lz4_read_bytes(z, int(size), scratch) or_return
+		progress.consumed += 4 + i64(size)
 		window := min(LEGACY_BLOCK_SIZE, limit - written)
 		lz4_grow(z.output, written + window, limit) or_return
-		end, decode_err := lz4_decode(z.output[:written + window], written, written, data, nil)
+		end, decode_err := lz4_decode(z.output[:written + window], written, written, data, nil, false, nil)
 		if decode_err != nil {
 			if decode_err == General_Error.Output_Too_Short {
 				return written, General_Error.Output_Too_Short if window < LEGACY_BLOCK_SIZE else LZ4_Error.Block_Too_Large
@@ -435,7 +478,7 @@ lz4_decode_legacy :: proc(z: ^compress.Context, start, limit: int, scratch: ^[dy
 }
 
 @(private)
-lz4_decode :: proc(output: []u8, op_start, history_start: int, input: []u8, dictionary: []u8) -> (op_end: int, err: Error) #no_bounds_check {
+lz4_decode :: proc(output: []u8, op_start, history_start: int, input: []u8, dictionary: []u8, $PROGRESS: bool, progress: ^LZ4_Check) -> (op_end: int, err: Error) #no_bounds_check {
 	src      := raw_data(input)
 	dst      := raw_data(output)
 	in_len   := len(input)
@@ -445,6 +488,11 @@ lz4_decode :: proc(output: []u8, op_start, history_start: int, input: []u8, dict
 	op       := op_start
 
 	for {
+		when PROGRESS {
+			if op >= progress.mark && lz4_progress_report(progress, op, i64(ip), i64(op - op_start)) {
+				return op, progress.err
+			}
+		}
 		if ip >= in_len {
 			return op, General_Error.Stream_Too_Short
 		}
@@ -603,16 +651,25 @@ lz4_stream_init :: proc(r: ^Frame_Reader, z: ^compress.Context, expected_output_
 	r.content_size      = -1
 	r.chunk             = options.chunk_size if options.chunk_size > 0 else CHUNK_SIZE
 	r.memory_max        = compress.memory_limit(options)
+	r.options           = options
+	r.total_in          = -1
+	r.total_out         = -1
 
 	if options.max_output_size < 0 {
 		return General_Error.Output_Too_Short
 	}
-	if options.max_memory < 0 || options.chunk_size < 0 {
+	if options.max_memory < 0 || options.chunk_size < 0 || options.progress_interval < 0 {
 		return General_Error.Incompatible_Options
 	}
 	expected := i64(expected_output_size)
 	if expected <= 0 && z.size_unpacked > 0 {
 		expected = z.size_unpacked
+	}
+	if expected > 0 {
+		r.total_out = expected
+	}
+	if options.progress != nil {
+		r.total_in = i64(compress.input_size(z))
 	}
 	if options.max_output_size > 0 {
 		r.limit = i64(options.max_output_size)
@@ -705,9 +762,11 @@ lz4_stream_fill :: proc(r: ^Frame_Reader) -> (err: Error) {
 			if magic_err != nil {
 				return General_Error.Stream_Too_Short
 			}
+			r.consumed += 4
 			switch {
 			case u32(magic) == FRAME_MAGIC:
 				h := lz4_frame_header(r.z, r.dictionary) or_return
+				r.consumed += i64(h.size)
 				room := r.limit - r.total if r.limit >= 0 else -1
 				r.frame_limit  = r.limit
 				r.content_size = h.content_size
@@ -742,7 +801,8 @@ lz4_stream_fill :: proc(r: ^Frame_Reader) -> (err: Error) {
 				if compress.skip(r.z, i64(size)) != nil {
 					return General_Error.Stream_Too_Short
 				}
-				r.frames += 1
+				r.consumed += 4 + i64(size)
+				r.frames   += 1
 			case u32(magic) == LEGACY_MAGIC:
 				room := r.limit - r.total if r.limit >= 0 else -1
 				need := LEGACY_BLOCK_SIZE
@@ -768,12 +828,14 @@ lz4_stream_fill :: proc(r: ^Frame_Reader) -> (err: Error) {
 			if header_err != nil {
 				return General_Error.Stream_Too_Short
 			}
+			r.consumed += 4
 			if header == 0 {
 				if r.content_hash {
 					expected, e := compress.read_data(r.z, u32le)
 					if e != nil {
 						return General_Error.Stream_Too_Short
 					}
+					r.consumed += 4
 					if xxhash.XXH32_digest(&r.digest) != u32(expected) {
 						return LZ4_Error.Content_Checksum_Failed
 					}
@@ -791,11 +853,13 @@ lz4_stream_fill :: proc(r: ^Frame_Reader) -> (err: Error) {
 				return LZ4_Error.Block_Too_Large
 			}
 			data := lz4_read_bytes(r.z, size, &r.scratch) or_return
+			r.consumed += i64(size)
 			if r.checksummed {
 				expected, e := compress.read_data(r.z, u32le)
 				if e != nil {
 					return General_Error.Stream_Too_Short
 				}
+				r.consumed += 4
 				if xxhash.XXH32(data) != u32(expected) {
 					return LZ4_Error.Block_Checksum_Failed
 				}
@@ -812,7 +876,7 @@ lz4_stream_fill :: proc(r: ^Frame_Reader) -> (err: Error) {
 				copy(r.window[start:], data)
 				r.written = start + size
 			} else {
-				end, decode_err := lz4_decode(r.window[:start + need], start, r.base, data, r.dictionary)
+				end, decode_err := lz4_decode(r.window[:start + need], start, r.base, data, r.dictionary, false, nil)
 				if decode_err != nil {
 					if decode_err == General_Error.Output_Too_Short {
 						return overflow if need < r.block_max else LZ4_Error.Block_Too_Large
@@ -853,9 +917,10 @@ lz4_stream_fill :: proc(r: ^Frame_Reader) -> (err: Error) {
 				return LZ4_Error.Block_Too_Large
 			}
 			data  := lz4_read_bytes(r.z, int(size), &r.scratch) or_return
+			r.consumed += 4 + i64(size)
 			start := r.written
 			r.base = start
-			end, decode_err := lz4_decode(r.window[:start + need], start, start, data, nil)
+			end, decode_err := lz4_decode(r.window[:start + need], start, start, data, nil, false, nil)
 			if decode_err != nil {
 				if decode_err == General_Error.Output_Too_Short {
 					return General_Error.Output_Too_Short if need < LEGACY_BLOCK_SIZE else LZ4_Error.Block_Too_Large
