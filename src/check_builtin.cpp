@@ -7057,8 +7057,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 			i64 n = exact_value_to_i64(z.value);
-			if (n <= 0) {
-				error(z.expr, "Scale parameter in '%.*s' must be positive, got %lld", LIT(builtin_name), cast(long long)n);
+			if (n < 0) {
+				error(z.expr, "Scale parameter in '%.*s' must not be negative, got %lld", LIT(builtin_name), cast(long long)n);
 				return false;
 			}
 			i64 sz = 8*type_size_of(x.type);
