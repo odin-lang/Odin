@@ -173,6 +173,14 @@ Extract_Iterator :: struct {
 	allocator: runtime.Allocator,
 }
 
+Extractor :: struct {
+	options:   Extract_Options,
+	path:      [dynamic]u8,
+	root:      int,
+	checked:   [dynamic]u8,
+	allocator: runtime.Allocator,
+}
+
 General_Error :: enum u32 {
 	None,
 	Unknown_Format,

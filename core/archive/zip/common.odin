@@ -1,23 +1,32 @@
-// TODO-UPDATE-COMMENT: the package now also writes archives (`create`, `write_entry`, `write_directory`, `commit`, `close`); "Reads" and "Writing (planned)" are stale
-// ---
 /*
-Reads ZIP archives, as specified by [PKWARE's APPNOTE.TXT, version 6.3.10, November 2022](https://pkware.cachefly.net/webdocs/APPNOTE/APPNOTE-6.3.10.TXT).
+Reads and writes ZIP archives, as specified by [PKWARE's APPNOTE.TXT, version 6.3.10, November 2022](https://pkware.cachefly.net/webdocs/APPNOTE/APPNOTE-6.3.10.TXT).
 
+Reading:
 - Opens archives from a path, a byte slice or a seekable `io.Stream`
 - Lists members through `core:archive`'s shared iterator, and finds them by path
 - Extracts one or more files
 - Supported compression methods: Store, Shrink, Reduce, Implode, Deflate, Deflate64, bzip2, LZMA and PPMd; XZ planned
 - ZIP64, data descriptors and self-extracting archives
 - UTF-8, Info-ZIP Unicode and code page 437 names
-- Unix and DOS attributes, symlinks, NTFS and Unix timestamps
+- Unix and DOS attributes, symlinks, NTFS and Unix timestamps; DOS times are read as local time
 - CRC-32 checked on extraction
 - Safe to read from several threads at once
-- WinZip AES and ZipCrypto decryption (planned)
-- Split and spanned archives (planned)
-- Streaming extraction for every method (planned)
-- Opt-in progress callback (planned)
-- Writing (planned)
-- Copy-on-write updates, safe alongside concurrent readers (planned)
+
+Writing:
+- Creates archives at a path or on an `io.Stream`; one that can't seek gets data descriptors
+- Adds members from a byte slice or an `io.Reader`, and whole directory trees with `write_directory`
+- Compression methods: Store, Deflate, Deflate64, bzip2, LZMA and PPMd, falling back to Store when compressing doesn't pay
+- ZIP64 whenever sizes, offsets or the member count need it
+- UTF-8 names, Unix and DOS attributes, symlinks, NTFS and Unix timestamps, archive and member comments
+- DOS times are written as local time
+- A deterministic mode for reproducible archives
+
+Planned:
+- WinZip AES and ZipCrypto decryption
+- Split and spanned archives
+- Streaming extraction for every method
+- Opt-in progress callback
+- Copy-on-write updates, safe alongside concurrent readers
 */
 package archive_zip
 
