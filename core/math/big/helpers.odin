@@ -526,13 +526,13 @@ int_to_bytes_little :: proc(a: ^Int, buf: []u8, signed := false, allocator := co
 	intrinsics.mem_zero(raw_data(buf), l)
 
 	size_in_bits := internal_count_bits(a)
-	i := 0
+	byte_count   := size_in_bits / 8 + (0 if size_in_bits % 8 == 0 else 1)
 	if signed {
 		buf[l - 1] = 1 if a.sign == .Negative else 0
 	}
-	#no_bounds_check for offset := 0; offset < size_in_bits; offset += 8 {
-		bits, _ := internal_int_bitfield_extract(a, offset, 8)
-		buf[i] = u8(bits & 255); i += 1
+	#no_bounds_check for i in 0..<byte_count {
+		bits, _ := internal_int_bitfield_extract(a, i * 8, 8)
+		buf[i] = u8(bits & 255)
 	}
 	return
 }
@@ -550,14 +550,14 @@ int_to_bytes_big :: proc(a: ^Int, buf: []u8, signed := false, allocator := conte
 	intrinsics.mem_zero(raw_data(buf), l)
 
 	size_in_bits := internal_count_bits(a)
-	i := l - 1
+	byte_count   := size_in_bits / 8 + (0 if size_in_bits % 8 == 0 else 1)
 
 	if signed {
 		buf[0] = 1 if a.sign == .Negative else 0
 	}
-	#no_bounds_check for offset := 0; offset < size_in_bits; offset += 8 {
-		bits, _ := internal_int_bitfield_extract(a, offset, 8)
-		buf[i] = u8(bits & 255); i -= 1
+	#no_bounds_check for i in 0..<byte_count {
+		bits, _ := internal_int_bitfield_extract(a, i * 8, 8)
+		buf[l - 1 - i] = u8(bits & 255)
 	}
 	return
 }
@@ -582,19 +582,19 @@ int_to_bytes_little_python :: proc(a: ^Int, buf: []u8, signed := false, allocato
 
 		for &v in buf { v = 255 }
 		size_in_bits := internal_count_bits(t)
-		i := 0
-		#no_bounds_check for offset := 0; offset < size_in_bits; offset += 8 {
-			bits, _ := internal_int_bitfield_extract(t, offset, 8)
-			buf[i] = 255 - u8(bits & 255); i += 1
+		byte_count   := size_in_bits / 8 + (0 if size_in_bits % 8 == 0 else 1)
+		#no_bounds_check for i in 0..<byte_count {
+			bits, _ := internal_int_bitfield_extract(t, i * 8, 8)
+			buf[i] = 255 - u8(bits & 255)
 		}
 		buf[l-1] = 255
 	} else {
 		intrinsics.mem_zero(raw_data(buf), l)
 		size_in_bits := internal_count_bits(a)
-		i := 0
-		#no_bounds_check for offset := 0; offset < size_in_bits; offset += 8 {
-			bits, _ := internal_int_bitfield_extract(a, offset, 8)
-			buf[i] = u8(bits & 255); i += 1
+		byte_count   := size_in_bits / 8 + (0 if size_in_bits % 8 == 0 else 1)
+		#no_bounds_check for i in 0..<byte_count {
+			bits, _ := internal_int_bitfield_extract(a, i * 8, 8)
+			buf[i] = u8(bits & 255)
 		}
 	}
 	return
@@ -621,10 +621,10 @@ int_to_bytes_big_python :: proc(a: ^Int, buf: []u8, signed := false, allocator :
 
 	for &v in buf { v = 255 }
 	size_in_bits := internal_count_bits(t)
-	i := l - 1
-	#no_bounds_check for offset := 0; offset < size_in_bits; offset += 8 {
-		bits, _ := internal_int_bitfield_extract(t, offset, 8)
-		buf[i] = 255 - u8(bits & 255); i -= 1
+	byte_count   := size_in_bits / 8 + (0 if size_in_bits % 8 == 0 else 1)
+	#no_bounds_check for i in 0..<byte_count {
+		bits, _ := internal_int_bitfield_extract(t, i * 8, 8)
+		buf[l - 1 - i] = 255 - u8(bits & 255)
 	}
 	buf[0] = 255
 
@@ -654,14 +654,14 @@ int_from_bytes_big :: proc(a: ^Int, buf: []u8, signed := false, allocator := con
 	if l == 0 { return internal_zero(a, false, allocator) }
 
 	sign: Sign
-	size_in_bits := l * 8
+	size_in_bits := i64(l) * 8
 	if signed { 
 		/*
 			First byte denotes the sign.
 		*/
 		size_in_bits -= 8
 	}
-	size_in_digits := (size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS
+	size_in_digits := int((size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS)
 	size_in_digits += 0 if size_in_bits % 8 == 0 else 1
 	internal_zero(a, false, allocator) or_return
 	internal_grow(a, size_in_digits, false, allocator) or_return
@@ -691,14 +691,14 @@ int_from_bytes_big_python :: proc(a: ^Int, buf: []u8, signed := false, allocator
 	if l == 0 { return internal_zero(a, false, allocator) }
 
 	sign: Sign
-	size_in_bits := l * 8
+	size_in_bits := i64(l) * 8
 	if signed { 
 		/*
 			The top bit of the first byte is the sign bit; that byte stays part of the two's complement value.
 		*/
 		sign = .Zero_or_Positive if buf[0] & 0x80 == 0 else .Negative
 	}
-	size_in_digits := (size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS
+	size_in_digits := int((size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS)
 	size_in_digits += 0 if size_in_bits % 8 == 0 else 1
 	internal_zero(a, false, allocator) or_return
 	internal_grow(a, size_in_digits, false, allocator) or_return
@@ -732,14 +732,14 @@ int_from_bytes_little :: proc(a: ^Int, buf: []u8, signed := false, allocator := 
 	if l == 0 { return internal_zero(a, false, allocator) }
 
 	sign: Sign
-	size_in_bits   := l * 8
+	size_in_bits   := i64(l) * 8
 	if signed { 
 		/*
 			Last byte denotes the sign.
 		*/
 		size_in_bits -= 8
 	}
-	size_in_digits := (size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS
+	size_in_digits := int((size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS)
 	size_in_digits += 0 if size_in_bits % 8 == 0 else 1
 	internal_zero(a, false, allocator) or_return
 	internal_grow(a, size_in_digits, false, allocator) or_return
@@ -769,14 +769,14 @@ int_from_bytes_little_python :: proc(a: ^Int, buf: []u8, signed := false, alloca
 	if l == 0 { return internal_zero(a, false, allocator) }
 
 	sign: Sign
-	size_in_bits := l * 8
+	size_in_bits := i64(l) * 8
 	if signed { 
 		/*
 			The top bit of the last byte is the sign bit; that byte stays part of the two's complement value.
 		*/
 		sign = .Zero_or_Positive if buf[l-1] & 0x80 == 0 else .Negative
 	}
-	size_in_digits := (size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS
+	size_in_digits := int((size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS)
 	size_in_digits += 0 if size_in_bits % 8 == 0 else 1
 	internal_zero(a, false, allocator) or_return
 	internal_grow(a, size_in_digits, false, allocator) or_return

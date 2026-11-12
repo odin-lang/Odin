@@ -1586,6 +1586,27 @@ test_fix_from_bytes_empty :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_fix_from_bytes_overflow :: proc(t: ^testing.T) {
+	when size_of(int) == 4 {
+		buf, alloc_err := make([]u8, 1 << 28)
+		if !testing.expect_value(t, alloc_err, nil) {
+			return
+		}
+		defer delete(buf)
+
+		a := &big.Int{}
+		defer big.destroy(a)
+
+		for signed in ([]bool{false, true}) {
+			testing.expect_value(t, big.int_from_bytes_big(a, buf, signed), big.Error.Integer_Overflow)
+			testing.expect_value(t, big.int_from_bytes_little(a, buf, signed), big.Error.Integer_Overflow)
+			testing.expect_value(t, big.int_from_bytes_big_python(a, buf, signed), big.Error.Integer_Overflow)
+			testing.expect_value(t, big.int_from_bytes_little_python(a, buf, signed), big.Error.Integer_Overflow)
+		}
+	}
+}
+
+@(test)
 test_fix_bytes_round_trip :: proc(t: ^testing.T) {
 	a, b := &big.Int{}, &big.Int{}
 	defer big.destroy(a, b)
