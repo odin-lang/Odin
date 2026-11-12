@@ -301,28 +301,20 @@ _trig_reduce_hi_lo_f64 :: proc "contextless" (x: f64) -> (j: u64, z, zl: f64) #n
 	hi, _ := add_u64(z0lo, z1hi, c)
 	// The top 3 bits are j.
 	j = hi >> 61
-	// TODO-UPDATE-COMMENT: the fraction is now kept as a 128-bit fixed-point value; its magnitude is found after the multiplication by pi/4
-	// ---
-	// Extract the fraction and find its magnitude.
+	// Extract the fraction as 128-bit fixed point in [0, 1).
 	f := (u128(hi) << 64 | u128(lo)) << 3
-	// TODO-UPDATE-COMMENT: zeros are now mapped by negating the fixed-point fraction, before the conversion to float
-	// ---
-	// Map zeros to origin.
+	// Map zeros to origin: for odd j, step to the next octant and use 1 - f, negating the result at the end.
 	neg := j&1 == 1
 	if neg {
 		j = (j + 1) & 7
 		f = ~f + 1
 	}
-	// TODO-UPDATE-COMMENT: the multiplication by pi/4 is now done in 128-bit fixed point, before the conversion to float
-	// ---
-	// Multiply the fractional part by pi/4.
+	// Multiply the fraction by pi/4 in 128-bit fixed point, then normalize.
 	f1, f0 := u64(f >> 64), u64(f)
 	r := u128(f1)*PI4_HI + (u128(f1)*PI4_LO) >> 64 + (u128(f0)*PI4_HI) >> 64
 	lz := uint(intrinsics.count_leading_zeros(r))
 	r <<= lz
-	// TODO-UPDATE-COMMENT: the result is now split into a high part z and a low part zl
-	// ---
-	// Include the exponent and convert to a float.
+	// Include the exponent and split the result into a high part z and a low part zl, 53 bits each.
 	z  = f64(u64(r >> 75))               * transmute(f64)(u64(BIAS - 53 - lz) << SHIFT)
 	zl = f64(u64(r >> 22) & (1<<53 - 1)) * transmute(f64)(u64(BIAS - 106 - lz) << SHIFT)
 	if neg {
