@@ -2244,6 +2244,7 @@ internal_int_clear :: proc(a: ^Int, minimize := false, allocator := context.allo
 	}
 	a.sign = .Zero_or_Positive
 	a.used = 0
+	a.flags -= {.NaN, .Inf}
 
 	return #force_inline internal_grow(a, a.used, minimize, allocator)
 }

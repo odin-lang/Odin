@@ -1828,3 +1828,374 @@ test_fix_combinatorics_immutable_dest :: proc(t: ^testing.T) {
 	x.flags = {}
 	fix_expect(t, x, "7")
 }
+
+@(test)
+test_fix_itoa_negative_no_leading_zero :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	defer big.destroy(a)
+
+	Case :: struct {
+		hex:      string,
+		radix:    i8,
+		expected: string,
+	}
+	cases := [?]Case{
+		{"-40000000000000000000000000000001", 10, "-85070591730234615865843651857942052865"},
+		{"-40000000000000000000000000000001", 3,  "-12011212011000120022000012112210022201211110120101000022212110022021120100011002"},
+		{"-43B55E9784AC7DA10895EBA000000000", 10, "-90000000000000000000000000000000000000"},
+	}
+	for c in cases {
+		testing.expect_value(t, big.atoi(a, c.hex, 16), nil)
+
+		s, err := big.itoa(a, c.radix)
+		testing.expect_value(t, err, nil)
+		testing.expect_value(t, s, c.expected)
+		delete(s)
+
+		cs, cerr := big.int_itoa_cstring(a, c.radix)
+		testing.expect_value(t, cerr, nil)
+		testing.expect_value(t, string(cs), c.expected)
+		delete(cs)
+	}
+}
+
+@(test)
+test_fix_itoa_raw_larger_buffer :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	defer big.destroy(a)
+
+	Case :: struct {
+		decimal:  string,
+		radix:    i8,
+		expected: string,
+	}
+	cases := [?]Case{
+		{"0",                                         10, "0"},
+		{"5",                                         10, "5"},
+		{"-123",                                      16, "-7B"},
+		{"18446744073709551616",                      16, "10000000000000000"},
+		{"18446744073709551616",                      7,  "45012021522523134134602"},
+		{"1361129467683753853853498429727072845825",  10, "1361129467683753853853498429727072845825"},
+		{"-1361129467683753853853498429727072845825", 16, "-400000000000000000000000000000001"},
+		{"-1361129467683753853853498429727072845825", 7,  "-15501652041535445035004034651000412123144600523"},
+		{"-9999999999999999999999999999999999999999", 10, "-9999999999999999999999999999999999999999"},
+	}
+	for c in cases {
+		fix_set(t, a, c.decimal)
+
+		buf: [80]u8
+		written, err := big.int_itoa_raw(a, c.radix, buf[:])
+		testing.expect_value(t, err, nil)
+		testing.expect_value(t, string(buf[:written]), c.expected)
+
+		zbuf: [80]u8
+		written, err = big.int_itoa_raw(a, c.radix, zbuf[:], zero_terminate = true)
+		testing.expect_value(t, err, nil)
+		testing.expect_value(t, written, len(c.expected) + 1)
+		testing.expect_value(t, string(zbuf[:len(c.expected)]), c.expected)
+		testing.expect_value(t, zbuf[len(c.expected)], 0)
+	}
+}
+
+@(test)
+test_fix_itoa_negative_zero :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	defer big.destroy(a)
+
+	fix_set(t, a, "0")
+	a.sign = .Negative
+
+	size, size_err := big.radix_size(a, 10)
+	testing.expect_value(t, size_err, nil)
+
+	s, err := big.itoa(a, 10)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, s, "0")
+	testing.expect_value(t, len(s), size)
+	delete(s)
+}
+
+@(private="file")
+fix_radix_size_with_context :: proc(a: ^big.Int, ctx, arg: mem.Allocator) -> (size: int, err: big.Error) {
+	context.allocator = ctx
+	return big.radix_size(a, 10, false, arg)
+}
+
+@(test)
+test_fix_radix_size_allocator :: proc(t: ^testing.T) {
+	ctx_track, arg_track: mem.Tracking_Allocator
+	mem.tracking_allocator_init(&ctx_track, context.allocator)
+	defer mem.tracking_allocator_destroy(&ctx_track)
+	mem.tracking_allocator_init(&arg_track, context.allocator)
+	defer mem.tracking_allocator_destroy(&arg_track)
+	ctx := mem.tracking_allocator(&ctx_track)
+	arg := mem.tracking_allocator(&arg_track)
+
+	a := &big.Int{}
+	size, err := fix_radix_size_with_context(a, ctx, arg)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, size, 1)
+
+	testing.expect_value(t, big.int_set_from_integer(a, 1234567, allocator = arg), nil)
+	size, err = fix_radix_size_with_context(a, ctx, arg)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, size, 7)
+
+	testing.expect_value(t, ctx_track.total_allocation_count, 0)
+	big.destroy(a)
+}
+
+@(test)
+test_fix_atoi_immutable_and_flags :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	defer big.destroy(a)
+
+	fix_set(t, a, "7")
+	a.flags = {.Immutable}
+	testing.expect_value(t, big.atoi(a, "12345", 10), big.Error.Assignment_To_Immutable)
+	testing.expect_value(t, big.atoi(big.INT_ONE, "5", 10), big.Error.Assignment_To_Immutable)
+	a.flags = {}
+	fix_expect(t, a, "7")
+	fix_expect(t, big.INT_ONE, "1")
+
+	testing.expect_value(t, big.nan(a), nil)
+	testing.expect_value(t, big.atoi(a, "5", 10), nil)
+	testing.expect_value(t, a.flags, big.Flags{})
+	fix_expect(t, a, "5")
+}
+
+@(private="file")
+Fix_Fail_State :: struct {
+	backing: mem.Allocator,
+	count:   int,
+	fail_at: int,
+}
+
+@(private="file")
+fix_fail_proc :: proc(data: rawptr, mode: mem.Allocator_Mode, size, alignment: int, old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, mem.Allocator_Error) {
+	st := (^Fix_Fail_State)(data)
+	#partial switch mode {
+	case .Alloc, .Alloc_Non_Zeroed, .Resize, .Resize_Non_Zeroed:
+		st.count += 1
+		if st.count == st.fail_at {
+			return nil, .Out_Of_Memory
+		}
+	}
+	return st.backing.procedure(st.backing.data, mode, size, alignment, old_memory, old_size, loc)
+}
+
+@(test)
+test_fix_itoa_allocators :: proc(t: ^testing.T) {
+	expected := "-9999999999999999999999999999999999999999"
+	failed := 0
+	for fail_at in 1..=12 {
+		track: mem.Tracking_Allocator
+		mem.tracking_allocator_init(&track, context.allocator)
+		base := mem.tracking_allocator(&track)
+		st := Fix_Fail_State{backing = base, fail_at = fail_at}
+		fa := mem.Allocator{procedure = fix_fail_proc, data = &st}
+
+		a := &big.Int{}
+		testing.expect_value(t, big.int_atoi(a, expected, 10, nil, base), nil)
+
+		s, err := big.int_itoa_string(a, 10, false, fa)
+		if err == nil {
+			testing.expect_value(t, s, expected)
+			delete(s, fa)
+		} else {
+			testing.expect_value(t, s, "")
+			failed += 1
+		}
+
+		big.destroy(a)
+		testing.expectf(t, len(track.allocation_map) == 0, "allocation %v failed: %v allocations leaked", fail_at, len(track.allocation_map))
+		mem.tracking_allocator_destroy(&track)
+	}
+	testing.expect(t, failed > 1)
+
+	str_track: mem.Tracking_Allocator
+	mem.tracking_allocator_init(&str_track, context.allocator)
+	defer mem.tracking_allocator_destroy(&str_track)
+	str_alloc := mem.tracking_allocator(&str_track)
+
+	z := &big.Int{}
+	defer big.destroy(z)
+
+	s, err := big.int_itoa_string(z, 10, false, str_alloc)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, s, "0")
+	delete(s, str_alloc)
+
+	cs, cerr := big.int_itoa_cstring(z, 10, str_alloc)
+	testing.expect_value(t, cerr, nil)
+	testing.expect_value(t, string(cs), "0")
+	delete(cs, str_alloc)
+
+	testing.expect_value(t, len(str_track.allocation_map), 0)
+}
+
+@(test)
+test_fix_unpack_overwrites_destination :: proc(t: ^testing.T) {
+	x := &big.Int{}
+	defer big.destroy(x)
+	buf := [?]u8{1, 2}
+
+	fix_set(t, x, "-5")
+	testing.expect_value(t, big.internal_int_unpack(x, buf[:], 0, .LSB_First), nil)
+	fix_expect(t, x, "513")
+
+	fix_set(t, x, "5")
+	testing.expect_value(t, big.internal_int_unpack(x, buf[:], 0, .MSB_First), nil)
+	fix_expect(t, x, "258")
+
+	testing.expect_value(t, big.nan(x), nil)
+	testing.expect_value(t, big.internal_int_unpack(x, buf[:], 0, .LSB_First), nil)
+	testing.expect_value(t, x.flags, big.Flags{})
+	fix_expect(t, x, "513")
+}
+
+@(test)
+test_fix_pack_u128 :: proc(t: ^testing.T) {
+	x, y := &big.Int{}, &big.Int{}
+	defer big.destroy(x, y)
+	testing.expect_value(t, big.atoi(x, "123456789ABCDEF0123456789ABCDEF0123456789ABCDEF", 16), nil)
+
+	words: [2]u128
+	testing.expect_value(t, big.internal_int_pack_count(x, u128, 0), 2)
+	written, err := big.internal_int_pack(x, words[:], 0, .LSB_First)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, written, 2)
+	testing.expect_value(t, words[0], 0x0123456789abcdef0123456789abcdef)
+	testing.expect_value(t, words[1], 0x123456789abcdef)
+	testing.expect_value(t, big.internal_int_unpack(y, words[:], 0, .LSB_First), nil)
+	equal, _ := big.equals(x, y)
+	testing.expect(t, equal)
+
+	written, err = big.internal_int_pack(x, words[:], 1, .MSB_First)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, written, 2)
+	testing.expect_value(t, words[0], 0x2468acf13579bde)
+	testing.expect_value(t, words[1], 0x123456789abcdef0123456789abcdef)
+	testing.expect_value(t, big.internal_int_unpack(y, words[:], 1, .MSB_First), nil)
+	equal, _ = big.equals(x, y)
+	testing.expect(t, equal)
+}
+
+@(test)
+test_fix_clear_drops_nan_inf :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	defer big.destroy(a)
+	bytes := [?]u8{1, 2}
+
+	testing.expect_value(t, big.nan(a), nil)
+	testing.expect_value(t, big.zero(a), nil)
+	testing.expect_value(t, a.flags, big.Flags{})
+	fix_expect(t, a, "0")
+
+	testing.expect_value(t, big.inf(a), nil)
+	testing.expect_value(t, big.int_from_bytes_big(a, bytes[:]), nil)
+	testing.expect_value(t, a.flags, big.Flags{})
+	fix_expect(t, a, "258")
+
+	testing.expect_value(t, big.minus_inf(a), nil)
+	testing.expect_value(t, big.int_from_bytes_little_python(a, bytes[:], true), nil)
+	testing.expect_value(t, a.flags, big.Flags{})
+	fix_expect(t, a, "513")
+
+	testing.expect_value(t, big.nan(a), nil)
+	testing.expect_value(t, big.int_from_bytes_big(a, nil), nil)
+	testing.expect_value(t, a.flags, big.Flags{})
+	fix_expect(t, a, "0")
+
+	testing.expect_value(t, big.nan(a), nil)
+	testing.expect_value(t, big.combinations_without_repetition(a, 3, 5), nil)
+	testing.expect_value(t, a.flags, big.Flags{})
+	fix_expect(t, a, "0")
+
+	testing.expect_value(t, big.inf(a), nil)
+	testing.expect_value(t, big.choose(a, 5, 6), nil)
+	testing.expect_value(t, a.flags, big.Flags{})
+	fix_expect(t, a, "0")
+
+	fix_set(t, a, "7")
+	a.flags = {.Immutable, .NaN, .Inf}
+	testing.expect_value(t, big.internal_int_clear(a), nil)
+	testing.expect_value(t, a.flags, big.Flags{.Immutable})
+	a.flags = {}
+	fix_expect(t, a, "0")
+}
+
+@(test)
+test_fix_pack_unpack_zero :: proc(t: ^testing.T) {
+	x := &big.Int{}
+	defer big.destroy(x)
+
+	fix_set(t, x, "0")
+	testing.expect_value(t, big.internal_int_pack_count(x, u128, 0), 0)
+	words: [1]u128
+	written, err := big.internal_int_pack(x, words[:], 0, .LSB_First)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, written, 0)
+
+	fix_set(t, x, "-5")
+	testing.expect_value(t, big.internal_int_unpack(x, words[:written], 0, .LSB_First), nil)
+	fix_expect(t, x, "0")
+
+	bytes: []u8
+	testing.expect_value(t, big.nan(x), nil)
+	testing.expect_value(t, big.internal_int_unpack(x, bytes, 0, .MSB_First), nil)
+	testing.expect_value(t, x.flags, big.Flags{})
+	fix_expect(t, x, "0")
+}
+
+@(test)
+test_fix_itoa_raw_small_buffer :: proc(t: ^testing.T) {
+	a := &big.Int{}
+	defer big.destroy(a)
+
+	Case :: struct {
+		decimal:  string,
+		radix:    i8,
+		expected: string,
+	}
+	cases := [?]Case{
+		{"0",                                         10, "0"},
+		{"-0",                                        10, "0"},
+		{"7",                                         10, "7"},
+		{"-7",                                        10, "-7"},
+		{"-123",                                      10, "-123"},
+		{"18446744073709551616",                      10, "18446744073709551616"},
+		{"-18446744073709551616",                     7,  "-45012021522523134134602"},
+		{"-1361129467683753853853498429727072845825", 16, "-400000000000000000000000000000001"},
+		{"1361129467683753853853498429727072845825",  32, "100000000000000000000000001"},
+		{"1361129467683753853853498429727072845825",  10, "1361129467683753853853498429727072845825"},
+		{"-1361129467683753853853498429727072845825", 7,  "-15501652041535445035004034651000412123144600523"},
+	}
+	for c in cases {
+		fix_set(t, a, c.decimal)
+		if c.decimal == "-0" {
+			a.sign = .Negative
+		}
+
+		for zero_terminate in ([?]bool{false, true}) {
+			exact := len(c.expected) + (1 if zero_terminate else 0)
+			storage: [64]u8
+
+			for l in 0..<exact {
+				written, err := big.int_itoa_raw(a, c.radix, storage[:l], l, zero_terminate)
+				testing.expectf(t, err == .Buffer_Overflow && written == 0, "%v radix %v, %v bytes, size passed: %v, %v", c.decimal, c.radix, l, written, err)
+
+				written, err = big.int_itoa_raw(a, c.radix, storage[:l], -1, zero_terminate)
+				testing.expectf(t, err == .Buffer_Overflow && written == 0, "%v radix %v, %v bytes: %v, %v", c.decimal, c.radix, l, written, err)
+			}
+
+			written, err := big.int_itoa_raw(a, c.radix, storage[:exact], exact, zero_terminate)
+			testing.expect_value(t, err, nil)
+			testing.expect_value(t, written, exact)
+			testing.expect_value(t, string(storage[:len(c.expected)]), c.expected)
+			if zero_terminate {
+				testing.expect_value(t, storage[len(c.expected)], 0)
+			}
+		}
+	}
+}
