@@ -87,10 +87,14 @@ Frame_Reader :: struct {
 	frame_limit:  i64,
 	frame_start:  i64,
 	content_size: i64,
+	consumed:     i64,
+	total_in:     i64,
+	total_out:    i64,
 	frames:       int,
 	digest:       xxhash.XXH32_state,
 	err:          Error,
 	allocator:    runtime.Allocator,
+	options:      compress.Options,
 	state:        LZ4_Stream_State,
 	independent:  bool,
 	checksummed:  bool,
@@ -113,16 +117,30 @@ Frame_Writer :: struct {
 	out_len:       int,
 	block_max:     int,
 	total:         i64,
+	flushed:       i64,
 	content_size:  i64,
 	digest:        xxhash.XXH32_state,
 	err:           Error,
 	allocator:     runtime.Allocator,
+	options:       compress.Options,
 	level:         Level,
 	frame_options: Frame_Options,
 	flags:         Frame_Flags,
 	needs_index:   bool,
 	finished:      bool,
 	owns_window:   bool,
+}
+
+@(private)
+LZ4_Check :: struct {
+	options:   compress.Options,
+	interval:  int,
+	mark:      int,
+	consumed:  i64,
+	total_in:  i64,
+	total_out: i64,
+	limit:     int,
+	err:       Error,
 }
 
 @(private)
@@ -136,6 +154,7 @@ LZ4_Stream_State :: enum u8 {
 @(private)
 LZ4_Frame_Header :: struct {
 	block_max:        int,
+	size:             int,
 	content_size:     i64,
 	independent:      bool,
 	block_checksum:   bool,
@@ -204,7 +223,7 @@ LZ4_LEVELS := [Level]LZ4_Level_Parameters{
 	.Level_7  = {64,   512,   .Lazy},
 	.Level_8  = {128,  1024,  .Lazy},
 	.Level_9  = {256,  4096,  .Lazy},
-	.Level_10 = {64,   128,   .Optimal},
+	.Level_10 = {96,   128,   .Optimal},
 	.Level_11 = {256,  512,   .Optimal},
 	.Level_12 = {1024, 1024,  .Optimal},
 }

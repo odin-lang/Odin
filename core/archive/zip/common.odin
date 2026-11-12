@@ -69,7 +69,7 @@ END_SEARCH_MAX  :: size_of(End_Record) + 0xFFFF + size_of(Zip64_Locator)
 COPY_CHUNK_SIZE :: 64 * 1024
 LINK_TARGET_MAX :: 4096
 
-ONE_SHOT_MAX      :: i64(#config(ZIP_ONE_SHOT_MAX, 16 * 1024 * 1024))
+ONE_SHOT_MAX      :: i64(#config(ZIP_ONE_SHOT_MAX, 256 * 1024))
 WRITE_CHUNK_SIZE  :: 256 * 1024
 ZIP16_MAX         :: 0xFFFF
 ZIP32_MAX         :: 0xFFFF_FFFF

@@ -763,7 +763,7 @@ _compress :: proc(zw: ^Writer, p: ^Pending_Entry, input: []u8, packed: ^[dynamic
 	case .Deflate64:
 		deflate.deflate64_raw_to_dynamic(packed, input, deflate.Deflate_Level(p.level), zw.allocator) or_return
 	case .BZip2:
-		bzip2.compress_to_dynamic(packed, input, bzip2.Level(p.level), zw.allocator) or_return
+		bzip2.compress_to_dynamic(packed, input, bzip2.Level(p.level), _codec_options(zw), zw.allocator) or_return
 	case .LZMA:
 		options := lzma.level_options(lzma.Level(p.level))
 		options.end_marker = true

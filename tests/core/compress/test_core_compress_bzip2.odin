@@ -139,7 +139,7 @@ bzip2_compress_arguments :: proc(t: ^testing.T) {
 	state := new(bzip2.BZip2)
 	defer free(state)
 
-	small := make([]u8, bzip2.compress_bound(len(input)) - 1)
+	small := make([]u8, 16)
 	defer delete(small)
 	_, err := bzip2.compress(state, small, input)
 	testing.expect_value(t, err, compress.General_Error.Output_Too_Short)

@@ -470,7 +470,7 @@ codec_writer_oneshot :: proc(codec: Codec, data: []byte, setup: Codec_Writer_Set
 		if setup.content_size < 0 {
 			frame_options.flags -= {.Content_Size}
 		}
-		lz4.compress_frame(output, data, setup.lz4_level, frame_options, setup.dictionary)
+		lz4.compress_frame(output, data, setup.lz4_level, frame_options, dictionary = setup.dictionary)
 	}
 }
 
