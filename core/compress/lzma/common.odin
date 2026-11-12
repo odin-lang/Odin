@@ -33,6 +33,34 @@ Error         :: compress.Error
 General_Error :: compress.General_Error
 LZMA_Error    :: compress.LZMA_Error
 
+CHUNK_SIZE :: 256 * 1024
+
+Reader :: struct {
+	z:           ^compress.Context,
+	decoder:     Decoder,
+	lzma2:       LZMA2_State,
+	window:      [dynamic]u8,
+	out:         Output,
+	flushed:     int,
+	keep:        int,
+	size:        int,
+	kind:        Stream_Kind,
+	from_format: bool,
+	done:        bool,
+	owns_window: bool,
+	options:     compress.Options,
+	allocator:   runtime.Allocator,
+	total_in:    i64,
+	err:         Error,
+}
+
+@(private)
+Stream_Kind :: enum u8 {
+	Alone,
+	Raw,
+	LZMA2,
+}
+
 LZMA2_Decoder :: struct {
 	probs:     []u16,
 	allocator: runtime.Allocator,

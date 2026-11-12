@@ -5,7 +5,7 @@ Reading:
 - Opens archives from a path, a byte slice or a seekable `io.Stream`
 - Lists members through `core:archive`'s shared iterator, in storage order, and finds them by path
 - Extracts one or more files; extracting several reads the archive in one forward pass
-- Streams members through an `io.Reader`: Store, Deflate, Deflate64, bzip2 and PPMd decode as they are read, LZMA, XZ and the pkzip-legacy methods are decoded in one shot first
+- Streams members through an `io.Reader`: Store, Deflate, Deflate64, bzip2, LZMA and PPMd decode as they are read, XZ and the pkzip-legacy methods are decoded in one shot first
 - Supported compression methods: Store, Shrink, Reduce, Implode, Deflate, Deflate64, bzip2, LZMA, PPMd and XZ
 - Decrypts WinZip AES (AE-1 and AE-2, 128, 192 and 256-bit keys, MAC checked) and ZipCrypto members, given the password in `archive.Read_Options`
 - ZIP64, data descriptors and self-extracting archives
@@ -28,7 +28,7 @@ Writing:
 
 Planned:
 - Split and spanned archives
-- Streaming extraction for LZMA, XZ and the pkzip-legacy methods
+- Streaming extraction for XZ and the pkzip-legacy methods
 - Copy-on-write updates, safe alongside concurrent readers
 */
 package archive_zip
@@ -38,6 +38,7 @@ import "core:archive"
 import "core:compress"
 import "core:compress/bzip2"
 import "core:compress/deflate"
+import "core:compress/lzma"
 import "core:compress/ppmd"
 import "core:io"
 import "core:os"
@@ -315,6 +316,7 @@ Member_Mode :: enum u8 {
 	Inflate,
 	BZip2,
 	PPMd,
+	LZMA,
 	Buffer,
 }
 
@@ -343,6 +345,7 @@ Member :: struct {
 	inflate:   deflate.Inflate_Reader,
 	bzip2:     bzip2.Reader,
 	ppmd:      ppmd.Reader,
+	lzma:      lzma.Reader,
 	progress:  Read_Progress,
 	cipher:    Cipher,
 	buffer:    [dynamic]u8,

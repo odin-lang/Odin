@@ -670,7 +670,7 @@ _extract_payload :: proc(r: ^Reader, index: int, data_offset: i64, w: io.Writer,
 	rp.head = section.offset - data_offset
 
 	#partial switch method {
-	case .Store, .Deflate, .Deflate64, .BZip2, .PPMd:
+	case .Store, .Deflate, .Deflate64, .BZip2, .PPMd, .LZMA:
 	case:
 		buffer: [dynamic]u8
 		buffer.allocator = r.allocator
@@ -686,9 +686,14 @@ _extract_payload :: proc(r: ^Reader, index: int, data_offset: i64, w: io.Writer,
 		_copy(r, &rp, section, rec.size, out) or_return
 	} else {
 		props: ppmd.Properties
-		if method == .PPMd {
+		lzma_props: lzma.Properties
+		#partial switch method {
+		case .PPMd:
 			props   = _ppmd_properties(section) or_return
 			rp.head = section.offset - data_offset
+		case .LZMA:
+			lzma_props = _lzma_properties(section) or_return
+			rp.head    = section.offset - data_offset
 		}
 		input: []u8
 		ctx := _section_context(r, section, &input, r.allocator)
@@ -705,6 +710,8 @@ _extract_payload :: proc(r: ^Reader, index: int, data_offset: i64, w: io.Writer,
 			decode_err = bzip2.decompress_to_writer(out, &ctx, expected, options, r.allocator)
 		case .PPMd:
 			decode_err = ppmd.decompress_to_writer(out, &ctx, props, expected, options, r.allocator)
+		case .LZMA:
+			decode_err = lzma.decompress_raw_to_writer(out, &ctx, lzma_props, expected, options, r.allocator)
 		}
 		if decode_err != nil {
 			if cw.over || (_declared_limit(r, rec) && decode_err == compress.General_Error.Output_Too_Short) {
@@ -738,6 +745,26 @@ _ppmd_properties :: proc(section: ^Section) -> (props: ppmd.Properties, err: Err
 	head: [ppmd.PROPERTIES_ZIP_SIZE]u8
 	_section_read_full(section, head[:]) or_return
 	decoded, props_err := ppmd.decode_properties_zip(head[:])
+	if props_err != nil {
+		return {}, props_err
+	}
+	return decoded, nil
+}
+
+@(private)
+_lzma_properties :: proc(section: ^Section) -> (props: lzma.Properties, err: Error) {
+	head: [4]u8
+	_section_read_full(section, head[:]) or_return
+	props_size := int(_u16(head[:], 2))
+	if props_size < lzma.PROPERTIES_SIZE || i64(props_size) > section.end - section.offset {
+		return {}, Zip_Error.Truncated
+	}
+	raw: [64]u8
+	if props_size > len(raw) {
+		return {}, Zip_Error.Truncated
+	}
+	_section_read_full(section, raw[:props_size]) or_return
+	decoded, props_err := lzma.decode_properties(raw[:lzma.PROPERTIES_SIZE])
 	if props_err != nil {
 		return {}, props_err
 	}
@@ -892,19 +919,6 @@ _decode :: proc(r: ^Reader, rec: ^Record, method: Method, flags: Flags, crc: May
 			options += {.Literal_Tree}
 		}
 		decode_err = legacy.explode_from_bytes(out, input, options, expected, limit, r.allocator)
-	case .LZMA:
-		if len(input) < 4 {
-			return Zip_Error.Truncated
-		}
-		props_size := int(_u16(input, 2))
-		if props_size < lzma.PROPERTIES_SIZE || 4 + props_size > len(input) {
-			return Zip_Error.Truncated
-		}
-		props, props_err := lzma.decode_properties(input[4:][:props_size])
-		if props_err != nil {
-			return props_err
-		}
-		decode_err = lzma.decompress_raw_from_bytes(out, input[4 + props_size:], props, expected, limit, r.allocator)
 	case .XZ:
 		decode_err = xz.decompress_from_bytes(out, input, {}, expected, limit, r.allocator)
 	case:
@@ -969,10 +983,15 @@ _member_init :: proc(m: ^Member, r: ^Reader, index: int, data_offset: i64, passw
 	case .Store:
 		_store_check(r, rec, &m.section) or_return
 		m.mode = .Store
-	case .Deflate, .Deflate64, .BZip2, .PPMd:
+	case .Deflate, .Deflate64, .BZip2, .PPMd, .LZMA:
 		props: ppmd.Properties
-		if method == .PPMd {
+		lzma_props: lzma.Properties
+		#partial switch method {
+		case .PPMd:
 			props           = _ppmd_properties(&m.section) or_return
+			m.progress.head = m.section.offset - data_offset
+		case .LZMA:
+			lzma_props      = _lzma_properties(&m.section) or_return
 			m.progress.head = m.section.offset - data_offset
 		}
 		m.ctx = _section_context(r, &m.section, &m.input, allocator)
@@ -995,6 +1014,11 @@ _member_init :: proc(m: ^Member, r: ^Reader, index: int, data_offset: i64, passw
 			m.mode = .PPMd
 			if init_err = ppmd.reader_init(&m.ppmd, &m.ctx, props, expected, options, allocator); init_err != nil {
 				ppmd.reader_destroy(&m.ppmd)
+			}
+		case .LZMA:
+			m.mode = .LZMA
+			if init_err = lzma.reader_init_raw(&m.lzma, &m.ctx, lzma_props, expected, options, allocator); init_err != nil {
+				lzma.reader_destroy(&m.lzma)
 			}
 		}
 		if init_err != nil {
@@ -1030,6 +1054,9 @@ _member_destroy :: proc(m: ^Member) {
 	case .PPMd:
 		ppmd.reader_destroy(&m.ppmd)
 		compress.destroy_context(&m.ctx)
+	case .LZMA:
+		lzma.reader_destroy(&m.lzma)
+		compress.destroy_context(&m.ctx)
 	case .Buffer:
 		delete(m.buffer)
 	}
@@ -1061,7 +1088,7 @@ _member_read :: proc(m: ^Member, p: []u8) -> (n: int, err: Error) {
 			return 0, m.err
 		}
 		n = want
-	case .Inflate, .BZip2, .PPMd:
+	case .Inflate, .BZip2, .PPMd, .LZMA:
 		codec_err: compress.Error
 		#partial switch m.mode {
 		case .Inflate:
@@ -1070,6 +1097,8 @@ _member_read :: proc(m: ^Member, p: []u8) -> (n: int, err: Error) {
 			n, codec_err = bzip2.reader_read(&m.bzip2, p)
 		case .PPMd:
 			n, codec_err = ppmd.reader_read(&m.ppmd, p)
+		case .LZMA:
+			n, codec_err = lzma.reader_read(&m.lzma, p)
 		}
 		if codec_err != nil {
 			if io_err, is_io := codec_err.(io.Error); is_io && io_err == .EOF {

@@ -95,7 +95,7 @@ decompress_lzma2_from_context :: proc(z: ^compress.Context, dict_size: u32, expe
 
 	o := output_begin(z, expected, max_output_size)
 	defer output_end(z, &o)
-	return decode_lzma2_body(&d, z, &o, expected)
+	return lzma2_run(&d, z, &o, expected)
 }
 
 lzma2_decoder_init :: proc(dec: ^LZMA2_Decoder, allocator := context.allocator) {
@@ -126,7 +126,7 @@ decompress_lzma2_append :: proc(dec: ^LZMA2_Decoder, output: ^[dynamic]u8, input
 
 	data := input
 	ctx  := compress.init_context_from_slice(&data, output=output)
-	o    := Output{buf = output, written = start, limit = max_output_size}
+	o    := Output{buf = output, written = start, limit = max_output_size, end = max_output_size}
 	bound := -1
 	if len(input) < max(int) / compress.LZMA_EXPANSION_MAX {
 		bound = len(input) * compress.LZMA_EXPANSION_MAX
@@ -138,7 +138,7 @@ decompress_lzma2_append :: proc(dec: ^LZMA2_Decoder, output: ^[dynamic]u8, input
 		}
 	}
 	size := start + expected_size if expected_size >= 0 else -1
-	err = decode_lzma2_body(&d, &ctx, &o, size)
+	err = lzma2_run(&d, &ctx, &o, size)
 	non_zero_resize(output, o.written)
 	return len(input) - len(ctx.window), err
 }
@@ -155,6 +155,7 @@ Decoder :: struct {
 	remain:     u32,
 	processed:  u32,
 	check_dict: u32,
+	consumed:   i64,
 }
 
 @(private)
@@ -172,6 +173,24 @@ Output :: struct {
 	buf:     ^[dynamic]u8,
 	written: int,
 	limit:   int,
+	base:    int,
+	end:     int,
+}
+
+@(private)
+LZMA2_Chunk :: enum u8 {
+	None,
+	Copy,
+	LZMA,
+}
+
+@(private)
+LZMA2_State :: struct {
+	need_init: u8,
+	chunk:     LZMA2_Chunk,
+	chunk_end: int,
+	packed:    int,
+	done:      bool,
 }
 
 @(private)
@@ -185,14 +204,19 @@ decompress_lzma :: proc(z: ^compress.Context, props: Properties, size: int, from
 	defer delete(d.probs)
 	decoder_reset_state(&d)
 
-	target := size if size >= 0 else o.limit
+	target := size if size >= 0 else o.end
 	packed := -1
 	eos    := decode_segment(&d, z, &o, target, &packed) or_return
+	return lzma_finish(&d, z, &o, size, eos, from_format)
+}
+
+@(private)
+lzma_finish :: proc(d: ^Decoder, z: ^compress.Context, o: ^Output, size: int, eos, from_format: bool) -> (err: Error) {
 	if eos {
 		if d.code != 0 {
 			return LZMA_Error.Corrupt_Range_Coder
 		}
-		if size >= 0 && o.written != size {
+		if size >= 0 && o.base + o.written != size {
 			return LZMA_Error.Unexpected_End_Marker
 		}
 		return nil
@@ -204,108 +228,142 @@ decompress_lzma :: proc(z: ^compress.Context, props: Properties, size: int, from
 	if d.remain != 0 {
 		return overflow
 	}
-	if (size >= 0 && d.code == 0) || decode_end_marker(&d, z) {
+	if (size >= 0 && d.code == 0) || decode_end_marker(d, z) {
 		return nil
 	}
 	return overflow
 }
 
 @(private)
-decode_lzma2_body :: proc(d: ^Decoder, z: ^compress.Context, o: ^Output, size: int) -> (err: Error) {
-	target    := size if size >= 0 else o.limit
-	overflow  := Error(General_Error.Output_Too_Short)
-	need_init := u8(LZMA2_CONTROL_RESET_DICT)
-	for {
-		control, control_err := compress.read_u8(z)
-		if control_err != nil {
-			return General_Error.Stream_Too_Short
-		}
-		if control == 0 {
-			break
-		}
+lzma2_run :: proc(d: ^Decoder, z: ^compress.Context, o: ^Output, size: int) -> (err: Error) {
+	s := LZMA2_State{need_init = LZMA2_CONTROL_RESET_DICT}
+	lzma2_fill(d, z, o, &s, size) or_return
+	if !s.done {
+		return General_Error.Output_Too_Short
+	}
+	return nil
+}
 
-		if control < LZMA2_CONTROL_LZMA {
-			if control == LZMA2_CONTROL_COPY_RESET_DICT {
-				need_init = LZMA2_CONTROL_SET_PROPS
-			} else if control > LZMA2_CONTROL_COPY || need_init == LZMA2_CONTROL_RESET_DICT {
+@(private)
+lzma2_fill :: proc(d: ^Decoder, z: ^compress.Context, o: ^Output, s: ^LZMA2_State, size: int) -> (err: Error) {
+	target   := size if size >= 0 else o.end
+	overflow := Error(General_Error.Output_Too_Short)
+	for !s.done {
+		switch s.chunk {
+		case .Copy:
+			for o.base + o.written < s.chunk_end {
+				if o.written >= o.limit {
+					return nil
+				}
+				n := min(s.chunk_end - o.base - o.written, o.limit - o.written)
+				output_ensure(o, o.written + n) or_return
+				if compress.read_slice(z, o.buf^[o.written:][:n]) != nil {
+					return General_Error.Stream_Too_Short
+				}
+				d.consumed += i64(n)
+				if d.check_dict == 0 && d.dict_size - d.processed <= u32(n) {
+					d.check_dict = d.dict_size
+				}
+				d.processed += u32(n)
+				o.written   += n
+			}
+			s.chunk = .None
+		case .LZMA:
+			eos := decode_segment(d, z, o, s.chunk_end, &s.packed) or_return
+			if !eos && o.base + o.written < s.chunk_end && o.written >= o.limit {
+				return nil
+			}
+			if eos || o.base + o.written != s.chunk_end || d.remain != 0 || d.code != 0 || s.packed != 0 {
 				return LZMA_Error.Invalid_Chunk
 			}
-			header: [2]u8
+			s.chunk = .None
+		case .None:
+			control, control_err := compress.read_u8(z)
+			if control_err != nil {
+				return General_Error.Stream_Too_Short
+			}
+			d.consumed += 1
+			if control == 0 {
+				if size >= 0 && o.base + o.written != size {
+					return LZMA_Error.Size_Mismatch
+				}
+				s.done = true
+				break
+			}
+			current := o.base + o.written
+
+			if control < LZMA2_CONTROL_LZMA {
+				if control == LZMA2_CONTROL_COPY_RESET_DICT {
+					s.need_init = LZMA2_CONTROL_SET_PROPS
+				} else if control > LZMA2_CONTROL_COPY || s.need_init == LZMA2_CONTROL_RESET_DICT {
+					return LZMA_Error.Invalid_Chunk
+				}
+				header: [2]u8
+				if compress.read_slice(z, header[:]) != nil {
+					return General_Error.Stream_Too_Short
+				}
+				d.consumed += 2
+				n := (int(header[0]) << 8 | int(header[1])) + 1
+				if control == LZMA2_CONTROL_COPY_RESET_DICT {
+					d.processed  = 0
+					d.check_dict = 0
+				}
+				if n > target - current {
+					return overflow
+				}
+				s.chunk     = .Copy
+				s.chunk_end = current + n
+				continue
+			}
+
+			if control < s.need_init {
+				return LZMA_Error.Invalid_Chunk
+			}
+			s.need_init = 0
+			header: [4]u8
 			if compress.read_slice(z, header[:]) != nil {
 				return General_Error.Stream_Too_Short
 			}
-			n := (int(header[0]) << 8 | int(header[1])) + 1
-			if control == LZMA2_CONTROL_COPY_RESET_DICT {
+			d.consumed += 4
+			unpacked := (int(control & 0x1F) << 16 | int(header[0]) << 8 | int(header[1])) + 1
+			packed   := (int(header[2]) << 8 | int(header[3])) + 1
+			if control >= LZMA2_CONTROL_SET_PROPS {
+				b, b_err := compress.read_u8(z)
+				if b_err != nil {
+					return General_Error.Stream_Too_Short
+				}
+				d.consumed += 1
+				if b >= 9 * 5 * 5 {
+					return LZMA_Error.Invalid_Properties
+				}
+				lc := b % 9
+				b  /= 9
+				lp := b % 5
+				if lc + lp > LZMA2_LCLP_MAX {
+					return LZMA_Error.Invalid_Properties
+				}
+				d.props.lc = lc
+				d.props.lp = lp
+				d.props.pb = b / 5
+			}
+			if control >= LZMA2_CONTROL_RESET_DICT {
 				d.processed  = 0
 				d.check_dict = 0
 			}
-			if n > target - o.written {
+			if control >= LZMA2_CONTROL_RESET_STATE {
+				decoder_reset_state(d)
+			}
+			if unpacked > target - current {
 				return overflow
 			}
-			output_ensure(o, o.written + n) or_return
-			if compress.read_slice(z, o.buf^[o.written:][:n]) != nil {
-				return General_Error.Stream_Too_Short
+			if packed < RC_INIT_SIZE {
+				return LZMA_Error.Invalid_Chunk
 			}
-			if d.check_dict == 0 && d.dict_size - d.processed <= u32(n) {
-				d.check_dict = d.dict_size
-			}
-			d.processed += u32(n)
-			o.written   += n
-			continue
+			rc_init(d, z) or_return
+			s.packed    = packed - RC_INIT_SIZE
+			s.chunk     = .LZMA
+			s.chunk_end = current + unpacked
 		}
-
-		if control < need_init {
-			return LZMA_Error.Invalid_Chunk
-		}
-		need_init = 0
-		header: [4]u8
-		if compress.read_slice(z, header[:]) != nil {
-			return General_Error.Stream_Too_Short
-		}
-		unpacked := (int(control & 0x1F) << 16 | int(header[0]) << 8 | int(header[1])) + 1
-		packed   := (int(header[2]) << 8 | int(header[3])) + 1
-		if control >= LZMA2_CONTROL_SET_PROPS {
-			b, b_err := compress.read_u8(z)
-			if b_err != nil {
-				return General_Error.Stream_Too_Short
-			}
-			if b >= 9 * 5 * 5 {
-				return LZMA_Error.Invalid_Properties
-			}
-			lc := b % 9
-			b  /= 9
-			lp := b % 5
-			if lc + lp > LZMA2_LCLP_MAX {
-				return LZMA_Error.Invalid_Properties
-			}
-			d.props.lc = lc
-			d.props.lp = lp
-			d.props.pb = b / 5
-		}
-		if control >= LZMA2_CONTROL_RESET_DICT {
-			d.processed  = 0
-			d.check_dict = 0
-		}
-		if control >= LZMA2_CONTROL_RESET_STATE {
-			decoder_reset_state(d)
-		}
-		if unpacked > target - o.written {
-			return overflow
-		}
-		if packed < RC_INIT_SIZE {
-			return LZMA_Error.Invalid_Chunk
-		}
-		rc_init(d, z) or_return
-		packed -= RC_INIT_SIZE
-
-		chunk_end := o.written + unpacked
-		eos := decode_segment(d, z, o, chunk_end, &packed) or_return
-		if eos || o.written != chunk_end || d.remain != 0 || d.code != 0 || packed != 0 {
-			return LZMA_Error.Invalid_Chunk
-		}
-	}
-	if size >= 0 && o.written != size {
-		return LZMA_Error.Size_Mismatch
 	}
 	return nil
 }
@@ -338,6 +396,7 @@ rc_init :: proc(d: ^Decoder, z: ^compress.Context) -> (err: Error) {
 	if compress.read_slice(z, buf[:]) != nil {
 		return General_Error.Stream_Too_Short
 	}
+	d.consumed += RC_INIT_SIZE
 	if buf[0] != 0 {
 		return LZMA_Error.Corrupt_Range_Coder
 	}
@@ -354,6 +413,7 @@ output_begin :: proc(z: ^compress.Context, declared, max_output_size: int) -> (o
 	o.buf     = z.output
 	o.written = 0
 	o.limit   = declared if declared >= 0 else max_output_size
+	o.end     = o.limit
 
 	input_size := compress.input_size(z)
 	bound      := -1
@@ -406,12 +466,13 @@ write_remaining :: proc(d: ^Decoder, o: ^Output, limit: int) -> (err: Error) #no
 decode_segment :: proc(d: ^Decoder, z: ^compress.Context, o: ^Output, limit: int, packed: ^int) -> (eos: bool, err: Error) {
 	memory := compress.is_memory_context(z)
 	for {
-		write_remaining(d, o, limit) or_return
-		if o.written >= limit {
+		phys := limit - o.base
+		write_remaining(d, o, min(phys, o.limit)) or_return
+		if o.written >= phys || o.written >= o.limit {
 			return false, nil
 		}
 		output_ensure(o, o.written + 1) or_return
-		cur_limit := min(len(o.buf^), limit)
+		cur_limit := min(len(o.buf^), phys)
 		if d.check_dict == 0 {
 			rem := uint(d.dict_size - d.processed)
 			if uint(cur_limit - o.written) > rem {
@@ -445,6 +506,7 @@ decode_segment :: proc(d: ^Decoder, z: ^compress.Context, o: ^Output, limit: int
 		d.code   = rc.code
 		consumed := min(rc.pos, len(avail))
 		z.window  = z.window[consumed:]
+		d.consumed += i64(consumed)
 		if packed^ >= 0 {
 			packed^ -= consumed
 		}
@@ -726,5 +788,6 @@ decode_end_marker :: proc(d: ^Decoder, z: ^compress.Context) -> (ok: bool) {
 		return false
 	}
 	z.window = z.window[rc.pos:]
+	d.consumed += i64(rc.pos)
 	return true
 }
