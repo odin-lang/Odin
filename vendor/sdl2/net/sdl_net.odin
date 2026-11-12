@@ -13,8 +13,8 @@ when ODIN_OS == .Windows {
 bool :: SDL.bool
 
 MAJOR_VERSION :: 2
-MINOR_VERSION :: 0
-PATCHLEVEL    :: 1
+MINOR_VERSION :: 4
+PATCHLEVEL    :: 0
 
 IPaddress :: struct {
 	host: u32,            /* 32-bit IPv4 host address */
@@ -49,6 +49,8 @@ TCPsocket :: distinct rawptr
 @(default_calling_convention="c", link_prefix="SDLNet_")
 foreign lib {
 	TCP_Open           :: proc(ip: ^IPaddress) -> TCPsocket ---
+	TCP_OpenServer     :: proc(ip: ^IPaddress) -> TCPsocket ---
+	TCP_OpenClient     :: proc(ip: ^IPaddress) -> TCPsocket ---
 	TCP_Accept         :: proc(server: TCPsocket) -> TCPsocket ---
 	TCP_GetPeerAddress :: proc(sock: TCPsocket) -> ^IPaddress ---
 	TCP_Send           :: proc(sock: TCPsocket, data: rawptr, len: c.int) -> c.int ---

@@ -21,5 +21,5 @@ atof :: proc(s: string) -> f64 {
 
 @(deprecated="Use strconv.write_float() instead")
 ftoa :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> string {
-	return string(generic_ftoa(buf, f, fmt, prec, bit_size))
+	return string(generic_ftoa(buf, f, fmt, prec, bit_size, { .Plus }))
 }

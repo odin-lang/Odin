@@ -6,6 +6,11 @@ when ODIN_OS == .Windows {
 	@(export, extra_linker_flags="/NODEFAULTLIB:msvcrt")
 	foreign import lib {
 		"lib/libcurl.lib",
+		"lib/zs.lib",
+		"lib/brotlidec.lib",
+		"lib/brotlicommon.lib",
+		"lib/zstd_static.lib",
+		"lib/nghttp2.lib",
 		"system:Advapi32.lib",
 		"system:Crypt32.lib",
 		"system:Normaliz.lib",
@@ -36,11 +41,11 @@ socklen_t :: c.int
 COPYRIGHT :: "Daniel Stenberg, <daniel@haxx.se>."
 
 /* This is the version number of the libcurl package from which this header file origins: */
-VERSION :: "8.17.0"
+VERSION :: "8.23.0"
 
 /* The numeric version number is also available "in parts" by using these defines: */
 VERSION_MAJOR :: 8
-VERSION_MINOR :: 17
+VERSION_MINOR :: 23
 VERSION_PATCH :: 0
 
 /*
@@ -63,7 +68,7 @@ VERSION_PATCH :: 0
 	CURL_VERSION_BITS() macro since curl's own configure script greps for it
 	and needs it to contain the full number.
 */
-VERSION_NUM :: 0x081100
+VERSION_NUM :: 0x081700
 
 /*
  * This is the date and time when the full source package was created. The
@@ -729,9 +734,14 @@ AUTH_DIGEST_IE    :: ((c.ulong)(1))<<4
 
 AUTH_BEARER       :: ((c.ulong)(1))<<6
 AUTH_AWS_SIGV4    :: ((c.ulong)(1))<<7
+AUTH_HTTPSIG      :: ((c.ulong)(1))<<8
 AUTH_ONLY         :: ((c.ulong)(1))<<31
-AUTH_ANY          :: ~AUTH_DIGEST_IE
-AUTH_ANYSAFE      :: ~(AUTH_BASIC|AUTH_DIGEST_IE)
+AUTH_ANY          :: (~(AUTH_DIGEST_IE|AUTH_HTTPSIG)) & c.ulong(0xffffffff)
+AUTH_ANYSAFE      :: (~(AUTH_BASIC|AUTH_DIGEST_IE|AUTH_HTTPSIG)) & c.ulong(0xffffffff)
+
+HTTPSIG_NONE        :: 0
+HTTPSIG_ED25519     :: 1
+HTTPSIG_HMAC_SHA256 :: 2
 
 SSH_AUTH_ANY       :: ~c.int(0)     /* all types supported by the server */
 SSH_AUTH_NONE      :: 0      /* none allowed, silly but complete */
@@ -977,7 +987,7 @@ PROTO_SMB     :: (1<<26)
 PROTO_SMBS    :: (1<<27)
 PROTO_MQTT    :: (1<<28)
 PROTO_GOPHERS :: (1<<29)
-PROTO_ALL     :: (~c.int(0)) /* enable everything */
+PROTO_ALL     :: c.ulong(0xffffffff) /* enable everything */
 
 /* long may be 32 or 64 bits, but we should never depend on anything else but 32 */
 OPTTYPE_LONG          :: 0
@@ -2046,6 +2056,14 @@ option :: enum c.int {
 
 	/* set TLS supported signature algorithms */
 	SSL_SIGNATURE_ALGORITHMS = OPTTYPE_STRINGPOINT + 328,
+
+	HTTPSIG_ALGORITHM = OPTTYPE_VALUES + 329,
+
+	HTTPSIG_KEY = OPTTYPE_STRINGPOINT + 330,
+
+	HTTPSIG_KEYID = OPTTYPE_STRINGPOINT + 331,
+
+	HTTPSIG_HEADERS = OPTTYPE_STRINGPOINT + 332,
 }
 
 
@@ -2623,6 +2641,7 @@ INFO :: enum c.int {
 	EARLYDATA_SENT_T          = INFO_OFF_T + 68,
 	HTTPAUTH_USED             = INFO_LONG + 69,
 	PROXYAUTH_USED            = INFO_LONG + 70,
+	SIZE_DELIVERED            = INFO_OFF_T + 71,
 
 	/* CURLINFO_RESPONSE_CODE is the new name for the option previously known as
 	   CURLINFO_HTTP_CODE */
@@ -2642,8 +2661,9 @@ closepolicy :: enum c.int {
 }
 
 GLOBAL_SSL       :: 1<<0 /* no purpose since 7.57.0 */
-GLOBAL_WIN32     :: 1<<1
-GLOBAL_ALL       :: (GLOBAL_SSL|GLOBAL_WIN32)
+GLOBAL_WINSOCK   :: 1<<1
+GLOBAL_WIN32     :: GLOBAL_WINSOCK
+GLOBAL_ALL       :: (GLOBAL_SSL|GLOBAL_WINSOCK)
 GLOBAL_NOTHING   :: 0
 GLOBAL_DEFAULT   :: GLOBAL_ALL
 GLOBAL_ACK_EINTR :: 1<<2

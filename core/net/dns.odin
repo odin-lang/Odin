@@ -209,33 +209,41 @@ get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type
 
 		_ = send(conn, dns_packet[:], name_server) or_continue
 
-		if set_option(conn, .Receive_Timeout, time.Second * 1) != nil {
-			return nil, .Connection_Error
-		}
+		deadline := time.tick_add(time.tick_now(), time.Second * 1)
+		for {
+			timeout := time.tick_diff(time.tick_now(), deadline)
+			if timeout < time.Millisecond {
+				break
+			}
+			if set_option(conn, .Receive_Timeout, timeout) != nil {
+				return nil, .Connection_Error
+			}
 
-		recv_sz, src := recv_udp(conn, dns_response_buf[:]) or_continue
-		if recv_sz == 0 {
-			continue
-		}
-		if src != name_server {
-			continue
-		}
+			recv_sz, src := recv_udp(conn, dns_response_buf[:]) or_break
+			if recv_sz < size_of(id) {
+				continue
+			}
+			if src != name_server && !(is_multicast(name_server.address) && src.port == name_server.port) {
+				continue
+			}
 
-		dns_response = dns_response_buf[:recv_sz]
+			dns_response = dns_response_buf[:recv_sz]
+			xid := transmute(u16be)[2]u8{dns_response[0], dns_response[1]}
+			if xid != id {
+				continue
+			}
 
-		rsp, xid, _ok := parse_response(dns_response, type)
-		if !_ok {
-			return nil, .Server_Error
-		}
-		if id != xid {
-			continue
-		}
+			rsp, _, _ok := parse_response(dns_response, type)
+			if !_ok {
+				return nil, .Server_Error
+			}
 
-		if len(rsp) == 0 {
-			continue
-		}
+			if len(rsp) == 0 {
+				break
+			}
 
-		return rsp[:], nil
+			return rsp[:], nil
+		}
 	}
 
 	return
@@ -622,6 +630,9 @@ validate_hostname :: proc(hostname: string) -> (ok: bool) {
 
 parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil, allocator := context.allocator) -> (record: DNS_Record, ok: bool) {
 	context.allocator = allocator
+	if cur_off^ < 0 || cur_off^ > len(packet) {
+		return
+	}
 	record_buf := packet[cur_off^:]
 
 	srv_record_name, hn_sz := decode_hostname(packet, cur_off^, context.temp_allocator) or_return
@@ -639,6 +650,9 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil,
 
 	data_sz := record_hdr.length
 	data_off := cur_off^ + int(hn_sz) + int(ahdr_sz)
+	if int(data_sz) > len(packet) - data_off {
+		return
+	}
 	data := packet[data_off:data_off+int(data_sz)]
 	cur_off^ += int(hn_sz) + int(ahdr_sz) + int(data_sz)
 
@@ -724,18 +738,18 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil,
 			// Not to be confused with the _target_ of the record, which is--in combination with the port--what we're looking up
 			// by making this request in the first place.
 
-			// NOTE(Jeroen): Service Name and Protocol Name can probably just be string slices into the record name.
-			// It's already cloned, after all. I wouldn't put them on the temp allocator like this.
-
-			parts := strings.split_n(srv_record_name, ".", 3, context.temp_allocator)
+			record_name := strings.clone(srv_record_name)
+			parts := strings.split_n(record_name, ".", 3, context.temp_allocator)
 			if len(parts) != 3 {
+				delete(record_name)
+				delete(target)
 				return
 			}
 			service_name, protocol_name := parts[0], parts[1]
 
 			_record = DNS_Record_SRV{
 				base = DNS_Record_Base{
-					record_name = strings.clone(srv_record_name),
+					record_name = record_name,
 					ttl_seconds = u32(record_hdr.ttl),
 				},
 				target        = target,
@@ -831,6 +845,10 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 		hn_sz := skip_hostname(response, cur_idx) or_return
 
 		cur_idx += hn_sz + dq_sz
+		if cur_idx > len(response) {
+			delete(_records)
+			return
+		}
 	}
 
 	for _ in 0..<answer_count {
@@ -838,7 +856,11 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 			continue
 		}
 
-		rec := parse_record(response, &cur_idx, filter) or_return
+		rec, rec_ok := parse_record(response, &cur_idx, filter)
+		if !rec_ok {
+			destroy_dns_records(_records[:])
+			return
+		}
 		if rec != nil {
 			append(&_records, rec)
 		}
@@ -849,7 +871,11 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 			continue
 		}
 
-		rec := parse_record(response, &cur_idx, filter) or_return
+		rec, rec_ok := parse_record(response, &cur_idx, filter)
+		if !rec_ok {
+			destroy_dns_records(_records[:])
+			return
+		}
 		if rec != nil {
 			append(&_records, rec)
 		}
@@ -860,7 +886,11 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 			continue
 		}
 
-		rec := parse_record(response, &cur_idx, filter) or_return
+		rec, rec_ok := parse_record(response, &cur_idx, filter)
+		if !rec_ok {
+			destroy_dns_records(_records[:])
+			return
+		}
 		if rec != nil {
 			append(&_records, rec)
 		}

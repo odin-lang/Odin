@@ -4,6 +4,39 @@ package linux
 
 import "base:intrinsics"
 
+/*
+	Android's seccomp filter allows i386's socket system calls only through `socketcall`, which bionic makes.
+	There, `socketcall_number` gives a socket system call's `socketcall` call, and the `syscall`s below make it.
+*/
+@(private)
+SOCKETCALL :: ODIN_ARCH == .i386 && ODIN_PLATFORM_SUBTARGET == .Android
+
+@(private)
+socketcall_number :: #force_inline proc "contextless" (nr: uintptr) -> uintptr {
+	when SOCKETCALL {
+		switch nr {
+		case SYS_socket:      return 1
+		case SYS_bind:        return 2
+		case SYS_connect:     return 3
+		case SYS_listen:      return 4
+		case SYS_getsockname: return 6
+		case SYS_getpeername: return 7
+		case SYS_socketpair:  return 8
+		case SYS_sendto:      return 11
+		case SYS_recvfrom:    return 12
+		case SYS_shutdown:    return 13
+		case SYS_setsockopt:  return 14
+		case SYS_getsockopt:  return 15
+		case SYS_sendmsg:     return 16
+		case SYS_recvmsg:     return 17
+		case SYS_accept4:     return 18
+		case SYS_recvmmsg:    return 19
+		case SYS_sendmmsg:    return 20
+		}
+	}
+	return 0
+}
+
 // Note(flysand): In the case of syscall let's get rid of extra
 // casting. First of all, let these syscalls return int, because
 // we'll need to check for Errno anyway. Second of all
@@ -29,6 +62,12 @@ where
 	size_of(p1) <= size_of(uintptr),
 	size_of(p2) <= size_of(uintptr) 
 {
+	when SOCKETCALL {
+		if call := socketcall_number(nr); call != 0 {
+			args := [2]uintptr{uintptr(p1), uintptr(p2)}
+			return int(intrinsics.syscall(SYS_socketcall, call, uintptr(&args)))
+		}
+	}
 	return int(intrinsics.syscall(nr, uintptr(p1), uintptr(p2)))
 }
 
@@ -39,6 +78,12 @@ where
 	size_of(p2) <= size_of(uintptr),
 	size_of(p3) <= size_of(uintptr)
 {
+	when SOCKETCALL {
+		if call := socketcall_number(nr); call != 0 {
+			args := [3]uintptr{uintptr(p1), uintptr(p2), uintptr(p3)}
+			return int(intrinsics.syscall(SYS_socketcall, call, uintptr(&args)))
+		}
+	}
 	return int(intrinsics.syscall(nr,
 		uintptr(p1),
 		uintptr(p2),
@@ -54,6 +99,12 @@ where
 	size_of(p3) <= size_of(uintptr),
 	size_of(p4) <= size_of(uintptr)
 {
+	when SOCKETCALL {
+		if call := socketcall_number(nr); call != 0 {
+			args := [4]uintptr{uintptr(p1), uintptr(p2), uintptr(p3), uintptr(p4)}
+			return int(intrinsics.syscall(SYS_socketcall, call, uintptr(&args)))
+		}
+	}
 	return int(intrinsics.syscall(nr,
 		uintptr(p1),
 		uintptr(p2),
@@ -71,6 +122,12 @@ where
 	size_of(p4) <= size_of(uintptr),
 	size_of(p5) <= size_of(uintptr)
 {
+	when SOCKETCALL {
+		if call := socketcall_number(nr); call != 0 {
+			args := [5]uintptr{uintptr(p1), uintptr(p2), uintptr(p3), uintptr(p4), uintptr(p5)}
+			return int(intrinsics.syscall(SYS_socketcall, call, uintptr(&args)))
+		}
+	}
 	return int(intrinsics.syscall(nr,
 		uintptr(p1),
 		uintptr(p2),
@@ -90,6 +147,12 @@ where
 	size_of(p5) <= size_of(uintptr),
 	size_of(p6) <= size_of(uintptr)
 {
+	when SOCKETCALL {
+		if call := socketcall_number(nr); call != 0 {
+			args := [6]uintptr{uintptr(p1), uintptr(p2), uintptr(p3), uintptr(p4), uintptr(p5), uintptr(p6)}
+			return int(intrinsics.syscall(SYS_socketcall, call, uintptr(&args)))
+		}
+	}
 	return int(intrinsics.syscall(nr,
 		uintptr(p1),
 		uintptr(p2),

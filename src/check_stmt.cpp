@@ -1552,6 +1552,9 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 	TypeSet seen = {};
 	defer (type_set_destroy(&seen));
 
+	Ast *first_shim_case = nullptr;
+	isize shim_case_count = 0;
+
 	for (Ast *stmt : bs->stmts) {
 		if (stmt->kind != Ast_CaseClause) {
 			// NOTE(bill): error handled by above multiple default checker
@@ -1597,6 +1600,14 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 					continue;
 				}
 
+				if (is_type_polymorphic(y.type)) {
+					gbString str = type_to_string(y.type);
+					error(type_expr, "Invalid use of a polymorphic type '%s' in a type switch case", str);
+					gb_string_free(str);
+					continue;
+				}
+
+				Type *seen_type = y.type;
 				if (switch_kind == TypeSwitch_Union) {
 					GB_ASSERT(is_type_union(bt));
 					bool tag_type_found = false;
@@ -1607,13 +1618,25 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 						}
 					}
 					if (!tag_type_found) {
+						Type *vt = type_info_variant_shim_type(bt, y.type);
+						if (vt != nullptr) {
+							tag_type_found = true;
+							seen_type = vt;
+
+							if (first_shim_case == nullptr) {
+								first_shim_case = type_expr;
+							}
+							shim_case_count += 1;
+						}
+					}
+					if (!tag_type_found) {
 						gbString type_str = type_to_string(y.type);
 						error(y.expr, "Unknown variant type, got '%s'", type_str);
 						gb_string_free(type_str);
 						continue;
 					}
 					case_type = y.type;
-					add_type_info_type(ctx, y.type);
+					add_type_info_type(ctx, seen_type);
 				} else if (switch_kind == TypeSwitch_Any) {
 					case_type = y.type;
 					add_type_info_type(ctx, y.type);
@@ -1621,7 +1644,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 					GB_PANIC("Unknown type to type switch statement");
 				}
 
-				if (type_set_update(&seen, y.type)) {
+				if (type_set_update(&seen, seen_type)) {
 					TokenPos pos = cc->token.pos;
 					gbString expr_str = expr_to_string(y.expr);
 					error(y.expr,
@@ -1663,6 +1686,16 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		}
 		check_stmt_list(ctx, cc->stmts, mod_flags);
 		check_close_scope(ctx);
+	}
+
+	if (first_shim_case != nullptr) {
+		gbString type_str = expr_to_string(first_shim_case);
+		if (shim_case_count == 1) {
+			warning(first_shim_case, "'case %s' on 'runtime.Type_Info.variant' is deprecated as it now holds pointers; use 'case ^%s'", type_str, type_str);
+		} else {
+			warning(first_shim_case, "'case %s' and %td other value cases on 'runtime.Type_Info.variant' are deprecated as it now holds pointers; use 'case ^%s' and so on", type_str, shim_case_count-1, type_str);
+		}
+		gb_string_free(type_str);
 	}
 
 	if (!is_partial && is_type_union(type_deref(x.type))) {
@@ -2224,6 +2257,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 				entity = alloc_entity_variable(ctx->scope, token, nullptr);
 				entity->identifier = name;
 				add_semantic_ident(ctx->info, name, entity, true);
+				add_semantic_attributes(ctx->info, entity, vd->attributes);
 
 				Ast *fl = ctx->foreign_context.curr_library;
 				if (fl != nullptr) {
@@ -2277,12 +2311,10 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 		if (init_type == nullptr) {
 			init_type = t_invalid;
 		} else if (is_type_polymorphic(base_type(init_type))) {
-			/* DISABLED: This error seems too aggressive for instantiated generic types.
 			gbString str = type_to_string(init_type);
 			error(vd->type, "Invalid use of a polymorphic type '%s' in variable declaration", str);
 			gb_string_free(str);
 			init_type = t_invalid;
-			*/
 		}
 		if (init_type == t_invalid && entity_count == 1 && (mod_flags & (Stmt_BreakAllowed|Stmt_FallthroughAllowed))) {
 			Entity *e = entities[0];
@@ -2717,7 +2749,8 @@ gb_internal void check_unsafe_return(Operand const &o, Type *type, Ast *expr) {
 			unsafe_return_error(o, "a slice of a compound literal");
 		}
 	} else if (o.mode == Addressing_Constant && is_type_slice(type)) {
-		if (is_load_directive_call(o.expr)) {
+		// Constant strings are loaded into read-only memory, so this is fine.
+		if (o.value.kind == ExactValue_String || o.value.kind == ExactValue_String16) {
 			return;
 		}
 

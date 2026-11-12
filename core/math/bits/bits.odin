@@ -3,6 +3,16 @@ package math_bits
 
 import "base:intrinsics"
 
+/*
+	Copyright 2017 Ginger Bill.
+	Copyright 2025 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's license.
+
+	List of contributors:
+		Ginger Bill:     Initial implementation.
+		Jeroen van Rijn: Documentation.
+*/
+
 // The minimum value held by a `u8`. The same value as `min(u8)`, except untyped.
 U8_MIN  :: 0
 // The minimum value held by a `u16`. The same value as `min(u16)`, except untyped.

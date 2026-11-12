@@ -17,6 +17,10 @@
 *.pdb
 *.sh
 
+!core/compress/lz4_vector_*.bin
+
+__pycache__/
+
 # Ignore documentation-related files.
 /documentation/verify/
 /documentation/all.odin-doc

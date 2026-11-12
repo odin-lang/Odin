@@ -1,7 +1,7 @@
 package test_core_compress
 
 /*
-	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2026 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's license.
 
 	List of contributors:
@@ -11,11 +11,12 @@ package test_core_compress
 */
 
 import "core:testing"
-
-import "core:compress/zlib"
-import "core:compress/gzip"
+import "core:compress"
+import "core:compress/deflate"
 import "core:compress/shoco"
 import "core:bytes"
+
+SLIM_TESTS :: #config(ODIN_TEST_SLIM, ODIN_ARCH == .riscv64)
 
 @test
 zlib_test :: proc(t: ^testing.T) {
@@ -39,15 +40,17 @@ zlib_test :: proc(t: ^testing.T) {
 		 63, 234, 138, 133, 204,
 	}
 
-	buf: bytes.Buffer
-	err := zlib.inflate(ODIN_DEMO, &buf)
+	buf: [dynamic]byte
+	err := deflate.inflate_zlib(&buf, ODIN_DEMO)
 
 	testing.expect(t, err == nil, "ZLIB failed to decompress ODIN_DEMO")
-	s := bytes.buffer_to_string(&buf)
+	s := string(buf[:])
 
 	testing.expect(t, s[68] == 240 && s[69] == 159 && s[70] == 152, "ZLIB result should've contained 😃 at position 68.")
 	testing.expect(t, len(s) == 438, "ZLIB result has an unexpected length.")
-	bytes.buffer_destroy(&buf)
+	delete(buf)
+
+	expect_truncated_fails(t, "ODIN_DEMO", .ZLIB, ODIN_DEMO)
 }
 
 @test
@@ -64,18 +67,50 @@ gzip_test :: proc(t: ^testing.T) {
 		0x6a, 0x2c, 0x42, 0x07, 0x00, 0x00, 0x00,
 	}
 
-	buf: bytes.Buffer
-	err := gzip.load(TEST, &buf)
+	buf: [dynamic]byte
+	err := deflate.inflate_gzip(&buf, TEST)
 
 	testing.expect(t, err == nil, "GZIP failed to decompress TEST")
-	testing.expect(t, bytes.buffer_to_string(&buf) == "payload", "GZIP result wasn't 'payload'")
+	testing.expect(t, string(buf[:]) == "payload", "GZIP result wasn't 'payload'")
 
-	bytes.buffer_destroy(&buf)
+	delete(buf)
+
+	expect_truncated_fails(t, "TEST", .GZIP, TEST)
+}
+
+expect_truncated_fails :: proc(t: ^testing.T, name: string, format: Deflate_Format, data: []u8) {
+	for n in 0..<len(data) {
+		expect_slice_fails(t, name, "head", format, data[:n], len(data))
+		expect_slice_fails(t, name, "tail", format, data[len(data) - n:], len(data))
+	}
+}
+
+expect_slice_fails :: proc(t: ^testing.T, name, kept: string, format: Deflate_Format, data: []u8, full: int) {
+	buf: [dynamic]byte
+	err: compress.Error
+	switch format {
+	case .Raw:  err = deflate.inflate_raw(&buf, data)
+	case .ZLIB: err = deflate.inflate_zlib(&buf, data)
+	case .GZIP: err = deflate.inflate_gzip(&buf, data)
+	}
+	delete(buf)
+	testing.expectf(t, err != nil, "%v, %v: %v %v of %v bytes decompressed without error", name, format, kept, len(data), full)
+
+	for kind in Stream_Kind {
+		input := data
+		br: bytes.Reader
+		tr: Trickle_Reader
+		output: [dynamic]byte
+		ctx := stream_test_context(kind, &input, &br, &tr, &output)
+		ctx_err := deflate_test_unpack(format, &ctx)
+		compress.destroy_context(&ctx)
+		delete(output)
+		testing.expectf(t, ctx_err != nil, "%v, %v, %v: %v %v of %v bytes decompressed without error", name, format, kind, kept, len(data), full)
+	}
 }
 
 @test
 shoco_test :: proc(t: ^testing.T) {
-
 	Shoco_Tests :: []struct{
 		compressed:     []u8,
 		raw:            []u8,

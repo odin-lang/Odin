@@ -4,11 +4,13 @@ package lua_5_3
 import "base:intrinsics"
 import "base:builtin"
 
-import c "core:c/libc"
+import c "core:c"
 
 #assert(size_of(c.int) == size_of(b32))
 
 LUA_SHARED :: #config(LUA_SHARED, false)
+
+LUA_WASM_LIB :: #config(LUA_WASM_LIB, "env.o")
 
 when LUA_SHARED {
 	when ODIN_OS == .Windows {
@@ -16,6 +18,8 @@ when LUA_SHARED {
 		foreign import lib "windows/lua53dll.lib"
 	} else when ODIN_OS == .Linux && ODIN_ARCH == .amd64 {
 		foreign import lib "linux/liblua53.so"
+	} else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+		foreign import lib { LUA_WASM_LIB }
 	} else {
 		foreign import lib "system:lua5.3"
 	}
@@ -24,6 +28,8 @@ when LUA_SHARED {
 		foreign import lib "windows/lua53dll.lib"
 	} else when ODIN_OS == .Linux && ODIN_ARCH == .amd64 {
 		foreign import lib "linux/liblua53.a"
+	} else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+		foreign import lib { LUA_WASM_LIB }
 	} else {
 		foreign import lib "system:lua5.3"
 	}
@@ -78,8 +84,9 @@ IDSIZE :: 60
 
 /*
 @@ LUAL_BUFFERSIZE is the buffer size used by the lauxlib buffer system.
+** In Lua 5.3 it is 0x80 * sizeof(void *) * sizeof(lua_Integer), and lua_Integer is a 64 bit `long long`.
 */
-L_BUFFERSIZE :: c.int(16 * size_of(rawptr) * size_of(Number))
+L_BUFFERSIZE :: c.int(0x80 * size_of(rawptr) * size_of(i64))
 
 
 MAXALIGNVAL :: max(align_of(Number), align_of(f64), align_of(rawptr), align_of(Integer), align_of(c.long))
@@ -308,7 +315,7 @@ State :: struct {} // opaque data type
 
 @(link_prefix="lua_")
 @(default_calling_convention="c")
-foreign lib {
+foreign {
 	/*
 	** RCS ident string
 	*/
@@ -422,7 +429,7 @@ foreign lib {
 	rawseti      :: proc(L: ^State, idx: c.int, n: Integer) ---
 	rawsetp      :: proc(L: ^State, idx: c.int, p: rawptr) ---
 	setmetatable :: proc(L: ^State, objindex: c.int) -> c.int ---
-	setuservalue :: proc(L: ^State, idx: c.int) -> c.int ---
+	setuservalue :: proc(L: ^State, idx: c.int) ---
 
 
 	/*
@@ -476,7 +483,7 @@ foreign lib {
 
 	stringtonumber :: proc(L: ^State, s: cstring) -> c.size_t ---
 
-	getallocf :: proc(L: State, ud: ^rawptr) -> Alloc ---
+	getallocf :: proc(L: ^State, ud: ^rawptr) -> Alloc ---
 	setallocf :: proc(L: ^State, f: Alloc, ud: rawptr) ---
 
 	/*
@@ -552,7 +559,7 @@ PRELOAD_TABLE :: "_PRELOAD"
 
 L_Reg :: struct {
 	name: cstring,
-  	func: CFunction,
+	func: CFunction,
 }
 
 L_NUMSIZES :: size_of(Integer)*16 + size_of(Number)
@@ -644,7 +651,7 @@ L_Buffer :: struct {
 }
 
 L_addchar :: #force_inline proc "c" (B: ^L_Buffer, c: byte) {
-	if B.n < B.size {
+	if B.n >= B.size {
 		L_prepbuffsize(B, 1)
 	}
 	B.b[B.n] = c

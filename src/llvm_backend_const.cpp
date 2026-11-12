@@ -36,6 +36,10 @@ gb_internal bool lb_is_elem_const(Ast *elem, Type *elem_type) {
 	}
 	TypeAndValue tav = type_and_value_of_expr(elem);
 	GB_ASSERT_MSG(tav.mode != Addressing_Invalid, "%s %s", expr_to_string(elem), type_to_string(tav.type));
+	if (tav.type != nullptr && !are_types_identical(tav.type, elem_type) &&
+	    check_is_assignable_to_using_subtype(tav.type, elem_type) > 0) {
+		return false;
+	}
 	return tav.value.kind != ExactValue_Invalid;
 }
 
@@ -935,6 +939,48 @@ gb_internal bool lb_const_value_is_broadcast(Type *elem_type, Type *lit_type) {
 	return type_conversion_is_variant(elem_type, lit_type);
 }
 
+gb_internal lbValue lb_const_value_using_subtype(lbModule *m, Type *dst, Type *src, ExactValue value, lbConstContext cc) {
+	lbValue res = lb_const_value(m, src, value, cc);
+
+	TEMPORARY_ALLOCATOR_GUARD();
+	Selection sel = {};
+	sel.index.allocator = temporary_allocator();
+	bool found = lookup_subtype_polymorphic_selection(dst, src, &sel);
+	GB_ASSERT_MSG(found && sel.entity != nullptr, "invalid subtype conversion %s -> %s", type_to_string(src), type_to_string(dst));
+
+	bool can_extract = LLVMIsConstant(res.value) && !sel.indirect;
+	Type *t = src;
+	for (i32 index : sel.index) {
+		Type *bt = base_type(t);
+		if (bt->kind != Type_Struct || bt->Struct.is_raw_union) {
+			can_extract = false;
+			break;
+		}
+		t = bt->Struct.fields[index]->type;
+	}
+
+	if (can_extract) {
+		t = src;
+		for (i32 index : sel.index) {
+			Type *bt = base_type(t);
+			res.value = llvm_const_extract_value(m, res.value, cast(unsigned)lb_convert_struct_index(m, bt, index));
+			t = bt->Struct.fields[index]->type;
+		}
+		res.type = dst;
+		return res;
+	}
+
+	if (m->curr_procedure == nullptr) {
+		gbString src_str = type_to_string(src);
+		gbString dst_str = type_to_string(dst);
+		error(value.value_compound, "Cannot convert the constant '%s' to '%s' at compile time, its 'using' field '%.*s' is reached through a pointer", src_str, dst_str, LIT(sel.entity->token.string));
+		gb_string_free(dst_str);
+		gb_string_free(src_str);
+		return lb_const_nil(m, dst);
+	}
+	return lb_emit_conv(m->curr_procedure, res, dst);
+}
+
 gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lbConstContext cc) {
 	if (cc.allow_local) {
 		cc.is_rodata = false;
@@ -1524,6 +1570,13 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		return res;
 
 	case ExactValue_Compound:
+		if (value.value_compound != nullptr) {
+			Type *literal_type = type_of_expr(value.value_compound);
+			if (literal_type != nullptr && !are_types_identical(literal_type, original_type) &&
+			    check_is_assignable_to_using_subtype(literal_type, original_type) > 0) {
+				return lb_const_value_using_subtype(m, original_type, literal_type, value, cc);
+			}
+		}
 		if (is_type_bit_field(original_type)) {
 			return lb_const_value_bit_field(m, original_type, value.value_compound);
 		} else if (is_type_slice(type)) {

@@ -289,6 +289,145 @@ arena_free_all :: proc(a: ^Arena) {
 	// sanitizer.address_poison(a.data)
 }
 
+/*
+Resize an allocation owned by an arena.
+
+This procedure resizes a memory region defined by its location `old_memory` and its size `old_size` to have a size `size` and alignment `alignment`.
+The newly allocated memory, if any, is zero-initialized.
+
+If `old_memory` is `nil`, this procedure acts just like `arena_alloc()`, allocating a memory region `size` bytes in size,
+aligned on a boundary specified by `alignment`.
+
+The last allocation is resized in place if it fits, and gives its tail back to the arena when it shrinks,
+unless a temporary memory region is active. Any other allocation shrinks in place, and moves to grow.
+
+This procedure returns the pointer to the resized memory region.
+*/
+@(require_results)
+arena_resize :: proc(
+	a:          ^Arena,
+	old_memory: rawptr,
+	old_size:   int,
+	size:       int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc       := #caller_location,
+) -> (rawptr, Allocator_Error) {
+	bytes, err := arena_resize_bytes(a, byte_slice(old_memory, old_size), size, alignment, loc)
+	return raw_data(bytes), err
+}
+
+/*
+Resize an allocation owned by an arena.
+
+This procedure resizes a memory region specified by `old_data` to have a size `size` and alignment `alignment`.
+The newly allocated memory, if any, is zero-initialized.
+
+If `old_memory` is `nil`, this procedure acts just like `arena_alloc()`, allocating a memory region `size` bytes in size,
+aligned on a boundary specified by `alignment`.
+
+The last allocation is resized in place if it fits, and gives its tail back to the arena when it shrinks, unless a temporary memory region is active.
+Any other allocation shrinks in place and moves to grow.
+
+This procedure returns the slice of the resized memory region.
+*/
+@(require_results)
+arena_resize_bytes :: proc(
+	a:        ^Arena,
+	old_data: []byte,
+	size:     int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc       := #caller_location,
+) -> ([]byte, Allocator_Error) {
+	bytes, err := arena_resize_bytes_non_zeroed(a, old_data, size, alignment, loc)
+	if bytes != nil && size > len(old_data) {
+		zero_slice(bytes[len(old_data):])
+	}
+	return bytes, err
+}
+
+/*
+Resize an allocation owned by an arena, without zero-initialization.
+
+This procedure resizes a memory region defined by its location `old_memory` and its size `old_size` to have a size `size` and alignment `alignment`.
+The newly allocated memory, if any, is not explicitly zero-initialized.
+
+If `old_memory` is `nil`, this procedure acts just like `arena_alloc()`, allocating a memory region `size` bytes in size,
+aligned on a boundary specified by `alignment`.
+
+The last allocation is resized in place if it fits, and gives its tail back to the arena when it shrinks,
+unless a temporary memory region is active. Any other allocation shrinks in place, and moves to grow.
+
+This procedure returns the pointer to the resized memory region.
+*/
+@(require_results)
+arena_resize_non_zeroed :: proc(
+	a:          ^Arena,
+	old_memory: rawptr,
+	old_size:   int,
+	size:       int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc       := #caller_location,
+) -> (rawptr, Allocator_Error) {
+	bytes, err := arena_resize_bytes_non_zeroed(a, byte_slice(old_memory, old_size), size, alignment, loc)
+	return raw_data(bytes), err
+}
+
+/*
+Resize an allocation owned by an arena, without zero-initialization.
+
+This procedure resizes a memory region specified by `old_data` to have a size `size` and alignment `alignment`.
+The newly allocated memory, if any, is not explicitly zero-initialized.
+
+If `old_memory` is `nil`, this procedure acts just like `arena_alloc()`, allocating a memory region `size` bytes in size,
+aligned on a boundary specified by `alignment`.
+
+The last allocation is resized in place if it fits, and gives its tail back to the arena when it shrinks,
+unless a temporary memory region is active. Any other allocation shrinks in place, and moves to grow.
+
+This procedure returns the slice of the resized memory region.
+*/
+@(require_results)
+arena_resize_bytes_non_zeroed :: proc(
+	a:        ^Arena,
+	old_data: []byte,
+	size:     int,
+	alignment := DEFAULT_ALIGNMENT,
+	loc       := #caller_location,
+) -> ([]byte, Allocator_Error) {
+	old_memory := raw_data(old_data)
+	old_size   := len(old_data)
+	if old_memory == nil {
+		return arena_alloc_bytes_non_zeroed(a, size, alignment, loc)
+	}
+	if is_aligned(old_memory, alignment) {
+		begin   := uintptr(raw_data(a.data))
+		old_ptr := uintptr(old_memory)
+		is_last := begin <= old_ptr && old_ptr+uintptr(old_size) == begin+uintptr(a.offset)
+		switch {
+		case is_last && int(old_ptr-begin)+size <= len(a.data):
+			// NOTE(bill): A temporary memory region may have saved an offset inside the tail; therefore keep the tail while one is active.
+			if size > old_size || a.temp_count == 0 {
+				// sanitizer.address_poison(old_data[size:])
+				a.offset    = int(old_ptr-begin) + size
+				a.peak_used = max(a.peak_used, a.offset)
+			}
+			result := byte_slice(old_memory, size)
+			// sanitizer.address_unpoison(result)
+			return result, nil
+
+		case size <= old_size:
+			// sanitizer.address_poison(old_data[size:])
+			return byte_slice(old_memory, size), nil
+		}
+	}
+	data, err := arena_alloc_bytes_non_zeroed(a, size, alignment, loc)
+	if err == nil {
+		runtime.copy(data, old_data)
+		// sanitizer.address_poison(old_data)
+	}
+	return data, err
+}
+
 arena_allocator_proc :: proc(
 	allocator_data: rawptr,
 	mode:           Allocator_Mode,
@@ -309,9 +448,9 @@ arena_allocator_proc :: proc(
 	case .Free_All:
 		arena_free_all(arena)
 	case .Resize:
-		return default_resize_bytes_align(byte_slice(old_memory, old_size), size, alignment, arena_allocator(arena), loc)
+		return arena_resize_bytes(arena, byte_slice(old_memory, old_size), size, alignment, loc)
 	case .Resize_Non_Zeroed:
-		return default_resize_bytes_align_non_zeroed(byte_slice(old_memory, old_size), size, alignment, arena_allocator(arena), loc)
+		return arena_resize_bytes_non_zeroed(arena, byte_slice(old_memory, old_size), size, alignment, loc)
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory)
 		if set != nil {
@@ -607,8 +746,7 @@ scratch_free :: proc(s: ^Scratch, ptr: rawptr, loc := #caller_location) -> Alloc
 	}
 	if len(s.leaked_allocations) != 0 {
 		for data, i in s.leaked_allocations {
-			ptr := raw_data(data)
-			if ptr == ptr {
+			if raw_data(data) == ptr {
 				free_bytes(data, s.backup_allocator, loc)
 				ordered_remove(&s.leaked_allocations, i, loc)
 				return nil
@@ -686,7 +824,7 @@ scratch_resize_bytes :: proc(
 ) -> ([]byte, Allocator_Error) {
 	bytes, err := scratch_resize_bytes_non_zeroed(s, old_data, size, alignment, loc)
 	if bytes != nil && size > len(old_data) {
-		zero_slice(bytes[size:])
+		zero_slice(bytes[len(old_data):])
 	}
 	return bytes, err
 }
@@ -753,6 +891,9 @@ scratch_resize_bytes_non_zeroed :: proc(
 		}
 		scratch_init(s, DEFAULT_BACKING_SIZE)
 	}
+	if old_memory == nil {
+		return scratch_alloc_bytes_non_zeroed(s, size, alignment, loc)
+	}
 	begin   := uintptr(raw_data(s.data))
 	end     := begin + uintptr(len(s.data))
 	old_ptr := uintptr(old_memory)
@@ -761,7 +902,7 @@ scratch_resize_bytes_non_zeroed :: proc(
 	//
 	// Also, the alignments must match, otherwise we must re-allocate to
 	// guarantee the user's request.
-	if s.prev_allocation == old_memory && is_aligned(old_memory, alignment) && old_ptr+uintptr(size) < end {
+	if s.prev_allocation == old_memory && is_aligned(old_memory, alignment) && old_ptr+uintptr(size) <= end {
 		// ensure_not_poisoned(old_data)
 		// sanitizer.address_poison(old_memory)
 		s.curr_offset = int(old_ptr-begin)+size
@@ -1172,7 +1313,8 @@ stack_resize_bytes_non_zeroed :: proc(
 	}
 	header := (^Stack_Allocation_Header)(curr_addr - size_of(Stack_Allocation_Header))
 	old_offset := int(curr_addr - uintptr(header.padding) - uintptr(raw_data(s.data)))
-	if old_offset != header.prev_offset {
+	if old_offset != s.prev_offset {
+		// Not the last allocation, so it cannot be resized in place.
 		data, err := stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
 		if err == nil {
 			runtime.copy(data, byte_slice(old_memory, old_size))
@@ -1183,10 +1325,12 @@ stack_resize_bytes_non_zeroed :: proc(
 	old_memory_size := uintptr(s.curr_offset) - (curr_addr - start)
 	assert(old_memory_size == uintptr(old_size))
 	diff := size - old_size
+	if s.curr_offset + diff > len(s.data) {
+		return nil, .Out_Of_Memory
+	}
 	s.curr_offset += diff // works for smaller sizes too
-	if diff > 0 {
-		zero(rawptr(curr_addr + uintptr(diff)), diff)
-	} else {
+	s.peak_used = max(s.peak_used, s.curr_offset)
+	if diff < 0 {
 		// sanitizer.address_poison(old_data[size:])
 	}
 	result := byte_slice(old_memory, size)
@@ -1591,6 +1735,20 @@ small_stack_resize_bytes_non_zeroed :: proc(
 		result := byte_slice(old_memory, size)
 		// sanitizer.address_unpoison(result)
 		return result, nil
+	}
+	is_last := curr_addr+uintptr(old_size) == start+uintptr(s.offset)
+	switch {
+	case is_last && int(curr_addr-start)+size <= len(s.data):
+		// sanitizer.address_poison(old_data[size:])
+		s.offset    = int(curr_addr-start) + size
+		s.peak_used = max(s.peak_used, s.offset)
+		result := byte_slice(old_memory, size)
+		// sanitizer.address_unpoison(result)
+		return result, nil
+
+	case size < old_size:
+		// sanitizer.address_poison(old_data[size:])
+		return byte_slice(old_memory, size), nil
 	}
 	data, err := small_stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
 	if err == nil {
@@ -2002,12 +2160,34 @@ dynamic_arena_resize_bytes_non_zeroed :: proc(
 	}
 	old_memory := raw_data(old_data)
 	old_size := len(old_data)
-	if old_size >= size {
-		// sanitizer.address_poison(old_data[size:])
-		return byte_slice(old_memory, size), nil
+	if is_aligned(old_memory, alignment) {
+		// No information is kept about allocations in this allocator, but the
+		// last one in the current block ends less than `minimum_alignment`
+		// bytes before `current_pos`, as any later one takes at least that
+		// many bytes. It can be resized in place.
+		old_end   := uintptr(old_memory) + uintptr(old_size)
+		curr_pos  := uintptr(a.current_pos)
+		block_end := curr_pos + uintptr(a.bytes_left)
+		if old_size > 0                                    &&
+		   uintptr(a.current_block) <= uintptr(old_memory) &&
+		   old_end <= curr_pos                             &&
+		   curr_pos-old_end < uintptr(a.minimum_alignment) {
+			new_pos := uintptr(old_memory) + uintptr(align_formula(size, max(a.minimum_alignment, alignment)))
+			if new_pos <= block_end {
+				// sanitizer.address_poison(old_data[size:])
+				a.current_pos = rawptr(new_pos)
+				a.bytes_left  = int(block_end - new_pos)
+				result := byte_slice(old_memory, size)
+				// sanitizer.address_unpoison(result)
+				return result, nil
+			}
+		}
+		if old_size >= size {
+			// sanitizer.address_poison(old_data[size:])
+			return byte_slice(old_memory, size), nil
+		}
 	}
-	// No information is kept about allocations in this allocator, thus we
-	// cannot truly resize anything and must reallocate.
+	// Any other allocation cannot truly be resized, and must be reallocated.
 	data, err := dynamic_arena_alloc_bytes_non_zeroed(a, size, alignment, loc)
 	if err == nil {
 		runtime.copy(data, byte_slice(old_memory, old_size))
@@ -2491,6 +2671,11 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		return rra.parent.procedure(rra.parent.data, mode, orig_size, header.alignment, orig_ptr, orig_size, location)
 
 	case .Resize, .Resize_Non_Zeroed:
+		if old_memory == nil {
+			alloc_mode := Allocator_Mode.Alloc if mode == .Resize else .Alloc_Non_Zeroed
+			return compat_allocator_proc(allocator_data, alloc_mode, size, alignment, nil, 0, location)
+		}
+
 		header    := get_unpoisoned_header(old_memory)
 		orig_a    := max(header.alignment, size_of(Header))
 		orig_ptr  := rawptr(uintptr(old_memory)-uintptr(orig_a))
@@ -2503,6 +2688,10 @@ compat_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		assert(size >= 0, "overflow")
 
 		allocation := rra.parent.procedure(rra.parent.data, mode, req_size, new_alignment, orig_ptr, orig_size, location) or_return
+		if a != orig_a {
+			// The header grew with the alignment, so the data must move up after it.
+			runtime.copy(allocation[a:], allocation[orig_a:][:min(header.size, size)])
+		}
 		#no_bounds_check data = allocation[a:]
 
 		([^]Header)(raw_data(data))[-1] = {

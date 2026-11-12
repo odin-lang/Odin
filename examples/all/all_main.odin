@@ -14,6 +14,13 @@ package all
 @(require) import "core:compress/shoco"
 @(require) import "core:compress/gzip"
 @(require) import "core:compress/zlib"
+@(require) import "core:compress/bzip2"
+@(require) import "core:compress/deflate"
+@(require) import "core:compress/filters"
+@(require) import "core:compress/lz4"
+@(require) import "core:compress/lzma"
+@(require) import "core:compress/ppmd"
+@(require) import pkzip_legacy "core:compress/pkzip-legacy"
 
 @(require) import "core:container/avl"
 @(require) import "core:container/bit_array"
@@ -67,6 +74,8 @@ package all
 @(require) import "core:debug/pe"
 @(require) import "core:debug/trace"
 
+@(require) import "core:diff"
+
 @(require) import "core:dynlib"
 @(require) import "core:net"
 
@@ -90,6 +99,7 @@ package all
 
 @(require) import "core:image"
 @(require) import "core:image/bmp"
+@(require) import "core:image/bng"
 @(require) import "core:image/netpbm"
 @(require) import "core:image/png"
 @(require) import "core:image/qoi"

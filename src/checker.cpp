@@ -218,6 +218,7 @@ gb_internal void init_decl_info_proc(DeclInfo *d, Ast *proc_lit) {
 	if (d->proc == nullptr) {
 		ProcDeclInfo *p = permanent_alloc_item<ProcDeclInfo>();
 		p->nested_to_check.allocator = heap_allocator();
+		p->asm_templates_to_check.allocator = heap_allocator();
 		p->labels.allocator = heap_allocator();
 		p->variadic_reuses.allocator = heap_allocator();
 		p->variadic_reuse_max_align = 1;
@@ -1475,7 +1476,10 @@ gb_internal void init_universal(void) {
 	{
 		int minimum_os_version = 0;
 		if (build_context.minimum_os_version_string != "") {
-			int major, minor, revision = 0;
+			int major    = 0;
+			int minor    = 0;
+			int revision = 0;
+
 		#if defined(GB_SYSTEM_WINDOWS)
 			sscanf_s(cast(const char *)(build_context.minimum_os_version_string.text), "%d.%d.%d", &major, &minor, &revision);
 		#else
@@ -1764,6 +1768,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	per_thread_array_init(&i->definition_queue, global_thread_pool.threads.count);
 	per_thread_array_init(&i->semantic_ident_queue, global_thread_pool.threads.count);
 	per_thread_array_init(&i->semantic_when_queue,  global_thread_pool.threads.count);
+	per_thread_array_init(&i->semantic_attributes_queue, global_thread_pool.threads.count);
 	per_thread_array_init(&i->checked_bodies_queue, global_thread_pool.threads.count);
 	per_thread_array_init(&i->checked_calls_queue,  global_thread_pool.threads.count);
 	per_thread_array_init(&i->checked_atomics_queue,   global_thread_pool.threads.count);
@@ -1804,6 +1809,7 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	per_thread_array_destroy(&i->definition_queue);
 	per_thread_array_destroy(&i->semantic_ident_queue);
 	per_thread_array_destroy(&i->semantic_when_queue);
+	per_thread_array_destroy(&i->semantic_attributes_queue);
 	per_thread_array_destroy(&i->checked_bodies_queue);
 	per_thread_array_destroy(&i->checked_calls_queue);
 	per_thread_array_destroy(&i->checked_atomics_queue);
@@ -1906,6 +1912,7 @@ gb_internal void init_checker(Checker *c) {
 
 	// NOTE(bill): 1 Mi elements should be enough on average
 	array_init(&c->procs_to_check, heap_allocator(), 0, 1<<20);
+	array_init(&c->asm_templates_to_check, heap_allocator());
 
 	per_thread_array_init(&c->global_untyped_queue, global_thread_pool.threads.count);
 	mpsc_init(&c->soa_types_to_complete, a); // , 1<<20);
@@ -1928,6 +1935,7 @@ gb_internal void destroy_checker(Checker *c) {
 	destroy_checker_context(&c->builtin_ctx);
 
 	array_free(&c->procs_to_check);
+	array_free(&c->asm_templates_to_check);
 	per_thread_array_destroy(&c->global_untyped_queue);
 	mpsc_destroy(&c->soa_types_to_complete);
 }
@@ -2199,6 +2207,12 @@ gb_internal void add_semantic_ident(CheckerInfo *i, Token const &token, Entity *
 
 gb_internal void add_semantic_ident(CheckerInfo *i, Ast *identifier, Entity *entity, bool definition) {
 	add_semantic_ident(i, identifier->Ident.token, entity, definition);
+}
+
+gb_internal void add_semantic_attributes(CheckerInfo *i, Entity *entity, Array<Ast *> const &attributes) {
+	if (build_context.export_semantics_format != SemanticsFormat_Invalid && attributes.count > 0) {
+		per_thread_array_add(&i->semantic_attributes_queue, SemanticAttributes{entity, &attributes});
+	}
 }
 
 gb_internal void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
@@ -2831,6 +2845,24 @@ gb_internal void check_procedure_later(Checker *c, AstFile *file, Token token, D
 	check_procedure_later(c, info);
 }
 
+gb_internal WORKER_TASK_PROC(check_asm_template_body_worker_proc);
+
+// NOTE(bill): like a procedure literal, only the signature of an asm template is needed to use it, so the rest of it
+// is checked once all of the procedure body it is within has been (as the names in that body are not all known
+// before then), otherwise with the procedure bodies
+gb_internal void check_asm_template_body_later(CheckerContext *c, Entity *e) {
+	GB_ASSERT(e->kind == Entity_AsmTemplate);
+	if (c->asm_templates_to_check != nullptr) {
+		array_add(c->asm_templates_to_check, e);
+	} else if (global_procedure_body_in_worker_queue.load()) {
+		thread_pool_add_task(check_asm_template_body_worker_proc, e);
+	} else {
+		mutex_lock(&c->checker->asm_templates_to_check_mutex);
+		array_add(&c->checker->asm_templates_to_check, e);
+		mutex_unlock(&c->checker->asm_templates_to_check_mutex);
+	}
+}
+
 
 gb_global Entity *min_dep_basic_equal_procs[Basic_COUNT];
 
@@ -3292,7 +3324,7 @@ gb_internal WORKER_TASK_PROC(add_definitions_to_set_worker) {
 				add_dependency_to_set_threaded(c, e);
 			}
 		} else if (e->kind == Entity_Procedure) {
-			if (e->Procedure.is_export) {
+			if (e->Procedure.is_export && (e->flags & EntityFlag_Overridden) == 0) {
 				add_dependency_to_set_threaded(c, e);
 			}
 		} else if (e->kind == Entity_Variable) {
@@ -3329,7 +3361,7 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 			}
 			break;
 		case Entity_Procedure:
-			if (e->Procedure.is_export) {
+			if (e->Procedure.is_export && (e->flags & EntityFlag_Overridden) == 0) {
 				add_to_set(c, e);
 			} else if (e->flags & EntityFlag_Require) {
 				add_to_set(c, e);
@@ -3943,6 +3975,7 @@ gb_internal void init_core_type_info(Checker *c) {
 	Entity *type_info_variant = tis->fields[4];
 	Type *tiv_type = type_info_variant->type;
 	GB_ASSERT(is_type_union(tiv_type));
+	t_type_info_variant = base_type(tiv_type);
 
 	t_type_info_named            = find_core_type(c, str_lit("Type_Info_Named"));
 	t_type_info_integer          = find_core_type(c, str_lit("Type_Info_Integer"));
@@ -4001,6 +4034,55 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_soa_pointer_ptr      = alloc_type_pointer(t_type_info_soa_pointer);
 	t_type_info_bit_field_ptr        = alloc_type_pointer(t_type_info_bit_field);
 	t_type_info_fixed_capacity_dynamic_array_ptr = alloc_type_pointer(t_type_info_fixed_capacity_dynamic_array);
+
+	Type *variant_types[] = {
+		t_type_info_named,
+		t_type_info_integer,
+		t_type_info_rune,
+		t_type_info_float,
+		t_type_info_complex,
+		t_type_info_quaternion,
+		t_type_info_string,
+		t_type_info_boolean,
+		t_type_info_any,
+		t_type_info_typeid,
+		t_type_info_pointer,
+		t_type_info_multi_pointer,
+		t_type_info_procedure,
+		t_type_info_array,
+		t_type_info_enumerated_array,
+		t_type_info_dynamic_array,
+		t_type_info_slice,
+		t_type_info_parameters,
+		t_type_info_struct,
+		t_type_info_union,
+		t_type_info_enum,
+		t_type_info_map,
+		t_type_info_bit_set,
+		t_type_info_simd_vector,
+		t_type_info_matrix,
+		t_type_info_soa_pointer,
+		t_type_info_bit_field,
+		t_type_info_fixed_capacity_dynamic_array,
+	};
+	GB_ASSERT(gb_count_of(variant_types) == Typeid__COUNT);
+
+	wait_for_record_signal(&t_type_info_variant->Union.variants_wait_signal, &t_type_info_variant->Union.checking_thread);
+	auto const &variants = t_type_info_variant->Union.variants;
+	GB_ASSERT_MSG(variants.count == Typeid__COUNT, "%td", variants.count);
+	for_array(i, variants) {
+		Type *vt = variants[i];
+		GB_ASSERT_MSG(is_type_pointer(vt), "runtime.Type_Info.variant must be a union of pointers, got %s", type_to_string(vt));
+		GB_ASSERT_MSG(are_types_identical(type_deref(vt), variant_types[i]), "%s vs %s", type_to_string(type_deref(vt)), type_to_string(variant_types[i]));
+
+		Type *rec = base_type(variant_types[i]);
+		GB_ASSERT(rec->kind == Type_Struct);
+		wait_for_struct_fields(rec);
+		GB_ASSERT(rec->Struct.fields.count >= 1);
+		Entity *header = rec->Struct.fields[0];
+		GB_ASSERT_MSG((header->flags & EntityFlag_Using) != 0, "%s", type_to_string(variant_types[i]));
+		GB_ASSERT(are_types_identical(header->type, t_type_info));
+	}
 }
 
 gb_internal void init_mem_allocator(Checker *c) {
@@ -4116,6 +4198,8 @@ gb_internal bool is_foreign_name_valid(String const &name) {
 			case '.':
 			case '_':
 			case ':':
+			case '?':
+			case '@':
 				break;
 			default:
 				if (!gb_char_is_alpha(cast(char)rune))
@@ -4220,6 +4304,9 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_group_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "private") {
+		// NOTE(bill): Handled elsewhere `check_collect_value_decl`
+		return true;
 	} else if (name == "objc_name") {
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind == ExactValue_String) {
@@ -4274,9 +4361,16 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "private") {
+		// NOTE(bill): Handled elsewhere `check_collect_value_decl`
+		return true;
 	} else if (name == "test") {
 		if (value != nullptr) {
 			error(value, "Expected no value for '%.*s'", LIT(name));
+		}
+		if (c->decl != nullptr && (c->decl->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
+			error(elem, "@(test) procedures must be declared at the file scope");
+			return true;
 		}
 		ac->test = true;
 		return true;
@@ -4768,6 +4862,9 @@ gb_internal DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		if (ev.kind != ExactValue_String) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
+		return true;
+	} else if (name == "private") {
+		// NOTE(bill): Handled elsewhere `check_collect_value_decl`
 		return true;
 	} else if (name == "static") {
 		if (value != nullptr) {
@@ -5364,9 +5461,8 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 	for_array(i, vd->attributes) {
 		Ast *attr = vd->attributes[i];
 		if (attr->kind != Ast_Attribute) continue;
-		auto *elems = &attr->Attribute.elems;
-		for (isize j = 0; j < elems->count; j++) {
-			Ast *elem = (*elems)[j];
+		// 'private' stays in the attributes for `-export-semantics`. The attribute procedures skip it.
+		for (Ast *elem : attr->Attribute.elems) {
 			String name = {};
 			Ast *value = nullptr;
 			switch (elem->kind) {
@@ -5415,8 +5511,6 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				} else {
 					entity_visibility_kind = kind;
 				}
-				slice_unordered_remove(elems, j);
-				j -= 1;
 			} else if (name == "test") {
 				is_test = true;
 			} else if (name == "init") {
@@ -5568,7 +5662,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				init_decl_info_proc(d, init);
 				d->init_expr = init;
 
-				if (is_test) {
+				if (is_test && (c->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) != 0) {
 					e->flags |= EntityFlag_Test;
 				}
 				if (is_init && is_fini) {
@@ -6195,6 +6289,7 @@ gb_internal void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 
 		add_entity(ctx, parent_scope, nullptr, e);
 		add_semantic_ident(ctx->info, id->import_name, e, true);
+		add_semantic_attributes(ctx->info, e, id->attributes);
 		if (force_use) {
 			add_entity_use(ctx, nullptr, e);
 		}
@@ -6419,6 +6514,7 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	add_entity_flags_from_file(ctx, e, parent_scope);
 	add_entity(ctx, scope, nullptr, e);
 	add_semantic_ident(ctx->info, fl->library_name, e, true);
+	add_semantic_attributes(ctx->info, e, fl->attributes);
 
 	mpsc_enqueue(&ctx->info->foreign_imports_to_check_fullpaths, e);
 
@@ -6977,7 +7073,11 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 		if (pi->poly_def_node != nullptr) {
 			token = ast_token(pi->poly_def_node);
 		}
-		error(token, "Unspecialized polymorphic procedure '%.*s'", LIT(name));
+		if (name.len == 0 && pi->decl->proc_lit != nullptr) {
+			error(pi->decl->proc_lit, "Unspecialized polymorphic procedure literal");
+		} else {
+			error(token, "Unspecialized polymorphic procedure '%.*s'", LIT(name));
+		}
 		pi->decl->proc->proc_checked_state.store(ProcCheckedState_Unchecked);
 		return false;
 	}
@@ -7231,6 +7331,27 @@ gb_internal WORKER_TASK_PROC(check_proc_info_worker_proc) {
 	return 1;
 }
 
+// NOTE(bill): the body of an asm template which is not within a procedure body, see `check_asm_template_body_later`
+gb_internal void check_queued_asm_template_body(Checker *c, Entity *e, UntypedExprInfoMap *untyped) {
+	GB_ASSERT(e->file != nullptr);
+	map_clear(untyped);
+
+	CheckerContext ctx = {};
+	init_checker_context(&ctx, c);
+	defer (destroy_checker_context(&ctx));
+	reset_checker_context(&ctx, e->file, untyped);
+
+	check_asm_template_body_from_entity(&ctx, e);
+
+	add_untyped_expressions(&c->info, ctx.untyped);
+}
+
+gb_internal WORKER_TASK_PROC(check_asm_template_body_worker_proc) {
+	auto *wd = &check_procedure_bodies_worker_data[current_thread_index()];
+	check_queued_asm_template_body(wd->c, cast(Entity *)data, &wd->untyped);
+	return 0;
+}
+
 gb_internal void check_init_worker_data(Checker *c) {
 	u32 thread_count = cast(u32)global_thread_pool.threads.count;
 
@@ -7252,10 +7373,18 @@ gb_internal void check_procedure_bodies(Checker *c) {
 
 	if (thread_count == 1) {
 		UntypedExprInfoMap *untyped = &check_procedure_bodies_worker_data[0].untyped;
-		for_array(i, c->procs_to_check) {
-			consume_proc_info(c, c->procs_to_check[i], untyped);
+		// NOTE(bill): either can queue the other, e.g. a procedure body which uses an asm template of a lazy file
+		while (c->procs_to_check.count != 0 || c->asm_templates_to_check.count != 0) {
+			for_array(i, c->procs_to_check) {
+				consume_proc_info(c, c->procs_to_check[i], untyped);
+			}
+			array_clear(&c->procs_to_check);
+
+			for_array(i, c->asm_templates_to_check) {
+				check_queued_asm_template_body(c, c->asm_templates_to_check[i], untyped);
+			}
+			array_clear(&c->asm_templates_to_check);
 		}
-		array_clear(&c->procs_to_check);
 
 		debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
 		return;
@@ -7269,6 +7398,13 @@ gb_internal void check_procedure_bodies(Checker *c) {
 	}
 	GB_ASSERT(prev_procs_to_check_count == c->procs_to_check.count);
 	array_clear(&c->procs_to_check);
+
+	isize prev_asm_templates_to_check_count = c->asm_templates_to_check.count;
+	for_array(i, c->asm_templates_to_check) {
+		thread_pool_add_task(check_asm_template_body_worker_proc, c->asm_templates_to_check[i]);
+	}
+	GB_ASSERT(prev_asm_templates_to_check_count == c->asm_templates_to_check.count);
+	array_clear(&c->asm_templates_to_check);
 
 	thread_pool_wait();
 
@@ -7337,6 +7473,14 @@ gb_internal void check_deferred_procedures(Checker *c) {
 			error(src->token,
 			      "Deferred procedure '%.*s' cannot be used as the target of '%.*s' because it has a deferred procedure itself (deferred procedure chaining is not allowed)",
 			      LIT(dst->token.string), LIT(src->token.string));
+			continue;
+		}
+
+		if (dst->Procedure.is_objc_impl_or_import && dst->Procedure.is_foreign) {
+			// NOTE(bill): An imported Objective-C method is a message send at each call site; there is no procedure to defer to
+			error(src->token,
+			      "Imported Objective-C method '%.*s' cannot be used as a %s procedure, call it from a procedure and use that instead",
+			      LIT(dst->token.string), attribute);
 			continue;
 		}
 
@@ -8245,6 +8389,7 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	thread_pool_wait();
 	GB_ASSERT(c->procs_to_check.count == 0);
+	GB_ASSERT(c->asm_templates_to_check.count == 0);
 
 	if (DEBUG_CHECK_ALL_PROCEDURES) {
 		TIME_SECTION("check unchecked (safety measure)");
@@ -8323,7 +8468,7 @@ gb_internal void check_parsed_files(Checker *c) {
 
 		isize hash_map_len = c->info.type_info_types_hash_map.count;
 		for (auto const &tt : type_info_types) {
-			isize index = tt.hash % hash_map_len;
+			isize index = type_info_table_home_index(tt.hash, hash_map_len);
 			// NOTE(bill): no need for a sanity check since there
 			// will always be enough space for the entries
 			for (;;) {
@@ -8363,16 +8508,24 @@ gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("sort init and fini procedures");
 	check_sort_init_and_fini_procedures(c);
 
+	bool entry_point_called_outside_runtime = false;
 	if (c->info.intrinsics_entry_point_usage.count > 0) {
 		TIME_SECTION("check intrinsics.__entry_point usage");
 		Ast *node = nullptr;
 		while (mpsc_dequeue(&c->info.intrinsics_entry_point_usage, &node)) {
-			if (c->info.entry_point == nullptr && node != nullptr) {
-				if (node->file()->pkg->kind != Package_Runtime) {
-					error(node, "usage of intrinsics.__entry_point will be a no-op");
+			if (node != nullptr && node->file()->pkg->kind != Package_Runtime) {
+				entry_point_called_outside_runtime = true;
+				if (c->info.entry_point == nullptr && !build_context.no_entry_point) {
+					error(node, "usage of intrinsics.__entry_point will be a no-op: the program does not define 'main'");
 				}
 			}
 		}
+	}
+
+	// NOTE(bill): The runtime does not call `main` when an Android library is loaded. Only a package calling
+	// `intrinsics.__entry_point` does, such as `core:sys/android/native_app_glue` once its activity is created.
+	if (selected_subtarget == Subtarget_Android && c->info.entry_point != nullptr && !entry_point_called_outside_runtime) {
+		error(c->info.entry_point->token, "Nothing calls 'main' on Android: import \"core:sys/android/native_app_glue\" to run it, or remove it");
 	}
 
 	TIME_SECTION("collate type info stuff");

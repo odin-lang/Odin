@@ -23,7 +23,7 @@ gb_internal void lb_exit_if_worker_failed(void) {
 }
 
 // Without a handler installed, LLVM prints an error of its own and calls exit(1) from whichever
-// thread it is on. 
+// thread it is on.
 gb_internal void lb_llvm_diagnostic_handler(LLVMDiagnosticInfoRef di, void *) {
 	char *description = LLVMGetDiagInfoDescription(di);
 	defer (LLVMDisposeMessage(description));
@@ -98,13 +98,13 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 	if (build_context.no_plt) {
 		LLVMAddModuleFlag(m->mod,
 			LLVMModuleFlagBehaviorWarning,
-			"RtLibUseGOT", 11, 
+			"RtLibUseGOT", 11,
 			LLVMValueAsMetadata(LLVMConstInt(LLVMInt32TypeInContext(m->ctx), 1, true)));
 	}
-	
+
 	LLVMAddModuleFlag(m->mod,
 		LLVMModuleFlagBehaviorWarning,
-		"PIC Level", 9, 
+		"PIC Level", 9,
 		LLVMValueAsMetadata(LLVMConstInt(LLVMInt32TypeInContext(m->ctx), get_reloc_mode(), true)));
 
 	if (build_context.ODIN_DEBUG) {
@@ -986,13 +986,13 @@ gb_internal lbValue lb_soa_array_component_elem_ptr(lbProcedure *p, lbValue soa_
 		return lb_const_nil(p->module, alloc_type_pointer(base_type(t->Struct.soa_elem)->Array.elem));
 	}
 	// do chain select between the component pointers;
-	// an element array holds at most 4 components, so this is at most 3 compares and 3 selects (branchless), 
+	// an element array holds at most 4 components, so this is at most 3 compares and 3 selects (branchless),
 	// and it is folded if j is resolved to constant after inlining/unrolling;
 	// TODO: more efficient codegen can be done, most definitely for fixed kind, possibly for slice/dynamic,
 	// (but this works for both kinds)
 	//
 	// lb_emit_select evaluates both arms, so every candidate address is
-	// formed; only the selected one is dereferenced	
+	// formed; only the selected one is dereferenced
 	lbValue ptr = lb_soa_field_elem_ptr(p, soa_ptr, 0, elem_index);
 	for (i64 component = 1; component < component_count; component++) {
 		lbValue candidate = lb_soa_field_elem_ptr(p, soa_ptr, cast(i32)component, elem_index);
@@ -2021,6 +2021,40 @@ gb_internal bool lb_const_has_misaligned_pointer(LLVMTargetDataRef td, LLVMValue
 	return false;
 }
 
+enum {LB_MAX_STORE_SIZE = 64};
+
+gb_internal bool lb_emit_store_writes_every_byte(lbProcedure *p, Type *type, lbValue value) {
+	if (!are_types_identical(type, value.type) || LLVMIsUndef(value.value)) {
+		return false;
+	}
+	i64 size = lb_sizeof(lb_type(p->module, type));
+	if (size != type_size_of(type)) {
+		return false;
+	}
+	if (LLVMIsNull(value.value)) {
+		return !is_type_proc(type) && size > lb_max_zero_init_size();
+	}
+	if (size <= LB_MAX_STORE_SIZE) {
+		return false;
+	}
+	if (lb_sizeof(LLVMTypeOf(value.value)) != size) {
+		return false;
+	}
+	if (!p->in_multi_assignment && LLVMIsALoadInst(value.value)) {
+		return true;
+	}
+	if (!LLVMIsConstant(value.value)) {
+		return false;
+	}
+
+	return !lb_const_has_misaligned_pointer(
+		LLVMGetModuleDataLayout(p->module->mod),
+		value.value,
+		/*offset*/0,
+		/*base_align*/cast(u64)type_align_of(value.type)
+	);
+}
+
 gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 	GB_ASSERT(value.value != nullptr);
 
@@ -2567,13 +2601,21 @@ gb_internal String lb_local_proc_name(lbModule *m, DeclInfo *decl) {
 		name = make_string(cast(u8 *)name_text, name_len-1);
 	} else {
 		// NOTE(bill): parent$anon-pkg:file:offset, named by position rather than a counter, as the order these are generated in varies
+		// A literal in a specialized polymorphic signature (e.g. a parameter's default) also gets that signature's type hash,
+		// as every specialization checks its own copy of it at the same position
 		TokenPos pos = ast_token(decl->proc_lit).pos;
 		AstFile *lit_file = decl->proc_lit->file();
 		String lit_pkg  = (lit_file && lit_file->pkg) ? lit_file->pkg->name : str_lit("");
 		String lit_name = lit_file ? filename_without_directory(lit_file->fullpath) : str_lit("");
-		isize name_len = prefix.len + lit_pkg.len + lit_name.len + 6 + 2 + 11 + 1;
+		isize name_len = prefix.len + lit_pkg.len + lit_name.len + 6 + 2 + 11 + 1 + 16 + 1;
 		char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
-		name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%.*s:%.*s:%d", LIT(prefix), LIT(lit_pkg), LIT(lit_name), pos.offset);
+		Type *signature = decl->proc->enclosing_signature;
+		if (signature != nullptr && signature->kind == Type_Proc && signature->Proc.is_poly_specialized) {
+			name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%.*s:%.*s:%d-%llx", LIT(prefix), LIT(lit_pkg), LIT(lit_name), pos.offset,
+			                       cast(unsigned long long)type_hash_canonical_type(signature));
+		} else {
+			name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%.*s:%.*s:%d", LIT(prefix), LIT(lit_pkg), LIT(lit_name), pos.offset);
+		}
 		name = make_string(cast(u8 *)name_text, name_len-1);
 	}
 
@@ -3432,7 +3474,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				}
 				is_packed = true;
 			}
-			
+
 			return LLVMStructTypeInContext(ctx, fields.data, cast(unsigned)fields.count, is_packed);
 		}
 		break;
@@ -3446,7 +3488,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		} else {
 			m->internal_type_level += 1;
 			defer (m->internal_type_level -= 1);
-			
+
 			unsigned field_count = cast(unsigned)(type->Tuple.variables.count);
 			LLVMTypeRef *fields = gb_alloc_array(temporary_allocator(), LLVMTypeRef, field_count);
 
@@ -3473,7 +3515,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 	case Type_SimdVector:
 		return LLVMVectorType(lb_type(m, type->SimdVector.elem), cast(unsigned)type->SimdVector.count);
-		
+
 	case Type_Matrix:
 		{
 			i64 size = type_size_of(type);
@@ -3481,12 +3523,12 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			GB_ASSERT(elem_size > 0);
 			i64 elem_count = size/elem_size;
 			GB_ASSERT_MSG(elem_count > 0, "%s", type_to_string(type));
-			
+
 			m->internal_type_level -= 1;
-			
+
 			LLVMTypeRef elem = lb_type(m, type->Matrix.elem);
 			LLVMTypeRef t = llvm_array_type(elem, elem_count);
-			
+
 			m->internal_type_level += 1;
 			return t;
 		}
@@ -3510,7 +3552,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 	case Type_BitField:
 		return lb_type_internal(m, type->BitField.backing_type);
-        
+
 	case Type_Generic:
 		if (type->Generic.specialized) {
 			return lb_type_internal(m, type->Generic.specialized);
@@ -3865,11 +3907,11 @@ general_end:;
 	if (src_size > dst_size) {
 		GB_ASSERT(p->decl_block != p->curr_block);
 		// NOTE(laytan): src is bigger than dst, need to memcpy the part of src we want.
-		
+
 		LLVMTypeRef llvm_src_type = LLVMPointerType(src_type, 0);
 		LLVMTypeRef llvm_dst_type = LLVMPointerType(dst_type, 0);
 
-		LLVMValueRef val_ptr; 
+		LLVMValueRef val_ptr;
 		if (LLVMIsALoadInst(val)) {
 			val_ptr = LLVMGetOperand(val, 0);
 		} else if (LLVMIsAAllocaInst(val)) {
@@ -4573,7 +4615,7 @@ gb_internal lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block
 // 2) locals declared by a statement outside its body (e.g. for i:=0; ..., or if x := f()),
 //    see comment on lb_open_scope;
 // 3) temps made by lb_add_local_generated (these have no syntactic scope);
-// 4) a constant literal that needs backing storage (slice, or a struct containing a slice) 
+// 4) a constant literal that needs backing storage (slice, or a struct containing a slice)
 //    gets it from lb_const_value, not lb_add_local, so v := []i8{...} gets no markers
 //    (TODO: this can be handled in lb_const_value)
 //

@@ -52,46 +52,93 @@ _mkdir_all :: proc(path: string, perm: Permissions) -> Error {
 	}
 }
 
-_remove_all :: proc(path: string) -> (err: Error) {
-	temp_allocator := TEMP_ALLOCATOR_GUARD({})
-	cpath := clone_to_cstring(path, temp_allocator) or_return
+_Remove_All_Dir :: posix.FD
 
-	dir := posix.opendir(cpath)
-	if dir == nil {
+@(private="file")
+_REMOVE_ALL_OPEN_FLAGS :: posix.O_Flags{.DIRECTORY, .NOFOLLOW, .NONBLOCK, .CLOEXEC}
+
+_remove_all_root :: proc(path: string, allocator: runtime.Allocator) -> (parent: _Remove_All_Dir, name: []u8, err: Error) {
+	root := path
+	for len(root) > 1 && root[len(root)-1] == '/' {
+		root = root[:len(root)-1]
+	}
+	croot := clone_to_cstring(root, allocator) or_return
+	return posix.AT_FDCWD, ([^]u8)(croot)[:len(root)], nil
+}
+
+_remove_all_open :: proc(parent: _Remove_All_Dir, name: []u8) -> (dir: _Remove_All_Dir, is_dir: bool, err: Error) {
+	cname := cstring(raw_data(name))
+	fd := posix.openat(parent, cname, _REMOVE_ALL_OPEN_FLAGS)
+	if fd >= 0 {
+		return fd, true, nil
+	}
+	open_errno := posix.errno()
+	if open_errno == .ENOENT {
+		return -1, false, .Not_Exist
+	}
+	st: posix.stat_t
+	if posix.fstatat(parent, cname, &st, {.SYMLINK_NOFOLLOW}) != .OK {
+		return -1, false, _get_platform_error()
+	}
+	if !posix.S_ISDIR(st.st_mode) {
+		if posix.unlinkat(parent, cname, {}) != .OK {
+			return -1, false, _get_platform_error()
+		}
+		return -1, false, nil
+	}
+	if posix.unlinkat(parent, cname, {.REMOVEDIR}) == .OK {
+		return -1, false, nil
+	}
+	return -1, false, _get_platform_error(open_errno)
+}
+
+_remove_all_read :: proc(dir: _Remove_All_Dir, names: ^[dynamic]u8, entries: ^[dynamic]_Remove_All_Entry) -> Error {
+	fd := posix.openat(dir, ".", {.DIRECTORY, .CLOEXEC})
+	if fd < 0 {
 		return _get_platform_error()
 	}
-	defer posix.closedir(dir)
+	stream := posix.fdopendir(fd)
+	if stream == nil {
+		err := _get_platform_error()
+		posix.close(fd)
+		return err
+	}
+	defer posix.closedir(stream)
 
 	for {
 		posix.set_errno(.NONE)
-		entry := posix.readdir(dir)
+		entry := posix.readdir(stream)
 		if entry == nil {
-			if errno := posix.errno(); errno != .NONE {
+			if posix.errno() != .NONE {
 				return _get_platform_error()
-			} else {
-				break
 			}
+			return nil
 		}
-
-		cname := cstring(raw_data(entry.d_name[:]))
-		if cname == "." || cname == ".." {
+		name := string(cstring(raw_data(entry.d_name[:])))
+		if name == "." || name == ".." {
 			continue
 		}
-
-		fullpath, _ := concatenate({path, "/", string(cname), "\x00"}, temp_allocator)
-		if entry.d_type == .DIR {
-			_remove_all(fullpath[:len(fullpath)-1]) or_return
-		} else {
-			if posix.unlink(cstring(raw_data(fullpath))) != .OK {
-				return _get_platform_error()
-			}
+		kind := _Remove_All_Kind.Other
+		if entry.d_type == .DIR || entry.d_type == .UNKNOWN {
+			kind = .Directory
 		}
+		_remove_all_add(names, entries, transmute([]u8)name, kind) or_return
 	}
+}
 
-	if posix.rmdir(cpath) != .OK {
+_remove_all_unlink :: proc(parent: _Remove_All_Dir, name: []u8, kind: _Remove_All_Kind) -> Error {
+	flags: posix.AT_Flags
+	if kind == .Directory {
+		flags = {.REMOVEDIR}
+	}
+	if posix.unlinkat(parent, cstring(raw_data(name)), flags) != .OK {
 		return _get_platform_error()
 	}
 	return nil
+}
+
+_remove_all_close :: proc(dir: _Remove_All_Dir) {
+	posix.close(dir)
 }
 
 _get_working_directory :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {

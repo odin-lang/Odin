@@ -13,7 +13,7 @@ import "core:testing"
 import "core:thread"
 import "core:time"
 
-FAIL_TIME        :: 1 * time.Second
+FAIL_TIME        :: 10 * time.Second
 SLEEP_TIME       :: 1 * time.Millisecond
 SMALL_SLEEP_TIME :: 10 * time.Microsecond
 

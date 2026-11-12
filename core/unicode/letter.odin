@@ -2,6 +2,7 @@ package unicode
 
 import "base:runtime"
 
+RUNE_ERROR       :: '\ufffd'
 MAX_RUNE         :: '\U0010ffff' // Maximum valid unicode code point
 REPLACEMENT_CHAR :: '\ufffd'     // Represented an invalid code point
 MAX_ASCII        :: '\u007f'     // Maximum ASCII value
@@ -214,13 +215,36 @@ is_graphic :: proc(r: rune) -> bool {
 	return false
 }
 
+/*
+	Returns true for Unicode characters which are reasonably likely
+	to have a well-behaved printable representation:
+	- letters
+	- numbers
+	- punctuation
+	- symbols
+	- ASCII space (0x20)
+
+	Notable omissions are:
+	- all marks (including combining characters)
+	- separators (including line, paragraph and non-ASCII space separators)
+
+	This is a practical classification for text output, not a guarantee that every
+	character will have a visible or consistent rendering in every font or editor.
+*/
 @(require_results)
 is_print :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
 		return char_properties[u8(r)]&pp != 0
 	}
+
+	if is_letter(r) || is_number(r) || is_punct(r) || is_symbol(r) {
+		return true
+	}
+
 	return false
 }
+
+is_printable :: is_print
 
 @(require_results)
 is_control :: proc(r: rune) -> bool #no_bounds_check {

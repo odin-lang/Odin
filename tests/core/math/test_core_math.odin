@@ -1267,6 +1267,7 @@ test_count_digits :: proc(t: ^testing.T) {
 
 @test
 test_nextafter :: proc(t: ^testing.T) {
+	// As in C, not Go: nextafter(x, y) returns y when x == y.
 	Datum :: struct($F: typeid) {
 		x, y, r: F,
 	}
@@ -1282,16 +1283,16 @@ test_nextafter :: proc(t: ^testing.T) {
 		{0h7c42, 0hbc00, 0h7e00}, // +NaN -> -1 = +canonical NaN
 		{0hfc42, 0hbc00, 0h7e00}, // -NaN -> -1 = +canonical NaN
 
-		{0h0000, 0h8000, 0h0000}, // +0 -> -0 = +0
+		{0h0000, 0h8000, 0h8000}, // +0 -> -0 = -0
 		{0h0000,     +1, 0h0001}, // +0 -> +1 = +smallest subnormal
 		{0h0000,     -1, 0h8001}, // +0 -> -1 = -smallest subnormal
 
 		{0h0000, 0h0000, 0h0000}, // +0 -> +0 = +0
-		{0h0000, 0h8000, 0h0000}, // +0 -> -0 = +0
+		{0h0000, 0h8000, 0h8000}, // +0 -> -0 = -0
 		{0h0000,     +1, 0h0001}, // +0 -> +1 = +smallest subnormal
 		{0h0000,     -1, 0h8001}, // +0 -> -1 = -smallest subnormal
 
-		{0h8000, 0h0000, 0h8000}, // -0 -> +0 = -0
+		{0h8000, 0h0000, 0h0000}, // -0 -> +0 = +0
 		{0h8000, 0h8000, 0h8000}, // -0 -> -0 = -0
 		{0h8000,     +1, 0h0001}, // -0 -> +1 = +smallest subnormal
 		{0h8000,     -1, 0h8001}, // -0 -> -1 = -smallest subnormal
@@ -1343,16 +1344,16 @@ test_nextafter :: proc(t: ^testing.T) {
 		{0h7f842000,         -1, 0h7fc00000}, // +NaN -> -1 = +canonical NaN
 		{0hff842000,         -1, 0h7fc00000}, // -NaN -> -1 = +canonical NaN
 
-		{0h00000000, 0h80000000, 0h00000000}, // +0 -> -0 = +0
+		{0h00000000, 0h80000000, 0h80000000}, // +0 -> -0 = -0
 		{0h00000000,         +1, 0h00000001}, // +0 -> +1 = +smallest subnormal
 		{0h00000000,         -1, 0h80000001}, // +0 -> -1 = -smallest subnormal
 
 		{0h00000000, 0h00000000, 0h00000000}, // +0 -> +0 = +0
-		{0h00000000, 0h80000000, 0h00000000}, // +0 -> -0 = +0
+		{0h00000000, 0h80000000, 0h80000000}, // +0 -> -0 = -0
 		{0h00000000,         +1, 0h00000001}, // +0 -> +1 = +smallest subnormal
 		{0h00000000,         -1, 0h80000001}, // +0 -> -1 = -smallest subnormal
 
-		{0h80000000, 0h00000000, 0h80000000}, // -0 -> +0 = -0
+		{0h80000000, 0h00000000, 0h00000000}, // -0 -> +0 = +0
 		{0h80000000, 0h80000000, 0h80000000}, // -0 -> -0 = -0
 		{0h80000000,         +1, 0h00000001}, // -0 -> +1 = +smallest subnormal
 		{0h80000000,         -1, 0h80000001}, // -0 -> -1 = -smallest subnormal
@@ -1404,16 +1405,16 @@ test_nextafter :: proc(t: ^testing.T) {
 		{0h7ff4200000000000, 0hbc00000000000000, 0h7ff8000000000001}, // +NaN -> -1 = +canonical NaN
 		{0hfff4200000000000, 0hbc00000000000000, 0h7ff8000000000001}, // -NaN -> -1 = +canonical NaN
 
-		{0h0000000000000000, 0h8000000000000000, 0h0000000000000000}, // +0 -> -0 = +0
+		{0h0000000000000000, 0h8000000000000000, 0h8000000000000000}, // +0 -> -0 = -0
 		{0h0000000000000000,                 +1, 0h0000000000000001}, // +0 -> +1 = +smallest subnormal
 		{0h0000000000000000,                 -1, 0h8000000000000001}, // +0 -> -1 = -smallest subnormal
 
 		{0h0000000000000000, 0h0000000000000000, 0h0000000000000000}, // +0 -> +0 = +0
-		{0h0000000000000000, 0h8000000000000000, 0h0000000000000000}, // +0 -> -0 = +0
+		{0h0000000000000000, 0h8000000000000000, 0h8000000000000000}, // +0 -> -0 = -0
 		{0h0000000000000000,                 +1, 0h0000000000000001}, // +0 -> +1 = +smallest subnormal
 		{0h0000000000000000,                 -1, 0h8000000000000001}, // +0 -> -1 = -smallest subnormal
 
-		{0h8000000000000000, 0h0000000000000000, 0h8000000000000000}, // -0 -> +0 = -0
+		{0h8000000000000000, 0h0000000000000000, 0h0000000000000000}, // -0 -> +0 = +0
 		{0h8000000000000000, 0h8000000000000000, 0h8000000000000000}, // -0 -> -0 = -0
 		{0h8000000000000000,                 +1, 0h0000000000000001}, // -0 -> +1 = +smallest subnormal
 		{0h8000000000000000,                 -1, 0h8000000000000001}, // -0 -> -1 = -smallest subnormal
@@ -1452,4 +1453,773 @@ test_nextafter :: proc(t: ^testing.T) {
 			transmute(u64)r == transmute(u64)datum.r,
 			"%h, %h -> %h != %h", datum.x, datum.y, r, datum.r)
 	}
+}
+
+@test
+test_floor_divmod :: proc(t: ^testing.T) {
+	for x in -50..=50 {
+		for y in -9..=9 {
+			if y == 0 {
+				continue
+			}
+			want_div := int(math.floor(f64(x) / f64(y)))
+			want_mod := x - want_div*y
+
+			div, mod := math.floor_divmod(x, y)
+			testing.expectf(t, div == want_div && mod == want_mod, "floor_divmod(%v, %v) = %v, %v, want %v, %v", x, y, div, mod, want_div, want_mod)
+			testing.expectf(t, math.floor_div(x, y) == want_div, "floor_div(%v, %v) = %v, want %v", x, y, math.floor_div(x, y), want_div)
+			testing.expectf(t, math.floor_mod(x, y) == want_mod, "floor_mod(%v, %v) = %v, want %v", x, y, math.floor_mod(x, y), want_mod)
+
+			div8, mod8 := math.floor_divmod(i8(x), i8(y))
+			testing.expectf(t, int(div8) == want_div && int(mod8) == want_mod, "floor_divmod(i8(%v), i8(%v)) = %v, %v, want %v, %v", x, y, div8, mod8, want_div, want_mod)
+		}
+	}
+}
+
+@test
+test_remap :: proc(t: ^testing.T) {
+	testing.expect_value(t, math.remap(5.0, 5.0, 5.0, 10.0, 20.0), 15.0)
+	testing.expect_value(t, math.remap(f32(5), 5, 5, -20, -10), -15)
+	testing.expect_value(t, math.remap(5, 5, 5, 100, 200), 150)
+	testing.expect_value(t, math.remap(i8(-3), -3, -3, -50, 50), 0)
+	testing.expect_value(t, math.remap_clamped(5.0, 5.0, 5.0, 10.0, 20.0), 15.0)
+
+	testing.expect_value(t, math.remap(2.5, 0.0, 10.0, 100.0, 200.0), 125.0)
+	testing.expect_value(t, math.remap(25, 0, 100, 100, 200), 125)
+}
+
+@test
+test_bias_gain :: proc(t: ^testing.T) {
+	testing.expect_value(t, math.bias(0.5, 0.5), 0.5)
+	testing.expect_value(t, math.bias(f32(0.5), 0.25), 0.25)
+	testing.expect_value(t, math.bias(f16(0), 0.75), 0)
+	testing.expect_value(t, math.bias(f64(1), 0.75), 1)
+	testing.expectf(t, abs(math.bias(0.5, 0.75) - 0.75) < 1e-15, "bias(0.5, 0.75) = %v, want 0.75", math.bias(0.5, 0.75))
+
+	testing.expect_value(t, math.gain(0.5, 0.25), 0.5)
+	testing.expect_value(t, math.gain(f32(0.25), 0.25), 0.125)
+}
+
+@test
+test_count_digits_limits :: proc(t: ^testing.T) {
+	_run_signed :: proc(t: ^testing.T, $T: typeid, $base: int) {
+		buf: [72]u8
+		for n in ([]T{min(T), min(T) + 1, -1, 0, 1, max(T) - 1, max(T)}) {
+			count := math.count_digits_of_base(n, base)
+			str := strconv.write_int(buf[:], i64(n), base)
+			want := len(str) - 1 if n < 0 else len(str)
+			testing.expectf(t, count == want, "%v %v in base-%i digit count is %i, want %i (%q)", typeid_of(T), n, base, count, want, str)
+		}
+	}
+	_run_unsigned :: proc(t: ^testing.T, $T: typeid, $base: int) {
+		buf: [72]u8
+		for n in ([]T{0, 1, max(T) - 1, max(T)}) {
+			count := math.count_digits_of_base(n, base)
+			str := strconv.write_uint(buf[:], u64(n), base)
+			testing.expectf(t, count == len(str), "%v %v in base-%i digit count is %i, want %i (%q)", typeid_of(T), n, base, count, len(str), str)
+		}
+	}
+	_run :: proc(t: ^testing.T, $base: int) {
+		_run_signed(t, i8, base)
+		_run_signed(t, i16, base)
+		_run_signed(t, i32, base)
+		_run_signed(t, i64, base)
+		_run_unsigned(t, u8, base)
+		_run_unsigned(t, u16, base)
+		_run_unsigned(t, u32, base)
+		_run_unsigned(t, u64, base)
+	}
+
+	_run(t, 2)
+	_run(t, 3)
+	_run(t, 7)
+	_run(t, 8)
+	_run(t, 10)
+	_run(t, 16)
+	_run(t, 32)
+}
+
+@test
+test_modf :: proc(t: ^testing.T) {
+	Datum :: struct {
+		x, i, f: f64,
+	}
+	@(static, rodata)
+	data := [?]Datum{
+		{0h7ff0_0000_0000_0000, 0h7ff0_0000_0000_0000, 0h0000_0000_0000_0000},
+		{0hfff0_0000_0000_0000, 0hfff0_0000_0000_0000, 0h8000_0000_0000_0000},
+		{0h0000_0000_0000_0000, 0h0000_0000_0000_0000, 0h0000_0000_0000_0000},
+		{0h8000_0000_0000_0000, 0h8000_0000_0000_0000, 0h8000_0000_0000_0000},
+		{ 1.5,     1,    0.5},
+		{-1.5,    -1,   -0.5},
+		{ 0.25,    0,    0.25},
+		{-0.25,   -0.0, -0.25},
+		{ 3,       3,    0},
+		{-3,      -3,   -0.0},
+		{ 100.75,  100,  0.75},
+	}
+
+	for d in data {
+		i, f := math.modf(d.x)
+		testing.expectf(t, transmute(u64)i == transmute(u64)d.i && transmute(u64)f == transmute(u64)d.f,
+			"modf(%v) = %v, %v, want %v, %v", d.x, i, f, d.i, d.f)
+
+		fi, ff := math.modf(f32(d.x))
+		testing.expectf(t, transmute(u32)fi == transmute(u32)f32(d.i) && transmute(u32)ff == transmute(u32)f32(d.f),
+			"modf(f32(%v)) = %v, %v, want %v, %v", d.x, fi, ff, d.i, d.f)
+
+		hi, hf := math.modf(f16(d.x))
+		testing.expectf(t, transmute(u16)hi == transmute(u16)f16(d.i) && transmute(u16)hf == transmute(u16)f16(d.f),
+			"modf(f16(%v)) = %v, %v, want %v, %v", d.x, hi, hf, d.i, d.f)
+	}
+
+	ni, nf := math.modf(math.nan_f64())
+	testing.expectf(t, math.is_nan(ni) && math.is_nan(nf), "modf(NaN) = %v, %v, want NaN, NaN", ni, nf)
+	ni32, nf32 := math.modf(math.nan_f32())
+	testing.expectf(t, math.is_nan(ni32) && math.is_nan(nf32), "modf(f32 NaN) = %v, %v, want NaN, NaN", ni32, nf32)
+	ni16, nf16 := math.modf(math.nan_f16())
+	testing.expectf(t, math.is_nan(ni16) && math.is_nan(nf16), "modf(f16 NaN) = %v, %v, want NaN, NaN", ni16, nf16)
+}
+
+@test
+test_pow10 :: proc(t: ^testing.T) {
+	for n in ([]f64{-7.5, -2.25, -0.5, 0.5, 1.5, 2.5, 3.75}) {
+		d := math.pow10(n)
+		testing.expectf(t, d == math.pow(f64(10), n), "pow10(%v) = %v, want %v", n, d, math.pow(f64(10), n))
+		f := math.pow10(f32(n))
+		testing.expectf(t, f == math.pow(f32(10), f32(n)), "pow10(f32(%v)) = %v, want %v", n, f, math.pow(f32(10), f32(n)))
+		h := math.pow10(f16(n))
+		testing.expectf(t, h == math.pow(f16(10), f16(n)), "pow10(f16(%v)) = %v, want %v", n, h, math.pow(f16(10), f16(n)))
+	}
+
+	p := math.pow10(f64(2.5))
+	testing.expectf(t, p > 316.2277 && p < 316.2278, "pow10(2.5) = %v, want ~316.22777", p)
+
+	testing.expect_value(t, math.pow10(f64(0)), 1)
+	testing.expect_value(t, math.pow10(f64(2)), 100)
+	testing.expect_value(t, math.pow10(f64(-1)), 0.1)
+	testing.expect_value(t, math.pow10(f32(3)), 1000)
+	testing.expect_value(t, math.pow10(f16(-2)), 0.01)
+
+	testing.expect_value(t, math.pow10(f64(309)), math.inf_f64(1))
+	testing.expect_value(t, math.pow10(f64(-400)), 0)
+	testing.expect_value(t, math.pow10(math.inf_f64(1)), math.inf_f64(1))
+	testing.expect_value(t, math.pow10(math.inf_f64(-1)), 0)
+	testing.expect_value(t, math.pow10(math.inf_f32(1)), math.inf_f32(1))
+	testing.expect_value(t, math.pow10(math.inf_f16(-1)), 0)
+
+	testing.expect(t, math.is_nan(math.pow10(math.nan_f64())), "pow10(NaN) is not NaN")
+	testing.expect(t, math.is_nan(math.pow10(math.nan_f32())), "pow10(f32 NaN) is not NaN")
+	testing.expect(t, math.is_nan(math.pow10(math.nan_f16())), "pow10(f16 NaN) is not NaN")
+}
+
+@test
+test_floor_ceil :: proc(t: ^testing.T) {
+	Case :: struct {
+		x, floor, ceil: f64,
+	}
+	cases := [?]Case{
+		{0, 0, 0},
+		{-0.0, -0.0, -0.0},
+		{0.5, 0, 1},
+		{-0.5, -1, -0.0},
+		{1, 1, 1},
+		{-1, -1, -1},
+		{2.5, 2, 3},
+		{-2.5, -3, -2},
+		{1e-300, 0, 1},
+		{-1e-300, -1, -0.0},
+		{4503599627370495.5, 4503599627370495, 4503599627370496},
+		{-4503599627370495.5, -4503599627370496, -4503599627370495},
+		{1e300, 1e300, 1e300},
+		{math.INF_F64, math.INF_F64, math.INF_F64},
+		{math.NEG_INF_F64, math.NEG_INF_F64, math.NEG_INF_F64},
+		{math.QNAN_F64, math.QNAN_F64, math.QNAN_F64},
+	}
+	for c in cases {
+		f := math.floor(c.x)
+		testing.expectf(t, same(f, c.floor), "floor(%v) = %v, want %v", c.x, f, c.floor)
+		g := math.ceil(c.x)
+		testing.expectf(t, same(g, c.ceil), "ceil(%v) = %v, want %v", c.x, g, c.ceil)
+	}
+
+	narrow := [?]Case{
+		{0, 0, 0},
+		{-0.0, -0.0, -0.0},
+		{0.5, 0, 1},
+		{-0.5, -1, -0.0},
+		{-2.5, -3, -2},
+		{511.75, 511, 512},
+		{math.INF_F64, math.INF_F64, math.INF_F64},
+		{math.NEG_INF_F64, math.NEG_INF_F64, math.NEG_INF_F64},
+	}
+	for c in narrow {
+		f32f, f32c := math.floor(f32(c.x)), math.ceil(f32(c.x))
+		testing.expectf(t, same(f32f, f32(c.floor)) && same(f32c, f32(c.ceil)), "floor, ceil(f32(%v)) = %v, %v", c.x, f32f, f32c)
+		f16f, f16c := math.floor(f16(c.x)), math.ceil(f16(c.x))
+		testing.expectf(t, same(f16f, f16(c.floor)) && same(f16c, f16(c.ceil)), "floor, ceil(f16(%v)) = %v, %v", c.x, f16f, f16c)
+	}
+	testing.expect(t, math.is_nan(math.floor(math.QNAN_F32)) && math.is_nan(math.ceil(math.QNAN_F32)))
+	testing.expect(t, math.is_nan(math.floor(math.QNAN_F16)) && math.is_nan(math.ceil(math.QNAN_F16)))
+}
+
+@test
+test_copy_sign_sign_bit :: proc(t: ^testing.T) {
+	testing.expect(t, same(math.copy_sign(f64(3), -1), f64(-3)))
+	testing.expect(t, same(math.copy_sign(f64(-3), 1), f64(3)))
+	testing.expect(t, same(math.copy_sign(f64(0), -1), f64(-0.0)))
+	testing.expect(t, same(math.copy_sign(f64(-0.0), 0), f64(0)))
+	testing.expect(t, same(math.copy_sign(math.INF_F64, -0.0), math.NEG_INF_F64))
+	testing.expect(t, same(math.copy_sign(f64(2), math.NEG_INF_F64), f64(-2)))
+	testing.expect(t, same(math.copy_sign(f64(2), -math.QNAN_F64), f64(-2)))
+	neg_nan := math.copy_sign(math.QNAN_F64, -1)
+	testing.expect(t, math.is_nan(neg_nan) && math.sign_bit(neg_nan))
+	testing.expect(t, same(math.copy_sign(f32(3), -1), f32(-3)))
+	testing.expect(t, same(math.copy_sign(f32(-0.0), 1), f32(0)))
+	testing.expect(t, same(math.copy_sign(f16(3), -1), f16(-3)))
+	testing.expect(t, same(math.copy_sign(f16(-0.0), 1), f16(0)))
+
+	testing.expect(t, !math.sign_bit(f64(0)))
+	testing.expect(t, math.sign_bit(f64(-0.0)))
+	testing.expect(t, math.sign_bit(f64(-5e-324)))
+	testing.expect(t, !math.sign_bit(math.INF_F64))
+	testing.expect(t, math.sign_bit(math.NEG_INF_F64))
+	testing.expect(t, !math.sign_bit(f32(0)))
+	testing.expect(t, math.sign_bit(f32(-0.0)))
+	testing.expect(t, !math.sign_bit(f32(1.401298464324817e-45)))
+	testing.expect(t, !math.sign_bit(f16(0)))
+	testing.expect(t, math.sign_bit(f16(-0.0)))
+	testing.expect(t, math.sign_bit(math.NEG_INF_F16))
+}
+
+@test
+test_is_nan_is_inf :: proc(t: ^testing.T) {
+	testing.expect(t, math.is_nan(math.QNAN_F64))
+	testing.expect(t, math.is_nan(math.SNAN_F64))
+	testing.expect(t, math.is_nan(math.copy_sign(math.QNAN_F64, -1)))
+	testing.expect(t, !math.is_nan(math.INF_F64))
+	testing.expect(t, !math.is_nan(f64(math.F64_MAX)))
+	testing.expect(t, !math.is_nan(f64(-0.0)))
+	testing.expect(t, math.is_nan(math.QNAN_F32))
+	testing.expect(t, !math.is_nan(math.INF_F32))
+	testing.expect(t, math.is_nan(math.QNAN_F16))
+	testing.expect(t, !math.is_nan(math.INF_F16))
+
+	testing.expect(t, math.is_inf(math.INF_F64))
+	testing.expect(t, math.is_inf(math.NEG_INF_F64))
+	testing.expect(t, math.is_inf(math.INF_F64, 1))
+	testing.expect(t, !math.is_inf(math.INF_F64, -1))
+	testing.expect(t, math.is_inf(math.NEG_INF_F64, -1))
+	testing.expect(t, !math.is_inf(math.NEG_INF_F64, 1))
+	testing.expect(t, !math.is_inf(math.QNAN_F64))
+	testing.expect(t, !math.is_inf(f64(math.F64_MAX)))
+	testing.expect(t, !math.is_inf(f64(0)))
+	testing.expect(t, math.is_inf(math.INF_F32, 1))
+	testing.expect(t, !math.is_inf(math.INF_F32, -1))
+	testing.expect(t, math.is_inf(math.NEG_INF_F32, -1))
+	testing.expect(t, !math.is_inf(math.QNAN_F32))
+	testing.expect(t, math.is_inf(math.INF_F16, 1))
+	testing.expect(t, !math.is_inf(math.NEG_INF_F16, 1))
+	testing.expect(t, math.is_inf(math.NEG_INF_F16, -1))
+	testing.expect(t, !math.is_inf(f16(65504)))
+}
+
+@test
+test_ilogb_logb :: proc(t: ^testing.T) {
+	Case :: struct {
+		x:    f64,
+		want: int,
+	}
+	cases := [?]Case{
+		{1, 0},
+		{-1, 0},
+		{0.75, -1},
+		{-8, 3},
+		{1023.9, 9},
+		{math.F64_MAX, 1023},
+		{math.F64_MIN, -1022},
+		{2.2250738585072009e-308, -1023},
+		{5e-324, -1074},
+		{-5e-324, -1074},
+	}
+	for c in cases {
+		i := math.ilogb(c.x)
+		testing.expectf(t, i == c.want, "ilogb(%v) = %v, want %v", c.x, i, c.want)
+		l := math.logb(c.x)
+		testing.expectf(t, same(l, f64(c.want)), "logb(%v) = %v, want %v", c.x, l, c.want)
+	}
+	testing.expect_value(t, math.ilogb(f64(0)), int(min(i32)))
+	testing.expect_value(t, math.ilogb(f64(-0.0)), int(min(i32)))
+	testing.expect_value(t, math.ilogb(math.INF_F64), int(max(i32)))
+	testing.expect_value(t, math.ilogb(math.NEG_INF_F64), int(max(i32)))
+	testing.expect_value(t, math.ilogb(math.QNAN_F64), int(max(i32)))
+	testing.expect(t, same(math.logb(f64(0)), math.NEG_INF_F64))
+	testing.expect(t, same(math.logb(f64(-0.0)), math.NEG_INF_F64))
+	testing.expect(t, same(math.logb(math.NEG_INF_F64), math.INF_F64))
+	testing.expect(t, math.is_nan(math.logb(math.QNAN_F64)))
+
+	testing.expect_value(t, math.ilogb(f32(0.75)), -1)
+	testing.expect_value(t, math.ilogb(f32(3.4028234663852886e38)), 127)
+	testing.expect_value(t, math.ilogb(f32(1.401298464324817e-45)), -149)
+	testing.expect_value(t, math.ilogb(f32(0)), int(min(i32)))
+	testing.expect(t, same(math.logb(f32(-8)), f32(3)))
+	testing.expect(t, same(math.logb(f32(0)), math.NEG_INF_F32))
+	testing.expect_value(t, math.ilogb(f16(65504)), 15)
+	testing.expect_value(t, math.ilogb(f16(5.960464477539063e-08)), -24)
+	testing.expect(t, same(math.logb(f16(0.75)), f16(-1)))
+	testing.expect(t, same(math.logb(math.NEG_INF_F16), math.INF_F16))
+}
+
+@test
+test_normalize :: proc(t: ^testing.T) {
+	y, e := math.normalize(f64(5e-324))
+	testing.expectf(t, same(y, f64(math.F64_MIN)) && e == -52, "normalize(5e-324) = %v, %v", y, e)
+	y, e = math.normalize(f64(-2.2250738585072009e-308))
+	testing.expectf(t, same(y, f64(-1.0020841800044862e-292)) && e == -52, "normalize(-2.2250738585072009e-308) = %v, %v", y, e)
+	y, e = math.normalize(f64(math.F64_MIN))
+	testing.expectf(t, same(y, f64(math.F64_MIN)) && e == 0, "normalize(F64_MIN) = %v, %v", y, e)
+	y, e = math.normalize(f64(-3))
+	testing.expectf(t, same(y, f64(-3)) && e == 0, "normalize(-3) = %v, %v", y, e)
+
+	y32, e32 := math.normalize(f32(1.401298464324817e-45))
+	testing.expectf(t, same(y32, f32(1.1754943508222875e-38)) && e32 == -23, "normalize(f32(1.401298464324817e-45)) = %v, %v", y32, e32)
+	y16, e16 := math.normalize(f16(5.960464477539063e-08))
+	testing.expectf(t, same(y16, f16(6.103515625e-05)) && e16 == -10, "normalize(f16(5.960464477539063e-08)) = %v, %v", y16, e16)
+}
+
+@test
+test_exp :: proc(t: ^testing.T) {
+	Case :: struct {
+		x, want: f64,
+	}
+	cases := [?]Case{
+		{0, 1},
+		{-0.0, 1},
+		{1, math.E},
+		{-1, 0.36787944117144233},
+		{0.5, 1.6487212707001282},
+		{100, 2.6881171418161356e+43},
+		{-700, 9.8596765437597708e-305},
+		{709.78, 1.7928227943945155e+308},
+		{710, math.INF_F64},
+		{-745, 5e-324},
+		{-746, 0},
+		{math.INF_F64, math.INF_F64},
+		{math.NEG_INF_F64, 0},
+		{math.QNAN_F64, math.QNAN_F64},
+	}
+	for c in cases {
+		got := math.exp(c.x)
+		testing.expectf(t, within_ulps(got, c.want), "exp(%v) = %v, want %v", c.x, got, c.want)
+	}
+	testing.expect(t, within_ulps(math.exp(f32(1)), f32(math.E)))
+	testing.expect(t, same(math.exp(math.NEG_INF_F32), f32(0)))
+	testing.expect(t, same(math.exp(f32(89)), math.INF_F32))
+	testing.expect(t, within_ulps(math.exp(f16(1)), f16(math.E)))
+	testing.expect(t, same(math.exp(f16(12)), math.INF_F16))
+}
+
+@test
+test_ln :: proc(t: ^testing.T) {
+	Case :: struct {
+		x, want: f64,
+	}
+	cases := [?]Case{
+		{1, 0},
+		{2, math.LN2},
+		{10, math.LN10},
+		{0.5, -math.LN2},
+		{1e-300, -690.77552789821368},
+		{5e-324, -744.44007192138122},
+		{1e300, 690.77552789821368},
+		{0, math.NEG_INF_F64},
+		{-0.0, math.NEG_INF_F64},
+		{-1, math.QNAN_F64},
+		{math.INF_F64, math.INF_F64},
+		{math.NEG_INF_F64, math.QNAN_F64},
+		{math.QNAN_F64, math.QNAN_F64},
+	}
+	for c in cases {
+		got := math.ln(c.x)
+		testing.expectf(t, within_ulps(got, c.want), "ln(%v) = %v, want %v", c.x, got, c.want)
+	}
+	testing.expect(t, within_ulps(math.ln(f32(2)), f32(math.LN2)))
+	testing.expect(t, same(math.ln(f32(0)), math.NEG_INF_F32))
+	testing.expect(t, math.is_nan(math.ln(f32(-1))))
+	testing.expect(t, within_ulps(math.ln(f16(2)), f16(math.LN2)))
+	testing.expect(t, same(math.ln(f16(1)), f16(0)))
+}
+
+@test
+test_log1p :: proc(t: ^testing.T) {
+	Case :: struct {
+		x, want: f64,
+	}
+	cases := [?]Case{
+		{0, 0},
+		{-0.0, -0.0},
+		{1e-10, 9.9999999995000007e-11},
+		{-1e-300, -1e-300},
+		{-0.5, -math.LN2},
+		{1, math.LN2},
+		{1e300, 690.77552789821368},
+		{-1, math.NEG_INF_F64},
+		{-2, math.QNAN_F64},
+		{math.INF_F64, math.INF_F64},
+		{math.NEG_INF_F64, math.QNAN_F64},
+		{math.QNAN_F64, math.QNAN_F64},
+	}
+	for c in cases {
+		got := math.log1p(c.x)
+		testing.expectf(t, within_ulps(got, c.want), "log1p(%v) = %v, want %v", c.x, got, c.want)
+	}
+	testing.expect(t, within_ulps(math.log1p(f32(1)), f32(math.LN2)))
+	testing.expect(t, same(math.log1p(f32(-1)), math.NEG_INF_F32))
+	testing.expect(t, within_ulps(math.log1p(f16(1)), f16(math.LN2)))
+	testing.expect(t, same(math.log1p(f16(-0.0)), f16(-0.0)))
+}
+
+@test
+test_pow :: proc(t: ^testing.T) {
+	Case :: struct {
+		x, y, want: f64,
+	}
+	cases := [?]Case{
+		{2, 0.5, math.SQRT_TWO},
+		{10, -3, 0.001},
+		{2.5, 3.5, 24.705294220065465},
+		{1.0000001, 1e7, 2.7182816941320818},
+		{-2, 3, -8},
+		{-2, -3, -0.125},
+		{2, -1074, 5e-324},
+		{0.5, -1074, math.INF_F64},
+		{math.QNAN_F64, 0, 1},
+		{math.QNAN_F64, -0.0, 1},
+		{1, math.QNAN_F64, 1},
+		{1, math.INF_F64, 1},
+		{-1, math.INF_F64, 1},
+		{-1, math.NEG_INF_F64, 1},
+		{0, -1, math.INF_F64},
+		{-0.0, -1, math.NEG_INF_F64},
+		{-0.0, -2, math.INF_F64},
+		{0, -0.5, math.INF_F64},
+		{-0.0, math.NEG_INF_F64, math.INF_F64},
+		{-0.0, 3, -0.0},
+		{-0.0, 2, 0},
+		{-0.0, 0.5, 0},
+		{-2, 0.5, math.QNAN_F64},
+		{0.5, math.NEG_INF_F64, math.INF_F64},
+		{2, math.NEG_INF_F64, 0},
+		{0.5, math.INF_F64, 0},
+		{2, math.INF_F64, math.INF_F64},
+		{math.NEG_INF_F64, -3, -0.0},
+		{math.NEG_INF_F64, -2, 0},
+		{math.NEG_INF_F64, 3, math.NEG_INF_F64},
+		{math.NEG_INF_F64, 2, math.INF_F64},
+		{math.INF_F64, -1, 0},
+		{math.INF_F64, 0.5, math.INF_F64},
+		{math.QNAN_F64, 1, math.QNAN_F64},
+		{2, math.QNAN_F64, math.QNAN_F64},
+	}
+	for c in cases {
+		got := math.pow(c.x, c.y)
+		testing.expectf(t, within_ulps(got, c.want), "pow(%v, %v) = %v, want %v", c.x, c.y, got, c.want)
+	}
+	testing.expect(t, within_ulps(math.pow(f32(2), 0.5), f32(math.SQRT_TWO)))
+	testing.expect(t, same(math.pow(f32(-0.0), -1), math.NEG_INF_F32))
+	testing.expect(t, same(math.pow(f16(2), 10), f16(1024)))
+	testing.expect(t, within_ulps(math.pow(f16(2), 0.5), f16(math.SQRT_TWO)))
+}
+
+@test
+test_erf :: proc(t: ^testing.T) {
+	Case :: struct {
+		x, want: f64,
+	}
+	cases := [?]Case{
+		{0, 0},
+		{-0.0, -0.0},
+		{0.1, 0.1124629160182849},
+		{0.5, 0.52049987781304652},
+		{-1, -0.84270079294971489},
+		{3, 0.99997790950300136},
+		{6, 1},
+		{math.INF_F64, 1},
+		{math.NEG_INF_F64, -1},
+		{math.QNAN_F64, math.QNAN_F64},
+	}
+	for c in cases {
+		got := math.erf(c.x)
+		testing.expectf(t, within_ulps(got, c.want), "erf(%v) = %v, want %v", c.x, got, c.want)
+	}
+	testing.expect(t, within_ulps(math.erf(f32(0.5)), f32(0.52049987781304652)))
+	testing.expect(t, same(math.erf(f32(-0.0)), f32(-0.0)))
+	testing.expect(t, within_ulps(math.erf(f16(0.5)), f16(0.52049987781304652)))
+	testing.expect(t, same(math.erf(math.NEG_INF_F16), f16(-1)))
+}
+
+@test
+test_gamma :: proc(t: ^testing.T) {
+	Case :: struct {
+		x, want: f64,
+	}
+	cases := [?]Case{
+		{0.5, 1.7724538509055161},
+		{1, 1},
+		{2, 1},
+		{5, 24},
+		{2.5, 1.329340388179137},
+		{10.1, 454760.7514415856},
+		{30, 8.8417619937397019e+30},
+		{-0.5, -3.5449077018110322},
+		{-2.5, -0.9453087204829419},
+		{1e-10, 9999999999.4227848},
+		{171.6, 1.5858969096672565e+308},
+		{172, math.INF_F64},
+		{0, math.INF_F64},
+		{-0.0, math.NEG_INF_F64},
+		{-1, math.QNAN_F64},
+		{-2, math.QNAN_F64},
+		{math.INF_F64, math.INF_F64},
+		{math.NEG_INF_F64, math.QNAN_F64},
+		{math.QNAN_F64, math.QNAN_F64},
+	}
+	for c in cases {
+		got := math.gamma(c.x)
+		testing.expectf(t, within_ulps(got, c.want), "gamma(%v) = %v, want %v", c.x, got, c.want)
+	}
+	testing.expect(t, within_ulps(math.gamma(f32(0.5)), f32(1.7724538509055161)))
+	testing.expect(t, same(math.gamma(f32(5)), f32(24)))
+	testing.expect(t, same(math.gamma(f32(-0.0)), math.NEG_INF_F32))
+	testing.expect(t, within_ulps(math.gamma(f16(0.5)), f16(1.7724538509055161)))
+	testing.expect(t, same(math.gamma(f16(5)), f16(24)))
+}
+
+@test
+test_cbrt :: proc(t: ^testing.T) {
+	Case :: struct {
+		x, want: f64,
+	}
+	cases := [?]Case{
+		{2, 1.2599210498948732},
+		{-27, -3},
+		{1e300, 1e100},
+		{0.001, 0.1},
+		{0, 0},
+		{-0.0, -0.0},
+		{math.INF_F64, math.INF_F64},
+		{math.NEG_INF_F64, math.NEG_INF_F64},
+		{math.QNAN_F64, math.QNAN_F64},
+	}
+	for c in cases {
+		got := math.cbrt(c.x)
+		testing.expectf(t, within_ulps(got, c.want), "cbrt(%v) = %v, want %v", c.x, got, c.want)
+	}
+	testing.expect(t, within_ulps(math.cbrt(f32(2)), f32(1.2599210498948732)))
+	testing.expect(t, same(math.cbrt(f32(-27)), f32(-3)))
+	testing.expect(t, same(math.cbrt(f16(-27)), f16(-3)))
+	testing.expect(t, same(math.cbrt(f16(-0.0)), f16(-0.0)))
+}
+
+@test
+test_divmod :: proc(t: ^testing.T) {
+	Case :: struct {
+		x, y, div, mod: int,
+	}
+	cases := [?]Case{
+		{7, 2, 3, 1},
+		{-7, 2, -3, -1},
+		{7, -2, -3, 1},
+		{-7, -2, 3, -1},
+		{6, 3, 2, 0},
+		{0, 5, 0, 0},
+	}
+	for c in cases {
+		div, mod := math.divmod(c.x, c.y)
+		testing.expectf(t, div == c.div && mod == c.mod, "divmod(%v, %v) = %v, %v, want %v, %v", c.x, c.y, div, mod, c.div, c.mod)
+	}
+	d8, m8 := math.divmod(i8(-128), 3)
+	testing.expectf(t, d8 == -42 && m8 == -2, "divmod(i8(-128), 3) = %v, %v", d8, m8)
+	du, mu := math.divmod(u32(4_000_000_001), 10)
+	testing.expectf(t, du == 400_000_000 && mu == 1, "divmod(u32(4_000_000_001), 10) = %v, %v", du, mu)
+}
+
+@test
+test_gcd :: proc(t: ^testing.T) {
+	testing.expect_value(t, math.gcd(12, 18), 6)
+	testing.expect_value(t, math.gcd(-12, 18), 6)
+	testing.expect_value(t, math.gcd(12, -18), 6)
+	testing.expect_value(t, math.gcd(-12, -18), 6)
+	testing.expect_value(t, math.gcd(17, 5), 1)
+	testing.expect_value(t, math.gcd(0, 5), 5)
+	testing.expect_value(t, math.gcd(-5, 0), 5)
+	testing.expect_value(t, math.gcd(0, 0), 0)
+	testing.expect_value(t, math.gcd(i64(1) << 40, i64(3) << 20), i64(1) << 20)
+	testing.expect_value(t, math.gcd(u8(255), 51), 51)
+}
+
+@test
+test_factorial :: proc(t: ^testing.T) {
+	LAST :: 20 when size_of(int) == 8 else 12
+	want := 1
+	for n in 0..=LAST {
+		if n > 0 {
+			want *= n
+		}
+		got := math.factorial(n)
+		testing.expectf(t, got == want, "factorial(%v) = %v, want %v", n, got, want)
+	}
+	testing.expect_value(t, math.factorial(12), 479_001_600)
+	when size_of(int) == 8 {
+		testing.expect_value(t, math.factorial(20), 2_432_902_008_176_640_000)
+	}
+}
+
+@test
+test_step_smoothstep :: proc(t: ^testing.T) {
+	testing.expect_value(t, math.step(f64(0.5), 0.25), 0)
+	testing.expect_value(t, math.step(f64(0.5), 0.5), 1)
+	testing.expect_value(t, math.step(f64(0.5), 0.75), 1)
+	testing.expect_value(t, math.step(3, 2), 0)
+	testing.expect_value(t, math.step(3, 3), 1)
+	testing.expect_value(t, math.smoothstep(f64(0), 1, -1), 0)
+	testing.expect_value(t, math.smoothstep(f64(0), 1, 0.25), 0.15625)
+	testing.expect_value(t, math.smoothstep(f64(0), 1, 0.5), 0.5)
+	testing.expect_value(t, math.smoothstep(f64(0), 1, 2), 1)
+	testing.expect_value(t, math.smoothstep(f64(10), 0, 2.5), 0.84375)
+	testing.expect_value(t, math.smoothstep(f32(2), 4, 3), 0.5)
+}
+
+@test
+test_lerp_unlerp_saturate :: proc(t: ^testing.T) {
+	testing.expect_value(t, math.lerp(f64(0), 10, f64(0.25)), 2.5)
+	testing.expect_value(t, math.lerp(f64(2), 4, f64(0)), 2)
+	testing.expect_value(t, math.lerp(f64(2), 4, f64(1)), 4)
+	testing.expect_value(t, math.lerp(f64(2), 4, f64(1.5)), 5)
+	testing.expect_value(t, math.lerp(f32(-1), 1, f32(0.5)), 0)
+	testing.expect_value(t, math.lerp([2]f32{0, 10}, [2]f32{10, 20}, f32(0.5)), [2]f32{5, 15})
+	testing.expect_value(t, math.unlerp(f64(0), 10, 2.5), 0.25)
+	testing.expect_value(t, math.unlerp(f64(10), 20, 5), -0.5)
+	testing.expect_value(t, math.unlerp(f32(2), 4, 4), 1)
+	testing.expect_value(t, math.saturate(f64(-0.5)), 0)
+	testing.expect_value(t, math.saturate(f64(0.5)), 0.5)
+	testing.expect_value(t, math.saturate(f64(1.5)), 1)
+	testing.expect_value(t, math.saturate(f32(2)), 1)
+}
+
+@test
+test_sum_prod_cumsum :: proc(t: ^testing.T) {
+	ints := []int{1, 2, 3, 4}
+	testing.expect_value(t, math.sum(ints), 10)
+	testing.expect_value(t, math.prod(ints), 24)
+	testing.expect_value(t, math.sum([]int{}), 0)
+	testing.expect_value(t, math.prod([]int{}), 1)
+	testing.expect_value(t, math.sum([]f64{0.5, 0.25, -2}), -1.25)
+	testing.expect_value(t, math.prod([]f64{0.5, 0.25, -2}), -0.25)
+
+	dst: [4]int
+	out := math.cumsum(dst[:], ints)
+	testing.expect_value(t, len(out), 4)
+	testing.expect_value(t, dst, [4]int{1, 3, 6, 10})
+	short: [2]int
+	out = math.cumsum(short[:], ints)
+	testing.expect_value(t, len(out), 2)
+	testing.expect_value(t, short, [2]int{1, 3})
+	out = math.cumsum(dst[:0], ints)
+	testing.expect_value(t, len(out), 0)
+
+	inplace := [4]f32{1, 2, 3, 4}
+	math.cumsum_inplace(inplace[:])
+	testing.expect_value(t, inplace, [4]f32{1, 3, 6, 10})
+}
+
+@test
+test_power_of_two :: proc(t: ^testing.T) {
+	BITS :: 8 * size_of(int)
+	for k in 0..<BITS - 1 {
+		p := int(1) << uint(k)
+		testing.expectf(t, math.is_power_of_two(p), "is_power_of_two(%v) = false", p)
+		testing.expectf(t, math.next_power_of_two(p) == p, "next_power_of_two(%v) = %v", p, math.next_power_of_two(p))
+		if k > 0 && k < BITS - 2 {
+			testing.expectf(t, !math.is_power_of_two(p + 1), "is_power_of_two(%v) = true", p + 1)
+			testing.expectf(t, math.next_power_of_two(p + 1) == p << 1, "next_power_of_two(%v) = %v", p + 1, math.next_power_of_two(p + 1))
+		}
+	}
+	testing.expect(t, !math.is_power_of_two(0))
+	testing.expect(t, !math.is_power_of_two(-4))
+	testing.expect(t, !math.is_power_of_two(min(int)))
+	testing.expect(t, !math.is_power_of_two(max(int)))
+	testing.expect_value(t, math.next_power_of_two(0), 1)
+	testing.expect_value(t, math.next_power_of_two(-5), 1)
+	testing.expect_value(t, math.next_power_of_two(min(int)), 1)
+	testing.expect_value(t, math.next_power_of_two(1000), 1024)
+}
+
+@test
+test_to_radians_to_degrees :: proc(t: ^testing.T) {
+	testing.expect(t, within_ulps(math.to_radians(f64(180)), f64(math.PI)))
+	testing.expect(t, within_ulps(math.to_radians(f64(45)), f64(math.PI / 4)))
+	testing.expect(t, within_ulps(math.to_radians(f64(-90)), f64(-math.PI / 2)))
+	testing.expect(t, within_ulps(math.to_degrees(f64(math.PI)), f64(180)))
+	testing.expect(t, same(math.to_degrees(f64(1)), f64(math.DEG_PER_RAD)))
+	testing.expect(t, same(math.to_radians(f64(0)), f64(0)))
+	testing.expect(t, same(math.to_degrees(f64(-0.0)), f64(-0.0)))
+	testing.expect(t, same(math.to_radians(math.NEG_INF_F64), math.NEG_INF_F64))
+	testing.expect(t, within_ulps(math.to_radians(f32(180)), f32(math.PI)))
+	testing.expect(t, within_ulps(math.to_degrees(f32(math.PI)), f32(180)))
+	testing.expect(t, within_ulps(math.to_radians(f16(180)), f16(math.PI)))
+	testing.expect(t, within_ulps(math.to_degrees(f16(math.PI)), f16(180)))
+}
+
+@test
+test_pow2 :: proc(t: ^testing.T) {
+	v64 := f64(1)
+	for k in 0..=1024 {
+		got := math.pow2_f64(k)
+		testing.expectf(t, same(got, v64), "pow2_f64(%v) = %v, want %v", k, got, v64)
+		v64 *= 2
+	}
+	v64 = 1
+	for k := 0; k >= -1074; k -= 1 {
+		got := math.pow2_f64(k)
+		testing.expectf(t, same(got, v64), "pow2_f64(%v) = %v, want %v", k, got, v64)
+		v64 *= 0.5
+	}
+	testing.expect(t, same(math.pow2_f64(-1075), f64(0)))
+	testing.expect(t, same(math.pow2_f64(-1076), f64(0)))
+	testing.expect(t, same(math.pow2_f64(min(int)), f64(0)))
+	testing.expect(t, same(math.pow2_f64(max(int)), math.INF_F64))
+
+	v32 := f32(1)
+	for k in 0..=128 {
+		got := math.pow2_f32(k)
+		testing.expectf(t, same(got, v32), "pow2_f32(%v) = %v, want %v", k, got, v32)
+		v32 *= 2
+	}
+	v32 = 1
+	for k := 0; k >= -149; k -= 1 {
+		got := math.pow2_f32(k)
+		testing.expectf(t, same(got, v32), "pow2_f32(%v) = %v, want %v", k, got, v32)
+		v32 *= 0.5
+	}
+	testing.expect(t, same(math.pow2_f32(-150), f32(0)))
+	testing.expect(t, same(math.pow2_f32(-151), f32(0)))
+	testing.expect(t, same(math.pow2_f32(-1000), f32(0)))
+	testing.expect(t, same(math.pow2_f32(max(int)), math.INF_F32))
+
+	v16 := f16(1)
+	for k in 0..=16 {
+		got := math.pow2_f16(k)
+		testing.expectf(t, same(got, v16), "pow2_f16(%v) = %v, want %v", k, got, v16)
+		v16 *= 2
+	}
+	v16 = 1
+	for k := 0; k >= -24; k -= 1 {
+		got := math.pow2_f16(k)
+		testing.expectf(t, same(got, v16), "pow2_f16(%v) = %v, want %v", k, got, v16)
+		v16 *= 0.5
+	}
+	testing.expect(t, same(math.pow2_f16(-25), f16(0)))
+	testing.expect(t, same(math.pow2_f16(-1000), f16(0)))
+	testing.expect(t, same(math.pow2_f16(max(int)), math.INF_F16))
 }

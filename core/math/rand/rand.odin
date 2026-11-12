@@ -1153,7 +1153,7 @@ choice_enum :: proc($T: typeid, gen := context.random_generator) -> T where intr
 			return T(i)
 		}
 	} else {
-		values := runtime.type_info_base(type_info_of(T)).variant.(runtime.Type_Info_Enum).values
+		values := runtime.type_info_base(type_info_of(T)).variant.(^runtime.Type_Info_Enum).values
 		return T(choice(values, gen))
 	}
 }

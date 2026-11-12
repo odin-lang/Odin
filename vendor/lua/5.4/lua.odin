@@ -4,11 +4,13 @@ package lua_5_4
 import "base:intrinsics"
 import "base:builtin"
 
-import c "core:c/libc"
+import c "core:c"
 
 #assert(size_of(c.int) == size_of(b32))
 
 LUA_SHARED :: #config(LUA_SHARED, false)
+
+LUA_WASM_LIB :: #config(LUA_WASM_LIB, "env.o")
 
 when LUA_SHARED {
 	when ODIN_OS == .Windows {
@@ -16,6 +18,8 @@ when LUA_SHARED {
 		foreign import lib "windows/lua54dll.lib"
 	} else when ODIN_OS == .Linux && ODIN_ARCH == .amd64 {
 		foreign import lib "linux/liblua54.so"
+	} else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+		foreign import lib { LUA_WASM_LIB }
 	} else {
 		foreign import lib "system:lua5.4"
 	}
@@ -24,6 +28,8 @@ when LUA_SHARED {
 		foreign import lib "windows/lua54dll.lib"
 	} else when ODIN_OS == .Linux && ODIN_ARCH == .amd64 {
 		foreign import lib "linux/liblua54.a"
+	} else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+		foreign import lib { LUA_WASM_LIB }
 	} else {
 		foreign import lib "system:lua5.4"
 	}
@@ -31,14 +37,14 @@ when LUA_SHARED {
 
 VERSION_MAJOR       :: "5"
 VERSION_MINOR       :: "4"
-VERSION_RELEASE     :: "2"
+VERSION_RELEASE     :: "9"
 
 VERSION_NUM         :: 504
-VERSION_RELEASE_NUM :: VERSION_NUM * 100 + 0
+VERSION_RELEASE_NUM :: VERSION_NUM * 100 + 9
 
 VERSION             :: "Lua " + VERSION_MAJOR + "." + VERSION_MINOR
 RELEASE             :: VERSION + "." + VERSION_RELEASE
-COPYRIGHT           :: RELEASE + "  Copyright (C) 1994-2020 Lua.org, PUC-Rio"
+COPYRIGHT           :: RELEASE + "  Copyright (C) 1994-2026 Lua.org, PUC-Rio"
 AUTHORS             :: "R. Ierusalimschy, L. H. de Figueiredo, W. Celes"
 
 
@@ -321,7 +327,7 @@ State :: struct {} // opaque data type
 
 @(link_prefix="lua_")
 @(default_calling_convention="c")
-foreign lib {
+foreign {
 	/*
 	** RCS ident string
 	*/
@@ -337,6 +343,7 @@ foreign lib {
 	close       :: proc(L: ^State) ---
 	newthread   :: proc(L: ^State) -> ^State ---
 	resetthread :: proc(L: ^State) -> Status ---
+	closethread :: proc(L: ^State, from: ^State) -> Status ---
 
 	atpanic :: proc(L: ^State, panicf: CFunction) -> CFunction ---
 
@@ -473,7 +480,7 @@ foreign lib {
 	*/
 
 	setwarnf :: proc(L: ^State, f: WarnFunction, ud: rawptr) ---
-	warning  :: proc(L: ^State, msg: string, tocont: b32) ---
+	warning  :: proc(L: ^State, msg: cstring, tocont: b32) ---
 
 
 	/*
@@ -498,10 +505,11 @@ foreign lib {
 
 	stringtonumber :: proc(L: ^State, s: cstring) -> c.size_t ---
 
-	getallocf :: proc(L: State, ud: ^rawptr) -> Alloc ---
+	getallocf :: proc(L: ^State, ud: ^rawptr) -> Alloc ---
 	setallocf :: proc(L: ^State, f: Alloc, ud: rawptr) ---
 
-	toclose :: proc(L: ^State, idx: c.int) ---
+	toclose   :: proc(L: ^State, idx: c.int) ---
+	closeslot :: proc(L: ^State, idx: c.int) ---
 
 	/*
 	** {======================================================================
@@ -679,7 +687,7 @@ L_buffaddr :: #force_inline proc "c" (bf: ^L_Buffer) -> [^]byte {
 }
 
 L_addchar :: #force_inline proc "c" (B: ^L_Buffer, c: byte) {
-	if B.n < B.size {
+	if B.n >= B.size {
 		L_prepbuffsize(B, 1)
 	}
 	B.b[B.n] = c

@@ -143,8 +143,11 @@ foreign user32 {
 	GetDCEx     :: proc(hWnd: HWND, hrgnClip: HRGN, flags: DWORD) -> HDC ---
 	ReleaseDC   :: proc(hWnd: HWND, hDC: HDC) -> INT ---
 
-	GetDlgCtrlID :: proc(hWnd: HWND) -> INT ---
-	GetDlgItem   :: proc(hDlg: HWND, nIDDlgItem: INT) -> HWND ---
+	GetDlgCtrlID     :: proc(hWnd: HWND) -> INT ---
+	GetDlgItem       :: proc(hDlg: HWND, nIDDlgItem: INT) -> HWND ---
+	GetDlgItemTextW  :: proc(hDlg: HWND, nIDDlgItem: INT, lpString: LPWSTR, cchMax: INT) -> UINT ---
+	SetDlgItemTextW  :: proc(hDlg: HWND, nIDDlgItem: INT, lpString: LPCWSTR) -> BOOL ---
+	CheckRadioButton :: proc(hDlg: HWND, nIDFirstButton: INT, nIDLastButton: INT, nIDCheckButton: INT) -> BOOL ---
 
 	CreateMenu             :: proc() -> HMENU ---
 	CreatePopupMenu        :: proc() -> HMENU ---
@@ -213,6 +216,13 @@ foreign user32 {
 
 	EnumDisplayDevicesW  :: proc(lpDevice: LPCWSTR, iDevNum: DWORD, lpDisplayDevice: PDISPLAY_DEVICEW, dwFlags: DWORD) -> BOOL ---
 	EnumDisplaySettingsW :: proc(lpszDeviceName: LPCWSTR, iModeNum: DWORD, lpDevMode: ^DEVMODEW) -> BOOL ---
+
+	GetDisplayConfigBufferSizes :: proc(flags: UINT32, numPathArrayElements: ^UINT32, numModeInfoArrayElements: ^UINT32) -> LONG ---
+	QueryDisplayConfig          :: proc(flags: UINT32, numPathArrayElements: ^UINT32, pathArray: [^]DISPLAYCONFIG_PATH_INFO, numModeInfoArrayElements: ^UINT32, modeInfoArray: [^]DISPLAYCONFIG_MODE_INFO, currentTopologyId: ^DISPLAYCONFIG_TOPOLOGY_ID) -> LONG ---
+	DisplayConfigGetDeviceInfo  :: proc(requestPacket: ^DISPLAYCONFIG_DEVICE_INFO_HEADER) -> LONG ---
+
+	RegisterDeviceNotificationW  :: proc(hRecipient: HANDLE, NotificationFilter: LPVOID, Flags: DWORD) -> HDEVNOTIFY ---
+	UnregisterDeviceNotification :: proc(Handle: HDEVNOTIFY) -> BOOL ---
 
 	WindowFromPoint     :: proc(pt: POINT) -> HWND ---
 	MonitorFromPoint    :: proc(pt: POINT, dwFlags: Monitor_From_Flags) -> HMONITOR ---
@@ -323,7 +333,7 @@ foreign user32 {
 
 	GetProcessWindowStation   :: proc() -> HWINSTA ---
 	GetUserObjectInformationW :: proc(hObj: HANDLE, nIndex: GetUserObjectInformationFlags, pvInfo: PVOID, nLength: DWORD, lpnLengthNeeded: LPDWORD) -> BOOL ---
-	
+
 	OpenClipboard                 :: proc(hWndNewOwner: HWND) -> BOOL ---
 	CloseClipboard                :: proc() -> BOOL ---
 	GetClipboardData              :: proc(uFormat: UINT) -> HANDLE ---
@@ -803,6 +813,161 @@ DISPLAY_DEVICEW :: struct {
 }
 PDISPLAY_DEVICEW :: ^DISPLAY_DEVICEW
 
+// QueryDisplayConfig() flags
+QDC_ALL_PATHS                  :: 0x00000001
+QDC_ONLY_ACTIVE_PATHS          :: 0x00000002
+QDC_DATABASE_CURRENT           :: 0x00000004
+QDC_VIRTUAL_MODE_AWARE         :: 0x00000010
+QDC_INCLUDE_HMD                :: 0x00000020
+QDC_VIRTUAL_REFRESH_RATE_AWARE :: 0x00000040
+
+DISPLAYCONFIG_DEVICE_INFO_TYPE :: enum UINT32 {
+	GET_SOURCE_NAME                = 1,
+	GET_TARGET_NAME                = 2,
+	GET_TARGET_PREFERRED_MODE      = 3,
+	GET_ADAPTER_NAME               = 4,
+	SET_TARGET_PERSISTENCE         = 5,
+	GET_TARGET_BASE_TYPE           = 6,
+	GET_SUPPORT_VIRTUAL_RESOLUTION = 7,
+	SET_SUPPORT_VIRTUAL_RESOLUTION = 8,
+	GET_ADVANCED_COLOR_INFO        = 9,
+	SET_ADVANCED_COLOR_STATE       = 10,
+	GET_SDR_WHITE_LEVEL            = 11,
+}
+
+DISPLAYCONFIG_VIDEO_OUTPUT_TECHNOLOGY :: enum UINT32 {
+	OTHER                  = 0xFFFFFFFF,
+	HD15                   = 0,
+	SVIDEO                 = 1,
+	COMPOSITE_VIDEO        = 2,
+	COMPONENT_VIDEO        = 3,
+	DVI                    = 4,
+	HDMI                   = 5,
+	LVDS                   = 6,
+	D_JPN                  = 8,
+	SDI                    = 9,
+	DISPLAYPORT_EXTERNAL   = 10,
+	DISPLAYPORT_EMBEDDED   = 11,
+	UDI_EXTERNAL           = 12,
+	UDI_EMBEDDED           = 13,
+	SDTVDONGLE             = 14,
+	MIRACAST               = 15,
+	INDIRECT_WIRED         = 16,
+	INDIRECT_VIRTUAL       = 17,
+	DISPLAYPORT_USB_TUNNEL = 18,
+	INTERNAL               = 0x80000000,
+}
+
+DISPLAYCONFIG_MODE_INFO_TYPE :: enum UINT32 {
+	SOURCE        = 1,
+	TARGET        = 2,
+	DESKTOP_IMAGE = 3,
+}
+
+DISPLAYCONFIG_TOPOLOGY_ID :: enum UINT32 {
+	INTERNAL = 0x00000001,
+	CLONE    = 0x00000002,
+	EXTEND   = 0x00000004,
+	EXTERNAL = 0x00000008,
+}
+
+DISPLAYCONFIG_RATIONAL :: struct {
+	Numerator:   UINT32,
+	Denominator: UINT32,
+}
+
+DISPLAYCONFIG_2DREGION :: struct {
+	cx: UINT32,
+	cy: UINT32,
+}
+
+DISPLAYCONFIG_PATH_SOURCE_INFO :: struct {
+	adapterId:   LUID,
+	id:          UINT32,
+	modeInfoIdx: UINT32,
+	statusFlags: UINT32,
+}
+
+DISPLAYCONFIG_PATH_TARGET_INFO :: struct {
+	adapterId:        LUID,
+	id:               UINT32,
+	modeInfoIdx:      UINT32,
+	outputTechnology: DISPLAYCONFIG_VIDEO_OUTPUT_TECHNOLOGY,
+	rotation:         UINT32,
+	scaling:          UINT32,
+	refreshRate:      DISPLAYCONFIG_RATIONAL,
+	scanLineOrdering: UINT32,
+	targetAvailable:  BOOL,
+	statusFlags:      UINT32,
+}
+
+DISPLAYCONFIG_PATH_INFO :: struct {
+	sourceInfo: DISPLAYCONFIG_PATH_SOURCE_INFO,
+	targetInfo: DISPLAYCONFIG_PATH_TARGET_INFO,
+	flags:      UINT32,
+}
+
+DISPLAYCONFIG_VIDEO_SIGNAL_INFO :: struct {
+	pixelRate:        UINT64,
+	hSyncFreq:        DISPLAYCONFIG_RATIONAL,
+	vSyncFreq:        DISPLAYCONFIG_RATIONAL,
+	activeSize:       DISPLAYCONFIG_2DREGION,
+	totalSize:        DISPLAYCONFIG_2DREGION,
+	videoStandard:    UINT32,
+	scanLineOrdering: UINT32,
+}
+
+DISPLAYCONFIG_TARGET_MODE :: struct {
+	targetVideoSignalInfo: DISPLAYCONFIG_VIDEO_SIGNAL_INFO,
+}
+
+DISPLAYCONFIG_SOURCE_MODE :: struct {
+	width:       UINT32,
+	height:      UINT32,
+	pixelFormat: UINT32,
+	position:    POINT,
+}
+
+DISPLAYCONFIG_DESKTOP_IMAGE_INFO :: struct {
+	PathSourceSize:     POINT,
+	DesktopImageRegion: RECT,
+	DesktopImageClip:   RECT,
+}
+
+DISPLAYCONFIG_MODE_INFO :: struct {
+	infoType:  DISPLAYCONFIG_MODE_INFO_TYPE,
+	id:        UINT32,
+	adapterId: LUID,
+	using _: struct #raw_union {
+		targetMode:       DISPLAYCONFIG_TARGET_MODE,
+		sourceMode:       DISPLAYCONFIG_SOURCE_MODE,
+		desktopImageInfo: DISPLAYCONFIG_DESKTOP_IMAGE_INFO,
+	},
+}
+
+DISPLAYCONFIG_DEVICE_INFO_HEADER :: struct {
+	type:      DISPLAYCONFIG_DEVICE_INFO_TYPE,
+	size:      UINT32,
+	adapterId: LUID,
+	id:        UINT32,
+}
+
+DISPLAYCONFIG_SOURCE_DEVICE_NAME :: struct {
+	header:            DISPLAYCONFIG_DEVICE_INFO_HEADER,
+	viewGdiDeviceName: [CCHDEVICENAME]WCHAR,
+}
+
+DISPLAYCONFIG_TARGET_DEVICE_NAME :: struct {
+	header:                    DISPLAYCONFIG_DEVICE_INFO_HEADER,
+	flags:                     UINT32,
+	outputTechnology:          DISPLAYCONFIG_VIDEO_OUTPUT_TECHNOLOGY,
+	edidManufactureId:         UINT16,
+	edidProductCodeId:         UINT16,
+	connectorInstance:         UINT32,
+	monitorFriendlyDeviceName: [64]WCHAR,
+	monitorDevicePath:         [128]WCHAR,
+}
+
 // OUTOFCONTEXT is the zero value, use {}
 WinEventFlags :: distinct bit_set[WinEventFlag; DWORD]
 
@@ -1085,3 +1250,43 @@ COPYDATASTRUCT :: struct {
 }
 
 PCOPYDATASTRUCT :: ^COPYDATASTRUCT
+
+HDEVNOTIFY :: PVOID
+
+// RegisterDeviceNotification() flags
+DEVICE_NOTIFY_WINDOW_HANDLE         :: 0x00000000
+DEVICE_NOTIFY_SERVICE_HANDLE        :: 0x00000001
+DEVICE_NOTIFY_ALL_INTERFACE_CLASSES :: 0x00000004
+
+// WM_DEVICECHANGE events
+DBT_DEVICEARRIVAL           :: 0x8000
+DBT_DEVICEQUERYREMOVE       :: 0x8001
+DBT_DEVICEQUERYREMOVEFAILED :: 0x8002
+DBT_DEVICEREMOVEPENDING     :: 0x8003
+DBT_DEVICEREMOVECOMPLETE    :: 0x8004
+DBT_DEVICETYPESPECIFIC      :: 0x8005
+DBT_CUSTOMEVENT             :: 0x8006
+
+DBT_DEVTYP_OEM             :: 0x00000000
+DBT_DEVTYP_DEVNODE         :: 0x00000001
+DBT_DEVTYP_VOLUME          :: 0x00000002
+DBT_DEVTYP_PORT            :: 0x00000003
+DBT_DEVTYP_NET             :: 0x00000004
+DBT_DEVTYP_DEVICEINTERFACE :: 0x00000005
+DBT_DEVTYP_HANDLE          :: 0x00000006
+
+DEV_BROADCAST_HDR :: struct {
+	dbch_size:       DWORD,
+	dbch_devicetype: DWORD,
+	dbch_reserved:   DWORD,
+}
+PDEV_BROADCAST_HDR :: ^DEV_BROADCAST_HDR
+
+DEV_BROADCAST_DEVICEINTERFACE_W :: struct {
+	dbcc_size:       DWORD,
+	dbcc_devicetype: DWORD,
+	dbcc_reserved:   DWORD,
+	dbcc_classguid:  GUID,
+	dbcc_name:       [1]WCHAR,
+}
+PDEV_BROADCAST_DEVICEINTERFACE_W :: ^DEV_BROADCAST_DEVICEINTERFACE_W

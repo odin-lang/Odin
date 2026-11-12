@@ -7,7 +7,7 @@ set -eu
 #
 #   ./run.sh
 #   ./run.sh linux_riscv64 riscv64-linux-gnu \
-#       "-extra-linker-flags:-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
+#       "-extra-linker-flags:--target=riscv64-linux-gnu -static" -no-rpath
 #
 # For a target with no cross libc -- i386, arm32 -- see `cross.sh`, which builds
 # the same corpus freestanding.

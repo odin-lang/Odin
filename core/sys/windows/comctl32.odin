@@ -511,6 +511,31 @@ foreign Comctl32 {
 	CreateMappedBitmap :: proc(hInstance: HINSTANCE, idBitmap: INT_PTR, wFlags: UINT, lpColorMap: LPCOLORMAP, iNumMaps: c_int) -> HBITMAP ---
 }
 
+// Tooltip Control
+TTTOOLINFOW :: struct {
+	cbSize: UINT,
+	uFlags: UINT,
+	hwnd: HWND,
+	uId: UINT_PTR,
+	rect: RECT,
+	hinst: HINSTANCE,
+	lpszText: LPWSTR,
+	lParam: LPARAM,
+	lpReserved: rawptr,
+}
+TOOLINFOW :: TTTOOLINFOW
+LPTTTOOLINFOW :: ^TTTOOLINFOW
+
+TTF_IDISHWND    :: 0x0001
+TTF_CENTERTIP   :: 0x0002
+TTF_RTLREADING  :: 0x0004
+TTF_SUBCLASS    :: 0x0010
+TTF_TRACK       :: 0x0020
+TTF_ABSOLUTE    :: 0x0080
+TTF_TRANSPARENT :: 0x0100
+TTF_PARSELINKS  :: 0x1000
+TTF_DI_SETITEM  :: 0x8000
+
 // Button Control
 BUTTON_IMAGELIST_ALIGN_LEFT   :: 0
 BUTTON_IMAGELIST_ALIGN_RIGHT  :: 1

@@ -115,6 +115,8 @@ erf :: proc{
 	erf_f32le,
 	erf_f32be,
 	erf_f64,
+	erf_f64le,
+	erf_f64be,
 }
 
 @(require_results) erf_f16   :: proc "contextless" (x: f16)   -> f16   { return f16(erf_f64(f64(x))) }
@@ -123,6 +125,8 @@ erf :: proc{
 @(require_results) erf_f32   :: proc "contextless" (x: f32)   -> f32   { return f32(erf_f64(f64(x))) }
 @(require_results) erf_f32le :: proc "contextless" (x: f32le) -> f32le { return f32le(erf_f64(f64(x))) }
 @(require_results) erf_f32be :: proc "contextless" (x: f32be) -> f32be { return f32be(erf_f64(f64(x))) }
+@(require_results) erf_f64le :: proc "contextless" (x: f64le) -> f64le { return f64le(erf_f64(f64(x))) }
+@(require_results) erf_f64be :: proc "contextless" (x: f64be) -> f64be { return f64be(erf_f64(f64(x))) }
 
 @(require_results)
 erf_f64 :: proc "contextless" (x: f64) -> f64 {
@@ -267,6 +271,8 @@ erfc :: proc{
 	erfc_f32le,
 	erfc_f32be,
 	erfc_f64,
+	erfc_f64le,
+	erfc_f64be,
 }
 
 @(require_results) erfc_f16   :: proc "contextless" (x: f16)   -> f16   { return f16(erfc_f64(f64(x))) }
@@ -275,6 +281,8 @@ erfc :: proc{
 @(require_results) erfc_f32   :: proc "contextless" (x: f32)   -> f32   { return f32(erfc_f64(f64(x))) }
 @(require_results) erfc_f32le :: proc "contextless" (x: f32le) -> f32le { return f32le(erfc_f64(f64(x))) }
 @(require_results) erfc_f32be :: proc "contextless" (x: f32be) -> f32be { return f32be(erfc_f64(f64(x))) }
+@(require_results) erfc_f64le :: proc "contextless" (x: f64le) -> f64le { return f64le(erfc_f64(f64(x))) }
+@(require_results) erfc_f64be :: proc "contextless" (x: f64be) -> f64be { return f64be(erfc_f64(f64(x))) }
 
 @(require_results)
 erfc_f64 :: proc "contextless" (x: f64) -> f64 {
@@ -367,7 +375,11 @@ erfc_f64 :: proc "contextless" (x: f64) -> f64 {
 			if x < 0.25 { // |x| < 1/4
 				temp = x + x*y
 			} else {
-				temp = 0.5 + (x*y + (x - 0.5))
+				w := x*y + (x - 0.5)
+				if sign {
+					return 1.5 + w
+				}
+				return 0.5 - w
 			}
 		}
 		if sign {

@@ -45,6 +45,8 @@ gb_internal String get_default_microarchitecture() {
 		} else {
 			default_march = str_lit("x86-64-v2");
 		}
+	} else if (build_context.metrics.arch == TargetArch_i386) {
+		default_march = str_lit("pentium4");
 	} else if (build_context.metrics.arch == TargetArch_riscv64) {
 		default_march = str_lit("generic-rv64");
 	} else if (build_context.metrics.arch == TargetArch_arm32) {
@@ -2444,6 +2446,14 @@ gb_internal void lb_create_global_variable(lbModule *m, lbGlobalVariable *var) {
 
 	lb_apply_thread_local_model(g.value, e->Variable.thread_local_model);
 
+	u32 alignment = cast(u32)gb_max(type_align_of(e->type), e->Variable.custom_align);
+
+	#ifdef __BIONIC__
+	if (e->Variable.thread_local_model != "") {
+		alignment = gb_max(alignment, 64);
+	}
+	#endif
+
 	if (is_foreign) {
 		LLVMSetLinkage(g.value, LLVMExternalLinkage);
 		LLVMSetDLLStorageClass(g.value, LLVMDLLImportStorageClass);
@@ -2459,7 +2469,7 @@ gb_internal void lb_create_global_variable(lbModule *m, lbGlobalVariable *var) {
 		LLVM_SET_INTERNAL_WEAK_LINKAGE(g.value);
 	}
 	lb_set_linkage_from_entity_flags(m, g.value, e->flags);
-	LLVMSetAlignment(g.value, cast(u32)gb_max(type_align_of(e->type), e->Variable.custom_align));
+	LLVMSetAlignment(g.value, alignment);
 
 	if (e->Variable.link_section.len > 0) {
 		LLVMSetSection(g.value, alloc_cstring(permanent_allocator(), e->Variable.link_section));
@@ -2727,6 +2737,9 @@ gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, Checker
 
 		if (e->kind == Entity_Procedure) {
 			if (e->Procedure.is_foreign && e->Procedure.is_objc_impl_or_import) {
+				// Track usage of Objective-C frameworks when an imported Objective-C method is used.
+				lb_add_foreign_library_path(m, e->Procedure.foreign_library);
+
 				// Do not generate declarations for foreign Objective-C methods. These are called indirectly through the Objective-C runtime.
 				continue;
 			}
@@ -3341,7 +3354,7 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 	Type *params  = alloc_type_tuple();
 	Type *results = alloc_type_tuple();
 
-	Type *t_ptr_cstring = alloc_type_pointer(t_cstring);
+	Type *t_argv = alloc_type_pointer(t_cstring);
 
 	bool call_cleanup = true;
 
@@ -3358,21 +3371,21 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 		call_cleanup = false;
 	} else if (build_context.metrics.os == TargetOs_windows && build_context.no_crt) {
 		name = str_lit("mainCRTStartup");
-	} else if (build_context.metrics.os == TargetOs_windows && build_context.metrics.arch == TargetArch_i386 && !build_context.no_crt) {
-		// Windows i386 with CRT: libcmt expects _main (main with underscore prefix)
-		name = str_lit("main");
+	} else if (build_context.metrics.os == TargetOs_windows) {
+		name = str_lit("wmain");
+		t_argv = alloc_type_pointer(t_cstring16);
 		has_args = true;
 		slice_init(&params->Tuple.variables, permanent_allocator(), 2);
-		params->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("argc"), t_i32, false, true);
-		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("argv"), t_ptr_cstring, false, true);
+		params->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("argc"), t_i32,  false, true);
+		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("argv"), t_argv, false, true);
 	} else if (is_arch_wasm()) {
 		name = str_lit("_start");
 		call_cleanup = false;
 	} else {
 		has_args = true;
 		slice_init(&params->Tuple.variables, permanent_allocator(), 2);
-		params->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("argc"), t_i32, false, true);
-		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("argv"), t_ptr_cstring, false, true);
+		params->Tuple.variables[0] = alloc_entity_param(nullptr, make_token_ident("argc"), t_i32,  false, true);
+		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("argv"), t_argv, false, true);
 	}
 
 	slice_init(&results->Tuple.variables, permanent_allocator(), 1);
@@ -3390,12 +3403,16 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 
 	if (has_args) { // initialize `runtime.args__`
 		lbValue argc = {LLVMGetParam(p->value, 0), t_i32};
-		lbValue argv = {LLVMGetParam(p->value, 1), t_ptr_cstring};
+		lbValue argv = {LLVMGetParam(p->value, 1), t_argv};
 		LLVMSetValueName2(argc.value, "argc", 4);
 		LLVMSetValueName2(argv.value, "argv", 4);
 		argc = lb_emit_conv(p, argc, t_int);
-		lbAddr args = lb_addr(lb_find_runtime_value(p->module, str_lit("args__")));
+
+		Type *t_args = alloc_type_slice(type_deref(t_argv));
+		lbAddr args = lb_add_local_generated(p, t_args, false);
 		lb_fill_slice(p, args, argv, argc);
+		lbValue rt_args = lb_find_runtime_value(p->module, str_lit("args__"));
+		lb_emit_store_union_variant(p, rt_args, lb_addr_load(p, args), t_args);
 	}
 
 	lbValue startup_runtime_value = {startup_runtime->value, startup_runtime->type};
@@ -3682,6 +3699,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	if (lb_x86_features_need_evex512(build_context.target_features_string)) {
 		llvm_features = gb_string_appendc(llvm_features, first ? "+evex512" : ",+evex512");
 	}
+	gen->target_features = copy_string(permanent_allocator(), make_string_c(llvm_features));
 
 	debugf("CPU: %.*s, Features: %s\n", LIT(llvm_cpu), llvm_features);	
 
@@ -3710,8 +3728,20 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		lbModule *m = entry.value;
 		m->target_machine = target_machine;
 		LLVMTargetDataRef data_layout = LLVMCreateTargetDataLayout(target_machine);
-		LLVMSetModuleDataLayout(m->mod, data_layout);
+		char *layout_string = LLVMCopyStringRepOfTargetData(data_layout);
 		LLVMDisposeTargetData(data_layout);
+		// LLVM aligns a vector to its size, but Odin caps at max_simd_align (lb_alignof);
+		// listing wider vectors with the capped ABI alignment makes LLVM's defaults (load/store, sret) claim that
+		gbString layout = gb_string_make(heap_allocator(), layout_string);
+		LLVMDisposeMessage(layout_string);
+		i64 cap_bits = 8*build_context.max_simd_align;
+		i64 max_bits = 8*LB_MAX_VECTOR_SIZE;
+		for (i64 bits = cap_bits+8; bits <= max_bits; bits += 8) {
+			// v<bits>:<abi>:<preferred>; the preferred alignment stays natural (for LLVM's own stack slots)
+			layout = gb_string_append_fmt(layout, "-v%lld:%lld:%lld", cast(long long)bits, cast(long long)cap_bits, cast(long long)(8*next_pow2(bits/8)));
+		}
+		LLVMSetDataLayout(m->mod, layout);
+		gb_string_free(layout);
 
 	#if LLVM_VERSION_MAJOR >= 18
 		if (build_context.fast_isel) {
@@ -3813,10 +3843,19 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			// NOTE(bill): Removes need for heap allocation by making it global memory
 			// for each module which defines type info entries
 			isize part_count = gen->type_info_modules.count;
-			auto counts        = array_make<isize>(heap_allocator(), part_count);
-			auto offsets_extra = array_make<isize>(heap_allocator(), part_count);
+
+			struct MemberCounts {
+				isize types;
+				isize names;
+				isize offsets;
+				isize usings;
+				isize tags;
+				isize empty_usings;
+				isize empty_tags;
+				isize enum_indices;
+			};
+			auto counts = array_make<MemberCounts>(heap_allocator(), part_count);
 			defer (array_free(&counts));
-			defer (array_free(&offsets_extra));
 
 			for (auto const &tt : m->info->type_info_types_hash_map) {
 				Type *t = tt.type;
@@ -3828,21 +3867,48 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 					continue;
 				}
 
-				isize part = index % part_count;
+				MemberCounts &c = counts[index % part_count];
 				switch (t->kind) {
 				case Type_Union:
-					counts[part] += t->Union.variants.count;
+					c.types += t->Union.variants.count;
 					break;
-				case Type_Struct:
-					counts[part] += t->Struct.fields.count;
+				case Type_Struct: {
+					isize n = t->Struct.fields.count;
+					c.types   += n;
+					c.names   += n;
+					c.offsets += n;
+					if (lb_type_info_struct_has_usings(t)) {
+						c.usings += n;
+					} else {
+						c.empty_usings = gb_max(c.empty_usings, n);
+					}
+					if (lb_type_info_has_tags(t)) {
+						c.tags += n;
+					} else {
+						c.empty_tags = gb_max(c.empty_tags, n);
+					}
 					break;
+				}
 				case Type_Tuple:
-					counts[part] += t->Tuple.variables.count;
+					c.types += t->Tuple.variables.count;
+					c.names += t->Tuple.variables.count;
 					break;
-				case Type_BitField:
-					counts[part] += t->BitField.fields.count;
-					// Twice is needed for the bit_offsets
-					offsets_extra[part] += t->BitField.fields.count;
+				case Type_BitField: {
+					isize n = t->BitField.fields.count;
+					c.types   += n;
+					c.names   += n;
+					c.offsets += 2*n; // bit_sizes and bit_offsets
+					if (lb_type_info_has_tags(t)) {
+						c.tags += n;
+					} else {
+						c.empty_tags = gb_max(c.empty_tags, n);
+					}
+					break;
+				}
+				case Type_Enum:
+					if (lb_type_info_enum_values_are_indices(t)) {
+						c.enum_indices = gb_max(c.enum_indices, t->Enum.fields.count);
+					}
 					break;
 				}
 			}
@@ -3858,13 +3924,30 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			};
 
 			for (lbModule *tm : gen->type_info_modules) {
-				isize count = counts[tm->type_info_part];
+				MemberCounts const &c = counts[tm->type_info_part];
 				lbTypeInfoMembers *members = permanent_alloc_item<lbTypeInfoMembers>();
-				members->types   = global_type_info_make(tm, LB_TYPE_INFO_TYPES_NAME,   t_type_info_ptr, count);
-				members->names   = global_type_info_make(tm, LB_TYPE_INFO_NAMES_NAME,   t_string,        count);
-				members->offsets = global_type_info_make(tm, LB_TYPE_INFO_OFFSETS_NAME, t_uintptr,       count+offsets_extra[tm->type_info_part]);
-				members->usings  = global_type_info_make(tm, LB_TYPE_INFO_USINGS_NAME,  t_bool,          count);
-				members->tags    = global_type_info_make(tm, LB_TYPE_INFO_TAGS_NAME,    t_string,        count);
+				members->types   = global_type_info_make(tm, LB_TYPE_INFO_TYPES_NAME,   t_type_info_ptr, c.types);
+				members->names   = global_type_info_make(tm, LB_TYPE_INFO_NAMES_NAME,   t_string,        c.names);
+				members->offsets = global_type_info_make(tm, LB_TYPE_INFO_OFFSETS_NAME, t_uintptr,       c.offsets);
+				members->usings  = global_type_info_make(tm, LB_TYPE_INFO_USINGS_NAME,  t_bool,          c.empty_usings + c.usings);
+				members->tags    = global_type_info_make(tm, LB_TYPE_INFO_TAGS_NAME,    t_string,        c.empty_tags   + c.tags);
+
+				members->empty_usings_count = c.empty_usings;
+				members->empty_tags_count   = c.empty_tags;
+				members->usings_index       = c.empty_usings;
+				members->tags_index         = c.empty_tags;
+
+				if (c.enum_indices > 0) {
+					members->enum_indices       = global_type_info_make(tm, LB_TYPE_INFO_ENUM_INDICES_NAME, t_type_info_enum_value, c.enum_indices);
+					members->enum_indices_count = c.enum_indices;
+
+					LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, c.enum_indices);
+					for (isize i = 0; i < c.enum_indices; i++) {
+						values[i] = lb_const_int(tm, t_type_info_enum_value, i).value;
+					}
+					LLVMSetInitializer(members->enum_indices.addr.value, llvm_const_array(tm, lb_type(tm, t_type_info_enum_value), values, c.enum_indices));
+				}
+
 				tm->type_info_members = members;
 			}
 		}
@@ -3886,6 +3969,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				if (e->pkg->kind == Package_Runtime) {
 					if (link_name == "main"           ||
 					    link_name == "_main"          ||
+					    link_name == "wmain"          ||
 					    link_name == "DllMain"        ||
 					    link_name == "WinMain"        ||
 					    link_name == "wWinMain"       ||

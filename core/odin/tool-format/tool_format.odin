@@ -68,11 +68,20 @@ Entity :: struct {
 	size:   int,
 	align:  int,
 	fields: []Field,
+
+	attributes: []Attribute, // written on its own declaration, in order
 }
 
 Field :: struct {
 	name:   string,
 	offset: int,
+}
+
+// `@(name)` or `@(name=value)`.
+// Not those of an enclosing `foreign` block.
+Attribute :: struct {
+	name:  string,
+	value: string, // the expression as text, empty when there is none
 }
 
 Exported_File :: struct {

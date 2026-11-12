@@ -107,6 +107,36 @@ test_align_lowered_union_variant :: proc(t: ^testing.T) {
 }
 
 
+// by-ref type switch on #align(N) union
+// the case variable only gets the union's align N
+
+@(export)
+u4: Union_Helper
+
+@(private="file")
+swap_by_ref :: proc(u: ^Under_Union, x: #simd[4]f32) -> #simd[4]f32 {
+	#partial switch &v in u^ {
+	case #simd[4]f32:
+		y := v
+		v = x
+		return y
+	}
+	return {}
+}
+
+@(test)
+test_align_lowered_union_type_switch_ref :: proc(t: ^testing.T) {
+	u4.u = #simd[4]f32{1, 2, 3, 4}
+
+	y := #force_no_inline swap_by_ref(&u4.u, {5, 6, 7, 8})
+	testing.expect(t, simd.to_array(y) == [4]f32{1, 2, 3, 4})
+
+	v, ok := u4.u.(#simd[4]f32)
+	testing.expect(t, ok)
+	testing.expect(t, simd.to_array(v) == [4]f32{5, 6, 7, 8})
+}
+
+
 // #align(N) #raw_union below the type alignment
 
 Under_Raw :: struct #raw_union #align(1) {

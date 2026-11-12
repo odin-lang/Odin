@@ -382,21 +382,20 @@ to_diagnostic_format_writer :: proc(w: io.Writer, val: Value, padding := 0) -> i
 	case Negative_U64: io.write_i128(w, i128(negative_to_int(v))) or_return
 
 	// NOTE: not using io.write_float because it removes the sign, 
-	// which we want for the diagnostic format.
+	//       which we want for the diagnostic format.
+	// NOTE(bplu4t2f): The note above must be stale.
+	//                 The existing tests expect that the sign is stripped, except for "+Inf".
 	case f16:
 		buf: [64]byte
-		str := strconv.write_float(buf[:], f64(v), 'f', 2*size_of(f16), 8*size_of(f16))
-		if str[0] == '+' && str != "+Inf" { str = str[1:] }
+		str := strconv.write_float(buf[:], f64(v), 'f', 2*size_of(f16), 8*size_of(f16), nil)
 		io.write_string(w, str) or_return
 	case f32:
 		buf: [128]byte
-		str := strconv.write_float(buf[:], f64(v), 'f', 2*size_of(f32), 8*size_of(f32))
-		if str[0] == '+' && str != "+Inf" { str = str[1:] }
+		str := strconv.write_float(buf[:], f64(v), 'f', 2*size_of(f32), 8*size_of(f32), nil)
 		io.write_string(w, str) or_return
 	case f64:
 		buf: [256]byte
-		str := strconv.write_float(buf[:], f64(v), 'f', 2*size_of(f64), 8*size_of(f64))
-		if str[0] == '+' && str != "+Inf" { str = str[1:] }
+		str := strconv.write_float(buf[:], f64(v), 'f', 2*size_of(f64), 8*size_of(f64), nil)
 		io.write_string(w, str) or_return
 
 	case bool: io.write_string(w, "true" if v else "false") or_return

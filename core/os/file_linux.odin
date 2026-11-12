@@ -63,6 +63,12 @@ _standard_stream_init :: proc "contextless" () {
 }
 
 _open :: proc(name: string, flags: File_Flags, perm: Permissions) -> (f: ^File, err: Error) {
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		if _is_asset_name(name) {
+			return _open_asset(name, flags)
+		}
+	}
+
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	name_cstr := clone_to_cstring(name, temp_allocator) or_return
 
@@ -132,7 +138,7 @@ _clone :: proc(f: ^File) -> (clone: ^File, err: Error) {
 _open_buffered :: proc(name: string, buffer_size: uint, flags := File_Flags{.Read}, perm: Permissions) -> (f: ^File, err: Error) {
 	assert(buffer_size > 0)
 	f, err = _open(name, flags, perm)
-	if f != nil && err == nil {
+	if f != nil && err == nil && f.stream.procedure == _file_stream_proc {
 		impl := (^File_Impl)(f.impl)
 		impl.buffer = make([]byte, buffer_size, file_allocator())
 		f.stream.procedure = _file_stream_buffered_proc
@@ -215,36 +221,63 @@ _read :: proc(f: ^File_Impl, p: []byte) -> (i64, Error) {
 		return 0, nil
 	}
 
-	n, errno := linux.read(f.fd, p[:min(len(p), MAX_RW)])
-	if errno != .NONE {
-		return 0, _get_platform_error(errno)
+	for {
+		n, errno := linux.read(f.fd, p[:min(len(p), MAX_RW)])
+		if errno == .EINTR {
+			continue
+		}
+		if errno != .NONE {
+			return 0, _get_platform_error(errno)
+		}
+		return i64(n), io.Error.EOF if n == 0 else nil
 	}
-	return i64(n), io.Error.EOF if n == 0 else nil
 }
 
-_read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (i64, Error) {
+_read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (nt: i64, err: Error) {
 	if len(p) <= 0 {
 		return 0, nil
 	}
 	if offset < 0 {
 		return 0, .Invalid_Offset
 	}
-	n, errno := linux.pread(f.fd, p[:min(len(p), MAX_RW)], offset)
-	if errno != .NONE {
-		return 0, _get_platform_error(errno)
+
+	p := p
+	offset := offset
+	for len(p) > 0 {
+		n, errno := linux.pread(f.fd, p[:min(len(p), MAX_RW)], offset)
+		if errno == .EINTR {
+			continue
+		}
+		if errno != .NONE {
+			err = _get_platform_error(errno)
+			return
+		}
+		if n == 0 {
+			err = .EOF
+			return
+		}
+
+		p = p[n:]
+		nt += i64(n)
+		offset += i64(n)
 	}
-	if n == 0 {
-		return 0, .EOF
-	}
-	return i64(n), nil
+
+	return
 }
 
 _write :: proc(f: ^File_Impl, p: []byte) -> (nt: i64, err: Error) {
 	p := p
 	for len(p) > 0 {
 		n, errno := linux.write(f.fd, p[:min(len(p), MAX_RW)])
+		if errno == .EINTR {
+			continue
+		}
 		if errno != .NONE {
 			err = _get_platform_error(errno)
+			return
+		}
+		if n == 0 {
+			err = .Short_Write
 			return
 		}
 
@@ -264,8 +297,15 @@ _write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (nt: i64, err: Error
 	offset := offset
 	for len(p) > 0 {
 		n, errno := linux.pwrite(f.fd, p[:min(len(p), MAX_RW)], offset)
+		if errno == .EINTR {
+			continue
+		}
 		if errno != .NONE {
 			err = _get_platform_error(errno)
+			return
+		}
+		if n == 0 {
+			err = .Short_Write
 			return
 		}
 
@@ -439,6 +479,12 @@ _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 
 _exists :: proc(name: string) -> bool {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		if _is_asset_name(name) {
+			_, err := _stat_asset(name, temp_allocator)
+			return err == nil
+		}
+	}
 	name_cstr, _ := clone_to_cstring(name, temp_allocator)
 	return linux.access(name_cstr, linux.F_OK) == .NONE
 }

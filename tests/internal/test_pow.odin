@@ -1,6 +1,5 @@
 package test_internal
 
-@(require) import "core:log"
 import "core:math"
 import "core:testing"
 
@@ -33,12 +32,6 @@ pow_test :: proc(t: ^testing.T) {
 			_v2 := transmute(u16)v2
 			_v1 := transmute(u16)v1
 
-			when ODIN_ARCH == .arm64 {
-				if exp == -25 {
-					log.info("skipping known test failure on arm64, Expected math.pow2_f16(-25) == math.pow(2, -25) (= 0000), got 0001")
-					_v2 = 0
-				}
-			}
 			testing.expectf(t,  _v1 == _v2, "Expected math.pow2_f16(%d) == math.pow(2, %d) (= %04x), got %04x", exp, exp, _v1, _v2)
 		}
 	}

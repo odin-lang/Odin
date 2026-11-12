@@ -127,6 +127,12 @@ struct lbTypeInfoMembers {
 	isize offsets_index;
 	isize usings_index;
 	isize tags_index;
+
+	isize empty_usings_count;
+	isize empty_tags_count;
+
+	lbAddr enum_indices;
+	isize  enum_indices_count;
 };
 
 // A type whose debug info is being lowered, innermost last
@@ -175,8 +181,8 @@ struct lbModule {
 
 	std::atomic<u32> global_array_index;
 
-	PtrMap<Entity *, lbValue> values;           
-	PtrMap<Entity *, lbAddr>  soa_values;       
+	PtrMap<Entity *, lbValue> values;
+	PtrMap<Entity *, lbAddr>  soa_values;
 	StringMap<lbValue>  members;
 	StringMap<lbProcedure *> procedures;
 	PtrMap<LLVMValueRef, Entity *> procedure_values;
@@ -204,7 +210,7 @@ struct lbModule {
 	LLVMMetadataRef debug_compile_unit;
 
 	RecursiveMutex debug_values_mutex;
-	PtrMap<void *, LLVMMetadataRef> debug_values; 
+	PtrMap<void *, LLVMMetadataRef> debug_values;
 	Array<lbDebugTypeFrame> debug_type_frames;
 
 
@@ -242,7 +248,7 @@ struct lbGenerator : LinkerData {
 	CheckerInfo *info;
 
 	PtrMap<void *, lbModule *>         modules; // key is `AstPackage *` (`void *` is used for future use)
-	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
+	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx;
 	PtrMap<AstFile *, lbModule *>      file_modules;
 	lbModule                           default_module;
 	Array<lbModule *>                  type_info_modules; // the will be the default module or several as the type info is a lot of data
@@ -256,6 +262,8 @@ struct lbGenerator : LinkerData {
 	isize used_module_count;
 
 	bool modules_in_parallel;
+
+	String target_features;
 
 	lbProcedure *startup_runtime;
 	lbProcedure *cleanup_runtime;
@@ -558,6 +566,8 @@ gb_internal void lb_add_foreign_library_path(lbModule *m, Entity *e);
 gb_internal lbValue lb_typeid(lbModule *m, Type *type);
 
 gb_internal lbValue lb_address_from_load_or_generate_local(lbProcedure *p, lbValue value);
+gb_internal i64     lb_known_value_address_alignment(lbProcedure *p, lbValue value, lbValue ptr, i64 assumed);
+gb_internal lbValue lb_aligned_address_from_load_or_generate_local(lbProcedure *p, lbValue value);
 gb_internal lbValue lb_address_from_load(lbProcedure *p, lbValue value);
 gb_internal void    lb_add_defer_node(lbProcedure *p, isize scope_index, Ast *stmt);
 gb_internal lbAddr lb_add_local_generated(lbProcedure *p, Type *type, bool zero_init);
@@ -677,9 +687,6 @@ gb_internal gb_inline i64 lb_max_zero_init_size(void) {
 	}
 }
 
-// NOTE: a loaded value larger than this is stored by copying its memory rather than as a first-class value
-gb_global i64 const LB_MAX_STORE_SIZE = 64;
-
 gb_internal LLVMTypeRef OdinLLVMGetArrayElementType(LLVMTypeRef type);
 gb_internal LLVMTypeRef OdinLLVMGetVectorElementType(LLVMTypeRef type);
 
@@ -710,12 +717,13 @@ gb_internal u64 lb_get_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, Stri
 
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_CLEANUP_RUNTIME_PROC_NAME   "__$cleanup_runtime"
-#define LB_TYPE_INFO_DATA_NAME       "__$type_info_data"
-#define LB_TYPE_INFO_TYPES_NAME      "__$type_info_types_data"
-#define LB_TYPE_INFO_NAMES_NAME      "__$type_info_names_data"
-#define LB_TYPE_INFO_OFFSETS_NAME    "__$type_info_offsets_data"
-#define LB_TYPE_INFO_USINGS_NAME     "__$type_info_usings_data"
-#define LB_TYPE_INFO_TAGS_NAME       "__$type_info_tags_data"
+#define LB_TYPE_INFO_DATA_NAME         "__$type_info_data"
+#define LB_TYPE_INFO_TYPES_NAME        "__$type_info_types_data"
+#define LB_TYPE_INFO_NAMES_NAME        "__$type_info_names_data"
+#define LB_TYPE_INFO_OFFSETS_NAME      "__$type_info_offsets_data"
+#define LB_TYPE_INFO_USINGS_NAME       "__$type_info_usings_data"
+#define LB_TYPE_INFO_TAGS_NAME         "__$type_info_tags_data"
+#define LB_TYPE_INFO_ENUM_INDICES_NAME "__$type_info_enum_indices"
 
 
 

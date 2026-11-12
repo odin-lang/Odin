@@ -6,7 +6,7 @@ import "core:mem/virtual"
 
 _Pool_Arena :: virtual.Arena
 
-_DEFAULT_BLOCK_SIZE :: runtime.Gigabyte
+_DEFAULT_BLOCK_SIZE :: runtime.Gigabyte when size_of(uintptr) == 8 else 16 * runtime.Megabyte
 
 _pool_arena_init :: proc(arena: ^Pool_Arena, block_size: uint = DEFAULT_BLOCK_SIZE) -> (err: runtime.Allocator_Error) {
 	virtual.arena_init_growing(arena, block_size) or_return

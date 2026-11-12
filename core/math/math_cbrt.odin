@@ -77,7 +77,7 @@ cbrt_f64 :: proc "contextless" (x: f64) -> f64 {
 	if x < SMALLEST_NORMAL {
 		t = f64(1 << 54)
 		t *= x
-		t = transmute(f64)((transmute(u64)x)/3 + B2<<32)
+		t = transmute(f64)((transmute(u64)t)/3 + B2<<32)
 	}
 
 	// Approximate cbrt (23-bits)

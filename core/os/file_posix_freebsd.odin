@@ -37,10 +37,8 @@ _posix_absolute_path :: proc(fd: posix.FD, name: string, allocator: runtime.Allo
 	kinfo: KInfo_File
 	kinfo.structsize = size_of(KInfo_File)
 
-	res := posix.fcntl(fd, posix.FCNTL_Cmd(F_KINFO), &kinfo)
-	if res == -1 {
-		err = _get_platform_error()
-		return
+	if posix.fcntl(fd, posix.FCNTL_Cmd(F_KINFO), &kinfo) == -1 || kinfo.path[0] == 0 {
+		return _posix_absolute_path_from_name(name, allocator)
 	}
 
 	return clone_to_cstring(string(cstring(&kinfo.path[0])), allocator)

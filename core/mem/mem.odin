@@ -186,8 +186,6 @@ compare :: proc "contextless" (a, b: []byte) -> int {
 	res := compare_byte_ptrs(raw_data(a), raw_data(b), min(len(a), len(b)))
 	if res == 0 && len(a) != len(b) {
 		return len(a) <= len(b) ? -1 : +1
-	} else if len(a) == 0 && len(b) == 0 {
-		return 0
 	}
 	return res
 }

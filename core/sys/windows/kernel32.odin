@@ -387,7 +387,7 @@ foreign kernel32 {
 		nNumberOfBytesToUnlockLow: DWORD,
 		nNumberOfBytesToLockHigh: DWORD,
 		lpOverlapped: LPOVERLAPPED,
-	) -> BOOL --- 
+	) -> BOOL ---
 
 	GetFileTime :: proc(
 		hFile: HANDLE,
@@ -483,7 +483,7 @@ foreign kernel32 {
 	GlobalReAlloc :: proc(mem: LPVOID, bytes: SIZE_T, flags: UINT) -> LPVOID ---
 	GlobalFree    :: proc(mem: LPVOID) -> LPVOID ---
 	GlobalSize    :: proc(Mem: LPVOID) -> SIZE_T ---
-	
+
 	GlobalLock   :: proc(hMem: HGLOBAL) -> LPVOID ---
 	GlobalUnlock :: proc(hMem: HGLOBAL) -> BOOL ---
 
@@ -1420,4 +1420,124 @@ ACTCTX_FLAG_HMODULE_VALID                :: 0x080
 foreign kernel32 {
 	CreateActCtxW  :: proc(pActCtx: ^ACTCTXW) -> HANDLE ---
 	ActivateActCtx :: proc(hActCtx: HANDLE, lpCookie: ^ULONG_PTR) -> BOOL ---
+}
+
+
+GROUP_AFFINITY :: struct {
+	Mask:       KAFFINITY,
+	Group:      WORD,
+	Reserved:   [3]WORD,
+}
+
+CPU_SET_INFORMATION_TYPE :: enum u32 {
+	CpuSetInformation,
+}
+
+SYSTEM_CPU_SET_INFORMATION :: struct {
+	Size: DWORD,
+	Type: CPU_SET_INFORMATION_TYPE,
+	using _: struct #raw_union {
+		CpuSet: struct {
+			Id:                       DWORD,
+			Group:                    WORD,
+			LogicalProcessorIndex:    BYTE,
+			CoreIndex:                BYTE,
+			LastLevelCacheIndex:      BYTE,
+			NumaNodeIndex:            BYTE,
+			EfficiencyClass:          BYTE,
+			using _: struct #raw_union {
+				AllFlags:   BYTE,
+				using _: bit_field u8 {
+					Parked:                   BYTE | 1,
+					Allocated:                BYTE | 1,
+					AllocatedToTargetProcess: BYTE | 1,
+					RealTime:                 BYTE | 1,
+					ReservedFlags:            BYTE | 4,
+				},
+			},
+			using _: struct #raw_union {
+				Reserved:           DWORD,
+				SchedulingClass:    BYTE,
+			},
+			AllocationTag:        DWORD64,
+		},
+	},
+}
+
+@(default_calling_convention = "system")
+foreign kernel32 {
+	GetSystemCpuSetInformation :: proc(
+		Information: ^SYSTEM_CPU_SET_INFORMATION,
+		BufferLength: ULONG,
+		ReturnedLength: ^ULONG,
+		Process: HANDLE,
+		Flags: ULONG,
+	) -> BOOL ---
+
+	GetProcessDefaultCpuSets :: proc(
+		Process: HANDLE,
+		CpuSetIds: ^ULONG,
+		CpuSetIdCount: ULONG,
+		RequiredIdCount: ^ULONG,
+	) -> BOOL ---
+
+	SetProcessDefaultCpuSets :: proc(
+		Process: HANDLE,
+		CpuSetIds: ^ULONG,
+		CpuSetIdCount: ULONG,
+	) -> BOOL ---
+
+	GetThreadSelectedCpuSets :: proc(
+		Thread: HANDLE,
+		CpuSetIds: ^ULONG,
+		CpuSetIdCount: ULONG,
+		RequiredIdCount: ^ULONG,
+	) -> BOOL ---
+
+	SetThreadSelectedCpuSets :: proc(
+		Thread: HANDLE,
+		CpuSetIds: ^ULONG,
+		CpuSetIdCount: ULONG,
+	) -> BOOL ---
+
+	GetProcessDefaultCpuSetMasks :: proc(
+		Process: HANDLE,
+		CpuSetMasks: ^GROUP_AFFINITY,
+		CpuSetMaskCount: USHORT,
+		RequiredMaskCount: ^USHORT,
+	) -> BOOL ---
+
+	SetProcessDefaultCpuSetMasks :: proc(
+		Process: HANDLE,
+		CpuSetMasks: ^GROUP_AFFINITY,
+		CpuSetMaskCount: USHORT,
+	) -> BOOL ---
+
+	GetThreadSelectedCpuSetMasks :: proc(
+		Thread: HANDLE,
+		CpuSetMasks: ^GROUP_AFFINITY,
+		CpuSetMaskCount: USHORT,
+		RequiredMaskCount: ^USHORT,
+	) -> BOOL ---
+
+	SetThreadSelectedCpuSetMasks :: proc(
+		Thread: HANDLE,
+		CpuSetMasks: ^GROUP_AFFINITY,
+		CpuSetMaskCount: USHORT,
+	) -> BOOL ---
+}
+
+
+EXECUTION_STATE_FLAG :: enum DWORD {
+	System_Required   = 0,
+	Display_Required  = 1,
+	User_Present      = 2,
+	AwayMode_Required = 6,
+	Continuous        = 31,
+}
+EXECUTION_STATE :: distinct bit_set[EXECUTION_STATE_FLAG; DWORD]
+
+@(default_calling_convention = "system")
+foreign kernel32 {
+	SetThreadExecutionState :: proc(esFlags: EXECUTION_STATE) -> EXECUTION_STATE ---
 }

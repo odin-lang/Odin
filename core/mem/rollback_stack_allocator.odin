@@ -326,12 +326,15 @@ rb_resize_bytes_non_zeroed :: proc(
 	assert(size >= 0, "Size must be positive or zero.", loc)
 	assert(old_size >= 0, "Old size must be positive or zero.", loc)
 	assert(is_power_of_two(cast(uintptr)alignment), "Alignment must be a power of two.", loc)
-	if ptr != nil {
+	if ptr == nil {
+		return rb_alloc_bytes_non_zeroed(stack, size, alignment, loc)
+	}
+	if is_aligned(ptr, alignment) {
 		if block, _, ok := rb_find_last_alloc(stack, ptr); ok {
 			// `block.offset` should never underflow because it is contingent
 			// on `old_size` in the first place, assuming sane arguments.
 			assert(block.offset >= cast(uintptr)old_size, "Rollback Stack Allocator received invalid `old_size`.")
-			if block.offset + cast(uintptr)size - cast(uintptr)old_size < cast(uintptr)len(block.buffer) {
+			if block.offset + cast(uintptr)size - cast(uintptr)old_size <= cast(uintptr)len(block.buffer) {
 				// Prevent singleton allocations from fragmenting by forbidding
 				// them to shrink, removing the possibility of overflow bugs.
 				if len(block.buffer) <= stack.block_size {

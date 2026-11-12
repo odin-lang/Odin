@@ -35,26 +35,40 @@ kmag :: builtin.kmag
 
 
 sin :: proc{
+	sin_complex32,
+	sin_complex64,
 	sin_complex128,
 }
 cos :: proc{
+	cos_complex32,
+	cos_complex64,
 	cos_complex128,
 }
 tan :: proc{
+	tan_complex32,
+	tan_complex64,
 	tan_complex128,
 }
 cot :: proc{
+	cot_complex32,
+	cot_complex64,
 	cot_complex128,
 }
 
 
 sinh :: proc{
+	sinh_complex32,
+	sinh_complex64,
 	sinh_complex128,
 }
 cosh :: proc{
+	cosh_complex32,
+	cosh_complex64,
 	cosh_complex128,
 }
 tanh :: proc{
+	tanh_complex32,
+	tanh_complex64,
 	tanh_complex128,
 }
 
@@ -100,6 +114,12 @@ polar :: proc{
 	polar_complex32,
 	polar_complex64,
 	polar_complex128,
+}
+
+rect :: proc{
+	rect_complex32,
+	rect_complex64,
+	rect_complex128,
 }
 
 is_inf :: proc{
@@ -187,17 +207,22 @@ sqrt_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 		if real(x) < 0 {
 			return complex(0, math.copy_sign(math.sqrt(-real(x)), imag(x)))
 		}
+		if math.is_nan(real(x)) {
+			return complex(real(x), real(x))
+		}
 		return complex(math.sqrt(real(x)), imag(x))
 	} else if math.is_inf(imag(x), 0) {
 		return complex(math.inf_f64(1.0), imag(x))
 	}
 	if real(x) == 0 {
-		if imag(x) < 0 {
-			r := math.sqrt(-0.5 * imag(x))
-			return complex(r, -r)
+		y := abs(imag(x))
+		r: f64
+		if y >= 2*math.F64_MIN {
+			r = math.sqrt(0.5 * y)
+		} else {
+			r = math.sqrt(0.5 * (y * (1 << 52))) / (1 << 26)
 		}
-		r := math.sqrt(0.5 * imag(x))
-		return complex(r, r)
+		return complex(r, math.copy_sign(r, imag(x)))
 	}
 	a := real(x)
 	b := imag(x)
@@ -230,40 +255,21 @@ sqrt_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 }
 
 ln_complex32 :: proc "contextless" (x: complex32) -> complex32 {
-	return complex32(ln_complex64(complex64(x)))
+	return complex32(ln_complex128(complex128(x)))
 }
 ln_complex64 :: proc "contextless" (x: complex64) -> complex64 {
-	return complex(math.ln(abs(x)), phase(x))
+	return complex64(ln_complex128(complex128(x)))
 }
 ln_complex128 :: proc "contextless" (x: complex128) -> complex128 {
-	return complex(math.ln(abs(x)), phase(x))
+	return complex(_ln_abs_f64(real(x), imag(x)), phase(x))
 }
 
 
 exp_complex32 :: proc "contextless" (x: complex32) -> complex32 {
-	return complex32(exp_complex64(complex64(x)))
+	return complex32(exp_complex128(complex128(x)))
 }
 exp_complex64 :: proc "contextless" (x: complex64) -> complex64 {
-	switch re, im := real(x), imag(x); {
-	case math.is_inf(re, 0):
-		switch {
-		case re > 0 && im == 0:
-			return x
-		case math.is_inf(im, 0) || math.is_nan(im):
-			if re < 0 {
-				return complex(0, math.copy_sign(0, im))
-			} else {
-				return complex(math.inf_f32(1.0), math.nan_f32())
-			}
-		}
-	case math.is_nan(re):
-		if im == 0 {
-			return complex(math.nan_f32(), im)
-		}
-	}
-	r := math.exp(real(x))
-	s, c := math.sincos(imag(x))
-	return complex(r*c, r*s)
+	return complex64(exp_complex128(complex128(x)))
 }
 exp_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 	switch re, im := real(x), imag(x); {
@@ -283,47 +289,24 @@ exp_complex128 :: proc "contextless" (x: complex128) -> complex128 {
 			return complex(math.nan_f64(), im)
 		}
 	}
-	r := math.exp(real(x))
+	if imag(x) == 0 {
+		return complex(math.exp(real(x)), imag(x))
+	}
 	s, c := math.sincos(imag(x))
+	if real(x) > 709 {
+		h := math.exp(0.5 * real(x))
+		return complex((h*c)*h, (h*s)*h)
+	}
+	r := math.exp(real(x))
 	return complex(r*c, r*s)
 }
 
 
 pow_complex32 :: proc "contextless" (x, y: complex32) -> complex32 {
-	return complex32(pow_complex64(complex64(x), complex64(y)))
+	return complex32(pow_complex128(complex128(x), complex128(y)))
 }
 pow_complex64 :: proc "contextless" (x, y: complex64) -> complex64 {
-	if x == 0 { // Guaranteed also true for x == -0.
-		if is_nan(y) {
-			return nan_complex64()
-		}
-		r, i := real(y), imag(y)
-		switch {
-		case r == 0:
-			return 1
-		case r < 0:
-			if i == 0 {
-				return complex(math.inf_f32(1), 0)
-			}
-			return inf_complex64()
-		case r > 0:
-			return 0
-		}
-		unreachable()
-	}
-	modulus := abs(x)
-	if modulus == 0 {
-		return complex(0, 0)
-	}
-	r := math.pow(modulus, real(y))
-	arg := phase(x)
-	theta := real(y) * arg
-	if imag(y) != 0 {
-		r *= math.exp(-imag(y) * arg)
-		theta += imag(y) * math.ln(modulus)
-	}
-	s, c := math.sincos(theta)
-	return complex(r*c, r*s)
+	return complex64(pow_complex128(complex128(x), complex128(y)))
 }
 pow_complex128 :: proc "contextless" (x, y: complex128) -> complex128 {
 	if x == 0 { // Guaranteed also true for x == -0.
@@ -342,7 +325,7 @@ pow_complex128 :: proc "contextless" (x, y: complex128) -> complex128 {
 		case r > 0:
 			return 0
 		}
-		unreachable()
+		return nan_complex128()
 	}
 	modulus := abs(x)
 	if modulus == 0 {
@@ -355,6 +338,9 @@ pow_complex128 :: proc "contextless" (x, y: complex128) -> complex128 {
 		r *= math.exp(-imag(y) * arg)
 		theta += imag(y) * math.ln(modulus)
 	}
+	if theta == 0 {
+		return complex(r, theta)
+	}
 	s, c := math.sincos(theta)
 	return complex(r*c, r*s)
 }
@@ -362,13 +348,14 @@ pow_complex128 :: proc "contextless" (x, y: complex128) -> complex128 {
 
 
 log10_complex32 :: proc "contextless" (x: complex32) -> complex32 {
-	return complex32(log10_complex64(complex64(x)))
+	return complex32(log10_complex128(complex128(x)))
 }
 log10_complex64 :: proc "contextless" (x: complex64) -> complex64 {
-	return math.LN10*ln(x)
+	return complex64(log10_complex128(complex128(x)))
 }
 log10_complex128 :: proc "contextless" (x: complex128) -> complex128 {
-	return math.LN10*ln(x)
+	z := ln(x)
+	return complex(real(z)/math.LN10, imag(z)/math.LN10)
 }
 
 
@@ -384,13 +371,15 @@ phase_complex128 :: proc "contextless" (x:  complex128) -> f64 {
 
 
 rect_complex32 :: proc "contextless" (r, θ: f16) -> complex32 {
-	return complex32(rect_complex64(f32(r), f32(θ)))
+	return complex32(rect_complex128(f64(r), f64(θ)))
 }
 rect_complex64 :: proc "contextless" (r, θ: f32) -> complex64 {
-	s, c := math.sincos(θ)
-	return complex(r*c, r*s)
+	return complex64(rect_complex128(f64(r), f64(θ)))
 }
 rect_complex128 :: proc "contextless" (r, θ: f64) -> complex128 {
+	if θ == 0 {
+		return complex(r, θ * math.copy_sign(1, r))
+	}
 	s, c := math.sincos(θ)
 	return complex(r*c, r*s)
 }
@@ -461,4 +450,59 @@ is_nan_complex128 :: proc "contextless" (x: complex128) -> bool {
 		return false
 	}
 	return math.is_nan(real(x)) || math.is_nan(imag(x))
+}
+
+
+@(private)
+_ln_abs_f64 :: proc "contextless" (re, im: f64) -> f64 {
+	p, q := abs(re), abs(im)
+	if math.is_inf(p, 0) || math.is_inf(q, 0) {
+		return math.inf_f64(1)
+	}
+	if math.is_nan(p) || math.is_nan(q) {
+		return p + q
+	}
+	if p < q {
+		p, q = q, p
+	}
+	if p == 0 {
+		return math.inf_f64(-1)
+	}
+	if p >= 0.5 && p <= 1 {
+		return 0.5 * math.log1p(_x2y2m1_f64(p, q))
+	}
+	r := q / p
+	return math.ln(p) + 0.5*math.log1p(r*r)
+}
+
+@(private="file")
+_x2y2m1_f64 :: proc "contextless" (p, q: f64) -> f64 {
+	SPLIT :: (1 << 27) + 1
+
+	t := SPLIT * p
+	ph := t - (t - p)
+	pl := p - ph
+	t = SPLIT * q
+	qh := t - (t - q)
+	ql := q - qh
+
+	terms := [6]f64{ph*ph - 1, qh*qh, 2*ph*pl, 2*qh*ql, pl*pl, ql*ql}
+	e: [6]f64
+	n := 0
+	for term in terms {
+		v := term
+		for i in 0..<n {
+			sum := v + e[i]
+			bv := sum - v
+			e[i] = (v - (sum - bv)) + (e[i] - bv)
+			v = sum
+		}
+		e[n] = v
+		n += 1
+	}
+	r := 0.0
+	for i in 0..<n {
+		r += e[i]
+	}
+	return r
 }

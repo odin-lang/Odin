@@ -323,7 +323,22 @@ gb_internal i64 big_int_to_i64(BigInt const *x) {
 }
 
 gb_internal f64 big_int_to_f64(BigInt const *x) {
-	return mp_get_double(x);
+	int bits = mp_count_bits(x);
+	if (bits <= 63) {
+		f64 f = cast(f64)cast(i64)mp_get_mag_u64(x);
+		return big_int_is_neg(x) ? -f : f;
+	}
+	int shift = bits - 63;
+	mp_int top;
+	mp_init(&top);
+	mp_div_2d(x, shift, &top, nullptr);
+	u64 mantissa = mp_get_mag_u64(&top);
+	mp_clear(&top);
+	if (mp_cnt_lsb(x) < shift) {
+		mantissa |= 1;
+	}
+	f64 f = ldexp(cast(f64)cast(i64)mantissa, shift);
+	return big_int_is_neg(x) ? -f : f;
 }
 
 

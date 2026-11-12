@@ -343,6 +343,9 @@ gb_internal void check_init_constant(CheckerContext *ctx, Entity *e, Operand *op
 	if (is_type_proc(e->type)) {
 		error(e->token, "Illegal declaration of a constant procedure value");
 	}
+	if (is_type_any(e->type)) {
+		error(e->token, "Illegal declaration of a constant 'any' value");
+	}
 
 	e->parent_proc_decl = ctx->curr_proc_decl;
 
@@ -1084,8 +1087,9 @@ gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeCon
 	Entity *tn = t->Named.type_name;
 	GB_ASSERT(tn->kind == Entity_TypeName);
 
-	if (tn->scope != e->scope) {
-		error(e->token, "@(objc_name) attribute may only be applied to procedures and types within the same scope");
+	// NOTE: Any file of the type's package may add methods to it, but only at file scope.
+	if (tn->pkg != e->pkg || e->scope == nullptr || (e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
+		error(e->token, "@(objc_name) attribute may only be applied to procedures at file scope within the same package as the type");
 	} else {
 		// Enable implementation by default if the class is an implementer too and
 		// @objc_implement was not set to false explicitly in this proc.
@@ -1155,7 +1159,8 @@ gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeCon
 					}
 				}
 			} else if (!has_body) {
-				if (ac.objc_selector == "The @(objc_selector) attribute is required for imported Objective-C methods.") {
+				if (ac.objc_selector == "") {
+					error(e->token, "The @(objc_selector) attribute is required for imported Objective-C methods");
 					return;
 				} else if (proc.calling_convention != ProcCC_CDecl) {
 					error(e->token, "Imported Objective-C methods must use the \"c\" calling convention");
@@ -1292,9 +1297,10 @@ gb_internal void check_link_name_uses(Checker *c) {
 			continue;
 		}
 		String name = u->name;
-		if (name == "main" && u->kind != LinkNameUse_Variable) {
+		bool is_entry_name = name == "main" || (name == "wmain" && build_context.metrics.os == TargetOs_windows);
+		if (is_entry_name && u->kind != LinkNameUse_Variable) {
 			if (u->kind == LinkNameUse_ForeignProcedure || u->entity->pkg->kind != Package_Runtime) {
-				error(u->decl->proc_lit, "The link name 'main' is reserved for internal use");
+				error(u->decl->proc_lit, "The link name '%.*s' is reserved for internal use", LIT(name));
 			}
 			continue;
 		}
@@ -2204,9 +2210,9 @@ gb_internal void check_asm_group_decl(CheckerContext *ctx, Entity *asm_entity, D
 	check_objc_methods(ctx, asm_entity, ac);
 }
 
-#include "check_asm.cpp"
-
 gb_internal void add_deps_from_child_to_parent(DeclInfo *decl);
+
+#include "check_asm.cpp"
 
 gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, Type *named_type) {
 	if (e->state == EntityState_Resolved)  {
@@ -2510,6 +2516,8 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 		return false;
 	}
 
+	ctx->asm_templates_to_check = &decl->proc->asm_templates_to_check;
+
 	check_open_scope(ctx, body);
 	{
 		ctx->scope->decl_info = decl;
@@ -2567,6 +2575,13 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 
 	}
 	check_close_scope(ctx);
+
+	// NOTE(bill): with every name in the body now known, see `check_asm_template_body_later`
+	ctx->asm_templates_to_check = nullptr;
+	for (Entity *e : decl->proc->asm_templates_to_check) {
+		check_asm_template_body_from_entity(ctx, e);
+	}
+	array_clear(&decl->proc->asm_templates_to_check);
 
 	check_scope_usage(ctx->checker, ctx->scope, check_vet_flags(body));
 

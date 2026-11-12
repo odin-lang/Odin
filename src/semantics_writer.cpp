@@ -4,11 +4,14 @@
 //     "version":  1,
 //     "files":    [path, ...],
 //     "types":    [type, ...],
-//     "entities": [{"name", "kind", "pkg", "file", "offset", "type", "value"?, "size"?, "align"?, "fields"?}, ...],
+//     "entities": [{"name", "kind", "pkg", "file", "offset", "type", "value"?, "size"?, "align"?, "fields"?, "attributes"?}, ...],
 //     "exported": [{"file", "uses": [offset, entity, ...], "definitions": [offset, entity, ...], "inactive": [from, to, ...]}, ...],
 // }
 //
 // `file`, `type`, and `entity` are indices into their tables, -1 when there is none, and offsets are in bytes
+//
+// `attributes` are the ones written on the entity's own declaration, in order: [{"name", "value"?}, ...].
+// A `value` is its expression as text. Attributes of an enclosing `foreign` block are not included.
 //
 // The copies of a declaration made by each instantiation of a generic are one entity, keeping only what they agree on,
 // otherwise the generic's own type, if any, and no value or layout
@@ -229,15 +232,16 @@ gb_internal GB_COMPARE_PROC(semantics_file_id_cmp) {
 }
 
 struct SemanticsEntity {
-	Entity *   e;
-	EntityKind kind;
-	i32        file_id;
-	i32        file_rank; // the file's position when sorted by path, -1 when there is none
-	i32        offset;
-	i32        index;     // its position before sorting
-	i32        type_index;
-	bool       varies;    // copies disagree on its value or layout
-	String     type;
+	Entity *             e;
+	EntityKind           kind;
+	i32                  file_id;
+	i32                  file_rank; // the file's position when sorted by path, -1 when there is none
+	i32                  offset;
+	i32                  index;     // its position before sorting
+	i32                  type_index;
+	bool                 varies;    // copies disagree on its value or layout
+	String               type;
+	Array<Ast *> const * attributes;
 };
 
 // copies of a declaration, from each instantiation of a generic, share its position
@@ -355,15 +359,65 @@ gb_internal bool semantics_same_details(SemanticsDetails const &x, SemanticsDeta
 	return true;
 }
 
+gb_internal Entity *semantics_declared_entity(Entity *e) {
+	if (e->kind == Entity_Procedure && e->Procedure.generated_from_polymorphic &&
+	    e->decl_info != nullptr && e->decl_info->proc->para_poly_original != nullptr) {
+		return e->decl_info->proc->para_poly_original;
+	}
+	return e;
+}
+
+gb_internal Array<Ast *> const *semantics_attributes(Entity *e, PtrMap<Entity *, Array<Ast *> const *> *without_decl) {
+	Array<Ast *> const *attributes = nullptr;
+	if (Array<Ast *> const **found = map_get(without_decl, e)) {
+		attributes = *found;
+	} else if (DeclInfo *d = semantics_declared_entity(e)->decl_info) {
+		attributes = &d->attributes;
+	}
+	if (attributes == nullptr || attributes->count == 0) {
+		return nullptr;
+	}
+	return attributes;
+}
+
+struct SemanticsAttribute {
+	String name;
+	Ast *  value;
+};
+
+gb_internal void semantics_attribute_elems(Array<SemanticsAttribute> *elems, Array<Ast *> const *attributes) {
+	array_clear(elems);
+	if (attributes == nullptr) {
+		return;
+	}
+	for (isize i = attributes->count-1; i >= 0; i--) {
+		Ast *attr = (*attributes)[i];
+		if (attr->kind != Ast_Attribute) {
+			continue;
+		}
+		for (Ast *elem : attr->Attribute.elems) {
+			SemanticsAttribute a = {};
+			Ast *field = elem;
+			if (elem->kind == Ast_FieldValue) {
+				field   = elem->FieldValue.field;
+				a.value = elem->FieldValue.value;
+			}
+			if (field->kind == Ast_Ident) {
+				a.name = field->Ident.token.string;
+			} else if (field->kind == Ast_Implicit) {
+				a.name = field->Implicit.string;
+			}
+			if (a.name.len > 0) {
+				array_add(elems, a);
+			}
+		}
+	}
+}
+
 gb_internal void semantics_type_strings(SemanticsEntity *items, isize count) {
 	for (isize i = 0; i < count; i++) {
 		Entity *e = items[i].e;
-		Type *type = e->type;
-		// NOTE(bill): The copies that a generic procedure's instantiations make are one entity which have the generic's type
-		if (e->kind == Entity_Procedure && e->Procedure.generated_from_polymorphic &&
-		    e->decl_info != nullptr && e->decl_info->proc->para_poly_original != nullptr) {
-			type = e->decl_info->proc->para_poly_original->type;
-		}
+		Type *type = semantics_declared_entity(e)->type;
 		if (e->kind == Entity_TypeName && type != nullptr) {
 			type = base_type(type);
 		}
@@ -380,12 +434,23 @@ gb_internal bool semantics_file_exported(Array<bool> const &exported, i32 file_i
 gb_internal void export_semantics(Checker *c) {
 	CheckerInfo *info = &c->info;
 
-	auto idents = array_make<SemanticIdent>(heap_allocator());
-	auto whens  = array_make<SemanticWhen>(heap_allocator());
+	auto idents     = array_make<SemanticIdent>     (heap_allocator());
+	auto whens      = array_make<SemanticWhen>      (heap_allocator());
+	auto attributes = array_make<SemanticAttributes>(heap_allocator());
 	defer (array_free(&idents));
 	defer (array_free(&whens));
-	per_thread_array_gather(&info->semantic_ident_queue, &idents);
-	per_thread_array_gather(&info->semantic_when_queue,  &whens);
+	defer (array_free(&attributes));
+
+	per_thread_array_gather(&info->semantic_ident_queue,      &idents);
+	per_thread_array_gather(&info->semantic_when_queue,       &whens);
+	per_thread_array_gather(&info->semantic_attributes_queue, &attributes);
+
+	PtrMap<Entity *, Array<Ast *> const *> attributes_without_decl = {};
+	map_init(&attributes_without_decl);
+	defer (map_destroy(&attributes_without_decl));
+	for (SemanticAttributes const &sa : attributes) {
+		map_set(&attributes_without_decl, sa.entity, sa.attributes);
+	}
 
 	auto exported = array_make<bool>(heap_allocator(), global_files.count);
 	defer (array_free(&exported));
@@ -528,6 +593,10 @@ gb_internal void export_semantics(Checker *c) {
 			}
 		}
 
+		for (isize j = i; j < end && u.attributes == nullptr; j++) {
+			u.attributes = semantics_attributes(entities[j].e, &attributes_without_decl);
+		}
+
 		if (u.file_id > 0 && file_index[u.file_id] < 0) {
 			file_index[u.file_id] = cast(i32)files.count;
 			array_add(&files, u.file_id);
@@ -645,12 +714,16 @@ gb_internal void export_semantics(Checker *c) {
 	sw_key(&w, "entities");
 	sw_array(&w, unique.count);
 
+	auto attribute_elems = array_make<SemanticsAttribute>(heap_allocator());
+	defer (array_free(&attribute_elems));
+
 	for (SemanticsEntity const &se : unique) {
 		Entity *e = se.e;
 		SemanticsDetails d = {};
 		if (!se.varies) {
 			d = semantics_details(e);
 		}
+		semantics_attribute_elems(&attribute_elems, se.attributes);
 		i32 file   = -1;
 		i32 offset = -1;
 		if (se.file_id > 0) {
@@ -662,7 +735,7 @@ gb_internal void export_semantics(Checker *c) {
 			pkg = e->pkg->name;
 		}
 
-		sw_map(&w, 6 + (d.value.len > 0) + 2*d.has_layout + (d.fields != nullptr));
+		sw_map(&w, 6 + (d.value.len > 0) + 2*d.has_layout + (d.fields != nullptr) + (attribute_elems.count > 0));
 		sw_key(&w, "name");   sw_string(&w, e->token.string);
 		sw_key(&w, "kind");   sw_string(&w, make_string_c(semantics_entity_kind(e)));
 		sw_key(&w, "pkg");    sw_string(&w, pkg);
@@ -683,6 +756,21 @@ gb_internal void export_semantics(Checker *c) {
 				sw_map(&w, 2);
 				sw_key(&w, "name");   sw_string(&w, d.fields->Struct.fields[j]->token.string);
 				sw_key(&w, "offset"); sw_int(&w, d.fields->Struct.offsets[j]);
+				sw_map_end(&w);
+			}
+			sw_array_end(&w);
+		}
+		if (attribute_elems.count > 0) {
+			sw_key(&w, "attributes");
+			sw_array(&w, attribute_elems.count);
+			for (SemanticsAttribute const &a : attribute_elems) {
+				sw_map(&w, 1 + (a.value != nullptr));
+				sw_key(&w, "name"); sw_string(&w, a.name);
+				if (a.value != nullptr) {
+					gbString value = expr_to_string(a.value);
+					sw_key(&w, "value"); sw_string(&w, make_string(cast(u8 *)value, gb_string_length(value)));
+					gb_string_free(value);
+				}
 				sw_map_end(&w);
 			}
 			sw_array_end(&w);

@@ -1,48 +1,49 @@
 package hash
 
+import "base:intrinsics"
 import "core:mem"
+import "core:simd"
 
 @(optimization_mode="favor_size")
 adler32 :: proc "contextless" (data: []byte, seed := u32(1)) -> u32 #no_bounds_check {
-
 	ADLER_CONST :: 65521
+	LANES       :: 16
+	MAX_CHUNKS  :: 4096
 
-	buffer := raw_data(data)
-	a, b: u64 = u64(seed) & 0xFFFF, u64(seed) >> 16
-	buf := data[:]
+	Bytes :: #simd[LANES]u8
+	Lanes :: #simd[LANES]u32
+	Wide  :: #simd[LANES]u64
 
-	for len(buf) != 0 && uintptr(buffer) & 7 != 0 {
-		a = (a + u64(buf[0]))
-		b = (b + a)
-		buffer = buffer[1:]
-		buf = buf[1:]
+	WEIGHTS :: Lanes{16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1}
+
+	if len(data) == 0 {
+		return seed
 	}
 
-	for len(buf) > 7 {
-		count := min(len(buf), 5552)
-		for count > 7 {
-			a += u64(buf[0]); b += a
-			a += u64(buf[1]); b += a
-			a += u64(buf[2]); b += a
-			a += u64(buf[3]); b += a
-			a += u64(buf[4]); b += a
-			a += u64(buf[5]); b += a
-			a += u64(buf[6]); b += a
-			a += u64(buf[7]); b += a
+	a, b: u64 = u64(seed) & 0xFFFF, u64(seed) >> 16
+	buf := data
 
-			buf = buf[8:]
-			count -= 8
+	for len(buf) >= LANES {
+		chunks := min(len(buf) / LANES, MAX_CHUNKS)
+		sums, prefix: Lanes
+		for i in 0..<chunks {
+			prefix += sums
+			sums += cast(Lanes)intrinsics.unaligned_load((^Bytes)(&buf[i * LANES]))
 		}
+		b += u64(chunks * LANES) * a
+		b += LANES * simd.reduce_add_pairs(cast(Wide)prefix)
+		b += u64(simd.reduce_add_pairs(sums * WEIGHTS))
+		a += u64(simd.reduce_add_pairs(sums))
 		a %= ADLER_CONST
 		b %= ADLER_CONST
+		buf = buf[chunks * LANES:]
 	}
 
-	for len(buf) != 0 {
-		a = (a + u64(buf[0])) % ADLER_CONST
-		b = (b + a) % ADLER_CONST
-		buf = buf[1:]
+	for v in buf {
+		a += u64(v)
+		b += a
 	}
-	return (u32(b) << 16) | u32(a)
+	return u32(b % ADLER_CONST) << 16 | u32(a % ADLER_CONST)
 }
 
 @(optimization_mode="favor_size")

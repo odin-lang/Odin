@@ -1051,7 +1051,8 @@ accept_callback :: proc(op: ^Operation) {
 		op.accept.client_endpoint = sockaddr_to_endpoint((^win.SOCKADDR_STORAGE_LH)(remote_addr))
 
 		// enables getsockopt, setsockopt, getsockname, getpeername, etc.
-		win.setsockopt(win.SOCKET(op.accept.client), win.SOL_SOCKET, win.SO_UPDATE_ACCEPT_CONTEXT, nil, 0)
+		listener := win.SOCKET(op.accept.socket)
+		win.setsockopt(win.SOCKET(op.accept.client), win.SOL_SOCKET, win.SO_UPDATE_ACCEPT_CONTEXT, &listener, size_of(listener))
 
 	case .OPERATION_ABORTED:
 		// This error could also happen when the user calls close on the socket.

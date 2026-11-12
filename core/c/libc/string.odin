@@ -37,7 +37,8 @@ foreign libc {
 	strcspn  :: proc(s1, s2: cstring) -> size_t ---
 	strpbrk  :: proc(s1, s2: cstring) -> [^]char ---
 	strrchr  :: proc(s: [^]char, c: int) -> [^]char ---
-	strcpn   :: proc(s1, s2: cstring) -> [^]char ---
+	strspn   :: proc(s1, s2: cstring) -> size_t ---
+	strstr   :: proc(s1, s2: cstring) -> [^]char ---
 	strtok   :: proc(s1: [^]char, s2: cstring) -> [^]char ---
 
 	// 7.24.6 Miscellaneous functions

@@ -151,16 +151,37 @@ expect_leaks :: proc(t: ^T, client_test: proc(t: ^T), verifier: Memory_Verifier_
 	}
 }
 
+/*
+Set a timeout after which the currently running test will fail.
+
+Passing `time.MAX_DURATION` disables the timeout.
+
+**Remarks:**
+
+Each call restarts the timeout from the time of the call; this can be used
+to implement watchdog-reset semantics for a test.
+
+When the timeout elapses, the test will be aborted immediately. When this
+happens, deferred statements will not run in the current implementation.
+*/
 set_fail_timeout :: proc(t: ^T, duration: time.Duration, loc := #caller_location) {
+	disabled := duration == time.MAX_DURATION
+	at_time: time.Time
+	if !disabled {
+		at_time = time.time_add(time.now(), duration)
+	}
+
 	chan.send(t.channel, Event_Set_Fail_Timeout {
-		at_time = time.time_add(time.now(), duration),
+		at_time = at_time,
 		location = loc,
+		duration = duration,
 	})
 }
 
 /*
 Let the test runner know that it should expect an assertion failure from a
-specific location in the source code for this test.
+specific location in the source code for this test. The test fails if it
+returns without one.
 
 In the event that an assertion fails, a debug message will be logged with its
 exact message and location in a copyable format to make it convenient to write
@@ -183,7 +204,7 @@ expect_assert_from :: proc(t: ^T, expected_place: runtime.Source_Code_Location, 
 
 /*
 Let the test runner know that it should expect an assertion failure with a
-specific message for this test.
+specific message for this test. The test fails if it returns without one.
 
 In the event that an assertion fails, a debug message will be logged with its
 exact message and location in a copyable format to make it convenient to write
@@ -211,7 +232,7 @@ expect_assert :: proc {
 
 /*
 Let the test runner know that it should expect a signal to be raised within
-this test.
+this test. The test fails if it returns without one.
 
 This API is for advanced users, as arbitrary signals will not be caught; only
 the ones already handled by the test runner, such as

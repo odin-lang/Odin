@@ -3011,12 +3011,46 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 			if (found->kind != Entity_Constant) {
 				error(arg, "'#config' entity '%.*s' found but expected a constant", LIT(name));
 			} else {
-				operand->type = found->type;
-				operand->mode = Addressing_Constant;
-				operand->value = found->Constant.value;
+				Operand config_value = {};
+				config_value.type = found->type;
+				config_value.mode = Addressing_Constant;
+				config_value.value = found->Constant.value;
+				config_value.expr = arg;
+
+				if (is_type_enum(def.type)) {
+					Type *enum_type = base_type(def.type);
+					if (config_value.value.kind != ExactValue_String) {
+						gbString type_str = type_to_string(def.type);
+						error(arg, "'#config' enum value for '%.*s' must name a field of '%s'", LIT(name), type_str);
+						gb_string_free(type_str);
+						config_value.mode = Addressing_Invalid;
+					} else {
+						String value_name = config_value.value.value_string;
+						InternedString value_interned = string_interner_insert(value_name);
+						Entity *enum_value = scope_lookup_current(enum_type->Enum.scope, value_interned);
+						if (enum_value == nullptr || enum_value->kind != Entity_Constant || !are_types_identical(enum_value->type, def.type)) {
+							gbString type_str = type_to_string(def.type);
+							error(arg, "Unknown enum value '%.*s' for '#config' '%.*s' of type '%s'", LIT(value_name), LIT(name), type_str);
+							gb_string_free(type_str);
+							check_did_you_mean_type(value_name, enum_type->Enum.fields);
+							config_value.mode = Addressing_Invalid;
+						} else {
+							config_value.type = enum_value->type;
+							config_value.value = enum_value->Constant.value;
+						}
+					}
+				}
+
+				if (config_value.mode != Addressing_Invalid) {
+					check_assignment(c, &config_value, def.type, str_lit("#config"));
+					if (config_value.mode != Addressing_Invalid) {
+						operand->type = config_value.type;
+						operand->mode = config_value.mode;
+						operand->value = config_value.value;
+					}
+				}
 			}
 		}
-
 		Defineable defineable    = {};
 		defineable.docs          = nullptr;
 		defineable.name          = name;
@@ -4572,61 +4606,56 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 		}
 
+		for_array(i, operands) {
+			Operand *a = &operands[i];
+			for_array(j, operands) {
+				if (i == j) {
+					continue;
+				}
+				Operand *b = &operands[j];
+
+				convert_to_typed(c, a, b->type);
+				if (a->mode == Addressing_Invalid) {
+					return false;
+				}
+				convert_to_typed(c, b, a->type);
+				if (b->mode == Addressing_Invalid) {
+					return false;
+				}
+			}
+		}
+
+		for (isize i = 0; i < operands.count-1; i++) {
+			Operand *a = &operands[i];
+			Operand *b = &operands[i+1];
+
+			if (!are_types_identical(a->type, b->type)) {
+				gbString type_a = type_to_string(a->type);
+				gbString type_b = type_to_string(b->type);
+				error(a->expr,
+				      "Mismatched types to 'min', '%s' vs '%s'",
+				      type_a, type_b);
+				gb_string_free(type_b);
+				gb_string_free(type_a);
+				return false;
+			}
+		}
+
 		if (all_constant) {
 			ExactValue value = operands[0].value;
-			Type *type = operands[0].type;
 			for (isize i = 1; i < operands.count; i++) {
 				Operand y = operands[i];
 				if (compare_exact_values(Token_Lt, value, y.value)) {
 					// okay
 				} else {
 					value = y.value;
-					type = y.type;
 				}
 			}
 			operand->value = value;
-			operand->type = type;
 		} else {
 			operand->mode = Addressing_Value;
-			operand->type = original_type;
-
-			for_array(i, operands) {
-				Operand *a = &operands[i];
-				for_array(j, operands) {
-					if (i == j) {
-						continue;
-					}
-					Operand *b = &operands[j];
-
-					convert_to_typed(c, a, b->type);
-					if (a->mode == Addressing_Invalid) {
-						return false;
-					}
-					convert_to_typed(c, b, a->type);
-					if (b->mode == Addressing_Invalid) {
-						return false;
-					}
-				}
-			}
-
-			for (isize i = 0; i < operands.count-1; i++) {
-				Operand *a = &operands[i];
-				Operand *b = &operands[i+1];
-
-				if (!are_types_identical(a->type, b->type)) {
-					gbString type_a = type_to_string(a->type);
-					gbString type_b = type_to_string(b->type);
-					error(a->expr,
-					      "Mismatched types to 'min', '%s' vs '%s'",
-					      type_a, type_b);
-					gb_string_free(type_b);
-					gb_string_free(type_a);
-					return false;
-				}
-			}
-
-			operand->type = operands[0].type;
 		}
+		operand->type = operands[0].type;
 		break;
 	}
 
@@ -4769,61 +4798,56 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 		}
 
+		for_array(i, operands) {
+			Operand *a = &operands[i];
+			for_array(j, operands) {
+				if (i == j) {
+					continue;
+				}
+				Operand *b = &operands[j];
+
+				convert_to_typed(c, a, b->type);
+				if (a->mode == Addressing_Invalid) {
+					return false;
+				}
+				convert_to_typed(c, b, a->type);
+				if (b->mode == Addressing_Invalid) {
+					return false;
+				}
+			}
+		}
+
+		for (isize i = 0; i < operands.count-1; i++) {
+			Operand *a = &operands[i];
+			Operand *b = &operands[i+1];
+
+			if (!are_types_identical(a->type, b->type)) {
+				gbString type_a = type_to_string(a->type);
+				gbString type_b = type_to_string(b->type);
+				error(a->expr,
+				      "Mismatched types to 'max', '%s' vs '%s'",
+				      type_a, type_b);
+				gb_string_free(type_b);
+				gb_string_free(type_a);
+				return false;
+			}
+		}
+
 		if (all_constant) {
 			ExactValue value = operands[0].value;
-			Type *type = operands[0].type;
 			for (isize i = 1; i < operands.count; i++) {
 				Operand y = operands[i];
 				if (compare_exact_values(Token_Gt, value, y.value)) {
 					// okay
 				} else {
-					type  = y.type;
 					value = y.value;
 				}
 			}
 			operand->value = value;
-			operand->type = type;
 		} else {
 			operand->mode = Addressing_Value;
-			operand->type = original_type;
-
-			for_array(i, operands) {
-				Operand *a = &operands[i];
-				for_array(j, operands) {
-					if (i == j) {
-						continue;
-					}
-					Operand *b = &operands[j];
-
-					convert_to_typed(c, a, b->type);
-					if (a->mode == Addressing_Invalid) {
-						return false;
-					}
-					convert_to_typed(c, b, a->type);
-					if (b->mode == Addressing_Invalid) {
-						return false;
-					}
-				}
-			}
-
-			for (isize i = 0; i < operands.count-1; i++) {
-				Operand *a = &operands[i];
-				Operand *b = &operands[i+1];
-
-				if (!are_types_identical(a->type, b->type)) {
-					gbString type_a = type_to_string(a->type);
-					gbString type_b = type_to_string(b->type);
-					error(a->expr,
-					      "Mismatched types to 'max', '%s' vs '%s'",
-					      type_a, type_b);
-					gb_string_free(type_b);
-					gb_string_free(type_a);
-					return false;
-				}
-			}
-
-			operand->type = operands[0].type;
 		}
+		operand->type = operands[0].type;
 		break;
 	}
 
@@ -4881,8 +4905,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			{
 				Type *bt = base_type(operand->type);
+				if (are_types_identical(bt, t_complex32))  add_package_dependency(c, "runtime", "abs_complex32");
 				if (are_types_identical(bt, t_complex64))  add_package_dependency(c, "runtime", "abs_complex64");
 				if (are_types_identical(bt, t_complex128)) add_package_dependency(c, "runtime", "abs_complex128");
+				if (are_types_identical(bt, t_quaternion64))  add_package_dependency(c, "runtime", "abs_quaternion64");
 				if (are_types_identical(bt, t_quaternion128)) add_package_dependency(c, "runtime", "abs_quaternion128");
 				if (are_types_identical(bt, t_quaternion256)) add_package_dependency(c, "runtime", "abs_quaternion256");
 			}
@@ -4932,7 +4958,32 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 		}
 
-		Type *type = x.type;
+		for (isize i = 0; i < 3; i++) {
+			Operand *a = ops[i];
+			for (isize j = 0; j < 3; j++) {
+				if (i == j) {
+					continue;
+				}
+				Operand *b = ops[j];
+				convert_to_typed(c, a, b->type);
+				if (a->mode == Addressing_Invalid) {
+					return false;
+				}
+			}
+		}
+
+		if (!are_types_identical(x.type, y.type) || !are_types_identical(x.type, z.type)) {
+			gbString type_x = type_to_string(x.type);
+			gbString type_y = type_to_string(y.type);
+			gbString type_z = type_to_string(z.type);
+			error(call,
+			      "Mismatched types to 'clamp', '%s', '%s', '%s'",
+			      type_x, type_y, type_z);
+			gb_string_free(type_z);
+			gb_string_free(type_y);
+			gb_string_free(type_x);
+			return false;
+		}
 
 		if (x.mode == Addressing_Constant &&
 		    y.mode == Addressing_Constant &&
@@ -4944,47 +4995,15 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->mode = Addressing_Constant;
 			if (compare_exact_values(Token_Lt, a, b)) {
 				operand->value = b;
-				operand->type = y.type;
 			} else if (compare_exact_values(Token_Gt, a, c)) {
 				operand->value = c;
-				operand->type = z.type;
 			} else {
 				operand->value = a;
-				operand->type = x.type;
 			}
 		} else {
 			operand->mode = Addressing_Value;
-			operand->type = type;
-
-			for (isize i = 0; i < 3; i++) {
-				Operand *a = ops[i];
-				for (isize j = 0; j < 3; j++) {
-					if (i == j) {
-						continue;
-					}
-					Operand *b = ops[j];
-					convert_to_typed(c, a, b->type);
-					if (a->mode == Addressing_Invalid) {
-						return false;
-					}
-				}
-			}
-
-			if (!are_types_identical(x.type, y.type) || !are_types_identical(x.type, z.type)) {
-				gbString type_x = type_to_string(x.type);
-				gbString type_y = type_to_string(y.type);
-				gbString type_z = type_to_string(z.type);
-				error(call,
-				      "Mismatched types to 'clamp', '%s', '%s', '%s'",
-				      type_x, type_y, type_z);
-				gb_string_free(type_z);
-				gb_string_free(type_y);
-				gb_string_free(type_x);
-				return false;
-			}
-
-			operand->type = ops[0]->type;
 		}
+		operand->type = x.type;
 
 		break;
 	}

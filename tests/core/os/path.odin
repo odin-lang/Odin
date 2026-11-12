@@ -375,8 +375,10 @@ glob_tests := []Glob_Test{
 		matches = {
 			ODIN_ROOT + "tests/core/os/dir.odin",
 			ODIN_ROOT + "tests/core/os/file.odin",
+			ODIN_ROOT + "tests/core/os/long_path_windows.odin",
 			ODIN_ROOT + "tests/core/os/path.odin",
 			ODIN_ROOT + "tests/core/os/process.odin",
+			ODIN_ROOT + "tests/core/os/stat_windows.odin",
 		},
 		err     = {},
 	},
@@ -393,7 +395,7 @@ glob_tests := []Glob_Test{
 test_glob :: proc(t: ^testing.T) {
 	compare_matches :: proc(t: ^testing.T, pattern: string, globbed, expected: []string) {
 		glob_fold   := make([]string, len(globbed), context.temp_allocator)
-		expect_fold := make([]string, len(globbed), context.temp_allocator)
+		expect_fold := make([]string, len(expected), context.temp_allocator)
 
 		for glob, i in globbed {
 			// If `glob` returned a path in response to a pattern,
@@ -415,7 +417,7 @@ test_glob :: proc(t: ^testing.T) {
 		slice.sort(glob_fold)
 		slice.sort(expect_fold)
 
-		not_equal_msg := fmt.tprintf("Expected os.glob(%q) to return %v, got %v", pattern, glob_fold, expect_fold)
+		not_equal_msg := fmt.tprintf("Expected os.glob(%q) to return %v, got %v", pattern, expect_fold, glob_fold)
 		testing.expect(t, slice.equal(glob_fold, expect_fold), not_equal_msg)
 	}
 
@@ -586,4 +588,199 @@ delete_split :: proc(s: []string) {
 		delete(part)
 	}
 	delete(s)
+}
+
+@(private="file")
+remove_all_temp_root :: proc(t: ^testing.T, loc := #caller_location) -> string {
+	root, root_err := os.make_directory_temp("", "odin-remove-all-*", context.temp_allocator)
+	if root_err != nil {
+		testing.fail_now(t, "could not create temporary directory", loc)
+	}
+	return root
+}
+
+@(private="file")
+remove_all_join :: proc(elems: ..string) -> string {
+	path, _ := os.join_path(elems, context.temp_allocator)
+	return path
+}
+
+@(test)
+test_remove_all_tree :: proc(t: ^testing.T) {
+	root := remove_all_temp_root(t)
+	defer os.remove_all(root)
+	tree := remove_all_join(root, "tree")
+
+	for dir in ([]string{"", "a", "a/b", "a/b/c", "a/empty", "d"}) {
+		testing.expect_value(t, os.make_directory(remove_all_join(tree, dir)), nil)
+	}
+	for file in ([]string{"top.txt", "a/a.txt", "a/b/b.txt", "a/b/c/c.txt", "d/d.txt"}) {
+		testing.expect_value(t, os.write_entire_file(remove_all_join(tree, file), file), nil)
+	}
+
+	testing.expect_value(t, os.remove_all(tree), nil)
+	testing.expect(t, !os.exists(tree))
+	testing.expect(t, os.exists(root))
+}
+
+@(test)
+test_remove_all_missing :: proc(t: ^testing.T) {
+	root := remove_all_temp_root(t)
+	defer os.remove_all(root)
+
+	testing.expect_value(t, os.remove_all(""), nil)
+	testing.expect_value(t, os.remove_all(remove_all_join(root, "missing")), nil)
+	testing.expect_value(t, os.remove_all(remove_all_join(root, "missing", "deeper")), nil)
+	testing.expect(t, os.exists(root))
+}
+
+@(test)
+test_remove_all_file :: proc(t: ^testing.T) {
+	root := remove_all_temp_root(t)
+	defer os.remove_all(root)
+	file := remove_all_join(root, "file.txt")
+	testing.expect_value(t, os.write_entire_file(file, "remove_all"), nil)
+
+	testing.expect_value(t, os.remove_all(file), nil)
+	testing.expect(t, !os.exists(file))
+	testing.expect(t, os.exists(root))
+}
+
+@(test)
+test_remove_all_trailing_separator :: proc(t: ^testing.T) {
+	root := remove_all_temp_root(t)
+	defer os.remove_all(root)
+	tree := remove_all_join(root, "tree")
+	testing.expect_value(t, os.make_directory(tree), nil)
+	testing.expect_value(t, os.write_entire_file(remove_all_join(tree, "file.txt"), "remove_all"), nil)
+
+	testing.expect_value(t, os.remove_all(fmt.tprintf("%s/", tree)), nil)
+	testing.expect(t, !os.exists(tree))
+	testing.expect(t, os.exists(root))
+}
+
+@(test)
+test_remove_all_many :: proc(t: ^testing.T) {
+	root := remove_all_temp_root(t)
+	defer os.remove_all(root)
+	tree := remove_all_join(root, "tree")
+	testing.expect_value(t, os.make_directory(tree), nil)
+
+	for i in 0..<1000 {
+		name := fmt.tprintf("file-with-a-longer-name-to-fill-directory-buffers-%04d.txt", i)
+		if err := os.write_entire_file(remove_all_join(tree, name), name); err != nil {
+			testing.fail_now(t, fmt.tprintf("could not create %s: %v", name, err))
+		}
+	}
+	for i in 0..<20 {
+		dir := remove_all_join(tree, fmt.tprintf("dir-%02d", i))
+		testing.expect_value(t, os.make_directory(dir), nil)
+		for j in 0..<20 {
+			testing.expect_value(t, os.write_entire_file(remove_all_join(dir, fmt.tprintf("%02d.txt", j)), "remove_all"), nil)
+		}
+	}
+
+	testing.expect_value(t, os.remove_all(tree), nil)
+	testing.expect(t, !os.exists(tree))
+}
+
+@(test)
+test_remove_all_deep :: proc(t: ^testing.T) {
+	root := remove_all_temp_root(t)
+	defer os.remove_all(root)
+	tree := remove_all_join(root, "tree")
+
+	deepest := tree
+	for _ in 0..<128 {
+		deepest = remove_all_join(deepest, "d")
+	}
+	if err := os.make_directory_all(deepest); err != nil {
+		testing.fail_now(t, fmt.tprintf("could not create a deep tree: %v", err))
+	}
+	testing.expect_value(t, os.write_entire_file(remove_all_join(deepest, "file.txt"), "remove_all"), nil)
+
+	testing.expect_value(t, os.remove_all(tree), nil)
+	testing.expect(t, !os.exists(tree))
+}
+
+@(test)
+test_remove_all_symlink_root :: proc(t: ^testing.T) {
+	root := remove_all_temp_root(t)
+	defer os.remove_all(root)
+	target := remove_all_join(root, "target")
+	testing.expect_value(t, os.make_directory(target), nil)
+	kept := remove_all_join(target, "kept.txt")
+	testing.expect_value(t, os.write_entire_file(kept, "remove_all"), nil)
+	link := remove_all_join(root, "link")
+
+	if err := os.symlink(target, link); err != nil {
+		log.infof("skipping, os.symlink failed: %v", err)
+		return
+	}
+	testing.expect_value(t, os.remove_all(link), nil)
+	_, link_err := os.lstat(link, context.temp_allocator)
+	testing.expect(t, link_err == .Not_Exist)
+	testing.expect(t, os.exists(kept))
+
+	testing.expect_value(t, os.symlink(target, link), nil)
+	testing.expect_value(t, os.remove_all(fmt.tprintf("%s/", link)), nil)
+	_, link_err = os.lstat(link, context.temp_allocator)
+	testing.expect(t, link_err == .Not_Exist)
+	testing.expect(t, os.exists(kept))
+}
+
+@(test)
+test_remove_all_symlink_inside :: proc(t: ^testing.T) {
+	root := remove_all_temp_root(t)
+	defer os.remove_all(root)
+	outside := remove_all_join(root, "outside")
+	testing.expect_value(t, os.make_directory(outside), nil)
+	kept := remove_all_join(outside, "kept.txt")
+	testing.expect_value(t, os.write_entire_file(kept, "remove_all"), nil)
+	tree := remove_all_join(root, "tree")
+	testing.expect_value(t, os.make_directory(tree), nil)
+	testing.expect_value(t, os.write_entire_file(remove_all_join(tree, "file.txt"), "remove_all"), nil)
+
+	if err := os.symlink(outside, remove_all_join(tree, "link")); err != nil {
+		log.infof("skipping, os.symlink failed: %v", err)
+		return
+	}
+	testing.expect_value(t, os.symlink(remove_all_join(root, "missing"), remove_all_join(tree, "dangling")), nil)
+
+	testing.expect_value(t, os.remove_all(tree), nil)
+	testing.expect(t, !os.exists(tree))
+	testing.expect(t, os.exists(kept))
+}
+
+when ODIN_OS != .Windows {
+	@(test)
+	test_remove_all_permission_denied :: proc(t: ^testing.T) {
+		root := remove_all_temp_root(t)
+		defer os.remove_all(root)
+		tree := remove_all_join(root, "tree")
+		locked := remove_all_join(tree, "locked")
+		testing.expect_value(t, os.make_directory_all(locked), nil)
+		kept := remove_all_join(locked, "kept.txt")
+		testing.expect_value(t, os.write_entire_file(kept, "remove_all"), nil)
+		sibling := remove_all_join(tree, "sibling")
+		testing.expect_value(t, os.make_directory(sibling), nil)
+		testing.expect_value(t, os.write_entire_file(remove_all_join(sibling, "file.txt"), "remove_all"), nil)
+		testing.expect_value(t, os.write_entire_file(remove_all_join(tree, "file.txt"), "remove_all"), nil)
+
+		testing.expect_value(t, os.chmod(locked, {.Read_User, .Execute_User}), nil)
+		defer os.chmod(locked, os.Permissions_Default_Directory)
+		if os.write_entire_file(remove_all_join(locked, "probe.txt"), "remove_all") == nil {
+			log.info("skipping, directory permissions are not enforced for this user")
+			return
+		}
+
+		testing.expect(t, os.remove_all(tree) == .Permission_Denied)
+		testing.expect(t, os.exists(kept))
+		testing.expect(t, !os.exists(sibling))
+		testing.expect(t, !os.exists(remove_all_join(tree, "file.txt")))
+
+		testing.expect_value(t, os.chmod(locked, os.Permissions_Default_Directory), nil)
+		testing.expect_value(t, os.remove_all(tree), nil)
+		testing.expect(t, !os.exists(tree))
+	}
 }

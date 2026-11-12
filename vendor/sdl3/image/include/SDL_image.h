@@ -45,7 +45,7 @@ extern "C" {
  */
 #define SDL_IMAGE_MAJOR_VERSION 3
 #define SDL_IMAGE_MINOR_VERSION 4
-#define SDL_IMAGE_MICRO_VERSION 0
+#define SDL_IMAGE_MICRO_VERSION 8
 
 /**
  * This is the version number macro for the current SDL_image version.
@@ -3209,6 +3209,8 @@ extern SDL_DECLSPEC IMG_AnimationDecoder * SDLCALL IMG_CreateAnimationDecoderWit
  * information about the underlying image such as description, copyright text
  * and loop count.
  *
+ * `IMG_PROP_METADATA_LOOP_COUNT_NUMBER`, if present, specifies the number of times to play the animation, with 0 meaning loop continuously.
+ *
  * \param decoder the animation decoder.
  * \returns the properties ID of the animation decoder, or 0 if there are no
  *          properties; call SDL_GetError() for more information.
@@ -3219,7 +3221,7 @@ extern SDL_DECLSPEC IMG_AnimationDecoder * SDLCALL IMG_CreateAnimationDecoderWit
  * \sa IMG_CreateAnimationDecoder_IO
  * \sa IMG_CreateAnimationDecoderWithProperties
  */
-extern SDL_DECLSPEC SDL_PropertiesID SDLCALL IMG_GetAnimationDecoderProperties(IMG_AnimationDecoder* decoder);
+extern SDL_DECLSPEC SDL_PropertiesID SDLCALL IMG_GetAnimationDecoderProperties(IMG_AnimationDecoder *decoder);
 
 #define IMG_PROP_METADATA_IGNORE_PROPS_BOOLEAN                 "SDL_image.metadata.ignore_props"
 #define IMG_PROP_METADATA_DESCRIPTION_STRING                   "SDL_image.metadata.description"
