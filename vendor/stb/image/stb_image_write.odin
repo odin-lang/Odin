@@ -26,11 +26,16 @@ write_func :: proc "c" (ctx: rawptr, data: rawptr, size: c.int)
 
 @(default_calling_convention="c", link_prefix="stbi_")
 foreign stbiw {
-	write_png_to_func :: proc(func: write_func, ctx: rawptr, w, h, comp: c.int, data: rawptr, stride_in_bytes: c.int)     -> c.int ---
-	write_bmp_to_func :: proc(func: write_func, ctx: rawptr, w, h, comp: c.int, data: rawptr)                             -> c.int ---
-	write_tga_to_func :: proc(func: write_func, ctx: rawptr, w, h, comp: c.int, data: rawptr)                             -> c.int ---
-	write_hdr_to_func :: proc(func: write_func, ctx: rawptr, w, h, comp: c.int, data: [^]f32)                             -> c.int ---
-	write_jpg_to_func :: proc(func: write_func, ctx: rawptr, x, y, comp: c.int, data: rawptr, quality: c.int /*0..=100*/) -> c.int ---
+	write_png_to_func :: proc(func: write_func, ctx: rawptr, w, h, comp: c.int, data: rawptr, stride_in_bytes: c.ptrdiff_t) -> c.int ---
+	write_bmp_to_func :: proc(func: write_func, ctx: rawptr, w, h, comp: c.int, data: rawptr)                                -> c.int ---
+	write_tga_to_func :: proc(func: write_func, ctx: rawptr, w, h, comp: c.int, data: rawptr)                                -> c.int ---
+	write_hdr_to_func :: proc(func: write_func, ctx: rawptr, w, h, comp: c.int, data: [^]f32)                                -> c.int ---
+	write_jpg_to_func :: proc(func: write_func, ctx: rawptr, x, y, comp: c.int, data: rawptr, quality: c.int /*0..=100*/)    -> c.int ---
+
+	write_bmp_strided_to_func :: proc(func: write_func, ctx: rawptr, w, h, comp: c.int, data: rawptr, stride_in_bytes: c.ptrdiff_t)                      -> c.int ---
+	write_tga_strided_to_func :: proc(func: write_func, ctx: rawptr, w, h, comp: c.int, data: rawptr, stride_in_bytes: c.ptrdiff_t)                      -> c.int ---
+	write_hdr_strided_to_func :: proc(func: write_func, ctx: rawptr, w, h, comp: c.int, data: [^]f32, stride_in_bytes: c.ptrdiff_t)                      -> c.int ---
+	write_jpg_strided_to_func :: proc(func: write_func, ctx: rawptr, x, y, comp: c.int, data: rawptr, stride_in_bytes: c.ptrdiff_t, quality: c.int) -> c.int ---
 	
 	flip_vertically_on_write :: proc(flip_boolean: b32) ---
 }
@@ -38,10 +43,15 @@ foreign stbiw {
 when !NO_STDIO {
 	@(default_calling_convention="c", link_prefix="stbi_")
 	foreign stbiw {
-		write_png :: proc(filename: cstring, w, h, comp: c.int, data: rawptr, stride_in_bytes: c.int)     -> c.int ---
-		write_bmp :: proc(filename: cstring, w, h, comp: c.int, data: rawptr)                             -> c.int ---
-		write_tga :: proc(filename: cstring, w, h, comp: c.int, data: rawptr)                             -> c.int ---
-		write_hdr :: proc(filename: cstring, w, h, comp: c.int, data: [^]f32)                             -> c.int ---
-		write_jpg :: proc(filename: cstring, w, h, comp: c.int, data: rawptr, quality: c.int /*0..=100*/) -> c.int ---
+		write_png :: proc(filename: cstring, w, h, comp: c.int, data: rawptr, stride_in_bytes: c.ptrdiff_t) -> c.int ---
+		write_bmp :: proc(filename: cstring, w, h, comp: c.int, data: rawptr)                                -> c.int ---
+		write_tga :: proc(filename: cstring, w, h, comp: c.int, data: rawptr)                                -> c.int ---
+		write_hdr :: proc(filename: cstring, w, h, comp: c.int, data: [^]f32)                                -> c.int ---
+		write_jpg :: proc(filename: cstring, w, h, comp: c.int, data: rawptr, quality: c.int /*0..=100*/)    -> c.int ---
+
+		write_bmp_strided :: proc(filename: cstring, w, h, comp: c.int, data: rawptr, stride_in_bytes: c.ptrdiff_t)                      -> c.int ---
+		write_tga_strided :: proc(filename: cstring, w, h, comp: c.int, data: rawptr, stride_in_bytes: c.ptrdiff_t)                      -> c.int ---
+		write_hdr_strided :: proc(filename: cstring, w, h, comp: c.int, data: [^]f32, stride_in_bytes: c.ptrdiff_t)                      -> c.int ---
+		write_jpg_strided :: proc(filename: cstring, w, h, comp: c.int, data: rawptr, stride_in_bytes: c.ptrdiff_t, quality: c.int) -> c.int ---
 	}
 }

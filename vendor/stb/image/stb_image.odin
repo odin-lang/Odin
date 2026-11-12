@@ -28,6 +28,27 @@ NO_STDIO :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
 #assert(size_of(c.int) == size_of(b32))
 #assert(size_of(b32) == size_of(c.int))
 
+Type :: enum c.int {
+	Unsupported = 0,
+	Unknown     = Unsupported,
+	JPEG,
+	PNG,
+	GIF,
+	BMP,
+	PSD,
+	PNM,
+	HDR,
+	TGA,
+}
+
+Info_Result :: struct {
+	type:          Type,
+	x, y, comp:    c.int,
+	is_16_bit:     c.int,
+	is_hdr:        c.int,
+	is_iphone_png: c.int,
+}
+
 //
 // load image by filename, open file, or memory buffer
 //
@@ -67,6 +88,9 @@ when !NO_STDIO {
 		// get image dimensions & components without fully decoding
 		info           :: proc(filename: cstring, x, y, comp: ^c.int) -> c.int ---
 		info_from_file :: proc(f: ^c.FILE,        x, y, comp: ^c.int) -> c.int ---
+
+		info2           :: proc(filename: cstring) -> Info_Result ---
+		info2_from_file :: proc(f: ^c.FILE)        -> Info_Result ---
 
 		is_16_bit           :: proc(filename: cstring) -> b32 ---
 		is_16_bit_from_file :: proc(f: ^c.FILE)        -> b32 ---
@@ -117,6 +141,9 @@ foreign stbi {
 	// get image dimensions & components without fully decoding
 	info_from_memory    :: proc(buffer: [^]byte, len: c.int,       x, y, comp: ^c.int) -> c.int ---
 	info_from_callbacks :: proc(clbk: ^Io_Callbacks, user: rawptr, x, y, comp: ^c.int) -> c.int ---
+
+	info2_from_memory    :: proc(buffer: [^]byte, len: c.int)       -> Info_Result ---
+	info2_from_callbacks :: proc(clbk: ^Io_Callbacks, user: rawptr) -> Info_Result ---
 	
 	is_16_bit_from_memory :: proc(buffer: [^]byte, len: c.int) -> c.int ---
 
