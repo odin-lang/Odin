@@ -24,7 +24,7 @@ import "base:intrinsics"
 int_itoa_string :: proc(a: ^Int, radix := i8(10), zero_terminate := false, allocator := context.allocator) -> (res: string, err: Error) {
 	assert_if_nil(a)
 	a := a; radix := radix
-	clear_if_uninitialized(a) or_return
+	a = _zero_if_uninitialized(a)
 
 	context.allocator = allocator
 
@@ -68,7 +68,7 @@ int_itoa_string :: proc(a: ^Int, radix := i8(10), zero_terminate := false, alloc
 int_itoa_cstring :: proc(a: ^Int, radix := i8(10), allocator := context.allocator) -> (res: cstring, err: Error) {
 	assert_if_nil(a)
 	a := a; radix := radix
-	clear_if_uninitialized(a) or_return
+	a = _zero_if_uninitialized(a)
 
 	context.allocator = allocator
 
@@ -97,7 +97,7 @@ int_itoa_cstring :: proc(a: ^Int, radix := i8(10), allocator := context.allocato
 int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_terminate := false) -> (written: int, err: Error) {
 	assert_if_nil(a)
 	a := a; radix := radix; size := size
-	clear_if_uninitialized(a) or_return
+	a = _zero_if_uninitialized(a)
 	/*
 		Radix defaults to 10.
 	*/
@@ -575,7 +575,7 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false, allocator := con
 	context.allocator = allocator
 
 	if radix < 2 || radix > 64                     { return -1, .Invalid_Argument }
-	clear_if_uninitialized(a) or_return
+	a = _zero_if_uninitialized(a)
 
 	if .NaN in a.flags || .Inf in a.flags {
 		if radix > _MAX_NON_FINITE_RADIX { return -1, .Invalid_Argument }
@@ -787,6 +787,7 @@ _log_bases := [65]u32{
 /*
 	Characters used in radix conversions.
 */
+@(rodata)
 RADIX_TABLE := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/"
 @(rodata)
 RADIX_TABLE_REVERSE := [RADIX_TABLE_REVERSE_SIZE]u8{

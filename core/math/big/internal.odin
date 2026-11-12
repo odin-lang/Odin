@@ -187,24 +187,15 @@ internal_int_add_digit :: proc(dest, a: ^Int, digit: DIGIT, allocator := context
 		If `a` is negative and `|a|` >= `digit`, call `dest = |a| - digit`
 	*/
 	if a.sign == .Negative && (a.used > 1 || a.digit[0] >= digit) {
-		/*
-			Temporarily fix `a`'s sign.
-		*/
-		a.sign = .Zero_or_Positive
+		t := a^
+		t.sign = .Zero_or_Positive
 		/*
 			dest = |a| - digit
 		*/
-		if err = internal_int_sub_digit(dest, a, digit); err != nil {
-			/*
-				Restore a's sign.
-			*/
-			a.sign = .Negative
-			return err
-		}
+		internal_int_sub_digit(dest, &t, digit) or_return
 		/*
-			Restore sign and set `dest` sign.
+			Set `dest` sign.
 		*/
-		a.sign    = .Negative
 		dest.sign = .Negative
 
 		return internal_clamp(dest)
@@ -2917,6 +2908,12 @@ internal_clear_if_uninitialized_multi :: proc(args: ..^Int, allocator := context
 	return err
 }
 internal_clear_if_uninitialized :: proc {internal_clear_if_uninitialized_single, internal_clear_if_uninitialized_multi, }
+
+@(private)
+_zero_if_uninitialized :: #force_inline proc(a: ^Int) -> (res: ^Int) {
+	if a != nil && a.used == 0 && ! #force_inline internal_is_initialized(a) { return INT_ZERO }
+	return a
+}
 
 internal_error_if_immutable_single :: proc "contextless" (arg: ^Int) -> (err: Error) {
 	if arg != nil && .Immutable in arg.flags { return .Assignment_To_Immutable }

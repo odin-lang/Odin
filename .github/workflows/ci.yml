@@ -39,6 +39,8 @@ jobs:
           ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:netbsd_amd64 -no-entry-point
           ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:netbsd_arm64 -no-entry-point
           ./odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:ODIN_TEST_LOG_STATE_CHANGES=true -microarch:native
+          ./odin test tests/core/math/big_cutoffs -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:ODIN_TEST_LOG_STATE_CHANGES=true -microarch:native -define:MATH_BIG_MUL_KARATSUBA_CUTOFF=0 -define:MATH_BIG_SQR_KARATSUBA_CUTOFF=0 -define:MATH_BIG_MUL_TOOM_CUTOFF=2 -define:MATH_BIG_SQR_TOOM_CUTOFF=2 -define:MATH_BIG_FACTORIAL_BINARY_SPLIT_CUTOFF=0
+          ./odin test tests/core/math/big_cutoffs -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:ODIN_TEST_LOG_STATE_CHANGES=true -microarch:native -define:MATH_BIG_MUL_KARATSUBA_CUTOFF=4 -define:MATH_BIG_SQR_KARATSUBA_CUTOFF=4 -define:MATH_BIG_MUL_TOOM_CUTOFF=9 -define:MATH_BIG_SQR_TOOM_CUTOFF=9 -define:MATH_BIG_FACTORIAL_BINARY_SPLIT_CUTOFF=40
           ./odin test tests/core/speed.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -o:speed -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:ODIN_TEST_LOG_STATE_CHANGES=true -microarch:native
           ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:ODIN_TEST_LOG_STATE_CHANGES=true -microarch:native
           (cd tests/issues; ./run.sh)
@@ -75,6 +77,8 @@ jobs:
           ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:freebsd_amd64
           ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:freebsd_amd64 -no-entry-point
           ./odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+          ./odin test tests/core/math/big_cutoffs -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:MATH_BIG_MUL_KARATSUBA_CUTOFF=0 -define:MATH_BIG_SQR_KARATSUBA_CUTOFF=0 -define:MATH_BIG_MUL_TOOM_CUTOFF=2 -define:MATH_BIG_SQR_TOOM_CUTOFF=2 -define:MATH_BIG_FACTORIAL_BINARY_SPLIT_CUTOFF=0
+          ./odin test tests/core/math/big_cutoffs -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:MATH_BIG_MUL_KARATSUBA_CUTOFF=4 -define:MATH_BIG_SQR_KARATSUBA_CUTOFF=4 -define:MATH_BIG_MUL_TOOM_CUTOFF=9 -define:MATH_BIG_SQR_TOOM_CUTOFF=9 -define:MATH_BIG_FACTORIAL_BINARY_SPLIT_CUTOFF=40
           ./odin test tests/core/speed.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -o:speed -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
           (cd tests/issues; ./run.sh)
@@ -202,6 +206,10 @@ jobs:
         run: ./odin test tests/core/speed.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
       - name: LZMA match finder normalization tests
         run: ./odin test tests/core/compress -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:LZMA_NORMALIZE_AT=135167 -define:ODIN_TEST_NAMES=test_core_compress.lzma_normalize
+      - name: Big integer cutoff tests
+        run: |
+          ./odin test tests/core/math/big_cutoffs -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:MATH_BIG_MUL_KARATSUBA_CUTOFF=0 -define:MATH_BIG_SQR_KARATSUBA_CUTOFF=0 -define:MATH_BIG_MUL_TOOM_CUTOFF=2 -define:MATH_BIG_SQR_TOOM_CUTOFF=2 -define:MATH_BIG_FACTORIAL_BINARY_SPLIT_CUTOFF=0
+          ./odin test tests/core/math/big_cutoffs -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:MATH_BIG_MUL_KARATSUBA_CUTOFF=4 -define:MATH_BIG_SQR_KARATSUBA_CUTOFF=4 -define:MATH_BIG_MUL_TOOM_CUTOFF=9 -define:MATH_BIG_SQR_TOOM_CUTOFF=9 -define:MATH_BIG_FACTORIAL_BINARY_SPLIT_CUTOFF=40
       - name: Wycheproof tests
         run: ./odin test tests/core/crypto/wycheproof -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed
       - name: Noise Protocol Framework tests
@@ -374,6 +382,12 @@ jobs:
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           odin test tests/core/speed.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true %ODIN_TARGET%
+      - name: Big integer cutoff tests
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          odin test tests/core/math/big_cutoffs -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:MATH_BIG_MUL_KARATSUBA_CUTOFF=0 -define:MATH_BIG_SQR_KARATSUBA_CUTOFF=0 -define:MATH_BIG_MUL_TOOM_CUTOFF=2 -define:MATH_BIG_SQR_TOOM_CUTOFF=2 -define:MATH_BIG_FACTORIAL_BINARY_SPLIT_CUTOFF=0 %ODIN_TARGET% || exit /b 1
+          odin test tests/core/math/big_cutoffs -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:MATH_BIG_MUL_KARATSUBA_CUTOFF=4 -define:MATH_BIG_SQR_KARATSUBA_CUTOFF=4 -define:MATH_BIG_MUL_TOOM_CUTOFF=9 -define:MATH_BIG_SQR_TOOM_CUTOFF=9 -define:MATH_BIG_FACTORIAL_BINARY_SPLIT_CUTOFF=40 %ODIN_TARGET%
       - name: Wycheproof tests
         shell: cmd
         run: |

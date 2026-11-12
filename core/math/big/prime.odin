@@ -19,7 +19,8 @@ internal_int_prime_is_divisible :: proc(a: ^Int, allocator := context.allocator)
 	assert_if_nil(a)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a) or_return
+	a := a
+	a = _zero_if_uninitialized(a)
 
 	for prime in _private_prime_table {
 		rem := #force_inline int_mod_digit(a, prime) or_return
@@ -361,9 +362,9 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 	b.digit[0] += 1
 	if !(internal_int_prime_miller_rabin(a, b) or_return) { return }
 
-	// Both, the Frobenius-Underwood test and the the Lucas-Selfridge test are quite
-	// slow so if speed is an issue, set `USE_MILLER_RABIN_ONLY` to use M-R tests with
-	// bases 2, 3 and t random bases.
+	// The Frobenius-Underwood or Lucas-Selfridge test (see `MATH_BIG_USE_FROBENIUS_TEST`) only runs when `miller_rabin_trials` >= 0, and is quite slow.
+	// If speed is an issue, pass `miller_rabin_only = true` or build with `-define:MATH_BIG_USE_MILLER_RABIN_ONLY=true`
+	// to skip it, leaving the M-R tests with bases 2, 3 and `miller_rabin_trials` random bases (one if it is 0).
 
 	if !miller_rabin_only {
 		if miller_rabin_trials >= 0 {

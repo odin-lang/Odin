@@ -146,30 +146,6 @@ test_fix_digit_above_mask :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_fix_divmod_small_karatsuba_cutoff :: proc(t: ^testing.T) {
-	a, b, q, r, check := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
-	defer big.destroy(a, b, q, r, check)
-
-	big.power_of_two(a, 63 * 200 - 5)
-	big.sub(a, a, big.DIGIT(1))
-	big.power_of_two(b, 63 * 100 - 7)
-	big.add(b, b, big.DIGIT(12345))
-
-	saved := big.MUL_KARATSUBA_CUTOFF
-	big.MUL_KARATSUBA_CUTOFF = 40
-	err := big.divmod(q, r, a, b)
-	big.MUL_KARATSUBA_CUTOFF = saved
-	testing.expect_value(t, err, nil)
-
-	big.mul(check, q, b)
-	big.add(check, check, r)
-	equal, _ := big.equals(check, a)
-	testing.expect(t, equal)
-	less, _ := big.lt(r, b)
-	testing.expect(t, less)
-}
-
-@(test)
 test_fix_shr1_grows_dest :: proc(t: ^testing.T) {
 	a, x, e := &big.Int{}, &big.Int{}, &big.Int{}
 	defer big.destroy(a, x, e)
@@ -802,63 +778,6 @@ fix_expect_hex :: proc(t: ^testing.T, got: ^big.Int, expected: string, loc := #c
 fix_ones :: proc(a: ^big.Int, limbs: int) {
 	big.power_of_two(a, limbs * big._DIGIT_BITS)
 	big.sub(a, a, 1)
-}
-
-@(private="file")
-fix_ones_product :: proc(e, tmp: ^big.Int, m, n: int) {
-	big.power_of_two(e, (m + n) * big._DIGIT_BITS)
-	big.add(e, e, 1)
-	big.power_of_two(tmp, m * big._DIGIT_BITS)
-	big.sub(e, e, tmp)
-	big.power_of_two(tmp, n * big._DIGIT_BITS)
-	big.sub(e, e, tmp)
-}
-
-@(test)
-test_fix_cutoffs_below_minimum :: proc(t: ^testing.T) {
-	mk, sk, mt, st := big.MUL_KARATSUBA_CUTOFF, big.SQR_KARATSUBA_CUTOFF, big.MUL_TOOM_CUTOFF, big.SQR_TOOM_CUTOFF
-	defer big.MUL_KARATSUBA_CUTOFF, big.SQR_KARATSUBA_CUTOFF, big.MUL_TOOM_CUTOFF, big.SQR_TOOM_CUTOFF = mk, sk, mt, st
-
-	a, b, c, e, tmp, q, r := &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}, &big.Int{}
-	defer big.destroy(a, b, c, e, tmp, q, r)
-
-	settings := [?][4]int{{0, 0, 0, 0}, {1, 1, 2, 2}, {2, 2, 3, 3}}
-	shapes   := [?][2]int{{1, 1}, {1, 2}, {2, 2}, {2, 3}, {3, 3}, {3, 7}, {5, 5}, {9, 4}}
-
-	for s in settings {
-		big.MUL_KARATSUBA_CUTOFF, big.SQR_KARATSUBA_CUTOFF, big.MUL_TOOM_CUTOFF, big.SQR_TOOM_CUTOFF = s[0], s[1], s[2], s[3]
-
-		for shape in shapes {
-			fix_ones(a, shape[0])
-			fix_ones(b, shape[1])
-
-			fix_ones_product(e, tmp, shape[0], shape[1])
-			testing.expect_value(t, big.mul(c, a, b), nil)
-			equal, _ := big.equals(c, e)
-			testing.expectf(t, equal, "cutoffs %v: mul of %v and %v limbs of ones is wrong", s, shape[0], shape[1])
-
-			fix_ones_product(e, tmp, shape[0], shape[0])
-			testing.expect_value(t, big.sqr(c, a), nil)
-			equal, _ = big.equals(c, e)
-			testing.expectf(t, equal, "cutoffs %v: sqr of %v limbs of ones is wrong", s, shape[0])
-		}
-
-		fix_ones(a, 3)
-		fix_ones(b, 2)
-		testing.expect_value(t, big._private_int_div_recursive(q, r, a, b), nil)
-		fix_expect_hex(t, q, "8000000000000000")
-		fix_expect_hex(t, r, "7FFFFFFFFFFFFFFF")
-
-		fix_ones(a, 30)
-		fix_ones(b, 9)
-		testing.expect_value(t, big.divmod(q, r, a, b), nil)
-		big.mul(c, q, b)
-		big.add(c, c, r)
-		equal, _ := big.equals(c, a)
-		testing.expectf(t, equal, "cutoffs %v: divmod doesn't round-trip", s)
-		less, _ := big.lt(r, b)
-		testing.expectf(t, less, "cutoffs %v: divmod remainder isn't below the divisor", s)
-	}
 }
 
 @(test)
