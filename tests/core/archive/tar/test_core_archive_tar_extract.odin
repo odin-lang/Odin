@@ -307,6 +307,32 @@ test_extract_no_follow :: proc(t: ^testing.T) {
 	testing.expect_value(t, info.type, os.File_Type.Directory)
 }
 
+@(test)
+test_extract_limits :: proc(t: ^testing.T) {
+	for name in ([2]string{"gnu-posix.tar", "gnu-posix.tar.gz"}) {
+		for options, k in ([3]archive.Extract_Options{{max_ratio = 1}, {max_total_size = 1}, {}}) {
+			a, err := archive.open(asset(name))
+			if !testing.expect_value(t, err, nil) {
+				return
+			}
+			one, text: [dynamic]u8
+			targets := []archive.Target{{path = "tree/ONE.TXT", to = &one}, {path = "tree/TEXT.TXT", to = &text}}
+			errs: [2]archive.Error
+			it := archive.extract_iterator_create(&a, targets, options)
+			for _, i in archive.extract_iterate(&it) {
+				_, errs[i] = archive.extract_iterator_error(&it)
+			}
+			archive.extract_iterator_destroy(&it)
+			archive.close(&a)
+			want_text: archive.Error = archive.General_Error.Limit_Exceeded if k == 1 else nil
+			testing.expectf(t, errs[0] == nil && string(one[:]) == "A", "%s, %v: ONE.TXT %v %q", name, options, errs[0], string(one[:]))
+			testing.expectf(t, errs[1] == want_text, "%s, %v: TEXT.TXT %v, want %v", name, options, errs[1], want_text)
+			delete(one)
+			delete(text)
+		}
+	}
+}
+
 extract_temp :: proc(t: ^testing.T, pattern: string) -> (base: string, ok: bool) {
 	err: os.Error
 	base, err = os.make_directory_temp("", pattern, context.temp_allocator)

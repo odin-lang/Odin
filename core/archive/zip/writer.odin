@@ -343,6 +343,9 @@ _prepare :: proc(zw: ^Writer, p: ^Pending_Entry, fi: archive.File_Info, data: En
 		if len(fi.link_target) == 0 {
 			return archive.General_Error.Incompatible_Options
 		}
+		if len(fi.link_target) > LINK_TARGET_MAX {
+			return Zip_Error.Field_Too_Long
+		}
 		p.link_target = fi.link_target
 		p.size        = i64(len(fi.link_target))
 	}

@@ -67,6 +67,7 @@ Signature :: enum u32le {
 
 END_SEARCH_MAX  :: size_of(End_Record) + 0xFFFF + size_of(Zip64_Locator)
 COPY_CHUNK_SIZE :: 64 * 1024
+LINK_TARGET_MAX :: 4096
 
 ONE_SHOT_MAX      :: i64(#config(ZIP_ONE_SHOT_MAX, 16 * 1024 * 1024))
 WRITE_CHUNK_SIZE  :: 256 * 1024
@@ -239,6 +240,7 @@ Zip64_Locator :: struct #packed {
 
 Directory_End :: struct {
 	end_offset:     i64,
+	records_offset: i64,
 	central_offset: i64,
 	central_size:   i64,
 	entry_count:    i64,
@@ -266,11 +268,17 @@ Record :: struct {
 	path_length:     int,
 	comment:         int,
 	comment_length:  int,
+	end:             i64,
 }
 
 Name_Index :: struct {
 	path:  string,
 	index: int,
+}
+
+Member_Span :: struct {
+	offset: i64,
+	index:  int,
 }
 
 Store :: struct {
@@ -322,6 +330,7 @@ Member :: struct {
 	pos:       int,
 	size:      i64,
 	produced:  i64,
+	declared:  bool,
 	crc:       u32,
 	expected:  Maybe(u32),
 	err:       Error,
@@ -343,6 +352,8 @@ Check_Writer :: struct {
 	w:     io.Writer,
 	crc:   u32,
 	count: i64,
+	limit: i64,
+	over:  bool,
 }
 
 Entry_Data :: union {

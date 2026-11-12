@@ -129,6 +129,9 @@ extract_current_to_dir :: proc(d: ^Extractor, it: ^Iterator, fi: File_Info, path
 		return General_Error.Skipped_Entry_Type
 	}
 	check_member_path(path) or_return
+	if fi.type == .Regular {
+		_check_limits(d.options, d.total, fi) or_return
+	}
 	if fi.type == .Regular && (!fi.supported || fi.encrypted) {
 		if _, probe_err := open_current(it); probe_err != nil {
 			return probe_err
@@ -185,6 +188,7 @@ extract_current_to_dir :: proc(d: ^Extractor, it: ^Iterator, fi: File_Info, path
 		}
 	}
 	defer os.close(f)
+	d.total += fi.size
 	return extract_current(it, os.to_stream(f))
 }
 
@@ -222,6 +226,7 @@ _extract_target :: proc(it: ^Extract_Iterator, t: ^Target, fi: File_Info, again:
 	if fi.type != .Regular {
 		return General_Error.Skipped_Entry_Type
 	}
+	_check_limits(it.options, it.total, fi) or_return
 	switch to in t.to {
 	case string:
 		flags := os.File_Flags{.Write, .Create}
@@ -238,10 +243,12 @@ _extract_target :: proc(it: ^Extract_Iterator, t: ^Target, fi: File_Info, again:
 			return open_err
 		}
 		defer os.close(f)
+		it.total += fi.size
 		return extract_current(&it.it, os.to_stream(f))
 	case ^[dynamic]u8:
 		clear(to)
 		r := open_current(&it.it) or_return
+		it.total += fi.size
 		chunk: [16 * 1024]u8
 		for {
 			n, read_err := io.read(r, chunk[:])
@@ -259,9 +266,27 @@ _extract_target :: proc(it: ^Extract_Iterator, t: ^Target, fi: File_Info, again:
 			}
 		}
 	case io.Writer:
+		it.total += fi.size
 		return extract_current(&it.it, to)
 	}
 	return General_Error.Incompatible_Options
+}
+
+@(private="file")
+_check_limits :: proc(options: Extract_Options, total: i64, fi: File_Info) -> (err: Error) {
+	if options.max_total_size <= 0 && options.max_ratio <= 0 {
+		return nil
+	}
+	if fi.size < 0 {
+		return General_Error.Limit_Exceeded
+	}
+	if options.max_ratio > 0 && fi.compressed_size >= 0 && fi.size > 0 && (fi.size - 1) / i64(options.max_ratio) >= fi.compressed_size {
+		return General_Error.Limit_Exceeded
+	}
+	if options.max_total_size > 0 && fi.size > options.max_total_size - total {
+		return General_Error.Limit_Exceeded
+	}
+	return nil
 }
 
 @(private="file")

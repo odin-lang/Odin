@@ -155,8 +155,10 @@ Target :: struct {
 }
 
 Extract_Options :: struct {
-	overwrite: bool,
-	last_wins: bool,
+	overwrite:      bool,
+	last_wins:      bool,
+	max_total_size: i64,
+	max_ratio:      int,
 }
 
 Extract_Iterator :: struct {
@@ -165,6 +167,7 @@ Extract_Iterator :: struct {
 	targets:   []Target,
 	options:   Extract_Options,
 	found:     int,
+	total:     i64,
 	done:      bool,
 	err:       Error,
 	err_path:  [dynamic]u8,
@@ -177,6 +180,7 @@ Extractor :: struct {
 	options:   Extract_Options,
 	path:      [dynamic]u8,
 	root:      int,
+	total:     i64,
 	checked:   [dynamic]u8,
 	allocator: runtime.Allocator,
 }
@@ -194,6 +198,7 @@ General_Error :: enum u32 {
 	Skipped_Entry_Type,
 	Incompatible_Options,
 	No_Current_Member,
+	Limit_Exceeded,
 }
 
 Tar_Error :: enum u32 {
@@ -222,6 +227,8 @@ Zip_Error :: enum u32 {
 	Invalid_Name,
 	Field_Too_Long,
 	Too_Large,
+	Overlapping_Member,
+	Local_Header_Mismatch,
 }
 
 Error :: union #shared_nil {
