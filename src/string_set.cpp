@@ -33,7 +33,7 @@ gb_internal gbAllocator string_set_allocator(void) {
 
 gb_internal gb_inline void string_set_init(StringSet *s, isize capacity) {
 	capacity = next_pow2_isize(gb_max(16, capacity));
-	
+
 	slice_init(&s->hashes,  string_set_allocator(), capacity);
 	array_init(&s->entries, string_set_allocator(), 0, capacity);
 	for (isize i = 0; i < capacity; i++) {
