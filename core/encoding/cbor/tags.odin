@@ -218,6 +218,9 @@ tag_big_unmarshal :: proc(_: ^Tag_Implementation, d: Decoder, tnr: Tag_Number, v
 		}
 
 		if tnr ==  TAG_NEGATIVE_BIG_NR {
+			if err := big.int_add_digit(&dst, &dst, 1); err != nil {
+				return .Bad_Tag_Value
+			}
 			dst.sign = .Negative
 		}
 
@@ -236,6 +239,10 @@ tag_big_marshal :: proc(_: ^Tag_Implementation, e: Encoder, v: any) -> Marshal_E
 			return _encode_u8(e.writer, 0, .Bytes)
 		}
 
+		if .NaN in vv.flags || .Inf in vv.flags {
+			return .Bad_Tag_Value
+		}
+
 		// NOTE: using the panic_allocator because all procedures should only allocate if the Int
 		// is uninitialized (which we checked).
 
@@ -249,13 +256,31 @@ tag_big_marshal :: proc(_: ^Tag_Implementation, e: Encoder, v: any) -> Marshal_E
 		assert(berr == nil, "should only error if not initialized, which has been checked")
 		assert(size_in_bytes >= 0)
 
+		borrow_byte := -1
+		if is_neg {
+			lsb, lerr := big.int_count_lsb(&vv, mem.panic_allocator())
+			assert(lerr == nil, "should only error if not initialized, which has been checked")
+			borrow_byte = lsb / 8
+
+			top, terr := big.int_bitfield_extract(&vv, (size_in_bytes - 1) * 8, 8, mem.panic_allocator())
+			assert(terr == nil, "should only error if not initialized or invalid argument (offset and count), which won't happen")
+			if borrow_byte == size_in_bytes - 1 && top & 255 == 1 {
+				size_in_bytes -= 1
+			}
+		}
+
 		err_conv(_encode_u64(e, u64(size_in_bytes), .Bytes)) or_return
 
 		for offset := (size_in_bytes*8)-8; offset >= 0; offset -= 8 {
 			bits, derr := big.int_bitfield_extract(&vv, offset, 8, mem.panic_allocator())
 			assert(derr == nil, "should only error if not initialized or invalid argument (offset and count), which won't happen")
 
-			io.write_full(e.writer, {u8(bits & 255)}) or_return
+			b := u8(bits & 255)
+			switch {
+			case offset / 8 == borrow_byte: b -= 1
+			case offset / 8 <  borrow_byte: b  = 255
+			}
+			io.write_full(e.writer, {b}) or_return
 		}
 		return nil
 

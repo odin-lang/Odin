@@ -100,6 +100,7 @@ rat_set_frac_int :: proc(dst: ^Rat, a, b: ^Int, allocator := context.allocator) 
 	}
 	context.allocator = allocator
 	internal_error_if_immutable(&dst.a, &dst.b) or_return
+	internal_error_if_non_finite(a, b) or_return
 	switch {
 	case b == &dst.a && a == &dst.b:
 		internal_swap(&dst.a, &dst.b)
@@ -613,6 +614,7 @@ int_div_rat :: proc(dst: ^Rat, x: ^Int, y: ^Rat, allocator := context.allocator)
 	context.allocator = allocator
 	internal_error_if_immutable(&dst.a, &dst.b) or_return
 	_rat_check(y) or_return
+	internal_error_if_non_finite(x) or_return
 
 	if internal_rat_is_zero(y) {
 		return .Division_by_Zero
@@ -740,6 +742,7 @@ _rat_add_sub :: proc(dst, x, y: ^Rat, subtract: bool) -> (err: Error) {
 // dst = x +/- n, or n - x when `reverse` is set as well as `subtract`.
 _rat_add_sub_int :: proc(dst, x: ^Rat, n: ^Int, subtract, reverse: bool) -> (err: Error) {
 	_rat_check(x) or_return
+	internal_error_if_non_finite(n) or_return
 	_rat_clear_non_finite(dst)
 
 	if internal_is_zero(&x.a) {
@@ -783,6 +786,7 @@ _rat_add_sub_int :: proc(dst, x: ^Rat, n: ^Int, subtract, reverse: bool) -> (err
 // dst = x * n, or x / n when `divide` is set.
 _rat_mul_int :: proc(dst, x: ^Rat, n: ^Int, divide: bool) -> (err: Error) {
 	_rat_check(x) or_return
+	internal_error_if_non_finite(n) or_return
 
 	if divide && internal_is_zero(n) {
 		return .Division_by_Zero

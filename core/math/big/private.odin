@@ -1152,6 +1152,7 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 			t2.digit[1] = x.digit[i - 1] /* i >= 1 always holds */
 			t2.digit[2] = x.digit[i]
 			t2.used = 3
+			internal_clamp(t2)
 
 			if internal_lte(t1, t2) {
 				break
@@ -1409,7 +1410,7 @@ _private_int_factorial_binary_split :: proc(res: ^Int, n: int, allocator := cont
 	internal_one(inner, false)                                       or_return
 	internal_one(outer, false)                                       or_return
 
-	bits_used := ilog2(n)
+	bits_used := bit_length(n)
 
 	for i := bits_used; i >= 0; i -= 1 {
 		start := (n >> (uint(i) + 1)) + 1 | 1
@@ -2031,7 +2032,9 @@ _private_int_montgomery_reduce :: proc(x, n: ^Int, rho: DIGIT, allocator := cont
 		Note that unlike in mul, you're safely allowed *less* than the available columns [255 per default],
 		since carries are fixed up in the inner loop.
 	*/
-	internal_clear_if_uninitialized(x, n) or_return
+	internal_clear_if_uninitialized(x) or_return
+	n := n
+	n = _zero_if_uninitialized(n)
 
 	digs := (n.used * 2) + 1
 	if digs < _WARRAY && x.used <= _WARRAY && n.used < _MAX_COMBA {
@@ -2122,7 +2125,9 @@ _private_int_montgomery_calc_normalization :: proc(a, b: ^Int, allocator := cont
 	/*
 		How many bits of last digit does b use.
 	*/
-	internal_clear_if_uninitialized(a, b) or_return
+	internal_clear_if_uninitialized(a) or_return
+	b := b
+	b = _zero_if_uninitialized(b)
 
 	bits := internal_count_bits(b) % _DIGIT_BITS
 
@@ -2158,7 +2163,8 @@ _private_int_montgomery_setup :: proc(n: ^Int, allocator := context.allocator) -
 		                  =>  2*X*A - X*X*A*A = 1
 		                  =>  2*(1) - (1)     = 1
 	*/
-	internal_clear_if_uninitialized(n, allocator) or_return
+	n := n
+	n = _zero_if_uninitialized(n)
 
 	b := n.digit[0]
 	if b & 1 == 0 { return 0, .Invalid_Argument }

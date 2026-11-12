@@ -24,7 +24,7 @@ package math_big
 	We pass the custom allocator to procedures by default using the pattern `context.allocator = allocator`.
 	This way we don't have to add `, allocator` at the end of each call.
 
-	TODO: Handle +/- Infinity and NaN.
+	`internal_*` procs on `Int`s don't check for NaN or +/-Inf, except `internal_error_if_non_finite`, which the public procs call to reject them.
 */
 
 import "base:builtin"
@@ -187,24 +187,15 @@ internal_int_add_digit :: proc(dest, a: ^Int, digit: DIGIT, allocator := context
 		If `a` is negative and `|a|` >= `digit`, call `dest = |a| - digit`
 	*/
 	if a.sign == .Negative && (a.used > 1 || a.digit[0] >= digit) {
-		/*
-			Temporarily fix `a`'s sign.
-		*/
-		a.sign = .Zero_or_Positive
+		t := a^
+		t.sign = .Zero_or_Positive
 		/*
 			dest = |a| - digit
 		*/
-		if err = internal_int_sub_digit(dest, a, digit); err != nil {
-			/*
-				Restore a's sign.
-			*/
-			a.sign = .Negative
-			return err
-		}
+		internal_int_sub_digit(dest, &t, digit) or_return
 		/*
-			Restore sign and set `dest` sign.
+			Set `dest` sign.
 		*/
-		a.sign    = .Negative
 		dest.sign = .Negative
 
 		return internal_clamp(dest)
@@ -723,10 +714,6 @@ internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.alloc
 			*/
 			err = _private_int_mul_balance(dest, src, multiplier)
 		} else if min_used >= MUL_TOOM_CUTOFF {
-			/*
-				Toom path commented out until it no longer fails Factorial 10k or 100k,
-				as reveaved in the long test.
-			*/
 			err = #force_inline _private_int_mul_toom(dest, src, multiplier)
 		} else if min_used >= MUL_KARATSUBA_CUTOFF {
 			err = #force_inline _private_int_mul_karatsuba(dest, src, multiplier)
@@ -1260,8 +1247,6 @@ internal_cmp_digit :: internal_compare_digit
 */
 internal_int_compare_magnitude :: #force_inline proc(a, b: ^Int) -> (comparison: int) {
 	assert_if_nil(a, b)
-	internal_clamp(a)
-	internal_clamp(b)
 
 	// Compare based on used digits.
 	if a.used != b.used {
@@ -1534,7 +1519,6 @@ internal_int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
 	/*
 		Fast path for `Int`s that fit within a single `DIGIT`.
 	*/
-	internal_clamp(a)
 	if a.used == 1 { return internal_log(a.digit[0], DIGIT(base)) }
 
 	return _private_int_log(a, base)
@@ -1693,11 +1677,11 @@ internal_int_pow_int :: proc(dest: ^Int, base, power: int, allocator := context.
 }
 
 internal_pow :: proc { internal_int_pow, internal_int_pow_int, }
-internal_exp :: pow
 
 /*
 
 */
+@(private="file")
 internal_small_pow :: proc(base: _WORD, exponent: _WORD) -> (result: _WORD) {
 	exponent := exponent; base := base
 	result = _WORD(1)
@@ -2921,6 +2905,12 @@ internal_clear_if_uninitialized_multi :: proc(args: ..^Int, allocator := context
 }
 internal_clear_if_uninitialized :: proc {internal_clear_if_uninitialized_single, internal_clear_if_uninitialized_multi, }
 
+@(private)
+_zero_if_uninitialized :: #force_inline proc(a: ^Int) -> (res: ^Int) {
+	if a != nil && a.used == 0 && ! #force_inline internal_is_initialized(a) { return INT_ZERO }
+	return a
+}
+
 internal_error_if_immutable_single :: proc "contextless" (arg: ^Int) -> (err: Error) {
 	if arg != nil && .Immutable in arg.flags { return .Assignment_To_Immutable }
 	return nil
@@ -2933,6 +2923,30 @@ internal_error_if_immutable_multi :: proc "contextless" (args: ..^Int) -> (err: 
 	return nil
 }
 internal_error_if_immutable :: proc {internal_error_if_immutable_single, internal_error_if_immutable_multi, }
+
+internal_error_if_non_finite_single :: proc "contextless" (arg: ^Int) -> (err: Error) {
+	if arg != nil && (.NaN in arg.flags || .Inf in arg.flags) { return .Invalid_Argument }
+	return nil
+}
+
+internal_error_if_non_finite_multi :: proc "contextless" (args: ..^Int) -> (err: Error) {
+	for i in args {
+		if i != nil && (.NaN in i.flags || .Inf in i.flags) { return .Invalid_Argument }
+	}
+	return nil
+}
+internal_error_if_non_finite :: proc {internal_error_if_non_finite_single, internal_error_if_non_finite_multi, }
+
+internal_clear_non_finite_single :: proc "contextless" (arg: ^Int) {
+	if arg != nil { arg.flags -= {.NaN, .Inf} }
+}
+
+internal_clear_non_finite_multi :: proc "contextless" (args: ..^Int) {
+	for i in args {
+		if i != nil { i.flags -= {.NaN, .Inf} }
+	}
+}
+internal_clear_non_finite :: proc {internal_clear_non_finite_single, internal_clear_non_finite_multi, }
 
 /*
 	Allocates several `Int`s at once.

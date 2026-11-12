@@ -24,7 +24,7 @@ import "base:intrinsics"
 int_itoa_string :: proc(a: ^Int, radix := i8(10), zero_terminate := false, allocator := context.allocator) -> (res: string, err: Error) {
 	assert_if_nil(a)
 	a := a; radix := radix
-	clear_if_uninitialized(a) or_return
+	a = _zero_if_uninitialized(a)
 
 	context.allocator = allocator
 
@@ -68,7 +68,7 @@ int_itoa_string :: proc(a: ^Int, radix := i8(10), zero_terminate := false, alloc
 int_itoa_cstring :: proc(a: ^Int, radix := i8(10), allocator := context.allocator) -> (res: cstring, err: Error) {
 	assert_if_nil(a)
 	a := a; radix := radix
-	clear_if_uninitialized(a) or_return
+	a = _zero_if_uninitialized(a)
 
 	context.allocator = allocator
 
@@ -91,11 +91,13 @@ int_itoa_cstring :: proc(a: ^Int, radix := i8(10), allocator := context.allocato
 	so the result is always `buffer[:written]`, however much larger than `size` the buffer is.
 
 	`size` only saves the `radix_size` call. A buffer too small for the result gives `.Buffer_Overflow`.
+
+	NaN and +/-Inf are written as "NaN", "+Inf" and "-Inf" in radix 2..=23. Radix 24..=64 gives `.Invalid_Argument`.
 */
 int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_terminate := false) -> (written: int, err: Error) {
 	assert_if_nil(a)
 	a := a; radix := radix; size := size
-	clear_if_uninitialized(a) or_return
+	a = _zero_if_uninitialized(a)
 	/*
 		Radix defaults to 10.
 	*/
@@ -118,6 +120,17 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 	if available < size {
 		return 0, .Buffer_Overflow
 	}
+
+	if .NaN in a.flags || .Inf in a.flags {
+		if radix > _MAX_NON_FINITE_RADIX { return 0, .Invalid_Argument }
+		s := _non_finite_string(a)
+		written = len(s) + (1 if zero_terminate else 0)
+		if available < written { return 0, .Buffer_Overflow }
+		intrinsics.mem_copy(&buffer[0], raw_data(s), len(s))
+		if zero_terminate { buffer[len(s)] = 0 }
+		return written, nil
+	}
+
 	/*
 		Fast path for when `Int` == 0 or the entire `Int` fits in a single radix digit.
 	*/
@@ -245,6 +258,12 @@ int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_ter
 	return _itoa_raw_full(a, radix, buffer, zero_terminate)
 }
 
+@(private)
+_non_finite_string :: proc "contextless" (a: ^Int) -> string {
+	if .NaN in a.flags { return "NaN" }
+	return "-Inf" if a.sign == .Negative else "+Inf"
+}
+
 itoa :: proc{int_itoa_string, int_itoa_raw}
 int_to_string  :: int_itoa_string
 int_to_cstring :: int_itoa_cstring
@@ -254,6 +273,9 @@ int_to_cstring :: int_itoa_cstring
 
 	If `n` isn't nil, it's set to the number of characters read, the same as `strconv`'s `n`: the
 	digits, and a leading '-' if anything follows it. So `input[n:]` is whatever comes after them.
+
+	In radix 2..=23, `input` may also start with "+Inf", "-Inf" or "NaN", which set `res` to +/-Inf or NaN and count as the number below.
+	In radix 24..=64 they get no special treatment and are read like any other input, e.g. "NaN" is 30191 in radix 36.
 
 	Returns:
 	- `nil` if `input` is just the number.
@@ -286,6 +308,28 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), n: ^int = nil, alloc
 		Set the integer to the default of zero.
 	*/
 	internal_zero(res) or_return
+
+	if radix <= _MAX_NON_FINITE_RADIX {
+		special := 0
+		switch {
+		case len(input) >= 4 && input[:4] == "+Inf":
+			internal_inf(res) or_return
+			special = 4
+		case len(input) >= 4 && input[:4] == "-Inf":
+			internal_minus_inf(res) or_return
+			special = 4
+		case len(input) >= 3 && input[:3] == "NaN":
+			internal_nan(res) or_return
+			special = 3
+		}
+		if special > 0 {
+			if n != nil { n^ = special }
+			input = input[special:]
+			if len(input) == 0 { return nil }
+			if _is_whitespace_or_nul(input) { return .Trailing_Whitespace }
+			return .Invalid_Character
+		}
+	}
 
 	/*
 		If the leading digit is a minus set the sign to negative.
@@ -531,7 +575,13 @@ radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false, allocator := con
 	context.allocator = allocator
 
 	if radix < 2 || radix > 64                     { return -1, .Invalid_Argument }
-	clear_if_uninitialized(a) or_return
+	a = _zero_if_uninitialized(a)
+
+	if .NaN in a.flags || .Inf in a.flags {
+		if radix > _MAX_NON_FINITE_RADIX { return -1, .Invalid_Argument }
+		size = len(_non_finite_string(a))
+		return size + (1 if zero_terminate else 0), nil
+	}
 
 	if internal_is_zero(a) {
 		if zero_terminate {
@@ -735,8 +785,10 @@ _log_bases := [65]u32{
 }
 
 /*
-	Characters used in radix conversions.
+	Characters used in radix conversions: digit `n` is written as `RADIX_TABLE[n]`, i.e. 0-9, A-Z, a-z, `+` and `/` for 0..=63.
+	That is not RFC 4648 base64, which starts with A-Z. `atoi` also accepts a-z as A-Z in radix 2..=36.
 */
+@(rodata)
 RADIX_TABLE := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+/"
 @(rodata)
 RADIX_TABLE_REVERSE := [RADIX_TABLE_REVERSE_SIZE]u8{

@@ -40,11 +40,11 @@ add :: proc {
 */
 sub :: proc {
 	/*
-		int_sub :: proc(dest, a, b: ^Int) -> (err: Error)
+		int_sub :: proc(dest, number, decrease: ^Int, allocator := context.allocator) -> (err: Error)
 	*/
 	int_sub,
 	/*
-		int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT) -> (err: Error)
+		int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT, allocator := context.allocator) -> (err: Error)
 	*/
 	int_sub_digit,
 	rat_sub_rat,
@@ -55,7 +55,7 @@ sub :: proc {
 /*
 	=== === === === === === === === === === === === === === === === === === === === === === === ===
 	                                        Comparisons.
-	                                    See `compare.odin`.
+	                                    See `public.odin`.
 	=== === === === === === === === === === === === === === === === === === === === === === === ===
 */
 
@@ -68,18 +68,18 @@ is_initialized :: proc {
 
 is_zero :: proc {
 	/*
-		int_is_zero :: proc(a: ^Int) -> bool
+		int_is_zero :: proc(a: ^Int, allocator := context.allocator) -> (zero: bool, err: Error)
 	*/
 	int_is_zero,
 	/*
-		rat_is_zero :: proc(a: ^Rat) -> bool
+		rat_is_zero :: proc(z: ^Rat) -> bool
 	*/
 	rat_is_zero,
 }
 
 is_positive :: proc {
 	/*
-		int_is_positive :: proc(a: ^Int) -> bool
+		int_is_positive :: proc(a: ^Int, allocator := context.allocator) -> (positive: bool, err: Error)
 	*/
 	int_is_positive,
 	rat_is_positive,
@@ -88,7 +88,7 @@ is_pos :: is_positive
 
 is_negative :: proc {
 	/*
-		int_is_negative :: proc(a: ^Int) -> bool
+		int_is_negative :: proc(a: ^Int, allocator := context.allocator) -> (negative: bool, err: Error)
 	*/
 	int_is_negative,
 	rat_is_negative,
@@ -97,7 +97,7 @@ is_neg :: is_negative
 
 is_even :: proc {
 	/*
-		int_is_even :: proc(a: ^Int) -> bool
+		int_is_even :: proc(a: ^Int, allocator := context.allocator) -> (even: bool, err: Error)
 	*/
 	int_is_even,
 	rat_is_even,
@@ -105,7 +105,7 @@ is_even :: proc {
 
 is_odd :: proc {
 	/*
-		int_is_odd :: proc(a: ^Int) -> bool
+		int_is_odd :: proc(a: ^Int, allocator := context.allocator) -> (odd: bool, err: Error)
 	*/
 	int_is_odd,
 	rat_is_odd,
@@ -117,7 +117,7 @@ is_power_of_two :: proc {
 	*/
 	platform_int_is_power_of_two,
 	/*
-		int_is_power_of_two :: proc(a: ^Int) -> (res: bool)
+		int_is_power_of_two :: proc(a: ^Int, allocator := context.allocator) -> (res: bool, err: Error)
 	*/
 	int_is_power_of_two,
 }
@@ -126,13 +126,13 @@ compare :: proc {
 	/*
 		Compare two `Int`s, signed.
 
-		int_compare :: proc(a, b: ^Int) -> Comparison_Flag
+		int_compare :: proc(a, b: ^Int, allocator := context.allocator) -> (comparison: int, err: Error)
 	*/
 	int_compare,
 	/*
 		Compare an `Int` to an unsigned number upto the size of the backing type.
 
-		int_compare_digit :: proc(a: ^Int, u: DIGIT) -> Comparison_Flag
+		int_compare_digit :: proc(a: ^Int, b: DIGIT, allocator := context.allocator) -> (comparison: int, err: Error)
 	*/
 	int_compare_digit,
 }

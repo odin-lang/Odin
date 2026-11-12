@@ -17,6 +17,7 @@ permutations_without_repetition :: proc(dest: ^Int, n, r: int) -> (error: Error)
 	assert_if_nil(dest)
 	if n < 0 || r < 0 { return .Invalid_Argument }
 	internal_error_if_immutable(dest) or_return
+	internal_clear_non_finite(dest)
 	if r > n { return internal_zero(dest) }
 
 	if n == r {
@@ -45,6 +46,7 @@ combinations_with_repetition :: proc(dest: ^Int, n, r: int) -> (error: Error) {
 	assert_if_nil(dest)
 	if n < 0 || r < 0 { return .Invalid_Argument }
 	internal_error_if_immutable(dest) or_return
+	internal_clear_non_finite(dest)
 	if r == 0 { return internal_one(dest) }
 	if n == 0 { return internal_zero(dest) }
 
@@ -63,6 +65,7 @@ combinations_without_repetition :: proc(dest: ^Int, n, r: int) -> (error: Error)
 	assert_if_nil(dest)
 	if n < 0 || r < 0 { return .Invalid_Argument }
 	internal_error_if_immutable(dest) or_return
+	internal_clear_non_finite(dest)
 	if r > n { return internal_zero(dest) }
 
 	tmp_a, tmp_b := &Int{}, &Int{}
