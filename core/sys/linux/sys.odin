@@ -16,7 +16,7 @@ NO_LEGACY_SYSCALLS :: ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 || ODIN_PLATF
 /*
 	Read data from file into the buffer
 	Returns the number of bytes successfully read, which may be less than the size
-	of the buffer even if the termination is successfull.
+	of the buffer even if the termination is successful.
 	Available since Linux 1.0.
 	Before Linux 3.14, this operation is not atomic (i.e. not thread safe).
 */
@@ -28,7 +28,7 @@ read :: proc "contextless" (fd: Fd, buf: []u8) -> (int, Errno) {
 /*
 	Write the data from a buffer into the file
 	Returns the number of bytes successfully written, which may be less than the size
-	of the buffer, even if the termination is successfull
+	of the buffer, even if the termination is successful
 	When using direct I/O, error doesn't mean the write has failed. Partial data may
 	have been written.
 	If .Eintr is returned, the write operation has failed due to interrupt. You'll probably
