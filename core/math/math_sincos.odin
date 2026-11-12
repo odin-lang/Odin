@@ -147,10 +147,8 @@ sincos_f64 :: proc "contextless" (x: f64) -> (sin, cos: f64) #no_bounds_check {
 	}
 
 	j: u64
-	y, z: f64
-	if x >= REDUCE_THRESHOLD {
-		j, z = _trig_reduce_f64(x)
-	} else {
+	y, z, zl: f64
+	if x < REDUCE_THRESHOLD {
 		j = u64(x * (4 / PI)) // integer part of x/(PI/4), as integer for tests on the phase angle
 		y = f64(j)           // integer part of x/(PI/4), as float
 
@@ -160,6 +158,9 @@ sincos_f64 :: proc "contextless" (x: f64) -> (sin, cos: f64) #no_bounds_check {
 		}
 		j &= 7                               // octant modulo TAU radians (360 degrees)
 		z = ((x - y*PI4A) - y*PI4B) - y*PI4C // Extended precision modular arithmetic
+	}
+	if x >= REDUCE_THRESHOLD || (y != 0 && abs(z) < CODY_WAITE_MIN) {
+		j, z, zl = _trig_reduce_hi_lo_f64(x)
 	}
 	if j > 3 { // reflect in x axis
 		j -= 4
@@ -171,8 +172,8 @@ sincos_f64 :: proc "contextless" (x: f64) -> (sin, cos: f64) #no_bounds_check {
 
 	zz := z * z
 
-	cos = 1.0 - 0.5*zz + zz*zz*((((((_cos[0]*zz)+_cos[1])*zz+_cos[2])*zz+_cos[3])*zz+_cos[4])*zz+_cos[5])
-	sin = z + z*zz*((((((_sin[0]*zz)+_sin[1])*zz+_sin[2])*zz+_sin[3])*zz+_sin[4])*zz+_sin[5])
+	cos = 1.0 - 0.5*zz + (zz*zz*((((((_cos[0]*zz)+_cos[1])*zz+_cos[2])*zz+_cos[3])*zz+_cos[4])*zz+_cos[5]) - z*zl)
+	sin = z + (z*zz*((((((_sin[0]*zz)+_sin[1])*zz+_sin[2])*zz+_sin[3])*zz+_sin[4])*zz+_sin[5]) + zl*(1 - 0.5*zz))
 
 	if j == 1 || j == 2 {
 		sin, cos = cos, sin
@@ -222,6 +223,9 @@ _cos := [?]f64{
 @(private="file")
 REDUCE_THRESHOLD :: 1 << 29
 
+@(private="file")
+CODY_WAITE_MIN :: 1.0 / (1 << 10)
+
 // _trig_reduce_f64 implements Payne-Hanek range reduction by Pi/4
 // for x > 0. It returns the integer part mod 8 (j) and
 // the fractional part (z) of x / (Pi/4).
@@ -229,7 +233,14 @@ REDUCE_THRESHOLD :: 1 << 29
 // "ARGUMENT REDUCTION FOR HUGE ARGUMENTS: Good to the Last Bit"
 // K. C. Ng et al, March 24, 1992
 // The simulated multi-precision calculation of x*B uses 64-bit integer arithmetic.
-_trig_reduce_f64 :: proc "contextless" (x: f64) -> (j: u64, z: f64) #no_bounds_check {
+_trig_reduce_f64 :: proc "contextless" (x: f64) -> (j: u64, z: f64) {
+	zl: f64
+	j, z, zl = _trig_reduce_hi_lo_f64(x)
+	return j, z + zl
+}
+
+@(private="file")
+_trig_reduce_hi_lo_f64 :: proc "contextless" (x: f64) -> (j: u64, z, zl: f64) #no_bounds_check {
 	// bd_pi4 is the binary digits of 4/pi as a u64 array,
 	// that is, 4/pi = Sum bd_pi4[i]*2^(-64*i)
 	// 19 64-bit digits and the leading one bit give 1217 bits
@@ -257,9 +268,12 @@ _trig_reduce_f64 :: proc "contextless" (x: f64) -> (j: u64, z: f64) #no_bounds_c
 		0xac06608df8f6d757,
 	}
 
+	PI4_HI :: 0xc90fdaa22168c234
+	PI4_LO :: 0xc4c6628b80dc1cd1
+
 	PI4 :: PI / 4
 	if x < PI4 {
-		return 0, x
+		return 0, x, 0
 	}
 
 	MASK  :: 0x7FF
@@ -287,24 +301,26 @@ _trig_reduce_f64 :: proc "contextless" (x: f64) -> (j: u64, z: f64) #no_bounds_c
 	hi, _ := add_u64(z0lo, z1hi, c)
 	// The top 3 bits are j.
 	j = hi >> 61
-	// Extract the fraction and find its magnitude.
-	hi = hi<<3 | lo>>61
-	lz := uint(intrinsics.count_leading_zeros(hi))
-	e := u64(BIAS - (lz + 1))
-	// Clear implicit mantissa bit and shift into place.
-	hi = (hi << (lz + 1)) | (lo >> (64 - (lz + 1)))
-	hi >>= 64 - SHIFT
-	// Include the exponent and convert to a float.
-	hi |= e << SHIFT
-	z = transmute(f64)hi
-	// Map zeros to origin.
-	if j&1 == 1 {
-		j += 1
-		j &= 7
-		z -= 1
+	// Extract the fraction as 128-bit fixed point in [0, 1).
+	f := (u128(hi) << 64 | u128(lo)) << 3
+	// Map zeros to origin: for odd j, step to the next octant and use 1 - f, negating the result at the end.
+	neg := j&1 == 1
+	if neg {
+		j = (j + 1) & 7
+		f = ~f + 1
 	}
-	// Multiply the fractional part by pi/4.
-	return j, z * PI4
+	// Multiply the fraction by pi/4 in 128-bit fixed point, then normalize.
+	f1, f0 := u64(f >> 64), u64(f)
+	r := u128(f1)*PI4_HI + (u128(f1)*PI4_LO) >> 64 + (u128(f0)*PI4_HI) >> 64
+	lz := uint(intrinsics.count_leading_zeros(r))
+	r <<= lz
+	// Include the exponent and split the result into a high part z and a low part zl, 53 bits each.
+	z  = f64(u64(r >> 75))               * transmute(f64)(u64(BIAS - 53 - lz) << SHIFT)
+	zl = f64(u64(r >> 22) & (1<<53 - 1)) * transmute(f64)(u64(BIAS - 106 - lz) << SHIFT)
+	if neg {
+		z, zl = -z, -zl
+	}
+	return
 
 	@(require_results)
 	add_u64 :: proc "contextless" (x, y, carry: u64) -> (sum, carry_out: u64) {

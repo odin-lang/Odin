@@ -101,3 +101,21 @@ test_truetype_bitmap :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@(test)
+test_truetype_default_name_and_width_scale :: proc(t: ^testing.T) {
+	info: stbtt.fontinfo
+	if !load_noto_sans(t, &info) { return }
+
+	name: [128]u8
+	n := stbtt.GetFontNameDefault(&info, raw_data(name[:]), len(name))
+	testing.expect(t, n > 0 && int(n) < len(name), "the default name fits and is not empty")
+	log.infof("default name: %v", string(name[:max(n, 0)]))
+
+	position, thickness: i32
+	testing.expect(t, bool(stbtt.GetFontUnderlineMetrics(&info, &position, &thickness)), "Noto Sans has a post table")
+	testing.expect(t, thickness > 0, "the underline has a thickness")
+
+	scale := stbtt.ScaleForPixelWidth(&info, 32)
+	testing.expect(t, scale > 0, "a positive scale")
+}

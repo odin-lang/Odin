@@ -66,7 +66,8 @@ test_sigpipe_bypass :: proc(t: ^testing.T) {
 	if !testing.expect_value(t, listen_err, nil) {
 		return
 	}
-	defer net.close(server_socket)
+	server_closed := false
+	defer if !server_closed { net.close(server_socket) }
 
 	ep, bound_err := net.bound_endpoint(server_socket)
 	if !testing.expect_value(t, bound_err, nil) {
@@ -82,6 +83,7 @@ test_sigpipe_bypass :: proc(t: ^testing.T) {
 	time.sleep(10 * time.Millisecond)
 
 	net.close(server_socket)
+	server_closed = true
 
 	time.sleep(10 * time.Millisecond)
 

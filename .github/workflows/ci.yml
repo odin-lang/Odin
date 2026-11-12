@@ -500,7 +500,7 @@ jobs:
           sudo apt-get install libcurl4-openssl-dev libmbedtls-dev
 
       - name: Install riscv64 toolchain and qemu
-        run: sudo apt-get install -y qemu-user qemu-user-binfmt gcc-12-riscv64-linux-gnu libc6-riscv64-cross
+        run: sudo apt-get install -y qemu-user qemu-user-binfmt gcc-14-riscv64-linux-gnu libc6-riscv64-cross
 
       # Need to save all downloaded apt packages in "$RUNNER_TEMP/apt-cache/" so that actions/checkout@v7 will pick them up
       - name: Save apt package archives

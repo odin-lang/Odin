@@ -26,13 +26,10 @@ import "core:math"
 @(require_results) trunc_f32       :: proc "c" (x: f32) -> f32 { return math.trunc(x) }
 @(require_results) round_f32       :: proc "c" (x: f32) -> f32 { return math.round(x) }
 @(require_results) ceil_f32        :: proc "c" (x: f32) -> f32 { return math.ceil(x) }
-@(require_results) mod_f32         :: proc "c" (x, y: f32) -> f32 { return math.mod(x, y) }
+@(require_results) mod_f32         :: proc "c" (x, y: f32) -> f32 { return x - y*math.floor(x/y) }
 @(require_results)
 fract_f32 :: proc "c" (x: f32) -> f32 {
-	if x >= 0 {
-		return x - math.trunc(x)
-	}
-	return math.trunc(-x) + x
+	return x - math.floor(x)
 }
 
 @(require_results) cos_f64         :: proc "c" (x: f64) -> f64 { return math.cos(x) }
@@ -59,11 +56,8 @@ fract_f32 :: proc "c" (x: f32) -> f32 {
 @(require_results) trunc_f64       :: proc "c" (x: f64) -> f64 { return math.trunc(x) }
 @(require_results) round_f64       :: proc "c" (x: f64) -> f64 { return math.round(x) }
 @(require_results) ceil_f64        :: proc "c" (x: f64) -> f64 { return math.ceil(x) }
-@(require_results) mod_f64         :: proc "c" (x, y: f64) -> f64 { return math.mod(x, y) }
+@(require_results) mod_f64         :: proc "c" (x, y: f64) -> f64 { return x - y*math.floor(x/y) }
 @(require_results)
 fract_f64 :: proc "c" (x: f64) -> f64 {
-	if x >= 0 {
-		return x - math.trunc(x)
-	}
-	return math.trunc(-x) + x
+	return x - math.floor(x)
 }

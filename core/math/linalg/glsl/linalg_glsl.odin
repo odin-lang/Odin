@@ -574,14 +574,14 @@ radians :: proc{
 	radians_dvec3,
 	radians_dvec4,
 }
-@(require_results) radians_f32  :: proc "c" (degrees: f32)  -> f32  { return degrees * TAU / 360.0 }
-@(require_results) radians_f64  :: proc "c" (degrees: f64)  -> f64  { return degrees * TAU / 360.0 }
-@(require_results) radians_vec2 :: proc "c" (degrees: vec2) -> vec2 { return degrees * TAU / 360.0 }
-@(require_results) radians_vec3 :: proc "c" (degrees: vec3) -> vec3 { return degrees * TAU / 360.0 }
-@(require_results) radians_vec4 :: proc "c" (degrees: vec4) -> vec4 { return degrees * TAU / 360.0 }
-@(require_results) radians_dvec2 :: proc "c" (degrees: dvec2) -> dvec2 { return degrees * TAU / 360.0 }
-@(require_results) radians_dvec3 :: proc "c" (degrees: dvec3) -> dvec3 { return degrees * TAU / 360.0 }
-@(require_results) radians_dvec4 :: proc "c" (degrees: dvec4) -> dvec4 { return degrees * TAU / 360.0 }
+@(require_results) radians_f32   :: proc "c" (degrees: f32)   -> f32   { return degrees * (TAU / 360.0) }
+@(require_results) radians_f64   :: proc "c" (degrees: f64)   -> f64   { return degrees * (TAU / 360.0) }
+@(require_results) radians_vec2  :: proc "c" (degrees: vec2)  -> vec2  { return degrees * (TAU / 360.0) }
+@(require_results) radians_vec3  :: proc "c" (degrees: vec3)  -> vec3  { return degrees * (TAU / 360.0) }
+@(require_results) radians_vec4  :: proc "c" (degrees: vec4)  -> vec4  { return degrees * (TAU / 360.0) }
+@(require_results) radians_dvec2 :: proc "c" (degrees: dvec2) -> dvec2 { return degrees * (TAU / 360.0) }
+@(require_results) radians_dvec3 :: proc "c" (degrees: dvec3) -> dvec3 { return degrees * (TAU / 360.0) }
+@(require_results) radians_dvec4 :: proc "c" (degrees: dvec4) -> dvec4 { return degrees * (TAU / 360.0) }
 
 
 degrees :: proc{
@@ -594,14 +594,14 @@ degrees :: proc{
 	degrees_dvec3,
 	degrees_dvec4,
 }
-@(require_results) degrees_f32  :: proc "c" (radians: f32)  -> f32  { return radians * 360.0 / TAU }
-@(require_results) degrees_f64  :: proc "c" (radians: f64)  -> f64  { return radians * 360.0 / TAU }
-@(require_results) degrees_vec2 :: proc "c" (radians: vec2) -> vec2 { return radians * 360.0 / TAU }
-@(require_results) degrees_vec3 :: proc "c" (radians: vec3) -> vec3 { return radians * 360.0 / TAU }
-@(require_results) degrees_vec4 :: proc "c" (radians: vec4) -> vec4 { return radians * 360.0 / TAU }
-@(require_results) degrees_dvec2 :: proc "c" (radians: dvec2) -> dvec2 { return radians * 360.0 / TAU }
-@(require_results) degrees_dvec3 :: proc "c" (radians: dvec3) -> dvec3 { return radians * 360.0 / TAU }
-@(require_results) degrees_dvec4 :: proc "c" (radians: dvec4) -> dvec4 { return radians * 360.0 / TAU }
+@(require_results) degrees_f32   :: proc "c" (radians: f32)   -> f32   { return radians * (360.0 / TAU) }
+@(require_results) degrees_f64   :: proc "c" (radians: f64)   -> f64   { return radians * (360.0 / TAU) }
+@(require_results) degrees_vec2  :: proc "c" (radians: vec2)  -> vec2  { return radians * (360.0 / TAU) }
+@(require_results) degrees_vec3  :: proc "c" (radians: vec3)  -> vec3  { return radians * (360.0 / TAU) }
+@(require_results) degrees_vec4  :: proc "c" (radians: vec4)  -> vec4  { return radians * (360.0 / TAU) }
+@(require_results) degrees_dvec2 :: proc "c" (radians: dvec2) -> dvec2 { return radians * (360.0 / TAU) }
+@(require_results) degrees_dvec3 :: proc "c" (radians: dvec3) -> dvec3 { return radians * (360.0 / TAU) }
+@(require_results) degrees_dvec4 :: proc "c" (radians: dvec4) -> dvec4 { return radians * (360.0 / TAU) }
 
 min :: proc{
 	min_i32,  
@@ -1049,53 +1049,53 @@ refract :: proc{
 	refract_dvec3,
 	refract_dvec4,
 }
-@(require_results) refract_f32  :: proc "c" (i, n, eta: f32) -> f32 {
+@(require_results) refract_f32   :: proc "c" (i, n, eta: f32) -> f32 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * f32(i32(cost2 > 0))
+	return t * f32(i32(cost2 >= 0))
 }
-@(require_results) refract_f64  :: proc "c" (i, n, eta: f64) -> f64 {
+@(require_results) refract_f64   :: proc "c" (i, n, eta: f64) -> f64 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * f64(i32(cost2 > 0))
+	return t * f64(i32(cost2 >= 0))
 }
 @(require_results) refract_vec2  :: proc "c" (i, n: vec2, eta: f32) -> vec2 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * f32(i32(cost2 > 0))
+	return t * f32(i32(cost2 >= 0))
 }
 @(require_results) refract_vec3  :: proc "c" (i, n: vec3, eta: f32) -> vec3 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * f32(i32(cost2 > 0))
+	return t * f32(i32(cost2 >= 0))
 }
 @(require_results) refract_vec4  :: proc "c" (i, n: vec4, eta: f32) -> vec4 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * f32(i32(cost2 > 0))
+	return t * f32(i32(cost2 >= 0))
 }
-@(require_results) refract_dvec2  :: proc "c" (i, n: dvec2, eta: f64) -> dvec2 {
+@(require_results) refract_dvec2 :: proc "c" (i, n: dvec2, eta: f64) -> dvec2 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * f64(i32(cost2 > 0))
+	return t * f64(i32(cost2 >= 0))
 }
-@(require_results) refract_dvec3  :: proc "c" (i, n: dvec3, eta: f64) -> dvec3 {
+@(require_results) refract_dvec3 :: proc "c" (i, n: dvec3, eta: f64) -> dvec3 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * f64(i32(cost2 > 0))
+	return t * f64(i32(cost2 >= 0))
 }
-@(require_results) refract_dvec4  :: proc "c" (i, n: dvec4, eta: f64) -> dvec4 {
+@(require_results) refract_dvec4 :: proc "c" (i, n: dvec4, eta: f64) -> dvec4 {
 	cosi := dot(-i, n)
 	cost2 := 1 - eta*eta*(1 - cosi*cosi)
 	t := eta*i + ((eta*cosi - sqrt(abs(cost2))) * n)
-	return t * f64(i32(cost2 > 0))
+	return t * f64(i32(cost2 >= 0))
 }
 
 scalarTripleProduct :: proc{

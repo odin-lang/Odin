@@ -99,7 +99,7 @@ test_refract :: proc(t: ^testing.T) {
 	for eta in ([]hlsl.double{0.5, 0.75, 1, 1.25, 1.5, 2}) {
 		k := 1 - eta*eta*(1 - ni*ni)
 		e: hlsl.double4
-		if k > 0 {
+		if k >= 0 {
 			e = eta*i - (eta*ni + hlsl.sqrt(k))*n
 		}
 
