@@ -941,9 +941,15 @@ Possible Output:
 */
 @(require_results) float64_range :: proc(low, high: f64, gen := context.random_generator) -> (val: f64) {
 	assert(low <= high, "low must be lower than or equal to high")
-	val = (high-low)*float64(gen) + low
+	f := float64(gen)
+	range := high - low
+	if math.is_inf(range) {
+		val = 2*((high*0.5 - low*0.5)*f + low*0.5)
+	} else {
+		val = range*f + low
+	}
 	if val >= high {
-		val = max(low, high * (1 - math.F64_EPSILON))
+		val = math.nextafter(high, low)
 	}
 	return
 }
@@ -976,9 +982,15 @@ Possible Output:
 */
 @(require_results) float32_range :: proc(low, high: f32, gen := context.random_generator) -> (val: f32) {
 	assert(low <= high, "low must be lower than or equal to high")
-	val = (high-low)*float32(gen) + low
+	f := float32(gen)
+	range := high - low
+	if math.is_inf(range) {
+		val = 2*((high*0.5 - low*0.5)*f + low*0.5)
+	} else {
+		val = range*f + low
+	}
 	if val >= high {
-		val = max(low, high * (1 - math.F32_EPSILON))
+		val = math.nextafter(high, low)
 	}
 	return
 }
@@ -1141,10 +1153,10 @@ choice :: proc(array: $T/[]$E, gen := context.random_generator) -> (res: E) {
 
 @(require_results)
 choice_enum :: proc($T: typeid, gen := context.random_generator) -> T where intrinsics.type_is_enum(T) {
-	when size_of(T) <= 8 && len(T) == cap(T) {
+	when size_of(T) <= 8 && len(T) == cap(T) && intrinsics.type_enum_is_contiguous(T) {
 		when intrinsics.type_is_unsigned(intrinsics.type_core_type(T)) &&
 			 u64(max(T)) > u64(max(i64)) {
-			i := uint64(gen) % u64(len(T))
+			i := uint64_max(u64(len(T)), gen)
 			i += u64(min(T))
 			return T(i)
 		} else {
