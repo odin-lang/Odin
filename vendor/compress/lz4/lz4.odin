@@ -11,7 +11,7 @@ import "core:c"
 
 VERSION_MAJOR   ::  1    /* for breaking interface changes  */
 VERSION_MINOR   :: 11    /* for new (non-breaking) interface capabilities */
-VERSION_RELEASE ::  0    /* for tweaks, bug-fixes, or development */
+VERSION_RELEASE ::  1    /* for tweaks, bug-fixes, or development */
 
 VERSION_NUMBER  :: VERSION_MAJOR * 10_000 + VERSION_MINOR * 100 + VERSION_RELEASE
 
