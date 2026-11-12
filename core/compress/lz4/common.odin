@@ -204,7 +204,7 @@ LZ4_LEVELS := [Level]LZ4_Level_Parameters{
 	.Level_7  = {64,   512,   .Lazy},
 	.Level_8  = {128,  1024,  .Lazy},
 	.Level_9  = {256,  4096,  .Lazy},
-	.Level_10 = {64,   128,   .Optimal},
+	.Level_10 = {96,   128,   .Optimal},
 	.Level_11 = {256,  512,   .Optimal},
 	.Level_12 = {1024, 1024,  .Optimal},
 }

@@ -687,6 +687,9 @@ lz4_compress_optimal :: proc(s: ^LZ4, output, data: []u8, start, end, low: int, 
 				nodes[k + 1] = {cost = literal_cost, tokens = node.tokens, literals = i32(literals), previous = i32(k), length = 0}
 			}
 
+			if nodes[k + 1].cost <= node.cost && k + LZ4_MIN_MATCH <= window && nodes[k + LZ4_MIN_MATCH].cost <= node.cost + 3 {
+				continue
+			}
 			if k < skip_until {
 				continue
 			}
