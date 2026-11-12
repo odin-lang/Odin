@@ -566,7 +566,7 @@ _handle_xml_special :: proc(t: ^Tokenizer, builder: ^strings.Builder, options: X
 		start_offset  := t.offset
 		t.read_offset += len(CDATA_START) - 1
 		for {
-			advance(t)
+			advance(t) or_return
 			if t.r < 0 {
 				// error(t, offset, "[scan_string] CDATA was not terminated\n")
 				return true, .CDATA_Not_Terminated
