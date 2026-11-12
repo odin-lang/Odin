@@ -226,9 +226,3 @@ Order :: enum i8 {
 	LSB_First = -1,
 	MSB_First =  1,
 }
-
-Endianness :: enum i8 {
-	Little   = -1,
-	Platform =  0,
-	Big      =  1,
-}

@@ -1693,11 +1693,11 @@ internal_int_pow_int :: proc(dest: ^Int, base, power: int, allocator := context.
 }
 
 internal_pow :: proc { internal_int_pow, internal_int_pow_int, }
-internal_exp :: pow
 
 /*
 
 */
+@(private="file")
 internal_small_pow :: proc(base: _WORD, exponent: _WORD) -> (result: _WORD) {
 	exponent := exponent; base := base
 	result = _WORD(1)

@@ -418,7 +418,7 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 		// The DIGITs have a defined bit-size but the size of a.digit is a simple 'int',
 		// the size of which can depend on the platform.
 		size_a := internal_count_bits(a)
-		mask   := (1 << uint(ilog2(size_a))) - 1
+		mask   := (1 << uint(bit_length(size_a))) - 1
 
 		/*
 			Assuming the General Rieman hypothesis (never thought to write that in a

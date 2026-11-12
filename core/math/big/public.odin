@@ -471,7 +471,8 @@ digit_log :: proc(a: DIGIT, base: DIGIT) -> (log: int, err: Error) {
 }
 log :: proc { int_log, digit_log, }
 
-ilog2 :: proc(value: $T) -> (log2: T) {
+// Bits needed for a non-negative `value`, 0 for 0. Used by `internal_int_is_prime` and `_private_int_factorial_binary_split`.
+bit_length :: proc(value: $T) -> (bits: T) {
 	return (size_of(T) * 8) - intrinsics.count_leading_zeros(value)
 }
 
@@ -501,12 +502,7 @@ int_pow_int :: proc(dest: ^Int, base, power: int, allocator := context.allocator
 	return #force_inline internal_pow(dest, base, power, allocator)
 }
 
-pow :: proc { int_pow, int_pow_int, small_pow, }
-exp :: pow
-
-small_pow :: proc(base: _WORD, exponent: _WORD) -> (result: _WORD) {
-	return #force_inline internal_small_pow(base, exponent)
-}
+pow :: proc { int_pow, int_pow_int, }
 
 /*
 	This function is less generic than `root_n`, simpler and faster.

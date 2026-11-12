@@ -3009,3 +3009,14 @@ test_fix_atoi_non_finite :: proc(t: ^testing.T) {
 	testing.expect_value(t, n, 4)
 	fix_expect(t, a, "16329833")
 }
+
+@(test)
+test_fix_bit_length :: proc(t: ^testing.T) {
+	testing.expect_value(t, big.bit_length(0), 0)
+	testing.expect_value(t, big.bit_length(1), 1)
+	testing.expect_value(t, big.bit_length(255), 8)
+	testing.expect_value(t, big.bit_length(256), 9)
+	testing.expect_value(t, big.bit_length(max(int)), 8 * size_of(int) - 1)
+	testing.expect_value(t, big.bit_length(max(u64)), u64(64))
+	testing.expect_value(t, big.bit_length(u8(0x80)), u8(8))
+}
