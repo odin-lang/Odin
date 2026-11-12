@@ -21,6 +21,7 @@ LICENSE_CRC :: 0xb047bfa7
 SMALL_CRC   :: 0x917123cb
 TEXT_CRC    :: 0x61c54dab
 SAME_CRC    :: 0x6733dede
+PASSWORD    :: "ODIN"
 
 CET := datetime.TZ_Region{
 	name  = "CET",
@@ -545,13 +546,17 @@ check_reader :: proc(t: ^testing.T, c: Corpus_Case, r: ^zip.Reader) {
 	for fi, index in zip.iterate(&it) {
 		testing.expectf(t, index == members && fi.handle.index == index, "%s: index %d", c.name, index)
 		members += 1
-		data, extract_err := extract_to_bytes(&it)
+		options: archive.Read_Options
+		if fi.encrypted {
+			encrypted += 1
+			locked, locked_err := extract_to_bytes(&it)
+			testing.expectf(t, locked_err == archive.General_Error.Encrypted && len(locked) == 0 && fi.supported, "%s/%s: no password %v", c.name, fi.path, locked_err)
+			delete(locked)
+			options.password = PASSWORD
+		}
+		data, extract_err := extract_to_bytes(&it, options)
 		defer delete(data)
 		switch {
-		case fi.encrypted:
-			encrypted += 1
-			testing.expectf(t, extract_err == archive.General_Error.Encrypted && !fi.supported, "%s/%s: %v", c.name, fi.path, extract_err)
-			continue
 		case fi.method == .XZ:
 			unsupported += 1
 			testing.expectf(t, extract_err == archive.General_Error.Unsupported_Method && !fi.supported, "%s/%s: %v", c.name, fi.path, extract_err)
@@ -561,13 +566,15 @@ check_reader :: proc(t: ^testing.T, c: Corpus_Case, r: ^zip.Reader) {
 			continue
 		}
 		testing.expectf(t, i64(len(data)) == fi.size, "%s/%s: size %d", c.name, fi.path, len(data))
-		crc, _ := fi.crc32.?
-		testing.expectf(t, hash.crc32(data[:]) == crc, "%s/%s: CRC", c.name, fi.path)
+		crc := hash.crc32(data[:])
+		if stored, has_crc := fi.crc32.?; has_crc {
+			testing.expectf(t, crc == stored, "%s/%s: CRC", c.name, fi.path)
+		}
 		if want, known := known_crc(fi.path); known && fi.type == .Regular {
 			testing.expectf(t, crc == want, "%s/%s: content CRC %08x", c.name, fi.path, crc)
 		}
 
-		reader, open_err := zip.open_current(&it)
+		reader, open_err := zip.open_current(&it, options)
 		if testing.expectf(t, open_err == nil, "%s/%s: open_current %v", c.name, fi.path, open_err) {
 			streamed, read_err := read_stream(reader)
 			testing.expectf(t, read_err == nil && bytes.equal(streamed[:], data[:]), "%s/%s: open_current %v", c.name, fi.path, read_err)
@@ -577,7 +584,7 @@ check_reader :: proc(t: ^testing.T, c: Corpus_Case, r: ^zip.Reader) {
 		found, handle, ok, find_err := zip.find(r, fi.path)
 		testing.expectf(t, ok && find_err == nil && found.path == fi.path, "%s/%s: find", c.name, fi.path)
 		if ok && handle.index == index {
-			m, member_err := zip.open_member(r, handle)
+			m, member_err := zip.open_member(r, handle, options)
 			if testing.expectf(t, member_err == nil, "%s/%s: open_member %v", c.name, fi.path, member_err) {
 				streamed, read_err := read_stream(m)
 				testing.expectf(t, read_err == nil && bytes.equal(streamed[:], data[:]), "%s/%s: open_member %v", c.name, fi.path, read_err)
@@ -605,9 +612,9 @@ known_crc :: proc(path: string) -> (crc: u32, ok: bool) {
 	return
 }
 
-extract_to_bytes :: proc(it: ^zip.Iterator) -> (data: [dynamic]u8, err: zip.Error) {
+extract_to_bytes :: proc(it: ^zip.Iterator, options := archive.Read_Options{}) -> (data: [dynamic]u8, err: zip.Error) {
 	sink := strings.builder_make()
-	err = zip.extract_current(it, strings.to_writer(&sink))
+	err = zip.extract_current(it, strings.to_writer(&sink), options)
 	return sink.buf, err
 }
 

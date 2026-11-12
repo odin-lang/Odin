@@ -124,12 +124,12 @@ iterator_error :: proc(it: ^Iterator) -> (path: string, err: Error) {
 	return _procs[it.archive.format].iterator_error(it)
 }
 
-extract_current :: proc(it: ^Iterator, w: io.Writer) -> (err: Error) {
-	return _procs[it.archive.format].extract_current(it, w)
+extract_current :: proc(it: ^Iterator, w: io.Writer, options := Read_Options{}) -> (err: Error) {
+	return _procs[it.archive.format].extract_current(it, w, options)
 }
 
-open_current :: proc(it: ^Iterator) -> (r: io.Reader, err: Error) {
-	return _procs[it.archive.format].open_current(it)
+open_current :: proc(it: ^Iterator, options := Read_Options{}) -> (r: io.Reader, err: Error) {
+	return _procs[it.archive.format].open_current(it, options)
 }
 
 read_link :: proc(it: ^Iterator, allocator := context.allocator) -> (target: string, err: Error) {
@@ -140,12 +140,12 @@ find :: proc(a: ^Archive, path: string) -> (fi: File_Info, handle: Handle, ok: b
 	return _procs[a.format].find(a, path)
 }
 
-extract :: proc(a: ^Archive, handle: Handle, w: io.Writer) -> (err: Error) {
-	return _procs[a.format].extract(a, handle, w)
+extract :: proc(a: ^Archive, handle: Handle, w: io.Writer, options := Read_Options{}) -> (err: Error) {
+	return _procs[a.format].extract(a, handle, w, options)
 }
 
-open_member :: proc(a: ^Archive, handle: Handle) -> (r: io.Reader, err: Error) {
-	return _procs[a.format].open_member(a, handle)
+open_member :: proc(a: ^Archive, handle: Handle, options := Read_Options{}) -> (r: io.Reader, err: Error) {
+	return _procs[a.format].open_member(a, handle, options)
 }
 
 close_member :: proc(r: io.Reader) {

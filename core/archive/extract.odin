@@ -133,7 +133,7 @@ extract_current_to_dir :: proc(d: ^Extractor, it: ^Iterator, fi: File_Info, path
 		_check_limits(d.options, d.total, fi) or_return
 	}
 	if fi.type == .Regular && (!fi.supported || fi.encrypted) {
-		if _, probe_err := open_current(it); probe_err != nil {
+		if _, probe_err := open_current(it, {password = d.options.password}); probe_err != nil {
 			return probe_err
 		}
 	}
@@ -187,9 +187,13 @@ extract_current_to_dir :: proc(d: ^Extractor, it: ^Iterator, fi: File_Info, path
 			return open_err
 		}
 	}
-	defer os.close(f)
 	d.total += fi.size
-	return extract_current(it, os.to_stream(f))
+	err = extract_current(it, os.to_stream(f), {password = d.options.password})
+	os.close(f)
+	if err != nil {
+		os.remove(full)
+	}
+	return
 }
 
 check_member_path :: proc(path: string, windows := ODIN_OS == .Windows) -> (err: Error) {
@@ -242,12 +246,19 @@ _extract_target :: proc(it: ^Extract_Iterator, t: ^Target, fi: File_Info, again:
 		if open_err != nil {
 			return open_err
 		}
-		defer os.close(f)
 		it.total += fi.size
-		return extract_current(&it.it, os.to_stream(f))
+		err = extract_current(&it.it, os.to_stream(f), {password = it.options.password})
+		os.close(f)
+		if err != nil {
+			os.remove(to)
+		}
+		return
 	case ^[dynamic]u8:
 		clear(to)
-		r := open_current(&it.it) or_return
+		defer if err != nil {
+			clear(to)
+		}
+		r := open_current(&it.it, {password = it.options.password}) or_return
 		it.total += fi.size
 		chunk: [16 * 1024]u8
 		for {
@@ -267,7 +278,7 @@ _extract_target :: proc(it: ^Extract_Iterator, t: ^Target, fi: File_Info, again:
 		}
 	case io.Writer:
 		it.total += fi.size
-		return extract_current(&it.it, to)
+		return extract_current(&it.it, to, {password = it.options.password})
 	}
 	return General_Error.Incompatible_Options
 }

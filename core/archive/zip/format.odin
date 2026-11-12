@@ -184,7 +184,7 @@ fill_info :: proc(fi: ^archive.File_Info, header: Central_Header, name, central_
 	fi.method    = zip_method(method)
 	fi.method_id = u64(method)
 	fi.encrypted = header.flags & ENCRYPTED_FLAGS != {} || header.method == .AES
-	fi.supported = method_supported(method) && !fi.encrypted
+	fi.supported = method_supported(method) && header.flags & {.Strong_Encryption, .Masked_Headers} == {}
 	if aes_version != 2 {
 		fi.crc32 = u32(header.crc32)
 	}

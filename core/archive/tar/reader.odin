@@ -1205,12 +1205,12 @@ _archive_iterator_error :: proc(it: ^archive.Iterator) -> (path: string, err: Er
 }
 
 @(private)
-_archive_extract_current :: proc(it: ^archive.Iterator, w: io.Writer) -> Error {
+_archive_extract_current :: proc(it: ^archive.Iterator, w: io.Writer, _: archive.Read_Options) -> Error {
 	return extract_current((^Iterator)(it.state), w)
 }
 
 @(private)
-_archive_open_current :: proc(it: ^archive.Iterator) -> (reader: io.Reader, err: Error) {
+_archive_open_current :: proc(it: ^archive.Iterator, _: archive.Read_Options) -> (reader: io.Reader, err: Error) {
 	return open_current((^Iterator)(it.state))
 }
 
@@ -1225,11 +1225,11 @@ _archive_find :: proc(a: ^archive.Archive, path: string) -> (fi: archive.File_In
 }
 
 @(private)
-_archive_extract :: proc(a: ^archive.Archive, handle: archive.Handle, w: io.Writer) -> Error {
+_archive_extract :: proc(a: ^archive.Archive, handle: archive.Handle, w: io.Writer, _: archive.Read_Options) -> Error {
 	return extract((^Reader)(a.state), handle, w)
 }
 
 @(private)
-_archive_open_member :: proc(a: ^archive.Archive, handle: archive.Handle) -> (reader: io.Reader, err: Error) {
+_archive_open_member :: proc(a: ^archive.Archive, handle: archive.Handle, _: archive.Read_Options) -> (reader: io.Reader, err: Error) {
 	return open_member((^Reader)(a.state), handle)
 }

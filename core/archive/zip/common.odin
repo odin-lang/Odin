@@ -1,17 +1,18 @@
-// TODO-UPDATE-COMMENT: the progress callback is done for reading and writing; members now stream for Store, Deflate, Deflate64, bzip2 and PPMd, while LZMA and the pkzip-legacy methods still decode in one shot; iteration and multi-extract follow storage order
-// ---
 /*
 Reads and writes ZIP archives, as specified by [PKWARE's APPNOTE.TXT, version 6.3.10, November 2022](https://pkware.cachefly.net/webdocs/APPNOTE/APPNOTE-6.3.10.TXT).
 
 Reading:
 - Opens archives from a path, a byte slice or a seekable `io.Stream`
-- Lists members through `core:archive`'s shared iterator, and finds them by path
-- Extracts one or more files
+- Lists members through `core:archive`'s shared iterator, in storage order, and finds them by path
+- Extracts one or more files; extracting several reads the archive in one forward pass
+- Streams members through an `io.Reader`: Store, Deflate, Deflate64, bzip2 and PPMd decode as they are read, LZMA and the pkzip-legacy methods are decoded in one shot first
 - Supported compression methods: Store, Shrink, Reduce, Implode, Deflate, Deflate64, bzip2, LZMA and PPMd; XZ planned
+- Decrypts WinZip AES (AE-1 and AE-2, 128, 192 and 256-bit keys, MAC checked) and ZipCrypto members, given the password in `archive.Read_Options`
 - ZIP64, data descriptors and self-extracting archives
 - UTF-8, Info-ZIP Unicode and code page 437 names
 - Unix and DOS attributes, symlinks, NTFS and Unix timestamps; DOS times are read as local time
 - CRC-32 checked on extraction
+- Opt-in progress callback with the member's name and index and the position in the archive; it can cancel
 - Safe to read from several threads at once
 
 Writing:
@@ -21,13 +22,13 @@ Writing:
 - ZIP64 whenever sizes, offsets or the member count need it
 - UTF-8 names, Unix and DOS attributes, symlinks, NTFS and Unix timestamps, archive and member comments
 - DOS times are written as local time
+- Opt-in progress callback; it can cancel
 - A deterministic mode for reproducible archives
+- No encryption
 
 Planned:
-- WinZip AES and ZipCrypto decryption
 - Split and spanned archives
-- Streaming extraction for every method
-- Opt-in progress callback
+- Streaming extraction for LZMA and the pkzip-legacy methods
 - Copy-on-write updates, safe alongside concurrent readers
 */
 package archive_zip
@@ -329,6 +330,7 @@ Section :: struct {
 	store:  ^Store,
 	offset: i64,
 	end:    i64,
+	cipher: ^Cipher,
 }
 
 Member :: struct {
@@ -342,6 +344,7 @@ Member :: struct {
 	bzip2:     bzip2.Reader,
 	ppmd:      ppmd.Reader,
 	progress:  Read_Progress,
+	cipher:    Cipher,
 	buffer:    [dynamic]u8,
 	pos:       int,
 	size:      i64,
