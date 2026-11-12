@@ -81,6 +81,13 @@ compress_lzma2_to_dynamic :: proc(output: ^[dynamic]u8, input: []u8, options: Op
 	return encode_to_dynamic(output, input, options, 0, true, allocator)
 }
 
+compress_lzma2_append :: proc(output: ^[dynamic]u8, input: []u8, options: Options, allocator := context.allocator) -> (props: Properties, err: Error) {
+	if output == nil {
+		return {}, General_Error.Incompatible_Options
+	}
+	return encode_to_dynamic(output, input, options, len(output), true, allocator)
+}
+
 @(private)
 write_header :: proc "contextless" (output: []u8, props: Properties, size: int) {
 	header := encode_properties(props)

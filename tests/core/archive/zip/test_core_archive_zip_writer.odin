@@ -16,7 +16,7 @@ import "core:time/timezone"
 
 WRITE_TEXT :: "The central directory lists every member, and each local header repeats its name and sizes.\n"
 
-WRITE_METHODS :: [?]archive.Method{.Store, .Deflate, .Deflate64, .BZip2, .LZMA, .PPMd_I}
+WRITE_METHODS :: [?]archive.Method{.Store, .Deflate, .Deflate64, .BZip2, .LZMA, .PPMd_I, .XZ}
 
 Output_Mode :: enum u8 {
 	Seekable,
@@ -185,7 +185,7 @@ test_write_errors :: proc(t: ^testing.T) {
 	testing.expect_value(t, zip.write_entry(&zw, "a/../b", text), archive.General_Error.Unsafe_Path)
 	long_name := strings.repeat("n", 0x10000, context.temp_allocator)
 	testing.expect_value(t, zip.write_entry(&zw, long_name, text), Zip_Error.Field_Too_Long)
-	testing.expect_value(t, zip.write_entry(&zw, "x", text, zip.Entry_Options{method = .XZ}), archive.General_Error.Unsupported_Method)
+	testing.expect_value(t, zip.write_entry(&zw, "x", text, zip.Entry_Options{method = .Implode}), archive.General_Error.Unsupported_Method)
 	testing.expect_value(t, zip.write_entry(&zw, "x", text, zip.Entry_Options{method = .PPMd_H}), archive.General_Error.Unsupported_Method)
 	testing.expect_value(t, zip.write_entry(&zw, archive.File_Info{path = "p", type = .Named_Pipe}), archive.General_Error.Unsupported_Entry)
 	testing.expect_value(t, zip.write_entry(&zw, archive.File_Info{path = "d", type = .Directory}, text), archive.General_Error.Incompatible_Options)
@@ -210,7 +210,7 @@ test_write_errors :: proc(t: ^testing.T) {
 	defer delete(other.data)
 	long_comment := strings.repeat("c", 0x10000, context.temp_allocator)
 	testing.expect_value(t, zip.create(&bad, memory_stream(&other), zip.Writer_Options{comment = long_comment}), Zip_Error.Field_Too_Long)
-	testing.expect_value(t, zip.create(&bad, memory_stream(&other), zip.Writer_Options{method = .XZ}), archive.General_Error.Unsupported_Method)
+	testing.expect_value(t, zip.create(&bad, memory_stream(&other), zip.Writer_Options{method = .Implode}), archive.General_Error.Unsupported_Method)
 
 	done: zip.Writer
 	if testing.expect_value(t, zip.create(&done, memory_stream(&other)), nil) {
@@ -640,8 +640,8 @@ write_and_check :: proc(t: ^testing.T, method: archive.Method, mode: Output_Mode
 		return
 	}
 
-	one_shot     := method == .LZMA
-	random_kept  := method if method != .LZMA else archive.Method.Store
+	one_shot     := method == .LZMA || method == .XZ
+	random_kept  := method if !one_shot else archive.Method.Store
 	check_written(t, label, m.data[:], {
 		{name = "empty.txt",         type = .Regular,   method = .Store},
 		{name = "text.txt",          type = .Regular,   method = method, content = text},

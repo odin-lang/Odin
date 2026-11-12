@@ -7,6 +7,7 @@ import "core:compress/bzip2"
 import "core:compress/deflate"
 import "core:compress/lzma"
 import "core:compress/ppmd"
+import "core:compress/xz"
 import "core:hash"
 import "core:io"
 import "core:os"
@@ -296,6 +297,9 @@ _resolve :: proc "contextless" (defaults, entry: Entry_Options) -> (method: Meth
 	case .LZMA:
 		method = .LZMA
 		level  = clamp(requested.? or_else int(lzma.Level.Default), int(lzma.Level.Level_0), int(lzma.Level.Level_9))
+	case .XZ:
+		method = .XZ
+		level  = clamp(requested.? or_else int(xz.Level.Default), int(xz.Level.Level_0), int(xz.Level.Level_9))
 	case .PPMd_I:
 		method = .PPMd
 		level  = clamp(requested.? or_else int(ppmd.Level.Default), int(ppmd.Level.Level_0), int(ppmd.Level.Level_9))
@@ -519,11 +523,11 @@ _write_member :: proc(zw: ^Writer, p: ^Pending_Entry, data: Entry_Data) -> (err:
 	}
 	switch d in data {
 	case []u8:
-		if p.method == .Store || p.method == .LZMA || p.size <= ONE_SHOT_MAX {
+		if p.method == .Store || p.method == .LZMA || p.method == .XZ || p.size <= ONE_SHOT_MAX {
 			return _write_one_shot(zw, p, d)
 		}
 	case io.Reader:
-		if p.method == .LZMA || (p.size >= 0 && p.size <= ONE_SHOT_MAX) {
+		if p.method == .LZMA || p.method == .XZ || (p.size >= 0 && p.size <= ONE_SHOT_MAX) {
 			buffer: [dynamic]u8
 			buffer.allocator = zw.allocator
 			defer delete(buffer)
@@ -774,6 +778,8 @@ _compress :: proc(zw: ^Writer, p: ^Pending_Entry, input: []u8, packed: ^[dynamic
 		head[2] = lzma.PROPERTIES_SIZE
 		head[3] = 0
 		head_len = 4 + copy(head[4:], encoded[:])
+	case .XZ:
+		xz.compress_to_dynamic(packed, input, xz.Level(p.level), {}, zw.allocator) or_return
 	case .PPMd:
 		props   := ppmd.level_properties(.I, ppmd.Level(p.level), len(input))
 		encoded := ppmd.encode_properties_zip(props) or_return
@@ -906,7 +912,7 @@ _version_needed :: proc "contextless" (p: ^Pending_Entry) -> (version: int) {
 	case .Deflate:     version = max(version, 20)
 	case .Deflate64:   version = max(version, 21)
 	case .BZip2:       version = max(version, 46)
-	case .LZMA, .PPMd: version = max(version, 63)
+	case .LZMA, .PPMd, .XZ: version = max(version, 63)
 	}
 	if p.local_zip64 || p.header >= ZIP32_MAX || p.size >= ZIP32_MAX || p.compressed >= ZIP32_MAX {
 		version = max(version, 45)

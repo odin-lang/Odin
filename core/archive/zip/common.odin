@@ -18,7 +18,7 @@ Reading:
 Writing:
 - Creates archives at a path or on an `io.Stream`; one that can't seek gets data descriptors
 - Adds members from a byte slice or an `io.Reader`, and whole directory trees with `write_directory`
-- Compression methods: Store, Deflate, Deflate64, bzip2, LZMA and PPMd, falling back to Store when compressing doesn't pay
+- Compression methods: Store, Deflate, Deflate64, bzip2, LZMA, PPMd and XZ, falling back to Store when compressing doesn't pay
 - ZIP64 whenever sizes, offsets or the member count need it
 - UTF-8 names, Unix and DOS attributes, symlinks, NTFS and Unix timestamps, archive and member comments
 - DOS times are written as local time

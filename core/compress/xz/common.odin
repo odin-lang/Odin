@@ -2,6 +2,7 @@ package compress_xz
 
 import "core:compress"
 import "core:compress/filters"
+import "core:compress/lzma"
 
 Error         :: compress.Error
 General_Error :: compress.General_Error
@@ -15,6 +16,8 @@ VLI_BYTES_MAX         :: 9
 VLI_MAX               :: u64(max(i64))
 INDEX_SIZE_MAX        :: u64(1) << 34
 UNPADDED_SIZE_MIN     :: 5
+BLOCK_SIZE_MIN        :: 1 << 20
+INDEX_RECORD_MAX      :: 2 * VLI_BYTES_MAX
 
 @(rodata)
 HEADER_MAGIC := [6]u8{0xFD, '7', 'z', 'X', 'Z', 0x00}
@@ -43,6 +46,22 @@ Filter_ID :: enum u64 {
 	ARM64     = 0x0A,
 	RISCV     = 0x0B,
 	LZMA2     = 0x21,
+}
+
+Filter :: struct {
+	id:             Filter_ID,
+	start_offset:   u32,
+	delta_distance: int,
+}
+
+Level :: lzma.Level
+
+Options :: struct {
+	lzma2:        lzma.Options,
+	check:        Maybe(Check),
+	block_size:   int,
+	filters:      [FILTERS_MAX - 1]Filter,
+	filter_count: int,
 }
 
 Decode_Flag :: enum u8 {
