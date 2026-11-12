@@ -2,21 +2,57 @@
 
 setlocal EnableDelayedExpansion
 
+rem The architecture to build the compiler for, x64 or arm64 (Windows on ARM): that of an already set up MSVC
+rem environment, otherwise that of the machine. Set ODIN_BUILD_ARCH to choose, e.g. an x64 build on ARM.
+if "%ODIN_BUILD_ARCH%" == "" (
+	set ODIN_BUILD_ARCH=x64
+	if /I "%VSCMD_ARG_TGT_ARCH%" == "arm64" (
+		set ODIN_BUILD_ARCH=arm64
+	) else if "%VSCMD_ARG_TGT_ARCH%" == "" (
+		rem The registry has the machine's architecture, %PROCESSOR_ARCHITECTURE% is AMD64 in emulated processes.
+		for /f "tokens=3" %%a in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v PROCESSOR_ARCHITECTURE 2^>NUL') do (
+			if /I "%%a" == "ARM64" set ODIN_BUILD_ARCH=arm64
+		)
+	)
+)
+if /I "%ODIN_BUILD_ARCH%" == "arm64" (
+	set ODIN_BUILD_ARCH=arm64
+	set vs_component=Microsoft.VisualStudio.Component.VC.Tools.ARM64
+	set manifest_arch=arm64
+	rem LLVM-C.dll next to odin.exe is the x64 build, the arm64 build is loaded from bin\llvm\windows-arm64 (see main.cpp)
+	set llvm_libs=bin\llvm\windows-arm64\LLVM-C.lib delayimp.lib
+	set llvm_linker_flags=/DELAYLOAD:LLVM-C.dll
+) else if /I "%ODIN_BUILD_ARCH%" == "x64" (
+	set ODIN_BUILD_ARCH=x64
+	set vs_component=Microsoft.VisualStudio.Component.VC.Tools.x86.x64
+	set manifest_arch=amd64
+	set llvm_libs=bin\llvm\windows\LLVM-C.lib
+	set llvm_linker_flags=
+) else (
+	echo ERROR: unsupported ODIN_BUILD_ARCH "%ODIN_BUILD_ARCH%", expected x64 or arm64
+	exit /b 1
+)
+
 where /Q cl.exe || (
 	set __VSCMD_ARG_NO_LOGO=1
-	for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath') do set VS=%%i
+	for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires !vs_component! -property installationPath') do set VS=%%i
 	if "!VS!" equ "" (
 		echo ERROR: MSVC installation not found
 		exit /b 1
 	)
-	call "!VS!\Common7\Tools\vsdevcmd.bat" -arch=x64 -host_arch=x64 || exit /b 1
+	call "!VS!\Common7\Tools\vsdevcmd.bat" -arch=%ODIN_BUILD_ARCH% -host_arch=%ODIN_BUILD_ARCH% || exit /b 1
 )
 
-if "%VSCMD_ARG_TGT_ARCH%" neq "x64" (
+if /I "%VSCMD_ARG_TGT_ARCH%" neq "%ODIN_BUILD_ARCH%" (
 	if "%ODIN_IGNORE_MSVC_CHECK%" == "" (
-		echo ERROR: please run this from MSVC x64 native tools command prompt, 32-bit target is not supported!
+		echo ERROR: please run this from an MSVC %ODIN_BUILD_ARCH% native tools command prompt, the MSVC environment targets "%VSCMD_ARG_TGT_ARCH%"!
+		echo        32-bit targets are not supported, set ODIN_BUILD_ARCH to x64 or arm64 to choose the architecture.
 		exit /b 1
 	)
+)
+
+if "%ODIN_BUILD_ARCH%" == "arm64" (
+	call misc\get_llvm_windows_arm64.bat || exit /b 1
 )
 
 where /Q git.exe || goto skip_git_hash
@@ -103,11 +139,11 @@ set compiler_includes= ^
 set libs= ^
 	kernel32.lib ^
 	Synchronization.lib ^
-	bin\llvm\windows\LLVM-C.lib
+	%llvm_libs%
 set odin_res=misc\odin.res
 set odin_rc=misc\odin.rc
 
-set linker_flags= -incremental:no -opt:ref -subsystem:console -MANIFEST:EMBED
+set linker_flags= -incremental:no -opt:ref -subsystem:console -MANIFEST:EMBED %llvm_linker_flags%
 
 if %release_mode% EQU 0 ( rem Debug
 	set linker_flags=%linker_flags% -debug /NATVIS:src\odin_compiler.natvis
@@ -124,7 +160,7 @@ del *.ilk > NUL 2> NUL
 rc %rc_flags% %odin_rc%
 cl %compiler_settings% "src\main.cpp" "src\libtommath.cpp" /link %linker_settings% -OUT:%exe_name%
 if %errorlevel% neq 0 goto end_of_build
-mt -nologo -inputresource:%exe_name%;#1 -manifest misc\odin.manifest -outputresource:%exe_name%;#1 -validate_manifest -identity:"odin, processorArchitecture=amd64, version=%odin_version_full%, type=win32"
+mt -nologo -inputresource:%exe_name%;#1 -manifest misc\odin.manifest -outputresource:%exe_name%;#1 -validate_manifest -identity:"odin, processorArchitecture=%manifest_arch%, version=%odin_version_full%, type=win32"
 if %errorlevel% neq 0 goto end_of_build
 
 call build_vendor.bat

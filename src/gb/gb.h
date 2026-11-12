@@ -2543,7 +2543,7 @@ gb_inline void gb_zero_size(void *ptr, isize size) {
 }
 
 
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER) && !defined(__clang__) && !defined(_M_ARM64)
 #pragma intrinsic(__movsb)
 #endif
 
@@ -2552,8 +2552,12 @@ gb_inline void *gb_memcopy(void *dest, void const *source, isize n) {
 	if (dest == NULL) {
 		return NULL;
 	}
+	#if defined(_M_ARM64)
+	memcpy(dest, source, n);
+	#else
 	// TODO(bill): Is this good enough?
 	__movsb(cast(u8 *)dest, cast(u8 *)source, n);
+	#endif
 // #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
 	// NOTE(zangent): I assume there's a reason this isn't being used elsewhere,
 	//   but casting pointers as arguments to an __asm__ call is considered an
@@ -6256,7 +6260,10 @@ gb_no_inline isize gb_snprintf_va(char *text, isize max_len, char const *fmt, va
 //
 //
 
-#if defined(GB_COMPILER_MSVC) && !defined(__clang__)
+#if defined(GB_COMPILER_MSVC) && !defined(__clang__) && defined(_M_ARM64)
+	// NOTE: The virtual count of the generic timer (CNTVCT_EL0), which user mode may read on Windows.
+	gb_inline u64 gb_rdtsc(void) { return cast(u64)_ReadStatusReg(ARM64_CNTVCT); }
+#elif defined(GB_COMPILER_MSVC) && !defined(__clang__)
 	gb_inline u64 gb_rdtsc(void) { return __rdtsc(); }
 #elif defined(__i386__)
 	gb_inline u64 gb_rdtsc(void) {

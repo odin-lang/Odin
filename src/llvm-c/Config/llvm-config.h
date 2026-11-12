@@ -17,15 +17,50 @@
 /* Define if LLVM_ENABLE_DUMP is enabled */
 /* #undef LLVM_ENABLE_DUMP */
 
+/* NOTE(Odin): These headers are shared by the x64 build of LLVM-C bundled in `bin/llvm/windows` and the
+   arm64 build fetched by `misc/get_llvm_windows_arm64.bat`, which only differ in their host. */
+
 /* Target triple LLVM will generate code for by default */
 /* Doesn't use `cmakedefine` because it is allowed to be empty. */
+#if defined(_M_ARM64)
+#define LLVM_DEFAULT_TARGET_TRIPLE "aarch64-pc-windows-msvc"
+#else
 #define LLVM_DEFAULT_TARGET_TRIPLE "x86_64-pc-windows-msvc"
+#endif
 
 /* Define if threads enabled */
 #define LLVM_ENABLE_THREADS 1
 
 /* Has gcc/MSVC atomic intrinsics */
 #define LLVM_HAS_ATOMICS 1
+
+#if defined(_M_ARM64)
+
+/* Host triple LLVM will be executed on */
+#define LLVM_HOST_TRIPLE "aarch64-pc-windows-msvc"
+
+/* LLVM architecture name for the native architecture, if available */
+#define LLVM_NATIVE_ARCH AArch64
+
+/* LLVM name for the native AsmParser init function, if available */
+#define LLVM_NATIVE_ASMPARSER LLVMInitializeAArch64AsmParser
+
+/* LLVM name for the native AsmPrinter init function, if available */
+#define LLVM_NATIVE_ASMPRINTER LLVMInitializeAArch64AsmPrinter
+
+/* LLVM name for the native Disassembler init function, if available */
+#define LLVM_NATIVE_DISASSEMBLER LLVMInitializeAArch64Disassembler
+
+/* LLVM name for the native Target init function, if available */
+#define LLVM_NATIVE_TARGET LLVMInitializeAArch64Target
+
+/* LLVM name for the native TargetInfo init function, if available */
+#define LLVM_NATIVE_TARGETINFO LLVMInitializeAArch64TargetInfo
+
+/* LLVM name for the native target MC init function, if available */
+#define LLVM_NATIVE_TARGETMC LLVMInitializeAArch64TargetMC
+
+#else
 
 /* Host triple LLVM will be executed on */
 #define LLVM_HOST_TRIPLE "x86_64-pc-windows-msvc"
@@ -50,6 +85,8 @@
 
 /* LLVM name for the native target MC init function, if available */
 #define LLVM_NATIVE_TARGETMC LLVMInitializeX86TargetMC
+
+#endif
 
 /* LLVM name for the native target MCA init function, if available */
 /* #undef LLVM_NATIVE_TARGETMCA */

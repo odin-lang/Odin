@@ -568,7 +568,7 @@ gb_internal u32 thread_current_id(void) {
 
 gb_internal gb_inline void yield_thread(void) {
 #if defined(GB_SYSTEM_WINDOWS)
-	_mm_pause();
+	YieldProcessor();
 #elif defined(GB_SYSTEM_OSX)
 	#if defined(GB_CPU_X86)
 	__asm__ volatile ("" : : : "memory");

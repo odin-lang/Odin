@@ -53,6 +53,69 @@ gb_global Timings global_timings = {0};
 
 #if defined(GB_SYSTEM_WINDOWS)
 #include "llvm-c/Types.h"
+
+#if defined(GB_CPU_ARM)
+// NOTE: The `LLVM-C.dll` next to `odin.exe` in the repository is the x64 build. The arm64 build of the
+// compiler delay-loads LLVM-C (see `build.bat`) to load the arm64 build from `bin\llvm\windows-arm64`
+// (see `misc\get_llvm_windows_arm64.bat`), and otherwise the one next to `odin.exe`, e.g. for a release
+// that ships the arm64 `LLVM-C.dll` there. It never falls back to the usual search, which would load
+// another version of LLVM from PATH (e.g. that of an installed clang) and skip the x64 one.
+#include <delayimp.h>
+
+gb_internal FARPROC WINAPI odin_llvm_delay_load_hook(unsigned notify, PDelayLoadInfo info) {
+	if (notify != dliNotePreLoadLibrary || _stricmp(info->szDll, "LLVM-C.dll") != 0) {
+		return nullptr;
+	}
+
+	// Relative to the directory of odin.exe, in order of preference
+	wchar_t const *candidates[] = {L"bin\\llvm\\windows-arm64\\LLVM-C.dll", L"LLVM-C.dll"};
+
+	HMODULE llvm = nullptr;
+	// NOTE: The error of the preferred candidate, as the fallback next to odin.exe is usually the x64 build,
+	// which would always report ERROR_BAD_EXE_FORMAT.
+	DWORD first_error = 0;
+	wchar_t path[4096] = {};
+	DWORD len = GetModuleFileNameW(nullptr, path, gb_count_of(path));
+	wchar_t *dir_end = len < gb_count_of(path) ? wcsrchr(path, L'\\') : nullptr;
+	if (dir_end != nullptr) {
+		isize room = gb_count_of(path) - (dir_end+1 - path);
+		for (wchar_t const *candidate : candidates) {
+			isize n = cast(isize)wcslen(candidate) + 1;
+			if (llvm == nullptr && n <= room) {
+				gb_memcopy(dir_end+1, candidate, n*gb_size_of(wchar_t));
+				llvm = LoadLibraryExW(path, nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
+				if (llvm == nullptr && first_error == 0) {
+					first_error = GetLastError();
+				}
+			}
+		}
+	} else {
+		first_error = GetLastError();
+	}
+	if (llvm == nullptr) {
+		gb_printf_err("Failed to load the arm64 LLVM-C.dll (error %lu), from bin\\llvm\\windows-arm64\\ next to odin.exe "
+		              "(see misc\\get_llvm_windows_arm64.bat) or next to odin.exe.\n", first_error);
+		ExitProcess(1);
+	}
+	return cast(FARPROC)llvm;
+}
+
+// NOTE: Without this the delay-load helper raises an SEH exception, so an outdated `LLVM-C.dll` would crash
+// without a message.
+gb_internal FARPROC WINAPI odin_llvm_delay_load_failure_hook(unsigned notify, PDelayLoadInfo info) {
+	if (notify == dliFailGetProc && info->dlp.fImportByName) {
+		gb_printf_err("%s has no procedure '%s', it is not the version of LLVM that odin.exe was built against.\n",
+		              info->szDll, info->dlp.szProcName);
+	} else {
+		gb_printf_err("Failed to load %s or one of its procedures (error %lu).\n", info->szDll, info->dwLastError);
+	}
+	ExitProcess(1); // noreturn
+}
+
+extern "C" const PfnDliHook __pfnDliNotifyHook2  = odin_llvm_delay_load_hook;
+extern "C" const PfnDliHook __pfnDliFailureHook2 = odin_llvm_delay_load_failure_hook;
+#endif
+
 #else
 #include <llvm-c/Types.h>
 #include <signal.h>
