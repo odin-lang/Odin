@@ -1309,27 +1309,27 @@ DS_CONTEXTHELP   :: 0x2000
 DS_SHELLFONT :: DS_SETFONT | DS_FIXEDSYS
 
 DLGTEMPLATE :: struct #max_field_align(2) {
-    style:           DWORD,
-    dwExtendedStyle: DWORD,
-    cdit:            WORD,
-    x, y, cx, cy:    c_short,
+	style:			DWORD,
+	dwExtendedStyle:	DWORD,
+	cdit:            WORD,
+	x, y, cx, cy:    c_short,
 }
 
 DLGITEMTEMPLATE :: struct #max_field_align(2) {
-    style:           DWORD,
-    dwExtendedStyle: DWORD,
-    x, y, cx, cy:    c_short,
-    id:              WORD,
+	style:           DWORD,
+	dwExtendedStyle: DWORD,
+	x, y, cx, cy:    c_short,
+	id:              WORD,
 }
 
 DLGPROC :: #type proc "system" (HWND, UINT, WPARAM, LPARAM) -> INT_PTR
 
 @(default_calling_convention="system")
 foreign user32 {
-    DialogBoxIndirectParamW :: proc(
-        hInstance:        HINSTANCE,
-        hDialogTemplate: ^DLGTEMPLATE,
-        hWndParent:       HWND,
-        lpDialogFunc:     DLGPROC,
-        dwInitParam:      LPARAM) -> INT_PTR ---
+	DialogBoxIndirectParamW :: proc(
+		hInstance:        HINSTANCE,
+		hDialogTemplate: ^DLGTEMPLATE,
+		hWndParent:       HWND,
+		lpDialogFunc:     DLGPROC,
+		dwInitParam:      LPARAM) -> INT_PTR ---
 }
