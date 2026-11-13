@@ -52,6 +52,8 @@ Entity :: struct {
 	name:        string, // &name;
 	description: string,
 	stix:        bool,
+	html5:       bool,
+	legacy:      bool,
 }
 
 Character :: struct {
@@ -184,12 +186,23 @@ main :: proc() {
 				codepoints  = {rune(codepoint), rune(codepoint2)},
 				description = description,
 				stix        = set == "STIX",
+				html5       = is_html5_set(set),
+				legacy      = set == "xhtml1-lat1",
+			}
+			switch name {
+			case "amp", "lt", "gt", "quot", "AMP", "LT", "GT", "QUOT", "COPY", "REG":
+				e.legacy = true
 			}
 
 			if index, seen := entity_map[name]; seen {
-				if entities[index].stix && !e.stix {
-					entities[index] = e
+				known := &entities[index]
+				if known.stix && !e.stix {
+					known.codepoints  = e.codepoints
+					known.description = e.description
+					known.stix        = false
 				}
+				known.html5  = known.html5  || e.html5
+				known.legacy = known.legacy || e.legacy
 				continue
 			}
 
@@ -298,6 +311,29 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 	fmt.wprintln(w, "\t}")
 	fmt.wprintln(w, "\treturn")
 	fmt.wprintln(w, "}\n")
+
+	legacy_names:   [dynamic]string
+	non_html5_names: [dynamic]string
+	defer delete(legacy_names)
+	defer delete(non_html5_names)
+	legacy_max_length := 0
+	for e in entities {
+		if e.legacy {
+			assert(e.html5)
+			append(&legacy_names, e.name)
+			legacy_max_length = max(legacy_max_length, len(e.name))
+		}
+		if !e.html5 {
+			append(&non_html5_names, e.name)
+		}
+	}
+	fmt.printfln("HTML5 names: %v, of which %v also match without `;`.", len(entities) - len(non_html5_names), len(legacy_names))
+
+	fmt.wprintln(w, "@(private)")
+	fmt.wprintfln(w, "HTML5_LEGACY_NAME_MAX_LENGTH :: %v\n", legacy_max_length)
+	write_name_switch(w, "is_html5_legacy_entity_name", legacy_names[:])
+	write_name_switch(w, "is_non_html5_entity_name", non_html5_names[:])
+
 	fmt.wprintln(w, GENERATED)
 
 	fmt.println()
@@ -313,6 +349,38 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 	} else {
 		fmt.printfln("Failed to write generated \"%v\".", generated_filename)
 	}
+}
+
+is_html5_set :: proc(set: string) -> bool {
+	switch set {
+	case "predefined", "html5-uppercase", "mmlalias", "mmlextra":
+		return true
+	case "9573-2003-isogrk1", "9573-2003-isogrk2", "9573-2003-isogrk4":
+		return false
+	}
+	return strings.has_prefix(set, "xhtml1-") || strings.has_prefix(set, "9573-2003-")
+}
+
+write_name_switch :: proc(w: io.Writer, proc_name: string, names: []string) {
+	fmt.wprintln(w, "@(private)")
+	fmt.wprint(w, proc_name, ":: proc(name: string) -> bool {\n")
+	fmt.wprint(w, "\tswitch name {\n")
+	for name, i in names {
+		switch {
+		case i == 0:
+			fmt.wprint(w, "\tcase ")
+		case i % 8 == 0:
+			fmt.wprint(w, ",\n\t\t")
+		case:
+			fmt.wprint(w, ", ")
+		}
+		fmt.wprintf(w, "%q", name)
+	}
+	fmt.wprint(w, ":\n")
+	fmt.wprint(w, "\t\treturn true\n")
+	fmt.wprint(w, "\t}\n")
+	fmt.wprint(w, "\treturn false\n")
+	fmt.wprint(w, "}\n\n")
 }
 
 write_rune_literal :: proc(w: io.Writer, r: rune) {

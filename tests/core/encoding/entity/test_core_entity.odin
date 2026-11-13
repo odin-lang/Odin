@@ -198,3 +198,69 @@ test_named_entity_iso_code_points :: proc(t: ^testing.T) {
 		testing.expectf(t, ok && count == 1 && decoded[0] == c.decoded, "&%v;: expected U+%04X, got %v (%v, %v)", c.name, c.decoded, decoded, count, ok)
 	}
 }
+
+@(test)
+test_unescape_html :: proc(t: ^testing.T) {
+	Unescape_Case :: struct {
+		src: string,
+		out: string,
+	}
+	cases := [?]Unescape_Case{
+		{"plain",          "plain"},
+		{"a&",             "a&"},
+		{"&",              "&"},
+		{"&&amp;",         "&&"},
+		{"AT&T rocks",     "AT&T rocks"},
+		{"a&b",            "a&b"},
+		{"&;",             "&;"},
+		{"&#",             "&#"},
+		{"&#;x",           "&#;x"},
+		{"&#x",            "&#x"},
+		{"&#x;",           "&#x;"},
+		{"&#xg;",          "&#xg;"},
+		{"&#1",            "\u0001"},
+		{"&#65",           "A"},
+		{"&#65;x",         "Ax"},
+		{"&#65x",          "Ax"},
+		{"&#x41;",         "A"},
+		{"&#X41;",         "A"},
+		{"&#x41g",         "Ag"},
+		{"&#0;",           "\ufffd"},
+		{"&#xd800;",       "\ufffd"},
+		{"&#x10ffff;",     "\U0010ffff"},
+		{"&#x110000;",     "\ufffd"},
+		{"&#4294967361;",  "\ufffd"},
+		{"&#00000000065;", "A"},
+		{"&#x80;",         "\u20ac"},
+		{"&#x81;",         "\u0081"},
+		{"&#150;",         "\u2013"},
+		{"&Alpha;",        "\u0391"},
+		{"&Alpha",         "&Alpha"},
+		{"&Alphax",        "&Alphax"},
+		{"&notin;",        "\u2209"},
+		{"&notit;",        "\u00acit;"},
+		{"&amp",           "&"},
+		{"&amp;",          "&"},
+		{"&ampx",          "&x"},
+		{"&AMP;&COPY",     "&\u00a9"},
+		{"&apos;",         "'"},
+		{"&apos",          "&apos"},
+		{"&TRADE;",        "\u2122"},
+		{"&TRADE",         "&TRADE"},
+		{"&frac34;",       "\u00be"},
+		{"&frac345",       "\u00be5"},
+		{"&copy2024",      "\u00a92024"},
+		{"&nGt;",          "\u226b\u20d2"},
+		{"&Agr;",          "&Agr;"},
+		{"&lowast;",       "\u2217"},
+	}
+	for c in cases {
+		out, allocated, err := entity.unescape_html(c.src)
+		testing.expect_value(t, err, nil)
+		testing.expectf(t, out == c.out, "%q: expected %q, got %q", c.src, c.out, out)
+		testing.expectf(t, allocated == (strings.index_byte(c.src, '&') >= 0), "%q: allocated = %v", c.src, allocated)
+		if allocated {
+			delete(out)
+		}
+	}
+}

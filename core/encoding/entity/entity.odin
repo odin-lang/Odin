@@ -305,53 +305,41 @@ unescape_html :: proc(s: string, allocator := context.allocator, loc := #caller_
 // Returns an unescaped string of an encoded XML/HTML entity.
 @(require_results)
 unescape_entity :: proc(s: string) -> (b: [8]byte, w: int, j: int) {
-	s := s
-	if len(s) < 2 {
+	if len(s) == 0 || s[0] != '&' {
 		return
 	}
-	if s[0] != '&' {
-		return
-	}
-	j = 1
+	b[0], w, j = '&', 1, 1
 
-	if s[j] == '#' { // scan numbers
-		j += 1
-		if len(s) <= 3 { // remove `&#.`
-			return
-		}
-		c := s[j]
+	if len(s) > 1 && s[1] == '#' { // scan numbers
+		i   := 2
 		hex := false
-		if c == 'x' || c == 'X' {
+		if i < len(s) && (s[i] == 'x' || s[i] == 'X') {
 			hex = true
-			j += 1
+			i  += 1
 		}
 
+		digits_start := i
 		x := rune(0)
-		scan_number: for j < len(s) {
-			c = s[j]
-			j += 1
-			if hex {
-				switch c {
-				case '0'..='9': x = 16*x + rune(c) - '0';      continue scan_number
-				case 'a'..='f': x = 16*x + rune(c) - 'a' + 10; continue scan_number
-				case 'A'..='F': x = 16*x + rune(c) - 'A' + 10; continue scan_number
-				}
-			} else {
-				switch c {
-				case '0'..='9': x = 10*x + rune(c) - '0'; continue scan_number
-				}
+		scan_number: for i < len(s) {
+			c := s[i]
+			d: rune
+			switch {
+			case c >= '0' && c <= '9':        d = rune(c - '0')
+			case hex && c >= 'a' && c <= 'f': d = rune(c - 'a' + 10)
+			case hex && c >= 'A' && c <= 'F': d = rune(c - 'A' + 10)
+			case:                             break scan_number
 			}
-
-			// Keep the ';' to check for cases which require it and cases which might not
-			if c != ';' {
-				j -= 1
+			if x <= unicode.MAX_RUNE {
+				x = (16 if hex else 10) * x + d
 			}
-			break scan_number
+			i += 1
 		}
 
-
-		if j <= 3 { // no replacement characters found
+		if i == digits_start {
 			return
+		}
+		if i < len(s) && s[i] == ';' {
+			i += 1
 		}
 
 		@(static, rodata)
@@ -366,76 +354,59 @@ unescape_entity :: proc(s: string) -> (b: [8]byte, w: int, j: int) {
 			'\u0153', '\u009d', '\u017e', '\u0178',
 		}
 
-		switch x {
-		case 0x80..<0xa0:
+		switch {
+		case x >= 0x80 && x < 0xa0:
 			x = windows_1252_replacement_table[x-0x80]
-		case 0, 0xd800..=0xdfff:
+		case x == 0, x >= 0xd800 && x <= 0xdfff, x > unicode.MAX_RUNE:
 			x = utf8.RUNE_ERROR
-		case:
-			if x > 0x10ffff {
-				x = utf8.RUNE_ERROR
-			}
-
 		}
 
 		b1, w1 := utf8.encode_rune(x)
-		w += copy(b[:], b1[:w1])
+		w = copy(b[:], b1[:w1])
+		j = i
 		return
 	}
 
 	// Lookup by entity names
 
-	scan_ident: for j < len(s) { // scan over letters and digits
-		c := s[j]
-		j += 1
+	name_end := 1
+	for name_end < len(s) && is_ascii_alphanumeric(s[name_end]) {
+		name_end += 1
+	}
+	name := s[1:name_end]
 
-		switch c {
-		case 'a'..='z', 'A'..='Z', '0'..='9':
-			continue scan_ident
+	if name_end < len(s) && s[name_end] == ';' && !is_non_html5_entity_name(name) {
+		if r2, n, ok := named_xml_entity_to_rune(name); ok {
+			w = encode_runes(&b, r2, n)
+			j = name_end + 1
+			return
 		}
-		// Keep the ';' to check for cases which require it and cases which might not
-		if c != ';' {
-			j -= 1
-		}
-		break scan_ident
 	}
 
-	entity_name := s[1:j]
-	if len(entity_name) == 0 {
-		return
-	}
-
-	if entity_name[len(entity_name)-1] == ';' {
-		entity_name = entity_name[:len(entity_name)-1]
-	}
-
-	if r2, _, ok := named_xml_entity_to_rune(entity_name); ok {
-		b1, w1 := utf8.encode_rune(r2[0])
-		w += copy(b[w:], b1[:w1])
-		if r2[1] != 0 {
-			b2, w2 := utf8.encode_rune(r2[1])
-			w += copy(b[w:], b2[:w2])
-		}
-		return
-	}
-
-	// The longest entities that do not end with a semicolon are <=6 bytes long
-	LONGEST_ENTITY_WITHOUT_SEMICOLON :: 6
-
-	n := min(len(entity_name)-1, LONGEST_ENTITY_WITHOUT_SEMICOLON)
-	for i := n; i > 1; i -= 1 {
-		if r2, _, ok := named_xml_entity_to_rune(entity_name[:i]); ok {
-			b1, w1 := utf8.encode_rune(r2[0])
-			w += copy(b[w:], b1[:w1])
-			if r2[1] != 0 {
-				b2, w2 := utf8.encode_rune(r2[1])
-				w += copy(b[w:], b2[:w2])
-			}
+	for l := min(len(name), HTML5_LEGACY_NAME_MAX_LENGTH); l >= 2; l -= 1 {
+		if is_html5_legacy_entity_name(name[:l]) {
+			r2, n, _ := named_xml_entity_to_rune(name[:l])
+			w = encode_runes(&b, r2, n)
+			j = 1 + l
 			return
 		}
 	}
 
 	return
+}
+
+@(private="file")
+encode_runes :: proc(b: ^[8]byte, r: [2]rune, n: int) -> (w: int) {
+	for i in 0..<n {
+		b1, w1 := utf8.encode_rune(r[i])
+		w += copy(b[w:], b1[:w1])
+	}
+	return
+}
+
+@(private="file")
+is_ascii_alphanumeric :: #force_inline proc(c: u8) -> bool {
+	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 }
 
 @(private="file")
