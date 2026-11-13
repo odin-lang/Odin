@@ -51,6 +51,34 @@ xml_test_attribute_entities :: proc(t: ^testing.T) {
 	}
 }
 
+@(test)
+xml_test_error_on_unsupported :: proc(t: ^testing.T) {
+	testing.expect_value(t, xml.Option_Flag.Error_on_Unsupported, xml.Option_Flag.Error_On_Unsupported)
+	testing.expect_value(t, int(xml.Option_Flag.Error_On_Unsupported),   4)
+	testing.expect_value(t, int(xml.Option_Flag.Ignore_Unsupported),     5)
+	testing.expect_value(t, int(xml.Option_Flag.Keep_Tag_Body_Comments), 8)
+
+	Case :: struct {
+		flags: xml.Option_Flags,
+		err:   xml.Error,
+	}
+
+	cases := [?]Case{
+		{flags = {.Error_On_Unsupported},                      err = .Unhandled_Bang},
+		{flags = {.Error_on_Unsupported},                      err = .Unhandled_Bang},
+		{flags = {.Ignore_Unsupported},                        err = .None},
+		{flags = {.Error_On_Unsupported, .Ignore_Unsupported}, err = .Conflicting_Options},
+		{flags = {.Error_on_Unsupported, .Ignore_Unsupported}, err = .Conflicting_Options},
+	}
+
+	src :: `<!FOO bar><e/>`
+	for c in cases {
+		doc, err := xml.parse_string(src, xml.Options{flags = c.flags}, error_handler = Silent)
+		xml.destroy(doc)
+		testing.expectf(t, err == c.err, "%q %v: expected %v, got %v", src, c.flags, c.err, err)
+	}
+}
+
 @(private="file")
 element_with_text :: proc(text: string) -> string {
 	return strings.concatenate({`<e a="`, text, `">`, text, `</e>`})

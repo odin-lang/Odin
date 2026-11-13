@@ -38,7 +38,8 @@ Option_Flag :: enum {
 	Intern_Comments,
 
 	// How to handle unsupported parts of the specification, like <! other than <!DOCTYPE and <![CDATA[
-	Error_on_Unsupported,
+	Error_On_Unsupported,
+	Error_on_Unsupported = Error_On_Unsupported,
 	Ignore_Unsupported,
 
 	// By default CDATA tags are passed-through as-is.
@@ -304,7 +305,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 						expected_doctype = doc.doctype.ident
 
 					case:
-						if .Error_on_Unsupported in opts.flags {
+						if .Error_On_Unsupported in opts.flags {
 							error(t, t.offset, "Unhandled: <!%v\n", next.text)
 							return doc, .Unhandled_Bang
 						}
@@ -430,7 +431,7 @@ destroy :: proc(doc: ^Document, allocator := context.allocator) {
 validate_options :: proc(options: Options) -> (validated: Options, err: Error) {
 	validated = options
 
-	if .Error_on_Unsupported in validated.flags && .Ignore_Unsupported in validated.flags {
+	if .Error_On_Unsupported in validated.flags && .Ignore_Unsupported in validated.flags {
 		return options, .Conflicting_Options
 	}
 	return validated, .None
