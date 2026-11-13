@@ -338,7 +338,11 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 				case .Dash:
 					// Comment: <!-- -->.
 					// The grammar does not allow a comment to end in --->
-					expect(t, .Dash)
+					if !strings.has_prefix(t.src[lt_offset:], COMMENT_START) {
+						error(t, lt_offset, "Expected a comment after <!-\n")
+						return doc, .Unexpected_Token
+					}
+					jump_to(t, lt_offset + len(COMMENT_START))
 					comment := scan_comment(t) or_return
 
 					if .Intern_Comments in opts.flags {
@@ -384,6 +388,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 
 				case:
 					error(t, t.offset, "Unexpected Token after <!: %#v", next)
+					return doc, .Unexpected_Token
 				}
 
 			} else if open.kind == .Question {

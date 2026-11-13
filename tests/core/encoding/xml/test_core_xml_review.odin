@@ -289,3 +289,32 @@ xml_test_review_skipping :: proc(t: ^testing.T) {
 	testing.expect_value(t, err2, xml.Error.Mismatched_Closing_Tag)
 	testing.expect_value(t, last_error_pos.line, 6)
 }
+
+@(test)
+xml_test_review_markup_in_body :: proc(t: ^testing.T) {
+	cases := [?]Review_Case{
+		{src = "<a>x<!--c--><!--d-->y</a>",                                  tree = `a{"x<!--c--><!--d-->y"}`},
+		{src = "<a>x<!--c--><!--d-->y</a>",     flags = {.Intern_Comments}, tree = `a{"x<!--c--><!--d-->y"}`},
+		{src = "<a>x<!--c--><b/></a>",                                       tree = `a{"x<!--c-->",b{}}`},
+		{src = "<a>x<![CDATA[1]]><![CDATA[2]]><b/></a>",                     tree = `a{"x<![CDATA[1]]><![CDATA[2]]>",b{}}`},
+		{src = "<a>x<!---->y</a>",                                           tree = `a{"x<!---->y"}`},
+		{src = "<a>x<!---y-->z</a>",                                         tree = `a{"x<!---y-->z"}`},
+		{src = "<a>x<!-- y --->z</a>",                                       err  = .Invalid_Sequence_In_Comment},
+		{src = "<a>x<!--c",                                                  err  = .Unclosed_Comment},
+		{src = "<a>x<![CDATA[y",                                             err  = .Premature_EOF},
+		{src = "<a><!--c-->x</a>",              flags = {.Intern_Comments}, tree = `a{!"c","x"}`},
+		{src = "<a><!----></a>",                flags = {.Intern_Comments}, tree = `a{!""}`},
+		{src = "<a><!-x --></a>",                                            err  = .Unexpected_Token},
+		{src = "<a><! --x--></a>",                                           err  = .Unexpected_Token},
+		{src = "<a><!- -x--></a>",                                           err  = .Unexpected_Token},
+		{src = "<a><!></a>",                                                 err  = .Unexpected_Token},
+		{src = "<a><!\"x\"></a>",                                            err  = .Unexpected_Token},
+	}
+	run_review_cases(t, cases[:])
+
+	last_error_pos = {}
+	doc, err := xml.parse_string("<a>x<![CDATA[\n\n]]><!--\n-->\n</b>", error_handler = remember_pos)
+	defer xml.destroy(doc)
+	testing.expect_value(t, err, xml.Error.Mismatched_Closing_Tag)
+	testing.expect_value(t, last_error_pos.line, 5)
+}

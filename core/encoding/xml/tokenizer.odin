@@ -335,23 +335,13 @@ skip_cdata :: proc(t: ^Tokenizer) -> (err: Error) {
 		return .None
 	}
 
-	t.read_offset += len(CDATA_START) - 1
 	offset := t.offset
-
-	for {
-		advance_rune(t)
-		if t.ch < 0 {
-			error(t, offset, "[scan_string] CDATA was not terminated\n")
-			return .Premature_EOF
-		}
-
-		if strings.has_prefix(string(t.src[t.offset:]), CDATA_END) {
-			break
-		}
+	end    := strings.index(t.src[offset + len(CDATA_START):], CDATA_END)
+	if end < 0 {
+		error(t, offset, "[skip_cdata] CDATA was not terminated\n")
+		return .Premature_EOF
 	}
-
-	advance_rune(t)
-	advance_rune(t)
+	jump_to(t, offset + len(CDATA_START) + end + len(CDATA_END))
 	return .None
 }
 
@@ -368,15 +358,16 @@ scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close
 			return "", .Premature_EOF
 
 		case '<':
-			if peek_byte(t) == '!' {
-				if peek_byte(t, 1) == '[' {
-					// Might be the start of a CDATA tag.
-					skip_cdata(t) or_return
-				} else if peek_byte(t, 1) == '-' && peek_byte(t, 2) == '-' {
-					// Comment start. Eat comment.
-					t.read_offset += 3
-					_ = scan_comment(t) or_return
-				}
+			rest := t.src[t.offset:]
+			if strings.has_prefix(rest, CDATA_START) {
+				// Might be the start of a CDATA tag.
+				skip_cdata(t) or_return
+				continue loop
+			} else if strings.has_prefix(rest, COMMENT_START) {
+				// Comment start. Eat comment.
+				jump_to(t, t.offset + len(COMMENT_START))
+				_ = scan_comment(t) or_return
+				continue loop
 			}
 
 		case '\n':
