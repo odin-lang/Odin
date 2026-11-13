@@ -74,6 +74,13 @@ stop_test_callback :: proc "system" (info: ^win32.EXCEPTION_POINTERS) -> win32.L
 		// Ignore informational status codes
 		return win32.EXCEPTION_CONTINUE_SEARCH
 	}
+	if code & 0x2000_0000 != 0 {
+		// Ignore customer codes: software exceptions that code raises on purpose and usually catches itself, such as C++
+		// exceptions (0xE06D7363), which GPU drivers and shader compilers throw and catch during normal operation.
+		// A vectored handler sees them before any handler of their own, so stopping the test here would kill a thread
+		// that holds the thrower's locks. One that nothing catches ends the process anyway (std::terminate).
+		return win32.EXCEPTION_CONTINUE_SEARCH
+	}
 
 
 	if local_test_index == -1 {
