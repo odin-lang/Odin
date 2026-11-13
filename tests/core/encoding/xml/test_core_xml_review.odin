@@ -260,3 +260,32 @@ xml_test_review_names :: proc(t: ^testing.T) {
 	}
 	run_review_cases(t, cases[:])
 }
+
+@(test)
+xml_test_review_skipping :: proc(t: ^testing.T) {
+	cases := [?]Review_Case{
+		{src = "<!DOCTYPE a [ <!-- don't --> <!ELEMENT a ANY> ]><a>x</a>", tree = `a{"x"}`},
+		{src = "<!DOCTYPE a [ <!ENTITY e \"x\ny\"> ]><a/>",                 tree = "a{}"},
+		{src = "<!DOCTYPE a [ <!ENTITY e '<b>'> ]><a/>",                    tree = "a{}"},
+		{src = "<!DOCTYPE a [ <?pi > ?> ]><a/>",                            tree = "a{}"},
+		{src = "<!DOCTYPE a [ <!ENTITY e \"x",                              err  = .Premature_EOF},
+		{src = "<a>x<?pi a > b?>y</a>",                                     tree = `a{"x","y"}`},
+		{src = "<?pi a > b?><a/>",                                          tree = "a{}"},
+		{src = "<a><?pi a > b",                                             err  = .Premature_EOF},
+		{src = "<a><!FOO \"x>y\"></a>", flags = {.Ignore_Unsupported},      tree = "a{}"},
+	}
+	run_review_cases(t, cases[:])
+
+	doc, err := xml.parse_string("<!DOCTYPE a [ <!-- don't --> ]><a/>", error_handler = Silent)
+	defer xml.destroy(doc)
+	testing.expect_value(t, err, xml.Error.None)
+	if err == .None {
+		testing.expect_value(t, doc.doctype.rest, "[ <!-- don't --> ]")
+	}
+
+	last_error_pos = {}
+	doc2, err2 := xml.parse_string("<!DOCTYPE a [\n<!ELEMENT a ANY>\n]>\n<?pi\n?>\n<a></b>", error_handler = remember_pos)
+	defer xml.destroy(doc2)
+	testing.expect_value(t, err2, xml.Error.Mismatched_Closing_Tag)
+	testing.expect_value(t, last_error_pos.line, 6)
+}

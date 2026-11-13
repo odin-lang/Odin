@@ -404,7 +404,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 						parse_prologue(doc) or_return
 					} else {
 						// Could be `<?xml-stylesheet`, etc. Ignore it.
-						skip_element(t) or_return
+						skip_pi(t) or_return
 					}
 				case:
 					error(t, t.offset, "Expected \"<?xml\", got \"<?%v\".", next.text)
@@ -604,28 +604,62 @@ parse_prologue :: proc(doc: ^Document) -> (err: Error) {
 }
 
 skip_element :: proc(t: ^Tokenizer) -> (err: Error) {
+	src   := t.src
+	i     := t.offset
 	close := 1
 
-	loop: for {
-		tok := scan(t)
-		#partial switch tok.kind {
-		case .EOF:
-			error(t, t.offset, "[skip_element] Premature EOF\n")
-			return .Premature_EOF
-
-		case .Lt:
-			close += 1
-
-		case .Gt:
-			close -= 1
-			if close == 0 {
+	loop: for i < len(src) {
+		switch src[i] {
+		case '"', '\'':
+			end := strings.index_byte(src[i + 1:], src[i])
+			if end < 0 {
 				break loop
 			}
+			i += end + 2
+			continue loop
 
-		case:
+		case '<':
+			rest := src[i:]
+			if strings.has_prefix(rest, COMMENT_START) {
+				end := strings.index(rest[len(COMMENT_START):], COMMENT_END)
+				if end < 0 {
+					break loop
+				}
+				i += len(COMMENT_START) + end + len(COMMENT_END)
+				continue loop
+			}
+			if strings.has_prefix(rest, "<?") {
+				end := strings.index(rest[2:], "?>")
+				if end < 0 {
+					break loop
+				}
+				i += 2 + end + 2
+				continue loop
+			}
+			close += 1
 
+		case '>':
+			close -= 1
+			if close == 0 {
+				jump_to(t, i + 1)
+				return .None
+			}
 		}
+		i += 1
 	}
+	jump_to(t, len(src))
+	error(t, t.offset, "[skip_element] Premature EOF\n")
+	return .Premature_EOF
+}
+
+skip_pi :: proc(t: ^Tokenizer) -> (err: Error) {
+	end := strings.index(t.src[t.offset:], "?>")
+	if end < 0 {
+		jump_to(t, len(t.src))
+		error(t, t.offset, "[skip_pi] Premature EOF\n")
+		return .Premature_EOF
+	}
+	jump_to(t, t.offset + end + 2)
 	return .None
 }
 

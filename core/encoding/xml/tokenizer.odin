@@ -218,6 +218,18 @@ advance_rune :: proc(t: ^Tokenizer) {
 	}
 }
 
+@(private)
+jump_to :: proc(t: ^Tokenizer, offset: int) {
+	skipped := t.src[t.offset:offset]
+	if lines := strings.count(skipped, "\n"); lines > 0 {
+		t.line_count += lines
+		t.line_offset = t.offset + strings.last_index_byte(skipped, '\n') + 1
+	}
+	t.read_offset = offset
+	t.ch = 0
+	advance_rune(t)
+}
+
 peek_byte :: proc(t: ^Tokenizer, offset := 0) -> byte {
 	if t.read_offset+offset < len(t.src) {
 		#no_bounds_check return t.src[t.read_offset+offset]
