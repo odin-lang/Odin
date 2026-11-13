@@ -13,7 +13,6 @@ xml_test_cdata_illegal_characters :: proc(t: ^testing.T) {
 	}
 
 	cases := [?]Case{
-		{cdata = "<![CDATA[a\xef\xbb\xbfb]]>", src = "<a>x<![CDATA[a\xef\xbb\xbfb]]>y</a>", err = .Illegal_BOM},
 		{cdata = "<![CDATA[a\xffb]]>",         src = "<a>x<![CDATA[a\xffb]]>y</a>",         err = .Illegal_UTF_Encoding},
 		{cdata = "<![CDATA[a\x00b]]>",         src = "<a>x<![CDATA[a\x00b]]>y</a>",         err = .Illegal_NUL_Character},
 	}

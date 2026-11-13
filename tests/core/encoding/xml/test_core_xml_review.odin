@@ -84,3 +84,12 @@ xml_test_review_bang_bracket :: proc(t: ^testing.T) {
 	}
 	run_review_cases(t, cases[:])
 }
+
+@(test)
+xml_test_review_mid_document_bom :: proc(t: ^testing.T) {
+	cases := [?]Review_Case{
+		{src = "<a b=\"x\xef\xbb\xbfy\">x\xef\xbb\xbfy&amp;</a>", flags = {.Decode_SGML_Entities},      tree = `a[b="x\ufeffy"]{"x\ufeffy&"}`},
+		{src = "\xef\xbb\xbf<a>\xef\xbb\xbf</a>",                 flags = {.Decode_SGML_Entities},      tree = `a{"\ufeff"}`},
+	}
+	run_review_cases(t, cases[:])
+}

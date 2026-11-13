@@ -37,7 +37,6 @@ Error :: enum u8 {
 
 	Illegal_NUL_Character,
 	Illegal_UTF_Encoding,
-	Illegal_BOM,
 
 	CDATA_Not_Terminated,
 	Comment_Not_Terminated,
@@ -213,8 +212,6 @@ advance :: proc(t: ^Tokenizer) -> (err: Error) {
 				t.r, t.w = utf8.decode_rune_in_string(t.src[t.read_offset:])
 				if t.r == utf8.RUNE_ERROR && t.w == 1 {
 					return .Illegal_UTF_Encoding
-				} else if t.r == utf8.RUNE_BOM && t.offset > 0 {
-					return .Illegal_BOM
 				}
 			}
 			t.read_offset += t.w
