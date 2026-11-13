@@ -458,3 +458,44 @@ xml_test_review_error_messages :: proc(t: ^testing.T) {
 	}
 	testing.expectf(t, found, "no message quotes the literal: %q", messages[:])
 }
+
+@(test)
+xml_test_review_many_attributes :: proc(t: ^testing.T) {
+	Many_Case :: struct {
+		count:  int,
+		dup_of: int,
+		dup_at: int,
+		err:    xml.Error,
+	}
+	cases := [?]Many_Case{
+		{count = 40,   dup_at = -1},
+		{count = 40,   dup_of = 3,    dup_at = 35,   err = .Duplicate_Attribute},
+		{count = 40,   dup_of = 33,   dup_at = 34,   err = .Duplicate_Attribute},
+		{count = 40,   dup_of = 0,    dup_at = 32,   err = .Duplicate_Attribute},
+		{count = 40,   dup_of = 31,   dup_at = 32,   err = .Duplicate_Attribute},
+		{count = 32,   dup_of = 0,    dup_at = 31,   err = .Duplicate_Attribute},
+		{count = 5000, dup_of = 4000, dup_at = 4999, err = .Duplicate_Attribute},
+		{count = 5000, dup_at = -1},
+	}
+	for c in cases {
+		b := strings.builder_make()
+		defer strings.builder_destroy(&b)
+		strings.write_string(&b, "<a")
+		for i in 0..<c.count {
+			fmt.sbprintf(&b, " k%v=\"%v\"", i == c.dup_at ? c.dup_of : i, i)
+		}
+		strings.write_string(&b, "/>")
+
+		doc, err := xml.parse_string(strings.to_string(b), error_handler = Silent)
+		defer xml.destroy(doc)
+		testing.expectf(t, err == c.err, "%v attributes, k%v at %v: expected %v, got %v", c.count, c.dup_of, c.dup_at, c.err, err)
+		if err == .None && c.err == .None {
+			attribs := doc.elements[0].attribs
+			testing.expect_value(t, len(attribs), c.count)
+			if len(attribs) == c.count {
+				last := fmt.tprintf("k%v", c.count - 1)
+				testing.expect_value(t, attribs[c.count - 1].key, last)
+			}
+		}
+	}
+}

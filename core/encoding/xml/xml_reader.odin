@@ -526,25 +526,26 @@ parse_attribute :: proc(doc: ^Document) -> (attr: Attribute, offset: int, err: E
 	context.allocator = doc.allocator
 	t := doc.tokenizer
 
-	key, value: string
-	key, value, offset = scan_attribute(t) or_return
-	value = strings.trim_right(value, " \t\r\n")
+	value: string
+	attr.key, value, offset = scan_attribute(t)               or_return
+	attr.val                = decode_attribute_value(doc, value) or_return
+	return attr, offset, .None
+}
+
+@(private)
+decode_attribute_value :: proc(doc: ^Document, raw: string) -> (decoded: string, err: Error) {
+	value := strings.trim_right(raw, " \t\r\n")
 
 	// Estimate decoded size based on input text.
 	builder, builder_err := strings.builder_make_len_cap(0, len(value) + 10, doc.extra_strings_allocator)
 	if builder_err != nil {
-		return attr, offset, .Allocation_Failed
+		return value, .Allocation_Failed
 	}
 	normalized, normalize_err := entity.decode_xml_sb(&builder, value, {.Normalize_Whitespace}, doc.allocator)
 	if normalize_err == .None {
-		value = normalized
+		return normalized, .None
 	}
-
-	attr.key = key
-	attr.val = value
-
-	err = .None
-	return
+	return value, .None
 }
 
 @(private)
@@ -592,6 +593,10 @@ parse_attributes :: proc(doc: ^Document, attribs: ^Attributes) -> (err: Error) {
 	context.allocator = doc.allocator
 	t := doc.tokenizer
 
+	MAP_FROM :: 32
+	keys: map[string]struct{}
+	defer delete(keys)
+
 	// PERF: Hot
 	for {
 		space := is_space(t.ch)
@@ -602,12 +607,33 @@ parse_attributes :: proc(doc: ^Document, attribs: ^Attributes) -> (err: Error) {
 			error(t, t.offset, "Expected whitespace before an attribute\n")
 			return .Unexpected_Token
 		}
-		attr, offset := parse_attribute(doc)                  or_return
-		check_duplicate_attributes(t, attribs^, attr, offset) or_return
+		key, value, offset := scan_attribute(t) or_return
+		if len(attribs^) < MAP_FROM {
+			check_duplicate_attributes(t, attribs^, Attribute{key = key}, offset) or_return
+		} else {
+			if len(keys) == 0 {
+				if reserve(&keys, 2 * MAP_FROM) != nil {
+					return .Allocation_Failed
+				}
+				for a in attribs^ {
+					keys[a.key] = {}
+				}
+			}
+			_, _, inserted, alloc_err := map_entry(&keys, key)
+			if alloc_err != nil {
+				return .Allocation_Failed
+			}
+			if !inserted {
+				error(t, offset, "Duplicate attribute: %v\n", key)
+				return .Duplicate_Attribute
+			}
+		}
+		val := decode_attribute_value(doc, value) or_return
+
 		if attribs^ == nil {
 			attribs^ = make_dynamic_array(Attributes, doc.extra_strings_allocator)
 		}
-		if _, alloc_err := append(attribs, attr); alloc_err != nil {
+		if _, alloc_err := append(attribs, Attribute{key = key, val = val}); alloc_err != nil {
 			return .Allocation_Failed
 		}
 	}
