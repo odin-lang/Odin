@@ -165,6 +165,12 @@ set ODIN=..\..\..\odin
 
 %ODIN% test "..\test_pr_6470" %COMMON% -define:TEST_EXPECT_FAILURE=true 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 
+%ODIN% test "..\test_issue_define_config" %COMMON% -define:DEFINE_VERSION=1.0 -define:DEFINE_MODE=true -define:DEFINE_HEX=-0x7f -define:DEFINE_MAX_U8=255 -define:DEFINE_MIN_I32=-2_147_483_648 -define:DEFINE_INTEGRAL_FLOAT=2.0 -define:DEFINE_INT_FOR_FLOAT=3 -define:DEFINE_EXPONENT=1_000e-3 -define:DEFINE_SEPARATORS=1_000_000 -define:DEFINE_RUNE=65 -define:DEFINE_ENUM=C -define:DEFINE_QUOTED='x' -define:DEFINE_EMPTY= "-define:DEFINE_SPACED=a b" -define:DEFINE_CSTRING=c -define:DEFINE_DISTINCT_STRING=d || exit /b
+set DEFINE_ERRORS=-define:DEFINE_NOT_A_NUMBER=abc -define:DEFINE_OUT_OF_RANGE=256 -define:DEFINE_TRUNCATED=1.5 -define:DEFINE_NOT_A_BOOL=T -define:DEFINE_EMPTY= -define:DEFINE_NOT_A_FIELD=C -define:DEFINE_NOT_SETTABLE=A -define:DEFINE_QUOTED_NUMBER='1'
+%ODIN% check "..\test_issue_define_config_errors" -no-entry-point %COMMON% %DEFINE_ERRORS% 2>&1 | find /c "Error:" | findstr /x "8" || exit /b
+%ODIN% check "..\test_issue_define_config_errors" -no-entry-point %COMMON% %DEFINE_ERRORS% 2>&1 | find /c "-define:DEFINE_" | findstr /x "8" || exit /b
+%ODIN% check "..\test_issue_define_config" -no-entry-point -vet -strict-style -define:DEFINE_VERSION=1.0 -define:DEFINE_NOWHERE=1 2>&1 | find /c "is unused in the project" | findstr /x "1" || exit /b
+
 %ODIN% check "..\test_pr_7848\pkg_b" "..\test_pr_7848\pkg_a" -no-entry-point -workspace -overlay:..\test_pr_7848\overlay.json %COMMON% -export-semantics:json -export-semantics-file:pr_7848.json || exit /b
 %ODIN% check "..\test_pr_7848\pkg_b" "..\test_pr_7848\pkg_a" -no-entry-point -workspace -overlay:..\test_pr_7848\overlay.json %COMMON% -export-semantics:cbor -export-semantics-file:pr_7848.cbor || exit /b
 %ODIN% check "..\test_pr_7848\pkg_b" "..\test_pr_7848\pkg_a" -no-entry-point -workspace -overlay:..\test_pr_7848\overlay.json %COMMON% -export-semantics:cbor -export-semantics-file:pr_7848_again.cbor || exit /b
