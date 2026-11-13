@@ -240,10 +240,25 @@ Zip_Error :: enum u32 {
 	Local_Header_Mismatch,
 }
 
+SevenZ_Error :: enum u32 {
+	None,
+	Invalid_Signature,
+	Unsupported_Version,
+	Header_CRC_Mismatch,
+	Invalid_Header,
+	Header_Too_Large,
+	Header_Too_Deep,
+	Invalid_Folder,
+	Truncated,
+	Size_Mismatch,
+	CRC_Mismatch,
+}
+
 Error :: union #shared_nil {
 	General_Error,
 	Tar_Error,
 	Zip_Error,
+	SevenZ_Error,
 	compress.Error,
 	io.Error,
 	os.Error,
