@@ -45,8 +45,9 @@ Option_Flag :: enum {
 	// This option unwraps them when encountered.
 	Unbox_CDATA,
 
-	// By default SGML entities like `&gt;`, `&#32;` and `&#x20;` are passed-through as-is.
+	// By default SGML entities like `&gt;`, `&#32;` and `&#x20;` in a tag's body are passed-through as-is.
 	// This option decodes them when encountered.
+	// Entities in attribute values are always decoded, as the XML spec requires.
 	Decode_SGML_Entities,
 
 	// If a tag body has a comment, it will be stripped unless this option is given.
