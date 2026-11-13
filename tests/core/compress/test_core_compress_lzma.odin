@@ -505,6 +505,17 @@ lzma_normalize :: proc(t: ^testing.T) {
 		clear(&output)
 		err = lzma.decompress_lzma2(&output, packed2[:], props.dict_size, len(input))
 		testing.expectf(t, err == nil && bytes.equal(output[:], input), "%v: lzma2 round trip %v", r.level, err)
+
+		for kind in ([]Lzma_Stream_Kind{.Raw, .LZMA2}) {
+			want := packed[:] if kind == .Raw else packed2[:]
+			for size in ([]i64{i64(len(input)), -1}) {
+				streamed: [dynamic]byte
+				defer delete(streamed)
+				aw := Append_Writer{out = &streamed, fail_at = -1}
+				_, err = lzma_writer_pack({kind = kind, options = options, input_size = size}, append_writer(&aw), input, .Random)
+				testing.expectf(t, err == nil && bytes.equal(streamed[:], want), "%v: %v writer, size %v: %v, %v vs %v bytes", r.level, kind, size, err, len(streamed), len(want))
+			}
+		}
 	}
 }
 

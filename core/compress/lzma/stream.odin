@@ -1,5 +1,6 @@
 package compress_lzma
 
+import "base:intrinsics"
 import "base:runtime"
 import "core:compress"
 import "core:io"
@@ -89,6 +90,99 @@ reader_destroy :: proc(r: ^Reader) {
 	r.out           = {}
 	r.flushed       = 0
 	r.owns_window   = false
+}
+
+writer_init :: proc(lw: ^Writer, w: io.Writer, level := Level.Default, input_size: i64 = -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
+	_, err = writer_create(lw, w, .Alone, level_options(level), input_size, options, allocator)
+	return
+}
+
+writer_init_raw :: proc(lw: ^Writer, w: io.Writer, lzma_options: Options, input_size: i64 = -1, options: compress.Options = {}, allocator := context.allocator) -> (props: Properties, err: Error) {
+	return writer_create(lw, w, .Raw, lzma_options, input_size, options, allocator)
+}
+
+writer_init_lzma2 :: proc(lw: ^Writer, w: io.Writer, lzma_options: Options, input_size: i64 = -1, options: compress.Options = {}, allocator := context.allocator) -> (props: Properties, err: Error) {
+	return writer_create(lw, w, .LZMA2, lzma_options, input_size, options, allocator)
+}
+
+writer_write :: proc(lw: ^Writer, p: []u8) -> (n: int, err: Error) {
+	if lw.err != nil {
+		return 0, lw.err
+	}
+	if lw.finished {
+		return 0, io.Error.Closed
+	}
+	defer lw.err = err
+	if lw.input_size >= 0 && i64(len(p)) > lw.input_size - lw.total_in {
+		return 0, LZMA_Error.Size_Mismatch
+	}
+	mf := &lw.encoder.mf
+	for n < len(p) {
+		if mf_room(mf) == 0 {
+			mf_move_block(mf)
+		}
+		k := min(mf_room(mf), len(p) - n)
+		intrinsics.mem_copy_non_overlapping(&mf.buffer[mf_avail(mf)], &p[n], k)
+		mf.stream_pos += u32(k)
+		lw.total_in   += i64(k)
+		n             += k
+		for mf_avail(mf) >= lw.threshold {
+			writer_step(lw) or_return
+		}
+	}
+	return
+}
+
+writer_finish :: proc(lw: ^Writer) -> (err: Error) {
+	if lw.err != nil {
+		return lw.err
+	}
+	if lw.finished {
+		return nil
+	}
+	defer lw.err = err
+	if lw.input_size >= 0 && lw.total_in != lw.input_size {
+		return LZMA_Error.Size_Mismatch
+	}
+	e := lw.encoder
+	if lw.kind == .LZMA2 {
+		for lw.chunker.src_pos < lw.total_in {
+			writer_step(lw) or_return
+		}
+		end := [1]u8{0}
+		if _, write_err := io.write_full(lw.w, end[:]); write_err != nil {
+			return write_err
+		}
+		lw.flushed += 1
+	} else {
+		for !e.finished {
+			writer_step(lw) or_return
+		}
+	}
+	lw.finished = true
+	return compress.report_progress(lw.options, lw.total_in, lw.flushed, lw.total_in, lw.flushed)
+}
+
+writer_to_stream :: proc(lw: ^Writer) -> (s: io.Stream) {
+	s.data      = lw
+	s.procedure = writer_stream_proc
+	return
+}
+
+writer_destroy :: proc(lw: ^Writer) {
+	context.allocator = lw.allocator
+	if lw.encoder != nil {
+		encoder_destroy(lw.encoder)
+		free(lw.encoder)
+	}
+	if lw.owns_block {
+		delete(lw.block)
+	}
+	delete(lw.out)
+	lw.encoder    = nil
+	lw.block      = nil
+	lw.out        = {}
+	lw.owns_block = false
 }
 
 @(private)
@@ -199,11 +293,13 @@ stream_fill :: proc(r: ^Reader) -> (err: Error) {
 		r.flushed  = r.keep
 		o.base    += shift
 	}
+	out_pos  := o.base + o.written
+	consumed := r.decoder.consumed
 	switch r.kind {
 	case .LZMA2:
 		lzma2_fill(&r.decoder, r.z, o, &r.lzma2, r.size) or_return
 		r.done = r.lzma2.done
-		if !r.done && o.written < o.limit {
+		if !r.done && (o.written < o.limit || (o.base + o.written == out_pos && r.decoder.consumed == consumed)) {
 			return General_Error.Output_Too_Short
 		}
 	case .Alone, .Raw:
@@ -211,6 +307,9 @@ stream_fill :: proc(r: ^Reader) -> (err: Error) {
 		packed := -1
 		eos    := decode_segment(&r.decoder, r.z, o, target, &packed) or_return
 		if !eos && o.base + o.written < target && o.written >= o.limit {
+			if o.base + o.written == out_pos && r.decoder.consumed == consumed {
+				return General_Error.Output_Too_Short
+			}
 			return nil
 		}
 		r.done = true
@@ -243,6 +342,146 @@ stream_to_writer :: proc(r: ^Reader, w: io.Writer) -> (err: Error) {
 @(private)
 stream_progress :: proc(r: ^Reader) -> (err: Error) {
 	return compress.report_progress(r.options, r.decoder.consumed, i64(r.out.base + r.flushed), r.total_in, i64(r.size))
+}
+
+@(private)
+writer_create :: proc(lw: ^Writer, w: io.Writer, kind: Stream_Kind, lzma_options: Options, input_size: i64, options: compress.Options, allocator: runtime.Allocator) -> (props: Properties, err: Error) {
+	context.allocator = allocator
+	lw^ = {}
+	lw.w          = w
+	lw.kind       = kind
+	lw.input_size = max(input_size, -1)
+	lw.options    = options
+	lw.allocator  = allocator
+	defer lw.err = err
+	defer if err != nil {
+		writer_destroy(lw)
+	}
+
+	if options.max_output_size < 0 || options.max_memory < 0 || options.chunk_size < 0 || options.progress_interval < 0 {
+		return {}, General_Error.Incompatible_Options
+	}
+	lzma2    := kind == .LZMA2
+	size     := -1
+	expected := UNKNOWN_SIZE
+	if input_size >= 0 {
+		size     = int(min(input_size, i64(max(int))))
+		expected = u64(input_size)
+	}
+	opts := normalize_options(lzma_options, size, lzma2) or_return
+	if kind == .Alone && input_size < 0 {
+		opts.end_marker = true
+	}
+	props = options_properties(opts)
+
+	keep_before := u64(encoder_history(opts.dict_size)) + NUM_OPTS + 1
+	threshold   := u64(LZMA2_UNPACK_CHUNK_MAX if lzma2 else CODE_BLOCK_UNPACK) + WRITER_LOOKAHEAD
+	need        := keep_before + threshold + BLOCK_MOVE_ALIGN
+	if need > BLOCK_SIZE_MAX {
+		return {}, General_Error.Memory_Limit_Exceeded
+	}
+	block_size := min((need + (need >> (1 if need < 1 << 30 else 2)) + BLOCK_SIZE_ALIGN - 1) &~ u64(BLOCK_SIZE_ALIGN - 1), BLOCK_SIZE_MAX)
+	out_size   := compress_lzma2_bound(int(threshold)) + HEADER_SIZE
+
+	memory := encoder_memory(opts, expected, lzma2) + u64(out_size)
+	if options.buffer != nil {
+		if u64(len(options.buffer)) < need {
+			return {}, General_Error.Incompatible_Options
+		}
+		lw.block = options.buffer[:min(u64(len(options.buffer)), BLOCK_SIZE_MAX)]
+	} else {
+		memory += block_size
+	}
+	if memory > u64(compress.memory_limit(options)) {
+		return {}, General_Error.Memory_Limit_Exceeded
+	}
+	if lw.block == nil {
+		lw.block      = non_zero_make([]u8, int(block_size)) or_return
+		lw.owns_block = true
+	}
+	lw.out.allocator = allocator
+	non_zero_resize(&lw.out, out_size) or_return
+
+	e := new(Encoder) or_return
+	lw.encoder = e
+	e.rc = Range_Encoder{buf = raw_data(lw.out), cap = len(lw.out), grow = &lw.out, limit = max(int)}
+	if kind == .Alone {
+		write_header(lw.out[:], props, expected)
+		e.rc.pos = HEADER_SIZE
+	}
+	encoder_create(e, opts, expected, lzma2) or_return
+
+	mf := &e.mf
+	mf.streaming   = true
+	mf.buf_base    = raw_data(lw.block)
+	mf.block_size  = len(lw.block)
+	mf.keep_before = u32(keep_before)
+	mf.buffer      = mf.buf_base
+	mf.pos         = 1
+	mf.stream_pos  = 1
+	lw.threshold   = u32(threshold)
+	if lzma2 {
+		lw.chunker = lzma2_chunker_init(opts)
+	}
+	return props, nil
+}
+
+@(private)
+writer_step :: proc(lw: ^Writer) -> (err: Error) {
+	e := lw.encoder
+	e.rc.grow = &lw.out
+	now_pos := e.now_pos64
+	if lw.kind == .LZMA2 {
+		_, chunk_err := lzma2_chunk(e, &lw.chunker)
+		if chunk_err != nil {
+			return chunk_err
+		}
+	} else {
+		code_one_block(e, 0, 0)
+		if e.rc.grow_err != nil {
+			return e.rc.grow_err
+		}
+	}
+	if e.now_pos64 == now_pos && mf_avail(&e.mf) > 0 {
+		return General_Error.Output_Too_Short
+	}
+	rc := &e.rc
+	if rc.pos > 0 {
+		if _, write_err := io.write_full(lw.w, rc.buf[:rc.pos]); write_err != nil {
+			return write_err
+		}
+		lw.flushed += i64(rc.pos)
+		rc.pos      = 0
+		rc.start    = 0
+	}
+	return compress.report_progress(lw.options, i64(e.now_pos64), lw.flushed, lw.input_size, -1)
+}
+
+@(private)
+writer_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	lw := (^Writer)(stream_data)
+	#partial switch mode {
+	case .Write:
+		written, write_err := writer_write(lw, p)
+		n = i64(written)
+		if write_err != nil {
+			io_err, is_io := write_err.(io.Error)
+			err = io_err if is_io else .Unknown
+		}
+		return
+	case .Close:
+		if finish_err := writer_finish(lw); finish_err != nil {
+			io_err, is_io := finish_err.(io.Error)
+			err = io_err if is_io else .Unknown
+		}
+		return
+	case .Destroy:
+		writer_destroy(lw)
+		return 0, nil
+	case .Query:
+		return io.query_utility({.Write, .Close, .Destroy, .Query})
+	}
+	return 0, .Unsupported
 }
 
 @(private)
