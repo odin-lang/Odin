@@ -158,9 +158,13 @@ at_end :: proc(p: ^Parser) -> bool {
 parse_value :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: Error) {
 	err = .None
 	token := p.curr_token
-	if p.spec == .JSON && p.curr_token_err == .Invalid_Number {
-		advance_token(p)
-		return nil, .Invalid_Number
+	if p.spec == .JSON {
+		#partial switch p.curr_token_err {
+		case .Invalid_Number, .Invalid_String:
+			err = p.curr_token_err
+			advance_token(p)
+			return
+		}
 	}
 	#partial switch token.kind {
 	case .Null:
@@ -352,8 +356,13 @@ parse_object_key :: proc(p: ^Parser, key_allocator: mem.Allocator, loc := #calle
 			return clone_string(tok.text, key_allocator, loc)
 		}
 	}
+	invalid := p.spec == .JSON && p.curr_token_err == .Invalid_String
 	if tok_err := expect_token(p, .String); tok_err != nil {
 		err = .Expected_String_For_Object_Key
+		return
+	}
+	if invalid {
+		err = .Invalid_String
 		return
 	}
 	return unquote_token(tok, p.spec, p.tok.validated, key_allocator, loc)

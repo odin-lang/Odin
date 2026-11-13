@@ -1179,8 +1179,9 @@ unmarshal_unsupported_type_field :: proc(t: ^testing.T) {
 
 @(test)
 strict_json :: proc(t: ^testing.T) {
-	// `.JSON` rejects trailing commas, data after the value and malformed numbers, whether the
-	// syntax is checked up front, by `parse`, or while unmarshalling with `.Skip_Validation`.
+	// `.JSON` rejects trailing commas, data after the value, malformed numbers and strings, and
+	// whitespace other than space, tab, CR and LF, whether the syntax is checked up front, by
+	// `parse`, or while unmarshalling with `.Skip_Validation`.
 	Named :: struct {
 		name: string,
 		x:    int,
@@ -1207,6 +1208,14 @@ strict_json :: proc(t: ^testing.T) {
 		{`{"x": 1.e5}`,          .Invalid_Number},
 		{`{"list": [01]}`,       .Invalid_Number},
 		{`{"other": 01}`,        .Invalid_Number},
+		{`{"name": "\uzzzz"}`,   .Invalid_String},
+		{`{"name": "\'"}`,       .Invalid_String},
+		{`{"name": "\x41"}`,     .Invalid_String},
+		{"{\"name\": \"a\tb\"}", .Invalid_String},
+		{`{"name": "abc}`,       .Invalid_String},
+		{`{"\x41": 1}`,          .Invalid_String},
+		{"{\"x\":\v1}",          .Unexpected_Token},
+		{"{\"x\": 1}\f",         .Unexpected_Token},
 	}
 	for c in invalid {
 		testing.expectf(t, !json.is_valid(transmute([]byte)c.src, .JSON), "%q: is_valid accepted it", c.src)
@@ -1230,6 +1239,7 @@ strict_json :: proc(t: ^testing.T) {
 		`{"x": 0, "list": [10, -1], "other": [1.5e-3, {"a": 0}, []]}`,
 		"{\"x\": 1}\x00\x00",
 		` {"name": "éꯍ"} `,
+		"\t{\"name\": \"\\\"\\\\\\/\\b\\f\\n\\r\\t\"}\r\n",
 	}
 	for src in valid {
 		testing.expectf(t, json.is_valid(transmute([]byte)src, .JSON), "%q: is_valid rejected it", src)
@@ -1249,14 +1259,13 @@ strict_json :: proc(t: ^testing.T) {
 
 	bad_escape := `{"name": "\uzzzz"}`
 	testing.expect(t, !json.is_valid(transmute([]byte)bad_escape, .JSON5))
-	n: Named
-	err := json.unmarshal_string(bad_escape, &n, .JSON, flags = {.Skip_Validation})
-	testing.expectf(t, err == json.Error.Invalid_String, "expected Invalid_String, got %v", err)
 
-	trailing := `{"x": 1, "list": [1, 2,],}`
-	testing.expect(t, json.is_valid(transmute([]byte)trailing, .JSON5))
-	n = {}
-	testing.expect_value(t, json.unmarshal_string(trailing, &n, .JSON5), nil)
+	json5 := "{\"x\":\v1, \"name\": \"\\'\", \"list\": [1, 2,],}"
+	testing.expect(t, json.is_valid(transmute([]byte)json5, .JSON5))
+	n: Named
+	testing.expect_value(t, json.unmarshal_string(json5, &n, .JSON5), nil)
+	testing.expect_value(t, n.name, "'")
 	testing.expect_value(t, len(n.list), 2)
+	delete(n.name)
 	delete(n.list)
 }

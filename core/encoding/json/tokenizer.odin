@@ -195,7 +195,13 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) #no_bounds_check 
 	scan: for start < len(data) {
 		c := data[start]
 		switch c {
-		case ' ', '\t', '\v', '\f', '\r':
+		case ' ', '\t', '\r':
+			start += 1
+			continue
+		case '\v', '\f':
+			if t.spec == .JSON {
+				break scan
+			}
 			start += 1
 			continue
 		case '\n':
@@ -311,7 +317,12 @@ get_other_token :: #force_no_inline proc(t: ^Tokenizer) -> (token: Token, err: E
 		i := t.offset
 		loop: for i < len(t.data) {
 			switch t.data[i] {
-			case ' ', '\t', '\v', '\f', '\r':
+			case ' ', '\t', '\r':
+				i += 1
+			case '\v', '\f':
+				if t.spec == .JSON {
+					break loop
+				}
 				i += 1
 			case '\n':
 				if on_newline {
@@ -796,7 +807,12 @@ is_valid_string_literal :: proc(str: string, spec: Specification) -> bool {
 				return false
 			}
 			switch s[i] {
-			case '"', '\'', '\\', '/', 'b', 'n', 'r', 't', 'f':
+			case '"', '\\', '/', 'b', 'n', 'r', 't', 'f':
+				i += 1
+			case '\'':
+				if spec == .JSON {
+					return false
+				}
 				i += 1
 			case '\r':
 				if spec != .JSON && i+1 < len(s) && s[i+1] == '\n' {
