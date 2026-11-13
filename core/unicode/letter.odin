@@ -262,7 +262,7 @@ Inputs:
 r: The rune to check if it is number.
 
 Returns:
-`true` if the ruen belongs to the general category Nd, Nl, or No. `false`
+`true` if the rune belongs to the general category Nd, Nl, or No. `false`
 is return in all other cases.
 
 */
