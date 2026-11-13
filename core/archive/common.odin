@@ -252,6 +252,7 @@ SevenZ_Error :: enum u32 {
 	Truncated,
 	Size_Mismatch,
 	CRC_Mismatch,
+	Invalid_Name,
 }
 
 Error :: union #shared_nil {

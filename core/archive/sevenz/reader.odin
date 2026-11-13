@@ -57,7 +57,7 @@ open_from_path :: proc(r: ^Reader, path: string, options := compress.Options{}, 
 
 open :: proc{open_from_path, open_from_bytes, open_from_stream}
 
-close :: proc{close_reader}
+close :: proc{close_reader, close_writer}
 
 close_reader :: proc(r: ^Reader) {
 	if r.owns_header {
@@ -836,6 +836,9 @@ _append_utf16 :: proc(out: ^[dynamic]u8, raw: []u8) -> (err: runtime.Allocator_E
 			}
 		case c >= 0xDC00 && c < 0xE000:
 			c = utf8.RUNE_ERROR
+		case c >= ESCAPE_FIRST && c <= ESCAPE_LAST:
+			append(out, u8(c - ESCAPE_BASE)) or_return
+			continue
 		}
 		bytes, n := utf8.encode_rune(c)
 		append(out, ..bytes[:n]) or_return

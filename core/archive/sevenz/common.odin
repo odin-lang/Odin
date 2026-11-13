@@ -47,6 +47,71 @@ ZERO_READS_MAX        :: 64
 LZMA_BASE_PROBS       :: 1984
 LZMA_LITERAL_PROBS    :: 0x300
 
+VERSION_MINOR         :: 4
+SNIFF_SIZE            :: 1 << 14
+CODER_PROPERTIES_MAX  :: 5
+WRITER_CODERS_MAX     :: 4
+SOLID_SIZE_MIN        :: i64(1) << 24
+SOLID_SIZE_MAX        :: i64(1) << 32
+SOLID_SIZE_LZMA2_MAX  :: i64(1) << 34
+LZMA2_CHUNK_MIN       :: i64(1) << 20
+LZMA2_CHUNK_MAX       :: i64(1) << 28
+ESCAPE_BASE           :: 0xEF00
+ESCAPE_FIRST          :: 0xEF80
+ESCAPE_LAST           :: 0xEFFF
+
+HEADER_LZMA_OPTIONS :: lzma.Options{
+	lc           = 3,
+	lp           = 0,
+	pb           = 2,
+	dict_size    = 1 << 20,
+	nice_len     = 273,
+	match_finder = .BT2,
+}
+
+BCJ2_LZMA_OPTIONS :: lzma.Options{
+	lc           = 0,
+	lp           = 2,
+	pb           = 2,
+	dict_size    = 1 << 20,
+	nice_len     = 128,
+	match_finder = .BT4,
+}
+
+SORT_EXTENSIONS := [?]string{
+	"7z", "xz", "lzma", "ace", "arc", "arj", "bz", "tbz", "bz2", "tbz2", "cab", "deb", "gz", "tgz", "ha", "lha", "lzh", "lzo", "lzx", "pak", "rar", "rpm", "sit", "zoo",
+	"zip", "jar", "ear", "war", "msi",
+	"3gp", "avi", "mov", "mpeg", "mpg", "mpe", "wmv",
+	"aac", "ape", "fla", "flac", "la", "mp3", "m4a", "mp4", "ofr", "ogg", "pac", "ra", "rm", "rka", "shn", "swa", "tta", "wv", "wma", "wav",
+	"swf",
+	"chm", "hxi", "hxs",
+	"gif", "jpeg", "jpg", "jp2", "png", "tiff", "bmp", "ico", "psd", "psp",
+	"awg", "ps", "eps", "cgm", "dxf", "svg", "vrml", "wmf", "emf", "ai", "md",
+	"cad", "dwg", "pps", "key", "sxi",
+	"max", "3ds",
+	"iso", "bin", "nrg", "mdf", "img", "pdi", "tar", "cpio", "xpi",
+	"vfd", "vhd", "vud", "vmc", "vsv",
+	"vmdk", "dsk", "nvram", "vmem", "vmsd", "vmsn", "vmss", "vmtm",
+	"inl", "inc", "idl", "acf", "asa",
+	"h", "hpp", "hxx", "c", "cpp", "cxx", "m", "mm", "go", "swift",
+	"rc", "java", "cs", "rs", "pas", "bas", "vb", "cls", "ctl", "frm", "dlg", "def",
+	"f77", "f", "f90", "f95",
+	"asm", "s",
+	"sql", "manifest", "dep",
+	"mak", "clw", "csproj", "vcproj", "sln", "dsp", "dsw",
+	"class",
+	"bat", "cmd", "bash", "sh",
+	"xml", "xsd", "xsl", "xslt", "hxk", "hxc", "htm", "html", "xhtml", "xht", "mht", "mhtml", "htw", "asp", "aspx", "css", "cgi", "jsp", "shtml",
+	"awk", "sed", "hta", "js", "json", "php", "php3", "php4", "php5", "phptml", "pl", "pm", "py", "pyo", "rb", "tcl", "ts", "vbs",
+	"text", "txt", "tex", "ans", "asc", "srt", "reg", "ini", "doc", "docx", "mcw", "dot", "rtf", "hlp", "xls", "xlr", "xlt", "xlw", "ppt", "pdf",
+	"sxc", "sxd", "sxi", "sxg", "sxw", "stc", "sti", "stw", "stm", "odt", "ott", "odg", "otg", "odp", "otp", "ods", "ots", "odf",
+	"abw", "afp", "cwk", "lwp", "wpd", "wps", "wpt", "wrf", "wri",
+	"abf", "afm", "bdf", "fon", "mgf", "otf", "pcf", "pfa", "snf", "ttf",
+	"dbf", "mdb", "nsf", "ntf", "wdb", "db", "fdb", "gdb",
+	"exe", "dll", "ocx", "vbx", "sfx", "sys", "tlb", "awx", "com", "obj", "lib", "out", "o", "so",
+	"pdb", "pch", "idb", "ncb", "opt",
+}
+
 Property_ID :: enum u8 {
 	End                = 0x00,
 	Header             = 0x01,
@@ -293,4 +358,177 @@ Iterator :: struct {
 	member:   Member,
 	err:      Error,
 	err_path: [dynamic]u8,
+}
+
+Filter_Choice :: enum u8 {
+	Auto,
+	None,
+	Delta,
+	BCJ_X86,
+	BCJ_PPC,
+	BCJ_IA64,
+	BCJ_ARM,
+	BCJ_ARMT,
+	BCJ_SPARC,
+	BCJ_ARM64,
+	BCJ_RISCV,
+	BCJ2,
+	Swap2,
+	Swap4,
+}
+
+Solid_Order :: enum u8 {
+	Name,
+	Extension,
+}
+
+Entry_Data :: union {
+	[]u8,
+	io.Reader,
+}
+
+Entry_Options :: struct {
+	method:         archive.Method,
+	level:          Maybe(int),
+	filter:         Filter_Choice,
+	delta_distance: int,
+	lzma:           Maybe(lzma.Options),
+	ppmd:           Maybe(ppmd.Properties),
+}
+
+Writer_Options :: struct {
+	method:         archive.Method,
+	level:          Maybe(int),
+	filter:         Filter_Choice,
+	delta_distance: int,
+	lzma:           Maybe(lzma.Options),
+	ppmd:           Maybe(ppmd.Properties),
+	solid:          bool,
+	solid_size:     i64,
+	solid_files:    int,
+	solid_order:    Solid_Order,
+	creation_time:  bool,
+	access_time:    bool,
+	plain_header:   bool,
+	deterministic:  bool,
+	options:        compress.Options,
+}
+
+Coder_Setup :: struct {
+	method:   archive.Method,
+	level:    int,
+	lzma:     lzma.Options,
+	ppmd:     ppmd.Properties,
+	lzma_set: bool,
+	ppmd_set: bool,
+	filter:   Filter_Choice,
+	delta:    int,
+}
+
+Filter_Pick :: struct {
+	filter: Filter_Choice,
+	delta:  int,
+	auto:   bool,
+}
+
+Out_Coder :: struct {
+	id:              Method_ID,
+	in_streams:      int,
+	properties:      [CODER_PROPERTIES_MAX]u8,
+	properties_size: int,
+	unpack_size:     i64,
+}
+
+Out_Folder :: struct {
+	coders:       [WRITER_CODERS_MAX]Out_Coder,
+	coder_count:  int,
+	bcj2:         bool,
+	stream_count: int,
+}
+
+Out_File :: struct {
+	size:              i64,
+	crc:               u32,
+	attributes:        u32,
+	modification_time: u64,
+	creation_time:     u64,
+	access_time:       u64,
+	has_stream:        bool,
+	is_directory:      bool,
+}
+
+Pack_Sink :: struct {
+	writer: ^Writer,
+	count:  i64,
+}
+
+Encoder :: struct {
+	method:  archive.Method,
+	w:       io.Writer,
+	deflate: deflate.Deflate_Writer,
+	bzip2:   bzip2.Writer,
+	lzma:    lzma.Writer,
+	ppmd:    ppmd.Writer,
+}
+
+Filter_Stage :: struct {
+	filter:  Filter_Choice,
+	branch:  filters.Branch_State,
+	delta:   filters.Delta_State,
+	buffer:  []u8,
+	pending: int,
+}
+
+Open_Folder :: struct {
+	active:  bool,
+	setup:   Coder_Setup,
+	folder:  Out_Folder,
+	encoder: Encoder,
+	stage:   Filter_Stage,
+	sink:    Pack_Sink,
+	input:   [dynamic]u8,
+	unpack:  i64,
+	limit:   i64,
+	files:   int,
+	broken:  bool,
+}
+
+Source :: struct {
+	data:     []u8,
+	reader:   io.Reader,
+	position: int,
+	eof:      bool,
+}
+
+Walked_Entry :: struct {
+	name:   string,
+	info:   os.File_Info,
+	pick:   Filter_Pick,
+	stream: bool,
+}
+
+Writer :: struct {
+	allocator:     runtime.Allocator,
+	options:       Writer_Options,
+	stream:        io.Stream,
+	file:          ^os.File,
+	path:          string,
+	start:         i64,
+	offset:        i64,
+	end:           i64,
+	pack_sizes:    [dynamic]i64,
+	folders:       [dynamic]Out_Folder,
+	files:         [dynamic]Out_File,
+	names:         [dynamic]u8,
+	name:          [dynamic]u8,
+	walk_name:     [dynamic]u8,
+	header:        [dynamic]u8,
+	chunk:         []u8,
+	head:          []u8,
+	filter_buffer: []u8,
+	folder:        Open_Folder,
+	archive_in:    i64,
+	err:           Error,
+	committed:     bool,
+	active:        bool,
 }

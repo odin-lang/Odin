@@ -1,0 +1,1981 @@
+package archive_sevenz
+
+import "base:runtime"
+import "core:archive"
+import "core:compress"
+import "core:compress/bzip2"
+import "core:compress/deflate"
+import "core:compress/filters"
+import "core:compress/lzma"
+import "core:compress/ppmd"
+import "core:hash"
+import "core:io"
+import "core:os"
+import "core:slice"
+import "core:strings"
+import "core:time"
+import "core:unicode/utf8"
+
+create_from_path :: proc(sw: ^Writer, path: string, options: Writer_Options = {}, allocator := context.allocator) -> (err: Error) {
+	sw^ = {}
+	sw.allocator = allocator
+	_check_writer_options(options) or_return
+	sw.path = strings.clone(path, allocator) or_return
+	f, create_err := os.create(path)
+	if create_err != nil {
+		close_writer(sw)
+		return create_err
+	}
+	sw.file = f
+	if err = _writer_init(sw, os.to_stream(f), options); err != nil {
+		close_writer(sw)
+	}
+	return
+}
+
+create_from_stream :: proc(sw: ^Writer, s: io.Stream, options: Writer_Options = {}, allocator := context.allocator) -> (err: Error) {
+	sw^ = {}
+	sw.allocator = allocator
+	_check_writer_options(options) or_return
+	if err = _writer_init(sw, s, options); err != nil {
+		close_writer(sw)
+	}
+	return
+}
+
+create :: proc{create_from_path, create_from_stream}
+
+write_entry_with_info :: proc(sw: ^Writer, fi: archive.File_Info, data: Entry_Data = nil, options: Entry_Options = {}) -> (err: Error) {
+	return _write_entry(sw, fi, data, options, nil)
+}
+
+write_entry_simple :: proc(sw: ^Writer, name: string, data: Entry_Data = nil, options: Entry_Options = {}) -> (err: Error) {
+	fi: archive.File_Info
+	fi.path              = name
+	fi.type              = .Regular
+	fi.modification_time = time.now()
+	switch d in data {
+	case []u8:
+		fi.size = i64(len(d))
+	case io.Reader:
+		fi.size = -1
+		if size, size_err := io.size(d); size_err == nil && size >= 0 {
+			fi.size = size
+		}
+	}
+	return write_entry_with_info(sw, fi, data, options)
+}
+
+write_entry :: proc{write_entry_with_info, write_entry_simple}
+
+write_directory :: proc(sw: ^Writer, dir: string, prefix := "", options: Entry_Options = {}) -> (err: Error) {
+	_writer_ready(sw) or_return
+	setup := _resolve(sw.options, options) or_return
+	root, root_err := os.get_absolute_path(dir, sw.allocator)
+	if root_err != nil {
+		return root_err
+	}
+	defer delete(root, sw.allocator)
+	base := strings.trim(prefix, "/")
+	if base != "" {
+		info, stat_err := os.stat(root, sw.allocator)
+		if stat_err != nil {
+			return stat_err
+		}
+		defer os.file_info_delete(info, sw.allocator)
+		fi: archive.File_Info
+		fi.path              = base
+		fi.type              = .Directory
+		fi.unix_mode         = transmute(u32)info.mode & archive.UNIX_PERMISSION_MASK
+		fi.modification_time = info.modification_time
+		fi.access_time       = info.access_time
+		fi.creation_time     = info.creation_time
+		_write_entry(sw, fi, nil, options, nil) or_return
+	}
+
+	walker := os.walker_create(root)
+	defer os.walker_destroy(&walker)
+	if !sw.options.deterministic && !sw.options.solid {
+		for info in os.walker_walk(&walker) {
+			if _, walk_err := os.walker_error(&walker); walk_err != nil {
+				return walk_err
+			}
+			_walk_name(sw, root, base, info.fullpath) or_return
+			_write_walked(sw, string(sw.walk_name[:]), info, options, nil) or_return
+		}
+	} else {
+		walked: [dynamic]Walked_Entry
+		walked.allocator = sw.allocator
+		defer {
+			for entry in walked {
+				delete(entry.name, sw.allocator)
+				os.file_info_delete(entry.info, sw.allocator)
+			}
+			delete(walked)
+		}
+		for info in os.walker_walk(&walker) {
+			if _, walk_err := os.walker_error(&walker); walk_err != nil {
+				return walk_err
+			}
+			_walk_name(sw, root, base, info.fullpath) or_return
+			entry: Walked_Entry
+			entry.name = strings.clone(string(sw.walk_name[:]), sw.allocator) or_return
+			cloned, clone_err := os.file_info_clone(info, sw.allocator)
+			if clone_err != nil {
+				delete(entry.name, sw.allocator)
+				return clone_err
+			}
+			entry.info = cloned
+			if _, append_err := append(&walked, entry); append_err != nil {
+				delete(entry.name, sw.allocator)
+				os.file_info_delete(entry.info, sw.allocator)
+				return append_err
+			}
+		}
+		if _, walk_err := os.walker_error(&walker); walk_err != nil {
+			return walk_err
+		}
+		if sw.options.solid {
+			for &entry in walked {
+				_group_walked(sw, setup, &entry) or_return
+			}
+			if sw.options.solid_order == .Extension {
+				slice.sort_by(walked[:], _less_by_extension)
+			} else {
+				slice.sort_by(walked[:], _less_by_group)
+			}
+		} else {
+			slice.sort_by(walked[:], proc(a, b: Walked_Entry) -> bool {
+				return a.name < b.name
+			})
+		}
+		for &entry in walked {
+			pick: ^Filter_Pick
+			if sw.options.solid && entry.stream {
+				pick = &entry.pick
+			}
+			_write_walked(sw, entry.name, entry.info, options, pick) or_return
+		}
+	}
+	if _, walk_err := os.walker_error(&walker); walk_err != nil {
+		return walk_err
+	}
+	return nil
+}
+
+commit :: proc(sw: ^Writer) -> (err: Error) {
+	if sw.committed {
+		return nil
+	}
+	_writer_ready(sw) or_return
+	defer if err != nil {
+		sw.err = err
+	}
+	if sw.folder.active {
+		_folder_close(sw) or_return
+	}
+	next_offset, next_size: i64
+	next_crc: u32
+	if len(sw.files) > 0 {
+		_build_header(sw) or_return
+		if !sw.options.plain_header {
+			_encode_header(sw) or_return
+		}
+		next_offset = sw.offset - sw.start - SIGNATURE_HEADER_SIZE
+		next_size   = i64(len(sw.header))
+		next_crc    = hash.crc32(sw.header[:])
+		_emit(sw, sw.header[:]) or_return
+	}
+	end := sw.offset
+	start := _start_header(next_offset, next_size, next_crc)
+	_seek(sw, sw.start) or_return
+	_emit(sw, start[:]) or_return
+	_seek(sw, end) or_return
+	_flush(sw) or_return
+	sw.committed = true
+	return nil
+}
+
+close_writer :: proc(sw: ^Writer) {
+	if sw.file != nil {
+		os.close(sw.file)
+		if !sw.committed {
+			os.remove(sw.path)
+		}
+	}
+	_folder_destroy(sw)
+	delete(sw.folder.input)
+	delete(sw.path, sw.allocator)
+	delete(sw.pack_sizes)
+	delete(sw.folders)
+	delete(sw.files)
+	delete(sw.names)
+	delete(sw.name)
+	delete(sw.walk_name)
+	delete(sw.header)
+	delete(sw.chunk, sw.allocator)
+	delete(sw.head, sw.allocator)
+	delete(sw.filter_buffer, sw.allocator)
+	sw^ = {}
+}
+
+lzma_options_7zip :: proc "contextless" (level: int) -> (options: lzma.Options) {
+	l := clamp(level, 0, 9)
+	options.lc = 3
+	options.lp = 0
+	options.pb = 2
+	switch {
+	case l <= 4:
+		options.dict_size = 1 << uint(2 * l + 16)
+	case l <= size_of(uintptr) / 2 + 4:
+		options.dict_size = 1 << uint(l + 20)
+	case:
+		options.dict_size = 1 << uint(size_of(uintptr) / 2 + 24)
+	}
+	options.fast         = l < 5
+	options.match_finder = .HC5 if l < 5 else .BT4
+	options.nice_len     = 32 if l < 7 else 64
+	options.depth        = (16 + options.nice_len / 2) >> (1 if options.fast else 0)
+	return
+}
+
+@(private)
+_writer_init :: proc(sw: ^Writer, s: io.Stream, options: Writer_Options) -> (err: Error) {
+	sw.pack_sizes.allocator   = sw.allocator
+	sw.folders.allocator      = sw.allocator
+	sw.files.allocator        = sw.allocator
+	sw.names.allocator        = sw.allocator
+	sw.name.allocator         = sw.allocator
+	sw.walk_name.allocator    = sw.allocator
+	sw.header.allocator       = sw.allocator
+	sw.folder.input.allocator = sw.allocator
+	sw.options = options
+
+	modes := io.query(s)
+	if .Write not_in modes {
+		return io.Error.Unsupported
+	}
+	if .Seek not_in modes {
+		return archive.General_Error.Not_Seekable
+	}
+	position, seek_err := io.seek(s, 0, .Current)
+	if seek_err != nil || position < 0 {
+		return archive.General_Error.Not_Seekable
+	}
+	sw.stream = s
+	sw.start  = position
+	sw.offset = position
+	sw.end    = position
+	placeholder: [SIGNATURE_HEADER_SIZE]u8
+	signature := SIGNATURE
+	copy(placeholder[:], signature[:])
+	placeholder[6] = VERSION_MAJOR
+	placeholder[7] = VERSION_MINOR
+	_emit(sw, placeholder[:]) or_return
+	sw.active = true
+	return nil
+}
+
+@(private)
+_check_writer_options :: proc(options: Writer_Options) -> (err: Error) {
+	o := options.options
+	if o.progress_interval < 0 || o.max_memory < 0 || o.max_output_size < 0 || o.chunk_size < 0 {
+		return archive.General_Error.Incompatible_Options
+	}
+	if options.solid_size < 0 || options.solid_files < 0 || options.solid_order > .Extension {
+		return archive.General_Error.Incompatible_Options
+	}
+	_ = _resolve(options, {}) or_return
+	return nil
+}
+
+@(private)
+_writer_ready :: proc(sw: ^Writer) -> (err: Error) {
+	if !sw.active || sw.committed {
+		return io.Error.Closed
+	}
+	return sw.err
+}
+
+@(private)
+_default_level :: proc "contextless" (method: archive.Method) -> (level: int) {
+	#partial switch method {
+	case .LZMA, .LZMA2:        level = int(lzma.Level.Default)
+	case .PPMd_H:              level = int(ppmd.Level.Default)
+	case .BZip2:               level = int(bzip2.Level.Default)
+	case .Deflate, .Deflate64: level = int(deflate.Deflate_Level.Default)
+	}
+	return
+}
+
+@(private)
+_resolve :: proc(defaults: Writer_Options, entry: Entry_Options) -> (setup: Coder_Setup, err: Error) {
+	chosen    := defaults.method if defaults.method != .Unknown else .LZMA2
+	wanted    := entry.method if entry.method != .Unknown else chosen
+	inherit   := wanted == chosen
+	requested := entry.level
+	if requested == nil && inherit {
+		requested = defaults.level
+	}
+	setup.method = wanted
+	#partial switch wanted {
+	case .Store:
+	case .LZMA, .LZMA2:
+		setup.level = clamp(requested.? or_else _default_level(wanted), int(lzma.Level.Level_0), int(lzma.Level.Level_9))
+		switch {
+		case entry.lzma != nil:
+			setup.lzma     = entry.lzma.?
+			setup.lzma_set = true
+		case entry.level == nil && inherit && defaults.lzma != nil:
+			setup.lzma     = defaults.lzma.?
+			setup.lzma_set = true
+		case:
+			setup.lzma = lzma.level_options(lzma.Level(setup.level))
+		}
+		setup.lzma.end_marker = false
+		l := setup.lzma
+		if l.lc > lzma.LC_MAX || l.lp > lzma.LP_MAX || l.pb > lzma.PB_MAX || l.match_finder > .BT5 {
+			return {}, archive.General_Error.Incompatible_Options
+		}
+		if wanted == .LZMA2 && l.lc + l.lp > lzma.LZMA2_LCLP_MAX {
+			return {}, archive.General_Error.Incompatible_Options
+		}
+	case .PPMd_H:
+		setup.level = clamp(requested.? or_else _default_level(wanted), int(ppmd.Level.Level_0), int(ppmd.Level.Level_9))
+		switch {
+		case entry.ppmd != nil:
+			setup.ppmd     = entry.ppmd.?
+			setup.ppmd_set = true
+		case entry.level == nil && inherit && defaults.ppmd != nil:
+			setup.ppmd     = defaults.ppmd.?
+			setup.ppmd_set = true
+		case:
+			setup.ppmd = ppmd.level_properties(.H, ppmd.Level(setup.level))
+		}
+		if setup.ppmd.variant != .H {
+			return {}, archive.General_Error.Incompatible_Options
+		}
+		if _, perr := ppmd.encode_properties_7z(setup.ppmd); perr != nil {
+			return {}, archive.General_Error.Incompatible_Options
+		}
+	case .BZip2:
+		setup.level = clamp(requested.? or_else _default_level(wanted), int(bzip2.Level.Level_1), int(bzip2.Level.Level_9))
+	case .Deflate, .Deflate64:
+		setup.level = clamp(requested.? or_else _default_level(wanted), int(deflate.Deflate_Level.Stored), int(deflate.Deflate_Level.Best))
+	case:
+		return {}, archive.General_Error.Unsupported_Method
+	}
+	setup.filter = defaults.filter
+	setup.delta  = defaults.delta_distance
+	if entry.filter != .Auto {
+		setup.filter = entry.filter
+		setup.delta  = entry.delta_distance
+	}
+	if setup.filter > .Swap4 || setup.delta < 0 || setup.delta > filters.DELTA_DISTANCE_MAX {
+		return {}, archive.General_Error.Incompatible_Options
+	}
+	return
+}
+
+@(private)
+_write_entry :: proc(sw: ^Writer, fi: archive.File_Info, data: Entry_Data, options: Entry_Options, preset: ^Filter_Pick) -> (err: Error) {
+	_writer_ready(sw) or_return
+	type := archive.Entry_Type.Regular if fi.type == .Unknown else fi.type
+	#partial switch type {
+	case .Regular, .Directory, .Symlink:
+	case:
+		return archive.General_Error.Unsupported_Entry
+	}
+	setup := _resolve(sw.options, options) or_return
+	_entry_name(sw, fi.path) or_return
+
+	file: Out_File
+	file.is_directory = type == .Directory
+	file.attributes   = _attributes(fi, type)
+	if !sw.options.deterministic {
+		file.modification_time = _filetime(fi.modification_time)
+		if sw.options.creation_time {
+			file.creation_time = _filetime(fi.creation_time)
+		}
+		if sw.options.access_time {
+			file.access_time = _filetime(fi.access_time)
+		}
+	}
+
+	source:   Source
+	expected: i64
+	switch d in data {
+	case []u8:
+		if type != .Regular && len(d) > 0 {
+			return archive.General_Error.Incompatible_Options
+		}
+		source.data = d
+		expected    = i64(len(d))
+	case io.Reader:
+		if type != .Regular {
+			return archive.General_Error.Incompatible_Options
+		}
+		source.reader = d
+		expected      = fi.size
+		if expected < 0 {
+			expected = -1
+			if size, size_err := io.size(d); size_err == nil && size >= 0 {
+				expected = size
+			}
+		}
+	}
+	if type == .Symlink {
+		if len(fi.link_target) == 0 {
+			return archive.General_Error.Incompatible_Options
+		}
+		if len(fi.link_target) > LINK_TARGET_MAX {
+			return archive.General_Error.Limit_Exceeded
+		}
+		source   = {data = transmute([]u8)fi.link_target}
+		expected = i64(len(fi.link_target))
+	}
+	if type == .Directory {
+		_add_file(sw, file) or_return
+		if err = _entry_done(sw, &file, 0); err != nil {
+			sw.err = err
+		}
+		return
+	}
+	head := _read_head(sw, &source) or_return
+	if len(head) == 0 {
+		if expected > 0 {
+			return SevenZ_Error.Size_Mismatch
+		}
+		_add_file(sw, file) or_return
+		if err = _entry_done(sw, &file, 0); err != nil {
+			sw.err = err
+		}
+		return
+	}
+	if expected == 0 || expected > 0 && i64(len(head)) > expected {
+		return SevenZ_Error.Size_Mismatch
+	}
+
+	pick: Filter_Pick
+	switch {
+	case type == .Symlink:
+		pick = {filter = .None}
+	case preset != nil:
+		pick = preset^
+	case:
+		pick = _pick_filter(sw, setup, head, expected)
+	}
+	_apply_pick(&setup, pick)
+	if setup.filter == .BCJ2 && expected > _bcj2_cap(sw) {
+		return compress.Error(compress.General_Error.Memory_Limit_Exceeded)
+	}
+
+	if sw.folder.active && !_folder_accepts(sw, setup, expected) {
+		if err = _folder_close(sw); err != nil {
+			sw.err = err
+			return
+		}
+	}
+	fresh     := !sw.folder.active
+	out_start := sw.offset
+	files     := len(sw.files)
+	if fresh {
+		_folder_open(sw, setup, expected) or_return
+	}
+	err = _folder_feed(sw, &source, head, expected, &file, out_start)
+	if err == nil {
+		err = _add_file(sw, file)
+	}
+	if err == nil && (!sw.options.solid || sw.folder.unpack >= sw.folder.limit || sw.folder.broken) {
+		err = _folder_close(sw)
+	}
+	if err == nil {
+		err = _entry_done(sw, &file, sw.offset - out_start)
+	}
+	if err != nil {
+		if fresh && sw.offset == out_start && len(sw.files) == files {
+			_folder_destroy(sw)
+		} else {
+			sw.err = err
+		}
+	}
+	return
+}
+
+@(private)
+_entry_name :: proc(sw: ^Writer, path: string) -> (err: Error) {
+	clear(&sw.name)
+	name := path
+	when ODIN_OS == .Windows {
+		if len(name) >= 2 && name[1] == ':' {
+			name = name[2:]
+		}
+	}
+	append(&sw.name, name) or_return
+	when ODIN_OS == .Windows {
+		for &c in sw.name {
+			if c == '\\' {
+				c = '/'
+			}
+		}
+	}
+	start := 0
+	for start < len(sw.name) {
+		if sw.name[start] == '/' {
+			start += 1
+		} else if sw.name[start] == '.' && start + 1 < len(sw.name) && sw.name[start + 1] == '/' {
+			start += 2
+		} else {
+			break
+		}
+	}
+	stop := len(sw.name)
+	for stop > start && sw.name[stop - 1] == '/' {
+		stop -= 1
+	}
+	cleaned := string(sw.name[start:stop])
+	if cleaned == "" || cleaned == "." || strings.index_byte(cleaned, 0) >= 0 {
+		return SevenZ_Error.Invalid_Name
+	}
+	rest := cleaned
+	for part in strings.split_iterator(&rest, "/") {
+		if part == ".." {
+			return archive.General_Error.Unsafe_Path
+		}
+	}
+	n := copy(sw.name[:], sw.name[start:stop])
+	resize(&sw.name, n)
+	return nil
+}
+
+@(private)
+_walk_name :: proc(sw: ^Writer, root, base, fullpath: string) -> (err: Error) {
+	if !strings.has_prefix(fullpath, root) {
+		return SevenZ_Error.Invalid_Name
+	}
+	rel := fullpath[len(root):]
+	for len(rel) > 0 && (rel[0] == '/' || rel[0] == os.Path_Separator) {
+		rel = rel[1:]
+	}
+	clear(&sw.walk_name)
+	if base != "" {
+		append(&sw.walk_name, base) or_return
+		append(&sw.walk_name, '/') or_return
+	}
+	start := len(sw.walk_name)
+	append(&sw.walk_name, rel) or_return
+	for &c in sw.walk_name[start:] {
+		if c == os.Path_Separator {
+			c = '/'
+		}
+	}
+	return nil
+}
+
+@(private)
+_write_walked :: proc(sw: ^Writer, name: string, info: os.File_Info, options: Entry_Options, pick: ^Filter_Pick) -> (err: Error) {
+	fi: archive.File_Info
+	fi.path              = name
+	fi.unix_mode         = transmute(u32)info.mode & archive.UNIX_PERMISSION_MASK
+	fi.modification_time = info.modification_time
+	fi.access_time       = info.access_time
+	fi.creation_time     = info.creation_time
+	#partial switch info.type {
+	case .Directory:
+		fi.type = .Directory
+		return _write_entry(sw, fi, nil, options, nil)
+	case .Symlink:
+		target, link_err := os.read_link(info.fullpath, sw.allocator)
+		if link_err != nil {
+			return link_err
+		}
+		defer delete(target, sw.allocator)
+		fi.type        = .Symlink
+		fi.link_target = target
+		return _write_entry(sw, fi, nil, options, nil)
+	case .Regular:
+		f, open_err := os.open(info.fullpath)
+		if open_err != nil {
+			return open_err
+		}
+		defer os.close(f)
+		fi.type = .Regular
+		fi.size = info.size
+		return _write_entry(sw, fi, os.to_reader(f), options, pick)
+	}
+	return nil
+}
+
+@(private)
+_group_walked :: proc(sw: ^Writer, setup: Coder_Setup, entry: ^Walked_Entry) -> (err: Error) {
+	#partial switch entry.info.type {
+	case .Symlink:
+		entry.stream = true
+		entry.pick   = {filter = .None}
+	case .Regular:
+		if entry.info.size <= 0 {
+			return nil
+		}
+		entry.stream = true
+		head: []u8
+		if setup.filter == .Auto && setup.method != .Store {
+			f, open_err := os.open(entry.info.fullpath)
+			if open_err != nil {
+				return open_err
+			}
+			defer os.close(f)
+			source := Source{reader = os.to_reader(f)}
+			head = _read_head(sw, &source) or_return
+		}
+		entry.pick = _pick_filter(sw, setup, head, entry.info.size)
+	}
+	return nil
+}
+
+@(private)
+_less_by_group :: proc(a, b: Walked_Entry) -> bool {
+	if a.stream != b.stream {
+		return !a.stream
+	}
+	if a.stream {
+		ka, kb := _group_key(a.pick), _group_key(b.pick)
+		if ka != kb {
+			return ka < kb
+		}
+	}
+	return a.name < b.name
+}
+
+@(private)
+_less_by_extension :: proc(a, b: Walked_Entry) -> bool {
+	if a.stream != b.stream {
+		return !a.stream
+	}
+	if !a.stream {
+		return a.name < b.name
+	}
+	ka, kb := _group_key(a.pick), _group_key(b.pick)
+	if ka != kb {
+		return ka < kb
+	}
+	ia, ea, na := _extension(a.name)
+	ib, eb, nb := _extension(b.name)
+	if ia != ib {
+		return ia < ib
+	}
+	if ea != eb {
+		return ea < eb
+	}
+	if na != nb {
+		return na < nb
+	}
+	return a.name < b.name
+}
+
+@(private)
+_group_key :: proc "contextless" (pick: Filter_Pick) -> (key: u64) {
+	id := u64(0) if pick.filter == .None else u64(_filter_id(pick.filter))
+	return id << 16 | u64(_filter_align(pick))
+}
+
+@(private)
+_extension :: proc "contextless" (name: string) -> (index: int, ext, base: string) {
+	slash := strings.last_index_byte(name, '/')
+	base = name[slash + 1:]
+	dot := strings.last_index_byte(name, '.')
+	if dot <= slash {
+		return 0, name[len(name):], base
+	}
+	ext = name[dot + 1:]
+	if ext == "" {
+		return
+	}
+	for c in transmute([]u8)ext {
+		if c >= 0x80 {
+			return
+		}
+	}
+	index = len(SORT_EXTENSIONS) + 1
+	for known, i in SORT_EXTENSIONS {
+		if len(known) != len(ext) {
+			continue
+		}
+		match := true
+		for k in 0..<len(ext) {
+			c := ext[k]
+			if c >= 'A' && c <= 'Z' {
+				c += 'a' - 'A'
+			}
+			if c != known[k] {
+				match = false
+				break
+			}
+		}
+		if match {
+			index = i + 1
+			break
+		}
+	}
+	return
+}
+
+@(private)
+_pick_filter :: proc(sw: ^Writer, setup: Coder_Setup, head: []u8, size: i64) -> (pick: Filter_Pick) {
+	#partial switch setup.filter {
+	case .Auto:
+		if setup.method == .Store {
+			return {filter = .None}
+		}
+		pick = _sniff(head)
+		if pick.filter == .None {
+			return
+		}
+		pick.auto = true
+		align := _filter_align(pick)
+		if pick.filter != .Delta && align > 1 && size >= 0 && size % i64(align) != 0 {
+			return {filter = .None}
+		}
+		if pick.filter == .BCJ_X86 && setup.level >= _default_level(setup.method) && size >= 0 && size <= _bcj2_cap(sw) {
+			pick.filter = .BCJ2
+		}
+	case .Delta:
+		pick = {filter = .Delta, delta = max(setup.delta, 1)}
+	case:
+		pick = {filter = setup.filter}
+	}
+	return
+}
+
+@(private)
+_apply_pick :: proc "contextless" (setup: ^Coder_Setup, pick: Filter_Pick) {
+	setup.filter = pick.filter
+	setup.delta  = pick.delta if pick.filter == .Delta else 0
+	if !pick.auto || setup.lzma_set || (setup.method != .LZMA && setup.method != .LZMA2) {
+		return
+	}
+	align := _filter_align(pick)
+	bits  := 0
+	switch {
+	case align & 1  != 0: bits = 0
+	case align & 2  != 0: bits = 1
+	case align & 4  != 0: bits = 2
+	case align & 8  != 0: bits = 3
+	case align & 16 != 0: bits = 4
+	}
+	if bits == 0 {
+		return
+	}
+	if bits > 2 || pick.filter == .Delta {
+		setup.lzma.pb = u8(bits)
+	}
+	setup.lzma.lc = u8(3 - bits) if bits < 3 else 0
+	setup.lzma.lp = u8(bits)
+}
+
+@(private)
+_filter_align :: proc "contextless" (pick: Filter_Pick) -> (align: int) {
+	#partial switch pick.filter {
+	case .Delta:
+		return pick.delta
+	case .BCJ_IA64:
+		return 16
+	case .BCJ_ARM64, .BCJ_ARM, .BCJ_PPC, .BCJ_SPARC:
+		return 4
+	case .BCJ_ARMT, .BCJ_RISCV:
+		return 2
+	case .BCJ_X86, .BCJ2:
+		return 1
+	}
+	return 0
+}
+
+@(private)
+_filter_id :: proc "contextless" (filter: Filter_Choice) -> (id: Method_ID) {
+	#partial switch filter {
+	case .Delta:     return .Delta
+	case .BCJ_X86:   return .BCJ_X86
+	case .BCJ_PPC:   return .BCJ_PPC
+	case .BCJ_IA64:  return .BCJ_IA64
+	case .BCJ_ARM:   return .BCJ_ARM
+	case .BCJ_ARMT:  return .BCJ_ARMT
+	case .BCJ_SPARC: return .BCJ_SPARC
+	case .BCJ_ARM64: return .ARM64
+	case .BCJ_RISCV: return .RISCV
+	case .BCJ2:      return .BCJ2
+	case .Swap2:     return .Swap2
+	case .Swap4:     return .Swap4
+	}
+	return .Copy
+}
+
+@(private)
+_method_id :: proc "contextless" (method: archive.Method) -> (id: Method_ID) {
+	#partial switch method {
+	case .LZMA2:     return .LZMA2
+	case .LZMA:      return .LZMA
+	case .PPMd_H:    return .PPMd
+	case .BZip2:     return .BZip2
+	case .Deflate:   return .Deflate
+	case .Deflate64: return .Deflate64
+	}
+	return .Copy
+}
+
+@(private)
+_choice_arch :: proc "contextless" (filter: Filter_Choice) -> (arch: filters.Branch_Arch) {
+	#partial switch filter {
+	case .BCJ_PPC:   return .PowerPC
+	case .BCJ_IA64:  return .IA64
+	case .BCJ_ARM:   return .ARM
+	case .BCJ_ARMT:  return .ARM_Thumb
+	case .BCJ_SPARC: return .SPARC
+	case .BCJ_ARM64: return .ARM64
+	case .BCJ_RISCV: return .RISCV
+	}
+	return .X86
+}
+
+@(private)
+_bcj2_cap :: proc "contextless" (sw: ^Writer) -> (limit: i64) {
+	return i64(compress.memory_limit(sw.options.options)) / 4
+}
+
+@(private)
+_solid_limit :: proc "contextless" (sw: ^Writer, setup: Coder_Setup) -> (limit: i64) {
+	if !sw.options.solid {
+		return 0
+	}
+	dict: i64
+	#partial switch setup.method {
+	case .LZMA, .LZMA2:
+		dict = i64(setup.lzma.dict_size)
+	case .PPMd_H:
+		dict = i64(setup.ppmd.mem_size)
+	case .Deflate:
+		dict = 1 << 15
+	case .Deflate64:
+		dict = 1 << 16
+	case .BZip2:
+		dict = i64(setup.level) * 100_000
+	}
+	switch {
+	case sw.options.solid_size > 0:
+		limit = sw.options.solid_size
+	case setup.method == .Store:
+		return 0
+	case setup.method == .LZMA2:
+		chunk := clamp(dict << 2, LZMA2_CHUNK_MIN, LZMA2_CHUNK_MAX)
+		chunk  = max(chunk, dict)
+		chunk  = (chunk + LZMA2_CHUNK_MIN - 1) &~ (LZMA2_CHUNK_MIN - 1)
+		limit  = max(min(chunk << 6, SOLID_SIZE_LZMA2_MAX), SOLID_SIZE_MIN)
+	case:
+		limit = max(min(dict << 7, SOLID_SIZE_MAX), SOLID_SIZE_MIN)
+	}
+	if setup.filter == .BCJ2 {
+		limit = min(limit, _bcj2_cap(sw))
+	}
+	return
+}
+
+@(private)
+_folder_accepts :: proc(sw: ^Writer, setup: Coder_Setup, expected: i64) -> bool {
+	f := &sw.folder
+	if f.setup != setup || f.broken {
+		return false
+	}
+	if sw.options.solid_files > 0 && f.files >= sw.options.solid_files {
+		return false
+	}
+	if expected >= 0 && f.unpack + expected > f.limit {
+		return false
+	}
+	return true
+}
+
+@(private)
+_folder_open :: proc(sw: ^Writer, setup: Coder_Setup, expected: i64) -> (err: Error) {
+	f := &sw.folder
+	input := f.input
+	f^ = {}
+	f.input  = input
+	f.setup  = setup
+	f.limit  = _solid_limit(sw, setup)
+	f.sink   = {writer = sw}
+	clear(&f.input)
+	folder := &f.folder
+	size   := expected if !sw.options.solid else -1
+	if setup.filter == .BCJ2 {
+		folder.bcj2        = true
+		folder.coder_count = 4
+		folder.coders[0]   = {id = .LZMA, in_streams = 1}
+		folder.coders[1]   = {id = .LZMA, in_streams = 1}
+		folder.coders[2]   = {id = _method_id(setup.method), in_streams = 1}
+		folder.coders[3]   = {id = .BCJ2, in_streams = 4}
+		main_setup := setup
+		if size >= 0 && i64(main_setup.lzma.dict_size) > size {
+			main_setup.lzma.dict_size = u32(max(size, lzma.DICT_SIZE_MIN))
+		}
+		bcj2_main := &folder.coders[2]
+		if bcj2_main.properties_size, err = _encoder_init(&f.encoder, sw, main_setup, -1, size, _sink_writer(&f.sink), bcj2_main.properties[:]); err != nil {
+			_encoder_destroy(&f.encoder)
+			f.encoder = {}
+			return
+		}
+		f.active = true
+		return nil
+	}
+	main := &folder.coders[0]
+	main^ = {id = _method_id(setup.method), in_streams = 1}
+	folder.coder_count = 1
+	if setup.filter != .None {
+		folder.coder_count = 2
+		filter := &folder.coders[1]
+		filter^ = {id = _filter_id(setup.filter), in_streams = 1}
+		if setup.filter == .Delta {
+			filter.properties[0]   = u8(setup.delta - 1)
+			filter.properties_size = 1
+		}
+		_stage_init(sw, &f.stage, setup) or_return
+	}
+	if main.properties_size, err = _encoder_init(&f.encoder, sw, setup, size, size, _sink_writer(&f.sink), main.properties[:]); err != nil {
+		_encoder_destroy(&f.encoder)
+		f.encoder = {}
+		return
+	}
+	f.active = true
+	return nil
+}
+
+@(private)
+_stage_init :: proc(sw: ^Writer, stage: ^Filter_Stage, setup: Coder_Setup) -> (err: Error) {
+	if sw.filter_buffer == nil {
+		sw.filter_buffer = make([]u8, FILTER_BUFFER_SIZE, sw.allocator) or_return
+	}
+	stage^ = {filter = setup.filter, buffer = sw.filter_buffer}
+	#partial switch setup.filter {
+	case .Delta:
+		filters.delta_init(&stage.delta, setup.delta)
+	case .Swap2, .Swap4:
+	case:
+		filters.branch_init(&stage.branch, _choice_arch(setup.filter))
+	}
+	return nil
+}
+
+@(private)
+_folder_feed :: proc(sw: ^Writer, source: ^Source, head: []u8, expected: i64, file: ^Out_File, out_start: i64) -> (err: Error) {
+	f := &sw.folder
+	interval  := i64(compress.progress_interval(sw.options.options))
+	crc       := hash.crc32(head)
+	total     := i64(len(head))
+	reported  := i64(0)
+	_folder_write(sw, head) or_return
+	chunk := _chunk(sw) or_return
+	for {
+		if total - reported >= interval {
+			_progress(sw, len(sw.files), total, expected, sw.offset - out_start, sw.archive_in + total) or_return
+			reported = total
+		}
+		data, read_err := _source_next(source, chunk)
+		if len(data) > 0 {
+			crc    = hash.crc32(data, crc)
+			total += i64(len(data))
+			if expected >= 0 && total > expected {
+				return SevenZ_Error.Size_Mismatch
+			}
+			_folder_write(sw, data) or_return
+		}
+		if read_err == .EOF {
+			break
+		}
+		if read_err != nil {
+			return read_err
+		}
+	}
+	if expected >= 0 && total != expected {
+		return SevenZ_Error.Size_Mismatch
+	}
+	f.unpack += total
+	f.files  += 1
+	f.folder.stream_count += 1
+	align := _filter_align({filter = f.setup.filter, delta = f.setup.delta})
+	if f.setup.filter != .Delta && align > 1 && total % i64(align) != 0 {
+		f.broken = true
+	}
+	file.size       = total
+	file.crc        = crc
+	file.has_stream = true
+	return nil
+}
+
+@(private)
+_folder_write :: proc(sw: ^Writer, data: []u8) -> (err: Error) {
+	f := &sw.folder
+	if f.folder.bcj2 {
+		if i64(len(f.input)) + i64(len(data)) > _bcj2_cap(sw) {
+			return compress.Error(compress.General_Error.Memory_Limit_Exceeded)
+		}
+		append(&f.input, ..data) or_return
+		return nil
+	}
+	if f.folder.coder_count == 1 {
+		return _encoder_write(&f.encoder, data)
+	}
+	stage := &f.stage
+	rest  := data
+	for len(rest) > 0 {
+		n := copy(stage.buffer[stage.pending:], rest)
+		rest = rest[n:]
+		total := stage.pending + n
+		done  := 0
+		#partial switch stage.filter {
+		case .Delta:
+			filters.delta_encode(&stage.delta, stage.buffer[:total])
+			done = total
+		case .Swap2:
+			done = filters.swap2(stage.buffer[:total])
+		case .Swap4:
+			done = filters.swap4(stage.buffer[:total])
+		case:
+			done = filters.branch_encode(&stage.branch, stage.buffer[:total])
+		}
+		_encoder_write(&f.encoder, stage.buffer[:done]) or_return
+		stage.pending = copy(stage.buffer, stage.buffer[done:total])
+	}
+	return nil
+}
+
+@(private)
+_folder_close :: proc(sw: ^Writer) -> (err: Error) {
+	f := &sw.folder
+	defer _folder_destroy(sw)
+	folder := &f.folder
+	if folder.bcj2 {
+		_folder_close_bcj2(sw) or_return
+	} else {
+		if folder.coder_count == 2 {
+			stage := &f.stage
+			_encoder_write(&f.encoder, stage.buffer[:stage.pending]) or_return
+			stage.pending = 0
+		}
+		_encoder_finish(&f.encoder) or_return
+		append(&sw.pack_sizes, f.sink.count) or_return
+		for &c in folder.coders[:folder.coder_count] {
+			c.unpack_size = f.unpack
+		}
+	}
+	append(&sw.folders, folder^) or_return
+	return nil
+}
+
+@(private)
+_folder_close_bcj2 :: proc(sw: ^Writer) -> (err: Error) {
+	f := &sw.folder
+	folder := &f.folder
+	streams: filters.Bcj2_Streams
+	defer {
+		delete(streams.main)
+		delete(streams.call)
+		delete(streams.jump)
+		delete(streams.rc)
+	}
+	filters.bcj2_encode(&streams, f.input[:], allocator = sw.allocator) or_return
+	delete(f.input)
+	f.input = {}
+	f.input.allocator = sw.allocator
+
+	_encoder_write(&f.encoder, streams.main[:]) or_return
+	_encoder_finish(&f.encoder) or_return
+	append(&sw.pack_sizes, f.sink.count) or_return
+
+	_emit(sw, streams.rc[:]) or_return
+	append(&sw.pack_sizes, i64(len(streams.rc))) or_return
+	_pack_lzma(sw, streams.call[:], &folder.coders[1]) or_return
+	_pack_lzma(sw, streams.jump[:], &folder.coders[0]) or_return
+
+	folder.coders[0].unpack_size = i64(len(streams.jump))
+	folder.coders[1].unpack_size = i64(len(streams.call))
+	folder.coders[2].unpack_size = i64(len(streams.main))
+	folder.coders[3].unpack_size = f.unpack
+	return nil
+}
+
+@(private)
+_pack_lzma :: proc(sw: ^Writer, data: []u8, coder: ^Out_Coder) -> (err: Error) {
+	packed: [dynamic]u8
+	packed.allocator = sw.allocator
+	defer delete(packed)
+	props   := lzma.compress_raw_to_dynamic(&packed, data, BCJ2_LZMA_OPTIONS, sw.allocator) or_return
+	encoded := lzma.encode_properties(props)
+	coder.properties_size = copy(coder.properties[:], encoded[:])
+	_emit(sw, packed[:]) or_return
+	append(&sw.pack_sizes, i64(len(packed))) or_return
+	return nil
+}
+
+@(private)
+_folder_destroy :: proc(sw: ^Writer) {
+	f := &sw.folder
+	_encoder_destroy(&f.encoder)
+	input := f.input
+	clear(&input)
+	f^ = {}
+	f.input = input
+}
+
+@(private)
+_codec_options :: proc "contextless" (sw: ^Writer) -> (options: compress.Options) {
+	options = sw.options.options
+	options.progress      = nil
+	options.progress_data = nil
+	return
+}
+
+@(private)
+_encoder_init :: proc(e: ^Encoder, sw: ^Writer, setup: Coder_Setup, size, hint: i64, w: io.Writer, properties: []u8) -> (properties_size: int, err: Error) {
+	e.method = setup.method
+	e.w      = w
+	options := _codec_options(sw)
+	#partial switch setup.method {
+	case .LZMA2:
+		props := lzma.writer_init_lzma2(&e.lzma, w, setup.lzma, size, options, sw.allocator) or_return
+		properties[0] = lzma.lzma2_dict_prop(props.dict_size)
+		return 1, nil
+	case .LZMA:
+		props   := lzma.writer_init_raw(&e.lzma, w, setup.lzma, size, options, sw.allocator) or_return
+		encoded := lzma.encode_properties(props)
+		return copy(properties, encoded[:]), nil
+	case .PPMd_H:
+		props := setup.ppmd
+		if !setup.ppmd_set && hint >= 0 {
+			props = ppmd.level_properties(.H, ppmd.Level(setup.level), int(min(hint, i64(max(int)))))
+		}
+		encoded := ppmd.encode_properties_7z(props) or_return
+		ppmd.writer_init(&e.ppmd, w, props, false, options, sw.allocator) or_return
+		return copy(properties, encoded[:]), nil
+	case .BZip2:
+		bzip2.writer_init(&e.bzip2, w, bzip2.Level(setup.level), options, sw.allocator) or_return
+	case .Deflate:
+		deflate.deflate_writer_init(&e.deflate, w, .Raw, deflate.Deflate_Level(setup.level), options, sw.allocator) or_return
+	case .Deflate64:
+		deflate.deflate_writer_init(&e.deflate, w, .Raw64, deflate.Deflate_Level(setup.level), options, sw.allocator) or_return
+	}
+	return 0, nil
+}
+
+@(private)
+_encoder_write :: proc(e: ^Encoder, data: []u8) -> (err: Error) {
+	#partial switch e.method {
+	case .Store:
+		if _, write_err := io.write_full(e.w, data); write_err != nil {
+			return write_err
+		}
+	case .Deflate, .Deflate64:
+		_ = deflate.deflate_writer_write(&e.deflate, data) or_return
+	case .BZip2:
+		_ = bzip2.writer_write(&e.bzip2, data) or_return
+	case .LZMA, .LZMA2:
+		_ = lzma.writer_write(&e.lzma, data) or_return
+	case .PPMd_H:
+		_ = ppmd.writer_write(&e.ppmd, data) or_return
+	}
+	return nil
+}
+
+@(private)
+_encoder_finish :: proc(e: ^Encoder) -> (err: Error) {
+	#partial switch e.method {
+	case .Deflate, .Deflate64:
+		deflate.deflate_writer_finish(&e.deflate) or_return
+	case .BZip2:
+		bzip2.writer_finish(&e.bzip2) or_return
+	case .LZMA, .LZMA2:
+		lzma.writer_finish(&e.lzma) or_return
+	case .PPMd_H:
+		ppmd.writer_finish(&e.ppmd) or_return
+	}
+	return nil
+}
+
+@(private)
+_encoder_destroy :: proc(e: ^Encoder) {
+	deflate.deflate_writer_destroy(&e.deflate)
+	bzip2.writer_destroy(&e.bzip2)
+	lzma.writer_destroy(&e.lzma)
+	ppmd.writer_destroy(&e.ppmd)
+}
+
+@(private)
+_sink_writer :: proc(sink: ^Pack_Sink) -> (w: io.Writer) {
+	w.data      = sink
+	w.procedure = _sink_proc
+	return
+}
+
+@(private)
+_sink_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	sink := (^Pack_Sink)(stream_data)
+	#partial switch mode {
+	case .Write:
+		sw := sink.writer
+		written, write_err := io.write_full(sw.stream, p)
+		sink.count += i64(written)
+		sw.offset  += i64(written)
+		sw.end      = max(sw.end, sw.offset)
+		return i64(written), write_err
+	case .Flush:
+		return 0, nil
+	case .Query:
+		return io.query_utility({.Write, .Flush, .Query})
+	}
+	return 0, .Unsupported
+}
+
+@(private)
+_read_head :: proc(sw: ^Writer, source: ^Source) -> (head: []u8, err: Error) {
+	if source.reader.procedure == nil {
+		n := min(len(source.data), SNIFF_SIZE)
+		source.position = n
+		return source.data[:n], nil
+	}
+	if sw.head == nil {
+		sw.head = make([]u8, SNIFF_SIZE, sw.allocator) or_return
+	}
+	n     := 0
+	zeros := 0
+	for n < len(sw.head) {
+		m, read_err := io.read(source.reader, sw.head[n:])
+		n += m
+		if read_err == .EOF {
+			source.eof = true
+			break
+		}
+		if read_err != nil {
+			return nil, read_err
+		}
+		if m > 0 {
+			zeros = 0
+		} else {
+			zeros += 1
+			if zeros >= ZERO_READS_MAX {
+				return nil, io.Error.No_Progress
+			}
+		}
+	}
+	return sw.head[:n], nil
+}
+
+@(private)
+_source_next :: proc(source: ^Source, chunk: []u8) -> (data: []u8, err: io.Error) {
+	if source.reader.procedure == nil {
+		if source.position >= len(source.data) {
+			return nil, .EOF
+		}
+		n := min(len(source.data) - source.position, len(chunk))
+		data = source.data[source.position:][:n]
+		source.position += n
+		return data, nil
+	}
+	if source.eof {
+		return nil, .EOF
+	}
+	for _ in 0..<ZERO_READS_MAX {
+		n, read_err := io.read(source.reader, chunk)
+		if read_err == .EOF {
+			source.eof = true
+		}
+		if n > 0 || read_err != nil {
+			return chunk[:n], read_err
+		}
+	}
+	return nil, .No_Progress
+}
+
+@(private)
+_chunk :: proc(sw: ^Writer) -> (chunk: []u8, err: Error) {
+	if sw.chunk == nil {
+		sw.chunk = make([]u8, COPY_CHUNK_SIZE, sw.allocator) or_return
+	}
+	return sw.chunk, nil
+}
+
+@(private)
+_add_file :: proc(sw: ^Writer, file: Out_File) -> (err: Error) {
+	mark := len(sw.names)
+	defer if err != nil {
+		resize(&sw.names, mark)
+	}
+	_append_name(&sw.names, sw.name[:]) or_return
+	append(&sw.files, file) or_return
+	sw.archive_in += file.size
+	return nil
+}
+
+@(private)
+_append_name :: proc(out: ^[dynamic]u8, name: []u8) -> (err: runtime.Allocator_Error) {
+	reserve(out, len(out) + 2 * len(name) + 2) or_return
+	i := 0
+	for i < len(name) {
+		r, n := utf8.decode_rune(name[i:])
+		if r == utf8.RUNE_ERROR && n == 1 || r >= ESCAPE_FIRST && r <= ESCAPE_LAST {
+			for b in name[i:][:n] {
+				_put_u16(out, ESCAPE_BASE + u16(b))
+			}
+		} else if r >= 0x10000 {
+			v := u32(r) - 0x10000
+			_put_u16(out, 0xD800 + u16(v >> 10))
+			_put_u16(out, 0xDC00 + u16(v & 0x3FF))
+		} else {
+			_put_u16(out, u16(r))
+		}
+		i += n
+	}
+	_put_u16(out, 0)
+	return nil
+}
+
+@(private)
+_attributes :: proc "contextless" (fi: archive.File_Info, type: archive.Entry_Type) -> (attributes: u32) {
+	mode := fi.unix_mode
+	if mode == 0 {
+		switch {
+		case fi.dos_attributes != 0:
+			mode = archive.unix_mode_from_dos(fi.dos_attributes | (archive.DOS_DIRECTORY if type == .Directory else 0))
+		case type == .Directory:
+			mode = 0o755
+		case type == .Symlink:
+			mode = 0o777
+		case:
+			mode = 0o644
+		}
+	}
+	mode = mode & archive.UNIX_PERMISSION_MASK | archive.unix_type_bits(type)
+	dos := fi.dos_attributes & 0x7FFF
+	if dos == 0 {
+		dos = archive.dos_attributes_from_unix(mode, type)
+	}
+	if type == .Directory {
+		dos |= archive.DOS_DIRECTORY
+	} else {
+		dos &~= archive.DOS_DIRECTORY
+	}
+	return dos | UNIX_EXTENSION | mode << 16
+}
+
+@(private)
+_filetime :: proc "contextless" (t: time.Time) -> (filetime: u64) {
+	if t == {} {
+		return 0
+	}
+	ticks := time.time_to_unix_nano(t) / 100 + NTFS_EPOCH_DELTA
+	return u64(ticks) if ticks > 0 else 0
+}
+
+@(private)
+_entry_done :: proc(sw: ^Writer, file: ^Out_File, bytes_out: i64) -> (err: Error) {
+	return _progress(sw, len(sw.files) - 1, file.size, file.size, bytes_out, sw.archive_in)
+}
+
+@(private)
+_progress :: proc(sw: ^Writer, index: int, bytes_in, total_in, bytes_out, archive_in: i64) -> (err: Error) {
+	options := sw.options.options
+	if options.progress == nil {
+		return nil
+	}
+	progress := compress.Progress{
+		bytes_in         = bytes_in,
+		bytes_out        = bytes_out,
+		total_in         = total_in,
+		total_out        = -1,
+		member           = string(sw.name[:]),
+		member_index     = index,
+		member_count     = -1,
+		archive_in       = archive_in,
+		archive_total_in = -1,
+	}
+	if options.progress(progress, options.progress_data) {
+		sw.err = compress.Error(compress.General_Error.Canceled)
+		return sw.err
+	}
+	return nil
+}
+
+@(private)
+_build_header :: proc(sw: ^Writer) -> (err: Error) {
+	buf := &sw.header
+	clear(buf)
+	bound := 256 + 320 * len(sw.folders) + 10 * len(sw.pack_sizes) + 48 * len(sw.files) + len(sw.names)
+	reserve(buf, bound) or_return
+
+	_put_id(buf, .Header)
+	if len(sw.folders) > 0 {
+		_put_id(buf, .Main_Streams)
+		_put_id(buf, .Pack_Info)
+		_put_number(buf, 0)
+		_put_number(buf, u64(len(sw.pack_sizes)))
+		_put_id(buf, .Size)
+		for size in sw.pack_sizes {
+			_put_number(buf, u64(size))
+		}
+		_put_id(buf, .End)
+
+		_put_id(buf, .Unpack_Info)
+		_put_id(buf, .Folder)
+		_put_number(buf, u64(len(sw.folders)))
+		append(buf, 0)
+		for &folder in sw.folders {
+			_put_folder(buf, &folder)
+		}
+		_put_id(buf, .Coders_Unpack_Size)
+		for &folder in sw.folders {
+			for c in folder.coders[:folder.coder_count] {
+				_put_number(buf, u64(c.unpack_size))
+			}
+		}
+		_put_id(buf, .End)
+
+		_put_id(buf, .Substreams_Info)
+		multiple := false
+		for folder in sw.folders {
+			if folder.stream_count != 1 {
+				multiple = true
+			}
+		}
+		if multiple {
+			_put_id(buf, .Num_Unpack_Stream)
+			for folder in sw.folders {
+				_put_number(buf, u64(folder.stream_count))
+			}
+			_put_id(buf, .Size)
+			index := 0
+			for folder in sw.folders {
+				for k in 0..<folder.stream_count {
+					for !sw.files[index].has_stream {
+						index += 1
+					}
+					if k + 1 < folder.stream_count {
+						_put_number(buf, u64(sw.files[index].size))
+					}
+					index += 1
+				}
+			}
+		}
+		_put_id(buf, .CRC)
+		append(buf, 1)
+		for file in sw.files {
+			if file.has_stream {
+				_put_u32(buf, file.crc)
+			}
+		}
+		_put_id(buf, .End)
+		_put_id(buf, .End)
+	}
+
+	_put_id(buf, .Files_Info)
+	_put_number(buf, u64(len(sw.files)))
+	empty, empty_files := 0, 0
+	for file in sw.files {
+		if !file.has_stream {
+			empty += 1
+			if !file.is_directory {
+				empty_files += 1
+			}
+		}
+	}
+	if empty > 0 {
+		_put_id(buf, .Empty_Stream)
+		_put_number(buf, u64((len(sw.files) + 7) / 8))
+		bits, mask := u8(0), u8(0x80)
+		for file in sw.files {
+			if !file.has_stream {
+				bits |= mask
+			}
+			mask >>= 1
+			if mask == 0 {
+				append(buf, bits)
+				bits, mask = 0, 0x80
+			}
+		}
+		if mask != 0x80 {
+			append(buf, bits)
+		}
+		if empty_files > 0 {
+			_put_id(buf, .Empty_File)
+			_put_number(buf, u64((empty + 7) / 8))
+			bits, mask = 0, 0x80
+			for file in sw.files {
+				if file.has_stream {
+					continue
+				}
+				if !file.is_directory {
+					bits |= mask
+				}
+				mask >>= 1
+				if mask == 0 {
+					append(buf, bits)
+					bits, mask = 0, 0x80
+				}
+			}
+			if mask != 0x80 {
+				append(buf, bits)
+			}
+		}
+	}
+
+	_put_id(buf, .Name)
+	_put_number(buf, u64(len(sw.names) + 1))
+	append(buf, 0)
+	append(buf, ..sw.names[:])
+
+	_put_times(buf, sw.files[:], .Creation_Time)
+	_put_times(buf, sw.files[:], .Access_Time)
+	_put_times(buf, sw.files[:], .Modification_Time)
+
+	_put_id(buf, .Attributes)
+	_put_number(buf, u64(4 * len(sw.files) + 2))
+	append(buf, 1)
+	append(buf, 0)
+	for file in sw.files {
+		_put_u32(buf, file.attributes)
+	}
+	_put_id(buf, .End)
+	_put_id(buf, .End)
+	return nil
+}
+
+@(private)
+_put_times :: proc(buf: ^[dynamic]u8, files: []Out_File, id: Property_ID) {
+	defined := 0
+	for &file in files {
+		if _file_time(&file, id) != 0 {
+			defined += 1
+		}
+	}
+	if defined == 0 {
+		return
+	}
+	vector := 0 if defined == len(files) else (len(files) + 7) / 8
+	_put_id(buf, id)
+	_put_number(buf, u64(8 * defined + vector + 2))
+	if vector == 0 {
+		append(buf, 1)
+	} else {
+		append(buf, 0)
+		bits, mask := u8(0), u8(0x80)
+		for &file in files {
+			if _file_time(&file, id) != 0 {
+				bits |= mask
+			}
+			mask >>= 1
+			if mask == 0 {
+				append(buf, bits)
+				bits, mask = 0, 0x80
+			}
+		}
+		if mask != 0x80 {
+			append(buf, bits)
+		}
+	}
+	append(buf, 0)
+	for &file in files {
+		if t := _file_time(&file, id); t != 0 {
+			_put_u64(buf, t)
+		}
+	}
+}
+
+@(private)
+_file_time :: proc "contextless" (file: ^Out_File, id: Property_ID) -> (filetime: u64) {
+	#partial switch id {
+	case .Creation_Time: return file.creation_time
+	case .Access_Time:   return file.access_time
+	}
+	return file.modification_time
+}
+
+@(private)
+_put_folder :: proc(buf: ^[dynamic]u8, folder: ^Out_Folder) {
+	_put_number(buf, u64(folder.coder_count))
+	for &c in folder.coders[:folder.coder_count] {
+		id   := u64(c.id)
+		size := 1
+		for size < 8 && id >> (8 * uint(size)) != 0 {
+			size += 1
+		}
+		flags := u8(size)
+		if c.in_streams != 1 {
+			flags |= 0x10
+		}
+		if c.properties_size > 0 {
+			flags |= 0x20
+		}
+		append(buf, flags)
+		for k in 0..<size {
+			append(buf, u8(id >> (8 * uint(size - 1 - k))))
+		}
+		if c.in_streams != 1 {
+			_put_number(buf, u64(c.in_streams))
+			_put_number(buf, 1)
+		}
+		if c.properties_size > 0 {
+			_put_number(buf, u64(c.properties_size))
+			append(buf, ..c.properties[:c.properties_size])
+		}
+	}
+	if folder.bcj2 {
+		bonds  := [3][2]u64{{5, 0}, {4, 1}, {3, 2}}
+		packed := [4]u64{2, 6, 1, 0}
+		for bond in bonds {
+			_put_number(buf, bond[0])
+			_put_number(buf, bond[1])
+		}
+		for index in packed {
+			_put_number(buf, index)
+		}
+	} else if folder.coder_count == 2 {
+		_put_number(buf, 1)
+		_put_number(buf, 0)
+	}
+}
+
+@(private)
+_encode_header :: proc(sw: ^Writer) -> (err: Error) {
+	packed: [dynamic]u8
+	packed.allocator = sw.allocator
+	defer delete(packed)
+	props    := lzma.compress_raw_to_dynamic(&packed, sw.header[:], HEADER_LZMA_OPTIONS, sw.allocator) or_return
+	encoded  := lzma.encode_properties(props)
+	crc      := hash.crc32(sw.header[:])
+	size     := len(sw.header)
+	pack_pos := sw.offset - sw.start - SIGNATURE_HEADER_SIZE
+	_emit(sw, packed[:]) or_return
+
+	buf := &sw.header
+	clear(buf)
+	reserve(buf, 128) or_return
+	folder := Out_Folder{coder_count = 1}
+	folder.coders[0] = {id = .LZMA, in_streams = 1, unpack_size = i64(size)}
+	folder.coders[0].properties_size = copy(folder.coders[0].properties[:], encoded[:])
+	_put_id(buf, .Encoded_Header)
+	_put_id(buf, .Pack_Info)
+	_put_number(buf, u64(pack_pos))
+	_put_number(buf, 1)
+	_put_id(buf, .Size)
+	_put_number(buf, u64(len(packed)))
+	_put_id(buf, .End)
+	_put_id(buf, .Unpack_Info)
+	_put_id(buf, .Folder)
+	_put_number(buf, 1)
+	append(buf, 0)
+	_put_folder(buf, &folder)
+	_put_id(buf, .Coders_Unpack_Size)
+	_put_number(buf, u64(size))
+	_put_id(buf, .CRC)
+	append(buf, 1)
+	_put_u32(buf, crc)
+	_put_id(buf, .End)
+	_put_id(buf, .End)
+	return nil
+}
+
+@(private)
+_start_header :: proc(next_offset, next_size: i64, next_crc: u32) -> (h: [SIGNATURE_HEADER_SIZE]u8) {
+	signature := SIGNATURE
+	copy(h[:], signature[:])
+	h[6] = VERSION_MAJOR
+	h[7] = VERSION_MINOR
+	for i in 0..<8 {
+		h[12 + i] = u8(u64(next_offset) >> (8 * uint(i)))
+		h[20 + i] = u8(u64(next_size) >> (8 * uint(i)))
+	}
+	for i in 0..<4 {
+		h[28 + i] = u8(next_crc >> (8 * uint(i)))
+	}
+	crc := hash.crc32(h[12:])
+	for i in 0..<4 {
+		h[8 + i] = u8(crc >> (8 * uint(i)))
+	}
+	return
+}
+
+@(private)
+_sniff :: proc "contextless" (b: []u8) -> (pick: Filter_Pick) {
+	if filter, ok := _sniff_pe(b); ok {
+		return {filter = filter}
+	}
+	if filter, ok := _sniff_elf(b); ok {
+		return {filter = filter}
+	}
+	if filter, ok := _sniff_macho(b); ok {
+		return {filter = filter}
+	}
+	if delta, ok := _sniff_wav(b); ok {
+		return {filter = .Delta, delta = delta}
+	}
+	return {filter = .None}
+}
+
+@(private)
+_sniff_pe :: proc "contextless" (b: []u8) -> (filter: Filter_Choice, ok: bool) {
+	if len(b) < 512 || _get16(b, 0, false) != 0x5A4D {
+		return
+	}
+	pe_offset := _get32(b, 0x3C, false)
+	if pe_offset >= 0x1000 || int(pe_offset) + 512 > len(b) || pe_offset & 7 != 0 {
+		return
+	}
+	p := int(pe_offset)
+	if _get32(b, p, false) != 0x00004550 {
+		return
+	}
+	p += 4
+	machine := _get16(b, p, false)
+	switch machine {
+	case 0x014C, 0x8664: filter = .BCJ_X86
+	case 0xAA64:         filter = .BCJ_ARM64
+	case 0x01C0, 0x01C2: filter = .BCJ_ARM
+	case 0x01C4:         filter = .BCJ_ARMT
+	case 0x5032, 0x5064: filter = .BCJ_RISCV
+	case 0x0200:         filter = .BCJ_IA64
+	case:
+		return
+	}
+	sections := int(_get16(b, p + 2, false))
+	optional := int(_get16(b, p + 16, false))
+	if optional > 1 << 10 {
+		return .None, false
+	}
+	p += 20
+	magic := _get16(b, p, false)
+	if magic != 0x10B && magic != 0x20B {
+		return .None, false
+	}
+	if p + optional <= len(b) && sections <= 64 && machine == 0x8664 {
+		p += optional
+		for _ in 0..<sections {
+			if p + 40 > len(b) {
+				break
+			}
+			if string(b[p:][:8]) == ".a64xrm\x00" {
+				filter = .BCJ_ARM64
+				break
+			}
+			p += 40
+		}
+	}
+	return filter, true
+}
+
+@(private)
+_sniff_elf :: proc "contextless" (b: []u8) -> (filter: Filter_Choice, ok: bool) {
+	if len(b) < 512 || b[6] != 1 || _get32(b, 0, false) != 0x464C457F {
+		return
+	}
+	if b[4] != 1 && b[4] != 2 {
+		return
+	}
+	be: bool
+	switch b[5] {
+	case 1: be = false
+	case 2: be = true
+	case:
+		return
+	}
+	switch _get16(b, 0x12, be) {
+	case 3, 6, 62:
+		filter = .BCJ_X86
+	case 2, 18, 43:
+		filter = .BCJ_SPARC
+	case 20, 21:
+		if !be {
+			return .None, false
+		}
+		filter = .BCJ_PPC
+	case 40:
+		if be {
+			return .None, false
+		}
+		filter = .BCJ_ARM
+	case 183:
+		if be {
+			return .None, false
+		}
+		filter = .BCJ_ARM64
+	case 243:
+		if be {
+			return .None, false
+		}
+		filter = .BCJ_RISCV
+	case:
+		return
+	}
+	return filter, true
+}
+
+@(private)
+_sniff_macho :: proc "contextless" (b: []u8) -> (filter: Filter_Choice, ok: bool) {
+	if len(b) < 512 {
+		return
+	}
+	be: bool
+	switch _get32(b, 0, false) {
+	case 0xCEFAEDFE, 0xCFFAEDFE: be = true
+	case 0xFEEDFACE, 0xFEEDFACF: be = false
+	case:
+		return
+	}
+	switch _get32(b, 4, be) {
+	case 7, 0x0100_0007:
+		filter = .BCJ_X86
+	case 12:
+		if be {
+			return .None, false
+		}
+		filter = .BCJ_ARM
+	case 14:
+		if !be {
+			return .None, false
+		}
+		filter = .BCJ_SPARC
+	case 18, 0x0100_0012:
+		if !be {
+			return .None, false
+		}
+		filter = .BCJ_PPC
+	case 0x0100_000C:
+		if be {
+			return .None, false
+		}
+		filter = .BCJ_ARM64
+	case:
+		return
+	}
+	if _get32(b, 0x14, be) > 1 << 24 || _get32(b, 0x10, be) > 1 << 18 {
+		return .None, false
+	}
+	return filter, true
+}
+
+@(private)
+_sniff_wav :: proc "contextless" (b: []u8) -> (delta: int, ok: bool) {
+	if len(b) < 0x2C {
+		return
+	}
+	if _get32(b, 0, false) != 0x46464952 || _get32(b, 8, false) != 0x45564157 || _get32(b, 0xC, false) != 0x20746D66 {
+		return
+	}
+	size := _get32(b, 0x10, false)
+	if size < 0x10 || size > 0x12 || _get16(b, 0x14, false) != 1 {
+		return
+	}
+	channels := u32(_get16(b, 0x16, false))
+	bits     := u32(_get16(b, 0x22, false))
+	if bits & 7 != 0 {
+		return
+	}
+	distance := channels * (bits >> 3)
+	if distance == 0 || distance > 256 {
+		return
+	}
+	pos := u64(0x14) + u64(size)
+	for _ in 0..<10 {
+		if pos + 8 > u64(len(b)) {
+			return
+		}
+		size = _get32(b, int(pos) + 4, false)
+		if _get32(b, int(pos), false) == 0x61746164 {
+			return int(distance), true
+		}
+		if size > 1 << 16 {
+			return
+		}
+		pos += u64(size) + 8
+	}
+	return
+}
+
+@(private)
+_get16 :: #force_inline proc "contextless" (b: []u8, pos: int, be: bool) -> (value: u16) {
+	if be {
+		return u16(b[pos]) << 8 | u16(b[pos + 1])
+	}
+	return u16(b[pos]) | u16(b[pos + 1]) << 8
+}
+
+@(private)
+_get32 :: #force_inline proc "contextless" (b: []u8, pos: int, be: bool) -> (value: u32) {
+	if be {
+		return u32(b[pos]) << 24 | u32(b[pos + 1]) << 16 | u32(b[pos + 2]) << 8 | u32(b[pos + 3])
+	}
+	return u32(b[pos]) | u32(b[pos + 1]) << 8 | u32(b[pos + 2]) << 16 | u32(b[pos + 3]) << 24
+}
+
+@(private)
+_put_id :: proc(buf: ^[dynamic]u8, id: Property_ID) {
+	append(buf, u8(id))
+}
+
+@(private)
+_put_number :: proc(buf: ^[dynamic]u8, value: u64) {
+	first := u8(0)
+	mask  := u8(0x80)
+	count := 0
+	for count < 8 {
+		if value < u64(1) << (7 * uint(count + 1)) {
+			first |= u8(value >> (8 * uint(count)))
+			break
+		}
+		first |= mask
+		mask >>= 1
+		count += 1
+	}
+	append(buf, first)
+	for k in 0..<count {
+		append(buf, u8(value >> (8 * uint(k))))
+	}
+}
+
+@(private)
+_put_u16 :: proc(buf: ^[dynamic]u8, v: u16) {
+	append(buf, u8(v), u8(v >> 8))
+}
+
+@(private)
+_put_u32 :: proc(buf: ^[dynamic]u8, v: u32) {
+	append(buf, u8(v), u8(v >> 8), u8(v >> 16), u8(v >> 24))
+}
+
+@(private)
+_put_u64 :: proc(buf: ^[dynamic]u8, v: u64) {
+	_put_u32(buf, u32(v))
+	_put_u32(buf, u32(v >> 32))
+}
+
+@(private)
+_emit :: proc(sw: ^Writer, p: []u8) -> (err: Error) {
+	n, write_err := io.write_full(sw.stream, p)
+	sw.offset += i64(n)
+	sw.end     = max(sw.end, sw.offset)
+	if write_err != nil {
+		return write_err
+	}
+	return nil
+}
+
+@(private)
+_seek :: proc(sw: ^Writer, offset: i64) -> (err: Error) {
+	if _, seek_err := io.seek(sw.stream, offset, .Start); seek_err != nil {
+		return seek_err
+	}
+	sw.offset = offset
+	return nil
+}
+
+@(private)
+_flush :: proc(sw: ^Writer) -> (err: Error) {
+	flush_err := io.flush(sw.stream)
+	if flush_err != nil && flush_err != .Unsupported && flush_err != .Empty {
+		return flush_err
+	}
+	return nil
+}
