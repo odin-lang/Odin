@@ -318,3 +318,89 @@ xml_test_review_markup_in_body :: proc(t: ^testing.T) {
 	testing.expect_value(t, err, xml.Error.Mismatched_Closing_Tag)
 	testing.expect_value(t, last_error_pos.line, 5)
 }
+
+@(test)
+xml_test_review_tag_syntax :: proc(t: ^testing.T) {
+	cases := [?]Review_Case{
+		{src = "< a/>",                    err  = .Unexpected_Token},
+		{src = "<a></ a>",                 err  = .Unexpected_Token},
+		{src = "<a/ >",                    err  = .Unexpected_Token},
+		{src = "<a / >",                   err  = .Unexpected_Token},
+		{src = "<! DOCTYPE a><a/>",        err  = .Unexpected_Token},
+		{src = "<? pi?><a/>",              err  = .Unexpected_Token},
+		{src = "<a />",                    tree = "a{}"},
+		{src = "<a\n></a\t>",              tree = "a{}"},
+		{src = "<a b=\"1\"c=\"2\"/>",      err  = .Unexpected_Token},
+		{src = "<a b='1'c='2'/>",          err  = .Unexpected_Token},
+		{src = "<a b=\"1\" c=\"2\"/>",     tree = `a[b="1" c="2"]{}`},
+		{src = "<a b = '1'\n\tc\n=\"2\"/>", tree = `a[b="1" c="2"]{}`},
+		{src = "<a b=\"x<y\"/>",           err  = .Invalid_Tag_Value},
+		{src = "<a b='x<y'/>",             err  = .Invalid_Tag_Value},
+		{src = "<a b='x\"y' c=\"x'y\"/>",  tree = `a[b="x\"y" c="x'y"]{}`},
+		{src = "<a b=\"]]>\"/>",           tree = `a[b="]]>"]{}`},
+		{src = "<a b=1/>",                 err  = .Unexpected_Token},
+		{src = "<a b=\"1",                 err  = .Premature_EOF},
+		{src = "<a>x]]>y</a>",             err  = .Unexpected_Token},
+		{src = "<a><![CDATA[x]]>]]></a>",  err  = .Unexpected_Token},
+		{src = "<a>x]]y]>z</a>",           tree = `a{"x]]y]>z"}`},
+		{src = "<a><!-- ]]> --></a>",      tree = "a{}"},
+		{src = "<a>x<!-- ]]> -->y</a>",    tree = `a{"x<!-- ]]> -->y"}`},
+		{src = "<a><?Xml x?></a>",         err  = .Invalid_Prolog},
+		{src = "<a><?pi&x?></a>",          err  = .Unexpected_Token},
+		{src = "<a><?pi?></a>",            tree = "a{}"},
+		{src = "<a><?xml-pi x?></a>",      tree = "a{}"},
+	}
+	run_review_cases(t, cases[:])
+
+	last_error_pos = {}
+	doc, err := xml.parse_string("<a\n b=\"x\n<\"/>", error_handler = remember_pos)
+	defer xml.destroy(doc)
+	testing.expect_value(t, err, xml.Error.Invalid_Tag_Value)
+	testing.expect_value(t, last_error_pos.line, 3)
+	testing.expect_value(t, last_error_pos.column, 1)
+}
+
+@(test)
+xml_test_review_xml_declaration :: proc(t: ^testing.T) {
+	cases := [?]Review_Case{
+		{src = "<?xml version=\"1.0\"?><a/>",                                         tree = "a{}"},
+		{src = "<?xml version='1.1' encoding='UTF-8' standalone='yes' ?><a/>",        tree = "a{}"},
+		{src = "<?xml version=\"1.0\" standalone=\"no\"?><a/>",                       tree = "a{}"},
+		{src = "<?xml version=\"1.5\"?><a/>",                                         tree = "a{}"},
+		{src = "<?xml\tversion = \"1.0\"\nencoding=\"x-a.b_c-1\"\n?><a/>",            tree = "a{}"},
+		{src = "<?XML version=\"1.0\"?><a/>",                                         err  = .Invalid_Prolog},
+		{src = "<?xml version=\"2.0\"?><a/>",                                         err  = .Unsupported_Version},
+		{src = "<?xml version=\"1.\"?><a/>",                                          err  = .Unsupported_Version},
+		{src = "<?xml version=\"1.0 \"?><a/>",                                        err  = .Unsupported_Version},
+		{src = "<?xml version=\"1.0a\"?><a/>",                                        err  = .Unsupported_Version},
+		{src = "<?xml?><a/>",                                                         err  = .Invalid_Prolog},
+		{src = "<?xml ?><a/>",                                                        err  = .Invalid_Prolog},
+		{src = "<?xml encoding=\"utf-8\"?><a/>",                                      err  = .Invalid_Prolog},
+		{src = "<?xml encoding=\"utf-8\" version=\"1.0\"?><a/>",                      err  = .Invalid_Prolog},
+		{src = "<?xml version=\"1.0\" standalone=\"yes\" encoding=\"utf-8\"?><a/>",   err  = .Invalid_Prolog},
+		{src = "<?xml version=\"1.0\" version=\"1.0\"?><a/>",                         err  = .Invalid_Prolog},
+		{src = "<?xml version=\"1.0\" foo=\"bar\"?><a/>",                             err  = .Invalid_Prolog},
+		{src = "<?xml version=\"1.0\" encoding=\"8bit\"?><a/>",                       err  = .Invalid_Prolog},
+		{src = "<?xml version=\"1.0\" encoding=\"\"?><a/>",                           err  = .Invalid_Prolog},
+		{src = "<?xml version=\"1.0\" encoding=\"utf 8\"?><a/>",                      err  = .Invalid_Prolog},
+		{src = "<?xml version=\"1.0\" standalone=\"maybe\"?><a/>",                    err  = .Invalid_Prolog},
+		{src = "<?xml version=\"1.0\"encoding=\"utf-8\"?><a/>",                       err  = .Invalid_Prolog},
+		{src = "<?xml version=\"1.0\"? ><a/>",                                        err  = .Unexpected_Token},
+		{src = "<?xmlversion=\"1.0\"?><a/>",                                          err  = .Unexpected_Token},
+		{src = "<?xml version=\"1.<0\"?><a/>",                                        err  = .Invalid_Tag_Value},
+	}
+	run_review_cases(t, cases[:])
+
+	doc, err := xml.parse_string("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?><a/>", error_handler = Silent)
+	defer xml.destroy(doc)
+	testing.expect_value(t, err, xml.Error.None)
+	if err == .None {
+		testing.expect_value(t, len(doc.prologue), 3)
+		testing.expect_value(t, doc.encoding, xml.Encoding.UTF_8)
+		if len(doc.prologue) == 3 {
+			testing.expect_value(t, doc.prologue[0].val, "1.0")
+			testing.expect_value(t, doc.prologue[1].val, "UTF-8")
+			testing.expect_value(t, doc.prologue[2].key, "standalone")
+		}
+	}
+}

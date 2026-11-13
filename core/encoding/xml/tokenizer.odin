@@ -237,6 +237,20 @@ peek_byte :: proc(t: ^Tokenizer, offset := 0) -> byte {
 	return 0
 }
 
+@(private)
+is_space :: #force_inline proc(r: rune) -> bool {
+	return r == ' ' || r == '\t' || r == '\n' || r == '\r'
+}
+
+@(private)
+expect_no_space :: proc(t: ^Tokenizer) -> (err: Error) {
+	if is_space(t.ch) {
+		error(t, t.offset, "Unexpected whitespace\n")
+		return .Unexpected_Token
+	}
+	return .None
+}
+
 @(optimization_mode="favor_size")
 skip_whitespace :: proc(t: ^Tokenizer) {
 	for {
@@ -368,6 +382,12 @@ scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close
 				jump_to(t, t.offset + len(COMMENT_START))
 				_ = scan_comment(t) or_return
 				continue loop
+			}
+
+		case ']':
+			if close == '<' && strings.has_prefix(t.src[t.offset:], CDATA_END) {
+				error(t, t.offset, "[scan_string] `]]>` is not allowed in text\n")
+				return "", .Unexpected_Token
 			}
 
 		case '\n':

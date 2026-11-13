@@ -236,6 +236,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 			// Consume peeked `<`
 			lt_offset := t.offset
 			advance_rune(t)
+			expect_no_space(t) or_return
 
 			open = scan(t)
 			// NOTE(Jeroen): We're not using a switch because this if-else chain ordered by likelihood is 2.5% faster at -o:size and -o:speed.
@@ -280,6 +281,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 
 				case .Slash:
 					// Empty tag. Close it.
+					expect_no_space(t) or_return
 					expect(t, .Gt) or_return
 					parent  = doc.elements[element].parent
 					element = parent
@@ -291,6 +293,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 
 			} else if open.kind == .Slash {
 				// Close tag.
+				expect_no_space(t) or_return
 				ident := expect(t, .Ident) or_return
 				_      = expect(t, .Gt)    or_return
 
@@ -308,6 +311,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 
 			} else if open.kind == .Exclaim {
 				// <!
+				expect_no_space(t) or_return
 				next := scan(t)
 				#partial switch next.kind {
 				case .Ident:
@@ -393,10 +397,15 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 
 			} else if open.kind == .Question {
 				// <?xml
+				expect_no_space(t) or_return
 				next := scan(t)
 				#partial switch next.kind {
 				case .Ident:
 					if len(next.text) == 3 && strings.equal_fold(next.text, "xml") {
+						if next.text != "xml" {
+							error(t, lt_offset, "Reserved processing instruction target: %v\n", next.text)
+							return doc, .Invalid_Prolog
+						}
 						if seen_xml {
 							error(t, lt_offset, "Only one XML declaration is allowed\n")
 							return doc, .Too_Many_Prologs
@@ -409,6 +418,10 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 						parse_prologue(doc) or_return
 					} else {
 						// Could be `<?xml-stylesheet`, etc. Ignore it.
+						if !is_space(t.ch) && !strings.has_prefix(t.src[t.offset:], "?>") {
+							error(t, t.offset, "Expected whitespace or ?> after the processing instruction target\n")
+							return doc, .Unexpected_Token
+						}
 						skip_pi(t) or_return
 					}
 				case:
@@ -513,25 +526,51 @@ parse_attribute :: proc(doc: ^Document) -> (attr: Attribute, offset: int, err: E
 	context.allocator = doc.allocator
 	t := doc.tokenizer
 
-	key    := expect(t, .Ident)  or_return
-	_       = expect(t, .Eq)     or_return
-	value  := expect(t, .String, multiline_string=true) or_return
+	key, value := scan_attribute(t) or_return
+	value = strings.trim_right(value, " \t\r\n")
 
 	// Estimate decoded size based on input text.
-	builder, builder_err := strings.builder_make_len_cap(0, len(value.text) + 10, doc.extra_strings_allocator)
+	builder, builder_err := strings.builder_make_len_cap(0, len(value) + 10, doc.extra_strings_allocator)
 	if builder_err != nil {
 		return attr, offset, .Allocation_Failed
 	}
-	normalized, normalize_err := entity.decode_xml_sb(&builder, value.text, {.Normalize_Whitespace}, doc.allocator)
+	normalized, normalize_err := entity.decode_xml_sb(&builder, value, {.Normalize_Whitespace}, doc.allocator)
 	if normalize_err == .None {
-		value.text = normalized
+		value = normalized
 	}
 
-	attr.key = key.text
-	attr.val = value.text
+	attr.key = key
+	attr.val = value
 
 	err = .None
 	return
+}
+
+@(private)
+scan_attribute :: proc(t: ^Tokenizer) -> (key: string, value: string, err: Error) {
+	key_token := expect(t, .Ident) or_return
+	_          = expect(t, .Eq)    or_return
+	skip_whitespace(t)
+
+	quote := t.ch
+	if quote != '"' && quote != '\'' {
+		error(t, t.offset, "Expected a quoted attribute value\n")
+		return key_token.text, "", .Unexpected_Token
+	}
+	start := t.offset + 1
+	end   := strings.index_byte(t.src[start:], u8(quote))
+	if end < 0 {
+		error(t, t.offset, "Attribute value was not terminated\n")
+		return key_token.text, "", .Premature_EOF
+	}
+	value = t.src[start:][:end]
+	if lt := strings.index_byte(value, '<'); lt >= 0 {
+		jump_to(t, start + lt)
+		error(t, t.offset, "`<` is not allowed in an attribute value\n")
+		return key_token.text, value, .Invalid_Tag_Value
+	}
+	jump_to(t, start + end + 1)
+	return key_token.text, value, .None
 }
 
 check_duplicate_attributes :: proc(t: ^Tokenizer, attribs: Attributes, attr: Attribute, offset: int) -> (err: Error) {
@@ -550,7 +589,15 @@ parse_attributes :: proc(doc: ^Document, attribs: ^Attributes) -> (err: Error) {
 	t := doc.tokenizer
 
 	// PERF: Hot
-	for peek(t).kind == .Ident {
+	for {
+		space := is_space(t.ch)
+		if peek(t).kind != .Ident {
+			break
+		}
+		if !space {
+			error(t, t.offset, "Expected whitespace before an attribute\n")
+			return .Unexpected_Token
+		}
 		attr, offset := parse_attribute(doc)                  or_return
 		check_duplicate_attributes(t, attribs^, attr, offset) or_return
 		if attribs^ == nil {
@@ -572,20 +619,35 @@ parse_prologue :: proc(doc: ^Document) -> (err: Error) {
 	t := doc.tokenizer
 
 	offset := t.offset
-	parse_attributes(doc, &doc.prologue) or_return
+	step   := 0
+	for {
+		space := is_space(t.ch)
+		skip_whitespace(t)
+		if t.ch == '?' {
+			break
+		}
+		if !space {
+			error(t, t.offset, "[parse_prologue] Expected whitespace\n")
+			return .Invalid_Prolog
+		}
+		key_offset := t.offset
+		key, val   := scan_attribute(t) or_return
 
-	for attr in doc.prologue {
-		switch attr.key {
-		case "version":
-			switch attr.val {
-			case "1.0", "1.1":
-			case:
-				error(t, offset, "[parse_prologue] Warning: Unhandled XML version: %v\n", attr.val)
+		switch {
+		case key == "version" && step == 0:
+			if !is_version_num(val) {
+				error(t, key_offset, "[parse_prologue] Unsupported XML version: %v\n", val)
+				return .Unsupported_Version
 			}
+			step = 1
 
-		case "encoding":
+		case key == "encoding" && step == 1:
+			if !is_encoding_name(val) {
+				error(t, key_offset, "[parse_prologue] Invalid encoding name: %v\n", val)
+				return .Invalid_Prolog
+			}
 			runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-			switch strings.to_lower(attr.val, context.temp_allocator) {
+			switch strings.to_lower(val, context.temp_allocator) {
 			case "utf-8", "utf8":
 				doc.encoding = .UTF_8
 
@@ -594,18 +656,69 @@ parse_prologue :: proc(doc: ^Document) -> (err: Error) {
 
 			case:
 				// Unrecognized encoding, assume UTF-8.
-				error(t, offset, "[parse_prologue] Warning: Unrecognized encoding: %v\n", attr.val)
+				error(t, offset, "[parse_prologue] Warning: Unrecognized encoding: %v\n", val)
 			}
+			step = 2
+
+		case key == "standalone" && (step == 1 || step == 2):
+			if val != "yes" && val != "no" {
+				error(t, key_offset, "[parse_prologue] Invalid standalone value: %v\n", val)
+				return .Invalid_Prolog
+			}
+			step = 3
 
 		case:
-			// Ignored.
+			error(t, key_offset, "[parse_prologue] Unexpected %v\n", key)
+			return .Invalid_Prolog
+		}
+
+		if doc.prologue == nil {
+			doc.prologue = make_dynamic_array(Attributes, doc.extra_strings_allocator)
+		}
+		if _, alloc_err := append(&doc.prologue, Attribute{key = key, val = val}); alloc_err != nil {
+			return .Allocation_Failed
 		}
 	}
 
+	if step == 0 {
+		error(t, offset, "[parse_prologue] Missing version\n")
+		return .Invalid_Prolog
+	}
+
 	_ = expect(t, .Question) or_return
+	expect_no_space(t)       or_return
 	_ = expect(t, .Gt)       or_return
 
 	return .None
+}
+
+@(private)
+is_version_num :: proc(s: string) -> bool {
+	if len(s) < 3 || s[:2] != "1." {
+		return false
+	}
+	for r in s[2:] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+@(private)
+is_encoding_name :: proc(s: string) -> bool {
+	for r, i in s {
+		switch r {
+		case 'A'..='Z', 'a'..='z':
+		case '0'..='9', '.', '_', '-':
+			if i == 0 {
+				return false
+			}
+		case:
+			return false
+		}
+	}
+	return len(s) > 0
 }
 
 skip_element :: proc(t: ^Tokenizer) -> (err: Error) {
