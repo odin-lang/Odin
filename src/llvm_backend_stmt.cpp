@@ -2728,17 +2728,10 @@ gb_internal void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice
 
 	bool prev_in_assignment = p->in_multi_assignment;
 
-	isize lval_count = 0;
-	for (lbAddr const &lval : lvals) {
-		if (lval.addr.value != nullptr) {
-			// check if it is not a blank identifier
-			lval_count += 1;
-		}
-	}
-
 	GB_ASSERT(lvals.count == inits.count);
+	bool multi = inits.count > 1;
 	auto copied = slice_make<bool>(temporary_allocator(), inits.count);
-	if (lval_count > 1) {
+	if (multi) {
 		for_array(i, inits) {
 			if (lvals[i].addr.value != nullptr) {
 				copied[i] = lb_copy_loaded_value_to_local(p, &inits[i]);
@@ -2750,7 +2743,7 @@ gb_internal void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice
 		lbAddr lval = lvals[i];
 		lbValue init = inits[i];
 		// NOTE: no store of this assignment writes a copy, so a copy can be read when it is stored
-		p->in_multi_assignment = lval_count > 1 && !copied[i];
+		p->in_multi_assignment = multi && !copied[i];
 		lb_addr_store(p, lval, init);
 	}
 
