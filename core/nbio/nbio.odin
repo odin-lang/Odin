@@ -20,7 +20,7 @@ FULLY_SUPPORTED :: _FULLY_SUPPORTED
 An event loop, one per thread, consider the fields private.
 Do not copy.
 */
-Event_Loop :: struct /* #no_copy */ {
+Event_Loop :: struct {
 	using impl:  _Event_Loop,
 	allocator:   runtime.Allocator,
 	err:         General_Error,
