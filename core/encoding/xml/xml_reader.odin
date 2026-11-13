@@ -77,7 +77,8 @@ Document :: struct {
 	tokenizer: ^Tokenizer            `fmt:"-"`,
 	allocator: mem.Allocator         `fmt:"-"`,
 
-	// Input. Either the original buffer, or a copy if `.Input_May_Be_Modified` isn't specified.
+	// Buffer the document allocated and `destroy` frees: the copy made when `.Input_May_Be_Modified` isn't specified, or the file `load_from_file` read.
+	// Empty otherwise: the caller owns the buffer, and must keep it alive while the document's strings point into it.
 	input:           []u8            `fmt:"-"`,
 
 	// An arena for small strings, especially for attribute key-value pairs.
@@ -190,8 +191,8 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 		if data, alloc_err = slice.clone(data); alloc_err != nil {
 			return doc, .Allocation_Failed
 		}
+		doc.input = data
 	}
-	doc.input = data
 
 	if doc.tokenizer, alloc_err = new(Tokenizer); alloc_err != nil {
 		return doc, .Allocation_Failed
@@ -415,8 +416,8 @@ parse_string :: proc(data: string, options := DEFAULT_OPTIONS, path := "", error
 parse :: proc { parse_string, parse_bytes }
 
 destroy :: proc(doc: ^Document, allocator := context.allocator) {
-	context.allocator = allocator
 	if doc == nil { return }
+	context.allocator = doc.allocator
 
 	for el in doc.elements {
 		delete(el.attribs)

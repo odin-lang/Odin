@@ -2,6 +2,7 @@ package test_core_xml
 
 import "core:encoding/xml"
 import "core:fmt"
+import "core:mem"
 import "core:strings"
 import "core:testing"
 
@@ -92,4 +93,29 @@ xml_test_review_mid_document_bom :: proc(t: ^testing.T) {
 		{src = "\xef\xbb\xbf<a>\xef\xbb\xbf</a>",                 flags = {.Decode_SGML_Entities},      tree = `a{"\ufeff"}`},
 	}
 	run_review_cases(t, cases[:])
+}
+
+@(test)
+xml_test_review_destroy_uses_parse_allocator :: proc(t: ^testing.T) {
+	track: mem.Tracking_Allocator
+	mem.tracking_allocator_init(&track, context.allocator)
+	defer mem.tracking_allocator_destroy(&track)
+
+	doc, err := xml.parse_string(`<a b="c">d<e/></a>`, error_handler = Silent, allocator = mem.tracking_allocator(&track))
+	testing.expect_value(t, err, xml.Error.None)
+	xml.destroy(doc)
+
+	testing.expect_value(t, len(track.allocation_map), 0)
+	testing.expect_value(t, len(track.bad_free_array), 0)
+}
+
+@(test)
+xml_test_review_caller_keeps_input :: proc(t: ^testing.T) {
+	data := make([]u8, 16)
+	defer delete(data)
+	copy(data, `<a b="c">d</a>`)
+
+	doc, err := xml.parse_bytes(data[:14], xml.Options{flags = {.Input_May_Be_Modified}}, error_handler = Silent)
+	testing.expect_value(t, err, xml.Error.None)
+	xml.destroy(doc)
 }

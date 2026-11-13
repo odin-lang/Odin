@@ -20,6 +20,8 @@ load_from_file :: proc(filename: string, options := DEFAULT_OPTIONS, error_handl
 	if doc == nil {
 		// No document took the data over, so it's still ours to free.
 		delete(data)
+	} else {
+		doc.input = data
 	}
 	return
 }

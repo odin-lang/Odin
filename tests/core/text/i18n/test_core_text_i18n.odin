@@ -193,6 +193,28 @@ test_qt_linguist :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_qt_linguist_from_bytes :: proc(t: ^testing.T) {
+	load_from_bytes :: proc(filename: string, options: i18n.Parse_Options, pluralizer: proc(int) -> int, allocator: runtime.Allocator) -> (^i18n.Translation, i18n.Error) {
+		data, err := os.read_entire_file(filename, allocator)
+		if err != nil {
+			return nil, .File_Error
+		}
+		defer delete(data, allocator)
+		return i18n.parse_qt_linguist_from_bytes(data, options, pluralizer, allocator)
+	}
+
+	test(t, {
+		file   = TEST_SUITE_PATH + "nl_NL-qt-ts.ts",
+		loader = load_from_bytes,
+		plural = nil,
+		tests  = {
+			{"Page",        "Text for translation", "Tekst om te vertalen", -1},
+			{"apple_count", "%d apple(s)",          "%d appels",            42},
+		},
+	})
+}
+
+@(test)
 test_qt_linguist_merge_sections :: proc(t: ^testing.T) {
 	test(t, {
 		file    = TEST_SUITE_PATH + "nl_NL-qt-ts.ts",
