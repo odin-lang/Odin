@@ -13274,11 +13274,6 @@ gb_internal ExprKind check_selector_call_expr(CheckerContext *c, Operand *o, Ast
 					break;
 				}
 			}
-			if (!fail && first_is_field_value) {
-				Token op = {Token_Eq};
-				AstFile *f = first_arg->file();
-				first_arg = ast_field_value(f, ast_ident(f, make_token_ident(first_arg_name)), first_arg, op);
-			}
 		}
 	}
 
