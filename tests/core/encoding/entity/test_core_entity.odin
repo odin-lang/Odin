@@ -323,3 +323,131 @@ test_percent_decode :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@(test)
+test_escape_html :: proc(t: ^testing.T) {
+	Escape_Case :: struct {
+		src: string,
+		out: string,
+	}
+	cases := [?]Escape_Case{
+		{"",                                 ""},
+		{"plain text",                       "plain text"},
+		{"&",                                "&amp;"},
+		{"'",                                "&#39;"},
+		{"<",                                "&lt;"},
+		{">",                                "&gt;"},
+		{"\"",                               "&#34;"},
+		{"&amp;",                            "&amp;amp;"},
+		{"<a href=\"x\">Tom & Jerry's</a>",  "&lt;a href=&#34;x&#34;&gt;Tom &amp; Jerry&#39;s&lt;/a&gt;"},
+		{"\u00e9\xff\x00",                   "\u00e9\xff\x00"},
+	}
+	for c in cases {
+		out, allocated := entity.escape_html(c.src)
+		testing.expectf(t, out == c.out, "%q: expected %q, got %q", c.src, c.out, out)
+		testing.expectf(t, allocated == (c.src != c.out), "%q: allocated = %v", c.src, allocated)
+
+		back, back_allocated, back_err := entity.unescape_html(out)
+		testing.expect_value(t, back_err, nil)
+		testing.expectf(t, back == c.src, "%q: round trip gave %q", c.src, back)
+		if back_allocated {
+			delete(back)
+		}
+		if allocated {
+			delete(out)
+		}
+	}
+}
+
+@(test)
+test_unescape_entity :: proc(t: ^testing.T) {
+	Entity_Case :: struct {
+		src:      string,
+		out:      string,
+		consumed: int,
+	}
+	cases := [?]Entity_Case{
+		{"",           "",                0},
+		{"x&amp;",     "",                0},
+		{"&",          "&",               1},
+		{"& x",        "&",               1},
+		{"&#;",        "&",               1},
+		{"&#x;",       "&",               1},
+		{"&nosuch;",   "&",               1},
+		{"&amp;rest",  "&",               5},
+		{"&amp rest",  "&",               4},
+		{"&#65;x",     "A",               5},
+		{"&#65x",      "A",               4},
+		{"&#x41;",     "A",               6},
+		{"&#x10ffff;", "\U0010ffff",      10},
+		{"&#0;",       "\ufffd",          4},
+		{"&#x80;",     "\u20ac",          6},
+		{"&notit;",    "\u00ac",          4},
+		{"&nGt;",      "\u226b\u20d2",    5},
+	}
+	for c in cases {
+		b, w, j := entity.unescape_entity(c.src)
+		testing.expectf(t, string(b[:w]) == c.out && j == c.consumed, "%q: expected %q and %v consumed, got %q and %v", c.src, c.out, c.consumed, string(b[:w]), j)
+	}
+}
+
+@(test)
+test_xml_decode_entity :: proc(t: ^testing.T) {
+	Rune_Case :: struct {
+		src:   string,
+		runes: [2]rune,
+		count: int,
+		ok:    bool,
+	}
+	cases := [?]Rune_Case{
+		{"amp",                    {'&', 0},                  1, true},
+		{"#65",                    {'A', 0},                  1, true},
+		{"#x41",                   {'A', 0},                  1, true},
+		{"#9",                     {'\t', 0},                 1, true},
+		{"#x10FFFF",               {'\U0010ffff', 0},         1, true},
+		{"nGt",                    {'\u226b', '\u20d2'},      2, true},
+		{"",                       {},                        0, false},
+		{"#",                      {},                        0, false},
+		{"#x",                     {},                        0, false},
+		{"#6a",                    {},                        0, false},
+		{"#xg",                    {},                        0, false},
+		{"#0",                     {},                        0, false},
+		{"#xD800",                 {},                        0, false},
+		{"#xFFFE",                 {},                        0, false},
+		{"#x110000",               {},                        0, false},
+		{"#99999999999999999999",  {},                        0, false},
+		{"nosuch",                 {},                        0, false},
+	}
+	for c in cases {
+		runes, count, ok := entity.xml_decode_entity(c.src)
+		testing.expectf(t, ok == c.ok, "%q: expected ok = %v, got %v", c.src, c.ok, ok)
+		if ok && c.ok {
+			testing.expectf(t, count == c.count && runes[0] == c.runes[0] && (count < 2 || runes[1] == c.runes[1]), "%q: expected %v %v, got %v %v", c.src, c.runes, c.count, runes, count)
+		}
+	}
+}
+
+@(test)
+test_decode_xml_sb :: proc(t: ^testing.T) {
+	builder := strings.builder_make()
+	defer strings.builder_destroy(&builder)
+	strings.write_string(&builder, "pre:")
+
+	decoded, err := entity.decode_xml_sb(&builder, "a&amp;b<![CDATA[&lt;]]>")
+	testing.expect_value(t, err, entity.Error.None)
+	testing.expect_value(t, decoded, "a&b&lt;")
+	testing.expect_value(t, strings.to_string(builder), "pre:a&b&lt;")
+
+	empty, empty_err := entity.decode_xml_sb(&builder, "")
+	testing.expect_value(t, empty_err, entity.Error.None)
+	testing.expect_value(t, empty, "")
+	testing.expect_value(t, strings.to_string(builder), "pre:a&b&lt;")
+
+	html, html_err := entity.decode_xml_sb(&builder, "&copy;", {.HTML_Entities})
+	testing.expect_value(t, html_err, entity.Error.None)
+	testing.expect_value(t, html, "\u00a9")
+	testing.expect_value(t, strings.to_string(builder), "pre:a&b&lt;\u00a9")
+
+	_, bad_err := entity.decode_xml_sb(&builder, "x&bad;")
+	testing.expect_value(t, bad_err, entity.Error.Unknown_Entity)
+}
