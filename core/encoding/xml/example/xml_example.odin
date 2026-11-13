@@ -18,7 +18,7 @@ example :: proc() {
 		xml.destroy(docs[round])
 	}
 
-	DOC :: #load("../../../../tests/core/assets/XML/utf8.xml")
+	DOC :: #load("../../../../tests/core/assets/XML/unicode.xml")
 	input := DOC
 
 	for round in 0..<N {
@@ -73,11 +73,7 @@ example :: proc() {
 	fmt.printf("Found `<charlist>` with %v children, %v elements total\n", len(docs[0].elements[charlist].value), docs[0].element_count)
 
 	crc32 := doc_hash(docs[0], false)
-	fmt.printf("[%v] CRC32: 0x%08x\n", "🎉" if crc32 == 0x420dbac5 else "🤬", crc32)
-
-	for round in 0..<N {
-		defer xml.destroy(docs[round])
-	}
+	fmt.printf("[%v] CRC32: 0x%08x\n", "🎉" if crc32 == 0x687119cd else "🤬", crc32)
 }
 
 doc_hash :: proc(doc: ^xml.Document, print := false) -> (crc32: u32) {

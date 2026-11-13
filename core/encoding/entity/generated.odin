@@ -1773,8 +1773,8 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 			return {'\u25c2', 0}, 1, true
 		case "blacktriangleright":              // BLACK RIGHT-POINTING SMALL TRIANGLE
 			return {'\u25b8', 0}, 1, true
-		case "blank":                           // BLANK SYMBOL
-			return {'\u2422', 0}, 1, true
+		case "blank":                           // OPEN BOX
+			return {'\u2423', 0}, 1, true
 		case "bldhar":                          // LEFTWARDS HARPOON WITH BARB DOWN FROM BAR
 			return {'\u295e', 0}, 1, true
 		case "blk12":                           // MEDIUM SHADE
@@ -3143,8 +3143,8 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 			return {'\u2a2d', 0}, 1, true
 		case "lotimes":                         // MULTIPLICATION SIGN IN LEFT HALF CIRCLE
 			return {'\u2a34', 0}, 1, true
-		case "lowast":                          // LOW ASTERISK
-			return {'\u204e', 0}, 1, true
+		case "lowast":                          // ASTERISK OPERATOR
+			return {'\u2217', 0}, 1, true
 		case "lowbar":                          // LOW LINE
 			return {'_', 0}, 1, true
 		case "lowint":                          // INTEGRAL WITH UNDERBAR
@@ -5084,6 +5084,75 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 		}
 	}
 	return
+}
+
+@(private)
+HTML5_LEGACY_NAME_MAX_LENGTH :: 6
+
+@(private)
+is_html5_legacy_entity_name :: proc(name: string) -> bool {
+	switch name {
+	case "AElig", "AMP", "Aacute", "Acirc", "Agrave", "Aring", "Atilde", "Auml",
+		"COPY", "Ccedil", "ETH", "Eacute", "Ecirc", "Egrave", "Euml", "GT",
+		"Iacute", "Icirc", "Igrave", "Iuml", "LT", "Ntilde", "Oacute", "Ocirc",
+		"Ograve", "Oslash", "Otilde", "Ouml", "QUOT", "REG", "THORN", "Uacute",
+		"Ucirc", "Ugrave", "Uuml", "Yacute", "aacute", "acirc", "acute", "aelig",
+		"agrave", "amp", "aring", "atilde", "auml", "brvbar", "ccedil", "cedil",
+		"cent", "copy", "curren", "deg", "divide", "eacute", "ecirc", "egrave",
+		"eth", "euml", "frac12", "frac14", "frac34", "gt", "iacute", "icirc",
+		"iexcl", "igrave", "iquest", "iuml", "laquo", "lt", "macr", "micro",
+		"middot", "nbsp", "not", "ntilde", "oacute", "ocirc", "ograve", "ordf",
+		"ordm", "oslash", "otilde", "ouml", "para", "plusmn", "pound", "quot",
+		"raquo", "reg", "sect", "shy", "sup1", "sup2", "sup3", "szlig",
+		"thorn", "times", "uacute", "ucirc", "ugrave", "uml", "uuml", "yacute",
+		"yen", "yuml":
+		return true
+	}
+	return false
+}
+
+@(private)
+is_non_html5_entity_name :: proc(name: string) -> bool {
+	switch name {
+	case "Aacgr", "Agr", "Ast", "Barint", "Barwedl", "Bgr", "Bvert", "Dgr",
+		"EEacgr", "EEgr", "Eacgr", "Egr", "Game", "Ggr", "Iacgr", "Idigr",
+		"Igr", "KHgr", "Kgr", "Lgr", "Ltbar", "Mapfrom", "Mapto", "Mgr",
+		"Ngr", "OHacgr", "OHgr", "Oacgr", "Ogr", "PHgr", "PSgr", "Pgr",
+		"Rgr", "Sgr", "THgr", "Tgr", "Thetav", "Uacgr", "Udigr", "Ugr",
+		"Xgr", "Zgr", "aacgr", "actuary", "agr", "ang90", "angdnl", "angdnr",
+		"angles", "angupl", "arrllsr", "arrlrsl", "arrsrll", "astb", "b.Delta", "b.Gamma",
+		"b.Gammad", "b.Lambda", "b.Omega", "b.Phi", "b.Pi", "b.Psi", "b.Sigma", "b.Theta",
+		"b.Upsi", "b.Xi", "b.alpha", "b.beta", "b.chi", "b.delta", "b.epsi", "b.epsiv",
+		"b.eta", "b.gamma", "b.gammad", "b.iota", "b.kappa", "b.kappav", "b.lambda", "b.mu",
+		"b.nu", "b.omega", "b.phi", "b.phiv", "b.pi", "b.piv", "b.psi", "b.rho",
+		"b.rhov", "b.sigma", "b.sigmav", "b.tau", "b.thetas", "b.thetav", "b.upsi", "b.xi",
+		"b.zeta", "barV", "bdlhar", "bdrhar", "bgr", "bldhar", "bluhar", "brdhar",
+		"bruhar", "btimes", "bulhar", "burhar", "capint", "cirb", "cirdarr", "cirerr",
+		"cirfdarr", "cirferr", "closur", "cupint", "cupre", "dAarr", "dalembrt", "darr2",
+		"darrb", "darrln", "dashV", "dgr", "diamdarr", "diamerr", "diamerrf", "dlarr",
+		"dlharb", "drarr", "drharb", "dtrilf", "dtrirf", "dumap", "eacgr", "eeacgr",
+		"eegr", "egr", "epsis", "eqeq", "fbowtie", "fdiag", "fdiordi", "fdonearr",
+		"fhrglass", "gcedil", "ggr", "gsdot", "gtrpar", "hrglass", "htimes", "iacgr",
+		"idiagr", "idigr", "igr", "iprodr", "isinvb", "jnodot", "kgr", "khgr",
+		"koppa", "larr2", "ldharb", "ldot", "ldrdshar", "lfbowtie", "lftimes", "lgr",
+		"lltrif", "locub", "lowint", "lpargt", "lrarr2", "lrhar2", "ltrivb", "luharb",
+		"lurushar", "mgr", "neonwarr", "neosearr", "neswsarr", "ngr", "nltrivb", "nprsim",
+		"nsGt", "nsLt", "nscsim", "nsqsub", "nsqsup", "nvbrtri", "nwonearr", "nwsesarr",
+		"oacgr", "obsol", "ogr", "ohacgr", "ohgr", "opfgamma", "opfpi", "opfsum",
+		"ovrbrk", "ovrcub", "ovrpar", "oxuarr", "pgr", "phgr", "phis", "plustrif",
+		"psgr", "rarr2", "rarr3", "rarrx", "rdharb", "rdiag", "rdiofdi", "rdosearr",
+		"rfbowtie", "rftimes", "rgr", "rimply", "rlarr2", "rlhar2", "rocub", "rsolbar",
+		"ruharb", "samalg", "sampi", "sbsol", "seonearr", "sfgr", "sgr", "shuffle",
+		"slint", "squb", "squerr", "squferr", "stigma", "sumint", "tgr", "thermod",
+		"thetas", "thgr", "timeint", "triS", "tribar", "tridoto", "tverbar", "uAarr",
+		"uacgr", "uarr2", "uarrb", "uarrln", "udiagr", "udigr", "udrbrk", "udrcub",
+		"udrpar", "ugr", "uldlshar", "ulharb", "upint", "urdrshar", "urharb", "urtrif",
+		"vDdash", "vbrtri", "veeBar", "vellip4", "vellipv", "vert3", "vldash", "vprime",
+		"xandand", "xbsol", "xcupdot", "xgr", "xoror", "xsol", "xsqcap", "xsqu",
+		"xsquf", "xtimes", "zgr":
+		return true
+	}
+	return false
 }
 
 /*

@@ -193,6 +193,28 @@ test_qt_linguist :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_qt_linguist_from_bytes :: proc(t: ^testing.T) {
+	load_from_bytes :: proc(filename: string, options: i18n.Parse_Options, pluralizer: proc(int) -> int, allocator: runtime.Allocator) -> (^i18n.Translation, i18n.Error) {
+		data, err := os.read_entire_file(filename, allocator)
+		if err != nil {
+			return nil, .File_Error
+		}
+		defer delete(data, allocator)
+		return i18n.parse_qt_linguist_from_bytes(data, options, pluralizer, allocator)
+	}
+
+	test(t, {
+		file   = TEST_SUITE_PATH + "nl_NL-qt-ts.ts",
+		loader = load_from_bytes,
+		plural = nil,
+		tests  = {
+			{"Page",        "Text for translation", "Tekst om te vertalen", -1},
+			{"apple_count", "%d apple(s)",          "%d appels",            42},
+		},
+	})
+}
+
+@(test)
 test_qt_linguist_merge_sections :: proc(t: ^testing.T) {
 	test(t, {
 		file    = TEST_SUITE_PATH + "nl_NL-qt-ts.ts",
@@ -248,4 +270,32 @@ test :: proc(t: ^testing.T, suite: Test_Suite, loc := #caller_location) {
 		}
 	}
 	i18n.destroy(cat)
+}
+
+@(test)
+test_qt_linguist_text :: proc(t: ^testing.T) {
+	TS ::
+		"<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+		"<!DOCTYPE TS>\n" +
+		"<TS version=\"2.1\" language=\"nl\">\n" +
+		"<context>\n" +
+		"\t<name>Page</name>\n" +
+		"\t<message>\n" +
+		"\t\t<source> Hello </source>\n" +
+		"\t\t<translation> Hallo </translation>\n" +
+		"\t</message>\n" +
+		"\t<message>\n" +
+		"\t\t<source>Tom &amp; Jerry</source>\n" +
+		"\t\t<translation><![CDATA[Tom &amp; Jerry]]></translation>\n" +
+		"\t</message>\n" +
+		"</context>\n" +
+		"</TS>\n"
+
+	cat, err := i18n.parse_qt_linguist_from_bytes(transmute([]u8)string(TS))
+	defer i18n.destroy(cat)
+	testing.expect_value(t, err, i18n.Error.None)
+	if err == .None {
+		testing.expect_value(t, T("Page", " Hello ", cat), " Hallo ")
+		testing.expect_value(t, T("Page", "Tom & Jerry", cat), "Tom &amp; Jerry")
+	}
 }

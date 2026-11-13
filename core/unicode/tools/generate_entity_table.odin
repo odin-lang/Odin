@@ -7,6 +7,7 @@ import      "core:strings"
 import      "core:strconv"
 import      "core:slice"
 import      "core:fmt"
+import      "core:io"
 
 GENERATED :: `/*
 	------ GENERATED ------ DO NOT EDIT ------ GENERATED ------ DO NOT EDIT ------ GENERATED ------
@@ -44,12 +45,15 @@ TABLE_FILE_PROLOG :: `/*
 // Silent error handler for the parser.
 Error_Handler :: proc(pos: xml.Pos, fmt: string, args: ..any) {}
 
-OPTIONS :: xml.Options{ flags = { .Ignore_Unsupported, }, expected_doctype = "unicode", }
+OPTIONS :: xml.Options{ flags = { .Ignore_Unsupported, .Trim_Whitespace, }, expected_doctype = "unicode", }
 
 Entity :: struct {
 	codepoints:  [2]rune,
 	name:        string, // &name;
 	description: string,
+	stix:        bool,
+	html5:       bool,
+	legacy:      bool,
 }
 
 Character :: struct {
@@ -97,7 +101,7 @@ main :: proc() {
 	// `Aring` and `angst` are both a capital A with a circle. The latter is the Angstrom symbol.
 	entities: [dynamic]Entity
 	defer delete(entities)
-	entity_map: map[string]Entity
+	entity_map: map[string]int
 	defer delete(entity_map)
 
 	min_name_length := max(int)
@@ -175,17 +179,34 @@ main :: proc() {
 			min_name_length = min(min_name_length, len(name))
 			max_name_length = max(max_name_length, len(name))
 
-			if name in entity_map {
-				continue
-			}
+			set, _ := xml.find_attribute_val_by_key(doc, character_entity, "set")
 
 			e := Entity{
 				name        = name,
 				codepoints  = {rune(codepoint), rune(codepoint2)},
 				description = description,
+				stix        = set == "STIX",
+				html5       = is_html5_set(set),
+				legacy      = set == "xhtml1-lat1",
+			}
+			switch name {
+			case "amp", "lt", "gt", "quot", "AMP", "LT", "GT", "QUOT", "COPY", "REG":
+				e.legacy = true
 			}
 
-			entity_map[name] = e
+			if index, seen := entity_map[name]; seen {
+				known := &entities[index]
+				if known.stix && !e.stix {
+					known.codepoints  = e.codepoints
+					known.description = e.description
+					known.stix        = false
+				}
+				known.html5  = known.html5  || e.html5
+				known.legacy = known.legacy || e.legacy
+				continue
+			}
+
+			entity_map[name] = len(entities)
 			append(&entities, e)
 		}
 	}
@@ -275,10 +296,14 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 			fmt.wprintf(w, " ")
 		}
 		fmt.wprintf(w, " // %v\n", e.description)
+		fmt.wprint(w, "\t\t\treturn {")
+		write_rune_literal(w, e.codepoints[0])
 		if e.codepoints[1] != 0 {
-			fmt.wprintf(w, "\t\t\treturn {{%q, %q}}, 2, true\n", e.codepoints[0], e.codepoints[1])
+			fmt.wprint(w, ", ")
+			write_rune_literal(w, e.codepoints[1])
+			fmt.wprintln(w, "}, 2, true")
 		} else {
-			fmt.wprintf(w, "\t\t\treturn {{%q, 0}}, 1, true\n", e.codepoints[0])
+			fmt.wprintln(w, ", 0}, 1, true")
 		}
 		should_close = true
 	}
@@ -286,6 +311,29 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 	fmt.wprintln(w, "\t}")
 	fmt.wprintln(w, "\treturn")
 	fmt.wprintln(w, "}\n")
+
+	legacy_names:   [dynamic]string
+	non_html5_names: [dynamic]string
+	defer delete(legacy_names)
+	defer delete(non_html5_names)
+	legacy_max_length := 0
+	for e in entities {
+		if e.legacy {
+			assert(e.html5)
+			append(&legacy_names, e.name)
+			legacy_max_length = max(legacy_max_length, len(e.name))
+		}
+		if !e.html5 {
+			append(&non_html5_names, e.name)
+		}
+	}
+	fmt.printfln("HTML5 names: %v, of which %v also match without `;`.", len(entities) - len(non_html5_names), len(legacy_names))
+
+	fmt.wprintln(w, "@(private)")
+	fmt.wprintfln(w, "HTML5_LEGACY_NAME_MAX_LENGTH :: %v\n", legacy_max_length)
+	write_name_switch(w, "is_html5_legacy_entity_name", legacy_names[:])
+	write_name_switch(w, "is_non_html5_entity_name", non_html5_names[:])
+
 	fmt.wprintln(w, GENERATED)
 
 	fmt.println()
@@ -303,12 +351,66 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 	}
 }
 
+is_html5_set :: proc(set: string) -> bool {
+	switch set {
+	case "predefined", "html5-uppercase", "mmlalias", "mmlextra":
+		return true
+	case "9573-2003-isogrk1", "9573-2003-isogrk2", "9573-2003-isogrk4":
+		return false
+	}
+	return strings.has_prefix(set, "xhtml1-") || strings.has_prefix(set, "9573-2003-")
+}
+
+write_name_switch :: proc(w: io.Writer, proc_name: string, names: []string) {
+	fmt.wprintln(w, "@(private)")
+	fmt.wprint(w, proc_name, ":: proc(name: string) -> bool {\n")
+	fmt.wprint(w, "\tswitch name {\n")
+	for name, i in names {
+		switch {
+		case i == 0:
+			fmt.wprint(w, "\tcase ")
+		case i % 8 == 0:
+			fmt.wprint(w, ",\n\t\t")
+		case:
+			fmt.wprint(w, ", ")
+		}
+		fmt.wprintf(w, "%q", name)
+	}
+	fmt.wprint(w, ":\n")
+	fmt.wprint(w, "\t\treturn true\n")
+	fmt.wprint(w, "\t}\n")
+	fmt.wprint(w, "\treturn false\n")
+	fmt.wprint(w, "}\n\n")
+}
+
+write_rune_literal :: proc(w: io.Writer, r: rune) {
+	switch {
+	case r == '\'':
+		fmt.wprint(w, `'\''`)
+	case r == '\\':
+		fmt.wprint(w, `'\\'`)
+	case r == '\t':
+		fmt.wprint(w, `'\t'`)
+	case r == '\n':
+		fmt.wprint(w, `'\n'`)
+	case r >= 0x20 && r < 0x7f, r > 0xa0 && r <= 0xff && r != 0xad:
+		fmt.wprintf(w, "'%c'", r)
+	case r > 0xffff:
+		fmt.wprintf(w, `'\U%08x'`, r)
+	case:
+		fmt.wprintf(w, `'\u%04x'`, r)
+	}
+}
+
 write_unicode_category_tables :: proc(characters: []Character) {
 	fmt.printfln("Found %v codepoints with a category.", len(characters))
 
 	// Sort by `category`, then `codepoints`
 	slice.sort_by(characters, proc(a, b: Character) -> bool {
-		return a.category < b.category && a.codepoint < b.codepoint
+		if a.category != b.category {
+			return a.category < b.category
+		}
+		return a.codepoint < b.codepoint
 	})
 
 	nd_range_start := rune(-1)
