@@ -1,30 +1,16 @@
 #+build !js
 package all
 
+// NOTE: Packages that link libraries which are only bundled as x64 builds for Windows are in `all_vendor_libs.odin`,
+// or in `all_vendor_windows_x86.odin` for the Windows only ones.
+
 @(require) import "vendor:cgltf"
-@(require) import "vendor:curl"
-@(require) import "vendor:ENet"
-@(require) import "vendor:OpenEXRCore"
-@(require) import "vendor:ggpo"
 @(require) import "vendor:OpenGL"
-@(require) import "vendor:glfw"
 @(require) import "vendor:microui"
 @(require) import "vendor:miniaudio"
-@(require) import "vendor:portmidi"
-@(require) import "vendor:raylib"
-@(require) import "vendor:raylib/rlgl"
-@(require) import "vendor:zlib"
-
-@(require) import "vendor:sdl2"
-@(require) import "vendor:sdl2/net"
-@(require) import "vendor:sdl2/image"
-@(require) import "vendor:sdl2/mixer"
-@(require) import "vendor:sdl2/ttf"
 
 @(require) import "vendor:vulkan"
 
-// NOTE(bill): only one can be checked at a time
-@(require) import lua54 "vendor:lua/5.4"
 @(require) import "vendor:nanovg"
 @(require) import "vendor:nanovg/gl"
 @(require) import "vendor:fontstash"
@@ -64,7 +50,6 @@ package all
 @(require) import "vendor:directx/d3d12"
 @(require) import "vendor:directx/d3d_compiler"
 @(require) import "vendor:directx/dxgi"
-@(require) import "vendor:commonmark"
 
 @(require) import "vendor:stb/easy_font"
 @(require) import stbi "vendor:stb/image"

@@ -1,6 +1,10 @@
 // Bindings for [[ ENet ; https://github.com/lsalzman/enet ]].
 package ENet
 
+when ODIN_OS == .Windows && ODIN_ARCH == .arm64 {
+	#panic("vendor:ENet only bundles x86 builds of ENet for Windows, use -target:windows_amd64 instead, which Windows on ARM runs through emulation")
+}
+
 when ODIN_OS == .Windows {
 	when ODIN_ARCH == .amd64 {
 		foreign import ENet {

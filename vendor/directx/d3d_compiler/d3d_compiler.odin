@@ -1,7 +1,13 @@
 // Bindings for [[ Direct3D Shader Compiler ; https://learn.microsoft.com/en-us/windows/win32/api/d3dcompiler/ ]].
 package directx_d3d_compiler
 
-foreign import d3dcompiler "d3dcompiler_47.lib"
+when ODIN_OS == .Windows && ODIN_ARCH == .arm64 {
+	// NOTE: The bundled `d3dcompiler_47.lib` is x64 only. Windows on ARM has a native `d3dcompiler_47.dll`,
+	// which the Windows SDK's `d3dcompiler.lib` imports.
+	foreign import d3dcompiler "system:d3dcompiler.lib"
+} else {
+	foreign import d3dcompiler "d3dcompiler_47.lib"
+}
 import win32 "core:sys/windows"
 
 D3DCOMPILER_DLL_A :: "d3dcompiler_47.dll"

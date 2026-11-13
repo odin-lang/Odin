@@ -1,6 +1,10 @@
 //  Bindings for [[LZ4 ; https://github.com/lz4/lz4]].
 package vendor_compress_lz4
 
+when ODIN_OS == .Windows && ODIN_ARCH == .arm64 {
+	#panic("vendor:compress/lz4 only bundles an x64 build of LZ4 for Windows, use -target:windows_amd64 instead, which Windows on ARM runs through emulation")
+}
+
 when ODIN_OS == .Windows {
 	foreign import lib "lib/liblz4_static.lib"
 } else {

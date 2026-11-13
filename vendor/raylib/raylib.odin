@@ -99,6 +99,11 @@ MAX_MATERIAL_MAPS      :: #config(RAYLIB_MAX_MATERIAL_MAPS, 12)
 RAYLIB_SHARED :: #config(RAYLIB_SHARED, false)
 RAYLIB_WASM_LIB :: #config(RAYLIB_WASM_LIB, "wasm/libraylib.web.a")
 
+// NOTE: `vendor:raylib/rlgl` imports this package, so this covers it too.
+when ODIN_OS == .Windows && ODIN_ARCH == .arm64 {
+	#panic("vendor:raylib only bundles x64 builds of raylib and raygui for Windows, use -target:windows_amd64 instead, which Windows on ARM runs through emulation")
+}
+
 when ODIN_OS == .Windows {
 	@(extra_linker_flags="/NODEFAULTLIB:" + ("msvcrt" when RAYLIB_SHARED else "libcmt"))
 	foreign import lib {

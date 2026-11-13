@@ -3,6 +3,10 @@ package vendor_zlib
 
 import "core:c"
 
+when ODIN_OS == .Windows && ODIN_ARCH == .arm64 {
+	#panic("vendor:zlib only bundles an x64 build of zlib for Windows, use -target:windows_amd64 instead, which Windows on ARM runs through emulation")
+}
+
 when ODIN_OS == .Windows {
 	foreign import zlib "libz.lib"
 } else when ODIN_OS == .Linux {

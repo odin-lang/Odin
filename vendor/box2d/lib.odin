@@ -12,6 +12,9 @@ when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
 }
 
 when ODIN_OS == .Windows {
+	when ODIN_ARCH == .arm64 {
+		#panic("vendor:box2d only bundles an x64 build of Box2D for Windows, use -target:windows_amd64 instead, which Windows on ARM runs through emulation")
+	}
 	@(private) LIB_PATH :: "lib/box2d_windows_amd64.lib"
 } else when ODIN_OS == .Darwin {
 	@(private) LIB_PATH :: "lib/box2d_darwin.a"

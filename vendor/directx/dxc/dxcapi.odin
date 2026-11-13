@@ -1,7 +1,11 @@
 // Bindings for [[ DXC ; https://learn.microsoft.com/en-us/windows/win32/api/dxcapi/ ]].
 package directx_dxc
 
-when ODIN_OS == .Windows {
+when ODIN_OS == .Windows && ODIN_ARCH == .arm64 {
+	// NOTE: The bundled DXC is x64 only. The Windows SDK has an arm64 `dxcompiler.lib`, and the `dxcompiler.dll`
+	// and `dxil.dll` it needs at run time in `bin\<version>\arm64`, as do the DXC releases on GitHub.
+	foreign import dxcompiler "system:dxcompiler.lib"
+} else when ODIN_OS == .Windows {
 	foreign import dxcompiler "dxcompiler.lib"
 } else {
 	foreign import dxcompiler "system:dxcompiler"

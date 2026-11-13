@@ -12,6 +12,10 @@ LUA_SHARED :: #config(LUA_SHARED, false)
 
 LUA_WASM_LIB :: #config(LUA_WASM_LIB, "env.o")
 
+when ODIN_OS == .Windows && ODIN_ARCH == .arm64 {
+	#panic("vendor:lua/5.2 only bundles an x64 build of Lua 5.2 for Windows, use -target:windows_amd64 instead, which Windows on ARM runs through emulation")
+}
+
 when LUA_SHARED {
 	when ODIN_OS == .Windows {
 		// Does nothing special on windows

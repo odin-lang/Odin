@@ -5,6 +5,10 @@ import "core:strings"
 
 PORTMIDI_SHARED :: #config(PORTMIDI_SHARED, false)
 
+when ODIN_OS == .Windows && ODIN_ARCH == .arm64 {
+	#panic("vendor:portmidi only bundles an x64 build of PortMidi for Windows, use -target:windows_amd64 instead, which Windows on ARM runs through emulation")
+}
+
 when ODIN_OS == .Windows {
 	when PORTMIDI_SHARED {
 		#panic("Shared linking not supported for portmidi on windows yet")

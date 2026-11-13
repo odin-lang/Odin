@@ -14,6 +14,10 @@ into new and existing games as easy as possible.
 */
 package vendor_ggpo
 
+when ODIN_OS == .Windows && ODIN_ARCH == .arm64 {
+	#panic("vendor:ggpo only bundles an x64 build of GGPO for Windows, use -target:windows_amd64 instead, which Windows on ARM runs through emulation")
+}
+
 foreign import lib "GGPO.lib"
 
 import c "core:c/libc"

@@ -5,6 +5,10 @@ import vk "vendor:vulkan"
 
 GLFW_SHARED :: #config(GLFW_SHARED, ODIN_OS != .Windows && ODIN_OS != .Darwin)
 
+when ODIN_OS == .Windows && ODIN_ARCH == .arm64 {
+	#panic("vendor:glfw only bundles x64 builds of GLFW for Windows, use -target:windows_amd64 instead, which Windows on ARM runs through emulation")
+}
+
 when ODIN_OS == .Windows {
 	when GLFW_SHARED {
 		foreign import glfw {

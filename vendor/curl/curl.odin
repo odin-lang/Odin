@@ -2,6 +2,10 @@ package vendor_curl
 
 import c "core:c/libc"
 
+when ODIN_OS == .Windows && ODIN_ARCH == .arm64 {
+	#panic("vendor:curl only bundles x64 builds of libcurl and its dependencies for Windows, use -target:windows_amd64 instead, which Windows on ARM runs through emulation")
+}
+
 when ODIN_OS == .Windows {
 	@(export, extra_linker_flags="/NODEFAULTLIB:msvcrt")
 	foreign import lib {

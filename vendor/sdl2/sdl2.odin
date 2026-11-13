@@ -26,6 +26,11 @@ package sdl2
 import "core:c"
 import "base:intrinsics"
 
+// NOTE: `vendor:sdl2/image`, `mixer`, `net` and `ttf` import this package, so this covers them too.
+when ODIN_OS == .Windows && ODIN_ARCH == .arm64 {
+	#panic("vendor:sdl2 only bundles x64 builds of SDL2 and its satellite libraries for Windows, use -target:windows_amd64 instead, which Windows on ARM runs through emulation")
+}
+
 when ODIN_OS == .Windows {
 	@(ignore_duplicates)
 	foreign import lib "SDL2.lib"
