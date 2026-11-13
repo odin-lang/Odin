@@ -464,6 +464,7 @@ Encoder :: struct {
 	w:       io.Writer,
 	deflate: deflate.Deflate_Writer,
 	bzip2:   bzip2.Writer,
+	lzma:    lzma.Writer,
 	ppmd:    ppmd.Writer,
 }
 

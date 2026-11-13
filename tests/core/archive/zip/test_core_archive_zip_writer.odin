@@ -8,6 +8,7 @@ import "core:compress/lzma"
 import "core:compress/ppmd"
 import "core:fmt"
 import "core:io"
+import "core:mem"
 import "core:os"
 import "core:strings"
 import "core:testing"
@@ -130,12 +131,15 @@ test_write_end_markers :: proc(t: ^testing.T) {
 		return
 	}
 	defer zip.close(&zw)
-	inner: bytes.Reader
+	inner, inner_lzma: bytes.Reader
 	bytes.reader_init(&inner, text)
-	unknown := Non_Seekable{inner = bytes.reader_to_stream(&inner)}
+	bytes.reader_init(&inner_lzma, text)
+	unknown      := Non_Seekable{inner = bytes.reader_to_stream(&inner)}
+	unknown_lzma := Non_Seekable{inner = bytes.reader_to_stream(&inner_lzma)}
 	testing.expect_value(t, zip.write_entry(&zw, "ppmd.txt", text, zip.Entry_Options{method = .PPMd_I}), nil)
 	testing.expect_value(t, zip.write_entry(&zw, archive.File_Info{path = "streamed.txt", size = -1}, non_seekable_stream(&unknown), zip.Entry_Options{method = .PPMd_I}), nil)
 	testing.expect_value(t, zip.write_entry(&zw, "lzma.txt", text, zip.Entry_Options{method = .LZMA}), nil)
+	testing.expect_value(t, zip.write_entry(&zw, archive.File_Info{path = "streamed_lzma.txt", size = -1}, non_seekable_stream(&unknown_lzma), zip.Entry_Options{method = .LZMA}), nil)
 	testing.expect_value(t, zip.commit(&zw), nil)
 
 	r: zip.Reader
@@ -204,6 +208,26 @@ test_write_errors :: proc(t: ^testing.T) {
 	testing.expect_value(t, zip.write_entry(&zw, archive.File_Info{path = "huge", size = 32 << 20}, bytes.reader_to_stream(&huge)), Zip_Error.Size_Mismatch)
 	testing.expect_value(t, zip.write_entry(&zw, "after.txt", text), Zip_Error.Size_Mismatch)
 	testing.expect_value(t, zip.commit(&zw), Zip_Error.Size_Mismatch)
+
+	streamed := make([]u8, int(zip.ONE_SHOT_MAX) * 2)
+	defer delete(streamed)
+	for i in 0..<len(streamed) {
+		streamed[i] = text[i % len(text)]
+	}
+	for method in ([?]archive.Method{.Deflate, .BZip2, .LZMA, .PPMd_I}) {
+		for declared in ([?]i64{i64(len(streamed)) + 1000, i64(len(streamed)) - 1000}) {
+			sw: zip.Writer
+			out := Memory_File{seekable = true}
+			if testing.expect_value(t, zip.create(&sw, memory_stream(&out)), nil) {
+				source: bytes.Reader
+				bytes.reader_init(&source, streamed)
+				err := zip.write_entry(&sw, archive.File_Info{path = "m", size = declared}, bytes.reader_to_stream(&source), zip.Entry_Options{method = method})
+				testing.expectf(t, err == Zip_Error.Size_Mismatch, "%v, declared %d of %d: %v", method, declared, len(streamed), err)
+				zip.close(&sw)
+			}
+			delete(out.data)
+		}
+	}
 
 	bad: zip.Writer
 	other := Memory_File{seekable = true}
@@ -562,6 +586,123 @@ test_write_streamed :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_write_lzma_streamed :: proc(t: ^testing.T) {
+	LEVEL :: 3
+	size  := int(zip.ONE_SHOT_MAX) * 4
+	text  := make([]u8, size)
+	defer delete(text)
+	line  := WRITE_TEXT
+	for i in 0..<size {
+		text[i] = line[i % len(line)]
+	}
+	random := write_random(size, 5)
+	defer delete(random)
+
+	want: [dynamic]u8
+	defer delete(want)
+	lzma_options := lzma.level_options(lzma.Level(LEVEL))
+	lzma_options.end_marker = true
+	props, props_err := lzma.compress_raw_to_dynamic(&want, text, lzma_options)
+	testing.expect_value(t, props_err, nil)
+	encoded := lzma.encode_properties(props)
+
+	for mode in Output_Mode {
+		m := Memory_File{seekable = mode == .Seekable}
+		defer delete(m.data)
+		zw: zip.Writer
+		if !testing.expect_value(t, zip.create(&zw, memory_stream(&m), zip.Writer_Options{method = .LZMA, level = LEVEL}), nil) {
+			return
+		}
+		known, inner: bytes.Reader
+		bytes.reader_init(&known, text)
+		bytes.reader_init(&inner, text)
+		unknown := Non_Seekable{inner = bytes.reader_to_stream(&inner)}
+		testing.expect_value(t, zip.write_entry(&zw, "text.txt", text), nil)
+		testing.expect_value(t, zip.write_entry(&zw, "known.txt", bytes.reader_to_stream(&known)), nil)
+		testing.expect_value(t, zip.write_entry(&zw, archive.File_Info{path = "unknown.txt", size = -1}, non_seekable_stream(&unknown)), nil)
+		testing.expect_value(t, zip.write_entry(&zw, "random.bin", random), nil)
+		testing.expect_value(t, zip.commit(&zw), nil)
+		zip.close(&zw)
+
+		label    := fmt.tprintf("lzma streamed/%v", mode)
+		streamed := mode == .Streaming
+		fallback := archive.Method.Store if mode == .Seekable else archive.Method.LZMA
+		check_written(t, label, m.data[:], {
+			{name = "text.txt",    type = .Regular, method = .LZMA,   content = text,   descriptor = streamed},
+			{name = "known.txt",   type = .Regular, method = .LZMA,   content = text,   descriptor = streamed},
+			{name = "unknown.txt", type = .Regular, method = .LZMA,   content = text,   descriptor = streamed},
+			{name = "random.bin",  type = .Regular, method = fallback, content = random, descriptor = streamed},
+		})
+
+		r: zip.Reader
+		if !testing.expect_value(t, zip.open(&r, m.data[:]), nil) {
+			continue
+		}
+		it := zip.iterator_create(&r)
+		for fi in zip.iterate(&it) {
+			entry := zip.current_entry(&it)
+			if entry.central.method != .LZMA {
+				continue
+			}
+			raw := m.data[entry.data_offset:][:entry.central.compressed_size]
+			testing.expectf(t, .Option_1 in entry.central.flags, "%s/%s: EOS flag", label, fi.path)
+			testing.expectf(t, bytes.equal(raw[:4], []u8{zip.LZMA_SDK_VERSION[0], zip.LZMA_SDK_VERSION[1], lzma.PROPERTIES_SIZE, 0}), "%s/%s: head % x", label, fi.path, raw[:4])
+			if fi.path == "text.txt" || fi.path == "known.txt" {
+				same := bytes.equal(raw[4:][:lzma.PROPERTIES_SIZE], encoded[:]) && bytes.equal(raw[4 + lzma.PROPERTIES_SIZE:], want[:])
+				testing.expectf(t, same, "%s/%s: %d bytes differ from one shot's %d", label, fi.path, len(raw), 4 + lzma.PROPERTIES_SIZE + len(want))
+			}
+		}
+		zip.iterator_destroy(&it)
+		zip.close(&r)
+	}
+}
+
+@(test)
+test_write_lzma_memory :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
+	sizes := [2]i64{8 << 20, 32 << 20}
+	peaks: [2][2]i64
+	for size, i in sizes {
+		for known, k in ([2]bool{true, false}) {
+			track: mem.Tracking_Allocator
+			mem.tracking_allocator_init(&track, context.allocator)
+			defer mem.tracking_allocator_destroy(&track)
+			m := Memory_File{seekable = true}
+			reserve(&m.data, 1 << 20)
+			defer delete(m.data)
+			zw: zip.Writer
+			if !testing.expect_value(t, zip.create(&zw, memory_stream(&m), zip.Writer_Options{method = .LZMA, level = 1}, mem.tracking_allocator(&track)), nil) {
+				return
+			}
+			zeros := Zero_Reader{remaining = size}
+			fi    := archive.File_Info{path = "zeros.bin", size = size if known else -1}
+			testing.expect_value(t, zip.write_entry(&zw, fi, zero_reader(&zeros)), nil)
+			testing.expect_value(t, zip.commit(&zw), nil)
+			zip.close(&zw)
+			testing.expectf(t, len(track.allocation_map) == 0, "size %d, known %v: %d allocations left", size, known, len(track.allocation_map))
+			peaks[k][i] = track.peak_memory_allocated
+
+			r: zip.Reader
+			if !testing.expect_value(t, zip.open(&r, m.data[:]), nil) {
+				continue
+			}
+			got, handle, ok, _ := zip.find(&r, "zeros.bin")
+			testing.expect(t, ok, "find zeros.bin")
+			testing.expect_value(t, got.method, archive.Method.LZMA)
+			d: Discard
+			testing.expect_value(t, zip.extract(&r, handle, discard_writer(&d)), nil)
+			testing.expect_value(t, d.count, size)
+			zip.close(&r)
+		}
+	}
+	for p in peaks {
+		testing.expectf(t, p[0] == p[1] && p[1] < sizes[1], "peaks %v for sizes %v", p, sizes)
+	}
+}
+
+@(test)
 test_write_large :: proc(t: ^testing.T) {
 	when SLIM_TESTS {
 		return
@@ -640,7 +781,7 @@ write_and_check :: proc(t: ^testing.T, method: archive.Method, mode: Output_Mode
 		return
 	}
 
-	one_shot     := method == .LZMA || method == .XZ
+	one_shot     := method == .XZ
 	random_kept  := method if !one_shot else archive.Method.Store
 	check_written(t, label, m.data[:], {
 		{name = "empty.txt",         type = .Regular,   method = .Store},

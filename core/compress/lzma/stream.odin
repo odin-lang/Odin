@@ -116,7 +116,7 @@ writer_write :: proc(lw: ^Writer, p: []u8) -> (n: int, err: Error) {
 	if lw.input_size >= 0 && i64(len(p)) > lw.input_size - lw.total_in {
 		return 0, LZMA_Error.Size_Mismatch
 	}
-	mf := &lw.encoder.mf
+	mf := &lw.state.encoder.mf
 	for n < len(p) {
 		if mf_room(mf) == 0 {
 			mf_move_block(mf)
@@ -144,7 +144,7 @@ writer_finish :: proc(lw: ^Writer) -> (err: Error) {
 	if lw.input_size >= 0 && lw.total_in != lw.input_size {
 		return LZMA_Error.Size_Mismatch
 	}
-	e := lw.encoder
+	e := &lw.state.encoder
 	if lw.kind == .LZMA2 {
 		for lw.chunker.src_pos < lw.total_in {
 			writer_step(lw) or_return
@@ -171,17 +171,16 @@ writer_to_stream :: proc(lw: ^Writer) -> (s: io.Stream) {
 
 writer_destroy :: proc(lw: ^Writer) {
 	context.allocator = lw.allocator
-	if lw.encoder != nil {
-		encoder_destroy(lw.encoder)
-		free(lw.encoder)
+	if lw.state != nil {
+		encoder_destroy(&lw.state.encoder)
+		delete(lw.state.out)
+		free(lw.state)
 	}
 	if lw.owns_block {
 		delete(lw.block)
 	}
-	delete(lw.out)
-	lw.encoder    = nil
+	lw.state      = nil
 	lw.block      = nil
-	lw.out        = {}
 	lw.owns_block = false
 }
 
@@ -399,14 +398,15 @@ writer_create :: proc(lw: ^Writer, w: io.Writer, kind: Stream_Kind, lzma_options
 		lw.block      = non_zero_make([]u8, int(block_size)) or_return
 		lw.owns_block = true
 	}
-	lw.out.allocator = allocator
-	non_zero_resize(&lw.out, out_size) or_return
+	state := new(Writer_State) or_return
+	lw.state = state
+	state.out.allocator = allocator
+	non_zero_resize(&state.out, out_size) or_return
 
-	e := new(Encoder) or_return
-	lw.encoder = e
-	e.rc = Range_Encoder{buf = raw_data(lw.out), cap = len(lw.out), grow = &lw.out, limit = max(int)}
+	e := &state.encoder
+	e.rc = Range_Encoder{buf = raw_data(state.out), cap = len(state.out), grow = &state.out, limit = max(int)}
 	if kind == .Alone {
-		write_header(lw.out[:], props, expected)
+		write_header(state.out[:], props, expected)
 		e.rc.pos = HEADER_SIZE
 	}
 	encoder_create(e, opts, expected, lzma2) or_return
@@ -428,8 +428,7 @@ writer_create :: proc(lw: ^Writer, w: io.Writer, kind: Stream_Kind, lzma_options
 
 @(private)
 writer_step :: proc(lw: ^Writer) -> (err: Error) {
-	e := lw.encoder
-	e.rc.grow = &lw.out
+	e := &lw.state.encoder
 	now_pos := e.now_pos64
 	if lw.kind == .LZMA2 {
 		_, chunk_err := lzma2_chunk(e, &lw.chunker)

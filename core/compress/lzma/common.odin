@@ -57,9 +57,8 @@ Reader :: struct {
 
 Writer :: struct {
 	w:          io.Writer,
-	encoder:    ^Encoder,
+	state:      ^Writer_State,
 	chunker:    LZMA2_Chunker,
-	out:        [dynamic]u8,
 	block:      []u8,
 	threshold:  u32,
 	kind:       Stream_Kind,
@@ -71,6 +70,12 @@ Writer :: struct {
 	err:        Error,
 	owns_block: bool,
 	finished:   bool,
+}
+
+@(private)
+Writer_State :: struct {
+	encoder: Encoder,
+	out:     [dynamic]u8,
 }
 
 @(private)

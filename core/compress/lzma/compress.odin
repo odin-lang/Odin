@@ -210,7 +210,7 @@ encoder_memory :: proc "contextless" (opts: Options, expected_size: u64, lzma2: 
 	if lzma2 {
 		lit *= 2
 	}
-	return size_of(Encoder) + refs * size_of(u32) + lit
+	return size_of(Writer_State) + refs * size_of(u32) + lit
 }
 
 @(private)

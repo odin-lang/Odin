@@ -523,11 +523,11 @@ _write_member :: proc(zw: ^Writer, p: ^Pending_Entry, data: Entry_Data) -> (err:
 	}
 	switch d in data {
 	case []u8:
-		if p.method == .Store || p.method == .LZMA || p.method == .XZ || p.size <= ONE_SHOT_MAX {
+		if p.method == .Store || p.method == .XZ || p.size <= ONE_SHOT_MAX {
 			return _write_one_shot(zw, p, d)
 		}
 	case io.Reader:
-		if p.method == .LZMA || p.method == .XZ || (p.size >= 0 && p.size <= ONE_SHOT_MAX) {
+		if p.method == .XZ || (p.size >= 0 && p.size <= ONE_SHOT_MAX) {
 			buffer: [dynamic]u8
 			buffer.allocator = zw.allocator
 			defer delete(buffer)
@@ -631,10 +631,10 @@ _write_streamed :: proc(zw: ^Writer, p: ^Pending_Entry, data: Entry_Data) -> (er
 			return read_err
 		}
 	}
-	_encoder_finish(&encoder) or_return
 	if expected >= 0 && total != expected {
 		return Zip_Error.Size_Mismatch
 	}
+	_encoder_finish(&encoder) or_return
 	p.size       = total
 	p.crc        = crc
 	p.compressed = sink.count
@@ -809,6 +809,16 @@ _encoder_init :: proc(e: ^Encoder, zw: ^Writer, p: ^Pending_Entry, size: i64, w:
 		deflate.deflate_writer_init(&e.deflate, w, .Raw64, deflate.Deflate_Level(p.level), options, zw.allocator) or_return
 	case .BZip2:
 		bzip2.writer_init(&e.bzip2, w, bzip2.Level(p.level), options, zw.allocator) or_return
+	case .LZMA:
+		lzma_options := lzma.level_options(lzma.Level(p.level))
+		lzma_options.end_marker = true
+		props   := lzma.writer_init_raw(&e.lzma, w, lzma_options, size, options, zw.allocator) or_return
+		encoded := lzma.encode_properties(props)
+		head    := [4 + lzma.PROPERTIES_SIZE]u8{0 = LZMA_SDK_VERSION[0], 1 = LZMA_SDK_VERSION[1], 2 = lzma.PROPERTIES_SIZE}
+		copy(head[4:], encoded[:])
+		if _, write_err := io.write_full(w, head[:]); write_err != nil {
+			return write_err
+		}
 	case .PPMd:
 		input_size := int(size) if size >= 0 && size <= i64(max(int)) else -1
 		props   := ppmd.level_properties(.I, ppmd.Level(p.level), input_size)
@@ -832,6 +842,8 @@ _encoder_write :: proc(e: ^Encoder, data: []u8) -> (err: Error) {
 		_ = deflate.deflate_writer_write(&e.deflate, data) or_return
 	case .BZip2:
 		_ = bzip2.writer_write(&e.bzip2, data) or_return
+	case .LZMA:
+		_ = lzma.writer_write(&e.lzma, data) or_return
 	case .PPMd:
 		_ = ppmd.writer_write(&e.ppmd, data) or_return
 	}
@@ -845,6 +857,8 @@ _encoder_finish :: proc(e: ^Encoder) -> (err: Error) {
 		deflate.deflate_writer_finish(&e.deflate) or_return
 	case .BZip2:
 		bzip2.writer_finish(&e.bzip2) or_return
+	case .LZMA:
+		lzma.writer_finish(&e.lzma) or_return
 	case .PPMd:
 		ppmd.writer_finish(&e.ppmd) or_return
 	}
@@ -855,6 +869,7 @@ _encoder_finish :: proc(e: ^Encoder) -> (err: Error) {
 _encoder_destroy :: proc(e: ^Encoder) {
 	deflate.deflate_writer_destroy(&e.deflate)
 	bzip2.writer_destroy(&e.bzip2)
+	lzma.writer_destroy(&e.lzma)
 	ppmd.writer_destroy(&e.ppmd)
 }
 
