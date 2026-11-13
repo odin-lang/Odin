@@ -1773,8 +1773,8 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 			return {'\u25c2', 0}, 1, true
 		case "blacktriangleright":              // BLACK RIGHT-POINTING SMALL TRIANGLE
 			return {'\u25b8', 0}, 1, true
-		case "blank":                           // BLANK SYMBOL
-			return {'\u2422', 0}, 1, true
+		case "blank":                           // OPEN BOX
+			return {'\u2423', 0}, 1, true
 		case "bldhar":                          // LEFTWARDS HARPOON WITH BARB DOWN FROM BAR
 			return {'\u295e', 0}, 1, true
 		case "blk12":                           // MEDIUM SHADE
@@ -3143,8 +3143,8 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 			return {'\u2a2d', 0}, 1, true
 		case "lotimes":                         // MULTIPLICATION SIGN IN LEFT HALF CIRCLE
 			return {'\u2a34', 0}, 1, true
-		case "lowast":                          // LOW ASTERISK
-			return {'\u204e', 0}, 1, true
+		case "lowast":                          // ASTERISK OPERATOR
+			return {'\u2217', 0}, 1, true
 		case "lowbar":                          // LOW LINE
 			return {'_', 0}, 1, true
 		case "lowint":                          // INTEGRAL WITH UNDERBAR

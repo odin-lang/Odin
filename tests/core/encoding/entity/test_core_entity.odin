@@ -180,3 +180,21 @@ test_decode_xml_in_place :: proc(t: ^testing.T) {
 	testing.expect_value(t, bad_offset, 7)
 	testing.expect_value(t, string(bad), "a&amp;b&bad;")
 }
+
+@(test)
+test_named_entity_iso_code_points :: proc(t: ^testing.T) {
+	Name_Case :: struct {
+		name:    string,
+		decoded: rune,
+	}
+	cases := [?]Name_Case{
+		{"lowast", 0x2217},
+		{"blank",  0x2423},
+		{"Aring",  0x00c5},
+		{"angst",  0x00c5},
+	}
+	for c in cases {
+		decoded, count, ok := entity.named_xml_entity_to_rune(c.name)
+		testing.expectf(t, ok && count == 1 && decoded[0] == c.decoded, "&%v;: expected U+%04X, got %v (%v, %v)", c.name, c.decoded, decoded, count, ok)
+	}
+}

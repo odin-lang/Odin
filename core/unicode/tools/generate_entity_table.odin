@@ -7,6 +7,7 @@ import      "core:strings"
 import      "core:strconv"
 import      "core:slice"
 import      "core:fmt"
+import      "core:io"
 
 GENERATED :: `/*
 	------ GENERATED ------ DO NOT EDIT ------ GENERATED ------ DO NOT EDIT ------ GENERATED ------
@@ -50,6 +51,7 @@ Entity :: struct {
 	codepoints:  [2]rune,
 	name:        string, // &name;
 	description: string,
+	stix:        bool,
 }
 
 Character :: struct {
@@ -97,7 +99,7 @@ main :: proc() {
 	// `Aring` and `angst` are both a capital A with a circle. The latter is the Angstrom symbol.
 	entities: [dynamic]Entity
 	defer delete(entities)
-	entity_map: map[string]Entity
+	entity_map: map[string]int
 	defer delete(entity_map)
 
 	min_name_length := max(int)
@@ -175,17 +177,23 @@ main :: proc() {
 			min_name_length = min(min_name_length, len(name))
 			max_name_length = max(max_name_length, len(name))
 
-			if name in entity_map {
-				continue
-			}
+			set, _ := xml.find_attribute_val_by_key(doc, character_entity, "set")
 
 			e := Entity{
 				name        = name,
 				codepoints  = {rune(codepoint), rune(codepoint2)},
 				description = description,
+				stix        = set == "STIX",
 			}
 
-			entity_map[name] = e
+			if index, seen := entity_map[name]; seen {
+				if entities[index].stix && !e.stix {
+					entities[index] = e
+				}
+				continue
+			}
+
+			entity_map[name] = len(entities)
 			append(&entities, e)
 		}
 	}
@@ -275,10 +283,14 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 			fmt.wprintf(w, " ")
 		}
 		fmt.wprintf(w, " // %v\n", e.description)
+		fmt.wprint(w, "\t\t\treturn {")
+		write_rune_literal(w, e.codepoints[0])
 		if e.codepoints[1] != 0 {
-			fmt.wprintf(w, "\t\t\treturn {{%q, %q}}, 2, true\n", e.codepoints[0], e.codepoints[1])
+			fmt.wprint(w, ", ")
+			write_rune_literal(w, e.codepoints[1])
+			fmt.wprintln(w, "}, 2, true")
 		} else {
-			fmt.wprintf(w, "\t\t\treturn {{%q, 0}}, 1, true\n", e.codepoints[0])
+			fmt.wprintln(w, ", 0}, 1, true")
 		}
 		should_close = true
 	}
@@ -303,12 +315,34 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: [2]rune, rune_count:
 	}
 }
 
+write_rune_literal :: proc(w: io.Writer, r: rune) {
+	switch {
+	case r == '\'':
+		fmt.wprint(w, `'\''`)
+	case r == '\\':
+		fmt.wprint(w, `'\\'`)
+	case r == '\t':
+		fmt.wprint(w, `'\t'`)
+	case r == '\n':
+		fmt.wprint(w, `'\n'`)
+	case r >= 0x20 && r < 0x7f, r > 0xa0 && r <= 0xff && r != 0xad:
+		fmt.wprintf(w, "'%c'", r)
+	case r > 0xffff:
+		fmt.wprintf(w, `'\U%08x'`, r)
+	case:
+		fmt.wprintf(w, `'\u%04x'`, r)
+	}
+}
+
 write_unicode_category_tables :: proc(characters: []Character) {
 	fmt.printfln("Found %v codepoints with a category.", len(characters))
 
 	// Sort by `category`, then `codepoints`
 	slice.sort_by(characters, proc(a, b: Character) -> bool {
-		return a.category < b.category && a.codepoint < b.codepoint
+		if a.category != b.category {
+			return a.category < b.category
+		}
+		return a.codepoint < b.codepoint
 	})
 
 	nd_range_start := rune(-1)
