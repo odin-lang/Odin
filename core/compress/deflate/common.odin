@@ -862,7 +862,7 @@ inflate_stream_to_writer :: proc(w: io.Writer, z: ^compress.Context, format: Inf
 		if fill_err != nil {
 			return fill_err
 		}
-		if produced {
+		if produced || r.done {
 			inflate_reader_progress(&r) or_return
 		}
 	}

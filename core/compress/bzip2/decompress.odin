@@ -173,7 +173,7 @@ decompress_to_writer :: proc(w: io.Writer, z: ^compress.Context, expected_output
 		if fill_err != nil {
 			return fill_err
 		}
-		if produced {
+		if produced || r.done {
 			bzip2_reader_progress(&r) or_return
 		}
 	}
@@ -187,6 +187,7 @@ reader_init :: proc(r: ^Reader, z: ^compress.Context, expected_output_size := -1
 }
 
 reader_read :: proc(r: ^Reader, p: []u8) -> (n: int, err: Error) {
+	was_done := r.done
 	for n < len(p) {
 		if r.flushed < r.written {
 			copied   := copy(p[n:], r.window[r.flushed:r.written])
@@ -198,12 +199,12 @@ reader_read :: proc(r: ^Reader, p: []u8) -> (n: int, err: Error) {
 			r.err = bzip2_stream_fill(r)
 		}
 	}
-	if n > 0 && r.err == nil {
+	if (n > 0 || (r.done && !was_done)) && r.err == nil {
 		if r.err = bzip2_reader_progress(r); r.err != nil {
 			r.flushed = r.written
 		}
 	}
-	if n > 0 {
+	if n > 0 || r.flushed < r.written {
 		return n, nil
 	}
 	if r.err != nil {

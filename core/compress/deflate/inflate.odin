@@ -67,6 +67,7 @@ inflate_reader_init :: proc(r: ^Inflate_Reader, z: ^compress.Context, format: In
 }
 
 inflate_reader_read :: proc(r: ^Inflate_Reader, p: []u8) -> (n: int, err: Error) {
+	was_done := r.done
 	for n < len(p) {
 		if r.flushed < r.written {
 			copied   := copy(p[n:], r.window[r.flushed:r.written])
@@ -78,12 +79,12 @@ inflate_reader_read :: proc(r: ^Inflate_Reader, p: []u8) -> (n: int, err: Error)
 			r.err = inflate_stream_fill(r)
 		}
 	}
-	if n > 0 && r.err == nil {
+	if (n > 0 || (r.done && !was_done)) && r.err == nil {
 		if r.err = inflate_reader_progress(r); r.err != nil {
 			r.flushed = r.written
 		}
 	}
-	if n > 0 {
+	if n > 0 || r.flushed < r.written {
 		return n, nil
 	}
 	if r.err != nil {

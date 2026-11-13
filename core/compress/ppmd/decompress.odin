@@ -80,10 +80,10 @@ reader_init :: proc(r: ^Reader, z: ^compress.Context, props: Properties, expecte
 }
 
 reader_read :: proc(r: ^Reader, p: []u8) -> (n: int, err: Error) {
-	if r.err == nil && !r.decoder.done {
+	if len(p) > 0 && r.err == nil && !r.decoder.done {
 		n, r.err = decoder_fill(&r.decoder, p)
 		decoder_sync(&r.decoder)
-		if r.err == nil && n > 0 {
+		if r.err == nil && (n > 0 || r.decoder.done) {
 			r.err = reader_progress(r)
 		}
 	}

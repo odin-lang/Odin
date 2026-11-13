@@ -44,6 +44,7 @@ reader_init_lzma2 :: proc(r: ^Reader, z: ^compress.Context, dict_size: u32, expe
 }
 
 reader_read :: proc(r: ^Reader, p: []u8) -> (n: int, err: Error) {
+	was_done := r.done
 	for n < len(p) {
 		if r.flushed < r.out.written {
 			copied   := copy(p[n:], r.window[r.flushed:r.out.written])
@@ -55,12 +56,12 @@ reader_read :: proc(r: ^Reader, p: []u8) -> (n: int, err: Error) {
 			r.err = stream_fill(r)
 		}
 	}
-	if n > 0 && r.err == nil {
+	if (n > 0 || (r.done && !was_done)) && r.err == nil {
 		if r.err = stream_progress(r); r.err != nil {
 			r.flushed = r.out.written
 		}
 	}
-	if n > 0 {
+	if n > 0 || r.flushed < r.out.written {
 		return n, nil
 	}
 	if r.err != nil {
@@ -232,7 +233,7 @@ stream_to_writer :: proc(r: ^Reader, w: io.Writer) -> (err: Error) {
 		if fill_err != nil {
 			return fill_err
 		}
-		if produced {
+		if produced || r.done {
 			stream_progress(r) or_return
 		}
 	}

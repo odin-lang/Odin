@@ -149,7 +149,7 @@ decompress_frame_to_writer :: proc(w: io.Writer, z: ^compress.Context, expected_
 		if fill_err != nil {
 			return fill_err
 		}
-		if produced {
+		if produced || r.done {
 			lz4_reader_progress(&r) or_return
 		}
 	}
@@ -163,6 +163,7 @@ frame_reader_init :: proc(r: ^Frame_Reader, z: ^compress.Context, expected_outpu
 }
 
 frame_reader_read :: proc(r: ^Frame_Reader, p: []u8) -> (n: int, err: Error) {
+	was_done := r.done
 	for n < len(p) {
 		if r.flushed < r.written {
 			copied   := copy(p[n:], r.window[r.flushed:r.written])
@@ -174,12 +175,12 @@ frame_reader_read :: proc(r: ^Frame_Reader, p: []u8) -> (n: int, err: Error) {
 			r.err = lz4_stream_fill(r)
 		}
 	}
-	if n > 0 && r.err == nil {
+	if (n > 0 || (r.done && !was_done)) && r.err == nil {
 		if r.err = lz4_reader_progress(r); r.err != nil {
 			r.flushed = r.written
 		}
 	}
-	if n > 0 {
+	if n > 0 || r.flushed < r.written {
 		return n, nil
 	}
 	if r.err != nil {
