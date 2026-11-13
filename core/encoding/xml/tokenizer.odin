@@ -159,7 +159,12 @@ report_illegal_input :: proc(handler: Error_Handler, path: string, normalized: [
 @(private)
 offset_to_pos :: proc(t: ^Tokenizer, offset: int) -> Pos {
 	line := t.line_count
-	column := offset - t.line_offset + 1
+	line_offset := t.line_offset
+	if offset < line_offset {
+		line -= strings.count(t.src[offset:line_offset], "\n")
+		line_offset = strings.last_index_byte(t.src[:offset], '\n') + 1
+	}
+	column := offset - line_offset + 1
 
 	return Pos {
 		file = t.path,
@@ -392,8 +397,7 @@ scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close
 
 		case '\n':
 			if !multiline {
-				error(t, offset, string(t.src[offset : t.offset]))
-				error(t, offset, "[scan_string] Not terminated\n")
+				error(t, offset, "[scan_string] Not terminated: %q\n", t.src[offset : t.offset])
 				err = .Invalid_Tag_Value
 				break loop	
 			}

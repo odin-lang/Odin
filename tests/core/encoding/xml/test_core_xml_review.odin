@@ -404,3 +404,57 @@ xml_test_review_xml_declaration :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@(thread_local, private="file")
+messages: [dynamic]string
+
+@(private="file")
+remember_message :: proc(pos: xml.Pos, format: string, args: ..any) {
+	last_error_pos = pos
+	append(&messages, fmt.aprintf(format, ..args))
+}
+
+@(test)
+xml_test_review_error_positions :: proc(t: ^testing.T) {
+	Position_Case :: struct {
+		src:    string,
+		err:    xml.Error,
+		line:   int,
+		column: int,
+	}
+	cases := [?]Position_Case{
+		{"<a>\n<!--\n\n\n",                     .Unclosed_Comment,    2, 5},
+		{"<a>\n<![CDATA[\n\n",                  .Premature_EOF,       2, 1},
+		{"<a\n b=\"1\"\n b=\"2\n\n\"/>",        .Duplicate_Attribute, 3, 2},
+		{"<a b=\"1\" b=\"2\"/>",                .Duplicate_Attribute, 1, 10},
+		{"<?xml\nversion=\"1.0\"\nencoding=\"\n\"?><a/>", .Invalid_Prolog, 3, 1},
+	}
+	for c in cases {
+		last_error_pos = {}
+		doc, err := xml.parse_string(c.src, error_handler = remember_pos)
+		xml.destroy(doc)
+		testing.expectf(t, err == c.err, "%q: expected %v, got %v", c.src, c.err, err)
+		testing.expectf(t, last_error_pos.line == c.line && last_error_pos.column == c.column, "%q: expected %v:%v, got %v:%v", c.src, c.line, c.column, last_error_pos.line, last_error_pos.column)
+	}
+}
+
+@(test)
+xml_test_review_error_messages :: proc(t: ^testing.T) {
+	defer {
+		for m in messages {
+			delete(m)
+		}
+		delete(messages)
+		messages = nil
+	}
+	doc, err := xml.parse_string("<a><!\"100%v\n\"></a>", error_handler = remember_message)
+	defer xml.destroy(doc)
+	testing.expect_value(t, err, xml.Error.Unexpected_Token)
+
+	found := false
+	for m in messages {
+		testing.expectf(t, !strings.contains(m, "%!"), "unformatted message: %q", m)
+		found |= strings.contains(m, `"100%v"`)
+	}
+	testing.expectf(t, found, "no message quotes the literal: %q", messages[:])
+}

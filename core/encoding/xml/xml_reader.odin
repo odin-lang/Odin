@@ -526,7 +526,8 @@ parse_attribute :: proc(doc: ^Document) -> (attr: Attribute, offset: int, err: E
 	context.allocator = doc.allocator
 	t := doc.tokenizer
 
-	key, value := scan_attribute(t) or_return
+	key, value: string
+	key, value, offset = scan_attribute(t) or_return
 	value = strings.trim_right(value, " \t\r\n")
 
 	// Estimate decoded size based on input text.
@@ -547,30 +548,33 @@ parse_attribute :: proc(doc: ^Document) -> (attr: Attribute, offset: int, err: E
 }
 
 @(private)
-scan_attribute :: proc(t: ^Tokenizer) -> (key: string, value: string, err: Error) {
+scan_attribute :: proc(t: ^Tokenizer) -> (key: string, value: string, offset: int, err: Error) {
 	key_token := expect(t, .Ident) or_return
 	_          = expect(t, .Eq)    or_return
 	skip_whitespace(t)
 
+	key    = key_token.text
+	offset = key_token.pos.offset
+
 	quote := t.ch
 	if quote != '"' && quote != '\'' {
 		error(t, t.offset, "Expected a quoted attribute value\n")
-		return key_token.text, "", .Unexpected_Token
+		return key, "", offset, .Unexpected_Token
 	}
 	start := t.offset + 1
 	end   := strings.index_byte(t.src[start:], u8(quote))
 	if end < 0 {
 		error(t, t.offset, "Attribute value was not terminated\n")
-		return key_token.text, "", .Premature_EOF
+		return key, "", offset, .Premature_EOF
 	}
 	value = t.src[start:][:end]
 	if lt := strings.index_byte(value, '<'); lt >= 0 {
 		jump_to(t, start + lt)
 		error(t, t.offset, "`<` is not allowed in an attribute value\n")
-		return key_token.text, value, .Invalid_Tag_Value
+		return key, value, offset, .Invalid_Tag_Value
 	}
 	jump_to(t, start + end + 1)
-	return key_token.text, value, .None
+	return key, value, offset, .None
 }
 
 check_duplicate_attributes :: proc(t: ^Tokenizer, attribs: Attributes, attr: Attribute, offset: int) -> (err: Error) {
@@ -630,8 +634,7 @@ parse_prologue :: proc(doc: ^Document) -> (err: Error) {
 			error(t, t.offset, "[parse_prologue] Expected whitespace\n")
 			return .Invalid_Prolog
 		}
-		key_offset := t.offset
-		key, val   := scan_attribute(t) or_return
+		key, val, key_offset := scan_attribute(t) or_return
 
 		switch {
 		case key == "version" && step == 0:
