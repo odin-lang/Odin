@@ -833,13 +833,40 @@ parse_doctype :: proc(doc: ^Document) -> (err: Error) {
 	tok := expect(t, .Ident) or_return
 	doc.doctype.ident = tok.text
 
+	if !is_space(t.ch) && t.ch != '[' && t.ch != '>' {
+		error(t, t.offset, "[parse_doctype] Expected whitespace, `[` or `>` after the DOCTYPE name\n")
+		return .Unexpected_Token
+	}
+
 	skip_whitespace(t)
 	offset := t.offset
 	skip_element(t) or_return
 
 	// 	-1 because the current offset is that of the closing tag, so the rest of the DOCTYPE tag ends just before it.
 	doc.doctype.rest = string(t.src[offset : t.offset - 1])
+
+	if !internal_subset_closed(doc.doctype.rest) {
+		error(t, t.offset - 1, "[parse_doctype] Internal subset not closed with `]`\n")
+		return .Unexpected_Token
+	}
 	return .None
+}
+
+@(private)
+internal_subset_closed :: proc(rest: string) -> bool {
+	for i := 0; i < len(rest); i += 1 {
+		switch rest[i] {
+		case '"', '\'':
+			end := strings.index_byte(rest[i + 1:], rest[i])
+			if end < 0 {
+				return true
+			}
+			i += end + 1
+		case '[':
+			return strings.has_suffix(strings.trim_right(rest, " \t\r\n"), "]")
+		}
+	}
+	return true
 }
 
 parse_body :: proc(doc: ^Document, element: Element_ID, opts: Options) -> (err: Error) {
