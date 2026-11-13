@@ -345,7 +345,7 @@ _index_add :: proc(d: ^Decoder, unpadded, uncompressed: u64) -> (err: Error) {
 _decode_index :: proc(d: ^Decoder) -> (size: int, err: Error) {
 	index_start := d.pos
 	d.pos += 1
-	rest := d.input[:min(len(d.input), index_start + int(min(INDEX_SIZE_MAX, u64(max(int)))))]
+	rest := d.input[:index_start + int(min(u64(len(d.input) - index_start), INDEX_SIZE_MAX))]
 
 	count, count_ok := _read_vli(rest, &d.pos)
 	if !count_ok {
