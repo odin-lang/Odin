@@ -238,3 +238,25 @@ xml_test_review_document_structure :: proc(t: ^testing.T) {
 		testing.expect_value(t, doc.comments[1], "c")
 	}
 }
+
+@(test)
+xml_test_review_names :: proc(t: ^testing.T) {
+	cases := [?]Review_Case{
+		{src = "<maven.compiler.source>17</maven.compiler.source>", tree = `maven.compiler.source{"17"}`},
+		{src = "<a.b c.d=\"1\"/>",                                   tree = `a.b[c.d="1"]{}`},
+		{src = "<a\u00b7b/>",                                        tree = "a\u00b7b{}"},
+		{src = "<a\u0301b/>",                                        tree = "a\u0301b{}"},
+		{src = "<a\u203fb/>",                                        tree = "a\u203fb{}"},
+		{src = "<:a/>",                                              tree = ":a{}"},
+		{src = "<_a-b.c:d/>",                                        tree = "_a-b.c:d{}"},
+		{src = "<\u00c0\u037f\u3001\U00010000/>",                    tree = "\u00c0\u037f\u3001\U00010000{}"},
+		{src = "<.a/>",                                              err  = .Unexpected_Token},
+		{src = "<1a/>",                                              err  = .Unexpected_Token},
+		{src = "<-a/>",                                              err  = .Unexpected_Token},
+		{src = "<\u00b7a/>",                                         err  = .Unexpected_Token},
+		{src = "<\u0301a/>",                                         err  = .Unexpected_Token},
+		{src = "<a\u037eb/>",                                        err  = .Unexpected_Token},
+		{src = "<a\u00d7b/>",                                        err  = .Unexpected_Token},
+	}
+	run_review_cases(t, cases[:])
+}

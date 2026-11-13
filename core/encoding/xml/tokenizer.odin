@@ -14,7 +14,6 @@ package encoding_xml
 
 
 import "core:fmt"
-import "core:unicode"
 import "core:unicode/utf8"
 import "core:strings"
 
@@ -242,29 +241,25 @@ skip_whitespace :: proc(t: ^Tokenizer) {
 is_letter :: proc(r: rune) -> bool {
 	if r < utf8.RUNE_SELF {
 		switch r {
-		case 'A'..='Z', 'a'..='z':
-			return true
-		case '_':
+		case 'A'..='Z', 'a'..='z', '_', ':':
 			return true
 		}
+		return false
 	}
-	return unicode.is_letter(r)
-}
-
-is_valid_identifier_rune :: proc(r: rune) -> bool {
-	if r < utf8.RUNE_SELF {
-		switch r {
-		case '_', '-', ':':        return true
-		case 'A'..='Z', 'a'..='z': return true
-		case '0'..='9':            return true
-		case -1:                   return false
-		}
-	}
-
-	if unicode.is_letter(r) || unicode.is_digit(r) {
+	switch r {
+	case 0xc0..=0xd6, 0xd8..=0xf6, 0xf8..=0x2ff, 0x370..=0x37d, 0x37f..=0x1fff, 0x200c..=0x200d,
+	     0x2070..=0x218f, 0x2c00..=0x2fef, 0x3001..=0xd7ff, 0xf900..=0xfdcf, 0xfdf0..=0xfffd, 0x10000..=0xeffff:
 		return true
 	}
 	return false
+}
+
+is_valid_identifier_rune :: proc(r: rune) -> bool {
+	switch r {
+	case '-', '.', '0'..='9', 0xb7, 0x300..=0x36f, 0x203f..=0x2040:
+		return true
+	}
+	return is_letter(r)
 }
 
 scan_identifier :: proc(t: ^Tokenizer) -> string {
