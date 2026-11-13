@@ -10,6 +10,7 @@ package tests_issues
 @(require) import "test_issue_1730"
 @(require) import "test_issue_2039"
 @(require) import "test_issue_2056"
+@(require) import "test_issue_2320"
 @(require) import "test_issue_2466"
 @(require) import "test_issue_2615"
 @(require) import "test_issue_2637"
