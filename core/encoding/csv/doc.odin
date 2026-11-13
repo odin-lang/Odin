@@ -13,7 +13,7 @@ Example:
 		r: csv.Reader
 		r.trim_leading_space  = true
 		r.reuse_record        = true // Without it you have to delete(record)
-		r.reuse_record_buffer = true // Without it you have to each of the fields within it
+		r.reuse_record_buffer = true // Without it you have to delete each of the fields within it
 		defer csv.reader_destroy(&r)
 
 		csv_data, csv_err := os.read_entire_file(filename, context.allocator)
