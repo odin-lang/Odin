@@ -129,6 +129,9 @@ reader_destroy :: proc(r: ^Reader) {
 
 	for record, row_idx in csv.iterator_next(&r) { ... }
 
+	Iteration stops at the first error, including the end of the input (`.EOF`).
+	Check `iterator_last_error` after the loop, and treat `.EOF` as success.
+
 	TIP: If you process the results within the loop and don't need to own the results,
 	you can set the Reader's `reuse_record` and `reuse_record_buffer` to true;
 	you won't need to delete the record or its fields.
@@ -138,9 +141,10 @@ iterator_next :: proc(r: ^Reader) -> (record: []string, idx: int, err: Error, mo
 	return record, r.line_count - 1, r.last_iterator_error, r.last_iterator_error == nil
 }
 
-// Get last CSV parse error if we ignored it in the iterator loop
+// Get the error that ended the iterator loop. It is `.EOF` after a complete read.
 //
 // for record, row_idx in csv.iterator_next(&r) { ... }
+// if err := csv.iterator_last_error(r); err != nil && !csv.is_io_error(err, .EOF) { ... }
 iterator_last_error :: proc(r: Reader) -> (err: Error) {
 	return r.last_iterator_error
 }
