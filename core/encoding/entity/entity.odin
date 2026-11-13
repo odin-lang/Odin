@@ -41,6 +41,8 @@ Error :: enum u8 {
 	CDATA_Not_Terminated,
 	Comment_Not_Terminated,
 	Invalid_Entity_Encoding,
+	Unknown_Entity,
+	Buffer_Too_Small,
 }
 
 Tokenizer :: struct {
@@ -58,22 +60,19 @@ CDATA_END     :: "]]>"
 COMMENT_START :: "<!--"
 COMMENT_END   :: "-->"
 
-// Default: CDATA and comments are passed through unchanged.
+// By default `decode_xml` decodes the 5 predefined entities and character references, unboxes CDATA without decoding it,
+// drops comments, and turns CRLF and lone CR into LF.
 XML_Decode_Option :: enum u8 {
-	// Do not decode & entities. It decodes by default. If given, overrides `Decode_CDATA`.
-	No_Entity_Decode,
-
-	// CDATA is unboxed.
-	Unbox_CDATA,
-
-	// Unboxed CDATA is decoded as well. Ignored if `.Unbox_CDATA` is not given.
-	Decode_CDATA,
-
-	// Comments are stripped.
-	Comment_Strip,
-
-	// Normalize whitespace
-	Normalize_Whitespace,
+	// Keep comments in the output.
+	Keep_Comments,
+	// Turn each literal tab, LF and CR into a space, as XML does for CDATA attribute values (§3.3.3).
+	Normalize_Attribute,
+	// Like `Normalize_Attribute`, then collapse runs of spaces and trim, as XML does for other attribute types.
+	Collapse_Whitespace,
+	// Also decode the HTML, MathML and ISO 8879 names from `unicode.xml`.
+	HTML_Entities,
+	// Keep unknown names as they are, instead of returning `.Unknown_Entity`.
+	Keep_Unknown_Entities,
 }
 XML_Decode_Options :: bit_set[XML_Decode_Option; u8]
 
@@ -97,106 +96,27 @@ decode_xml_sb :: proc(builder: ^strings.Builder, input: string, options := XML_D
 
 	string_start_in_builder := len(builder.buf)
 
-	t := Tokenizer{src=input}
-	in_data := false
-
-	prev: rune = ' '
-
-	// PERF: Hot
-	loop: for {
-		advance(&t) or_return
-
-		if t.r < 0 { break loop }
-
-		// Below here we're never inside a CDATA tag. At most we'll see the start of one,
-		// but that doesn't affect the logic.
-		switch t.r {
-		case '<':
-			/*
-				Might be the start of a CDATA tag or comment.
-
-				We don't need to check if we need to write a `<`, because if it isn't CDATA or a comment,
-				it couldn't have been part of an XML tag body to be decoded here.
-
-				Keep in mind that we could already *be* inside a CDATA tag.
-				If so, write `<` as a literal and continue.
-			*/
-			if in_data {
-				write_rune(builder, '<')
-				continue
-			}
-			in_data = _handle_xml_special(&t, builder, options) or_return
-
-		case ']':
-			// If we're unboxing _and_ decoding CDATA, we'll have to check for the end tag.
-			if in_data && strings.has_prefix(t.src[t.offset:], CDATA_END) {
-				in_data = false
-				t.read_offset += len(CDATA_END) - 1
-				continue
-			}
-			write_rune(builder, ']')
-
-		case:
-			if in_data && .Decode_CDATA not_in options {
-				// Unboxed, but undecoded.
-				write_rune(builder, t.r)
-				continue
-			}
-
-			if t.r == '&' {
-				entity, entity_err := _extract_xml_entity(&t)
-				if entity_err == nil {
-					if .No_Entity_Decode not_in options {
-						if decoded, count, ok := xml_decode_entity(entity); ok {
-							for i in 0..<count {
-								write_rune(builder, decoded[i])
-							}
-							prev = decoded[count - 1]
-							continue
-						}
-					}
-
-					// Literal passthrough because the decode failed or we want entities not decoded.
-					// PERF: Cold
-					write_string(builder, "&")
-					write_string(builder, entity)
-					write_string(builder, ";")
-				} else {
-					// PERF: Cold
-					// We read to the end of the string without closing the entity. Pass through as-is.
-					write_string(builder, entity)
-				}
-			} else {
-				// Handle AV Normalization: https://www.w3.org/TR/2006/REC-xml11-20060816/#AVNormalize
-				if .Normalize_Whitespace in options {
-					switch t.r {
-					case ' ', '\r', '\n', '\t':
-						if prev != ' ' {
-							write_rune(builder, ' ')
-							prev = ' '
-						}
-					case:
-						write_rune(builder, t.r)
-						prev = t.r
-					}
-				} else {
-					// https://www.w3.org/TR/2006/REC-xml11-20060816/#sec-line-ends
-					switch t.r {
-					case '\n', 0x85, 0x2028:
-						write_rune(builder, '\n')
-					case '\r': // Do nothing until next character
-					case:
-						if prev == '\r' { // Turn a single carriage return into a \n
-							write_rune(builder, '\n')
-						}
-						write_rune(builder, t.r)
-					}
-					prev = t.r
-				}
-			}
-		}
-	}
+	sink := Sink{sb = builder}
+	err, _ = decode(input, options, &sink)
 	return transmute(string)builder.buf[string_start_in_builder:], err
+}
+
+decode_xml_in_place :: proc(buf: []u8, options := XML_Decode_Options{}) -> (decoded: string, err: Error, err_offset: int) {
+	measure: Sink
+	err, err_offset = decode(string(buf), options, &measure)
+	switch {
+	case err != .None:
+		return "", err, err_offset
+	case measure.grows:
+		return "", .Buffer_Too_Small, measure.grow_offset
+	case !measure.changed:
+		return string(buf), .None, 0
+	}
+
+	sink := Sink{buf = buf}
+	err, err_offset = decode(string(buf), options, &sink)
+	assert(err == .None && sink.w == measure.w)
+	return string(buf[:sink.w]), .None, 0
 }
 
 advance :: proc(t: ^Tokenizer) -> (err: Error) {
@@ -238,6 +158,7 @@ xml_decode_entity :: proc(entity: string) -> (decoded: [2]rune, rune_count: int,
 		if entity[0] == 'x' || entity[0] == 'X' {
 			base = 16
 			entity = entity[1:]
+			if len(entity) == 0 { return }
 		}
 
 		for len(entity) > 0 {
@@ -264,6 +185,7 @@ xml_decode_entity :: proc(entity: string) -> (decoded: [2]rune, rune_count: int,
 			if val > MAX_RUNE_CODEPOINT { return  }
 			entity = entity[1:]
 		}
+		if !is_xml_char(rune(val)) { return }
 		return rune(val), 1, true
 	}
 	// Named entity.
@@ -516,97 +438,302 @@ unescape_entity :: proc(s: string) -> (b: [8]byte, w: int, j: int) {
 	return
 }
 
-
-// Private XML helper to extract `&<stuff>;` entity.
 @(private="file")
-_extract_xml_entity :: proc(t: ^Tokenizer) -> (entity: string, err: Error) {
-	assert(t != nil && t.r == '&')
-
-	// All of these would be in the ASCII range.
-	// Even if one is not, it doesn't matter. All characters we need to compare to extract are.
-
-	length := len(t.src)
-	found  := false
-
-	#no_bounds_check {
-		for t.read_offset < length {
-			if t.src[t.read_offset] == ';' {
-				t.read_offset += 1
-				found = true
-				break
-			}
-			t.read_offset += 1
-		}
-	}
-
-	if found {
-		return string(t.src[t.offset + 1 : t.read_offset - 1]), .None
-	}
-	return string(t.src[t.offset : t.read_offset]), .Invalid_Entity_Encoding
+Sink :: struct {
+	buf:         []u8,
+	sb:          ^strings.Builder,
+	w:           int,
+	normalize:   bool,
+	collapse:    bool,
+	space:       bool,
+	started:     bool,
+	changed:     bool,
+	grows:       bool,
+	grow_offset: int,
 }
 
-// Private XML helper for CDATA and comments.
 @(private="file")
-_handle_xml_special :: proc(t: ^Tokenizer, builder: ^strings.Builder, options: XML_Decode_Options) -> (in_data: bool, err: Error) {
-	assert(t != nil && t.r == '<')
-	if t.read_offset + len(CDATA_START) >= len(t.src) { return false, .None }
-
-	s := string(t.src[t.offset:])
-	if strings.has_prefix(s, CDATA_START) {
-		if .Unbox_CDATA in options && .Decode_CDATA in options {
-			// We're unboxing _and_ decoding CDATA
-			t.read_offset += len(CDATA_START) - 1
-			return true, .None
-		}
-
-		// CDATA is passed through. Scan until end of CDATA.
-		start_offset  := t.offset
-		t.read_offset += len(CDATA_START) - 1
-		for {
-			advance(t) or_return
-			if t.r < 0 {
-				// error(t, offset, "[scan_string] CDATA was not terminated\n")
-				return true, .CDATA_Not_Terminated
-			}
-
-			// Scan until the end of a CDATA tag.
-			if strings.has_prefix(t.src[t.offset:], CDATA_END) {
-				t.read_offset = t.offset + len(CDATA_END)
-				cdata := string(t.src[start_offset:t.read_offset])
-
-				if .Unbox_CDATA in options {
-					cdata = cdata[len(CDATA_START):]
-					cdata = cdata[:len(cdata) - len(CDATA_END)]
-				}
-				write_string(builder, cdata)
-				return false, .None
-			}
-		}
-
-
-	} else if strings.has_prefix(s, COMMENT_START) {
-		t.read_offset += len(COMMENT_START)
-		// Comment is passed through by default.
-		offset := t.offset
-
-		// Scan until end of Comment.
-		for {
-			advance(t) or_return
-			if t.r < 0 { return true, .Comment_Not_Terminated }
-
-			if t.read_offset + len(COMMENT_END) < len(t.src) {
-				if string(t.src[t.offset:][:len(COMMENT_END)]) == COMMENT_END {
-					t.read_offset += len(COMMENT_END) - 1
-
-					if .Comment_Strip not_in options {
-						comment := string(t.src[offset : t.read_offset])
-						write_string(builder, comment)
-					}
-					return false, .None
-				}
-			}
-		}
-
+emit :: #force_inline proc(s: ^Sink, text: string) {
+	if s.sb != nil {
+		write_string(s.sb, text)
+	} else if s.buf != nil {
+		copy(s.buf[s.w:], text)
 	}
-	return false, .None
+	s.w += len(text)
+}
+
+@(private="file")
+emit_content :: proc(s: ^Sink, text: string) {
+	if len(text) == 0 {
+		return
+	}
+	if s.collapse {
+		if s.space && s.started {
+			emit(s, " ")
+		}
+		s.space   = false
+		s.started = true
+	}
+	emit(s, text)
+}
+
+@(private="file")
+emit_whitespace :: proc(s: ^Sink, c: u8) {
+	switch {
+	case s.collapse:
+		s.space   = true
+		s.changed = true
+	case s.normalize:
+		emit(s, " ")
+		s.changed |= c != ' '
+	case:
+		emit(s, "\n")
+		s.changed = true
+	}
+}
+
+@(private="file")
+decode :: proc(src: string, options: XML_Decode_Options, s: ^Sink) -> (err: Error, err_offset: int) {
+	s.collapse  = .Collapse_Whitespace in options
+	s.normalize = s.collapse || .Normalize_Attribute in options
+	return decode_span(s, src, 0, len(src), true, options)
+}
+
+@(private="file")
+decode_span :: proc(s: ^Sink, src: string, from, to: int, markup: bool, options: XML_Decode_Options) -> (err: Error, err_offset: int) {
+	i, run := from, from
+	for i < to {
+		c := src[i]
+		switch c {
+		case '&':
+			if !markup {
+				i += 1
+				continue
+			}
+			emit_content(s, src[run:i])
+			decoded, count, length, ref_err := parse_reference(src[i:to], options)
+			if ref_err != .None {
+				return ref_err, i
+			}
+			if count == 0 {
+				emit_content(s, src[i:][:length])
+			} else {
+				s.changed = true
+				written := 0
+				for r in decoded[:count] {
+					if s.collapse && r == ' ' {
+						s.space = true
+						continue
+					}
+					bytes, n := utf8.encode_rune(r)
+					written += n
+					emit_content(s, string(bytes[:n]))
+				}
+				if written > length && !s.grows {
+					s.grows       = true
+					s.grow_offset = i
+				}
+			}
+			i  += length
+			run = i
+
+		case '<':
+			if !markup {
+				i += 1
+				continue
+			}
+			rest := src[i:to]
+			if strings.has_prefix(rest, CDATA_START) {
+				emit_content(s, src[run:i])
+				start := i + len(CDATA_START)
+				end   := strings.index(src[start:to], CDATA_END)
+				if end < 0 {
+					return .CDATA_Not_Terminated, i
+				}
+				s.changed = true
+				if span_err, span_offset := decode_span(s, src, start, start + end, false, options); span_err != .None {
+					return span_err, span_offset
+				}
+				i  = start + end + len(CDATA_END)
+				run = i
+			} else if strings.has_prefix(rest, COMMENT_START) {
+				emit_content(s, src[run:i])
+				end := strings.index(src[i + len(COMMENT_START):to], COMMENT_END)
+				if end < 0 {
+					return .Comment_Not_Terminated, i
+				}
+				next := i + len(COMMENT_START) + end + len(COMMENT_END)
+				span_err:    Error
+				span_offset: int
+				if .Keep_Comments in options {
+					span_err, span_offset = decode_span(s, src, i, next, false, options)
+				} else {
+					s.changed = true
+					span_err, span_offset = validate_span(src, i, next)
+				}
+				if span_err != .None {
+					return span_err, span_offset
+				}
+				i  = next
+				run = i
+			} else {
+				i += 1
+			}
+
+		case '\r':
+			emit_content(s, src[run:i])
+			s.changed = true
+			if i + 1 < to && src[i + 1] == '\n' {
+				i  += 1
+				run = i
+				continue
+			}
+			emit_whitespace(s, '\n')
+			i  += 1
+			run = i
+
+		case '\t', '\n', ' ':
+			if !s.normalize || (c == ' ' && !s.collapse) {
+				i += 1
+				continue
+			}
+			emit_content(s, src[run:i])
+			emit_whitespace(s, c)
+			i  += 1
+			run = i
+
+		case 0:
+			return .Illegal_NUL_Character, i
+
+		case utf8.RUNE_SELF..=0xff:
+			r, w := utf8.decode_rune_in_string(src[i:to])
+			if r == utf8.RUNE_ERROR && w == 1 {
+				return .Illegal_UTF_Encoding, i
+			}
+			i += w
+
+		case:
+			i += 1
+		}
+	}
+	emit_content(s, src[run:to])
+	return .None, 0
+}
+
+@(private="file")
+validate_span :: proc(src: string, from, to: int) -> (err: Error, err_offset: int) {
+	for i := from; i < to; {
+		c := src[i]
+		switch {
+		case c == 0:
+			return .Illegal_NUL_Character, i
+		case c >= utf8.RUNE_SELF:
+			r, w := utf8.decode_rune_in_string(src[i:to])
+			if r == utf8.RUNE_ERROR && w == 1 {
+				return .Illegal_UTF_Encoding, i
+			}
+			i += w
+		case:
+			i += 1
+		}
+	}
+	return .None, 0
+}
+
+@(private="file")
+parse_reference :: proc(s: string, options: XML_Decode_Options) -> (decoded: [2]rune, rune_count: int, length: int, err: Error) {
+	assert(len(s) > 0 && s[0] == '&')
+	i := 1
+	if i < len(s) && s[i] == '#' {
+		i += 1
+		hex := i < len(s) && s[i] == 'x'
+		if hex {
+			i += 1
+		}
+		digits := i
+		digit_loop: for i < len(s) {
+			switch s[i] {
+			case '0'..='9':
+			case 'a'..='f', 'A'..='F':
+				if !hex {
+					break digit_loop
+				}
+			case:
+				break digit_loop
+			}
+			i += 1
+		}
+		if i == digits || i >= len(s) || s[i] != ';' {
+			return {}, 0, 0, .Invalid_Entity_Encoding
+		}
+		ok: bool
+		decoded, rune_count, ok = xml_decode_entity(s[1:i])
+		if !ok {
+			return {}, 0, 0, .Invalid_Entity_Encoding
+		}
+		return decoded, rune_count, i + 1, .None
+	}
+
+	r, w := utf8.decode_rune_in_string(s[i:])
+	if w == 0 || (r == utf8.RUNE_ERROR && w == 1) || !is_name_start_char(r) {
+		return {}, 0, 0, .Invalid_Entity_Encoding
+	}
+	i += w
+	for i < len(s) {
+		r, w = utf8.decode_rune_in_string(s[i:])
+		if (r == utf8.RUNE_ERROR && w == 1) || !is_name_char(r) {
+			break
+		}
+		i += w
+	}
+	if i >= len(s) || s[i] != ';' {
+		return {}, 0, 0, .Invalid_Entity_Encoding
+	}
+	length = i + 1
+
+	switch s[1:i] {
+	case "lt":   return {'<',  0}, 1, length, .None
+	case "gt":   return {'>',  0}, 1, length, .None
+	case "amp":  return {'&',  0}, 1, length, .None
+	case "apos": return {'\'', 0}, 1, length, .None
+	case "quot": return {'"',  0}, 1, length, .None
+	}
+	if .HTML_Entities in options {
+		if named, count, ok := named_xml_entity_to_rune(s[1:i]); ok {
+			return named, count, length, .None
+		}
+	}
+	if .Keep_Unknown_Entities in options {
+		return {}, 0, length, .None
+	}
+	return {}, 0, 0, .Unknown_Entity
+}
+
+@(private="file")
+is_xml_char :: proc(r: rune) -> bool {
+	switch r {
+	case 0x9, 0xa, 0xd, 0x20..=0xd7ff, 0xe000..=0xfffd, 0x10000..=0x10ffff:
+		return true
+	}
+	return false
+}
+
+@(private="file")
+is_name_start_char :: proc(r: rune) -> bool {
+	switch r {
+	case 'A'..='Z', 'a'..='z', '_', ':',
+	     0xc0..=0xd6, 0xd8..=0xf6, 0xf8..=0x2ff, 0x370..=0x37d, 0x37f..=0x1fff, 0x200c..=0x200d,
+	     0x2070..=0x218f, 0x2c00..=0x2fef, 0x3001..=0xd7ff, 0xf900..=0xfdcf, 0xfdf0..=0xfffd, 0x10000..=0xeffff:
+		return true
+	}
+	return false
+}
+
+@(private="file")
+is_name_char :: proc(r: rune) -> bool {
+	switch r {
+	case '-', '.', '0'..='9', 0xb7, 0x300..=0x36f, 0x203f..=0x2040:
+		return true
+	}
+	return is_name_start_char(r)
 }

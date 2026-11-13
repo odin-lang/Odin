@@ -44,7 +44,7 @@ TABLE_FILE_PROLOG :: `/*
 // Silent error handler for the parser.
 Error_Handler :: proc(pos: xml.Pos, fmt: string, args: ..any) {}
 
-OPTIONS :: xml.Options{ flags = { .Ignore_Unsupported, }, expected_doctype = "unicode", }
+OPTIONS :: xml.Options{ flags = { .Ignore_Unsupported, .Trim_Whitespace, }, expected_doctype = "unicode", }
 
 Entity :: struct {
 	codepoints:  [2]rune,

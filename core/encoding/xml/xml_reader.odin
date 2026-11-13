@@ -24,7 +24,7 @@ DEFAULT_OPTIONS :: Options{
 }
 
 Option_Flag :: enum {
-	// Parse in the caller's buffer instead of a copy of it. Line ends are normalised in place, and the document's strings point into the buffer.
+	// Parse in the caller's buffer instead of a copy of it. Line ends are normalised and bodies and attribute values decoded in place, and the document's strings point into the buffer.
 	// `parse_string` ignores this flag, since string data may be read-only.
 	Input_May_Be_Modified,
 
@@ -42,17 +42,16 @@ Option_Flag :: enum {
 	Error_on_Unsupported = Error_On_Unsupported,
 	Ignore_Unsupported,
 
-	// By default CDATA tags are passed-through as-is.
-	// This option unwraps them when encountered.
-	Unbox_CDATA,
-
-	// By default SGML entities like `&gt;`, `&#32;` and `&#x20;` in a tag's body are passed-through as-is.
-	// This option decodes them when encountered.
-	// Entities in attribute values are always decoded, as the XML spec requires.
+	// Also decode the HTML, MathML and ISO 8879 names from `unicode.xml`, in bodies and attribute values.
+	// The 5 predefined entities and character references are always decoded. Other names are `.Unknown_Entity`,
+	// unless `.Ignore_Unsupported` is set and the DOCTYPE has an internal subset or external ID: then they're kept as they are.
 	Decode_SGML_Entities,
 
 	// If a tag body has a comment, it will be stripped unless this option is given.
 	Keep_Tag_Body_Comments,
+
+	// Trim whitespace around body text, so whitespace between elements is dropped, and collapse and trim attribute values.
+	Trim_Whitespace,
 }
 Option_Flags :: bit_set[Option_Flag; u16]
 
@@ -70,12 +69,13 @@ Document :: struct {
 	},
 
 	// With `.Intern_Comments`, comments outside the root element, before or after it, live here.
-	// Comments inside it that come right after a tag or another such comment become `.Comment` elements.
+	// Comments inside it become `.Comment` elements, except those `.Keep_Tag_Body_Comments` keeps in the body text.
 	comments: [dynamic]string        `fmt:"-"`,
 
 	// Internal
 	tokenizer: ^Tokenizer            `fmt:"-"`,
 	allocator: mem.Allocator         `fmt:"-"`,
+	options:   Options               `fmt:"-"`,
 
 	// Buffer the document allocated and `destroy` frees: the copy made when `.Input_May_Be_Modified` isn't specified, or the file `load_from_file` read.
 	// Empty otherwise: the caller owns the buffer, and must keep it alive while the document's strings point into it.
@@ -171,6 +171,8 @@ Error :: enum {
 
 	// An allocation failed.
 	Allocation_Failed,
+
+	Unknown_Entity,
 }
 
 parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_handler := default_error_handler, allocator := context.allocator) -> (doc: ^Document, err: Error) {
@@ -185,6 +187,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 		return nil, .Allocation_Failed
 	}
 	doc.allocator = allocator
+	doc.options   = opts
 
 	// If `.Input_May_Be_Modified` is not specified, we duplicate the input so that we can modify it in-place.
 	if .Input_May_Be_Modified not_in opts.flags {
@@ -230,7 +233,9 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 	seen_xml  := false
 
 	loop: for {
-		skip_whitespace(t)
+		if depth == 0 || .Trim_Whitespace in opts.flags {
+			skip_whitespace(t)
+		}
 		switch t.ch {
 		case '<':
 			// Consume peeked `<`
@@ -369,7 +374,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 
 				case .Open_Bracket:
 					// Only `<![CDATA[` can be part of a body, inside the root element; any other `<![` is unsupported.
-					// Unread the `<![` and let `parse_body` handle the CDATA.
+					// Unread the `<![` and let `parse_body` unbox the CDATA.
 					if !strings.has_prefix(t.src[lt_offset:], CDATA_START) {
 						if .Error_On_Unsupported in opts.flags {
 							error(t, lt_offset, "Unhandled: <![\n")
@@ -534,18 +539,24 @@ parse_attribute :: proc(doc: ^Document) -> (attr: Attribute, offset: int, err: E
 
 @(private)
 decode_attribute_value :: proc(doc: ^Document, raw: string) -> (decoded: string, err: Error) {
-	value := strings.trim_right(raw, " \t\r\n")
+	collapse := .Trim_Whitespace in doc.options.flags
+	needs    := strings.index_byte(raw, '&') >= 0
+	if !needs {
+		for c in transmute([]u8)raw {
+			if c == '\t' || c == '\n' || c == '\r' || (collapse && c == ' ') {
+				needs = true
+				break
+			}
+		}
+	}
+	if !needs {
+		return raw, .None
+	}
 
-	// Estimate decoded size based on input text.
-	builder, builder_err := strings.builder_make_len_cap(0, len(value) + 10, doc.extra_strings_allocator)
-	if builder_err != nil {
-		return value, .Allocation_Failed
-	}
-	normalized, normalize_err := entity.decode_xml_sb(&builder, value, {.Normalize_Whitespace}, doc.allocator)
-	if normalize_err == .None {
-		return normalized, .None
-	}
-	return value, .None
+	options := entity_options(doc)
+	options += {.Collapse_Whitespace} if collapse else {.Normalize_Attribute}
+	start := int(uintptr(raw_data(raw)) - uintptr(raw_data(doc.tokenizer.src)))
+	return decode_in_place(doc, start, raw, options)
 }
 
 @(private)
@@ -839,46 +850,76 @@ parse_body :: proc(doc: ^Document, element: Element_ID, opts: Options) -> (err: 
 	context.allocator = doc.allocator
 	t := doc.tokenizer
 
-	body_text        := scan_string(t, t.offset) or_return
-	needs_processing := .Unbox_CDATA          in opts.flags
-	needs_processing |= .Decode_SGML_Entities in opts.flags
+	start := t.offset
+	stop_at_comments := .Intern_Comments in opts.flags && .Keep_Tag_Body_Comments not_in opts.flags
+	_ = scan_string(t, start, stop_at_comments=stop_at_comments) or_return
 
-	if !needs_processing {
-		if _, alloc_err := append(&doc.elements[element].value, body_text); alloc_err != nil {
-			return .Allocation_Failed
+	body_text := t.src[start:t.offset]
+	if .Trim_Whitespace in opts.flags {
+		body_text = strings.trim_right(body_text, " \t\r\n")
+	}
+
+	if strings.index_byte(body_text, '&') >= 0 || strings.index_byte(body_text, '<') >= 0 {
+		decode_opts := entity_options(doc)
+		if .Keep_Tag_Body_Comments in opts.flags {
+			decode_opts += {.Keep_Comments}
 		}
-		return
+		body_text = decode_in_place(doc, start, body_text, decode_opts) or_return
 	}
 
-	decode_opts := entity.XML_Decode_Options{}
-	if .Keep_Tag_Body_Comments not_in opts.flags {
-		decode_opts += { .Comment_Strip }
-	}
-
-	if .Decode_SGML_Entities not_in opts.flags {
-		decode_opts += { .No_Entity_Decode }
-	}
-
-	if .Unbox_CDATA in opts.flags {
-		decode_opts += { .Unbox_CDATA }
-		if .Decode_SGML_Entities in opts.flags {
-			decode_opts += { .Decode_CDATA }
-		}
-	}
-
-	builder, builder_err := strings.builder_make_len_cap(0, len(body_text) + 10, doc.extra_strings_allocator)
-	if builder_err != nil {
+	if _, alloc_err := append(&doc.elements[element].value, body_text); alloc_err != nil {
 		return .Allocation_Failed
 	}
-	decoded, decode_err := entity.decode_xml_sb(&builder, body_text, decode_opts)
-	if decode_err != .None {
-		decoded = body_text
-	}
-	if _, alloc_err := append(&doc.elements[element].value, decoded); alloc_err != nil {
-		return .Allocation_Failed
-	}
-
 	return
+}
+
+@(private)
+entity_options :: proc(doc: ^Document) -> (options: entity.XML_Decode_Options) {
+	if .Decode_SGML_Entities in doc.options.flags {
+		options += {.HTML_Entities}
+	}
+	if .Ignore_Unsupported in doc.options.flags && len(doc.doctype.rest) > 0 {
+		options += {.Keep_Unknown_Entities}
+	}
+	return
+}
+
+@(private)
+decode_in_place :: proc(doc: ^Document, start: int, text: string, options: entity.XML_Decode_Options) -> (decoded: string, err: Error) {
+	t   := doc.tokenizer
+	end := start + len(text)
+
+	clean_line_offset := t.clean_line_offset
+	if nl := strings.last_index_byte(t.src[t.clean_offset:end], '\n'); nl >= 0 {
+		clean_line_offset = t.clean_offset + nl + 1
+	}
+
+	decode_err: entity.Error
+	err_offset: int
+	decoded, decode_err, err_offset = entity.decode_xml_in_place(transmute([]u8)text, options)
+	#partial switch decode_err {
+	case .None:
+		t.clean_offset      = end
+		t.clean_line_offset = clean_line_offset
+		return decoded, .None
+
+	case .Buffer_Too_Small:
+		builder, builder_err := strings.builder_make_len_cap(0, len(text) + len(text) / 4 + 8, doc.extra_strings_allocator)
+		if builder_err != nil {
+			return text, .Allocation_Failed
+		}
+		decoded, decode_err = entity.decode_xml_sb(&builder, text, options)
+		if decode_err == .None {
+			return decoded, .None
+		}
+		err_offset = 0
+
+	case .Unknown_Entity:
+		error(t, start + err_offset, "Unknown entity\n")
+		return text, .Unknown_Entity
+	}
+	error(t, start + err_offset, "Invalid entity reference: %v\n", decode_err)
+	return text, .Invalid_Token
 }
 
 Element_ID :: u32

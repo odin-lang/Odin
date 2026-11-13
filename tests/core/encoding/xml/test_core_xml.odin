@@ -36,6 +36,42 @@ UTF8_XML ::
 	"</부끄러운:barzle>\n" +
 	"</恥ずべきフクロウ>\n"
 
+ENTITIES_HTML ::
+	"<html>\n" +
+	"\t<head>\n" +
+	"\t\t<title>Entity Reference Test</title>\n" +
+	"\t\t<style>\n" +
+	"\t\t\tbody {\n" +
+	"\t\t\t\tbackground: #000; color: #eee;\n" +
+	"\t\t\t\twidth: 40%;\n" +
+	"\t\t\t\tmargin-left:  auto;\n" +
+	"\t\t\t\tmargin-right: auto;\n" +
+	"\t\t\t\tfont-size: 14pt;\n" +
+	"\t\t\t}\n" +
+	"\t\t</style>\n" +
+	"\t</head>\n" +
+	"\t<body>\n" +
+	"\t\t<h1>Entity Reference Test</h1>\n" +
+	"\t\t<div id=\"test_cdata_in_comment\" foo=\"\">\n" +
+	"\t\t\tFoozle]!&#32;&copy;&#x20;<!-- <![CDATA[&#32;&reg;&#x20;]]> -->42&amp;;1234&amp;\n" +
+	"\t\t</div>\n" +
+	"\t\t<!-- foo attribute should be empty but present -->\n" +
+	"\t\t<!-- EXPECTED: Foozle]! © 42&;1234& -->\n" +
+	"\t\t<div id=\"test_cdata_unwrap_and_passthrough\">\n" +
+	"\t\t\tFoozle]!&#32;&copy;&#x20;<![CDATA[BOX&#32;&reg;&#x20;/BOX]]>42&amp;;1234&amp;\n" +
+	"\t\t</div>\n" +
+	"\t\t<!-- EXPECTED: Foozle]! © BOX ® /BOX42&;1234& -->\n" +
+	"\t\t<div>\n" +
+	"\t\t\t&verbar; &vert; &VerticalLine; &fjlig; &grave; &bsol; &reg; &rhov; &CounterClockwiseContourIntegral; &bsemi;\n" +
+	"\t\t</div>\n" +
+	"\t\t<div> H<![CDATA[ellope!]]>Hellope!</div>\n" +
+	"\t\t<div>\tH<![CDATA[ellope!]]>Hellope!</div>\n" +
+	"\t\t<div> H<![CDATA[ellope!]]>Hellope! </div>\n" +
+	"\t\t<div>\tH<![CDATA[ellope!]]>Hellope!\t</div>\n" +
+	"\t\t<div>H<![CDATA[ellope!]]>Hellope! </div>\n" +
+	"\t</body>\n" +
+	"</html>"
+
 ATTRIBUTE_WHITESPACE_XML ::
 	"<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
 	"<!DOCTYPE foozle>\n" +
@@ -61,20 +97,19 @@ xml_test_utf8_normal :: proc(t: ^testing.T) {
 			},
 			expected_doctype = "恥ずべきフクロウ",
 		},
-		crc32     = 0xb6d07206,
+		crc32     = 0x28211c7a,
 	})
 }
 
 @(test)
-xml_test_utf8_unbox_cdata :: proc(t: ^testing.T) {
+xml_test_utf8_trim_whitespace :: proc(t: ^testing.T) {
 	run_test(t, {
-		// Same as above.
-		// Unbox CDATA in data tag.
+		// Same as above, but with `.Trim_Whitespace`.
 		filename  = "XML/utf8.xml",
 		src       = UTF8_XML,
 		options   = {
 			flags = {
-				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA,
+				.Ignore_Unsupported, .Intern_Comments, .Trim_Whitespace,
 			},
 			expected_doctype = "恥ずべきフクロウ",
 		},
@@ -90,11 +125,11 @@ xml_test_nl_qt_ts :: proc(t: ^testing.T) {
 		filename  = "I18N/nl_NL-qt-ts.ts",
 		options   = {
 			flags = {
-				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA, .Decode_SGML_Entities,
+				.Ignore_Unsupported, .Intern_Comments, .Decode_SGML_Entities,
 			},
 			expected_doctype = "TS",
 		},
-		crc32     = 0x859b7443,
+		crc32     = 0x6f328435,
 	})
 }
 
@@ -106,11 +141,11 @@ xml_test_xliff_1_2 :: proc(t: ^testing.T) {
 		filename  = "I18N/nl_NL-xliff-1.2.xliff",
 		options   = {
 			flags = {
-				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA, .Decode_SGML_Entities,
+				.Ignore_Unsupported, .Intern_Comments, .Decode_SGML_Entities,
 			},
 			expected_doctype = "xliff",
 		},
-		crc32     = 0x3deaf329,
+		crc32     = 0x995eb569,
 	})
 }
 
@@ -122,11 +157,11 @@ xml_test_xliff_2_0 :: proc(t: ^testing.T) {
 		filename  = "I18N/nl_NL-xliff-2.0.xliff",
 		options   = {
 			flags = {
-				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA, .Decode_SGML_Entities,
+				.Ignore_Unsupported, .Intern_Comments, .Decode_SGML_Entities,
 			},
 			expected_doctype = "xliff",
 		},
-		crc32     = 0x0c55e287,
+		crc32     = 0x2a78e8ca,
 	})
 }
 
@@ -140,35 +175,53 @@ xml_test_entities :: proc(t: ^testing.T) {
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0x2a0022cc,
+		err       = .Unknown_Entity,
+		crc32     = 0x31876be0,
 	})
 }
 
 @(test)
-xml_test_entities_unbox :: proc(t: ^testing.T) {
+xml_test_entities_bare_ampersand :: proc(t: ^testing.T) {
 	run_test(t, {
 		filename  = "XML/entities.html",
 		options   = {
 			flags = {
-				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA,
+				.Ignore_Unsupported, .Intern_Comments, .Decode_SGML_Entities,
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0x5fd5ab4e,
+		err       = .Invalid_Token,
+		crc32     = 0x1b6e7146,
 	})
 }
 
 @(test)
-xml_test_entities_unbox_decode :: proc(t: ^testing.T) {
+xml_test_entities_decode :: proc(t: ^testing.T) {
 	run_test(t, {
 		filename  = "XML/entities.html",
+		src       = ENTITIES_HTML,
 		options   = {
 			flags = {
-				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA, .Decode_SGML_Entities,
+				.Ignore_Unsupported, .Intern_Comments, .Decode_SGML_Entities,
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0xda1ac384,
+		crc32     = 0xafc3144c,
+	})
+}
+
+@(test)
+xml_test_entities_trim_whitespace :: proc(t: ^testing.T) {
+	run_test(t, {
+		filename  = "XML/entities.html",
+		src       = ENTITIES_HTML,
+		options   = {
+			flags = {
+				.Ignore_Unsupported, .Intern_Comments, .Decode_SGML_Entities, .Trim_Whitespace,
+			},
+			expected_doctype = "html",
+		},
+		crc32     = 0xa6a8a65b,
 	})
 }
 
@@ -181,6 +234,19 @@ xml_test_attribute_whitespace :: proc(t: ^testing.T) {
 		src       = ATTRIBUTE_WHITESPACE_XML,
 		options   = {
 			flags = {},
+			expected_doctype = "foozle",
+		},
+		crc32     = 0xa202c48e,
+	})
+}
+
+@(test)
+xml_test_attribute_whitespace_trim :: proc(t: ^testing.T) {
+	run_test(t, {
+		filename  = "XML/attribute-whitespace.xml",
+		src       = ATTRIBUTE_WHITESPACE_XML,
+		options   = {
+			flags = {.Trim_Whitespace},
 			expected_doctype = "foozle",
 		},
 		crc32     = 0x8f5fd6c1,
@@ -213,64 +279,55 @@ xml_test_unicode :: proc(t: ^testing.T) {
 			expected_doctype = "",
 		},
 		err       = .None,
-		crc32     = 0x738664b1,
+		crc32     = 0x687119cd,
 	})
 }
 
 @(test)
 xml_test_cdata_edge_cases :: proc(t: ^testing.T) {
 	Case :: struct {
-		src:     string,
-		err:     xml.Error,
-		value:   string,
-		decoded: string,
-		unboxed: string,
+		src:   string,
+		err:   xml.Error,
+		value: string,
+		kept:  string,
 	}
 
 	cases := [?]Case{
-		{src = `<a>x <![CDATA[l]]></a>`,                value = `x <![CDATA[l]]>`,                unboxed = `x l`},
-		{src = `<a>x <![CDATA[]]></a>`,                 value = `x <![CDATA[]]>`,                 unboxed = `x `},
-		{src = `<a>x <![CDATA[ab]]></a>`,               value = `x <![CDATA[ab]]>`,               unboxed = `x ab`},
-		{src = `<a>x <![CDATA[]]><!-- c --> y</a>`,     value = `x <![CDATA[]]><!-- c --> y`,     decoded = `x <![CDATA[]]> y`, unboxed = `x  y`},
-		{src = `<a>x <![CDATA[]]><![CDATA[z]]> y</a>`,  value = `x <![CDATA[]]><![CDATA[z]]> y`,  unboxed = `x z y`},
-		{src = `<a>x <![CDATA[a<]]> y</a>`,             value = `x <![CDATA[a<]]> y`,             unboxed = `x a< y`},
-		{src = `<a>x <![CDATA[]]]>y</a>`,               value = `x <![CDATA[]]]>y`,               unboxed = `x ]y`},
-		{src = `<a>x <![CDATA[a]b]]>y</a>`,             value = `x <![CDATA[a]b]]>y`,             unboxed = `x a]by`},
-		{src = "<a>x <![CDATA[l\nm]]>y</a>",             value = "x <![CDATA[l\nm]]>y",             unboxed = "x l\nmy"},
+		{src = `<a>x <![CDATA[l]]></a>`,                value = `x l`},
+		{src = `<a>x <![CDATA[]]></a>`,                 value = `x `},
+		{src = `<a>x <![CDATA[ab]]></a>`,               value = `x ab`},
+		{src = `<a>x <![CDATA[]]><!-- c --> y</a>`,     value = `x  y`, kept = `x <!-- c --> y`},
+		{src = `<a>x <![CDATA[]]><![CDATA[z]]> y</a>`,  value = `x z y`},
+		{src = `<a>x <![CDATA[a<]]> y</a>`,             value = `x a< y`},
+		{src = `<a>x <![CDATA[]]]>y</a>`,               value = `x ]y`},
+		{src = `<a>x <![CDATA[a]b]]>y</a>`,             value = `x a]by`},
+		{src = "<a>x <![CDATA[l\nm]]>y</a>",             value = "x l\nmy"},
+		{src = `<a>x <![CDATA[&amp;]]>y</a>`,           value = `x &amp;y`},
 		{src = `<a>x <![CDATA[unterminated</a>`,         err   = .Premature_EOF},
 	}
 
-	Mode :: struct {
-		flags:   xml.Option_Flags,
-		decoded: bool,
-		unboxed: bool,
-	}
-
-	modes := [?]Mode{
-		{flags = {.Ignore_Unsupported}},
-		{flags = {.Ignore_Unsupported, .Decode_SGML_Entities},               decoded = true},
-		{flags = {.Ignore_Unsupported, .Unbox_CDATA},                        unboxed = true},
-		{flags = {.Ignore_Unsupported, .Unbox_CDATA, .Decode_SGML_Entities}, unboxed = true},
+	flag_sets := [?]xml.Option_Flags{
+		{.Ignore_Unsupported},
+		{.Ignore_Unsupported, .Decode_SGML_Entities},
+		{.Ignore_Unsupported, .Keep_Tag_Body_Comments},
 	}
 
 	for c in cases {
-		for m in modes {
-			doc, err := xml.parse_string(c.src, xml.Options{flags = m.flags}, error_handler = Silent)
+		for flags in flag_sets {
+			doc, err := xml.parse_string(c.src, xml.Options{flags = flags}, error_handler = Silent)
 			defer xml.destroy(doc)
 
-			testing.expectf(t, err == c.err, "%q %v: expected %v, got %v", c.src, m.flags, c.err, err)
+			testing.expectf(t, err == c.err, "%q %v: expected %v, got %v", c.src, flags, c.err, err)
 			if c.err == .None && err == .None {
 				expected := c.value
-				if m.unboxed {
-					expected = c.unboxed
-				} else if m.decoded && c.decoded != "" {
-					expected = c.decoded
+				if .Keep_Tag_Body_Comments in flags && c.kept != "" {
+					expected = c.kept
 				}
-				values   := doc.elements[0].value
-				testing.expectf(t, len(values) == 1, "%q %v: expected 1 value, got %v", c.src, m.flags, len(values))
+				values := doc.elements[0].value
+				testing.expectf(t, len(values) == 1, "%q %v: expected 1 value, got %v", c.src, flags, len(values))
 				if len(values) == 1 {
 					got, _ := values[0].(string)
-					testing.expectf(t, got == expected, "%q %v: expected %q, got %q", c.src, m.flags, expected, got)
+					testing.expectf(t, got == expected, "%q %v: expected %q, got %q", c.src, flags, expected, got)
 				}
 			}
 		}
@@ -370,7 +427,7 @@ run_test :: proc(t: ^testing.T, test: TEST, loc := #caller_location) {
 @(test)
 test_normalize_whitespace :: proc(t: ^testing.T) {
 	s := "A &amp; B"
-	normalized_entity_decode, _ := entity.decode_xml(s, {.Normalize_Whitespace})
+	normalized_entity_decode, _ := entity.decode_xml(s, {.Normalize_Attribute})
 	defer delete(normalized_entity_decode)
 
 	testing.expect_value(t, normalized_entity_decode, "A & B")

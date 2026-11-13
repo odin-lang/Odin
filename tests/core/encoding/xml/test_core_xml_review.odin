@@ -80,8 +80,8 @@ xml_test_review_bang_bracket :: proc(t: ^testing.T) {
 		{src = "<a><![INCLUDE[ x ]]></a>",     flags = {.Ignore_Unsupported},   tree = "a{}"},
 		{src = "<a><![CDTA[x]]></a>",          flags = {.Error_On_Unsupported}, err  = .Unhandled_Bang},
 		{src = "<a><![x",                      flags = {.Ignore_Unsupported},   err  = .Premature_EOF},
-		{src = "<a>x<![CDATA[<y>]]>z</a>",     flags = {.Ignore_Unsupported},   tree = `a{"x<![CDATA[<y>]]>z"}`},
-		{src = "<a><![CDATA[<y>]]>z</a>",      flags = {.Ignore_Unsupported},   tree = `a{"<![CDATA[<y>]]>z"}`},
+		{src = "<a>x<![CDATA[<y>]]>z</a>",     flags = {.Ignore_Unsupported},   tree = `a{"x<y>z"}`},
+		{src = "<a><![CDATA[<y>]]>z</a>",      flags = {.Ignore_Unsupported},   tree = `a{"<y>z"}`},
 	}
 	run_review_cases(t, cases[:])
 }
@@ -125,9 +125,9 @@ xml_test_review_line_ends :: proc(t: ^testing.T) {
 	cases := [?]Review_Case{
 		{src = "<a>p\r\nq\rr\n\rs</a>",                             tree = `a{"p\nq\nr\n\ns"}`},
 		{src = "<a>p\r\nq\rr</a>",  flags = {.Decode_SGML_Entities}, tree = `a{"p\nq\nr"}`},
-		{src = "<a>p<!--x\r\ny-->q</a>", flags = {.Keep_Tag_Body_Comments, .Unbox_CDATA}, tree = `a{"p<!--x\ny-->q"}`},
-		{src = "<a>p<![CDATA[x\r\ny]]>q</a>",                       tree = `a{"p<![CDATA[x\ny]]>q"}`},
-		{src = "<a>p<![CDATA[x\ry]]>q</a>", flags = {.Unbox_CDATA},  tree = `a{"px\nyq"}`},
+		{src = "<a>p<!--x\r\ny-->q</a>", flags = {.Keep_Tag_Body_Comments}, tree = `a{"p<!--x\ny-->q"}`},
+		{src = "<a>p<![CDATA[x\r\ny]]>q</a>",                       tree = `a{"px\nyq"}`},
+		{src = "<a>p<![CDATA[x\ry]]>q</a>",                         tree = `a{"px\nyq"}`},
 		{src = "\r\n<a>x</a>\r\n",                                  tree = `a{"x"}`},
 	}
 	run_review_cases(t, cases[:])
@@ -293,12 +293,13 @@ xml_test_review_skipping :: proc(t: ^testing.T) {
 @(test)
 xml_test_review_markup_in_body :: proc(t: ^testing.T) {
 	cases := [?]Review_Case{
-		{src = "<a>x<!--c--><!--d-->y</a>",                                  tree = `a{"x<!--c--><!--d-->y"}`},
-		{src = "<a>x<!--c--><!--d-->y</a>",     flags = {.Intern_Comments}, tree = `a{"x<!--c--><!--d-->y"}`},
-		{src = "<a>x<!--c--><b/></a>",                                       tree = `a{"x<!--c-->",b{}}`},
-		{src = "<a>x<![CDATA[1]]><![CDATA[2]]><b/></a>",                     tree = `a{"x<![CDATA[1]]><![CDATA[2]]>",b{}}`},
-		{src = "<a>x<!---->y</a>",                                           tree = `a{"x<!---->y"}`},
-		{src = "<a>x<!---y-->z</a>",                                         tree = `a{"x<!---y-->z"}`},
+		{src = "<a>x<!--c--><!--d-->y</a>",                                  tree = `a{"xy"}`},
+		{src = "<a>x<!--c--><!--d-->y</a>",     flags = {.Intern_Comments}, tree = `a{"x",!"c",!"d","y"}`},
+		{src = "<a>x<!--c--><!--d-->y</a>",     flags = {.Keep_Tag_Body_Comments}, tree = `a{"x<!--c--><!--d-->y"}`},
+		{src = "<a>x<!--c--><b/></a>",                                       tree = `a{"x",b{}}`},
+		{src = "<a>x<![CDATA[1]]><![CDATA[2]]><b/></a>",                     tree = `a{"x12",b{}}`},
+		{src = "<a>x<!---->y</a>",                                           tree = `a{"xy"}`},
+		{src = "<a>x<!---y-->z</a>",                                         tree = `a{"xz"}`},
 		{src = "<a>x<!-- y --->z</a>",                                       err  = .Invalid_Sequence_In_Comment},
 		{src = "<a>x<!--c",                                                  err  = .Unclosed_Comment},
 		{src = "<a>x<![CDATA[y",                                             err  = .Premature_EOF},
@@ -344,7 +345,7 @@ xml_test_review_tag_syntax :: proc(t: ^testing.T) {
 		{src = "<a><![CDATA[x]]>]]></a>",  err  = .Unexpected_Token},
 		{src = "<a>x]]y]>z</a>",           tree = `a{"x]]y]>z"}`},
 		{src = "<a><!-- ]]> --></a>",      tree = "a{}"},
-		{src = "<a>x<!-- ]]> -->y</a>",    tree = `a{"x<!-- ]]> -->y"}`},
+		{src = "<a>x<!-- ]]> -->y</a>",    tree = `a{"xy"}`},
 		{src = "<a><?Xml x?></a>",         err  = .Invalid_Prolog},
 		{src = "<a><?pi&x?></a>",          err  = .Unexpected_Token},
 		{src = "<a><?pi?></a>",            tree = "a{}"},
@@ -497,5 +498,109 @@ xml_test_review_many_attributes :: proc(t: ^testing.T) {
 				testing.expect_value(t, attribs[c.count - 1].key, last)
 			}
 		}
+	}
+}
+
+@(test)
+xml_test_review_text_whitespace :: proc(t: ^testing.T) {
+	cases := [?]Review_Case{
+		{src = "<a> x <b/> y </a>",                                                   tree = `a{" x ",b{}," y "}`},
+		{src = "<a> x <b/> y </a>",       flags = {.Trim_Whitespace},                 tree = `a{"x",b{},"y"}`},
+		{src = "<a>\n  <b/>\n</a>",                                                   tree = `a{"\n  ",b{},"\n"}`},
+		{src = "<a>\n  <b/>\n</a>",       flags = {.Trim_Whitespace},                 tree = `a{b{}}`},
+		{src = "<a>\n <!--c-->\n</a>",                                                tree = `a{"\n \n"}`},
+		{src = "<a>\n <!--c-->\n</a>",    flags = {.Intern_Comments},                 tree = `a{"\n ",!"c","\n"}`},
+		{src = "<a>\n <!--c-->\n</a>",    flags = {.Intern_Comments, .Trim_Whitespace}, tree = `a{!"c"}`},
+		{src = "<a>x <!--c--> y</a>",     flags = {.Intern_Comments, .Keep_Tag_Body_Comments}, tree = `a{"x <!--c--> y"}`},
+		{src = "<a b=\" x\ty\nz \"/>",                                                tree = `a[b=" x y z "]{}`},
+		{src = "<a b=\" x\ty\nz \"/>",    flags = {.Trim_Whitespace},                 tree = `a[b="x y z"]{}`},
+		{src = "<a b=\"&#10;&#9;\"/>",                                                tree = `a[b="\n\t"]{}`},
+		{src = "<a b=\"a&#32; b\"/>",                                                 tree = `a[b="a  b"]{}`},
+		{src = "<a b=\"a&#32; b\"/>",     flags = {.Trim_Whitespace},                 tree = `a[b="a b"]{}`},
+	}
+	run_review_cases(t, cases[:])
+}
+
+@(test)
+xml_test_review_references :: proc(t: ^testing.T) {
+	cases := [?]Review_Case{
+		{src = "<a>&lt;&#65;<![CDATA[&amp;]]></a>",                                         tree = `a{"<A&amp;"}`},
+		{src = "<a>&</a>",                                                                   err  = .Invalid_Token},
+		{src = "<a>&;</a>",                                                                  err  = .Invalid_Token},
+		{src = "<a>&amp</a>",                                                                err  = .Invalid_Token},
+		{src = "<a>&#0;</a>",                                                                err  = .Invalid_Token},
+		{src = "<a b=\"&\"/>",                                                               err  = .Invalid_Token},
+		{src = "<a>&copy;</a>",                                                              err  = .Unknown_Entity},
+		{src = "<a>&copy;</a>",                        flags = {.Decode_SGML_Entities},      tree = "a{\"\u00a9\"}"},
+		{src = "<a b=\"&copy;\"/>",                                                          err  = .Unknown_Entity},
+		{src = "<a b=\"&copy;\"/>",                    flags = {.Decode_SGML_Entities},      tree = "a[b=\"\u00a9\"]{}"},
+		{src = "<a>&nosuch;</a>",                      flags = {.Decode_SGML_Entities},      err  = .Unknown_Entity},
+		{src = "<a b=\"&nGt;\">&nGt;</a>",             flags = {.Decode_SGML_Entities},      tree = "a[b=\"\u226b\\u20d2\"]{\"\u226b\\u20d2\"}"},
+		{src = "<!DOCTYPE a [<!ENTITY e \"x\">]><a b=\"&e;\">&e;</a>", flags = {.Ignore_Unsupported}, tree = `a[b="&e;"]{"&e;"}`},
+		{src = "<!DOCTYPE a SYSTEM \"a.dtd\"><a>&e;</a>",          flags = {.Ignore_Unsupported}, tree = `a{"&e;"}`},
+		{src = "<!DOCTYPE a [<!ENTITY e \"x\">]><a>&e;</a>",       flags = {.Error_On_Unsupported}, err = .Unknown_Entity},
+		{src = "<!DOCTYPE a [<!ENTITY e \"x\">]><a>&e;</a>",                                 err  = .Unknown_Entity},
+		{src = "<!DOCTYPE a><a>&e;</a>",                           flags = {.Ignore_Unsupported}, err = .Unknown_Entity},
+	}
+	run_review_cases(t, cases[:])
+}
+
+@(test)
+xml_test_review_decode_in_place :: proc(t: ^testing.T) {
+	in_buffer :: proc(buf: []u8, s: string) -> bool {
+		p := uintptr(raw_data(s))
+		b := uintptr(raw_data(buf))
+		return p >= b && p + uintptr(len(s)) <= b + uintptr(len(buf))
+	}
+
+	SRC :: "<a b=\"x&amp;y\">p&lt;q<![CDATA[r]]></a>"
+
+	buf := transmute([]u8)strings.clone(SRC)
+	defer delete(buf)
+	doc, err := xml.parse_bytes(buf, xml.Options{flags = {.Input_May_Be_Modified}}, error_handler = Silent)
+	defer xml.destroy(doc)
+	testing.expect_value(t, err, xml.Error.None)
+	if err == .None {
+		val     := doc.elements[0].attribs[0].val
+		body, _ := doc.elements[0].value[0].(string)
+		testing.expect_value(t, val,  "x&y")
+		testing.expect_value(t, body, "p<qr")
+		testing.expect(t, in_buffer(buf, val) && in_buffer(buf, body), "values were not decoded in place")
+	}
+
+	src := strings.clone(SRC)
+	defer delete(src)
+	doc2, err2 := xml.parse_bytes(transmute([]u8)src, error_handler = Silent)
+	defer xml.destroy(doc2)
+	testing.expect_value(t, err2, xml.Error.None)
+	testing.expect_value(t, src, SRC)
+
+	doc3, err3 := xml.parse_string(src, xml.Options{flags = {.Input_May_Be_Modified}}, error_handler = Silent)
+	defer xml.destroy(doc3)
+	testing.expect_value(t, err3, xml.Error.None)
+	testing.expect_value(t, src, SRC)
+}
+
+@(test)
+xml_test_review_decode_error_positions :: proc(t: ^testing.T) {
+	Position_Case :: struct {
+		src:    string,
+		err:    xml.Error,
+		line:   int,
+		column: int,
+	}
+	cases := [?]Position_Case{
+		{"<a>\n  &nosuch;</a>",                          .Unknown_Entity,   2, 3},
+		{"<a b=\"x\n &\"/>",                             .Invalid_Token,    2, 2},
+		{"<a>&amp;\nxxxxxxxx<b c=\"&bad;\n\"/></a>",     .Unknown_Entity,   2, 15},
+		{"<a b=\"&amp;\nxxxxxxxxx\">&bad;\n</a>",        .Unknown_Entity,   2, 12},
+		{"<a b=\"&amp;\nxxxxxxxx\">yy<!--\n",            .Unclosed_Comment, 2, 17},
+	}
+	for c in cases {
+		last_error_pos = {}
+		doc, err := xml.parse_string(c.src, error_handler = remember_pos)
+		xml.destroy(doc)
+		testing.expectf(t, err == c.err, "%q: expected %v, got %v", c.src, c.err, err)
+		testing.expectf(t, last_error_pos.line == c.line && last_error_pos.column == c.column, "%q: expected %v:%v, got %v:%v", c.src, c.line, c.column, last_error_pos.line, last_error_pos.column)
 	}
 }

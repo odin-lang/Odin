@@ -78,6 +78,9 @@ Tokenizer :: struct {
 	line_offset: int,
 	line_count:  int,
 
+	clean_offset:      int,
+	clean_line_offset: int,
+
 	// Mutable data
 	error_count: int,
 }
@@ -90,6 +93,8 @@ init :: proc(t: ^Tokenizer, src: string, path: string, err: Error_Handler = defa
 	t.read_offset = 0
 	t.line_offset = 0
 	t.line_count = len(src) > 0 ? 1 : 0
+	t.clean_offset = 0
+	t.clean_line_offset = 0
 	t.error_count = 0
 	t.path = path
 
@@ -162,7 +167,13 @@ offset_to_pos :: proc(t: ^Tokenizer, offset: int) -> Pos {
 	line_offset := t.line_offset
 	if offset < line_offset {
 		line -= strings.count(t.src[offset:line_offset], "\n")
-		line_offset = strings.last_index_byte(t.src[:offset], '\n') + 1
+		if offset < t.clean_offset {
+			line_offset = strings.last_index_byte(t.src[:offset], '\n') + 1
+		} else if nl := strings.last_index_byte(t.src[t.clean_offset:offset], '\n'); nl >= 0 {
+			line_offset = t.clean_offset + nl + 1
+		} else {
+			line_offset = t.clean_line_offset
+		}
 	}
 	column := offset - line_offset + 1
 
@@ -365,7 +376,7 @@ skip_cdata :: proc(t: ^Tokenizer) -> (err: Error) {
 }
 
 @(optimization_mode="favor_size")
-scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close := false, multiline := true) -> (value: string, err: Error) {
+scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close := false, multiline := true, stop_at_comments := false) -> (value: string, err: Error) {
 	err = .None
 
 	loop: for {
@@ -382,7 +393,7 @@ scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close
 				// Might be the start of a CDATA tag.
 				skip_cdata(t) or_return
 				continue loop
-			} else if strings.has_prefix(rest, COMMENT_START) {
+			} else if !stop_at_comments && strings.has_prefix(rest, COMMENT_START) {
 				// Comment start. Eat comment.
 				jump_to(t, t.offset + len(COMMENT_START))
 				_ = scan_comment(t) or_return

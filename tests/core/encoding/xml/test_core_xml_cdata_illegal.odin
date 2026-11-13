@@ -19,15 +19,16 @@ xml_test_cdata_illegal_characters :: proc(t: ^testing.T) {
 
 	decode_options := [?]entity.XML_Decode_Options{
 		{},
-		{.Unbox_CDATA},
-		{.Unbox_CDATA, .Decode_CDATA},
+		{.Keep_Comments},
+		{.Normalize_Attribute},
+		{.Collapse_Whitespace, .HTML_Entities},
 	}
 
 	flags := [?]xml.Option_Flags{
 		{.Ignore_Unsupported},
 		{.Ignore_Unsupported, .Decode_SGML_Entities},
-		{.Ignore_Unsupported, .Unbox_CDATA},
-		{.Ignore_Unsupported, .Unbox_CDATA, .Decode_SGML_Entities},
+		{.Ignore_Unsupported, .Keep_Tag_Body_Comments},
+		{.Ignore_Unsupported, .Trim_Whitespace, .Decode_SGML_Entities},
 	}
 
 	for c in cases {

@@ -47,7 +47,7 @@ _entities :: proc() {
 }
 
 _main :: proc() {
-	options := xml.Options{ flags = { .Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA, .Decode_SGML_Entities }}
+	options := xml.Options{ flags = { .Ignore_Unsupported, .Intern_Comments, .Decode_SGML_Entities }}
 
 	doc, _ := xml.parse(#load("test.html"), options)
 

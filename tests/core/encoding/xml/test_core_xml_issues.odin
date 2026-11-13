@@ -40,7 +40,7 @@ xml_test_attribute_entities :: proc(t: ^testing.T) {
 			val, found := xml.find_attribute_val_by_key(doc, 0, "a")
 			testing.expectf(t, found && val == c.decoded, "%q %v: expected attribute %q, got %q (found %v)", src, f, c.decoded, val, found)
 
-			body := c.text if .Decode_SGML_Entities not_in f else c.decoded
+			body := c.decoded
 			values := doc.elements[0].value
 			testing.expectf(t, len(values) == 1, "%q %v: expected 1 value, got %v", src, f, len(values))
 			if len(values) == 1 {
@@ -56,7 +56,7 @@ xml_test_error_on_unsupported :: proc(t: ^testing.T) {
 	testing.expect_value(t, xml.Option_Flag.Error_on_Unsupported, xml.Option_Flag.Error_On_Unsupported)
 	testing.expect_value(t, int(xml.Option_Flag.Error_On_Unsupported),   4)
 	testing.expect_value(t, int(xml.Option_Flag.Ignore_Unsupported),     5)
-	testing.expect_value(t, int(xml.Option_Flag.Keep_Tag_Body_Comments), 8)
+	testing.expect_value(t, int(xml.Option_Flag.Keep_Tag_Body_Comments), 7)
 
 	Case :: struct {
 		flags: xml.Option_Flags,

@@ -20,7 +20,6 @@ TS_XML_Options := xml.Options{
 		.Must_Have_Prolog,
 		.Must_Have_DocType,
 		.Ignore_Unsupported,
-		.Unbox_CDATA,
 		.Decode_SGML_Entities,
 	},
 	expected_doctype = "TS",
@@ -72,6 +71,9 @@ parse_qt_linguist :: proc(data: []byte, may_modify: bool, options: Parse_Options
 	section: ^Section
 
 	for value in ts.elements[0].value {
+		if text, is_text := value.(string); is_text && strings.trim_space(text) == "" {
+			continue
+		}
 		child_id := get_id(value) or_return
 
 		// These should be <context>s.
