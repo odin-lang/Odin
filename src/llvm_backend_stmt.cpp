@@ -2847,9 +2847,9 @@ gb_internal void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice
 	for_array(i, inits) {
 		lbAddr lval = lvals[i];
 		lbValue init = inits[i];
-		// TODO-UPDATE-COMMENT: values read from fresh temporaries, or a first value whose source nothing writes before its store, are also stored from memory without a copy
-		// ---
-		// NOTE: no store of this assignment writes a copy, so a copy can be read when it is stored
+		// NOTE: these values are read from memory when they are stored, as no earlier store of this assignment writes them:
+		// copies, temporaries created after the targets were built, and the first value when its target is a plain
+		// variable and nothing after its load writes memory
 		p->in_multi_assignment = multi && !store_from_memory[i];
 		lb_addr_store(p, lval, init);
 	}
