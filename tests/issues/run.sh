@@ -207,7 +207,7 @@ else
 	exit 1
 fi
 
-$ODIN test ../test_issue_type_info_variant_shim $COMMON
+$ODIN test ../test_issue_type_info_variant_shim $COMMON -ignore-warnings
 if [[ $($ODIN check ../test_issue_type_info_variant_shim -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Warning:") -eq 11 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
