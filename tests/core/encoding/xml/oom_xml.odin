@@ -135,7 +135,7 @@ oom_small_document :: proc() -> string {
 @(test)
 test_oom_load_from_file :: proc(t: ^testing.T) {
 	// Reading the file allocates too, and the parse takes over the data it read.
-	sweep_parse(t, "", {flags = {.Ignore_Unsupported, .Intern_Comments}}, elements = 5, path = TEST_SUITE_PATH + "XML/utf8.xml")
+	sweep_parse(t, "", {flags = {.Ignore_Unsupported, .Intern_Comments}}, elements = 24, path = TEST_SUITE_PATH + "I18N/nl_NL-qt-ts.ts")
 }
 
 @(test)

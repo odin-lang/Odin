@@ -69,8 +69,8 @@ Document :: struct {
 		rest:    string,
 	},
 
-	// If we encounter comments before the root node, and the option to intern comments is given, this is where they'll live.
-	// Otherwise they'll be in the element tree.
+	// With `.Intern_Comments`, comments outside the root element, before or after it, live here.
+	// Comments inside it that come right after a tag or another such comment become `.Comment` elements.
 	comments: [dynamic]string        `fmt:"-"`,
 
 	// Internal
@@ -225,6 +225,10 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 	// If an expected DOCTYPE is given in options (i.e. it's non-empty), the DOCTYPE (if present) and root tag have to match.
 	expected_doctype := options.expected_doctype
 
+	depth     := 0
+	doc_start := t.offset
+	seen_xml  := false
+
 	loop: for {
 		skip_whitespace(t)
 		switch t.ch {
@@ -237,6 +241,10 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 			// NOTE(Jeroen): We're not using a switch because this if-else chain ordered by likelihood is 2.5% faster at -o:size and -o:speed.
 			if likely(open.kind, Token_Kind.Ident) == .Ident {
 				// e.g. <odin - Start of new element.
+				if doc.element_count > 0 && depth == 0 {
+					error(t, lt_offset, "A document can only have one root element\n")
+					return doc, .Unexpected_Token
+				}
 				element = new_element(doc) or_return
 				if element == 0 { // First Element
 					parent = element
@@ -268,6 +276,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 				case .Gt:
 					// We're now the new parent.
 					parent = element
+					depth += 1
 
 				case .Slash:
 					// Empty tag. Close it.
@@ -285,12 +294,17 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 				ident := expect(t, .Ident) or_return
 				_      = expect(t, .Gt)    or_return
 
+				if depth == 0 {
+					error(t, lt_offset, "Closing tag without a start tag: %v\n", ident.text)
+					return doc, .Mismatched_Closing_Tag
+				}
 				if doc.elements[element].ident != ident.text {
 					error(t, t.offset, "Mismatched Closing Tag. Expected %v, got %v\n", doc.elements[element].ident, ident.text)
 					return doc, .Mismatched_Closing_Tag
 				}
 				parent  = doc.elements[element].parent
 				element = parent
+				depth  -= 1
 
 			} else if open.kind == .Exclaim {
 				// <!
@@ -328,7 +342,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 					comment := scan_comment(t) or_return
 
 					if .Intern_Comments in opts.flags {
-						if doc.element_count == 0 {
+						if depth == 0 {
 							if _, alloc_err = append(&doc.comments, comment); alloc_err != nil {
 								return doc, .Allocation_Failed
 							}
@@ -346,7 +360,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 					}
 
 				case .Open_Bracket:
-					// Only `<![CDATA[` can be part of a body; any other `<![` is unsupported.
+					// Only `<![CDATA[` can be part of a body, inside the root element; any other `<![` is unsupported.
 					// Unread the `<![` and let `parse_body` handle the CDATA.
 					if !strings.has_prefix(t.src[lt_offset:], CDATA_START) {
 						if .Error_On_Unsupported in opts.flags {
@@ -355,6 +369,10 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 						}
 						skip_element(t) or_return
 						continue loop
+					}
+					if depth == 0 {
+						error(t, lt_offset, "CDATA outside the root element\n")
+						return doc, .Unexpected_Token
 					}
 					t.read_offset = lt_offset
 					advance_rune(t)
@@ -374,10 +392,16 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 				#partial switch next.kind {
 				case .Ident:
 					if len(next.text) == 3 && strings.equal_fold(next.text, "xml") {
+						if seen_xml {
+							error(t, lt_offset, "Only one XML declaration is allowed\n")
+							return doc, .Too_Many_Prologs
+						}
+						if lt_offset != doc_start {
+							error(t, lt_offset, "The XML declaration must come first\n")
+							return doc, .Invalid_Prolog
+						}
+						seen_xml = true
 						parse_prologue(doc) or_return
-					} else if len(doc.prologue) > 0 {
-						// We've already seen a prologue.
-						return doc, .Too_Many_Prologs
 					} else {
 						// Could be `<?xml-stylesheet`, etc. Ignore it.
 						skip_element(t) or_return
@@ -398,8 +422,22 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 
 		case:
 			// This should be a tag's body text.
+			if depth == 0 {
+				error(t, t.offset, "Text outside the root element\n")
+				return doc, .Unexpected_Token
+			}
 			parse_body(doc, element, opts) or_return
 		}
+	}
+
+	if doc.element_count == 0 {
+		error(t, t.offset, "No root element\n")
+		return doc, .Premature_EOF
+	}
+
+	if depth > 0 {
+		error(t, t.offset, "Unclosed element: %v\n", doc.elements[element].ident)
+		return doc, .Premature_EOF
 	}
 
 	if .Must_Have_Prolog in opts.flags && len(doc.prologue) == 0 {

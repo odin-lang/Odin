@@ -198,3 +198,43 @@ xml_test_review_input_may_be_modified :: proc(t: ^testing.T) {
 		testing.expect(t, raw_data(value) == &data[3], "the value should point into the caller's buffer")
 	}
 }
+
+@(test)
+xml_test_review_document_structure :: proc(t: ^testing.T) {
+	cases := [?]Review_Case{
+		{src = "<a><b>",                                                  err  = .Premature_EOF},
+		{src = "<a><b></b>",                                              err  = .Premature_EOF},
+		{src = "<a/></a>",                                                err  = .Mismatched_Closing_Tag},
+		{src = "</a>",                                                    err  = .Mismatched_Closing_Tag},
+		{src = "<a/><b/>",                                                err  = .Unexpected_Token},
+		{src = "<a></a><b/>",                                             err  = .Unexpected_Token},
+		{src = "x<a/>",                                                   err  = .Unexpected_Token},
+		{src = "<a/>x",                                                   err  = .Unexpected_Token},
+		{src = "<![CDATA[x]]><a/>",                                       err  = .Unexpected_Token},
+		{src = "<a/><![CDATA[x]]>",                                       err  = .Unexpected_Token},
+		{src = "",                                                        err  = .Premature_EOF},
+		{src = " \n\t",                                                   err  = .Premature_EOF},
+		{src = "<!--c-->",                     flags = {.Intern_Comments}, err  = .Premature_EOF},
+		{src = "<?xml version=\"1.0\"?>",                                 err  = .Premature_EOF},
+		{src = "<a/><?xml version=\"1.0\"?>",                             err  = .Invalid_Prolog},
+		{src = "<a/><?xml version=\"1.0\"?>",  flags = {.Must_Have_Prolog}, err = .Invalid_Prolog},
+		{src = " <?xml version=\"1.0\"?><a/>",                            err  = .Invalid_Prolog},
+		{src = "<?xml version=\"1.0\"?><?xml version=\"1.0\"?><a/>",      err  = .Too_Many_Prologs},
+		{src = "<?xml version=\"1.0\"?><?xml encoding=\"utf-8\"?><a/>",   err  = .Too_Many_Prologs},
+		{src = "<?xml version=\"1.0\"?><?xml-stylesheet href=\"a.css\"?><r/>", tree = "r{}"},
+		{src = "<?xml version=\"1.0\"?><a>x<?pi y?>z</a>",                tree = `a{"x","z"}`},
+		{src = "\n<a/>\n",                                                tree = "a{}"},
+		{src = "<!--b--><a/><!--c-->",         flags = {.Intern_Comments}, tree = "a{}"},
+		{src = "<a><b/><c></c></a>",                                      tree = "a{b{},c{}}"},
+	}
+	run_review_cases(t, cases[:])
+
+	doc, err := xml.parse_string("<!--b--><a><!--x--></a><!--c-->", xml.Options{flags = {.Intern_Comments}}, error_handler = Silent)
+	defer xml.destroy(doc)
+	testing.expect_value(t, err, xml.Error.None)
+	testing.expect_value(t, len(doc.comments), 2)
+	if len(doc.comments) == 2 {
+		testing.expect_value(t, doc.comments[0], "b")
+		testing.expect_value(t, doc.comments[1], "c")
+	}
+}

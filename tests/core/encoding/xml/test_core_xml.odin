@@ -17,12 +17,35 @@ OPTIONS :: xml.Options{ flags = { .Ignore_Unsupported, .Intern_Comments, },
 
 TEST :: struct {
 	filename: string,
+	src:      string,
 	options:  xml.Options,
 	err:      xml.Error,
 	crc32:    u32,
 }
 
 TEST_SUITE_PATH :: ODIN_ROOT + "tests/core/assets/"
+
+UTF8_XML ::
+	"<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+	"<!DOCTYPE 恥ずべきフクロウ>\n" +
+	"<恥ずべきフクロウ 올빼미_id=\"Foozle&#32;Barzle\">\n" +
+	"<부끄러운:barzle>\n" +
+	"\t<name foo:bar=\"birmese\">ရှက်စရာ ဇီးကွက်</name>\n" +
+	"\t<nickname>Owl of Shame</nickname>\n" +
+	"\t<data>More CDATA <![CDATA[<greeting>Hello, world!</greeting><![CDATA] <$]]> Nonsense.</data>\n" +
+	"</부끄러운:barzle>\n" +
+	"</恥ずべきフクロウ>\n"
+
+ATTRIBUTE_WHITESPACE_XML ::
+	"<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+	"<!DOCTYPE foozle>\n" +
+	"<foozle>Barzle\n" +
+	"<부끄러운:barzle>\n" +
+	"\t<name foo:bar=\"   birmese\n" +
+	"\tkittens   have\n" +
+	"\tfur   \">Indeed!</name>\n" +
+	"</부끄러운:barzle>\n" +
+	"</foozle>\n"
 
 @(test)
 xml_test_utf8_normal :: proc(t: ^testing.T) {
@@ -31,13 +54,14 @@ xml_test_utf8_normal :: proc(t: ^testing.T) {
 		// Test namespaced ident.
 		// Tests that nested partial CDATA start doesn't trip up parser.
 		filename  = "XML/utf8.xml",
+		src       = UTF8_XML,
 		options   = {
 			flags = {
 				.Ignore_Unsupported, .Intern_Comments,
 			},
 			expected_doctype = "恥ずべきフクロウ",
 		},
-		crc32     = 0xefa55f27,
+		crc32     = 0xb6d07206,
 	})
 }
 
@@ -47,13 +71,14 @@ xml_test_utf8_unbox_cdata :: proc(t: ^testing.T) {
 		// Same as above.
 		// Unbox CDATA in data tag.
 		filename  = "XML/utf8.xml",
+		src       = UTF8_XML,
 		options   = {
 			flags = {
 				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA,
 			},
 			expected_doctype = "恥ずべきフクロウ",
 		},
-		crc32     = 0x2dd27770,
+		crc32     = 0x873198d6,
 	})
 }
 
@@ -153,6 +178,7 @@ xml_test_attribute_whitespace :: proc(t: ^testing.T) {
 		// Same as above.
 		// Unbox CDATA in data tag.
 		filename  = "XML/attribute-whitespace.xml",
+		src       = ATTRIBUTE_WHITESPACE_XML,
 		options   = {
 			flags = {},
 			expected_doctype = "foozle",
@@ -298,7 +324,13 @@ run_test :: proc(t: ^testing.T, test: TEST, loc := #caller_location) {
 	log.debugf("Starting xml.load_from_file...")
 	time.stopwatch_reset(&sw)
 	time.stopwatch_start(&sw)
-	doc, err := xml.load_from_file(path, test.options, Silent)
+	doc: ^xml.Document
+	err: xml.Error
+	if test.src != "" {
+		doc, err = xml.parse_string(test.src, test.options, test.filename, Silent)
+	} else {
+		doc, err = xml.load_from_file(path, test.options, Silent)
+	}
 	log.debugf("Finished xml.load_from_file: %v", time.stopwatch_duration(sw))
 	defer {
 		log.debugf("Starting xml.destroy...")
