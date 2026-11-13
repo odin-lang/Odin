@@ -222,6 +222,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 		switch t.ch {
 		case '<':
 			// Consume peeked `<`
+			lt_offset := t.offset
 			advance_rune(t)
 
 			open = scan(t)
@@ -337,9 +338,18 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 					}
 
 				case .Open_Bracket:
-					// This could be a CDATA tag part of a tag's body. Unread the `<![`
-					t.offset -= 3
-					t.read_offset = t.offset
+					// Only `<![CDATA[` can be part of a body; any other `<![` is unsupported.
+					// Unread the `<![` and let `parse_body` handle the CDATA.
+					if !strings.has_prefix(t.src[lt_offset:], CDATA_START) {
+						if .Error_On_Unsupported in opts.flags {
+							error(t, lt_offset, "Unhandled: <![\n")
+							return doc, .Unhandled_Bang
+						}
+						skip_element(t) or_return
+						continue loop
+					}
+					t.read_offset = lt_offset
+					advance_rune(t)
 
 					// Instead of calling `parse_body` here, we could also `continue loop`
 					// and fall through to the `case:` at the bottom of the outer loop.
