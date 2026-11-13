@@ -1132,3 +1132,47 @@ unmarshal_integral_floats_wrap_like_integers :: proc(t: ^testing.T) {
 	}
 	free_all(context.temp_allocator)
 }
+
+@(test)
+unmarshal_unsupported_type_field :: proc(t: ^testing.T) {
+	Point :: struct {
+		pos: [2]f64,
+	}
+	Outer :: struct {
+		inner: Point,
+	}
+	Point_Or_Int :: union {
+		Point,
+		int,
+	}
+
+	point: Point
+	err := json.unmarshal_string(`{"pos": ["a", 1]}`, &point)
+	e, is_type := err.(json.Unsupported_Type_Error)
+	testing.expectf(t, is_type, "expected Unsupported_Type_Error, got %v", err)
+	testing.expect_value(t, e.field, "pos")
+	testing.expect_value(t, e.id, [2]f64)
+	delete(e.field)
+
+	outer: Outer
+	err = json.unmarshal_string(`{"inner": {"pos": ["a", 1]}}`, &outer)
+	e, is_type = err.(json.Unsupported_Type_Error)
+	testing.expectf(t, is_type, "expected Unsupported_Type_Error, got %v", err)
+	testing.expect_value(t, e.field, "pos")
+	testing.expect_value(t, e.id, [2]f64)
+	delete(e.field)
+
+	array: [2]f64
+	err = json.unmarshal_string(`["a", 1]`, &array)
+	e, is_type = err.(json.Unsupported_Type_Error)
+	testing.expectf(t, is_type, "expected Unsupported_Type_Error, got %v", err)
+	testing.expect_value(t, e.field, "")
+	testing.expect_value(t, e.id, f64)
+
+	point_or_int: Point_Or_Int
+	err = json.unmarshal_string(`{"pos": ["a", 1]}`, &point_or_int)
+	e, is_type = err.(json.Unsupported_Type_Error)
+	testing.expectf(t, is_type, "expected Unsupported_Type_Error, got %v", err)
+	testing.expect_value(t, e.field, "")
+	testing.expect_value(t, e.id, Point_Or_Int)
+}

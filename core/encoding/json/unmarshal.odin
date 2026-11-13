@@ -18,6 +18,7 @@ Unmarshal_Data_Error :: enum {
 Unsupported_Type_Error :: struct {
 	id:    typeid,
 	token: Token,
+	field: string,
 }
 
 Unmarshal_Error :: union {
@@ -426,7 +427,7 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, token: Token, ti: ^reflect.
 }
 
 unmarshal_value :: proc(p: ^Parser, v: any, flags := Unmarshal_Flags{}) -> (err: Unmarshal_Error) {
-	UNSUPPORTED_TYPE := Unsupported_Type_Error{v.id, p.curr_token}
+	UNSUPPORTED_TYPE := Unsupported_Type_Error{id = v.id, token = p.curr_token}
 	token := p.curr_token
 
 	if _user_unmarshalers != nil {
@@ -460,6 +461,9 @@ unmarshal_value :: proc(p: ^Parser, v: any, flags := Unmarshal_Flags{}) -> (err:
 					tag := any{rawptr(uintptr(v.data) + u.tag_offset), u.tag_type.id}
 					assign_int(tag, raw_tag)
 					return
+				}
+				if e, is_type := err.(Unsupported_Type_Error); is_type {
+					delete(e.field, p.allocator)
 				}
 			}
 			return UNSUPPORTED_TYPE
@@ -630,7 +634,7 @@ json_name_from_tag_value :: proc(value: string) -> (json_name, extra: string) {
 
 @(private)
 unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind, flags: Unmarshal_Flags) -> (err: Unmarshal_Error) {
-	UNSUPPORTED_TYPE := Unsupported_Type_Error{v.id, p.curr_token}
+	UNSUPPORTED_TYPE := Unsupported_Type_Error{id = v.id, token = p.curr_token}
 
 	if end_token == .Close_Brace {
 		unmarshal_expect_token(p, .Open_Brace)
@@ -790,7 +794,14 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind, flags: Unmar
 
 				field_ptr := rawptr(uintptr(v.data) + offset)
 				field := any{field_ptr, type.id}
-				unmarshal_value(p, field, flags) or_return
+				if err = unmarshal_value(p, field, flags); err != nil {
+					if e, is_type := err.(Unsupported_Type_Error); is_type && e.field == "" {
+						e.id    = type.id
+						e.field = clone_string(key, p.allocator) or_return
+						return e
+					}
+					return
+				}
 
 				if parse_comma(p) {
 					break struct_loop
@@ -1021,7 +1032,7 @@ unmarshal_array :: proc(p: ^Parser, v: any, flags: Unmarshal_Flags) -> (err: Unm
 		return nil
 	}
 
-	UNSUPPORTED_TYPE := Unsupported_Type_Error{v.id, p.curr_token}
+	UNSUPPORTED_TYPE := Unsupported_Type_Error{id = v.id, token = p.curr_token}
 
 	ti := reflect.type_info_base(type_info_of(v.id))
 
