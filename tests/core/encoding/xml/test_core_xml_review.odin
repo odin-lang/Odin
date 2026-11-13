@@ -2,6 +2,7 @@ package test_core_xml
 
 import "core:encoding/xml"
 import "core:fmt"
+import "core:io"
 import "core:mem"
 import "core:strings"
 import "core:testing"
@@ -602,5 +603,50 @@ xml_test_review_decode_error_positions :: proc(t: ^testing.T) {
 		xml.destroy(doc)
 		testing.expectf(t, err == c.err, "%q: expected %v, got %v", c.src, c.err, err)
 		testing.expectf(t, last_error_pos.line == c.line && last_error_pos.column == c.column, "%q: expected %v:%v, got %v:%v", c.src, c.line, c.column, last_error_pos.line, last_error_pos.column)
+	}
+}
+
+@(test)
+xml_test_review_debug_print :: proc(t: ^testing.T) {
+	SRC :: "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE a [<!ELEMENT a ANY>]>\n<!--top-->\n<a x=\"1\">t<!--c--><b/></a>"
+	EXPECTED ::
+		"[XML Prolog]\n" +
+		"\tversion: 1.0\n" +
+		"\tencoding: UTF-8\n" +
+		"[Encoding] UTF_8\n" +
+		"[DOCTYPE]  a\n" +
+		"\t[<!ELEMENT a ANY>]\n" +
+		"[Pre-root comment]  top\n" +
+		" --- \n" +
+		"\t<a>\n" +
+		"\t\t[Value] t\n" +
+		"\t\t[COMMENT] c\n" +
+		"\t\t<b>\n" +
+		"\t\t[Attr] x: 1\n" +
+		" --- \n"
+
+	doc, err := xml.parse_string(SRC, xml.Options{flags = {.Intern_Comments}}, error_handler = Silent)
+	defer xml.destroy(doc)
+	testing.expect_value(t, err, xml.Error.None)
+	if err != .None {
+		return
+	}
+
+	b := strings.builder_make()
+	defer strings.builder_destroy(&b)
+	written, print_err := xml.print(strings.to_writer(&b), doc)
+	testing.expect_value(t, print_err, io.Error.None)
+	testing.expect_value(t, strings.to_string(b), EXPECTED)
+	testing.expect_value(t, written, len(EXPECTED))
+
+	expected := EXPECTED
+	for size in 0..<len(expected) {
+		buf := make([]u8, size)
+		defer delete(buf)
+		fixed := strings.builder_from_bytes(buf)
+		n, n_err := xml.print(strings.to_writer(&fixed), doc)
+		testing.expectf(t, n_err != .None, "size %v: expected a write error", size)
+		testing.expectf(t, n == strings.builder_len(fixed), "size %v: written %v, but %v bytes in the buffer", size, n, strings.builder_len(fixed))
+		testing.expectf(t, strings.to_string(fixed) == expected[:n], "size %v: output %q", size, strings.to_string(fixed))
 	}
 }

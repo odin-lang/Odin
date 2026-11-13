@@ -191,7 +191,7 @@ xml_test_entities_bare_ampersand :: proc(t: ^testing.T) {
 			expected_doctype = "html",
 		},
 		err       = .Invalid_Token,
-		crc32     = 0x1b6e7146,
+		crc32     = 0x21791738,
 	})
 }
 
@@ -206,7 +206,7 @@ xml_test_entities_decode :: proc(t: ^testing.T) {
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0xafc3144c,
+		crc32     = 0xa6fe0a49,
 	})
 }
 
@@ -221,7 +221,7 @@ xml_test_entities_trim_whitespace :: proc(t: ^testing.T) {
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0xa6a8a65b,
+		crc32     = 0x7aa5f81e,
 	})
 }
 
@@ -531,7 +531,13 @@ doc_to_string :: proc(doc: ^xml.Document, capacity: int) -> (result: string) {
 			}
 		} else if element.kind == .Comment {
 			// PERF: Cold
-			fmt.sbprintf(writer, "[COMMENT] %v\n", element.value)
+			strings.write_string(writer, "[COMMENT] ")
+			for value in element.value {
+				if text, is_text := value.(string); is_text {
+					strings.write_string(writer, text)
+				}
+			}
+			strings.write_string(writer, "\n")
 		}
 	}
 
