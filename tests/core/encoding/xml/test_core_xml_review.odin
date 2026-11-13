@@ -353,6 +353,8 @@ xml_test_review_tag_syntax :: proc(t: ^testing.T) {
 		{src = "<a b='x\"y' c=\"x'y\"/>",  tree = `a[b="x\"y" c="x'y"]{}`},
 		{src = "<a b=\"]]>\"/>",           tree = `a[b="]]>"]{}`},
 		{src = "<a b=1/>",                 err  = .Unexpected_Token},
+		{src = "<a \"x\"></a>",            err  = .Unexpected_Token},
+		{src = "<a b=\"c\" =></a>",        err  = .Unexpected_Token},
 		{src = "<a b=\"1",                 err  = .Premature_EOF},
 		{src = "<a>x]]>y</a>",             err  = .Unexpected_Token},
 		{src = "<a><![CDATA[x]]>]]></a>",  err  = .Unexpected_Token},
@@ -660,5 +662,84 @@ xml_test_review_debug_print :: proc(t: ^testing.T) {
 		testing.expectf(t, n_err != .None, "size %v: expected a write error", size)
 		testing.expectf(t, n == strings.builder_len(fixed), "size %v: written %v, but %v bytes in the buffer", size, n, strings.builder_len(fixed))
 		testing.expectf(t, strings.to_string(fixed) == expected[:n], "size %v: output %q", size, strings.to_string(fixed))
+	}
+}
+
+@(test)
+xml_test_review_find_child_by_ident :: proc(t: ^testing.T) {
+	SRC :: `<a>t<b i="0"/><!--c--><c/><b i="1"><b i="x"/></b><b i="2"/></a>`
+
+	doc, err := xml.parse_string(SRC, xml.Options{flags = {.Intern_Comments}}, error_handler = Silent)
+	defer xml.destroy(doc)
+	testing.expect_value(t, err, xml.Error.None)
+	if err != .None {
+		return
+	}
+
+	b1, b1_found := xml.find_child_by_ident(doc, 0, "b", 1)
+	c,  c_found  := xml.find_child_by_ident(doc, 0, "c")
+	testing.expect(t, b1_found && c_found)
+
+	Find_Case :: struct {
+		parent: xml.Element_ID,
+		ident:  string,
+		nth:    int,
+		want:   string,
+	}
+	cases := [?]Find_Case{
+		{0,  "b", 0, "b0"},
+		{0,  "b", 1, "b1"},
+		{0,  "b", 2, "b2"},
+		{0,  "b", 3, ""},
+		{0,  "c", 0, "c"},
+		{0,  "c", 1, ""},
+		{0,  "",  0, ""},
+		{0,  "t", 0, ""},
+		{0,  "a", 0, ""},
+		{0,  "B", 0, ""},
+		{b1, "b", 0, "bx"},
+		{b1, "b", 1, ""},
+		{c,  "b", 0, ""},
+	}
+	for f in cases {
+		id, found := xml.find_child_by_ident(doc, f.parent, f.ident, f.nth)
+		got := ""
+		if found {
+			i, _ := xml.find_attribute_val_by_key(doc, id, "i")
+			got = fmt.tprintf("%v%v", doc.elements[id].ident, i)
+		}
+		testing.expectf(t, found == (f.want != "") && got == f.want, "%v %q %v: expected %q, got %q (found = %v)", f.parent, f.ident, f.nth, f.want, got, found)
+	}
+}
+
+@(test)
+xml_test_review_find_attribute_val_by_key :: proc(t: ^testing.T) {
+	SRC :: `<a k="v" e="" amp="x&amp;y" K="upper"><b/></a>`
+
+	doc, err := xml.parse_string(SRC, error_handler = Silent)
+	defer xml.destroy(doc)
+	testing.expect_value(t, err, xml.Error.None)
+	if err != .None {
+		return
+	}
+
+	Key_Case :: struct {
+		parent: xml.Element_ID,
+		key:    string,
+		val:    string,
+		found:  bool,
+	}
+	cases := [?]Key_Case{
+		{0, "k",   "v",     true},
+		{0, "e",   "",      true},
+		{0, "amp", "x&y",   true},
+		{0, "K",   "upper", true},
+		{0, "x",   "",      false},
+		{0, "",    "",      false},
+		{1, "k",   "",      false},
+	}
+	for c in cases {
+		val, found := xml.find_attribute_val_by_key(doc, c.parent, c.key)
+		testing.expectf(t, val == c.val && found == c.found, "%v %q: expected %q %v, got %q %v", c.parent, c.key, c.val, c.found, val, found)
 	}
 }
