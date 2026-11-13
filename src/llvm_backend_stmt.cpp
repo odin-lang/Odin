@@ -2805,20 +2805,17 @@ gb_internal void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice
 
 	bool prev_in_assignment = p->in_multi_assignment;
 
-	isize lval_count = 0;
 	isize first_lval = -1;
 	for_array(i, lvals) {
 		if (lvals[i].addr.value != nullptr) {
 			// check if it is not a blank identifier
-			if (first_lval < 0) {
-				first_lval = i;
-			}
-			lval_count += 1;
+			first_lval = i;
+			break;
 		}
 	}
 
 	GB_ASSERT(lvals.count == inits.count);
-	bool multi = lval_count > 1;
+	bool multi = inits.count > 1;
 	auto store_from_memory = slice_make<bool>(temporary_allocator(), inits.count);
 	auto copy_slots = slice_make<isize>(temporary_allocator(), inits.count);
 	for_array(i, copy_slots) {

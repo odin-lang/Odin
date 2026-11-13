@@ -143,11 +143,13 @@ foreign user32 {
 	GetDCEx     :: proc(hWnd: HWND, hrgnClip: HRGN, flags: DWORD) -> HDC ---
 	ReleaseDC   :: proc(hWnd: HWND, hDC: HDC) -> INT ---
 
-	GetDlgCtrlID     :: proc(hWnd: HWND) -> INT ---
-	GetDlgItem       :: proc(hDlg: HWND, nIDDlgItem: INT) -> HWND ---
-	GetDlgItemTextW  :: proc(hDlg: HWND, nIDDlgItem: INT, lpString: LPWSTR, cchMax: INT) -> UINT ---
-	SetDlgItemTextW  :: proc(hDlg: HWND, nIDDlgItem: INT, lpString: LPCWSTR) -> BOOL ---
-	CheckRadioButton :: proc(hDlg: HWND, nIDFirstButton: INT, nIDLastButton: INT, nIDCheckButton: INT) -> BOOL ---
+	GetDlgCtrlID       :: proc(hWnd: HWND) -> INT ---
+	GetDlgItem         :: proc(hDlg: HWND, nIDDlgItem: INT) -> HWND ---
+	GetDlgItemTextW    :: proc(hDlg: HWND, nIDDlgItem: INT, lpString: LPWSTR, cchMax: INT) -> UINT ---
+	SetDlgItemTextW    :: proc(hDlg: HWND, nIDDlgItem: INT, lpString: LPCWSTR) -> BOOL ---
+	CheckDlgButton     :: proc(hDlg: HWND, nIDButton: INT, uCheck: UINT) -> BOOL ---
+	CheckRadioButton   :: proc(hDlg: HWND, nIDFirstButton: INT, nIDLastButton: INT, nIDCheckButton: INT) -> BOOL ---
+	IsDlgButtonChecked :: proc(hDlg: HWND, nIDButton: c_int) -> UINT ---
 
 	CreateMenu             :: proc() -> HMENU ---
 	CreatePopupMenu        :: proc() -> HMENU ---
@@ -1290,3 +1292,44 @@ DEV_BROADCAST_DEVICEINTERFACE_W :: struct {
 	dbcc_name:       [1]WCHAR,
 }
 PDEV_BROADCAST_DEVICEINTERFACE_W :: ^DEV_BROADCAST_DEVICEINTERFACE_W
+
+// Dialog style flags
+DS_ABSALIGN      :: 0x01
+DS_SETFONT       :: 0x40
+DS_MODALFRAME    :: 0x80
+DS_NOIDLEMSG     :: 0x100
+DS_SETFOREGROUND :: 0x200
+DS_FIXEDSYS      :: 0x0008
+DS_NOFAILCREATE  :: 0x0010
+DS_CONTROL       :: 0x0400
+DS_CENTER        :: 0x0800
+DS_CENTERMOUSE   :: 0x1000
+DS_CONTEXTHELP   :: 0x2000
+
+DS_SHELLFONT :: DS_SETFONT | DS_FIXEDSYS
+
+DLGTEMPLATE :: struct #max_field_align(2) {
+	style:			DWORD,
+	dwExtendedStyle:	DWORD,
+	cdit:            WORD,
+	x, y, cx, cy:    c_short,
+}
+
+DLGITEMTEMPLATE :: struct #max_field_align(2) {
+	style:           DWORD,
+	dwExtendedStyle: DWORD,
+	x, y, cx, cy:    c_short,
+	id:              WORD,
+}
+
+DLGPROC :: #type proc "system" (HWND, UINT, WPARAM, LPARAM) -> INT_PTR
+
+@(default_calling_convention="system")
+foreign user32 {
+	DialogBoxIndirectParamW :: proc(
+		hInstance:        HINSTANCE,
+		hDialogTemplate: ^DLGTEMPLATE,
+		hWndParent:       HWND,
+		lpDialogFunc:     DLGPROC,
+		dwInitParam:      LPARAM) -> INT_PTR ---
+}
