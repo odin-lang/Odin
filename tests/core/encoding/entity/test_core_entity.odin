@@ -264,3 +264,62 @@ test_unescape_html :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@(test)
+test_percent_encode :: proc(t: ^testing.T) {
+	Encode_Case :: struct {
+		src: string,
+		out: string,
+	}
+	cases := [?]Encode_Case{
+		{"",                      ""},
+		{"azAZ09-._~",            "azAZ09-._~"},
+		{"a b",                   "a%20b"},
+		{"%",                     "%25"},
+		{"+",                     "%2B"},
+		{":/?#[]@!$&'()*,;=",     "%3A%2F%3F%23%5B%5D%40%21%24%26%27%28%29%2A%2C%3B%3D"},
+		{"\u00fc",                "%C3%BC"},
+		{"\xff\x00",              "%FF%00"},
+	}
+	for c in cases {
+		out, allocated, err := entity.percent_encode(c.src)
+		testing.expect_value(t, err, nil)
+		testing.expectf(t, out == c.out, "%q: expected %q, got %q", c.src, c.out, out)
+		testing.expectf(t, allocated == (c.src != c.out), "%q: allocated = %v", c.src, allocated)
+		if allocated {
+			delete(out)
+		}
+	}
+}
+
+@(test)
+test_percent_decode :: proc(t: ^testing.T) {
+	Decode_Percent_Case :: struct {
+		src: string,
+		out: string,
+		err: entity.Percent_Error,
+	}
+	cases := [?]Decode_Percent_Case{
+		{"",             "",          nil},
+		{"plain+text",   "plain+text", nil},
+		{"a%20b",        "a b",       nil},
+		{"%c3%bc%C3%BC", "\u00fc\u00fc", nil},
+		{"%25%32%35",    "%25",       nil},
+		{"%FF%00",       "\xff\x00",  nil},
+		{"%",            "",          entity.Error.Invalid_Entity_Encoding},
+		{"a%2",          "",          entity.Error.Invalid_Entity_Encoding},
+		{"%%",           "",          entity.Error.Invalid_Entity_Encoding},
+		{"%zz",          "",          entity.Error.Invalid_Entity_Encoding},
+		{"%0x41",        "",          entity.Error.Invalid_Entity_Encoding},
+		{"%+1",          "",          entity.Error.Invalid_Entity_Encoding},
+	}
+	for c in cases {
+		out, allocated, err := entity.percent_decode(c.src)
+		testing.expectf(t, err == c.err, "%q: expected %v, got %v", c.src, c.err, err)
+		testing.expectf(t, out == c.out, "%q: expected %q, got %q", c.src, c.out, out)
+		testing.expectf(t, allocated == (err == nil && c.src != c.out), "%q: allocated = %v", c.src, allocated)
+		if allocated {
+			delete(out)
+		}
+	}
+}

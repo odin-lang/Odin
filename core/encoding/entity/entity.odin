@@ -25,6 +25,7 @@ import "base:runtime"
 import "core:unicode/utf8"
 import "core:unicode"
 import "core:strings"
+import "core:encoding/hex"
 
 MAX_RUNE_CODEPOINT :: int(unicode.MAX_RUNE)
 
@@ -43,6 +44,11 @@ Error :: enum u8 {
 	Invalid_Entity_Encoding,
 	Unknown_Entity,
 	Buffer_Too_Small,
+}
+
+Percent_Error :: union #shared_nil {
+	runtime.Allocator_Error,
+	Error,
 }
 
 Tokenizer :: struct {
@@ -407,6 +413,71 @@ encode_runes :: proc(b: ^[8]byte, r: [2]rune, n: int) -> (w: int) {
 @(private="file")
 is_ascii_alphanumeric :: #force_inline proc(c: u8) -> bool {
 	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+}
+
+// Unlike `net.percent_encode`, this encodes bytes rather than runes, so invalid UTF-8 survives a round trip
+// instead of turning into `%EF%BF%BD`, and it returns `s` itself, without allocating, when nothing needs escaping.
+@(require_results)
+percent_encode :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (output: string, was_allocation: bool, err: runtime.Allocator_Error) {
+	escaped := 0
+	for i in 0..<len(s) {
+		if !is_unreserved(s[i]) {
+			escaped += 1
+		}
+	}
+	if escaped == 0 {
+		return s, false, nil
+	}
+
+	b := strings.builder_make(0, len(s) + 2 * escaped, allocator, loc) or_return
+	w := strings.to_writer(&b)
+	for i in 0..<len(s) {
+		if is_unreserved(s[i]) {
+			strings.write_byte(&b, s[i])
+		} else {
+			strings.write_byte(&b, '%')
+			hex.encode_upper_into_writer(w, transmute([]byte)s[i:i + 1])
+		}
+	}
+	assert(len(b.buf) == cap(b.buf))
+	return strings.to_string(b), true, nil
+}
+
+// Unlike `net.percent_decode`, `%%` is `.Invalid_Entity_Encoding` instead of `%`, allocation failures are returned,
+// and `s` itself is returned, without allocating, when it holds no `%`.
+@(require_results)
+percent_decode :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (output: string, was_allocation: bool, err: Percent_Error) {
+	escaped := 0
+	for i := 0; i < len(s); i += 1 {
+		if s[i] == '%' {
+			if _, ok := hex.decode_sequence(s[i + 1:min(i + 3, len(s))]); !ok {
+				return "", false, .Invalid_Entity_Encoding
+			}
+			escaped += 1
+			i += 2
+		}
+	}
+	if escaped == 0 {
+		return s, false, nil
+	}
+
+	buf := make([]byte, len(s) - 2 * escaped, allocator, loc) or_return
+	w := 0
+	for i := 0; i < len(s); i += 1 {
+		if s[i] == '%' {
+			buf[w], _ = hex.decode_sequence(s[i + 1:i + 3])
+			i += 2
+		} else {
+			buf[w] = s[i]
+		}
+		w += 1
+	}
+	return string(buf), true, nil
+}
+
+@(private="file")
+is_unreserved :: #force_inline proc(c: u8) -> bool {
+	return is_ascii_alphanumeric(c) || c == '-' || c == '.' || c == '_' || c == '~'
 }
 
 @(private="file")
