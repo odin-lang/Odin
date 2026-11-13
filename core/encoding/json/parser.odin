@@ -53,7 +53,12 @@ parse_string :: proc(data: string, spec := DEFAULT_SPECIFICATION, parse_integers
 
 	switch p.spec {
 	case .JSON:
-		return parse_value(&p, loc)
+		value, err := parse_value(&p, loc)
+		if err == nil && !at_end(&p) {
+			destroy_value(value, allocator, loc)
+			return nil, .Unexpected_Token
+		}
+		return value, err
 	case .JSON5:
 		return parse_value(&p, loc)
 	case .SJSON:
@@ -125,10 +130,38 @@ parse_comma :: proc(p: ^Parser) -> (do_break: bool) {
 	return false
 }
 
+// Like `expect_token`, but under `.JSON` a comma before the closing token is an error.
+@(private, require_results)
+expect_closing_token :: proc(p: ^Parser, kind: Token_Kind) -> Error {
+	if p.spec == .JSON && p.prev_token.kind == .Comma {
+		advance_token(p)
+		return .Unexpected_Token
+	}
+	return expect_token(p, kind)
+}
+
+// Whether the current token is `.EOF` with nothing but NULs after it.
+@(private, require_results)
+at_end :: proc(p: ^Parser) -> bool {
+	if p.curr_token.kind != .EOF {
+		return false
+	}
+	for i in p.curr_token.offset..<len(p.tok.data) {
+		if p.tok.data[i] != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 @(require_results)
 parse_value :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: Error) {
 	err = .None
 	token := p.curr_token
+	if p.spec == .JSON && p.curr_token_err == .Invalid_Number {
+		advance_token(p)
+		return nil, .Invalid_Number
+	}
 	#partial switch token.kind {
 	case .Null:
 		advance_token(p)
@@ -197,15 +230,22 @@ parse_value :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: 
 }
 
 @(private, require_results)
-skip_value :: proc(p: ^Parser, check_strings := false) -> Error {
+skip_value :: proc(p: ^Parser, check_tokens := false) -> Error {
 	#partial switch p.curr_token.kind {
-	case .Null, .False, .True, .Integer, .Float:
+	case .Null, .False, .True:
 		advance_token(p)
+		return nil
+	case .Integer, .Float:
+		invalid := p.spec == .JSON && p.curr_token_err == .Invalid_Number
+		advance_token(p)
+		if check_tokens && invalid {
+			return .Invalid_Number
+		}
 		return nil
 	case .String:
 		invalid := p.curr_token_err == .Invalid_String
 		advance_token(p)
-		if check_strings && invalid {
+		if check_tokens && invalid {
 			return .Invalid_String
 		}
 		return nil
@@ -217,30 +257,30 @@ skip_value :: proc(p: ^Parser, check_strings := false) -> Error {
 	case .Open_Brace:
 		expect_token(p, .Open_Brace) or_return
 		for p.curr_token.kind != .Close_Brace {
-			if check_strings && p.curr_token_err == .Invalid_String {
+			if check_tokens && p.curr_token_err == .Invalid_String {
 				return .Invalid_String
 			}
 			if !(p.spec != .JSON && allow_token(p, .Ident)) && expect_token(p, .String) != nil {
 				return .Expected_String_For_Object_Key
 			}
-			parse_colon(p)                or_return
-			skip_value (p, check_strings) or_return
+			parse_colon(p)               or_return
+			skip_value (p, check_tokens) or_return
 
 			if parse_comma(p) {
 				break
 			}
 		}
-		return expect_token(p, .Close_Brace)
+		return expect_closing_token(p, .Close_Brace)
 	case .Open_Bracket:
 		expect_token(p, .Open_Bracket) or_return
 		for p.curr_token.kind != .Close_Bracket {
-			skip_value(p, check_strings) or_return
+			skip_value(p, check_tokens) or_return
 
 			if parse_comma(p) {
 				break
 			}
 		}
-		return expect_token(p, .Close_Bracket)
+		return expect_closing_token(p, .Close_Bracket)
 	case:
 		if p.spec != .JSON && (allow_token(p, .Infinity) || allow_token(p, .NaN)) {
 			return nil
@@ -273,7 +313,7 @@ parse_array :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: 
 		}
 	}
 
-	expect_token(p, .Close_Bracket) or_return
+	expect_closing_token(p, .Close_Bracket) or_return
 	value = array
 	return
 }
@@ -400,7 +440,10 @@ parse_object_body :: proc(p: ^Parser, end_token: Token_Kind, loc := #caller_loca
 parse_object :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: Error) {
 	expect_token(p, .Open_Brace) or_return
 	obj := parse_object_body(p, .Close_Brace, loc) or_return
-	expect_token(p, .Close_Brace) or_return
+	if err = expect_closing_token(p, .Close_Brace); err != nil {
+		destroy_value(obj, p.allocator, loc)
+		return nil, err
+	}
 	return obj, .None
 }
 

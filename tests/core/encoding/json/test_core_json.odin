@@ -1176,3 +1176,87 @@ unmarshal_unsupported_type_field :: proc(t: ^testing.T) {
 	testing.expect_value(t, e.field, "")
 	testing.expect_value(t, e.id, Point_Or_Int)
 }
+
+@(test)
+strict_json :: proc(t: ^testing.T) {
+	// `.JSON` rejects trailing commas, data after the value and malformed numbers, whether the
+	// syntax is checked up front, by `parse`, or while unmarshalling with `.Skip_Validation`.
+	Named :: struct {
+		name: string,
+		x:    int,
+		list: []int,
+	}
+
+	invalid := []struct {
+		src: string,
+		err: json.Error,
+	}{
+		{`{"x": 1,}`,            .Unexpected_Token},
+		{`{"list": [1,]}`,       .Unexpected_Token},
+		{`{"other": [1,]}`,      .Unexpected_Token},
+		{`{"other": {"a": 1,}}`, .Unexpected_Token},
+		{`{"x": 1} x`,           .Unexpected_Token},
+		{`{"x": 1}}`,            .Unexpected_Token},
+		{`{"x": 1}{"x": 2}`,     .Unexpected_Token},
+		{"{\"x\": 1}\x00x",      .Unexpected_Token},
+		{`{"x": 01}`,            .Invalid_Number},
+		{`{"x": -01}`,           .Invalid_Number},
+		{`{"x": 1.}`,            .Invalid_Number},
+		{`{"x": 1e}`,            .Invalid_Number},
+		{`{"x": 1e+}`,           .Invalid_Number},
+		{`{"x": 1.e5}`,          .Invalid_Number},
+		{`{"list": [01]}`,       .Invalid_Number},
+		{`{"other": 01}`,        .Invalid_Number},
+	}
+	for c in invalid {
+		testing.expectf(t, !json.is_valid(transmute([]byte)c.src, .JSON), "%q: is_valid accepted it", c.src)
+
+		value, err := json.parse_string(c.src, .JSON)
+		json.destroy_value(value)
+		testing.expectf(t, err == c.err, "%q: expected %v from parse, got %v", c.src, c.err, err)
+
+		n: Named
+		uerr := json.unmarshal_string(c.src, &n, .JSON)
+		testing.expectf(t, uerr == json.Unmarshal_Data_Error.Invalid_Data, "%q: expected Invalid_Data, got %v", c.src, uerr)
+		delete(n.list)
+
+		n = {}
+		uerr = json.unmarshal_string(c.src, &n, .JSON, flags = {.Skip_Validation})
+		testing.expectf(t, uerr == c.err, "%q: expected %v with .Skip_Validation, got %v", c.src, c.err, uerr)
+		delete(n.list)
+	}
+
+	valid := []string{
+		`{"x": 0, "list": [10, -1], "other": [1.5e-3, {"a": 0}, []]}`,
+		"{\"x\": 1}\x00\x00",
+		` {"name": "éꯍ"} `,
+	}
+	for src in valid {
+		testing.expectf(t, json.is_valid(transmute([]byte)src, .JSON), "%q: is_valid rejected it", src)
+
+		value, err := json.parse_string(src, .JSON)
+		json.destroy_value(value)
+		testing.expectf(t, err == nil, "%q: parse returned %v", src, err)
+
+		for flags in ([]json.Unmarshal_Flags{{}, {.Skip_Validation}}) {
+			n: Named
+			uerr := json.unmarshal_string(src, &n, .JSON, flags = flags)
+			testing.expectf(t, uerr == nil, "%q: unmarshal with %v returned %v", src, flags, uerr)
+			delete(n.name)
+			delete(n.list)
+		}
+	}
+
+	bad_escape := `{"name": "\uzzzz"}`
+	testing.expect(t, !json.is_valid(transmute([]byte)bad_escape, .JSON5))
+	n: Named
+	err := json.unmarshal_string(bad_escape, &n, .JSON, flags = {.Skip_Validation})
+	testing.expectf(t, err == json.Error.Invalid_String, "expected Invalid_String, got %v", err)
+
+	trailing := `{"x": 1, "list": [1, 2,],}`
+	testing.expect(t, json.is_valid(transmute([]byte)trailing, .JSON5))
+	n = {}
+	testing.expect_value(t, json.unmarshal_string(trailing, &n, .JSON5), nil)
+	testing.expect_value(t, len(n.list), 2)
+	delete(n.list)
+}
