@@ -605,81 +605,6 @@ gb_internal void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, Str
 	array_add(build_flags, flag);
 }
 
-// A value such as `1e-5` is a float, not an integer. Base prefixed literals are excluded because
-// `e` is a valid digit in bases 16 and above, e.g. `0x1e`.
-gb_internal bool build_param_looks_like_float(String const &param) {
-	if (string_contains_char(param, '.')) {
-		return true;
-	}
-	isize i = 0;
-	if (param.len > 0 && (param[0] == '-' || param[0] == '+')) {
-		i = 1;
-	}
-	if (param.len > i+1 && param[i] == '0' && !gb_char_is_digit(cast(char)param[i+1])) {
-		return false;
-	}
-	for (; i < param.len; i++) {
-		if (param[i] == 'e' || param[i] == 'E') {
-			return true;
-		}
-	}
-	return false;
-}
-
-gb_internal ExactValue build_param_to_exact_value(String name, String param) {
-	ExactValue value = {};
-
-	/*
-		Bail out on an empty param string
-	*/
-	if (param.len == 0) {
-		gb_printf_err("Invalid flag parameter for '%.*s' = '%.*s'\n", LIT(name), LIT(param));
-		return value;
-	}
-
-	/*
-		Attempt to parse as bool first.
-	*/
-	if (str_eq_ignore_case(param, str_lit("t")) || str_eq_ignore_case(param, str_lit("true"))) {
-		return exact_value_bool(true);
-	}
-	if (str_eq_ignore_case(param, str_lit("f")) || str_eq_ignore_case(param, str_lit("false"))) {
-		return exact_value_bool(false);
-	}
-
-	/*
-		Try to parse as an integer or float
-	*/
-	if (param[0] == '-' || param[0] == '+' || gb_is_between(param[0], '0', '9')) {
-		if (build_param_looks_like_float(param)) {
-			value = exact_value_float_from_string(param);
-		} else {
-			value = exact_value_integer_from_string(param);
-		}
-		if (value.kind != ExactValue_Invalid) {
-			return value;
-		}
-	}
-
-	/*
-		Treat the param as a string literal,
-		optionally be quoted in '' to avoid being parsed as a bool, integer or float.
-	*/
-	value = exact_value_string(param);
-
-	if (param[0] == '\'' && value.kind == ExactValue_String) {
-		String s = value.value_string;
-		if (s.len > 1 && s[0] == '\'' && s[s.len-1] == '\'') {
-			value.value_string = substring(s, 1, s.len-1);
-		}
-	}
-
-	if (value.kind != ExactValue_String) {
-		gb_printf_err("Invalid flag parameter for '%.*s' = '%.*s'\n", LIT(name), LIT(param));
-	}
-	return value;
-}
-
 // Writes a did-you-mean message for formerly deprecated flags.
 gb_internal void did_you_mean_flag(String flag) {
 	gbAllocator a = heap_allocator();
@@ -1302,7 +1227,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							}
 							String name = substring(str, 0, eq_pos);
 							String value = substring(str, eq_pos+1, str.len);
-							if (name.len == 0 || value.len == 0) {
+							if (name.len == 0) {
 								gb_printf_err("Expected 'name=value', got '%.*s'\n", LIT(param));
 								bad_flags = true;
 								break;
@@ -1328,13 +1253,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								break;
 							}
 
-							ExactValue v = build_param_to_exact_value(name, value);
-							if (v.kind != ExactValue_Invalid) {
-								map_set(&build_context.defined_values, key, v);
-							} else {
-								gb_printf_err("Invalid define constant value: '%.*s'. Define constants must be a valid Odin literal.\n", LIT(value));
-								bad_flags = true;
-							}
+							map_set(&build_context.defined_values, key, value);
 
 							break;
 						}
@@ -2304,8 +2223,6 @@ gb_internal void timings_export_all(Timings *t, Checker *c, bool timings_are_fin
 gb_internal void check_defines(BuildContext *bc, Checker *c) {
 	for (auto const &entry : bc->defined_values) {
 		String name = make_string_c(entry.key);
-		ExactValue value = entry.value;
-		GB_ASSERT(value.kind != ExactValue_Invalid);
 
 		bool found = false;
 		for_array(i, c->info.defineables) {
@@ -3126,7 +3043,12 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 
 		if (print_flag("-define:<name>=<value>")) {
-			print_usage_line(2, "Defines a scalar boolean, integer, string or enum as global constant.");
+			print_usage_line(2, "Sets the value of '#config(<name>, default_value)'.");
+			print_usage_line(2, "The value is kept as text, and each '#config' parses it by the type of its default value:");
+				print_usage_line(3, "string: the text as given, which may be empty");
+				print_usage_line(3, "boolean: 'true' or 'false'");
+				print_usage_line(3, "integer or float: an Odin number literal, e.g. 123, -0x7f, 1_000, 1.5e3");
+				print_usage_line(3, "enum: the name of one of its fields");
 			print_usage_line(2, "Example: -define:SPAM=123");
 			print_usage_line(2, "Usage in code:");
 				print_usage_line(3, "#config(SPAM, default_value)");

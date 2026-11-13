@@ -1235,7 +1235,6 @@ gb_internal void init_universal(void) {
 
 	builtin_pkg    = create_builtin_package("builtin");
 	intrinsics_pkg = create_builtin_package("intrinsics");
-	config_pkg     = create_builtin_package("config");
 
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
@@ -1597,43 +1596,6 @@ gb_internal void init_universal(void) {
 		Entity *entity = alloc_entity(Entity_Builtin, nullptr, make_token_ident(name), t_invalid);
 		entity->Builtin.id = id;
 		add_global_entity(entity, builtin_pkg->scope);
-	}
-
-	bool defined_values_double_declaration = false;
-	for (auto const &entry : bc->defined_values) {
-		char const *name = entry.key;
-		ExactValue value = entry.value;
-		GB_ASSERT(value.kind != ExactValue_Invalid);
-
-		Type *type = nullptr;
-		switch (value.kind) {
-		case ExactValue_Bool:
-			type = t_untyped_bool;
-			break;
-		case ExactValue_String:
-			type = t_untyped_string;
-			break;
-		case ExactValue_Integer:
-			type = t_untyped_integer;
-			break;
-		case ExactValue_Float:
-		case ExactValue_Rational:
-			type = t_untyped_float;
-			break;
-		}
-		GB_ASSERT(type != nullptr);
-
-		Entity *entity = alloc_entity_constant(nullptr, make_token_ident(name), type, value);
-		entity->state = EntityState_Resolved;
-		if (scope_insert(config_pkg->scope, entity)) {
-			error(entity->token, "'%s' defined as an argument is already declared at the global scope", name);
-			defined_values_double_declaration = true;
-			// NOTE(bill): Just exit early before anything, even though the compiler will do that anyway
-		}
-	}
-
-	if (defined_values_double_declaration) {
-		exit_with_errors();
 	}
 
 
@@ -8238,7 +8200,6 @@ gb_internal void check_parsed_files(Checker *c) {
 	}
 	builtin_pkg->scope->flags    |= ScopeFlag_ReadOnly;
 	intrinsics_pkg->scope->flags |= ScopeFlag_ReadOnly;
-	config_pkg->scope->flags     |= ScopeFlag_ReadOnly;
 
 	TIME_SECTION("add entities from queues");
 	check_merge_queues_into_arrays(c);
