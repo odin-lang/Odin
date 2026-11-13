@@ -1230,7 +1230,7 @@ scrub :: proc(s: []byte, replacement: []byte, allocator := context.allocator, lo
 reverse :: proc(s: []byte, allocator := context.allocator, loc := #caller_location) -> []byte {
 	str := s
 	n := len(str)
-	buf := make([]byte, n, loc=loc)
+	buf := make([]byte, n, allocator, loc=loc)
 	i := n
 
 	for len(str) > 0 {
