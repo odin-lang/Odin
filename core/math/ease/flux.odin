@@ -115,10 +115,6 @@ flux_update :: proc(flux: ^Flux_Map($T), dt: f64) where intrinsics.type_is_float
 				continue
 			}
 
-			// TODO-UPDATE-COMMENT: `elapsed` now keeps what is left of `dt` after the delay, not the part the delay consumed
-			// ---
-			// We finished the delay, but in doing so consumed part of this frame's `dt` budget.
-			// Keep track of it so we can apply it to this tween without affecting others.
 			elapsed = dt - tween.delay
 			// We're done with this delay.
 			tween.delay = 0
@@ -137,11 +133,6 @@ flux_update :: proc(flux: ^Flux_Map($T), dt: f64) where intrinsics.type_is_float
 			}
 		}
 
-		// TODO-UPDATE-COMMENT: `delay_remainder` is gone; `elapsed` is already what is left of `dt`
-		// ---
-		// If part of the `dt` budget was consumed this frame, then `delay_remainder` will be
-		// that remainder, a negative value. Adding it to `dt` applies what's left of the `dt`
-		// to the tween so it advances properly, instead of too much or little.
 		tween.progress += tween.rate * elapsed
 		if tween.progress >= 1 {
 			tween.value^ = tween.goal
@@ -158,9 +149,6 @@ flux_update :: proc(flux: ^Flux_Map($T), dt: f64) where intrinsics.type_is_float
 		}
 
 		if tween.progress >= 1 {
-			// TODO-UPDATE-COMMENT: a finished tween is now deleted right away, before `on_complete`
-			// ---
-			// append keys to array that will be deleted after the loop
 			on_complete, data := tween.on_complete, tween.data
 			delete_key(&flux.values, key)
 
