@@ -305,18 +305,10 @@ is_valid_identifier_rune :: proc(r: rune) -> bool {
 }
 
 scan_identifier :: proc(t: ^Tokenizer) -> string {
-	offset     := t.offset
-	namespaced := false
+	offset := t.offset
 
 	for is_valid_identifier_rune(t.ch) {
 		advance_rune(t)
-		if t.ch == ':' {
-			// A namespaced attr can have at most two parts, `namespace:ident`.
-			if namespaced {
-				break	
-			}
-			namespaced = true
-		}
 	}
 	return string(t.src[offset : t.offset])
 }
