@@ -29,6 +29,10 @@ EV_RLSD                    :: DWORD(0x0020)
 EV_RXCHAR                  :: DWORD(0x0001)
 EV_RXFLAG                  :: DWORD(0x0002)
 EV_TXEMPTY                 :: DWORD(0x0004)
+PURGE_TXABORT              :: DWORD(0x0001)
+PURGE_RXABORT              :: DWORD(0x0002)
+PURGE_TXCLEAR              :: DWORD(0x0004)
+PURGE_RXCLEAR              :: DWORD(0x0008)
 
 WAITORTIMERCALLBACK :: #type proc "system" (lpParameter: PVOID, TimerOrWaitFired: BOOLEAN)
 
@@ -136,6 +140,7 @@ foreign kernel32 {
 	SetCommMask         :: proc(handle: HANDLE, dwEvtMap: DWORD) -> BOOL ---
 	GetCommMask         :: proc(handle: HANDLE, lpEvtMask: LPDWORD) -> BOOL ---
 	WaitCommEvent       :: proc(handle: HANDLE, lpEvtMask: LPDWORD, lpOverlapped: LPOVERLAPPED) -> BOOL ---
+	PurgeComm           :: proc(hFile: HANDLE, dwFlags: DWORD) -> BOOL ---
 	GetCommandLineW     :: proc() -> LPCWSTR ---
 	GetTempPathW        :: proc(nBufferLength: DWORD, lpBuffer: LPCWSTR) -> DWORD ---
 	GetTempFileNameW    :: proc(lpPathName: LPCWSTR, lpPrefixString: LPCWSTR, uUnique: c_int, lpTempFileName: LPWSTR) -> c_uint ---
