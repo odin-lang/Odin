@@ -129,7 +129,6 @@ Encoding :: enum {
 Error :: enum {
 	// General return values.
 	None = 0,
-	General_Error,
 	Unexpected_Token,
 	Invalid_Token,
 
@@ -157,11 +156,9 @@ Error :: enum {
 	Mismatched_Closing_Tag,
 
 	Unclosed_Comment,
-	Comment_Before_Root_Element,
 	Invalid_Sequence_In_Comment,
 
 	Unsupported_Version,
-	Unsupported_Encoding,
 
 	// <!FOO are usually skipped.
 	Unhandled_Bang,
