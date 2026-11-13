@@ -421,4 +421,24 @@ test_non_zeroed_allocations :: proc(t: ^testing.T) {
 		strings.builder_replace(&b, "-", "+++", 2)
 		testing.expect_value(t, strings.to_string(b), "+++a+++Z-b-Z-c-")
 	}
+
+	{
+		// these writes grow the builder a few times from empty
+		b := strings.builder_make_none(a)
+		for _ in 0..<100 {
+			strings.write_byte(&b, 'a')
+			strings.write_string(&b, "bc")
+			strings.write_rune(&b, 'd')
+			strings.write_rune(&b, 'ñ')
+			strings.write_bytes(&b, {'e', 'f'})
+		}
+		testing.expect_value(t, strings.to_string(b), strings.repeat("abcdñef", 100, a))
+
+		terminated, terminated_err := strings.to_cstring(&b)
+		testing.expect_value(t, terminated_err, nil)
+		testing.expect_value(t, len(terminated), strings.builder_len(b))
+		terminated, terminated_err = strings.unsafe_to_cstring(&b)
+		testing.expect_value(t, terminated_err, nil)
+		testing.expect_value(t, len(terminated), strings.builder_len(b))
+	}
 }

@@ -2817,10 +2817,10 @@ split_multi :: proc(s: string, substrs: []string, allocator := context.allocator
 				break
 			}
 			part := it[:i]
-			append(&results, part)
+			non_zero_append(&results, part)
 			it = it[i+w:]
 		}
-		append(&results, it)
+		non_zero_append(&results, it)
 	}
 	assert(len(results) == n)
 	return results[:], nil
@@ -3355,7 +3355,7 @@ fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.alloc
 		end = offset
 		if f(r) {
 			if start >= 0 {
-				append(&substrings, s[start : end])
+				non_zero_append(&substrings, s[start : end])
 				// -1 could be used, but just speed it up through bitwise not
 				// gotta love 2's complement
 				start = ~start
@@ -3368,7 +3368,7 @@ fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.alloc
 	}
 
 	if start >= 0 {
-		append(&substrings, s[start : len(s)])
+		non_zero_append(&substrings, s[start : len(s)])
 	}
 
 	return substrings[:], nil
