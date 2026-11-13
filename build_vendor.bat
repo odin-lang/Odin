@@ -2,23 +2,14 @@
 
 setlocal EnableDelayedExpansion
 
-rem build the .lib files already exist
+rem Build the vendor .lib files that don't exist yet, for the architecture that the MSVC environment targets.
+rem The x64 libraries are in each package's lib directory, the arm64 ones (Windows on ARM) in lib\windows_arm64.
+set lib_dir=lib
+if /I "%VSCMD_ARG_TGT_ARCH%" == "arm64" set lib_dir=lib\windows_arm64
 
-if not exist "vendor\stb\lib\*.lib" (
-	pushd vendor\stb\src
-		call build.bat
-	popd
-)
-
-if not exist "vendor\miniaudio\lib\*.lib" (
-	pushd vendor\miniaudio\src
-		call build.bat
-	popd
-)
-
-
-if not exist "vendor\cgltf\lib\*.lib" (
-	pushd vendor\cgltf\src
-		call build.bat
-	popd
+for %%p in (stb miniaudio cgltf kb_text_shape) do (
+	if not exist "vendor\%%p\%lib_dir%\*.lib" (
+		call vendor\%%p\src\build.bat
+		if errorlevel 1 exit /b 1
+	)
 )

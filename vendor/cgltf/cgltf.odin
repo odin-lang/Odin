@@ -3,10 +3,11 @@ package cgltf
 
 @(private)
 LIB :: (
-	     "lib/cgltf.lib"      when ODIN_OS == .Windows
-	else "lib/cgltf.a"        when ODIN_OS == .Linux
-	else "lib/darwin/cgltf.a" when ODIN_OS == .Darwin
-	else "lib/cgltf_wasm.o"   when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
+	     "lib/windows_arm64/cgltf.lib" when ODIN_OS == .Windows && ODIN_ARCH == .arm64
+	else "lib/cgltf.lib"               when ODIN_OS == .Windows
+	else "lib/cgltf.a"                 when ODIN_OS == .Linux
+	else "lib/darwin/cgltf.a"          when ODIN_OS == .Darwin
+	else "lib/cgltf_wasm.o"            when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
 	else ""
 )
 

@@ -20,7 +20,12 @@ when ODIN_PLATFORM_SUBTARGET == .Android {
 	}
 } else {
 	@(private)
-	LIB :: "lib/miniaudio.lib" when ODIN_OS == .Windows else "lib/darwin/miniaudio.a" when ODIN_OS == .Darwin else "lib/miniaudio.a"
+	LIB :: (
+		     "lib/windows_arm64/miniaudio.lib" when ODIN_OS == .Windows && ODIN_ARCH == .arm64
+		else "lib/miniaudio.lib"               when ODIN_OS == .Windows
+		else "lib/darwin/miniaudio.a"          when ODIN_OS == .Darwin
+		else "lib/miniaudio.a"
+	)
 
 	when !#exists(LIB) {
 		// The Windows and macOS libraries are shipped with the compiler, so a message for them should not be needed.
