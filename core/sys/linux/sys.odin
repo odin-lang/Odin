@@ -741,18 +741,18 @@ setsockopt :: proc {
 	setsockopt_base,
 }
 
-getsockopt_base :: proc "contextless" (sock: Fd, level: int, opt: Socket_Option, val: $T) -> (int, Errno)
+getsockopt_base :: proc "contextless" (sock: Fd, level: int, opt: int, val: $T) -> (int, Errno)
 where
 	intrinsics.type_is_pointer(T) ||
 	intrinsics.type_is_multi_pointer(T)
 {
 	val_data := val
-	val_size := size_of(T)
+	val_size := u32(size_of(intrinsics.type_elem_type(T))) // socklen_t
 	ret := syscall(SYS_getsockopt, sock, level, opt, val_data, cast(rawptr) &val_size)
-	return val_size, Errno(-ret)
+	return int(val_size), Errno(-ret)
 }
 
-getsockopt_sock :: proc "contextless" (sock: Fd, level: Socket_API_Level_Sock, opt: Socket_Option, val: ^$T) -> (int, Errno)
+getsockopt_sock :: proc "contextless" (sock: Fd, level: Socket_API_Level_Sock, opt: Socket_Option, val: $T) -> (int, Errno)
 where
 	intrinsics.type_is_pointer(T) ||
 	intrinsics.type_is_multi_pointer(T)
@@ -760,7 +760,7 @@ where
 	return getsockopt_base(sock, cast(int) level, cast(int) opt, val)
 }
 
-getsockopt_tcp :: proc "contextless" (sock: Fd, level: Socket_API_Level_TCP, opt: Socket_TCP_Option, val: ^$T) -> (int, Errno)
+getsockopt_tcp :: proc "contextless" (sock: Fd, level: Socket_API_Level_TCP, opt: Socket_TCP_Option, val: $T) -> (int, Errno)
 where
 	intrinsics.type_is_pointer(T) ||
 	intrinsics.type_is_multi_pointer(T)
@@ -768,7 +768,7 @@ where
 	return getsockopt_base(sock, cast(int) level, cast(int) opt, val)
 }
 
-getsockopt_udp :: proc "contextless" (sock: Fd, level: Socket_API_Level_UDP, opt: Socket_UDP_Option, val: ^$T) -> (int, Errno)
+getsockopt_udp :: proc "contextless" (sock: Fd, level: Socket_API_Level_UDP, opt: Socket_UDP_Option, val: $T) -> (int, Errno)
 where
 	intrinsics.type_is_pointer(T) ||
 	intrinsics.type_is_multi_pointer(T)
