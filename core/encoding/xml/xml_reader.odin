@@ -24,8 +24,8 @@ DEFAULT_OPTIONS :: Options{
 }
 
 Option_Flag :: enum {
-	// If the caller says that input may be modified, we can perform in-situ parsing.
-	// If this flag isn't provided, the XML parser first duplicates the input so that it can.
+	// Parse in the caller's buffer instead of a copy of it. Line ends are normalised in place, and the document's strings point into the buffer.
+	// `parse_string` ignores this flag, since string data may be read-only.
 	Input_May_Be_Modified,
 
 	// Document MUST start with `<?xml` prologue.
@@ -193,6 +193,13 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 		}
 		doc.input = data
 	}
+
+	length, illegal, valid := normalize_input(data)
+	if !valid {
+		report_illegal_input(error_handler, path, data[:length], illegal)
+		return doc, .Invalid_Token
+	}
+	data = data[:length]
 
 	if doc.tokenizer, alloc_err = new(Tokenizer); alloc_err != nil {
 		return doc, .Allocation_Failed
@@ -410,6 +417,8 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 parse_string :: proc(data: string, options := DEFAULT_OPTIONS, path := "", error_handler := default_error_handler, allocator := context.allocator) -> (doc: ^Document, err: Error) {
 	_data := transmute([]u8)data
 
+	options := options
+	options.flags -= {.Input_May_Be_Modified}
 	return parse_bytes(_data, options, path, error_handler, allocator)
 }
 

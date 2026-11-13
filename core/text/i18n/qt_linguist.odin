@@ -11,12 +11,12 @@ package i18n
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
+import "base:runtime"
 import "core:encoding/xml"
 import "core:strings"
 
 TS_XML_Options := xml.Options{
 	flags = {
-		.Input_May_Be_Modified,
 		.Must_Have_Prolog,
 		.Must_Have_DocType,
 		.Ignore_Unsupported,
@@ -27,6 +27,11 @@ TS_XML_Options := xml.Options{
 }
 
 parse_qt_linguist_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTIONS, pluralizer: proc(int) -> int = nil, allocator := context.allocator) -> (translation: ^Translation, err: Error) {
+	return parse_qt_linguist(data, false, options, pluralizer, allocator)
+}
+
+@(private)
+parse_qt_linguist :: proc(data: []byte, may_modify: bool, options: Parse_Options, pluralizer: proc(int) -> int, allocator: runtime.Allocator) -> (translation: ^Translation, err: Error) {
 	context.allocator = allocator
 
 	get_str :: proc(val: xml.Value, intern: ^strings.Intern) -> (str: string, err: Error) {
@@ -48,7 +53,11 @@ parse_qt_linguist_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTI
 		return 0, .Bad_Id
 	}
 
-	ts, xml_err := xml.parse(data, TS_XML_Options)
+	xml_options := TS_XML_Options
+	if may_modify {
+		xml_options.flags += {.Input_May_Be_Modified}
+	}
+	ts, xml_err := xml.parse(data, xml_options)
 	defer xml.destroy(ts)
 
 	if xml_err != .None || ts.element_count < 1 || ts.elements[0].ident != "TS" || len(ts.elements[0].value) == 0 {

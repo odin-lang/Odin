@@ -101,6 +101,63 @@ init :: proc(t: ^Tokenizer, src: string, path: string, err: Error_Handler = defa
 }
 
 @(private)
+normalize_input :: proc(buf: []u8) -> (length: int, illegal: rune, ok: bool) {
+	w, r := 0, 0
+	n := len(buf)
+	#no_bounds_check for r < n {
+		c := buf[r]
+		switch {
+		case c >= 0x20 && c < utf8.RUNE_SELF, c == '\n', c == '\t':
+			if w != r {
+				buf[w] = c
+			}
+			r += 1
+			w += 1
+		case c == '\r':
+			buf[w] = '\n'
+			r += 1
+			w += 1
+			if r < n && buf[r] == '\n' {
+				r += 1
+			}
+		case c < 0x20:
+			return w, rune(c), false
+		case:
+			ch, size := utf8.decode_rune(buf[r:])
+			if ch == utf8.RUNE_ERROR && size == 1 || ch == 0xfffe || ch == 0xffff {
+				return w, ch, false
+			}
+			if w != r {
+				copy(buf[w:], buf[r:][:size])
+			}
+			r += size
+			w += size
+		}
+	}
+	return w, 0, true
+}
+
+@(private)
+report_illegal_input :: proc(handler: Error_Handler, path: string, normalized: []u8, illegal: rune) {
+	if handler == nil {
+		return
+	}
+	text := string(normalized)
+	line_start := strings.last_index_byte(text, '\n') + 1
+	pos := Pos{
+		file   = path,
+		offset = len(text),
+		line   = strings.count(text, "\n") + 1,
+		column = len(text) - line_start + 1,
+	}
+	if illegal == utf8.RUNE_ERROR {
+		handler(pos, "Invalid UTF-8 encoding\n")
+	} else {
+		handler(pos, "Illegal character U+%04X\n", u32(illegal))
+	}
+}
+
+@(private)
 offset_to_pos :: proc(t: ^Tokenizer, offset: int) -> Pos {
 	line := t.line_count
 	column := offset - t.line_offset + 1

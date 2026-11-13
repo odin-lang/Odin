@@ -115,7 +115,7 @@ xml_test_entities :: proc(t: ^testing.T) {
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0x98791215,
+		crc32     = 0x2a0022cc,
 	})
 }
 

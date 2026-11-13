@@ -119,3 +119,82 @@ xml_test_review_caller_keeps_input :: proc(t: ^testing.T) {
 	testing.expect_value(t, err, xml.Error.None)
 	xml.destroy(doc)
 }
+
+@(test)
+xml_test_review_line_ends :: proc(t: ^testing.T) {
+	cases := [?]Review_Case{
+		{src = "<a>p\r\nq\rr\n\rs</a>",                             tree = `a{"p\nq\nr\n\ns"}`},
+		{src = "<a>p\r\nq\rr</a>",  flags = {.Decode_SGML_Entities}, tree = `a{"p\nq\nr"}`},
+		{src = "<a>p<!--x\r\ny-->q</a>", flags = {.Keep_Tag_Body_Comments, .Unbox_CDATA}, tree = `a{"p<!--x\ny-->q"}`},
+		{src = "<a>p<![CDATA[x\r\ny]]>q</a>",                       tree = `a{"p<![CDATA[x\ny]]>q"}`},
+		{src = "<a>p<![CDATA[x\ry]]>q</a>", flags = {.Unbox_CDATA},  tree = `a{"px\nyq"}`},
+		{src = "\r\n<a>x</a>\r\n",                                  tree = `a{"x"}`},
+	}
+	run_review_cases(t, cases[:])
+}
+
+@(thread_local, private="file")
+last_error_pos: xml.Pos
+
+@(private="file")
+remember_pos :: proc(pos: xml.Pos, format: string, args: ..any) {
+	last_error_pos = pos
+}
+
+@(test)
+xml_test_review_illegal_characters :: proc(t: ^testing.T) {
+	Case :: struct {
+		src:    string,
+		line:   int,
+		column: int,
+	}
+	cases := [?]Case{
+		{"<a>\x00</a>",            1, 4},
+		{"<a>\x01</a>",            1, 4},
+		{"<a>\x1f</a>",            1, 4},
+		{"<a>\xff</a>",            1, 4},
+		{"<a>\xc0\x80</a>",        1, 4},
+		{"<a>\xed\xa0\x80</a>",    1, 4},
+		{"<a>\xef\xbf\xbe</a>",    1, 4},
+		{"<a>\xef\xbf\xbf</a>",    1, 4},
+		{"<a b=\"\x02\"/>",        1, 7},
+		{"<a>\r\nx\r\nyz\x0b</a>", 3, 3},
+		{"<a>\r\nx\rabc\x0c</a>",  3, 4},
+	}
+	for c in cases {
+		last_error_pos = {}
+		doc, err := xml.parse_string(c.src, error_handler = remember_pos)
+		xml.destroy(doc)
+		testing.expectf(t, err == .Invalid_Token, "%q: expected Invalid_Token, got %v", c.src, err)
+		testing.expectf(t, last_error_pos.line == c.line && last_error_pos.column == c.column, "%q: expected %v:%v, got %v:%v", c.src, c.line, c.column, last_error_pos.line, last_error_pos.column)
+	}
+
+	legal := [?]string{
+		"<a>\t\x7f\xc2\x80\xc2\x85\xe2\x80\xa8\xef\xbf\xbd\xf4\x8f\xbf\xbd</a>",
+	}
+	for src in legal {
+		doc, err := xml.parse_string(src, error_handler = Silent)
+		xml.destroy(doc)
+		testing.expectf(t, err == .None, "%q: expected None, got %v", src, err)
+	}
+}
+
+@(test)
+xml_test_review_input_may_be_modified :: proc(t: ^testing.T) {
+	doc, err := xml.parse_string("<a>x\r\ny</a>", xml.Options{flags = {.Input_May_Be_Modified}}, error_handler = Silent)
+	testing.expect_value(t, err, xml.Error.None)
+	xml.destroy(doc)
+
+	data := make([]u8, 11)
+	defer delete(data)
+	copy(data, "<a>x\r\ny</a>")
+	doc, err = xml.parse_bytes(data, xml.Options{flags = {.Input_May_Be_Modified}}, error_handler = Silent)
+	defer xml.destroy(doc)
+	testing.expect_value(t, err, xml.Error.None)
+	testing.expect_value(t, string(data[:10]), "<a>x\ny</a>")
+	if err == .None && len(doc.elements[0].value) == 1 {
+		value := doc.elements[0].value[0].(string)
+		testing.expect_value(t, value, "x\ny")
+		testing.expect(t, raw_data(value) == &data[3], "the value should point into the caller's buffer")
+	}
+}
