@@ -788,7 +788,13 @@ __setUniforms :: proc(ctx: ^Context, uniformOffset: int, image: int) {
 		gl.BindBufferRange(gl.UNIFORM_BUFFER, ctx.frag_binding, ctx.fragBuf, uniformOffset, size_of(FragUniforms))
 	} else {
 		frag := __fragUniformPtr(ctx, uniformOffset)
-		gl.Uniform4fv(ctx.shader.loc[.FRAG], GL_UNIFORMARRAY_SIZE, cast(^f32) frag)
+		// The shader reads `texType` and `type` as floats (`int(frag[10].z)`), but they are stored as integers.
+		values: [GL_UNIFORMARRAY_SIZE][4]f32
+		#assert(size_of(FragUniforms) == size_of(values))
+		mem.copy(&values, frag, size_of(values))
+		values[10][2] = f32(frag.texType)
+		values[10][3] = f32(frag.type)
+		gl.Uniform4fv(ctx.shader.loc[.FRAG], GL_UNIFORMARRAY_SIZE, &values[0][0])
 	}
 
 	__checkError(ctx, "uniform4")
