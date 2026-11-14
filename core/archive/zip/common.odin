@@ -1,3 +1,5 @@
+// TODO-UPDATE-COMMENT: The writer now encrypts members with WinZip AES-256 (AE-2), so "No encryption" is wrong
+// ---
 /*
 Reads and writes ZIP archives, as specified by [PKWARE's APPNOTE.TXT, version 6.3.10, November 2022](https://pkware.cachefly.net/webdocs/APPNOTE/APPNOTE-6.3.10.TXT).
 
@@ -40,6 +42,7 @@ import "core:compress/bzip2"
 import "core:compress/deflate"
 import "core:compress/lzma"
 import "core:compress/ppmd"
+import "core:crypto/aes"
 import "core:io"
 import "core:os"
 import "core:time/datetime"
@@ -79,6 +82,13 @@ ZIP16_MAX         :: 0xFFFF
 ZIP32_MAX         :: 0xFFFF_FFFF
 ZIP64_LOCAL_LIMIT :: 0xF000_0000
 MADE_BY_VERSION   :: 63
+
+AES_VERSION        :: 2
+AES_STRENGTH       :: 3
+AES_SALT_SIZE      :: aes.KEY_SIZE_256 / 2
+AES_OVERHEAD       :: AES_SALT_SIZE + AES_VERIFIER_SIZE + AES_MAC_SIZE
+AES_VERSION_NEEDED :: 51
+CIPHER_BUFFER_SIZE :: 64 * 1024
 DOS_EPOCH         :: 315_532_800
 LZMA_SDK_VERSION  :: [2]u8{19, 0}
 
@@ -385,8 +395,9 @@ Entry_Data :: union {
 }
 
 Entry_Options :: struct {
-	method: archive.Method,
-	level:  Maybe(int),
+	method:   archive.Method,
+	level:    Maybe(int),
+	password: Maybe(string),
 }
 
 Writer_Options :: struct {
@@ -394,29 +405,32 @@ Writer_Options :: struct {
 	level:         Maybe(int),
 	deterministic: bool,
 	comment:       string,
+	password:      string,
 	options:       compress.Options,
 }
 
 Writer :: struct {
-	allocator:  runtime.Allocator,
-	options:    Writer_Options,
-	stream:     io.Stream,
-	file:       ^os.File,
-	path:       string,
-	seekable:   bool,
-	offset:     i64,
-	end:        i64,
-	count:      i64,
-	archive_in: i64,
-	central:    [dynamic]u8,
-	header:     [dynamic]u8,
-	name:       [dynamic]u8,
-	walk_name:  [dynamic]u8,
-	chunk:      []u8,
-	err:        Error,
-	committed:  bool,
-	active:     bool,
-	zone:       ^datetime.TZ_Region,
+	allocator:     runtime.Allocator,
+	options:       Writer_Options,
+	stream:        io.Stream,
+	file:          ^os.File,
+	path:          string,
+	seekable:      bool,
+	offset:        i64,
+	end:           i64,
+	count:         i64,
+	archive_in:    i64,
+	central:       [dynamic]u8,
+	header:        [dynamic]u8,
+	name:          [dynamic]u8,
+	walk_name:     [dynamic]u8,
+	chunk:         []u8,
+	cipher_buffer: []u8,
+	password:      string,
+	err:           Error,
+	committed:     bool,
+	active:        bool,
+	zone:          ^datetime.TZ_Region,
 }
 
 Pending_Entry :: struct {
@@ -444,10 +458,12 @@ Pending_Entry :: struct {
 	header:        i64,
 	local_zip64:   bool,
 	final:         bool,
+	password:      string,
 }
 
 Member_Sink :: struct {
 	writer: ^Writer,
+	cipher: ^Cipher,
 	count:  i64,
 }
 

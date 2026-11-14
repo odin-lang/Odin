@@ -1,5 +1,6 @@
 package archive_zip
 
+import "base:runtime"
 import "core:archive"
 import "core:compress"
 import "core:crypto"
@@ -9,6 +10,7 @@ import "core:crypto/hmac"
 import "core:crypto/pbkdf2"
 import "core:encoding/endian"
 import "core:hash"
+import "core:io"
 
 ZIPCRYPTO_HEADER_SIZE :: 12
 AES_EXTRA_SIZE        :: 7
@@ -159,8 +161,33 @@ _zipcrypto_decrypt :: proc "contextless" (keys: ^[3]u32, p: []u8) {
 @(private)
 _aes_decrypt :: proc(c: ^Cipher, p: []u8) {
 	hmac.update(&c.mac, p)
+	_aes_ctr(c, p)
+}
+
+@(private)
+_aes_encrypt :: proc(c: ^Cipher, p: []u8) {
+	_aes_ctr(c, p)
+	hmac.update(&c.mac, p)
+}
+
+@(private)
+_aes_ctr :: proc(c: ^Cipher, p: []u8) {
 	block: [aes.BLOCK_SIZE]u8
-	for &b in p {
+	rest := p
+	for len(rest) > 0 && c.used < aes.BLOCK_SIZE {
+		rest[0] ~= c.stream[c.used]
+		c.used += 1
+		rest = rest[1:]
+	}
+	for len(rest) >= aes.BLOCK_SIZE {
+		c.counter += 1
+		endian.unchecked_put_u64le(block[:8], c.counter)
+		aes.encrypt_ecb(&c.block, c.stream[:], block[:])
+		chunk := (^[aes.BLOCK_SIZE]u8)(raw_data(rest))
+		chunk^ = chunk^ ~ c.stream
+		rest = rest[aes.BLOCK_SIZE:]
+	}
+	for &b in rest {
 		if c.used == aes.BLOCK_SIZE {
 			c.counter += 1
 			endian.unchecked_put_u64le(block[:8], c.counter)
@@ -254,4 +281,107 @@ _cipher_destroy :: proc(c: ^Cipher) {
 		hmac.reset(&c.mac)
 	}
 	crypto.zero_explicit(c, size_of(c^))
+}
+
+@(private)
+_check_password :: proc(password: string, deterministic: bool) -> (err: Error) {
+	if password == "" {
+		return nil
+	}
+	if deterministic {
+		return archive.General_Error.Incompatible_Options
+	}
+	if !crypto.HAS_RAND_BYTES {
+		return archive.General_Error.Unsupported_Method
+	}
+	return nil
+}
+
+@(private)
+_entry_password :: proc(zw: ^Writer, options: Entry_Options) -> (password: string, err: Error) {
+	password = options.password.? or_else zw.password
+	_check_password(password, zw.options.deterministic) or_return
+	return
+}
+
+@(private)
+_secret_clone :: proc(secret: string, allocator: runtime.Allocator) -> (clone: string, err: runtime.Allocator_Error) {
+	if secret == "" {
+		return "", nil
+	}
+	buf := make([]u8, len(secret), allocator) or_return
+	copy(buf, secret)
+	return string(buf), nil
+}
+
+@(private)
+_secret_delete :: proc(secret: string, allocator: runtime.Allocator) {
+	if secret == "" {
+		return
+	}
+	crypto.zero_explicit(raw_data(secret), len(secret))
+	delete(secret, allocator)
+}
+
+@(private)
+_encrypt_begin :: proc(zw: ^Writer, c: ^Cipher, password: string) -> (err: Error) {
+	_cipher_destroy(c)
+	if password == "" {
+		return nil
+	}
+	if zw.cipher_buffer == nil {
+		zw.cipher_buffer = make([]u8, CIPHER_BUFFER_SIZE, zw.allocator) or_return
+	}
+	head: [AES_SALT_SIZE + AES_VERIFIER_SIZE]u8
+	crypto.rand_bytes(head[:AES_SALT_SIZE])
+
+	derived: [2 * aes.KEY_SIZE_256 + AES_VERIFIER_SIZE]u8
+	defer crypto.zero_explicit(&derived, size_of(derived))
+	pbkdf2.derive(.Insecure_SHA1, transmute([]u8)password, head[:AES_SALT_SIZE], AES_ITERATIONS, derived[:])
+	copy(head[AES_SALT_SIZE:], derived[2 * aes.KEY_SIZE_256:])
+
+	aes.init_ecb(&c.block, derived[:aes.KEY_SIZE_256])
+	hmac.init(&c.mac, .Insecure_SHA1, derived[aes.KEY_SIZE_256:][:aes.KEY_SIZE_256])
+	c.kind  = .AES
+	c.keyed = true
+	c.used  = aes.BLOCK_SIZE
+	return _emit(zw, head[:])
+}
+
+@(private)
+_encrypt_emit :: proc(zw: ^Writer, c: ^Cipher, p: []u8) -> (err: Error) {
+	if c.kind != .AES {
+		return _emit(zw, p)
+	}
+	if _, write_err := _encrypt_write(zw, c, p); write_err != nil {
+		zw.err = write_err
+		return write_err
+	}
+	return nil
+}
+
+@(private)
+_encrypt_write :: proc(zw: ^Writer, c: ^Cipher, p: []u8) -> (written: int, err: io.Error) {
+	for written < len(p) {
+		n := copy(zw.cipher_buffer, p[written:])
+		_aes_encrypt(c, zw.cipher_buffer[:n])
+		k, write_err := io.write_full(zw.stream, zw.cipher_buffer[:n])
+		zw.offset += i64(k)
+		zw.end     = max(zw.end, zw.offset)
+		written   += k
+		if write_err != nil {
+			return written, write_err
+		}
+	}
+	return written, nil
+}
+
+@(private)
+_encrypt_end :: proc(zw: ^Writer, c: ^Cipher) -> (err: Error) {
+	if c.kind != .AES {
+		return nil
+	}
+	sum: [crypto_hash.MAX_DIGEST_SIZE]u8
+	hmac.final(&c.mac, sum[:crypto_hash.DIGEST_SIZES[.Insecure_SHA1]])
+	return _emit(zw, sum[:AES_MAC_SIZE])
 }

@@ -78,6 +78,7 @@ write_entry :: proc{write_entry_with_info, write_entry_simple}
 
 write_directory :: proc(zw: ^Writer, dir: string, prefix := "", options: Entry_Options = {}) -> (err: Error) {
 	_writer_ready(zw) or_return
+	_ = _entry_password(zw, options) or_return
 	root, root_err := os.get_absolute_path(dir, zw.allocator)
 	if root_err != nil {
 		return root_err
@@ -227,6 +228,8 @@ close_writer :: proc(zw: ^Writer) {
 	delete(zw.name)
 	delete(zw.walk_name)
 	delete(zw.chunk, zw.allocator)
+	delete(zw.cipher_buffer, zw.allocator)
+	_secret_delete(zw.password, zw.allocator)
 	timezone.region_destroy(zw.zone, zw.allocator)
 	zw^ = {}
 }
@@ -240,6 +243,8 @@ _writer_init :: proc(zw: ^Writer, s: io.Stream, options: Writer_Options) -> (err
 	zw.options = options
 	zw.options.comment = ""
 	zw.options.comment = strings.clone(options.comment, zw.allocator) or_return
+	zw.options.password = ""
+	zw.password = _secret_clone(options.password, zw.allocator) or_return
 
 	modes := io.query(s)
 	if .Write not_in modes {
@@ -262,11 +267,11 @@ _writer_init :: proc(zw: ^Writer, s: io.Stream, options: Writer_Options) -> (err
 
 @(private)
 _check_options :: proc(options: Writer_Options) -> (err: Error) {
-	_, _ = _resolve({options.method, options.level}, {}) or_return
+	_, _ = _resolve({method = options.method, level = options.level}, {}) or_return
 	if len(options.comment) > ZIP16_MAX {
 		return Zip_Error.Field_Too_Long
 	}
-	return nil
+	return _check_password(options.password, options.deterministic)
 }
 
 @(private)
@@ -323,7 +328,11 @@ _prepare :: proc(zw: ^Writer, p: ^Pending_Entry, fi: archive.File_Info, data: En
 		return Zip_Error.Field_Too_Long
 	}
 	p.comment = fi.comment
-	p.method, p.level = _resolve({zw.options.method, zw.options.level}, options) or_return
+	p.method, p.level = _resolve({method = zw.options.method, level = zw.options.level}, options) or_return
+	p.password = _entry_password(zw, options) or_return
+	if p.type == .Directory {
+		p.password = ""
+	}
 
 	switch d in data {
 	case []u8:
@@ -561,14 +570,21 @@ _write_one_shot :: proc(zw: ^Writer, p: ^Pending_Entry, input: []u8) -> (err: Er
 		}
 	}
 	p.compressed  = i64(head_len) + i64(len(payload))
+	if p.password != "" {
+		p.compressed += AES_OVERHEAD
+	}
 	p.header      = zw.offset
 	p.local_zip64 = p.size >= ZIP32_MAX || p.compressed >= ZIP32_MAX
 	p.final       = true
 	_set_flags(p)
 	_local_header(p, &zw.header) or_return
+	cipher: Cipher
+	defer _cipher_destroy(&cipher)
 	_emit(zw, zw.header[:]) or_return
-	_emit(zw, head[:head_len]) or_return
-	_emit(zw, payload) or_return
+	_encrypt_begin(zw, &cipher, p.password) or_return
+	_encrypt_emit(zw, &cipher, head[:head_len]) or_return
+	_encrypt_emit(zw, &cipher, payload) or_return
+	_encrypt_end(zw, &cipher) or_return
 	_progress(zw, p, p.size, p.compressed) or_return
 	return _add_central(zw, p)
 }
@@ -600,8 +616,14 @@ _write_streamed :: proc(zw: ^Writer, p: ^Pending_Entry, data: Entry_Data) -> (er
 	_emit(zw, zw.header[:]) or_return
 	data_start := zw.offset
 
+	cipher: Cipher
+	defer _cipher_destroy(&cipher)
 	chunk := _chunk(zw) or_return
 	sink  := Member_Sink{writer = zw}
+	if p.password != "" {
+		_encrypt_begin(zw, &cipher, p.password) or_return
+		sink.cipher = &cipher
+	}
 	encoder: Encoder
 	defer _encoder_destroy(&encoder)
 	_encoder_init(&encoder, zw, p, expected, _sink_writer(&sink)) or_return
@@ -639,7 +661,11 @@ _write_streamed :: proc(zw: ^Writer, p: ^Pending_Entry, data: Entry_Data) -> (er
 	p.crc        = crc
 	p.compressed = sink.count
 	if p.method != .Store && p.compressed >= p.size && zw.seekable && source.rewindable {
-		_rewrite_stored(zw, p, &source, data_start, chunk) or_return
+		_rewrite_stored(zw, p, &source, data_start, chunk, &cipher) or_return
+	}
+	if p.password != "" {
+		_encrypt_end(zw, &cipher) or_return
+		p.compressed += AES_OVERHEAD
 	}
 	if !p.local_zip64 && (p.size >= ZIP32_MAX || p.compressed >= ZIP32_MAX) {
 		return Zip_Error.Too_Large
@@ -656,8 +682,9 @@ _write_streamed :: proc(zw: ^Writer, p: ^Pending_Entry, data: Entry_Data) -> (er
 }
 
 @(private)
-_rewrite_stored :: proc(zw: ^Writer, p: ^Pending_Entry, source: ^Source, data_start: i64, chunk: []u8) -> (err: Error) {
+_rewrite_stored :: proc(zw: ^Writer, p: ^Pending_Entry, source: ^Source, data_start: i64, chunk: []u8, cipher: ^Cipher) -> (err: Error) {
 	_seek(zw, data_start) or_return
+	_encrypt_begin(zw, cipher, p.password) or_return
 	if source.reader.procedure != nil {
 		if _, seek_err := io.seek(source.reader, source.start, .Start); seek_err != nil {
 			return seek_err
@@ -674,7 +701,7 @@ _rewrite_stored :: proc(zw: ^Writer, p: ^Pending_Entry, source: ^Source, data_st
 			if total > p.size {
 				return Zip_Error.Size_Mismatch
 			}
-			_emit(zw, chunk[:n]) or_return
+			_encrypt_emit(zw, cipher, chunk[:n]) or_return
 		}
 		if read_err == .EOF {
 			break
@@ -886,6 +913,11 @@ _sink_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset:
 	#partial switch mode {
 	case .Write:
 		zw := sink.writer
+		if sink.cipher != nil {
+			written, write_err := _encrypt_write(zw, sink.cipher, p)
+			sink.count += i64(written)
+			return i64(written), write_err
+		}
 		written, write_err := io.write_full(zw.stream, p)
 		sink.count += i64(written)
 		zw.offset  += i64(written)
@@ -904,6 +936,9 @@ _set_flags :: proc "contextless" (p: ^Pending_Entry) {
 	p.flags &= {.Data_Descriptor}
 	if p.utf8 {
 		p.flags += {.UTF8}
+	}
+	if p.password != "" {
+		p.flags += {.Encrypted}
 	}
 	#partial switch p.method {
 	case .Deflate, .Deflate64:
@@ -932,7 +967,29 @@ _version_needed :: proc "contextless" (p: ^Pending_Entry) -> (version: int) {
 	if p.local_zip64 || p.header >= ZIP32_MAX || p.size >= ZIP32_MAX || p.compressed >= ZIP32_MAX {
 		version = max(version, 45)
 	}
+	if p.password != "" {
+		version = max(version, AES_VERSION_NEEDED)
+	}
 	return
+}
+
+@(private)
+_header_method :: proc "contextless" (p: ^Pending_Entry) -> Method {
+	return .AES if p.password != "" else p.method
+}
+
+@(private)
+_header_crc :: proc "contextless" (p: ^Pending_Entry) -> u32 {
+	return 0 if p.password != "" else p.crc
+}
+
+@(private)
+_put_aes_extra :: proc(buf: ^[dynamic]u8, p: ^Pending_Entry) {
+	_put_u16(buf, u16(Extra_ID.AES))
+	_put_u16(buf, AES_EXTRA_SIZE)
+	_put_u16(buf, AES_VERSION)
+	append(buf, 'A', 'E', AES_STRENGTH)
+	_put_u16(buf, u16(p.method))
 }
 
 @(private)
@@ -947,6 +1004,9 @@ _local_header :: proc(p: ^Pending_Entry, buf: ^[dynamic]u8) -> (err: runtime.All
 	if p.has_owner {
 		extra_length += 4 + _owner_size(p)
 	}
+	if p.password != "" {
+		extra_length += 4 + AES_EXTRA_SIZE
+	}
 	clear(buf)
 	_grow(buf, size_of(Local_Header) + len(p.name) + extra_length) or_return
 
@@ -955,14 +1015,14 @@ _local_header :: proc(p: ^Pending_Entry, buf: ^[dynamic]u8) -> (err: runtime.All
 		signature      = .Local,
 		version_needed = u16le(_version_needed(p)),
 		flags          = p.flags,
-		method         = p.method,
+		method         = _header_method(p),
 		dos_time       = u16le(p.dos_time),
 		dos_date       = u16le(p.dos_date),
 		name_length    = u16le(len(p.name)),
 		extra_length   = u16le(extra_length),
 	}
 	if known {
-		header.crc32 = u32le(p.crc)
+		header.crc32 = u32le(_header_crc(p))
 		if !p.local_zip64 {
 			header.compressed_size   = u32le(p.compressed)
 			header.uncompressed_size = u32le(p.size)
@@ -985,6 +1045,9 @@ _local_header :: proc(p: ^Pending_Entry, buf: ^[dynamic]u8) -> (err: runtime.All
 	}
 	if p.has_owner {
 		_put_owner(buf, p)
+	}
+	if p.password != "" {
+		_put_aes_extra(buf, p)
 	}
 	return nil
 }
@@ -1009,7 +1072,7 @@ _write_descriptor :: proc(zw: ^Writer, p: ^Pending_Entry) -> (err: Error) {
 	clear(&zw.header)
 	_grow(&zw.header, 24) or_return
 	_put_u32(&zw.header, u32(Signature.Descriptor))
-	_put_u32(&zw.header, p.crc)
+	_put_u32(&zw.header, _header_crc(p))
 	if p.local_zip64 {
 		_put_u64(&zw.header, u64(p.compressed))
 		_put_u64(&zw.header, u64(p.size))
@@ -1045,6 +1108,9 @@ _add_central :: proc(zw: ^Writer, p: ^Pending_Entry) -> (err: Error) {
 	if p.has_owner {
 		extra_length += 4 + _owner_size(p)
 	}
+	if p.password != "" {
+		extra_length += 4 + AES_EXTRA_SIZE
+	}
 	buf := &zw.central
 	_grow(buf, size_of(Central_Header) + len(p.name) + extra_length + len(p.comment)) or_return
 
@@ -1054,10 +1120,10 @@ _add_central :: proc(zw: ^Writer, p: ^Pending_Entry) -> (err: Error) {
 		made_by_host        = .Unix,
 		version_needed      = u16le(_version_needed(p)),
 		flags               = p.flags,
-		method              = p.method,
+		method              = _header_method(p),
 		dos_time            = u16le(p.dos_time),
 		dos_date            = u16le(p.dos_date),
-		crc32               = u32le(p.crc),
+		crc32               = u32le(_header_crc(p)),
 		compressed_size     = u32le(min(p.compressed, ZIP32_MAX)),
 		uncompressed_size   = u32le(min(p.size, ZIP32_MAX)),
 		name_length         = u16le(len(p.name)),
@@ -1096,6 +1162,9 @@ _add_central :: proc(zw: ^Writer, p: ^Pending_Entry) -> (err: Error) {
 	}
 	if p.has_owner {
 		_put_owner(buf, p)
+	}
+	if p.password != "" {
+		_put_aes_extra(buf, p)
 	}
 	append(buf, p.comment)
 	zw.count      += 1
