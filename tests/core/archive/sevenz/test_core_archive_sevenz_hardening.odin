@@ -4,6 +4,7 @@ import "core:archive"
 import "core:archive/sevenz"
 import "core:bytes"
 import "core:compress"
+import "core:compress/filters"
 import "core:crypto/aes"
 import "core:crypto/sha2"
 import "core:hash"
@@ -74,8 +75,53 @@ test_bcj2_memory :: proc(t: ^testing.T) {
 	fi, handle, ok, _ := sevenz.find(&r, "A.EXE")
 	testing.expect(t, ok && .BCJ2 in fi.filters && fi.size == 1 << 30, "A.EXE is a BCJ2 member")
 	d: Discard
-	testing.expect_value(t, sevenz.extract(&r, handle, discard_writer(&d)), compress.Error(compress.General_Error.Memory_Limit_Exceeded))
+	testing.expect_value(t, sevenz.extract(&r, handle, discard_writer(&d)), compress.Error(compress.BCJ2_Error.Corrupt_Data))
 	testing.expect_value(t, d.count, 0)
+
+	data := make([]u8, 2 << 20)
+	defer delete(data)
+	for i := 0; i < len(data); i += 1 {
+		if i % 13 == 0 && i + 5 <= len(data) {
+			data[i]     = 0xE8
+			data[i + 1] = u8(i >> 3)
+			data[i + 2] = u8(i >> 11)
+			data[i + 3] = 0
+			data[i + 4] = 0
+			i += 4
+			continue
+		}
+		data[i] = u8(i * 7 + i / 13)
+	}
+	streams: filters.Bcj2_Streams
+	defer {
+		delete(streams.main)
+		delete(streams.call)
+		delete(streams.jump)
+		delete(streams.rc)
+	}
+	if !testing.expect_value(t, filters.bcj2_encode(&streams, data), nil) {
+		return
+	}
+	packed: [dynamic]u8
+	defer delete(packed)
+	append(&packed, ..streams.main[:])
+	append(&packed, ..streams.call[:])
+	append(&packed, ..streams.jump[:])
+	append(&packed, ..streams.rc[:])
+	sizes := []u64{u64(len(streams.main)), u64(len(streams.call)), u64(len(streams.jump)), u64(len(streams.rc))}
+	big := build_archive({packed = packed[:], pack_sizes = sizes, coder_bytes = bcj2, unpack_size = u64(len(data)), file_crc = hash.crc32(data), name = "B.EXE"})
+	defer delete(big)
+	br: sevenz.Reader
+	if !testing.expect_value(t, sevenz.open(&br, big[:], compress.Options{max_memory = 1 << 20}), nil) {
+		return
+	}
+	defer sevenz.close(&br)
+	_, big_handle, big_ok, _ := sevenz.find(&br, "B.EXE")
+	testing.expect(t, big_ok, "find B.EXE")
+	out: bytes.Buffer
+	defer bytes.buffer_destroy(&out)
+	testing.expect_value(t, sevenz.extract(&br, big_handle, bytes.buffer_to_stream(&out)), nil)
+	testing.expect(t, bytes.equal(bytes.buffer_to_bytes(&out), data), "B.EXE decodes under a 1 MiB memory limit")
 }
 
 @(test)

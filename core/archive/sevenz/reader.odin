@@ -1531,13 +1531,14 @@ _decoder_destroy :: proc(d: ^Folder_Decoder) {
 		if node.has_ctx {
 			compress.destroy_context(&node.ctx)
 		}
+		filters.reader_destroy(&node.filter)
+		filters.bcj2_reader_destroy(&node.bcj2)
 		if node.keyed {
 			_aes_destroy(&node)
 			_secret_delete(node.buffer, d.allocator)
 		} else {
 			delete(node.buffer, d.allocator)
 		}
-		delete(node.output, d.allocator)
 	}
 	delete(d.nodes, d.allocator)
 	delete(d.sections, d.allocator)
@@ -1643,10 +1644,8 @@ _folder_memory :: proc(s: ^Streams, f: ^Folder, options: compress.Options) -> (e
 		case .Branch, .Delta, .Swap2, .Swap4, .AES:
 			need += FILTER_BUFFER_SIZE
 		case .BCJ2:
-			need = _add(need, size)
-			for k in 0..<c.in_streams {
-				need = _add(need, u64(max(_in_stream_size(s, f, c.first_in + k), 0)))
-			}
+			chunk := u64(_bcj2_chunk(c.unpack_size))
+			need += chunk + 3 * min(u64(filters.BCJ2_SIDE_BUFFER_SIZE), max(chunk / 8, 8))
 		}
 		total = _add(total, need)
 		if total > limit {
@@ -1670,21 +1669,6 @@ _lzma_memory :: proc "contextless" (dict_size: u32, lclp: u8, size: u64, options
 @(private)
 _add :: #force_inline proc "contextless" (a, b: u64) -> u64 {
 	return a + b if b <= max(u64) - a else max(u64)
-}
-
-@(private)
-_in_stream_size :: proc(s: ^Streams, f: ^Folder, in_index: int) -> (size: i64) {
-	for b in s.bind_pairs[f.first_bind:][:f.bind_count] {
-		if b.in_index == in_index {
-			return s.coders[f.first_coder + b.out_index].unpack_size
-		}
-	}
-	for p, j in s.packed[f.first_packed:][:f.packed_count] {
-		if p == in_index {
-			return s.pack_sizes[f.first_pack + j]
-		}
-	}
-	return 0
 }
 
 @(private)
@@ -1796,20 +1780,23 @@ _node_start :: proc(node: ^Node, properties: []u8) -> (err: Error) {
 		case:
 			return SevenZ_Error.Invalid_Folder
 		}
-		if !filters.branch_init(&node.branch, _branch_arch(node.id), start) {
-			return SevenZ_Error.Invalid_Folder
-		}
-		node.buffer = make([]u8, FILTER_BUFFER_SIZE, d.allocator) or_return
+		_filter_start(node, filters.Branch_Filter{arch = _branch_arch(node.id), start_offset = start}) or_return
 	case .Delta:
-		if len(properties) != 1 || !filters.delta_init(&node.delta, int(properties[0]) + 1) {
+		if len(properties) != 1 {
 			return SevenZ_Error.Invalid_Folder
 		}
-		node.buffer = make([]u8, FILTER_BUFFER_SIZE, d.allocator) or_return
-	case .Swap2, .Swap4:
-		node.buffer = make([]u8, FILTER_BUFFER_SIZE, d.allocator) or_return
+		_filter_start(node, filters.Delta_Filter{distance = int(properties[0]) + 1}) or_return
+	case .Swap2:
+		_filter_start(node, filters.Swap_Filter.Swap2) or_return
+	case .Swap4:
+		_filter_start(node, filters.Swap_Filter.Swap4) or_return
 	case .AES:
 		_aes_start(node, properties) or_return
-	case .Copy, .BCJ2:
+	case .BCJ2:
+		bcj2_options := _filter_options(d)
+		bcj2_options.chunk_size = _bcj2_chunk(node.size)
+		codec_err = filters.bcj2_reader_init(&node.bcj2, node.inputs[0], node.inputs[1], node.inputs[2], node.inputs[3], bcj2_options, d.allocator)
+	case .Copy:
 	case:
 		return archive.General_Error.Unsupported_Method
 	}
@@ -1817,6 +1804,31 @@ _node_start :: proc(node: ^Node, properties: []u8) -> (err: Error) {
 		return _folder_error(d, codec_err)
 	}
 	return
+}
+
+@(private)
+_filter_options :: proc "contextless" (d: ^Folder_Decoder) -> (options: compress.Options) {
+	options = d.options
+	options.chunk_size = FILTER_BUFFER_SIZE
+	return
+}
+
+@(private)
+_bcj2_chunk :: proc "contextless" (size: i64) -> (chunk: int) {
+	return int(clamp(size, i64(filters.FILTER_BUFFER_MIN), i64(FILTER_BUFFER_SIZE)))
+}
+
+@(private)
+_filter_start :: proc(node: ^Node, filter: filters.Filter) -> (err: Error) {
+	d := node.decoder
+	filter_err := filters.reader_init(&node.filter, node.inputs[0], filter, .Decode, _filter_options(d), d.allocator)
+	if filter_err == compress.General_Error.Incompatible_Options {
+		return SevenZ_Error.Invalid_Folder
+	}
+	if filter_err != nil {
+		return filter_err
+	}
+	return nil
 }
 
 @(private)
@@ -1867,10 +1879,12 @@ _node_read :: proc(node: ^Node, p: []u8) -> (n: int, err: Error) {
 		n, codec_err = deflate.inflate_reader_read(&node.inflate, buf)
 	case .BZip2:
 		n, codec_err = bzip2.reader_read(&node.bzip2, buf)
-	case .Branch, .Delta, .Swap2, .Swap4, .AES:
+	case .Branch, .Delta, .Swap2, .Swap4:
+		n, codec_err = filters.reader_read(&node.filter, buf)
+	case .AES:
 		n, err = _filter_read(node, buf)
 	case .BCJ2:
-		n, err = _bcj2_read(node, buf)
+		n, codec_err = filters.bcj2_reader_read(&node.bcj2, buf)
 	case:
 		err = archive.General_Error.Unsupported_Method
 	}
@@ -1900,7 +1914,31 @@ _node_read :: proc(node: ^Node, p: []u8) -> (n: int, err: Error) {
 		err = nil
 	}
 	node.produced += i64(n)
+	if node.kind == .BCJ2 && node.produced == node.size && node.err == nil {
+		if end_err := _bcj2_end(node); end_err != nil {
+			node.err = end_err
+			if node.decoder.err == nil {
+				node.decoder.err = end_err
+			}
+		}
+	}
 	return
+}
+
+@(private)
+_bcj2_end :: proc(node: ^Node) -> (err: Error) {
+	probe: [1]u8
+	n, end_err := filters.bcj2_reader_read(&node.bcj2, probe[:])
+	if n > 0 {
+		return SevenZ_Error.Size_Mismatch
+	}
+	if io_err, is_io := end_err.(io.Error); is_io && io_err == .EOF {
+		return nil
+	}
+	if end_err != nil {
+		return end_err
+	}
+	return nil
 }
 
 @(private)
@@ -1934,33 +1972,20 @@ _filter_fill :: proc(node: ^Node) -> (err: Error) {
 		if read_err != nil {
 			return read_err
 		}
-		if got == 0 {
-			stalls += 1
-			if stalls > ZERO_READS_MAX {
-				return io.Error.No_Progress
-			}
+		if got > 0 {
+			stalls = 0
+			continue
+		}
+		stalls += 1
+		if stalls > ZERO_READS_MAX {
+			return io.Error.No_Progress
 		}
 	}
 	data := node.buffer[:node.end]
-	#partial switch node.kind {
-	case .Branch:
-		node.ready = filters.branch_decode(&node.branch, data)
-	case .Delta:
-		filters.delta_decode(&node.delta, data)
-		node.ready = len(data)
-	case .Swap2:
-		node.ready = filters.swap2(data)
-	case .Swap4:
-		node.ready = filters.swap4(data)
-	case .AES:
-		node.ready = len(data) &~ (aes.BLOCK_SIZE - 1)
-		_cbc_decrypt(&node.cipher, &node.iv, data[:node.ready])
-		if node.eof && node.ready != node.end {
-			return SevenZ_Error.Size_Mismatch
-		}
-	}
-	if node.eof {
-		node.ready = node.end
+	node.ready = len(data) &~ (aes.BLOCK_SIZE - 1)
+	_cbc_decrypt(&node.cipher, &node.iv, data[:node.ready])
+	if node.eof && node.ready != node.end {
+		return SevenZ_Error.Size_Mismatch
 	}
 	return
 }
@@ -1971,69 +1996,6 @@ _folder_error :: proc(d: ^Folder_Decoder, err: Error) -> Error {
 		return err
 	}
 	return _password_error(err)
-}
-
-@(private)
-_bcj2_read :: proc(node: ^Node, p: []u8) -> (n: int, err: Error) {
-	if !node.decoded {
-		_bcj2_decode(node) or_return
-	}
-	return copy(p, node.output[node.produced:]), nil
-}
-
-@(private)
-_bcj2_decode :: proc(node: ^Node) -> (err: Error) {
-	d := node.decoder
-	if node.size > i64(max(int)) {
-		return runtime.Allocator_Error.Out_Of_Memory
-	}
-	total := i64(0)
-	for k in 0..<4 {
-		if node.input_sizes[k] > i64(max(int)) - total {
-			return runtime.Allocator_Error.Out_Of_Memory
-		}
-		total += node.input_sizes[k]
-	}
-	node.output = make([]u8, int(node.size), d.allocator) or_return
-	inputs := make([]u8, int(total), d.allocator) or_return
-	defer delete(inputs, d.allocator)
-	parts: [4][]u8
-	offset := 0
-	for k in 0..<4 {
-		parts[k] = inputs[offset:][:int(node.input_sizes[k])]
-		offset  += len(parts[k])
-		_read_full(node.inputs[k], parts[k]) or_return
-	}
-	if bcj2_err := filters.bcj2_decode_to_slice(node.output, parts[0], parts[1], parts[2], parts[3]); bcj2_err != nil {
-		return bcj2_err
-	}
-	node.decoded = true
-	return
-}
-
-@(private)
-_read_full :: proc(s: io.Stream, p: []u8) -> (err: Error) {
-	done, stalls := 0, 0
-	for done < len(p) {
-		n, read_err := io.read(s, p[done:])
-		done += n
-		if done == len(p) {
-			break
-		}
-		if read_err == .EOF {
-			return SevenZ_Error.Size_Mismatch
-		}
-		if read_err != nil {
-			return read_err
-		}
-		if n == 0 {
-			stalls += 1
-			if stalls > ZERO_READS_MAX {
-				return io.Error.No_Progress
-			}
-		}
-	}
-	return
 }
 
 @(private)

@@ -332,15 +332,13 @@ Node :: struct {
 	ppmd:        ppmd.Reader,
 	bzip2:       bzip2.Reader,
 	inflate:     deflate.Inflate_Reader,
-	branch:      filters.Branch_State,
-	delta:       filters.Delta_State,
+	filter:      filters.Reader,
+	bcj2:        filters.Bcj2_Reader,
 	buffer:      []u8,
 	start:       int,
 	ready:       int,
 	end:         int,
 	eof:         bool,
-	output:      []u8,
-	decoded:     bool,
 	cipher:      aes.Context_ECB,
 	iv:          [aes.BLOCK_SIZE]u8,
 	keyed:       bool,
@@ -523,14 +521,12 @@ Encoder :: struct {
 	bzip2:   bzip2.Writer,
 	lzma:    lzma.Writer,
 	ppmd:    ppmd.Writer,
+	err:     Error,
 }
 
-Filter_Stage :: struct {
-	filter:  Filter_Choice,
-	branch:  filters.Branch_State,
-	delta:   filters.Delta_State,
-	buffer:  []u8,
-	pending: int,
+Side_Sink :: struct {
+	data: [dynamic]u8,
+	err:  Error,
 }
 
 Open_Folder :: struct {
@@ -538,9 +534,13 @@ Open_Folder :: struct {
 	setup:     Coder_Setup,
 	folder:    Out_Folder,
 	encoder:   Encoder,
-	stage:     Filter_Stage,
+	stage:     filters.Writer,
+	bcj2:      filters.Bcj2_Writer,
+	bcj2_in:   i64,
+	call:      Side_Sink,
+	jump:      Side_Sink,
+	rc:        Side_Sink,
 	sink:      Pack_Sink,
-	input:     [dynamic]u8,
 	unpack:    i64,
 	limit:     i64,
 	files:     int,

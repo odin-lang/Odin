@@ -208,7 +208,9 @@ close_writer :: proc(sw: ^Writer) {
 	_folder_destroy(sw)
 	_key_cache_destroy(&sw.keys)
 	_secret_delete(transmute([]u8)sw.password, sw.allocator)
-	delete(sw.folder.input)
+	delete(sw.folder.call.data)
+	delete(sw.folder.jump.data)
+	delete(sw.folder.rc.data)
 	delete(sw.path, sw.allocator)
 	delete(sw.pack_sizes)
 	delete(sw.folders)
@@ -254,7 +256,9 @@ _writer_init :: proc(sw: ^Writer, s: io.Stream, options: Writer_Options) -> (err
 	sw.name.allocator         = sw.allocator
 	sw.walk_name.allocator    = sw.allocator
 	sw.header.allocator       = sw.allocator
-	sw.folder.input.allocator = sw.allocator
+	sw.folder.call.data.allocator  = sw.allocator
+	sw.folder.jump.data.allocator  = sw.allocator
+	sw.folder.rc.data.allocator    = sw.allocator
 	sw.ciphers.allocator      = sw.allocator
 	sw.keys.allocator         = sw.allocator
 	sw.options = options
@@ -921,13 +925,15 @@ _folder_accepts :: proc(sw: ^Writer, setup: Coder_Setup, expected: i64, key: ^[A
 @(private)
 _folder_open :: proc(sw: ^Writer, setup: Coder_Setup, expected: i64, key: ^[AES_KEY_SIZE]u8) -> (err: Error) {
 	f := &sw.folder
-	input := f.input
+	call, jump, rc := f.call.data, f.jump.data, f.rc.data
 	f^ = {}
-	f.input  = input
+	f.call.data, f.jump.data, f.rc.data = call, jump, rc
 	f.setup  = setup
 	f.limit  = _solid_limit(sw, setup)
 	f.sink   = {writer = sw}
-	clear(&f.input)
+	clear(&f.call.data)
+	clear(&f.jump.data)
+	clear(&f.rc.data)
 	folder := &f.folder
 	size   := expected if !sw.options.solid else -1
 	if key != nil {
@@ -954,6 +960,10 @@ _folder_open :: proc(sw: ^Writer, setup: Coder_Setup, expected: i64, key: ^[AES_
 			_folder_destroy(sw)
 			return
 		}
+		if err = _bcj2_init(sw); err != nil {
+			_folder_destroy(sw)
+			return
+		}
 		f.active = true
 		return nil
 	}
@@ -968,7 +978,7 @@ _folder_open :: proc(sw: ^Writer, setup: Coder_Setup, expected: i64, key: ^[AES_
 			filter.properties[0]   = u8(setup.delta - 1)
 			filter.properties_size = 1
 		}
-		if err = _stage_init(sw, &f.stage, setup); err != nil {
+		if err = _stage_init(sw, setup); err != nil {
 			_folder_destroy(sw)
 			return
 		}
@@ -982,19 +992,38 @@ _folder_open :: proc(sw: ^Writer, setup: Coder_Setup, expected: i64, key: ^[AES_
 }
 
 @(private)
-_stage_init :: proc(sw: ^Writer, stage: ^Filter_Stage, setup: Coder_Setup) -> (err: Error) {
+_filter_buffer_options :: proc(sw: ^Writer) -> (options: compress.Options, err: Error) {
 	if sw.filter_buffer == nil {
 		sw.filter_buffer = make([]u8, FILTER_BUFFER_SIZE, sw.allocator) or_return
 	}
-	stage^ = {filter = setup.filter, buffer = sw.filter_buffer}
+	options = _codec_options(sw)
+	options.buffer = sw.filter_buffer
+	return
+}
+
+@(private)
+_stage_init :: proc(sw: ^Writer, setup: Coder_Setup) -> (err: Error) {
+	f := &sw.folder
+	options := _filter_buffer_options(sw) or_return
+	filter: filters.Filter
 	#partial switch setup.filter {
 	case .Delta:
-		filters.delta_init(&stage.delta, setup.delta)
-	case .Swap2, .Swap4:
+		filter = filters.Delta_Filter{distance = setup.delta}
+	case .Swap2:
+		filter = filters.Swap_Filter.Swap2
+	case .Swap4:
+		filter = filters.Swap_Filter.Swap4
 	case:
-		filters.branch_init(&stage.branch, _choice_arch(setup.filter))
+		filter = filters.Branch_Filter{arch = _choice_arch(setup.filter)}
 	}
-	return nil
+	return filters.writer_init(&f.stage, _encoder_writer(&f.encoder), filter, .Encode, options, sw.allocator)
+}
+
+@(private)
+_bcj2_init :: proc(sw: ^Writer) -> (err: Error) {
+	f := &sw.folder
+	options := _filter_buffer_options(sw) or_return
+	return filters.bcj2_writer_init(&f.bcj2, _encoder_writer(&f.encoder), _dynamic_writer(&f.call), _dynamic_writer(&f.jump), _dynamic_writer(&f.rc), options = options, allocator = sw.allocator)
 }
 
 @(private)
@@ -1047,37 +1076,18 @@ _folder_feed :: proc(sw: ^Writer, source: ^Source, head: []u8, expected: i64, fi
 _folder_write :: proc(sw: ^Writer, data: []u8) -> (err: Error) {
 	f := &sw.folder
 	if f.folder.bcj2 {
-		if i64(len(f.input)) + i64(len(data)) > _bcj2_cap(sw) {
+		if f.bcj2_in + i64(len(data)) > _bcj2_cap(sw) {
 			return compress.Error(compress.General_Error.Memory_Limit_Exceeded)
 		}
-		append(&f.input, ..data) or_return
-		return nil
+		f.bcj2_in += i64(len(data))
+		_, bcj2_err := filters.bcj2_writer_write(&f.bcj2, data)
+		return _stage_error(f, bcj2_err)
 	}
 	if f.folder.coder_count == 1 {
 		return _encoder_write(&f.encoder, data)
 	}
-	stage := &f.stage
-	rest  := data
-	for len(rest) > 0 {
-		n := copy(stage.buffer[stage.pending:], rest)
-		rest = rest[n:]
-		total := stage.pending + n
-		done  := 0
-		#partial switch stage.filter {
-		case .Delta:
-			filters.delta_encode(&stage.delta, stage.buffer[:total])
-			done = total
-		case .Swap2:
-			done = filters.swap2(stage.buffer[:total])
-		case .Swap4:
-			done = filters.swap4(stage.buffer[:total])
-		case:
-			done = filters.branch_encode(&stage.branch, stage.buffer[:total])
-		}
-		_encoder_write(&f.encoder, stage.buffer[:done]) or_return
-		stage.pending = copy(stage.buffer, stage.buffer[done:total])
-	}
-	return nil
+	_, filter_err := filters.writer_write(&f.stage, data)
+	return _stage_error(f, filter_err)
 }
 
 @(private)
@@ -1089,9 +1099,7 @@ _folder_close :: proc(sw: ^Writer) -> (err: Error) {
 		_folder_close_bcj2(sw) or_return
 	} else {
 		if folder.coder_count == 2 {
-			stage := &f.stage
-			_encoder_write(&f.encoder, stage.buffer[:stage.pending]) or_return
-			stage.pending = 0
+			_stage_error(f, filters.writer_finish(&f.stage)) or_return
 		}
 		_encoder_finish(&f.encoder) or_return
 		_pack_finish(sw, 0) or_return
@@ -1110,29 +1118,17 @@ _folder_close :: proc(sw: ^Writer) -> (err: Error) {
 _folder_close_bcj2 :: proc(sw: ^Writer) -> (err: Error) {
 	f := &sw.folder
 	folder := &f.folder
-	streams: filters.Bcj2_Streams
-	defer {
-		delete(streams.main)
-		delete(streams.call)
-		delete(streams.jump)
-		delete(streams.rc)
-	}
-	filters.bcj2_encode(&streams, f.input[:], allocator = sw.allocator) or_return
-	delete(f.input)
-	f.input = {}
-	f.input.allocator = sw.allocator
-
-	_encoder_write(&f.encoder, streams.main[:]) or_return
+	_stage_error(f, filters.bcj2_writer_finish(&f.bcj2)) or_return
 	_encoder_finish(&f.encoder) or_return
 	_pack_finish(sw, 0) or_return
 
-	_pack_emit(sw, streams.rc[:], 1) or_return
-	_pack_lzma(sw, streams.call[:], &folder.coders[1], 2) or_return
-	_pack_lzma(sw, streams.jump[:], &folder.coders[0], 3) or_return
+	_pack_emit(sw, f.rc.data[:], 1) or_return
+	_pack_lzma(sw, f.call.data[:], &folder.coders[1], 2) or_return
+	_pack_lzma(sw, f.jump.data[:], &folder.coders[0], 3) or_return
 
-	folder.coders[0].unpack_size = i64(len(streams.jump))
-	folder.coders[1].unpack_size = i64(len(streams.call))
-	folder.coders[2].unpack_size = i64(len(streams.main))
+	folder.coders[0].unpack_size = i64(len(f.jump.data))
+	folder.coders[1].unpack_size = i64(len(f.call.data))
+	folder.coders[2].unpack_size = f.bcj2.written[.Main]
 	folder.coders[3].unpack_size = f.unpack
 	return nil
 }
@@ -1176,12 +1172,16 @@ _pack_finish :: proc(sw: ^Writer, stream: int) -> (err: Error) {
 _folder_destroy :: proc(sw: ^Writer) {
 	f := &sw.folder
 	_encoder_destroy(&f.encoder)
+	filters.writer_destroy(&f.stage)
+	filters.bcj2_writer_destroy(&f.bcj2)
 	_cipher_destroy(&f.cipher)
 	crypto.zero_explicit(&f.key, size_of(f.key))
-	input := f.input
-	clear(&input)
+	call, jump, rc := f.call.data, f.jump.data, f.rc.data
+	clear(&call)
+	clear(&jump)
+	clear(&rc)
 	f^ = {}
-	f.input = input
+	f.call.data, f.jump.data, f.rc.data = call, jump, rc
 }
 
 @(private)
@@ -1264,6 +1264,65 @@ _encoder_destroy :: proc(e: ^Encoder) {
 	bzip2.writer_destroy(&e.bzip2)
 	lzma.writer_destroy(&e.lzma)
 	ppmd.writer_destroy(&e.ppmd)
+}
+
+@(private)
+_stage_error :: proc(f: ^Open_Folder, err: compress.Error) -> Error {
+	if err == nil {
+		return nil
+	}
+	for stashed in ([?]Error{f.encoder.err, f.call.err, f.jump.err, f.rc.err}) {
+		if stashed != nil {
+			return stashed
+		}
+	}
+	return err
+}
+
+@(private)
+_encoder_writer :: proc(e: ^Encoder) -> (w: io.Writer) {
+	w.data      = e
+	w.procedure = _encoder_proc
+	return
+}
+
+@(private)
+_encoder_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	e := (^Encoder)(stream_data)
+	#partial switch mode {
+	case .Write:
+		if write_err := _encoder_write(e, p); write_err != nil {
+			e.err = write_err
+			return 0, .Unknown
+		}
+		return i64(len(p)), nil
+	case .Query:
+		return io.query_utility({.Write, .Query})
+	}
+	return 0, .Unsupported
+}
+
+@(private)
+_dynamic_writer :: proc(sink: ^Side_Sink) -> (w: io.Writer) {
+	w.data      = sink
+	w.procedure = _dynamic_proc
+	return
+}
+
+@(private)
+_dynamic_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	sink := (^Side_Sink)(stream_data)
+	#partial switch mode {
+	case .Write:
+		if _, append_err := append(&sink.data, ..p); append_err != nil {
+			sink.err = append_err
+			return 0, .Unknown
+		}
+		return i64(len(p)), nil
+	case .Query:
+		return io.query_utility({.Write, .Query})
+	}
+	return 0, .Unsupported
 }
 
 @(private)
