@@ -22,10 +22,7 @@ decompress_from_context :: proc(z: ^compress.Context, props: Properties, expecte
 	if u64(props.mem_size) > u64(min(compress.memory_limit(options), MEMORY_MAX)) {
 		return General_Error.Memory_Limit_Exceeded
 	}
-	expected := expected_output_size
-	if expected < 0 && z.size_unpacked >= 0 && z.size_unpacked <= i64(max(int)) {
-		expected = int(z.size_unpacked)
-	}
+	expected := compress.declared_size(expected_output_size)
 	if expected > max_output_size {
 		return General_Error.Output_Too_Short
 	}
@@ -142,10 +139,7 @@ stream_init :: proc(r: ^Reader, z: ^compress.Context, props: Properties, expecte
 		return General_Error.Incompatible_Options
 	}
 	check_properties(props) or_return
-	expected := i64(expected_output_size)
-	if expected < 0 && z.size_unpacked >= 0 {
-		expected = z.size_unpacked
-	}
+	expected := i64(compress.declared_size(expected_output_size))
 	if options.max_output_size > 0 {
 		d.limit = i64(options.max_output_size)
 	}

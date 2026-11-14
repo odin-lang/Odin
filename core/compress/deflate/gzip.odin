@@ -9,28 +9,26 @@ inflate_gzip :: proc{inflate_gzip_from_context, inflate_gzip_from_bytes}
 inflate_gzip_from_context :: proc(z: ^compress.Context, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
-	expected_output_size := expected_output_size
-	if expected_output_size <= 0 && z.size_unpacked > 0 {
-		expected_output_size = int(min(z.size_unpacked, i64(max(int))))
-	}
-	if expected_output_size > compress.output_limit(options) {
+	expected := compress.declared_size(expected_output_size)
+	if expected > compress.output_limit(options) {
 		return General_Error.Output_Exceeds_COMPRESS_OUTPUT_ALLOCATE_MAX
 	}
 
-	size_hint := -1
-	if expected_output_size <= 0 && compress.is_memory_context(z) && len(z.window) >= size_of(Gzip_Trailer) {
-		size_hint = min(int((^u32le)(raw_data(z.window[len(z.window) - 4:]))^), INFLATE_INITIAL_SIZE_MAX)
+	isize := i64(-1)
+	if compress.is_memory_context(z) && len(z.window) >= size_of(Gzip_Trailer) {
+		isize = min(i64((^u32le)(raw_data(z.window[len(z.window) - 4:]))^), INFLATE_INITIAL_SIZE_MAX)
 	}
+	size_hint := compress.declared_size(expected, isize)
 
 	p: Inflate_Progress
-	inflate_progress_init(&p, z, expected_output_size, options) or_return
+	inflate_progress_init(&p, z, expected, options) or_return
 
 	start := 0
 	for {
 		_, header_size := inflate_gzip_header(z) or_return
 		p.bytes_in += i64(header_size)
 		digest := u32(0)
-		output := inflate_to_buffer(z, expected_output_size, &p, start, size_hint, .CRC32, &digest, false) or_return
+		output := inflate_to_buffer(z, expected, &p, start, size_hint, .CRC32, &digest, false) or_return
 		member := output[start:]
 
 		trailer, trailer_err := compress.read_data(z, Gzip_Trailer)

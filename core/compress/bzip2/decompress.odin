@@ -20,12 +20,9 @@ decompress_from_context :: proc(z: ^compress.Context, expected_output_size := -1
 		return General_Error.Incompatible_Options
 	}
 
-	expected := expected_output_size
-	if expected <= 0 && z.size_unpacked > 0 && z.size_unpacked <= i64(max(int)) {
-		expected = int(z.size_unpacked)
-	}
-	limit := max_output_size
-	if expected > 0 {
+	expected := compress.declared_size(expected_output_size)
+	limit    := max_output_size
+	if expected >= 0 {
 		if expected > limit {
 			return General_Error.Output_Too_Short
 		}
@@ -41,7 +38,7 @@ decompress_from_context :: proc(z: ^compress.Context, expected_output_size := -1
 	input_size := len(z.window) if memory else compress.input_size(z)
 	non_zero_reserve(z.output, min(compress.output_reservation(expected, bzip2_decompress_bound(input_size) if input_size >= 0 else -1, input_size), limit)) or_return
 
-	total_out := i64(expected) if expected > 0 else -1
+	total_out := i64(expected)
 	interval  := compress.progress_interval(options)
 	mark      := max(int)
 	if options.progress != nil {
@@ -845,20 +842,15 @@ bzip2_stream_init :: proc(r: ^Reader, z: ^compress.Context, expected_output_size
 	if options.max_output_size < 0 || options.max_memory < 0 || options.chunk_size < 0 || options.progress_interval < 0 {
 		return General_Error.Incompatible_Options
 	}
-	expected := i64(expected_output_size)
-	if expected <= 0 && z.size_unpacked > 0 {
-		expected = z.size_unpacked
-	}
-	if expected > 0 {
-		r.total_out = expected
-	}
+	expected := i64(compress.declared_size(expected_output_size))
+	r.total_out = expected
 	if options.progress != nil {
 		r.total_in = i64(compress.input_size(z))
 	}
 	if options.max_output_size > 0 {
 		r.limit = i64(options.max_output_size)
 	}
-	if expected > 0 {
+	if expected >= 0 {
 		if r.limit >= 0 && expected > r.limit {
 			return General_Error.Output_Too_Short
 		}

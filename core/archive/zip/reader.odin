@@ -777,7 +777,7 @@ _section_context :: proc(r: ^Reader, section: ^Section, input: ^[]u8, allocator:
 		input^ = r.store.data[section.offset:section.end]
 		return compress.init_context_from_slice(input)
 	}
-	return compress.init_context_from_stream(_section_stream(section), nil, -1, nil, allocator)
+	return compress.init_context_from_stream(_section_stream(section), nil, nil, allocator)
 }
 
 @(private)

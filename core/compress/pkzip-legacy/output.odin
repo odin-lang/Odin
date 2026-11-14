@@ -5,10 +5,7 @@ import "core:compress"
 
 @(private)
 output_limit :: proc(z: ^compress.Context, expected_output_size, max_output_size, expansion_max: int) -> (expected: int, err: Error) {
-	expected = expected_output_size
-	if expected < 0 && z.size_unpacked >= 0 && z.size_unpacked <= i64(max(int)) {
-		expected = int(z.size_unpacked)
-	}
+	expected = compress.declared_size(expected_output_size)
 	if expected < 0 || max_output_size < 0 {
 		return expected, General_Error.Incompatible_Options
 	}

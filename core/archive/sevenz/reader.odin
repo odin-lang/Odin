@@ -1826,7 +1826,7 @@ _node_context :: proc(node: ^Node) -> (err: Error) {
 		node.slice = d.store.data[section.offset:section.end]
 		node.ctx   = compress.init_context_from_slice(&node.slice)
 	} else {
-		node.ctx = compress.init_context_from_stream(node.inputs[0], nil, -1, nil, d.allocator)
+		node.ctx = compress.init_context_from_stream(node.inputs[0], nil, nil, d.allocator)
 		if len(node.ctx.backing) == 0 {
 			return runtime.Allocator_Error.Out_Of_Memory
 		}

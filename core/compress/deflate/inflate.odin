@@ -881,19 +881,16 @@ inflate_to_buffer :: proc(z: ^compress.Context, expected_output_size: int, p: ^I
 	if z.output == nil {
 		return nil, General_Error.Incompatible_Options
 	}
-	expected_output_size := expected_output_size
-	if expected_output_size <= 0 && z.size_unpacked > 0 && z.size_unpacked <= i64(max(int)) {
-		expected_output_size = int(z.size_unpacked)
-	}
+	expected := compress.declared_size(expected_output_size)
 
 	limit := compress.output_limit(p.options)
 	hint  := size_hint - start if size_hint > start else -1
-	if expected_output_size > 0 {
-		if expected_output_size > limit {
+	if expected >= 0 {
+		if expected > limit {
 			return nil, General_Error.Output_Too_Short
 		}
-		limit = expected_output_size
-		hint  = expected_output_size - start
+		limit = expected
+		hint  = expected - start
 	}
 	limit -= start
 	if limit < 0 {

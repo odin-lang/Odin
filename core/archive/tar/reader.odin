@@ -303,7 +303,7 @@ _start_gzip :: proc(r: ^Reader) -> (err: Error) {
 	if r.input.procedure == nil {
 		r.ctx = compress.init_context_from_slice(&r.input_data)
 	} else {
-		r.ctx = compress.init_context_from_stream(_prefix_stream(r), nil, -1, nil, r.allocator)
+		r.ctx = compress.init_context_from_stream(_prefix_stream(r), nil, nil, r.allocator)
 	}
 	inflate_err := deflate.inflate_reader_init(&r.inflate, &r.ctx, .Gzip, -1, r.options, r.allocator)
 	r.source = .Gzip
@@ -337,7 +337,7 @@ _decode_whole :: proc(r: ^Reader, sniffed: Sniffed) -> (err: Error) {
 			decode_err = xz.decompress_from_bytes(&r.decoded, r.input_data, {}, -1, limit, r.allocator)
 		}
 	} else {
-		r.ctx = compress.init_context_from_stream(_prefix_stream(r), &r.decoded, -1, nil, r.allocator)
+		r.ctx = compress.init_context_from_stream(_prefix_stream(r), &r.decoded, nil, r.allocator)
 		defer compress.destroy_context(&r.ctx)
 		#partial switch sniffed {
 		case .BZip2:

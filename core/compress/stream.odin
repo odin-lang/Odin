@@ -32,23 +32,19 @@ Context :: struct #align(64) {
 	code_buffer:       u64,           // 32-bit: 8, 64-bit: 8
 	num_bits:          u64,           // 32-bit: 8, 64-bit: 8
 
-	// Some algorithms, like legacy PKZIP methods Implode & Reduce,
-	// need to know the unpacked size to not write a spurious tail,
-	size_unpacked:     i64,           // 32-bit: 8, 64-bit: 8
-
 	buffer:            []byte,
 	window:            []byte,
 	backing:           []byte,
 	backing_allocator: runtime.Allocator,
 	owns_backing:      b8,
-	_reserved:         [7]u8,
+	_reserved:         [15]u8,
 }
 
 when size_of(rawptr) == 8 {
-	#assert(size_of(Context) == 16 + 8 + 8 + 8 + 8 + 8 + 3 * 16 + 16 + 8)
+	#assert(size_of(Context) == 16 + 8 + 8 + 8 + 8 + 3 * 16 + 16 + 16)
 	// 128 bytes
 } else {
-	#assert(size_of(Context) == (8 + 4 + 8 + 8 + 8 + 8 + 3 * 8 + 8 + 8 + 63) &~ 63)
+	#assert(size_of(Context) == (8 + 4 + 8 + 8 + 8 + 3 * 8 + 8 + 16 + 63) &~ 63)
 	// 84 bytes, padded to 128 by `#align(64)`
 }
 
@@ -64,22 +60,20 @@ _memory_reader_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte
 }
 
 // Initialize I/O `Context` from byte slice
-init_context_from_slice :: proc(data: ^[]byte, output: ^[dynamic]byte = nil, size_unpacked := i64(-1)) -> (ctx: Context) {
+init_context_from_slice :: proc(data: ^[]byte, output: ^[dynamic]byte = nil) -> (ctx: Context) {
 	ctx.input = Memory_Reader{
 		procedure = _memory_reader_proc,
 		data      = data,
 	}
-	ctx.buffer        = data^
-	ctx.window        = data^
-	ctx.output        = output
-	ctx.size_unpacked = size_unpacked
+	ctx.buffer = data^
+	ctx.window = data^
+	ctx.output = output
 	return
 }
 
 // Initialize I/O `Context` from `io.Stream`
-init_context_from_stream :: proc(stream: io.Stream, output: ^[dynamic]byte = nil, size_unpacked := i64(-1), buffer: []byte = nil, allocator := context.allocator) -> (ctx: Context) {
+init_context_from_stream :: proc(stream: io.Stream, output: ^[dynamic]byte = nil, buffer: []byte = nil, allocator := context.allocator) -> (ctx: Context) {
 	ctx.input         = stream
-	ctx.size_unpacked = size_unpacked
 	ctx.output        = output
 	ctx.backing_allocator = allocator
 	if buffer != nil {
@@ -166,6 +160,12 @@ size :: proc(z: ^Context) -> (res: i64, err: io.Error) {
 	}
 	total    := io.size(z.input)                   or_return
 	position := io.seek(z.input, 0, .Current)     or_return
+	if total <= 0 {
+		return 0, .Unsupported
+	}
+	if position > total {
+		return 0, .Invalid_Offset
+	}
 	return total - position + i64(len(z.window)), nil
 }
 
@@ -177,9 +177,19 @@ input_size :: #force_inline proc(z: ^Context) -> (res: int) {
 	return int(n)
 }
 
+declared_size :: #force_inline proc "contextless" (expected_output_size: int, format_size := i64(-1)) -> (size: int) {
+	if expected_output_size >= 0 {
+		return expected_output_size
+	}
+	if format_size >= 0 && format_size <= i64(max(int)) {
+		return int(format_size)
+	}
+	return -1
+}
+
 output_reservation :: #force_inline proc "contextless" (declared, bound, input_size: int) -> (size: int) {
 	size = declared
-	if declared <= 0 {
+	if declared < 0 {
 		size = COMPRESS_RESERVE_DEFAULT
 		if input_size >= 0 {
 			size = COMPRESS_INITIAL_RESERVATION

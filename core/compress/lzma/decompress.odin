@@ -60,10 +60,7 @@ decompress_raw_from_context :: proc(z: ^compress.Context, props: Properties, exp
 	if !valid_properties(props) {
 		return LZMA_Error.Invalid_Properties
 	}
-	expected := expected_output_size
-	if expected < 0 && z.size_unpacked >= 0 && z.size_unpacked <= i64(max(int)) {
-		expected = int(z.size_unpacked)
-	}
+	expected := compress.declared_size(expected_output_size)
 	if expected > max_output_size {
 		return General_Error.Output_Too_Short
 	}
@@ -81,10 +78,7 @@ decompress_lzma2_from_context :: proc(z: ^compress.Context, dict_size: u32, expe
 	if z.output == nil || max_output_size < 0 {
 		return General_Error.Incompatible_Options
 	}
-	expected := expected_output_size
-	if expected < 0 && z.size_unpacked >= 0 && z.size_unpacked <= i64(max(int)) {
-		expected = int(z.size_unpacked)
-	}
+	expected := compress.declared_size(expected_output_size)
 	if expected > max_output_size {
 		return General_Error.Output_Too_Short
 	}

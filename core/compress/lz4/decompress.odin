@@ -65,12 +65,9 @@ decompress_frame_from_context :: proc(z: ^compress.Context, expected_output_size
 	}
 	lz4_check_options(options) or_return
 
-	expected := expected_output_size
-	if expected <= 0 && z.size_unpacked > 0 && z.size_unpacked <= i64(max(int)) {
-		expected = int(z.size_unpacked)
-	}
-	limit := compress.output_limit(options)
-	if expected > 0 {
+	expected := compress.declared_size(expected_output_size)
+	limit    := compress.output_limit(options)
+	if expected >= 0 {
 		if expected > limit {
 			return General_Error.Output_Too_Short
 		}
@@ -78,7 +75,7 @@ decompress_frame_from_context :: proc(z: ^compress.Context, expected_output_size
 	}
 
 	input_size := compress.input_size(z)
-	if expected > 0 {
+	if expected >= 0 {
 		non_zero_reserve(z.output, lz4_initial_size(expected, input_size)) or_return
 	}
 
@@ -91,7 +88,7 @@ decompress_frame_from_context :: proc(z: ^compress.Context, expected_output_size
 		z.bytes_written = i64(written)
 	}
 
-	progress := lz4_progress_init(options, 0, i64(input_size), i64(expected) if expected > 0 else -1)
+	progress := lz4_progress_init(options, 0, i64(input_size), i64(expected))
 	frames   := 0
 	for {
 		if frames > 0 {
@@ -662,20 +659,15 @@ lz4_stream_init :: proc(r: ^Frame_Reader, z: ^compress.Context, expected_output_
 	if options.max_memory < 0 || options.chunk_size < 0 || options.progress_interval < 0 {
 		return General_Error.Incompatible_Options
 	}
-	expected := i64(expected_output_size)
-	if expected <= 0 && z.size_unpacked > 0 {
-		expected = z.size_unpacked
-	}
-	if expected > 0 {
-		r.total_out = expected
-	}
+	expected := i64(compress.declared_size(expected_output_size))
+	r.total_out = expected
 	if options.progress != nil {
 		r.total_in = i64(compress.input_size(z))
 	}
 	if options.max_output_size > 0 {
 		r.limit = i64(options.max_output_size)
 	}
-	if expected > 0 {
+	if expected >= 0 {
 		if r.limit >= 0 && expected > r.limit {
 			return General_Error.Output_Too_Short
 		}

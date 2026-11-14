@@ -60,5 +60,5 @@ load_from_bytes :: proc(data: []byte, output: ^bytes.Buffer, known_gzip_size := 
 
 @(deprecated="Use `deflate.inflate_gzip` from `core:compress/deflate`")
 load_from_context :: proc(z: ^compress.Context, known_gzip_size := -1, allocator := context.allocator) -> (err: Error) {
-	return deflate.inflate_gzip_from_context(z, int(z.size_unpacked), allocator=allocator)
+	return deflate.inflate_gzip_from_context(z, allocator=allocator)
 }

@@ -200,10 +200,7 @@ stream_init :: proc(r: ^Reader, z: ^compress.Context, kind: Stream_Kind, props: 
 		r.total_in = i64(compress.input_size(z))
 	}
 
-	size := expected_output_size
-	if size < 0 && z.size_unpacked >= 0 && z.size_unpacked <= i64(max(int)) {
-		size = int(z.size_unpacked)
-	}
+	size  := compress.declared_size(expected_output_size)
 	props := props
 	switch kind {
 	case .Alone:

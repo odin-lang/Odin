@@ -694,14 +694,11 @@ inflate_stream_init :: proc(r: ^Inflate_Reader, z: ^compress.Context, format: In
 	if options.max_memory < 0 || options.chunk_size < 0 || options.progress_interval < 0 {
 		return General_Error.Incompatible_Options
 	}
-	expected := i64(expected_output_size)
-	if expected <= 0 && z.size_unpacked > 0 {
-		expected = z.size_unpacked
-	}
+	expected := i64(compress.declared_size(expected_output_size))
 	if options.max_output_size > 0 {
 		r.limit = i64(options.max_output_size)
 	}
-	if expected > 0 {
+	if expected >= 0 {
 		if r.limit >= 0 && expected > r.limit {
 			return General_Error.Output_Exceeds_COMPRESS_OUTPUT_ALLOCATE_MAX if format == .Gzip else General_Error.Output_Too_Short
 		}
@@ -883,12 +880,8 @@ inflate_progress_init :: proc(p: ^Inflate_Progress, z: ^compress.Context, expect
 	if options.progress == nil {
 		return nil
 	}
-	p.total_in = i64(compress.input_size(z))
-	if expected_output_size > 0 {
-		p.total_out = i64(expected_output_size)
-	} else if z.size_unpacked > 0 {
-		p.total_out = z.size_unpacked
-	}
+	p.total_in  = i64(compress.input_size(z))
+	p.total_out = i64(compress.declared_size(expected_output_size))
 	p.next = i64(compress.progress_interval(options))
 	return nil
 }
