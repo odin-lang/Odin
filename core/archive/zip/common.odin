@@ -42,6 +42,7 @@ Updating:
 
 Planned:
 - Streaming extraction for XZ and the pkzip-legacy methods
+- Copy-on-write updates, safe alongside concurrent readers
 */
 package archive_zip
 
