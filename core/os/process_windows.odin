@@ -473,8 +473,10 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			win32.FILE_ATTRIBUTE_NORMAL,
 			nil,
 		)
-		// Opening NUL should always succeed.
-		assert(null_handle != nil)
+		if null_handle == win32.INVALID_HANDLE_VALUE {
+			err = _get_platform_error()
+			return
+		}
 	}
 	// NOTE(laytan): I believe it is fine to close this handle right after CreateProcess,
 	// and we don't have to hold onto this until the process exits.
@@ -524,6 +526,7 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		err = _get_platform_error()
 		return
 	}
+	win32.CloseHandle(process_info.hThread)
 	process = {pid = int(process_info.dwProcessId), handle = uintptr(process_info.hProcess)}
 	return
 }
@@ -759,7 +762,7 @@ _build_command_line :: proc(command: []string, allocator: runtime.Allocator) -> 
 			strings.write_byte(&builder, ' ')
 		}
 		j := 0
-		if strings.contains_any(arg, "()[]{}^=;!'+,`~\" ") {
+		if len(arg) == 0 || strings.contains_any(arg, "()[]{}^=;!'+,`~\" \t") {
 			strings.write_byte(&builder, '"')
 			for j < len(arg) {
 				backslashes := 0
