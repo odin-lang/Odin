@@ -153,7 +153,7 @@ OLECHAR               :: WCHAR
 BSTR                  :: ^OLECHAR
 
 LPOLESTR   :: cstring16
-LPCOLESTR  :: LPCSTR
+LPCOLESTR  :: wstring
 LPFILETIME :: ^FILETIME
 LPWSABUF   :: ^WSABUF
 
@@ -4241,6 +4241,21 @@ STATSTG :: struct {
 	reserved:          DWORD,
 }
 
+SHITEMID :: struct #packed {
+	cb:   USHORT,
+	abID: [1]BYTE,
+}
+
+ITEMIDLIST :: struct #packed {
+	mkid: SHITEMID,
+}
+
+LPITEMIDLIST  :: ^ITEMIDLIST
+LPCITEMIDLIST :: ^ITEMIDLIST
+
+PIDLIST_ABSOLUTE  :: ^ITEMIDLIST
+PCIDLIST_ABSOLUTE :: ^ITEMIDLIST
+
 COMDLG_FILTERSPEC :: struct {
 	pszName, pszSpec: LPCWSTR,
 }
@@ -4352,14 +4367,46 @@ SHACF_AUTOSUGGEST_FORCE_OFF :: 0x20000000  // Ignore the registry default and fo
 SHACF_AUTOAPPEND_FORCE_ON   :: 0x40000000  // Ignore the registry default and force the feature on. (Also know as AutoComplete)
 SHACF_AUTOAPPEND_FORCE_OFF  :: 0x80000000  // Ignore the registry default and force the feature off. (Also know as AutoComplete)
 
+STGM_READ             :: 0x00000000
+STGM_WRITE            :: 0x00000001
+STGM_READWRITE        :: 0x00000002
+STGM_SHARE_DENY_NONE  :: 0x00000040
+STGM_SHARE_DENY_READ  :: 0x00000030
+STGM_SHARE_DENY_WRITE :: 0x00000020
+STGM_SHARE_EXCLUSIVE  :: 0x00000010
+
+// SLR_FLAGS (Flags for IShellLinkW::Resolve)
+SLR_NO_UI                     : DWORD : 0x0001
+SLR_ANY_MATCH                 : DWORD : 0x0002
+SLR_UPDATE                    : DWORD : 0x0004
+SLR_NOUPDATE                  : DWORD : 0x0008
+SLR_NOSEARCH                  : DWORD : 0x0010
+SLR_NOTRACK                   : DWORD : 0x0020
+SLR_NOLINKINFO                : DWORD : 0x0040
+SLR_INVOKE_MSI                : DWORD : 0x0080
+SLR_NO_UI_WITH_MSG_PUMP       : DWORD : 0x0101
+SLR_OFFER_DELETE_WITHOUT_FILE : DWORD : 0x0200
+SLR_KNOWN_REPOSITORY          : DWORD : 0x0400
+SLR_MACHINE_IN_LOCAL_TARGET   : DWORD : 0x0800
+SLR_UPDATE_MACHINE_AND_SID    : DWORD : 0x1000
+SLR_NO_OBJECT_ID              : DWORD : 0x2000
+
+// SLGP_FLAGS (Flags for IShellLinkW::GetPath)
+SLGP_SHORTPATH                : DWORD : 0x0001
+SLGP_UNCPRIORITY              : DWORD : 0x0002
+SLGP_RAWPATH                  : DWORD : 0x0004
+SLGP_RELATIVEPRIORITY         : DWORD : 0x0008
+
 LWSTDAPI :: HRESULT
 
 CLSID_FileOpenDialog    := &GUID{0xDC1C5A9C, 0xE88A, 0x4DDE, {0xA5, 0xA1, 0x60, 0xF8, 0x2A, 0x20, 0xAE, 0xF7}}
 CLSID_FileSaveDialog    := &GUID{0xC0B4E2F3, 0xBA21, 0x4773, {0x8D, 0xBA, 0x33, 0x5E, 0xC9, 0x46, 0xEB, 0x8B}}
 CLSID_TaskbarList       := &GUID{0x56FDF344, 0xFD6D, 0x11d0, {0x95, 0x8A, 0x00, 0x60, 0x97, 0xC9, 0xA0, 0x90}}
 CLSID_QueryAssociations :=  GUID{0xa07034fd, 0x6caa, 0x4954, {0xac, 0x3f, 0x97, 0xa2, 0x72, 0x16, 0xf9, 0x8a}}
+CLSID_ShellLink         := &GUID{0x00021401, 0x0000, 0x0000, {0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46}}
 
 IID_IShellItem         := &GUID{0x43826d1e, 0xe718, 0x42ee, {0xbc, 0x55, 0xa1, 0xe2, 0x61, 0xc3, 0x7b, 0xfe}}
+IID_IShellLinkW        := &GUID{0x000214F9, 0x0000, 0x0000, {0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46}}
 IID_IFileDialog        := &GUID{0x42F85136, 0xDB7E, 0x439C, {0x85, 0xF1, 0xE4, 0x07, 0x5D, 0x13, 0x5F, 0xC8}}
 IID_IFileSaveDialog    := &GUID{0x84BCCD23, 0x5FDE, 0x4CDB, {0xAE, 0xA4, 0xAF, 0x64, 0xB8, 0x3D, 0x78, 0xAB}}
 IID_IFileOpenDialog    := &GUID{0xD57C7288, 0xD4AD, 0x4768, {0xBE, 0x02, 0x9D, 0x96, 0x95, 0x32, 0xD9, 0x60}}
@@ -4367,6 +4414,8 @@ IID_ITaskbarList       := &GUID{0x56FDF342, 0xFD6D, 0x11d0, {0x95, 0x8A, 0x00, 0
 IID_ITaskbarList2      := &GUID{0x602D4995, 0xB13A, 0x429b, {0xA6, 0x6E, 0x19, 0x35, 0xE4, 0x4F, 0x43, 0x17}}
 IID_ITaskbarList3      := &GUID{0xea1afb91, 0x9e28, 0x4b86, {0x90, 0xe9, 0x9e, 0x9f, 0x8a, 0x5e, 0xef, 0xaf}}
 IID_IQueryAssociations := &GUID{0xc46ca590, 0x3c3f, 0x11d2, {0xbe, 0xe6, 0x00, 0x00, 0xf8, 0x05, 0xca, 0x57}}
+
+IID_IPersistFile        := &GUID{0x0000010b, 0x0000, 0x0000, {0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46}}
 
 IModalWindow :: struct #raw_union {
 	#subtype IUnknown: IUnknown,
@@ -4423,6 +4472,21 @@ IPersistStreamVtbl :: struct {
 	Load:       proc "system" (this: ^IPersistStream, pStm: ^IStream) -> HRESULT,
 	Save:       proc "system" (this: ^IPersistStream, pStm: ^IStream, fClearDirty: BOOL) -> HRESULT,
 	GetSizeMax: proc "system" (this: ^IPersistStream, pcbSize: ^ULARGE_INTEGER) -> HRESULT,
+}
+
+IPersistFile :: struct #raw_union {
+	#subtype ipersist: IPersist,
+	using ipersistfile_vtbl: ^IPersistFileVtbl,
+}
+
+IPersistFileVtbl :: struct {
+	using ipersist_vtbl: IPersistVtbl,
+
+	IsDirty:       proc "stdcall" (this: ^IPersistFile) -> HRESULT,
+	Load:          proc "stdcall" (this: ^IPersistFile, pszFileName: LPCOLESTR, dwMode: DWORD) -> HRESULT,
+	Save:          proc "stdcall" (this: ^IPersistFile, pszFileName: LPCOLESTR, fRemember: BOOL) -> HRESULT,
+	SaveCompleted: proc "stdcall" (this: ^IPersistFile, pszFileName: LPCOLESTR) -> HRESULT,
+	GetCurFile:    proc "stdcall" (this: ^IPersistFile, ppszFileName: ^LPOLESTR) -> HRESULT,
 }
 
 IMoniker :: struct #raw_union {
@@ -4543,6 +4607,34 @@ IShellItemArrayVtbl :: struct {
 	GetCount:                   proc "system" (this: ^IShellItemArray, pdwNumItems: ^DWORD) -> HRESULT,
 	GetItemAt:                  proc "system" (this: ^IShellItemArray, dwIndex: DWORD, ppsi: ^^IShellItem) -> HRESULT,
 	EnumItems:                  proc "system" (this: ^IShellItemArray, ppenumShellItems: ^^IEnumShellItems) -> HRESULT,
+}
+
+IShellLinkW :: struct #raw_union {
+	#subtype iunknown: IUnknown,
+	using ishelllinkwvtbl: ^IShellLinkWVtbl,
+}
+
+IShellLinkWVtbl :: struct {
+	using iunknown_vtbl: IUnknownVtbl,
+
+	GetPath:             proc"stdcall"(this: ^IShellLinkW, pszFile: LPWSTR, cch: c.int, pfd: ^WIN32_FIND_DATAW, fFlags: DWORD) -> HRESULT,
+	GetIDList:           proc"stdcall"(this: ^IShellLinkW, ppidl: ^PIDLIST_ABSOLUTE) -> HRESULT,
+	SetIDList:           proc"stdcall"(this: ^IShellLinkW, pidl: PCIDLIST_ABSOLUTE) -> HRESULT,
+	GetDescription:      proc"stdcall"(this: ^IShellLinkW, pszName: LPWSTR, cch: c.int) -> HRESULT,
+	SetDescription:      proc"stdcall"(this: ^IShellLinkW, pszName: LPCWSTR) -> HRESULT,
+	GetWorkingDirectory: proc"stdcall"(this: ^IShellLinkW, pszDir: LPWSTR, cch: c.int) -> HRESULT,
+	SetWorkingDirectory: proc"stdcall"(this: ^IShellLinkW, pszDir: LPCWSTR) -> HRESULT,
+	GetArguments:        proc"stdcall"(this: ^IShellLinkW, pszArgs: LPWSTR, cch: c.int) -> HRESULT,
+	SetArguments:        proc"stdcall"(this: ^IShellLinkW, pszArgs: LPCWSTR) -> HRESULT,
+	GetHotkey:           proc"stdcall"(this: ^IShellLinkW, pwHotkey: ^WORD) -> HRESULT,
+	SetHotkey:           proc"stdcall"(this: ^IShellLinkW, wHotkey: WORD) -> HRESULT,
+	GetShowCmd:          proc"stdcall"(this: ^IShellLinkW, piShowCmd: ^c.int) -> HRESULT,
+	SetShowCmd:          proc"stdcall"(this: ^IShellLinkW, iShowCmd: c.int) -> HRESULT,
+	GetIconLocation:     proc"stdcall"(this: ^IShellLinkW, pszIconPath: LPWSTR, cch: c.int, piIcon: ^c.int) -> HRESULT,
+	SetIconLocation:     proc"stdcall"(this: ^IShellLinkW, pszIconPath: LPCWSTR, iIcon: c.int) -> HRESULT,
+	SetRelativePath:     proc"stdcall"(this: ^IShellLinkW, pszPathRel: LPCWSTR, dwReserved: DWORD) -> HRESULT,
+	Resolve:             proc"stdcall"(this: ^IShellLinkW, hwnd: HWND, fFlags: DWORD) -> HRESULT,
+	SetPath:             proc"stdcall"(this: ^IShellLinkW, pszFile: LPCWSTR) -> HRESULT,
 }
 
 IFileDialogEvents :: struct #raw_union {
