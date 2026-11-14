@@ -39,40 +39,19 @@ _same_file :: proc(fi1, fi2: File_Info) -> bool {
 	return fi1.fullpath == fi2.fullpath
 }
 
-full_path_from_name :: proc(name: string, allocator: runtime.Allocator) -> (path: string, err: Error) {
-	name := name
-	if name == "" {
-		name = "."
-	}
-
-	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
-
-	p := win32_utf8_to_utf16(name, temp_allocator) or_return
-
-	n := win32.GetFullPathNameW(cstring16(raw_data(p)), 0, nil, nil)
-	if n == 0 {
-		return "", _get_platform_error()
-	}
-	buf := make([]u16, n+1, temp_allocator)
-	n = win32.GetFullPathNameW(cstring16(raw_data(p)), u32(len(buf)), cstring16(raw_data(buf)), nil)
-	if n == 0 {
-		return "", _get_platform_error()
-	}
-	return win32_utf16_to_utf8(buf[:n], allocator)
-}
-
 internal_stat :: proc(name: string, create_file_attributes: u32, allocator: runtime.Allocator) -> (fi: File_Info, e: Error) {
 	if len(name) == 0 {
 		return {}, .Not_Exist
 	}
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
-	wname := _fix_long_path(name, temp_allocator) or_return
+	wide  := win32_utf8_to_utf16(name, temp_allocator) or_return
+	wname := cstring16(raw_data(_fix_long_path_wide(name, wide, temp_allocator) or_return))
 	fa: win32.WIN32_FILE_ATTRIBUTE_DATA
 	ok := win32.GetFileAttributesExW(wname, win32.GetFileExInfoStandard, &fa)
 	if ok && fa.dwFileAttributes & win32.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
 		// Not a symlink
-		fi = _file_info_from_win32_file_attribute_data(&fa, name, allocator) or_return
+		fi = _file_info_from_win32_file_attribute_data(&fa, wide, allocator) or_return
 		if fi.type == .Undetermined {
 			fi.type = _file_type_from_create_file(wname, create_file_attributes)
 		}
@@ -90,7 +69,7 @@ internal_stat :: proc(name: string, create_file_attributes: u32, allocator: runt
 		}
 		win32.FindClose(sh)
 
-		fi = _file_info_from_win32_find_data(&fd, name, allocator) or_return
+		fi = _file_info_from_win32_find_data(&fd, wide, allocator) or_return
 		if fi.type == .Undetermined {
 			fi.type = _file_type_from_create_file(wname, create_file_attributes)
 		}
@@ -103,7 +82,7 @@ internal_stat :: proc(name: string, create_file_attributes: u32, allocator: runt
 		return
 	}
 	defer win32.CloseHandle(h)
-	fullpath := full_path_from_name(name, allocator) or_return
+	fullpath := _full_path_utf8(wide, allocator) or_return
 	fi, e = _file_info_from_get_file_information_by_handle(fullpath, h, allocator)
 	if e != nil {
 		delete(fullpath, allocator)
@@ -257,7 +236,7 @@ filetime_as_time_ft :: #force_inline proc(ft: win32.FILETIME) -> (t: time.Time) 
 
 filetime_as_time :: proc{filetime_as_time_ft, filetime_as_time_li}
 
-_file_info_from_win32_file_attribute_data :: proc(d: ^win32.WIN32_FILE_ATTRIBUTE_DATA, name: string, allocator: runtime.Allocator) -> (fi: File_Info, e: Error) {
+_file_info_from_win32_file_attribute_data :: proc(d: ^win32.WIN32_FILE_ATTRIBUTE_DATA, wide: []u16, allocator: runtime.Allocator) -> (fi: File_Info, e: Error) {
 	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
 	type, mode := _file_type_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
 	fi.type = type
@@ -265,12 +244,12 @@ _file_info_from_win32_file_attribute_data :: proc(d: ^win32.WIN32_FILE_ATTRIBUTE
 	fi.creation_time     = filetime_as_time(d.ftCreationTime)
 	fi.modification_time = filetime_as_time(d.ftLastWriteTime)
 	fi.access_time       = filetime_as_time(d.ftLastAccessTime)
-	fi.fullpath, e = full_path_from_name(name, allocator)
+	fi.fullpath, e = _full_path_utf8(wide, allocator)
 	fi.name = basename(fi.fullpath)
 	return
 }
 
-_file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, name: string, allocator: runtime.Allocator) -> (fi: File_Info, e: Error) {
+_file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, wide: []u16, allocator: runtime.Allocator) -> (fi: File_Info, e: Error) {
 	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
 	type, mode := _file_type_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
 	fi.type = type
@@ -278,7 +257,7 @@ _file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, name: string
 	fi.creation_time     = filetime_as_time(d.ftCreationTime)
 	fi.modification_time = filetime_as_time(d.ftLastWriteTime)
 	fi.access_time       = filetime_as_time(d.ftLastAccessTime)
-	fi.fullpath, e = full_path_from_name(name, allocator)
+	fi.fullpath, e = _full_path_utf8(wide, allocator)
 	fi.name = basename(fi.fullpath)
 	return
 }
