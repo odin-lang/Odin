@@ -269,6 +269,9 @@ _load :: proc(r: ^Reader) -> (err: Error) {
 	next_crc    := _u32(start[:], 28)
 	r.generation = 1
 	if next_size == 0 {
+		if next_offset != 0 || next_crc != 0 {
+			return SevenZ_Error.Invalid_Header
+		}
 		return nil
 	}
 	available := u64(r.store.size - SIGNATURE_HEADER_SIZE)
@@ -296,6 +299,9 @@ _load :: proc(r: ^Reader) -> (err: Error) {
 		id := _parse_number(&p) or_return
 		if id == u64(Property_ID.Header) {
 			_parse_header(r, &p) or_return
+			if p.pos != len(p.data) {
+				return SevenZ_Error.Invalid_Header
+			}
 			return _build_index(r)
 		}
 		if id != u64(Property_ID.Encoded_Header) {
@@ -373,7 +379,13 @@ _parse_header :: proc(r: ^Reader, p: ^Parser) -> (err: Error) {
 	}
 	if id == u64(Property_ID.Files_Info) {
 		_parse_files(r, p) or_return
-		id = _parse_number(p) or_return
+		for {
+			id = _parse_number(p) or_return
+			if id == u64(Property_ID.End) {
+				break
+			}
+			_skip_property(p) or_return
+		}
 	}
 	if id != u64(Property_ID.End) {
 		return SevenZ_Error.Invalid_Header
@@ -427,6 +439,9 @@ _parse_pack_info :: proc(r: ^Reader, p: ^Parser, s: ^Streams) -> (err: Error) {
 		append(&s.pack_sizes, size) or_return
 		position += size
 	}
+	if position > r.header_start {
+		return SevenZ_Error.Invalid_Header
+	}
 	for {
 		id := _parse_number(p) or_return
 		switch id {
@@ -453,16 +468,30 @@ _parse_unpack_info :: proc(p: ^Parser, s: ^Streams) -> (err: Error) {
 	_wait_id(p, .Coders_Unpack_Size) or_return
 	for &f in s.folders {
 		for k in 0..<f.coder_count {
-			s.coders[f.first_coder + k].unpack_size = _parse_size(p) or_return
+			c := &s.coders[f.first_coder + k]
+			if k == f.unpack_coder {
+				c.unpack_size = _parse_size(p) or_return
+				continue
+			}
+			value := _parse_number(p) or_return
+			c.unpack_size = -1
+			if value <= u64(max(i64)) {
+				c.unpack_size = i64(value)
+			}
 		}
 		f.unpack_size = s.coders[f.first_coder + f.unpack_coder].unpack_size
 	}
+	has_crcs := false
 	for {
 		id := _parse_number(p) or_return
 		switch id {
 		case u64(Property_ID.End):
 			return
 		case u64(Property_ID.CRC):
+			if has_crcs {
+				return SevenZ_Error.Invalid_Header
+			}
+			has_crcs = true
 			crcs: [dynamic]Maybe(u32)
 			crcs.allocator = s.folders.allocator
 			defer delete(crcs)
@@ -517,7 +546,7 @@ _parse_folder :: proc(p: ^Parser, s: ^Streams) -> (err: Error) {
 		}
 	}
 	bind_count := coder_count - 1
-	if in_total <= bind_count {
+	if in_total < bind_count {
 		return SevenZ_Error.Invalid_Folder
 	}
 	used_in:  [FOLDER_STREAMS_MAX]bool
@@ -561,6 +590,9 @@ _parse_folder :: proc(p: ^Parser, s: ^Streams) -> (err: Error) {
 		}
 	}
 	_classify(s, &f)
+	if packed_count == 0 {
+		f.supported = false
+	}
 	append(&s.folders, f) or_return
 	return
 }
@@ -719,6 +751,7 @@ _parse_files :: proc(r: ^Reader, p: ^Parser) -> (err: Error) {
 	items := r.items
 	empty_stream, empty_file, anti, names: []u8
 	empty_count := 0
+	seen: bit_set[Property_ID]
 	for {
 		kind := _parse_number(p) or_return
 		if kind == 0 {
@@ -726,10 +759,21 @@ _parse_files :: proc(r: ^Reader, p: ^Parser) -> (err: Error) {
 		}
 		size := _parse_count(p) or_return
 		q := Parser{data = _parse_bytes(p, size) or_return}
-		if kind > u64(max(u8)) {
+		if kind > u64(Property_ID.Dummy) {
 			continue
 		}
-		#partial switch Property_ID(kind) {
+		id := Property_ID(kind)
+		#partial switch id {
+		case .Empty_Stream, .Empty_File, .Name, .Creation_Time, .Modification_Time, .Attributes:
+			if id in seen || (id == .Empty_Stream && .Empty_File in seen) {
+				return SevenZ_Error.Invalid_Header
+			}
+			seen += {id}
+		case .Anti, .Access_Time, .Start_Position:
+		case:
+			continue
+		}
+		#partial switch id {
 		case .Empty_Stream:
 			empty_stream = _parse_bits(&q, count) or_return
 			empty_count  = 0
@@ -748,8 +792,12 @@ _parse_files :: proc(r: ^Reader, p: ^Parser) -> (err: Error) {
 				return SevenZ_Error.Invalid_Header
 			}
 			names = q.data[q.pos:]
-		case .Creation_Time, .Access_Time, .Modification_Time, .Start_Position, .Attributes:
-			_parse_item_values(&q, items, Property_ID(kind)) or_return
+			q.pos = len(q.data)
+		case:
+			_parse_item_values(&q, items, id) or_return
+		}
+		if q.pos != len(q.data) {
+			return SevenZ_Error.Invalid_Header
 		}
 	}
 	empty := 0
@@ -762,7 +810,7 @@ _parse_files :: proc(r: ^Reader, p: ^Parser) -> (err: Error) {
 			empty += 1
 		}
 	}
-	return _parse_names(r, names)
+	return _parse_names(r, names, .Name in seen)
 }
 
 @(private)
@@ -777,6 +825,10 @@ _parse_item_values :: proc(q: ^Parser, items: []Item, kind: Property_ID) -> (err
 	}
 	for &item, i in items {
 		if all == 0 && !_bit(defined, i) {
+			#partial switch kind {
+			case .Access_Time:    item.access_time    = nil
+			case .Start_Position: item.start_position = nil
+			}
 			continue
 		}
 		if kind == .Attributes {
@@ -795,7 +847,10 @@ _parse_item_values :: proc(q: ^Parser, items: []Item, kind: Property_ID) -> (err
 }
 
 @(private)
-_parse_names :: proc(r: ^Reader, raw: []u8) -> (err: Error) {
+_parse_names :: proc(r: ^Reader, raw: []u8, present: bool) -> (err: Error) {
+	if present && (len(raw) % 2 != 0 || (len(r.items) == 0 && len(raw) != 0)) {
+		return SevenZ_Error.Invalid_Header
+	}
 	starts := make([]int, len(r.items) + 1, r.allocator) or_return
 	defer delete(starts, r.allocator)
 	names: [dynamic]u8
@@ -806,7 +861,7 @@ _parse_names :: proc(r: ^Reader, raw: []u8) -> (err: Error) {
 	pos := 0
 	for &item, i in r.items {
 		starts[i] = len(names)
-		if raw == nil {
+		if !present {
 			continue
 		}
 		end := pos
@@ -819,6 +874,9 @@ _parse_names :: proc(r: ^Reader, raw: []u8) -> (err: Error) {
 		item.raw_path = raw[pos:end]
 		_append_utf16(&names, raw[pos:end]) or_return
 		pos = end + 2
+	}
+	if present && pos != len(raw) {
+		return SevenZ_Error.Invalid_Header
 	}
 	starts[len(r.items)] = len(names)
 	r.names = names[:]
@@ -1484,6 +1542,11 @@ _decoder_init :: proc(d: ^Folder_Decoder, store: ^Store, streams: ^Streams, fold
 	if f.encrypted && password == "" {
 		return archive.General_Error.Encrypted
 	}
+	for c in streams.coders[f.first_coder:][:f.coder_count] {
+		if c.unpack_size < 0 {
+			return SevenZ_Error.Size_Mismatch
+		}
+	}
 	_folder_memory(streams, f, options) or_return
 	d.store     = store
 	d.streams   = streams
@@ -1733,6 +1796,25 @@ _node_start :: proc(node: ^Node, properties: []u8) -> (err: Error) {
 	expected := int(node.size) if node.size <= i64(max(int)) else -1
 	options  := d.options
 	options.max_output_size = max(expected, 0)
+	#partial switch node.kind {
+	case .Copy, .Deflate, .Deflate64, .BZip2, .Swap2, .Swap4, .BCJ2:
+		if len(properties) != 0 {
+			return SevenZ_Error.Invalid_Folder
+		}
+	case .LZMA2:
+		if len(properties) != 1 {
+			return SevenZ_Error.Invalid_Folder
+		}
+	case .PPMd:
+		if len(properties) != ppmd.PROPERTIES_7Z_SIZE {
+			return SevenZ_Error.Invalid_Folder
+		}
+	case .Branch:
+		arch := _branch_arch(node.id)
+		if len(properties) != 0 && (len(properties) != 4 || (arch != .ARM64 && arch != .RISCV)) {
+			return SevenZ_Error.Invalid_Folder
+		}
+	}
 	codec_err: compress.Error
 	#partial switch node.kind {
 	case .LZMA:
@@ -1744,9 +1826,6 @@ _node_start :: proc(node: ^Node, properties: []u8) -> (err: Error) {
 		node.active = true
 		codec_err = lzma.reader_init_raw(&node.lzma, &node.ctx, props, expected, options, d.allocator)
 	case .LZMA2:
-		if len(properties) < 1 {
-			return SevenZ_Error.Invalid_Folder
-		}
 		dict, dict_err := lzma.lzma2_dict_size(properties[0])
 		if dict_err != nil {
 			return dict_err
@@ -1773,12 +1852,8 @@ _node_start :: proc(node: ^Node, properties: []u8) -> (err: Error) {
 		codec_err = bzip2.reader_init(&node.bzip2, &node.ctx, expected, options, d.allocator)
 	case .Branch:
 		start := u32(0)
-		switch len(properties) {
-		case 0:
-		case 4:
+		if len(properties) == 4 {
 			start = _u32(properties, 0)
-		case:
-			return SevenZ_Error.Invalid_Folder
 		}
 		_filter_start(node, filters.Branch_Filter{arch = _branch_arch(node.id), start_offset = start}) or_return
 	case .Delta:
@@ -1914,8 +1989,8 @@ _node_read :: proc(node: ^Node, p: []u8) -> (n: int, err: Error) {
 		err = nil
 	}
 	node.produced += i64(n)
-	if node.kind == .BCJ2 && node.produced == node.size && node.err == nil {
-		if end_err := _bcj2_end(node); end_err != nil {
+	if node.produced == node.size && node.err == nil {
+		if end_err := _node_end(node); end_err != nil {
 			node.err = end_err
 			if node.decoder.err == nil {
 				node.decoder.err = end_err
@@ -1926,10 +2001,27 @@ _node_read :: proc(node: ^Node, p: []u8) -> (n: int, err: Error) {
 }
 
 @(private)
-_bcj2_end :: proc(node: ^Node) -> (err: Error) {
+_node_end :: proc(node: ^Node) -> (err: Error) {
 	probe: [1]u8
-	n, end_err := filters.bcj2_reader_read(&node.bcj2, probe[:])
-	if n > 0 {
+	n: int
+	end_err: compress.Error
+	#partial switch node.kind {
+	case .LZMA, .LZMA2:
+		n, end_err = lzma.reader_read(&node.lzma, probe[:])
+	case .PPMd:
+		n, end_err = ppmd.reader_read(&node.ppmd, probe[:])
+	case .Deflate, .Deflate64:
+		n, end_err = deflate.inflate_reader_read(&node.inflate, probe[:])
+	case .BZip2:
+		n, end_err = bzip2.reader_read(&node.bzip2, probe[:])
+	case .Branch, .Delta, .Swap2, .Swap4:
+		n, end_err = filters.reader_read(&node.filter, probe[:])
+	case .BCJ2:
+		n, end_err = filters.bcj2_reader_read(&node.bcj2, probe[:])
+	case:
+		return nil
+	}
+	if n > 0 || end_err == compress.General_Error.Output_Too_Short {
 		return SevenZ_Error.Size_Mismatch
 	}
 	if io_err, is_io := end_err.(io.Error); is_io && io_err == .EOF {

@@ -5,6 +5,7 @@ import "core:archive/sevenz"
 import "core:bytes"
 import "core:compress"
 import "core:compress/filters"
+import "core:compress/lzma"
 import "core:crypto/aes"
 import "core:crypto/sha2"
 import "core:hash"
@@ -30,6 +31,14 @@ Archive_Spec :: struct {
 	coder_bytes: []u8,
 	pack_sizes:  []u64,
 	streams:     []u64,
+	pack_pos:    u64,
+	unpack_tail: []u8,
+	file_props:  []u8,
+	names:       []u8,
+	after_files: []u8,
+	header_tail: []u8,
+	coders:      u64,
+	coder_sizes: []u64,
 }
 
 @(test)
@@ -365,9 +374,224 @@ test_malformed :: proc(t: ^testing.T) {
 	testing.expect_value(t, sevenz.open(&r, built[:len(built) - 1]), SevenZ_Error.Truncated)
 	testing.expect_value(t, sevenz.open(&r, built[:31]), SevenZ_Error.Invalid_Signature)
 
+	empty: [32]u8
+	copy(empty[:], []u8{'7', 'z', 0xBC, 0xAF, 0x27, 0x1C, 0x00, 0x04})
+	put_start :: proc(start: []u8, offset, size: u64, crc: u32) {
+		for i in 0..<8 {
+			start[12 + i] = u8(offset >> (8 * uint(i)))
+			start[20 + i] = u8(size >> (8 * uint(i)))
+		}
+		for i in 0..<4 {
+			start[28 + i] = u8(crc >> (8 * uint(i)))
+		}
+		start_crc := hash.crc32(start[12:32])
+		for i in 0..<4 {
+			start[8 + i] = u8(start_crc >> (8 * uint(i)))
+		}
+	}
+	put_start(empty[:], 0, 0, 0)
+	if testing.expect_value(t, sevenz.open(&r, empty[:]), nil) {
+		testing.expect_value(t, len(r.items), 0)
+		sevenz.close(&r)
+	}
+	put_start(empty[:], 4, 0, 0)
+	testing.expect_value(t, sevenz.open(&r, empty[:]), SevenZ_Error.Invalid_Header)
+	put_start(empty[:], 0, 0, 1)
+	testing.expect_value(t, sevenz.open(&r, empty[:]), SevenZ_Error.Invalid_Header)
+
 	many := build_archive({packed = data, unpack_size = 100, coder = COPY_ID, name = "A.BIN", file_count = 1 << 40})
 	defer delete(many)
 	testing.expect_value(t, sevenz.open(&r, many[:]), SevenZ_Error.Invalid_Header)
+}
+
+@(test)
+test_strict_header :: proc(t: ^testing.T) {
+	data := pattern(100)
+	defer delete(data)
+	MTIME :: []u8{0x14, 0x0A, 0x01, 0x00, 0x00, 0x80, 0x3E, 0xD5, 0xDE, 0xB1, 0x9D, 0x01}
+	Case :: struct {
+		label: string,
+		spec:  Archive_Spec,
+		want:  archive.Error,
+	}
+	cases := [?]Case{
+		{"plain",                        {}, nil},
+		{"property after files",         {after_files = {0x19, 0x00}}, nil},
+		{"mtime",                        {file_props = MTIME}, nil},
+		{"anti before empty stream",     {file_props = {0x10, 0x00, 0x0E, 0x01, 0x80}, file_count = 2}, nil},
+		{"duplicate anti",               {file_props = {0x0E, 0x01, 0x80, 0x10, 0x01, 0x00, 0x10, 0x01, 0x80}, file_count = 2}, nil},
+		{"folder crc",                   {unpack_tail = {0x0A, 0x01, 0x78, 0x56, 0x34, 0x12}}, nil},
+		{"byte after header end",        {header_tail = {0x00}}, SevenZ_Error.Invalid_Header},
+		{"duplicate folder crc",         {unpack_tail = {0x0A, 0x01, 0x78, 0x56, 0x34, 0x12, 0x0A, 0x01, 0x78, 0x56, 0x34, 0x12}}, SevenZ_Error.Invalid_Header},
+		{"pack stream past header",      {pack_pos = 1}, SevenZ_Error.Invalid_Header},
+		{"duplicate empty stream",       {file_props = {0x0E, 0x01, 0x00, 0x0E, 0x01, 0x00}}, SevenZ_Error.Invalid_Header},
+		{"empty stream after empty file", {file_props = {0x0F, 0x00, 0x0E, 0x01, 0x00}}, SevenZ_Error.Invalid_Header},
+		{"long empty stream",            {file_props = {0x0E, 0x02, 0x00, 0x00}}, SevenZ_Error.Invalid_Header},
+		{"anti without empty streams",   {file_props = {0x10, 0x01, 0x00}}, SevenZ_Error.Invalid_Header},
+		{"long mtime",                   {file_props = {0x14, 0x0B, 0x01, 0x00, 0x00, 0x80, 0x3E, 0xD5, 0xDE, 0xB1, 0x9D, 0x01, 0x00}}, SevenZ_Error.Invalid_Header},
+		{"duplicate mtime",              {file_props = {0x14, 0x0A, 0x01, 0x00, 0x00, 0x80, 0x3E, 0xD5, 0xDE, 0xB1, 0x9D, 0x01, 0x14, 0x0A, 0x01, 0x00, 0x00, 0x80, 0x3E, 0xD5, 0xDE, 0xB1, 0x9D, 0x01}}, SevenZ_Error.Invalid_Header},
+		{"odd names",                    {names = {'A', 0, 0}}, SevenZ_Error.Invalid_Header},
+		{"unterminated name",            {names = {'A', 0}}, SevenZ_Error.Invalid_Header},
+		{"bytes after names",            {names = {'A', 0, 0, 0, 'B', 0}}, SevenZ_Error.Invalid_Header},
+		{"extra name",                   {names = {'A', 0, 0, 0, 0, 0}}, SevenZ_Error.Invalid_Header},
+	}
+	for c in cases {
+		spec := c.spec
+		spec.packed      = data
+		spec.unpack_size = 100
+		spec.coder       = COPY_ID
+		spec.name        = "A.BIN"
+		built := build_archive(spec)
+		defer delete(built)
+		r: sevenz.Reader
+		err := sevenz.open(&r, built[:])
+		testing.expectf(t, err == c.want, "%s: %v", c.label, err)
+		if err == nil {
+			testing.expectf(t, len(r.items) == int(max(spec.file_count, 1)) && r.items[len(r.items) - 1].path == "A.BIN", "%s: items", c.label)
+			sevenz.close(&r)
+		}
+	}
+}
+
+@(test)
+test_repeated_properties :: proc(t: ^testing.T) {
+	data := pattern(100)
+	defer delete(data)
+	props := []u8{
+		0x13, 0x0A, 0x01, 0x00, 1, 0, 0, 0, 0, 0, 0, 0,
+		0x13, 0x03, 0x00, 0x00, 0x00,
+		0x18, 0x0A, 0x01, 0x00, 1, 0, 0, 0, 0, 0, 0, 0,
+		0x18, 0x0A, 0x01, 0x00, 2, 0, 0, 0, 0, 0, 0, 0,
+	}
+	built := build_archive({packed = data, unpack_size = 100, coder = COPY_ID, name = "A.BIN", file_props = props})
+	defer delete(built)
+	r: sevenz.Reader
+	if testing.expect_value(t, sevenz.open(&r, built[:]), nil) {
+		testing.expect_value(t, r.items[0].access_time, nil)
+		testing.expect_value(t, r.items[0].start_position, Maybe(u64)(2))
+		sevenz.close(&r)
+	}
+}
+
+@(test)
+test_coder_properties :: proc(t: ^testing.T) {
+	data := pattern(100)
+	defer delete(data)
+	Case :: struct {
+		label: string,
+		coder: []u8,
+		ok:    bool,
+	}
+	cases := [?]Case{
+		{"copy",               {0x01, 0x00}, true},
+		{"copy with props",    {0x21, 0x00, 0x01, 0x00}, false},
+		{"lzma2 long props",   {0x21, 0x21, 0x02, 0x10, 0x00}, false},
+		{"ppmd long props",    {0x23, 0x03, 0x04, 0x01, 0x06, 0x06, 0x00, 0x00, 0x10, 0x00, 0x00}, false},
+		{"bcj start offset",   {0x24, 0x03, 0x03, 0x01, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00}, false},
+		{"arm start offset",   {0x24, 0x03, 0x03, 0x05, 0x01, 0x04, 0x00, 0x00, 0x00, 0x00}, false},
+		{"arm64 start offset", {0x21, 0x0A, 0x04, 0x00, 0x10, 0x00, 0x00}, true},
+		{"arm64 unaligned",    {0x21, 0x0A, 0x04, 0x02, 0x00, 0x00, 0x00}, false},
+		{"riscv start offset", {0x21, 0x0B, 0x04, 0x02, 0x00, 0x00, 0x00}, true},
+		{"swap4 with props",   {0x23, 0x02, 0x03, 0x04, 0x01, 0x00}, false},
+	}
+	for c in cases {
+		built := build_archive({packed = data, unpack_size = 100, coder_bytes = c.coder, name = "A.BIN"})
+		defer delete(built)
+		r: sevenz.Reader
+		if !testing.expectf(t, sevenz.open(&r, built[:]) == nil, "%s: open", c.label) {
+			continue
+		}
+		_, handle, found, _ := sevenz.find(&r, "A.BIN")
+		d: Discard
+		err := sevenz.extract(&r, handle, discard_writer(&d))
+		if c.ok {
+			testing.expectf(t, found && err == nil && d.count == 100, "%s: %v, %d bytes", c.label, err, d.count)
+		} else {
+			testing.expectf(t, found && err == SevenZ_Error.Invalid_Folder, "%s: %v", c.label, err)
+		}
+		sevenz.close(&r)
+	}
+}
+
+@(test)
+test_inner_coder_size :: proc(t: ^testing.T) {
+	data := pattern(100)
+	defer delete(data)
+	coder := []u8{0x21, 0x03, 0x01, 0x00, 0x01, 0x00, 0x00, 0x01}
+	inner := [?]u64{100, 1 << 63, max(u64)}
+	for size in inner {
+		built := build_archive({packed = data, unpack_size = 100, coders = 2, coder_bytes = coder, coder_sizes = {100, size}, name = "A.BIN"})
+		defer delete(built)
+		r: sevenz.Reader
+		if !testing.expectf(t, sevenz.open(&r, built[:]) == nil, "%v: open", size) {
+			continue
+		}
+		_, handle, found, _ := sevenz.find(&r, "A.BIN")
+		d: Discard
+		err := sevenz.extract(&r, handle, discard_writer(&d))
+		if size == 100 {
+			testing.expectf(t, found && err == nil && d.count == 100, "%v: %v, %d bytes", size, err, d.count)
+		} else {
+			testing.expectf(t, found && err == SevenZ_Error.Size_Mismatch, "%v: %v", size, err)
+		}
+		sevenz.close(&r)
+	}
+}
+
+@(test)
+test_no_pack_streams :: proc(t: ^testing.T) {
+	data := pattern(100)
+	defer delete(data)
+	built := build_archive({packed = data, unpack_size = 100, coder_bytes = {0x10, 0x00, 0x01}, name = "A.BIN"})
+	defer delete(built)
+	r: sevenz.Reader
+	if testing.expect_value(t, sevenz.open(&r, built[:]), nil) {
+		fi, handle, found, _ := sevenz.find(&r, "A.BIN")
+		testing.expect(t, found && !fi.supported, "supported")
+		d: Discard
+		testing.expect_value(t, sevenz.extract(&r, handle, discard_writer(&d)), archive.General_Error.Unsupported_Method)
+		sevenz.close(&r)
+	}
+	short := build_archive({packed = data, unpack_size = 100, coders = 2, coder_bytes = {0x10, 0x00, 0x01, 0x10, 0x00, 0x01}, coder_sizes = {100, 100}, name = "A.BIN"})
+	defer delete(short)
+	testing.expect_value(t, sevenz.open(&r, short[:]), SevenZ_Error.Invalid_Folder)
+}
+
+@(test)
+test_short_final_byte :: proc(t: ^testing.T) {
+	data := pattern(1000)
+	defer delete(data)
+	packed: [dynamic]u8
+	defer delete(packed)
+	props, props_err := lzma.compress_raw_to_dynamic(&packed, data, lzma.level_options(.Default))
+	if !testing.expect_value(t, props_err, nil) {
+		return
+	}
+	encoded := lzma.encode_properties(props)
+	coder: [dynamic]u8
+	defer delete(coder)
+	append(&coder, 0x23, 0x03, 0x01, 0x01, u8(len(encoded)))
+	append(&coder, ..encoded[:])
+	for cut in 0..=1 {
+		built := build_archive({packed = packed[:len(packed) - cut], unpack_size = 1000, coder_bytes = coder[:], name = "A.BIN"})
+		defer delete(built)
+		r: sevenz.Reader
+		if !testing.expect_value(t, sevenz.open(&r, built[:]), nil) {
+			return
+		}
+		_, handle, found, _ := sevenz.find(&r, "A.BIN")
+		sink := strings.builder_make()
+		err := sevenz.extract(&r, handle, strings.to_writer(&sink))
+		testing.expectf(t, found && len(sink.buf) == len(data), "cut %d: %d bytes", cut, len(sink.buf))
+		if cut == 0 {
+			testing.expect_value(t, err, nil)
+			testing.expect(t, bytes.equal(sink.buf[:], data), "cut 0: data")
+		} else {
+			testing.expect_value(t, err, compress.Error(compress.General_Error.Stream_Too_Short))
+		}
+		strings.builder_destroy(&sink)
+		sevenz.close(&r)
+	}
 }
 
 @(test)
@@ -627,7 +851,7 @@ build_archive :: proc(spec: Archive_Spec) -> (out: [dynamic]u8) {
 		pack_sizes = single
 	}
 	append(&header, 0x01, 0x04, 0x06)
-	put_number(&header, 0)
+	put_number(&header, spec.pack_pos)
 	put_number(&header, u64(len(pack_sizes)))
 	append(&header, 0x09)
 	for size in pack_sizes {
@@ -636,7 +860,7 @@ build_archive :: proc(spec: Archive_Spec) -> (out: [dynamic]u8) {
 	append(&header, 0x00, 0x07, 0x0B)
 	put_number(&header, 1)
 	append(&header, 0x00)
-	put_number(&header, 1)
+	put_number(&header, max(spec.coders, 1))
 	if spec.coder_bytes != nil {
 		append(&header, ..spec.coder_bytes)
 	} else {
@@ -649,11 +873,18 @@ build_archive :: proc(spec: Archive_Spec) -> (out: [dynamic]u8) {
 		}
 	}
 	append(&header, 0x0C)
-	put_number(&header, spec.unpack_size)
+	if spec.coder_sizes != nil {
+		for size in spec.coder_sizes {
+			put_number(&header, size)
+		}
+	} else {
+		put_number(&header, spec.unpack_size)
+	}
 	if crc, ok := spec.folder_crc.?; ok {
 		append(&header, 0x0A, 0x01)
 		put_u32(&header, crc)
 	}
+	append(&header, ..spec.unpack_tail)
 	append(&header, 0x00)
 	if spec.streams != nil {
 		append(&header, 0x08, 0x0D)
@@ -674,17 +905,27 @@ build_archive :: proc(spec: Archive_Spec) -> (out: [dynamic]u8) {
 	}
 	append(&header, 0x00, 0x05)
 	put_number(&header, file_count)
-	names := int(file_count) if file_count <= 64 else 1
+	append(&header, ..spec.file_props)
 	append(&header, 0x11)
-	put_number(&header, u64(1 + names * (2 * len(spec.name) + 2)))
-	append(&header, 0x00)
-	for _ in 0..<names {
-		for c in transmute([]u8)spec.name {
-			append(&header, c, 0)
+	if spec.names != nil {
+		put_number(&header, u64(1 + len(spec.names)))
+		append(&header, 0x00)
+		append(&header, ..spec.names)
+	} else {
+		names := int(file_count) if file_count <= 64 else 1
+		put_number(&header, u64(1 + names * (2 * len(spec.name) + 2)))
+		append(&header, 0x00)
+		for _ in 0..<names {
+			for c in transmute([]u8)spec.name {
+				append(&header, c, 0)
+			}
+			append(&header, 0x00, 0x00)
 		}
-		append(&header, 0x00, 0x00)
 	}
-	append(&header, 0x00, 0x00)
+	append(&header, 0x00)
+	append(&header, ..spec.after_files)
+	append(&header, 0x00)
+	append(&header, ..spec.header_tail)
 
 	body: [dynamic]u8
 	defer delete(body)
