@@ -12,6 +12,27 @@ gb_internal LLVMValueRef lb_call_intrinsic(lbProcedure *p, const char *name, LLV
 	return LLVMBuildCall2(p->builder, call_type, ip, args, arg_count, "");
 }
 
+// alignment to claim for a ptr operand of a mem copy intrinsic;
+// the pointed value's type alignment is the default but overridden by
+// anything provable about the value itself through lb_try_get_alignment;
+// the result can be below the default (e.g. ptr to field in #packed struct)
+gb_internal unsigned lb_mem_copy_ptr_alignment(lbProcedure *p, lbValue ptr_value) {
+	unsigned def = 1;  // align 1 for raw ptrs
+	if (ptr_value.type != nullptr) {
+		Type *bt = base_type(ptr_value.type);
+		Type *elem = nullptr;
+		if (bt->kind == Type_Pointer) {
+			elem = bt->Pointer.elem;
+		} else if (bt->kind == Type_MultiPointer) {
+			elem = bt->MultiPointer.elem;
+		}
+		if (elem != nullptr) {
+			def = cast(unsigned)type_align_of(elem);
+		}
+	}
+	return lb_try_get_alignment(p->module, ptr_value.value, def);
+}
+
 // llvm.va_start, llvm.va_end and llvm.va_copy are overloaded on the pointer type since LLVM 19
 gb_internal void lb_call_va_intrinsic(lbProcedure *p, char const *name, LLVMValueRef *args, unsigned arg_count) {
 #if LLVM_VERSION_MAJOR >= 19
@@ -23,12 +44,14 @@ gb_internal void lb_call_va_intrinsic(lbProcedure *p, char const *name, LLVMValu
 }
 
 gb_internal void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile) {
+	unsigned dst_align = lb_mem_copy_ptr_alignment(p, dst);
+	unsigned src_align = lb_mem_copy_ptr_alignment(p, src);
 	dst = lb_emit_conv(p, dst, t_rawptr);
 	src = lb_emit_conv(p, src, t_rawptr);
 	len = lb_emit_conv(p, len, t_int);
 
 	if (!is_volatile && lb_uses_fast_isel()) {
-		lb_emit_memmove(p, dst.value, 1, src.value, 1, len.value);
+		lb_emit_memmove(p, dst.value, dst_align, src.value, src_align, len.value);
 		return;
 	}
 
@@ -51,12 +74,20 @@ gb_internal void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue sr
 		LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), 0, is_volatile)
 	};
 
-	lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+	LLVMValueRef call = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+	if (dst_align > 1) {
+		LLVMAddCallSiteAttribute(call, 1, lb_create_enum_attribute(p->module->ctx, "align", dst_align));
+	}
+	if (src_align > 1) {
+		LLVMAddCallSiteAttribute(call, 2, lb_create_enum_attribute(p->module->ctx, "align", src_align));
+	}
 }
 
 
 
 gb_internal void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile) {
+	unsigned dst_align = lb_mem_copy_ptr_alignment(p, dst);
+	unsigned src_align = lb_mem_copy_ptr_alignment(p, src);
 	dst = lb_emit_conv(p, dst, t_rawptr);
 	src = lb_emit_conv(p, src, t_rawptr);
 	len = lb_emit_conv(p, len, t_int);
@@ -81,7 +112,13 @@ gb_internal void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValu
 			len.value,
 			LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), 0, is_volatile) };
 
-	lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+	LLVMValueRef call = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+	if (dst_align > 1) {
+		LLVMAddCallSiteAttribute(call, 1, lb_create_enum_attribute(p->module->ctx, "align", dst_align));
+	}
+	if (src_align > 1) {
+		LLVMAddCallSiteAttribute(call, 2, lb_create_enum_attribute(p->module->ctx, "align", src_align));
+	}
 }
 
 
@@ -1095,7 +1132,8 @@ gb_internal LLVMValueRef lb_coerce_fields_load(lbProcedure *p, lbValue x, lbArgT
 		GB_ASSERT(arg->coerce_offsets.count == 1);
 		LLVMValueRef index = LLVMConstInt(i64t, cast(unsigned long long)arg->coerce_offsets[0], false);
 		LLVMValueRef ptr   = LLVMBuildInBoundsGEP2(p->builder, i8, base.value, &index, 1, "");
-		return LLVMBuildLoad2(p->builder, arg->cast_type, ptr, "");
+		// the source may be a field of a #packed struct
+		return OdinLLVMBuildLoad(p, arg->cast_type, ptr);
 	}
 
 	unsigned count = LLVMCountStructElementTypes(arg->cast_type);
@@ -1105,7 +1143,7 @@ gb_internal LLVMValueRef lb_coerce_fields_load(lbProcedure *p, lbValue x, lbArgT
 		LLVMTypeRef elem_type = LLVMStructGetTypeAtIndex(arg->cast_type, i);
 		LLVMValueRef index = LLVMConstInt(i64t, cast(unsigned long long)arg->coerce_offsets[i], false);
 		LLVMValueRef ptr   = LLVMBuildInBoundsGEP2(p->builder, i8, base.value, &index, 1, "");
-		LLVMValueRef elem  = LLVMBuildLoad2(p->builder, elem_type, ptr, "");
+		LLVMValueRef elem  = OdinLLVMBuildLoad(p, elem_type, ptr);
 		result = LLVMBuildInsertValue(p->builder, result, elem, i, "");
 	}
 	return result;
@@ -1229,6 +1267,9 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 			param_offset += 1;
 
 			LLVMAddCallSiteAttribute(ret, 1, lb_create_enum_attribute_with_type(p->module->ctx, "sret", LLVMTypeOf(args[0])));
+			if (ft->ret.align_attribute != nullptr) {
+				LLVMAddCallSiteAttribute(ret, 1, ft->ret.align_attribute);
+			}
 		}
 
 		for_array(i, ft->args) {
@@ -1430,12 +1471,17 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 				} else if (is_odin_cc) {
 					// NOTE(bill): Odin parameters are immutable so the original value can be passed if possible
 					// i.e. `T const &` in C++
+					i64 required_align = type_align_of(original_type);
 					if (LLVMIsConstant(x.value)) {
 						// NOTE(bill): if the value is already constant, then just it as a global variable
 						// and pass it by pointer
 						lbAddr addr = lb_add_global_generated_from_procedure(p, original_type, x);
 						lb_make_global_private_const(addr);
 						ptr = addr.addr;
+						if (LLVMIsAGlobalValue(ptr.value) &&
+						    cast(i64)LLVMGetAlignment(ptr.value) < required_align) {
+							LLVMSetAlignment(ptr.value, cast(unsigned)required_align);
+						}
 					} else {
 						// the callee assumes ptr is aligned to type_align_of(T)
 						ptr = lb_aligned_address_from_load_or_generate_local(p, x);
@@ -4130,6 +4176,10 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			lbValue src = lb_build_expr(p, ce->args[1]);
 			lbValue len = lb_build_expr(p, ce->args[2]);
 
+			// treat as rawptr, so no alignment is implied by the operands;
+			// alignment can still be recovered inside lb_mem_copy_ptr_alignment
+			dst = lb_emit_conv(p, dst, t_rawptr);
+			src = lb_emit_conv(p, src, t_rawptr);
 			if (lb_can_inline_small_mem_copy(p, len)) {
 				lb_mem_copy_small_inline(p, dst, src, len, true);
 			} else {
@@ -4143,6 +4193,10 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			lbValue src = lb_build_expr(p, ce->args[1]);
 			lbValue len = lb_build_expr(p, ce->args[2]);
 
+			// treat as rawptr, so no alignment is implied by the operands;
+			// alignment can still be recovered inside lb_mem_copy_ptr_alignment
+			dst = lb_emit_conv(p, dst, t_rawptr);
+			src = lb_emit_conv(p, src, t_rawptr);
 			if (lb_can_inline_small_mem_copy(p, len)) {
 				lb_mem_copy_small_inline(p, dst, src, len, false);
 			} else {
@@ -4294,6 +4348,10 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				LLVMSetAlignment(store, 1);
 			} else {
 				src = lb_address_from_load_or_generate_local(p, src);
+				// dst is allowed to be misaligned;
+				// treat as rawptr, so no alignment is implied by the type;
+				// alignment can still be recovered inside lb_mem_copy_ptr_alignment
+				dst = lb_emit_conv(p, dst, t_rawptr);
 				lb_mem_copy_non_overlapping(p, dst, src, lb_const_int(p->module, t_int, type_size_of(t)), false);
 			}
 			return {};
@@ -4310,6 +4368,10 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				return res;
 			} else {
 				lbAddr dst = lb_add_local_generated(p, t, false);
+				// src is allowed to be misaligned;
+				// treat as rawptr, so no alignment is implied by the type;
+				// alignment can still be recovered inside lb_mem_copy_ptr_alignment
+				src = lb_emit_conv(p, src, t_rawptr);
 				lb_mem_copy_non_overlapping(p, dst.addr, src, lb_const_int(p->module, t_int, type_size_of(t)), false);
 				return lb_addr_load(p, dst);
 			}

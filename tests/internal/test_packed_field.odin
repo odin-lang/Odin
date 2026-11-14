@@ -358,3 +358,33 @@ test_packed_field_in_any :: proc(t: ^testing.T) {
 	testing.expect(t, #force_no_inline any_simd_to_array(p7.v) == [4]f32{1, 2, 3, 4})
 	testing.expect(t, #force_no_inline xor_field_wide(&p7) == 6) // GEP with packed metadata
 }
+
+
+// field access through ^runtime.Unaligned must compile to misalignment safe code
+
+import "base:runtime"
+
+@(export)
+p8: Packed_Small
+
+@(private="file")
+read_wrapped :: proc(u: ^runtime.Unaligned(#simd[4]f32)) -> #simd[4]f32 {
+	return u.value
+}
+
+@(private="file")
+write_wrapped :: proc(u: ^runtime.Unaligned(#simd[4]f32), x: #simd[4]f32) {
+	u.value = x
+}
+
+@(test)
+test_packed_field_unaligned_wrapper :: proc(t: ^testing.T) {
+	p8.v = {1, 2, 3, 4}
+
+	u := (^runtime.Unaligned(#simd[4]f32))(&p8.v) // addr of field at offset 1
+	y := #force_no_inline read_wrapped(u)
+	testing.expect(t, simd.to_array(y) == [4]f32{1, 2, 3, 4})
+
+	#force_no_inline write_wrapped(u, {5, 6, 7, 8})
+	testing.expect(t, simd.to_array(p8.v) == [4]f32{5, 6, 7, 8})
+}

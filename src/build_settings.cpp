@@ -321,6 +321,7 @@ enum VetFlags : u64 {
 	VetFlag_NilDeref        = 1u<<13,
 	VetFlag_Uninitialized   = 1u<<14,
 	VetFlag_AtomicAccess    = 1u<<15,
+	VetFlag_PackedFieldAddr = 1u<<16,
 
 	VetFlag_Unused = VetFlag_UnusedVariables|VetFlag_UnusedImports,
 
@@ -381,6 +382,8 @@ u64 get_vet_flag_from_name(String const &name) {
 		return VetFlag_Uninitialized;
 	} else if (name == "atomic-access") {
 		return VetFlag_AtomicAccess;
+	} else if (name == "packed-field-addr") {
+		return VetFlag_PackedFieldAddr;
 	}
 	return VetFlag_NONE;
 }

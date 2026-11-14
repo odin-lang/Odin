@@ -2374,7 +2374,9 @@ gb_internal bool lb_init_global_var(lbModule *m, lbProcedure *p, Entity *e, Ast 
 			LLVMValueRef dst = var.var.value;
 			if (LLVMTypeOf(src0.value) != vt || !lb_try_copy_loaded_aggregate(p, dst, src0.value)) {
 				LLVMValueRef src = OdinLLVMBuildTransmute(p, src0.value, vt);
-				LLVMBuildStore(p->builder, src, dst);
+				// the global is aligned to its Odin type, which can be below LLVM's ABI
+				// alignment of the value type (e.g. u128 on i386: 4 vs 16)
+				OdinLLVMBuildStore(p, src, dst);
 			}
 		}
 
