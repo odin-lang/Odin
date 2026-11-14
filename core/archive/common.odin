@@ -219,6 +219,7 @@ Tar_Error :: enum u32 {
 	Unsupported_GNU_Extension,
 	Invalid_Name,
 	Size_Mismatch,
+	Invalid_Sparse_Map,
 }
 
 Zip_Error :: enum u32 {

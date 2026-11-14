@@ -10,6 +10,7 @@ import "core:compress/lzma"
 import "core:compress/xz"
 import "core:io"
 import "core:os"
+import "core:slice"
 import "core:strings"
 import "core:time"
 
@@ -122,6 +123,10 @@ close_reader :: proc(r: ^Reader) {
 		delete(value)
 	}
 	delete(r.path_buf)
+	delete(r.long_name)
+	delete(r.long_link)
+	delete(r.label)
+	delete(r.sparse_map)
 	delete(r.fail_path)
 	if r.file != nil {
 		os.close(r.file)
@@ -133,6 +138,7 @@ info :: proc(r: ^Reader) -> (info: archive.Archive_Info) {
 	info.format       = .Tar
 	info.member_count = r.member_count if r.ended else -1
 	info.compression  = r.compression
+	info.comment      = string(r.label[:])
 	return
 }
 
@@ -289,6 +295,10 @@ _init :: proc(r: ^Reader, options: compress.Options, allocator: runtime.Allocato
 		value.allocator = allocator
 	}
 	r.path_buf.allocator   = allocator
+	r.long_name.allocator  = allocator
+	r.long_link.allocator  = allocator
+	r.label.allocator      = allocator
+	r.sparse_map.allocator = allocator
 	r.fail_path.allocator  = allocator
 	r.decoded.allocator    = allocator
 }
@@ -515,10 +525,13 @@ _skip :: proc(r: ^Reader, count: i64) -> (err: Error) {
 		return
 	}
 	if r.source == .Stream && r.seekable {
-		target := r.offset + count
-		if r.input_size >= 0 && r.input_start + target > r.input_size {
+		if count > max(i64) - r.input_start - r.offset {
 			return Tar_Error.Truncated
 		}
+		if r.input_size >= 0 && count > r.input_size - r.input_start - r.offset {
+			return Tar_Error.Truncated
+		}
+		target := r.offset + count
 		if _, seek_err := io.seek(r.input, r.input_start + target, .Start); seek_err != nil {
 			return seek_err
 		}
@@ -574,8 +587,7 @@ _rewind :: proc(r: ^Reader) -> (err: Error) {
 	r.unsupported = nil
 	r.broken      = nil
 	r.pending     = nil
-	clear(&r.local_buf)
-	clear(&r.global_buf)
+	_clear_member(r)
 	r.global_set = {}
 	r.gnu_sparse = false
 	clear(&r.fail_path)
@@ -583,11 +595,25 @@ _rewind :: proc(r: ^Reader) -> (err: Error) {
 }
 
 @(private)
+_clear_member :: proc(r: ^Reader) {
+	clear(&r.local_buf)
+	clear(&r.global_buf)
+	clear(&r.long_name)
+	clear(&r.long_link)
+	clear(&r.sparse_map)
+	r.has_long     = {}
+	r.sparse       = false
+	r.sparse_index = 0
+	r.sparse_pos   = 0
+	r.data_size    = 0
+}
+
+@(private)
 _seek_member :: proc(r: ^Reader, index: int) -> (err: Error) {
 	if index < 0 {
 		return archive.General_Error.Not_Found
 	}
-	if r.has_current && r.index == index && r.remaining == r.current.size {
+	if r.has_current && r.index == index && r.remaining == r.data_size && r.sparse_pos == 0 {
 		return
 	}
 	if index <= r.index {
@@ -631,8 +657,7 @@ _next_member :: proc(r: ^Reader) -> (fi: archive.File_Info, ok: bool, err: Error
 		r.has_current = false
 		r.unsupported = nil
 	}
-	clear(&r.local_buf)
-	clear(&r.global_buf)
+	_clear_member(r)
 	for {
 		block, eof := _next_block(r) or_return
 		if eof || _all_zero(block) {
@@ -650,12 +675,19 @@ _next_member :: proc(r: ^Reader) -> (fi: archive.File_Info, ok: bool, err: Error
 		}
 		typeflag := h[156]
 		size     := _parse_number(h[124:136]) or_return
+		if size < 0 || size > MEMBER_SIZE_MAX {
+			return {}, false, Tar_Error.Invalid_Size
+		}
 		switch typeflag {
 		case 'x', 'g':
 			_read_records(r, typeflag, size) or_return
 			continue
-		case 'L', 'K', 'S', 'D', 'M', 'V', 'N':
-			return {}, false, Tar_Error.Unsupported_GNU_Extension
+		case 'L', 'K':
+			_read_long(r, typeflag, size) or_return
+			continue
+		case 'V':
+			_read_label(r, size) or_return
+			continue
 		}
 		fi = _make_info(r, typeflag, size) or_return
 		return fi, true, nil
@@ -663,9 +695,42 @@ _next_member :: proc(r: ^Reader) -> (fi: archive.File_Info, ok: bool, err: Error
 }
 
 @(private)
+_held :: proc "contextless" (r: ^Reader) -> i64 {
+	held := i64(len(r.local_buf) + len(r.global_buf) + len(r.long_name) + len(r.long_link))
+	return held + i64(len(r.sparse_map)) * size_of(Sparse_Region)
+}
+
+@(private)
+_record_limit :: proc "contextless" (r: ^Reader) -> i64 {
+	return min(i64(HEADER_RECORD_MAX), i64(compress.memory_limit(r.options)))
+}
+
+@(private)
+_read_long :: proc(r: ^Reader, typeflag: u8, size: i64) -> (err: Error) {
+	kind := Long_Kind.Name if typeflag == 'L' else .Link
+	buf  := &r.long_name if kind == .Name else &r.long_link
+	if _held(r) - i64(len(buf)) + size > _record_limit(r) {
+		return Tar_Error.Header_Too_Large
+	}
+	resize(buf, int(size)) or_return
+	_read_exact(r, buf[:]) or_return
+	_skip(r, _padding(size)) or_return
+	r.has_long += {kind}
+	return
+}
+
+@(private)
+_read_label :: proc(r: ^Reader, size: i64) -> (err: Error) {
+	if !r.has_label {
+		append(&r.label, _field(r.header.block[0:100])) or_return
+		r.has_label = true
+	}
+	return _skip(r, size + _padding(size))
+}
+
+@(private)
 _read_records :: proc(r: ^Reader, typeflag: u8, size: i64) -> (err: Error) {
-	limit := min(i64(HEADER_RECORD_MAX), i64(compress.memory_limit(r.options)))
-	if i64(len(r.local_buf) + len(r.global_buf)) + size > limit {
+	if _held(r) + size > _record_limit(r) {
 		return Tar_Error.Header_Too_Large
 	}
 	buf   := &r.local_buf if typeflag == 'x' else &r.global_buf
@@ -717,7 +782,7 @@ _validate_records :: proc(records: []u8) -> (err: Error) {
 		}
 		rest = next
 		switch key {
-		case "path", "linkpath", "uname", "gname":
+		case "path", "linkpath", "uname", "gname", "GNU.sparse.name":
 			if strings.index_byte(value, 0) >= 0 {
 				return Tar_Error.Invalid_Pax_Record
 			}
@@ -773,25 +838,35 @@ _make_info :: proc(r: ^Reader, typeflag: u8, size: i64) -> (fi: archive.File_Inf
 	r.header.format   = format
 	r.header.typeflag = typeflag
 
-	name   := _field(h[0:100])
-	prefix := ""
-	#partial switch format {
-	case .Ustar: prefix = _field(h[345:500])
-	case .Star:  prefix = _field(h[345:476])
-	}
-	fi.path = name
-	if prefix != "" {
-		clear(&r.path_buf)
-		append(&r.path_buf, prefix) or_return
-		append(&r.path_buf, '/') or_return
-		append(&r.path_buf, name) or_return
-		fi.path = string(r.path_buf[:])
+	if .Name in r.has_long {
+		fi.path = _field(r.long_name[:])
+	} else {
+		name   := _field(h[0:100])
+		prefix := ""
+		#partial switch format {
+		case .Ustar: prefix = _field(h[345:500])
+		case .Star:  prefix = _field(h[345:476])
+		}
+		fi.path = name
+		if prefix != "" {
+			clear(&r.path_buf)
+			append(&r.path_buf, prefix) or_return
+			append(&r.path_buf, '/') or_return
+			append(&r.path_buf, name) or_return
+			fi.path = string(r.path_buf[:])
+		}
 	}
 	fi.link_target = _field(h[157:257])
+	if .Link in r.has_long {
+		fi.link_target = _field(r.long_link[:])
+	}
 
 	mode  := _parse_number(h[100:108]) or_return
 	fi.uid = _parse_number(h[108:116]) or_return
 	fi.gid = _parse_number(h[116:124]) or_return
+	if mode < 0 || fi.uid < 0 || fi.gid < 0 {
+		return {}, Tar_Error.Invalid_Number
+	}
 	mtime := _parse_number(h[136:148]) or_return
 	fi.modification_time = _unix_time(mtime, 0)
 	if format != .V7 {
@@ -799,43 +874,94 @@ _make_info :: proc(r: ^Reader, typeflag: u8, size: i64) -> (fi: archive.File_Inf
 		fi.group = _field(h[297:329])
 		major := _parse_number(h[329:337]) or_return
 		minor := _parse_number(h[337:345]) or_return
-		if major > i64(max(u32)) || minor > i64(max(u32)) {
+		if major < 0 || minor < 0 || major > i64(max(u32)) || minor > i64(max(u32)) {
 			return {}, Tar_Error.Invalid_Number
 		}
 		fi.device = {u32(major), u32(minor)}
+	}
+	if format == .GNU {
+		if atime, atime_err := _parse_number(h[345:357]); atime_err == nil && atime != 0 {
+			fi.access_time = _unix_time(atime, 0)
+		}
 	}
 
 	r.header.global_records = r.global_buf[:]
 	r.header.local_records  = r.local_buf[:]
 	data_size := size
-	sparse    := r.gnu_sparse
 	base      := fi
 	for slot in r.global_set {
-		_apply_record(&fi, &data_size, &sparse, base, size, GLOBAL_KEYS[slot], string(r.globals[slot][:]))
+		_apply_record(&fi, &data_size, base, size, GLOBAL_KEYS[slot], string(r.globals[slot][:]))
 	}
-	_apply_records(&fi, &data_size, &sparse, base, size, r.local_buf[:]) or_return
+	_apply_records(&fi, &data_size, base, size, r.local_buf[:]) or_return
 	fi.extended_metadata = len(r.local_buf) > 0 || len(r.global_buf) > 0
-	if data_size < 0 {
+	if data_size < 0 || data_size > MEMBER_SIZE_MAX {
 		return {}, Tar_Error.Invalid_Size
 	}
 
 	switch typeflag {
-	case '0', 0, '7':
+	case '0', 0, '7', 'S', 'M':
 		fi.type = .Regular
-		if typeflag != '7' && strings.has_suffix(fi.path, "/") {
+		if (typeflag == '0' || typeflag == 0) && strings.has_suffix(fi.path, "/") {
 			fi.type = .Directory
 		}
-	case '1': fi.type = .Hard_Link
-	case '2': fi.type = .Symlink
-	case '3': fi.type = .Character_Device
-	case '4': fi.type = .Block_Device
-	case '5': fi.type = .Directory
-	case '6': fi.type = .Named_Pipe
-	case:     fi.type = .Unknown
+	case '1':      fi.type = .Hard_Link
+	case '2':      fi.type = .Symlink
+	case '3':      fi.type = .Character_Device
+	case '4':      fi.type = .Block_Device
+	case '5', 'D': fi.type = .Directory
+	case '6':      fi.type = .Named_Pipe
+	case:          fi.type = .Unknown
 	}
+	hidden := i64(0)
 	switch typeflag {
 	case '1', '2', '3', '4', '5', '6':
 		data_size = 0
+	case 'D':
+		hidden    = data_size
+		data_size = 0
+	}
+
+	stored    := data_size
+	physical  := data_size
+	sparse    := false
+	unsparsed := r.gnu_sparse
+	if typeflag == 'S' {
+		real_size := _gnu_sparse(r) or_return
+		_check_sparse(r, real_size, physical) or_return
+		data_size, sparse = real_size, true
+	} else if fi.type == .Regular && !unsparsed {
+		keys      := _pax_sparse_keys(r)
+		version_1 := keys.major == "1" && keys.minor == "0"
+		version_0 := (keys.major == "" && keys.minor == "") || (keys.major == "0" && (keys.minor == "0" || keys.minor == "1"))
+		version_0  = version_0 && (keys.has_map || keys.has_pairs)
+		if version_1 {
+			real_size := _sparse_number(keys.size) or_return
+			used      := _read_sparse_map(r, stored) or_return
+			physical   = stored - used
+			_check_sparse(r, real_size, physical) or_return
+			data_size  = real_size
+		} else if version_0 {
+			real_size := _sparse_number(keys.size) or_return
+			blocks    := _sparse_number(keys.numblocks) or_return
+			if keys.has_map {
+				_parse_sparse_map(r, keys.sparse_map) or_return
+			} else {
+				_collect_sparse_pairs(r) or_return
+			}
+			if i64(len(r.sparse_map)) != blocks {
+				return {}, Tar_Error.Invalid_Sparse_Map
+			}
+			_check_sparse(r, real_size, physical) or_return
+			data_size = real_size
+		}
+		if version_1 || version_0 {
+			sparse = true
+			if keys.name != "" {
+				fi.path = keys.name
+			}
+		} else if keys.has_keys {
+			unsparsed = true
+		}
 	}
 
 	fi.raw_path = transmute([]u8)fi.path
@@ -847,13 +973,13 @@ _make_info :: proc(r: ^Reader, typeflag: u8, size: i64) -> (fi: archive.File_Inf
 	}
 
 	fi.size            = data_size
-	fi.compressed_size = data_size if r.compression == .Store else -1
+	fi.compressed_size = stored if r.compression == .Store else -1
 	fi.method          = .Store
 	fi.unix_mode       = u32(mode & archive.UNIX_PERMISSION_MASK) | archive.unix_type_bits(fi.type)
 	fi.dos_attributes  = archive.dos_attributes_from_unix(fi.unix_mode, fi.type)
 	fi.supported       = true
 	r.unsupported      = nil
-	if sparse {
+	if unsparsed || typeflag == 'M' {
 		fi.supported  = false
 		r.unsupported = Tar_Error.Unsupported_GNU_Extension
 	} else if fi.type == .Unknown {
@@ -861,17 +987,238 @@ _make_info :: proc(r: ^Reader, typeflag: u8, size: i64) -> (fi: archive.File_Inf
 		r.unsupported = archive.General_Error.Unsupported_Entry
 	}
 
-	r.index      += 1
-	fi.handle     = {index = r.index}
-	r.remaining   = data_size
-	r.padding     = _padding(data_size)
-	r.current     = fi
-	r.has_current = true
+	r.index       += 1
+	fi.handle      = {index = r.index}
+	r.sparse       = sparse
+	r.sparse_index = 0
+	r.sparse_pos   = 0
+	r.remaining    = physical
+	r.padding      = _padding(physical) + hidden + _padding(hidden)
+	r.data_size    = physical
+	r.current      = fi
+	r.has_current  = true
 	return
 }
 
 @(private)
-_apply_records :: proc(fi: ^archive.File_Info, size: ^i64, sparse: ^bool, base: archive.File_Info, base_size: i64, records: []u8) -> (err: Error) {
+_gnu_sparse :: proc(r: ^Reader) -> (real_size: i64, err: Error) {
+	h := r.header.block[:]
+	_gnu_sparse_entries(r, h[386:482], SPARSE_IN_HEADER) or_return
+	extended := h[482] != 0
+	number_err: Error
+	real_size, number_err = _parse_number(h[483:495])
+	if number_err != nil {
+		return 0, Tar_Error.Invalid_Sparse_Map
+	}
+	for extended {
+		block, eof := _next_block(r) or_return
+		if eof {
+			return 0, Tar_Error.Truncated
+		}
+		_gnu_sparse_entries(r, block[:SPARSE_IN_BLOCK * 24], SPARSE_IN_BLOCK) or_return
+		extended = block[SPARSE_IN_BLOCK * 24] != 0
+	}
+	return
+}
+
+@(private)
+_gnu_sparse_entries :: proc(r: ^Reader, entries: []u8, count: int) -> (err: Error) {
+	for i in 0..<count {
+		entry := entries[i * 24:][:24]
+		if entry[0] == 0 {
+			break
+		}
+		offset, offset_err := _parse_number(entry[0:12])
+		size,   size_err   := _parse_number(entry[12:24])
+		if offset_err != nil || size_err != nil {
+			return Tar_Error.Invalid_Sparse_Map
+		}
+		_add_region(r, offset, size) or_return
+	}
+	return
+}
+
+@(private)
+_pax_sparse_keys :: proc(r: ^Reader) -> (keys: Pax_Sparse) {
+	PREFIX :: "GNU.sparse."
+	rest := r.local_buf[:]
+	for len(rest) > 0 && !_all_zero(rest) {
+		key, value, next, ok := _next_record(rest)
+		if !ok {
+			break
+		}
+		rest = next
+		if !strings.has_prefix(key, PREFIX) {
+			continue
+		}
+		keys.has_keys = true
+		switch key[len(PREFIX):] {
+		case "major":            keys.major = value
+		case "minor":            keys.minor = value
+		case "name":             keys.name = value
+		case "size", "realsize": keys.size = value
+		case "numblocks":        keys.numblocks = value
+		case "map":
+			keys.sparse_map = value
+			keys.has_map    = true
+		case "offset", "numbytes":
+			keys.has_pairs = true
+		}
+	}
+	return
+}
+
+@(private)
+_sparse_number :: proc "contextless" (s: string) -> (value: i64, err: Error) {
+	ok: bool
+	if value, ok = _parse_decimal(s); !ok {
+		return 0, Tar_Error.Invalid_Sparse_Map
+	}
+	return
+}
+
+@(private)
+_parse_sparse_map :: proc(r: ^Reader, s: string) -> (err: Error) {
+	if s == "" {
+		return
+	}
+	rest    := s
+	count   := 0
+	pending := i64(0)
+	for {
+		comma := strings.index_byte(rest, ',')
+		part  := rest if comma < 0 else rest[:comma]
+		value := _sparse_number(part) or_return
+		if count % 2 == 0 {
+			pending = value
+		} else {
+			_add_region(r, pending, value) or_return
+		}
+		count += 1
+		if comma < 0 {
+			break
+		}
+		rest = rest[comma + 1:]
+	}
+	if count % 2 != 0 {
+		return Tar_Error.Invalid_Sparse_Map
+	}
+	return
+}
+
+@(private)
+_collect_sparse_pairs :: proc(r: ^Reader) -> (err: Error) {
+	rest    := r.local_buf[:]
+	offset  := true
+	pending := i64(0)
+	for len(rest) > 0 && !_all_zero(rest) {
+		key, value, next, ok := _next_record(rest)
+		if !ok {
+			break
+		}
+		rest = next
+		switch key {
+		case "GNU.sparse.offset":
+			if !offset {
+				return Tar_Error.Invalid_Sparse_Map
+			}
+			pending = _sparse_number(value) or_return
+			offset  = false
+		case "GNU.sparse.numbytes":
+			if offset {
+				return Tar_Error.Invalid_Sparse_Map
+			}
+			size := _sparse_number(value) or_return
+			_add_region(r, pending, size) or_return
+			offset = true
+		}
+	}
+	if !offset {
+		return Tar_Error.Invalid_Sparse_Map
+	}
+	return
+}
+
+@(private)
+_read_sparse_map :: proc(r: ^Reader, stored: i64) -> (used: i64, err: Error) {
+	block:   [BLOCK_SIZE]u8
+	count   := i64(-1)
+	numbers := i64(0)
+	value   := i64(0)
+	digits  := 0
+	pending := i64(0)
+	for {
+		if stored - used < BLOCK_SIZE {
+			return 0, Tar_Error.Invalid_Sparse_Map
+		}
+		_read_exact(r, block[:]) or_return
+		used += BLOCK_SIZE
+		for c in block {
+			switch c {
+			case '0'..='9':
+				if value > (max(i64) - i64(c - '0')) / 10 {
+					return 0, Tar_Error.Invalid_Sparse_Map
+				}
+				value   = value * 10 + i64(c - '0')
+				digits += 1
+			case '\n':
+				if digits == 0 {
+					return 0, Tar_Error.Invalid_Sparse_Map
+				}
+				if count < 0 {
+					count = value
+				} else if numbers % 2 == 0 {
+					pending  = value
+					numbers += 1
+				} else {
+					_add_region(r, pending, value) or_return
+					numbers += 1
+				}
+				value, digits = 0, 0
+				if numbers % 2 == 0 && numbers / 2 == count {
+					return used, nil
+				}
+			case:
+				return 0, Tar_Error.Invalid_Sparse_Map
+			}
+		}
+	}
+}
+
+@(private)
+_add_region :: proc(r: ^Reader, offset, size: i64) -> (err: Error) {
+	if offset < 0 || size < 0 {
+		return Tar_Error.Invalid_Sparse_Map
+	}
+	if _held(r) + size_of(Sparse_Region) > _record_limit(r) {
+		return Tar_Error.Header_Too_Large
+	}
+	append(&r.sparse_map, Sparse_Region{offset, size}) or_return
+	return
+}
+
+@(private)
+_check_sparse :: proc "contextless" (r: ^Reader, real_size, physical: i64) -> (err: Error) {
+	if real_size < 0 || real_size > MEMBER_SIZE_MAX {
+		return Tar_Error.Invalid_Sparse_Map
+	}
+	end   := i64(0)
+	total := i64(0)
+	for region in r.sparse_map {
+		if region.offset < end || region.offset > real_size || region.size > real_size - region.offset {
+			return Tar_Error.Invalid_Sparse_Map
+		}
+		end    = region.offset + region.size
+		total += region.size
+	}
+	if total != physical {
+		return Tar_Error.Invalid_Sparse_Map
+	}
+	return
+}
+
+@(private)
+_apply_records :: proc(fi: ^archive.File_Info, size: ^i64, base: archive.File_Info, base_size: i64, records: []u8) -> (err: Error) {
 	rest := records
 	for len(rest) > 0 && !_all_zero(rest) {
 		key, value, next, ok := _next_record(rest)
@@ -879,13 +1226,13 @@ _apply_records :: proc(fi: ^archive.File_Info, size: ^i64, sparse: ^bool, base: 
 			return Tar_Error.Invalid_Pax_Record
 		}
 		rest = next
-		_apply_record(fi, size, sparse, base, base_size, key, value)
+		_apply_record(fi, size, base, base_size, key, value)
 	}
 	return
 }
 
 @(private)
-_apply_record :: proc(fi: ^archive.File_Info, size: ^i64, sparse: ^bool, base: archive.File_Info, base_size: i64, key, value: string) {
+_apply_record :: proc(fi: ^archive.File_Info, size: ^i64, base: archive.File_Info, base_size: i64, key, value: string) {
 	switch key {
 	case "path":
 		fi.path = value if value != "" else base.path
@@ -921,24 +1268,48 @@ _apply_record :: proc(fi: ^archive.File_Info, size: ^i64, sparse: ^bool, base: a
 		fi.access_time, _ = _parse_pax_time(value)
 	case "LIBARCHIVE.creationtime":
 		fi.creation_time, _ = _parse_pax_time(value)
-	case:
-		if strings.has_prefix(key, "GNU.sparse.") {
-			sparse^ = true
-		}
 	}
 }
 
 @(private)
 _parse_number :: proc "contextless" (field: []u8) -> (value: i64, err: Error) {
-	if len(field) > 0 && field[0] & 0x80 != 0 {
-		return 0, Tar_Error.Unsupported_GNU_Extension
-	}
 	ok: bool
-	value, ok = _parse_octal(field)
+	if len(field) > 0 && field[0] & 0x80 != 0 {
+		value, ok = _parse_base256(field)
+	} else {
+		value, ok = _parse_octal(field)
+	}
 	if !ok {
 		return 0, Tar_Error.Invalid_Number
 	}
 	return
+}
+
+@(private)
+_parse_base256 :: proc "contextless" (field: []u8) -> (value: i64, ok: bool) {
+	negative := field[0] & 0x40 != 0
+	fill     := u8(0xff) if negative else 0
+	first    := field[0] & 0x7f | (0x80 if negative else 0)
+	extra    := len(field) - 8
+	bits     := u64(0)
+	if extra < 0 && negative {
+		bits = max(u64)
+	}
+	for b, i in field {
+		c := first if i == 0 else b
+		if i < extra {
+			if c != fill {
+				return 0, false
+			}
+			continue
+		}
+		bits = bits << 8 | u64(c)
+	}
+	value = i64(bits)
+	if (value < 0) != negative {
+		return 0, false
+	}
+	return value, true
 }
 
 @(private)
@@ -994,12 +1365,16 @@ _parse_pax_time :: proc "contextless" (s: string) -> (t: time.Time, ok: bool) {
 
 @(private)
 _unix_time :: proc "contextless" (seconds, nanoseconds: i64) -> (t: time.Time) {
-	LIMIT :: max(i64) / 1_000_000_000 - 1
 	switch {
-	case seconds > LIMIT:  return time.unix(LIMIT, 0)
-	case seconds < -LIMIT: return time.unix(-LIMIT, 0)
+	case seconds > max(i64) / 1e9: return {max(i64)}
+	case seconds < min(i64) / 1e9: return {min(i64)}
 	}
-	return time.unix(seconds, nanoseconds)
+	whole := seconds * 1e9
+	switch {
+	case nanoseconds > 0 && whole > max(i64) - nanoseconds: return {max(i64)}
+	case nanoseconds < 0 && whole < min(i64) - nanoseconds: return {min(i64)}
+	}
+	return {whole + nanoseconds}
 }
 
 @(private)
@@ -1037,34 +1412,84 @@ _extract :: proc(r: ^Reader, w: io.Writer) -> (err: Error) {
 	if r.unsupported != nil {
 		return r.unsupported
 	}
+	if !r.sparse {
+		return _extract_data(r, w, r.remaining)
+	}
+	for r.sparse_pos < r.current.size {
+		in_data, until := _sparse_step(r)
+		count := until - r.sparse_pos
+		if in_data {
+			_extract_data(r, w, count) or_return
+		} else {
+			_write_zeros(w, count) or_return
+		}
+		r.sparse_pos += count
+	}
+	return
+}
+
+@(private)
+_extract_data :: proc(r: ^Reader, w: io.Writer, count: i64) -> (err: Error) {
+	count := count
 	if _memory(r) {
-		count := min(r.remaining, i64(len(r.data) - r.pos))
-		if count > 0 {
-			if _, write_err := io.write_full(w, r.data[r.pos:][:count]); write_err != nil {
+		n := min(count, i64(len(r.data) - r.pos))
+		if n > 0 {
+			if _, write_err := io.write_full(w, r.data[r.pos:][:n]); write_err != nil {
 				return write_err
 			}
-			r.pos       += int(count)
-			r.remaining -= count
+			r.pos       += int(n)
+			r.remaining -= n
+			count       -= n
 		}
-		if r.remaining > 0 {
+		if count > 0 {
 			return Tar_Error.Truncated
 		}
 		return
 	}
-	for r.remaining > 0 {
+	for count > 0 {
 		if r.pos == r.end {
 			available := _fill(r, 1) or_return
 			if available == 0 {
 				return Tar_Error.Truncated
 			}
 		}
-		count := min(r.remaining, i64(r.end - r.pos))
-		if _, write_err := io.write_full(w, r.buf[r.pos:][:count]); write_err != nil {
+		n := min(count, i64(r.end - r.pos))
+		if _, write_err := io.write_full(w, r.buf[r.pos:][:n]); write_err != nil {
 			return write_err
 		}
-		r.pos       += int(count)
-		r.offset    += count
-		r.remaining -= count
+		r.pos       += int(n)
+		r.offset    += n
+		r.remaining -= n
+		count       -= n
+	}
+	return
+}
+
+@(private)
+_sparse_step :: proc "contextless" (r: ^Reader) -> (in_data: bool, until: i64) {
+	for r.sparse_index < len(r.sparse_map) {
+		region := r.sparse_map[r.sparse_index]
+		if region.offset + region.size > r.sparse_pos {
+			if region.offset <= r.sparse_pos {
+				return true, region.offset + region.size
+			}
+			return false, region.offset
+		}
+		r.sparse_index += 1
+	}
+	return false, r.current.size
+}
+
+@(private)
+_write_zeros :: proc(w: io.Writer, count: i64) -> (err: Error) {
+	zero: [ZERO_CHUNK_SIZE]u8
+	count := count
+	for count > 0 {
+		n := min(count, ZERO_CHUNK_SIZE)
+		if _, write_err := io.write_full(w, zero[:n]); write_err != nil {
+			return write_err
+		}
+		count -= n
 	}
 	return
 }
@@ -1084,6 +1509,29 @@ _open_current :: proc(r: ^Reader) -> (reader: io.Reader, err: Error) {
 
 @(private)
 _read_member :: proc(r: ^Reader, p: []u8) -> (n: int, err: Error) {
+	if !r.sparse {
+		return _read_data(r, p)
+	}
+	if r.sparse_pos >= r.current.size {
+		return 0, io.Error.EOF
+	}
+	if len(p) == 0 {
+		return 0, nil
+	}
+	in_data, until := _sparse_step(r)
+	count := int(min(i64(len(p)), until - r.sparse_pos))
+	if in_data {
+		n = _read_data(r, p[:count]) or_return
+	} else {
+		slice.zero(p[:count])
+		n = count
+	}
+	r.sparse_pos += i64(n)
+	return
+}
+
+@(private)
+_read_data :: proc(r: ^Reader, p: []u8) -> (n: int, err: Error) {
 	if r.remaining == 0 {
 		return 0, io.Error.EOF
 	}

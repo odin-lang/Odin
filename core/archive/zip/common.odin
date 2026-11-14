@@ -1,5 +1,3 @@
-// TODO-UPDATE-COMMENT: The writer now encrypts members with WinZip AES-256 (AE-2), so "No encryption" is wrong
-// ---
 /*
 Reads and writes ZIP archives, as specified by [PKWARE's APPNOTE.TXT, version 6.3.10, November 2022](https://pkware.cachefly.net/webdocs/APPNOTE/APPNOTE-6.3.10.TXT).
 
@@ -26,7 +24,7 @@ Writing:
 - DOS times are written as local time
 - Opt-in progress callback; it can cancel
 - A deterministic mode for reproducible archives
-- No encryption
+- Can encrypt members with WinZip AES-256 (AE-2)
 
 Planned:
 - Split and spanned archives

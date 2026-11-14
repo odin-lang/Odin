@@ -133,11 +133,13 @@ test_extract_hostile :: proc(t: ^testing.T) {
 		{"hostile-pax-noequals.tar",     archive.Tar_Error.Invalid_Pax_Record,        nil},
 		{"hostile-nul-path.tar",         archive.Tar_Error.Invalid_Pax_Record,        nil},
 		{"hostile-pax-huge.tar",         archive.Tar_Error.Header_Too_Large,          nil},
-		{"hostile-size-base256.tar",     archive.Tar_Error.Unsupported_GNU_Extension, nil},
-		{"hostile-size-negative.tar",    archive.Tar_Error.Unsupported_GNU_Extension, nil},
-		{"hostile-longname-dotdot.tar",  archive.Tar_Error.Unsupported_GNU_Extension, nil},
-		{"hostile-longname-huge.tar",    archive.Tar_Error.Unsupported_GNU_Extension, nil},
-		{"hostile-sparse-map.tar",       archive.Tar_Error.Unsupported_GNU_Extension, nil},
+		{"hostile-longname-dotdot.tar",  nil, {U}},
+		{"gnu-sparse.tar",               nil, {nil, nil}},
+		{"gnu-multivolume-2.tar",        archive.Tar_Error.Truncated, {archive.Tar_Error.Unsupported_GNU_Extension, archive.Tar_Error.Truncated}},
+		{"hostile-size-base256.tar",     archive.Tar_Error.Invalid_Size,       nil},
+		{"hostile-size-negative.tar",    archive.Tar_Error.Invalid_Size,       nil},
+		{"hostile-longname-huge.tar",    archive.Tar_Error.Header_Too_Large,   nil},
+		{"hostile-sparse-map.tar",       archive.Tar_Error.Invalid_Sparse_Map, nil},
 		{"hostile-size-absurd.tar",      archive.Tar_Error.Truncated,                 nil},
 		{"hostile-truncated-data.tar",   archive.Tar_Error.Truncated,                 nil},
 		{"hostile-truncated-header.tar", archive.Tar_Error.Truncated,                 nil},
@@ -163,6 +165,48 @@ test_extract_hostile :: proc(t: ^testing.T) {
 	same, _ := os.join_path({base, "hostile-duplicates.tar", "out", "same.txt"}, context.temp_allocator)
 	first, _ := os.read_entire_file(same, context.temp_allocator)
 	testing.expectf(t, string(first) == "first\n", "same.txt %q", string(first))
+	sparse, _ := os.join_path({base, "gnu-sparse.tar", "out"}, context.temp_allocator)
+	expect_file_crc(t, sparse, "sparse/sparse.bin", SPARSE_CRC)
+}
+
+@(test)
+test_extract_sparse :: proc(t: ^testing.T) {
+	base, base_ok := extract_temp(t, "odin_tar_extract_sparse_*")
+	if !base_ok {
+		return
+	}
+	defer os.remove_all(base)
+
+	for name in ([?]string{"gnu-sparse.tar", "gnu-sparse-posix-0.0.tar", "gnu-sparse-posix-0.1.tar", "gnu-sparse-posix-1.0.tar"}) {
+		out, _ := os.join_path({base, name}, context.temp_allocator)
+		a, err := archive.open(asset(name))
+		if !testing.expect_value(t, err, nil) {
+			continue
+		}
+		testing.expectf(t, archive.extract_all(&a, out) == nil, "%s: extract_all", name)
+		archive.close(&a)
+		expect_file_crc(t, out, "sparse/sparse.bin", SPARSE_CRC)
+
+		for ratio in ([2]int{100, 1000}) {
+			sparse: [dynamic]u8
+			targets := []archive.Target{{path = "sparse/sparse.bin", to = &sparse}}
+			a, err = archive.open(asset(name))
+			if !testing.expect_value(t, err, nil) {
+				continue
+			}
+			it := archive.extract_iterator_create(&a, targets, {max_ratio = ratio})
+			got: archive.Error
+			for _ in archive.extract_iterate(&it) {
+				_, got = archive.extract_iterator_error(&it)
+			}
+			archive.extract_iterator_destroy(&it)
+			archive.close(&a)
+			want: archive.Error = archive.General_Error.Limit_Exceeded if ratio == 100 else nil
+			testing.expectf(t, got == want, "%s, ratio %d: %v, want %v", name, ratio, got, want)
+			testing.expectf(t, want != nil || hash.crc32(sparse[:]) == SPARSE_CRC, "%s, ratio %d: crc", name, ratio)
+			delete(sparse)
+		}
+	}
 }
 
 @(test)
