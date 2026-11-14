@@ -1309,8 +1309,8 @@ DS_CONTEXTHELP   :: 0x2000
 DS_SHELLFONT :: DS_SETFONT | DS_FIXEDSYS
 
 DLGTEMPLATE :: struct #max_field_align(2) {
-	style:			DWORD,
-	dwExtendedStyle:	DWORD,
+	style:			 DWORD,
+	dwExtendedStyle: DWORD,
 	cdit:            WORD,
 	x, y, cx, cy:    c_short,
 }
