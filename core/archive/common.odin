@@ -128,6 +128,7 @@ Format_Procs :: struct {
 	detect:           proc(head: []u8) -> bool,
 	open_bytes:       proc(a: ^Archive, data: []u8, options: compress.Options, read_options: Read_Options) -> Error,
 	open_stream:      proc(a: ^Archive, s: io.Stream, options: compress.Options, read_options: Read_Options) -> Error,
+	open_path:        proc(a: ^Archive, path: string, options: compress.Options, read_options: Read_Options) -> Error,
 	close:            proc(a: ^Archive),
 	info:             proc(a: ^Archive) -> Archive_Info,
 	iterator_create:  proc(it: ^Iterator) -> Error,
@@ -206,6 +207,7 @@ General_Error :: enum u32 {
 	Incompatible_Options,
 	No_Current_Member,
 	Limit_Exceeded,
+	Busy,
 }
 
 Tar_Error :: enum u32 {

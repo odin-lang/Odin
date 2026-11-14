@@ -21,17 +21,22 @@ create_from_path :: proc(zw: ^Writer, path: string, options: Writer_Options = {}
 	zw^ = {}
 	zw.allocator = allocator
 	_check_options(options) or_return
-	zw.path = strings.clone(path, allocator) or_return
-	f, create_err := os.create(path)
-	if create_err != nil {
-		close_writer(zw)
-		return create_err
-	}
-	zw.file = f
-	if err = _writer_init(zw, os.to_stream(f), options); err != nil {
+	zw.mode = .Create_Path
+	defer if err != nil {
 		close_writer(zw)
 	}
-	return
+	zw.path      = strings.clone(path, allocator) or_return
+	zw.temp_path = _sibling_path(path, TEMP_SUFFIX, allocator) or_return
+	lock, lock_err := _lock_open(path, .Exclusive, false, allocator)
+	if lock_err != nil && !_is_not_exist(lock_err) {
+		return lock_err
+	}
+	zw.lock = lock
+	zw.file = _lock_open(zw.temp_path, .Exclusive, true, allocator) or_return
+	if truncate_err := os.truncate(zw.file, 0); truncate_err != nil {
+		return truncate_err
+	}
+	return _writer_init(zw, os.to_stream(zw.file), options)
 }
 
 create_from_stream :: proc(zw: ^Writer, s: io.Stream, options: Writer_Options = {}, allocator := context.allocator) -> (err: Error) {
@@ -50,11 +55,28 @@ write_entry_with_info :: proc(zw: ^Writer, fi: archive.File_Info, data: Entry_Da
 	_writer_ready(zw) or_return
 	p: Pending_Entry
 	_prepare(zw, &p, fi, data, options) or_return
+	if zw.mode != .Update_Path && zw.mode != .Update_Stream {
+		start := zw.offset
+		defer if err != nil && zw.offset != start {
+			zw.err = err
+		}
+		return _write_member(zw, &p, data)
+	}
+	slot := _slot_reserve(zw, p.type == .Directory) or_return
+	defer if err != nil {
+		delete(slot.raw_name, zw.allocator)
+	}
+	_journal_begin(zw) or_return
 	start := zw.offset
 	defer if err != nil && zw.offset != start {
 		zw.err = err
 	}
-	return _write_member(zw, &p, data)
+	slot.central = len(zw.central)
+	_write_member(zw, &p, data) or_return
+	slot.header   = p.header
+	slot.data_end = zw.offset
+	_slot_link(zw, slot)
+	return nil
 }
 
 write_entry_simple :: proc(zw: ^Writer, name: string, data: Entry_Data = nil, options: Entry_Options = {}) -> (err: Error) {
@@ -161,67 +183,41 @@ commit :: proc(zw: ^Writer) -> (err: Error) {
 	defer if err != nil {
 		zw.err = err
 	}
-	_flush(zw) or_return
-	if zw.offset < zw.end && zw.file == nil {
-		_seek(zw, zw.end) or_return
+	switch zw.mode {
+	case .Stream:
+		_commit_archive(zw, nil) or_return
+	case .Create_Path:
+		_commit_archive(zw, nil) or_return
+		_publish(zw, &zw.file, &zw.lock) or_return
+	case .Update_Stream, .Update_Path:
+		_commit_update(zw) or_return
 	}
-	central_offset := zw.offset
-	central_size   := i64(len(zw.central))
-	_emit(zw, zw.central[:]) or_return
-
-	clear(&zw.header)
-	_grow(&zw.header, size_of(Zip64_End_Record) + size_of(Zip64_Locator) + size_of(End_Record) + len(zw.options.comment)) or_return
-	if zw.count >= ZIP16_MAX || central_size >= ZIP32_MAX || central_offset >= ZIP32_MAX {
-		record := Zip64_End_Record{
-			signature         = .Zip64_End,
-			record_size       = size_of(Zip64_End_Record) - 12,
-			made_by_version   = MADE_BY_VERSION,
-			made_by_host      = .Unix,
-			version_needed    = 45,
-			entries_this_disk = u64le(zw.count),
-			entries_total     = u64le(zw.count),
-			central_size      = u64le(central_size),
-			central_offset    = u64le(central_offset),
-		}
-		locator := Zip64_Locator{
-			signature   = .Zip64_Locator,
-			end_offset  = u64le(zw.offset),
-			total_disks = 1,
-		}
-		_put_struct(&zw.header, record)
-		_put_struct(&zw.header, locator)
-	}
-	end := End_Record{
-		signature         = .End,
-		entries_this_disk = u16le(min(zw.count, ZIP16_MAX)),
-		entries_total     = u16le(min(zw.count, ZIP16_MAX)),
-		central_size      = u32le(min(central_size, ZIP32_MAX)),
-		central_offset    = u32le(min(central_offset, ZIP32_MAX)),
-		comment_length    = u16le(len(zw.options.comment)),
-	}
-	_put_struct(&zw.header, end)
-	append(&zw.header, zw.options.comment)
-	_emit(zw, zw.header[:]) or_return
-
-	if zw.file != nil && zw.offset < zw.end {
-		if truncate_err := os.truncate(zw.file, zw.offset); truncate_err != nil {
-			return truncate_err
-		}
-		zw.end = zw.offset
-	}
-	_flush(zw) or_return
 	zw.committed = true
 	return nil
 }
 
 close_writer :: proc(zw: ^Writer) {
-	if zw.file != nil {
-		os.close(zw.file)
-		if !zw.committed {
-			os.remove(zw.path)
+	if zw.active && !zw.committed {
+		_abort(zw)
+	}
+	_remove_held(&zw.temp, zw.temp_path)
+	if zw.mode == .Create_Path {
+		_remove_held(&zw.file, zw.temp_path)
+	}
+	for f in ([3]^os.File{zw.file, zw.lock, zw.temp}) {
+		if f != nil {
+			os.close(f)
 		}
 	}
+	close_reader(&zw.old)
+	for slot in zw.slots {
+		delete(slot.raw_name, zw.allocator)
+	}
+	delete(zw.slots)
+	delete(zw.heads)
 	delete(zw.path, zw.allocator)
+	delete(zw.temp_path, zw.allocator)
+	delete(zw.journal_path, zw.allocator)
 	delete(zw.options.comment, zw.allocator)
 	delete(zw.central)
 	delete(zw.header)
@@ -232,6 +228,111 @@ close_writer :: proc(zw: ^Writer) {
 	_secret_delete(zw.password, zw.allocator)
 	timezone.region_destroy(zw.zone, zw.allocator)
 	zw^ = {}
+}
+
+@(private)
+_commit_archive :: proc(zw: ^Writer, prefix: []u8) -> (err: Error) {
+	_flush(zw) or_return
+	if zw.offset < zw.end && zw.file == nil {
+		_seek(zw, zw.end) or_return
+	}
+	central_offset := zw.offset
+	central_size   := i64(len(prefix)) + i64(len(zw.central))
+	_emit(zw, prefix) or_return
+	_emit(zw, zw.central[:]) or_return
+
+	clear(&zw.header)
+	_put_end(&zw.header, zw.count, central_offset - zw.base, central_size, zw.offset - zw.base, zw.options.comment) or_return
+	_emit(zw, zw.header[:]) or_return
+
+	if zw.file != nil && zw.offset < zw.end {
+		if truncate_err := os.truncate(zw.file, zw.offset); truncate_err != nil {
+			return truncate_err
+		}
+		zw.end = zw.offset
+	}
+	return _flush(zw)
+}
+
+@(private)
+_put_end :: proc(buf: ^[dynamic]u8, count, central_offset, central_size, end_offset: i64, comment: string) -> (err: runtime.Allocator_Error) {
+	_grow(buf, size_of(Zip64_End_Record) + size_of(Zip64_Locator) + size_of(End_Record) + len(comment)) or_return
+	if count >= ZIP16_MAX || central_size >= ZIP32_MAX || central_offset >= ZIP32_MAX {
+		record := Zip64_End_Record{
+			signature         = .Zip64_End,
+			record_size       = size_of(Zip64_End_Record) - 12,
+			made_by_version   = MADE_BY_VERSION,
+			made_by_host      = .Unix,
+			version_needed    = 45,
+			entries_this_disk = u64le(count),
+			entries_total     = u64le(count),
+			central_size      = u64le(central_size),
+			central_offset    = u64le(central_offset),
+		}
+		locator := Zip64_Locator{
+			signature   = .Zip64_Locator,
+			end_offset  = u64le(end_offset),
+			total_disks = 1,
+		}
+		_put_struct(buf, record)
+		_put_struct(buf, locator)
+	}
+	end := End_Record{
+		signature         = .End,
+		entries_this_disk = u16le(min(count, ZIP16_MAX)),
+		entries_total     = u16le(min(count, ZIP16_MAX)),
+		central_size      = u32le(min(central_size, ZIP32_MAX)),
+		central_offset    = u32le(min(central_offset, ZIP32_MAX)),
+		comment_length    = u16le(len(comment)),
+	}
+	_put_struct(buf, end)
+	append(buf, comment)
+	return nil
+}
+
+@(private)
+_publish :: proc(zw: ^Writer, temp, target: ^^os.File) -> (err: Error) {
+	when ODIN_OS == .Windows {
+		os.close(temp^)
+		temp^ = nil
+		if target^ != nil {
+			os.close(target^)
+			target^ = nil
+		}
+		return _replace(zw.temp_path, zw.path, zw.allocator)
+	} else {
+		if target^ != nil {
+			_copy_mode(target^, temp^, zw.allocator)
+		}
+		_replace(zw.temp_path, zw.path, zw.allocator) or_return
+		_sync_parent(zw.path, zw.allocator)
+		os.close(temp^)
+		temp^ = nil
+		if target^ != nil {
+			os.close(target^)
+			target^ = nil
+		}
+		return nil
+	}
+}
+
+@(private)
+_abort :: proc(zw: ^Writer) {
+	switch zw.mode {
+	case .Stream, .Create_Path:
+	case .Update_Stream:
+		if zw.end > zw.old_length {
+			_restore_stream(zw)
+		}
+	case .Update_Path:
+		_remove_held(&zw.temp, zw.temp_path)
+		if zw.journaled && zw.file != nil {
+			if os.truncate(zw.file, zw.old_length) == nil && os.sync(zw.file) == nil {
+				_journal_remove(zw.journal_path, zw.allocator)
+				zw.journaled = false
+			}
+		}
+	}
 }
 
 @(private)
@@ -574,6 +675,7 @@ _write_one_shot :: proc(zw: ^Writer, p: ^Pending_Entry, input: []u8) -> (err: Er
 		p.compressed += AES_OVERHEAD
 	}
 	p.header      = zw.offset
+	p.offset      = zw.offset - zw.base
 	p.local_zip64 = p.size >= ZIP32_MAX || p.compressed >= ZIP32_MAX
 	p.final       = true
 	_set_flags(p)
@@ -607,6 +709,7 @@ _write_streamed :: proc(zw: ^Writer, p: ^Pending_Entry, data: Entry_Data) -> (er
 	}
 	expected := p.size
 	p.header      = zw.offset
+	p.offset      = zw.offset - zw.base
 	p.local_zip64 = expected < 0 || expected >= ZIP64_LOCAL_LIMIT
 	if !zw.seekable {
 		p.flags += {.Data_Descriptor}
@@ -964,7 +1067,7 @@ _version_needed :: proc "contextless" (p: ^Pending_Entry) -> (version: int) {
 	case .BZip2:       version = max(version, 46)
 	case .LZMA, .PPMd, .XZ: version = max(version, 63)
 	}
-	if p.local_zip64 || p.header >= ZIP32_MAX || p.size >= ZIP32_MAX || p.compressed >= ZIP32_MAX {
+	if p.local_zip64 || p.offset >= ZIP32_MAX || p.size >= ZIP32_MAX || p.compressed >= ZIP32_MAX {
 		version = max(version, 45)
 	}
 	if p.password != "" {
@@ -1092,7 +1195,7 @@ _add_central :: proc(zw: ^Writer, p: ^Pending_Entry) -> (err: Error) {
 	if p.compressed >= ZIP32_MAX {
 		zip64_length += 8
 	}
-	if p.header >= ZIP32_MAX {
+	if p.offset >= ZIP32_MAX {
 		zip64_length += 8
 	}
 	extra_length := 0
@@ -1130,7 +1233,7 @@ _add_central :: proc(zw: ^Writer, p: ^Pending_Entry) -> (err: Error) {
 		extra_length        = u16le(extra_length),
 		comment_length      = u16le(len(p.comment)),
 		external_attributes = u32le(p.external),
-		local_header_offset = u32le(min(p.header, ZIP32_MAX)),
+		local_header_offset = u32le(min(p.offset, ZIP32_MAX)),
 	}
 	_put_struct(buf, header)
 	append(buf, ..p.name)
@@ -1143,8 +1246,8 @@ _add_central :: proc(zw: ^Writer, p: ^Pending_Entry) -> (err: Error) {
 		if p.compressed >= ZIP32_MAX {
 			_put_u64(buf, u64(p.compressed))
 		}
-		if p.header >= ZIP32_MAX {
-			_put_u64(buf, u64(p.header))
+		if p.offset >= ZIP32_MAX {
+			_put_u64(buf, u64(p.offset))
 		}
 	}
 	if p.has_unix_time {

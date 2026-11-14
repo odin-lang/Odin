@@ -381,11 +381,25 @@ test_write_path :: proc(t: ^testing.T) {
 	}
 
 	dropped, _ := os.join_path({root, "dropped.zip"}, context.temp_allocator)
+	dropped_temp := strings.concatenate({dropped, "-temp"}, context.temp_allocator)
 	if testing.expect_value(t, zip.create(&zw, dropped), nil) {
 		testing.expect_value(t, zip.write_entry(&zw, "text.txt", text), nil)
-		testing.expect(t, os.exists(dropped), "uncommitted archive exists while writing")
+		testing.expect(t, !os.exists(dropped), "no archive before the commit")
+		testing.expect(t, os.exists(dropped_temp), "temp archive exists while writing")
 		zip.close(&zw)
-		testing.expect(t, !os.exists(dropped), "uncommitted archive removed on close")
+		testing.expect(t, !os.exists(dropped), "no archive after an uncommitted close")
+		testing.expect(t, !os.exists(dropped_temp), "temp archive removed on close")
+	}
+
+	if testing.expect_value(t, zip.create(&zw, path), nil) {
+		testing.expect_value(t, zip.write_entry(&zw, "other.txt", text), nil)
+		zip.close(&zw)
+		r: zip.Reader
+		if testing.expect_value(t, zip.open(&r, path), nil) {
+			_, _, ok, _ := zip.find(&r, "text.txt")
+			testing.expect(t, ok, "an uncommitted create keeps the existing archive")
+			zip.close(&r)
+		}
 	}
 
 	m := Memory_File{seekable = true}

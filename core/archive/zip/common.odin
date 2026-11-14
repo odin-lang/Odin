@@ -1,35 +1,47 @@
 /*
-Reads and writes ZIP archives, as specified by [PKWARE's APPNOTE.TXT, version 6.3.10, November 2022](https://pkware.cachefly.net/webdocs/APPNOTE/APPNOTE-6.3.10.TXT).
+Reads and writes ZIP archives, as specified by version 6.3.10 (November 2022) of
+[PKWARE's APPNOTE.TXT](https://pkware.cachefly.net/webdocs/APPNOTE/APPNOTE-6.3.10.TXT).
 
 Reading:
 - Opens archives from a path, a byte slice or a seekable `io.Stream`
 - Lists members through `core:archive`'s shared iterator, in storage order, and finds them by path
 - Extracts one or more files; extracting several reads the archive in one forward pass
-- Streams members through an `io.Reader`: Store, Deflate, Deflate64, bzip2, LZMA and PPMd decode as they are read, XZ and the pkzip-legacy methods are decoded in one shot first
-- Supported compression methods: Store, Shrink, Reduce, Implode, Deflate, Deflate64, bzip2, LZMA, PPMd and XZ
-- Decrypts WinZip AES (AE-1 and AE-2, 128, 192 and 256-bit keys, MAC checked) and ZipCrypto members, given the password in `archive.Read_Options`
+- Streams members through an `io.Reader`
+- Store, Deflate, Deflate64, bzip2, LZMA and PPMd decode as they are read
+- XZ and the pkzip-legacy methods are decoded in one shot first
+- Compression methods: Store, Shrink, Reduce, Implode, Deflate, Deflate64, bzip2, LZMA, PPMd, XZ
+- Decrypts ZipCrypto and WinZip AES (AE-1 and AE-2; 128, 192 and 256-bit keys; MAC checked)
+- The password goes in `archive.Read_Options`
 - ZIP64, data descriptors and self-extracting archives
 - UTF-8, Info-ZIP Unicode and code page 437 names
 - Unix and DOS attributes, symlinks, NTFS and Unix timestamps; DOS times are read as local time
 - CRC-32 checked on extraction
-- Opt-in progress callback with the member's name and index and the position in the archive; it can cancel
+- Opt-in progress callback with the member's name and index and the archive position; can cancel
 - Safe to read from several threads at once
 
 Writing:
 - Creates archives at a path or on an `io.Stream`; one that can't seek gets data descriptors
 - Adds members from a byte slice or an `io.Reader`, and whole directory trees with `write_directory`
-- Compression methods: Store, Deflate, Deflate64, bzip2, LZMA, PPMd and XZ, falling back to Store when compressing doesn't pay
+- Compression methods: Store, Deflate, Deflate64, bzip2, LZMA, PPMd and XZ
+- Falls back to Store when compressing doesn't pay
 - ZIP64 whenever sizes, offsets or the member count need it
-- UTF-8 names, Unix and DOS attributes, symlinks, NTFS and Unix timestamps, archive and member comments
+- UTF-8 names, Unix and DOS attributes, symlinks, NTFS and Unix timestamps
+- Archive and member comments
 - DOS times are written as local time
 - Opt-in progress callback; it can cancel
 - A deterministic mode for reproducible archives
 - Can encrypt members with WinZip AES-256 (AE-2)
 
+Updating:
+- `update` appends members in place, at a path or on a seekable `io.Stream`
+- At a path, `remove_entry` and `rename_entry` write a new archive and rename it over the old one
+- Replacing a member is a remove plus a write
+- Crash-safe at a path: after a crash, a reopen gives the last committed state or the one before
+- Path readers take a shared lock and path writers an exclusive one, except on js and wasi
+- Lock contention gives `archive.General_Error.Busy`
+
 Planned:
-- Split and spanned archives
 - Streaming extraction for XZ and the pkzip-legacy methods
-- Copy-on-write updates, safe alongside concurrent readers
 */
 package archive_zip
 
@@ -314,6 +326,7 @@ Reader :: struct {
 	comment:     string,
 	raw_comment: []u8,
 	base:        i64,
+	dir_start:   i64,
 	zip64:       bool,
 	generation:  u32,
 	zone:        ^datetime.TZ_Region,
@@ -407,15 +420,42 @@ Writer_Options :: struct {
 	options:       compress.Options,
 }
 
+Writer_Mode :: enum u8 {
+	Stream,
+	Create_Path,
+	Update_Stream,
+	Update_Path,
+}
+
+Update_Slot :: struct {
+	central:   int,
+	record:    int,
+	header:    i64,
+	data_end:  i64,
+	raw_name:  []u8,
+	name:      string,
+	next:      int,
+	old:       bool,
+	renamed:   bool,
+	removed:   bool,
+	directory: bool,
+}
+
 Writer :: struct {
 	allocator:     runtime.Allocator,
 	options:       Writer_Options,
+	mode:          Writer_Mode,
 	stream:        io.Stream,
 	file:          ^os.File,
+	lock:          ^os.File,
+	temp:          ^os.File,
 	path:          string,
+	temp_path:     string,
+	journal_path:  string,
 	seekable:      bool,
 	offset:        i64,
 	end:           i64,
+	base:          i64,
 	count:         i64,
 	archive_in:    i64,
 	central:       [dynamic]u8,
@@ -429,6 +469,14 @@ Writer :: struct {
 	committed:     bool,
 	active:        bool,
 	zone:          ^datetime.TZ_Region,
+	old:           Reader,
+	old_length:    i64,
+	old_count:     i64,
+	slots:         [dynamic]Update_Slot,
+	heads:         map[string]int,
+	journaled:     bool,
+	modified:      bool,
+	comment_set:   bool,
 }
 
 Pending_Entry :: struct {
@@ -454,6 +502,7 @@ Pending_Entry :: struct {
 	size:          i64,
 	compressed:    i64,
 	header:        i64,
+	offset:        i64,
 	local_zip64:   bool,
 	final:         bool,
 	password:      string,

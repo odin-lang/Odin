@@ -35,9 +35,38 @@ open_from_bytes :: proc(data: []u8, options := compress.Options{}, allocator := 
 
 open_from_stream :: proc(s: io.Stream, options := compress.Options{}, allocator := context.allocator, read_options := Read_Options{}) -> (a: Archive, err: Error) {
 	a.allocator = allocator
+	a.format    = _detect_stream(s) or_return
+	err = _procs[a.format].open_stream(&a, s, options, read_options)
+	return
+}
+
+open_from_path :: proc(path: string, options := compress.Options{}, allocator := context.allocator, read_options := Read_Options{}) -> (a: Archive, err: Error) {
+	a.allocator = allocator
+	f := os.open(path) or_return
+	format, detect_err := _detect_stream(os.to_stream(f))
+	if detect_err != nil {
+		os.close(f)
+		return a, detect_err
+	}
+	a.format = format
+	if _procs[format].open_path != nil {
+		os.close(f)
+		err = _procs[format].open_path(&a, path, options, read_options)
+		return
+	}
+	if err = _procs[format].open_stream(&a, os.to_stream(f), options, read_options); err != nil {
+		os.close(f)
+		return
+	}
+	a.file = f
+	return
+}
+
+@(private)
+_detect_stream :: proc(s: io.Stream) -> (format: Format, err: Error) {
 	start, seek_err := io.seek(s, 0, .Current)
 	if seek_err != nil {
-		return a, General_Error.Not_Seekable
+		return .Unknown, General_Error.Not_Seekable
 	}
 	head: [DETECT_HEAD_SIZE]u8
 	n := 0
@@ -49,7 +78,7 @@ open_from_stream :: proc(s: io.Stream, options := compress.Options{}, allocator 
 		}
 		if read_err != nil {
 			if n == 0 {
-				return a, read_err
+				return .Unknown, read_err
 			}
 			break
 		}
@@ -58,25 +87,13 @@ open_from_stream :: proc(s: io.Stream, options := compress.Options{}, allocator 
 		}
 	}
 	if _, seek_err = io.seek(s, start, .Start); seek_err != nil {
-		return a, General_Error.Not_Seekable
+		return .Unknown, General_Error.Not_Seekable
 	}
-	a.format = which(head[:n])
-	if a.format == .Unknown {
-		return a, General_Error.Unknown_Format
+	format = which(head[:n])
+	if format == .Unknown {
+		return .Unknown, General_Error.Unknown_Format
 	}
-	err = _procs[a.format].open_stream(&a, s, options, read_options)
-	return
-}
-
-open_from_path :: proc(path: string, options := compress.Options{}, allocator := context.allocator, read_options := Read_Options{}) -> (a: Archive, err: Error) {
-	f := os.open(path) or_return
-	a, err = open_from_stream(os.to_stream(f), options, allocator, read_options)
-	if err != nil {
-		os.close(f)
-		return
-	}
-	a.file = f
-	return
+	return format, nil
 }
 
 open :: proc{open_from_path, open_from_bytes, open_from_stream}

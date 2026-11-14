@@ -44,14 +44,21 @@ open_from_stream :: proc(r: ^Reader, s: io.Stream, options := compress.Options{}
 }
 
 open_from_path :: proc(r: ^Reader, path: string, options := compress.Options{}, allocator := context.allocator) -> (err: Error) {
-	f, open_err := os.open(path)
-	if open_err != nil {
-		return open_err
-	}
-	if err = open_from_stream(r, os.to_stream(f), options, allocator); err != nil {
+	f := _lock_open(path, .Shared, false, allocator) or_return
+	defer if err != nil {
 		os.close(f)
-		return
 	}
+	size, size_err := os.file_size(f)
+	if size_err != nil {
+		return size_err
+	}
+	limit := _journal_limit(path, f, size, allocator) or_return
+	_init(r, options, allocator)
+	defer if err != nil {
+		close(r)
+	}
+	r.store = {stream = os.to_stream(f), size = limit}
+	_load(r) or_return
 	r.file = f
 	return
 }
@@ -208,6 +215,7 @@ _register :: proc "contextless" () {
 		detect           = _archive_detect,
 		open_bytes       = _archive_open_bytes,
 		open_stream      = _archive_open_stream,
+		open_path        = _archive_open_path,
 		close            = _archive_close,
 		info             = _archive_info,
 		iterator_create  = _archive_iterator_create,
@@ -246,6 +254,7 @@ _load :: proc(r: ^Reader) -> (err: Error) {
 	if end.central_size > i64(max(int)) {
 		return runtime.Allocator_Error.Out_Of_Memory
 	}
+	r.dir_start = central_start
 	if r.store.memory {
 		r.directory = r.store.data[central_start:][:end.central_size]
 	} else {
@@ -1265,6 +1274,17 @@ _archive_open_bytes :: proc(a: ^archive.Archive, data: []u8, options: compress.O
 _archive_open_stream :: proc(a: ^archive.Archive, s: io.Stream, options: compress.Options, _: archive.Read_Options) -> (err: Error) {
 	r := new(Reader, a.allocator) or_return
 	if err = open_from_stream(r, s, options, a.allocator); err != nil {
+		free(r, a.allocator)
+		return
+	}
+	a.state = r
+	return
+}
+
+@(private)
+_archive_open_path :: proc(a: ^archive.Archive, path: string, options: compress.Options, _: archive.Read_Options) -> (err: Error) {
+	r := new(Reader, a.allocator) or_return
+	if err = open_from_path(r, path, options, a.allocator); err != nil {
 		free(r, a.allocator)
 		return
 	}
