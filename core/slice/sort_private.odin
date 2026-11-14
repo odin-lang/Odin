@@ -126,181 +126,183 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 }
 
 @(private)
-_smoothsort :: proc(base: [^]byte, nel: uint, width: uint, cmp: Generic_Cmp, arg: rawptr) {
-	pntz :: proc "contextless" (p: [2]uint) -> int {
-		r := intrinsics.count_trailing_zeros(p[0] - 1)
-		if r != 0 {
-			return int(r)
-		}
-		r = (8*size_of(uint) + intrinsics.count_trailing_zeros(p[1]))
-		if r != 8*size_of(uint) {
-			return int(r)
-		}
-		return 0
-	}
+_generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr) {
+	loop(data, length, width, cmp, arg, true, 0)
 
-	shl :: proc "contextless" (p: []uint, n: int) {
-		n := n
-		if n >= 8*size_of(uint) {
-			n -= 8*size_of(uint)
-			p[1] = p[0]
-			p[0] = 0
-		}
-		p[1] <<= uint(n)
-		p[0] |= p[0] >> uint(8*size_of(uint) - n)
-		p[0] <<= uint(n)
-	}
-	shr :: proc "contextless" (p: []uint, n: int) {
-		n := n
-		if n >= 8*size_of(uint) {
-			n -= 8*size_of(uint)
-			p[0] = p[1]
-			p[1] = 0
-		}
-		p[0] >>= uint(n)
-		p[0] |= p[1] << uint(8*size_of(uint) - n)
-		p[1] >>= uint(n)
-	}
+	loop :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr, leftmost: bool, unbalanced: int) {
+		data := data
+		length := length
+		leftmost := leftmost
+		unbalanced := unbalanced
 
-	cycle :: proc "contextless" (width: uint, data: [][^]byte, n: int) {
-		if len(data) < 2 || n < 1 {
-			return
-		}
-		buf: [256]u8 = ---
-		width := width
-		for width != 0 {
-			l := builtin.min(size_of(buf), int(width))
-			copy(buf[:l], data[0][:l])
-			for i in 0..<n-1 {
-				copy(data[i][:l], data[i+1][:l])
-				data[i] = data[i][l:]
+		for {
+			if length <= 64 {
+				shell_sort(data, length, width, cmp, arg)
+				return
 			}
-			copy(data[n-1][:l], buf[:l])
-			data[n-1] = data[n-1][l:]
-			width -= uint(l)
-		}
-	}
 
-	sift :: proc(head: [^]byte, width: uint, cmp: Generic_Cmp, arg: rawptr, pshift: int, lp: []uint) {
-		head := head
-		buf: [14*size_of(uint)+1][^]byte = ---
-		buf[0] = head
-		i := 1
-		pshift := pshift
-		for pshift > 1 {
-			rt := head[-width:]
-			lf := head[-width:][-lp[pshift - 2]:]
-			if cmp(buf[0], lf, arg) >= .Equal && cmp(buf[0], rt, arg) >= .Equal {
-				break
+			log2 := 0
+			for n := length; n > 0; n >>= 1 {
+				log2 += 1
 			}
-			if cmp(lf, rt, arg) >= .Equal {
-				buf[i], head = lf, lf
-				pshift -= 1
-			} else {
-				buf[i], head = rt, rt
-				pshift -= 2
+
+			median_3_depth := log2 / 5
+			rand := 0
+			if unbalanced >= 3 {
+				unbalanced -= 1
+				rand = cast(int)intrinsics.read_cycle_counter() & (63 if length > 2048 else 3)
 			}
-			i += 1
-		}
-		cycle(width, buf[:], i)
-	}
+			pivot_index := median_3(data, rand, length, width, cmp, arg, median_3_depth)
 
-	trinkle :: proc(head: [^]byte, width: uint, cmp: Generic_Cmp, arg: rawptr, pp: []uint, pshift: int, trusty: bool, lp: []uint) {
-		head := head
+			if !leftmost {
+				if cmp(data[pivot_index * width:], data[-width:], arg) != .Greater {
+					left := partition_hoare_reverse(data, length, width, cmp, arg, pivot_index)
+					left += 1
 
-		p := [2]uint{pp[0], pp[1]}
-
-		buf: [14*size_of(uint)+1][^]byte = ---
-		buf[0] = head
-
-		i := 1
-		trail := 0
-		pshift := pshift
-		trusty := trusty
-		for p[0] != 1 || p[1] != 0 {
-			stepson := head[-lp[pshift]:]
-			if cmp(stepson, buf[0], arg) <= .Equal {
-				break
-			}
-			if !trusty && pshift > 1 {
-				rt := head[-width:]
-				lf := head[-width:][-lp[pshift-2]:]
-				if cmp(rt, stepson, arg) >= .Equal || cmp(lf, stepson, arg) >= .Equal {
-					break
+					data = data[left * width:]
+					length = length - left
+					leftmost = false
+					continue
 				}
 			}
-			buf[i] = stepson
-			head = stepson
-			trail = pntz(p)
-			shr(p[:], trail)
-			pshift += trail
-			trusty = false
-			i += 1
+
+			left := partition_hoare(data, length, width, cmp, arg, pivot_index)
+			right := length - left
+
+			if left < right {
+				loop(data, left, width, cmp, arg, leftmost, 0)
+				data = data[(left + 1) * width:]
+				length = right - 1
+				leftmost = false
+				if left < right / 32 {
+					unbalanced += 1
+				}
+			} else {
+				loop(data[(left + 1) * width:], right - 1, width, cmp, arg, false, 0)
+				length = left
+				if right < left / 32 {
+					unbalanced += 1
+				}
+			}
 		}
-		if trusty {
+		
+	}
+
+	shell_sort :: #force_inline proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr) #no_bounds_check {
+		if length < 2 {
 			return
 		}
-		cycle(width, buf[:], i)
-		sift(head, width, cmp, arg, pshift, lp)
-	}
 
-	size := nel * width
-	if size == 0 {
-		return
-	}
+		gaps := []int{51, 23, 10, 4, 1}
 
-	lp: [12*size_of(uint)]uint = ---
-	lp[1] = width
-	lp[0] = lp[1]
-	for i := 2; true; i += 1 {
-		lp[i] = lp[i-2] + lp[i-1] + width
-		if lp[i] >= size {
-			break
-		}
-	}
+		for gap in gaps {
+			for i := gap ; i < length; i += 1 {
+				if !(cmp(data[(i - gap) * width:], data[i * width:], arg) == .Greater) {
+					continue
+				}
+				j := i - gap
 
-	head := base
-	high := head[size - width:]
-	p := [2]uint{1, 0}
-	pshift := 1
-	for head < high {
-		if (p[0] & 3) == 3 {
-			sift(head, width, cmp, arg, pshift, lp[:])
-			shr(p[:], 2)
-			pshift += 2
-		} else {
-			if lp[pshift - 1] >= uint(uintptr(high) - uintptr(head)) {
-				trinkle(head, width, cmp, arg, p[:], pshift, false, lp[:])
-			} else {
-				sift(head, width, cmp, arg, pshift, lp[:])
-			}
-			if pshift == 1 {
-				shl(p[:], 1)
-				pshift = 0
-			} else {
-				shl(p[:], pshift - 1)
-				pshift = 1
+				for ; j >= gap && cmp(data[(j - gap) * width:], data[i * width:], arg) == .Greater; j -= gap {}
+				
+				buf: [256]u8 = ---
+				w := width
+				d := data
+				for w != 0 {
+					l := builtin.min(size_of(buf), w)
+					copy(buf[:l], d[i*width:][:l])
+					for e := i; e > j; e -= gap {
+						copy(d[(e)*width:][:l], d[(e - gap)*width:][:l])
+					}
+					copy(d[j*width:][:l], buf[:l])
+					d = d[l:]
+					w -= l
+				}
 			}
 		}
-		p[0] |= 1
-		head = head[width:]
 	}
-	trinkle(head, width, cmp, arg, p[:], pshift, false, lp[:])
-	for pshift != 1 || p[0] != 1 || p[1] != 0 {
-		if pshift <= 1 {
-			trail := pntz(p)
-			shr(p[:], trail)
-			pshift += trail
-		} else {
-			shl(p[:], 2)
-			pshift -= 2
-			p[0] ~= 7
-			shr(p[:], 1)
-			trinkle(head[-width:][-lp[pshift]:], width, cmp, arg, p[:], pshift + 1, true, lp[:])
-			shl(p[:], 1)
-			p[0] |= 1
-			trinkle(head[-width:], width, cmp, arg, p[:], pshift, true, lp[:])
+
+	median_3 :: proc(data: [^]byte, start, end, width: int, cmp: Generic_Cmp, arg: rawptr, depth: int) -> (piv: int) #no_bounds_check {
+		if depth == 0 {
+			return start
 		}
-		head = head[-width:]
+
+		div := (end - start) / 3
+
+		swap := [3]int{
+			median_3(data, start          , start + div    , width, cmp, arg, depth - 1),
+			median_3(data, start + div    , start + div * 2, width, cmp, arg, depth - 1),
+			median_3(data, start + div * 2, end            , width, cmp, arg, depth - 1),
+		}
+
+		x := cast(int)(cmp(data[swap[0] * width:], data[swap[1] * width:], arg) == .Less)
+		y := cast(int)(cmp(data[swap[1] * width:], data[swap[2] * width:], arg) == .Less)
+
+		switch x + 2*y {
+		case 0, 3: piv = swap[1]
+		case 1: 
+			if cmp(data[swap[0] * width:], data[swap[2] * width:], arg) == .Less {
+				piv = swap[2]
+			} else {
+				piv = swap[0]
+			}
+		case 2: 
+			if cmp(data[swap[0] * width:], data[swap[2] * width:], arg) == .Less {
+				piv = swap[0]
+			} else {
+				piv = swap[2]
+			}
+		}
+		
+		return piv
+	}
+
+	// [ < |p| >= ]
+	partition_hoare :: #force_inline proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr, pivot_index: int) -> (left: int) {
+		ptr_swap_non_overlapping(data[0:], data[pivot_index * width:], width)
+
+		left = 1
+		right := length - 1
+
+		for { 
+			for left <= right && cmp(data[left * width:], data[0:], arg) == .Less { left += 1 }
+			for left <= right && cmp(data[right * width:], data[0:], arg) != .Less { right -= 1 }
+			
+			if left >= right {
+				break
+			}
+
+			ptr_swap_non_overlapping(data[left * width:], data[right * width:], width)
+			left += 1
+			right -= 1
+		}
+		left -= 1
+		ptr_swap_non_overlapping(data[0:], data[left * width:], width)
+
+		return left
+	}
+
+	// [ <= |p| > ]
+	partition_hoare_reverse :: #force_inline proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr, pivot_index: int) -> (left: int) {
+		ptr_swap_non_overlapping(data[0:], data[pivot_index * width:], width)
+
+		left = 1
+		right := length - 1
+
+		for {
+			for left <= right && cmp(data[left * width:], data[0:], arg) != .Greater { left += 1 }
+			for left <= right && cmp(data[right * width:], data[0:], arg) == .Greater { right -= 1 }
+
+			if left >= right {
+				break
+			}
+
+			ptr_swap_non_overlapping(data[left * width:], data[right * width:], width)
+			left += 1
+			right -= 1
+		}
+		left -= 1
+		ptr_swap_non_overlapping(data[0:], data[left * width:], width)
+
+		return left
 	}
 }
