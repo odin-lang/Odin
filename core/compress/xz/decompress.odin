@@ -143,7 +143,8 @@ _decode_stream :: proc(d: ^Decoder) -> (err: Error) {
 		if d.input[d.pos] == 0 {
 			break
 		}
-		_decode_block(d) or_return
+		unpadded, uncompressed := _decode_block(d) or_return
+		_index_add(d, unpadded, uncompressed) or_return
 	}
 	index_size := _decode_index(d) or_return
 
@@ -165,16 +166,16 @@ _decode_stream :: proc(d: ^Decoder) -> (err: Error) {
 }
 
 @(private)
-_decode_block :: proc(d: ^Decoder) -> (err: Error) {
+_decode_block :: proc(d: ^Decoder) -> (unpadded, uncompressed_size: u64, err: Error) {
 	block_start := d.pos
 	header_size := (int(d.input[d.pos]) + 1) * 4
 	header      := _take(d, header_size) or_return
 	if hash.crc32(header[:header_size - 4]) != endian.unchecked_get_u32le(header[header_size - 4:]) {
-		return XZ_Error.Header_Checksum_Failed
+		return 0, 0, XZ_Error.Header_Checksum_Failed
 	}
 	block_flags := header[1]
 	if block_flags & 0x3C != 0 {
-		return XZ_Error.Reserved_Bit_Set
+		return 0, 0, XZ_Error.Reserved_Bit_Set
 	}
 	body := header[:header_size - 4]
 	p    := 2
@@ -186,14 +187,14 @@ _decode_block :: proc(d: ^Decoder) -> (err: Error) {
 	if has_compressed {
 		value, ok := _read_vli(body, &p)
 		if !ok || value == 0 {
-			return XZ_Error.Invalid_Block_Header
+			return 0, 0, XZ_Error.Invalid_Block_Header
 		}
 		compressed = value
 	}
 	if has_uncompressed {
 		value, ok := _read_vli(body, &p)
 		if !ok {
-			return XZ_Error.Invalid_Block_Header
+			return 0, 0, XZ_Error.Invalid_Block_Header
 		}
 		uncompressed = value
 	}
@@ -205,7 +206,7 @@ _decode_block :: proc(d: ^Decoder) -> (err: Error) {
 		id, id_ok := _read_vli(body, &p)
 		props_size, props_ok := _read_vli(body, &p)
 		if !id_ok || !props_ok || props_size > u64(len(body) - p) {
-			return XZ_Error.Invalid_Block_Header
+			return 0, 0, XZ_Error.Invalid_Block_Header
 		}
 		props := body[p:][:int(props_size)]
 		p += int(props_size)
@@ -213,36 +214,36 @@ _decode_block :: proc(d: ^Decoder) -> (err: Error) {
 		switch id {
 		case u64(Filter_ID.LZMA2):
 			if !last || len(props) != 1 {
-				return XZ_Error.Invalid_Filter_Chain
+				return 0, 0, XZ_Error.Invalid_Filter_Chain
 			}
 			size, size_err := lzma.lzma2_dict_size(props[0])
 			if size_err != nil {
-				return XZ_Error.Invalid_Filter_Chain
+				return 0, 0, XZ_Error.Invalid_Filter_Chain
 			}
 			dict_size = size
 		case u64(Filter_ID.Delta):
 			if last || len(props) != 1 || !filters.delta_init(&chain[i].delta, int(props[0]) + 1) {
-				return XZ_Error.Invalid_Filter_Chain
+				return 0, 0, XZ_Error.Invalid_Filter_Chain
 			}
 		case u64(Filter_ID.X86) ..= u64(Filter_ID.RISCV):
 			if last || (len(props) != 0 && len(props) != 4) {
-				return XZ_Error.Invalid_Filter_Chain
+				return 0, 0, XZ_Error.Invalid_Filter_Chain
 			}
 			start := u32(0)
 			if len(props) == 4 {
 				start = endian.unchecked_get_u32le(props)
 			}
 			if !filters.branch_init(&chain[i].branch, _branch_arch(Filter_ID(id)), start) {
-				return XZ_Error.Invalid_Filter_Chain
+				return 0, 0, XZ_Error.Invalid_Filter_Chain
 			}
 		case:
-			return XZ_Error.Unsupported_Filter
+			return 0, 0, XZ_Error.Unsupported_Filter
 		}
 		chain[i].id = Filter_ID(id)
 	}
 	for b in body[p:] {
 		if b != 0 {
-			return XZ_Error.Reserved_Bit_Set
+			return 0, 0, XZ_Error.Reserved_Bit_Set
 		}
 	}
 
@@ -251,7 +252,7 @@ _decode_block :: proc(d: ^Decoder) -> (err: Error) {
 	data       := d.input[data_start:]
 	if has_compressed {
 		if compressed > u64(available) {
-			return General_Error.Stream_Too_Short
+			return 0, 0, General_Error.Stream_Too_Short
 		}
 		data = data[:int(compressed)]
 	}
@@ -259,22 +260,22 @@ _decode_block :: proc(d: ^Decoder) -> (err: Error) {
 	expected := -1
 	if has_uncompressed {
 		if uncompressed > u64(d.max_output_size - start) {
-			return General_Error.Output_Too_Short
+			return 0, 0, General_Error.Output_Too_Short
 		}
 		expected = int(uncompressed)
 	}
 	consumed, lzma_err := lzma.decompress_lzma2_append(&d.lzma2, d.output, data, dict_size, expected, d.max_output_size)
 	if lzma_err != nil {
 		if lzma_err == compress.LZMA_Error.Size_Mismatch || (expected >= 0 && lzma_err == General_Error.Output_Too_Short) {
-			return XZ_Error.Size_Mismatch
+			return 0, 0, XZ_Error.Size_Mismatch
 		}
 		if has_compressed && lzma_err == General_Error.Stream_Too_Short {
-			return XZ_Error.Size_Mismatch
+			return 0, 0, XZ_Error.Size_Mismatch
 		}
-		return lzma_err
+		return 0, 0, lzma_err
 	}
 	if has_compressed && u64(consumed) != compressed {
-		return XZ_Error.Size_Mismatch
+		return 0, 0, XZ_Error.Size_Mismatch
 	}
 	d.pos = data_start + consumed
 
@@ -290,7 +291,7 @@ _decode_block :: proc(d: ^Decoder) -> (err: Error) {
 	for (d.pos - block_start) % 4 != 0 {
 		pad := _take(d, 1) or_return
 		if pad[0] != 0 {
-			return XZ_Error.Invalid_Padding
+			return 0, 0, XZ_Error.Invalid_Padding
 		}
 	}
 	check_size := CHECK_SIZES[d.check_id]
@@ -299,9 +300,7 @@ _decode_block :: proc(d: ^Decoder) -> (err: Error) {
 		_verify_check(d.check_id, out, check) or_return
 	}
 
-	unpadded := u64(header_size + consumed + check_size)
-	_index_add(d, unpadded, u64(len(out))) or_return
-	return nil
+	return u64(header_size + consumed + check_size), u64(len(out)), nil
 }
 
 @(private)

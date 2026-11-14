@@ -3,6 +3,7 @@ package compress_xz
 import "core:compress"
 import "core:compress/filters"
 import "core:compress/lzma"
+import "core:io"
 
 Error         :: compress.Error
 General_Error :: compress.General_Error
@@ -16,6 +17,7 @@ VLI_BYTES_MAX         :: 9
 VLI_MAX               :: u64(max(i64))
 INDEX_SIZE_MAX        :: u64(1) << 34
 UNPADDED_SIZE_MIN     :: 5
+UNPADDED_SIZE_MAX     :: VLI_MAX &~ 3
 BLOCK_SIZE_MIN        :: 1 << 20
 INDEX_RECORD_MAX      :: 2 * VLI_BYTES_MAX
 
@@ -69,6 +71,58 @@ Decode_Flag :: enum u8 {
 }
 
 Decode_Flags :: bit_set[Decode_Flag; u8]
+
+Block_Info :: struct {
+	stream:              int,
+	compressed_offset:   i64,
+	uncompressed_offset: i64,
+	unpadded_size:       i64,
+	uncompressed_size:   i64,
+}
+
+Stream_Info :: struct {
+	check_id:            u8,
+	compressed_offset:   i64,
+	compressed_size:     i64,
+	uncompressed_offset: i64,
+	uncompressed_size:   i64,
+	padding:             i64,
+	first_block:         int,
+	block_count:         int,
+}
+
+Index :: struct {
+	streams:           [dynamic]Stream_Info,
+	blocks:            [dynamic]Block_Info,
+	compressed_size:   i64,
+	uncompressed_size: i64,
+}
+
+@(private)
+INDEX_SCAN_CHUNK :: 4096
+
+@(private)
+Index_Source :: struct {
+	bytes:     []u8,
+	stream:    io.Stream,
+	is_stream: bool,
+	size:      i64,
+	buffer:    [dynamic]u8,
+}
+
+@(private)
+Index_Location :: struct {
+	offset: i64,
+	size:   i64,
+	padded: i64,
+}
+
+@(private)
+Index_Summary :: struct {
+	count:        u64,
+	padded:       i64,
+	uncompressed: i64,
+}
 
 @(private)
 Block_Filter :: struct {
