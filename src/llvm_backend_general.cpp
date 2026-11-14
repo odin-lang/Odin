@@ -2023,6 +2023,120 @@ gb_internal bool lb_const_has_misaligned_pointer(LLVMTargetDataRef td, LLVMValue
 
 enum {LB_MAX_STORE_SIZE = 64};
 
+// A constant aggregate > LB_MAX_STORE_SIZE is considered "sparse" when less than
+// LB_WHOLE_CONST_MIN_DENSITY_PERCENT of its bytes are non-zero and it has at most
+// LB_SPARSE_CONST_MAX_LEAVES non-zero leaves. A sparse value is stored by zeroing it and then storing its non-zero leaves.
+// A non-sparse value is copied wholesale from a private global (in rodata),
+// which is right for a densely filled struct (or a table), but wasteful for a sparse one.
+// The leaf cap keeps a big table with few non-zero bytes but many leaves (a constant slice of structs)
+// as one copy instead of many stores.
+enum {LB_WHOLE_CONST_MIN_DENSITY_PERCENT = 33};
+enum {LB_SPARSE_CONST_MAX_LEAVES = 16};
+
+// Counts the non-zero leaves of a constant aggregate and their bytes. It traverses the value the same
+// way lb_store_const_leaves below does, so leaves match the number of stores the sparse path would emit and
+// bytes match what the stores write.
+// (A constant data array/vector is one leaf written whole, so its bytes count in full:
+// stored as a value when size <= LB_MAX_STORE_SIZE, otherwise copied out of a private global of its own.)
+// Early exit once the leaves exceed max_leaves.
+gb_internal void lb_const_nonzero_leaves(LLVMValueRef c, i64 max_leaves, i64 *leaves, i64 *bytes) {
+	if (LLVMIsNull(c) || LLVMIsUndef(c)) {
+		return;
+	}
+	if (LLVMIsAConstantStruct(c) || LLVMIsAConstantArray(c)) {
+		unsigned n = cast(unsigned)LLVMGetNumOperands(c);
+		for (unsigned i = 0; i < n && *leaves <= max_leaves; i++) {
+			lb_const_nonzero_leaves(LLVMGetOperand(c, i), max_leaves, leaves, bytes);
+		}
+		return;
+	}
+	*leaves += 1;
+	*bytes += lb_sizeof(LLVMTypeOf(c));
+}
+
+gb_internal bool lb_const_is_sparse(LLVMValueRef c) {
+	i64 size = lb_sizeof(LLVMTypeOf(c));
+	if (size <= 0) {
+		return false;
+	}
+	i64 leaves = 0;
+	i64 bytes = 0;
+	lb_const_nonzero_leaves(c, LB_SPARSE_CONST_MAX_LEAVES, &leaves, &bytes);
+	return leaves <= LB_SPARSE_CONST_MAX_LEAVES && bytes*100 < size*LB_WHOLE_CONST_MIN_DENSITY_PERCENT;
+}
+
+gb_internal void lb_store_const_leaves(lbProcedure *p, LLVMTargetDataRef td, LLVMValueRef dst, unsigned dst_alignment, LLVMValueRef c, i64 offset) {
+	if (LLVMIsNull(c) || LLVMIsUndef(c)) {
+		return;
+	}
+	LLVMTypeRef t = LLVMTypeOf(c);
+	if (LLVMIsAConstantStruct(c)) {
+		unsigned n = cast(unsigned)LLVMGetNumOperands(c);
+		for (unsigned i = 0; i < n; i++) {
+			lb_store_const_leaves(p, td, dst, dst_alignment, LLVMGetOperand(c, i), offset + cast(i64)LLVMOffsetOfElement(td, t, i));
+		}
+		return;
+	}
+	if (LLVMIsAConstantArray(c)) {
+		i64 stride = cast(i64)LLVMABISizeOfType(td, LLVMGetElementType(t));
+		unsigned n = cast(unsigned)LLVMGetNumOperands(c);
+		for (unsigned i = 0; i < n; i++) {
+			lb_store_const_leaves(p, td, dst, dst_alignment, LLVMGetOperand(c, i), offset + cast(i64)i*stride);
+		}
+		return;
+	}
+	LLVMTypeRef i8 = LLVMInt8TypeInContext(p->module->ctx);
+	LLVMTypeRef i64_type = LLVMInt64TypeInContext(p->module->ctx);
+	LLVMValueRef index = LLVMConstInt(i64_type, cast(u64)offset, false);
+	LLVMValueRef ptr = offset ? LLVMBuildInBoundsGEP2(p->builder, i8, dst, &index, 1, "") : dst;
+	unsigned alignment = lb_aggregate_field_alignment(dst_alignment, offset);
+
+	i64 size = lb_sizeof(t);
+	if (size > LB_MAX_STORE_SIZE) {
+		// A big leaf (a constant data array) is copied out of a private global of its own, like lb_emit_store
+		// does for big constants. This prevents LLVM from splitting a single store of the whole array
+		// into per-element stores (which slows down compilation a lot).
+		unsigned global_alignment = cast(unsigned)LLVMABIAlignmentOfType(td, t);
+		LLVMValueRef global = LLVMAddGlobal(p->module->mod, t, "");
+		LLVMSetInitializer(global, c);
+		LLVMSetGlobalConstant(global, true);
+		LLVMSetLinkage(global, LLVMPrivateLinkage);
+		LLVMSetUnnamedAddress(global, LLVMGlobalUnnamedAddr);
+		LLVMSetAlignment(global, global_alignment);
+		LLVMBuildMemCpy(p->builder, ptr, alignment, global, global_alignment, LLVMConstInt(i64_type, cast(u64)size, false));
+		return;
+	}
+	LLVMValueRef s = LLVMBuildStore(p->builder, c, ptr);
+	LLVMSetAlignment(s, alignment);
+}
+
+// Store a large constant aggregate by zeroing the destination (lb_mem_zero_ptr) and storing its
+// non-zero leaves, if it qualifies as "sparse". Returns false if it does not (or is not an aggregate
+// the check understands, or the destination is not exactly the constant's size: the zeroing covers
+// the destination while the leaves follow the constant's layout).
+// The zeroing covers every byte, which lb_emit_store_writes_every_byte relies on.
+gb_internal bool lb_try_store_sparse_constant(lbProcedure *p, LLVMValueRef dst, Type *type, LLVMValueRef c) {
+	if (!(LLVMIsAConstantStruct(c) || LLVMIsAConstantArray(c))) {
+		return false;
+	}
+	if (type_size_of(type) != lb_sizeof(LLVMTypeOf(c))) {
+		return false;
+	}
+	if (!lb_const_is_sparse(c)) {
+		return false;
+	}
+	// Only the alignment the address is known to have (a local or a global, and offsets into one), otherwise 1,
+	// as the copy out of a private global this replaces claims: the destination may be less aligned than
+	// its type, e.g. a pointer to a field of a #packed struct
+	unsigned dst_alignment = cast(unsigned)lb_known_address_alignment(p->module, dst, 1);
+	lb_mem_zero_ptr(p, dst, type, dst_alignment);
+	lb_store_const_leaves(p, LLVMGetModuleDataLayout(p->module->mod), dst, dst_alignment, c, 0);
+	return true;
+}
+
+// Whether lb_emit_store(ptr, ...) writes every byte of ptr, so ptr needs no zero-init first.
+// (For a large constant this is true for both paths lb_emit_store can take: the copy out of a private
+// global, and the zeroing plus non-zero leaves of lb_try_store_sparse_constant.)
 gb_internal bool lb_emit_store_writes_every_byte(lbProcedure *p, Type *type, lbValue value) {
 	if (!are_types_identical(type, value.type) || LLVMIsUndef(value.value)) {
 		return false;
@@ -2103,6 +2217,9 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 			return;
 		} else if (LLVMIsConstant(value.value) &&
 		           !lb_const_has_misaligned_pointer(LLVMGetModuleDataLayout(p->module->mod), value.value, 0, cast(u64)type_align_of(value.type))) {
+			if (lb_try_store_sparse_constant(p, ptr.value, a, value.value)) {
+				return;
+			}
 			lbAddr addr = lb_add_global_generated_from_procedure(p, value.type, value);
 			lb_make_global_private_const(addr);
 
