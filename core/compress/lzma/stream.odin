@@ -368,28 +368,35 @@ writer_create :: proc(lw: ^Writer, w: io.Writer, kind: Stream_Kind, lzma_options
 	if kind == .Alone && input_size < 0 {
 		opts.end_marker = true
 	}
-	props = options_properties(opts)
-
-	keep_before := u64(encoder_history(opts.dict_size)) + NUM_OPTS + 1
-	threshold   := u64(LZMA2_UNPACK_CHUNK_MAX if lzma2 else CODE_BLOCK_UNPACK) + WRITER_LOOKAHEAD
-	need        := keep_before + threshold + BLOCK_MOVE_ALIGN
-	if need > BLOCK_SIZE_MAX {
-		return {}, General_Error.Memory_Limit_Exceeded
-	}
-	block_size := min((need + (need >> (1 if need < 1 << 30 else 2)) + BLOCK_SIZE_ALIGN - 1) &~ u64(BLOCK_SIZE_ALIGN - 1), BLOCK_SIZE_MAX)
-	out_size   := compress_lzma2_bound(int(threshold)) + HEADER_SIZE
-
-	memory := encoder_memory(opts, expected, lzma2) + u64(out_size)
-	if options.buffer != nil {
-		if u64(len(options.buffer)) < need {
-			return {}, General_Error.Incompatible_Options
+	threshold := u64(LZMA2_UNPACK_CHUNK_MAX if lzma2 else CODE_BLOCK_UNPACK) + WRITER_LOOKAHEAD
+	out_size  := compress_lzma2_bound(int(threshold)) + HEADER_SIZE
+	limit     := u64(compress.memory_limit(options))
+	keep_before, block_size: u64
+	for {
+		keep_before = u64(encoder_history(opts.dict_size)) + NUM_OPTS + 1
+		need       := keep_before + threshold + BLOCK_MOVE_ALIGN
+		block_size  = min((need + (need >> (1 if need < 1 << 30 else 2)) + BLOCK_SIZE_ALIGN - 1) &~ u64(BLOCK_SIZE_ALIGN - 1), BLOCK_SIZE_MAX)
+		memory     := encoder_memory(opts, expected, lzma2) + u64(out_size)
+		short      := false
+		if options.buffer != nil {
+			short = u64(len(options.buffer)) < need
+		} else {
+			memory += block_size
 		}
-		lw.block = options.buffer[:min(u64(len(options.buffer)), BLOCK_SIZE_MAX)]
-	} else {
-		memory += block_size
+		if need <= BLOCK_SIZE_MAX && !short && memory <= limit {
+			break
+		}
+		if opts.dict_size <= DICT_SIZE_MIN {
+			if short {
+				return {}, General_Error.Incompatible_Options
+			}
+			return {}, General_Error.Memory_Limit_Exceeded
+		}
+		opts.dict_size, _ = lzma2_dict_size(lzma2_dict_prop(opts.dict_size) - 1)
 	}
-	if memory > u64(compress.memory_limit(options)) {
-		return {}, General_Error.Memory_Limit_Exceeded
+	props = options_properties(opts)
+	if options.buffer != nil {
+		lw.block = options.buffer[:min(u64(len(options.buffer)), BLOCK_SIZE_MAX)]
 	}
 	if lw.block == nil {
 		lw.block      = non_zero_make([]u8, int(block_size)) or_return

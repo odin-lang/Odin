@@ -165,6 +165,63 @@ lzma_writer_memory :: proc(t: ^testing.T) {
 }
 
 @(test)
+lzma_writer_shrink :: proc(t: ^testing.T) {
+	g := Lz4_Test_Lcg{state = 0x5348524b}
+	text := lz4_test_lcg_text(&g, 100_000)
+	defer delete(text)
+	data: [dynamic]byte
+	defer delete(data)
+	for len(data) < (3 << 19 if !SLIM_TESTS else 1 << 18) {
+		append(&data, ..text)
+		append(&data, u8(len(data)), u8(len(data) >> 8), u8(len(data) >> 16))
+	}
+
+	for kind in Lzma_Stream_Kind {
+		for use_buffer in ([]bool{false, true}) {
+			level   := lzma.Level.Level_9 if !use_buffer else lzma.Level.Level_6
+			options := lzma.level_options(level)
+			setup   := Lzma_Writer_Setup{kind = kind, level = level, options = options, input_size = -1, stream = {max_memory = 8 << 20}}
+			if use_buffer {
+				setup.stream = {buffer = make([]byte, 3 << 20, context.temp_allocator)}
+			}
+
+			track: mem.Tracking_Allocator
+			mem.tracking_allocator_init(&track, context.allocator)
+			defer mem.tracking_allocator_destroy(&track)
+			got: [dynamic]byte
+			defer delete(got)
+			aw := Append_Writer{out = &got, fail_at = -1}
+			props: lzma.Properties
+			err: compress.Error
+			{
+				context.allocator = mem.tracking_allocator(&track)
+				props, err = lzma_writer_pack(setup, append_writer(&aw), data[:], .Random)
+			}
+			if !testing.expectf(t, err == nil, "%v, buffer %v: %v", kind, use_buffer, err) {
+				continue
+			}
+			if kind == .Alone && testing.expect(t, len(got) >= lzma.HEADER_SIZE) {
+				props.dict_size = u32(got[1]) | u32(got[2]) << 8 | u32(got[3]) << 16 | u32(got[4]) << 24
+			}
+			series, _ := lzma.lzma2_dict_size(lzma.lzma2_dict_prop(props.dict_size))
+			testing.expectf(t, props.dict_size >= lzma.DICT_SIZE_MIN && props.dict_size < options.dict_size && series == props.dict_size, "%v, buffer %v: dictionary %v, level %v", kind, use_buffer, props.dict_size, options.dict_size)
+			if !use_buffer {
+				testing.expectf(t, int(track.peak_memory_allocated) <= setup.stream.max_memory, "%v: peak %v, limit %v", kind, track.peak_memory_allocated, setup.stream.max_memory)
+			}
+
+			out: [dynamic]byte
+			defer delete(out)
+			switch kind {
+			case .Alone: err = lzma.decompress(&out, got[:])
+			case .Raw:   err = lzma.decompress_raw(&out, got[:], props, len(data))
+			case .LZMA2: err = lzma.decompress_lzma2(&out, got[:], props.dict_size)
+			}
+			testing.expectf(t, err == nil && bytes.equal(out[:], data[:]), "%v, buffer %v: round trip %v, %v bytes", kind, use_buffer, err, len(out))
+		}
+	}
+}
+
+@(test)
 lzma_writer_buffer :: proc(t: ^testing.T) {
 	runs := codec_runs_data(900_000)
 	defer delete(runs)
