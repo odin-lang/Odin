@@ -449,12 +449,11 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	command_line   := _build_command_line(desc.command, temp_allocator)
 	command_line_w := win32_utf8_to_wstring(command_line, temp_allocator) or_return
-	environment := desc.env
-	if desc.env == nil {
-		environment = environ(temp_allocator) or_return
+	environment_block_w: []u16
+	if desc.env != nil {
+		environment_block  := _build_environment_block(desc.env, temp_allocator)
+		environment_block_w = win32_utf8_to_utf16(environment_block, temp_allocator) or_return
 	}
-	environment_block   := _build_environment_block(environment, temp_allocator)
-	environment_block_w := win32_utf8_to_utf16(environment_block, temp_allocator) or_return
 
 	stderr_handle: win32.HANDLE	
 	stdout_handle: win32.HANDLE	

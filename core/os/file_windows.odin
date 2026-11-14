@@ -79,14 +79,14 @@ _handle :: proc "contextless" (f: ^File) -> win32.HANDLE {
 	return win32.HANDLE(_fd(f))
 }
 
-_open_internal :: proc(name: string, flags: File_Flags, perm: Permissions) -> (handle: uintptr, err: Error) {
+_open_internal :: proc(name: string, wide: []u16, flags: File_Flags, perm: Permissions) -> (handle: uintptr, err: Error) {
 	if len(name) == 0 {
 		err = .Not_Exist
 		return
 	}
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
-	path := _fix_long_path(name, temp_allocator) or_return
+	path := cstring16(raw_data(_fix_long_path_wide(name, wide, temp_allocator) or_return))
 	access: u32
 	switch flags & {.Read, .Write} {
 	case {.Read}:         access = win32.FILE_GENERIC_READ
@@ -159,11 +159,22 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: Permissions) -> (h
 
 _open :: proc(name: string, flags: File_Flags, perm: Permissions) -> (f: ^File, err: Error) {
 	flags := flags if flags != nil else {.Read}
-	handle := _open_internal(name, flags, perm) or_return
-	return _new_file(handle, name, file_allocator())
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	wide := win32_utf8_to_utf16(name, temp_allocator) or_return
+	handle := _open_internal(name, wide, flags, perm) or_return
+	return _new_file_wide(handle, name, wide, file_allocator())
 }
 
 _new_file :: proc(handle: uintptr, name: string, allocator: runtime.Allocator) -> (f: ^File, err: Error) {
+	if handle == INVALID_HANDLE {
+		return
+	}
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
+	wide := win32_utf8_to_utf16(name, temp_allocator) or_return
+	return _new_file_wide(handle, name, wide, allocator)
+}
+
+_new_file_wide :: proc(handle: uintptr, name: string, wide: []u16, allocator: runtime.Allocator) -> (f: ^File, err: Error) {
 	if handle == INVALID_HANDLE {
 		return
 	}
@@ -177,7 +188,11 @@ _new_file :: proc(handle: uintptr, name: string, allocator: runtime.Allocator) -
 	impl.allocator = allocator
 	impl.fd = rawptr(handle)
 	impl.name = clone_string(name, impl.allocator) or_return
-	impl.wname = win32_utf8_to_wstring(name, impl.allocator) or_return
+	if len(wide) > 0 {
+		wname := make([]u16, len(wide) + 1, impl.allocator) or_return
+		copy(wname, wide)
+		impl.wname = cstring16(raw_data(wname))
+	}
 
 	handle := _handle(&impl.file)
 	kind := File_Impl_Kind.File
@@ -202,12 +217,14 @@ _new_file :: proc(handle: uintptr, name: string, allocator: runtime.Allocator) -
 _open_buffered :: proc(name: string, buffer_size: uint, flags := File_Flags{.Read}, perm: Permissions) -> (f: ^File, err: Error) {
 	assert(buffer_size > 0)
 	flags := flags if flags != nil else {.Read}
-	handle := _open_internal(name, flags, perm) or_return
-	return _new_file_buffered(handle, name, buffer_size)
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	wide := win32_utf8_to_utf16(name, temp_allocator) or_return
+	handle := _open_internal(name, wide, flags, perm) or_return
+	return _new_file_buffered(handle, name, wide, buffer_size)
 }
 
-_new_file_buffered :: proc(handle: uintptr, name: string, buffer_size: uint) -> (f: ^File, err: Error) {
-	f, err = _new_file(handle, name, file_allocator())
+_new_file_buffered :: proc(handle: uintptr, name: string, wide: []u16, buffer_size: uint) -> (f: ^File, err: Error) {
+	f, err = _new_file_wide(handle, name, wide, file_allocator())
 	if f != nil && err == nil {
 		impl := (^File_Impl)(f.impl)
 		impl.r_buf = make([]byte, buffer_size, file_allocator())
