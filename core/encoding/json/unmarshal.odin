@@ -139,12 +139,12 @@ unmarshal_any :: proc(data: []byte, v: any, spec := DEFAULT_SPECIFICATION, alloc
 	// NOTE(bill): From here on, `.Skip_Validation` means the syntax is checked while unmarshalling instead.
 	have_custom := _user_unmarshalers != nil && len(_user_unmarshalers) > 0
 	if have_custom {
-		flags -= {.Skip_Validation}
+		flags += {.Skip_Validation}
 	} else if .Skip_Validation not_in flags && !is_valid(data, spec, PARSE_INTEGERS) {
 		return .Invalid_Data
 	}
 	p := make_parser(data, spec, PARSE_INTEGERS, allocator)
-	p.tok.validated = !have_custom && .Skip_Validation not_in flags
+	p.tok.validated = .Skip_Validation not_in flags
 
 	data := any{(^rawptr)(v.data)^, ti.variant.(^reflect.Type_Info_Pointer).elem.id}
 	if v.data == nil {
@@ -160,7 +160,11 @@ unmarshal_any :: proc(data: []byte, v: any, spec := DEFAULT_SPECIFICATION, alloc
 		}
 	}
 
-	return unmarshal_value(&p, data, flags)
+	unmarshal_value(&p, data, flags) or_return
+	if p.spec == .JSON && !at_end(&p) {
+		return .Unexpected_Token
+	}
+	return nil
 }
 
 
@@ -485,6 +489,11 @@ unmarshal_value :: proc(p: ^Parser, v: any, flags := Unmarshal_Flags{}) -> (err:
 		return
 	}
 
+	if .Skip_Validation in flags && p.spec == .JSON && p.curr_token_err == .Invalid_Number {
+		advance_token(p)
+		return .Invalid_Number
+	}
+
 	#partial switch token.kind {
 	case .Null:
 		mem.zero(v.data, ti.size)
@@ -613,6 +622,9 @@ unmarshal_expect :: proc(p: ^Parser, kind: Token_Kind, flags: Unmarshal_Flags, e
 	}
 	if p.curr_token.kind != kind {
 		return .EOF if p.curr_token.kind == .EOF else error
+	}
+	if p.spec == .JSON && p.prev_token.kind == .Comma {
+		return .Unexpected_Token
 	}
 	advance_token(p)
 	return nil
