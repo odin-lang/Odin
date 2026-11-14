@@ -26,14 +26,15 @@ Memory_File :: struct {
 }
 
 Write_Expect :: struct {
-	name:    string,
-	type:    archive.Entry_Type,
-	content: []u8,
-	method:  archive.Method,
-	filters: archive.Filters,
-	mode:    u32,
-	dos:     u32,
-	link:    string,
+	name:      string,
+	type:      archive.Entry_Type,
+	content:   []u8,
+	method:    archive.Method,
+	filters:   archive.Filters,
+	mode:      u32,
+	dos:       u32,
+	link:      string,
+	encrypted: bool,
 }
 
 Filter_Case :: struct {
@@ -931,9 +932,9 @@ progress_keep :: proc(progress: compress.Progress, user_data: rawptr) -> (cancel
 	return progress_record(kept, user_data)
 }
 
-check_written :: proc(t: ^testing.T, label: string, data: []u8, expected: []Write_Expect) {
+check_written :: proc(t: ^testing.T, label: string, data: []u8, expected: []Write_Expect, password := "") {
 	r: sevenz.Reader
-	if open_err := sevenz.open(&r, data); !testing.expectf(t, open_err == nil, "%s: open %v", label, open_err) {
+	if open_err := sevenz.open(&r, data, compress.Options{}, context.allocator, archive.Read_Options{password = password}); !testing.expectf(t, open_err == nil, "%s: open %v", label, open_err) {
 		return
 	}
 	defer sevenz.close(&r)
@@ -953,6 +954,7 @@ check_written :: proc(t: ^testing.T, label: string, data: []u8, expected: []Writ
 			testing.expectf(t, fi.method == want.method, "%s/%s: method %v", label, want.name, fi.method)
 		}
 		testing.expectf(t, fi.filters == want.filters, "%s/%s: filters %v, want %v", label, want.name, fi.filters, want.filters)
+		testing.expectf(t, fi.encrypted == want.encrypted, "%s/%s: encrypted %v", label, want.name, fi.encrypted)
 		if want.mode != 0 {
 			testing.expectf(t, fi.unix_mode == want.mode, "%s/%s: mode %o", label, want.name, fi.unix_mode)
 		}
@@ -976,9 +978,9 @@ check_written :: proc(t: ^testing.T, label: string, data: []u8, expected: []Writ
 	testing.expectf(t, count == len(expected), "%s: %d entries, want %d", label, count, len(expected))
 }
 
-count_folders :: proc(data: []u8) -> int {
+count_folders :: proc(data: []u8, password := "") -> int {
 	r: sevenz.Reader
-	if sevenz.open(&r, data) != nil {
+	if sevenz.open(&r, data, compress.Options{}, context.allocator, archive.Read_Options{password = password}) != nil {
 		return -1
 	}
 	defer sevenz.close(&r)

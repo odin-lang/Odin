@@ -8,6 +8,7 @@ import "core:compress/deflate"
 import "core:compress/filters"
 import "core:compress/lzma"
 import "core:compress/ppmd"
+import "core:crypto/aes"
 import "core:hash"
 import "core:io"
 import "core:os"
@@ -16,20 +17,22 @@ import "core:strings"
 import "core:time"
 import "core:unicode/utf8"
 
-open_from_bytes :: proc(r: ^Reader, data: []u8, options := compress.Options{}, allocator := context.allocator) -> (err: Error) {
+open_from_bytes :: proc(r: ^Reader, data: []u8, options := compress.Options{}, allocator := context.allocator, read_options := archive.Read_Options{}) -> (err: Error) {
 	_init(r, options, allocator)
 	defer if err != nil {
 		close(r)
 	}
+	r.password = _secret_clone(read_options.password, allocator) or_return
 	r.store = {data = data, size = i64(len(data)), memory = true}
 	return _load(r)
 }
 
-open_from_stream :: proc(r: ^Reader, s: io.Stream, options := compress.Options{}, allocator := context.allocator) -> (err: Error) {
+open_from_stream :: proc(r: ^Reader, s: io.Stream, options := compress.Options{}, allocator := context.allocator, read_options := archive.Read_Options{}) -> (err: Error) {
 	_init(r, options, allocator)
 	defer if err != nil {
 		close(r)
 	}
+	r.password = _secret_clone(read_options.password, allocator) or_return
 	modes := io.query(s)
 	if .Read_At not_in modes && (.Seek not_in modes || .Read not_in modes) {
 		return archive.General_Error.Not_Seekable
@@ -42,12 +45,12 @@ open_from_stream :: proc(r: ^Reader, s: io.Stream, options := compress.Options{}
 	return _load(r)
 }
 
-open_from_path :: proc(r: ^Reader, path: string, options := compress.Options{}, allocator := context.allocator) -> (err: Error) {
+open_from_path :: proc(r: ^Reader, path: string, options := compress.Options{}, allocator := context.allocator, read_options := archive.Read_Options{}) -> (err: Error) {
 	f, open_err := os.open(path)
 	if open_err != nil {
 		return open_err
 	}
-	if err = open_from_stream(r, os.to_stream(f), options, allocator); err != nil {
+	if err = open_from_stream(r, os.to_stream(f), options, allocator, read_options); err != nil {
 		os.close(f)
 		return
 	}
@@ -67,6 +70,8 @@ close_reader :: proc(r: ^Reader) {
 	delete(r.items, r.allocator)
 	delete(r.names, r.allocator)
 	delete(r.index, r.allocator)
+	_key_cache_destroy(&r.keys)
+	_secret_delete(transmute([]u8)r.password, r.allocator)
 	if r.file != nil {
 		os.close(r.file)
 	}
@@ -133,8 +138,9 @@ extract_current :: proc(it: ^Iterator, w: io.Writer, options := archive.Read_Opt
 		return archive.General_Error.No_Current_Member
 	}
 	_member_destroy(&it.member)
-	d := _iterator_decoder(it) or_return
-	return _extract(it.reader, it.index, d, w)
+	password := _password(it.reader, options)
+	d := _iterator_decoder(it, password) or_return
+	return _extract(it.reader, it.index, d, w, password)
 }
 
 open_current :: proc(it: ^Iterator, options := archive.Read_Options{}) -> (reader: io.Reader, err: Error) {
@@ -142,8 +148,9 @@ open_current :: proc(it: ^Iterator, options := archive.Read_Options{}) -> (reade
 		return {}, archive.General_Error.No_Current_Member
 	}
 	_member_destroy(&it.member)
-	d := _iterator_decoder(it) or_return
-	_member_init(&it.member, it.reader, it.index, d, it.reader.allocator) or_return
+	password := _password(it.reader, options)
+	d := _iterator_decoder(it, password) or_return
+	_member_init(&it.member, it.reader, it.index, d, it.reader.allocator, password) or_return
 	return _member_stream(&it.member), nil
 }
 
@@ -159,8 +166,8 @@ read_link :: proc(it: ^Iterator, allocator := context.allocator) -> (target: str
 	if fi.size > LINK_TARGET_MAX {
 		return "", archive.General_Error.Limit_Exceeded
 	}
-	d := _iterator_decoder(it) or_return
-	return _read_link(it.reader, it.index, d, allocator)
+	d := _iterator_decoder(it, it.reader.password) or_return
+	return _read_link(it.reader, it.index, d, allocator, it.reader.password)
 }
 
 find :: proc(r: ^Reader, path: string) -> (fi: archive.File_Info, handle: archive.Handle, ok: bool, err: Error) {
@@ -183,13 +190,13 @@ find :: proc(r: ^Reader, path: string) -> (fi: archive.File_Info, handle: archiv
 
 extract :: proc(r: ^Reader, handle: archive.Handle, w: io.Writer, options := archive.Read_Options{}) -> (err: Error) {
 	index := _handle_index(r, handle) or_return
-	return _extract(r, index, nil, w)
+	return _extract(r, index, nil, w, _password(r, options))
 }
 
 open_member :: proc(r: ^Reader, handle: archive.Handle, options := archive.Read_Options{}, allocator := context.allocator) -> (reader: io.Reader, err: Error) {
 	index := _handle_index(r, handle) or_return
 	m := new(Member, allocator) or_return
-	if err = _member_init(m, r, index, nil, allocator); err != nil {
+	if err = _member_init(m, r, index, nil, allocator, _password(r, options)); err != nil {
 		free(m, allocator)
 		return
 	}
@@ -227,7 +234,13 @@ _init :: proc(r: ^Reader, options: compress.Options, allocator: runtime.Allocato
 	r^ = {}
 	r.allocator = allocator
 	r.options   = options
+	r.keys.allocator = allocator
 	_streams_init(&r.streams, allocator)
+}
+
+@(private)
+_password :: proc "contextless" (r: ^Reader, options: archive.Read_Options) -> (password: string) {
+	return options.password if options.password != "" else r.password
 }
 
 @(private)
@@ -325,7 +338,7 @@ _decode_header :: proc(r: ^Reader, p: ^Parser) -> (data: []u8, err: Error) {
 	data = make([]u8, int(f.unpack_size), r.allocator) or_return
 	d: Folder_Decoder
 	defer _decoder_destroy(&d)
-	if err = _decoder_init(&d, &r.store, &streams, 0, r.options, r.allocator); err == nil {
+	if err = _decoder_init(&d, &r.store, &streams, 0, r.options, r.allocator, &r.keys, r.password); err == nil {
 		_, err = _decoder_read(&d, data)
 		if err == nil {
 			err = d.err
@@ -563,7 +576,6 @@ _classify :: proc(s: ^Streams, f: ^Folder) {
 			f.supported = false
 		case .AES:
 			f.encrypted = true
-			f.supported = false
 		case .Delta:
 			f.filters += {.Delta}
 		case .Branch:
@@ -1247,28 +1259,29 @@ _time :: proc "contextless" (filetime: Maybe(u64)) -> (t: time.Time) {
 }
 
 @(private)
-_iterator_decoder :: proc(it: ^Iterator) -> (d: ^Folder_Decoder, err: Error) {
+_iterator_decoder :: proc(it: ^Iterator, password: string) -> (d: ^Folder_Decoder, err: Error) {
 	r := it.reader
 	item := &r.items[it.index]
 	if !item.has_stream {
 		return nil, nil
 	}
 	d = &it.decoder
-	if d.active && d.folder == item.folder && d.err != nil {
+	rekey := r.streams.folders[item.folder].encrypted && d.password != password
+	if d.active && d.folder == item.folder && d.err != nil && !rekey {
 		return nil, d.err
 	}
-	if !d.active || d.folder != item.folder || d.position > item.folder_offset {
+	if !d.active || d.folder != item.folder || d.position > item.folder_offset || rekey {
 		_decoder_destroy(d)
-		_decoder_init(d, &r.store, &r.streams, item.folder, r.options, r.allocator) or_return
+		_decoder_init(d, &r.store, &r.streams, item.folder, r.options, r.allocator, &r.keys, password) or_return
 	}
 	_decoder_skip(d, item.folder_offset) or_return
 	return
 }
 
 @(private)
-_extract :: proc(r: ^Reader, index: int, borrowed: ^Folder_Decoder, w: io.Writer) -> (err: Error) {
+_extract :: proc(r: ^Reader, index: int, borrowed: ^Folder_Decoder, w: io.Writer, password: string) -> (err: Error) {
 	m: Member
-	_member_init(&m, r, index, borrowed, r.allocator) or_return
+	_member_init(&m, r, index, borrowed, r.allocator, password) or_return
 	defer _member_destroy(&m)
 	buf: []u8
 	if m.decoder != nil {
@@ -1289,9 +1302,9 @@ _extract :: proc(r: ^Reader, index: int, borrowed: ^Folder_Decoder, w: io.Writer
 }
 
 @(private)
-_read_link :: proc(r: ^Reader, index: int, borrowed: ^Folder_Decoder, allocator: runtime.Allocator) -> (target: string, err: Error) {
+_read_link :: proc(r: ^Reader, index: int, borrowed: ^Folder_Decoder, allocator: runtime.Allocator, password: string) -> (target: string, err: Error) {
 	b := strings.builder_make_len_cap(0, int(r.items[index].size), allocator) or_return
-	if err = _extract(r, index, borrowed, strings.to_writer(&b)); err != nil {
+	if err = _extract(r, index, borrowed, strings.to_writer(&b), password); err != nil {
 		strings.builder_destroy(&b)
 		return "", err
 	}
@@ -1299,7 +1312,7 @@ _read_link :: proc(r: ^Reader, index: int, borrowed: ^Folder_Decoder, allocator:
 }
 
 @(private)
-_member_init :: proc(m: ^Member, r: ^Reader, index: int, borrowed: ^Folder_Decoder, allocator: runtime.Allocator) -> (err: Error) {
+_member_init :: proc(m: ^Member, r: ^Reader, index: int, borrowed: ^Folder_Decoder, allocator: runtime.Allocator, password: string) -> (err: Error) {
 	m^ = {}
 	item := &r.items[index]
 	if r.options.max_output_size > 0 && item.size > i64(r.options.max_output_size) {
@@ -1314,7 +1327,7 @@ _member_init :: proc(m: ^Member, r: ^Reader, index: int, borrowed: ^Folder_Decod
 	if item.has_stream {
 		m.decoder = borrowed
 		if m.decoder == nil {
-			_decoder_init(&m.own, &r.store, &r.streams, item.folder, r.options, allocator) or_return
+			_decoder_init(&m.own, &r.store, &r.streams, item.folder, r.options, allocator, &r.keys, password) or_return
 			if err = _decoder_skip(&m.own, item.folder_offset); err != nil {
 				_decoder_destroy(&m.own)
 				return
@@ -1356,7 +1369,7 @@ _member_read :: proc(m: ^Member, p: []u8) -> (n: int, err: Error) {
 	want := int(min(i64(len(p)), remaining))
 	if n, err = _decoder_read(m.decoder, p[:want]); err != nil {
 		if _is_eof(err) {
-			err = SevenZ_Error.Size_Mismatch
+			err = _folder_error(m.decoder, SevenZ_Error.Size_Mismatch)
 		}
 		m.err = err
 		return 0, err
@@ -1374,7 +1387,7 @@ _member_finish :: proc(m: ^Member) -> (err: Error) {
 		return m.err
 	}
 	if expected, ok := m.expected.?; ok && expected != m.crc {
-		m.err = SevenZ_Error.CRC_Mismatch
+		m.err = _folder_error(m.decoder, SevenZ_Error.CRC_Mismatch)
 		return m.err
 	}
 	if progress_err := _member_progress(m); progress_err != nil {
@@ -1462,11 +1475,14 @@ _member_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte
 }
 
 @(private)
-_decoder_init :: proc(d: ^Folder_Decoder, store: ^Store, streams: ^Streams, folder: int, options: compress.Options, allocator: runtime.Allocator) -> (err: Error) {
+_decoder_init :: proc(d: ^Folder_Decoder, store: ^Store, streams: ^Streams, folder: int, options: compress.Options, allocator: runtime.Allocator, keys: ^Key_Cache, password: string) -> (err: Error) {
 	d^ = {}
 	f := &streams.folders[folder]
 	if !f.supported {
 		return archive.General_Error.Unsupported_Method
+	}
+	if f.encrypted && password == "" {
+		return archive.General_Error.Encrypted
 	}
 	_folder_memory(streams, f, options) or_return
 	d.store     = store
@@ -1480,8 +1496,12 @@ _decoder_init :: proc(d: ^Folder_Decoder, store: ^Store, streams: ^Streams, fold
 	d.options.progress        = nil
 	d.options.progress_data   = nil
 	d.active    = true
+	d.keys      = keys
 	defer if err != nil {
 		_decoder_destroy(d)
+	}
+	if f.encrypted {
+		d.password = _secret_clone(password, allocator) or_return
 	}
 	d.nodes    = make([]Node, f.coder_count, allocator) or_return
 	d.sections = make([]Section, f.packed_count, allocator) or_return
@@ -1511,11 +1531,19 @@ _decoder_destroy :: proc(d: ^Folder_Decoder) {
 		if node.has_ctx {
 			compress.destroy_context(&node.ctx)
 		}
-		delete(node.buffer, d.allocator)
+		if node.keyed {
+			_aes_destroy(&node)
+			_secret_delete(node.buffer, d.allocator)
+		} else {
+			delete(node.buffer, d.allocator)
+		}
 		delete(node.output, d.allocator)
 	}
 	delete(d.nodes, d.allocator)
 	delete(d.sections, d.allocator)
+	if d.password != "" {
+		_secret_delete(transmute([]u8)d.password, d.allocator)
+	}
 	delete(d.scratch, d.allocator)
 	d^ = {}
 }
@@ -1555,6 +1583,7 @@ _decoder_read :: proc(d: ^Folder_Decoder, p: []u8) -> (n: int, err: Error) {
 			d.err = SevenZ_Error.CRC_Mismatch
 		}
 	}
+	d.err = _folder_error(d, d.err)
 	if n > 0 || d.err == nil {
 		return n, nil
 	}
@@ -1568,7 +1597,7 @@ _decoder_skip :: proc(d: ^Folder_Decoder, target: i64) -> (err: Error) {
 		_, err = _decoder_read(d, d.scratch[:want])
 		if err != nil {
 			if _is_eof(err) {
-				err = SevenZ_Error.Size_Mismatch
+				err = _folder_error(d, SevenZ_Error.Size_Mismatch)
 			}
 			return
 		}
@@ -1611,7 +1640,7 @@ _folder_memory :: proc(s: ^Streams, f: ^Folder, options: compress.Options) -> (e
 			need += DEFLATE64_MEMORY
 		case .BZip2:
 			need += BZIP2_MEMORY
-		case .Branch, .Delta, .Swap2, .Swap4:
+		case .Branch, .Delta, .Swap2, .Swap4, .AES:
 			need += FILTER_BUFFER_SIZE
 		case .BCJ2:
 			need = _add(need, size)
@@ -1778,12 +1807,14 @@ _node_start :: proc(node: ^Node, properties: []u8) -> (err: Error) {
 		node.buffer = make([]u8, FILTER_BUFFER_SIZE, d.allocator) or_return
 	case .Swap2, .Swap4:
 		node.buffer = make([]u8, FILTER_BUFFER_SIZE, d.allocator) or_return
+	case .AES:
+		_aes_start(node, properties) or_return
 	case .Copy, .BCJ2:
 	case:
 		return archive.General_Error.Unsupported_Method
 	}
 	if codec_err != nil {
-		return codec_err
+		return _folder_error(d, codec_err)
 	}
 	return
 }
@@ -1836,7 +1867,7 @@ _node_read :: proc(node: ^Node, p: []u8) -> (n: int, err: Error) {
 		n, codec_err = deflate.inflate_reader_read(&node.inflate, buf)
 	case .BZip2:
 		n, codec_err = bzip2.reader_read(&node.bzip2, buf)
-	case .Branch, .Delta, .Swap2, .Swap4:
+	case .Branch, .Delta, .Swap2, .Swap4, .AES:
 		n, err = _filter_read(node, buf)
 	case .BCJ2:
 		n, err = _bcj2_read(node, buf)
@@ -1921,11 +1952,25 @@ _filter_fill :: proc(node: ^Node) -> (err: Error) {
 		node.ready = filters.swap2(data)
 	case .Swap4:
 		node.ready = filters.swap4(data)
+	case .AES:
+		node.ready = len(data) &~ (aes.BLOCK_SIZE - 1)
+		_cbc_decrypt(&node.cipher, &node.iv, data[:node.ready])
+		if node.eof && node.ready != node.end {
+			return SevenZ_Error.Size_Mismatch
+		}
 	}
 	if node.eof {
 		node.ready = node.end
 	}
 	return
+}
+
+@(private)
+_folder_error :: proc(d: ^Folder_Decoder, err: Error) -> Error {
+	if err == nil || d == nil || !d.streams.folders[d.folder].encrypted {
+		return err
+	}
+	return _password_error(err)
 }
 
 @(private)
@@ -2080,9 +2125,9 @@ _archive_detect :: proc(head: []u8) -> bool {
 }
 
 @(private)
-_archive_open_bytes :: proc(a: ^archive.Archive, data: []u8, options: compress.Options) -> (err: Error) {
+_archive_open_bytes :: proc(a: ^archive.Archive, data: []u8, options: compress.Options, read_options: archive.Read_Options) -> (err: Error) {
 	r := new(Reader, a.allocator) or_return
-	if err = open_from_bytes(r, data, options, a.allocator); err != nil {
+	if err = open_from_bytes(r, data, options, a.allocator, read_options); err != nil {
 		free(r, a.allocator)
 		return
 	}
@@ -2091,9 +2136,9 @@ _archive_open_bytes :: proc(a: ^archive.Archive, data: []u8, options: compress.O
 }
 
 @(private)
-_archive_open_stream :: proc(a: ^archive.Archive, s: io.Stream, options: compress.Options) -> (err: Error) {
+_archive_open_stream :: proc(a: ^archive.Archive, s: io.Stream, options: compress.Options, read_options: archive.Read_Options) -> (err: Error) {
 	r := new(Reader, a.allocator) or_return
-	if err = open_from_stream(r, s, options, a.allocator); err != nil {
+	if err = open_from_stream(r, s, options, a.allocator, read_options); err != nil {
 		free(r, a.allocator)
 		return
 	}

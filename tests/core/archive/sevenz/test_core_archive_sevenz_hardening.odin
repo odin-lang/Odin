@@ -4,6 +4,8 @@ import "core:archive"
 import "core:archive/sevenz"
 import "core:bytes"
 import "core:compress"
+import "core:crypto/aes"
+import "core:crypto/sha2"
 import "core:hash"
 import "core:io"
 import "core:os"
@@ -384,6 +386,159 @@ check_corrupt :: proc(t: ^testing.T, name: string, data: []u8) {
 		}
 		delete(got)
 	}
+}
+
+@(test)
+test_aes_folders :: proc(t: ^testing.T) {
+	data := pattern(96)
+	defer delete(data)
+	salt := []u8{'S', 'A', 'L', 'T'}
+	iv   := []u8{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
+	Case :: struct {
+		name:  string,
+		power: u8,
+		salt:  []u8,
+		iv:    []u8,
+		bare:  bool,
+	}
+	cases := [?]Case{
+		{"raw key",       0x3F, salt, iv,  false},
+		{"one round",     0,    salt, iv,  false},
+		{"no salt",       4,    nil,  iv,  false},
+		{"no iv",         2,    salt, nil, false},
+		{"power only",    1,    nil,  nil, false},
+		{"no properties", 0,    nil,  nil, true},
+	}
+	for c in cases {
+		packed := aes_encrypt(data, c.power, c.salt, c.iv, PASSWORD)
+		defer delete(packed)
+		coder := aes_coder(c.power, c.salt, c.iv, c.bare)
+		defer delete(coder)
+		built := build_archive({packed = packed, unpack_size = u64(len(data)), coder_bytes = coder[:], folder_crc = hash.crc32(data), name = "A.BIN"})
+		defer delete(built)
+		r: sevenz.Reader
+		if !testing.expectf(t, sevenz.open(&r, built[:]) == nil, "%s: open", c.name) {
+			continue
+		}
+		fi, handle, ok, _ := sevenz.find(&r, "A.BIN")
+		testing.expectf(t, ok && fi.encrypted && fi.supported, "%s: A.BIN is encrypted", c.name)
+		sink := strings.builder_make()
+		testing.expectf(t, sevenz.extract(&r, handle, strings.to_writer(&sink)) == archive.General_Error.Encrypted, "%s: no password", c.name)
+		strings.builder_reset(&sink)
+		testing.expectf(t, sevenz.extract(&r, handle, strings.to_writer(&sink), {password = "odin"}) == archive.General_Error.Wrong_Password, "%s: wrong password", c.name)
+		strings.builder_reset(&sink)
+		err := sevenz.extract(&r, handle, strings.to_writer(&sink), {password = PASSWORD})
+		testing.expectf(t, err == nil && bytes.equal(sink.buf[:], data), "%s: %v", c.name, err)
+		strings.builder_destroy(&sink)
+		sevenz.close(&r)
+	}
+
+	Bad :: struct {
+		name:   string,
+		coder:  []u8,
+		packed: int,
+		want:   archive.Error,
+	}
+	bads := [?]Bad{
+		{"power over the cap", {0x24, 0x06, 0xF1, 0x07, 0x01, 0x01, 25},         16, archive.General_Error.Limit_Exceeded},
+		{"power 63 is raw",    {0x24, 0x06, 0xF1, 0x07, 0x01, 0x01, 0x3F},       16, archive.General_Error.Wrong_Password},
+		{"short properties",   {0x24, 0x06, 0xF1, 0x07, 0x01, 0x02, 0xC1, 0x00}, 16, SevenZ_Error.Invalid_Folder},
+		{"flagless extra",     {0x24, 0x06, 0xF1, 0x07, 0x01, 0x02, 0x01, 0x00}, 16, SevenZ_Error.Invalid_Folder},
+		{"flags, no sizes",    {0x24, 0x06, 0xF1, 0x07, 0x01, 0x01, 0x41},       16, SevenZ_Error.Invalid_Folder},
+		{"partial block",      {0x24, 0x06, 0xF1, 0x07, 0x01, 0x01, 0x01},       15, SevenZ_Error.Invalid_Folder},
+	}
+	for b in bads {
+		packed := pattern(b.packed)
+		defer delete(packed)
+		built := build_archive({packed = packed, unpack_size = u64(b.packed), coder_bytes = b.coder, folder_crc = 0, name = "A.BIN"})
+		defer delete(built)
+		r: sevenz.Reader
+		if !testing.expectf(t, sevenz.open(&r, built[:]) == nil, "%s: open", b.name) {
+			continue
+		}
+		_, handle, ok, _ := sevenz.find(&r, "A.BIN")
+		testing.expectf(t, ok, "%s: find", b.name)
+		sink := strings.builder_make()
+		err := sevenz.extract(&r, handle, strings.to_writer(&sink), {password = PASSWORD})
+		testing.expectf(t, err == b.want, "%s: %v, want %v", b.name, err, b.want)
+		strings.builder_destroy(&sink)
+		sevenz.close(&r)
+	}
+}
+
+aes_coder :: proc(power: u8, salt, iv: []u8, bare: bool) -> (out: [dynamic]u8) {
+	if bare {
+		append(&out, 0x04, 0x06, 0xF1, 0x07, 0x01)
+		return
+	}
+	props: [dynamic]u8
+	defer delete(props)
+	b0 := power
+	if len(salt) > 0 {
+		b0 |= 0x80
+	}
+	if len(iv) > 0 {
+		b0 |= 0x40
+	}
+	append(&props, b0)
+	if len(salt) > 0 || len(iv) > 0 {
+		s := len(salt) - 1 if len(salt) > 0 else 0
+		v := len(iv) - 1 if len(iv) > 0 else 0
+		append(&props, u8(s << 4 | v))
+		append(&props, ..salt)
+		append(&props, ..iv)
+	}
+	append(&out, 0x24, 0x06, 0xF1, 0x07, 0x01, u8(len(props)))
+	append(&out, ..props[:])
+	return
+}
+
+aes_encrypt :: proc(data: []u8, power: u8, salt, iv: []u8, password: string) -> (out: []u8) {
+	key := aes_key(power, salt, password)
+	ecb: aes.Context_ECB
+	aes.init_ecb(&ecb, key[:])
+	defer aes.reset_ecb(&ecb)
+	chain: [16]u8
+	copy(chain[:], iv)
+	out = make([]u8, len(data))
+	for i := 0; i < len(data); i += 16 {
+		block: [16]u8
+		for k in 0..<16 {
+			block[k] = data[i + k] ~ chain[k]
+		}
+		aes.encrypt_ecb(&ecb, out[i:][:16], block[:])
+		copy(chain[:], out[i:][:16])
+	}
+	return
+}
+
+aes_key :: proc(power: u8, salt: []u8, password: string) -> (key: [32]u8) {
+	encoded: [dynamic]u8
+	defer delete(encoded)
+	for c in transmute([]u8)password {
+		append(&encoded, c, 0)
+	}
+	if power == 0x3F {
+		n := copy(key[:], salt)
+		copy(key[n:], encoded[:])
+	} else {
+		buf: [dynamic]u8
+		defer delete(buf)
+		append(&buf, ..salt)
+		append(&buf, ..encoded[:])
+		resize(&buf, len(buf) + 8)
+		counter := buf[len(buf) - 8:]
+		ctx: sha2.Context_256
+		sha2.init_256(&ctx)
+		for round in 0..<u64(1) << power {
+			for &b, k in counter {
+				b = u8(round >> (8 * uint(k)))
+			}
+			sha2.update(&ctx, buf[:])
+		}
+		sha2.final(&ctx, key[:])
+	}
+	return
 }
 
 pattern :: proc(n: int) -> (data: []u8) {

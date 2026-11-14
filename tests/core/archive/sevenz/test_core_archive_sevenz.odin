@@ -16,6 +16,7 @@ TEST_SUITE_PATH_7Z :: ODIN_ROOT + "tests/core/assets/7Z/"
 SOURCE_TIME        :: 1_794_139_200
 TEXT_CRC           :: 0x61c54dab
 TEXT_SIZE          :: 80_000
+PASSWORD           :: "ODIN"
 
 SevenZ_Error :: archive.SevenZ_Error
 
@@ -107,6 +108,20 @@ test_corpus :: proc(t: ^testing.T) {
 	for c in CORPUS {
 		for source in Source_Kind {
 			check_archive(t, c, source)
+		}
+	}
+}
+
+@(test)
+test_encrypted_corpus :: proc(t: ^testing.T) {
+	cases := [?]Corpus_Case{
+		{"aes-copy.7z",    1, 0, 1},
+		{"aes.7z",         6, 0, 5},
+		{"aes-headers.7z", 6, 0, 5},
+	}
+	for c in cases {
+		for source in Source_Kind {
+			check_archive(t, c, source, PASSWORD)
 		}
 	}
 }
@@ -271,23 +286,65 @@ test_memory_limit :: proc(t: ^testing.T) {
 @(test)
 test_encrypted :: proc(t: ^testing.T) {
 	r: sevenz.Reader
-	testing.expect_value(t, sevenz.open(&r, asset("aes-headers.7z")), archive.General_Error.Unsupported_Method)
+	testing.expect_value(t, sevenz.open(&r, asset("aes-headers.7z")), archive.General_Error.Encrypted)
+	testing.expect_value(t, sevenz.open(&r, asset("aes-headers.7z"), compress.Options{}, context.allocator, archive.Read_Options{password = "odin"}), archive.General_Error.Wrong_Password)
 
 	if !testing.expect_value(t, sevenz.open(&r, asset("aes.7z")), nil) {
 		return
 	}
-	defer sevenz.close(&r)
 	fi, handle, ok, _ := sevenz.find(&r, "TEXT.TXT")
-	testing.expect(t, ok && fi.encrypted && !fi.supported && fi.method == .LZMA2, "TEXT.TXT is encrypted LZMA2")
+	testing.expect(t, ok && fi.encrypted && fi.supported && fi.method == .LZMA2, "TEXT.TXT is encrypted LZMA2")
 	sink := strings.builder_make()
 	defer strings.builder_destroy(&sink)
-	testing.expect_value(t, sevenz.extract(&r, handle, strings.to_writer(&sink)), archive.General_Error.Unsupported_Method)
+	testing.expect_value(t, sevenz.extract(&r, handle, strings.to_writer(&sink)), archive.General_Error.Encrypted)
 	_, open_err := sevenz.open_member(&r, handle)
-	testing.expect_value(t, open_err, archive.General_Error.Unsupported_Method)
+	testing.expect_value(t, open_err, archive.General_Error.Encrypted)
+	testing.expect_value(t, sevenz.extract(&r, handle, strings.to_writer(&sink), {password = "odin"}), archive.General_Error.Wrong_Password)
+	strings.builder_reset(&sink)
+	testing.expect_value(t, sevenz.extract(&r, handle, strings.to_writer(&sink), {password = PASSWORD}), nil)
+	testing.expect_value(t, hash.crc32(sink.buf[:]), TEXT_CRC)
 
 	fi, handle, ok, _ = sevenz.find(&r, "EMPTY.TXT")
 	testing.expect(t, ok && !fi.encrypted && fi.supported && fi.size == 0, "EMPTY.TXT has no stream")
 	testing.expect_value(t, sevenz.extract(&r, handle, strings.to_writer(&sink)), nil)
+	sevenz.close(&r)
+
+	if !testing.expect_value(t, sevenz.open(&r, asset("aes.7z"), compress.Options{}, context.allocator, archive.Read_Options{password = "odin"}), nil) {
+		return
+	}
+	it := sevenz.iterator_create(&r)
+	for member in sevenz.iterate(&it) {
+		if member.path != "TEXT.TXT" {
+			continue
+		}
+		strings.builder_reset(&sink)
+		testing.expect_value(t, sevenz.extract_current(&it, strings.to_writer(&sink)), archive.General_Error.Wrong_Password)
+		strings.builder_reset(&sink)
+		testing.expect_value(t, sevenz.extract_current(&it, strings.to_writer(&sink), {password = PASSWORD}), nil)
+		testing.expect_value(t, hash.crc32(sink.buf[:]), TEXT_CRC)
+		strings.builder_reset(&sink)
+		testing.expect_value(t, sevenz.extract_current(&it, strings.to_writer(&sink)), archive.General_Error.Wrong_Password)
+	}
+	sevenz.iterator_destroy(&it)
+	sevenz.close(&r)
+
+	if testing.expect_value(t, sevenz.open(&r, asset("aes-copy.7z")), nil) {
+		_, handle, ok, _ = sevenz.find(&r, "TEXT.TXT")
+		testing.expect(t, ok, "find TEXT.TXT in aes-copy.7z")
+		strings.builder_reset(&sink)
+		testing.expect_value(t, sevenz.extract(&r, handle, strings.to_writer(&sink), {password = "odin"}), archive.General_Error.Wrong_Password)
+		sevenz.close(&r)
+	}
+
+	a, a_err := archive.open(asset("aes-headers.7z"), compress.Options{}, context.allocator, archive.Read_Options{password = PASSWORD})
+	if testing.expect_value(t, a_err, nil) {
+		fi, handle, ok, _ = archive.find(&a, "TEXT.TXT")
+		testing.expect(t, ok && fi.encrypted, "find TEXT.TXT through archive.open")
+		strings.builder_reset(&sink)
+		testing.expect_value(t, archive.extract(&a, handle, strings.to_writer(&sink)), nil)
+		testing.expect_value(t, hash.crc32(sink.buf[:]), TEXT_CRC)
+		archive.close(&a)
+	}
 }
 
 @(test)
@@ -589,15 +646,16 @@ test_unsupported_sources :: proc(t: ^testing.T) {
 	testing.expect_value(t, sevenz.open(&r, asset("lzma.7z"), compress.Options{max_output_size = -1}), archive.General_Error.Incompatible_Options)
 }
 
-check_archive :: proc(t: ^testing.T, c: Corpus_Case, source: Source_Kind) {
+check_archive :: proc(t: ^testing.T, c: Corpus_Case, source: Source_Kind, password := "") {
+	read_options := archive.Read_Options{password = password}
 	r: sevenz.Reader
 	switch source {
 	case .Path:
-		err := sevenz.open(&r, asset(c.name))
+		err := sevenz.open(&r, asset(c.name), compress.Options{}, context.allocator, read_options)
 		if !testing.expectf(t, err == nil, "%s: open %v", c.name, err) {
 			return
 		}
-		check_reader(t, c, &r)
+		check_reader(t, c, &r, password)
 		sevenz.close(&r)
 	case .Bytes, .Bytes_Progress:
 		data, read_err := os.read_entire_file(asset(c.name), context.allocator)
@@ -610,11 +668,11 @@ check_archive :: proc(t: ^testing.T, c: Corpus_Case, source: Source_Kind) {
 			options.progress          = progress_ignore
 			options.progress_interval = 4096
 		}
-		err := sevenz.open(&r, data, options)
+		err := sevenz.open(&r, data, options, context.allocator, read_options)
 		if !testing.expectf(t, err == nil, "%s: open from bytes %v", c.name, err) {
 			return
 		}
-		check_reader(t, c, &r)
+		check_reader(t, c, &r, password)
 		sevenz.close(&r)
 	case .Seek_Read:
 		f, open_err := os.open(asset(c.name))
@@ -623,16 +681,16 @@ check_archive :: proc(t: ^testing.T, c: Corpus_Case, source: Source_Kind) {
 		}
 		defer os.close(f)
 		counting := Counting{inner = os.to_stream(f)}
-		err := sevenz.open(&r, counting_stream(&counting))
+		err := sevenz.open(&r, counting_stream(&counting), compress.Options{}, context.allocator, read_options)
 		if !testing.expectf(t, err == nil, "%s: open from seek and read %v", c.name, err) {
 			return
 		}
-		check_reader(t, c, &r)
+		check_reader(t, c, &r, password)
 		sevenz.close(&r)
 	}
 }
 
-check_reader :: proc(t: ^testing.T, c: Corpus_Case, r: ^sevenz.Reader) {
+check_reader :: proc(t: ^testing.T, c: Corpus_Case, r: ^sevenz.Reader, password: string) {
 	it := sevenz.iterator_create(r)
 	defer sevenz.iterator_destroy(&it)
 	members, directories, encrypted := 0, 0, 0
@@ -647,8 +705,10 @@ check_reader :: proc(t: ^testing.T, c: Corpus_Case, r: ^sevenz.Reader) {
 		defer delete(data)
 		if fi.encrypted {
 			encrypted += 1
-			testing.expectf(t, !fi.supported && extract_err == archive.General_Error.Unsupported_Method && len(data) == 0, "%s/%s: encrypted %v", c.name, fi.path, extract_err)
-			continue
+			if password == "" {
+				testing.expectf(t, fi.supported && extract_err == archive.General_Error.Encrypted && len(data) == 0, "%s/%s: encrypted %v", c.name, fi.path, extract_err)
+				continue
+			}
 		}
 		if !testing.expectf(t, extract_err == nil && fi.supported, "%s/%s: %v", c.name, fi.path, extract_err) {
 			continue

@@ -1251,7 +1251,7 @@ _archive_detect :: proc(head: []u8) -> bool {
 }
 
 @(private)
-_archive_open_bytes :: proc(a: ^archive.Archive, data: []u8, options: compress.Options) -> (err: Error) {
+_archive_open_bytes :: proc(a: ^archive.Archive, data: []u8, options: compress.Options, _: archive.Read_Options) -> (err: Error) {
 	r := new(Reader, a.allocator) or_return
 	if err = open_from_bytes(r, data, options, a.allocator); err != nil {
 		free(r, a.allocator)
@@ -1262,7 +1262,7 @@ _archive_open_bytes :: proc(a: ^archive.Archive, data: []u8, options: compress.O
 }
 
 @(private)
-_archive_open_stream :: proc(a: ^archive.Archive, s: io.Stream, options: compress.Options) -> (err: Error) {
+_archive_open_stream :: proc(a: ^archive.Archive, s: io.Stream, options: compress.Options, _: archive.Read_Options) -> (err: Error) {
 	r := new(Reader, a.allocator) or_return
 	if err = open_from_stream(r, s, options, a.allocator); err != nil {
 		free(r, a.allocator)

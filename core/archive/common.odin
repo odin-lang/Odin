@@ -126,8 +126,8 @@ Iterator :: struct {
 
 Format_Procs :: struct {
 	detect:           proc(head: []u8) -> bool,
-	open_bytes:       proc(a: ^Archive, data: []u8, options: compress.Options) -> Error,
-	open_stream:      proc(a: ^Archive, s: io.Stream, options: compress.Options) -> Error,
+	open_bytes:       proc(a: ^Archive, data: []u8, options: compress.Options, read_options: Read_Options) -> Error,
+	open_stream:      proc(a: ^Archive, s: io.Stream, options: compress.Options, read_options: Read_Options) -> Error,
 	close:            proc(a: ^Archive),
 	info:             proc(a: ^Archive) -> Archive_Info,
 	iterator_create:  proc(it: ^Iterator) -> Error,

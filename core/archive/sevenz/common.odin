@@ -8,8 +8,10 @@ import "core:compress/deflate"
 import "core:compress/filters"
 import "core:compress/lzma"
 import "core:compress/ppmd"
+import "core:crypto/aes"
 import "core:io"
 import "core:os"
+import "core:sync"
 
 /*
 	Copyright 2026 Jeroen van Rijn <nom@duclavier.com>.
@@ -46,11 +48,21 @@ DEFLATE64_MEMORY      :: 1 << 19
 ZERO_READS_MAX        :: 64
 LZMA_BASE_PROBS       :: 1984
 LZMA_LITERAL_PROBS    :: 0x300
+AES_KEY_SIZE          :: 32
+AES_SALT_MAX          :: 16
+AES_IV_MAX            :: 16
+AES_POWER_MAX         :: 24
+AES_POWER_RAW         :: 0x3F
+KEY_CACHE_SIZE        :: 4
 
 VERSION_MINOR         :: 4
 SNIFF_SIZE            :: 1 << 14
 CODER_PROPERTIES_MAX  :: 5
 WRITER_CODERS_MAX     :: 4
+BCJ2_PACK_STREAMS     :: 4
+AES_POWER_DEFAULT     :: 19
+AES_PROPERTIES_MAX    :: 2 + AES_SALT_MAX + AES_IV_MAX
+CIPHER_BUFFER_SIZE    :: 64 * 1024
 SOLID_SIZE_MIN        :: i64(1) << 24
 SOLID_SIZE_MAX        :: i64(1) << 32
 SOLID_SIZE_LZMA2_MAX  :: i64(1) << 34
@@ -274,6 +286,23 @@ Reader :: struct {
 	names:        []u8,
 	index:        []Name_Index,
 	generation:   u32,
+	password:     string,
+	keys:         Key_Cache,
+}
+
+Cached_Key :: struct {
+	password:  []u8,
+	salt:      [AES_SALT_MAX]u8,
+	salt_size: int,
+	power:     int,
+	key:       [AES_KEY_SIZE]u8,
+}
+
+Key_Cache :: struct {
+	lock:      sync.Mutex,
+	allocator: runtime.Allocator,
+	entries:   [KEY_CACHE_SIZE]Cached_Key,
+	next:      int,
 }
 
 Parser :: struct {
@@ -312,6 +341,9 @@ Node :: struct {
 	eof:         bool,
 	output:      []u8,
 	decoded:     bool,
+	cipher:      aes.Context_ECB,
+	iv:          [aes.BLOCK_SIZE]u8,
+	keyed:       bool,
 	err:         Error,
 	active:      bool,
 }
@@ -329,6 +361,8 @@ Folder_Decoder :: struct {
 	packed_in: i64,
 	crc:       u32,
 	scratch:   []u8,
+	keys:      ^Key_Cache,
+	password:  string,
 	err:       Error,
 	fast:      bool,
 	active:    bool,
@@ -394,24 +428,28 @@ Entry_Options :: struct {
 	delta_distance: int,
 	lzma:           Maybe(lzma.Options),
 	ppmd:           Maybe(ppmd.Properties),
+	password:       Maybe(string),
 }
 
 Writer_Options :: struct {
-	method:         archive.Method,
-	level:          Maybe(int),
-	filter:         Filter_Choice,
-	delta_distance: int,
-	lzma:           Maybe(lzma.Options),
-	ppmd:           Maybe(ppmd.Properties),
-	solid:          bool,
-	solid_size:     i64,
-	solid_files:    int,
-	solid_order:    Solid_Order,
-	creation_time:  bool,
-	access_time:    bool,
-	plain_header:   bool,
-	deterministic:  bool,
-	options:        compress.Options,
+	method:             archive.Method,
+	level:              Maybe(int),
+	filter:             Filter_Choice,
+	delta_distance:     int,
+	lzma:               Maybe(lzma.Options),
+	ppmd:               Maybe(ppmd.Properties),
+	solid:              bool,
+	solid_size:         i64,
+	solid_files:        int,
+	solid_order:        Solid_Order,
+	creation_time:      bool,
+	access_time:        bool,
+	plain_header:       bool,
+	deterministic:      bool,
+	password:           string,
+	kdf_power:          int,
+	unencrypted_header: bool,
+	options:            compress.Options,
 }
 
 Coder_Setup :: struct {
@@ -443,7 +481,22 @@ Out_Folder :: struct {
 	coders:       [WRITER_CODERS_MAX]Out_Coder,
 	coder_count:  int,
 	bcj2:         bool,
+	encrypted:    bool,
 	stream_count: int,
+}
+
+Out_Cipher :: struct {
+	ivs:          [BCJ2_PACK_STREAMS][aes.BLOCK_SIZE]u8,
+	unpack_sizes: [BCJ2_PACK_STREAMS]i64,
+}
+
+Pack_Cipher :: struct {
+	ctx:     aes.Context_ECB,
+	iv:      [aes.BLOCK_SIZE]u8,
+	block:   [aes.BLOCK_SIZE]u8,
+	pending: int,
+	plain:   i64,
+	keyed:   bool,
 }
 
 Out_File :: struct {
@@ -459,6 +512,7 @@ Out_File :: struct {
 
 Pack_Sink :: struct {
 	writer: ^Writer,
+	cipher: ^Pack_Cipher,
 	count:  i64,
 }
 
@@ -480,17 +534,21 @@ Filter_Stage :: struct {
 }
 
 Open_Folder :: struct {
-	active:  bool,
-	setup:   Coder_Setup,
-	folder:  Out_Folder,
-	encoder: Encoder,
-	stage:   Filter_Stage,
-	sink:    Pack_Sink,
-	input:   [dynamic]u8,
-	unpack:  i64,
-	limit:   i64,
-	files:   int,
-	broken:  bool,
+	active:    bool,
+	setup:     Coder_Setup,
+	folder:    Out_Folder,
+	encoder:   Encoder,
+	stage:     Filter_Stage,
+	sink:      Pack_Sink,
+	input:     [dynamic]u8,
+	unpack:    i64,
+	limit:     i64,
+	files:     int,
+	broken:    bool,
+	encrypted: bool,
+	key:       [AES_KEY_SIZE]u8,
+	cipher:    Pack_Cipher,
+	ciphered:  Out_Cipher,
 }
 
 Source :: struct {
@@ -526,7 +584,14 @@ Writer :: struct {
 	chunk:         []u8,
 	head:          []u8,
 	filter_buffer: []u8,
+	cipher_buffer: []u8,
 	folder:        Open_Folder,
+	password:      string,
+	kdf_power:     int,
+	salt:          [AES_SALT_MAX]u8,
+	salted:        bool,
+	keys:          Key_Cache,
+	ciphers:       [dynamic]Out_Cipher,
 	archive_in:    i64,
 	err:           Error,
 	committed:     bool,

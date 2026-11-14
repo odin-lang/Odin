@@ -23,17 +23,17 @@ which :: proc(head: []u8) -> (format: Format) {
 	return .Unknown
 }
 
-open_from_bytes :: proc(data: []u8, options := compress.Options{}, allocator := context.allocator) -> (a: Archive, err: Error) {
+open_from_bytes :: proc(data: []u8, options := compress.Options{}, allocator := context.allocator, read_options := Read_Options{}) -> (a: Archive, err: Error) {
 	a.allocator = allocator
 	a.format    = which(data[:min(len(data), DETECT_HEAD_SIZE)])
 	if a.format == .Unknown {
 		return a, General_Error.Unknown_Format
 	}
-	err = _procs[a.format].open_bytes(&a, data, options)
+	err = _procs[a.format].open_bytes(&a, data, options, read_options)
 	return
 }
 
-open_from_stream :: proc(s: io.Stream, options := compress.Options{}, allocator := context.allocator) -> (a: Archive, err: Error) {
+open_from_stream :: proc(s: io.Stream, options := compress.Options{}, allocator := context.allocator, read_options := Read_Options{}) -> (a: Archive, err: Error) {
 	a.allocator = allocator
 	start, seek_err := io.seek(s, 0, .Current)
 	if seek_err != nil {
@@ -64,13 +64,13 @@ open_from_stream :: proc(s: io.Stream, options := compress.Options{}, allocator 
 	if a.format == .Unknown {
 		return a, General_Error.Unknown_Format
 	}
-	err = _procs[a.format].open_stream(&a, s, options)
+	err = _procs[a.format].open_stream(&a, s, options, read_options)
 	return
 }
 
-open_from_path :: proc(path: string, options := compress.Options{}, allocator := context.allocator) -> (a: Archive, err: Error) {
+open_from_path :: proc(path: string, options := compress.Options{}, allocator := context.allocator, read_options := Read_Options{}) -> (a: Archive, err: Error) {
 	f := os.open(path) or_return
-	a, err = open_from_stream(os.to_stream(f), options, allocator)
+	a, err = open_from_stream(os.to_stream(f), options, allocator, read_options)
 	if err != nil {
 		os.close(f)
 		return

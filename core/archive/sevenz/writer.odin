@@ -8,6 +8,7 @@ import "core:compress/deflate"
 import "core:compress/filters"
 import "core:compress/lzma"
 import "core:compress/ppmd"
+import "core:crypto"
 import "core:hash"
 import "core:io"
 import "core:os"
@@ -71,6 +72,7 @@ write_entry :: proc{write_entry_with_info, write_entry_simple}
 write_directory :: proc(sw: ^Writer, dir: string, prefix := "", options: Entry_Options = {}) -> (err: Error) {
 	_writer_ready(sw) or_return
 	setup := _resolve(sw.options, options) or_return
+	_ = _entry_password(sw, options) or_return
 	root, root_err := os.get_absolute_path(dir, sw.allocator)
 	if root_err != nil {
 		return root_err
@@ -178,7 +180,7 @@ commit :: proc(sw: ^Writer) -> (err: Error) {
 	next_crc: u32
 	if len(sw.files) > 0 {
 		_build_header(sw) or_return
-		if !sw.options.plain_header {
+		if !sw.options.plain_header || _header_encrypted(sw) {
 			_encode_header(sw) or_return
 		}
 		next_offset = sw.offset - sw.start - SIGNATURE_HEADER_SIZE
@@ -204,10 +206,14 @@ close_writer :: proc(sw: ^Writer) {
 		}
 	}
 	_folder_destroy(sw)
+	_key_cache_destroy(&sw.keys)
+	_secret_delete(transmute([]u8)sw.password, sw.allocator)
 	delete(sw.folder.input)
 	delete(sw.path, sw.allocator)
 	delete(sw.pack_sizes)
 	delete(sw.folders)
+	delete(sw.ciphers)
+	delete(sw.cipher_buffer, sw.allocator)
 	delete(sw.files)
 	delete(sw.names)
 	delete(sw.name)
@@ -249,7 +255,12 @@ _writer_init :: proc(sw: ^Writer, s: io.Stream, options: Writer_Options) -> (err
 	sw.walk_name.allocator    = sw.allocator
 	sw.header.allocator       = sw.allocator
 	sw.folder.input.allocator = sw.allocator
+	sw.ciphers.allocator      = sw.allocator
+	sw.keys.allocator         = sw.allocator
 	sw.options = options
+	sw.options.password = ""
+	sw.kdf_power = options.kdf_power if options.kdf_power != 0 else AES_POWER_DEFAULT
+	sw.password  = _secret_clone(options.password, sw.allocator) or_return
 
 	modes := io.query(s)
 	if .Write not_in modes {
@@ -285,6 +296,10 @@ _check_writer_options :: proc(options: Writer_Options) -> (err: Error) {
 	if options.solid_size < 0 || options.solid_files < 0 || options.solid_order > .Extension {
 		return archive.General_Error.Incompatible_Options
 	}
+	if options.kdf_power < 0 || options.kdf_power > AES_POWER_MAX {
+		return archive.General_Error.Incompatible_Options
+	}
+	_check_password(options.password, options.deterministic) or_return
 	_ = _resolve(options, {}) or_return
 	return nil
 }
@@ -386,7 +401,8 @@ _write_entry :: proc(sw: ^Writer, fi: archive.File_Info, data: Entry_Data, optio
 	case:
 		return archive.General_Error.Unsupported_Entry
 	}
-	setup := _resolve(sw.options, options) or_return
+	setup    := _resolve(sw.options, options) or_return
+	password := _entry_password(sw, options) or_return
 	_entry_name(sw, fi.path) or_return
 
 	file: Out_File
@@ -470,7 +486,14 @@ _write_entry :: proc(sw: ^Writer, fi: archive.File_Info, data: Entry_Data, optio
 		return compress.Error(compress.General_Error.Memory_Limit_Exceeded)
 	}
 
-	if sw.folder.active && !_folder_accepts(sw, setup, expected) {
+	key: [AES_KEY_SIZE]u8
+	defer crypto.zero_explicit(&key, size_of(key))
+	keyed: ^[AES_KEY_SIZE]u8
+	if password != "" {
+		_writer_key(sw, password, &key) or_return
+		keyed = &key
+	}
+	if sw.folder.active && !_folder_accepts(sw, setup, expected, keyed) {
 		if err = _folder_close(sw); err != nil {
 			sw.err = err
 			return
@@ -480,7 +503,7 @@ _write_entry :: proc(sw: ^Writer, fi: archive.File_Info, data: Entry_Data, optio
 	out_start := sw.offset
 	files     := len(sw.files)
 	if fresh {
-		_folder_open(sw, setup, expected) or_return
+		_folder_open(sw, setup, expected, keyed) or_return
 	}
 	err = _folder_feed(sw, &source, head, expected, &file, out_start)
 	if err == nil {
@@ -878,9 +901,12 @@ _solid_limit :: proc "contextless" (sw: ^Writer, setup: Coder_Setup) -> (limit: 
 }
 
 @(private)
-_folder_accepts :: proc(sw: ^Writer, setup: Coder_Setup, expected: i64) -> bool {
+_folder_accepts :: proc(sw: ^Writer, setup: Coder_Setup, expected: i64, key: ^[AES_KEY_SIZE]u8) -> bool {
 	f := &sw.folder
 	if f.setup != setup || f.broken {
+		return false
+	}
+	if f.encrypted != (key != nil) || (key != nil && f.key != key^) {
 		return false
 	}
 	if sw.options.solid_files > 0 && f.files >= sw.options.solid_files {
@@ -893,7 +919,7 @@ _folder_accepts :: proc(sw: ^Writer, setup: Coder_Setup, expected: i64) -> bool 
 }
 
 @(private)
-_folder_open :: proc(sw: ^Writer, setup: Coder_Setup, expected: i64) -> (err: Error) {
+_folder_open :: proc(sw: ^Writer, setup: Coder_Setup, expected: i64, key: ^[AES_KEY_SIZE]u8) -> (err: Error) {
 	f := &sw.folder
 	input := f.input
 	f^ = {}
@@ -904,6 +930,14 @@ _folder_open :: proc(sw: ^Writer, setup: Coder_Setup, expected: i64) -> (err: Er
 	clear(&f.input)
 	folder := &f.folder
 	size   := expected if !sw.options.solid else -1
+	if key != nil {
+		f.encrypted      = true
+		f.key            = key^
+		f.sink.cipher    = &f.cipher
+		folder.encrypted = true
+		_cipher_init(&f.cipher, &f.key)
+		_cipher_begin(&f.cipher, &f.ciphered.ivs[0])
+	}
 	if setup.filter == .BCJ2 {
 		folder.bcj2        = true
 		folder.coder_count = 4
@@ -917,8 +951,7 @@ _folder_open :: proc(sw: ^Writer, setup: Coder_Setup, expected: i64) -> (err: Er
 		}
 		bcj2_main := &folder.coders[2]
 		if bcj2_main.properties_size, err = _encoder_init(&f.encoder, sw, main_setup, -1, size, _sink_writer(&f.sink), bcj2_main.properties[:]); err != nil {
-			_encoder_destroy(&f.encoder)
-			f.encoder = {}
+			_folder_destroy(sw)
 			return
 		}
 		f.active = true
@@ -935,11 +968,13 @@ _folder_open :: proc(sw: ^Writer, setup: Coder_Setup, expected: i64) -> (err: Er
 			filter.properties[0]   = u8(setup.delta - 1)
 			filter.properties_size = 1
 		}
-		_stage_init(sw, &f.stage, setup) or_return
+		if err = _stage_init(sw, &f.stage, setup); err != nil {
+			_folder_destroy(sw)
+			return
+		}
 	}
 	if main.properties_size, err = _encoder_init(&f.encoder, sw, setup, size, size, _sink_writer(&f.sink), main.properties[:]); err != nil {
-		_encoder_destroy(&f.encoder)
-		f.encoder = {}
+		_folder_destroy(sw)
 		return
 	}
 	f.active = true
@@ -1059,10 +1094,13 @@ _folder_close :: proc(sw: ^Writer) -> (err: Error) {
 			stage.pending = 0
 		}
 		_encoder_finish(&f.encoder) or_return
-		append(&sw.pack_sizes, f.sink.count) or_return
+		_pack_finish(sw, 0) or_return
 		for &c in folder.coders[:folder.coder_count] {
 			c.unpack_size = f.unpack
 		}
+	}
+	if f.encrypted {
+		append(&sw.ciphers, f.ciphered) or_return
 	}
 	append(&sw.folders, folder^) or_return
 	return nil
@@ -1086,12 +1124,11 @@ _folder_close_bcj2 :: proc(sw: ^Writer) -> (err: Error) {
 
 	_encoder_write(&f.encoder, streams.main[:]) or_return
 	_encoder_finish(&f.encoder) or_return
-	append(&sw.pack_sizes, f.sink.count) or_return
+	_pack_finish(sw, 0) or_return
 
-	_emit(sw, streams.rc[:]) or_return
-	append(&sw.pack_sizes, i64(len(streams.rc))) or_return
-	_pack_lzma(sw, streams.call[:], &folder.coders[1]) or_return
-	_pack_lzma(sw, streams.jump[:], &folder.coders[0]) or_return
+	_pack_emit(sw, streams.rc[:], 1) or_return
+	_pack_lzma(sw, streams.call[:], &folder.coders[1], 2) or_return
+	_pack_lzma(sw, streams.jump[:], &folder.coders[0], 3) or_return
 
 	folder.coders[0].unpack_size = i64(len(streams.jump))
 	folder.coders[1].unpack_size = i64(len(streams.call))
@@ -1101,15 +1138,37 @@ _folder_close_bcj2 :: proc(sw: ^Writer) -> (err: Error) {
 }
 
 @(private)
-_pack_lzma :: proc(sw: ^Writer, data: []u8, coder: ^Out_Coder) -> (err: Error) {
+_pack_lzma :: proc(sw: ^Writer, data: []u8, coder: ^Out_Coder, stream: int) -> (err: Error) {
 	packed: [dynamic]u8
 	packed.allocator = sw.allocator
 	defer delete(packed)
 	props   := lzma.compress_raw_to_dynamic(&packed, data, BCJ2_LZMA_OPTIONS, sw.allocator) or_return
 	encoded := lzma.encode_properties(props)
 	coder.properties_size = copy(coder.properties[:], encoded[:])
-	_emit(sw, packed[:]) or_return
-	append(&sw.pack_sizes, i64(len(packed))) or_return
+	return _pack_emit(sw, packed[:], stream)
+}
+
+@(private)
+_pack_emit :: proc(sw: ^Writer, data: []u8, stream: int) -> (err: Error) {
+	f := &sw.folder
+	if f.encrypted {
+		_cipher_begin(&f.cipher, &f.ciphered.ivs[stream])
+	}
+	if _, write_err := io.write_full(_sink_writer(&f.sink), data); write_err != nil {
+		return write_err
+	}
+	return _pack_finish(sw, stream)
+}
+
+@(private)
+_pack_finish :: proc(sw: ^Writer, stream: int) -> (err: Error) {
+	f := &sw.folder
+	if f.encrypted {
+		f.ciphered.unpack_sizes[stream] = f.cipher.plain
+		_cipher_finish(&f.sink) or_return
+	}
+	append(&sw.pack_sizes, f.sink.count) or_return
+	f.sink.count = 0
 	return nil
 }
 
@@ -1117,6 +1176,8 @@ _pack_lzma :: proc(sw: ^Writer, data: []u8, coder: ^Out_Coder) -> (err: Error) {
 _folder_destroy :: proc(sw: ^Writer) {
 	f := &sw.folder
 	_encoder_destroy(&f.encoder)
+	_cipher_destroy(&f.cipher)
+	crypto.zero_explicit(&f.key, size_of(f.key))
 	input := f.input
 	clear(&input)
 	f^ = {}
@@ -1217,18 +1278,31 @@ _sink_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset:
 	sink := (^Pack_Sink)(stream_data)
 	#partial switch mode {
 	case .Write:
-		sw := sink.writer
-		written, write_err := io.write_full(sw.stream, p)
-		sink.count += i64(written)
-		sw.offset  += i64(written)
-		sw.end      = max(sw.end, sw.offset)
-		return i64(written), write_err
+		if sink.cipher != nil {
+			if write_err := _cipher_write(sink, p); write_err != nil {
+				return 0, write_err
+			}
+			return i64(len(p)), nil
+		}
+		before := sink.count
+		write_err := _sink_emit(sink, p)
+		return sink.count - before, write_err
 	case .Flush:
 		return 0, nil
 	case .Query:
 		return io.query_utility({.Write, .Flush, .Query})
 	}
 	return 0, .Unsupported
+}
+
+@(private)
+_sink_emit :: proc(sink: ^Pack_Sink, p: []u8) -> (err: io.Error) {
+	sw := sink.writer
+	written, write_err := io.write_full(sw.stream, p)
+	sink.count += i64(written)
+	sw.offset  += i64(written)
+	sw.end      = max(sw.end, sw.offset)
+	return write_err
 }
 
 @(private)
@@ -1404,7 +1478,7 @@ _progress :: proc(sw: ^Writer, index: int, bytes_in, total_in, bytes_out, archiv
 _build_header :: proc(sw: ^Writer) -> (err: Error) {
 	buf := &sw.header
 	clear(buf)
-	bound := 256 + 320 * len(sw.folders) + 10 * len(sw.pack_sizes) + 48 * len(sw.files) + len(sw.names)
+	bound := 256 + 320 * len(sw.folders) + 240 * len(sw.ciphers) + 10 * len(sw.pack_sizes) + 48 * len(sw.files) + len(sw.names)
 	reserve(buf, bound) or_return
 
 	_put_id(buf, .Header)
@@ -1423,14 +1497,24 @@ _build_header :: proc(sw: ^Writer) -> (err: Error) {
 		_put_id(buf, .Folder)
 		_put_number(buf, u64(len(sw.folders)))
 		append(buf, 0)
+		cipher_index := 0
 		for &folder in sw.folders {
-			_put_folder(buf, &folder)
+			cipher: ^Out_Cipher
+			if folder.encrypted {
+				cipher = &sw.ciphers[cipher_index]
+				cipher_index += 1
+			}
+			_put_folder(sw, buf, &folder, cipher)
 		}
 		_put_id(buf, .Coders_Unpack_Size)
+		cipher_index = 0
 		for &folder in sw.folders {
-			for c in folder.coders[:folder.coder_count] {
-				_put_number(buf, u64(c.unpack_size))
+			cipher: ^Out_Cipher
+			if folder.encrypted {
+				cipher = &sw.ciphers[cipher_index]
+				cipher_index += 1
 			}
+			_put_unpack_sizes(buf, &folder, cipher)
 		}
 		_put_id(buf, .End)
 
@@ -1594,47 +1678,91 @@ _file_time :: proc "contextless" (file: ^Out_File, id: Property_ID) -> (filetime
 }
 
 @(private)
-_put_folder :: proc(buf: ^[dynamic]u8, folder: ^Out_Folder) {
-	_put_number(buf, u64(folder.coder_count))
+_put_folder :: proc(sw: ^Writer, buf: ^[dynamic]u8, folder: ^Out_Folder, cipher: ^Out_Cipher) {
+	packs := BCJ2_PACK_STREAMS if folder.bcj2 else 1
+	shift := u64(0)
+	count := folder.coder_count
+	if cipher != nil {
+		shift  = u64(packs)
+		count += packs
+		properties: [AES_PROPERTIES_MAX]u8
+		_put_number(buf, u64(count))
+		for p in 0..<packs {
+			n := _aes_properties(properties[:], sw.kdf_power, sw.salt[:], cipher.ivs[p][:])
+			_put_coder(buf, .AES, 1, properties[:n])
+		}
+	} else {
+		_put_number(buf, u64(count))
+	}
 	for &c in folder.coders[:folder.coder_count] {
-		id   := u64(c.id)
-		size := 1
-		for size < 8 && id >> (8 * uint(size)) != 0 {
-			size += 1
+		_put_coder(buf, c.id, c.in_streams, c.properties[:c.properties_size])
+	}
+	packed := [BCJ2_PACK_STREAMS]u64{2, 6, 1, 0}
+	if folder.bcj2 {
+		bonds := [3][2]u64{{5, 0}, {4, 1}, {3, 2}}
+		for bond in bonds {
+			_put_number(buf, bond[0] + shift)
+			_put_number(buf, bond[1] + shift)
 		}
-		flags := u8(size)
-		if c.in_streams != 1 {
-			flags |= 0x10
-		}
-		if c.properties_size > 0 {
-			flags |= 0x20
-		}
-		append(buf, flags)
-		for k in 0..<size {
-			append(buf, u8(id >> (8 * uint(size - 1 - k))))
-		}
-		if c.in_streams != 1 {
-			_put_number(buf, u64(c.in_streams))
-			_put_number(buf, 1)
-		}
-		if c.properties_size > 0 {
-			_put_number(buf, u64(c.properties_size))
-			append(buf, ..c.properties[:c.properties_size])
+	} else {
+		packed[0] = 0
+		if folder.coder_count == 2 {
+			_put_number(buf, 1 + shift)
+			_put_number(buf, 0 + shift)
 		}
 	}
-	if folder.bcj2 {
-		bonds  := [3][2]u64{{5, 0}, {4, 1}, {3, 2}}
-		packed := [4]u64{2, 6, 1, 0}
-		for bond in bonds {
-			_put_number(buf, bond[0])
-			_put_number(buf, bond[1])
+	if cipher != nil {
+		for p in 0..<packs {
+			_put_number(buf, packed[p] + shift)
+			_put_number(buf, u64(p))
+			packed[p] = u64(p)
 		}
+	}
+	if packs > 1 {
 		for index in packed {
 			_put_number(buf, index)
 		}
-	} else if folder.coder_count == 2 {
+	}
+}
+
+@(private)
+_put_coder :: proc(buf: ^[dynamic]u8, method: Method_ID, in_streams: int, properties: []u8) {
+	id   := u64(method)
+	size := 1
+	for size < 8 && id >> (8 * uint(size)) != 0 {
+		size += 1
+	}
+	flags := u8(size)
+	if in_streams != 1 {
+		flags |= 0x10
+	}
+	if len(properties) > 0 {
+		flags |= 0x20
+	}
+	append(buf, flags)
+	for k in 0..<size {
+		append(buf, u8(id >> (8 * uint(size - 1 - k))))
+	}
+	if in_streams != 1 {
+		_put_number(buf, u64(in_streams))
 		_put_number(buf, 1)
-		_put_number(buf, 0)
+	}
+	if len(properties) > 0 {
+		_put_number(buf, u64(len(properties)))
+		append(buf, ..properties)
+	}
+}
+
+@(private)
+_put_unpack_sizes :: proc(buf: ^[dynamic]u8, folder: ^Out_Folder, cipher: ^Out_Cipher) {
+	if cipher != nil {
+		packs := BCJ2_PACK_STREAMS if folder.bcj2 else 1
+		for size in cipher.unpack_sizes[:packs] {
+			_put_number(buf, u64(size))
+		}
+	}
+	for c in folder.coders[:folder.coder_count] {
+		_put_number(buf, u64(c.unpack_size))
 	}
 }
 
@@ -1643,33 +1771,60 @@ _encode_header :: proc(sw: ^Writer) -> (err: Error) {
 	packed: [dynamic]u8
 	packed.allocator = sw.allocator
 	defer delete(packed)
-	props    := lzma.compress_raw_to_dynamic(&packed, sw.header[:], HEADER_LZMA_OPTIONS, sw.allocator) or_return
-	encoded  := lzma.encode_properties(props)
 	crc      := hash.crc32(sw.header[:])
 	size     := len(sw.header)
 	pack_pos := sw.offset - sw.start - SIGNATURE_HEADER_SIZE
-	_emit(sw, packed[:]) or_return
+	folder   := Out_Folder{coder_count = 1}
+	main     := &folder.coders[0]
+	main^ = {id = .Copy, in_streams = 1, unpack_size = i64(size)}
+	data := sw.header[:]
+	if !sw.options.plain_header {
+		props   := lzma.compress_raw_to_dynamic(&packed, sw.header[:], HEADER_LZMA_OPTIONS, sw.allocator) or_return
+		encoded := lzma.encode_properties(props)
+		main.id              = .LZMA
+		main.properties_size = copy(main.properties[:], encoded[:])
+		data = packed[:]
+	}
+
+	pack_size := i64(len(data))
+	ciphered: Out_Cipher
+	cipher:   ^Out_Cipher
+	if _header_encrypted(sw) {
+		key: [AES_KEY_SIZE]u8
+		defer crypto.zero_explicit(&key, size_of(key))
+		_writer_key(sw, sw.password, &key) or_return
+		state: Pack_Cipher
+		defer _cipher_destroy(&state)
+		_cipher_init(&state, &key)
+		_cipher_begin(&state, &ciphered.ivs[0])
+		sink := Pack_Sink{writer = sw, cipher = &state}
+		_cipher_write(&sink, data) or_return
+		_cipher_finish(&sink) or_return
+		ciphered.unpack_sizes[0] = state.plain
+		pack_size        = sink.count
+		folder.encrypted = true
+		cipher           = &ciphered
+	} else {
+		_emit(sw, data) or_return
+	}
 
 	buf := &sw.header
 	clear(buf)
-	reserve(buf, 128) or_return
-	folder := Out_Folder{coder_count = 1}
-	folder.coders[0] = {id = .LZMA, in_streams = 1, unpack_size = i64(size)}
-	folder.coders[0].properties_size = copy(folder.coders[0].properties[:], encoded[:])
+	reserve(buf, 256) or_return
 	_put_id(buf, .Encoded_Header)
 	_put_id(buf, .Pack_Info)
 	_put_number(buf, u64(pack_pos))
 	_put_number(buf, 1)
 	_put_id(buf, .Size)
-	_put_number(buf, u64(len(packed)))
+	_put_number(buf, u64(pack_size))
 	_put_id(buf, .End)
 	_put_id(buf, .Unpack_Info)
 	_put_id(buf, .Folder)
 	_put_number(buf, 1)
 	append(buf, 0)
-	_put_folder(buf, &folder)
+	_put_folder(sw, buf, &folder, cipher)
 	_put_id(buf, .Coders_Unpack_Size)
-	_put_number(buf, u64(size))
+	_put_unpack_sizes(buf, &folder, cipher)
 	_put_id(buf, .CRC)
 	append(buf, 1)
 	_put_u32(buf, crc)
