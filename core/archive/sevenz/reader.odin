@@ -154,7 +154,7 @@ open_current :: proc(it: ^Iterator, options := archive.Read_Options{}) -> (reade
 	return _member_stream(&it.member), nil
 }
 
-read_link :: proc(it: ^Iterator, allocator := context.allocator) -> (target: string, err: Error) {
+read_link :: proc(it: ^Iterator, options := archive.Read_Options{}, allocator := context.allocator) -> (target: string, err: Error) {
 	if !_has_current(it) {
 		return "", archive.General_Error.No_Current_Member
 	}
@@ -166,8 +166,9 @@ read_link :: proc(it: ^Iterator, allocator := context.allocator) -> (target: str
 	if fi.size > LINK_TARGET_MAX {
 		return "", archive.General_Error.Limit_Exceeded
 	}
-	d := _iterator_decoder(it, it.reader.password) or_return
-	return _read_link(it.reader, it.index, d, allocator, it.reader.password)
+	password := _password(it.reader, options)
+	d := _iterator_decoder(it, password) or_return
+	return _read_link(it.reader, it.index, d, allocator, password)
 }
 
 find :: proc(r: ^Reader, path: string) -> (fi: archive.File_Info, handle: archive.Handle, ok: bool, err: Error) {
@@ -2251,8 +2252,8 @@ _archive_open_current :: proc(it: ^archive.Iterator, options: archive.Read_Optio
 }
 
 @(private)
-_archive_read_link :: proc(it: ^archive.Iterator, allocator: runtime.Allocator) -> (target: string, err: Error) {
-	return read_link((^Iterator)(it.state), allocator)
+_archive_read_link :: proc(it: ^archive.Iterator, options: archive.Read_Options, allocator: runtime.Allocator) -> (target: string, err: Error) {
+	return read_link((^Iterator)(it.state), options, allocator)
 }
 
 @(private)

@@ -194,6 +194,7 @@ _commit_update :: proc(zw: ^Writer) -> (err: Error) {
 		return _commit_rewrite(zw)
 	}
 	if zw.count != zw.old_count || zw.comment_set {
+		_check_old_extents(zw) or_return
 		_journal_begin(zw) or_return
 		_commit_archive(zw, zw.old.directory) or_return
 	}
@@ -204,6 +205,29 @@ _commit_update :: proc(zw: ^Writer) -> (err: Error) {
 	if zw.mode == .Update_Path {
 		os.close(zw.file)
 		zw.file = nil
+	}
+	return nil
+}
+
+@(private)
+_check_old_extents :: proc(zw: ^Writer) -> (err: Error) {
+	r     := &zw.old
+	size  := r.store.size
+	slack := i64(size_of(Local_Header)) + 2 * i64(max(u16))
+	for rec in r.records {
+		if rec.local_offset <= size - slack && rec.compressed_size <= size - slack - rec.local_offset {
+			continue
+		}
+		fixed: [size_of(Local_Header)]u8
+		_store_read(&r.store, fixed[:], rec.local_offset) or_return
+		header, ok := parse_local(fixed[:])
+		if !ok {
+			continue
+		}
+		data_offset := rec.local_offset + size_of(Local_Header) + i64(header.name_length) + i64(header.extra_length)
+		if data_offset > size || rec.compressed_size > size - data_offset {
+			return Zip_Error.Truncated
+		}
 	}
 	return nil
 }

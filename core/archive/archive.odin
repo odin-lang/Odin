@@ -149,8 +149,8 @@ open_current :: proc(it: ^Iterator, options := Read_Options{}) -> (r: io.Reader,
 	return _procs[it.archive.format].open_current(it, options)
 }
 
-read_link :: proc(it: ^Iterator, allocator := context.allocator) -> (target: string, err: Error) {
-	return _procs[it.archive.format].read_link(it, allocator)
+read_link :: proc(it: ^Iterator, options := Read_Options{}, allocator := context.allocator) -> (target: string, err: Error) {
+	return _procs[it.archive.format].read_link(it, options, allocator)
 }
 
 find :: proc(a: ^Archive, path: string) -> (fi: File_Info, handle: Handle, ok: bool, err: Error) {

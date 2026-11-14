@@ -156,11 +156,11 @@ open_current :: proc(it: ^Iterator, options := archive.Read_Options{}) -> (reade
 	return _member_stream(&it.member), nil
 }
 
-read_link :: proc(it: ^Iterator, allocator := context.allocator) -> (target: string, err: Error) {
+read_link :: proc(it: ^Iterator, options := archive.Read_Options{}, allocator := context.allocator) -> (target: string, err: Error) {
 	if !_has_current(it) {
 		return "", archive.General_Error.No_Current_Member
 	}
-	return _read_link(it.reader, it.index, allocator)
+	return _read_link(it.reader, it.index, allocator, options.password)
 }
 
 find :: proc(r: ^Reader, path: string) -> (fi: archive.File_Info, handle: archive.Handle, ok: bool, err: Error) {
@@ -949,7 +949,7 @@ _decode :: proc(r: ^Reader, rec: ^Record, method: Method, flags: Flags, crc: May
 }
 
 @(private)
-_read_link :: proc(r: ^Reader, index: int, allocator: runtime.Allocator) -> (target: string, err: Error) {
+_read_link :: proc(r: ^Reader, index: int, allocator: runtime.Allocator, password: string) -> (target: string, err: Error) {
 	header, name, extra := _central(r, index)
 	fi: archive.File_Info
 	fill_info(&fi, header, name, extra, nil, r.zone)
@@ -961,7 +961,7 @@ _read_link :: proc(r: ^Reader, index: int, allocator: runtime.Allocator) -> (tar
 	}
 	_, _, data_offset := _local(r, &r.records[index], nil) or_return
 	b := strings.builder_make_len_cap(0, int(r.records[index].size), allocator) or_return
-	if err = _extract(r, index, data_offset, strings.to_writer(&b), ""); err != nil {
+	if err = _extract(r, index, data_offset, strings.to_writer(&b), password); err != nil {
 		strings.builder_destroy(&b)
 		return "", err
 	}
@@ -1343,8 +1343,8 @@ _archive_open_current :: proc(it: ^archive.Iterator, options: archive.Read_Optio
 }
 
 @(private)
-_archive_read_link :: proc(it: ^archive.Iterator, allocator: runtime.Allocator) -> (target: string, err: Error) {
-	return read_link((^Iterator)(it.state), allocator)
+_archive_read_link :: proc(it: ^archive.Iterator, options: archive.Read_Options, allocator: runtime.Allocator) -> (target: string, err: Error) {
+	return read_link((^Iterator)(it.state), options, allocator)
 }
 
 @(private)

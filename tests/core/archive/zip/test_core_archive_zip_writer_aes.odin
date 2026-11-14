@@ -299,14 +299,44 @@ check_aes :: proc(t: ^testing.T, label: string, data: []u8, expected: []Aes_Expe
 		content, err := extract_to_bytes(&it, {password = want.password})
 		testing.expectf(t, err == nil && bytes.equal(content[:], want.content), "%s: content %v, %d bytes", name, err, len(content))
 		delete(content)
-		if want_type == .Symlink && want.password == "" {
-			target, link_err := zip.read_link(&it)
+		if want_type == .Symlink {
+			if want.password != "" {
+				locked, locked_err := zip.read_link(&it)
+				delete(locked)
+				testing.expectf(t, locked_err == archive.General_Error.Encrypted, "%s: link without a password: %v", name, locked_err)
+				wrong, wrong_err := zip.read_link(&it, {password = "wrong"})
+				delete(wrong)
+				testing.expectf(t, wrong_err == archive.General_Error.Wrong_Password || wrong_err == archive.General_Error.Authentication_Failed, "%s: link with a wrong password: %v", name, wrong_err)
+			}
+			target, link_err := zip.read_link(&it, {password = want.password})
 			testing.expectf(t, link_err == nil && target == string(want.content), "%s: link %q %v", name, target, link_err)
 			delete(target)
 		}
 	}
 	path, iter_err := zip.iterator_error(&it)
 	testing.expectf(t, iter_err == nil, "%s: iterator %s %v", label, path, iter_err)
+
+	a, archive_err := archive.open(data)
+	if testing.expectf(t, archive_err == nil, "%s: archive.open %v", label, archive_err) {
+		ait := archive.iterator_create(&a)
+		for fi, index in archive.iterate(&ait) {
+			if index >= len(expected) || fi.type != .Symlink {
+				continue
+			}
+			want := expected[index]
+			name := fmt.tprintf("%s/%s", label, want.name)
+			target, link_err := archive.read_link(&ait, {password = want.password})
+			testing.expectf(t, link_err == nil && target == string(want.content), "%s: archive.read_link %q %v", name, target, link_err)
+			delete(target)
+			if want.password != "" {
+				locked, locked_err := archive.read_link(&ait)
+				delete(locked)
+				testing.expectf(t, locked_err == archive.General_Error.Encrypted, "%s: archive.read_link without a password: %v", name, locked_err)
+			}
+		}
+		archive.iterator_destroy(&ait)
+		archive.close(&a)
+	}
 	testing.expectf(t, count == len(expected), "%s: %d members, want %d", label, count, len(expected))
 
 	raw := raw_members(data)

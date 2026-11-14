@@ -39,6 +39,8 @@ Updating:
 - Crash-safe at a path: after a crash, a reopen gives the last committed state or the one before
 - Path readers take a shared lock and path writers an exclusive one, except on js and wasi
 - Lock contention gives `archive.General_Error.Busy`
+- An in-place append or comment change fails at `commit` with `Zip_Error.Truncated` when an old
+  member's data runs past the archive's end; at a path, removing those members first works
 
 Planned:
 - Streaming extraction for XZ and the pkzip-legacy methods

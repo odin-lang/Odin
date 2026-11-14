@@ -1666,7 +1666,7 @@ _archive_open_current :: proc(it: ^archive.Iterator, _: archive.Read_Options) ->
 }
 
 @(private)
-_archive_read_link :: proc(it: ^archive.Iterator, allocator: runtime.Allocator) -> (target: string, err: Error) {
+_archive_read_link :: proc(it: ^archive.Iterator, _: archive.Read_Options, allocator: runtime.Allocator) -> (target: string, err: Error) {
 	return read_link((^Iterator)(it.state), allocator)
 }
 

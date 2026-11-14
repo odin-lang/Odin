@@ -228,6 +228,59 @@ test_write_entry_passwords :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_read_link_passwords :: proc(t: ^testing.T) {
+	text := write_text()
+	m := Memory_File{seekable = true}
+	defer delete(m.data)
+	sw: sevenz.Writer
+	options := sevenz.Writer_Options{password = WRITE_PASSWORD, kdf_power = 1, unencrypted_header = true}
+	if !testing.expect_value(t, sevenz.create(&sw, memory_stream(&m), options), nil) {
+		return
+	}
+	testing.expect_value(t, sevenz.write_entry(&sw, "a.txt", text), nil)
+	testing.expect_value(t, sevenz.write_entry(&sw, archive.File_Info{path = "link", type = .Symlink, link_target = "a.txt"}), nil)
+	testing.expect_value(t, sevenz.write_entry(&sw, archive.File_Info{path = "other", type = .Symlink, link_target = "../b.txt"}, nil, {password = OTHER_PASSWORD}), nil)
+	testing.expect_value(t, sevenz.commit(&sw), nil)
+	sevenz.close(&sw)
+
+	Link_Case :: struct {
+		open_password: string,
+		name:          string,
+		password:      string,
+		target:        string,
+		err:           archive.Error,
+	}
+	cases := [?]Link_Case{
+		{"",             "link",  "",             "",         archive.General_Error.Encrypted},
+		{"",             "link",  WRITE_PASSWORD, "a.txt",    nil},
+		{"",             "other", OTHER_PASSWORD, "../b.txt", nil},
+		{WRITE_PASSWORD, "link",  "",             "a.txt",    nil},
+		{WRITE_PASSWORD, "other", "",             "",         archive.General_Error.Wrong_Password},
+		{WRITE_PASSWORD, "other", OTHER_PASSWORD, "../b.txt", nil},
+	}
+	for c in cases {
+		r: sevenz.Reader
+		if !testing.expect_value(t, sevenz.open(&r, m.data[:], compress.Options{}, context.allocator, archive.Read_Options{password = c.open_password}), nil) {
+			continue
+		}
+		it := sevenz.iterator_create(&r)
+		seen := false
+		for fi in sevenz.iterate(&it) {
+			if fi.path != c.name {
+				continue
+			}
+			seen = true
+			target, err := sevenz.read_link(&it, {password = c.password})
+			testing.expectf(t, err == c.err && target == c.target, "%s, opened with %q, read with %q: %q %v, want %q %v", c.name, c.open_password, c.password, target, err, c.target, c.err)
+			delete(target)
+		}
+		testing.expectf(t, seen, "%s: missing", c.name)
+		sevenz.iterator_destroy(&it)
+		sevenz.close(&r)
+	}
+}
+
+@(test)
 test_write_password_options :: proc(t: ^testing.T) {
 	text := write_text()
 	m := Memory_File{seekable = true}

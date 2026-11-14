@@ -368,6 +368,128 @@ test_update_errors :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_update_past_end :: proc(t: ^testing.T) {
+	root, root_ok := update_root(t, "odin_zip_update_past_end_*")
+	if !root_ok {
+		return
+	}
+	defer os.remove_all(root)
+	text   := write_text()
+	random := write_random(20_000, 13)
+	defer delete(random)
+	added := write_random(3_000, 14)
+	defer delete(added)
+
+	good := build_archive(t, {{name = "a.txt", content = text}, {name = "b.bin", content = random, method = .Store}}, "past")
+	central := bytes.last_index(good, transmute([]u8)string("b.bin")) - size_of(zip.Central_Header)
+	if !testing.expect(t, central > 0, "b.bin has a central record") {
+		return
+	}
+	local        := int(endian.unchecked_get_u32le(good[central:][offset_of(zip.Central_Header, local_header_offset):]))
+	name_length  := int(endian.unchecked_get_u16le(good[local:][offset_of(zip.Local_Header, name_length):]))
+	extra_length := int(endian.unchecked_get_u16le(good[local:][offset_of(zip.Local_Header, extra_length):]))
+	data_offset  := local + size_of(zip.Local_Header) + name_length + extra_length
+	damage :: proc(good: []u8, central, compressed: int) -> []u8 {
+		old := slice.clone(good, context.temp_allocator)
+		endian.unchecked_put_u32le(old[central:][offset_of(zip.Central_Header, compressed_size):], u32(compressed))
+		return old
+	}
+	kept  := entry_states({{name = "a.txt", content = text}, {name = "b.bin"}})
+	grown := entry_states({{name = "a.txt", content = text}, {name = "b.bin"}, {name = "new.bin", content = added}})
+
+	Past_Case :: struct {
+		label:      string,
+		compressed: int,
+		want:       zip.Error,
+	}
+	cases := [?]Past_Case{
+		{"past the end",  len(good) - data_offset + 1, Zip_Error.Truncated},
+		{"up to the end", len(good) - data_offset,     nil},
+	}
+	for c in cases {
+		old := damage(good, central, c.compressed)
+		_, _, open_err := state_bytes(old)
+		if !testing.expectf(t, open_err == nil, "%s: open %v", c.label, open_err) {
+			continue
+		}
+
+		p := update_paths(root, "past.zip")
+		testing.expect_value(t, os.write_entire_file(p.path, old), nil)
+		zw: zip.Writer
+		if testing.expect_value(t, zip.update(&zw, p.path), nil) {
+			testing.expect_value(t, zip.write_entry(&zw, "new.bin", added), nil)
+			commit_err := zip.commit(&zw)
+			testing.expectf(t, commit_err == c.want, "%s: commit %v, want %v", c.label, commit_err, c.want)
+			zip.close(&zw)
+		}
+		data, _ := os.read_entire_file(p.path, context.temp_allocator)
+		testing.expectf(t, !os.exists(p.journal) && !os.exists(p.temp), "%s: no journal or temp", c.label)
+		if c.want != nil {
+			testing.expectf(t, bytes.equal(data, old), "%s: a refused append leaves the archive alone", c.label)
+		} else {
+			expect_damaged(t, c.label, data, grown, "b.bin")
+		}
+
+		testing.expect_value(t, os.write_entire_file(p.path, old), nil)
+		if testing.expect_value(t, zip.update(&zw, p.path, {comment = "changed"}), nil) {
+			commit_err := zip.commit(&zw)
+			testing.expectf(t, commit_err == c.want, "%s/comment: commit %v, want %v", c.label, commit_err, c.want)
+			zip.close(&zw)
+		}
+		data, _ = os.read_entire_file(p.path, context.temp_allocator)
+		if c.want != nil {
+			testing.expectf(t, bytes.equal(data, old), "%s/comment: a refused commit leaves the archive alone", c.label)
+		} else {
+			expect_damaged(t, fmt.tprintf("%s/comment", c.label), data, kept, "b.bin")
+		}
+
+		tw: Torn_Writer
+		torn_init(&tw, old)
+		if testing.expect_value(t, zip.update(&zw, torn_stream(&tw)), nil) {
+			testing.expect_value(t, zip.write_entry(&zw, "new.bin", added), nil)
+			commit_err := zip.commit(&zw)
+			testing.expectf(t, commit_err == c.want, "%s/stream: commit %v, want %v", c.label, commit_err, c.want)
+			zip.close(&zw)
+		}
+		testing.expectf(t, bytes.equal(tw.data[:len(old)], old), "%s/stream: the old bytes stay", c.label)
+		expect_damaged(t, fmt.tprintf("%s/stream", c.label), tw.data[:], kept if c.want != nil else grown, "b.bin")
+	}
+
+	old := damage(good, central, len(good) - data_offset + 1)
+	p := update_paths(root, "repair.zip")
+	testing.expect_value(t, os.write_entire_file(p.path, old), nil)
+	zw: zip.Writer
+	if testing.expect_value(t, zip.update(&zw, p.path), nil) {
+		testing.expect_value(t, zip.remove_entry(&zw, "b.bin"), nil)
+		testing.expect_value(t, zip.write_entry(&zw, "new.bin", added), nil)
+		testing.expect_value(t, zip.commit(&zw), nil)
+		zip.close(&zw)
+	}
+	data, _ := os.read_entire_file(p.path, context.temp_allocator)
+	expect_archive(t, "repair", data, entry_states({{name = "a.txt", content = text}, {name = "new.bin", content = added}}), "past")
+	testing.expect(t, !os.exists(p.journal) && !os.exists(p.temp), "repair: no journal or temp")
+}
+
+expect_damaged :: proc(t: ^testing.T, label: string, data: []u8, want: []Member_State, damaged: string, loc := #caller_location) {
+	got, _, err := state_bytes(data)
+	if !testing.expectf(t, err == nil, "%s: open %v", label, err, loc = loc) {
+		return
+	}
+	if !testing.expectf(t, len(got) == len(want), "%s: %d members, want %d", label, len(got), len(want), loc = loc) {
+		return
+	}
+	for m, i in got {
+		w := want[i]
+		testing.expectf(t, m.name == w.name, "%s/%d: %q, want %q", label, i, m.name, w.name, loc = loc)
+		if w.name == damaged {
+			testing.expectf(t, m.err != nil, "%s/%s: reads, want an error", label, w.name, loc = loc)
+		} else {
+			testing.expectf(t, m.err == nil && bytes.equal(m.content, w.content), "%s/%s: %v %d bytes, want %d bytes", label, w.name, m.err, len(m.content), len(w.content), loc = loc)
+		}
+	}
+}
+
+@(test)
 test_update_locks :: proc(t: ^testing.T) {
 	root, root_ok := update_root(t, "odin_zip_update_locks_*")
 	if !root_ok {

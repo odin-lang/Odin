@@ -137,7 +137,7 @@ Format_Procs :: struct {
 	iterator_error:   proc(it: ^Iterator) -> (path: string, err: Error),
 	extract_current:  proc(it: ^Iterator, w: io.Writer, options: Read_Options) -> Error,
 	open_current:     proc(it: ^Iterator, options: Read_Options) -> (r: io.Reader, err: Error),
-	read_link:        proc(it: ^Iterator, allocator: runtime.Allocator) -> (target: string, err: Error),
+	read_link:        proc(it: ^Iterator, options: Read_Options, allocator: runtime.Allocator) -> (target: string, err: Error),
 	find:             proc(a: ^Archive, path: string) -> (fi: File_Info, handle: Handle, ok: bool, err: Error),
 	extract:          proc(a: ^Archive, handle: Handle, w: io.Writer, options: Read_Options) -> Error,
 	open_member:      proc(a: ^Archive, handle: Handle, options: Read_Options) -> (r: io.Reader, err: Error),
