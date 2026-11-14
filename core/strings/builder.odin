@@ -578,15 +578,9 @@ Output:
 
 */
 
-write_string :: proc(b: ^Builder, ss: ..string, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
-	n0 := len(b.buf)
-	for s in ss {
-		_, err = append(&b.buf, s, loc)
-		if err != nil { break }
-	}
-	return len(b.buf)-n0, err
+write_string :: proc(b: ^Builder, s: ..string, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+	return append_string(&b.buf, ..s, loc=loc)
 }
-
 
 /*
 Appends UTF-16 encoded string `str` to the Builder `b`, and returns the number of bytes written.
