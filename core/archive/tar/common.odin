@@ -18,6 +18,10 @@ import "core:os"
 
 	Formats: v7, ustar and pax, as specified by POSIX.1-2024 (IEEE Std 1003.1-2024), `pax`:
 		https://pubs.opengroup.org/onlinepubs/9799919799/utilities/pax.html
+
+	GNU tar's format and its sparse files, as described in the GNU tar manual:
+		https://www.gnu.org/software/tar/manual/html_node/Standard.html and
+		https://www.gnu.org/software/tar/manual/html_node/Sparse-Formats.html
 */
 
 BLOCK_SIZE         :: 512
@@ -31,6 +35,13 @@ USTAR_ID_MAX       :: 0o777_7777
 BUFFER_SIZE        :: 64 * 1024
 HEAD_SIZE          :: 1024
 HEADER_RECORD_MAX  :: 1 << 20
+MEMBER_SIZE_MAX    :: max(i64) - BLOCK_SIZE
+GNU_MAGIC          :: "ustar  \x00"
+GNU_LONG_NAME      :: "././@LongLink"
+GNU_BASE256_8_MAX  :: 1 << 56 - 1
+SPARSE_IN_HEADER   :: 4
+SPARSE_IN_BLOCK    :: 21
+ZERO_CHUNK_SIZE    :: 8 * 1024
 
 Error     :: archive.Error
 Tar_Error :: archive.Tar_Error
@@ -40,6 +51,17 @@ Header_Format :: enum u8 {
 	Ustar,
 	GNU,
 	Star,
+}
+
+Write_Format :: enum u8 {
+	Pax,
+	Ustar,
+	GNU,
+}
+
+Sparse_Region :: struct {
+	offset: i64,
+	size:   i64,
 }
 
 Header :: struct {
@@ -132,12 +154,39 @@ Reader :: struct {
 	global_set:   bit_set[Global_Key],
 	gnu_sparse:   bool,
 	path_buf:     [dynamic]u8,
+	long_name:    [dynamic]u8,
+	long_link:    [dynamic]u8,
+	has_long:     bit_set[Long_Kind],
+	label:        [dynamic]u8,
+	has_label:    bool,
+	sparse:       bool,
+	sparse_map:   [dynamic]Sparse_Region,
+	sparse_index: int,
+	sparse_pos:   i64,
+	data_size:    i64,
 	current:      archive.File_Info,
 	has_current:  bool,
 	unsupported:  Error,
 	broken:       Error,
 	pending:      Error,
 	fail_path:    [dynamic]u8,
+}
+
+Long_Kind :: enum u8 {
+	Name,
+	Link,
+}
+
+Pax_Sparse :: struct {
+	major:      string,
+	minor:      string,
+	name:       string,
+	size:       string,
+	numblocks:  string,
+	sparse_map: string,
+	has_map:    bool,
+	has_pairs:  bool,
+	has_keys:   bool,
 }
 
 Entry_Data :: union {
@@ -148,6 +197,7 @@ Entry_Data :: union {
 Writer_Options :: struct {
 	compression:   archive.Method,
 	level:         Maybe(int),
+	format:        Write_Format,
 	deterministic: bool,
 	options:       compress.Options,
 }
@@ -176,11 +226,13 @@ Writer :: struct {
 }
 
 Pending_Entry :: struct {
-	name:     string,
-	type:     archive.Entry_Type,
-	typeflag: u8,
-	size:     i64,
-	next:     i64,
+	name:      string,
+	type:      archive.Entry_Type,
+	typeflag:  u8,
+	size:      i64,
+	next:      i64,
+	long_name: bool,
+	long_link: bool,
 }
 
 Walked_Entry :: struct {

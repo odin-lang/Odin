@@ -11,6 +11,7 @@ import "core:slice"
 import "core:strconv"
 import "core:strings"
 import "core:time"
+import "core:unicode/utf8"
 
 create_from_path :: proc(tw: ^Writer, path: string, options: Writer_Options = {}, allocator := context.allocator) -> (err: Error) {
 	tw^ = {}
@@ -192,6 +193,11 @@ _check_options :: proc(options: Writer_Options) -> (err: Error) {
 	if options.options.progress_interval < 0 {
 		return archive.General_Error.Incompatible_Options
 	}
+	switch options.format {
+	case .Pax, .Ustar, .GNU:
+	case:
+		return archive.General_Error.Incompatible_Options
+	}
 	level, has_level := options.level.?
 	#partial switch options.compression {
 	case .Unknown, .Store:
@@ -273,8 +279,13 @@ _write_member :: proc(tw: ^Writer, fi: archive.File_Info, data: Entry_Data) -> (
 	case .Unknown, .Anti:
 		return archive.General_Error.Unsupported_Entry
 	}
-	if (p.type == .Symlink || p.type == .Hard_Link) && len(fi.link_target) == 0 {
-		return archive.General_Error.Incompatible_Options
+	if p.type == .Symlink || p.type == .Hard_Link {
+		if len(fi.link_target) == 0 {
+			return archive.General_Error.Incompatible_Options
+		}
+		if strings.index_byte(fi.link_target, 0) >= 0 {
+			return Tar_Error.Invalid_Name
+		}
 	}
 	_entry_name(tw, fi.path, p.type == .Directory) or_return
 	p.name = string(tw.name[:])
@@ -311,6 +322,12 @@ _write_member :: proc(tw: ^Writer, fi: archive.File_Info, data: Entry_Data) -> (
 	}
 
 	_build_header(tw, &p, fi) or_return
+	if p.long_name {
+		_emit_long(tw, 'L', p.name) or_return
+	}
+	if p.long_link {
+		_emit_long(tw, 'K', fi.link_target) or_return
+	}
 	if len(tw.records) > 0 {
 		_emit_records(tw, &p) or_return
 	}
@@ -391,9 +408,25 @@ _read_unknown :: proc(tw: ^Writer, r: io.Reader, out: ^[dynamic]u8) -> (err: Err
 
 @(private)
 _build_header :: proc(tw: ^Writer, p: ^Pending_Entry, fi: archive.File_Info) -> (err: Error) {
+	if tw.options.format == .GNU {
+		return _build_gnu_header(tw, p, fi)
+	}
 	clear(&tw.records)
 	tw.block = {}
 	b := tw.block[:]
+
+	uid, gid := max(fi.uid, 0), max(fi.gid, 0)
+	user, group := fi.user, fi.group
+	mtime := fi.modification_time
+	if tw.options.deterministic {
+		uid, gid    = 0, 0
+		user, group = "", ""
+		mtime       = {}
+	}
+	link := fi.link_target if p.type == .Symlink || p.type == .Hard_Link else ""
+	if !utf8.valid_string(p.name) || !utf8.valid_string(link) || !utf8.valid_string(user) || !utf8.valid_string(group) {
+		_add_record(tw, "hdrcharset", "BINARY") or_return
+	}
 
 	name := p.name
 	if !_is_ascii(name) {
@@ -409,24 +442,8 @@ _build_header :: proc(tw: ^Writer, p: ^Pending_Entry, fi: archive.File_Info) -> 
 		_put_sanitized(b[0:USTAR_NAME_MAX], name)
 	}
 
-	mode := fi.unix_mode & archive.UNIX_PERMISSION_MASK
-	if mode == 0 {
-		#partial switch p.type {
-		case .Directory: mode = 0o755
-		case .Symlink:   mode = 0o777
-		case:            mode = 0o644
-		}
-	}
-	_put_octal(b[100:108], i64(mode))
+	_put_octal(b[100:108], _header_mode(p, fi))
 
-	uid, gid := max(fi.uid, 0), max(fi.gid, 0)
-	user, group := fi.user, fi.group
-	mtime := fi.modification_time
-	if tw.options.deterministic {
-		uid, gid    = 0, 0
-		user, group = "", ""
-		mtime       = {}
-	}
 	_put_id(tw, b[108:116], "uid", uid) or_return
 	_put_id(tw, b[116:124], "gid", gid) or_return
 
@@ -439,7 +456,13 @@ _build_header :: proc(tw: ^Writer, p: ^Pending_Entry, fi: archive.File_Info) -> 
 
 	nanos   := time.time_to_unix_nano(mtime)
 	seconds := nanos / 1e9
-	if nanos % 1e9 != 0 || seconds < 0 || seconds > USTAR_SIZE_MAX {
+	if tw.options.format == .Ustar {
+		seconds = _floor_seconds(nanos)
+		if seconds < 0 || seconds > USTAR_SIZE_MAX {
+			return archive.General_Error.Incompatible_Options
+		}
+		_put_octal(b[136:148], seconds)
+	} else if nanos % 1e9 != 0 || seconds < 0 || seconds > USTAR_SIZE_MAX {
 		buf: [48]u8
 		_add_record(tw, "mtime", _pax_time(buf[:], nanos)) or_return
 		_put_octal(b[136:148], clamp(seconds, 0, USTAR_SIZE_MAX))
@@ -476,6 +499,125 @@ _build_header :: proc(tw: ^Writer, p: ^Pending_Entry, fi: archive.File_Info) -> 
 }
 
 @(private)
+_build_gnu_header :: proc(tw: ^Writer, p: ^Pending_Entry, fi: archive.File_Info) -> (err: Error) {
+	clear(&tw.records)
+	tw.block = {}
+	b := tw.block[:]
+
+	p.long_name = len(p.name) > USTAR_NAME_MAX
+	copy(b[0:USTAR_NAME_MAX], p.name)
+
+	_put_octal(b[100:108], _header_mode(p, fi))
+
+	uid, gid := max(fi.uid, 0), max(fi.gid, 0)
+	user, group := fi.user, fi.group
+	mtime, atime := fi.modification_time, fi.access_time
+	if tw.options.deterministic {
+		uid, gid     = 0, 0
+		user, group  = "", ""
+		mtime, atime = {}, {}
+	}
+	_put_gnu_number(b[108:116], uid) or_return
+	_put_gnu_number(b[116:124], gid) or_return
+	_put_gnu_number(b[124:136], p.size if p.type == .Regular else 0) or_return
+	_put_gnu_number(b[136:148], _floor_seconds(time.time_to_unix_nano(mtime))) or_return
+	b[156] = p.typeflag
+
+	long := i64(len(p.name) + 1) if p.long_name else 0
+	if p.type == .Symlink || p.type == .Hard_Link {
+		target := fi.link_target
+		p.long_link = len(target) > USTAR_NAME_MAX
+		copy(b[157:][:USTAR_NAME_MAX], target)
+		if p.long_link {
+			long += i64(len(target) + 1)
+		}
+	}
+	copy(b[257:265], GNU_MAGIC)
+	for owner in ([2]string{user, group}) {
+		if len(owner) > USTAR_OWNER_MAX || strings.index_byte(owner, 0) >= 0 {
+			return archive.General_Error.Incompatible_Options
+		}
+	}
+	copy(b[265:297], user)
+	copy(b[297:329], group)
+	if p.type == .Character_Device || p.type == .Block_Device {
+		_put_gnu_number(b[329:337], i64(fi.device[0])) or_return
+		_put_gnu_number(b[337:345], i64(fi.device[1])) or_return
+	}
+	if atime_nanos := time.time_to_unix_nano(atime); atime_nanos != 0 {
+		_put_gnu_number(b[345:357], _floor_seconds(atime_nanos)) or_return
+	}
+	_put_checksum(b)
+	if long > HEADER_RECORD_MAX {
+		return Tar_Error.Header_Too_Large
+	}
+	return nil
+}
+
+@(private)
+_header_mode :: proc "contextless" (p: ^Pending_Entry, fi: archive.File_Info) -> i64 {
+	mode := fi.unix_mode & archive.UNIX_PERMISSION_MASK
+	if mode == 0 {
+		#partial switch p.type {
+		case .Directory: mode = 0o755
+		case .Symlink:   mode = 0o777
+		case:            mode = 0o644
+		}
+	}
+	return i64(mode)
+}
+
+@(private)
+_emit_long :: proc(tw: ^Writer, typeflag: u8, value: string) -> (err: Error) {
+	header: [BLOCK_SIZE]u8
+	b := header[:]
+	copy(b[0:], GNU_LONG_NAME)
+	_put_octal(b[100:108], 0o644)
+	_put_octal(b[108:116], 0)
+	_put_octal(b[116:124], 0)
+	_put_octal(b[124:136], i64(len(value) + 1))
+	_put_octal(b[136:148], 0)
+	b[156] = typeflag
+	copy(b[257:265], GNU_MAGIC)
+	copy(b[265:297], "root")
+	copy(b[297:329], "root")
+	_put_checksum(b)
+	_emit(tw, b) or_return
+	_emit(tw, transmute([]u8)value) or_return
+	terminator := [1]u8{0}
+	_emit(tw, terminator[:]) or_return
+	return _pad(tw, i64(len(value) + 1))
+}
+
+@(private)
+_put_gnu_number :: proc "contextless" (field: []u8, value: i64) -> (err: Error) {
+	digits := uint(len(field) - 1)
+	if value >= 0 && value < i64(1) << (3 * digits) {
+		_put_octal(field, value)
+		return nil
+	}
+	if len(field) <= 8 && (value > GNU_BASE256_8_MAX || value < -GNU_BASE256_8_MAX - 1) {
+		return archive.General_Error.Incompatible_Options
+	}
+	v := value
+	for i := len(field) - 1; i >= 0; i -= 1 {
+		field[i] = u8(v & 0xff)
+		v >>= 8
+	}
+	field[0] |= 0x80
+	return nil
+}
+
+@(private)
+_floor_seconds :: proc "contextless" (nanos: i64) -> (seconds: i64) {
+	seconds = nanos / 1e9
+	if nanos % 1e9 < 0 {
+		seconds -= 1
+	}
+	return
+}
+
+@(private)
 _emit_records :: proc(tw: ^Writer, p: ^Pending_Entry) -> (err: Error) {
 	header: [BLOCK_SIZE]u8
 	b := header[:]
@@ -505,6 +647,9 @@ _emit_records :: proc(tw: ^Writer, p: ^Pending_Entry) -> (err: Error) {
 
 @(private)
 _add_record :: proc(tw: ^Writer, key, value: string) -> (err: Error) {
+	if tw.options.format == .Ustar {
+		return archive.General_Error.Incompatible_Options
+	}
 	body   := len(key) + len(value) + 3
 	digits := len_digits(body)
 	for len_digits(body + digits) != digits {
@@ -545,6 +690,9 @@ _put_id :: proc(tw: ^Writer, field: []u8, key: string, id: i64) -> (err: Error) 
 
 @(private)
 _put_owner :: proc(tw: ^Writer, field: []u8, key, name: string) -> (err: Error) {
+	if strings.index_byte(name, 0) >= 0 {
+		return archive.General_Error.Incompatible_Options
+	}
 	if _is_ascii(name) && len(name) <= len(field) {
 		copy(field, name)
 		return nil

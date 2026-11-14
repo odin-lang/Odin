@@ -48,7 +48,11 @@ Burst :: struct {
 
 TREE_ARCHIVES :: [?]string{
 	"gnu-b1.tar",
+	"gnu-gnu.tar",
 	"gnu-gnu.tar.gz",
+	"gnu-incremental.tar",
+	"gnu-label.tar",
+	"gnu-oldgnu.tar",
 	"gnu-posix-global.tar",
 	"gnu-posix-members.tar.gz",
 	"gnu-posix.tar",
@@ -59,6 +63,7 @@ TREE_ARCHIVES :: [?]string{
 	"gnu-ustar.tar",
 	"gnu-v7.tar",
 	"bsd-mac-default.tar",
+	"bsd-mac-gnutar.tar",
 	"bsd-mac-pax.tar",
 	"bsd-mac-ustar.tar",
 	"bsd-mac-v7.tar",
@@ -66,6 +71,7 @@ TREE_ARCHIVES :: [?]string{
 	"bsd-mac.tar.gz",
 	"bsd-mac.tar.xz",
 	"bsd-win-default.tar",
+	"bsd-win-gnutar.tar",
 	"bsd-win-pax.tar",
 	"bsd-win-ustar.tar",
 	"bsd-win-v7.tar",
@@ -126,25 +132,44 @@ test_tree_archives :: proc(t: ^testing.T) {
 
 @(test)
 test_long_names :: proc(t: ^testing.T) {
-	for name in ([?]string{"gnu-ustar.tar", "gnu-posix.tar", "bsd-mac-pax.tar", "bsd-win-pax.tar"}) {
-		listing := list_path(t, name)
+	Case :: struct {
+		file:  string,
+		split: bool,
+		long:  bool,
+		link:  bool,
+	}
+	cases := [?]Case{
+		{"gnu-ustar.tar",      true,  false, false},
+		{"gnu-posix.tar",      true,  true,  false},
+		{"gnu-gnu.tar",        true,  true,  true},
+		{"gnu-oldgnu.tar",     true,  true,  true},
+		{"bsd-mac-pax.tar",    false, true,  false},
+		{"bsd-win-pax.tar",    false, true,  false},
+		{"bsd-mac-gnutar.tar", true,  true,  true},
+		{"bsd-win-gnutar.tar", true,  true,  false},
+	}
+	for c in cases {
+		listing := list_path(t, c.file)
 		defer listing_destroy(&listing)
-		testing.expectf(t, listing.err == nil, "%s: %v", name, listing.err)
+		testing.expectf(t, listing.err == nil, "%s: %v", c.file, listing.err)
 		found_split := false
 		found_long  := false
+		found_link  := false
 		for path, entry in listing.entries {
 			if len(path) == 135 && strings.has_suffix(path, "/file.txt") {
-				found_split = entry.type == .Regular
+				found_split = entry.type == .Regular && entry.crc == 0xdfc16252
 			}
 			if len(path) == 159 && strings.has_prefix(path, "long/nnnn") {
-				found_long = entry.type == .Regular
+				found_long = entry.type == .Regular && entry.crc == 0x8d1f752f
 			}
 			if path == "long/link-long" {
-				testing.expectf(t, entry.type == .Symlink && len(entry.link) == 148, "%s: link-long %v", name, entry)
+				found_link = entry.type == .Symlink && len(entry.link) == 148
+				testing.expectf(t, found_link, "%s: link-long %v", c.file, entry)
 			}
 		}
-		testing.expectf(t, found_split || name != "gnu-ustar.tar" && name != "gnu-posix.tar", "%s: no 135-byte path", name)
-		testing.expectf(t, found_long || name == "gnu-ustar.tar", "%s: no 155-byte name", name)
+		testing.expectf(t, found_split || !c.split, "%s: no 135-byte path", c.file)
+		testing.expectf(t, found_long || !c.long, "%s: no 155-byte name", c.file)
+		testing.expectf(t, found_link || !c.link, "%s: no 148-byte link", c.file)
 	}
 }
 
@@ -222,50 +247,6 @@ test_pax_fields :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_unsupported :: proc(t: ^testing.T) {
-	gnu := [?]string{
-		"gnu-gnu.tar",
-		"gnu-oldgnu.tar",
-		"gnu-ids.tar",
-		"gnu-incremental.tar",
-		"gnu-label.tar",
-		"gnu-multivolume-1.tar",
-		"gnu-multivolume-2.tar",
-		"gnu-multivolume-3.tar",
-		"gnu-sparse.tar",
-		"bsd-mac-gnutar.tar",
-		"bsd-win-gnutar.tar",
-	}
-	for name in gnu {
-		listing := list_path(t, name)
-		defer listing_destroy(&listing)
-		testing.expectf(t, listing.err == archive.Tar_Error.Unsupported_GNU_Extension, "%s: %v", name, listing.err)
-	}
-
-	for name in ([?]string{"gnu-sparse-posix-0.0.tar", "gnu-sparse-posix-0.1.tar", "gnu-sparse-posix-1.0.tar"}) {
-		r: tar.Reader
-		err := tar.open(&r, asset(name))
-		testing.expectf(t, err == nil, "%s: %v", name, err)
-		it := tar.iterator_create(&r)
-		sparse_seen := false
-		for fi in tar.iterate(&it) {
-			if fi.type == .Regular && !fi.supported {
-				sparse_seen = true
-				buf: bytes.Buffer
-				extract_err := tar.extract_current(&it, bytes.buffer_to_stream(&buf))
-				testing.expectf(t, extract_err == archive.Tar_Error.Unsupported_GNU_Extension, "%s: extract %v", name, extract_err)
-				bytes.buffer_destroy(&buf)
-			}
-		}
-		_, it_err := tar.iterator_error(&it)
-		testing.expectf(t, it_err == nil, "%s: %v", name, it_err)
-		testing.expectf(t, sparse_seen, "%s: no unsupported sparse member", name)
-		tar.iterator_destroy(&it)
-		tar.close(&r)
-	}
-}
-
-@(test)
 test_hostile :: proc(t: ^testing.T) {
 	Case :: struct {
 		file: string,
@@ -279,11 +260,11 @@ test_hostile :: proc(t: ^testing.T) {
 		{"hostile-pax-noequals.tar",      archive.Tar_Error.Invalid_Pax_Record},
 		{"hostile-nul-path.tar",          archive.Tar_Error.Invalid_Pax_Record},
 		{"hostile-pax-huge.tar",          archive.Tar_Error.Header_Too_Large},
-		{"hostile-size-base256.tar",      archive.Tar_Error.Unsupported_GNU_Extension},
-		{"hostile-size-negative.tar",     archive.Tar_Error.Unsupported_GNU_Extension},
-		{"hostile-longname-dotdot.tar",   archive.Tar_Error.Unsupported_GNU_Extension},
-		{"hostile-longname-huge.tar",     archive.Tar_Error.Unsupported_GNU_Extension},
-		{"hostile-sparse-map.tar",        archive.Tar_Error.Unsupported_GNU_Extension},
+		{"hostile-size-base256.tar",      archive.Tar_Error.Invalid_Size},
+		{"hostile-size-negative.tar",     archive.Tar_Error.Invalid_Size},
+		{"hostile-longname-dotdot.tar",   nil},
+		{"hostile-longname-huge.tar",     archive.Tar_Error.Header_Too_Large},
+		{"hostile-sparse-map.tar",        archive.Tar_Error.Invalid_Sparse_Map},
 		{"hostile-size-absurd.tar",       archive.Tar_Error.Truncated},
 		{"hostile-truncated-data.tar",    archive.Tar_Error.Truncated},
 		{"hostile-truncated-header.tar",  archive.Tar_Error.Truncated},

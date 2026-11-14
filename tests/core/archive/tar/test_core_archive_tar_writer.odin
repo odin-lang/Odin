@@ -6,6 +6,7 @@ import "core:bytes"
 import "core:compress"
 import "core:io"
 import "core:os"
+import "core:slice"
 import "core:strings"
 import "core:testing"
 import "core:time"
@@ -200,6 +201,330 @@ test_write_progress :: proc(t: ^testing.T) {
 		testing.expect(t, calls.monotonic, "progress went backwards")
 		tar.close(&tw)
 	}
+}
+
+@(test)
+test_write_gnu :: proc(t: ^testing.T) {
+	entries := write_entries(t)
+	defer delete(entries)
+	for &e in entries {
+		if len(e.info.group) > 32 {
+			e.info.group = e.info.group[:32]
+		}
+	}
+	want := make([]Written, len(entries), context.temp_allocator)
+	copy(want, entries[:])
+	for &e in want {
+		e.info.modification_time = time.unix(time.to_unix_seconds(e.info.modification_time), 0)
+	}
+	for compression in WRITE_COMPRESSIONS {
+		for source in Write_Source {
+			out := strings.builder_make()
+			defer strings.builder_destroy(&out)
+			if !write_archive(t, &out, entries[:], {compression = compression, format = .GNU}, source) {
+				continue
+			}
+			check_written(t, out.buf[:], want, false, compression, source)
+			if compression == .Store {
+				flags := raw_typeflags(out.buf[:])
+				testing.expectf(t, slice.count(flags.typeflags[:], 'L') == 2 && slice.count(flags.typeflags[:], 'K') == 1, "%v: typeflags %s", source, string(flags.typeflags[:]))
+				testing.expectf(t, slice.count(flags.typeflags[:], 'x') == 0 && flags.all_gnu, "%v: not pure GNU: %s", source, string(flags.typeflags[:]))
+			}
+		}
+	}
+
+	first, second := strings.builder_make(), strings.builder_make()
+	defer strings.builder_destroy(&first)
+	defer strings.builder_destroy(&second)
+	write_archive(t, &first, entries[:], {deterministic = true, format = .GNU}, .Bytes)
+	for &e in entries {
+		e.info.modification_time = time.unix(1_234_567_890, 123)
+		e.info.access_time       = time.unix(1_234_567_890, 0)
+		e.info.uid  = 4242
+		e.info.user = "someone"
+	}
+	write_archive(t, &second, entries[:], {deterministic = true, format = .GNU}, .Bytes)
+	testing.expect(t, bytes.equal(first.buf[:], second.buf[:]), "deterministic GNU output differs")
+	check_written(t, first.buf[:], entries[:], true, .Store, .Bytes)
+}
+
+@(test)
+test_write_gnu_fields :: proc(t: ^testing.T) {
+	Case :: struct {
+		label:  string,
+		info:   archive.File_Info,
+		offset: int,
+		field:  []u8,
+		err:    archive.Error,
+	}
+	base := archive.File_Info{path = "f", type = .Regular}
+	with :: proc(fi: archive.File_Info, uid: i64 = 0, user := "", mtime := i64(0), atime := i64(0), device := [2]u32{}, type := archive.Entry_Type.Regular) -> archive.File_Info {
+		fi := fi
+		fi.uid               = uid
+		fi.user              = user
+		fi.modification_time = time.unix(0, mtime)
+		fi.access_time       = time.unix(0, atime)
+		fi.device            = device
+		fi.type              = type
+		return fi
+	}
+	I :: archive.General_Error.Incompatible_Options
+	cases := [?]Case{
+		{"octal uid",       with(base, uid = 2_097_151),           108, {'7', '7', '7', '7', '7', '7', '7', 0}, nil},
+		{"base-256 uid",    with(base, uid = 3_000_000),           108, {0x80, 0, 0, 0, 0, 0x2d, 0xc6, 0xc0}, nil},
+		{"largest uid",     with(base, uid = 1 << 56 - 1),         108, {0x80, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}, nil},
+		{"uid too large",   with(base, uid = 1 << 56),             0,   nil, I},
+		{"negative mtime",  with(base, mtime = -1),                136, {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}, nil},
+		{"floored mtime",   with(base, mtime = 1_999_999_999),     136, {'0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '1', 0}, nil},
+		{"large mtime",     with(base, mtime = 8_589_934_592_000_000_000),     136, {0x80, 0, 0, 0, 0, 0, 0, 0x02, 0, 0, 0, 0}, nil},
+		{"atime",           with(base, atime = 1_794_156_220e9),   345, {'1', '5', '2', '7', '4', '1', '2', '3', '2', '7', '4', 0}, nil},
+		{"no atime",        base,                                  345, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, nil},
+		{"device",          with(base, device = {max(u32), 0x1234}, type = .Block_Device), 329, {0x80, 0, 0, 0, 0xff, 0xff, 0xff, 0xff, '0', '0', '1', '1', '0', '6', '4', 0}, nil},
+		{"user 32 bytes",   with(base, user = "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu"),  265, {'u', 'u'}, nil},
+		{"user 33 bytes",   with(base, user = "uuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuuu"), 0,   nil, I},
+		{"user with NUL",   with(base, user = "a\x00b"),           0,   nil, I},
+		{"magic",           base,                                  257, {'u', 's', 't', 'a', 'r', ' ', ' ', 0}, nil},
+	}
+	for c in cases {
+		out := strings.builder_make()
+		defer strings.builder_destroy(&out)
+		tw: tar.Writer
+		if !testing.expect_value(t, tar.create(&tw, strings.to_writer(&out), {format = .GNU}), nil) {
+			continue
+		}
+		err := tar.write_entry(&tw, c.info, nil)
+		testing.expectf(t, err == c.err, "%s: %v, want %v", c.label, err, c.err)
+		testing.expect_value(t, tar.write_entry(&tw, "next", []u8{'n'}), nil)
+		testing.expect_value(t, tar.commit(&tw), nil)
+		tar.close(&tw)
+		data := out.buf[:]
+		if c.err == nil {
+			testing.expectf(t, bytes.equal(data[c.offset:][:len(c.field)], c.field), "%s: field % x", c.label, data[c.offset:][:len(c.field)])
+		}
+
+		r: tar.Reader
+		if !testing.expect_value(t, tar.open(&r, data), nil) {
+			continue
+		}
+		it := tar.iterator_create(&r)
+		count := 0
+		for fi in tar.iterate(&it) {
+			count += 1
+			if c.err != nil || count > 1 {
+				continue
+			}
+			testing.expectf(t, fi.uid == c.info.uid && fi.user == c.info.user && fi.device == c.info.device, "%s: read back %d %q %v", c.label, fi.uid, fi.user, fi.device)
+			testing.expectf(t, time.to_unix_seconds(fi.modification_time) == floor_seconds(c.info.modification_time), "%s: mtime %v", c.label, fi.modification_time)
+			testing.expectf(t, time.to_unix_seconds(fi.access_time) == floor_seconds(c.info.access_time), "%s: atime %v", c.label, fi.access_time)
+		}
+		_, it_err := tar.iterator_error(&it)
+		testing.expectf(t, it_err == nil && count == (1 if c.err != nil else 2), "%s: %d members, %v", c.label, count, it_err)
+		tar.iterator_destroy(&it)
+		tar.close(&r)
+	}
+
+	Name_Case :: struct {
+		name:  string,
+		link:  string,
+		flags: string,
+	}
+	n100 := strings.repeat("n", 100, context.temp_allocator)
+	n101 := strings.repeat("n", 101, context.temp_allocator)
+	names := [?]Name_Case{
+		{n100, "",   "0"},
+		{n101, "",   "L0"},
+		{"l",  n100, "2"},
+		{"l",  n101, "K2"},
+		{n101, n101, "LK2"},
+	}
+	for c in names {
+		out := strings.builder_make()
+		defer strings.builder_destroy(&out)
+		tw: tar.Writer
+		testing.expect_value(t, tar.create(&tw, strings.to_writer(&out), {format = .GNU}), nil)
+		fi := archive.File_Info{path = c.name, type = .Regular}
+		if c.link != "" {
+			fi.type        = .Symlink
+			fi.link_target = c.link
+		}
+		testing.expect_value(t, tar.write_entry(&tw, fi, nil), nil)
+		testing.expect_value(t, tar.commit(&tw), nil)
+		tar.close(&tw)
+		flags := raw_typeflags(out.buf[:])
+		testing.expectf(t, string(flags.typeflags[:]) == c.flags && flags.all_gnu, "%d/%d: %s", len(c.name), len(c.link), string(flags.typeflags[:]))
+		data := out.buf[:]
+		if c.flags[0] == 'L' || c.flags[0] == 'K' {
+			value := c.name if c.flags[0] == 'L' else c.link
+			testing.expect_value(t, string(data[0:13]), "././@LongLink")
+			testing.expectf(t, string(data[512:][:len(value) + 1]) == strings.concatenate({value, "\x00"}, context.temp_allocator), "%s: long data", c.flags)
+		}
+		r: tar.Reader
+		testing.expect_value(t, tar.open(&r, data), nil)
+		it := tar.iterator_create(&r)
+		fi_read, _, ok := tar.iterate(&it)
+		testing.expectf(t, ok && fi_read.path == c.name && fi_read.link_target == c.link, "%s: read back %q %q", c.flags, fi_read.path, fi_read.link_target)
+		tar.iterator_destroy(&it)
+		tar.close(&r)
+	}
+}
+
+@(test)
+test_write_ustar :: proc(t: ^testing.T) {
+	entries := write_entries(t)
+	defer delete(entries)
+	fits: [dynamic]Written
+	defer delete(fits)
+	rejected := 0
+	out := strings.builder_make()
+	defer strings.builder_destroy(&out)
+	tw: tar.Writer
+	if !testing.expect_value(t, tar.create(&tw, strings.to_writer(&out), {format = .Ustar}), nil) {
+		return
+	}
+	for e in entries {
+		data: tar.Entry_Data
+		if e.info.type == .Regular {
+			data = transmute([]u8)e.data
+		}
+		err := tar.write_entry(&tw, e.info, data)
+		if err == nil {
+			kept := e
+			kept.info.modification_time = time.unix(time.to_unix_seconds(e.info.modification_time), 0)
+			append(&fits, kept)
+			continue
+		}
+		testing.expectf(t, err == archive.General_Error.Incompatible_Options, "%s: %v", e.info.path, err)
+		rejected += 1
+	}
+
+	extra := [?]archive.File_Info{
+		{path = "late.txt", type = .Regular, modification_time = time.unix(1 << 33, 0)},
+		{path = "big.bin",  type = .Regular, size = 1 << 33},
+		{path = "dev",      type = .Character_Device, device = {1 << 21, 0}},
+	}
+	big := Unsized{}
+	for fi in extra {
+		data: tar.Entry_Data
+		if fi.size > 0 {
+			data = unsized_reader(&big)
+		}
+		testing.expectf(t, tar.write_entry(&tw, fi, data) == archive.General_Error.Incompatible_Options, "%s accepted", fi.path)
+	}
+	testing.expect_value(t, tar.commit(&tw), nil)
+	tar.close(&tw)
+
+	testing.expect_value(t, rejected, 5)
+	testing.expect_value(t, len(fits), len(entries) - 5)
+	check_written(t, out.buf[:], fits[:], false, .Store, .Bytes)
+	flags := raw_typeflags(out.buf[:])
+	testing.expectf(t, slice.count(flags.typeflags[:], 'x') == 0 && slice.count(flags.typeflags[:], 'g') == 0 && !flags.all_gnu, "ustar typeflags %s", string(flags.typeflags[:]))
+}
+
+@(test)
+test_write_format_errors :: proc(t: ^testing.T) {
+	out := strings.builder_make()
+	defer strings.builder_destroy(&out)
+	tw: tar.Writer
+	testing.expect_value(t, tar.create(&tw, strings.to_writer(&out), {format = tar.Write_Format(3)}), archive.Error(archive.General_Error.Incompatible_Options))
+
+	for format in tar.Write_Format {
+		if !testing.expect_value(t, tar.create(&tw, strings.to_writer(&out), {format = format}), nil) {
+			continue
+		}
+		link := archive.File_Info{path = "link", type = .Symlink, link_target = "a\x00b"}
+		testing.expect_value(t, tar.write_entry(&tw, link), archive.Error(archive.Tar_Error.Invalid_Name))
+		owner := archive.File_Info{path = "owner", type = .Regular, user = "a\x00b"}
+		testing.expect_value(t, tar.write_entry(&tw, owner), archive.Error(archive.General_Error.Incompatible_Options))
+		owner.user  = ""
+		owner.group = "a\x00b"
+		testing.expect_value(t, tar.write_entry(&tw, owner), archive.Error(archive.General_Error.Incompatible_Options))
+		testing.expect_value(t, tar.write_entry(&tw, "ok", []u8{'k'}), nil)
+		testing.expect_value(t, tar.commit(&tw), nil)
+		tar.close(&tw)
+		strings.builder_reset(&out)
+	}
+}
+
+@(test)
+test_write_hdrcharset :: proc(t: ^testing.T) {
+	Case :: struct {
+		info:   archive.File_Info,
+		binary: bool,
+	}
+	cases := [?]Case{
+		{{path = "bin-\xe5\x90\xff.txt", type = .Regular}, true},
+		{{path = "日本.txt", type = .Regular}, false},
+		{{path = "link", type = .Symlink, link_target = "\xff"}, true},
+		{{path = "link", type = .Symlink, link_target = "日本"}, false},
+		{{path = "owned.txt", type = .Regular, user = "\xc3"}, true},
+		{{path = "owned.txt", type = .Regular, group = "Jérôme"}, false},
+	}
+	for c, i in cases {
+		out := strings.builder_make()
+		defer strings.builder_destroy(&out)
+		tw: tar.Writer
+		testing.expect_value(t, tar.create(&tw, strings.to_writer(&out), {}), nil)
+		testing.expect_value(t, tar.write_entry(&tw, c.info), nil)
+		testing.expect_value(t, tar.commit(&tw), nil)
+		tar.close(&tw)
+		data := strings.to_string(out)
+		testing.expectf(t, strings.has_prefix(data[512:], "21 hdrcharset=BINARY\n") == c.binary, "case %d: hdrcharset record", i)
+		testing.expectf(t, strings.count(data, "hdrcharset") == int(c.binary), "case %d: hdrcharset count", i)
+
+		r: tar.Reader
+		testing.expect_value(t, tar.open(&r, transmute([]u8)data), nil)
+		it := tar.iterator_create(&r)
+		fi, _, ok := tar.iterate(&it)
+		if testing.expectf(t, ok, "case %d: no member", i) {
+			testing.expectf(t, fi.path == c.info.path && fi.link_target == c.info.link_target, "case %d: %q %q", i, fi.path, fi.link_target)
+			testing.expectf(t, fi.user == c.info.user && fi.group == c.info.group, "case %d: %q %q", i, fi.user, fi.group)
+		}
+		tar.iterator_destroy(&it)
+		tar.close(&r)
+
+		strings.builder_reset(&out)
+		testing.expect_value(t, tar.create(&tw, strings.to_writer(&out), {format = .Ustar}), nil)
+		testing.expectf(t, tar.write_entry(&tw, c.info) == archive.General_Error.Incompatible_Options, "case %d: ustar accepted it", i)
+		tar.close(&tw)
+	}
+}
+
+Typeflags :: struct {
+	typeflags: [dynamic]u8,
+	all_gnu:   bool,
+}
+
+raw_typeflags :: proc(data: []u8) -> (flags: Typeflags) {
+	flags.typeflags = make([dynamic]u8, context.temp_allocator)
+	flags.all_gnu   = true
+	pos := 0
+	for pos + 512 <= len(data) {
+		h := data[pos:][:512]
+		if slice.all_of(h, 0) {
+			break
+		}
+		append(&flags.typeflags, h[156])
+		if string(h[257:265]) != "ustar  \x00" {
+			flags.all_gnu = false
+		}
+		size := 0
+		for c in h[124:136] {
+			if c >= '0' && c <= '7' {
+				size = size * 8 + int(c - '0')
+			}
+		}
+		pos += 512 + (size + 511) / 512 * 512
+	}
+	return
+}
+
+floor_seconds :: proc(stamp: time.Time) -> i64 {
+	nanos   := time.to_unix_nanoseconds(stamp)
+	seconds := nanos / 1e9
+	if nanos % 1e9 < 0 {
+		seconds -= 1
+	}
+	return seconds
 }
 
 write_entries :: proc(t: ^testing.T) -> (entries: [dynamic]Written) {
