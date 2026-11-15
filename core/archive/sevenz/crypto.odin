@@ -4,6 +4,7 @@ import "base:runtime"
 import "core:archive"
 import "core:compress"
 import "core:crypto"
+import "core:crypto/_aes/ct64"
 import "core:crypto/aes"
 import "core:crypto/sha2"
 import "core:io"
@@ -68,15 +69,28 @@ _aes_destroy :: proc(node: ^Node) {
 }
 
 @(private)
-_cbc_decrypt :: proc(ctx: ^aes.Context_ECB, iv: ^[aes.BLOCK_SIZE]u8, data: []u8) {
+_cbc_decrypt_ct64 :: proc(ctx: ^ct64.Context, iv: ^[aes.BLOCK_SIZE]u8, data: []u8) {
 	chain := iv^
-	saved: [aes.BLOCK_SIZE]u8
-	for offset := 0; offset + aes.BLOCK_SIZE <= len(data); offset += aes.BLOCK_SIZE {
-		block := (^[aes.BLOCK_SIZE]u8)(&data[offset])
-		saved = block^
-		aes.decrypt_ecb(ctx, block[:], saved[:])
-		block^ = block^ ~ chain
-		chain = saved
+	saved:  [ct64.STRIDE][aes.BLOCK_SIZE]u8
+	blocks: [ct64.STRIDE][]u8
+	copies: [ct64.STRIDE][]u8
+	for k in 0 ..< ct64.STRIDE {
+		copies[k] = saved[k][:]
+	}
+	offset := 0
+	for offset + aes.BLOCK_SIZE <= len(data) {
+		n := min((len(data) - offset) / aes.BLOCK_SIZE, ct64.STRIDE)
+		for k in 0 ..< n {
+			blocks[k] = data[offset + k * aes.BLOCK_SIZE:][:aes.BLOCK_SIZE]
+			saved[k]  = (^[aes.BLOCK_SIZE]u8)(raw_data(blocks[k]))^
+		}
+		ct64.decrypt_blocks(ctx, blocks[:n], copies[:n])
+		for k in 0 ..< n {
+			block := (^[aes.BLOCK_SIZE]u8)(raw_data(blocks[k]))
+			block^ = block^ ~ chain
+			chain  = saved[k]
+		}
+		offset += n * aes.BLOCK_SIZE
 	}
 	iv^ = chain
 }
@@ -284,12 +298,12 @@ _cipher_destroy :: proc(c: ^Pack_Cipher) {
 }
 
 @(private)
-_cbc_encrypt :: proc(ctx: ^aes.Context_ECB, iv: ^[aes.BLOCK_SIZE]u8, dst, src: []u8) {
+_cbc_encrypt_ct64 :: proc(ctx: ^ct64.Context, iv: ^[aes.BLOCK_SIZE]u8, dst, src: []u8) {
 	block: [aes.BLOCK_SIZE]u8
 	chain := iv^
 	for offset := 0; offset + aes.BLOCK_SIZE <= len(src); offset += aes.BLOCK_SIZE {
 		block = (^[aes.BLOCK_SIZE]u8)(&src[offset])^ ~ chain
-		aes.encrypt_ecb(ctx, chain[:], block[:])
+		ct64.encrypt_block(ctx, chain[:], block[:])
 		(^[aes.BLOCK_SIZE]u8)(&dst[offset])^ = chain
 	}
 	iv^ = chain

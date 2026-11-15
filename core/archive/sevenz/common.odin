@@ -53,6 +53,8 @@ AES_SALT_MAX          :: 16
 AES_IV_MAX            :: 16
 AES_POWER_MAX         :: 24
 AES_POWER_RAW         :: 0x3F
+AES_CBC_STRIDE        :: 8
+AES_VAES_STRIDE       :: 16
 KEY_CACHE_SIZE        :: 4
 
 VERSION_MINOR         :: 4
