@@ -19,7 +19,8 @@ internal_int_prime_is_divisible :: proc(a: ^Int, allocator := context.allocator)
 	assert_if_nil(a)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a) or_return
+	a := a
+	a = _zero_if_uninitialized(a)
 
 	for prime in _private_prime_table {
 		rem := #force_inline int_mod_digit(a, prime) or_return
@@ -50,6 +51,8 @@ internal_int_power_modulo :: proc(res, G, X, P: ^Int, allocator := context.alloc
 		Modulus P must be positive.
 	*/
 	if internal_is_negative(P) { return .Invalid_Argument }
+
+	if internal_eq(P, 1) { return internal_zero(res) }
 
 	/*
 		If exponent X is negative we have to recurse.
@@ -85,17 +88,11 @@ internal_int_power_modulo :: proc(res, G, X, P: ^Int, allocator := context.alloc
 	}
 
 	/*
-		Is it a DR modulus? default to no.
+		Is it an unrestricted DR modulus, of the form `2**k - b`?
+		`_private_int_reduce_is_2k_l` above has already claimed the restricted DR moduli.
 	*/
-	dr = 1 if _private_dr_is_modulus(P) else 0
-
-	/*
-		If not, is it a unrestricted DR modulus?
-	*/
-	if dr == 0 {
-		reduce_is_2k := _private_int_reduce_is_2k(P) or_return
-		dr = 2 if reduce_is_2k else 0
-	}
+	reduce_is_2k := _private_int_reduce_is_2k(P) or_return
+	dr = 2 if reduce_is_2k else 0
 
 	/*
 		If the modulus is odd or dr != 0 use the montgomery method.
@@ -227,7 +224,7 @@ internal_int_prime_miller_rabin :: proc(a, b: ^Int, allocator := context.allocat
 	/*
 		Ensure `b` > 1.
 	*/
-	if internal_lte(b, 1) { return false, nil }
+	if internal_lte(b, 1) { return false, .Invalid_Argument }
 
 	/*
 		Get `n1` = `a` - 1.
@@ -323,6 +320,8 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 	b, res := &Int{}, &Int{}
 	defer internal_destroy(b, res)
 
+	if internal_is_negative(a) { return }
+
 	// Some shortcuts
 	// `N` > 3
 	if a.used == 1 {
@@ -363,9 +362,9 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 	b.digit[0] += 1
 	if !(internal_int_prime_miller_rabin(a, b) or_return) { return }
 
-	// Both, the Frobenius-Underwood test and the the Lucas-Selfridge test are quite
-	// slow so if speed is an issue, set `USE_MILLER_RABIN_ONLY` to use M-R tests with
-	// bases 2, 3 and t random bases.
+	// The Frobenius-Underwood or Lucas-Selfridge test (see `MATH_BIG_USE_FROBENIUS_TEST`) only runs when `miller_rabin_trials` >= 0, and is quite slow.
+	// If speed is an issue, pass `miller_rabin_only = true` or build with `-define:MATH_BIG_USE_MILLER_RABIN_ONLY=true`
+	// to skip it, leaving the M-R tests with bases 2, 3 and `miller_rabin_trials` random bases (one if it is 0).
 
 	if !miller_rabin_only {
 		if miller_rabin_trials >= 0 {
@@ -420,7 +419,7 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 		// The DIGITs have a defined bit-size but the size of a.digit is a simple 'int',
 		// the size of which can depend on the platform.
 		size_a := internal_count_bits(a)
-		mask   := (1 << uint(ilog2(size_a))) - 1
+		mask   := (1 << uint(bit_length(size_a))) - 1
 
 		/*
 			Assuming the General Rieman hypothesis (never thought to write that in a
@@ -477,7 +476,7 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 				ix -= 1
 				continue
 			}
-			internal_random(b, l) or_return
+			internal_random(b, l * _DIGIT_BITS) or_return
 
 			// That number might got too big and the witness has to be smaller than "a"
 			l = internal_count_bits(b)
@@ -500,7 +499,8 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 }
 
 /*
- * floor of positive solution of (2^16) - 1 = (a + 4) * (2 * a + 5)
+ * floor of positive solution of (2^31) - 1 = (a + 4) * (2 * a + 5),
+ * so the product below fits a 32-bit `int`.
  * TODO: Both values are smaller than N^(1/4), would have to use a bigint
  *       for `a` instead, but any `a` bigger than about 120 are already so rare that
  *       it is possible to ignore them and still get enough pseudoprimes.
@@ -610,6 +610,8 @@ internal_int_prime_frobenius_underwood :: proc(N: ^Int, allocator := context.all
 	(If that name sounds familiar, he is the guy who found the fdiv bug in the Pentium CPU.)
 */
 internal_int_prime_strong_lucas_selfridge :: proc(a: ^Int, allocator := context.allocator) -> (lucas_selfridge: bool, err: Error) {
+	context.allocator = allocator
+
 	// TODO: choose better variable names!
 
 	Dz, gcd, Np1, Uz, Vz, U2mz, V2mz, Qmz, Q2mz, Qkdz, T1z, T2z, T3z, T4z, Q2kdz := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}, &Int{}
@@ -645,6 +647,7 @@ internal_int_prime_strong_lucas_selfridge :: proc(a: ^Int, allocator := context.
 		if j == -1 { break }
 
 		D += 2
+		if D == 23 && (internal_int_is_square(a) or_return) { return }
 		if D > max(int) - 2                              { return false, .Invalid_Argument }
 	}
 
@@ -811,7 +814,7 @@ internal_int_prime_strong_lucas_selfridge :: proc(a: ^Int, allocator := context.
 	*/
 
 	/* Initialize 2*Q^(d*2^r) for V_2m */
-	internal_int_shr1(Q2kdz, Qkdz) or_return
+	internal_int_shl1(Q2kdz, Qkdz) or_return
 
 	for r := 1; r < s; r += 1 {
 		internal_sqr(Vz, Vz) or_return
@@ -842,6 +845,8 @@ internal_int_prime_strong_lucas_selfridge :: proc(a: ^Int, allocator := context.
 	Assumes `a` and `b` not to be `nil` and to have been initialized.
 */
 internal_prime_fermat :: proc(a, b: ^Int, allocator := context.allocator) -> (fermat: bool, err: Error) {
+	context.allocator = allocator
+
 	t := &Int{}
 	defer internal_destroy(t)
 
@@ -989,7 +994,7 @@ internal_int_sqrtmod_prime :: proc(res, n, prime: ^Int, allocator := context.all
 
 		i = 0
 		for {
-			if internal_eq(T, 1)                                     { break }
+			if internal_eq(t1, 1)                                    { break }
 
 			/*
 				No exponent in the range 0 < i < M found.
@@ -1002,7 +1007,7 @@ internal_int_sqrtmod_prime :: proc(res, n, prime: ^Int, allocator := context.all
 		}
 
 		if i == 0 {
-			internal_copy(res, R)                                    or_return
+			return internal_copy(res, R)
 		}
 
 		/*
@@ -1110,7 +1115,7 @@ internal_int_prime_next_prime :: proc(a: ^Int, trials: int, bbs_style: bool, all
 		Generate the restable.
 	*/
 	for x := 1; x < _PRIME_TAB_SIZE; x += 1 {
-		res_tab = cast(type_of(res_tab))(internal_mod(a, _private_prime_table[x]) or_return)
+		res_tab[x] = internal_mod(a, _private_prime_table[x]) or_return
 	}
 
 	for {
@@ -1224,6 +1229,10 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 
 		internal_int_random(a, size_in_bits)                         or_return
 
+		top := (size_in_bits - 1) / _DIGIT_BITS
+		a.used = top + 1
+		a.digit[top] |= DIGIT(1) << uint((size_in_bits - 1) % _DIGIT_BITS)
+
 		/*
 			Make sure it's odd.
 		*/
@@ -1231,10 +1240,12 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 			a.digit[0] |= 1
 		} else {
 			/*
-				A 2-bit prime can be either 2 (0b10) or 3 (0b11).
-				So, let's force the top bit to 1 and return early.
+				A 2-bit prime can be either 2 (0b10) or 3 (0b11), and the top bit is already set.
+				`.Blum_Blum_Shub` and `.Second_MSB_On` both need 3, so set the low bit for those and return early.
 			*/
-			a.digit[0] |= 2
+			if .Blum_Blum_Shub in flags || .Second_MSB_On in flags {
+				a.digit[0] |= 1
+			}
 			return nil
 		}
 
@@ -1242,20 +1253,6 @@ internal_random_prime :: proc(a: ^Int, size_in_bits: int, trials: int, flags := 
 			a.digit[0] |= 3
 		}
 		if .Second_MSB_On in flags {
-			/*
-				Ensure there's enough space for the bit to be set.
-			*/
-			if a.used * _DIGIT_BITS < size_in_bits - 1 {
-				new_size := (size_in_bits - 1) / _DIGIT_BITS
-
-				if new_size % _DIGIT_BITS > 0 {
-					new_size += 1
-				}
-
-				internal_grow(a, new_size) or_return
-				a.used = new_size
-			}
-
 			internal_int_bitfield_set_single(a, size_in_bits - 2) or_return
 		}
 

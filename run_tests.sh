@@ -2,7 +2,9 @@
 set -eu
 
 # This file runs most of the tests that the CI would run.
-# It omits time-intensive optimized core library tests and Wycheproof tests.
+# When the "slim" argument is provided, it omits time-intensive optimized core library tests and Wycheproof tests,
+# as well as some other tests that don't add coverage on and across architectures. Enabled on RISC-V by default.
+
 
 here=$(cd "$(dirname "$0")" && pwd)
 : "${ODIN:=$here/odin}"
@@ -47,7 +49,7 @@ fi
 # Normal Core library tests
 (
 	cd "$here/tests/core"
-	"$ODIN" test normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
+	"$ODIN" test normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address ${SLIM:+-define:ODIN_TEST_SLIM=true}
 )
 
 # Vendor library tests
@@ -118,10 +120,4 @@ fi
 
 if [[ -n "${ODIN_TESTS_NO_CLANG:-}" ]]; then
 	echo "WARNING:  ODIN_TESTS_NO_CLANG specified - ABI tests have been skipped."
-fi
-
-if [[ -n "${ODIN_DONT_DOWNLOAD_TEST_ASSETS:-}" ]]; then
-	echo "WARNING:  ODIN_DONT_DOWNLOAD_TEST_ASSETS specified - core test assets might be stale."
-else
-	echo "Note:     You may skip downloading core test assets in future runs by exporting  ODIN_DONT_DOWNLOAD_TEST_ASSETS=1"
 fi

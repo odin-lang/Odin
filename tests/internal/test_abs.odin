@@ -190,3 +190,17 @@ simd_abs_variable :: proc(t: ^testing.T) {
 	f64_expected := [2]f64{0., max(f64)}
 	testing.expect_value(t, transmute([2]u64)f64x2, transmute([2]u64)f64_expected)
 }
+
+@(test)
+abs_complex_variable :: proc(t: ^testing.T) {
+	testing.expect_value(t, abs(not_const(complex32(3 + 4i))), 5)
+	testing.expect_value(t, abs(not_const(complex64(3 + 4i))), 5)
+	testing.expect_value(t, abs(not_const(complex128(3 + 4i))), 5)
+}
+
+@(test)
+abs_quaternion_variable :: proc(t: ^testing.T) {
+	testing.expect_value(t, abs(not_const(quaternion64(1 + 2i + 2j + 4k))), 5)
+	testing.expect_value(t, abs(not_const(quaternion128(1 + 2i + 2j + 4k))), 5)
+	testing.expect_value(t, abs(not_const(quaternion256(1 + 2i + 2j + 4k))), 5)
+}

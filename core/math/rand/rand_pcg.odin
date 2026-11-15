@@ -82,7 +82,7 @@ pcg_random_generator_proc :: proc(data: rawptr, mode: runtime.Random_Generator_M
 			return
 		}
 		info := (^Generator_Query_Info)(raw_data(p))
-		info^ += {.Uniform, .Resettable}
+		info^ += {.Resettable}
 	}
 }
 

@@ -169,6 +169,14 @@ noise_4d_improve_xyz :: proc(seed: i64, coord: Vec4) -> (value: f32) {
 	return _internal_noise_4d_unskewed_base(seed, skewed)
 }
 
+@(require_results)
+noise_4d_improve_xy_improve_zw :: proc(seed: i64, coord: Vec4) -> (value: f32) {
+	s2 := (coord.x + coord.y) * -0.178275657951399372 + (coord.z + coord.w) * 0.215623393288842828
+	t2 := (coord.z + coord.w) * -0.403949762580207112 + (coord.x + coord.y) * -0.375199083010075342
+
+	return _internal_noise_4d_unskewed_base(seed, Vec4{coord.x + s2, coord.y + s2, coord.z + t2, coord.w + t2})
+}
+
 /*
 	4D OpenSimplex2 noise, fallback lattice orientation.
 */

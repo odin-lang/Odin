@@ -315,6 +315,101 @@ read_header :: proc(ctx: ^compress.Context, allocator := context.temp_allocator)
 	return header, nil
 }
 
+@(private)
+Seen_Chunk :: enum u8 {
+	IHDR,
+	PLTE,
+	IDAT,
+	IEND,
+	tRNS,
+	bKGD,
+	hIST,
+	cHRM,
+	cICP,
+	gAMA,
+	iCCP,
+	mDCV,
+	cLLI,
+	sBIT,
+	sRGB,
+	eXIf,
+	pHYs,
+	sPLT,
+	tIME,
+	acTL,
+}
+
+@(private)
+Seen_Chunks :: bit_set[Seen_Chunk; u32]
+
+@(private)
+Chunk_Rule :: struct {
+	before:         Seen_Chunks,
+	after:          Seen_Chunks,
+	after_paletted: Seen_Chunks,
+	repeatable:     bool,
+}
+
+@(private, rodata)
+CHUNK_RULES := #partial [Seen_Chunk]Chunk_Rule{
+	.tRNS = {before = {.IDAT},        after_paletted = {.PLTE}},
+	.bKGD = {before = {.IDAT},        after_paletted = {.PLTE}},
+	.hIST = {before = {.IDAT},        after          = {.PLTE}},
+	.cHRM = {before = {.PLTE, .IDAT}},
+	.cICP = {before = {.PLTE, .IDAT}},
+	.gAMA = {before = {.PLTE, .IDAT}},
+	.iCCP = {before = {.PLTE, .IDAT}},
+	.mDCV = {before = {.PLTE, .IDAT}},
+	.cLLI = {before = {.PLTE, .IDAT}},
+	.sBIT = {before = {.PLTE, .IDAT}},
+	.sRGB = {before = {.PLTE, .IDAT}},
+	.eXIf = {before = {.IDAT}},
+	.pHYs = {before = {.IDAT}},
+	.acTL = {before = {.IDAT}},
+	.sPLT = {before = {.IDAT}, repeatable = true},
+	.tIME = {},
+}
+
+@(private)
+chunk_slot :: proc(type: image.PNG_Chunk_Type) -> (slot: Seen_Chunk, tracked: bool) {
+	#partial switch type {
+	case .tRNS: return .tRNS, true
+	case .bKGD: return .bKGD, true
+	case .hIST: return .hIST, true
+	case .cHRM: return .cHRM, true
+	case .cICP: return .cICP, true
+	case .gAMA: return .gAMA, true
+	case .iCCP: return .iCCP, true
+	case .mDCV: return .mDCV, true
+	case .cLLI: return .cLLI, true
+	case .sBIT: return .sBIT, true
+	case .sRGB: return .sRGB, true
+	case .eXIf: return .eXIf, true
+	case .pHYs: return .pHYs, true
+	case .sPLT: return .sPLT, true
+	case .tIME: return .tIME, true
+	case .acTL: return .acTL, true
+	}
+	return
+}
+
+@(private)
+check_chunk_placement :: proc(slot: Seen_Chunk, seen: Seen_Chunks, paletted: bool) -> (err: image.PNG_Error) {
+	rule  := CHUNK_RULES[slot]
+	after := rule.after
+	if paletted {
+		after += rule.after_paletted
+	}
+
+	if slot in seen && !rule.repeatable {
+		return .Duplicate_Chunk
+	}
+	if seen & rule.before != {} || after - seen != {} {
+		return .Chunk_Out_Of_Order
+	}
+	return .None
+}
+
 chunk_type_to_name :: proc(type: ^image.PNG_Chunk_Type) -> string {
 	return string(([^]u8)(type)[:4])
 }
@@ -380,12 +475,8 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 	header:	image.PNG_IHDR
 
 	// State to ensure correct chunk ordering.
-	seen_ihdr := false; first := true
-	seen_plte := false
-	seen_bkgd := false
-	seen_trns := false
-	seen_idat := false
-	seen_iend := false
+	seen: Seen_Chunks
+	first := true
 
 	_plte := PLTE{}
 	trns := image.PNG_Chunk{}
@@ -394,7 +485,7 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 
 	read_error: io.Error
 	// 12 bytes is the size of a chunk with a zero-length payload.
-	for read_error == .None && !seen_iend {
+	for read_error == .None && (.IEND not_in seen) {
 		// Peek at next chunk's length and type.
 		// TODO: Some streams may not provide seek/read_at
 
@@ -404,12 +495,24 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 		}
 		// name := chunk_type_to_name(&ch.type); // Only used for debug prints during development.
 
+		slot, tracked := chunk_slot(ch.type)
+		if tracked {
+			if placement := check_chunk_placement(slot, seen, .Paletted in header.color_type); placement != .None {
+				if .ignore_duplicate_chunks not_in options {
+					return img, placement
+				}
+				_, _ = read_ancillary_chunk(ctx, ch.type) or_return
+				first = false
+				continue
+			}
+		}
+
 		#partial switch ch.type {
 		case .IHDR:
-			if seen_ihdr || !first {
+			if .IHDR in seen || !first {
 				return {}, .IHDR_Not_First_Chunk
 			}
-			seen_ihdr = true
+			seen += {.IHDR}
 
 			header = read_header(ctx) or_return
 
@@ -480,10 +583,16 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 			}
 
 		case .PLTE:
-			seen_plte = true
+			if .PLTE in seen {
+				return img, .Duplicate_Chunk
+			}
+			if seen & {.tRNS, .bKGD, .hIST} != {} && .ignore_duplicate_chunks not_in options {
+				return img, .Chunk_Out_Of_Order
+			}
+			seen += {.PLTE}
 			// PLTE must appear before IDAT and can't appear for color types 0, 4.
 			ct := transmute(u8)info.header.color_type
-			if seen_idat || ct == 0 || ct == 4 {
+			if .IDAT in seen || ct == 0 || ct == 4 {
 				return img, .PLTE_Encountered_Unexpectedly
 			}
 
@@ -504,7 +613,7 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 
 		case .IDAT:
 			// If we only want image metadata and don't want the pixel data, we can early out.
-			if !seen_ihdr {
+			if .IHDR not_in seen {
 				return {}, .IHDR_Not_First_Chunk
 			}
 
@@ -514,7 +623,7 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 			}
 
 			// There must be at least 1 IDAT, contiguous if more.
-			if seen_idat {
+			if .IDAT in seen {
 				return img, .IDAT_Must_Be_Contiguous
 			}
 
@@ -551,18 +660,18 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 			if int(idat_length) != len(idat) {
 				return {}, .IDAT_Corrupt
 			}
-			seen_idat = true
+			seen += {.IDAT}
 
 		case .IEND:
 			c = read_chunk(ctx) or_return
-			seen_iend = true
+			seen += {.IEND}
 
 		case .bKGD:
 			c, skip_chunk = read_ancillary_chunk(ctx, ch.type) or_return
 			if skip_chunk {
 				break
 			}
-			seen_bkgd = true
+			seen += {.bKGD}
 			if .return_metadata in options {
 				append_chunk(&info.chunks, c) or_return
 			}
@@ -598,6 +707,7 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 			if skip_chunk {
 				break
 			}
+			seen += {.tRNS}
 
 			if .Alpha in info.header.color_type {
 				return img, .TRNS_Encountered_Unexpectedly
@@ -615,7 +725,6 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 			*/
 
 			final_image_channels += 1
-			seen_trns = true
 
 			if .Paletted in header.color_type {
 				if len(c.data) > 256 {
@@ -651,9 +760,15 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 
 		case:
 			// Unhandled type
+			if (transmute([4]u8)ch.type)[0] & 0x20 == 0 {
+				return img, .Unknown_Critical_Chunk
+			}
 			c, skip_chunk = read_ancillary_chunk(ctx, ch.type) or_return
 			if skip_chunk {
 				break
+			}
+			if tracked {
+				seen += {slot}
 			}
 			if .return_metadata in options {
 				append_chunk(&info.chunks, c) or_return
@@ -668,11 +783,11 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 		return img, nil
 	}
 
-	if !seen_idat {
+	if .IDAT not_in seen {
 		return img, .IDAT_Missing
 	}
 
-	if .Paletted in header.color_type && !seen_plte {
+	if .Paletted in header.color_type && .PLTE not_in seen {
 		return img, .PLTE_Missing
 	}
 
@@ -713,6 +828,9 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 	*/
 	raw_image_channels := img.channels
 	out_image_channels := 3
+
+	seen_bkgd := .bKGD in seen
+	seen_trns := .tRNS in seen
 
 	/*
 		To give ourselves less options to test, we'll knock out

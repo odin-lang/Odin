@@ -1,6 +1,8 @@
 #+build windows
 package sys_windows
 
+GUID_DEVINTERFACE_HID :: GUID{0x4D1E55B2, 0xF16F, 0x11CF, {0x88, 0xCB, 0x00, 0x11, 0x11, 0x00, 0x00, 0x30}}
+
 HIDD_CONFIGURATION :: struct {
 	cookie:         PVOID,
 	size:           ULONG,

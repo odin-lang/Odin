@@ -9,15 +9,8 @@ import "base:intrinsics"
 import "base:runtime"
 
 /*
-	TODO: Make the tunables runtime adjustable where practical.
-
-	This allows to benchmark and/or setting optimized values for a certain CPU without recompiling.
+	Most tunables below are `#config` constants set at compile time, e.g. `-define:MATH_BIG_MUL_KARATSUBA_CUTOFF=60` sets `MUL_KARATSUBA_CUTOFF`.
 */
-
-MUL_KARATSUBA_CUTOFF := _DEFAULT_MUL_KARATSUBA_CUTOFF
-SQR_KARATSUBA_CUTOFF := _DEFAULT_SQR_KARATSUBA_CUTOFF
-MUL_TOOM_CUTOFF      := _DEFAULT_MUL_TOOM_CUTOFF
-SQR_TOOM_CUTOFF      := _DEFAULT_SQR_TOOM_CUTOFF
 
 /*
 	These defaults were tuned on an AMD A8-6600K (64-bit) using libTomMath's `make tune`.
@@ -25,47 +18,48 @@ SQR_TOOM_CUTOFF      := _DEFAULT_SQR_TOOM_CUTOFF
 	TODO(Jeroen): Port this tuning algorithm and tune them for more modern processors.
 
 	It would also be cool if we collected some data across various processor families.
-	This would let uss set reasonable defaults at runtime as this library initializes
-	itself by using `cpuid` or the ARM equivalent.
 */
 
-_DEFAULT_MUL_KARATSUBA_CUTOFF :: #config(MATH_BIG_MUL_KARATSUBA_CUTOFF,  80)
-_DEFAULT_SQR_KARATSUBA_CUTOFF :: #config(MATH_BIG_SQR_KARATSUBA_CUTOFF, 120)
-_DEFAULT_MUL_TOOM_CUTOFF      :: #config(MATH_BIG_MUL_TOOM_CUTOFF,      350)
-_DEFAULT_SQR_TOOM_CUTOFF      :: #config(MATH_BIG_SQR_TOOM_CUTOFF,      400)
+MUL_KARATSUBA_CUTOFF :: #config(MATH_BIG_MUL_KARATSUBA_CUTOFF,  80)
+SQR_KARATSUBA_CUTOFF :: #config(MATH_BIG_SQR_KARATSUBA_CUTOFF, 120)
+MUL_TOOM_CUTOFF      :: #config(MATH_BIG_MUL_TOOM_CUTOFF,      350)
+SQR_TOOM_CUTOFF      :: #config(MATH_BIG_SQR_TOOM_CUTOFF,      400)
+#assert(MUL_KARATSUBA_CUTOFF >= 0 && SQR_KARATSUBA_CUTOFF >= 0 && MUL_TOOM_CUTOFF >= 0 && SQR_TOOM_CUTOFF >= 0)
 
-
-MAX_ITERATIONS_ROOT_N := 500
+MAX_ITERATIONS_ROOT_N :: #config(MATH_BIG_MAX_ITERATIONS_ROOT_N, 500)
+#assert(MAX_ITERATIONS_ROOT_N >= 1)
 
 /*
 	Largest `N` for which we'll compute `N!`
 */
-FACTORIAL_MAX_N := 1_000_000
+FACTORIAL_MAX_N :: #config(MATH_BIG_FACTORIAL_MAX_N, 1_000_000)
+#assert(FACTORIAL_MAX_N >= 0)
 
 /*
 	Cutoff to switch to int_factorial_binary_split, and its max recursion level.
 */
-FACTORIAL_BINARY_SPLIT_CUTOFF         := 6100
-FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS := 100
+FACTORIAL_BINARY_SPLIT_CUTOFF         :: #config(MATH_BIG_FACTORIAL_BINARY_SPLIT_CUTOFF,         6100)
+FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS :: #config(MATH_BIG_FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS,  100)
+#assert(FACTORIAL_BINARY_SPLIT_CUTOFF >= 0 && FACTORIAL_BINARY_SPLIT_MAX_RECURSIONS >= 0)
 
 /*
 	`internal_int_is_prime` switchables.
 
-	Use Frobenius-Underwood for primality testing, or use Lucas-Selfridge (default).
+	Use Frobenius-Underwood for primality testing (default), or Lucas-Selfridge with `-define:MATH_BIG_USE_LUCAS_SELFRIDGE_TEST=true`.
 */
 MATH_BIG_USE_LUCAS_SELFRIDGE_TEST :: #config(MATH_BIG_USE_LUCAS_SELFRIDGE_TEST, false)
 MATH_BIG_USE_FROBENIUS_TEST       :: !MATH_BIG_USE_LUCAS_SELFRIDGE_TEST
 
 /*
-	Runtime tunable to use Miller-Rabin primality testing only and skip the above.
+	Default for `internal_int_is_prime`'s `miller_rabin_only`: use Miller-Rabin primality testing only and skip the above.
 */
-USE_MILLER_RABIN_ONLY       := false
+USE_MILLER_RABIN_ONLY        :: #config(MATH_BIG_USE_MILLER_RABIN_ONLY, false)
 
 /*
 	How many times we'll call `internal_int_random` during random prime generation before we bail out.
 	Set to 0 or less to try indefinitely.	
 */
-MAX_ITERATIONS_RANDOM_PRIME  := 1_000_000
+MAX_ITERATIONS_RANDOM_PRIME  :: #config(MATH_BIG_MAX_ITERATIONS_RANDOM_PRIME, 1_000_000)
 
 /*
 	How many iterations we used for the last random prime.
@@ -76,12 +70,16 @@ MAX_ITERATIONS_RANDOM_PRIME  := 1_000_000
 	Trade a smaller memory footprint for more processing overhead?
 */
 _LOW_MEMORY :: #config(MATH_BIG_SMALL_MEMORY, false)
+/*
+	Default allocation in limbs for many results: 32, or 8 with `MATH_BIG_SMALL_MEMORY`.
+	Set it with `-define:MATH_BIG_DEFAULT_LIMB_COUNT=<n>`; values below `_MIN_DIGIT_COUNT` are raised to it.
+*/
 when _LOW_MEMORY {
-	_DEFAULT_DIGIT_COUNT ::   8
+	_DEFAULT_DIGIT_COUNT :: max(#config(MATH_BIG_DEFAULT_LIMB_COUNT,  8), _MIN_DIGIT_COUNT)
 	_TAB_SIZE            ::  32
 	_MAX_WIN_SIZE        ::   5
 } else {
-	_DEFAULT_DIGIT_COUNT ::  32
+	_DEFAULT_DIGIT_COUNT :: max(#config(MATH_BIG_DEFAULT_LIMB_COUNT, 32), _MIN_DIGIT_COUNT)
 	_TAB_SIZE            :: 256
 	_MAX_WIN_SIZE        ::   0
 }
@@ -187,7 +185,7 @@ Primality_Flags :: bit_set[Primality_Flag; u8]
 	- Must be large enough such that `init_integer` can store `u128` in the `Int` without growing.
  */
 
-_MIN_DIGIT_COUNT :: max(3, ((size_of(u128) + _DIGIT_BITS) - 1) / _DIGIT_BITS)
+_MIN_DIGIT_COUNT :: 3
 #assert(_DEFAULT_DIGIT_COUNT >= _MIN_DIGIT_COUNT)
 
 /*
@@ -208,6 +206,8 @@ ITOA_DIVISOR :: DIGIT(1_000_000_000_000_000_000)
 ITOA_COUNT   :: 18
 #assert(size_of(_WORD) == 2 * size_of(DIGIT))
 
+_MAX_NON_FINITE_RADIX :: 23
+
 _DIGIT_TYPE_BITS :: 8 * size_of(DIGIT)
 _WORD_TYPE_BITS  :: 8 * size_of(_WORD)
 
@@ -223,10 +223,4 @@ _WARRAY          :: 1 << ((_WORD_TYPE_BITS - (2 * _DIGIT_BITS)) + 1)
 Order :: enum i8 {
 	LSB_First = -1,
 	MSB_First =  1,
-}
-
-Endianness :: enum i8 {
-	Little   = -1,
-	Platform =  0,
-	Big      =  1,
 }

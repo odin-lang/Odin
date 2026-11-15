@@ -572,7 +572,7 @@ impl_GetTexParameterIuiv:                 proc "c" (target: u32, pname: u32, par
 impl_ClearBufferiv:                       proc "c" (buffer: u32, drawbuffer: i32, value: ^i32)
 impl_ClearBufferuiv:                      proc "c" (buffer: u32, drawbuffer: i32, value: ^u32)
 impl_ClearBufferfv:                       proc "c" (buffer: u32, drawbuffer: i32, value: ^f32)
-impl_ClearBufferfi:                       proc "c" (buffer: u32, drawbuffer: i32, depth: f32, stencil: i32) -> rawptr
+impl_ClearBufferfi:                       proc "c" (buffer: u32, drawbuffer: i32, depth: f32, stencil: i32)
 impl_GetStringi:                          proc "c" (name: u32, index: u32) -> cstring
 impl_IsRenderbuffer:                      proc "c" (renderbuffer: u32) -> bool
 impl_BindRenderbuffer:                    proc "c" (target: u32, renderbuffer: u32)

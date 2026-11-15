@@ -111,6 +111,8 @@ Image_Option:
 
 	`.do_not_expand_channels`
 		Applies both `.do_not_expand_grayscale` and `.do_not_expand_indexed`.
+		This also applies to JPEG 12-bit images, in which case it returns
+		samples in the range of 0..=4095, instead of expanding them to 0..=65535.
 
 	`.alpha_add_if_missing`
 		If the image has no alpha channel, it'll add one set to max(type).
@@ -123,7 +125,7 @@ Image_Option:
 		NOTE: For PNG, this also skips handling of the tRNS chunk, if present,
 		unless you select `alpha_premultiply`.
 		In this case it'll premultiply the specified pixels in question only,
-		as the others are implicitly fully opaque.	
+		as the others are implicitly fully opaque.
 
 	`.alpha_premultiply`
 		If the image has an alpha channel, returns image data as follows:
@@ -151,11 +153,11 @@ Option :: enum {
 	alpha_drop_if_present,         // Unimplemented for QOI. Returns error.
 	alpha_premultiply,             // Unimplemented for QOI. Returns error.
 	blend_background,              // Ignored for non-PNG formats
-
-	// Unimplemented
-	do_not_expand_grayscale,
-	do_not_expand_indexed,
-	do_not_expand_channels,
+	do_not_expand_grayscale,       // Used in `jpeg`, `tga`, and `png`
+	do_not_expand_indexed,         // Used in `png`
+	do_not_expand_channels,        // Used in `jpeg` and `png`
+	ignore_duplicate_chunks,       // Used in `png`, applies `libpng`'s more forgiving approach.
+	                               // By default we follow the spec strictly.
 
 	// SAVE OPTIONS
 	qoi_all_channels_linear,       // QOI, informative only. If not set, defaults to sRGB with linear alpha.
@@ -393,6 +395,9 @@ PNG_Error :: enum {
 	Requested_Channel_Not_Present,
 	Post_Processing_Error,
 	Invalid_Chunk_Length,
+	Unknown_Critical_Chunk,
+	Duplicate_Chunk,
+	Chunk_Out_Of_Order,
 }
 
 PNG_Info :: struct {
@@ -434,6 +439,13 @@ PNG_Chunk_Type :: enum u32be {
 	hIST = 'h' << 24 | 'I' << 16 | 'S' << 8 | 'T',
 	cHRM = 'c' << 24 | 'H' << 16 | 'R' << 8 | 'M',
 	sBIT = 's' << 24 | 'B' << 16 | 'I' << 8 | 'T',
+	cICP = 'c' << 24 | 'I' << 16 | 'C' << 8 | 'P',
+	mDCV = 'm' << 24 | 'D' << 16 | 'C' << 8 | 'V',
+	cLLI = 'c' << 24 | 'L' << 16 | 'L' << 8 | 'I',
+
+	acTL = 'a' << 24 | 'c' << 16 | 'T' << 8 | 'L',
+	fcTL = 'f' << 24 | 'c' << 16 | 'T' << 8 | 'L',
+	fdAT = 'f' << 24 | 'd' << 16 | 'A' << 8 | 'T',
 
 	/*
 		eXIf tags are not part of the core spec, but have been ratified
@@ -642,6 +654,8 @@ JPEG_Error :: enum {
 	Invalid_Scan_Parameters,
 	Invalid_Component,
 	Missing_Image_Data,
+	Missing_DNL_Marker,
+	DNL_Requires_Seekable_Stream,
 }
 
 JFIF_Unit :: enum byte {
@@ -748,6 +762,56 @@ JPEG_Info :: struct {
 	comments: [dynamic]string,
 	exif: [dynamic]Exif,
 	frame_type: JPEG_Marker,
+	color_space: JPEG_Color_Space,
+}
+
+JPEG_Color_Space :: enum u8 {
+	Gray,
+	Gray_Alpha,
+	YCbCr,
+	RGB,
+	CMYK,
+	YCCK,
+}
+
+JPEG_Subsampling :: enum u8 {
+	S444,
+	S422,
+	S420,
+}
+
+// NOTE(Jeroen): Support for saving images using the hierarchical profile was left out on purpose.
+//               Our JPEG loader decodes it, but the profile is only of historical interest as
+//               far as creating them is.
+JPEG_Profile :: enum u8 {
+	Baseline,
+	Extended,
+	Progressive,
+	Lossless,
+}
+
+JPEG_Entropy_Coding :: enum u8 {
+	Huffman,
+	Huffman_Optimized,
+	Arithmetic,
+}
+
+JPEG_Lossless_Predictor :: enum u8 {
+	Left,
+	Above,
+	Above_Left,
+	Planar,
+	Left_Planar,
+	Above_Planar,
+	Average,
+	Best,
+}
+
+JPEG_Save_Options :: struct {
+	entropy_coding:        JPEG_Entropy_Coding,
+	lossless_predictor:    JPEG_Lossless_Predictor,
+	restart_interval_rows: u16,
+	color_space:           Maybe(JPEG_Color_Space),
 }
 
 Channel :: enum u8 {

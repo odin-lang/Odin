@@ -303,9 +303,67 @@ gb_internal void win10_best(String short_name, String full_name, Version_Data *d
 	}
 }
 
-gb_internal void find_windows_kit_paths(Find_Result *result) {
-	bool sdk_found = false;
+// Attempts to find the "best" MSVC version by picking the one with the highest version number.
+gb_internal void msvc_best(String short_name, String full_name, Version_Data *data) {
+	int i0, i1, i2;
+	auto success = sscanf_s((const char *const)short_name.text, "%d.%d.%d", &i0, &i1, &i2);
+	if (success < 3) return;
 
+	if (i0 < data->best_version[0]) return;
+	else if (i0 == data->best_version[0]) {
+		if (i1 < data->best_version[1]) return;
+		else if (i1 == data->best_version[1]) {
+			if (i2 < data->best_version[2]) return;
+		}
+	}
+
+	if (data->best_name.len) mc_free(data->best_name);
+
+	data->best_name = copy_string(mc_allocator, full_name);
+
+	if (data->best_name.len) {
+		data->best_version[0] = i0;
+		data->best_version[1] = i1;
+		data->best_version[2] = i2;
+	}
+}
+
+// On many machines `kits_root10` will be something like `C:\Program Files (x86)\Windows Kits\10\`.
+// However, this function lets you specify that `kits_root10` path yourself.
+gb_internal bool find_windows_kit_paths_in_kits_root10(Find_Result *result, String kits_root10) {
+	String windows10_lib = mc_concat(kits_root10, str_lit("Lib\\"));
+	Version_Data data_lib = {0};
+	mc_visit_files(windows10_lib, &data_lib, win10_best);
+	defer (mc_free(windows10_lib));
+	defer (mc_free(data_lib.best_name));
+
+	String windows10_bin = mc_concat(kits_root10, str_lit("bin\\"));
+	Version_Data data_bin = {0};
+	mc_visit_files(windows10_bin, &data_bin, win10_best);
+	defer (mc_free(windows10_bin));
+	defer (mc_free(data_bin.best_name));
+
+	if (!data_lib.best_name.len || !data_bin.best_name.len) {
+		return false;
+	}
+
+	if (build_context.metrics.arch == TargetArch_amd64) {
+		result->windows_sdk_um_library_path   = mc_concat(data_lib.best_name, str_lit("\\um\\x64\\"));
+		result->windows_sdk_ucrt_library_path = mc_concat(data_lib.best_name, str_lit("\\ucrt\\x64\\"));
+		result->windows_sdk_bin_path          = mc_concat(data_bin.best_name, str_lit("\\x64\\"));
+	} else if (build_context.metrics.arch == TargetArch_i386) {
+		result->windows_sdk_um_library_path   = mc_concat(data_lib.best_name, str_lit("\\um\\x86\\"));
+		result->windows_sdk_ucrt_library_path = mc_concat(data_lib.best_name, str_lit("\\ucrt\\x86\\"));
+		result->windows_sdk_bin_path          = mc_concat(data_bin.best_name, str_lit("\\x86\\"));
+	} else {
+		return false;
+	}
+
+	result->windows_sdk_version = 10;
+	return true;
+}
+
+gb_internal void find_windows_kit_paths(Find_Result *result) {
 	HKEY main_key;
 
 	auto rc = RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows Kits\\Installed Roots",
@@ -318,37 +376,66 @@ gb_internal void find_windows_kit_paths(Find_Result *result) {
 
 	if (windows10_root.len) {
 		defer (mc_free(windows10_root));
+		find_windows_kit_paths_in_kits_root10(result, windows10_root);
+	}
+}
 
-		String windows10_lib = mc_concat(windows10_root, str_lit("Lib\\"));
-		Version_Data data_lib = {0};
-		mc_visit_files(windows10_lib, &data_lib, win10_best);
-		defer (mc_free(windows10_lib));
-		defer (mc_free(data_lib.best_name));
+gb_internal bool find_visual_studio_in_installation_path(Find_Result *result, String installation_path) {
+	String tools_filename = mc_concat(installation_path, str_lit("\\VC\\Auxiliary\\Build\\Microsoft.VCToolsVersion.default.txt"));
+	defer (mc_free(tools_filename));
 
-		String windows10_bin = mc_concat(windows10_root, str_lit("bin\\"));
-		Version_Data data_bin = {0};
-		mc_visit_files(windows10_bin, &data_bin, win10_best);
-		defer (mc_free(windows10_bin));
-		defer (mc_free(data_bin.best_name));
+	gbFileContents tool_version = gb_file_read_contents(mc_allocator, true, (const char*)tools_filename.text);
+	defer (gb_file_free_contents(&tool_version));
 
-		if (data_lib.best_name.len && data_bin.best_name.len) {
-			if (build_context.metrics.arch == TargetArch_amd64) {
-				result->windows_sdk_um_library_path   = mc_concat(data_lib.best_name, str_lit("\\um\\x64\\"));
-				result->windows_sdk_ucrt_library_path = mc_concat(data_lib.best_name, str_lit("\\ucrt\\x64\\"));
-				result->windows_sdk_bin_path          = mc_concat(data_bin.best_name, str_lit("\\x64\\"));
-				sdk_found = true;
-			} else if (build_context.metrics.arch == TargetArch_i386) {
-				result->windows_sdk_um_library_path   = mc_concat(data_lib.best_name, str_lit("\\um\\x86\\"));
-				result->windows_sdk_ucrt_library_path = mc_concat(data_lib.best_name, str_lit("\\ucrt\\x86\\"));
-				result->windows_sdk_bin_path          = mc_concat(data_bin.best_name, str_lit("\\x86\\"));
-				sdk_found = true;
-			}
+	String msvc_dir = mc_concat(installation_path, str_lit("\\VC\\Tools\\MSVC\\"));
+	defer (mc_free(msvc_dir));
+
+	Version_Data data_msvc = {0};
+	defer (mc_free(data_msvc.best_name));
+
+	String base_path = {};
+
+	if (tool_version.size) {
+		String version_string = make_string((const u8*)tool_version.data, tool_version.size);
+		version_string = string_trim_whitespace(version_string);
+		base_path = mc_concat(msvc_dir, version_string);
+	} else {
+		mc_visit_files(msvc_dir, &data_msvc, msvc_best);
+
+		if (!data_msvc.best_name.len) {
+			return false;
 		}
+
+		base_path = mc_concat(data_msvc.best_name, str_lit(""));
 	}
 
-	if (sdk_found) {
-		result->windows_sdk_version = 10;
+	defer (mc_free(base_path));
+
+	String library_path = {};
+	String exe_path = {};
+
+	if (build_context.metrics.arch == TargetArch_amd64) {
+		library_path = mc_concat(base_path, str_lit("\\lib\\x64\\"));
+		exe_path = mc_concat(base_path, str_lit("\\bin\\Hostx64\\x64\\"));
+	} else if (build_context.metrics.arch == TargetArch_i386) {
+		library_path = mc_concat(base_path, str_lit("\\lib\\x86\\"));
+		exe_path = mc_concat(base_path, str_lit("\\bin\\Hostx86\\x86\\"));
+	} else {
+		return false;
 	}
+
+	String library_file = mc_concat(library_path, str_lit("vcruntime.lib"));
+	defer (mc_free(library_file));
+
+	if (!gb_file_exists((const char*)library_file.text)) {
+		mc_free(library_path);
+		mc_free(exe_path);
+		return false;
+	}
+
+	result->vs_exe_path = exe_path;
+	result->vs_library_path = library_path;
+	return true;
 }
 
 gb_internal bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *result) {
@@ -403,39 +490,7 @@ gb_internal bool find_visual_studio_by_fighting_through_microsoft_craziness(Find
 			String inst_path = mc_wstring_to_string(inst_path_wide);
 			defer (mc_free(inst_path));
 
-			String tools_filename = mc_concat(inst_path, str_lit("\\VC\\Auxiliary\\Build\\Microsoft.VCToolsVersion.default.txt"));
-			defer (mc_free(tools_filename));
-
-			gbFileContents tool_version = gb_file_read_contents(mc_allocator, true, (const char*)tools_filename.text);
-			defer (gb_file_free_contents(&tool_version));
-
-			String version_string = make_string((const u8*)tool_version.data, tool_version.size);
-			version_string = string_trim_whitespace(version_string);
-
-			String base_path = mc_concat(inst_path, str_lit("\\VC\\Tools\\MSVC\\"), version_string);
-			defer (mc_free(base_path));
-
-			String library_path = {};
-			if (build_context.metrics.arch == TargetArch_amd64) {
-				library_path = mc_concat(base_path, str_lit("\\lib\\x64\\"));
-			} else if (build_context.metrics.arch == TargetArch_i386) {
-				library_path = mc_concat(base_path, str_lit("\\lib\\x86\\"));
-			} else {
-				continue;
-			}
-
-			String library_file = mc_concat(library_path, str_lit("vcruntime.lib"));
-
-			if (gb_file_exists((const char*)library_file.text)) {
-				if (build_context.metrics.arch == TargetArch_amd64) {
-					result->vs_exe_path = mc_concat(base_path, str_lit("\\bin\\Hostx64\\x64\\"));
-				} else if (build_context.metrics.arch == TargetArch_i386) {
-					result->vs_exe_path = mc_concat(base_path, str_lit("\\bin\\Hostx86\\x86\\"));
-				} else {
-					continue;
-				}
-
-				result->vs_library_path = library_path;
+			if (find_visual_studio_in_installation_path(result, inst_path)) {
 				return true;
 			}
 			/*
@@ -758,8 +813,54 @@ gb_internal void find_visual_studio_paths_from_env_vars(Find_Result *result) {
 	}
 }
 
+// Looks for 'bin\msvc' relative to the Odin compiler root. In there it expects to find a `VC` and
+// a `Windows Kits\10` folder.
+//
+// This enables the creation of Odin installation programs that dump the required MSVC stuff into
+// `bin\msvc`. The layout is also compatible with Mārtiņš Možeiko's portable-msvc.py:
+// https://gist.github.com/mmozeiko/7f3162ec2988e81e56d5c4e22cde9977 -- You could run that script
+// within the `bin` folder and get all the MSVC + WinSDK stuff you need, automatically picked up by
+// the compiler.
+//
+// The `VC` folder is what you usually find using the `VCINSTALLDIR` environment variable on
+// machines that have Visual Studio installed (it's usually set by the `vcvars64.bat` script). That
+// environment variable often points to something like:
+// `C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\`
+//
+// The `Windows Kits\10` folder is what you usually find using the `WindowsSdkDir` on machines that
+// have the Windows SDK installed (also set by the `vcvars64.bat` script). That environment variable
+// often points to something like: `C:\Program Files (x86)\Windows Kits\10\` -- We expect
+// to find the whole `Windows Kits` folder inside `bin\msvc`.
+gb_internal bool find_paths_in_bin_msvc(Find_Result *result) {
+	String root = odin_root_dir();
+
+	if (root.len == 0) {
+		return false;
+	}
+
+	String msvc_root = mc_concat(root, str_lit("bin\\msvc"));
+	defer (mc_free(msvc_root));
+	String kits_root10 = mc_concat(msvc_root, str_lit("\\Windows Kits\\10\\"));
+	defer (mc_free(kits_root10));
+
+	bool sdk_found = find_windows_kit_paths_in_kits_root10(result, kits_root10);
+	bool vs_found = find_visual_studio_in_installation_path(result, msvc_root);
+
+	if (!sdk_found || !vs_found) {
+		*result = {};
+		return false;
+	}
+
+	return true;
+}
+
 gb_internal Find_Result find_visual_studio_and_windows_sdk() {
 	Find_Result r = {};
+
+	if (find_paths_in_bin_msvc(&r)) {
+		return r;
+	}
+
 	find_windows_kit_paths(&r);
 
 	// Prefer the toolset exported into the environment (e.g. by vsdevcmd) so the

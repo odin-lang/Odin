@@ -871,8 +871,9 @@ gb_internal lbValue lb_emit_union_cast_only_ok_check(lbProcedure *p, lbValue val
 		lbValue data = lb_emit_transmute(p, value, dst);
 		cond = lb_emit_comp_against_nil(p, Token_NotEq, data);
 	} else {
+		Type *vt = type_info_variant_shim_type(src, dst);
 		lbValue tag = lb_emit_union_tag_value(p, value);
-		lbValue dst_tag = lb_const_union_tag(m, src, dst);
+		lbValue dst_tag = lb_const_union_tag(m, src, vt ? vt : dst);
 		cond = lb_emit_comp(p, Token_CmpEq, tag, dst_tag);
 	}
 
@@ -906,8 +907,14 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 
 	lbValue value_  = lb_address_from_load_or_generate_local(p, value);
 
+	Type *vt = type_info_variant_shim_type(src, dst);
+
 	if ((p->state_flags & StateFlag_no_type_assert) != 0 && !is_tuple) {
 		// no tag check, just load the variant data at the front
+		if (vt != nullptr) {
+			lbValue stored = lb_emit_load(p, lb_emit_union_variant_ptr(p, value_, vt));
+			return lb_emit_load(p, stored);
+		}
 		lbValue ptr = lb_emit_union_variant_ptr(p, value_, dst);
 		return lb_emit_load(p, ptr);
 	}
@@ -924,7 +931,7 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 		data = lb_emit_load(p, lb_emit_union_variant_ptr(p, value_, dst));
 	} else {
 		tag     = lb_emit_load(p, lb_emit_union_tag_ptr(p, value_));
-		dst_tag = lb_const_union_tag(m, src, dst);
+		dst_tag = lb_const_union_tag(m, src, vt ? vt : dst);
 	}
 
 	lbBlock *ok_block = lb_create_block(p, "union_cast.ok");
@@ -943,7 +950,12 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 
 
 	if (data.value == nullptr) {
-		data = lb_emit_load(p, lb_emit_union_variant_ptr(p, value_, dst));
+		if (vt != nullptr) {
+			lbValue stored = lb_emit_load(p, lb_emit_union_variant_ptr(p, value_, vt));
+			data = lb_emit_load(p, stored);
+		} else {
+			data = lb_emit_load(p, lb_emit_union_variant_ptr(p, value_, dst));
+		}
 	}
 	lb_emit_store(p, gep0, data);
 	lb_emit_store(p, gep1, lb_const_bool(m, t_bool, true));
@@ -970,7 +982,7 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 
 			if (!build_context.no_rtti) {
 				args[4] = lb_typeid(m, src_type);
-				args[5] = lb_typeid(m, dst_type);
+				args[5] = lb_typeid(m, vt ? vt : dst_type);
 				args[6] = lb_emit_conv(p, value_, t_rawptr);
 			}
 
@@ -3609,4 +3621,38 @@ gb_internal bool lb_x86_features_need_evex512(String features) {
 #else
 	return false;
 #endif
+}
+
+gb_internal void lb_add_target_features_to_proc(lbModule *m, LLVMValueRef proc_value, String const &features) {
+	gbString feature_str = gb_string_make(temporary_allocator(), "");
+
+	char const *attr_name = "target-features";
+	LLVMAttributeRef existing = LLVMGetStringAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, attr_name, cast(unsigned)gb_strlen(attr_name));
+	if (existing != nullptr) {
+		unsigned existing_len = 0;
+		char const *existing_str = LLVMGetStringAttributeValue(existing, &existing_len);
+		feature_str = gb_string_append_length(feature_str, existing_str, existing_len);
+	} else {
+		feature_str = gb_string_append_length(feature_str, m->gen->target_features.text, m->gen->target_features.len);
+	}
+
+	String_Iterator it = {features, 0};
+	String str = {};
+	while (string_split_iterator_next(&it, ',', &str)) {
+		if (str.len == 0) {
+			continue;
+		}
+		if (gb_string_length(feature_str) > 0) {
+			feature_str = gb_string_appendc(feature_str, ",");
+		}
+		if (!(string_starts_with(str, '+') || string_starts_with(str, '-'))) {
+			feature_str = gb_string_appendc(feature_str, "+");
+		}
+		feature_str = gb_string_append_length(feature_str, str.text, str.len);
+	}
+	if (lb_x86_features_need_evex512(features)) {
+		feature_str = gb_string_appendc(feature_str, gb_string_length(feature_str) > 0 ? ",+evex512" : "+evex512");
+	}
+
+	lb_add_attribute_to_proc_with_string(m, proc_value, str_lit("target-features"), make_string(cast(u8 const *)feature_str, gb_string_length(feature_str)));
 }

@@ -136,6 +136,162 @@ test_xxhash_secret :: proc(t: ^testing.T) {
 	}
 }
 
+// Regression test for XXH3 streaming: after consuming whole internal buffers directly from
+// the input, `XXH3_update` must save the *last consumed* stripe for `XXH3_digest_long`.
+// The zero-filled vectors above can't catch a wrong stripe being saved, so this uses a
+// non-uniform byte pattern and compares streaming against one-shot for many lengths and
+// update sizes, including sizes around the 256-byte internal buffer and the 1024-byte block.
+@(test)
+test_xxhash_xxh3_streamed_vs_oneshot :: proc(t: ^testing.T) {
+	buf := make([]u8, 16 * 1024 + 64)
+	defer delete(buf)
+	xxh3_fill_pattern(buf)
+
+	lengths := make([dynamic]int)
+	defer delete(lengths)
+	for i in 0..=1100 {
+		append(&lengths, i)
+	}
+	append(&lengths, 2047, 2048, 2049, 4095, 4096, 4097, 10000, 10001, 16 * 1024 + 63)
+
+	CHUNK_SIZES :: [?]int{1, 3, 7, 63, 64, 65, 100, 191, 192, 193, 255, 256, 257, 300, 511, 512, 513, 1000, 1023, 1024, 1025, 4096}
+
+	custom_secret: [192]u8
+	for &b, i in custom_secret {
+		b = u8((i * 7 + 3) & 0xff)
+	}
+
+	Mode :: struct {
+		name:   string,
+		seed:   u64,
+		secret: []u8,
+	}
+	modes := [?]Mode{
+		{"default",       0,                  nil},
+		{"seeded",        0x9e3779b97f4a7c15, nil},
+		{"custom secret", 0,                  custom_secret[:]},
+	}
+
+	state, state_err := xxhash.XXH3_create_state()
+	defer xxhash.XXH3_destroy_state(state)
+	testing.expect(t, state_err == nil, "Problem initializing XXH3 state")
+
+	for mode in modes {
+		for chunk_size in CHUNK_SIZES {
+			failures, first_failure := 0, -1
+			for length in lengths {
+				b := buf[:length]
+
+				expected_64:  u64
+				expected_128: u128
+				if mode.secret != nil {
+					expected_64, expected_128 = xxhash.XXH3_64(b, mode.secret), xxhash.XXH3_128(b, mode.secret)
+				} else {
+					expected_64, expected_128 = xxhash.XXH3_64(b, mode.seed), xxhash.XXH3_128(b, mode.seed)
+				}
+
+				h64, h128 := xxh3_streamed(state, b, chunk_size, mode.seed, mode.secret)
+				if h64 != expected_64 || h128 != expected_128 {
+					if failures == 0 {
+						first_failure = length
+					}
+					failures += 1
+				}
+			}
+			testing.expectf(t, failures == 0,
+				"[XXH3 streamed, %s, %d-byte updates] %d lengths differ from one-shot, first at length %d",
+				mode.name, chunk_size, failures, first_failure)
+		}
+	}
+}
+
+// Known answers from the reference C implementation (xxhash.h v0.8.3, `XXH3_64bits_withSeed`
+// and `XXH3_128bits_withSeed`) over the same byte pattern.
+@(test)
+test_xxhash_xxh3_streamed_known_answers :: proc(t: ^testing.T) {
+	buf := make([]u8, 65553)
+	defer delete(buf)
+	xxh3_fill_pattern(buf)
+
+	state, state_err := xxhash.XXH3_create_state()
+	defer xxhash.XXH3_destroy_state(state)
+	testing.expect(t, state_err == nil, "Problem initializing XXH3 state")
+
+	for v in XXH3_PATTERN_VECTORS {
+		b := buf[:v.length]
+
+		xxh3_64  := xxhash.XXH3_64(b, v.seed)
+		xxh3_128 := xxhash.XXH3_128(b, v.seed)
+		testing.expectf(t, xxh3_64  == v.xxh3_64,  "[XXH3_64(%05d, %x)  ] Expected: %016x, got: %016x", v.length, v.seed, v.xxh3_64,  xxh3_64)
+		testing.expectf(t, xxh3_128 == v.xxh3_128, "[XXH3_128(%05d, %x) ] Expected: %032x, got: %032x", v.length, v.seed, v.xxh3_128, xxh3_128)
+
+		for chunk_size in ([?]int{1, 64, 256, 1000, 1024, 4096}) {
+			h64, h128 := xxh3_streamed(state, b, chunk_size, v.seed)
+			testing.expectf(t, h64  == v.xxh3_64,  "[XXH3_64s(%05d, %x, %d)  ] Expected: %016x, got: %016x", v.length, v.seed, chunk_size, v.xxh3_64,  h64)
+			testing.expectf(t, h128 == v.xxh3_128, "[XXH3_128s(%05d, %x, %d) ] Expected: %032x, got: %032x", v.length, v.seed, chunk_size, v.xxh3_128, h128)
+		}
+	}
+}
+
+@(private="file")
+xxh3_fill_pattern :: proc(buf: []u8) {
+	for &b, i in buf {
+		b = u8((i * 31 + 7) & 0xff)
+	}
+}
+
+// Streams `data` through `state` in `chunk_size`-byte updates and returns both digests.
+// `XXH3_64_update` is an alias of `XXH3_128_update`, so one pass covers both.
+@(private="file")
+xxh3_streamed :: proc(state: ^xxhash.XXH3_state, data: []u8, chunk_size: int, seed: u64, secret: []u8 = nil) -> (h64: u64, h128: u128) {
+	if secret != nil {
+		xxhash.XXH3_128_reset_with_secret(state, secret)
+	} else {
+		xxhash.XXH3_128_reset_with_seed(state, seed)
+	}
+	for b := data; len(b) > 0; {
+		n := min(len(b), chunk_size)
+		xxhash.XXH3_128_update(state, b[:n])
+		b = b[n:]
+	}
+	return xxhash.XXH3_64_digest(state), xxhash.XXH3_128_digest(state)
+}
+
+XXH3_Pattern_Test_Vector :: struct {
+	length:   int,
+	seed:     u64,
+	xxh3_64:  u64,
+	xxh3_128: u128,
+}
+
+// Input byte `i` is `u8(i * 31 + 7)`.
+XXH3_PATTERN_VECTORS := [?]XXH3_Pattern_Test_Vector{
+	{length =   241, seed = 0x0000000000000000, xxh3_64 = 0x0b3b630948ce4a00, xxh3_128 = 0x92b991a7192f3f080b3b630948ce4a00},
+	{length =   256, seed = 0x0000000000000000, xxh3_64 = 0xec85b75bafe6ca74, xxh3_128 = 0x24ee30633ca52c6aec85b75bafe6ca74},
+	{length =   257, seed = 0x0000000000000000, xxh3_64 = 0x12ef0ff633841459, xxh3_128 = 0x0f849a4f3e33b6c212ef0ff633841459},
+	{length =   320, seed = 0x0000000000000000, xxh3_64 = 0x73df0720aa2b40f3, xxh3_128 = 0xa53d68f8e791941b73df0720aa2b40f3},
+	{length =   511, seed = 0x0000000000000000, xxh3_64 = 0x0fec8fb6eae1df8b, xxh3_128 = 0xf7b19289ed7568430fec8fb6eae1df8b},
+	{length =  1024, seed = 0x0000000000000000, xxh3_64 = 0x23bc880ebf0d29c6, xxh3_128 = 0x4c17271c906df79223bc880ebf0d29c6},
+	{length =  1025, seed = 0x0000000000000000, xxh3_64 = 0xc09fdfbc398c7d82, xxh3_128 = 0x70a4eb1b9691d77fc09fdfbc398c7d82},
+	{length =  1088, seed = 0x0000000000000000, xxh3_64 = 0xa16bad67843c5a45, xxh3_128 = 0xfcf9dfe2b0ba271ba16bad67843c5a45},
+	{length =  2047, seed = 0x0000000000000000, xxh3_64 = 0xc49f1b36d955611e, xxh3_128 = 0x7d344df231e0f912c49f1b36d955611e},
+	{length =  4096, seed = 0x0000000000000000, xxh3_64 = 0xa3c19f8174cde0bb, xxh3_128 = 0x49d3842b33d51e8aa3c19f8174cde0bb},
+	{length = 10000, seed = 0x0000000000000000, xxh3_64 = 0x441f01d9711bebed, xxh3_128 = 0xd53e809be21e616d441f01d9711bebed},
+	{length = 65553, seed = 0x0000000000000000, xxh3_64 = 0xb7f0f58a1abec2db, xxh3_128 = 0xe6795137352010f4b7f0f58a1abec2db},
+	{length =   241, seed = 0x9e3779b97f4a7c15, xxh3_64 = 0x422e82e8913e49e0, xxh3_128 = 0xc39cbfb460caf47e422e82e8913e49e0},
+	{length =   256, seed = 0x9e3779b97f4a7c15, xxh3_64 = 0xb4dbe810e81c3d97, xxh3_128 = 0xba6635ddc89f0599b4dbe810e81c3d97},
+	{length =   257, seed = 0x9e3779b97f4a7c15, xxh3_64 = 0xb87fedcb6c4cd0d3, xxh3_128 = 0x7eb7dcc911d97a4eb87fedcb6c4cd0d3},
+	{length =   320, seed = 0x9e3779b97f4a7c15, xxh3_64 = 0x1442756b9fd983a6, xxh3_128 = 0x6962e651d3e9134e1442756b9fd983a6},
+	{length =   511, seed = 0x9e3779b97f4a7c15, xxh3_64 = 0xb15a032408e79741, xxh3_128 = 0x655285fb79614244b15a032408e79741},
+	{length =  1024, seed = 0x9e3779b97f4a7c15, xxh3_64 = 0x7e249adc60e1f9b4, xxh3_128 = 0x927c8d2b50d33f537e249adc60e1f9b4},
+	{length =  1025, seed = 0x9e3779b97f4a7c15, xxh3_64 = 0x16cfe055154ff1dd, xxh3_128 = 0x0d225711ec9bb34416cfe055154ff1dd},
+	{length =  1088, seed = 0x9e3779b97f4a7c15, xxh3_64 = 0x944ceebc0cd06093, xxh3_128 = 0x94a42d1b269cc1c9944ceebc0cd06093},
+	{length =  2047, seed = 0x9e3779b97f4a7c15, xxh3_64 = 0xed9dffa68a84fdb9, xxh3_128 = 0xb3976bb88e4197cced9dffa68a84fdb9},
+	{length =  4096, seed = 0x9e3779b97f4a7c15, xxh3_64 = 0x224e1aff9c0f0707, xxh3_128 = 0x95fad31aabba45e1224e1aff9c0f0707},
+	{length = 10000, seed = 0x9e3779b97f4a7c15, xxh3_64 = 0xd19cf166bc6207df, xxh3_128 = 0x0540bede911260ffd19cf166bc6207df},
+	{length = 65553, seed = 0x9e3779b97f4a7c15, xxh3_64 = 0x35577cdf8b9c71d9, xxh3_128 = 0x3b2412f9e665e7d835577cdf8b9c71d9},
+}
+
 XXHASH_Test_Vectors :: struct #packed {
 	/*
 		Old hashes

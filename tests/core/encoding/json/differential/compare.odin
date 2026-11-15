@@ -229,8 +229,8 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flag
 	}
 
 	#partial switch ia in ba.variant {
-	case reflect.Type_Info_Struct:
-		ib, ok := bb.variant.(reflect.Type_Info_Struct)
+	case ^reflect.Type_Info_Struct:
+		ib, ok := bb.variant.(^reflect.Type_Info_Struct)
 		if !ok || ia.field_count != ib.field_count {
 			return fmt.tprintf(": type mismatch %v vs %v", ta.id, tb.id)
 		}
@@ -246,7 +246,7 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flag
 		}
 		return ""
 
-	case reflect.Type_Info_String:
+	case ^reflect.Type_Info_String:
 		if ia.is_cstring {
 			ca, cb := (^cstring)(a)^, (^cstring)(b)^
 			if (ca == nil) != (cb == nil) || string(ca) != string(cb) {
@@ -266,23 +266,23 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flag
 		}
 		return ""
 
-	case reflect.Type_Info_Pointer, reflect.Type_Info_Multi_Pointer, reflect.Type_Info_Procedure:
+	case ^reflect.Type_Info_Pointer, ^reflect.Type_Info_Multi_Pointer, ^reflect.Type_Info_Procedure:
 		pa, pb := (^rawptr)(a)^, (^rawptr)(b)^
 		if (pa == nil) != (pb == nil) {
 			return fmt.tprintf(": pointer is nil=%v in current, nil=%v in reference", pa == nil, pb == nil)
 		}
 		return ""
 
-	case reflect.Type_Info_Array:
-		ib := bb.variant.(reflect.Type_Info_Array)
+	case ^reflect.Type_Info_Array:
+		ib := bb.variant.(^reflect.Type_Info_Array)
 		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.count, flags, wrapped)
 
-	case reflect.Type_Info_Enumerated_Array:
-		ib := bb.variant.(reflect.Type_Info_Enumerated_Array)
+	case ^reflect.Type_Info_Enumerated_Array:
+		ib := bb.variant.(^reflect.Type_Info_Enumerated_Array)
 		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.count, flags, wrapped)
 
-	case reflect.Type_Info_Slice:
-		ib := bb.variant.(reflect.Type_Info_Slice)
+	case ^reflect.Type_Info_Slice:
+		ib := bb.variant.(^reflect.Type_Info_Slice)
 		ra, rb := (^runtime.Raw_Slice)(a)^, (^runtime.Raw_Slice)(b)^
 		if ra.len != rb.len {
 			return fmt.tprintf(": len %d in current, %d in reference", ra.len, rb.len)
@@ -292,8 +292,8 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flag
 		}
 		return elems_diff(ra.data, rb.data, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ra.len, flags, wrapped)
 
-	case reflect.Type_Info_Dynamic_Array:
-		ib := bb.variant.(reflect.Type_Info_Dynamic_Array)
+	case ^reflect.Type_Info_Dynamic_Array:
+		ib := bb.variant.(^reflect.Type_Info_Dynamic_Array)
 		ra, rb := (^runtime.Raw_Dynamic_Array)(a)^, (^runtime.Raw_Dynamic_Array)(b)^
 		if ra.len != rb.len || ra.cap != rb.cap {
 			return fmt.tprintf(": len/cap %d/%d in current, %d/%d in reference", ra.len, ra.cap, rb.len, rb.cap)
@@ -306,16 +306,16 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flag
 		}
 		return elems_diff(ra.data, rb.data, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ra.len, flags, wrapped)
 
-	case reflect.Type_Info_Fixed_Capacity_Dynamic_Array:
-		ib := bb.variant.(reflect.Type_Info_Fixed_Capacity_Dynamic_Array)
+	case ^reflect.Type_Info_Fixed_Capacity_Dynamic_Array:
+		ib := bb.variant.(^reflect.Type_Info_Fixed_Capacity_Dynamic_Array)
 		la, lb := (^int)(ptr_add(a, ia.len_offset))^, (^int)(ptr_add(b, ib.len_offset))^
 		if la != lb {
 			return fmt.tprintf(": len %d in current, %d in reference", la, lb)
 		}
 		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.capacity, flags, wrapped)
 
-	case reflect.Type_Info_Union:
-		ib := bb.variant.(reflect.Type_Info_Union)
+	case ^reflect.Type_Info_Union:
+		ib := bb.variant.(^reflect.Type_Info_Union)
 		if reflect.type_info_union_is_pure_maybe(ia) {
 			pa, pb := (^rawptr)(a)^, (^rawptr)(b)^
 			if (pa == nil) != (pb == nil) {
@@ -348,8 +348,8 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flag
 		}
 		return ""
 
-	case reflect.Type_Info_Map:
-		ib := bb.variant.(reflect.Type_Info_Map)
+	case ^reflect.Type_Info_Map:
+		ib := bb.variant.(^reflect.Type_Info_Map)
 		ra, rb := (^runtime.Raw_Map)(a)^, (^runtime.Raw_Map)(b)^
 		len_a, len_b := runtime.map_len(ra), runtime.map_len(rb)
 		cap_a, cap_b := runtime.map_cap(ra), runtime.map_cap(rb)

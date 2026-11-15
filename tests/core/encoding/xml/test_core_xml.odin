@@ -17,12 +17,71 @@ OPTIONS :: xml.Options{ flags = { .Ignore_Unsupported, .Intern_Comments, },
 
 TEST :: struct {
 	filename: string,
+	src:      string,
 	options:  xml.Options,
 	err:      xml.Error,
 	crc32:    u32,
 }
 
 TEST_SUITE_PATH :: ODIN_ROOT + "tests/core/assets/"
+
+UTF8_XML ::
+	"<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+	"<!DOCTYPE 恥ずべきフクロウ>\n" +
+	"<恥ずべきフクロウ 올빼미_id=\"Foozle&#32;Barzle\">\n" +
+	"<부끄러운:barzle>\n" +
+	"\t<name foo:bar=\"birmese\">ရှက်စရာ ဇီးကွက်</name>\n" +
+	"\t<nickname>Owl of Shame</nickname>\n" +
+	"\t<data>More CDATA <![CDATA[<greeting>Hello, world!</greeting><![CDATA] <$]]> Nonsense.</data>\n" +
+	"</부끄러운:barzle>\n" +
+	"</恥ずべきフクロウ>\n"
+
+ENTITIES_HTML ::
+	"<html>\n" +
+	"\t<head>\n" +
+	"\t\t<title>Entity Reference Test</title>\n" +
+	"\t\t<style>\n" +
+	"\t\t\tbody {\n" +
+	"\t\t\t\tbackground: #000; color: #eee;\n" +
+	"\t\t\t\twidth: 40%;\n" +
+	"\t\t\t\tmargin-left:  auto;\n" +
+	"\t\t\t\tmargin-right: auto;\n" +
+	"\t\t\t\tfont-size: 14pt;\n" +
+	"\t\t\t}\n" +
+	"\t\t</style>\n" +
+	"\t</head>\n" +
+	"\t<body>\n" +
+	"\t\t<h1>Entity Reference Test</h1>\n" +
+	"\t\t<div id=\"test_cdata_in_comment\" foo=\"\">\n" +
+	"\t\t\tFoozle]!&#32;&copy;&#x20;<!-- <![CDATA[&#32;&reg;&#x20;]]> -->42&amp;;1234&amp;\n" +
+	"\t\t</div>\n" +
+	"\t\t<!-- foo attribute should be empty but present -->\n" +
+	"\t\t<!-- EXPECTED: Foozle]! © 42&;1234& -->\n" +
+	"\t\t<div id=\"test_cdata_unwrap_and_passthrough\">\n" +
+	"\t\t\tFoozle]!&#32;&copy;&#x20;<![CDATA[BOX&#32;&reg;&#x20;/BOX]]>42&amp;;1234&amp;\n" +
+	"\t\t</div>\n" +
+	"\t\t<!-- EXPECTED: Foozle]! © BOX ® /BOX42&;1234& -->\n" +
+	"\t\t<div>\n" +
+	"\t\t\t&verbar; &vert; &VerticalLine; &fjlig; &grave; &bsol; &reg; &rhov; &CounterClockwiseContourIntegral; &bsemi;\n" +
+	"\t\t</div>\n" +
+	"\t\t<div> H<![CDATA[ellope!]]>Hellope!</div>\n" +
+	"\t\t<div>\tH<![CDATA[ellope!]]>Hellope!</div>\n" +
+	"\t\t<div> H<![CDATA[ellope!]]>Hellope! </div>\n" +
+	"\t\t<div>\tH<![CDATA[ellope!]]>Hellope!\t</div>\n" +
+	"\t\t<div>H<![CDATA[ellope!]]>Hellope! </div>\n" +
+	"\t</body>\n" +
+	"</html>"
+
+ATTRIBUTE_WHITESPACE_XML ::
+	"<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+	"<!DOCTYPE foozle>\n" +
+	"<foozle>Barzle\n" +
+	"<부끄러운:barzle>\n" +
+	"\t<name foo:bar=\"   birmese\n" +
+	"\tkittens   have\n" +
+	"\tfur   \">Indeed!</name>\n" +
+	"</부끄러운:barzle>\n" +
+	"</foozle>\n"
 
 @(test)
 xml_test_utf8_normal :: proc(t: ^testing.T) {
@@ -31,29 +90,30 @@ xml_test_utf8_normal :: proc(t: ^testing.T) {
 		// Test namespaced ident.
 		// Tests that nested partial CDATA start doesn't trip up parser.
 		filename  = "XML/utf8.xml",
+		src       = UTF8_XML,
 		options   = {
 			flags = {
 				.Ignore_Unsupported, .Intern_Comments,
 			},
 			expected_doctype = "恥ずべきフクロウ",
 		},
-		crc32     = 0xefa55f27,
+		crc32     = 0x28211c7a,
 	})
 }
 
 @(test)
-xml_test_utf8_unbox_cdata :: proc(t: ^testing.T) {
+xml_test_utf8_trim_whitespace :: proc(t: ^testing.T) {
 	run_test(t, {
-		// Same as above.
-		// Unbox CDATA in data tag.
+		// Same as above, but with `.Trim_Whitespace`.
 		filename  = "XML/utf8.xml",
+		src       = UTF8_XML,
 		options   = {
 			flags = {
-				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA,
+				.Ignore_Unsupported, .Intern_Comments, .Trim_Whitespace,
 			},
 			expected_doctype = "恥ずべきフクロウ",
 		},
-		crc32     = 0x2dd27770,
+		crc32     = 0x873198d6,
 	})
 }
 
@@ -65,11 +125,11 @@ xml_test_nl_qt_ts :: proc(t: ^testing.T) {
 		filename  = "I18N/nl_NL-qt-ts.ts",
 		options   = {
 			flags = {
-				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA, .Decode_SGML_Entities,
+				.Ignore_Unsupported, .Intern_Comments, .Decode_SGML_Entities,
 			},
 			expected_doctype = "TS",
 		},
-		crc32     = 0x859b7443,
+		crc32     = 0x6f328435,
 	})
 }
 
@@ -81,11 +141,11 @@ xml_test_xliff_1_2 :: proc(t: ^testing.T) {
 		filename  = "I18N/nl_NL-xliff-1.2.xliff",
 		options   = {
 			flags = {
-				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA, .Decode_SGML_Entities,
+				.Ignore_Unsupported, .Intern_Comments, .Decode_SGML_Entities,
 			},
 			expected_doctype = "xliff",
 		},
-		crc32     = 0x3deaf329,
+		crc32     = 0x995eb569,
 	})
 }
 
@@ -97,11 +157,11 @@ xml_test_xliff_2_0 :: proc(t: ^testing.T) {
 		filename  = "I18N/nl_NL-xliff-2.0.xliff",
 		options   = {
 			flags = {
-				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA, .Decode_SGML_Entities,
+				.Ignore_Unsupported, .Intern_Comments, .Decode_SGML_Entities,
 			},
 			expected_doctype = "xliff",
 		},
-		crc32     = 0x0c55e287,
+		crc32     = 0x2a78e8ca,
 	})
 }
 
@@ -115,35 +175,53 @@ xml_test_entities :: proc(t: ^testing.T) {
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0x98791215,
+		err       = .Unknown_Entity,
+		crc32     = 0x31876be0,
 	})
 }
 
 @(test)
-xml_test_entities_unbox :: proc(t: ^testing.T) {
+xml_test_entities_bare_ampersand :: proc(t: ^testing.T) {
 	run_test(t, {
 		filename  = "XML/entities.html",
 		options   = {
 			flags = {
-				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA,
+				.Ignore_Unsupported, .Intern_Comments, .Decode_SGML_Entities,
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0x5fd5ab4e,
+		err       = .Invalid_Token,
+		crc32     = 0x21791738,
 	})
 }
 
 @(test)
-xml_test_entities_unbox_decode :: proc(t: ^testing.T) {
+xml_test_entities_decode :: proc(t: ^testing.T) {
 	run_test(t, {
 		filename  = "XML/entities.html",
+		src       = ENTITIES_HTML,
 		options   = {
 			flags = {
-				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA, .Decode_SGML_Entities,
+				.Ignore_Unsupported, .Intern_Comments, .Decode_SGML_Entities,
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0xda1ac384,
+		crc32     = 0xa6fe0a49,
+	})
+}
+
+@(test)
+xml_test_entities_trim_whitespace :: proc(t: ^testing.T) {
+	run_test(t, {
+		filename  = "XML/entities.html",
+		src       = ENTITIES_HTML,
+		options   = {
+			flags = {
+				.Ignore_Unsupported, .Intern_Comments, .Decode_SGML_Entities, .Trim_Whitespace,
+			},
+			expected_doctype = "html",
+		},
+		crc32     = 0x7aa5f81e,
 	})
 }
 
@@ -153,8 +231,22 @@ xml_test_attribute_whitespace :: proc(t: ^testing.T) {
 		// Same as above.
 		// Unbox CDATA in data tag.
 		filename  = "XML/attribute-whitespace.xml",
+		src       = ATTRIBUTE_WHITESPACE_XML,
 		options   = {
 			flags = {},
+			expected_doctype = "foozle",
+		},
+		crc32     = 0xa202c48e,
+	})
+}
+
+@(test)
+xml_test_attribute_whitespace_trim :: proc(t: ^testing.T) {
+	run_test(t, {
+		filename  = "XML/attribute-whitespace.xml",
+		src       = ATTRIBUTE_WHITESPACE_XML,
+		options   = {
+			flags = {.Trim_Whitespace},
 			expected_doctype = "foozle",
 		},
 		crc32     = 0x8f5fd6c1,
@@ -187,66 +279,94 @@ xml_test_unicode :: proc(t: ^testing.T) {
 			expected_doctype = "",
 		},
 		err       = .None,
-		crc32     = 0x738664b1,
+		crc32     = 0x687119cd,
 	})
 }
 
 @(test)
 xml_test_cdata_edge_cases :: proc(t: ^testing.T) {
 	Case :: struct {
-		src:     string,
-		err:     xml.Error,
-		value:   string,
-		decoded: string,
-		unboxed: string,
+		src:   string,
+		err:   xml.Error,
+		value: string,
+		kept:  string,
 	}
 
 	cases := [?]Case{
-		{src = `<a>x <![CDATA[l]]></a>`,                value = `x <![CDATA[l]]>`,                unboxed = `x l`},
-		{src = `<a>x <![CDATA[]]></a>`,                 value = `x <![CDATA[]]>`,                 unboxed = `x `},
-		{src = `<a>x <![CDATA[ab]]></a>`,               value = `x <![CDATA[ab]]>`,               unboxed = `x ab`},
-		{src = `<a>x <![CDATA[]]><!-- c --> y</a>`,     value = `x <![CDATA[]]><!-- c --> y`,     decoded = `x <![CDATA[]]> y`, unboxed = `x  y`},
-		{src = `<a>x <![CDATA[]]><![CDATA[z]]> y</a>`,  value = `x <![CDATA[]]><![CDATA[z]]> y`,  unboxed = `x z y`},
-		{src = `<a>x <![CDATA[a<]]> y</a>`,             value = `x <![CDATA[a<]]> y`,             unboxed = `x a< y`},
-		{src = `<a>x <![CDATA[]]]>y</a>`,               value = `x <![CDATA[]]]>y`,               unboxed = `x ]y`},
-		{src = `<a>x <![CDATA[a]b]]>y</a>`,             value = `x <![CDATA[a]b]]>y`,             unboxed = `x a]by`},
-		{src = "<a>x <![CDATA[l\nm]]>y</a>",             value = "x <![CDATA[l\nm]]>y",             unboxed = "x l\nmy"},
+		{src = `<a>x <![CDATA[l]]></a>`,                value = `x l`},
+		{src = `<a>x <![CDATA[]]></a>`,                 value = `x `},
+		{src = `<a>x <![CDATA[ab]]></a>`,               value = `x ab`},
+		{src = `<a>x <![CDATA[]]><!-- c --> y</a>`,     value = `x  y`, kept = `x <!-- c --> y`},
+		{src = `<a>x <![CDATA[]]><![CDATA[z]]> y</a>`,  value = `x z y`},
+		{src = `<a>x <![CDATA[a<]]> y</a>`,             value = `x a< y`},
+		{src = `<a>x <![CDATA[]]]>y</a>`,               value = `x ]y`},
+		{src = `<a>x <![CDATA[a]b]]>y</a>`,             value = `x a]by`},
+		{src = "<a>x <![CDATA[l\nm]]>y</a>",             value = "x l\nmy"},
+		{src = `<a>x <![CDATA[&amp;]]>y</a>`,           value = `x &amp;y`},
 		{src = `<a>x <![CDATA[unterminated</a>`,         err   = .Premature_EOF},
 	}
 
-	Mode :: struct {
-		flags:   xml.Option_Flags,
-		decoded: bool,
-		unboxed: bool,
-	}
-
-	modes := [?]Mode{
-		{flags = {.Ignore_Unsupported}},
-		{flags = {.Ignore_Unsupported, .Decode_SGML_Entities},               decoded = true},
-		{flags = {.Ignore_Unsupported, .Unbox_CDATA},                        unboxed = true},
-		{flags = {.Ignore_Unsupported, .Unbox_CDATA, .Decode_SGML_Entities}, unboxed = true},
+	flag_sets := [?]xml.Option_Flags{
+		{.Ignore_Unsupported},
+		{.Ignore_Unsupported, .Decode_SGML_Entities},
+		{.Ignore_Unsupported, .Keep_Tag_Body_Comments},
 	}
 
 	for c in cases {
-		for m in modes {
-			doc, err := xml.parse_string(c.src, xml.Options{flags = m.flags}, error_handler = Silent)
+		for flags in flag_sets {
+			doc, err := xml.parse_string(c.src, xml.Options{flags = flags}, error_handler = Silent)
 			defer xml.destroy(doc)
 
-			testing.expectf(t, err == c.err, "%q %v: expected %v, got %v", c.src, m.flags, c.err, err)
+			testing.expectf(t, err == c.err, "%q %v: expected %v, got %v", c.src, flags, c.err, err)
 			if c.err == .None && err == .None {
 				expected := c.value
-				if m.unboxed {
-					expected = c.unboxed
-				} else if m.decoded && c.decoded != "" {
-					expected = c.decoded
+				if .Keep_Tag_Body_Comments in flags && c.kept != "" {
+					expected = c.kept
 				}
-				values   := doc.elements[0].value
-				testing.expectf(t, len(values) == 1, "%q %v: expected 1 value, got %v", c.src, m.flags, len(values))
+				values := doc.elements[0].value
+				testing.expectf(t, len(values) == 1, "%q %v: expected 1 value, got %v", c.src, flags, len(values))
 				if len(values) == 1 {
 					got, _ := values[0].(string)
-					testing.expectf(t, got == expected, "%q %v: expected %q, got %q", c.src, m.flags, expected, got)
+					testing.expectf(t, got == expected, "%q %v: expected %q, got %q", c.src, flags, expected, got)
 				}
 			}
+		}
+	}
+}
+
+@(test)
+xml_test_many_attributes :: proc(t: ^testing.T) {
+	// An element's attributes grow in the strings arena, whose blocks are a quarter of the input
+	// (256 bytes at least): every attribute is kept, whatever the document's size.
+	ATTRIBUTES :: 32
+
+	for padding in ([?]int{0, 1_000, 2_000, 4_000, 30_000}) {
+		sb := strings.builder_make()
+		defer strings.builder_destroy(&sb)
+
+		strings.write_string(&sb, "<r><e")
+		for i in 0..<ATTRIBUTES {
+			fmt.sbprintf(&sb, ` a%v="%v"`, i, i)
+		}
+		strings.write_string(&sb, "/><!--")
+		for _ in 0..<padding {
+			strings.write_byte(&sb, ' ')
+		}
+		strings.write_string(&sb, "--></r>")
+		src := strings.to_string(sb)
+
+		doc, err := xml.parse_string(src, error_handler = Silent)
+		defer xml.destroy(doc)
+
+		testing.expectf(t, err == .None, "%v bytes: expected no error, got %v", len(src), err)
+		if err != .None {
+			continue
+		}
+		attribs := doc.elements[1].attribs
+		testing.expectf(t, len(attribs) == ATTRIBUTES, "%v bytes: expected %v attributes, got %v", len(src), ATTRIBUTES, len(attribs))
+		for a, i in attribs {
+			key, val := fmt.tprintf("a%v", i), fmt.tprintf("%v", i)
+			testing.expectf(t, a.key == key && a.val == val, "%v bytes: attribute %v: expected %v=%q, got %v=%q", len(src), i, key, val, a.key, a.val)
 		}
 	}
 }
@@ -261,7 +381,13 @@ run_test :: proc(t: ^testing.T, test: TEST, loc := #caller_location) {
 	log.debugf("Starting xml.load_from_file...")
 	time.stopwatch_reset(&sw)
 	time.stopwatch_start(&sw)
-	doc, err := xml.load_from_file(path, test.options, Silent)
+	doc: ^xml.Document
+	err: xml.Error
+	if test.src != "" {
+		doc, err = xml.parse_string(test.src, test.options, test.filename, Silent)
+	} else {
+		doc, err = xml.load_from_file(path, test.options, Silent)
+	}
 	log.debugf("Finished xml.load_from_file: %v", time.stopwatch_duration(sw))
 	defer {
 		log.debugf("Starting xml.destroy...")
@@ -301,7 +427,7 @@ run_test :: proc(t: ^testing.T, test: TEST, loc := #caller_location) {
 @(test)
 test_normalize_whitespace :: proc(t: ^testing.T) {
 	s := "A &amp; B"
-	normalized_entity_decode, _ := entity.decode_xml(s, {.Normalize_Whitespace})
+	normalized_entity_decode, _ := entity.decode_xml(s, {.Normalize_Attribute})
 	defer delete(normalized_entity_decode)
 
 	testing.expect_value(t, normalized_entity_decode, "A & B")
@@ -405,7 +531,13 @@ doc_to_string :: proc(doc: ^xml.Document, capacity: int) -> (result: string) {
 			}
 		} else if element.kind == .Comment {
 			// PERF: Cold
-			fmt.sbprintf(writer, "[COMMENT] %v\n", element.value)
+			strings.write_string(writer, "[COMMENT] ")
+			for value in element.value {
+				if text, is_text := value.(string); is_text {
+					strings.write_string(writer, text)
+				}
+			}
+			strings.write_string(writer, "\n")
 		}
 	}
 

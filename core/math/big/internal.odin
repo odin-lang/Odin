@@ -24,12 +24,13 @@ package math_big
 	We pass the custom allocator to procedures by default using the pattern `context.allocator = allocator`.
 	This way we don't have to add `, allocator` at the end of each call.
 
-	TODO: Handle +/- Infinity and NaN.
+	`internal_*` procs on `Int`s don't check for NaN or +/-Inf, except `internal_error_if_non_finite`, which the public procs call to reject them.
 */
 
 import "base:builtin"
 import "base:intrinsics"
 import "base:runtime"
+import "core:math"
 @(require) import rnd "core:math/rand"
 
 /*
@@ -152,6 +153,13 @@ internal_add_signed :: proc { internal_int_add_signed, }
 internal_int_add_digit :: proc(dest, a: ^Int, digit: DIGIT, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
+	if digit > _MASK {
+		t := &Int{}
+		defer internal_destroy(t)
+		internal_set(t, digit) or_return
+		return #force_inline internal_int_add_signed(dest, a, t)
+	}
+
 	internal_grow(dest, a.used + 1) or_return
 	/*
 		Fast paths for destination and input Int being the same.
@@ -179,24 +187,15 @@ internal_int_add_digit :: proc(dest, a: ^Int, digit: DIGIT, allocator := context
 		If `a` is negative and `|a|` >= `digit`, call `dest = |a| - digit`
 	*/
 	if a.sign == .Negative && (a.used > 1 || a.digit[0] >= digit) {
-		/*
-			Temporarily fix `a`'s sign.
-		*/
-		a.sign = .Zero_or_Positive
+		t := a^
+		t.sign = .Zero_or_Positive
 		/*
 			dest = |a| - digit
 		*/
-		if err = #force_inline internal_int_add_digit(dest, a, digit); err != nil {
-			/*
-				Restore a's sign.
-			*/
-			a.sign = .Negative
-			return err
-		}
+		internal_int_sub_digit(dest, &t, digit) or_return
 		/*
-			Restore sign and set `dest` sign.
+			Set `dest` sign.
 		*/
-		a.sign    = .Negative
 		dest.sign = .Negative
 
 		return internal_clamp(dest)
@@ -383,6 +382,13 @@ internal_int_sub_signed :: proc(dest, number, decrease: ^Int, allocator := conte
 internal_int_sub_digit :: proc(dest, number: ^Int, digit: DIGIT, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
+	if digit > _MASK {
+		t := &Int{}
+		defer internal_destroy(t)
+		internal_set(t, digit) or_return
+		return #force_inline internal_int_sub_signed(dest, number, t)
+	}
+
 	internal_grow(dest, number.used + 1) or_return
 
 	dest := dest; digit := digit
@@ -412,10 +418,10 @@ internal_int_sub_digit :: proc(dest, number: ^Int, digit: DIGIT, allocator := co
 		If `a` is negative, just do an unsigned addition (with fudged signs).
 	*/
 	if number.sign == .Negative {
-		t := number
+		t := number^
 		t.sign = .Zero_or_Positive
 
-		err =  #force_inline internal_int_add_digit(dest, t, digit)
+		err =  #force_inline internal_int_add_digit(dest, &t, digit)
 		dest.sign = .Negative
 
 		internal_clamp(dest)
@@ -470,9 +476,12 @@ internal_decr :: proc { internal_int_decr, }
 	dest = src >> 1
 
 	Assumes `dest` and `src` not to be `nil` and have been initialized.
-	We make no allocations here.
+	Grows `dest` to `src.used` digits if it is shorter.
 */
-internal_int_shr1 :: proc(dest, src: ^Int) -> (err: Error) {
+internal_int_shr1 :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator
+
+	internal_grow(dest, src.used) or_return
 	old_used  := dest.used; dest.used = src.used
 	/*
 		Carry
@@ -594,6 +603,13 @@ internal_int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT, allocator := 
 		return internal_shl(dest, src, ix)
 	}
 
+	if multiplier > _MASK {
+		t := &Int{}
+		defer internal_destroy(t)
+		internal_set(t, multiplier) or_return
+		return #force_inline internal_int_mul(dest, src, t)
+	}
+
 	/*
 		Ensure `dest` is big enough to hold `src` * `multiplier`.
 	*/
@@ -698,10 +714,6 @@ internal_int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.alloc
 			*/
 			err = _private_int_mul_balance(dest, src, multiplier)
 		} else if min_used >= MUL_TOOM_CUTOFF {
-			/*
-				Toom path commented out until it no longer fails Factorial 10k or 100k,
-				as reveaved in the long test.
-			*/
 			err = #force_inline _private_int_mul_toom(dest, src, multiplier)
 		} else if min_used >= MUL_KARATSUBA_CUTOFF {
 			err = #force_inline _private_int_mul_karatsuba(dest, src, multiplier)
@@ -754,15 +766,9 @@ internal_int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, a
 	}
 
 	if (denominator.used > 2 * MUL_KARATSUBA_CUTOFF) && (denominator.used <= (numerator.used / 3) * 2) {
-		assert(denominator.used >= 160 && numerator.used >= 240, "MUL_KARATSUBA_CUTOFF global not properly set.")
 		return _private_int_div_recursive(quotient, remainder, numerator, denominator)
 	} else {
 		return #force_inline _private_int_div_school(quotient, remainder, numerator, denominator)
-		/*
-			NOTE(Jeroen): We no longer need or use `_private_int_div_small`.
-			We'll keep it around for a bit until we're reasonably certain div_school is bug free.
-		*/
-		// err = _private_int_div_small(quotient, remainder, numerator, denominator)
 	}
 }
 
@@ -816,40 +822,38 @@ internal_int_divmod_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT,
 	}
 
 	/*
-		Three?
+		One digit: a plain division.
 	*/
-	if denominator == 3 {
-		return _private_int_div_3(quotient, numerator)
+	if numerator.used == 1 {
+		n    := numerator.digit[0]
+		sign := numerator.sign
+		if quotient != nil {
+			internal_set(quotient, n / denominator) or_return
+			if quotient.used > 0 {
+				quotient.sign = sign
+			}
+		}
+		return n % denominator, nil
 	}
 
 	/*
-		No easy answer [c'est la vie].  Just division.
+		No easy answer [c'est la vie].  Just division, by a reciprocal of the denominator.
 	*/
-	q := &Int{}
-
-	internal_grow(q, numerator.used) or_return
-
-	q.used = numerator.used
-	q.sign = numerator.sign
-
-	w := _WORD(0)
-
-	for ix = numerator.used - 1; ix >= 0; ix -= 1 {
-		t := DIGIT(0)
-		w = (w << _WORD(_DIGIT_BITS) | _WORD(numerator.digit[ix]))
-		if w >= _WORD(denominator) {
-			t = DIGIT(w / _WORD(denominator))
-			w -= _WORD(t) * _WORD(denominator)
-		}
-		q.digit[ix] = t
+	reciprocal := _private_digit_reciprocal(denominator)
+	if quotient == nil {
+		return _private_divmod_digits(nil, raw_data(numerator.digit), numerator.used, reciprocal), nil
 	}
-	remainder = DIGIT(w)
 
-	if quotient != nil {
-		internal_clamp(q)
-		internal_swap(q, quotient)
+	if quotient != numerator {
+		internal_grow(quotient, numerator.used) or_return
 	}
-	internal_destroy(q)
+	old_used := quotient.used
+	remainder = _private_divmod_digits(raw_data(quotient.digit), raw_data(numerator.digit), numerator.used, reciprocal)
+
+	quotient.used = numerator.used
+	quotient.sign = numerator.sign
+	internal_zero_unused(quotient, old_used)
+	internal_clamp(quotient)
 	return remainder, nil
 }
 
@@ -871,15 +875,28 @@ internal_div :: proc { internal_int_div, }
 	Asssumes quotient, numerator and denominator to have been initialized and not to be nil.
 */
 internal_int_mod :: proc(remainder, numerator, denominator: ^Int, allocator := context.allocator) -> (err: Error) {
-	#force_inline internal_int_divmod(nil, remainder, numerator, denominator, allocator) or_return
+	context.allocator = allocator
+
+	if remainder == denominator {
+		t := &Int{}
+		defer internal_destroy(t)
+		internal_copy(t, denominator) or_return
+		return internal_int_mod(remainder, numerator, t)
+	}
+
+	#force_inline internal_int_divmod(nil, remainder, numerator, denominator) or_return
 
 	if remainder.used == 0 || denominator.sign == remainder.sign { return nil }
 
-	return #force_inline internal_add(remainder, remainder, denominator, allocator)
+	return #force_inline internal_add(remainder, remainder, denominator)
 }
 
 internal_int_mod_digit :: proc(numerator: ^Int, denominator: DIGIT, allocator := context.allocator) -> (remainder: DIGIT, err: Error) {
-	return internal_int_divmod_digit(nil, numerator, denominator, allocator)
+	remainder = internal_int_divmod_digit(nil, numerator, denominator, allocator) or_return
+	if remainder != 0 && numerator.sign == .Negative {
+		remainder = denominator - remainder
+	}
+	return
 }
 
 internal_mod :: proc{ internal_int_mod, internal_int_mod_digit, }
@@ -888,8 +905,17 @@ internal_mod :: proc{ internal_int_mod, internal_int_mod_digit, }
 	remainder = (number + addend) % modulus.
 */
 internal_int_addmod :: proc(remainder, number, addend, modulus: ^Int, allocator := context.allocator) -> (err: Error) {
-	#force_inline internal_add(remainder, number, addend, allocator) or_return
-	return #force_inline internal_mod(remainder, remainder, modulus, allocator)
+	context.allocator = allocator
+
+	if remainder == modulus {
+		t := &Int{}
+		defer internal_destroy(t)
+		#force_inline internal_add(t, number, addend) or_return
+		return #force_inline internal_mod(remainder, t, modulus)
+	}
+
+	#force_inline internal_add(remainder, number, addend) or_return
+	return #force_inline internal_mod(remainder, remainder, modulus)
 }
 internal_addmod :: proc { internal_int_addmod, }
 
@@ -897,8 +923,17 @@ internal_addmod :: proc { internal_int_addmod, }
 	remainder = (number - decrease) % modulus.
 */
 internal_int_submod :: proc(remainder, number, decrease, modulus: ^Int, allocator := context.allocator) -> (err: Error) {
-	#force_inline internal_sub(remainder, number, decrease, allocator) or_return
-	return #force_inline internal_mod(remainder, remainder, modulus, allocator)
+	context.allocator = allocator
+
+	if remainder == modulus {
+		t := &Int{}
+		defer internal_destroy(t)
+		#force_inline internal_sub(t, number, decrease) or_return
+		return #force_inline internal_mod(remainder, t, modulus)
+	}
+
+	#force_inline internal_sub(remainder, number, decrease) or_return
+	return #force_inline internal_mod(remainder, remainder, modulus)
 }
 internal_submod :: proc { internal_int_submod, }
 
@@ -906,8 +941,17 @@ internal_submod :: proc { internal_int_submod, }
 	remainder = (number * multiplicand) % modulus.
 */
 internal_int_mulmod :: proc(remainder, number, multiplicand, modulus: ^Int, allocator := context.allocator) -> (err: Error) {
-	#force_inline internal_mul(remainder, number, multiplicand, allocator) or_return
-	return #force_inline internal_mod(remainder, remainder, modulus, allocator)
+	context.allocator = allocator
+
+	if remainder == modulus {
+		t := &Int{}
+		defer internal_destroy(t)
+		#force_inline internal_mul(t, number, multiplicand) or_return
+		return #force_inline internal_mod(remainder, t, modulus)
+	}
+
+	#force_inline internal_mul(remainder, number, multiplicand) or_return
+	return #force_inline internal_mod(remainder, remainder, modulus)
 }
 internal_mulmod :: proc { internal_int_mulmod, }
 
@@ -915,8 +959,17 @@ internal_mulmod :: proc { internal_int_mulmod, }
 	remainder = (number * number) % modulus.
 */
 internal_int_sqrmod :: proc(remainder, number, modulus: ^Int, allocator := context.allocator) -> (err: Error) {
-	#force_inline internal_sqr(remainder, number, allocator) or_return
-	return #force_inline internal_mod(remainder, remainder, modulus, allocator)
+	context.allocator = allocator
+
+	if remainder == modulus {
+		t := &Int{}
+		defer internal_destroy(t)
+		#force_inline internal_sqr(t, number) or_return
+		return #force_inline internal_mod(remainder, t, modulus)
+	}
+
+	#force_inline internal_sqr(remainder, number) or_return
+	return #force_inline internal_mod(remainder, remainder, modulus)
 }
 internal_sqrmod :: proc { internal_int_sqrmod, }
 
@@ -1101,7 +1154,7 @@ internal_int_is_power_of_two :: #force_inline proc(a: ^Int) -> (power_of_two: bo
 	/*
 		Early out for Int == 0.
 	*/
-	if #force_inline internal_is_zero(a) { return true }
+	if #force_inline internal_is_zero(a) { return false }
 
 	/*
 		For an `Int` to be a power of two, its bottom limb has to be a power of two.
@@ -1117,7 +1170,9 @@ internal_int_is_power_of_two :: #force_inline proc(a: ^Int) -> (power_of_two: bo
 	/*
 		For an `Int` to be a power of two, all limbs except the top one have to be zero.
 	*/
-	for i := 1; i < a.used && a.digit[i - 1] != 0; i += 1 { return false }
+	for i := 0; i < a.used - 1; i += 1 {
+		if a.digit[i] != 0 { return false }
+	}
 
 	return true
 }
@@ -1148,10 +1203,10 @@ internal_compare :: proc { internal_int_compare, internal_int_compare_digit, }
 internal_cmp :: internal_compare
 
 /*
-	Compare an `Int` to an unsigned number upto `DIGIT & _MASK`.
-	Returns -1 if `a` < `b`, 0 if `a` == `b` and 1 if `b` > `a`.
+	Compare an `Int` to an unsigned `DIGIT`, which may use all of its bits.
+	Returns -1 if `a` < `b`, 0 if `a` == `b` and 1 if `a` > `b`.
 
-	Expects: `a` and `b` both to be valid `Int`s, i.e. initialized and not `nil`.
+	Expects: `a` to be a valid `Int`, i.e. initialized and not `nil`.
 */
 internal_int_compare_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (comparison: int) {
 	assert_if_nil(a)
@@ -1165,7 +1220,12 @@ internal_int_compare_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (comparis
 	/*
 		Then compare on magnitude.
 	*/
-	case a.used > 1:        return +1
+	case a.used > 2:        return +1
+	case a.used == 2:
+		v := _WORD(a.digit[1]) << _DIGIT_BITS | _WORD(a.digit[0])
+		if v > _WORD(b) { return +1 }
+		if v < _WORD(b) { return -1 }
+		return 0
 	/*
 		We have only one digit. Compare it against `b`.
 	*/
@@ -1187,8 +1247,6 @@ internal_cmp_digit :: internal_compare_digit
 */
 internal_int_compare_magnitude :: #force_inline proc(a, b: ^Int) -> (comparison: int) {
 	assert_if_nil(a, b)
-	internal_clamp(a)
-	internal_clamp(b)
 
 	// Compare based on used digits.
 	if a.used != b.used {
@@ -1392,7 +1450,7 @@ internal_int_is_square :: proc(a: ^Int, allocator := context.allocator) -> (squa
 	square = false
 
 	if internal_is_negative(a)                                       { return }
-	if internal_is_zero(a)                                           { return }
+	if internal_is_zero(a)                                           { return true, nil }
 
 	/*
 		First check mod 128 (suppose that _DIGIT_BITS is at least 7).
@@ -1461,7 +1519,6 @@ internal_int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
 	/*
 		Fast path for `Int`s that fit within a single `DIGIT`.
 	*/
-	internal_clamp(a)
 	if a.used == 1 { return internal_log(a.digit[0], DIGIT(base)) }
 
 	return _private_int_log(a, base)
@@ -1472,6 +1529,9 @@ internal_int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
 	Returns log_base(a), where `a` is a DIGIT.
 */
 internal_digit_log :: proc(a: DIGIT, base: DIGIT) -> (log: int, err: Error) {
+	if base < 2 { return -1, .Invalid_Argument }
+	if a == 0   { return -1, .Math_Domain_Error }
+
 	/*
 		If the number is smaller than the base, it fits within a fraction.
 		Therefore, we return 0.
@@ -1545,6 +1605,12 @@ internal_int_pow :: proc(dest, base: ^Int, power: int, allocator := context.allo
 
 	}
 	if power < 0 {
+		if base.used == 1 && base.digit[0] == 1 {
+			if internal_is_negative(base) && power & 1 == 1 {
+				return internal_minus_one(dest)
+			}
+			return internal_one(dest)
+		}
 		/*
 			Fraction, so we'll return zero.
 		*/
@@ -1566,14 +1632,13 @@ internal_int_pow :: proc(dest, base: ^Int, power: int, allocator := context.allo
 	}
 
 	g := &Int{}
+	defer internal_destroy(g)
 	internal_copy(g, base) or_return
 
 	/*
 		Set initial result.
 	*/
 	internal_one(dest) or_return
-
-	defer internal_destroy(g)
 
 	for power > 0 {
 		/*
@@ -1612,11 +1677,11 @@ internal_int_pow_int :: proc(dest: ^Int, base, power: int, allocator := context.
 }
 
 internal_pow :: proc { internal_int_pow, internal_int_pow_int, }
-internal_exp :: pow
 
 /*
 
 */
+@(private="file")
 internal_small_pow :: proc(base: _WORD, exponent: _WORD) -> (result: _WORD) {
 	exponent := exponent; base := base
 	result = _WORD(1)
@@ -1681,12 +1746,15 @@ internal_sqrt :: proc { internal_int_sqrt, }
 
 
 /*
-	Find the nth root of an Integer.
-	Result found such that `(dest)**n <= src` and `(dest+1)**n > src`
+	Find the nth root of an Integer, truncated towards zero.
+	Result found such that `dest**n <= |src| < (dest+1)**n`, with the sign of `src`.
 
-	This algorithm uses Newton's approximation `x[i+1] = x[i] - f(x[i])/f'(x[i])`,
-	which will find the root in `log(n)` time where each step involves a fair bit.
+	The top bits of the root are found one at a time, which puts the estimate just above
+	the root, within a factor of 1 + 1/(2n). From there Newton's iteration
+	`x[i+1] = ((n - 1) * x[i] + |src| / x[i]**(n - 1)) / n` converges quadratically
+	down to the root, stopping as soon as `x` no longer decreases.
 
+	`n` must be at least 1, and odd if `src` is negative.
 	Assumes `dest` and `src` not to be `nil` and have been initialized.
 */
 internal_int_root_n :: proc(dest, src: ^Int, n: int, allocator := context.allocator) -> (err: Error) {
@@ -1697,9 +1765,22 @@ internal_int_root_n :: proc(dest, src: ^Int, n: int, allocator := context.alloca
 	*/
 	if n == 2 { return #force_inline internal_sqrt(dest, src) }
 
-	if n < 0 || _WORD(n) > _WORD(_DIGIT_MAX) { return .Invalid_Argument }
+	if n < 1 || _WORD(n) > _WORD(_DIGIT_MAX) { return .Invalid_Argument }
 
 	if n & 1 == 0 && #force_inline internal_is_negative(src) { return .Invalid_Argument }
+
+	if n == 1 { return internal_copy(dest, src) }
+
+	if #force_inline internal_is_zero(src) { return internal_zero(dest) }
+
+	sign := src.sign
+	bits := internal_count_bits(src)
+
+	if bits <= n {
+		internal_one(dest) or_return
+		dest.sign = sign
+		return nil
+	}
 
 	/*
 		Set up temporaries.
@@ -1714,134 +1795,45 @@ internal_int_root_n :: proc(dest, src: ^Int, n: int, allocator := context.alloca
 	a.used  = src.used
 	a.digit = src.digit
 
-	/*
-		If "n" is larger than INT_MAX it is also larger than
-		log_2(src) because the bit-length of the "src" is measured
-		with an int and hence the root is always < 2 (two).
-	*/
-	if n > max(int) / 2 {
-		err = set(dest, 1)
-		dest.sign = a.sign
-		return err
-	}
+	root_bits := (bits + n - 1) / n
+	n_bits    := _DIGIT_TYPE_BITS - int(intrinsics.count_leading_zeros(DIGIT(n)))
+	top_bits  := min(root_bits, n_bits + 2)
 
-	/*
-		Compute seed: 2^(log_2(src)/n + 2)
-	*/
-	ilog2 := internal_count_bits(src)
-
-	/*
-		"src" is smaller than max(int), we can cast safely.
-	*/
-	if ilog2 < n {
-		err = internal_one(dest)
-		dest.sign = a.sign
-		return err
-	}
-
-	ilog2 /= n
-	if ilog2 == 0 {
-		err = internal_one(dest)
-		dest.sign = a.sign
-		return err
-	}
-
-	/*
-		Start value must be larger than root.
-	*/
-	ilog2 += 2
-	internal_int_power_of_two(t2, ilog2) or_return
-
-	c: int
-	iterations := 0
-	for {
-		/* t1 = t2 */
-		internal_copy(t1, t2) or_return
-
-		/* t2 = t1 - ((t1**b - a) / (b * t1**(b-1))) */
-
-		/* t3 = t1**(b-1) */
-		internal_pow(t3, t1, n-1) or_return
-
-		/* numerator */
-		/* t2 = t1**b */
-		internal_mul(t2, t1, t3) or_return
-
-		/* t2 = t1**b - a */
-		internal_sub(t2, t2, a) or_return
-
-		/* denominator */
-		/* t3 = t1**(b-1) * b  */
-		internal_mul(t3, t3, DIGIT(n)) or_return
-
-		/* t3 = (t1**b - a)/(b * t1**(b-1)) */
-		internal_div(t3, t2, t3) or_return
-		internal_sub(t2, t1, t3) or_return
-
-		/*
-			 Number of rounds is at most log_2(root). If it is more it
-			 got stuck, so break out of the loop and do the rest manually.
-		*/
-		if ilog2 -= 1; ilog2 == 0 { break }
-		if internal_eq(t1, t2)    { break }
-
-		iterations += 1
-		if iterations == MAX_ITERATIONS_ROOT_N {
-			return .Max_Iterations_Reached
-		}
-	}
-
-	/*						Result can be off by a few so check.					*/
-	/* Loop beneath can overshoot by one if found root is smaller than actual root. */
-
-	iterations = 0
-	for {
+	internal_zero(t1) or_return
+	for i := root_bits - 1; i >= root_bits - top_bits; i -= 1 {
+		internal_int_power_of_two(t3, i) or_return
+		internal_add(t1, t1, t3) or_return
 		internal_pow(t2, t1, n) or_return
-
-		c = internal_cmp(t2, a)
-		if c == 0 {
-			swap(dest, t1)
-			return nil
-		} else if c == -1 {
-			internal_add(t1, t1, DIGIT(1)) or_return
-		} else {
-			break
-		}
-
-		iterations += 1
-		if iterations == MAX_ITERATIONS_ROOT_N {
-			return .Max_Iterations_Reached
+		if internal_gt(t2, a) {
+			internal_sub(t1, t1, t3) or_return
 		}
 	}
 
-	iterations = 0
-	/*
-		Correct overshoot from above or from recurrence.
-		*/
-	for {
-		internal_pow(t2, t1, n) or_return
-	
-		if internal_lt(t2, a) { break }
-		
-		internal_sub(t1, t1, DIGIT(1)) or_return
+	if top_bits < root_bits {
+		internal_int_power_of_two(t3, root_bits - top_bits) or_return
+		internal_add(t1, t1, t3) or_return
 
-		iterations += 1
-		if iterations == MAX_ITERATIONS_ROOT_N {
-			return .Max_Iterations_Reached
+		iterations := 0
+		for {
+			internal_pow(t3, t1, n - 1) or_return
+			internal_div(t3, a, t3) or_return
+			internal_mul(t2, t1, DIGIT(n - 1)) or_return
+			internal_add(t2, t2, t3) or_return
+			_ = internal_divmod(t2, t2, DIGIT(n)) or_return
+
+			if internal_gte(t2, t1) { break }
+			internal_swap(t1, t2)
+
+			iterations += 1
+			if iterations == MAX_ITERATIONS_ROOT_N {
+				return .Max_Iterations_Reached
+			}
 		}
 	}
 
-	/*
-		Set the result.
-	*/
 	internal_swap(dest, t1)
-
-	/*
-		Set the sign of the result.
-	*/
-	dest.sign = src.sign
-
-	return err
+	dest.sign = sign
+	return nil
 }
 internal_root_n :: proc { internal_int_root_n, }
 
@@ -1891,7 +1883,8 @@ internal_int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, al
 
 	temp := src
 
-	is_maximally_negative := src == min(T)
+	// For an unsigned `T`, `min(T)` is zero.
+	is_maximally_negative := !intrinsics.type_is_unsigned(T) && src == min(T)
 	if is_maximally_negative {
 		/*
 			Prevent overflow on abs()
@@ -1906,10 +1899,10 @@ internal_int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, al
 		temp >>= _DIGIT_BITS
 	}
 
+	internal_zero_unused(dest)
 	if is_maximally_negative {
 		return internal_sub(dest, dest, 1)
 	}
-	internal_zero_unused(dest)
 	return nil
 }
 
@@ -1918,10 +1911,14 @@ internal_set :: proc { internal_int_set_from_integer, internal_int_copy, int_ato
 internal_copy_digits :: #force_inline proc(dest, src: ^Int, digits: int, offset := int(0)) -> (err: Error) {
 	#force_inline internal_error_if_immutable(dest) or_return
 
+	if digits < 0 || offset < 0 || offset > len(src.digit) { return .Invalid_Argument }
+	count := min(digits, len(src.digit) - offset, len(dest.digit))
+	if count == 0 { return nil }
+
 	/*
 		If dest == src, do nothing
 	*/
-	return #force_inline _private_copy_digits(dest, src, digits, offset)
+	return #force_inline _private_copy_digits(dest, src, count, offset)
 }
 
 /*
@@ -1968,6 +1965,7 @@ internal_int_swap :: #force_inline proc(a, b: ^Int) {
 	a.used,  b.used  = b.used,  a.used
 	a.sign,  b.sign  = b.sign,  a.sign
 	a.digit, b.digit = b.digit, a.digit
+	a.flags, b.flags = b.flags, a.flags
 }
 internal_swap :: proc { 
 	internal_int_swap, 
@@ -2066,25 +2064,26 @@ internal_invmod :: proc{ internal_int_inverse_modulo, }
 */
 internal_int_bitfield_extract_bool :: proc(a: ^Int, offset: int) -> (val: bool, err: Error) {
 	limb := offset / _DIGIT_BITS
-	if limb < 0 || limb >= a.used  { return false, .Invalid_Argument }
+	if offset < 0 || limb >= a.used  { return false, .Invalid_Argument }
 	i := _WORD(1 << _WORD((offset % _DIGIT_BITS)))
 	return bool(_WORD(a.digit[limb]) & i), nil
 }
 
 internal_int_bitfield_extract_single :: proc(a: ^Int, offset: int) -> (bit: _WORD, err: Error) {
 	limb := offset / _DIGIT_BITS
-	if limb < 0 || limb >= a.used  { return 0, .Invalid_Argument }
+	if offset < 0 || limb >= a.used  { return 0, .Invalid_Argument }
 	i := _WORD(1 << _WORD((offset % _DIGIT_BITS)))
 	return 1 if ((_WORD(a.digit[limb]) & i) != 0) else 0, nil
 }
 
 internal_int_bitfield_extract :: proc(a: ^Int, offset, count: int) -> (res: _WORD, err: Error) #no_bounds_check {
+	if offset < 0 || offset / _DIGIT_BITS >= a.used { return 0, .Invalid_Argument }
+
 	/*
 		Early out for single bit.
 	*/
 	if count == 1 {
 		limb := offset / _DIGIT_BITS
-		if limb < 0 || limb >= a.used  { return 0, .Invalid_Argument }
 		i := _WORD(1 << _WORD((offset % _DIGIT_BITS)))
 		return 1 if ((_WORD(a.digit[limb]) & i) != 0) else 0, nil
 	}
@@ -2114,7 +2113,7 @@ internal_int_bitfield_extract :: proc(a: ^Int, offset, count: int) -> (res: _WOR
 	res          = (_WORD(a.digit[limb]) >> uint(shift)) & mask
 
 	bits_left -= num_bits
-	if bits_left == 0 { return res, nil }
+	if bits_left == 0 || limb + 1 >= a.used { return res, nil }
 
 	res_shift := num_bits
 	num_bits   = min(bits_left, _DIGIT_BITS)
@@ -2123,7 +2122,7 @@ internal_int_bitfield_extract :: proc(a: ^Int, offset, count: int) -> (res: _WOR
 	res |= (_WORD(a.digit[limb + 1]) & mask) << uint(res_shift)
 
 	bits_left -= num_bits
-	if bits_left == 0 { return res, nil }
+	if bits_left == 0 || limb + 2 >= a.used { return res, nil }
 
 	mask     = (1 << uint(bits_left)) - 1
 	res_shift += _DIGIT_BITS
@@ -2139,7 +2138,7 @@ internal_int_bitfield_extract :: proc(a: ^Int, offset, count: int) -> (res: _WOR
 */
 internal_int_bitfield_set_single :: proc(a: ^Int, offset: int) -> (err: Error) {
 	limb := offset / _DIGIT_BITS
-	if limb < 0 || limb >= a.used  { return .Invalid_Argument }
+	if offset < 0 || limb >= a.used  { return .Invalid_Argument }
 	i := DIGIT(1 << uint((offset % _DIGIT_BITS)))
 	a.digit[limb] |= i
 	return
@@ -2147,18 +2146,18 @@ internal_int_bitfield_set_single :: proc(a: ^Int, offset: int) -> (err: Error) {
 
 internal_int_bitfield_unset_single :: proc(a: ^Int, offset: int) -> (err: Error) {
 	limb := offset / _DIGIT_BITS
-	if limb < 0 || limb >= a.used  { return .Invalid_Argument }
+	if offset < 0 || limb >= a.used  { return .Invalid_Argument }
 	i := DIGIT(1 << uint((offset % _DIGIT_BITS)))
 	a.digit[limb] &= _MASK - i
-	return
+	return internal_clamp(a)
 }
 
 internal_int_bitfield_toggle_single :: proc(a: ^Int, offset: int) -> (err: Error) {
 	limb := offset / _DIGIT_BITS
-	if limb < 0 || limb >= a.used  { return .Invalid_Argument }
+	if offset < 0 || limb >= a.used  { return .Invalid_Argument }
 	i := DIGIT(1 << uint((offset % _DIGIT_BITS)))
 	a.digit[limb] ~= i
-	return
+	return internal_clamp(a)
 }
 
 /*
@@ -2170,7 +2169,7 @@ internal_int_bitfield_toggle_single :: proc(a: ^Int, offset: int) -> (err: Error
 internal_int_shrink :: proc(a: ^Int) -> (err: Error) {
 	needed := max(_MIN_DIGIT_COUNT, a.used)
 
-	if a.used != needed { return internal_grow(a, needed, true) }
+	if internal_int_allocated_cap(a) != needed { return internal_grow(a, needed, true) }
 	return nil
 }
 internal_shrink :: proc { internal_int_shrink, }
@@ -2183,6 +2182,7 @@ internal_int_grow :: proc(a: ^Int, digits: int, allow_shrink := false, allocator
 	cap := internal_int_allocated_cap(a)
 
 	needed := max(_MIN_DIGIT_COUNT, a.used, digits)
+	if needed > _MAX_DIGIT_COUNT { return .Integer_Overflow }
 	if !allow_shrink {
 		needed = max(needed, cap)
 	}
@@ -2228,6 +2228,7 @@ internal_int_clear :: proc(a: ^Int, minimize := false, allocator := context.allo
 	}
 	a.sign = .Zero_or_Positive
 	a.used = 0
+	a.flags -= {.NaN, .Inf}
 
 	return #force_inline internal_grow(a, a.used, minimize, allocator)
 }
@@ -2264,7 +2265,7 @@ internal_inf :: proc { internal_int_inf, }
 internal_int_minus_inf :: proc(a: ^Int, minimize := false, allocator := context.allocator) -> (err: Error) {
 	return internal_copy(a, INT_MINUS_INF, minimize, allocator)
 }
-internal_minus_inf :: proc { internal_int_inf, }
+internal_minus_inf :: proc { internal_int_minus_inf, }
 
 /*
 	Set the `Int` to NaN and optionally shrink it to the minimum backing size.
@@ -2282,8 +2283,10 @@ internal_int_power_of_two :: proc(a: ^Int, power: int, allocator := context.allo
 	/*
 		Grow to accomodate the single bit.
 	*/
-	a.used = (power / _DIGIT_BITS) + 1
-	internal_grow(a, a.used) or_return
+	internal_grow(a, (power / _DIGIT_BITS) + 1) or_return
+	a.used  = (power / _DIGIT_BITS) + 1
+	a.sign  = .Zero_or_Positive
+	a.flags = {}
 	/*
 		Zero the entirety.
 	*/
@@ -2347,10 +2350,8 @@ internal_get_low_u64 :: proc(a: ^Int) -> u64 #no_bounds_check {
 	}
 	
 	v := u64(a.digit[0])
-	when size_of(DIGIT) == 4 {
-		if a.used > 1 {
-			return u64(a.digit[1])<<32 | v
-		}
+	if a.used > 1 {
+		v |= u64(a.digit[1]) << _DIGIT_BITS
 	}
 	return v
 }
@@ -2376,6 +2377,15 @@ internal_int_get :: proc(a: ^Int, $T: typeid) -> (res: T, err: Error) where intr
 
 	bits_used := internal_count_bits(a)
 
+	when !intrinsics.type_is_unsigned(T) {
+		if a.sign == .Negative && bits_used == target_bit_size {
+			lsb, _ := internal_int_count_lsb(a)
+			if lsb != target_bit_size - 1 {
+				return min(T), .Integer_Underflow
+			}
+		}
+	}
+
 	if bits_used > target_bit_size {
 		if a.sign == .Negative {
 			return min(T), .Integer_Underflow
@@ -2399,19 +2409,24 @@ internal_int_get :: proc(a: ^Int, $T: typeid) -> (res: T, err: Error) where intr
 internal_get :: proc { internal_int_get, }
 
 internal_int_get_float :: proc(a: ^Int) -> (res: f64, err: Error) {
-	/*
-		log2(max(f64)) is approximately 1020, or 17 legs with the 64-bit storage.
-	*/
-	legs :: 1020 / _DIGIT_BITS
-	l   := min(a.used, legs)
-	fac := f64(1 << _DIGIT_BITS)
-	d   := 0.0
+	bits := internal_count_bits(a)
 
-	#no_bounds_check for i := l; i >= 0; i -= 1 {
-		d = (d * fac) + f64(a.digit[i])
+	if bits <= _DIGIT_BITS {
+		res = f64(a.digit[0]) if bits > 0 else 0
+	} else if bits > 1024 {
+		res = math.inf_f64(1)
+	} else {
+		shift := bits - 64
+		top, _ := internal_int_bitfield_extract(a, shift, 64)
+		mantissa := u64(top)
+		lsb, _ := internal_int_count_lsb(a)
+		if lsb < shift {
+			mantissa |= 1
+		}
+		res = math.ldexp(f64(mantissa), shift)
 	}
 
-	res = -d if a.sign == .Negative else d
+	res = -res if a.sign == .Negative else res
 	return
 }
 
@@ -2611,22 +2626,8 @@ internal_xor :: proc { internal_int_xor, }
 internal_int_complement :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
-	/*
-		Temporarily fix sign.
-	*/
-	old_sign := src.sign
-
-	neg := #force_inline internal_is_zero(src) || #force_inline internal_is_positive(src)
-
-	src.sign = .Negative if neg else .Zero_or_Positive
-
-	err = #force_inline internal_sub(dest, src, 1)
-	/*
-		Restore sign.
-	*/
-	src.sign = old_sign
-
-	return err
+	internal_neg(dest, src) or_return
+	return #force_inline internal_sub(dest, dest, 1)
 }
 internal_complement :: proc { internal_int_complement, }
 
@@ -2684,7 +2685,7 @@ internal_int_shrmod :: proc(quotient, remainder, numerator: ^Int, bits: int, all
 		}
 
 	}
-	return internal_clamp(numerator)
+	return internal_clamp(quotient)
 }
 internal_shrmod :: proc { internal_int_shrmod, }
 
@@ -2704,7 +2705,7 @@ internal_int_shr_signed :: proc(dest, src: ^Int, bits: int, allocator := context
 	}
 	internal_int_add_digit(dest, src, DIGIT(1)) or_return
 	internal_shr(dest, dest, bits) or_return
-	return internal_sub(dest, src, DIGIT(1))
+	return internal_sub(dest, dest, DIGIT(1))
 }
 
 internal_shr_signed :: proc { internal_int_shr_signed, }
@@ -2860,6 +2861,7 @@ internal_int_random :: proc(dest: ^Int, bits: int, allocator := context.allocato
 
 	#force_inline internal_grow(dest, digits) or_return
 
+	old_used := dest.used
 	for i := 0; i < digits; i += 1 {
 		dest.digit[i] = int_random_digit() & _MASK
 	}
@@ -2867,6 +2869,9 @@ internal_int_random :: proc(dest: ^Int, bits: int, allocator := context.allocato
 		dest.digit[digits - 1] &= ((1 << uint(bits)) - 1)
 	}
 	dest.used = digits
+	dest.sign = .Zero_or_Positive
+	dest.flags = {}
+	internal_zero_unused(dest, old_used)
 	return internal_clamp(dest)
 }
 internal_random :: proc { internal_int_random, }
@@ -2900,6 +2905,12 @@ internal_clear_if_uninitialized_multi :: proc(args: ..^Int, allocator := context
 }
 internal_clear_if_uninitialized :: proc {internal_clear_if_uninitialized_single, internal_clear_if_uninitialized_multi, }
 
+@(private)
+_zero_if_uninitialized :: #force_inline proc(a: ^Int) -> (res: ^Int) {
+	if a != nil && a.used == 0 && ! #force_inline internal_is_initialized(a) { return INT_ZERO }
+	return a
+}
+
 internal_error_if_immutable_single :: proc "contextless" (arg: ^Int) -> (err: Error) {
 	if arg != nil && .Immutable in arg.flags { return .Assignment_To_Immutable }
 	return nil
@@ -2912,6 +2923,30 @@ internal_error_if_immutable_multi :: proc "contextless" (args: ..^Int) -> (err: 
 	return nil
 }
 internal_error_if_immutable :: proc {internal_error_if_immutable_single, internal_error_if_immutable_multi, }
+
+internal_error_if_non_finite_single :: proc "contextless" (arg: ^Int) -> (err: Error) {
+	if arg != nil && (.NaN in arg.flags || .Inf in arg.flags) { return .Invalid_Argument }
+	return nil
+}
+
+internal_error_if_non_finite_multi :: proc "contextless" (args: ..^Int) -> (err: Error) {
+	for i in args {
+		if i != nil && (.NaN in i.flags || .Inf in i.flags) { return .Invalid_Argument }
+	}
+	return nil
+}
+internal_error_if_non_finite :: proc {internal_error_if_non_finite_single, internal_error_if_non_finite_multi, }
+
+internal_clear_non_finite_single :: proc "contextless" (arg: ^Int) {
+	if arg != nil { arg.flags -= {.NaN, .Inf} }
+}
+
+internal_clear_non_finite_multi :: proc "contextless" (args: ..^Int) {
+	for i in args {
+		if i != nil { i.flags -= {.NaN, .Inf} }
+	}
+}
+internal_clear_non_finite :: proc {internal_clear_non_finite_single, internal_clear_non_finite_multi, }
 
 /*
 	Allocates several `Int`s at once.

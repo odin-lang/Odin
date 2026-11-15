@@ -1150,10 +1150,12 @@ gb_internal lbValue lb_enum_values_slice(lbProcedure *p, Type *enum_type, i64 *e
 
 	if (enum_count_) *enum_count_ = enum_count;
 
-	lbValue ti       = lb_type_info(p, t);
-	lbValue variant  = lb_emit_struct_ep(p, ti, 4);
-	lbValue eti_ptr  = lb_emit_conv(p, variant, t_type_info_enum_ptr);
-	lbValue values   = lb_emit_load(p, lb_emit_struct_ep(p, eti_ptr, 2));
+	Selection sel = lookup_field(t_type_info_enum, string_interner_insert(str_lit("values")), false);
+	GB_ASSERT(sel.entity != nullptr);
+
+	lbValue ti      = lb_type_info(p, t);
+	lbValue eti_ptr = lb_emit_conv(p, ti, t_type_info_enum_ptr);
+	lbValue values  = lb_emit_load(p, lb_emit_deep_field_gep(p, eti_ptr, sel));
 	return values;
 }
 
@@ -2466,7 +2468,8 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 					saw_nil = true;
 					on_val = lb_const_int(m, union_tag_type(ut), 0);
 				} else {
-					on_val = lb_const_union_tag(m, ut, case_type);
+					Type *vt = type_info_variant_shim_type(ut, case_type);
+					on_val = lb_const_union_tag(m, ut, vt ? vt : case_type);
 				}
 
 			} else if (switch_kind == TypeSwitch_Any) {
@@ -2498,6 +2501,15 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 			Type *ct = case_entity->type;
 			Type *ct_ptr = alloc_type_pointer(ct);
 
+			lbValue stored = {};
+			if (switch_kind == TypeSwitch_Union) {
+				Type *vt = type_info_variant_shim_type(base_type(parent_base_type), ct);
+				if (vt != nullptr) {
+					stored = lb_emit_load(p, lb_emit_union_variant_ptr(p, parent_ptr, vt));
+					data = stored;
+				}
+			}
+
 			lbValue ptr = {};
 
 			if (backing_data.addr.value) { // by value
@@ -2511,7 +2523,9 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 
 			} else { // by reference
 				GB_ASSERT(by_reference);
-				if (switch_kind == TypeSwitch_Union) {
+				if (stored.value != nullptr) {
+					ptr = stored;
+				} else if (switch_kind == TypeSwitch_Union) {
 					ptr = lb_emit_union_variant_ptr(p, parent_ptr, ct);
 				} else {
 					ptr = lb_emit_conv(p, data, ct_ptr);
@@ -2670,10 +2684,117 @@ gb_internal isize lb_append_tuple_values(lbProcedure *p, Array<lbValue> *dst_val
 }
 
 
+gb_internal bool lb_is_large_plain_load(LLVMValueRef value) {
+	if (!LLVMIsALoadInst(value) || LLVMGetVolatile(value) || LLVMGetOrdering(value) != LLVMAtomicOrderingNotAtomic) {
+		return false;
+	}
+	return lb_sizeof(LLVMTypeOf(value)) > LB_MAX_STORE_SIZE;
+}
+
+gb_internal bool lb_load_reads_alloca_after(lbProcedure *p, LLVMValueRef load, LLVMValueRef decl_marker) {
+	LLVMValueRef base = LLVMGetOperand(load, 0);
+	while (LLVMIsAGetElementPtrInst(base) || LLVMIsABitCastInst(base) || LLVMIsAAddrSpaceCastInst(base)) {
+		base = LLVMGetOperand(base, 0);
+	}
+	if (!LLVMIsAAllocaInst(base)) {
+		return false;
+	}
+	LLVMValueRef it = decl_marker != nullptr ? LLVMGetNextInstruction(decl_marker) : LLVMGetFirstInstruction(p->decl_block->block);
+	for (; it != nullptr; it = LLVMGetNextInstruction(it)) {
+		if (it == base) {
+			return true;
+		}
+	}
+	return false;
+}
+
+gb_internal bool lb_is_instr_memory_preserving(LLVMValueRef instr) {
+	return LLVMIsALoadInst(instr)            ||
+	       LLVMIsAGetElementPtrInst(instr)   ||
+	       LLVMIsACastInst(instr)            ||
+	       LLVMIsABinaryOperator(instr)      ||
+	       LLVMIsAUnaryOperator(instr)       ||
+	       LLVMIsACmpInst(instr)             ||
+	       LLVMIsASelectInst(instr)          ||
+	       LLVMIsAExtractValueInst(instr)    ||
+	       LLVMIsAInsertValueInst(instr)     ||
+	       LLVMIsAExtractElementInst(instr)  ||
+	       LLVMIsAInsertElementInst(instr)   ||
+	       LLVMIsAShuffleVectorInst(instr)   ||
+	       LLVMIsAFreezeInst(instr)          ||
+	       LLVMIsADbgInfoIntrinsic(instr);
+}
+
+gb_internal bool lb_load_is_last_memory_access(lbProcedure *p, LLVMValueRef load) {
+	if (LLVMGetInstructionParent(load) != p->curr_block->block) {
+		return false;
+	}
+	for (LLVMValueRef it = LLVMGetNextInstruction(load); it != nullptr; it = LLVMGetNextInstruction(it)) {
+		if (!lb_is_instr_memory_preserving(it)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+gb_internal isize lb_acquire_multi_assign_copy_slot(lbProcedure *p, Type *type) {
+	for_array(i, p->multi_assign_copy_slots) {
+		lbMultiAssignCopySlot &slot = p->multi_assign_copy_slots[i];
+		if (!slot.in_use && are_types_identical(slot.type, type)) {
+			slot.in_use = true;
+			return i;
+		}
+	}
+	lbAddr addr = lb_add_local_generated(p, type, false);
+	lbMultiAssignCopySlot slot = {};
+	slot.type   = type;
+	slot.ptr    = addr.addr.value;
+	slot.in_use = true;
+	array_add(&p->multi_assign_copy_slots, slot);
+	return p->multi_assign_copy_slots.count-1;
+}
+
+// NOTE: Copies a large loaded value into a local right after its load, so it is stored by copying memory and
+// not as a first-class aggregate, which LLVM splits per element and can take minutes to optimize
+gb_internal isize lb_copy_loaded_value_to_local(lbProcedure *p, lbValue *value, bool reuse_slot) {
+	LLVMValueRef load = value->value;
+	i64 size = lb_sizeof(LLVMTypeOf(load));
+
+	isize slot_index = -1;
+	lbValue copy = {};
+	if (reuse_slot) {
+		slot_index = lb_acquire_multi_assign_copy_slot(p, value->type);
+		copy.value = p->multi_assign_copy_slots[slot_index].ptr;
+		copy.type  = alloc_type_pointer(value->type);
+	} else {
+		copy = lb_add_local_generated(p, value->type, false).addr;
+	}
+
+	LLVMMetadataRef prev_loc = LLVMGetCurrentDebugLocation2(p->builder);
+	LLVMValueRef next = LLVMGetNextInstruction(load);
+	if (next != nullptr) {
+		LLVMPositionBuilderBefore(p->builder, next);
+	} else {
+		LLVMPositionBuilderAtEnd(p->builder, LLVMGetInstructionParent(load));
+	}
+	LLVMSetCurrentDebugLocation2(p->builder, LLVMInstructionGetDebugLoc(load));
+	LLVMBuildMemCpy(p->builder,
+	                copy.value, lb_try_get_alignment(copy.value, 1),
+	                LLVMGetOperand(load, 0), LLVMGetAlignment(load),
+	                LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), size, false));
+	LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);
+	LLVMSetCurrentDebugLocation2(p->builder, prev_loc);
+
+	*value = lb_addr_load(p, lb_addr(copy));
+	return slot_index;
+}
+
 gb_internal void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice<Ast *> const &values) {
 	if (values.count == 0) {
 		return;
 	}
+
+	LLVMValueRef decl_marker = LLVMGetLastInstruction(p->decl_block->block);
 
 	auto inits = array_make<lbValue>(permanent_allocator(), 0, lvals.count);
 
@@ -2684,20 +2805,59 @@ gb_internal void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice
 
 	bool prev_in_assignment = p->in_multi_assignment;
 
-	isize lval_count = 0;
-	for (lbAddr const &lval : lvals) {
-		if (lval.addr.value != nullptr) {
+	isize first_lval = -1;
+	for_array(i, lvals) {
+		if (lvals[i].addr.value != nullptr) {
 			// check if it is not a blank identifier
-			lval_count += 1;
+			first_lval = i;
+			break;
 		}
 	}
-	p->in_multi_assignment = lval_count > 1;
 
 	GB_ASSERT(lvals.count == inits.count);
+	bool multi = inits.count > 1;
+	auto store_from_memory = slice_make<bool>(temporary_allocator(), inits.count);
+	auto copy_slots = slice_make<isize>(temporary_allocator(), inits.count);
+	for_array(i, copy_slots) {
+		copy_slots[i] = -1;
+	}
+	if (multi) {
+		auto large = slice_make<bool>(temporary_allocator(), inits.count);
+		auto plain = slice_make<bool>(temporary_allocator(), inits.count);
+		for_array(i, inits) {
+			if (lvals[i].addr.value == nullptr || !lb_is_large_plain_load(inits[i].value)) {
+				continue;
+			}
+			large[i] = true;
+			plain[i] = lvals[i].kind == lbAddr_Default && are_types_identical(lb_addr_type(lvals[i]), inits[i].type);
+			if (lb_load_reads_alloca_after(p, inits[i].value, decl_marker)) {
+				store_from_memory[i] = true;
+			} else if (i == first_lval && plain[i] && lb_load_is_last_memory_access(p, inits[i].value)) {
+				store_from_memory[i] = true;
+			}
+		}
+		for_array(i, inits) {
+			if (large[i] && !store_from_memory[i]) {
+				copy_slots[i] = lb_copy_loaded_value_to_local(p, &inits[i], plain[i]);
+				store_from_memory[i] = true;
+			}
+		}
+	}
+
 	for_array(i, inits) {
 		lbAddr lval = lvals[i];
 		lbValue init = inits[i];
+		// NOTE: these values are read from memory when they are stored, as no earlier store of this assignment writes them:
+		// copies, temporaries created after the targets were built, and the first value when its target is a plain
+		// variable and nothing after its load writes memory
+		p->in_multi_assignment = multi && !store_from_memory[i];
 		lb_addr_store(p, lval, init);
+	}
+
+	for_array(i, copy_slots) {
+		if (copy_slots[i] >= 0) {
+			p->multi_assign_copy_slots[copy_slots[i]].in_use = false;
+		}
 	}
 
 	p->in_multi_assignment = prev_in_assignment;

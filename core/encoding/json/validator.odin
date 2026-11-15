@@ -9,7 +9,7 @@ is_valid :: proc(data: []byte, spec := DEFAULT_SPECIFICATION, parse_integers := 
 
 	switch p.spec {
 	case .JSON:
-		return validate_value(&p)
+		return validate_value(&p) && at_end(&p)
 	case .JSON5:
 		return validate_value(&p)
 	case .MJSON:
@@ -60,7 +60,7 @@ validate_object :: proc(p: ^Parser) -> bool {
 
 	validate_object_body(p, .Close_Brace) or_return
 
-	if err := expect_token(p, .Close_Brace); err != .None {
+	if err := expect_closing_token(p, .Close_Brace); err != .None {
 		return false
 	}
 	return true
@@ -82,7 +82,7 @@ validate_array :: proc(p: ^Parser) -> bool {
 		}
 	}
 
-	if err := expect_token(p, .Close_Bracket); err != .None {
+	if err := expect_closing_token(p, .Close_Bracket); err != .None {
 		return false
 	}
 
@@ -92,6 +92,9 @@ validate_array :: proc(p: ^Parser) -> bool {
 @(require_results)
 validate_value :: proc(p: ^Parser) -> bool {
 	token := p.curr_token
+	if p.spec == .JSON && p.curr_token_err == .Invalid_Number {
+		return false
+	}
 
 	#partial switch token.kind {
 	case .Null, .False, .True:

@@ -5,8 +5,16 @@ package container_rbtree
 @(require) import "base:runtime"
 import "core:slice"
 
-// Originally based on the CC0 implementation from literateprograms.org
-// But with API design mimicking `core:container/avl` for ease of use.
+/*
+	Copyright 2024-2026 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+
+	Originally based on the CC0 red-black tree in C from literateprograms.org,
+	with its API modelled on Yawning Angel's `core:container/avl` for ease of use.
+*/
 
 // Direction specifies the traversal direction for a tree iterator.
 Direction :: enum i8 {

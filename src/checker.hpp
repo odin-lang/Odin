@@ -217,6 +217,7 @@ struct ProcDeclInfo {
 
 	Type *  gen_proc_type; // Precalculated
 	Entity *para_poly_original;
+	Type *  enclosing_signature;
 	std::atomic<struct ProcInfo *> gen_proc_info; // a specialization's body, queued for checking when it is first used
 	struct ProcInfo *proc_info; // its body, once checked
 
@@ -1006,7 +1007,6 @@ struct Checker {
 
 gb_global AstPackage *builtin_pkg    = nullptr;
 gb_global AstPackage *intrinsics_pkg = nullptr;
-gb_global AstPackage *config_pkg      = nullptr;
 
 
 // CheckerInfo API

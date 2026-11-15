@@ -71,10 +71,7 @@ decompress_frame_from_context :: proc(z: ^compress.Context, expected_output_size
 		limit = expected
 	}
 
-	input_size := -1
-	if n, size_err := compress.size(z); size_err == nil && n <= i64(max(int)) {
-		input_size = int(n)
-	}
+	input_size := compress.input_size(z)
 	if expected > 0 {
 		non_zero_reserve(z.output, lz4_initial_size(expected, input_size)) or_return
 	}
@@ -153,18 +150,15 @@ lz4_read_bytes :: proc(z: ^compress.Context, n: int, scratch: ^[dynamic]u8) -> (
 
 @(private)
 lz4_decompress_bound :: proc "contextless" (input_size: int) -> int {
-	if input_size > max(int) / LZ4_EXPANSION_MAX {
+	if input_size > max(int) / compress.LZ4_EXPANSION_MAX {
 		return max(int)
 	}
-	return LZ4_EXPANSION_MAX * input_size
+	return compress.LZ4_EXPANSION_MAX * input_size
 }
 
 @(private)
 lz4_initial_size :: proc "contextless" (size, input_size: int) -> int {
-	if input_size >= 0 {
-		return min(size, lz4_decompress_bound(input_size))
-	}
-	return min(size, LZ4_INITIAL_SIZE_MAX)
+	return compress.output_reservation(size, lz4_decompress_bound(input_size) if input_size >= 0 else -1, input_size)
 }
 
 @(private)
@@ -174,9 +168,7 @@ lz4_grow :: proc(output: ^[dynamic]u8, need, limit: int) -> (err: Error) {
 	}
 	if need > len(output) {
 		if need > cap(output) {
-			capacity := cap(output)
-			step     := capacity if capacity < LZ4_GROWTH_STEP else max(LZ4_GROWTH_STEP, capacity / 4)
-			non_zero_reserve(output, min(max(capacity + step, need), limit)) or_return
+			non_zero_reserve(output, compress.output_grow_capacity(cap(output), need, limit)) or_return
 		}
 		non_zero_resize(output, need) or_return
 	}
@@ -250,6 +242,11 @@ lz4_decode_frame :: proc(z: ^compress.Context, start, limit, input_size: int, di
 		overflow    = LZ4_Error.Content_Size_Mismatch
 		if start + lz4_initial_size(int(content_size), input_size) > cap(z.output) {
 			non_zero_reserve(z.output, start + lz4_initial_size(int(content_size), input_size)) or_return
+		}
+	} else if start == 0 {
+		reservation := min(lz4_initial_size(-1, input_size), limit)
+		if reservation > cap(z.output) {
+			non_zero_reserve(z.output, reservation) or_return
 		}
 	}
 

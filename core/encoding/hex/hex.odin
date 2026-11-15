@@ -6,6 +6,18 @@ import "core:io"
 import "core:strings"
 
 /*
+	Copyright 2023 Laytan Laats.
+	Copyright 2026 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's license.
+
+	List of contributors:
+		Laytan Laats:    Initial implementation.
+		Jeroen van Rijn: `encode_upper`, `encode_upper_into_writer`, documentation.
+		mo:              `decode_into_buffer`.
+		bplu4t2f:        Error handling.
+*/
+
+/*
 Encodes a byte slice into a lowercase hex sequence
 
 *Allocates Using Provided Allocator*
