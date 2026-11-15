@@ -63,6 +63,10 @@ set ODIN=..\..\..\odin
 %ODIN% check "..\test_issue_atomic_errors" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
 %ODIN% check "..\test_issue_atomic_access" -no-entry-point -vet-atomic-access %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
 %ODIN% check "..\test_issue_escape_stored_field" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "holds a pointer into itself" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "is taken at" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "'temp.allocator.data' may refer to 'temp.arena' in the stack memory of the named result 'temp'" | findstr /x "1" || exit /b
 %ODIN% test "..\test_issue_type_info_variant_shim" %COMMON% -ignore-warnings || exit /b
 %ODIN% check "..\test_issue_type_info_variant_shim" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "11" || exit /b
 %ODIN% check "..\test_issue_type_info_variant_shim_duplicate" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b

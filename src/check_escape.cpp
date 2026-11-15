@@ -66,6 +66,7 @@ struct EscapeOrigin {
 	bool             offset_lost; // an offset into the memory of a 'ParamLoad' or 'ParamDeep' was dropped
 	EscapeObject     obj;
 	EscapePath       path;
+	Ast *            site;        // where the address of a 'Local' was taken, not part of its identity
 };
 
 struct EscapeValueFact {
@@ -181,6 +182,9 @@ struct EscapeReport {
 	Ast *            node;
 	String           expr_str;
 	EscapeOrigin     origin;
+	String           held;     // where the pointer is within what is returned, e.g. `'x.a.b'`, or empty for all of it
+	String           target;   // where the pointer points within a local, e.g. `x.c`, or empty for all of it
+	bool             self_ref; // what is returned is the local it points into
 };
 
 struct EscapeAlias {
@@ -238,6 +242,7 @@ struct EscapeAnalysis {
 	isize                stmt_visits;
 	bool                 too_large;   // see `escape_too_large` and `escape_analyse`
 	bool                 calls_unknown; // what the calls do, after growing too large with it
+	Ast *                addr_site;   // the outermost expression whose address is being taken
 
 	bool                 nil_deref;    // -vet-nil-deref
 	bool                 uninit;       // -vet-uninitialized
@@ -358,11 +363,11 @@ gb_internal void escape_value_merge(EscapeValue *v, EscapeValue const &w) {
 	}
 }
 
-gb_internal EscapeValue escape_value_of(EscapeOriginKind kind, EscapeObject const &obj, EscapePath const &path) {
+gb_internal EscapeValue escape_value_of(EscapeOriginKind kind, EscapeObject const &obj, EscapePath const &path, Ast *site=nullptr) {
 	EscapeValue v = escape_value();
 	// the stack memory is made by the expression itself
 	bool definite = kind == EscapeOrigin_Local || kind == EscapeOrigin_Temp;
-	escape_value_add(&v, {}, EscapeOrigin{kind, false, obj, path}, definite);
+	escape_value_add(&v, {}, EscapeOrigin{kind, false, obj, path, site}, definite);
 	return v;
 }
 
@@ -3019,7 +3024,7 @@ gb_internal EscapeValue escape_ident_addr(EscapeAnalysis *ea, Entity *e) {
 	if (!escape_is_local(e)) {
 		return escape_value_of(EscapeOrigin_Outer, {}, {});
 	}
-	return escape_value_of(EscapeOrigin_Local, {e}, {});
+	return escape_value_of(EscapeOrigin_Local, {e}, {}, ea->addr_site);
 }
 
 gb_internal EscapeValue escape_ident_value(EscapeAnalysis *ea, Entity *e) {
@@ -3063,6 +3068,12 @@ gb_internal EscapeValue escape_addr(EscapeAnalysis *ea, Ast *expr) {
 	if (expr == nullptr) {
 		return escape_value();
 	}
+
+	Ast *addr_site = ea->addr_site;
+	if (addr_site == nullptr) {
+		ea->addr_site = expr;
+	}
+	defer (ea->addr_site = addr_site);
 
 	switch (expr->kind) {
 	case_ast_node(pe, ParenExpr, expr);
@@ -3213,6 +3224,11 @@ gb_internal void escape_store_loaded(EscapeAnalysis *ea, Ast *call, EscapeValue 
 
 gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 	ast_node(ce, CallExpr, call);
+
+	Ast *addr_site = ea->addr_site;
+	ea->addr_site = nullptr;
+	defer (ea->addr_site = addr_site);
+
 	escape_visit_exits(ea, ce->proc);
 
 	Entity *e = nullptr;
@@ -3445,6 +3461,11 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 	if (expr == nullptr) {
 		return escape_value();
 	}
+
+	// an address taken within another has its own site, e.g. `&b` in `&a[f(&b)]`
+	Ast *addr_site = ea->addr_site;
+	ea->addr_site = nullptr;
+	defer (ea->addr_site = addr_site);
 
 	AstTypeAndValue const &tav = expr->tav;
 	if (tav.mode == Addressing_Constant) {
@@ -3733,12 +3754,16 @@ gb_internal bool escape_is_stack(EscapeOrigin const &o) {
 	return false;
 }
 
-gb_internal bool escape_find_stack_origin(EscapeAnalysis *ea, EscapeValue const &v, EscapeOrigin *found, bool *definite=nullptr) {
+// `held` is where the pointer is within the value, unless it was found through the buffer of a local dynamic array or map
+gb_internal bool escape_find_stack_origin(EscapeAnalysis *ea, EscapeValue const &v, EscapeOrigin *found, bool *definite=nullptr, EscapePath *held=nullptr) {
 	for (EscapeValueFact const &f : v) {
 		if (f.definite && escape_is_stack(f.origin)) {
 			*found = f.origin;
 			if (definite) {
 				*definite = true;
+			}
+			if (held) {
+				*held = f.path;
 			}
 			return true;
 		}
@@ -3752,6 +3777,9 @@ gb_internal bool escape_find_stack_origin(EscapeAnalysis *ea, EscapeValue const 
 		EscapeOrigin o = work[i];
 		if (escape_is_stack(o)) {
 			*found = o;
+			if (held && i < v.count) {
+				*held = v[i].path;
+			}
 			return true;
 		}
 		if (o.kind != EscapeOrigin_Owned) {
@@ -3791,6 +3819,44 @@ gb_internal gbString escape_expr_to_string(Ast *expr) {
 	return s;
 }
 
+// the fields a path goes through within a value of the type, e.g. `.a.b` of `.a.b[_]`
+gb_internal gbString escape_append_fields(gbString s, Type *t, EscapePath const &path) {
+	for (EscapeStep const &step : path) {
+		Type *bt = base_type(t);
+		if (step.kind != EscapeStep_Field || bt == nullptr || bt->kind != Type_Struct) {
+			break;
+		}
+		bool is_own_field = false;
+		for (Entity *field : bt->Struct.fields) {
+			is_own_field |= field == step.field;
+		}
+		if (!is_own_field || step.field->token.string.len == 0 || is_blank_ident(step.field->token)) {
+			break;
+		}
+		s = gb_string_append_fmt(s, ".%.*s", LIT(step.field->token.string));
+		t = step.field->type;
+	}
+	return s;
+}
+
+// on the line shown with the report of the node, or within the node
+gb_internal bool escape_site_shown(Ast *node, Ast *site) {
+	TokenPos pos   = ast_token(site).pos;
+	TokenPos start = ast_token(node).pos;
+	if (pos.file_id != start.file_id) {
+		return false;
+	}
+	if (pos.line == start.line) {
+		return true;
+	}
+	if (!is_ast_expr(node)) {
+		return false;
+	}
+
+	TokenPos end = ast_end_token(node).pos;
+	return start.offset <= pos.offset && pos.offset <= end.offset;
+}
+
 gb_internal void escape_report_emit(EscapeReport const &r) {
 	Ast *node = r.node;
 	String expr_str = r.expr_str;
@@ -3799,21 +3865,26 @@ gb_internal void escape_report_emit(EscapeReport const &r) {
 
 	TEMPORARY_ALLOCATOR_GUARD();
 	gbString origin = gb_string_make(temporary_allocator(), "");
+	if (r.target.len > 0) {
+		origin = gb_string_append_fmt(origin, "'%.*s' in ", LIT(r.target));
+	}
+	char const *temp_description = "temporary value";
 	switch (o.kind) {
 	case EscapeOrigin_Local: {
 		char const *description = "local variable";
-		if (o.obj.entity->flags & EntityFlag_Param) {
+		if (o.obj.entity->flags & EntityFlag_Result) {
+			description = "named result";
+		} else if (o.obj.entity->flags & EntityFlag_Param) {
 			description = "parameter";
 		}
 		origin = gb_string_append_fmt(origin, "the stack memory of the %s '%.*s'", description, LIT(o.obj.entity->token.string));
 		break;
 	}
 	case EscapeOrigin_Temp: {
-		char const *description = "a temporary value";
 		if (o.obj.temp->kind == Ast_CompoundLit) {
-			description = "a compound literal";
+			temp_description = "compound literal";
 		}
-		origin = gb_string_append_fmt(origin, "the stack memory of %s", description);
+		origin = gb_string_append_fmt(origin, "the stack memory of a %s", temp_description);
 		break;
 	}
 	case EscapeOrigin_Variadic:
@@ -3821,13 +3892,18 @@ gb_internal void escape_report_emit(EscapeReport const &r) {
 		break;
 	}
 
+	String held = r.held;
+	if (held.len == 0) {
+		held = str_lit("it");
+	}
+
 	ERROR_BLOCK();
 	switch (kind) {
 	case EscapeReport_Return:
-		error(ast_token(node), "It is unsafe to return '%.*s' from a procedure, as it refers to %s", LIT(expr_str), origin);
+		error(ast_token(node), "It is unsafe to return '%.*s' from a procedure, as %.*s refers to %s", LIT(expr_str), LIT(held), origin);
 		break;
 	case EscapeReport_MayReturn:
-		warning(ast_token(node), "It is unsafe to return '%.*s' from a procedure, as it may refer to %s", LIT(expr_str), origin);
+		warning(ast_token(node), "It is unsafe to return '%.*s' from a procedure, as %.*s may refer to %s", LIT(expr_str), LIT(held), origin);
 		break;
 	case EscapeReport_Store:
 		warning(ast_token(node), "'%.*s' may still refer to %s after the procedure returns", LIT(expr_str), origin);
@@ -3849,14 +3925,28 @@ gb_internal void escape_report_emit(EscapeReport const &r) {
 		break;
 	}
 
-	if (kind == EscapeReport_Store) {
+	if (o.kind == EscapeOrigin_Local && o.site != nullptr && !escape_site_shown(node, o.site)) {
+		gbString site = escape_expr_to_string(o.site);
+		error_line("\tThe address of '%s' is taken at %s\n", site, token_pos_to_string(ast_token(o.site).pos));
+		gb_string_free(site);
+	} else if (o.kind == EscapeOrigin_Temp && !escape_site_shown(node, o.obj.temp)) {
+		error_line("\tThe %s is made at %s\n", temp_description, token_pos_to_string(ast_token(o.obj.temp).pos));
+	}
+
+	if (r.self_ref) {
+		String   name = o.obj.entity->token.string;
+		gbString type = type_to_string(o.obj.entity->type);
+		error_line("\tNote: '%.*s' holds a pointer into itself. A returned copy would still point into the original in this procedure's stack frame\n", LIT(name));
+		error_line("\tSuggestion: Initialize '%.*s' in place through a pointer parameter instead, e.g. '%.*s: ^%s'\n", LIT(name), LIT(name), type);
+		gb_string_free(type);
+	} else if (kind == EscapeReport_Store) {
 		error_line("\tSuggestion: Clear it before the procedure returns, e.g. 'defer %.*s = %s'\n", LIT(expr_str), type_zero_value_string(node->tav.type));
 	} else {
 		error_line("\tSuggestion: If this is intended, make it explicit with a conversion to 'rawptr' or 'uintptr', or a 'transmute'\n");
 	}
 }
 
-gb_internal void escape_report(EscapeAnalysis *ea, Ast *node, String expr_str, EscapeOrigin const &o, EscapeReportKind kind) {
+gb_internal void escape_report(EscapeAnalysis *ea, Ast *node, String expr_str, EscapeOrigin const &o, EscapeReportKind kind, String held={}, bool self_ref=false) {
 	if (ea->muted || (kind != EscapeReport_Return && global_ignore_warnings())) {
 		return;
 	}
@@ -3868,15 +3958,29 @@ gb_internal void escape_report(EscapeAnalysis *ea, Ast *node, String expr_str, E
 	array_add(&ea->reported, node);
 
 	EscapeReport r = {kind, node, expr_str, o};
-	r.expr_str    = copy_string(permanent_allocator(), expr_str);
+	r.expr_str = copy_string(permanent_allocator(), expr_str);
+	r.held     = copy_string(permanent_allocator(), held);
+	r.self_ref = self_ref;
+
+	// the paths are gone with the analysis' temporary memory by the time it is emitted
+	if (o.kind == EscapeOrigin_Local) {
+		String   name   = o.obj.entity->token.string;
+		gbString target = gb_string_make_length(temporary_allocator(), name.text, name.len);
+		target = escape_append_fields(target, o.obj.entity->type, o.path);
+		if (gb_string_length(target) > name.len) {
+			r.target = copy_string(permanent_allocator(), make_string_c(target));
+		}
+	}
 	r.origin.path = {};
 	array_add(ea->reports, r);
 }
 
-gb_internal void escape_report_value(EscapeAnalysis *ea, Ast *node, Ast *expr, String name, EscapeValue const &v) {
+// `v` is returned as `result` by `expr`, which is null for a bare return of the named results
+gb_internal void escape_report_value(EscapeAnalysis *ea, Ast *node, Ast *expr, Entity *result, EscapeValue const &v) {
 	EscapeOrigin o = {};
 	bool definite = false;
-	if (!escape_find_stack_origin(ea, v, &o, &definite)) {
+	EscapePath held_path = {};
+	if (!escape_find_stack_origin(ea, v, &o, &definite, &held_path)) {
 		return;
 	}
 
@@ -3885,12 +3989,39 @@ gb_internal void escape_report_value(EscapeAnalysis *ea, Ast *node, Ast *expr, S
 		kind = EscapeReport_Return;
 	}
 
-	if (expr != nullptr) {
-		gbString s = escape_expr_to_string(expr);
-		escape_report(ea, node, make_string_c(s), o, kind);
-		gb_string_free(s);
-	} else {
-		escape_report(ea, node, name, o, kind);
+	Ast *    x        = unparen_expr(expr);
+	String   expr_str = result->token.string;
+	gbString expr_s   = nullptr;
+	Entity * returned = result;
+	if (x != nullptr) {
+		expr_s   = escape_expr_to_string(expr);
+		expr_str = make_string_c(expr_s);
+		returned = nullptr;
+		if (x->kind == Ast_Ident) {
+			returned = entity_of_node(x);
+		}
+	}
+
+	// the fields of what is returned, which may be another anonymous struct of the same layout as the result
+	Type *type = result->type;
+	if (x != nullptr && x->tav.type != nullptr && !is_type_tuple(x->tav.type)) {
+		type = x->tav.type;
+	}
+
+	gbString fields = escape_append_fields(gb_string_make(temporary_allocator(), ""), type, held_path);
+	gbString held   = gb_string_make(temporary_allocator(), "");
+	if (gb_string_length(fields) > 0) {
+		if (x == nullptr || x->kind == Ast_Ident || x->kind == Ast_SelectorExpr) {
+			held = gb_string_append_fmt(held, "'%.*s%s'", LIT(expr_str), fields);
+		} else {
+			held = gb_string_append_fmt(held, "its field '%s'", fields+1);
+		}
+	}
+
+	bool self_ref = o.kind == EscapeOrigin_Local && returned != nullptr && o.obj.entity == returned;
+	escape_report(ea, node, expr_str, o, kind, make_string_c(held), self_ref);
+	if (expr_s != nullptr) {
+		gb_string_free(expr_s);
 	}
 }
 
@@ -4005,14 +4136,14 @@ gb_internal void escape_exit(EscapeAnalysis *ea, Ast *node, Slice<Ast *> const &
 			if (results.count == values.count) {
 				result = results[i];
 			}
-			escape_report_value(ea, result, result, {}, values[i]);
+			escape_report_value(ea, result, result, pt->results->Tuple.variables[i], values[i]);
 			escape_add_result_flows(ea, i, values[i]);
 		}
 	} else if (pt->has_named_results) {
 		for_array(i, pt->results->Tuple.variables) {
 			Entity *e = pt->results->Tuple.variables[i];
 			EscapeValue v = escape_obj_value(ea, {e}, {});
-			escape_report_value(ea, node, nullptr, e->token.string, v);
+			escape_report_value(ea, node, nullptr, e, v);
 			escape_add_result_flows(ea, i, v);
 		}
 	}

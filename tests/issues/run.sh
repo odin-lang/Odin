@@ -207,6 +207,17 @@ else
 	exit 1
 fi
 
+ESCAPE_OUT=$($ODIN check ../test_issue_escape_diagnostics -no-entry-point $COMMON_CHECK 2>&1 >/dev/null)
+if [[ $(grep -c "Warning:" <<< "$ESCAPE_OUT") -eq 4 &&
+      $(grep -c "holds a pointer into itself" <<< "$ESCAPE_OUT") -eq 2 &&
+      $(grep -c "is taken at" <<< "$ESCAPE_OUT") -eq 4 &&
+      $(grep -c "'temp.allocator.data' may refer to 'temp.arena' in the stack memory of the named result 'temp'" <<< "$ESCAPE_OUT") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 $ODIN test ../test_issue_type_info_variant_shim $COMMON -ignore-warnings
 if [[ $($ODIN check ../test_issue_type_info_variant_shim -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Warning:") -eq 11 ]]; then
 	echo "SUCCESSFUL 1/1"
