@@ -5,6 +5,16 @@ import "base:runtime"
 import "core:sync"
 
 /*
+A fancier tracking allocator that also prints stack traces
+also exists under `core:debug/trace`.
+
+It does have additional dependencies, and so it was decided
+not to make it the "default", i.e. replace this one.
+
+Give it a look. You may prefer it.
+*/
+
+/*
 Allocation entry for the tracking allocator.
 
 This structure stores the data related to an allocation.
@@ -82,6 +92,8 @@ Destroy the tracking allocator.
 tracking_allocator_destroy :: proc(t: ^Tracking_Allocator) {
 	delete(t.allocation_map)
 	delete(t.bad_free_array)
+	t.allocation_map = {}
+	t.bad_free_array = {}
 }
 
 /*

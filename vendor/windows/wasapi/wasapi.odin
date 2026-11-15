@@ -34,7 +34,7 @@ IMMDeviceEnumerator_VTable :: struct {
 		This: ^IMMDeviceEnumerator,
 		dataFlow: EDataFlow,
 		dwStateMask: windows.DWORD,
-		ppDevices: [^]IMMDeviceCollection, // Out
+		ppDevices: ^[^]IMMDeviceCollection, // Out
 	) -> windows.HRESULT,
 
 	GetDefaultAudioEndpoint: proc "system" (

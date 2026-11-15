@@ -46,6 +46,9 @@ load_unicode_data :: proc(filename: string, allocator := context.allocator) -> (
 		num_6: string
 		num_7: string
 		nt := Numeric_Type.None
+		sum:   rune
+		slm:   rune
+		stm:   rune
 
 		field_num := 0
 		for _field in strings.split_iterator(&line, ";") {
@@ -101,9 +104,21 @@ load_unicode_data :: proc(filename: string, allocator := context.allocator) -> (
 			case 9:  // Bidi mirrored
 			case 10: // Unicode 1 Name (Obsolete as of 6.2.0)
 			case 11: // should be null
-			case 12:
-			case 13:
-			case 14:
+			case 12: // Simple_Uppercase_Mapping
+				if field != "" {
+					sum, _ = decode_rune(field) or_return
+				}
+
+			case 13: // Simple_Lowercase_Mapping
+				if field != "" {
+					slm, _ = decode_rune(field) or_return
+				}
+
+			case 14: // Simple_Titlecase_Mapping
+				if field != "" {
+					stm, _ = decode_rune(field) or_return
+				}
+
 			case:
 				err = .Extra_Fields
 				return
@@ -124,6 +139,9 @@ load_unicode_data :: proc(filename: string, allocator := context.allocator) -> (
 				cp   = cp,
 				name = name,
 				nt   = nt,
+				sum  = sum,
+				slm  = slm,
+				stm  = stm,
 			})
 		}
 	}
@@ -229,6 +247,58 @@ extra_digits :: proc(ud: ^Unicode_Data, allocator := context.allocator) -> (Dyna
 	}
 
 	return exd
+}
+
+/*
+Builds the simple case mapping table for `mapping` from the Unicode data.
+
+An empty Simple_Titlecase_Mapping means it is the same as the
+Simple_Uppercase_Mapping, so the `.Title` table only holds the code points whose
+titlecase differs from their uppercase.
+*/
+case_table :: proc(ud: ^Unicode_Data, mapping: Case_Mapping, allocator := context.allocator) -> (ct: Case_Table) {
+	ct.ranges   = make([dynamic][3]i32, 0, 128, allocator)
+	ct.singlets = make([dynamic][2]i32, 0, 1024, allocator)
+
+	pairs := make([dynamic][2]i32, 0, 2048)
+	defer delete(pairs)
+
+	for point in ud {
+		p := point.(Char) or_continue
+
+		to: rune
+		switch mapping {
+		case .Upper:
+			to = p.sum
+		case .Lower:
+			to = p.slm
+		case .Title:
+			upper := p.sum if p.sum != 0 else p.cp
+			title := p.stm if p.stm != 0 else upper
+			if title != upper {
+				to = title
+			}
+		}
+
+		if to != 0 {
+			append(&pairs, [2]i32{i32(p.cp), i32(to - p.cp)})
+		}
+	}
+
+	for i := 0; i < len(pairs); {
+		j := i
+		for j+1 < len(pairs) && pairs[j+1][0] == pairs[j][0]+1 && pairs[j+1][1] == pairs[i][1] {
+			j += 1
+		}
+		if j > i {
+			append(&ct.ranges, [3]i32{pairs[i][0], pairs[j][0], pairs[i][1]})
+		} else {
+			append(&ct.singlets, pairs[i])
+		}
+		i = j + 1
+	}
+
+	return
 }
 
 /*

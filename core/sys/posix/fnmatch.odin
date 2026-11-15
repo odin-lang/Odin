@@ -46,7 +46,8 @@ FNM_Flag_Bits :: enum c.int {
 }
 FNM_Flags :: bit_set[FNM_Flag_Bits; c.int]
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD {
+// Bionic (Android) uses the BSD values.
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_PLATFORM_SUBTARGET == .Android {
 
 	FNM_NOMATCH  :: 1
 

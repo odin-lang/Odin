@@ -58,13 +58,14 @@ T32_SUB_BUCKETS :: 32    // bits[24:20] of u32
 
 Entry :: struct {
 	mnemonic:   lib.Mnemonic,
-	ops:        [4]lib.Operand_Type,
-	enc:        [4]lib.Operand_Encoding,
+	ops:        [6]lib.Operand_Type,
+	enc:        [6]lib.Operand_Encoding,
 	bits:       u32,
 	mask:       u32,
 	feature:    lib.Feature,
 	mode:       lib.Mode,
 	flags:      lib.Encoding_Flags,
+	dt:         lib.Data_Types,
 	is_thumb32: bool,
 	key:        u16,   // primary dispatch key (8 bits A32, 7 bits T32, 6 bits T16)
 	ilen:       u8,
@@ -101,7 +102,7 @@ emit_encode_tables :: proc() -> (total: int) {
 		if len(forms) == 0 { continue }
 		fmt.sbprintfln(&sb, "\t// .%v", m)
 		for f in forms {
-			write_row(&sb, f.mnemonic, f.ops, f.enc, f.bits, f.mask, f.feature, f.mode, f.flags)
+			write_row(&sb, f.mnemonic, f.ops, f.enc, f.bits, f.mask, f.feature, f.mode, f.flags, f.dt)
 		}
 	}
 	strings.write_string(&sb, "}\n\n")
@@ -170,6 +171,7 @@ emit_decode_tables :: proc() -> (total: int) {
 				feature    = f.feature,
 				mode       = f.mode,
 				flags      = f.flags,
+				dt         = f.dt,
 				is_thumb32 = f.flags.thumb32,
 				ilen       = ilen,
 				form_idx   = u16(fi),
@@ -301,7 +303,7 @@ emit_decode_tables :: proc() -> (total: int) {
 	strings.write_string(&sb, "@(rodata)\n")
 	fmt.sbprintfln(&sb, "DECODE_ENTRIES := [%d]lib.Decode_Entry{{", len(all))
 	for e in all {
-		write_row(&sb, e.mnemonic, e.ops, e.enc, e.bits, e.mask, e.feature, e.mode, e.flags)
+		write_row(&sb, e.mnemonic, e.ops, e.enc, e.bits, e.mask, e.feature, e.mode, e.flags, e.dt)
 	}
 	strings.write_string(&sb, "}\n\n")
 
@@ -349,12 +351,14 @@ emit_range :: proc(sb: ^strings.Builder, name: string, ranges: []Range) {
 // Shared row + flags formatting
 // -----------------------------------------------------------------------------
 
-write_row :: proc(sb: ^strings.Builder, mn: lib.Mnemonic, ops: [4]lib.Operand_Type,
-                  enc: [4]lib.Operand_Encoding, bits, mask: u32,
-                  feature: lib.Feature, mode: lib.Mode, flags: lib.Encoding_Flags) {
-	fmt.sbprintf(sb, "\t{{ .%v, {{.%v,.%v,.%v,.%v}}, {{.%v,.%v,.%v,.%v}}, 0x%08X, 0x%08X, .%v, .%v, {{%s}} }},\n",
-		mn, ops[0], ops[1], ops[2], ops[3], enc[0], enc[1], enc[2], enc[3],
-		bits, mask, feature, mode, flags_lit(flags))
+write_row :: proc(sb: ^strings.Builder, mn: lib.Mnemonic, ops: [6]lib.Operand_Type,
+                  enc: [6]lib.Operand_Encoding, bits, mask: u32,
+                  feature: lib.Feature, mode: lib.Mode, flags: lib.Encoding_Flags,
+                  dt: lib.Data_Types) {
+	fmt.sbprintf(sb, "\t{{ .%v, {{.%v,.%v,.%v,.%v,.%v,.%v}}, {{.%v,.%v,.%v,.%v,.%v,.%v}}, 0x%08X, 0x%08X, .%v, .%v, {{%s}}, {{.%v,.%v}} }},\n",
+		mn, ops[0], ops[1], ops[2], ops[3], ops[4], ops[5],
+		enc[0], enc[1], enc[2], enc[3], enc[4], enc[5],
+		bits, mask, feature, mode, flags_lit(flags), dt[0], dt[1])
 }
 
 flags_lit :: proc(f: lib.Encoding_Flags) -> string {
@@ -367,6 +371,9 @@ flags_lit :: proc(f: lib.Encoding_Flags) -> string {
 	if f.writes_pc   { append(&parts, "writes_pc=true")   }
 	if f.thumb32     { append(&parts, "thumb32=true")     }
 	if f.deprecated  { append(&parts, "deprecated=true")  }
+	if f.cond_in_21  { append(&parts, "cond_in_21=true")  }
+	// Every flag has to be named here: this is what re-emits the table, so a
+	// flag left out is a flag silently dropped on the next regeneration.
 	return strings.join(parts[:], ", ", context.temp_allocator)
 }
 
@@ -405,15 +412,16 @@ Encode_Run :: struct {
 
 Decode_Entry :: struct #packed {
 	mnemonic: Mnemonic,            // 2
-	ops:      [4]Operand_Type,     // 4
-	enc:      [4]Operand_Encoding, // 4
+	ops:      [6]Operand_Type,     // 6
+	enc:      [6]Operand_Encoding, // 6
 	bits:     u32,                 // 4
 	mask:     u32,                 // 4
 	feature:  Feature,             // 1
 	mode:     Mode,                // 1
 	flags:    Encoding_Flags,      // 1
+	dt:       Data_Types,          // 2 -- see Data_Type in encoding_types.odin
 }
-#assert(size_of(Decode_Entry) == 21)
+#assert(size_of(Decode_Entry) == 27)
 
 Decode_Index :: struct #packed {
 	start: u16,

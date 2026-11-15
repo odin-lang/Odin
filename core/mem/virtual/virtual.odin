@@ -82,7 +82,7 @@ memory_block_alloc :: proc(committed, reserved: uint, alignment: uint = 0, flags
 	reserved  = align_formula(reserved, page_size)
 	committed = clamp(committed, 0, reserved)
 	
-	total_size     := reserved + alignment + size_of(Platform_Memory_Block)
+	total_size     := reserved + 2*alignment + size_of(Platform_Memory_Block)
 	base_offset    := mem.align_forward_uintptr(size_of(Platform_Memory_Block), max(uintptr(alignment), align_of(Platform_Memory_Block)))
 	protect_offset := uintptr(0)
 	
@@ -156,7 +156,7 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint,
 		return nil, .Out_Of_Memory
 	}
 
-	alignment_offset := calc_alignment_offset(block, uintptr(alignment))
+	alignment_offset := calc_alignment_offset(block, uintptr(max(alignment, 1)))
 	size, size_ok := safe_add(min_size, alignment_offset)
 	if !size_ok {
 		err = .Out_Of_Memory

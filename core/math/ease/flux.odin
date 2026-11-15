@@ -97,59 +97,64 @@ flux_tween_init :: proc(tween: ^Flux_Tween($T), duration: time.Duration) where i
 // deletes tween from the map after completion
 flux_update :: proc(flux: ^Flux_Map($T), dt: f64) where intrinsics.type_is_float(T) {
 	clear(&flux.keys_to_be_deleted)
+	for key in flux.values {
+		append(&flux.keys_to_be_deleted, key)
+	}
 
-	for key, &tween in flux.values {
-		delay_remainder := f64(0)
+	for key in flux.keys_to_be_deleted {
+		tween, ok := &flux.values[key]
+		if !ok {
+			continue
+		}
+		elapsed := dt
 
 		// Update delay if necessary.
 		if tween.delay > 0 {
-			tween.delay -= dt
-
-			if tween.delay < 0 {
-				// We finished the delay, but in doing so consumed part of this frame's `dt` budget.
-				// Keep track of it so we can apply it to this tween without affecting others.
-				delay_remainder = tween.delay
-				// We're done with this delay.
-				tween.delay = 0
+			if tween.delay > dt {
+				tween.delay -= dt
+				continue
 			}
+
+			elapsed = dt - tween.delay
+			// We're done with this delay.
+			tween.delay = 0
 		}
 
 		// We either had no delay, or the delay has been consumed.
-		if tween.delay <= 0 {
-			if !tween.inited {
-				flux_tween_init(&tween, tween.duration)
+		if !tween.inited {
+			flux_tween_init(tween, tween.duration)
 
-				if tween.on_start != nil {
-					tween.on_start(flux, tween.data)
-				}
-			}
-
-			// If part of the `dt` budget was consumed this frame, then `delay_remainder` will be
-			// that remainder, a negative value. Adding it to `dt` applies what's left of the `dt`
-			// to the tween so it advances properly, instead of too much or little.
-			tween.progress += tween.rate * (dt + delay_remainder)
-			x := tween.progress >= 1 ? 1 : ease(tween.type, tween.progress)
-			tween.value^ = tween.start + tween.diff * T(x)
-
-			if tween.on_update != nil {
-				tween.on_update(flux, tween.data)
-			}
-
-			if tween.progress >= 1 {
-				// append keys to array that will be deleted after the loop
-				append(&flux.keys_to_be_deleted, key)
-
-				if tween.on_complete != nil {
-					tween.on_complete(flux, tween.data)
+			if tween.on_start != nil {
+				tween.on_start(flux, tween.data)
+				tween, ok = &flux.values[key]
+				if !ok || !tween.inited {
+					continue
 				}
 			}
 		}
-	}
 
-	// loop through keys that should be deleted from the map
-	if len(flux.keys_to_be_deleted) != 0 {
-		for key in flux.keys_to_be_deleted {
+		tween.progress += tween.rate * elapsed
+		if tween.progress >= 1 {
+			tween.value^ = tween.goal
+		} else {
+			tween.value^ = tween.start + tween.diff * T(ease(tween.type, tween.progress))
+		}
+
+		if tween.on_update != nil {
+			tween.on_update(flux, tween.data)
+			tween, ok = &flux.values[key]
+			if !ok || !tween.inited {
+				continue
+			}
+		}
+
+		if tween.progress >= 1 {
+			on_complete, data := tween.on_complete, tween.data
 			delete_key(&flux.values, key)
+
+			if on_complete != nil {
+				on_complete(flux, data)
+			}
 		}
 	}
 }
@@ -171,7 +176,11 @@ flux_stop :: proc(flux: ^Flux_Map($T), key: ^T) -> bool where intrinsics.type_is
 @(require_results)
 flux_tween_time_left :: proc(flux: Flux_Map($T), key: ^T) -> f64 {
 	if tween, ok := flux.values[key]; ok {
-		return ((1 - tween.progress) * tween.rate) + tween.delay
+		left := max(tween.delay, 0)
+		if tween.duration > 0 {
+			left += (1 - tween.progress) * time.duration_seconds(tween.duration)
+		}
+		return left
 	} else {
 		return 0
 	}

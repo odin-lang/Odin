@@ -139,13 +139,17 @@ PBI_Flag_Bits :: enum u32 {
 	THCWD       = intrinsics.constant_log2(0x0100),
 	PC_THROTTLE = intrinsics.constant_log2(0x0200),
 	PC_SUSP     = intrinsics.constant_log2(0x0400),
-	PC_KILL     = intrinsics.constant_log2(0x0600),
 	PA_THROTTLE = intrinsics.constant_log2(0x0800),
 	PA_SUSP     = intrinsics.constant_log2(0x1000),
 	PA_PSUGID   = intrinsics.constant_log2(0x2000),
 	EXEC        = intrinsics.constant_log2(0x4000),
 }
 PBI_Flags :: bit_set[PBI_Flag_Bits; u32]
+
+// PC_THROTTLE, PC_SUSP and PC_KILL are the values 1, 2 and 3 of a two-bit field, not separate flags:
+// read it with `flags & PBI_FLAGS_PC_MASK == PBI_FLAGS_PC_KILL`
+PBI_FLAGS_PC_KILL :: PBI_Flags{.PC_THROTTLE, .PC_SUSP}
+PBI_FLAGS_PC_MASK :: PBI_Flags{.PC_THROTTLE, .PC_SUSP}
 
 PID_Info_Flavor :: enum i32 {
 	LISTFDS = 1,

@@ -277,6 +277,8 @@ odin
 *.bin
 demo.bin
 libLLVM*.so*
+*.a
+*.o
 
 # core:rexcode commits its generated encode/decode tables: each arch's tablegen
 # emits human-readable Odin, serialized to tables/*.bin, which the library
@@ -306,7 +308,9 @@ build.sh
 # RAD debugger project file
 *.raddbg
 *.rdi
-tests/issues/build/*
+
+# NOTE: The /tests/** directories have their own .gitignore files
+
 misc/featuregen/featuregen
 
 # Clangd stuff
@@ -319,3 +323,4 @@ build/
 cmake-build*/
 CMakeLists.txt
 sandbox/
+__pycache__/

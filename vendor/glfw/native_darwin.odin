@@ -1,8 +1,8 @@
-#+build darwin
+#+build darwin:default
 
 package glfw
 
-import NS "core:sys/darwin/Foundation"
+import NS "vendor:darwin/AppKit"
 
 @(default_calling_convention="c", link_prefix="glfw")
 foreign {

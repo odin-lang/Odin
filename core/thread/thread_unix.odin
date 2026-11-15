@@ -5,9 +5,9 @@ package thread
 import "base:runtime"
 import "core:sync"
 import "core:sys/posix"
+import "core:strings"
 
 _IS_SUPPORTED :: true
-
 // NOTE(tetra): Aligned here because of core/unix/pthread_linux.odin/pthread_t.
 // Also see core/sys/darwin/mach_darwin.odin/semaphore_t.
 Thread_Os_Specific :: struct #align(16) {
@@ -18,7 +18,7 @@ Thread_Os_Specific :: struct #align(16) {
 // Creates a thread which will run the given procedure.
 // It then waits for `start` to be called.
 //
-_create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
+_create :: proc(procedure: Thread_Proc, priority: Thread_Priority, name: Maybe(string)) -> ^Thread {
 	__unix_thread_entry_proc :: proc "c" (t: rawptr) -> rawptr {
 		t := (^Thread)(t)
 
@@ -28,15 +28,18 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 			sync.wait(&t.start_ok)
 		}
 
-		// Enable thread's cancelability.
-		err := posix.pthread_setcancelstate(.ENABLE, nil)
-		assert_contextless(err == nil)
+		// NOTE: Bionic (Android) has no thread cancellation.
+		when ODIN_PLATFORM_SUBTARGET != .Android {
+			// Enable thread's cancelability.
+			err := posix.pthread_setcancelstate(.ENABLE, nil)
+			assert_contextless(err == nil)
 
-		// NOTE(laytan): .ASYNCHRONOUS should make `pthread_cancel` cancel immediately
-		// instead of waiting for a cancellation point.
-		// This does not seem to work on at least Darwin and NetBSD though.
-		err = posix.pthread_setcanceltype(.ASYNCHRONOUS, nil)
-		assert_contextless(err == nil)
+			// NOTE(laytan): .ASYNCHRONOUS should make `pthread_cancel` cancel immediately
+			// instead of waiting for a cancellation point.
+			// This does not seem to work on at least Darwin and NetBSD though.
+			err = posix.pthread_setcanceltype(.ASYNCHRONOUS, nil)
+			assert_contextless(err == nil)
+		}
 
 		{
 			init_context := t.init_context
@@ -49,6 +52,8 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 				_maybe_destroy_default_temp_allocator(init_context)
 				runtime.run_thread_local_cleaners()
 			}
+
+			_set_name(t)
 
 			t.procedure(t)
 		}
@@ -122,6 +127,9 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 		free(thread, thread.creation_allocator)
 		return nil
 	}
+
+	thread.name = name
+
 	return thread
 }
 
@@ -151,8 +159,6 @@ _join :: proc(t: ^Thread) {
 	}
 
 	posix.pthread_join(t.unix_thread, nil)
-
-	t.flags += {.Joined}
 }
 
 _join_multiple :: proc(threads: ..^Thread) {
@@ -178,9 +184,60 @@ _terminate :: proc(t: ^Thread, exit_code: int) {
 	//
 	// This is in contrast to behavior I have seen on Linux where the thread is
 	// just terminated.
-	posix.pthread_cancel(t.unix_thread)
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		unimplemented("core:thread: `terminate` is not supported on Android (bionic has no `pthread_cancel`)")
+	} else {
+		posix.pthread_cancel(t.unix_thread)
+	}
 }
 
 _yield :: proc() {
 	posix.sched_yield()
+}
+
+_get_name :: proc(thread: ^Thread, allocator: runtime.Allocator, loc: runtime.Source_Code_Location) -> (name: string, err: runtime.Allocator_Error) {
+	tid: posix.pthread_t
+	if thread == nil {
+		tid = posix.pthread_self()
+	} else {
+		tid = thread.unix_thread
+	}
+	
+	buf : [_MAX_PTHREAD_NAME_LENGTH]u8
+
+	when ODIN_OS == .OpenBSD {
+		pthread_get_name_np(tid, raw_data(buf[:]), len(buf))
+	} else {
+		pthread_getname_np(tid, raw_data(buf[:]), len(buf))
+	}
+
+	name, err = strings.clone_from_cstring(cstring(raw_data(buf[:])), allocator, loc)
+	return
+}
+
+_set_name :: proc(thread: ^Thread) {
+	name, ok := thread.name.?
+	if !ok {
+		return
+	}
+
+	when ODIN_OS != .Darwin {
+		tid := thread.unix_thread
+	}
+
+	// _MAX_PTHREAD_NAME_LENGTH includes terminating null
+	buflen := len(name) + 1 < _MAX_PTHREAD_NAME_LENGTH ? len(name) + 1 : _MAX_PTHREAD_NAME_LENGTH
+	buf := make([]u8, buflen)
+	defer delete(buf)
+	copy(buf[:len(buf) - 1], name)
+
+	when ODIN_OS == .Darwin {
+		pthread_setname_np(raw_data(buf[:]))
+	} else when ODIN_OS == .OpenBSD {
+		pthread_set_name_np(tid, raw_data(buf[:]))
+	} else when ODIN_OS == .NetBSD {
+		pthread_setname_np(tid, "%s", raw_data(buf[:]))
+	} else {
+		pthread_setname_np(tid, raw_data(buf[:]))
+	}
 }

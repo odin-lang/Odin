@@ -337,6 +337,33 @@ run_decoder_tests :: proc() {
 					true)
 	}
 
+	// ---- 5. Feature disambiguation: opcode 0x37 is `LD` (MIPS III) OR the PSP `vfim.s` (VFPU) --------
+	// The table is universal, so the shared opcode needs a feature set to resolve. `LD $ra, 0($sp)` must
+	// decode as LD under a MIPS III profile, but the PSP VFPU entry wins under the all-features default.
+	{
+		clear(&relocs); clear(&errors)
+		for i in 0..<len(code) { code[i] = 0 }
+		ebyte_count, _ := mips.encode(
+			[]mips.Instruction{mips.inst_r_m(.LD, mips.RA, mips.mem(mips.SP, 0))},
+			nil, code[:], &relocs, &errors)
+		dcheck_int ("disamb: encoded bytes", int(ebyte_count), 4)
+
+		decode_one :: proc(code: []u8, features: mips.Feature_Set) -> mips.Mnemonic {
+			insts:  [dynamic]mips.Instruction
+			info:   [dynamic]mips.Instruction_Info
+			labels: [dynamic]mips.Label_Definition
+			errs:   [dynamic]mips.Error
+			defer { delete(insts); delete(info); delete(labels); delete(errs) }
+			mips.decode(code, nil, &insts, &info, &labels, &errs, .BIG, features)
+			return len(insts) > 0 ? insts[0].mnemonic : .INVALID
+		}
+		dcheck_mnem("disamb: MIPS_III -> LD", decode_one(code[:ebyte_count], mips.FEATURES_MIPS_III), .LD)
+		// The universal default lets the PSP VFPU entry take 0x37 — so it is specifically NOT LD, which is
+		// exactly why a MIPS III consumer must pass the profile.
+		dcheck_bool("disamb: ALL default != LD",
+					decode_one(code[:ebyte_count], mips.FEATURES_ALL) != .LD, true)
+	}
+
 	fmt.println()
 	fmt.printfln("==> decoder: %d passed, %d failed", dpasses, dfailures)
 	if dfailures > 0 { os.exit(1) }

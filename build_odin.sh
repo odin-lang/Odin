@@ -16,7 +16,7 @@ LDFLAGS="$LDFLAGS -pthread -lm"
 OS_ARCH="$(uname -m)"
 OS_NAME="$(uname -s)"
 
-if [ -d ".git" ] && [ -n "$(command -v git)" ]; then
+if [ -e ".git" ] && [ -n "$(command -v git)" ]; then
 	# Counter the user's git config to show the signature in logs.
 	gitnosig="-c log.showSignature=false"
 	GIT_SHA=$(git $gitnosig show --pretty='%h' --no-patch --no-notes HEAD)
@@ -125,7 +125,7 @@ NetBSD)
 	;;
 Linux)
 	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
-	LDFLAGS="$LDFLAGS -lstdc++ -ldl $($LLVM_CONFIG --libs core native --system-libs --libfiles)"
+	LDFLAGS="$LDFLAGS -lstdc++ -ldl $($LLVM_CONFIG --libs core native passes arm aarch64 x86 webassembly riscv --system-libs --libfiles)"
 	# Copy libLLVM*.so into current directory for linking
 	# NOTE: This is needed by the Linux release pipeline!
 	# cp $(readlink -f $($LLVM_CONFIG --libfiles)) ./

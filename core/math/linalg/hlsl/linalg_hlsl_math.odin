@@ -24,18 +24,26 @@ import "core:math"
 @(require_results) log2_half        :: proc "c" (x: half)    -> half { return math.log(x, 2) }
 @(require_results) log10_half       :: proc "c" (x: half)    -> half { return math.log(x, 10) }
 @(require_results) exp2_half        :: proc "c" (x: half)    -> half { return math.pow(half(2), x) }
-@(require_results) sign_half        :: proc "c" (x: half)    -> half { return math.sign(x) }
+@(require_results) sign_half        :: proc "c" (x: half)    -> int { return -1 if x < 0 else +1 if x > 0 else 0 }
 @(require_results) floor_half       :: proc "c" (x: half)    -> half { return math.floor(x) }
-@(require_results) round_half       :: proc "c" (x: half)    -> half { return math.round(x) }
+@(require_results)
+round_half :: proc "c" (x: half) -> half {
+	r := math.round(x)
+	if abs(r - x) == 0.5 {
+		r = 2 * math.round(x * 0.5)
+	}
+	return r
+}
 @(require_results) ceil_half        :: proc "c" (x: half)    -> half { return math.ceil(x) }
 @(require_results) isnan_half       :: proc "c" (x: half)    -> bool  { return math.classify(x) == .NaN}
 @(require_results) fmod_half        :: proc "c" (x, y: half) -> half { return math.mod(x, y) }
 @(require_results)
 frac_half :: proc "c" (x: half) -> half {
-	if x >= 0 {
-		return x - math.trunc(x)
+	r := x - math.floor(x)
+	if r >= 1 {
+		r = 1 - 0.5*math.F16_EPSILON
 	}
-	return math.trunc(-x) + x
+	return r
 }
 
 @(require_results) cos_float         :: proc "c" (x: float)    -> float { return math.cos(x) }
@@ -60,18 +68,26 @@ frac_half :: proc "c" (x: half) -> half {
 @(require_results) log2_float        :: proc "c" (x: float)    -> float { return math.log(x, 2) }
 @(require_results) log10_float       :: proc "c" (x: float)    -> float { return math.log(x, 10) }
 @(require_results) exp2_float        :: proc "c" (x: float)    -> float { return math.pow(float(2), x) }
-@(require_results) sign_float        :: proc "c" (x: float)    -> float { return math.sign(x) }
+@(require_results) sign_float        :: proc "c" (x: float)    -> int { return -1 if x < 0 else +1 if x > 0 else 0 }
 @(require_results) floor_float       :: proc "c" (x: float)    -> float { return math.floor(x) }
-@(require_results) round_float       :: proc "c" (x: float)    -> float { return math.round(x) }
+@(require_results)
+round_float :: proc "c" (x: float) -> float {
+	r := math.round(x)
+	if abs(r - x) == 0.5 {
+		r = 2 * math.round(x * 0.5)
+	}
+	return r
+}
 @(require_results) ceil_float        :: proc "c" (x: float)    -> float { return math.ceil(x) }
 @(require_results) isnan_float       :: proc "c" (x: float)    -> bool  { return math.classify(x) == .NaN}
 @(require_results) fmod_float        :: proc "c" (x, y: float) -> float { return math.mod(x, y) }
 @(require_results)
 frac_float :: proc "c" (x: float) -> float {
-	if x >= 0 {
-		return x - math.trunc(x)
+	r := x - math.floor(x)
+	if r >= 1 {
+		r = 1 - 0.5*math.F32_EPSILON
 	}
-	return math.trunc(-x) + x
+	return r
 }
 
 
@@ -97,16 +113,24 @@ frac_float :: proc "c" (x: float) -> float {
 @(require_results) log2_double        :: proc "c" (x: double)    -> double { return math.log(x, 2) }
 @(require_results) log10_double       :: proc "c" (x: double)    -> double { return math.log(x, 10) }
 @(require_results) exp2_double        :: proc "c" (x: double)    -> double { return math.pow(double(2), x) }
-@(require_results) sign_double        :: proc "c" (x: double)    -> double { return math.sign(x) }
+@(require_results) sign_double        :: proc "c" (x: double)    -> int { return -1 if x < 0 else +1 if x > 0 else 0 }
 @(require_results) floor_double       :: proc "c" (x: double)    -> double { return math.floor(x) }
-@(require_results) round_double       :: proc "c" (x: double)    -> double { return math.round(x) }
+@(require_results)
+round_double :: proc "c" (x: double) -> double {
+	r := math.round(x)
+	if abs(r - x) == 0.5 {
+		r = 2 * math.round(x * 0.5)
+	}
+	return r
+}
 @(require_results) ceil_double        :: proc "c" (x: double)    -> double { return math.ceil(x) }
 @(require_results) isnan_double       :: proc "c" (x: double)    -> bool   { return math.classify(x) == .NaN}
 @(require_results) fmod_double        :: proc "c" (x, y: double) -> double { return math.mod(x, y) }
 @(require_results)
 frac_double :: proc "c" (x: double) -> double {
-	if x >= 0 {
-		return x - math.trunc(x)
+	r := x - math.floor(x)
+	if r >= 1 {
+		r = 1 - 0.5*math.F64_EPSILON
 	}
-	return math.trunc(-x) + x
+	return r
 }

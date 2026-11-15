@@ -106,6 +106,9 @@ LONG64  :: i64
 DWORD64  :: u64
 PDWORD64 :: ^DWORD64
 
+KAFFINITY :: ULONG_PTR
+PKAFFINITY :: ^KAFFINITY
+
 PDWORD_PTR :: ^DWORD_PTR
 ATOM       :: distinct WORD
 
@@ -519,6 +522,13 @@ BROADCAST_QUERY_DENY :: 0x424D5144
 // Special HWND value for use with PostMessage() and SendMessage()
 HWND_BROADCAST :: HWND(uintptr(0xffff))
 HWND_MESSAGE   :: HWND(~uintptr(0) - 2) // -3
+
+// SendMessageTimeout() flags
+SMTO_NORMAL           :: 0x0000
+SMTO_BLOCK              :: 0x0001
+SMTO_ABORTIFHUNG        :: 0x0002
+SMTO_NOTIMEOUTIFNOTHUNG :: 0x0008
+SMTO_ERRORONEXIT        :: 0x0020
 
 // Color Types
 CTLCOLOR_MSGBOX    :: 0
@@ -1724,17 +1734,32 @@ NM_FONTCHANGED          :: NM_OUTOFMEMORY-22
 NM_CUSTOMTEXT           :: NM_OUTOFMEMORY-23 // uses NMCUSTOMTEXT struct
 NM_TVSTATEIMAGECHANGING :: NM_OUTOFMEMORY-23 // uses NMTVSTATEIMAGECHANGING struct, defined after HTREEITEM
 
+// Pointer to a double-null-terminated string.
+// Special care must be taken when converting to this type.
 PCZZWSTR :: cstring16
 
-SHFILEOPSTRUCTW :: struct {
-	hwnd:                  HWND,
-	wFunc:                 UINT,
-	pFrom:                 PCZZWSTR,
-	pTo:                   PCZZWSTR,
-	fFlags:                FILEOP_FLAGS,
-	fAnyOperationsAborted: BOOL,
-	hNameMappings:         LPVOID,
-	lpszProgressTitle:     PCWSTR, // only used if FOF_SIMPLEPROGRESS
+when ODIN_ARCH == .i386 {
+	SHFILEOPSTRUCTW :: struct #packed {
+		hwnd:                  HWND,
+		wFunc:                 UINT,
+		pFrom:                 PCZZWSTR,
+		pTo:                   PCZZWSTR,
+		fFlags:                FILEOP_FLAGS,
+		fAnyOperationsAborted: BOOL,
+		hNameMappings:         LPVOID,
+		lpszProgressTitle:     PCWSTR,
+	}
+} else {
+	SHFILEOPSTRUCTW :: struct {
+		hwnd:                  HWND,
+		wFunc:                 UINT,
+		pFrom:                 PCZZWSTR,
+		pTo:                   PCZZWSTR,
+		fFlags:                FILEOP_FLAGS,
+		fAnyOperationsAborted: BOOL,
+		hNameMappings:         LPVOID,
+		lpszProgressTitle:     PCWSTR, // only used if FOF_SIMPLEPROGRESS
+	}
 }
 LPSHFILEOPSTRUCTW :: ^SHFILEOPSTRUCTW
 
@@ -2247,7 +2272,7 @@ SEE_MASK_WAITFORINPUTIDLE  :: 0x02000000
 SEE_MASK_FLAG_LOG_USAGE    :: 0x04000000
 
 // When SEE_MASK_FLAG_HINST_IS_SITE is specified SHELLEXECUTEINFO.hInstApp is used as an
-// _In_ parameter and specifies a IUnknown* to be used as a site pointer. The site pointer
+// `_In_` parameter and specifies a `IUnknown*` to be used as a site pointer. The site pointer
 // is used to provide services to shell execute, the handler binding process and the verb handlers
 // once they are invoked.
 SEE_MASK_FLAG_HINST_IS_SITE :: 0x08000000
@@ -2333,6 +2358,8 @@ MONITORINFO :: struct {
 	dwFlags: DWORD,
 }
 LPMONITORINFO :: ^MONITORINFO
+
+MONITORINFOF_PRIMARY :: 0x00000001
 
 CCHDEVICENAME :: 32
 MONITORINFOEXW :: struct {
@@ -2537,6 +2564,12 @@ DC_BRUSH            :: 18
 DC_PEN              :: 19
 STOCK_LAST          :: 19
 
+// GetDeviceCaps() indices
+HORZSIZE   :: 4
+VERTSIZE   :: 6
+LOGPIXELSX :: 88
+LOGPIXELSY :: 90
+
 CLR_INVALID :: 0xFFFFFFFF
 
 RGBQUAD :: struct {
@@ -2649,6 +2682,10 @@ FSCTL_GET_REPARSE_POINT: DWORD : 0x900a8
 IO_REPARSE_TAG_SYMLINK: DWORD : 0xa000000c
 IO_REPARSE_TAG_MOUNT_POINT: DWORD : 0xa0000003
 SYMLINK_FLAG_RELATIVE: DWORD : 0x00000001
+
+IsReparseTagNameSurrogate :: #force_inline proc "contextless" (tag: DWORD) -> bool {
+	return tag & 0x20000000 != 0
+}
 FSCTL_SET_REPARSE_POINT: DWORD : 0x900a4
 
 SYMBOLIC_LINK_FLAG_DIRECTORY: DWORD : 0x1
@@ -2963,10 +3000,10 @@ FILE_END_OF_FILE_INFO :: struct {
 }
 
 FILE_NOTIFY_INFORMATION :: struct {
-	next_entry_offset: DWORD,
-	action:            DWORD,
-	file_name_length:  DWORD,
-	file_name:         [1]WCHAR,
+	NextEntryOffset: DWORD,
+	Action:          DWORD,
+	FileNameLength:  DWORD,
+	FileName:        [1]WCHAR,
 }
 
 REPARSE_DATA_BUFFER :: struct {
@@ -3538,7 +3575,7 @@ LoadLibraryEx_Flag :: enum DWORD {
 	LOAD_LIBRARY_SEARCH_DEFAULT_DIRS    = 12, // 1 << 12: 0x1000,
 	LOAD_LIBRARY_SAFE_CURRENT_DIRS      = 13, // 1 << 13: 0x2000,
 }
-LoadLibraryEx_Flags :: distinct bit_set[LoadLibraryEx_Flag]
+LoadLibraryEx_Flags :: distinct bit_set[LoadLibraryEx_Flag; DWORD]
 
 // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-quota_limits
 // Used in LogonUserExW
@@ -4302,7 +4339,7 @@ SHCONTF_ENABLE_ASYNC          :: 0x8000
 SHCONTF_INCLUDESUPERHIDDEN    :: 0x10000
 
 SHACF_DEFAULT               :: 0x00000000  // Currently (SHACF_FILESYSTEM | SHACF_URLALL)
-SHACF_FILESYSTEM            :: 0x00000001  // This includes the File System as well as the rest of the shell (Desktop\My Computer\Control Panel\)
+SHACF_FILESYSTEM            :: 0x00000001  // This includes the File System as well as the rest of the shell (`Desktop\My Computer\Control Panel\`)
 SHACF_URLALL                :: (SHACF_URLHISTORY | SHACF_URLMRU)
 SHACF_URLHISTORY            :: 0x00000002  // URLs in the User's History
 SHACF_URLMRU                :: 0x00000004  // URLs in the User's Recently Used list.
@@ -5479,10 +5516,9 @@ CRYPT_DIGEST_BLOB   :: distinct CRYPTOAPI_BLOB
 CRYPT_DER_BLOB      :: distinct CRYPTOAPI_BLOB
 CRYPT_ATTR_BLOB     :: distinct CRYPTOAPI_BLOB
 
-//+-------------------------------------------------------------------------
 //  In a CRYPT_BIT_BLOB the last byte may contain 0-7 unused bits. Therefore, the
 //  overall bit length is cbData * 8 - cUnusedBits.
-//--------------------------------------------------------------------------
+//
 // certenrolls_begin -- CERT_CONTEXT
 CRYPT_BIT_BLOB :: struct {
 	cbData:      DWORD,
@@ -5490,12 +5526,10 @@ CRYPT_BIT_BLOB :: struct {
 	cUnusedBits: DWORD,
 }
 
-//+-------------------------------------------------------------------------
 //  Type used for any algorithm
 //
 //  Where the Parameters CRYPT_OBJID_BLOB is in its encoded representation. For most
 //  algorithm types, the Parameters CRYPT_OBJID_BLOB is NULL (Parameters.cbData = 0).
-//--------------------------------------------------------------------------
 CRYPT_ALGORITHM_IDENTIFIER :: struct {
 	pszObjId:   LPSTR,
 	Parameters: CRYPT_OBJID_BLOB,

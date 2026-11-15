@@ -9,31 +9,27 @@ ENABLE_VALIDATION :: false
 
 BOX3D_SHARED :: #config(BOX3D_SHARED, false)
 
-when ODIN_OS == .Windows {
-	@(export)
-	foreign import lib {
-		"lib/box3d.lib",
+@(private)
+LIB_PATH :: (
+	     "lib/box3d_wasm.o"           when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
+	else "lib/linux-amd64/libbox3d.a" when ODIN_OS == .Linux && ODIN_ARCH == .amd64 && !BOX3D_SHARED
+	else "lib/linux-arm64/libbox3d.a" when ODIN_OS == .Linux && ODIN_ARCH == .arm64 && !BOX3D_SHARED
+	else "lib/darwin/libbox3d.a"      when ODIN_OS == .Darwin && (ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64) && !BOX3D_SHARED
+	else "lib/box3ddll.lib"           when ODIN_OS == .Windows && BOX3D_SHARED
+	else "lib/box3d.lib"              when ODIN_OS == .Windows
+	else ""
+)
+
+when LIB_PATH != "" {
+	when !#exists(LIB_PATH) {
+		#panic("Could not find the compiled Box3D library at \"" + LIB_PATH + "\", it can be compiled by running `\"" + ODIN_ROOT + "vendor/box3d/src/build.sh\"`")
 	}
-} else when ODIN_OS == .Linux && ODIN_ARCH == .amd64 && !BOX3D_SHARED {
+
 	@(export)
-	foreign import lib {
-		"lib/linux-amd64/libbox3d.a",
-	}
-} else when ODIN_OS == .Linux && ODIN_ARCH == .arm64 && !BOX3D_SHARED {
-	@(export)
-	foreign import lib {
-		"lib/linux-arm64/libbox3d.a",
-	}
-} else when ODIN_OS == .Darwin && (ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64) && !BOX3D_SHARED {
-	@(export)
-	foreign import lib {
-		"lib/darwin/libbox3d.a",
-	}
+	foreign import lib { LIB_PATH }
 } else {
 	@(export)
-	foreign import lib {
-		"system:box3d",
-	}
+	foreign import lib "system:box3d"
 }
 
 // This is used to indicate null for interfaces that work with indices instead of pointers
@@ -431,7 +427,7 @@ foreign lib {
 	// Create a recording buffer with an optional initial byte capacity.
 	// Pass 0 to use the default (64 KiB). The buffer grows on demand.
 	// @return a new recording, owned by the caller
-	 CreateRecording :: proc(byteCapacity: c.int) -> Recording ---
+	CreateRecording :: proc(byteCapacity: c.int) -> ^Recording ---
 
 	// Destroy a recording and free its buffer.
 	// @param recording may be NULL
@@ -441,11 +437,11 @@ foreign lib {
 	// Valid until the recording buffer is modified or destroyed.
 	// @param recording the recording handle
 	// @return pointer to the byte buffer, or NULL if no bytes have been written
-	Recording_GetData :: proc(#by_ptr recording: Recording) -> [^]u8 ---
+	Recording_GetData :: proc(recording: ^Recording) -> [^]u8 ---
 
 	// Get the number of bytes currently in the recording buffer.
 	// @param recording the recording handle
-	Recording_GetSize :: proc(#by_ptr recording: Recording) -> c.int ---
+	Recording_GetSize :: proc(recording: ^Recording) -> c.int ---
 
 	// Begin recording world mutations into the provided buffer.
 	// The buffer is reset on each call so a single Recording can be reused for multiple sessions.
@@ -461,12 +457,12 @@ foreign lib {
 	// Save the recording buffer to a file. Returns true on success.
 	// @param recording the recording to save
 	// @param path file path to write
-	SaveRecordingToFile :: proc(#by_ptr recording: Recording, path: cstring) -> bool ---
+	SaveRecordingToFile :: proc(recording: ^Recording, path: cstring) -> bool ---
 
 	// Load a recording from a file. Returns NULL on failure (file not found, wrong magic).
 	// The caller owns the returned recording and must destroy it with DestroyRecording.
 	// @param path file path to read
-	 LoadRecordingFromFile :: proc(path: cstring) -> Recording ---
+	LoadRecordingFromFile :: proc(path: cstring) -> ^Recording ---
 
 	// Replay a recording from memory and verify it reproduces the same world-state hashes.
 	// Stands up a fresh world, restores the seed snapshot, replays every op, and checks each embedded
@@ -484,7 +480,7 @@ foreign lib {
 	// Replaying at a different count re-partitions the constraint graph, so the StateHash check
 	// becomes a cross-thread determinism test. Adjustable later with RecPlayer_SetWorkerCount.
 	// @return a new player, or NULL on bad header or deserialization failure
-	RecPlayer_Create :: proc(data: rawptr, size: c.int, workerCount: c.int) -> RecPlayer ---
+	RecPlayer_Create :: proc(data: rawptr, size: c.int, workerCount: c.int) -> ^RecPlayer ---
 
 	// Destroy the player and free all memory. Restores the previous global length scale.
 	RecPlayer_Destroy :: proc(player: ^RecPlayer) ---
@@ -507,28 +503,28 @@ foreign lib {
 	RecPlayer_SeekFrame :: proc(player: ^RecPlayer, targetFrame: c.int) ---
 
 	// @return the world currently driven by this player
-	RecPlayer_GetWorldId :: proc(#by_ptr player: RecPlayer) -> WorldId ---
+	RecPlayer_GetWorldId :: proc(player: ^RecPlayer) -> WorldId ---
 
 	// @return the last fully-stepped frame index (0 before any step)
-	RecPlayer_GetFrame :: proc(#by_ptr player: RecPlayer) -> c.int ---
+	RecPlayer_GetFrame :: proc(player: ^RecPlayer) -> c.int ---
 
 	// @return total number of recorded frames
-	RecPlayer_GetFrameCount :: proc(#by_ptr player: RecPlayer) -> c.int ---
+	RecPlayer_GetFrameCount :: proc(player: ^RecPlayer) -> c.int ---
 
 	// @return true when the op stream is exhausted
-	RecPlayer_IsAtEnd :: proc(#by_ptr player: RecPlayer) -> bool ---
+	RecPlayer_IsAtEnd :: proc(player: ^RecPlayer) -> bool ---
 
 	// @return true when the op stream is paused between body creation and world step.
-	RecPlayer_IsAtPreStep :: proc(#by_ptr player: RecPlayer) -> bool ---
+	RecPlayer_IsAtPreStep :: proc(player: ^RecPlayer) -> bool ---
 
 	// @return true when any StateHash mismatch has been detected
-	RecPlayer_HasDiverged :: proc(#by_ptr player: RecPlayer) -> bool ---
+	RecPlayer_HasDiverged :: proc(player: ^RecPlayer) -> bool ---
 
 	// @return a summary of the recording read at open: frame count, recorded tuning, and bounds
-	RecPlayer_GetInfo :: proc(#by_ptr player: RecPlayer) -> RecPlayerInfo ---
+	RecPlayer_GetInfo :: proc(player: ^RecPlayer) -> RecPlayerInfo ---
 
 	// @return the first frame at which replay diverged, or -1 if it has not diverged
-	RecPlayer_GetDivergeFrame :: proc(#by_ptr player: RecPlayer) -> c.int ---
+	RecPlayer_GetDivergeFrame :: proc(player: ^RecPlayer) -> c.int ---
 
 	// Set the worker count of the replay world. Clamped to [1, B3_MAX_WORKERS]. Applied to the live
 	// world at once and reused whenever the player rebuilds its world on Restart or a backward seek.
@@ -546,24 +542,24 @@ foreign lib {
 	RecPlayer_SetKeyframePolicy :: proc(player: ^RecPlayer, budgetBytes: uint, minIntervalFrames: c.int) ---
 
 	// @return the keyframe memory budget in bytes
-	RecPlayer_GetKeyframeBudget :: proc(#by_ptr player: RecPlayer) -> uint ---
+	RecPlayer_GetKeyframeBudget :: proc(player: ^RecPlayer) -> uint ---
 
 	// @return the finest keyframe spacing in frames
-	RecPlayer_GetKeyframeMinInterval :: proc(#by_ptr player: RecPlayer) -> c.int ---
+	RecPlayer_GetKeyframeMinInterval :: proc(player: ^RecPlayer) -> c.int ---
 
 	// @return the current keyframe spacing in frames; starts at the min interval and doubles as the
 	// ring evicts to stay under budget, so it reflects the effective backward-seek granularity now
-	RecPlayer_GetKeyframeInterval :: proc(#by_ptr player: RecPlayer) -> c.int ---
+	RecPlayer_GetKeyframeInterval :: proc(player: ^RecPlayer) -> c.int ---
 
 	// @return the memory currently held by keyframe snapshots, in bytes
-	RecPlayer_GetKeyframeBytes :: proc(#by_ptr player: RecPlayer) -> uint ---
+	RecPlayer_GetKeyframeBytes :: proc(player: ^RecPlayer) -> uint ---
 
 	// @return the number of bodies tracked in creation order (including holes for destroyed bodies)
-	RecPlayer_GetBodyCount :: proc(#by_ptr player: RecPlayer) -> c.int ---
+	RecPlayer_GetBodyCount :: proc(player: ^RecPlayer) -> c.int ---
 
 	// Resolve a creation ordinal to the live body id at the current frame.
 	// @return the body id, or a null id if that ordinal is out of range or its body is destroyed
-	RecPlayer_GetBodyId :: proc(#by_ptr player: RecPlayer, index: c.int) -> BodyId ---
+	RecPlayer_GetBodyId :: proc(player: ^RecPlayer, index: c.int) -> BodyId ---
 
 	// Wire host debug-shape callbacks into the player's replay world so a renderer can build
 	// per-shape draw resources (the 3D sample needs this or the replay world draws nothing).
@@ -586,13 +582,13 @@ foreign lib {
 
 
 	// @return the number of spatial queries recorded for the most recently replayed frame
-	RecPlayer_GetFrameQueryCount :: proc(#by_ptr player: RecPlayer) -> c.int ---
+	RecPlayer_GetFrameQueryCount :: proc(player: ^RecPlayer) -> c.int ---
 
 	// Get a recorded query from the most recently replayed frame by index.
-	RecPlayer_GetFrameQuery :: proc(#by_ptr player: RecPlayer, index: c.int) -> RecQueryInfo ---
+	RecPlayer_GetFrameQuery :: proc(player: ^RecPlayer, index: c.int) -> RecQueryInfo ---
 
 	// Get one result of a recorded query from the most recently replayed frame.
-	RecPlayer_GetFrameQueryHit :: proc(#by_ptr player: RecPlayer, queryIndex: c.int, hitIndex: c.int) -> RecQueryHit ---
+	RecPlayer_GetFrameQueryHit :: proc(player: ^RecPlayer, queryIndex: c.int, hitIndex: c.int) -> RecQueryHit ---
 
 	/**@}*/ // recording
 
@@ -837,6 +833,14 @@ foreign lib {
 	// Is this body a bullet?
 	Body_IsBullet :: proc(bodyId: BodyId) -> bool ---
 
+	// Allow this body to rotate fast. Useful for axially symmetric bodies, such as vehicle wheels.
+	// Normally rotation speed is clamped to improve CCD. However, this clamping is unnecessary for
+	// bodies that only rotate fast around an axis of symmetry.
+	Body_AllowFastRotation :: proc(bodyId: BodyId, flag: bool) ---
+
+	// Is this body allowed to rotate fast?
+	Body_IsFastRotationAllowed :: proc(bodyId: BodyId) -> bool ---
+
 	// Enable or disable contact recycling for this body. Contact recycling is a performance optimization
 	// that reuses contact manifolds when bodies move slightly. Disabling it can avoid ghost collisions
 	// on characters at the cost of higher per-step work. Existing contacts retain their prior setting;
@@ -899,6 +903,10 @@ foreign lib {
 	 * @defgroup shape Shape
 	 * Functions to create, destroy, and access.
 	 * Shapes bind raw geometry to bodies and hold material properties including friction and restitution.
+	 * You may add multiple shapes to a single body. There are no hard limits on shape count per body.
+	 *
+	 * When you create a shape on a body the center of mass moves. This can lead to the body linear velocity
+	 * changing if the angular velocity is non-zero.
 	 * @{
 	 */
 
@@ -937,8 +945,10 @@ foreign lib {
 	// @return the shape id for accessing the shape
 	CreateHeightFieldShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, heightField: ^HeightFieldData) -> ShapeId ---
 
-	// Compound shapes are only allowed on static bodies.
-	CreateCompoundShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, compound: ^CompoundData) -> ShapeId ---
+	// Baked compound shapes are only allowed on static bodies.
+	// Note: runtime compounds are achieved by adding multiple shapes to a body.
+	// Runtime compounds can be dynamic and/or kinematic.
+	CreateBakedCompoundShape :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, compound: ^CompoundData) -> ShapeId ---
 
 	// Destroy a shape. You may defer the body mass update which can improve performance if several shapes on a
 	//	body are destroyed at once.
@@ -1079,12 +1089,12 @@ foreign lib {
 	// Allows you to change a shape to be a hull or update the current hull.
 	// This does not modify the mass properties.
 	// @see Body_ApplyMassFromShapes
-	Shape_SetHull :: proc(shapeId: ShapeId, #by_ptr hull: HullData) ---
+	Shape_SetHull :: proc(shapeId: ShapeId, hull: ^HullData) ---
 
 	// Allows you to change a shape to be a mesh or update the current mesh.
 	// This does not modify the mass properties.
 	// @see Body_ApplyMassFromShapes
-	Shape_SetMesh :: proc(shapeId: ShapeId, #by_ptr meshData: MeshData, scale: Vec3) ---
+	Shape_SetMesh :: proc(shapeId: ShapeId, meshData: ^MeshData, scale: Vec3) ---
 
 	// Get the maximum capacity required for retrieving all the touching contacts on a shape
 	Shape_GetContactCapacity :: proc(shapeId: ShapeId) -> c.int ---

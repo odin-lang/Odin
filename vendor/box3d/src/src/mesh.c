@@ -928,7 +928,8 @@ static int b3BuildRecursive( b3Array( b3MeshNode ) * nodes, int count, b3Primiti
 		node->data.asNode.childOffset = rightIndex - index;
 		node->lowerBound = aabb.lowerBound;
 		node->upperBound = aabb.upperBound;
-		// triangleOffset is leaf-only, but lives outside the union — zero it so mesh->hash is deterministic
+
+		// Zero so mesh->hash is deterministic
 		node->triangleOffset = 0;
 
 		return index;
@@ -1321,14 +1322,17 @@ b3MeshData* b3CreateWaveMesh( int xCount, int zCount, float cellWidth, float amp
 	float omegaX = 2.0f * B3_PI * columnFrequency * cellWidth;
 
 	float x = -0.5f * xWidth;
+	b3CosSin cs = { 0 };
 	for ( int ix = 0; ix <= xCount; ++ix )
 	{
-		float rowHeight = sinf( omegaX * ix );
+		cs = b3ComputeCosSin( omegaX * ix );
+		float rowHeight = cs.sine;
 
 		float z = -0.5f * zWidth;
 		for ( int iz = 0; iz <= zCount; ++iz )
 		{
-			float columnHeight = sinf( omegaZ * iz );
+			cs = b3ComputeCosSin( omegaZ * iz );
+			float columnHeight = cs.sine;
 
 			float y = amplitude * rowHeight * columnHeight;
 			vertices.data[index] = (b3Vec3){ x, y, z };
@@ -1482,7 +1486,7 @@ b3MeshData* b3CreateBoxMesh( b3Vec3 center, b3Vec3 extent, bool identifyEdges )
 	return b3CreateMesh( &def, NULL, 0 );
 }
 
-b3MeshData* b3CreateHollowBoxMesh(b3Vec3 center, b3Vec3 extent)
+b3MeshData* b3CreateHollowBoxMesh( b3Vec3 center, b3Vec3 extent )
 {
 	float x = extent.x;
 	float y = extent.y;

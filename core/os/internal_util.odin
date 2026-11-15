@@ -83,7 +83,7 @@ concatenate :: proc(strings: []string, allocator: runtime.Allocator) -> (res: st
 @(require_results)
 random_string :: proc(buf: []byte) -> string {
 	for i := 0; i < len(buf); i += 16 {
-		n := rand.uint64()
+		n := rand.uint64(runtime.default_random_generator())
 		end := min(i + 16, len(buf))
 		for j := i; j < end; j += 1 {
 			buf[j] = '0' + u8(n) % 10

@@ -1,3 +1,7 @@
+// NOTE: the default is 32 digits (256 bytes), but nearly every constant fits in 64 bits and digits
+// grow when needed. 4 is the minimum of 3 digits rounded up to MP_CALLOC's 16-byte alignment.
+#define MP_DEFAULT_DIGIT_COUNT 4
+
 #include "libtommath/mp_2expt.c"
 #include "libtommath/mp_abs.c"
 #include "libtommath/mp_add.c"

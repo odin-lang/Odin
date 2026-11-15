@@ -248,6 +248,31 @@ decode_pipeline_t :: struct {
 	 * this being used.
 	 */
 	_quick_chan_store: [5]coding_channel_info_t,
+
+	/** Set when the sample count table has been decompressed. */
+	sample_count_valid: c.int,
+
+	/** Some compression methods (using external libraries) require additional
+	 * contexts to be constructed. Rather than re-initialize those every chunk,
+	 * allow the context to be re-used across chunks.
+	 *
+	 * NB: Do not store thread-specific data or contexts which use
+	 * thread-specific data using this mechanism, as the decode pipeline is
+	 * free to be used by multiple threads from invocation to invocation
+	 * (just not concurrently).
+	 *
+	 * If the context is not NULL upon destruction, or if somehow the
+	 * compression changes during an update, the `free_compression_context`
+	 * function will be invoked. If that free routine is not provided,
+	 * memory may leak.
+	 */
+	compression_context: rawptr,
+
+	/** Cleanup routine for the `compression_context` member.
+	 * If a compression context is set, but this routine is NULL,
+	 * no attempt to free will be made, so your program might leak.
+	 */
+	free_compression_context: proc "c" (pipeline: ^decode_pipeline_t),
 }
 
 DECODE_PIPELINE_INITIALIZER :: decode_pipeline_t{ pipe_size = size_of(decode_pipeline_t) }

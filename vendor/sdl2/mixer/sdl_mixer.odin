@@ -11,8 +11,8 @@ when ODIN_OS == .Windows {
 }
 
 MAJOR_VERSION :: 2
-MINOR_VERSION :: 0
-PATCHLEVEL    :: 4
+MINOR_VERSION :: 8
+PATCHLEVEL    :: 2
 
 CHANNELS :: 8
 
@@ -27,6 +27,7 @@ InitFlag :: enum c.int {
 	OGG    = 4,
 	MID    = 5,
 	OPUS   = 6,
+	WAVPACK = 7,
 }
 
 InitFlags :: distinct bit_set[InitFlag; c.int]
@@ -37,6 +38,7 @@ INIT_MP3  :: InitFlags{.MP3}
 INIT_OGG  :: InitFlags{.OGG}
 INIT_MID  :: InitFlags{.MID}
 INIT_OPUS :: InitFlags{.OPUS}
+INIT_WAVPACK :: InitFlags{.WAVPACK}
 
 DEFAULT_FREQUENCY :: 44100
 DEFAULT_FORMAT :: SDL.AUDIO_S16SYS
@@ -72,6 +74,8 @@ MusicType :: enum c.int {
 	FLAC,
 	MODPLUG_UNUSED,
 	OPUS,
+	WAVPACK,
+	GME,
 }
 
 MUS_NONE           :: MusicType.NONE
@@ -85,6 +89,8 @@ MUS_MP3_MAD_UNUSED :: MusicType.MP3_MAD_UNUSED
 MUS_FLAC           :: MusicType.FLAC
 MUS_MODPLUG_UNUSED :: MusicType.MODPLUG_UNUSED
 MUS_OPUS           :: MusicType.OPUS
+MUS_WAVPACK        :: MusicType.WAVPACK
+MUS_GME            :: MusicType.GME
 
 Music :: struct {}
 
@@ -112,6 +118,7 @@ foreign lib {
 	OpenAudio            :: proc(frequency: c.int, format: u16, channels: c.int, chunksize: c.int) -> c.int ---
 	OpenAudioDevice      :: proc(frequency: c.int, format: u16, channels: c.int, chunksize: c.int, device: cstring, allowed_changed: c.int) -> c.int ---
 	AllocateChannels     :: proc(numchans: c.int) -> c.int ---
+	PauseAudio           :: proc(pause_on: c.int) ---
 	QuerySpec            :: proc(frequency: ^c.int, format: ^u16, channels: ^c.int) -> c.int ---
 	LoadWAV_RW           :: proc(src: ^SDL.RWops, freesrc: bool) -> ^Chunk ---
 	LoadMUS              :: proc(file: cstring) -> ^Music ---
@@ -182,6 +189,9 @@ foreign lib {
 	Volume                :: proc(channel: c.int, volume: c.int) -> c.int ---
 	VolumeChunk           :: proc(chunk: ^Chunk, volume: c.int) -> c.int ---
 	VolumeMusic           :: proc(volume: c.int) -> c.int ---
+	MasterVolume          :: proc(volume: c.int) -> c.int ---
+	StartTrack            :: proc(music: ^Music, track: c.int) -> c.int ---
+	GetNumTracks          :: proc(music: ^Music) -> c.int ---
 	GetMusicVolume        :: proc(music: ^Music) -> c.int ---
 	HaltChannel           :: proc(channel: c.int) -> c.int ---
 	HaltGroup             :: proc(tag: c.int) -> c.int ---

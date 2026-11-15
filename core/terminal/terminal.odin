@@ -24,6 +24,11 @@ is_terminal :: proc(f: $T) -> bool {
 }
 
 /*
+This is true if the terminal is dumb, i.e. cannot process ANSI control sequences.
+*/
+is_dumb: bool
+
+/*
 This is true if the terminal is accepting any form of colored text output.
 */
 color_enabled: bool

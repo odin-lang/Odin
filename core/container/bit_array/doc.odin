@@ -8,20 +8,18 @@ Example:
 	package test
 
 	import "core:fmt"
-	import "core:container/bit_array"
+	import ba "core:container/bit_array"
 
 	main :: proc() {
-		using bit_array
-
-		bits: Bit_Array
+		bits: ba.Bit_Array
 
 		// returns `true`
-		fmt.println(set(&bits, 42))
+		fmt.println(ba.set(&bits, 42))
 
 		// returns `false`, `false`, because this Bit Array wasn't created to allow negative indices.
-		was_set, was_retrieved := get(&bits, -1)
+		was_set, was_retrieved := ba.get(&bits, -1)
 		fmt.println(was_set, was_retrieved)
-		destroy(&bits)
+		ba.destroy(&bits)
 	}
 
 A `Bit_Array` can optionally allow for negative indices, if the minimum value was given during creation.
@@ -29,7 +27,7 @@ Example:
 	package test
 
 	import "core:fmt"
-	import "core:container/bit_array"
+	import ba "core:container/bit_array"
 
 	main :: proc() {
 		Foo :: enum int {
@@ -38,17 +36,20 @@ Example:
 			Leaves        = 69105,
 		}
 
-		using bit_array
+		bits := ba.create_from_enum(Foo)
+		defer ba.destroy(bits)
 
-		bits := create(int(max(Foo)), int(min(Foo)))
-		defer destroy(bits)
+		assert(bits.bias   == int(Foo.Negative_Test))
+		assert(bits.length == abs(int(min(Foo))) + int(max(Foo)))
 
-		fmt.printf("Set(Bar):           %v\n",     set(bits, Foo.Bar))
-		fmt.printf("Get(Bar):           %v, %v\n", get(bits, Foo.Bar))
-		fmt.printf("Set(Negative_Test): %v\n",     set(bits, Foo.Negative_Test))
-		fmt.printf("Get(Leaves):        %v, %v\n", get(bits, Foo.Leaves))
-		fmt.printf("Get(Negative_Test): %v, %v\n", get(bits, Foo.Negative_Test))
-		fmt.printf("Freed.\n")
+		fmt.printfln("Set(Bar):             %v", ba.set(bits, Foo.Bar))
+		fmt.printfln("Get(Bar):             %v", ba.get(bits, Foo.Bar))
+		fmt.printfln("Set(Negative_Test):   %v", ba.set(bits, Foo.Negative_Test))
+		fmt.printfln("Get(Leaves):          %v", ba.get(bits, Foo.Leaves))
+		fmt.printfln("Get(Leaves):          %v", ba.unsafe_get(bits, Foo.Leaves))
+		fmt.printfln("Get(Negative_Test):   %v", ba.get(bits, Foo.Negative_Test))
+		fmt.printfln("Unset(Negative_Test): %v", ba.unset(bits, Foo.Negative_Test))
+		assert(ba.get(bits, Foo.Negative_Test) == false)
 	}
 */
 package container_dynamic_bit_array

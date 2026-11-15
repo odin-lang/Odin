@@ -84,6 +84,8 @@ foreign Kernel32 {
 	) -> rawptr ---
 
 	UnmapViewOfFile :: proc(lpBaseAddress: rawptr) -> b32 ---
+
+	CloseHandle :: proc(hObject: rawptr) -> b32 ---
 }
 
 @(no_sanitize_address)
@@ -163,6 +165,7 @@ _map_file :: proc "contextless" (fd: uintptr, size: i64, flags: Map_File_Flags) 
 	if handle == nil {
 		return nil, .Map_Failure
 	}
+	defer CloseHandle(handle)
 
 	desired_access: u32
 	if .Read in flags {

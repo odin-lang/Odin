@@ -28,7 +28,7 @@ Outer_Struct :: struct{
 	_: int,
 }
 Inner_Struct :: struct{
-	field: int,
+	field: i64,
 }
 
 
@@ -44,7 +44,7 @@ test_address_of_large_anonymous_global :: proc(t: ^testing.T) {
 	// instead of the data segment
 	for _ in 0..<10 {
 		for i in 0..<8 {
-			testing.expect(t, global_variable_64.inner.field[i] == i)
+			testing.expect(t, global_variable_64.inner.field[i] == i64(i))
 		}
 	}
 }
@@ -52,7 +52,7 @@ test_address_of_large_anonymous_global :: proc(t: ^testing.T) {
 #assert(size_of(Inner_Struct_64) == 64)
 global_variable_64 := Outer_Struct_64{
 	inner = &Inner_Struct_64{
-		field = [8]int{0, 1, 2, 3, 4, 5, 6, 7},
+		field = [8]i64{0, 1, 2, 3, 4, 5, 6, 7},
 	},
 }
 Outer_Struct_64 :: struct{
@@ -63,5 +63,5 @@ Outer_Struct_64 :: struct{
 	_: int,
 }
 Inner_Struct_64 :: struct{
-	field: [8]int,
+	field: [8]i64,
 }

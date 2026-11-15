@@ -19,3 +19,5 @@ import "core:rexcode/isa"
 Label_Definition :: isa.Label_Definition
 Label_Map        :: isa.Label_Map
 LABEL_UNDEFINED  :: isa.LABEL_UNDEFINED
+Label_Offset     :: isa.Label_Offset
+Label_Names      :: isa.Label_Names

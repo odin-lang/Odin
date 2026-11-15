@@ -540,6 +540,7 @@ gb_internal void report_os_info() {
 		}
 
 		switch (major) {
+		case 27: gb_printf("macOS Golden Gate"); break;
 		case 26: gb_printf("macOS Tahoe"); break;
 		case 15: gb_printf("macOS Sequoia"); break;
 		case 14: gb_printf("macOS Sonoma"); break;

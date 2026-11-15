@@ -48,8 +48,8 @@ GPR_NAMES_ABI := [32]string{
 // Public string accessors
 // =============================================================================
 
-// Canonical mnemonic spelling (lowercase, with `_` mapped to `.`).
-// The few enum names that carry a disambiguator suffix get a hand mapping.
+// Canonical mnemonic spelling (lowercase; `_` maps to `.`, except in MSA).
+// Canonical mnemonic spelling (lowercase; `_` maps to `.`, except in MSA).
 mnemonic_to_string :: proc(m: Mnemonic, lowercase: bool = true, allocator := context.temp_allocator) -> string {
 	sb := strings.builder_make(allocator)
 	write_mnemonic(&sb, m, !lowercase)
@@ -74,7 +74,7 @@ sbprint :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) {
 	opts := options
 	if opts == nil {
@@ -83,14 +83,11 @@ sbprint :: proc(
 		opts = &defaults
 	}
 
-	// Offset -> label_id index (single linear pass over label_defs).
-	offset_to_label: map[u32]u32
-	defer delete(offset_to_label)
-	for ld, id in label_defs {
-		if ld != LABEL_UNDEFINED {
-			offset_to_label[u32(ld)] = u32(id)
-		}
-	}
+	// Display-side label naming: numbers in ADDRESS order (independent of the internal ids'
+	// allocation order), caller names keyed by byte offset (isa.Label_Display).
+	display: isa.Label_Display
+	isa.label_display_init(&display, label_defs, label_names)
+	defer isa.label_display_destroy(&display)
 
 	for i in 0..<len(instructions) {
 		inst := &instructions[i]
@@ -99,9 +96,9 @@ sbprint :: proc(
 			offset = inst_info[i].offset
 		}
 
-		// Label at this offset?
-		if label_id, has := offset_to_label[offset]; has {
-			write_label(sb, label_id, label_names, opts)
+		// A displayable label at this offset — a definition, or a caller-named offset?
+		if isa.label_display_at(&display, offset) {
+			isa.label_display_write(&display, sb, offset, opts.label_prefix)
 			strings.write_byte(sb, ':')
 			strings.write_string(sb, opts.separator)
 		}
@@ -123,7 +120,7 @@ sbprint :: proc(
 						strings.write_byte(sb, ' ')
 					}
 				}
-				write_operand(sb, &inst.ops[slot], offset_to_label, label_names, opts)
+				write_operand(sb, &inst.ops[slot], &display, opts)
 			}
 		}
 		strings.write_string(sb, opts.separator)
@@ -137,7 +134,7 @@ sbprintln :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) {
 	sbprint(sb, instructions, inst_info, label_defs, tokens, options, label_names)
 	strings.write_byte(sb, '\n')
@@ -153,7 +150,7 @@ print :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) {
 	sb := strings.builder_make(context.temp_allocator)
 	sbprint(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
@@ -166,7 +163,7 @@ println :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) {
 	sb := strings.builder_make(context.temp_allocator)
 	sbprintln(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
@@ -179,7 +176,7 @@ aprint :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 	allocator := context.allocator,
 ) -> string {
 	sb := strings.builder_make(allocator)
@@ -193,7 +190,7 @@ aprintln :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 	allocator := context.allocator,
 ) -> string {
 	sb := strings.builder_make(allocator)
@@ -207,7 +204,7 @@ tprint :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) -> string {
 	sb := strings.builder_make(context.temp_allocator)
 	sbprint(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
@@ -220,7 +217,7 @@ tprintln :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) -> string {
 	sb := strings.builder_make(context.temp_allocator)
 	sbprintln(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
@@ -234,7 +231,7 @@ bprint :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) -> string {
 	sb := strings.builder_from_bytes(buf)
 	sbprint(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
@@ -248,7 +245,7 @@ bprintln :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) -> string {
 	sb := strings.builder_from_bytes(buf)
 	sbprintln(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
@@ -262,7 +259,7 @@ fprint :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) {
 	sb := strings.builder_make(context.temp_allocator)
 	sbprint(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
@@ -276,7 +273,7 @@ fprintln :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) {
 	sb := strings.builder_make(context.temp_allocator)
 	sbprintln(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
@@ -290,7 +287,7 @@ wprint :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) {
 	sb := strings.builder_make(context.temp_allocator)
 	sbprint(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
@@ -304,7 +301,7 @@ wprintln :: proc(
 	label_defs:   []Label_Definition,
 	tokens:       ^[dynamic]Token = nil,
 	options:      ^Print_Options  = nil,
-	label_names:  ^map[u32]string = nil,
+	label_names:  ^isa.Label_Names = nil,
 ) {
 	sb := strings.builder_make(context.temp_allocator)
 	sbprintln(&sb, instructions, inst_info, label_defs, tokens, options, label_names)
@@ -317,38 +314,50 @@ wprintln :: proc(
 
 @(private="file")
 write_mnemonic :: proc(sb: ^strings.Builder, m: Mnemonic, uppercase: bool) {
-	// Disambiguator-suffix overrides: enum names like DMUL_R6, OP_GTE,
-	// MADD_EE carry a disambiguator that should NOT appear in the printed
-	// mnemonic (the canonical assembly form is just `dmul`, `op`, `madd`).
-	name: string
-	#partial switch m {
-	case .DMUL_R6:  name = "DMUL"
-	case .DDIV_R6:  name = "DDIV"
-	case .DDIVU_R6: name = "DDIVU"
-	case .OP_GTE:   name = "OP"
-	case .SQR_GTE:  name = "SQR"
-	case .MADD_EE:  name = "MADD"
-	case .MADDU_EE: name = "MADDU"
-	case .MSUB_EE:  name = "MSUB"
-	case .MSUBU_EE: name = "MSUBU"
-	case:
-		n, ok := reflect.enum_name_from_value(m)
-		if !ok {
-			strings.write_string(sb, "<?>")
-			return
+	// No disambiguator overrides any more: the enum holds assembler
+	// mnemonics, and the ISA-variant encodings that used to need a suffix
+	// (pre-R6 vs R6 MUL, the PS2 MMI MADD, the PS1 GTE OP) are now forms of
+	// one mnemonic, picked by operand shape or by the caller's Feature_Set.
+	name, ok := reflect.enum_name_from_value(m)
+	if !ok {
+		strings.write_string(sb, "<?>")
+		return
+	}
+	// Underscores become dots -- except in MSA, which spells the sign
+	// qualifier with an underscore and only the element size with a dot:
+	// `adds_s.b`, `max_s.h`, `copy_u.w`. An assembler rejects `adds.s.b`.
+	// Nothing in the NAME distinguishes the two: MSA's ADDS_S_D and the FP
+	// convert CVT_S_D have the same shape and need opposite treatment, so
+	// the family has to come from the form's feature. Only the LAST
+	// underscore is a dot for MSA; every underscore is a dot elsewhere.
+	dot_only_last := is_msa(m)
+	last_underscore := -1
+	if dot_only_last {
+		for i in 0..<len(name) {
+			if name[i] == '_' { last_underscore = i }
 		}
-		name = n
 	}
 	for i in 0..<len(name) {
 		c := name[i]
-		if c == '_' {
+		if c == '_' && (!dot_only_last || i == last_underscore) {
 			strings.write_byte(sb, '.')
+		} else if c == '_' {
+			strings.write_byte(sb, '_')
 		} else if !uppercase && c >= 'A' && c <= 'Z' {
 			strings.write_byte(sb, c + 32)
 		} else {
 			strings.write_byte(sb, c)
 		}
 	}
+}
+
+// Is this mnemonic an MSA (MIPS SIMD) instruction? Read off the form table
+// rather than the name, which cannot tell MSA apart from the FP converts.
+@(private="file", require_results)
+is_msa :: proc(m: Mnemonic) -> bool {
+	r := ENCODE_RUNS[u16(m)]
+	if r.count == 0 { return false }
+	return ENCODE_FORMS[r.start].feature == .MSA
 }
 
 @(private="file")
@@ -404,11 +413,10 @@ write_register :: proc(sb: ^strings.Builder, r: Register, uppercase: bool) {
 
 @(private="file")
 write_operand :: proc(
-	sb:              ^strings.Builder,
-	op:              ^Operand,
-	offset_to_label: map[u32]u32,
-	label_names:     ^map[u32]string,
-	opts:            ^Print_Options,
+	sb:      ^strings.Builder,
+	op:      ^Operand,
+	display: ^isa.Label_Display,
+	opts:    ^Print_Options,
 ) {
 	switch op.kind {
 	case .NONE:
@@ -428,30 +436,13 @@ write_operand :: proc(
 
 	case .RELATIVE:
 		target := u32(op.relative)
-		if id, has := offset_to_label[target]; has {
-			write_label(sb, id, label_names, opts)
+		if isa.label_display_at(display, target) {
+			isa.label_display_write(display, sb, target, opts.label_prefix)
 		} else {
 			// No label discovered at this target -- fall back to absolute hex.
 			isa.print_hex(sb, u64(target), opts)
 		}
 	}
-}
-
-@(private="file")
-write_label :: proc(
-	sb:          ^strings.Builder,
-	label_id:    u32,
-	label_names: ^map[u32]string,
-	opts:        ^Print_Options,
-) {
-	if label_names != nil {
-		if name, has := label_names^[label_id]; has {
-			strings.write_string(sb, name)
-			return
-		}
-	}
-	strings.write_string(sb, opts.label_prefix)
-	write_decimal_u32(sb, label_id)
 }
 
 @(private="file")

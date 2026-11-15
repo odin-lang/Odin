@@ -52,6 +52,27 @@ mach_port_right_t :: distinct c.uint
 
 sync_policy_t :: distinct c.int
 
+integer_t  :: c.int
+natural_t  :: c.uint
+cpu_type_t :: integer_t
+
+mach_vm_address_t :: u64
+mach_vm_size_t    :: u64
+
+mach_error_t    :: kern_return_t
+task_id_token_t :: mach_port_t
+
+clock_res_t :: c.int
+
+mach_timespec_t :: struct {
+	tv_sec:  c.uint,
+	tv_nsec: clock_res_t,
+}
+
+audit_token_t :: struct {
+	val: [8]c.uint,
+}
+
 mach_msg_port_descriptor_t :: struct {
 	name: mach_port_t,
 	_: u32,

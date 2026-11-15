@@ -8,6 +8,12 @@ foreign import system "system:System"
 
 Bool :: b8
 
+// Opaque <sys/acl.h> access control list.
+acl_t :: distinct rawptr
+
+// Opaque <malloc/malloc.h> zone, only used through pointers.
+malloc_zone_t :: struct {}
+
 RUsage :: struct {
 	ru_utime:    timeval,
 	ru_stime:    timeval,

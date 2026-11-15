@@ -15,20 +15,14 @@ foreign libc {
 	// 7.29.2 Formatted wide character input/output functions
 	fwprintf  :: proc(stream: ^FILE, format: [^]wchar_t, #c_vararg arg: ..any) -> int ---
 	fwscanf   :: proc(stream: ^FILE, format: [^]wchar_t, #c_vararg arg: ..any) -> int ---
-	swprintf  :: proc(stream: ^FILE, n: size_t, format: [^]wchar_t, #c_vararg arg: ..any) -> int ---
+	swprintf  :: proc(s: [^]wchar_t, n: size_t, format: [^]wchar_t, #c_vararg arg: ..any) -> int ---
 	swscanf   :: proc(s, format: [^]wchar_t, #c_vararg arg: ..any) -> int ---
-	vfwprintf :: proc(stream: ^FILE, format: [^]wchar_t, arg: ^va_list) -> int ---
-	vfwscanf  :: proc(stream: ^FILE, format: [^]wchar_t, arg: ^va_list) -> int ---
-	vswprintf :: proc(s: [^]wchar_t, n: size_t, format: [^]wchar_t, arg: ^va_list) -> int ---
-	vswscanf  :: proc(s, format: [^]wchar_t, arg: ^va_list) -> int ---
-	vwprintf  :: proc(format: [^]wchar_t, arg: ^va_list) -> int ---
-	vwscanf   :: proc(format: [^]wchar_t, arg: ^va_list) -> int ---
 	wprintf   :: proc(format: [^]wchar_t, #c_vararg arg: ..any) -> int ---
 	wscanf    :: proc(format: [^]wchar_t, #c_vararg arg: ..any) -> int ---
 
 	// 7.29.3 Wide character input/output functions
-	fwgetc    :: proc(stream: ^FILE) -> wint_t ---
-	fgetws    :: proc(s: [^]wchar_t, n: int, stream: ^FILE) -> wchar_t ---
+	fgetwc    :: proc(stream: ^FILE) -> wint_t ---
+	fgetws    :: proc(s: [^]wchar_t, n: int, stream: ^FILE) -> [^]wchar_t ---
 	fputwc    :: proc(c: wchar_t, stream: ^FILE) -> wint_t ---
 	fputws    :: proc(s: [^]wchar_t, stream: ^FILE) -> int ---
 	fwide     :: proc(stream: ^FILE, mode: int) -> int ---
@@ -106,5 +100,40 @@ wint_t    :: distinct wchar_t
 
 // Calculate these values correctly regardless of what type wchar_t actually is.
 WINT_MIN  :: 0
-WINT_MAX  :: 1 << (size_of(wint_t) * 8)
+WINT_MAX  :: (1 << (size_of(wint_t) * 8)) - 1
 WEOF      :: ~wint_t(0)
+
+// The v* procedures take a pointer to the va_list on every target, see va_list_arg.
+@(default_calling_convention="c", private)
+foreign libc {
+	@(link_name="vfwprintf") _vfwprintf :: proc(stream: ^FILE, format: [^]wchar_t, arg: va_list_arg) -> int ---
+	@(link_name="vfwscanf")  _vfwscanf  :: proc(stream: ^FILE, format: [^]wchar_t, arg: va_list_arg) -> int ---
+	@(link_name="vswprintf") _vswprintf :: proc(s: [^]wchar_t, n: size_t, format: [^]wchar_t, arg: va_list_arg) -> int ---
+	@(link_name="vswscanf")  _vswscanf  :: proc(s, format: [^]wchar_t, arg: va_list_arg) -> int ---
+	@(link_name="vwprintf")  _vwprintf  :: proc(format: [^]wchar_t, arg: va_list_arg) -> int ---
+	@(link_name="vwscanf")   _vwscanf   :: proc(format: [^]wchar_t, arg: va_list_arg) -> int ---
+}
+
+vfwprintf :: #force_inline proc "c" (stream: ^FILE, format: [^]wchar_t, arg: ^va_list) -> int {
+	return _vfwprintf(stream, format, va_list_arg_from(arg))
+}
+
+vfwscanf :: #force_inline proc "c" (stream: ^FILE, format: [^]wchar_t, arg: ^va_list) -> int {
+	return _vfwscanf(stream, format, va_list_arg_from(arg))
+}
+
+vswprintf :: #force_inline proc "c" (s: [^]wchar_t, n: size_t, format: [^]wchar_t, arg: ^va_list) -> int {
+	return _vswprintf(s, n, format, va_list_arg_from(arg))
+}
+
+vswscanf :: #force_inline proc "c" (s, format: [^]wchar_t, arg: ^va_list) -> int {
+	return _vswscanf(s, format, va_list_arg_from(arg))
+}
+
+vwprintf :: #force_inline proc "c" (format: [^]wchar_t, arg: ^va_list) -> int {
+	return _vwprintf(format, va_list_arg_from(arg))
+}
+
+vwscanf :: #force_inline proc "c" (format: [^]wchar_t, arg: ^va_list) -> int {
+	return _vwscanf(format, va_list_arg_from(arg))
+}

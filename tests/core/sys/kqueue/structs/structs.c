@@ -1,16 +1,33 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <sys/event.h>
+#if defined(__NetBSD__)
+#include <sys/param.h>
+#endif
+
+#if defined(__NetBSD__) && __NetBSD_Version__ >= 1100000000
+struct kevent100 {
+	uintptr_t ident;
+	uint32_t  filter;
+	uint32_t  flags;
+	uint32_t  fflags;
+	int64_t   data;
+	void     *udata;
+};
+#define KEVENT struct kevent100
+#else
+#define KEVENT struct kevent
+#endif
 
 int main(int argc, char *argv[])
 {
-	printf("kevent %zu %zu\n",    sizeof(struct kevent), _Alignof(struct kevent));
-	printf("kevent.ident %zu\n",  offsetof(struct kevent, ident));
-	printf("kevent.filter %zu\n", offsetof(struct kevent, filter));
-	printf("kevent.flags %zu\n",  offsetof(struct kevent, flags));
-	printf("kevent.fflags %zu\n", offsetof(struct kevent, fflags));
-	printf("kevent.data %zu\n",   offsetof(struct kevent, data));
-	printf("kevent.udata %zu\n",  offsetof(struct kevent, udata));
+	printf("kevent %zu %zu\n",    sizeof(KEVENT), _Alignof(KEVENT));
+	printf("kevent.ident %zu\n",  offsetof(KEVENT, ident));
+	printf("kevent.filter %zu\n", offsetof(KEVENT, filter));
+	printf("kevent.flags %zu\n",  offsetof(KEVENT, flags));
+	printf("kevent.fflags %zu\n", offsetof(KEVENT, fflags));
+	printf("kevent.data %zu\n",   offsetof(KEVENT, data));
+	printf("kevent.udata %zu\n",  offsetof(KEVENT, udata));
 
 	printf("EV_ADD %d\n",      EV_ADD);
 	printf("EV_DELETE %d\n",   EV_DELETE);

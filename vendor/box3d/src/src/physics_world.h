@@ -178,7 +178,7 @@ typedef struct b3World
 	b3Array( b3Shape ) shapes;
 
 	// Reference counted store of shared hull data keyed by content. Shapes hold a
-	// pointer to the owned copy here. Opaque to avoid leaking the verstable map
+	// pointer to the hull stored in the db. Type erased to avoid leaking the verstable map
 	// type into this header.
 	void* hullDatabase;
 

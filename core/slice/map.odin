@@ -7,7 +7,7 @@ _ :: intrinsics
 _ :: runtime
 
 map_keys :: proc(m: $M/map[$K]$V, allocator := context.allocator, loc := #caller_location) -> (keys: []K, err: runtime.Allocator_Error) {
-	keys = make(type_of(keys), len(m), allocator, loc) or_return
+	keys = non_zero_make(type_of(keys), len(m), allocator, loc) or_return
 	i := 0
 	for key in m {
 		keys[i] = key
@@ -16,7 +16,7 @@ map_keys :: proc(m: $M/map[$K]$V, allocator := context.allocator, loc := #caller
 	return
 }
 map_values :: proc(m: $M/map[$K]$V, allocator := context.allocator, loc := #caller_location) -> (values: []V, err: runtime.Allocator_Error) {
-	values = make(type_of(values), len(m), allocator, loc) or_return
+	values = non_zero_make(type_of(values), len(m), allocator, loc) or_return
 	i := 0
 	for _, value in m {
 		values[i] = value
@@ -52,7 +52,7 @@ map_entry_infos :: proc(m: $M/map[$K]$V, allocator := context.allocator, loc := 
 	m := m
 	rm := (^runtime.Raw_Map)(&m)
 
-	info := runtime.type_info_base(type_info_of(M)).variant.(runtime.Type_Info_Map)
+	info := runtime.type_info_base(type_info_of(M)).variant.(^runtime.Type_Info_Map)
 	if info.map_info != nil {
 		entries = make(type_of(entries), len(m), allocator, loc) or_return
 

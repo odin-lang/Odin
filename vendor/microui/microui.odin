@@ -998,6 +998,7 @@ textbox_raw :: proc(ctx: ^Context, textbuf: []u8, textlen: ^int, id: Id, r: Rect
 		builder := strings.builder_from_bytes(textbuf)
 		non_zero_resize(&builder.buf, textlen^)
 		ctx.textbox_state.builder = &builder
+		defer ctx.textbox_state.builder = nil
 		if ctx.textbox_state.id != u64(id) {
 			ctx.textbox_state.id = u64(id)
 			ctx.textbox_state.selection = {}

@@ -1,13 +1,16 @@
 package vendor_kb_text_shape
 
 when ODIN_OS == .Windows {
-	foreign import lib {
-		"lib/kb_text_shape.lib",
-	}
+	foreign import lib "lib/kb_text_shape.lib"
 } else {
-	foreign import lib {
-		"lib/kb_text_shape.a",
+	@(private)
+	LIB_PATH :: "lib/darwin/kb_text_shape.a" when ODIN_OS == .Darwin else "lib/kb_text_shape.a"
+
+	when !#exists(LIB_PATH) {
+		#panic("Could not find the compiled kb_text_shape library at \"" + LIB_PATH + "\", it can be compiled by running `\"" + ODIN_ROOT + "vendor/kb_text_shape/src/build_unix.sh\"`")
 	}
+
+	foreign import lib { LIB_PATH }
 }
 
 import "base:runtime"
@@ -26,6 +29,7 @@ foreign lib {
 	CreateShapeContext       :: proc(Allocator: allocator_function, AllocatorData: rawptr) -> ^shape_context ---
 	DestroyShapeContext      :: proc(Context: ^shape_context) ---
 	ShapePushFont            :: proc(Context: ^shape_context, Font: ^font) -> ^font ---
+	ShapePushFont2           :: proc(Context: ^shape_context, Font: ^font, Variations: [^]variation, VariationCount: c.int, ContextFontHandle: ^u32) -> ^font ---
 	ShapePopFont             :: proc(Context: ^shape_context) -> ^font ---
 	ShapeBegin               :: proc(Context: ^shape_context, ParagraphDirection: direction, Language: language) ---
 	ShapeEnd                 :: proc(Context: ^shape_context) ---
@@ -38,6 +42,11 @@ foreign lib {
 	ShapeNextManualRun       :: proc(Context: ^shape_context, Direction: direction, Script: script) ---
 	ShapeEndManualRuns       :: proc(Context: ^shape_context) ---
 	ShapeManualBreak         :: proc(Context: ^shape_context) ---
+	ShapeSetFontVariationVector :: proc(Context: ^shape_context, ContextFontHandle: u32, VariationVector: [^]f32) -> b32 ---
+	ShapeSetFontVariations   :: proc(Context: ^shape_context, ContextFontHandle: u32, Variations: [^]variation, VariationCount: c.int) -> c.int ---
+	ShapeSetFontVariation    :: proc(Context: ^shape_context, ContextFontHandle: u32, Tag: u32, Value: f32) -> b32 ---
+	ShapePushGlobalVariation :: proc(Context: ^shape_context, Tag: u32, Value: f32) -> b32 ---
+	ShapePopGlobalVariation  :: proc(Context: ^shape_context, Tag: u32) -> b32 ---
 }
 
 @(require_results)
@@ -65,6 +74,14 @@ ShapePushFontFromMemory :: proc "c" (Context: ^shape_context, Memory: []byte, Fo
 	return kbts_ShapePushFontFromMemory(Context, raw_data(Memory), c.int(len(Memory)), FontIndex)
 }
 
+ShapePushFontFromMemory2 :: proc "c" (Context: ^shape_context, Memory: []byte, FontIndex: c.int, Variations: []variation = nil, ContextFontHandle: ^u32 = nil) -> ^font {
+	@(default_calling_convention="c", require_results)
+	foreign lib {
+		kbts_ShapePushFontFromMemory2 :: proc(Context: ^shape_context, Memory: rawptr, Size: c.int, FontIndex: c.int, Variations: [^]variation, VariationCount: c.int, ContextFontHandle: ^u32) -> ^font ---
+	}
+	return kbts_ShapePushFontFromMemory2(Context, raw_data(Memory), c.int(len(Memory)), FontIndex, raw_data(Variations), c.int(len(Variations)), ContextFontHandle)
+}
+
 @(require_results)
 ShapeRun :: proc "contextless" (Context: ^shape_context) -> (Run: run, Ok: b32) {
 	@(default_calling_convention="c", require_results)
@@ -72,6 +89,16 @@ ShapeRun :: proc "contextless" (Context: ^shape_context) -> (Run: run, Ok: b32) 
 		kbts_ShapeRun :: proc(Context: ^shape_context, Run: ^run) -> b32 ---
 	}
 	Ok = kbts_ShapeRun(Context, &Run)
+	return
+}
+
+@(require_results)
+ShapeRun2 :: proc "contextless" (Context: ^shape_context) -> (Run: run2, Ok: b32) {
+	@(default_calling_convention="c", require_results)
+	foreign lib {
+		kbts_ShapeRun2 :: proc(Context: ^shape_context, Run: ^run2) -> b32 ---
+	}
+	Ok = kbts_ShapeRun2(Context, &Run)
 	return
 }
 
@@ -111,6 +138,8 @@ foreign lib {
 	ShapeCurrentCodepointsIterator :: proc(Context: ^shape_context) -> shape_codepoint_iterator ---
 	ShapeCodepointIteratorIsValid  :: proc(It: ^shape_codepoint_iterator) -> b32 ---
 	ShapeGetShapeCodepoint         :: proc(Context: ^shape_context, CodepointIndex: c.int, Codepoint: ^shape_codepoint) -> b32 ---
+	// Codepoint.Size has to be size_of(shape_codepoint2).
+	ShapeGetShapeCodepoint2        :: proc(Context: ^shape_context, CodepointIndex: c.int, Codepoint: ^shape_codepoint2) -> b32 ---
 }
 
 @(require_results)
@@ -125,6 +154,17 @@ ShapeCodepointIteratorNext :: proc "contextless" (It: ^shape_codepoint_iterator)
 
 
 
+@(require_results)
+ShapeCodepointIteratorNext2 :: proc "contextless" (It: ^shape_codepoint_iterator) -> (Codepoint: shape_codepoint2, CodepointIndex: c.int, Ok: b32) {
+	@(default_calling_convention="c", require_results)
+	foreign lib {
+		kbts_ShapeCodepointIteratorNext2 :: proc(It: ^shape_codepoint_iterator, Codepoint: ^shape_codepoint2, CodepointIndex: ^c.int) -> b32 ---
+	}
+	Codepoint.Size = size_of(shape_codepoint2)
+	Ok = kbts_ShapeCodepointIteratorNext2(It, &Codepoint, &CodepointIndex)
+	return
+}
+
 //
 // Direct API
 //
@@ -136,8 +176,17 @@ foreign lib {
 	GetFontInfo  :: proc(Font: ^font, Info: ^font_info) ---
 	GetFontInfo2 :: proc(Font: ^font, Info: ^font_info2) ---
 
+	// Variable fonts
+	GetVariationInfo          :: proc(Font: ^font, AxisCount: ^c.int, InstanceCount: ^c.int) ---
+	NormalizeVariationVector  :: proc(Font: ^font, VariationVector: [^]f32, VariationVectorNormalized: [^]i16) ---
+	GetVariationAxisInfo      :: proc(Font: ^font, AxisIndex: c.int, Info: ^variation_axis_info) -> b32 ---
+	GetVariationInstance      :: proc(Font: ^font, InstanceIndex: c.int, Info: ^variation_instance_info, VariationVector: [^]f32) -> b32 ---
+
 	// A shape_config is a bag of pre-computed data for a specific shaping setup.
 	SizeOfShapeConfig  :: proc(Font: ^font, Script: script, Language: language) -> b32 ---
+	SizeOfShapeConfig2 :: proc(Font: ^font, Script: script, Language: language, VariationVector: [^]f32) -> c.int ---
+	PlaceShapeConfig2  :: proc(Font: ^font, Script: script, Language: language, VariationVector: [^]f32, Memory: rawptr, Uid: ^uid) -> ^shape_config ---
+	CreateShapeConfig2 :: proc(Font: ^font, Script: script, Language: language, VariationVector: [^]f32, Allocator: allocator_function, AllocatorData: rawptr, Uid: ^uid) -> ^shape_config ---
 	PlaceShapeConfig   :: proc(Font: ^font, Script: script, Language: language, Memory: rawptr) -> ^shape_config ---
 	CreateShapeConfig  :: proc(Font: ^font, Script: script, Language: language, Allocator: allocator_function, AllocatorData: rawptr) -> ^shape_config ---
 	DestroyShapeConfig :: proc(Config: ^shape_config) ---
@@ -205,6 +254,37 @@ ShapeDirect :: proc "contextless" (Scratchpad: ^shape_scratchpad, Storage: ^glyp
 	return
 }
 
+// VariationVectorNormalized is nil, or as big as the number of variation axes in the font (see NormalizeVariationVector).
+@(require_results)
+ShapeDirect2 :: proc "contextless" (Scratchpad: ^shape_scratchpad, Storage: ^glyph_storage, RunDirection: direction, VariationVectorNormalized: []i16 = nil) -> (Output: glyph_iterator, Err: shape_error) {
+	@(default_calling_convention="c", require_results)
+	foreign lib {
+		kbts_ShapeDirect2 :: proc(Scratchpad: ^shape_scratchpad, Storage: ^glyph_storage, RunDirection: direction, VariationVectorNormalized: [^]i16, Output: ^glyph_iterator) -> shape_error ---
+	}
+	Err = kbts_ShapeDirect2(Scratchpad, Storage, RunDirection, raw_data(VariationVectorNormalized), &Output)
+	return
+}
+
+
+// Fills String with up to len(String) bytes of UTF-8 and returns the byte length of the whole string.
+@(require_results)
+LookupFontString :: proc "c" (Font: ^font, StringId: font_info_string_id, LanguageId: windows_language_id, String: []byte) -> c.int {
+	@(default_calling_convention="c", require_results)
+	foreign lib {
+		kbts_LookupFontString :: proc(Font: ^font, StringId: font_info_string_id, LanguageId: windows_language_id, String: [^]byte, StringCapacity: c.int) -> c.int ---
+	}
+	return kbts_LookupFontString(Font, StringId, LanguageId, raw_data(String), c.int(len(String)))
+}
+
+// Writes the Windows language ids that match Language into Ids if they all fit, and returns how many there are.
+@(require_results)
+WindowsIdsForLanguage :: proc "c" (Language: language, Ids: []windows_language_id) -> c.int {
+	@(default_calling_convention="c", require_results)
+	foreign lib {
+		kbts_WindowsIdsForLanguage :: proc(Language: language, Ids: [^]windows_language_id, IdCapacity: c.int) -> c.int ---
+	}
+	return kbts_WindowsIdsForLanguage(Language, raw_data(Ids), c.int(len(Ids)))
+}
 
 @(require_results)
 SizeOfGlyphConfig :: proc "c" (ShapeConfig: ^shape_config, Overrides: []feature_override) -> c.int {
@@ -346,6 +426,15 @@ DecodeUtf8 :: proc "c" (Utf8: string) -> decode {
 		kbts_DecodeUtf8 :: proc(Utf8: [^]byte, Length: un) -> decode ---
 	}
 	return kbts_DecodeUtf8(raw_data(Utf8), un(len(Utf8)))
+}
+
+@(require_results)
+DecodeUtf16 :: proc "c" (Utf16: []u16, Flags: decode_utf16_flags = {}) -> decode {
+	@(default_calling_convention="c", require_results)
+	foreign lib {
+		kbts_DecodeUtf16 :: proc(Utf16: [^]u16, Length: un, Flags: decode_utf16_flags) -> decode ---
+	}
+	return kbts_DecodeUtf16(raw_data(Utf16), un(len(Utf16)), Flags)
 }
 
 // This is a quick guess that stops at the first glyph that has a strong script/direction associated to it.

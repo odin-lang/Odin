@@ -1,11 +1,12 @@
 /*
 `Deflate` decompression of raw and `ZLIB`-type streams.
 
+This package is deprecated, use `core:compress/deflate` as the example below does.
+
 Example:
 	package main
 
-	import "core:bytes"
-	import "core:compress/zlib"
+	import "core:compress/deflate"
 	import "core:fmt"
 
 	main :: proc() {
@@ -26,16 +27,16 @@ Example:
 		}
 		OUTPUT_SIZE :: 432
 
-		buf: bytes.Buffer
+		buf: [dynamic]byte
+		defer delete(buf)
 
-		// We can pass ", true" to inflate a raw DEFLATE stream instead of a ZLIB wrapped one.
-		err := zlib.inflate(input=ODIN_DEMO, buf=&buf, expected_output_size=OUTPUT_SIZE)
-		defer bytes.buffer_destroy(&buf)
+		// Use `deflate.inflate_raw` to inflate a raw DEFLATE stream instead of a ZLIB wrapped one.
+		err := deflate.inflate_zlib(&buf, ODIN_DEMO, OUTPUT_SIZE)
 
 		if err != nil {
 			fmt.printf("\nError: %v\n", err)
 		}
-		s := bytes.buffer_to_string(&buf)
+		s := string(buf[:])
 		fmt.printf("Input: %v bytes, output (%v bytes):\n%v\n", len(ODIN_DEMO), len(s), s)
 		assert(len(s) == OUTPUT_SIZE)
 	}
@@ -43,7 +44,7 @@ Example:
 package compress_zlib
 
 /*
-	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2021-2026 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's license.
 
 	List of contributors:

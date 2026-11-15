@@ -415,6 +415,8 @@ typedef struct SDL_AudioSpec
  * This reports on the size of an audio sample frame: stereo Sint16 data (2
  * channels of 2 bytes each) would be 4 bytes per frame, for example.
  *
+ * This casts the value to unsigned int to avoid implicit sign conversion.
+ *
  * \param x an SDL_AudioSpec to query.
  * \returns the number of bytes used per sample frame.
  *
@@ -422,7 +424,7 @@ typedef struct SDL_AudioSpec
  *
  * \since This macro is available since SDL 3.2.0.
  */
-#define SDL_AUDIO_FRAMESIZE(x) (SDL_AUDIO_BYTESIZE((x).format) * (x).channels)
+#define SDL_AUDIO_FRAMESIZE(x) (((unsigned int)SDL_AUDIO_BYTESIZE((x).format)) * ((unsigned int)((x).channels)))
 
 /**
  * The opaque handle that represents an audio stream.
@@ -434,7 +436,8 @@ typedef struct SDL_AudioSpec
  * - It can handle incoming data in any variable size.
  * - It can handle input/output format changes on the fly.
  * - It can remap audio channels between inputs and outputs.
- * - You push data as you have it, and pull it when you need it
+ * - You push data as you have it, and pull it when you need it; the
+ *   stream will buffer data as needed.
  * - It can also function as a basic audio data queue even if you just have
  *   sound that needs to pass from one place to another.
  * - You can hook callbacks up to them when more data is added or requested,
@@ -1054,8 +1057,15 @@ extern SDL_DECLSPEC SDL_AudioDeviceID SDLCALL SDL_GetAudioStreamDevice(SDL_Audio
 /**
  * Create a new audio stream.
  *
- * \param src_spec the format details of the input audio.
- * \param dst_spec the format details of the output audio.
+ * Note that `src_spec` or `dst_spec` may be NULL, but any attempts to
+ * put or get data from an audio stream will fail until it has valid
+ * specs assigned to both ends of the stream. Specs can be assigned later
+ * through SDL_SetAudioStreamFormat(), or binding the stream to an audio
+ * device (which will set the format of only the input or output,
+ * depending on what kind of device the stream was bound to).
+ *
+ * \param src_spec the format details of the input audio. May be NULL.
+ * \param dst_spec the format details of the output audio. May be NULL.
  * \returns a new audio stream on success or NULL on failure; call
  *          SDL_GetError() for more information.
  *
@@ -1136,6 +1146,9 @@ extern SDL_DECLSPEC bool SDLCALL SDL_GetAudioStreamFormat(SDL_AudioStream *strea
  * dst_spec for playback devices). Attempts to make a change to this side will
  * be ignored, but this will not report an error. The other side's format can
  * be changed.
+ *
+ * `src_spec` and `dst_spec` may each be NULL; a NULL spec signals not to
+ * change the current format for that side of the stream.
  *
  * \param stream the stream the format is being changed.
  * \param src_spec the new format of the audio input; if NULL, it is not
@@ -1349,7 +1362,7 @@ extern SDL_DECLSPEC int * SDLCALL SDL_GetAudioStreamOutputChannelMap(SDL_AudioSt
  *
  * \since This function is available since SDL 3.2.0.
  *
- * \sa SDL_SetAudioStreamInputChannelMap
+ * \sa SDL_SetAudioStreamOutputChannelMap
  */
 extern SDL_DECLSPEC bool SDLCALL SDL_SetAudioStreamInputChannelMap(SDL_AudioStream *stream, const int *chmap, int count);
 
@@ -1791,6 +1804,16 @@ extern SDL_DECLSPEC bool SDLCALL SDL_AudioStreamDevicePaused(SDL_AudioStream *st
  * As this is just a wrapper over SDL_LockMutex for an internal lock; it has
  * all the same attributes (recursive locks are allowed, etc).
  *
+ * Note that when the stream's callback runs, SDL is holding both an internal
+ * mutex for the audio device and the stream's lock, in that order. Which is
+ * to say: while this function can protect arbitrary data, calling into some
+ * SDL audio functions while holding this lock may cause a deadlock--the app
+ * holds this lock, and then calls into something that wants to obtain the
+ * device lock, in the opposite order that SDL's audio thread obtained them.
+ * Therefore, best practice is to use this function to protect simple app data
+ * against the audio callback, and be careful about what SDL functions one
+ * calls while locked outside of the callback.
+ *
  * \param stream the audio stream to lock.
  * \returns true on success or false on failure; call SDL_GetError() for more
  *          information.
@@ -1842,6 +1865,8 @@ extern SDL_DECLSPEC bool SDLCALL SDL_UnlockAudioStream(SDL_AudioStream *stream);
  * adding/reading data on demand, and the app will often put/get data as
  * appropriate, but the system goes on with the data currently available to it
  * if this callback does nothing.
+ *
+ * Do not call SDL_DestroyAudioStream() on `stream` during this callback.
  *
  * \param stream the SDL audio stream associated with this callback.
  * \param additional_amount the amount of data, in bytes, that is needed right

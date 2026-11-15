@@ -146,3 +146,11 @@ perf_cache_config :: #force_inline proc "contextless" (id: Perf_Hardware_Cache_I
 	res: Perf_Hardware_Cache_Result_Id) -> u64 {
 	return u64(id) | (u64(op) << 8) | (u64(res) << 16)
 }
+
+/// Constructs a Dev from major and minor device numbers
+makedev :: #force_inline proc "contextless" (major, minor: u32) -> Dev {
+	return Dev((u64(minor & 0xff)) |
+	           (u64(major & 0xfff) << 8) |
+	           (u64(minor & ~u32(0xff)) << 12) |
+	           (u64(major & ~u32(0xfff)) << 32))
+}

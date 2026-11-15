@@ -524,31 +524,31 @@ B3_API b3WorldTransform b3Body_GetTransform( b3BodyId bodyId );
 
 /// Set the world transform of a body. This acts as a teleport and is fairly expensive.
 /// @note Generally you should create a body with the intended transform.
-/// @see b3BodyDef::position and b3BodyDef::rotation
+/// @see b3BodyDef::position and b3BodyDef::rotation.
 B3_API void b3Body_SetTransform( b3BodyId bodyId, b3Pos position, b3Quat rotation );
 
-/// Get a local point on a body given a world point
+/// Get a local point on a body given a world point.
 B3_API b3Vec3 b3Body_GetLocalPoint( b3BodyId bodyId, b3Pos worldPoint );
 
-/// Get a world point on a body given a local point
+/// Get a world point on a body given a local point.
 B3_API b3Pos b3Body_GetWorldPoint( b3BodyId bodyId, b3Vec3 localPoint );
 
-/// Get a local vector on a body given a world vector
+/// Get a local vector on a body given a world vector.
 B3_API b3Vec3 b3Body_GetLocalVector( b3BodyId bodyId, b3Vec3 worldVector );
 
-/// Get a world vector on a body given a local vector
+/// Get a world vector on a body given a local vector.
 B3_API b3Vec3 b3Body_GetWorldVector( b3BodyId bodyId, b3Vec3 localVector );
 
 /// Get the linear velocity of a body's center of mass. Usually in meters per second.
 B3_API b3Vec3 b3Body_GetLinearVelocity( b3BodyId bodyId );
 
-/// Get the angular velocity of a body in radians per second
+/// Get the angular velocity of a body in radians per second.
 B3_API b3Vec3 b3Body_GetAngularVelocity( b3BodyId bodyId );
 
-/// Set the linear velocity of a body. Usually in meters per second.
+/// Set the linear velocity of a body at the center of mass. Usually in meters per second.
 B3_API void b3Body_SetLinearVelocity( b3BodyId bodyId, b3Vec3 linearVelocity );
 
-/// Set the angular velocity of a body in radians per second
+/// Set the angular velocity of a body in radians per second.
 B3_API void b3Body_SetAngularVelocity( b3BodyId bodyId, b3Vec3 angularVelocity );
 
 /// Set the velocity to reach the given transform after a given time step.
@@ -710,6 +710,14 @@ B3_API void b3Body_SetBullet( b3BodyId bodyId, bool flag );
 /// Is this body a bullet?
 B3_API bool b3Body_IsBullet( b3BodyId bodyId );
 
+/// Allow this body to rotate fast. Useful for axially symmetric bodies, such as vehicle wheels.
+/// Normally rotation speed is clamped to improve CCD. However, this clamping is unnecessary for
+/// bodies that only rotate fast around an axis of symmetry.
+B3_API void b3Body_AllowFastRotation( b3BodyId bodyId, bool flag );
+
+/// Is this body allowed to rotate fast?
+B3_API bool b3Body_IsFastRotationAllowed( b3BodyId bodyId );
+
 /// Enable or disable contact recycling for this body. Contact recycling is a performance optimization
 /// that reuses contact manifolds when bodies move slightly. Disabling it can avoid ghost collisions
 /// on characters at the cost of higher per-step work. Existing contacts retain their prior setting;
@@ -777,6 +785,10 @@ B3_API int b3Body_CollideMover( b3BodyId bodyId, b3BodyPlaneResult* bodyPlanes, 
  * @defgroup shape Shape
  * Functions to create, destroy, and access.
  * Shapes bind raw geometry to bodies and hold material properties including friction and restitution.
+ * You may add multiple shapes to a single body. There are no hard limits on shape count per body.
+ * 
+ * When you create a shape on a body the center of mass moves. This can lead to the body linear velocity
+ * changing if the angular velocity is non-zero.
  * @{
  */
 
@@ -816,8 +828,10 @@ B3_API b3ShapeId b3CreateMeshShape( b3BodyId bodyId, const b3ShapeDef* def, cons
 /// @return the shape id for accessing the shape
 B3_API b3ShapeId b3CreateHeightFieldShape( b3BodyId bodyId, const b3ShapeDef* def, const b3HeightFieldData* heightField );
 
-/// Compound shapes are only allowed on static bodies.
-B3_API b3ShapeId b3CreateCompoundShape( b3BodyId bodyId, b3ShapeDef* def, const b3CompoundData* compound );
+/// Baked compound shapes are only allowed on static bodies.
+/// Note: runtime compounds are achieved by adding multiple shapes to a body.
+/// Runtime compounds can be dynamic and/or kinematic.
+B3_API b3ShapeId b3CreateBakedCompoundShape( b3BodyId bodyId, b3ShapeDef* def, const b3CompoundData* compound );
 
 /// Destroy a shape. You may defer the body mass update which can improve performance if several shapes on a
 ///	body are destroyed at once.

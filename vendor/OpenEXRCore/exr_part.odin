@@ -25,7 +25,7 @@ foreign lib {
 	/** @brief Define a new part in the file. */
 	add_part :: proc(
 		ctxt:      context_t,
-		partname:  rawptr,
+		partname:  cstring,
 		type:      storage_t,
 		new_index: ^c.int) -> result_t ---
 
@@ -125,7 +125,7 @@ foreign lib {
 	 *
 	 * TODO: consider removing this prior to release once C++ fully converted
 	 */
-	get_chunk_table :: proc(ctxt: const_context_t, part_index: c.int, table: [^][^]u64, count: ^i32) -> result_t ---
+	get_chunk_table :: proc(ctxt: const_context_t, part_index: c.int, table: ^[^]u64, count: ^i32) -> result_t ---
 
 	/** Return whether the chunk table for this part is completely written.
 	 *
@@ -134,7 +134,7 @@ foreign lib {
 	 * return EXR_ERR_INCOMPLETE_CHUNK_TABLE when incomplete, EXR_ERR_SUCCESS
 	 * if it appears ok, or another error if otherwise problematic
 	 */
-	exr_validate_chunk_table :: proc(ctxt: context_t, part_index: c.int) -> result_t ---
+	validate_chunk_table :: proc(ctxt: context_t, part_index: c.int) -> result_t ---
 
 	/** Return the number of scanlines chunks for this file part.
 	 *
@@ -194,6 +194,47 @@ foreign lib {
 	 */
 	set_dwa_compression_level :: proc(ctxt: context_t, part_index: c.int, level: f32) -> result_t ---
 
+	/** @brief Retrieve the lossy HTJ2K compression quality used for the specified
+	 * part.
+	 *
+	 * This only applies when the compression method is LJ2K.
+	 *
+	 * This value is NOT persisted in the file, and only exists for the lifetime of
+	 * the context, so will be at the default value when just reading a file.
+	 */
+	get_lossy_htj2k_quality :: proc(ctxt: const_context_t, part_index: c.int, level: ^f32) -> result_t ---
+
+	/** @brief Set the lossy HTJ2K compression quality for the specified part.
+	 *
+	 * This only applies when the compression method is LJ2K.
+	 *
+	 * This value is NOT persisted in the file, and only exists for the lifetime of
+	 * the context, so this value will be ignored when reading a file.
+	 */
+	set_lossy_htj2k_quality :: proc(ctxt: context_t, part_index: c.int, level: f32) -> result_t ---
+
+	/** @brief Retrieve the zstd compression level used for the specified part.
+	 *
+	 * This only applies when the compression method is zstd. Valid levels
+	 * are 1 through 22; the default is 5.
+	 *
+	 * This value is NOT persisted in the file, and only exists for the
+	 * lifetime of the context, so will be at the default value when just
+	 * reading a file.
+	 */
+	get_zstd_compression_level :: proc(ctxt: const_context_t, part_index: c.int, level: ^i32) -> result_t ---
+
+	/** @brief Set the zstd compression level for the specified part.
+	 *
+	 * This only applies when the compression method is zstd. `level` must
+	 * be between 1 and 22 inclusive (libzstd range).
+	 *
+	 * This value is NOT persisted in the file, and only exists for the
+	 * lifetime of the context, so this value will be ignored when
+	 * reading a file.
+	 */
+	set_zstd_compression_level :: proc(ctxt: context_t, part_index: c.int, level: c.int) -> result_t ---
+
 	/**************************************/
 
 	/** @defgroup PartMetadata Functions to get and set metadata for a particular part.
@@ -232,7 +273,7 @@ foreign lib {
 		part_index: c.int,
 		mode:       attr_list_access_mode_t,
 		count:      ^i32,
-		outlist:    ^[^]attribute_t) -> result_t ---
+		outlist:    [^]^attribute_t) -> result_t ---
 
 	/** Declare an attribute within the specified part.
 	 *
@@ -276,7 +317,7 @@ foreign lib {
 		displayWindow:      ^attr_box2i_t,
 		dataWindow:         ^attr_box2i_t,
 		pixelaspectratio:   f32,
-		screenWindowCenter: attr_v2f_t,
+		screenWindowCenter: ^attr_v2f_t,
 		screenWindowWidth:  f32,
 		lineorder:          lineorder_t,
 		ctype:              compression_t) -> result_t ---
@@ -438,6 +479,18 @@ foreign lib {
 		name:       cstring,
 		val:        ^attr_box2f_t) -> result_t ---
 
+	attr_get_bytes :: proc(
+		ctxt:       const_context_t,
+		part_index: c.int,
+		name:       cstring,
+		out:        ^attr_bytes_t) -> result_t ---
+
+	attr_set_bytes :: proc(
+		ctxt:       context_t,
+		part_index: c.int,
+		name:       cstring,
+		val:        ^attr_bytes_t) -> result_t ---
+
 	/** @brief Zero-copy query of channel data.
 	 *
 	 * Do not free or manipulate the @p chlist data, or use
@@ -482,7 +535,7 @@ foreign lib {
 		name:       cstring,
 		comp:       compression_t) -> result_t ---
 
-	attr_get_double :: proc(ctxt: const_context_t, part_index: c.int, name: cstring, out: f64) -> result_t ---
+	attr_get_double :: proc(ctxt: const_context_t, part_index: c.int, name: cstring, out: ^f64) -> result_t ---
 
 	attr_set_double :: proc(ctxt: context_t, part_index: c.int, name: cstring, val: f64) -> result_t ---
 
@@ -641,14 +694,14 @@ foreign lib {
 		part_index: c.int,
 		name:       cstring,
 		size:       ^i32,
-		out: ^cstring) -> result_t ---
+		out:        [^]cstring) -> result_t ---
 
 	attr_set_string_vector :: proc(
 		ctxt:       context_t,
 		part_index: c.int,
 		name:       cstring,
 		size:       i32,
-		sv: ^cstring) -> result_t ---
+		sv:         [^]cstring) -> result_t ---
 
 	attr_get_tiledesc :: proc(
 		ctxt:       const_context_t,

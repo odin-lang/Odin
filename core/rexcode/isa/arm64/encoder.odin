@@ -141,10 +141,11 @@ encode_one_inline :: #force_inline proc(
 	}
 
 	word = form.bits
-	if form.enc[0] != .NONE { word |= pack_operand_inline(&inst.ops[0], form.enc[0], form, pc, inst_idx, relocs) }
-	if form.enc[1] != .NONE { word |= pack_operand_inline(&inst.ops[1], form.enc[1], form, pc, inst_idx, relocs) }
-	if form.enc[2] != .NONE { word |= pack_operand_inline(&inst.ops[2], form.enc[2], form, pc, inst_idx, relocs) }
-	if form.enc[3] != .NONE { word |= pack_operand_inline(&inst.ops[3], form.enc[3], form, pc, inst_idx, relocs) }
+	if form.enc[0] != .NONE { word |= pack_operand_inline(&inst.ops[0], form.enc[0], form, pc, inst_idx, relocs, inst) }
+	if form.enc[1] != .NONE { word |= pack_operand_inline(&inst.ops[1], form.enc[1], form, pc, inst_idx, relocs, inst) }
+	if form.enc[2] != .NONE { word |= pack_operand_inline(&inst.ops[2], form.enc[2], form, pc, inst_idx, relocs, inst) }
+	if form.enc[3] != .NONE { word |= pack_operand_inline(&inst.ops[3], form.enc[3], form, pc, inst_idx, relocs, inst) }
+	if form.enc[4] != .NONE { word |= pack_operand_inline(&inst.ops[4], form.enc[4], form, pc, inst_idx, relocs, inst) }
 	return word, true
 }
 
@@ -155,7 +156,8 @@ encoding_matches_inline :: #force_inline proc "contextless" (
 	return  operand_matches_inline(&inst.ops[0], form.ops[0], form) &&
 			operand_matches_inline(&inst.ops[1], form.ops[1], form) &&
 			operand_matches_inline(&inst.ops[2], form.ops[2], form) &&
-			operand_matches_inline(&inst.ops[3], form.ops[3], form)
+			operand_matches_inline(&inst.ops[3], form.ops[3], form) &&
+			operand_matches_inline(&inst.ops[4], form.ops[4], form)
 }
 
 @(private="file")
@@ -226,19 +228,23 @@ operand_matches_inline :: #force_inline proc "contextless" (
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && (op.size == 0 || op.size == 56)
 	case .V_2D:
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && (op.size == 0 || op.size == 64)
+	case .V_1Q:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && (op.size == 0 || op.size == 72)
 	case .V_4H_FP16:
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && (op.size == 0 || op.size == 24)
 	// Element-indexed V views: element size carried in op.size (B=1,H=2,S=4,
 	// D=8) so DUP/INS forms disambiguate. .S also accepts size 0 so a plain
 	// op_reg (as the hand-written SM3TT forms pass) still matches the .S slot.
+	// Element-view sizes are odd (1/3/5/7) so they can never be confused with
+	// an arrangement, which is always a multiple of 8 (see op_v_elem_*).
 	case .V_ELEM_B:
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && op.size == 1
 	case .V_ELEM_H:
-		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && op.size == 2
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && op.size == 3
 	case .V_ELEM_S:
-		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && (op.size == 4 || op.size == 0)
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && (op.size == 5 || op.size == 0)
 	case .V_ELEM_D:
-		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && op.size == 8
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && op.size == 7
 
 	// SVE Z registers. Element size carried in op.size: B=1, H=2, S=4, D=8.
 	// op.size==0 (legacy / default-constructed) accepts any width.
@@ -250,43 +256,104 @@ operand_matches_inline :: #force_inline proc "contextless" (
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z && (op.size == 0 || op.size == 4)
 	case .Z_REG_D:
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z && (op.size == 0 || op.size == 8)
-	case .P_REG, .P_REG_MERGE, .P_REG_ZERO, .P_REG_GOV:
+	case .P_REG, .P_REG_MERGE, .P_REG_ZERO, .P_REG_GOV,
+	     .P_REG_B, .P_REG_H, .P_REG_S, .P_REG_D:
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_P
+	case .PN_REG, .PN_REG_ZERO:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_PN
+	case .ZT_REG:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_ZT
+	case .ZA_ARRAY:
+		return op.kind == .ZA_SLICE
+	case .Z_LIST1_B, .Z_LIST1_H, .Z_LIST1_S, .Z_LIST1_D:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z && op.list_count <= 1
+	case .Z_LIST2_B:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z && op.list_count == 2
+	// The first register of a pair must be even, of a quad a multiple of four.
+	case .Z_REG_ANY:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z
+	case .Z_PAIR_B, .Z_PAIR_H, .Z_PAIR_S, .Z_PAIR_D:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z && (reg_hw(op.reg) & 0x1) == 0 &&
+		       (op.size == 0 || op.size == z_elem_size(ot))
+	case .Z_QUAD_B, .Z_QUAD_H, .Z_QUAD_S, .Z_QUAD_D:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z && (reg_hw(op.reg) & 0x3) == 0 &&
+		       (op.size == 0 || op.size == z_elem_size(ot))
 
 	// SME tile state (immediate-encoded tile number; user supplies the
 	// tile index as an immediate, e.g. 0 for ZA0.S, 3 for ZA3.S).
 	case .ZA_TILE_B, .ZA_TILE_H, .ZA_TILE_S, .ZA_TILE_D, .ZA_TILE_Q:
+		if op.kind == .REGISTER { return reg_class(op.reg) == REG_ZA }
 		return op.kind == .IMMEDIATE
 	// Misc immediate sub-types added in batch 3
 	case .FCMLA_ROT, .FCADD_ROT, .SVE_PRFOP, .LDRAA_IMM10:
 		return op.kind == .IMMEDIATE
 	case .LSL_SHIFT_W, .LSL_SHIFT_X, .ROR_SHIFT:
 		return op.kind == .IMMEDIATE
-	case .Z_PAIR:
-		// SME2 vector pair: first reg must be even (Z0, Z2, ..., Z30).
-		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z && (reg_hw(op.reg) & 0x1) == 0
-	case .Z_QUAD:
-		// SME2 vector quad: first reg must be multiple of 4.
-		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z && (reg_hw(op.reg) & 0x3) == 0
 	case .SME_PATTERN, .SVE_PATTERN:
 		return op.kind == .IMMEDIATE
 	// SME tile slice (packed immediate descriptor; see encoding_types.odin)
 	case .SME_SLICE_B, .SME_SLICE_H, .SME_SLICE_W, .SME_SLICE_D, .SME_SLICE_Q:
-		return op.kind == .IMMEDIATE
+		return op.kind == .ZA_SLICE
 
 	case .IMM_12, .IMM_16, .IMM_8, .IMM_6, .IMM_5, .IMM_4, .IMM_3, .IMM_2,
-		 .NZCV_IMM, .SYS_REG, .HW_SHIFT, .LSE_SIZE, .VEC_SHIFT, .VEC_INDEX:
+	     .NZCV_IMM, .PSTATE_FIELD, .HW_SHIFT, .LSE_SIZE, .VEC_SHIFT, .VEC_INDEX,
+	     .IMM_MUL4:
 		return op.kind == .IMMEDIATE
+	case .SYS_REG:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_SYS
 	case .BITMASK_IMM:
 		// The user passes the raw logical mask value; we validate that it
 		// fits the AArch64 bitmask-immediate encoding at the form's width.
 		return op.kind == .IMMEDIATE && is_valid_bitmask_imm(u64(op.immediate), form.flags.is_64)
 	case .REL_26, .REL_19, .REL_14, .REL_PG21:
 		return op.kind == .RELATIVE
-	case .MEM:
-		return op.kind == .MEMORY
+	// Memory: the addressing mode is what selects between the forms of one
+	// mnemonic (LDR [Xn,#i] / [Xn,#i]! / [Xn],#i / [Xn,Xm]), so it has to
+	// be matched, not just packed.
+	case .MEM_OFFSET:
+		return op.kind == .MEMORY && op.mem.mode == .OFFSET
+	case .MEM_PRE:
+		return op.kind == .MEMORY && op.mem.mode == .PRE_INDEXED
+	case .MEM_POST:
+		return op.kind == .MEMORY && op.mem.mode == .POST_INDEXED
+	// Register offset and extended-register offset are one instruction word:
+	// the option field at 15:13 picks LSL / UXTW / SXTW / SXTX. One MEM_REG
+	// form serves both addressing modes, the way the RM slot takes plain and
+	// shifted registers, and the index register's width has to agree with the
+	// extend that consumes it.
+	case .MEM_REG:
+		if op.kind != .MEMORY { return false }
+		if op.mem.mode == .REG_OFFSET {
+			return reg_class(op.mem.index) == REG_X
+		}
+		if op.mem.mode != .EXT_REG_OFFSET { return false }
+		switch op.mem.extend {
+		case .UXTB, .UXTH, .SXTB, .SXTH:
+			// The option field cannot name the byte/half extends.
+			return false
+		case .UXTW, .SXTW:
+			return reg_class(op.mem.index) == REG_W
+		case .UXTX, .SXTX:
+			return reg_class(op.mem.index) == REG_X
+		}
+		return false
+	case .MEM_EXT:
+		return op.kind == .MEMORY && op.mem.mode == .EXT_REG_OFFSET
+	// SVE: the plain mode is not enough -- a gather's scalar+scalar and
+	// scalar+vector forms are both REG_OFFSET and differ only in whether
+	// the index (or base) is a Z register.
+	case .MEM_SVE_SS:
+		return op.kind == .MEMORY && op.mem.mode == .REG_OFFSET && reg_class(op.mem.index) != REG_Z
+	case .MEM_SVE_SI:
+		return op.kind == .MEMORY && op.mem.mode == .OFFSET && reg_class(op.mem.base) != REG_Z
+	case .MEM_SVE_VEC:
+		return op.kind == .MEMORY && op.mem.mode == .REG_OFFSET && reg_class(op.mem.index) == REG_Z
+	case .MEM_SVE_VB:
+		return op.kind == .MEMORY && op.mem.mode == .OFFSET && reg_class(op.mem.base) == REG_Z
 	case .COND:
 		return op.kind == .COND
+	case .COND_NOT_AL:
+		return op.kind == .COND && (op.cond & 0xE) != 0xE
 	}
 	return false
 }
@@ -333,6 +400,10 @@ pack_operand_inline :: #force_inline proc(
 	pc:       u32,
 	inst_idx: u16,
 	relocs:   ^[dynamic]Relocation,
+	// Most encodings pack one operand in isolation. SVE's tsz field does not:
+	// it holds an element size and a shift together, and the size belongs to a
+	// different operand than the shift.
+	inst:     ^Instruction,
 ) -> u32 {
 	switch enc {
 	case .NONE, .IMPL:
@@ -343,6 +414,9 @@ pack_operand_inline :: #force_inline proc(
 		return (u32(reg_hw(op.reg)) & 0x1F) << 0
 	case .RN:
 		return (u32(reg_hw(op.reg)) & 0x1F) << 5
+	case .RN_RM:
+		r := u32(reg_hw(op.reg)) & 0x1F
+		return (r << 5) | (r << 16)
 	case .RT2, .RA:
 		return (u32(reg_hw(op.reg)) & 0x1F) << 10
 	case .RM:
@@ -361,7 +435,7 @@ pack_operand_inline :: #force_inline proc(
 			return (u32(reg_hw(op.extended.reg)) & 0x1F) << 16 |
 				   (u32(op.extended.extend)      & 0x7)  << 13 |
 				   (u32(op.extended.amount)      & 0x7)  << 10
-		case .NONE, .IMMEDIATE, .MEMORY, .RELATIVE, .COND:
+		case .NONE, .IMMEDIATE, .MEMORY, .RELATIVE, .COND, .ZA_SLICE:
 			return 0
 		}
 
@@ -379,13 +453,16 @@ pack_operand_inline :: #force_inline proc(
 		// Condition payload may arrive as IMMEDIATE (raw) or COND kind.
 		c := u32(op.cond) if op.kind == .COND else u32(op.immediate)
 		return (c & 0xF) << 12
+	case .COND_HI_INV:
+		c := u32(op.cond) if op.kind == .COND else u32(op.immediate)
+		return ((c ~ 1) & 0xF) << 12
 	case .COND_LO:
 		c := u32(op.cond) if op.kind == .COND else u32(op.immediate)
 		return (c & 0xF) << 0
 	case .NZCV_FIELD:
 		return (u32(op.immediate) & 0xF) << 0
 	case .SYS_FIELD:
-		return (u32(op.immediate) & 0x7FFF) << 5
+		return sysreg_bits(op.reg) << 5
 	case .HINT_FIELD:
 		return (u32(op.immediate) & 0x7F) << 5
 	case .BARRIER_FIELD:
@@ -418,11 +495,29 @@ pack_operand_inline :: #force_inline proc(
 		// Atomic addressing: [Xn] only -- no displacement, no shift.
 		// Used by load/store exclusives, acquire/release, LSE atomics.
 		return (u32(reg_hw(op.mem.base)) & 0x1F) << 5
+	case .OFFSET_PAIR_4, .OFFSET_PAIR_8, .OFFSET_PAIR_16:
+		// LDP/STP: signed imm7, scaled by the transfer size, at bits 21:15.
+		// The pre/post marker is already in the form's bits, so nothing is
+		// ORed into bits 11:10 -- those belong to Rt2.
+		scale := i32(4)
+		if enc == .OFFSET_PAIR_8 {
+			scale = 8
+		} else if enc == .OFFSET_PAIR_16 {
+			scale = 16
+		}
+		base_bits := (u32(reg_hw(op.mem.base)) & 0x1F) << 5
+		imm_bits  := u32((i32(op.mem.disp) / scale) & 0x7F)
+		return base_bits | (imm_bits << 15)
 	case .OFFSET_REG:
-		// [Xn, Xm{, LSL #s}]: option=011, S = shift!=0.
+		// [Xn, Xm{, LSL #s}] or [Xn, Wm|Xm, <extend> {#s}] -- one encoding:
+		// option (15:13) is 011 for LSL and the extend value otherwise, and
+		// S (12) says whether a shift amount is present.
 		base_bits := (u32(reg_hw(op.mem.base))  & 0x1F) << 5
 		idx_bits  := (u32(reg_hw(op.mem.index)) & 0x1F) << 16
 		option    := u32(0x3) << 13
+		if op.mem.mode == .EXT_REG_OFFSET {
+			option = (u32(op.mem.extend) & 0x7) << 13
+		}
 		s_bit     := op.mem.shift != 0 ? u32(1) << 12 : 0
 		return base_bits | idx_bits | option | s_bit | (0x2 << 10)
 	case .OFFSET_EXT:
@@ -471,9 +566,9 @@ pack_operand_inline :: #force_inline proc(
 		return ((bit >> 5) & 1) << 31 | (bit & 0x1F) << 19
 
 	// ---- NEON / SIMD register slots (alias of RD/RN/RM/RA bit positions) --
-	case .VD:
+	case .VD, .VD_TSZ, .VD_LIST1, .VD_LIST2, .VD_LIST3, .VD_LIST4:
 		return (u32(reg_hw(op.reg)) & 0x1F) << 0
-	case .VN:
+	case .VN, .VN_TSZ, .VN_LIST1, .VN_LIST2, .VN_LIST3, .VN_LIST4:
 		return (u32(reg_hw(op.reg)) & 0x1F) << 5
 	case .VM:
 		return (u32(reg_hw(op.reg)) & 0x1F) << 16
@@ -544,8 +639,12 @@ pack_operand_inline :: #force_inline proc(
 
 	// SVE2 XAR rotate amount: V = 2*esize - amount, split tszh:tszl:imm3.
 	case .SVE_XAR_SHIFT:
-		esize := vec_esize(form.ops[0])
-		v := (2 * esize - u32(op.immediate)) & 0x7F
+		// The element size shares this field with the shift, so it cannot also
+		// select between forms -- there is one form, and the size comes from
+		// the register the caller passed.
+		esize := u32(inst.ops[0].size) * 8
+		if esize == 0 || esize > 64 { esize = vec_esize(form.ops[0]) }
+		v := sve_tsz_pack(esize, u32(op.immediate))
 		return ((v >> 5) & 0x3) << 22 | ((v >> 3) & 0x3) << 19 | (v & 0x7) << 16
 
 	// NEON MOVI/FMOV immediate split: abc at bits 18-16, defgh at bits 9-5.
@@ -592,6 +691,17 @@ pack_operand_inline :: #force_inline proc(
 		return (u32(reg_hw(op.reg)) & 0xF) << 5
 	case .PM:
 		return (u32(reg_hw(op.reg)) & 0xF) << 16
+	case .SME_ZA_MASK:
+		return u32(op.immediate) & 0xFF
+	case .SME_ZA_ARRAY:
+		return ((u32(op.za.ws) & 0x3) << 13) | (u32(op.za.offset) & 0xF)
+	case .ENC_ZT0:
+		return 0
+	case .LUTI_IDX:
+		return (u32(op.immediate) & 0x3) << 15
+	case .PNG:
+		// The field holds pn - 8.
+		return ((u32(reg_hw(op.reg)) - 8) & 0x7) << 10
 	case .PG:
 		// Governing predicate (3-bit slot, P0..P7 only).
 		return (u32(reg_hw(op.reg)) & 0x7) << 10
@@ -607,6 +717,9 @@ pack_operand_inline :: #force_inline proc(
 	case .SVE_IMM8:
 		// Signed 8-bit at bits 12-5 (DUP/CPY/ADD imm).
 		return (u32(op.immediate) & 0xFF) << 5
+	case .SVE_IMM5A:
+		// INDEX's first operand; SVE_IMM5 is the second, at bits 20:16.
+		return (u32(op.immediate) & 0x1F) << 5
 	case .SVE_IMM5:
 		// 5-bit at bits 20-16 (INDEX imm, etc.).
 		return (u32(op.immediate) & 0x1F) << 16
@@ -617,8 +730,19 @@ pack_operand_inline :: #force_inline proc(
 	case .SVE_PATTERN:
 		return (u32(op.immediate) & 0x1F) << 5
 
+	case .IMM_MUL4:
+		// SVE element-count multiplier "MUL #imm" (INCW/DECW/CNTW/SQINCW/...).
+		// imm4 field at bits 19:16 encodes (imm - 1); asm range MUL #1..#16
+		// maps to 0..15. The operand carries the architectural multiplier
+		// (1..16), so subtract one here, matching the ENC_LSL_IMM_* /
+		// NEON_SHR_IMM convention of encoding the adjusted value.
+		mul := u32(op.immediate)
+		if mul == 0 { mul = 1 }
+		return ((mul - 1) & 0xF) << 16
+
 	// SVE memory operands
-	case .SVE_OFFSET_BASE_SS:
+	case .SVE_OFFSET_BASE_SS, .SVE_OFFSET_BASE_SS1, .SVE_OFFSET_BASE_SS2, .SVE_OFFSET_BASE_SS3,
+	     .SVE_OFFSET_BASE_SS4:
 		// [Xn, Xm, LSL #s] scalar+scalar. Base at 9:5, index at 20:16;
 		// shift is implicit in the encoding's static bits (per ESize).
 		base_bits := (u32(reg_hw(op.mem.base))  & 0x1F) << 5
@@ -633,23 +757,28 @@ pack_operand_inline :: #force_inline proc(
 
 	// SME ZA tile number fields (position depends on element size).
 	case .ZA_TILE_NUM_B:
-		// ZA0.B only -- nothing to encode (single tile of byte form).
-		return 0
+		// The tile number sits in the low bits, as wide as the element
+		// size leaves room for.
+		return u32(reg_hw(op.reg)) & 0x0
 	case .ZA_TILE_NUM_H:
-		// ZA0.H..ZA1.H -- 1-bit tile number at bit 22.
-		return (u32(op.immediate) & 0x1) << 22
+		// The tile number sits in the low bits, as wide as the element
+		// size leaves room for.
+		return u32(reg_hw(op.reg)) & 0x1
 	case .ZA_TILE_NUM_S:
-		// ZA0.S..ZA3.S -- 2-bit tile number at bits 23:22.
-		return (u32(op.immediate) & 0x3) << 22
+		// The tile number sits in the low bits, as wide as the element
+		// size leaves room for.
+		return u32(reg_hw(op.reg)) & 0x3
 	case .ZA_TILE_NUM_D:
-		// ZA0.D..ZA7.D -- 3-bit tile number at bits 23:21.
-		return (u32(op.immediate) & 0x7) << 21
+		// The tile number sits in the low bits, as wide as the element
+		// size leaves room for.
+		return u32(reg_hw(op.reg)) & 0x7
 	case .SME_PATTERN_FIELD:
 		// 4-bit SME pattern/list at bits 8:5 (ZERO instruction list mask).
 		return (u32(op.immediate) & 0xF) << 5
 
 	// ---- SVE gather/scatter + vector-base memory --------------------------
-	case .SVE_OFFSET_BASE_VEC:
+	case .SVE_OFFSET_BASE_VEC, .SVE_OFFSET_BASE_VEC_S, .SVE_OFFSET_BASE_VEC_D,
+	     .SVE_OFFSET_BASE_VECST_S, .SVE_OFFSET_BASE_VECST_D:
 		// [Xn, Zm.S/D, extend] -- base GPR at 9:5, Zm at 20:16.
 		base := (u32(reg_hw(op.mem.base))  & 0x1F) << 5
 		idx  := (u32(reg_hw(op.mem.index)) & 0x1F) << 16
@@ -693,40 +822,22 @@ pack_operand_inline :: #force_inline proc(
 	//     .D : tile[2:0]<<1 | imm[0]     (8 tiles, 2 slices each)
 	//     .Q : tile[3:0]                 (16 tiles, no imm)
 	case .SME_SLICE_B:
-		v     := u32(op.immediate)
-		imm   := v & 0xF
-		vflag := (v >> 4) & 0x1
-		ws    := (v >> 5) & 0x3
-		return (vflag << 15) | (ws << 13) | imm
+		return (u32(op.za.vertical ? 1 : 0) << 15) | ((u32(op.za.ws) & 0x3) << 13) |
+		       ((u32(op.za.tile) << 4) & 0xF) | (u32(op.za.offset) & 0xF)
 	case .SME_SLICE_H:
-		v     := u32(op.immediate)
-		imm   := v & 0x7
-		vflag := (v >> 4) & 0x1
-		ws    := (v >> 5) & 0x3
-		tile  := (v >> 7) & 0x1
-		return (vflag << 15) | (ws << 13) | imm | (tile << 3)
+		return (u32(op.za.vertical ? 1 : 0) << 15) | ((u32(op.za.ws) & 0x3) << 13) |
+		       ((u32(op.za.tile) << 3) & 0xF) | (u32(op.za.offset) & 0x7)
 	case .SME_SLICE_W:
-		v     := u32(op.immediate)
-		imm   := v & 0x3
-		vflag := (v >> 4) & 0x1
-		ws    := (v >> 5) & 0x3
-		tile  := (v >> 7) & 0x3
-		return (vflag << 15) | (ws << 13) | imm | (tile << 2)
+		return (u32(op.za.vertical ? 1 : 0) << 15) | ((u32(op.za.ws) & 0x3) << 13) |
+		       ((u32(op.za.tile) << 2) & 0xF) | (u32(op.za.offset) & 0x3)
 	case .SME_SLICE_D:
-		v     := u32(op.immediate)
-		imm   := v & 0x1
-		vflag := (v >> 4) & 0x1
-		ws    := (v >> 5) & 0x3
-		tile  := (v >> 7) & 0x7
-		return (vflag << 15) | (ws << 13) | imm | (tile << 1)
+		return (u32(op.za.vertical ? 1 : 0) << 15) | ((u32(op.za.ws) & 0x3) << 13) |
+		       ((u32(op.za.tile) << 1) & 0xF) | (u32(op.za.offset) & 0x1)
 	case .SME_SLICE_Q:
-		v     := u32(op.immediate)
-		vflag := (v >> 4) & 0x1
-		ws    := (v >> 5) & 0x3
-		tile  := (v >> 7) & 0xF
-		return (vflag << 15) | (ws << 13) | tile
-
-	// ---- Batch 3 misc immediate encodings ----
+		return (u32(op.za.vertical ? 1 : 0) << 15) | ((u32(op.za.ws) & 0x3) << 13) |
+		       ((u32(op.za.tile) << 0) & 0xF) | (u32(op.za.offset) & 0x0)
+	case .NEON_IDX2:
+		return (u32(op.immediate) & 0x3) << 12
 	case .ENC_FCMLA_ROT:
 		// 2-bit rotation at bits 13:12 (0/1/2/3 = 0°/90°/180°/270°).
 		return (u32(op.immediate) & 0x3) << 12
@@ -755,6 +866,16 @@ pack_operand_inline :: #force_inline proc(
 		immr := ((~imm + 1) & 0x3F)
 		imms := (63 - imm) & 0x3F
 		return (immr << 16) | (imms << 10)
+	case .ENC_IMM6_LO:
+		// Signed 6-bit at bits 10:5 (RDSVL); range -32..31.
+		return (u32(op.immediate) & 0x3F) << 5
+	case .ENC_SHIFT_IMMR:
+		// LSR/ASR by immediate: immr = shift at bits 21:16. imms is the
+		// constant 31 / 63 already present in the form's bits, so unlike
+		// ENC_LSL_IMM_* there is nothing to compute for it. Mask to the
+		// register width so a W-form shift cannot spill into bit 21.
+		width := form.flags.is_64 ? u32(0x3F) : u32(0x1F)
+		return (u32(op.immediate) & width) << 16
 	case .ENC_DUAL_RN_RM:
 		// Pack the register at both Rn (9:5) AND Rm (20:16) slots
 		// (for ROR Rd, Rn, #imm = EXTR Rd, Rn, Rn, #imm).
@@ -765,8 +886,7 @@ pack_operand_inline :: #force_inline proc(
 		return (u32(op.immediate) & 0x3F) << 10
 
 	case .ENC_Z_PAIR_VD, .ENC_Z_QUAD_VD:
-		// Pack first Z reg into Vd slot (bits 4:0).
-		return (u32(reg_hw(op.reg)) & 0x1F) << 0
+		return u32(reg_hw(op.reg)) & (enc == .ENC_Z_PAIR_VD ? 0x1E : 0x1C)
 	case .ENC_Z_PAIR_VN, .ENC_Z_QUAD_VN:
 		return (u32(reg_hw(op.reg)) & 0x1F) << 5
 	case .ENC_Z_PAIR_VM, .ENC_Z_QUAD_VM:
@@ -910,4 +1030,15 @@ read_u32 :: #force_inline proc "contextless" (
 			(u32(code[offset+1]) << 16) |
 			(u32(code[offset+2]) <<  8) |
 			 u32(code[offset+3])
+}
+
+// The SVE element-width code an SME2 pair/quad operand type carries.
+@(private="file", require_results)
+z_elem_size :: #force_inline proc "contextless" (ot: Operand_Type) -> u8 {
+	#partial switch ot {
+	case .Z_PAIR_B, .Z_QUAD_B: return 1
+	case .Z_PAIR_H, .Z_QUAD_H: return 2
+	case .Z_PAIR_S, .Z_QUAD_S: return 4
+	}
+	return 8
 }

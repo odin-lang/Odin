@@ -63,10 +63,11 @@ Scan_Flag :: enum u32 {
 	Scan_Raw_Strings,
 	Scan_Comments,
 	Skip_Comments, // if set with .Scan_Comments, comments become white space
+	Scan_Triple_Quote_Strings,
 }
 Scan_Flags :: distinct bit_set[Scan_Flag; u32]
 
-Odin_Like_Tokens :: Scan_Flags{.Scan_Idents, .Scan_Ints, .Scan_Floats, .Scan_Chars, .Scan_Strings, .Scan_Raw_Strings, .Scan_Comments, .Skip_Comments}
+Odin_Like_Tokens :: Scan_Flags{.Scan_Idents, .Scan_Ints, .Scan_Floats, .Scan_Chars, .Scan_Strings, .Scan_Raw_Strings, .Scan_Comments, .Skip_Comments, .Scan_Triple_Quote_Strings}
 C_Like_Tokens    :: Scan_Flags{.Scan_Idents, .Scan_Ints, .Scan_C_Int_Prefixes, .Scan_Floats, .Scan_Chars, .Scan_Strings, .Scan_Raw_Strings, .Scan_Comments, .Skip_Comments}
 
 // Only allows for ASCII whitespace
@@ -377,8 +378,13 @@ scan_number :: proc(s: ^Scanner, ch: rune, seen_dot: bool) -> (rune, rune) {
 		ch, ds = digits(s, ch, base, &invalid)
 		digsep |= ds
 		if ch == '.' && .Scan_Floats in s.flags {
+			prev_s := s^
 			ch = advance(s)
-			seen_dot = true
+			if ch == '.' {
+				s^ = prev_s
+			} else {
+				seen_dot = true
+			}
 		}
 	}
 
@@ -448,18 +454,28 @@ scan_string :: proc(s: ^Scanner, quote: rune) -> (n: int) {
 		return ch
 	}
 
+	is_triple_quote := .Scan_Triple_Quote_Strings in s.flags && quote == '"' &&
+					   strings.has_prefix(s.src[s.src_pos:], "\"\"\n")
+
+	if is_triple_quote { 
+		_ = advance(s)
+		_ = advance(s)
+		_ = advance(s)
+		n += 3
+	}
+	
 	ch := advance(s)
-	for ch != quote {
-		if ch == '\n' || ch < 0 {
+	for ch != quote || (is_triple_quote && !strings.has_prefix(s.src[s.src_pos:], `""`)) {
+		if !is_triple_quote && (ch == '\n' || ch < 0) {
 			error(s, "literal not terminated")
 			return
 		}
 		if ch == '\\' {
 			ch = advance(s)
 			switch ch {
-			case quote, 'a', 'b', 'e', 'f', 'n', 'r', 't', 'v', '\\':
+			case 'a', 'b', 'e', 'f', 'n', 'r', 't', 'v', '\\', '\'', '\"':
 				ch = advance(s)
-			case '0'..='7': ch = scan_digits(s, advance(s), 8, 3)
+			case '0'..='7': ch = scan_digits(s, advance(s), 8, 2)
 			case 'x':       ch = scan_digits(s, advance(s), 16, 2)
 			case 'u':       ch = scan_digits(s, advance(s), 16, 4)
 			case 'U':       ch = scan_digits(s, advance(s), 16, 8)
@@ -470,6 +486,12 @@ scan_string :: proc(s: ^Scanner, quote: rune) -> (n: int) {
 			ch = advance(s)
 		}
 		n += 1
+	}
+	
+	if is_triple_quote {
+		_ = advance(s)
+		_ = advance(s)
+		n += 2
 	}
 	return
 }

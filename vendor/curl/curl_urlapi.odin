@@ -38,6 +38,7 @@ Ucode :: enum c.int {
 	E_BAD_USER,            /* 29 */
 	E_LACKS_IDN,           /* 30 */
 	E_TOO_LARGE,           /* 31 */
+	E_BACKSLASH,
 }
 
 UPart :: enum c.int {

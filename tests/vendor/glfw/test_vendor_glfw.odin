@@ -5,8 +5,8 @@ import "core:testing"
 import "vendor:glfw"
 
 GLFW_MAJOR :: 3
-GLFW_MINOR :: 4
-GLFW_PATCH :: 0
+GLFW_MINOR :: 5
+GLFW_PATCH :: 1
 
 @(test)
 test_glfw :: proc(t: ^testing.T) {

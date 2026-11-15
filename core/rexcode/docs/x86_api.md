@@ -122,6 +122,7 @@ Memory :: bit_field u64 {
 	addr_size_override: bool | 1,
 	base_class:         u8   | 5,
 	index_class:        u8   | 5,
+	disp_is_label:      bool | 1,   // disp holds a label id -> REL32 relocation
 }
 MEM_BASE_RIP :: 30   MEM_BASE_NONE :: 31   MEM_INDEX_NONE :: 31
 ```
@@ -131,7 +132,17 @@ MEM_BASE_RIP :: 30   MEM_BASE_NONE :: 31   MEM_INDEX_NONE :: 31
 **Convenience constructors** (current names after the in-tree refactor):
 `mem_base_only(base)`, `mem_base_disp(base, disp)`,
 `mem_base_index(base, index, scale)`,
-`mem_base_index_disp(base, index, scale, disp)`, `mem_rip_disp(disp)`.
+`mem_base_index_disp(base, index, scale, disp)`, `mem_rip_disp(disp)`,
+`mem_rip_label(label_id)`.
+
+> **Label addressing.** `mem_rip_label(label_id)` builds a RIP-relative operand
+> whose displacement references a **label** rather than a literal: the encoder
+> writes a placeholder disp32 and emits a `REL32` relocation for `label_id` at
+> that field (addend 0), exactly as the `.RELATIVE` jump/call path does. This is
+> how `lea reg, [rip + <label>]` (position-independent data addressing) is
+> expressed. When the label is defined the disp resolves in place; otherwise the
+> relocation is appended to the caller's `relocs`. The `disp_is_label` bit reuses
+> one of `Memory`'s spare bits — no struct growth.
 
 > ⚠️ `mem_base` is an **accessor** (returns the base `Register`), not a
 > constructor — use `mem_base_only` for the no-displacement case.
@@ -158,17 +169,24 @@ Operand :: struct #packed {              // 16 bytes
 Broadcast :: enum u8 { NONE, B1TO2, B1TO4, B1TO8, B1TO16 }   // EVEX
 
 Operand_Flags :: bit_field u16 {   // EVEX-specific
-	mask:      u8        | 3,   // opmask K1–K7
-	zeroing:   bool      | 1,   // merge vs zero masking
-	broadcast: Broadcast | 3,
-	er_sae:    u8        | 2,   // embedded rounding / SAE
+	mask:         u8        | 3,   // opmask K1–K7
+	zeroing:      bool      | 1,   // merge vs zero masking
+	broadcast:    Broadcast | 3,
+	er_sae:       u8        | 2,   // embedded rounding / SAE
+	imm_is_label: bool      | 1,   // movabs imm64 holds a label id -> ABS64 reloc
 }
 ```
 
 ### Generic operand constructors
 
 `op_reg(r)`, `op_mem(m, size)`, `op_mem_from_parts(base, index, scale, disp, size)`,
-`op_imm8/16/32/64(v)`, `op_rel8/32(offset)`, `op_label(label_id, size=4)`.
+`op_imm8/16/32/64(v)`, `op_rel8/32(offset)`, `op_label(label_id, size=4)`,
+`op_imm_label(label_id)`.
+
+> `op_imm_label(label_id)` is a `movabs reg, <label>` immediate: it stays kind
+> `.IMMEDIATE` (form matching unchanged) but is flagged so the encoder emits an
+> `ABS64` relocation (size 8) for the imm64 instead of a literal. The label
+> always selects the full imm64 form regardless of the id's numeric value.
 
 ### Typed operand constructors (compile-time class safety)
 

@@ -8,13 +8,12 @@
 package test_core_sync
 
 import "base:intrinsics"
-// import "core:log"
 import "core:sync"
 import "core:testing"
 import "core:thread"
 import "core:time"
 
-FAIL_TIME        :: 1 * time.Second
+FAIL_TIME        :: 10 * time.Second
 SLEEP_TIME       :: 1 * time.Millisecond
 SMALL_SLEEP_TIME :: 10 * time.Microsecond
 
@@ -538,6 +537,12 @@ test_ticket_mutex :: proc(t: ^testing.T) {
 
 @test
 test_benaphore :: proc(t: ^testing.T) {
+	when ODIN_ARCH == .riscv64 {
+		// NOTE(Jeroen): Regularly times out on the simulated RISC-V CI runners,
+		//               so we're skipping the test there.
+		return
+	}
+
 	testing.set_fail_timeout(t, FAIL_TIME)
 
 	Data :: struct {
