@@ -1,6 +1,7 @@
 // Decoders for PKZIP's legacy compression methods: Shrink (1), Reduce (2-5) and Implode (6).
 package compress_pkzip_legacy
 
+import "base:runtime"
 import "core:compress"
 
 /*
@@ -47,6 +48,63 @@ IMPLODE_LITERAL_SYMBOLS   :: 256
 IMPLODE_LENGTH_SYMBOLS    :: 64
 IMPLODE_DISTANCE_SYMBOLS  :: 64
 IMPLODE_EXTRA_LENGTH      :: 63
+
+READER_WINDOW_SIZE        :: 64 * 1024
+READER_HISTORY            :: 8192
+READER_STEP_MAX           :: SHRINK_TABLE_SIZE + 1
+#assert(READER_HISTORY >= (1 << IMPLODE_DISTANCE_BITS_MAX) * IMPLODE_DISTANCE_SYMBOLS)
+#assert(READER_WINDOW_SIZE - READER_STEP_MAX >= READER_HISTORY)
+
+IMPLODE_DISTANCE_BITS_MAX :: 7
+
+Reader :: struct {
+	z:             ^compress.Context,
+	src:           ^compress.Context,
+	source:        compress.Context,
+	streamed:      bool,
+	owns_window:   bool,
+	base:          i64,
+	pulled:        i64,
+	options:       compress.Options,
+	allocator:     runtime.Allocator,
+	method:        Reader_Method,
+	window:        []u8,
+	start:         int,
+	ready:         int,
+	produced:      i64,
+	size:          i64,
+	total_in:      i64,
+	done:          bool,
+	started:       bool,
+	err:           Error,
+
+	shrink:        ^Unshrink,
+	code_size:     uint,
+	next_free:     int,
+	previous:      int,
+	first_byte:    u8,
+
+	expand:        ^Expand,
+	state:         Expand_State,
+	length_bits:   uint,
+	length_max:    int,
+	distance_mask: int,
+	last:          int,
+	v:             int,
+	length:        int,
+
+	trees:         ^[3]Implode_Tree,
+	literal_tree:  bool,
+	distance_bits: uint,
+	min_match:     int,
+}
+
+@(private)
+Reader_Method :: enum u8 {
+	Shrink,
+	Reduce,
+	Implode,
+}
 
 @(private)
 Unshrink :: struct {

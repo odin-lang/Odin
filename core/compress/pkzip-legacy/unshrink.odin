@@ -29,21 +29,7 @@ unshrink_from_context :: proc(z: ^compress.Context, expected_output_size := -1, 
 	raw := runtime.mem_alloc_non_zeroed(size_of(Unshrink), align_of(Unshrink)) or_return
 	s   := (^Unshrink)(raw_data(raw))
 	defer free(s)
-	s.used      = {}
-	s.children  = {}
-	s.leaf_next = {}
-	s.free      = {}
-	s.leaf_head = SHRINK_LEAF_END
-	for i in 0..<256 {
-		s.used[i]   = true
-		s.value[i]  = u8(i)
-		s.parent[i] = u16(i)
-	}
-	s.used[SHRINK_CONTROL_CODE] = true
-	for &word in s.free[SHRINK_FIRST_FREE_CODE >> 6:] {
-		word = ~u64(0)
-	}
-	s.free[SHRINK_FIRST_FREE_CODE >> 6] &~= (1 << uint(SHRINK_FIRST_FREE_CODE & 63)) - 1
+	unshrink_init(s)
 
 	code_size := uint(SHRINK_MIN_CODE_SIZE)
 	next_free := SHRINK_FIRST_FREE_CODE
@@ -105,6 +91,25 @@ unshrink_from_context :: proc(z: ^compress.Context, expected_output_size := -1, 
 		return General_Error.Stream_Too_Short
 	}
 	return nil
+}
+
+@(private)
+unshrink_init :: proc(s: ^Unshrink) {
+	s.used      = {}
+	s.children  = {}
+	s.leaf_next = {}
+	s.free      = {}
+	s.leaf_head = SHRINK_LEAF_END
+	for i in 0..<256 {
+		s.used[i]   = true
+		s.value[i]  = u8(i)
+		s.parent[i] = u16(i)
+	}
+	s.used[SHRINK_CONTROL_CODE] = true
+	for &word in s.free[SHRINK_FIRST_FREE_CODE >> 6:] {
+		word = ~u64(0)
+	}
+	s.free[SHRINK_FIRST_FREE_CODE >> 6] &~= (1 << uint(SHRINK_FIRST_FREE_CODE & 63)) - 1
 }
 
 @(private)

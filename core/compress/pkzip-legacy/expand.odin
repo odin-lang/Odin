@@ -25,21 +25,7 @@ expand_from_context :: proc(z: ^compress.Context, factor: int, expected_output_s
 	defer z.bytes_written = i64(len(z.output) - start)
 
 	e: Expand
-	for i := 255; i >= 0; i -= 1 {
-		count := read_bits_required(z, 6) or_return
-		if count > REDUCE_MAX_FOLLOWERS {
-			return PKZIP_Legacy_Error.Invalid_Follower_Set
-		}
-		e.counts[i] = u8(count)
-		bits := 1
-		for 1 << uint(bits) < count {
-			bits += 1
-		}
-		e.index_bits[i] = u8(bits)
-		for j in 0..<count {
-			e.followers[i][j] = u8(read_bits_required(z, 8) or_return)
-		}
-	}
+	expand_read_followers(z, &e) or_return
 
 	length_bits   := uint(8 - factor)
 	length_max    := 1 << length_bits - 1
@@ -84,6 +70,26 @@ expand_from_context :: proc(z: ^compress.Context, factor: int, expected_output_s
 
 	if len(z.output) - start != expected {
 		return General_Error.Stream_Too_Short
+	}
+	return nil
+}
+
+@(private)
+expand_read_followers :: proc(z: ^compress.Context, e: ^Expand) -> (err: Error) {
+	for i := 255; i >= 0; i -= 1 {
+		count := read_bits_required(z, 6) or_return
+		if count > REDUCE_MAX_FOLLOWERS {
+			return PKZIP_Legacy_Error.Invalid_Follower_Set
+		}
+		e.counts[i] = u8(count)
+		bits := 1
+		for 1 << uint(bits) < count {
+			bits += 1
+		}
+		e.index_bits[i] = u8(bits)
+		for j in 0..<count {
+			e.followers[i][j] = u8(read_bits_required(z, 8) or_return)
+		}
 	}
 	return nil
 }
