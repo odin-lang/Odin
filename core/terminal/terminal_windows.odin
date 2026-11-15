@@ -18,7 +18,7 @@ old_modes: [2]struct{
 }
 
 _get_terminal_size :: proc "contextless" () -> (width, height: int, ok: bool) {
-	stdout := windows.GetStdHandle(windoes.STD_OUTPUT_HANDLE)
+	stdout := windows.GetStdHandle(windows.STD_OUTPUT_HANDLE)
 	if stdout == windows.INVALID_HANDLE_VALUE {
 		return 0, 0, false
 	}
