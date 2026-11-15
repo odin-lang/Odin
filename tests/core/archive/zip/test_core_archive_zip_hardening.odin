@@ -5,6 +5,7 @@ import "core:archive/zip"
 import "core:compress"
 import "core:compress/bzip2"
 import "core:compress/deflate"
+import pkzip_legacy "core:compress/pkzip-legacy"
 import "core:encoding/endian"
 import "core:fmt"
 import "core:hash"
@@ -51,6 +52,12 @@ Member_Result :: struct {
 	written: i64,
 	open:    zip.Error,
 	read:    io.Error,
+}
+
+Legacy_Bits :: struct {
+	buffer: [dynamic]u8,
+	bits:   u64,
+	count:  uint,
 }
 
 @(test)
@@ -629,6 +636,83 @@ test_link_target_cap :: proc(t: ^testing.T) {
 	}
 }
 
+@(test)
+test_legacy_bomb_memory :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
+	Bomb :: struct {
+		method: zip.Method,
+		units:  [2]int,
+	}
+	bombs := [?]Bomb{
+		{.Shrink,   {1_250, 5_650}},
+		{.Reduce_1, {2_000, 40_000}},
+		{.Implode,  {2_500, 50_000}},
+	}
+	for b in bombs {
+		peaks: [2][2]i64
+		sizes: [2]int
+		for units, i in b.units {
+			packed, size := legacy_bomb(b.method, units)
+			defer delete(packed)
+			sizes[i] = size
+			crc := legacy_bomb_crc(size)
+
+			c: Crafted
+			defer crafted_destroy(&c)
+			m := Crafted_Member{name = "bomb", method = b.method, crc = crc, packed = len(packed), size = size}
+			local := crafted_local(&c.data, m)
+			append(&c.data, ..packed[:])
+			crafted_central(&c, m, local)
+			data := crafted_finish(&c)
+
+			for mode in 0..<2 {
+				track: mem.Tracking_Allocator
+				mem.tracking_allocator_init(&track, context.allocator)
+				defer mem.tracking_allocator_destroy(&track)
+				r: zip.Reader
+				if !testing.expect_value(t, zip.open(&r, data, {}, mem.tracking_allocator(&track)), nil) {
+					continue
+				}
+				_, handle, ok, _ := zip.find(&r, "bomb")
+				testing.expectf(t, ok, "%v: find bomb", b.method)
+				if mode == 0 {
+					d: Discard
+					testing.expect_value(t, zip.extract(&r, handle, discard_writer(&d)), nil)
+					testing.expectf(t, d.count == i64(size), "%v extract: %d bytes, want %d", b.method, d.count, size)
+				} else {
+					rd, open_err := zip.open_member(&r, handle, {}, mem.tracking_allocator(&track))
+					if testing.expect_value(t, open_err, nil) {
+						chunk: [4096]u8
+						got: int
+						got_crc: u32
+						for {
+							n, read_err := io.read(rd, chunk[:])
+							got_crc = hash.crc32(chunk[:n], got_crc)
+							got += n
+							if read_err == .EOF {
+								break
+							}
+							if !testing.expectf(t, read_err == nil, "%v read: %v", b.method, read_err) {
+								break
+							}
+						}
+						testing.expectf(t, got == size && got_crc == crc, "%v read: %d bytes, want %d, CRC %08x, want %08x", b.method, got, size, got_crc, crc)
+						zip.close_member(rd)
+					}
+				}
+				zip.close(&r)
+				testing.expectf(t, len(track.allocation_map) == 0, "%v, mode %d, size %d: %d allocations left", b.method, mode, size, len(track.allocation_map))
+				peaks[mode][i] = track.peak_memory_allocated
+			}
+		}
+		for p, mode in peaks {
+			testing.expectf(t, p[1] == p[0] && p[1] <= 256 * 1024, "%v, mode %d: peaks %v for sizes %v", b.method, mode, p, sizes)
+		}
+	}
+}
+
 limit_results :: proc(t: ^testing.T, data: []u8, options: archive.Extract_Options, loc := #caller_location) -> (errs: [3]archive.Error) {
 	a, err := archive.open(data)
 	if !testing.expect_value(t, err, nil, loc) {
@@ -830,4 +914,78 @@ expect_all_ok :: proc(t: ^testing.T, data: []u8, sizes: []int, label: string, lo
 	for res, i in results {
 		expect_member_ok(t, res, sizes[i], fmt.tprintf("%s, member %d", label, i), loc)
 	}
+}
+
+legacy_bomb :: proc(method: zip.Method, units: int) -> (packed: [dynamic]u8, size: int) {
+	w: Legacy_Bits
+	#partial switch method {
+	case .Shrink:
+		code_size := uint(pkzip_legacy.SHRINK_MIN_CODE_SIZE)
+		legacy_put_bits(&w, 'a', code_size)
+		size = 1
+		for next in pkzip_legacy.SHRINK_FIRST_FREE_CODE ..< pkzip_legacy.SHRINK_FIRST_FREE_CODE + units {
+			if next == 1 << code_size {
+				legacy_put_bits(&w, pkzip_legacy.SHRINK_CONTROL_CODE, code_size)
+				legacy_put_bits(&w, pkzip_legacy.SHRINK_INCREASE_CODE_SIZE, code_size)
+				code_size += 1
+			}
+			legacy_put_bits(&w, next, code_size)
+			size += next - 255
+		}
+	case .Reduce_1:
+		for _ in 0..<256 {
+			legacy_put_bits(&w, 0, 6)
+		}
+		legacy_put_bits(&w, 'a', 8)
+		size = 1
+		for _ in 0..<units {
+			for v in ([4]int{pkzip_legacy.REDUCE_DLE, 0x7f, 0xff, 0x00}) {
+				legacy_put_bits(&w, v, 8)
+			}
+			size += 127 + 255 + 3
+		}
+	case .Implode:
+		for _ in 0..<2 {
+			legacy_put_bits(&w, 3, 8)
+			for _ in 0..<4 {
+				legacy_put_bits(&w, 0xf5, 8)
+			}
+		}
+		legacy_put_bits(&w, 1, 1)
+		legacy_put_bits(&w, 'a', 8)
+		size = 1
+		for _ in 0..<units {
+			legacy_put_bits(&w, 0, 1)
+			legacy_put_bits(&w, 0, 6)
+			legacy_put_bits(&w, 0x3f, 6)
+			legacy_put_bits(&w, 0, 6)
+			legacy_put_bits(&w, 255, 8)
+			size += 63 + 255 + 2
+		}
+	}
+	if w.count > 0 {
+		append(&w.buffer, u8(w.bits))
+	}
+	return w.buffer, size
+}
+
+legacy_put_bits :: proc(w: ^Legacy_Bits, value: int, bits: uint) {
+	w.bits  |= u64(value) << w.count
+	w.count += bits
+	for w.count >= 8 {
+		append(&w.buffer, u8(w.bits))
+		w.bits  >>= 8
+		w.count  -= 8
+	}
+}
+
+legacy_bomb_crc :: proc(size: int) -> (crc: u32) {
+	chunk: [4096]u8
+	for &b in chunk {
+		b = 'a'
+	}
+	for left := size; left > 0; left -= len(chunk) {
+		crc = hash.crc32(chunk[:min(left, len(chunk))], crc)
+	}
+	return
 }
