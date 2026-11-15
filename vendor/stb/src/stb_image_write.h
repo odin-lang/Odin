@@ -1,4 +1,4 @@
-/* stb_image_write - v1.17 - public domain - http://nothings.org/stb
+/* stb_image_write - v1.18 - public domain - http://nothings.org/stb
    writes out PNG/BMP/TGA/JPEG/HDR images to C stdio - Sean Barrett 2010-2015
                                      no warranty implied; use at your own risk
 
@@ -161,6 +161,7 @@ CREDITS:
       Adam Schackart
       Andrew Kensler
       Sanjay Nambiar
+      github:Nevermore1994
 
 LICENSE
 
@@ -378,7 +379,7 @@ static int stbi__start_write_file(stbi__write_context *s, const char *filename)
 
 static int stbi__end_write_file(stbi__write_context *s, int result)
 {
-   if (fclose((FILE *)s->context) != 0)
+   if (fclose((FILE *)s->file_maybe) != 0)
        s->ok = 0;
    return s->ok ? result : 0;
 }
