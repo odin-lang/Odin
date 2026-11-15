@@ -672,47 +672,58 @@ test_write_lzma_streamed :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_write_lzma_memory :: proc(t: ^testing.T) {
+test_write_stream_memory :: proc(t: ^testing.T) {
 	when SLIM_TESTS {
 		return
 	}
 	sizes := [2]i64{8 << 20, 32 << 20}
-	peaks: [2][2]i64
-	for size, i in sizes {
-		for known, k in ([2]bool{true, false}) {
-			track: mem.Tracking_Allocator
-			mem.tracking_allocator_init(&track, context.allocator)
-			defer mem.tracking_allocator_destroy(&track)
-			m := Memory_File{seekable = true}
-			reserve(&m.data, 1 << 20)
-			defer delete(m.data)
-			zw: zip.Writer
-			if !testing.expect_value(t, zip.create(&zw, memory_stream(&m), zip.Writer_Options{method = .LZMA, level = 1}, mem.tracking_allocator(&track)), nil) {
-				return
-			}
-			zeros := Zero_Reader{remaining = size}
-			fi    := archive.File_Info{path = "zeros.bin", size = size if known else -1}
-			testing.expect_value(t, zip.write_entry(&zw, fi, zero_reader(&zeros)), nil)
-			testing.expect_value(t, zip.commit(&zw), nil)
-			zip.close(&zw)
-			testing.expectf(t, len(track.allocation_map) == 0, "size %d, known %v: %d allocations left", size, known, len(track.allocation_map))
-			peaks[k][i] = track.peak_memory_allocated
+	for method in ([?]archive.Method{.LZMA, .XZ}) {
+		slack := i64(0) if method == .LZMA else 4096
+		peaks:      [2][2]i64
+		read_peaks: [2][2]i64
+		for size, i in sizes {
+			for known, k in ([2]bool{true, false}) {
+				track: mem.Tracking_Allocator
+				mem.tracking_allocator_init(&track, context.allocator)
+				defer mem.tracking_allocator_destroy(&track)
+				m := Memory_File{seekable = true}
+				reserve(&m.data, 1 << 20)
+				defer delete(m.data)
+				zw: zip.Writer
+				if !testing.expect_value(t, zip.create(&zw, memory_stream(&m), zip.Writer_Options{method = method, level = 1}, mem.tracking_allocator(&track)), nil) {
+					return
+				}
+				zeros := Zero_Reader{remaining = size}
+				fi    := archive.File_Info{path = "zeros.bin", size = size if known else -1}
+				testing.expect_value(t, zip.write_entry(&zw, fi, zero_reader(&zeros)), nil)
+				testing.expect_value(t, zip.commit(&zw), nil)
+				zip.close(&zw)
+				testing.expectf(t, len(track.allocation_map) == 0, "%v, size %d, known %v: %d allocations left", method, size, known, len(track.allocation_map))
+				peaks[k][i] = track.peak_memory_allocated
 
-			r: zip.Reader
-			if !testing.expect_value(t, zip.open(&r, m.data[:]), nil) {
-				continue
+				read_track: mem.Tracking_Allocator
+				mem.tracking_allocator_init(&read_track, context.allocator)
+				defer mem.tracking_allocator_destroy(&read_track)
+				r: zip.Reader
+				if !testing.expect_value(t, zip.open(&r, m.data[:], {}, mem.tracking_allocator(&read_track)), nil) {
+					continue
+				}
+				got, handle, ok, _ := zip.find(&r, "zeros.bin")
+				testing.expect(t, ok, "find zeros.bin")
+				testing.expect_value(t, got.method, method)
+				d: Discard
+				testing.expect_value(t, zip.extract(&r, handle, discard_writer(&d)), nil)
+				testing.expect_value(t, d.count, size)
+				zip.close(&r)
+				read_peaks[k][i] = read_track.peak_memory_allocated
 			}
-			got, handle, ok, _ := zip.find(&r, "zeros.bin")
-			testing.expect(t, ok, "find zeros.bin")
-			testing.expect_value(t, got.method, archive.Method.LZMA)
-			d: Discard
-			testing.expect_value(t, zip.extract(&r, handle, discard_writer(&d)), nil)
-			testing.expect_value(t, d.count, size)
-			zip.close(&r)
 		}
-	}
-	for p in peaks {
-		testing.expectf(t, p[0] == p[1] && p[1] < sizes[1], "peaks %v for sizes %v", p, sizes)
+		for p in peaks {
+			testing.expectf(t, abs(p[1] - p[0]) <= slack && p[1] < sizes[1], "%v: write peaks %v for sizes %v", method, p, sizes)
+		}
+		for p in read_peaks {
+			testing.expectf(t, abs(p[1] - p[0]) <= slack && p[1] < sizes[0], "%v: read peaks %v for sizes %v", method, p, sizes)
+		}
 	}
 }
 
@@ -795,15 +806,13 @@ write_and_check :: proc(t: ^testing.T, method: archive.Method, mode: Output_Mode
 		return
 	}
 
-	one_shot     := method == .XZ
-	random_kept  := method if !one_shot else archive.Method.Store
 	check_written(t, label, m.data[:], {
 		{name = "empty.txt",         type = .Regular,   method = .Store},
 		{name = "text.txt",          type = .Regular,   method = method, content = text},
 		{name = "random.bin",        type = .Regular,   method = .Store, content = random},
 		{name = "known.txt",         type = .Regular,   method = method, content = text},
-		{name = "unknown.txt",       type = .Regular,   method = method, content = text, descriptor = streaming && !one_shot},
-		{name = "unknown.bin",       type = .Regular,   method = random_kept, content = random, descriptor = streaming && !one_shot},
+		{name = "unknown.txt",       type = .Regular,   method = method, content = text, descriptor = streaming},
+		{name = "unknown.bin",       type = .Regular,   method = method, content = random, descriptor = streaming},
 		{name = "dir/",              type = .Directory, method = .Store},
 		{name = "dir/link",          type = .Symlink,   method = .Store, content = transmute([]u8)string("../text.txt"), link = "../text.txt"},
 		{name = "naïve/ünïcode.txt", type = .Regular,   method = method, content = text, comment = "entry comment ✓", utf8 = true},

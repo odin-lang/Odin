@@ -679,13 +679,9 @@ _extract_payload :: proc(r: ^Reader, index: int, data_offset: i64, w: io.Writer,
 	rp.head = section.offset - data_offset
 
 	#partial switch method {
-	case .Store, .Deflate, .Deflate64, .BZip2, .PPMd, .LZMA:
+	case .Store, .Deflate, .Deflate64, .BZip2, .PPMd, .LZMA, .XZ, .Shrink, .Reduce_1, .Reduce_2, .Reduce_3, .Reduce_4, .Implode:
 	case:
-		buffer: [dynamic]u8
-		buffer.allocator = r.allocator
-		defer delete(buffer)
-		_decode(r, rec, method, flags, crc, section, &buffer) or_return
-		return _write_out(&rp, w, buffer[:], rec.compressed_size)
+		return archive.General_Error.Unsupported_Method
 	}
 
 	cw := Check_Writer{w = w, limit = rec.size}
@@ -721,6 +717,14 @@ _extract_payload :: proc(r: ^Reader, index: int, data_offset: i64, w: io.Writer,
 			decode_err = ppmd.decompress_to_writer(out, &ctx, props, expected, options, r.allocator)
 		case .LZMA:
 			decode_err = lzma.decompress_raw_to_writer(out, &ctx, lzma_props, expected, options, r.allocator)
+		case .XZ:
+			decode_err = xz.decompress_to_writer(out, &ctx, {}, expected, options, r.allocator)
+		case .Shrink:
+			decode_err = legacy.unshrink_to_writer(out, &ctx, expected, options, r.allocator)
+		case .Reduce_1, .Reduce_2, .Reduce_3, .Reduce_4:
+			decode_err = legacy.expand_to_writer(out, &ctx, int(method) - 1, expected, options, r.allocator)
+		case .Implode:
+			decode_err = legacy.explode_to_writer(out, &ctx, _implode_options(flags), expected, options, r.allocator)
 		}
 		if decode_err != nil {
 			if cw.over || (_declared_limit(r, rec) && decode_err == compress.General_Error.Output_Too_Short) {
@@ -890,62 +894,14 @@ _copy :: proc(r: ^Reader, rp: ^Read_Progress, section: ^Section, count: i64, w: 
 }
 
 @(private)
-_decode :: proc(r: ^Reader, rec: ^Record, method: Method, flags: Flags, crc: Maybe(u32), section: ^Section, out: ^[dynamic]u8) -> (err: Error) {
-	input: []u8
-	owned: []u8
-	defer delete(owned, r.allocator)
-	size := section.end - section.offset
-	if r.store.memory && section.cipher == nil {
-		input = r.store.data[section.offset:section.end]
-	} else {
-		if size > i64(max(int)) {
-			return runtime.Allocator_Error.Out_Of_Memory
-		}
-		owned = make([]u8, int(size), r.allocator) or_return
-		_section_read_full(section, owned) or_return
-		_cipher_finish(section) or_return
-		input = owned
+_implode_options :: proc "contextless" (flags: Flags) -> (options: legacy.Implode_Options) {
+	if .Option_1 in flags {
+		options += {.Large_Window}
 	}
-
-	expected := _expected_size(rec.size)
-	limit    := compress.output_limit(r.options)
-	capped   := rec.size < i64(limit)
-	if capped {
-		limit = int(max(rec.size, 1))
+	if .Option_2 in flags {
+		options += {.Literal_Tree}
 	}
-	decode_err: compress.Error
-	#partial switch method {
-	case .Shrink:
-		decode_err = legacy.unshrink_from_bytes(out, input, expected, limit, r.allocator)
-	case .Reduce_1, .Reduce_2, .Reduce_3, .Reduce_4:
-		decode_err = legacy.expand_from_bytes(out, input, int(method) - 1, expected, limit, r.allocator)
-	case .Implode:
-		options: legacy.Implode_Options
-		if .Option_1 in flags {
-			options += {.Large_Window}
-		}
-		if .Option_2 in flags {
-			options += {.Literal_Tree}
-		}
-		decode_err = legacy.explode_from_bytes(out, input, options, expected, limit, r.allocator)
-	case .XZ:
-		decode_err = xz.decompress_from_bytes(out, input, {}, expected, limit, r.allocator)
-	case:
-		return archive.General_Error.Unsupported_Method
-	}
-	if decode_err != nil {
-		if capped && decode_err == compress.General_Error.Output_Too_Short {
-			return Zip_Error.Size_Mismatch
-		}
-		return decode_err
-	}
-	if i64(len(out)) != rec.size {
-		return Zip_Error.Size_Mismatch
-	}
-	if expected, ok := crc.?; ok && hash.crc32(out[:]) != expected {
-		return Zip_Error.CRC_Mismatch
-	}
-	return nil
+	return
 }
 
 @(private)
@@ -992,7 +948,7 @@ _member_init :: proc(m: ^Member, r: ^Reader, index: int, data_offset: i64, passw
 	case .Store:
 		_store_check(r, rec, &m.section) or_return
 		m.mode = .Store
-	case .Deflate, .Deflate64, .BZip2, .PPMd, .LZMA:
+	case .Deflate, .Deflate64, .BZip2, .PPMd, .LZMA, .XZ, .Shrink, .Reduce_1, .Reduce_2, .Reduce_3, .Reduce_4, .Implode:
 		props: ppmd.Properties
 		lzma_props: lzma.Properties
 		#partial switch method {
@@ -1029,18 +985,33 @@ _member_init :: proc(m: ^Member, r: ^Reader, index: int, data_offset: i64, passw
 			if init_err = lzma.reader_init_raw(&m.lzma, &m.ctx, lzma_props, expected, options, allocator); init_err != nil {
 				lzma.reader_destroy(&m.lzma)
 			}
+		case .XZ:
+			m.mode = .XZ
+			if init_err = xz.reader_init(&m.xz, &m.ctx, {}, expected, options, allocator); init_err != nil {
+				xz.reader_destroy(&m.xz)
+			}
+		case .Shrink:
+			m.mode = .Legacy
+			if init_err = legacy.reader_init_unshrink(&m.legacy, &m.ctx, expected, options, allocator); init_err != nil {
+				legacy.reader_destroy(&m.legacy)
+			}
+		case .Reduce_1, .Reduce_2, .Reduce_3, .Reduce_4:
+			m.mode = .Legacy
+			if init_err = legacy.reader_init_expand(&m.legacy, &m.ctx, int(method) - 1, expected, options, allocator); init_err != nil {
+				legacy.reader_destroy(&m.legacy)
+			}
+		case .Implode:
+			m.mode = .Legacy
+			if init_err = legacy.reader_init_explode(&m.legacy, &m.ctx, _implode_options(header.flags), expected, options, allocator); init_err != nil {
+				legacy.reader_destroy(&m.legacy)
+			}
 		}
 		if init_err != nil {
 			compress.destroy_context(&m.ctx)
 			return init_err
 		}
 	case:
-		m.mode = .Buffer
-		m.buffer.allocator = allocator
-		if decode_err := _decode(r, rec, method, header.flags, m.expected, &m.section, &m.buffer); decode_err != nil {
-			delete(m.buffer)
-			return decode_err
-		}
+		return archive.General_Error.Unsupported_Method
 	}
 	m.active = true
 	return nil
@@ -1066,8 +1037,12 @@ _member_destroy :: proc(m: ^Member) {
 	case .LZMA:
 		lzma.reader_destroy(&m.lzma)
 		compress.destroy_context(&m.ctx)
-	case .Buffer:
-		delete(m.buffer)
+	case .XZ:
+		xz.reader_destroy(&m.xz)
+		compress.destroy_context(&m.ctx)
+	case .Legacy:
+		legacy.reader_destroy(&m.legacy)
+		compress.destroy_context(&m.ctx)
 	}
 	m^ = {}
 }
@@ -1078,14 +1053,6 @@ _member_read :: proc(m: ^Member, p: []u8) -> (n: int, err: Error) {
 		return 0, m.err
 	}
 	switch m.mode {
-	case .Buffer:
-		if m.pos >= len(m.buffer) {
-			return 0, io.Error.EOF
-		}
-		n = copy(p, m.buffer[m.pos:])
-		m.pos += n
-		m.err  = _member_progress(&m.progress, m.reader.records[m.progress.index].compressed_size, i64(m.pos))
-		return n, nil
 	case .Store:
 		remaining := m.section.end - m.section.offset
 		if remaining <= 0 {
@@ -1097,7 +1064,7 @@ _member_read :: proc(m: ^Member, p: []u8) -> (n: int, err: Error) {
 			return 0, m.err
 		}
 		n = want
-	case .Inflate, .BZip2, .PPMd, .LZMA:
+	case .Inflate, .BZip2, .PPMd, .LZMA, .XZ, .Legacy:
 		codec_err: compress.Error
 		#partial switch m.mode {
 		case .Inflate:
@@ -1108,6 +1075,10 @@ _member_read :: proc(m: ^Member, p: []u8) -> (n: int, err: Error) {
 			n, codec_err = ppmd.reader_read(&m.ppmd, p)
 		case .LZMA:
 			n, codec_err = lzma.reader_read(&m.lzma, p)
+		case .XZ:
+			n, codec_err = xz.reader_read(&m.xz, p)
+		case .Legacy:
+			n, codec_err = legacy.reader_read(&m.legacy, p)
 		}
 		if codec_err != nil {
 			if io_err, is_io := codec_err.(io.Error); is_io && io_err == .EOF {

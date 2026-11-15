@@ -633,11 +633,11 @@ _write_member :: proc(zw: ^Writer, p: ^Pending_Entry, data: Entry_Data) -> (err:
 	}
 	switch d in data {
 	case []u8:
-		if p.method == .Store || p.method == .XZ || p.size <= ONE_SHOT_MAX {
+		if p.method == .Store || p.size <= ONE_SHOT_MAX {
 			return _write_one_shot(zw, p, d)
 		}
 	case io.Reader:
-		if p.method == .XZ || (p.size >= 0 && p.size <= ONE_SHOT_MAX) {
+		if p.size >= 0 && p.size <= ONE_SHOT_MAX {
 			buffer: [dynamic]u8
 			buffer.allocator = zw.allocator
 			defer delete(buffer)
@@ -957,6 +957,8 @@ _encoder_init :: proc(e: ^Encoder, zw: ^Writer, p: ^Pending_Entry, size: i64, w:
 			return write_err
 		}
 		ppmd.writer_init(&e.ppmd, w, props, true, options, zw.allocator) or_return
+	case .XZ:
+		xz.writer_init(&e.xz, w, xz.Level(p.level), {}, options, zw.allocator) or_return
 	}
 	return nil
 }
@@ -976,6 +978,8 @@ _encoder_write :: proc(e: ^Encoder, data: []u8) -> (err: Error) {
 		_ = lzma.writer_write(&e.lzma, data) or_return
 	case .PPMd:
 		_ = ppmd.writer_write(&e.ppmd, data) or_return
+	case .XZ:
+		_ = xz.writer_write(&e.xz, data) or_return
 	}
 	return nil
 }
@@ -991,6 +995,8 @@ _encoder_finish :: proc(e: ^Encoder) -> (err: Error) {
 		lzma.writer_finish(&e.lzma) or_return
 	case .PPMd:
 		ppmd.writer_finish(&e.ppmd) or_return
+	case .XZ:
+		xz.writer_finish(&e.xz) or_return
 	}
 	return nil
 }
@@ -1001,6 +1007,7 @@ _encoder_destroy :: proc(e: ^Encoder) {
 	bzip2.writer_destroy(&e.bzip2)
 	lzma.writer_destroy(&e.lzma)
 	ppmd.writer_destroy(&e.ppmd)
+	xz.writer_destroy(&e.xz)
 }
 
 @(private)

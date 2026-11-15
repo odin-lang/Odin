@@ -7,8 +7,6 @@ Reading:
 - Lists members through `core:archive`'s shared iterator, in storage order, and finds them by path
 - Extracts one or more files; extracting several reads the archive in one forward pass
 - Streams members through an `io.Reader`
-- Store, Deflate, Deflate64, bzip2, LZMA and PPMd decode as they are read
-- XZ and the pkzip-legacy methods are decoded in one shot first
 - Compression methods: Store, Shrink, Reduce, Implode, Deflate, Deflate64, bzip2, LZMA, PPMd, XZ
 - Decrypts ZipCrypto and WinZip AES (AE-1 and AE-2; 128, 192 and 256-bit keys; MAC checked)
 - The password goes in `archive.Read_Options`
@@ -18,6 +16,7 @@ Reading:
 - CRC-32 checked on extraction
 - Opt-in progress callback with the member's name and index and the archive position; can cancel
 - Safe to read from several threads at once
+- Every compression method decodes as it is read
 
 Writing:
 - Creates archives at a path or on an `io.Stream`; one that can't seek gets data descriptors
@@ -43,7 +42,6 @@ Updating:
   member's data runs past the archive's end; at a path, removing those members first works
 
 Planned:
-- Streaming extraction for XZ and the pkzip-legacy methods
 - Copy-on-write updates, safe alongside concurrent readers
 */
 package archive_zip
@@ -54,7 +52,9 @@ import "core:compress"
 import "core:compress/bzip2"
 import "core:compress/deflate"
 import "core:compress/lzma"
+import legacy "core:compress/pkzip-legacy"
 import "core:compress/ppmd"
+import "core:compress/xz"
 import "core:crypto/aes"
 import "core:io"
 import "core:os"
@@ -341,7 +341,8 @@ Member_Mode :: enum u8 {
 	BZip2,
 	PPMd,
 	LZMA,
-	Buffer,
+	XZ,
+	Legacy,
 }
 
 Read_Progress :: struct {
@@ -370,10 +371,10 @@ Member :: struct {
 	bzip2:     bzip2.Reader,
 	ppmd:      ppmd.Reader,
 	lzma:      lzma.Reader,
+	xz:        xz.Reader,
+	legacy:    legacy.Reader,
 	progress:  Read_Progress,
 	cipher:    Cipher,
-	buffer:    [dynamic]u8,
-	pos:       int,
 	size:      i64,
 	produced:  i64,
 	declared:  bool,
@@ -532,6 +533,7 @@ Encoder :: struct {
 	bzip2:   bzip2.Writer,
 	lzma:    lzma.Writer,
 	ppmd:    ppmd.Writer,
+	xz:      xz.Writer,
 }
 
 Walked_Entry :: struct {

@@ -139,6 +139,58 @@ test_methods :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_legacy_members :: proc(t: ^testing.T) {
+	data, read_err := os.read_entire_file(asset("pkzip-legacy.zip"), context.allocator)
+	if !testing.expect_value(t, read_err, nil) {
+		return
+	}
+	defer delete(data)
+
+	for source in Source_Kind {
+		r: zip.Reader
+		err: zip.Error
+		switch source {
+		case .Path:  err = zip.open(&r, asset("pkzip-legacy.zip"))
+		case .Bytes: err = zip.open(&r, data)
+		}
+		if !testing.expectf(t, err == nil, "%v: open %v", source, err) {
+			continue
+		}
+		defer zip.close(&r)
+
+		it := zip.iterator_create(&r)
+		defer zip.iterator_destroy(&it)
+		found := 0
+		for fi in zip.iterate(&it) {
+			if fi.method != .Shrink && fi.method != .Reduce && fi.method != .Implode {
+				continue
+			}
+			found += 1
+			m, open_err := zip.open_current(&it)
+			if !testing.expectf(t, open_err == nil, "%v %s: open %v", source, fi.path, open_err) {
+				continue
+			}
+			got: [dynamic]u8
+			defer delete(got)
+			chunk: [7]u8
+			for {
+				n, member_err := io.read(m, chunk[:])
+				append(&got, ..chunk[:n])
+				if member_err == .EOF {
+					break
+				}
+				if !testing.expectf(t, member_err == nil, "%v %s: read %v", source, fi.path, member_err) {
+					break
+				}
+			}
+			crc, has_crc := fi.crc32.?
+			testing.expectf(t, i64(len(got)) == fi.size && has_crc && hash.crc32(got[:]) == crc, "%v %s: %v bytes, CRC", source, fi.path, len(got))
+		}
+		testing.expectf(t, found >= 30, "%v: %v legacy members", source, found)
+	}
+}
+
+@(test)
 test_names :: proc(t: ^testing.T) {
 	Want :: struct {
 		archive: string,

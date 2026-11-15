@@ -61,7 +61,6 @@ test_write_aes :: proc(t: ^testing.T) {
 		for mode in Output_Mode {
 			label    := fmt.tprintf("%v/%v", method, mode)
 			seekable := mode == .Seekable
-			one_shot := method == .XZ
 			m := Memory_File{seekable = seekable}
 			defer delete(m.data)
 			zw: zip.Writer
@@ -84,7 +83,7 @@ test_write_aes :: proc(t: ^testing.T) {
 			testing.expectf(t, zip.commit(&zw) == nil, "%s: commit", label)
 			zip.close(&zw)
 
-			big_kept := method if !seekable && !one_shot else archive.Method.Store
+			big_kept := method if !seekable else archive.Method.Store
 			check_aes(t, label, m.data[:], {
 				{name = "empty.txt",   method = .Store,   password = AES_PASSWORD},
 				{name = "text.txt",    method = method,   password = AES_PASSWORD, content = text},
