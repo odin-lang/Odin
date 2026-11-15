@@ -9,11 +9,11 @@ import "core:sort"
 test_sort_inlined :: proc(t: ^testing.T) {
 	rand.reset(t.seed)
 	id :: distinct i32
-	arr := make([]id, 1_000)
+	arr := make([]id, 10_000)
 	defer delete(arr)
 
 	for &a in arr {
-		a = cast(id)rand.int_max(1_000)
+		a = cast(id)rand.int_max(10_000)
 	}
 
 	sort.sort_inlined(arr)
@@ -151,8 +151,8 @@ test_sort_inlined_by_cmp :: proc(t: ^testing.T) {
 	sort.sort_inlined_by_cmp(
 		arr,
 		proc(l, r: f32) -> sort.Ordering {
-			if l < r  {return .Less}
-			if l > r {return .Greater}
+			if l < r { return .Less }
+			if l > r { return .Greater }
 			return .Equal
 		},
 	)

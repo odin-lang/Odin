@@ -11,7 +11,7 @@ Ordering :: enum {
 /*
 WARNING: each call generates a new quicksort, only use in performance critical path
 
-This sort is not guaranteed to be stable
+This sort is unstable
 
 	example :: proc() {
 		arr := []int{3,2,1}
@@ -33,7 +33,7 @@ sort_inlined :: proc(arr: $T/[]$E) where ORD(E) {
 /*
 WARNING: each call generates a new quicksort, only use in performance critical path
 
-This sort is not guaranteed to be stable
+This sort is unstable
 
 	example :: proc() {
 		Data :: struct { rand: int, data: int }
@@ -56,7 +56,7 @@ sort_inlined_by :: proc(arr: $T/[]$E, $LESS: proc(l, r: E) -> bool) {
 /*
 WARNING: each call generates a new quicksort, only use in performance critical path
 
-This sort is not guaranteed to be stable
+This sort is unstable
 
 	example :: proc() {
 		arr := []int{3,2,1}
@@ -89,7 +89,7 @@ sort_inlined_with_indices :: proc(arr: $T/[]$E, allocator := context.allocator) 
 /*
 WARNING: each call generates a new quicksort, only use in performance critical path
 
-This sort is not guaranteed to be stable
+This sort is unstable
 
 	example :: proc() {
 		Data :: struct { rand: int, data: [10]int }
@@ -122,7 +122,7 @@ sort_inlined_by_with_indices :: proc(arr: $T/[]$E, $LESS: proc(l, r: E) -> bool,
 /*
 WARNING: each call generates a new quicksort, only use in performance critical path
 
-This sort is not guaranteed to be stable
+This sort is unstable
 
 	example :: proc() {
 		Data :: struct { rand: int, data: [10]int }
@@ -150,7 +150,7 @@ sort_inlined_by_with_data :: proc(arr: $T/[]$E, $LESS: proc(l, r: E, user_data: 
 /*
 WARNING: each call generates a new quicksort, only use in performance critical path
 
-This sort is not guaranteed to be stable
+This sort is unstable
 
 	example :: proc() {
 		Data :: struct { rand: int, data: [10]int }
@@ -193,7 +193,7 @@ sort_inlined_by_with_indices_with_data :: proc(arr: $T/[]$E, $LESS: proc(l, r: E
 
 // WARNING: each call generates a new quicksort, only use in performance critical path
 //
-// This sort is not guaranteed to be stable
+// This sort is unstable
 sort_inlined_by_cmp :: proc(arr: $T/[]$E, $CMP: proc(l, r: E) -> Ordering) {
 	when size_of(E) != 0 {
 		if len(arr) > 1 {
@@ -206,7 +206,7 @@ sort_inlined_by_cmp :: proc(arr: $T/[]$E, $CMP: proc(l, r: E) -> Ordering) {
 
 // WARNING: each call generates a new quicksort, only use in performance critical path
 //
-// This sort is not guaranteed to be stable
+// This sort is unstable
 sort_inlined_by_cmp_with_data :: proc(arr: $T/[]$E, $CMP: proc(l, r: E, user_data: ^$D) -> Ordering, user_data: ^D) {
 	when size_of(E) != 0 {
 		if len(arr) > 1 {
@@ -255,19 +255,17 @@ _quick_lomuto :: proc(arr: $T/[]$E, data: $D, $LESS: $P) #no_bounds_check {
 	loop(arr, data, true, 0)
 	
 	SMALL_THRESHOLD :: 28
-	when size_of(E) > 100 {
-		small_sort :: shell_sort
-	} else {
-		small_sort :: pingpong
-	}
-	
-	
+
 	loop :: proc(arr: T, data: D, leftmost: bool, unbalanced: int) #no_bounds_check {
 		arr := arr; leftmost := leftmost; unbalanced := unbalanced
 
 		for {
 			if len(arr) <= SMALL_THRESHOLD {
-				small_sort(arr, data)
+				when size_of(E) > 100 {
+					shell_sort(arr, data)
+				} else {
+					pingpong(arr, data)
+				}
 				return
 			}
 			
@@ -297,6 +295,7 @@ _quick_lomuto :: proc(arr: $T/[]$E, data: $D, $LESS: $P) #no_bounds_check {
 			
 			right := len(arr) - left
 
+			// loop() into the smaller partition to keep stack space lg(n)
 			if left < right {
 				loop(arr[:left], data, leftmost, 0)
 				
