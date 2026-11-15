@@ -165,6 +165,23 @@ compress_lz4_concatenated_frames :: proc(t: ^testing.T) {
 	defer delete(only_skippable)
 	append(&only_skippable, ..skippable[:])
 	lz4_test_unpack_frame(t, "skippable only", only_skippable[:], nil)
+
+	truncated: [dynamic]byte
+	defer delete(truncated)
+	append(&truncated, ..LZ4_VECTOR_B5)
+	append(&truncated, ..skippable[:len(skippable) - 1])
+	for kind in Stream_Kind {
+		input := truncated[:]
+		br: bytes.Reader
+		tr: Trickle_Reader
+		output: [dynamic]byte
+		defer delete(output)
+		ctx := stream_test_context(kind, &input, &br, &tr, &output)
+		defer compress.destroy_context(&ctx)
+		err := lz4.decompress_frame(&ctx)
+		testing.expectf(t, err == compress.General_Error.Stream_Too_Short, "truncated skippable frame, %v: decompress_frame returned %v", kind, err)
+		testing.expectf(t, bytes.equal(output[:], inputs.text), "truncated skippable frame, %v: output differs (%v vs %v bytes)", kind, len(output), len(inputs.text))
+	}
 }
 
 @(test)

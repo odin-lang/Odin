@@ -315,9 +315,12 @@ skip :: proc(z: ^Context, offset: i64) -> (err: io.Error) #no_bounds_check {
 	remaining := offset - i64(len(z.window))
 	z.window   = z.window[len(z.window):]
 
-	if _, seek_err := io.seek(z.input, remaining, .Current); seek_err == nil {
+	if position, seek_err := io.seek(z.input, remaining, .Current); seek_err == nil {
 		z.buffer = z.backing[:0]
 		z.window = z.buffer
+		if size, size_err := io.size(z.input); size_err == nil && position > size {
+			return .Short_Buffer
+		}
 		return nil
 	}
 
