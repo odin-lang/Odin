@@ -339,8 +339,19 @@ template <typename AsmCtx>
 gb_internal void check_asm_cfg_report_undef_reg(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *tmpl_entity,
                                                 AstAsmInstruction *instr, String name, u16 bit) {
 	char const *rname = asm_ctx->clobber_reg_bit_name(bit);
+	char const *reads = "implicitly reads";
 	String      owner = {};
 	char const *role  = nullptr;
+
+	for (Ast *op : instr->operands) {
+		if (op->kind != Ast_AsmRegister) {
+			continue;
+		}
+		if (asm_ctx->clobber_bit_for_reg_name(op->AsmRegister.name.string) == bit) {
+			reads = "reads";
+			break;
+		}
+	}
 
 	auto const &decls = tmpl_entity->AsmTemplate.decls;
 	for_array(i, decls) {
@@ -361,14 +372,15 @@ gb_internal void check_asm_cfg_report_undef_reg(AsmCtx *asm_ctx, AsmCfg *cfg, En
 	}
 	if (role != nullptr) {
 		error(instr->name,
-		      "'%.*s' implicitly reads %%%s, which is bound to the %s parameter '%.*s', "
+		      "'%.*s' %s %%%s, which is bound to the %s parameter '%.*s', "
 		      "but nothing writes %%%s on all paths reaching here; write to it (e.g. into '%.*s') first",
-		      LIT(name), rname, role, LIT(owner), rname, LIT(owner));
+		      LIT(name), reads, rname, role, LIT(owner), rname, LIT(owner));
 	} else {
 		error(instr->name,
-		      "'%.*s' implicitly reads %%%s, but nothing in this template produces a value for it "
-		      "on all paths reaching here; pin an input to %%%s, or write %%%s first",
-		      LIT(name), rname, rname, rname);
+		      "'%.*s' %s %%%s, but nothing in this template produces a value for it "
+		      "on all paths reaching here; pin an input to %%%s, write %%%s first, "
+		      "or add '#preserve %%%s' if this template saves and restores it",
+		      LIT(name), reads, rname, rname, rname, rname);
 	}
 }
 
