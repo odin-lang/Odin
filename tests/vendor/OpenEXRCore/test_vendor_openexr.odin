@@ -71,7 +71,7 @@ library_version :: proc(t: ^testing.T) {
 	exr.get_library_version(&major, &minor, &patch, &extra)
 	testing.expect_value(t, major, 3)
 	testing.expect_value(t, minor, 5)
-	testing.expect_value(t, patch, 3)
+	testing.expect_value(t, patch, 4)
 }
 
 @(test)
