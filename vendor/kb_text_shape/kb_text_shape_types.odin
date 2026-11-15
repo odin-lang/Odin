@@ -1460,6 +1460,7 @@ unicode_flag :: enum u8 {
 	PART_OF_WORD            = 4,
 	DECIMAL_DIGIT           = 5,
 	NON_SPACING_MARK        = 6,
+	RECOMPOSITION_RHS       = 7,
 }
 
 UNICODE_FLAG_MODIFIER_COMBINING_MARK :: unicode_flags{.MODIFIER_COMBINING_MARK}
@@ -1469,6 +1470,7 @@ UNICODE_FLAG_CLOSE_BRACKET           :: unicode_flags{.CLOSE_BRACKET}
 UNICODE_FLAG_PART_OF_WORD            :: unicode_flags{.PART_OF_WORD}
 UNICODE_FLAG_DECIMAL_DIGIT           :: unicode_flags{.DECIMAL_DIGIT}
 UNICODE_FLAG_NON_SPACING_MARK        :: unicode_flags{.NON_SPACING_MARK}
+UNICODE_FLAG_RECOMPOSITION_RHS       :: unicode_flags{.RECOMPOSITION_RHS}
 UNICODE_FLAG_MIRRORED                :: unicode_flags{.OPEN_BRACKET, .CLOSE_BRACKET}
 
 unicode_bidirectional_class :: enum u8 {
@@ -2517,8 +2519,6 @@ glyph :: struct {
 	AttachGlyph: ^glyph, // Set by GPOS attachments.
 
 	Config: ^glyph_config,
-
-	Decomposition: u64,
 
 	Classes: glyph_classes,
 

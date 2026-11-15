@@ -57,7 +57,11 @@ layout :: proc(t: ^testing.T) {
 		testing.expect_value(t, offset_of(kb.run2, Glyphs), 24)
 		testing.expect_value(t, offset_of(kb.run2, VariationVector), 56)
 		testing.expect_value(t, size_of(kb.glyph_iterator), 32)
-		testing.expect_value(t, size_of(kb.glyph), 120)
+		testing.expect_value(t, size_of(kb.glyph), 112)
+		testing.expect_value(t, offset_of(kb.glyph, Config), 56)
+		testing.expect_value(t, offset_of(kb.glyph, Classes), 64)
+		testing.expect_value(t, offset_of(kb.glyph, ParentInfo), 72)
+		testing.expect_value(t, offset_of(kb.glyph, UnicodeFlags), 106)
 
 		testing.expect_value(t, size_of(kb.uid), 16)
 		testing.expect_value(t, size_of(kb.variation_axis_info), 20)
