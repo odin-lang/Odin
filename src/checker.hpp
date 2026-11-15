@@ -723,6 +723,7 @@ struct LoadFileCache {
 	BlockingMutex  mutex; // for everything below
 	String         path;
 	gbFileError    file_error;
+	bool           is_dir;
 	String         data;
 	StringMap<u64> hashes;
 };

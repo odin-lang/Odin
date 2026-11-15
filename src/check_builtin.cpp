@@ -2068,8 +2068,15 @@ gb_internal void load_file_cache_load(LoadFileCache *cache, LoadFileTier tier) {
 		gbFile f = {};
 	#if defined(GB_SYSTEM_WINDOWS)
 		cache->file_error = gb__win32_file_open(&f.fd, &f.ops, gbFileMode_Read, c_str);
+		if (cache->file_error != gbFileError_None) {
+			cache->is_dir = path_is_directory(path);
+		}
 	#else
 		cache->file_error = gb__posix_file_open(&f.fd, &f.ops, gbFileMode_Read, c_str);
+		if (cache->file_error == gbFileError_None) {
+			struct stat st = {};
+			cache->is_dir = fstat(f.fd.i, &st) == 0 && S_ISDIR(st.st_mode);
+		}
 	#endif
 		defer (gb_file_close(&f));
 
@@ -2081,6 +2088,9 @@ gb_internal void load_file_cache_load(LoadFileCache *cache, LoadFileTier tier) {
 				// Nothing to do.
 				break;
 			case LoadFileTier_Contents: {
+				if (cache->is_dir) {
+					break;
+				}
 				isize file_size = cast(isize)gb_file_size(&f);
 				if (file_size > 0) {
 					u8 *ptr = permanent_alloc_array<u8>(file_size+1);
@@ -2136,7 +2146,20 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 
 	mutex_lock(&cache->mutex);
 	gbFileError file_error = cache->file_error;
+	bool is_dir = cache->is_dir;
 	mutex_unlock(&cache->mutex);
+
+	if (is_dir && tier == LoadFileTier_Contents) {
+		if (err_on_not_found) {
+			if (builtin_name == "load") {
+				error(ce->proc, "Failed to `#%.*s` file: %.*s; it is a directory, use `#load_directory` instead", LIT(builtin_name), LIT(path));
+			} else {
+				error(ce->proc, "Failed to `#%.*s` file: %.*s; it is a directory", LIT(builtin_name), LIT(path));
+			}
+		}
+		call->state_flags |= StateFlag_DirectiveWasFalse;
+		return false;
+	}
 
 	switch (file_error) {
 	default:
