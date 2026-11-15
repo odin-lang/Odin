@@ -5,6 +5,9 @@ import "core:archive"
 import "core:archive/tar"
 import "core:bytes"
 import "core:compress"
+import "core:compress/lz4"
+import "core:compress/lzma"
+import "core:compress/xz"
 import "core:fmt"
 import "core:hash"
 import "core:io"
@@ -45,6 +48,13 @@ Burst :: struct {
 	data: []u8,
 	pos:  int,
 }
+
+Sink :: struct {
+	total: i64,
+	crc:   u32,
+}
+
+STREAM_MEMBER_SIZE :: 64 * 1024
 
 TREE_ARCHIVES :: [?]string{
 	"gnu-b1.tar",
@@ -309,7 +319,7 @@ Source_Kind :: enum {
 
 @(test)
 test_sources :: proc(t: ^testing.T) {
-	for name in ([?]string{"gnu-posix.tar", "gnu-posix.tar.gz", "gnu-posix.tar.bz2", "gnu-posix.tar.lzma", "gnu-posix-members.tar.gz"}) {
+	for name in ([?]string{"gnu-posix.tar", "gnu-posix.tar.gz", "gnu-posix.tar.bz2", "gnu-posix.tar.lzma", "gnu-posix.tar.xz", "gnu-posix-members.tar.gz"}) {
 		for source in Source_Kind {
 			listing := list_path(t, name, source)
 			defer listing_destroy(&listing)
@@ -435,10 +445,98 @@ test_limits :: proc(t: ^testing.T) {
 	_, it_err := tar.iterator_error(&it)
 	testing.expect_value(t, it_err, archive.Tar_Error.Header_Too_Large)
 
-	small: tar.Reader
-	err = tar.open(&small, asset("gnu-posix.tar.bz2"), compress.Options{max_output_size = 4096})
-	testing.expectf(t, err != nil, "bz2 over max_output_size: %v", err)
-	tar.close(&small)
+	too_large := archive.Error(compress.Error(compress.General_Error.Output_Too_Short))
+	for name in ([?]string{"gnu-posix.tar.bz2", "gnu-posix.tar.gz", "gnu-posix.tar.lzma", "gnu-posix.tar.xz"}) {
+		small: tar.Reader
+		err = tar.open(&small, asset(name), compress.Options{max_output_size = 4096})
+		testing.expectf(t, err == nil, "%s: open %v", name, err)
+		small_it := tar.iterator_create(&small)
+		for _ in tar.iterate(&small_it) {
+		}
+		_, small_err := tar.iterator_error(&small_it)
+		testing.expectf(t, small_err == too_large, "%s over max_output_size: %v", name, small_err)
+		tar.iterator_destroy(&small_it)
+		tar.close(&small)
+	}
+}
+
+@(test)
+test_stream_memory :: proc(t: ^testing.T) {
+	sizes   := [2]int{512 * 1024, 2 << 20}
+	payload := stream_payload(sizes[1])
+	defer delete(payload)
+	want_crc: [2]u32
+	for size, i in sizes {
+		want_crc[i] = hash.crc32(payload[:size])
+	}
+	for method in ([?]archive.Method{.Deflate, .BZip2, .LZ4, .LZMA, .XZ}) {
+		packed: [2][dynamic]u8
+		defer for &p in packed {
+			delete(p)
+		}
+		for size, i in sizes {
+			packed[i] = stream_archive(t, method, payload[:size])
+		}
+		for source in ([?]Source_Kind{.Bytes, .Stream, .Non_Seekable}) {
+			peaks: [2]i64
+			for size, i in sizes {
+				sink: Sink
+				peaks[i] = stream_extract(t, packed[i][:], source, method, &sink)
+				testing.expectf(t, sink.total == i64(size) && sink.crc == want_crc[i], "%v via %v, %d bytes: extracted %d bytes, crc %8x", method, source, size, sink.total, sink.crc)
+			}
+			testing.expectf(t, peaks[1] <= peaks[0] + 128 * 1024, "%v via %v: peak %d bytes for %d, %d bytes for %d", method, source, peaks[0], sizes[0], peaks[1], sizes[1])
+		}
+	}
+}
+
+@(test)
+test_stream_trailer :: proc(t: ^testing.T) {
+	payload := stream_payload(3 * STREAM_MEMBER_SIZE)
+	defer delete(payload)
+	for method in ([?]archive.Method{.Deflate, .BZip2, .LZ4, .XZ}) {
+		packed := stream_archive(t, method, payload)
+		defer delete(packed)
+		if !testing.expectf(t, len(packed) > 16, "%v: %d bytes", method, len(packed)) {
+			continue
+		}
+		#partial switch method {
+		case .Deflate: packed[len(packed) - 8] ~= 0x01
+		case .BZip2:   packed[len(packed) - 2] ~= 0x01
+		case .LZ4:     packed[len(packed) - 1] ~= 0x01
+		case .XZ:      packed[len(packed) - 12] ~= 0x01
+		}
+		for source in ([?]Source_Kind{.Bytes, .Stream, .Non_Seekable}) {
+			reader: bytes.Reader
+			wrapper: Non_Seekable
+			r: tar.Reader
+			err: archive.Error
+			#partial switch source {
+			case .Bytes:
+				err = tar.open(&r, packed[:])
+			case .Stream:
+				err = tar.open(&r, bytes.reader_init(&reader, packed[:]))
+			case .Non_Seekable:
+				wrapper.inner = bytes.reader_init(&reader, packed[:])
+				err = tar.open(&r, non_seekable_stream(&wrapper))
+			}
+			if !testing.expectf(t, err == nil, "%v via %v: open %v", method, source, err) {
+				tar.close(&r)
+				continue
+			}
+			it := tar.iterator_create(&r)
+			sink: Sink
+			count := 0
+			for _ in tar.iterate(&it) {
+				count += 1
+				testing.expect_value(t, tar.extract_current(&it, sink_stream(&sink)), nil)
+			}
+			_, it_err := tar.iterator_error(&it)
+			testing.expectf(t, count == 3 && sink.total == i64(len(payload)), "%v via %v: %d members, %d bytes", method, source, count, sink.total)
+			testing.expectf(t, it_err != nil, "%v via %v: bad trailer not reported", method, source)
+			tar.iterator_destroy(&it)
+			tar.close(&r)
+		}
+	}
 }
 
 @(test)
@@ -1042,4 +1140,123 @@ failing_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_M
 		return nil, .Out_Of_Memory
 	}
 	return nil, nil
+}
+
+stream_payload :: proc(size: int) -> (payload: []u8) {
+	payload = make([]u8, size)
+	alphabet := "etaoin shrdlu\ncm"
+	x := u32(0x9e3779b9)
+	for &b in payload {
+		x = x * 1_103_515_245 + 12_345
+		b = alphabet[x >> 28]
+	}
+	return
+}
+
+stream_archive :: proc(t: ^testing.T, method: archive.Method, payload: []u8) -> (packed: [dynamic]u8) {
+	wrap    := method == .LZ4 || method == .LZMA || method == .XZ
+	options := tar.Writer_Options{compression = .Store if wrap else method}
+	if !wrap {
+		options.level = 1
+	}
+	out := strings.builder_make()
+	tw: tar.Writer
+	if !testing.expect_value(t, tar.create(&tw, strings.to_writer(&out), options), nil) {
+		return out.buf
+	}
+	for start := 0; start < len(payload); start += STREAM_MEMBER_SIZE {
+		n := min(STREAM_MEMBER_SIZE, len(payload) - start)
+		fi: archive.File_Info
+		fi.path      = fmt.tprintf("m%04d.bin", start / STREAM_MEMBER_SIZE)
+		fi.type      = .Regular
+		fi.size      = i64(n)
+		fi.unix_mode = 0o644
+		testing.expect_value(t, tar.write_entry(&tw, fi, payload[start:][:n]), nil)
+	}
+	testing.expect_value(t, tar.commit(&tw), nil)
+	tar.close(&tw)
+	if !wrap {
+		return out.buf
+	}
+	defer strings.builder_destroy(&out)
+	if method == .LZ4 {
+		lz4_err := lz4.compress_frame_to_dynamic(&packed, out.buf[:], .Level_1, {block_max_size = .Max_64KiB, flags = lz4.DEFAULT_FRAME_FLAGS})
+		testing.expect_value(t, lz4_err, nil)
+		return
+	}
+	if method == .XZ {
+		xz_opts := xz.level_options(.Level_1)
+		xz_opts.lzma2.dict_size = 64 * 1024
+		xz_err := xz.compress(&packed, out.buf[:], .Level_1, xz_opts)
+		testing.expect_value(t, xz_err, nil)
+		return
+	}
+	opts := lzma.level_options(.Level_1)
+	opts.dict_size = 64 * 1024
+	raw: [dynamic]u8
+	defer delete(raw)
+	props, err := lzma.compress_raw(&raw, out.buf[:], opts)
+	testing.expect_value(t, err, nil)
+	header := lzma.encode_properties(props)
+	append(&packed, ..header[:])
+	size := u64(len(out.buf))
+	for i in 0..<8 {
+		append(&packed, u8(size >> (8 * uint(i))))
+	}
+	append(&packed, ..raw[:])
+	return
+}
+
+stream_extract :: proc(t: ^testing.T, packed: []u8, source: Source_Kind, method: archive.Method, sink: ^Sink) -> (peak: i64) {
+	track: mem.Tracking_Allocator
+	mem.tracking_allocator_init(&track, context.allocator)
+	defer mem.tracking_allocator_destroy(&track)
+	context.allocator = mem.tracking_allocator(&track)
+
+	reader: bytes.Reader
+	wrapper: Non_Seekable
+	r: tar.Reader
+	err: archive.Error
+	#partial switch source {
+	case .Bytes:
+		err = tar.open(&r, packed)
+	case .Stream:
+		err = tar.open(&r, bytes.reader_init(&reader, packed))
+	case .Non_Seekable:
+		wrapper.inner = bytes.reader_init(&reader, packed)
+		err = tar.open(&r, non_seekable_stream(&wrapper))
+	}
+	if testing.expectf(t, err == nil, "%v via %v: open %v", method, source, err) {
+		testing.expectf(t, r.compression == method, "%v via %v: read as %v", method, source, r.compression)
+		it := tar.iterator_create(&r)
+		for _ in tar.iterate(&it) {
+			extract_err := tar.extract_current(&it, sink_stream(sink))
+			testing.expectf(t, extract_err == nil, "%v via %v: extract %v", method, source, extract_err)
+		}
+		_, it_err := tar.iterator_error(&it)
+		testing.expectf(t, it_err == nil, "%v via %v: %v", method, source, it_err)
+		tar.iterator_destroy(&it)
+	}
+	tar.close(&r)
+	testing.expectf(t, len(track.allocation_map) == 0, "%v via %v: %d allocations left", method, source, len(track.allocation_map))
+	return track.peak_memory_allocated
+}
+
+sink_stream :: proc(s: ^Sink) -> (stream: io.Stream) {
+	stream.data      = s
+	stream.procedure = sink_proc
+	return
+}
+
+sink_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	s := (^Sink)(stream_data)
+	#partial switch mode {
+	case .Write:
+		s.total += i64(len(p))
+		s.crc    = hash.crc32(p, s.crc)
+		return i64(len(p)), nil
+	case .Query:
+		return io.query_utility({.Write, .Query})
+	}
+	return 0, .Unsupported
 }

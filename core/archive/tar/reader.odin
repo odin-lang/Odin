@@ -31,10 +31,15 @@ open_from_bytes :: proc(r: ^Reader, data: []u8, options := compress.Options{}, a
 		r.source      = .Memory
 		r.data        = data
 	case .Gzip:
-		r.compression = .Deflate
-		_start_gzip(r) or_return
-	case .BZip2, .LZ4, .LZMA, .XZ:
-		_decode_whole(r, sniffed) or_return
+		_start_decoder(r, .Deflate) or_return
+	case .BZip2:
+		_start_decoder(r, .BZip2) or_return
+	case .LZ4:
+		_start_decoder(r, .LZ4) or_return
+	case .LZMA:
+		_start_decoder(r, .LZMA) or_return
+	case .XZ:
+		_start_decoder(r, .XZ) or_return
 	}
 	return
 }
@@ -85,10 +90,15 @@ open_from_stream :: proc(r: ^Reader, s: io.Stream, options := compress.Options{}
 		copy(r.buf, r.head[:n])
 		r.end = n
 	case .Gzip:
-		r.compression = .Deflate
-		_start_gzip(r) or_return
-	case .BZip2, .LZ4, .LZMA, .XZ:
-		_decode_whole(r, sniffed) or_return
+		_start_decoder(r, .Deflate) or_return
+	case .BZip2:
+		_start_decoder(r, .BZip2) or_return
+	case .LZ4:
+		_start_decoder(r, .LZ4) or_return
+	case .LZMA:
+		_start_decoder(r, .LZMA) or_return
+	case .XZ:
+		_start_decoder(r, .XZ) or_return
 	}
 	return
 }
@@ -111,11 +121,10 @@ open :: proc{open_from_path, open_from_bytes, open_from_stream}
 close :: proc{close_reader, close_writer}
 
 close_reader :: proc(r: ^Reader) {
-	if r.source == .Gzip {
-		deflate.inflate_reader_destroy(&r.inflate)
+	if r.source == .Decoder {
+		_destroy_decoder(r)
 	}
 	compress.destroy_context(&r.ctx)
-	delete(r.decoded)
 	delete(r.buf, r.allocator)
 	delete(r.local_buf)
 	delete(r.global_buf)
@@ -300,25 +309,39 @@ _init :: proc(r: ^Reader, options: compress.Options, allocator: runtime.Allocato
 	r.label.allocator      = allocator
 	r.sparse_map.allocator = allocator
 	r.fail_path.allocator  = allocator
-	r.decoded.allocator    = allocator
 }
 
 @(private)
 _memory :: #force_inline proc "contextless" (r: ^Reader) -> bool {
-	return r.source == .Memory || r.source == .Decoded
+	return r.source == .Memory
 }
 
 @(private)
-_start_gzip :: proc(r: ^Reader) -> (err: Error) {
+_start_decoder :: proc(r: ^Reader, method: archive.Method) -> (err: Error) {
 	if r.input.procedure == nil {
 		r.ctx = compress.init_context_from_slice(&r.input_data)
 	} else {
 		r.ctx = compress.init_context_from_stream(_prefix_stream(r), nil, nil, r.allocator)
 	}
-	inflate_err := deflate.inflate_reader_init(&r.inflate, &r.ctx, .Gzip, -1, r.options, r.allocator)
-	r.source = .Gzip
-	if inflate_err != nil {
-		return inflate_err
+	r.compression = method
+	r.source      = .Decoder
+	decoder_err: compress.Error
+	#partial switch method {
+	case .Deflate:
+		decoder_err = deflate.inflate_reader_init(&r.inflate, &r.ctx, .Gzip, -1, r.options, r.allocator)
+	case .BZip2:
+		decoder_err = bzip2.reader_init(&r.bzip2_reader, &r.ctx, -1, r.options, r.allocator)
+	case .LZ4:
+		decoder_err = lz4.frame_reader_init(&r.lz4_reader, &r.ctx, -1, r.options, nil, r.allocator)
+	case .LZMA:
+		decoder_err = lzma.reader_init(&r.lzma_reader, &r.ctx, -1, r.options, r.allocator)
+	case .XZ:
+		decoder_err = xz.reader_init(&r.xz_reader, &r.ctx, {}, -1, r.options, r.allocator)
+	case:
+		panic("archive/tar: no stream decoder for this method")
+	}
+	if decoder_err != nil {
+		return decoder_err
 	}
 	if r.buf == nil {
 		r.buf = make([]u8, BUFFER_SIZE, r.allocator) or_return
@@ -328,49 +351,36 @@ _start_gzip :: proc(r: ^Reader) -> (err: Error) {
 }
 
 @(private)
-_decode_whole :: proc(r: ^Reader, sniffed: Sniffed) -> (err: Error) {
-	limit := compress.output_limit(r.options)
-	decode_err: compress.Error
-	if r.input.procedure == nil {
-		#partial switch sniffed {
-		case .BZip2:
-			r.compression = .BZip2
-			decode_err = bzip2.decompress_from_bytes(&r.decoded, r.input_data, -1, r.options, r.allocator)
-		case .LZ4:
-			r.compression = .LZ4
-			decode_err = lz4.decompress_frame_from_bytes(&r.decoded, r.input_data, -1, r.options, nil, r.allocator)
-		case .LZMA:
-			r.compression = .LZMA
-			decode_err = lzma.decompress_from_bytes(&r.decoded, r.input_data, -1, limit, r.allocator)
-		case .XZ:
-			r.compression = .XZ
-			decode_err = xz.decompress_from_bytes(&r.decoded, r.input_data, {}, -1, limit, r.allocator)
-		}
-	} else {
-		r.ctx = compress.init_context_from_stream(_prefix_stream(r), &r.decoded, nil, r.allocator)
-		defer compress.destroy_context(&r.ctx)
-		#partial switch sniffed {
-		case .BZip2:
-			r.compression = .BZip2
-			decode_err = bzip2.decompress_from_context(&r.ctx, -1, r.options, r.allocator)
-		case .LZ4:
-			r.compression = .LZ4
-			decode_err = lz4.decompress_frame_from_context(&r.ctx, -1, r.options, nil, r.allocator)
-		case .LZMA:
-			r.compression = .LZMA
-			decode_err = lzma.decompress_from_context(&r.ctx, -1, limit, r.allocator)
-		case .XZ:
-			r.compression = .XZ
-			decode_err = xz.decompress_from_context(&r.ctx, {}, -1, limit, r.allocator)
-		}
+_decoder_read :: proc(r: ^Reader, p: []u8) -> (n: int, err: compress.Error) {
+	#partial switch r.compression {
+	case .Deflate:
+		return deflate.inflate_reader_read(&r.inflate, p)
+	case .BZip2:
+		return bzip2.reader_read(&r.bzip2_reader, p)
+	case .LZ4:
+		return lz4.frame_reader_read(&r.lz4_reader, p)
+	case .LZMA:
+		return lzma.reader_read(&r.lzma_reader, p)
+	case .XZ:
+		return xz.reader_read(&r.xz_reader, p)
 	}
-	if decode_err != nil {
-		return decode_err
+	panic("archive/tar: no stream decoder for this method")
+}
+
+@(private)
+_destroy_decoder :: proc(r: ^Reader) {
+	#partial switch r.compression {
+	case .Deflate:
+		deflate.inflate_reader_destroy(&r.inflate)
+	case .BZip2:
+		bzip2.reader_destroy(&r.bzip2_reader)
+	case .LZ4:
+		lz4.frame_reader_destroy(&r.lz4_reader)
+	case .LZMA:
+		lzma.reader_destroy(&r.lzma_reader)
+	case .XZ:
+		xz.reader_destroy(&r.xz_reader)
 	}
-	r.source = .Decoded
-	r.data   = r.decoded[:]
-	r.pos    = 0
-	return
 }
 
 @(private)
@@ -408,13 +418,13 @@ _source_read :: proc(r: ^Reader, p: []u8) -> (n: int, eof: bool, err: Error) {
 	}
 	got: int
 	read_err: Error
-	if r.source == .Gzip {
-		inflate_err: compress.Error
-		got, inflate_err = deflate.inflate_reader_read(&r.inflate, p)
-		if io_err, is_io := inflate_err.(io.Error); is_io && io_err == .EOF {
+	if r.source == .Decoder {
+		decoder_err: compress.Error
+		got, decoder_err = _decoder_read(r, p)
+		if io_err, is_io := decoder_err.(io.Error); is_io && io_err == .EOF {
 			return got, true, nil
 		}
-		read_err = inflate_err
+		read_err = decoder_err
 	} else {
 		stream_err: io.Error
 		got, stream_err = io.read(r.stream, p)
@@ -431,6 +441,17 @@ _source_read :: proc(r: ^Reader, p: []u8) -> (n: int, eof: bool, err: Error) {
 		return 0, false, read_err
 	}
 	return got, got == 0 && len(p) > 0, nil
+}
+
+@(private)
+_drain :: proc(r: ^Reader) -> (err: Error) {
+	r.pos, r.end = 0, 0
+	for {
+		_, eof := _source_read(r, r.buf) or_return
+		if eof {
+			return
+		}
+	}
 }
 
 @(private)
@@ -555,7 +576,7 @@ _skip :: proc(r: ^Reader, count: i64) -> (err: Error) {
 @(private)
 _rewind :: proc(r: ^Reader) -> (err: Error) {
 	switch r.source {
-	case .Memory, .Decoded:
+	case .Memory:
 		r.pos = 0
 	case .Stream:
 		if !r.seekable {
@@ -565,7 +586,7 @@ _rewind :: proc(r: ^Reader) -> (err: Error) {
 			return seek_err
 		}
 		r.pos, r.end, r.offset = 0, 0, 0
-	case .Gzip:
+	case .Decoder:
 		if r.input.procedure != nil {
 			if !r.seekable {
 				return archive.General_Error.Not_Seekable
@@ -575,9 +596,9 @@ _rewind :: proc(r: ^Reader) -> (err: Error) {
 			}
 			r.prefix = {stream = r.input}
 		}
-		deflate.inflate_reader_destroy(&r.inflate)
+		_destroy_decoder(r)
 		compress.destroy_context(&r.ctx)
-		_start_gzip(r) or_return
+		_start_decoder(r, r.compression) or_return
 	}
 	r.index       = -1
 	r.remaining   = 0
@@ -661,6 +682,9 @@ _next_member :: proc(r: ^Reader) -> (fi: archive.File_Info, ok: bool, err: Error
 	for {
 		block, eof := _next_block(r) or_return
 		if eof || _all_zero(block) {
+			if r.source == .Decoder {
+				_drain(r) or_return
+			}
 			r.ended        = true
 			r.member_count = r.index + 1
 			return

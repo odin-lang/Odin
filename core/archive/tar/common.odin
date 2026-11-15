@@ -6,6 +6,8 @@ import "core:compress"
 import "core:compress/bzip2"
 import "core:compress/deflate"
 import "core:compress/lz4"
+import "core:compress/lzma"
+import "core:compress/xz"
 import "core:io"
 import "core:os"
 
@@ -104,8 +106,7 @@ GLOBAL_KEYS := [Global_Key]string{
 Source :: enum u8 {
 	Memory,
 	Stream,
-	Gzip,
-	Decoded,
+	Decoder,
 }
 
 Prefix_Stream :: struct {
@@ -132,7 +133,10 @@ Reader :: struct {
 	prefix:       Prefix_Stream,
 	ctx:          compress.Context,
 	inflate:      deflate.Inflate_Reader,
-	decoded:      [dynamic]u8,
+	bzip2_reader: bzip2.Reader,
+	lz4_reader:   lz4.Frame_Reader,
+	lzma_reader:  lzma.Reader,
+	xz_reader:    xz.Reader,
 
 	data:         []u8,
 	buf:          []u8,
@@ -212,6 +216,8 @@ Writer :: struct {
 	deflate:    deflate.Deflate_Writer,
 	bzip2:      bzip2.Writer,
 	lz4:        lz4.Frame_Writer,
+	lzma:       lzma.Writer,
+	xz:         xz.Writer,
 	block:      [BLOCK_SIZE]u8,
 	records:    [dynamic]u8,
 	name:       [dynamic]u8,

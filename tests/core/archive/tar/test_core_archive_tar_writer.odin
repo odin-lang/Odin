@@ -34,7 +34,7 @@ Write_Calls :: struct {
 	monotonic: bool,
 }
 
-WRITE_COMPRESSIONS :: [?]archive.Method{.Store, .Deflate, .BZip2, .LZ4}
+WRITE_COMPRESSIONS :: [?]archive.Method{.Store, .Deflate, .BZip2, .LZ4, .LZMA, .XZ}
 
 @(test)
 test_write_round_trip :: proc(t: ^testing.T) {
@@ -129,7 +129,11 @@ test_write_errors :: proc(t: ^testing.T) {
 	w := strings.to_writer(&out)
 
 	tw: tar.Writer
-	testing.expect_value(t, tar.create(&tw, w, {compression = .LZMA}), archive.Error(archive.General_Error.Unsupported_Method))
+	testing.expect_value(t, tar.create(&tw, w, {compression = .LZMA2}), archive.Error(archive.General_Error.Unsupported_Method))
+	testing.expect_value(t, tar.create(&tw, w, {compression = .LZMA, level = 10}), archive.Error(archive.General_Error.Incompatible_Options))
+	testing.expect_value(t, tar.create(&tw, w, {compression = .XZ, level = -1}), archive.Error(archive.General_Error.Incompatible_Options))
+	testing.expect_value(t, tar.create(&tw, w, {compression = .XZ, options = {max_memory = 1024}}), archive.Error(compress.Error(compress.General_Error.Memory_Limit_Exceeded)))
+	testing.expect_value(t, len(out.buf), 0)
 	testing.expect_value(t, tar.create(&tw, w, {compression = .BZip2, level = 0}), archive.Error(archive.General_Error.Incompatible_Options))
 	testing.expect_value(t, tar.create(&tw, w, {level = 1}), archive.Error(archive.General_Error.Incompatible_Options))
 

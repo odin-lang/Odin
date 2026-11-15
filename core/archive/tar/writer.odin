@@ -5,6 +5,8 @@ import "core:compress"
 import "core:compress/bzip2"
 import "core:compress/deflate"
 import "core:compress/lz4"
+import "core:compress/lzma"
+import "core:compress/xz"
 import "core:io"
 import "core:os"
 import "core:slice"
@@ -158,6 +160,10 @@ commit :: proc(tw: ^Writer) -> (err: Error) {
 		bzip2.writer_finish(&tw.bzip2) or_return
 	case .LZ4:
 		lz4.frame_writer_finish(&tw.lz4) or_return
+	case .LZMA:
+		lzma.writer_finish(&tw.lzma) or_return
+	case .XZ:
+		xz.writer_finish(&tw.xz) or_return
 	}
 	tw.committed = true
 	return nil
@@ -172,6 +178,10 @@ close_writer :: proc(tw: ^Writer) {
 			bzip2.writer_destroy(&tw.bzip2)
 		case .LZ4:
 			lz4.frame_writer_destroy(&tw.lz4)
+		case .LZMA:
+			lzma.writer_destroy(&tw.lzma)
+		case .XZ:
+			xz.writer_destroy(&tw.xz)
 		}
 	}
 	if tw.file != nil {
@@ -216,6 +226,10 @@ _check_options :: proc(options: Writer_Options) -> (err: Error) {
 		if has_level && (level < int(lz4.Level.Fastest) || level > int(lz4.Level.Best)) {
 			return archive.General_Error.Incompatible_Options
 		}
+	case .LZMA, .XZ:
+		if has_level && (level < int(lzma.Level.Fastest) || level > int(lzma.Level.Best)) {
+			return archive.General_Error.Incompatible_Options
+		}
 	case:
 		return archive.General_Error.Unsupported_Method
 	}
@@ -251,6 +265,14 @@ _writer_init :: proc(tw: ^Writer, s: io.Stream, options: Writer_Options) -> (err
 		lz4_level := lz4.Level(level) if has_level else .Default
 		lz4.frame_writer_init(&tw.lz4, s, lz4_level, {flags = lz4.DEFAULT_FRAME_FLAGS}, -1, codec, nil, tw.allocator) or_return
 		tw.out = lz4.frame_writer_to_stream(&tw.lz4)
+	case .LZMA:
+		lzma_level := lzma.Level(level) if has_level else .Default
+		lzma.writer_init(&tw.lzma, s, lzma_level, -1, codec, tw.allocator) or_return
+		tw.out = lzma.writer_to_stream(&tw.lzma)
+	case .XZ:
+		xz_level := xz.Level(level) if has_level else .Default
+		xz.writer_init(&tw.xz, s, xz_level, {}, codec, tw.allocator) or_return
+		tw.out = xz.writer_to_stream(&tw.xz)
 	}
 	tw.active = true
 	return nil
