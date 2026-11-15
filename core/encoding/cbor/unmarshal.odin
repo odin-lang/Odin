@@ -95,7 +95,7 @@ _unmarshal_value :: proc(d: Decoder, v: any, hdr: Header, allocator := context.a
 	// If it's a union with only one variant, then treat it as that variant
 	if u, ok := ti.variant.(^reflect.Type_Info_Union); ok && len(u.variants) == 1 {
 		#partial switch hdr {
-		case .Nil, .Undefined, nil: // no-op.
+		case .Nil, .Undefined: // no-op.
 		case:
 			variant := u.variants[0]
 			v.id = variant.id
