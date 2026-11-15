@@ -994,6 +994,7 @@ gb_internal EscapeValue escape_load(EscapeAnalysis *ea, EscapeValue const &ptr, 
 	return v;
 }
 
+// the exits and calls within an expression whose value is not kept, e.g. `put(&h, &b)` in `1 + put(&h, &b)`
 gb_internal void escape_visit_exits(EscapeAnalysis *ea, Ast *expr) {
 	if (expr == nullptr) {
 		return;
@@ -1004,6 +1005,95 @@ gb_internal void escape_visit_exits(EscapeAnalysis *ea, Ast *expr) {
 	}
 	if (Ast *call = escape_call_of(expr)) {
 		escape_call(ea, call);
+		return;
+	}
+
+	expr = unparen_expr(expr);
+	if (expr->tav.mode == Addressing_Constant || expr->tav.mode == Addressing_Type) {
+		return;
+	}
+	switch (expr->kind) {
+	case_ast_node(ue, UnaryExpr, expr);
+		escape_visit_exits(ea, ue->expr);
+	case_end;
+
+	case_ast_node(be, BinaryExpr, expr);
+		escape_visit_exits(ea, be->left);
+		escape_visit_exits(ea, be->right);
+	case_end;
+
+	case_ast_node(se, SelectorExpr, expr);
+		escape_visit_exits(ea, se->expr);
+	case_end;
+
+	case_ast_node(ie, IndexExpr, expr);
+		escape_visit_exits(ea, ie->expr);
+		escape_visit_exits(ea, ie->index);
+	case_end;
+
+	case_ast_node(mie, MatrixIndexExpr, expr);
+		escape_visit_exits(ea, mie->expr);
+		escape_visit_exits(ea, mie->row_index);
+		escape_visit_exits(ea, mie->column_index);
+	case_end;
+
+	case_ast_node(se, SliceExpr, expr);
+		escape_visit_exits(ea, se->expr);
+		escape_visit_exits(ea, se->low);
+		escape_visit_exits(ea, se->high);
+	case_end;
+
+	case_ast_node(de, DerefExpr, expr);
+		escape_visit_exits(ea, de->expr);
+	case_end;
+
+	case_ast_node(tc, TypeCast, expr);
+		escape_visit_exits(ea, tc->expr);
+	case_end;
+
+	case_ast_node(ac, AutoCast, expr);
+		escape_visit_exits(ea, ac->expr);
+	case_end;
+
+	case_ast_node(ta, TypeAssertion, expr);
+		escape_visit_exits(ea, ta->expr);
+	case_end;
+
+	case_ast_node(te, TagExpr, expr);
+		escape_visit_exits(ea, te->expr);
+	case_end;
+
+	case_ast_node(te, TernaryIfExpr, expr);
+		escape_visit_exits(ea, te->cond);
+		escape_visit_exits(ea, te->x);
+		escape_visit_exits(ea, te->y);
+	case_end;
+
+	case_ast_node(te, TernaryWhenExpr, expr);
+		if (te->cond == nullptr || te->cond->tav.value().kind != ExactValue_Bool) {
+			break;
+		}
+		if (te->cond->tav.value().value_bool) {
+			escape_visit_exits(ea, te->x);
+		} else {
+			escape_visit_exits(ea, te->y);
+		}
+	case_end;
+
+	case_ast_node(oe, OrElseExpr, expr);
+		escape_visit_exits(ea, oe->x);
+		escape_visit_exits(ea, oe->y);
+	case_end;
+
+	case_ast_node(cl, CompoundLit, expr);
+		for (Ast *elem : cl->elems) {
+			escape_visit_exits(ea, elem);
+		}
+	case_end;
+
+	case_ast_node(fv, FieldValue, expr);
+		escape_visit_exits(ea, fv->value);
+	case_end;
 	}
 }
 
@@ -4935,6 +5025,8 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 			for_array(i, as->lhs) {
 				if (stored[i]) {
 					escape_store(ea, as->lhs[i], values[i]);
+				} else {
+					escape_visit_exits(ea, as->lhs[i]);
 				}
 			}
 		} else {
