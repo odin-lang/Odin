@@ -1,5 +1,7 @@
 package ansi
 
+import "core:fmt"
+
 BEL     :: "\a" // Bell
 BS      :: "\b" // Backspace
 ESC     :: "\e" // Escape
@@ -137,3 +139,77 @@ DECRC :: ESC + "8" // DEC Restore Cursor
 WINDOW_TITLE :: "2"  // Followed by ";<text>" ST.
 HYPERLINK    :: "8"  // Followed by ";[params];<URI>" ST. Closed by OSC HYPERLINK ";;" ST.
 CLIPBOARD    :: "52" // Followed by ";c;<Base64-encoded string>" ST.
+
+// Returns an SGR sequence for the given code, such as `FG_RED` or `BOLD`.
+sgr :: proc(code: string) -> string {
+	return fmt.tprintf("%s%s%s", CSI, code, SGR)
+}
+
+// Wraps text in an SGR style and resets the style afterward.
+//
+// `codes` may contain multiple semicolon-separated SGR parameters, such as
+// `BOLD + ";" + FG_RED` or `FG_COLOR_24_BIT + ";255;0;0"`.
+color :: proc(text, codes: string) -> string {
+	return fmt.tprintf("%s%s%s%s%s%s", CSI, codes, SGR, text, CSI, RESET + SGR)
+}
+
+// Returns a sequence that clears the screen and moves the cursor to the home position.
+clear_screen :: proc() -> string {
+	return CSI + "2" + ED + CSI + CUP
+}
+
+clear_line :: proc() -> string {
+	return CSI + "2" + EL
+}
+
+clear_to_end_of_line :: proc() -> string {
+	return CSI + "0" + EL
+}
+
+clear_to_start_of_line :: proc() -> string {
+	return CSI + "1" + EL
+}
+
+hide_cursor :: proc() -> string {
+	return CSI + DECTCEM_HIDE
+}
+
+show_cursor :: proc() -> string {
+	return CSI + DECTCEM_SHOW
+}
+
+enter_alt_screen :: proc() -> string {
+	return CSI + DECASB_ENTER
+}
+
+exit_alt_screen :: proc() -> string {
+	return CSI + DECASB_EXIT
+}
+
+move_cursor :: proc(row, column: int) -> string {
+	return fmt.tprintf("%s%i;%i%s", CSI, row, column, CUP)
+}
+
+move_cursor_up :: proc(count := 1) -> string {
+	return fmt.tprintf("%s%i%s", CSI, count, CUU)
+}
+
+move_cursor_down :: proc(count := 1) -> string {
+	return fmt.tprintf("%s%i%s", CSI, count, CUD)
+}
+
+move_cursor_forward :: proc(count := 1) -> string {
+	return fmt.tprintf("%s%i%s", CSI, count, CUF)
+}
+
+move_cursor_backward :: proc(count := 1) -> string {
+	return fmt.tprintf("%s%i%s", CSI, count, CUB)
+}
+
+save_cursor :: proc() -> string {
+	return CSI + SCP
+}
+
+restore_cursor :: proc() -> string {
+	return CSI + RCP
+}

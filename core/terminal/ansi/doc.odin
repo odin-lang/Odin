@@ -5,6 +5,12 @@ Primarily used in terminal emulators for enhanced graphics, such as colors, text
 For example, you can print out a line of cyan text like this:
 	fmt.println(ansi.CSI + ansi.FG_CYAN + ansi.SGR + "Hellope!" + ansi.CSI + ansi.RESET + ansi.SGR)
 
+The helper procedures can also be used to color text and control the terminal:
+	fmt.println(ansi.color("Hellope!", ansi.FG_CYAN))
+	fmt.print(ansi.clear_screen() + ansi.hide_cursor() + ansi.enter_alt_screen())
+	fmt.print(ansi.move_cursor(2, 4) + "Hellope!")
+	fmt.print(ansi.exit_alt_screen() + ansi.show_cursor())
+
 Multiple SGR (Select Graphic Rendition) codes can be joined by semicolons:
 	fmt.println(ansi.CSI + ansi.BOLD + ";" + ansi.FG_BLUE + ansi.SGR + "Hellope!" + ansi.CSI + ansi.RESET + ansi.SGR)
 
