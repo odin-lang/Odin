@@ -1,4 +1,4 @@
-/* stb_image - v2.31 - public domain image loader - http://nothings.org/stb
+/* stb_image - v2.32 - public domain image loader - http://nothings.org/stb
                                   no warranty implied; use at your own risk
 
    == SECURITY NOTE ==
@@ -64,6 +64,7 @@ LICENSE
 
 RECENT REVISION HISTORY:
 
+      2.32  (2026-11-12) fix req_comp regression; other fixes
       2.31  (2026-11-08) many bugfixes and etc.
       2.30  (2024-05-31) avoid erroneous gcc warning
       2.29  (2023-05-xx) optimizations
@@ -1077,7 +1078,7 @@ static int stbi__mul2sizes_valid(int a, int b)
    return a <= INT_MAX/b;
 }
 
-#if !defined(STBI_NO_JPEG) || !defined(STBI_NO_PNG) || !defined(STBI_NO_TGA) || !defined(STBI_NO_HDR)
+#if !defined(STBI_NO_JPEG) || !defined(STBI_NO_PNG) || !defined(STBI_NO_TGA) || !defined(STBI_NO_HDR) || !defined(STBI_NO_GIF)
 // returns 1 if "a*b + add" has no negative terms/factors and doesn't overflow
 static int stbi__mad2sizes_valid(int a, int b, int add)
 {
@@ -1093,15 +1094,13 @@ static int stbi__mad3sizes_valid(int a, int b, int c, int add)
 }
 
 // returns 1 if "a*b*c*d + add" has no negative terms/factors and doesn't overflow
-#if !defined(STBI_NO_LINEAR) || !defined(STBI_NO_HDR) || !defined(STBI_NO_PNM)
 static int stbi__mad4sizes_valid(int a, int b, int c, int d, int add)
 {
    return stbi__mul2sizes_valid(a, b) && stbi__mul2sizes_valid(a*b, c) &&
       stbi__mul2sizes_valid(a*b*c, d) && stbi__addsizes_valid(a*b*c*d, add);
 }
-#endif
 
-#if !defined(STBI_NO_JPEG) || !defined(STBI_NO_PNG) || !defined(STBI_NO_TGA) || !defined(STBI_NO_HDR)
+#if !defined(STBI_NO_JPEG) || !defined(STBI_NO_PNG) || !defined(STBI_NO_TGA) || !defined(STBI_NO_HDR) || !defined(STBI_NO_GIF)
 // mallocs with size overflow checking
 static void *stbi__malloc_mad2(int a, int b, int add)
 {
@@ -1203,7 +1202,7 @@ static void *stbi__load_main(stbi__context *s, int *x, int *y, int *comp, int re
    ri->channel_order = STBI_ORDER_RGB; // all current input & output are this, but this is here so we can add BGR order
    ri->num_channels = 0;
 
-   if (req_comp < 1 || req_comp > 4) return stbi__errpuc("bad req_comp", "Invalid value for required components");
+   if (req_comp < 0 || req_comp > 4) return stbi__errpuc("bad req_comp", "Invalid value for required components");
 
    // test the formats with a very explicit header first (at least a FOURCC
    // or distinctive magic number first)
@@ -1503,7 +1502,7 @@ STBIDEF stbi_uc *stbi_load_gif_from_memory(stbi_uc const *buffer, int len, int *
    stbi__context s;
    stbi__start_mem(&s,buffer,len);
 
-   if (req_comp < 1 || req_comp > 4)
+   if (req_comp < 0 || req_comp > 4)
       return stbi__errpuc("bad req_comp", "Invalid number of required components");
 
    return (unsigned char*) stbi__load_gif_main(&s, delays, x, y, z, comp, req_comp);
@@ -1722,7 +1721,7 @@ static void stbi__skip(stbi__context *s, int n)
 }
 #endif
 
-#if defined(STBI_NO_PNG) && defined(STBI_NO_TGA) && defined(STBI_NO_HDR) && defined(STBI_NO_PNM)
+#if defined(STBI_NO_PNG) && defined(STBI_NO_TGA) && defined(STBI_NO_PNM)
 // nothing
 #else
 static int stbi__getn(stbi__context *s, stbi_uc *buffer, int n)
@@ -1860,7 +1859,7 @@ static unsigned char *stbi__convert_format(unsigned char *data, int img_n, int r
 }
 #endif
 
-#if defined(STBI_NO_PNG) && defined(STBI_NO_PSD)
+#if defined(STBI_NO_PNG) && defined(STBI_NO_PSD) && defined(STBI_NO_PNM)
 // nothing
 #else
 static stbi__uint16 stbi__compute_y_16(int r, int g, int b)
@@ -1869,7 +1868,7 @@ static stbi__uint16 stbi__compute_y_16(int r, int g, int b)
 }
 #endif
 
-#if defined(STBI_NO_PNG) && defined(STBI_NO_PSD)
+#if defined(STBI_NO_PNG) && defined(STBI_NO_PSD) && defined(STBI_NO_PNM)
 // nothing
 #else
 static stbi__uint16 *stbi__convert_format16(stbi__uint16 *data, int img_n, int req_comp, unsigned int x, unsigned int y)
@@ -7009,7 +7008,7 @@ static float *stbi__hdr_load(stbi__context *s, int *x, int *y, int *comp, int re
    const char *headerToken;
    STBI_NOTUSED(ri);
 
-   if (req_comp < 1 || req_comp > 4)
+   if (req_comp < 0 || req_comp > 4)
       return stbi__errpf("bad req_comp", "Invalid number of required components");
 
    // Check identifier
@@ -7456,10 +7455,11 @@ STBIDEF int stbi_info_from_file(FILE *f, int *x, int *y, int *comp)
 
 STBIDEF stbi_info_res stbi_info2(char const *filename)
 {
-   stbi_info_res res = {0};
+   stbi_info_res res;
    FILE *f = stbi__fopen(filename, "rb");
    if (!f) {
       stbi__err("can't fopen", "Unable to open file");
+      memset(&res,0,sizeof(res));
       return res;
    }
    res = stbi_info2_from_file(f);
@@ -7469,7 +7469,7 @@ STBIDEF stbi_info_res stbi_info2(char const *filename)
 
 STBIDEF stbi_info_res stbi_info2_from_file(FILE *f)
 {
-   stbi_info_res res = {0};
+   stbi_info_res res;
    stbi__context s;
    long pos = ftell(f);
    stbi__start_file(&s, f);
