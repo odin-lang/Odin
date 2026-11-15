@@ -7002,6 +7002,7 @@ gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &bas
 			}
 		} else if (node->kind == Ast_ForeignImportDecl) {
 			ast_node(fl, ForeignImportDecl, node);
+			f->seen_foreign_import_count++;
 
 			if (fl->filepaths.count == 0) {
 				syntax_error(decls[i], "No foreign paths found");
@@ -7869,6 +7870,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 		pkg->is_extra = string_set_exists(&extra_fullpaths, pkg->fullpath);
 		for (AstFile *file : pkg->files) {
 			p->total_seen_load_directive_count += file->seen_load_directive_count;
+			p->total_seen_foreign_import_count += file->seen_foreign_import_count;
 		}
 	}
 
