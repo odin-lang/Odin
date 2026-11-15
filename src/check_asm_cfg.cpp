@@ -28,6 +28,19 @@ gb_internal i32 asm_reg_index_from_bit(u16 bit) {
 	return -1;
 }
 
+template <typename AsmCtx>
+gb_internal u16 asm_stack_pointer_bit(AsmCtx *asm_ctx) {
+	switch (build_context.metrics.arch) {
+	case TargetArch_amd64:
+		return asm_ctx->clobber_bit_for_reg_name(str_lit("rsp"));
+	case TargetArch_arm64:
+	case TargetArch_riscv64:
+		return asm_ctx->clobber_bit_for_reg_name(str_lit("sp"));
+	default:
+		return 0;
+	}
+}
+
 struct AsmBlock {
 	i32        first; // instruction index
 	i32        last;
@@ -448,8 +461,8 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 		}
 	}
 
-	// NOTE(bill): #preserve
-	u16 preserve_bits = 0;
+	// NOTE(bill): #preserve, and the stack pointer which every template starts with defined
+	u16 preserve_bits = asm_stack_pointer_bit(asm_ctx);
 	for (String const &reg : ate->preserve_registers_set) {
 		preserve_bits |= asm_ctx->clobber_bit_for_reg_name(reg);
 	}
@@ -959,7 +972,7 @@ gb_internal bool check_asm_cfg_liveness(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *en
 
 	u16 const REG_TOP = asm_ctx->CLOBBER_REGS_NAMED;
 
-	u16 exit_live = 0;
+	u16 exit_live = asm_stack_pointer_bit(asm_ctx);
 	u16 output_regs = 0;
 	for_array(i, entity->AsmTemplate.decls) {
 		auto const &ed = entity->AsmTemplate.decls[i];
