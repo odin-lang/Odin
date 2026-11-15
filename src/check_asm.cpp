@@ -157,7 +157,7 @@ gb_internal void check_asm_pin_type_compat(AsmRegClass reg_class, i32 reg_w, Typ
 // nested memory sub-operands). Reads Ident.entity, which check_asm_instruction_operand
 // populates during operand checking.
 template <typename AsmCtx>
-gb_internal void check_asm_collect_refs(AsmCtx *asm_ctx, PtrSet<Entity *> *refs, Ast *expr, u16 *touched_regs_) {
+gb_internal void check_asm_collect_refs(AsmCtx *asm_ctx, PtrSet<Entity *> *refs, Ast *expr, u16 *touched_regs_, StringSet *touched_families_) {
 	if (expr == nullptr) {
 		return;
 	}
@@ -170,37 +170,43 @@ gb_internal void check_asm_collect_refs(AsmCtx *asm_ctx, PtrSet<Entity *> *refs,
 	case Ast_AsmRegister:
 		// A literal %reg touches a physical register. A pinned scratch/immediate is
 		// referenced in the body via its pinned register, not its identifier, so record
-		// the bit; the unused check maps decl pins back through this mask.
+		// the bit and the register family; the unused check maps decl pins back through them.
 		if (touched_regs_) *touched_regs_ |= asm_ctx->clobber_bit_for_reg_name(expr->AsmRegister.name.string);
+		if (touched_families_) {
+			String family = asm_register_family_name(asm_ctx, expr->AsmRegister.name.string);
+			if (family.len != 0) {
+				string_set_add(touched_families_, family);
+			}
+		}
 		return;
 
 	case Ast_AsmMemoryTerm: {
 		auto *t = &expr->AsmMemoryTerm;
-		check_asm_collect_refs(asm_ctx, refs, t->operand, touched_regs_);
-		check_asm_collect_refs(asm_ctx, refs, t->scale,   touched_regs_);
+		check_asm_collect_refs(asm_ctx, refs, t->operand, touched_regs_, touched_families_);
+		check_asm_collect_refs(asm_ctx, refs, t->scale,   touched_regs_, touched_families_);
 		return;
 	}
 
 	case Ast_AsmMemoryOperand: {
 		auto *m = &expr->AsmMemoryOperand;
-		check_asm_collect_refs(asm_ctx, refs, m->segment_override, touched_regs_);
+		check_asm_collect_refs(asm_ctx, refs, m->segment_override, touched_regs_, touched_families_);
 		for (Ast *term : m->terms) {
-			check_asm_collect_refs(asm_ctx, refs, term, touched_regs_);
+			check_asm_collect_refs(asm_ctx, refs, term, touched_regs_, touched_families_);
 		}
 		return;
 	}
 	case Ast_IndexExpr:
-		check_asm_collect_refs(asm_ctx, refs, expr->IndexExpr.expr,  touched_regs_);
-		check_asm_collect_refs(asm_ctx, refs, expr->IndexExpr.index, touched_regs_);
+		check_asm_collect_refs(asm_ctx, refs, expr->IndexExpr.expr,  touched_regs_, touched_families_);
+		check_asm_collect_refs(asm_ctx, refs, expr->IndexExpr.index, touched_regs_, touched_families_);
 		return;
 
 	case Ast_UnaryExpr:
-		check_asm_collect_refs(asm_ctx, refs, expr->UnaryExpr.expr,  touched_regs_);
+		check_asm_collect_refs(asm_ctx, refs, expr->UnaryExpr.expr,  touched_regs_, touched_families_);
 		return;
 
 	case Ast_BinaryExpr:
-		check_asm_collect_refs(asm_ctx, refs, expr->BinaryExpr.left,  touched_regs_);
-		check_asm_collect_refs(asm_ctx, refs, expr->BinaryExpr.right, touched_regs_);
+		check_asm_collect_refs(asm_ctx, refs, expr->BinaryExpr.left,  touched_regs_, touched_families_);
+		check_asm_collect_refs(asm_ctx, refs, expr->BinaryExpr.right, touched_regs_, touched_families_);
 		return;
 	}
 }
@@ -281,6 +287,167 @@ gb_internal bool asm_register_is_mask(AsmCtx *asm_ctx, String name) {
 gb_internal bool asm_register_is_mask(Asm_amd64 *asm_ctx, String name) {
 	auto r = asm_ctx->register_lookup(name);
 	return r != Asm_amd64::REG_INVALID && asm_ctx->reg_class(asm_ctx->register_codes[r]) == Asm_amd64::REG_CLASS_K;
+}
+
+template <typename AsmCtx>
+gb_internal String asm_register_name_from_code(AsmCtx *asm_ctx, u32 code) {
+	for (isize r = 1; r < AsmCtx::REG_COUNT; r++) {
+		if (asm_ctx->register_codes[r] == code) {
+			return asm_ctx->register_strings[r];
+		}
+	}
+	return {};
+}
+
+// NOTE(bill): the whole register a named register is part of (e.g. %r8d -> r8, %ymm3 -> xmm3), spelt as LLVM clobbers it.
+// Empty for the registers a clobber never names: the stack pointer, the zero registers, and system registers.
+gb_internal String asm_register_family_name(Asm_amd64 *asm_ctx, String name) {
+	auto r = asm_ctx->register_lookup(name);
+	if (r == Asm_amd64::REG_INVALID) {
+		return {};
+	}
+	u16 code = asm_ctx->register_codes[r];
+	u16 num  = code & 0xFF;
+	u16 full = 0;
+	switch (asm_ctx->reg_class(code)) {
+	case Asm_amd64::REG_CLASS_GPR64:
+	case Asm_amd64::REG_CLASS_GPR32:
+	case Asm_amd64::REG_CLASS_GPR16:
+	case Asm_amd64::REG_CLASS_GPR8:
+		full = Asm_amd64::REG_CLASS_GPR64 | num;
+		break;
+	case Asm_amd64::REG_CLASS_GPR8H: // %ah, %ch, %dh, and %bh are encoded as 4 to 7
+		full = Asm_amd64::REG_CLASS_GPR64 | (num - 4);
+		break;
+	case Asm_amd64::REG_CLASS_XMM:
+	case Asm_amd64::REG_CLASS_YMM:
+	case Asm_amd64::REG_CLASS_ZMM:
+		full = Asm_amd64::REG_CLASS_XMM | num;
+		break;
+	case Asm_amd64::REG_CLASS_K:
+		full = code;
+		break;
+	default:
+		return {};
+	}
+	if (full == (Asm_amd64::REG_CLASS_GPR64 | 4)) { // %rsp
+		return {};
+	}
+	return asm_register_name_from_code(asm_ctx, full);
+}
+
+gb_internal String asm_register_family_name(Asm_arm64 *asm_ctx, String name) {
+	auto r = asm_ctx->register_lookup(name);
+	if (r == Asm_arm64::REG_INVALID) {
+		return {};
+	}
+	u32 code = asm_ctx->register_codes[r];
+	u32 num  = code & 0xFF;
+	u32 full = 0;
+	switch (asm_ctx->reg_class(code)) {
+	case Asm_arm64::REG_CLASS_X:
+	case Asm_arm64::REG_CLASS_W:
+		if (num == 31) { // %xzr, %wzr
+			return {};
+		}
+		full = Asm_arm64::REG_CLASS_X | num;
+		break;
+	case Asm_arm64::REG_CLASS_V:
+	case Asm_arm64::REG_CLASS_B:
+	case Asm_arm64::REG_CLASS_H:
+	case Asm_arm64::REG_CLASS_S:
+	case Asm_arm64::REG_CLASS_D:
+	case Asm_arm64::REG_CLASS_Q:
+		full = Asm_arm64::REG_CLASS_V | num;
+		break;
+	default:
+		return {};
+	}
+	return asm_register_name_from_code(asm_ctx, full);
+}
+
+gb_internal String asm_register_family_name(Asm_riscv *asm_ctx, String name) {
+	auto r = asm_ctx->register_lookup(name);
+	if (r == Asm_riscv::REG_INVALID) {
+		return {};
+	}
+	u16 code = asm_ctx->register_codes[r];
+	u16 num  = code & 0xFF;
+	switch (asm_ctx->reg_class(code)) {
+	case Asm_riscv::REG_CLASS_GPR:
+		switch (num) {
+		case 0: // zero
+		case 2: // sp
+		case 3: // gp
+		case 4: // tp
+			return {};
+		}
+		return asm_ctx->register_strings[r];
+	case Asm_riscv::REG_CLASS_FPR:
+		return asm_ctx->register_strings[r];
+	}
+	return {};
+}
+
+// NOTE(bill): an output's register is already declared as written, and clobbering it as well
+// lets LLVM drop the moves into it of an input tied to that output
+template <typename AsmCtx>
+gb_internal bool asm_register_family_is_pinned_output(AsmCtx *asm_ctx, Entity *tmpl_entity, String family) {
+	for (auto const &ed : tmpl_entity->AsmTemplate.decls) {
+		if (ed.param_group != AsmTemplateEntityDeclParamGroup_Output || ed.pin.len == 0) {
+			continue;
+		}
+		if (asm_register_family_name(asm_ctx, ed.pin) == family) {
+			return true;
+		}
+	}
+	return false;
+}
+
+template <typename AsmCtx>
+gb_internal void asm_clobber_written_register(AsmCtx *asm_ctx, Entity *tmpl_entity, String reg_name) {
+	String family = asm_register_family_name(asm_ctx, reg_name);
+	if (family.len == 0) {
+		return;
+	}
+	if (asm_register_family_is_pinned_output(asm_ctx, tmpl_entity, family)) {
+		return;
+	}
+	string_set_add(&tmpl_entity->AsmTemplate.clobber_registers_set, family);
+}
+
+// NOTE(bill): name each register by its family (%eax as rax) so the same register is never named twice;
+// a register with no family, such as the stack pointer, keeps its name
+template <typename AsmCtx>
+gb_internal void asm_normalize_register_names(AsmCtx *asm_ctx, StringSet *set) {
+	TEMPORARY_ALLOCATOR_GUARD();
+	auto names = array_make<String>(temporary_allocator());
+	for (String const &reg : *set) {
+		String family = asm_register_family_name(asm_ctx, reg);
+		if (family.len == 0) {
+			family = reg;
+		}
+		array_add(&names, family);
+	}
+	string_set_clear(set);
+	for (String const &name : names) {
+		string_set_add(set, name);
+	}
+}
+
+template <typename AsmCtx>
+gb_internal void asm_clobber_implicit_vector_registers(AsmCtx *asm_ctx, Entity *tmpl_entity, u32 implicit_wr) {
+	// only AMD64 has instructions which implicitly write every vector register
+}
+gb_internal void asm_clobber_implicit_vector_registers(Asm_amd64 *asm_ctx, Entity *tmpl_entity, u32 implicit_wr) {
+	if ((implicit_wr & Asm_amd64::ClobberReg_VECTOR) == 0) {
+		return;
+	}
+	// NOTE(bill): e.g. vzeroall and vzeroupper write %ymm0 to %ymm15
+	for (u16 num = 0; num < 16; num++) {
+		String name = asm_register_name_from_code(asm_ctx, Asm_amd64::REG_CLASS_XMM | num);
+		asm_clobber_written_register(asm_ctx, tmpl_entity, name);
+	}
 }
 
 // Returns true if the operand's Odin type is size/class-compatible with the form's slot.
@@ -1826,6 +1993,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				u16 b = asm_ctx->clobber_bit_for_reg_name(e->AsmRegister.name.string);
 				produced |= b;
 				explicit_writes |= b;
+				asm_clobber_written_register(asm_ctx, tmpl_entity, e->AsmRegister.name.string);
 				continue;
 			}
 			// NOTE(bill): A lane operand `v[idx]` is an IndexExpr with no entity of its own
@@ -1957,6 +2125,10 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 						array_add(&facts->gen_params,  be);
 						array_add(&facts->read_params, be);
 					}
+					Ast *base = m->classify.base;
+					if (base != nullptr && base->kind == Ast_AsmRegister) {
+						asm_clobber_written_register(asm_ctx, tmpl_entity, base->AsmRegister.name.string);
+					}
 				}
 			}
 			Entity *pe = entity_of_node(operands[i].expr);
@@ -2049,6 +2221,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		// LLVM reserves the stack pointer, and a template must leave it as it found it.
 		u16 implicit_clobbers = produced & ~output_pinned_mask & ~asm_stack_pointer_bit(asm_ctx);
 		asm_ctx->clobber_implicit_regs(&ate->clobber_registers_set, implicit_clobbers);
+		asm_clobber_implicit_vector_registers(asm_ctx, tmpl_entity, cast(u32)clobber.implicit_wr);
 
 		// Purity inference
 		if (cfg->can_be_pure) {
@@ -3091,40 +3264,26 @@ gb_internal void check_asm_template_body(AsmCtx *asm_ctx, CheckerContext *ctx, E
 		entity->AsmTemplate.is_volatile    = is_volatile;
 		entity->AsmTemplate.is_align_stack = is_align_stack;
 
-		// add normalizations for the registers too
-		for (String const &reg : *clobber_registers_set) {
-			u16 bit = asm_ctx->clobber_bit_for_reg_name(reg);
-			String rname = make_string_c(asm_ctx->clobber_reg_bit_name(bit));
-			if (rname != reg) {
-				string_set_update(clobber_registers_set, rname);
-			}
-		}
-
-		for (String const &reg : *preserve_registers_set) {
-			u16 bit = asm_ctx->clobber_bit_for_reg_name(reg);
-			String rname = make_string_c(asm_ctx->clobber_reg_bit_name(bit));
-			if (rname != reg) {
-				string_set_update(preserve_registers_set, rname);
-			}
-		}
+		asm_normalize_register_names(asm_ctx, clobber_registers_set);
+		asm_normalize_register_names(asm_ctx, preserve_registers_set);
 	}
 
 
 	// Two distinct operands pinned to the same physical register only makes sense when
-	// they are tied (they intentionally share one register). Compared by bit so %eax
-	// and %rax collide. Flag pins ("flags") yield bit 0 and are skipped.
+	// they are tied (they intentionally share one register). Compared by register family so
+	// %eax and %rax collide. Flag pins ("flags") have no family and are skipped.
 	for_array(i, ate->decls) {
 		auto const &a = ate->decls[i];
 		if (a.pin.len == 0) {
 			continue;
 		}
-		u16 abit = asm_ctx->clobber_bit_for_reg_name(a.pin);
-		if (abit == 0) {
+		String afamily = asm_register_family_name(asm_ctx, a.pin);
+		if (afamily.len == 0) {
 			continue;
 		}
 		for (isize j = i+1; j < ate->decls.count; j++) {
 			auto const &b = ate->decls[j];
-			if (b.pin.len == 0 || asm_ctx->clobber_bit_for_reg_name(b.pin) != abit) {
+			if (b.pin.len == 0 || asm_register_family_name(asm_ctx, b.pin) != afamily) {
 				continue;
 			}
 			bool tied = (a.tie == cast(i32)j) || (b.tie == cast(i32)i);
@@ -3132,9 +3291,9 @@ gb_internal void check_asm_template_body(AsmCtx *asm_ctx, CheckerContext *ctx, E
 				continue;
 			}
 			error(b.entity ? b.entity->token : entity->token,
-			      "Parameters '%.*s' and '%.*s' are both pinned to %%%s but are not tied",
+			      "Parameters '%.*s' and '%.*s' are both pinned to %%%.*s but are not tied",
 			      LIT(a.entity->token.string), LIT(b.entity->token.string),
-			      asm_ctx->clobber_reg_bit_name(abit));
+			      LIT(afamily));
 		}
 	}
 
@@ -3143,12 +3302,11 @@ gb_internal void check_asm_template_body(AsmCtx *asm_ctx, CheckerContext *ctx, E
 		if (ed.param_group != AsmTemplateEntityDeclParamGroup_Output || ed.pin.len == 0) {
 			continue;
 		}
-		u16 bit = asm_ctx->clobber_bit_for_reg_name(ed.pin);
-		if (bit == 0) {
+		String family = asm_register_family_name(asm_ctx, ed.pin);
+		if (family.len == 0) {
 			continue;
 		}
-		String rname = make_string_c(asm_ctx->clobber_reg_bit_name(bit));
-		if (string_set_exists(&ate->clobber_registers_set, rname)) {
+		if (string_set_exists(&ate->clobber_registers_set, family)) {
 			error(ed.entity->token,
 			      "'asm' output '%.*s' is pinned to %%%.*s, which '#clobber' also names; an output's register is already written, so remove the '#clobber'",
 			      LIT(ed.entity->token.string), LIT(ed.pin));
@@ -3431,11 +3589,14 @@ gb_internal void check_asm_template_body(AsmCtx *asm_ctx, CheckerContext *ctx, E
 		ptr_set_init(&refs);
 		defer (ptr_set_destroy(&refs));
 		u16 touched_regs = 0;
+		StringSet touched_families = {};
+		string_set_init(&touched_families);
+		defer (string_set_destroy(&touched_families));
 
 		for (Ast *instruction_ : at->instructions) {
 			if (instruction_->kind == Ast_AsmInstruction) {
 				for (Ast *op : instruction_->AsmInstruction.operands) {
-					check_asm_collect_refs(asm_ctx, &refs, op, &touched_regs);
+					check_asm_collect_refs(asm_ctx, &refs, op, &touched_regs, &touched_families);
 				}
 				// NOTE(bill): An implicit read (e.g. CQO reads RAX, CPUID reads EAX/ECX) uses the pinned register too
 				if (AsmInstructionFacts *facts = instruction_->AsmInstruction.facts) {
@@ -3443,7 +3604,7 @@ gb_internal void check_asm_template_body(AsmCtx *asm_ctx, CheckerContext *ctx, E
 				}
 			} else if (instruction_->kind == Ast_AsmDirective) {
 				for (Ast *op : instruction_->AsmDirective.operands) {
-					check_asm_collect_refs(asm_ctx, &refs, op, &touched_regs);
+					check_asm_collect_refs(asm_ctx, &refs, op, &touched_regs, &touched_families);
 				}
 			}
 		}
@@ -3464,6 +3625,10 @@ gb_internal void check_asm_template_body(AsmCtx *asm_ctx, CheckerContext *ctx, E
 			if (ed.pin.len != 0) {
 				u16 pin_bit = asm_ctx->clobber_bit_for_reg_name(ed.pin);
 				if (pin_bit != 0 && (touched_regs & pin_bit) != 0) {
+					continue;
+				}
+				String pin_family = asm_register_family_name(asm_ctx, ed.pin);
+				if (pin_family.len != 0 && string_set_exists(&touched_families, pin_family)) {
 					continue;
 				}
 			}
@@ -3531,15 +3696,19 @@ gb_internal void check_asm_template_body(AsmCtx *asm_ctx, CheckerContext *ctx, E
 		    ed.pin.len     == 0) {
 			continue;
 		}
-		u16 bit = asm_ctx->clobber_bit_for_reg_name(ed.pin);
-		if (bit == 0) {
+		String family = asm_register_family_name(asm_ctx, ed.pin);
+		u16    bit    = asm_ctx->clobber_bit_for_reg_name(ed.pin);
+		if (family.len == 0 && bit == 0) {
 			continue;
 		}
 
 		TEMPORARY_ALLOCATOR_GUARD();
 		auto names = array_make<String>(temporary_allocator());
 		for (String const &reg : ate->clobber_registers_set) {
-			if (asm_ctx->clobber_bit_for_reg_name(reg) == bit) {
+			// NOTE(bill): an implicit clobber may be named by its bit (e.g. lr) rather than its family (x30)
+			bool same_family = family.len != 0 && asm_register_family_name(asm_ctx, reg) == family;
+			bool same_bit    = bit != 0 && asm_ctx->clobber_bit_for_reg_name(reg) == bit;
+			if (same_family || same_bit) {
 				array_add(&names, reg);
 			}
 		}

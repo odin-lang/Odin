@@ -535,6 +535,7 @@ if [[ "$(uname -m)" == "x86_64" || "$(uname -m)" == "amd64" ]]; then
 		exit 1
 	fi
 	$ODIN test ../test_issue_asm_pinned_clobbers $COMMON -o:speed
+	$ODIN test ../test_issue_asm_named_register_clobbers $COMMON -o:speed
 	if [[ $($ODIN check ../test_issue_asm_clobber_pinned_output $COMMON_CHECK 2>&1 >/dev/null | grep -c "which '#clobber' also names") -eq 3 ]]; then
 		echo "SUCCESSFUL 1/1"
 	else
