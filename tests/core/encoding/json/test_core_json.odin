@@ -13,7 +13,7 @@ import "base:runtime"
 
 @test
 parse_json :: proc(t: ^testing.T) {
-   
+
 	json_data := `
 	{
 	  "firstName": "John",
@@ -40,7 +40,7 @@ parse_json :: proc(t: ^testing.T) {
 	  "spouse": null
 	}
 	`
-   
+
 	val, err := json.parse(transmute([]u8)json_data)
 	json.destroy_value(val)
 	testing.expectf(t, err == nil, "Expected `json.parse` to return nil, got %v", err)
@@ -54,7 +54,7 @@ out_of_memory_in_parse_json :: proc(t: ^testing.T) {
 	testing.expectf(t, arena_init_error == nil, "Expected arena initialization to not return error, got: %v\n", arena_init_error)
 
 	context.allocator = virtual.arena_allocator(&arena)
-	
+
 	json_data := `
 	{
 	  "firstName": "John",
@@ -130,17 +130,17 @@ out_of_memory_in_unmarshal :: proc(t: ^testing.T) {
 
 @test
 marshal_json :: proc(t: ^testing.T) {
-   
+
 	My_Struct :: struct {
 		a: int,
 		b: int,
 	}
-   
+
 	my_struct := My_Struct {
 		a = 2,
 		b = 5,
 	}
-   
+
 	data, err := json.marshal(my_struct)
 	defer delete(data)
 	testing.expectf(t, err == nil, "Expected `json.marshal` to return nil, got %v", err)
@@ -516,7 +516,7 @@ map_with_integer_keys :: proc(t: ^testing.T) {
 
 	marshaled_data, marshal_err := json.marshal(my_map)
 	defer delete(marshaled_data)
-	
+
 	testing.expectf(t, marshal_err == nil, "Expected `json.marshal` to return nil error, got %v", marshal_err)
 
 	my_map2 := make(map[i32]string)
@@ -532,7 +532,7 @@ map_with_integer_keys :: proc(t: ^testing.T) {
 
 	for key, item in my_map {
 		testing.expectf(t, key in my_map2, "Expected key %v to be present in unmarshaled map", key)
-		
+
 		if key in my_map2 {
 			testing.expectf(t, runtime.string_eq(item, my_map2[key]), "Expected value %s to be present in unmarshaled map", key)
 		}
@@ -993,8 +993,9 @@ marshal_floats_round_trip :: proc(t: ^testing.T) {
 
 @(test)
 parse_integers_out_of_range :: proc(t: ^testing.T) {
-	// An integer outside i64 wraps to 64 bits in a `Value`, the same as when it is unmarshalled
-	// into an `i64`. Past i128 only the digits that fit in an i128 are read.
+	// An integer outside i64 wraps to 64 bits in a `Value`,
+	// the same as when it is unmarshalled into an `i64`.
+	// Past u128 only the digits that fit in an i128 are read.
 	Case :: struct {
 		text:     string,
 		spec:     json.Specification,
@@ -1011,6 +1012,8 @@ parse_integers_out_of_range :: proc(t: ^testing.T) {
 		{"0xFFFFFFFFFFFFFFFF",     .JSON5, -1},
 		{"0x10000000000000000",    .MJSON, 0},
 		{"1000000000000000000000000000000000000000000000", .JSON, 687399551400673280}, // 10^38, wrapped
+		{"170141183460469231731687303715884105729", .JSON, 1},
+		{"0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", .JSON5, -1},
 	}
 	only_integer :: proc(v: json.Value) -> (i: i64, ok: bool) {
 		array := v.(json.Array) or_return
@@ -1052,16 +1055,24 @@ keys_checked_like_values :: proc(t: ^testing.T) {
 		Red,
 		Green,
 	}
-	bad := [?]string{
-		"{\"a\tb\":1}",
-		"{\"c\r\":5}",
-		"{\"\xff\":1}",
-		"{\"\\q\":1}",
-		"{\"\\u12\":1}",
-		"{\"a\":1,\"x\":{\"k\x01\":2}}", // in a value that is skipped
+	Bad :: struct {
+		src:   string,
+		specs: bit_set[json.Specification],
 	}
-	for s in bad {
-		for spec in ([?]json.Specification{.JSON, .JSON5, .MJSON}) {
+	ALL_SPECS :: bit_set[json.Specification]{.JSON, .JSON5, .MJSON}
+	bad := [?]Bad{
+		{"{\"a\tb\":1}", {.JSON}},
+		{"{\"c\r\":5}", ALL_SPECS},
+		{"{\"\xff\":1}", ALL_SPECS},
+		{"{\"\\q\":1}", {.JSON}},
+		{"{\"\\1\":1}", ALL_SPECS},
+		{"{\"\\u12\":1}", ALL_SPECS},
+		{"{\"a\":1,\"x\":{\"k\x01\":2}}", {.JSON}}, // in a value that is skipped
+		{"{\"a\":1,\"x\":{\"k\\1\":2}}", ALL_SPECS},
+	}
+	for b in bad {
+		s := b.src
+		for spec in b.specs {
 			testing.expectf(t, !json.is_valid(transmute([]byte)s, spec), "is_valid accepts %q (%v)", s, spec)
 
 			target: Target
@@ -1116,6 +1127,7 @@ unmarshal_integral_floats_wrap_like_integers :: proc(t: ^testing.T) {
 		{"-1",                   "-1e0"},
 		{"18446744073709551616", "18446744073709551616.0"},
 		{"9223372036854775808",  "9.223372036854775808e18"},
+		{"170141183460469231731687303715884105728", "1.7014118346046923e38"},
 	}
 	for pair in pairs {
 		ai, af: [1]i8
@@ -1133,7 +1145,7 @@ unmarshal_integral_floats_wrap_like_integers :: proc(t: ^testing.T) {
 	err := json.unmarshal_string("[-1.7014118346046923e38, 1.7014118346046921e38]", &limits, allocator = context.temp_allocator)
 	testing.expectf(t, err == nil && limits[0] == min(i128) && limits[1] == 170141183460469212842221372237303250944, "i128 limits: %v (%v)", limits, err)
 
-	for s in ([?]string{"[1.7014118346046923e38]", "[-1.7014118346046926e38]", "[1e300]", "[-1e300]", "[1e999]", "[-1e999]"}) {
+	for s in ([?]string{"[3.5e38]", "[-1.7014118346046926e38]", "[1e300]", "[-1e300]", "[1e999]", "[-1e999]"}) {
 		v: [1]i128
 		err = json.unmarshal_string(s, &v, allocator = context.temp_allocator)
 		_, unsupported := err.(json.Unsupported_Type_Error)
@@ -1341,7 +1353,7 @@ unmarshal_values_that_do_not_fit :: proc(t: ^testing.T) {
 	testing.expect_value(t, v.f, 1e42)
 
 	// JSON5 and MJSON can represent non-finite floats.
-	testing.expect_value(t, json.unmarshal_string(`{"f": "inf"}`, &v, .JSON5), nil)
+	testing.expect_value(t, json.unmarshal_string(`{"f": "Infinity"}`, &v, .JSON5), nil)
 	testing.expect(t, math.is_inf(v.f))
 }
 

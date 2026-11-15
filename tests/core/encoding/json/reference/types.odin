@@ -3,12 +3,13 @@ Encoding and decoding JSON in strict `JSON`, [[ JSON5 ; https://json5.org/ ]] an
 
 Using one of these `Specification`s.
 	JSON
-		strict JSON
+		strict JSON; NUL bytes after the value are ignored
 	JSON5
 		pure superset of JSON and valid JavaScript
 		https://json5.org/
 
-		* Object keys may be an ECMAScript 5.1 IdentifierName.
+		* Object keys may be an ECMAScript 5.1 IdentifierName of ASCII letters, digits, `_` and `$`;
+		  Unicode letters and `\u` escapes are not supported.
 		* Objects may have a single trailing comma.
 		* Arrays may have a single trailing comma.
 		* Strings may be single quoted.
@@ -26,8 +27,9 @@ Using one of these `Specification`s.
 		https://bitsquid.blogspot.com/2009/10/simplified-json-notation.html
 
 		* All the same features as JSON5 plus extras.
-		* Assume an object definition at the root level (no need to surround entire file with { } ).
-		* Commas are optional, using comma insertion rules with newlines.
+		* Assume an object definition at the root level (no need to surround entire file with { } );
+		  an empty document is an empty object.
+		* Commas are optional; a line break after a value acts as one, so no line may start with a comma.
 		* Quotes around object keys are optional if the keys are valid identifiers.
 		* : can be replaced with =
 */
@@ -47,6 +49,8 @@ Specification :: enum {
 
 
 DEFAULT_SPECIFICATION :: Specification.JSON5
+
+MAX_DEPTH :: #config(JSON_MAX_DEPTH, 128)
 
 Null    :: distinct rawptr
 Integer :: i64
@@ -84,7 +88,8 @@ Error :: enum {
 	Expected_String_For_Object_Key,
 	Duplicate_Object_Key,
 	Expected_Colon_After_Key,
-	
+	Max_Depth_Exceeded,
+
 	// Allocating Errors
 	Invalid_Allocator,
 	Out_Of_Memory,

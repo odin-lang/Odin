@@ -5,7 +5,6 @@ import "core:encoding/json"
 import "core:fmt"
 import "core:mem"
 import "core:reflect"
-import "core:slice"
 import ref "../reference"
 
 // Results from the two packages have distinct types, so both are normalized before comparing.
@@ -48,6 +47,7 @@ Error_Kind :: enum u8 {
 	Error,
 	Data,
 	Unsupported,
+	Unknown_Field,
 }
 
 Norm_Error :: struct {
@@ -65,6 +65,8 @@ norm_error_current :: proc(e: json.Unmarshal_Error) -> (n: Norm_Error) {
 		n.kind, n.code = .Data, int(v)
 	case json.Unsupported_Type_Error:
 		n.kind, n.id, n.token = .Unsupported, v.id, norm_token_current(v.token)
+	case json.Unknown_Field_Error:
+		n.kind, n.id, n.token = .Unknown_Field, v.id, norm_token_current(v.token)
 	}
 	return
 }
@@ -77,6 +79,8 @@ norm_error_reference :: proc(e: ref.Unmarshal_Error) -> (n: Norm_Error) {
 		n.kind, n.code = .Data, int(v)
 	case ref.Unsupported_Type_Error:
 		n.kind, n.id, n.token = .Unsupported, v.id, norm_token_reference(v.token)
+	case ref.Unknown_Field_Error:
+		n.kind, n.id, n.token = .Unknown_Field, v.id, norm_token_reference(v.token)
 	}
 	return
 }
@@ -91,6 +95,7 @@ fmt_error :: proc(n: Norm_Error) -> string {
 	case .Error:       return fmt.tprintf("Error.%v", json.Error(n.code))
 	case .Data:        return fmt.tprintf("Unmarshal_Data_Error.%v", json.Unmarshal_Data_Error(n.code))
 	case .Unsupported: return fmt.tprintf("Unsupported_Type_Error{{id=%v, token=%s}}", n.id, fmt_token(n.token))
+	case .Unknown_Field: return fmt.tprintf("Unknown_Field_Error{{id=%v, token=%s}}", n.id, fmt_token(n.token))
 	}
 	return ""
 }
@@ -122,14 +127,14 @@ errors_equal :: proc(a, b: Norm_Error) -> bool {
 	return a.kind == b.kind && a.code == b.code && ids_equivalent(a.id, b.id) && a.token == b.token
 }
 
-values_equal :: proc(a: json.Value, b: ref.Value, wrapped: []Wrapped_Integer = nil) -> bool {
+values_equal :: proc(a: json.Value, b: ref.Value) -> bool {
 	switch av in a {
 	case json.Null:
 		bv, ok := b.(ref.Null)
 		return ok && rawptr(av) == rawptr(bv)
 	case json.Integer:
 		bv, ok := b.(ref.Integer)
-		return ok && (av == bv || slice.contains(wrapped, Wrapped_Integer{bv, av}))
+		return ok && av == bv
 	case json.Float:
 		bv, ok := b.(ref.Float)
 		return ok && transmute(u64)av == transmute(u64)bv
@@ -145,7 +150,7 @@ values_equal :: proc(a: json.Value, b: ref.Value, wrapped: []Wrapped_Integer = n
 			return false
 		}
 		for x, i in av {
-			if !values_equal(x, bv[i], wrapped) {
+			if !values_equal(x, bv[i]) {
 				return false
 			}
 		}
@@ -157,7 +162,7 @@ values_equal :: proc(a: json.Value, b: ref.Value, wrapped: []Wrapped_Integer = n
 		}
 		for k, x in av {
 			y, found := bv[k]
-			if !found || !values_equal(x, y, wrapped) {
+			if !found || !values_equal(x, y) {
 				return false
 			}
 		}
@@ -190,11 +195,11 @@ allocators_equal :: proc(a, b: runtime.Allocator) -> bool {
 }
 
 @(private="file")
-elems_diff :: proc(a, b: rawptr, ea, eb: ^reflect.Type_Info, size_a, size_b, count: int, flags: Diff_Flags, wrapped: []Wrapped_Integer) -> string {
+elems_diff :: proc(a, b: rawptr, ea, eb: ^reflect.Type_Info, size_a, size_b, count: int, flags: Diff_Flags) -> string {
 	for i in 0..<count {
 		pa := ptr_add(a, uintptr(i*size_a))
 		pb := ptr_add(b, uintptr(i*size_b))
-		if d := diff_values(pa, pb, ea, eb, flags, wrapped); d != "" {
+		if d := diff_values(pa, pb, ea, eb, flags); d != "" {
 			return fmt.tprintf("[%d]%s", i, d)
 		}
 	}
@@ -207,17 +212,16 @@ elems_diff :: proc(a, b: rawptr, ea, eb: ^reflect.Type_Info, size_a, size_b, cou
 // involved.
 Diff_Flag :: enum {
 	After_Error, // Both packages returned the same error, see the union case.
-	Any_Map_Cap, // `.Reserve_Maps` sizes maps up front, so their capacity may differ.
 }
 Diff_Flags :: bit_set[Diff_Flag]
 
-diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flags{}, wrapped: []Wrapped_Integer = nil) -> string {
+diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flags{}) -> string {
 	if ta.id == json.Value || tb.id == ref.Value {
 		va, vb := (^json.Value)(a)^, (^ref.Value)(b)^
 		if ta.id != json.Value || tb.id != ref.Value {
 			return fmt.tprintf(": type mismatch %v vs %v", ta.id, tb.id)
 		}
-		if !values_equal(va, vb, wrapped) {
+		if !values_equal(va, vb) {
 			return fmt.tprintf(": current %v, reference %v", va, vb)
 		}
 		return ""
@@ -240,7 +244,7 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flag
 		for i in 0..<int(ia.field_count) {
 			pa := ptr_add(a, ia.offsets[i])
 			pb := ptr_add(b, ib.offsets[i])
-			if d := diff_values(pa, pb, ia.types[i], ib.types[i], flags, wrapped); d != "" {
+			if d := diff_values(pa, pb, ia.types[i], ib.types[i], flags); d != "" {
 				return fmt.tprintf(".%s%s", ia.names[i], d)
 			}
 		}
@@ -275,11 +279,11 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flag
 
 	case ^reflect.Type_Info_Array:
 		ib := bb.variant.(^reflect.Type_Info_Array)
-		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.count, flags, wrapped)
+		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.count, flags)
 
 	case ^reflect.Type_Info_Enumerated_Array:
 		ib := bb.variant.(^reflect.Type_Info_Enumerated_Array)
-		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.count, flags, wrapped)
+		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.count, flags)
 
 	case ^reflect.Type_Info_Slice:
 		ib := bb.variant.(^reflect.Type_Info_Slice)
@@ -290,7 +294,7 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flag
 		if (ra.data == nil) != (rb.data == nil) {
 			return fmt.tprintf(": data is nil=%v in current, nil=%v in reference", ra.data == nil, rb.data == nil)
 		}
-		return elems_diff(ra.data, rb.data, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ra.len, flags, wrapped)
+		return elems_diff(ra.data, rb.data, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ra.len, flags)
 
 	case ^reflect.Type_Info_Dynamic_Array:
 		ib := bb.variant.(^reflect.Type_Info_Dynamic_Array)
@@ -304,7 +308,7 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flag
 		if !allocators_equal(ra.allocator, rb.allocator) {
 			return ": allocator differs"
 		}
-		return elems_diff(ra.data, rb.data, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ra.len, flags, wrapped)
+		return elems_diff(ra.data, rb.data, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ra.len, flags)
 
 	case ^reflect.Type_Info_Fixed_Capacity_Dynamic_Array:
 		ib := bb.variant.(^reflect.Type_Info_Fixed_Capacity_Dynamic_Array)
@@ -312,18 +316,18 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flag
 		if la != lb {
 			return fmt.tprintf(": len %d in current, %d in reference", la, lb)
 		}
-		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.capacity, flags, wrapped)
+		return elems_diff(a, b, ia.elem, ib.elem, ia.elem_size, ib.elem_size, ia.capacity, flags)
 
 	case ^reflect.Type_Info_Union:
 		ib := bb.variant.(^reflect.Type_Info_Union)
-		if reflect.type_info_union_is_pure_maybe(ia) {
+		if reflect.type_info_union_is_pure_maybe(ia^) {
 			pa, pb := (^rawptr)(a)^, (^rawptr)(b)^
 			if (pa == nil) != (pb == nil) {
 				return fmt.tprintf(": pointer is nil=%v in current, nil=%v in reference", pa == nil, pb == nil)
 			}
 			return ""
 		}
-		tag_a, tag_b := read_union_tag(a, ia), read_union_tag(b, ib)
+		tag_a, tag_b := read_union_tag(a, ia^), read_union_tag(b, ib^)
 		if tag_a != tag_b {
 			return fmt.tprintf(": union tag %d in current, %d in reference", tag_a, tag_b)
 		}
@@ -343,7 +347,7 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flag
 			// two packages, so after an error only the tags are compared.
 			return ""
 		}
-		if d := diff_values(a, b, ia.variants[index], ib.variants[index], flags, wrapped); d != "" {
+		if d := diff_values(a, b, ia.variants[index], ib.variants[index], flags); d != "" {
 			return fmt.tprintf(".(%v)%s", ia.variants[index].id, d)
 		}
 		return ""
@@ -353,7 +357,7 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flag
 		ra, rb := (^runtime.Raw_Map)(a)^, (^runtime.Raw_Map)(b)^
 		len_a, len_b := runtime.map_len(ra), runtime.map_len(rb)
 		cap_a, cap_b := runtime.map_cap(ra), runtime.map_cap(rb)
-		if len_a != len_b || (cap_a != cap_b && .Any_Map_Cap not_in flags) {
+		if len_a != len_b || cap_a != cap_b {
 			return fmt.tprintf(": len/cap %d/%d in current, %d/%d in reference", len_a, cap_a, len_b, cap_b)
 		}
 		if !allocators_equal(ra.allocator, rb.allocator) {
@@ -364,10 +368,10 @@ diff_values :: proc(a, b: rawptr, ta, tb: ^reflect.Type_Info, flags := Diff_Flag
 			found := false
 			it_b := 0
 			for kb, vb in reflect.iterate_map(any{b, tb.id}, &it_b) {
-				if diff_values(ka.data, kb.data, ia.key, ib.key, flags, wrapped) != "" {
+				if diff_values(ka.data, kb.data, ia.key, ib.key, flags) != "" {
 					continue
 				}
-				if d := diff_values(va.data, vb.data, ia.value, ib.value, flags, wrapped); d != "" {
+				if d := diff_values(va.data, vb.data, ia.value, ib.value, flags); d != "" {
 					return fmt.tprintf("[%v]%s", ka, d)
 				}
 				found = true
