@@ -346,9 +346,10 @@ _decode_index :: proc(d: ^Decoder) -> (size: int, err: Error) {
 	d.pos += 1
 	rest := d.input[:index_start + int(min(u64(len(d.input) - index_start), INDEX_SIZE_MAX))]
 
+	count_start := d.pos
 	count, count_ok := _read_vli(rest, &d.pos)
 	if !count_ok {
-		return 0, _short_or(d, rest, XZ_Error.Invalid_Index)
+		return 0, _short_or(d, rest, count_start, XZ_Error.Invalid_Index)
 	}
 	if count != d.records {
 		return 0, XZ_Error.Index_Mismatch
@@ -358,10 +359,15 @@ _decode_index :: proc(d: ^Decoder) -> (size: int, err: Error) {
 	defer sha2.reset(&verify)
 	unpadded_sum, uncompressed_sum: u64
 	for _ in 0..<count {
+		unpadded_start := d.pos
 		unpadded, unpadded_ok := _read_vli(rest, &d.pos)
+		if !unpadded_ok {
+			return 0, _short_or(d, rest, unpadded_start, XZ_Error.Invalid_Index)
+		}
+		uncompressed_start := d.pos
 		uncompressed, uncompressed_ok := _read_vli(rest, &d.pos)
-		if !unpadded_ok || !uncompressed_ok {
-			return 0, _short_or(d, rest, XZ_Error.Invalid_Index)
+		if !uncompressed_ok {
+			return 0, _short_or(d, rest, uncompressed_start, XZ_Error.Invalid_Index)
 		}
 		if unpadded < UNPADDED_SIZE_MIN || unpadded > VLI_MAX - unpadded_sum || uncompressed > VLI_MAX - uncompressed_sum {
 			return 0, XZ_Error.Invalid_Index
@@ -401,8 +407,9 @@ _hash_record :: proc(ctx: ^sha2.Context_256, unpadded, uncompressed: u64) {
 }
 
 @(private)
-_short_or :: proc(d: ^Decoder, rest: []u8, err: Error) -> Error {
-	if d.pos >= len(rest) && len(rest) == len(d.input) {
+_short_or :: proc(d: ^Decoder, rest: []u8, start: int, err: Error) -> Error {
+	read := d.pos - start
+	if d.pos >= len(rest) && len(rest) == len(d.input) && read < VLI_BYTES_MAX && (read == 0 || rest[d.pos - 1] & 0x80 != 0) {
 		return General_Error.Stream_Too_Short
 	}
 	return err

@@ -1,8 +1,10 @@
 package compress_xz
 
+import "base:runtime"
 import "core:compress"
 import "core:compress/filters"
 import "core:compress/lzma"
+import "core:crypto/sha2"
 import "core:io"
 
 Error         :: compress.Error
@@ -96,6 +98,74 @@ Index :: struct {
 	blocks:            [dynamic]Block_Info,
 	compressed_size:   i64,
 	uncompressed_size: i64,
+}
+
+Reader :: struct {
+	z:                ^compress.Context,
+	flags:            Decode_Flags,
+	options:          compress.Options,
+	allocator:        runtime.Allocator,
+	size:             int,
+	total_in:         i64,
+	consumed:         i64,
+	produced:         i64,
+	done:             bool,
+	err:              Error,
+
+	check_id:         u8,
+	stream_flags:     [2]u8,
+	records:          u64,
+	unpadded_sum:     u64,
+	uncompressed_sum: u64,
+	index_hash:       sha2.Context_256,
+
+	in_block:         bool,
+	lzma:             lzma.Reader,
+	chain:            [FILTERS_MAX - 1]filters.Reader,
+	chain_count:      int,
+	header_size:      int,
+	compressed:       u64,
+	uncompressed:     u64,
+	has_compressed:   bool,
+	has_uncompressed: bool,
+	block_out:        u64,
+	crc32:            u32,
+	crc64:            u64,
+	sha256:           sha2.Context_256,
+
+	bounded:          bool,
+	block_view:       bool,
+	block_z:          compress.Context,
+	block_data:       []u8,
+	block_left:       u64,
+	block_eof:        bool,
+	block_backing:    []u8,
+}
+
+Writer :: struct {
+	w:           io.Writer,
+	opts:        Options,
+	options:     compress.Options,
+	allocator:   runtime.Allocator,
+	check:       Check,
+	props:       lzma.Properties,
+	lzma:        lzma.Writer,
+	chain:       [FILTERS_MAX - 1]filters.Writer,
+	chain_count: int,
+	open:        bool,
+	in_block:    bool,
+	block_in:    u64,
+	block_start: i64,
+	header_size: int,
+	records:     [dynamic][2]u64,
+	total_in:    i64,
+	total_out:   i64,
+	next_report: i64,
+	crc32:       u32,
+	crc64:       u64,
+	sha256:      sha2.Context_256,
+	err:         Error,
+	finished:    bool,
 }
 
 @(private)

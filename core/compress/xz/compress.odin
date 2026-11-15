@@ -255,12 +255,15 @@ _encode :: proc(s: ^Sink, input: []u8, opts: Options) -> (err: Error) {
 }
 
 @(private)
-_block_header :: proc(b: []u8, opts: Options, props: lzma.Properties, packed, size: u64) -> (n: int) {
+_block_header :: proc(b: []u8, opts: Options, props: lzma.Properties, packed, size: u64, sizes := true) -> (n: int) {
 	opts := opts
-	b[1] = u8(opts.filter_count) | 0x40 | 0x80
+	b[1] = u8(opts.filter_count)
 	n = 2
-	n += _write_vli(b[n:], packed)
-	n += _write_vli(b[n:], size)
+	if sizes {
+		b[1] |= 0x40 | 0x80
+		n += _write_vli(b[n:], packed)
+		n += _write_vli(b[n:], size)
+	}
 	for f in opts.filters[:opts.filter_count] {
 		n += _write_vli(b[n:], u64(f.id))
 		switch {

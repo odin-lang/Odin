@@ -213,6 +213,18 @@ test_xz_hostile :: proc(t: ^testing.T) {
 			}
 			testing.expectf(t, len(out) == want, "%s: %d bytes, want %d", c.label, len(out), want)
 		}
+		stream_want := c.err
+		if c.label == "valid, dict prop 40" {
+			stream_want = GE.Memory_Limit_Exceeded
+		}
+		for streamed in ([2]bool{false, true}) {
+			stream_out, stream_err := xz_stream_decode(input[:], {}, -1, {max_output_size = limit, chunk_size = 1}, streamed, 0 if streamed else 4096)
+			testing.expectf(t, stream_err == stream_want, "%s (stream, streamed %v): %v, want %v", c.label, streamed, stream_err, stream_want)
+			if c.err == nil && stream_err == nil {
+				testing.expectf(t, len(stream_out) == len(out), "%s (stream): %d bytes, want %d", c.label, len(stream_out), len(out))
+			}
+			delete(stream_out)
+		}
 		delete(out)
 	}
 }
