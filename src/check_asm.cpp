@@ -2046,7 +2046,9 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		}
 		// NOTE(bill): an output's register is already declared as written.
 		// Clobbering it as well lets LLVM drop the moves into it of an input tied to that output.
-		asm_ctx->clobber_implicit_regs(&ate->clobber_registers_set, produced & ~output_pinned_mask);
+		// LLVM reserves the stack pointer, and a template must leave it as it found it.
+		u16 implicit_clobbers = produced & ~output_pinned_mask & ~asm_stack_pointer_bit(asm_ctx);
+		asm_ctx->clobber_implicit_regs(&ate->clobber_registers_set, implicit_clobbers);
 
 		// Purity inference
 		if (cfg->can_be_pure) {
