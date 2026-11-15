@@ -2,6 +2,7 @@ package archive_zip
 
 import "base:runtime"
 import "core:archive"
+import "core:archive/transaction"
 import "core:compress"
 import "core:compress/bzip2"
 import "core:compress/deflate"
@@ -44,7 +45,7 @@ open_from_stream :: proc(r: ^Reader, s: io.Stream, options := compress.Options{}
 }
 
 open_from_path :: proc(r: ^Reader, path: string, options := compress.Options{}, allocator := context.allocator) -> (err: Error) {
-	f := _lock_open(path, .Shared, false, allocator) or_return
+	f := transaction.lock_open(path, .Shared, false, allocator) or_return
 	defer if err != nil {
 		os.close(f)
 	}
@@ -52,7 +53,8 @@ open_from_path :: proc(r: ^Reader, path: string, options := compress.Options{}, 
 	if size_err != nil {
 		return size_err
 	}
-	limit := _journal_limit(path, f, size, allocator) or_return
+	limit, ranges := transaction.journal_view(path, f, size, allocator) or_return
+	transaction.ranges_delete(ranges, allocator)
 	_init(r, options, allocator)
 	defer if err != nil {
 		close(r)

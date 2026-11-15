@@ -2,6 +2,7 @@ package archive_zip
 
 import "base:runtime"
 import "core:archive"
+import "core:archive/transaction"
 import "core:compress"
 import "core:compress/bzip2"
 import "core:compress/deflate"
@@ -26,13 +27,13 @@ create_from_path :: proc(zw: ^Writer, path: string, options: Writer_Options = {}
 		close_writer(zw)
 	}
 	zw.path      = strings.clone(path, allocator) or_return
-	zw.temp_path = _sibling_path(path, TEMP_SUFFIX, allocator) or_return
-	lock, lock_err := _lock_open(path, .Exclusive, false, allocator)
-	if lock_err != nil && !_is_not_exist(lock_err) {
+	zw.temp_path = transaction.sibling_path(path, transaction.TEMP_SUFFIX, allocator) or_return
+	lock, lock_err := transaction.lock_open(path, .Exclusive, false, allocator)
+	if lock_err != nil && !transaction.is_not_exist(lock_err) {
 		return lock_err
 	}
 	zw.lock = lock
-	zw.file = _lock_open(zw.temp_path, .Exclusive, true, allocator) or_return
+	zw.file = transaction.lock_open(zw.temp_path, .Exclusive, true, allocator) or_return
 	if truncate_err := os.truncate(zw.file, 0); truncate_err != nil {
 		return truncate_err
 	}
@@ -188,7 +189,7 @@ commit :: proc(zw: ^Writer) -> (err: Error) {
 		_commit_archive(zw, nil) or_return
 	case .Create_Path:
 		_commit_archive(zw, nil) or_return
-		_publish(zw, &zw.file, &zw.lock) or_return
+		transaction.publish(zw.temp_path, zw.path, &zw.file, &zw.lock, zw.allocator) or_return
 	case .Update_Stream, .Update_Path:
 		_commit_update(zw) or_return
 	}
@@ -200,9 +201,9 @@ close_writer :: proc(zw: ^Writer) {
 	if zw.active && !zw.committed {
 		_abort(zw)
 	}
-	_remove_held(&zw.temp, zw.temp_path)
+	transaction.remove_held(&zw.temp, zw.temp_path)
 	if zw.mode == .Create_Path {
-		_remove_held(&zw.file, zw.temp_path)
+		transaction.remove_held(&zw.file, zw.temp_path)
 	}
 	for f in ([3]^os.File{zw.file, zw.lock, zw.temp}) {
 		if f != nil {
@@ -291,32 +292,6 @@ _put_end :: proc(buf: ^[dynamic]u8, count, central_offset, central_size, end_off
 }
 
 @(private)
-_publish :: proc(zw: ^Writer, temp, target: ^^os.File) -> (err: Error) {
-	when ODIN_OS == .Windows {
-		os.close(temp^)
-		temp^ = nil
-		if target^ != nil {
-			os.close(target^)
-			target^ = nil
-		}
-		return _replace(zw.temp_path, zw.path, zw.allocator)
-	} else {
-		if target^ != nil {
-			_copy_mode(target^, temp^, zw.allocator)
-		}
-		_replace(zw.temp_path, zw.path, zw.allocator) or_return
-		_sync_parent(zw.path, zw.allocator)
-		os.close(temp^)
-		temp^ = nil
-		if target^ != nil {
-			os.close(target^)
-			target^ = nil
-		}
-		return nil
-	}
-}
-
-@(private)
 _abort :: proc(zw: ^Writer) {
 	switch zw.mode {
 	case .Stream, .Create_Path:
@@ -325,10 +300,10 @@ _abort :: proc(zw: ^Writer) {
 			_restore_stream(zw)
 		}
 	case .Update_Path:
-		_remove_held(&zw.temp, zw.temp_path)
+		transaction.remove_held(&zw.temp, zw.temp_path)
 		if zw.journaled && zw.file != nil {
 			if os.truncate(zw.file, zw.old_length) == nil && os.sync(zw.file) == nil {
-				_journal_remove(zw.journal_path, zw.allocator)
+				transaction.journal_remove(zw.journal_path, zw.allocator)
 				zw.journaled = false
 			}
 		}

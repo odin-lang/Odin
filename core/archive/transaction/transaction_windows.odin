@@ -1,5 +1,5 @@
 #+private
-package archive_zip
+package archive_transaction
 
 import "base:runtime"
 import "core:archive"

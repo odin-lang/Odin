@@ -2,6 +2,7 @@ package archive_sevenz
 
 import "base:runtime"
 import "core:archive"
+import "core:archive/transaction"
 import "core:compress"
 import "core:compress/bzip2"
 import "core:compress/deflate"
@@ -56,6 +57,7 @@ AES_POWER_RAW         :: 0x3F
 AES_CBC_STRIDE        :: 8
 AES_VAES_STRIDE       :: 16
 KEY_CACHE_SIZE        :: 4
+UPDATE_SAVED_MAX      :: 64 << 20
 
 VERSION_MINOR         :: 4
 SNIFF_SIZE            :: 1 << 14
@@ -269,10 +271,11 @@ Name_Index :: struct {
 }
 
 Store :: struct {
-	data:   []u8,
-	stream: io.Stream,
-	size:   i64,
-	memory: bool,
+	data:    []u8,
+	stream:  io.Stream,
+	size:    i64,
+	memory:  bool,
+	patches: []transaction.Range,
 }
 
 Reader :: struct {
@@ -280,6 +283,7 @@ Reader :: struct {
 	options:      compress.Options,
 	store:        Store,
 	file:         ^os.File,
+	journal:      []transaction.Range,
 	header:       []u8,
 	owns_header:  bool,
 	header_start: i64,
@@ -508,6 +512,25 @@ Out_File :: struct {
 	access_time:       u64,
 	has_stream:        bool,
 	is_directory:      bool,
+	is_anti:           bool,
+	no_attributes:     bool,
+	no_crc:            bool,
+}
+
+Writer_Mode :: enum u8 {
+	Stream,
+	Create_Path,
+	Update_Stream,
+	Update_Path,
+}
+
+Update_Slot :: struct {
+	name:     string,
+	raw_name: []u8,
+	item:     int,
+	next:     int,
+	removed:  bool,
+	renamed:  bool,
 }
 
 Pack_Sink :: struct {
@@ -598,4 +621,22 @@ Writer :: struct {
 	err:           Error,
 	committed:     bool,
 	active:        bool,
+	mode:          Writer_Mode,
+	lock:          ^os.File,
+	temp:          ^os.File,
+	temp_path:     string,
+	journal_path:  string,
+	pack_pos:      i64,
+	old:           Reader,
+	old_length:    i64,
+	data_start:    i64,
+	saved:         []transaction.Range,
+	kept:          [dynamic]int,
+	slots:         [dynamic]Update_Slot,
+	heads:         map[string]int,
+	guard:         bool,
+	journaled:     bool,
+	modified:      bool,
+	must_rewrite:  bool,
+	repacking:     bool,
 }

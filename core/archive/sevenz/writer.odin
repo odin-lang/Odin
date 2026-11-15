@@ -2,6 +2,7 @@ package archive_sevenz
 
 import "base:runtime"
 import "core:archive"
+import "core:archive/transaction"
 import "core:compress"
 import "core:compress/bzip2"
 import "core:compress/deflate"
@@ -21,17 +22,22 @@ create_from_path :: proc(sw: ^Writer, path: string, options: Writer_Options = {}
 	sw^ = {}
 	sw.allocator = allocator
 	_check_writer_options(options) or_return
-	sw.path = strings.clone(path, allocator) or_return
-	f, create_err := os.create(path)
-	if create_err != nil {
-		close_writer(sw)
-		return create_err
-	}
-	sw.file = f
-	if err = _writer_init(sw, os.to_stream(f), options); err != nil {
+	sw.mode = .Create_Path
+	defer if err != nil {
 		close_writer(sw)
 	}
-	return
+	sw.path      = strings.clone(path, allocator) or_return
+	sw.temp_path = transaction.sibling_path(path, transaction.TEMP_SUFFIX, allocator) or_return
+	lock, lock_err := transaction.lock_open(path, .Exclusive, false, allocator)
+	if lock_err != nil && !transaction.is_not_exist(lock_err) {
+		return lock_err
+	}
+	sw.lock = lock
+	sw.file = transaction.lock_open(sw.temp_path, .Exclusive, true, allocator) or_return
+	if truncate_err := os.truncate(sw.file, 0); truncate_err != nil {
+		return truncate_err
+	}
+	return _writer_init(sw, os.to_stream(sw.file), options)
 }
 
 create_from_stream :: proc(sw: ^Writer, s: io.Stream, options: Writer_Options = {}, allocator := context.allocator) -> (err: Error) {
@@ -173,38 +179,44 @@ commit :: proc(sw: ^Writer) -> (err: Error) {
 	defer if err != nil {
 		sw.err = err
 	}
-	if sw.folder.active {
-		_folder_close(sw) or_return
+	switch sw.mode {
+	case .Stream:
+		_commit_archive(sw) or_return
+	case .Create_Path:
+		_commit_archive(sw) or_return
+		transaction.publish(sw.temp_path, sw.path, &sw.file, &sw.lock, sw.allocator) or_return
+	case .Update_Stream, .Update_Path:
+		_commit_update(sw) or_return
 	}
-	next_offset, next_size: i64
-	next_crc: u32
-	if len(sw.files) > 0 {
-		_build_header(sw) or_return
-		if !sw.options.plain_header || _header_encrypted(sw) {
-			_encode_header(sw) or_return
-		}
-		next_offset = sw.offset - sw.start - SIGNATURE_HEADER_SIZE
-		next_size   = i64(len(sw.header))
-		next_crc    = hash.crc32(sw.header[:])
-		_emit(sw, sw.header[:]) or_return
-	}
-	end := sw.offset
-	start := _start_header(next_offset, next_size, next_crc)
-	_seek(sw, sw.start) or_return
-	_emit(sw, start[:]) or_return
-	_seek(sw, end) or_return
-	_flush(sw) or_return
 	sw.committed = true
 	return nil
 }
 
 close_writer :: proc(sw: ^Writer) {
-	if sw.file != nil {
-		os.close(sw.file)
-		if !sw.committed {
-			os.remove(sw.path)
+	if sw.active && !sw.committed {
+		_abort(sw)
+	}
+	transaction.remove_held(&sw.temp, sw.temp_path)
+	if sw.mode == .Create_Path {
+		transaction.remove_held(&sw.file, sw.temp_path)
+	}
+	for f in ([3]^os.File{sw.file, sw.lock, sw.temp}) {
+		if f != nil {
+			os.close(f)
 		}
 	}
+	if sw.mode == .Update_Path || sw.mode == .Update_Stream {
+		close_reader(&sw.old)
+	}
+	for slot in sw.slots {
+		delete(slot.raw_name, sw.allocator)
+	}
+	delete(sw.slots)
+	delete(sw.heads)
+	delete(sw.kept)
+	transaction.ranges_delete(sw.saved, sw.allocator)
+	delete(sw.temp_path, sw.allocator)
+	delete(sw.journal_path, sw.allocator)
 	_folder_destroy(sw)
 	_key_cache_destroy(&sw.keys)
 	_secret_delete(transmute([]u8)sw.password, sw.allocator)
@@ -225,6 +237,36 @@ close_writer :: proc(sw: ^Writer) {
 	delete(sw.head, sw.allocator)
 	delete(sw.filter_buffer, sw.allocator)
 	sw^ = {}
+}
+
+@(private)
+_commit_archive :: proc(sw: ^Writer) -> (err: Error) {
+	if sw.folder.active {
+		_folder_close(sw) or_return
+	}
+	start := _write_header(sw, sw.files[:], sw.names[:]) or_return
+	end := sw.offset
+	_seek(sw, sw.start) or_return
+	_emit(sw, start[:]) or_return
+	_seek(sw, end) or_return
+	return _flush(sw)
+}
+
+@(private)
+_write_header :: proc(sw: ^Writer, files: []Out_File, names: []u8) -> (start: [SIGNATURE_HEADER_SIZE]u8, err: Error) {
+	next_offset, next_size: i64
+	next_crc: u32
+	if len(files) > 0 {
+		_build_header(sw, files, names) or_return
+		if !sw.options.plain_header || _header_encrypted(sw) {
+			_encode_header(sw) or_return
+		}
+		next_offset = sw.offset - sw.start - SIGNATURE_HEADER_SIZE
+		next_size   = i64(len(sw.header))
+		next_crc    = hash.crc32(sw.header[:])
+		_emit(sw, sw.header[:]) or_return
+	}
+	return _start_header(next_offset, next_size, next_crc), nil
 }
 
 lzma_options_7zip :: proc "contextless" (level: int) -> (options: lzma.Options) {
@@ -249,6 +291,22 @@ lzma_options_7zip :: proc "contextless" (level: int) -> (options: lzma.Options) 
 
 @(private)
 _writer_init :: proc(sw: ^Writer, s: io.Stream, options: Writer_Options) -> (err: Error) {
+	_writer_setup(sw, s, options) or_return
+	placeholder: [SIGNATURE_HEADER_SIZE]u8
+	signature := SIGNATURE
+	copy(placeholder[:], signature[:])
+	placeholder[6] = VERSION_MAJOR
+	placeholder[7] = VERSION_MINOR
+	_emit(sw, placeholder[:]) or_return
+	sw.active = true
+	return nil
+}
+
+@(private)
+_writer_setup :: proc(sw: ^Writer, s: io.Stream, options: Writer_Options) -> (err: Error) {
+	sw.kept.allocator         = sw.allocator
+	sw.slots.allocator        = sw.allocator
+	sw.heads                  = make(map[string]int, sw.allocator)
 	sw.pack_sizes.allocator   = sw.allocator
 	sw.folders.allocator      = sw.allocator
 	sw.files.allocator        = sw.allocator
@@ -281,13 +339,6 @@ _writer_init :: proc(sw: ^Writer, s: io.Stream, options: Writer_Options) -> (err
 	sw.start  = position
 	sw.offset = position
 	sw.end    = position
-	placeholder: [SIGNATURE_HEADER_SIZE]u8
-	signature := SIGNATURE
-	copy(placeholder[:], signature[:])
-	placeholder[6] = VERSION_MAJOR
-	placeholder[7] = VERSION_MINOR
-	_emit(sw, placeholder[:]) or_return
-	sw.active = true
 	return nil
 }
 
@@ -408,6 +459,7 @@ _write_entry :: proc(sw: ^Writer, fi: archive.File_Info, data: Entry_Data, optio
 	setup    := _resolve(sw.options, options) or_return
 	password := _entry_password(sw, options) or_return
 	_entry_name(sw, fi.path) or_return
+	_name_check(sw) or_return
 
 	file: Out_File
 	file.is_directory = type == .Directory
@@ -924,6 +976,7 @@ _folder_accepts :: proc(sw: ^Writer, setup: Coder_Setup, expected: i64, key: ^[A
 
 @(private)
 _folder_open :: proc(sw: ^Writer, setup: Coder_Setup, expected: i64, key: ^[AES_KEY_SIZE]u8) -> (err: Error) {
+	_journal_begin(sw) or_return
 	f := &sw.folder
 	call, jump, rc := f.call.data, f.jump.data, f.rc.data
 	f^ = {}
@@ -1434,6 +1487,7 @@ _chunk :: proc(sw: ^Writer) -> (chunk: []u8, err: Error) {
 
 @(private)
 _add_file :: proc(sw: ^Writer, file: Out_File) -> (err: Error) {
+	_name_register(sw) or_return
 	mark := len(sw.names)
 	defer if err != nil {
 		resize(&sw.names, mark)
@@ -1534,19 +1588,37 @@ _progress :: proc(sw: ^Writer, index: int, bytes_in, total_in, bytes_out, archiv
 }
 
 @(private)
-_build_header :: proc(sw: ^Writer) -> (err: Error) {
+_build_header :: proc(sw: ^Writer, files: []Out_File, names: []u8) -> (err: Error) {
 	buf := &sw.header
 	clear(buf)
-	bound := 256 + 320 * len(sw.folders) + 240 * len(sw.ciphers) + 10 * len(sw.pack_sizes) + 48 * len(sw.files) + len(sw.names)
+	old := &sw.old.streams
+	bound := 256 + 320 * len(sw.folders) + 240 * len(sw.ciphers) + 10 * len(sw.pack_sizes) + 52 * len(files) + len(names)
+	for index in sw.kept {
+		f := &old.folders[index]
+		bound += 64 + 20 * f.coder_count + 20 * f.bind_count + 20 * f.packed_count
+		for c in old.coders[f.first_coder:][:f.coder_count] {
+			bound += len(c.properties)
+		}
+	}
 	reserve(buf, bound) or_return
 
 	_put_id(buf, .Header)
-	if len(sw.folders) > 0 {
+	if len(sw.kept) + len(sw.folders) > 0 {
+		pack_count := len(sw.pack_sizes)
+		for index in sw.kept {
+			pack_count += old.folders[index].packed_count
+		}
 		_put_id(buf, .Main_Streams)
 		_put_id(buf, .Pack_Info)
-		_put_number(buf, 0)
-		_put_number(buf, u64(len(sw.pack_sizes)))
+		_put_number(buf, u64(sw.pack_pos))
+		_put_number(buf, u64(pack_count))
 		_put_id(buf, .Size)
+		for index in sw.kept {
+			f := &old.folders[index]
+			for size in old.pack_sizes[f.first_pack:][:f.packed_count] {
+				_put_number(buf, u64(size))
+			}
+		}
 		for size in sw.pack_sizes {
 			_put_number(buf, u64(size))
 		}
@@ -1554,8 +1626,11 @@ _build_header :: proc(sw: ^Writer) -> (err: Error) {
 
 		_put_id(buf, .Unpack_Info)
 		_put_id(buf, .Folder)
-		_put_number(buf, u64(len(sw.folders)))
+		_put_number(buf, u64(len(sw.kept) + len(sw.folders)))
 		append(buf, 0)
+		for index in sw.kept {
+			_put_old_folder(buf, old, &old.folders[index])
+		}
 		cipher_index := 0
 		for &folder in sw.folders {
 			cipher: ^Out_Cipher
@@ -1566,6 +1641,12 @@ _build_header :: proc(sw: ^Writer) -> (err: Error) {
 			_put_folder(sw, buf, &folder, cipher)
 		}
 		_put_id(buf, .Coders_Unpack_Size)
+		for index in sw.kept {
+			f := &old.folders[index]
+			for c in old.coders[f.first_coder:][:f.coder_count] {
+				_put_number(buf, u64(c.unpack_size))
+			}
+		}
 		cipher_index = 0
 		for &folder in sw.folders {
 			cipher: ^Out_Cipher
@@ -1579,6 +1660,11 @@ _build_header :: proc(sw: ^Writer) -> (err: Error) {
 
 		_put_id(buf, .Substreams_Info)
 		multiple := false
+		for index in sw.kept {
+			if old.folders[index].stream_count != 1 {
+				multiple = true
+			}
+		}
 		for folder in sw.folders {
 			if folder.stream_count != 1 {
 				multiple = true
@@ -1586,28 +1672,64 @@ _build_header :: proc(sw: ^Writer) -> (err: Error) {
 		}
 		if multiple {
 			_put_id(buf, .Num_Unpack_Stream)
+			for index in sw.kept {
+				_put_number(buf, u64(old.folders[index].stream_count))
+			}
 			for folder in sw.folders {
 				_put_number(buf, u64(folder.stream_count))
 			}
 			_put_id(buf, .Size)
 			index := 0
-			for folder in sw.folders {
-				for k in 0..<folder.stream_count {
-					for !sw.files[index].has_stream {
+			for k in 0..<len(sw.kept) + len(sw.folders) {
+				count := old.folders[sw.kept[k]].stream_count if k < len(sw.kept) else sw.folders[k - len(sw.kept)].stream_count
+				for j in 0..<count {
+					for !files[index].has_stream {
 						index += 1
 					}
-					if k + 1 < folder.stream_count {
-						_put_number(buf, u64(sw.files[index].size))
+					if j + 1 < count {
+						_put_number(buf, u64(files[index].size))
 					}
 					index += 1
 				}
 			}
 		}
-		_put_id(buf, .CRC)
-		append(buf, 1)
-		for file in sw.files {
+		streams, digests := 0, 0
+		for file in files {
 			if file.has_stream {
-				_put_u32(buf, file.crc)
+				streams += 1
+				if !file.no_crc {
+					digests += 1
+				}
+			}
+		}
+		if digests > 0 {
+			_put_id(buf, .CRC)
+			if digests == streams {
+				append(buf, 1)
+			} else {
+				append(buf, 0)
+				bits, mask := u8(0), u8(0x80)
+				for file in files {
+					if !file.has_stream {
+						continue
+					}
+					if !file.no_crc {
+						bits |= mask
+					}
+					mask >>= 1
+					if mask == 0 {
+						append(buf, bits)
+						bits, mask = 0, 0x80
+					}
+				}
+				if mask != 0x80 {
+					append(buf, bits)
+				}
+			}
+			for file in files {
+				if file.has_stream && !file.no_crc {
+					_put_u32(buf, file.crc)
+				}
 			}
 		}
 		_put_id(buf, .End)
@@ -1615,21 +1737,24 @@ _build_header :: proc(sw: ^Writer) -> (err: Error) {
 	}
 
 	_put_id(buf, .Files_Info)
-	_put_number(buf, u64(len(sw.files)))
-	empty, empty_files := 0, 0
-	for file in sw.files {
+	_put_number(buf, u64(len(files)))
+	empty, empty_files, anti := 0, 0, 0
+	for file in files {
 		if !file.has_stream {
 			empty += 1
 			if !file.is_directory {
 				empty_files += 1
 			}
+			if file.is_anti {
+				anti += 1
+			}
 		}
 	}
 	if empty > 0 {
 		_put_id(buf, .Empty_Stream)
-		_put_number(buf, u64((len(sw.files) + 7) / 8))
+		_put_number(buf, u64((len(files) + 7) / 8))
 		bits, mask := u8(0), u8(0x80)
-		for file in sw.files {
+		for file in files {
 			if !file.has_stream {
 				bits |= mask
 			}
@@ -1643,14 +1768,39 @@ _build_header :: proc(sw: ^Writer) -> (err: Error) {
 			append(buf, bits)
 		}
 		if empty_files > 0 {
-			_put_id(buf, .Empty_File)
-			_put_number(buf, u64((empty + 7) / 8))
-			bits, mask = 0, 0x80
-			for file in sw.files {
-				if file.has_stream {
-					continue
-				}
-				if !file.is_directory {
+			_put_empty_bits(buf, files, .Empty_File, empty)
+		}
+		if anti > 0 {
+			_put_empty_bits(buf, files, .Anti, empty)
+		}
+	}
+
+	_put_id(buf, .Name)
+	_put_number(buf, u64(len(names) + 1))
+	append(buf, 0)
+	append(buf, ..names)
+
+	_put_times(buf, files, .Creation_Time)
+	_put_times(buf, files, .Access_Time)
+	_put_times(buf, files, .Modification_Time)
+
+	attributes := 0
+	for file in files {
+		if !file.no_attributes {
+			attributes += 1
+		}
+	}
+	if attributes > 0 {
+		vector := 0 if attributes == len(files) else (len(files) + 7) / 8
+		_put_id(buf, .Attributes)
+		_put_number(buf, u64(4 * attributes + vector + 2))
+		if vector == 0 {
+			append(buf, 1)
+		} else {
+			append(buf, 0)
+			bits, mask := u8(0), u8(0x80)
+			for file in files {
+				if !file.no_attributes {
 					bits |= mask
 				}
 				mask >>= 1
@@ -1663,27 +1813,57 @@ _build_header :: proc(sw: ^Writer) -> (err: Error) {
 				append(buf, bits)
 			}
 		}
-	}
-
-	_put_id(buf, .Name)
-	_put_number(buf, u64(len(sw.names) + 1))
-	append(buf, 0)
-	append(buf, ..sw.names[:])
-
-	_put_times(buf, sw.files[:], .Creation_Time)
-	_put_times(buf, sw.files[:], .Access_Time)
-	_put_times(buf, sw.files[:], .Modification_Time)
-
-	_put_id(buf, .Attributes)
-	_put_number(buf, u64(4 * len(sw.files) + 2))
-	append(buf, 1)
-	append(buf, 0)
-	for file in sw.files {
-		_put_u32(buf, file.attributes)
+		append(buf, 0)
+		for file in files {
+			if !file.no_attributes {
+				_put_u32(buf, file.attributes)
+			}
+		}
 	}
 	_put_id(buf, .End)
 	_put_id(buf, .End)
 	return nil
+}
+
+@(private)
+_put_empty_bits :: proc(buf: ^[dynamic]u8, files: []Out_File, id: Property_ID, empty: int) {
+	_put_id(buf, id)
+	_put_number(buf, u64((empty + 7) / 8))
+	bits, mask := u8(0), u8(0x80)
+	for file in files {
+		if file.has_stream {
+			continue
+		}
+		set := file.is_anti if id == .Anti else !file.is_directory
+		if set {
+			bits |= mask
+		}
+		mask >>= 1
+		if mask == 0 {
+			append(buf, bits)
+			bits, mask = 0, 0x80
+		}
+	}
+	if mask != 0x80 {
+		append(buf, bits)
+	}
+}
+
+@(private)
+_put_old_folder :: proc(buf: ^[dynamic]u8, s: ^Streams, f: ^Folder) {
+	_put_number(buf, u64(f.coder_count))
+	for c in s.coders[f.first_coder:][:f.coder_count] {
+		_put_coder(buf, Method_ID(c.id), c.in_streams, c.properties)
+	}
+	for b in s.bind_pairs[f.first_bind:][:f.bind_count] {
+		_put_number(buf, u64(b.in_index))
+		_put_number(buf, u64(b.out_index))
+	}
+	if f.packed_count > 1 {
+		for index in s.packed[f.first_packed:][:f.packed_count] {
+			_put_number(buf, u64(index))
+		}
+	}
 }
 
 @(private)
@@ -2167,6 +2347,7 @@ _put_u64 :: proc(buf: ^[dynamic]u8, v: u64) {
 
 @(private)
 _emit :: proc(sw: ^Writer, p: []u8) -> (err: Error) {
+	_journal_begin(sw) or_return
 	n, write_err := io.write_full(sw.stream, p)
 	sw.offset += i64(n)
 	sw.end     = max(sw.end, sw.offset)

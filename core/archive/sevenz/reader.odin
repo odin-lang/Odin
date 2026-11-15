@@ -2,6 +2,7 @@ package archive_sevenz
 
 import "base:runtime"
 import "core:archive"
+import "core:archive/transaction"
 import "core:compress"
 import "core:compress/bzip2"
 import "core:compress/deflate"
@@ -46,14 +47,23 @@ open_from_stream :: proc(r: ^Reader, s: io.Stream, options := compress.Options{}
 }
 
 open_from_path :: proc(r: ^Reader, path: string, options := compress.Options{}, allocator := context.allocator, read_options := archive.Read_Options{}) -> (err: Error) {
-	f, open_err := os.open(path)
-	if open_err != nil {
-		return open_err
-	}
-	if err = open_from_stream(r, os.to_stream(f), options, allocator, read_options); err != nil {
+	f := transaction.lock_open(path, .Shared, false, allocator) or_return
+	defer if err != nil {
 		os.close(f)
-		return
 	}
+	size, size_err := os.file_size(f)
+	if size_err != nil {
+		return size_err
+	}
+	length, journal := transaction.journal_view(path, f, size, allocator) or_return
+	_init(r, options, allocator)
+	r.journal = journal
+	defer if err != nil {
+		close(r)
+	}
+	r.password = _secret_clone(read_options.password, allocator) or_return
+	r.store = {stream = os.to_stream(f), size = length, patches = journal}
+	_load(r) or_return
 	r.file = f
 	return
 }
@@ -72,6 +82,7 @@ close_reader :: proc(r: ^Reader) {
 	delete(r.index, r.allocator)
 	_key_cache_destroy(&r.keys)
 	_secret_delete(transmute([]u8)r.password, r.allocator)
+	transaction.ranges_delete(r.journal, r.allocator)
 	if r.file != nil {
 		os.close(r.file)
 	}
@@ -215,6 +226,7 @@ _register :: proc "contextless" () {
 		detect           = _archive_detect,
 		open_bytes       = _archive_open_bytes,
 		open_stream      = _archive_open_stream,
+		open_path        = _archive_open_path,
 		close            = _archive_close,
 		info             = _archive_info,
 		iterator_create  = _archive_iterator_create,
@@ -1203,6 +1215,38 @@ _store_read :: proc(s: ^Store, p: []u8, offset: i64) -> (err: Error) {
 	if offset < 0 || offset > s.size || i64(len(p)) > s.size - offset {
 		return SevenZ_Error.Truncated
 	}
+	if len(s.patches) == 0 {
+		return _store_read_raw(s, p, offset)
+	}
+	position := offset
+	end      := offset + i64(len(p))
+	for position < end {
+		next    := end
+		covered := false
+		for patch in s.patches {
+			low  := patch.offset
+			high := low + i64(len(patch.data))
+			if position >= low && position < high {
+				n := min(high, end) - position
+				copy(p[position - offset:][:n], patch.data[position - low:][:n])
+				position += n
+				covered   = true
+				break
+			}
+			if low > position && low < next {
+				next = low
+			}
+		}
+		if !covered {
+			_store_read_raw(s, p[position - offset:next - offset], position) or_return
+			position = next
+		}
+	}
+	return nil
+}
+
+@(private)
+_store_read_raw :: proc(s: ^Store, p: []u8, offset: i64) -> (err: Error) {
 	if s.memory {
 		copy(p, s.data[offset:][:len(p)])
 		return nil
@@ -2183,6 +2227,17 @@ _archive_detect :: proc(head: []u8) -> bool {
 _archive_open_bytes :: proc(a: ^archive.Archive, data: []u8, options: compress.Options, read_options: archive.Read_Options) -> (err: Error) {
 	r := new(Reader, a.allocator) or_return
 	if err = open_from_bytes(r, data, options, a.allocator, read_options); err != nil {
+		free(r, a.allocator)
+		return
+	}
+	a.state = r
+	return
+}
+
+@(private)
+_archive_open_path :: proc(a: ^archive.Archive, path: string, options: compress.Options, read_options: archive.Read_Options) -> (err: Error) {
+	r := new(Reader, a.allocator) or_return
+	if err = open_from_path(r, path, options, a.allocator, read_options); err != nil {
 		free(r, a.allocator)
 		return
 	}

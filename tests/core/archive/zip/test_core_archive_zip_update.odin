@@ -14,7 +14,7 @@ import "core:testing"
 import "core:time"
 
 TORN_SECTOR     :: 512
-JOURNAL_MAGIC   :: "ZIPJOURN"
+JOURNAL_MAGIC   :: "ARCJOURN"
 JOURNAL_TAIL    :: 64 * 1024
 UPDATE_UNIX_SEC :: 1_700_000_000
 
@@ -969,13 +969,15 @@ is_not_exist :: proc(err: zip.Error) -> bool {
 	return is_general && general == .Not_Exist
 }
 
-journal_record :: proc(old: []u8) -> (record: [28]u8) {
+journal_record :: proc(old: []u8) -> (record: [40]u8) {
 	tail := min(len(old), JOURNAL_TAIL)
 	copy(record[:8], JOURNAL_MAGIC)
 	endian.unchecked_put_u64le(record[8:], u64(len(old)))
-	endian.unchecked_put_u32le(record[16:], u32(tail))
-	endian.unchecked_put_u32le(record[20:], hash.crc32(old[len(old) - tail:]))
-	endian.unchecked_put_u32le(record[24:], hash.crc32(record[:24]))
+	endian.unchecked_put_u64le(record[16:], u64(len(old)))
+	endian.unchecked_put_u32le(record[24:], u32(tail))
+	endian.unchecked_put_u32le(record[28:], hash.crc32(old[len(old) - tail:]))
+	endian.unchecked_put_u32le(record[32:], 0)
+	endian.unchecked_put_u32le(record[36:], hash.crc32(record[:36]))
 	return
 }
 

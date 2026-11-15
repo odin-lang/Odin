@@ -1,6 +1,7 @@
 package archive_zip
 
 import "core:archive"
+import "core:archive/transaction"
 import "core:io"
 import "core:os"
 import "core:slice"
@@ -15,11 +16,11 @@ update_from_path :: proc(zw: ^Writer, path: string, options: Writer_Options = {}
 		close_writer(zw)
 	}
 	zw.path         = strings.clone(path, allocator) or_return
-	zw.temp_path    = _sibling_path(path, TEMP_SUFFIX, allocator) or_return
-	zw.journal_path = _sibling_path(path, JOURNAL_SUFFIX, allocator) or_return
-	zw.file = _lock_open(path, .Exclusive, false, allocator) or_return
-	_recover(zw.file, zw.journal_path, allocator) or_return
-	_clear_stale(zw.temp_path, allocator) or_return
+	zw.temp_path    = transaction.sibling_path(path, transaction.TEMP_SUFFIX, allocator) or_return
+	zw.journal_path = transaction.sibling_path(path, transaction.JOURNAL_SUFFIX, allocator) or_return
+	zw.file = transaction.lock_open(path, .Exclusive, false, allocator) or_return
+	transaction.recover(zw.file, zw.journal_path, allocator) or_return
+	transaction.clear_stale(zw.temp_path, allocator) or_return
 	return _update_init(zw, os.to_stream(zw.file), options)
 }
 
@@ -183,7 +184,7 @@ _journal_begin :: proc(zw: ^Writer) -> (err: Error) {
 	if zw.mode != .Update_Path || zw.journaled {
 		return nil
 	}
-	_journal_write(zw.journal_path, zw.file, zw.old_length, zw.allocator) or_return
+	transaction.journal_write(zw.journal_path, zw.file, zw.old_length, zw.old_length, nil, zw.allocator) or_return
 	zw.journaled = true
 	return nil
 }
@@ -199,7 +200,7 @@ _commit_update :: proc(zw: ^Writer) -> (err: Error) {
 		_commit_archive(zw, zw.old.directory) or_return
 	}
 	if zw.journaled {
-		_journal_remove(zw.journal_path, zw.allocator) or_return
+		transaction.journal_remove(zw.journal_path, zw.allocator) or_return
 		zw.journaled = false
 	}
 	if zw.mode == .Update_Path {
@@ -248,7 +249,7 @@ _restore_stream :: proc(zw: ^Writer) {
 
 @(private)
 _commit_rewrite :: proc(zw: ^Writer) -> (err: Error) {
-	zw.temp = _lock_open(zw.temp_path, .Exclusive, true, zw.allocator) or_return
+	zw.temp = transaction.lock_open(zw.temp_path, .Exclusive, true, zw.allocator) or_return
 	if truncate_err := os.truncate(zw.temp, 0); truncate_err != nil {
 		return truncate_err
 	}
@@ -292,10 +293,10 @@ _commit_rewrite :: proc(zw: ^Writer) -> (err: Error) {
 		if sync_err := os.sync(zw.file); sync_err != nil {
 			return sync_err
 		}
-		_journal_remove(zw.journal_path, zw.allocator) or_return
+		transaction.journal_remove(zw.journal_path, zw.allocator) or_return
 		zw.journaled = false
 	}
-	return _publish(zw, &zw.temp, &zw.file)
+	return transaction.publish(zw.temp_path, zw.path, &zw.temp, &zw.file, zw.allocator)
 }
 
 @(private)

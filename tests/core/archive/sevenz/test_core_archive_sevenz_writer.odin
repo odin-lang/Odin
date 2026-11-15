@@ -690,11 +690,14 @@ test_write_path :: proc(t: ^testing.T) {
 	}
 
 	dropped, _ := os.join_path({root, "dropped.7z"}, context.temp_allocator)
+	dropped_temp := strings.concatenate({dropped, "-temp"}, context.temp_allocator)
 	if testing.expect_value(t, sevenz.create(&sw, dropped), nil) {
 		testing.expect_value(t, sevenz.write_entry(&sw, "text.txt", text), nil)
-		testing.expect(t, os.exists(dropped), "uncommitted archive exists while writing")
+		testing.expect(t, !os.exists(dropped), "no archive before the commit")
+		testing.expect(t, os.exists(dropped_temp), "temp archive exists while writing")
 		sevenz.close(&sw)
-		testing.expect(t, !os.exists(dropped), "uncommitted archive removed on close")
+		testing.expect(t, !os.exists(dropped), "no archive after an uncommitted close")
+		testing.expect(t, !os.exists(dropped_temp), "temp archive removed on close")
 	}
 
 	m := Memory_File{seekable = true}
@@ -938,7 +941,11 @@ check_written :: proc(t: ^testing.T, label: string, data: []u8, expected: []Writ
 		return
 	}
 	defer sevenz.close(&r)
-	it := sevenz.iterator_create(&r)
+	check_entries(t, label, &r, expected)
+}
+
+check_entries :: proc(t: ^testing.T, label: string, r: ^sevenz.Reader, expected: []Write_Expect) {
+	it := sevenz.iterator_create(r)
 	defer sevenz.iterator_destroy(&it)
 	count := 0
 	for fi, index in sevenz.iterate(&it) {
