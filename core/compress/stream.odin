@@ -28,8 +28,8 @@ CONTEXT_HISTORY     :: 16
 Context :: struct #align(64) {
 	input:             io.Stream,     // 32-bit: 8, 64-bit: 16
 	output:            ^[dynamic]byte, // 32-bit: 4, 64-bit: 8
-	bytes_written:     i64,           // 32-bit: 8, 64-bit: 8
 	code_buffer:       u64,           // 32-bit: 8, 64-bit: 8
+	bytes_written:     i64,           // 32-bit: 8, 64-bit: 8
 	num_bits:          u64,           // 32-bit: 8, 64-bit: 8
 
 	buffer:            []byte,
