@@ -104,12 +104,17 @@ _aes_key :: proc(keys: ^Key_Cache, password: string, power: int, salt: []u8, key
 	for &entry in keys.entries {
 		if len(entry.password) > 0 && entry.power == power && slice.equal(entry.salt[:entry.salt_size], salt) && slice.equal(entry.password, encoded) {
 			key^ = entry.key
-			_secret_delete(encoded, keys.allocator)
+			archive._secret_delete(encoded, keys.allocator)
 			return
 		}
 	}
+	if keys.limit > 0 && keys.derivations >= keys.limit {
+		archive._secret_delete(encoded, keys.allocator)
+		return archive.General_Error.Limit_Exceeded
+	}
+	keys.derivations += 1
 	if err = _derive_key(key, power, salt, encoded, keys.allocator); err != nil {
-		_secret_delete(encoded, keys.allocator)
+		archive._secret_delete(encoded, keys.allocator)
 		return
 	}
 	slot := &keys.entries[keys.next]
@@ -131,7 +136,7 @@ _derive_key :: proc(key: ^[AES_KEY_SIZE]u8, power: int, salt, password: []u8, al
 		return
 	}
 	buf := make([]u8, len(salt) + len(password) + 8, allocator) or_return
-	defer _secret_delete(buf, allocator)
+	defer archive._secret_delete(buf, allocator)
 	copy(buf, salt)
 	copy(buf[len(salt):], password)
 	counter := buf[len(buf) - 8:]
@@ -164,27 +169,8 @@ _password_utf16 :: proc(password: string, allocator: runtime.Allocator) -> (enco
 }
 
 @(private)
-_secret_clone :: proc(secret: string, allocator: runtime.Allocator) -> (clone: string, err: runtime.Allocator_Error) {
-	if secret == "" {
-		return "", nil
-	}
-	buf := make([]u8, len(secret), allocator) or_return
-	copy(buf, secret)
-	return string(buf), nil
-}
-
-@(private)
-_secret_delete :: proc(secret: []u8, allocator: runtime.Allocator) {
-	if secret == nil {
-		return
-	}
-	crypto.zero_explicit(raw_data(secret), len(secret))
-	delete(secret, allocator)
-}
-
-@(private)
 _cached_key_destroy :: proc(entry: ^Cached_Key, allocator: runtime.Allocator) {
-	_secret_delete(entry.password, allocator)
+	archive._secret_delete(entry.password, allocator)
 	crypto.zero_explicit(entry, size_of(entry^))
 }
 
@@ -214,27 +200,6 @@ _password_error :: proc(err: Error) -> Error {
 		return archive.General_Error.Wrong_Password
 	}
 	return err
-}
-
-@(private)
-_check_password :: proc(password: string, deterministic: bool) -> (err: Error) {
-	if password == "" {
-		return nil
-	}
-	if deterministic {
-		return archive.General_Error.Incompatible_Options
-	}
-	if !crypto.HAS_RAND_BYTES {
-		return archive.General_Error.Unsupported_Method
-	}
-	return nil
-}
-
-@(private)
-_entry_password :: proc(sw: ^Writer, options: Entry_Options) -> (password: string, err: Error) {
-	password = options.password.? or_else sw.password
-	_check_password(password, sw.options.deterministic) or_return
-	return
 }
 
 @(private)

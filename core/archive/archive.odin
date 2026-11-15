@@ -2,6 +2,7 @@ package archive
 
 import "base:runtime"
 import "core:compress"
+import "core:crypto"
 import "core:io"
 import "core:os"
 import "core:strings"
@@ -264,5 +265,41 @@ unix_mode_from_dos :: proc "contextless" (attributes: u32) -> (unix_mode: u32) {
 	if attributes & DOS_READ_ONLY != 0 {
 		unix_mode &~= 0o222
 	}
+	return
+}
+
+_secret_clone :: proc(secret: string, allocator: runtime.Allocator) -> (clone: string, err: runtime.Allocator_Error) {
+	if secret == "" {
+		return "", nil
+	}
+	buf := make([]u8, len(secret), allocator) or_return
+	copy(buf, secret)
+	return string(buf), nil
+}
+
+_secret_delete :: proc(secret: []u8, allocator: runtime.Allocator) {
+	if len(secret) == 0 {
+		return
+	}
+	crypto.zero_explicit(raw_data(secret), len(secret))
+	delete(secret, allocator)
+}
+
+_check_password :: proc(password: string, deterministic: bool) -> (err: Error) {
+	if password == "" {
+		return nil
+	}
+	if deterministic {
+		return General_Error.Incompatible_Options
+	}
+	if !crypto.HAS_RAND_BYTES {
+		return General_Error.Unsupported_Method
+	}
+	return nil
+}
+
+_entry_password :: proc(entry: Maybe(string), password: string, deterministic: bool) -> (result: string, err: Error) {
+	result = entry.? or_else password
+	_check_password(result, deterministic) or_return
 	return
 }

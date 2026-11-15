@@ -1,6 +1,5 @@
 package archive_zip
 
-import "base:runtime"
 import "core:archive"
 import "core:compress"
 import "core:crypto"
@@ -281,46 +280,6 @@ _cipher_destroy :: proc(c: ^Cipher) {
 		hmac.reset(&c.mac)
 	}
 	crypto.zero_explicit(c, size_of(c^))
-}
-
-@(private)
-_check_password :: proc(password: string, deterministic: bool) -> (err: Error) {
-	if password == "" {
-		return nil
-	}
-	if deterministic {
-		return archive.General_Error.Incompatible_Options
-	}
-	if !crypto.HAS_RAND_BYTES {
-		return archive.General_Error.Unsupported_Method
-	}
-	return nil
-}
-
-@(private)
-_entry_password :: proc(zw: ^Writer, options: Entry_Options) -> (password: string, err: Error) {
-	password = options.password.? or_else zw.password
-	_check_password(password, zw.options.deterministic) or_return
-	return
-}
-
-@(private)
-_secret_clone :: proc(secret: string, allocator: runtime.Allocator) -> (clone: string, err: runtime.Allocator_Error) {
-	if secret == "" {
-		return "", nil
-	}
-	buf := make([]u8, len(secret), allocator) or_return
-	copy(buf, secret)
-	return string(buf), nil
-}
-
-@(private)
-_secret_delete :: proc(secret: string, allocator: runtime.Allocator) {
-	if secret == "" {
-		return
-	}
-	crypto.zero_explicit(raw_data(secret), len(secret))
-	delete(secret, allocator)
 }
 
 @(private)

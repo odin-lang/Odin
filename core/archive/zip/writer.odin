@@ -101,7 +101,7 @@ write_entry :: proc{write_entry_with_info, write_entry_simple}
 
 write_directory :: proc(zw: ^Writer, dir: string, prefix := "", options: Entry_Options = {}) -> (err: Error) {
 	_writer_ready(zw) or_return
-	_ = _entry_password(zw, options) or_return
+	_ = archive._entry_password(options.password, zw.password, zw.options.deterministic) or_return
 	root, root_err := os.get_absolute_path(dir, zw.allocator)
 	if root_err != nil {
 		return root_err
@@ -226,7 +226,7 @@ close_writer :: proc(zw: ^Writer) {
 	delete(zw.walk_name)
 	delete(zw.chunk, zw.allocator)
 	delete(zw.cipher_buffer, zw.allocator)
-	_secret_delete(zw.password, zw.allocator)
+	archive._secret_delete(transmute([]u8)zw.password, zw.allocator)
 	timezone.region_destroy(zw.zone, zw.allocator)
 	zw^ = {}
 }
@@ -320,7 +320,7 @@ _writer_init :: proc(zw: ^Writer, s: io.Stream, options: Writer_Options) -> (err
 	zw.options.comment = ""
 	zw.options.comment = strings.clone(options.comment, zw.allocator) or_return
 	zw.options.password = ""
-	zw.password = _secret_clone(options.password, zw.allocator) or_return
+	zw.password = archive._secret_clone(options.password, zw.allocator) or_return
 
 	modes := io.query(s)
 	if .Write not_in modes {
@@ -347,7 +347,7 @@ _check_options :: proc(options: Writer_Options) -> (err: Error) {
 	if len(options.comment) > ZIP16_MAX {
 		return Zip_Error.Field_Too_Long
 	}
-	return _check_password(options.password, options.deterministic)
+	return archive._check_password(options.password, options.deterministic)
 }
 
 @(private)
@@ -405,7 +405,7 @@ _prepare :: proc(zw: ^Writer, p: ^Pending_Entry, fi: archive.File_Info, data: En
 	}
 	p.comment = fi.comment
 	p.method, p.level = _resolve({method = zw.options.method, level = zw.options.level}, options) or_return
-	p.password = _entry_password(zw, options) or_return
+	p.password = archive._entry_password(options.password, zw.password, zw.options.deterministic) or_return
 	if p.type == .Directory {
 		p.password = ""
 	}

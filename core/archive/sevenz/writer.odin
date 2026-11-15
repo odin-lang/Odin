@@ -78,7 +78,7 @@ write_entry :: proc{write_entry_with_info, write_entry_simple}
 write_directory :: proc(sw: ^Writer, dir: string, prefix := "", options: Entry_Options = {}) -> (err: Error) {
 	_writer_ready(sw) or_return
 	setup := _resolve(sw.options, options) or_return
-	_ = _entry_password(sw, options) or_return
+	_ = archive._entry_password(options.password, sw.password, sw.options.deterministic) or_return
 	root, root_err := os.get_absolute_path(dir, sw.allocator)
 	if root_err != nil {
 		return root_err
@@ -219,7 +219,7 @@ close_writer :: proc(sw: ^Writer) {
 	delete(sw.journal_path, sw.allocator)
 	_folder_destroy(sw)
 	_key_cache_destroy(&sw.keys)
-	_secret_delete(transmute([]u8)sw.password, sw.allocator)
+	archive._secret_delete(transmute([]u8)sw.password, sw.allocator)
 	delete(sw.folder.call.data)
 	delete(sw.folder.jump.data)
 	delete(sw.folder.rc.data)
@@ -322,7 +322,7 @@ _writer_setup :: proc(sw: ^Writer, s: io.Stream, options: Writer_Options) -> (er
 	sw.options = options
 	sw.options.password = ""
 	sw.kdf_power = options.kdf_power if options.kdf_power != 0 else AES_POWER_DEFAULT
-	sw.password  = _secret_clone(options.password, sw.allocator) or_return
+	sw.password  = archive._secret_clone(options.password, sw.allocator) or_return
 
 	modes := io.query(s)
 	if .Write not_in modes {
@@ -354,7 +354,7 @@ _check_writer_options :: proc(options: Writer_Options) -> (err: Error) {
 	if options.kdf_power < 0 || options.kdf_power > AES_POWER_MAX {
 		return archive.General_Error.Incompatible_Options
 	}
-	_check_password(options.password, options.deterministic) or_return
+	archive._check_password(options.password, options.deterministic) or_return
 	_ = _resolve(options, {}) or_return
 	return nil
 }
@@ -457,7 +457,7 @@ _write_entry :: proc(sw: ^Writer, fi: archive.File_Info, data: Entry_Data, optio
 		return archive.General_Error.Unsupported_Entry
 	}
 	setup    := _resolve(sw.options, options) or_return
-	password := _entry_password(sw, options) or_return
+	password := archive._entry_password(options.password, sw.password, sw.options.deterministic) or_return
 	_entry_name(sw, fi.path) or_return
 	_name_check(sw) or_return
 

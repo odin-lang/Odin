@@ -57,6 +57,7 @@ AES_POWER_RAW         :: 0x3F
 AES_CBC_STRIDE        :: 8
 AES_VAES_STRIDE       :: 16
 KEY_CACHE_SIZE        :: 4
+KDF_LIMIT_DEFAULT     :: 16
 UPDATE_SAVED_MAX      :: 64 << 20
 
 VERSION_MINOR         :: 4
@@ -305,10 +306,12 @@ Cached_Key :: struct {
 }
 
 Key_Cache :: struct {
-	lock:      sync.Mutex,
-	allocator: runtime.Allocator,
-	entries:   [KEY_CACHE_SIZE]Cached_Key,
-	next:      int,
+	lock:        sync.Mutex,
+	allocator:   runtime.Allocator,
+	entries:     [KEY_CACHE_SIZE]Cached_Key,
+	next:        int,
+	derivations: int,
+	limit:       int,
 }
 
 Parser :: struct {

@@ -413,6 +413,81 @@ test_write_secrets_freed :: proc(t: ^testing.T) {
 	testing.expectf(t, scan.hits == 0, "reader freed %d blocks holding a password or key", scan.hits)
 }
 
+@(test)
+test_key_derivation_limit :: proc(t: ^testing.T) {
+	text      := write_text()
+	names     := [?]string{"0.txt", "1.txt", "2.txt", "3.txt", "4.txt", "5.txt"}
+	passwords := [?]string{"Limit-Heron-0", "Limit-Heron-1", "Limit-Heron-2", "Limit-Heron-3", "Limit-Heron-4", "Limit-Heron-5"}
+	m := Memory_File{seekable = true}
+	defer delete(m.data)
+	sw: sevenz.Writer
+	if !testing.expect_value(t, sevenz.create(&sw, memory_stream(&m), {kdf_power = 1}), nil) {
+		return
+	}
+	for name, i in names {
+		testing.expect_value(t, sevenz.write_entry(&sw, name, text, {password = passwords[i]}), nil)
+	}
+	testing.expect_value(t, sevenz.commit(&sw), nil)
+	sevenz.close(&sw)
+	testing.expect_value(t, count_folders(m.data[:]), len(names))
+
+	r: sevenz.Reader
+	err := sevenz.open(&r, m.data[:], compress.Options{}, context.allocator, archive.Read_Options{max_key_derivations = -1})
+	testing.expect_value(t, err, archive.Error(archive.General_Error.Incompatible_Options))
+
+	Step :: struct {
+		entry: int,
+		err:   archive.Error,
+	}
+	steps := [?]Step{
+		{0, nil},
+		{1, nil},
+		{2, nil},
+		{3, nil},
+		{4, nil},
+		{4, nil},
+		{5, nil},
+		{0, archive.General_Error.Limit_Exceeded},
+		{1, archive.General_Error.Limit_Exceeded},
+		{2, nil},
+	}
+	if testing.expect_value(t, sevenz.open(&r, m.data[:], compress.Options{}, context.allocator, archive.Read_Options{max_key_derivations = 6}), nil) {
+		for step, k in steps {
+			err = extract_with_password(&r, names[step.entry], passwords[step.entry], text)
+			testing.expectf(t, err == step.err, "step %d (%s): %v, want %v", k, names[step.entry], err, step.err)
+		}
+		sevenz.close(&r)
+	}
+
+	if testing.expect_value(t, sevenz.open(&r, m.data[:]), nil) {
+		extracted := 0
+		err = nil
+		for err == nil && extracted <= 2 * sevenz.KDF_LIMIT_DEFAULT {
+			err = extract_with_password(&r, names[extracted % len(names)], passwords[extracted % len(names)], text)
+			if err == nil {
+				extracted += 1
+			}
+		}
+		testing.expect_value(t, extracted, sevenz.KDF_LIMIT_DEFAULT)
+		testing.expect_value(t, err, archive.Error(archive.General_Error.Limit_Exceeded))
+		sevenz.close(&r)
+	}
+}
+
+extract_with_password :: proc(r: ^sevenz.Reader, name, password: string, want: []u8) -> (err: archive.Error) {
+	_, handle, ok, _ := sevenz.find(r, name)
+	if !ok {
+		return archive.General_Error.Not_Found
+	}
+	sink := strings.builder_make()
+	defer strings.builder_destroy(&sink)
+	sevenz.extract(r, handle, strings.to_writer(&sink), {password = password}) or_return
+	if !bytes.equal(sink.buf[:], want) {
+		return archive.SevenZ_Error.CRC_Mismatch
+	}
+	return nil
+}
+
 check_locked :: proc(t: ^testing.T, label: string, data: []u8, header_encrypted: bool) {
 	for password in ([?]string{"", "wrong"}) {
 		want := archive.Error(archive.General_Error.Encrypted if password == "" else archive.General_Error.Wrong_Password)

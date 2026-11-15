@@ -144,7 +144,8 @@ Format_Procs :: struct {
 }
 
 Read_Options :: struct {
-	password: string,
+	password:            string,
+	max_key_derivations: int,
 }
 
 Target_Destination :: union {

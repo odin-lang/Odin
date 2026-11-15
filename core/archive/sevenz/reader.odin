@@ -23,7 +23,7 @@ open_from_bytes :: proc(r: ^Reader, data: []u8, options := compress.Options{}, a
 	defer if err != nil {
 		close(r)
 	}
-	r.password = _secret_clone(read_options.password, allocator) or_return
+	_read_options(r, read_options) or_return
 	r.store = {data = data, size = i64(len(data)), memory = true}
 	return _load(r)
 }
@@ -33,7 +33,7 @@ open_from_stream :: proc(r: ^Reader, s: io.Stream, options := compress.Options{}
 	defer if err != nil {
 		close(r)
 	}
-	r.password = _secret_clone(read_options.password, allocator) or_return
+	_read_options(r, read_options) or_return
 	modes := io.query(s)
 	if .Read_At not_in modes && (.Seek not_in modes || .Read not_in modes) {
 		return archive.General_Error.Not_Seekable
@@ -61,7 +61,7 @@ open_from_path :: proc(r: ^Reader, path: string, options := compress.Options{}, 
 	defer if err != nil {
 		close(r)
 	}
-	r.password = _secret_clone(read_options.password, allocator) or_return
+	_read_options(r, read_options) or_return
 	r.store = {stream = os.to_stream(f), size = length, patches = journal}
 	_load(r) or_return
 	r.file = f
@@ -81,7 +81,7 @@ close_reader :: proc(r: ^Reader) {
 	delete(r.names, r.allocator)
 	delete(r.index, r.allocator)
 	_key_cache_destroy(&r.keys)
-	_secret_delete(transmute([]u8)r.password, r.allocator)
+	archive._secret_delete(transmute([]u8)r.password, r.allocator)
 	transaction.ranges_delete(r.journal, r.allocator)
 	if r.file != nil {
 		os.close(r.file)
@@ -249,6 +249,16 @@ _init :: proc(r: ^Reader, options: compress.Options, allocator: runtime.Allocato
 	r.options   = options
 	r.keys.allocator = allocator
 	_streams_init(&r.streams, allocator)
+}
+
+@(private)
+_read_options :: proc(r: ^Reader, read_options: archive.Read_Options) -> (err: Error) {
+	if read_options.max_key_derivations < 0 {
+		return archive.General_Error.Incompatible_Options
+	}
+	r.keys.limit = read_options.max_key_derivations if read_options.max_key_derivations > 0 else KDF_LIMIT_DEFAULT
+	r.password = archive._secret_clone(read_options.password, r.allocator) or_return
+	return
 }
 
 @(private)
@@ -1609,7 +1619,7 @@ _decoder_init :: proc(d: ^Folder_Decoder, store: ^Store, streams: ^Streams, fold
 		_decoder_destroy(d)
 	}
 	if f.encrypted {
-		d.password = _secret_clone(password, allocator) or_return
+		d.password = archive._secret_clone(password, allocator) or_return
 	}
 	d.nodes    = make([]Node, f.coder_count, allocator) or_return
 	d.sections = make([]Section, f.packed_count, allocator) or_return
@@ -1643,7 +1653,7 @@ _decoder_destroy :: proc(d: ^Folder_Decoder) {
 		filters.bcj2_reader_destroy(&node.bcj2)
 		if node.keyed {
 			_aes_destroy(&node)
-			_secret_delete(node.buffer, d.allocator)
+			archive._secret_delete(node.buffer, d.allocator)
 		} else {
 			delete(node.buffer, d.allocator)
 		}
@@ -1651,7 +1661,7 @@ _decoder_destroy :: proc(d: ^Folder_Decoder) {
 	delete(d.nodes, d.allocator)
 	delete(d.sections, d.allocator)
 	if d.password != "" {
-		_secret_delete(transmute([]u8)d.password, d.allocator)
+		archive._secret_delete(transmute([]u8)d.password, d.allocator)
 	}
 	delete(d.scratch, d.allocator)
 	d^ = {}
