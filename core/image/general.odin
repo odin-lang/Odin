@@ -1,39 +1,70 @@
 package image
 
+import "core:compress"
 import "core:mem"
-import "core:bytes"
 
 Loader_Proc :: #type proc(data: []byte, options: Options, allocator: mem.Allocator) -> (img: ^Image, err: Error)
+Context_Loader_Proc :: #type proc(ctx: ^compress.Context, options: Options, allocator: mem.Allocator) -> (img: ^Image, err: Error)
 Destroy_Proc :: #type proc(img: ^Image)
 
 @(private)
 _internal_loaders: [Which_File_Type]Loader_Proc
+@(private)
+_internal_context_loaders: [Which_File_Type]Context_Loader_Proc
 _internal_destroyers: [Which_File_Type]Destroy_Proc
 
-register :: proc "contextless" (kind: Which_File_Type, loader: Loader_Proc, destroyer: Destroy_Proc) {
+register :: proc "contextless" (kind: Which_File_Type, loader: Loader_Proc, destroyer: Destroy_Proc, context_loader: Context_Loader_Proc = nil) {
 	assert_contextless(loader != nil)
 	assert_contextless(destroyer != nil)
 	assert_contextless(_internal_loaders[kind] == nil)
 	_internal_loaders[kind] = loader
+	_internal_context_loaders[kind] = context_loader
 
 	assert_contextless(_internal_destroyers[kind] == nil)
 	_internal_destroyers[kind] = destroyer
 }
 
+@(private)
+_check_loaders_registered :: proc() -> Error {
+	// Check if there is at least one loader, otherwise panic to let the user know about misuse.
+	for a_loader in _internal_loaders {
+		if a_loader != nil {
+			return .Unsupported_Format
+		}
+	}
+	panic("image.load called when no image loaders are registered. Register a loader by first importing a subpackage (eg: `import \"core:image/png\"`), or with image.register")
+}
+
 load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	loader := _internal_loaders[which(data)]
 	if loader == nil {
-
-		// Check if there is at least one loader, otherwise panic to let the user know about misuse.
-		for a_loader in _internal_loaders {
-			if a_loader != nil {
-				return nil, .Unsupported_Format
-			}
-		}
-
-		panic("image.load called when no image loaders are registered. Register a loader by first importing a subpackage (eg: `import \"core:image/png\"`), or with image.register")
+		return nil, _check_loaders_registered()
 	}
 	return loader(data, options, allocator)
+}
+
+load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
+	if !compress.is_memory_context(ctx) {
+		#partial switch compress.refill_window(ctx, 128) {
+		case nil, .EOF, .Short_Buffer:
+		case:
+			return nil, .Unable_To_Read_File
+		}
+	}
+	kind := which_bytes(ctx.window)
+	if _internal_loaders[kind] == nil {
+		return nil, _check_loaders_registered()
+	}
+	if context_loader := _internal_context_loaders[kind]; context_loader != nil {
+		return context_loader(ctx, options, allocator)
+	}
+
+	data, data_err := compress.read_remaining(ctx, allocator)
+	defer delete(data)
+	if data_err != nil {
+		return nil, .Unable_To_Read_File
+	}
+	return _internal_loaders[kind](data[:], options, allocator)
 }
 
 
@@ -47,7 +78,7 @@ destroy :: proc(img: ^Image, allocator := context.allocator) {
 		destroyer(img)
 	} else {
 		assert(img.metadata == nil)
-		bytes.buffer_destroy(&img.pixels)
+		delete(img.pixels)
 		free(img)
 	}
 }
@@ -56,6 +87,7 @@ Which_File_Type :: enum {
 	Unknown,
 
 	BMP,
+	BNG,
 	DjVu, // AT&T DjVu file format
 	EXR,
 	FLIF,
@@ -134,6 +166,8 @@ which_bytes :: proc(data: []byte) -> Which_File_Type {
 	switch {
 	case s[:2] == "BM":
 		return .BMP
+	case s[:7] == "\xff\x0e\x38\x30\x2a\x1a\x18":
+		return .BNG
 	case s[:8] == "AT&TFORM":
 		switch s[12:16] {
 		case "DJVU", "DJVM":
@@ -147,7 +181,7 @@ which_bytes :: proc(data: []byte) -> Which_File_Type {
 		return .JPEG
 	case s[:3] == "\xff\xd8\xff":
 		switch s[3] {
-		case 0xdb, 0xee, 0xe1, 0xe0, 0xfe, 0xed:
+		case 0xdb, 0xee, 0xe1, 0xe0, 0xfe, 0xed, 0xc0, 0xc1, 0xc2, 0xc3, 0xc4, 0xdd, 0xc9, 0xca, 0xcb, 0xcc, 0xde:
 			return .JPEG
 		}
 		switch {

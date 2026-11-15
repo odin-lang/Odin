@@ -420,7 +420,7 @@ generate_emit_proc :: proc(sb: ^strings.Builder, entry: Proc_Entry, max_name_pad
 		strings.write_string(sb, ": ")
 		strings.write_string(sb, operand_odin_type(entry.sig.types[i]))
 	}
-	strings.write_string(sb, ") { append(instructions, ")
+	strings.write_string(sb, ") { append_elem(instructions, ")
 	strings.write_string(sb, entry.proc_name)
 	strings.write_string(sb, "(")
 	for i in 0..<entry.sig.count {

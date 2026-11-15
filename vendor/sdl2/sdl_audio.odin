@@ -148,6 +148,7 @@ foreign lib {
 
 	GetAudioDeviceName :: proc(index: c.int, iscapture: bool) -> cstring ---
 	GetAudioDeviceSpec :: proc(index: c.int, iscapture: bool, spec: ^AudioSpec) -> c.int ---
+	GetDefaultAudioInfo :: proc(name: ^cstring, spec: ^AudioSpec, iscapture: bool) -> c.int ---
 
 	OpenAudioDevice :: proc(device: cstring,
 	                        iscapture: bool,
@@ -237,9 +238,13 @@ foreign lib {
 	GetQueuedAudioSize :: proc(dev: AudioDeviceID) -> u32                                        ---
 	ClearQueuedAudio   :: proc(dev: AudioDeviceID)                                               ---
 
+	@(synchronizes=.Acquire)
 	LockAudio         :: proc()                   ---
+	@(synchronizes=.Acquire)
 	LockAudioDevice   :: proc(dev: AudioDeviceID) ---
+	@(synchronizes=.Release)
 	UnlockAudio       :: proc()                   ---
+	@(synchronizes=.Release)
 	UnlockAudioDevice :: proc(dev: AudioDeviceID) --- /* Audio lock functions */
 
 	CloseAudio       :: proc() ---

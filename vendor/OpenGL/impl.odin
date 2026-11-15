@@ -572,7 +572,7 @@ impl_GetTexParameterIuiv:                 proc "c" (target: u32, pname: u32, par
 impl_ClearBufferiv:                       proc "c" (buffer: u32, drawbuffer: i32, value: ^i32)
 impl_ClearBufferuiv:                      proc "c" (buffer: u32, drawbuffer: i32, value: ^u32)
 impl_ClearBufferfv:                       proc "c" (buffer: u32, drawbuffer: i32, value: ^f32)
-impl_ClearBufferfi:                       proc "c" (buffer: u32, drawbuffer: i32, depth: f32, stencil: i32) -> rawptr
+impl_ClearBufferfi:                       proc "c" (buffer: u32, drawbuffer: i32, depth: f32, stencil: i32)
 impl_GetStringi:                          proc "c" (name: u32, index: u32) -> cstring
 impl_IsRenderbuffer:                      proc "c" (renderbuffer: u32) -> bool
 impl_BindRenderbuffer:                    proc "c" (target: u32, renderbuffer: u32)
@@ -1302,6 +1302,7 @@ impl_ObjectLabel:                     proc "c" (identifier: u32, name: u32, leng
 impl_GetObjectLabel:                  proc "c" (identifier: u32, name: u32, bufSize: i32, length: ^i32, label: [^]u8)
 impl_ObjectPtrLabel:                  proc "c" (ptr: rawptr, length: i32, label: cstring)
 impl_GetObjectPtrLabel:               proc "c" (ptr: rawptr, bufSize: i32, length: ^i32, label: [^]u8)
+impl_GetPointerv:                     proc "c" (pname: u32, params: ^rawptr)
 
 load_4_3 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_ClearBufferData,                 "glClearBufferData")
@@ -1347,6 +1348,7 @@ load_4_3 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_GetObjectLabel,                  "glGetObjectLabel")
 	set_proc_address(&impl_ObjectPtrLabel,                  "glObjectPtrLabel")
 	set_proc_address(&impl_GetObjectPtrLabel,               "glGetObjectPtrLabel")
+	set_proc_address(&impl_GetPointerv,                     "glGetPointerv")
 }
 
 // VERSION_4_4

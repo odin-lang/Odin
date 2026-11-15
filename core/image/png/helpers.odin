@@ -1,7 +1,7 @@
 package png
 
 /*
-	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2021-2026 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-2 license.
 
 	List of contributors:
@@ -12,7 +12,7 @@ package png
 */
 
 import "core:image"
-import "core:compress/zlib"
+import "core:compress/deflate"
 import coretime "core:time"
 import "core:strings"
 import "core:bytes"
@@ -34,7 +34,7 @@ destroy :: proc(img: ^Image) {
 		return
 	}
 
-	bytes.buffer_destroy(&img.pixels)
+	delete(img.pixels)
 
 	if v, ok := img.metadata.(^image.PNG_Info); ok {
 		for chunk in v.chunks {
@@ -118,15 +118,15 @@ text :: proc(c: image.PNG_Chunk) -> (res: Text, ok: bool) {
 		}
 
 		// Set up ZLIB context and decompress text payload.
-		buf: bytes.Buffer
-		zlib_error := zlib.inflate_from_byte_array(fields[2], &buf)
-		defer bytes.buffer_destroy(&buf)
+		buf: [dynamic]u8
+		zlib_error := deflate.inflate_zlib(&buf, fields[2])
+		defer delete(buf)
 		if zlib_error != nil {
 			ok = false; return
 		}
 
 		res.keyword = strings.clone(string(fields[0]))
-		res.text = strings.clone(bytes.buffer_to_string(&buf))
+		res.text = strings.clone(string(buf[:]))
 		return
 	case .iTXt:
 		ok = true
@@ -172,15 +172,15 @@ text :: proc(c: image.PNG_Chunk) -> (res: Text, ok: bool) {
 			res.text = strings.clone(string(rest))
 		} else {
 			// Set up ZLIB context and decompress text payload.
-			buf: bytes.Buffer
-			zlib_error := zlib.inflate_from_byte_array(rest, &buf)
-			defer bytes.buffer_destroy(&buf)
+			buf: [dynamic]u8
+			zlib_error := deflate.inflate_zlib(&buf, rest)
+			defer delete(buf)
 			if zlib_error != nil {
 
 				ok = false; return
 			}
 
-			res.text = strings.clone(bytes.buffer_to_string(&buf))
+			res.text = strings.clone(string(buf[:]))
 		}
 		return
 	case:
@@ -200,6 +200,9 @@ iccp :: proc(c: image.PNG_Chunk) -> (res: iCCP, ok: bool) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
 
 	fields := bytes.split_n(c.data, sep=[]u8{0}, n=3, allocator=context.temp_allocator)
+	if len(fields) != 3 {
+		return
+	}
 
 	if len(fields[0]) < 1 || len(fields[0]) > 79 {
 		// Invalid profile name
@@ -212,15 +215,15 @@ iccp :: proc(c: image.PNG_Chunk) -> (res: iCCP, ok: bool) {
 	}
 
 	// Set up ZLIB context and decompress iCCP payload
-	buf: bytes.Buffer
-	zlib_error := zlib.inflate_from_byte_array(fields[2], &buf)
+	buf: [dynamic]u8
+	zlib_error := deflate.inflate_zlib(&buf, fields[2])
 	if zlib_error != nil {
-		bytes.buffer_destroy(&buf)
+		delete(buf)
 		return
 	}
 
 	res.name = strings.clone(string(fields[0]))
-	res.profile = bytes.buffer_to_bytes(&buf)
+	res.profile = buf[:]
 	ok = true
 	return
 }
@@ -264,7 +267,7 @@ splt :: proc(c: image.PNG_Chunk) -> (res: sPLT, ok: bool) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
 
 	fields := bytes.split_n(c.data, sep=[]u8{0}, n=2, allocator=context.temp_allocator)
-	if len(fields) != 2 {
+	if len(fields) != 2 || len(fields[1]) < 1 {
 		return
 	}
 

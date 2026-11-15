@@ -206,7 +206,11 @@ exp_float64 :: proc(gen := context.random_generator) -> f64 {
 			return x
 		}
 		if i == 0 {
-			return re - math.ln(float64(gen))
+			u := float64(gen)
+			for u == 0 {
+				u = float64(gen)
+			}
+			return re - math.ln(u)
 		}
 		if fe[i]+f32(float64(gen))*(fe[i-1]-fe[i]) < f32(math.exp(-x)) {
 			return x

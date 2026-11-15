@@ -31,6 +31,9 @@ enum AsmOperandKind : u8 {
 	AsmOperand_Register_Or_Memory,
 	AsmOperand_Immediate,
 	AsmOperand_Label,
+	AsmOperand_RegisterGroup,
+	AsmOperand_Lane,
+	AsmOperand_RegisterShift,
 
 	AsmOperand_COUNT
 };
@@ -42,6 +45,9 @@ gb_global String const asm_operand_kind_strings[AsmOperand_COUNT] = {
 	str_lit("register or memory"),
 	str_lit("immediate"),
 	str_lit("label"),
+	str_lit("register group"),
+	str_lit("lane"),
+	str_lit("register shift"),
 };
 
 gb_global String const asm_operand_kind_expected_strings[AsmOperand_COUNT] = {
@@ -51,12 +57,31 @@ gb_global String const asm_operand_kind_expected_strings[AsmOperand_COUNT] = {
 	str_lit("a register or memory"),
 	str_lit("an immediate"),
 	str_lit("a label"),
+	str_lit("a register group"),
+	str_lit("a lane"),
+	str_lit("a register shift"),
+};
+
+enum AsmOperandConstraintKind : u32 {
+	AsmOperandConstraint_None = 0,
+	AsmOperandConstraint_ShiftCount,     // integer const must satisfy 0 <= v < width
+	AsmOperandConstraint_NonZeroDivisor, // integer const must be != 0
+
+	AsmOperandConstraint_COUNT
+};
+
+
+struct AsmOperandConstraint {
+	AsmOperandConstraintKind kind;
+	i32 width_operand; // ShiftCount
 };
 
 #include "asm_tables_amd64.cpp"
 #include "asm_tables_riscv.cpp"
+#include "asm_tables_arm64.cpp"
 
 void init_asm_tables(i64 word_size_bytes) {
 	g_asm_amd64.init(word_size_bytes*8);
 	g_asm_riscv.init(word_size_bytes*8);
+	g_asm_arm64.init(word_size_bytes*8);
 }

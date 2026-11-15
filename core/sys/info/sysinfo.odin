@@ -114,6 +114,7 @@ OS_Version_Platform :: enum {
 	FreeBSD,
 	OpenBSD,
 	NetBSD,
+	Android,
 }
 
 Version :: struct {

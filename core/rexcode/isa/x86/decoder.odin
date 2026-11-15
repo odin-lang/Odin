@@ -565,6 +565,21 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 		}
 
 		if !has_modrm_byte {
+			// ADDRESS-size variants first: a form declaring one is picked by which
+			// address size is in effect (mode default vs 67h), an axis the operand-
+			// size scan below cannot see -- it reads REX.W and 66h, and neither
+			// affects address size. 0xE3 is the case: JRCXZ/JECXZ/JCXZ are one
+			// opcode telling RCX/ECX/CX apart, and nothing else in the bytes says
+			// which. Checked before the operand-size pass so a REX.W-prefixed E3
+			// (legal, and ignored by the CPU for address size) still reads as JRCXZ.
+			addr_want := effective_addr_size(state.mode, state.prefix_67)
+			for i in 0..<int(idx.count) {
+				e := &LEGACY_DECODE_ENTRIES[base + i]
+				if e.flags.addr_size != .DEFAULT && e.flags.addr_size == addr_want {
+					return e, nil, .NONE
+				}
+			}
+
 			// Select the size variant. Two families live here: flag-tagged forms
 			// with no operands (CBW/CWDE/CDQE, CWD/CDQ/CQO, string ops, PUSHF/POPF,
 			// IRET*) and accumulator+immediate forms whose size shows in the implied

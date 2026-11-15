@@ -228,7 +228,8 @@ when ODIN_NO_CRT {
 
 	_get_original_env :: #force_inline proc() -> [^]cstring {
 		// essentially &argv[argc] which should be a nil pointer!
-		#no_bounds_check env: [^]cstring = &runtime.args__[len(runtime.args__)]
+		args := runtime.args__.([]cstring)
+		#no_bounds_check env: [^]cstring = &args[len(args)]
 		assert(env[0] == nil)
 		return &env[1]
 	}
@@ -338,7 +339,9 @@ when ODIN_NO_CRT {
 
 	_environ :: proc(allocator: runtime.Allocator) -> (environ: []string, err: Error) {
 		n := 0
-		for entry := posix.environ[0]; entry != nil; n, entry = n+1, posix.environ[n] {}
+		for entry := posix.environ[0]; entry != nil; n += 1 {
+			entry = posix.environ[n]
+		}
 
 		r := make([dynamic]string, 0, n, allocator) or_return
 		defer if err != nil {
@@ -348,7 +351,8 @@ when ODIN_NO_CRT {
 			delete(r)
 		}
 
-		for i, entry := 0, posix.environ[0]; entry != nil; i, entry = i+1, posix.environ[i] {
+		for i, entry := 0, posix.environ[0]; entry != nil; i += 1 {
+			entry = posix.environ[i]
 			append(&r, strings.clone(string(entry), allocator) or_return)
 		}
 

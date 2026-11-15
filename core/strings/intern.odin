@@ -117,7 +117,7 @@ _intern_get_entry :: proc(m: ^Intern, text: string, loc := #caller_location) -> 
 	}
 
 	entry_size := int(offset_of(Intern_Entry, str)) + len(text) + 1
-	bytes := runtime.mem_alloc(entry_size, align_of(Intern_Entry), m.allocator, loc) or_return
+	bytes := runtime.mem_alloc_non_zeroed(entry_size, align_of(Intern_Entry), m.allocator, loc) or_return
 	new_entry = (^Intern_Entry)(raw_data(bytes))
 
 	new_entry.len = len(text)

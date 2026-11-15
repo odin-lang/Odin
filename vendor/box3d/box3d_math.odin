@@ -291,9 +291,9 @@ RotateVector :: proc "c" (q: Quat, v: Vec3) -> Vec3 {
 	// v + 2 * cross(q.xyz, cross(q.xyz, v) + q.w * v)
 	// B3_ASSERT(IsNormalizedQuat(q));
 	t1 := Cross(q.xyz, v)
-	t2 := t1 * q.w + v
+	t2 := t1 + q.w * v
 	t3 := Cross(q.xyz, t2)
-	return v * 2.0 + t3
+	return v + 2.0 * t3
 }
 
 // Inverse rotate a vector.
@@ -302,9 +302,9 @@ InvRotateVector :: proc "c" (q: Quat, v: Vec3) -> Vec3 {
 	// v + 2 * cross(q.xyz, cross(q.xyz, v) - q.w * v)
 	// B3_ASSERT(IsNormalizedQuat(q));
 	t1 := Cross(q.xyz, v)
-	t2 := t1 * q.w - v
+	t2 := t1 - q.w * v
 	t3 := Cross(q.xyz, t2)
-	return v * 2.0 + t3
+	return v + 2.0 * t3
 }
 
 // Compute dot product of two quaternions. Useful for polarity tests.

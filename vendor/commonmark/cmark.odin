@@ -4,7 +4,7 @@ import "core:c"
 import "base:runtime"
 
 COMMONMARK_SHARED :: #config(COMMONMARK_SHARED, false)
-BINDING_VERSION :: Version_Info{major = 0, minor = 30, patch = 2}
+BINDING_VERSION :: Version_Info{major = 0, minor = 31, patch = 2}
 
 when COMMONMARK_SHARED {
 	#panic("Shared linking for vendor:commonmark is not supported yet")
@@ -167,6 +167,7 @@ Node_Flag :: enum u16 {
 	Open              = 0,
 	Last_Line_Blank   = 1,
 	Last_Line_Checked = 2,
+	List_Last_Line_Blank = 3,
 }
 Node_Flags :: bit_set[Node_Flag; u16]
 
@@ -207,6 +208,15 @@ Custom :: struct {
 
 @(default_calling_convention="c", link_prefix="cmark_")
 foreign lib {
+	// Returns `true` if `node` is a block node.
+	node_is_block :: proc(node: ^Node) -> (is_block: c.bool) ---
+
+	// Returns `true` if `node` is an inline node.
+	node_is_inline :: proc(node: ^Node) -> (is_inline: c.bool) ---
+
+	// Returns `true` if `node` is a leaf node, i.e. one that cannot contain children.
+	node_is_leaf :: proc(node: ^Node) -> (is_leaf: c.bool) ---
+
 	// Creates a new node of type 'type'.
 	// Note that the node may have other required properties, which it is the caller's responsibility
 	// to assign.
@@ -422,6 +432,11 @@ foreign lib {
 	// Creates a new parser object with the given memory allocator.
 	parser_new_with_mem :: proc(options: Options, mem: ^Allocator) -> (parser: ^Parser) ---
 
+	// Creates a new parser object that uses `root` as the root node of the parsed tree.
+	// Parsed children are appended after any children `root` already has, which allows building one
+	// document out of several parsed fragments.
+	parser_new_with_mem_into_root :: proc(options: Options, mem: ^Allocator, root: ^Node) -> (parser: ^Parser) ---
+
 	// Frees memory allocated for a parser object.
 	parser_free :: proc(parser: ^Parser) ---
 
@@ -442,7 +457,7 @@ foreign lib {
 	//
 	// Called `parse_from_libc_file` so as not to confuse with Odin's file handling.
 
-	@(link_name = "parse_from_file")
+	@(link_name = "cmark_parse_file")
 	parse_from_libc_file :: proc(file: ^c.FILE, options: Options) -> (root: ^Node) ---
 }
 

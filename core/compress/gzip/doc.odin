@@ -1,12 +1,15 @@
 /*
 A small `GZIP` unpacker.
 
+This package is deprecated, use `core:compress/deflate` as the example below does.
+
 Example:
-	import "core:bytes"
-	import "core:os"
+	package compress_gzip_example
+
 	import "core:compress"
-	import "core:compress/gzip"
+	import "core:compress/deflate"
 	import "core:fmt"
+	import "core:os"
 
 	// Small GZIP file with fextra, fname and fcomment present.
 	@private
@@ -23,8 +26,8 @@ Example:
 
 	main :: proc() {
 		// Set up output buffer.
-		buf: bytes.Buffer
-		defer bytes.buffer_destroy(&buf)
+		buf: [dynamic]byte
+		defer delete(buf)
 
 		stdout :: proc(s: string) {
 			os.write_string(os.stdout, s)
@@ -35,49 +38,50 @@ Example:
 
 		if len(os.args) < 2 {
 			stderr("No input file specified.\n")
-			err := gzip.load(data=TEST, buf=&buf, known_gzip_size=len(TEST))
+			err := deflate.inflate_gzip(&buf, TEST)
 			if err == nil {
 				stdout("Displaying test vector: \"")
-				stdout(bytes.buffer_to_string(&buf))
+				stdout(string(buf[:]))
 				stdout("\"\n")
 			} else {
-				fmt.printf("gzip.load returned %v\n", err)
+				fmt.printf("deflate.inflate_gzip returned %v\n", err)
 			}
-			bytes.buffer_destroy(&buf)
+			delete(buf)
 			os.exit(0)
 		}
 
 		for file in os.args[1:] {
-			err: gzip.Error
+			clear(&buf)
+			err: deflate.Error
 
 			if file == "-" {
 				// Read from stdin
-				ctx := &compress.Context_Stream_Input{
-					input = os.to_stream(os.stdin),
-				}
-				err = gzip.load(ctx, &buf)
+				ctx := compress.init_context(os.to_stream(os.stdin), &buf)
+				defer compress.destroy_context(&ctx)
+				err = deflate.inflate_gzip(&ctx)
 			} else {
-				err = gzip.load(file, &buf)
+				data, read_err := os.read_entire_file(file, context.allocator)
+				defer delete(data)
+				if read_err != nil {
+					stderr("File not found: ")
+					stderr(file)
+					stderr("\n")
+					os.exit(1)
+				}
+				err = deflate.inflate_gzip(&buf, data)
 			}
-			switch err {
-			case nil:
-				stdout(bytes.buffer_to_string(&buf))
-			case gzip.E_General.File_Not_Found:
-				stderr("File not found: ")
-				stderr(file)
-				stderr("\n")
-				os.exit(1)
-			case:
+			if err != nil {
 				stderr("GZIP returned an error.\n")
 				os.exit(2)
 			}
+			stdout(string(buf[:]))
 		}
 	}
 */
 package compress_gzip
 
 /*
-	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2021-2026 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's license.
 
 	List of contributors:

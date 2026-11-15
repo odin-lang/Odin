@@ -351,6 +351,7 @@ _set_option :: proc(sock: Any_Socket, option: Socket_Option, value: any, loc := 
 	bool_value: b32
 	int_value: i32
 	timeval_value: linux.Time_Val
+	linger_value: linux.Linger
 	errno: linux.Errno
 	#partial switch option {
 	case
@@ -377,8 +378,21 @@ _set_option :: proc(sock: Any_Socket, option: Socket_Option, value: any, loc := 
 				panic("set_option() value must be a boolean here", loc)
 			}
 			errno = linux.setsockopt(os_sock, level, int(option), &bool_value)
+	case .Linger:
+			t, ok := value.(time.Duration)
+			if !ok {
+				panic("set_option() value must be a time.Duration here", loc)
+			}
+
+			num_secs := time.duration_seconds(t)
+			if num_secs < 0 || num_secs > f64(max(i32)) {
+				return .Invalid_Value
+			}
+			// NOTE: `SO_LINGER` expects a `struct linger`, not a `struct timeval`.
+			linger_value.l_onoff  = 1
+			linger_value.l_linger = i32(num_secs)
+			errno = linux.setsockopt(os_sock, level, int(option), &linger_value)
 	case
-		.Linger,
 		.Send_Timeout,
 		.Receive_Timeout:
 			t, ok := value.(time.Duration)

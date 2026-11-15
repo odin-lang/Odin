@@ -30,6 +30,7 @@ float fabsf(float x);
 double fabs(double x);
 int abs(int);
 double ldexp(double, int);
+double frexp(double, int *);
 double exp(double);
 float logf(float);
 double log(double);

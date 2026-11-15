@@ -29,6 +29,9 @@ struct lbArgType {
 gb_internal i64 lb_sizeof(LLVMTypeRef type);
 gb_internal i64 lb_alignof(LLVMTypeRef type);
 
+// the widest vector in bytes (e.g. a matrix's 64 elements)
+enum { LB_MAX_VECTOR_SIZE = 8*SIMD_ELEMENT_COUNT_MAX };
+
 gb_internal lbArgType lb_arg_type_direct(LLVMTypeRef type, LLVMTypeRef cast_type, LLVMTypeRef pad_type, LLVMAttributeRef attr) {
 	return lbArgType{lbArg_Direct, type, cast_type, pad_type, attr, {}, false};
 }
@@ -150,6 +153,23 @@ gb_internal LLVMTypeRef lb_function_type_to_llvm_raw(lbFunctionType *ft, bool is
 // 	return LLVMPointerType(func_type, 0);
 // }
 
+gb_internal lbCallingConventionKind lb_calling_convention_kind(ProcCallingConvention cc) {
+	if (selected_subtarget == Subtarget_Playdate) {
+		return lbCallingConvention_ARM_AAPCS_VFP;
+	}
+	if (is_arch_wasm()) {
+		return lbCallingConvention_C;
+	}
+	return lb_calling_convention_map[cc];
+}
+
+gb_internal LLVMAttributeRef lb_create_nocapture_attribute(LLVMContextRef c) {
+#if LLVM_VERSION_MAJOR >= 21
+	return lb_create_enum_attribute(c, "captures", 0); // 0 == CaptureInfo::none()
+#else
+	return lb_create_enum_attribute(c, "nocapture");
+#endif
+}
 
 gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType *ft, ProcCallingConvention calling_convention) {
 	if (ft == nullptr) {
@@ -164,11 +184,7 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 	LLVMContextRef c = ft->ctx;
 	LLVMAttributeRef noalias_attr   = lb_create_enum_attribute(c, "noalias");
 	LLVMAttributeRef nonnull_attr   = lb_create_enum_attribute(c, "nonnull");
-#if LLVM_VERSION_MAJOR >= 21
-	LLVMAttributeRef nocapture_attr = lb_create_string_attribute(c, make_string_c("captures"), make_string_c("none"));
-#else
-	LLVMAttributeRef nocapture_attr = lb_create_enum_attribute(c, "nocapture");
-#endif
+	LLVMAttributeRef nocapture_attr = lb_create_nocapture_attribute(c);
 
 	unsigned arg_index = offset;
 	for (unsigned i = 0; i < arg_count; i++) {
@@ -204,13 +220,7 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 		LLVMAddAttributeAtIndex(fn, offset, noalias_attr);
 	}
 
-	lbCallingConventionKind cc_kind = lbCallingConvention_C;
-	// TODO(bill): Clean up this logic
-	if (selected_subtarget == Subtarget_Playdate) {
-		cc_kind = lbCallingConvention_ARM_AAPCS_VFP;
-	} else if (!is_arch_wasm()) {
-		cc_kind = lb_calling_convention_map[calling_convention];
-	}
+	lbCallingConventionKind cc_kind = lb_calling_convention_kind(calling_convention);
 	// if (build_context.metrics.arch == TargetArch_amd64) {
 	// 	if (build_context.metrics.os == TargetOs_windows) {
 	// 		if (cc_kind == lbCallingConvention_C) {
@@ -233,6 +243,44 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 }
 
 
+struct lbTypeLayout {
+	i64 size;
+	i64 align;
+};
+
+gb_thread_local PtrMap<LLVMTypeRef, lbTypeLayout> lb_aggregate_layouts;
+
+gb_internal lbTypeLayout lb_aggregate_layout(LLVMTypeRef type) {
+	if (lbTypeLayout *found = map_get(&lb_aggregate_layouts, type)) {
+		return *found;
+	}
+	lbTypeLayout layout = {0, 1};
+	if (LLVMGetTypeKind(type) == LLVMArrayTypeKind) {
+		LLVMTypeRef elem = OdinLLVMGetArrayElementType(type);
+		layout.size  = cast(i64)LLVMGetArrayLength(type) * lb_sizeof(elem);
+		layout.align = lb_alignof(elem);
+	} else {
+		GB_ASSERT(LLVMGetTypeKind(type) == LLVMStructTypeKind);
+		if (LLVMIsOpaqueStruct(type)) {
+			return layout;
+		}
+		bool is_packed = LLVMIsPackedStruct(type);
+		unsigned field_count = LLVMCountStructElementTypes(type);
+		for (unsigned i = 0; i < field_count; i++) {
+			LLVMTypeRef field = LLVMStructGetTypeAtIndex(type, i);
+			if (!is_packed) {
+				i64 field_align = lb_alignof(field);
+				layout.size  = llvm_align_formula(layout.size, field_align);
+				layout.align = gb_max(layout.align, field_align);
+			}
+			layout.size += lb_sizeof(field);
+		}
+		layout.size = llvm_align_formula(layout.size, layout.align);
+	}
+	map_set(&lb_aggregate_layouts, type, layout);
+	return layout;
+}
+
 gb_internal i64 lb_sizeof(LLVMTypeRef type) {
 	LLVMTypeKind kind = LLVMGetTypeKind(type);
 	switch (kind) {
@@ -252,35 +300,8 @@ gb_internal i64 lb_sizeof(LLVMTypeRef type) {
 	case LLVMPointerTypeKind:
 		return build_context.ptr_size;
 	case LLVMStructTypeKind:
-		{
-			unsigned field_count = LLVMCountStructElementTypes(type);
-			i64 offset = 0;
-			if (LLVMIsPackedStruct(type)) {
-				for (unsigned i = 0; i < field_count; i++) {
-					LLVMTypeRef field = LLVMStructGetTypeAtIndex(type, i);
-					offset += lb_sizeof(field);
-				}
-			} else {
-				for (unsigned i = 0; i < field_count; i++) {
-					LLVMTypeRef field = LLVMStructGetTypeAtIndex(type, i);
-					i64 align = lb_alignof(field);
-					offset = llvm_align_formula(offset, align);
-					offset += lb_sizeof(field);
-				}
-				offset = llvm_align_formula(offset, lb_alignof(type));
-			}
-			return offset;
-		}
-		break;
 	case LLVMArrayTypeKind:
-		{
-			LLVMTypeRef elem = OdinLLVMGetArrayElementType(type);
-			i64 elem_size = lb_sizeof(elem);
-			i64 count = LLVMGetArrayLength(type);
-			i64 size = count * elem_size;
-			return size;
-		}
-		break;
+		return lb_aggregate_layout(type).size;
 
 #if LLVM_VERSION_MAJOR < 20
 	case LLVMX86_MMXTypeKind:
@@ -320,23 +341,8 @@ gb_internal i64 lb_alignof(LLVMTypeRef type) {
 	case LLVMPointerTypeKind:
 		return build_context.ptr_size;
 	case LLVMStructTypeKind:
-		{
-			if (LLVMIsPackedStruct(type)) {
-				return 1;
-			} else {
-				unsigned field_count = LLVMCountStructElementTypes(type);
-				i64 max_align = 1;
-				for (unsigned i = 0; i < field_count; i++) {
-					LLVMTypeRef field = LLVMStructGetTypeAtIndex(type, i);
-					i64 field_align = lb_alignof(field);
-					max_align = gb_max(max_align, field_align);
-				}
-				return max_align;
-			}
-		}
-		break;
 	case LLVMArrayTypeKind:
-		return lb_alignof(OdinLLVMGetArrayElementType(type));
+		return lb_aggregate_layout(type).align;
 
 #if LLVM_VERSION_MAJOR < 20
 	case LLVMX86_MMXTypeKind:
@@ -349,6 +355,7 @@ gb_internal i64 lb_alignof(LLVMTypeRef type) {
 			i64 elem_size = lb_sizeof(elem);
 			i64 count = LLVMGetVectorSize(type);
 			i64 size = count * elem_size;
+			GB_ASSERT_MSG(size <= build_context.max_simd_align || size <= LB_MAX_VECTOR_SIZE, "%s is wider than the datalayout's capped vector entries", LLVMPrintTypeToString(type));
 			return gb_clamp(next_pow2(size), 1, build_context.max_simd_align);
 		}
 

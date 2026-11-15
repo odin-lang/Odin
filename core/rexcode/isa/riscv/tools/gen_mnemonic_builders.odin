@@ -305,7 +305,7 @@ write_emit_body :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 	sig   := entry.sig
 	names := param_names(sig)
 
-	strings.write_string(sb, "append(instructions, ")
+	strings.write_string(sb, "append_elem(instructions, ")
 	strings.write_string(sb, entry.proc_name)
 	strings.write_byte(sb, '(')
 	for i in 0..<sig.count {

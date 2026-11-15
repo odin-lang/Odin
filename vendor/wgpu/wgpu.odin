@@ -163,11 +163,12 @@ BlendFactor :: enum i32 {
 }
 
 BlendOperation :: enum i32 {
-	Add = 0x00000000,
-	Subtract = 0x00000001,
-	ReverseSubtract = 0x00000002,
-	Min = 0x00000003,
-	Max = 0x00000004,
+	Undefined = 0x00000000,
+	Add = 0x00000001,
+	Subtract = 0x00000002,
+	ReverseSubtract = 0x00000003,
+	Min = 0x00000004,
+	Max = 0x00000005,
 }
 
 BufferBindingType :: enum i32 {

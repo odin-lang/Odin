@@ -36,12 +36,19 @@ check :: proc(name: string, m: a.Mnemonic, idx: int, want_bits, want_mask: u32) 
 }
 
 main :: proc() {
+	for arg in os.args[1:] {
+		if arg == "bench" {
+			run_benchmarks()
+			return
+		}
+	}
+
 	fmt.println("=== AArch64 encoding-table spot checks ===")
 
 	// ---- Data-proc immediate ------------------------------------------------
-	check("ADD imm 32",     .ADD_IMM,  0, 0x11000000, 0xFF800000)
-	check("ADD imm 64",     .ADD_IMM,  1, 0x91000000, 0xFF800000)
-	check("SUBS imm 64",    .SUBS_IMM, 1, 0xF1000000, 0xFF800000)
+	check("ADD imm 32",     .ADD,  0, 0x11000000, 0xFF800000)
+	check("ADD imm 64",     .ADD,  1, 0x91000000, 0xFF800000)
+	check("SUBS imm 64",    .SUBS, 1, 0xF1000000, 0xFF800000)
 	check("MOVZ 32",        .MOVZ,     0, 0x52800000, 0xFF800000)
 	check("MOVZ 64",        .MOVZ,     1, 0xD2800000, 0xFF800000)
 	check("MOVN 64",        .MOVN,     1, 0x92800000, 0xFF800000)
@@ -50,27 +57,27 @@ main :: proc() {
 	check("ADRP",           .ADRP,     0, 0x90000000, 0x9F000000)
 
 	// ---- Data-proc shifted register -----------------------------------------
-	check("ADD SR 64",      .ADD_SR,   1, 0x8B000000, 0xFF200000)
-	check("SUBS SR 64",     .SUBS_SR,  1, 0xEB000000, 0xFF200000)
-	check("AND SR 32",      .AND_SR,   0, 0x0A000000, 0xFF200000)
-	check("BIC SR 64",      .BIC_SR,   1, 0x8A200000, 0xFF200000)
-	check("ORR SR 64",      .ORR_SR,   1, 0xAA000000, 0xFF200000)
-	check("ORN SR 64",      .ORN_SR,   1, 0xAA200000, 0xFF200000)
-	check("EOR SR 64",      .EOR_SR,   1, 0xCA000000, 0xFF200000)
-	check("EON SR 64",      .EON_SR,   1, 0xCA200000, 0xFF200000)
-	check("ANDS SR 64",     .ANDS_SR,  1, 0xEA000000, 0xFF200000)
+	check("ADD SR 64",      .ADD,   3, 0x8B000000, 0xFF200000)
+	check("SUBS SR 64",     .SUBS,  3, 0xEB000000, 0xFF200000)
+	check("AND SR 32",      .AND,   0, 0x0A000000, 0xFF200000)
+	check("BIC SR 64",      .BIC,   1, 0x8A200000, 0xFF200000)
+	check("ORR SR 64",      .ORR,   1, 0xAA000000, 0xFF200000)
+	check("ORN SR 64",      .ORN,   1, 0xAA200000, 0xFF200000)
+	check("EOR SR 64",      .EOR,   1, 0xCA000000, 0xFF200000)
+	check("EON SR 64",      .EON,   1, 0xCA200000, 0xFF200000)
+	check("ANDS SR 64",     .ANDS,  1, 0xEA000000, 0xFF200000)
 
 	// ---- Data-proc extended register ----------------------------------------
-	check("ADD ER 64",      .ADD_ER,   1, 0x8B200000, 0xFFE00000)
-	check("SUBS ER 64",     .SUBS_ER,  1, 0xEB200000, 0xFFE00000)
+	check("ADD ER 64",      .ADD,   5, 0x8B200000, 0xFFE00000)
+	check("SUBS ER 64",     .SUBS,  5, 0xEB200000, 0xFFE00000)
 
 	// ---- Data-proc 2-source -------------------------------------------------
 	check("UDIV 64",        .UDIV,     1, 0x9AC00800, 0xFFE0FC00)
 	check("SDIV 64",        .SDIV,     1, 0x9AC00C00, 0xFFE0FC00)
-	check("LSLV 64",        .LSLV,     1, 0x9AC02000, 0xFFE0FC00)
-	check("LSRV 64",        .LSRV,     1, 0x9AC02400, 0xFFE0FC00)
-	check("ASRV 64",        .ASRV,     1, 0x9AC02800, 0xFFE0FC00)
-	check("RORV 64",        .RORV,     1, 0x9AC02C00, 0xFFE0FC00)
+	check("LSL 64",        .LSL,     1, 0x9AC02000, 0xFFE0FC00)
+	check("LSR 64",        .LSR,     1, 0x9AC02400, 0xFFE0FC00)
+	check("ASR 64",        .ASR,     1, 0x9AC02800, 0xFFE0FC00)
+	check("ROR 64",        .ROR,     1, 0x9AC02C00, 0xFFE0FC00)
 
 	// ---- Data-proc 3-source -------------------------------------------------
 	check("MADD 64",        .MADD,     1, 0x9B000000, 0xFFE08000)
@@ -97,7 +104,8 @@ main :: proc() {
 	// ---- Branches -----------------------------------------------------------
 	check("B",              .B,        0, 0x14000000, 0xFC000000)
 	check("BL",             .BL,       0, 0x94000000, 0xFC000000)
-	check("B.cond",         .B_COND,   0, 0x54000000, 0xFF000010)
+	check("B.eq",           .B_EQ,     0, 0x54000000, 0xFF00001F)
+	check("B.le",           .B_LE,     0, 0x5400000D, 0xFF00001F)
 	check("CBZ 64",         .CBZ,      1, 0xB4000000, 0xFF000000)
 	check("CBNZ 64",        .CBNZ,     1, 0xB5000000, 0xFF000000)
 	check("TBZ",            .TBZ,      0, 0x36000000, 0x7F000000)
@@ -118,7 +126,7 @@ main :: proc() {
 	check("LDRSW",          .LDRSW,    0, 0xB9800000, 0xFFC00000)
 	check("LDP X",          .LDP,      1, 0xA9400000, 0xFFC00000)
 	check("STP X",          .STP,      1, 0xA9000000, 0xFFC00000)
-	check("LDR literal X",  .LDR_LIT,  1, 0x58000000, 0xFF000000)
+	check("LDR literal X",  .LDR,  3, 0x58000000, 0xFF000000)
 
 	// ---- System -------------------------------------------------------------
 	check("NOP",            .NOP,      0, 0xD503201F, 0xFFFFFFFF)
@@ -134,7 +142,7 @@ main :: proc() {
 	check("HLT",            .HLT,      0, 0xD4400000, 0xFFE0001F)
 	check("ERET",           .ERET,     0, 0xD69F03E0, 0xFFFFFFFF)
 	check("MRS",            .MRS,      0, 0xD5300000, 0xFFF00000)
-	check("MSR reg",        .MSR_REG,  0, 0xD5100000, 0xFFF00000)
+	check("MSR reg",        .MSR,  1, 0xD5100000, 0xFFF00000)
 
 	// ---- FP scalar ----------------------------------------------------------
 	check("FABS S",         .FABS,     0, 0x1E20C000, 0xFFFFFC00)
@@ -164,81 +172,81 @@ main :: proc() {
 	check("UCVTF D<-X",     .UCVTF,    3, 0x9E630000, 0xFFFFFC00)
 	check("FCVTZS X<-D",    .FCVTZS,   3, 0x9E780000, 0xFFFFFC00)
 	check("FCVTZU X<-D",    .FCVTZU,   3, 0x9E790000, 0xFFFFFC00)
-	check("FMOV S<-S",      .FMOV_REG, 0, 0x1E204000, 0xFFFFFC00)
-	check("FMOV W<-S",      .FMOV_GEN, 0, 0x1E260000, 0xFFFFFC00)
-	check("FMOV S<-W",      .FMOV_GEN, 1, 0x1E270000, 0xFFFFFC00)
-	check("FMOV X<-D",      .FMOV_GEN, 2, 0x9E660000, 0xFFFFFC00)
-	check("FMOV D<-X",      .FMOV_GEN, 3, 0x9E670000, 0xFFFFFC00)
+	check("FMOV S<-S",      .FMOV, 0, 0x1E204000, 0xFFFFFC00)
+	check("FMOV W<-S",      .FMOV, 5, 0x1E260000, 0xFFFFFC00)
+	check("FMOV S<-W",      .FMOV, 6, 0x1E270000, 0xFFFFFC00)
+	check("FMOV X<-D",      .FMOV, 7, 0x9E660000, 0xFFFFFC00)
+	check("FMOV D<-X",      .FMOV, 8, 0x9E670000, 0xFFFFFC00)
 
 	// ---- Bitmask logical immediate ------------------------------------------
-	check("AND_IMM 32",     .AND_IMM,  0, 0x12000000, 0xFFC00000)
-	check("AND_IMM 64",     .AND_IMM,  1, 0x92000000, 0xFF800000)
-	check("ORR_IMM 64",     .ORR_IMM,  1, 0xB2000000, 0xFF800000)
-	check("EOR_IMM 64",     .EOR_IMM,  1, 0xD2000000, 0xFF800000)
-	check("ANDS_IMM 64",    .ANDS_IMM, 1, 0xF2000000, 0xFF800000)
-	check("TST_IMM 64",     .TST_IMM,  1, 0xF200001F, 0xFF80001F)
+	check("AND 32",     .AND,  2, 0x12000000, 0xFFC00000)
+	check("AND 64",     .AND,  3, 0x92000000, 0xFF800000)
+	check("ORR 64",     .ORR,  3, 0xB2000000, 0xFF800000)
+	check("EOR 64",     .EOR,  3, 0xD2000000, 0xFF800000)
+	check("ANDS 64",    .ANDS, 3, 0xF2000000, 0xFF800000)
+	check("TST 64",     .TST,  1, 0xF200001F, 0xFF80001F)
 
 	// ---- SVE -- vectors unpredicated ----------------------------------------
-	check("SVE_ADD_Z B",    .SVE_ADD_Z,  0, 0x04200000, 0xFFE0FC00)
-	check("SVE_ADD_Z S",    .SVE_ADD_Z,  2, 0x04A00000, 0xFFE0FC00)
-	check("SVE_SUB_Z D",    .SVE_SUB_Z,  3, 0x04E00400, 0xFFE0FC00)
-	check("SVE_SQADD_Z H",  .SVE_SQADD_Z,1, 0x04601000, 0xFFE0FC00)
+	check("ADD B",    .ADD,  13, 0x04200000, 0xFFE0FC00)
+	check("ADD S",    .ADD,  15, 0x04A00000, 0xFFE0FC00)
+	check("SUB D",    .SUB,  13, 0x04E00400, 0xFFE0FC00)
+	check("SQADD H",  .SQADD,8, 0x04601000, 0xFFE0FC00)
 
 	// ---- SVE -- vectors predicated ------------------------------------------
-	check("SVE_ADD_PRED B", .SVE_ADD_PRED, 0, 0x04000000, 0xFFE0E000)
-	check("SVE_MUL_PRED S", .SVE_MUL_PRED, 2, 0x04900000, 0xFFE0E000)
-	check("SVE_SDIV S",     .SVE_SDIV_PRED, 0, 0x04940000, 0xFFE0E000)
-	check("SVE_ASR_PRED D", .SVE_ASR_PRED, 3, 0x04D08000, 0xFFE0E000)
-	check("SVE_NEG_PRED D", .SVE_NEG_PRED, 3, 0x04D7A000, 0xFFE0E000)
+	check("ADD B", .ADD, 17, 0x04000000, 0xFFFFE000)
+	check("MUL S", .MUL, 5, 0x04900000, 0xFFFFE000)
+	check("SVE_SDIV S",     .SDIV, 2, 0x04940000, 0xFFFFE000)
+	check("ASR D", .ASR, 5, 0x04D08000, 0xFFFFE000)
+	check("NEG D", .NEG, 10, 0x04D7A000, 0xFFF7E000)
 
 	// ---- SVE -- bitwise predicated ------------------------------------------
-	check("SVE_AND_PRED D", .SVE_AND_PRED, 0, 0x041A0000, 0xFFFFE000)
-	check("SVE_EOR_PRED D", .SVE_EOR_PRED, 0, 0x04190000, 0xFFFFE000)
+	check("AND D", .AND, 5, 0x041A0000, 0xFFFFE000)
+	check("EOR D", .EOR, 5, 0x04190000, 0xFFFFE000)
 
 	// ---- SVE -- FP unpredicated ---------------------------------------------
-	check("SVE_FADD_Z S",   .SVE_FADD_Z, 1, 0x65800000, 0xFFE0FC00)
-	check("SVE_FMUL_Z D",   .SVE_FMUL_Z, 2, 0x65C00800, 0xFFE0FC00)
+	check("FADD S",   .FADD, 7, 0x65800000, 0xFFE0FC00)
+	check("FMUL D",   .FMUL, 8, 0x65C00800, 0xFFE0FC00)
 
 	// ---- SVE -- FP predicated -----------------------------------------------
-	check("SVE_FADD_PRED S",.SVE_FADD_PRED, 1, 0x65808000, 0xFFE0E000)
-	check("SVE_FMLA S",     .SVE_FMLA,      1, 0x65A00000, 0xFFE0E000)
+	check("FADD S",.FADD, 10, 0x65808000, 0xFFFFE000)
+	check("FMLA S",     .FMLA,      3, 0x65A00000, 0xFFE0E000)
 
 	// ---- SVE -- predicate logical -------------------------------------------
-	check("SVE_AND_P",      .SVE_AND_P,   0, 0x25004000, 0xFFE0C210)
-	check("SVE_ORR_P",      .SVE_ORR_P,   0, 0x25804000, 0xFFE0C210)
-	check("SVE_SEL_P",      .SVE_SEL_P,   0, 0x25004210, 0xFFE0C210)
-	check("SVE_PTRUE",      .SVE_PTRUE,   0, 0x2518E000, 0xFFFFFC10)
-	check("SVE_PFALSE",     .SVE_PFALSE,  0, 0x2518E400, 0xFFFFFFF0)
+	check("SVE_AND_P",      .AND,   9, 0x25004000, 0xFFE0C210)
+	check("SVE_ORR_P",      .ORR,   9, 0x25804000, 0xFFE0C210)
+	check("SVE_SEL_P",      .SEL,   0, 0x25004210, 0xFFE0C210)
+	check("SVE_PTRUE",      .PTRUE,   0, 0x2518E000, 0xFFFFFC10)
+	check("SVE_PFALSE",     .PFALSE,  0, 0x2518E400, 0xFFFFFFF0)
 
 	// ---- SVE -- compares ----------------------------------------------------
-	check("SVE_CMPEQ B",    .SVE_CMPEQ, 0, 0x2400A000, 0xFFE0E000)
-	check("SVE_CMPGT S",    .SVE_CMPGT, 2, 0x24808010, 0xFFE0E010)
-	check("SVE_CMPHS D",    .SVE_CMPHS, 3, 0x24C00000, 0xFFE0E010)
+	check("CMPEQ B",    .CMPEQ, 0, 0x2400A000, 0xFFE0E000)
+	check("CMPGT S",    .CMPGT, 2, 0x24808010, 0xFFE0E010)
+	check("CMPHS D",    .CMPHS, 3, 0x24C00000, 0xFFE0E010)
 
 	// ---- SVE -- loads/stores -----------------------------------------------
-	check("SVE_LD1B",       .SVE_LD1B, 0, 0xA4004000, 0xFFE0E000)
-	check("SVE_LD1D",       .SVE_LD1D, 0, 0xA5E04000, 0xFFE0E000)
-	check("SVE_ST1W",       .SVE_ST1W, 0, 0xE5404000, 0xFFE0E000)
+	check("SVE_LD1B",       .LD1B, 0, 0xA4004000, 0xFFE0E000)
+	check("SVE_LD1D",       .LD1D, 0, 0xA5E04000, 0xFFE0E000)
+	check("SVE_ST1W",       .ST1W, 0, 0xE5404000, 0xFFE0E000)
 
 	// ---- SVE permute -------------------------------------------------------
-	check("SVE_ZIP1_Z B",   .SVE_ZIP1_Z, 0, 0x05206000, 0xFFE0FC00)
-	check("SVE_UZP2_Z S",   .SVE_UZP2_Z, 2, 0x05A06C00, 0xFFE0FC00)
-	check("SVE_TBL B",      .SVE_TBL,    0, 0x05203000, 0xFFE0FC00)
+	check("ZIP1 B",   .ZIP1, 7, 0x05206000, 0xFFE0FC00)
+	check("UZP2 S",   .UZP2, 9, 0x05A06C00, 0xFFE0FC00)
+	check("TBL B",      .TBL,    2, 0x05203000, 0xFFE0FC00)
 
 	// ---- SVE2 ---------------------------------------------------------------
-	check("SVE_WHILELT 64", .SVE_WHILELT,  0, 0x25201400, 0xFF20FC10)
-	check("SVE_SQRDMLAH B", .SVE_SQRDMLAH, 0, 0x44007000, 0xFFE0FC00)
-	check("SVE_AESE",       .SVE_AESE,     0, 0x4522E000, 0xFFFFFC00)
-	check("SVE_MATCH B",    .SVE_MATCH,    0, 0x45208000, 0xFFE0E010)
+	check("WHILELT 64", .WHILELT,  0, 0x25201400, 0xFFE0FC10)
+	check("SQRDMLAH B", .SQRDMLAH, 0, 0x44007000, 0xFFE0FC00)
+	check("SVE_AESE",       .AESE,     1, 0x4522E000, 0xFFFFFC00)
+	check("MATCH B",    .MATCH,    0, 0x45208000, 0xFFE0E010)
 
 	// ---- SME ----------------------------------------------------------------
-	check("SME_SMSTART",    .SME_SMSTART, 0, 0xD503477F, 0xFFFFFFFF)
-	check("SME_SMSTOP",     .SME_SMSTOP,  0, 0xD503467F, 0xFFFFFFFF)
-	check("SME_RDSVL",      .SME_RDSVL,   0, 0x04BF5800, 0xFFFFFC00)
-	check("SME_FMOPA S",    .SME_FMOPA,   0, 0x80800000, 0xFFE08010)
-	check("SME_BFMOPA",     .SME_BFMOPA,  0, 0x81800000, 0xFFE08010)
-	check("SME_SMOPA S",    .SME_SMOPA,   0, 0xA0800000, 0xFFE08010)
-	check("SME_UMOPA D",    .SME_UMOPA,   1, 0xA1E00000, 0xFFE08010)
+	check("SME_SMSTART",    .SMSTART, 0, 0xD503477F, 0xFFFFFFFF)
+	check("SME_SMSTOP",     .SMSTOP,  0, 0xD503467F, 0xFFFFFFFF)
+	check("SME_RDSVL",      .RDSVL,   0, 0x04BF5800, 0xFFFFF800)
+	check("FMOPA S",    .FMOPA,   0, 0x80800000, 0xFFE08010)
+	check("SME_BFMOPA",     .BFMOPA,  0, 0x81800000, 0xFFE08010)
+	check("SMOPA S",    .SMOPA,   0, 0xA0800000, 0xFFE08010)
+	check("UMOPA D",    .UMOPA,   1, 0xA1E00000, 0xFFE08010)
 
 	// ---- Apple AMX ----------------------------------------------------------
 	check("AMX_LDX",        .AMX_LDX,    0, 0x00201000, 0xFFFFFFE0)
@@ -260,8 +268,8 @@ main :: proc() {
 	check("CPYFM",      .CPYFM,    0, 0x19400400, 0xFFE03C00)
 	check("CPYFE",      .CPYFE,    0, 0x19800400, 0xFFE03C00)
 	check("SETP",       .SETP,     0, 0x19C00400, 0xFFE03C00)
-	check("SETM",       .SETM,     0, 0x19C04400, 0xFFE03C00)
-	check("SETE",       .SETE,     0, 0x19C08400, 0xFFE03C00)
+	check("SETM",       .SETM,     0, 0x19C04400, 0xFFE07C00)
+	check("SETE",       .SETE,     0, 0x19C08400, 0xFFE0BC00)
 
 	// ---- Cache management ---------------------------------------------------
 	check("DC IVAC",    .DC_IVAC,    0, 0xD5087620, 0xFFFFFFE0)
@@ -286,95 +294,95 @@ main :: proc() {
 	// ---- PRFM ---------------------------------------------------------------
 	check("PRFM",       .PRFM,     0, 0xF9800000, 0xFFC00000)
 	check("PRFUM",      .PRFUM,    0, 0xF8800000, 0xFFE00C00)
-	check("PRFM_LIT",   .PRFM_LIT, 0, 0xD8000000, 0xFF000000)
+	check("PRFM_LIT",   .PRFM, 1, 0xD8000000, 0xFF000000)
 
 	// ---- Aliases ------------------------------------------------------------
-	check("MOV_REG 32",   .MOV_REG,     0, 0x2A0003E0, 0xFFE0FFE0)
-	check("MOV_REG 64",   .MOV_REG,     1, 0xAA0003E0, 0xFFE0FFE0)
-	check("MOV_BITMASK 64", .MOV_BITMASK, 1, 0xB20003E0, 0xFF8003E0)
-	check("MVN 64",       .MVN,         1, 0xAA2003E0, 0xFFE0FFE0)
-	check("NEG_SR 64",    .NEG_SR,      1, 0xCB0003E0, 0xFF2003E0)
+	check("MOV 32",   .MOV,     8, 0x2A0003E0, 0xFFE0FFE0)
+	check("MOV 64",   .MOV,     9, 0xAA0003E0, 0xFFE0FFE0)
+	check("MOV 64", .MOV, 11, 0xB20003E0, 0xFF8003E0)
+	check("MVN 64",       .MVN,         3, 0xAA2003E0, 0xFFE0FFE0)
+	check("NEG 64",    .NEG,      12, 0xCB0003E0, 0xFF2003E0)
 	check("NEGS 64",      .NEGS,        1, 0xEB0003E0, 0xFF2003E0)
-	check("CMP_SR 64",    .CMP_SR,      1, 0xEB00001F, 0xFF20001F)
-	check("CMP_ER 64",    .CMP_ER,      1, 0xEB20001F, 0xFFE0001F)
-	check("CMP_IMM 64",   .CMP_IMM,     1, 0xF100001F, 0xFF80001F)
-	check("CMN_SR 64",    .CMN_SR,      1, 0xAB00001F, 0xFF20001F)
-	check("CMN_IMM 64",   .CMN_IMM,     1, 0xB100001F, 0xFF80001F)
-	check("TST_SR 64",    .TST_SR,      1, 0xEA00001F, 0xFF20001F)
+	check("CMP 64",    .CMP,      1, 0xEB00001F, 0xFF20001F)
+	check("CMP 64",    .CMP,      3, 0xEB20001F, 0xFFE0001F)
+	check("CMP 64",   .CMP,     5, 0xF100001F, 0xFF80001F)
+	check("CMN 64",    .CMN,      1, 0xAB00001F, 0xFF20001F)
+	check("CMN 64",   .CMN,     5, 0xB100001F, 0xFF80001F)
+	check("TST 64",    .TST,      3, 0xEA00001F, 0xFF20001F)
 
 	// ---- SVE indexed FMLA / FMLS ---------------------------------------
-	check("SVE_FMLA_IDX_H", .SVE_FMLA_IDX_H, 0, 0x64200000, 0xFFA0FC00)
-	check("SVE_FMLA_IDX_S", .SVE_FMLA_IDX_S, 0, 0x64A00000, 0xFFE0FC00)
-	check("SVE_FMLA_IDX_D", .SVE_FMLA_IDX_D, 0, 0x64E00000, 0xFFE0FC00)
-	check("SVE_FMLS_IDX_S", .SVE_FMLS_IDX_S, 0, 0x64A00400, 0xFFE0FC00)
-	check("SVE_FMLS_IDX_D", .SVE_FMLS_IDX_D, 0, 0x64E00400, 0xFFE0FC00)
+	check("SVE_FMLA_IDX_H", .FMLA, 5, 0x64200000, 0xFFA0FC00)
+	check("SVE_FMLA_IDX_S", .FMLA, 6, 0x64A00000, 0xFFE0FC00)
+	check("SVE_FMLA_IDX_D", .FMLA, 7, 0x64E00000, 0xFFE0FC00)
+	check("SVE_FMLS_IDX_S", .FMLS, 6, 0x64A00400, 0xFFE0FC00)
+	check("SVE_FMLS_IDX_D", .FMLS, 7, 0x64E00400, 0xFFE0FC00)
 
 	// ---- SVE gather loads ----------------------------------------------
-	check("SVE_LD1B_GATHER_S", .SVE_LD1B_GATHER_S, 0, 0x84004000, 0xFFA0E000)
-	check("SVE_LD1W_GATHER_D", .SVE_LD1W_GATHER_D, 0, 0xC5004000, 0xFFA0E000)
-	check("SVE_LD1D_GATHER_D", .SVE_LD1D_GATHER_D, 0, 0xC5804000, 0xFFA0E000)
-	check("SVE_LD1SB_GATHER_S",.SVE_LD1SB_GATHER_S,0, 0x84000000, 0xFFA0E000)
-	check("SVE_LD1SW_GATHER_D",.SVE_LD1SW_GATHER_D,0, 0xC5000000, 0xFFA0E000)
+	check("SVE_LD1B_GATHER_S", .LD1B, 1, 0x84004000, 0xFFA0E000)
+	check("SVE_LD1W_GATHER_D", .LD1W, 2, 0xC5004000, 0xFFA0E000)
+	check("SVE_LD1D_GATHER_D", .LD1D, 1, 0xC5804000, 0xFFA0E000)
+	check("SVE_LD1SB_GATHER_S",.LD1SB,1, 0x84000000, 0xFFA0E000)
+	check("SVE_LD1SW_GATHER_D",.LD1SW,1, 0xC5000000, 0xFFA0E000)
 
 	// ---- SVE scatter stores --------------------------------------------
-	check("SVE_ST1B_SCATTER_S",.SVE_ST1B_SCATTER_S,0, 0xE4008000, 0xFFA0E000)
-	check("SVE_ST1W_SCATTER_S",.SVE_ST1W_SCATTER_S,0, 0xE5008000, 0xFFA0E000)
-	check("SVE_ST1D_SCATTER_D",.SVE_ST1D_SCATTER_D,0, 0xE5808000, 0xFFA0E000)
+	check("SVE_ST1B_SCATTER_S",.ST1B,1, 0xE4408000, 0xFFE0A000)
+	check("SVE_ST1W_SCATTER_S",.ST1W,1, 0xE5408000, 0xFFE0A000)
+	check("SVE_ST1D_SCATTER_D",.ST1D,1, 0xE5808000, 0xFFE0A000)
 
 	// ---- SME tile slice memory -----------------------------------------
-	check("SME_LD1B_TILE", .SME_LD1B_TILE, 0, 0xE0000000, 0xFFE00010)
-	check("SME_LD1H_TILE", .SME_LD1H_TILE, 0, 0xE0400000, 0xFFE00010)
-	check("SME_LD1W_TILE", .SME_LD1W_TILE, 0, 0xE0800000, 0xFFE00010)
-	check("SME_LD1D_TILE", .SME_LD1D_TILE, 0, 0xE0C00000, 0xFFE00010)
-	check("SME_LD1Q_TILE", .SME_LD1Q_TILE, 0, 0xE1C00000, 0xFFE00010)
-	check("SME_ST1B_TILE", .SME_ST1B_TILE, 0, 0xE0200000, 0xFFE00010)
-	check("SME_ST1W_TILE", .SME_ST1W_TILE, 0, 0xE0A00000, 0xFFE00010)
-	check("SME_MOVA_Z_FROM_TILE", .SME_MOVA_Z_FROM_TILE, 0, 0xC0020000, 0xFFE08010)
-	check("SME_MOVA_TILE_FROM_Z", .SME_MOVA_TILE_FROM_Z, 0, 0xC0000000, 0xFFE08010)
+	check("SME_LD1B_TILE", .LD1B, 3, 0xE0000000, 0xFFE00010)
+	check("SME_LD1H_TILE", .LD1H, 3, 0xE0400000, 0xFFE00010)
+	check("SME_LD1W_TILE", .LD1W, 3, 0xE0800000, 0xFFE00010)
+	check("SME_LD1D_TILE", .LD1D, 2, 0xE0C00000, 0xFFE00010)
+	check("SME_LD1Q_TILE", .LD1Q, 0, 0xE1C00000, 0xFFE00010)
+	check("SME_ST1B_TILE", .ST1B, 3, 0xE0200000, 0xFFE00010)
+	check("SME_ST1W_TILE", .ST1W, 3, 0xE0A00000, 0xFFE00010)
+	check("SME_MOVA_Z_FROM_TILE", .MOVA, 0, 0xC0020000, 0xFFE28010)
+	check("SME_MOVA_TILE_FROM_Z", .MOVA, 1, 0xC0000000, 0xFFE08010)
 
 	// ---- NEON FCMLA / FCADD (v8.3-A FCMA) -- verified vs LLVM golden -----
-	check("FCMLA_4H", .FCMLA_4H, 0, 0x2E40C400, 0xFFA0CC00)
-	check("FCMLA_8H", .FCMLA_8H, 0, 0x6E40C400, 0xFFA0CC00)
-	check("FCMLA_4S", .FCMLA_4S, 0, 0x6E80C400, 0xFFA0CC00)
-	check("FCMLA_2D", .FCMLA_2D, 0, 0x6EC0C400, 0xFFA0CC00)
-	check("FCADD_4H", .FCADD_4H, 0, 0x2E40E400, 0xFFA0EC00)
-	check("FCADD_4S", .FCADD_4S, 0, 0x6E80E400, 0xFFA0EC00)
+	check("FCMLA_4H", .FCMLA, 0, 0x2E40C400, 0xFFE0CC00)
+	check("FCMLA_8H", .FCMLA, 1, 0x6E40C400, 0xFFE0CC00)
+	check("FCMLA_4S", .FCMLA, 2, 0x6E80C400, 0xFFE0CC00)
+	check("FCMLA_2D", .FCMLA, 3, 0x6EC0C400, 0xFFE0CC00)
+	check("FCADD_4H", .FCADD, 0, 0x2E40E400, 0xFFE0EC00)
+	check("FCADD_4S", .FCADD, 2, 0x6E80E400, 0xFFA0EC00)
 
 	// ---- SVE prefetch ----------------------------------------------------
-	check("SVE_PRFB", .SVE_PRFB, 0, 0x8400C000, 0xFFE0E000)
-	check("SVE_PRFH", .SVE_PRFH, 0, 0x8480C000, 0xFFE0E000)
-	check("SVE_PRFW", .SVE_PRFW, 0, 0x8500C000, 0xFFE0E000)
-	check("SVE_PRFD", .SVE_PRFD, 0, 0x8580C000, 0xFFE0E000)
+	check("SVE_PRFB", .PRFB, 0, 0x8400C000, 0xFFE0E000)
+	check("SVE_PRFH", .PRFH, 0, 0x8480C000, 0xFFE0E000)
+	check("SVE_PRFW", .PRFW, 0, 0x8500C000, 0xFFE0E000)
+	check("SVE_PRFD", .PRFD, 0, 0x8580C000, 0xFFE0E000)
 
 	// ---- SVE LDNT / STNT (non-temporal) ----------------------------------
-	check("SVE_LDNT1B", .SVE_LDNT1B, 0, 0xA400C000, 0xFFE0E000)
-	check("SVE_LDNT1D", .SVE_LDNT1D, 0, 0xA580C000, 0xFFE0E000)
-	check("SVE_STNT1B", .SVE_STNT1B, 0, 0xE4006000, 0xFFE0E000)
-	check("SVE_STNT1D", .SVE_STNT1D, 0, 0xE5806000, 0xFFE0E000)
+	check("SVE_LDNT1B", .LDNT1B, 0, 0xA400C000, 0xFFE0E000)
+	check("SVE_LDNT1D", .LDNT1D, 0, 0xA580C000, 0xFFE0E000)
+	check("SVE_STNT1B", .STNT1B, 0, 0xE4006000, 0xFFE0E000)
+	check("SVE_STNT1D", .STNT1D, 0, 0xE5806000, 0xFFE0E000)
 
 	// ---- SVE permute / init ---------------------------------------------
-	check("SVE_EXT",     .SVE_EXT,    0, 0x05200000, 0xFFE0E000)
-	check("SVE_SPLICE",  .SVE_SPLICE, 0, 0x052C8000, 0xFFFFE000)
-	check("SVE_INDEX_II",.SVE_INDEX_II,0,0x04204000, 0xFFE0FC00)
-	check("SVE_INDEX_RR",.SVE_INDEX_RR,0,0x04204C00, 0xFFE0FC00)
+	check("SVE_EXT",     .EXT,    3, 0x05200000, 0xFFE0E000)
+	check("SVE_SPLICE",  .SPLICE, 0, 0x052C8000, 0xFFFFE000)
+	check("SVE_INDEX_II",.INDEX,0,0x04204000, 0xFFE0FC00)
+	check("SVE_INDEX_RR",.INDEX,3,0x04204C00, 0xFFE0FC00)
 
 	// ---- SVE2 bit-select family + polynomial multiply -------------------
-	check("SVE_BSL",     .SVE_BSL,    0, 0x04203C00, 0xFFE0FC00)
-	check("SVE_BSL1N",   .SVE_BSL1N,  0, 0x04603C00, 0xFFE0FC00)
-	check("SVE_NBSL",    .SVE_NBSL,   0, 0x04E03C00, 0xFFE0FC00)
-	check("SVE_PMUL_VEC",.SVE_PMUL_VEC,0,0x04206400, 0xFFE0FC00)
-	check("SVE_PMULLB",  .SVE_PMULLB, 0, 0x45006800, 0xFFE0FC00)
-	check("SVE_PMULLT",  .SVE_PMULLT, 0, 0x45006C00, 0xFFE0FC00)
+	check("SVE_BSL",     .BSL,    1, 0x04203C00, 0xFFE0FC00)
+	check("SVE_BSL1N",   .BSL1N,  0, 0x04603C00, 0xFFE0FC00)
+	check("SVE_NBSL",    .NBSL,   0, 0x04E03C00, 0xFFE0FC00)
+	check("SVE_PMUL_VEC",.PMUL,0,0x04206400, 0xFFE0FC00)
+	check("SVE_PMULLB",  .PMULLB, 0, 0x45C06800, 0xFFE0FC00)
+	check("SVE_PMULLT",  .PMULLT, 0, 0x45C06C00, 0xFFE0FC00)
 
 	// ---- SVE BF16 conversions -------------------------------------------
-	check("SVE_BFCVT",   .SVE_BFCVT,   0, 0x658AA000, 0xFFFFE000)
-	check("SVE_BFCVTNT", .SVE_BFCVTNT, 0, 0x648AA000, 0xFFFFE000)
+	check("SVE_BFCVT",   .BFCVT,   1, 0x658AA000, 0xFFFFE000)
+	check("SVE_BFCVTNT", .BFCVTNT, 0, 0x648AA000, 0xFFFFE000)
 
 	// ---- PAC-authenticated loads ----------------------------------------
 	check("LDRAA",       .LDRAA,      0, 0xF8200400, 0xFFA00C00)
 	check("LDRAB",       .LDRAB,      0, 0xF8A00400, 0xFFA00C00)
-	check("LDRAA_PRE",   .LDRAA_PRE,  0, 0xF8200C00, 0xFFA00C00)
-	check("LDRAB_PRE",   .LDRAB_PRE,  0, 0xF8A00C00, 0xFFA00C00)
+	check("LDRAA_PRE",   .LDRAA,  1, 0xF8200C00, 0xFFA00C00)
+	check("LDRAB_PRE",   .LDRAB,  1, 0xF8A00C00, 0xFFA00C00)
 
 	// ---- TME ------------------------------------------------------------
 	check("TSTART",  .TSTART,  0, 0xD5233060, 0xFFFFFFE0)
@@ -387,7 +395,8 @@ main :: proc() {
 	check("WFIT",    .WFIT, 0, 0xD5031020, 0xFFFFFFE0)
 
 	// ---- BC.cond (v8.8-A) ------------------------------------------------
-	check("BC.cond", .BC_COND, 0, 0x54000010, 0xFF000010)
+	check("BC.eq",   .BC_EQ,   0, 0x54000010, 0xFF00001F)
+	check("BC.le",   .BC_LE,   0, 0x5400001D, 0xFF00001F)
 
 	// ---- Sign/zero-extend aliases ---------------------------------------
 	check("UXTB", .UXTB, 0, 0x53001C00, 0xFFFFFC00)
@@ -416,9 +425,9 @@ main :: proc() {
 	check("LDAPURSW",  .LDAPURSW, 0, 0x99800000, 0xFFE00C00)
 
 	// ---- SVE BF16 predicated arithmetic ---------------------------------
-	check("SVE_BFADD", .SVE_BFADD, 0, 0x65008000, 0xFFE0E000)
-	check("SVE_BFMUL", .SVE_BFMUL, 0, 0x65028000, 0xFFE0E000)
-	check("SVE_BFMLA", .SVE_BFMLA, 0, 0x65200000, 0xFFE0E000)
+	check("SVE_BFADD", .BFADD, 0, 0x65008000, 0xFFFFE000)
+	check("SVE_BFMUL", .BFMUL, 0, 0x65028000, 0xFFFFE000)
+	check("SVE_BFMLA", .BFMLA, 0, 0x65200000, 0xFFE0E000)
 
 	// ---- Speculation / profiling barriers + BTI variants ----------------
 	check("SB",        .SB,        0, 0xD50330FF, 0xFFFFFFFF)
@@ -426,48 +435,48 @@ main :: proc() {
 	check("DGH",       .DGH,       0, 0xD50320DF, 0xFFFFFFFF)
 	check("PSB CSYNC", .PSB_CSYNC, 0, 0xD503223F, 0xFFFFFFFF)
 	check("TSB CSYNC", .TSB_CSYNC, 0, 0xD503225F, 0xFFFFFFFF)
-	check("BTI j",     .BTI_J,     0, 0xD503245F, 0xFFFFFFFF)
-	check("BTI c",     .BTI_C,     0, 0xD503249F, 0xFFFFFFFF)
+	check("BTI j",     .BTI_J,     0, 0xD503249F, 0xFFFFFFFF)
+	check("BTI c",     .BTI_C,     0, 0xD503245F, 0xFFFFFFFF)
 	check("BTI jc",    .BTI_JC,    0, 0xD50324DF, 0xFFFFFFFF)
 
 	// ---- NEON aliases ---------------------------------------------------
-	check("MOV.16B",   .MOV_V_ALIAS, 1, 0x4EA01C00, 0xFFE0FC00)
-	check("NOT.16B",   .NOT_V_ALIAS, 1, 0x6E205800, 0xFFFFFC00)
+	check("MOV.16B",   .MOV, 1, 0x4EA01C00, 0xFFE0FC00)
+	check("NOT.16B",   .NOT, 1, 0x6E205800, 0xFFFFFC00)
 
 	// ---- Shift-by-immediate aliases -------------------------------------
-	check("LSR_IMM 32", .LSR_IMM, 0, 0x53007C00, 0xFFC0FC00)
-	check("LSR_IMM 64", .LSR_IMM, 1, 0xD340FC00, 0xFFC0FC00)
-	check("ASR_IMM 32", .ASR_IMM, 0, 0x13007C00, 0xFFC0FC00)
-	check("ASR_IMM 64", .ASR_IMM, 1, 0x9340FC00, 0xFFC0FC00)
+	check("LSR 32", .LSR, 6, 0x53007C00, 0xFFC0FC00)
+	check("LSR 64", .LSR, 7, 0xD340FC00, 0xFFC0FC00)
+	check("ASR 32", .ASR, 6, 0x13007C00, 0xFFC0FC00)
+	check("ASR 64", .ASR, 7, 0x9340FC00, 0xFFC0FC00)
 
 	// ---- LSL_IMM / ROR_IMM (composite-packed aliases) --------------------
-	check("LSL_IMM 32", .LSL_IMM, 0, 0x53000000, 0xFFC00000)
-	check("LSL_IMM 64", .LSL_IMM, 1, 0xD3400000, 0xFFC00000)
-	check("ROR_IMM 32", .ROR_IMM, 0, 0x13800000, 0xFFE00000)
-	check("ROR_IMM 64", .ROR_IMM, 1, 0x93C00000, 0xFFE00000)
+	check("LSL 32", .LSL, 6, 0x53000000, 0xFFC00000)
+	check("LSL 64", .LSL, 7, 0xD3400000, 0xFFC00000)
+	check("ROR 32", .ROR, 2, 0x13800000, 0xFFE00000)
+	check("ROR 64", .ROR, 3, 0x93C00000, 0xFFE00000)
 
 	// ---- SVE2.1 / SVE BF16 unpredicated + clamp + max/min ----------------
-	check("BFADD unpred", .SVE_BFADD_UNPRED, 0, 0x65000000, 0xFFE0FC00)
-	check("BFSUB unpred", .SVE_BFSUB_UNPRED, 0, 0x65000400, 0xFFE0FC00)
-	check("BFMUL unpred", .SVE_BFMUL_UNPRED, 0, 0x65000800, 0xFFE0FC00)
-	check("BFCLAMP",      .SVE_BFCLAMP,      0, 0x64202400, 0xFFE0FC00)
-	check("BFMAXNM",      .SVE_BFMAXNM,      0, 0x65048000, 0xFFE0E000)
-	check("BFMINNM",      .SVE_BFMINNM,      0, 0x65058000, 0xFFE0E000)
+	check("BFADD unpred", .BFADD, 1, 0x65000000, 0xFFE0FC00)
+	check("BFSUB unpred", .BFSUB, 1, 0x65000400, 0xFFE0FC00)
+	check("BFMUL unpred", .BFMUL, 1, 0x65000800, 0xFFE0FC00)
+	check("BFCLAMP",      .BFCLAMP,      0, 0x64202400, 0xFFE0FC00)
+	check("BFMAXNM",      .BFMAXNM,      0, 0x65048000, 0xFFFFE000)
+	check("BFMINNM",      .BFMINNM,      0, 0x65058000, 0xFFFFE000)
 
 	// ---- SME2 multi-vector ----------------------------------------------
-	check("SME2 LUTI2.B", .SME2_LUTI2_B, 0, 0xC08C4000, 0xFFE0F000)
-	check("SME2 LUTI4.B", .SME2_LUTI4_B, 0, 0xC08A4000, 0xFFE0F000)
-	check("SME2 LD1B x2", .SME2_LD1B_X2, 0, 0xA0000000, 0xFFE0E000)
-	check("SME2 LD1W x4", .SME2_LD1W_X4, 0, 0xA000C000, 0xFFE0E000)
-	check("SME2 ST1D x2", .SME2_ST1D_X2, 0, 0xA0206000, 0xFFE0E000)
-	check("SME2 ZIP_4",   .SME2_ZIP_4,   0, 0xC136E000, 0xFFFFFC00)
-	check("SME2 UZP_3",   .SME2_UZP_3,   0, 0xC120D001, 0xFFE0FC00)
+	check("SME2 LUTI2.B", .LUTI2, 0, 0xC08C4000, 0xFFFE7C00)
+	check("SME2 LUTI4.B", .LUTI4, 0, 0xC08A4000, 0xFFFE7C00)
+	check("SME2 LD1B x2", .LD1B, 4, 0xA0000000, 0xFFE0E000)
+	check("SME2 LD1W x4", .LD1W, 5, 0xA000C000, 0xFFE0E000)
+	check("SME2 ST1D x2", .ST1D, 3, 0xA0206000, 0xFFE0E000)
+	check("SME2 ZIP_4",   .ZIP,   1, 0xC136E000, 0xFFFFFC00)
+	check("SME2 UZP_3",   .UZP,   0, 0xC120D001, 0xFFE0FC01)
 
 	// ---- RME (Realm Management Extension) -------------------------------
 	check("TLBI RPALOS",  .TLBI_RPALOS,  0, 0xD5084EE0, 0xFFFFFFE0)
 	check("TLBI RPAOS",   .TLBI_RPAOS,   0, 0xD5084EA0, 0xFFFFFFE0)
-	check("TLBI PAALL",   .TLBI_PAALL,   0, 0xD508E89F, 0xFFFFFFFF)
-	check("TLBI PAALLOS", .TLBI_PAALLOS, 0, 0xD508E81F, 0xFFFFFFFF)
+	check("TLBI PAALL",   .TLBI_PAALL,   0, 0xD50E879F, 0xFFFFFFFF)
+	check("TLBI PAALLOS", .TLBI_PAALLOS, 0, 0xD50E819F, 0xFFFFFFFF)
 	check("AT S1E1A",     .AT_S1E1A,     0, 0xD5079140, 0xFFFFFFE0)
 	check("DC CIPAPA",    .DC_CIPAPA,    0, 0xD50E7CE0, 0xFFFFFFE0)
 	check("DC CIGDPAPA",  .DC_CIGDPAPA,  0, 0xD50E7DE0, 0xFFFFFFE0)

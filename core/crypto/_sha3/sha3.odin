@@ -134,6 +134,7 @@ init :: proc "contextless" (ctx: ^Context) {
 	}
 	ctx.rsiz = 200 - 2 * ctx.mdlen
 	ctx.pt = 0
+	ctx.keccak_round_start = 0
 
 	ctx.is_initialized = true
 	ctx.is_finalized = false

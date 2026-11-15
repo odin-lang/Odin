@@ -220,7 +220,14 @@ local function structural(isa)
   local p, bad = pkg(isa), {}
   local function must(rel)    if not file_exists(p.."/"..rel) then bad[#bad+1]="missing "..rel end end
   local function absent(rel)  if file_exists(p.."/"..rel)     then bad[#bad+1]="stray "..rel   end end
-  must("tables.odin"); must("tablegen/encoding_table.odin"); must("tablegen/gen.odin")
+  -- the table source is encoding_table.odin, except where it has been renamed
+  -- to instruction_table.odin (arm64/riscv/x86); either satisfies the check
+  local function must_one(a, b)
+    if not (file_exists(p.."/"..a) or file_exists(p.."/"..b)) then
+      bad[#bad+1] = "missing "..a.." (or "..b..")"
+    end
+  end
+  must("tables.odin"); must_one("tablegen/encoding_table.odin", "tablegen/instruction_table.odin"); must("tablegen/gen.odin")
   must("tablegen/generated/encode_tables.odin"); must("tablegen/generated/decode_tables.odin")
   must("tablegen/generated/writer.odin")
   must("mnemonic_builders.odin"); must("tools/gen_mnemonic_builders.odin")

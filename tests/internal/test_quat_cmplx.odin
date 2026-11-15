@@ -1,6 +1,7 @@
 package test_internal
 
 import "core:testing"
+import "core:strconv"
 
 // Constant folding of complex and quaternion values, against the answer the backend
 // produces. Every constant case is paired with the same expression on variables: the
@@ -326,4 +327,92 @@ accessors_keep_their_bits_through_transmute :: proc(t: ^testing.T) {
 	k := kmag(q)
 	testing.expect_value(t, transmute(u64)jmag(q), transmute(u64)j)
 	testing.expect_value(t, transmute(u64)kmag(q), transmute(u64)k)
+}
+
+// Untyped complex/quaternion constant components are now held exactly (as big rationals) and the
+// arithmetic folds exactly, rounding only once when the value is finally given a concrete type. This
+// is the complex/quaternion analogue of `0.1 + 0.2 == 0.3` for untyped floats: before, the components
+// were pre-rounded to f64 and every lane folded in binary floating point, coming out a ULP off.
+
+@(test)
+constant_complex_exact_folding :: proc(t: ^testing.T) {
+	X :: 0.1 + 0.2i
+	Y :: 0.2 + 0.1i
+	testing.expect(t, complex128(X + Y) == complex128(0.3 + 0.3i), "exact complex constant addition")
+
+	// (1/10) * 3 == 3/10 exactly, in the real lane
+	testing.expect(t, complex128((0.1+0i) * 3) == complex128(0.3+0i), "exact complex constant multiplication")
+
+	// (0.3 + 0.6i) / 3 == (0.1 + 0.2i) exactly (true rational division, not fmod)
+	testing.expect(t, complex128((0.3 + 0.6i) / 3) == complex128(0.1 + 0.2i), "exact complex constant division")
+
+	// The same expression on runtime f64 variables still rounds in binary floating point, so the
+	// folded and runtime answers genuinely differ here.
+	xr, xi := 0.1, 0.2
+	yr, yi := 0.2, 0.1
+	runtime_sum := complex(xr, xi) + complex(yr, yi)
+	testing.expect(t, runtime_sum != complex128(0.3 + 0.3i), "runtime complex arithmetic still rounds")
+}
+
+@(test)
+constant_quaternion_exact_folding :: proc(t: ^testing.T) {
+	X :: 0.1 + 0.2i + 0.3j + 0.4k
+	Y :: 0.2 + 0.1i + 0.4j + 0.3k
+	testing.expect(t, quaternion256(X + Y) == quaternion256(0.3 + 0.3i + 0.7j + 0.7k),
+		"exact quaternion constant addition")
+
+	// Multiplying by a real scalar keeps every lane exact.
+	testing.expect(t, quaternion256((0.1 + 0.2i + 0.3j + 0.4k) * 10) == quaternion256(1 + 2i + 3j + 4k),
+		"exact quaternion constant multiplication")
+
+	q64  := quaternion(w=0.1, x=0.2, y=0.3, z=0.4) + quaternion(w=0.2, x=0.1, y=0.4, z=0.3)
+	testing.expect(t, q64 != quaternion256(0.3 + 0.3i + 0.7j + 0.7k), "runtime quaternion arithmetic still rounds")
+}
+
+// A finite component that overflows the element float's range is rejected at compile time (parity with
+// scalar floats), so `complex128(1.0e400)` is an error rather than a silent +Inf. The rejection itself is
+// a compile error and can't be asserted here; these near-max constants guard the other side - that
+// representable components are NOT falsely rejected.
+
+@(test)
+constant_complex_representable_bounds :: proc(t: ^testing.T) {
+	c128 :: complex128(1e308 + 1e308i)          // < f64 max (~1.8e308)
+	testing.expect_value(t, real(c128), 1e308)
+	testing.expect_value(t, imag(c128), 1e308)
+
+	c64 :: complex64(3e38 + 3e38i)              // < f32 max (~3.4e38)
+	testing.expect(t, real(c64) > 0 && imag(c64) > 0, "complex64 near-max components fold")
+
+	c32 :: complex32(60000 + 60000i)            // < f16 max (65504)
+	testing.expect(t, real(c32) > 0 && imag(c32) > 0, "complex32 near-max components fold")
+
+	q256 :: quaternion256(1e308 + 1e308i + 1e308j + 1e308k)
+	testing.expect_value(t, jmag(q256), 1e308)
+	testing.expect_value(t, kmag(q256), 1e308)
+
+	q64 :: quaternion64(60000 + 60000i + 60000j + 60000k)
+	testing.expect(t, jmag(q64) > 0 && kmag(q64) > 0, "quaternion64 near-max lanes fold")
+}
+
+// complex64/complex32 (and quaternion128/quaternion64) components are rounded exactly once, directly
+// from the exact literal to the element format, so a folded constant matches the correctly-rounded
+// runtime parse instead of double-rounding through f64.
+
+@(test)
+constant_complex_f32_rounding :: proc(t: ^testing.T) {
+	c32 :: proc(t: ^testing.T, got: f32, lit: string) {
+		want, _ := strconv.parse_f32(lit)
+		testing.expectf(t, transmute(u32)got == transmute(u32)want,
+			"f32 %s: got %08x, want %08x", lit, transmute(u32)got, transmute(u32)want)
+	}
+	rr : f32 : real(complex64(0.1 + 0.2i))
+	ii : f32 : imag(complex64(0.1 + 0.2i))
+	c32(t, rr, "0.1")
+	c32(t, ii, "0.2")
+	c32(t, real(complex64(3.14159265358979323846 + 2.71828182845904523536i)), "3.14159265358979323846")
+	c32(t, imag(complex64(3.14159265358979323846 + 2.71828182845904523536i)), "2.71828182845904523536")
+
+	// quaternion128 lanes as well
+	q1 : f32 : jmag(quaternion128(0 + 0i + 0.1j + 0k))
+	c32(t, q1, "0.1")
 }

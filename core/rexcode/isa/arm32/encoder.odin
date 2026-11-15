@@ -160,9 +160,11 @@ encode_one_inline :: #force_inline proc(
 	if inst.form_id != 0 && int(inst.form_id) - 1 < len(forms) {
 		f := &forms[inst.form_id - 1]
 		if f.mode == inst.mode &&
+		   (inst.dt[0] == .NONE || f.dt == inst.dt) &&
 		   (want_len == 0 || inst_size_from_bits(f.bits, f.mode) == want_len) &&
 		   encoding_matches_inline(inst, f) &&
-		   inst.flags.sets_flags == f.flags.sets_flags &&
+		   inst.sets_flags == f.flags.sets_flags &&
+		   writeback_matches(inst, f) &&
 		   mem_mode_matches(inst, f) {
 			form = f
 		}
@@ -170,10 +172,16 @@ encode_one_inline :: #force_inline proc(
 	if form == nil {
 		for &f in forms {
 			if f.mode != inst.mode { continue }
+			// The `.i32` / `.s32.f32` suffix. NEON reuses one operand shape
+			// across every element width, so without this the scan can only
+			// ever reach the first form of a shape. .NONE means the caller did
+			// not say, and every form of the shape stays eligible.
+			if inst.dt[0] != .NONE && f.dt != inst.dt { continue }
 			if want_len > 0 && inst_size_from_bits(f.bits, f.mode) != want_len { continue }
 			if !encoding_matches_inline(inst, &f) { continue }
-			if inst.flags.sets_flags && !f.flags.sets_flags { continue }
-			if !inst.flags.sets_flags && f.flags.sets_flags { continue }
+			if inst.sets_flags && !f.flags.sets_flags { continue }
+			if !inst.sets_flags && f.flags.sets_flags { continue }
+			if !writeback_matches(inst, &f) { continue }
 			if !mem_mode_matches(inst, &f) { continue }
 			form = &f
 			break
@@ -194,10 +202,10 @@ encode_one_inline :: #force_inline proc(
 		word = (word & 0x0FFFFFFF) | (u32(inst.cond) << 28)
 	}
 
-	if form.enc[0] != .NONE { word |= pack_operand_inline(&inst.ops[0], form.enc[0], pc, inst_idx, relocs, form) }
-	if form.enc[1] != .NONE { word |= pack_operand_inline(&inst.ops[1], form.enc[1], pc, inst_idx, relocs, form) }
-	if form.enc[2] != .NONE { word |= pack_operand_inline(&inst.ops[2], form.enc[2], pc, inst_idx, relocs, form) }
-	if form.enc[3] != .NONE { word |= pack_operand_inline(&inst.ops[3], form.enc[3], pc, inst_idx, relocs, form) }
+	if form.enc[0] != .NONE { word |= pack_operand_inline(&inst.ops[0], form.enc[0], pc, inst_idx, relocs, form, inst) }
+	if form.enc[1] != .NONE { word |= pack_operand_inline(&inst.ops[1], form.enc[1], pc, inst_idx, relocs, form, inst) }
+	if form.enc[2] != .NONE { word |= pack_operand_inline(&inst.ops[2], form.enc[2], pc, inst_idx, relocs, form, inst) }
+	if form.enc[3] != .NONE { word |= pack_operand_inline(&inst.ops[3], form.enc[3], pc, inst_idx, relocs, form, inst) }
 
 	return word, inst_size_from_bits(form.bits, form.mode), true
 }
@@ -239,7 +247,11 @@ mem_mode_matches :: #force_inline proc "contextless" (inst: ^Instruction, form: 
 		// because R0-as-index is exceedingly rare in real code.
 		has_index := op.mem.index != Register(0)
 		#partial switch form.enc[k] {
-		case .MEM_IMM12_OFFSET, .MEM_IMM8_OFFSET:
+		case .MEM_IMM8_SCALED4_PRE:
+			if m != .PRE_INDEX { return false }
+		case .MEM_IMM8_SCALED4_POST:
+			if m != .POST_INDEX { return false }
+		case .MEM_IMM12_OFFSET, .MEM_IMM8_OFFSET, .MEM_IMM8_SCALED4:
 			if m != .OFFSET { return false }
 			if has_index { return false }
 		case .MEM_REG_OFFSET, .MEM_DOUBLEREG:
@@ -256,14 +268,14 @@ mem_mode_matches :: #force_inline proc "contextless" (inst: ^Instruction, form: 
 
 @(private="file")
 encoding_matches_inline :: #force_inline proc "contextless" (inst: ^Instruction, form: ^Encoding) -> bool {
-	return  operand_matches_inline(&inst.ops[0], form.ops[0]) &&
-	        operand_matches_inline(&inst.ops[1], form.ops[1]) &&
-	        operand_matches_inline(&inst.ops[2], form.ops[2]) &&
-	        operand_matches_inline(&inst.ops[3], form.ops[3])
+	return  operand_matches_inline(&inst.ops[0], form.ops[0], form.enc[0]) &&
+	        operand_matches_inline(&inst.ops[1], form.ops[1], form.enc[1]) &&
+	        operand_matches_inline(&inst.ops[2], form.ops[2], form.enc[2]) &&
+	        operand_matches_inline(&inst.ops[3], form.ops[3], form.enc[3])
 }
 
 @(private="file")
-operand_matches_inline :: #force_inline proc "contextless" (op: ^Operand, ot: Operand_Type) -> bool {
+operand_matches_inline :: #force_inline proc "contextless" (op: ^Operand, ot: Operand_Type, enc: Operand_Encoding) -> bool {
 	#partial switch ot {
 	case .NONE:
 		return op.kind == .NONE
@@ -278,16 +290,40 @@ operand_matches_inline :: #force_inline proc "contextless" (op: ^Operand, ot: Op
 	case .SPR:      return op.kind == .REGISTER && is_spr(op.reg)
 	case .DPR:      return op.kind == .REGISTER && is_dpr(op.reg)
 	case .QPR:      return op.kind == .REGISTER && is_qpr(op.reg)
-	case .DPR_ELEM: return op.kind == .REGISTER && is_dpr(op.reg)
+	case .DPR_ELEM:
+		if op.kind != .REGISTER || !is_dpr(op.reg) { return false }
+		// A by-scalar multiplier names a lane, and how far the register and
+		// lane numbers reach depends on how they share the field.
+		#partial switch enc {
+		case .NEON_VM_SCALAR_16: return op.has_lane && reg_hw(op.reg) < 8  && op.lane < 4
+		case .NEON_VM_SCALAR_32: return op.has_lane && reg_hw(op.reg) < 16 && op.lane < 2
+		case .NEON_VDUP_LANE_8:  return op.has_lane && op.lane < 8
+		case .NEON_VDUP_LANE_16: return op.has_lane && op.lane < 4
+		case .NEON_VDUP_LANE_32: return op.has_lane && op.lane < 2
+		}
+		return true
 	case .QPR_ELEM: return op.kind == .REGISTER && is_qpr(op.reg)
 	case .SPR_ELEM: return op.kind == .REGISTER && is_spr(op.reg)
-	case .SPR_LIST, .DPR_LIST:
-		return op.kind == .REG_LIST || (op.kind == .REGISTER && (is_spr(op.reg) || is_dpr(op.reg)))
+	case .SPR_LIST:
+		return op.kind == .REGISTER && is_spr(op.reg)
+	case .DPR_LIST:
+		if op.kind != .REGISTER || !is_dpr(op.reg) { return false }
+		// Forms whose run length is a fixed pattern bit are told apart only
+		// by that length -- {d0} and {d0, d1} are different instructions.
+		#partial switch enc {
+		case .NEON_VN_TABLE_1: return op.list.count == 1
+		case .NEON_VN_TABLE_2: return op.list.count == 2
+		case .NEON_VN_TABLE_3: return op.list.count == 3
+		case .NEON_VN_TABLE_4: return op.list.count == 4
+		}
+		return true
 	case .IMM, .IMM_MOD, .IMM_T32_MOD, .IMM12, .IMM5, .IMM5_W,
 	     .IMM4, .IMM4_SAT, .IMM8, .IMM3, .IMM_HINT, .IMM_BARRIER,
-	     .IMM_ENDIAN, .IMM_IFLAGS, .IMM_BANKED, .IMM_SYSM,
+	     .IMM_IFLAGS, .IMM_BANKED, .IMM_SYSM,
 	     .IMM_COPROC, .IMM_COPROC_OP, .NEON_IMM, .IMM16_LO_HI:
-		return op.kind == .IMMEDIATE
+		// A modified immediate reaches an immediate slot as an expanded bit
+		// pattern or a float, so all three kinds are the same slot's shape.
+		return op.kind == .IMMEDIATE || op.kind == .HEX_IMMEDIATE || op.kind == .FLOAT_IMMEDIATE
 	case .REL24, .REL24_T32, .REL20, .REL11, .REL8, .REL_LDR_LITERAL, .REL_BF:
 		return op.kind == .RELATIVE
 	case .COND:
@@ -299,8 +335,12 @@ operand_matches_inline :: #force_inline proc "contextless" (op: ^Operand, ot: Op
 		return op.kind == .MEMORY || op.kind == .RELATIVE
 	case .COPROC_REG, .COPROC_NUM:
 		return op.kind == .REGISTER || op.kind == .IMMEDIATE
+	case .IMM_ENDIAN:
+		return op.kind == .REGISTER
 	case .PSR_FIELD:
-		return op.kind == .IMMEDIATE
+		// APSR, SPSR and the endian tokens are named registers in the syntax
+		// even where no field encodes them.
+		return op.kind == .IMMEDIATE || op.kind == .REGISTER
 	case .VPR, .QPR_MVE:
 		return op.kind == .REGISTER && is_qpr(op.reg)
 	case .QPR_MVE_LIST:
@@ -324,6 +364,8 @@ pack_operand_inline :: #force_inline proc(
 	inst_idx: u16,
 	relocs:   ^[dynamic]Relocation,
 	form:     ^Encoding,
+	// BFI's msb is lsb + width - 1, so packing it needs a sibling operand.
+	inst:     ^Instruction,
 ) -> u32 {
 	switch enc {
 	case .NONE, .IMPL:
@@ -397,6 +439,7 @@ pack_operand_inline :: #force_inline proc(
 	// ---- A32 immediate field placements ----
 	case .A32_IMM12:        return u32(op.immediate) & 0xFFF
 	case .A32_IMM_SHIFT:    return (u32(op.immediate) & 0x1F) << 7
+	case .A32_IMM_SHIFT_32: return (u32(op.immediate) & 0x1F) << 7   // 32 wraps to 0, which is what encodes it
 	case .A32_SHIFT_TYPE:   return (u32(op.immediate) & 0x3)  << 5
 	case .A32_RS_SHIFT:     return (u32(reg_hw(op.reg)) & 0xF) << 8
 	case .A32_IMM24:
@@ -465,6 +508,18 @@ pack_operand_inline :: #force_inline proc(
 		return (u32(reg_hw(op.reg)) & 0x7) << 17
 	case .VM_Q_MVE:
 		return (u32(reg_hw(op.reg)) & 0x7) << 1
+	case .DBG_OPTION:    return u32(op.immediate) & 0xF
+	case .MRS_SPEC_REG:  return 0    // the R bit is a fixed bit of the form
+	case .VFP_SPEC_REG:  return (u32(reg_hw(op.reg)) & 0xF) << 16
+	case .SETEND_ENDIAN: return (u32(reg_hw(op.reg)) & 1) << 9
+	case .IMPL_SP:       return 0
+	case .MODE_IMM5:     return u32(op.immediate) & 0x1F
+	case .RN_A32_WB:     return (u32(reg_hw(op.reg)) & 0xF) << 16
+	case .VM_S_PLUS1:
+		return 0    // only the first of the pair is encoded
+	case .NEON_LANE_VN_32:
+		n := u32(reg_hw(op.reg)) & 0x1F
+		return ((n >> 4) & 1) << 7 | (n & 0xF) << 16 | (u32(op.lane) & 1) << 21
 	case .VFP_IMM8:
 		// Run the VFP 8-bit float encoder; the user supplies the wire-format
 		// 32-bit float bit pattern (for F32). The encoder finds the abcdefgh.
@@ -489,20 +544,58 @@ pack_operand_inline :: #force_inline proc(
 	case .NEON_OP_BIT:      return (u32(op.immediate) & 1) << 5
 
 	// ---- VFP/NEON register lists (LDM/STM/PUSH/POP for FP regs) ------------
-	case .VFP_S_LIST, .VFP_D_LIST:
-		return u32(op.immediate) & 0xFF
+	case .NEON_D_LIST_1, .NEON_D_LIST_2, .NEON_D_LIST_3, .NEON_D_LIST_4, .NEON_D_LIST_2X, .NEON_D_LIST_3X, .NEON_D_LIST_4X, .NEON_D_LIST_ALL:
+		// Only Vd; the count lives in the form's type field.
+		n := u32(reg_hw(op.reg)) & 0x1F
+		return ((n >> 4) & 1) << 22 | (n & 0xF) << 12
+	case .NEON_D_LIST_ALL_2, .NEON_D_LIST_ALL_3, .NEON_D_LIST_ALL_4:
+		// Same, plus the spacing, which bit 5 carries.
+		n := u32(reg_hw(op.reg)) & 0x1F
+		return ((n >> 4) & 1) << 22 | (n & 0xF) << 12 | (op.list.stride > 1 ? u32(1) : 0) << 5
+	case .NEON_LANE_D_8, .NEON_LANE_D_16, .NEON_LANE_D_32, .NEON_LANE_D_8_2, .NEON_LANE_D_16_2, .NEON_LANE_D_32_2, .NEON_LANE_D_8_3, .NEON_LANE_D_16_3, .NEON_LANE_D_32_3, .NEON_LANE_D_8_4, .NEON_LANE_D_16_4, .NEON_LANE_D_32_4:
+		n := u32(reg_hw(op.reg)) & 0x1F
+		shift, mask, _ := neon_lane_shape(enc)
+		return ((n >> 4) & 1) << 22 | (n & 0xF) << 12 | (u32(op.lane) & mask) << shift
+	case .NEON_VDUP_LANE_8, .NEON_VDUP_LANE_16, .NEON_VDUP_LANE_32:
+		n := u32(reg_hw(op.reg)) & 0x1F
+		shift: u32 = enc == .NEON_VDUP_LANE_8 ? 1 : enc == .NEON_VDUP_LANE_16 ? 2 : 3
+		// The marker bit below the index is a fixed bit of the form.
+		return ((n >> 4) & 1) << 5 | (n & 0xF) | (u32(op.lane) << shift) << 16
+	case .NEON_VM_SCALAR_16:
+		n := u32(reg_hw(op.reg)) & 0x7
+		idx := u32(op.lane) & 0x3
+		return n | ((idx >> 1) & 1) << 5 | (idx & 1) << 3
+	case .NEON_VM_SCALAR_32:
+		return (u32(reg_hw(op.reg)) & 0xF) | (u32(op.lane) & 1) << 5
+	case .NEON_VN_TABLE_1, .NEON_VN_TABLE_2, .NEON_VN_TABLE_3, .NEON_VN_TABLE_4:
+		// The run length is already a fixed bit of the form; only Vn is ours.
+		n := u32(reg_hw(op.reg)) & 0x1F
+		return ((n >> 4) & 1) << 7 | (n & 0xF) << 16
+	case .VFP_S_LIST:
+		n := u32(reg_hw(op.reg)) & 0x1F
+		return ((n >> 1) & 0xF) << 12 | (n & 1) << 22 | (u32(op.list.count) & 0xFF)
+	case .VFP_D_LIST:
+		n := u32(reg_hw(op.reg)) & 0x1F
+		return ((n >> 4) & 1) << 22 | (n & 0xF) << 12 | ((u32(op.list.count) * 2) & 0xFF)
 
 	// ---- Memory addressing composites --------------------------------------
+	case .MEM_IMM8_SCALED4, .MEM_IMM8_SCALED4_PRE, .MEM_IMM8_SCALED4_POST:
+		m := op.mem
+		base := (u32(reg_hw(m.base)) & 0xF) << 16
+		u_bit: u32 = (m.disp > 0 || (m.disp == 0 && m.sign >= 0)) ? 1 : 0
+		return base | (u_bit << 23) | ((u32(abs_i32(m.disp)) / 4) & 0xFF)
 	case .MEM_IMM12_OFFSET:
 		m := op.mem
 		base := (u32(reg_hw(m.base)) & 0xF) << 16
-		u_bit: u32 = m.disp >= 0 ? 1 : 0
+		u_bit: u32 = (m.disp > 0 || (m.disp == 0 && m.sign >= 0)) ? 1 : 0
 		disp := u32(abs_i32(m.disp)) & 0xFFF
 		return base | (u_bit << 23) | disp
-	case .MEM_IMM8_OFFSET:
+	case .RT2_A32_PAIR:
+		return 0
+	case .MEM_IMM8_PRE_INDEX, .MEM_IMM8_POST_INDEX, .MEM_IMM8_OFFSET:
 		m := op.mem
 		base := (u32(reg_hw(m.base)) & 0xF) << 16
-		u_bit: u32 = m.disp >= 0 ? 1 : 0
+		u_bit: u32 = (m.disp > 0 || (m.disp == 0 && m.sign >= 0)) ? 1 : 0
 		disp := u32(abs_i32(m.disp)) & 0xFF
 		return base | (u_bit << 23) | ((disp >> 4) & 0xF) << 8 | (disp & 0xF)
 	case .MEM_REG_OFFSET:
@@ -516,14 +609,14 @@ pack_operand_inline :: #force_inline proc(
 		// P=1, W=1 in bits 24/21 to select pre-index addressing mode.
 		m := op.mem
 		base := (u32(reg_hw(m.base)) & 0xF) << 16
-		u_bit: u32 = m.disp >= 0 ? 1 : 0
+		u_bit: u32 = (m.disp > 0 || (m.disp == 0 && m.sign >= 0)) ? 1 : 0
 		disp := u32(abs_i32(m.disp)) & 0xFFF
 		return base | (u_bit << 23) | disp
 	case .MEM_POST_INDEX:
 		// Same layout as MEM_IMM12_OFFSET; form bits select P=0 in bit 24.
 		m := op.mem
 		base := (u32(reg_hw(m.base)) & 0xF) << 16
-		u_bit: u32 = m.disp >= 0 ? 1 : 0
+		u_bit: u32 = (m.disp > 0 || (m.disp == 0 && m.sign >= 0)) ? 1 : 0
 		disp := u32(abs_i32(m.disp)) & 0xFFF
 		return base | (u_bit << 23) | disp
 	case .MEM_LITERAL:
@@ -537,7 +630,9 @@ pack_operand_inline :: #force_inline proc(
 		return ((u32(reg_hw(m.base)) & 0xF) << 16) | (u32(reg_hw(m.index)) & 0xF)
 
 	// ---- Coprocessor -------------------------------------------------------
-	case .COPROC_NUM_FIELD:   return (u32(op.immediate) & 0xF) << 8
+	case .COPROC_NUM_FIELD:   return (u32(reg_hw(op.reg)) & 0xF) << 8
+	case .COPROC_CRD_FIELD:   return (u32(reg_hw(op.reg)) & 0xF) << 12
+	case .COPROC_OPC1_MCR:    return (u32(op.immediate) & 0x7) << 21
 	case .COPROC_OPC1_FIELD:  return (u32(op.immediate) & 0xF) << 20
 	case .COPROC_OPC2_FIELD:  return (u32(op.immediate) & 0x7) << 5
 	case .COPROC_CRN_FIELD:   return (u32(reg_hw(op.reg)) & 0xF) << 16
@@ -607,9 +702,30 @@ pack_operand_inline :: #force_inline proc(
 	case .IT_MASK:          return u32(op.immediate) & 0xFF
 	case .CPS_IFLAGS:       return u32(op.immediate) & 0x1FF
 	case .HINT_FIELD:       return u32(op.immediate) & 0xFF
-	case .SAT_IMM5, .SAT_IMM5_T32:
+	case .NEON_SHLL_8, .NEON_SHLL_16, .NEON_SHLL_32:
+		return 0    // the amount is the form's element size; no field carries it
+	case .NEON_ROT_2:
+		return (op.immediate == 270 ? u32(1) : 0) << 24
+	case .NEON_ROT_4:
+		return ((u32(op.immediate) / 90) & 3) << 20
+	case .NEON_ROT_4_HI:
+		return ((u32(op.immediate) / 90) & 3) << 23
+	case .VFP_FBITS:
+		// sx is a fixed bit of the form, so the width comes from its pattern.
+		width: u32 = ((form.bits >> 7) & 1) != 0 ? 32 : 16
+		imm := width - (u32(op.immediate) & 0x3F)
+		return ((imm >> 1) & 0xF) | (imm & 1) << 5
+	case .SAT_IMM5, .SAT_IMM5_T32, .BFX_WIDTH:
+		return ((u32(op.immediate) - 1) & 0x1F) << 16
+	case .SAT_IMM5_U, .SAT_IMM5_U_T32:
 		return (u32(op.immediate) & 0x1F) << 16
-	case .BFI_MSB:          return (u32(op.immediate) & 0x1F) << 16
+	case .BFI_MSB:
+		// msb = lsb + width - 1; the lsb rides in whichever slot carries it.
+		lsb: u32 = 0
+		for e, k in form.enc {
+			if e == .BFI_LSB || e == .BFI_LSB_T32 { lsb = u32(inst.ops[k].immediate); break }
+		}
+		return ((lsb + u32(op.immediate) - 1) & 0x1F) << 16
 	case .BFI_LSB, .BFI_LSB_T32:
 		return (u32(op.immediate) & 0x1F) << 7
 	case .NEON_SHIFT_IMM6:  return (u32(op.immediate) & 0x3F) << 16
@@ -838,4 +954,37 @@ write_u16_le :: #force_inline proc "contextless" (code: []u8, offset: u32, word:
 @(private="package")
 read_u16_le :: #force_inline proc "contextless" (code: []u8, offset: u32) -> u16 {
 	return u16(code[offset+0]) | (u16(code[offset+1]) << 8)
+}
+
+// The lane field's position and the list length for a NEON single-lane
+// load/store. The lane sits just above the alignment bits, and how far above
+// follows the element size: bits 7:5 for .8, 7:6 for .16, bit 7 for .32.
+@(private="file", require_results)
+neon_lane_shape :: #force_inline proc "contextless" (e: Operand_Encoding) -> (shift, mask: u32, count: u8) {
+	#partial switch e {
+	case .NEON_LANE_D_8:    return 5, 0x7, 1
+	case .NEON_LANE_D_16:   return 6, 0x3, 1
+	case .NEON_LANE_D_32:   return 7, 0x1, 1
+	case .NEON_LANE_D_8_2:  return 5, 0x7, 2
+	case .NEON_LANE_D_16_2: return 6, 0x3, 2
+	case .NEON_LANE_D_32_2: return 7, 0x1, 2
+	case .NEON_LANE_D_8_3:  return 5, 0x7, 3
+	case .NEON_LANE_D_16_3: return 6, 0x3, 3
+	case .NEON_LANE_D_32_3: return 7, 0x1, 3
+	case .NEON_LANE_D_8_4:  return 5, 0x7, 4
+	case .NEON_LANE_D_16_4: return 6, 0x3, 4
+	case:                   return 7, 0x1, 4
+	}
+}
+
+// LDM/STM come in a writeback form and a plain one that differ only in bit 21,
+// so the operand shapes cannot tell them apart.
+@(private="file", require_results)
+writeback_matches :: #force_inline proc "contextless" (inst: ^Instruction, f: ^Encoding) -> bool {
+	for e in f.enc {
+		if e == .A32_REG_LIST || e == .RN_A32_WB || e == .IMPL_SP {
+			return ((f.bits >> 21) & 1 != 0) == inst.writeback
+		}
+	}
+	return true
 }

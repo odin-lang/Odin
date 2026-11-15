@@ -666,35 +666,195 @@ print_highlighted :: proc(text: string, tokens: []x86.Token) {
 // SECTION 4: MNEMONIC EQUIVALENCE
 // =============================================================================
 
+/*
+	Several x86 mnemonics name ONE encoding -- SHL and SAL are both /4 in the
+	shift group, JE and JZ are both 0x74. Which name a decode returns is declared
+	by x86.MNEMONIC_ALIASES and enforced by the generator, which drops the
+	aliased spelling before the decode tables are written; so encoding SAL and
+	decoding it back yields SHL, and a round-trip compares canonical forms.
+
+	This used to be a second alias table maintained BY HAND here, and that is how
+	SHL/SAL went missing: the shift group was never listed, nothing checked, and
+	it stayed invisible until a table regeneration moved SAL ahead of SHL and
+	four long-passing tests began reporting `SAL != expected SHL`. There is now
+	one table, in the library, and run_alias_table_test below proves it complete
+	against the built tables rather than against anyone's memory.
+*/
 mnemonics_eq :: proc(a, b: x86.Mnemonic) -> bool {
-	if a == b { return true }
-	aliases := [][2]x86.Mnemonic{
-		// MOV/MOVABS
-		{.MOV, .MOVABS},
-		// CMOVcc aliases
-		{.CMOVE, .CMOVZ}, {.CMOVNE, .CMOVNZ},
-		{.CMOVG, .CMOVNLE}, {.CMOVGE, .CMOVNL},
-		{.CMOVL, .CMOVNGE}, {.CMOVLE, .CMOVNG},
-		{.CMOVA, .CMOVNBE}, {.CMOVAE, .CMOVNB}, {.CMOVAE, .CMOVNC},
-		{.CMOVB, .CMOVNAE}, {.CMOVB, .CMOVC}, {.CMOVBE, .CMOVNA},
-		// SETcc aliases
-		{.SETE, .SETZ}, {.SETNE, .SETNZ},
-		{.SETG, .SETNLE}, {.SETGE, .SETNL},
-		{.SETL, .SETNGE}, {.SETLE, .SETNG},
-		{.SETA, .SETNBE}, {.SETAE, .SETNB}, {.SETAE, .SETNC},
-		{.SETB, .SETNAE}, {.SETB, .SETC}, {.SETBE, .SETNA},
-		// Jcc aliases
-		{.JE, .JZ}, {.JNE, .JNZ},
-		{.JB, .JC}, {.JAE, .JNC},
-		{.JG, .JNLE}, {.JGE, .JNL},
-		{.JL, .JNGE}, {.JLE, .JNG},
-		{.JA, .JNBE}, {.JAE, .JNB},
-		{.JB, .JNAE}, {.JBE, .JNA},
+	return a == b || x86.canonical_mnemonic(a) == x86.canonical_mnemonic(b)
+}
+
+/*
+	No encoding may be spelled by two mnemonics that both survive into the decode
+	tables -- because the decoder would then have to choose between them with
+	nothing to choose on, which is the defect x86.MNEMONIC_ALIASES exists to
+	remove. Two entries are indistinguishable exactly when they agree on every
+	field the decoder can read, so the property is computable from the tables
+	themselves, and this recomputes it.
+
+	It is what makes the declaration maintainable: an instruction added with a
+	mnemonic that aliases another's encoding fails here BY NAME, with the row to
+	write, instead of silently decoding as whichever spelling the sort happened
+	to put first.
+*/
+run_alias_table_test :: proc() {
+	Group_Key :: struct {
+		esc:    x86.Escape,
+		prefix: u8,
+		opcode: u8,
+		ext:    u8,
+		ops:    [4]x86.Operand_Type,
+		enc:    [4]x86.Operand_Encoding,
+		flags:  x86.Encoding_Flags,
 	}
-	for alias in aliases {
-		if (a == alias[0] && b == alias[1]) || (a == alias[1] && b == alias[0]) { return true }
+	groups := make(map[Group_Key][dynamic]x86.Mnemonic)
+	defer {
+		for _, list in groups { delete(list) }
+		delete(groups)
 	}
-	return false
+	for e in x86.LEGACY_DECODE_ENTRIES {
+		key := Group_Key{e.esc, e.prefix, e.opcode, e.ext, e.ops, e.enc, e.flags}
+		list, present := &groups[key]
+		if !present {
+			groups[key] = make([dynamic]x86.Mnemonic)
+			list = &groups[key]
+		}
+		known := false
+		for m in list {
+			if m == e.mnemonic {
+				known = true
+				break
+			}
+		}
+		if !known { append(list, e.mnemonic) }
+	}
+
+	ambiguous := 0
+	for key, list in groups {
+		if len(list) < 2 { continue }
+		ambiguous += 1
+		if ambiguous <= 10 {
+			fmt.printf("    %sFAIL%s esc=%v prefix=%d opcode=%02X ext=%02X is spelled by",
+				RED, RESET, key.esc, key.prefix, key.opcode, key.ext)
+			for m in list { fmt.printf(" %v", m) }
+			fmt.printf(",\n         and the decoder has nothing to choose between them. Declare one in\n")
+			fmt.printf("         x86.MNEMONIC_ALIASES (isa/x86/aliases.odin), then regenerate:\n")
+			fmt.printf("           odin run core/rexcode/isa/x86/tablegen && odin run core/rexcode/isa/x86/tablegen/generated\n")
+		}
+	}
+	if ambiguous > 10 {
+		fmt.printf("         ... and %d further ambiguous encoding(s).\n", ambiguous - 10)
+	}
+	if ambiguous > 0 {
+		g_stats.failed += 1
+		return
+	}
+	g_stats.passed += 1
+	g_stats.cases_validated += 1
+}
+
+/*
+	0xE3 is one opcode whose MNEMONIC is chosen by address size -- which counter
+	register it tests -- and address size is the 67h axis, not REX.W. Modelling
+	JRCXZ as `force_rex_w` made its encoding `48 E3 cb` (llvm-mc emits a bare
+	`E3 cb`, and REX.W does not affect address size at all), gave JECXZ the bare
+	encoding that is really JRCXZ in long mode, and left the decoder with three
+	indistinguishable entries to guess between.
+
+	Both directions and both modes are asserted here, refusals included: JCXZ is
+	unreachable in long mode (67h selects 32-bit there, never 16-bit) and JRCXZ
+	outside it. Every expectation below was measured against llvm-mc.
+*/
+run_addr_size_tests :: proc() {
+	Decode_Case :: struct {
+		bytes: []u8,
+		mode:  x86.Mode,
+		want:  x86.Mnemonic,
+		note:  string,
+	}
+	decodes := []Decode_Case{
+		{{0xE3, 0x00},       ._64, .JRCXZ, "long mode default address size is 64-bit"},
+		{{0x67, 0xE3, 0x00}, ._64, .JECXZ, "67h drops long mode to 32-bit"},
+		{{0x48, 0xE3, 0x00}, ._64, .JRCXZ, "REX.W is ignored for address size"},
+		{{0xE3, 0x00},       ._32, .JECXZ, "protected mode default is 32-bit"},
+		{{0x67, 0xE3, 0x00}, ._32, .JCXZ,  "67h drops protected mode to 16-bit"},
+	}
+	for c in decodes {
+		insts  := make([dynamic]x86.Instruction)
+		info   := make([dynamic]x86.Instruction_Info)
+		labels := make([dynamic]x86.Label_Definition)
+		errors := make([dynamic]x86.Error)
+		defer {
+			delete(insts); delete(info); delete(labels); delete(errors)
+		}
+		_, ok := x86.decode(c.bytes, nil, &insts, &info, &labels, &errors, c.mode)
+		if !ok || len(insts) == 0 {
+			g_stats.failed += 1
+			fmt.printf("    %sFAIL%s %v decode failed in %v (%s)\n", RED, RESET, c.bytes, c.mode, c.note)
+			continue
+		}
+		if insts[0].mnemonic != c.want {
+			g_stats.failed += 1
+			fmt.printf("    %sFAIL%s %v in %v decoded %v, expected %v -- %s\n",
+				RED, RESET, c.bytes, c.mode, insts[0].mnemonic, c.want, c.note)
+			continue
+		}
+		g_stats.passed += 1
+		g_stats.cases_validated += 1
+	}
+
+	Encode_Case :: struct {
+		mnemonic: x86.Mnemonic,
+		mode:     x86.Mode,
+		want:     []u8, // empty = must be refused; this mode cannot express it
+	}
+	encodes := []Encode_Case{
+		{.JRCXZ, ._64, {0xE3, 0x00}},
+		{.JECXZ, ._64, {0x67, 0xE3, 0x00}},
+		{.JCXZ,  ._64, {}},
+		{.JECXZ, ._32, {0xE3, 0x00}},
+		{.JCXZ,  ._32, {0x67, 0xE3, 0x00}},
+		{.JRCXZ, ._32, {}},
+	}
+	for c in encodes {
+		insts  := []x86.Instruction{x86.inst_rel_offset(c.mnemonic, 0, 1)}
+		code   := make([]u8, 32)
+		relocs := make([dynamic]x86.Relocation)
+		errors := make([dynamic]x86.Error)
+		defer {
+			delete(code); delete(relocs); delete(errors)
+		}
+		count, ok := x86.encode(insts, nil, code, &relocs, &errors, true, 0, c.mode)
+		if len(c.want) == 0 {
+			if ok && count > 0 {
+				g_stats.failed += 1
+				fmt.printf("    %sFAIL%s %v encoded to %02X in %v, but that mode cannot express its address size\n",
+					RED, RESET, c.mnemonic, code[:count], c.mode)
+				continue
+			}
+			g_stats.passed += 1
+			g_stats.cases_validated += 1
+			continue
+		}
+		if !ok || int(count) != len(c.want) {
+			g_stats.failed += 1
+			fmt.printf("    %sFAIL%s %v in %v encoded %d byte(s), expected %d\n",
+				RED, RESET, c.mnemonic, c.mode, count, len(c.want))
+			continue
+		}
+		same := true
+		for want, i in c.want {
+			if code[i] != want { same = false; break }
+		}
+		if !same {
+			g_stats.failed += 1
+			fmt.printf("    %sFAIL%s %v in %v encoded % 02X, expected % 02X\n",
+				RED, RESET, c.mnemonic, c.mode, code[:count], c.want)
+			continue
+		}
+		g_stats.passed += 1
+		g_stats.cases_validated += 1
+	}
 }
 
 // =============================================================================
@@ -3204,7 +3364,44 @@ tb_check :: proc(name: string, typed, generic: x86.Instruction) {
 	}
 }
 
+/* THE BUILDERS AND THE TABLES MUST BE THE SAME GENERATION.
+
+   `run_typed_builder_tests` below compares a HAND-LISTED sample of typed builders against the matcher
+   path, which is the right shape of check and covers about forty of 3820 builders. CALL r/m64 is not
+   among them — so when `9ae9a9bf9` shifted the encode table without regenerating the builders, its
+   baked hint 495 came to name JPE's `0F 8A` and this suite stayed green while every indirect call in
+   every JIT compiled to a conditional jump.
+
+   This closes it for ALL of them at once. A baked hint is valid exactly when it lands inside its own
+   mnemonic's run, so the whole invariant is a function of ENCODE_RUNS; the generator records a
+   fingerprint of the runs it generated against, and this compares it to the live table. Regenerating
+   the builders is what makes them agree again — one command, printed here so nobody has to find it. */
+run_builder_generation_test :: proc() {
+	fingerprint := u64(0xcbf2_9ce4_8422_2325)
+	for m in x86.Mnemonic {
+		r := x86.ENCODE_RUNS[m]
+		for part in ([2]u64{u64(r.start), u64(r.count)}) {
+			for shift: uint = 0; shift < 64; shift += 8 {
+				fingerprint = (fingerprint ~ ((part >> shift) & 0xff)) * 0x0000_0100_0000_01b3
+			}
+		}
+	}
+	if fingerprint == x86.BUILDER_TABLE_FINGERPRINT {
+		g_stats.passed += 1
+		g_stats.cases_validated += 1
+		return
+	}
+	g_stats.failed += 1
+	fmt.printf("    %sFAIL%s mnemonic_builders.odin is STALE: it bakes form indices for an ENCODE_RUNS\n", RED, RESET)
+	fmt.printf("         layout of %016x, but the loaded tables are %016x. Every builder past the\n",
+		x86.BUILDER_TABLE_FINGERPRINT, fingerprint)
+	fmt.printf("         first inserted form now names another mnemonic's encoding. Regenerate:\n")
+	fmt.printf("           odin run core/rexcode/isa/x86/tools/gen_mnemonic_builders.odin -file\n")
+}
+
 run_typed_builder_tests :: proc() {
+	run_builder_generation_test()
+
 	md8  := x86.mem_base_disp(x86.RBP, -16)
 	md32 := x86.mem_base_disp(x86.RCX, 100000)
 	mbi  := x86.mem_base_index_disp(x86.R8, x86.RDX, 4, 32)
@@ -3592,6 +3789,12 @@ main :: proc() {
 
 	log_header("TYPED BUILDER CONSISTENCY")
 	run_typed_builder_tests()
+
+	log_header("MNEMONIC ALIAS TABLE")
+	run_alias_table_test()
+
+	log_header("ADDRESS-SIZE SELECTED MNEMONICS")
+	run_addr_size_tests()
 
 	log_header("I386 (32-BIT MODE) TESTS")
 	run_i386_tests()

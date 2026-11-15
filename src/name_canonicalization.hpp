@@ -46,6 +46,7 @@
 struct TypeWriter;
 
 gb_internal void     write_type_to_canonical_string(TypeWriter *w, Type *type);
+gb_internal void     write_canonical_exact_value(TypeWriter *w, ExactValue const &v);
 gb_internal void     write_canonical_entity_name(TypeWriter *w, Entity *e);
 gb_internal u64      type_hash_canonical_type(Type *type);
 gb_internal String   type_to_canonical_string(gbAllocator allocator, Type *type);

@@ -7,9 +7,16 @@
 -- the differing bits are operand-driven, so mask = ~(bits0 ^ bits31). Per-form
 -- assembly makes it robust: an arrangement llvm-mc rejects is reported, skipped.
 --
--- Output replaces the SPECGEN:BEGIN..SPECGEN:END region of encoding_table.odin
--- in place; the hand-written core is untouched. Every bit pattern is therefore
--- reproducible and llvm-mc-backed.
+-- Output is MERGED into instruction_table.odin: a generated form is inserted
+-- into its mnemonic's block only if no form with the same (mnemonic, bits,
+-- mask) is there already. Existing rows are never rewritten -- their Clobber
+-- data is hand-maintained and must not be clobbered (pun intended) by a
+-- regeneration. So this is an "add the forms that are missing" tool, which is
+-- what it is actually for. Every bit pattern is llvm-mc-backed.
+--
+-- Merging (rather than owning a whole region) is required because a Mnemonic
+-- is now an ASSEMBLER mnemonic: ADD holds the integer, NEON and SVE forms in
+-- one block, so specgen cannot own `.ADD = { ... }` outright.
 --
 -- Two spec kinds:
 --   * uniform — every operand shares one arrangement T (iterate ALL_ARR).
@@ -21,7 +28,7 @@
 local bit  = require("bit")
 local LLVM = "llvm-mc --assemble --arch=aarch64 --mattr=+fullfp16 --show-encoding"
 local DIR   = (arg[0]:match("^(.*)/[^/]*$")) or "."
-local TABLE = DIR .. "/encoding_table.odin"
+local TABLE = DIR .. "/instruction_table.odin"
 
 local ARR = {
 	["8B"]={vt="V_8B",asm="8b"}, ["16B"]={vt="V_16B",asm="16b"},
@@ -53,6 +60,81 @@ local function padded(tokens, n)
 	return "{" .. table.concat(t, ", ") .. "}"
 end
 
+-- The Mnemonic enum holds assembler mnemonics, so the ISA-namespace prefixes
+-- and per-encoding suffixes these specs were written against are gone.
+local CANON_PRE = {"SVE2_", "SVE_", "SME2_", "SME_"}
+local CANON_SUF = {
+	"_GATHER_S","_GATHER_D","_SCATTER_S","_SCATTER_D","_FROM_TILE","_TILE_FROM",
+	"_UNPRED","_BITMASK","_SCALAR","_ALIAS","_PRED","_TILE","_LANE",
+	"_IDX","_GEN","_LIT","_IMM","_VEC","_PRE","_POST","_REG",
+	"_4H","_8H","_4S","_2D","_1D","_2S","_8B","_16B",
+	"_II","_IR","_RI","_RR","_X2","_X4","_SR","_ER","_ZA",
+	"_Z","_P","_V","_H","_S","_D","_B","_3","_4",
+}
+-- A conditional branch is one mnemonic per condition (B_LE -> `b.le`), so
+-- nothing about those names should be canonicalized away.
+local function is_cond_branch(name) return name:match("^BC?_%u%u$") ~= nil end
+local CANON_KEEP = {}
+local CANON_RENAME = { LSLV="LSL", LSRV="LSR", ASRV="ASR", RORV="ROR" }
+local function canon(name)
+	if CANON_KEEP[name] or is_cond_branch(name) then return name end
+	for _, k in ipairs({"DC_","IC_","AT_","TLBI_","BTI_","PSB_","TSB_"}) do
+		if name:sub(1, #k) == k then return name end
+	end
+	local c = CANON_RENAME[name] or name
+	for _, pre in ipairs(CANON_PRE) do
+		if c:sub(1, #pre) == pre then c = c:sub(#pre + 1); break end
+	end
+	local changed = true
+	while changed do
+		changed = false
+		for _, suf in ipairs(CANON_SUF) do
+			if #c > #suf and c:sub(-#suf) == suf then
+				local stem = c:sub(1, #c - #suf)
+				if #stem > 0 and stem:sub(-1) ~= "_" then c = stem; changed = true; break end
+			end
+		end
+	end
+	return (#c > 0) and c or name
+end
+
+-- A Form is an Encoding plus a Clobber. For the data-processing shapes this
+-- tool emits, slot 0 is the destination and every later register-ish slot is a
+-- source (a destination repeated in a later slot -- SVE destructive forms --
+-- is therefore correctly counted as a read too).
+local REG_SLOT = {
+	VD=true, VN=true, VM=true, VA=true, RD=true, RN=true, RM=true, RA=true,
+	PD=true, PN=true, PM=true, PG=true, PG4=true, PM3=true, RT=true, RT2=true,
+}
+-- The table aligns the operand tuple at a fixed column; keep generated rows
+-- looking like the hand-written ones around them.
+local function mnem_field(name)
+	local s = "{{." .. name .. ","
+	return s .. string.rep(" ", math.max(1, 28 - #s))
+end
+
+-- The table also aligns the Clobber at a fixed column. Applied once at merge
+-- time so every row formatter stays a plain string.format.
+-- The table is not uniformly aligned (166..176 across sections); 169 is the
+-- dominant column, so new rows land in the majority style.
+local CLOBBER_COL = 169
+local function align_row(row)
+	local head, tail = row:match("^(.-%}%},) (%{.*)$")
+	if not head then return row end
+	return head .. string.rep(" ", math.max(1, CLOBBER_COL - #head)) .. tail
+end
+
+local function clobber_of(enc_str)
+	local slots = {}
+	for tok in enc_str:gmatch("%.([%w_]+)") do slots[#slots+1] = tok end
+	local reads = {}
+	for i = 2, #slots do
+		if REG_SLOT[slots[i]] then reads[#reads+1] = tostring(i - 1) end
+	end
+	if #reads == 0 then return "{written={0}}" end
+	return string.format("{written={0}, read={%s}}", table.concat(reads, ", "))
+end
+
 local sections, skips, n_forms, n_mnem = {}, {}, 0, 0
 
 -- Emit one mnemonic's block from a list of arrangement tuples (operand order).
@@ -72,8 +154,8 @@ local function emit(mnem, llvm, enc_str, feature, variants)
 			for i, t in ipairs(tup) do ops[i] = "."..tok_vt(t) end
 			local f = feature
 			for _, tk in ipairs(tup) do if ARR[tk] and ARR[tk].feat then f = ARR[tk].feat end end
-			rows[#rows+1] = string.format("\t\t{.%s, %s, %s, 0x%s, 0x%s, .%s, {}},",
-				mnem, padded(ops, #tup), enc_str, bit.tohex(w0):upper(), bit.tohex(mask):upper(), f)
+			rows[#rows+1] = string.format("\t\t%s%s, %s, 0x%s, 0x%s, .%s, {}}, %s},",
+				mnem_field(canon(mnem)), padded(ops, #tup), enc_str, bit.tohex(w0):upper(), bit.tohex(mask):upper(), f, clobber_of(enc_str))
 			n_forms = n_forms + 1
 		else
 			skips[#skips+1] = mnem.." "..table.concat(tup, "/")
@@ -81,7 +163,7 @@ local function emit(mnem, llvm, enc_str, feature, variants)
 	end
 	if #rows == 0 then return nil end
 	n_mnem = n_mnem + 1
-	return string.format("\t.%s = {\n%s\n\t},", mnem, table.concat(rows, "\n"))
+	return string.format("\t.%s = {\n%s\n\t},", canon(mnem), table.concat(rows, "\n"))
 end
 
 -- Compare-against-zero: a 2-register shape whose asm carries a literal #0
@@ -97,8 +179,8 @@ local function emit_cmp0(mnem, llvm, fp, arr)
 			local mask = bit.band(bit.bnot(bit.bxor(w0, w31)), 0xFFFFFFFF)
 			local f = ARR[a].feat or "NEON"
 			rows[#rows+1] = string.format(
-				"\t\t{.%s, {.%s, .%s, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x%s, 0x%s, .%s, {}},",
-				mnem, ARR[a].vt, ARR[a].vt, bit.tohex(w0):upper(), bit.tohex(mask):upper(), f)
+				"\t\t{{.%s, {.%s, .%s, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x%s, 0x%s, .%s, {}}, {written={0}, read={1}}},",
+				canon(mnem), ARR[a].vt, ARR[a].vt, bit.tohex(w0):upper(), bit.tohex(mask):upper(), f)
 			n_forms = n_forms + 1
 		else
 			skips[#skips+1] = mnem.." "..a
@@ -106,7 +188,7 @@ local function emit_cmp0(mnem, llvm, fp, arr)
 	end
 	if #rows == 0 then return nil end
 	n_mnem = n_mnem + 1
-	return string.format("\t.%s = {\n%s\n\t},", mnem, table.concat(rows, "\n"))
+	return string.format("\t.%s = {\n%s\n\t},", canon(mnem), table.concat(rows, "\n"))
 end
 
 -- ---- Uniform shapes (all operands share one arrangement) -------------------
@@ -311,7 +393,7 @@ local function emit_shift(mnem, llvm, dir, variants)
 	end
 	if #rows == 0 then return nil end
 	n_mnem = n_mnem + 1
-	return string.format("\t.%s = {\n%s\n\t},", mnem, table.concat(rows, "\n"))
+	return string.format("\t.%s = {\n%s\n\t},", canon(mnem), table.concat(rows, "\n"))
 end
 local SAME_SH = {}
 for _, a in ipairs({"8B","16B","4H","8H","2S","4S","2D"}) do SAME_SH[#SAME_SH+1] = {a, a} end
@@ -366,12 +448,12 @@ local ELEM = {
 do
 	local blk = {}
 	local function emit_rows(mnem, rows)
-		if #rows > 0 then blk[#blk+1] = string.format("\t.%s = {\n%s\n\t},", mnem, table.concat(rows, "\n")); n_mnem = n_mnem + 1 end
+		if #rows > 0 then blk[#blk+1] = string.format("\t.%s = {\n%s\n\t},", canon(mnem), table.concat(rows, "\n")); n_mnem = n_mnem + 1 end
 	end
 	local function mkrow(mnem, ops, enc, b0, variants)
 		n_forms = n_forms + 1
-		return string.format("\t\t{.%s, %s, %s, 0x%s, 0x%s, .NEON, {}},",
-			mnem, ops, enc, bit.tohex(b0):upper(), bit.tohex(mask_of(b0, variants)):upper())
+		return string.format("\t\t%s%s, %s, 0x%s, 0x%s, .NEON, {}}, %s},",
+			mnem_field(canon(mnem)), ops, enc, bit.tohex(b0):upper(), bit.tohex(mask_of(b0, variants)):upper(), clobber_of(enc))
 	end
 
 	-- MOV Vd.T, Vn.T  (= ORR Vd,Vn,Vn): the single source feeds both Vn and Vm.
@@ -467,7 +549,7 @@ end
 do
 	local blk = {}
 	local function block(mnem, rows)
-		if #rows > 0 then blk[#blk+1] = string.format("\t.%s = {\n%s\n\t},", mnem, table.concat(rows, "\n")); n_mnem = n_mnem + 1 end
+		if #rows > 0 then blk[#blk+1] = string.format("\t.%s = {\n%s\n\t},", canon(mnem), table.concat(rows, "\n")); n_mnem = n_mnem + 1 end
 	end
 	-- scalar FP two-register (FRINTx, FRECPX): <op> Sd, Sn.
 	for _, it in ipairs({
@@ -479,8 +561,8 @@ do
 			local function mk(r) return string.format("%s %s%d, %s%d", it[2], sc[1], r, sc[1], r) end
 			local b0, b31 = word(mk(0)), word(mk(31))
 			if b0 and b31 then
-				rows[#rows+1] = string.format("\t\t{.%s, {.%s, .%s, .NONE, .NONE}, {.RD, .RN, .NONE, .NONE}, 0x%s, 0x%s, .%s, {}},",
-					it[1], sc[2], sc[2], bit.tohex(b0):upper(), bit.tohex(mask_of(b0,{b31})):upper(), sc[3])
+				rows[#rows+1] = string.format("\t\t%s{.%s, .%s, .NONE, .NONE}, {.RD, .RN, .NONE, .NONE}, 0x%s, 0x%s, .%s, {}}, {written={0}, read={1}}},",
+					mnem_field(canon(it[1])), sc[2], sc[2], bit.tohex(b0):upper(), bit.tohex(mask_of(b0,{b31})):upper(), sc[3])
 				n_forms = n_forms + 1
 			end
 		end
@@ -499,8 +581,8 @@ do
 				local bD = word(mk(gp[3], fp[1].."0"))        -- Rd field (zero reg)
 				local bN = word(mk(gp[1].."0", fp[1].."31"))  -- Rn field
 				if b0 and bD and bN then
-					rows[#rows+1] = string.format("\t\t{.%s, {.%s, .%s, .NONE, .NONE}, {.RD, .RN, .NONE, .NONE}, 0x%s, 0x%s, .%s, {}},",
-						it[1], gp[2], fp[2], bit.tohex(b0):upper(), bit.tohex(mask_of(b0,{bD,bN})):upper(), fp[3])
+					rows[#rows+1] = string.format("\t\t%s{.%s, .%s, .NONE, .NONE}, {.RD, .RN, .NONE, .NONE}, 0x%s, 0x%s, .%s, {}}, {written={0}, read={1}}},",
+						mnem_field(canon(it[1])), gp[2], fp[2], bit.tohex(b0):upper(), bit.tohex(mask_of(b0,{bD,bN})):upper(), fp[3])
 					n_forms = n_forms + 1
 				end
 			end
@@ -526,12 +608,12 @@ do
 			local function mk(r,v) return string.format("%s v%d.%s, #%s", llvm, r, ARR[a].asm, tostring(v)) end
 			local b0, bR, bI = word(mk(0,"0")), word(mk(31,"0")), word(mk(0,vmax))
 			if b0 and bR and bI then
-				rows[#rows+1] = string.format("\t\t{.%s, {.%s, .IMM_8, .NONE, .NONE}, {.VD, .NEON_IMM8_FMOV, .NONE, .NONE}, 0x%s, 0x%s, .NEON, {}},",
-					mnem, ARR[a].vt, bit.tohex(b0):upper(), bit.tohex(mask_of(b0,{bR,bI})):upper())
+				rows[#rows+1] = string.format("\t\t%s{.%s, .IMM_8, .NONE, .NONE}, {.VD, .NEON_IMM8_FMOV, .NONE, .NONE}, 0x%s, 0x%s, .NEON, {}}, {written={0}}},",
+					mnem_field(canon(mnem)), ARR[a].vt, bit.tohex(b0):upper(), bit.tohex(mask_of(b0,{bR,bI})):upper())
 				n_forms = n_forms + 1
 			else skips[#skips+1] = mnem.." "..a end
 		end
-		if #rows > 0 then blk[#blk+1] = string.format("\t.%s = {\n%s\n\t},", mnem, table.concat(rows, "\n")); n_mnem = n_mnem + 1 end
+		if #rows > 0 then blk[#blk+1] = string.format("\t.%s = {\n%s\n\t},", canon(mnem), table.concat(rows, "\n")); n_mnem = n_mnem + 1 end
 	end
 	imm8_block("MOVI", "movi", {"8B","16B","4H","8H","2S","4S","2D"})
 	imm8_block("MVNI", "mvni", {"4H","8H","2S","4S"})
@@ -565,12 +647,12 @@ do
 			local w=sve_word(build(v)); if not w then skips[#skips+1]=mnem..":v"..i; return nil end; vs[#vs+1]=w
 		end
 		n_forms=n_forms+1
-		return string.format("\t\t{.%s, %s, %s, 0x%s, 0x%s, .SVE, {%s}},",
-			mnem, ops, enc, bit.tohex(b0):upper(), bit.tohex(mask_of(b0,vs)):upper(), flags)
+		return string.format("\t\t%s%s, %s, 0x%s, 0x%s, .SVE, {%s}}, %s},",
+			mnem_field(canon(mnem)), ops, enc, bit.tohex(b0):upper(), bit.tohex(mask_of(b0,vs)):upper(), flags, clobber_of(enc))
 	end
 	local function block(mnem, rows)
 		local r={}; for _,x in ipairs(rows) do if x then r[#r+1]=x end end
-		if #r>0 then blk[#blk+1]=string.format("\t.%s = {\n%s\n\t},", mnem, table.concat(r,"\n")); n_mnem=n_mnem+1 end
+		if #r>0 then blk[#blk+1]=string.format("\t.%s = {\n%s\n\t},", canon(mnem), table.concat(r,"\n")); n_mnem=n_mnem+1 end
 	end
 	local function g(v, x) if v==0 then return x and "x0" or "w0" else return x and "xzr" or "wzr" end end
 
@@ -690,17 +772,68 @@ do
 	sections[#sections+1] = "\t// SVE predicated / compare / predicate-logical / SVE2.\n" .. table.concat(blk, "\n")
 end
 
--- ---- splice into the SoT ---------------------------------------------------
-local region = "\t// SPECGEN:BEGIN\n" .. table.concat(sections, "\n\n") .. "\n\t// SPECGEN:END"
+-- ---- merge into the SoT ----------------------------------------------------
+--
+-- Every generated block is `\t.MNEM = {\n<rows>\n\t},`. Take it apart, and add
+-- each row to that mnemonic's existing block ONLY when no form with the same
+-- (mnemonic, bits, mask) is present. Existing rows are left byte-for-byte
+-- alone so hand-maintained Clobber data survives a regeneration.
 local fh = assert(io.open(TABLE, "r")); local src = fh:read("*a"); fh:close()
-local new, n = src:gsub("\t// SPECGEN:BEGIN.-\t// SPECGEN:END", (region:gsub("%%", "%%%%")))
-if n ~= 1 then
-	io.stderr:write("FATAL: expected exactly one SPECGEN:BEGIN..END region, found "..n.."\n")
-	os.exit(1)
-end
-local wh = assert(io.open(TABLE, "w")); wh:write(new); wh:close()
 
-io.write(string.format("specgen: wrote %d mnemonics / %d forms into %s\n", n_mnem, n_forms, TABLE))
+local generated = {}          -- ordered list of {mnem=, rows={}}
+local by_mnem   = {}
+for _, sec in ipairs(sections) do
+	for mnem, body in sec:gmatch("\t%.([%w_]+) = {\n(.-)\n\t},") do
+		local g = by_mnem[mnem]
+		if not g then
+			g = {mnem = mnem, rows = {}}
+			by_mnem[mnem] = g
+			generated[#generated+1] = g
+		end
+		for row in body:gmatch("[^\n]+") do g.rows[#g.rows+1] = row end
+	end
+end
+
+local added, present, created = 0, 0, 0
+for _, g in ipairs(generated) do
+	local head = "\t." .. g.mnem .. " = {\n"
+	local s, e = src:find(head, 1, true)
+	local fresh = {}
+	for _, row in ipairs(g.rows) do
+		-- (bits, mask) uniquely identify a form within one mnemonic's run.
+		local bits, mask = row:match("(0x%x+), (0x%x+)")
+		local dup = false
+		if s and bits then
+			local _, blk_end = src:find("\n\t},", e, true)
+			local block = src:sub(e, blk_end or #src)
+			dup = block:find(bits .. ", " .. mask, 1, true) ~= nil
+		end
+		if dup then present = present + 1 else fresh[#fresh+1] = align_row(row) end
+	end
+	if #fresh > 0 then
+		if s then
+			-- insert BEFORE the block terminator; splitting inside "\n\t}," would
+			-- leave its comma stranded after the appended rows.
+			local term = src:find("\n\t},", e, true)
+			src = src:sub(1, term - 1) .. "\n" .. table.concat(fresh, "\n") .. src:sub(term)
+		else
+			src = src:gsub("\n}%s*$", "\n" .. head .. table.concat(fresh, "\n") .. "\n\t},\n}\n", 1)
+			created = created + 1
+		end
+		added = added + #fresh
+	end
+end
+
+local wh = assert(io.open(TABLE, "w")); wh:write(src); wh:close()
+
+io.write(string.format("specgen: %d forms generated across %d mnemonics\n", n_forms, n_mnem))
+io.write(string.format("  already present: %d   added: %d   new mnemonic blocks: %d\n", present, added, created))
+io.write("  -> " .. TABLE .. "\n")
+if added > 0 then
+	io.write("  NOTE: added rows carry a derived Clobber (dest = slot 0, later\n")
+	io.write("        register slots = reads). Review it for anything that also\n")
+	io.write("        touches NZCV/FPSR/memory before committing.\n")
+end
 if #skips > 0 then
 	io.write("  skipped "..#skips.." invalid arrangement(s)\n")
 end

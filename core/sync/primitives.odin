@@ -18,7 +18,7 @@ section, and thus prevent access to same piece of memory by multiple threads, at
 the same time.
 
 Mutex's zero-initializzed value represents an initial, *unlocked* state.
- 
+
 If another thread tries to acquire the lock, while it's already held (typically
 by another thread), the thread's execution will be blocked, until the lock is
 released. Code or memory that is "surrounded" by a mutex lock and unlock
@@ -28,8 +28,7 @@ operations is said to be "guarded by a mutex".
 first time). This is because, in order to coordinate with other threads, all
 threads must watch the same memory address to know when the lock has been
 released. Trying to use a copy of the lock at a different memory address will
-result in broken and unsafe behavior. For this reason, Mutexes are marked as
-`#no_copy`.
+result in broken and unsafe behavior.
 
 **Note**: If the current thread attempts to lock a mutex, while it's already
 holding another lock, that will cause a trivial case of deadlock. Do not use
@@ -54,6 +53,7 @@ until the the lock is released.
 **Note**: If the mutex is already locked by the current thread, a call to this
 procedure will block indefinately. Do not use this in recursive procedures.
 */
+@(synchronizes=.Acquire)
 mutex_lock :: proc "contextless" (m: ^Mutex) {
 	_mutex_lock(m)
 }
@@ -69,6 +69,7 @@ this allows one other thread waiting on the mutex to enter any critical sections
 associated with the mutex. If there are no threads waiting on the mutex, the
 critical sections will remain open.
 */
+@(synchronizes=.Release)
 mutex_unlock :: proc "contextless" (m: ^Mutex) {
 	_mutex_unlock(m)
 }
@@ -84,6 +85,7 @@ If the lock is acquired, all threads that attempt to acquire a lock will be
 blocked from entering any critical sections associated with the same mutex,
 until the lock is released.
 */
+@(synchronizes=.Acquire)
 mutex_try_lock :: proc "contextless" (m: ^Mutex) -> bool {
 	return _mutex_try_lock(m)
 }
@@ -109,6 +111,7 @@ section by putting the function inside the `if` statement.
 	}
 */
 @(deferred_in=mutex_unlock)
+@(synchronizes=.Acquire)
 mutex_guard :: proc "contextless" (m: ^Mutex) -> bool {
 	mutex_lock(m)
 	return true
@@ -140,8 +143,7 @@ all shared locks are released.
 acquiring a lock). This is because, in order to coordinate with other threads,
 all threads must watch the same memory address to know when the lock has been
 released. Trying to use a copy of the lock at a different memory address will
-result in broken and unsafe behavior. For this reason, mutexes are marked as
-`#no_copy`.
+result in broken and unsafe behavior.
 
 **Note**: A read-write mutex is not recursive. Do not attempt to acquire an
 exclusive lock more than once from the same thread, or an exclusive and shared
@@ -162,6 +164,7 @@ After a lock has been acquired, any thread attempting to acquire any lock
 will be blocked from entering any critical sections associated with the same
 read-write mutex, until the exclusive lock is released.
 */
+@(synchronizes=.Acquire)
 rw_mutex_lock :: proc "contextless" (rw: ^RW_Mutex) {
 	_rw_mutex_lock(rw)
 }
@@ -175,6 +178,7 @@ read-write mutex.
 When the exclusive lock is released, all critical sections, associated with the
 same read-write mutex, become open to other threads.
 */
+@(synchronizes=.Release)
 rw_mutex_unlock :: proc "contextless" (rw: ^RW_Mutex) {
 	_rw_mutex_unlock(rw)
 }
@@ -190,6 +194,7 @@ If the lock has been acquired, all threads attempting to acquire any lock
 will be blocked from entering any critical sections associated with the same
 read-write mutex, until the exclusive locked is released.
 */
+@(synchronizes=.Acquire)
 rw_mutex_try_lock :: proc "contextless" (rw: ^RW_Mutex) -> bool {
 	return _rw_mutex_try_lock(rw)
 }
@@ -206,6 +211,7 @@ exclusive lock will be blocked from entering any critical sections associated
 with the same read-write mutex, until all shared locks associated with the
 specified read-write mutex are released.
 */
+@(synchronizes_shared=.Acquire)
 rw_mutex_shared_lock :: proc "contextless" (rw: ^RW_Mutex) {
 	_rw_mutex_shared_lock(rw)
 }
@@ -217,6 +223,7 @@ This procedure releases shared lock on the specified read-write mutex. When all
 shared locks are released, all critical sections associated with the same
 read-write mutex become open to other threads.
 */
+@(synchronizes_shared=.Release)
 rw_mutex_shared_unlock :: proc "contextless" (rw: ^RW_Mutex) {
 	_rw_mutex_shared_unlock(rw)
 }
@@ -232,6 +239,7 @@ If the shared lock has been acquired, it causes all threads attempting to
 acquire the exclusive lock to be blocked from entering any critical sections
 associated with the same read-write mutex, until all shared locks are released.
 */
+@(synchronizes_shared=.Acquire)
 rw_mutex_try_shared_lock :: proc "contextless" (rw: ^RW_Mutex) -> bool {
 	return _rw_mutex_try_shared_lock(rw)
 }
@@ -257,7 +265,7 @@ section by running this procedure inside an `if` statement.
 		...
 	}
 */
-@(deferred_in=rw_mutex_unlock)
+@(deferred_in=rw_mutex_unlock, synchronizes=.Acquire)
 rw_mutex_guard :: proc "contextless" (m: ^RW_Mutex) -> bool {
 	rw_mutex_lock(m)
 	return true
@@ -284,7 +292,7 @@ section by running this procedure inside an `if` statement.
 		...
 	}
 */
-@(deferred_in=rw_mutex_shared_unlock)
+@(deferred_in=rw_mutex_shared_unlock, synchronizes_shared=.Acquire)
 rw_mutex_shared_guard :: proc "contextless" (m: ^RW_Mutex) -> bool {
 	rw_mutex_shared_lock(m)
 	return true
@@ -310,8 +318,7 @@ releases the lock as many times as it has been locked by the thread.
 acquiring a lock). This is because, in order to coordinate with other threads,
 all threads must watch the same memory address to know when the lock has been
 released. Trying to use a copy of the lock at a different memory address will
-result in broken and unsafe behavior. For this reason, mutexes are marked as
-`#no_copy`.
+result in broken and unsafe behavior.
 */
 Recursive_Mutex :: struct {
 	impl: _Recursive_Mutex,
@@ -328,6 +335,7 @@ When the lock is acquired, all other threads attempting to acquire a lock will
 be blocked from entering any critical sections associated with the same mutex,
 until the lock is released.
 */
+@(synchronizes=.Acquire)
 recursive_mutex_lock :: proc "contextless" (m: ^Recursive_Mutex) {
 	_recursive_mutex_lock(m)
 }
@@ -339,6 +347,7 @@ This procedure releases a lock on the specified recursive mutex. It also causes
 the critical sections associated with the same mutex, to become open for other
 threads for entering.
 */
+@(synchronizes=.Release)
 recursive_mutex_unlock :: proc "contextless" (m: ^Recursive_Mutex) {
 	_recursive_mutex_unlock(m)
 }
@@ -354,6 +363,7 @@ If the lock is acquired, all other threads attempting to obtain a lock will be
 blocked from entering any critical sections associated with the same mutex,
 until the lock is released.
 */
+@(synchronizes=.Acquire)
 recursive_mutex_try_lock :: proc "contextless" (m: ^Recursive_Mutex) -> bool {
 	return _recursive_mutex_try_lock(m)
 }
@@ -379,7 +389,7 @@ section by calling this procedure inside an `if` statement.
 		...
 	}
 */
-@(deferred_in=recursive_mutex_unlock)
+@(deferred_in=recursive_mutex_unlock, synchronizes=.Acquire)
 recursive_mutex_guard :: proc "contextless" (m: ^Recursive_Mutex) -> bool {
 	recursive_mutex_lock(m)
 	return true
@@ -411,8 +421,7 @@ A thread that intends to wait on a shared variable shall:
 waiting on it the first time). This is because, in order to coordinate with
 other threads, all threads must watch the same memory address to know when the
 lock has been released. Trying to use a copy of the lock at a different memory
-address will result in broken and unsafe behavior. For this reason, condition
-variables are marked as `#no_copy`.
+address will result in broken and unsafe behavior.
 */
 Cond :: struct {
 	impl: _Cond,
@@ -492,7 +501,7 @@ semaphore counter to become non-zero and decreasing it, if necessary.
 to it). This is because, in order to coordinate with other threads, all threads
 must watch the same memory address to know when the lock has been released.
 Trying to use a copy of the lock at a different memory address will result in
-broken and unsafe behavior. For this reason, semaphores are marked as `#no_copy`.
+broken and unsafe behavior.
 */
 Sema :: struct {
 	impl: _Sema,
@@ -505,6 +514,7 @@ This procedure increments the internal counter of the semaphore. If any of the
 threads were waiting on the semaphore, up to `count` of threads will continue
 the execution and enter the critical section.
 */
+@(synchronizes=.Release)
 sema_post :: proc "contextless" (s: ^Sema, count := 1) {
 	_sema_post(s, count)
 }
@@ -516,6 +526,7 @@ This procedure blocks the execution of the current thread, until the semaphore
 counter is non-zero, and atomically decrements it by one, once the wait has
 ended.
 */
+@(synchronizes=.Acquire)
 sema_wait :: proc "contextless" (s: ^Sema) {
 	_sema_wait(s)
 }
@@ -528,6 +539,7 @@ counter is non-zero, and if so atomically decrements it by one, once the wait
 has ended. If the specified timeout is reached, the function returns `false`,
 otherwise it returns `true`.
 */
+@(synchronizes=.Acquire)
 sema_wait_with_timeout :: proc "contextless" (s: ^Sema, duration: time.Duration) -> bool {
 	return _sema_wait_with_timeout(s, duration)
 }
@@ -554,8 +566,9 @@ If the value of the futex is `expected`, this procedure blocks the execution of
 the current thread, until the futex is woken up, or until a spurious wakeup
 occurs.
 */
+@(futex=.Wait)
 futex_wait :: proc "contextless" (f: ^Futex, expected: u32) {
-	if u32(atomic_load_explicit(f, .Acquire)) != expected {
+	if u32(atomic_load_explicit(f, .Relaxed)) != expected {
 		return
 	}
 	ok := _futex_wait(f, expected)
@@ -572,20 +585,22 @@ until a spurious wakeup occurs.
 
 This procedure returns `false` if the timeout was reached, `true` otherwise.
 */
+@(futex=.Wait)
 futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, duration: time.Duration) -> bool {
-	if u32(atomic_load_explicit(f, .Acquire)) != expected {
+	if u32(atomic_load_explicit(f, .Relaxed)) != expected {
 		return true
 	}
 	if duration <= 0 {
 		return false
-	}	
-	
+	}
+
 	return _futex_wait_with_timeout(f, expected, duration)
 }
 
 /*
 Wake up a single thread waiting on a futex.
 */
+@(futex=.Wake)
 futex_signal :: proc "contextless" (f: ^Futex) {
 	_futex_signal(f)
 }
@@ -593,6 +608,7 @@ futex_signal :: proc "contextless" (f: ^Futex) {
 /*
 Wake up multiple threads waiting on a futex.
 */
+@(futex=.Wake)
 futex_broadcast :: proc "contextless" (f: ^Futex) {
 	_futex_broadcast(f)
 }

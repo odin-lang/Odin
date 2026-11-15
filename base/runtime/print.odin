@@ -64,7 +64,7 @@ when !ODIN_NO_RTTI {
 		case:
 			ti := type_info_of(x.id)
 			#partial switch v in ti.variant {
-			case Type_Info_Pointer, Type_Info_Multi_Pointer:
+			case ^Type_Info_Pointer, ^Type_Info_Multi_Pointer:
 				print_uintptr((^uintptr)(x.data)^)
 				return
 			}
@@ -269,9 +269,9 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 	}
 
 	switch info in ti.variant {
-	case Type_Info_Named:
+	case ^Type_Info_Named:
 		print_string(info.name)
-	case Type_Info_Integer:
+	case ^Type_Info_Integer:
 		switch ti.id {
 		case int:     print_string("int")
 		case uint:    print_string("uint")
@@ -286,9 +286,9 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		case .Big:      print_string("be")
 		}
 
-	case Type_Info_Rune:
+	case ^Type_Info_Rune:
 		print_string("rune")
-	case Type_Info_Float:
+	case ^Type_Info_Float:
 		print_byte('f')
 		print_u64(u64(8*ti.size))
 		switch info.endianness {
@@ -296,13 +296,13 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		case .Little:   print_string("le")
 		case .Big:      print_string("be")
 		}
-	case Type_Info_Complex:
+	case ^Type_Info_Complex:
 		print_string("complex")
 		print_u64(u64(8*ti.size))
-	case Type_Info_Quaternion:
+	case ^Type_Info_Quaternion:
 		print_string("quaternion")
 		print_u64(u64(8*ti.size))
-	case Type_Info_String:
+	case ^Type_Info_String:
 		if info.is_cstring {
 			print_byte('c')
 		}
@@ -311,37 +311,37 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		case .UTF_8:  /**/
 		case .UTF_16: print_string("16")
 		}
-	case Type_Info_Boolean:
+	case ^Type_Info_Boolean:
 		switch ti.id {
 		case bool: print_string("bool")
 		case:
 			print_byte('b')
 			print_u64(u64(8*ti.size))
 		}
-	case Type_Info_Any:
+	case ^Type_Info_Any:
 		print_string("any")
-	case Type_Info_Type_Id:
+	case ^Type_Info_Type_Id:
 		print_string("typeid")
 
-	case Type_Info_Pointer:
+	case ^Type_Info_Pointer:
 		if info.elem == nil {
 			print_string("rawptr")
 		} else {
 			print_string("^")
 			print_type(info.elem)
 		}
-	case Type_Info_Multi_Pointer:
+	case ^Type_Info_Multi_Pointer:
 		print_string("[^]")
 		print_type(info.elem)
-	case Type_Info_Soa_Pointer:
+	case ^Type_Info_Soa_Pointer:
 		print_string("#soa ^")
 		print_type(info.elem)
-	case Type_Info_Procedure:
+	case ^Type_Info_Procedure:
 		print_string("proc")
 		if info.params == nil {
 			print_string("()")
 		} else {
-			t := info.params.variant.(Type_Info_Parameters)
+			t := info.params.variant.(^Type_Info_Parameters)
 			print_byte('(')
 			for t, i in t.types {
 				if i > 0 { print_string(", ") }
@@ -353,7 +353,7 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 			print_string(" -> ")
 			print_type(info.results)
 		}
-	case Type_Info_Parameters:
+	case ^Type_Info_Parameters:
 		count := len(info.names)
 		if count != 1 { print_byte('(') }
 		for name, i in info.names {
@@ -369,13 +369,13 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		}
 		if count != 1 { print_string(")") }
 
-	case Type_Info_Array:
+	case ^Type_Info_Array:
 		print_byte('[')
 		print_u64(u64(info.count))
 		print_byte(']')
 		print_type(info.elem)
 
-	case Type_Info_Enumerated_Array:
+	case ^Type_Info_Enumerated_Array:
 		if info.is_sparse {
 			print_string("#sparse")
 		}
@@ -385,26 +385,26 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		print_type(info.elem)
 
 
-	case Type_Info_Dynamic_Array:
+	case ^Type_Info_Dynamic_Array:
 		print_string("[dynamic]")
 		print_type(info.elem)
-	case Type_Info_Slice:
+	case ^Type_Info_Slice:
 		print_string("[]")
 		print_type(info.elem)
 
-	case Type_Info_Fixed_Capacity_Dynamic_Array:
+	case ^Type_Info_Fixed_Capacity_Dynamic_Array:
 		print_string("[dynamic; ")
 		print_u64(u64(info.capacity))
 		print_string("]")
 		print_type(info.elem)
 
-	case Type_Info_Map:
+	case ^Type_Info_Map:
 		print_string("map[")
 		print_type(info.key)
 		print_byte(']')
 		print_type(info.value)
 
-	case Type_Info_Struct:
+	case ^Type_Info_Struct:
 		switch info.soa_kind {
 		case .None: // Ignore
 		case .Fixed:
@@ -442,7 +442,7 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		}
 		print_byte('}')
 
-	case Type_Info_Union:
+	case ^Type_Info_Union:
 		print_string("union ")
 		if info.custom_align {
 			print_string("#align(")
@@ -459,7 +459,7 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		}
 		print_string("}")
 
-	case Type_Info_Enum:
+	case ^Type_Info_Enum:
 		print_string("enum ")
 		print_type(info.base)
 		print_string(" {")
@@ -469,13 +469,13 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		}
 		print_string("}")
 
-	case Type_Info_Bit_Set:
+	case ^Type_Info_Bit_Set:
 		print_string("bit_set[")
 
 		#partial switch elem in type_info_base(info.elem).variant {
-		case Type_Info_Enum:
+		case ^Type_Info_Enum:
 			print_type(info.elem)
-		case Type_Info_Rune:
+		case ^Type_Info_Rune:
 			print_encoded_rune(rune(info.lower))
 			print_string("..")
 			print_encoded_rune(rune(info.upper))
@@ -490,7 +490,7 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		}
 		print_byte(']')
 
-	case Type_Info_Bit_Field:
+	case ^Type_Info_Bit_Field:
 		print_string("bit_field ")
 		print_type(info.backing_type)
 		print_string(" {")
@@ -505,13 +505,13 @@ print_type :: #force_no_inline proc "contextless" (ti: ^Type_Info) {
 		print_byte('}')
 
 
-	case Type_Info_Simd_Vector:
+	case ^Type_Info_Simd_Vector:
 		print_string("#simd[")
 		print_u64(u64(info.count))
 		print_byte(']')
 		print_type(info.elem)
 		
-	case Type_Info_Matrix:
+	case ^Type_Info_Matrix:
 		if info.layout == .Row_Major {
 			print_string("#row_major ")
 		}
@@ -689,9 +689,9 @@ write_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte, t
 	}
 
 	switch info in ti.variant {
-	case Type_Info_Named:
+	case ^Type_Info_Named:
 		write_string(i, buf, info.name) or_return
-	case Type_Info_Integer:
+	case ^Type_Info_Integer:
 		switch ti.id {
 		case int:     write_string(i, buf, "int")     or_return
 		case uint:    write_string(i, buf, "uint")    or_return
@@ -706,9 +706,9 @@ write_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte, t
 		case .Big:      write_string(i, buf, "be") or_return
 		}
 
-	case Type_Info_Rune:
+	case ^Type_Info_Rune:
 		write_string(i, buf, "rune") or_return
-	case Type_Info_Float:
+	case ^Type_Info_Float:
 		write_byte(i, buf, 'f') or_return
 		write_u64(i, buf, u64(8*ti.size)) or_return
 		switch info.endianness {
@@ -717,13 +717,13 @@ write_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte, t
 		case .Big:      write_string(i, buf, "be") or_return
 		}
 
-	case Type_Info_Complex:
+	case ^Type_Info_Complex:
 		write_string(i, buf, "complex")      or_return
 		write_u64   (i, buf, u64(8*ti.size)) or_return
-	case Type_Info_Quaternion:
+	case ^Type_Info_Quaternion:
 		write_string(i, buf, "quaternion")   or_return
 		write_u64   (i, buf, u64(8*ti.size)) or_return
-	case Type_Info_String:
+	case ^Type_Info_String:
 		if info.is_cstring {
 			write_byte(i, buf, 'c') or_return
 		}
@@ -732,37 +732,37 @@ write_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte, t
 		case .UTF_8:  /**/
 		case .UTF_16: write_string(i, buf, "16") or_return
 		}
-	case Type_Info_Boolean:
+	case ^Type_Info_Boolean:
 		switch ti.id {
 		case bool: write_string(i, buf, "bool") or_return
 		case:
 			write_byte(i, buf, 'b')            or_return
 			write_u64 (i, buf, u64(8*ti.size)) or_return
 		}
-	case Type_Info_Any:
+	case ^Type_Info_Any:
 		write_string(i, buf, "any") or_return
-	case Type_Info_Type_Id:
+	case ^Type_Info_Type_Id:
 		write_string(i, buf, "typeid") or_return
 
-	case Type_Info_Pointer:
+	case ^Type_Info_Pointer:
 		if info.elem == nil {
 			write_string(i, buf, "rawptr") or_return
 		} else {
 			write_string    (i, buf, "^")       or_return
 			write_write_type(i, buf, info.elem) or_return
 		}
-	case Type_Info_Multi_Pointer:
+	case ^Type_Info_Multi_Pointer:
 		write_string    (i, buf, "[^]")     or_return
 		write_write_type(i, buf, info.elem) or_return
-	case Type_Info_Soa_Pointer:
+	case ^Type_Info_Soa_Pointer:
 		write_string    (i, buf, "#soa ^")  or_return
 		write_write_type(i, buf, info.elem) or_return
-	case Type_Info_Procedure:
+	case ^Type_Info_Procedure:
 		write_string(i, buf, "proc") or_return
 		if info.params == nil {
 			write_string(i, buf, "()") or_return
 		} else {
-			t := info.params.variant.(Type_Info_Parameters)
+			t := info.params.variant.(^Type_Info_Parameters)
 			write_byte(i, buf, '(') or_return
 			for t, j in t.types {
 				if j > 0 { write_string(i, buf, ", ") or_return }
@@ -774,7 +774,7 @@ write_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte, t
 			write_string    (i, buf, " -> ")       or_return
 			write_write_type(i, buf, info.results) or_return
 		}
-	case Type_Info_Parameters:
+	case ^Type_Info_Parameters:
 		count := len(info.names)
 		if count != 1 { write_byte(i, buf, '(') or_return }
 		for name, j in info.names {
@@ -790,13 +790,13 @@ write_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte, t
 		}
 		if count != 1 { write_string(i, buf, ")") or_return }
 
-	case Type_Info_Array:
+	case ^Type_Info_Array:
 		write_byte      (i, buf, '[')             or_return
 		write_u64       (i, buf, u64(info.count)) or_return
 		write_byte      (i, buf, ']')             or_return
 		write_write_type(i, buf, info.elem)       or_return
 
-	case Type_Info_Enumerated_Array:
+	case ^Type_Info_Enumerated_Array:
 		if info.is_sparse {
 			write_string(i, buf, "#sparse") or_return
 		}
@@ -806,26 +806,26 @@ write_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte, t
 		write_write_type(i, buf, info.elem)  or_return
 
 
-	case Type_Info_Dynamic_Array:
+	case ^Type_Info_Dynamic_Array:
 		write_string    (i, buf, "[dynamic]") or_return
 		write_write_type(i, buf, info.elem)   or_return
-	case Type_Info_Slice:
+	case ^Type_Info_Slice:
 		write_string    (i, buf, "[]")      or_return
 		write_write_type(i, buf, info.elem) or_return
 
-	case Type_Info_Fixed_Capacity_Dynamic_Array:
+	case ^Type_Info_Fixed_Capacity_Dynamic_Array:
 		write_string    (i, buf, "[dynamic; ")       or_return
 		write_u64       (i, buf, u64(info.capacity)) or_return
 		write_string    (i, buf, "]")                or_return
 		write_write_type(i, buf, info.elem)          or_return
 
-	case Type_Info_Map:
+	case ^Type_Info_Map:
 		write_string    (i, buf, "map[")     or_return
 		write_write_type(i, buf, info.key)   or_return
 		write_byte      (i, buf, ']')        or_return
 		write_write_type(i, buf, info.value) or_return
 
-	case Type_Info_Struct:
+	case ^Type_Info_Struct:
 		switch info.soa_kind {
 		case .None: // Ignore
 		case .Fixed:
@@ -863,7 +863,7 @@ write_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte, t
 		}
 		write_byte(i, buf, '}') or_return
 
-	case Type_Info_Union:
+	case ^Type_Info_Union:
 		write_string(i, buf, "union ") or_return
 		if info.custom_align {
 			write_string(i, buf, "#align(")     or_return
@@ -880,7 +880,7 @@ write_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte, t
 		}
 		write_string(i, buf, "}") or_return
 
-	case Type_Info_Enum:
+	case ^Type_Info_Enum:
 		write_string    (i, buf, "enum ")   or_return
 		write_write_type(i, buf, info.base) or_return
 		write_string    (i, buf, " {")      or_return
@@ -890,13 +890,13 @@ write_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte, t
 		}
 		write_string(i, buf, "}") or_return
 
-	case Type_Info_Bit_Set:
+	case ^Type_Info_Bit_Set:
 		write_string(i, buf, "bit_set[") or_return
 
 		#partial switch elem in type_info_base(info.elem).variant {
-		case Type_Info_Enum:
+		case ^Type_Info_Enum:
 			write_write_type(i, buf, info.elem) or_return
-		case Type_Info_Rune:
+		case ^Type_Info_Rune:
 			write_encoded_rune(i, buf, rune(info.lower)) or_return
 			write_string      (i, buf, "..")             or_return
 			write_encoded_rune(i, buf, rune(info.upper)) or_return
@@ -911,7 +911,7 @@ write_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte, t
 		}
 		write_byte(i, buf, ']') or_return
 
-	case Type_Info_Bit_Field:
+	case ^Type_Info_Bit_Field:
 		write_string    (i, buf, "bit_field ")      or_return
 		write_write_type(i, buf, info.backing_type) or_return
 		write_string    (i, buf, " {")              or_return
@@ -926,13 +926,13 @@ write_write_type :: #force_no_inline proc "contextless" (i: ^int, buf: []byte, t
 		write_byte(i, buf, '}') or_return
 
 
-	case Type_Info_Simd_Vector:
+	case ^Type_Info_Simd_Vector:
 		write_string    (i, buf, "#simd[")        or_return
 		write_u64       (i, buf, u64(info.count)) or_return
 		write_byte      (i, buf, ']')             or_return
 		write_write_type(i, buf, info.elem)       or_return
 
-	case Type_Info_Matrix:
+	case ^Type_Info_Matrix:
 		if info.layout == .Row_Major {
 			write_string(i, buf, "#row_major ") or_return
 		}

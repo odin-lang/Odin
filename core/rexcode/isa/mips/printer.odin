@@ -48,8 +48,8 @@ GPR_NAMES_ABI := [32]string{
 // Public string accessors
 // =============================================================================
 
-// Canonical mnemonic spelling (lowercase, with `_` mapped to `.`).
-// The few enum names that carry a disambiguator suffix get a hand mapping.
+// Canonical mnemonic spelling (lowercase; `_` maps to `.`, except in MSA).
+// Canonical mnemonic spelling (lowercase; `_` maps to `.`, except in MSA).
 mnemonic_to_string :: proc(m: Mnemonic, lowercase: bool = true, allocator := context.temp_allocator) -> string {
 	sb := strings.builder_make(allocator)
 	write_mnemonic(&sb, m, !lowercase)
@@ -314,38 +314,50 @@ wprintln :: proc(
 
 @(private="file")
 write_mnemonic :: proc(sb: ^strings.Builder, m: Mnemonic, uppercase: bool) {
-	// Disambiguator-suffix overrides: enum names like DMUL_R6, OP_GTE,
-	// MADD_EE carry a disambiguator that should NOT appear in the printed
-	// mnemonic (the canonical assembly form is just `dmul`, `op`, `madd`).
-	name: string
-	#partial switch m {
-	case .DMUL_R6:  name = "DMUL"
-	case .DDIV_R6:  name = "DDIV"
-	case .DDIVU_R6: name = "DDIVU"
-	case .OP_GTE:   name = "OP"
-	case .SQR_GTE:  name = "SQR"
-	case .MADD_EE:  name = "MADD"
-	case .MADDU_EE: name = "MADDU"
-	case .MSUB_EE:  name = "MSUB"
-	case .MSUBU_EE: name = "MSUBU"
-	case:
-		n, ok := reflect.enum_name_from_value(m)
-		if !ok {
-			strings.write_string(sb, "<?>")
-			return
+	// No disambiguator overrides any more: the enum holds assembler
+	// mnemonics, and the ISA-variant encodings that used to need a suffix
+	// (pre-R6 vs R6 MUL, the PS2 MMI MADD, the PS1 GTE OP) are now forms of
+	// one mnemonic, picked by operand shape or by the caller's Feature_Set.
+	name, ok := reflect.enum_name_from_value(m)
+	if !ok {
+		strings.write_string(sb, "<?>")
+		return
+	}
+	// Underscores become dots -- except in MSA, which spells the sign
+	// qualifier with an underscore and only the element size with a dot:
+	// `adds_s.b`, `max_s.h`, `copy_u.w`. An assembler rejects `adds.s.b`.
+	// Nothing in the NAME distinguishes the two: MSA's ADDS_S_D and the FP
+	// convert CVT_S_D have the same shape and need opposite treatment, so
+	// the family has to come from the form's feature. Only the LAST
+	// underscore is a dot for MSA; every underscore is a dot elsewhere.
+	dot_only_last := is_msa(m)
+	last_underscore := -1
+	if dot_only_last {
+		for i in 0..<len(name) {
+			if name[i] == '_' { last_underscore = i }
 		}
-		name = n
 	}
 	for i in 0..<len(name) {
 		c := name[i]
-		if c == '_' {
+		if c == '_' && (!dot_only_last || i == last_underscore) {
 			strings.write_byte(sb, '.')
+		} else if c == '_' {
+			strings.write_byte(sb, '_')
 		} else if !uppercase && c >= 'A' && c <= 'Z' {
 			strings.write_byte(sb, c + 32)
 		} else {
 			strings.write_byte(sb, c)
 		}
 	}
+}
+
+// Is this mnemonic an MSA (MIPS SIMD) instruction? Read off the form table
+// rather than the name, which cannot tell MSA apart from the FP converts.
+@(private="file", require_results)
+is_msa :: proc(m: Mnemonic) -> bool {
+	r := ENCODE_RUNS[u16(m)]
+	if r.count == 0 { return false }
+	return ENCODE_FORMS[r.start].feature == .MSA
 }
 
 @(private="file")

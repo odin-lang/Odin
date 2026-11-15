@@ -330,6 +330,12 @@ Socket_Address_Basic :: struct #packed {
 	data: [14]c.char,
 }
 
+// struct linger
+linger :: struct {
+	l_onoff:  c.int, /* whether linger option is enabled */
+	l_linger: c.int, /* linger time in seconds */
+}
+
 /*
  * howto arguments for shutdown(2), specified by Posix.1g.
  */

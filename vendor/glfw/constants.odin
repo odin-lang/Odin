@@ -4,10 +4,11 @@ package glfw
 GLFW_SHARED :: #config(GLFW_SHARED, false)
 
 /*** Constants ***/
+
 /* Versions */
 VERSION_MAJOR    :: 3
-VERSION_MINOR    :: 4
-VERSION_REVISION :: 0
+VERSION_MINOR    :: 5
+VERSION_REVISION :: 1
 
 /* Booleans */
 TRUE  :: true
@@ -38,7 +39,7 @@ KEY_UNKNOWN :: -1
 KEY_SPACE         :: 32
 KEY_APOSTROPHE    :: 39  /* ' */
 KEY_COMMA         :: 44  /* , */
-KEY_MINUS         :: 45  /* - */
+KEY_MINUS         :: 45  /* `-` */
 KEY_PERIOD        :: 46  /* . */
 KEY_SLASH         :: 47  /* / */
 KEY_SEMICOLON     :: 59  /* ; */
@@ -357,6 +358,7 @@ CURSOR_CAPTURED :: 0x00034004
 
 /* Mouse motion */
 RAW_MOUSE_MOTION :: 0x00033005
+UNLIMITED_MOUSE_BUTTONS :: 0x00033006
 
 /* Behavior? */
 ANY_RELEASE_BEHAVIOR   :: 0

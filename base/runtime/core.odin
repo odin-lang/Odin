@@ -93,38 +93,50 @@ Type_Info_String_Encoding_Kind :: enum u8 {
 
 // Variant Types
 Type_Info_Named :: struct {
+	using header: Type_Info,
+
 	name: string,
 	base: ^Type_Info,
 	pkg:  string,
 	loc:  ^Source_Code_Location,
 }
-Type_Info_Integer    :: struct {signed: bool, endianness: Platform_Endianness}
-Type_Info_Rune       :: struct {}
-Type_Info_Float      :: struct {endianness: Platform_Endianness}
-Type_Info_Complex    :: struct {}
-Type_Info_Quaternion :: struct {}
-Type_Info_String     :: struct {is_cstring: bool, encoding: Type_Info_String_Encoding_Kind}
-Type_Info_Boolean    :: struct {}
-Type_Info_Any        :: struct {}
-Type_Info_Type_Id    :: struct {}
+Type_Info_Integer    :: struct {using header: Type_Info, signed: bool, endianness: Platform_Endianness}
+Type_Info_Rune       :: struct {using header: Type_Info}
+Type_Info_Float      :: struct {using header: Type_Info, endianness: Platform_Endianness}
+Type_Info_Complex    :: struct {using header: Type_Info}
+Type_Info_Quaternion :: struct {using header: Type_Info}
+Type_Info_String     :: struct {using header: Type_Info, is_cstring: bool, encoding: Type_Info_String_Encoding_Kind}
+Type_Info_Boolean    :: struct {using header: Type_Info}
+Type_Info_Any        :: struct {using header: Type_Info}
+Type_Info_Type_Id    :: struct {using header: Type_Info}
 Type_Info_Pointer :: struct {
+	using header: Type_Info,
+
 	elem: ^Type_Info, // nil -> rawptr
 }
 Type_Info_Multi_Pointer :: struct {
+	using header: Type_Info,
+
 	elem: ^Type_Info,
 }
 Type_Info_Procedure :: struct {
+	using header: Type_Info,
+
 	params:     ^Type_Info, // Type_Info_Parameters
 	results:    ^Type_Info, // Type_Info_Parameters
 	variadic:   bool,
 	convention: Calling_Convention,
 }
 Type_Info_Array :: struct {
+	using header: Type_Info,
+
 	elem:      ^Type_Info,
 	elem_size: int,
 	count:     int,
 }
 Type_Info_Enumerated_Array :: struct {
+	using header: Type_Info,
+
 	elem:      ^Type_Info,
 	index:     ^Type_Info,
 	elem_size: int,
@@ -133,10 +145,12 @@ Type_Info_Enumerated_Array :: struct {
 	max_value: Type_Info_Enum_Value,
 	is_sparse: bool,
 }
-Type_Info_Dynamic_Array :: struct {elem: ^Type_Info, elem_size: int}
-Type_Info_Slice         :: struct {elem: ^Type_Info, elem_size: int}
+Type_Info_Dynamic_Array :: struct {using header: Type_Info, elem: ^Type_Info, elem_size: int}
+Type_Info_Slice         :: struct {using header: Type_Info, elem: ^Type_Info, elem_size: int}
 
 Type_Info_Parameters :: struct { // Only used for procedures parameters and results
+	using header: Type_Info,
+
 	types:        []^Type_Info,
 	names:        []string,
 }
@@ -151,6 +165,8 @@ Type_Info_Struct_Flag :: enum u8 {
 }
 
 Type_Info_Struct :: struct {
+	using header: Type_Info,
+
 	// Slice these with `field_count`
 	types:   [^]^Type_Info `fmt:"v,field_count"`,
 	names:   [^]string     `fmt:"v,field_count"`,
@@ -170,6 +186,8 @@ Type_Info_Struct :: struct {
 	equal: Equal_Proc, // set only when the struct has .Comparable set but does not have .Simple_Compare set
 }
 Type_Info_Union :: struct {
+	using header: Type_Info,
+
 	variants:     []^Type_Info,
 	tag_offset:   uintptr,
 	tag_type:     ^Type_Info,
@@ -181,16 +199,22 @@ Type_Info_Union :: struct {
 	shared_nil:   bool,
 }
 Type_Info_Enum :: struct {
+	using header: Type_Info,
+
 	base:   ^Type_Info,
 	names:  []string,
 	values: []Type_Info_Enum_Value,
 }
 Type_Info_Map :: struct {
+	using header: Type_Info,
+
 	key:      ^Type_Info,
 	value:    ^Type_Info,
 	map_info: ^Map_Info,
 }
 Type_Info_Bit_Set :: struct {
+	using header: Type_Info,
+
 	elem:                ^Type_Info,
 	underlying:          ^Type_Info,
 	explicit_underlying: bool, // false = bit_set[T], true = bit_set[T, U]
@@ -198,11 +222,15 @@ Type_Info_Bit_Set :: struct {
 	upper:               i64,
 }
 Type_Info_Simd_Vector :: struct {
+	using header: Type_Info,
+
 	elem:       ^Type_Info,
 	elem_size:  int,
 	count:      int,
 }
 Type_Info_Matrix :: struct {
+	using header: Type_Info,
+
 	elem:         ^Type_Info,
 	elem_size:    int,
 	elem_stride:  int, // elem_stride >= row_count
@@ -215,9 +243,13 @@ Type_Info_Matrix :: struct {
 	},
 }
 Type_Info_Soa_Pointer :: struct {
+	using header: Type_Info,
+
 	elem: ^Type_Info,
 }
 Type_Info_Bit_Field :: struct {
+	using header: Type_Info,
+
 	backing_type: ^Type_Info,
 	names:        [^]string     `fmt:"v,field_count"`,
 	types:        [^]^Type_Info `fmt:"v,field_count"`,
@@ -228,6 +260,8 @@ Type_Info_Bit_Field :: struct {
 }
 
 Type_Info_Fixed_Capacity_Dynamic_Array :: struct {
+	using header: Type_Info,
+
 	elem: ^Type_Info,
 	elem_size:  int,
 	capacity:   int,
@@ -242,40 +276,40 @@ Type_Info_Flag :: enum u8 {
 Type_Info_Flags :: distinct bit_set[Type_Info_Flag; u32]
 
 Type_Info :: struct {
-	size:  int,
-	align: int,
-	flags: Type_Info_Flags,
-	id:    typeid,
+	size:       int,
+	align:      int,
+	type_flags: Type_Info_Flags,
+	id:         typeid,
 
 	variant: union {
-		Type_Info_Named,
-		Type_Info_Integer,
-		Type_Info_Rune,
-		Type_Info_Float,
-		Type_Info_Complex,
-		Type_Info_Quaternion,
-		Type_Info_String,
-		Type_Info_Boolean,
-		Type_Info_Any,
-		Type_Info_Type_Id,
-		Type_Info_Pointer,
-		Type_Info_Multi_Pointer,
-		Type_Info_Procedure,
-		Type_Info_Array,
-		Type_Info_Enumerated_Array,
-		Type_Info_Dynamic_Array,
-		Type_Info_Slice,
-		Type_Info_Parameters,
-		Type_Info_Struct,
-		Type_Info_Union,
-		Type_Info_Enum,
-		Type_Info_Map,
-		Type_Info_Bit_Set,
-		Type_Info_Simd_Vector,
-		Type_Info_Matrix,
-		Type_Info_Soa_Pointer,
-		Type_Info_Bit_Field,
-		Type_Info_Fixed_Capacity_Dynamic_Array,
+		^Type_Info_Named,
+		^Type_Info_Integer,
+		^Type_Info_Rune,
+		^Type_Info_Float,
+		^Type_Info_Complex,
+		^Type_Info_Quaternion,
+		^Type_Info_String,
+		^Type_Info_Boolean,
+		^Type_Info_Any,
+		^Type_Info_Type_Id,
+		^Type_Info_Pointer,
+		^Type_Info_Multi_Pointer,
+		^Type_Info_Procedure,
+		^Type_Info_Array,
+		^Type_Info_Enumerated_Array,
+		^Type_Info_Dynamic_Array,
+		^Type_Info_Slice,
+		^Type_Info_Parameters,
+		^Type_Info_Struct,
+		^Type_Info_Union,
+		^Type_Info_Enum,
+		^Type_Info_Map,
+		^Type_Info_Bit_Set,
+		^Type_Info_Simd_Vector,
+		^Type_Info_Matrix,
+		^Type_Info_Soa_Pointer,
+		^Type_Info_Bit_Field,
+		^Type_Info_Fixed_Capacity_Dynamic_Array,
 	},
 }
 
@@ -283,7 +317,7 @@ Type_Info :: struct {
 // This will be set by the compiler
 type_table: []^Type_Info
 
-args__: []cstring
+args__: union #no_nil {[]cstring, []cstring16}
 
 when ODIN_OS == .Windows {
 	// NOTE(Jeroen): If we're a Windows DLL, fwdReason will be populated.
@@ -754,7 +788,7 @@ type_info_base :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	base := info
 	loop: for {
 		#partial switch i in base.variant {
-		case Type_Info_Named: base = i.base
+		case ^Type_Info_Named: base = i.base
 		case: break loop
 		}
 	}
@@ -773,9 +807,9 @@ type_info_core :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	base := info
 	loop: for {
 		#partial switch i in base.variant {
-		case Type_Info_Named:     base = i.base
-		case Type_Info_Enum:      base = i.base
-		case Type_Info_Bit_Field: base = i.backing_type
+		case ^Type_Info_Named:     base = i.base
+		case ^Type_Info_Enum:      base = i.base
+		case ^Type_Info_Bit_Field: base = i.backing_type
 		case: break loop
 		}
 	}
@@ -795,10 +829,10 @@ type_info_underlying :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 	base := info
 	loop: for {
 		#partial switch i in base.variant {
-		case Type_Info_Named:     base = i.base
-		case Type_Info_Enum:      base = i.base
-		case Type_Info_Bit_Set:   base = i.underlying
-		case Type_Info_Bit_Field: base = i.backing_type
+		case ^Type_Info_Named:     base = i.base
+		case ^Type_Info_Enum:      base = i.base
+		case ^Type_Info_Bit_Set:   base = i.underlying
+		case ^Type_Info_Bit_Field: base = i.backing_type
 		case: break loop
 		}
 	}
@@ -812,11 +846,19 @@ type_info_base_without_enum :: type_info_core
 
 @(require_results)
 __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check {
-	n := u64(len(type_table))
-	i := transmute(u64)id % n
+	n := uint(len(type_table))
+	i: uint
+	when size_of(uintptr) == 8 {
+		i = uint((u128(transmute(u64)id << 1) * u128(n)) >> 64)
+	} else {
+		i = uint((((transmute(u64)id << 1) >> 32) * u64(n)) >> 32)
+	}
 	for _ in 0..<n {
 		ptr := type_table[i]
-		if ptr != nil && ptr.id == id {
+		if ptr == nil {
+			break
+		}
+		if ptr.id == id {
 			return ptr
 		}
 		i = i+1 if i+1 < n else 0

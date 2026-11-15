@@ -48,7 +48,7 @@ String and slice of bytes
 Slice and dynamic array:
 	%p    address of the 0th element in base 16 notation (upper-case), with leading 0x
 Pointer:
-	%p    base 16 notation (upper-case), with leading 0x
+	%p    base 16 notation (upper-case), with leading 0x; a width zero fills the digits after it
 	The %b, %d, %o, %z, %x, %X verbs also work with pointers,
 	treating it as if it was an integer
 Enums:
@@ -121,7 +121,7 @@ prints "37 13", whilst:
 is equivalent to:
 	fmt.printfln("%6.2f",   17.0) // C-like syntax
 	fmt.printfln("{:6.2f}", 17.0) // Python-like syntax
-and prints "17.00".
+and prints " 17.00".
 
 Format errors:
 

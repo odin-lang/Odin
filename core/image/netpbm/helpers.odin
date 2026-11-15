@@ -1,6 +1,5 @@
 package netpbm
 
-import "core:bytes"
 import "core:image"
 
 destroy :: proc(img: ^image.Image) -> bool {
@@ -9,7 +8,7 @@ destroy :: proc(img: ^image.Image) -> bool {
 	}
 
 	defer free(img)
-	bytes.buffer_destroy(&img.pixels)
+	delete(img.pixels)
 
 	info := img.metadata.(^image.Netpbm_Info) or_return
 

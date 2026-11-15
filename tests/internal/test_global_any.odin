@@ -32,7 +32,9 @@ test_static_any :: proc(t: ^testing.T) {
 	testing.expect(t, is_int == true)
 	testing.expect(t, as_int == 3)
 
-	var = f32(1.1)
+	@(static)
+	value: f32 = 1.1
+	var = value
 
 	as_f32, is_f32 := var.(f32)
 	testing.expect(t, is_f32 == true)

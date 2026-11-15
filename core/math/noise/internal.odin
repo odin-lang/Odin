@@ -494,7 +494,7 @@ _internal_noise_2d_unskewed_base :: proc(seed: i64, coord: Vec2) -> (value: f32)
 	}
 
 	// Second vertex.
-	a1 := f32(2 * (1 + 2 * UNSKEW_2D) * (1 / UNSKEW_2D + 2)) * t + f32(-2 * (1 + 2 * UNSKEW_2D) * (1 + 2 * UNSKEW_2D)) + a0
+	a1 := f32(2 * (1 + 2 * UNSKEW_2D) * (1 / UNSKEW_2D + 2)) * t + (f32(-2 * (1 + 2 * UNSKEW_2D) * (1 + 2 * UNSKEW_2D)) + a0)
 	if a1 > 0 {
 		d1 := d0 - [2]f32{f32(1 + 2 * UNSKEW_2D), f32(1 + 2 * UNSKEW_2D)}
 		value += (a1 * a1) * (a1 * a1) * grad(seed, [2]i64{bp.x + PRIME_X, bp.y + PRIME_Y}, d1)
@@ -639,7 +639,7 @@ _internal_noise_4d_unskewed_base :: proc(seed: i64, coord: Vec4) -> (value: f32)
 		// Next point is the closest vertex on the 4-simplex whose base vertex is the aforementioned vertex.
 		score := 1.0 + ssi * (-1.0 / UNSKEW_4D) // Seems slightly faster than 1.0-xsi-ysi-zsi-wsi
 		switch {
-		case si.x >= si.x && si.x >= si.z && si.x >= si.w && si.x >= score:
+		case si.x >= si.y && si.x >= si.z && si.x >= si.w && si.x >= score:
 			svp.x += PRIME_X
 			si.x -= 1
 			ssi -= UNSKEW_4D

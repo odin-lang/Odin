@@ -37,6 +37,13 @@ normalize_our :: proc(name: string) -> string {
 			break
 		}
 	}
+	// A conditional branch keeps its condition: B_LE is `b.le`, not `b`.
+	// Truncating at the underscore would collapse all sixteen onto one name
+	// and make every one of them compare equal to every other.
+	if strings.has_prefix(s, "b_") || strings.has_prefix(s, "bc_") {
+		return strings.concatenate({s[:strings.index_byte(s, '_')], ".",
+		                            s[strings.index_byte(s, '_')+1:]}, context.temp_allocator)
+	}
 	if i := strings.index_byte(s, '_'); i >= 0 {
 		s = s[:i]
 	}
@@ -146,15 +153,6 @@ is_known_alias :: proc(ours, llvm: string) -> bool {
 		{"and",   "mov"},
 		{"facge", "facge"},
 		{"facgt", "facgt"},
-		// Conditional branches: our table has B_COND but LLVM prints b.eq/b.ne/...
-		{"b",     "b.eq"}, {"b", "b.ne"}, {"b", "b.cs"}, {"b", "b.cc"},
-		{"b",     "b.mi"}, {"b", "b.pl"}, {"b", "b.vs"}, {"b", "b.vc"},
-		{"b",     "b.hi"}, {"b", "b.ls"}, {"b", "b.ge"}, {"b", "b.lt"},
-		{"b",     "b.gt"}, {"b", "b.le"}, {"b", "b.al"}, {"b", "b.nv"},
-		{"bc",    "bc.eq"}, {"bc", "bc.ne"}, {"bc", "bc.cs"}, {"bc", "bc.cc"},
-		{"bc",    "bc.mi"}, {"bc", "bc.pl"}, {"bc", "bc.vs"}, {"bc", "bc.vc"},
-		{"bc",    "bc.hi"}, {"bc", "bc.ls"}, {"bc", "bc.ge"}, {"bc", "bc.lt"},
-		{"bc",    "bc.gt"}, {"bc", "bc.le"}, {"bc", "bc.al"}, {"bc", "bc.nv"},
 		// FCSEL is canonical for FCSET/FCINC variants if any
 		{"fmov",  "fmov"},
 		// Atomics: many of these LLVM might print without the size suffix
