@@ -90,7 +90,7 @@ stop_test_callback :: proc "system" (info: ^win32.EXCEPTION_POINTERS) -> win32.L
 		// The most we can do now is make sure the user's cursor is visible,
 		// nuke the entire processs, and hope a useful core dump survives.
 		if !global_ansi_disabled {
-			show_cursor := ansi.CSI + ansi.DECTCEM_SHOW
+			show_cursor := ansi.show_cursor()
 			os.write_string(os.stdout, show_cursor)
 			os.flush(os.stdout)
 		}

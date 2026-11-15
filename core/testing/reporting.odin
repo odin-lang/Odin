@@ -17,13 +17,6 @@ import "core:path/filepath"
 import "core:strings"
 import "core:terminal/ansi"
 
-// Definitions of colors for use in the test runner.
-SGR_RESET   :: ansi.CSI + ansi.RESET           + ansi.SGR
-SGR_READY   :: ansi.CSI + ansi.FG_BRIGHT_BLACK + ansi.SGR
-SGR_RUNNING :: ansi.CSI + ansi.FG_YELLOW       + ansi.SGR
-SGR_SUCCESS :: ansi.CSI + ansi.FG_GREEN        + ansi.SGR
-SGR_FAILED  :: ansi.CSI + ansi.FG_RED          + ansi.SGR
-
 MAX_PROGRESS_WIDTH :: 100
 
 // More than enough bytes to cover long package names, long test names, dozens
@@ -186,22 +179,22 @@ redraw_package :: proc(w: io.Writer, report: Report, pkg: ^Package_Run) {
 		switch state {
 		case .Ready:
 			if last_state != state {
-				io.write_string(line_writer, SGR_READY)
+				io.write_string(line_writer, ansi.sgr(ansi.FG_BRIGHT_BLACK))
 				last_state = state
 			}
 		case .Running:
 			if last_state != state {
-				io.write_string(line_writer, SGR_RUNNING)
+				io.write_string(line_writer, ansi.sgr(ansi.FG_YELLOW))
 				last_state = state
 			}
 		case .Successful:
 			if last_state != state {
-				io.write_string(line_writer, SGR_SUCCESS)
+				io.write_string(line_writer, ansi.sgr(ansi.FG_GREEN))
 				last_state = state
 			}
 		case .Failed:
 			if last_state != state {
-				io.write_string(line_writer, SGR_FAILED)
+				io.write_string(line_writer, ansi.sgr(ansi.FG_RED))
 				last_state = state
 			}
 		}
@@ -212,13 +205,19 @@ redraw_package :: proc(w: io.Writer, report: Report, pkg: ^Package_Run) {
 		io.write_byte(line_writer, ' ')
 	}
 
-	io.write_string(line_writer, SGR_RESET + "] ")
+	io.write_string(line_writer, ansi.sgr(ansi.RESET))
+	io.write_string(line_writer, "] ")
 
 	ticker: string
 	if done_count == len(pkg.test_states) {
 		ticker = "[package done]"
 		if failed_count > 0 {
-			ticker = fmt.tprintf("%s (" + SGR_FAILED + "%i" + SGR_RESET + " failed)", ticker, failed_count)
+			ticker = fmt.tprintf("%s (%s%i%s failed)",
+				ticker,
+				ansi.sgr(ansi.FG_RED),
+				failed_count,
+				ansi.sgr(ansi.RESET),
+			)
 		}
 	} else {
 		if len(pkg.last_change_name) == 0 {
@@ -227,13 +226,13 @@ redraw_package :: proc(w: io.Writer, report: Report, pkg: ^Package_Run) {
 
 		switch pkg.last_change_state {
 		case .Ready:
-			ticker = fmt.tprintf(SGR_READY + "%s" + SGR_RESET, pkg.last_change_name)
+			ticker = ansi.color(pkg.last_change_name, ansi.FG_BRIGHT_BLACK)
 		case .Running:
-			ticker = fmt.tprintf(SGR_RUNNING + "%s" + SGR_RESET, pkg.last_change_name)
+			ticker = ansi.color(pkg.last_change_name, ansi.FG_YELLOW)
 		case .Failed:
-			ticker = fmt.tprintf(SGR_FAILED + "%s" + SGR_RESET, pkg.last_change_name)
+			ticker = ansi.color(pkg.last_change_name, ansi.FG_RED)
 		case .Successful:
-			ticker = fmt.tprintf(SGR_SUCCESS + "%s" + SGR_RESET, pkg.last_change_name)
+			ticker = ansi.color(pkg.last_change_name, ansi.FG_GREEN)
 		}
 	}
 
@@ -274,11 +273,11 @@ redraw_report :: proc(w: io.Writer, report: Report) {
 	//
 	// Of course, if you resize your terminal while it's printing, things can
 	// still break...
-	fmt.wprint(w, ansi.CSI + ansi.DECAWM_OFF)
+	fmt.wprint(w, ansi.disable_auto_wrap())
 	for &pkg in report.packages {
 		redraw_package(w, report, &pkg)
 	}
-	fmt.wprint(w, ansi.CSI + ansi.DECAWM_ON)
+	fmt.wprint(w, ansi.enable_auto_wrap())
 }
 
 needs_to_redraw :: proc(report: Report) -> bool {

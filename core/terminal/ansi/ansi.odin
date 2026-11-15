@@ -170,11 +170,15 @@ clear_to_start_of_line :: proc() -> string {
 	return CSI + "1" + EL
 }
 
-hide_cursor :: proc() -> string {
+clear_display_to_end :: proc() -> string {
+	return CSI + "0" + ED
+}
+
+hide_cursor :: proc "contextless" () -> string {
 	return CSI + DECTCEM_HIDE
 }
 
-show_cursor :: proc() -> string {
+show_cursor :: proc "contextless" () -> string {
 	return CSI + DECTCEM_SHOW
 }
 
@@ -206,10 +210,22 @@ move_cursor_backward :: proc(count := 1) -> string {
 	return fmt.tprintf("%s%i%s", CSI, count, CUB)
 }
 
+move_cursor_previous_line :: proc(count := 1) -> string {
+	return fmt.tprintf("%s%i%s", CSI, count, CPL)
+}
+
 save_cursor :: proc() -> string {
 	return CSI + SCP
 }
 
 restore_cursor :: proc() -> string {
 	return CSI + RCP
+}
+
+disable_auto_wrap :: proc() -> string {
+	return CSI + DECAWM_OFF
+}
+
+enable_auto_wrap :: proc() -> string {
+	return CSI + DECAWM_ON
 }
