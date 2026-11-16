@@ -267,6 +267,16 @@ stream_init :: proc(r: ^Reader, z: ^compress.Context, kind: Stream_Kind, props: 
 	}
 	r.out = Output{buf = &r.window, limit = capacity, end = end}
 
+	input_size := compress.input_size(z)
+	bound      := -1
+	if input_size >= 0 && input_size < max(int) / compress.LZMA_EXPANSION_MAX {
+		bound = input_size * compress.LZMA_EXPANSION_MAX
+	}
+	reservation := min(compress.output_reservation(size, bound, input_size), capacity)
+	if non_zero_resize(&r.window, reservation) != nil {
+		non_zero_resize(&r.window, 0)
+	}
+
 	switch kind {
 	case .Alone, .Raw:
 		rc_init(&r.decoder, z) or_return

@@ -552,10 +552,47 @@ rc_bit :: #force_inline proc "contextless" (rc: ^Rc, p: ^u16, $CHECKED: bool) ->
 }
 
 @(private)
+LZMA_PROB_ONE_TARGET :: (1 << NUM_MOVE_BITS) - 1
+
+@(private)
+rc_bit_select :: #force_inline proc "contextless" (rc: ^Rc, p: ^u16, $CHECKED: bool) -> (bit: u32) #no_bounds_check {
+	rc_normalize(rc, CHECKED)
+	ttt   := u32(p^)
+	bound := (rc.range_ >> NUM_BIT_MODEL_TOTAL_BITS) * ttt
+	one   := rc.code >= bound
+	rc.range_ = rc.range_ - bound if one else bound
+	rc.code   = rc.code - bound if one else rc.code
+	target   := i32(LZMA_PROB_ONE_TARGET) if one else i32(BIT_MODEL_TOTAL)
+	p^ = u16(i32(ttt) + ((target - i32(ttt)) >> NUM_MOVE_BITS))
+	return u32(one)
+}
+
+@(private)
+rc_literal :: #force_inline proc "contextless" (rc: ^Rc, prob: [^]u16, $CHECKED: bool) -> (symbol: u32) #no_bounds_check {
+	symbol   = 1
+	current := u32(prob[1])
+	for _ in 0..<8 {
+		next  := symbol << 1
+		zero  := u32(prob[next])
+		one_p := u32(prob[next + 1])
+		rc_normalize(rc, CHECKED)
+		bound := (rc.range_ >> NUM_BIT_MODEL_TOTAL_BITS) * current
+		one   := rc.code >= bound
+		rc.range_ = rc.range_ - bound if one else bound
+		rc.code   = rc.code - bound if one else rc.code
+		target   := i32(LZMA_PROB_ONE_TARGET) if one else i32(BIT_MODEL_TOTAL)
+		prob[symbol] = u16(i32(current) + ((target - i32(current)) >> NUM_MOVE_BITS))
+		symbol  = next + u32(one)
+		current = one_p if one else zero
+	}
+	return symbol
+}
+
+@(private)
 rc_tree :: #force_inline proc "contextless" (rc: ^Rc, probs: [^]u16, $BITS: u32, $CHECKED: bool) -> (symbol: u32) #no_bounds_check {
 	symbol = 1
 	for _ in 0..<BITS {
-		symbol = (symbol << 1) | rc_bit(rc, &probs[symbol], CHECKED)
+		symbol = (symbol << 1) | rc_bit_select(rc, &probs[symbol], CHECKED)
 	}
 	return symbol - (1 << BITS)
 }
@@ -587,13 +624,9 @@ decode_distance :: #force_inline proc "contextless" (rc: ^Rc, probs: [^]u16, len
 		m    := u32(1)
 		distance += 1
 		for _ in 0..<num_direct {
-			if rc_bit(rc, &spec[distance], CHECKED) == 0 {
-				distance += m
-				m        += m
-			} else {
-				m        += m
-				distance += m
-			}
+			b := rc_bit_select(rc, &spec[distance], CHECKED)
+			distance += m + (m & (0 - b))
+			m        += m
 		}
 		return distance - m
 	}
@@ -607,12 +640,10 @@ decode_distance :: #force_inline proc "contextless" (rc: ^Rc, probs: [^]u16, len
 	}
 	align := probs[ALIGN:]
 	i     := u32(1)
-	i += 1 if rc_bit(rc, &align[i], CHECKED) == 0 else 2
-	i += 2 if rc_bit(rc, &align[i], CHECKED) == 0 else 4
-	i += 4 if rc_bit(rc, &align[i], CHECKED) == 0 else 8
-	if rc_bit(rc, &align[i], CHECKED) == 0 {
-		i -= 8
-	}
+	i += 1 + rc_bit_select(rc, &align[i], CHECKED)
+	i += 2 + 2 * rc_bit_select(rc, &align[i], CHECKED)
+	i += 4 + 4 * rc_bit_select(rc, &align[i], CHECKED)
+	i -= 8 & (rc_bit_select(rc, &align[i], CHECKED) - 1)
 	return (distance << NUM_ALIGN_BITS) | i
 }
 
@@ -656,9 +687,7 @@ decode_real :: proc(d: ^Decoder, rc_ptr: ^Rc, o: ^Output, limit, safe: int, $CHE
 			symbol := u32(1)
 			if state < NUM_LIT_STATES {
 				state -= state if state < 4 else 3
-				for _ in 0..<8 {
-					symbol = (symbol << 1) | rc_bit(&rc, &prob[symbol], CHECKED)
-				}
+				symbol = rc_literal(&rc, prob, CHECKED)
 			} else {
 				match_byte := u32(out[pos - int(rep0)])
 				offs       := u32(0x100)
@@ -667,11 +696,9 @@ decode_real :: proc(d: ^Decoder, rc_ptr: ^Rc, o: ^Output, limit, safe: int, $CHE
 					match_byte <<= 1
 					bit  := offs
 					offs &= match_byte
-					b    := rc_bit(&rc, &prob[offs + bit + symbol], CHECKED)
+					b    := rc_bit_select(&rc, &prob[offs + bit + symbol], CHECKED)
 					symbol = (symbol << 1) | b
-					if b == 0 {
-						offs ~= bit
-					}
+					offs ~= bit & (b - 1)
 				}
 			}
 			out[pos] = u8(symbol)
