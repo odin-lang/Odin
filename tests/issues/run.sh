@@ -570,6 +570,14 @@ if [[ "$(uname -m)" == "x86_64" || "$(uname -m)" == "amd64" ]]; then
 		exit 1
 	fi
 fi
+if [[ $($ODIN check ../test_issue_asm_writeback_errors -target:linux_arm64 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 &&
+      $($ODIN check ../test_issue_asm_writeback_errors -target:linux_arm64 $COMMON_CHECK 2>&1 >/dev/null | grep -c "writes back its base register") -eq 1 &&
+      $($ODIN check ../test_issue_asm_writeback_errors -target:linux_arm64 $COMMON_CHECK 2>&1 >/dev/null | grep -c "takes only a base register and a constant offset") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
 
 $ODIN test ../test_lifetime_markers $COMMON -o:size -lifetime-markers
 $ODIN test ../test_lifetime_markers $COMMON -o:speed -lifetime-markers

@@ -149,6 +149,25 @@ struct lbAsmGenerate {
 		return nullptr;
 	}
 
+	// The constant displacement of a memory operand: its folded constants plus its $ immediate parameters
+	i64 memory_displacement(AstAsmMemoryOperand *mem_op) {
+		i64 disp = mem_op->classify.has_disp_const ? mem_op->classify.disp_total : 0;
+		for (Ast *term : mem_op->terms) {
+			if (term->kind != Ast_AsmMemoryTerm || term->AsmMemoryTerm.scale != nullptr) {
+				continue;
+			}
+			Entity *e = entity_of_node(term->AsmMemoryTerm.operand);
+			if (e == nullptr || e->kind != Entity_Variable || entity_op(e)->kind != AsmTemplateEntityDecl_Immediate) {
+				continue;
+			}
+			LLVMValueRef v = (*this->curr_args)[entity_op(e)->param_index].value;
+			GB_ASSERT_MSG(LLVMIsAConstantInt(v), "asm: displacement immediate '%.*s' is not a constant", LIT(e->token.string));
+			i64 value = LLVMConstIntGetSExtValue(v);
+			disp += term->AsmMemoryTerm.op.kind == Token_Sub ? -value : value;
+		}
+		return disp;
+	}
+
 
 
 	// LLVM type of a returned register output, taken from the proc signature's results.
@@ -1224,10 +1243,11 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 		GB_ASSERT_MSG(mem_op->classify.index == nullptr && mem_op->classify.scale == nullptr, "asm: RISC-V memory operands have no index/scale");
 
 		auto const &cl = mem_op->classify;
+		i64 disp = this->memory_displacement(mem_op);
 		if (cl.label != nullptr) {
 			this->write_operand(op_number, cl.label, flags&~WriteOperandFlag_PrintPrefixes);
-		} else if (cl.has_disp_const && (cl.disp_total != 0 || cl.base == nullptr)) {
-			write_i64(cl.disp_total);
+		} else if (disp != 0 || cl.base == nullptr) {
+			write_i64(disp);
 		}
 		write_cstr("(");
 		if (cl.base != nullptr) {
@@ -1838,6 +1858,7 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 		              "asm: ARM64 memory scale requires an index register");
 
 		auto const &cl = mem_op->classify;
+		i64 disp = this->memory_displacement(mem_op);
 		write_cstr("[");
 		if (cl.base != nullptr) {
 			this->write_operand(op_number, cl.base, flags&~WriteOperandFlag_PrintPrefixes);
@@ -1862,10 +1883,18 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 					asm_string = gb_string_append_fmt(asm_string, ", lsl #%lld", cast(long long)shift);
 				}
 			}
-		} else if (cl.has_disp_const && cl.disp_total != 0) {
-			asm_string = gb_string_append_fmt(asm_string, ", #%lld", cast(long long)cl.disp_total);
+		} else if (mem_op->kind == AsmMemoryOperand_Pre || (mem_op->kind == AsmMemoryOperand_Default && disp != 0)) {
+			asm_string = gb_string_append_fmt(asm_string, ", #%lld", cast(long long)disp);
 		}
 		write_cstr("]");
+		switch (mem_op->kind) {
+		case AsmMemoryOperand_Pre: // [x1, #8]!
+			write_cstr("!");
+			break;
+		case AsmMemoryOperand_Post: // [x1], #8
+			asm_string = gb_string_append_fmt(asm_string, ", #%lld", cast(long long)disp);
+			break;
+		}
 	}
 
 	// A flag output '= %flags.<n|z|c|v>' lowers to '=@cc<cond>', where the condition

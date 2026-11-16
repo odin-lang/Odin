@@ -266,7 +266,27 @@ enum AsmMismatch : u8 {
 	AsmMismatch_ImmRange,  // constant immediate does not fit the slot width
 	AsmMismatch_ImmType,   // non-integer constant where an integer immediate is required
 	AsmMismatch_NamedReg,  // slot only a named hardware register can fill
+	AsmMismatch_Writeback, // memory operand whose #pre/#post writeback differs from the slot's
 };
+
+gb_global char const *asm_writeback_names[AsmMemoryOperand_COUNT] = {"", "pre", "post"};
+
+// NOTE(bill): the writeback a memory slot takes. Only AArch64 has pre- and post-indexed addressing.
+template <typename AsmCtx>
+gb_internal AsmMemoryOperandKind asm_slot_writeback(AsmCtx *asm_ctx, typename AsmCtx::OperandType slot) {
+	return AsmMemoryOperand_Default;
+}
+gb_internal AsmMemoryOperandKind asm_slot_writeback(Asm_arm64 *asm_ctx, Asm_arm64::OperandType slot) {
+	switch (slot) {
+	case Asm_arm64::OP_MEM_PRE:  return AsmMemoryOperand_Pre;
+	case Asm_arm64::OP_MEM_POST: return AsmMemoryOperand_Post;
+	}
+	return AsmMemoryOperand_Default;
+}
+
+gb_internal AsmMemoryOperandKind asm_operand_writeback(Operand const *operand) {
+	return operand->expr->kind == Ast_AsmMemoryOperand ? operand->expr->AsmMemoryOperand.kind : AsmMemoryOperand_Default;
+}
 
 // Does a constant immediate value fit a slot of `bits` width (0 == unconstrained)?
 // Accepts either a signed or an unsigned interpretation of the bit pattern, which
@@ -687,6 +707,13 @@ struct AsmSlotFit {
 template <typename AsmCtx>
 gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::OperandType slot, Operand const *operand, AsmSlotFit *fit) {
 	*fit = {};
+
+	// e.g. `ldr r, #post [p + 8]` fills only a post-indexed slot, and `ldr r, [p + 8]` none.
+	// Other targets have no writeback, and report #pre/#post on their own.
+	if (build_context.metrics.arch == TargetArch_arm64 && asm_operand_writeback(operand) != asm_slot_writeback(asm_ctx, slot)) {
+		fit->mismatch = AsmMismatch_Writeback;
+		return false;
+	}
 
 	AsmOperandKind slot_kind = asm_ctx->kind_from_operand_type(slot);
 	if (slot_kind == AsmOperand_Immediate) {
@@ -1614,6 +1641,9 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 					            : gb_string_appendc(s, "v[i]");
 					break;
 				case AsmOperand_Memory:
+					if (AsmMemoryOperandKind wb = asm_slot_writeback(asm_ctx, slot)) {
+						s = gb_string_append_fmt(s, "#%s ", asm_writeback_names[wb]);
+					}
 					s = (w > 0) ? gb_string_append_fmt(s, "m%d", cast(int)w)
 					            : gb_string_appendc(s, "m");
 					break;
@@ -1929,9 +1959,9 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 			if (spot_ok) {
 				score += 2;
-			} else if (kind_ok && fit.mismatch != AsmMismatch_NamedReg) {
-				// A slot wanting a named hardware register is not a near miss for anything
-				// else, so it must not outrank a form that merely has the widths wrong.
+			} else if (kind_ok && fit.mismatch != AsmMismatch_NamedReg && fit.mismatch != AsmMismatch_Writeback) {
+				// A slot wanting a named hardware register or another writeback is not a near miss.
+				// It must not outrank a form that merely has the widths wrong.
 				score += 1; // kind matched, only value/size/class failed
 			}
 		}
@@ -2225,16 +2255,16 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			// won't see it; record the base's def+use here so liveness sees the
 			// cursor advance and a later read of it isn't flagged undefined.
 			if (operands[i].expr->kind == Ast_AsmMemoryOperand) {
-				auto *m = &operands[i].expr->AsmMemoryOperand;
-				if (m->kind == AsmMemoryOperand_Pre || m->kind == AsmMemoryOperand_Post) {
-					Entity *be = entity_of_node(m->classify.base);
+				auto *m    = &operands[i].expr->AsmMemoryOperand;
+				Ast  *base = m->classify.base; // NOTE(bill): a missing base was already reported
+				if (m->kind != AsmMemoryOperand_Default && base != nullptr) {
+					Entity *be = entity_of_node(base);
 					if (be != nullptr && be->kind == Entity_Variable) {
 						array_add(&facts->gen_params,  be);
 						array_add(&facts->read_params, be);
 						check_asm_mark_input_written(ate->decls, check_asm_find_decl(be, ate->decls));
 					}
-					Ast *base = m->classify.base;
-					if (base != nullptr && base->kind == Ast_AsmRegister) {
+					if (base->kind == Ast_AsmRegister) {
 						asm_clobber_written_register(asm_ctx, tmpl_entity, base->AsmRegister.name.string);
 						u16 base_bit = asm_ctx->clobber_bit_for_reg_name(base->AsmRegister.name.string);
 						writes_back_stack_pointer |= (base_bit & asm_stack_pointer_bit(asm_ctx)) != 0;
@@ -2437,6 +2467,16 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			      LIT(name), i,
 			      fit.want_bits, LIT(asm_reg_class_strings[dst_reg_class]), LIT(asm_operand_kind_strings[dst]),
 			      fit.got_bits,  LIT(asm_reg_class_strings[src_reg_class]), LIT(asm_operand_kind_strings[src]));
+		} else if (m == AsmMismatch_Writeback) {
+			auto slot = operand_slot_type(forms[best_form], cast(int)i);
+			AsmMemoryOperandKind want = asm_slot_writeback(asm_ctx, slot);
+			if (want == AsmMemoryOperand_Default) {
+				error(operands[i].expr, "'%.*s' operand-%td is #%s, but no form of '%.*s' writes back its base register",
+				      LIT(name), i, asm_writeback_names[asm_operand_writeback(&operands[i])], LIT(name));
+			} else {
+				error(operands[i].expr, "'%.*s' operand-%td must be a #%s memory operand",
+				      LIT(name), i, asm_writeback_names[want]);
+			}
 		} else if (m == AsmMismatch_NamedReg) {
 			auto slot = operand_slot_type(forms[best_form], cast(int)i);
 			error(operands[i].expr, "'%.*s' operand-%td must be a named %.*s register, got a %.*s",
@@ -2800,18 +2840,6 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 			}
 		}
 
-		switch (mem_op->kind) {
-		case AsmMemoryOperand_Default:
-			break;
-		case AsmMemoryOperand_Pre:
-		case AsmMemoryOperand_Post:
-			if (build_context.metrics.arch != TargetArch_arm64) {
-				error(expr, "#pre/#post asm memory operands are not supported by the target platform");
-			}
-			break;
-		}
-
-
 		Operand base  = {};
 		Operand index = {};
 		Operand scale = {};
@@ -3016,6 +3044,15 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 			}
 			if (scale.expr != nullptr) {
 				error(scale.expr, "The target platform does not support memory index scaling within memory operands");
+			}
+		}
+
+		// NOTE(bill): a writeback moves the base register by a constant offset, e.g. `[x1, #8]!` or `[x1], #8`
+		if (mem_op->kind != AsmMemoryOperand_Default) {
+			if (build_context.metrics.arch != TargetArch_arm64) {
+				error(expr, "#pre/#post asm memory operands are not supported by the target platform");
+			} else if (base.expr == nullptr || index.expr != nullptr || label_node != nullptr) {
+				error(expr, "A #%s memory operand takes only a base register and a constant offset", asm_writeback_names[mem_op->kind]);
 			}
 		}
 
@@ -3571,8 +3608,6 @@ gb_internal void check_asm_template_body(AsmCtx *asm_ctx, CheckerContext *ctx, E
 			}
 			case CheckMnemomic_PseudoMacroMnemonic:
 				all_instructions_good &= check_pseudo_macro_mnemonic(asm_ctx, entity, instr, slice_from_array(operands));
-				break;
-			default:
 				break;
 			}
 			cfg.saw_any_instructions |= res != CheckMnemomic_Invalid;
