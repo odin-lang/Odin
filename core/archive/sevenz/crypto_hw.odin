@@ -32,16 +32,13 @@ _cbc_encrypt :: proc(ctx: ^aes.Context_ECB, iv: ^[aes.BLOCK_SIZE]u8, dst, src: [
 	}
 }
 
-@(private)
-TEST_AES_VAES :: #config(SEVENZ_TEST_AES_VAES, true)
-
 @(private, enable_target_feature = aes_hw.TARGET_FEATURES)
 _cbc_decrypt_hw :: proc(ctx: ^aes_hw.Context, iv: ^[aes.BLOCK_SIZE]u8, data: []u8) {
 	p     := raw_data(data)
 	n     := len(data) / aes.BLOCK_SIZE
 	chain := intrinsics.unaligned_load((^simd.u8x16)(iv))
-	when ODIN_ARCH == .amd64 && TEST_AES_VAES {
-		if _has_vaes && n >= AES_VAES_STRIDE {
+	when ODIN_ARCH == .amd64 {
+		if _has_vaes() && n >= AES_VAES_STRIDE {
 			wide := n &~ (AES_VAES_STRIDE - 1)
 			chain = _cbc_decrypt_vaes(ctx, chain, p, wide)
 			p = p[wide * aes.BLOCK_SIZE:]

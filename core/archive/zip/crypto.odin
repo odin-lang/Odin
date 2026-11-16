@@ -3,6 +3,7 @@ package archive_zip
 import "core:archive"
 import "core:compress"
 import "core:crypto"
+import "core:crypto/_aes/ct64"
 import "core:crypto/aes"
 import crypto_hash "core:crypto/hash"
 import "core:crypto/hmac"
@@ -171,31 +172,53 @@ _aes_encrypt :: proc(c: ^Cipher, p: []u8) {
 
 @(private)
 _aes_ctr :: proc(c: ^Cipher, p: []u8) {
-	block: [aes.BLOCK_SIZE]u8
 	rest := p
 	for len(rest) > 0 && c.used < aes.BLOCK_SIZE {
 		rest[0] ~= c.stream[c.used]
 		c.used += 1
 		rest = rest[1:]
 	}
-	for len(rest) >= aes.BLOCK_SIZE {
-		c.counter += 1
-		endian.unchecked_put_u64le(block[:8], c.counter)
-		aes.encrypt_ecb(&c.block, c.stream[:], block[:])
-		chunk := (^[aes.BLOCK_SIZE]u8)(raw_data(rest))
-		chunk^ = chunk^ ~ c.stream
-		rest = rest[aes.BLOCK_SIZE:]
+	whole := len(rest) &~ (aes.BLOCK_SIZE - 1)
+	if whole > 0 {
+		_ctr_xor(&c.block, &c.counter, rest[:whole])
+		rest = rest[whole:]
 	}
-	for &b in rest {
-		if c.used == aes.BLOCK_SIZE {
-			c.counter += 1
-			endian.unchecked_put_u64le(block[:8], c.counter)
-			aes.encrypt_ecb(&c.block, c.stream[:], block[:])
-			c.used = 0
+	if len(rest) > 0 {
+		c.stream = {}
+		_ctr_xor(&c.block, &c.counter, c.stream[:])
+		c.used = 0
+		for &b in rest {
+			b ~= c.stream[c.used]
+			c.used += 1
 		}
-		b ~= c.stream[c.used]
-		c.used += 1
 	}
+}
+
+@(private)
+_ctr_xor_ct64 :: proc(ctx: ^ct64.Context, counter: ^u64, data: []u8) {
+	stream: [ct64.STRIDE][aes.BLOCK_SIZE]u8
+	blocks: [ct64.STRIDE][]u8
+	for k in 0 ..< ct64.STRIDE {
+		blocks[k] = stream[k][:]
+	}
+	ctr    := counter^
+	offset := 0
+	for offset < len(data) {
+		n := min((len(data) - offset) / aes.BLOCK_SIZE, ct64.STRIDE)
+		for k in 0 ..< n {
+			ctr += 1
+			endian.unchecked_put_u64le(stream[k][:8], ctr)
+			endian.unchecked_put_u64le(stream[k][8:], 0)
+		}
+		ct64.encrypt_blocks(ctx, blocks[:n], blocks[:n])
+		for k in 0 ..< n {
+			chunk := (^[aes.BLOCK_SIZE]u8)(&data[offset + k * aes.BLOCK_SIZE])
+			chunk^ = chunk^ ~ stream[k]
+		}
+		offset += n * aes.BLOCK_SIZE
+	}
+	counter^ = ctr
+	crypto.zero_explicit(&stream, size_of(stream))
 }
 
 @(private)

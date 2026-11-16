@@ -2,30 +2,19 @@
 package archive_sevenz
 
 import "base:intrinsics"
+import "core:archive"
 import "core:crypto"
 import "core:crypto/_aes"
 import aes_hw "core:crypto/_aes/hw"
 import "core:crypto/aes"
 import "core:simd"
-import "core:sys/info"
 
 @(private = "file")
 VAES_FEATURES :: aes_hw.TARGET_FEATURES + ",avx,avx2,vaes,-slow-unaligned-mem-32"
 
 @(private)
-_has_vaes: bool
-
-@(init, private)
-_detect_vaes :: proc "contextless" () {
-	if !TEST_AES_VAES || !aes_hw.is_supported() || .avx2 not_in info.cpu_features() {
-		return
-	}
-	max_id, _, _, _ := intrinsics.x86_cpuid(0, 0)
-	if max_id < 7 {
-		return
-	}
-	_, _, ecx7, _ := intrinsics.x86_cpuid(7, 0)
-	_has_vaes = ecx7 >> 9 & 1 != 0
+_has_vaes :: #force_inline proc "contextless" () -> bool {
+	return archive._has_vaes()
 }
 
 @(private = "file", default_calling_convention = "none")
