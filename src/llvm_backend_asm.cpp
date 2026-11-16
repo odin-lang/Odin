@@ -1844,5 +1844,11 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 	GB_ASSERT(generator != nullptr);
 	generator->init(entity);
 	defer (generator->destroy());
-	return generator->emit_call(p, args);
+
+	lbValue result = generator->emit_call(p, args);
+	if (base_type(entity->type)->Proc.diverging) {
+		// NOTE(bill): the checker requires every path through a diverging template to end without returning
+		LLVMBuildUnreachable(p->builder);
+	}
+	return result;
 }

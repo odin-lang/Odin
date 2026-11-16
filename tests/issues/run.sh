@@ -542,6 +542,14 @@ if [[ "$(uname -m)" == "x86_64" || "$(uname -m)" == "amd64" ]]; then
 		echo "SUCCESSFUL 0/1"
 		exit 1
 	fi
+	if [[ $($ODIN check ../test_issue_asm_call_flow $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 &&
+	      $($ODIN check ../test_issue_asm_call_flow $COMMON_CHECK 2>&1 >/dev/null | grep -c "can fall through the end") -eq 1 &&
+	      $($ODIN check ../test_issue_asm_call_flow $COMMON_CHECK 2>&1 >/dev/null | grep -c "Warning:") -eq 0 ]]; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1"
+		exit 1
+	fi
 fi
 
 $ODIN test ../test_lifetime_markers $COMMON -o:size -lifetime-markers

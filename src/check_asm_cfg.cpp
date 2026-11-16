@@ -81,6 +81,8 @@ struct AsmInstructionFacts {
 	bool is_control;
 	bool is_conditional;
 	bool is_terminal;
+	bool is_call;
+	bool calls_out; // a call to code outside of the template, rather than to one of its labels
 
 	Entity *branch_target;
 	i32     block_id;
@@ -293,7 +295,7 @@ gb_internal void check_asm_cfg_build(AsmCtx *asm_ctx, AsmCfg *cfg, Ast *at_node,
 				}
 				// For `t == blocks.count`, this implies a jump to the implicit end, and is handled as "leaves" below
 			}
-			// e.g. jmp/ret/hlt (and, conservatively, call) do not fall through in this model.
+			// e.g. jmp/ret/hlt, and a call to a diverging procedure, do not fall through
 			if (lf->is_terminal) {
 				fallthrough = false;
 			}
@@ -910,7 +912,7 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 		if (any_leak) {
 			error(entity->token,
 			      "This 'asm' template is declared diverging (-> !) but a reachable path can fall through the end; "
-			      "end every path with an unconditional jump, return, or halt");
+			      "end every path with an unconditional jump, return, halt, or call to a diverging (-> !) procedure");
 		}
 	} else {
 		// Not declared diverging: no reachable block leaves => control never returns
@@ -1015,6 +1017,11 @@ gb_internal bool check_asm_cfg_liveness(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *en
 				if (f == nullptr) {
 					continue;
 				}
+				if (f->is_call) {
+					// NOTE(bill): the callee may take any register as an argument
+					live = REG_TOP;
+					continue;
+				}
 				live = (live & ~asm_full_kill_mask(f)) | (f->read_regs & REG_TOP);
 			}
 
@@ -1053,6 +1060,10 @@ gb_internal bool check_asm_cfg_liveness(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *en
 		for (i32 ii = b.last; ii >= b.first; ii--) {
 			AsmInstructionFacts *f = cfg->insts[ii]->facts;
 			if (f == nullptr) {
+				continue;
+			}
+			if (f->is_call) {
+				live = REG_TOP;
 				continue;
 			}
 			u16 live_after = live;

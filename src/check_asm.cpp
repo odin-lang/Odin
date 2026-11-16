@@ -435,6 +435,64 @@ gb_internal void asm_normalize_register_names(AsmCtx *asm_ctx, StringSet *set) {
 	}
 }
 
+gb_internal bool asm_instruction_is_call(Asm_amd64 *asm_ctx, u16 mnemonic, Asm_amd64::Clobber const &clobber, u16 produced) {
+	return mnemonic == Asm_amd64::M_CALL;
+}
+gb_internal bool asm_instruction_is_call(Asm_arm64 *asm_ctx, u16 mnemonic, Asm_arm64::Clobber const &clobber, u16 produced) {
+	// bl, blr, and their authenticated forms write the link register
+	return clobber.has_control() && (cast(u32)clobber.implicit_wr & Asm_arm64::ClobberReg_LR) != 0;
+}
+gb_internal bool asm_instruction_is_call(Asm_riscv *asm_ctx, u16 mnemonic, Asm_riscv::Clobber const &clobber, u16 produced) {
+	// jal and jalr are calls when they link through ra, and jumps when they link through zero
+	return clobber.has_control() && (produced & Asm_riscv::ClobberReg_RA) != 0;
+}
+
+// NOTE(bill): a call returns to the next instruction unless its callee is declared diverging (-> !).
+// Nothing is assumed about the callee's calling convention: it may take any register as an argument,
+// and every register and flag holds a value once it returns.
+template <typename AsmCtx>
+gb_internal void check_asm_call_facts(AsmCtx *asm_ctx, Entity *tmpl_entity, AsmInstructionFacts *facts, Slice<Operand> const &operands) {
+	bool internal = false;
+	bool diverges = false;
+	for (auto const &op : operands) {
+		if (op.expr == nullptr) {
+			continue;
+		}
+		if (op.expr->kind == Ast_AsmLabelDecl) {
+			internal = true;
+			continue;
+		}
+		Entity *e = entity_of_node(op.expr);
+		if (e == nullptr || e->type == nullptr) {
+			continue;
+		}
+		Type *t = base_type(e->type);
+		if (t->kind == Type_Proc && t->Proc.diverging) {
+			diverges = true;
+		}
+	}
+
+	facts->is_call     = true;
+	facts->calls_out   = !internal;
+	facts->is_terminal = diverges;
+
+	facts->gen_regs  |= asm_ctx->CLOBBER_REGS_NAMED;
+	facts->gen_flags  = cast(u16)~cast(u16)0;
+
+	u8 full = cast(u8)(build_context.metrics.ptr_size*8);
+	for (i32 idx = 0; idx < ASM_WIDTH_REG_COUNT; idx++) {
+		if ((asm_ctx->CLOBBER_REGS_NAMED & (1u << idx)) != 0) {
+			facts->gen_reg_w.e[idx] = full;
+		}
+	}
+
+	for (auto const &ed : tmpl_entity->AsmTemplate.decls) {
+		if (ed.param_group == AsmTemplateEntityDeclParamGroup_Output && ed.pin.len != 0 && ed.entity != nullptr) {
+			array_add(&facts->gen_params, ed.entity);
+		}
+	}
+}
+
 template <typename AsmCtx>
 gb_internal void asm_clobber_implicit_vector_registers(AsmCtx *asm_ctx, Entity *tmpl_entity, u32 implicit_wr) {
 	// only AMD64 has instructions which implicitly write every vector register
@@ -2216,6 +2274,9 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			facts->is_conditional = conditional;
 			facts->is_terminal = halt || (control && !conditional);
 		}
+		if (asm_instruction_is_call(asm_ctx, mnemonic, clobber, produced)) {
+			check_asm_call_facts(asm_ctx, tmpl_entity, facts, operands);
+		}
 		// NOTE(bill): an output's register is already declared as written.
 		// Clobbering it as well lets LLVM drop the moves into it of an input tied to that output.
 		// LLVM reserves the stack pointer, and a template must leave it as it found it.
@@ -3592,6 +3653,7 @@ gb_internal void check_asm_template_body(AsmCtx *asm_ctx, CheckerContext *ctx, E
 		StringSet touched_families = {};
 		string_set_init(&touched_families);
 		defer (string_set_destroy(&touched_families));
+		bool calls_out = false; // the callee may take any pinned register as an argument
 
 		for (Ast *instruction_ : at->instructions) {
 			if (instruction_->kind == Ast_AsmInstruction) {
@@ -3601,6 +3663,7 @@ gb_internal void check_asm_template_body(AsmCtx *asm_ctx, CheckerContext *ctx, E
 				// NOTE(bill): An implicit read (e.g. CQO reads RAX, CPUID reads EAX/ECX) uses the pinned register too
 				if (AsmInstructionFacts *facts = instruction_->AsmInstruction.facts) {
 					touched_regs |= facts->read_regs;
+					calls_out    |= facts->calls_out;
 				}
 			} else if (instruction_->kind == Ast_AsmDirective) {
 				for (Ast *op : instruction_->AsmDirective.operands) {
@@ -3623,6 +3686,9 @@ gb_internal void check_asm_template_body(AsmCtx *asm_ctx, CheckerContext *ctx, E
 				continue;
 			}
 			if (ed.pin.len != 0) {
+				if (calls_out) {
+					continue;
+				}
 				u16 pin_bit = asm_ctx->clobber_bit_for_reg_name(ed.pin);
 				if (pin_bit != 0 && (touched_regs & pin_bit) != 0) {
 					continue;
