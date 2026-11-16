@@ -560,13 +560,61 @@ if [[ "$(uname -m)" == "x86_64" || "$(uname -m)" == "amd64" ]]; then
 		exit 1
 	fi
 	$ODIN test ../test_issue_asm_pinned_clobbers $COMMON -o:speed
+	$ODIN test ../test_issue_asm_named_register_clobbers $COMMON -o:speed
+	$ODIN test ../test_issue_asm_call_clobbers $COMMON -o:speed
+	$ODIN test ../test_issue_asm_written_inputs $COMMON -o:speed
 	if [[ $($ODIN check ../test_issue_asm_clobber_pinned_output $COMMON_CHECK 2>&1 >/dev/null | grep -c "which '#clobber' also names") -eq 3 ]]; then
 		echo "SUCCESSFUL 1/1"
 	else
 		echo "SUCCESSFUL 0/1"
 		exit 1
 	fi
+	if [[ $($ODIN check ../test_issue_asm_call_flow $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 &&
+	      $($ODIN check ../test_issue_asm_call_flow $COMMON_CHECK 2>&1 >/dev/null | grep -c "can fall through the end") -eq 1 &&
+	      $($ODIN check ../test_issue_asm_call_flow $COMMON_CHECK 2>&1 >/dev/null | grep -c "Warning:") -eq 0 ]]; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1"
+		exit 1
+	fi
+	if [[ $($ODIN check ../test_issue_asm_align_stack $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 &&
+	      $($ODIN check ../test_issue_asm_align_stack $COMMON_CHECK 2>&1 >/dev/null | grep -c "must declare #align_stack") -eq 4 &&
+	      $($ODIN check ../test_issue_asm_align_stack $COMMON_CHECK 2>&1 >/dev/null | grep -c "#align_stack is redundant") -eq 1 ]]; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1"
+		exit 1
+	fi
+	if [[ $($ODIN check ../test_issue_asm_call_targets $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 8 &&
+	      $($ODIN check ../test_issue_asm_call_targets $COMMON_CHECK 2>&1 >/dev/null | grep -c "uses the Odin calling convention") -eq 3 &&
+	      $($ODIN check ../test_issue_asm_call_targets $COMMON_CHECK 2>&1 >/dev/null | grep -c "as the target of a call") -eq 2 &&
+	      $($ODIN check ../test_issue_asm_call_targets $COMMON_CHECK 2>&1 >/dev/null | grep -c "Assertion Failure") -eq 0 ]]; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1"
+		exit 1
+	fi
 fi
+if [[ $($ODIN check ../test_issue_asm_writeback_errors -target:linux_arm64 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 &&
+      $($ODIN check ../test_issue_asm_writeback_errors -target:linux_arm64 $COMMON_CHECK 2>&1 >/dev/null | grep -c "writes back its base register") -eq 1 &&
+      $($ODIN check ../test_issue_asm_writeback_errors -target:linux_arm64 $COMMON_CHECK 2>&1 >/dev/null | grep -c "takes only a base register and a constant offset") -eq 1 &&
+      $($ODIN check ../test_issue_asm_writeback_errors -target:linux_arm64 $COMMON_CHECK 2>&1 >/dev/null | grep -c "needs a base register") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+if [[ $($ODIN check ../test_issue_asm_baseless_errors -target:linux_arm64 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 2 &&
+      $($ODIN check ../test_issue_asm_baseless_errors -target:linux_arm64 $COMMON_CHECK 2>&1 >/dev/null | grep -c "needs a base register") -eq 2 &&
+      $($ODIN check ../test_issue_asm_baseless_errors -target:linux_riscv64 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 2 &&
+      $($ODIN check ../test_issue_asm_baseless_errors -target:linux_riscv64 $COMMON_CHECK 2>&1 >/dev/null | grep -c "must be from -2048 to 2047") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+$ODIN build ../test_issue_asm_baseless_riscv -target:linux_riscv64 -build-mode:obj $COMMON_CHECK
+$ODIN build ../test_issue_asm_keyword_mnemonic -target:linux_amd64 -build-mode:obj $COMMON_CHECK
 
 $ODIN test ../test_lifetime_markers $COMMON -o:size -lifetime-markers
 $ODIN test ../test_lifetime_markers $COMMON -o:speed -lifetime-markers

@@ -20,6 +20,8 @@ struct lbAsmGenerate {
 
 	PtrSet<Entity *>      lane_written;
 
+	PtrMap<Entity *, i32> symbol_numbers; // the operand number of each procedure named in the body
+
 	enum WriteOperandFlags : u32 {
 		WriteOperandFlag_PrintPrefixes  = 1<<0,
 		WriteOperandFlag_IsScale        = 1<<1,
@@ -47,6 +49,7 @@ struct lbAsmGenerate {
 		this->asm_string  = gb_string_make_reserve(heap_allocator(), 256);
 		this->constraints = gb_string_make_reserve(heap_allocator(), 64);
 		map_init(&this->label_numbers);
+		map_init(&this->symbol_numbers);
 
 		// Pre-scan the body: any `dst[i]` operand written by INS marks its base
 		// entity as lane-written.
@@ -71,7 +74,35 @@ struct lbAsmGenerate {
 		gb_string_free(this->constraints);
 		map_destroy(&this->label_numbers);
 		map_destroy(&this->label_def_pos);
+		map_destroy(&this->symbol_numbers);
 		ptr_set_destroy(&this->lane_written);
+	}
+
+	Entity *procedure_of_operand(Ast *op) {
+		if (op == nullptr || (op->kind != Ast_Ident && op->kind != Ast_SelectorExpr)) {
+			return nullptr;
+		}
+		Entity *e = entity_of_node(op);
+		if (e == nullptr || e->kind != Entity_Procedure) {
+			return nullptr;
+		}
+		return e;
+	}
+
+	// A procedure named in the body is a symbol operand, so a call to it is direct
+	bool write_procedure_operand(Ast *op) {
+		Entity *e = this->procedure_of_operand(op);
+		if (e == nullptr) {
+			return false;
+		}
+		i32 *n = map_get(&this->symbol_numbers, e);
+		GB_ASSERT(n != nullptr);
+		this->write_symbol_operand(*n);
+		return true;
+	}
+
+	virtual void write_symbol_operand(i32 n) {
+		asm_string = gb_string_append_fmt(asm_string, "$%d", n);
 	}
 
 	void write_cstr(char const *cstr) { asm_string = gb_string_appendc      (asm_string, cstr);                                }
@@ -116,6 +147,25 @@ struct lbAsmGenerate {
 		}
 		GB_PANIC("Could not find asm entity %.*s", LIT(parameter->token.string));
 		return nullptr;
+	}
+
+	// The constant displacement of a memory operand: its folded constants plus its $ immediate parameters
+	i64 memory_displacement(AstAsmMemoryOperand *mem_op) {
+		i64 disp = mem_op->classify.has_disp_const ? mem_op->classify.disp_total : 0;
+		for (Ast *term : mem_op->terms) {
+			if (term->kind != Ast_AsmMemoryTerm || term->AsmMemoryTerm.scale != nullptr) {
+				continue;
+			}
+			Entity *e = entity_of_node(term->AsmMemoryTerm.operand);
+			if (e == nullptr || e->kind != Entity_Variable || entity_op(e)->kind != AsmTemplateEntityDecl_Immediate) {
+				continue;
+			}
+			LLVMValueRef v = (*this->curr_args)[entity_op(e)->param_index].value;
+			GB_ASSERT_MSG(LLVMIsAConstantInt(v), "asm: displacement immediate '%.*s' is not a constant", LIT(e->token.string));
+			i64 value = LLVMConstIntGetSExtValue(v);
+			disp += term->AsmMemoryTerm.op.kind == Token_Sub ? -value : value;
+		}
+		return disp;
 	}
 
 
@@ -211,7 +261,7 @@ struct lbAsmGenerate {
 			bool is_output        = e.param_group == AsmTemplateEntityDeclParamGroup_Output;
 			bool is_alloc_scratch = e.param_group == AsmTemplateEntityDeclParamGroup_Scratch
 			                     && e.kind == AsmTemplateEntityDecl_Register;
-			bool is_overwritten   = e.param_group == AsmTemplateEntityDeclParamGroup_Input && e.pin_overwritten;
+			bool is_overwritten   = e.param_group == AsmTemplateEntityDeclParamGroup_Input && e.overwritten;
 			if (!is_output && !is_alloc_scratch && !is_overwritten) {
 				continue;
 			}
@@ -280,7 +330,7 @@ struct lbAsmGenerate {
 				GB_ASSERT(n >= 0);
 				constraints = gb_string_append_fmt(constraints, "%d", n);
 				add_input_value(&param_types, &call_args, v.value);
-			} else if (e.pin_overwritten) {
+			} else if (e.overwritten) {
 				GB_ASSERT(tie_op[i] >= 0);
 				constraints = gb_string_append_fmt(constraints, "%d", tie_op[i]);
 				add_input_value(&param_types, &call_args, v.value);
@@ -324,6 +374,25 @@ struct lbAsmGenerate {
 				}
 			}
 			op_number[i] = next_op++;
+		}
+
+		// Procedures named in the body
+		for (Ast *node : tmpl_node->instructions) {
+			if (node->kind != Ast_AsmInstruction) {
+				continue;
+			}
+			for (Ast *op : node->AsmInstruction.operands) {
+				Entity *e = this->procedure_of_operand(op);
+				if (e == nullptr || map_get(&this->symbol_numbers, e) != nullptr) {
+					continue;
+				}
+				sep();
+				raw("s");
+				lbValue v = lb_find_procedure_value_from_entity(m, e);
+				GB_ASSERT(v.value != nullptr);
+				add_input_value(&param_types, &call_args, v.value);
+				map_set(&this->symbol_numbers, e, next_op++);
+			}
 		}
 
 		// AArch64 uses numeric local labels for internal branches; resolve each label's
@@ -788,9 +857,17 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		write_cstr(")");
 	}
 
+	void write_symbol_operand(i32 n) override {
+		// NOTE(bill): P prints a symbol as the target of a call, e.g. `foo` or `foo@PLT`, rather than an immediate
+		asm_string = gb_string_append_fmt(asm_string, "${%d:P}", n);
+	}
+
 	void write_operand(Slice<i32> const &op_number, Ast *op, u32 flags) override {
 		if (op->tav.mode == Addressing_Constant) {
 			this->write_constant_operand(op, flags);
+			return;
+		}
+		if (this->write_procedure_operand(op)) {
 			return;
 		}
 
@@ -1125,6 +1202,9 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 			this->write_constant_operand(op, flags);
 			return;
 		}
+		if (this->write_procedure_operand(op)) {
+			return;
+		}
 		if (flags & WriteOperandFlag_Negate) {
 			flags &= ~WriteOperandFlag_Negate;
 			write_cstr("-");
@@ -1163,14 +1243,17 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 		GB_ASSERT_MSG(mem_op->classify.index == nullptr && mem_op->classify.scale == nullptr, "asm: RISC-V memory operands have no index/scale");
 
 		auto const &cl = mem_op->classify;
+		i64 disp = this->memory_displacement(mem_op);
 		if (cl.label != nullptr) {
 			this->write_operand(op_number, cl.label, flags&~WriteOperandFlag_PrintPrefixes);
-		} else if (cl.has_disp_const && (cl.disp_total != 0 || cl.base == nullptr)) {
-			write_i64(cl.disp_total);
+		} else if (disp != 0 || cl.base == nullptr) {
+			write_i64(disp);
 		}
 		write_cstr("(");
 		if (cl.base != nullptr) {
 			this->write_operand(op_number, cl.base, flags&~WriteOperandFlag_PrintPrefixes);
+		} else {
+			write_cstr("zero"); // x0 always reads zero: `16(zero)` is the absolute address 16
 		}
 		write_cstr(")");
 	}
@@ -1426,6 +1509,9 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 				return;
 			}
 			this->write_constant_operand(op, flags);
+			return;
+		}
+		if (this->write_procedure_operand(op)) {
 			return;
 		}
 
@@ -1774,6 +1860,7 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 		              "asm: ARM64 memory scale requires an index register");
 
 		auto const &cl = mem_op->classify;
+		i64 disp = this->memory_displacement(mem_op);
 		write_cstr("[");
 		if (cl.base != nullptr) {
 			this->write_operand(op_number, cl.base, flags&~WriteOperandFlag_PrintPrefixes);
@@ -1798,10 +1885,18 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 					asm_string = gb_string_append_fmt(asm_string, ", lsl #%lld", cast(long long)shift);
 				}
 			}
-		} else if (cl.has_disp_const && cl.disp_total != 0) {
-			asm_string = gb_string_append_fmt(asm_string, ", #%lld", cast(long long)cl.disp_total);
+		} else if (mem_op->kind == AsmMemoryOperand_Pre || (mem_op->kind == AsmMemoryOperand_Default && disp != 0)) {
+			asm_string = gb_string_append_fmt(asm_string, ", #%lld", cast(long long)disp);
 		}
 		write_cstr("]");
+		switch (mem_op->kind) {
+		case AsmMemoryOperand_Pre: // [x1, #8]!
+			write_cstr("!");
+			break;
+		case AsmMemoryOperand_Post: // [x1], #8
+			asm_string = gb_string_append_fmt(asm_string, ", #%lld", cast(long long)disp);
+			break;
+		}
 	}
 
 	// A flag output '= %flags.<n|z|c|v>' lowers to '=@cc<cond>', where the condition
@@ -1844,5 +1939,11 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 	GB_ASSERT(generator != nullptr);
 	generator->init(entity);
 	defer (generator->destroy());
-	return generator->emit_call(p, args);
+
+	lbValue result = generator->emit_call(p, args);
+	if (base_type(entity->type)->Proc.diverging) {
+		// NOTE(bill): the checker requires every path through a diverging template to end without returning
+		LLVMBuildUnreachable(p->builder);
+	}
+	return result;
 }
