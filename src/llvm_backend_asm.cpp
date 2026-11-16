@@ -242,7 +242,7 @@ struct lbAsmGenerate {
 			bool is_output        = e.param_group == AsmTemplateEntityDeclParamGroup_Output;
 			bool is_alloc_scratch = e.param_group == AsmTemplateEntityDeclParamGroup_Scratch
 			                     && e.kind == AsmTemplateEntityDecl_Register;
-			bool is_overwritten   = e.param_group == AsmTemplateEntityDeclParamGroup_Input && e.pin_overwritten;
+			bool is_overwritten   = e.param_group == AsmTemplateEntityDeclParamGroup_Input && e.overwritten;
 			if (!is_output && !is_alloc_scratch && !is_overwritten) {
 				continue;
 			}
@@ -311,7 +311,7 @@ struct lbAsmGenerate {
 				GB_ASSERT(n >= 0);
 				constraints = gb_string_append_fmt(constraints, "%d", n);
 				add_input_value(&param_types, &call_args, v.value);
-			} else if (e.pin_overwritten) {
+			} else if (e.overwritten) {
 				GB_ASSERT(tie_op[i] >= 0);
 				constraints = gb_string_append_fmt(constraints, "%d", tie_op[i]);
 				add_input_value(&param_types, &call_args, v.value);

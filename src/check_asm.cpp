@@ -947,6 +947,17 @@ gb_internal AsmTemplateEntityDeclKind check_asm_find_kind(Entity *entity, Array<
 	return ed ? ed->kind : AsmTemplateEntityDecl_Invalid;
 }
 
+// NOTE(bill): LLVM forbids writing an input-only operand.
+// An input the template writes, itself or through a width-view, is tied to a discarded output.
+gb_internal void check_asm_mark_input_written(Array<AsmTemplateEntityDecl> const &decls, AsmTemplateEntityDecl *ed) {
+	if (ed != nullptr && ed->view_of >= 0) {
+		ed = &decls.data[ed->view_of];
+	}
+	if (ed != nullptr && ed->param_group == AsmTemplateEntityDeclParamGroup_Input && ed->tie < 0) {
+		ed->overwritten = true;
+	}
+}
+
 gb_internal bool check_asm_is_immediate_param(Entity *tmpl_entity, Operand const *o) {
 	Entity *pe = entity_of_node(o->expr);
 	if (pe != nullptr && pe->kind == Entity_Variable) {
@@ -2100,6 +2111,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			Entity *pe = entity_of_node(e);
 			if (pe != nullptr && pe->kind == Entity_Variable) {
 				AsmTemplateEntityDecl *d = check_asm_find_decl(pe, ate->decls);
+				check_asm_mark_input_written(ate->decls, d);
 				u16 pin_bit = asm_decl_resolve_pin_bit(asm_ctx, ate->decls, d ? d->total_index : -1);
 				pinned_param_writes |= pin_bit;
 
@@ -2219,6 +2231,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 					if (be != nullptr && be->kind == Entity_Variable) {
 						array_add(&facts->gen_params,  be);
 						array_add(&facts->read_params, be);
+						check_asm_mark_input_written(ate->decls, check_asm_find_decl(be, ate->decls));
 					}
 					Ast *base = m->classify.base;
 					if (base != nullptr && base->kind == Ast_AsmRegister) {
@@ -2233,13 +2246,14 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				continue;
 			}
 
-			if (!self_zeroing && (cast(u16)clobber.read & (1u << slot))) {
+			bool reads  = !self_zeroing && (cast(u16)clobber.read & (1u << slot)) != 0;
+			bool writes = (cast(u16)clobber.written & (1u << slot)) != 0;
+			if (reads) {
 				array_add(&facts->read_params, pe);
 			}
-			if (cast(u16)clobber.written & (1u << slot)) {
+			if (writes) {
 				array_add(&facts->gen_params, pe);
 			}
-
 
 			// View aliasing: a view decl shares its source's physical register.
 			AsmTemplateEntityDecl *view = check_asm_find_decl(pe, ate->decls);
@@ -2247,12 +2261,12 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				Entity *src_e = ate->decls[view->view_of].entity;
 
 				// A read of the view is a read of the source
-				if (cast(u16)clobber.read & (1u << slot)) {
+				if (reads) {
 					array_add(&facts->read_params, src_e);
 				}
 
 				// A write of the view defines the source only if it covers the parent
-				if (cast(u16)clobber.written & (1u << slot)) {
+				if (writes) {
 					i32 parent_w = check_asm_operand_bit_width(src_e->type);
 					if (view->view_bits == 32 || view->view_bits == parent_w) {
 						array_add(&facts->gen_params, src_e);
@@ -3747,8 +3761,8 @@ gb_internal void check_asm_template_body(AsmCtx *asm_ctx, CheckerContext *ctx, E
 		check_asm_template_call_clobbers(asm_ctx, entity, at);
 	}
 
-	// NOTE(bill): LLVM does not allow the asm to write an input's register unless that input is tied to an output.
-	// A pinned input whose register is written is tied to a discarded output in that register instead of being clobbered.
+	// NOTE(bill): a pinned input whose register is written by name or implicitly is tied, not clobbered.
+	// See `check_asm_mark_input_written` for writes through the parameter.
 	for (auto &ed : ate->decls) {
 		if (ed.param_group != AsmTemplateEntityDeclParamGroup_Input ||
 		    ed.tie         >= 0                                     ||
@@ -3780,7 +3794,7 @@ gb_internal void check_asm_template_body(AsmCtx *asm_ctx, CheckerContext *ctx, E
 		for (String const &reg : names) {
 			string_set_remove(&ate->clobber_registers_set, reg);
 		}
-		ed.pin_overwritten = names.count != 0;
+		ed.overwritten |= names.count != 0;
 	}
 }
 

@@ -696,11 +696,22 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *ent
 	}
 }
 
-gb_internal u16 asm_cfg_live_before(AsmInstructionFacts *f, u16 live_after, u16 reg_top) {
+// NOTE(bill): the registers an instruction reads by name, implicitly, or through a pinned parameter
+gb_internal u16 asm_cfg_read_regs(AsmCfg *cfg, AsmInstructionFacts *f) {
+	u16 regs = f->read_regs;
+	for (Entity *pe : f->read_params) {
+		if (i32 *ix = map_get(&cfg->entity_to_index, pe)) {
+			regs |= cfg->decl_pin_bit[*ix];
+		}
+	}
+	return regs;
+}
+
+gb_internal u16 asm_cfg_live_before(AsmCfg *cfg, AsmInstructionFacts *f, u16 live_after, u16 reg_top) {
 	if (f->reads_every_register) {
 		return reg_top;
 	}
-	return (live_after & ~asm_full_kill_mask(f)) | (f->read_regs & reg_top);
+	return (live_after & ~asm_full_kill_mask(f)) | (asm_cfg_read_regs(cfg, f) & reg_top);
 }
 
 // Backward liveness: a value is live at a point if some path from there reads it before overwriting it.
@@ -749,7 +760,7 @@ gb_internal void check_asm_cfg_liveness(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *en
 			u16 live = lo;
 			for (i32 ii = b.last; ii >= b.first; ii--) {
 				if (AsmInstructionFacts *f = cfg->insts[ii]->facts) {
-					live = asm_cfg_live_before(f, live, REG_TOP);
+					live = asm_cfg_live_before(cfg, f, live, REG_TOP);
 				}
 			}
 
@@ -774,7 +785,7 @@ gb_internal void check_asm_cfg_liveness(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *en
 			if (f == nullptr) {
 				continue;
 			}
-			u16 dead = f->reads_every_register ? 0 : asm_full_kill_mask(f) & ~live & ~f->read_regs;
+			u16 dead = f->reads_every_register ? 0 : asm_full_kill_mask(f) & ~live & ~asm_cfg_read_regs(cfg, f);
 			for (u16 bit = 1; bit != 0; bit <<= 1) {
 				if ((dead & bit) == 0) {
 					continue;
@@ -790,7 +801,7 @@ gb_internal void check_asm_cfg_liveness(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *en
 					        LIT(f->name), asm_ctx->clobber_reg_bit_name(bit));
 				}
 			}
-			live = asm_cfg_live_before(f, live, REG_TOP);
+			live = asm_cfg_live_before(cfg, f, live, REG_TOP);
 		}
 	}
 }

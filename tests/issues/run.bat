@@ -202,6 +202,7 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 %ODIN% test "..\test_issue_asm_pinned_clobbers" %COMMON% -o:speed || exit /b
 %ODIN% test "..\test_issue_asm_named_register_clobbers" %COMMON% -o:speed || exit /b
 %ODIN% test "..\test_issue_asm_call_clobbers" %COMMON% -o:speed || exit /b
+%ODIN% test "..\test_issue_asm_written_inputs" %COMMON% -o:speed || exit /b
 %ODIN% check "..\test_issue_asm_clobber_pinned_output" %COMMON% 2>&1 | find /c "which '#clobber' also names" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_asm_call_flow" %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_asm_call_flow" %COMMON% 2>&1 | find /c "can fall through the end" | findstr /x "1" || exit /b
