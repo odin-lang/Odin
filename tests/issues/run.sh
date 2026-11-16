@@ -125,6 +125,13 @@ else
 	exit 1
 fi
 
+if [[ $($ODIN check ../test_issue_inferred_default_overflow -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error: Cannot convert numeric value") -eq 6 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 $ODIN check ../test_issue_6484 -no-entry-point $COMMON_CHECK
 
 if [[ $($ODIN check ../test_issue_6874 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
