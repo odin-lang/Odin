@@ -84,6 +84,9 @@ struct AsmInstructionFacts {
 	bool is_call;
 	bool calls_out; // a call to code outside of the template, rather than to one of its labels
 
+	// NOTE(bill): a call, return, or jump out of the template hands every register to code which may read it
+	bool reads_every_register;
+
 	Entity *branch_target;
 	i32     block_id;
 };
@@ -119,6 +122,8 @@ struct AsmCfg {
 	// any call/branch (CONTROL) or memory effect that could require the stack
 	// to be realigned. If none occurred, #align_stack is redundant.
 	bool saw_call_or_mem;
+
+	bool calls_out; // a call to code outside of the template, which may write any register
 
 	// Purity test
 	bool        can_be_pure;
@@ -1017,8 +1022,7 @@ gb_internal bool check_asm_cfg_liveness(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *en
 				if (f == nullptr) {
 					continue;
 				}
-				if (f->is_call) {
-					// NOTE(bill): the callee may take any register as an argument
+				if (f->reads_every_register) {
 					live = REG_TOP;
 					continue;
 				}
@@ -1062,7 +1066,7 @@ gb_internal bool check_asm_cfg_liveness(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *en
 			if (f == nullptr) {
 				continue;
 			}
-			if (f->is_call) {
+			if (f->reads_every_register) {
 				live = REG_TOP;
 				continue;
 			}

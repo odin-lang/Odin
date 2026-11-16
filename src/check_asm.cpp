@@ -389,6 +389,116 @@ gb_internal String asm_register_family_name(Asm_riscv *asm_ctx, String name) {
 	return {};
 }
 
+// NOTE(bill): the registers a call out of a template may write, which is every register but the stack and frame pointers,
+// as the callee's calling convention is not assumed. Below them are the registers an operand is pinned to when a template calls out,
+// in order of preference.
+gb_internal void asm_call_clobber_families(Asm_amd64 *asm_ctx, Array<String> *families) {
+	for (u16 num = 0; num < 16; num++) {
+		if (num == 4 || num == 5) { // %rsp, %rbp
+			continue;
+		}
+		array_add(families, asm_register_name_from_code(asm_ctx, Asm_amd64::REG_CLASS_GPR64 | num));
+	}
+	for (u16 num = 0; num < 32; num++) {
+		array_add(families, asm_register_name_from_code(asm_ctx, Asm_amd64::REG_CLASS_XMM | num));
+	}
+	for (u16 num = 0; num < 8; num++) {
+		array_add(families, asm_register_name_from_code(asm_ctx, Asm_amd64::REG_CLASS_K | num));
+	}
+}
+gb_internal void asm_call_pin_candidates(Asm_amd64 *asm_ctx, AsmRegClass reg_class, Array<String> *candidates) {
+	switch (reg_class) {
+	case AsmRegClass_Integer: {
+		static u16 const nums[] = {3, 12, 13, 14, 15, 6, 7, 8, 9, 10, 11, 1, 2, 0}; // %rbx, %r12 to %r15, then the rest
+		for (u16 num : nums) {
+			array_add(candidates, asm_register_name_from_code(asm_ctx, Asm_amd64::REG_CLASS_GPR64 | num));
+		}
+		break;
+	}
+	case AsmRegClass_Float:
+	case AsmRegClass_Vector:
+		for (u16 i = 0; i < 16; i++) {
+			array_add(candidates, asm_register_name_from_code(asm_ctx, Asm_amd64::REG_CLASS_XMM | ((i + 8) % 16)));
+		}
+		break;
+	case AsmRegClass_Mask:
+		for (u16 num = 1; num < 8; num++) {
+			array_add(candidates, asm_register_name_from_code(asm_ctx, Asm_amd64::REG_CLASS_K | num));
+		}
+		break;
+	}
+}
+
+gb_internal bool asm_arm64_x18_is_reserved(void) {
+	// NOTE(bill): LLVM reserves x18 as the platform register on these by default
+	return build_context.metrics.os == TargetOs_darwin || selected_subtarget == Subtarget_Android;
+}
+gb_internal void asm_call_clobber_families(Asm_arm64 *asm_ctx, Array<String> *families) {
+	for (u32 num = 0; num < 31; num++) {
+		if (num == 29 || (num == 18 && asm_arm64_x18_is_reserved())) { // the frame pointer, and the platform register
+			continue;
+		}
+		array_add(families, asm_register_name_from_code(asm_ctx, Asm_arm64::REG_CLASS_X | num));
+	}
+	for (u32 num = 0; num < 32; num++) {
+		array_add(families, asm_register_name_from_code(asm_ctx, Asm_arm64::REG_CLASS_V | num));
+	}
+}
+gb_internal void asm_call_pin_candidates(Asm_arm64 *asm_ctx, AsmRegClass reg_class, Array<String> *candidates) {
+	switch (reg_class) {
+	case AsmRegClass_Integer: {
+		static u32 const nums[] = {19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 9, 10, 11, 12, 13, 14, 15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 16, 17};
+		for (u32 num : nums) {
+			array_add(candidates, asm_register_name_from_code(asm_ctx, Asm_arm64::REG_CLASS_X | num));
+		}
+		break;
+	}
+	case AsmRegClass_Float:
+	case AsmRegClass_Vector:
+		for (u32 i = 0; i < 32; i++) {
+			array_add(candidates, asm_register_name_from_code(asm_ctx, Asm_arm64::REG_CLASS_V | ((i + 8) % 32)));
+		}
+		break;
+	}
+}
+
+gb_internal void asm_call_clobber_families(Asm_riscv *asm_ctx, Array<String> *families) {
+	for (u16 num = 1; num < 32; num++) {
+		switch (num) {
+		case 2: // sp
+		case 3: // gp
+		case 4: // tp
+		case 8: // s0, the frame pointer
+			continue;
+		}
+		array_add(families, asm_register_name_from_code(asm_ctx, Asm_riscv::REG_CLASS_GPR | num));
+	}
+	for (u16 num = 0; num < 32; num++) {
+		array_add(families, asm_register_name_from_code(asm_ctx, Asm_riscv::REG_CLASS_FPR | num));
+	}
+}
+gb_internal void asm_call_pin_candidates(Asm_riscv *asm_ctx, AsmRegClass reg_class, Array<String> *candidates) {
+	switch (reg_class) {
+	case AsmRegClass_Integer: {
+		// s1 to s11, then t0 to t6, then a0 to a7
+		static u16 const nums[] = {9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 5, 6, 7, 28, 29, 30, 31, 10, 11, 12, 13, 14, 15, 16, 17};
+		for (u16 num : nums) {
+			array_add(candidates, asm_register_name_from_code(asm_ctx, Asm_riscv::REG_CLASS_GPR | num));
+		}
+		break;
+	}
+	case AsmRegClass_Float:
+	case AsmRegClass_Vector: {
+		// fs0 to fs11, then ft0 to ft11, then fa0 to fa7
+		static u16 const nums[] = {8, 9, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 0, 1, 2, 3, 4, 5, 6, 7, 28, 29, 30, 31, 10, 11, 12, 13, 14, 15, 16, 17};
+		for (u16 num : nums) {
+			array_add(candidates, asm_register_name_from_code(asm_ctx, Asm_riscv::REG_CLASS_FPR | num));
+		}
+		break;
+	}
+	}
+}
+
 // NOTE(bill): an output's register is already declared as written, and clobbering it as well
 // lets LLVM drop the moves into it of an input tied to that output
 template <typename AsmCtx>
@@ -475,6 +585,8 @@ gb_internal void check_asm_call_facts(AsmCtx *asm_ctx, Entity *tmpl_entity, AsmI
 	facts->is_call     = true;
 	facts->calls_out   = !internal;
 	facts->is_terminal = diverges;
+
+	facts->reads_every_register = true;
 
 	facts->gen_regs  |= asm_ctx->CLOBBER_REGS_NAMED;
 	facts->gen_flags  = cast(u16)~cast(u16)0;
@@ -2273,9 +2385,14 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			facts->is_control = control;
 			facts->is_conditional = conditional;
 			facts->is_terminal = halt || (control && !conditional);
+
+			// NOTE(bill): e.g. ret, or a jump through a register or parameter, rather than to one of the template's labels
+			bool to_label = check_asm_instr_targets_internal_label(instr);
+			facts->reads_every_register = control && !conditional && !halt && !to_label;
 		}
 		if (asm_instruction_is_call(asm_ctx, mnemonic, clobber, produced)) {
 			check_asm_call_facts(asm_ctx, tmpl_entity, facts, operands);
+			cfg->calls_out |= facts->calls_out;
 		}
 		// NOTE(bill): an output's register is already declared as written.
 		// Clobbering it as well lets LLVM drop the moves into it of an input tied to that output.
@@ -3158,6 +3275,119 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 	return;
 }
 
+// NOTE(bill): a call out of a template may write any register (see `asm_call_clobber_families`), so all of them are clobbered.
+// That leaves LLVM nowhere to allocate a register operand, so each unpinned one is pinned to a register the template does not
+// otherwise name: LLVM already knows the template writes an output or scratch, and an input there is tied to a discarded output.
+template <typename AsmCtx>
+gb_internal void check_asm_template_call_clobbers(AsmCtx *asm_ctx, Entity *entity, AstAsmTemplate *at) {
+	auto *ate = &entity->AsmTemplate;
+
+	StringSet taken = {};
+	string_set_init(&taken);
+	defer (string_set_destroy(&taken));
+
+	for (auto const &ed : ate->decls) {
+		String family = asm_register_family_name(asm_ctx, ed.pin);
+		if (family.len != 0) {
+			string_set_add(&taken, family);
+		}
+	}
+	for (String const &reg : ate->clobber_registers_set) {
+		string_set_add(&taken, reg);
+	}
+	{
+		PtrSet<Entity *> refs = {};
+		ptr_set_init(&refs);
+		defer (ptr_set_destroy(&refs));
+
+		u16 touched_regs = 0;
+		for (Ast *instruction_ : at->instructions) {
+			if (instruction_->kind != Ast_AsmInstruction) {
+				continue;
+			}
+			auto *instr = &instruction_->AsmInstruction;
+			for (Ast *op : instr->operands) {
+				check_asm_collect_refs(asm_ctx, &refs, op, &touched_regs, &taken);
+			}
+			// NOTE(bill): the registers an instruction reads or writes implicitly, e.g. %rdx for div
+			if (instr->facts != nullptr && !instr->facts->is_call) {
+				touched_regs |= instr->facts->read_regs | instr->facts->gen_regs;
+			}
+		}
+		for (u16 bit = 1; bit != 0; bit <<= 1) {
+			if ((touched_regs & bit) == 0) {
+				continue;
+			}
+			String name   = make_string_c(asm_ctx->clobber_reg_bit_name(bit));
+			String family = asm_register_family_name(asm_ctx, name);
+			string_set_add(&taken, family.len != 0 ? family : name);
+		}
+	}
+
+	StringSet written_operands = {}; // the registers of outputs and scratch
+	string_set_init(&written_operands);
+	defer (string_set_destroy(&written_operands));
+
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	for (auto &ed : ate->decls) {
+		if (ed.view_of >= 0 || ed.entity == nullptr) {
+			continue;
+		}
+		bool in_register = false;
+		switch (ed.param_group) {
+		case AsmTemplateEntityDeclParamGroup_Input:
+			in_register = ed.tie < 0 && (ed.kind == AsmTemplateEntityDecl_Register || ed.kind == AsmTemplateEntityDecl_Memory);
+			break;
+		case AsmTemplateEntityDeclParamGroup_Output:
+			in_register = ed.kind == AsmTemplateEntityDecl_Register || ed.kind == AsmTemplateEntityDecl_Memory;
+			break;
+		case AsmTemplateEntityDeclParamGroup_Scratch:
+			in_register = ed.kind == AsmTemplateEntityDecl_Register;
+			break;
+		}
+		if (!in_register) {
+			continue;
+		}
+
+		if (ed.pin.len == 0) {
+			auto candidates = array_make<String>(temporary_allocator());
+			asm_call_pin_candidates(asm_ctx, ed.reg_class, &candidates);
+			for (String const &candidate : candidates) {
+				if (!string_set_exists(&taken, candidate)) {
+					ed.pin = candidate;
+					break;
+				}
+			}
+			if (ed.pin.len == 0) {
+				error(ed.entity->token,
+				      "'asm' parameter '%.*s' needs a register, but this template calls out of itself, "
+				      "which may write every register, and every register it could use is already named or pinned in the template",
+				      LIT(ed.entity->token.string));
+				continue;
+			}
+			string_set_add(&taken, ed.pin);
+		}
+
+		if (ed.param_group != AsmTemplateEntityDeclParamGroup_Input) {
+			String family = asm_register_family_name(asm_ctx, ed.pin);
+			if (family.len != 0) {
+				string_set_add(&written_operands, family);
+			}
+		}
+	}
+
+	auto families = array_make<String>(temporary_allocator());
+	asm_call_clobber_families(asm_ctx, &families);
+	for (String const &family : families) {
+		if (string_set_exists(&written_operands, family)) {
+			continue;
+		}
+		asm_clobber_written_register(asm_ctx, entity, family);
+	}
+	ate->clobber_flags  = true;
+	ate->clobber_memory = true;
+}
 
 // NOTE(bill): the signature is everything needed to call an asm template, the rest is checked by `check_asm_template_body`
 gb_internal bool check_asm_template_signature(CheckerContext *ctx, Entity *entity, DeclInfo *d) {
@@ -3752,14 +3982,22 @@ gb_internal void check_asm_template_body(AsmCtx *asm_ctx, CheckerContext *ctx, E
 		}
 	}
 
+	if (cfg.calls_out) {
+		check_asm_template_call_clobbers(asm_ctx, entity, at);
+	}
+
 	// NOTE(bill): LLVM does not allow the asm to write an input's register unless that input is tied to an output.
 	// A pinned input whose register is written is tied to a discarded output in that register instead of being clobbered.
 	for (auto &ed : ate->decls) {
 		if (ed.param_group != AsmTemplateEntityDeclParamGroup_Input ||
-		    ed.kind        != AsmTemplateEntityDecl_Register        ||
 		    ed.tie         >= 0                                     ||
 		    ed.view_of     >= 0                                     ||
 		    ed.pin.len     == 0) {
+			continue;
+		}
+		// NOTE(bill): a pointer or procedure input is passed in a register too
+		if (ed.kind != AsmTemplateEntityDecl_Register &&
+		    ed.kind != AsmTemplateEntityDecl_Memory) {
 			continue;
 		}
 		String family = asm_register_family_name(asm_ctx, ed.pin);
