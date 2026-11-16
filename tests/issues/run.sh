@@ -589,6 +589,7 @@ else
 	exit 1
 fi
 $ODIN build ../test_issue_asm_baseless_riscv -target:linux_riscv64 -build-mode:obj $COMMON_CHECK
+$ODIN build ../test_issue_asm_keyword_mnemonic -target:linux_amd64 -build-mode:obj $COMMON_CHECK
 
 $ODIN test ../test_lifetime_markers $COMMON -o:size -lifetime-markers
 $ODIN test ../test_lifetime_markers $COMMON -o:speed -lifetime-markers

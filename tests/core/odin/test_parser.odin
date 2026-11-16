@@ -17,7 +17,7 @@ test_parse_demo :: proc(t: ^testing.T) {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	pkg, ok := parser.parse_package_from_path(ODIN_ROOT + "examples/demo")
-	
+
 	testing.expect(t, ok, "parser.parse_package_from_path failed")
 
 	for key, value in pkg.files {
@@ -534,4 +534,45 @@ test_parse_multiline_triple_ticked_string :: proc(t: ^testing.T) {
 	ok := parser.parse_file(&p, &file)
 	testing.expect(t, ok, "bad parse")
 	testing.expect(t, file.syntax_error_count == 0, "should contain zero errors")
+}
+
+@test
+test_parse_asm_keyword_mnemonic :: proc(t: ^testing.T) {
+	context.allocator = context.temp_allocator
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	file := ast.File{
+		fullpath = "test.odin",
+		src = `
+package main
+
+read :: asm(port: u16) -> (r: u8, s: u8) [port = %dx, r = %al, #volatile] {
+	in
+	mov s, %al
+	in // with a comment
+	mov s, %al
+	in %al, %dx
+}
+		`,
+	}
+
+	p := parser.default_parser()
+	p.err = proc(pos: tokenizer.Pos, format: string, args: ..any) {
+		log.errorf("%s(%d:%d): %s", pos.file, pos.line, pos.column, fmt.tprintf(format, ..args))
+	}
+
+	ok := parser.parse_file(&p, &file)
+	testing.expect(t, ok, "bad parse")
+	testing.expect_value(t, file.syntax_error_count, 0)
+	if !ok || file.syntax_error_count != 0 {
+		return
+	}
+
+	decl := file.decls[0].derived_stmt.(^ast.Value_Decl)
+	tmpl := decl.values[0].derived_expr.(^ast.Asm_Template)
+	operand_counts: [dynamic]int
+	for stmt in tmpl.instructions {
+		append(&operand_counts, len(stmt.derived_stmt.(^ast.Asm_Instruction).operands))
+	}
+	testing.expect_value(t, fmt.tprint(operand_counts[:]), "[0, 2, 0, 2, 2]")
 }

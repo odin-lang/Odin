@@ -223,6 +223,7 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 %ODIN% check "..\test_issue_asm_baseless_errors" -target:linux_riscv64 %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
 %ODIN% check "..\test_issue_asm_baseless_errors" -target:linux_riscv64 %COMMON% 2>&1 | find /c "must be from -2048 to 2047" | findstr /x "2" || exit /b
 %ODIN% build "..\test_issue_asm_baseless_riscv" -target:linux_riscv64 -build-mode:obj %COMMON% || exit /b
+%ODIN% build "..\test_issue_asm_keyword_mnemonic" -target:linux_amd64 -build-mode:obj %COMMON% || exit /b
 
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:size -lifetime-markers || exit /b
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:speed -lifetime-markers || exit /b
