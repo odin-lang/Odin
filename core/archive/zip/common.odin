@@ -29,7 +29,8 @@ Writing:
 - DOS times are written as local time
 - Opt-in progress callback; it can cancel
 - A deterministic mode for reproducible archives
-- Can encrypt members with WinZip AES-256 (AE-2)
+- Can encrypt members with WinZip AES-256 (AE-2); the password must be ASCII and at most
+  99 bytes, as 7-Zip requires, or the writer returns `Zip_Error.Unsupported_Password`
 
 Updating:
 - `update` appends members in place, at a path or on a seekable `io.Stream`
@@ -103,6 +104,9 @@ AES_OVERHEAD       :: AES_SALT_SIZE + AES_VERIFIER_SIZE + AES_MAC_SIZE
 AES_VERSION_NEEDED :: 51
 AES_CTR_STRIDE     :: 8
 AES_VAES_STRIDE    :: 16
+
+// Longest zip AES password 7-Zip accepts, in bytes
+AES_PASSWORD_MAX   :: 99
 CIPHER_BUFFER_SIZE :: 64 * 1024
 DOS_EPOCH         :: 315_532_800
 LZMA_SDK_VERSION  :: [2]u8{19, 0}

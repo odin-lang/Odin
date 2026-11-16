@@ -101,7 +101,8 @@ write_entry :: proc{write_entry_with_info, write_entry_simple}
 
 write_directory :: proc(zw: ^Writer, dir: string, prefix := "", options: Entry_Options = {}) -> (err: Error) {
 	_writer_ready(zw) or_return
-	_ = archive._entry_password(options.password, zw.password, zw.options.deterministic) or_return
+	password := archive._entry_password(options.password, zw.password, zw.options.deterministic) or_return
+	_check_aes_password(password) or_return
 	root, root_err := os.get_absolute_path(dir, zw.allocator)
 	if root_err != nil {
 		return root_err
@@ -347,7 +348,8 @@ _check_options :: proc(options: Writer_Options) -> (err: Error) {
 	if len(options.comment) > ZIP16_MAX {
 		return Zip_Error.Field_Too_Long
 	}
-	return archive._check_password(options.password, options.deterministic)
+	archive._check_password(options.password, options.deterministic) or_return
+	return _check_aes_password(options.password)
 }
 
 @(private)
@@ -409,6 +411,7 @@ _prepare :: proc(zw: ^Writer, p: ^Pending_Entry, fi: archive.File_Info, data: En
 	if p.type == .Directory {
 		p.password = ""
 	}
+	_check_aes_password(p.password) or_return
 
 	switch d in data {
 	case []u8:

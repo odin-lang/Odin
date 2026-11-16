@@ -306,6 +306,19 @@ _cipher_destroy :: proc(c: ^Cipher) {
 }
 
 @(private)
+_check_aes_password :: proc "contextless" (password: string) -> (err: Error) {
+	if len(password) > AES_PASSWORD_MAX {
+		return Zip_Error.Unsupported_Password
+	}
+	for i in 0 ..< len(password) {
+		if password[i] >= 0x80 {
+			return Zip_Error.Unsupported_Password
+		}
+	}
+	return nil
+}
+
+@(private)
 _encrypt_begin :: proc(zw: ^Writer, c: ^Cipher, password: string) -> (err: Error) {
 	_cipher_destroy(c)
 	if password == "" {

@@ -156,6 +156,64 @@ test_write_aes_options :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_write_aes_password_limits :: proc(t: ^testing.T) {
+	text        := write_text()
+	unsupported := archive.Error(archive.Zip_Error.Unsupported_Password)
+	longest     := strings.repeat("a", zip.AES_PASSWORD_MAX, context.temp_allocator)
+	too_long    := strings.repeat("a", zip.AES_PASSWORD_MAX + 1, context.temp_allocator)
+	rejected    := [?]string{too_long, "Ostrich-Sesame-é", "\x80", "Ostrich\xff"}
+	for password in rejected {
+		m := Memory_File{seekable = true}
+		defer delete(m.data)
+		zw: zip.Writer
+		err := zip.create(&zw, memory_stream(&m), zip.Writer_Options{password = password})
+		testing.expectf(t, err == unsupported, "create, password of %d bytes: %v", len(password), err)
+		if err == nil {
+			zip.close(&zw)
+		}
+		update_err := zip.update(&zw, memory_stream(&m), zip.Writer_Options{password = password})
+		testing.expectf(t, update_err == unsupported, "update, password of %d bytes: %v", len(password), update_err)
+		if update_err == nil {
+			zip.close(&zw)
+		}
+	}
+	{
+		m := Memory_File{seekable = true}
+		defer delete(m.data)
+		zw: zip.Writer
+		if !testing.expect_value(t, zip.create(&zw, memory_stream(&m)), nil) {
+			return
+		}
+		for password in rejected {
+			testing.expectf(t, zip.write_entry(&zw, "locked.txt", text, {password = password}) == unsupported, "entry, password of %d bytes", len(password))
+			testing.expectf(t, zip.write_directory(&zw, ".", options = {password = password}) == unsupported, "directory, password of %d bytes", len(password))
+		}
+		testing.expect_value(t, zip.write_entry(&zw, "longest.txt", text, {password = longest}), nil)
+		testing.expect_value(t, zip.write_entry(&zw, "open.txt", text), nil)
+		testing.expect_value(t, zip.commit(&zw), nil)
+		zip.close(&zw)
+		check_aes(t, "password limits", m.data[:], {
+			{name = "longest.txt", method = .Deflate, content = text, password = longest},
+			{name = "open.txt",    method = .Deflate, content = text},
+		})
+	}
+	{
+		m := Memory_File{seekable = true}
+		defer delete(m.data)
+		zw: zip.Writer
+		if !testing.expect_value(t, zip.create(&zw, memory_stream(&m), zip.Writer_Options{password = longest}), nil) {
+			return
+		}
+		testing.expect_value(t, zip.write_entry(&zw, "default.txt", text), nil)
+		testing.expect_value(t, zip.commit(&zw), nil)
+		zip.close(&zw)
+		check_aes(t, "longest archive password", m.data[:], {
+			{name = "default.txt", method = .Deflate, content = text, password = longest},
+		})
+	}
+}
+
+@(test)
 test_write_aes_tamper :: proc(t: ^testing.T) {
 	text := write_text()
 	m := Memory_File{seekable = true}

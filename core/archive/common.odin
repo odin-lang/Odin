@@ -242,6 +242,7 @@ Zip_Error :: enum u32 {
 	Too_Large,
 	Overlapping_Member,
 	Local_Header_Mismatch,
+	Unsupported_Password,
 }
 
 SevenZ_Error :: enum u32 {
