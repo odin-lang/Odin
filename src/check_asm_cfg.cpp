@@ -118,10 +118,10 @@ struct AsmCfg {
 
 	bool saw_any_instructions; // NOTE(bill): An empty diverging body cannot diverge.
 
-	// NOTE(bill): Related to #align_stack
-	// any call/branch (CONTROL) or memory effect that could require the stack
-	// to be realigned. If none occurred, #align_stack is redundant.
-	bool saw_call_or_mem;
+	// NOTE(bill): Related to #align_stack, the first instruction which pushes, calls, or writes the stack pointer.
+	// If there is none, #align_stack is redundant.
+	Ast *       stack_use_node;
+	char const *stack_use;
 
 	bool calls_out; // a call to code outside of the template, which may write any register
 

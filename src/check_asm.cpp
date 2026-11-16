@@ -2130,14 +2130,6 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		ate->has_observable_side_effect |= effective_side_effects;
 		ate->has_observable_side_effect |= clobber.writes_mem && mem_is_real;
 
-		// #align_stack only matters if the body makes a call (which requires the stack
-		// aligned at the call boundary) or manipulates RSP directly. Plain memory access
-		// through a parameter pointer does NOT require stack realignment, so
-		// implies_clobber_memory() is intentionally NOT used here.
-		if (clobber.is_call_or_mem()) {
-			cfg->saw_call_or_mem = true;
-		}
-
 		u16 pinned_mask = 0;
 		u16 output_pinned_mask = 0;
 		for_array(i, ate->decls) {
@@ -2278,6 +2270,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		}
 
 
+		bool writes_back_stack_pointer = false; // e.g. `stp %x29, %x30, #pre [%sp - 16]`
 		for_array(i, operands) {
 			int slot = user_operand_target_index(cast(int)i);
 			if (slot < 0) {
@@ -2298,6 +2291,8 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 					Ast *base = m->classify.base;
 					if (base != nullptr && base->kind == Ast_AsmRegister) {
 						asm_clobber_written_register(asm_ctx, tmpl_entity, base->AsmRegister.name.string);
+						u16 base_bit = asm_ctx->clobber_bit_for_reg_name(base->AsmRegister.name.string);
+						writes_back_stack_pointer |= (base_bit & asm_stack_pointer_bit(asm_ctx)) != 0;
 					}
 				}
 			}
@@ -2393,6 +2388,25 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		if (asm_instruction_is_call(asm_ctx, mnemonic, clobber, produced)) {
 			check_asm_call_facts(asm_ctx, tmpl_entity, facts, operands);
 			cfg->calls_out |= facts->calls_out;
+		}
+
+		if (cfg->stack_use == nullptr) {
+			u16  stack_pointer_bit = asm_stack_pointer_bit(asm_ctx);
+			bool pushes            = (cast(u32)clobber.implicit_wr & stack_pointer_bit) != 0 && clobber.writes_mem;
+			bool writes_sp         = (explicit_writes & stack_pointer_bit) != 0 || writes_back_stack_pointer;
+
+			char const *stack_use = nullptr;
+			if (facts->is_call) {
+				stack_use = "makes a call";
+			} else if (pushes) {
+				stack_use = "pushes onto the stack";
+			} else if (writes_sp) {
+				stack_use = "writes the stack pointer";
+			}
+			if (stack_use != nullptr) {
+				cfg->stack_use      = stack_use;
+				cfg->stack_use_node = instr->name;
+			}
 		}
 		// NOTE(bill): an output's register is already declared as written.
 		// Clobbering it as well lets LLVM drop the moves into it of an input tied to that output.
@@ -3950,10 +3964,16 @@ gb_internal void check_asm_template_body(AsmCtx *asm_ctx, CheckerContext *ctx, E
 		        "Please add #volatile if the effect is intended.");
 	}
 
-	if (entity->AsmTemplate.is_align_stack && !cfg.saw_call_or_mem) {
+	// NOTE(bill): without #align_stack, the stack need not be aligned for a call, and LLVM may keep a procedure's values below
+	// the stack pointer (the red zone on SysV), where a push or call in the template would overwrite them
+	if (cfg.stack_use != nullptr && !entity->AsmTemplate.is_align_stack) {
+		error(cfg.stack_use_node,
+		      "This 'asm' template must declare #align_stack as it %s here; without it, the stack may not be aligned for a call, "
+		      "and the procedure may keep values below the stack pointer, where the template would overwrite them",
+		      cfg.stack_use);
+	} else if (entity->AsmTemplate.is_align_stack && cfg.stack_use == nullptr) {
 		warning(entity->token,
-		        "#align_stack is redundant; this template makes no call and touches no memory "
-		        "that would require the stack to be realigned");
+		        "#align_stack is redundant; this template neither pushes onto the stack, makes a call, nor writes the stack pointer");
 	}
 
 	{

@@ -206,6 +206,9 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 %ODIN% check "..\test_issue_asm_call_flow" %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_asm_call_flow" %COMMON% 2>&1 | find /c "can fall through the end" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_asm_call_flow" %COMMON% 2>&1 | find /c "Warning:" | findstr /x "0" || exit /b
+%ODIN% check "..\test_issue_asm_align_stack" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_asm_align_stack" %COMMON% 2>&1 | find /c "must declare #align_stack" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_asm_align_stack" %COMMON% 2>&1 | find /c "#align_stack is redundant" | findstr /x "1" || exit /b
 
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:size -lifetime-markers || exit /b
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:speed -lifetime-markers || exit /b
