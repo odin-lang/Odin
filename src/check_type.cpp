@@ -3196,6 +3196,9 @@ gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_
 
 		if (in_type) {
 			check_assignment(ctx, &o, in_type, str_lit("parameter value"));
+		} else if (out_type_ != nullptr && o.mode != Addressing_Invalid &&
+		           is_type_untyped(o.type) && !is_type_untyped_nil(o.type)) {
+			convert_to_typed(ctx, &o, default_type(o.type));
 		}
 
 
