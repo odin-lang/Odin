@@ -4091,6 +4091,18 @@ parse_asm_operand :: proc(p: ^Parser, allow_memory_operand: bool) -> ^ast.Expr {
 
 	case .Ident:
 		operand = parse_ident(p)
+		if p.curr_tok.kind == .Period {
+			// an entity from another package, e.g. `call libc.strlen`
+			tok   := expect_token(p, .Period)
+			field := parse_ident(p)
+
+			sel := ast.new(ast.Selector_Expr, operand.pos, field)
+			sel.expr  = operand
+			sel.op    = tok
+			sel.field = field
+
+			operand = sel
+		}
 
 	case .Mod:
 		operand = parse_asm_register(p)

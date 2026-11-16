@@ -209,6 +209,9 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 %ODIN% check "..\test_issue_asm_align_stack" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_asm_align_stack" %COMMON% 2>&1 | find /c "must declare #align_stack" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_asm_align_stack" %COMMON% 2>&1 | find /c "#align_stack is redundant" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_asm_call_targets" %COMMON% 2>&1 | find /c "Error:" | findstr /x "8" || exit /b
+%ODIN% check "..\test_issue_asm_call_targets" %COMMON% 2>&1 | find /c "uses the Odin calling convention" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_asm_call_targets" %COMMON% 2>&1 | find /c "as the target of a call" | findstr /x "2" || exit /b
 
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:size -lifetime-markers || exit /b
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:speed -lifetime-markers || exit /b

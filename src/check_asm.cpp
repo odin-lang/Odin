@@ -78,12 +78,23 @@ gb_internal AsmOperandKind determine_asm_operand_kind(Operand const *operand) {
 	case_ast_node(reg, AsmMemoryOperand, expr);
 		return AsmOperand_Memory;
 	case_end;
+	case_ast_node(se, SelectorExpr, expr);
+		// NOTE(bill): a procedure from another package, which is called directly like a label
+		Entity *e = entity_of_node(expr);
+		if (e != nullptr && (e->kind == Entity_Procedure || e->kind == Entity_ProcGroup)) {
+			return AsmOperand_Label;
+		}
+		return AsmOperand_Invalid;
+	case_end;
 	case_ast_node(ident, Ident, expr);
 		// TODO(bill): Is this correct?
 		if (expr->tav.mode == Addressing_Constant) {
 			return AsmOperand_Immediate;
 		}
 		Entity *e = entity_of_node(expr);
+		if (e != nullptr && (e->kind == Entity_Procedure || e->kind == Entity_ProcGroup)) {
+			return AsmOperand_Label; // NOTE(bill): a procedure named in the body is called directly like a label
+		}
 		if (e != nullptr && e->kind == Entity_Variable && (e->flags & EntityFlag_PolyConst) != 0) {
 			return AsmOperand_Immediate;
 		}
@@ -577,7 +588,16 @@ gb_internal void check_asm_call_facts(AsmCtx *asm_ctx, Entity *tmpl_entity, AsmI
 			continue;
 		}
 		Type *t = base_type(e->type);
-		if (t->kind == Type_Proc && t->Proc.diverging) {
+		if (t->kind != Type_Proc) {
+			continue;
+		}
+		if (t->Proc.calling_convention == ProcCC_Odin) {
+			error(op.expr,
+			      "'%.*s' uses the Odin calling convention, whose hidden 'context' argument an 'asm' template cannot pass; "
+			      "give it another calling convention, such as \"c\" or \"contextless\"",
+			      LIT(e->token.string));
+		}
+		if (t->Proc.diverging) {
 			diverges = true;
 		}
 	}
@@ -640,6 +660,12 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 		bool ok = check_asm_immediate_value_fits(ev, want_w, &needed, mismatch_);
 		if (got_bits_) *got_bits_ = needed;
 		return ok;
+	}
+	if (slot_kind == AsmOperand_Label && operand->expr != nullptr) {
+		Entity *e = entity_of_node(operand->expr);
+		if (e != nullptr && (e->kind == Entity_Procedure || e->kind == Entity_ProcGroup)) {
+			return true; // a procedure named in the body, which the assembler resolves like a label
+		}
 	}
 
 	// Register / memory-sized slots
@@ -2388,6 +2414,13 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		if (asm_instruction_is_call(asm_ctx, mnemonic, clobber, produced)) {
 			check_asm_call_facts(asm_ctx, tmpl_entity, facts, operands);
 			cfg->calls_out |= facts->calls_out;
+		} else {
+			for (auto const &op : operands) {
+				Entity *e = op.expr != nullptr ? entity_of_node(op.expr) : nullptr;
+				if (e != nullptr && e->kind == Entity_Procedure) {
+					error(op.expr, "A procedure can only be named in an 'asm' template as the target of a call");
+				}
+			}
 		}
 
 		if (cfg->stack_use == nullptr) {
@@ -2597,6 +2630,41 @@ gb_internal AsmTermCategory check_asm_mem_term_category(Operand *o, Array<AsmTem
 	return AsmTermCategory_Other;
 }
 
+// NOTE(bill): a procedure named in the body, which may only be the target of a call
+gb_internal void check_asm_procedure_operand(CheckerContext *ctx, Operand *operand, Ast *expr, bool allow_memory_operands) {
+	if (operand->mode == Addressing_Invalid) {
+		return;
+	}
+	defer (if (operand->mode == Addressing_Invalid) {
+		operand->type = t_invalid;
+	});
+
+	Entity *e = entity_of_node(expr);
+	if (operand->mode == Addressing_ProcGroup || (e != nullptr && e->kind == Entity_ProcGroup)) {
+		error(expr, "A procedure group cannot be called from an 'asm' template; name one of its procedures instead");
+		operand->mode = Addressing_Invalid;
+		return;
+	}
+	if (e == nullptr || e->kind != Entity_Procedure) {
+		error(expr, "Only asm parameters, constants, or procedures are allowed to be used within an 'asm' template");
+		operand->mode = Addressing_Invalid;
+		return;
+	}
+	if (!allow_memory_operands) {
+		error(expr, "A procedure can only be named in an 'asm' template as the target of a call");
+		operand->mode = Addressing_Invalid;
+		return;
+	}
+	if (is_type_polymorphic(e->type)) {
+		error(expr, "A polymorphic procedure cannot be called from an 'asm' template");
+		operand->mode = Addressing_Invalid;
+		return;
+	}
+	operand->mode = Addressing_Value;
+	operand->type = e->type;
+	add_type_and_value(ctx, expr, operand->mode, operand->type, {});
+}
+
 template <typename AsmCtx>
 gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *entity, Operand *operand, Ast *expr, bool allow_memory_operands) {
 	if (expr == nullptr) {
@@ -2690,6 +2758,13 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		// NOTE(bill): resolved like any other identifier, as the constant may not have been checked yet,
 		// e.g. one declared later in the same block, or one in a lazy file
 		found = resolve_alias_entity(ctx, found, nullptr);
+		if (found->kind == Entity_Procedure || found->kind == Entity_ProcGroup) {
+			GB_ASSERT(ctx->scope == param_scope->parent);
+			check_ident(ctx, operand, expr, nullptr, nullptr, false);
+			i->entity = found; // NOTE(bill): check_ident leaves a procedure group's unset
+			check_asm_procedure_operand(ctx, operand, expr, allow_memory_operands);
+			return;
+		}
 		if (found->kind == Entity_Constant) {
 			GB_ASSERT(ctx->scope == param_scope->parent);
 			check_ident(ctx, operand, expr, nullptr, nullptr, false);
@@ -3277,6 +3352,16 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 
 		operand->mode = reg.mode;
 		operand->type = reg.type;
+		return;
+	case_end;
+
+	case_ast_node(se, SelectorExpr, expr);
+		// NOTE(bill): a procedure or constant from another package, e.g. `call libc.strlen`
+		check_expr(ctx, operand, expr);
+		if (operand->mode == Addressing_Invalid || operand->mode == Addressing_Constant) {
+			return;
+		}
+		check_asm_procedure_operand(ctx, operand, expr, allow_memory_operands);
 		return;
 	case_end;
 	}

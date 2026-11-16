@@ -20,6 +20,8 @@ struct lbAsmGenerate {
 
 	PtrSet<Entity *>      lane_written;
 
+	PtrMap<Entity *, i32> symbol_numbers; // the operand number of each procedure named in the body
+
 	enum WriteOperandFlags : u32 {
 		WriteOperandFlag_PrintPrefixes  = 1<<0,
 		WriteOperandFlag_IsScale        = 1<<1,
@@ -47,6 +49,7 @@ struct lbAsmGenerate {
 		this->asm_string  = gb_string_make_reserve(heap_allocator(), 256);
 		this->constraints = gb_string_make_reserve(heap_allocator(), 64);
 		map_init(&this->label_numbers);
+		map_init(&this->symbol_numbers);
 
 		// Pre-scan the body: any `dst[i]` operand written by INS marks its base
 		// entity as lane-written.
@@ -71,7 +74,35 @@ struct lbAsmGenerate {
 		gb_string_free(this->constraints);
 		map_destroy(&this->label_numbers);
 		map_destroy(&this->label_def_pos);
+		map_destroy(&this->symbol_numbers);
 		ptr_set_destroy(&this->lane_written);
+	}
+
+	Entity *procedure_of_operand(Ast *op) {
+		if (op == nullptr || (op->kind != Ast_Ident && op->kind != Ast_SelectorExpr)) {
+			return nullptr;
+		}
+		Entity *e = entity_of_node(op);
+		if (e == nullptr || e->kind != Entity_Procedure) {
+			return nullptr;
+		}
+		return e;
+	}
+
+	// A procedure named in the body is a symbol operand, so a call to it is direct
+	bool write_procedure_operand(Ast *op) {
+		Entity *e = this->procedure_of_operand(op);
+		if (e == nullptr) {
+			return false;
+		}
+		i32 *n = map_get(&this->symbol_numbers, e);
+		GB_ASSERT(n != nullptr);
+		this->write_symbol_operand(*n);
+		return true;
+	}
+
+	virtual void write_symbol_operand(i32 n) {
+		asm_string = gb_string_append_fmt(asm_string, "$%d", n);
 	}
 
 	void write_cstr(char const *cstr) { asm_string = gb_string_appendc      (asm_string, cstr);                                }
@@ -324,6 +355,25 @@ struct lbAsmGenerate {
 				}
 			}
 			op_number[i] = next_op++;
+		}
+
+		// Procedures named in the body
+		for (Ast *node : tmpl_node->instructions) {
+			if (node->kind != Ast_AsmInstruction) {
+				continue;
+			}
+			for (Ast *op : node->AsmInstruction.operands) {
+				Entity *e = this->procedure_of_operand(op);
+				if (e == nullptr || map_get(&this->symbol_numbers, e) != nullptr) {
+					continue;
+				}
+				sep();
+				raw("s");
+				lbValue v = lb_find_procedure_value_from_entity(m, e);
+				GB_ASSERT(v.value != nullptr);
+				add_input_value(&param_types, &call_args, v.value);
+				map_set(&this->symbol_numbers, e, next_op++);
+			}
 		}
 
 		// AArch64 uses numeric local labels for internal branches; resolve each label's
@@ -788,9 +838,17 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		write_cstr(")");
 	}
 
+	void write_symbol_operand(i32 n) override {
+		// NOTE(bill): P prints a symbol as the target of a call, e.g. `foo` or `foo@PLT`, rather than an immediate
+		asm_string = gb_string_append_fmt(asm_string, "${%d:P}", n);
+	}
+
 	void write_operand(Slice<i32> const &op_number, Ast *op, u32 flags) override {
 		if (op->tav.mode == Addressing_Constant) {
 			this->write_constant_operand(op, flags);
+			return;
+		}
+		if (this->write_procedure_operand(op)) {
 			return;
 		}
 
@@ -1125,6 +1183,9 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 			this->write_constant_operand(op, flags);
 			return;
 		}
+		if (this->write_procedure_operand(op)) {
+			return;
+		}
 		if (flags & WriteOperandFlag_Negate) {
 			flags &= ~WriteOperandFlag_Negate;
 			write_cstr("-");
@@ -1426,6 +1487,9 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 				return;
 			}
 			this->write_constant_operand(op, flags);
+			return;
+		}
+		if (this->write_procedure_operand(op)) {
 			return;
 		}
 

@@ -2578,6 +2578,12 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 		}
 	case Token_Ident:
 		operand = parse_ident(f);
+		if (f->curr_token.kind == Token_Period) {
+			// NOTE(bill): an entity from another package, e.g. `call libc.strlen`
+			Token token = expect_token(f, Token_Period);
+			Ast *selector = parse_ident(f);
+			operand = ast_selector_expr(f, token, operand, selector);
+		}
 		break;
 	case Token_Mod:
 		operand = parse_asm_register(f);
