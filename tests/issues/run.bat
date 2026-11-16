@@ -216,7 +216,13 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 %ODIN% check "..\test_issue_asm_call_targets" %COMMON% 2>&1 | find /c "Assertion Failure" | findstr /x "0" || exit /b
 %ODIN% check "..\test_issue_asm_writeback_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_asm_writeback_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "writes back its base register" | findstr /x "1" || exit /b
-%ODIN% check "..\test_issue_asm_writeback_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "takes only a base register and a constant offset" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_asm_writeback_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "takes only a base register and a constant offset" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_asm_writeback_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "needs a base register" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_asm_baseless_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_asm_baseless_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "needs a base register" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_asm_baseless_errors" -target:linux_riscv64 %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_asm_baseless_errors" -target:linux_riscv64 %COMMON% 2>&1 | find /c "must be from -2048 to 2047" | findstr /x "2" || exit /b
+%ODIN% build "..\test_issue_asm_baseless_riscv" -target:linux_riscv64 -build-mode:obj %COMMON% || exit /b
 
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:size -lifetime-markers || exit /b
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:speed -lifetime-markers || exit /b

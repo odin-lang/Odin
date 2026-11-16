@@ -1252,6 +1252,8 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 		write_cstr("(");
 		if (cl.base != nullptr) {
 			this->write_operand(op_number, cl.base, flags&~WriteOperandFlag_PrintPrefixes);
+		} else {
+			write_cstr("zero"); // x0 always reads zero: `16(zero)` is the absolute address 16
 		}
 		write_cstr(")");
 	}

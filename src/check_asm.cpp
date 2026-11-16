@@ -2651,7 +2651,8 @@ gb_internal void check_asm_mem_scale(CheckerContext *ctx, Operand *scale, Token 
 	add_type_and_value(ctx, scale->expr, scale->mode, scale->type, scale->value);
 }
 
-// NOTE(bill): a displacement: an integer constant which fits a signed 32-bit value, a $ immediate parameter, or a label
+// NOTE(bill): a displacement: an integer constant which fits a signed 32-bit value (12-bit on RISC-V),
+// a $ immediate parameter, or a label
 gb_internal void check_asm_mem_displacement(Operand *disp, bool has_register, Array<AsmTemplateEntityDecl> const &decls) {
 	Ast *expr = disp->expr;
 	if (expr->kind == Ast_AsmRegister) {
@@ -2674,10 +2675,15 @@ gb_internal void check_asm_mem_displacement(Operand *disp, bool has_register, Ar
 	if (disp->mode == Addressing_Constant && disp->value.kind == ExactValue_Integer) {
 		AsmMismatch m = AsmMismatch_None;
 		i32 needed = 0;
+		gbString vs = exact_value_to_string(disp->value);
+		defer (gb_string_free(vs));
 		if (!check_asm_immediate_value_fits(disp->value, 32, &needed, &m)) {
-			gbString vs = exact_value_to_string(disp->value);
 			error(expr, "A memory displacement must fit in a signed 32-bit value, got %s (needs %d bits)", vs, cast(int)needed);
-			gb_string_free(vs);
+		} else if (build_context.metrics.arch == TargetArch_riscv64) {
+			i64 v = exact_value_to_i64(disp->value);
+			if (v < -2048 || v > 2047) {
+				error(expr, "A RISC-V memory displacement must be from -2048 to 2047, got %s", vs);
+			}
 		}
 		return;
 	}
@@ -3047,8 +3053,11 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 			}
 		}
 
-		// NOTE(bill): a writeback moves the base register by a constant offset, e.g. `[x1, #8]!` or `[x1], #8`
-		if (mem_op->kind != AsmMemoryOperand_Default) {
+		if (build_context.metrics.arch == TargetArch_arm64 && class_ok && base.expr == nullptr && label_node == nullptr) {
+			// NOTE(bill): AArch64 has no absolute addressing. Base register 31 is sp, not xzr.
+			error(expr, "An AArch64 memory operand needs a base register");
+		} else if (mem_op->kind != AsmMemoryOperand_Default) {
+			// NOTE(bill): a writeback moves the base register by a constant offset, e.g. `[x1, #8]!` or `[x1], #8`
 			if (build_context.metrics.arch != TargetArch_arm64) {
 				error(expr, "#pre/#post asm memory operands are not supported by the target platform");
 			} else if (base.expr == nullptr || index.expr != nullptr || label_node != nullptr) {
