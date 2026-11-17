@@ -941,12 +941,8 @@ gb_internal void escape_store_obj(EscapeAnalysis *ea, EscapeObject const &obj, E
 	if (escape_too_large(ea)) {
 		return;
 	}
-	// a store to any element of an array leaves the others
-	bool replaces = update == EscapeUpdate_Replace;
-	for (EscapeStep const &step : path) {
-		replaces &= step.kind != EscapeStep_AnyElement;
-	}
-	if (replaces) {
+	// a store to an element of an array is taken to replace all of them (it may be any one)
+	if (update == EscapeUpdate_Replace) {
 		Type *type = escape_type_at(obj, {});
 		auto pieces = array_make<EscapeFact>(temporary_allocator(), 0, 0);
 		for (isize i = ea->state.facts.count-1; i >= 0; i--) {
@@ -3853,6 +3849,12 @@ gb_internal void escape_outer_location(Ast *lhs, EscapeLocation *loc) {
 
 	case_ast_node(ie, IndexExpr, lhs);
 		escape_outer_location(ie->expr, loc);
+		// the elements of a slice and such are in the memory it points to
+		Type *bt = base_type(ie->expr->tav.type);
+		bool inline_elems = escape_is_inline_array(bt) || (bt != nullptr && bt->kind == Type_Struct && bt->Struct.soa_kind == StructSoa_Fixed);
+		if (!inline_elems) {
+			loc->path = escape_path_concat(loc->path, escape_path_of(EscapeStep_Deref));
+		}
 		loc->path  = escape_path_concat(loc->path, escape_path_of(EscapeStep_AnyElement));
 		loc->exact = false;
 	case_end;
@@ -3877,17 +3879,38 @@ gb_internal void escape_store(EscapeAnalysis *ea, Ast *lhs, EscapeValue const &v
 		}
 	}
 
-	EscapeValue ptr = escape_addr(ea, lhs);
-	// with only one place it may store to, the store replaces what that held
-	EscapeUpdateKind update = EscapeUpdate_Add;
-	if (ptr.count == 1) {
-		update = EscapeUpdate_Replace;
+	// it is taken to replace what each place it may store to held
+	escape_store_through(ea, lhs, escape_addr(ea, lhs), v, EscapeUpdate_Replace);
+}
+
+// whether a store to the location replaces an earlier one: one within where it stores, not in memory reached through
+// a pointer in there
+gb_internal bool escape_outer_replaces(EscapeLocation const &loc, EscapeOuterStore const &s) {
+	EscapePath const &path = loc.path;
+	EscapePath const &held = s.location.path;
+	if (loc.root == nullptr || s.location.root != loc.root) {
+		return false;
 	}
-	escape_store_through(ea, lhs, ptr, v, update);
+	if (path.count <= held.count) {
+		EscapePath rest = slice(held, path.count, held.count);
+		return escape_path_has_prefix(held, path) && escape_path_deref_index(rest) == rest.count;
+	}
+	// what is stored has no dereference within it
+	return escape_path_has_prefix(path, held) && escape_path_has_prefix(s.value_path, slice(path, held.count, path.count));
 }
 
 // `node` is the left hand side, or a call storing into memory it was given
 gb_internal void escape_store_through(EscapeAnalysis *ea, Ast *node, EscapeValue const &ptr, EscapeValue const &v, EscapeUpdateKind update) {
+	EscapeLocation location = {};
+	escape_outer_location(node, &location);
+	if (update == EscapeUpdate_Replace) {
+		for (isize i = ea->state.outers.count-1; i >= 0; i--) {
+			if (escape_outer_replaces(location, ea->state.outers[i])) {
+				array_unordered_remove(&ea->state.outers, i);
+			}
+		}
+	}
+
 	for (EscapeValueFact const &f : ptr) {
 		EscapeOrigin const &o = f.origin;
 		switch (o.kind) {
@@ -3902,17 +3925,8 @@ gb_internal void escape_store_through(EscapeAnalysis *ea, Ast *node, EscapeValue
 		case EscapeOrigin_ParamLoad:
 		case EscapeOrigin_ParamDeep: {
 			EscapeOuterStore s = {};
-			s.dest = o;
-			escape_outer_location(node, &s.location);
-			if (s.location.exact) {
-				for (isize i = ea->state.outers.count-1; i >= 0; i--) {
-					EscapeLocation const &p = ea->state.outers[i].location;
-					if (p.root == s.location.root && escape_path_eq(p.path, s.location.path)) {
-						array_unordered_remove(&ea->state.outers, i);
-					}
-				}
-			}
-
+			s.dest     = o;
+			s.location = location;
 			for (EscapeValueFact const &vf : v) {
 				s.node       = node;
 				s.origin     = vf.origin;
