@@ -885,6 +885,12 @@ gb_internal Type *escape_type_at(EscapeObject const &obj, EscapePath const &path
 	return nullptr;
 }
 
+// a value keeps its paths where it goes only when both types are known to be the same, e.g. not through a union, as
+// otherwise its paths could nest without end in a loop
+gb_internal bool escape_types_known_identical(Type *a, Type *b) {
+	return a != nullptr && b != nullptr && are_types_identical(a, b);
+}
+
 // what a value of the type points to, e.g. the elements of a slice
 gb_internal Type *escape_pointee_type(Type *t) {
 	t = base_type(t);
@@ -3083,7 +3089,7 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 		switch (flow.target) {
 		case EscapeFlowTarget_Result: {
 			Type *t = escape_type_within(pt->results->Tuple.variables[flow.target_index]->type, flow.target_path);
-			if (v_type != nullptr && t != nullptr && !are_types_identical(v_type, t)) {
+			if (!escape_types_known_identical(v_type, t)) {
 				v = escape_as_pointer(v);
 			}
 			for (EscapeValueFact const &f : v) {
@@ -3100,7 +3106,7 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 				EscapeValue ptr = escape_arg_pointers(args[flow.target_index], types[flow.target_index], flow.target_path, &pointee);
 				if (flow.target != EscapeFlowTarget_Pointee) {
 					ptr = escape_as_pointer(escape_load_once(ea, ptr));
-				} else if (v_type != nullptr && pointee != nullptr && !are_types_identical(v_type, pointee)) {
+				} else if (!escape_types_known_identical(v_type, pointee)) {
 					v = escape_as_pointer(v);
 				}
 				if (flow.target == EscapeFlowTarget_Deep) {
