@@ -183,3 +183,31 @@ other_field_through_local_pointer :: proc() {
 	p.a = &x // warning
 	two.b = nil
 }
+
+// A call storing into a global is matched by where in it the call stores
+
+set_global :: proc(p: rawptr) {
+	thing.pointer = p
+}
+
+set_global_whole :: proc(p: rawptr) {
+	thing = {pointer = p}
+}
+
+stored_into_global_by_call :: proc() {
+	x: int
+	set_global(&x)
+	thing.pointer = nil
+}
+
+stored_into_global_whole_by_call :: proc() {
+	x: int
+	set_global_whole(&x)
+	thing.pointer = nil
+}
+
+other_global :: proc() {
+	x: int
+	set_global(&x) // warning
+	outer.inner.pointer = nil
+}

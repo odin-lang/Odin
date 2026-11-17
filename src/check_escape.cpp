@@ -59,6 +59,7 @@ struct EscapeFlow {
 	isize                target_index; // of the result, or of the argument it is stored through
 	EscapePath           target_path;  // within the result, or of the pointer within that argument
 	EscapePath           value_path;   // within what is stored through a loaded pointer, where the argument's pointers are
+	Entity *             global;       // of an outer target when known: the target and value paths are then within it
 };
 
 struct EscapeOrigin {
@@ -3115,9 +3116,14 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 			}
 			break;
 
-		case EscapeFlowTarget_Outer:
-			escape_store_through(ea, call, escape_value_of(EscapeOrigin_Outer, {}, {}), v, EscapeUpdate_Add);
+		case EscapeFlowTarget_Outer: {
+			EscapeValue within = escape_value();
+			for (EscapeValueFact const &f : v) {
+				escape_value_add(&within, escape_path_concat(flow.value_path, f.path), f.origin, f.definite);
+			}
+			escape_store_through(ea, call, escape_value_of(EscapeOrigin_Outer, {flow.global}, flow.target_path), within, EscapeUpdate_Add);
 			break;
+		}
 		}
 	}
 	return results;
@@ -3684,6 +3690,7 @@ gb_internal bool escape_eq(EscapeFlow const &a, EscapeFlow const &b) {
 	       a.param        == b.param        &&
 	       a.target       == b.target       &&
 	       a.target_index == b.target_index &&
+	       a.global       == b.global       &&
 	       escape_path_eq(a.param_path,  b.param_path) &&
 	       escape_path_eq(a.target_path, b.target_path) &&
 	       escape_path_eq(a.value_path,  b.value_path);
@@ -3784,7 +3791,13 @@ gb_internal void escape_exit(EscapeAnalysis *ea, Ast *node, Slice<Ast *> const &
 		default:
 			continue;
 		}
-		if (flow.target != EscapeFlowTarget_Outer) {
+		if (flow.target == EscapeFlowTarget_Outer) {
+			if (s.location.root != nullptr && !escape_is_local(s.location.root)) {
+				flow.global      = s.location.root;
+				flow.target_path = s.location.path;
+				flow.value_path  = s.value_path;
+			}
+		} else {
 			// NOTE(bill): where in what is stored its pointer is, which for memory loaded through the argument is only known without an offset into it
 			flow.target_path = s.dest.path;
 			if (flow.target == EscapeFlowTarget_Pointee) {
