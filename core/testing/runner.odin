@@ -334,6 +334,22 @@ format_test_timeout_message :: proc(
 	return
 }
 
+write_log_messages :: proc(w: io.Writer, log_messages: ^[dynamic]Log_Message) {
+	// Because each thread has its own messenger channel, log messages
+	// arrive in chunks that are in-order, but when they're merged with the
+	// logs from other threads, they become out-of-order.
+	slice.stable_sort_by(log_messages^[:], proc(a, b: Log_Message) -> bool {
+		return time.diff(a.time, b.time) > 0
+	})
+
+	for message in log_messages^ {
+		fmt.wprintln(w, message.text)
+		delete(message.text, message.allocator)
+	}
+
+	clear(log_messages)
+}
+
 runner :: proc(internal_tests: []Internal_Test) -> bool {
 	BATCH_BUFFER_SIZE     :: 32 * mem.Kilobyte
 	POOL_BLOCK_SIZE       :: 16 * mem.Kilobyte
@@ -520,15 +536,11 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	// We cannot make use of the ANSI save/restore cursor codes, because they
 	// work by absolute screen coordinates. This will cause unnecessary
 	// scrollback if we print at the bottom of someone's terminal.
-	ansi_redraw_string := fmt.aprintf("%s%s%s",
-		// Go up N lines, then erase the display from the cursor forward.
-		ansi.move_cursor_previous_line(1 + len(report.packages)),
-		ansi.clear_display_to_end(),
-		// Combine this with the window title, since both can be printed together.
-		OSC_WINDOW_TITLE,
-	)
-	assert(len(ansi_redraw_string) > 0, "Error allocating ANSI redraw string.")
-	defer delete(ansi_redraw_string)
+	// Instead, redraws go up `report_lines`, the height of the last frame,
+	// except when a test was just stopped by a signal and failed; see
+	// `bypass_progress_overwrite`.
+	report_lines := 0
+	cursor_buf: [ansi.CURSOR_SEQUENCE_BUF_MAX]byte
 
 	thread_count_status_string: string = ---
 	{
@@ -657,9 +669,10 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	}
 
 	signals_were_raised := false
+	runner_interrupted := false
 
 	if should_show_animations {
-		redraw_report(stdout, report)
+		report_lines = 1 + redraw_report(stdout, report, true)
 		draw_status_bar(stdout, thread_count_status_string, total_done_count, total_test_count)
 	}
 
@@ -865,6 +878,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 		if should_stop_runner() {
 			fmt.wprintln(stderr, "\nCaught interrupt signal. Stopping all tests.")
+			runner_interrupted = true
 			thread.pool_shutdown(&pool)
 			break main_loop
 		}
@@ -965,7 +979,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			#no_bounds_check pkg := report.packages_by_name[it.pkg]
 
 			pkg.frame_ready = false
-			
+
 			timeout_message_short, timeout_message_full := format_test_timeout_message(
 				timeout^,
 				it,
@@ -1008,13 +1022,28 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		// -- Redraw.
 
 		if should_show_animations {
-			if len(log_messages) == 0 && !needs_to_redraw(report) {
+			// Log messages are held until the end of the run, so only a changed
+			// report needs a redraw.
+			if !needs_to_redraw(report) {
 				continue main_loop
 			}
 
 			if !bypass_progress_overwrite {
-				fmt.wprintf(stdout, ansi_redraw_string, total_done_count, total_test_count)
+				// Go up N lines and draw over the old report in the same write as
+				// the new one, so the terminal never shows it cleared: each line
+				// clears to its end, and the display is cleared below the status bar.
+				// Combine this with the window title, since both can be printed together.
+				fmt.wprintf(batch_writer, "%s" + OSC_WINDOW_TITLE,
+					ansi.move_cursor_previous_line(cursor_buf[:], report_lines),
+					total_done_count,
+					total_test_count)
 			}
+
+			report_lines = 1 + redraw_report(batch_writer, report, true)
+			draw_status_bar(batch_writer, thread_count_status_string, total_done_count, total_test_count)
+			fmt.wprint(batch_writer, ansi.clear_display_to_end())
+			fmt.wprint(stdout, bytes.buffer_to_string(&batch_buffer))
+			bytes.buffer_reset(&batch_buffer)
 		} else {
 			if total_done_count != last_done_count {
 				if !(global_ansi_disabled || !FANCY_OUTPUT) {
@@ -1026,28 +1055,9 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			if len(log_messages) == 0 {
 				continue main_loop
 			}
-		}
 
-		// Because each thread has its own messenger channel, log messages
-		// arrive in chunks that are in-order, but when they're merged with the
-		// logs from other threads, they become out-of-order.
-		slice.stable_sort_by(log_messages[:], proc(a, b: Log_Message) -> bool {
-			return time.diff(a.time, b.time) > 0
-		})
-
-		for message in log_messages {
-			fmt.wprintln(batch_writer, message.text)
-			delete(message.text, message.allocator)
-		}
-
-		fmt.wprint(stderr, bytes.buffer_to_string(&batch_buffer))
-		clear(&log_messages)
-		bytes.buffer_reset(&batch_buffer)
-
-		if should_show_animations {
-			redraw_report(batch_writer, report)
-			draw_status_bar(batch_writer, thread_count_status_string, total_done_count, total_test_count)
-			fmt.wprint(stdout, bytes.buffer_to_string(&batch_buffer))
+			write_log_messages(batch_writer, &log_messages)
+			fmt.wprint(stderr, bytes.buffer_to_string(&batch_buffer))
 			bytes.buffer_reset(&batch_buffer)
 		}
 	}
@@ -1065,9 +1075,26 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	finished_in := time.since(start_time)
 
+	if should_show_animations && !runner_interrupted && report_lines - 1 != len(report.packages) {
+		fmt.wprint(batch_writer, ansi.move_cursor_previous_line(cursor_buf[:], report_lines))
+		redraw_report(batch_writer, report, false)
+		draw_status_bar(batch_writer, thread_count_status_string, total_done_count, total_test_count)
+		fmt.wprint(batch_writer, ansi.clear_display_to_end())
+		fmt.wprint(stdout, bytes.buffer_to_string(&batch_buffer))
+		bytes.buffer_reset(&batch_buffer)
+	}
+
 	if !should_show_animations || !terminal.is_terminal(os.stderr) {
 		// One line to space out the results, since we don't have the status
 		// bar in plain mode.
+		fmt.wprintln(batch_writer)
+	}
+
+	if should_show_animations && len(log_messages) > 0 {
+		if runner_interrupted {
+			fmt.wprintln(batch_writer)
+		}
+		write_log_messages(batch_writer, &log_messages)
 		fmt.wprintln(batch_writer)
 	}
 
@@ -1174,8 +1201,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	if should_show_animations {
 		if signals_were_raised {
 			fmt.wprintln(batch_writer, `
-Signals were raised during this test run. Log messages are likely to have collided with each other.
-To partly mitigate this, redirect STDERR to a file or use the -define:ODIN_TEST_FANCY=false option.`)
+Signals were raised during this test run. To partly mitigate this, redirect STDERR to a file or use the -define:ODIN_TEST_FANCY=false option.`)
 		}
 	}
 
