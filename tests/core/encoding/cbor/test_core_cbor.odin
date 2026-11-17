@@ -333,6 +333,27 @@ test_marshalling_nil_maybe :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_marshalling_zero_maybe :: proc(t: ^testing.T) {
+	// The integer 0 is the header byte 0x00: it is a value, and not a nil.
+	maybe_test: Maybe(int) = 0
+	data, err := cbor.marshal(maybe_test)
+	defer delete(data)
+	testing.expect_value(t, err, nil)
+
+	val, derr := cbor.decode(string(data))
+	testing.expect_value(t, derr, nil)
+
+	diag := cbor.to_diagnostic_format(val)
+	testing.expect_value(t, diag, "0")
+	delete(diag)
+
+	maybe_dest: Maybe(int)
+	uerr := cbor.unmarshal(string(data), &maybe_dest)
+	testing.expect_value(t, uerr, nil)
+	testing.expect_value(t, maybe_dest, 0)
+}
+
+@(test)
 test_marshalling_union :: proc(t: ^testing.T) {
 	My_Distinct :: distinct string
 
