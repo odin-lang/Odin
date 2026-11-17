@@ -1243,6 +1243,29 @@ emit_c :: proc() -> string {
 		strings.write_string(&sb, "\n\tif (before != 0x1111111111111111LL) return -1;\n")
 		strings.write_string(&sb, "\tif (after  != 0x2222222222222222LL) return -2;\n")
 		w(&sb, "\tif (!(%s)) return -3;\n\treturn last;\n}\n", c_conds(t, "s"))
+		// _odd: the aggregate after ONE integer register. AAPCS64 starts an
+		// aggregate whose natural alignment is 16 on an even register pair. No
+		// other shape starts a 16-byte aggregate on an odd register.
+		w(&sb, "double %s_odd(int64_t before, %s s, int64_t after, double last) {\n", t.name, t.name)
+		strings.write_string(&sb, "\tif (before != 0x1111111111111111LL) return -1;\n")
+		strings.write_string(&sb, "\tif (after  != 0x2222222222222222LL) return -2;\n")
+		w(&sb, "\tif (!(%s)) return -3;\n\treturn last;\n}\n", c_conds(t, "s"))
+		// _odd2: the aggregate after an ODD number of 8-byte stack slots, on every
+		// target. A 16-aligned slot and an 8-aligned one only part ways there;
+		// every other stacked shape lands on a 16-aligned offset either way.
+		w(
+			&sb,
+			"double %s_odd2(%s, int64_t before, %s s, int64_t after, double last) {\n\t",
+			t.name,
+			numbered("int64_t p%d", 8),
+			t.name,
+		)
+		for i in 0 ..< 8 {
+			w(&sb, "(void)p%d;", i)
+		}
+		strings.write_string(&sb, "\n\tif (before != 0x1111111111111111LL) return -1;\n")
+		strings.write_string(&sb, "\tif (after  != 0x2222222222222222LL) return -2;\n")
+		w(&sb, "\tif (!(%s)) return -3;\n\treturn last;\n}\n", c_conds(t, "s"))
 		// _va: the variadic path, which is a separate set of rules -- SysV's AL
 		// register count, Win64 duplicating a float into the matching GPR,
 		// Darwin-arm64 stacking every variadic argument. A zero-sized type has
@@ -1317,6 +1340,12 @@ ABI_MUTATE :: #config(ABI_MUTATE, false)
 // Turn it on with ` + "`-define:ABI_VARARGS=true`" + ` to measure it.
 ABI_VARARGS :: #config(ABI_VARARGS, false)
 
+// The aggregate after an odd number of stack slots (` + "`_odd2`" + `), OFF by default on
+// riscv64 only. There Odin puts a 16-byte value whose alignment is 16 (` + "`i128`" + `
+// included) in the next 8-byte slot. Clang rounds the slot up to 16.
+// Turn it on with ` + "`-define:ABI_ODD_STACK=true`" + ` to measure it.
+ABI_ODD_STACK :: #config(ABI_ODD_STACK, ODIN_ARCH != .riscv64)
+
 
 
 E32 :: enum i32 { LO = 0, HI = 0x7fffffff }
@@ -1343,6 +1372,9 @@ emit_odin_decls :: proc(sb: ^strings.Builder, t: Ty, ind: string) {
 		" before: i64, s: %s, after: i64, last: f64) -> f64 ---\n", ind, t.name, t.name)
 	w(sb, "%s\t%s_can :: proc(q0, q1, q2, q3, q4, q5, q6: i64," +
 		" w0, w1, w2, w3, w4, w5, w6, w7: f64," +
+		" before: i64, s: %s, after: i64, last: f64) -> f64 ---\n", ind, t.name, t.name)
+	w(sb, "%s\t%s_odd :: proc(before: i64, s: %s, after: i64, last: f64) -> f64 ---\n", ind, t.name, t.name)
+	w(sb, "%s\t%s_odd2 :: proc(p0, p1, p2, p3, p4, p5, p6, p7: i64," +
 		" before: i64, s: %s, after: i64, last: f64) -> f64 ---\n", ind, t.name, t.name)
 	if len(t.fields) > 0 {
 		w(sb, "%s\t%s_va  :: proc(n: i32, #c_vararg args: ..any) -> f64 ---\n", ind, t.name)
@@ -1390,6 +1422,10 @@ emit_odin :: proc() -> string {
 		w(&sb, "%s\ttesting.expect_value(t, %s_two(s, s, 7), f64(7))\n", ind, t.name)
 		w(&sb, "%s\ttesting.expect_value(t, %s_can(1,2,3,4,5,6,7, 1,2,3,4,5,6,7,8, 0x1111111111111111, s, 0x2222222222222222, 7), f64(7))\n", ind, t.name)
 		w(&sb, "%s\ttesting.expect_value(t, %s_can2(1,2,3,4,5,6,7,8,9,10,11, 0x1111111111111111, s, 0x2222222222222222, 7), f64(7))\n", ind, t.name)
+		w(&sb, "%s\ttesting.expect_value(t, %s_odd(0x1111111111111111, s, 0x2222222222222222, 7), f64(7))\n", ind, t.name)
+		w(&sb, "%s\twhen ABI_ODD_STACK {\n", ind)
+		w(&sb, "%s\t\ttesting.expect_value(t, %s_odd2(1,2,3,4,5,6,7,8, 0x1111111111111111, s, 0x2222222222222222, 7), f64(7))\n", ind, t.name)
+		w(&sb, "%s\t}\n", ind)
 		w(&sb, "%s\ttesting.expect_value(t, %s_back(), i32(0))\n", ind, t.name)
 		if len(t.fields) > 0 {
 			w(&sb, "%s\twhen ABI_VARARGS {\n", ind)
@@ -1453,6 +1489,12 @@ ABI_SKIP :: #config(ABI_SKIP, 0)
 // Turn it on with ` + "`-define:ABI_VARARGS=true`" + ` to measure it.
 ABI_VARARGS :: #config(ABI_VARARGS, false)
 
+// The aggregate after an odd number of stack slots (` + "`_odd2`" + `), OFF by default on
+// riscv64 only. There Odin puts a 16-byte value whose alignment is 16 (` + "`i128`" + `
+// included) in the next 8-byte slot. Clang rounds the slot up to 16.
+// Turn it on with ` + "`-define:ABI_ODD_STACK=true`" + ` to measure it.
+ABI_ODD_STACK :: #config(ABI_ODD_STACK, ODIN_ARCH != .riscv64)
+
 
 
 foreign import lib "../abi_corpus_c.o"
@@ -1483,6 +1525,10 @@ emit_main :: proc() -> string {
 		w(&sb, "%s\tif %s_two(s, s, 7) != 7 { return 1 }\n", ind, t.name)
 		w(&sb, "%s\tif %s_can(1,2,3,4,5,6,7, 1,2,3,4,5,6,7,8, 0x1111111111111111, s, 0x2222222222222222, 7) != 7 { return 1 }\n", ind, t.name)
 		w(&sb, "%s\tif %s_can2(1,2,3,4,5,6,7,8,9,10,11, 0x1111111111111111, s, 0x2222222222222222, 7) != 7 { return 1 }\n", ind, t.name)
+		w(&sb, "%s\tif %s_odd(0x1111111111111111, s, 0x2222222222222222, 7) != 7 { return 1 }\n", ind, t.name)
+		w(&sb, "%s\twhen ABI_ODD_STACK {\n", ind)
+		w(&sb, "%s\t\tif %s_odd2(1,2,3,4,5,6,7,8, 0x1111111111111111, s, 0x2222222222222222, 7) != 7 { return 1 }\n", ind, t.name)
+		w(&sb, "%s\t}\n", ind)
 		w(&sb, "%s\tif %s_back() != 0 { return 1 }\n", ind, t.name)
 		w(&sb, "%s\tr := %s_ret()\n", ind, t.name)
 		getters := odin_getters(t, "r")
@@ -1539,7 +1585,7 @@ main :: proc() {
 
 	c_funcs := 0
 	for t in types {
-		c_funcs += len(t.fields) > 0 ? 8 : 7
+		c_funcs += len(t.fields) > 0 ? 12 : 11
 	}
 	fmt.printfln("%d types, %d C functions, %d Odin callees", len(types), c_funcs, len(types) * 2)
 }
