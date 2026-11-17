@@ -120,7 +120,7 @@ abort_with_advisory :: proc "contextless" (sig: libc.int, advisory_a, advisory_b
 	// undefined behavior in C99 but possibly tolerated in POSIX 2008.
 	// Either way, we may as well try to salvage what we can.
 	if !global_ansi_disabled {
-		show_cursor := ansi.CSI + ansi.DECTCEM_SHOW
+		show_cursor := ansi.show_cursor()
 		libc.fwrite(raw_data(show_cursor), size_of(byte), len(show_cursor), libc.stdout)
 		libc.fflush(libc.stdout)
 	}

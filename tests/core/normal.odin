@@ -58,6 +58,7 @@ download_assets :: proc "contextless" () {
 @(require) import "sys/posix"
 @(require) import "sys/kqueue"
 @(require) import "sys/windows"
+@(require) import "terminal/ansi"
 @(require) import "text/edit"
 @(require) import "text/i18n"
 @(require) import "text/match"

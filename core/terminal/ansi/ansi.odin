@@ -1,5 +1,7 @@
 package ansi
 
+import "core:fmt"
+
 BEL     :: "\a" // Bell
 BS      :: "\b" // Backspace
 ESC     :: "\e" // Escape
@@ -137,3 +139,173 @@ DECRC :: ESC + "8" // DEC Restore Cursor
 WINDOW_TITLE :: "2"  // Followed by ";<text>" ST.
 HYPERLINK    :: "8"  // Followed by ";[params];<URI>" ST. Closed by OSC HYPERLINK ";;" ST.
 CLIPBOARD    :: "52" // Followed by ";c;<Base64-encoded string>" ST.
+
+// Buffer size sufficient for any cursor movement helper, including move_cursor,
+// for all values representable by int. SGR and color helpers depend on the
+// lengths of their string arguments and have no fixed maximum buffer size.
+CURSOR_SEQUENCE_BUF_MAX :: 4 + 6 * size_of(int)
+
+sgr_alloc :: proc(code: string, allocator := context.temp_allocator) -> string {
+	return fmt.aprintf("%s%s%s", CSI, code, SGR, allocator = allocator)
+}
+
+sgr_buf :: proc(buf: []byte, code: string) -> string {
+	return fmt.bprintf(buf, "%s%s%s", CSI, code, SGR)
+}
+
+// Returns an SGR sequence for the given code, such as `FG_RED` or `BOLD`.
+// The buffer form requires enough space for the code and sequence (len(code) + 3 bytes).
+sgr :: proc {
+	sgr_alloc,
+	sgr_buf,
+}
+
+color_alloc :: proc(text: any, codes: string, allocator := context.temp_allocator) -> string {
+	return fmt.aprintf("%s%s%s%v%s%s", CSI, codes, SGR, text, CSI, RESET + SGR, allocator = allocator)
+}
+
+color_buf :: proc(buf: []byte, text: any, codes: string) -> string {
+	return fmt.bprintf(buf, "%s%s%s%v%s%s", CSI, codes, SGR, text, CSI, RESET + SGR)
+}
+
+// Wraps text in an SGR style and resets the style afterward.
+//
+// `codes` may contain multiple semicolon-separated SGR parameters, such as
+// `BOLD + ";" + FG_RED` or `FG_COLOR_24_BIT + ";255;0;0"`.
+// The buffer form requires enough space for the `%v` representation of `text`,
+// `codes`, and the surrounding escape sequences.
+color :: proc {
+	color_alloc,
+	color_buf,
+}
+
+// Returns a sequence that clears the screen and moves the cursor to the home position.
+clear_screen :: proc() -> string {
+	return CSI + "2" + ED + CSI + CUP
+}
+
+clear_line :: proc() -> string {
+	return CSI + "2" + EL
+}
+
+clear_to_end_of_line :: proc() -> string {
+	return CSI + "0" + EL
+}
+
+clear_to_start_of_line :: proc() -> string {
+	return CSI + "1" + EL
+}
+
+clear_display_to_end :: proc() -> string {
+	return CSI + "0" + ED
+}
+
+hide_cursor :: proc "contextless" () -> string {
+	return CSI + DECTCEM_HIDE
+}
+
+show_cursor :: proc "contextless" () -> string {
+	return CSI + DECTCEM_SHOW
+}
+
+enter_alt_screen :: proc() -> string {
+	return CSI + DECASB_ENTER
+}
+
+exit_alt_screen :: proc() -> string {
+	return CSI + DECASB_EXIT
+}
+
+move_cursor_alloc :: proc(row, column: int, allocator := context.temp_allocator) -> string {
+	return fmt.aprintf("%s%i;%i%s", CSI, row, column, CUP, allocator = allocator)
+}
+
+move_cursor_buf :: proc(buf: []byte, row, column: int) -> string {
+	return fmt.bprintf(buf, "%s%i;%i%s", CSI, row, column, CUP)
+}
+
+move_cursor :: proc {
+	move_cursor_alloc,
+	move_cursor_buf,
+}
+
+move_cursor_up_alloc :: proc(count := 1, allocator := context.temp_allocator) -> string {
+	return fmt.aprintf("%s%i%s", CSI, count, CUU, allocator = allocator)
+}
+
+move_cursor_up_buf :: proc(buf: []byte, count := 1) -> string {
+	return fmt.bprintf(buf, "%s%i%s", CSI, count, CUU)
+}
+
+move_cursor_up :: proc {
+	move_cursor_up_alloc,
+	move_cursor_up_buf,
+}
+
+move_cursor_down_alloc :: proc(count := 1, allocator := context.temp_allocator) -> string {
+	return fmt.aprintf("%s%i%s", CSI, count, CUD, allocator = allocator)
+}
+
+move_cursor_down_buf :: proc(buf: []byte, count := 1) -> string {
+	return fmt.bprintf(buf, "%s%i%s", CSI, count, CUD)
+}
+
+move_cursor_down :: proc {
+	move_cursor_down_alloc,
+	move_cursor_down_buf,
+}
+
+move_cursor_forward_alloc :: proc(count := 1, allocator := context.temp_allocator) -> string {
+	return fmt.aprintf("%s%i%s", CSI, count, CUF, allocator = allocator)
+}
+
+move_cursor_forward_buf :: proc(buf: []byte, count := 1) -> string {
+	return fmt.bprintf(buf, "%s%i%s", CSI, count, CUF)
+}
+
+move_cursor_forward :: proc {
+	move_cursor_forward_alloc,
+	move_cursor_forward_buf,
+}
+
+move_cursor_backward_alloc :: proc(count := 1, allocator := context.temp_allocator) -> string {
+	return fmt.aprintf("%s%i%s", CSI, count, CUB, allocator = allocator)
+}
+
+move_cursor_backward_buf :: proc(buf: []byte, count := 1) -> string {
+	return fmt.bprintf(buf, "%s%i%s", CSI, count, CUB)
+}
+
+move_cursor_backward :: proc {
+	move_cursor_backward_alloc,
+	move_cursor_backward_buf,
+}
+
+move_cursor_previous_line_alloc :: proc(count := 1, allocator := context.temp_allocator) -> string {
+	return fmt.aprintf("%s%i%s", CSI, count, CPL, allocator = allocator)
+}
+
+move_cursor_previous_line_buf :: proc(buf: []byte, count := 1) -> string {
+	return fmt.bprintf(buf, "%s%i%s", CSI, count, CPL)
+}
+
+move_cursor_previous_line :: proc {
+	move_cursor_previous_line_alloc,
+	move_cursor_previous_line_buf,
+}
+
+save_cursor :: proc() -> string {
+	return CSI + SCP
+}
+
+restore_cursor :: proc() -> string {
+	return CSI + RCP
+}
+
+disable_auto_wrap :: proc() -> string {
+	return CSI + DECAWM_OFF
+}
+
+enable_auto_wrap :: proc() -> string {
+	return CSI + DECAWM_ON
+}
