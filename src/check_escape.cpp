@@ -24,7 +24,7 @@ struct EscapeObject {
 
 enum EscapeOriginKind : u8 {
 	EscapeOrigin_Invalid,
-	EscapeOrigin_Outer,
+	EscapeOrigin_Outer,     // e.g. a global, with `obj` and `path` set when its address was taken
 	EscapeOrigin_Local,
 	EscapeOrigin_Temp,
 	EscapeOrigin_Owned,     // the buffer of a local dynamic array or map, tracked as its contents
@@ -417,6 +417,11 @@ gb_internal isize escape_path_deref_index(EscapePath const &p) {
 
 gb_internal EscapeOrigin escape_origin_offset(EscapeOrigin o, EscapePath const &extra) {
 	switch (o.kind) {
+	case EscapeOrigin_Outer:
+		if (o.obj.entity != nullptr) {
+			o.path = escape_path_concat(o.path, extra);
+		}
+		break;
 	case EscapeOrigin_Local:
 	case EscapeOrigin_Temp:
 	case EscapeOrigin_Owned:
@@ -989,7 +994,7 @@ gb_internal EscapeValue escape_load(EscapeAnalysis *ea, EscapeValue const &ptr, 
 		EscapeOrigin const &o = pf.origin;
 		switch (o.kind) {
 		case EscapeOrigin_Outer:
-			escape_value_add(&v, {}, o);
+			escape_value_add(&v, {}, EscapeOrigin{EscapeOrigin_Outer});
 			break;
 
 		case EscapeOrigin_Variadic: {
@@ -2712,7 +2717,7 @@ gb_internal EscapeValue escape_ident_addr(EscapeAnalysis *ea, Entity *e) {
 	}
 
 	if (!escape_is_local(e)) {
-		return escape_value_of(EscapeOrigin_Outer, {}, {});
+		return escape_value_of(EscapeOrigin_Outer, {e}, {});
 	}
 	return escape_value_of(EscapeOrigin_Local, {e}, {}, ea->addr_site);
 }
@@ -3899,14 +3904,40 @@ gb_internal bool escape_outer_replaces(EscapeLocation const &loc, EscapeOuterSto
 	return escape_path_has_prefix(path, held) && escape_path_has_prefix(s.value_path, slice(path, held.count, path.count));
 }
 
+gb_internal void escape_outer_kill(EscapeAnalysis *ea, EscapeLocation const &loc) {
+	for (isize i = ea->state.outers.count-1; i >= 0; i--) {
+		if (escape_outer_replaces(loc, ea->state.outers[i])) {
+			array_unordered_remove(&ea->state.outers, i);
+		}
+	}
+}
+
+gb_internal bool escape_dest_location(EscapeOrigin const &o, EscapeLocation *loc) {
+	if (o.kind == EscapeOrigin_Outer && o.obj.entity != nullptr) {
+		*loc = {o.obj.entity, o.path, true};
+		return true;
+	}
+	if (o.kind != EscapeOrigin_Param) {
+		return false;
+	}
+	*loc = {o.obj.entity, o.path, true};
+	// as `escape_outer_location` names it, e.g. `p^` for `p: ^T`
+	if (escape_path_deref_index(o.path) == o.path.count) {
+		loc->path = escape_path_concat(o.path, escape_path_of(EscapeStep_Deref));
+	}
+	return true;
+}
+
 // `node` is the left hand side, or a call storing into memory it was given
 gb_internal void escape_store_through(EscapeAnalysis *ea, Ast *node, EscapeValue const &ptr, EscapeValue const &v, EscapeUpdateKind update) {
 	EscapeLocation location = {};
 	escape_outer_location(node, &location);
 	if (update == EscapeUpdate_Replace) {
-		for (isize i = ea->state.outers.count-1; i >= 0; i--) {
-			if (escape_outer_replaces(location, ea->state.outers[i])) {
-				array_unordered_remove(&ea->state.outers, i);
+		escape_outer_kill(ea, location);
+		for (EscapeValueFact const &f : ptr) {
+			EscapeLocation dest = {};
+			if (escape_dest_location(f.origin, &dest)) {
+				escape_outer_kill(ea, dest);
 			}
 		}
 	}
@@ -3927,6 +3958,8 @@ gb_internal void escape_store_through(EscapeAnalysis *ea, Ast *node, EscapeValue
 			EscapeOuterStore s = {};
 			s.dest     = o;
 			s.location = location;
+			escape_dest_location(o, &s.location);
+
 			for (EscapeValueFact const &vf : v) {
 				s.node       = node;
 				s.origin     = vf.origin;

@@ -131,3 +131,55 @@ stored_in_loop :: proc() {
 		array.elems[i] = &x // warning
 	}
 }
+
+// A store is matched by where it goes, e.g. a global through a pointer to it, or what a parameter points to
+
+set :: proc(t: ^Thing, p: rawptr) {
+	t.pointer = p
+}
+
+stored_through_local_pointer :: proc() {
+	x: int
+	p := &thing
+	p.pointer = &x
+	thing.pointer = nil
+}
+
+cleared_through_local_pointer :: proc() {
+	x: int
+	thing.pointer = &x
+	p := &thing
+	p.pointer = nil
+}
+
+stored_by_call :: proc() {
+	x: int
+	set(&thing, &x)
+	thing.pointer = nil
+}
+
+stored_by_call_through_parameter :: proc(t: ^Thing) {
+	x: int
+	set(t, &x)
+	t.pointer = nil
+}
+
+cleared_through_element_pointer :: proc() {
+	x: int
+	array.elems[0] = &x
+	p := &array.elems[1]
+	p^ = nil
+}
+
+other_parameter :: proc(t, u: ^Thing) {
+	x: int
+	set(t, &x) // warning
+	u.pointer = nil
+}
+
+other_field_through_local_pointer :: proc() {
+	x: int
+	p := &two
+	p.a = &x // warning
+	two.b = nil
+}
