@@ -893,7 +893,7 @@ write_float :: proc(b: ^Builder, f: f64, fmt: byte, prec, bit_size: int, always_
 	if always_signed {
 		flags |= { .Plus }
 	}
-	buf: [384]byte
+	buf: [384]byte = ---
 	s := strconv.write_float(buf[:], f, fmt, prec, bit_size, flags)
 	return write_string(b, s, loc=loc)
 }
@@ -917,7 +917,7 @@ write_f16 :: proc(b: ^Builder, f: f16, fmt: byte, always_signed := false, loc :=
 	if always_signed {
 		flags |= { .Plus }
 	}
-	buf: [384]byte
+	buf: [384]byte = ---
 	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f), flags)
 	return write_string(b, s, loc=loc)
 }
@@ -959,7 +959,7 @@ write_f32 :: proc(b: ^Builder, f: f32, fmt: byte, always_signed := false, loc :=
 	if always_signed {
 		flags |= { .Plus }
 	}
-	buf: [384]byte
+	buf: [384]byte = ---
 	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f), flags)
 	return write_string(b, s, loc=loc)
 }
@@ -983,7 +983,7 @@ write_f64 :: proc(b: ^Builder, f: f64, fmt: byte, always_signed := false, loc :=
 	if always_signed {
 		flags |= { .Plus }
 	}
-	buf: [384]byte
+	buf: [384]byte = ---
 	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f), flags)
 	return write_string(b, s, loc=loc)
 }
