@@ -24,7 +24,7 @@ struct EscapeObject {
 
 enum EscapeOriginKind : u8 {
 	EscapeOrigin_Invalid,
-	EscapeOrigin_Outer,     // e.g. a global, with `obj` and `path` set when its address was taken
+	EscapeOrigin_Outer,     // e.g. a global, named by `obj` and `path` when known
 	EscapeOrigin_Local,
 	EscapeOrigin_Temp,
 	EscapeOrigin_Owned,     // the buffer of a local dynamic array or map, tracked as its contents
@@ -362,9 +362,8 @@ gb_internal bool escape_eq(EscapeOrigin const &a, EscapeOrigin const &b) {
 }
 
 gb_internal bool escape_eq(EscapeOuterStore const &a, EscapeOuterStore const &b) {
-	return a.location.root  == b.location.root               &&
-	       a.location.exact == b.location.exact              &&
-	       a.node           == b.node                        &&
+	return a.location.root == b.location.root               &&
+	       a.node          == b.node                        &&
 	       escape_path_eq(a.location.path, b.location.path) &&
 	       escape_path_eq(a.value_path,    b.value_path)    &&
 	       escape_eq(a.dest,   b.dest)                      &&
@@ -389,6 +388,12 @@ gb_internal void escape_value_add(EscapeValue *v, EscapePath const &path, Escape
 gb_internal void escape_value_add_all(EscapeValue *v, EscapeValue const &w) {
 	for (EscapeValueFact const &f : w) {
 		escape_value_add(v, f.path, f.origin);
+	}
+}
+
+gb_internal void escape_value_add_at(EscapeValue *v, EscapePath const &path, EscapeValue const &w) {
+	for (EscapeValueFact const &f : w) {
+		escape_value_add(v, escape_path_concat(path, f.path), f.origin, f.definite);
 	}
 }
 
@@ -2748,15 +2753,8 @@ gb_internal EscapeValue escape_ident_value(EscapeAnalysis *ea, Entity *e) {
 		return escape_value();
 	}
 
-	if (escape_is_reference(e) || escape_is_using_field(e)) {
+	if (escape_is_reference(e) || escape_is_using_field(e) || !escape_is_local(e)) {
 		return escape_load(ea, escape_ident_addr(ea, e), e->type);
-	}
-
-	if (!escape_is_local(e)) {
-		if (escape_type_has_pointers(e->type)) {
-			return escape_value_of(EscapeOrigin_Outer, {e}, escape_path_of(EscapeStep_Deref));
-		}
-		return escape_value();
 	}
 
 	if (escape_is_param(e)) {
@@ -2921,9 +2919,7 @@ gb_internal EscapeValue escape_arg_pointers(EscapeValue const &arg, Type *type, 
 // e.g. through a cast, where it is all of it as before
 gb_internal void escape_store_loaded(EscapeAnalysis *ea, Ast *call, EscapeValue const &ptr, EscapeValue const &v, EscapePath const &value_path) {
 	EscapeValue within = escape_value();
-	for (EscapeValueFact const &f : v) {
-		escape_value_add(&within, escape_path_concat(value_path, f.path), f.origin, f.definite);
-	}
+	escape_value_add_at(&within, value_path, v);
 	for (EscapeValueFact const &pf : ptr) {
 		bool fits = true;
 		switch (pf.origin.kind) {
@@ -3205,9 +3201,7 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 
 		case EscapeFlowTarget_Outer: {
 			EscapeValue within = escape_value();
-			for (EscapeValueFact const &f : v) {
-				escape_value_add(&within, escape_path_concat(flow.value_path, f.path), f.origin, f.definite);
-			}
+			escape_value_add_at(&within, flow.value_path, v);
 			escape_store_through(ea, call, escape_value_of(EscapeOrigin_Outer, {flow.global}, flow.target_path), within, EscapeUpdate_Add);
 			break;
 		}
@@ -3305,10 +3299,7 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 				escape_visit_exits(ea, value);
 				continue;
 			}
-			EscapeValue ev = escape_convert(ea, escape_expr(ea, value), value, elem_type);
-			for (EscapeValueFact const &f : ev) {
-				escape_value_add(&v, escape_path_concat(path, f.path), f.origin, f.definite);
-			}
+			escape_value_add_at(&v, path, escape_convert(ea, escape_expr(ea, value), value, elem_type));
 		}
 
 		if (t->kind == Type_Slice) {
@@ -3918,7 +3909,7 @@ gb_internal void escape_outer_location(Ast *lhs, EscapeLocation *loc) {
 		Entity *e = entity_of_node(lhs);
 		EscapePath field = {};
 		if (e == nullptr || !escape_is_using_field(e) || !escape_using_path(e, &field)) {
-			*loc = {e, {}, e != nullptr};
+			*loc = {e};
 			return;
 		}
 
@@ -3926,7 +3917,7 @@ gb_internal void escape_outer_location(Ast *lhs, EscapeLocation *loc) {
 		if (e->using_expr != nullptr) {
 			escape_outer_location(e->using_expr, loc);
 		} else {
-			*loc = {e->using_parent, {}, true};
+			*loc = {e->using_parent};
 		}
 		if (is_type_pointer(e->using_parent->type)) {
 			loc->path = escape_path_concat(loc->path, escape_path_of(EscapeStep_Deref));
@@ -3936,7 +3927,7 @@ gb_internal void escape_outer_location(Ast *lhs, EscapeLocation *loc) {
 
 	case_ast_node(se, SelectorExpr, lhs);
 		if (Entity *g = escape_package_selector(lhs)) {
-			*loc = {g, {}, true};
+			*loc = {g};
 			return;
 		}
 
@@ -3960,8 +3951,7 @@ gb_internal void escape_outer_location(Ast *lhs, EscapeLocation *loc) {
 		if (!inline_elems) {
 			loc->path = escape_path_concat(loc->path, escape_path_of(EscapeStep_Deref));
 		}
-		loc->path  = escape_path_concat(loc->path, escape_path_of(EscapeStep_AnyElement));
-		loc->exact = false;
+		loc->path = escape_path_concat(loc->path, escape_path_of(EscapeStep_AnyElement));
 	case_end;
 
 	case_ast_node(de, DerefExpr, lhs);
@@ -4016,32 +4006,26 @@ gb_internal bool escape_outer_replaces(EscapeLocation const &loc, EscapeOuterSto
 	return escape_path_has_prefix(path, held) && escape_path_has_prefix(s.value_path, slice(path, held.count, path.count));
 }
 
-gb_internal void escape_outer_kill(EscapeAnalysis *ea, EscapeLocation const &loc) {
+gb_internal bool escape_dest_location(EscapeOrigin const &o, EscapeLocation *loc) {
+	if (o.kind != EscapeOrigin_Param && (o.kind != EscapeOrigin_Outer || o.obj.entity == nullptr)) {
+		return false;
+	}
+	*loc = {o.obj.entity, o.path};
+	// as `escape_outer_location` names it, e.g. `p^` for `p: ^T`
+	if (o.kind == EscapeOrigin_Param && escape_path_deref_index(o.path) == o.path.count) {
+		loc->path = escape_path_concat(o.path, escape_path_of(EscapeStep_Deref));
+	}
+	return true;
+}
+
+gb_internal void escape_overwrite(EscapeAnalysis *ea, EscapeLocation const &loc, EscapeOrigin const *dest) {
 	for (isize i = ea->state.outers.count-1; i >= 0; i--) {
 		if (escape_outer_replaces(loc, ea->state.outers[i])) {
 			escape_add_unique(&ea->state.cleared, ea->state.outers[i]);
 			array_unordered_remove(&ea->state.outers, i);
 		}
 	}
-}
 
-gb_internal bool escape_dest_location(EscapeOrigin const &o, EscapeLocation *loc) {
-	if (o.kind == EscapeOrigin_Outer && o.obj.entity != nullptr) {
-		*loc = {o.obj.entity, o.path, true};
-		return true;
-	}
-	if (o.kind != EscapeOrigin_Param) {
-		return false;
-	}
-	*loc = {o.obj.entity, o.path, true};
-	// as `escape_outer_location` names it, e.g. `p^` for `p: ^T`
-	if (escape_path_deref_index(o.path) == o.path.count) {
-		loc->path = escape_path_concat(o.path, escape_path_of(EscapeStep_Deref));
-	}
-	return true;
-}
-
-gb_internal void escape_add_write(EscapeAnalysis *ea, EscapeLocation const &loc, EscapeOrigin const *dest) {
 	EscapeFlow flow = {EscapeFlow_Write, -1};
 	Type *written = nullptr;
 	if (dest != nullptr && dest->kind == EscapeOrigin_Param) {
@@ -4073,13 +4057,11 @@ gb_internal void escape_store_through(EscapeAnalysis *ea, Ast *node, EscapeValue
 	EscapeLocation location = {};
 	escape_outer_location(node, &location);
 	if (update == EscapeUpdate_Replace) {
-		escape_outer_kill(ea, location);
-		escape_add_write(ea, location, nullptr);
+		escape_overwrite(ea, location, nullptr);
 		for (EscapeValueFact const &f : ptr) {
 			EscapeLocation dest = {};
 			if (escape_dest_location(f.origin, &dest)) {
-				escape_outer_kill(ea, dest);
-				escape_add_write(ea, dest, &f.origin);
+				escape_overwrite(ea, dest, &f.origin);
 			}
 		}
 	}
