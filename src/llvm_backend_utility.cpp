@@ -149,8 +149,13 @@ gb_internal LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef p
 	args[2] = LLVMBuildIntCast2(p->builder, len, types[1], /*signed*/false, "");
 	args[3] = LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), is_volatile, false);
 
-	return lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
-
+	// the caller pushed alignment can be overrriden by anything provable about ptr
+	alignment = lb_try_get_alignment(p->module, ptr, alignment);
+	LLVMValueRef call = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+	if (alignment > 1) {
+		LLVMAddCallSiteAttribute(call, 1, lb_create_enum_attribute(p->module->ctx, "align", alignment));
+	}
+	return call;
 }
 
 gb_internal void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, unsigned alignment) {
@@ -173,10 +178,10 @@ gb_internal void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, u
 		}
 		break;
 	default:
-		{
-			LLVMValueRef store = LLVMBuildStore(p->builder, LLVMConstNull(lb_type(p->module, type)), ptr);
-			lb_lower_store_alignment_to_known(p, store, ptr);
-		}
+		// claim at most the caller's alignment;
+		// note that it can be below LLVM's alignment of the stored type
+		// (e.g. a u128 bit_set on i386: 4 vs 16)
+		OdinLLVMBuildStoreAligned(p, LLVMConstNull(llvm_type), ptr, gb_min(cast(i64)alignment, lb_alignof(llvm_type)));
 		break;
 	}
 }
@@ -1481,7 +1486,8 @@ gb_internal lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 	lbValue gep = lb_emit_struct_ep_internal(p, s, index, result_type);
 
 	Type *bt = base_type(t);
-	if (bt->kind == Type_Struct) {
+	// metadata can only be attached to LLVM instructions
+	if (bt->kind == Type_Struct && LLVMIsAInstruction(gep.value)) {
 		if (bt->Struct.is_packed) {
 			lb_set_metadata_custom_u64(p->module, gep.value, ODIN_METADATA_IS_PACKED, 1);
 			GB_ASSERT(lb_get_metadata_custom_u64(p->module, gep.value, ODIN_METADATA_IS_PACKED) == 1);
@@ -3013,8 +3019,8 @@ gb_internal lbValue lb_handle_objc_block(lbProcedure *p, Ast *expr) {
 			lbAddr p_current_context = lb_find_or_generate_context_ptr(p);
 
 			LLVMValueRef context_size = LLVMConstInt(LLVMInt64TypeInContext(m->ctx), (u64)lb_sizeof(lb_type(m, t_context)), false);
-			LLVMBuildMemCpy(p->builder, f_context, lb_try_get_alignment(f_context, 1),
-							p_current_context.addr.value, lb_try_get_alignment(p_current_context.addr.value, 1), context_size);
+			LLVMBuildMemCpy(p->builder, f_context, lb_try_get_alignment(m, f_context, 1),
+							p_current_context.addr.value, lb_try_get_alignment(m, p_current_context.addr.value, 1), context_size);
 		}
 
 		// Store captured args into the block
