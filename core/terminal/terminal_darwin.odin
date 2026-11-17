@@ -6,7 +6,7 @@ import "core:sys/posix"
 
 _get_terminal_size :: proc "contextless" () -> (width, height: int, ok: bool) {
 	Winsize :: struct {
-		row, col: u16,
+		row, col, xpixel, ypixel: u16,
 	}
 
 	ws: Winsize

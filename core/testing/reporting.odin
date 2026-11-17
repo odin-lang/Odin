@@ -15,6 +15,7 @@ import "core:io"
 import "core:mem"
 import "core:path/filepath"
 import "core:strings"
+import "core:terminal"
 import "core:terminal/ansi"
 
 MAX_PROGRESS_WIDTH :: 100
@@ -69,7 +70,7 @@ make_report :: proc(internal_tests: []Internal_Test) -> (report: Report, error: 
 	// This loop assumes the tests are sorted by package already.
 	for it, index in internal_tests {
 		if cur_pkg != it.pkg {
-			#no_bounds_check { 
+			#no_bounds_check {
 				append(&packages, Package_Run {
 					name = cur_pkg,
 					tests = report.all_tests[pkg_start:index],
@@ -138,8 +139,12 @@ destroy_report :: proc(report: ^Report) {
 }
 
 redraw_package :: proc(w: io.Writer, report: Report, pkg: ^Package_Run) {
+	render_package(report, pkg)
+	io.write_string(w, pkg.redraw_string)
+}
+
+render_package :: proc(report: Report, pkg: ^Package_Run) {
 	if pkg.frame_ready {
-		io.write_string(w, pkg.redraw_string)
 		return
 	}
 
@@ -237,47 +242,100 @@ redraw_package :: proc(w: io.Writer, report: Report, pkg: ^Package_Run) {
 	}
 
 	if done_count == len(pkg.test_states) {
-		fmt.wprintfln(line_writer, "     % 4i :: %s",
+		fmt.wprintfln(line_writer, "     % 4i :: %s%s",
 			len(pkg.test_states),
 			ticker,
+			ansi.clear_to_end_of_line(),
 		)
 	} else {
-		fmt.wprintfln(line_writer, "% 4i/% 4i :: %s",
+		fmt.wprintfln(line_writer, "% 4i/% 4i :: %s%s",
 			done_count,
 			len(pkg.test_states),
 			ticker,
+			ansi.clear_to_end_of_line(),
 		)
 	}
 
 	pkg.redraw_string = strings.to_string(line_builder)
 	pkg.frame_ready = true
-	io.write_string(w, pkg.redraw_string)
 }
 
-redraw_report :: proc(w: io.Writer, report: Report) {
+package_done :: proc(pkg: ^Package_Run) -> bool {
+	for state in pkg.test_states {
+		if state <= .Running {
+			return false
+		}
+	}
+	return true
+}
+
+redraw_report :: proc(w: io.Writer, report: Report, fit_to_terminal: bool) -> (lines: int) {
 	// If we print a line longer than the user's terminal can handle, it may
 	// wrap around, shifting the progress report out of alignment.
 	//
-	// There are ways to get the current terminal width, and that would be the
-	// ideal way to handle this, but it would require system-specific code such
-	// as setting STDIN to be non-blocking in order to read the response from
-	// the ANSI DSR escape code, or reading environment variables.
-	//
 	// The DECAWM escape codes control whether or not the terminal will wrap
 	// long lines or overwrite the last visible character.
-	// This should be fine for now.
+	// The Windows 10 console host ignores them, so long lines still wrap there.
 	//
 	// Note that we only do this for the animated summary; log messages are
-	// still perfectly fine to wrap, as they're printed in their own batch,
+	// still perfectly fine to wrap, as they're printed after the final report,
 	// whereas the animation depends on each package being only on one line.
+	//
+	// With `fit_to_terminal`, and when its height is known, the report is
+	// also kept within the terminal's height. The cursor can't move above
+	// the top row, so a taller report would scroll on every redraw. When the
+	// packages don't fit, unfinished packages take priority for the free
+	// lines, all in their usual order, and a "+N more packages" line counts
+	// the rest. Unless the run was interrupted, the runner draws the final
+	// report in full, as nothing redraws it afterwards.
 	//
 	// Of course, if you resize your terminal while it's printing, things can
 	// still break...
 	fmt.wprint(w, ansi.disable_auto_wrap())
-	for &pkg in report.packages {
-		redraw_package(w, report, &pkg)
+	defer fmt.wprint(w, ansi.enable_auto_wrap())
+
+	max_lines := len(report.packages)
+	if fit_to_terminal {
+		if _, rows, ok := terminal.get_terminal_size(); ok {
+			max_lines = rows - 2
+		}
 	}
-	fmt.wprint(w, ansi.enable_auto_wrap())
+
+	if len(report.packages) <= max_lines {
+		for &pkg in report.packages {
+			redraw_package(w, report, &pkg)
+		}
+		return len(report.packages)
+	}
+
+	slots := max(max_lines - 1, 0)
+	unfinished := 0
+	for &pkg in report.packages {
+		if !package_done(&pkg) {
+			unfinished += 1
+		}
+	}
+	show_unfinished := min(unfinished, slots)
+	show_done := slots - show_unfinished
+
+	for &pkg in report.packages {
+		if package_done(&pkg) {
+			if show_done > 0 {
+				redraw_package(w, report, &pkg)
+				show_done -= 1
+				continue
+			}
+		} else if show_unfinished > 0 {
+			redraw_package(w, report, &pkg)
+			show_unfinished -= 1
+			continue
+		}
+		render_package(report, &pkg)
+	}
+
+	hidden := len(report.packages) - slots
+	fmt.wprintfln(w, "+%i more package%s%s", hidden, "" if hidden == 1 else "s", ansi.clear_to_end_of_line())
+	return slots + 1
 }
 
 needs_to_redraw :: proc(report: Report) -> bool {
@@ -294,13 +352,14 @@ draw_status_bar :: proc(w: io.Writer, threads_string: string, total_done_count, 
 	if total_done_count == total_test_count {
 		// All tests are done; print a blank line to maintain the same height
 		// of the progress report.
-		fmt.wprintln(w)
+		fmt.wprintln(w, ansi.clear_to_end_of_line())
 	} else {
 		fmt.wprintfln(w,
-			"%s % 4i/% 4i :: total",
+			"%s % 4i/% 4i :: total%s",
 			threads_string,
 			total_done_count,
-			total_test_count)
+			total_test_count,
+			ansi.clear_to_end_of_line())
 	}
 }
 
