@@ -2,6 +2,9 @@
 // next to a case which must stay quiet
 package test_issues
 
+import "base:intrinsics"
+import "core:mem"
+
 Thing :: struct {
 	pointer: rawptr,
 }
@@ -210,4 +213,82 @@ other_global :: proc() {
 	x: int
 	set_global(&x) // warning
 	outer.inner.pointer = nil
+}
+
+// A call which may write over a pointer clears it
+
+reset :: proc(t: ^Thing) {
+	t.pointer = nil
+}
+
+reset_global :: proc() {
+	thing.pointer = nil
+}
+
+reset_two_b :: proc(t: ^Two) {
+	t.b = nil
+}
+
+cleared_by_call :: proc() {
+	x: int
+	thing.pointer = &x
+	reset(&thing)
+}
+
+cleared_by_call_without_arguments :: proc() {
+	x: int
+	thing.pointer = &x
+	reset_global()
+}
+
+local_cleared_by_call :: proc() -> Thing {
+	x: int
+	t: Thing
+	set(&t, &x)
+	reset(&t)
+	return t
+}
+
+cleared_by_procedure_value :: proc() {
+	x: int
+	f := reset
+	thing.pointer = &x
+	f(&thing)
+}
+
+cleared_by_zeroing :: proc() {
+	x: int
+	thing.pointer = &x
+	intrinsics.mem_zero(&thing, size_of(thing))
+}
+
+cleared_by_zero_item :: proc() {
+	x: int
+	thing.pointer = &x
+	mem.zero_item(&thing)
+}
+
+cleared_bytewise :: proc() {
+	x: int
+	thing.pointer = &x
+	mem.set(&thing, 0, size_of(thing))
+}
+
+other_field_cleared_by_call :: proc() {
+	x: int
+	two.a = &x // warning
+	reset_two_b(&two)
+}
+
+other_pointer_cleared_by_call :: proc() {
+	x: int
+	thing.pointer = &x // warning
+	reset(&outer.inner)
+}
+
+not_cleared_by_allocation :: proc() {
+	x: int
+	thing.pointer = &x // warning
+	p := new(int)
+	free(p)
 }
