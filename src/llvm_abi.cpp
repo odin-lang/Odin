@@ -506,6 +506,62 @@ gb_internal Type *lb_abi_single_result_type(Type *proc_type) {
 	return nullptr;
 }
 
+// `#by_ptr` parameters become pointers after classification, and are classified as pointers.
+gb_internal Array<bool> lb_abi_param_by_ptr(Type *proc_type, unsigned arg_count) {
+	auto out = array_make<bool>(temporary_allocator(), cast(isize)arg_count);
+	if (proc_type == nullptr || proc_type->kind != Type_Proc || proc_type->Proc.params == nullptr) {
+		return out;
+	}
+	auto const &params = proc_type->Proc.params->Tuple.variables;
+	for (isize i = 0, j = 0; i < cast(isize)arg_count && j < params.count; j++) {
+		if (params[j]->kind != Entity_Variable) {
+			continue;
+		}
+		out[i] = (params[j]->flags & EntityFlag_ByPtr) != 0;
+		i += 1;
+	}
+	return out;
+}
+
+// The alignment C declares with `__declspec(align)`:
+// `#align`, `#min_field_align`, and the vector and matrix types.
+// MSVC declares `__m128` and the like with it.
+gb_internal i64 lb_abi_required_alignment(Type *t) {
+	t = base_type(t);
+	switch (t->kind) {
+	case Type_Struct:
+		{
+			i64 align = gb_max(t->Struct.custom_align, t->Struct.custom_min_field_align);
+			for (Entity *f : t->Struct.fields) {
+				if (f->kind == Entity_Variable) {
+					align = gb_max(align, lb_abi_required_alignment(f->type));
+				}
+			}
+			return align;
+		}
+	case Type_Union:
+		{
+			i64 align = t->Union.custom_align;
+			for (Type *variant : t->Union.variants) {
+				align = gb_max(align, lb_abi_required_alignment(variant));
+			}
+			return align;
+		}
+	case Type_Array:
+		return lb_abi_required_alignment(t->Array.elem);
+	case Type_EnumeratedArray:
+		return lb_abi_required_alignment(t->EnumeratedArray.elem);
+	case Type_SimdVector:
+	case Type_Matrix:
+		return type_align_of(t);
+	}
+	return 1;
+}
+
+namespace lbAbiVectorCall {
+	gb_internal bool homogeneous_members(Type *t, Type **base, i64 *members);
+}
+
 namespace lbAbi386 {
 	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type);
 	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
@@ -594,14 +650,42 @@ namespace lbAbi386 {
 		return lb_arg_type_direct(type, nullptr, nullptr, attr);
 	}
 
+	// MSVC passes an aggregate declared over-aligned by reference.
+	// One made only of `f32`s with no padding is the exception, and stays on the stack.
+	gb_internal bool windows_passes_by_reference(Type *t) {
+		if (lb_abi_required_alignment(t) <= 4) {
+			return false;
+		}
+
+		Type *base    = nullptr;
+		i64   members = 0;
+		if (!lbAbiVectorCall::homogeneous_members(t, &base, &members)) {
+			return true;
+		}
+		if (is_type_simd_vector(base)) {
+			return true;
+		}
+		return type_size_of(base) != 4;
+	}
+
 	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type) {
-		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
-		auto srcs = lb_abi_param_source_types(original_type, arg_count);
+		auto args   = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
+		auto srcs   = lb_abi_param_source_types(original_type, arg_count);
+		auto by_ptr = lb_abi_param_by_ptr(original_type, arg_count);
+
+		// Since MSVC 2015, Windows passes the first three vectors in XMM0-2 and the rest by reference.
+		bool is_windows = build_context.metrics.os == TargetOs_windows;
+		i64  free_sse   = 3;
 
 		for (unsigned i = 0; i < arg_count; i++) {
 			LLVMTypeRef t = arg_types[i];
 			LLVMTypeKind kind = LLVMGetTypeKind(t);
 			i64 sz = lb_sizeof(t);
+			if (by_ptr[i]) {
+				args[i] = lb_arg_type_indirect(t, nullptr);
+				continue;
+			}
+
 			// `bit_field` lowers to a bare integer; C represents it as a struct with bit-field
 			// members, and i386 passes every struct by value on the stack. Use Src Type to match
 			bool is_aggregate = kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind ||
@@ -609,10 +693,20 @@ namespace lbAbi386 {
 			if (is_aggregate) {
 				if (sz == 0) {
 					args[i] = lb_arg_type_ignore(t);
+				} else if (is_windows && srcs[i] != nullptr && windows_passes_by_reference(srcs[i])) {
+					args[i] = lb_arg_type_indirect(t, nullptr);
 				} else {
 					// Aggregates are pushed onto the stack by value, not passed as a pointer
 					// to a caller-owned copy. This is the rule for both i386 targets.
 					args[i] = lb_arg_type_indirect_byval(c, t);
+				}
+			} else if (is_windows && kind == LLVMVectorTypeKind) {
+				if (sz <= 64 && free_sse > 0) {
+					free_sse -= 1;
+					args[i] = lb_arg_type_direct(t);
+					args[i].in_reg = true;
+				} else {
+					args[i] = lb_arg_type_indirect(t, nullptr);
 				}
 			} else {
 				args[i] = non_struct(c, t, false, srcs[i]);
@@ -870,63 +964,11 @@ namespace lbAbiVectorCall {
 		return lb_arg_type_direct(type, cast_type, nullptr, nullptr);
 	}
 
-	// The alignment C declares with `__declspec(align)`:
-	// `#align`, `#min_field_align`, and the vector and matrix types.
-	// MSVC declares `__m128` and the like with it.
-	gb_internal i64 required_alignment(Type *t) {
-		t = base_type(t);
-		switch (t->kind) {
-		case Type_Struct:
-			{
-				i64 align = gb_max(t->Struct.custom_align, t->Struct.custom_min_field_align);
-				for (Entity *f : t->Struct.fields) {
-					if (f->kind == Entity_Variable) {
-						align = gb_max(align, required_alignment(f->type));
-					}
-				}
-				return align;
-			}
-		case Type_Union:
-			{
-				i64 align = t->Union.custom_align;
-				for (Type *variant : t->Union.variants) {
-					align = gb_max(align, required_alignment(variant));
-				}
-				return align;
-			}
-		case Type_Array:
-			return required_alignment(t->Array.elem);
-		case Type_EnumeratedArray:
-			return required_alignment(t->EnumeratedArray.elem);
-		case Type_SimdVector:
-		case Type_Matrix:
-			return type_align_of(t);
-		}
-		return 1;
-	}
-
 	gb_internal Type *result_source_type(Type *proc_type) {
 		if (proc_type == nullptr || proc_type->kind != Type_Proc || proc_type->Proc.results == nullptr) {
 			return nullptr;
 		}
 		return reduce_tuple_to_single_type(proc_type->Proc.results);
-	}
-
-	// `#by_ptr` parameters become pointers after classification, and are classified as pointers.
-	gb_internal Array<bool> param_by_ptr(Type *proc_type, unsigned arg_count) {
-		auto out = array_make<bool>(temporary_allocator(), cast(isize)arg_count);
-		if (proc_type == nullptr || proc_type->kind != Type_Proc || proc_type->Proc.params == nullptr) {
-			return out;
-		}
-		auto const &params = proc_type->Proc.params->Tuple.variables;
-		for (isize i = 0, j = 0; i < cast(isize)arg_count && j < params.count; j++) {
-			if (params[j]->kind != Entity_Variable) {
-				continue;
-			}
-			out[i] = (params[j]->flags & EntityFlag_ByPtr) != 0;
-			i += 1;
-		}
-		return out;
 	}
 
 	gb_internal LB_ABI_INFO(abi_info_amd64) {
@@ -946,7 +988,7 @@ namespace lbAbiVectorCall {
 		}
 
 		auto srcs   = lb_abi_param_source_types(original_type, arg_count);
-		auto by_ptr = param_by_ptr(original_type, arg_count);
+		auto by_ptr = lb_abi_param_by_ptr(original_type, arg_count);
 		auto is_agg = array_make<bool>(temporary_allocator(), cast(isize)arg_count);
 
 		// The first six arguments take the registers of their position, XMM0-5 for a float or a vector.
@@ -1062,7 +1104,7 @@ namespace lbAbiVectorCall {
 				return lb_arg_type_ignore(type);
 			}
 			// Aggregates never go in registers, nor use them up. An over-aligned one is passed by reference.
-			if (source != nullptr && required_alignment(source) > 4) {
+			if (source != nullptr && lb_abi_required_alignment(source) > 4) {
 				return indirect_i386(type, free_regs);
 			}
 			return lb_arg_type_indirect_byval(c, type);
@@ -1144,7 +1186,7 @@ namespace lbAbiVectorCall {
 		}
 
 		auto srcs   = lb_abi_param_source_types(original_type, arg_count);
-		auto by_ptr = param_by_ptr(original_type, arg_count);
+		auto by_ptr = lb_abi_param_by_ptr(original_type, arg_count);
 
 		i64 free_regs = 2;
 		i64 free_sse  = 6;
@@ -1178,15 +1220,35 @@ namespace lbAbiVectorCall {
 	}
 }
 
-// Windows decorates a `vectorcall` symbol as `name@@N`. N counts the bytes of the parameters as C declares them,
-// each rounded up to the pointer size. LLVM would count the lowered parameters instead, where an argument passed
-// by reference is only a pointer. The leading "\x01" stops LLVM decorating the name again.
+// Windows decorates a `vectorcall` symbol as `name@@N`, and on i386 a `stdcall` one as `_name@N` and a `fastcall` one as `@name@N`.
+// N counts the bytes of the parameters as C declares them, each rounded up to the pointer size.
+// LLVM would count the lowered parameters instead, where an argument passed by reference is only a pointer.
+// The leading "\x01" stops LLVM decorating the name again.
 gb_internal String lb_procedure_symbol_name(String const &name, Type *proc_type) {
 	Type *pt = base_type(proc_type);
-	if (pt == nullptr || pt->kind != Type_Proc || pt->Proc.calling_convention != ProcCC_VectorCall) {
+	if (pt == nullptr || pt->kind != Type_Proc || pt->Proc.c_vararg) {
 		return name;
 	}
 	if (build_context.metrics.os != TargetOs_windows) {
+		return name;
+	}
+
+	char const *prefix = "";
+	char const *suffix = "@";
+	switch (pt->Proc.calling_convention) {
+	case ProcCC_VectorCall:
+		suffix = "@@";
+		break;
+	case ProcCC_StdCall:
+		prefix = "_";
+		break;
+	case ProcCC_FastCall:
+		prefix = "@";
+		break;
+	default:
+		return name;
+	}
+	if (pt->Proc.calling_convention != ProcCC_VectorCall && build_context.metrics.arch != TargetArch_i386) {
 		return name;
 	}
 
@@ -1206,8 +1268,9 @@ gb_internal String lb_procedure_symbol_name(String const &name, Type *proc_type)
 	}
 
 	gbString s = gb_string_make(temporary_allocator(), "\x01");
+	s = gb_string_appendc(s, prefix);
 	s = gb_string_append_length(s, name.text, name.len);
-	s = gb_string_append_fmt(s, "@@%lld", cast(long long)bytes);
+	s = gb_string_append_fmt(s, "%s%lld", suffix, cast(long long)bytes);
 	return make_string(cast(u8 *)s, gb_string_length(s));
 }
 
