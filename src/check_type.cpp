@@ -4150,6 +4150,7 @@ gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc
 	switch (cc) {
 	case ProcCC_StdCall:
 	case ProcCC_FastCall:
+	case ProcCC_VectorCall:
 		if (arch != TargetArch_i386 && arch != TargetArch_amd64) {
 			error(proc_type_node, "Invalid procedure calling convention \"%s\" for target architecture, expected either i386 or amd64, got %.*s",
 			      proc_calling_convention_strings[cc], LIT(target_arch_names[arch]));
@@ -4259,6 +4260,7 @@ gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc
 				break;
 			case ProcCC_Odin:
 			case ProcCC_Contextless:
+			case ProcCC_VectorCall:
 				error(e->token, "Calling convention does not support #c_vararg");
 				break;
 			}

@@ -4431,8 +4431,12 @@ gb_internal void lb_set_anonymous_proc_linkage(lbModule *m, lbProcedure *p) {
 	LLVMSetVisibility(p->value, LLVMHiddenVisibility);
 	if (build_context.metrics.os != TargetOs_darwin) {
 		// Mach-O has no COMDATs, but merges weak definitions itself
+		// COFF needs the COMDAT named after its symbol, which can be decorated (e.g. `stdcall`)
 		TEMPORARY_ALLOCATOR_GUARD();
-		LLVMSetComdat(p->value, LLVMGetOrInsertComdat(m->mod, alloc_cstring(temporary_allocator(), p->name)));
+		size_t      name_len  = 0;
+		char const *name_text = LLVMGetValueName2(p->value, &name_len);
+		String      name      = make_string(cast(u8 const *)name_text, name_len);
+		LLVMSetComdat(p->value, LLVMGetOrInsertComdat(m->mod, alloc_cstring(temporary_allocator(), name)));
 	}
 }
 
