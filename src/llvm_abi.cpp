@@ -827,6 +827,11 @@ namespace lbAbiAmd64Win64 {
 	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type);
 	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 
+	// MSVC's only 8-byte vector is `__m64`, a union passed and returned like an integer.
+	gb_internal bool is_m64_vector(LLVMTypeRef type) {
+		return lb_is_type_kind(type, LLVMVectorTypeKind) && lb_sizeof(type) == 8;
+	}
+
 	gb_internal LB_ABI_INFO(abi_info) {
 		LLVMContextRef c = m->ctx;
 		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
@@ -856,6 +861,8 @@ namespace lbAbiAmd64Win64 {
 					args[i] = lb_arg_type_indirect(t, nullptr);
 					break;
 				}
+			} else if (is_m64_vector(t)) {
+				args[i] = lb_arg_type_direct(t, LLVMInt64TypeInContext(c), nullptr, nullptr);
 			} else {
 				args[i] = lbAbi386::non_struct(c, t, false, nullptr);
 			}
@@ -866,6 +873,8 @@ namespace lbAbiAmd64Win64 {
 	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type) {
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
+		} else if (is_m64_vector(return_type)) {
+			return lb_arg_type_direct(return_type, LLVMInt64TypeInContext(c), nullptr, nullptr);
 		} else if (lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind)) {
 			i64 sz = lb_sizeof(return_type);
 			switch (sz) {
@@ -1109,7 +1118,11 @@ namespace lbAbiVectorCall {
 				}
 				break;
 			case LLVMVectorTypeKind:
-				ft->args[i] = lb_arg_type_direct(t);
+				if (lbAbiAmd64Win64::is_m64_vector(t)) {
+					ft->args[i] = lb_arg_type_direct(t, LLVMInt64TypeInContext(c), nullptr, nullptr);
+				} else {
+					ft->args[i] = lb_arg_type_direct(t);
+				}
 				break;
 			default:
 				if (t == LLVMInt128TypeInContext(c)) {
