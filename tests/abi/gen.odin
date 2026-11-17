@@ -109,6 +109,8 @@ calling_convention := "c"
 c_calling_convention :: proc(cc: string) -> string {
 	switch cc {
 	case "c":          return ""
+	case "stdcall":    return "__stdcall"
+	case "fastcall":   return "__fastcall"
 	case "vectorcall": return "__vectorcall"
 	}
 	fmt.panicf("no C spelling for the calling convention %q", cc)

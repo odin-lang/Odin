@@ -17,6 +17,7 @@ struct lbArgType {
 	bool is_byval;
 	bool no_capture;
 	bool in_reg;
+	bool pad_in_reg;
 
 	// For RiscV (Optional for others): A `cast_type` is normally applied by reinterpreting the value's
 	// bits from offset zero. Only correct when the two layouts agree. When an ABI flattens an aggregate
@@ -203,6 +204,9 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 			continue;
 		}
 		if (arg->pad_type != nullptr) {
+			if (arg->pad_in_reg) {
+				LLVMAddAttributeAtIndex(fn, arg_index+1, inreg_attr);
+			}
 			arg_index++;
 		}
 
@@ -563,14 +567,14 @@ namespace lbAbiVectorCall {
 }
 
 namespace lbAbi386 {
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type);
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type, ProcCallingConvention calling_convention);
 	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 
 	gb_internal LB_ABI_INFO(abi_info) {
 		LLVMContextRef c = m->ctx;
 		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
-		ft->args = compute_arg_types(c, arg_types, arg_count, original_type);
+		ft->args = compute_arg_types(c, arg_types, arg_count, original_type, calling_convention);
 		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 
 		// `bit_field` is treated as a struct.
@@ -668,7 +672,55 @@ namespace lbAbi386 {
 		return type_size_of(base) != 4;
 	}
 
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type) {
+	gb_internal bool take_register(i64 *free_regs) {
+		if (*free_regs <= 0) {
+			return false;
+		}
+		*free_regs -= 1;
+		return true;
+	}
+
+	// A struct of one 32-bit integer, float, or pointer, which clang passes as that scalar.
+	gb_internal bool is_single_word_struct(Type *t) {
+		t = base_type(t);
+		if (t->kind != Type_Struct) {
+			return false;
+		}
+		if (type_size_of(t) != 4) {
+			return false;
+		}
+
+		Type *field = nullptr;
+		for (Entity *f : t->Struct.fields) {
+			if (f->kind != Entity_Variable) {
+				continue;
+			}
+			if (field != nullptr) {
+				return false;
+			}
+			field = base_type(f->type);
+		}
+		if (field == nullptr) {
+			return false;
+		}
+		if (type_size_of(field) != 4) {
+			return false;
+		}
+
+		switch (field->kind) {
+		case Type_Basic:
+			return !is_type_complex(field);
+		case Type_Pointer:
+		case Type_MultiPointer:
+		case Type_Proc:
+		case Type_Enum:
+		case Type_BitSet:
+			return true;
+		}
+		return false;
+	}
+
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type, ProcCallingConvention calling_convention) {
 		auto args   = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 		auto srcs   = lb_abi_param_source_types(original_type, arg_count);
 		auto by_ptr = lb_abi_param_by_ptr(original_type, arg_count);
@@ -677,12 +729,16 @@ namespace lbAbi386 {
 		bool is_windows = build_context.metrics.os == TargetOs_windows;
 		i64  free_sse   = 3;
 
+		// `fastcall` passes the first two integers or pointers of 32 bits or fewer in ECX and EDX.
+		i64 free_regs = calling_convention == ProcCC_FastCall ? 2 : 0;
+
 		for (unsigned i = 0; i < arg_count; i++) {
 			LLVMTypeRef t = arg_types[i];
 			LLVMTypeKind kind = LLVMGetTypeKind(t);
 			i64 sz = lb_sizeof(t);
 			if (by_ptr[i]) {
 				args[i] = lb_arg_type_indirect(t, nullptr);
+				args[i].in_reg = take_register(&free_regs);
 				continue;
 			}
 
@@ -695,10 +751,26 @@ namespace lbAbi386 {
 					args[i] = lb_arg_type_ignore(t);
 				} else if (is_windows && srcs[i] != nullptr && windows_passes_by_reference(srcs[i])) {
 					args[i] = lb_arg_type_indirect(t, nullptr);
+					args[i].in_reg = take_register(&free_regs);
 				} else {
 					// Aggregates are pushed onto the stack by value, not passed as a pointer
 					// to a caller-owned copy. This is the rule for both i386 targets.
 					args[i] = lb_arg_type_indirect_byval(c, t);
+
+					// Outside Windows, GCC's `fastcall` counts an aggregate against ECX and EDX by its size.
+					// A struct of one 32-bit scalar keeps its register filled with a padding argument.
+					if (!is_windows && free_regs > 0) {
+						i64 words = (sz+3)/4;
+						if (words > free_regs) {
+							free_regs = 0;
+						} else {
+							free_regs -= words;
+							if (free_regs > 0 && srcs[i] != nullptr && is_single_word_struct(srcs[i])) {
+								args[i].pad_type   = LLVMInt32TypeInContext(c);
+								args[i].pad_in_reg = true;
+							}
+						}
+					}
 				}
 			} else if (is_windows && kind == LLVMVectorTypeKind) {
 				if (sz <= 64 && free_sse > 0) {
@@ -707,9 +779,15 @@ namespace lbAbi386 {
 					args[i].in_reg = true;
 				} else {
 					args[i] = lb_arg_type_indirect(t, nullptr);
+					args[i].in_reg = take_register(&free_regs);
 				}
 			} else {
 				args[i] = non_struct(c, t, false, srcs[i]);
+				if (args[i].kind == lbArg_Indirect) {
+					args[i].in_reg = take_register(&free_regs);
+				} else if ((kind == LLVMIntegerTypeKind || kind == LLVMPointerTypeKind) && sz <= 4) {
+					args[i].in_reg = take_register(&free_regs);
+				}
 			}
 		}
 		return args;

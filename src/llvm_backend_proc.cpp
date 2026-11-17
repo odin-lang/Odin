@@ -1241,6 +1241,9 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 				continue;
 			}
 			if (ft->args[i].pad_type != nullptr) {
+				if (ft->args[i].pad_in_reg) {
+					LLVMAddCallSiteAttribute(ret, param_offset, lb_create_enum_attribute(p->module->ctx, "inreg"));
+				}
 				param_offset += 1;
 			}
 			LLVMAttributeRef attribute = ft->args[i].attribute;
