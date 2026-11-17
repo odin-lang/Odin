@@ -14772,6 +14772,10 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 	case_ast_node(bs, BitSetType, node);
 		str = gb_string_appendc(str, "bit_set[");
 		str = write_expr_to_string(str, bs->elem, shorthand);
+		if (bs->underlying) {
+			str = gb_string_appendc(str, "; ");
+			str = write_expr_to_string(str, bs->underlying, shorthand);
+		}
 		str = gb_string_appendc(str, "]");
 	case_end;
 
