@@ -32,6 +32,7 @@ outer:  Outer
 holder: Holder
 array:  Array
 slice:  []rawptr
+list:   [dynamic]rawptr
 
 // A store clears what earlier stores put anywhere within where it stores
 
@@ -345,6 +346,29 @@ cleared_before_early_return :: proc(c: bool) {
 		thing.pointer = nil
 		return
 	}
+}
+
+slice_cleared_in_loop :: proc() {
+	x: int
+	slice[0] = &x
+	for &elem in slice {
+		elem = nil
+	}
+}
+
+list_cleared_in_loop :: proc() {
+	x: int
+	list[0] = &x
+	for &elem in list {
+		elem = nil
+	}
+}
+
+// `clear` only sets the length, leaving the pointer in the buffer
+list_cleared_by_length :: proc() {
+	x: int
+	list[0] = &x // warning
+	clear(&list)
 }
 
 // a returned pointer is not a store

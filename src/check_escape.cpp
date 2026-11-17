@@ -1010,7 +1010,12 @@ gb_internal EscapeValue escape_load(EscapeAnalysis *ea, EscapeValue const &ptr, 
 		EscapeOrigin const &o = pf.origin;
 		switch (o.kind) {
 		case EscapeOrigin_Outer:
-			escape_value_add(&v, {}, EscapeOrigin{EscapeOrigin_Outer});
+			// what a global points to is named by it, one level deep
+			if (o.obj.entity != nullptr && escape_path_deref_index(o.path) == o.path.count) {
+				escape_value_add(&v, {}, EscapeOrigin{EscapeOrigin_Outer, false, o.obj, escape_path_concat(o.path, escape_path_of(EscapeStep_Deref))});
+			} else {
+				escape_value_add(&v, {}, EscapeOrigin{EscapeOrigin_Outer});
+			}
 			break;
 
 		case EscapeOrigin_Variadic: {
@@ -2749,7 +2754,7 @@ gb_internal EscapeValue escape_ident_value(EscapeAnalysis *ea, Entity *e) {
 
 	if (!escape_is_local(e)) {
 		if (escape_type_has_pointers(e->type)) {
-			return escape_value_of(EscapeOrigin_Outer, {}, {});
+			return escape_value_of(EscapeOrigin_Outer, {e}, escape_path_of(EscapeStep_Deref));
 		}
 		return escape_value();
 	}
