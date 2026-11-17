@@ -290,18 +290,15 @@ gb_internal Slice<i32> escape_callers(EscapeGraph *g, i32 v) {
 }
 
 
-gb_internal EscapeValue        escape_expr                         (EscapeAnalysis *ea, Ast *expr);
-gb_internal EscapeValue        escape_addr                         (EscapeAnalysis *ea, Ast *expr);
-gb_internal EscapeValue        escape_ident_value                  (EscapeAnalysis *ea, Entity *e);
-gb_internal Array<EscapeValue> escape_call                         (EscapeAnalysis *ea, Ast *call);
-gb_internal Ast *              escape_call_of                      (Ast *expr);
-gb_internal EscapeValue        escape_load_once                    (EscapeAnalysis *ea, EscapeValue const &ptr, Type *type=nullptr);
-gb_internal void               escape_store_through                (EscapeAnalysis *ea, Ast *node, EscapeValue const &ptr, EscapeValue const &v, EscapeUpdateKind update);
-gb_internal bool               escape_is_explicit_unsafe_conversion(Type *t);
-gb_internal void               escape_scan                         (EscapeAnalysis *ea, Ast *expr, u8 flags);
-gb_internal void               escape_stmt                         (EscapeAnalysis *ea, Ast *node);
-gb_internal void               escape_branch                       (EscapeAnalysis *ea, Ast *label, TokenKind kind);
-gb_internal void               escape_exit                         (EscapeAnalysis *ea, Ast *node, Slice<Ast *> const &results, Array<EscapeValue> const &values);
+gb_internal EscapeValue        escape_expr         (EscapeAnalysis *ea, Ast *expr);
+gb_internal EscapeValue        escape_addr         (EscapeAnalysis *ea, Ast *expr);
+gb_internal EscapeValue        escape_ident_value  (EscapeAnalysis *ea, Entity *e);
+gb_internal Array<EscapeValue> escape_call         (EscapeAnalysis *ea, Ast *call);
+gb_internal void               escape_store_through(EscapeAnalysis *ea, Ast *node, EscapeValue const &ptr, EscapeValue const &v, EscapeUpdateKind update);
+gb_internal void               escape_scan         (EscapeAnalysis *ea, Ast *expr, u8 flags);
+gb_internal void               escape_stmt         (EscapeAnalysis *ea, Ast *node);
+gb_internal void               escape_branch       (EscapeAnalysis *ea, Ast *label, TokenKind kind);
+gb_internal void               escape_exit         (EscapeAnalysis *ea, Ast *node, Slice<Ast *> const &results, Array<EscapeValue> const &values);
 
 // see checker_global.cpp
 gb_internal i32  global_graph_scc(i32 node_count, Array<i32> const &offsets,   Array<i32> const &targets, Array<i32> *comp_of_);
@@ -385,6 +382,12 @@ gb_internal void escape_value_add(EscapeValue *v, EscapePath const &path, Escape
 	array_add(v, EscapeValueFact{path, o, definite});
 }
 
+gb_internal EscapeValue escape_value_one(EscapePath const &path, EscapeOrigin const &o, bool definite=false) {
+	EscapeValue v = escape_value();
+	escape_value_add(&v, path, o, definite);
+	return v;
+}
+
 gb_internal void escape_value_add_all(EscapeValue *v, EscapeValue const &w) {
 	for (EscapeValueFact const &f : w) {
 		escape_value_add(v, f.path, f.origin);
@@ -406,11 +409,8 @@ gb_internal void escape_value_merge(EscapeValue *v, EscapeValue const &w) {
 }
 
 gb_internal EscapeValue escape_value_of(EscapeOriginKind kind, EscapeObject const &obj, EscapePath const &path, Ast *site=nullptr) {
-	EscapeValue v = escape_value();
-	// the stack memory is made by the expression itself
 	bool definite = kind == EscapeOrigin_Local || kind == EscapeOrigin_Temp;
-	escape_value_add(&v, {}, EscapeOrigin{kind, false, obj, path, site}, definite);
-	return v;
+	return escape_value_one({}, EscapeOrigin{kind, false, obj, path, site}, definite);
 }
 
 gb_internal isize escape_path_deref_index(EscapePath const &p) {
@@ -798,6 +798,10 @@ gb_internal bool escape_type_is_plain(Type *t) {
 	return false;
 }
 
+gb_internal bool escape_is_explicit_unsafe_conversion(Type *t) {
+	return t != nullptr && (is_type_rawptr(t) || is_type_uintptr(t));
+}
+
 // one of the struct's own fields, e.g. not one reached through 'using'
 gb_internal bool escape_struct_has_field(Type *bt, Entity *field) {
 	if (bt == nullptr || bt->kind != Type_Struct) {
@@ -1062,6 +1066,27 @@ gb_internal EscapeValue escape_load(EscapeAnalysis *ea, EscapeValue const &ptr, 
 	return v;
 }
 
+gb_internal EscapeValue escape_load_once(EscapeAnalysis *ea, EscapeValue const &ptr, Type *type=nullptr) {
+	EscapeValue v = escape_value();
+	for (EscapeValueFact const &f : ptr) {
+		EscapeOrigin const &o = f.origin;
+		bool own = o.kind == EscapeOrigin_Temp || o.kind == EscapeOrigin_Owned ||
+		           (o.kind == EscapeOrigin_Local && !escape_is_param(o.obj.entity));
+		Type *t = type;
+		if (own && t == nullptr) {
+			t = base_type(escape_type_at(o.obj, o.path));
+		}
+		if (own && t != nullptr && (t->kind == Type_DynamicArray || t->kind == Type_Map)) {
+			EscapeOrigin buffer = {EscapeOrigin_Owned, false, o.obj, escape_path_concat(o.path, escape_path_of(EscapeStep_AnyElement))};
+			escape_value_add(&v, {}, buffer, f.definite);
+			continue;
+		}
+
+		escape_value_add_all(&v, escape_load(ea, escape_value_one({}, o), nullptr));
+	}
+	return v;
+}
+
 // the branch of a `when` ternary which is compiled in
 gb_internal Ast *escape_when_branch(Ast *expr) {
 	ast_node(te, TernaryWhenExpr, expr);
@@ -1111,7 +1136,17 @@ gb_internal Slice<Ast *> escape_operands(Ast *x, Ast *parts[3]) {
 	return {};
 }
 
-// the exits and calls within an expression whose value is not kept, e.g. `put(&h, &b)` in `1 + put(&h, &b)`
+gb_internal Ast *escape_call_of(Ast *expr) {
+	expr = unparen_expr(expr);
+	if (expr->kind == Ast_SelectorCallExpr) {
+		expr = expr->SelectorCallExpr.call;
+	}
+	if (expr->kind == Ast_CallExpr) {
+		return expr;
+	}
+	return nullptr;
+}
+
 gb_internal void escape_visit_exits(EscapeAnalysis *ea, Ast *expr) {
 	if (expr == nullptr) {
 		return;
@@ -2839,36 +2874,6 @@ gb_internal EscapeValue escape_addr(EscapeAnalysis *ea, Ast *expr) {
 }
 
 
-gb_internal bool escape_is_explicit_unsafe_conversion(Type *t) {
-	return t != nullptr && (is_type_rawptr(t) || is_type_uintptr(t));
-}
-
-// loading through the pointers once, as the callee does, where a dynamic array or map of this procedure holds the
-// pointer to its own buffer; `type`, if known, is what each of them points to
-gb_internal EscapeValue escape_load_once(EscapeAnalysis *ea, EscapeValue const &ptr, Type *type) {
-	EscapeValue v = escape_value();
-	for (EscapeValueFact const &f : ptr) {
-		EscapeOrigin const &o = f.origin;
-		bool own = o.kind == EscapeOrigin_Temp || o.kind == EscapeOrigin_Owned ||
-		           (o.kind == EscapeOrigin_Local && !escape_is_param(o.obj.entity));
-		Type *t = type;
-		if (own && t == nullptr) {
-			t = base_type(escape_type_at(o.obj, o.path));
-		}
-		if (own && t != nullptr && (t->kind == Type_DynamicArray || t->kind == Type_Map)) {
-			EscapeOrigin buffer = {EscapeOrigin_Owned, false, o.obj, escape_path_concat(o.path, escape_path_of(EscapeStep_AnyElement))};
-			escape_value_add(&v, {}, buffer, f.definite);
-			continue;
-		}
-
-		EscapeValue single = escape_value();
-		escape_value_add(&single, {}, o);
-		escape_value_add_all(&v, escape_load(ea, single, nullptr));
-	}
-	return v;
-}
-
-// what is loaded through the pointers of a value, at any depth
 gb_internal EscapeValue escape_reachable(EscapeAnalysis *ea, EscapeValue const &v) {
 	EscapeValue reached  = escape_value();
 	EscapeValue frontier = escape_as_pointer(v);
@@ -2925,9 +2930,7 @@ gb_internal void escape_store_loaded(EscapeAnalysis *ea, Ast *call, EscapeValue 
 			fits = escape_type_within(escape_type_at(pf.origin.obj, pf.origin.path), value_path) != nullptr;
 			break;
 		}
-		EscapeValue single = escape_value();
-		escape_value_add(&single, pf.path, pf.origin, pf.definite);
-		escape_store_through(ea, call, single, fits ? within : v, EscapeUpdate_Add);
+		escape_store_through(ea, call, escape_value_one(pf.path, pf.origin, pf.definite), fits ? within : v, EscapeUpdate_Add);
 	}
 }
 
@@ -3204,18 +3207,6 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 		}
 	}
 	return results;
-}
-
-// the call of an expression of several values, e.g. `x, ok := f()`
-gb_internal Ast *escape_call_of(Ast *expr) {
-	expr = unparen_expr(expr);
-	if (expr->kind == Ast_SelectorCallExpr) {
-		expr = expr->SelectorCallExpr.call;
-	}
-	if (expr->kind == Ast_CallExpr) {
-		return expr;
-	}
-	return nullptr;
 }
 
 gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
@@ -3839,10 +3830,8 @@ gb_internal void escape_exit(EscapeAnalysis *ea, Ast *node, Slice<Ast *> const &
 	escape_run_defers(ea, 0);
 
 	for (EscapeOuterStore const &s : ea->state.outers) {
-		EscapeValue v = escape_value();
-		escape_value_add(&v, {}, s.origin);
 		EscapeOrigin o = {};
-		if (escape_find_stack_origin(ea, v, &o) && o.kind != EscapeOrigin_Variadic) {
+		if (escape_find_stack_origin(ea, escape_value_one({}, s.origin), &o) && o.kind != EscapeOrigin_Variadic) {
 			EscapeReportKind kind = EscapeReport_Store;
 			if (s.node->kind == Ast_CallExpr) {
 				kind = EscapeReport_CallStore;
