@@ -16,6 +16,8 @@ test_sgr_and_color_buffer_overloads :: proc(t: ^testing.T) {
 		ansi.color(color_buf[:], "warning", ansi.FG_YELLOW),
 		"\x1b[33mwarning\x1b[0m",
 	)
+	testing.expect_value(t, ansi.color(42, ansi.FG_GREEN), "\x1b[32m42\x1b[0m")
+	testing.expect_value(t, ansi.color(color_buf[:], 42, ansi.FG_GREEN), "\x1b[32m42\x1b[0m")
 }
 
 @(test)

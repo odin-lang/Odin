@@ -160,19 +160,20 @@ sgr :: proc {
 	sgr_buf,
 }
 
-color_alloc :: proc(text, codes: string, allocator := context.temp_allocator) -> string {
-	return fmt.aprintf("%s%s%s%s%s%s", CSI, codes, SGR, text, CSI, RESET + SGR, allocator = allocator)
+color_alloc :: proc(text: any, codes: string, allocator := context.temp_allocator) -> string {
+	return fmt.aprintf("%s%s%s%v%s%s", CSI, codes, SGR, text, CSI, RESET + SGR, allocator = allocator)
 }
 
-color_buf :: proc(buf: []byte, text, codes: string) -> string {
-	return fmt.bprintf(buf, "%s%s%s%s%s%s", CSI, codes, SGR, text, CSI, RESET + SGR)
+color_buf :: proc(buf: []byte, text: any, codes: string) -> string {
+	return fmt.bprintf(buf, "%s%s%s%v%s%s", CSI, codes, SGR, text, CSI, RESET + SGR)
 }
 
 // Wraps text in an SGR style and resets the style afterward.
 //
 // `codes` may contain multiple semicolon-separated SGR parameters, such as
 // `BOLD + ";" + FG_RED` or `FG_COLOR_24_BIT + ";255;0;0"`.
-// The buffer form requires len(text) + len(codes) + 7 bytes.
+// The buffer form requires enough space for the `%v` representation of `text`,
+// `codes`, and the surrounding escape sequences.
 color :: proc {
 	color_alloc,
 	color_buf,
