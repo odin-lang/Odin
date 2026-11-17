@@ -1466,6 +1466,8 @@ gb_internal void init_universal(void) {
 			{"PreserveNone",  ProcCC_PreserveNone},
 			{"PreserveMost",  ProcCC_PreserveMost},
 			{"PreserveAll",   ProcCC_PreserveAll},
+
+			{"Vector_Call",   ProcCC_VectorCall},
 		};
 
 		auto fields = add_global_enum_type(str_lit("Odin_Calling_Convention"), values, gb_count_of(values), &t_odin_calling_convention, t_u8);

@@ -268,7 +268,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 
 	{
 		TEMPORARY_ALLOCATOR_GUARD();
-		char *c_link_name = alloc_cstring(temporary_allocator(), p->name);
+		char *c_link_name = alloc_cstring(temporary_allocator(), lb_procedure_symbol_name(p->name, p->type));
 		// the compiler may have declared this intrinsic itself (e.g. `llvm.memset`), and a second
 		// declaration would be renamed and so no longer be the intrinsic
 		LLVMValueRef existing = nullptr;
@@ -834,6 +834,9 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 				// lbArg_Ignore params are not present in the LLVM function signature,
 				// so they don't advance the LLVM signature position
 				defer (if (arg_type->kind != lbArg_Ignore) { llvm_param_index += 1; });
+				if (arg_type->kind != lbArg_Ignore && arg_type->pad_type != nullptr) {
+					llvm_param_index += 1;
+				}
 
 				if (arg_type->kind == lbArg_Ignore) {
 					// Even though it is an ignored argument, it might still be referenced in the
@@ -1237,6 +1240,9 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 			if (ft->args[i].kind == lbArg_Ignore) {
 				continue;
 			}
+			if (ft->args[i].pad_type != nullptr) {
+				param_offset += 1;
+			}
 			LLVMAttributeRef attribute = ft->args[i].attribute;
 			if (attribute != nullptr) {
 				LLVMAddCallSiteAttribute(ret, param_offset, attribute);
@@ -1245,6 +1251,10 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 			// from the CALL, not the declaration
 			if (ft->args[i].align_attribute != nullptr) {
 				LLVMAddCallSiteAttribute(ret, param_offset, ft->args[i].align_attribute);
+			}
+			// an indirect call has no declaration, so this is the only `inreg` LLVM sees
+			if (ft->args[i].in_reg) {
+				LLVMAddCallSiteAttribute(ret, param_offset, lb_create_enum_attribute(p->module->ctx, "inreg"));
 			}
 			param_offset += 1;
 		}
@@ -1398,6 +1408,10 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 
 			lbValue x = lb_emit_conv(p, args[i], original_type);
 			LLVMTypeRef xt = lb_type(p->module, x.type);
+
+			if (arg->pad_type != nullptr) {
+				array_add(&processed_args, lbValue{LLVMGetUndef(arg->pad_type), t_i64});
+			}
 
 			if (arg->kind == lbArg_Direct) {
 				LLVMTypeRef abi_type = arg->cast_type;
