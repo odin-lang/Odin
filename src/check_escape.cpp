@@ -6,7 +6,7 @@ enum EscapeStepKind : u8 {
 	EscapeStep_Invalid,
 	EscapeStep_Field,
 	EscapeStep_AnyElement,
-	EscapeStep_Deref, // only in the location of an outer store
+	EscapeStep_Deref, // into what the pointer at the path so far points to
 };
 
 struct EscapeStep {
@@ -2061,9 +2061,7 @@ gb_internal bool escape_bounds_linear(EscapeAnalysis *ea, Array<EscapeLimit> con
 			r.c = -r.c;
 		}
 		if (r.atom.kind != EscapeAtom_Zero) {
-			EscapeLinear swap = l;
-			l = r;
-			r = swap;
+			gb_swap(EscapeLinear, l, r);
 		}
 		if (r.atom.kind != EscapeAtom_Zero) {
 			return false;
@@ -2138,9 +2136,7 @@ gb_internal void escape_limits_refine(EscapeAnalysis *ea, Array<EscapeLimit> *li
 		}
 		// as `l < r` or `l <= r`
 		if (op == Token_Gt || op == Token_GtEq) {
-			EscapeLinear swap = l;
-			l = r;
-			r = swap;
+			gb_swap(EscapeLinear, l, r);
 			op = op == Token_Gt ? Token_Lt : Token_LtEq;
 		}
 		i64 strict = op == Token_Lt ? -1 : 0;
@@ -3886,12 +3882,8 @@ gb_internal void escape_exit(EscapeAnalysis *ea, Ast *node, Slice<Ast *> const &
 			if (!escape_param_index(ea->pt, s.dest.obj.entity, &flow.target_index)) {
 				continue;
 			}
-		}
-		if (flow.target != EscapeFlowTarget_Outer && flow.target_index == flow.param) {
-			if (flow.kind == EscapeFlow_Load) {
-				continue;
-			}
-			if (flow.target == EscapeFlowTarget_Pointee && escape_path_eq(flow.target_path, flow.param_path)) {
+			if (flow.target_index == flow.param && (flow.kind == EscapeFlow_Load ||
+			    (flow.target == EscapeFlowTarget_Pointee && escape_path_eq(flow.target_path, flow.param_path)))) {
 				continue;
 			}
 		}
@@ -3963,14 +3955,18 @@ gb_internal void escape_outer_location(Ast *lhs, EscapeLocation *loc) {
 
 gb_internal bool escape_plain_store_writes(Ast *lhs) {
 	lhs = unparen_expr(lhs);
-	if (lhs->kind == Ast_DerefExpr) {
+	switch (lhs->kind) {
+	case Ast_DerefExpr:
 		return true;
+	case Ast_SelectorExpr:
+		// a plain value stored into a raw union still overwrites its pointers
+		return is_type_raw_union(type_deref(lhs->SelectorExpr.expr->tav.type));
+	case Ast_IndexExpr: {
+		Type *bt = base_type(lhs->IndexExpr.expr->tav.type);
+		return bt != nullptr && (bt->kind == Type_MultiPointer || bt->kind == Type_Pointer || bt->kind == Type_Slice);
 	}
-	if (lhs->kind != Ast_IndexExpr) {
-		return false;
 	}
-	Type *bt = base_type(lhs->IndexExpr.expr->tav.type);
-	return bt != nullptr && (bt->kind == Type_MultiPointer || bt->kind == Type_Pointer || bt->kind == Type_Slice);
+	return false;
 }
 
 gb_internal void escape_store(EscapeAnalysis *ea, Ast *lhs, EscapeValue const &v) {
@@ -4654,11 +4650,7 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 			auto stored = array_make<bool>(temporary_allocator(), as->lhs.count);
 			for_array(i, as->rhs) {
 				Ast *lhs = unparen_expr(as->lhs[i]);
-				stored[i] = !escape_type_is_plain(lhs->tav.type);
-				if (lhs->kind == Ast_SelectorExpr && is_type_raw_union(type_deref(lhs->SelectorExpr.expr->tav.type))) {
-					// a plain value stored into a raw union still overwrites its pointers
-					stored[i] = true;
-				}
+				stored[i] = !escape_type_is_plain(lhs->tav.type) || escape_plain_store_writes(lhs);
 				if (stored[i]) {
 					values[i] = escape_convert(ea, escape_expr(ea, as->rhs[i]), as->rhs[i], lhs->tav.type);
 				} else {
@@ -4668,8 +4660,6 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 			for_array(i, as->lhs) {
 				if (stored[i]) {
 					escape_store(ea, as->lhs[i], values[i]);
-				} else if (escape_plain_store_writes(as->lhs[i])) {
-					escape_store(ea, as->lhs[i], escape_value());
 				} else {
 					escape_visit_exits(ea, as->lhs[i]);
 				}
@@ -4765,14 +4755,7 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 
 		for_array(i, rs->results) {
 			Ast *expr = rs->results[i];
-			Entity *e = ea->pt->results->Tuple.variables[i];
-			if (escape_type_is_plain(e->type)) {
-				escape_visit_exits(ea, expr);
-				array_add(&values, escape_value());
-				continue;
-			}
-			EscapeValue v = escape_expr(ea, expr);
-			array_add(&values, escape_convert(ea, v, expr, e->type));
+			array_add(&values, escape_convert(ea, escape_expr(ea, expr), expr, ea->pt->results->Tuple.variables[i]->type));
 		}
 
 		escape_exit(ea, node, rs->results, values);
