@@ -137,6 +137,7 @@ struct EscapeState {
 	bool                    reachable;
 	Array<EscapeFact>       facts;
 	Array<EscapeOuterStore> outers;
+	Array<EscapeOuterStore> cleared; // from `outers` on a path reaching here: dropped from the other paths it joins
 	Array<EscapeNil>        nils;
 	Array<Ast *>            checks; // index and slice expressions whose bounds checks passed on every path reaching here, with what they read unchanged since
 	Array<EscapeLimit>      limits; // known on every path reaching here, of what was not assigned since
@@ -481,22 +482,24 @@ gb_internal EscapeValue escape_value_project(EscapeValue const &v, EscapePath co
 
 gb_internal EscapeState escape_state_unreachable(void) {
 	EscapeState s = {};
-	s.facts  = array_make<EscapeFact>      (temporary_allocator(), 0, 0);
-	s.outers = array_make<EscapeOuterStore>(temporary_allocator(), 0, 0);
-	s.nils   = array_make<EscapeNil>       (temporary_allocator(), 0, 0);
-	s.checks = array_make<Ast *>           (temporary_allocator(), 0, 0);
-	s.limits = array_make<EscapeLimit>     (temporary_allocator(), 0, 0);
+	s.facts   = array_make<EscapeFact>      (temporary_allocator(), 0, 0);
+	s.outers  = array_make<EscapeOuterStore>(temporary_allocator(), 0, 0);
+	s.cleared = array_make<EscapeOuterStore>(temporary_allocator(), 0, 0);
+	s.nils    = array_make<EscapeNil>       (temporary_allocator(), 0, 0);
+	s.checks  = array_make<Ast *>           (temporary_allocator(), 0, 0);
+	s.limits  = array_make<EscapeLimit>     (temporary_allocator(), 0, 0);
 	return s;
 }
 
 gb_internal EscapeState escape_state_clone(EscapeState const &s) {
 	EscapeState c = {};
 	c.reachable = s.reachable;
-	c.facts  = array_clone(temporary_allocator(), s.facts);
-	c.outers = array_clone(temporary_allocator(), s.outers);
-	c.nils   = array_clone(temporary_allocator(), s.nils);
-	c.checks = array_clone(temporary_allocator(), s.checks);
-	c.limits = array_clone(temporary_allocator(), s.limits);
+	c.facts   = array_clone(temporary_allocator(), s.facts);
+	c.outers  = array_clone(temporary_allocator(), s.outers);
+	c.cleared = array_clone(temporary_allocator(), s.cleared);
+	c.nils    = array_clone(temporary_allocator(), s.nils);
+	c.checks  = array_clone(temporary_allocator(), s.checks);
+	c.limits  = array_clone(temporary_allocator(), s.limits);
 	return c;
 }
 
@@ -664,8 +667,19 @@ gb_internal bool escape_state_join(EscapeState *dst, EscapeState const &src) {
 	for (EscapeFact const &f : src.facts) {
 		changed |= escape_add_unique(&dst->facts, f);
 	}
+	for (isize i = dst->outers.count-1; i >= 0; i--) {
+		if (escape_contains(src.cleared, dst->outers[i])) {
+			array_unordered_remove(&dst->outers, i);
+			changed = true;
+		}
+	}
 	for (EscapeOuterStore const &o : src.outers) {
-		changed |= escape_add_unique(&dst->outers, o);
+		if (!escape_contains(dst->cleared, o)) {
+			changed |= escape_add_unique(&dst->outers, o);
+		}
+	}
+	for (EscapeOuterStore const &o : src.cleared) {
+		changed |= escape_add_unique(&dst->cleared, o);
 	}
 
 	// nil only where it is on both
@@ -4000,6 +4014,7 @@ gb_internal bool escape_outer_replaces(EscapeLocation const &loc, EscapeOuterSto
 gb_internal void escape_outer_kill(EscapeAnalysis *ea, EscapeLocation const &loc) {
 	for (isize i = ea->state.outers.count-1; i >= 0; i--) {
 		if (escape_outer_replaces(loc, ea->state.outers[i])) {
+			escape_add_unique(&ea->state.cleared, ea->state.outers[i]);
 			array_unordered_remove(&ea->state.outers, i);
 		}
 	}
@@ -4095,6 +4110,11 @@ gb_internal void escape_store_through(EscapeAnalysis *ea, Ast *node, EscapeValue
 					// never reported, only made into a flow meaning where it is stored does not need telling apart
 					s.node = nullptr;
 					break;
+				}
+				for (isize i = ea->state.cleared.count-1; i >= 0; i--) {
+					if (escape_eq(ea->state.cleared[i], s)) {
+						array_unordered_remove(&ea->state.cleared, i);
+					}
 				}
 				escape_add_unique(&ea->state.outers, s);
 			}

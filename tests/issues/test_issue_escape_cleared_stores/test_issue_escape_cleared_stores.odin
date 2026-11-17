@@ -292,3 +292,67 @@ not_cleared_by_allocation :: proc() {
 	p := new(int)
 	free(p)
 }
+
+// A pointer cleared on one path is taken as cleared where the paths join
+
+cleared_on_one_path :: proc(c: bool) {
+	x: int
+	thing.pointer = &x
+	if c {
+		thing.pointer = nil
+	}
+}
+
+cleared_under_the_same_condition :: proc(c: bool) {
+	x: int
+	if c {
+		thing.pointer = &x
+	}
+	if c {
+		thing.pointer = nil
+	}
+}
+
+cleared_in_loop :: proc() {
+	x: int
+	array.elems[0] = &x
+	for &elem in array.elems {
+		elem = nil
+	}
+}
+
+stored_on_the_other_path :: proc(c: bool) {
+	x: int
+	if c {
+		thing.pointer = &x // warning
+	} else {
+		thing.pointer = nil
+	}
+}
+
+stored_again_after_clearing :: proc(n: int) {
+	x: int
+	for _ in 0..<n {
+		thing.pointer = nil
+		thing.pointer = &x // warning
+	}
+}
+
+cleared_before_early_return :: proc(c: bool) {
+	x: int
+	thing.pointer = &x // warning
+	if c {
+		thing.pointer = nil
+		return
+	}
+}
+
+// a returned pointer is not a store
+local_cleared_on_one_path :: proc(c: bool) -> ^int {
+	x: int
+	p := &x
+	if c {
+		p = nil
+	}
+	return p // warning
+}
