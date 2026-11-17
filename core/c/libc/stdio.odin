@@ -138,13 +138,28 @@ when ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
 
 	TMP_MAX :: 308915776
 
-	foreign libc {
-		__sF: [3]FILE
-	}
+	when ODIN_OS == .OpenBSD {
+		foreign libc {
+			__stdin:  FILE
+			__stdout: FILE
+			__stderr: FILE
+		}
 
-	stdin:  ^FILE = &__sF[0]
-	stdout: ^FILE = &__sF[1]
-	stderr: ^FILE = &__sF[2]
+		stdin:  ^FILE = &__stdin
+		stdout: ^FILE = &__stdout
+		stderr: ^FILE = &__stderr
+	} else {
+		@(private)
+		NETBSD_FILE_SIZE :: 152
+
+		foreign libc {
+			__sF: [3][NETBSD_FILE_SIZE]u8
+		}
+
+		stdin:  ^FILE = cast(^FILE)&__sF[0]
+		stdout: ^FILE = cast(^FILE)&__sF[1]
+		stderr: ^FILE = cast(^FILE)&__sF[2]
+	}
 }
 
 when ODIN_OS == .FreeBSD {

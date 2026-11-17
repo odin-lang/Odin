@@ -28,6 +28,8 @@ _Remove_All_Frame :: struct {
 	first_err: Error,
 }
 
+_REMOVE_ALL_MAX_OPEN :: 32
+
 // Entry names stay in the platform's native encoding throughout: UTF-8 bytes on POSIX and WASI, UTF-16 code units on Windows.
 _remove_all :: proc(path: string) -> Error {
 	if path == "" {
@@ -60,9 +62,14 @@ _remove_all :: proc(path: string) -> Error {
 	for len(stack) > 0 {
 		top   := len(stack) - 1
 		frame := &stack[top]
-		parent_dir := root_parent if frame.parent < 0 else stack[frame.parent].dir
 
 		if !frame.open {
+			parent_dir, broken, parent_err := _remove_all_parent(stack[:], top, root_parent)
+			if broken >= 0 {
+				_remove_all_unwind(&stack, &result, broken, parent_err)
+				continue
+			}
+			_remove_all_make_room(stack[:])
 			dir, is_dir, open_err := _remove_all_open(parent_dir, frame.name)
 			if !is_dir {
 				_remove_all_finish(&stack, &result, open_err)
@@ -93,6 +100,7 @@ _remove_all :: proc(path: string) -> Error {
 				_remove_all_record(frame, _remove_all_unlink(frame.dir, name, .Other))
 				continue
 			}
+			_remove_all_make_room(stack[:])
 			child, child_is_dir, child_err := _remove_all_open(frame.dir, name)
 			if !child_is_dir {
 				_remove_all_record(frame, child_err)
@@ -110,6 +118,11 @@ _remove_all :: proc(path: string) -> Error {
 			continue
 		}
 
+		parent_dir, broken, parent_err := _remove_all_parent(stack[:], top, root_parent)
+		if broken >= 0 {
+			_remove_all_unwind(&stack, &result, broken, parent_err)
+			continue
+		}
 		_remove_all_close(frame.dir)
 		frame.open = false
 		remove_err := _remove_all_unlink(parent_dir, frame.name, .Directory)
@@ -144,6 +157,54 @@ _remove_all_push :: proc(stack: ^[dynamic]_Remove_All_Frame, dir: _Remove_All_Di
 	frame.entries.allocator = file_allocator()
 	_, err := append(stack, frame)
 	return err
+}
+
+@(private="file")
+_remove_all_parent :: proc(stack: []_Remove_All_Frame, top: int, root_parent: _Remove_All_Dir) -> (parent: _Remove_All_Dir, broken: int, err: Error) {
+	broken = -1
+	first := top
+	for first > 0 && !stack[first - 1].open {
+		first -= 1
+	}
+	for i in first..<top {
+		_remove_all_make_room(stack)
+		dir := root_parent if i == 0 else stack[i - 1].dir
+		reopened, is_dir, open_err := _remove_all_open(dir, stack[i].name)
+		if !is_dir {
+			broken = i
+			err    = open_err
+			return
+		}
+		stack[i].dir  = reopened
+		stack[i].open = true
+	}
+	parent = root_parent if top == 0 else stack[top - 1].dir
+	return
+}
+
+@(private="file")
+_remove_all_make_room :: proc(stack: []_Remove_All_Frame) {
+	open_count := 0
+	shallowest := -1
+	for &frame, i in stack {
+		if frame.open {
+			open_count += 1
+			if shallowest < 0 {
+				shallowest = i
+			}
+		}
+	}
+	if open_count >= _REMOVE_ALL_MAX_OPEN {
+		_remove_all_close(stack[shallowest].dir)
+		stack[shallowest].open = false
+	}
+}
+
+@(private="file")
+_remove_all_unwind :: proc(stack: ^[dynamic]_Remove_All_Frame, result: ^Error, depth: int, err: Error) {
+	for len(stack) > depth {
+		_remove_all_finish(stack, result, err)
+	}
 }
 
 @(private="file")

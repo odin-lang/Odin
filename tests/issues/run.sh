@@ -479,7 +479,7 @@ fi
 if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 	clang -c ../test_issue_5640/test_issue_5640.c -o test_issue_5640_c.o
 
-	if [[ "$(uname)" != "NetBSD" ]]; then
+	if [[ "$(uname)" != "NetBSD" && "$(uname)" != "OpenBSD" ]]; then
 		$ODIN test ../test_issue_5640 -o:none --sanitize:address $COMMON
 	else
 		$ODIN test ../test_issue_5640 -o:none $COMMON
@@ -493,7 +493,7 @@ fi
 
 $ODIN test ../test_issue_6344 $COMMON -o:speed
 
-if [[ "$(uname)" != "NetBSD" ]]; then
+if [[ "$(uname)" != "NetBSD" && "$(uname)" != "OpenBSD" ]]; then
 	$ODIN test ../test_issue_8072 -o:minimal --sanitize:address $COMMON
 fi
 $ODIN test ../test_issue_8072 -o:speed -lifetime-markers $COMMON

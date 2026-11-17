@@ -79,7 +79,9 @@ main :: proc() {
 
 	fmt.println("utimbuf", size_of(posix.utimbuf), align_of(posix.utimbuf))
 
-	fmt.println("wordexp_t", size_of(posix.wordexp_t), align_of(posix.wordexp_t))
+	when ODIN_OS != .OpenBSD {
+		fmt.println("wordexp_t", size_of(posix.wordexp_t), align_of(posix.wordexp_t))
+	}
 	
 	fmt.println("time_t", size_of(posix.time_t), align_of(posix.time_t))
 	fmt.println("timespec", size_of(posix.timespec), align_of(posix.timespec))

@@ -382,6 +382,9 @@ parse_resolv_conf :: proc(resolv_str: string, allocator := context.allocator) ->
 		}
 
 		server_ip_str := strings.trim_left_space(line[id_len:])
+		if end := strings.index_any(server_ip_str, " \t#;"); end >= 0 {
+			server_ip_str = server_ip_str[:end]
+		}
 		if len(server_ip_str) == 0 {
 			continue
 		}

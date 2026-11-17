@@ -428,6 +428,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 		}
 		GB_PANIC("unreachable");
 	}
+	defer (closedir(dir));
 
 	array_init(fi, a, 0, 100);
 
