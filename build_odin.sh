@@ -4,6 +4,7 @@ set -eu
 SUPPORTED_LLVM_VERSIONS="22 21 20 19 18 17"
 SUGGESTED_LLVM_VERSION="22"
 MINIMUM_LLVM_VERSION="17"
+REQUIRED_LLVM_TARGETS="X86 AArch64 ARM RISCV WebAssembly"
 
 : ${CPPFLAGS=}
 : ${CXXFLAGS=}
@@ -32,6 +33,34 @@ error() {
 	exit 1
 }
 
+llvm_missing_targets() {
+	BUILT_TARGETS=" $($1 --targets-built) "
+	MISSING_TARGETS=""
+	for T in $REQUIRED_LLVM_TARGETS; do
+		case "$BUILT_TARGETS" in
+		*" $T "*)
+			;;
+		*)
+			MISSING_TARGETS="$MISSING_TARGETS $T"
+			;;
+		esac
+	done
+	echo $MISSING_TARGETS
+}
+
+use_llvm_config() {
+	if [ -z "$(command -v "$1")" ]; then
+		return 1
+	fi
+	if [ -n "$(llvm_missing_targets "$1")" ]; then
+		if [ -z "$INCOMPLETE_LLVM_CONFIG" ]; then
+			INCOMPLETE_LLVM_CONFIG="$1"
+		fi
+		return 1
+	fi
+	LLVM_CONFIG="$1"
+}
+
 # Brew advises people not to add llvm to their $PATH, so try and use brew to find it.
 if [ -z "$LLVM_CONFIG" ] &&  [ -n "$(command -v brew)" ]; then
 	for V in $SUPPORTED_LLVM_VERSIONS; do
@@ -44,25 +73,27 @@ fi
 
 if [ -z "$LLVM_CONFIG" ]; then
 	DEFAULT_VERSION=""
+	INCOMPLETE_LLVM_CONFIG=""
 
 	if [ -n "$(command -v llvm-config)" ]; then
 		DEFAULT_VERSION=$(llvm-config --version | awk -F. '{print $1}')
 	fi
 
 	for V in $SUPPORTED_LLVM_VERSIONS; do
-		if [ "$DEFAULT_VERSION" = "$V" ]; then
-			LLVM_CONFIG="llvm-config"
+		if [ "$DEFAULT_VERSION" = "$V" ] && use_llvm_config llvm-config; then
 			break
 		# darwin, linux, openbsd
-		elif [ -n "$(command -v "llvm-config-$V")" ]; then
-			LLVM_CONFIG="llvm-config-$V"
+		elif use_llvm_config "llvm-config-$V"; then
 			break
 		# freebsd
-		elif [ -n "$(command -v "llvm-config$V")" ]; then
-			LLVM_CONFIG="llvm-config$V"
+		elif use_llvm_config "llvm-config$V"; then
 			break
 		fi
 	done
+
+	if [ -z "$LLVM_CONFIG" ]; then
+		LLVM_CONFIG="$INCOMPLETE_LLVM_CONFIG"
+	fi
 
 	if [ -z "$LLVM_CONFIG" ]; then
 		if [ -f "/etc/os-release" ]; then
@@ -99,6 +130,19 @@ LLVM_VERSION_PATCH="$(echo $LLVM_VERSION | awk -F. '{print $3}')"
 
 if [ $LLVM_VERSION_MAJOR -lt $MINIMUM_LLVM_VERSION ]; then
 	error "Unsupported LLVM version $LLVM_VERSION: must be 17, 18, 19, 20, 21 or 22"
+fi
+
+MISSING_LLVM_TARGETS="$(llvm_missing_targets "$LLVM_CONFIG")"
+if [ -n "$MISSING_LLVM_TARGETS" ]; then
+	echo "ERROR: The LLVM of $LLVM_CONFIG lacks targets that Odin needs: $MISSING_LLVM_TARGETS"
+	echo "Its targets are: $($LLVM_CONFIG --targets-built)"
+	if [ "$OS_NAME" = "OpenBSD" ]; then
+		echo "OpenBSD's own LLVM only targets this machine. Install LLVM $SUGGESTED_LLVM_VERSION with: pkg_add llvm%$SUGGESTED_LLVM_VERSION"
+		echo "This script then finds it as llvm-config-$SUGGESTED_LLVM_VERSION."
+	else
+		echo "Install a full LLVM $SUGGESTED_LLVM_VERSION and set LLVM_CONFIG to its llvm-config."
+	fi
+	exit 1
 fi
 
 case "$OS_NAME" in

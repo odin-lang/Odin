@@ -248,12 +248,11 @@ when ODIN_OS == .Darwin {
 	_FILTER_USER   :: -10
 
 	_NOTE_USECONDS :: 0x00000002
-	_NOTE_NSECONDS :: 0x00000004
 	_NOTE_ABSOLUTE :: 0x00000010
 
-	_TIMER_FLAGS_NSECONDS :: Timer_Flags{Timer_Flag(log2(_NOTE_NSECONDS))}
+	_TIMER_FLAGS_NSECONDS :: Timer_Flags{.Seconds, .USeconds}
 
-	KEvent :: struct #align(4) {
+	KEvent :: struct {
 		// Value used to identify this event. The exact interpretation is determined by the attached filter.
 		ident:  uintptr,
 		// Filter for event.

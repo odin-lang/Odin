@@ -698,6 +698,28 @@ test_dns_parse_response_bounds :: proc(t: ^testing.T) {
 }
 
 @test
+test_parse_resolv_conf :: proc(t: ^testing.T) {
+	RESOLV_CONF :: "# comment\nnameserver 192.168.122.3 # resolvd: vio0\nnameserver\t10.0.0.1;old\nnameserver 2001:db8::1 \nnameserver\nlookup file bind\n"
+
+	name_servers := net.parse_resolv_conf(RESOLV_CONF)
+	defer delete(name_servers)
+
+	if !testing.expect_value(t, len(name_servers), 3) {
+		return
+	}
+
+	ip6, ip6_ok := net.parse_ip6_address("2001:db8::1")
+	testing.expect(t, ip6_ok)
+
+	testing.expect_value(t, name_servers[0].address.(net.IP4_Address), net.IP4_Address{192, 168, 122, 3})
+	testing.expect_value(t, name_servers[1].address.(net.IP4_Address), net.IP4_Address{10, 0, 0, 1})
+	testing.expect_value(t, name_servers[2].address.(net.IP6_Address), ip6)
+	for ns in name_servers {
+		testing.expect_value(t, ns.port, 53)
+	}
+}
+
+@test
 test_nonblocking_option :: proc(t: ^testing.T) {
 	server, listen_err := net.listen_tcp({address=net.IP4_Address{127, 0, 0, 1}, port=0})
 	if !testing.expect_value(t, listen_err, nil) {
