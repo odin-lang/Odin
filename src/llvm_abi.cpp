@@ -2628,11 +2628,20 @@ namespace lbAbiRiscv64 {
 				return lb_arg_type_direct(orig_type, LLVMIntTypeInContext(c, cast(unsigned)(size*8)), nullptr, nullptr);
 			}
 		} else if (size <= 2*xlen) {
+			*gprs_left -= 2;
+
+			i64 align = source_type != nullptr ? type_align_of(source_type) : lb_alignof(orig_type);
+			if (align == 2*xlen) {
+				LLVMTypeRef wide = LLVMIntTypeInContext(c, cast(unsigned)(2*xlen*8));
+				if (orig_type == wide) {
+					return lb_arg_type_direct(orig_type, nullptr, nullptr, nullptr);
+				}
+				return lb_arg_type_direct(orig_type, wide, nullptr, nullptr);
+			}
+
 			LLVMTypeRef *fields = gb_alloc_array(temporary_allocator(), LLVMTypeRef, 2);
 			fields[0] = LLVMIntTypeInContext(c, cast(unsigned)(xlen*8));
 			fields[1] = LLVMIntTypeInContext(c, cast(unsigned)((size-xlen)*8));
-
-			*gprs_left -= 2;
 			return lb_arg_type_direct(orig_type, LLVMStructTypeInContext(c, fields, 2, false), nullptr, nullptr);
 		} else {
 			return lb_arg_type_indirect(orig_type, nullptr);

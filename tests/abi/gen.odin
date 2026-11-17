@@ -1340,12 +1340,6 @@ ABI_MUTATE :: #config(ABI_MUTATE, false)
 // Turn it on with ` + "`-define:ABI_VARARGS=true`" + ` to measure it.
 ABI_VARARGS :: #config(ABI_VARARGS, false)
 
-// The aggregate after an odd number of stack slots (` + "`_odd2`" + `), OFF by default on
-// riscv64 only. There Odin puts a 16-byte value whose alignment is 16 (` + "`i128`" + `
-// included) in the next 8-byte slot. Clang rounds the slot up to 16.
-// Turn it on with ` + "`-define:ABI_ODD_STACK=true`" + ` to measure it.
-ABI_ODD_STACK :: #config(ABI_ODD_STACK, ODIN_ARCH != .riscv64)
-
 
 
 E32 :: enum i32 { LO = 0, HI = 0x7fffffff }
@@ -1423,9 +1417,7 @@ emit_odin :: proc() -> string {
 		w(&sb, "%s\ttesting.expect_value(t, %s_can(1,2,3,4,5,6,7, 1,2,3,4,5,6,7,8, 0x1111111111111111, s, 0x2222222222222222, 7), f64(7))\n", ind, t.name)
 		w(&sb, "%s\ttesting.expect_value(t, %s_can2(1,2,3,4,5,6,7,8,9,10,11, 0x1111111111111111, s, 0x2222222222222222, 7), f64(7))\n", ind, t.name)
 		w(&sb, "%s\ttesting.expect_value(t, %s_odd(0x1111111111111111, s, 0x2222222222222222, 7), f64(7))\n", ind, t.name)
-		w(&sb, "%s\twhen ABI_ODD_STACK {\n", ind)
-		w(&sb, "%s\t\ttesting.expect_value(t, %s_odd2(1,2,3,4,5,6,7,8, 0x1111111111111111, s, 0x2222222222222222, 7), f64(7))\n", ind, t.name)
-		w(&sb, "%s\t}\n", ind)
+		w(&sb, "%s\ttesting.expect_value(t, %s_odd2(1,2,3,4,5,6,7,8, 0x1111111111111111, s, 0x2222222222222222, 7), f64(7))\n", ind, t.name)
 		w(&sb, "%s\ttesting.expect_value(t, %s_back(), i32(0))\n", ind, t.name)
 		if len(t.fields) > 0 {
 			w(&sb, "%s\twhen ABI_VARARGS {\n", ind)
@@ -1489,12 +1481,6 @@ ABI_SKIP :: #config(ABI_SKIP, 0)
 // Turn it on with ` + "`-define:ABI_VARARGS=true`" + ` to measure it.
 ABI_VARARGS :: #config(ABI_VARARGS, false)
 
-// The aggregate after an odd number of stack slots (` + "`_odd2`" + `), OFF by default on
-// riscv64 only. There Odin puts a 16-byte value whose alignment is 16 (` + "`i128`" + `
-// included) in the next 8-byte slot. Clang rounds the slot up to 16.
-// Turn it on with ` + "`-define:ABI_ODD_STACK=true`" + ` to measure it.
-ABI_ODD_STACK :: #config(ABI_ODD_STACK, ODIN_ARCH != .riscv64)
-
 
 
 foreign import lib "../abi_corpus_c.o"
@@ -1526,9 +1512,7 @@ emit_main :: proc() -> string {
 		w(&sb, "%s\tif %s_can(1,2,3,4,5,6,7, 1,2,3,4,5,6,7,8, 0x1111111111111111, s, 0x2222222222222222, 7) != 7 { return 1 }\n", ind, t.name)
 		w(&sb, "%s\tif %s_can2(1,2,3,4,5,6,7,8,9,10,11, 0x1111111111111111, s, 0x2222222222222222, 7) != 7 { return 1 }\n", ind, t.name)
 		w(&sb, "%s\tif %s_odd(0x1111111111111111, s, 0x2222222222222222, 7) != 7 { return 1 }\n", ind, t.name)
-		w(&sb, "%s\twhen ABI_ODD_STACK {\n", ind)
-		w(&sb, "%s\t\tif %s_odd2(1,2,3,4,5,6,7,8, 0x1111111111111111, s, 0x2222222222222222, 7) != 7 { return 1 }\n", ind, t.name)
-		w(&sb, "%s\t}\n", ind)
+		w(&sb, "%s\tif %s_odd2(1,2,3,4,5,6,7,8, 0x1111111111111111, s, 0x2222222222222222, 7) != 7 { return 1 }\n", ind, t.name)
 		w(&sb, "%s\tif %s_back() != 0 { return 1 }\n", ind, t.name)
 		w(&sb, "%s\tr := %s_ret()\n", ind, t.name)
 		getters := odin_getters(t, "r")
