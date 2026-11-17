@@ -520,14 +520,13 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	// We cannot make use of the ANSI save/restore cursor codes, because they
 	// work by absolute screen coordinates. This will cause unnecessary
 	// scrollback if we print at the bottom of someone's terminal.
-	ansi_redraw_string := fmt.aprintf(
-		// ANSI for "go up N lines then erase the screen from the cursor forward."
-		ansi.CSI + "%i" + ansi.CPL + ansi.CSI + ansi.ED +
-		// We'll combine this with the window title format string, since it
-		// can be printed at the same time.
-		"%s",
-		// 1 extra line for the status bar.
-		1 + len(report.packages), OSC_WINDOW_TITLE)
+	ansi_redraw_string := fmt.aprintf("%s%s%s",
+		// Go up N lines, then erase the display from the cursor forward.
+		ansi.move_cursor_previous_line(1 + len(report.packages)),
+		ansi.clear_display_to_end(),
+		// Combine this with the window title, since both can be printed together.
+		OSC_WINDOW_TITLE,
+	)
 	assert(len(ansi_redraw_string) > 0, "Error allocating ANSI redraw string.")
 	defer delete(ansi_redraw_string)
 
@@ -654,7 +653,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	setup_signal_handler()
 
 	if !global_ansi_disabled {
-		fmt.wprint(stdout, ansi.CSI + ansi.DECTCEM_HIDE)
+		fmt.wprint(stdout, ansi.hide_cursor())
 	}
 
 	signals_were_raised := false
@@ -1080,29 +1079,43 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	if total_done_count != total_test_count {
 		not_run_count := total_test_count - total_done_count
-		message := " %i %s left undone." if global_log_colors_disabled else " " + SGR_READY + "%i" + SGR_RESET + " %s left undone."
+		count := fmt.tprintf("%i", not_run_count)
+		if !global_log_colors_disabled {
+			count = ansi.color(count, ansi.FG_BRIGHT_BLACK)
+		}
 		fmt.wprintf(batch_writer,
-			message,
-			not_run_count,
+			" %s %s left undone.",
+			count,
 			"test was" if not_run_count == 1 else "tests were")
 	}
 
 	if total_success_count == total_test_count {
-		message := " %s successful." if global_log_colors_disabled else " %s " + SGR_SUCCESS + "successful." + SGR_RESET
+		successful := "successful."
+		if !global_log_colors_disabled {
+			successful = ansi.color(successful, ansi.FG_GREEN)
+		}
 		fmt.wprintfln(batch_writer,
-			message,
-			"The test was" if total_test_count == 1 else "All tests were")
+			" %s %s",
+			"The test was" if total_test_count == 1 else "All tests were",
+			successful)
 	} else if total_failure_count > 0 {
 		if total_failure_count == total_test_count {
-			message := " %s failed." if global_log_colors_disabled else " %s " + SGR_FAILED + "failed." + SGR_RESET
+			failed := "failed."
+			if !global_log_colors_disabled {
+				failed = ansi.color(failed, ansi.FG_RED)
+			}
 			fmt.wprintfln(batch_writer,
-				message,
-				"The test" if total_test_count == 1 else "All tests")
+				" %s %s",
+				"The test" if total_test_count == 1 else "All tests",
+				failed)
 		} else {
-			message := " %i test%s failed." if global_log_colors_disabled else " " + SGR_FAILED + "%i" + SGR_RESET + " test%s failed."
+			count := fmt.tprintf("%i", total_failure_count)
+			if !global_log_colors_disabled {
+				count = ansi.color(count, ansi.FG_RED)
+			}
 			fmt.wprintfln(batch_writer,
-				message,
-				total_failure_count,
+				" %s test%s failed.",
+				count,
 				"" if total_failure_count == 1 else "s")
 		}
 
@@ -1155,7 +1168,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	}
 
 	if !global_ansi_disabled {
-		fmt.wprint(stdout, ansi.CSI + ansi.DECTCEM_SHOW)
+		fmt.wprint(stdout, ansi.show_cursor())
 	}
 
 	if should_show_animations {
