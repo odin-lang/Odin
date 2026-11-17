@@ -1,8 +1,6 @@
 package pem
 
 import "base:runtime"
-import "core:bufio"
-import "core:bytes"
 import "core:crypto"
 import "core:encoding/base64"
 import "core:strings"
@@ -31,7 +29,7 @@ Block :: struct {
 }
 
 LABEL_CERTIFICATE :: "CERTIFICATE" // RFC 5280
-LABEL_X509_CRL :: "X509_CRL" // RFC 5280
+LABEL_X509_CRL :: "X509 CRL" // RFC 5280
 LABEL_CERTIFICATE_REQUEST :: "CERTIFICATE REQUEST" // RFC 2986
 LABEL_PKCS7 :: "PKCS7" // RFC 2315
 LABEL_CMS :: "CMS" // RFC 5652
@@ -58,82 +56,76 @@ Error :: union #shared_nil {
 // block, remaining data, and nil if and only if (⟺) the process was
 // successful.
 //
+// Lines before the block that start with "-----BEGIN " but are not a
+// valid boundary are skipped.  If no valid block follows, the error from
+// the first such line is returned.
+//
 // Note: No PEM blocks will result in this procedure returning all nils,
 // and is not considered an error.
 @(require_results)
 decode :: proc(data: []byte, allocator := context.allocator) -> (blk: ^Block, remaining: []byte, err: Error) {
 	line: []byte
-	remaining = data
+	rest := data
 
 	// Search for the first `preeb`.
 	label: string
 	found := false // Label is allowed to be empty.
-	for len(remaining) > 0 {
-		line, remaining = get_line(remaining)
+	for len(rest) > 0 {
+		line, rest = get_line(rest)
 
-		label, found, err = parse_eb(line, true)
-		if err != nil {
-			return nil, nil, err
-		}
+		eb_err: Error
+		label, found, eb_err = parse_eb(line, true)
 		if found {
 			break
 		}
+		if err == nil {
+			err = eb_err
+		}
 	}
 	if !found {
-		return nil, nil, nil
+		return nil, nil, err
 	}
+	err = nil
 
 	// RFC 1421: Parse header block.
 	// RFC 7468 (lax): Skip whitespace.
 
-	// Initialize the block.
-	blk = new(Block, allocator) or_return
-	if blk.data, err = make([dynamic]byte, 0, 32, allocator); err != nil {
-		free(blk, allocator)
-		return nil, nil, err
-	}
-	if blk.label, err = strings.clone(label, allocator); err != nil {
-		block_delete(blk)
-		return nil, nil, err
-	}
-
 	// Parse the `strictbase64text`.
-	l_buf: [BASE64_FULL_LINE_BYTES]byte
-	defer crypto.zero_explicit(&l_buf, size_of(l_buf))
-	base64text_loop: for len(remaining) > 0 {
-		line, remaining = get_line(remaining)
+	body := rest
+	out_len := 0
+	base64text_loop: for {
+		if len(rest) == 0 {
+			return nil, nil, .Missing_End_Boundary
+		}
+		body_end := len(body) - len(rest)
+		line, rest = get_line(rest)
 		l := len(line)
 		switch {
 		case l == 0:
-			block_delete(blk)
 			return nil, nil, .Bad_Data
 		case line[0] == '-':
 			// Looks like we hit the `posteb`, break.
+			body = body[:body_end]
 			break base64text_loop
 		case l > BASE64_FULL_LINE_LENGTH || l & 3 != 0:
 			// Padding is mandatory, so the line length will always
 			// be a multiple of 4.
-			block_delete(blk)
 			return nil, nil, .Bad_Data
 		}
 
-		decoded, dec_err := base64.decode_into_buf(l_buf[:], transmute(string)(line))
-		if dec_err != nil {
-			block_delete(blk)
-			return nil, nil, .Bad_Data
+		padding := 0
+		if line[l - 1] == '=' {
+			padding = 2 if line[l - 2] == '=' else 1
 		}
-
-		if _, err = append(&blk.data, ..decoded); err != nil {
-			block_delete(blk)
-			return nil, nil, err
-		}
+		out_len += l / 4 * 3 - padding
 
 		// As `strictbase64text = *base64fullline strictbase64finl`,
-		// if we did not have a full line, we must have reached
-		// `strictbase64finl`.  Grab what should be the `posteb`
-		// and break.
-		if l < BASE64_FULL_LINE_LENGTH {
-			line, remaining = get_line(remaining)
+		// a line that is shorter than a full line, or that ends in
+		// padding, must be `strictbase64finl`.  Grab what should be
+		// the `posteb` and break.
+		if l < BASE64_FULL_LINE_LENGTH || padding > 0 {
+			body = body[:len(body) - len(rest)]
+			line, rest = get_line(rest)
 			break
 		}
 	}
@@ -150,70 +142,90 @@ decode :: proc(data: []byte, allocator := context.allocator) -> (blk: ^Block, re
 		}
 	}
 	if err != nil {
-		block_delete(blk)
-		blk, remaining = nil, nil
+		return nil, nil, err
 	}
 
-	return
+	// Initialize the block.
+	blk = new(Block, allocator) or_return
+	if blk.data, err = make([dynamic]byte, out_len, allocator); err != nil {
+		free(blk, allocator)
+		return nil, nil, err
+	}
+	if blk.label, err = strings.clone(label, allocator); err != nil {
+		block_delete(blk)
+		return nil, nil, err
+	}
+
+	dst := blk.data[:]
+	for len(body) > 0 {
+		line, body = get_line(body)
+		decoded, dec_err := base64.decode_into_buf(dst, transmute(string)(line), options = {.Strict})
+		if dec_err != nil {
+			block_delete(blk)
+			return nil, nil, .Bad_Data
+		}
+		dst = dst[len(decoded):]
+	}
+
+	return blk, rest, nil
 }
 
-// encode encodes the specified label and data into PEM format.
+// encode encodes the specified label and data into PEM format.  It
+// returns .Bad_Label if the label does not follow the RFC 7468 label
+// grammar.  With newline set (the default), the output ends with a
+// newline after the END line, as the strict format requires.
 @(require_results)
-encode :: proc(label: string, data: []byte, newline := false, allocator := context.allocator) -> (res: []byte, err: runtime.Allocator_Error) #optional_allocator_error {
-	sanitize_sb := proc(sb: ^strings.Builder) {
-		buf := sb.buf[:]
-		b, l := raw_data(buf), len(buf)
-		crypto.zero_explicit(b, l)
-		strings.builder_destroy(sb)
-	}
-
-	sb := strings.builder_make_none(allocator) or_return
-	defer sanitize_sb(&sb)
-
-	label_len := len(label)
-
-	// Write `preeb`.
-	n := strings.write_string(&sb, PREFIX_BEGIN)
-	n += strings.write_string(&sb, label)
-	n += strings.write_string(&sb, SUFFIX)
-	n += strings.write_string(&sb, LF)
-	if n != PREEB_OVERHEAD + label_len {
+encode :: proc(label: string, data: []byte, newline := true, allocator := context.allocator) -> (res: []byte, err: Error) {
+	full_lines := len(data) / BASE64_FULL_LINE_BYTES
+	tail := len(data) % BASE64_FULL_LINE_BYTES
+	if full_lines > (max(int) - 2 * (BASE64_FULL_LINE_LENGTH + len(LF))) / (BASE64_FULL_LINE_LENGTH + len(LF)) {
 		return nil, .Out_Of_Memory
 	}
+	body_len := full_lines * (BASE64_FULL_LINE_LENGTH + len(LF))
+	if tail > 0 {
+		body_len += (tail + 2) / 3 * 4 + len(LF)
+	}
+	overhead := PREEB_OVERHEAD + POSTEB_OVERHEAD + len(LF)
+	if len(label) > (max(int) - overhead - body_len) / 2 {
+		return nil, .Out_Of_Memory
+	}
+	out_len := PREEB_OVERHEAD + POSTEB_OVERHEAD + 2 * len(label) + body_len
+	if newline {
+		out_len += len(LF)
+	}
+
+	if !valid_label(transmute([]byte)(label)) {
+		return nil, .Bad_Label
+	}
+
+	res = make([]byte, out_len, allocator) or_return
+
+	// Write `preeb`.
+	n := copy(res, PREFIX_BEGIN)
+	n += copy(res[n:], label)
+	n += copy(res[n:], SUFFIX)
+	n += copy(res[n:], LF)
 
 	// RFC 1421: Write header block.
 
 	// Write `base64text`.
-	l: [BASE64_FULL_LINE_LENGTH]byte
-	defer crypto.zero_explicit(&l, size_of(l))
-
 	d := data
 	for len(d) > 0 {
-		n = min(len(d), BASE64_FULL_LINE_BYTES)
-		encoded, _ := base64.encode_into_buf(l[:], d[:n])
-		d = d[n:]
-
-		expected_len := len(encoded) + len(LF)
-		n = strings.write_bytes(&sb, encoded)
-		n += strings.write_string(&sb, LF)
-		if n != expected_len {
-			return nil, .Out_Of_Memory
-		}
+		chunk := min(len(d), BASE64_FULL_LINE_BYTES)
+		encoded, _ := base64.encode_into_buf(res[n:], d[:chunk])
+		d = d[chunk:]
+		n += len(encoded)
+		n += copy(res[n:], LF)
 	}
 
 	// Write `posteb`.
-	expected_len := POSTEB_OVERHEAD + label_len + (len(LF) if newline else 0)
-	n = strings.write_string(&sb, PREFIX_END)
-	n += strings.write_string(&sb, label)
-	n += strings.write_string(&sb, SUFFIX)
+	n += copy(res[n:], PREFIX_END)
+	n += copy(res[n:], label)
+	n += copy(res[n:], SUFFIX)
 	if newline {
-		n += strings.write_string(&sb, LF)
+		n += copy(res[n:], LF)
 	}
-	if n != expected_len {
-		return nil, .Out_Of_Memory
-	}
-
-	res = transmute([]byte)(strings.clone(strings.to_string(sb), allocator) or_return)
+	assert(n == out_len)
 
 	return
 }
@@ -228,6 +240,10 @@ block_bytes :: proc(blk: ^Block) -> []byte {
 // Note: No allocator is specified as decode uses the same allocator
 // for everything.
 block_delete :: proc(blk: ^Block) {
+	if blk == nil {
+		return
+	}
+
 	allocator := ((^runtime.Raw_Dynamic_Array)(&blk.data)).allocator
 
 	delete(blk.label, allocator)
@@ -237,11 +253,19 @@ block_delete :: proc(blk: ^Block) {
 
 @(private)
 get_line :: proc(data: []byte) -> (line, rest: []byte) {
-	adv: int
-	adv, line, _, _ = bufio.scan_lines(data, true)
-	rest = data[adv:]
+	for b, i in data {
+		switch b {
+		case '\n':
+			return data[:i], data[i + 1:]
+		case '\r':
+			if i + 1 < len(data) && data[i + 1] == '\n' {
+				return data[:i], data[i + 2:]
+			}
+			return data[:i], data[i + 1:]
+		}
+	}
 
-	return
+	return data, data[len(data):]
 }
 
 @(private)
@@ -256,38 +280,42 @@ parse_eb :: proc(line: []byte, is_pre: bool) -> (label: string, found: bool, err
 		prefix = PREFIX_END
 	}
 
-	l := len(line)
-	line = bytes.trim_prefix(line, transmute([]byte)(prefix))
-	if len(line) == l {
+	if len(line) < len(prefix) || transmute(string)(line[:len(prefix)]) != prefix {
 		return "", false, nil
 	}
+	line = line[len(prefix):]
 
-	l = len(line)
-	line = bytes.trim_suffix(line, transmute([]byte)(SUFFIX))
-	if len(line) == l {
+	if len(line) < len(SUFFIX) || transmute(string)(line[len(line) - len(SUFFIX):]) != SUFFIX {
 		return "", false, .Bad_Boundary
 	}
+	line = line[:len(line) - len(SUFFIX)]
 
 	// labelchar  = %x21-2C / %x2E-7E ; any printable character,
 	//                                ; except hyphen-minus
 	// label      = [ labelchar *( ["-" / SP] labelchar ) ] ; empty ok
-	l = len(line)
-	line = bytes.trim(line, []byte{'-', ' '})
-	if len(line) != l {
+	if !valid_label(line) {
 		return "", false, .Bad_Label
-	}
-	for b in line {
-		// We already ruled out non-labelchar start/end, so this
-		// allows ' '/'-'.
-		if b < 0x20 || b > 0x7e {
-			return "", false, .Bad_Label
-		}
 	}
 
 	found = true
 	label = transmute(string)(line)
 
 	return
+}
+
+@(private)
+valid_label :: proc(label: []byte) -> bool {
+	for b, i in label {
+		if b == '-' || b == ' ' {
+			if i == 0 || i == len(label) - 1 || label[i - 1] == '-' || label[i - 1] == ' ' {
+				return false
+			}
+		} else if b < 0x21 || b > 0x7e {
+			return false
+		}
+	}
+
+	return true
 }
 
 @(private)
