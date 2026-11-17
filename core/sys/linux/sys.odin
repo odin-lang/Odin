@@ -20,7 +20,7 @@ NO_LEGACY_SYSCALLS :: ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 || ODIN_PLATF
 	Available since Linux 1.0.
 	Before Linux 3.14, this operation is not atomic (i.e. not thread safe).
 */
-read :: proc "contextless" (fd: Fd, buf: []u8) -> (int, Errno) {
+read :: proc "contextless" (fd: Fd, buf: []u8) -> (bytes_read: int, err: Errno) {
 	ret := syscall(SYS_read, fd, raw_data(buf), len(buf))
 	return errno_unwrap(ret, int)
 }
@@ -37,7 +37,7 @@ read :: proc "contextless" (fd: Fd, buf: []u8) -> (int, Errno) {
 	Available since Linux 1.0
 	Before Linux 3.14 this operation is not atomic (i.e. not thread safe)
 */
-write :: proc "contextless" (fd: Fd, buf: []u8) -> (int, Errno) {
+write :: proc "contextless" (fd: Fd, buf: []u8) -> (bytes_written: int, err: Errno) {
 	ret := syscall(SYS_write, fd, raw_data(buf), len(buf))
 	return errno_unwrap(ret, int)
 }
