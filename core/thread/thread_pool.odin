@@ -143,6 +143,7 @@ pool_destroy :: proc(pool: ^Pool) {
 	}
 
 	delete(pool.threads, pool.allocator)
+	pool^ = {}
 }
 
 @(synchronizes=.Release)

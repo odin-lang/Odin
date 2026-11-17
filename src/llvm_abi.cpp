@@ -1840,7 +1840,46 @@ namespace lbAbiArm64 {
 			return lb_arg_type_direct(return_type, cast_type, nullptr, nullptr);
 		}
 	}
-    
+
+	gb_internal i64 aggregate_align_of(Type *t) {
+		Type *bt    = base_type(t);
+		i64   align = type_align_of(bt);
+		if (build_context.metrics.os == TargetOs_darwin) {
+			return align;
+		}
+
+		i64 natural = 1;
+		switch (bt->kind) {
+		case Type_Struct:
+			if (bt->Struct.custom_align == 0) {
+				return align;
+			}
+			for (Entity *f : bt->Struct.fields) {
+				natural = gb_max(natural, type_align_of(f->type));
+			}
+			if (bt->Struct.custom_min_field_align > 0) {
+				natural = gb_max(natural, bt->Struct.custom_min_field_align);
+			}
+			if (bt->Struct.custom_max_field_align != 0) {
+				natural = gb_min(natural, bt->Struct.custom_max_field_align);
+			}
+			break;
+
+		case Type_Union:
+			if (bt->Union.custom_align == 0) {
+				return align;
+			}
+			for (Type *variant : bt->Union.variants) {
+				natural = gb_max(natural, type_align_of(variant));
+			}
+			break;
+
+		default:
+			return align;
+		}
+		return gb_min(natural, align);
+	}
+
 	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type* original_type) {
 		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 
@@ -1879,6 +1918,8 @@ namespace lbAbiArm64 {
 						cast_type = LLVMStructTypeInContext(c, nullptr, 0, false);
 					} else if (size <= 8) {
 						cast_type = LLVMIntTypeInContext(c, cast(unsigned)(size*8));
+					} else if (aggregate_align_of(ptype) == 16) {
+						cast_type = LLVMIntTypeInContext(c, 128);
 					} else {
 						LLVMTypeRef llvm_i64 = LLVMIntTypeInContext(c, 64);
 						cast_type = llvm_array_type(llvm_i64, 2);
@@ -2587,11 +2628,20 @@ namespace lbAbiRiscv64 {
 				return lb_arg_type_direct(orig_type, LLVMIntTypeInContext(c, cast(unsigned)(size*8)), nullptr, nullptr);
 			}
 		} else if (size <= 2*xlen) {
+			*gprs_left -= 2;
+
+			i64 align = source_type != nullptr ? type_align_of(source_type) : lb_alignof(orig_type);
+			if (align == 2*xlen) {
+				LLVMTypeRef wide = LLVMIntTypeInContext(c, cast(unsigned)(2*xlen*8));
+				if (orig_type == wide) {
+					return lb_arg_type_direct(orig_type, nullptr, nullptr, nullptr);
+				}
+				return lb_arg_type_direct(orig_type, wide, nullptr, nullptr);
+			}
+
 			LLVMTypeRef *fields = gb_alloc_array(temporary_allocator(), LLVMTypeRef, 2);
 			fields[0] = LLVMIntTypeInContext(c, cast(unsigned)(xlen*8));
 			fields[1] = LLVMIntTypeInContext(c, cast(unsigned)((size-xlen)*8));
-
-			*gprs_left -= 2;
 			return lb_arg_type_direct(orig_type, LLVMStructTypeInContext(c, fields, 2, false), nullptr, nullptr);
 		} else {
 			return lb_arg_type_indirect(orig_type, nullptr);
