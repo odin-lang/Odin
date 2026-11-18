@@ -84,6 +84,11 @@ Vector of 2 `i64` lanes (128 bits).
 i64x2 :: #simd[2]i64
 
 /*
+Vector of 8 `f16` lanes (128 bits).
+*/
+f16x8 :: #simd[8]f16
+
+/*
 Vector of 4 `f32` lanes (128 bits).
 */
 f32x4 :: #simd[4]f32
