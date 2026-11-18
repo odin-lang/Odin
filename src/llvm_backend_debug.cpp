@@ -167,7 +167,16 @@ gb_internal LLVMMetadataRef lb_debug_subroutine_type_nocall(lbModule *m, Slice<L
 	LLVMMemoryBufferRef buffer  = LLVMCreateMemoryBufferWithMemoryRangeCopy(text, gb_strlen(text), "odin.nocall");
 	LLVMModuleRef       scratch = nullptr;
 	char *              error   = nullptr;
-	if (LLVMParseIRInContext(m->ctx, buffer, &scratch, &error)) {
+
+	// NOTE(bill): LLVMParseIRInContext consumes the buffer and is deprecated from LLVM 22 on.
+	// LLVMParseIRInContext2 leaves the buffer to the caller.
+#if LLVM_VERSION_MAJOR >= 22
+	bool failed = LLVMParseIRInContext2(m->ctx, buffer, &scratch, &error);
+	LLVMDisposeMemoryBuffer(buffer);
+#else
+	bool failed = LLVMParseIRInContext(m->ctx, buffer, &scratch, &error);
+#endif
+	if (failed) {
 		LLVMDisposeMessage(error);
 		return nullptr;
 	}
