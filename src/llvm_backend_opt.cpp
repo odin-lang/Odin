@@ -752,6 +752,80 @@ gb_internal bool lb_scalarize_aggregate_store(lbFastIselLowering *s, LLVMValueRe
 	return true;
 }
 
+// The aggregate of `type` from its leaves, in the order lb_aggregate_leaves lists them (nullptr for an undefined one)
+gb_internal LLVMValueRef lb_build_aggregate_from_leaves(lbFastIselLowering *s, LLVMTypeRef type, LLVMValueRef const *fields, isize *index) {
+	LLVMTypeKind kind = LLVMGetTypeKind(type);
+	if (kind != LLVMStructTypeKind && kind != LLVMArrayTypeKind) {
+		LLVMValueRef field = fields[(*index)++];
+		return field != nullptr ? field : LLVMGetUndef(type);
+	}
+	LLVMValueRef value = LLVMGetUndef(type);
+	unsigned count = kind == LLVMStructTypeKind ? LLVMCountStructElementTypes(type) : cast(unsigned)LLVMGetArrayLength(type);
+	for (unsigned i = 0; i < count; i++) {
+		LLVMTypeRef elem = kind == LLVMStructTypeKind ? LLVMStructGetTypeAtIndex(type, i) : OdinLLVMGetArrayElementType(type);
+		value = LLVMBuildInsertValue(s->builder, value, lb_build_aggregate_from_leaves(s, elem, fields, index), i, "");
+	}
+	return value;
+}
+
+// NOTE(bill): A `ret` of an aggregate returns it in more than one register, which the fast instruction selector cannot do,
+// and it hands the whole block of that `ret` to SelectionDAG. So every such `ret` of a procedure branches to one new block
+// instead, which takes the leaves through `phi`s and builds the aggregate. Only that small block goes to SelectionDAG.
+gb_internal void lb_merge_aggregate_returns(lbFastIselLowering *s, LLVMValueRef fn, Array<LLVMValueRef> const &rets) {
+	if (rets.count == 0) {
+		return;
+	}
+	LLVMTypeRef type = LLVMTypeOf(LLVMGetOperand(rets[0], 0));
+
+	lbAggregateLeaf leaves[LB_SCALARIZE_MAX_LEAVES] = {};
+	isize leaf_count = 0;
+	unsigned path[LB_SCALARIZE_MAX_DEPTH] = {};
+	if (!lb_aggregate_leaves(type, path, 0, leaves, &leaf_count)) {
+		return;
+	}
+
+	auto fields = array_make<LLVMValueRef>(heap_allocator(), rets.count*leaf_count, rets.count*leaf_count);
+	defer (array_free(&fields));
+	for_array(r, rets) {
+		s->store = rets[r];
+		LLVMValueRef value = LLVMGetOperand(rets[r], 0);
+		for (isize i = 0; i < leaf_count; i++) {
+			if (!lb_aggregate_field_value(s, value, leaves[i].path, leaves[i].depth, &fields[r*leaf_count + i])) {
+				return; // anything made so far is unused and removed with the rest
+			}
+		}
+	}
+
+	LLVMBasicBlockRef block = LLVMAppendBasicBlockInContext(s->m->ctx, fn, "");
+	LLVMPositionBuilderAtEnd(s->builder, block);
+	LLVMSetCurrentDebugLocation2(s->builder, LLVMInstructionGetDebugLoc(rets[0]));
+
+	LLVMValueRef phis[LB_SCALARIZE_MAX_LEAVES] = {};
+	for (isize i = 0; i < leaf_count; i++) {
+		LLVMTypeRef field_type = nullptr;
+		lb_aggregate_path_offset(type, leaves[i].path, leaves[i].depth, &field_type);
+		phis[i] = LLVMBuildPhi(s->builder, field_type, "");
+	}
+	isize index = 0;
+	LLVMBuildRet(s->builder, lb_build_aggregate_from_leaves(s, type, phis, &index));
+
+	for_array(r, rets) {
+		LLVMValueRef      ret  = rets[r];
+		LLVMBasicBlockRef from = LLVMGetInstructionParent(ret);
+		for (isize i = 0; i < leaf_count; i++) {
+			LLVMValueRef field = fields[r*leaf_count + i];
+			if (field == nullptr) {
+				field = LLVMGetUndef(LLVMTypeOf(phis[i]));
+			}
+			LLVMAddIncoming(phis[i], &field, &from, 1);
+		}
+		LLVMPositionBuilderBefore(s->builder, ret);
+		LLVMSetCurrentDebugLocation2(s->builder, LLVMInstructionGetDebugLoc(ret));
+		LLVMBuildBr(s->builder, block);
+		LLVMInstructionEraseFromParent(ret);
+	}
+}
+
 // NOTE(bill): If a a constant has too many fields to store one at a time is set or copied from a constant instead
 gb_internal void lb_lower_large_constant_store(lbFastIselLowering *s, LLVMValueRef store) {
 	lbModule *m = s->m;
@@ -1110,10 +1184,11 @@ gb_internal void lb_lower_for_fast_isel(lbModule *m) {
 				continue;
 			}
 
-			if (!(LLVMIsAConstant(agg)        ||
-			      LLVMIsAInsertValueInst(agg) ||
-			      LLVMIsASelectInst(agg)      ||
-			      LLVMIsAPHINode(agg)         ||
+			if (!(LLVMIsAConstant(agg)         ||
+			      LLVMIsAInsertValueInst(agg)  ||
+			      LLVMIsAExtractValueInst(agg) ||
+			      LLVMIsASelectInst(agg)       ||
+			      LLVMIsAPHINode(agg)          ||
 			      (LLVMIsALoadInst(agg) && lb_is_plain_access(agg)))) {
 				continue;
 			}
@@ -1126,6 +1201,22 @@ gb_internal void lb_lower_for_fast_isel(lbModule *m) {
 				LLVMInstructionEraseFromParent(i);
 			}
 		}
+
+		array_clear(&work);
+		for (LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(fn); bb != nullptr; bb = LLVMGetNextBasicBlock(bb)) {
+			LLVMValueRef term = LLVMGetBasicBlockTerminator(bb);
+			if (term == nullptr || !LLVMIsAReturnInst(term) || LLVMGetNumOperands(term) != 1 ||
+			    !lb_is_aggregate_type(LLVMTypeOf(LLVMGetOperand(term, 0)))) {
+				continue;
+			}
+			// a `musttail` call must be followed by its `ret`
+			LLVMValueRef prev = LLVMGetPreviousInstruction(term);
+			if (prev != nullptr && LLVMIsACallInst(prev) && LLVMIsTailCall(prev)) {
+				continue;
+			}
+			array_add(&work, term);
+		}
+		lb_merge_aggregate_returns(&s, fn, work);
 
 		bool removed = true;
 		while (removed) {
