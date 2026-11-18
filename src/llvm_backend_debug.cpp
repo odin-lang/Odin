@@ -1567,8 +1567,16 @@ gb_internal LLVMValueRef lb_debug_storage(lbProcedure *p, LLVMValueRef storage, 
 	LLVMBasicBlockRef insert_block = LLVMGetInsertBlock(p->builder);
 	LLVMValueRef slot = llvm_alloca(p, LLVMTypeOf(storage), build_context.ptr_size, "");
 	LLVMPositionBuilderAtEnd(p->builder, is_argument ? p->decl_block->block : insert_block);
-	LLVMBuildStore(p->builder, storage, slot);
+	LLVMValueRef store = LLVMBuildStore(p->builder, storage, slot);
 	LLVMPositionBuilderAtEnd(p->builder, insert_block);
+
+	// NOTE(bill): DWARF puts prologue_end on the first instruction with a line.
+	// A breakpoint on the procedure stops there.
+	// An argument spilled here with a line would move it ahead of the parameter stores and show stale parameters.
+	// CodeView needs the line, see lb_begin_procedure_body.
+	if (is_argument && build_context.metrics.os != TargetOs_windows) {
+		LLVMInstructionSetDebugLoc(store, nullptr);
+	}
 
 	uint64_t deref = 0x06; // DW_OP_deref
 	*expr = LLVMDIBuilderCreateExpression(p->module->debug_builder, &deref, 1);
