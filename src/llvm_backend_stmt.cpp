@@ -3071,8 +3071,11 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 				result_values[i] = lb_emit_conv(p, results[i], tuple->variables[i]->type);
 			}
 
+			// NOTE(bill): the result pointers follow the parameters, some of which take no or several LLVM parameters
 			isize param_offset = return_by_pointer ? 1 : 0;
-			param_offset += ft->original_arg_count;
+			for (isize i = 0; i < ft->original_arg_count; i++) {
+				param_offset += lb_arg_param_count(&ft->args[i]);
+			}
 			for_array(i, result_eps) {
 				lbValue result_ep = {};
 				result_ep.value = LLVMGetParam(p->value, cast(unsigned)(param_offset+i));

@@ -2896,6 +2896,7 @@ gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *t
 			ft->args[i].align_attribute = nullptr;
 			ft->args[i].byval_alignment = 0;
 			ft->args[i].is_byval = false;
+			ft->args[i].expand = false;
 		}
 	}
 

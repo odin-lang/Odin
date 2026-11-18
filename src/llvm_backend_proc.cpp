@@ -422,6 +422,14 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 				// these are not present in the LLVM function signature, don't advance parameter_index
 				continue;
 			}
+			if (arg->pad_type != nullptr) {
+				parameter_index += 1;
+			}
+			if (arg->kind == lbArg_Direct && arg->expand) {
+				// the elements of a struct take no attributes
+				parameter_index += lb_arg_value_param_count(arg);
+				continue;
+			}
 
 			if (e->flags&EntityFlag_NoAlias) {
 				lb_add_proc_attribute_at_index(p, offset+parameter_index, "noalias");
@@ -833,7 +841,9 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 				defer (param_index += 1);
 				// lbArg_Ignore params are not present in the LLVM function signature,
 				// so they don't advance the LLVM signature position
-				defer (if (arg_type->kind != lbArg_Ignore) { llvm_param_index += 1; });
+				defer (if (arg_type->kind != lbArg_Ignore) {
+					llvm_param_index += lb_arg_value_param_count(arg_type);
+				});
 				if (arg_type->kind != lbArg_Ignore && arg_type->pad_type != nullptr) {
 					llvm_param_index += 1;
 				}
@@ -845,8 +855,20 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 					lb_add_entity(p->module, e, dummy);
 				} else if (arg_type->kind == lbArg_Direct) {
 					if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
-						LLVMTypeRef param_type = lb_type(p->module, e->type);
-						LLVMValueRef original_value = LLVMGetParam(p->value, param_offset+llvm_param_index);
+						LLVMTypeRef  param_type     = lb_type(p->module, e->type);
+						LLVMValueRef original_value = nullptr;
+						if (arg_type->expand) {
+							LLVMTypeRef abi_type = arg_type->cast_type != nullptr ? arg_type->cast_type : arg_type->type;
+							original_value = LLVMGetUndef(abi_type);
+
+							unsigned n = lb_arg_value_param_count(arg_type);
+							for (unsigned k = 0; k < n; k++) {
+								LLVMValueRef elem = LLVMGetParam(p->value, param_offset+llvm_param_index+k);
+								original_value = LLVMBuildInsertValue(p->builder, original_value, elem, k, "");
+							}
+						} else {
+							original_value = LLVMGetParam(p->value, param_offset+llvm_param_index);
+						}
 						LLVMValueRef value = arg_type->coerce_offsets.count > 0
 							? lb_coerce_fields_store(p, original_value, e->type, arg_type)
 							: OdinLLVMBuildTransmute(p, original_value, param_type);
@@ -912,69 +934,16 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 				if (e->token.string != "") {
 					GB_ASSERT(!is_blank_ident(e->token));
 
-					lbAddr res = {};
-					if (p->entity && p->entity->decl_info &&
-					    p->entity->decl_info->proc->defer_use_checked.load(std::memory_order_relaxed) &&
-					    p->entity->decl_info->proc->defer_used == 0) {
-
-						// NOTE(bill): this is a bodge to get around the issue of the problem BELOW
-						// We check to see if we ever use a defer statement ever within a procedure and if it
-						// if it never happens, see if you can possibly do take the return value pointer
-						//
-						// NOTE(bill): this could be buggy in that I have missed a case where `defer` was used
-						//
-						// TODO(bill): This could be optimized to check to see where a `defer` only uses
-						// the variable in question
-
-						bool has_return_ptr = p->return_ptr.addr.value != nullptr;
-						lbValue ptr = {};
-
-						if (ft->multiple_return_original_type != nullptr) {
-							isize the_offset = -1;
-							if (i+1 < results->variables.count) {
-								the_offset = cast(isize)param_offset + ft->original_arg_count + i;
-							} else if (has_return_ptr) {
-								GB_ASSERT(i+1 == results->variables.count);
-								the_offset = 0;
-							}
-							if (the_offset >= 0) {
-								lbValue ptr = {};
-								ptr.value = LLVMGetParam(p->value, cast(unsigned)the_offset);
-								ptr.type = alloc_type_pointer(e->type);
-
-
-							}
-						} else if (has_return_ptr) {
-							lbValue ptr = p->return_ptr.addr;
-
-							if (results->variables.count > 1) {
-								ptr = lb_emit_tuple_ep(p, ptr, cast(i32)i);
-							}
-							GB_ASSERT(is_type_pointer(ptr.type));
-							GB_ASSERT(are_types_identical(type_deref(ptr.type), e->type));
-						}
-
-						if (ptr.value != nullptr) {
-							lb_add_entity(p->module, e, ptr);
-							lb_add_debug_local_variable(p, ptr.value, e->type, e->token);
-							// NOTE(bill): no need to zero on the callee side as it is zeroed on the caller side
-
-							res = lb_addr(ptr);
-						}
-					}
-
-					if (res.addr.type == nullptr) {
-						// NOTE(bill): Don't even bother trying to optimize this with the return ptr value
-						// This will violate the defer rules if you do:
-						//         foo :: proc() -> (x, y: T) {
-						//                 defer x = ... // defer is executed after the `defer`
-						//                 return // the values returned should be zeroed
-						//         }
-						// NOTE(bill): REALLY, don't even bother.
-						//
-						// IMPORTANT NOTE(bill): REALLY, don't even bother!!!!!!
-						res = lb_add_local(p, e->type, e);
-					}
+					// NOTE(bill): Don't even bother trying to optimize this with the return ptr value
+					// This will violate the defer rules if you do:
+					//         foo :: proc() -> (x, y: T) {
+					//                 defer x = ... // defer is executed after the `defer`
+					//                 return // the values returned should be zeroed
+					//         }
+					// NOTE(bill): REALLY, don't even bother.
+					//
+					// IMPORTANT NOTE(bill): REALLY, don't even bother!!!!!!
+					lbAddr res = lb_add_local(p, e->type, e);
 
 					if (e->Variable.param_value.kind != ParameterValue_Invalid) {
 						GB_ASSERT(e->Variable.param_value.kind != ParameterValue_Location);
@@ -1246,6 +1215,10 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 				}
 				param_offset += 1;
 			}
+			if (ft->args[i].kind == lbArg_Direct && ft->args[i].expand) {
+				param_offset += lb_arg_value_param_count(&ft->args[i]);
+				continue;
+			}
 			LLVMAttributeRef attribute = ft->args[i].attribute;
 			if (attribute != nullptr) {
 				LLVMAddCallSiteAttribute(ret, param_offset, attribute);
@@ -1382,7 +1355,6 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 
 	lbValue result = {};
 
-	isize ignored_args = 0;
 	auto processed_args = array_make<lbValue>(permanent_allocator(), 0, args.count);
 
 	{
@@ -1405,7 +1377,6 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			lbArgType *arg = &ft->args[param_index];
 			if (arg->kind == lbArg_Ignore) {
 				param_index += 1;
-				ignored_args += 1;
 				continue;
 			}
 
@@ -1421,7 +1392,16 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 				if (!abi_type) {
 					abi_type = arg->type;
 				}
-				if (arg->coerce_offsets.count > 0) {
+				if (arg->expand) {
+					if (xt != abi_type) {
+						x.value = OdinLLVMBuildTransmute(p, x.value, abi_type);
+					}
+					unsigned n = lb_arg_value_param_count(arg);
+					for (unsigned k = 0; k < n; k++) {
+						LLVMValueRef elem = LLVMBuildExtractValue(p->builder, x.value, k, "");
+						array_add(&processed_args, lbValue{elem, t_uintptr});
+					}
+				} else if (arg->coerce_offsets.count > 0) {
 					x.value = lb_coerce_fields_load(p, x, arg);
 					array_add(&processed_args, x);
 				} else if (xt == abi_type) {
@@ -1474,11 +1454,12 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 
 		Type *rt = reduce_tuple_to_single_type(results);
 		Type *original_rt = rt;
+		isize split_returns_index = processed_args.count;
 		if (split_returns) {
 			GB_ASSERT(rt->kind == Type_Tuple);
 			for (isize j = 0; j < rt->Tuple.variables.count-1; j++) {
-				Type *partial_return_type = rt->Tuple.variables[j]->type;
-				lbValue partial_return_ptr = lb_add_local(p, partial_return_type, nullptr, true, false).addr;
+				Type *  partial_return_type = rt->Tuple.variables[j]->type;
+				lbValue partial_return_ptr  = lb_add_local(p, partial_return_type, nullptr, false, true).addr;
 				array_add(&processed_args, partial_return_ptr);
 			}
 			rt = reduce_tuple_to_single_type(rt->Tuple.variables[rt->Tuple.variables.count-1]->type);
@@ -1489,7 +1470,9 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			if (sret_dst != nullptr) {
 				return_ptr = *sret_dst;
 			} else {
-				return_ptr = lb_add_local_generated(p, rt, true).addr;
+				// An Odin callee writes all of it before it returns, padding included.
+				// A C one need not write the padding.
+				return_ptr = lb_add_local_generated(p, rt, !is_odin_cc).addr;
 			}
 			lb_emit_call_internal(p, value, return_ptr, processed_args, nullptr, context_ptr, inlining, tailing);
 			result = lb_emit_load(p, return_ptr);
@@ -1531,9 +1514,8 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			auto tuple_fix_values = slice_make<lbValue>(permanent_allocator(), ret_count);
 			auto tuple_geps = slice_make<lbValue>(permanent_allocator(), ret_count);
 
-			isize offset = ft->original_arg_count - ignored_args;
 			for (isize j = 0; j < ret_count-1; j++) {
-				lbValue ret_arg_ptr = processed_args[offset + j];
+				lbValue ret_arg_ptr = processed_args[split_returns_index + j];
 				lbValue ret_arg = lb_emit_load(p, ret_arg_ptr);
 				tuple_fix_values[j] = ret_arg;
 			}
