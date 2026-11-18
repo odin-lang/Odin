@@ -109,6 +109,15 @@ PropModeReplace :: 0
 PropModePrepend :: 1
 PropModeAppend  :: 2
 
+StaticGray      :: 0
+GrayScale       :: 1
+StaticColor     :: 2
+PseudoColor     :: 3
+TrueColor       :: 4
+DirectColor     :: 5
+
+AllPlanes       :: ~uint(0)
+
 XA_ATOM              :: Atom(4)
 XA_CARDINAL          :: Atom(6)
 XA_INTEGER           :: Atom(19)
