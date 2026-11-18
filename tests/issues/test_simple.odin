@@ -84,4 +84,5 @@ package tests_issues
 @(require) import "test_issue_procedure_of_specialized"
 @(require) import "test_issue_statics_across_modules"
 @(require) import "test_issue_any_constant_conversion"
+@(require) import "test_issue_proc_cast_compound_literal"
 

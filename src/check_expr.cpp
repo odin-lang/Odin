@@ -4325,7 +4325,8 @@ gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type) 
 			}
 			x->mode = Addressing_Value;
 		}
-		if (x->mode == Addressing_Value) {
+		// a procedure cast to a procedure type is still that procedure
+		if (x->mode == Addressing_Value && !(x->value.kind == ExactValue_Procedure && is_type_proc(type))) {
 			x->value = {};
 		}
 		return true;
@@ -10642,9 +10643,6 @@ gb_internal bool check_is_operand_compound_lit_constant(CheckerContext *c, Opera
 	Ast *expr = unparen_expr(o->expr);
 	if (expr != nullptr) {
 		Entity *e = strip_entity_wrapping(entity_from_expr(expr));
-		if (e != nullptr && e->kind == Entity_Procedure) {
-			return true;
-		}
 		if (expr->kind == Ast_ProcLit) {
 			ExactValue value = exact_value_procedure(expr);
 			value.variant_type = o->value.variant_type;
@@ -10657,6 +10655,9 @@ gb_internal bool check_is_operand_compound_lit_constant(CheckerContext *c, Opera
 			// TODO(bill): rodata inlining for non-indirect values
 			// e.g. **NOT** []T{...}
 		}
+	}
+	if (o->value.kind == ExactValue_Procedure) {
+		return true;
 	}
 	return o->mode == Addressing_Constant;
 }
@@ -14007,6 +14008,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 				break;
 			}
 		}
+		o->expr = node;
 		return Expr_Expr;
 	case_end;
 
