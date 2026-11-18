@@ -10,7 +10,9 @@
 			array_add(&passes, "annotation2metadata");
 			array_add(&passes, "inferattrs");
 			array_add(&passes, "forceattrs");
-			array_add(&passes, "function<eager-inv>(sroa<modify-cfg>,early-cse<>)");
+			// NOTE(bill): Before inlining, `mem2reg` promotes the scalar locals much like SROA would, for less compile time.
+			// Splitting aggregates is left to the SROA after inlining.
+			array_add(&passes, "function<eager-inv>(mem2reg,early-cse<>)");
 			array_add(&passes, "always-inline");
 			array_add(&passes, "function<eager-inv>(sroa<modify-cfg>,instsimplify,simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>)");
 			// array_add(&passes, "verify");
