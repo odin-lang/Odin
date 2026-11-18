@@ -3,6 +3,27 @@ package simd_x86
 
 import "core:simd"
 
+_MM_DENORMALS_ZERO_MASK   : u32 : 0x0040
+_MM_DENORMALS_ZERO_ON     : u32 : 0x0040
+_MM_DENORMALS_ZERO_OFF    : u32 : 0x0000
+
+// Set the denormals-are-zeros bit of the MXCSR control
+// and status register to the value in unsigned 32-bit integer `a`.
+// The denormals-are-zeros may contain any of the following flags:
+// `_MM_DENORMALS_ZERO_ON` or `_MM_DENORMALS_ZERO_OFF`.
+@(enable_target_feature="sse,sse3")
+_MM_SET_DENORMALS_ZERO_MODE :: #force_inline proc "c" (a: u32) {
+	_mm_setcsr((_mm_getcsr() &~ _MM_DENORMALS_ZERO_MASK) | (a & _MM_DENORMALS_ZERO_MASK))
+}
+
+// Get the denormals-are-zeros bit from the MXCSR control and status register.
+// The denormals-are-zeros may contain any of the following flags:
+// `_MM_DENORMALS_ZERO_ON` or `_MM_DENORMALS_ZERO_OFF`.
+@(require_results, enable_target_feature="sse,sse3")
+_MM_GET_DENORMALS_ZERO_MODE :: #force_inline proc "c" () -> u32 {
+	return _mm_getcsr() & _MM_DENORMALS_ZERO_MASK
+}
+
 // Alternatively add and subtract packed double-precision (64-bit) floating-point elements in `a`
 // to/from packed elements in `b`, and store the results in `dst`.
 //
