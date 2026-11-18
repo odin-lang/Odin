@@ -27,6 +27,7 @@ download_assets :: proc "contextless" () {
 @(require) import "encoding/ini"
 @(require) import "encoding/json"
 @(require) import "encoding/json/differential"
+@(require) import "encoding/pem"
 @(require) import "encoding/uuid"
 @(require) import "encoding/varint"
 @(require) import "encoding/xml"
