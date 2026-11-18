@@ -1064,30 +1064,25 @@ split_multi :: proc(s: []byte, substrs: [][]byte, skip_empty := false, allocator
 		return nil
 	}
 
-	sublen := len(substrs[0])
-
-	for substr in substrs[1:] {
-		sublen = min(sublen, len(substr))
-	}
-
-	shared := len(s) - sublen
-
-	if shared <= 0 {
-		return nil
+	// disallow empty substrs
+	for substr in substrs {
+		if len(substr) == 0 {
+			return nil
+		}
 	}
 
 	// number, index, last
 	n, i, l := 0, 0, 0
 
 	// count results
-	first_pass: for i <= shared {
+	first_pass: for i < len(s) {
 		for substr in substrs {
-			if string(s[i:i+sublen]) == string(substr) {
+			if len(s) - i >= len(substr) && string(s[i:i+len(substr)]) == string(substr) {
 				if !skip_empty || i - l > 0 {
 					n += 1
 				}
 
-				i += sublen
+				i += len(substr)
 				l  = i
 
 				continue first_pass
@@ -1112,15 +1107,15 @@ split_multi :: proc(s: []byte, substrs: [][]byte, skip_empty := false, allocator
 	n, i, l = 0, 0, 0
 
 	// slice results
-	second_pass: for i <= shared {
+	second_pass: for i < len(s) {
 		for substr in substrs {
-			if string(s[i:i+sublen]) == string(substr) {
+			if len(s) - i >= len(substr) && string(s[i:i+len(substr)]) == string(substr) {
 				if !skip_empty || i - l > 0 {
 					buf[n] = s[l:i]
 					n += 1
 				}
 
-				i += sublen
+				i += len(substr)
 				l  = i
 
 				continue second_pass
