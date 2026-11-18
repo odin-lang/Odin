@@ -850,19 +850,14 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 					lb_add_entity(p->module, e, dummy);
 				} else if (arg_type->kind == lbArg_Direct) {
 					if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
-						LLVMTypeRef  param_type     = lb_type(p->module, e->type);
-						LLVMValueRef original_value = nullptr;
+						LLVMTypeRef   param_type     = lb_type(p->module, e->type);
+						LLVMValueRef *params         = &p->raw_input_parameters[param_offset+llvm_param_index];
+						LLVMValueRef  original_value = params[0];
 						if (arg_type->expand) {
+							// the struct put back together from its elements, which are the parameters
 							LLVMTypeRef abi_type = arg_type->cast_type != nullptr ? arg_type->cast_type : arg_type->type;
-							original_value = LLVMGetUndef(abi_type);
-
-							unsigned n = lb_arg_value_param_count(arg_type);
-							for (unsigned k = 0; k < n; k++) {
-								LLVMValueRef elem = LLVMGetParam(p->value, param_offset+llvm_param_index+k);
-								original_value = LLVMBuildInsertValue(p->builder, original_value, elem, k, "");
-							}
-						} else {
-							original_value = LLVMGetParam(p->value, param_offset+llvm_param_index);
+							isize index = 0;
+							original_value = lb_build_aggregate_from_leaves(p->builder, abi_type, params, &index);
 						}
 						LLVMValueRef value = arg_type->coerce_offsets.count > 0
 							? lb_coerce_fields_store(p, original_value, e->type, arg_type)
