@@ -2102,13 +2102,7 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 
 				// Call real procedure for method from here, passing the parameters expected, if any.
 				lbValue method_proc_value = lb_find_procedure_value_from_entity(m, md.proc_entity);
-				lbValue result = lb_emit_call(wrapper_proc, method_proc_value, method_args);
-
-				if (wrapper_results_tuple != nullptr) {
-					lb_build_return_stmt_internal(wrapper_proc, result, {});
-				} else {
-					LLVMBuildRetVoid(wrapper_proc->builder);
-				}
+				lb_emit_forwarding_call(wrapper_proc, method_proc_value, method_args);
 			}
 			lb_end_procedure_body(wrapper_proc);
 

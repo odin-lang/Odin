@@ -2623,7 +2623,7 @@ gb_internal lbValue lb_handle_objc_ivar_get(lbProcedure *p, Ast *expr) {
 	return lb_handle_objc_ivar_for_objc_object_pointer(p, self);
 }
 
-// NOTE(bill): THis is to allow parameters of a C procedure generated to pass its arguments on to an Odin one.
+// NOTE(bill): This is to allow parameters of a C procedure generated to pass its arguments on to an Odin one.
 // Their LLVM parameters cannot be passed on as they are since the two conventions can lower the same value differently.
 // Named (they get a value each from lb_begin_procedure_body) which lb_forwarded_param_value reads back for an ordinary call.
 gb_internal Type *lb_alloc_forwarded_params(Type **types, isize count) {
@@ -2637,6 +2637,16 @@ gb_internal Type *lb_alloc_forwarded_params(Type **types, isize count) {
 gb_internal lbValue lb_forwarded_param_value(lbProcedure *p, isize index) {
 	Entity *e = p->type->Proc.params->Tuple.variables[index];
 	return lb_emit_load(p, lb_find_value_from_entity(p->module, e));
+}
+
+// Calls `callee` and returns its result, if any, from `p`, each through its own convention
+gb_internal void lb_emit_forwarding_call(lbProcedure *p, lbValue callee, Array<lbValue> const &args) {
+	lbValue result = lb_emit_call(p, callee, args);
+	if (base_type(callee.type)->Proc.result_count > 0) {
+		lb_build_return_stmt_internal(p, result, {});
+	} else {
+		LLVMBuildRetVoid(p->builder);
+	}
 }
 
 gb_internal void lb_create_objc_block_helper_procs(
@@ -2933,13 +2943,7 @@ gb_internal lbValue lb_handle_objc_block(lbProcedure *p, Ast *expr) {
 			lb_push_context_onto_stack(invoker_proc, lb_addr(p_context));
 		}
 
-		lbValue result = lb_emit_call(invoker_proc, user_proc_value, call_args);
-
-		if (user_proc.result_count > 0) {
-			lb_build_return_stmt_internal(invoker_proc, result, {});
-		} else {
-			LLVMBuildRetVoid(invoker_proc->builder);
-		}
+		lb_emit_forwarding_call(invoker_proc, user_proc_value, call_args);
 	}
 	lb_end_procedure_body(invoker_proc);
 

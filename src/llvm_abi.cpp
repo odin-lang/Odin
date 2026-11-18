@@ -27,7 +27,7 @@ struct lbArgType {
 	Slice<i64> coerce_offsets;
 
 	// A direct argument of struct type passed as one LLVM parameter per element, the way clang passes a
-	// coerced struct. The Odin conventions use it on amd64 for two-word values.
+	// coerced struct. The Odin conventions use it on amd64 for two-word values, which take no attributes.
 	bool expand;
 
 	// `cast_type` is a struct of the scalars of `type` in order.
@@ -239,11 +239,6 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 			arg_index++;
 		}
 
-		if (arg->kind == lbArg_Direct && arg->expand) {
-			arg_index += lb_arg_value_param_count(arg);
-			continue;
-		}
-
 		if (arg->attribute) {
 			LLVMAddAttributeAtIndex(fn, arg_index+1, arg->attribute);
 		}
@@ -266,7 +261,7 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 			}
 		}
 
-		arg_index++;
+		arg_index += lb_arg_value_param_count(arg);
 	}
 
 	if (offset != 0 && ft->ret.kind == lbArg_Indirect && ft->ret.attribute != nullptr) {
@@ -952,7 +947,7 @@ namespace lbAbi386 {
 	}
 };
 
-gb_internal lbArgType lb_amd64_odin_return(LLVMContextRef c, LLVMTypeRef return_type);
+gb_internal lbArgType lb_amd64_odin_return(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_tuple, ProcCallingConvention calling_convention, i64 c_register_bytes);
 gb_internal bool      lb_amd64_odin_is_two_words(LLVMTypeRef type);
 
 namespace lbAbiAmd64Win64 {
@@ -1017,26 +1012,16 @@ namespace lbAbiAmd64Win64 {
 		} else if (is_m64_vector(return_type)) {
 			return lb_arg_type_direct(return_type, LLVMInt64TypeInContext(c), nullptr, nullptr);
 		} else if (lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind)) {
-			if (return_is_tuple) {
-				lbArgType in_registers = lb_amd64_odin_return(c, return_type);
-				if (in_registers.type != nullptr) {
-					return in_registers;
-				}
+			lbArgType in_registers = lb_amd64_odin_return(c, return_type, return_is_tuple, ft->calling_convention, 8);
+			if (in_registers.type != nullptr) {
+				return in_registers;
 			}
 
-			i64 sz = lb_sizeof(return_type);
-			switch (sz) {
+			switch (lb_sizeof(return_type)) {
 			case 1: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c,  8), nullptr, nullptr);
 			case 2: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 16), nullptr, nullptr);
 			case 4: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
 			case 8: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 64), nullptr, nullptr);
-			}
-
-			if (!return_is_tuple && sz > 8 && is_calling_convention_odin(ft->calling_convention)) {
-				lbArgType in_registers = lb_amd64_odin_return(c, return_type);
-				if (in_registers.type != nullptr) {
-					return in_registers;
-				}
 			}
 
 			LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
@@ -1375,19 +1360,6 @@ namespace lbAbiAmd64SysV {
 	gb_internal Array<RegClass> classify(LLVMTypeRef t, Type *source_type);
 	gb_internal LLVMTypeRef llreg(LLVMContextRef c, Array<RegClass> const &reg_classes, LLVMTypeRef type);
 
-	gb_internal lbArgType odin_large_return(LLVMContextRef c, LLVMTypeRef return_type, ProcCallingConvention calling_convention) {
-		if (!is_calling_convention_odin(calling_convention)) {
-			return {};
-		}
-		if (!lb_is_type_kind(return_type, LLVMStructTypeKind) && !lb_is_type_kind(return_type, LLVMArrayTypeKind)) {
-			return {};
-		}
-		if (lb_sizeof(return_type) <= 16) {
-			return {};
-		}
-		return lb_amd64_odin_return(c, return_type);
-	}
-
 	// LLVM passes a struct argument as if each of its elements were a separate argument.
 	// Passing them separately changes nothing in the registers but the fast instruction selector used at `-o:none` cannot take a struct argument.
 	gb_internal void odin_expand_pair(lbArgType *arg) {
@@ -1411,16 +1383,9 @@ namespace lbAbiAmd64SysV {
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
 		}
-		if (return_is_tuple) {
-			lbArgType in_registers = lb_amd64_odin_return(c, return_type);
-			if (in_registers.type != nullptr) {
-				return in_registers;
-			}
-		} else {
-			lbArgType in_registers = odin_large_return(c, return_type, ft->calling_convention);
-			if (in_registers.type != nullptr) {
-				return in_registers;
-			}
+		lbArgType in_registers = lb_amd64_odin_return(c, return_type, return_is_tuple, ft->calling_convention, 16);
+		if (in_registers.type != nullptr) {
+			return in_registers;
 		}
 		LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
 
@@ -1473,7 +1438,7 @@ namespace lbAbiAmd64SysV {
 		}
 
 		if (return_source != nullptr) {
-			ft->ret = odin_large_return(c, return_type, calling_convention);
+			ft->ret = lb_amd64_odin_return(c, return_type, false, calling_convention, 16);
 			if (ft->ret.type == nullptr) {
 				ft->ret = amd64_type(c, return_type, Amd64TypeAttribute_StructRect, calling_convention,
 				                     false,
@@ -2200,33 +2165,52 @@ namespace lbAbiAmd64SysV {
 // Win64 passes a two-word value, such as a string, slice, `any`, or `Allocator`, as its two words instead of a pointer to a copy of it.
 // SysV already passed it in two registers.
 
-gb_internal bool lb_amd64_odin_count_return_registers(LLVMTypeRef t, i32 *gpr, i32 *xmm) {
+// The return registers an Odin result takes (one per scalar leaf) out of what a target has
+struct lbReturnRegisters {
+	i32      gpr, max_gpr;
+	i32      fpr, max_fpr;
+	unsigned max_array_count;
+};
+
+gb_internal bool lb_count_return_registers(LLVMTypeRef t, lbReturnRegisters *regs) {
 	switch (LLVMGetTypeKind(t)) {
 	case LLVMStructTypeKind: {
 		unsigned n = LLVMCountStructElementTypes(t);
 		for (unsigned i = 0; i < n; i++) {
-			if (!lb_amd64_odin_count_return_registers(LLVMStructGetTypeAtIndex(t, i), gpr, xmm)) {
+			if (!lb_count_return_registers(LLVMStructGetTypeAtIndex(t, i), regs)) {
 				return false;
 			}
 		}
 		return true;
 	}
-	case LLVMArrayTypeKind:
-		return LLVMGetArrayLength(t) == 1 && lb_amd64_odin_count_return_registers(OdinLLVMGetArrayElementType(t), gpr, xmm);
+	case LLVMArrayTypeKind: {
+		unsigned n = LLVMGetArrayLength(t);
+		LLVMTypeRef elem = OdinLLVMGetArrayElementType(t);
+		if (n > regs->max_array_count || (n > 1 && lb_is_type_kind(elem, LLVMIntegerTypeKind) && lb_sizeof(elem) < 8)) {
+			// NOTE(bill): bytes and padding are better as whole words
+			return false;
+		}
+		for (unsigned i = 0; i < n; i++) {
+			if (!lb_count_return_registers(elem, regs)) {
+				return false;
+			}
+		}
+		return true;
+	}
 	case LLVMIntegerTypeKind:
-		*gpr += cast(i32)((lb_sizeof(t) + 7) / 8);
-		return *gpr <= 3;
+		regs->gpr += cast(i32)((lb_sizeof(t) + 7) / 8);
+		return regs->gpr <= regs->max_gpr;
 	case LLVMPointerTypeKind:
-		*gpr += 1;
-		return *gpr <= 3;
+		regs->gpr += 1;
+		return regs->gpr <= regs->max_gpr;
 	case LLVMHalfTypeKind:
 	case LLVMFloatTypeKind:
 	case LLVMDoubleTypeKind:
-		*xmm += 1;
-		return *xmm <= 2;
+		regs->fpr += 1;
+		return regs->fpr <= regs->max_fpr;
 	case LLVMVectorTypeKind:
-		*xmm += 1;
-		return lb_sizeof(t) <= 16 && *xmm <= 2;
+		regs->fpr += 1;
+		return lb_sizeof(t) <= 16 && regs->fpr <= regs->max_fpr;
 	}
 	return false;
 }
@@ -2317,10 +2301,18 @@ gb_internal void lb_scalar_types(LLVMTypeRef t, Array<LLVMTypeRef> *scalars) {
 	array_add(scalars, t);
 }
 
-gb_internal lbArgType lb_amd64_odin_return(LLVMContextRef c, LLVMTypeRef return_type) {
-	i32 gpr = 0;
-	i32 xmm = 0;
-	if (lb_amd64_odin_count_return_registers(return_type, &gpr, &xmm)) {
+// Multiple return values or a single aggregate C would return through a hidden pointer (more than `c_register_bytes`) in registers where it fits
+gb_internal lbArgType lb_amd64_odin_return(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_tuple, ProcCallingConvention calling_convention, i64 c_register_bytes) {
+	if (!return_is_tuple) {
+		if (!is_calling_convention_odin(calling_convention) ||
+		    !(lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind)) ||
+		    lb_sizeof(return_type) <= c_register_bytes) {
+			return {};
+		}
+	}
+
+	lbReturnRegisters regs = {0, 3, 0, 2, 1}; // RAX, RDX, RCX; XMM0, XMM1
+	if (lb_count_return_registers(return_type, &regs)) {
 		lbArgType ret = lb_arg_type_direct(return_type);
 
 		// LLVM returns a nested struct in the same registers as its scalars one after another.
@@ -2621,55 +2613,10 @@ namespace lbAbiArm64 {
 		return (member_count <= 4);
 	}
 
-	// One register per scalar leaf of `t`, up to the return registers X0-X7 and V0-V7
-	gb_internal bool odin_count_return_registers(LLVMTypeRef t, i32 *gpr, i32 *fpr) {
-		switch (LLVMGetTypeKind(t)) {
-		case LLVMStructTypeKind: {
-			unsigned n = LLVMCountStructElementTypes(t);
-			for (unsigned i = 0; i < n; i++) {
-				if (!odin_count_return_registers(LLVMStructGetTypeAtIndex(t, i), gpr, fpr)) {
-					return false;
-				}
-			}
-			return true;
-		}
-		case LLVMArrayTypeKind: {
-			unsigned n = LLVMGetArrayLength(t);
-			LLVMTypeRef elem = OdinLLVMGetArrayElementType(t);
-			if (n > 8 || (n > 1 && lb_is_type_kind(elem, LLVMIntegerTypeKind) && lb_sizeof(elem) < 8)) {
-				// NOTE(bill): bytes and padding are better as whole words
-				return false;
-			}
-			for (unsigned i = 0; i < n; i++) {
-				if (!odin_count_return_registers(elem, gpr, fpr)) {
-					return false;
-				}
-			}
-			return true;
-		}
-		case LLVMIntegerTypeKind:
-			*gpr += cast(i32)((lb_sizeof(t) + 7) / 8);
-			return *gpr <= 8;
-		case LLVMPointerTypeKind:
-			*gpr += 1;
-			return *gpr <= 8;
-		case LLVMHalfTypeKind:
-		case LLVMFloatTypeKind:
-		case LLVMDoubleTypeKind:
-			*fpr += 1;
-			return *fpr <= 8;
-		case LLVMVectorTypeKind:
-			*fpr += 1;
-			return lb_sizeof(t) <= 16 && *fpr <= 8;
-		}
-		return false;
-	}
-
 	// Odin returns a result of more than 16 bytes in registers where it fits: one per scalar, or else as words in X0-X7
 	gb_internal lbArgType odin_large_return(LLVMContextRef c, LLVMTypeRef return_type) {
-		i32 gpr = 0;
-		i32 fpr = 0;
-		if (odin_count_return_registers(return_type, &gpr, &fpr)) {
+		lbReturnRegisters regs = {0, 8, 0, 8, 8}; // X0-X7; V0-V7
+		if (lb_count_return_registers(return_type, &regs)) {
 			return lb_arg_type_direct(return_type);
 		}
 		i64 size = lb_sizeof(return_type);
