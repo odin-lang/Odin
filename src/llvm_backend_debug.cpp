@@ -153,6 +153,50 @@ gb_internal LLVMMetadataRef lb_debug_procedure_parameters(lbModule *m, Type *typ
 	return lb_debug_type(m, type);
 }
 
+// NOTE(bill): the LLVM C API cannot set the calling convention of a subroutine type but textual IR can.
+// A `distinct` node parsed into the module's context belongs to that context and outlives the module parsed to hold it.
+// Its empty type list is then replaced with the real one.
+// Returns nullptr if LLVM no longer reads the text the same way.
+gb_internal LLVMMetadataRef lb_debug_subroutine_type_nocall(lbModule *m, Slice<LLVMMetadataRef> const &types, LLVMDIFlags flags) {
+	char text[128] = {};
+	gb_snprintf(text, gb_size_of(text),
+	            "!odin.nocall = !{!0}\n"
+	            "!0 = distinct !DISubroutineType(cc: DW_CC_nocall, flags: %u, types: !{})\n",
+	            cast(unsigned)flags);
+
+	LLVMMemoryBufferRef buffer  = LLVMCreateMemoryBufferWithMemoryRangeCopy(text, gb_strlen(text), "odin.nocall");
+	LLVMModuleRef       scratch = nullptr;
+	char *              error   = nullptr;
+	if (LLVMParseIRInContext(m->ctx, buffer, &scratch, &error)) {
+		LLVMDisposeMessage(error);
+		return nullptr;
+	}
+
+	LLVMValueRef node = nullptr;
+	if (LLVMGetNamedMetadataNumOperands(scratch, "odin.nocall") == 1) {
+		LLVMGetNamedMetadataOperands(scratch, "odin.nocall", &node);
+	}
+	LLVMDisposeModule(scratch);
+	if (node == nullptr) {
+		return nullptr;
+	}
+
+	// NOTE(bill): the type list is found as the one empty node rather than assuming LLVM's operand order
+	LLVMValueRef operands[16] = {};
+	unsigned operand_count = LLVMGetMDNodeNumOperands(node);
+	if (operand_count > gb_count_of(operands)) {
+		return nullptr;
+	}
+	LLVMGetMDNodeOperands(node, operands);
+	for (unsigned i = 0; i < operand_count; i++) {
+		if (operands[i] != nullptr && LLVMIsAMDNode(operands[i]) && LLVMGetMDNodeNumOperands(operands[i]) == 0) {
+			LLVMReplaceMDNodeOperandWith(node, i, LLVMMDNodeInContext2(m->ctx, types.data, cast(size_t)types.count));
+			return LLVMValueAsMetadata(node);
+		}
+	}
+	return nullptr;
+}
+
 gb_internal LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type) {
 	i64 size = type_size_of(type); // Check size
 	gb_unused(size);
@@ -220,6 +264,15 @@ gb_internal LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type)
 	LLVMDIFlags flags = LLVMDIFlagZero;
 	if (type->Proc.diverging) {
 		flags = LLVMDIFlagNoReturn;
+	}
+
+	// NOTE: a debugger must neither call an Odin procedure nor read its results the C way. DWARF states this with
+	// DW_CC_nocall, the same mark LLVM gives procedures whose signatures it changes. CodeView has no such convention.
+	if (is_calling_convention_odin(type->Proc.calling_convention) && build_context.metrics.os != TargetOs_windows) {
+		LLVMMetadataRef nocall = lb_debug_subroutine_type_nocall(m, slice_from_array(parameters), flags);
+		if (nocall != nullptr) {
+			return nocall;
+		}
 	}
 
 	return LLVMDIBuilderCreateSubroutineType(m->debug_builder, file, parameters.data, cast(unsigned)parameters.count, flags);
