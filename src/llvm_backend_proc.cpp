@@ -761,6 +761,15 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 	p->entry_block = lb_create_block(p, "entry", true);
 	lb_start_block(p, p->entry_block);
 
+	// NOTE(bill): CodeView gives an instruction without a location the line of the next located instruction.
+	// For the parameter stores below that is the first statement of the body.
+	// A breakpoint on that statement would then stop before the stores.
+	// They take the procedure's opening line instead.
+	// DWARF leaves them without a line and keeps its prologue_end after them.
+	if (build_context.metrics.os == TargetOs_windows) {
+		lb_set_debug_position_to_procedure_begin(p);
+	}
+
 	map_init(&p->direct_parameters);
 	p->variadic_reuses.allocator = heap_allocator();
 
