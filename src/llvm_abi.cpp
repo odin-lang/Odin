@@ -29,6 +29,10 @@ struct lbArgType {
 	// A direct argument of struct type passed as one LLVM parameter per element, the way clang passes a
 	// coerced struct. The Odin conventions use it on amd64 for two-word values.
 	bool expand;
+
+	// `cast_type` is a struct of the scalars of `type` in order.
+	// A value is converted one scalar at a time instead of reinterpreted because two memory layouts can differ.
+	bool flattened;
 };
 
 // The number of LLVM parameters the value of a non-ignored `arg` takes, its padding not included
@@ -2292,11 +2296,48 @@ gb_internal lbArgType lb_amd64_odin_return_words(LLVMContextRef c, LLVMTypeRef t
 	return lb_arg_type_direct(type, llreg(c, cls, type), nullptr, nullptr);
 }
 
+gb_internal void lb_scalar_types(LLVMTypeRef t, Array<LLVMTypeRef> *scalars) {
+	switch (LLVMGetTypeKind(t)) {
+	case LLVMStructTypeKind: {
+		unsigned n = LLVMCountStructElementTypes(t);
+		for (unsigned i = 0; i < n; i++) {
+			lb_scalar_types(LLVMStructGetTypeAtIndex(t, i), scalars);
+		}
+		return;
+	}
+	case LLVMArrayTypeKind: {
+		unsigned n = LLVMGetArrayLength(t);
+		LLVMTypeRef elem = OdinLLVMGetArrayElementType(t);
+		for (unsigned i = 0; i < n; i++) {
+			lb_scalar_types(elem, scalars);
+		}
+		return;
+	}
+	}
+	array_add(scalars, t);
+}
+
 gb_internal lbArgType lb_amd64_odin_return(LLVMContextRef c, LLVMTypeRef return_type) {
 	i32 gpr = 0;
 	i32 xmm = 0;
 	if (lb_amd64_odin_count_return_registers(return_type, &gpr, &xmm)) {
-		return lb_arg_type_direct(return_type);
+		lbArgType ret = lb_arg_type_direct(return_type);
+
+		// LLVM returns a nested struct in the same registers as its scalars one after another.
+		// The fast instruction selector used at `-o:none` can only take a scalar out of a call result (one index), not a nested one.
+		bool nested = !lb_is_type_kind(return_type, LLVMStructTypeKind);
+		for (unsigned i = 0; !nested && i < LLVMCountStructElementTypes(return_type); i++) {
+			LLVMTypeKind kind = LLVMGetTypeKind(LLVMStructGetTypeAtIndex(return_type, i));
+			nested = kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind;
+		}
+		if (nested) {
+			auto scalars = array_make<LLVMTypeRef>(heap_allocator(), 0, 8);
+			defer (array_free(&scalars));
+			lb_scalar_types(return_type, &scalars);
+			ret.cast_type = LLVMStructTypeInContext(c, scalars.data, cast(unsigned)scalars.count, false);
+			ret.flattened = true;
+		}
+		return ret;
 	}
 	return lb_amd64_odin_return_words(c, return_type);
 }

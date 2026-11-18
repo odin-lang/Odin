@@ -1106,6 +1106,50 @@ gb_internal LLVMValueRef lb_coerce_fields_store(lbProcedure *p, LLVMValueRef coe
 	return lb_addr_load(p, slot).value;
 }
 
+// A `flattened` cast type lists the scalars of the original type in order (see `lbArgType::flattened`).
+// These two convert between them one scalar at a time.
+gb_internal void lb_flatten_value_into(lbProcedure *p, LLVMValueRef v, LLVMValueRef *flat, unsigned *index) {
+	LLVMTypeRef  type = LLVMTypeOf(v);
+	LLVMTypeKind kind = LLVMGetTypeKind(type);
+	if (kind != LLVMStructTypeKind && kind != LLVMArrayTypeKind) {
+		*flat = LLVMBuildInsertValue(p->builder, *flat, v, (*index)++, "");
+		return;
+	}
+	unsigned count = kind == LLVMStructTypeKind ? LLVMCountStructElementTypes(type) : LLVMGetArrayLength(type);
+	for (unsigned i = 0; i < count; i++) {
+		lb_flatten_value_into(p, LLVMBuildExtractValue(p->builder, v, i, ""), flat, index);
+	}
+}
+
+gb_internal LLVMValueRef lb_flatten_value(lbProcedure *p, LLVMValueRef v, LLVMTypeRef flat_type) {
+	LLVMValueRef flat = LLVMGetUndef(flat_type);
+	unsigned index = 0;
+	lb_flatten_value_into(p, v, &flat, &index);
+	GB_ASSERT(index == LLVMCountStructElementTypes(flat_type));
+	return flat;
+}
+
+gb_internal LLVMValueRef lb_unflatten_value_from(lbProcedure *p, LLVMValueRef flat, LLVMTypeRef type, unsigned *index) {
+	LLVMTypeKind kind = LLVMGetTypeKind(type);
+	if (kind != LLVMStructTypeKind && kind != LLVMArrayTypeKind) {
+		return LLVMBuildExtractValue(p->builder, flat, (*index)++, "");
+	}
+	LLVMValueRef v = LLVMGetUndef(type);
+	unsigned count = kind == LLVMStructTypeKind ? LLVMCountStructElementTypes(type) : LLVMGetArrayLength(type);
+	for (unsigned i = 0; i < count; i++) {
+		LLVMTypeRef elem_type = kind == LLVMStructTypeKind ? LLVMStructGetTypeAtIndex(type, i) : OdinLLVMGetArrayElementType(type);
+		v = LLVMBuildInsertValue(p->builder, v, lb_unflatten_value_from(p, flat, elem_type, index), i, "");
+	}
+	return v;
+}
+
+gb_internal LLVMValueRef lb_unflatten_value(lbProcedure *p, LLVMValueRef flat, LLVMTypeRef type) {
+	unsigned index = 0;
+	LLVMValueRef v = lb_unflatten_value_from(p, flat, type, &index);
+	GB_ASSERT(index == LLVMCountStructElementTypes(LLVMTypeOf(flat)));
+	return v;
+}
+
 gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr, Array<lbValue> const &processed_args, Type *abi_rt, lbAddr context_ptr, ProcInlining inlining, ProcTailing tailing) {
 	GB_ASSERT(p->module->ctx == LLVMGetTypeContext(LLVMTypeOf(value.value)));
 
@@ -1480,6 +1524,8 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			result = lb_emit_call_internal(p, value, {}, processed_args, rt, context_ptr, inlining, tailing);
 			if (ft->ret.coerce_offsets.count > 0) {
 				result.value = lb_coerce_fields_store(p, result.value, rt, &ft->ret);
+			} else if (ft->ret.flattened) {
+				result.value = lb_unflatten_value(p, result.value, ft->ret.type);
 			} else {
 				if (ft->ret.cast_type) {
 					result.value = OdinLLVMBuildTransmute(p, result.value, ft->ret.cast_type);
