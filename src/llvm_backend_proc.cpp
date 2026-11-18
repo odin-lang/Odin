@@ -757,9 +757,13 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 
 	p->builder = LLVMCreateBuilderInContext(p->module->ctx);
 
-	p->decl_block  = lb_create_block(p, "decls", true);
+	// NOTE(bill): The allocas, the argument spills, the parameter stores, and the body all start in one block.
+	// At -o:none a separate block of allocas makes the register allocator spill and reload the arguments across it.
+	// Some targets (arm64) also keep its branch as a real instruction.
+	// DWARF's prologue_end then lands before the parameter stores.
 	p->entry_block = lb_create_block(p, "entry", true);
 	lb_start_block(p, p->entry_block);
+	p->decls_end = LLVMBuildAlloca(p->builder, LLVMInt8TypeInContext(p->module->ctx), "decls.end");
 
 	// NOTE(bill): CodeView gives an instruction without a location the line of the next located instruction.
 	// For the parameter stores below that is the first statement of the body.
@@ -916,7 +920,7 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 						}
 
 						lb_add_entity(p->module, e, ptr);
-						lb_add_debug_param_variable(p, incoming_ptr, e->type, e->token, param_index+1, p->decl_block);
+						lb_add_debug_param_variable(p, incoming_ptr, e->type, e->token, param_index+1, p->curr_block);
 					}
 				}
 			}
@@ -958,22 +962,13 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 	}
 
 	lb_set_debug_position_to_procedure_begin(p);
-	if (p->debug_info != nullptr) {
-		if (p->context_stack.count != 0) {
-			lbBlock *prev_block = p->curr_block;
-			p->curr_block = p->decl_block;
-			lb_add_debug_context_variable(p, lb_find_or_generate_context_ptr(p));
-			p->curr_block = prev_block;
-		}
+	if (p->debug_info != nullptr && p->context_stack.count != 0) {
+		lb_add_debug_context_variable(p, lb_find_or_generate_context_ptr(p));
 	}
 }
 
 gb_internal void lb_end_procedure_body(lbProcedure *p) {
 	lb_set_debug_position_to_procedure_begin(p);
-
-	LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
-	LLVMBuildBr(p->builder, p->entry_block->block);
-	LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);
 
 	LLVMValueRef instr = nullptr;
 
@@ -998,6 +993,9 @@ gb_internal void lb_end_procedure_body(lbProcedure *p) {
 			LLVMBuildUnreachable(p->builder);
 		}
 	}
+
+	LLVMInstructionEraseFromParent(p->decls_end);
+	p->decls_end = nullptr;
 
 	p->curr_block = nullptr;
 	p->state_flags = 0;
@@ -1150,9 +1148,6 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 	}
 
 	GB_ASSERT(arg_index == arg_count);
-
-	LLVMBasicBlockRef curr_block = LLVMGetInsertBlock(p->builder);
-	GB_ASSERT(curr_block != p->decl_block->block);
 
 	{
 		Type *proc_type = base_type(value.type);

@@ -257,8 +257,13 @@ gb_internal void lb_run_instrumentation_pass(lbProcedure *p) {
 	LLVMBuilderRef dummy_builder = LLVMCreateBuilderInContext(m->ctx);
 	defer (LLVMDisposeBuilder(dummy_builder));
 
+	// NOTE(bill): The entry call goes after the allocas at the top of the first block.
 	LLVMBasicBlockRef entry_bb = p->entry_block->block;
-	LLVMPositionBuilder(dummy_builder, entry_bb, LLVMGetFirstInstruction(entry_bb));
+	LLVMValueRef first = LLVMGetFirstInstruction(entry_bb);
+	while (first != nullptr && LLVMIsAAllocaInst(first)) {
+		first = LLVMGetNextInstruction(first);
+	}
+	LLVMPositionBuilder(dummy_builder, entry_bb, first);
 	lb_run_instrumentation_pass_insert_call(p, enter, dummy_builder, true);
 	LLVMRemoveStringAttributeAtIndex(p->value, LLVMAttributeIndex_FunctionIndex, LLVM_V_NAME("instrument-function-entry"));
 

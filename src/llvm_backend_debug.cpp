@@ -1566,7 +1566,11 @@ gb_internal LLVMValueRef lb_debug_storage(lbProcedure *p, LLVMValueRef storage, 
 	}
 	LLVMBasicBlockRef insert_block = LLVMGetInsertBlock(p->builder);
 	LLVMValueRef slot = llvm_alloca(p, LLVMTypeOf(storage), build_context.ptr_size, "");
-	LLVMPositionBuilderAtEnd(p->builder, is_argument ? p->decl_block->block : insert_block);
+	if (is_argument) {
+		lb_position_before_decls_end(p);
+	} else {
+		LLVMPositionBuilderAtEnd(p->builder, insert_block);
+	}
 	LLVMValueRef store = LLVMBuildStore(p->builder, storage, slot);
 	LLVMPositionBuilderAtEnd(p->builder, insert_block);
 

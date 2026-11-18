@@ -416,7 +416,7 @@ struct lbProcedure {
 	Array<lbBranchBlocks> branch_blocks;
 	Scope *          curr_scope;
 	i32              scope_index;
-	lbBlock *        decl_block;
+	LLVMValueRef     decls_end; // placeholder in entry_block: allocas and argument spills go before it
 	lbBlock *        entry_block;
 	lbBlock *        curr_block;
 	lbTargetList *   target_list;
@@ -664,6 +664,7 @@ gb_internal lbValue lb_expr_untyped_const_to_typed(lbModule *m, Ast *expr, Type 
 gb_internal bool lb_is_expr_untyped_const(Ast *expr);
 
 gb_internal LLVMValueRef llvm_alloca(lbProcedure *p, LLVMTypeRef llvm_type, isize alignment, char const *name = "");
+gb_internal void lb_position_before_decls_end(lbProcedure *p);
 
 gb_internal void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, unsigned alignment);
 

@@ -2700,8 +2700,8 @@ gb_internal bool lb_load_reads_alloca_after(lbProcedure *p, LLVMValueRef load, L
 	if (!LLVMIsAAllocaInst(base)) {
 		return false;
 	}
-	LLVMValueRef it = decl_marker != nullptr ? LLVMGetNextInstruction(decl_marker) : LLVMGetFirstInstruction(p->decl_block->block);
-	for (; it != nullptr; it = LLVMGetNextInstruction(it)) {
+	LLVMValueRef it = decl_marker != nullptr ? LLVMGetNextInstruction(decl_marker) : LLVMGetFirstInstruction(p->entry_block->block);
+	for (; it != p->decls_end; it = LLVMGetNextInstruction(it)) {
 		if (it == base) {
 			return true;
 		}
@@ -2795,7 +2795,7 @@ gb_internal void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice
 		return;
 	}
 
-	LLVMValueRef decl_marker = LLVMGetLastInstruction(p->decl_block->block);
+	LLVMValueRef decl_marker = LLVMGetPreviousInstruction(p->decls_end);
 
 	auto inits = array_make<lbValue>(permanent_allocator(), 0, lvals.count);
 
