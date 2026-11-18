@@ -27,37 +27,31 @@ _capture :: #force_no_inline proc(buf: Capture, skip: int) -> (n: int) {
 }
 
 @(private="package")
-_locations_destroy :: proc(locations: []Location, allocator: runtime.Allocator) {
-	for line in locations {
-		if line.file_path != "??" && line.file_path != OOM_MARKER {
-			delete(line.file_path, allocator)
+_locations_destroy :: proc(locations: []Resolved_Location, allocator: runtime.Allocator) {
+	for entry in locations {
+		if entry.location.file_path != "??" && entry.location.file_path != OOM_MARKER {
+			delete(entry.location.file_path, allocator)
 		}
-		if line.procedure != "??" && line.procedure != OOM_MARKER {
-			delete(line.procedure, allocator)
+		if entry.location.procedure != "??" && entry.location.procedure != OOM_MARKER {
+			delete(entry.location.procedure, allocator)
 		}
 	}
 	delete(locations, allocator)
 }
 
 @(private="package")
-_resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (out: []Location, err: Resolve_Error) {
-	{
-		mem_err: runtime.Allocator_Error
-		out, mem_err = make([]Location, len(bt), allocator)
-		if mem_err != nil { return nil, .Allocator_Error }
-	}
-
-	defer if err != nil { _locations_destroy(out, allocator) }
+_resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (out: []Resolved_Location, err: runtime.Allocator_Error) {
+	out = make([]Resolved_Location, len(bt), allocator) or_return
 
 	// Debug info is needed, if we call with out-of-date debug symbols it will return out-of-date info, so better to short-circuit right away.
 	when !ODIN_DEBUG {
-		for &location, i in out {
-			location.file_path = "??"
+		for &entry, i in out {
+			entry.location.file_path = "??"
 
 			builder := strings.builder_make(allocator)
 			strings.write_string(&builder, "0x")
 			strings.write_i64   (&builder, i64(bt[i]), 16)
-			location.procedure = strings.to_string(builder)
+			entry.location.procedure = strings.to_string(builder)
 		}
 		return
 	}
@@ -67,7 +61,11 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 	sync.guard(&_win32_dbghelp_mutex)
 
 	if !win.SymInitialize(process, nil, true) {
-		err = .Resolve_Aborted
+		for &entry in out {
+			entry.location.procedure = "??"
+			entry.location.file_path = "??"
+			entry.error = .Resolve_Aborted
+		}
 		return
 	}
 	defer win.SymCleanup(process)
@@ -81,19 +79,19 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 	symbol.SizeOfStruct = size_of(symbol^)
 	symbol.MaxNameLen = 255
 
-	for &line, i in out {
+	for &entry, i in out {
 		if win.SymFromAddrW(process, win.DWORD64(bt[i]), nil, symbol) {
 			symbol, mem_err := win.wstring_to_utf8(cstring16(&symbol.Name[0]), int(symbol.NameLen), allocator)
 			if mem_err != nil {
-				line.procedure = OOM_MARKER 
+				entry.location.procedure = OOM_MARKER
 			} else if symbol == "??" {
 				delete(symbol, allocator)
-				line.procedure = "??"
+				entry.location.procedure = "??"
 			} else {
-				line.procedure = symbol
+				entry.location.procedure = symbol
 			}
 		} else {
-			line.procedure = "??"
+			entry.location.procedure = "??"
 		}
 
 		lineInfo: win.IMAGEHLP_LINEW64
@@ -101,19 +99,19 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 		if win.SymGetLineFromAddrW64(process, win.DWORD64(bt[i]), &{}, &lineInfo) {
 			file_name, mem_err := win.wstring_to_utf8(lineInfo.FileName, len(lineInfo.FileName), allocator)
 			if mem_err != nil {
-				line.file_path = OOM_MARKER
+				entry.location.file_path = OOM_MARKER
 			} else if file_name == "??" {
 				delete(file_name, allocator)
-				line.file_path = "??"
+				entry.location.file_path = "??"
 			} else {
-				line.file_path = file_name
+				entry.location.file_path = file_name
 			}
-			line.line = i32(lineInfo.LineNumber)
+			entry.location.line = i32(lineInfo.LineNumber)
 		} else {
 			location := strings.builder_make(allocator)
 			strings.write_string(&location, "0x")
 			strings.write_i64   (&location, i64(bt[i]), 16)
-			line.file_path = strings.to_string(location)
+			entry.location.file_path = strings.to_string(location)
 		}
 	}
 

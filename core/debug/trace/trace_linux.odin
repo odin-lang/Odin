@@ -38,16 +38,16 @@ _capture :: #force_no_inline proc(buf: Capture, skip: int) -> (n: int) {
 }
 
 @(private="package")
-_locations_destroy :: proc(locations: []Location, allocator: runtime.Allocator) {
-	for location in locations {
-		if location.file_path != OOM_MARKER { delete(location.file_path, allocator) }
-		if location.procedure != OOM_MARKER { delete(location.procedure, allocator) }
+_locations_destroy :: proc(locations: []Resolved_Location, allocator: runtime.Allocator) {
+	for entry in locations {
+		if entry.location.file_path != OOM_MARKER { delete(entry.location.file_path, allocator) }
+		if entry.location.procedure != OOM_MARKER { delete(entry.location.procedure, allocator) }
 	}
 	delete(locations, allocator)
 }
 
 @(private="package")
-_resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (locations: []Location, err: Resolve_Error) {
+_resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (locations: []Resolved_Location, alloc_err: runtime.Allocator_Error) {
 	foreign lib {
 		backtrace_symbols :: proc(buffer: [^]rawptr, size: c.int) -> [^]cstring ---
 		@(link_name="free")
@@ -58,21 +58,11 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 	msgs := backtrace_symbols(([^]rawptr)(raw_data(bt)), i32(len(bt)))[:len(bt)]
 	defer backtrace_free(raw_data(msgs))
 
-	{
-		mem_err: runtime.Allocator_Error
-		locations, mem_err = make([]Location, len(bt), allocator)
-		if mem_err != nil {
-			return nil, .Allocator_Error
-		}
-	}
-
-	defer if err != nil {
-		_locations_destroy(locations, allocator)
-	}
+	locations = make([]Resolved_Location, len(bt), allocator) or_return
 
 	// Debug info is needed.
 	when !ODIN_DEBUG {
-		fill_unresolved(locations, msgs, allocator)
+		fill_unresolved(locations, msgs, .None, allocator)
 		return
 	}
 
@@ -82,32 +72,46 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 	defer delete(command)
 
 	if _, err := append(&command, SYMBOLIZER_PROGRAM, "--functions", "--exe", ""); err != nil {
-		fill_unresolved(locations, msgs, allocator)
+		fill_unresolved(locations, msgs, .Resolve_Aborted, allocator)
 		return
 	}
 
 	COMMAND_EXE_POS   :: 3
 	COMMAND_START_LEN :: 4
 
-	for msg in msgs {
-		exe, addr := parse_address(msg) or_return
-		if command[COMMAND_EXE_POS] == "" {
-			command[COMMAND_EXE_POS] = exe
-		} else if command[COMMAND_EXE_POS] != exe {
-			i += exec_and_fill(command[:], locations[i:], msgs[i:], allocator, temp_allocator) or_return
+	for msg, j in msgs {
+		exe, addr, parse_err := parse_address(msg)
 
-			command[COMMAND_EXE_POS] = exe
-			resize(&command, COMMAND_START_LEN)
+		if parse_err == nil {
+			if command[COMMAND_EXE_POS] == "" {
+				command[COMMAND_EXE_POS] = exe
+			} else if command[COMMAND_EXE_POS] != exe {
+				i += exec_and_fill(command[:], locations[i:], msgs[i:], allocator, temp_allocator)
+
+				command[COMMAND_EXE_POS] = exe
+				resize(&command, COMMAND_START_LEN)
+			}
+
+			if append(&command, addr) == 1 {
+				continue
+			}
 		}
 
-		if _, err := append(&command, addr); err != nil {
-			fill_unresolved(locations, msgs, allocator)
-			return
+		// Parse/append failure:
+		// execute existing command and mark current location as aborted
+
+		if len(command) > COMMAND_START_LEN {
+			i += exec_and_fill(command[:], locations[i:], msgs[i:], allocator, temp_allocator)
 		}
+		command[COMMAND_EXE_POS] = ""
+		resize(&command, COMMAND_START_LEN)
+
+		fill_unresolved(locations[j:j+1], msgs[j:j+1], .Resolve_Aborted, allocator)
+		i = j+1
 	}
 
 	if len(command) > COMMAND_START_LEN {
-		i += exec_and_fill(command[:], locations[i:], msgs[i:], allocator, temp_allocator) or_return
+		i += exec_and_fill(command[:], locations[i:], msgs[i:], allocator, temp_allocator)
 	}
 
 	return
@@ -121,19 +125,25 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 		return clone
 	}
 
-	fill_unresolved :: proc(locations: []Location, msgs: []cstring, allocator: runtime.Allocator) {
+	fill_unresolved :: proc(locations: []Resolved_Location, msgs: []cstring, err: Resolve_Error, allocator: runtime.Allocator) {
 		for msg, i in msgs {
 			exe, address, parse_err := parse_address(msg)
 			if parse_err != nil {
-				locations[i] = Location {
-					procedure = clone_or_oom_marker(string(msg), allocator),
+				locations[i] = Resolved_Location {
+					location = Location{
+						procedure = clone_or_oom_marker(string(msg), allocator),
+					},
+					error = parse_err,
 				}
 				continue
 			}
 
-			locations[i] = Location {
-				file_path = clone_or_oom_marker(exe,     allocator),
-				procedure = clone_or_oom_marker(address, allocator),
+			locations[i] = Resolved_Location {
+				location = Location{
+					file_path = clone_or_oom_marker(exe,     allocator),
+					procedure = clone_or_oom_marker(address, allocator),
+				},
+				error = err,
 			}
 		}
 	}
@@ -151,20 +161,16 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 		return msg[:open_idx], msg[open_idx+1:close_idx], nil
 	}
 
-	exec_and_fill :: proc(command: []string, locations: []Location, msgs: []cstring, allocator, temp_allocator: runtime.Allocator) -> (filled: int, err: Resolve_Error) {
+	exec_and_fill :: proc(command: []string, locations: []Resolved_Location, msgs: []cstring, allocator, temp_allocator: runtime.Allocator) -> (filled: int) {
 		stdout, exec_errno, success := exec_symbolizer(command, temp_allocator)
 		defer delete(stdout, temp_allocator)
 
 		count := len(command)-COMMAND_START_LEN
 
 		// `SYMBOLIZER_PROGRAM` does not exist, lets fall back to unresolved info.
-		if exec_errno == .ENOENT {
-			fill_unresolved(locations, msgs, allocator)
-			return count, nil
-		}
-
-		if !success {
-			return 0, .Resolve_Aborted
+		if exec_errno == .ENOENT || !success {
+			fill_unresolved(locations, msgs, .Resolve_Aborted, allocator)
+			return count
 		}
 
 		sstdout := string(stdout)
@@ -172,25 +178,31 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 			exe, address, parse_err := parse_address(msgs[i])
 			assert(parse_err == nil)
 
-			procedure := process_line(strings.split_lines_iterator(&sstdout)) or_return
+			procedure, proc_err := process_line(strings.split_lines_iterator(&sstdout))
+			location, loc_err := process_line(strings.split_lines_iterator(&sstdout))
+			if proc_err != nil || loc_err != nil {
+				fill_unresolved(locations[i:], msgs[i:], .Resolve_Aborted, allocator)
+				break
+			}
 			if procedure == "" || procedure == "??" {
 				procedure = address
 			}
 
-			location        := process_line(strings.split_lines_iterator(&sstdout)) or_return
 			file_path, line := split_location(location)
 			if file_path == "" || strings.starts_with(file_path, "??") {
 				file_path = exe
 			}
 
-			locations[i] = {
-				procedure = clone_or_oom_marker(procedure, allocator),
-				file_path = clone_or_oom_marker(file_path, allocator),
-				line      = line,
+			locations[i] = Resolved_Location {
+				location = Location{
+					procedure = clone_or_oom_marker(procedure, allocator),
+					file_path = clone_or_oom_marker(file_path, allocator),
+					line      = line,
+				},
 			}
 		}
 
-		return count, nil
+		return count
 	}
 
 	split_location :: proc(location: string) -> (file_path: string, line: i32) {

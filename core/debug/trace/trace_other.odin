@@ -18,10 +18,11 @@ _capture :: #force_no_inline proc(buf: Capture, skip: int) -> (n: int) {
 }
 
 @(private="package")
-_locations_destroy :: proc(locations: []Location, allocator: runtime.Allocator) {}
+_locations_destroy :: proc(locations: []Resolved_Location, allocator: runtime.Allocator) {}
 
 @(private="package")
-_resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (locations: []Location, err: Resolve_Error) {
+_resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (locations: []Resolved_Location, err: runtime.Allocator_Error) {
+	locations = make([]Resolved_Location, len(bt), allocator) or_return
 	return
 }
 
