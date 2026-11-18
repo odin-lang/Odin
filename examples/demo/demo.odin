@@ -37,8 +37,8 @@ import "core:math/rand"
 	Nightly Builds - https://odin-lang.org/docs/nightly/
 		Get the latest nightly builds of Odin.
 	More Odin Examples - https://github.com/odin-lang/examples
-		This repository contains examples of how certain things can be accomplished 
-		in idiomatic Odin, allowing you learn its semantics, as well as how to use 
+		This repository contains examples of how certain things can be accomplished
+		in idiomatic Odin, allowing you learn its semantics, as well as how to use
 		parts of the core and vendor package collections.
 */
 
@@ -57,7 +57,7 @@ the_basics :: proc() {
 		// Lexical elements and literals
 		// A comment
 
-		my_integer_variable: int // A comment for documentaton
+		my_integer_variable: int // A comment for documentation
 
 		// Multi-line comments begin with /* and end with */. Multi-line comments can
 		// also be nested (unlike in C):
@@ -98,14 +98,14 @@ the_basics :: proc() {
 		// In Odin, if a numeric constant can be represented by a type without
 		// precision loss, it will automatically convert to that type.
 
-		x: int = 1.0 // A float literal but it can be represented by an integer without precision loss
-		// Constant literals are “untyped” which means that they can implicitly convert to a type.
+		x: int = 1.0 // A float literal but it can be represented by an integer without precision loss.
+					 // Constant literals are “untyped” which means that they can implicitly convert to a type.
 
 		y: int // `y` is typed of type `int`
 		y = 1  // `1` is an untyped integer literal which can implicitly convert to `int`
 
-		z: f64 // `z` is typed of type `f64` (64-bit floating point number)
-		z = 1  // `1` is an untyped integer literal which can be implicitly converted to `f64`
+		z: f64  // `z` is typed of type `f64` (64-bit floating point number)
+		z = 1   // `1` is an untyped integer literal which can be implicitly converted to `f64`
 				// No need for any suffixes or decimal places like in other languages
 				// (with the exception of negative zero, which must be given as `-0.0`)
 				// CONSTANTS JUST WORK!!!
@@ -1096,7 +1096,7 @@ parametric_polymorphism :: proc() {
 			// `I` is the type of N
 			// `T` is the type passed
 			fmt.printf("Generating an array of type %v from the value %v of type %v\n",
-					   typeid_of(type_of(res)), N, typeid_of(I))
+						typeid_of(type_of(res)), N, typeid_of(I))
 			for i in 0..<N {
 				res[i] = T(i*i)
 			}
@@ -1216,7 +1216,7 @@ threading_example :: proc() {
 
 
 		for i in 0..<30 {
-			// be mindful of the allocator used for tasks. The allocator needs to be thread safe, or be owned by the task for exclusive use 
+			// be mindful of the allocator used for tasks. The allocator needs to be thread safe, or be owned by the task for exclusive use
 			thread.pool_add_task(&pool, allocator=context.allocator, procedure=task_proc, data=nil, user_index=i)
 		}
 
@@ -1593,7 +1593,7 @@ where_clauses :: proc() {
 	{ // Sanity checks
 		simple_sanity_check :: proc(x: [2]int)
 			where len(x) > 1,
-				  type_of(x) == [2]int {
+					type_of(x) == [2]int {
 			fmt.println(x)
 		}
 	}
@@ -1634,7 +1634,7 @@ where_clauses :: proc() {
 
 		bar :: proc(x: [$N]int) -> bool
 			where 0 < N,
-				  N <= 2 {
+					N <= 2 {
 			fmt.println(#procedure, "was called with the parameter", x)
 			return false
 		}
@@ -1652,7 +1652,7 @@ where_clauses :: proc() {
 	{ // Record types
 		Foo :: struct($T: typeid, $N: int)
 			where intrinsics.type_is_integer(T),
-				  N > 2 {
+					N > 2 {
 			x: [N]T,
 			y: [N-2]T,
 		}
@@ -2536,15 +2536,15 @@ matrix_type :: proc() {
 bit_field_type :: proc() {
 	fmt.println("\n# bit_field type")
 	// A `bit_field` is a record type in Odin that is akin to a bit-packed struct.
-	// IMPORTNAT NOTE: `bit_field` is NOT equivalent to `bit_set` as it has different sematics and use cases.
+	// IMPORTANT NOTE: `bit_field` is NOT equivalent to `bit_set` as it has different semantics and use cases.
 
 	{
 		// `bit_field` fields are accessed by using a dot:
 		Foo :: bit_field u16 {          // backing type must be an integer or array of integers
-		    x: i32     | 3,             // signed integers will be signed extended on use
-		    y: u16     | 2 + 3,         // general expressions
-		    z: My_Enum | SOME_CONSTANT, // ability to define the bit-width elsewhere
-		    w: bool    | 2 when SOME_CONSTANT > 10 else 1,
+			x: i32     | 3,             // signed integers will be signed extended on use
+			y: u16     | 2 + 3,         // general expressions
+			z: My_Enum | SOME_CONSTANT, // ability to define the bit-width elsewhere
+			w: bool    | 2 when SOME_CONSTANT > 10 else 1,
 		}
 
 		v := Foo{}
