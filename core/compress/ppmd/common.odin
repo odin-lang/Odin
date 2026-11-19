@@ -34,6 +34,7 @@ package compress_ppmd
 import "base:intrinsics"
 import "base:runtime"
 import "core:compress"
+import "core:io"
 
 Error         :: compress.Error
 General_Error :: compress.General_Error
@@ -73,6 +74,32 @@ Level :: enum i32 {
 	Best    = Level_9,
 }
 
+Reader :: struct {
+	decoder:     Decoder,
+	window:      []u8,
+	options:     compress.Options,
+	total_in:    i64,
+	err:         Error,
+	allocator:   runtime.Allocator,
+	owns_window: bool,
+}
+
+Writer :: struct {
+	model_h:     ^Model_H,
+	model_i:     ^Model_I,
+	rc_h:        Encoder_H,
+	rc_i:        Coder_I,
+	sink:        Sink,
+	window:      []u8,
+	options:     compress.Options,
+	total_in:    i64,
+	err:         Error,
+	allocator:   runtime.Allocator,
+	end_marker:  bool,
+	finished:    bool,
+	owns_window: bool,
+}
+
 ORDER_MIN      :: 2
 H_ORDER_MAX    :: 64
 I_ORDER_MAX    :: 16
@@ -82,6 +109,7 @@ CUT_OFF_MEM_SIZE_MIN :: (1 + 256 / 2) * 12 * 4 / 3
 PROPERTIES_7Z_SIZE  :: 5
 PROPERTIES_ZIP_SIZE :: 2
 ZIP_MEM_SIZE_MAX    :: 256 << 20
+CHUNK_SIZE          :: 256 * 1024
 
 when size_of(uintptr) == 8 {
 	MEMORY_MAX :: int(#config(PPMD_MEMORY_MAX, MEM_SIZE_MAX))
@@ -121,16 +149,17 @@ decode_properties_7z :: proc "contextless" (data: []u8) -> (props: Properties, e
 	props.variant  = .H
 	props.order    = data[0]
 	props.mem_size = u32(data[1]) | u32(data[2]) << 8 | u32(data[3]) << 16 | u32(data[4]) << 24
-	if !valid_properties(props) {
-		return {}, PPMd_Error.Invalid_Properties
+	if err = check_properties(props); err != nil {
+		return {}, err
 	}
 	return props, nil
 }
 
 encode_properties_7z :: proc "contextless" (props: Properties) -> (data: [PROPERTIES_7Z_SIZE]u8, err: Error) {
-	if props.variant != .H || !valid_properties(props) {
+	if props.variant != .H {
 		return {}, PPMd_Error.Invalid_Properties
 	}
+	check_properties(props) or_return
 	data[0] = props.order
 	for i in 0..<4 {
 		data[1 + i] = u8(props.mem_size >> (8 * uint(i)))
@@ -150,14 +179,15 @@ decode_properties_zip :: proc "contextless" (data: []u8) -> (props: Properties, 
 		return {}, PPMd_Error.Invalid_Properties
 	}
 	props.restore = Restore_Method(w >> 12)
-	if !valid_properties(props) {
-		return {}, PPMd_Error.Invalid_Properties
+	if err = check_properties(props); err != nil {
+		return {}, err
 	}
 	return props, nil
 }
 
 encode_properties_zip :: proc "contextless" (props: Properties) -> (data: [PROPERTIES_ZIP_SIZE]u8, err: Error) {
-	if props.variant != .I || !valid_properties(props) || props.mem_size & (1 << 20 - 1) != 0 || props.mem_size > ZIP_MEM_SIZE_MAX {
+	check_properties(props) or_return
+	if props.variant != .I || props.mem_size & (1 << 20 - 1) != 0 || props.mem_size > ZIP_MEM_SIZE_MAX {
 		return {}, PPMd_Error.Invalid_Properties
 	}
 	w := u32(props.order - 1) | ((props.mem_size >> 20) - 1) << 4 | u32(props.restore) << 12
@@ -167,21 +197,24 @@ encode_properties_zip :: proc "contextless" (props: Properties) -> (data: [PROPE
 }
 
 @(private)
-valid_properties :: proc "contextless" (props: Properties) -> bool {
+check_properties :: proc "contextless" (props: Properties) -> Error {
 	order_max := u8(H_ORDER_MAX) if props.variant == .H else u8(I_ORDER_MAX)
 	if props.order < ORDER_MIN || props.order > order_max {
-		return false
+		return PPMd_Error.Invalid_Properties
 	}
 	if props.mem_size < MEM_SIZE_MIN || props.mem_size > MEM_SIZE_MAX {
-		return false
+		return PPMd_Error.Invalid_Properties
 	}
 	if props.variant == .H {
-		return props.restore == .Restart
+		return nil if props.restore == .Restart else PPMd_Error.Invalid_Properties
 	}
-	if props.restore == .Cut_Off && props.mem_size < CUT_OFF_MEM_SIZE_MIN {
-		return false
+	if props.restore == .Freeze {
+		return PPMd_Error.Unsupported_Restore_Method
 	}
-	return props.restore <= .Freeze
+	if props.restore > .Freeze || (props.restore == .Cut_Off && props.mem_size < CUT_OFF_MEM_SIZE_MIN) {
+		return PPMd_Error.Invalid_Properties
+	}
+	return nil
 }
 
 @(private)
@@ -212,7 +245,6 @@ INIT_BIN_ESC := [8]u16{0x3CDD, 0x1F3F, 0x59BF, 0x48F3, 0x64A1, 0x5ABC, 0x6632, 0
 @(private) FLAG_PREV_HIGH :: 1 << 4
 @(private) EMPTY_NODE_H :: u16(0)
 @(private) EMPTY_NODE_I :: u32(0xFFFF_FFFF)
-@(private) RESTORE_FREEZE :: u32(Restore_Method.Freeze)
 
 @(private)
 State :: struct {
@@ -323,22 +355,40 @@ Model_I :: struct {
 }
 
 @(private)
-Reader :: struct {
-	buf:     []u8,
-	pos:     int,
-	z:       ^compress.Context,
-	overrun: bool,
+Input :: struct {
+	buf:       []u8,
+	pos:       int,
+	z:         ^compress.Context,
+	consumed:  i64,
+	overrun:   bool,
+	input_err: io.Error,
 }
 
 @(private)
-Writer :: struct {
-	buf:   [^]u8,
-	pos:   int,
-	cap:   int,
-	grow:  ^[dynamic]u8,
-	limit: int,
-	full:  bool,
-	err:   Error,
+Decoder :: struct {
+	model_h: ^Model_H,
+	model_i: ^Model_I,
+	rc_h:    Decoder_H,
+	rc_i:    Coder_I,
+	input:   Input,
+	size:    i64,
+	limit:   i64,
+	written: i64,
+	done:    bool,
+}
+
+@(private)
+Sink :: struct {
+	buf:     [^]u8,
+	pos:     int,
+	cap:     int,
+	grow:    ^[dynamic]u8,
+	limit:   int,
+	stream:  io.Writer,
+	flushed: i64,
+	full:    bool,
+	stop:    bool,
+	err:     Error,
 }
 
 @(private)
@@ -374,7 +424,7 @@ sub_allocator_init :: proc(sa: ^Sub_Allocator, size: u32, allocator: runtime.All
 		sa.indx2units[i] = u8(k)
 	}
 	if uint(size) > uint(MEMORY_MAX) {
-		return PPMd_Error.Memory_Limit_Exceeded
+		return General_Error.Memory_Limit_Exceeded
 	}
 	sa.align_offset = (4 - size) & 3
 	data := runtime.mem_alloc_non_zeroed(int(sa.align_offset) + int(size), 16, allocator) or_return

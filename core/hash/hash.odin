@@ -4,7 +4,6 @@ import "base:intrinsics"
 import "core:mem"
 import "core:simd"
 
-@(optimization_mode="favor_size")
 adler32 :: proc "contextless" (data: []byte, seed := u32(1)) -> u32 #no_bounds_check {
 	ADLER_CONST :: 65521
 	LANES       :: 16
@@ -22,6 +21,14 @@ adler32 :: proc "contextless" (data: []byte, seed := u32(1)) -> u32 #no_bounds_c
 
 	a, b: u64 = u64(seed) & 0xFFFF, u64(seed) >> 16
 	buf := data
+
+	when ADLER32_SIMD {
+		if len(buf) >= ADLER32_SIMD_MIN && adler32_simd_available() {
+			consumed: int
+			a, b, consumed = adler32_simd(a, b, buf)
+			buf = buf[consumed:]
+		}
+	}
 
 	for len(buf) >= LANES {
 		chunks := min(len(buf) / LANES, MAX_CHUNKS)

@@ -29,9 +29,12 @@ Inputs:
 
 Returns:
 - res: The hex-encoded result
-- err: An optional allocator error if one occured, `.None` otherwise
+- err: An optional allocator error if one occurred, `.None` otherwise
 */
 encode :: proc(src: []byte, allocator := context.allocator, loc := #caller_location) -> (res: []byte, err: runtime.Allocator_Error) #optional_allocator_error {
+	if len(src) > max(int) / 2 {
+		return nil, .Out_Of_Memory
+	}
 	res = make([]byte, len(src) * 2, allocator, loc) or_return
 	#no_bounds_check for i, j := 0, 0; i < len(src); i += 1 {
 		v := src[i]
@@ -50,13 +53,10 @@ Inputs:
 - src: The `[]byte` to be hex-encoded
 
 Returns:
-- err: An `io.Error` if one occured, `.None` otherwise
+- err: An `io.Error` if one occurred, `.None` otherwise
 */
 encode_into_writer :: proc(dst: io.Writer, src: []byte) -> (err: io.Error) {
-	for v in src {
-		io.write(dst, {LOWER[v>>4], LOWER[v&0x0f]}) or_return
-	}
-	return
+	return encode_into_writer_table(dst, src, LOWER)
 }
 
 /*
@@ -71,9 +71,12 @@ Inputs:
 
 Returns:
 - res: The hex-encoded result
-- err: An optional allocator error if one occured, `.None` otherwise
+- err: An optional allocator error if one occurred, `.None` otherwise
 */
 encode_upper :: proc(src: []byte, allocator := context.allocator, loc := #caller_location) -> (res: []byte, err: runtime.Allocator_Error) #optional_allocator_error {
+	if len(src) > max(int) / 2 {
+		return nil, .Out_Of_Memory
+	}
 	res = make([]byte, len(src) * 2, allocator, loc) or_return
 	#no_bounds_check for i, j := 0, 0; i < len(src); i += 1 {
 		v := src[i]
@@ -92,13 +95,10 @@ Inputs:
 - src: The `[]byte` to be hex-encoded
 
 Returns:
-- err: An `io.Error` if one occured, `.None` otherwise
+- err: An `io.Error` if one occurred, `.None` otherwise
 */
 encode_upper_into_writer :: proc(dst: io.Writer, src: []byte) -> (err: io.Error) {
-	for v in src {
-		io.write(dst, {UPPER[v>>4], UPPER[v&0x0f]}) or_return
-	}
-	return
+	return encode_into_writer_table(dst, src, UPPER)
 }
 
 /*
@@ -112,42 +112,33 @@ Inputs:
 - loc: The caller location for debugging purposes (default: #caller_location)
 
 Returns:
-- dst: The hex sequence decoded into bytes
-- ok:  A bool, `true` if decoding succeeded, `false` otherwise
+- dst: The hex sequence decoded into bytes, `nil` on failure
+- err: `.Invalid_Length` if `len(src)` is odd, else an allocator error if one occurred, else
+  `.Invalid_Character` if `src` holds a byte that isn't a hex digit, `nil` otherwise
 */
-decode :: proc(src: []byte, allocator := context.allocator, loc := #caller_location) -> (dst: []byte, ok: bool) {
+decode :: proc(src: []byte, allocator := context.allocator, loc := #caller_location) -> (dst: []byte, err: Error) {
 	if len(src) % 2 == 1 {
-		return
+		return nil, .Invalid_Length
 	}
 
-	err: runtime.Allocator_Error
-	dst, err = make([]byte, len(src) / 2, allocator, loc)
-	if err != nil {
-		return
-	}
+	dst = make([]byte, len(src) / 2, allocator, loc) or_return
 
 	#no_bounds_check for i, j := 0, 1; j < len(src); j += 2 {
 		p := src[j-1]
 		q := src[j]
 
 		a, a_ok := hex_digit(p)
-		if !a_ok {
-			delete(dst, allocator)
-			dst = nil
-			return
-		}
 		b, b_ok := hex_digit(q)
-		if !b_ok {
-			delete(dst, allocator)
-			dst = nil
-			return
+		if !a_ok || !b_ok {
+			delete(dst, allocator, loc)
+			return nil, .Invalid_Character
 		}
 
 		dst[i] = (a << 4) | b
 		i += 1
 	}
 
-	return dst, true
+	return dst, nil
 }
 
 /*
@@ -155,11 +146,13 @@ Decodes a hex sequence into a byte slice
 
 Inputs:
 - src: The `[]byte` to be hex-decoded
-- buf: A buffer large enough to hold the decoded sequence
+- buf: A buffer large enough to hold the decoded sequence, or `src` itself to decode in place
 
 Returns:
-- dst: The hex sequence decoded into bytes
-- ok:  A bool, `true` if decoding succeeded, `false` otherwise
+- dst: `buf[:len(src) / 2]` holding the decoded bytes, `nil` on failure
+- ok:  `false` if `len(src)` is odd, if `buf` is shorter than `len(src) / 2`, or if `src`
+  holds a byte that isn't a hex digit, `true` otherwise. In the last case `buf` already
+  holds the bytes decoded from the pairs before the bad one.
 */
 decode_into_buffer :: proc(src: []byte, buf: []byte) -> (dst: []byte, ok: bool) #optional_ok {
 	if len(src) % 2 == 1 {
@@ -185,14 +178,14 @@ decode_into_buffer :: proc(src: []byte, buf: []byte) -> (dst: []byte, ok: bool) 
 }
 
 /*
-Decodes the first byte in a hex sequence to a byte
+Decodes two hex digits, optionally prefixed with `0x` or `0X`, to a byte
 
 Inputs:
 - str: A hex-encoded `string`, e.g. `"0x23"`
 
 Returns:
 - res: The decoded byte, e.g. `'#'`
-- ok:  A bool, `true` if decoding succeeded, `false` otherwise
+- ok:  `false` if `str` isn't two hex digits after the optional prefix, `true` otherwise
 */
 decode_sequence :: proc(str: string) -> (res: byte, ok: bool) {
 	str := str
@@ -224,6 +217,25 @@ UPPER := [16]byte {
 	'4', '5', '6', '7',
 	'8', '9', 'A', 'B',
 	'C', 'D', 'E', 'F',
+}
+
+@(private)
+encode_into_writer_table :: proc(dst: io.Writer, src: []byte, table: [16]byte) -> (err: io.Error) {
+	buf: [256]byte
+	n := 0
+	for v in src {
+		buf[n]   = table[v>>4]
+		buf[n+1] = table[v&0x0f]
+		n += 2
+		if n == len(buf) {
+			io.write_full(dst, buf[:]) or_return
+			n = 0
+		}
+	}
+	if n > 0 {
+		io.write_full(dst, buf[:n]) or_return
+	}
+	return
 }
 
 @(private)

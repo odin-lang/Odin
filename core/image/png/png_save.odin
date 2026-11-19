@@ -47,7 +47,7 @@ save_to_buffer :: proc(output: ^[dynamic]byte, img: ^Image, options := Options{}
 	}
 
 	filtered_size := (row_stride + 1) * img.height
-	bound         := deflate.deflate_bound(filtered_size)
+	bound         := deflate.compress_zlib_bound(filtered_size)
 	if bound < 0 || bound > compress.COMPRESS_OUTPUT_ALLOCATE_MAX {
 		return .Image_Dimensions_Too_Large
 	}
@@ -79,7 +79,7 @@ save_to_buffer :: proc(output: ^[dynamic]byte, img: ^Image, options := Options{}
 	s := new(deflate.Deflate) or_return
 	defer free(s)
 
-	written := deflate.deflate_zlib_to_slice(s, buf[SAVE_DATA_OFFSET:][:bound], filtered, level) or_return
+	written := deflate.compress_zlib_to_slice(s, buf[SAVE_DATA_OFFSET:][:bound], filtered, level) or_return
 	if written > int(max(i32)) {
 		return .Image_Dimensions_Too_Large
 	}

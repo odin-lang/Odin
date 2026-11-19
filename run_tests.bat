@@ -52,6 +52,7 @@ if not defined ODIN_TESTS_NO_CLANG (
 @rem Normal Core library tests
 @pushd tests\core
 ..\..\odin test normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address %SLIM_DEFINE% || exit /b
+..\..\odin test compress.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address %SLIM_DEFINE% || exit /b
 @popd
 
 @rem Vendor library tests

@@ -1,28 +1,28 @@
 package compress_bzip2
 
 import "base:intrinsics"
+import "base:runtime"
 import "core:compress"
+import "core:io"
 
 decompress :: proc{decompress_from_bytes, decompress_from_context}
 
-decompress_from_bytes :: proc(output: ^[dynamic]u8, input: []u8, expected_output_size := -1, max_output_size := compress.COMPRESS_OUTPUT_ALLOCATE_MAX, allocator := context.allocator) -> (err: Error) {
+decompress_from_bytes :: proc(output: ^[dynamic]u8, input: []u8, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
 	input := input
 	ctx   := compress.init_context_from_slice(&input, output=output)
-	return decompress_from_context(&ctx, expected_output_size, max_output_size, allocator)
+	return decompress_from_context(&ctx, expected_output_size, options, allocator)
 }
 
-decompress_from_context :: proc(z: ^compress.Context, expected_output_size := -1, max_output_size := compress.COMPRESS_OUTPUT_ALLOCATE_MAX, allocator := context.allocator) -> (err: Error) {
+decompress_from_context :: proc(z: ^compress.Context, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
-	if z.output == nil || max_output_size < 0 {
+	max_output_size := compress.output_limit(options)
+	if z.output == nil || max_output_size < 0 || options.progress_interval < 0 {
 		return General_Error.Incompatible_Options
 	}
 
-	expected := expected_output_size
-	if expected <= 0 && z.size_unpacked > 0 && z.size_unpacked <= i64(max(int)) {
-		expected = int(z.size_unpacked)
-	}
-	limit := max_output_size
-	if expected > 0 {
+	expected := compress.declared_size(expected_output_size)
+	limit    := max_output_size
+	if expected >= 0 {
 		if expected > limit {
 			return General_Error.Output_Too_Short
 		}
@@ -37,6 +37,13 @@ decompress_from_context :: proc(z: ^compress.Context, expected_output_size := -1
 
 	input_size := len(z.window) if memory else compress.input_size(z)
 	non_zero_reserve(z.output, min(compress.output_reservation(expected, bzip2_decompress_bound(input_size) if input_size >= 0 else -1, input_size), limit)) or_return
+
+	total_out := i64(expected)
+	interval  := compress.progress_interval(options)
+	mark      := max(int)
+	if options.progress != nil {
+		mark = interval
+	}
 
 	written := 0
 	defer {
@@ -54,53 +61,72 @@ decompress_from_context :: proc(z: ^compress.Context, expected_output_size := -1
 	pending: [BZIP2_INTERLEAVE]BZip2_Pending = ---
 	d: BZip2_Decoder = ---
 
-	for streams := 0; ; streams += 1 {
-		if !memory && !br.eof && len(br.data) - br.pos < 4 {
-			bzip2_fill(&br, 4)
+	stream_loop: for streams := 0; ; streams += 1 {
+		nblock_max, at_end := bzip2_stream_header(&br, streams) or_return
+		if at_end {
+			break stream_loop
 		}
-		header := br.data[br.pos:]
-		if len(header) < 4 || header[0] != 'B' || header[1] != 'Z' || header[2] != 'h' || header[3] < '1' || header[3] > '9' {
-			if streams > 0 {
-				return nil
-			}
-			if len(header) < 4 {
-				return General_Error.Stream_Too_Short
-			}
-			return BZip2_Error.Invalid_Magic
-		}
-		nblock_max := int(header[3] - '0') * BZIP2_BLOCK_UNIT
 
-		br.pos  += 4
-		br.bits  = 0
-		br.count = 0
 		combined: u32
 		np := 0
+		block_err: Error
 		for {
+			if written >= mark {
+				compress.report_progress(options, bzip2_bytes_in(&br), i64(written), i64(input_size), total_out) or_return
+				mark = written + interval if interval < max(int) - written else max(int)
+			}
 			magic := u64(bzip2_bits(&br, 24)) << 24
 			magic |= u64(bzip2_bits(&br, 24))
 			stored_crc := bzip2_bits(&br, 32)
-			bzip2_check_overrun(&br) or_return
+			if block_err = bzip2_check_overrun(&br); block_err != nil {
+				break
+			}
 			if magic == END_MAGIC {
-				written = bzip2_flush(z.output, written, limit, tts[:], scratch[:], pending[:np], &combined) or_return
+				written, err = bzip2_flush(z.output, written, limit, tts[:], scratch[:], pending[:np], &combined)
+				if err != nil {
+					break stream_loop
+				}
 				if stored_crc != combined {
 					return BZip2_Error.Stream_Checksum_Failed
+				}
+				if written >= mark {
+					compress.report_progress(options, bzip2_bytes_in(&br), i64(written), i64(input_size), total_out) or_return
+					mark = written + interval if interval < max(int) - written else max(int)
 				}
 				break
 			}
 			if magic != BLOCK_MAGIC {
-				return BZip2_Error.Invalid_Block_Magic
+				block_err = BZip2_Error.Invalid_Block_Magic
+				break
 			}
 
 			if len(tts[np]) < nblock_max {
 				delete(tts[np])
 				tts[np] = nil
-				tts[np] = non_zero_make([]u32, nblock_max) or_return
+				tts[np], block_err = non_zero_make([]u32, nblock_max)
+				if block_err != nil {
+					break
+				}
 			}
-			nblock, orig_ptr, randomised := bzip2_decode_block(&d, &br, tts[np][:nblock_max]) or_return
+			nblock, orig_ptr: int
+			randomised: bool
+			nblock, orig_ptr, randomised, block_err = bzip2_decode_block(&d, &br, tts[np][:nblock_max])
+			if block_err != nil {
+				if overrun_err := bzip2_check_overrun(&br); overrun_err != nil {
+					block_err = overrun_err
+				}
+				break
+			}
 			if randomised {
-				written = bzip2_flush(z.output, written, limit, tts[:], scratch[:], pending[:np], &combined) or_return
+				written, err = bzip2_flush(z.output, written, limit, tts[:], scratch[:], pending[:np], &combined)
+				if err != nil {
+					break stream_loop
+				}
 				start := written
-				written = bzip2_emit_block(z.output, written, limit, tts[np][:nblock], orig_ptr, true) or_return
+				written, err = bzip2_emit_block(z.output, written, limit, tts[np][:nblock], orig_ptr, true)
+				if err != nil {
+					break stream_loop
+				}
 				block_crc := ~bzip2_crc(0xffff_ffff, z.output[start:written])
 				if block_crc != stored_crc {
 					return BZip2_Error.Block_Checksum_Failed
@@ -112,24 +138,152 @@ decompress_from_context :: proc(z: ^compress.Context, expected_output_size := -1
 			pending[np] = {nblock, orig_ptr, stored_crc}
 			np += 1
 			if np == BZIP2_INTERLEAVE {
-				written = bzip2_flush(z.output, written, limit, tts[:], scratch[:], pending[:np], &combined) or_return
+				written, err = bzip2_flush(z.output, written, limit, tts[:], scratch[:], pending[:np], &combined)
+				if err != nil {
+					break stream_loop
+				}
 				np = 0
 			}
 		}
-
-		next := br.pos - int(br.count / 8)
-		br.bits  = 0
-		br.count = 0
-		if next < 0 {
-			z.window = br.data
-			if !compress.rewind(z, -next) {
-				return General_Error.Stream_Too_Short
+		if block_err != nil {
+			written, err = bzip2_flush(z.output, written, limit, tts[:], scratch[:], pending[:np], &combined)
+			if err != nil {
+				break stream_loop
 			}
-			br.data = z.window
-			next    = 0
+			return block_err
 		}
-		br.pos = next
+		bzip2_stream_end(z, &br) or_return
 	}
+	if expected >= 0 && (err == General_Error.Output_Too_Short || (err == nil && written != expected)) {
+		return General_Error.Size_Mismatch
+	}
+	return
+}
+
+decompress_to_writer :: proc(w: io.Writer, z: ^compress.Context, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
+	r: Reader
+	defer reader_destroy(&r)
+	bzip2_stream_init(&r, z, expected_output_size, options, allocator) or_return
+	for !r.done {
+		fill_err := bzip2_stream_fill(&r)
+		produced := r.written > r.flushed
+		if produced {
+			_, write_err := io.write_full(w, r.window[r.flushed:r.written])
+			if write_err != nil {
+				return write_err
+			}
+			r.flushed = r.written
+		}
+		if fill_err != nil {
+			return fill_err
+		}
+		if produced || r.done {
+			bzip2_reader_progress(&r) or_return
+		}
+	}
+	return nil
+}
+
+reader_init :: proc(r: ^Reader, z: ^compress.Context, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
+	err   = bzip2_stream_init(r, z, expected_output_size, options, allocator)
+	r.err = err
+	return
+}
+
+reader_read :: proc(r: ^Reader, p: []u8) -> (n: int, err: Error) {
+	was_done := r.done
+	for n < len(p) {
+		if r.flushed < r.written {
+			copied   := copy(p[n:], r.window[r.flushed:r.written])
+			r.flushed += copied
+			n         += copied
+		} else if r.done || r.err != nil {
+			break
+		} else {
+			r.err = bzip2_stream_fill(r)
+		}
+	}
+	if (n > 0 || (r.done && !was_done)) && r.err == nil {
+		if r.err = bzip2_reader_progress(r); r.err != nil {
+			r.flushed = r.written
+		}
+	}
+	if n > 0 || r.flushed < r.written {
+		return n, nil
+	}
+	if r.err != nil {
+		return 0, r.err
+	}
+	if len(p) > 0 && r.done {
+		return 0, io.Error.EOF
+	}
+	return 0, nil
+}
+
+reader_to_stream :: proc(r: ^Reader) -> (s: io.Stream) {
+	s.data      = r
+	s.procedure = bzip2_reader_stream_proc
+	return
+}
+
+reader_destroy :: proc(r: ^Reader) {
+	if r.owns_window {
+		delete(r.window, r.allocator)
+	}
+	for k in 0..<BZIP2_INTERLEAVE {
+		delete(r.tts[k], r.allocator)
+		delete(r.scratch[k], r.allocator)
+		r.tts[k]     = nil
+		r.scratch[k] = nil
+	}
+	free(r.decoder, r.allocator)
+	r.decoder     = nil
+	r.window      = nil
+	r.written     = 0
+	r.flushed     = 0
+	r.owns_window = false
+}
+
+@(private)
+bzip2_stream_header :: proc(br: ^BZip2_Bit_Reader, streams: int) -> (nblock_max: int, at_end: bool, err: Error) {
+	if br.z != nil && !br.eof && len(br.data) - br.pos < 4 {
+		bzip2_fill(br, 4)
+	}
+	if br.input_err != nil {
+		return 0, false, br.input_err
+	}
+	header := br.data[br.pos:]
+	if len(header) < 4 || header[0] != 'B' || header[1] != 'Z' || header[2] != 'h' || header[3] < '1' || header[3] > '9' {
+		if streams > 0 {
+			return 0, true, nil
+		}
+		if len(header) < 4 {
+			return 0, false, General_Error.Stream_Too_Short
+		}
+		return 0, false, BZip2_Error.Invalid_Magic
+	}
+	br.pos  += 4
+	br.bits  = 0
+	br.count = 0
+	return int(header[3] - '0') * BZIP2_BLOCK_UNIT, false, nil
+}
+
+@(private)
+bzip2_stream_end :: proc(z: ^compress.Context, br: ^BZip2_Bit_Reader) -> (err: Error) {
+	next := br.pos - int(br.count / 8)
+	br.bits  = 0
+	br.count = 0
+	if next < 0 {
+		z.window = br.data
+		if !compress.rewind(z, -next) {
+			return General_Error.Stream_Too_Short
+		}
+		br.data      = z.window
+		br.consumed += i64(next)
+		next         = 0
+	}
+	br.pos = next
+	return nil
 }
 
 @(private)
@@ -175,9 +329,13 @@ bzip2_refill_slow :: proc(br: ^BZip2_Bit_Reader) #no_bounds_check {
 
 @(private)
 bzip2_fill :: proc(br: ^BZip2_Bit_Reader, need: int) {
-	br.z.window = br.data[br.pos:]
-	if compress.refill_window(br.z, need) != nil {
+	br.consumed += i64(br.pos)
+	br.z.window  = br.data[br.pos:]
+	if refill_err := compress.refill_window(br.z, need); refill_err != nil {
 		br.eof = true
+		if refill_err != .EOF && refill_err != .Unexpected_EOF && refill_err != .Short_Buffer {
+			br.input_err = refill_err
+		}
 	}
 	br.data = br.z.window
 	br.pos  = 0
@@ -195,8 +353,21 @@ bzip2_bits :: #force_inline proc (br: ^BZip2_Bit_Reader, n: uint) -> u32 {
 }
 
 @(private)
+bzip2_bytes_in :: proc "contextless" (br: ^BZip2_Bit_Reader) -> (n: i64) {
+	return br.consumed + i64(min(br.pos - int(br.count >> 3), len(br.data)))
+}
+
+@(private)
+bzip2_reader_progress :: proc(r: ^Reader) -> (err: Error) {
+	return compress.report_progress(r.options, bzip2_bytes_in(&r.br), r.total - i64(r.written - r.flushed), r.total_in, r.total_out)
+}
+
+@(private)
 bzip2_check_overrun :: proc "contextless" (br: ^BZip2_Bit_Reader) -> Error {
 	if br.pos * 8 - int(br.count) > len(br.data) * 8 {
+		if br.input_err != nil {
+			return br.input_err
+		}
 		return General_Error.Stream_Too_Short
 	}
 	return nil
@@ -460,7 +631,9 @@ bzip2_emit_block :: proc(output: ^[dynamic]u8, written, limit: int, tt: []u32, o
 		}
 
 		if pos >= len(output) {
-			bzip2_grow(output, pos + 1, limit) or_return
+			if err = bzip2_grow(output, pos + 1, limit); err != nil {
+				return pos, err
+			}
 		}
 		output[pos] = u8(c)
 		pos += 1
@@ -494,7 +667,9 @@ bzip2_emit_block :: proc(output: ^[dynamic]u8, written, limit: int, tt: []u32, o
 		}
 
 		if pos + n > len(output) {
-			bzip2_grow(output, pos + n, limit) or_return
+			if err = bzip2_grow(output, pos + n, limit); err != nil {
+				return bzip2_overflow(output, pos, limit, u8(prev), err)
+			}
 		}
 		for &b in output[pos:pos + n] {
 			b = u8(prev)
@@ -513,7 +688,9 @@ bzip2_flush :: proc(output: ^[dynamic]u8, written, limit: int, tts: [][]u32, scr
 	case 0:
 		return pos, nil
 	case 1:
-		pos = bzip2_emit_block(output, pos, limit, tts[0][:pend[0].nblock], pend[0].orig_ptr, false) or_return
+		if pos, err = bzip2_emit_block(output, pos, limit, tts[0][:pend[0].nblock], pend[0].orig_ptr, false); err != nil {
+			return pos, err
+		}
 		block_crc := ~bzip2_crc(0xffff_ffff, output[written:pos])
 		if block_crc != pend[0].crc {
 			return pos, BZip2_Error.Block_Checksum_Failed
@@ -526,7 +703,9 @@ bzip2_flush :: proc(output: ^[dynamic]u8, written, limit: int, tts: [][]u32, scr
 		if len(scratch[k]) < p.nblock {
 			delete(scratch[k])
 			scratch[k] = nil
-			scratch[k] = non_zero_make([]u8, len(tts[k])) or_return
+			if scratch[k], err = non_zero_make([]u8, len(tts[k])); err != nil {
+				return pos, err
+			}
 		}
 	}
 	switch len(pend) {
@@ -538,7 +717,9 @@ bzip2_flush :: proc(output: ^[dynamic]u8, written, limit: int, tts: [][]u32, scr
 
 	for p, k in pend {
 		start := pos
-		pos = bzip2_unrle(output, pos, limit, scratch[k][:p.nblock]) or_return
+		if pos, err = bzip2_unrle(output, pos, limit, scratch[k][:p.nblock]); err != nil {
+			return pos, err
+		}
 		block_crc := ~bzip2_crc(0xffff_ffff, output[start:pos])
 		if block_crc != p.crc {
 			return pos, BZip2_Error.Block_Checksum_Failed
@@ -580,7 +761,9 @@ bzip2_walk :: proc "contextless" (tts: [][]u32, scratch: [][]u8, pend: []BZip2_P
 bzip2_unrle :: proc(output: ^[dynamic]u8, written, limit: int, s: []u8) -> (new_written: int, err: Error) #no_bounds_check {
 	pos := written
 	if pos + len(s) > len(output) {
-		bzip2_grow(output, min(pos + len(s), limit), limit) or_return
+		if err = bzip2_grow(output, min(pos + len(s), limit), limit); err != nil {
+			return pos, err
+		}
 	}
 	i := 0
 	for i < len(s) {
@@ -591,7 +774,9 @@ bzip2_unrle :: proc(output: ^[dynamic]u8, written, limit: int, s: []u8) -> (new_
 				n += int(s[i + 4])
 			}
 			if pos + n > len(output) {
-				bzip2_grow(output, pos + n, limit) or_return
+				if err = bzip2_grow(output, pos + n, limit); err != nil {
+					return bzip2_overflow(output, pos, limit, c, err)
+				}
 			}
 			for &b in output[pos:pos + n] {
 				b = c
@@ -601,13 +786,29 @@ bzip2_unrle :: proc(output: ^[dynamic]u8, written, limit: int, s: []u8) -> (new_
 			continue
 		}
 		if pos >= len(output) {
-			bzip2_grow(output, pos + 1, limit) or_return
+			if err = bzip2_grow(output, pos + 1, limit); err != nil {
+				return pos, err
+			}
 		}
 		output[pos] = c
 		pos += 1
 		i   += 1
 	}
 	return pos, nil
+}
+
+@(private)
+bzip2_overflow :: proc(output: ^[dynamic]u8, pos, limit: int, c: u8, grow_err: Error) -> (new_written: int, err: Error) {
+	if grow_err != General_Error.Output_Too_Short || pos >= limit {
+		return pos, grow_err
+	}
+	if err = bzip2_grow(output, limit, limit); err != nil {
+		return pos, err
+	}
+	for &b in output[pos:limit] {
+		b = c
+	}
+	return limit, grow_err
 }
 
 @(private)
@@ -636,4 +837,329 @@ bzip2_crc :: proc "contextless" (crc: u32, data: []u8) -> u32 #no_bounds_check {
 		crc = (crc << 8) ~ BZIP2_CRC_TABLE[0][(crc >> 24) ~ u32(b)]
 	}
 	return crc
+}
+
+@(private)
+bzip2_stream_init :: proc(r: ^Reader, z: ^compress.Context, expected_output_size: int, options: compress.Options, allocator: runtime.Allocator) -> (err: Error) {
+	r^ = {}
+	r.z          = z
+	r.allocator  = allocator
+	r.limit      = -1
+	r.crc        = 0xffff_ffff
+	r.memory_max = compress.memory_limit(options)
+	r.options    = options
+	r.total_in   = -1
+	r.total_out  = -1
+	r.br         = BZip2_Bit_Reader{data = z.window}
+	if !compress.is_memory_context(z) {
+		r.br.z = z
+	}
+
+	if options.max_output_size < 0 || options.max_memory < 0 || options.chunk_size < 0 || options.progress_interval < 0 {
+		return General_Error.Incompatible_Options
+	}
+	expected := i64(compress.declared_size(expected_output_size))
+	r.total_out = expected
+	if options.progress != nil {
+		r.total_in = i64(compress.input_size(z))
+	}
+	if options.max_output_size > 0 {
+		r.limit = i64(options.max_output_size)
+	}
+	if expected >= 0 {
+		if r.limit >= 0 && expected > r.limit {
+			return General_Error.Output_Too_Short
+		}
+		r.limit = expected
+	}
+
+	if options.buffer != nil {
+		if len(options.buffer) == 0 {
+			return General_Error.Incompatible_Options
+		}
+		r.window = options.buffer
+	} else {
+		size := options.chunk_size if options.chunk_size > 0 else CHUNK_SIZE
+		if r.limit >= 0 && r.limit < i64(size) {
+			size = int(r.limit)
+		}
+		if size > r.memory_max - size_of(BZip2_Decoder) {
+			return General_Error.Memory_Limit_Exceeded
+		}
+		r.window      = non_zero_make([]u8, size, allocator) or_return
+		r.owns_window = true
+	}
+	r.decoder = new(BZip2_Decoder, allocator) or_return
+	return nil
+}
+
+@(private)
+bzip2_stream_reserve :: proc(r: ^Reader, nblock_max: int) -> (err: Error) {
+	fixed := size_of(BZip2_Decoder) + (len(r.window) if r.owns_window else 0)
+	if fixed + 5 * nblock_max > r.memory_max {
+		return General_Error.Memory_Limit_Exceeded
+	}
+	k := BZIP2_INTERLEAVE
+	for k > 1 && fixed + k * 5 * nblock_max > r.memory_max {
+		k -= 1
+	}
+	for j in k..<BZIP2_INTERLEAVE {
+		delete(r.tts[j], r.allocator)
+		delete(r.scratch[j], r.allocator)
+		r.tts[j]     = nil
+		r.scratch[j] = nil
+	}
+	r.interleave = k
+	r.nblock_max = nblock_max
+	return nil
+}
+
+@(private)
+bzip2_stream_walk :: proc(r: ^Reader) -> (err: Error) {
+	for k in 0..<r.count {
+		if len(r.scratch[k]) < r.pending[k].nblock {
+			delete(r.scratch[k], r.allocator)
+			r.scratch[k] = nil
+			r.scratch[k] = non_zero_make([]u8, len(r.tts[k]), r.allocator) or_return
+		}
+	}
+	n := r.count - 1 if r.randomised else r.count
+	switch n {
+	case 1: bzip2_walk(r.tts[:], r.scratch[:], r.pending[:1], 1)
+	case 2: bzip2_walk(r.tts[:], r.scratch[:], r.pending[:2], 2)
+	case 3: bzip2_walk(r.tts[:], r.scratch[:], r.pending[:3], 3)
+	case 4: bzip2_walk(r.tts[:], r.scratch[:], r.pending[:4], 4)
+	}
+	if r.randomised {
+		p := r.pending[n]
+		bzip2_walk_randomised(r.tts[n], r.scratch[n], p.nblock, p.orig_ptr)
+	}
+	return nil
+}
+
+@(private)
+bzip2_walk_randomised :: proc "contextless" (tt: []u32, s: []u8, nblock, orig_ptr: int) #no_bounds_check {
+	t       := tt[orig_ptr] >> 8
+	r_to_go := 0
+	r_pos   := 0
+	for i in 0..<nblock {
+		t = tt[t]
+		c := u8(t)
+		t >>= 8
+		if r_to_go == 0 {
+			r_to_go = int(BZIP2_RAND_TABLE[r_pos])
+			r_pos   = (r_pos + 1) & 511
+		}
+		r_to_go -= 1
+		if r_to_go == 1 {
+			c ~= 1
+		}
+		s[i] = c
+	}
+}
+
+@(private)
+bzip2_unrle_window :: proc(r: ^Reader, s: []u8, capacity: int) -> (finished: bool) #no_bounds_check {
+	out := r.window
+	pos := r.written
+	if r.run > 0 {
+		k := min(r.run, capacity - pos)
+		for &b in out[pos:pos + k] {
+			b = r.run_byte
+		}
+		pos   += k
+		r.run -= k
+		if r.run > 0 {
+			r.written = pos
+			return false
+		}
+	}
+	i := r.emit_pos
+	for i < len(s) {
+		c := s[i]
+		if i + 3 < len(s) && s[i + 1] == c && s[i + 2] == c && s[i + 3] == c {
+			n := 4
+			if i + 4 < len(s) {
+				n += int(s[i + 4])
+			}
+			i += 5
+			k := min(n, capacity - pos)
+			for &b in out[pos:pos + k] {
+				b = c
+			}
+			pos += k
+			if k < n {
+				r.run      = n - k
+				r.run_byte = c
+				r.emit_pos = i
+				r.written  = pos
+				return false
+			}
+			continue
+		}
+		if pos >= capacity {
+			r.emit_pos = i
+			r.written  = pos
+			return false
+		}
+		out[pos] = c
+		pos += 1
+		i   += 1
+	}
+	r.emit_pos = i
+	r.written  = pos
+	return true
+}
+
+@(private)
+bzip2_stream_fill :: proc(r: ^Reader) -> (err: Error) {
+	defer {
+		r.z.bytes_written = r.total
+		if err != nil || r.state == .Done {
+			r.z.window = r.br.data[min(r.br.pos, len(r.br.data)):]
+		}
+	}
+	if r.flushed == r.written {
+		r.written = 0
+		r.flushed = 0
+	}
+	for {
+		switch r.state {
+		case .Done:
+			r.done = true
+			if r.total_out >= 0 && r.total != r.total_out {
+				return General_Error.Size_Mismatch
+			}
+			return nil
+
+		case .Header:
+			nblock_max, at_end := bzip2_stream_header(&r.br, r.streams) or_return
+			if at_end {
+				r.state = .Done
+				continue
+			}
+			bzip2_stream_reserve(r, nblock_max) or_return
+			r.combined = 0
+			r.count    = 0
+			r.state    = .Block
+
+		case .Block:
+			block_err: Error
+			magic := u64(bzip2_bits(&r.br, 24)) << 24
+			magic |= u64(bzip2_bits(&r.br, 24))
+			stored_crc := bzip2_bits(&r.br, 32)
+			block: if block_err = bzip2_check_overrun(&r.br); block_err == nil {
+				if magic == END_MAGIC {
+					r.stream_crc = stored_crc
+					r.after      = .Trailer
+					r.state      = .Emit if r.count > 0 else .Trailer
+					break block
+				}
+				if magic != BLOCK_MAGIC {
+					block_err = BZip2_Error.Invalid_Block_Magic
+					break block
+				}
+				if len(r.tts[r.count]) < r.nblock_max {
+					delete(r.tts[r.count], r.allocator)
+					r.tts[r.count] = nil
+					if r.tts[r.count], block_err = non_zero_make([]u32, r.nblock_max, r.allocator); block_err != nil {
+						break block
+					}
+				}
+				nblock, orig_ptr: int
+				randomised: bool
+				nblock, orig_ptr, randomised, block_err = bzip2_decode_block(r.decoder, &r.br, r.tts[r.count][:r.nblock_max])
+				if block_err != nil {
+					if overrun_err := bzip2_check_overrun(&r.br); overrun_err != nil {
+						block_err = overrun_err
+					}
+					break block
+				}
+				r.pending[r.count] = {nblock, orig_ptr, stored_crc}
+				r.count     += 1
+				r.randomised = randomised
+				if randomised || r.count == r.interleave {
+					r.after = .Block
+					r.state = .Emit
+				}
+			}
+			if block_err != nil {
+				if r.count == 0 {
+					return block_err
+				}
+				r.randomised = false
+				r.deferred   = block_err
+				r.state      = .Emit
+			}
+
+		case .Emit:
+			if !r.walked {
+				bzip2_stream_walk(r) or_return
+				r.walked = true
+			}
+			for r.emit < r.count {
+				capacity := len(r.window)
+				if r.limit >= 0 && r.limit - r.total < i64(capacity - r.written) {
+					capacity = r.written + int(r.limit - r.total)
+				}
+				start    := r.written
+				finished := bzip2_unrle_window(r, r.scratch[r.emit][:r.pending[r.emit].nblock], capacity)
+				r.crc    = bzip2_crc(r.crc, r.window[start:r.written])
+				r.total += i64(r.written - start)
+				if !finished {
+					if r.limit >= 0 && r.total >= r.limit {
+						return General_Error.Size_Mismatch if r.total_out >= 0 else General_Error.Output_Too_Short
+					}
+					return nil
+				}
+				block_crc := ~r.crc
+				if block_crc != r.pending[r.emit].crc {
+					return BZip2_Error.Block_Checksum_Failed
+				}
+				r.combined = ((r.combined << 1) | (r.combined >> 31)) ~ block_crc
+				r.emit    += 1
+				r.emit_pos = 0
+				r.run      = 0
+				r.crc      = 0xffff_ffff
+			}
+			r.count  = 0
+			r.emit   = 0
+			r.walked = false
+			if r.deferred != nil {
+				err        = r.deferred
+				r.deferred = nil
+				return err
+			}
+			r.state = r.after
+
+		case .Trailer:
+			if r.stream_crc != r.combined {
+				return BZip2_Error.Stream_Checksum_Failed
+			}
+			bzip2_stream_end(r.z, &r.br) or_return
+			r.streams += 1
+			r.state    = .Header
+		}
+	}
+}
+
+@(private)
+bzip2_reader_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	r := (^Reader)(stream_data)
+	#partial switch mode {
+	case .Read:
+		read, read_err := reader_read(r, p)
+		n = i64(read)
+		if read_err != nil {
+			io_err, is_io := read_err.(io.Error)
+			err = io_err if is_io else .Unknown
+		}
+		return
+	case .Destroy:
+		reader_destroy(r)
+		return 0, nil
+	case .Query:
+		return io.query_utility({.Read, .Destroy, .Query})
+	}
+	return 0, .Unsupported
 }
