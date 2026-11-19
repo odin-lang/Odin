@@ -846,29 +846,29 @@ type_info_underlying :: proc "contextless" (info: ^Type_Info) -> ^Type_Info {
 // This is also aliased as `type_info_core`
 type_info_base_without_enum :: type_info_core
 
-@(require_results)
-__type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check {
-	n := uint(len(type_table))
-	i: uint
-	when size_of(uintptr) == 8 {
-		i = uint((u128(transmute(u64)id << 1) * u128(n)) >> 64)
-	} else {
-		i = uint((((transmute(u64)id << 1) >> 32) * u64(n)) >> 32)
-	}
-	for _ in 0..<n {
-		ptr := type_table[i]
-		if ptr == nil {
-			break
-		}
-		if ptr.id == id {
-			return ptr
-		}
-		i = i+1 if i+1 < n else 0
-	}
-	return type_table[0]
-}
-
 when !ODIN_NO_RTTI {
+	@(require_results)
+	__type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check {
+		n := uint(len(type_table))
+		i: uint
+		when size_of(uintptr) == 8 {
+			i = uint((u128(transmute(u64)id << 1) * u128(n)) >> 64)
+		} else {
+			i = uint((((transmute(u64)id << 1) >> 32) * u64(n)) >> 32)
+		}
+		for _ in 0..<n {
+			ptr := type_table[i]
+			if ptr == nil {
+				break
+			}
+			if ptr.id == id {
+				return ptr
+			}
+			i = i+1 if i+1 < n else 0
+		}
+		return type_table[0]
+	}
+
 	// typeid_base returns the base-type of a `typeid` stripping the `distinct`ness from the first level
 	@(require_results)
 	typeid_base :: proc "contextless" (id: typeid) -> typeid {
