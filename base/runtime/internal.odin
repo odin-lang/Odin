@@ -4,7 +4,7 @@ package runtime
 import "base:intrinsics"
 
 @(private="file")
-IS_WASM :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
+IS_WASM :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 || ODIN_ARCH == .wasm64
 
 @(private)
 RUNTIME_LINKAGE :: "strong"   when ODIN_USE_SEPARATE_MODULES else
