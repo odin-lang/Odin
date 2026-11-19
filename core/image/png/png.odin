@@ -792,6 +792,8 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 	}
 
 	buf: [dynamic]u8
+	reservation := min(u64(expected_size), idat_length * compress.DEFLATE_EXPANSION_MAX, u64(MAX_IDAT_SIZE))
+	non_zero_reserve(&buf, int(reservation)) or_return
 	zlib_error := deflate.decompress_zlib(&buf, idat, expected_size)
 	defer delete(buf)
 

@@ -2738,22 +2738,6 @@ find_dnl_height :: proc(d: ^Decoder) -> (height: int, err: Error) {
 }
 
 @(private="file")
-remaining_input :: proc(z: ^compress.Context) -> (n: i64, known: bool) {
-	if compress.is_memory_context(z) {
-		return i64(len(z.window)), true
-	}
-	size, size_err := io.size(z.input)
-	if size_err != nil || size <= 0 {
-		return 0, false
-	}
-	position, position_err := io.seek(z.input, 0, .Current)
-	if position_err != nil {
-		return 0, false
-	}
-	return size - position + i64(len(z.window)), true
-}
-
-@(private="file")
 parse_scan :: proc(d: ^Decoder, img: ^Image) -> (err: Error) {
 	ctx := d.ctx
 	length := read_length(ctx)              or_return
@@ -2862,7 +2846,7 @@ parse_scan :: proc(d: ^Decoder, img: ^Image) -> (err: Error) {
 		for c in d.components[:d.component_count] {
 			samples += i64(c.width) * i64(c.height)
 		}
-		if remaining, known := remaining_input(d.ctx); known && remaining < (samples + 7) / 8 {
+		if remaining := compress.input_size(d.ctx); remaining >= 0 && i64(remaining) < (samples + 7) / 8 {
 			return .Missing_Image_Data
 		}
 	}
