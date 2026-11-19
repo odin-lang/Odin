@@ -769,3 +769,58 @@ xz_index_equal :: proc(a, b: ^xz.Index) -> bool {
 	}
 	return true
 }
+
+@(test)
+test_xz_read_hiccups :: proc(t: ^testing.T) {
+	g := Lz4_Test_Lcg{state = 0x48696363}
+	text := lz4_test_lcg_text(&g, 300_000)
+	defer delete(text)
+	packed: [dynamic]u8
+	defer delete(packed)
+	testing.expect_value(t, xz.compress(&packed, text, .Level_1, {block_size = 100_000}), nil)
+
+	for hiccups in ([]int{3, 100, 101, max(int)}) {
+		output: [dynamic]u8
+		defer delete(output)
+		r := Stall_Reader{data = packed[:], fail = .EOF, chunk = 4096, hiccups = hiccups}
+		ctx := compress.init_context(stall_stream(&r), &output)
+		err := xz.decompress(&ctx)
+		compress.destroy_context(&ctx)
+		if hiccups > 100 {
+			testing.expectf(t, err == io.Error.No_Progress, "%v hiccups: decompress from a context gave %v", hiccups, err)
+			continue
+		}
+		testing.expectf(t, err == nil && bytes.equal(output[:], text), "%v hiccups: decompress from a context gave %v", hiccups, err)
+	}
+
+	known, known_err := xz.read_index_from_bytes(packed[:])
+	defer xz.index_destroy(&known)
+	testing.expect_value(t, known_err, nil)
+	testing.expect_value(t, len(known.blocks), 3)
+
+	for read_at in ([]bool{true, false}) {
+		for hiccups in ([]int{3, 100, 101, max(int)}) {
+			label := fmt.tprintf("read_at %v, %v hiccups", read_at, hiccups)
+			r := Stall_Reader{data = packed[:], fail = .EOF, chunk = 4096, hiccups = hiccups, seekable = true, read_at = read_at}
+			index, err := xz.read_index_from_stream(stall_stream(&r))
+			defer xz.index_destroy(&index)
+			if hiccups > 100 {
+				testing.expectf(t, err == io.Error.No_Progress, "%v: read_index_from_stream gave %v", label, err)
+			} else {
+				testing.expectf(t, err == nil && len(index.blocks) == 3, "%v: read_index_from_stream gave %v", label, err)
+			}
+
+			output: [dynamic]u8
+			defer delete(output)
+			err = xz.decompress_block_from_stream(&output, stall_stream(&r), &known, 1)
+			if hiccups > 100 {
+				testing.expectf(t, err == io.Error.No_Progress, "%v: decompress_block_from_stream gave %v", label, err)
+				continue
+			}
+			b := known.blocks[1]
+			want := text[b.uncompressed_offset:][:b.uncompressed_size]
+			testing.expectf(t, err == nil && bytes.equal(output[:], want), "%v: decompress_block_from_stream gave %v", label, err)
+		}
+	}
+	free_all(context.temp_allocator)
+}

@@ -85,7 +85,7 @@ decompress_block_from_stream :: proc(output: ^[dynamic]u8, input: io.Stream, ind
 	}
 	data := make([]u8, int(padded)) or_return
 	defer delete(data)
-	_, read_err := io.read_full_at(input, data, b.compressed_offset)
+	_, read_err := _read_full_at(input, data, b.compressed_offset)
 	if read_err == .EOF || read_err == .Unexpected_EOF {
 		return General_Error.Stream_Too_Short
 	}
@@ -337,7 +337,7 @@ _source_read :: proc(src: ^Index_Source, offset: i64, n: int) -> (data: []u8, er
 		return src.bytes[int(offset):][:n], nil
 	}
 	non_zero_resize(&src.buffer, n) or_return
-	_, read_err := io.read_full_at(src.stream, src.buffer[:], offset)
+	_, read_err := _read_full_at(src.stream, src.buffer[:], offset)
 	if read_err == .EOF || read_err == .Unexpected_EOF {
 		return nil, General_Error.Stream_Too_Short
 	}
@@ -350,4 +350,28 @@ _source_read :: proc(src: ^Index_Source, offset: i64, n: int) -> (data: []u8, er
 @(private)
 _padded_size :: proc "contextless" (unpadded: i64) -> i64 {
 	return (unpadded + 3) &~ 3
+}
+
+@(private)
+_read_full_at :: proc(r: io.Reader_At, buf: []byte, offset: i64) -> (n: int, err: io.Error) {
+	stalled := 0
+	for n < len(buf) && err == nil {
+		got: int
+		got, err = io.read_at(r, buf[n:], offset + i64(n))
+		n += got
+		if got > 0 {
+			stalled = 0
+		} else if err == nil {
+			stalled += 1
+			if stalled > 100 {
+				return n, .No_Progress
+			}
+		}
+	}
+	if n >= len(buf) {
+		err = nil
+	} else if n > 0 && err == .EOF {
+		err = .Unexpected_EOF
+	}
+	return
 }

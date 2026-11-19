@@ -282,7 +282,7 @@ read_slice :: proc(z: ^Context, buf: []byte) -> (err: io.Error) #no_bounds_check
 		return nil
 	}
 
-	if _, err = io.read_full(z.input, rest); err != nil {
+	if _, err = _read_full(z.input, rest); err != nil {
 		return .Short_Buffer if err == .EOF || err == .Unexpected_EOF else err
 	}
 	kept    := copy(z.backing, rest[max(len(rest) - CONTEXT_HISTORY, 0):])
@@ -364,7 +364,7 @@ peek_data_at_offset :: proc(z: ^Context, $T: typeid, #any_int offset: i64) -> (r
 peek_input_at :: proc(z: ^Context, buf: []byte, offset: i64) -> (err: io.Error) {
 	position := io.seek(z.input, 0, .Current) or_return
 	io.seek(z.input, position - i64(len(z.window)) + offset, .Start) or_return
-	_, err = io.read_full(z.input, buf)
+	_, err = _read_full(z.input, buf)
 	_, seek_err := io.seek(z.input, position, .Start)
 	return err if err != nil else seek_err
 }
@@ -406,3 +406,27 @@ read_remaining :: proc(z: ^Context, allocator := context.allocator) -> (data: [d
 }
 
 peek_data :: proc{peek_data_at_cursor, peek_data_at_offset}
+
+@(private)
+_read_full :: proc(r: io.Reader, buf: []byte) -> (n: int, err: io.Error) {
+	stalled := 0
+	for n < len(buf) && err == nil {
+		got: int
+		got, err = io.read(r, buf[n:])
+		n += got
+		if got > 0 {
+			stalled = 0
+		} else if err == nil {
+			stalled += 1
+			if stalled > 100 {
+				return n, .No_Progress
+			}
+		}
+	}
+	if n >= len(buf) {
+		err = nil
+	} else if n > 0 && err == .EOF {
+		err = .Unexpected_EOF
+	}
+	return
+}
