@@ -730,7 +730,8 @@ gb_internal LLVMValueRef llvm_zero(lbModule *m) {
 }
 
 gb_internal void lb_position_before_decls_end(lbProcedure *p) {
-	// NOTE(bill): On LLVM 18 and older LLVMPositionBuilderBefore also takes that instruction's debug location.
+	// NOTE(bill): LLVMPositionBuilderBefore also takes the debug location of the instruction it positions before.
+	// The instructions built here keep the current one instead.
 	LLVMMetadataRef loc = LLVMGetCurrentDebugLocation2(p->builder);
 	LLVMPositionBuilderBefore(p->builder, p->decls_end);
 	LLVMSetCurrentDebugLocation2(p->builder, loc);
