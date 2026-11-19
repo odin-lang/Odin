@@ -381,11 +381,12 @@ struct lbGlobalVariable {
 };
 
 
-struct lbPendingArgCopy {
+struct lbPendingCopy {
 	LLVMValueRef temp;
 	LLVMValueRef copy;
 	LLVMValueRef src;
-	LLVMValueRef base;
+	LLVMValueRef local; // the copy is kept if this local's address escapes
+	unsigned     align;
 };
 
 struct lbProcedure {
@@ -466,9 +467,8 @@ struct lbProcedure {
 	Type *internal_gen_type; // map_set, map_get, etc.
 
 	// -internal-by-value
-	PtrSet<LLVMValueRef>      safe_indirect_params;
 	PtrMap<LLVMValueRef, u64> uncaptured_arg_masks;
-	Array<lbPendingArgCopy>   pending_arg_copies;
+	Array<lbPendingCopy>      pending_copies;
 };
 
 

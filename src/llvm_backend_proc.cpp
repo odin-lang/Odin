@@ -1,5 +1,6 @@
 gb_internal LLVMValueRef lb_coerce_fields_load(lbProcedure *p, lbValue x, lbArgType const *arg);
 gb_internal LLVMValueRef lb_coerce_fields_store(lbProcedure *p, LLVMValueRef coerced, Type *original_type, lbArgType const *arg);
+gb_internal lbValue      lb_copy_indirect_param(lbProcedure *p, lbValue ptr);
 
 gb_internal LLVMValueRef lb_call_intrinsic(lbProcedure *p, const char *name, LLVMValueRef* args, unsigned arg_count, LLVMTypeRef* types, unsigned type_count) {
 	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
@@ -252,7 +253,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	p->lifetime_locals.allocator         = a;
 	p->multi_assign_copy_slots.allocator = a;
 	p->lifetime_scopes.allocator         = a;
-	p->pending_arg_copies.allocator      = a;
+	p->pending_copies.allocator          = a;
 	// map_init(&p->selector_values,  0);
 	// map_init(&p->selector_addr,    0);
 	// map_init(&p->tuple_fix_map,    0);
@@ -581,7 +582,7 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 	p->lifetime_locals.allocator         = a;
 	p->multi_assign_copy_slots.allocator = a;
 	p->lifetime_scopes.allocator         = a;
-	p->pending_arg_copies.allocator      = a;
+	p->pending_copies.allocator          = a;
 	map_init(&p->tuple_fix_map, 0);
 
 
@@ -883,10 +884,6 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 						ptr.type = alloc_type_pointer(e->type);
 						LLVMValueRef incoming_ptr = ptr.value;
 
-						if (build_context.internal_by_value && is_odin_cc && !do_callee_copy) {
-							ptr_set_add(&p->safe_indirect_params, incoming_ptr);
-						}
-
 						if (do_callee_copy) {
 							lbValue new_ptr = lb_add_local_generated(p, e->type, false).addr;
 							if (sz <= 16 && !realign) {
@@ -895,6 +892,8 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 								lb_mem_copy_non_overlapping(p, new_ptr, ptr, lb_const_int(p->module, t_uint, sz));
 							}
 							ptr = new_ptr;
+						} else if (build_context.internal_by_value && is_odin_cc) {
+							ptr = lb_copy_indirect_param(p, ptr);
 						}
 
 						lb_add_entity(p->module, e, ptr);
@@ -1005,29 +1004,47 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 
 // NOTE(bill, 2026-11-19): -internal-by-value:
 // The caller copies an indirect Odin argument when something could write it during the call.
-// It passes the original address of a constant, a temporary, one of its own indirect parameters, or a local whose address never escapes.
-// A copy from a local is made at the call and dropped at the end of the procedure if the local's address did not escape.
+// It passes the original address of a constant, a temporary, or a local whose address never escapes.
+// The callee keeps each indirect parameter in a local copy, and forwarding that local follows the same rule.
+// A copy is made up front and dropped at the end of the procedure if its local's address did not escape.
+// A parameter whose address escapes (e.g. boxed in an `any`) keeps its copy: writes through that address never reach the caller.
+gb_internal lbPendingCopy lb_copy_to_new_local(lbProcedure *p, LLVMValueRef src, Type *type) {
+	unsigned     align = cast(unsigned)type_align_of(type);
+	LLVMValueRef size  = lb_const_int(p->module, t_uint, type_size_of(type)).value;
+
+	// NOTE(bill): The copy starts with exactly the alignment the original address has.
+	// Loads and stores through it must stay valid when the copy is dropped.
+	lbPendingCopy c = {};
+	c.temp  = llvm_alloca(p, lb_type(p->module, type), align, "");
+	c.copy  = LLVMBuildMemCpy(p->builder, c.temp, align, src, align, size);
+	c.src   = src;
+	c.align = align;
+	return c;
+}
+
+gb_internal lbValue lb_copy_indirect_param(lbProcedure *p, lbValue ptr) {
+	lbPendingCopy c = lb_copy_to_new_local(p, ptr.value, type_deref(ptr.type));
+	c.local = c.temp;
+	array_add(&p->pending_copies, c);
+	return lbValue{c.temp, ptr.type};
+}
+
 gb_internal lbValue lb_copy_indirect_arg_if_aliased(lbProcedure *p, lbValue x, lbValue ptr) {
 	if (!LLVMIsALoadInst(x.value) || LLVMGetOperand(x.value, 0) != ptr.value) {
 		return ptr;
 	}
 
 	LLVMValueRef base = lb_pointer_base(ptr.value);
-	if (LLVMIsAArgument(base) && ptr_set_exists(&p->safe_indirect_params, base)) {
-		return ptr;
-	}
 	if (LLVMIsAGlobalVariable(base) && LLVMIsGlobalConstant(base)) {
 		return ptr;
 	}
 
-	unsigned     align = cast(unsigned)type_align_of(x.type);
-	LLVMValueRef size  = lb_const_int(p->module, t_uint, type_size_of(x.type)).value;
-	lbValue      temp  = lb_add_local_generated(p, x.type, false).addr;
-	LLVMValueRef copy  = LLVMBuildMemCpy(p->builder, temp.value, align, ptr.value, align, size);
+	lbPendingCopy c = lb_copy_to_new_local(p, ptr.value, x.type);
 	if (LLVMIsAAllocaInst(base)) {
-		array_add(&p->pending_arg_copies, lbPendingArgCopy{temp.value, copy, ptr.value, base});
+		c.local = base;
+		array_add(&p->pending_copies, c);
 	}
-	return temp;
+	return lbValue{c.temp, ptr.type};
 }
 
 gb_internal void lb_set_uncaptured_args(lbProcedure *p, LLVMValueRef call, u64 mask) {
@@ -1040,19 +1057,23 @@ gb_internal void lb_set_uncaptured_args(lbProcedure *p, LLVMValueRef call, u64 m
 	map_set(&p->uncaptured_arg_masks, call, mask);
 }
 
-gb_internal bool lb_is_memory_intrinsic_call(LLVMValueRef call) {
+gb_internal String lb_called_function_name(LLVMValueRef call) {
 	LLVMValueRef callee = LLVMGetCalledValue(call);
 	if (callee == nullptr) {
-		return false;
+		return {};
 	}
 	if (!LLVMIsAFunction(callee)) {
-		return false;
+		return {};
 	}
 
 	size_t len = 0;
 	char const *name = LLVMGetValueName2(callee, &len);
-	String s = make_string(cast(u8 const *)name, cast(isize)len);
-	if (LLVMGetIntrinsicID(callee) == 0) {
+	return make_string(cast(u8 const *)name, cast(isize)len);
+}
+
+gb_internal bool lb_is_memory_intrinsic_call(LLVMValueRef call) {
+	String s = lb_called_function_name(call);
+	if (!string_starts_with(s, str_lit("llvm."))) {
 		return s == "memmove" || s == "memcpy" || s == "memset";
 	}
 	return string_starts_with(s, str_lit("llvm.memcpy"))    ||
@@ -1107,18 +1128,27 @@ gb_internal bool lb_pointer_may_escape(lbProcedure *p, LLVMValueRef ptr) {
 	return false;
 }
 
-gb_internal void lb_drop_unneeded_arg_copies(lbProcedure *p) {
+gb_internal void lb_drop_unneeded_copies(lbProcedure *p) {
 	PtrMap<LLVMValueRef, bool> escapes = {};
-	for (lbPendingArgCopy const &c : p->pending_arg_copies) {
+
+	// NOTE(bill): Backwards: the copies made from a parameter's local are dropped before the parameter's own copy.
+	for (isize i = p->pending_copies.count-1; i >= 0; i -= 1) {
+		lbPendingCopy const &c = p->pending_copies[i];
+
 		bool  escaped = false;
-		bool *found   = map_get(&escapes, c.base);
+		bool *found   = map_get(&escapes, c.local);
 		if (found != nullptr) {
 			escaped = *found;
 		} else {
-			escaped = lb_pointer_may_escape(p, c.base);
-			map_set(&escapes, c.base, escaped);
+			escaped = lb_pointer_may_escape(p, c.local);
+			map_set(&escapes, c.local, escaped);
 		}
 		if (escaped) {
+			continue;
+		}
+		// NOTE(bill): e.g. array arithmetic raised the copy's alignment for its vector loads.
+		// The original address need not have that alignment.
+		if (LLVMGetAlignment(c.temp) != c.align) {
 			continue;
 		}
 
@@ -1126,7 +1156,7 @@ gb_internal void lb_drop_unneeded_arg_copies(lbProcedure *p) {
 		for (LLVMUseRef use = LLVMGetFirstUse(c.temp); use != nullptr; /**/) {
 			LLVMValueRef user = LLVMGetUser(use);
 			use = LLVMGetNextUse(use);
-			if (LLVMIsACallInst(user) && lb_is_memory_intrinsic_call(user)) {
+			if (LLVMIsACallInst(user) && string_starts_with(lb_called_function_name(user), str_lit("llvm.lifetime."))) {
 				LLVMInstructionEraseFromParent(user);
 			}
 		}
@@ -1135,8 +1165,7 @@ gb_internal void lb_drop_unneeded_arg_copies(lbProcedure *p) {
 	}
 	map_destroy(&escapes);
 
-	array_free(&p->pending_arg_copies);
-	ptr_set_destroy(&p->safe_indirect_params);
+	array_free(&p->pending_copies);
 	map_destroy(&p->uncaptured_arg_masks);
 }
 
@@ -1172,7 +1201,7 @@ gb_internal void lb_end_procedure_body(lbProcedure *p) {
 	}
 
 	if (build_context.internal_by_value) {
-		lb_drop_unneeded_arg_copies(p);
+		lb_drop_unneeded_copies(p);
 	}
 
 	p->curr_block = nullptr;
