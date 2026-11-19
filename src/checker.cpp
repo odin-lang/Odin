@@ -5766,6 +5766,13 @@ gb_internal bool correct_single_type_alias(CheckerContext *c, Entity *e) {
 				e->kind = Entity_TypeName;
 				return true;
 			}
+			// NOTE: resolve import aliases (`x :: x`) early to avoid a race in checker
+			if (alias_of != nullptr && alias_of->kind == Entity_ImportName && d->attributes.count == 0) {
+				add_entity_use(c, init, alias_of);
+				override_entity_in_scope(e, alias_of);
+				e->state = EntityState_Resolved;
+				return true;
+			}
 		}
 	}
 	return false;
