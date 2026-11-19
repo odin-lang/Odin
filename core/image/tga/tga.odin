@@ -2,7 +2,7 @@
 package tga
 
 /*
-	Copyright 2022 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2022-2026 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's license.
 
 	List of contributors:
@@ -12,7 +12,6 @@ package tga
 
 import "core:mem"
 import "core:image"
-import "core:bytes"
 import "core:compress"
 import "core:strings"
 
@@ -26,7 +25,7 @@ GA_Pixel   :: image.GA_Pixel
 RGB_Pixel  :: image.RGB_Pixel
 RGBA_Pixel :: image.RGBA_Pixel
 
-save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}, allocator := context.allocator) -> (err: Error) {
+save_to_buffer  :: proc(output: ^[dynamic]byte, img: ^Image, options := Options{}, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
 	if img == nil {
@@ -47,7 +46,7 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 		return .Invalid_Input_Image
 	}
 
-	if img.channels * pixels != len(img.pixels.buf) {
+	if img.channels * pixels != len(img.pixels) {
 		return .Invalid_Input_Image
 	}
 
@@ -56,7 +55,7 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 	// Calculate and allocate necessary space.
 	necessary := pixels * img.channels + size_of(image.TGA_Header)
 
-	if resize(&output.buf, necessary) != nil {
+	if resize(output, necessary) != nil {
 		return .Unable_To_Allocate_Or_Resize
 	}
 
@@ -68,21 +67,21 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 	}
 	header_bytes := transmute([size_of(image.TGA_Header)]u8)header
 
-	copy(output.buf[written:], header_bytes[:])
+	copy(output[written:], header_bytes[:])
 	written += size_of(image.TGA_Header)
 
 	/*
 		Encode loop starts here.
 	*/
 	if img.channels == 3 {
-		pix := mem.slice_data_cast([]RGB_Pixel, img.pixels.buf[:])
-		out := mem.slice_data_cast([]RGB_Pixel, output.buf[written:])
+		pix := mem.slice_data_cast([]RGB_Pixel, img.pixels[:])
+		out := mem.slice_data_cast([]RGB_Pixel, output[written:])
 		for p, i in pix {
 			out[i] = p.bgr
 		}
 	} else if img.channels == 4 {
-		pix := mem.slice_data_cast([]RGBA_Pixel, img.pixels.buf[:])
-		out := mem.slice_data_cast([]RGBA_Pixel, output.buf[written:])
+		pix := mem.slice_data_cast([]RGBA_Pixel, img.pixels[:])
+		out := mem.slice_data_cast([]RGBA_Pixel, output[written:])
 		for p, i in pix {
 			out[i] = p.bgra
 		}
@@ -90,7 +89,7 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 	return nil
 }
 
-load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
+load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	context.allocator = allocator
 	options := options
 
@@ -108,15 +107,14 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	}
 
 	// First check for a footer.
-	filesize := compress.input_size(ctx) or_return
-
 	footer: image.TGA_Footer
 	have_valid_footer := false
 
 	extension: image.TGA_Extension
 	have_valid_extension := false
 
-	if filesize >= size_of(image.TGA_Header) + size_of(image.TGA_Footer) {
+	filesize, size_err := compress.size(ctx)
+	if .return_metadata in options && size_err == nil && filesize >= size_of(image.TGA_Header) + size_of(image.TGA_Footer) {
 		if f, f_err := compress.peek_data(ctx, image.TGA_Footer, filesize - i64(size_of(image.TGA_Footer))); f_err == .None {
 			if string(f.signature[:]) == image.New_TGA_Signature {
 				have_valid_footer = true
@@ -134,7 +132,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		}
 	}
 
-	header := image.read_data(ctx, image.TGA_Header) or_return
+	header := compress.read_data(ctx, image.TGA_Header) or_return
 
 	// Header checks
 	rle_encoding  := false
@@ -231,12 +229,13 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	img.height = int(header.dimensions[1])
 
 	// Read Image ID if present
+	image_id_buf: [255]u8
 	image_id := ""
-	if _id, e := compress.read_slice(ctx, int(header.id_length)); e != .None {
+	if e := compress.read_slice(ctx, image_id_buf[:header.id_length]); e != nil {
 		return img, .Corrupt
 	} else {
 		if .return_metadata in options {
-			id := strings.trim_right_null(string(_id))
+			id := strings.trim_right_null(string(image_id_buf[:header.id_length]))
 			image_id = strings.clone(id)
 		}
 	}
@@ -294,7 +293,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		return img, nil
 	}
 
-	if resize(&img.pixels.buf, img.channels * img.width * img.height) != nil {
+	if resize(&img.pixels, img.channels * img.width * img.height) != nil {
 		return img, .Unable_To_Allocate_Or_Resize
 	}
 
@@ -330,8 +329,8 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			}
 			// Read pixel
 			if read_pixel {
-				src, src_err := compress.read_slice(ctx, src_channels)
-				if src_err != .None {
+				src: [4]u8
+				if compress.read_slice(ctx, src[:src_channels]) != nil {
 					return img, .Corrupt
 				}
 				switch src_channels {
@@ -367,7 +366,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			}
 
 			// Write pixel
-			copy(img.pixels.buf[offset:], pixel[:img.channels])
+			copy(img.pixels[offset:], pixel[:img.channels])
 			offset += img.channels if origin_is_left else -img.channels
 			rle_repetition_count -= 1
 		}
@@ -377,12 +376,9 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 }
 
 load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
-	ctx := &compress.Context_Memory_Input{
-		input_data = data,
-	}
-
-	img, err = load_from_context(ctx, options, allocator)
-	return img, err
+	data := data
+	ctx  := compress.init_context_from_slice(&data)
+	return load_from_context(&ctx, options, allocator)
 }
 
 
@@ -391,7 +387,7 @@ destroy :: proc(img: ^Image) {
 		return
 	}
 
-	bytes.buffer_destroy(&img.pixels)
+	delete(img.pixels)
 	if v, ok := img.metadata.(^image.TGA_Info); ok {
 		delete(v.image_id)
 		free(v)
@@ -409,5 +405,5 @@ IMAGE_DESCRIPTOR_TOP_MASK   :: 1<<5
 
 @(init, private)
 _register :: proc "contextless" () {
-	image.register(.TGA, load_from_bytes, destroy)
+	image.register(.TGA, load_from_bytes, destroy, load_from_context)
 }

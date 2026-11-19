@@ -803,9 +803,7 @@ _mm_load_ps :: #force_inline proc "c" (mem_addr: ^f32) -> __m128 {
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_loadu_ps)
 @(require_results, enable_target_feature="sse")
 _mm_loadu_ps :: #force_inline proc "c" (mem_addr: ^f32) -> __m128 {
-	dst := _mm_undefined_ps()
-	intrinsics.mem_copy_non_overlapping(&dst, mem_addr, size_of(__m128))
-	return dst
+	return intrinsics.unaligned_load((^__m128)(mem_addr))
 }
 
 // Load 4 single-precision (32-bit) floating-point elements from memory into `dst` in reverse order.
@@ -862,8 +860,7 @@ _mm_store_ps :: #force_inline proc "c" (mem_addr: ^f32, a: __m128) {
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_storeu_ps)
 @(enable_target_feature="sse")
 _mm_storeu_ps :: #force_inline proc "c" (mem_addr: ^f32, a: __m128) {
-	b := a
-	intrinsics.mem_copy_non_overlapping(mem_addr, &b, size_of(__m128))
+	intrinsics.unaligned_store((^__m128)(mem_addr), a)
 }
 
 // Store 4 single-precision (32-bit) floating-point elements from `a` into memory in reverse order.
@@ -1078,7 +1075,7 @@ when ODIN_ARCH == .amd64 {
 	}
 }
 
-@(private, default_calling_convention="none")
+@(private="file", default_calling_convention="none")
 foreign _ {
 	@(link_name="llvm.x86.sse.rcp.ss")      llvm_rcpss       :: proc(a: simd.f32x4) -> simd.f32x4 ---
 	@(link_name="llvm.x86.sse.rcp.ps")      llvm_rcpps       :: proc(a: simd.f32x4) -> simd.f32x4 ---
@@ -1111,7 +1108,7 @@ foreign _ {
 }
 
 when ODIN_ARCH == .amd64 {
-	@(private, default_calling_convention="none")
+	@(private="file", default_calling_convention="none")
 	foreign _ {
 		@(link_name="llvm.x86.sse.cvtss2si64")  llvm_cvtss2si64  :: proc(a: simd.f32x4) -> i64 ---
 		@(link_name="llvm.x86.sse.cvttss2si64") llvm_cvttss2si64 :: proc(a: simd.f32x4) -> i64 ---

@@ -4,6 +4,9 @@ import "core:unicode"
 
 ZERO_WIDTH_JOINER                 :: unicode.ZERO_WIDTH_JOINER
 is_control                        :: unicode.is_control
+is_printable                      :: unicode.is_printable
+is_combining                      :: unicode.is_combining
+is_graphic                        :: unicode.is_graphic
 is_hangul_syllable_leading        :: unicode.is_hangul_syllable_leading
 is_hangul_syllable_vowel          :: unicode.is_hangul_syllable_vowel
 is_hangul_syllable_trailing       :: unicode.is_hangul_syllable_trailing

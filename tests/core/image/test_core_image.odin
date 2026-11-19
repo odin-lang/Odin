@@ -1,5 +1,5 @@
 /*
-	Copyright 2021-2024 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2021-2026 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's license.
 
 	List of contributors:
@@ -11,7 +11,7 @@
 package test_core_image
 
 import "core:testing"
-
+import "core:io"
 import "core:compress"
 import "core:image"
 import "core:image/bmp"
@@ -21,15 +21,17 @@ import "core:image/qoi"
 import "core:image/tga"
 import "core:image/jpeg"
 
-import "core:bytes"
 import "core:hash"
 import "core:strings"
 import "core:mem"
 import "core:time"
 
+SLIM_TESTS :: #config(ODIN_TEST_SLIM, ODIN_ARCH == .riscv64)
+
 TEST_SUITE_PATH_PNG :: ODIN_ROOT + "tests/core/assets/PNG"
 TEST_SUITE_PATH_BMP :: ODIN_ROOT + "tests/core/assets/BMP"
 TEST_SUITE_PATH_JPG :: ODIN_ROOT + "tests/core/assets/JPG"
+TEST_SUITE_PATH_BNG :: ODIN_ROOT + "tests/core/assets/BNG"
 
 I_Error :: image.Error
 
@@ -1469,12 +1471,13 @@ run_png_suite :: proc(t: ^testing.T, suite: []Test) {
 			count += 1
 
 			img, err = png.load(test_file, test.options)
+			expect_stream_loads_file(t, file.file, test_file, png_context_loader, test.options, img, err)
 
 			passed := (test.expected_error == nil && err == nil) || (test.expected_error == err)
 			testing.expectf(t, passed, "%q failed to load with error %v.", file.file, err)
 
 			if err == nil { // No point in running the other tests if it didn't load.
-				pixels := bytes.buffer_to_bytes(&img.pixels)
+				pixels := img.pixels[:]
 
 				dims      := Dims{img.width, img.height, img.channels, img.depth}
 				dims_pass := test.dims == dims
@@ -1486,39 +1489,64 @@ run_png_suite :: proc(t: ^testing.T, suite: []Test) {
 				passed &= test.hash == png_hash
 
 				if passed {
+					// Roundtrip through PNG to test the PNG encoder and decoder.
+					if img.channels >= 1 && img.channels <= 4 && (img.depth == 8 || img.depth == 16) {
+						png_buffer: [dynamic]u8
+						defer delete(png_buffer)
+						png_save_err := png.save(&png_buffer, img)
+
+						testing.expectf(t, png_save_err == nil, "%v test %v PNG save failed with %v", file.file, count, png_save_err)
+						if png_save_err == nil {
+							png_img, png_load_err := png.load(png_buffer[:], {.do_not_expand_channels})
+							defer png.destroy(png_img)
+							expect_stream_loads(t, file.file, png_buffer[:], png_context_loader, {.do_not_expand_channels}, png_img, png_load_err)
+
+							testing.expectf(t, png_load_err == nil, "%v test %v PNG load failed with %v", file.file, count, png_load_err)
+							if png_load_err == nil {
+								png_dims := Dims{png_img.width, png_img.height, png_img.channels, png_img.depth}
+								testing.expectf(t, png_dims == dims, "%v test %v PNG load has %v, expected %v", file.file, count, png_dims, dims)
+
+								png_rt_hash := hash.crc32(png_img.pixels[:])
+								testing.expectf(t, png_rt_hash == png_hash, "%v test %v PNG load hash is %08x, expected it match PNG's %08x with %v", file.file, count, png_rt_hash, png_hash, test.options)
+							}
+						}
+					}
+
 					// Roundtrip through QOI to test the QOI encoder and decoder.
 					if img.depth == 8 && (img.channels == 3 || img.channels == 4) {
-						qoi_buffer: bytes.Buffer
-						defer bytes.buffer_destroy(&qoi_buffer)
+						qoi_buffer: [dynamic]u8
+						defer delete(qoi_buffer)
 						qoi_save_err := qoi.save(&qoi_buffer, img)
 
 						testing.expectf(t, qoi_save_err == nil, "%v test %v QOI save failed with %v", file.file, count, qoi_save_err)
 
 						if qoi_save_err == nil {
-							qoi_img, qoi_load_err := qoi.load(qoi_buffer.buf[:])
+							qoi_img, qoi_load_err := qoi.load(qoi_buffer[:])
 							defer qoi.destroy(qoi_img)
+							expect_stream_loads(t, file.file, qoi_buffer[:], qoi_context_loader, {}, qoi_img, qoi_load_err)
 
 							testing.expectf(t, qoi_load_err == nil, "%v test %v QOI load failed with %v", file.file, count, qoi_load_err)
 
-							qoi_hash := hash.crc32(qoi_img.pixels.buf[:])
+							qoi_hash := hash.crc32(qoi_img.pixels[:])
 							testing.expectf(t, qoi_hash == png_hash, "%v test %v QOI load hash is %08x, expected it match PNG's %08x with %v", file.file, count, qoi_hash, png_hash, test.options)
 						}
 					}
 
 					// Roundtrip through TGA to test the TGA encoder and decoder.
 					if img.depth == 8 && (img.channels == 3 || img.channels == 4) {
-						tga_buffer: bytes.Buffer
-						defer bytes.buffer_destroy(&tga_buffer)
+						tga_buffer: [dynamic]u8
+						defer delete(tga_buffer)
 						tga_save_err := tga.save(&tga_buffer, img)
 
 						testing.expectf(t, tga_save_err == nil, "%v test %v TGA save failed with %v", file.file, count, tga_save_err)
 						if tga_save_err == nil {
-							tga_img, tga_load_err := tga.load(tga_buffer.buf[:])
+							tga_img, tga_load_err := tga.load(tga_buffer[:])
 							defer tga.destroy(tga_img)
+							expect_stream_loads(t, file.file, tga_buffer[:], tga_context_loader, {}, tga_img, tga_load_err)
 
 							testing.expectf(t, tga_load_err == nil, "%v test %v TGA load failed with %v", file.file, count, tga_load_err)
 
-							tga_hash := hash.crc32(tga_img.pixels.buf[:])
+							tga_hash := hash.crc32(tga_img.pixels[:])
 							testing.expectf(t, tga_hash == png_hash, "%v test %v TGA load hash is %08x, expected it match PNG's %08x with %v", file.file, count, tga_hash, png_hash, test.options)
 						}
 					}
@@ -1534,11 +1562,12 @@ run_png_suite :: proc(t: ^testing.T, suite: []Test) {
 							// Try to load it again.
 							pbm_img, pbm_load_err := pbm.load(pbm_buf)
 							defer pbm.destroy(pbm_img)
+							expect_stream_loads(t, file.file, pbm_buf, pbm_context_loader, {}, pbm_img, pbm_load_err)
 
 							testing.expectf(t, pbm_load_err == nil, "%v test %v PBM load failed with %v", file.file, count, pbm_load_err)
 
 							if pbm_load_err == nil {
-								pbm_hash := hash.crc32(pbm_img.pixels.buf[:])
+								pbm_hash := hash.crc32(pbm_img.pixels[:])
 								testing.expectf(t, pbm_hash == png_hash, "%v test %v PBM load hash is %08x, expected it match PNG's %08x with %v", file.file, count, pbm_hash, png_hash, test.options)
 							}
 						}
@@ -1559,11 +1588,12 @@ run_png_suite :: proc(t: ^testing.T, suite: []Test) {
 								// Try to load it again.
 								pbm_img, pbm_load_err := pbm.load(pbm_buf)
 								defer pbm.destroy(pbm_img)
+								expect_stream_loads(t, file.file, pbm_buf, pbm_context_loader, {}, pbm_img, pbm_load_err)
 
 								testing.expectf(t, pbm_load_err == nil, "%v test %v PBM load failed with %v", file.file, count, pbm_load_err)
 
 								if pbm_load_err == nil {
-									pbm_hash := hash.crc32(pbm_img.pixels.buf[:])
+									pbm_hash := hash.crc32(pbm_img.pixels[:])
 									testing.expectf(t, pbm_hash == png_hash, "%v test %v PBM load hash is %08x, expected it match PNG's %08x with %v", file.file, count, pbm_hash, png_hash, test.options)
 								}
 							}
@@ -1584,7 +1614,7 @@ run_png_suite :: proc(t: ^testing.T, suite: []Test) {
 							float_img.depth    = 32
 
 							buffer_size := image.compute_buffer_size(img.width, img.height, img.channels, 32)
-							resize(&float_img.pixels.buf, buffer_size)
+							resize(&float_img.pixels, buffer_size)
 
 							pbm_info := pbm.Info {
 								header = {
@@ -1600,15 +1630,15 @@ run_png_suite :: proc(t: ^testing.T, suite: []Test) {
 							}
 
 							// Transform data...
-							orig_float := mem.slice_data_cast([]f32, float_img.pixels.buf[:])
+							orig_float := mem.slice_data_cast([]f32, float_img.pixels[:])
 
 							switch img.depth {
 							case 8:
-								for v, i in img.pixels.buf {
+								for v, i in img.pixels {
 									orig_float[i] = f32(v) / f32(256)
 								}
 							case 16:
-								wide := mem.slice_data_cast([]u16, img.pixels.buf[:])
+								wide := mem.slice_data_cast([]u16, img.pixels[:])
 								for v, i in wide {
 									orig_float[i] = f32(v) / f32(65536)
 								}
@@ -1623,10 +1653,11 @@ run_png_suite :: proc(t: ^testing.T, suite: []Test) {
 								// Load float image and compare.
 								float_pbm_img, float_pbm_load_err := pbm.load(float_pbm_buf)
 								defer pbm.destroy(float_pbm_img)
+								expect_stream_loads(t, file.file, float_pbm_buf, pbm_context_loader, {}, float_pbm_img, float_pbm_load_err)
 
 								testing.expectf(t, float_pbm_load_err == nil, "%v test %v PFM load failed with %v", file.file, count, float_pbm_load_err)
 
-								load_float := mem.slice_data_cast([]f32, float_pbm_img.pixels.buf[:])
+								load_float := mem.slice_data_cast([]f32, float_pbm_img.pixels[:])
 
 								testing.expectf(t, len(load_float) == len(orig_float), "%v test %v PFM load returned %v floats, expected %v", file.file, count, len(load_float), len(orig_float))
 
@@ -2287,7 +2318,7 @@ Known_Bad_BMP_Tests := []Test{
 	},
 	{
 		"shortfile", {
-			{Default, .Short_Buffer, {127, 64, 1, 1}, 0x_0000_0000},
+			{Default, io.Error.Short_Buffer, {127, 64, 1, 1}, 0x_0000_0000},
 		},
 	},
 }
@@ -2324,12 +2355,13 @@ run_bmp_suite :: proc(t: ^testing.T, suite: []Test) {
 
 		for test in file.tests {
 			img, err := bmp.load(test_file, test.options)
+			expect_stream_loads_file(t, file.file, test_file, bmp_context_loader, test.options, img, err)
 
 			passed := (test.expected_error == nil && err == nil) || (test.expected_error == err)
 			testing.expectf(t, passed, "%q failed to load with error %v.", file.file, err)
 
 			if err == nil { // No point in running the other tests if it didn't load.
-				pixels := bytes.buffer_to_bytes(&img.pixels)
+				pixels := img.pixels[:]
 
 				dims   := Dims{img.width, img.height, img.channels, img.depth}
 				testing.expectf(t, test.dims == dims, "%v has %v, expected: %v.", file.file, dims, test.dims)
@@ -2338,23 +2370,23 @@ run_bmp_suite :: proc(t: ^testing.T, suite: []Test) {
 				testing.expectf(t, test.hash == img_hash, "%v test #1's hash is %08x, expected %08x with %v.", file.file, img_hash, test.hash, test.options)
 
 				// Save to BMP file in memory
-				buf: bytes.Buffer
+				buf: [dynamic]u8
 				save_err := bmp.save(&buf, img)
 				testing.expectf(t, save_err == nil, "expected saving to BMP in memory not to raise error, got %v", save_err)
 
 				// Reload BMP from memory
-				reload_img, reload_err := bmp.load(buf.buf[:])
+				reload_img, reload_err := bmp.load(buf[:])
 				testing.expectf(t, reload_err == nil, "expected reloading BMP from memory not to raise error, got %v", reload_err)
 
 				testing.expect(t, img.width    == reload_img.width    && img.height == reload_img.height, "expected saved BMP to have the same dimensions")
 				testing.expect(t, img.channels == reload_img.channels && img.depth  == reload_img.depth,  "expected saved BMP to have the same dimensions")
 
-				reload_pixels := bytes.buffer_to_bytes(&reload_img.pixels)
+				reload_pixels := reload_img.pixels[:]
 				reload_hash   := hash.crc32(reload_pixels)
 
 				testing.expectf(t, img_hash == reload_hash, "expected saved BMP to have the same pixel hash (%08x), got %08x", img_hash, reload_hash)
 
-				bytes.buffer_destroy(&buf)
+				delete(buf)
 				bmp.destroy(reload_img)
 			}
 			bmp.destroy(img)
@@ -2367,20 +2399,21 @@ run_bmp_suite :: proc(t: ^testing.T, suite: []Test) {
 Basic_JPG_Tests := []Test{
 	{
 		"emblem-1024", {
-			{Default,   nil, {1024, 1024, 3, 8}, 0x_46a29e0f},
-			{Alpha_Add, nil, {1024, 1024, 4, 8}, 0x_cae2d532},
+			{Default,   nil, {1024, 1024, 3, 8}, 0x_b2eb4ed9},
+			{Alpha_Add, nil, {1024, 1024, 4, 8}, 0x_c44eff16},
 		},
 	},
 	{
 		"emblem-1024-progressive", {
-			{Default,   .Unsupported_Frame_Type, {1024, 1024, 3, 8}, 0x_46a29e0f},
+			{Default,   nil, {1024, 1024, 3, 8}, 0x_b2eb4ed9},
+			{Alpha_Add, nil, {1024, 1024, 4, 8}, 0x_c44eff16},
 		},
 	},
 	{
 		"emblem-1024-gray", {
-			{Default,              nil,                 {1024, 1024, 3, 8}, 0x_4115d669},
-			{Alpha_Add,            nil,                 {1024, 1024, 4, 8}, 0x_db496297},
-			{No_Channel_Expansion, .Unsupported_Option, {1024, 1024, 1, 8}, 0},
+			{Default,              nil, {1024, 1024, 3, 8}, 0x_379a135a},
+			{Alpha_Add,            nil, {1024, 1024, 4, 8}, 0x_be8e5529},
+			{No_Channel_Expansion, nil, {1024, 1024, 1, 8}, 0x_75a319d0},
 		},
 	},
 }
@@ -2398,6 +2431,7 @@ run_jpg_suite :: proc(t: ^testing.T, suite: []Test) {
 		for test in file.tests {
 			img, err := jpeg.load(test_file, test.options)
 			defer jpeg.destroy(img)
+			expect_stream_loads_file(t, file.file, test_file, jpeg_context_loader, test.options, img, err)
 
 			passed := (test.expected_error == nil && err == nil) || (test.expected_error == err)
 			testing.expectf(t, passed, "%q failed to load with error %v.", file.file, err)
@@ -2405,7 +2439,7 @@ run_jpg_suite :: proc(t: ^testing.T, suite: []Test) {
 			// No point in running the other tests if it didn't load.
 			(err == nil) or_continue
 
-			pixels := bytes.buffer_to_bytes(&img.pixels)
+			pixels := img.pixels[:]
 			dims   := Dims{img.width, img.height, img.channels, img.depth}
 			testing.expectf(t, test.dims == dims, "%v has %v, expected: %v.", file.file, dims, test.dims)
 

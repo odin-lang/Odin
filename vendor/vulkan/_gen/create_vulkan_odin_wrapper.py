@@ -25,6 +25,7 @@ file_and_urls = [
     ("vulkan_wayland.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_wayland.h', False),
     ("vulkan_xlib.h",    'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_xlib.h',    False),
     ("vulkan_xcb.h",     'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_xcb.h',     False),
+    ("vulkan_android.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_android.h', False),
     ("vulkan_beta.h",    'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_beta.h',    False),
     # Vulkan Video
     ("vulkan_video_codec_av1std.h",         'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_av1std.h', False),
@@ -105,6 +106,8 @@ def convert_type(t, prev_name, curr_name):
         "struct BaseInStructure":  "BaseInStructure",
         "struct wl_display": "wl_display",
         "struct wl_surface": "wl_surface",
+        "struct ANativeWindow": "ANativeWindow",
+        "struct AHardwareBuffer": "AHardwareBuffer",
         "Display": "XlibDisplay",
         "Window": "XlibWindow",
         "VisualID": "XlibVisualID",
@@ -1028,6 +1031,9 @@ _ :: win32
 import "vendor:x11/xlib"
 _ :: xlib
 
+import android "core:sys/android"
+_ :: android
+
 when ODIN_OS == .Windows {
 \tHINSTANCE           :: win32.HINSTANCE
 \tHWND                :: win32.HWND
@@ -1061,6 +1067,14 @@ when xlib.IS_SUPPORTED {
 \tXlibDisplay  :: struct {} // Opaque struct defined by Xlib
 \tXlibWindow   :: c.ulong
 \tXlibVisualID :: c.ulong
+}
+
+when ODIN_PLATFORM_SUBTARGET == .Android {
+\tANativeWindow   :: android.ANativeWindow
+\tAHardwareBuffer :: android.AHardwareBuffer
+} else {
+\tANativeWindow   :: struct {} // Opaque struct defined by the Android NDK
+\tAHardwareBuffer :: struct {} // Opaque struct defined by the Android NDK
 }
 
 xcb_visualid_t :: u32

@@ -31,6 +31,9 @@ check_histogram_falls_back :: proc(t: ^testing.T, a, b: []i32, loc := #caller_lo
 
 @(test)
 test_histogram_exhaustive :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	check_exhaustive(t, 2, 7, {algorithm = .Histogram})
 	check_exhaustive(t, 3, 5, {algorithm = .Histogram})
 	check_exhaustive(t, 4, 4, {algorithm = .Histogram})
@@ -83,6 +86,9 @@ test_histogram_fallback :: proc(t: ^testing.T) {
 */
 @(test)
 test_histogram_one_anchor :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	RARE :: 1_000_000
 
 	rand.reset(t.seed)

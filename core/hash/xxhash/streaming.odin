@@ -250,17 +250,22 @@ XXH3_update :: #force_inline proc(
 
 	/* Consume input by a multiple of internal buffer size */
 	if len(input) > XXH3_INTERNAL_BUFFER_SIZE {
-		tail := input[:len(input) - XXH_STRIPE_LEN]
-		for len(input) > XXH3_INTERNAL_BUFFER_SIZE {
+		consumed := 0
+		for len(input) - consumed > XXH3_INTERNAL_BUFFER_SIZE {
 			XXH3_consume_stripes(
 				state.acc[:], &state.stripes_so_far, state.stripes_per_block,
-				input, XXH3_INTERNAL_BUFFER_STRIPES,
+				input[consumed:], XXH3_INTERNAL_BUFFER_STRIPES,
 				secret, state.secret_limit, f_acc512, f_scramble)
 
-			input = input[XXH3_INTERNAL_BUFFER_SIZE:]
+			consumed += XXH3_INTERNAL_BUFFER_SIZE
 		}
-		/* for last partial stripe */
-		mem_copy(&state.buffer[XXH3_INTERNAL_BUFFER_SIZE - XXH_STRIPE_LEN], &tail[0], XXH_STRIPE_LEN)
+		/*
+			For last partial stripe: save the last *consumed* stripe, i.e. the 64 bytes
+			immediately preceding the remaining input, so `XXH3_digest_long` can use it
+			if fewer than `XXH_STRIPE_LEN` bytes remain buffered.
+		*/
+		mem_copy(&state.buffer[XXH3_INTERNAL_BUFFER_SIZE - XXH_STRIPE_LEN], &input[consumed - XXH_STRIPE_LEN], XXH_STRIPE_LEN)
+		input = input[consumed:]
 	}
 
 	length = len(input)
@@ -315,7 +320,7 @@ XXH3_64_digest :: proc(state: ^XXH3_state) -> (hash: XXH64_hash) {
 	}
 
 	/* totalLen <= XXH3_MIDSIZE_MAX: digesting a short input */
-	if state.seed == 0 {
+	if state.seed != 0 {
 		return XXH3_64_with_seed(state.buffer[:state.total_length], state.seed)
 	}
 	return XXH3_64_with_secret(state.buffer[:state.total_length], secret[:state.secret_limit + XXH_STRIPE_LEN])

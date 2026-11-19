@@ -17,6 +17,22 @@ old_modes: [2]struct{
 	{windows.STD_ERROR_HANDLE, 0},
 }
 
+_get_terminal_size :: proc "contextless" () -> (width, height: int, ok: bool) {
+	stdout := windows.GetStdHandle(windows.STD_OUTPUT_HANDLE)
+	if stdout == windows.INVALID_HANDLE_VALUE {
+		return 0, 0, false
+	}
+
+	csbi: windows.CONSOLE_SCREEN_BUFFER_INFO
+	if windows.GetConsoleScreenBufferInfo(stdout, &csbi) {
+		width = int(csbi.srWindow.Right - csbi.srWindow.Left + 1)
+		height = int(csbi.srWindow.Bottom - csbi.srWindow.Top + 1)
+		ok = width > 0 && height > 0
+	}
+
+	return width, height, ok
+}
+
 _init_terminal :: proc "contextless" () {
 	context = runtime.default_context()
 

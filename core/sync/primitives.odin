@@ -18,7 +18,7 @@ section, and thus prevent access to same piece of memory by multiple threads, at
 the same time.
 
 Mutex's zero-initializzed value represents an initial, *unlocked* state.
- 
+
 If another thread tries to acquire the lock, while it's already held (typically
 by another thread), the thread's execution will be blocked, until the lock is
 released. Code or memory that is "surrounded" by a mutex lock and unlock
@@ -28,8 +28,7 @@ operations is said to be "guarded by a mutex".
 first time). This is because, in order to coordinate with other threads, all
 threads must watch the same memory address to know when the lock has been
 released. Trying to use a copy of the lock at a different memory address will
-result in broken and unsafe behavior. For this reason, Mutexes are marked as
-`#no_copy`.
+result in broken and unsafe behavior.
 
 **Note**: If the current thread attempts to lock a mutex, while it's already
 holding another lock, that will cause a trivial case of deadlock. Do not use
@@ -144,8 +143,7 @@ all shared locks are released.
 acquiring a lock). This is because, in order to coordinate with other threads,
 all threads must watch the same memory address to know when the lock has been
 released. Trying to use a copy of the lock at a different memory address will
-result in broken and unsafe behavior. For this reason, mutexes are marked as
-`#no_copy`.
+result in broken and unsafe behavior.
 
 **Note**: A read-write mutex is not recursive. Do not attempt to acquire an
 exclusive lock more than once from the same thread, or an exclusive and shared
@@ -320,8 +318,7 @@ releases the lock as many times as it has been locked by the thread.
 acquiring a lock). This is because, in order to coordinate with other threads,
 all threads must watch the same memory address to know when the lock has been
 released. Trying to use a copy of the lock at a different memory address will
-result in broken and unsafe behavior. For this reason, mutexes are marked as
-`#no_copy`.
+result in broken and unsafe behavior.
 */
 Recursive_Mutex :: struct {
 	impl: _Recursive_Mutex,
@@ -424,8 +421,7 @@ A thread that intends to wait on a shared variable shall:
 waiting on it the first time). This is because, in order to coordinate with
 other threads, all threads must watch the same memory address to know when the
 lock has been released. Trying to use a copy of the lock at a different memory
-address will result in broken and unsafe behavior. For this reason, condition
-variables are marked as `#no_copy`.
+address will result in broken and unsafe behavior.
 */
 Cond :: struct {
 	impl: _Cond,
@@ -505,7 +501,7 @@ semaphore counter to become non-zero and decreasing it, if necessary.
 to it). This is because, in order to coordinate with other threads, all threads
 must watch the same memory address to know when the lock has been released.
 Trying to use a copy of the lock at a different memory address will result in
-broken and unsafe behavior. For this reason, semaphores are marked as `#no_copy`.
+broken and unsafe behavior.
 */
 Sema :: struct {
 	impl: _Sema,
@@ -596,8 +592,8 @@ futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, duratio
 	}
 	if duration <= 0 {
 		return false
-	}	
-	
+	}
+
 	return _futex_wait_with_timeout(f, expected, duration)
 }
 

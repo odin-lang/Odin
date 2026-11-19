@@ -12,6 +12,8 @@ package all
 @(require) import "core:compress/shoco"
 // @(require) import "core:compress/gzip"
 @(require) import "core:compress/zlib"
+@(require) import "core:compress/bzip2"
+@(require) import pkzip_legacy "core:compress/pkzip-legacy"
 
 @(require) import "core:container/avl"
 @(require) import "core:container/bit_array"
@@ -85,6 +87,7 @@ package all
 
 @(require) import "core:image"
 @(require) import "core:image/bmp"
+@(require) import "core:image/bng"
 @(require) import "core:image/netpbm"
 @(require) import "core:image/png"
 @(require) import "core:image/qoi"

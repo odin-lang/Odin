@@ -8,7 +8,8 @@ import "core:sys/posix"
 _get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err: Error) {
 	// OpenBSD does not have an API for this, we do our best below.
 
-	if len(runtime.args__) <= 0 {
+	args := runtime.args__.([]cstring)
+	if len(args) <= 0 {
 		err = .Invalid_Path
 		return
 	}
@@ -23,7 +24,7 @@ _get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err
 		return clone_string(string(real), allocator)
 	} 
 
-	arg := runtime.args__[0]
+	arg := args[0]
 	sarg := string(arg)
 
 	if len(sarg) == 0 {
@@ -31,7 +32,7 @@ _get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err
 		return
 	}
 
-	if sarg[0] == '.' || sarg[0] == '/' {
+	if strings.contains_rune(sarg, '/') {
 		return real(arg, allocator)
 	}
 
@@ -50,6 +51,10 @@ _get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err
 		if posix.access(cpath, {.X_OK}) == .OK {
 			return real(cpath, allocator)
 		}
+	}
+
+	if posix.access(arg, {.X_OK}) == .OK {
+		return real(arg, allocator)
 	}
 
 	err = .Invalid_Path

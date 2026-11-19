@@ -144,7 +144,7 @@ write_clobber :: proc(sb: ^strings.Builder, clobber: lib.Clobber) {
 				}
 				bits := reflect.as_u64(value_int) or_else panic("cannot get bits")
 
-				bs := reflect.type_info_base(field.type).variant.(reflect.Type_Info_Bit_Set)
+				bs := reflect.type_info_base(field.type).variant.(^reflect.Type_Info_Bit_Set)
 				et := reflect.type_info_base(bs.elem)
 				lower := bs.lower
 				upper := bs.upper
@@ -153,7 +153,7 @@ write_clobber :: proc(sb: ^strings.Builder, clobber: lib.Clobber) {
 				strings.write_string(sb, "={")
 				defer strings.write_byte(sb, '}')
 
-				e, is_enum := et.variant.(reflect.Type_Info_Enum)
+				e, is_enum := et.variant.(^reflect.Type_Info_Enum)
 
 				commas := 0
 				loop: for i in transmute(bit_set[0..<64])bits {

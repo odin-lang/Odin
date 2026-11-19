@@ -177,10 +177,10 @@ _init_cpu_name :: proc "contextless" () {
 	// e.g. `      Intel(R) Xeon(R) CPU E5-1650 v2 @ 3.50GHz`
 
 	_name = string(_name_buf[:])
-	for len(_name) > 0 && _name[0] == 0 || _name[0] == ' ' {
+	for len(_name) > 0 && (_name[0] == 0 || _name[0] == ' ') {
 		_name = _name[1:]
 	}
-	for len(_name) > 0 && _name[len(_name) - 1] == 0 || _name[len(_name) - 1] == ' ' {
+	for len(_name) > 0 && (_name[len(_name) - 1] == 0 || _name[len(_name) - 1] == ' ') {
 		_name = _name[:len(_name) - 1]
 	}
 }

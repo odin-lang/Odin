@@ -89,7 +89,8 @@ foreign lib {
 // Linux
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
-	LinuxSetThreadPriority :: proc(threadID: i64, priority: c.int) -> c.int ---
+	LinuxSetThreadPriority          :: proc(threadID: i64, priority: c.int) -> c.int ---
+	LinuxSetThreadPriorityAndPolicy :: proc(threadID: i64, sdlPriority, schedPolicy: c.int) -> c.int ---
 }
 
 
@@ -125,4 +126,5 @@ foreign lib {
 	AndroidGetExternalStoragePath  :: proc() -> cstring ---
 	AndroidRequestPermission       :: proc(permission: cstring) -> bool ---
 	AndroidShowToast               :: proc(message: cstring, duration, gravity, xoffset, yoffset: c.int) -> c.int ---
+	AndroidSendMessage             :: proc(command: u32, param: c.int) -> c.int ---
 }

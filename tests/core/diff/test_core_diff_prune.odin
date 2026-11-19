@@ -144,6 +144,9 @@ test_prune_without_frequent :: proc(t: ^testing.T) {
 */
 @(test)
 test_prune_all_matched :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	rand.reset(t.seed)
 	for _ in 0..<200 {
 		alphabet := 1 + rand.int_max(4)
@@ -173,6 +176,9 @@ test_prune_all_matched :: proc(t: ^testing.T) {
 // `.Prune` only sets aside tokens with no match when the diff must be minimal.
 @(test)
 test_prune_minimal_exhaustive :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	check_exhaustive(t, 2, 7, {algorithm = .Minimal, flags = {.Prune}})
 	check_exhaustive(t, 3, 5, {algorithm = .Minimal, flags = {.Prune}})
 	check_exhaustive(t, 2, 7, {algorithm = .Myers,   flags = {.Prune}})

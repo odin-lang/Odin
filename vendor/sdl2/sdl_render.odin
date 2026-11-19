@@ -64,6 +64,15 @@ RendererFlip :: enum c.int {
 	VERTICAL   = 0x00000002,    /**< flip vertically */
 }
 
+/**
+ *  Vertex structure
+ */
+Vertex :: struct {
+	position:  FPoint, /**< Vertex position, in SDL_Renderer coordinates */
+	color:     Color,  /**< Vertex color */
+	tex_coord: FPoint, /**< Normalized texture coordinates, if needed */
+}
+
 Renderer :: struct {}
 
 Texture :: struct {}
@@ -144,4 +153,11 @@ foreign lib {
 	RenderGetMetalLayer          :: proc(renderer: ^Renderer) -> rawptr ---
 	RenderGetMetalCommandEncoder :: proc(renderer: ^Renderer) -> rawptr ---
 	RenderSetVSync               :: proc(renderer: ^Renderer, vsync: bool) -> c.int ---
+	RenderGetWindow              :: proc(renderer: ^Renderer) -> ^Window ---
+	SetTextureUserData           :: proc(texture: ^Texture, userdata: rawptr) -> c.int ---
+	GetTextureUserData           :: proc(texture: ^Texture) -> rawptr ---
+	RenderWindowToLogical        :: proc(renderer: ^Renderer, windowX, windowY: c.int, logicalX, logicalY: ^f32) ---
+	RenderLogicalToWindow        :: proc(renderer: ^Renderer, logicalX, logicalY: f32, windowX, windowY: ^c.int) ---
+	RenderGeometry               :: proc(renderer: ^Renderer, texture: ^Texture, vertices: [^]Vertex, num_vertices: c.int, indices: [^]c.int, num_indices: c.int) -> c.int ---
+	RenderGeometryRaw            :: proc(renderer: ^Renderer, texture: ^Texture, xy: [^]f32, xy_stride: c.int, color: [^]Color, color_stride: c.int, uv: [^]f32, uv_stride: c.int, num_vertices: c.int, indices: rawptr, num_indices: c.int, size_indices: c.int) -> c.int ---
 }

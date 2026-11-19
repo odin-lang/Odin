@@ -71,11 +71,15 @@ when ODIN_OS == .Linux {
 
 	EOF           :: int(-1)
 
-	FOPEN_MAX     :: 1000
-
 	FILENAME_MAX  :: 4096
 
-	L_tmpnam      :: 20
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		FOPEN_MAX :: 20
+		L_tmpnam  :: 4096
+	} else {
+		FOPEN_MAX :: 1000
+		L_tmpnam  :: 20
+	}
 
 	SEEK_SET      :: 0
 	SEEK_CUR      :: 1
@@ -134,13 +138,28 @@ when ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD {
 
 	TMP_MAX :: 308915776
 
-	foreign libc {
-		__sF: [3]FILE
-	}
+	when ODIN_OS == .OpenBSD {
+		foreign libc {
+			__stdin:  FILE
+			__stdout: FILE
+			__stderr: FILE
+		}
 
-	stdin:  ^FILE = &__sF[0]
-	stdout: ^FILE = &__sF[1]
-	stderr: ^FILE = &__sF[2]
+		stdin:  ^FILE = &__stdin
+		stdout: ^FILE = &__stdout
+		stderr: ^FILE = &__stderr
+	} else {
+		@(private)
+		NETBSD_FILE_SIZE :: 152
+
+		foreign libc {
+			__sF: [3][NETBSD_FILE_SIZE]u8
+		}
+
+		stdin:  ^FILE = cast(^FILE)&__sF[0]
+		stdout: ^FILE = cast(^FILE)&__sF[1]
+		stderr: ^FILE = cast(^FILE)&__sF[2]
+	}
 }
 
 when ODIN_OS == .FreeBSD {

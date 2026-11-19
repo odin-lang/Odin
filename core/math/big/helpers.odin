@@ -7,9 +7,15 @@ package math_big
 
 import "base:intrinsics"
 import "base:runtime"
+import "core:math"
 
 /*
-	TODO: Int.flags and Constants like ONE, NAN, etc, are not yet properly handled everywhere.
+	Public procs return `.Invalid_Argument` for NaN and +/-Inf operands, and clear `.NaN` and `.Inf` on their destinations.
+	Procs that only move or store an `Int` keep them: `copy`, `set` from an `Int`, `swap`, `abs`, `neg`, `shrink`, `grow` and `rat_set_int`.
+	`inf`, `minus_inf` and `nan` set them, and so does `atoi` for "+Inf", "-Inf" and "NaN" in radix 2..=23.
+	`get_float` returns NaN or +/-Inf, and `itoa` writes "NaN", "+Inf" or "-Inf" in radix 2..=23.
+	`is_initialized`, `destroy`, `clamp`, `zero_unused`, `clear_if_uninitialized`, `error_if_immutable` and `assert_initialized` don't reject them.
+	`internal_*` procs on `Int`s don't check for them, except `internal_error_if_non_finite`.
 */
 
 /*
@@ -73,7 +79,8 @@ int_copy :: proc(dest, src: ^Int, minimize := false, allocator := context.alloca
 	assert_if_nil(dest, src)
 	context.allocator = allocator
 
-	#force_inline internal_clear_if_uninitialized(src) or_return
+	src := src
+	src = _zero_if_uninitialized(src)
 	#force_inline internal_error_if_immutable(dest)    or_return
 
 	return #force_inline internal_int_copy(dest, src, minimize)
@@ -90,6 +97,7 @@ copy :: proc {
 */
 int_swap :: proc(a, b: ^Int) {
 	assert_if_nil(a, b)
+	assert(.Immutable not_in a.flags && .Immutable not_in b.flags, "Assignment to immutable")
 	#force_inline internal_swap(a, b)
 }
 swap :: proc { int_swap, rat_swap }
@@ -104,7 +112,8 @@ int_abs :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error)
 	assert_if_nil(dest, src)
 	context.allocator = allocator
 
-	#force_inline internal_clear_if_uninitialized(src) or_return
+	src := src
+	src = _zero_if_uninitialized(src)
 	#force_inline internal_error_if_immutable(dest)    or_return
 
 	return #force_inline internal_int_abs(dest, src)
@@ -125,7 +134,8 @@ int_neg :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error)
 	assert_if_nil(dest, src)
 	context.allocator = allocator
 
-	#force_inline internal_clear_if_uninitialized(src) or_return
+	src := src
+	src = _zero_if_uninitialized(src)
 	#force_inline internal_error_if_immutable(dest)    or_return
 
 	return #force_inline internal_int_neg(dest, src)
@@ -146,7 +156,9 @@ int_bitfield_extract :: proc(a: ^Int, offset, count: int, allocator := context.a
 	assert_if_nil(a)
 	context.allocator = allocator
 
-	#force_inline internal_clear_if_uninitialized(a) or_return
+	a := a
+	a = _zero_if_uninitialized(a)
+	internal_error_if_non_finite(a) or_return
 	return #force_inline internal_int_bitfield_extract(a, offset, count)
 }
 
@@ -181,6 +193,7 @@ int_clear :: proc(a: ^Int, minimize := false, allocator := context.allocator) ->
 		Check that `a` is usable.
 	*/
 	assert_if_nil(a)
+	#force_inline internal_error_if_immutable(a) or_return
 	return #force_inline internal_int_clear(a, minimize, allocator)
 }
 clear :: proc { int_clear, }
@@ -232,7 +245,7 @@ int_minus_inf :: proc(a: ^Int, minimize := false, allocator := context.allocator
 	assert_if_nil(a)
 	return #force_inline internal_minus_inf(a, minimize, allocator)
 }
-minus_inf :: proc { int_inf, }
+minus_inf :: proc { int_minus_inf, }
 
 /*
 	Set the `Int` to NaN and optionally shrink it to the minimum backing size.
@@ -251,6 +264,7 @@ power_of_two :: proc(a: ^Int, power: int, allocator := context.allocator) -> (er
 		Check that `a` is usable.
 	*/
 	assert_if_nil(a)
+	#force_inline internal_error_if_immutable(a) or_return
 	return #force_inline internal_int_power_of_two(a, power, allocator)
 }
 
@@ -317,7 +331,9 @@ int_get :: proc(a: ^Int, $T: typeid, allocator := context.allocator) -> (res: T,
 		Check that `a` is usable.
 	*/
 	assert_if_nil(a)
-	#force_inline internal_clear_if_uninitialized(a, allocator) or_return
+	a := a
+	a = _zero_if_uninitialized(a)
+	internal_error_if_non_finite(a) or_return
 	return #force_inline internal_int_get(a, T)
 }
 get :: proc { int_get, }
@@ -327,7 +343,10 @@ int_get_float :: proc(a: ^Int, allocator := context.allocator) -> (res: f64, err
 		Check that `a` is usable.
 	*/
 	assert_if_nil(a)
-	#force_inline internal_clear_if_uninitialized(a, allocator) or_return
+	a := a
+	a = _zero_if_uninitialized(a)
+	if .NaN in a.flags { return math.nan_f64(), nil }
+	if .Inf in a.flags { return math.inf_f64(-1 if a.sign == .Negative else 1), nil }
 	return #force_inline internal_int_get_float(a)
 }
 
@@ -339,7 +358,9 @@ count_bits :: proc(a: ^Int, allocator := context.allocator) -> (count: int, err:
 		Check that `a` is usable.
 	*/
 	assert_if_nil(a)
-	#force_inline internal_clear_if_uninitialized(a, allocator) or_return
+	a := a
+	a = _zero_if_uninitialized(a)
+	internal_error_if_non_finite(a) or_return
 	return #force_inline internal_count_bits(a), nil
 }
 
@@ -352,7 +373,9 @@ int_count_lsb :: proc(a: ^Int, allocator := context.allocator) -> (count: int, e
 		Check that `a` is usable.
 	*/
 	assert_if_nil(a)
-	#force_inline internal_clear_if_uninitialized(a, allocator) or_return
+	a := a
+	a = _zero_if_uninitialized(a)
+	internal_error_if_non_finite(a) or_return
 	return #force_inline internal_int_count_lsb(a)
 }
 
@@ -370,6 +393,8 @@ int_random :: proc(dest: ^Int, bits: int, allocator := context.allocator) -> (er
 		Check that `a` is usable.
 	*/
 	assert_if_nil(dest)
+	#force_inline internal_error_if_immutable(dest) or_return
+	internal_clear_non_finite(dest)
 	return #force_inline internal_int_random(dest, bits, allocator)
 
 }
@@ -424,6 +449,7 @@ error_if_immutable :: proc {error_if_immutable_single, error_if_immutable_multi,
 */
 int_init_multi :: proc(integers: ..^Int, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(..integers)
+	#force_inline internal_error_if_immutable(..integers) or_return
 
 	integers := integers
 	for a in integers {
@@ -441,7 +467,12 @@ copy_digits :: proc(dest, src: ^Int, digits: int, offset := int(0), allocator :=
 		Check that `src` is usable and `dest` isn't immutable.
 	*/
 	assert_if_nil(dest, src)
-	#force_inline internal_clear_if_uninitialized(src) or_return
+	#force_inline internal_clear_if_uninitialized(dest) or_return
+	src := src
+	src = _zero_if_uninitialized(src)
+	#force_inline internal_error_if_immutable(dest) or_return
+	internal_error_if_non_finite(src) or_return
+	internal_clear_non_finite(dest)
 
 	return #force_inline internal_copy_digits(dest, src, digits, offset)
 }
@@ -472,7 +503,9 @@ clamp :: proc(a: ^Int, allocator := context.allocator) -> (err: Error) {
 */
 int_to_bytes_size :: proc(a: ^Int, signed := false, allocator := context.allocator) -> (size_in_bytes: int, err: Error) {
 	assert_if_nil(a)
-	#force_inline internal_clear_if_uninitialized(a, allocator) or_return
+	a := a
+	a = _zero_if_uninitialized(a)
+	internal_error_if_non_finite(a) or_return
 
 	size_in_bits := internal_count_bits(a)
 
@@ -492,15 +525,16 @@ int_to_bytes_little :: proc(a: ^Int, buf: []u8, signed := false, allocator := co
 	size_in_bytes := int_to_bytes_size(a, signed, allocator) or_return
 	l := len(buf)
 	if size_in_bytes > l { return .Buffer_Overflow }
+	intrinsics.mem_zero(raw_data(buf), l)
 
 	size_in_bits := internal_count_bits(a)
-	i := 0
+	byte_count   := size_in_bits / 8 + (0 if size_in_bits % 8 == 0 else 1)
 	if signed {
 		buf[l - 1] = 1 if a.sign == .Negative else 0
 	}
-	#no_bounds_check for offset := 0; offset < size_in_bits; offset += 8 {
-		bits, _ := internal_int_bitfield_extract(a, offset, 8)
-		buf[i] = u8(bits & 255); i += 1
+	#no_bounds_check for i in 0..<byte_count {
+		bits, _ := internal_int_bitfield_extract(a, i * 8, 8)
+		buf[i] = u8(bits & 255)
 	}
 	return
 }
@@ -515,16 +549,17 @@ int_to_bytes_big :: proc(a: ^Int, buf: []u8, signed := false, allocator := conte
 	size_in_bytes := int_to_bytes_size(a, signed, allocator) or_return
 	l := len(buf)
 	if size_in_bytes > l { return .Buffer_Overflow }
+	intrinsics.mem_zero(raw_data(buf), l)
 
 	size_in_bits := internal_count_bits(a)
-	i := l - 1
+	byte_count   := size_in_bits / 8 + (0 if size_in_bits % 8 == 0 else 1)
 
 	if signed {
 		buf[0] = 1 if a.sign == .Negative else 0
 	}
-	#no_bounds_check for offset := 0; offset < size_in_bits; offset += 8 {
-		bits, _ := internal_int_bitfield_extract(a, offset, 8)
-		buf[i] = u8(bits & 255); i -= 1
+	#no_bounds_check for i in 0..<byte_count {
+		bits, _ := internal_int_bitfield_extract(a, i * 8, 8)
+		buf[l - 1 - i] = u8(bits & 255)
 	}
 	return
 }
@@ -547,19 +582,21 @@ int_to_bytes_little_python :: proc(a: ^Int, buf: []u8, signed := false, allocato
 		defer destroy(t)
 		internal_complement(t, a, allocator) or_return
 
+		for &v in buf { v = 255 }
 		size_in_bits := internal_count_bits(t)
-		i := 0
-		#no_bounds_check for offset := 0; offset < size_in_bits; offset += 8 {
-			bits, _ := internal_int_bitfield_extract(t, offset, 8)
-			buf[i] = 255 - u8(bits & 255); i += 1
+		byte_count   := size_in_bits / 8 + (0 if size_in_bits % 8 == 0 else 1)
+		#no_bounds_check for i in 0..<byte_count {
+			bits, _ := internal_int_bitfield_extract(t, i * 8, 8)
+			buf[i] = 255 - u8(bits & 255)
 		}
 		buf[l-1] = 255
 	} else {
+		intrinsics.mem_zero(raw_data(buf), l)
 		size_in_bits := internal_count_bits(a)
-		i := 0
-		#no_bounds_check for offset := 0; offset < size_in_bits; offset += 8 {
-			bits, _ := internal_int_bitfield_extract(a, offset, 8)
-			buf[i] = u8(bits & 255); i += 1
+		byte_count   := size_in_bits / 8 + (0 if size_in_bits % 8 == 0 else 1)
+		#no_bounds_check for i in 0..<byte_count {
+			bits, _ := internal_int_bitfield_extract(a, i * 8, 8)
+			buf[i] = u8(bits & 255)
 		}
 	}
 	return
@@ -584,15 +621,27 @@ int_to_bytes_big_python :: proc(a: ^Int, buf: []u8, signed := false, allocator :
 
 	internal_complement(t, a, allocator) or_return
 
+	for &v in buf { v = 255 }
 	size_in_bits := internal_count_bits(t)
-	i := l - 1
-	#no_bounds_check for offset := 0; offset < size_in_bits; offset += 8 {
-		bits, _ := internal_int_bitfield_extract(t, offset, 8)
-		buf[i] = 255 - u8(bits & 255); i -= 1
+	byte_count   := size_in_bits / 8 + (0 if size_in_bits % 8 == 0 else 1)
+	#no_bounds_check for i in 0..<byte_count {
+		bits, _ := internal_int_bitfield_extract(t, i * 8, 8)
+		buf[l - 1 - i] = 255 - u8(bits & 255)
 	}
 	buf[0] = 255
 
 	return
+}
+
+@(private="file")
+_int_or_byte :: #force_inline proc "contextless" (a: ^Int, value: u8, index: int) {
+	bit   := index * 8
+	limb  := bit / _DIGIT_BITS
+	shift := uint(bit % _DIGIT_BITS)
+	a.digit[limb] |= (DIGIT(value) << shift) & _MASK
+	if shift > _DIGIT_BITS - 8 {
+		a.digit[limb + 1] |= DIGIT(value) >> (_DIGIT_BITS - shift)
+	}
 }
 
 /*
@@ -601,19 +650,20 @@ int_to_bytes_big_python :: proc(a: ^Int, buf: []u8, signed := false, allocator :
 */
 int_from_bytes_big :: proc(a: ^Int, buf: []u8, signed := false, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(a)
+	#force_inline internal_error_if_immutable(a) or_return
 	buf := buf
 	l := len(buf)
-	if l == 0 { return .Invalid_Argument }
+	if l == 0 { return internal_zero(a, false, allocator) }
 
 	sign: Sign
-	size_in_bits := l * 8
+	size_in_bits := i64(l) * 8
 	if signed { 
 		/*
 			First byte denotes the sign.
 		*/
 		size_in_bits -= 8
 	}
-	size_in_digits := (size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS
+	size_in_digits := int((size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS)
 	size_in_digits += 0 if size_in_bits % 8 == 0 else 1
 	internal_zero(a, false, allocator) or_return
 	internal_grow(a, size_in_digits, false, allocator) or_return
@@ -623,9 +673,8 @@ int_from_bytes_big :: proc(a: ^Int, buf: []u8, signed := false, allocator := con
 		buf = buf[1:]
 	}
 
-	#no_bounds_check for v in buf {
-		internal_shl(a, a, 8) or_return
-		a.digit[0] |= DIGIT(v)
+	for v, i in buf {
+		_int_or_byte(a, v, len(buf) - 1 - i)
 	}
 	a.sign = sign
 	a.used = size_in_digits
@@ -638,34 +687,29 @@ int_from_bytes_big :: proc(a: ^Int, buf: []u8, signed := false, allocator := con
 */
 int_from_bytes_big_python :: proc(a: ^Int, buf: []u8, signed := false, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(a)
+	#force_inline internal_error_if_immutable(a) or_return
 	buf := buf
 	l := len(buf)
-	if l == 0 { return .Invalid_Argument }
+	if l == 0 { return internal_zero(a, false, allocator) }
 
 	sign: Sign
-	size_in_bits := l * 8
+	size_in_bits := i64(l) * 8
 	if signed { 
 		/*
-			First byte denotes the sign.
+			The top bit of the first byte is the sign bit; that byte stays part of the two's complement value.
 		*/
-		size_in_bits -= 8
+		sign = .Zero_or_Positive if buf[0] & 0x80 == 0 else .Negative
 	}
-	size_in_digits := (size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS
+	size_in_digits := int((size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS)
 	size_in_digits += 0 if size_in_bits % 8 == 0 else 1
 	internal_zero(a, false, allocator) or_return
 	internal_grow(a, size_in_digits, false, allocator) or_return
 
-	if signed {
-		sign = .Zero_or_Positive if buf[0] == 0 else .Negative
-		buf = buf[1:]
-	}
-
-	#no_bounds_check for v in buf {
-		internal_shl(a, a, 8) or_return
+	for v, i in buf {
 		if signed && sign == .Negative {
-			a.digit[0] |= DIGIT(255 - v)	
+			_int_or_byte(a, 255 - v, l - 1 - i)
 		} else {
-			a.digit[0] |= DIGIT(v)
+			_int_or_byte(a, v, l - 1 - i)
 		}
 	}
 	a.sign = sign
@@ -684,19 +728,20 @@ int_from_bytes_big_python :: proc(a: ^Int, buf: []u8, signed := false, allocator
 */
 int_from_bytes_little :: proc(a: ^Int, buf: []u8, signed := false, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(a)
+	#force_inline internal_error_if_immutable(a) or_return
 	buf := buf
 	l := len(buf)
-	if l == 0 { return .Invalid_Argument }
+	if l == 0 { return internal_zero(a, false, allocator) }
 
 	sign: Sign
-	size_in_bits   := l * 8
+	size_in_bits   := i64(l) * 8
 	if signed { 
 		/*
-			First byte denotes the sign.
+			Last byte denotes the sign.
 		*/
 		size_in_bits -= 8
 	}
-	size_in_digits := (size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS
+	size_in_digits := int((size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS)
 	size_in_digits += 0 if size_in_bits % 8 == 0 else 1
 	internal_zero(a, false, allocator) or_return
 	internal_grow(a, size_in_digits, false, allocator) or_return
@@ -704,12 +749,10 @@ int_from_bytes_little :: proc(a: ^Int, buf: []u8, signed := false, allocator := 
 	if signed {
 		sign = .Zero_or_Positive if buf[l-1] == 0 else .Negative
 		buf = buf[:l-1]
-		l -= 1
 	}
 
-	for _, i in buf {
-		internal_shl(a, a, 8) or_return
-		a.digit[0] |= DIGIT(buf[l-i-1])
+	for v, i in buf {
+		_int_or_byte(a, v, i)
 	}
 	a.sign = sign
 	a.used = size_in_digits
@@ -718,39 +761,33 @@ int_from_bytes_little :: proc(a: ^Int, buf: []u8, signed := false, allocator := 
 
 /*
 	Read `Int` from a Little Endian Python binary representation.
-	Sign is detected from the first byte if `signed` is true.
+	Sign is detected from the top bit of the last byte if `signed` is true.
 */
 int_from_bytes_little_python :: proc(a: ^Int, buf: []u8, signed := false, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(a)
+	#force_inline internal_error_if_immutable(a) or_return
 	buf := buf
 	l := len(buf)
-	if l == 0 { return .Invalid_Argument }
+	if l == 0 { return internal_zero(a, false, allocator) }
 
 	sign: Sign
-	size_in_bits := l * 8
+	size_in_bits := i64(l) * 8
 	if signed { 
 		/*
-			First byte denotes the sign.
+			The top bit of the last byte is the sign bit; that byte stays part of the two's complement value.
 		*/
-		size_in_bits -= 8
+		sign = .Zero_or_Positive if buf[l-1] & 0x80 == 0 else .Negative
 	}
-	size_in_digits := (size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS
+	size_in_digits := int((size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS)
 	size_in_digits += 0 if size_in_bits % 8 == 0 else 1
 	internal_zero(a, false, allocator) or_return
 	internal_grow(a, size_in_digits, false, allocator) or_return
 
-	if signed {
-		sign = .Zero_or_Positive if buf[l-1] == 0 else .Negative
-		buf = buf[:l-1]
-		l -= 1
-	}
-
-	for _, i in buf {
-		internal_shl(a, a, 8) or_return
+	for v, i in buf {
 		if signed && sign == .Negative {
-			a.digit[0] |= DIGIT(255 - buf[l-i-1])
+			_int_or_byte(a, 255 - v, i)
 		} else {
-			a.digit[0] |= DIGIT(buf[l-i-1])
+			_int_or_byte(a, v, i)
 		}
 	}
 	a.sign = sign

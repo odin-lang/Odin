@@ -1,5 +1,0 @@
-The source code to this library used with SDL_mixer can be found here:
-https://hg.libsdl.org/SDL_mixer/file/default/external
----
-
-ModPlug-XMMS and libmodplug are now in the public domain.

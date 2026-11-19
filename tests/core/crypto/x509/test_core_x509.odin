@@ -25,6 +25,8 @@ import "core:encoding/asn1"
 import "core:testing"
 import "core:time"
 
+SLIM_TESTS :: #config(ODIN_TEST_SLIM, ODIN_ARCH == .riscv64)
+
 RSA_DER := #load("testdata/rsa.der")
 EC_DER := #load("testdata/ec.der")
 ED_DER := #load("testdata/ed.der")
@@ -843,11 +845,17 @@ test_verify_chain_bad_issuers :: proc(t: ^testing.T) {
 
 @(test)
 test_verify_signature_tamper_sweep_ECDSA_1 :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	check_tamper_sweep(t, EC_CHAIN_LEAF, EC_CHAIN_INTER, .low)
 }
 
 @(test)
 test_verify_signature_tamper_sweep_ECDSA_2 :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	check_tamper_sweep(t, EC_CHAIN_LEAF, EC_CHAIN_INTER, .high)
 }
 

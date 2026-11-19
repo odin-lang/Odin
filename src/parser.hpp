@@ -340,6 +340,8 @@ enum ProcCallingConvention : i32 {
 	ProcCC_PreserveMost = 12,
 	ProcCC_PreserveAll  = 13,
 
+	ProcCC_VectorCall   = 14,
+
 	ProcCC_MAX,
 
 
@@ -361,6 +363,7 @@ gb_global char const *proc_calling_convention_strings[ProcCC_MAX] = {
 	"preserve/none",
 	"preserve/most",
 	"preserve/all",
+	"vectorcall",
 };
 
 gb_internal ProcCallingConvention default_calling_convention(void) {
@@ -639,6 +642,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		Ast *type; \
 		Type *type_hint; \
 		bool ignores[2]; \
+		bool optional_ok; \
 	}) \
 	AST_KIND(TypeCast,      "type cast",           struct { Token token; Ast *type, *expr; }) \
 	AST_KIND(AutoCast,      "auto_cast",           struct { Token token; Ast *expr; }) \

@@ -144,25 +144,50 @@ XXH32_finalize :: #force_inline proc(h32: u32, buf: []u8, alignment: Alignment) 
 	unreachable()
 }
 
+XXH32_stripes :: #force_inline proc(v: [4]u32, buf: []u8, alignment: Alignment) -> (res: [4]u32, rest: []u8) #no_bounds_check {
+	buf := buf
+	when ODIN_ENDIAN == .Little {
+		PRIME1 :: #simd[4]u32{XXH_PRIME32_1, XXH_PRIME32_1, XXH_PRIME32_1, XXH_PRIME32_1}
+		PRIME2 :: #simd[4]u32{XXH_PRIME32_2, XXH_PRIME32_2, XXH_PRIME32_2, XXH_PRIME32_2}
+		LEFT   :: #simd[4]u32{13, 13, 13, 13}
+		RIGHT  :: #simd[4]u32{19, 19, 19, 19}
+
+		acc := transmute(#simd[4]u32)v
+		for len(buf) >= 16 {
+			x := intrinsics.unaligned_load((^#simd[4]u32)(raw_data(buf)))
+			acc += x * PRIME2
+			acc  = intrinsics.simd_shl(acc, LEFT) | intrinsics.simd_shr(acc, RIGHT)
+			acc *= PRIME1
+			buf  = buf[16:]
+		}
+		return transmute([4]u32)acc, buf
+	} else {
+		res = v
+		for len(buf) >= 16 {
+			res[0] = XXH32_round(res[0], XXH32_read32(buf, alignment)); buf = buf[4:]
+			res[1] = XXH32_round(res[1], XXH32_read32(buf, alignment)); buf = buf[4:]
+			res[2] = XXH32_round(res[2], XXH32_read32(buf, alignment)); buf = buf[4:]
+			res[3] = XXH32_round(res[3], XXH32_read32(buf, alignment)); buf = buf[4:]
+		}
+		return res, buf
+	}
+}
+
 @(optimization_mode="favor_size")
-XXH32_endian_align :: #force_inline proc(input: []u8, seed := XXH32_DEFAULT_SEED, alignment: Alignment) -> (res: XXH32_hash) {
+XXH32_endian_align ::#force_inline proc(input: []u8, seed := XXH32_DEFAULT_SEED, alignment: Alignment) -> (res: XXH32_hash) {
 	buf := input
 	length := len(input)
 
 	if length >= 16 {
-		v1 := seed + XXH_PRIME32_1 + XXH_PRIME32_2
-		v2 := seed + XXH_PRIME32_2
-		v3 := seed + 0
-		v4 := seed - XXH_PRIME32_1
-
-		for len(buf) >= 16 {
-			#no_bounds_check v1 = XXH32_round(v1, XXH32_read32(buf, alignment)); buf = buf[4:]
-			#no_bounds_check v2 = XXH32_round(v2, XXH32_read32(buf, alignment)); buf = buf[4:]
-			#no_bounds_check v3 = XXH32_round(v3, XXH32_read32(buf, alignment)); buf = buf[4:]
-			#no_bounds_check v4 = XXH32_round(v4, XXH32_read32(buf, alignment)); buf = buf[4:]
+		v := [4]u32{
+			seed + XXH_PRIME32_1 + XXH_PRIME32_2,
+			seed + XXH_PRIME32_2,
+			seed + 0,
+			seed - XXH_PRIME32_1,
 		}
+		v, buf = XXH32_stripes(v, buf, alignment)
 
-		res = XXH_rotl32(v1, 1)  + XXH_rotl32(v2, 7) + XXH_rotl32(v3, 12) + XXH_rotl32(v4, 18)
+		res = XXH_rotl32(v[0], 1)  + XXH_rotl32(v[1], 7) + XXH_rotl32(v[2], 12) + XXH_rotl32(v[3], 18)
 	} else {
 		res  = seed + XXH_PRIME32_5
 	}
@@ -255,22 +280,13 @@ XXH32_update :: proc(state: ^XXH32_state, input: []u8) -> (err: Error) {
 	}
 
 	if len(buf) >= 16 {
-		v1 := state.v1
-		v2 := state.v2
-		v3 := state.v3
-		v4 := state.v4
+		v := [4]u32{state.v1, state.v2, state.v3, state.v4}
+		v, buf = XXH32_stripes(v, buf, .Unaligned)
 
-		for len(buf) >= 16 {
-			#no_bounds_check v1 = XXH32_round(v1, XXH32_read32(buf, .Unaligned)); buf = buf[4:]
-			#no_bounds_check v2 = XXH32_round(v2, XXH32_read32(buf, .Unaligned)); buf = buf[4:]
-			#no_bounds_check v3 = XXH32_round(v3, XXH32_read32(buf, .Unaligned)); buf = buf[4:]
-			#no_bounds_check v4 = XXH32_round(v4, XXH32_read32(buf, .Unaligned)); buf = buf[4:]
-		}
-
-		state.v1 = v1
-		state.v2 = v2
-		state.v3 = v3
-		state.v4 = v4
+		state.v1 = v[0]
+		state.v2 = v[1]
+		state.v3 = v[2]
+		state.v4 = v[3]
 	}
 
 	length = len(buf)

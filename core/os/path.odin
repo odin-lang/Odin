@@ -124,6 +124,8 @@ set_working_directory :: proc(dir: string) -> (err: Error) {
 /*
 Get the path for the currently running executable.
 
+An Android app's executable is the system's `app_process64` or `app_process32`, which loads the app's library.
+
 *Allocates Using Provided Allocator*
 */
 @(require_results)

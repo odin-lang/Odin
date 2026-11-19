@@ -1,10 +1,10 @@
-// Bindings for [[ PortMidi ; http://sourceforge.net/projects/portmedia ]] Portable Real-Time MIDI Library.
+// Bindings for [[ PortMidi ; https://github.com/PortMidi/portmidi ]] Portable Real-Time MIDI Library.
 package portmidi
 
 /*
  * PortMidi Portable Real-Time MIDI Library
  * PortMidi API Header File
- * Latest version available at: http://sourceforge.net/projects/portmedia
+ * Latest version available at: https://github.com/PortMidi/portmidi
  *
  * Copyright (c) 1999-2000 Ross Bencina and Phil Burk
  * Copyright (c) 2001-2006 Roger B. Dannenberg

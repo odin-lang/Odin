@@ -33,7 +33,9 @@ set ODIN=..\..\..\odin
 @rem #########################################################################################################
 
 @rem "odin check" tests:
+%ODIN% check "..\test_issue_3973" %COMMON% 2>&1 | find /c "Error:" | findstr /x "28" || exit /b
 %ODIN% check "..\test_issue_5105_5569" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_5335" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
 %ODIN% check "..\test_issue_6484" -no-entry-point %COMMON% || exit /b
 %ODIN% check "..\test_issue_6874" %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_6979" -no-entry-point %COMMON% || exit /b
@@ -55,12 +57,35 @@ set ODIN=..\..\..\odin
 %ODIN% check "..\test_issue_foreign_import_attributes" -no-entry-point %COMMON% || exit /b
 %ODIN% check "..\test_issue_foreign_redeclaration_mismatch" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_integer_literal_exponent" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_inferred_default_overflow" -no-entry-point %COMMON% 2>&1 | find /c "Error: Cannot convert numeric value" | findstr /x "6" || exit /b
 %ODIN% check "..\test_issue_fixed_point_scale" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_poly_proc_value" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_atomic_orderings" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "13" || exit /b
 %ODIN% check "..\test_issue_atomic_errors" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
 %ODIN% check "..\test_issue_atomic_access" -no-entry-point -vet-atomic-access %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
 %ODIN% check "..\test_issue_escape_stored_field" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "holds a pointer into itself" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "is taken at" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "'temp.allocator.data' may refer to 'temp.arena' in the stack memory of the named result 'temp'" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_escape_nested_calls" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "6" || exit /b
+%ODIN% check "..\test_issue_escape_cleared_stores" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "15" || exit /b
+%ODIN% check "..\test_issue_escape_cleared_stores" -no-entry-point %COMMON% 2>&1 | find /c "local variable 'y'" | findstr /x "1" || exit /b
+%ODIN% test "..\test_issue_type_info_variant_shim" %COMMON% -ignore-warnings || exit /b
+%ODIN% check "..\test_issue_type_info_variant_shim" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "11" || exit /b
+%ODIN% check "..\test_issue_type_info_variant_shim_duplicate" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_bit_field_tag_identity" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_8074" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "34" || exit /b
+%ODIN% check "..\test_issue_8258" %COMMON% 2>&1 | find /c "Error: @(test) procedures must be declared at the file scope" | findstr /x "4" || exit /b
+%ODIN% test "..\test_issue_invalid_tests_only" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_8294" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_5024" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_8455" %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_8455" %COMMON% 2>&1 | find /c "it is a directory" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_7947" %COMMON% 2>&1 | find /c "Error: Unspecialized polymorphic procedure literal" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_7502_cycle" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_8097" -no-entry-point %COMMON% 2>&1 | find /c "Error: Invalid use of a polymorphic type" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_poly_record_unspecialized_field" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
 @rem Objective-C tests target darwin, which can be checked and built for from any host
 %ODIN% check "..\test_issue_objc_import_missing_selector" -no-entry-point -target:darwin_arm64 %COMMON% 2>&1 | find /c "is required for imported Objective-C methods" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_objc_deferred_import" -no-entry-point -target:darwin_arm64 %COMMON% 2>&1 | find /c "cannot be used as a deferred_out procedure" | findstr /x "1" || exit /b
@@ -92,6 +117,9 @@ set ODIN=..\..\..\odin
 @rem #########################################################################################################
 
 @rem "odin run" tests:
+%ODIN% run "..\test_issue_7442" %COMMON% || exit /b
+%ODIN% run "..\test_issue_7442" %COMMON% -no-crt -no-thread-local || exit /b
+%ODIN% run "..\test_issue_7442" %COMMON% -subsystem:windows || exit /b
 %ODIN% run "..\test_issue_7482" %COMMON% || exit /b
 %ODIN% run "..\test_issue_7562" %COMMON% -no-crt -no-thread-local || exit /b
 %ODIN% run "..\test_issue_7562" %COMMON% -no-crt -no-thread-local -o:speed || exit /b
@@ -142,7 +170,16 @@ set ODIN=..\..\..\odin
 
 %ODIN% test "..\test_issue_6344" %COMMON% -o:speed || exit /b
 
+%ODIN% test "..\test_issue_max_simd_align" %COMMON% -o:speed || exit /b
+%ODIN% test "..\test_issue_8072" %COMMON% -o:speed -lifetime-markers || exit /b
+
 %ODIN% test "..\test_pr_6470" %COMMON% -define:TEST_EXPECT_FAILURE=true 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
+
+%ODIN% test "..\test_issue_define_config" %COMMON% -define:DEFINE_VERSION=1.0 -define:DEFINE_MODE=true -define:DEFINE_HEX=-0x7f -define:DEFINE_MAX_U8=255 -define:DEFINE_MIN_I32=-2_147_483_648 -define:DEFINE_INTEGRAL_FLOAT=2.0 -define:DEFINE_INT_FOR_FLOAT=3 -define:DEFINE_EXPONENT=1_000e-3 -define:DEFINE_SEPARATORS=1_000_000 -define:DEFINE_RUNE=65 -define:DEFINE_ENUM=C -define:DEFINE_QUOTED='x' -define:DEFINE_EMPTY= "-define:DEFINE_SPACED=a b" -define:DEFINE_CSTRING=c -define:DEFINE_DISTINCT_STRING=d || exit /b
+set DEFINE_ERRORS=-define:DEFINE_NOT_A_NUMBER=abc -define:DEFINE_OUT_OF_RANGE=256 -define:DEFINE_TRUNCATED=1.5 -define:DEFINE_NOT_A_BOOL=T -define:DEFINE_EMPTY= -define:DEFINE_NOT_A_FIELD=C -define:DEFINE_NOT_SETTABLE=A -define:DEFINE_QUOTED_NUMBER='1'
+%ODIN% check "..\test_issue_define_config_errors" -no-entry-point %COMMON% %DEFINE_ERRORS% 2>&1 | find /c "Error:" | findstr /x "8" || exit /b
+%ODIN% check "..\test_issue_define_config_errors" -no-entry-point %COMMON% %DEFINE_ERRORS% 2>&1 | find /c "-define:DEFINE_" | findstr /x "8" || exit /b
+%ODIN% check "..\test_issue_define_config" -no-entry-point -vet -strict-style -define:DEFINE_VERSION=1.0 -define:DEFINE_NOWHERE=1 2>&1 | find /c "is unused in the project" | findstr /x "1" || exit /b
 
 %ODIN% check "..\test_pr_7848\pkg_b" "..\test_pr_7848\pkg_a" -no-entry-point -workspace -overlay:..\test_pr_7848\overlay.json %COMMON% -export-semantics:json -export-semantics-file:pr_7848.json || exit /b
 %ODIN% check "..\test_pr_7848\pkg_b" "..\test_pr_7848\pkg_a" -no-entry-point -workspace -overlay:..\test_pr_7848\overlay.json %COMMON% -export-semantics:cbor -export-semantics-file:pr_7848.cbor || exit /b
@@ -158,6 +195,8 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 @rem 	@echo "!!! WARNING !!! test_issue_7010 is not compatible with MSVC."
 @rem )
 
+%ODIN% test "..\test_issue_7547" %COMMON% || exit /b
+
 %ODIN% test "..\test_issue_split_globals" -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables || exit /b
 %ODIN% test "..\test_issue_split_globals" -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug || exit /b
 
@@ -170,9 +209,38 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 %ODIN% check "..\test_issue_asm_deferred_errors" %COMMON% 2>&1 | find /c "Unknown mnemonic" | findstr /x "5" || exit /b
 %ODIN% check "..\test_issue_asm_target_features" %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_asm_target_features" %COMMON% 2>&1 | find /c "enables target feature 'avx'" | findstr /x "3" || exit /b
+%ODIN% test "..\test_issue_asm_pinned_clobbers" %COMMON% -o:speed || exit /b
+%ODIN% test "..\test_issue_asm_named_register_clobbers" %COMMON% -o:speed || exit /b
+%ODIN% test "..\test_issue_asm_call_clobbers" %COMMON% -o:speed || exit /b
+%ODIN% test "..\test_issue_asm_written_inputs" %COMMON% -o:speed || exit /b
+%ODIN% check "..\test_issue_asm_clobber_pinned_output" %COMMON% 2>&1 | find /c "which '#clobber' also names" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_asm_call_flow" %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_asm_call_flow" %COMMON% 2>&1 | find /c "can fall through the end" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_asm_call_flow" %COMMON% 2>&1 | find /c "Warning:" | findstr /x "0" || exit /b
+%ODIN% check "..\test_issue_asm_align_stack" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_asm_align_stack" %COMMON% 2>&1 | find /c "must declare #align_stack" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_asm_align_stack" %COMMON% 2>&1 | find /c "#align_stack is redundant" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_asm_call_targets" %COMMON% 2>&1 | find /c "Error:" | findstr /x "8" || exit /b
+%ODIN% check "..\test_issue_asm_call_targets" %COMMON% 2>&1 | find /c "uses the Odin calling convention" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_asm_call_targets" %COMMON% 2>&1 | find /c "as the target of a call" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_asm_call_targets" %COMMON% 2>&1 | find /c "Assertion Failure" | findstr /x "0" || exit /b
+%ODIN% check "..\test_issue_asm_writeback_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_asm_writeback_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "writes back its base register" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_asm_writeback_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "takes only a base register and a constant offset" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_asm_writeback_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "needs a base register" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_asm_baseless_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_asm_baseless_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "needs a base register" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_asm_baseless_errors" -target:linux_riscv64 %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_asm_baseless_errors" -target:linux_riscv64 %COMMON% 2>&1 | find /c "must be from -2048 to 2047" | findstr /x "2" || exit /b
+%ODIN% build "..\test_issue_asm_baseless_riscv" -target:linux_riscv64 -build-mode:obj %COMMON% || exit /b
+%ODIN% build "..\test_issue_asm_keyword_mnemonic" -target:linux_amd64 -build-mode:obj %COMMON% || exit /b
 
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:size -lifetime-markers || exit /b
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:speed -lifetime-markers || exit /b
+
+%ODIN% test "..\test_issue_udivmod128_zero_divisor" %COMMON% -integer-division-by-zero:zero     || exit /b
+%ODIN% test "..\test_issue_udivmod128_zero_divisor" %COMMON% -integer-division-by-zero:self     || exit /b
+%ODIN% test "..\test_issue_udivmod128_zero_divisor" %COMMON% -integer-division-by-zero:all-bits || exit /b
 
 @if "%ODIN_TESTS_NO_CLANG%" == "" (
 	clang -c "..\test_issue_sysv_abi\test_issue_sysv_abi.c" -o test_issue_sysv_abi_c.o || exit /b

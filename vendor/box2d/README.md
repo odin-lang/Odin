@@ -1,32 +1,30 @@
 ![Box2D Logo](https://box2d.org/images/logo.svg)
 
-# Status
-[![Build Status](https://github.com/erincatto/box2c/actions/workflows/build.yml/badge.svg)](https://github.com/erincatto/box2c/actions)
-
-# Box2D v3.0 Notes
-This repository is beta and ready for testing. It should build on recent versions of clang and gcc. However, you will need the latest Visual Studio version for C11 atomics to compile (17.8.3+).
-
-AVX2 CPU support is assumed. You can turn this off in the CMake options and use SSE2 instead.
-
 # Box2D
-Box2D is a 2D physics engine for games.
 
-## Contributing
-Please do not submit pull requests with new features or core library changes. Instead, please file an issue first for discussion. For bugs, I prefer detailed bug reports over pull requests.
+Odin bindings for [Box2D](https://box2d.org) v3.2.0, a 2D physics engine for games by Erin Catto, under the
+[MIT license](LICENSE).
 
-# Giving Feedback
-Please visit the discussions tab, file an issue, or start a chat on discord.
+The bindings are single precision (no `BOX2D_DOUBLE_PRECISION`), where `Pos` is a `Vec2` and `WorldTransform` a `Transform`.
+`box2d.odin`, `collision.odin`, `types.odin`, `base.odin` and `id.odin` are generated from the API description that
+Box2D ships (`api/box2d_api.json`); `lib.odin`, `constants.odin`, `id_helpers.odin` and `math_functions.odin` are written
+by hand, including the functions that Box2D's headers define inline.
 
-## Community
-- [Discord](https://discord.gg/NKYgCBP)
+Box2D selects AVX2 or SSE2 at run time, so there is a single library per platform. The libraries in `lib` are built by
+`build_box2d.sh`: a Windows one (`box2d_windows_amd64.lib`), a universal macOS one (`box2d_darwin.a`) and two for WASM
+(`box2d_wasm.o`, and `box2d_wasm_simd.o` which lets the compiler use `simd128`). On Linux there are none, run
+`build_box2d.sh` to build `box2d_other_amd64.a` (or `box2d_other.a` for other CPUs).
 
-## License
-Box2D is developed by Erin Catto, and uses the [MIT license](https://en.wikipedia.org/wiki/MIT_License).
+Some notes:
 
-## Sponsorship
-Support development of Box2D through [Github Sponsors](https://github.com/sponsors/erincatto)
+- Box2D creates and destroys worlds in a global array without locking, so do not do that from several threads at once.
+- Box2D 3.2 runs its own worker threads when a world has a `workerCount` above 1 and no task callbacks. A WASM world is
+  single threaded, leave `workerCount` at 1.
+- The 3.2 release notes list the API changes from 3.1:
+  https://github.com/erincatto/box2d/blob/v3.2.0/docs/release_notes_v320.md
 
-## Ports, wrappers, and Bindings
+## Ports, wrappers, and bindings
+
 - https://github.com/odin-lang/Odin/tree/master/vendor/box2d
 - https://github.com/EnokViking/Box2DBeef
 - https://github.com/HolyBlackCat/box2cpp

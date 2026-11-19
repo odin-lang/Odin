@@ -12,9 +12,38 @@ when ODIN_OS == .Windows {
 
 Joystick :: struct {}
 
-JoystickGUID :: struct {
+VIRTUAL_JOYSTICK_DESC_VERSION :: 1
+
+/**
+ *  The structure that defines a virtual joystick, see JoystickAttachVirtualEx.
+ */
+VirtualJoystickDesc :: struct {
+	version:     u16, /**< VIRTUAL_JOYSTICK_DESC_VERSION */
+	type:        u16, /**< JoystickType */
+	naxes:       u16, /**< the number of axes on this joystick */
+	nbuttons:    u16, /**< the number of buttons on this joystick */
+	nhats:       u16, /**< the number of hats on this joystick */
+	vendor_id:   u16, /**< the USB vendor ID of this joystick */
+	product_id:  u16, /**< the USB product ID of this joystick */
+	padding:     u16, /**< unused */
+	button_mask: u32, /**< A mask of which buttons are valid for this controller e.g. (1 << GAMECONTROLLER_BUTTON_A) */
+	axis_mask:   u32, /**< A mask of which axes are valid for this controller e.g. (1 << GAMECONTROLLER_AXIS_LEFTX) */
+	name:        cstring, /**< the name of the joystick */
+
+	userdata:       rawptr, /**< User data pointer passed to callbacks */
+	Update:         proc "c" (userdata: rawptr), /**< Called when the joystick state should be updated */
+	SetPlayerIndex: proc "c" (userdata: rawptr, player_index: c.int), /**< Called when the player index is set */
+	Rumble:         proc "c" (userdata: rawptr, low_frequency_rumble, high_frequency_rumble: u16) -> c.int, /**< Implements JoystickRumble() */
+	RumbleTriggers: proc "c" (userdata: rawptr, left_rumble, right_rumble: u16) -> c.int, /**< Implements JoystickRumbleTriggers() */
+	SetLED:         proc "c" (userdata: rawptr, red, green, blue: u8) -> c.int, /**< Implements JoystickSetLED() */
+	SendEffect:     proc "c" (userdata: rawptr, data: rawptr, size: c.int) -> c.int, /**< Implements JoystickSendEffect() */
+}
+
+GUID :: struct {
 	data: [16]u8,
 }
+
+JoystickGUID :: GUID
 
 JoystickID :: distinct i32
 
@@ -90,7 +119,16 @@ foreign lib {
 	JoystickGetSerial               :: proc(joystick: ^Joystick) -> cstring ---
 	JoystickGetType                 :: proc(joystick: ^Joystick) -> JoystickType ---
 	JoystickGetGUIDString           :: proc(guid: JoystickGUID, pszGUID: [^]u8, cbGUID: c.int) ---
+	GUIDToString                    :: proc(guid: GUID, pszGUID: [^]u8, cbGUID: c.int) ---
+	GUIDFromString                  :: proc(pchGUID: cstring) -> GUID ---
 	JoystickGetGUIDFromString       :: proc(pchGUID: cstring) -> JoystickGUID ---
+	GetJoystickGUIDInfo             :: proc(guid: JoystickGUID, vendor, product, version, crc16: ^u16) ---
+	JoystickPathForIndex            :: proc(device_index: c.int) -> cstring ---
+	JoystickPath                    :: proc(joystick: ^Joystick) -> cstring ---
+	JoystickGetFirmwareVersion      :: proc(joystick: ^Joystick) -> u16 ---
+	JoystickHasRumble               :: proc(joystick: ^Joystick) -> bool ---
+	JoystickHasRumbleTriggers       :: proc(joystick: ^Joystick) -> bool ---
+	JoystickAttachVirtualEx         :: proc(desc: ^VirtualJoystickDesc) -> c.int ---
 	JoystickGetAttached             :: proc(joystick: ^Joystick) -> bool ---
 	JoystickInstanceID              :: proc(joystick: ^Joystick) -> JoystickID ---
 	JoystickNumAxes                 :: proc(joystick: ^Joystick) -> c.int ---

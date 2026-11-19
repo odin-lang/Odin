@@ -7373,19 +7373,19 @@ CLOBBER_FORMS := [2480]lib.Clobber{
 	// .PREFETCH
 	{read={0}, reads_mem=true, side_effects={.HINT}},
 	// .IN
-	{written={0}, read={1}, side_effects={.PRIVILEGED}},
-	{written={0}, read={1}, side_effects={.PRIVILEGED}},
-	{written={0}, read={1}, side_effects={.PRIVILEGED}},
-	{written={0}, read={1}, side_effects={.PRIVILEGED}},
-	{written={0}, read={1}, side_effects={.PRIVILEGED}},
-	{written={0}, read={1}, side_effects={.PRIVILEGED}},
+	{read={1}, implicit_wr={.RAX}, side_effects={.PRIVILEGED}},
+	{read={1}, implicit_wr={.RAX}, side_effects={.PRIVILEGED}},
+	{read={1}, implicit_wr={.RAX}, side_effects={.PRIVILEGED}},
+	{implicit_wr={.RAX}, implicit_rd={.RDX}, side_effects={.PRIVILEGED}},
+	{implicit_wr={.RAX}, implicit_rd={.RDX}, side_effects={.PRIVILEGED}},
+	{implicit_wr={.RAX}, implicit_rd={.RDX}, side_effects={.PRIVILEGED}},
 	// .OUT
-	{read={0, 1}, side_effects={.PRIVILEGED}},
-	{read={0, 1}, side_effects={.PRIVILEGED}},
-	{read={0, 1}, side_effects={.PRIVILEGED}},
-	{read={0, 1}, side_effects={.PRIVILEGED}},
-	{read={0, 1}, side_effects={.PRIVILEGED}},
-	{read={0, 1}, side_effects={.PRIVILEGED}},
+	{read={0}, implicit_rd={.RAX}, side_effects={.PRIVILEGED}},
+	{read={0}, implicit_rd={.RAX}, side_effects={.PRIVILEGED}},
+	{read={0}, implicit_rd={.RAX}, side_effects={.PRIVILEGED}},
+	{implicit_rd={.RAX, .RDX}, side_effects={.PRIVILEGED}},
+	{implicit_rd={.RAX, .RDX}, side_effects={.PRIVILEGED}},
+	{implicit_rd={.RAX, .RDX}, side_effects={.PRIVILEGED}},
 	// .TPAUSE
 	{read={0}, implicit_rd={.RAX, .RDX}, flags_wr={.CF}, side_effects={.HINT}},
 	// .UMONITOR

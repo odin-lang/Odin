@@ -51,9 +51,10 @@ test_pem_roundtrip :: proc(t: ^testing.T) {
 	}
 
 	// Encode and compare.
-	encoded := pem.encode(blk.label, pem.block_bytes(blk))
+	encoded, enc_err := pem.encode(blk.label, pem.block_bytes(blk), false)
 	defer delete(encoded)
-	testing.expectf(t, CMS_PEM_TEXT == transmute(string)(encoded), "PEM encode mismatch: '%s'", encoded)
+	testing.expectf(t, enc_err == nil, "PEM encode failed: %v", enc_err)
+	testing.expectf(t, CMS_PEM_TEXT ==transmute(string)(encoded), "PEM encode mismatch: '%s'", encoded)
 }
 
 @(test)
@@ -76,8 +77,9 @@ test_pem_surrounded :: proc(t: ^testing.T) {
 	defer pem.block_delete(blk)
 
 	// Check if the decode is correct by ensuring it round-trips.
-	encoded := pem.encode(blk.label, pem.block_bytes(blk))
+	encoded, enc_err := pem.encode(blk.label, pem.block_bytes(blk), false)
 	defer delete(encoded)
+	testing.expectf(t, enc_err == nil, "PEM encode failed: %v", enc_err)
 	if !testing.expectf(t, CMS_PEM_TEXT == transmute(string)(encoded), "PEM encode mismatch: '%s'", encoded) {
 		return
 	}

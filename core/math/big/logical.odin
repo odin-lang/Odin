@@ -25,7 +25,11 @@ int_bit_and :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: E
 	assert_if_nil(dest, a, b)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a, b) or_return
+	a, b := a, b
+	a, b = _zero_if_uninitialized(a), _zero_if_uninitialized(b)
+	internal_error_if_immutable(dest) or_return
+	internal_error_if_non_finite(a, b) or_return
+	internal_clear_non_finite(dest)
 	return #force_inline internal_int_and(dest, a, b)
 }
 bit_and :: proc { int_bit_and, }
@@ -37,7 +41,11 @@ int_bit_or :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Er
 	assert_if_nil(dest, a, b)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a, b) or_return
+	a, b := a, b
+	a, b = _zero_if_uninitialized(a), _zero_if_uninitialized(b)
+	internal_error_if_immutable(dest) or_return
+	internal_error_if_non_finite(a, b) or_return
+	internal_clear_non_finite(dest)
 	return #force_inline internal_int_or(dest, a, b)
 }
 bit_or :: proc { int_bit_or, }
@@ -49,7 +57,11 @@ int_bit_xor :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: E
 	assert_if_nil(dest, a, b)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a, b) or_return
+	a, b := a, b
+	a, b = _zero_if_uninitialized(a), _zero_if_uninitialized(b)
+	internal_error_if_immutable(dest) or_return
+	internal_error_if_non_finite(a, b) or_return
+	internal_clear_non_finite(dest)
 	return #force_inline internal_int_xor(dest, a, b)
 }
 bit_xor :: proc { int_bit_xor, }
@@ -64,7 +76,12 @@ int_bit_complement :: proc(dest, src: ^Int, allocator := context.allocator) -> (
 	assert_if_nil(dest, src)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(dest, src) or_return
+	internal_clear_if_uninitialized(dest) or_return
+	src := src
+	src = _zero_if_uninitialized(src)
+	internal_error_if_immutable(dest) or_return
+	internal_error_if_non_finite(src) or_return
+	internal_clear_non_finite(dest)
 	return #force_inline internal_int_complement(dest, src)
 }
 bit_complement :: proc { int_bit_complement, }
@@ -77,7 +94,12 @@ int_shrmod :: proc(quotient, remainder, numerator: ^Int, bits: int, allocator :=
 	assert_if_nil(quotient, numerator)
 	context.allocator = allocator
 
-	if err = internal_clear_if_uninitialized(quotient, numerator);  err != nil { return err }
+	if err = internal_clear_if_uninitialized(quotient);  err != nil { return err }
+	numerator := numerator
+	numerator = _zero_if_uninitialized(numerator)
+	internal_error_if_immutable(quotient, remainder) or_return
+	internal_error_if_non_finite(numerator) or_return
+	internal_clear_non_finite(quotient, remainder)
 	return #force_inline internal_int_shrmod(quotient, remainder, numerator, bits)
 }
 shrmod :: proc { int_shrmod, }
@@ -94,7 +116,12 @@ int_shr_signed :: proc(dest, src: ^Int, bits: int, allocator := context.allocato
 	assert_if_nil(dest, src)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(dest, src) or_return
+	internal_clear_if_uninitialized(dest) or_return
+	src := src
+	src = _zero_if_uninitialized(src)
+	internal_error_if_immutable(dest) or_return
+	internal_error_if_non_finite(src) or_return
+	internal_clear_non_finite(dest)
 	return #force_inline internal_int_shr_signed(dest, src, bits)
 }
 
@@ -107,7 +134,12 @@ int_shl :: proc(dest, src: ^Int, bits: int, allocator := context.allocator) -> (
 	assert_if_nil(dest, src)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(dest, src) or_return
+	internal_clear_if_uninitialized(dest) or_return
+	src := src
+	src = _zero_if_uninitialized(src)
+	internal_error_if_immutable(dest) or_return
+	internal_error_if_non_finite(src) or_return
+	internal_clear_non_finite(dest)
 	return #force_inline internal_int_shl(dest, src, bits)
 }
 shl :: proc { int_shl, }

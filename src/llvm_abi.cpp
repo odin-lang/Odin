@@ -16,11 +16,13 @@ struct lbArgType {
 	i64 byval_alignment;
 	bool is_byval;
 	bool no_capture;
+	bool in_reg;
+	bool pad_in_reg;
 
-	// For RiscV (Optional for others): A `cast_type` is normally applied by reinterpreting the value's 
-	// bits from offset zero. Only correct when the two layouts agree. When an ABI flattens an aggregate 
+	// For RiscV (Optional for others): A `cast_type` is normally applied by reinterpreting the value's
+	// bits from offset zero. Only correct when the two layouts agree. When an ABI flattens an aggregate
 	// it drops padding, and the dense type it produces puts the surviving members at different offsets
-	// than they really have, eg `struct #min_field_align(16){i8, f32}` flattens to `{i8, float}`, moving 
+	// than they really have, eg `struct #min_field_align(16){i8, f32}` flattens to `{i8, float}`, moving
 	// the float from offset 16 to offset 4. These give the real byte offset of each `cast_type` element.
 	Slice<i64> coerce_offsets;
 };
@@ -28,6 +30,9 @@ struct lbArgType {
 
 gb_internal i64 lb_sizeof(LLVMTypeRef type);
 gb_internal i64 lb_alignof(LLVMTypeRef type);
+
+// the widest vector in bytes (e.g. a matrix's 64 elements)
+enum { LB_MAX_VECTOR_SIZE = 8*SIMD_ELEMENT_COUNT_MAX };
 
 gb_internal lbArgType lb_arg_type_direct(LLVMTypeRef type, LLVMTypeRef cast_type, LLVMTypeRef pad_type, LLVMAttributeRef attr) {
 	return lbArgType{lbArg_Direct, type, cast_type, pad_type, attr, {}, false};
@@ -113,6 +118,11 @@ gb_internal LLVMTypeRef lb_function_type_to_llvm_raw(lbFunctionType *ft, bool is
 	GB_ASSERT_MSG(ret != nullptr, "%d", ft->ret.kind);
 
 	unsigned maximum_arg_count = offset+arg_count;
+	for (unsigned i = 0; i < arg_count; i++) {
+		if (ft->args[i].pad_type != nullptr) {
+			maximum_arg_count += 1;
+		}
+	}
 	LLVMTypeRef *args = gb_alloc_array(permanent_allocator(), LLVMTypeRef, maximum_arg_count);
 	if (offset == 1) {
 		GB_ASSERT(ft->ret.kind == lbArg_Indirect);
@@ -122,6 +132,9 @@ gb_internal LLVMTypeRef lb_function_type_to_llvm_raw(lbFunctionType *ft, bool is
 	unsigned arg_index = offset;
 	for (unsigned i = 0; i < arg_count; i++) {
 		lbArgType *arg = &ft->args[i];
+		if (arg->kind != lbArg_Ignore && arg->pad_type != nullptr) {
+			args[arg_index++] = arg->pad_type;
+		}
 		if (arg->kind == lbArg_Direct) {
 			LLVMTypeRef arg_type = nullptr;
 			if (ft->args[i].cast_type != nullptr) {
@@ -182,6 +195,7 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 	LLVMAttributeRef noalias_attr   = lb_create_enum_attribute(c, "noalias");
 	LLVMAttributeRef nonnull_attr   = lb_create_enum_attribute(c, "nonnull");
 	LLVMAttributeRef nocapture_attr = lb_create_nocapture_attribute(c);
+	LLVMAttributeRef inreg_attr     = lb_create_enum_attribute(c, "inreg");
 
 	unsigned arg_index = offset;
 	for (unsigned i = 0; i < arg_count; i++) {
@@ -189,12 +203,21 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 		if (arg->kind == lbArg_Ignore) {
 			continue;
 		}
+		if (arg->pad_type != nullptr) {
+			if (arg->pad_in_reg) {
+				LLVMAddAttributeAtIndex(fn, arg_index+1, inreg_attr);
+			}
+			arg_index++;
+		}
 
 		if (arg->attribute) {
 			LLVMAddAttributeAtIndex(fn, arg_index+1, arg->attribute);
 		}
 		if (arg->align_attribute) {
 			LLVMAddAttributeAtIndex(fn, arg_index+1, arg->align_attribute);
+		}
+		if (arg->in_reg) {
+			LLVMAddAttributeAtIndex(fn, arg_index+1, inreg_attr);
 		}
 
 		if (arg->no_capture) {
@@ -228,7 +251,7 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 	// 			cc_kind = lbCallingConvention_X86_64_SysV;
 	// 		}
 	// 	}
-	// } 
+	// }
 	LLVMSetFunctionCallConv(fn, cc_kind);
 	if (calling_convention == ProcCC_Odin) {
 		unsigned context_index = arg_index;
@@ -352,6 +375,7 @@ gb_internal i64 lb_alignof(LLVMTypeRef type) {
 			i64 elem_size = lb_sizeof(elem);
 			i64 count = LLVMGetVectorSize(type);
 			i64 size = count * elem_size;
+			GB_ASSERT_MSG(size <= build_context.max_simd_align || size <= LB_MAX_VECTOR_SIZE, "%s is wider than the datalayout's capped vector entries", LLVMPrintTypeToString(type));
 			return gb_clamp(next_pow2(size), 1, build_context.max_simd_align);
 		}
 
@@ -438,7 +462,7 @@ gb_internal lbArgType lb_abi_modify_return_is_tuple(lbFunctionType *ft, LLVMCont
 // Every psABI except AAPCS64 and Win64 makes the caller widen a sub-word integer to 32 bits, in
 // both argument and return position, and clang records that as `signext`/`zeroext`. A callee
 // compiled against the attribute reads the whole 32-bit register rather than the byte, so omitting
-// it hands the callee whatever the high bits happened to hold. 
+// it hands the callee whatever the high bits happened to hold.
 gb_internal LLVMAttributeRef lb_integer_extension_attribute(LLVMContextRef c, LLVMTypeRef type, Type *source_type) {
 	if (source_type == nullptr) {
 		// Knowable without the source: an `i1` is always zero-extended.
@@ -458,8 +482,12 @@ gb_internal LLVMAttributeRef lb_integer_extension_attribute(LLVMContextRef c, LL
 
 // The source type of each parameter, where one exists. `arg_types` can carry entries with no
 // counterpart, so the tuple is walked rather than indexed.
-gb_internal Array<Type *> lb_abi_param_source_types(Type *proc_type, unsigned arg_count) {
+// `#by_ptr` parameters become pointers after classification, so `by_ptr` reports them to be classified as pointers.
+gb_internal Array<Type *> lb_abi_param_source_types(Type *proc_type, unsigned arg_count, Array<bool> *by_ptr = nullptr) {
 	auto out = array_make<Type *>(temporary_allocator(), cast(isize)arg_count);
+	if (by_ptr != nullptr) {
+		*by_ptr = array_make<bool>(temporary_allocator(), cast(isize)arg_count);
+	}
 	Entity **params = nullptr;
 	isize param_count = 0;
 	if (proc_type != nullptr && proc_type->kind == Type_Proc && proc_type->Proc.params != nullptr) {
@@ -471,6 +499,9 @@ gb_internal Array<Type *> lb_abi_param_source_types(Type *proc_type, unsigned ar
 			j++;
 		}
 		out[i] = cast(isize)j < param_count ? params[j]->type : nullptr;
+		if (by_ptr != nullptr && cast(isize)j < param_count) {
+			(*by_ptr)[i] = (params[j]->flags & EntityFlag_ByPtr) != 0;
+		}
 	}
 	return out;
 }
@@ -486,15 +517,141 @@ gb_internal Type *lb_abi_single_result_type(Type *proc_type) {
 	return nullptr;
 }
 
+// The alignment C declares with `__declspec(align)`:
+// `#align`, `#min_field_align`, and the vector and matrix types.
+// MSVC declares `__m128` and the like with it.
+gb_internal i64 lb_abi_required_alignment(Type *t) {
+	t = base_type(t);
+	switch (t->kind) {
+	case Type_Struct:
+		{
+			i64 align = gb_max(t->Struct.custom_align, t->Struct.custom_min_field_align);
+			for (Entity *f : t->Struct.fields) {
+				if (f->kind == Entity_Variable) {
+					align = gb_max(align, lb_abi_required_alignment(f->type));
+				}
+			}
+			return align;
+		}
+	case Type_Union:
+		{
+			i64 align = t->Union.custom_align;
+			for (Type *variant : t->Union.variants) {
+				align = gb_max(align, lb_abi_required_alignment(variant));
+			}
+			return align;
+		}
+	case Type_Array:
+		return lb_abi_required_alignment(t->Array.elem);
+	case Type_EnumeratedArray:
+		return lb_abi_required_alignment(t->EnumeratedArray.elem);
+	case Type_SimdVector:
+	case Type_Matrix:
+		return type_align_of(t);
+	}
+	return 1;
+}
+
+gb_internal bool lb_abi_is_vector_register_type(Type *t) {
+	t = core_type(t);
+	if (t->kind == Type_SimdVector) {
+		i64 size = type_size_of(t);
+		return size == 16 || size == 32 || size == 64;
+	}
+	return is_type_float(t);
+}
+
+// Clang's `isHomogeneousAggregate` without its limit of four members.
+// Every member is a float of one width or a vector of one size, and there is no padding.
+// Returns the number of members, and 0 for a type that is not homogeneous.
+gb_internal i64 lb_abi_homogeneous_members(Type *t, Type **base) {
+	t = base_type(t);
+	switch (t->kind) {
+	case Type_Struct:
+		{
+			i64 total = 0;
+			for (Entity *f : t->Struct.fields) {
+				if (f->kind != Entity_Variable) {
+					continue;
+				}
+
+				Type *elem = base_type(f->type);
+				for (;;) {
+					if (elem->kind == Type_Array) {
+						if (elem->Array.count == 0) {
+							return 0;
+						}
+						elem = base_type(elem->Array.elem);
+					} else if (elem->kind == Type_EnumeratedArray) {
+						if (elem->EnumeratedArray.count == 0) {
+							return 0;
+						}
+						elem = base_type(elem->EnumeratedArray.elem);
+					} else {
+						break;
+					}
+				}
+				if (elem->kind == Type_Struct && type_size_of(elem) == 0) {
+					continue;
+				}
+
+				i64 count = lb_abi_homogeneous_members(f->type, base);
+				if (count == 0) {
+					return 0;
+				}
+				total = t->Struct.is_raw_union ? gb_max(total, count) : total+count;
+			}
+
+			if (total == 0) {
+				return 0;
+			}
+			if (type_size_of(*base)*total != type_size_of(t)) {
+				return 0;
+			}
+			return total;
+		}
+	case Type_Array:
+		return t->Array.count * lb_abi_homogeneous_members(t->Array.elem, base);
+	case Type_EnumeratedArray:
+		return t->EnumeratedArray.count * lb_abi_homogeneous_members(t->EnumeratedArray.elem, base);
+	case Type_Matrix:
+		return type_size_of(t)/type_size_of(t->Matrix.elem) * lb_abi_homogeneous_members(t->Matrix.elem, base);
+	}
+
+	Type *elem  = t;
+	i64   count = 1;
+	if (is_type_complex(t)) {
+		elem  = base_complex_elem_type(t);
+		count = 2;
+	} else if (is_type_quaternion(t)) {
+		elem  = base_complex_elem_type(t);
+		count = 4;
+	}
+	if (!lb_abi_is_vector_register_type(elem)) {
+		return 0;
+	}
+
+	if (*base == nullptr) {
+		*base = elem;
+	}
+	if (is_type_simd_vector(*base) != is_type_simd_vector(elem)) {
+		return 0;
+	}
+	if (type_size_of(*base) != type_size_of(elem)) {
+		return 0;
+	}
+	return count;
+}
+
 namespace lbAbi386 {
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type);
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type, ProcCallingConvention calling_convention);
 	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 
 	gb_internal LB_ABI_INFO(abi_info) {
-		LLVMContextRef c = m->ctx;		
+		LLVMContextRef c = m->ctx;
 		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
-		ft->args = compute_arg_types(c, arg_types, arg_count, original_type);
+		ft->args = compute_arg_types(c, arg_types, arg_count, original_type, calling_convention);
 		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 
 		// `bit_field` is treated as a struct.
@@ -518,7 +675,7 @@ namespace lbAbi386 {
 
 		// A complex lowers to a struct of two floats. The struct rule sends every struct through
 		// a hidden pointer. The psABI gives complex its own rule: one of eight bytes or fewer
-		// comes back in EAX:EDX, and only the wider ones go through memory. `complex64` is 
+		// comes back in EAX:EDX, and only the wider ones go through memory. `complex64` is
 		// returned coerced to `i64` and `complex128` keeps the hidden pointer.
 		if (return_is_defined && !return_is_tuple &&
 		    return_source != nullptr && is_type_complex(return_source)) {
@@ -574,28 +731,158 @@ namespace lbAbi386 {
 		return lb_arg_type_direct(type, nullptr, nullptr, attr);
 	}
 
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type) {
-		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
-		auto srcs = lb_abi_param_source_types(original_type, arg_count);
+	// MSVC passes an aggregate declared over-aligned by reference.
+	// One made only of `f32`s with no padding is the exception, and stays on the stack.
+	gb_internal bool windows_passes_by_reference(Type *t) {
+		if (lb_abi_required_alignment(t) <= 4) {
+			return false;
+		}
 
-		for (unsigned i = 0; i < arg_count; i++) {
-			LLVMTypeRef t = arg_types[i];
-			LLVMTypeKind kind = LLVMGetTypeKind(t);
-			i64 sz = lb_sizeof(t);
-			// `bit_field` lowers to a bare integer; C represents it as a struct with bit-field 
-			// members, and i386 passes every struct by value on the stack. Use Src Type to match
-			bool is_aggregate = kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind ||
-			                    (srcs[i] != nullptr && is_type_bit_field(srcs[i]));
-			if (is_aggregate) {
-				if (sz == 0) {
-					args[i] = lb_arg_type_ignore(t);
+		Type *base = nullptr;
+		if (lb_abi_homogeneous_members(t, &base) == 0) {
+			return true;
+		}
+		if (is_type_simd_vector(base)) {
+			return true;
+		}
+		return type_size_of(base) != 4;
+	}
+
+	// The registers still free for arguments.
+	struct Registers {
+		i64 gpr; // ECX and EDX, for `fastcall` and `vectorcall`
+		i64 sse; // the vector registers
+	};
+
+	gb_internal bool take_gpr(Registers *regs) {
+		if (regs->gpr <= 0) {
+			return false;
+		}
+		regs->gpr -= 1;
+		return true;
+	}
+
+	gb_internal lbArgType indirect(LLVMTypeRef type, Registers *regs) {
+		lbArgType arg = lb_arg_type_indirect(type, nullptr);
+		arg.in_reg = take_gpr(regs);
+		return arg;
+	}
+
+	// `bit_field` lowers to a bare integer; C represents it as a struct with bit-field
+	// members, and i386 passes every struct by value on the stack. Use Src Type to match
+	gb_internal bool is_aggregate(LLVMTypeRef type, Type *source) {
+		LLVMTypeKind kind = LLVMGetTypeKind(type);
+		return kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind ||
+		       (source != nullptr && is_type_bit_field(source));
+	}
+
+	// A struct of one 32-bit integer, float, or pointer, which clang passes as that scalar.
+	gb_internal bool is_single_word_struct(Type *t) {
+		t = base_type(t);
+		if (t->kind != Type_Struct) {
+			return false;
+		}
+		if (type_size_of(t) != 4) {
+			return false;
+		}
+
+		Type *field = nullptr;
+		for (Entity *f : t->Struct.fields) {
+			if (f->kind != Entity_Variable) {
+				continue;
+			}
+			if (field != nullptr) {
+				return false;
+			}
+			field = base_type(f->type);
+		}
+		if (field == nullptr) {
+			return false;
+		}
+		if (type_size_of(field) != 4) {
+			return false;
+		}
+
+		switch (field->kind) {
+		case Type_Basic:
+			return !is_type_complex(field);
+		case Type_Pointer:
+		case Type_MultiPointer:
+		case Type_Proc:
+		case Type_Enum:
+		case Type_BitSet:
+			return true;
+		}
+		return false;
+	}
+
+	// One argument that is not `#by_ptr`. `vectorcall` comes here once its vectors are placed, with MSVC's rules on every OS.
+	gb_internal lbArgType arg_type(LLVMContextRef c, LLVMTypeRef type, Type *source, bool msvc_rules, Registers *regs) {
+		i64 sz = lb_sizeof(type);
+		if (is_aggregate(type, source)) {
+			if (sz == 0) {
+				return lb_arg_type_ignore(type);
+			}
+			if (msvc_rules && source != nullptr && windows_passes_by_reference(source)) {
+				return indirect(type, regs);
+			}
+
+			// Aggregates are pushed onto the stack by value, not passed as a pointer
+			// to a caller-owned copy. This is the rule for both i386 targets.
+			lbArgType arg = lb_arg_type_indirect_byval(c, type);
+
+			// GCC's `fastcall` counts an aggregate against ECX and EDX by its size.
+			// A struct of one 32-bit scalar keeps its register filled with a padding argument.
+			if (!msvc_rules && regs->gpr > 0) {
+				i64 words = (sz+3)/4;
+				if (words > regs->gpr) {
+					regs->gpr = 0;
 				} else {
-					// Aggregates are pushed onto the stack by value, not passed as a pointer
-					// to a caller-owned copy. This is the rule for both i386 targets.
-					args[i] = lb_arg_type_indirect_byval(c, t);
+					regs->gpr -= words;
+					if (regs->gpr > 0 && source != nullptr && is_single_word_struct(source)) {
+						arg.pad_type   = LLVMInt32TypeInContext(c);
+						arg.pad_in_reg = true;
+					}
 				}
+			}
+			return arg;
+		}
+
+		LLVMTypeKind kind = LLVMGetTypeKind(type);
+		if (msvc_rules && kind == LLVMVectorTypeKind) {
+			if (sz <= 64 && regs->sse > 0) {
+				regs->sse -= 1;
+				lbArgType arg = lb_arg_type_direct(type);
+				arg.in_reg = true;
+				return arg;
+			}
+			return indirect(type, regs);
+		}
+
+		// Only an integer or a pointer of 32 bits or fewer takes ECX or EDX.
+		// A wider one goes on the stack and leaves them free.
+		lbArgType arg = non_struct(c, type, false, source);
+		bool is_word = (kind == LLVMIntegerTypeKind || kind == LLVMPointerTypeKind) && sz <= 4;
+		if (arg.kind == lbArg_Indirect || is_word) {
+			arg.in_reg = take_gpr(regs);
+		}
+		return arg;
+	}
+
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type, ProcCallingConvention calling_convention) {
+		Array<bool>      by_ptr = {};
+		Array<Type *>    srcs   = lb_abi_param_source_types(original_type, arg_count, &by_ptr);
+		Array<lbArgType> args   = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
+
+		// `fastcall` passes the first two integers or pointers of 32 bits or fewer in ECX and EDX.
+		// Since MSVC 2015, Windows passes the first three vectors in XMM0-2 and the rest by reference.
+		bool      msvc_rules = build_context.metrics.os == TargetOs_windows;
+		Registers regs       = {calling_convention == ProcCC_FastCall ? 2 : 0, 3};
+		for (unsigned i = 0; i < arg_count; i++) {
+			if (by_ptr[i]) {
+				args[i] = indirect(arg_types[i], &regs);
 			} else {
-				args[i] = non_struct(c, t, false, srcs[i]);
+				args[i] = arg_type(c, arg_types[i], srcs[i], msvc_rules, &regs);
 			}
 		}
 		return args;
@@ -635,8 +922,13 @@ namespace lbAbiAmd64Win64 {
 	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type);
 	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 
+	// MSVC's only 8-byte vector is `__m64`, a union passed and returned like an integer.
+	gb_internal bool is_m64_vector(LLVMTypeRef type) {
+		return lb_is_type_kind(type, LLVMVectorTypeKind) && lb_sizeof(type) == 8;
+	}
+
 	gb_internal LB_ABI_INFO(abi_info) {
-		LLVMContextRef c = m->ctx;		
+		LLVMContextRef c = m->ctx;
 		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
 		ft->args = compute_arg_types(c, arg_types, arg_count, original_type);
@@ -645,28 +937,30 @@ namespace lbAbiAmd64Win64 {
 		return ft;
 	}
 
+	// One argument, which `vectorcall` shares unless it is a homogeneous vector aggregate.
+	gb_internal lbArgType arg_type(LLVMContextRef c, LLVMTypeRef type) {
+		LLVMTypeKind kind = LLVMGetTypeKind(type);
+		if (kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind) {
+			i64 sz = lb_sizeof(type);
+			switch (sz) {
+			case 1:
+			case 2:
+			case 4:
+			case 8:
+				return lb_arg_type_direct(type, LLVMIntTypeInContext(c, 8*cast(unsigned)sz), nullptr, nullptr);
+			}
+			return lb_arg_type_indirect(type, nullptr);
+		}
+		if (is_m64_vector(type)) {
+			return lb_arg_type_direct(type, LLVMInt64TypeInContext(c), nullptr, nullptr);
+		}
+		return lbAbi386::non_struct(c, type, false, nullptr);
+	}
+
 	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type) {
 		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
-
 		for (unsigned i = 0; i < arg_count; i++) {
-			LLVMTypeRef t = arg_types[i];
-			LLVMTypeKind kind = LLVMGetTypeKind(t);
-			if (kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind) {
-				i64 sz = lb_sizeof(t);
-				switch (sz) {
-				case 1:
-				case 2:
-				case 4:
-				case 8:
-					args[i] = lb_arg_type_direct(t, LLVMIntTypeInContext(c, 8*cast(unsigned)sz), nullptr, nullptr);
-					break;
-				default:
-					args[i] = lb_arg_type_indirect(t, nullptr);
-					break;
-				}
-			} else {
-				args[i] = lbAbi386::non_struct(c, t, false, nullptr);
-			}
+			args[i] = arg_type(c, arg_types[i]);
 		}
 		return args;
 	}
@@ -674,6 +968,8 @@ namespace lbAbiAmd64Win64 {
 	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type) {
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
+		} else if (is_m64_vector(return_type)) {
+			return lb_arg_type_direct(return_type, LLVMInt64TypeInContext(c), nullptr, nullptr);
 		} else if (lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind)) {
 			i64 sz = lb_sizeof(return_type);
 			switch (sz) {
@@ -691,6 +987,254 @@ namespace lbAbiAmd64Win64 {
 		return lbAbi386::non_struct(c, return_type, true, nullptr);
 	}
 };
+
+
+// NOTE(bill, 2026-11-17)
+// It appears that clang disagrees with MSVC in the following cases
+//
+//     i386   struct{a: f32, b: i32}    Clang splits it into scalars and LLVM puts `a` in XMM0.
+//                                      MSVC passes the whole struct on the stack.
+//     i386   struct{a: [5]f32}         Homogeneous, with more than four members.
+//                                      Clang passes it on the stack
+//                                      MSVC by reference.
+//     amd64  an HVA in registers       Clang drops the slot from the seventh argument on.
+//                                      MSVC keeps its stack slot.
+//
+// For everything else, I am going to just make MSVC the implementation because it's Microsoft's ABI anyway.
+// And I believe these are clang bugs too. Don't you just love Clang and LLVM? /s
+namespace lbAbiVectorCall {
+	// The members of a homogeneous vector aggregate, which has at most four, and 0 for any other type.
+	gb_internal i64 hva_members(Type *t, Type **base) {
+		*base = nullptr;
+		if (t == nullptr) {
+			return 0;
+		}
+		i64 members = lb_abi_homogeneous_members(t, base);
+		return members <= 4 ? members : 0;
+	}
+
+	// LLVM only treats an `inreg` argument as an HVA when it is a struct.
+	// An array or a union is passed as a struct of its members.
+	gb_internal lbArgType hva_direct(lbModule *m, LLVMTypeRef type, Type *source, Type *base, i64 members) {
+		if (lb_abi_is_vector_register_type(source)) {
+			return lb_arg_type_direct(type);
+		}
+
+		LLVMTypeRef elem = lb_type(m, base);
+		LLVMTypeRef fields[4] = {elem, elem, elem, elem};
+		LLVMTypeRef cast_type = LLVMStructTypeInContext(m->ctx, fields, cast(unsigned)members, false);
+		if (cast_type == type) {
+			cast_type = nullptr;
+		}
+		return lb_arg_type_direct(type, cast_type, nullptr, nullptr);
+	}
+
+	gb_internal LB_ABI_INFO(abi_info_amd64) {
+		LLVMContextRef c = m->ctx;
+		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
+		ft->ctx = c;
+		ft->calling_convention = calling_convention;
+
+		Type *base    = nullptr;
+		Type *result  = lb_abi_single_result_type(original_type);
+		i64   members = hva_members(result, &base);
+		if (return_is_defined && members > 0) {
+			ft->ret = hva_direct(m, return_type, result, base, members);
+		} else {
+			ft->ret = lbAbiAmd64Win64::compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
+		}
+
+		Array<bool>   by_ptr  = {};
+		Array<Type *> srcs    = lb_abi_param_source_types(original_type, arg_count, &by_ptr);
+		Array<bool>   pending = array_make<bool>(temporary_allocator(), cast(isize)arg_count);
+
+		// The first six arguments take the registers of their position, XMM0-5 for a float or a vector.
+		// An aggregate HVA waits for whatever vector registers that leaves.
+		i64 free_sse = 6;
+		ft->args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
+		for (unsigned i = 0; i < arg_count; i++) {
+			LLVMTypeRef t = arg_types[i];
+			if (by_ptr[i]) {
+				ft->args[i] = lb_arg_type_indirect(t, nullptr);
+			} else if (lb_abi_is_vector_register_type(srcs[i])) {
+				if (i < 6) {
+					free_sse -= 1;
+				}
+				ft->args[i] = lb_arg_type_direct(t);
+			} else if (hva_members(srcs[i], &base) > 0) {
+				pending[i] = true;
+				ft->args[i] = lb_arg_type_indirect(t, nullptr);
+			} else {
+				ft->args[i] = lbAbiAmd64Win64::arg_type(c, t);
+			}
+		}
+
+		for (unsigned i = 0; i < arg_count; i++) {
+			if (!pending[i]) {
+				continue;
+			}
+			members = hva_members(srcs[i], &base);
+			if (members > free_sse) {
+				continue;
+			}
+			free_sse -= members;
+			ft->args[i] = hva_direct(m, arg_types[i], srcs[i], base, members);
+			ft->args[i].in_reg = true;
+
+			// LLVM only keeps the stack slot of the fifth and sixth arguments.
+			// A padding argument takes it from the seventh on.
+			if (i >= 6) {
+				ft->args[i].pad_type = LLVMInt64TypeInContext(c);
+			}
+		}
+		return ft;
+	}
+
+	// i386 `vectorcall` is `fastcall` with the vector registers. HVAs take what XMM0-5 the
+	// floats and vectors left, and a homogeneous aggregate of more than four members goes by reference.
+	gb_internal lbArgType arg_i386(lbModule *m, LLVMTypeRef type, Type *source, lbAbi386::Registers *regs) {
+		Type *base    = nullptr;
+		i64   members = lb_abi_homogeneous_members(source, &base);
+		if (members > 4) {
+			return lbAbi386::indirect(type, regs);
+		}
+		if (members == 0) {
+			return lbAbi386::arg_type(m->ctx, type, source, true, regs);
+		}
+
+		if (members <= regs->sse) {
+			regs->sse -= members;
+			lbArgType arg = hva_direct(m, type, source, base, members);
+			arg.in_reg = true;
+			return arg;
+		}
+		if (is_type_float(source)) {
+			return lb_arg_type_direct(type);
+		}
+		return lbAbi386::indirect(type, regs);
+	}
+
+	gb_internal LB_ABI_INFO(abi_info_i386) {
+		LLVMContextRef c = m->ctx;
+		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
+		ft->ctx = c;
+		ft->calling_convention = calling_convention;
+
+		// The hidden return pointer goes on the stack and leaves ECX and EDX free.
+		Type *base    = nullptr;
+		Type *result  = lb_abi_single_result_type(original_type);
+		i64   members = hva_members(result, &base);
+		if (!return_is_defined) {
+			ft->ret = lb_arg_type_direct(LLVMVoidTypeInContext(c));
+		} else if (members > 0) {
+			ft->ret = hva_direct(m, return_type, result, base, members);
+		} else if (lbAbi386::is_aggregate(return_type, result)) {
+			i64 sz = lb_sizeof(return_type);
+			switch (sz) {
+			case 0:
+				ft->ret = lb_arg_type_direct(return_type);
+				break;
+			case 1:
+			case 2:
+			case 4:
+			case 8:
+				ft->ret = lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 8*cast(unsigned)sz), nullptr, nullptr);
+				break;
+			default:
+				ft->ret = lb_arg_type_indirect(return_type, lb_create_enum_attribute_with_type(c, "sret", return_type));
+				break;
+			}
+		} else {
+			ft->ret = lbAbi386::non_struct(c, return_type, true, nullptr);
+		}
+
+		Array<bool>   by_ptr   = {};
+		Array<Type *> srcs     = lb_abi_param_source_types(original_type, arg_count, &by_ptr);
+		Array<bool>   assigned = array_make<bool>(temporary_allocator(), cast(isize)arg_count);
+
+		lbAbi386::Registers regs = {2, 6};
+		ft->args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
+
+		// Floats and vectors take XMM0-5 first, in order, ahead of everything else.
+		for (unsigned i = 0; i < arg_count; i++) {
+			if (by_ptr[i] || !lb_abi_is_vector_register_type(srcs[i])) {
+				continue;
+			}
+			if (regs.sse > 0) {
+				regs.sse -= 1;
+				ft->args[i] = lb_arg_type_direct(arg_types[i]);
+				ft->args[i].in_reg = true;
+				assigned[i] = true;
+			}
+		}
+
+		for (unsigned i = 0; i < arg_count; i++) {
+			if (assigned[i]) {
+				continue;
+			}
+			if (by_ptr[i]) {
+				ft->args[i] = lbAbi386::indirect(arg_types[i], &regs);
+			} else {
+				ft->args[i] = arg_i386(m, arg_types[i], srcs[i], &regs);
+			}
+		}
+		return ft;
+	}
+}
+
+// Windows decorates a `vectorcall` symbol as `name@@N`, and on i386 a `stdcall` one as `_name@N` and a `fastcall` one as `@name@N`.
+// N counts the bytes of the parameters as C declares them, each rounded up to the pointer size.
+// LLVM would count the lowered parameters instead, where an argument passed by reference is only a pointer.
+// The leading "\x01" stops LLVM decorating the name again.
+gb_internal String lb_procedure_symbol_name(String const &name, Type *proc_type) {
+	Type *pt = base_type(proc_type);
+	if (pt == nullptr || pt->kind != Type_Proc || pt->Proc.c_vararg) {
+		return name;
+	}
+	if (build_context.metrics.os != TargetOs_windows) {
+		return name;
+	}
+
+	char const *prefix = "";
+	char const *suffix = "@";
+	switch (pt->Proc.calling_convention) {
+	case ProcCC_VectorCall:
+		suffix = "@@";
+		break;
+	case ProcCC_StdCall:
+		prefix = "_";
+		break;
+	case ProcCC_FastCall:
+		prefix = "@";
+		break;
+	default:
+		return name;
+	}
+	if (pt->Proc.calling_convention != ProcCC_VectorCall && build_context.metrics.arch != TargetArch_i386) {
+		return name;
+	}
+
+	i64 ptr_size = build_context.ptr_size;
+	i64 bytes    = 0;
+	if (pt->Proc.params != nullptr) {
+		for (Entity *e : pt->Proc.params->Tuple.variables) {
+			if (e->kind != Entity_Variable) {
+				continue;
+			}
+			if (e->flags & EntityFlag_ByPtr) {
+				bytes += ptr_size;
+			} else {
+				bytes += llvm_align_formula(type_size_of(e->type), ptr_size);
+			}
+		}
+	}
+
+	gbString s = gb_string_make(temporary_allocator(), "\x01");
+	s = gb_string_appendc(s, prefix);
+	s = gb_string_append_length(s, name.text, name.len);
+	s = gb_string_append_fmt(s, "%s%lld", suffix, cast(long long)bytes);
+	return make_string(cast(u8 *)s, gb_string_length(s));
+}
 
 
 gb_internal bool is_llvm_type_slice_like(LLVMTypeRef type) {
@@ -1546,7 +2090,7 @@ namespace lbAbiArm64 {
 	gb_internal bool is_homogenous_aggregate(LLVMContextRef c, LLVMTypeRef type, LLVMTypeRef *base_type_, unsigned *member_count_);
 
 	gb_internal LB_ABI_INFO(abi_info) {
-		LLVMContextRef c = m->ctx;		
+		LLVMContextRef c = m->ctx;
 		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
 		ft->args = compute_arg_types(c, arg_types, arg_count, original_type);
@@ -1836,7 +2380,46 @@ namespace lbAbiArm64 {
 			return lb_arg_type_direct(return_type, cast_type, nullptr, nullptr);
 		}
 	}
-    
+
+	gb_internal i64 aggregate_align_of(Type *t) {
+		Type *bt    = base_type(t);
+		i64   align = type_align_of(bt);
+		if (build_context.metrics.os == TargetOs_darwin) {
+			return align;
+		}
+
+		i64 natural = 1;
+		switch (bt->kind) {
+		case Type_Struct:
+			if (bt->Struct.custom_align == 0) {
+				return align;
+			}
+			for (Entity *f : bt->Struct.fields) {
+				natural = gb_max(natural, type_align_of(f->type));
+			}
+			if (bt->Struct.custom_min_field_align > 0) {
+				natural = gb_max(natural, bt->Struct.custom_min_field_align);
+			}
+			if (bt->Struct.custom_max_field_align != 0) {
+				natural = gb_min(natural, bt->Struct.custom_max_field_align);
+			}
+			break;
+
+		case Type_Union:
+			if (bt->Union.custom_align == 0) {
+				return align;
+			}
+			for (Type *variant : bt->Union.variants) {
+				natural = gb_max(natural, type_align_of(variant));
+			}
+			break;
+
+		default:
+			return align;
+		}
+		return gb_min(natural, align);
+	}
+
 	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type* original_type) {
 		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 
@@ -1875,6 +2458,8 @@ namespace lbAbiArm64 {
 						cast_type = LLVMStructTypeInContext(c, nullptr, 0, false);
 					} else if (size <= 8) {
 						cast_type = LLVMIntTypeInContext(c, cast(unsigned)(size*8));
+					} else if (aggregate_align_of(ptype) == 16) {
+						cast_type = LLVMIntTypeInContext(c, 128);
 					} else {
 						LLVMTypeRef llvm_i64 = LLVMIntTypeInContext(c, 64);
 						cast_type = llvm_array_type(llvm_i64, 2);
@@ -1902,7 +2487,7 @@ namespace lbAbiWasm {
 	enum {MAX_DIRECT_STRUCT_SIZE = 32};
 
 	gb_internal LB_ABI_INFO(abi_info) {
-		LLVMContextRef c = m->ctx;		
+		LLVMContextRef c = m->ctx;
 		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
 		ft->calling_convention = calling_convention;
@@ -1931,7 +2516,7 @@ namespace lbAbiWasm {
 		}
 		return lb_arg_type_direct(type, nullptr, nullptr, attr);
 	}
-	
+
 	gb_internal bool is_basic_register_type(LLVMTypeRef type) {
 		switch (LLVMGetTypeKind(type)) {
 		case LLVMHalfTypeKind:
@@ -1941,7 +2526,7 @@ namespace lbAbiWasm {
 			return true;
 		case LLVMIntegerTypeKind:
 			return lb_sizeof(type) <= 16;
-		}	
+		}
 		return false;
 	}
 
@@ -1999,7 +2584,7 @@ namespace lbAbiWasm {
 	gb_internal lbArgType is_struct(LLVMContextRef c, LLVMTypeRef type, Type *original_type, ProcCallingConvention calling_convention) {
 		LLVMTypeKind kind = LLVMGetTypeKind(type);
 		GB_ASSERT(kind == LLVMArrayTypeKind || kind == LLVMStructTypeKind);
-		
+
 		i64 sz = lb_sizeof(type);
 		if (sz == 0) {
 			return lb_arg_type_ignore(type);
@@ -2009,7 +2594,7 @@ namespace lbAbiWasm {
 		}
 		return lb_arg_type_indirect(type, nullptr);
 	}
-	
+
 	gb_internal lbArgType pseudo_slice(LLVMContextRef c, LLVMTypeRef type, Type *original_type, ProcCallingConvention calling_convention) {
 		if (build_context.metrics.ptr_size < build_context.metrics.int_size &&
 		    type_can_be_direct(type, original_type, calling_convention)) {
@@ -2111,7 +2696,7 @@ namespace lbAbiArm32 {
 	gb_internal lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined, ProcCallingConvention calling_convention, Type *return_source);
 
 	gb_internal LB_ABI_INFO(abi_info) {
-		LLVMContextRef c = m->ctx;		
+		LLVMContextRef c = m->ctx;
 		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
 		ft->args = compute_arg_types(c, arg_types, arg_count, calling_convention, original_type);
@@ -2142,7 +2727,7 @@ namespace lbAbiArm32 {
 	gb_internal lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type, bool is_return, Type *source_type) {
 		// A bare vector narrower than a word has no register of its own to sit in, clang coerces
 		// it to `i32` as an argument whatever its element is. The return keeps the vector
-		// type, same as x86, except: a half vector is not a legal type at this microarchitecture 
+		// type, same as x86, except: a half vector is not a legal type at this microarchitecture
 		// (`arm1176jzf-s` has VFP2 but no fp16), so clang coerces that one in both directions.
 		//
 		//     <4 x i8> <2 x i16> <2 x half>  as an argument  ->  i32
@@ -2159,8 +2744,8 @@ namespace lbAbiArm32 {
 	}
 
 	// AAPCS32 §5.5, the VFP variant that the `gnueabihf` triple selects: an aggregate of at most
-	// four members that are all the same fp type is a Homogeneous fp Aggregate, and travels 
-	// in s0-s3 / d0-d3 rather than in the core registers. Everything below coerces aggregates to 
+	// four members that are all the same fp type is a Homogeneous fp Aggregate, and travels
+	// in s0-s3 / d0-d3 rather than in the core registers. Everything below coerces aggregates to
 	// `[N x i32]`, which puts an HFA in r0-r3 where the C side reads s0-s3.
 	//
 	// The detector is arm64's: AAPCS64 states the same rule over the same shapes.
@@ -2263,7 +2848,7 @@ namespace lbAbiArm32 {
 			if (is_hfa(c, return_type, return_source, calling_convention, &hfa_coerce)) {
 				return lb_arg_type_direct(return_type, hfa_coerce, nullptr, nullptr);
 			}
-			// `lb_arg_type_direct` takes (type, cast_type), and the cast type is what the function actually returns. 
+			// `lb_arg_type_direct` takes (type, cast_type), and the cast type is what the function actually returns.
 			switch (lb_sizeof(return_type)) {
 			case 1:         return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 8),  nullptr, nullptr);
 			case 2:         return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 16), nullptr, nullptr);
@@ -2583,11 +3168,20 @@ namespace lbAbiRiscv64 {
 				return lb_arg_type_direct(orig_type, LLVMIntTypeInContext(c, cast(unsigned)(size*8)), nullptr, nullptr);
 			}
 		} else if (size <= 2*xlen) {
+			*gprs_left -= 2;
+
+			i64 align = source_type != nullptr ? type_align_of(source_type) : lb_alignof(orig_type);
+			if (align == 2*xlen) {
+				LLVMTypeRef wide = LLVMIntTypeInContext(c, cast(unsigned)(2*xlen*8));
+				if (orig_type == wide) {
+					return lb_arg_type_direct(orig_type, nullptr, nullptr, nullptr);
+				}
+				return lb_arg_type_direct(orig_type, wide, nullptr, nullptr);
+			}
+
 			LLVMTypeRef *fields = gb_alloc_array(temporary_allocator(), LLVMTypeRef, 2);
 			fields[0] = LLVMIntTypeInContext(c, cast(unsigned)(xlen*8));
 			fields[1] = LLVMIntTypeInContext(c, cast(unsigned)((size-xlen)*8));
-
-			*gprs_left -= 2;
 			return lb_arg_type_direct(orig_type, LLVMStructTypeInContext(c, fields, 2, false), nullptr, nullptr);
 		} else {
 			return lb_arg_type_indirect(orig_type, nullptr);
@@ -2721,6 +3315,12 @@ gb_internal LB_ABI_INFO(lb_get_abi_info_internal) {
 	case ProcCC_SysV:
 		GB_ASSERT(build_context.metrics.arch == TargetArch_amd64);
 		return lbAbiAmd64SysV::abi_info(m, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention, original_type);
+	case ProcCC_VectorCall:
+		if (build_context.metrics.arch == TargetArch_amd64) {
+			return lbAbiVectorCall::abi_info_amd64(m, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention, original_type);
+		}
+		GB_ASSERT(build_context.metrics.arch == TargetArch_i386);
+		return lbAbiVectorCall::abi_info_i386(m, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention, original_type);
 	}
 
 	switch (build_context.metrics.arch) {
