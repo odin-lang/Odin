@@ -356,11 +356,12 @@ Model_I :: struct {
 
 @(private)
 Input :: struct {
-	buf:      []u8,
-	pos:      int,
-	z:        ^compress.Context,
-	consumed: i64,
-	overrun:  bool,
+	buf:       []u8,
+	pos:       int,
+	z:         ^compress.Context,
+	consumed:  i64,
+	overrun:   bool,
+	input_err: io.Error,
 }
 
 @(private)

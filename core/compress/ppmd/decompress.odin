@@ -287,13 +287,24 @@ input_refill :: proc(r: ^Input) -> u8 {
 	r.z.window = r.z.window[r.pos:]
 	r.buf = nil
 	r.pos = 0
-	if compress.refill_window(r.z, 1) != nil || len(r.z.window) == 0 {
+	if refill_err := compress.refill_window(r.z, 1); refill_err != nil || len(r.z.window) == 0 {
 		r.overrun = true
+		if refill_err != .EOF && refill_err != .Unexpected_EOF && refill_err != .Short_Buffer {
+			r.input_err = refill_err
+		}
 		return 0
 	}
 	r.buf = r.z.window
 	r.pos = 1
 	return r.buf[0]
+}
+
+@(private)
+input_overrun_error :: proc "contextless" (r: ^Input) -> Error {
+	if r.input_err != nil {
+		return r.input_err
+	}
+	return General_Error.Stream_Too_Short
 }
 
 @(private)
@@ -324,7 +335,7 @@ decoder_start :: proc(d: ^Decoder) -> (err: Error) {
 	r := &d.input
 	if d.model_h != nil {
 		if input_byte(r) != 0 {
-			return General_Error.Stream_Too_Short if r.overrun else PPMd_Error.Corrupt_Data
+			return input_overrun_error(r) if r.overrun else PPMd_Error.Corrupt_Data
 		}
 		return rc_start(r, &d.rc_h)
 	}
@@ -338,7 +349,7 @@ rc_start :: proc(r: ^Input, rc: ^$R) -> (err: Error) {
 	}
 	rc.range_ = 0xFFFF_FFFF
 	if r.overrun {
-		return General_Error.Stream_Too_Short
+		return input_overrun_error(r)
 	}
 	if rc.code == 0xFFFF_FFFF {
 		return PPMd_Error.Corrupt_Data
@@ -372,7 +383,7 @@ decode_into :: proc(d: ^Decoder, m: ^$M, rc: ^$R, out: []u8) -> (n: int, err: Er
 		if r.overrun {
 			d.written += i64(n)
 			d.done = true
-			return n, General_Error.Stream_Too_Short
+			return n, input_overrun_error(r)
 		}
 		dst[n] = u8(sym)
 		n += 1
@@ -392,6 +403,9 @@ decode_end :: proc(d: ^Decoder, m: ^$M, rc: ^$R, sym: int) -> (err: Error) {
 	if sym >= 0 && d.size < 0 {
 		sym = decode_one(m, rc, r)
 		if sym >= 0 {
+			if r.input_err != nil {
+				return r.input_err
+			}
 			return General_Error.Output_Too_Short
 		}
 	}
@@ -399,13 +413,13 @@ decode_end :: proc(d: ^Decoder, m: ^$M, rc: ^$R, sym: int) -> (err: Error) {
 		sym = decode_one(m, rc, r)
 		if sym != SYM_END {
 			if r.overrun {
-				return General_Error.Stream_Too_Short
+				return input_overrun_error(r)
 			}
 			return General_Error.Size_Mismatch if sym >= 0 else PPMd_Error.Corrupt_Data
 		}
 	}
 	if r.overrun {
-		return General_Error.Stream_Too_Short
+		return input_overrun_error(r)
 	}
 	if sym == SYM_ERROR {
 		return PPMd_Error.Corrupt_Data

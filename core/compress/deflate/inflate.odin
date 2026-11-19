@@ -34,7 +34,7 @@ decompress_zlib_from_context :: proc(z: ^compress.Context, expected_output_size 
 
 	adler, adler_err := compress.read_data(z, u32be)
 	if adler_err != nil {
-		return General_Error.Stream_Too_Short
+		return inflate_input_error(adler_err)
 	}
 	p.bytes_in += size_of(u32be)
 	if digest != u32(adler) {
@@ -169,7 +169,11 @@ inflate_refill :: #force_inline proc(s: ^Inflate, written: int, $STREAM: bool) -
 		return false
 	}
 	when STREAM {
-		s.input, s.position, s.bit_buffer, s.bit_count, s.eof, s.base = inflate_refill_stream(s.ctx, s.input, s.position, s.bit_buffer, s.bit_count, s.eof, s.base)
+		fill_err: io.Error
+		s.input, s.position, s.bit_buffer, s.bit_count, s.eof, s.base, fill_err = inflate_refill_stream(s.ctx, s.input, s.position, s.bit_buffer, s.bit_count, s.eof, s.base)
+		if fill_err != nil {
+			s.input_err = fill_err
+		}
 	} else {
 		for s.bit_count < 56 {
 			b: u64 = 0
@@ -189,10 +193,10 @@ inflate_refill :: #force_inline proc(s: ^Inflate, written: int, $STREAM: bool) -
 }
 
 @(private, cold)
-inflate_refill_stream :: #force_no_inline proc(ctx: ^compress.Context, input: []u8, position: int, bit_buffer: u64, bit_count: i32, eof: bool, base: i64) -> (new_input: []u8, new_position: int, new_bit_buffer: u64, new_bit_count: i32, new_eof: bool, new_base: i64) #no_bounds_check {
+inflate_refill_stream :: #force_no_inline proc(ctx: ^compress.Context, input: []u8, position: int, bit_buffer: u64, bit_count: i32, eof: bool, base: i64) -> (new_input: []u8, new_position: int, new_bit_buffer: u64, new_bit_count: i32, new_eof: bool, new_base: i64, fill_err: io.Error) #no_bounds_check {
 	new_input, new_position, new_bit_buffer, new_bit_count, new_eof, new_base = input, position, bit_buffer, bit_count, eof, base
 	if !new_eof {
-		new_input, new_position, new_eof, new_base = inflate_fill(ctx, new_input, new_position, new_eof, 8, new_base)
+		new_input, new_position, new_eof, new_base, fill_err = inflate_fill(ctx, new_input, new_position, new_eof, 8, new_base)
 		if len(new_input) - new_position >= 8 {
 			new_bit_buffer |= inflate_load_u64(raw_data(new_input)[new_position:]) << u64(new_bit_count)
 			new_position   += int((63 - new_bit_count) >> 3)
@@ -213,13 +217,16 @@ inflate_refill_stream :: #force_no_inline proc(ctx: ^compress.Context, input: []
 }
 
 @(private)
-inflate_fill :: proc(ctx: ^compress.Context, input: []u8, position: int, eof: bool, need: int, base: i64) -> (new_input: []u8, new_position: int, new_eof: bool, new_base: i64) #no_bounds_check {
+inflate_fill :: proc(ctx: ^compress.Context, input: []u8, position: int, eof: bool, need: int, base: i64) -> (new_input: []u8, new_position: int, new_eof: bool, new_base: i64, fill_err: io.Error) #no_bounds_check {
 	if eof || position > len(input) {
-		return input, position, true, base
+		return input, position, true, base, nil
 	}
 	ctx.window = input[position:]
 	refill_error := compress.refill_window(ctx, need)
-	return ctx.window, 0, refill_error != nil, base + i64(position)
+	if refill_error != nil && !inflate_input_ended(refill_error) {
+		fill_err = refill_error
+	}
+	return ctx.window, 0, refill_error != nil, base + i64(position), fill_err
 }
 
 @(private)
@@ -746,7 +753,11 @@ inflate_decompress :: proc(d: ^Inflate_Decoder, output: []u8, grow: ^[dynamic]u8
 						if written >= high_water { return written, nil }
 					}
 					if s.position == builtin.len(s.input) {
-						s.input, s.position, s.eof, s.base = inflate_fill(s.ctx, s.input, s.position, s.eof, 1, s.base)
+						fill_err: io.Error
+						s.input, s.position, s.eof, s.base, fill_err = inflate_fill(s.ctx, s.input, s.position, s.eof, 1, s.base)
+						if fill_err != nil {
+							s.input_err = fill_err
+						}
 						if s.position == builtin.len(s.input) {
 							return written, General_Error.Stream_Too_Short
 						}
@@ -1101,6 +1112,9 @@ inflate_to_buffer :: proc(z: ^compress.Context, expected_output_size: int, p: ^I
 	if err != nil && inflate_overrun(&d.s) {
 		err     = General_Error.Stream_Too_Short
 		written = min(written, d.s.checkpoint)
+	}
+	if err == General_Error.Stream_Too_Short && d.s.input_err != nil {
+		err = d.s.input_err
 	}
 	if err == General_Error.Output_Too_Short && expected >= 0 {
 		err = General_Error.Size_Mismatch
