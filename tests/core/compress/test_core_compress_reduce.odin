@@ -66,8 +66,8 @@ reduce_test_reference :: proc(t: ^testing.T) {
 				err = pkzip_legacy.expand(&output, m.data, factor, m.unpacked)
 			case 1:
 				r   := Trickle_Reader{data = m.data, chunk = 1}
-				ctx := compress.init_context(trickle_stream(&r), &output, i64(m.unpacked))
-				err  = pkzip_legacy.expand(&ctx, factor)
+				ctx := compress.init_context(trickle_stream(&r), &output)
+				err  = pkzip_legacy.expand(&ctx, factor, m.unpacked)
 				compress.destroy_context(&ctx)
 			case 2:
 				br: bytes.Reader
@@ -116,7 +116,7 @@ reduce_test_handcrafted :: proc(t: ^testing.T) {
 		{"unsized end",     1, {},                               {'a', REDUCE_DLE},                  -1, "",                   compress.General_Error.Incompatible_Options},
 		{"empty",           1, {},                               {},                                 0,  "",                   nil},
 		{"too short",       1, {},                               {'A', 'B', 'C'},                    10, "",                   compress.General_Error.Stream_Too_Short},
-		{"match too long",  1, {},                               {'a', REDUCE_DLE, 7, 0},            5,  "",                   compress.General_Error.Output_Too_Short},
+		{"match too long",  1, {},                               {'a', REDUCE_DLE, 7, 0},            5,  "",                   compress.General_Error.Size_Mismatch},
 		{"literal too long",1, {},                               {'A', 'B', 'C'},                    2,  "AB",                 nil},
 		{"factor 0",        0, {},                               {'A'},                              1,  "",                   compress.General_Error.Incompatible_Options},
 		{"factor 5",        5, {},                               {'A'},                              1,  "",                   compress.General_Error.Incompatible_Options},
@@ -253,7 +253,7 @@ reduce_test_output_limit :: proc(t: ^testing.T) {
 	{
 		output: [dynamic]u8
 		defer delete(output)
-		limit_err := pkzip_legacy.expand(&output, data, 1, len(full), len(full) - 1)
+		limit_err := pkzip_legacy.expand(&output, data, 1, len(full), {max_output_size = len(full) - 1})
 		testing.expect_value(t, limit_err, compress.General_Error.Output_Too_Short)
 		testing.expect_value(t, cap(output), 0)
 	}
@@ -262,7 +262,7 @@ reduce_test_output_limit :: proc(t: ^testing.T) {
 		output: [dynamic]u8
 		defer delete(output)
 		limit_err := pkzip_legacy.expand(&output, data, 1, limit)
-		testing.expectf(t, limit_err == compress.General_Error.Output_Too_Short, "limit %v: %v", limit, limit_err)
+		testing.expectf(t, limit_err == compress.General_Error.Size_Mismatch, "limit %v: %v", limit, limit_err)
 		testing.expectf(t, len(output) <= limit, "limit %v: wrote %v bytes", limit, len(output))
 	}
 
@@ -301,8 +301,8 @@ reduce_test_reservation :: proc(t: ^testing.T) {
 		output: [dynamic]u8
 		defer delete(output)
 		r   := Trickle_Reader{data = data, chunk = 1}
-		ctx := compress.init_context(trickle_stream(&r), &output, i64(compress.COMPRESS_OUTPUT_ALLOCATE_MAX))
-		err := pkzip_legacy.expand(&ctx, 1)
+		ctx := compress.init_context(trickle_stream(&r), &output)
+		err := pkzip_legacy.expand(&ctx, 1, compress.COMPRESS_OUTPUT_ALLOCATE_MAX)
 		compress.destroy_context(&ctx)
 		testing.expect_value(t, err, compress.General_Error.Stream_Too_Short)
 		testing.expectf(t, cap(output) <= compress.COMPRESS_INITIAL_RESERVATION, "reserved %v bytes for an unsized stream", cap(output))

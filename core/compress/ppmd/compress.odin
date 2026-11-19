@@ -2,26 +2,31 @@ package compress_ppmd
 
 import "base:runtime"
 import "core:compress"
+import "core:io"
 
 compress :: proc{compress_to_slice, compress_to_dynamic}
 
-compress_to_slice :: proc(output, input: []u8, props: Properties, end_marker := false, allocator := context.allocator) -> (written: int, err: Error) {
-	w := Writer{buf = raw_data(output), cap = len(output), limit = len(output)}
-	encode(&w, input, props, end_marker, allocator) or_return
+compress_to_slice :: proc(output, input: []u8, props: Properties, end_marker := false, options: compress.Options = {}, allocator := context.allocator) -> (written: int, err: Error) {
+	limit := len(output)
+	if options.max_output_size > 0 {
+		limit = min(limit, options.max_output_size)
+	}
+	w := Sink{buf = raw_data(output), cap = limit, limit = limit}
+	encode(&w, input, props, end_marker, options, allocator) or_return
 	return w.pos, nil
 }
 
-compress_to_dynamic :: proc(output: ^[dynamic]u8, input: []u8, props: Properties, end_marker := false, allocator := context.allocator) -> (err: Error) {
-	if output == nil {
+compress_to_dynamic :: proc(output: ^[dynamic]u8, input: []u8, props: Properties, end_marker := false, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
+	if output == nil || options.max_output_size < 0 {
 		return General_Error.Incompatible_Options
 	}
 	context.allocator = allocator
-	limit       := compress.COMPRESS_OUTPUT_ALLOCATE_MAX
+	limit       := compress.output_limit(options)
 	reservation := min(compress.output_reservation(len(input) / 2 + 64, -1, len(input)), limit)
 	non_zero_resize(output, reservation) or_return
 
-	w := Writer{buf = raw_data(output^), cap = len(output^), grow = output, limit = limit}
-	if err = encode(&w, input, props, end_marker, allocator); err != nil {
+	w := Sink{buf = raw_data(output^), cap = len(output^), grow = output, limit = limit}
+	if err = encode(&w, input, props, end_marker, options, allocator); err != nil {
 		non_zero_resize(output, 0)
 		return
 	}
@@ -29,10 +34,170 @@ compress_to_dynamic :: proc(output: ^[dynamic]u8, input: []u8, props: Properties
 	return nil
 }
 
+writer_init :: proc(pw: ^Writer, w: io.Writer, props: Properties, end_marker := false, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
+	pw^ = {}
+	pw.allocator  = allocator
+	pw.options    = options
+	pw.end_marker = end_marker
+	defer pw.err = err
+
+	if options.max_output_size < 0 || options.max_memory < 0 || options.chunk_size < 0 || options.progress_interval < 0 {
+		return General_Error.Incompatible_Options
+	}
+	if options.buffer != nil && len(options.buffer) == 0 {
+		return General_Error.Incompatible_Options
+	}
+	check_properties(props) or_return
+	window := 0
+	if options.buffer == nil {
+		window = options.chunk_size if options.chunk_size > 0 else CHUNK_SIZE
+	}
+	if u64(props.mem_size) > u64(MEMORY_MAX) || u64(props.mem_size) + u64(window) > u64(compress.memory_limit(options)) {
+		return General_Error.Memory_Limit_Exceeded
+	}
+	if options.buffer != nil {
+		pw.window = options.buffer
+	} else {
+		pw.window      = non_zero_make([]u8, window, allocator) or_return
+		pw.owns_window = true
+	}
+	pw.sink = Sink{buf = raw_data(pw.window), cap = len(pw.window), limit = len(pw.window), stream = w}
+
+	switch props.variant {
+	case .H:
+		pw.model_h = new(Model_H, allocator) or_return
+		h_init(pw.model_h, props, allocator) or_return
+		pw.rc_h = Encoder_H{range_ = 0xFFFF_FFFF, cache_size = 1}
+	case .I:
+		pw.model_i = new(Model_I, allocator) or_return
+		i_init(pw.model_i, props, allocator) or_return
+		pw.rc_i = Coder_I{range_ = 0xFFFF_FFFF}
+	}
+	return nil
+}
+
+writer_write :: proc(pw: ^Writer, p: []u8) -> (n: int, err: Error) {
+	if pw.err != nil {
+		return 0, pw.err
+	}
+	if pw.finished {
+		return 0, io.Error.Closed
+	}
+	defer pw.err = err
+	for n < len(p) {
+		done: int
+		if pw.model_h != nil {
+			done = encode_input(pw.model_h, &pw.rc_h, &pw.sink, p[n:])
+		} else {
+			done = encode_input(pw.model_i, &pw.rc_i, &pw.sink, p[n:])
+		}
+		n           += done
+		pw.total_in += i64(done)
+		if pw.sink.stop {
+			pw.sink.stop = false
+			if pw.sink.err != nil {
+				return n, pw.sink.err
+			}
+			writer_progress(pw) or_return
+		}
+	}
+	return n, nil
+}
+
+writer_finish :: proc(pw: ^Writer) -> (err: Error) {
+	if pw.err != nil {
+		return pw.err
+	}
+	if pw.finished {
+		return nil
+	}
+	defer pw.err = err
+	w := &pw.sink
+	if pw.model_h != nil {
+		encode_end(pw.model_h, &pw.rc_h, w, pw.end_marker)
+	} else {
+		encode_end(pw.model_i, &pw.rc_i, w, pw.end_marker)
+	}
+	w.stop = false
+	if w.err != nil {
+		return w.err
+	}
+	if w.pos > 0 {
+		if _, write_err := io.write_full(w.stream, w.buf[:w.pos]); write_err != nil {
+			return write_err
+		}
+		w.flushed += i64(w.pos)
+		w.pos      = 0
+	}
+	pw.finished = true
+	return writer_progress(pw)
+}
+
+writer_to_stream :: proc(pw: ^Writer) -> (s: io.Stream) {
+	s.data      = pw
+	s.procedure = writer_stream_proc
+	return
+}
+
+writer_destroy :: proc(pw: ^Writer) {
+	if pw.model_h != nil {
+		sub_allocator_destroy(&pw.model_h.sub_alloc, pw.allocator)
+		free(pw.model_h, pw.allocator)
+	}
+	if pw.model_i != nil {
+		sub_allocator_destroy(&pw.model_i.sub_alloc, pw.allocator)
+		free(pw.model_i, pw.allocator)
+	}
+	if pw.owns_window {
+		delete(pw.window, pw.allocator)
+	}
+	pw.model_h     = nil
+	pw.model_i     = nil
+	pw.window      = nil
+	pw.sink        = {}
+	pw.owns_window = false
+}
+
 @(private)
-encode :: proc(w: ^Writer, input: []u8, props: Properties, end_marker: bool, allocator: runtime.Allocator) -> (err: Error) {
-	if !valid_properties(props) {
-		return PPMd_Error.Invalid_Properties
+writer_progress :: proc(pw: ^Writer) -> (err: Error) {
+	return compress.report_progress(pw.options, pw.total_in, pw.sink.flushed, -1, -1)
+}
+
+@(private)
+writer_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	pw := (^Writer)(stream_data)
+	#partial switch mode {
+	case .Write:
+		written, write_err := writer_write(pw, p)
+		n = i64(written)
+		if write_err != nil {
+			io_err, is_io := write_err.(io.Error)
+			err = io_err if is_io else .Unknown
+		}
+		return
+	case .Close:
+		if finish_err := writer_finish(pw); finish_err != nil {
+			io_err, is_io := finish_err.(io.Error)
+			err = io_err if is_io else .Unknown
+		}
+		return
+	case .Destroy:
+		writer_destroy(pw)
+		return 0, nil
+	case .Query:
+		return io.query_utility({.Write, .Close, .Destroy, .Query})
+	}
+	return 0, .Unsupported
+}
+
+@(private)
+encode :: proc(w: ^Sink, input: []u8, props: Properties, end_marker: bool, options: compress.Options, allocator: runtime.Allocator) -> (err: Error) {
+	if options.max_output_size < 0 || options.max_memory < 0 || options.progress_interval < 0 {
+		return General_Error.Incompatible_Options
+	}
+	check_properties(props) or_return
+	if u64(props.mem_size) > u64(min(compress.memory_limit(options), MEMORY_MAX)) {
+		return General_Error.Memory_Limit_Exceeded
 	}
 	switch props.variant {
 	case .H:
@@ -40,36 +205,13 @@ encode :: proc(w: ^Writer, input: []u8, props: Properties, end_marker: bool, all
 		h_init(&m, props, allocator) or_return
 		defer sub_allocator_destroy(&m.sub_alloc, allocator)
 		rc := Encoder_H{range_ = 0xFFFF_FFFF, cache_size = 1}
-		for b in input {
-			#force_inline h_encode_symbol(&m, &rc, w, int(b))
-			if w.full {
-				break
-			}
-		}
-		if end_marker {
-			h_encode_symbol(&m, &rc, w, SYM_END)
-		}
-		for _ in 0..<5 {
-			h_shift_low(&rc, w)
-		}
+		encode_all(&m, &rc, w, input, end_marker, options) or_return
 	case .I:
 		m: Model_I
 		i_init(&m, props, allocator) or_return
 		defer sub_allocator_destroy(&m.sub_alloc, allocator)
 		rc := Coder_I{range_ = 0xFFFF_FFFF}
-		for b in input {
-			#force_inline i_encode_symbol(&m, &rc, w, int(b))
-			if w.full {
-				break
-			}
-		}
-		if end_marker {
-			i_encode_symbol(&m, &rc, w, SYM_END)
-		}
-		for _ in 0..<4 {
-			writer_byte(w, u8(rc.low >> 24))
-			rc.low <<= 8
-		}
+		encode_all(&m, &rc, w, input, end_marker, options) or_return
 	}
 	if w.err != nil {
 		return w.err
@@ -81,23 +223,94 @@ encode :: proc(w: ^Writer, input: []u8, props: Properties, end_marker: bool, all
 }
 
 @(private)
-writer_byte :: #force_inline proc(w: ^Writer, b: u8) #no_bounds_check {
-	if w.pos < w.cap || writer_grow(w) {
+encode_all :: proc(m: ^$M, rc: ^$R, w: ^Sink, input: []u8, end_marker: bool, options: compress.Options) -> (err: Error) {
+	step := len(input)
+	if options.progress != nil {
+		step = min(step, compress.progress_interval(options))
+	}
+	done := 0
+	for done < len(input) {
+		done += encode_input(m, rc, w, input[done:][:min(step, len(input) - done)])
+		if w.stop {
+			return nil
+		}
+		compress.report_progress(options, i64(done), i64(w.pos), i64(len(input)), -1) or_return
+	}
+	encode_end(m, rc, w, end_marker)
+	return nil
+}
+
+@(private)
+encode_input :: proc(m: ^$M, rc: ^$R, w: ^Sink, input: []u8) -> (n: int) {
+	r := rc^
+	defer rc^ = r
+	for b, i in input {
+		when M == Model_H {
+			#force_inline h_encode_symbol(m, &r, w, int(b))
+		} else {
+			#force_inline i_encode_symbol(m, &r, w, int(b))
+		}
+		if w.stop {
+			return i + 1
+		}
+	}
+	return len(input)
+}
+
+@(private)
+encode_end :: proc(m: ^$M, rc: ^$R, w: ^Sink, end_marker: bool) {
+	when M == Model_H {
+		if end_marker {
+			h_encode_symbol(m, rc, w, SYM_END)
+		}
+		for _ in 0..<5 {
+			h_shift_low(rc, w)
+		}
+	} else {
+		if end_marker {
+			i_encode_symbol(m, rc, w, SYM_END)
+		}
+		for _ in 0..<4 {
+			sink_byte(w, u8(rc.low >> 24))
+			rc.low <<= 8
+		}
+	}
+}
+
+@(private)
+sink_byte :: #force_inline proc(w: ^Sink, b: u8) #no_bounds_check {
+	if w.pos < w.cap || sink_grow(w) {
 		w.buf[w.pos] = b
 		w.pos += 1
 	}
 }
 
 @(private)
-writer_grow :: proc(w: ^Writer) -> bool {
+sink_grow :: proc(w: ^Sink) -> bool {
+	if w.stream.procedure != nil {
+		if w.err != nil {
+			return false
+		}
+		if _, err := io.write_full(w.stream, w.buf[:w.pos]); err != nil {
+			w.err  = err
+			w.stop = true
+			return false
+		}
+		w.flushed += i64(w.pos)
+		w.pos      = 0
+		w.stop     = true
+		return w.cap > 0
+	}
 	if w.grow == nil || w.full || w.pos >= w.limit {
 		w.full = true
+		w.stop = true
 		return false
 	}
 	capacity := compress.output_grow_capacity(w.cap, w.pos + 1, w.limit)
 	if err := non_zero_resize(w.grow, capacity); err != nil {
 		w.err  = err
 		w.full = true
+		w.stop = true
 		return false
 	}
 	w.buf = raw_data(w.grow^)
@@ -106,11 +319,11 @@ writer_grow :: proc(w: ^Writer) -> bool {
 }
 
 @(private)
-h_shift_low :: proc(rc: ^Encoder_H, w: ^Writer) {
+h_shift_low :: proc(rc: ^Encoder_H, w: ^Sink) {
 	if u32(rc.low) < 0xFF00_0000 || rc.low >> 32 != 0 {
 		temp := rc.cache
 		for {
-			writer_byte(w, temp + u8(rc.low >> 32))
+			sink_byte(w, temp + u8(rc.low >> 32))
 			temp = 0xFF
 			rc.cache_size -= 1
 			if rc.cache_size == 0 {
@@ -124,7 +337,7 @@ h_shift_low :: proc(rc: ^Encoder_H, w: ^Writer) {
 }
 
 @(private)
-h_enc_norm_1 :: #force_inline proc(rc: ^Encoder_H, w: ^Writer) {
+h_enc_norm_1 :: #force_inline proc(rc: ^Encoder_H, w: ^Sink) {
 	if rc.range_ < TOP_7Z {
 		rc.range_ <<= 8
 		h_shift_low(rc, w)
@@ -132,7 +345,7 @@ h_enc_norm_1 :: #force_inline proc(rc: ^Encoder_H, w: ^Writer) {
 }
 
 @(private)
-h_enc_norm :: #force_inline proc(rc: ^Encoder_H, w: ^Writer) {
+h_enc_norm :: #force_inline proc(rc: ^Encoder_H, w: ^Sink) {
 	if rc.range_ < TOP_7Z {
 		rc.range_ <<= 8
 		h_shift_low(rc, w)
@@ -150,7 +363,7 @@ h_rc_encode :: #force_inline proc "contextless" (rc: ^Encoder_H, start, size: u3
 }
 
 @(private)
-h_encode_symbol :: proc(p: ^Model_H, rc: ^Encoder_H, w: ^Writer, symbol: int) #no_bounds_check {
+h_encode_symbol :: proc(p: ^Model_H, rc: ^Encoder_H, w: ^Sink, symbol: int) #no_bounds_check {
 	char_mask: [256]u8 = ---
 	mc := p.min_context
 	if mc.num_stats != 1 {
@@ -249,7 +462,7 @@ h_encode_symbol :: proc(p: ^Model_H, rc: ^Encoder_H, w: ^Writer, symbol: int) #n
 }
 
 @(private)
-i_enc_norm :: #force_inline proc(rc: ^Coder_I, w: ^Writer) {
+i_enc_norm :: #force_inline proc(rc: ^Coder_I, w: ^Sink) {
 	for {
 		if (rc.low ~ (rc.low + rc.range_)) >= TOP_I {
 			if rc.range_ >= BOT_I {
@@ -257,7 +470,7 @@ i_enc_norm :: #force_inline proc(rc: ^Coder_I, w: ^Writer) {
 			}
 			rc.range_ = (0 - rc.low) & (BOT_I - 1)
 		}
-		writer_byte(w, u8(rc.low >> 24))
+		sink_byte(w, u8(rc.low >> 24))
 		rc.range_ <<= 8
 		rc.low    <<= 8
 	}
@@ -271,7 +484,7 @@ i_rc_encode :: #force_inline proc "contextless" (rc: ^Coder_I, start, size, tota
 }
 
 @(private)
-i_encode_symbol :: proc(p: ^Model_I, rc: ^Coder_I, w: ^Writer, symbol: int) #no_bounds_check {
+i_encode_symbol :: proc(p: ^Model_I, rc: ^Coder_I, w: ^Sink, symbol: int) #no_bounds_check {
 	char_mask: [256]u8 = ---
 	mc := p.min_context
 	if mc.num_stats != 0 {

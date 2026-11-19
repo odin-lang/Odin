@@ -2,49 +2,212 @@ package compress_ppmd
 
 import "base:runtime"
 import "core:compress"
+import "core:io"
 
 decompress :: proc{decompress_from_bytes, decompress_from_context}
 
-decompress_from_bytes :: proc(output: ^[dynamic]u8, input: []u8, props: Properties, expected_output_size := -1, max_output_size := compress.COMPRESS_OUTPUT_ALLOCATE_MAX, allocator := context.allocator) -> (err: Error) {
+decompress_from_bytes :: proc(output: ^[dynamic]u8, input: []u8, props: Properties, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
 	input := input
 	ctx   := compress.init_context_from_slice(&input, output=output)
-	return decompress_from_context(&ctx, props, expected_output_size, max_output_size, allocator)
+	return decompress_from_context(&ctx, props, expected_output_size, options, allocator)
 }
 
-decompress_from_context :: proc(z: ^compress.Context, props: Properties, expected_output_size := -1, max_output_size := compress.COMPRESS_OUTPUT_ALLOCATE_MAX, allocator := context.allocator) -> (err: Error) {
+decompress_from_context :: proc(z: ^compress.Context, props: Properties, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
-	if z.output == nil || max_output_size < 0 {
+	max_output_size := compress.output_limit(options)
+	if z.output == nil || max_output_size < 0 || options.max_memory < 0 || options.progress_interval < 0 {
 		return General_Error.Incompatible_Options
 	}
-	if !valid_properties(props) {
-		return PPMd_Error.Invalid_Properties
+	check_properties(props) or_return
+	if u64(props.mem_size) > u64(min(compress.memory_limit(options), MEMORY_MAX)) {
+		return General_Error.Memory_Limit_Exceeded
 	}
-	expected := expected_output_size
-	if expected < 0 && z.size_unpacked >= 0 && z.size_unpacked <= i64(max(int)) {
-		expected = int(z.size_unpacked)
-	}
+	expected := compress.declared_size(expected_output_size)
 	if expected > max_output_size {
 		return General_Error.Output_Too_Short
 	}
 
+	total_in := i64(compress.input_size(z)) if options.progress != nil else -1
 	o := output_begin(z, expected, max_output_size)
 	defer output_end(z, &o)
-	r := Reader{buf = z.window, z = z}
-	defer z.window = z.window[min(r.pos, len(z.window)):]
+	d := Decoder{input = {buf = z.window, z = z}, size = i64(expected), limit = i64(max_output_size)}
+	defer z.window = z.window[min(d.input.pos, len(z.window)):]
 
 	switch props.variant {
 	case .H:
 		m: Model_H
 		h_init(&m, props, allocator) or_return
 		defer sub_allocator_destroy(&m.sub_alloc, allocator)
-		return h_decode(&m, &r, &o, expected)
+		d.model_h = &m
+		return decode_to_output(&d, &o, options, total_in)
 	case .I:
 		m: Model_I
 		i_init(&m, props, allocator) or_return
 		defer sub_allocator_destroy(&m.sub_alloc, allocator)
-		return i_decode(&m, &r, &o, expected)
+		d.model_i = &m
+		return decode_to_output(&d, &o, options, total_in)
 	}
 	return PPMd_Error.Invalid_Properties
+}
+
+decompress_to_writer :: proc(w: io.Writer, z: ^compress.Context, props: Properties, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
+	r: Reader
+	defer reader_destroy(&r)
+	defer decoder_sync(&r.decoder)
+	stream_init(&r, z, props, expected_output_size, options, allocator, true) or_return
+	for !r.decoder.done {
+		n, fill_err := decoder_fill(&r.decoder, r.window)
+		if n > 0 {
+			if _, write_err := io.write_full(w, r.window[:n]); write_err != nil {
+				return write_err
+			}
+		}
+		if fill_err != nil {
+			return fill_err
+		}
+		reader_progress(&r) or_return
+	}
+	return nil
+}
+
+reader_init :: proc(r: ^Reader, z: ^compress.Context, props: Properties, expected_output_size := -1, options: compress.Options = {}, allocator := context.allocator) -> (err: Error) {
+	err   = stream_init(r, z, props, expected_output_size, options, allocator, false)
+	r.err = err
+	return
+}
+
+reader_read :: proc(r: ^Reader, p: []u8) -> (n: int, err: Error) {
+	if len(p) > 0 && r.err == nil && !r.decoder.done {
+		n, r.err = decoder_fill(&r.decoder, p)
+		decoder_sync(&r.decoder)
+		if r.err == nil && (n > 0 || r.decoder.done) {
+			r.err = reader_progress(r)
+		}
+	}
+	if n > 0 {
+		return n, nil
+	}
+	if r.err != nil {
+		return 0, r.err
+	}
+	if len(p) > 0 && r.decoder.done {
+		return 0, io.Error.EOF
+	}
+	return 0, nil
+}
+
+reader_to_stream :: proc(r: ^Reader) -> (s: io.Stream) {
+	s.data      = r
+	s.procedure = reader_stream_proc
+	return
+}
+
+reader_destroy :: proc(r: ^Reader) {
+	d := &r.decoder
+	if d.model_h != nil {
+		sub_allocator_destroy(&d.model_h.sub_alloc, r.allocator)
+		free(d.model_h, r.allocator)
+	}
+	if d.model_i != nil {
+		sub_allocator_destroy(&d.model_i.sub_alloc, r.allocator)
+		free(d.model_i, r.allocator)
+	}
+	if r.owns_window {
+		delete(r.window, r.allocator)
+	}
+	d.model_h     = nil
+	d.model_i     = nil
+	r.window      = nil
+	r.owns_window = false
+}
+
+@(private)
+stream_init :: proc(r: ^Reader, z: ^compress.Context, props: Properties, expected_output_size: int, options: compress.Options, allocator: runtime.Allocator, chunked: bool) -> (err: Error) {
+	r^ = {}
+	r.allocator = allocator
+	r.options   = options
+	r.total_in  = -1
+	d := &r.decoder
+	d.input = Input{buf = z.window, z = z}
+	d.size  = -1
+	d.limit = max(i64)
+
+	if options.max_output_size < 0 || options.max_memory < 0 || options.chunk_size < 0 || options.progress_interval < 0 {
+		return General_Error.Incompatible_Options
+	}
+	if chunked && options.buffer != nil && len(options.buffer) == 0 {
+		return General_Error.Incompatible_Options
+	}
+	check_properties(props) or_return
+	expected := i64(compress.declared_size(expected_output_size))
+	if options.max_output_size > 0 {
+		d.limit = i64(options.max_output_size)
+	}
+	if expected >= 0 {
+		if expected > d.limit {
+			return General_Error.Output_Too_Short
+		}
+		d.size = expected
+	}
+
+	window := 0
+	if chunked && options.buffer == nil {
+		window = options.chunk_size if options.chunk_size > 0 else CHUNK_SIZE
+		if d.size > 0 && d.size < i64(window) {
+			window = int(d.size)
+		}
+	}
+	if u64(props.mem_size) > u64(MEMORY_MAX) || u64(props.mem_size) + u64(window) > u64(compress.memory_limit(options)) {
+		return General_Error.Memory_Limit_Exceeded
+	}
+	if chunked {
+		if options.buffer != nil {
+			r.window = options.buffer
+		} else {
+			r.window      = non_zero_make([]u8, max(window, 1), allocator) or_return
+			r.owns_window = true
+		}
+	}
+
+	switch props.variant {
+	case .H:
+		d.model_h = new(Model_H, allocator) or_return
+		h_init(d.model_h, props, allocator) or_return
+	case .I:
+		d.model_i = new(Model_I, allocator) or_return
+		i_init(d.model_i, props, allocator) or_return
+	}
+	if options.progress != nil {
+		r.total_in = i64(compress.input_size(z))
+	}
+	return decoder_start(d)
+}
+
+@(private)
+reader_progress :: proc(r: ^Reader) -> (err: Error) {
+	d := &r.decoder
+	return compress.report_progress(r.options, d.input.consumed + i64(d.input.pos), d.written, r.total_in, d.size)
+}
+
+@(private)
+reader_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	r := (^Reader)(stream_data)
+	#partial switch mode {
+	case .Read:
+		read, read_err := reader_read(r, p)
+		n = i64(read)
+		if read_err != nil {
+			io_err, is_io := read_err.(io.Error)
+			err = io_err if is_io else .Unknown
+		}
+		return
+	case .Destroy:
+		reader_destroy(r)
+		return 0, nil
+	case .Query:
+		return io.query_utility({.Read, .Destroy, .Query})
+	}
+	return 0, .Unsupported
 }
 
 @(private)
@@ -80,25 +243,55 @@ output_grow :: proc(o: ^Output) -> (err: Error) {
 }
 
 @(private)
-reader_byte :: #force_inline proc(r: ^Reader) -> u8 #no_bounds_check {
+decode_to_output :: proc(d: ^Decoder, o: ^Output, options: compress.Options, total_in: i64) -> (err: Error) {
+	decoder_start(d) or_return
+	target   := d.size if d.size >= 0 else d.limit
+	interval := compress.progress_interval(options)
+	mark     := max(int)
+	if options.progress != nil {
+		mark = interval if interval < max(int) else max(int)
+	}
+	for !d.done {
+		if o.written >= len(o.buf^) && i64(o.written) < target {
+			output_grow(o) or_return
+		}
+		n, fill_err := decoder_fill(d, o.buf[o.written:min(len(o.buf^), mark)])
+		o.written += n
+		if fill_err != nil {
+			return fill_err
+		}
+		if o.written >= mark {
+			compress.report_progress(options, d.input.consumed + i64(d.input.pos), i64(o.written), total_in, d.size) or_return
+			mark = o.written + interval if interval < max(int) - o.written else max(int)
+		}
+	}
+	return nil
+}
+
+@(private)
+input_byte :: #force_inline proc(r: ^Input) -> u8 #no_bounds_check {
 	if r.pos < len(r.buf) {
 		b := r.buf[r.pos]
 		r.pos += 1
 		return b
 	}
-	return reader_refill(r)
+	return input_refill(r)
 }
 
 @(private)
-reader_refill :: proc(r: ^Reader) -> u8 {
+input_refill :: proc(r: ^Input) -> u8 {
 	if r.overrun {
 		return 0
 	}
+	r.consumed += i64(r.pos)
 	r.z.window = r.z.window[r.pos:]
 	r.buf = nil
 	r.pos = 0
-	if compress.refill_window(r.z, 1) != nil || len(r.z.window) == 0 {
+	if refill_err := compress.refill_window(r.z, 1); refill_err != nil || len(r.z.window) == 0 {
 		r.overrun = true
+		if refill_err != .EOF && refill_err != .Unexpected_EOF && refill_err != .Short_Buffer {
+			r.input_err = refill_err
+		}
 		return 0
 	}
 	r.buf = r.z.window
@@ -107,7 +300,29 @@ reader_refill :: proc(r: ^Reader) -> u8 {
 }
 
 @(private)
-decode_one :: #force_inline proc(m: ^$M, rc: ^$R, r: ^Reader) -> int {
+input_overrun_error :: proc "contextless" (r: ^Input) -> Error {
+	if r.input_err != nil {
+		return r.input_err
+	}
+	return General_Error.Stream_Too_Short
+}
+
+@(private)
+decoder_sync :: proc(d: ^Decoder) {
+	r := &d.input
+	if r.z == nil {
+		return
+	}
+	pos := min(r.pos, len(r.z.window))
+	r.consumed += i64(pos)
+	r.z.window = r.z.window[pos:]
+	r.z.bytes_written = d.written
+	r.buf = r.z.window
+	r.pos = 0
+}
+
+@(private)
+decode_one :: #force_inline proc(m: ^$M, rc: ^$R, r: ^Input) -> int {
 	when M == Model_H {
 		return h_decode_symbol(m, rc, r)
 	} else {
@@ -116,117 +331,123 @@ decode_one :: #force_inline proc(m: ^$M, rc: ^$R, r: ^Reader) -> int {
 }
 
 @(private)
-decode_loop :: proc(m: ^$M, rc: ^$R, r: ^Reader, o: ^Output, size: int) -> (sym: int, err: Error) #no_bounds_check {
-	target := size if size >= 0 else o.limit
-	out    := raw_data(o.buf^)
-	avail  := min(len(o.buf^), target)
-	for o.written < target {
-		if o.written >= avail {
-			output_grow(o) or_return
-			out   = raw_data(o.buf^)
-			avail = min(len(o.buf^), target)
+decoder_start :: proc(d: ^Decoder) -> (err: Error) {
+	r := &d.input
+	if d.model_h != nil {
+		if input_byte(r) != 0 {
+			return input_overrun_error(r) if r.overrun else PPMd_Error.Corrupt_Data
 		}
-		sym = decode_one(m, rc, r)
-		if sym < 0 {
-			return sym, nil
-		}
-		if r.overrun {
-			return sym, General_Error.Stream_Too_Short
-		}
-		out[o.written] = u8(sym)
-		o.written += 1
+		return rc_start(r, &d.rc_h)
 	}
-	if size < 0 {
-		sym = decode_one(m, rc, r)
-		if sym >= 0 {
-			return sym, General_Error.Output_Too_Short
-		}
-		return sym, nil
-	}
-	return 0, nil
+	return rc_start(r, &d.rc_i)
 }
 
 @(private)
-finish :: proc(sym: int, size, written: int, overrun: bool, code_zero: bool) -> (err: Error) {
-	if overrun {
-		return General_Error.Stream_Too_Short
+rc_start :: proc(r: ^Input, rc: ^$R) -> (err: Error) {
+	for _ in 0..<4 {
+		rc.code = rc.code << 8 | u32(input_byte(r))
 	}
-	if sym == SYM_ERROR {
-		return PPMd_Error.Corrupt_Data
+	rc.range_ = 0xFFFF_FFFF
+	if r.overrun {
+		return input_overrun_error(r)
 	}
-	if sym == SYM_END && size >= 0 && written != size {
-		return PPMd_Error.Unexpected_End_Marker
-	}
-	if !code_zero {
+	if rc.code == 0xFFFF_FFFF {
 		return PPMd_Error.Corrupt_Data
 	}
 	return nil
 }
 
 @(private)
-h_decode :: proc(m: ^Model_H, r: ^Reader, o: ^Output, size: int) -> (err: Error) {
-	rc: Decoder_H
-	if reader_byte(r) != 0 {
-		return General_Error.Stream_Too_Short if r.overrun else PPMd_Error.Corrupt_Data
+decoder_fill :: proc(d: ^Decoder, out: []u8) -> (n: int, err: Error) {
+	if d.model_h != nil {
+		return decode_into(d, d.model_h, &d.rc_h, out)
 	}
-	for _ in 0..<4 {
-		rc.code = rc.code << 8 | u32(reader_byte(r))
-	}
-	rc.range_ = 0xFFFF_FFFF
-	if r.overrun {
-		return General_Error.Stream_Too_Short
-	}
-	if rc.code == 0xFFFF_FFFF {
-		return PPMd_Error.Corrupt_Data
-	}
-	sym := decode_loop(m, &rc, r, o, size) or_return
-	if sym >= 0 && rc.code != 0 {
-		sym = h_decode_symbol(m, &rc, r)
-		if sym != SYM_END {
-			return PPMd_Error.Corrupt_Data if !r.overrun else General_Error.Stream_Too_Short
-		}
-	}
-	return finish(sym, size, o.written, r.overrun, rc.code == 0)
+	return decode_into(d, d.model_i, &d.rc_i, out)
 }
 
 @(private)
-i_decode :: proc(m: ^Model_I, r: ^Reader, o: ^Output, size: int) -> (err: Error) {
-	rc: Coder_I
-	for _ in 0..<4 {
-		rc.code = rc.code << 8 | u32(reader_byte(r))
+decode_into :: proc(d: ^Decoder, m: ^$M, rc: ^$R, out: []u8) -> (n: int, err: Error) #no_bounds_check {
+	if d.done {
+		return 0, nil
 	}
-	rc.range_ = 0xFFFF_FFFF
-	if r.overrun {
-		return General_Error.Stream_Too_Short
-	}
-	if rc.code == 0xFFFF_FFFF {
-		return PPMd_Error.Corrupt_Data
-	}
-	sym := decode_loop(m, &rc, r, o, size) or_return
-	if sym >= 0 && rc.code != 0 {
-		sym = i_decode_symbol(m, &rc, r)
-		if sym != SYM_END {
-			return PPMd_Error.Corrupt_Data if !r.overrun else General_Error.Stream_Too_Short
+	r    := &d.input
+	left := (d.size if d.size >= 0 else d.limit) - d.written
+	room := int(min(i64(len(out)), left))
+	dst  := raw_data(out)
+	for n < room {
+		sym := decode_one(m, rc, r)
+		if sym < 0 {
+			d.written += i64(n)
+			return n, decode_end(d, m, rc, sym)
 		}
+		if r.overrun {
+			d.written += i64(n)
+			d.done = true
+			return n, input_overrun_error(r)
+		}
+		dst[n] = u8(sym)
+		n += 1
 	}
-	return finish(sym, size, o.written, r.overrun, rc.code == 0)
+	d.written += i64(n)
+	if i64(n) == left {
+		return n, decode_end(d, m, rc, 0)
+	}
+	return n, nil
 }
 
 @(private)
-h_rc_norm_1 :: #force_inline proc(rc: ^Decoder_H, r: ^Reader) {
+decode_end :: proc(d: ^Decoder, m: ^$M, rc: ^$R, sym: int) -> (err: Error) {
+	d.done = true
+	r   := &d.input
+	sym := sym
+	if sym >= 0 && d.size < 0 {
+		sym = decode_one(m, rc, r)
+		if sym >= 0 {
+			if r.input_err != nil {
+				return r.input_err
+			}
+			return General_Error.Output_Too_Short
+		}
+	}
+	if sym >= 0 && rc.code != 0 {
+		sym = decode_one(m, rc, r)
+		if sym != SYM_END {
+			if r.overrun {
+				return input_overrun_error(r)
+			}
+			return General_Error.Size_Mismatch if sym >= 0 else PPMd_Error.Corrupt_Data
+		}
+	}
+	if r.overrun {
+		return input_overrun_error(r)
+	}
+	if sym == SYM_ERROR {
+		return PPMd_Error.Corrupt_Data
+	}
+	if sym == SYM_END && d.size >= 0 && d.written != d.size {
+		return General_Error.Size_Mismatch
+	}
+	if rc.code != 0 {
+		return PPMd_Error.Corrupt_Data
+	}
+	return nil
+}
+
+@(private)
+h_rc_norm_1 :: #force_inline proc(rc: ^Decoder_H, r: ^Input) {
 	if rc.range_ < TOP_7Z {
-		rc.code    = rc.code << 8 | u32(reader_byte(r))
+		rc.code    = rc.code << 8 | u32(input_byte(r))
 		rc.range_ <<= 8
 	}
 }
 
 @(private)
-h_rc_norm :: #force_inline proc(rc: ^Decoder_H, r: ^Reader) {
+h_rc_norm :: #force_inline proc(rc: ^Decoder_H, r: ^Input) {
 	if rc.range_ < TOP_7Z {
-		rc.code    = rc.code << 8 | u32(reader_byte(r))
+		rc.code    = rc.code << 8 | u32(input_byte(r))
 		rc.range_ <<= 8
 		if rc.range_ < TOP_7Z {
-			rc.code    = rc.code << 8 | u32(reader_byte(r))
+			rc.code    = rc.code << 8 | u32(input_byte(r))
 			rc.range_ <<= 8
 		}
 	}
@@ -239,7 +460,7 @@ h_rc_decode :: #force_inline proc "contextless" (rc: ^Decoder_H, start, size: u3
 }
 
 @(private)
-h_decode_symbol :: proc(p: ^Model_H, rc: ^Decoder_H, r: ^Reader) -> int #no_bounds_check {
+h_decode_symbol :: proc(p: ^Model_H, rc: ^Decoder_H, r: ^Input) -> int #no_bounds_check {
 	char_mask: [256]u8 = ---
 	mc := p.min_context
 	if mc.num_stats != 1 {
@@ -357,7 +578,7 @@ h_decode_symbol :: proc(p: ^Model_H, rc: ^Decoder_H, r: ^Reader) -> int #no_boun
 }
 
 @(private)
-i_rc_norm :: #force_inline proc(rc: ^Coder_I, r: ^Reader) {
+i_rc_norm :: #force_inline proc(rc: ^Coder_I, r: ^Input) {
 	for {
 		if (rc.low ~ (rc.low + rc.range_)) >= TOP_I {
 			if rc.range_ >= BOT_I {
@@ -365,7 +586,7 @@ i_rc_norm :: #force_inline proc(rc: ^Coder_I, r: ^Reader) {
 			}
 			rc.range_ = (0 - rc.low) & (BOT_I - 1)
 		}
-		rc.code    = rc.code << 8 | u32(reader_byte(r))
+		rc.code    = rc.code << 8 | u32(input_byte(r))
 		rc.range_ <<= 8
 		rc.low    <<= 8
 	}
@@ -380,7 +601,7 @@ i_rc_decode :: #force_inline proc "contextless" (rc: ^Coder_I, start, size: u32)
 }
 
 @(private)
-i_decode_symbol :: proc(p: ^Model_I, rc: ^Coder_I, r: ^Reader) -> int #no_bounds_check {
+i_decode_symbol :: proc(p: ^Model_I, rc: ^Coder_I, r: ^Input) -> int #no_bounds_check {
 	char_mask: [256]u8 = ---
 	mc := p.min_context
 	if mc.num_stats != 0 {

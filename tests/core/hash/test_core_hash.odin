@@ -313,6 +313,40 @@ test_crc64_vectors :: proc(t: ^testing.T) {
 	}
 }
 
+crc64_xz_bitwise :: proc(data: []byte, seed: u64) -> u64 {
+	crc := ~seed
+	for b in data {
+		crc ~= u64(b)
+		for _ in 0..<8 {
+			crc = (crc >> 1) ~ (0xc96c5795d7870f42 if crc & 1 != 0 else 0)
+		}
+	}
+	return ~crc
+}
+
+@test
+test_crc64_xz_lengths :: proc(t: ^testing.T) {
+	data := make([]byte, 4096 + 16)
+	defer delete(data)
+	for &b in data {
+		b = byte(rand.uint32())
+	}
+
+	for length in 0..=1100 {
+		for offset in 0..<16 {
+			seed := rand.uint64() if offset & 1 != 0 else 0
+			input := data[offset:][:length]
+			got  := hash.crc64_xz(input, seed)
+			want := crc64_xz_bitwise(input, seed)
+			testing.expectf(t, got == want, "CRC-64/XZ length %v, offset %v, seed 0x%016x: expected 0x%016x, got 0x%016x", length, offset, seed, want, got)
+		}
+	}
+
+	whole := hash.crc64_xz(data)
+	testing.expect_value(t, whole, crc64_xz_bitwise(data, 0))
+	testing.expect_value(t, hash.crc64_xz(data[1234:], hash.crc64_xz(data[:1234])), whole)
+}
+
 @test
 test_murmur32_vectors :: proc(t: ^testing.T) {
 	vectors :: []V32{

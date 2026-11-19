@@ -10,7 +10,7 @@ import "core:time"
 INFLATE_TEST_SIZE :: 1 << 20
 
 @(test)
-inflate_expected_size_is_a_limit :: proc(t: ^testing.T) {
+inflate_expected_size_is_exact :: proc(t: ^testing.T) {
 	data := make([]byte, INFLATE_TEST_SIZE)
 	defer delete(data)
 
@@ -29,6 +29,7 @@ inflate_expected_size_is_a_limit :: proc(t: ^testing.T) {
 				ctx := stream_test_context(kind, &input, &br, &tr, &output)
 				err := inflate_test_unpack(format, &ctx, expected)
 				compress.destroy_context(&ctx)
+				sinks_check(t, "expected size", sinks_format(format), kind, packed[:], expected)
 
 				if expected == len(data) {
 					testing.expectf(t, err == nil, "%v %v: %v", format, kind, err)
@@ -37,8 +38,8 @@ inflate_expected_size_is_a_limit :: proc(t: ^testing.T) {
 						testing.expectf(t, cap(output) == len(data), "%v %v: capacity %v for an exact size", format, kind, cap(output))
 					}
 				} else {
-					testing.expectf(t, err == compress.General_Error.Output_Too_Short, "%v %v: %v", format, kind, err)
-					testing.expectf(t, cap(output) <= expected, "%v %v: capacity %v for a limit of %v", format, kind, cap(output), expected)
+					testing.expectf(t, err == compress.General_Error.Size_Mismatch, "%v %v: %v", format, kind, err)
+					testing.expectf(t, cap(output) <= expected, "%v %v: capacity %v for a declared %v", format, kind, cap(output), expected)
 				}
 			}
 		}
@@ -58,7 +59,7 @@ inflate_max_output_size :: proc(t: ^testing.T) {
 		for limit in ([]int{64 * 1024, len(data)}) {
 			output: [dynamic]byte
 			defer delete(output)
-			err := inflate_test_unpack_bytes(format, &output, packed[:], -1, limit)
+			err := inflate_test_unpack_bytes(t, format, &output, packed[:], -1, limit)
 			if limit == len(data) {
 				testing.expectf(t, err == nil, "%v: %v", format, err)
 				testing.expectf(t, len(output) == len(data), "%v: %v bytes", format, len(output))
@@ -71,12 +72,8 @@ inflate_max_output_size :: proc(t: ^testing.T) {
 		{
 			output: [dynamic]byte
 			defer delete(output)
-			err := inflate_test_unpack_bytes(format, &output, packed[:], 2 * len(data), len(data))
-			if format == .GZIP {
-				testing.expectf(t, err == compress.General_Error.Output_Exceeds_COMPRESS_OUTPUT_ALLOCATE_MAX, "%v: %v", format, err)
-			} else {
-				testing.expectf(t, err == compress.General_Error.Output_Too_Short, "%v: %v", format, err)
-			}
+			err := inflate_test_unpack_bytes(t, format, &output, packed[:], 2 * len(data), len(data))
+			testing.expectf(t, err == compress.General_Error.Output_Too_Short, "%v: %v", format, err)
 			testing.expectf(t, cap(output) == 0, "%v: capacity %v", format, cap(output))
 		}
 	}
@@ -88,12 +85,12 @@ inflate_gzip_size_hint :: proc(t: ^testing.T) {
 	defer delete(data)
 	packed: [dynamic]byte
 	defer delete(packed)
-	testing.expect_value(t, deflate.deflate_gzip(&packed, data), nil)
+	testing.expect_value(t, deflate.compress_gzip(&packed, data), nil)
 
 	{
 		output: [dynamic]byte
 		defer delete(output)
-		err := deflate.inflate_gzip(&output, packed[:])
+		err := deflate.decompress_gzip(&output, packed[:])
 		testing.expect_value(t, err, nil)
 		testing.expect_value(t, len(output), len(data))
 		testing.expect_value(t, cap(output), len(data))
@@ -104,14 +101,16 @@ inflate_gzip_size_hint :: proc(t: ^testing.T) {
 	{
 		output: [dynamic]byte
 		defer delete(output)
-		err := deflate.inflate_gzip(&output, packed[:])
+		err := deflate.decompress_gzip(&output, packed[:])
 		testing.expect_value(t, err, compress.GZIP_Error.Payload_Length_Invalid)
+		sinks_check(t, "size hint", .Gzip, .Memory, packed[:])
 	}
 	{
 		output: [dynamic]byte
 		defer delete(output)
-		err := deflate.inflate_gzip(&output, packed[:], max_output_size = 64 * 1024)
+		err := deflate.decompress_gzip(&output, packed[:], options = {max_output_size = 64 * 1024})
 		testing.expect_value(t, err, compress.General_Error.Output_Too_Short)
+		sinks_check(t, "size hint", .Gzip, .Memory, packed[:], options = {max_output_size = 64 * 1024})
 		testing.expectf(t, cap(output) <= 64 * 1024, "capacity %v", cap(output))
 	}
 }
@@ -125,11 +124,11 @@ inflate_growth_overshoot :: proc(t: ^testing.T) {
 	defer delete(data)
 	packed: [dynamic]byte
 	defer delete(packed)
-	testing.expect_value(t, deflate.deflate_raw(&packed, data, .Level_1), nil)
+	testing.expect_value(t, deflate.compress_raw(&packed, data, .Level_1), nil)
 
 	output: [dynamic]byte
 	defer delete(output)
-	err := deflate.inflate_raw(&output, packed[:])
+	err := deflate.decompress_raw(&output, packed[:])
 	testing.expect_value(t, err, nil)
 	testing.expect_value(t, len(output), len(data))
 	testing.expectf(t, cap(output) - len(output) <= 16 << 20, "capacity %v for %v bytes", cap(output), len(output))
@@ -141,7 +140,7 @@ inflate_stored_block_limit :: proc(t: ^testing.T) {
 	defer delete(data)
 	packed: [dynamic]byte
 	defer delete(packed)
-	testing.expect_value(t, deflate.deflate_raw(&packed, data, .Stored), nil)
+	testing.expect_value(t, deflate.compress_raw(&packed, data, .Stored), nil)
 
 	for kind in Stream_Kind {
 		input := packed[:]
@@ -150,9 +149,10 @@ inflate_stored_block_limit :: proc(t: ^testing.T) {
 		br: bytes.Reader
 		tr: Trickle_Reader
 		ctx := stream_test_context(kind, &input, &br, &tr, &output)
-		err := deflate.inflate_raw(&ctx, 10)
+		err := deflate.decompress_raw(&ctx, 10)
 		compress.destroy_context(&ctx)
-		testing.expectf(t, err == compress.General_Error.Output_Too_Short, "%v: %v", kind, err)
+		sinks_check(t, "stored limit", .Raw, kind, packed[:], 10)
+		testing.expectf(t, err == compress.General_Error.Size_Mismatch, "%v: %v", kind, err)
 		testing.expectf(t, cap(output) <= 10, "%v: capacity %v", kind, cap(output))
 	}
 }
@@ -184,28 +184,31 @@ inflate_empty_block_floods :: proc(t: ^testing.T) {
 		output: [dynamic]byte
 		defer delete(output)
 		start   := time.tick_now()
-		err     := deflate.inflate_raw(&output, packed[:])
+		err     := deflate.decompress_raw(&output, packed[:])
 		elapsed := time.tick_since(start)
 		testing.expectf(t, err == nil, "%v: %v", flood, err)
 		testing.expectf(t, len(output) == 0, "%v: %v bytes", flood, len(output))
 		log.infof("%v empty blocks: %v bytes in %v", flood, len(packed), elapsed)
+		sinks_check(t, "flood", .Raw, .Memory, packed[:])
 	}
 }
 
 inflate_test_unpack :: proc(format: Deflate_Format, ctx: ^compress.Context, expected: int) -> compress.Error {
 	switch format {
-	case .Raw:  return deflate.inflate_raw(ctx, expected)
-	case .ZLIB: return deflate.inflate_zlib(ctx, expected)
-	case .GZIP: return deflate.inflate_gzip(ctx, expected)
+	case .Raw:  return deflate.decompress_raw(ctx, expected)
+	case .ZLIB: return deflate.decompress_zlib(ctx, expected)
+	case .GZIP: return deflate.decompress_gzip(ctx, expected)
 	}
 	return nil
 }
 
-inflate_test_unpack_bytes :: proc(format: Deflate_Format, output: ^[dynamic]byte, input: []byte, expected, limit: int) -> compress.Error {
+inflate_test_unpack_bytes :: proc(t: ^testing.T, format: Deflate_Format, output: ^[dynamic]byte, input: []byte, expected, limit: int) -> compress.Error {
+	options := compress.Options{max_output_size = limit}
+	sinks_check(t, "unpack bytes", sinks_format(format), .Memory, input, expected, options)
 	switch format {
-	case .Raw:  return deflate.inflate_raw(output, input, expected, limit)
-	case .ZLIB: return deflate.inflate_zlib(output, input, expected, limit)
-	case .GZIP: return deflate.inflate_gzip(output, input, expected, limit)
+	case .Raw:  return deflate.decompress_raw(output, input, expected, options)
+	case .ZLIB: return deflate.decompress_zlib(output, input, expected, options)
+	case .GZIP: return deflate.decompress_gzip(output, input, expected, options)
 	}
 	return nil
 }

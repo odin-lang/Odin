@@ -2,12 +2,16 @@
 //
 // Branch converters (BCJ) for x86, PowerPC, IA-64, ARM, ARM Thumb, SPARC, ARM64 and RISC-V, Delta, and Swap2/Swap4,
 // as used by xz (and so zip method 95) and 7z, plus 7z's four-stream BCJ2.
-// Each filter is a transform only: mapping xz filter IDs and 7z method IDs onto them is up to those containers.
+// Each filter runs in place over a buffer (BCJ2 one-shot between whole buffers), or streams through
+// `Reader` and `Writer` (`Bcj2_Reader` and `Bcj2_Writer` for BCJ2). Mapping xz filter IDs and 7z
+// method IDs onto them is up to those containers.
 // It is a port of Igor Pavlov's public domain LZMA SDK, and the output is byte-identical to the SDK's.
 package compress_filters
 
 import "base:intrinsics"
+import "base:runtime"
 import "core:compress"
+import "core:io"
 
 /*
 	Copyright 2026 Jeroen van Rijn <nom@duclavier.com>.
@@ -79,7 +83,147 @@ Bcj2_Streams :: struct {
 	rc:   [dynamic]u8,
 }
 
+FILTER_CHUNK_SIZE     :: 64 * 1024
+FILTER_BUFFER_MIN     :: 16
+BCJ2_SIDE_BUFFER_SIZE :: 4 * 1024
+BCJ2_BUFFER_MIN       :: 64
+
+Direction :: enum u8 {
+	Decode,
+	Encode,
+}
+
+Branch_Filter :: struct {
+	arch:         Branch_Arch,
+	start_offset: u32,
+}
+
+Delta_Filter :: struct {
+	distance: int,
+}
+
+Swap_Filter :: enum u8 {
+	Swap2,
+	Swap4,
+}
+
+Filter :: union {
+	Branch_Filter,
+	Delta_Filter,
+	Swap_Filter,
+}
+
+Reader :: struct {
+	source:      io.Reader,
+	converter:   Converter,
+	buffer:      []u8,
+	start:       int,
+	ready:       int,
+	end:         int,
+	eof:         bool,
+	owns_buffer: bool,
+	allocator:   runtime.Allocator,
+	err:         Error,
+}
+
+Writer :: struct {
+	w:           io.Writer,
+	converter:   Converter,
+	buffer:      []u8,
+	pending:     int,
+	finished:    bool,
+	owns_buffer: bool,
+	allocator:   runtime.Allocator,
+	err:         Error,
+}
+
+Bcj2_Stream :: enum u8 {
+	Main,
+	Call,
+	Jump,
+	RC,
+}
+
+Bcj2_Reader :: struct {
+	inputs:       [Bcj2_Stream]Bcj2_Input,
+	storage:      []u8,
+	owns_storage: bool,
+	allocator:    runtime.Allocator,
+	probs:        [2 + 256]u16,
+	range_:       u32,
+	code:         u32,
+	ip:           u32,
+	prev:         u32,
+	marker:       u32,
+	pending:      [4]u8,
+	pending_pos:  int,
+	step:         Bcj2_Step,
+	err:          Error,
+}
+
+Bcj2_Writer :: struct {
+	outputs:      [Bcj2_Stream]io.Writer,
+	written:      [Bcj2_Stream]i64,
+	buffers:      [Bcj2_Stream][]u8,
+	filled:       [Bcj2_Stream]int,
+	input:        []u8,
+	pending:      int,
+	storage:      []u8,
+	owns_storage: bool,
+	allocator:    runtime.Allocator,
+	probs:        [2 + 256]u16,
+	low:          u64,
+	range_:       u32,
+	cache:        u8,
+	cache_size:   u64,
+	ip:           u64,
+	prev:         u32,
+	size_limit:   u64,
+	relat_limit:  u32,
+	scanning:     bool,
+	finished:     bool,
+	err:          Error,
+}
+
+@(private)
+Converter_Kind :: enum u8 {
+	None,
+	Branch,
+	Delta,
+	Swap2,
+	Swap4,
+}
+
+@(private)
+Converter :: struct {
+	kind:      Converter_Kind,
+	direction: Direction,
+	branch:    Branch_State,
+	delta:     Delta_State,
+}
+
+@(private)
+Bcj2_Input :: struct {
+	reader: io.Reader,
+	buffer: []u8,
+	pos:    int,
+	end:    int,
+	eof:    bool,
+}
+
+@(private)
+Bcj2_Step :: enum u8 {
+	Header,
+	Normalize,
+	Scan,
+	Address,
+	Output,
+	Verify,
+	Done,
+}
+
 @(private) BCJ2_TOP        :: u32(1) << 24
+@(private) READ_STALLS_MAX :: 100
 @(private) BCJ2_PROB_BITS  :: 11
 @(private) BCJ2_PROB_INIT  :: u16(1 << BCJ2_PROB_BITS >> 1)
 @(private) BCJ2_MOVE_BITS  :: 5
@@ -118,4 +262,38 @@ put_le32 :: #force_inline proc "contextless" (data: []u8, i: int, v: u32) #no_bo
 @(private)
 put_be32 :: #force_inline proc "contextless" (data: []u8, i: int, v: u32) #no_bounds_check {
 	intrinsics.unaligned_store((^u32be)(&data[i]), u32be(v))
+}
+
+@(private)
+_chunk_size :: proc "contextless" (options: compress.Options) -> (size: int) {
+	return options.chunk_size if options.chunk_size > 0 else FILTER_CHUNK_SIZE
+}
+
+@(private)
+_stream_buffer :: proc(options: compress.Options, minimum, size: int, allocator: runtime.Allocator) -> (buffer: []u8, owned: bool, err: Error) {
+	if options.max_output_size < 0 || options.max_memory < 0 || options.chunk_size < 0 || options.progress_interval < 0 {
+		return nil, false, General_Error.Incompatible_Options
+	}
+	if options.buffer != nil {
+		if len(options.buffer) < minimum {
+			return nil, false, General_Error.Incompatible_Options
+		}
+		return options.buffer, false, nil
+	}
+	if size > compress.memory_limit(options) {
+		return nil, false, General_Error.Memory_Limit_Exceeded
+	}
+	buffer = make([]u8, size, allocator) or_return
+	return buffer, true, nil
+}
+
+@(private)
+_io_error :: proc "contextless" (err: Error) -> (result: io.Error) {
+	if err == nil {
+		return nil
+	}
+	if io_err, is_io := err.(io.Error); is_io {
+		return io_err
+	}
+	return .Unknown
 }

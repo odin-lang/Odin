@@ -16,8 +16,8 @@ hexbytes_compare :: proc(x: Hex_Bytes, b: []byte, allocator := context.allocator
 }
 
 hexbytes_decode :: proc(x: Hex_Bytes, allocator := context.allocator) -> []byte {
-	dst, ok := hex.decode(transmute([]byte)(x), allocator)
-	if !ok {
+	dst, err := hex.decode(transmute([]byte)(x), allocator)
+	if err != nil {
 		panic("Hex_Bytes: invalid hex encoding")
 	}
 

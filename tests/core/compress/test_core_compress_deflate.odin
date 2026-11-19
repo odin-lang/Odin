@@ -18,18 +18,18 @@ DEFLATE_TEST_TRAILER :: [5]byte{'O', 'd', 'i', 'n', '!'}
 
 deflate_test_pack :: proc(format: Deflate_Format, input: []byte, output: ^[dynamic]byte, level: deflate.Deflate_Level) -> compress.Error {
 	switch format {
-	case .Raw:  return deflate.deflate_raw(output, input, level)
-	case .ZLIB: return deflate.deflate_zlib(output, input, level)
-	case .GZIP: return deflate.deflate_gzip(output, input, level)
+	case .Raw:  return deflate.compress_raw(output, input, level)
+	case .ZLIB: return deflate.compress_zlib(output, input, level)
+	case .GZIP: return deflate.compress_gzip(output, input, level)
 	}
 	return nil
 }
 
 deflate_test_unpack :: proc(format: Deflate_Format, ctx: ^compress.Context) -> compress.Error {
 	switch format {
-	case .Raw:  return deflate.inflate_raw(ctx)
-	case .ZLIB: return deflate.inflate_zlib(ctx)
-	case .GZIP: return deflate.inflate_gzip(ctx)
+	case .Raw:  return deflate.decompress_raw(ctx)
+	case .ZLIB: return deflate.decompress_zlib(ctx)
+	case .GZIP: return deflate.decompress_gzip(ctx)
 	}
 	return nil
 }
@@ -63,6 +63,7 @@ deflate_test_round_trip :: proc(t: ^testing.T, name: string, data: []byte) {
 				rest: [5]byte
 				rest_err := compress.read_slice(&ctx, rest[:])
 				testing.expectf(t, rest_err == nil && rest == DEFLATE_TEST_TRAILER, "%v, %v, %v, %v: bytes after the stream were %v, %v", name, format, level, kind, rest, rest_err)
+				sinks_check(t, name, sinks_format(format), kind, packed[:])
 			}
 		}
 	}
@@ -96,11 +97,16 @@ compress_deflate_output_too_short :: proc(t: ^testing.T) {
 	s := new(deflate.Deflate)
 	defer free(s)
 	input  := transmute([]byte)context_test_data
-	output := make([]byte, deflate.deflate_bound(len(input)) - 1)
+	packed: [dynamic]byte
+	defer delete(packed)
+	testing.expect_value(t, deflate.compress_raw(&packed, input), nil)
+	output := make([]byte, len(packed))
 	defer delete(output)
 
-	_, err := deflate.deflate_raw(s, output, input)
-	testing.expect_value(t, err, compress.Error(compress.General_Error.Output_Too_Short))
+	n, err := deflate.compress_raw(s, output, input)
+	testing.expectf(t, err == nil && n == len(packed) && bytes.equal(output, packed[:]), "exact size: %v, %v", n, err)
+	n, err = deflate.compress_raw(s, output[:len(packed) - 1], input)
+	testing.expectf(t, n == 0 && err == compress.General_Error.Output_Too_Short, "one byte short: %v, %v", n, err)
 }
 
 @(test)
@@ -115,8 +121,8 @@ compress_gzip_multiple_members :: proc(t: ^testing.T) {
 	for part, i in ([][]byte{first, nil, second}) {
 		member: [dynamic]byte
 		defer delete(member)
-		err := deflate.deflate_gzip(&member, part, .Level_1 if i == 0 else .Level_9)
-		testing.expectf(t, err == nil, "member %v: deflate_gzip returned %v", i, err)
+		err := deflate.compress_gzip(&member, part, .Level_1 if i == 0 else .Level_9)
+		testing.expectf(t, err == nil, "member %v: compress_gzip returned %v", i, err)
 		append(&packed, ..member[:])
 	}
 	trailer := DEFLATE_TEST_TRAILER
@@ -131,13 +137,14 @@ compress_gzip_multiple_members :: proc(t: ^testing.T) {
 		ctx := stream_test_context(kind, &input, &br, &tr, &output)
 		defer compress.destroy_context(&ctx)
 
-		err := deflate.inflate_gzip(&ctx)
-		testing.expectf(t, err == nil, "%v: inflate_gzip returned %v", kind, err)
+		err := deflate.decompress_gzip(&ctx)
+		testing.expectf(t, err == nil, "%v: decompress_gzip returned %v", kind, err)
 		testing.expectf(t, bytes.equal(output[:], data[:100_000]), "%v: output differs", kind)
 
 		rest: [5]byte
 		rest_err := compress.read_slice(&ctx, rest[:])
 		testing.expectf(t, rest_err == nil && rest == DEFLATE_TEST_TRAILER, "%v: bytes after the stream were %v, %v", kind, rest, rest_err)
+		sinks_check(t, "multiple members", .Gzip, kind, packed[:])
 	}
 }
 
@@ -147,7 +154,7 @@ compress_gzip_bad_trailer :: proc(t: ^testing.T) {
 
 	packed: [dynamic]byte
 	defer delete(packed)
-	testing.expect_value(t, deflate.deflate_gzip(&packed, input), nil)
+	testing.expect_value(t, deflate.compress_gzip(&packed, input), nil)
 	raw := packed[:]
 
 	Corruption :: struct {
@@ -162,8 +169,11 @@ compress_gzip_bad_trailer :: proc(t: ^testing.T) {
 		raw[c.offset] ~= 0x55
 		output: [dynamic]byte
 		defer delete(output)
-		err := deflate.inflate_gzip(&output, raw)
-		testing.expectf(t, err == c.want, "corrupt byte %v: inflate_gzip returned %v, expected %v", c.offset, err, c.want)
+		err := deflate.decompress_gzip(&output, raw)
+		testing.expectf(t, err == c.want, "corrupt byte %v: decompress_gzip returned %v, expected %v", c.offset, err, c.want)
+		for kind in Stream_Kind {
+			sinks_check(t, "bad trailer", .Gzip, kind, raw)
+		}
 		raw[c.offset] ~= 0x55
 	}
 }
@@ -187,17 +197,19 @@ compress_gzip_header_crc :: proc(t: ^testing.T) {
 		ctx := stream_test_context(kind, &input, &br, &tr, &output)
 		defer compress.destroy_context(&ctx)
 
-		err := deflate.inflate_gzip(&ctx)
-		testing.expectf(t, err == nil, "%v: inflate_gzip returned %v", kind, err)
+		err := deflate.decompress_gzip(&ctx)
+		testing.expectf(t, err == nil, "%v: decompress_gzip returned %v", kind, err)
 		testing.expectf(t, string(output[:]) == expected, "%v: output was %q", kind, string(output[:]))
+		sinks_check(t, "header crc", .Gzip, kind, packed[:])
 	}
 
 	for offset in ([]int{4, 9, 12, 17, 22, 30, 37, 38}) {
 		packed[offset] ~= 0x55
 		output: [dynamic]byte
 		defer delete(output)
-		err := deflate.inflate_gzip(&output, packed[:])
-		testing.expectf(t, err == compress.GZIP_Error.Header_CRC_Invalid, "corrupt byte %v: inflate_gzip returned %v", offset, err)
+		err := deflate.decompress_gzip(&output, packed[:])
+		testing.expectf(t, err == compress.GZIP_Error.Header_CRC_Invalid, "corrupt byte %v: decompress_gzip returned %v", offset, err)
+		sinks_check(t, "header crc", .Gzip, .One_Byte_No_Seek, packed[:])
 		packed[offset] ~= 0x55
 	}
 
@@ -210,8 +222,8 @@ compress_gzip_header_crc :: proc(t: ^testing.T) {
 		unchecked[offset] ~= 0x55
 		output: [dynamic]byte
 		defer delete(output)
-		err := deflate.inflate_gzip(&output, unchecked[:])
-		testing.expectf(t, err == nil, "unchecked, corrupt byte %v: inflate_gzip returned %v", offset, err)
+		err := deflate.decompress_gzip(&output, unchecked[:])
+		testing.expectf(t, err == nil, "unchecked, corrupt byte %v: decompress_gzip returned %v", offset, err)
 		testing.expectf(t, string(output[:]) == expected, "unchecked, corrupt byte %v: output was %q", offset, string(output[:]))
 		unchecked[offset] ~= 0x55
 	}
@@ -225,7 +237,7 @@ compress_gzip_header_max_extra :: proc(t: ^testing.T) {
 
 	body: [dynamic]byte
 	defer delete(body)
-	testing.expect_value(t, deflate.deflate_raw(&body, data), nil)
+	testing.expect_value(t, deflate.compress_raw(&body, data), nil)
 
 	for checked in ([]bool{false, true}) {
 		packed: [dynamic]byte
@@ -256,17 +268,18 @@ compress_gzip_header_max_extra :: proc(t: ^testing.T) {
 			ctx := stream_test_context(kind, &input, &br, &tr, &output)
 			defer compress.destroy_context(&ctx)
 
-			err := deflate.inflate_gzip(&ctx)
-			testing.expectf(t, err == nil, "checked %v, %v: inflate_gzip returned %v", checked, kind, err)
+			err := deflate.decompress_gzip(&ctx)
+			testing.expectf(t, err == nil, "checked %v, %v: decompress_gzip returned %v", checked, kind, err)
 			testing.expectf(t, bytes.equal(output[:], data), "checked %v, %v: output differs", checked, kind)
+			sinks_check(t, "max extra", .Gzip, kind, packed[:])
 		}
 
 		packed[40_000] ~= 0x55
 		output: [dynamic]byte
 		defer delete(output)
-		err := deflate.inflate_gzip(&output, packed[:])
+		err := deflate.decompress_gzip(&output, packed[:])
 		want := compress.Error(compress.GZIP_Error.Header_CRC_Invalid) if checked else nil
-		testing.expectf(t, err == want, "checked %v, corrupt extra: inflate_gzip returned %v", checked, err)
+		testing.expectf(t, err == want, "checked %v, corrupt extra: decompress_gzip returned %v", checked, err)
 	}
 }
 
@@ -333,7 +346,7 @@ compress_deflate_literal_only_blocks :: proc(t: ^testing.T) {
 			for format in 0..<2 {
 				packed: [dynamic]byte
 				defer delete(packed)
-				err := deflate.deflate_raw(&packed, d.sequence[:], level) if format == 0 else deflate.deflate64_raw(&packed, d.sequence[:], level)
+				err := deflate.compress_raw(&packed, d.sequence[:], level) if format == 0 else deflate.compress_raw64(&packed, d.sequence[:], level)
 				testing.expectf(t, err == nil, "k=%v %v format %v: %v", k, level, format, err)
 				if err != nil || len(packed) < 2 {
 					continue
@@ -347,7 +360,7 @@ compress_deflate_literal_only_blocks :: proc(t: ^testing.T) {
 
 				unpacked: [dynamic]byte
 				defer delete(unpacked)
-				unpack_err := deflate.inflate_raw(&unpacked, packed[:], len(d.sequence)) if format == 0 else deflate.inflate64_raw(&unpacked, packed[:], len(d.sequence))
+				unpack_err := deflate.decompress_raw(&unpacked, packed[:], len(d.sequence)) if format == 0 else deflate.decompress_raw64(&unpacked, packed[:], len(d.sequence))
 				testing.expectf(t, unpack_err == nil && bytes.equal(unpacked[:], d.sequence[:]), "k=%v %v format %v: round trip failed: %v", k, level, format, unpack_err)
 			}
 		}

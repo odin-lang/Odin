@@ -26,11 +26,78 @@ package compress_lzma
 		https://tukaani.org/xz/
 */
 
+import "base:runtime"
 import "core:compress"
+import "core:io"
 
 Error         :: compress.Error
 General_Error :: compress.General_Error
 LZMA_Error    :: compress.LZMA_Error
+
+CHUNK_SIZE :: 256 * 1024
+
+Reader :: struct {
+	z:           ^compress.Context,
+	decoder:     Decoder,
+	lzma2:       LZMA2_State,
+	window:      [dynamic]u8,
+	out:         Output,
+	flushed:     int,
+	keep:        int,
+	size:        int,
+	kind:        Stream_Kind,
+	done:        bool,
+	owns_window: bool,
+	options:     compress.Options,
+	allocator:   runtime.Allocator,
+	total_in:    i64,
+	err:         Error,
+}
+
+Writer :: struct {
+	w:          io.Writer,
+	state:      ^Writer_State,
+	chunker:    LZMA2_Chunker,
+	block:      []u8,
+	threshold:  u32,
+	kind:       Stream_Kind,
+	input_size: i64,
+	total_in:   i64,
+	flushed:    i64,
+	options:    compress.Options,
+	allocator:  runtime.Allocator,
+	err:        Error,
+	owns_block: bool,
+	finished:   bool,
+}
+
+@(private)
+Writer_State :: struct {
+	encoder: Encoder,
+	out:     [dynamic]u8,
+}
+
+@(private)
+Stream_Kind :: enum u8 {
+	Alone,
+	Raw,
+	LZMA2,
+}
+
+@(private)
+Output_Progress :: struct {
+	options:   compress.Options,
+	base_in:   i64,
+	total_in:  i64,
+	total_out: i64,
+	interval:  int,
+	mark:      int,
+}
+
+LZMA2_Decoder :: struct {
+	probs:     []u16,
+	allocator: runtime.Allocator,
+}
 
 Properties :: struct {
 	lc:        u8,
@@ -131,6 +198,18 @@ Match_Finder :: struct {
 	history_size:    u32,
 	fixed_hash_size: u32,
 	crc:             [256]u32,
+	buf_base:        [^]u8,
+	block_size:      int,
+	keep_before:     u32,
+	streaming:       bool,
+}
+
+@(private)
+LZMA2_Chunker :: struct {
+	src_pos:         i64,
+	props_byte:      u8,
+	need_init_state: bool,
+	need_init_prop:  bool,
 }
 
 @(private)
@@ -365,6 +444,16 @@ NICE_LEN_MIN             :: 5
 COMPRESS_BOUND_SLACK     :: 1024
 @(private)
 LZMA2_KEEP_WINDOW_SIZE   :: LZMA2_UNPACK_CHUNK_MAX
+@(private)
+CODE_BLOCK_UNPACK        :: 1 << 17
+@(private)
+WRITER_LOOKAHEAD         :: 4 * NUM_OPTS
+@(private)
+BLOCK_MOVE_ALIGN         :: 1 << 7
+@(private)
+BLOCK_SIZE_ALIGN         :: 1 << 16
+@(private)
+BLOCK_SIZE_MAX           :: u64(0xFFFF_FFFF) - BLOCK_SIZE_ALIGN + 1
 
 @(private)
 MF_HASH2_SIZE            :: u32(1) << 10
@@ -459,4 +548,25 @@ num_probs :: #force_inline proc "contextless" (lc, lp: u8) -> int {
 @(private)
 valid_properties :: proc "contextless" (props: Properties) -> bool {
 	return props.lc <= LC_MAX && props.lp <= LP_MAX && props.pb <= PB_MAX
+}
+
+@(private)
+check_options :: proc "contextless" (options: compress.Options) -> (err: Error) {
+	if options.max_output_size < 0 || options.max_memory < 0 || options.chunk_size < 0 || options.progress_interval < 0 {
+		return General_Error.Incompatible_Options
+	}
+	return nil
+}
+
+@(private)
+input_ended :: proc "contextless" (err: io.Error) -> bool {
+	return err == .EOF || err == .Unexpected_EOF || err == .Short_Buffer
+}
+
+@(private)
+input_error :: proc "contextless" (err: io.Error) -> Error {
+	if input_ended(err) {
+		return General_Error.Stream_Too_Short
+	}
+	return err
 }

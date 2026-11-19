@@ -3,6 +3,7 @@ package test_core_compress
 import "core:bytes"
 import "core:compress"
 import "core:compress/lzma"
+import "core:fmt"
 import "core:hash"
 import "core:math/rand"
 import "core:mem"
@@ -60,20 +61,20 @@ Lzma_Test_Format :: enum {
 	Lzma2,
 }
 
-lzma_test_decode :: proc(ctx: ^compress.Context, format: Lzma_Test_Format, props: lzma.Properties, expected := -1, max_output := compress.COMPRESS_OUTPUT_ALLOCATE_MAX) -> lzma.Error {
+lzma_test_decode :: proc(ctx: ^compress.Context, format: Lzma_Test_Format, props: lzma.Properties, expected := -1, options := compress.Options{}) -> lzma.Error {
 	switch format {
-	case .Lzma:  return lzma.decompress(ctx, expected, max_output)
-	case .Raw:   return lzma.decompress_raw(ctx, props, expected, max_output)
-	case .Lzma2: return lzma.decompress_lzma2(ctx, props.dict_size, expected, max_output)
+	case .Lzma:  return lzma.decompress(ctx, expected, options)
+	case .Raw:   return lzma.decompress_raw(ctx, props, expected, options)
+	case .Lzma2: return lzma.decompress_lzma2(ctx, props.dict_size, expected, options)
 	}
 	return nil
 }
 
-lzma_test_decode_bytes :: proc(output: ^[dynamic]byte, input: []byte, format: Lzma_Test_Format, props: lzma.Properties, expected := -1, max_output := compress.COMPRESS_OUTPUT_ALLOCATE_MAX) -> lzma.Error {
+lzma_test_decode_bytes :: proc(output: ^[dynamic]byte, input: []byte, format: Lzma_Test_Format, props: lzma.Properties, expected := -1, options := compress.Options{}) -> lzma.Error {
 	switch format {
-	case .Lzma:  return lzma.decompress(output, input, expected, max_output)
-	case .Raw:   return lzma.decompress_raw(output, input, props, expected, max_output)
-	case .Lzma2: return lzma.decompress_lzma2(output, input, props.dict_size, expected, max_output)
+	case .Lzma:  return lzma.decompress(output, input, expected, options)
+	case .Raw:   return lzma.decompress_raw(output, input, props, expected, options)
+	case .Lzma2: return lzma.decompress_lzma2(output, input, props.dict_size, expected, options)
 	}
 	return nil
 }
@@ -189,7 +190,7 @@ lzma_corrupt :: proc(t: ^testing.T) {
 				copy(data, c.packed)
 				data[i] ~= mask
 				output: [dynamic]byte
-				err := lzma_test_decode_bytes(&output, data, c.format, c.props, max_output = limit)
+				err := lzma_test_decode_bytes(&output, data, c.format, c.props, options = {max_output_size = limit})
 				testing.expectf(t, len(output) <= limit, "%v: flip %x at %v wrote %v bytes", c.name, mask, i, len(output))
 				if err == nil {
 					accepted += 1
@@ -229,7 +230,7 @@ lzma_corrupt :: proc(t: ^testing.T) {
 				br: bytes.Reader
 				tr: Trickle_Reader
 				ctx := stream_test_context(.Memory if k == 0 else kind, &input, &br, &tr, &outputs[k])
-				errs[k] = lzma_test_decode(&ctx, c.format, c.props, max_output = limit)
+				errs[k] = lzma_test_decode(&ctx, c.format, c.props, options = {max_output_size = limit})
 				compress.destroy_context(&ctx)
 				testing.expectf(t, len(outputs[k]) <= limit, "%v, %v: random corruption wrote %v bytes", c.name, kind, len(outputs[k]))
 			}
@@ -249,23 +250,23 @@ lzma_limits :: proc(t: ^testing.T) {
 	output: [dynamic]byte
 	defer delete(output)
 
-	testing.expect_value(t, lzma.decompress(&output, LZMA_VECTOR_SDK, max_output_size = len(inputs.text) - 1), compress.General_Error.Output_Too_Short)
-	testing.expect_value(t, lzma.decompress(&output, LZMA_VECTOR_SDK, len(inputs.text) + 1), compress.LZMA_Error.Size_Mismatch)
-	testing.expect_value(t, lzma.decompress(&output, LZMA_VECTOR_XZ, max_output_size = len(inputs.repeat) - 1), compress.General_Error.Output_Too_Short)
+	testing.expect_value(t, lzma.decompress(&output, LZMA_VECTOR_SDK, options = {max_output_size = len(inputs.text) - 1}), compress.General_Error.Output_Too_Short)
+	testing.expect_value(t, lzma.decompress(&output, LZMA_VECTOR_SDK, len(inputs.text) + 1), compress.General_Error.Size_Mismatch)
+	testing.expect_value(t, lzma.decompress(&output, LZMA_VECTOR_XZ, options = {max_output_size = len(inputs.repeat) - 1}), compress.General_Error.Output_Too_Short)
 	testing.expect(t, len(output) <= len(inputs.repeat) - 1)
-	testing.expect_value(t, lzma.decompress(&output, LZMA_VECTOR_XZ, len(inputs.repeat), len(inputs.repeat) - 1), compress.General_Error.Output_Too_Short)
+	testing.expect_value(t, lzma.decompress(&output, LZMA_VECTOR_XZ, len(inputs.repeat), {max_output_size = len(inputs.repeat) - 1}), compress.General_Error.Output_Too_Short)
 	testing.expect(t, len(output) <= len(inputs.repeat) - 1)
-	testing.expect_value(t, lzma.decompress(&output, LZMA_VECTOR_XZ, len(inputs.repeat) + 1), compress.LZMA_Error.Unexpected_End_Marker)
-	testing.expect(t, lzma.decompress(&output, LZMA_VECTOR_XZ, len(inputs.repeat) - 1) != nil)
-	testing.expect_value(t, lzma.decompress(&output, LZMA_VECTOR_XZ, max_output_size = len(inputs.repeat)), nil)
+	testing.expect_value(t, lzma.decompress(&output, LZMA_VECTOR_XZ, len(inputs.repeat) + 1), compress.General_Error.Size_Mismatch)
+	testing.expect_value(t, lzma.decompress(&output, LZMA_VECTOR_XZ, len(inputs.repeat) - 1), compress.General_Error.Size_Mismatch)
+	testing.expect_value(t, lzma.decompress(&output, LZMA_VECTOR_XZ, options = {max_output_size = len(inputs.repeat)}), nil)
 	testing.expect(t, bytes.equal(output[:], inputs.repeat))
 
-	testing.expect_value(t, lzma.decompress_lzma2(&output, LZMA_VECTOR_LZMA2, 64 << 10, max_output_size = len(inputs.mixed) - 1), compress.General_Error.Output_Too_Short)
-	testing.expect_value(t, lzma.decompress_lzma2(&output, LZMA_VECTOR_LZMA2, 64 << 10, len(inputs.mixed) + 1), compress.LZMA_Error.Size_Mismatch)
+	testing.expect_value(t, lzma.decompress_lzma2(&output, LZMA_VECTOR_LZMA2, 64 << 10, options = {max_output_size = len(inputs.mixed) - 1}), compress.General_Error.Output_Too_Short)
+	testing.expect_value(t, lzma.decompress_lzma2(&output, LZMA_VECTOR_LZMA2, 64 << 10, len(inputs.mixed) + 1), compress.General_Error.Size_Mismatch)
 	testing.expect_value(t, lzma.decompress_lzma2(&output, LZMA_VECTOR_LZMA2, 64 << 10, len(inputs.mixed)), nil)
 	testing.expect(t, bytes.equal(output[:], inputs.mixed))
 
-	testing.expect_value(t, lzma.decompress(&output, LZMA_VECTOR_SDK, max_output_size = -1), compress.General_Error.Incompatible_Options)
+	testing.expect_value(t, lzma.decompress(&output, LZMA_VECTOR_SDK, options = {max_output_size = -1}), compress.General_Error.Incompatible_Options)
 	testing.expect_value(t, lzma.decompress((^[dynamic]byte)(nil), LZMA_VECTOR_SDK), compress.General_Error.Incompatible_Options)
 }
 
@@ -505,6 +506,17 @@ lzma_normalize :: proc(t: ^testing.T) {
 		clear(&output)
 		err = lzma.decompress_lzma2(&output, packed2[:], props.dict_size, len(input))
 		testing.expectf(t, err == nil && bytes.equal(output[:], input), "%v: lzma2 round trip %v", r.level, err)
+
+		for kind in ([]Lzma_Stream_Kind{.Raw, .LZMA2}) {
+			want := packed[:] if kind == .Raw else packed2[:]
+			for size in ([]i64{i64(len(input)), -1}) {
+				streamed: [dynamic]byte
+				defer delete(streamed)
+				aw := Append_Writer{out = &streamed, fail_at = -1}
+				_, err = lzma_writer_pack({kind = kind, options = options, input_size = size}, append_writer(&aw), input, .Random)
+				testing.expectf(t, err == nil && bytes.equal(streamed[:], want), "%v: %v writer, size %v: %v, %v vs %v bytes", r.level, kind, size, err, len(streamed), len(want))
+			}
+		}
 	}
 }
 
@@ -713,4 +725,328 @@ lzma_compress_arguments :: proc(t: ^testing.T) {
 	testing.expect_value(t, lzma.compress(&output, zeros, .Level_9), nil)
 	header, _ = lzma.decode_properties(output[:])
 	testing.expect_value(t, header, props)
+}
+
+LZMA_TEST_BAD_OPTIONS :: [?]compress.Options{{max_output_size = -1}, {max_memory = -1}, {chunk_size = -1}, {progress_interval = -1}}
+
+lzma_test_pack :: proc(output: ^[dynamic]byte, input: []byte, format: Lzma_Test_Format) -> (props: lzma.Properties, err: lzma.Error) {
+	o := lzma.level_options(.Level_1)
+	o.end_marker = true
+	switch format {
+	case .Lzma:  err = lzma.compress(output, input, .Level_1)
+	case .Raw:   props, err = lzma.compress_raw(output, input, o)
+	case .Lzma2: props, err = lzma.compress_lzma2(output, input, o)
+	}
+	return
+}
+
+lzma_test_encode :: proc(output: ^[dynamic]byte, input: []byte, format: Lzma_Test_Format, to_slice: bool, options: compress.Options, allocator := context.allocator) -> (err: lzma.Error) {
+	o := lzma.level_options(.Level_1)
+	if !to_slice {
+		switch format {
+		case .Lzma:  err = lzma.compress(output, input, .Level_1, options, allocator)
+		case .Raw:   _, err = lzma.compress_raw(output, input, o, options, allocator)
+		case .Lzma2: _, err = lzma.compress_lzma2(output, input, o, options, allocator)
+		}
+		return
+	}
+	buffer := make([]byte, lzma.compress_bound(len(input)))
+	defer delete(buffer)
+	n: int
+	switch format {
+	case .Lzma:  n, err = lzma.compress(buffer, input, .Level_1, options, allocator)
+	case .Raw:   n, _, err = lzma.compress_raw(buffer, input, o, options, allocator)
+	case .Lzma2: n, _, err = lzma.compress_lzma2(buffer, input, o, options, allocator)
+	}
+	clear(output)
+	if err == nil {
+		append(output, ..buffer[:n])
+	}
+	return
+}
+
+lzma_test_probs_memory :: proc(format: Lzma_Test_Format) -> int {
+	lc_lp := uint(lzma.LZMA2_LCLP_MAX) if format == .Lzma2 else 3
+	return (1984 + int(0x300) << lc_lp) * size_of(u16)
+}
+
+@(test)
+lzma_decode_options :: proc(t: ^testing.T) {
+	INTERVAL :: 10_000
+	g := Lz4_Test_Lcg{state = 0x4c5a4f50}
+	text := lz4_test_lcg_text(&g, 30 * INTERVAL)
+	defer delete(text)
+	log: Ppmd_Progress_Log
+	defer delete(log.calls)
+	first: [dynamic]compress.Progress
+	defer delete(first)
+
+	for format in Lzma_Test_Format {
+		packed: [dynamic]byte
+		defer delete(packed)
+		props, pack_err := lzma_test_pack(&packed, text, format)
+		if !testing.expect_value(t, pack_err, nil) {
+			continue
+		}
+
+		clear(&first)
+		for kind in Stream_Kind {
+			input := packed[:]
+			output: [dynamic]byte
+			defer delete(output)
+			br: bytes.Reader
+			tr: Trickle_Reader
+			ctx := stream_test_context(kind, &input, &br, &tr, &output)
+			err := lzma_test_decode(&ctx, format, props, len(text), ppmd_progress_options(&log, {progress_interval = INTERVAL}))
+			compress.destroy_context(&ctx)
+			label := fmt.tprintf("lzma %v progress %v", format, kind)
+			testing.expectf(t, err == nil && bytes.equal(output[:], text), "%v: %v", label, err)
+			testing.expectf(t, len(log.calls) == 30, "%v: %v calls", label, len(log.calls))
+			ppmd_progress_expect(t, label, log.calls[:], codec_progress_input_total(kind, len(packed)), i64(len(text)), i64(len(packed)), i64(len(text)))
+			for c, i in log.calls {
+				testing.expectf(t, c.bytes_out == i64(i + 1) * INTERVAL, "%v call %v: %v bytes out", label, i, c.bytes_out)
+			}
+			codec_progress_same(t, label, &first, log.calls[:])
+		}
+		free_all(context.temp_allocator)
+
+		{
+			output: [dynamic]byte
+			defer delete(output)
+			testing.expect_value(t, lzma_test_decode_bytes(&output, packed[:], format, props, -1, ppmd_progress_options(&log)), nil)
+			testing.expectf(t, len(log.calls) == 0, "lzma %v default interval: %v calls", format, len(log.calls))
+
+			log.cancel_at = 2
+			err := lzma_test_decode_bytes(&output, packed[:], format, props, -1, ppmd_progress_options(&log, {progress_interval = INTERVAL}))
+			testing.expectf(t, err == compress.General_Error.Canceled && len(log.calls) == 2, "lzma %v cancel: %v, %v calls", format, err, len(log.calls))
+			testing.expectf(t, len(output) <= len(text) && bytes.equal(output[:], text[:min(len(output), len(text))]), "lzma %v cancel: %v bytes kept", format, len(output))
+			input := packed[:]
+			br: bytes.Reader
+			tr: Trickle_Reader
+			ctx := stream_test_context(.One_Byte_No_Seek, &input, &br, &tr, &output)
+			err = lzma_test_decode(&ctx, format, props, -1, ppmd_progress_options(&log, {progress_interval = INTERVAL}))
+			compress.destroy_context(&ctx)
+			testing.expectf(t, err == compress.General_Error.Canceled && len(log.calls) == 2, "lzma %v stream cancel: %v, %v calls", format, err, len(log.calls))
+			log.cancel_at = 0
+		}
+
+		for kind in Stream_Kind {
+			for expected in ([]int{-1, len(text)}) {
+				for limit in ([]int{len(text) - 1, len(text)}) {
+					input := packed[:]
+					output: [dynamic]byte
+					defer delete(output)
+					br: bytes.Reader
+					tr: Trickle_Reader
+					ctx := stream_test_context(kind, &input, &br, &tr, &output)
+					err := lzma_test_decode(&ctx, format, props, expected, {max_output_size = limit})
+					compress.destroy_context(&ctx)
+					if limit < len(text) {
+						testing.expectf(t, err == compress.General_Error.Output_Too_Short && len(output) <= limit, "lzma %v %v, expected %v, limit %v: %v, %v bytes", format, kind, expected, limit, err, len(output))
+					} else {
+						testing.expectf(t, err == nil && bytes.equal(output[:], text), "lzma %v %v, expected %v, limit %v: %v", format, kind, expected, limit, err)
+					}
+				}
+			}
+		}
+
+		for bad in LZMA_TEST_BAD_OPTIONS {
+			output: [dynamic]byte
+			defer delete(output)
+			err := lzma_test_decode_bytes(&output, packed[:], format, props, -1, bad)
+			testing.expectf(t, err == compress.General_Error.Incompatible_Options, "lzma %v %v: %v", format, bad, err)
+			input := packed[:]
+			br: bytes.Reader
+			ctx := compress.init_context(bytes.reader_init(&br, input), &output)
+			err = lzma_test_decode(&ctx, format, props, -1, bad)
+			compress.destroy_context(&ctx)
+			testing.expectf(t, err == compress.General_Error.Incompatible_Options, "lzma %v stream %v: %v", format, bad, err)
+		}
+
+		{
+			need := lzma_test_probs_memory(format)
+			output: [dynamic]byte
+			defer delete(output)
+			track: mem.Tracking_Allocator
+			mem.tracking_allocator_init(&track, context.allocator)
+			defer mem.tracking_allocator_destroy(&track)
+			{
+				context.allocator = mem.tracking_allocator(&track)
+				input := packed[:]
+				ctx := compress.init_context(&input, &output)
+				err := lzma_test_decode(&ctx, format, props, -1, {max_memory = need - 1})
+				compress.destroy_context(&ctx)
+				testing.expectf(t, err == compress.General_Error.Memory_Limit_Exceeded && track.total_memory_allocated == 0, "lzma %v memory %v: %v, %v allocated", format, need - 1, err, track.total_memory_allocated)
+			}
+			testing.expect_value(t, lzma_test_decode_bytes(&output, packed[:], format, props, -1, {max_memory = need}), nil)
+			testing.expect(t, bytes.equal(output[:], text))
+		}
+	}
+}
+
+@(test)
+lzma2_append_options :: proc(t: ^testing.T) {
+	INTERVAL :: 10_000
+	g := Lz4_Test_Lcg{state = 0x4c5a4f53}
+	text := lz4_test_lcg_text(&g, 30 * INTERVAL)
+	defer delete(text)
+	packed: [dynamic]byte
+	defer delete(packed)
+	props, pack_err := lzma_test_pack(&packed, text, .Lzma2)
+	testing.expect_value(t, pack_err, nil)
+	log: Ppmd_Progress_Log
+	defer delete(log.calls)
+
+	dec: lzma.LZMA2_Decoder
+	lzma.lzma2_decoder_init(&dec)
+	defer lzma.lzma2_decoder_destroy(&dec)
+	output: [dynamic]byte
+	defer delete(output)
+
+	append(&output, 'a', 'b', 'c')
+	consumed, err := lzma.decompress_lzma2_append(&dec, &output, packed[:], props.dict_size, len(text), ppmd_progress_options(&log, {progress_interval = INTERVAL}))
+	testing.expectf(t, err == nil && consumed == len(packed) && string(output[:3]) == "abc" && bytes.equal(output[3:], text), "lzma2 append: %v, %v consumed", err, consumed)
+	testing.expectf(t, len(log.calls) == 30, "lzma2 append: %v calls", len(log.calls))
+	ppmd_progress_expect(t, "lzma2 append", log.calls[:], i64(len(packed)), i64(3 + len(text)), i64(len(packed)), i64(3 + len(text)))
+	for c, i in log.calls {
+		testing.expectf(t, c.bytes_out == i64(i + 1) * INTERVAL, "lzma2 append call %v: %v bytes out", i, c.bytes_out)
+	}
+
+	resize(&output, 3)
+	log.cancel_at = 2
+	_, err = lzma.decompress_lzma2_append(&dec, &output, packed[:], props.dict_size, -1, ppmd_progress_options(&log, {progress_interval = INTERVAL}))
+	testing.expectf(t, err == compress.General_Error.Canceled && len(log.calls) == 2, "lzma2 append cancel: %v, %v calls", err, len(log.calls))
+	log.cancel_at = 0
+
+	for expected in ([]int{-1, len(text)}) {
+		resize(&output, 3)
+		consumed, err = lzma.decompress_lzma2_append(&dec, &output, packed[:], props.dict_size, expected, {max_output_size = 3 + len(text) - 1})
+		testing.expectf(t, err == compress.General_Error.Output_Too_Short && len(output) < 3 + len(text), "lzma2 append, expected %v: %v, %v bytes", expected, err, len(output))
+		resize(&output, 3)
+		consumed, err = lzma.decompress_lzma2_append(&dec, &output, packed[:], props.dict_size, expected, {max_output_size = 3 + len(text)})
+		testing.expectf(t, err == nil && consumed == len(packed) && bytes.equal(output[3:], text), "lzma2 append, expected %v at the limit: %v", expected, err)
+	}
+	_, err = lzma.decompress_lzma2_append(&dec, &output, packed[:], props.dict_size, -1, {max_output_size = 2})
+	testing.expect_value(t, err, compress.General_Error.Output_Too_Short)
+
+	for bad in LZMA_TEST_BAD_OPTIONS {
+		resize(&output, 3)
+		_, err = lzma.decompress_lzma2_append(&dec, &output, packed[:], props.dict_size, -1, bad)
+		testing.expectf(t, err == compress.General_Error.Incompatible_Options, "lzma2 append %v: %v", bad, err)
+	}
+
+	fresh: lzma.LZMA2_Decoder
+	lzma.lzma2_decoder_init(&fresh)
+	defer lzma.lzma2_decoder_destroy(&fresh)
+	clear(&output)
+	need := lzma_test_probs_memory(.Lzma2)
+	_, err = lzma.decompress_lzma2_append(&fresh, &output, packed[:], props.dict_size, -1, {max_memory = need - 1})
+	testing.expect_value(t, err, compress.General_Error.Memory_Limit_Exceeded)
+	_, err = lzma.decompress_lzma2_append(&fresh, &output, packed[:], props.dict_size, -1, {max_memory = need})
+	testing.expectf(t, err == nil && bytes.equal(output[:], text), "lzma2 append at the memory limit: %v", err)
+}
+
+@(test)
+lzma_encode_options :: proc(t: ^testing.T) {
+	INTERVAL :: 100_000
+	g := Lz4_Test_Lcg{state = 0x4c5a4f51}
+	text := lz4_test_lcg_text(&g, 1 << 20)
+	defer delete(text)
+	log: Ppmd_Progress_Log
+	defer delete(log.calls)
+	first: [dynamic]compress.Progress
+	defer delete(first)
+
+	for format in Lzma_Test_Format {
+		want: [dynamic]byte
+		defer delete(want)
+		testing.expect_value(t, lzma_test_encode(&want, text, format, false, {}), nil)
+
+		clear(&first)
+		for to_slice in ([]bool{false, true}) {
+			label := fmt.tprintf("lzma %v encode, slice %v", format, to_slice)
+			got: [dynamic]byte
+			defer delete(got)
+			err := lzma_test_encode(&got, text, format, to_slice, ppmd_progress_options(&log, {progress_interval = INTERVAL}))
+			testing.expectf(t, err == nil && bytes.equal(got[:], want[:]), "%v: %v", label, err)
+			testing.expectf(t, len(log.calls) >= 2, "%v: %v calls", label, len(log.calls))
+			ppmd_progress_expect(t, label, log.calls[:], i64(len(text)), -1, i64(len(text)), i64(len(want)))
+			codec_progress_expect_spacing(t, label, log.calls[:max(len(log.calls) - 1, 0)], INTERVAL, true)
+			codec_progress_expect_last(t, label, log.calls[:], i64(len(text)), i64(len(want)))
+			codec_progress_same(t, label, &first, log.calls[:])
+
+			log.cancel_at = 2
+			err = lzma_test_encode(&got, text, format, to_slice, ppmd_progress_options(&log, {progress_interval = INTERVAL}))
+			testing.expectf(t, err == compress.General_Error.Canceled && len(log.calls) == 2 && len(got) == 0, "%v cancel: %v, %v calls, %v bytes", label, err, len(log.calls), len(got))
+			log.cancel_at = 0
+
+			err = lzma_test_encode(&got, text, format, to_slice, {max_output_size = len(want) - 1})
+			testing.expectf(t, err == compress.General_Error.Output_Too_Short && len(got) == 0, "%v limit: %v, %v bytes", label, err, len(got))
+			err = lzma_test_encode(&got, text, format, to_slice, {max_output_size = len(want)})
+			testing.expectf(t, err == nil && bytes.equal(got[:], want[:]), "%v at the limit: %v", label, err)
+
+			for bad in LZMA_TEST_BAD_OPTIONS {
+				err = lzma_test_encode(&got, text, format, to_slice, bad)
+				testing.expectf(t, err == compress.General_Error.Incompatible_Options, "%v %v: %v", label, bad, err)
+			}
+
+			track: mem.Tracking_Allocator
+			mem.tracking_allocator_init(&track, context.allocator)
+			defer mem.tracking_allocator_destroy(&track)
+			clear(&got)
+			err = lzma_test_encode(&got, text, format, to_slice, {max_memory = 1 << 16}, mem.tracking_allocator(&track))
+			testing.expectf(t, err == compress.General_Error.Memory_Limit_Exceeded && track.total_memory_allocated == 0, "%v memory: %v, %v allocated", label, err, track.total_memory_allocated)
+		}
+		free_all(context.temp_allocator)
+	}
+
+	o := lzma.level_options(.Level_1)
+	want: [dynamic]byte
+	defer delete(want)
+	_, want_err := lzma.compress_lzma2(&want, text, o)
+	testing.expect_value(t, want_err, nil)
+	got: [dynamic]byte
+	defer delete(got)
+	append(&got, 'a', 'b', 'c')
+	_, err := lzma.compress_lzma2_append(&got, text, o, ppmd_progress_options(&log, {progress_interval = INTERVAL}))
+	testing.expectf(t, err == nil && string(got[:3]) == "abc" && bytes.equal(got[3:], want[:]), "lzma2 append encode: %v", err)
+	ppmd_progress_expect(t, "lzma2 append encode", log.calls[:], i64(len(text)), -1, i64(len(text)), i64(3 + len(want)))
+	codec_progress_expect_last(t, "lzma2 append encode", log.calls[:], i64(len(text)), i64(3 + len(want)))
+
+	resize(&got, 3)
+	_, err = lzma.compress_lzma2_append(&got, text, o, {max_output_size = 3 + len(want) - 1})
+	testing.expect_value(t, err, compress.General_Error.Output_Too_Short)
+	testing.expectf(t, string(got[:]) == "abc", "lzma2 append encode keeps the prefix on error: %q", got[:])
+	clear(&got)
+	append(&got, 'a', 'b', 'c')
+	_, err = lzma.compress_lzma2_append(&got, text, o, {max_output_size = 3 + len(want)})
+	testing.expectf(t, err == nil && bytes.equal(got[3:], want[:]), "lzma2 append encode at the limit: %v", err)
+	_, err = lzma.compress_lzma2_append(&got, text, o, {max_output_size = 2})
+	testing.expect_value(t, err, compress.General_Error.Output_Too_Short)
+}
+
+@(test)
+lzma_compress_raw_bound :: proc(t: ^testing.T) {
+	testing.expect_value(t, lzma.compress_raw_bound(-1), -1)
+	testing.expect_value(t, lzma.compress_raw_bound(max(int)), -1)
+	g := Lz4_Test_Lcg{state = 0x4c5a4f52}
+	for n in ([]int{0, 1, 2, 100, 4096, 70_000, 300_000}) {
+		testing.expect_value(t, lzma.compress_raw_bound(n) + lzma.HEADER_SIZE, lzma.compress_bound(n))
+		noise := lz4_test_lcg_bytes(&g, n)
+		defer delete(noise)
+		exact := make([]byte, lzma.compress_raw_bound(n))
+		defer delete(exact)
+		for level in ([]lzma.Level{.Level_0, .Level_5}) {
+			for end_marker in ([]bool{false, true}) {
+				o := lzma.level_options(level)
+				o.end_marker = end_marker
+				packed: [dynamic]byte
+				defer delete(packed)
+				_, err := lzma.compress_raw(&packed, noise, o)
+				testing.expectf(t, err == nil && len(packed) <= lzma.compress_raw_bound(n), "%v bytes, %v, end marker %v: %v, %v bytes packed", n, level, end_marker, err, len(packed))
+				written, _, slice_err := lzma.compress_raw(exact, noise, o)
+				testing.expectf(t, slice_err == nil && written == len(packed), "%v bytes, %v, end marker %v: slice %v, %v bytes", n, level, end_marker, slice_err, written)
+			}
+		}
+	}
 }

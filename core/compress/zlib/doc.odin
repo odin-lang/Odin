@@ -30,8 +30,8 @@ Example:
 		buf: [dynamic]byte
 		defer delete(buf)
 
-		// Use `deflate.inflate_raw` to inflate a raw DEFLATE stream instead of a ZLIB wrapped one.
-		err := deflate.inflate_zlib(&buf, ODIN_DEMO, OUTPUT_SIZE)
+		// Use `deflate.decompress_raw` to inflate a raw DEFLATE stream instead of a ZLIB wrapped one.
+		err := deflate.decompress_zlib(&buf, ODIN_DEMO, OUTPUT_SIZE)
 
 		if err != nil {
 			fmt.printf("\nError: %v\n", err)

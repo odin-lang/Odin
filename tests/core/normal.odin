@@ -11,7 +11,6 @@ download_assets :: proc "contextless" () {
 
 @(require) import "bytes"
 @(require) import "c/libc"
-@(require) import "compress"
 @(require) import "container"
 @(require) import "crypto/x509"
 @(require) import "diff"
@@ -27,6 +26,7 @@ download_assets :: proc "contextless" () {
 @(require) import "encoding/ini"
 @(require) import "encoding/json"
 @(require) import "encoding/json/differential"
+@(require) import "encoding/pem"
 @(require) import "encoding/uuid"
 @(require) import "encoding/varint"
 @(require) import "encoding/xml"
