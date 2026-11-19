@@ -1099,6 +1099,23 @@ gb_internal lbAddr lb_find_or_generate_context_ptr(lbProcedure *p) {
 	return c;
 }
 
+gb_internal LLVMValueRef lb_pointer_base(LLVMValueRef ptr) {
+	for (;;) {
+		if (LLVMIsAGetElementPtrInst(ptr) || LLVMIsABitCastInst(ptr) || LLVMIsAAddrSpaceCastInst(ptr)) {
+			ptr = LLVMGetOperand(ptr, 0);
+			continue;
+		}
+		if (LLVMIsAConstantExpr(ptr)) {
+			LLVMOpcode op = LLVMGetConstOpcode(ptr);
+			if (op == LLVMGetElementPtr || op == LLVMBitCast || op == LLVMAddrSpaceCast) {
+				ptr = LLVMGetOperand(ptr, 0);
+				continue;
+			}
+		}
+		return ptr;
+	}
+}
+
 gb_internal lbValue lb_address_from_load_or_generate_local(lbProcedure *p, lbValue value) {
 	if (!p->in_multi_assignment && LLVMIsALoadInst(value.value)) {
 		lbValue res = {};

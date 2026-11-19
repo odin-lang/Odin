@@ -2692,10 +2692,7 @@ gb_internal bool lb_is_large_plain_load(LLVMValueRef value) {
 }
 
 gb_internal bool lb_load_reads_alloca_after(lbProcedure *p, LLVMValueRef load, LLVMValueRef decl_marker) {
-	LLVMValueRef base = LLVMGetOperand(load, 0);
-	while (LLVMIsAGetElementPtrInst(base) || LLVMIsABitCastInst(base) || LLVMIsAAddrSpaceCastInst(base)) {
-		base = LLVMGetOperand(base, 0);
-	}
+	LLVMValueRef base = lb_pointer_base(LLVMGetOperand(load, 0));
 	if (!LLVMIsAAllocaInst(base)) {
 		return false;
 	}
