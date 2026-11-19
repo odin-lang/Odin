@@ -5,7 +5,8 @@ import "base:runtime"
 // PPMd var.I rev.1 by Dmitry Shkarin, after 7-Zip's `C/Ppmd8.c`. `Properties.variant = .I`.
 // Used by ZIP as method 98: its own carryless range coder, the 2-byte `wPPMd` header (order, memory
 // size in MiB and restore method) and an end marker.
-// When its memory runs out it restarts, cuts off or freezes the model, as the restore method says.
+// When its memory runs out it restarts or cuts off the model, as the restore method says.
+// Freezing (restore method 2) is rejected with `Unsupported_Restore_Method`.
 
 @(private)
 i_init :: proc(p: ^Model_I, props: Properties, allocator: runtime.Allocator) -> (err: Error) {
@@ -425,36 +426,6 @@ i_cut_off :: proc "contextless" (p: ^Model_I, ctx: ^Context_I, order: u32) -> u3
 }
 
 @(private)
-i_remove_bin_contexts :: proc "contextless" (p: ^Model_I, ctx: ^Context_I, order: u32) -> u32 #no_bounds_check {
-	if ctx.num_stats == 0 {
-		s := i_one_state(ctx)
-		successor := get_successor(s)
-		if uintptr(ptr_at(&p.sub_alloc, successor)) >= uintptr(p.sub_alloc.units_start) && order < p.max_order {
-			successor = i_remove_bin_contexts(p, i_ctx(p, successor), order + 1)
-		} else {
-			successor = 0
-		}
-		set_successor(s, successor)
-		suffix := i_suffix(p, ctx)
-		if successor == 0 && (suffix.num_stats == 0 || suffix.flags == 0xFF) {
-			i_free_units(p, ctx, 1)
-			return 0
-		}
-	} else {
-		for k := int(ctx.num_stats); k >= 0; k -= 1 {
-			s := &i_stats(p, ctx)[k]
-			successor := get_successor(s)
-			if uintptr(ptr_at(&p.sub_alloc, successor)) >= uintptr(p.sub_alloc.units_start) && order < p.max_order {
-				set_successor(s, i_remove_bin_contexts(p, i_ctx(p, successor), order + 1))
-			} else {
-				set_successor(s, 0)
-			}
-		}
-	}
-	return ref_of(&p.sub_alloc, ctx)
-}
-
-@(private)
 i_used_memory :: proc "contextless" (p: ^Model_I) -> u32 #no_bounds_check {
 	v: u32
 	for i in 0..<u32(NUM_INDEXES) {
@@ -464,7 +435,7 @@ i_used_memory :: proc "contextless" (p: ^Model_I) -> u32 #no_bounds_check {
 }
 
 @(private)
-i_restore_model :: proc "contextless" (p: ^Model_I, ctx_error: ^Context_I, f_successor: ^Context_I) {
+i_restore_model :: proc "contextless" (p: ^Model_I, ctx_error: ^Context_I) {
 	p.sub_alloc.text = forward(p.sub_alloc.base, p.sub_alloc.align_offset)
 
 	c := p.max_context
@@ -490,22 +461,7 @@ i_restore_model :: proc "contextless" (p: ^Model_I, ctx_error: ^Context_I, f_suc
 		}
 	}
 
-	if p.restore_method > RESTORE_FREEZE {
-		if f_successor == nil || uintptr(f_successor) < uintptr(p.sub_alloc.units_start) {
-			i_restart_model(p)
-		} else {
-			p.max_context = f_successor
-			p.sub_alloc.glue_count += u32(p.stamps[1] & 1 == 0)
-		}
-	} else if p.restore_method == RESTORE_FREEZE {
-		for p.max_context.suffix != 0 {
-			p.max_context = i_suffix(p, p.max_context)
-		}
-		i_remove_bin_contexts(p, p.max_context, 0)
-		p.restore_method = RESTORE_FREEZE + 1
-		p.sub_alloc.glue_count     = 0
-		p.order_fall     = p.max_order
-	} else if p.restore_method == u32(Restore_Method.Restart) || i_used_memory(p) < p.sub_alloc.size >> 1 {
+	if p.restore_method == u32(Restore_Method.Restart) || i_used_memory(p) < p.sub_alloc.size >> 1 {
 		i_restart_model(p)
 	} else {
 		for p.max_context.suffix != 0 {
@@ -640,14 +596,6 @@ i_reduce_order :: proc "contextless" (p: ^Model_I, s1: ^State, c: ^Context_I) ->
 			s1 = nil
 		} else {
 			if c.suffix == 0 {
-				if p.restore_method > RESTORE_FREEZE {
-					for num_ps > 0 {
-						num_ps -= 1
-						set_successor(ps[num_ps], ref_of(&p.sub_alloc, c))
-					}
-					p.sub_alloc.text       = forward(p.sub_alloc.base, p.sub_alloc.align_offset + 1)
-					p.order_fall = 1
-				}
 				return c
 			}
 			c = i_suffix(p, c)
@@ -675,16 +623,7 @@ i_reduce_order :: proc "contextless" (p: ^Model_I, s1: ^State, c: ^Context_I) ->
 		p.order_fall += 1
 	}
 
-	if p.restore_method > RESTORE_FREEZE {
-		c = i_ctx(p, get_successor(s))
-		for num_ps > 0 {
-			num_ps -= 1
-			set_successor(ps[num_ps], ref_of(&p.sub_alloc, c))
-		}
-		p.sub_alloc.text       = forward(p.sub_alloc.base, p.sub_alloc.align_offset + 1)
-		p.order_fall = 1
-		return c
-	} else if get_successor(s) <= up_branch {
+	if get_successor(s) <= up_branch {
 		s2 := p.found_state
 		p.found_state = s
 		successor := i_create_successors(p, false, nil, c)
@@ -746,7 +685,7 @@ i_update_model :: proc "contextless" (p: ^Model_I) #no_bounds_check {
 		cs := i_create_successors(p, true, s, p.min_context)
 		if cs == nil {
 			set_successor(p.found_state, 0)
-			i_restore_model(p, c, i_ctx(p, min_successor))
+			i_restore_model(p, c)
 			return
 		}
 		set_successor(p.found_state, ref_of(&p.sub_alloc, cs))
@@ -758,7 +697,7 @@ i_update_model :: proc "contextless" (p: ^Model_I) #no_bounds_check {
 	p.sub_alloc.text[0] = fs.symbol
 	p.sub_alloc.text = forward(p.sub_alloc.text, 1)
 	if uintptr(p.sub_alloc.text) >= uintptr(p.sub_alloc.units_start) {
-		i_restore_model(p, c, i_ctx(p, min_successor))
+		i_restore_model(p, c)
 		return
 	}
 	max_successor := ref_of(&p.sub_alloc, p.sub_alloc.text)
@@ -766,14 +705,14 @@ i_update_model :: proc "contextless" (p: ^Model_I) #no_bounds_check {
 	if min_successor == 0 {
 		cs := i_reduce_order(p, s, p.min_context)
 		if cs == nil {
-			i_restore_model(p, c, nil)
+			i_restore_model(p, c)
 			return
 		}
 		min_successor = ref_of(&p.sub_alloc, cs)
 	} else if uintptr(ptr_at(&p.sub_alloc, min_successor)) < uintptr(p.sub_alloc.units_start) {
 		cs := i_create_successors(p, false, s, p.min_context)
 		if cs == nil {
-			i_restore_model(p, c, nil)
+			i_restore_model(p, c)
 			return
 		}
 		min_successor = ref_of(&p.sub_alloc, cs)
@@ -785,10 +724,6 @@ i_update_model :: proc "contextless" (p: ^Model_I) #no_bounds_check {
 		if p.max_context != p.min_context {
 			p.sub_alloc.text = backward(p.sub_alloc.text, 1)
 		}
-	} else if p.restore_method > RESTORE_FREEZE {
-		max_successor = min_successor
-		p.sub_alloc.text        = forward(p.sub_alloc.base, p.sub_alloc.align_offset)
-		p.order_fall  = 0
 	}
 
 	flag := u8(hi_bits_flag_3(f_symbol))
@@ -805,7 +740,7 @@ i_update_model :: proc "contextless" (p: ^Model_I) #no_bounds_check {
 				if i != u2i(&p.sub_alloc, old_nu + 1) {
 					ptr := i_alloc_units(p, i + 1)
 					if ptr == nil {
-						i_restore_model(p, c, i_ctx(p, min_successor))
+						i_restore_model(p, c)
 						return
 					}
 					old_ptr := i_stats(p, c)
@@ -819,7 +754,7 @@ i_update_model :: proc "contextless" (p: ^Model_I) #no_bounds_check {
 		} else {
 			one_copy := (^State)(i_alloc_units(p, 0))
 			if one_copy == nil {
-				i_restore_model(p, c, i_ctx(p, min_successor))
+				i_restore_model(p, c)
 				return
 			}
 			one  := i_one_state(c)
@@ -871,7 +806,7 @@ i_rescale :: proc "contextless" (p: ^Model_I) #no_bounds_check {
 
 	sum_freq := u32(stats[0].freq)
 	esc_freq := u32(mc.summ_freq) - sum_freq
-	adder    := u32(p.order_fall != 0) | u32(p.restore_method > RESTORE_FREEZE)
+	adder    := u32(p.order_fall != 0)
 	sum_freq = (sum_freq + 4 + adder) >> 1
 	i := u32(mc.num_stats)
 	stats[0].freq = u8(sum_freq)

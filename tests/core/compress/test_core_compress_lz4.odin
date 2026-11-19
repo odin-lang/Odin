@@ -165,6 +165,23 @@ compress_lz4_concatenated_frames :: proc(t: ^testing.T) {
 	defer delete(only_skippable)
 	append(&only_skippable, ..skippable[:])
 	lz4_test_unpack_frame(t, "skippable only", only_skippable[:], nil)
+
+	truncated: [dynamic]byte
+	defer delete(truncated)
+	append(&truncated, ..LZ4_VECTOR_B5)
+	append(&truncated, ..skippable[:len(skippable) - 1])
+	for kind in Stream_Kind {
+		input := truncated[:]
+		br: bytes.Reader
+		tr: Trickle_Reader
+		output: [dynamic]byte
+		defer delete(output)
+		ctx := stream_test_context(kind, &input, &br, &tr, &output)
+		defer compress.destroy_context(&ctx)
+		err := lz4.decompress_frame(&ctx)
+		testing.expectf(t, err == compress.General_Error.Stream_Too_Short, "truncated skippable frame, %v: decompress_frame returned %v", kind, err)
+		testing.expectf(t, bytes.equal(output[:], inputs.text), "truncated skippable frame, %v: output differs (%v vs %v bytes)", kind, len(output), len(inputs.text))
+	}
 }
 
 @(test)
@@ -265,10 +282,12 @@ compress_lz4_block_output_too_short :: proc(t: ^testing.T) {
 	s := new(lz4.LZ4)
 	defer free(s)
 	input  := transmute([]byte)context_test_data
-	output := make([]byte, lz4.compress_block_bound(len(input)) - 1)
+	output := make([]byte, lz4.compress_block_bound(len(input)))
 	defer delete(output)
 
-	_, err := lz4.compress_block(s, output, input)
+	n, err := lz4.compress_block(s, output, input)
+	testing.expect_value(t, err, nil)
+	_, err = lz4.compress_block(s, output[:n - 1], input)
 	testing.expect_value(t, err, compress.Error(compress.General_Error.Output_Too_Short))
 }
 
@@ -327,13 +346,13 @@ compress_lz4_dictionary_round_trip :: proc(t: ^testing.T) {
 		defer delete(plain)
 		defer delete(packed)
 		plain_n, _ := lz4.compress_block(s, plain, inputs.text, level)
-		n, err := lz4.compress_block(s, packed, inputs.text, level, inputs.dictionary)
+		n, err := lz4.compress_block(s, packed, inputs.text, level, dictionary = inputs.dictionary)
 		testing.expectf(t, err == nil, "%v: compress_block with dictionary returned %v", level, err)
 		testing.expectf(t, n < plain_n, "%v: dictionary did not help (%v vs %v)", level, n, plain_n)
 
 		output := make([]byte, len(inputs.text))
 		defer delete(output)
-		w, unpack_err := lz4.decompress_block_to_slice(output, packed[:n], inputs.dictionary)
+		w, unpack_err := lz4.decompress_block_to_slice(output, packed[:n], dictionary = inputs.dictionary)
 		testing.expectf(t, unpack_err == nil && w == len(output) && bytes.equal(output, inputs.text), "%v: dictionary round trip failed (%v)", level, unpack_err)
 
 		_, missing_err := lz4.decompress_block_to_slice(output, packed[:n])
@@ -351,7 +370,7 @@ compress_lz4_dictionary_round_trip :: proc(t: ^testing.T) {
 			packed: [dynamic]byte
 			defer delete(packed)
 			options := lz4.Frame_Options{block_max_size = .Max_64KiB, flags = lz4.DEFAULT_FRAME_FLAGS + ({.Independent_Blocks} if independent else {}), dictionary_id = 0x12345678}
-			err := lz4.compress_frame(&packed, data[:], level, options, inputs.dictionary)
+			err := lz4.compress_frame(&packed, data[:], level, options, dictionary = inputs.dictionary)
 			testing.expectf(t, err == nil, "%v, %v: compress_frame with dictionary returned %v", independent, level, err)
 			lz4_test_unpack_frame(t, "dictionary frame", packed[:], data[:], inputs.dictionary)
 		}
@@ -403,7 +422,7 @@ compress_lz4_frame_errors :: proc(t: ^testing.T) {
 	sized[6] += 1
 	sized[14] = u8(xxhash.XXH32(sized[4:14]) >> 8)
 	clear(&output)
-	testing.expect_value(t, lz4.decompress_frame(&output, sized[:n]), compress.Error(lz4.LZ4_Error.Content_Size_Mismatch))
+	testing.expect_value(t, lz4.decompress_frame(&output, sized[:n]), compress.Error(compress.General_Error.Size_Mismatch))
 
 	oversized := []byte{0x04, 0x22, 0x4d, 0x18, 0x40, 0x40, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00}
 	oversized[6] = u8(xxhash.XXH32(oversized[4:6]) >> 8)

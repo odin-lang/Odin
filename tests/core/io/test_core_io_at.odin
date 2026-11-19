@@ -11,6 +11,8 @@ Chunked_Reader :: struct {
 	r:           bytes.Reader,
 	chunk:       int,
 	has_read_at: bool,
+	hiccups:     int,
+	pending:     int,
 }
 
 @(private="file")
@@ -19,11 +21,21 @@ chunked_reader_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte
 	inner := bytes.reader_to_stream(&c.r)
 	#partial switch mode {
 	case .Read:
+		if c.pending < c.hiccups {
+			c.pending += 1
+			return 0, nil
+		}
+		c.pending = 0
 		return inner.procedure(inner.data, .Read, p[:min(len(p), c.chunk)], offset, whence)
 	case .Read_At:
 		if !c.has_read_at {
 			return 0, .Unsupported
 		}
+		if c.pending < c.hiccups {
+			c.pending += 1
+			return 0, nil
+		}
+		c.pending = 0
 		return inner.procedure(inner.data, .Read_At, p[:min(len(p), c.chunk)], offset, whence)
 	case .Seek, .Size:
 		return inner.procedure(inner.data, mode, p, offset, whence)
@@ -46,10 +58,12 @@ chunked_reader_init :: proc(c: ^Chunked_Reader, data: []byte, chunk: int, has_re
 
 @(private="file")
 Chunked_Writer :: struct {
-	data:  [64]byte,
-	pos:   i64,
-	size:  i64,
-	chunk: int,
+	data:     [64]byte,
+	pos:      i64,
+	size:     i64,
+	chunk:    int,
+	stuck:    bool,
+	stuck_at: i64,
 }
 
 @(private="file")
@@ -57,6 +71,9 @@ chunked_writer_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte
 	c := (^Chunked_Writer)(stream_data)
 	#partial switch mode {
 	case .Write:
+		if c.stuck && c.pos >= c.stuck_at {
+			return 0, nil
+		}
 		if c.pos >= i64(len(c.data)) {
 			return 0, .Short_Write
 		}
@@ -151,6 +168,35 @@ test_read_at_fallback :: proc(t: ^testing.T) {
 	testing.expect_value(t, n, 4)
 	testing.expect_value(t, err, nil)
 	testing.expect(t, bytes.equal(buf[:4], data[10:14]))
+}
+
+@test
+test_read_at_fallback_stall :: proc(t: ^testing.T) {
+	data: [100]byte
+	for i in 0..<len(data) {
+		data[i] = byte(i)
+	}
+
+	for hiccups in ([]int{3, 100, 101, max(int)}) {
+		c: Chunked_Reader
+		s := chunked_reader_init(&c, data[:], 7, false)
+		c.hiccups = hiccups
+		pos, seek_err := io.seek(s, 10, .Start)
+		testing.expect_value(t, pos, 10)
+		testing.expect_value(t, seek_err, nil)
+
+		buf: [64]byte
+		n, err := io.read_at(s, buf[:], 30)
+		if hiccups > 100 {
+			testing.expect_value(t, n, 0)
+			testing.expect_value(t, err, io.Error.No_Progress)
+		} else {
+			testing.expect_value(t, n, 64)
+			testing.expect_value(t, err, nil)
+			testing.expect(t, bytes.equal(buf[:], data[30:94]))
+		}
+		expect_position(t, s, 10)
+	}
 }
 
 @test
@@ -285,4 +331,85 @@ test_write_at_fallback :: proc(t: ^testing.T) {
 	testing.expect_value(t, n, 1)
 	testing.expect_value(t, err, nil)
 	testing.expect_value(t, string(c.data[:10]), "01XY4Q6789")
+}
+
+@test
+test_read_full_stall :: proc(t: ^testing.T) {
+	data: [100]byte
+	for i in 0..<len(data) {
+		data[i] = byte(i) ~ 0x5a
+	}
+
+	for has_read_at in ([]bool{false, true}) {
+		for hiccups in ([]int{0, 3, 100, 101, max(int)}) {
+			c: Chunked_Reader
+			s := chunked_reader_init(&c, data[:], 7, has_read_at)
+			c.hiccups = hiccups
+
+			buf: [64]byte
+			n, err := io.read_full(s, buf[:])
+			if hiccups > 100 {
+				testing.expectf(t, n == 0 && err == .No_Progress, "read_full, %d hiccups: %d %v", hiccups, n, err)
+			} else {
+				testing.expectf(t, n == 64 && err == nil, "read_full, %d hiccups: %d %v", hiccups, n, err)
+				testing.expect(t, bytes.equal(buf[:], data[:64]))
+			}
+
+			c.pending = 0
+			buf = {}
+			n, err = io.read_full_at(s, buf[:], 30)
+			if hiccups > 100 {
+				testing.expectf(t, n == 0 && err == .No_Progress, "read_full_at %v, %d hiccups: %d %v", has_read_at, hiccups, n, err)
+			} else {
+				testing.expectf(t, n == 64 && err == nil, "read_full_at %v, %d hiccups: %d %v", has_read_at, hiccups, n, err)
+				testing.expect(t, bytes.equal(buf[:], data[30:94]))
+			}
+		}
+	}
+}
+
+@test
+test_copy_stall :: proc(t: ^testing.T) {
+	data: [100]byte
+	for i in 0..<len(data) {
+		data[i] = byte(i) * 3
+	}
+
+	for hiccups in ([]int{0, 3, 100, 101, max(int)}) {
+		c: Chunked_Reader
+		s := chunked_reader_init(&c, data[:], 7, false)
+		c.hiccups = hiccups
+		out := strings.builder_make()
+		defer strings.builder_destroy(&out)
+		written, err := io.copy(strings.to_writer(&out), s)
+		if hiccups > 100 {
+			testing.expectf(t, written == 0 && err == .No_Progress, "%d hiccups: %d %v", hiccups, written, err)
+		} else {
+			testing.expectf(t, written == 100 && err == nil, "%d hiccups: %d %v", hiccups, written, err)
+			testing.expect(t, bytes.equal(out.buf[:], data[:]))
+		}
+	}
+}
+
+@test
+test_write_full_stall :: proc(t: ^testing.T) {
+	src := "0123456789abcdef"
+	for stuck_at in ([]i64{0, 7, 14}) {
+		c := Chunked_Writer{chunk = 7, stuck = true, stuck_at = stuck_at}
+		s := io.Stream{procedure = chunked_writer_proc, data = &c}
+		n, err := io.write_full(s, transmute([]byte)src)
+		testing.expectf(t, i64(n) == stuck_at && err == .Short_Write, "stuck at %d: %d %v", stuck_at, n, err)
+		testing.expect_value(t, string(c.data[:n]), src[:n])
+	}
+
+	c := Chunked_Writer{chunk = 7, stuck = true, stuck_at = 10}
+	s := io.Stream{procedure = chunked_writer_proc, data = &c}
+	pos, seek_err := io.seek(s, 1, .Start)
+	testing.expect_value(t, pos, 1)
+	testing.expect_value(t, seek_err, nil)
+	n, err := io.write_at(s, transmute([]byte)src, 3)
+	testing.expect_value(t, n, 7)
+	testing.expect_value(t, err, io.Error.Short_Write)
+	testing.expect_value(t, string(c.data[3:10]), src[:7])
+	expect_position(t, s, 1)
 }

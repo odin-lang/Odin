@@ -119,7 +119,7 @@ text :: proc(c: image.PNG_Chunk) -> (res: Text, ok: bool) {
 
 		// Set up ZLIB context and decompress text payload.
 		buf: [dynamic]u8
-		zlib_error := deflate.inflate_zlib(&buf, fields[2])
+		zlib_error := deflate.decompress_zlib(&buf, fields[2])
 		defer delete(buf)
 		if zlib_error != nil {
 			ok = false; return
@@ -173,7 +173,7 @@ text :: proc(c: image.PNG_Chunk) -> (res: Text, ok: bool) {
 		} else {
 			// Set up ZLIB context and decompress text payload.
 			buf: [dynamic]u8
-			zlib_error := deflate.inflate_zlib(&buf, rest)
+			zlib_error := deflate.decompress_zlib(&buf, rest)
 			defer delete(buf)
 			if zlib_error != nil {
 
@@ -216,7 +216,7 @@ iccp :: proc(c: image.PNG_Chunk) -> (res: iCCP, ok: bool) {
 
 	// Set up ZLIB context and decompress iCCP payload
 	buf: [dynamic]u8
-	zlib_error := deflate.inflate_zlib(&buf, fields[2])
+	zlib_error := deflate.decompress_zlib(&buf, fields[2])
 	if zlib_error != nil {
 		delete(buf)
 		return

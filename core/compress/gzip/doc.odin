@@ -38,13 +38,13 @@ Example:
 
 		if len(os.args) < 2 {
 			stderr("No input file specified.\n")
-			err := deflate.inflate_gzip(&buf, TEST)
+			err := deflate.decompress_gzip(&buf, TEST)
 			if err == nil {
 				stdout("Displaying test vector: \"")
 				stdout(string(buf[:]))
 				stdout("\"\n")
 			} else {
-				fmt.printf("deflate.inflate_gzip returned %v\n", err)
+				fmt.printf("deflate.decompress_gzip returned %v\n", err)
 			}
 			delete(buf)
 			os.exit(0)
@@ -58,7 +58,7 @@ Example:
 				// Read from stdin
 				ctx := compress.init_context(os.to_stream(os.stdin), &buf)
 				defer compress.destroy_context(&ctx)
-				err = deflate.inflate_gzip(&ctx)
+				err = deflate.decompress_gzip(&ctx)
 			} else {
 				data, read_err := os.read_entire_file(file, context.allocator)
 				defer delete(data)
@@ -68,7 +68,7 @@ Example:
 					stderr("\n")
 					os.exit(1)
 				}
-				err = deflate.inflate_gzip(&buf, data)
+				err = deflate.decompress_gzip(&buf, data)
 			}
 			if err != nil {
 				stderr("GZIP returned an error.\n")
