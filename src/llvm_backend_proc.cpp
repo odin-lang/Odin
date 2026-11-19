@@ -1,5 +1,6 @@
 gb_internal LLVMValueRef lb_coerce_fields_load(lbProcedure *p, lbValue x, lbArgType const *arg);
 gb_internal LLVMValueRef lb_coerce_fields_store(lbProcedure *p, LLVMValueRef coerced, Type *original_type, lbArgType const *arg);
+gb_internal lbValue      lb_copy_indirect_param(lbProcedure *p, lbValue ptr);
 
 gb_internal LLVMValueRef lb_call_intrinsic(lbProcedure *p, const char *name, LLVMValueRef* args, unsigned arg_count, LLVMTypeRef* types, unsigned type_count) {
 	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
@@ -252,6 +253,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	p->lifetime_locals.allocator         = a;
 	p->multi_assign_copy_slots.allocator = a;
 	p->lifetime_scopes.allocator         = a;
+	p->pending_copies.allocator          = a;
 	// map_init(&p->selector_values,  0);
 	// map_init(&p->selector_addr,    0);
 	// map_init(&p->tuple_fix_map,    0);
@@ -580,6 +582,7 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 	p->lifetime_locals.allocator         = a;
 	p->multi_assign_copy_slots.allocator = a;
 	p->lifetime_scopes.allocator         = a;
+	p->pending_copies.allocator          = a;
 	map_init(&p->tuple_fix_map, 0);
 
 
@@ -869,9 +872,6 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 
 						if (is_odin_cc) {
 							do_callee_copy = sz <= 16;
-							if (build_context.internal_by_value) {
-								do_callee_copy = true;
-							}
 						}
 
 						bool realign =arg_type->is_byval && type_align_of(e->type) > arg_type->byval_alignment;
@@ -892,6 +892,8 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 								lb_mem_copy_non_overlapping(p, new_ptr, ptr, lb_const_int(p->module, t_uint, sz));
 							}
 							ptr = new_ptr;
+						} else if (build_context.internal_by_value && is_odin_cc) {
+							ptr = lb_copy_indirect_param(p, ptr);
 						}
 
 						lb_add_entity(p->module, e, ptr);
@@ -1000,6 +1002,173 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 	}
 }
 
+// NOTE(bill, 2026-11-19): -internal-by-value:
+// The caller copies an indirect Odin argument when something could write it during the call.
+// It passes the original address of a constant, a temporary, or a local whose address never escapes.
+// The callee keeps each indirect parameter in a local copy, and forwarding that local follows the same rule.
+// A copy is made up front and dropped at the end of the procedure if its local's address did not escape.
+// A parameter whose address escapes (e.g. boxed in an `any`) keeps its copy: writes through that address never reach the caller.
+gb_internal lbPendingCopy lb_copy_to_new_local(lbProcedure *p, LLVMValueRef src, Type *type) {
+	unsigned     align = cast(unsigned)type_align_of(type);
+	LLVMValueRef size  = lb_const_int(p->module, t_uint, type_size_of(type)).value;
+
+	// NOTE(bill): The copy starts with exactly the alignment the original address has.
+	// Loads and stores through it must stay valid when the copy is dropped.
+	lbPendingCopy c = {};
+	c.temp  = llvm_alloca(p, lb_type(p->module, type), align, "");
+	c.copy  = LLVMBuildMemCpy(p->builder, c.temp, align, src, align, size);
+	c.src   = src;
+	c.align = align;
+	return c;
+}
+
+gb_internal lbValue lb_copy_indirect_param(lbProcedure *p, lbValue ptr) {
+	lbPendingCopy c = lb_copy_to_new_local(p, ptr.value, type_deref(ptr.type));
+	c.local = c.temp;
+	array_add(&p->pending_copies, c);
+	return lbValue{c.temp, ptr.type};
+}
+
+gb_internal lbValue lb_copy_indirect_arg_if_aliased(lbProcedure *p, lbValue x, lbValue ptr) {
+	if (!LLVMIsALoadInst(x.value) || LLVMGetOperand(x.value, 0) != ptr.value) {
+		return ptr;
+	}
+
+	LLVMValueRef base = lb_pointer_base(ptr.value);
+	if (LLVMIsAGlobalVariable(base) && LLVMIsGlobalConstant(base)) {
+		return ptr;
+	}
+
+	lbPendingCopy c = lb_copy_to_new_local(p, ptr.value, x.type);
+	if (LLVMIsAAllocaInst(base)) {
+		c.local = base;
+		array_add(&p->pending_copies, c);
+	}
+	return lbValue{c.temp, ptr.type};
+}
+
+gb_internal void lb_set_uncaptured_args(lbProcedure *p, LLVMValueRef call, u64 mask) {
+	if (!build_context.internal_by_value) {
+		return;
+	}
+	if (mask == 0) {
+		return;
+	}
+	map_set(&p->uncaptured_arg_masks, call, mask);
+}
+
+gb_internal String lb_called_function_name(LLVMValueRef call) {
+	LLVMValueRef callee = LLVMGetCalledValue(call);
+	if (callee == nullptr) {
+		return {};
+	}
+	if (!LLVMIsAFunction(callee)) {
+		return {};
+	}
+
+	size_t len = 0;
+	char const *name = LLVMGetValueName2(callee, &len);
+	return make_string(cast(u8 const *)name, cast(isize)len);
+}
+
+gb_internal bool lb_is_memory_intrinsic_call(LLVMValueRef call) {
+	String s = lb_called_function_name(call);
+	if (!string_starts_with(s, str_lit("llvm."))) {
+		return s == "memmove" || s == "memcpy" || s == "memset";
+	}
+	return string_starts_with(s, str_lit("llvm.memcpy"))    ||
+	       string_starts_with(s, str_lit("llvm.memmove"))   ||
+	       string_starts_with(s, str_lit("llvm.memset"))    ||
+	       string_starts_with(s, str_lit("llvm.lifetime.")) ||
+	       string_starts_with(s, str_lit("llvm.dbg."));
+}
+
+gb_internal bool lb_pointer_may_escape(lbProcedure *p, LLVMValueRef ptr) {
+	for (LLVMUseRef use = LLVMGetFirstUse(ptr); use != nullptr; use = LLVMGetNextUse(use)) {
+		LLVMValueRef user = LLVMGetUser(use);
+		if (LLVMIsALoadInst(user)) {
+			continue;
+		}
+		if (LLVMIsAStoreInst(user)) {
+			if (LLVMGetOperand(user, 0) == ptr) {
+				return true;
+			}
+			continue;
+		}
+		if (LLVMIsAGetElementPtrInst(user) || LLVMIsABitCastInst(user) || LLVMIsAAddrSpaceCastInst(user)) {
+			if (LLVMGetOperand(user, 0) != ptr) {
+				return true;
+			}
+			if (lb_pointer_may_escape(p, user)) {
+				return true;
+			}
+			continue;
+		}
+		if (!LLVMIsACallInst(user)) {
+			return true;
+		}
+		if (lb_is_memory_intrinsic_call(user)) {
+			continue;
+		}
+		if (LLVMGetCalledValue(user) == ptr) {
+			return true;
+		}
+
+		u64 *mask = map_get(&p->uncaptured_arg_masks, user);
+		unsigned n = cast(unsigned)LLVMGetNumArgOperands(user);
+		for (unsigned i = 0; i < n; i++) {
+			if (LLVMGetOperand(user, i) != ptr) {
+				continue;
+			}
+			if (mask == nullptr || i >= 64 || (*mask & (1ull<<i)) == 0) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+gb_internal void lb_drop_unneeded_copies(lbProcedure *p) {
+	PtrMap<LLVMValueRef, bool> escapes = {};
+
+	// NOTE(bill): Backwards: the copies made from a parameter's local are dropped before the parameter's own copy.
+	for (isize i = p->pending_copies.count-1; i >= 0; i -= 1) {
+		lbPendingCopy const &c = p->pending_copies[i];
+
+		bool  escaped = false;
+		bool *found   = map_get(&escapes, c.local);
+		if (found != nullptr) {
+			escaped = *found;
+		} else {
+			escaped = lb_pointer_may_escape(p, c.local);
+			map_set(&escapes, c.local, escaped);
+		}
+		if (escaped) {
+			continue;
+		}
+		// NOTE(bill): e.g. array arithmetic raised the copy's alignment for its vector loads.
+		// The original address need not have that alignment.
+		if (LLVMGetAlignment(c.temp) != c.align) {
+			continue;
+		}
+
+		LLVMInstructionEraseFromParent(c.copy);
+		for (LLVMUseRef use = LLVMGetFirstUse(c.temp); use != nullptr; /**/) {
+			LLVMValueRef user = LLVMGetUser(use);
+			use = LLVMGetNextUse(use);
+			if (LLVMIsACallInst(user) && string_starts_with(lb_called_function_name(user), str_lit("llvm.lifetime."))) {
+				LLVMInstructionEraseFromParent(user);
+			}
+		}
+		LLVMReplaceAllUsesWith(c.temp, c.src);
+		LLVMInstructionEraseFromParent(c.temp);
+	}
+	map_destroy(&escapes);
+
+	array_free(&p->pending_copies);
+	map_destroy(&p->uncaptured_arg_masks);
+}
+
 gb_internal void lb_end_procedure_body(lbProcedure *p) {
 	lb_set_debug_position_to_procedure_begin(p);
 
@@ -1029,6 +1198,10 @@ gb_internal void lb_end_procedure_body(lbProcedure *p) {
 			LLVMPositionBuilderAtEnd(p->builder, block);
 			LLVMBuildUnreachable(p->builder);
 		}
+	}
+
+	if (build_context.internal_by_value) {
+		lb_drop_unneeded_copies(p);
 	}
 
 	p->curr_block = nullptr;
@@ -1393,6 +1566,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 		bool return_by_pointer = ft->ret.kind == lbArg_Indirect;
 		bool split_returns = ft->multiple_return_original_type != nullptr;
 
+		u64 uncaptured_arg_mask = 0; // positions in processed_args
 		unsigned param_index = 0;
 		for (isize i = 0; i < param_count; i++) {
 			Entity *e = pt->Proc.params->Tuple.variables[i];
@@ -1456,9 +1630,15 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 					} else {
 						// the callee assumes ptr is aligned to type_align_of(T)
 						ptr = lb_aligned_address_from_load_or_generate_local(p, x);
+						if (build_context.internal_by_value && type_size_of(original_type) > 16) {
+							ptr = lb_copy_indirect_arg_if_aliased(p, x, ptr);
+						}
 					}
 				} else {
 					ptr = lb_copy_value_to_ptr(p, x, original_type, 16);
+				}
+				if ((arg->is_byval || is_odin_cc) && processed_args.count < 63) {
+					uncaptured_arg_mask |= 1ull<<processed_args.count;
 				}
 				array_add(&processed_args, ptr);
 			}
@@ -1491,10 +1671,19 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			} else {
 				return_ptr = lb_add_local_generated(p, rt, true).addr;
 			}
-			lb_emit_call_internal(p, value, return_ptr, processed_args, nullptr, context_ptr, inlining, tailing);
+			lbValue call = lb_emit_call_internal(p, value, return_ptr, processed_args, nullptr, context_ptr, inlining, tailing);
+
+			// NOTE(bill): An Odin callee sees its result slot only as its own local.
+			// No valid pointer to the slot outlives the call.
+			u64 mask = uncaptured_arg_mask << 1;
+			if (is_odin_cc) {
+				mask |= 1;
+			}
+			lb_set_uncaptured_args(p, call.value, mask);
 			result = lb_emit_load(p, return_ptr);
 		} else if (rt != nullptr) {
 			result = lb_emit_call_internal(p, value, {}, processed_args, rt, context_ptr, inlining, tailing);
+			lb_set_uncaptured_args(p, result.value, uncaptured_arg_mask);
 			if (ft->ret.coerce_offsets.count > 0) {
 				result.value = lb_coerce_fields_store(p, result.value, rt, &ft->ret);
 			} else {
@@ -1511,7 +1700,8 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 				result = lb_emit_conv(p, result, rt);
 			}
 		} else {
-			lb_emit_call_internal(p, value, {}, processed_args, nullptr, context_ptr, inlining, tailing);
+			lbValue call = lb_emit_call_internal(p, value, {}, processed_args, nullptr, context_ptr, inlining, tailing);
+			lb_set_uncaptured_args(p, call.value, uncaptured_arg_mask);
 		}
 
 		if (original_rt != rt) {

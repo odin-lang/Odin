@@ -381,6 +381,14 @@ struct lbGlobalVariable {
 };
 
 
+struct lbPendingCopy {
+	LLVMValueRef temp;
+	LLVMValueRef copy;
+	LLVMValueRef src;
+	LLVMValueRef local; // the copy is kept if this local's address escapes
+	unsigned     align;
+};
+
 struct lbProcedure {
 	u32 flags;
 	u16 state_flags;
@@ -457,6 +465,10 @@ struct lbProcedure {
 	lbProcedure *objc_names;
 
 	Type *internal_gen_type; // map_set, map_get, etc.
+
+	// -internal-by-value
+	PtrMap<LLVMValueRef, u64> uncaptured_arg_masks;
+	Array<lbPendingCopy>      pending_copies;
 };
 
 
