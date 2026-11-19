@@ -21,6 +21,13 @@ The checksums must match between compilers: they double as a correctness check.
 | `diff`              | `core:diff` Myers and histogram diffs of two texts                 |
 | `sha256`            | `core:crypto/hash`: a leaf-heavy control                           |
 | `log_off_in_callee` | filtered-out logging of a large parameter that is then passed on   |
+| `linalg`            | `core:math/linalg` with `matrix`, quaternions, and an `#soa` slice |
+| `csv`               | `core:encoding/csv` reading through `bufio`, then writing back     |
+| `dijkstra`          | shortest paths on a grid with `core:container/priority_queue`      |
+| `compress`          | deflate compression, plus LZ4 and QOI round trips                  |
+| `datetime`          | `core:time/datetime` day-to-date conversions and date arithmetic   |
+| `cbor`              | `core:encoding/cbor` round trips of the JSON records               |
+| `unicode`           | rune classification and case mapping of mixed-script text          |
 
 ## Comparing two compilers
 
@@ -54,14 +61,16 @@ It prints `name milliseconds checksum` for each named workload, or for all of th
 - **Library.** Each compiler builds against the library it finds: `ODIN_ROOT`, or its own folder.
   Two trees can then run different library code.
   `-root` builds both against one tree; its `base:runtime` must suit both compilers.
-- **Corpus.** `odin_parse` and `gzip` embed ten `core` directories with `#load_directory`, relative to this folder.
+- **Corpus.** `odin_parse`, `gzip`, and `compress` embed ten `core` directories with `#load_directory`, relative to this folder.
   Both builds in a run see the same bytes.
   The corpus follows `core`: compare times within a run, not across commits.
 - **Checksums** depend on the target and on the checkout's line endings.
-  Compare them within a run only.
+  On 32-bit targets `rand.int_max` draws other values, and matrix-vector products sum in another order.
+  Compare checksums within a run only.
+  A compiler change to how matrix products sum can change `linalg`'s checksum without being wrong.
 - **Noise.** On Windows the benchmark raises its priority class to high.
   `-cpu` pins it on Windows and Linux; macOS has no pinning API.
   Pick an idle performance core.
   On Linux, `nice -n -10` (as root) raises the priority.
-  Compared with itself (10 rounds, pinned, idle Windows desktop), a compiler's geomean stayed within ±0.4%.
-  Single workloads vary more, and more again unpinned.
+  Compared with itself (10 rounds, `-o:speed`, pinned, idle Windows desktop), a compiler's geomean stayed within ±0.8% over five runs.
+  Single workloads moved by up to 4%, and more again unpinned.

@@ -10,13 +10,19 @@ package benchmark_codegen
 
 import "base:runtime"
 import "core:compress/deflate"
+import "core:compress/lz4"
+import "core:container/priority_queue"
 import "core:crypto/hash"
 import "core:diff"
+import "core:encoding/cbor"
+import "core:encoding/csv"
 import "core:encoding/json"
 import "core:fmt"
+import "core:image/qoi"
 import "core:log"
 import "core:math"
 import "core:math/big"
+import "core:math/linalg"
 import "core:math/rand"
 import "core:mem/virtual"
 import "core:odin/ast"
@@ -28,6 +34,9 @@ import "core:strconv"
 import "core:strings"
 import "core:text/regex"
 import "core:time"
+import "core:time/datetime"
+import "core:unicode"
+import "core:unicode/utf8"
 
 Workload :: struct {
 	name: string,
@@ -51,14 +60,27 @@ WORKLOADS := [?]Workload{
 	{"diff",              diff_work},
 	{"sha256",            sha256_work},
 	{"log_off_in_callee", log_off_in_callee},
+	{"linalg",            linalg_work},
+	{"csv",               csv_work},
+	{"dijkstra",          dijkstra_work},
+	{"compress",          compress_work},
+	{"datetime",          datetime_work},
+	{"cbor",              cbor_work},
+	{"unicode",           unicode_work},
 }
 
-g_json_text: string
-g_sources:   [dynamic]string
-g_gzip:      []byte
-g_text:      string
-g_text_b:    string
-g_items:     []Item
+g_json_text:    string
+g_records:      []Record
+g_sources:      [dynamic]string
+g_corpus:       string
+g_gzip:         []byte
+g_text:         string
+g_text_b:       string
+g_items:        []Item
+g_csv_text:     string
+g_grid:         []u8
+g_image:        qoi.Image
+g_unicode_text: string
 
 main :: proc() {
 	cpu := -1
@@ -108,12 +130,22 @@ main :: proc() {
 }
 
 setup :: proc() {
-	rand.reset(12345)
+	setup_json()
+	setup_corpus()
+	setup_texts()
+	setup_items()
+	setup_csv()
+	setup_grid()
+	setup_image()
+	setup_unicode()
+}
 
-	// JSON document: an array of records with nested arrays and objects.
+// An array of records with nested arrays and objects.
+setup_json :: proc() {
 	RECORD :: `{{"id":%d,"name":"item_%d","price":%.4f,"tags":["a%d","b%d","c"],"active":%v,` +
 	          `"pos":{{"x":%.3f,"y":%.3f,"z":%.3f}},"note":"line\nwith \"escapes\" %d"}}`
 
+	rand.reset(12345)
 	sb := strings.builder_make()
 	strings.write_string(&sb, "[")
 	for i in 0..<6000 {
@@ -131,8 +163,14 @@ setup :: proc() {
 	strings.write_string(&sb, "]")
 	g_json_text = strings.to_string(sb)
 
-	// Odin sources for the parser and gzip workloads. They come from this checkout,
-	// not the compiler's root. Both builds in an A/B run see the same bytes.
+	if err := json.unmarshal_string(g_json_text, &g_records); err != nil {
+		fmt.panicf("unmarshal: %v", err)
+	}
+}
+
+// Odin sources for the parser, gzip, and compress workloads. They come from this
+// checkout, not the compiler's root. Both builds in an A/B run see the same bytes.
+setup_corpus :: proc() {
 	corpus := [?][]runtime.Load_Directory_File{
 		#load_directory("../../../core/fmt"),
 		#load_directory("../../../core/strings"),
@@ -152,23 +190,25 @@ setup :: proc() {
 			}
 		}
 	}
+	g_corpus = strings.concatenate(g_sources[:])
 
-	// The gzip workload inflates the same sources.
-	joined := strings.concatenate(g_sources[:])
 	gz: [dynamic]byte
-	if err := deflate.compress_gzip(&gz, transmute([]byte)joined); err != nil {
+	if err := deflate.compress_gzip(&gz, transmute([]byte)g_corpus); err != nil {
 		fmt.panicf("deflate: %v", err)
 	}
 	g_gzip = gz[:]
-	delete(joined)
+}
 
-	// Two related texts for the strings, regex, and diff workloads.
+// Two related texts for the strings, regex, and diff workloads.
+setup_texts :: proc() {
 	words := [?]string{
 		"alpha",  "beta", "gamma", "delta",
 		"x",      "y",    "count", "value",
 		"return", "if",   "for",   "proc",
 		"struct", "1234", "3.14",  "foo@bar.com",
 	}
+
+	rand.reset(54321)
 	tb  := strings.builder_make()
 	tb2 := strings.builder_make()
 	for _ in 0..<20000 {
@@ -196,8 +236,10 @@ setup :: proc() {
 	}
 	g_text   = strings.to_string(tb)
 	g_text_b = strings.to_string(tb2)
+}
 
-	// Records for the logging workload.
+// Records for the logging workload.
+setup_items :: proc() {
 	rand.reset(777)
 	g_items = make([]Item, 2000)
 	for &it, i in g_items {
@@ -210,6 +252,121 @@ setup :: proc() {
 			score = rand.float64()*100,
 		}
 	}
+}
+
+// Rows with quoted fields, embedded commas, and doubled quotes.
+setup_csv :: proc() {
+	ROW :: "%d,item_%d,%s,%.2f,%d,2026-%02d-%02d,%s\n"
+
+	cities := [?]string{
+		`Lisbon`,
+		`Oslo`,
+		`"New York, NY"`,
+		`"Washington, D.C."`,
+		`Tokyo`,
+	}
+	notes := [?]string{
+		``,
+		`ok`,
+		`"needs ""quotes"""`,
+		`"a, b, and c"`,
+		`late delivery`,
+	}
+
+	rand.reset(2718)
+	sb := strings.builder_make()
+	strings.write_string(&sb, "id,name,city,amount,quantity,date,note\n")
+	for i in 0..<20000 {
+		city     := cities[rand.int_max(len(cities))]
+		amount   := rand.float64()*10000
+		quantity := rand.int_max(500)
+		month    := 1 + rand.int_max(12)
+		day      := 1 + rand.int_max(28)
+		note     := notes[rand.int_max(len(notes))]
+		fmt.sbprintf(&sb, ROW, i, i, city, amount, quantity, month, day, note)
+	}
+	g_csv_text = strings.to_string(sb)
+}
+
+// Step costs for the path-finding workload.
+setup_grid :: proc() {
+	rand.reset(1618)
+	g_grid = make([]u8, GRID_SIZE*GRID_SIZE)
+	for &cost in g_grid {
+		cost = u8(1 + rand.int_max(9))
+	}
+}
+
+// An image with gradients, flat bands, a small palette, and noise, so the
+// QOI encoder uses each of its operations.
+setup_image :: proc() {
+	IMAGE_SIZE :: 512
+
+	palette := [?][4]u8{
+		{230,  57,  70, 255},
+		{241, 250, 238, 255},
+		{168, 218, 220, 255},
+		{ 69, 123, 157, 255},
+		{ 29,  53,  87, 255},
+	}
+
+	rand.reset(3141)
+	g_image = {
+		width    = IMAGE_SIZE,
+		height   = IMAGE_SIZE,
+		channels = 4,
+		depth    = 8,
+	}
+	resize(&g_image.pixels, IMAGE_SIZE*IMAGE_SIZE*4)
+	for y in 0..<IMAGE_SIZE {
+		for x in 0..<IMAGE_SIZE {
+			pixel: [4]u8
+			switch {
+			case x < 128:
+				pixel = {u8(x*2), u8(y/2), u8((x+y)/4), 255}
+			case x < 256:
+				pixel = {u8(y/32*32), 40, 90, 255}
+			case x < 384:
+				pixel = palette[(x/8 + y/8) % len(palette)]
+			case:
+				pixel = {
+					u8(rand.int_max(256)),
+					u8(rand.int_max(256)),
+					u8(rand.int_max(256)),
+					u8(rand.int_max(256)),
+				}
+			}
+
+			offset := (y*IMAGE_SIZE + x)*4
+			copy(g_image.pixels[offset:][:4], pixel[:])
+		}
+	}
+}
+
+// Lines of words from several scripts, with digits, symbols, and emoji.
+setup_unicode :: proc() {
+	words := [?]string{
+		"Grüße",   "straße",   "naïve",  "café",
+		"Ελλάδα",  "αλφάβητο", "Москва", "привет",
+		"日本語",  "漢字",     "한국어", "مرحبا",
+		"Ünïcödé", "Δ",        "½",      "№42",
+		"🙂",      "ok",       "١٢٣",    "Ⅻ",
+	}
+	separators := [?]string{" ", ", ", "; ", " — ", "! "}
+
+	rand.reset(1414)
+	sb := strings.builder_make()
+	for _ in 0..<20000 {
+		n := 3 + rand.int_max(8)
+		for k in 0..<n {
+			strings.write_string(&sb, words[rand.int_max(len(words))])
+			if k+1 < n {
+				strings.write_string(&sb, separators[rand.int_max(len(separators))])
+			}
+		}
+		strings.write_byte(&sb, '\n')
+	}
+	g_unicode_text = strings.to_string(sb)
 }
 
 mix :: #force_inline proc "contextless" (h, v: u64) -> u64 {
@@ -908,5 +1065,346 @@ log_off_in_callee :: proc() -> u64 {
 			h = mix(h, trace(it))
 		}
 	}
+	return h
+}
+
+Transform :: struct {
+	position: [3]f32,
+	scale:    [3]f32,
+	rotation: quaternion128,
+	spin:     quaternion128,
+}
+
+// Spins objects kept in an `#soa` slice, builds their model-view-projection
+// matrices, and counts the box corners inside the view.
+linalg_work :: proc() -> u64 {
+	random_vector :: proc(lo, hi: f32) -> [3]f32 {
+		return {
+			lo + (hi-lo)*f32(rand.float64()),
+			lo + (hi-lo)*f32(rand.float64()),
+			lo + (hi-lo)*f32(rand.float64()),
+		}
+	}
+
+	OBJECTS :: 2000
+	FRAMES  :: 1000
+
+	rand.reset(2024)
+	objects := make(#soa[]Transform, OBJECTS, context.temp_allocator)
+	for i in 0..<OBJECTS {
+		axis     := linalg.normalize(random_vector(0.1, 1))
+		position := random_vector(-20, 20)
+		scale    := random_vector(0.5, 2)
+		angle    := f32(rand.float64())*math.TAU
+		objects[i] = Transform{
+			position = position,
+			scale    = scale,
+			rotation = linalg.quaternion_angle_axis_f32(angle, axis),
+			spin     = linalg.quaternion_angle_axis_f32(0.02, axis),
+		}
+	}
+
+	corners := [8][4]f32{
+		{-1, -1, -1, 1},
+		{ 1, -1, -1, 1},
+		{-1,  1, -1, 1},
+		{ 1,  1, -1, 1},
+		{-1, -1,  1, 1},
+		{ 1, -1,  1, 1},
+		{-1,  1,  1, 1},
+		{ 1,  1,  1, 1},
+	}
+
+	projection := linalg.matrix4_perspective_f32(math.PI/3, 16.0/9.0, 0.1, 100)
+
+	h: u64
+	for frame in 0..<FRAMES {
+		angle := f32(frame)*0.01
+		eye   := [3]f32{30*math.cos(angle), 8, 30*math.sin(angle)}
+		view  := linalg.matrix4_look_at_f32(eye, {0, 0, 0}, {0, 1, 0})
+		view_projection := projection * view
+
+		visible := 0
+		for i in 0..<OBJECTS {
+			rotation := linalg.normalize(objects[i].spin * objects[i].rotation)
+			objects[i].rotation = rotation
+
+			translate := linalg.matrix4_translate_f32(objects[i].position)
+			rotate    := linalg.matrix4_from_quaternion_f32(rotation)
+			scale     := linalg.matrix4_scale_f32(objects[i].scale)
+			mvp := view_projection * translate * rotate * scale
+
+			for corner in corners {
+				clip := mvp * corner
+				inside := abs(clip.x) <= clip.w &&
+				          abs(clip.y) <= clip.w &&
+				          abs(clip.z) <= clip.w
+				if inside {
+					visible += 1
+				}
+			}
+		}
+
+		inverse  := linalg.matrix4_inverse_f32(view_projection)
+		diagonal := inverse[0, 0] + inverse[1, 1] + inverse[2, 2] + inverse[3, 3]
+		h = mix(h, u64(visible))
+		h = mix(h, u64(i64(diagonal*1000)))
+	}
+	return h
+}
+
+// Reads every record through `bufio` and writes it back out.
+csv_work :: proc() -> u64 {
+	out := strings.builder_make()
+	defer strings.builder_destroy(&out)
+
+	h: u64
+	for _ in 0..<16 {
+		strings.builder_reset(&out)
+
+		r: csv.Reader
+		r.reuse_record        = true
+		r.reuse_record_buffer = true
+		csv.reader_init_with_string(&r, g_csv_text)
+
+		w: csv.Writer
+		csv.writer_init(&w, strings.to_writer(&out))
+
+		for {
+			record, err := csv.read(&r)
+			if csv.is_io_error(err, .EOF) {
+				break
+			}
+			if err != nil {
+				fmt.panicf("csv read: %v", err)
+			}
+
+			for field in record {
+				h = mix(h, u64(len(field)))
+			}
+			if werr := csv.write(&w, record); werr != nil {
+				fmt.panicf("csv write: %v", werr)
+			}
+		}
+		csv.reader_destroy(&r)
+
+		h = mix(h, u64(strings.builder_len(out)))
+	}
+	return h
+}
+
+GRID_SIZE :: 512
+
+Path_Node :: struct {
+	dist:  int,
+	index: int,
+}
+
+// Shortest paths on a grid of step costs, from four starting cells.
+dijkstra_work :: proc() -> u64 {
+	by_dist :: proc(a, b: Path_Node) -> bool {
+		return a.dist < b.dist
+	}
+
+	CELLS :: GRID_SIZE*GRID_SIZE
+	dist := make([]int, CELLS)
+	defer delete(dist)
+
+	starts := [?]int{
+		0,
+		GRID_SIZE - 1,
+		CELLS/2 + GRID_SIZE/2,
+		CELLS - 1,
+	}
+
+	h: u64
+	for start in starts {
+		slice.fill(dist, max(int))
+		dist[start] = 0
+
+		swap := priority_queue.default_swap_proc(Path_Node)
+		queue: priority_queue.Priority_Queue(Path_Node)
+		priority_queue.init(&queue, by_dist, swap)
+		priority_queue.push(&queue, Path_Node{dist = 0, index = start})
+
+		for priority_queue.len(queue) > 0 {
+			node := priority_queue.pop(&queue)
+			if node.dist > dist[node.index] {
+				continue
+			}
+
+			x := node.index % GRID_SIZE
+			y := node.index / GRID_SIZE
+			neighbours := [4][2]int{
+				{x - 1, y},
+				{x + 1, y},
+				{x, y - 1},
+				{x, y + 1},
+			}
+			for n in neighbours {
+				inside := 0 <= n.x && n.x < GRID_SIZE &&
+				          0 <= n.y && n.y < GRID_SIZE
+				if !inside {
+					continue
+				}
+
+				next := n.y*GRID_SIZE + n.x
+				d := node.dist + int(g_grid[next])
+				if d < dist[next] {
+					dist[next] = d
+					priority_queue.push(&queue, Path_Node{dist = d, index = next})
+				}
+			}
+		}
+		priority_queue.destroy(&queue)
+
+		for d in dist {
+			h = mix(h, u64(d))
+		}
+	}
+	return h
+}
+
+// Compresses the corpus with deflate, round-trips it through LZ4, and round-trips
+// an image through QOI.
+compress_work :: proc() -> u64 {
+	input := transmute([]byte)g_corpus
+	h: u64
+
+	gz: [dynamic]byte
+	if err := deflate.compress_gzip(&gz, input); err != nil {
+		fmt.panicf("deflate: %v", err)
+	}
+	h = mix(h, u64(len(gz)))
+	delete(gz)
+
+	for _ in 0..<4 {
+		packed: [dynamic]byte
+		if err := lz4.compress_frame(&packed, input); err != nil {
+			fmt.panicf("lz4 compress: %v", err)
+		}
+
+		unpacked: [dynamic]byte
+		if err := lz4.decompress_frame(&unpacked, packed[:]); err != nil {
+			fmt.panicf("lz4 decompress: %v", err)
+		}
+
+		h = mix(h, u64(len(packed)))
+		h = mix(h, u64(len(unpacked)) + u64(unpacked[len(unpacked)/2]))
+		delete(packed)
+		delete(unpacked)
+	}
+
+	for _ in 0..<8 {
+		encoded: [dynamic]byte
+		if err := qoi.save_to_buffer(&encoded, &g_image); err != nil {
+			fmt.panicf("qoi save: %v", err)
+		}
+
+		img, err := qoi.load_from_bytes(encoded[:])
+		if err != nil {
+			fmt.panicf("qoi load: %v", err)
+		}
+
+		h = mix(h, u64(len(encoded)))
+		h = mix(h, u64(img.pixels[len(img.pixels)/2]))
+		qoi.destroy(img)
+		delete(encoded)
+	}
+	return h
+}
+
+// Converts each day to a date and back, with weekday, month-length, and date arithmetic.
+datetime_work :: proc() -> u64 {
+	DAYS :: 1_000_000
+
+	h: u64
+	for ordinal in 1..=datetime.Ordinal(DAYS) {
+		date, err := datetime.ordinal_to_date(ordinal)
+		if err != .None {
+			fmt.panicf("datetime: %v", err)
+		}
+
+		back, _     := datetime.date_to_ordinal(date)
+		last_day, _ := datetime.last_day_of_month(date.year, date.month)
+		later, _    := datetime.add_days_to_date(date, 100)
+		delta, _    := datetime.subtract_dates(later, date)
+		weekday     := datetime.day_of_week(ordinal)
+
+		h = mix(h, u64(date.year)*372 + u64(date.month)*31 + u64(date.day))
+		h = mix(h, u64(back) + u64(last_day) + u64(delta.days) + u64(weekday))
+	}
+	return h
+}
+
+// Marshals the JSON workload's records to CBOR and back.
+cbor_work :: proc() -> u64 {
+	h: u64
+	for _ in 0..<6 {
+		arena: virtual.Arena
+		_ = virtual.arena_init_growing(&arena)
+		context.allocator = virtual.arena_allocator(&arena)
+
+		data, err := cbor.marshal(g_records)
+		if err != nil {
+			fmt.panicf("cbor marshal: %v", err)
+		}
+		h = mix(h, u64(len(data)))
+
+		back: []Record
+		if uerr := cbor.unmarshal(data, &back); uerr != nil {
+			fmt.panicf("cbor unmarshal: %v", uerr)
+		}
+		for r in back {
+			h = mix(h, u64(r.id) + u64(len(r.tags)) + u64(len(r.note)))
+		}
+
+		virtual.arena_destroy(&arena)
+		free_all(context.temp_allocator)
+	}
+	return h
+}
+
+// Classifies and case-maps every rune of mixed-script text.
+unicode_work :: proc() -> u64 {
+	h: u64
+	letters := 0
+	uppers  := 0
+	digits  := 0
+	spaces  := 0
+	puncts  := 0
+	for r in g_unicode_text {
+		if unicode.is_letter(r) {
+			letters += 1
+		}
+		if unicode.is_upper(r) {
+			uppers += 1
+		}
+		if unicode.is_digit(r) {
+			digits += 1
+		}
+		if unicode.is_space(r) {
+			spaces += 1
+		}
+		if unicode.is_punct(r) {
+			puncts += 1
+		}
+
+		upper := u64(unicode.to_upper(r))
+		lower := u64(unicode.to_lower(r))
+		h = mix(h, upper ~ lower << 21)
+	}
+
+	upper_text := strings.to_upper(g_unicode_text, context.temp_allocator)
+	lower_text := strings.to_lower(g_unicode_text, context.temp_allocator)
+	h = mix(h, u64(len(upper_text)))
+	h = mix(h, u64(len(lower_text)))
+	h = mix(h, u64(utf8.rune_count(lower_text)))
+
+	h = mix(h, u64(letters))
+	h = mix(h, u64(uppers))
+	h = mix(h, u64(digits))
+	h = mix(h, u64(spaces))
+	h = mix(h, u64(puncts))
 	return h
 }
