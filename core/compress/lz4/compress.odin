@@ -6,6 +6,19 @@ import "base:intrinsics"
 import "base:runtime"
 import "core:compress"
 import "core:hash/xxhash"
+import "core:io"
+
+/*
+	Copyright 2026 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+
+	Formats: Yann Collet's LZ4 block and frame format specifications:
+		https://github.com/lz4/lz4/blob/dev/doc/lz4_Block_format.md
+		https://github.com/lz4/lz4/blob/dev/doc/lz4_Frame_format.md
+*/
 
 // One exception to the cleanroom principle is present only for the highest
 // compression modes:
@@ -25,152 +38,306 @@ compress_block_bound :: proc(length: int) -> int {
 	return length + length / 255 + 16
 }
 
-compress_frame_bound :: proc(length: int, options := Frame_Options{flags = DEFAULT_FRAME_FLAGS}) -> int {
+compress_frame_bound :: proc(length: int, frame_options := Frame_Options{flags = DEFAULT_FRAME_FLAGS}) -> int {
 	if length < 0 || length > LZ4_INPUT_MAX {
 		return -1
 	}
-	block_max := LZ4_BLOCK_MAX_BYTES[options.block_max_size]
+	block_max := LZ4_BLOCK_MAX_BYTES[frame_options.block_max_size]
 	blocks    := (length + block_max - 1) / block_max
 	return FRAME_HEADER_MAX + FRAME_FOOTER_MAX + 4 + blocks * 8 + length + block_max / 255 + 16
 }
 
-compress_block_to_slice :: proc(s: ^LZ4, output, input: []u8, level := Level.Default, dictionary: []u8 = nil) -> (written: int, err: Error) {
-	lz4_check_arguments(s, len(output), compress_block_bound(len(input))) or_return
+compress_block_to_slice :: proc(s: ^LZ4, output, input: []u8, level := Level.Default, options: compress.Options = {}, dictionary: []u8 = nil) -> (written: int, err: Error) {
+	lz4_check_options(options) or_return
+	bound := compress_block_bound(len(input))
+	lz4_check_arguments(s, bound) or_return
+	limit := lz4_output_size(len(output), options)
 	lz4_reset(s, level)
-
-	if len(dictionary) == 0 {
-		return lz4_compress_range(s, output, input, 0, len(input), 0, level), nil
-	}
-
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	data, history := lz4_prefix_dictionary(dictionary, input) or_return
-	lz4_index(s, data, 0, history, level)
-	return lz4_compress_range(s, output, data, history, len(data), 0, level), nil
-}
-
-compress_block_to_dynamic :: proc(output: ^[dynamic]u8, input: []u8, level := Level.Default, dictionary: []u8 = nil, allocator := context.allocator) -> (err: Error) {
-	context.allocator = allocator
-	return lz4_to_dynamic(output, input, compress_block_bound(len(input)), level, {}, dictionary, false)
-}
-
-compress_frame_to_slice :: proc(s: ^LZ4, output, input: []u8, level := Level.Default, options := Frame_Options{flags = DEFAULT_FRAME_FLAGS}, dictionary: []u8 = nil) -> (written: int, err: Error) #no_bounds_check {
-	lz4_check_arguments(s, len(output), compress_frame_bound(len(input), options)) or_return
-	lz4_reset(s, level)
-
-	block_max := LZ4_BLOCK_MAX_BYTES[options.block_max_size]
-	_, has_dictionary_id := options.dictionary_id.?
-
-	dst := raw_data(output)
-	lz4_store_u32(dst, FRAME_MAGIC)
-	flg := transmute(LZ4_Descriptor_Flags)options.flags + {.Version_Low}
-	if has_dictionary_id {
-		flg += {.Dictionary_ID}
-	}
-	dst[4] = transmute(u8)flg
-	dst[5] = LZ4_BLOCK_MAX_CODE[options.block_max_size] << 4
-	op := 6
-	if .Content_Size in options.flags {
-		lz4_store_u64(dst[op:], u64(len(input)))
-		op += 8
-	}
-	if has_dictionary_id {
-		lz4_store_u32(dst[op:], options.dictionary_id.?)
-		op += 4
-	}
-	dst[op] = u8(xxhash.XXH32(output[4:op]) >> 8)
-	op += 1
 
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	data    := input
 	history := 0
-	if len(dictionary) > 0 && .Independent_Blocks not_in options.flags {
+	if len(dictionary) > 0 {
 		data, history = lz4_prefix_dictionary(dictionary, input) or_return
 		lz4_index(s, data, 0, history, level)
 	}
 
-	for offset := 0; offset < len(input); offset += block_max {
-		block_end := min(offset + block_max, len(input))
-		size      := block_end - offset
-		header    := op
-		op += 4
+	if options.progress == nil && limit >= bound {
+		return lz4_compress_range(s, output, data, history, len(data), 0, level, false, nil), nil
+	}
+	check := lz4_progress_init(options, history, i64(len(input)), -1)
+	check.limit = limit
+	written = lz4_compress_range(s, output, data, history, len(data), 0, level, true, &check)
+	if check.err != nil {
+		return 0, check.err
+	}
+	compress.report_progress(options, i64(len(input)), i64(written), i64(len(input)), -1) or_return
+	return written, nil
+}
 
-		compressed: int
-		switch {
-		case len(dictionary) > 0 && .Independent_Blocks in options.flags:
-			block, block_history := lz4_prefix_dictionary(dictionary, input[offset:block_end]) or_return
-			lz4_reset(s, level)
-			lz4_index(s, block, 0, block_history, level)
-			compressed = lz4_compress_range(s, output[op:], block, block_history, len(block), 0, level)
-		case .Independent_Blocks in options.flags:
-			compressed = lz4_compress_range(s, output[op:], data, offset, block_end, offset, level)
-		case:
-			compressed = lz4_compress_range(s, output[op:], data, history + offset, history + block_end, max(0, history + offset - LZ4_MAX_OFFSET), level)
-		}
+compress_block_to_dynamic :: proc(output: ^[dynamic]u8, input: []u8, level := Level.Default, options: compress.Options = {}, dictionary: []u8 = nil, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator
+	return lz4_to_dynamic(output, input, compress_block_bound(len(input)), level, {}, options, dictionary, false)
+}
 
-		if compressed >= size {
-			intrinsics.mem_copy_non_overlapping(dst[op:], raw_data(input[offset:]), size)
-			lz4_store_u32(dst[header:], u32(size) | 0x8000_0000)
-			compressed = size
-		} else {
-			lz4_store_u32(dst[header:], u32(compressed))
-		}
-		if .Block_Checksum in options.flags {
-			lz4_store_u32(dst[op + compressed:], xxhash.XXH32(output[op:op + compressed]))
-			compressed += 4
-		}
-		op += compressed
+compress_frame_to_slice :: proc(s: ^LZ4, output, input: []u8, level := Level.Default, frame_options := Frame_Options{flags = DEFAULT_FRAME_FLAGS}, options: compress.Options = {}, dictionary: []u8 = nil) -> (written: int, err: Error) #no_bounds_check {
+	lz4_check_options(options) or_return
+	lz4_check_arguments(s, compress_frame_bound(len(input), frame_options)) or_return
+	limit := lz4_output_size(len(output), options)
+	lz4_reset(s, level)
+
+	block_max := LZ4_BLOCK_MAX_BYTES[frame_options.block_max_size]
+	header: [FRAME_HEADER_MAX]u8
+	op := lz4_write_frame_header(header[:], frame_options, u64(len(input)))
+	if op > limit {
+		return 0, General_Error.Output_Too_Short
+	}
+	copy(output, header[:op])
+
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	data    := input
+	history := 0
+	if len(dictionary) > 0 && .Independent_Blocks not_in frame_options.flags {
+		data, history = lz4_prefix_dictionary(dictionary, input) or_return
+		lz4_index(s, data, 0, history, level)
 	}
 
+	check := lz4_progress_init(options, 0, i64(len(input)), -1)
+	for offset := 0; offset < len(input); offset += block_max {
+		block_end := min(offset + block_max, len(input))
+		op += lz4_encode_block(s, output[op:limit], data, history + offset, history + block_end, level, frame_options.flags, dictionary) or_return
+		if block_end >= check.mark && block_end < len(input) && lz4_progress_report(&check, block_end, i64(block_end), i64(op)) {
+			return 0, check.err
+		}
+	}
+
+	if 4 + (4 if .Content_Checksum in frame_options.flags else 0) > limit - op {
+		return 0, General_Error.Output_Too_Short
+	}
+	dst := raw_data(output)
 	lz4_store_u32(dst[op:], 0)
 	op += 4
-	if .Content_Checksum in options.flags {
+	if .Content_Checksum in frame_options.flags {
 		lz4_store_u32(dst[op:], xxhash.XXH32(input))
 		op += 4
 	}
+	compress.report_progress(options, i64(len(input)), i64(op), i64(len(input)), -1) or_return
 	return op, nil
 }
 
-compress_frame_to_dynamic :: proc(output: ^[dynamic]u8, input: []u8, level := Level.Default, options := Frame_Options{flags = DEFAULT_FRAME_FLAGS}, dictionary: []u8 = nil, allocator := context.allocator) -> (err: Error) {
+compress_frame_to_dynamic :: proc(output: ^[dynamic]u8, input: []u8, level := Level.Default, frame_options := Frame_Options{flags = DEFAULT_FRAME_FLAGS}, options: compress.Options = {}, dictionary: []u8 = nil, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
-	return lz4_to_dynamic(output, input, compress_frame_bound(len(input), options), level, options, dictionary, true)
+	return lz4_to_dynamic(output, input, compress_frame_bound(len(input), frame_options), level, frame_options, options, dictionary, true)
+}
+
+frame_writer_init :: proc(fw: ^Frame_Writer, w: io.Writer, level := Level.Default, frame_options := Frame_Options{flags = DEFAULT_FRAME_FLAGS}, input_size: i64 = -1, options: compress.Options = {}, dictionary: []u8 = nil, allocator := context.allocator) -> (err: Error) {
+	fw^ = {}
+	fw.level         = level
+	fw.frame_options = frame_options
+	fw.dictionary    = dictionary
+	fw.allocator     = allocator
+	fw.options       = options
+	fw.block_max     = LZ4_BLOCK_MAX_BYTES[frame_options.block_max_size]
+	defer fw.err = err
+
+	if options.max_output_size < 0 || options.max_memory < 0 || options.chunk_size < 0 || options.progress_interval < 0 || input_size < -1 {
+		return General_Error.Incompatible_Options
+	}
+
+	minimum   := 2 * LZ4_WINDOW_SIZE + fw.block_max + 4
+	out_size  := FRAME_HEADER_MAX + compress_block_bound(fw.block_max) + 8 + FRAME_FOOTER_MAX
+	available := compress.memory_limit(options) - size_of(LZ4) - out_size
+	if options.buffer != nil {
+		if len(options.buffer) < minimum {
+			return General_Error.Incompatible_Options
+		}
+		fw.window = options.buffer
+	} else if available < minimum {
+		return General_Error.Memory_Limit_Exceeded
+	}
+
+	state := runtime.mem_alloc_non_zeroed(size_of(LZ4), align_of(LZ4), allocator) or_return
+	fw.state = (^LZ4)(raw_data(state))
+	fw.out = non_zero_make([]u8, out_size, allocator) or_return
+	if fw.window == nil {
+		size := min(minimum + (options.chunk_size if options.chunk_size > 0 else WRITER_CHUNK_SIZE), available)
+		fw.window      = non_zero_make([]u8, size, allocator) or_return
+		fw.owns_window = true
+	}
+	lz4_writer_start(fw, w, input_size)
+	return nil
+}
+
+frame_writer_reset :: proc(fw: ^Frame_Writer, w: io.Writer, input_size: i64 = -1) -> (err: Error) {
+	defer fw.err = err
+	if fw.state == nil || fw.out == nil || fw.window == nil || input_size < -1 {
+		return General_Error.Incompatible_Options
+	}
+	lz4_writer_start(fw, w, input_size)
+	return nil
+}
+
+frame_writer_write :: proc(fw: ^Frame_Writer, p: []u8) -> (n: int, err: Error) {
+	if fw.err != nil {
+		return 0, fw.err
+	}
+	if fw.finished {
+		return 0, io.Error.Closed
+	}
+	defer fw.err = err
+	if fw.input_size >= 0 && i64(len(p)) > fw.input_size - fw.total {
+		return 0, General_Error.Size_Mismatch
+	}
+	for n < len(p) {
+		if fw.filled == len(fw.window) {
+			lz4_writer_slide(fw)
+		}
+		k := copy(fw.window[fw.filled:], p[n:])
+		if .Content_Checksum in fw.flags {
+			xxhash.XXH32_update(&fw.digest, p[n:n + k])
+		}
+		fw.filled += k
+		fw.total  += i64(k)
+		n         += k
+		for fw.filled - fw.start >= fw.block_max + 4 {
+			lz4_writer_block(fw, fw.block_max) or_return
+			compress.report_progress(fw.options, fw.total, fw.flushed, fw.input_size, -1) or_return
+		}
+	}
+	return
+}
+
+frame_writer_finish :: proc(fw: ^Frame_Writer) -> (err: Error) {
+	if fw.err != nil {
+		return fw.err
+	}
+	if fw.finished {
+		return nil
+	}
+	defer fw.err = err
+	if fw.input_size >= 0 && fw.total != fw.input_size {
+		return General_Error.Size_Mismatch
+	}
+	for fw.start < fw.filled {
+		lz4_writer_block(fw, min(fw.block_max, fw.filled - fw.start)) or_return
+	}
+	dst := raw_data(fw.out)
+	lz4_store_u32(dst[fw.out_len:], 0)
+	fw.out_len += 4
+	if .Content_Checksum in fw.flags {
+		lz4_store_u32(dst[fw.out_len:], u32(xxhash.XXH32_digest(&fw.digest)))
+		fw.out_len += 4
+	}
+	lz4_writer_flush(fw) or_return
+	fw.finished = true
+	return compress.report_progress(fw.options, fw.total, fw.flushed, fw.input_size, -1)
+}
+
+frame_writer_to_stream :: proc(fw: ^Frame_Writer) -> (s: io.Stream) {
+	s.data      = fw
+	s.procedure = lz4_writer_stream_proc
+	return
+}
+
+frame_writer_destroy :: proc(fw: ^Frame_Writer) {
+	if fw.owns_window {
+		delete(fw.window, fw.allocator)
+	}
+	delete(fw.out, fw.allocator)
+	free(fw.state, fw.allocator)
+	fw.state       = nil
+	fw.window      = nil
+	fw.out         = nil
+	fw.owns_window = false
 }
 
 @(private)
-lz4_check_arguments :: proc(s: ^LZ4, output_size, bound: int) -> Error {
+lz4_check_arguments :: proc(s: ^LZ4, bound: int) -> Error {
 	if s == nil {
 		return General_Error.Incompatible_Options
 	}
 	if bound < 0 {
 		return LZ4_Error.Input_Too_Large
 	}
-	if output_size < bound {
-		return General_Error.Output_Too_Short
+	return nil
+}
+
+@(private)
+lz4_check_options :: proc "contextless" (options: compress.Options) -> Error {
+	if options.max_output_size < 0 || options.max_memory < 0 || options.progress_interval < 0 {
+		return General_Error.Incompatible_Options
 	}
 	return nil
 }
 
 @(private)
-lz4_to_dynamic :: proc(output: ^[dynamic]u8, input: []u8, bound: int, level: Level, options: Frame_Options, dictionary: []u8, $FRAME: bool) -> (err: Error) {
+lz4_output_size :: proc "contextless" (size: int, options: compress.Options) -> int {
+	return min(size, options.max_output_size) if options.max_output_size > 0 else size
+}
+
+@(private)
+lz4_progress_init :: proc "contextless" (options: compress.Options, origin: int, total_in, total_out: i64) -> (p: LZ4_Check) {
+	p.options   = options
+	p.interval  = compress.progress_interval(options)
+	p.mark      = max(int)
+	p.limit     = max(int)
+	p.total_in  = total_in
+	p.total_out = total_out
+	if options.progress != nil {
+		p.mark = origin + p.interval if p.interval < max(int) - origin else max(int)
+	}
+	return
+}
+
+@(private)
+lz4_progress_report :: proc(p: ^LZ4_Check, position: int, bytes_in, bytes_out: i64) -> (canceled: bool) {
+	p.err  = compress.report_progress(p.options, bytes_in, bytes_out, p.total_in, p.total_out)
+	p.mark = position + p.interval if p.interval < max(int) - position else max(int)
+	return p.err != nil
+}
+
+@(private)
+lz4_sequence_overflows :: #force_inline proc "contextless" (check: ^LZ4_Check, op, literals, length: int) -> bool {
+	if op + literals + (literals + 240) / 255 + (length - LZ4_MIN_MATCH + 240) / 255 + 9 <= check.limit {
+		return false
+	}
+	check.err = General_Error.Output_Too_Short
+	return true
+}
+
+@(private)
+lz4_last_overflows :: #force_inline proc "contextless" (check: ^LZ4_Check, op, literals: int) -> bool {
+	if op + 1 + literals + (literals + 240) / 255 <= check.limit {
+		return false
+	}
+	check.err = General_Error.Output_Too_Short
+	return true
+}
+
+@(private)
+lz4_to_dynamic :: proc(output: ^[dynamic]u8, input: []u8, bound: int, level: Level, frame_options: Frame_Options, options: compress.Options, dictionary: []u8, $FRAME: bool) -> (err: Error) {
 	if output == nil {
 		return General_Error.Incompatible_Options
 	}
+	lz4_check_options(options) or_return
 	if bound < 0 {
 		return LZ4_Error.Input_Too_Large
 	}
-	if bound > compress.COMPRESS_OUTPUT_ALLOCATE_MAX {
-		return General_Error.Output_Too_Short
+	if size_of(LZ4) > compress.memory_limit(options) {
+		return General_Error.Memory_Limit_Exceeded
 	}
 	state := runtime.mem_alloc_non_zeroed(size_of(LZ4), align_of(LZ4)) or_return
 	s := (^LZ4)(raw_data(state))
 	defer free(s)
 
-	non_zero_resize(output, bound) or_return
+	non_zero_resize(output, min(bound, compress.output_limit(options))) or_return
 	written: int
 	when FRAME {
-		written, err = compress_frame_to_slice(s, output[:], input, level, options, dictionary)
+		written, err = compress_frame_to_slice(s, output[:], input, level, frame_options, options, dictionary)
 	} else {
-		written, err = compress_block_to_slice(s, output[:], input, level, dictionary)
+		written, err = compress_block_to_slice(s, output[:], input, level, options, dictionary)
 	}
 	non_zero_resize(output, written)
 	return
@@ -217,19 +384,19 @@ lz4_index :: proc(s: ^LZ4, data: []u8, from, to: int, level: Level) #no_bounds_c
 }
 
 @(private)
-lz4_compress_range :: proc(s: ^LZ4, output, data: []u8, start, end, low: int, level: Level) -> int {
+lz4_compress_range :: proc(s: ^LZ4, output, data: []u8, start, end, low: int, level: Level, $CHECKED: bool, check: ^LZ4_Check) -> int {
 	parameters := LZ4_LEVELS[clamp(level, Level.Fastest, Level.Best)]
 	switch parameters.strategy {
 	case .Fast:
-		return lz4_compress_fast(s, output, data, start, end, low)
+		return lz4_compress_fast(s, output, data, start, end, low, CHECKED, check)
 	case .Double:
-		return lz4_compress_double(s, output, data, start, end, low)
+		return lz4_compress_double(s, output, data, start, end, low, CHECKED, check)
 	case .Greedy:
-		return lz4_compress_chain(s, output, data, start, end, low, parameters.chain_depth, parameters.nice_length, false)
+		return lz4_compress_chain(s, output, data, start, end, low, parameters.chain_depth, parameters.nice_length, false, CHECKED, check)
 	case .Lazy:
-		return lz4_compress_chain(s, output, data, start, end, low, parameters.chain_depth, parameters.nice_length, true)
+		return lz4_compress_chain(s, output, data, start, end, low, parameters.chain_depth, parameters.nice_length, true, CHECKED, check)
 	case .Optimal:
-		return lz4_compress_optimal(s, output, data, start, end, low, parameters.chain_depth, parameters.nice_length)
+		return lz4_compress_optimal(s, output, data, start, end, low, parameters.chain_depth, parameters.nice_length, CHECKED, check)
 	}
 	unreachable()
 }
@@ -324,7 +491,7 @@ lz4_emit_last :: #force_inline proc "contextless" (dst: [^]u8, op: int, src: [^]
 }
 
 @(private)
-lz4_compress_fast :: proc(s: ^LZ4, output, data: []u8, start, end, low: int) -> int #no_bounds_check {
+lz4_compress_fast :: proc(s: ^LZ4, output, data: []u8, start, end, low: int, $CHECKED: bool, check: ^LZ4_Check) -> int #no_bounds_check {
 	LZ4_SKIP_TRIGGER :: 6
 
 	dst := raw_data(output)
@@ -333,6 +500,11 @@ lz4_compress_fast :: proc(s: ^LZ4, output, data: []u8, start, end, low: int) -> 
 	anchor := start
 
 	if end - start <= LZ4_MATCH_START_LIMIT {
+		when CHECKED {
+			if lz4_last_overflows(check, op, end - anchor) {
+				return op
+			}
+		}
 		return lz4_emit_last(dst, op, src, anchor, end)
 	}
 	match_limit  := end - LZ4_MATCH_START_LIMIT
@@ -341,6 +513,11 @@ lz4_compress_fast :: proc(s: ^LZ4, output, data: []u8, start, end, low: int) -> 
 	ip := start
 
 	outer: for ip <= match_limit {
+		when CHECKED {
+			if ip >= check.mark && lz4_progress_report(check, ip, i64(ip - start), i64(op)) {
+				return op
+			}
+		}
 		candidate: int
 		search := 1 << LZ4_SKIP_TRIGGER
 		for {
@@ -356,6 +533,11 @@ lz4_compress_fast :: proc(s: ^LZ4, output, data: []u8, start, end, low: int) -> 
 			if ip > match_limit {
 				break outer
 			}
+			when CHECKED {
+				if ip >= check.mark && lz4_progress_report(check, ip, i64(ip - start), i64(op)) {
+					return op
+				}
+			}
 		}
 
 		for ip > anchor && candidate > low && src[ip - 1] == src[candidate - 1] {
@@ -364,6 +546,11 @@ lz4_compress_fast :: proc(s: ^LZ4, output, data: []u8, start, end, low: int) -> 
 		}
 
 		length := LZ4_MIN_MATCH + lz4_count(src, ip + LZ4_MIN_MATCH, candidate + LZ4_MIN_MATCH, length_limit)
+		when CHECKED {
+			if lz4_sequence_overflows(check, op, ip - anchor, length) {
+				return op
+			}
+		}
 		op = lz4_emit_sequence(dst, op, src, anchor, ip - anchor, ip - candidate, length)
 		ip    += length
 		anchor = ip
@@ -371,6 +558,11 @@ lz4_compress_fast :: proc(s: ^LZ4, output, data: []u8, start, end, low: int) -> 
 			break
 		}
 		table[lz4_hash_fast(lz4_load_u64(src[ip - 2:]))] = u32(ip - 2)
+	}
+	when CHECKED {
+		if lz4_last_overflows(check, op, end - anchor) {
+			return op
+		}
 	}
 	return lz4_emit_last(dst, op, src, anchor, end)
 }
@@ -386,7 +578,7 @@ lz4_double_insert :: #force_inline proc "contextless" (s: ^LZ4, src: [^]u8, p: i
 }
 
 @(private)
-lz4_compress_double :: proc(s: ^LZ4, output, data: []u8, start, end, low: int) -> int #no_bounds_check {
+lz4_compress_double :: proc(s: ^LZ4, output, data: []u8, start, end, low: int, $CHECKED: bool, check: ^LZ4_Check) -> int #no_bounds_check {
 	LZ4_SKIP_TRIGGER :: 6
 
 	dst := raw_data(output)
@@ -395,6 +587,11 @@ lz4_compress_double :: proc(s: ^LZ4, output, data: []u8, start, end, low: int) -
 	anchor := start
 
 	if end - start <= LZ4_MATCH_START_LIMIT {
+		when CHECKED {
+			if lz4_last_overflows(check, op, end - anchor) {
+				return op
+			}
+		}
 		return lz4_emit_last(dst, op, src, anchor, end)
 	}
 	match_limit  := end - LZ4_MATCH_START_LIMIT
@@ -405,6 +602,11 @@ lz4_compress_double :: proc(s: ^LZ4, output, data: []u8, start, end, low: int) -
 	search := 1 << LZ4_SKIP_TRIGGER
 
 	for ip <= match_limit {
+		when CHECKED {
+			if ip >= check.mark && lz4_progress_report(check, ip, i64(ip - start), i64(op)) {
+				return op
+			}
+		}
 		sequence := lz4_load_u64(src[ip:])
 		h8 := (sequence * 0x9E3779B185EBCA87) >> (64 - LZ4_DOUBLE_HASH_LOG)
 		h4 := (u32(sequence) * 2654435761) >> (32 - LZ4_DOUBLE_HASH_LOG)
@@ -440,6 +642,11 @@ lz4_compress_double :: proc(s: ^LZ4, output, data: []u8, start, end, low: int) -
 		}
 
 		match_start := ip
+		when CHECKED {
+			if lz4_sequence_overflows(check, op, ip - anchor, length) {
+				return op
+			}
+		}
 		op = lz4_emit_sequence(dst, op, src, anchor, ip - anchor, ip - candidate, length)
 		ip    += length
 		anchor = ip
@@ -449,6 +656,11 @@ lz4_compress_double :: proc(s: ^LZ4, output, data: []u8, start, end, low: int) -
 		lz4_double_insert(s, src, match_start + 1)
 		lz4_double_insert(s, src, ip - 2)
 		lz4_double_insert(s, src, ip - 1)
+	}
+	when CHECKED {
+		if lz4_last_overflows(check, op, end - anchor) {
+			return op
+		}
 	}
 	return lz4_emit_last(dst, op, src, anchor, end)
 }
@@ -468,11 +680,19 @@ lz4_insert :: #force_inline proc "contextless" (s: ^LZ4, src: [^]u8, next: ^int,
 lz4_find :: #force_inline proc "contextless" (s: ^LZ4, src: [^]u8, ip, low, length_limit: int, depth, nice: i32) -> (best_length, best_offset: int) {
 	sequence  := lz4_load_u32(src[ip:])
 	candidate := int(s.head[lz4_hash(sequence)])
+	next_head := int(s.head[lz4_hash(lz4_load_u32(src[ip + 1:]))])
+	intrinsics.prefetch_read_data(&s.chain[next_head & (LZ4_WINDOW_SIZE - 1)], 3)
+	intrinsics.prefetch_read_data(&src[next_head], 3)
+	if candidate >= ip {
+		return 0, 0
+	}
 	best_length = LZ4_MIN_MATCH - 1
 	max_length := length_limit - ip
+	floor      := max(low, ip - LZ4_MAX_OFFSET)
+	target     := src[ip + best_length]
 	depth := depth
-	for depth > 0 && candidate >= low && candidate < ip && ip - candidate <= LZ4_MAX_OFFSET {
-		if src[candidate + best_length] == src[ip + best_length] && lz4_load_u32(src[candidate:]) == sequence {
+	for depth > 0 && candidate >= floor {
+		if src[candidate + best_length] == target && lz4_load_u32(src[candidate:]) == sequence {
 			length := LZ4_MIN_MATCH + lz4_count(src, ip + LZ4_MIN_MATCH, candidate + LZ4_MIN_MATCH, length_limit)
 			if length > best_length {
 				best_length = length
@@ -480,6 +700,7 @@ lz4_find :: #force_inline proc "contextless" (s: ^LZ4, src: [^]u8, ip, low, leng
 				if length >= int(nice) || length >= max_length {
 					break
 				}
+				target = src[ip + best_length]
 			}
 		}
 		delta := int(s.chain[candidate & (LZ4_WINDOW_SIZE - 1)])
@@ -496,7 +717,7 @@ lz4_find :: #force_inline proc "contextless" (s: ^LZ4, src: [^]u8, ip, low, leng
 }
 
 @(private)
-lz4_compress_chain :: proc(s: ^LZ4, output, data: []u8, start, end, low: int, depth, nice: i32, lazy: bool) -> int #no_bounds_check {
+lz4_compress_chain :: proc(s: ^LZ4, output, data: []u8, start, end, low: int, depth, nice: i32, lazy: bool, $CHECKED: bool, check: ^LZ4_Check) -> int #no_bounds_check {
 	dst := raw_data(output)
 	src := raw_data(data)
 	op  := 0
@@ -506,6 +727,11 @@ lz4_compress_chain :: proc(s: ^LZ4, output, data: []u8, start, end, low: int, de
 
 	if end - start <= LZ4_MATCH_START_LIMIT {
 		lz4_insert(s, src, &next, min(end, insert_limit))
+		when CHECKED {
+			if lz4_last_overflows(check, op, end - anchor) {
+				return op
+			}
+		}
 		return lz4_emit_last(dst, op, src, anchor, end)
 	}
 	match_limit  := end - LZ4_MATCH_START_LIMIT
@@ -513,6 +739,11 @@ lz4_compress_chain :: proc(s: ^LZ4, output, data: []u8, start, end, low: int, de
 	ip := start
 
 	for ip <= match_limit {
+		when CHECKED {
+			if ip >= check.mark && lz4_progress_report(check, ip, i64(ip - start), i64(op)) {
+				return op
+			}
+		}
 		lz4_insert(s, src, &next, ip)
 		length, offset := lz4_find(s, src, ip, low, length_limit, depth, nice)
 		if length == 0 {
@@ -530,11 +761,21 @@ lz4_compress_chain :: proc(s: ^LZ4, output, data: []u8, start, end, low: int, de
 				length, offset = next_length, next_offset
 			}
 		}
+		when CHECKED {
+			if lz4_sequence_overflows(check, op, ip - anchor, length) {
+				return op
+			}
+		}
 		op = lz4_emit_sequence(dst, op, src, anchor, ip - anchor, offset, length)
 		ip    += length
 		anchor = ip
 	}
 	lz4_insert(s, src, &next, min(end, insert_limit))
+	when CHECKED {
+		if lz4_last_overflows(check, op, end - anchor) {
+			return op
+		}
+	}
 	return lz4_emit_last(dst, op, src, anchor, end)
 }
 
@@ -560,7 +801,7 @@ lz4_length_extra :: #force_inline proc "contextless" (n: int) -> int {
 }
 
 @(private)
-lz4_compress_optimal :: proc(s: ^LZ4, output, data: []u8, start, end, low: int, depth, nice: i32) -> int #no_bounds_check {
+lz4_compress_optimal :: proc(s: ^LZ4, output, data: []u8, start, end, low: int, depth, nice: i32, $CHECKED: bool, check: ^LZ4_Check) -> int #no_bounds_check {
 	dst := raw_data(output)
 	src := raw_data(data)
 	op  := 0
@@ -570,6 +811,11 @@ lz4_compress_optimal :: proc(s: ^LZ4, output, data: []u8, start, end, low: int, 
 
 	if end - start <= LZ4_MATCH_START_LIMIT {
 		lz4_insert(s, src, &next, min(end, insert_limit))
+		when CHECKED {
+			if lz4_last_overflows(check, op, end - anchor) {
+				return op
+			}
+		}
 		return lz4_emit_last(dst, op, src, anchor, end)
 	}
 	match_limit  := end - LZ4_MATCH_START_LIMIT
@@ -579,7 +825,7 @@ lz4_compress_optimal :: proc(s: ^LZ4, output, data: []u8, start, end, low: int, 
 	node_count := LZ4_OPTIMAL_WINDOW + 1
 	nodes, alloc_err := make([]LZ4_Optimal_Node, node_count, context.temp_allocator)
 	if alloc_err != nil {
-		return lz4_compress_chain(s, output, data, start, end, low, depth, nice, true)
+		return lz4_compress_chain(s, output, data, start, end, low, depth, nice, true, CHECKED, check)
 	}
 
 	Match :: struct {
@@ -591,6 +837,11 @@ lz4_compress_optimal :: proc(s: ^LZ4, output, data: []u8, start, end, low: int, 
 	pending_start, pending_offset, pending_length := 0, 0, 0
 	p := start
 	for p <= match_limit {
+		when CHECKED {
+			if check.err != nil || p >= check.mark && lz4_progress_report(check, p, i64(p - start), i64(op)) {
+				return op
+			}
+		}
 		window := min(LZ4_OPTIMAL_WINDOW, match_limit + 1 - p)
 		for k in 0..=window {
 			nodes[k].cost = max(i32)
@@ -614,6 +865,9 @@ lz4_compress_optimal :: proc(s: ^LZ4, output, data: []u8, start, end, low: int, 
 				nodes[k + 1] = {cost = literal_cost, tokens = node.tokens, literals = i32(literals), previous = i32(k), length = 0}
 			}
 
+			if nodes[k + 1].cost <= node.cost && k + LZ4_MIN_MATCH <= window && nodes[k + LZ4_MIN_MATCH].cost <= node.cost + 3 {
+				continue
+			}
 			if k < skip_until {
 				continue
 			}
@@ -670,12 +924,12 @@ lz4_compress_optimal :: proc(s: ^LZ4, output, data: []u8, start, end, low: int, 
 				continue
 			}
 			match_start := p + int(node.previous)
-			op = lz4_emit_pending(dst, op, src, &anchor, &pending_start, &pending_offset, &pending_length, match_start, int(node.offset), int(node.length))
+			op = lz4_emit_pending(dst, op, src, &anchor, &pending_start, &pending_offset, &pending_length, match_start, int(node.offset), int(node.length), CHECKED, check)
 		}
 		p += path_end
 
 		if forced_length > 0 {
-			op = lz4_emit_pending(dst, op, src, &anchor, &pending_start, &pending_offset, &pending_length, p, forced_offset, forced_length)
+			op = lz4_emit_pending(dst, op, src, &anchor, &pending_start, &pending_offset, &pending_length, p, forced_offset, forced_length, CHECKED, check)
 			p += forced_length
 		}
 		if path_end == 0 && forced_length == 0 {
@@ -683,21 +937,36 @@ lz4_compress_optimal :: proc(s: ^LZ4, output, data: []u8, start, end, low: int, 
 		}
 	}
 	if pending_length > 0 {
+		when CHECKED {
+			if lz4_sequence_overflows(check, op, pending_start - anchor, pending_length) {
+				return op
+			}
+		}
 		op = lz4_emit_sequence(dst, op, src, anchor, pending_start - anchor, pending_offset, pending_length)
 		anchor = pending_start + pending_length
 	}
 	lz4_insert(s, src, &next, min(end, insert_limit))
+	when CHECKED {
+		if lz4_last_overflows(check, op, end - anchor) {
+			return op
+		}
+	}
 	return lz4_emit_last(dst, op, src, anchor, end)
 }
 
 @(private)
-lz4_emit_pending :: #force_inline proc "contextless" (dst: [^]u8, op: int, src: [^]u8, anchor, pending_start, pending_offset, pending_length: ^int, start, offset, length: int) -> int {
+lz4_emit_pending :: #force_inline proc "contextless" (dst: [^]u8, op: int, src: [^]u8, anchor, pending_start, pending_offset, pending_length: ^int, start, offset, length: int, $CHECKED: bool, check: ^LZ4_Check) -> int {
 	op := op
 	if pending_length^ > 0 && start == pending_start^ + pending_length^ && lz4_count(src, start, start - pending_offset^, start + length) == length {
 		pending_length^ += length
 		return op
 	}
 	if pending_length^ > 0 {
+		when CHECKED {
+			if lz4_sequence_overflows(check, op, pending_start^ - anchor^, pending_length^) {
+				return op
+			}
+		}
 		op = lz4_emit_sequence(dst, op, src, anchor^, pending_start^ - anchor^, pending_offset^, pending_length^)
 		anchor^ = pending_start^ + pending_length^
 	}
@@ -708,14 +977,22 @@ lz4_emit_pending :: #force_inline proc "contextless" (dst: [^]u8, op: int, src: 
 }
 
 @(private)
-lz4_gather :: proc(s: ^LZ4, src: [^]u8, ip, low, length_limit: int, depth, nice: i32, matches: []$T) -> (count: int) #no_bounds_check {
+lz4_gather :: #force_inline proc "contextless" (s: ^LZ4, src: [^]u8, ip, low, length_limit: int, depth, nice: i32, matches: []$T) -> (count: int) #no_bounds_check {
 	sequence  := lz4_load_u32(src[ip:])
 	candidate := int(s.head[lz4_hash(sequence)])
+	next_head := int(s.head[lz4_hash(lz4_load_u32(src[ip + 1:]))])
+	intrinsics.prefetch_read_data(&s.chain[next_head & (LZ4_WINDOW_SIZE - 1)], 3)
+	intrinsics.prefetch_read_data(&src[next_head], 3)
+	if candidate >= ip {
+		return 0
+	}
 	best_length := LZ4_MIN_MATCH - 1
 	max_length  := length_limit - ip
+	floor       := max(low, ip - LZ4_MAX_OFFSET)
+	target      := src[ip + best_length]
 	depth := depth
-	for depth > 0 && candidate >= low && candidate < ip && ip - candidate <= LZ4_MAX_OFFSET {
-		if src[candidate + best_length] == src[ip + best_length] && lz4_load_u32(src[candidate:]) == sequence {
+	for depth > 0 && candidate >= floor {
+		if src[candidate + best_length] == target && lz4_load_u32(src[candidate:]) == sequence {
 			length := LZ4_MIN_MATCH + lz4_count(src, ip + LZ4_MIN_MATCH, candidate + LZ4_MIN_MATCH, length_limit)
 			if length > best_length {
 				best_length = length
@@ -727,6 +1004,7 @@ lz4_gather :: proc(s: ^LZ4, src: [^]u8, ip, low, length_limit: int, depth, nice:
 				if length >= int(nice) || length >= max_length {
 					break
 				}
+				target = src[ip + best_length]
 			}
 		}
 		delta := int(s.chain[candidate & (LZ4_WINDOW_SIZE - 1)])
@@ -737,6 +1015,176 @@ lz4_gather :: proc(s: ^LZ4, src: [^]u8, ip, low, length_limit: int, depth, nice:
 		depth     -= 1
 	}
 	return
+}
+
+@(private)
+lz4_write_frame_header :: proc(output: []u8, options: Frame_Options, content_size: u64) -> int #no_bounds_check {
+	_, has_dictionary_id := options.dictionary_id.?
+	dst := raw_data(output)
+	lz4_store_u32(dst, FRAME_MAGIC)
+	flg := transmute(LZ4_Descriptor_Flags)options.flags + {.Version_Low}
+	if has_dictionary_id {
+		flg += {.Dictionary_ID}
+	}
+	dst[4] = transmute(u8)flg
+	dst[5] = LZ4_BLOCK_MAX_CODE[options.block_max_size] << 4
+	op := 6
+	if .Content_Size in options.flags {
+		lz4_store_u64(dst[op:], content_size)
+		op += 8
+	}
+	if has_dictionary_id {
+		lz4_store_u32(dst[op:], options.dictionary_id.?)
+		op += 4
+	}
+	dst[op] = u8(xxhash.XXH32(output[4:op]) >> 8)
+	return op + 1
+}
+
+@(private)
+lz4_encode_block :: proc(s: ^LZ4, output, data: []u8, start, end: int, level: Level, flags: Frame_Flags, dictionary: []u8) -> (written: int, err: Error) #no_bounds_check {
+	dst  := raw_data(output)
+	size := end - start
+	room := len(output) - 4 - (4 if .Block_Checksum in flags else 0)
+	if room < 1 {
+		return 0, General_Error.Output_Too_Short
+	}
+
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	block := data
+	from, to, low := start, end, max(0, start - LZ4_MAX_OFFSET)
+	switch {
+	case len(dictionary) > 0 && .Independent_Blocks in flags:
+		block_history: int
+		block, block_history = lz4_prefix_dictionary(dictionary, data[start:end]) or_return
+		lz4_reset(s, level)
+		lz4_index(s, block, 0, block_history, level)
+		from, to, low = block_history, len(block), 0
+	case .Independent_Blocks in flags:
+		low = start
+	}
+
+	compressed: int
+	if room >= compress_block_bound(size) {
+		compressed = lz4_compress_range(s, output[4:], block, from, to, low, level, false, nil)
+	} else {
+		check := LZ4_Check{mark = max(int), limit = min(room, size - 1)}
+		compressed = lz4_compress_range(s, output[4:], block, from, to, low, level, true, &check)
+		if check.err != nil {
+			compressed = size
+		}
+	}
+
+	if compressed >= size {
+		if size > room {
+			return 0, General_Error.Output_Too_Short
+		}
+		intrinsics.mem_copy_non_overlapping(dst[4:], raw_data(data[start:]), size)
+		lz4_store_u32(dst, u32(size) | 0x8000_0000)
+		compressed = size
+	} else {
+		lz4_store_u32(dst, u32(compressed))
+	}
+	if .Block_Checksum in flags {
+		lz4_store_u32(dst[4 + compressed:], xxhash.XXH32(output[4:4 + compressed]))
+		compressed += 4
+	}
+	return 4 + compressed, nil
+}
+
+@(private)
+lz4_writer_start :: proc(fw: ^Frame_Writer, w: io.Writer, input_size: i64) {
+	fw.w            = w
+	fw.input_size   = input_size
+	fw.filled       = 0
+	fw.start        = 0
+	fw.history      = 0
+	fw.total        = 0
+	fw.flushed      = 0
+	fw.needs_index  = false
+	fw.finished     = false
+	header_options := fw.frame_options
+	if input_size < 0 {
+		header_options.flags -= {.Content_Size}
+	}
+	fw.flags = header_options.flags
+	lz4_reset(fw.state, fw.level)
+	fw.out_len = lz4_write_frame_header(fw.out, header_options, u64(max(input_size, 0)))
+	if len(fw.dictionary) > 0 && .Independent_Blocks not_in fw.flags {
+		tail := fw.dictionary[max(0, len(fw.dictionary) - LZ4_MAX_OFFSET):]
+		copy(fw.window, tail)
+		fw.filled      = len(tail)
+		fw.start       = len(tail)
+		fw.history     = len(tail)
+		fw.needs_index = true
+	}
+	if .Content_Checksum in fw.flags {
+		xxhash.XXH32_reset_state(&fw.digest)
+	}
+}
+
+@(private)
+lz4_writer_block :: proc(fw: ^Frame_Writer, size: int) -> (err: Error) {
+	data := fw.window[:fw.filled]
+	if fw.needs_index {
+		lz4_index(fw.state, data, 0, fw.history, fw.level)
+		fw.needs_index = false
+	}
+	fw.out_len += lz4_encode_block(fw.state, fw.out[fw.out_len:], data, fw.start, fw.start + size, fw.level, fw.flags, fw.dictionary) or_return
+	fw.start   += size
+	return lz4_writer_flush(fw)
+}
+
+@(private)
+lz4_writer_flush :: proc(fw: ^Frame_Writer) -> (err: Error) {
+	if fw.out_len > 0 {
+		_, write_err := io.write_full(fw.w, fw.out[:fw.out_len])
+		if write_err != nil {
+			return write_err
+		}
+		fw.flushed += i64(fw.out_len)
+		fw.out_len  = 0
+	}
+	return nil
+}
+
+@(private)
+lz4_writer_slide :: proc(fw: ^Frame_Writer) {
+	shift := (fw.start - LZ4_WINDOW_SIZE) &~ (LZ4_WINDOW_SIZE - 1)
+	copy(fw.window, fw.window[shift:fw.filled])
+	fw.filled -= shift
+	fw.start  -= shift
+	table := fw.state.fast[:] if LZ4_LEVELS[clamp(fw.level, Level.Fastest, Level.Best)].strategy == .Fast else fw.state.head[:]
+	for &position in table {
+		position = position - u32(shift) if int(position) >= shift else 0
+	}
+}
+
+@(private)
+lz4_writer_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	fw := (^Frame_Writer)(stream_data)
+	#partial switch mode {
+	case .Write:
+		written, write_err := frame_writer_write(fw, p)
+		n = i64(written)
+		if write_err != nil {
+			io_err, is_io := write_err.(io.Error)
+			err = io_err if is_io else .Unknown
+		}
+		return
+	case .Close:
+		if finish_err := frame_writer_finish(fw); finish_err != nil {
+			io_err, is_io := finish_err.(io.Error)
+			err = io_err if is_io else .Unknown
+		}
+		return
+	case .Destroy:
+		frame_writer_destroy(fw)
+		return 0, nil
+	case .Query:
+		return io.query_utility({.Write, .Close, .Destroy, .Query})
+	}
+	return 0, .Unsupported
 }
 
 /*

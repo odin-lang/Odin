@@ -50,6 +50,7 @@ fi
 (
 	cd "$here/tests/core"
 	"$ODIN" test normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address ${SLIM:+-define:ODIN_TEST_SLIM=true}
+	"$ODIN" test compress.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address ${SLIM:+-define:ODIN_TEST_SLIM=true}
 )
 
 # Vendor library tests

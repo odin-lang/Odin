@@ -140,6 +140,25 @@ stream_test_context :: proc(kind: Stream_Kind, data: ^[]byte, br: ^bytes.Reader,
 }
 
 @(test)
+compress_context_skip_past_end :: proc(t: ^testing.T) {
+	for kind in Stream_Kind {
+		data  := [8]byte{1, 2, 3, 4, 5, 6, 7, 8}
+		input := data[:]
+		br: bytes.Reader
+		tr: Trickle_Reader
+		ctx := stream_test_context(kind, &input, &br, &tr)
+		testing.expectf(t, compress.skip(&ctx, 8) == nil, "%v: skip to the end failed", kind)
+		testing.expectf(t, compress.skip(&ctx, 1) != nil, "%v: skip past the end succeeded", kind)
+		compress.destroy_context(&ctx)
+
+		input = data[:]
+		ctx   = stream_test_context(kind, &input, &br, &tr)
+		testing.expectf(t, compress.skip(&ctx, 9) != nil, "%v: skip one byte past the end succeeded", kind)
+		compress.destroy_context(&ctx)
+	}
+}
+
+@(test)
 compress_context_window :: proc(t: ^testing.T) {
 	data := stream_test_data()
 	defer delete(data)
@@ -206,9 +225,9 @@ compress_context_zlib_stored :: proc(t: ^testing.T) {
 		ctx := stream_test_context(kind, &input, &br, &tr, &output)
 		defer compress.destroy_context(&ctx)
 
-		err := deflate.inflate_zlib(&ctx)
-		testing.expectf(t, err == nil, "%v: inflate_zlib returned %v", kind, err)
-		testing.expectf(t, bytes.equal(output[:], data), "%v: inflate_zlib output differs", kind)
+		err := deflate.decompress_zlib(&ctx)
+		testing.expectf(t, err == nil, "%v: decompress_zlib returned %v", kind, err)
+		testing.expectf(t, bytes.equal(output[:], data), "%v: decompress_zlib output differs", kind)
 	}
 }
 
@@ -340,9 +359,9 @@ compress_context_zlib_fixed :: proc(t: ^testing.T) {
 			ctx := stream_test_context(kind, &input, &br, &tr, &output)
 			defer compress.destroy_context(&ctx)
 
-			err := deflate.inflate_zlib(&ctx)
-			testing.expectf(t, err == nil, "%v, tail %q: inflate_zlib returned %v", kind, tail, err)
-			testing.expectf(t, bytes.equal(output[:], want), "%v, tail %q: inflate_zlib output differs", kind, tail)
+			err := deflate.decompress_zlib(&ctx)
+			testing.expectf(t, err == nil, "%v, tail %q: decompress_zlib returned %v", kind, tail, err)
+			testing.expectf(t, bytes.equal(output[:], want), "%v, tail %q: decompress_zlib output differs", kind, tail)
 
 			rest: [5]byte
 			rest_err := compress.read_slice(&ctx, rest[:])

@@ -10,7 +10,15 @@ swap2 :: proc "contextless" (data: []u8) -> (processed: int) #no_bounds_check {
 
 swap4 :: proc "contextless" (data: []u8) -> (processed: int) #no_bounds_check {
 	processed = len(data) &~ 3
-	for i := 0; i < processed; i += 4 {
+	address := uintptr(raw_data(data))
+	head := 0
+	if address & 3 == 0 {
+		head = min(int(32 - address & 31) & 31, processed)
+	}
+	for i := 0; i < head; i += 4 {
+		put_be32(data, i, get_le32(data, i))
+	}
+	for i := head; i < processed; i += 4 {
 		put_be32(data, i, get_le32(data, i))
 	}
 	return
