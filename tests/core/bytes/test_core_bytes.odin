@@ -143,3 +143,69 @@ test_buffer_read_from_stall :: proc(t: ^testing.T) {
 		}
 	}
 }
+@test
+test_split_multi_iterator :: proc(t: ^testing.T) {
+	collect :: proc(input: string, delims: []string, skip_empty: bool) -> (out: [dynamic]string) {
+		s := transmute([]byte)input
+		substrs := make([][]byte, len(delims), context.temp_allocator)
+		for d, i in delims {
+			substrs[i] = transmute([]byte)d
+		}
+		// Bounded so a regression to the old non-advancing behaviour fails instead of hanging.
+		for _ in 0..<32 {
+			part, ok := bytes.split_multi_iterator(&s, substrs, skip_empty)
+			if !ok {
+				break
+			}
+			append(&out, string(part))
+		}
+		return
+	}
+	defer free_all(context.temp_allocator)
+
+	{
+		got := collect("a,b", {","}, false)
+		defer delete(got)
+		testing.expect_value(t, len(got), 2)
+		if len(got) == 2 {
+			testing.expect_value(t, got[0], "a")
+			testing.expect_value(t, got[1], "b")
+		}
+	}
+	{
+		got := collect("a,,b", {","}, false)
+		defer delete(got)
+		testing.expect_value(t, len(got), 3)
+		if len(got) == 3 {
+			testing.expect_value(t, got[1], "")
+		}
+	}
+	{
+		got := collect("a,,b", {","}, true)
+		defer delete(got)
+		testing.expect_value(t, len(got), 2)
+	}
+	{
+		// delimiters of different lengths
+		got := collect("a::b,c", {",", "::"}, false)
+		defer delete(got)
+		testing.expect_value(t, len(got), 3)
+		if len(got) == 3 {
+			testing.expect_value(t, got[0], "a")
+			testing.expect_value(t, got[1], "b")
+			testing.expect_value(t, got[2], "c")
+		}
+	}
+	{
+		// input not longer than the shortest delimiter still yields the remaining bytes
+		got := collect("a", {","}, false)
+		defer delete(got)
+		testing.expect_value(t, len(got), 1)
+	}
+	{
+		// empty delimiters are rejected instead of looping forever
+		got := collect("a,b", {""}, false)
+		defer delete(got)
+		testing.expect_value(t, len(got), 0)
+	}
+}
