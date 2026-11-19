@@ -28,13 +28,14 @@ hex_encode :: proc(t: ^testing.T) {
 @(test)
 hex_decode :: proc(t: ^testing.T) {
 	for test in CASES {
-		decoded, ok := hex.decode(transmute([]byte)test[1])
+		decoded, err := hex.decode(transmute([]byte)test[1])
 		defer delete(decoded)
 		testing.expectf(
 			t,
-			ok,
-			"decode: %q not ok",
+			err == nil,
+			"decode: %q failed: %v",
 			test[1],
+			err,
 		)
 		testing.expectf(
 			t,
