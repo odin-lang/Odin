@@ -1570,6 +1570,15 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 					array_add(&in_args, args[i]);
 				}
 			}
+			if (kind == DeferredProcedure_in || kind == DeferredProcedure_in_out) {
+				// NOTE(bill): A deferred procedure takes the arguments as they were at the call, like its results.
+				// An argument passed by address would otherwise be read at the end of the scope.
+				for (lbValue &arg : in_args) {
+					if (LLVMIsALoadInst(arg.value)) {
+						lb_copy_loaded_value_to_local(p, &arg, false);
+					}
+				}
+			}
 			Array<lbValue> result_as_args = {};
 			switch (kind) {
 			case DeferredProcedure_none:
