@@ -206,8 +206,8 @@ stream_init :: proc(r: ^Reader, z: ^compress.Context, kind: Stream_Kind, props: 
 	switch kind {
 	case .Alone:
 		header: [HEADER_SIZE]u8
-		if compress.read_slice(z, header[:]) != nil {
-			return General_Error.Stream_Too_Short
+		if read_err := compress.read_slice(z, header[:]); read_err != nil {
+			return input_error(read_err)
 		}
 		r.decoder.consumed = HEADER_SIZE
 		props = decode_properties(header[:PROPERTIES_SIZE]) or_return

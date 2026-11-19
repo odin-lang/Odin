@@ -244,6 +244,7 @@ Inflate :: struct {
 	base:       i64,
 	bit_buffer: u64,
 	bit_count:  i32,
+	input_err:  io.Error,
 	eof:        bool,
 	ctx:        ^compress.Context,
 }
@@ -1006,10 +1007,23 @@ deflate_round_up_divide :: proc(n, d: i32) -> i32 #no_bounds_check {
 }
 
 @(private)
+inflate_input_ended :: proc "contextless" (err: io.Error) -> bool {
+	return err == .EOF || err == .Unexpected_EOF || err == .Short_Buffer
+}
+
+@(private)
+inflate_input_error :: proc "contextless" (err: io.Error) -> Error {
+	if inflate_input_ended(err) {
+		return General_Error.Stream_Too_Short
+	}
+	return err
+}
+
+@(private)
 inflate_zlib_header :: proc(z: ^compress.Context) -> (err: Error) {
 	header, header_err := compress.read_data(z, [ZLIB_HEADER_SIZE]u8)
 	if header_err != nil {
-		return General_Error.Stream_Too_Short
+		return inflate_input_error(header_err)
 	}
 	cmf, flg := u32(header[0]), u32(header[1])
 	if cmf & 0x0f != 8 {
@@ -1149,6 +1163,9 @@ inflate_stream_fill :: proc(r: ^Reader) -> (err: Error) {
 		err     = General_Error.Stream_Too_Short
 		written = min(written, r.decoder.s.checkpoint)
 	}
+	if err == General_Error.Stream_Too_Short && r.decoder.s.input_err != nil {
+		err = r.decoder.s.input_err
+	}
 	if err == General_Error.Output_Too_Short && r.declared >= 0 {
 		err = General_Error.Size_Mismatch
 	}
@@ -1167,7 +1184,7 @@ inflate_stream_fill :: proc(r: ^Reader) -> (err: Error) {
 	case .Zlib:
 		adler, adler_err := compress.read_data(r.z, u32be)
 		if adler_err != nil {
-			return General_Error.Stream_Too_Short
+			return inflate_input_error(adler_err)
 		}
 		r.progress.bytes_in += size_of(u32be)
 		if r.digest != u32(adler) {
@@ -1177,7 +1194,7 @@ inflate_stream_fill :: proc(r: ^Reader) -> (err: Error) {
 	case .Gzip:
 		trailer, trailer_err := compress.read_data(r.z, Gzip_Trailer)
 		if trailer_err != nil {
-			return General_Error.Stream_Too_Short
+			return inflate_input_error(trailer_err)
 		}
 		r.progress.bytes_in += size_of(Gzip_Trailer)
 		if u32le(r.digest) != trailer.crc32 {
@@ -1187,6 +1204,9 @@ inflate_stream_fill :: proc(r: ^Reader) -> (err: Error) {
 			return GZIP_Error.Payload_Length_Invalid
 		}
 		magic, magic_err := compress.peek_data(r.z, Gzip_Magic)
+		if magic_err != nil && !inflate_input_ended(magic_err) {
+			return magic_err
+		}
 		r.done = magic_err != nil || magic != .GZIP
 	}
 	if r.done && r.declared >= 0 && r.total != r.declared {

@@ -283,3 +283,16 @@ lz4_copy_8 :: #force_inline proc "contextless" (dst, src: [^]u8) {
 lz4_copy_16 :: #force_inline proc "contextless" (dst, src: [^]u8) {
 	intrinsics.unaligned_store((^[2]u64)(dst), intrinsics.unaligned_load((^[2]u64)(src)))
 }
+
+@(private)
+lz4_input_ended :: proc "contextless" (err: io.Error) -> bool {
+	return err == .EOF || err == .Unexpected_EOF || err == .Short_Buffer
+}
+
+@(private)
+lz4_input_error :: proc "contextless" (err: io.Error) -> Error {
+	if lz4_input_ended(err) {
+		return General_Error.Stream_Too_Short
+	}
+	return err
+}

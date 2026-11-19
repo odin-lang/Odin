@@ -453,7 +453,7 @@ _bounded_read :: proc(r: ^Reader, p: []u8) -> (n: int, eof: bool, err: Error) {
 	if len(r.z.window) == 0 {
 		refill_err := compress.refill_window(r.z, 1)
 		if len(r.z.window) == 0 {
-			if refill_err != nil && refill_err != .EOF && refill_err != .Short_Buffer {
+			if refill_err != nil && refill_err != .EOF && refill_err != .Unexpected_EOF && refill_err != .Short_Buffer {
 				return 0, false, refill_err
 			}
 			r.block_eof = true
@@ -542,7 +542,7 @@ _stream_padding :: proc(r: ^Reader) -> (err: Error) {
 		if len(r.z.window) == 0 {
 			refill_err := compress.refill_window(r.z, 1)
 			if len(r.z.window) == 0 {
-				if refill_err != nil && refill_err != .EOF && refill_err != .Short_Buffer {
+				if refill_err != nil && refill_err != .EOF && refill_err != .Unexpected_EOF && refill_err != .Short_Buffer {
 					return refill_err
 				}
 				if padding % 4 != 0 {
@@ -559,8 +559,11 @@ _stream_padding :: proc(r: ^Reader) -> (err: Error) {
 		r.consumed += 1
 		padding    += 1
 	}
-	_ = compress.refill_window(r.z, len(HEADER_MAGIC))
+	magic_err := compress.refill_window(r.z, len(HEADER_MAGIC))
 	avail := r.z.window
+	if len(avail) < len(HEADER_MAGIC) && magic_err != nil && magic_err != .EOF && magic_err != .Unexpected_EOF && magic_err != .Short_Buffer {
+		return magic_err
+	}
 	if len(avail) < len(HEADER_MAGIC) || string(avail[:len(HEADER_MAGIC)]) != string(HEADER_MAGIC[:]) {
 		if len(avail) < len(HEADER_MAGIC) && string(avail) == string(HEADER_MAGIC[:len(avail)]) {
 			return General_Error.Stream_Too_Short

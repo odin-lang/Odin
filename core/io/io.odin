@@ -281,6 +281,9 @@ write_at :: proc(w: Writer_At, p: []byte, offset: i64, n_written: ^int = nil) ->
 					nn: int
 					nn, err = write(w, p[n:])
 					n += nn
+					if nn <= 0 && err == nil {
+						err = .Short_Write
+					}
 				}
 			}
 			_, err1 := seek(w, curr, .Start)
@@ -429,10 +432,19 @@ read_full :: proc(r: Reader, buf: []byte) -> (n: int, err: Error) {
 }
 
 read_full_at :: proc(r: Reader_At, buf: []byte, offset: i64) -> (n: int, err: Error) {
+	stalled := 0
 	for n < len(buf) && err == nil {
 		nn: int
 		nn, err = read_at(r, buf[n:], offset + i64(n))
 		n += nn
+		if nn > 0 {
+			stalled = 0
+		} else if err == nil {
+			stalled += 1
+			if stalled > 100 {
+				err = .No_Progress
+			}
+		}
 	}
 
 	if n >= len(buf) {
@@ -452,10 +464,19 @@ read_at_least :: proc(r: Reader, buf: []byte, min: int) -> (n: int, err: Error) 
 	if len(buf) < min {
 		return 0, .Short_Buffer
 	}
+	stalled := 0
 	for n < min && err == nil {
 		nn: int
 		nn, err = read(r, buf[n:])
 		n += nn
+		if nn > 0 {
+			stalled = 0
+		} else if err == nil {
+			stalled += 1
+			if stalled > 100 {
+				err = .No_Progress
+			}
+		}
 	}
 
 	if n >= min {
@@ -481,6 +502,9 @@ write_at_least :: proc(w: Writer, buf: []byte, min: int) -> (n: int, err: Error)
 		nn: int
 		nn, err = write(w, buf[n:])
 		n += nn
+		if nn <= 0 && err == nil {
+			err = .Short_Write
+		}
 	}
 	return
 }
@@ -542,9 +566,11 @@ _copy_buffer :: proc(dst: Writer, src: Reader, buf: []byte) -> (written: i64, er
 		// NOTE(bill): alloca is fine here
 		buf = intrinsics.alloca(size, 2*align_of(rawptr))[:size]
 	}
+	stalled := 0
 	for {
 		nr, er := read(src, buf)
 		if nr > 0 {
+			stalled = 0
 			nw, ew := write(dst, buf[0:nr])
 			if nw > 0 {
 				written += i64(nw)
@@ -555,6 +581,12 @@ _copy_buffer :: proc(dst: Writer, src: Reader, buf: []byte) -> (written: i64, er
 			}
 			if nr != nw {
 				err = .Short_Write
+				break
+			}
+		} else if er == nil {
+			stalled += 1
+			if stalled > 100 {
+				err = .No_Progress
 				break
 			}
 		}

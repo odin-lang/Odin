@@ -557,3 +557,16 @@ check_options :: proc "contextless" (options: compress.Options) -> (err: Error) 
 	}
 	return nil
 }
+
+@(private)
+input_ended :: proc "contextless" (err: io.Error) -> bool {
+	return err == .EOF || err == .Unexpected_EOF || err == .Short_Buffer
+}
+
+@(private)
+input_error :: proc "contextless" (err: io.Error) -> Error {
+	if input_ended(err) {
+		return General_Error.Stream_Too_Short
+	}
+	return err
+}

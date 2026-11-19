@@ -2,6 +2,7 @@ package compress_lzma
 
 import "base:intrinsics"
 import "core:compress"
+import "core:io"
 
 decompress        :: proc{decompress_from_bytes, decompress_from_context}
 decompress_raw    :: proc{decompress_raw_from_bytes, decompress_raw_from_context}
@@ -25,8 +26,8 @@ decompress_from_context :: proc(z: ^compress.Context, expected_output_size := -1
 	}
 	total_in := progress_total_in(z, options)
 	header: [HEADER_SIZE]u8
-	if compress.read_slice(z, header[:]) != nil {
-		return General_Error.Stream_Too_Short
+	if read_err := compress.read_slice(z, header[:]); read_err != nil {
+		return input_error(read_err)
 	}
 	props := decode_properties(header[:PROPERTIES_SIZE]) or_return
 	size  := u64(0)
@@ -291,7 +292,10 @@ lzma_finish :: proc(d: ^Decoder, z: ^compress.Context, o: ^Output, size: int, eo
 	if d.remain != 0 {
 		return overflow
 	}
-	if (size >= 0 && d.code == 0) || decode_end_marker(d, z) {
+	if size >= 0 && d.code == 0 {
+		return nil
+	}
+	if decode_end_marker(d, z) or_return {
 		return nil
 	}
 	return overflow
@@ -326,8 +330,8 @@ lzma2_fill :: proc(d: ^Decoder, z: ^compress.Context, o: ^Output, s: ^LZMA2_Stat
 					n = min(n, o.progress.mark - o.base - o.written)
 				}
 				output_ensure(o, o.written + n) or_return
-				if compress.read_slice(z, o.buf^[o.written:][:n]) != nil {
-					return General_Error.Stream_Too_Short
+				if read_err := compress.read_slice(z, o.buf^[o.written:][:n]); read_err != nil {
+					return input_error(read_err)
 				}
 				d.consumed += i64(n)
 				if d.check_dict == 0 && d.dict_size - d.processed <= u32(n) {
@@ -349,7 +353,7 @@ lzma2_fill :: proc(d: ^Decoder, z: ^compress.Context, o: ^Output, s: ^LZMA2_Stat
 		case .None:
 			control, control_err := compress.read_u8(z)
 			if control_err != nil {
-				return General_Error.Stream_Too_Short
+				return input_error(control_err)
 			}
 			d.consumed += 1
 			if control == 0 {
@@ -368,8 +372,8 @@ lzma2_fill :: proc(d: ^Decoder, z: ^compress.Context, o: ^Output, s: ^LZMA2_Stat
 					return LZMA_Error.Invalid_Chunk
 				}
 				header: [2]u8
-				if compress.read_slice(z, header[:]) != nil {
-					return General_Error.Stream_Too_Short
+				if read_err := compress.read_slice(z, header[:]); read_err != nil {
+					return input_error(read_err)
 				}
 				d.consumed += 2
 				n := (int(header[0]) << 8 | int(header[1])) + 1
@@ -390,8 +394,8 @@ lzma2_fill :: proc(d: ^Decoder, z: ^compress.Context, o: ^Output, s: ^LZMA2_Stat
 			}
 			s.need_init = 0
 			header: [4]u8
-			if compress.read_slice(z, header[:]) != nil {
-				return General_Error.Stream_Too_Short
+			if read_err := compress.read_slice(z, header[:]); read_err != nil {
+				return input_error(read_err)
 			}
 			d.consumed += 4
 			unpacked := (int(control & 0x1F) << 16 | int(header[0]) << 8 | int(header[1])) + 1
@@ -399,7 +403,7 @@ lzma2_fill :: proc(d: ^Decoder, z: ^compress.Context, o: ^Output, s: ^LZMA2_Stat
 			if control >= LZMA2_CONTROL_SET_PROPS {
 				b, b_err := compress.read_u8(z)
 				if b_err != nil {
-					return General_Error.Stream_Too_Short
+					return input_error(b_err)
 				}
 				d.consumed += 1
 				if b >= 9 * 5 * 5 {
@@ -462,8 +466,8 @@ decoder_reset_state :: proc(d: ^Decoder) {
 @(private)
 rc_init :: proc(d: ^Decoder, z: ^compress.Context) -> (err: Error) {
 	buf: [RC_INIT_SIZE]u8
-	if compress.read_slice(z, buf[:]) != nil {
-		return General_Error.Stream_Too_Short
+	if read_err := compress.read_slice(z, buf[:]); read_err != nil {
+		return input_error(read_err)
 	}
 	d.consumed += RC_INIT_SIZE
 	if buf[0] != 0 {
@@ -564,12 +568,13 @@ decode_segment :: proc(d: ^Decoder, z: ^compress.Context, o: ^Output, limit: int
 		if packed^ >= 0 && len(avail) > packed^ {
 			avail = avail[:packed^]
 		}
+		refill_err: io.Error
 		if len(avail) <= REQUIRED_INPUT_MAX && !memory && (packed^ < 0 || len(avail) < packed^) {
 			need := REQUIRED_INPUT_MAX + 1
 			if packed^ >= 0 {
 				need = min(need, packed^)
 			}
-			compress.refill_window(z, need)
+			refill_err = compress.refill_window(z, need)
 			avail = z.window
 			if packed^ >= 0 && len(avail) > packed^ {
 				avail = avail[:packed^]
@@ -594,6 +599,9 @@ decode_segment :: proc(d: ^Decoder, z: ^compress.Context, o: ^Output, limit: int
 			d.check_dict = d.dict_size
 		}
 		if rc.overrun {
+			if refill_err != nil && !input_ended(refill_err) {
+				return false, refill_err
+			}
 			return false, General_Error.Stream_Too_Short
 		}
 		if err != nil || eos {
@@ -899,27 +907,29 @@ decode_real :: proc(d: ^Decoder, rc_ptr: ^Rc, o: ^Output, limit, safe: int, $CHE
 }
 
 @(private)
-decode_end_marker :: proc(d: ^Decoder, z: ^compress.Context) -> (ok: bool) {
+decode_end_marker :: proc(d: ^Decoder, z: ^compress.Context) -> (ok: bool, err: Error) {
 	if !compress.is_memory_context(z) {
-		compress.refill_window(z, REQUIRED_INPUT_MAX)
+		if refill_err := compress.refill_window(z, REQUIRED_INPUT_MAX); refill_err != nil && !input_ended(refill_err) {
+			return false, refill_err
+		}
 	}
 	rc        := Rc{range_ = d.range_, code = d.code, src = raw_data(z.window), end = len(z.window)}
 	probs     := raw_data(d.probs)
 	pos_state := (d.processed & ((u32(1) << d.props.pb) - 1)) << 4
 	state     := d.state
 	if rc_bit(&rc, &probs[IS_MATCH + pos_state + state], true) == 0 {
-		return false
+		return false, nil
 	}
 	if rc_bit(&rc, &probs[IS_REP + state], true) != 0 {
-		return false
+		return false, nil
 	}
 	length   := decode_len(&rc, probs[LEN_CODER:], pos_state, true)
 	distance := decode_distance(&rc, probs, length, true)
 	rc_normalize(&rc, true)
 	if rc.overrun || distance != 0xFFFF_FFFF || rc.code != 0 {
-		return false
+		return false, nil
 	}
 	z.window = z.window[rc.pos:]
 	d.consumed += i64(rc.pos)
-	return true
+	return true, nil
 }
