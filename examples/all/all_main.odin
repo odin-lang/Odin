@@ -20,6 +20,7 @@ package all
 @(require) import "core:compress/lz4"
 @(require) import "core:compress/lzma"
 @(require) import "core:compress/ppmd"
+@(require) import "core:compress/xz"
 @(require) import pkzip_legacy "core:compress/pkzip-legacy"
 
 @(require) import "core:container/avl"

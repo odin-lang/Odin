@@ -7,6 +7,7 @@ import "core:compress/deflate"
 import "core:compress/lz4"
 import "core:compress/lzma"
 import "core:compress/ppmd"
+import "core:compress/xz"
 import "core:io"
 import "core:testing"
 
@@ -24,6 +25,7 @@ Declared_Codec :: enum {
 	LZMA,
 	LZMA_Raw,
 	LZMA2,
+	XZ,
 }
 
 Declared_Path :: enum {
@@ -110,6 +112,8 @@ declared_encode :: proc(t: ^testing.T, codec: Declared_Codec, data: []byte) -> (
 		props: lzma.Properties
 		props, err = lzma.compress_lzma2_to_dynamic(&s.packed, data, lzma.level_options())
 		s.dict_size = props.dict_size
+	case .XZ:
+		err = xz.compress_to_dynamic(&s.packed, data)
 	}
 	testing.expectf(t, err == nil, "%v: encode failed: %v", codec, err)
 	return
@@ -131,6 +135,7 @@ declared_decode :: proc(codec: Declared_Codec, path: Declared_Path, s: ^Declared
 		case .LZMA:             return lzma.decompress_from_bytes(out, input, expected)
 		case .LZMA_Raw:         return lzma.decompress_raw_from_bytes(out, input, s.lzma_props, expected)
 		case .LZMA2:            return lzma.decompress_lzma2_from_bytes(out, input, s.dict_size, expected)
+		case .XZ:               return xz.decompress_from_bytes(out, input, {}, expected)
 		}
 	}
 
@@ -161,6 +166,7 @@ declared_decode :: proc(codec: Declared_Codec, path: Declared_Path, s: ^Declared
 		case .LZMA:             return lzma.decompress_from_context(&ctx, expected)
 		case .LZMA_Raw:         return lzma.decompress_raw_from_context(&ctx, s.lzma_props, expected)
 		case .LZMA2:            return lzma.decompress_lzma2_from_context(&ctx, s.dict_size, expected)
+		case .XZ:               return xz.decompress_from_context(&ctx, {}, expected)
 		}
 	case .Writer_Memory, .Writer_Stream:
 		buf: bytes.Buffer
@@ -179,6 +185,7 @@ declared_decode :: proc(codec: Declared_Codec, path: Declared_Path, s: ^Declared
 		case .LZMA:             err = lzma.decompress_to_writer(w, &ctx, expected)
 		case .LZMA_Raw:         err = lzma.decompress_raw_to_writer(w, &ctx, s.lzma_props, expected)
 		case .LZMA2:            err = lzma.decompress_lzma2_to_writer(w, &ctx, s.dict_size, expected)
+		case .XZ:               err = xz.decompress_to_writer(w, &ctx, {}, expected)
 		}
 		append(out, ..bytes.buffer_to_bytes(&buf))
 		return
@@ -216,6 +223,11 @@ declared_decode :: proc(codec: Declared_Codec, path: Declared_Path, s: ^Declared
 			}
 			defer lzma.reader_destroy(&r)
 			return declared_read_all(&r, lzma.reader_read, out)
+		case .XZ:
+			r: xz.Reader
+			xz.reader_init(&r, &ctx, {}, expected) or_return
+			defer xz.reader_destroy(&r)
+			return declared_read_all(&r, xz.reader_read, out)
 		}
 	}
 	return
