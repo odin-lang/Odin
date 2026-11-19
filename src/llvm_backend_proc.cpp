@@ -919,7 +919,7 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 								lb_mem_copy_non_overlapping(p, new_ptr, ptr, lb_const_int(p->module, t_uint, sz));
 							}
 							ptr = new_ptr;
-						} else if (build_context.internal_by_value && is_odin_cc) {
+						} else if (!build_context.internal_by_reference && is_odin_cc) {
 							ptr = lb_copy_indirect_param(p, ptr);
 						}
 
@@ -971,7 +971,7 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 	}
 }
 
-// NOTE(bill, 2026-11-19): -internal-by-value:
+// NOTE(bill, 2026-11-19): Indirect Odin parameters are values (`-internal-by-reference` goes back to `T const &`):
 // The caller copies an indirect Odin argument when something could write it during the call.
 // It passes the original address of a constant, a temporary, or a local whose address never escapes.
 // The callee keeps each indirect parameter in a local copy, and forwarding that local follows the same rule.
@@ -1177,7 +1177,7 @@ gb_internal void lb_end_procedure_body(lbProcedure *p) {
 		}
 	}
 
-	if (build_context.internal_by_value) {
+	if (!build_context.internal_by_reference) {
 		lb_drop_unneeded_copies(p);
 	}
 
@@ -1391,7 +1391,7 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 		LLVMSetInstructionCallConv(ret, lb_calling_convention_kind(proc_type->Proc.calling_convention));
 
 		bool is_odin_cc = is_calling_convention_odin(proc_type->Proc.calling_convention);
-		u64  uncaptured = 0; // -internal-by-value: the argument positions the callee never keeps a pointer to
+		u64  uncaptured = 0; // the argument positions the callee never keeps a pointer to
 
 		LLVMAttributeIndex param_offset = LLVMAttributeIndex_FirstArgIndex;
 		if (return_ptr.value != nullptr) {
@@ -1438,7 +1438,7 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 			}
 			param_offset += lb_arg_value_param_count(&ft->args[i]);
 		}
-		if (build_context.internal_by_value && uncaptured != 0) {
+		if (!build_context.internal_by_reference && uncaptured != 0) {
 			map_set(&p->uncaptured_arg_masks, ret, uncaptured);
 		}
 
@@ -1643,7 +1643,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 					} else {
 						// the callee assumes ptr is aligned to type_align_of(T)
 						ptr = lb_aligned_address_from_load_or_generate_local(p, x);
-						if (build_context.internal_by_value && type_size_of(original_type) > 16) {
+						if (!build_context.internal_by_reference && type_size_of(original_type) > 16) {
 							ptr = lb_copy_indirect_arg_if_aliased(p, x, ptr);
 						}
 					}
@@ -5657,9 +5657,9 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 	Ast *proc_expr = unparen_expr(ce->proc);
 	Entity *proc_entity = entity_of_node(proc_expr);
 
-	// NOTE(bill): -internal-by-value: an `any` boxed while building a call's arguments is tied to that call.
+	// NOTE(bill): An `any` boxed while building a call's arguments is tied to that call.
 	// A builtin such as `append` may keep an `any` it is given: what it boxes is tied to no call.
-	if (build_context.internal_by_value) {
+	if (!build_context.internal_by_reference) {
 		i32 call = 0;
 		if (proc_mode != Addressing_Builtin) {
 			p->call_count += 1;
@@ -5667,7 +5667,7 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 		}
 		array_add(&p->call_stack, call);
 	}
-	defer (if (build_context.internal_by_value) { array_pop(&p->call_stack); });
+	defer (if (!build_context.internal_by_reference) { array_pop(&p->call_stack); });
 
 	if (proc_mode == Addressing_Builtin) {
 		BuiltinProcId id = BuiltinProc_Invalid;

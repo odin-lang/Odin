@@ -1127,7 +1127,7 @@ gb_internal i32 lb_current_call(lbProcedure *p) {
 	return p->call_stack[p->call_stack.count-1];
 }
 
-// NOTE(bill): -internal-by-value: an `any` boxed from a value straight into a call gets its own pointer to the value.
+// NOTE(bill): An `any` boxed from a value straight into a call gets its own pointer to the value.
 // Through it, lb_drop_unneeded_copies sees which call the value is reachable from.
 gb_internal LLVMValueRef lb_any_data_for_call(lbProcedure *p, lbValue value, LLVMValueRef data) {
 	i32 call = lb_current_call(p);

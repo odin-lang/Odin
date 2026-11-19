@@ -468,7 +468,7 @@ struct lbProcedure {
 
 	Type *internal_gen_type; // map_set, map_get, etc.
 
-	// -internal-by-value
+	// by-value parameters
 	PtrMap<LLVMValueRef, u64> uncaptured_arg_masks;
 	Array<lbPendingCopy>      pending_copies;
 	PtrMap<LLVMValueRef, i32> any_boxes;  // a boxed pointer -> the call it is an argument of
