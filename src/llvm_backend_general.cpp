@@ -1170,6 +1170,19 @@ gb_internal lbValue lb_build_addr_ptr(lbProcedure *p, Ast *expr) {
 	return lb_addr_get_ptr(p, addr);
 }
 
+// The address of a value being indexed, selected, or ranged over.
+// A map index (`m[key]`) with a missing key gives a zeroed local instead of nil.
+// A found value is used in place, without a copy.
+gb_internal lbValue lb_addr_get_ptr_or_zero(lbProcedure *p, lbAddr const &addr) {
+	lbValue ptr = lb_addr_get_ptr(p, addr);
+	if (addr.kind == lbAddr_Map) {
+		lbValue zero  = lb_add_local_generated(p, type_deref(ptr.type), true).addr;
+		lbValue found = lb_emit_comp_against_nil(p, Token_NotEq, ptr);
+		ptr = lb_emit_select(p, found, ptr, zero);
+	}
+	return ptr;
+}
+
 gb_internal void lb_set_file_line_col(lbProcedure *p, Array<lbValue> arr, TokenPos pos) {
 	String file = get_file_path_string(pos.file_id);
 	i32 line    = pos.line;
