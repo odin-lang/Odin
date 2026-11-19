@@ -254,6 +254,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	p->multi_assign_copy_slots.allocator = a;
 	p->lifetime_scopes.allocator         = a;
 	p->pending_copies.allocator          = a;
+	p->call_stack.allocator              = a;
 	// map_init(&p->selector_values,  0);
 	// map_init(&p->selector_addr,    0);
 	// map_init(&p->tuple_fix_map,    0);
@@ -583,6 +584,7 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 	p->multi_assign_copy_slots.allocator = a;
 	p->lifetime_scopes.allocator         = a;
 	p->pending_copies.allocator          = a;
+	p->call_stack.allocator              = a;
 	map_init(&p->tuple_fix_map, 0);
 
 
@@ -1007,7 +1009,10 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 // It passes the original address of a constant, a temporary, or a local whose address never escapes.
 // The callee keeps each indirect parameter in a local copy, and forwarding that local follows the same rule.
 // A copy is made up front and dropped at the end of the procedure if its local's address did not escape.
-// A parameter whose address escapes (e.g. boxed in an `any`) keeps its copy: writes through that address never reach the caller.
+// A parameter whose address escapes keeps its copy: writes through that address never reach the caller.
+// An `any` boxed from a value straight into a call is not an escape: the value is only reachable through it during that call.
+// That call still gets copies of its by-value arguments.
+// Writing through such an `any` of a parameter reaches the caller's storage: `any` is the escape hatch.
 gb_internal lbPendingCopy lb_copy_to_new_local(lbProcedure *p, LLVMValueRef src, Type *type) {
 	unsigned     align = cast(unsigned)type_align_of(type);
 	LLVMValueRef size  = lb_const_int(p->module, t_uint, type_size_of(type)).value;
@@ -1042,6 +1047,7 @@ gb_internal lbValue lb_copy_indirect_arg_if_aliased(lbProcedure *p, lbValue x, l
 	lbPendingCopy c = lb_copy_to_new_local(p, ptr.value, x.type);
 	if (LLVMIsAAllocaInst(base)) {
 		c.local = base;
+		c.call  = lb_current_call(p);
 		array_add(&p->pending_copies, c);
 	}
 	return lbValue{c.temp, ptr.type};
@@ -1083,7 +1089,8 @@ gb_internal bool lb_is_memory_intrinsic_call(LLVMValueRef call) {
 	       string_starts_with(s, str_lit("llvm.dbg."));
 }
 
-gb_internal bool lb_pointer_may_escape(lbProcedure *p, LLVMValueRef ptr) {
+// `box_calls` gets the calls an `any` of the pointer is boxed for.
+gb_internal bool lb_pointer_may_escape(lbProcedure *p, LLVMValueRef ptr, Array<i32> *box_calls) {
 	for (LLVMUseRef use = LLVMGetFirstUse(ptr); use != nullptr; use = LLVMGetNextUse(use)) {
 		LLVMValueRef user = LLVMGetUser(use);
 		if (LLVMIsALoadInst(user)) {
@@ -1095,11 +1102,18 @@ gb_internal bool lb_pointer_may_escape(lbProcedure *p, LLVMValueRef ptr) {
 			}
 			continue;
 		}
+		if (LLVMIsAGetElementPtrInst(user)) {
+			i32 *call = map_get(&p->any_boxes, user);
+			if (call != nullptr) {
+				array_add(box_calls, *call);
+				continue;
+			}
+		}
 		if (LLVMIsAGetElementPtrInst(user) || LLVMIsABitCastInst(user) || LLVMIsAAddrSpaceCastInst(user)) {
 			if (LLVMGetOperand(user, 0) != ptr) {
 				return true;
 			}
-			if (lb_pointer_may_escape(p, user)) {
+			if (lb_pointer_may_escape(p, user, box_calls)) {
 				return true;
 			}
 			continue;
@@ -1128,20 +1142,37 @@ gb_internal bool lb_pointer_may_escape(lbProcedure *p, LLVMValueRef ptr) {
 	return false;
 }
 
+struct lbLocalEscape {
+	bool       escaped;
+	Array<i32> box_calls;
+};
+
 gb_internal void lb_drop_unneeded_copies(lbProcedure *p) {
-	PtrMap<LLVMValueRef, bool> escapes = {};
+	PtrMap<LLVMValueRef, isize> escape_index = {};
+	auto escapes = array_make<lbLocalEscape>(heap_allocator());
 
 	// NOTE(bill): Backwards: the copies made from a parameter's local are dropped before the parameter's own copy.
 	for (isize i = p->pending_copies.count-1; i >= 0; i -= 1) {
 		lbPendingCopy const &c = p->pending_copies[i];
 
-		bool  escaped = false;
-		bool *found   = map_get(&escapes, c.local);
-		if (found != nullptr) {
-			escaped = *found;
-		} else {
-			escaped = lb_pointer_may_escape(p, c.local);
-			map_set(&escapes, c.local, escaped);
+		isize *found = map_get(&escape_index, c.local);
+		if (found == nullptr) {
+			lbLocalEscape e = {};
+			e.box_calls = array_make<i32>(heap_allocator());
+			e.escaped   = lb_pointer_may_escape(p, c.local, &e.box_calls);
+			map_set(&escape_index, c.local, escapes.count);
+			array_add(&escapes, e);
+			found = map_get(&escape_index, c.local);
+		}
+		lbLocalEscape const &e = escapes[*found];
+
+		bool escaped = e.escaped;
+		if (c.local != c.temp) {
+			for (i32 call : e.box_calls) {
+				if (call == c.call) {
+					escaped = true;
+				}
+			}
 		}
 		if (escaped) {
 			continue;
@@ -1163,10 +1194,16 @@ gb_internal void lb_drop_unneeded_copies(lbProcedure *p) {
 		LLVMReplaceAllUsesWith(c.temp, c.src);
 		LLVMInstructionEraseFromParent(c.temp);
 	}
-	map_destroy(&escapes);
+	for (lbLocalEscape &e : escapes) {
+		array_free(&e.box_calls);
+	}
+	array_free(&escapes);
+	map_destroy(&escape_index);
 
 	array_free(&p->pending_copies);
 	map_destroy(&p->uncaptured_arg_masks);
+	map_destroy(&p->any_boxes);
+	array_free(&p->call_stack);
 }
 
 gb_internal void lb_end_procedure_body(lbProcedure *p) {
@@ -5652,6 +5689,18 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 
 	Ast *proc_expr = unparen_expr(ce->proc);
 	Entity *proc_entity = entity_of_node(proc_expr);
+
+	// NOTE(bill): -internal-by-value: an `any` boxed while building a call's arguments is tied to that call.
+	// A builtin such as `append` may keep an `any` it is given: what it boxes is tied to no call.
+	if (build_context.internal_by_value) {
+		i32 call = 0;
+		if (proc_mode != Addressing_Builtin) {
+			p->call_count += 1;
+			call = p->call_count;
+		}
+		array_add(&p->call_stack, call);
+	}
+	defer (if (build_context.internal_by_value) { array_pop(&p->call_stack); });
 
 	if (proc_mode == Addressing_Builtin) {
 		BuiltinProcId id = BuiltinProc_Invalid;

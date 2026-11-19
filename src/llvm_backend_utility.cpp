@@ -1116,6 +1116,36 @@ gb_internal LLVMValueRef lb_pointer_base(LLVMValueRef ptr) {
 	}
 }
 
+gb_internal i32 lb_current_call(lbProcedure *p) {
+	if (p->call_stack.count == 0) {
+		return 0;
+	}
+	return p->call_stack[p->call_stack.count-1];
+}
+
+// NOTE(bill): -internal-by-value: an `any` boxed from a value straight into a call gets its own pointer to the value.
+// Through it, lb_drop_unneeded_copies sees which call the value is reachable from.
+gb_internal LLVMValueRef lb_any_data_for_call(lbProcedure *p, lbValue value, LLVMValueRef data) {
+	if (!build_context.internal_by_value) {
+		return data;
+	}
+	i32 call = lb_current_call(p);
+	if (call == 0) {
+		return data;
+	}
+	if (!LLVMIsALoadInst(value.value) || LLVMGetOperand(value.value, 0) != data) {
+		return data;
+	}
+
+	LLVMValueRef zero = LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), 0, false);
+	LLVMValueRef box  = LLVMBuildGEP2(p->builder, LLVMInt8TypeInContext(p->module->ctx), data, &zero, 1, "");
+	if (!LLVMIsAGetElementPtrInst(box)) {
+		return data;
+	}
+	map_set(&p->any_boxes, box, call);
+	return box;
+}
+
 gb_internal lbValue lb_address_from_load_or_generate_local(lbProcedure *p, lbValue value) {
 	if (!p->in_multi_assignment && LLVMIsALoadInst(value.value)) {
 		lbValue res = {};
