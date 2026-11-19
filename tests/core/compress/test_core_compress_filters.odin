@@ -363,10 +363,10 @@ filters_bcj2_corrupt :: proc(t: ^testing.T) {
 
 	short := make([]byte, len(input) - 1)
 	defer delete(short)
-	testing.expect_value(t, filters.bcj2_decode(short, main, call, jump, rc), compress.BCJ2_Error.Size_Mismatch)
+	testing.expect_value(t, filters.bcj2_decode(short, main, call, jump, rc), compress.General_Error.Size_Mismatch)
 	full := make([]byte, len(input))
 	defer delete(full)
-	testing.expect_value(t, filters.bcj2_decode(full, main[:len(main) - 1], call, jump, rc), compress.BCJ2_Error.Size_Mismatch)
+	testing.expect_value(t, filters.bcj2_decode(full, main[:len(main) - 1], call, jump, rc), compress.General_Error.Size_Mismatch)
 
 	output: [dynamic]byte
 	defer delete(output)
@@ -422,10 +422,10 @@ filters_bcj2_sizes :: proc(t: ^testing.T) {
 	output: [dynamic]byte
 	defer delete(output)
 
-	testing.expect_value(t, filters.bcj2_decode(buffer[:1], huge, huge, buffer[:3], nil), compress.BCJ2_Error.Size_Mismatch)
-	testing.expect_value(t, filters.bcj2_decode(buffer[:1], buffer[:1], huge, huge, nil), compress.BCJ2_Error.Size_Mismatch)
-	testing.expect_value(t, filters.bcj2_decode(&output, huge, huge, buffer[:3], nil), compress.BCJ2_Error.Size_Mismatch)
-	testing.expect_value(t, filters.bcj2_decode(&output, buffer[:1], huge[:max(int) - 1], buffer[:1], nil), compress.BCJ2_Error.Size_Mismatch)
+	testing.expect_value(t, filters.bcj2_decode(buffer[:1], huge, huge, buffer[:3], nil), compress.General_Error.Size_Mismatch)
+	testing.expect_value(t, filters.bcj2_decode(buffer[:1], buffer[:1], huge, huge, nil), compress.General_Error.Size_Mismatch)
+	testing.expect_value(t, filters.bcj2_decode(&output, huge, huge, buffer[:3], nil), compress.General_Error.Size_Mismatch)
+	testing.expect_value(t, filters.bcj2_decode(&output, buffer[:1], huge[:max(int) - 1], buffer[:1], nil), compress.General_Error.Size_Mismatch)
 	testing.expect_value(t, len(output), 0)
 
 	streams: filters.Bcj2_Streams

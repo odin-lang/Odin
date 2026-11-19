@@ -6,6 +6,7 @@ import "core:compress/ppmd"
 import "core:fmt"
 import "core:hash"
 import "core:math/rand"
+import "core:mem"
 import "core:testing"
 
 PPMD_TEST_TRAILER :: [5]byte{'O', 'd', 'i', 'n', '!'}
@@ -15,7 +16,6 @@ PPMD_VECTOR_ZIP5      :: #load("ppmd_vector_zip5.bin")
 PPMD_VECTOR_ZIP9      :: #load("ppmd_vector_zip9.bin")
 PPMD_VECTOR_I_RESTART :: #load("ppmd_vector_i_restart.bin")
 PPMD_VECTOR_I_CUT_OFF :: #load("ppmd_vector_i_cut_off.bin")
-PPMD_VECTOR_I_FREEZE  :: #load("ppmd_vector_i_freeze.bin")
 
 PPMD_VECTOR_7Z_PROPS   :: ppmd.Properties{variant = .H, order = 8, mem_size = 1 << 18}
 PPMD_VECTOR_ZIP5_PROPS :: ppmd.Properties{variant = .I, order = 8, mem_size = 1 << 20, restore = .Restart}
@@ -164,7 +164,6 @@ ppmd_vectors :: proc(t: ^testing.T) {
 	restores := [?]Restore_Case{
 		{"restart", PPMD_VECTOR_I_RESTART, .Restart},
 		{"cut off", PPMD_VECTOR_I_CUT_OFF, .Cut_Off},
-		{"freeze",  PPMD_VECTOR_I_FREEZE,  .Freeze},
 	}
 	for r in restores {
 		props := ppmd.Properties{variant = .I, order = 16, mem_size = 1 << 16, restore = r.restore}
@@ -172,6 +171,14 @@ ppmd_vectors :: proc(t: ^testing.T) {
 		ppmd_test_unpack(t, r.name, r.packed, props, inputs.text, -1)
 		ppmd_test_pack(t, r.name, inputs.text, props, true, r.packed)
 	}
+
+	freeze := ppmd.Properties{variant = .I, order = 16, mem_size = 1 << 16, restore = .Freeze}
+	output: [dynamic]byte
+	defer delete(output)
+	testing.expect_value(t, ppmd.decompress(&output, PPMD_VECTOR_I_RESTART, freeze, -1), compress.PPMd_Error.Unsupported_Restore_Method)
+	testing.expect_value(t, len(output), 0)
+	testing.expect_value(t, ppmd.compress(&output, inputs.text, freeze), compress.PPMd_Error.Unsupported_Restore_Method)
+	testing.expect_value(t, len(output), 0)
 }
 
 @(test)
@@ -207,7 +214,7 @@ ppmd_restore_methods :: proc(t: ^testing.T) {
 	input := inputs.mixed[len(inputs.text) - 8000:][:12_000]
 	for mem in ([]u32{ppmd.MEM_SIZE_MIN, ppmd.CUT_OFF_MEM_SIZE_MIN, 3001, 1 << 14, u32(ppmd.MEM_SIZE_MIN + rand.int_max(1 << 15))}) {
 		for order in ([]u8{2, 6, 16, u8(ppmd.ORDER_MIN + rand.int_max(ppmd.I_ORDER_MAX - ppmd.ORDER_MIN + 1))}) {
-			for restore in ppmd.Restore_Method {
+			for restore in ([]ppmd.Restore_Method{.Restart, .Cut_Off}) {
 				if restore == .Cut_Off && mem < ppmd.CUT_OFF_MEM_SIZE_MIN {
 					continue
 				}
@@ -290,7 +297,7 @@ ppmd_truncated :: proc(t: ^testing.T) {
 		{"7z",              PPMD_VECTOR_7Z,                         PPMD_VECTOR_7Z_PROPS,   len(inputs.text)},
 		{"zip mx5",         zip5[ppmd.PROPERTIES_ZIP_SIZE:],        PPMD_VECTOR_ZIP5_PROPS, len(inputs.text)},
 		{"zip mx5 unsized", zip5[ppmd.PROPERTIES_ZIP_SIZE:],        PPMD_VECTOR_ZIP5_PROPS, -1},
-		{"freeze unsized",  PPMD_VECTOR_I_FREEZE, {variant = .I, order = 16, mem_size = 1 << 16, restore = .Freeze}, -1},
+		{"restart unsized", PPMD_VECTOR_I_RESTART, {variant = .I, order = 16, mem_size = 1 << 16, restore = .Restart}, -1},
 	}
 	for c in cases {
 		for k in 0..<24 + len(c.packed) / 23 {
@@ -301,7 +308,7 @@ ppmd_truncated :: proc(t: ^testing.T) {
 			case:        n = 16 + rand.int_max(len(c.packed) - 24)
 			}
 			output: [dynamic]byte
-			err := ppmd.decompress(&output, c.packed[:n], c.props, c.expected, len(inputs.text) + 1000)
+			err := ppmd.decompress(&output, c.packed[:n], c.props, c.expected, {max_output_size = len(inputs.text) + 1000})
 			delete(output)
 			testing.expectf(t, err != nil, "%v: %v of %v bytes decoded without error", c.name, n, len(c.packed))
 		}
@@ -321,7 +328,7 @@ ppmd_corrupt :: proc(t: ^testing.T) {
 	}
 	cases := [?]Case{
 		{"7z",             PPMD_VECTOR_7Z,       PPMD_VECTOR_7Z_PROPS, len(inputs.text)},
-		{"freeze unsized", PPMD_VECTOR_I_FREEZE, {variant = .I, order = 16, mem_size = 1 << 16, restore = .Freeze}, -1},
+		{"restart unsized", PPMD_VECTOR_I_RESTART, {variant = .I, order = 16, mem_size = 1 << 16, restore = .Restart}, -1},
 	}
 	for c in cases {
 		data := make([]byte, len(c.packed))
@@ -348,7 +355,7 @@ ppmd_corrupt :: proc(t: ^testing.T) {
 			}
 			data[i] ~= mask
 			output: [dynamic]byte
-			err := ppmd.decompress(&output, data, c.props, c.expected, limit)
+			err := ppmd.decompress(&output, data, c.props, c.expected, {max_output_size = limit})
 			testing.expectf(t, len(output) <= limit, "%v: flip %x at %v wrote %v bytes", c.name, mask, i, len(output))
 			if err == nil {
 				accepted += 1
@@ -372,19 +379,65 @@ ppmd_limits :: proc(t: ^testing.T) {
 	stream := zip5[ppmd.PROPERTIES_ZIP_SIZE:]
 	size   := len(inputs.text)
 
-	testing.expect_value(t, ppmd.decompress(&output, PPMD_VECTOR_7Z, PPMD_VECTOR_7Z_PROPS, size, size - 1), compress.General_Error.Output_Too_Short)
-	testing.expect(t, ppmd.decompress(&output, PPMD_VECTOR_7Z, PPMD_VECTOR_7Z_PROPS, size - 1) != nil)
+	testing.expect_value(t, ppmd.decompress(&output, PPMD_VECTOR_7Z, PPMD_VECTOR_7Z_PROPS, size, {max_output_size = size - 1}), compress.General_Error.Output_Too_Short)
+	testing.expect_value(t, ppmd.decompress(&output, PPMD_VECTOR_7Z, PPMD_VECTOR_7Z_PROPS, size - 1), compress.General_Error.Size_Mismatch)
 
-	testing.expect_value(t, ppmd.decompress(&output, stream, PPMD_VECTOR_ZIP5_PROPS, max_output_size = size - 1), compress.General_Error.Output_Too_Short)
+	testing.expect_value(t, ppmd.decompress(&output, stream, PPMD_VECTOR_ZIP5_PROPS, options = {max_output_size = size - 1}), compress.General_Error.Output_Too_Short)
 	testing.expect(t, len(output) <= size - 1)
-	testing.expect_value(t, ppmd.decompress(&output, stream, PPMD_VECTOR_ZIP5_PROPS, size + 1), compress.PPMd_Error.Unexpected_End_Marker)
-	testing.expect_value(t, ppmd.decompress(&output, stream, PPMD_VECTOR_ZIP5_PROPS, size - 1), compress.PPMd_Error.Corrupt_Data)
-	testing.expect_value(t, ppmd.decompress(&output, stream, PPMD_VECTOR_ZIP5_PROPS, max_output_size = size), nil)
+	testing.expect_value(t, ppmd.decompress(&output, stream, PPMD_VECTOR_ZIP5_PROPS, size + 1), compress.General_Error.Size_Mismatch)
+	testing.expect_value(t, ppmd.decompress(&output, stream, PPMD_VECTOR_ZIP5_PROPS, size - 1), compress.General_Error.Size_Mismatch)
+	testing.expect_value(t, ppmd.decompress(&output, stream, PPMD_VECTOR_ZIP5_PROPS, options = {max_output_size = size}), nil)
 	testing.expect(t, bytes.equal(output[:], inputs.text))
 
-	testing.expect_value(t, ppmd.decompress(&output, stream, PPMD_VECTOR_ZIP5_PROPS, max_output_size = -1), compress.General_Error.Incompatible_Options)
+	testing.expect_value(t, ppmd.decompress(&output, stream, PPMD_VECTOR_ZIP5_PROPS, options = {max_output_size = -1}), compress.General_Error.Incompatible_Options)
 	testing.expect_value(t, ppmd.decompress((^[dynamic]byte)(nil), stream, PPMD_VECTOR_ZIP5_PROPS), compress.General_Error.Incompatible_Options)
 	testing.expect_value(t, ppmd.compress((^[dynamic]byte)(nil), inputs.text, PPMD_VECTOR_ZIP5_PROPS), compress.General_Error.Incompatible_Options)
+}
+
+@(test)
+ppmd_runtime_memory_limit :: proc(t: ^testing.T) {
+	inputs := ppmd_test_inputs()
+	defer ppmd_test_inputs_destroy(inputs)
+
+	zip5   := PPMD_VECTOR_ZIP5
+	stream := zip5[ppmd.PROPERTIES_ZIP_SIZE:]
+	props  := PPMD_VECTOR_ZIP5_PROPS
+	huge, huge_err := ppmd.decode_properties_7z({6, 0xdb, 0xff, 0xff, 0xff})
+	testing.expect_value(t, huge_err, nil)
+
+	track: mem.Tracking_Allocator
+	mem.tracking_allocator_init(&track, context.allocator)
+	defer mem.tracking_allocator_destroy(&track)
+	allocator := mem.tracking_allocator(&track)
+
+	Limit_Case :: struct {
+		props:  ppmd.Properties,
+		packed: []byte,
+		limit:  int,
+	}
+	refused := [?]Limit_Case{
+		{props, stream, 1},
+		{props, stream, int(props.mem_size) - 1},
+		{huge, PPMD_VECTOR_7Z, 64 << 20},
+	}
+	for c in refused {
+		output: [dynamic]byte
+		err := ppmd.decompress(&output, c.packed, c.props, len(inputs.text), {max_memory = c.limit}, allocator)
+		testing.expectf(t, err == compress.General_Error.Memory_Limit_Exceeded, "mem %v, max_memory %v: %v", c.props.mem_size, c.limit, err)
+		testing.expectf(t, track.total_allocation_count == 0, "mem %v, max_memory %v: %v allocations before refusing", c.props.mem_size, c.limit, track.total_allocation_count)
+		testing.expect_value(t, len(output), 0)
+	}
+
+	for limit in ([]int{int(props.mem_size), 0, 1 << 30}) {
+		output: [dynamic]byte
+		defer delete(output)
+		err := ppmd.decompress(&output, stream, props, len(inputs.text), {max_memory = limit})
+		testing.expectf(t, err == nil && bytes.equal(output[:], inputs.text), "max_memory %v: %v, %v bytes", limit, err, len(output))
+	}
+
+	output: [dynamic]byte
+	defer delete(output)
+	testing.expect_value(t, ppmd.decompress(&output, stream, props, len(inputs.text), {max_memory = -1}), compress.General_Error.Incompatible_Options)
 }
 
 @(test)
@@ -400,15 +453,15 @@ ppmd_memory_limit :: proc(t: ^testing.T) {
 	input := [?]byte{1, 2, 3}
 	for mem in ([]u32{u32(ppmd.MEMORY_MAX) + 1, 1 << 31, ppmd.MEM_SIZE_MAX}) {
 		for props in ([]ppmd.Properties{{variant = .H, order = 6, mem_size = mem}, {variant = .I, order = 6, mem_size = mem, restore = .Cut_Off}}) {
-			testing.expect_value(t, ppmd.decompress(&output, PPMD_VECTOR_7Z, props, 100), compress.PPMd_Error.Memory_Limit_Exceeded)
-			testing.expect_value(t, ppmd.compress(&packed, input[:], props), compress.PPMd_Error.Memory_Limit_Exceeded)
+			testing.expect_value(t, ppmd.decompress(&output, PPMD_VECTOR_7Z, props, 100), compress.General_Error.Memory_Limit_Exceeded)
+			testing.expect_value(t, ppmd.compress(&packed, input[:], props), compress.General_Error.Memory_Limit_Exceeded)
 		}
 	}
 
 	props, props_err := ppmd.decode_properties_7z({6, 0xdb, 0xff, 0xff, 0xff})
 	testing.expect_value(t, props_err, nil)
 	testing.expect_value(t, props.mem_size, ppmd.MEM_SIZE_MAX)
-	testing.expect_value(t, ppmd.decompress(&output, PPMD_VECTOR_7Z, props, 100), compress.PPMd_Error.Memory_Limit_Exceeded)
+	testing.expect_value(t, ppmd.decompress(&output, PPMD_VECTOR_7Z, props, 100), compress.General_Error.Memory_Limit_Exceeded)
 }
 
 @(test)
@@ -462,8 +515,10 @@ ppmd_properties :: proc(t: ^testing.T) {
 	testing.expect_value(t, encode_7z_err, compress.PPMd_Error.Invalid_Properties)
 
 	props_zip, err_zip := ppmd.decode_properties_zip({0x07, 0x20})
-	testing.expect_value(t, err_zip, nil)
-	testing.expect_value(t, props_zip, ppmd.Properties{variant = .I, order = 8, mem_size = 1 << 20, restore = .Freeze})
+	testing.expect_value(t, err_zip, compress.PPMd_Error.Unsupported_Restore_Method)
+	testing.expect_value(t, props_zip, ppmd.Properties{})
+	_, freeze_zip_err := ppmd.encode_properties_zip({variant = .I, order = 8, mem_size = 1 << 20, restore = .Freeze})
+	testing.expect_value(t, freeze_zip_err, compress.PPMd_Error.Unsupported_Restore_Method)
 	props_zip, err_zip = ppmd.decode_properties_zip({0xff, 0x1f})
 	testing.expect_value(t, err_zip, nil)
 	testing.expect_value(t, props_zip, ppmd.Properties{variant = .I, order = 16, mem_size = ppmd.ZIP_MEM_SIZE_MAX, restore = .Cut_Off})

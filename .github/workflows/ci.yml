@@ -9,7 +9,7 @@ jobs:
         os: [macos-latest, ubuntu-latest, ubuntu-24.04-arm]
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.os == 'macos-latest' && 'MacOS ARM' || (matrix.os == 'ubuntu-latest' && 'Ubuntu') || (matrix.os == 'ubuntu-24.04-arm' && 'Ubuntu ARM') }} Build, Check, and Test
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
 
       - uses: actions/checkout@v7
@@ -119,6 +119,8 @@ jobs:
         run: ./odin check examples/all/sdl3 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point
       - name: Normal Core library tests
         run: ./odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
+      - name: Compression tests
+        run: ./odin test tests/core/compress.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: Optimized Core library tests
         run: ./odin test tests/core/speed.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
       - name: LZMA match finder normalization tests
@@ -268,7 +270,7 @@ jobs:
   build_windows:
     name: Windows ${{ matrix.arch }} Build, Check, and Test
     runs-on: windows-2022
-    timeout-minutes: 15
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -320,6 +322,11 @@ jobs:
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true %ODIN_ASAN% %ODIN_TARGET%
+      - name: Compression tests
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          odin test tests/core/compress.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true %ODIN_ASAN% %ODIN_TARGET%
       - name: Optimized core library tests
         shell: cmd
         run: |
@@ -414,7 +421,7 @@ jobs:
   build_linux_riscv64:
     runs-on: ubuntu-latest
     name: Linux riscv64 (emulated) Build, Check and Test
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
 
@@ -499,6 +506,9 @@ jobs:
 
       - name: Normal Core library tests
         run: ./odin test tests/core/normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
+
+      - name: Compression tests
+        run: ./odin test tests/core/compress.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
 
       - name: Optimized Core library tests
         run: ./odin test tests/core/speed.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
