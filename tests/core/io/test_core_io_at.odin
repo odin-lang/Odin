@@ -11,6 +11,8 @@ Chunked_Reader :: struct {
 	r:           bytes.Reader,
 	chunk:       int,
 	has_read_at: bool,
+	hiccups:     int,
+	pending:     int,
 }
 
 @(private="file")
@@ -19,6 +21,11 @@ chunked_reader_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte
 	inner := bytes.reader_to_stream(&c.r)
 	#partial switch mode {
 	case .Read:
+		if c.pending < c.hiccups {
+			c.pending += 1
+			return 0, nil
+		}
+		c.pending = 0
 		return inner.procedure(inner.data, .Read, p[:min(len(p), c.chunk)], offset, whence)
 	case .Read_At:
 		if !c.has_read_at {
@@ -151,6 +158,35 @@ test_read_at_fallback :: proc(t: ^testing.T) {
 	testing.expect_value(t, n, 4)
 	testing.expect_value(t, err, nil)
 	testing.expect(t, bytes.equal(buf[:4], data[10:14]))
+}
+
+@test
+test_read_at_fallback_stall :: proc(t: ^testing.T) {
+	data: [100]byte
+	for i in 0..<len(data) {
+		data[i] = byte(i)
+	}
+
+	for hiccups in ([]int{3, 100, 101, max(int)}) {
+		c: Chunked_Reader
+		s := chunked_reader_init(&c, data[:], 7, false)
+		c.hiccups = hiccups
+		pos, seek_err := io.seek(s, 10, .Start)
+		testing.expect_value(t, pos, 10)
+		testing.expect_value(t, seek_err, nil)
+
+		buf: [64]byte
+		n, err := io.read_at(s, buf[:], 30)
+		if hiccups > 100 {
+			testing.expect_value(t, n, 0)
+			testing.expect_value(t, err, io.Error.No_Progress)
+		} else {
+			testing.expect_value(t, n, 64)
+			testing.expect_value(t, err, nil)
+			testing.expect(t, bytes.equal(buf[:], data[30:94]))
+		}
+		expect_position(t, s, 10)
+	}
 }
 
 @test

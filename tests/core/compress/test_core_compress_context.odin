@@ -20,6 +20,8 @@ Stall_Reader :: struct {
 	chunk:    int,
 	hiccups:  int,
 	pending:  int,
+	seekable: bool,
+	read_at:  bool,
 }
 
 stall_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
@@ -41,8 +43,57 @@ stall_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset:
 			return i64(count), nil
 		}
 		return 0, r.fail
+	case .Read_At:
+		if !r.read_at {
+			return 0, .Unsupported
+		}
+		if offset < 0 {
+			return 0, .Invalid_Offset
+		}
+		if offset < i64(len(r.data)) {
+			if r.pending < r.hiccups {
+				r.pending += 1
+				return 0, nil
+			}
+			r.pending = 0
+			limit := len(r.data) - int(offset)
+			if r.chunk > 0 {
+				limit = min(limit, r.chunk)
+			}
+			return i64(copy(p, r.data[offset:][:limit])), nil
+		}
+		return 0, r.fail
+	case .Seek:
+		if !r.seekable {
+			return 0, .Unsupported
+		}
+		base: int
+		switch whence {
+		case .Start:   base = 0
+		case .Current: base = r.position
+		case .End:     base = len(r.data)
+		case:          return 0, .Invalid_Whence
+		}
+		target := i64(base) + offset
+		if target < 0 {
+			return 0, .Invalid_Offset
+		}
+		r.position = int(target)
+		return target, nil
+	case .Size:
+		if !r.seekable {
+			return 0, .Unsupported
+		}
+		return i64(len(r.data)), nil
 	case .Query:
-		return io.query_utility({.Read, .Query})
+		modes := io.Stream_Mode_Set{.Read, .Query}
+		if r.seekable {
+			modes += {.Seek, .Size}
+		}
+		if r.read_at {
+			modes += {.Read_At}
+		}
+		return io.query_utility(modes)
 	}
 	return 0, .Unsupported
 }
@@ -252,6 +303,51 @@ compress_context_refill_hiccups :: proc(t: ^testing.T) {
 	testing.expect_value(t, serr, io.Error.No_Progress)
 	testing.expect(t, bytes.equal(srest[:], data[:1]))
 	delete(srest)
+}
+
+@(test)
+compress_context_read_slice_hiccups :: proc(t: ^testing.T) {
+	data := pattern_data(200_000)
+	defer delete(data)
+	big := make([]byte, 100_000)
+	defer delete(big)
+
+	for hiccups in ([]int{0, 3, 100, 101, max(int)}) {
+		r := Stall_Reader{data = data, fail = .EOF, chunk = 4096, hiccups = hiccups}
+		ctx := compress.init_context(stall_stream(&r))
+		defer compress.destroy_context(&ctx)
+
+		err := compress.read_slice(&ctx, big)
+		if hiccups > 100 {
+			testing.expectf(t, err == .No_Progress, "%v hiccups: read_slice past the window gave %v", hiccups, err)
+			continue
+		}
+		testing.expectf(t, err == nil && bytes.equal(big, data[:100_000]), "%v hiccups: read_slice past the window gave %v", hiccups, err)
+		b, b_err := compress.read_u8(&ctx)
+		testing.expectf(t, b_err == nil && b == data[100_000], "%v hiccups: read_u8 after read_slice gave %v", hiccups, b_err)
+	}
+}
+
+@(test)
+compress_context_peek_input_at_hiccups :: proc(t: ^testing.T) {
+	data := pattern_data(200_000)
+	defer delete(data)
+
+	for hiccups in ([]int{0, 3, 100, 101, max(int)}) {
+		r := Stall_Reader{data = data, fail = .EOF, chunk = 3, hiccups = hiccups, seekable = true}
+		ctx := compress.init_context(stall_stream(&r))
+		defer compress.destroy_context(&ctx)
+
+		buf: [8]byte
+		err := compress.peek_input_at(&ctx, buf[:], 150_000)
+		if hiccups > 100 {
+			testing.expectf(t, err == .No_Progress, "%v hiccups: peek_input_at gave %v", hiccups, err)
+			continue
+		}
+		testing.expectf(t, err == nil && bytes.equal(buf[:], data[150_000:150_008]), "%v hiccups: peek_input_at gave %v", hiccups, err)
+		b, b_err := compress.read_u8(&ctx)
+		testing.expectf(t, b_err == nil && b == data[0], "%v hiccups: read_u8 after peek_input_at gave %v", hiccups, b_err)
+	}
 }
 
 @(test)

@@ -236,10 +236,19 @@ read_at :: proc(r: Reader_At, p: []byte, offset: i64, n_read: ^int = nil) -> (n:
 		} else {
 			curr := seek(r, 0, .Current) or_return
 			if _, err = seek(r, offset, .Start); err == nil {
+				stalled := 0
 				for n < len(p) && err == nil {
 					nn: int
 					nn, err = read(r, p[n:])
 					n += nn
+					if nn > 0 {
+						stalled = 0
+					} else if err == nil {
+						stalled += 1
+						if stalled > 100 {
+							err = .No_Progress
+						}
+					}
 				}
 			}
 			_, err1 := seek(r, curr, .Start)
