@@ -387,6 +387,7 @@ struct lbPendingCopy {
 	LLVMValueRef src;
 	LLVMValueRef local; // the copy is kept if this local's address escapes
 	unsigned     align;
+	i32          call;  // the call an argument copy is for
 };
 
 struct lbProcedure {
@@ -469,6 +470,9 @@ struct lbProcedure {
 	// -internal-by-value
 	PtrMap<LLVMValueRef, u64> uncaptured_arg_masks;
 	Array<lbPendingCopy>      pending_copies;
+	PtrMap<LLVMValueRef, i32> any_boxes;  // a boxed pointer -> the call it is an argument of
+	Array<i32>                call_stack; // the calls whose arguments are being built
+	i32                       call_count;
 };
 
 

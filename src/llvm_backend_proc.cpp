@@ -254,6 +254,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	p->multi_assign_copy_slots.allocator = a;
 	p->lifetime_scopes.allocator         = a;
 	p->pending_copies.allocator          = a;
+	p->call_stack.allocator              = a;
 	// map_init(&p->selector_values,  0);
 	// map_init(&p->selector_addr,    0);
 	// map_init(&p->tuple_fix_map,    0);
@@ -583,6 +584,7 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 	p->multi_assign_copy_slots.allocator = a;
 	p->lifetime_scopes.allocator         = a;
 	p->pending_copies.allocator          = a;
+	p->call_stack.allocator              = a;
 	map_init(&p->tuple_fix_map, 0);
 
 
@@ -1007,7 +1009,10 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 // It passes the original address of a constant, a temporary, or a local whose address never escapes.
 // The callee keeps each indirect parameter in a local copy, and forwarding that local follows the same rule.
 // A copy is made up front and dropped at the end of the procedure if its local's address did not escape.
-// A parameter whose address escapes (e.g. boxed in an `any`) keeps its copy: writes through that address never reach the caller.
+// A parameter whose address escapes keeps its copy: writes through that address never reach the caller.
+// An `any` boxed from a value straight into a call is not an escape: the value is only reachable through it during that call.
+// That call still gets copies of its by-value arguments.
+// Writing through such an `any` of a parameter reaches the caller's storage: `any` is the escape hatch.
 gb_internal lbPendingCopy lb_copy_to_new_local(lbProcedure *p, LLVMValueRef src, Type *type) {
 	unsigned     align = cast(unsigned)type_align_of(type);
 	LLVMValueRef size  = lb_const_int(p->module, t_uint, type_size_of(type)).value;
@@ -1030,7 +1035,7 @@ gb_internal lbValue lb_copy_indirect_param(lbProcedure *p, lbValue ptr) {
 }
 
 gb_internal lbValue lb_copy_indirect_arg_if_aliased(lbProcedure *p, lbValue x, lbValue ptr) {
-	if (!LLVMIsALoadInst(x.value) || LLVMGetOperand(x.value, 0) != ptr.value) {
+	if (!lb_is_load_from(x.value, ptr.value)) {
 		return ptr;
 	}
 
@@ -1042,19 +1047,10 @@ gb_internal lbValue lb_copy_indirect_arg_if_aliased(lbProcedure *p, lbValue x, l
 	lbPendingCopy c = lb_copy_to_new_local(p, ptr.value, x.type);
 	if (LLVMIsAAllocaInst(base)) {
 		c.local = base;
+		c.call  = lb_current_call(p);
 		array_add(&p->pending_copies, c);
 	}
 	return lbValue{c.temp, ptr.type};
-}
-
-gb_internal void lb_set_uncaptured_args(lbProcedure *p, LLVMValueRef call, u64 mask) {
-	if (!build_context.internal_by_value) {
-		return;
-	}
-	if (mask == 0) {
-		return;
-	}
-	map_set(&p->uncaptured_arg_masks, call, mask);
 }
 
 gb_internal String lb_called_function_name(LLVMValueRef call) {
@@ -1099,6 +1095,9 @@ gb_internal bool lb_pointer_may_escape(lbProcedure *p, LLVMValueRef ptr) {
 			if (LLVMGetOperand(user, 0) != ptr) {
 				return true;
 			}
+			if (map_get(&p->any_boxes, user) != nullptr) {
+				continue;
+			}
 			if (lb_pointer_may_escape(p, user)) {
 				return true;
 			}
@@ -1128,6 +1127,15 @@ gb_internal bool lb_pointer_may_escape(lbProcedure *p, LLVMValueRef ptr) {
 	return false;
 }
 
+gb_internal bool lb_boxed_for_call(lbProcedure *p, LLVMValueRef local, i32 call) {
+	for (auto const &entry : p->any_boxes) {
+		if (entry.value == call && lb_pointer_base(entry.key) == local) {
+			return true;
+		}
+	}
+	return false;
+}
+
 gb_internal void lb_drop_unneeded_copies(lbProcedure *p) {
 	PtrMap<LLVMValueRef, bool> escapes = {};
 
@@ -1144,6 +1152,10 @@ gb_internal void lb_drop_unneeded_copies(lbProcedure *p) {
 			map_set(&escapes, c.local, escaped);
 		}
 		if (escaped) {
+			continue;
+		}
+		// NOTE(bill): The call an `any` of the local is boxed for still gets its copy.
+		if (lb_boxed_for_call(p, c.local, c.call)) {
 			continue;
 		}
 		// NOTE(bill): e.g. array arithmetic raised the copy's alignment for its vector loads.
@@ -1167,6 +1179,8 @@ gb_internal void lb_drop_unneeded_copies(lbProcedure *p) {
 
 	array_free(&p->pending_copies);
 	map_destroy(&p->uncaptured_arg_masks);
+	map_destroy(&p->any_boxes);
+	array_free(&p->call_stack);
 }
 
 gb_internal void lb_end_procedure_body(lbProcedure *p) {
@@ -1400,11 +1414,20 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 
 		LLVMSetInstructionCallConv(ret, lb_calling_convention_kind(proc_type->Proc.calling_convention));
 
+		bool is_odin_cc = is_calling_convention_odin(proc_type->Proc.calling_convention);
+		u64  uncaptured = 0; // -internal-by-value: the argument positions the callee never keeps a pointer to
+
 		LLVMAttributeIndex param_offset = LLVMAttributeIndex_FirstArgIndex;
 		if (return_ptr.value != nullptr) {
 			param_offset += 1;
 
 			LLVMAddCallSiteAttribute(ret, 1, lb_create_enum_attribute_with_type(p->module->ctx, "sret", LLVMTypeOf(args[0])));
+
+			// NOTE(bill): An Odin callee sees its result slot only as its own local.
+			// No valid pointer to the slot outlives the call.
+			if (is_odin_cc) {
+				uncaptured |= 1;
+			}
 		}
 
 		for_array(i, ft->args) {
@@ -1432,7 +1455,15 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 			if (ft->args[i].in_reg) {
 				LLVMAddCallSiteAttribute(ret, param_offset, lb_create_enum_attribute(p->module->ctx, "inreg"));
 			}
+			bool by_reference = ft->args[i].kind == lbArg_Indirect &&
+			                    (ft->args[i].is_byval || is_odin_cc);
+			if (by_reference && param_offset <= 64) {
+				uncaptured |= 1ull<<(param_offset-1);
+			}
 			param_offset += 1;
+		}
+		if (build_context.internal_by_value && uncaptured != 0) {
+			map_set(&p->uncaptured_arg_masks, ret, uncaptured);
 		}
 
 		switch (inlining) {
@@ -1566,7 +1597,6 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 		bool return_by_pointer = ft->ret.kind == lbArg_Indirect;
 		bool split_returns = ft->multiple_return_original_type != nullptr;
 
-		u64 uncaptured_arg_mask = 0; // positions in processed_args
 		unsigned param_index = 0;
 		for (isize i = 0; i < param_count; i++) {
 			Entity *e = pt->Proc.params->Tuple.variables[i];
@@ -1637,9 +1667,6 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 				} else {
 					ptr = lb_copy_value_to_ptr(p, x, original_type, 16);
 				}
-				if ((arg->is_byval || is_odin_cc) && processed_args.count < 63) {
-					uncaptured_arg_mask |= 1ull<<processed_args.count;
-				}
 				array_add(&processed_args, ptr);
 			}
 
@@ -1671,19 +1698,10 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			} else {
 				return_ptr = lb_add_local_generated(p, rt, true).addr;
 			}
-			lbValue call = lb_emit_call_internal(p, value, return_ptr, processed_args, nullptr, context_ptr, inlining, tailing);
-
-			// NOTE(bill): An Odin callee sees its result slot only as its own local.
-			// No valid pointer to the slot outlives the call.
-			u64 mask = uncaptured_arg_mask << 1;
-			if (is_odin_cc) {
-				mask |= 1;
-			}
-			lb_set_uncaptured_args(p, call.value, mask);
+			lb_emit_call_internal(p, value, return_ptr, processed_args, nullptr, context_ptr, inlining, tailing);
 			result = lb_emit_load(p, return_ptr);
 		} else if (rt != nullptr) {
 			result = lb_emit_call_internal(p, value, {}, processed_args, rt, context_ptr, inlining, tailing);
-			lb_set_uncaptured_args(p, result.value, uncaptured_arg_mask);
 			if (ft->ret.coerce_offsets.count > 0) {
 				result.value = lb_coerce_fields_store(p, result.value, rt, &ft->ret);
 			} else {
@@ -1700,8 +1718,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 				result = lb_emit_conv(p, result, rt);
 			}
 		} else {
-			lbValue call = lb_emit_call_internal(p, value, {}, processed_args, nullptr, context_ptr, inlining, tailing);
-			lb_set_uncaptured_args(p, call.value, uncaptured_arg_mask);
+			lb_emit_call_internal(p, value, {}, processed_args, nullptr, context_ptr, inlining, tailing);
 		}
 
 		if (original_rt != rt) {
@@ -5652,6 +5669,18 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 
 	Ast *proc_expr = unparen_expr(ce->proc);
 	Entity *proc_entity = entity_of_node(proc_expr);
+
+	// NOTE(bill): -internal-by-value: an `any` boxed while building a call's arguments is tied to that call.
+	// A builtin such as `append` may keep an `any` it is given: what it boxes is tied to no call.
+	if (build_context.internal_by_value) {
+		i32 call = 0;
+		if (proc_mode != Addressing_Builtin) {
+			p->call_count += 1;
+			call = p->call_count;
+		}
+		array_add(&p->call_stack, call);
+	}
+	defer (if (build_context.internal_by_value) { array_pop(&p->call_stack); });
 
 	if (proc_mode == Addressing_Builtin) {
 		BuiltinProcId id = BuiltinProc_Invalid;
