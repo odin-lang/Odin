@@ -54,7 +54,6 @@ hex_decode_into_buffer :: proc(t: ^testing.T) {
 		buffer := make([]u8, len(test[1]) / 2)
 		defer delete(buffer)
 		decoded, ok := hex.decode_into_buffer(transmute([]byte)test[1], buffer)
-		testing.expect(t, ok, "decode_into_buffer: not ok")
 		testing.expectf(
 			t,
 			ok,
@@ -76,7 +75,6 @@ hex_decode_into_buffer :: proc(t: ^testing.T) {
 		buffer := make([]u8, len(test[1]) / 2 + 1)
 		defer delete(buffer)
 		decoded, ok := hex.decode_into_buffer(transmute([]byte)test[1], buffer)
-		testing.expect(t, ok, "decode_into_buffer: not ok")
 		testing.expectf(
 			t,
 			ok,
