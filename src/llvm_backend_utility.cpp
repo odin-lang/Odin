@@ -1116,6 +1116,10 @@ gb_internal LLVMValueRef lb_pointer_base(LLVMValueRef ptr) {
 	}
 }
 
+gb_internal bool lb_is_load_from(LLVMValueRef value, LLVMValueRef ptr) {
+	return LLVMIsALoadInst(value) && LLVMGetOperand(value, 0) == ptr;
+}
+
 gb_internal i32 lb_current_call(lbProcedure *p) {
 	if (p->call_stack.count == 0) {
 		return 0;
@@ -1126,14 +1130,11 @@ gb_internal i32 lb_current_call(lbProcedure *p) {
 // NOTE(bill): -internal-by-value: an `any` boxed from a value straight into a call gets its own pointer to the value.
 // Through it, lb_drop_unneeded_copies sees which call the value is reachable from.
 gb_internal LLVMValueRef lb_any_data_for_call(lbProcedure *p, lbValue value, LLVMValueRef data) {
-	if (!build_context.internal_by_value) {
-		return data;
-	}
 	i32 call = lb_current_call(p);
 	if (call == 0) {
 		return data;
 	}
-	if (!LLVMIsALoadInst(value.value) || LLVMGetOperand(value.value, 0) != data) {
+	if (!lb_is_load_from(value.value, data)) {
 		return data;
 	}
 
@@ -1162,7 +1163,7 @@ gb_internal lbValue lb_address_from_load_or_generate_local(lbProcedure *p, lbVal
 }
 gb_internal i64 lb_known_value_address_alignment(lbProcedure *p, lbValue value, lbValue ptr, i64 assumed) {
 	i64 known = cast(i64)lb_known_address_alignment(p->module, ptr.value, cast(u64)assumed);
-	if (LLVMIsALoadInst(value.value) && ptr.value == LLVMGetOperand(value.value, 0)) {
+	if (lb_is_load_from(value.value, ptr.value)) {
 		i64 load_align = LLVMGetAlignment(value.value);
 		if (load_align < gb_min(type_align_of(value.type), lb_alignof(LLVMTypeOf(value.value)))) {
 			known = gb_min(known, load_align);
