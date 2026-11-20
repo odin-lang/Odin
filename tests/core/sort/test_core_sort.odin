@@ -56,7 +56,7 @@ test_interface_sort_stability :: proc(t: ^testing.T) {
 		}
 
 		// Sort
-		sort.sort_stable(it)
+		sort.stable_sort(it)
 
 		// Verify sorted test values
 		rand.reset(t.seed)
