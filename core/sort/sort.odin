@@ -1,6 +1,7 @@
 // A sorting interface and algorithms.
 package sort
 
+import "core:fmt"
 import "core:mem"
 import "base:intrinsics"
 
@@ -60,6 +61,35 @@ sort :: proc(it: Interface) {
 
 	n := it->len()
 	_quick_sort(it, 0, n, max_depth(n))
+}
+
+
+/*
+Sorts the elements of an `Interface` in place.
+
+This sort is guaranteed to be stable.
+
+Inputs:
+- it: The `Interface` to sort.
+
+Example:
+
+	import "core:fmt"
+	import "core:sort"
+
+	sort_example :: proc() {
+		data := []int{5, 2, 8, 1, 9}
+		sort.sort_stable(sort.slice_interface(&data))
+		fmt.println(data)
+	}
+
+Output:
+
+	[1, 2, 5, 8, 9]
+
+*/
+sort_stable :: proc(it: Interface) {
+	_merge_rotate(it, 0, it->len())
 }
 
 /*
@@ -287,13 +317,15 @@ rotate :: proc(it: Interface, a, m, b: int) {
 	i := m - a
 	j := b - m
 
+    if i <= 0 || j <= 0 { return }
+
 	for i != j {
 		if i > j {
 			swap_range(it, m-i, m, j)
 			i -= j
 		} else {
-			swap_range(it, m-i, m+j-1, i)
-			j -= 1
+			swap_range(it, m-i, m+j-i, i)
+			j -= i
 		}
 	}
 	swap_range(it, m-i, m, i)
@@ -454,6 +486,84 @@ _insertion_sort :: proc(it: Interface, a, b: int) {
 		}
 	}
 }
+
+@(private)
+_merge_rotate :: proc(it: Interface, a, b: int){
+	if b - a < 16 {
+		_insertion_sort(it, a, b)
+		return
+	}
+		
+	mid := int(uint(a + b) / 2)
+	_merge_rotate(it, a, mid)
+	_merge_rotate(it, mid, b)
+
+	_inplace_merge(it, a, mid, b)
+}
+
+@(private)
+_inplace_merge :: proc(it: Interface, a, mid, b: int) {
+	if b - a < 10 {
+		l := a
+		r := mid
+
+		for l < r && r < b {
+			if !it->less(r, l) {
+				l += 1
+			} else {
+				for s := r; s > l; s -= 1 {
+					it->swap(s, s-1)
+				}
+				r += 1
+				l += 1
+			}
+		}
+		return
+	}
+    left := mid - a
+    right := b - mid
+	left_cut, right_cut: int
+	
+	if left < right {
+		right_cut = mid + right / 2
+
+        left_cut = a
+        end := mid
+
+		for left_cut < end {
+			m := int(uint(left_cut + end) / 2)
+
+            if it->less(m, right_cut) {
+                left_cut = m + 1
+            } else {
+                end  = m
+            }
+		}
+	} else {
+		left_cut = a + left / 2
+
+        right_cut = mid
+        end := b
+
+		for right_cut < end {
+			m := int(uint(right_cut + end) / 2)
+
+            if !it->less(left_cut, m) {
+                right_cut = m + 1
+            } else {
+                end  = m
+            }
+		}
+	}
+
+	rotate(it, left_cut, mid, right_cut)
+
+	new_mid := left_cut + right_cut - mid
+
+	_inplace_merge(it, a, left_cut,  new_mid)
+	_inplace_merge(it, new_mid, right_cut, b)
+}
+
 
 /*
 Sorts a slice in place using bubble sort, ordered by the given comparator.
