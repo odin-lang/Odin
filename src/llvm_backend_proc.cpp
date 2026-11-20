@@ -613,6 +613,9 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 		lb_add_proc_attribute_at_index(p, context_index, "noalias");
 		lb_add_proc_attribute_at_index(p, context_index, "nonnull");
 		lb_add_nocapture_proc_attribute_at_index(p, context_index);
+		if (lb_context_ptr_is_pinned_to_register()) {
+			lb_add_proc_attribute_at_index(p, context_index, "swiftself");
+		}
 	}
 	return p;
 }
@@ -1464,6 +1467,12 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 		}
 		if (build_context.internal_by_value && uncaptured != 0) {
 			map_set(&p->uncaptured_arg_masks, ret, uncaptured);
+		}
+
+		if (context_ptr.addr.value != nullptr && lb_context_ptr_is_pinned_to_register()) {
+			// context is the last parameter;
+			// we need the call site swiftself attribute to repeat the declaration (for indirect calls)
+			LLVMAddCallSiteAttribute(ret, arg_count, lb_create_enum_attribute(p->module->ctx, "swiftself"));
 		}
 
 		switch (inlining) {
