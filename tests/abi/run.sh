@@ -7,7 +7,7 @@ set -eu
 #
 #   ./run.sh
 #   ./run.sh linux_riscv64 riscv64-linux-gnu \
-#       "-extra-linker-flags:-fuse-ld=/usr/bin/riscv64-linux-gnu-gcc-12 -static -Wl,-static" -no-rpath
+#       "-extra-linker-flags:--target=riscv64-linux-gnu -static" -no-rpath
 #
 # For a target with no cross libc -- i386, arm32 -- see `cross.sh`, which builds
 # the same corpus freestanding.
@@ -43,7 +43,7 @@ $ODIN run ../gen.odin -file $HOST_MARCH -- .
 # Ask the C compiler which tiers it has, by preprocessing the generated `build-cross/tiers.c`. 
 # The Odin side must use the same tiers or it references symbols C never emitted.
 have() { $CLANG $CC_TARGET -E tiers.c 2>/dev/null | grep -q "ABI_YES_$1" && echo true || echo false; }
-TIERS="-define:ABI_TIER_GNU=$(have GNU) -define:ABI_TIER_F16=$(have F16) -define:ABI_TIER_I128=$(have I128)"
+TIERS="-define:ABI_TIER_GNU=$(have GNU) -define:ABI_TIER_F16=$(have F16) -define:ABI_TIER_I128=$(have I128) -define:ABI_TIER_COMPLEX=$(have COMPLEX)"
 
 # `-w` because the corpus deliberately uses zero-length arrays and empty
 # structs; both are the extensions under test.

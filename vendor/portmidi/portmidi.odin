@@ -15,6 +15,15 @@ when ODIN_OS == .Windows {
 			"system:Advapi32.lib",
 		}
 	}
+} else when ODIN_OS == .Darwin && !PORTMIDI_SHARED {
+	// A universal (arm64 and x86_64) static library, which needs CoreMIDI and friends.
+	foreign import lib {
+		"darwin/portmidi_s.a",
+		"system:CoreAudio.framework",
+		"system:CoreFoundation.framework",
+		"system:CoreMIDI.framework",
+		"system:CoreServices.framework",
+	}
 } else {
 	foreign import lib "system:portmidi"
 }
@@ -43,6 +52,10 @@ Error :: enum c.int {
 	BadData, /** illegal midi data, e.g. missing EOX */
 	InternalError,
 	BufferMaxSize, /** buffer is already as large as it can be */
+	NotImplemented, /** the function is not implemented, nor will it ever be */
+	InterfaceNotSupported, /** the requested interface is not supported */
+	NameConflict, /** Cannot create virtual device because name is taken. */
+	DeviceRemoved, /** Output attempted after (USB) device was removed. */
 }
 
 /**  A single Stream is a descriptor for an open MIDI device.
@@ -109,6 +122,30 @@ GetHostErrorText :: proc (buf: []byte) -> string {
 }
 
 
+/**
+	Find a device that matches a pattern.
+
+	`pattern` is a substring of the device name, or if it contains the two-character separator ", ", then the
+	first part of the pattern is a device interface substring and the second part after the separator is a
+	device name substring. `is_input` restricts the search to an input when true, or an output when false.
+
+	Returns the number of the first device whose interface contains the interface pattern (if any), whose name
+	contains the name pattern, and whose direction matches `is_input`. If no match is found, NoDevice (-1) is
+	returned.
+
+	PortMidi writes into the pattern while it parses it, so this passes it a copy that is made with `allocator`.
+*/
+FindDevice :: proc(pattern: string, is_input: b32, allocator := context.temp_allocator) -> DeviceID {
+	@(default_calling_convention="c")
+	foreign lib {
+		Pm_FindDevice :: proc(pattern: [^]u8, is_input: b32) -> DeviceID ---
+	}
+	copy_of := make([]byte, len(pattern) + 1, allocator)
+	defer delete(copy_of, allocator)
+	copy(copy_of, pattern)
+	return Pm_FindDevice(raw_data(copy_of), is_input)
+}
+
 HDRLENGTH :: 50
 HOST_ERROR_MSG_LEN :: 256 /* any host error msg will occupy less 
                               than this number of characters */
@@ -122,6 +159,38 @@ DeviceInfo :: struct {
 	input:         b32,     /**< true if and only if (⟺) input is available */
 	output:        b32,     /**< true if and only if (⟺) output is available */
 	opened:        b32,     /**< used by generic PortMidi code to do error checking on arguments */
+	is_virtual:    b32,     /**< true if and only if (⟺) this is a virtual input or output device */
+}
+
+/** Version number of DeviceInfo, stored in DeviceInfo.structVersion */
+DEVICEINFO_VERS :: 200
+
+/** Keys of the system-dependent properties that can be passed in a SysDepInfo. */
+SysDepPropertyKey :: enum c.int {
+	None                 = 0, /**< a "noop" key value */
+	CoreMidiManufacturer = 1, /**< CoreMIDI manufacturer name, the value is a string */
+	AlsaPortName         = 2, /**< Linux ALSA snd_seq_port_info_set_name, the value is a string. It names the port created when opening a device. */
+	AlsaClientName       = 3, /**< Linux ALSA snd_seq_set_client_name, the value is a string. It names the client and applies to all ports. */
+}
+
+/** Version number of SysDepInfo, stored in SysDepInfo.structVersion */
+SYSDEPINFO_VERS :: 210
+
+/** One key and value of a SysDepInfo. */
+SysDepProperty :: struct {
+	key:   SysDepPropertyKey,
+	value: rawptr,
+}
+
+/**
+	System-dependent information can be passed when creating and opening ports with this structure, which
+	stores `length` key and value pairs right after the header. It is variable sized, so allocate room for the
+	pairs after it and pass a pointer to it as the `inputSysDepInfo`, `outputSysDepInfo` or `sysDepInfo` argument.
+*/
+SysDepInfo :: struct {
+	structVersion: c.int, /**< this structure version, SYSDEPINFO_VERS */
+	length:        c.int, /**< number of properties that follow */
+	properties:    [0]SysDepProperty,
 }
 
 @(default_calling_convention="c", link_prefix="Pm_")
@@ -166,17 +235,17 @@ foreign lib {
 
 		inputDevice is the id of the device used for input (see DeviceID above).
 
-		inputDriverInfo is a pointer to an optional driver specific data structure
+		inputSysDepInfo is a pointer to an optional system-dependent data structure (a SysDepInfo)
 		containing additional information for device setup or handle processing.
-		inputDriverInfo is never required for correct operation. If not used
-		inputDriverInfo should be nil.
+		inputSysDepInfo is never required for correct operation. If not used
+		inputSysDepInfo should be nil.
 
 		outputDevice is the id of the device used for output (see DeviceID above.)
 
-		outputDriverInfo is a pointer to an optional driver specific data structure
+		outputSysDepInfo is a pointer to an optional system-dependent data structure (a SysDepInfo)
 		containing additional information for device setup or handle processing.
-		outputDriverInfo is never required for correct operation. If not used
-		outputDriverInfo should be nil.
+		outputSysDepInfo is never required for correct operation. If not used
+		outputSysDepInfo should be nil.
 
 		For input, the buffersize specifies the number of input events to be 
 		buffered waiting to be read using Read(). For output, buffersize 
@@ -223,19 +292,59 @@ foreign lib {
 	*/
 	OpenInput :: proc(stream: ^Stream,
 	                  inputDevice: DeviceID,
-	                  inputDriverInfo: rawptr,
+	                  inputSysDepInfo: rawptr,
 	                  bufferSize: i32,
 	                  time_proc: TimeProc,
 	                  time_info: rawptr) -> Error ---
 
 	OpenOutput :: proc(stream: ^Stream,
 	                   outputDevice: DeviceID,
-	                   outputDriverInfo: rawptr,
+	                   outputSysDepInfo: rawptr,
 	                   bufferSize: i32,
 	                   time_proc: TimeProc,
 	                   time_info: rawptr,
 	                   latency: i32) -> Error ---
-	
+
+	/**
+		Create a virtual input device. `name` is the name of the virtual device, which is visible to other
+		applications. `interf` is the interface (system API) used to create the device: "CoreMIDI" or "ALSA"
+		(NOT "MMSystem"), or nil for the default. `sysDepInfo` is an optional SysDepInfo, or nil.
+
+		Returns the ID of the new device, or a negative Error: .NameConflict if `name` is invalid or already
+		exists, or .InterfaceNotSupported if `interf` does not match a supported interface. Cast it with
+		`Error(id)` when it is negative.
+
+		The created virtual device appears to other applications as if it is an output device. The device must be
+		opened to obtain a stream and read from it.
+
+		Virtual devices are not supported by Windows (Multimedia API) and on Windows this returns .NotImplemented.
+	*/
+	CreateVirtualInput :: proc(name: cstring, interf: cstring = nil, sysDepInfo: rawptr = nil) -> DeviceID ---
+
+	/**
+		Create a virtual output device. `name` is the name of the virtual device, which is visible to other
+		applications. `interf` is the interface (system API) used to create the device: "CoreMIDI" or "ALSA"
+		(NOT "MMSystem"), or nil for the default. `sysDepInfo` is an optional SysDepInfo, or nil.
+
+		Returns the ID of the new device, or a negative Error, see CreateVirtualInput. (A name conflict may also be reported as .InvalidDeviceId.)
+
+		The created virtual device appears to other applications as if it is an input device. The device must be
+		opened to obtain a stream and write to it.
+
+		Virtual devices are not supported by Windows (Multimedia API) and on Windows this returns .NotImplemented.
+	*/
+	CreateVirtualOutput :: proc(name: cstring, interf: cstring = nil, sysDepInfo: rawptr = nil) -> DeviceID ---
+
+	/**
+		Remove a virtual device, so other applications can no longer see or open it. It may be either for input or
+		output, and must not be open. The device ID may be reused, but existing devices are not renumbered, so an ID
+		in the range from 0 to CountDevices() can be one that no longer designates a device: GetDeviceInfo()
+		returns nil for it.
+
+		Returns .NoError if the device was deleted, or .InvalidDeviceId if the device is open, already deleted, or
+		out of range.
+	*/
+	DeleteVirtualDevice :: proc(device: DeviceID) -> Error ---
 }
 
 
@@ -397,7 +506,7 @@ MessageDecompose :: #force_inline proc "c" (msg: Message) -> (status, data1, dat
 }
 
 
-Message :: distinct i32
+Message :: distinct u32
 /**
 	All midi data comes in the form of Event structures. A sysex
 	message is encoded as a sequence of Event structures, with each

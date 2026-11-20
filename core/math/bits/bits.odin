@@ -3,6 +3,16 @@ package math_bits
 
 import "base:intrinsics"
 
+/*
+	Copyright 2017 Ginger Bill.
+	Copyright 2025 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's license.
+
+	List of contributors:
+		Ginger Bill:     Initial implementation.
+		Jeroen van Rijn: Documentation.
+*/
+
 // The minimum value held by a `u8`. The same value as `min(u8)`, except untyped.
 U8_MIN  :: 0
 // The minimum value held by a `u16`. The same value as `min(u16)`, except untyped.
@@ -789,7 +799,12 @@ Returns:
 */
 @(require_results)
 div_u32 :: proc "odin" (hi, lo, y: u32) -> (quo, rem: u32) {
-	assert(y != 0 && y <= hi)
+	if y == 0 {
+		panic("divide error")
+	}
+	if y <= hi {
+		panic("overflow error")
+	}
 	z := u64(hi)<<32 | u64(lo)
 	quo, rem = u32(z/u64(y)), u32(z%u64(y))
 	return
@@ -1139,7 +1154,7 @@ Returns:
 */
 @(require_results)
 bitfield_extract_i8 :: proc "contextless" (value: i8, offset, bits: uint) -> i8 {
-	v := (u8(value) >> offset) & u8(1<<bits - 1)
+	v := u8(value >> offset) & u8(1<<bits - 1)
 	m := u8(1<<(bits-1))
 	r := (v~m) - m
 	return i8(r)
@@ -1158,7 +1173,7 @@ Returns:
 */
 @(require_results)
 bitfield_extract_i16 :: proc "contextless" (value: i16, offset, bits: uint) -> i16 {
-	v := (u16(value) >> offset) & u16(1<<bits - 1)
+	v := u16(value >> offset) & u16(1<<bits - 1)
 	m := u16(1<<(bits-1))
 	r := (v~m) - m
 	return i16(r)
@@ -1177,7 +1192,7 @@ Returns:
 */
 @(require_results)
 bitfield_extract_i32 :: proc "contextless" (value: i32, offset, bits: uint) -> i32 {
-	v := (u32(value) >> offset) & u32(1<<bits - 1)
+	v := u32(value >> offset) & u32(1<<bits - 1)
 	m := u32(1<<(bits-1))
 	r := (v~m) - m
 	return i32(r)
@@ -1196,7 +1211,7 @@ Returns:
 */
 @(require_results)
 bitfield_extract_i64 :: proc "contextless" (value: i64, offset, bits: uint) -> i64 {
-	v := (u64(value) >> offset) & u64(1<<bits - 1)
+	v := u64(value >> offset) & u64(1<<bits - 1)
 	m := u64(1<<(bits-1))
 	r := (v~m) - m
 	return i64(r)
@@ -1215,7 +1230,7 @@ Returns:
 */
 @(require_results)
 bitfield_extract_i128 :: proc "contextless" (value: i128, offset, bits: uint) -> i128 {
-	v := (u128(value) >> offset) & u128(1<<bits - 1)
+	v := u128(value >> offset) & u128(1<<bits - 1)
 	m := u128(1<<(bits-1))
 	r := (v~m) - m
 	return i128(r)
@@ -1234,7 +1249,7 @@ Returns:
 */
 @(require_results)
 bitfield_extract_int :: proc "contextless" (value: int, offset, bits: uint) -> int {
-	v := (uint(value) >> offset) & uint(1<<bits - 1)
+	v := uint(value >> offset) & uint(1<<bits - 1)
 	m := uint(1<<(bits-1))
 	r := (v~m) - m
 	return int(r)

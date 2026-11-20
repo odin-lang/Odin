@@ -126,7 +126,11 @@ norm_float64 :: proc(gen := context.random_generator) -> f64 {
 
 		if i == 0 {
 			for {
-				x = -math.ln(float64(gen)) * (1.0/ rn)
+				u := float64(gen)
+				if u == 0 {
+					continue
+				}
+				x = -math.ln(u) * (1.0/ rn)
 				y := -math.ln(float64(gen))
 				if y+y >= x*x {
 					break

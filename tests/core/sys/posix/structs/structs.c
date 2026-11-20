@@ -29,7 +29,9 @@
 #include <sys/time.h>
 #include <utime.h>
 
+#ifndef __OpenBSD__
 #include <wordexp.h>
+#endif
 
 #include <sys/socket.h>
 
@@ -108,7 +110,9 @@ int main(int argc, char *argv[])
 
 	printf("utimbuf %zu %zu\n", sizeof(struct utimbuf), _Alignof(struct utimbuf));
 
+#ifndef __OpenBSD__
 	printf("wordexp_t %zu %zu\n", sizeof(wordexp_t), _Alignof(wordexp_t));
+#endif
 
 	printf("time_t %zu %zu\n", sizeof(time_t), _Alignof(time_t));
 	printf("timespec %zu %zu\n", sizeof(struct timespec), _Alignof(struct timespec));

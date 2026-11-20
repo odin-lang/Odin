@@ -96,7 +96,7 @@ _resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (
 			line.procedure = "??"
 		}
 
-		lineInfo: win.IMAGEHLP_LINE64
+		lineInfo: win.IMAGEHLP_LINEW64
 		lineInfo.SizeOfStruct = size_of(lineInfo)
 		if win.SymGetLineFromAddrW64(process, win.DWORD64(bt[i]), &{}, &lineInfo) {
 			file_name, mem_err := win.wstring_to_utf8(lineInfo.FileName, len(lineInfo.FileName), allocator)

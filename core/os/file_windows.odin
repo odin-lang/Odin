@@ -79,14 +79,14 @@ _handle :: proc "contextless" (f: ^File) -> win32.HANDLE {
 	return win32.HANDLE(_fd(f))
 }
 
-_open_internal :: proc(name: string, flags: File_Flags, perm: Permissions) -> (handle: uintptr, err: Error) {
+_open_internal :: proc(name: string, wide: []u16, flags: File_Flags, perm: Permissions) -> (handle: uintptr, err: Error) {
 	if len(name) == 0 {
 		err = .Not_Exist
 		return
 	}
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 
-	path := _fix_long_path(name, temp_allocator) or_return
+	path := cstring16(raw_data(_fix_long_path_wide(name, wide, temp_allocator) or_return))
 	access: u32
 	switch flags & {.Read, .Write} {
 	case {.Read}:         access = win32.FILE_GENERIC_READ
@@ -159,11 +159,22 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: Permissions) -> (h
 
 _open :: proc(name: string, flags: File_Flags, perm: Permissions) -> (f: ^File, err: Error) {
 	flags := flags if flags != nil else {.Read}
-	handle := _open_internal(name, flags, perm) or_return
-	return _new_file(handle, name, file_allocator())
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	wide := win32_utf8_to_utf16(name, temp_allocator) or_return
+	handle := _open_internal(name, wide, flags, perm) or_return
+	return _new_file_wide(handle, name, wide, file_allocator())
 }
 
 _new_file :: proc(handle: uintptr, name: string, allocator: runtime.Allocator) -> (f: ^File, err: Error) {
+	if handle == INVALID_HANDLE {
+		return
+	}
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
+	wide := win32_utf8_to_utf16(name, temp_allocator) or_return
+	return _new_file_wide(handle, name, wide, allocator)
+}
+
+_new_file_wide :: proc(handle: uintptr, name: string, wide: []u16, allocator: runtime.Allocator) -> (f: ^File, err: Error) {
 	if handle == INVALID_HANDLE {
 		return
 	}
@@ -177,7 +188,11 @@ _new_file :: proc(handle: uintptr, name: string, allocator: runtime.Allocator) -
 	impl.allocator = allocator
 	impl.fd = rawptr(handle)
 	impl.name = clone_string(name, impl.allocator) or_return
-	impl.wname = win32_utf8_to_wstring(name, impl.allocator) or_return
+	if len(wide) > 0 {
+		wname := make([]u16, len(wide) + 1, impl.allocator) or_return
+		copy(wname, wide)
+		impl.wname = cstring16(raw_data(wname))
+	}
 
 	handle := _handle(&impl.file)
 	kind := File_Impl_Kind.File
@@ -202,12 +217,14 @@ _new_file :: proc(handle: uintptr, name: string, allocator: runtime.Allocator) -
 _open_buffered :: proc(name: string, buffer_size: uint, flags := File_Flags{.Read}, perm: Permissions) -> (f: ^File, err: Error) {
 	assert(buffer_size > 0)
 	flags := flags if flags != nil else {.Read}
-	handle := _open_internal(name, flags, perm) or_return
-	return _new_file_buffered(handle, name, buffer_size)
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	wide := win32_utf8_to_utf16(name, temp_allocator) or_return
+	handle := _open_internal(name, wide, flags, perm) or_return
+	return _new_file_buffered(handle, name, wide, buffer_size)
 }
 
-_new_file_buffered :: proc(handle: uintptr, name: string, buffer_size: uint) -> (f: ^File, err: Error) {
-	f, err = _new_file(handle, name, file_allocator())
+_new_file_buffered :: proc(handle: uintptr, name: string, wide: []u16, buffer_size: uint) -> (f: ^File, err: Error) {
+	f, err = _new_file_wide(handle, name, wide, file_allocator())
 	if f != nil && err == nil {
 		impl := (^File_Impl)(f.impl)
 		impl.r_buf = make([]byte, buffer_size, file_allocator())
@@ -570,6 +587,11 @@ _truncate :: proc(f: ^File, size: i64) -> Error {
 _remove :: proc(name: string) -> Error {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	p := _fix_long_path(name, temp_allocator) or_return
+	return _remove_wstring(p)
+}
+
+// Takes an already converted UTF-16 path so remove_all can delete names that have no UTF-8 form.
+_remove_wstring :: proc(p: win32.wstring) -> Error {
 	err, err1: Error
 	if !win32.DeleteFileW(p) {
 		err = _get_platform_error()
@@ -584,24 +606,31 @@ _remove :: proc(name: string) -> Error {
 		return nil
 	}
 
-	if err != err1 {
-		a := win32.GetFileAttributesW(p)
-		if a == win32.INVALID_FILE_ATTRIBUTES {
+	a := win32.GetFileAttributesW(p)
+	if a == win32.INVALID_FILE_ATTRIBUTES {
+		if err != err1 {
 			err = _get_platform_error()
-		} else {
-			if a & win32.FILE_ATTRIBUTE_DIRECTORY != 0 {
-				err = err1
-			} else if a & win32.FILE_ATTRIBUTE_READONLY != 0 {
-				if win32.SetFileAttributesW(p, a &~ win32.FILE_ATTRIBUTE_READONLY) {
-					err = nil
-					if !win32.DeleteFileW(p) {
-						err = _get_platform_error()
-					}
-				}
-			}
+		}
+		return err
+	}
+	is_dir := a & win32.FILE_ATTRIBUTE_DIRECTORY != 0
+	if is_dir {
+		err = err1
+	}
+	if a & win32.FILE_ATTRIBUTE_READONLY == 0 || !win32.SetFileAttributesW(p, a &~ win32.FILE_ATTRIBUTE_READONLY) {
+		return err
+	}
+	if is_dir {
+		if win32.RemoveDirectoryW(p) {
+			return nil
+		}
+	} else {
+		if win32.DeleteFileW(p) {
+			return nil
 		}
 	}
-
+	err = _get_platform_error()
+	win32.SetFileAttributesW(p, a)
 	return err
 }
 
@@ -910,39 +939,6 @@ win32_utf8_to_utf16 :: proc(s: string, allocator: runtime.Allocator) -> (ws: []u
 		n -= 1
 	}
 	ws = text[:n]
-	return
-}
-
-// Used for `SHFILEOPSTRUCTW`, which requires double-null-terminated strings (`PCZZWSTR`).
-@(private="package", require_results)
-win32_utf8_to_pczzwstr :: proc(s: string, allocator: runtime.Allocator) -> (ws: win32.PCZZWSTR, err: Error) {
-	if len(s) < 1 {
-		// We still need to provide a double-null-terminated empty string.
-		t := make([]u16, 2, allocator) or_return
-		ws = cast(win32.PCZZWSTR)raw_data(t)
-		return
-	}
-
-	b := transmute([]byte)s
-	cstr := raw_data(b)
-	n := win32.MultiByteToWideChar(win32.CP_UTF8, win32.MB_ERR_INVALID_CHARS, cstr, i32(len(s)), nil, 0)
-	if n == 0 {
-		err = _get_platform_error()
-		return
-	}
-
-	text := make([]u16, n+2, allocator) or_return
-
-	n1 := win32.MultiByteToWideChar(win32.CP_UTF8, win32.MB_ERR_INVALID_CHARS, cstr, i32(len(s)), raw_data(text), n)
-	if n1 == 0 {
-		err = _get_platform_error()
-		delete(text, allocator)
-		return
-	}
-
-	text[n+1] = 0
-	text[n] = 0
-	ws = cast(win32.PCZZWSTR)raw_data(text)
 	return
 }
 

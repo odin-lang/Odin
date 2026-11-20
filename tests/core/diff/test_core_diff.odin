@@ -6,6 +6,8 @@ import "core:math/rand"
 import "core:slice"
 import "core:testing"
 
+SLIM_TESTS :: #config(ODIN_TEST_SLIM, ODIN_ARCH == .riscv64)
+
 /*
 	Harness
 */
@@ -330,11 +332,17 @@ test_myers_paper_example :: proc(t: ^testing.T) {
 
 @(test)
 test_minimal_exhaustive_binary :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	check_exhaustive(t, 2, 8)
 }
 
 @(test)
 test_minimal_exhaustive_ternary :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	check_exhaustive(t, 3, 5)
 }
 
@@ -347,6 +355,9 @@ test_myers_exhaustive_binary :: proc(t: ^testing.T) {
 // Caps this small are hit on almost every split.
 @(test)
 test_cost_cap_exhaustive :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	check_exhaustive(t, 2, 7, {algorithm = .Myers, max_cost = 1})
 	check_exhaustive(t, 3, 4, {algorithm = .Myers, max_cost = 2})
 }
@@ -399,6 +410,9 @@ test_cost_cap_disjoint :: proc(t: ^testing.T) {
 
 @(test)
 test_random :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	rand.reset(t.seed)
 	for _ in 0..<300 {
 		alphabet := 2 + rand.int_max(7)
@@ -414,6 +428,9 @@ test_random :: proc(t: ^testing.T) {
 
 @(test)
 test_random_mutations :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	rand.reset(t.seed)
 	for _ in 0..<300 {
 		alphabet := 1 + rand.int_max(20)

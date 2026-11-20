@@ -34,6 +34,16 @@ emulated.
 HAS_HARDWARE_SIMD :: runtime.HAS_HARDWARE_SIMD
 
 /*
+Vector of 2 `i32` lanes (64 bits).
+*/
+i32x2 :: #simd[2]i32
+
+/*
+Vector of 2 `f32` lanes (64 bits).
+*/
+f32x2 :: #simd[2]f32
+
+/*
 Vector of 16 `u8` lanes (128 bits).
 */
 u8x16 :: #simd[16]u8
@@ -72,6 +82,11 @@ u64x2 :: #simd[2]u64
 Vector of 2 `i64` lanes (128 bits).
 */
 i64x2 :: #simd[2]i64
+
+/*
+Vector of 8 `f16` lanes (128 bits).
+*/
+f16x8 :: #simd[8]f16
 
 /*
 Vector of 4 `f32` lanes (128 bits).

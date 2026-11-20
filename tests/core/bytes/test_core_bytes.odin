@@ -1,6 +1,7 @@
 package test_core_bytes
 
 import "core:bytes"
+import "core:io"
 import "core:slice"
 import "core:testing"
 
@@ -94,4 +95,51 @@ test_last_index_byte_bounds :: proc(t: ^testing.T) {
 	assert(len(input) == 16)
 	idx := bytes.last_index_byte(transmute([]byte)(input[:len(input)-1]), '.')
 	testing.expect_value(t, idx, 10)
+}
+
+@(private="file")
+Hiccup_Reader :: struct {
+	data:    []byte,
+	pos:     int,
+	hiccups: int,
+	pending: int,
+}
+
+@(private="file")
+hiccup_reader_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	h := (^Hiccup_Reader)(stream_data)
+	#partial switch mode {
+	case .Read:
+		if h.pending < h.hiccups {
+			h.pending += 1
+			return 0, nil
+		}
+		h.pending = 0
+		if h.pos >= len(h.data) {
+			return 0, .EOF
+		}
+		m := copy(p[:min(len(p), 7)], h.data[h.pos:])
+		h.pos += m
+		return i64(m), nil
+	case .Query:
+		return io.query_utility({.Read, .Query})
+	}
+	return 0, .Unsupported
+}
+
+@test
+test_buffer_read_from_stall :: proc(t: ^testing.T) {
+	data := "Empty reads between every chunk of this input."
+	for hiccups in ([]int{0, 3, 100, 101, max(int)}) {
+		h := Hiccup_Reader{data = transmute([]byte)data, hiccups = hiccups}
+		b: bytes.Buffer
+		defer bytes.buffer_destroy(&b)
+		n, err := bytes.buffer_read_from(&b, io.Stream{procedure = hiccup_reader_proc, data = &h})
+		if hiccups > 100 {
+			testing.expectf(t, n == 0 && err == .No_Progress, "%d hiccups: %d %v", hiccups, n, err)
+		} else {
+			testing.expectf(t, n == i64(len(data)) && err == nil, "%d hiccups: %d %v", hiccups, n, err)
+			testing.expect_value(t, bytes.buffer_to_string(&b), data)
+		}
+	}
 }

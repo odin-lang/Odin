@@ -63,10 +63,11 @@ Scan_Flag :: enum u32 {
 	Scan_Raw_Strings,
 	Scan_Comments,
 	Skip_Comments, // if set with .Scan_Comments, comments become white space
+	Scan_Triple_Quote_Strings,
 }
 Scan_Flags :: distinct bit_set[Scan_Flag; u32]
 
-Odin_Like_Tokens :: Scan_Flags{.Scan_Idents, .Scan_Ints, .Scan_Floats, .Scan_Chars, .Scan_Strings, .Scan_Raw_Strings, .Scan_Comments, .Skip_Comments}
+Odin_Like_Tokens :: Scan_Flags{.Scan_Idents, .Scan_Ints, .Scan_Floats, .Scan_Chars, .Scan_Strings, .Scan_Raw_Strings, .Scan_Comments, .Skip_Comments, .Scan_Triple_Quote_Strings}
 C_Like_Tokens    :: Scan_Flags{.Scan_Idents, .Scan_Ints, .Scan_C_Int_Prefixes, .Scan_Floats, .Scan_Chars, .Scan_Strings, .Scan_Raw_Strings, .Scan_Comments, .Skip_Comments}
 
 // Only allows for ASCII whitespace
@@ -453,9 +454,19 @@ scan_string :: proc(s: ^Scanner, quote: rune) -> (n: int) {
 		return ch
 	}
 
+	is_triple_quote := .Scan_Triple_Quote_Strings in s.flags && quote == '"' &&
+					   strings.has_prefix(s.src[s.src_pos:], "\"\"\n")
+
+	if is_triple_quote { 
+		_ = advance(s)
+		_ = advance(s)
+		_ = advance(s)
+		n += 3
+	}
+	
 	ch := advance(s)
-	for ch != quote {
-		if ch == '\n' || ch < 0 {
+	for ch != quote || (is_triple_quote && !strings.has_prefix(s.src[s.src_pos:], `""`)) {
+		if !is_triple_quote && (ch == '\n' || ch < 0) {
 			error(s, "literal not terminated")
 			return
 		}
@@ -475,6 +486,12 @@ scan_string :: proc(s: ^Scanner, quote: rune) -> (n: int) {
 			ch = advance(s)
 		}
 		n += 1
+	}
+	
+	if is_triple_quote {
+		_ = advance(s)
+		_ = advance(s)
+		n += 2
 	}
 	return
 }

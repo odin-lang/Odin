@@ -258,6 +258,7 @@ _set_option :: proc(socket: Any_Socket, option: Socket_Option, value: any, loc :
 	// TODO: Assuming no larger than i32, but the system may accept i64.
 	int_value: i32
 	timeval_value: freebsd.timeval
+	linger_value: freebsd.linger
 
 	ptr: rawptr
 	len: freebsd.socklen_t
@@ -283,8 +284,23 @@ _set_option :: proc(socket: Any_Socket, option: Socket_Option, value: any, loc :
 			}
 			ptr = &bool_value
 			len = size_of(bool_value)
+	case .Linger:
+			t, ok := value.(time.Duration)
+			if !ok {
+				panic("set_option() value must be a time.Duration here", loc)
+			}
+
+			num_secs := time.duration_seconds(t)
+			if num_secs < 0 || num_secs > f64(max(i32)) {
+				return .Invalid_Value
+			}
+			// NOTE: `SO_LINGER` expects a `struct linger`, not a `struct timeval`.
+			linger_value.l_onoff  = 1
+			linger_value.l_linger = i32(num_secs)
+
+			ptr = &linger_value
+			len = size_of(linger_value)
 	case
-		.Linger,
 		.Send_Timeout,
 		.Receive_Timeout:
 			t, ok := value.(time.Duration)

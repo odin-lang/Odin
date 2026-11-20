@@ -119,6 +119,13 @@ ldexp :: proc "c" (x: f64, y: i32) -> f64{
 	return math.ldexp(x, int(y))
 }
 
+@(require, linkage="strong", link_name="frexp")
+frexp :: proc "c" (x: f64, exp: ^i32) -> f64 {
+	significand, exponent := math.frexp(x)
+	exp^ = i32(exponent)
+	return significand
+}
+
 @(require, linkage="strong", link_name="exp")
 exp :: proc "c" (x: f64) -> f64 {
 	return math.exp(x)

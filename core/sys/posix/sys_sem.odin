@@ -112,6 +112,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	} else when ODIN_OS == .OpenBSD {
 		semid_ds :: struct {
 			sem_perm:  ipc_perm, /* [PSX] operation permission structure */
+			sem_base:  rawptr,
 			sem_nsems: c.ushort, /* [PSX] number of semaphores in set */
 			sem_otime: time_t,   /* [PSX] last semop() */
 			sem_pad1:  c.long,

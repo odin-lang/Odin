@@ -24,6 +24,16 @@ is_terminal :: proc(f: $T) -> bool {
 }
 
 /*
+Returns the width(columns) and height(rows) of the current terminal window.
+
+`ok` will be `false` in case of an error.
+*/
+@(require_results)
+get_terminal_size :: proc() -> (width, height: int, ok: bool) {
+	return _get_terminal_size()
+}
+
+/*
 This is true if the terminal is dumb, i.e. cannot process ANSI control sequences.
 */
 is_dumb: bool

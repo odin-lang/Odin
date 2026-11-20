@@ -9,8 +9,15 @@ when ODIN_BUILD_MODE == .Dynamic {
 	@(link_name="_odin_entry_point", linkage="strong", require/*, link_section=".init"*/)
 	_odin_entry_point :: proc "c" () {
 		context = default_context()
+		when ODIN_PLATFORM_SUBTARGET == .Android {
+			args__ = _android_args()
+		}
 		when !ODIN_BEDROCK { #force_no_inline _startup_runtime() }
-		intrinsics.__entry_point()
+		// NOTE(bill): An Android app's library is loaded by `System.loadLibrary` on the UI thread, before its
+		// activity exists. `core:sys/android/native_app_glue` calls `main` on a thread of its own instead.
+		when ODIN_PLATFORM_SUBTARGET != .Android {
+			intrinsics.__entry_point()
+		}
 	}
 	@(link_name="_odin_exit_point", linkage="strong", require/*, link_section=".fini"*/)
 	_odin_exit_point :: proc "c" () {
@@ -33,9 +40,14 @@ when ODIN_BUILD_MODE == .Dynamic {
 		} else when ODIN_ARCH == .i386 {
 			@require foreign import entry "entry_unix_no_crt_i386.asm"
 			SYS_exit :: 1
-		} else when ODIN_OS == .Darwin && ODIN_ARCH == .arm64 {
-			@require foreign import entry "entry_unix_no_crt_darwin_arm64.asm"
-			SYS_exit :: 1
+		} else when ODIN_ARCH == .arm64 {
+			when ODIN_OS == .Darwin {
+				@require foreign import entry "entry_unix_no_crt_darwin_arm64.asm"
+				SYS_exit :: 1
+			} else {
+				@require foreign import entry "entry_unix_no_crt_arm64.asm"
+				SYS_exit :: 93
+			}
 		} else when ODIN_ARCH == .riscv64 {
 			@require foreign import entry "entry_unix_no_crt_riscv64.asm"
 			SYS_exit :: 93

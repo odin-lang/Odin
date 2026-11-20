@@ -206,7 +206,7 @@ test_marshalling :: proc(t: ^testing.T) {
 	"biggest": 2(h'0f951a9fd3c158afdff08ab8e0'),
 	"smallie": -18446744073709551616,
 	"my_bytes": h'',
-	"smallest": 3(h'0f951a9fd3c158afdff08ab8e0'),
+	"smallest": 3(h'0f951a9fd3c158afdff08ab8df'),
 	"important": "!",
 	"onetwenty": 12345,
 	"renamed :)": 123123.12500000,
@@ -333,6 +333,27 @@ test_marshalling_nil_maybe :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_marshalling_zero_maybe :: proc(t: ^testing.T) {
+	// The integer 0 is the header byte 0x00: it is a value, and not a nil.
+	maybe_test: Maybe(int) = 0
+	data, err := cbor.marshal(maybe_test)
+	defer delete(data)
+	testing.expect_value(t, err, nil)
+
+	val, derr := cbor.decode(string(data))
+	testing.expect_value(t, derr, nil)
+
+	diag := cbor.to_diagnostic_format(val)
+	testing.expect_value(t, diag, "0")
+	delete(diag)
+
+	maybe_dest: Maybe(int)
+	uerr := cbor.unmarshal(string(data), &maybe_dest)
+	testing.expect_value(t, uerr, nil)
+	testing.expect_value(t, maybe_dest, 0)
+}
+
+@(test)
 test_marshalling_union :: proc(t: ^testing.T) {
 	My_Distinct :: distinct string
 
@@ -436,7 +457,11 @@ test_lying_length_array :: proc(t: ^testing.T) {
 	// Input says this is an array of length max(u64), this should not allocate that amount.
 	input := []byte{0x9B, 0x00, 0x00, 0x42, 0xFA, 0x42, 0xFA, 0x42, 0xFA, 0x42}
 	_, err := cbor.decode(string(input))
-	testing.expect_value(t, err, io.Error.Unexpected_EOF) // .Out_Of_Memory would be bad.
+	expected: cbor.Decode_Error = io.Error.Unexpected_EOF
+	when size_of(int) < 8 {
+		expected = cbor.Decode_Data_Error.Length_Too_Big
+	}
+	testing.expect_value(t, err, expected) // .Out_Of_Memory would be bad.
 }
 
 @(test)
@@ -987,4 +1012,90 @@ test_bit_set_endianness :: proc(t: ^testing.T) {
 	check(t, u64,   "\x1b\x00\x00\x00\x00\x00\x00\x12\x01")
 	check(t, u64le, "\x1b\x00\x00\x00\x00\x00\x00\x12\x01")
 	check(t, u64be, "\x1b\x00\x00\x00\x00\x00\x00\x12\x01")
+}
+
+@(test)
+test_unmarshal_epoch_time_range :: proc(t: ^testing.T) {
+	Case :: struct {
+		data:  string,
+		nsec:  i64,
+		valid: bool,
+	}
+	cases := [?]Case{
+		{"\xc1\x1a\x51\x4b\x67\xb0",                 1363896240 * 1e9,       true},
+		{"\xc1\xfb\x41\xd4\x52\xd9\xec\x20\x00\x00", 1363896240 * 1e9 + 5e8, true},
+		{"\xc1\xfb\xc0\x04\x00\x00\x00\x00\x00\x00", -25e8,                  true},
+		{"\xc1\x1b\x00\x00\x00\x02\x25\xc1\x7d\x04", 9223372036 * 1e9,       true},
+		{"\xc1\x3b\x00\x00\x00\x02\x25\xc1\x7d\x03", -9223372036 * 1e9,      true},
+		{"\xc1\x1b\x00\x00\x00\x02\x25\xc1\x7d\x05", 0,                      false},
+		{"\xc1\x3b\x00\x00\x00\x02\x25\xc1\x7d\x04", 0,                      false},
+		{"\xc1\x1b\xff\xff\xff\xff\xff\xff\xff\xff", 0,                      false},
+		{"\xc1\x3b\xff\xff\xff\xff\xff\xff\xff\xff", 0,                      false},
+		{"\xc1\xfb\x7f\xf8\x00\x00\x00\x00\x00\x00", 0,                      false},
+		{"\xc1\xfb\x7f\xf0\x00\x00\x00\x00\x00\x00", 0,                      false},
+		{"\xc1\xfb\xff\xf0\x00\x00\x00\x00\x00\x00", 0,                      false},
+		{"\xc1\xfb\x7e\x37\xe4\x3c\x88\x00\x75\x9c", 0,                      false},
+		{"\xc1\xf9\x7c\x00",                         0,                      false},
+	}
+	for c in cases {
+		v: time.Time
+		err := cbor.unmarshal(c.data, &v)
+		if c.valid {
+			testing.expectf(t, err == nil && v._nsec == c.nsec, "% x: expected %v, got %v (%v)", c.data, c.nsec, v._nsec, err)
+		} else {
+			testing.expectf(t, err == cbor.Decode_Data_Error.Bad_Tag_Value, "% x: expected Bad_Tag_Value, got %v (%v)", c.data, v._nsec, err)
+		}
+	}
+}
+
+@(test)
+test_big_tags :: proc(t: ^testing.T) {
+	expect_big_tag(t, "0", "\xc2\x40")
+	expect_big_tag(t, "1", "\xc2\x41\x01")
+	expect_big_tag(t, "18446744073709551616", "\xc2\x49\x01\x00\x00\x00\x00\x00\x00\x00\x00")
+	expect_big_tag(t, "-18446744073709551617", "\xc3\x49\x01\x00\x00\x00\x00\x00\x00\x00\x00")
+	expect_big_tag(t, "-18446744073709551616", "\xc3\x48\xff\xff\xff\xff\xff\xff\xff\xff")
+	expect_big_tag(t, "-1", "\xc3\x40")
+	expect_big_tag(t, "-2", "\xc3\x41\x01")
+	expect_big_tag(t, "-255", "\xc3\x41\xfe")
+	expect_big_tag(t, "-256", "\xc3\x41\xff")
+	expect_big_tag(t, "-257", "\xc3\x42\x01\x00")
+	expect_big_tag(t, "-512", "\xc3\x42\x01\xff")
+	expect_big_tag(t, "-65536", "\xc3\x42\xff\xff")
+	expect_big_tag(t, "-16777216", "\xc3\x43\xff\xff\xff")
+}
+
+@(test)
+test_big_tag_non_finite :: proc(t: ^testing.T) {
+	v: big.Int
+	defer big.destroy(&v)
+
+	for kind in 0..<3 {
+		switch kind {
+		case 0: big.nan(&v)
+		case 1: big.inf(&v)
+		case:   big.minus_inf(&v)
+		}
+		data, err := cbor.marshal(v)
+		defer delete(data)
+		e, ok := err.(cbor.Encode_Data_Error)
+		testing.expect(t, ok)
+		testing.expect_value(t, e, cbor.Encode_Data_Error.Bad_Tag_Value)
+	}
+}
+
+expect_big_tag :: proc(t: ^testing.T, value: string, encoded: string, loc := #caller_location) {
+	v, back: big.Int
+	defer big.destroy(&v, &back)
+	testing.expect_value(t, big.atoi(&v, value), nil, loc)
+
+	data, err := cbor.marshal(v)
+	defer delete(data)
+	testing.expect_value(t, err, nil, loc)
+	testing.expect_value(t, fmt.tprint(data), fmt.tprint(transmute([]byte)encoded), loc)
+
+	uerr := cbor.unmarshal(encoded, &back)
+	testing.expect_value(t, uerr, nil, loc)
+	s, _ := big.itoa(&back, 10, false, context.temp_allocator)
+	testing.expect_value(t, s, value, loc)
 }

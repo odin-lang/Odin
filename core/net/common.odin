@@ -162,6 +162,146 @@ Address_Family :: enum {
 
 Netmask :: distinct Address
 
+IP4_Prefix :: struct {
+	address: IP4_Address,
+	length:  u8,
+}
+
+IP6_Prefix :: struct {
+	address: IP6_Address,
+	length:  u8,
+}
+
+Prefix :: union {IP4_Prefix, IP6_Prefix}
+
+IP4_Range :: struct {
+	first: IP4_Address,
+	last:  IP4_Address,
+}
+
+IP6_Range :: struct {
+	first: IP6_Address,
+	last:  IP6_Address,
+}
+
+Address_Range :: union {IP4_Range, IP6_Range}
+
+Address_Category :: enum u8 {
+	Global_Unicast,
+	Unspecified,
+	This_Network,
+	Loopback,
+	Private_Use,
+	Shared_Address,
+	Link_Local,
+	Unique_Local,
+	Documentation,
+	Benchmarking,
+	Protocol_Assignment,
+	Translation,
+	IP4_Mapped,
+	Discard_Only,
+	Dummy,
+	Reserved,
+	Limited_Broadcast,
+	Multicast,
+	Deprecated,
+}
+
+Registry_Flag :: enum u8 {
+	False,
+	True,
+	Not_Applicable,
+}
+
+Special_Purpose_Entry :: struct {
+	prefix:               Prefix,
+	name:                 string,
+	rfc:                  string,
+	category:             Address_Category,
+	source:               Registry_Flag,
+	destination:          Registry_Flag,
+	forwardable:          Registry_Flag,
+	globally_reachable:   Registry_Flag,
+	reserved_by_protocol: Registry_Flag,
+}
+
+Multicast_Scope :: enum u8 {
+	Reserved_0         = 0x0,
+	Interface_Local    = 0x1,
+	Link_Local         = 0x2,
+	Realm_Local        = 0x3,
+	Admin_Local        = 0x4,
+	Site_Local         = 0x5,
+	Organization_Local = 0x8,
+	Global             = 0xe,
+	Reserved_F         = 0xf,
+}
+
+MAX_RANGE_PREFIXES :: 254
+
+IP4_SPECIAL_PURPOSE_REGISTRY_UPDATED :: "2025-10-09"
+IP6_SPECIAL_PURPOSE_REGISTRY_UPDATED :: "2025-10-09"
+
+@(rodata)
+IP4_SPECIAL_PURPOSE_REGISTRY := [?]Special_Purpose_Entry{
+	{IP4_Prefix{{  0,   0,   0,   0},  8}, "This network",                              "RFC 791, Section 3.2",            .This_Network,        .True,           .False,          .False,          .False,          .True},
+	{IP4_Prefix{{  0,   0,   0,   0}, 32}, "This host on this network",                 "RFC 1122, Section 3.2.1.3",       .Unspecified,         .True,           .False,          .False,          .False,          .True},
+	{IP4_Prefix{{ 10,   0,   0,   0},  8}, "Private-Use",                               "RFC 1918",                        .Private_Use,         .True,           .True,           .True,           .False,          .False},
+	{IP4_Prefix{{100,  64,   0,   0}, 10}, "Shared Address Space",                      "RFC 6598",                        .Shared_Address,      .True,           .True,           .True,           .False,          .False},
+	{IP4_Prefix{{127,   0,   0,   0},  8}, "Loopback",                                  "RFC 1122, Section 3.2.1.3",       .Loopback,            .False,          .False,          .False,          .False,          .True},
+	{IP4_Prefix{{169, 254,   0,   0}, 16}, "Link Local",                                "RFC 3927",                        .Link_Local,          .True,           .True,           .False,          .False,          .True},
+	{IP4_Prefix{{172,  16,   0,   0}, 12}, "Private-Use",                               "RFC 1918",                        .Private_Use,         .True,           .True,           .True,           .False,          .False},
+	{IP4_Prefix{{192,   0,   0,   0}, 24}, "IETF Protocol Assignments",                 "RFC 6890, Section 2.1",           .Protocol_Assignment, .False,          .False,          .False,          .False,          .False},
+	{IP4_Prefix{{192,   0,   0,   0}, 29}, "IPv4 Service Continuity Prefix",            "RFC 7335",                        .Translation,         .True,           .True,           .True,           .False,          .False},
+	{IP4_Prefix{{192,   0,   0,   8}, 32}, "IPv4 dummy address",                        "RFC 7600",                        .Dummy,               .True,           .False,          .False,          .False,          .False},
+	{IP4_Prefix{{192,   0,   0,   9}, 32}, "Port Control Protocol Anycast",             "RFC 7723",                        .Protocol_Assignment, .True,           .True,           .True,           .True,           .False},
+	{IP4_Prefix{{192,   0,   0,  10}, 32}, "Traversal Using Relays around NAT Anycast", "RFC 8155",                        .Protocol_Assignment, .True,           .True,           .True,           .True,           .False},
+	{IP4_Prefix{{192,   0,   0, 170}, 32}, "NAT64/DNS64 Discovery",                     "RFC 8880; RFC 7050, Section 2.2", .Translation,         .False,          .False,          .False,          .False,          .True},
+	{IP4_Prefix{{192,   0,   0, 171}, 32}, "NAT64/DNS64 Discovery",                     "RFC 8880; RFC 7050, Section 2.2", .Translation,         .False,          .False,          .False,          .False,          .True},
+	{IP4_Prefix{{192,   0,   2,   0}, 24}, "Documentation (TEST-NET-1)",                "RFC 5737",                        .Documentation,       .False,          .False,          .False,          .False,          .False},
+	{IP4_Prefix{{192,  31, 196,   0}, 24}, "AS112-v4",                                  "RFC 7535",                        .Protocol_Assignment, .True,           .True,           .True,           .True,           .False},
+	{IP4_Prefix{{192,  52, 193,   0}, 24}, "AMT",                                       "RFC 7450",                        .Protocol_Assignment, .True,           .True,           .True,           .True,           .False},
+	{IP4_Prefix{{192,  88,  99,   0}, 24}, "Deprecated (6to4 Relay Anycast)",           "RFC 7526",                        .Deprecated,          .Not_Applicable, .Not_Applicable, .Not_Applicable, .Not_Applicable, .Not_Applicable},
+	{IP4_Prefix{{192,  88,  99,   2}, 32}, "6a44-relay anycast address",                "RFC 6751",                        .Translation,         .True,           .True,           .True,           .False,          .False},
+	{IP4_Prefix{{192, 168,   0,   0}, 16}, "Private-Use",                               "RFC 1918",                        .Private_Use,         .True,           .True,           .True,           .False,          .False},
+	{IP4_Prefix{{192, 175,  48,   0}, 24}, "Direct Delegation AS112 Service",           "RFC 7534",                        .Protocol_Assignment, .True,           .True,           .True,           .True,           .False},
+	{IP4_Prefix{{198,  18,   0,   0}, 15}, "Benchmarking",                              "RFC 2544",                        .Benchmarking,        .True,           .True,           .True,           .False,          .False},
+	{IP4_Prefix{{198,  51, 100,   0}, 24}, "Documentation (TEST-NET-2)",                "RFC 5737",                        .Documentation,       .False,          .False,          .False,          .False,          .False},
+	{IP4_Prefix{{203,   0, 113,   0}, 24}, "Documentation (TEST-NET-3)",                "RFC 5737",                        .Documentation,       .False,          .False,          .False,          .False,          .False},
+	{IP4_Prefix{{240,   0,   0,   0},  4}, "Reserved",                                  "RFC 1112, Section 4",             .Reserved,            .False,          .False,          .False,          .False,          .True},
+	{IP4_Prefix{{255, 255, 255, 255}, 32}, "Limited Broadcast",                         "RFC 8190; RFC 919, Section 7",    .Limited_Broadcast,   .False,          .True,           .False,          .False,          .True},
+}
+
+@(rodata)
+IP6_SPECIAL_PURPOSE_REGISTRY := [?]Special_Purpose_Entry{
+	{IP6_Prefix{{0,      0,      0,      0, 0, 0,      0, 1}, 128}, "Loopback Address",                                   "RFC 4291",                  .Loopback,            .False, .False, .False, .False,          .True},
+	{IP6_Prefix{{0,      0,      0,      0, 0, 0,      0, 0}, 128}, "Unspecified Address",                                "RFC 4291",                  .Unspecified,         .True,  .False, .False, .False,          .True},
+	{IP6_Prefix{{0,      0,      0,      0, 0, 0xffff, 0, 0},  96}, "IPv4-mapped Address",                                "RFC 4291",                  .IP4_Mapped,          .False, .False, .False, .False,          .True},
+	{IP6_Prefix{{0x64,   0xff9b, 0,      0, 0, 0,      0, 0},  96}, "IPv4-IPv6 Translat.",                                "RFC 6052",                  .Translation,         .True,  .True,  .True,  .True,           .False},
+	{IP6_Prefix{{0x64,   0xff9b, 1,      0, 0, 0,      0, 0},  48}, "IPv4-IPv6 Translat.",                                "RFC 8215",                  .Translation,         .True,  .True,  .True,  .False,          .False},
+	{IP6_Prefix{{0x100,  0,      0,      0, 0, 0,      0, 0},  64}, "Discard-Only Address Block",                         "RFC 6666",                  .Discard_Only,        .True,  .True,  .True,  .False,          .False},
+	{IP6_Prefix{{0x100,  0,      0,      1, 0, 0,      0, 0},  64}, "Dummy IPv6 Prefix",                                  "RFC 9780",                  .Dummy,               .True,  .False, .False, .False,          .False},
+	{IP6_Prefix{{0x2001, 0,      0,      0, 0, 0,      0, 0},  23}, "IETF Protocol Assignments",                          "RFC 2928",                  .Protocol_Assignment, .False, .False, .False, .False,          .False},
+	{IP6_Prefix{{0x2001, 0,      0,      0, 0, 0,      0, 0},  32}, "TEREDO",                                             "RFC 4380; RFC 8190",        .Translation,         .True,  .True,  .True,  .Not_Applicable, .False},
+	{IP6_Prefix{{0x2001, 1,      0,      0, 0, 0,      0, 1}, 128}, "Port Control Protocol Anycast",                      "RFC 7723",                  .Protocol_Assignment, .True,  .True,  .True,  .True,           .False},
+	{IP6_Prefix{{0x2001, 1,      0,      0, 0, 0,      0, 2}, 128}, "Traversal Using Relays around NAT Anycast",          "RFC 8155",                  .Protocol_Assignment, .True,  .True,  .True,  .True,           .False},
+	{IP6_Prefix{{0x2001, 1,      0,      0, 0, 0,      0, 3}, 128}, "DNS-SD Service Registration Protocol Anycast",       "RFC 9665",                  .Protocol_Assignment, .True,  .True,  .True,  .True,           .False},
+	{IP6_Prefix{{0x2001, 2,      0,      0, 0, 0,      0, 0},  48}, "Benchmarking",                                       "RFC 5180; RFC Errata 1752", .Benchmarking,        .True,  .True,  .True,  .False,          .False},
+	{IP6_Prefix{{0x2001, 3,      0,      0, 0, 0,      0, 0},  32}, "AMT",                                                "RFC 7450",                  .Protocol_Assignment, .True,  .True,  .True,  .True,           .False},
+	{IP6_Prefix{{0x2001, 4,      0x112,  0, 0, 0,      0, 0},  48}, "AS112-v6",                                           "RFC 7535",                  .Protocol_Assignment, .True,  .True,  .True,  .True,           .False},
+	{IP6_Prefix{{0x2001, 0x10,   0,      0, 0, 0,      0, 0},  28}, "Deprecated (previously ORCHID)",                     "RFC 4843",                  .Deprecated,          .Not_Applicable, .Not_Applicable, .Not_Applicable, .Not_Applicable, .Not_Applicable},
+	{IP6_Prefix{{0x2001, 0x20,   0,      0, 0, 0,      0, 0},  28}, "ORCHIDv2",                                           "RFC 7343",                  .Protocol_Assignment, .True,  .True,  .True,  .True,           .False},
+	{IP6_Prefix{{0x2001, 0x30,   0,      0, 0, 0,      0, 0},  28}, "Drone Remote ID Protocol Entity Tags (DETs) Prefix", "RFC 9374",                  .Protocol_Assignment, .True,  .True,  .True,  .True,           .False},
+	{IP6_Prefix{{0x2001, 0xdb8,  0,      0, 0, 0,      0, 0},  32}, "Documentation",                                      "RFC 3849",                  .Documentation,       .False, .False, .False, .False,          .False},
+	{IP6_Prefix{{0x2002, 0,      0,      0, 0, 0,      0, 0},  16}, "6to4",                                               "RFC 3056",                  .Translation,         .True,  .True,  .True,  .Not_Applicable, .False},
+	{IP6_Prefix{{0x2620, 0x4f,   0x8000, 0, 0, 0,      0, 0},  48}, "Direct Delegation AS112 Service",                    "RFC 7534",                  .Protocol_Assignment, .True,  .True,  .True,  .True,           .False},
+	{IP6_Prefix{{0x3fff, 0,      0,      0, 0, 0,      0, 0},  20}, "Documentation",                                      "RFC 9637",                  .Documentation,       .False, .False, .False, .False,          .False},
+	{IP6_Prefix{{0x5f00, 0,      0,      0, 0, 0,      0, 0},  16}, "Segment Routing (SRv6) SIDs",                        "RFC 9602",                  .Protocol_Assignment, .True,  .True,  .True,  .False,          .False},
+	{IP6_Prefix{{0xfc00, 0,      0,      0, 0, 0,      0, 0},   7}, "Unique-Local",                                       "RFC 4193; RFC 8190",        .Unique_Local,        .True,  .True,  .True,  .False,          .False},
+	{IP6_Prefix{{0xfe80, 0,      0,      0, 0, 0,      0, 0},  10}, "Link-Local Unicast",                                 "RFC 4291",                  .Link_Local,          .True,  .True,  .False, .False,          .True},
+}
+
 /*
 	INTERFACE / LINK STATE
 */

@@ -53,9 +53,12 @@ match :: proc(value: Value, args: ..Match_Key_Variant, flags: Match_Flags = nil)
 				return
 			}
 			vfound, vok := v[k]
-			if vok || (.Ignore_Key_Not_Found in flags) {
+			if vok {
 				found = vfound
 				continue arg_loop
+			}
+			if .Ignore_Key_Not_Found in flags {
+				return nil, .None
 			}
 			err = .Key_Not_Found
 			return

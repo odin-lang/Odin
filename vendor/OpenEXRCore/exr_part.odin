@@ -194,6 +194,47 @@ foreign lib {
 	 */
 	set_dwa_compression_level :: proc(ctxt: context_t, part_index: c.int, level: f32) -> result_t ---
 
+	/** @brief Retrieve the lossy HTJ2K compression quality used for the specified
+	 * part.
+	 *
+	 * This only applies when the compression method is LJ2K.
+	 *
+	 * This value is NOT persisted in the file, and only exists for the lifetime of
+	 * the context, so will be at the default value when just reading a file.
+	 */
+	get_lossy_htj2k_quality :: proc(ctxt: const_context_t, part_index: c.int, level: ^f32) -> result_t ---
+
+	/** @brief Set the lossy HTJ2K compression quality for the specified part.
+	 *
+	 * This only applies when the compression method is LJ2K.
+	 *
+	 * This value is NOT persisted in the file, and only exists for the lifetime of
+	 * the context, so this value will be ignored when reading a file.
+	 */
+	set_lossy_htj2k_quality :: proc(ctxt: context_t, part_index: c.int, level: f32) -> result_t ---
+
+	/** @brief Retrieve the zstd compression level used for the specified part.
+	 *
+	 * This only applies when the compression method is zstd. Valid levels
+	 * are 1 through 22; the default is 5.
+	 *
+	 * This value is NOT persisted in the file, and only exists for the
+	 * lifetime of the context, so will be at the default value when just
+	 * reading a file.
+	 */
+	get_zstd_compression_level :: proc(ctxt: const_context_t, part_index: c.int, level: ^i32) -> result_t ---
+
+	/** @brief Set the zstd compression level for the specified part.
+	 *
+	 * This only applies when the compression method is zstd. `level` must
+	 * be between 1 and 22 inclusive (libzstd range).
+	 *
+	 * This value is NOT persisted in the file, and only exists for the
+	 * lifetime of the context, so this value will be ignored when
+	 * reading a file.
+	 */
+	set_zstd_compression_level :: proc(ctxt: context_t, part_index: c.int, level: c.int) -> result_t ---
+
 	/**************************************/
 
 	/** @defgroup PartMetadata Functions to get and set metadata for a particular part.
@@ -437,6 +478,18 @@ foreign lib {
 		part_index: c.int,
 		name:       cstring,
 		val:        ^attr_box2f_t) -> result_t ---
+
+	attr_get_bytes :: proc(
+		ctxt:       const_context_t,
+		part_index: c.int,
+		name:       cstring,
+		out:        ^attr_bytes_t) -> result_t ---
+
+	attr_set_bytes :: proc(
+		ctxt:       context_t,
+		part_index: c.int,
+		name:       cstring,
+		val:        ^attr_bytes_t) -> result_t ---
 
 	/** @brief Zero-copy query of channel data.
 	 *

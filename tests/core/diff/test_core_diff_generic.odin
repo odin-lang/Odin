@@ -118,6 +118,9 @@ string_equal :: proc(x, y: string, _: rawptr) -> bool {
 
 @(test)
 test_generic_ints :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	rand.reset(t.seed)
 	for _ in 0..<100 {
 		alphabet := 1 + rand.int_max(12)

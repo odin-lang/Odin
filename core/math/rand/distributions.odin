@@ -13,15 +13,21 @@ float64_triangular :: proc(lo, hi: f64, mode: Maybe(f64), gen := context.random_
 	if hi-lo == 0 {
 		return lo
 	}
+	scale := f64(1)
+	if math.is_inf(hi - lo) {
+		scale = 0.5
+	}
 	lo, hi := lo, hi
+	lo *= scale
+	hi *= scale
 	u := float64(gen)
-	c := f64(0.5) if mode == nil else clamp((mode.?-lo) / (hi-lo), 0, 1)
+	c := f64(0.5) if mode == nil else clamp((mode.?*scale-lo) / (hi-lo), 0, 1)
 	if u > c {
 		u = 1-u
 		c = 1-c
 		lo, hi = hi, lo
 	}
-	return lo + (hi - lo) * math.sqrt(u * c)
+	return (lo + (hi - lo) * math.sqrt(u * c)) / scale
 
 }
 // Triangular Distribution
@@ -31,15 +37,11 @@ float32_triangular :: proc(lo, hi: f32, mode: Maybe(f32), gen := context.random_
 	if hi-lo == 0 {
 		return lo
 	}
-	lo, hi := lo, hi
-	u := float32(gen)
-	c := f32(0.5) if mode == nil else clamp((mode.?-lo) / (hi-lo), 0, 1)
-	if u > c {
-		u = 1-u
-		c = 1-c
-		lo, hi = hi, lo
+	mode64: Maybe(f64)
+	if m, ok := mode.?; ok {
+		mode64 = f64(m)
 	}
-	return lo + (hi - lo) * math.sqrt(u * c)
+	return f32(float64_triangular(f64(lo), f64(hi), mode64, gen))
 }
 
 
@@ -98,8 +100,8 @@ float32_exponential :: proc(lambda: f32, gen := context.random_generator) -> f32
 // mean is `alpha*beta`, variance is `math.pow(alpha*beta, 2)`
 @(require_results)
 float64_gamma :: proc(alpha, beta: f64, gen := context.random_generator) -> f64 {
-	if alpha <= 0 || beta <= 0 {
-		panic(#procedure + ": alpha and beta must be > 0.0")
+	if !(alpha > 0 && beta > 0) || math.is_inf(alpha) {
+		panic(#procedure + ": alpha must be finite, and alpha and beta must be > 0.0")
 	}
 
 	LOG4 :: 1.3862943611198906188344642429163531361510002687205105082413600189
@@ -110,8 +112,6 @@ float64_gamma :: proc(alpha, beta: f64, gen := context.random_generator) -> f64 
 		// R.C.H. Cheng, "The generation of Gamma variables with non-integral shape parameters", Applied Statistics, (1977), 26, No. 1, p71-74
 
 		ainv := math.sqrt(2 * alpha - 1)
-		bbb := alpha - LOG4
-		ccc := alpha + ainv
 		for {
 			u1 := float64(gen)
 			if !(1e-7 < u1 && u1 < 0.9999999) {
@@ -119,9 +119,16 @@ float64_gamma :: proc(alpha, beta: f64, gen := context.random_generator) -> f64 
 			}
 			u2 := 1 - float64(gen)
 			v := math.ln(u1 / (1 - u1)) / ainv
-			x := alpha * math.exp(v)
+			e := math.exp(v)
+			x := alpha * e
 			z := u1 * u1 * u2
-			t := bbb + ccc*v - x
+			em: f64
+			if abs(v) < 1.0/32 {
+				em = v*v*(1.0/2 + v*(1.0/6 + v*(1.0/24 + v*(1.0/120 + v*(1.0/720 + v*(1.0/5040 + v*(1.0/40320 + v*(1.0/362880 + v*(1.0/3628800)))))))))
+			} else {
+				em = e - 1 - v
+			}
+			t := ainv*v - LOG4 - alpha*em
 			if t + SG_MAGIC_CONST - 4.5 * z >= 0 || t >= math.ln(z) {
 				return x * beta
 			}
@@ -175,8 +182,32 @@ float32_gamma :: proc(alpha, beta: f32, gen := context.random_generator) -> f32 
 // Return values range between 0 and 1
 @(require_results)
 float64_beta :: proc(alpha, beta: f64, gen := context.random_generator) -> f64 {
-	if alpha <= 0 || beta <= 0 {
-		panic(#procedure + ": alpha and beta must be > 0.0")
+	if !(alpha > 0 && beta > 0) || math.is_inf(alpha) || math.is_inf(beta) {
+		panic(#procedure + ": alpha and beta must be finite and > 0.0")
+	}
+	if alpha < 1 || beta < 1 {
+		ln_y, ln_z: f64
+		if alpha < 1 {
+			g := float64_gamma(alpha + 1, 1.0, gen)
+			u := 1 - float64(gen)
+			ln_y = math.ln(g) + math.ln(u)/alpha
+		} else {
+			ln_y = math.ln(float64_gamma(alpha, 1.0, gen))
+		}
+		if beta < 1 {
+			g := float64_gamma(beta + 1, 1.0, gen)
+			u := 1 - float64(gen)
+			ln_z = math.ln(g) + math.ln(u)/beta
+		} else {
+			ln_z = math.ln(float64_gamma(beta, 1.0, gen))
+		}
+		d := ln_y - ln_z
+		if d >= 0 {
+			e := math.exp(-d)
+			return 1 - e / (1 + e)
+		}
+		e := math.exp(d)
+		return e / (1 + e)
 	}
 	// Knuth Vol 2 Ed 3 pg 134 "the beta distribution"
 	y := float64_gamma(alpha, 1.0, gen)
@@ -205,7 +236,7 @@ float64_pareto :: proc(alpha: f64, gen := context.random_generator) -> f64 {
 // Pareto distribution, `alpha` is the shape parameter.
 // https://wikipedia.org/wiki/Pareto_distribution
 @(require_results)
-float32_pareto :: proc(alpha, beta: f32, gen := context.random_generator) -> f32 {
+float32_pareto :: proc(alpha: f32, gen := context.random_generator) -> f32 {
 	return f32(float64_pareto(f64(alpha), gen))
 }
 
@@ -232,6 +263,9 @@ float64_von_mises :: proc(mean_angle, kappa: f64, gen := context.random_generato
 	// Fisher, N.I., "Statistical Analysis of Circular Data", Cambridge University Press, 1993.
 
 	mu := mean_angle
+	if !(kappa >= 0) {
+		panic(#procedure + ": kappa must be >= 0.0")
+	}
 	if kappa <= 1e-6 {
 		return math.TAU * float64(gen)
 	}
@@ -253,11 +287,19 @@ float64_von_mises :: proc(mean_angle, kappa: f64, gen := context.random_generato
 	q := 1.0 / t
 	f := (q + z) / (1 + q*z)
 	u3 := float64(gen)
+	r: f64
 	if u3 > 0.5 {
-		return math.mod(mu + math.acos(f), math.TAU)
+		r = math.mod(mu + math.acos(f), math.TAU)
 	} else {
-		return math.mod(mu - math.acos(f), math.TAU)
+		r = math.mod(mu - math.acos(f), math.TAU)
 	}
+	if r < 0 {
+		r += math.TAU
+		if r >= math.TAU {
+			r = 0
+		}
+	}
+	return r
 }
 // Circular Data (von Mises) Distribution
 // `mean_angle` is the in mean angle between 0 and 2pi radians
@@ -307,7 +349,11 @@ float32_log_cauchy_lorentz :: proc(x_0, gamma: f32, gen := context.random_genera
 @(require_results)
 float64_laplace :: proc(mean, b: f64, gen := context.random_generator) -> f64 {
 	assert(b > 0)
-	p := float64(gen)-0.5
+	u := float64(gen)
+	for u == 0 {
+		u = float64(gen)
+	}
+	p := u-0.5
 	return -math.sign(p)*math.ln(1 - 2*abs(p))*b + mean
 }
 // Laplace Distribution
@@ -323,12 +369,12 @@ float32_laplace :: proc(mean, b: f32, gen := context.random_generator) -> f32 {
 // Both `eta` and `b` must be > 0
 @(require_results)
 float64_gompertz :: proc(eta, b: f64, gen := context.random_generator) -> f64 {
-	if eta <= 0 || b <= 0 {
+	if !(eta > 0 && b > 0) {
 		panic(#procedure + ": eta and b must be > 0.0")
 	}
 
 	p := float64(gen)
-	return math.ln(1 - math.ln(1 - p)/eta)/b
+	return math.log1p(-math.log1p(-p)/eta)/b
 }
 // Gompertz Distribution
 // `eta` is the shape, `b` is the scale
@@ -375,13 +421,16 @@ zipf_create :: proc(s, v: f64, imax: u64, gen := context.random_generator) -> (z
 	z.hxm           = zipf_h(z, z.imax + 0.5)
 	z.hx0_minus_hxm = zipf_h(z, 0.5) - math.exp(math.ln(z.v)*(-z.q)) - z.hxm
 	z.s             = 1 - zipf_hinv(z, zipf_h(z, 1.5)-math.exp(-z.q * math.ln(z.v+1.0)))
+	if !(z.hx0_minus_hxm < 0) {
+		return {}, false
+	}
 	return z, true
 }
 
 
 @(require_results)
 zipf_h :: proc(z: Zipf, x: f64) -> f64 {
-	return math.exp(z.oneminus_Q * math.ln(z.v + x) * z.oneminus_Qinv)
+	return math.exp(z.oneminus_Q * math.ln(z.v + x)) * z.oneminus_Qinv
 }
 @(require_results)
 zipf_hinv :: proc(z: Zipf, x: f64) -> f64 {
@@ -399,7 +448,7 @@ zipf_uint64 :: proc(z: Zipf) -> u64 {
 		r := float64(z.gen) // [0, 1)
 		ur := r * z.hx0_minus_hxm + z.hxm
 		x := zipf_hinv(z, ur)
-		k = math.floor(x + 0.5)
+		k = clamp(math.floor(x + 0.5), 0, z.imax)
 		if k-x <= z.s {
 			break
 		}
@@ -408,5 +457,8 @@ zipf_uint64 :: proc(z: Zipf) -> u64 {
 		}
 	}
 
+	if k >= 1 << 64 {
+		return max(u64)
+	}
 	return u64(k)
 }

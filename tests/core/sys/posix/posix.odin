@@ -179,16 +179,20 @@ test_locale :: proc(t: ^testing.T) {
 
 @(test)
 test_monetary :: proc(t: ^testing.T) {
-	when ODIN_OS == .Darwin && .Address in ODIN_SANITIZER_FLAGS {
-		log.warn("skipping on darwin with -sanitize:address, this fails inside macOS (also from C/clang)")
-		return
-	}
+	when ODIN_OS == .OpenBSD {
+		log.warn("skipping on openbsd, it has no strfmon")
+	} else {
+		when ODIN_OS == .Darwin && .Address in ODIN_SANITIZER_FLAGS {
+			log.warn("skipping on darwin with -sanitize:address, this fails inside macOS (also from C/clang)")
+			return
+		}
 
-	value := 123456.789
-	buf: [128]byte
-	size := posix.strfmon(raw_data(buf[:]), len(buf), "%n", value)
-	testing.expectf(t, int(size) != -1, "strfmon failure: %v", posix.strerror(posix.errno()))
-	log.debug(string(buf[:size]))
+		value := 123456.789
+		buf: [128]byte
+		size := posix.strfmon(raw_data(buf[:]), len(buf), "%n", value)
+		testing.expectf(t, int(size) != -1, "strfmon failure: %v", posix.strerror(posix.errno()))
+		log.debug(string(buf[:size]))
+	}
 }
 
 @(test)

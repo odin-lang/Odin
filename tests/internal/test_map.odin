@@ -62,6 +62,25 @@ map_insert_random_key_value :: proc(t: ^testing.T) {
 }
 
 @test
+map_insert_error :: proc(t: ^testing.T) {
+	m: map[i64]i64
+	defer {
+		m.allocator = context.allocator
+		delete(m)
+	}
+
+	m.allocator = context.allocator
+	for i in i64(0)..<6 {
+		_, err_normal_insert := map_insert(&m, i, i)
+		testing.expectf(t, err_normal_insert == nil, "Unexpected error: '%s'.", err_normal_insert)
+	}
+
+	m.allocator = runtime.nil_allocator()
+	_, err_grow_insert := map_insert(&m, 67, 67)
+	testing.expectf(t, err_grow_insert == .Out_Of_Memory, "Expected error to be '.Out_Of_Memory'. Got '%s'", err_grow_insert)
+}
+
+@test
 map_update_random_key_value :: proc(t: ^testing.T) {
 	seed_incr := u64(0)
 	for entries in ENTRY_COUNTS {

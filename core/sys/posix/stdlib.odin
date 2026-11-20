@@ -117,7 +117,7 @@ foreign lib {
 	Returns: the index of the matched token string, or -1 if no token strings were matched
 
 	Example:
-		args := runtime.args__
+		// `argc` and `argv` are the arguments of a C `main`.
 
 		Opt :: enum {
 			RO,
@@ -141,7 +141,7 @@ foreign lib {
 
 		errfnd: bool
 		for {
-			opt := posix.getopt(i32(len(args)), raw_data(args), "o:")
+			opt := posix.getopt(argc, argv, "o:")
 			if opt == -1 {
 				break
 			}
@@ -179,8 +179,8 @@ foreign lib {
 			}
 		}
 
-		if errfnd || len(args) == 1 {
-			fmt.eprintfln("\nUsage: %s -o <suboptstring>", args[0])
+		if errfnd || argc == 1 {
+			fmt.eprintfln("\nUsage: %s -o <suboptstring>", argv[0])
 			fmt.eprintfln("suboptions are 'ro', 'rw', and 'name=<value>'")
 			posix.exit(1)
 		}

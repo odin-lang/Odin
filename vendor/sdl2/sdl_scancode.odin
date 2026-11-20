@@ -270,6 +270,11 @@ Scancode :: enum c.int {
 	AUDIOREWIND = 285,
 	AUDIOFASTFORWARD = 286,
 
+	SOFTLEFT  = 287, /**< Usually situated below the display on phones and used as a multi-function feature key for selecting a software defined function shown on the bottom left of the display. */
+	SOFTRIGHT = 288, /**< Usually situated below the display on phones and used as a multi-function feature key for selecting a software defined function shown on the bottom right of the display. */
+	CALL      = 289, /**< Used for accepting phone calls. */
+	ENDCALL   = 290, /**< Used for rejecting phone calls. */
+
 	NUM_SCANCODES = 512,
 }
 
@@ -540,3 +545,7 @@ SCANCODE_APP2 :: Scancode.APP2
 
 SCANCODE_AUDIOREWIND      :: Scancode.AUDIOREWIND
 SCANCODE_AUDIOFASTFORWARD :: Scancode.AUDIOFASTFORWARD
+SCANCODE_SOFTLEFT         :: Scancode.SOFTLEFT
+SCANCODE_SOFTRIGHT        :: Scancode.SOFTRIGHT
+SCANCODE_CALL             :: Scancode.CALL
+SCANCODE_ENDCALL          :: Scancode.ENDCALL
