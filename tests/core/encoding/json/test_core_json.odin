@@ -1434,3 +1434,98 @@ marshal_any :: proc(t: ^testing.T) {
 
 	free_all(context.temp_allocator)
 }
+
+@(test)
+unmarshal_string_to_enum :: proc(t: ^testing.T) {
+	json_string := `
+	{
+		"whitespace_titlecase": "Sleepy Snorlax",
+		"whitespace_lowercase": "sleepy snorlax",
+		"hyphen_titlecase": "Sleepy-Snorlax",
+		"hyphen_lowercase": "sleepy-snorlax",
+		"underscore_titlecase": "Sleepy_Snorlax",
+		"underscore_lowercase": "sleepy_snorlax",
+		"pascalcase" :"SleepySnorlax"
+	}`
+
+	json_data := transmute([]byte)json_string
+
+	// JSON
+	{
+		unmarshalled: Unmarshalled
+		err := json.unmarshal(json_data, &unmarshalled, .JSON, context.temp_allocator)
+		defer free_all(context.temp_allocator)
+
+		testing.expect_value(t, err, nil)
+
+		testing.expect_value(t, unmarshalled.whitespace_titlecase, .Sleepy_Snorlax)
+		testing.expect_value(t, unmarshalled.whitespace_lowercase, .Sleepy_Snorlax)
+
+		testing.expect_value(t, unmarshalled.hyphen_titlecase, .Sleepy_Snorlax)
+		testing.expect_value(t, unmarshalled.hyphen_lowercase, .Sleepy_Snorlax)
+
+		testing.expect_value(t, unmarshalled.underscore_titlecase, .Sleepy_Snorlax)
+		testing.expect_value(t, unmarshalled.underscore_lowercase, .Sleepy_Snorlax)
+
+		testing.expect_value(t, unmarshalled.pascalcase, .Sleepy_Snorlax)
+	}
+
+	// JSON5
+	{
+		unmarshalled: Unmarshalled
+		err := json.unmarshal(json_data, &unmarshalled, .JSON5, context.temp_allocator)
+		defer free_all(context.temp_allocator)
+
+		testing.expect_value(t, err, nil)
+
+		testing.expect_value(t, unmarshalled.whitespace_titlecase, .Sleepy_Snorlax)
+		testing.expect_value(t, unmarshalled.whitespace_lowercase, .Sleepy_Snorlax)
+
+		testing.expect_value(t, unmarshalled.hyphen_titlecase, .Sleepy_Snorlax)
+		testing.expect_value(t, unmarshalled.hyphen_lowercase, .Sleepy_Snorlax)
+
+		testing.expect_value(t, unmarshalled.underscore_titlecase, .Sleepy_Snorlax)
+		testing.expect_value(t, unmarshalled.underscore_lowercase, .Sleepy_Snorlax)
+
+		testing.expect_value(t, unmarshalled.pascalcase, .Sleepy_Snorlax)
+	}
+
+	// SJSON
+	{
+		unmarshalled: Unmarshalled
+		err := json.unmarshal(json_data, &unmarshalled, .SJSON, context.temp_allocator)
+		defer free_all(context.temp_allocator)
+
+		testing.expect_value(t, err, nil)
+
+		testing.expect_value(t, unmarshalled.whitespace_titlecase, .Sleepy_Snorlax)
+		testing.expect_value(t, unmarshalled.whitespace_lowercase, .Sleepy_Snorlax)
+
+		testing.expect_value(t, unmarshalled.hyphen_titlecase, .Sleepy_Snorlax)
+		testing.expect_value(t, unmarshalled.hyphen_lowercase, .Sleepy_Snorlax)
+
+		testing.expect_value(t, unmarshalled.underscore_titlecase, .Sleepy_Snorlax)
+		testing.expect_value(t, unmarshalled.underscore_lowercase, .Sleepy_Snorlax)
+
+		testing.expect_value(t, unmarshalled.pascalcase, .Sleepy_Snorlax)
+	}
+
+
+	Unmarshalled :: struct {
+		whitespace_titlecase: Pokemon,
+		whitespace_lowercase: Pokemon,
+
+		hyphen_titlecase:     Pokemon,
+		hyphen_lowercase:     Pokemon,
+
+		underscore_titlecase: Pokemon,
+		underscore_lowercase: Pokemon,
+
+		pascalcase:           Pokemon,
+	}
+
+	Pokemon :: enum {
+		Default,
+		Sleepy_Snorlax,
+	}
+}
