@@ -76,9 +76,9 @@ Example:
 	import "core:fmt"
 	import "core:sort"
 
-	sort_example :: proc() {
+	stable_sort_example :: proc() {
 		data := []int{5, 2, 8, 1, 9}
-		sort.sort_stable(sort.slice_interface(&data))
+		sort.stable_sort(sort.slice_interface(&data))
 		fmt.println(data)
 	}
 
@@ -230,9 +230,9 @@ Example:
 	import "core:fmt"
 	import "core:sort"
 
-	reverse_sort_example :: proc() {
+	reverse_stable_sort_example :: proc() {
 		data := []int{5, 2, 8, 1}
-		sort.reverse_sort(sort.slice_interface(&data))
+		sort.reverse_stable_sort(sort.slice_interface(&data))
 		fmt.println(data)
 	}
 
