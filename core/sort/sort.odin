@@ -287,7 +287,7 @@ rotate :: proc(it: Interface, a, m, b: int) {
 	i := m - a
 	j := b - m
 
-    if i <= 0 || j <= 0 { return }
+	if i <= 0 || j <= 0 { return }
 
 	for i != j {
 		if i > j {
