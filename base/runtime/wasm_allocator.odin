@@ -154,7 +154,7 @@ wasm_allocator_proc :: proc(a: rawptr, mode: Allocator_Mode, size, alignment: in
 		free(a, old_memory, loc)
 		return nil, nil
 
-	case .Free_All, .Query_Info:
+	case .Free_All, .Query_Info, .Thread_Attach, .Thread_Detach:
 		return nil, .Mode_Not_Implemented
 
 	case .Query_Features:
