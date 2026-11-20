@@ -217,6 +217,36 @@ reverse_sort :: proc(it: Interface) {
 	sort(reverse_interface(&it))
 }
 
+
+/*
+Sorts the elements of an `Interface` in descending order, in place.
+
+This sort is guaranteed to be stable.
+
+Inputs:
+- it: The `Interface` to sort.
+
+Example:
+
+	import "core:fmt"
+	import "core:sort"
+
+	reverse_sort_example :: proc() {
+		data := []int{5, 2, 8, 1}
+		sort.reverse_sort(sort.slice_interface(&data))
+		fmt.println(data)
+	}
+
+Output:
+
+	[8, 5, 2, 1]
+
+*/
+reverse_sort_stable :: proc(it: Interface) {
+	it := it
+	sort_stable(reverse_interface(&it))
+}
+
 /*
 Reports whether the elements of an `Interface` are in ascending order.
 
