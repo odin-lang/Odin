@@ -519,7 +519,7 @@ _insertion_sort :: proc(it: Interface, a, b: int) {
 
 @(private)
 _merge_rotate :: proc(it: Interface, a, b: int){
-	if b - a < 5 {
+	if b - a < 11 {
 		_insertion_sort(it, a, b)
 		return
 	}
@@ -550,6 +550,7 @@ _inplace_merge :: proc(it: Interface, a, mid, b: int) {
 		}
 		return
 	}
+
     left := mid - a
     right := b - mid
 	left_cut, right_cut: int
@@ -563,10 +564,10 @@ _inplace_merge :: proc(it: Interface, a, mid, b: int) {
 		for left_cut < end {
 			m := int(uint(left_cut + end) / 2)
 
-            if it->less(m, right_cut) {
-                left_cut = m + 1
+            if it->less(right_cut, m) {
+                end = m
             } else {
-                end  = m
+                left_cut = m + 1
             }
 		}
 	} else {
@@ -578,10 +579,10 @@ _inplace_merge :: proc(it: Interface, a, mid, b: int) {
 		for right_cut < end {
 			m := int(uint(right_cut + end) / 2)
 
-            if !it->less(left_cut, m) {
+            if it->less(m, left_cut) {
                 right_cut = m + 1
             } else {
-                end  = m
+                end = m
             }
 		}
 	}
