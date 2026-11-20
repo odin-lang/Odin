@@ -177,8 +177,23 @@ utf8_to_utf16_buf :: proc(buf: []u16, s: string) -> []u16 {
 // The result of converting an empty string is indistinguishable from conversion failure.
 utf8_to_utf16 :: proc{utf8_to_utf16_alloc, utf8_to_utf16_buf}
 
+// Converts a regular UTF-8 `string` to a null-terminated UTF-16 `wstring`.
+//
+// Allocates the result using `allocator`.
+// Returns `nil` on conversion failure or allocation failure.
+// An empty string is valid and returns a value distinct from `nil`.
 @(require_results)
 utf8_to_wstring_alloc :: proc(s: string, allocator := context.temp_allocator) -> wstring {
+	return cast(wstring)utf8_to_wstring_multi_pointer_alloc(s, allocator)
+}
+
+// Converts a regular UTF-8 `string` to a null-terminated `[^]WCHAR`.
+//
+// Allocates the result using `allocator`.
+// Returns `nil` on conversion failure or allocation failure.
+// An empty string is valid and returns a value distinct from `nil`.
+@(require_results)
+utf8_to_wstring_multi_pointer_alloc :: proc(s: string, allocator := context.temp_allocator) -> [^]WCHAR {
 	if len(s) == 0 {
 		// Empty string. Needs special care because an empty string
 		// is different from conversion failure.
@@ -187,22 +202,39 @@ utf8_to_wstring_alloc :: proc(s: string, allocator := context.temp_allocator) ->
 			return nil
 		}
 		buf[0] = 0
-		return wstring(raw_data(buf))
+		return raw_data(buf)
 	}
 	// utf8_to_utf16 null-terminates the result in the allocated memory block,
 	// however, the null character is not part of the returned slice (it is just beyond).
 	// The conversion to wstring will bypass this implicit overrun.
 	res := utf8_to_utf16(s, allocator)
 	if len(res) > 0 {
-		return wstring(raw_data(res))
+		return raw_data(res)
 	} else {
 		// Conversion failure.
 		return nil
 	}
 }
 
+// Converts a regular UTF-8 `string` to a null-terminated UTF-16 `wstring`,
+// using `buf` as the backing buffer.
+//
+// Returns `nil` on conversion failure or if `buf` is too small.
+// An empty string is valid and returns a value distinct from `nil`,
+// as long as `buf` has room for its null terminator.
 @(require_results)
 utf8_to_wstring_buf :: proc(buf: []u16, s: string) -> wstring {
+	return cast(wstring)utf8_to_wstring_multi_pointer_buf(buf, s)
+}
+
+// Converts a regular UTF-8 `string` to a null-terminated `[^]WCHAR`,
+// using `buf` as the backing buffer.
+//
+// Returns `nil` on conversion failure or if `buf` is too small.
+// An empty string is valid and returns a value distinct from `nil`,
+// as long as `buf` has room for its null terminator.
+@(require_results)
+utf8_to_wstring_multi_pointer_buf :: proc(buf: []u16, s: string) -> [^]WCHAR {
 	buf_length := len(buf)
 	if buf_length == 0 {
 		// Insufficient buffer size, even for an empty string.
@@ -212,14 +244,14 @@ utf8_to_wstring_buf :: proc(buf: []u16, s: string) -> wstring {
 		// Empty string. Needs special care because an empty string
 		// is different from conversion failure.
 		buf[0] = 0
-		return wstring(raw_data(buf))
+		return raw_data(buf)
 	}
 	// utf8_to_utf16 null-terminates the result in the buffer,
 	// however, the null character is not part of the returned slice (it is just beyond).
 	// The conversion to wstring will bypass this implicit overrun.
 	res := utf8_to_utf16(buf[:], s)
 	if len(res) > 0 {
-		return wstring(raw_data(res))
+		return raw_data(res)
 	} else {
 		// Conversion failure.
 		return nil
@@ -234,10 +266,26 @@ utf8_to_wstring_buf :: proc(buf: []u16, s: string) -> wstring {
 // or allocation failure (`utf8_to_wstring_alloc` only).
 //
 // An empty string is valid, and results in a value distinct from `nil`.
-utf8_to_wstring :: proc{utf8_to_wstring_alloc, utf8_to_wstring_buf}
+utf8_to_wstring :: proc{
+	utf8_to_wstring_alloc,
+	utf8_to_wstring_buf,
+}
+
+// Converts a regular UTF-8 `string` to UTF-16, and returns the result as a
+// null-terminated `[^]WCHAR`, or `nil` on conversion failure.
+//
+// Conversion may fail due to an invalid byte sequence in the input string,
+// or an insufficient buffer size (`utf8_to_wstring_multi_pointer_buf` only),
+// or allocation failure (`utf8_to_wstring_multi_pointer_alloc` only).
+//
+// An empty string is valid, and results in a value distinct from `nil`.
+utf8_to_wstring_multi_pointer :: proc {
+	utf8_to_wstring_multi_pointer_alloc,
+	utf8_to_wstring_multi_pointer_buf,
+}
 
 /*
-Converts a UTF-16 `wstring` into a regular UTF-8 `string` and allocates the result.
+Converts an optionally null-terminated UTF-16 `wstring` into a regular UTF-8 `string` and allocates the result.
 The procedure can either assume a null-terminated input string, or convert
 a fixed number of characters.
 
@@ -289,7 +337,29 @@ wstring_to_utf8_alloc :: proc(s: wstring, N := -1, allocator := context.temp_all
 }
 
 /*
-Converts a UTF-16 `wstring` into a regular UTF-8 `string`, using `buf` as its backing buffer.
+Converts an optionally null-terminated UTF-16 `[^]WCHAR` string into a regular UTF-8 `string` and allocates the result.
+The procedure can either assume a null-terminated input string, or convert
+a fixed number of characters.
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The string to be converted
+- N: The number of characters in `s` that should be converted. A value of `-1` indicates that the
+     procedure should keep going until it finds a terminating null character in `s`.
+- allocator: (default: context.temp_allocator)
+
+Returns:
+- res: A cloned and converted string
+- err: An optional allocator error if one occured, `nil` otherwise
+*/
+@(require_results)
+wstring_multi_pointer_to_utf8_alloc :: proc(s: [^]WCHAR, N := -1, allocator := context.temp_allocator) -> (res: string, err: runtime.Allocator_Error) {
+	return wstring_to_utf8_alloc(cast(wstring)s, N, allocator)
+}
+
+/*
+Converts an optionally null-terminated UTF-16 `wstring` into a regular UTF-8 `string`, using `buf` as its backing buffer.
 The procedure can either assume a null-terminated input string, or convert
 a fixed number of characters.
 
@@ -329,7 +399,45 @@ wstring_to_utf8_buf :: proc(buf: []u8, s: wstring, N := -1) -> (res: string) {
 	return string(buf[:n2])
 }
 
-wstring_to_utf8 :: proc{wstring_to_utf8_alloc, wstring_to_utf8_buf}
+/*
+Converts an optionally null-terminated UTF-16 `[^]WCHAR` string into a regular UTF-8 `string`, using `buf` as its backing buffer.
+The procedure can either assume a null-terminated input string, or convert
+a fixed number of characters.
+
+*Uses `buf` for backing*
+
+Inputs:
+- buf: Backing buffer for result string
+- s: The string to be converted
+- N: The number of characters in `s` that should be converted. A value of `-1` indicates that the
+     procedure should keep going until it finds a terminating null character in `s`.
+
+Returns:
+- res: A cloned and converted string
+*/
+wstring_multi_pointer_to_utf8_buf :: proc(buf: []u8, s: [^]WCHAR, N := -1) -> (res: string) {
+	return wstring_to_utf8_buf(buf, cast(wstring)s, N)
+}
+
+/*
+Converts an optionally null-terminated UTF-16 string into a regular UTF-8 `string`.
+The procedure can either assume a null-terminated input string, or convert
+a fixed number of characters.
+
+Inputs:
+- s: The string to be converted
+- N: The number of characters in `s` that should be converted. A value of `-1` indicates that the
+     procedure should keep going until it finds a terminating null character in `s`.
+
+Returns:
+- res: A cloned and converted string
+*/
+wstring_to_utf8 :: proc {
+	wstring_to_utf8_alloc,
+	wstring_multi_pointer_to_utf8_alloc,
+	wstring_to_utf8_buf,
+	wstring_multi_pointer_to_utf8_buf,
+}
 
 /*
 Converts a UTF-16 string into a regular UTF-8 `string` and allocates the result.
@@ -351,7 +459,7 @@ utf16_to_utf8_alloc :: proc(s: []u16, allocator := context.temp_allocator) -> (r
 	if len(s) == 0 {
 		return "", nil
 	}
-	return wstring_to_utf8(wstring(raw_data(s)), len(s), allocator)
+	return wstring_to_utf8(raw_data(s), len(s), allocator)
 }
 
 /*
@@ -366,14 +474,14 @@ Inputs:
 - buf: Backing buffer for result string
 
 Returns:
-- res: A converted string, backed byu `buf`
+- res: A converted string, backed by `buf`
 */
 @(require_results)
 utf16_to_utf8_buf :: proc(buf: []u8, s: []u16) -> (res: string) {
 	if len(s) == 0 {
 		return
 	}
-	return wstring_to_utf8(buf, wstring(raw_data(s)), len(s))
+	return wstring_to_utf8(buf, raw_data(s), len(s))
 }
 
 utf16_to_utf8 :: proc{utf16_to_utf8_alloc, utf16_to_utf8_buf}
@@ -616,7 +724,7 @@ add_user_profile :: proc(username: string) -> (ok: bool, profile_path: string) {
 	if res2 != 0 {
 		return false, ""
 	}
-	profile_path = wstring_to_utf8(wstring(&pszProfilePath[0]), 257) or_else ""
+	profile_path = wstring_to_utf8(raw_data(pszProfilePath[:]), 257) or_else ""
 
 	return true, profile_path
 }
