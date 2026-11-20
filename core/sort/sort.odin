@@ -87,7 +87,7 @@ Output:
 	[1, 2, 5, 8, 9]
 
 */
-sort_stable :: proc(it: Interface) {
+stable_sort :: proc(it: Interface) {
 	_merge_rotate(it, 0, it->len())
 }
 
@@ -241,9 +241,9 @@ Output:
 	[8, 5, 2, 1]
 
 */
-reverse_sort_stable :: proc(it: Interface) {
+reverse_stable_sort :: proc(it: Interface) {
 	it := it
-	sort_stable(reverse_interface(&it))
+	stable_sort(reverse_interface(&it))
 }
 
 /*
