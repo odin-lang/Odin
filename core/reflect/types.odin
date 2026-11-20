@@ -812,6 +812,9 @@ write_type_writer :: #force_no_inline proc(w: io.Writer, ti: ^Type_Info, n_writt
 		io.write_i64(w, i64(info.column_count), 10, &n) or_return
 		io.write_string(w, "]",                     &n) or_return
 		write_type(w, info.elem,                    &n) or_return
+	
+	case nil:
+		io.write_string(w, "nil", &n) or_return
 	}
 
 	return
