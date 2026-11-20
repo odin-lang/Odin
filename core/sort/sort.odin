@@ -287,13 +287,15 @@ rotate :: proc(it: Interface, a, m, b: int) {
 	i := m - a
 	j := b - m
 
+    if i <= 0 || j <= 0 { return }
+
 	for i != j {
 		if i > j {
 			swap_range(it, m-i, m, j)
 			i -= j
 		} else {
-			swap_range(it, m-i, m+j-1, i)
-			j -= 1
+			swap_range(it, m-i, m+j-i, i)
+			j -= i
 		}
 	}
 	swap_range(it, m-i, m, i)
