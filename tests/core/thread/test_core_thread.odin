@@ -86,3 +86,19 @@ name_test :: proc(_t: ^testing.T) {
 
 	thread.join(t)
 }
+
+@(test)
+join_unstarted_test :: proc(_t: ^testing.T) {
+	@static join_unstarted_ran: bool
+
+	t := thread.create(proc(_: ^thread.Thread) {
+		intrinsics.atomic_store(&join_unstarted_ran, true)
+	})
+	if !testing.expect(_t, t != nil, "thread creation failed") {
+		return
+	}
+	defer free(t)
+
+	thread.join(t)
+	testing.expect(_t, intrinsics.atomic_load(&join_unstarted_ran), "join did not start and wait for the unstarted thread")
+}
