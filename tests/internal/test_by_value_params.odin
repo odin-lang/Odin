@@ -45,6 +45,32 @@ forward :: #force_no_inline proc(v: Big) -> int {
 	return write_global_read(v)
 }
 
+@(private="file")
+g_write: proc()
+
+@(private="file")
+write_global :: proc() {
+	g_big.a = 99
+}
+
+@(private="file")
+write_through_proc_read :: #force_no_inline proc(v: Big) -> int {
+	g_write()
+	return v.a
+}
+
+@(private="file")
+write_through_callee_read :: #force_no_inline proc(v: Big) -> int {
+	write_global()
+	return v.a
+}
+
+// writes nothing outside its own memory: a call to it needs no copy
+@(private="file")
+read_both :: #force_no_inline proc(v: Big, p: ^Big) -> int {
+	return v.a*1000 + p.a
+}
+
 @(test)
 test_by_value_params :: proc(t: ^testing.T) {
 	g_big = {a = 1}
@@ -62,6 +88,16 @@ test_by_value_params :: proc(t: ^testing.T) {
 
 	y := Big{a = 1}
 	testing.expect_value(t, write_any_read(y, y), 1)
+
+	g_big = {a = 1}
+	g_write = write_global
+	testing.expect_value(t, write_through_proc_read(g_big), 1)
+
+	g_big = {a = 1}
+	testing.expect_value(t, write_through_callee_read(g_big), 1)
+
+	g_big = {a = 1}
+	testing.expect_value(t, read_both(g_big, &g_big), 1001)
 }
 
 // The address is taken after the first call: the loop brings the call back round.

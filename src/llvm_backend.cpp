@@ -4078,6 +4078,11 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Procedure Generation (queued)");
 	lb_generate_queued_procedures(gen, do_threading);
 
+	if (!build_context.internal_by_reference) {
+		TIME_SECTION("LLVM Drop Copies for Read-Only Calls");
+		lb_drop_copies_for_read_only_calls(gen);
+	}
+
 	if (gen->objc_names) {
 		TIME_SECTION("Finalize objc names");
 		lb_finalize_objc_names(gen, gen->objc_names);

@@ -143,6 +143,13 @@ struct lbDebugTypeFrame {
 	isize lowest_cut; // the lowest frame cut back to while lowering this type
 };
 
+// A by-value copy that a procedure's own escape walk kept
+struct lbKeptCopy {
+	LLVMValueRef temp;
+	LLVMValueRef copy;
+	bool         param; // the callee's copy of its own parameter
+};
+
 struct lbModule {
 	LLVMModuleRef mod;
 	LLVMContextRef ctx;
@@ -229,6 +236,9 @@ struct lbModule {
 
 	BlockingMutex pad_types_mutex;
 	Array<lbPadType> pad_types;
+
+	BlockingMutex     kept_copies_mutex;
+	Array<lbKeptCopy> kept_copies;
 };
 
 struct lbEntityCorrection {
@@ -385,8 +395,7 @@ struct lbGlobalVariable {
 struct lbPendingCopy {
 	LLVMValueRef temp;
 	LLVMValueRef copy;
-	LLVMValueRef src;
-	LLVMValueRef local; // the copy is kept if this local's address escapes
+	LLVMValueRef local; // the copy is kept if this local's address escapes or if there is no such local
 	unsigned     align;
 	i32          call;  // the call an argument copy is for
 };
