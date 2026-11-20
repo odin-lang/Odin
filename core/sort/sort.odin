@@ -1,7 +1,6 @@
 // A sorting interface and algorithms.
 package sort
 
-import "core:fmt"
 import "core:mem"
 import "base:intrinsics"
 
@@ -347,7 +346,7 @@ rotate :: proc(it: Interface, a, m, b: int) {
 	i := m - a
 	j := b - m
 
-    if i <= 0 || j <= 0 { return }
+	if i <= 0 || j <= 0 { return }
 
 	for i != j {
 		if i > j {
@@ -551,39 +550,39 @@ _inplace_merge :: proc(it: Interface, a, mid, b: int) {
 		return
 	}
 
-    left := mid - a
-    right := b - mid
+	left := mid - a
+	right := b - mid
 	left_cut, right_cut: int
 	
 	if left < right {
 		right_cut = mid + right / 2
 
-        left_cut = a
-        end := mid
+		left_cut = a
+		end := mid
 
 		for left_cut < end {
 			m := int(uint(left_cut + end) / 2)
 
-            if it->less(right_cut, m) {
-                end = m
-            } else {
-                left_cut = m + 1
-            }
+			if it->less(right_cut, m) {
+				end = m
+			} else {
+				left_cut = m + 1
+			}
 		}
 	} else {
 		left_cut = a + left / 2
 
-        right_cut = mid
-        end := b
+		right_cut = mid
+		end := b
 
 		for right_cut < end {
 			m := int(uint(right_cut + end) / 2)
 
-            if it->less(m, left_cut) {
-                right_cut = m + 1
-            } else {
-                end = m
-            }
+			if it->less(m, left_cut) {
+				right_cut = m + 1
+			} else {
+				end = m
+			}
 		}
 	}
 
