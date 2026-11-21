@@ -2061,35 +2061,35 @@ review_marshal_keys :: proc(t: ^testing.T) {
 		m := make(map[string]int, context.temp_allocator)
 		m[key] = 1
 		data, err := json.marshal(m, {spec = .MJSON}, context.temp_allocator)
-		testing.expectf(t, err == nil && string(data) == fmt.tprintf("%s:1", key), "%q: %s %v", key, data, err)
+		testing.expectf(t, err == nil && string(data) == fmt.tprintf("%s:1", key), "MJSON bare %q: %s %v", key, data, err)
 		back: map[string]int
 		uerr := json.unmarshal(data, &back, .MJSON, context.temp_allocator)
-		testing.expectf(t, uerr == nil && len(back) == 1 && back[key] == 1, "%q: %v %v", key, back, uerr)
+		testing.expectf(t, uerr == nil && len(back) == 1 && back[key] == 1, "MJSON bare %q: %v %v", key, back, uerr)
 
 		data, err = json.marshal(m, {spec = .JSON5, json5_keys_omit_quotes = true}, context.temp_allocator)
-		testing.expectf(t, err == nil && string(data) == fmt.tprintf("%s:1", key), "%q: %s %v", key, data, err)
-		uerr = json.unmarshal(data, &back, .MJSON, context.temp_allocator)
-		testing.expectf(t, uerr == nil && len(back) == 1 && back[key] == 1, "%q: %v %v", key, back, uerr)
+		testing.expectf(t, err == nil && string(data) == fmt.tprintf("%s:1", key), "JSON5 bare %q: %s %v", key, data, err)
+		uerr = json.unmarshal(data, &back, .JSON5, context.temp_allocator)
+		testing.expectf(t, uerr == nil && len(back) == 1 && back[key] == 1, "JSON5 bare %q: %v %v", key, back, uerr)
 	}
 	for key in NOT_BARE {
 		m := make(map[string]int, context.temp_allocator)
 		m[key] = 1
 		data, err := json.marshal(m, {spec = .MJSON}, context.temp_allocator)
-		testing.expectf(t, err == json.Marshal_Data_Error.Key_Needs_Quotes, "%q: %s %v", key, data, err)
+		testing.expectf(t, err == json.Marshal_Data_Error.Key_Needs_Quotes, "MJSON needs quotes %q: %s %v", key, data, err)
 		data, err = json.marshal(m, {spec = .MJSON, mjson_keys_use_quotes = true}, context.temp_allocator)
-		testing.expectf(t, err == nil && string(data) == fmt.tprintf("\"%s\":1, key"), "%q: %s %v", key, data, err)
+		testing.expectf(t, err == nil && string(data) == fmt.tprintf("\"%s\":1, key"), "MJSON quoted %q: %s %v", key, data, err)
 		data, err = json.marshal(m, {spec = .MJSON, quote_keys_when_needed = true}, context.temp_allocator)
-		testing.expectf(t, err == nil && string(data) == fmt.tprintf("\"%s\":1, key"), "%q: %s %v", key, data, err)
+		testing.expectf(t, err == nil && string(data) == fmt.tprintf("\"%s\":1, key"), "MJSON quoted %q: %s %v", key, data, err)
 		back: map[string]int
 		uerr := json.unmarshal(data, &back, .MJSON, context.temp_allocator)
 		testing.expectf(t, err == nil && uerr == nil && len(back) == 1 && back[key] == 1, "%q quoted: %s %v %v %v", key, data, err, back, uerr)
 
 		data, err = json.marshal(m, {spec = .JSON5, json5_keys_omit_quotes = true}, context.temp_allocator)
-		testing.expectf(t, err == json.Marshal_Data_Error.Key_Needs_Quotes, "%q: %s %v", key, data, err)
+		testing.expectf(t, err == json.Marshal_Data_Error.Key_Needs_Quotes, "JSON5 needs quotes %q: %s %v", key, data, err)
 		data, err = json.marshal(m, {spec = .JSON5}, context.temp_allocator)
-		testing.expectf(t, err == nil && string(data) == fmt.tprintf("\"%s\":1, key"), "%q: %s %v", key, data, err)
+		testing.expectf(t, err == nil && string(data) == fmt.tprintf("\"%s\":1, key"), "JSON5 quoted %q: %s %v", key, data, err)
 		data, err = json.marshal(m, {spec = .JSON5, quote_keys_when_needed = true}, context.temp_allocator)
-		testing.expectf(t, err == nil && string(data) == fmt.tprintf("\"%s\":1, key"), "%q: %s %v", key, data, err)
+		testing.expectf(t, err == nil && string(data) == fmt.tprintf("\"%s\":1, key"), "JSON5 quoted %q: %s %v", key, data, err)
 		uerr = json.unmarshal(data, &back, .JSON5, context.temp_allocator)
 		testing.expectf(t, err == nil && uerr == nil && len(back) == 1 && back[key] == 1, "%q quoted: %s %v %v %v", key, data, err, back, uerr)
 	}
@@ -2524,14 +2524,19 @@ review_marshal_trailing_comma :: proc(t: ^testing.T) {
 	expect_marshal(t, [1]int{0}, opt, "[0,]")
 	expect_marshal(t, [2]int{0,1}, opt, "[0,1,]")
 
-	Some_Enum :: enum {
+	Enum_Empty :: enum {
+	}
+	Enum_Zero :: enum {
+		Zero,
+	}
+	Enum_One :: enum {
 		Zero,
 		One,
 	}
 	// Type_Info_Enumerated_Array
-	expect_marshal(t, #partial [Some_Enum]int{}, opt, "[]")
-	expect_marshal(t, #partial [Some_Enum]int{.Zero=0,}, opt, "[0,]")
-	expect_marshal(t, #partial [Some_Enum]int{.Zero=0,.One=1}, opt, "[0,1,]")
+	expect_marshal(t, #partial [Enum_Empty]int{}, opt, "{}")
+	expect_marshal(t, #partial [Enum_Zero]int{.Zero=0,}, opt, "{\"Zero\":0,}")
+	expect_marshal(t, #partial [Enum_One]int{.Zero=0,.One=1}, opt, "{\"Zero\":0,\"One\":0,}")
 
 	// Type_Info_Dynamic_Array
 	dynamic_array := make([dynamic]int, 0, allocator=context.temp_allocator)
