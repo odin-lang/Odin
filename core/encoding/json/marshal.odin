@@ -43,7 +43,7 @@ Marshal_Options :: struct {
 	write_uint_as_hex: bool,
 
 	// If spec is MJSON and this is true, then keys will be quoted.
- 	// Otherwise each key must be a bare identifier, `[A-Za-z_][A-Za-z0-9_$]*` other than
+ 	// Otherwise each key must be a bare identifier, `[A-Za-z_$][A-Za-z0-9_$]*` other than
  	// `null`, `true`, `false`, `NaN` and `Infinity`, or marshal returns `.Key_Needs_Quotes`.
 	// If `quote_keys_when_needed` is `true`, then the key will be quoted instead of returning `.Key_Needs_Quotes`.
 	mjson_keys_use_quotes: bool,
@@ -53,7 +53,7 @@ Marshal_Options :: struct {
 	mjson_keys_use_equal_sign: bool,
 
 	// If spec is JSON5 and this is true, then keys will not be quoted.
- 	// Each key must be a bare identifier, `[A-Za-z_][A-Za-z0-9_$]*` other than
+ 	// Each key must be a bare identifier, `[A-Za-z_$][A-Za-z0-9_$]*` other than
  	// `null`, `true`, `false`, `NaN` and `Infinity`, or marshal returns `.Key_Needs_Quotes`.
 	// If `quote_keys_when_needed` is `true`, then the key will be quoted instead of returning `.Key_Needs_Quotes`.
 	json5_keys_omit_quotes: bool,
