@@ -1141,48 +1141,39 @@ split_multi :: proc(s: []byte, substrs: [][]byte, skip_empty := false, allocator
 
 
 split_multi_iterator :: proc(s: ^[]byte, substrs: [][]byte, skip_empty := false) -> ([]byte, bool) #no_bounds_check {
-	if s == nil || s^ == nil || len(substrs) <= 0 {
+	if s == nil || len(s^) == 0 || len(substrs) <= 0 {
 		return nil, false
 	}
 
-	sublen := len(substrs[0])
-
-	for substr in substrs[1:] {
-		sublen = min(sublen, len(substr))
+	// disallow empty substrs, they would match everywhere
+	for substr in substrs {
+		if len(substr) == 0 {
+			return nil, false
+		}
 	}
 
-	shared := len(s) - sublen
-
-	if shared <= 0 {
-		return nil, false
-	}
-
-	// index, last
-	i, l := 0, 0
-
-	loop: for i <= shared {
-		for substr in substrs {
-			if string(s[i:i+sublen]) == string(substr) {
-				if !skip_empty || i - l > 0 {
-					res := s[l:i]
-					s^ = s[i:]
-					return res, true
+	outer: for len(s^) > 0 {
+		i := 0
+		for i < len(s^) {
+			for substr in substrs {
+				if len(s^) - i >= len(substr) && equal(s^[i:i+len(substr)], substr) {
+					res := s^[:i]
+					s^ = s^[i+len(substr):]
+					if !skip_empty || len(res) > 0 {
+						return res, true
+					}
+					// skip this empty token and keep scanning the rest
+					continue outer
 				}
-
-				i += sublen
-				l  = i
-
-				continue loop
 			}
+
+			_, skip := utf8.decode_rune(s^[i:])
+			i += skip
 		}
 
-		_, skip := utf8.decode_rune(s[i:])
-		i += skip
-	}
-
-	if !skip_empty || len(s) - l > 0 {
-		res := s[l:]
-		s^ = s[len(s):]
+		// no delimiter left: last value
+		res := s^
+		s^ = s^[len(s^):]
 		return res, true
 	}
 
