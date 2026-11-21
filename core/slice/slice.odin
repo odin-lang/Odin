@@ -771,8 +771,9 @@ max_index :: proc "contextless" (s: $S/[]$T) -> (max_index: int, ok: bool) where
 	return max_index, true
 }
 
+// Returns true if an element is equal to 'value'.
 @(require_results)
-any_of :: proc "contextless" (s: $S/[]$T, value: T) -> bool where intrinsics.type_is_comparable(T) {
+any_of :: proc "contextless" (s: $S/[]$T, value: T) -> (any_equal: bool) where intrinsics.type_is_comparable(T) {
 	for v in s {
 		if v == value {
 			return true
@@ -781,8 +782,9 @@ any_of :: proc "contextless" (s: $S/[]$T, value: T) -> bool where intrinsics.typ
 	return false
 }
 
+// Returns true if no element is equal to 'value'.
 @(require_results)
-none_of :: proc "contextless" (s: $S/[]$T, value: T) -> bool where intrinsics.type_is_comparable(T) {
+none_of :: proc "contextless" (s: $S/[]$T, value: T) -> (none_equal: bool) where intrinsics.type_is_comparable(T) {
 	for v in s {
 		if v == value {
 			return false
@@ -791,8 +793,9 @@ none_of :: proc "contextless" (s: $S/[]$T, value: T) -> bool where intrinsics.ty
 	return true
 }
 
+// Returns true if all elements are equal to 'value'.
 @(require_results)
-all_of :: proc "contextless" (s: $S/[]$T, value: T) -> bool where intrinsics.type_is_comparable(T) {
+all_of :: proc "contextless" (s: $S/[]$T, value: T) -> (all_equal: bool) where intrinsics.type_is_comparable(T) {
 	if len(s) == 0 {
 		return false
 	}
@@ -804,9 +807,9 @@ all_of :: proc "contextless" (s: $S/[]$T, value: T) -> bool where intrinsics.typ
 	return true
 }
 
-
+// Returns true if an element evaluates 'f' to true.
 @(require_results)
-any_of_proc :: proc(s: $S/[]$T, f: proc(T) -> bool) -> bool {
+any_of_proc :: proc(s: $S/[]$T, f: proc(T) -> bool) -> (any_true: bool) {
 	for v in s {
 		if f(v) {
 			return true
@@ -815,8 +818,9 @@ any_of_proc :: proc(s: $S/[]$T, f: proc(T) -> bool) -> bool {
 	return false
 }
 
+// Returns true if no element evaluates 'f' to true.
 @(require_results)
-none_of_proc :: proc(s: $S/[]$T, f: proc(T) -> bool) -> bool {
+none_of_proc :: proc(s: $S/[]$T, f: proc(T) -> bool) -> (none_true: bool) {
 	for v in s {
 		if f(v) {
 			return false
@@ -825,8 +829,9 @@ none_of_proc :: proc(s: $S/[]$T, f: proc(T) -> bool) -> bool {
 	return true
 }
 
+// Returns true if all elements evaluate 'f' to true.
 @(require_results)
-all_of_proc :: proc(s: $S/[]$T, f: proc(T) -> bool) -> bool {
+all_of_proc :: proc(s: $S/[]$T, f: proc(T) -> bool) -> (all_true: bool) {
 	if len(s) == 0 {
 		return false
 	}
