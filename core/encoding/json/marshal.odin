@@ -43,13 +43,29 @@ Marshal_Options :: struct {
 	write_uint_as_hex: bool,
 
 	// If spec is MJSON and this is true, then keys will be quoted.
- 	// Otherwise each key must be a bare identifier, `[A-Za-z_][A-Za-z0-9_]*` other than
+ 	// Otherwise each key must be a bare identifier, `[A-Za-z_][A-Za-z0-9_$]*` other than
  	// `null`, `true`, `false`, `NaN` and `Infinity`, or marshal returns `.Key_Needs_Quotes`.
+	// If `quote_keys_when_needed` is `true`, then the key will be quoted instead of returning `.Key_Needs_Quotes`.
 	mjson_keys_use_quotes: bool,
 
 	// If spec is MJSON and this is true, then use '=' as delimiter between
 	// keys and values, otherwise ':' is used.
 	mjson_keys_use_equal_sign: bool,
+
+	// If spec is JSON5 and this is true, then keys will not be quoted.
+ 	// Each key must be a bare identifier, `[A-Za-z_][A-Za-z0-9_$]*` other than
+ 	// `null`, `true`, `false`, `NaN` and `Infinity`, or marshal returns `.Key_Needs_Quotes`.
+	// If `quote_keys_when_needed` is `true`, then the key will be quoted instead of returning `.Key_Needs_Quotes`.
+	json5_keys_omit_quotes: bool,
+
+	// If spec is JSON5 and this is true, then objects and arrays will be written with a trailing comma.
+	json5_use_trailing_commas: bool,
+
+	// If spec is MJSON and `mjson_keys_use_quotes` is `false`,
+	// or if spec is JSON5 and `json5_keys_omit_quotes` is `true`,
+	// then keys that require quotes to be valid will be written with quotes,
+	// instead of causing the marshal to return `.Key_Needs_Quotes`.
+	quote_keys_when_needed: bool,
 
 	// When outputting a map, sort the output by key.
 	//
@@ -308,6 +324,7 @@ _marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err:
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
 			_marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
+		opt_write_trailing_comma(w, opt, info.count != 0) or_return
 		opt_write_end(w, opt, ']') or_return
 
 	case ^runtime.Type_Info_Enumerated_Array:
@@ -315,6 +332,7 @@ _marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err:
 		enum_type := index_type.variant.(^reflect.Type_Info_Enum)
 
 		opt_write_start(w, opt, '{') or_return
+		any_iterations := false
 		for i in 0..<info.count {
 			value := info.min_value + runtime.Type_Info_Enum_Value(i)
 			index, found := slice.linear_search(enum_type.values, value)
@@ -322,11 +340,13 @@ _marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err:
 				continue
 			}
 
+			any_iterations = true
 			opt_write_iteration(w, opt, i == 0) or_return
 			opt_write_key(w, opt, enum_type.names[index]) or_return
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
 			_marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
+		opt_write_trailing_comma(w, opt, any_iterations) or_return
 		opt_write_end(w, opt, '}') or_return
 
 	case ^runtime.Type_Info_Dynamic_Array:
@@ -337,6 +357,7 @@ _marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err:
 			data := uintptr(array.data) + uintptr(i*info.elem_size)
 			_marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
+		opt_write_trailing_comma(w, opt, array.len != 0) or_return
 		opt_write_end(w, opt, ']') or_return
 
 	case ^runtime.Type_Info_Fixed_Capacity_Dynamic_Array:
@@ -347,6 +368,7 @@ _marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err:
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
 			_marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
+		opt_write_trailing_comma(w, opt, len != 0) or_return
 		opt_write_end(w, opt, ']') or_return
 
 	case ^runtime.Type_Info_Slice:
@@ -357,6 +379,7 @@ _marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err:
 			data := uintptr(slice.data) + uintptr(i*info.elem_size)
 			_marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
+		opt_write_trailing_comma(w, opt, slice.len != 0) or_return
 		opt_write_end(w, opt, ']') or_return
 
 	case ^runtime.Type_Info_Map:
@@ -408,6 +431,7 @@ _marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err:
 
 					_marshal_to_writer(w, any{value, info.value.id}, opt) or_return
 				}
+				opt_write_trailing_comma(w, opt, i != 0) or_return
 			} else {
 				Entry :: struct {
 					key: string,
@@ -465,6 +489,7 @@ _marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err:
 					opt_write_key(w, opt, name) or_return
 					_marshal_to_writer(w, s.value, opt) or_return
 				}
+				opt_write_trailing_comma(w, opt, len(sorted) != 0) or_return
 			}
 		}
 
@@ -564,6 +589,7 @@ _marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err:
 		opt_write_start(w, opt, '{') or_return
 		first_iteration := true
 		marshal_struct_fields(w, v, opt, &first_iteration) or_return
+		opt_write_trailing_comma(w, opt, !first_iteration) or_return
 		opt_write_end(w, opt, '}') or_return
 
 	case ^runtime.Type_Info_Union:
@@ -853,8 +879,21 @@ opt_write_comment :: proc(w: io.Writer, opt: ^Marshal_Options, comment: ^string)
 @(private)
 opt_write_key :: proc(w: io.Writer, opt: ^Marshal_Options, name: string) -> (err: Marshal_Error)  {
 	switch opt.spec {
-	case .JSON, .JSON5:
+	case .JSON:
 		write_quoted_json_string(w, name) or_return
+		io.write_string(w, ": " if opt.pretty else ":") or_return
+
+	case .JSON5:
+		if !opt.json5_keys_omit_quotes {
+			write_quoted_json_string(w, name) or_return
+		} else if is_bare_mjson_key(name) {
+			io.write_string(w, name) or_return
+		} else if opt.quote_keys_when_needed {
+			write_quoted_json_string(w, name) or_return
+		} else {
+			return .Key_Needs_Quotes
+		}
+
 		io.write_string(w, ": " if opt.pretty else ":") or_return
 
 	case .MJSON:
@@ -862,6 +901,8 @@ opt_write_key :: proc(w: io.Writer, opt: ^Marshal_Options, name: string) -> (err
 			write_quoted_json_string(w, name) or_return
 		} else if is_bare_mjson_key(name) {
 			io.write_string(w, name) or_return
+		} else if opt.quote_keys_when_needed {
+			write_quoted_json_string(w, name) or_return
 		} else {
 			return .Key_Needs_Quotes
 		}
@@ -884,7 +925,7 @@ is_bare_mjson_key :: proc(name: string) -> bool {
 	}
 	for c, i in transmute([]byte)name {
 		switch c {
-		case 'A'..='Z', 'a'..='z', '_':
+		case 'A'..='Z', 'a'..='z', '_', '$':
 		case '0'..='9':
 			if i == 0 {
 				return false
@@ -949,6 +990,15 @@ opt_write_iteration :: proc(w: io.Writer, opt: ^Marshal_Options, first_iteration
 		}
 
 		opt_write_indentation(w, opt) or_return
+	}
+
+	return
+}
+
+// insert trailing comma if applicable
+opt_write_trailing_comma :: proc(w: io.Writer, opt: ^Marshal_Options, any_iterations: bool) -> (err: io.Error) {
+	if any_iterations && opt.spec == .JSON5 && opt.json5_use_trailing_commas {
+		io.write_byte(w, ',') or_return
 	}
 
 	return
