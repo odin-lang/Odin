@@ -4,7 +4,7 @@
 package strconv_decimal
 
 Decimal :: struct {
-	digits:        [384]byte, // big-endian digits
+	digits:        [800]byte, // big-endian digits
 	count:         int,
 	decimal_point: int,
 	neg, trunc:    bool,
@@ -36,6 +36,7 @@ set :: proc(d: ^Decimal, s: string) -> (ok: bool) {
 	// digits
 	saw_dot := false
 	saw_digits := false
+	nd := 0
 	for ; i < len(s); i += 1 {
 		switch {
 		case s[i] == '_':
@@ -46,15 +47,16 @@ set :: proc(d: ^Decimal, s: string) -> (ok: bool) {
 				return
 			}
 			saw_dot = true
-			d.decimal_point = d.count
+			d.decimal_point = nd
 			continue
 
 		case '0' <= s[i] && s[i] <= '9':
 			saw_digits = true
-			if s[i] == '0' && d.count == 0 {
+			if s[i] == '0' && nd == 0 {
 				d.decimal_point -= 1
 				continue
 			}
+			nd += 1
 			if d.count < len(d.digits) {
 				d.digits[d.count] = s[i]
 				d.count += 1
@@ -69,7 +71,7 @@ set :: proc(d: ^Decimal, s: string) -> (ok: bool) {
 		return
 	}
 	if !saw_dot {
-		d.decimal_point = d.count
+		d.decimal_point = nd
 	}
 
 	lower :: #force_inline proc "contextless" (ch: byte) -> byte { return ('a' - 'A') | ch }
@@ -93,11 +95,13 @@ set :: proc(d: ^Decimal, s: string) -> (ok: bool) {
 				// ignore underscores
 				continue
 			}
-			if e < 1e4 {
-				e = e*10 + int(s[i]) - '0'
-			}
+			e = max(int) if e > (max(int) - 9) / 10 else e*10 + int(s[i]) - '0'
 		}
-		d.decimal_point += e * exp_sign
+		if exp_sign > 0 {
+			d.decimal_point = max(int) if d.decimal_point > max(int) - e else d.decimal_point + e
+		} else {
+			d.decimal_point = min(int) if d.decimal_point < min(int) + e else d.decimal_point - e
+		}
 	}
 
 	return i == len(s)
@@ -132,6 +136,9 @@ decimal_to_string :: proc(buf: []byte, a: ^Decimal) -> string {
 	}
 
 	w := 0
+	if a.neg {
+		b[w] = '-'; w += 1
+	}
 	if a.decimal_point <= 0 {
 		b[w] = '0'; w += 1
 		b[w] = '.'; w += 1

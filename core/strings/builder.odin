@@ -888,14 +888,53 @@ Returns:
 - n: The number of characters written
 - err: An allocator error if one occured, `nil` otherwise.
 */
-write_float :: proc(b: ^Builder, f: f64, fmt: byte, prec, bit_size: int, always_signed := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+write_float :: #force_no_inline proc(b: ^Builder, f: f64, fmt: byte, prec, bit_size: int, always_signed := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	flags: strconv.Float_Flags
 	if always_signed {
 		flags |= { .Plus }
 	}
-	buf: [384]byte = ---
-	s := strconv.write_float(buf[:], f, fmt, prec, bit_size, flags)
-	return write_string(b, s, loc=loc)
+	p := prec
+	zeros := 0
+	switch fmt {
+	case 'f', 'F':
+		if p > 1074 {
+			zeros = p - 1074
+			p = 1074
+		}
+	case 'e', 'E':
+		if p > 767 {
+			zeros = p - 767
+			p = 767
+		}
+	case 'g', 'G':
+		p = min(p, 767)
+	}
+	buf: [1385]byte = ---
+	s := strconv.write_float(buf[:], f, fmt, p, bit_size, flags)
+	if zeros == 0 || len(s) == 0 || s[len(s)-1] < '0' || s[len(s)-1] > '9' {
+		return write_string(b, s, loc=loc)
+	}
+	head, tail := s, ""
+	if fmt == 'e' || fmt == 'E' {
+		i := last_index_byte(s, fmt)
+		head, tail = s[:i], s[i:]
+	}
+	m: int
+	m, err = write_string(b, head, loc=loc)
+	n += m
+	if err != nil {
+		return
+	}
+	for _ in 0..<zeros {
+		m, err = write_byte(b, '0', loc=loc)
+		n += m
+		if err != nil {
+			return
+		}
+	}
+	m, err = write_string(b, tail, loc=loc)
+	n += m
+	return
 }
 /*
 Writes a f16 value to the Builder and returns the number of characters written
@@ -1002,7 +1041,7 @@ Returns:
 - err: An allocator error if one occured, `nil` otherwise.
 */
 write_u64 :: proc(b: ^Builder, i: u64, base: int = 10, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
-	buf: [32]byte
+	buf: [64]byte
 	s := strconv.write_bits(buf[:], i, base, false, 64, strconv.digits, nil)
 	return write_string(b, s, loc=loc)
 }
@@ -1021,7 +1060,7 @@ Returns:
 - err: An allocator error if one occured, `nil` otherwise.
 */
 write_i64 :: proc(b: ^Builder, i: i64, base: int = 10, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
-	buf: [32]byte
+	buf: [65]byte
 	s := strconv.write_bits(buf[:], u64(i), base, true, 64, strconv.digits, nil)
 	return write_string(b, s, loc=loc)
 }
