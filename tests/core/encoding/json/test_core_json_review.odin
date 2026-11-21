@@ -2067,7 +2067,7 @@ review_marshal_keys :: proc(t: ^testing.T) {
 		testing.expectf(t, uerr == nil && len(back) == 1 && back[key] == 1, "MJSON bare %q: %v %v", key, back, uerr)
 
 		data, err = json.marshal(m, {spec = .JSON5, json5_keys_omit_quotes = true}, context.temp_allocator)
-		testing.expectf(t, err == nil && string(data) == fmt.tprintf("%s:1", key), "JSON5 bare %q: %s %v", key, data, err)
+		testing.expectf(t, err == nil && string(data) == fmt.tprintf("{%s:1}", key), "JSON5 bare %q: %s %v", key, data, err)
 		uerr = json.unmarshal(data, &back, .JSON5, context.temp_allocator)
 		testing.expectf(t, uerr == nil && len(back) == 1 && back[key] == 1, "JSON5 bare %q: %v %v", key, back, uerr)
 	}
@@ -2536,7 +2536,7 @@ review_marshal_trailing_comma :: proc(t: ^testing.T) {
 	// Type_Info_Enumerated_Array
 	expect_marshal(t, #partial [Enum_Empty]int{}, opt, "{}")
 	expect_marshal(t, #partial [Enum_Zero]int{.Zero=0,}, opt, "{\"Zero\":0,}")
-	expect_marshal(t, #partial [Enum_One]int{.Zero=0,.One=1}, opt, "{\"Zero\":0,\"One\":0,}")
+	expect_marshal(t, #partial [Enum_One]int{.Zero=0,.One=1}, opt, "{\"Zero\":0,\"One\":1,}")
 
 	// Type_Info_Dynamic_Array
 	dynamic_array := make([dynamic]int, 0, allocator=context.temp_allocator)
