@@ -71,9 +71,10 @@ Writes the string representation of an integer to a buffer with specified base, 
 - flags: The Int_Flags bit set to control integer formatting
 
 **Returns**
-- The string containing the integer representation appended to the buffer
+- result: The integer representation written to the start of `buf`, clipped to `len(buf)`
+- ok: `false` if `buf` was too small for the whole representation
 */
-write_bits :: proc(buf: []byte, x: u64, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flags) -> string {
+write_bits :: proc(buf: []byte, x: u64, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flags) -> (result: string, ok: bool) #optional_ok {
 	if base < 2 || base > MAX_BASE {
 		panic("strconv: illegal base passed to write_bits")
 	}
@@ -83,16 +84,16 @@ write_bits :: proc(buf: []byte, x: u64, base: int, is_signed: bool, bit_size: in
 	i := _write_digits(a[:], u, base, digits)
 
 	if .Prefix in flags {
-		ok := true
+		prefixed := true
 		switch base {
 		case  2: i-=1; a[i] = 'b'
 		case  8: i-=1; a[i] = 'o'
 		// case 10: i-=1; a[i] = 'd';
 		case 12: i-=1; a[i] = 'z'
 		case 16: i-=1; a[i] = 'x'
-		case: ok = false
+		case: prefixed = false
 		}
-		if ok {
+		if prefixed {
 			i-=1; a[i] = '0'
 		}
 	}
@@ -105,8 +106,8 @@ write_bits :: proc(buf: []byte, x: u64, base: int, is_signed: bool, bit_size: in
 	}
 
 	out := a[i:]
-	copy(buf, out)
-	return string(buf[0:len(out)])
+	n := copy(buf, out)
+	return string(buf[:n]), n == len(out)
 }
 /*
 Determines whether the given unsigned 128-bit integer is a negative value by interpreting it as a signed integer with the specified bit size.
@@ -163,9 +164,10 @@ Writes the string representation of a 128-bit integer to a buffer with specified
 - flags: The Int_Flags bit set to control integer formatting
 
 **Returns**
-- The string containing the integer representation written to the buffer
+- result: The integer representation written to the start of `buf`, clipped to `len(buf)`
+- ok: `false` if `buf` was too small for the whole representation
 */
-write_bits_128 :: proc(buf: []byte, x: u128, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flags) -> string {
+write_bits_128 :: proc(buf: []byte, x: u128, base: int, is_signed: bool, bit_size: int, digits: string, flags: Int_Flags) -> (result: string, ok: bool) #optional_ok {
 	if base < 2 || base > MAX_BASE {
 		panic("strconv: illegal base passed to write_bits")
 	}
@@ -175,16 +177,15 @@ write_bits_128 :: proc(buf: []byte, x: u128, base: int, is_signed: bool, bit_siz
 	i := _write_digits_128(a[:], u, base, digits)
 
 	if .Prefix in flags {
-		ok := true
+		prefixed := true
 		switch base {
 		case  2: i-=1; a[i] = 'b'
 		case  8: i-=1; a[i] = 'o'
-		case 10: i-=1; a[i] = 'd'
 		case 12: i-=1; a[i] = 'z'
 		case 16: i-=1; a[i] = 'x'
-		case: ok = false
+		case: prefixed = false
 		}
-		if ok {
+		if prefixed {
 			i-=1; a[i] = '0'
 		}
 	}
@@ -197,8 +198,8 @@ write_bits_128 :: proc(buf: []byte, x: u128, base: int, is_signed: bool, bit_siz
 	}
 
 	out := a[i:]
-	copy(buf, out)
-	return string(buf[0:len(out)])
+	n := copy(buf, out)
+	return string(buf[:n]), n == len(out)
 }
 
 @(private, require_results)

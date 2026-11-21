@@ -2949,7 +2949,7 @@ test_fix_atoi_non_finite :: proc(t: ^testing.T) {
 
 	testing.expect_value(t, big.int_atoi(a, "-inf", 10, &n), big.Error.Invalid_Character)
 	testing.expect_value(t, a.flags, big.Flags{})
-	testing.expect_value(t, n, 1)
+	testing.expect_value(t, n, 0)
 
 	testing.expect_value(t, big.int_atoi(a, "-Inf", 19, &n), nil)
 	testing.expect_value(t, a.flags, big.Flags{.Inf})

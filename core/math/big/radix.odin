@@ -34,7 +34,7 @@ int_itoa_string :: proc(a: ^Int, radix := i8(10), zero_terminate := false, alloc
 	*/
 
 	/*
-		Calculate the size of the buffer we need, and 
+		Calculate the size of the buffer we need, and
 		Exit if calculating the size returned an error.
 	*/
 	size := radix_size(a, radix, zero_terminate) or_return
@@ -272,7 +272,8 @@ int_to_cstring :: int_itoa_cstring
 	Read a string [ASCII] in a given radix.
 
 	If `n` isn't nil, it's set to the number of characters read, the same as `strconv`'s `n`: the
-	digits, and a leading '-' if anything follows it. So `input[n:]` is whatever comes after them.
+	digits, and a leading '-' before them. It is 0 if no digit was read. So `input[n:]` is whatever
+	comes after them.
 
 	In radix 2..=23, `input` may also start with "+Inf", "-Inf" or "NaN", which set `res` to +/-Inf or NaN and count as the number below.
 	In radix 24..=64 they get no special treatment and are read like any other input, e.g. "NaN" is 30191 in radix 36.
@@ -367,7 +368,7 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), n: ^int = nil, alloc
 			power_of_two >>= 1
 			bits_per_digit += 1
 		}
-		
+
 		/*
 			Ex.: Radix 16
 			-> 4 bits per digit
@@ -513,9 +514,9 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), n: ^int = nil, alloc
 
 	/*
 		`input` now starts at the first character that isn't a digit in the radix, if there is one.
-		Like `strconv`, `n` counts a leading '-' even when no digit follows it.
+		Like `strconv`, `n` stays 0 if no digit was read, even after a leading '-'.
 	*/
-	if n != nil {
+	if n != nil && len(input) < digits_start {
 		n^ = input_len - len(input)
 	}
 
@@ -746,7 +747,7 @@ internal_int_unpack :: proc(a: ^Int, buf: []$T, nails := 0, order := Order.LSB_F
 			internal_set(t, W & type_mask)                           or_return
 			internal_shl(a, a, type_bits)                            or_return
 			internal_add(a, a, t)                                    or_return
-		}		
+		}
 	}
 
 	return internal_clamp(a)

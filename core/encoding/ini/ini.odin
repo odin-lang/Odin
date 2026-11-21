@@ -82,9 +82,15 @@ Map :: distinct map[string]map[string]string
 
 load_map_from_string :: proc(src: string, allocator: runtime.Allocator, options := DEFAULT_OPTIONS) -> (m: Map, err: runtime.Allocator_Error) {
 	unquote :: proc(val: string) -> (string, runtime.Allocator_Error) {
-		if len(val) > 0 && (val[0] == '"' || val[0] == '\'') {
-			v, allocated, ok := strconv.unquote_string(val)
-			if !ok {
+		if len(val) >= 2 && val[0] == '\'' && val[len(val)-1] == '\'' && strings.index_byte(val[1:len(val)-1], '\'') < 0 {
+			return strings.clone(val[1:len(val)-1])
+		}
+		if len(val) > 0 && val[0] == '"' {
+			v, allocated, err := strconv.unquote_string(val)
+			if alloc_err, is_alloc_err := err.(runtime.Allocator_Error); is_alloc_err {
+				return "", alloc_err
+			}
+			if err != nil {
 				return strings.clone(val)
 			}
 			if allocated {

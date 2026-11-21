@@ -1207,21 +1207,10 @@ _zero_pad :: #force_inline proc(fi: ^Info) -> bool {
 // - is_signed: A boolean indicating if the integer is signed
 // - bit_size: The bit size of the integer
 // - digits: A string containing the digits for formatting
-//
-// WARNING: May panic if the width and precision are too big, causing a buffer overrun
-//
 _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, digits: string) {
 	_, neg := strconv.is_integer_negative(u, is_signed, bit_size)
 
 	BUF_SIZE :: 256
-	if fi.width_set || fi.prec_set {
-		width := fi.width + fi.prec + 3 // 3 extra bytes for sign and prefix
-		if width > BUF_SIZE {
-			// TODO(bill):????
-			panic("_fmt_int: buffer overrun. Width and precision too big")
-		}
-	}
-
 	buf: [BUF_SIZE]byte = ---
 	start := 0
 
@@ -1285,6 +1274,7 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 
 	_pad(fi, strconv.write_bits(buf[start:], u, base, is_signed, bit_size, digits, flags))
 }
+
 // Formats an int128 value based on the provided formatting options.
 //
 // Inputs:
@@ -1294,22 +1284,11 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 // - is_signed: Whether the value should be treated as signed or unsigned.
 // - bit_size: The number of bits of the value (e.g. 64, 128).
 // - digits: A string containing the digit characters to use for the formatted integer.
-//
-// WARNING: Panics if the formatting options result in a buffer overrun.
-//
 _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: int, digits: string) {
 	_, neg := strconv.is_integer_negative_128(u, is_signed, bit_size)
 
 	BUF_SIZE :: 256
-	if fi.width_set || fi.prec_set {
-		width := fi.width + fi.prec + 3 // 3 extra bytes for sign and prefix
-		if width > BUF_SIZE {
-			// TODO(bill):????
-			panic("_fmt_int: buffer overrun. Width and precision too big")
-		}
-	}
-
-	buf: [256]byte = ---
+	buf: [BUF_SIZE]byte = ---
 	start := 0
 	if fi.hash && !is_signed && _zero_pad(fi) {
 		switch base {
@@ -1420,24 +1399,8 @@ _fmt_memory :: proc(fi: ^Info, u: u64, is_signed: bool, bit_size: int, units: st
 		amt = -amt
 	}
 
-	flags: strconv.Float_Flags
-	if fi.plus {
-		flags |= { .Plus }
-	}
-	buf: [256]byte
-	// NOTE(bplu4t2f):
-	//     This is currently the only instance of strconv.write_float in core which assumes
-	//     that `&str[0] == &buf[0]`. This assumption is not formally part of the API contract.
-	//     This may be relevant because an implementation could decide to strip or trim
-	//     something from the beginning by simply offseting the returned slice's start index.
-	//     Currently, this works only because no implementation does that.
-	str := strconv.write_float(buf[:], amt, 'f', prec, 64, flags)
-
 	// Add the unit at the end.
-	copy(buf[len(str):], units[off:off+unit_len])
-	str = string(buf[:len(str)+unit_len])
-
-	_pad(fi, str)
+	_fmt_float_as(fi, amt, 64, 'm', 'f', prec, units[off:off+unit_len])
 }
 // Hex Values:
 @(rodata) __DIGITS_LOWER := "0123456789abcdefx"
@@ -1557,6 +1520,31 @@ _pad :: proc(fi: ^Info, s: string) {
 		_write_string(fi, s)
 	}
 }
+_pad_parts :: proc(fi: ^Info, head: string, zeros: int, tail: string, suffix: string) {
+	width := 0
+	if fi.width_set {
+		width = fi.width - utf8.rune_count_in_string(head) - zeros - utf8.rune_count_in_string(tail) - utf8.rune_count_in_string(suffix)
+	}
+	if fi.minus {
+		_write_string(fi, head)
+		_write_repeated_byte(fi, '0', zeros)
+		_write_string(fi, tail)
+		_write_string(fi, suffix)
+		fmt_write_padding(fi, width)
+		return
+	}
+	body := head
+	if _zero_pad(fi) && head != "" && (head[0] == '-' || head[0] == '+') {
+		_write_byte(fi, head[0])
+		body = head[1:]
+	}
+	fmt_write_padding(fi, width)
+	_write_string(fi, body)
+	_write_repeated_byte(fi, '0', zeros)
+	_write_string(fi, tail)
+	_write_string(fi, suffix)
+}
+
 // Formats a floating-point number with a specific format and precision.
 //
 // Inputs:
@@ -1566,10 +1554,11 @@ _pad :: proc(fi: ^Info, s: string) {
 // - verb: The format specifier character.
 // - float_fmt: The byte format used for formatting the float (either 'f' or 'e').
 // - default_prec: Precision used if `fi` does not specify anything.
+// - suffix: Text written after the number, inside the width (default "").
 //
 // NOTE: Can return "NaN", "+Inf", "-Inf", "<value>", "+<value>", or "-<value>".
 //
-_fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: byte, default_prec: int) {
+_fmt_float_as :: #force_no_inline proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: byte, default_prec: int, suffix := "") {
 	prec := fi.prec if fi.prec_set else default_prec
 
 	flags: strconv.Float_Flags
@@ -1577,12 +1566,35 @@ _fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: b
 		flags |= { .Plus }
 	}
 
-	buf: [386]byte = ---
+	zeros := 0
+	switch float_fmt {
+	case 'f', 'F':
+		if prec > 1074 {
+			zeros = prec - 1074
+			prec = 1074
+		}
+	case 'e', 'E':
+		if prec > 767 {
+			zeros = prec - 767
+			prec = 767
+		}
+	case 'g', 'G':
+		prec = min(prec, 767)
+	}
+
+	buf: [1385]byte = ---
 
 	// Can return "NaN", "+Inf", "-Inf", "<value>", "+<value>", "-<value>".
 	str := strconv.write_float(buf[:], v, float_fmt, prec, bit_size, flags)
 
-	_pad(fi, str)
+	head, tail := str, ""
+	if zeros == 0 || str == "" || str[len(str)-1] < '0' || str[len(str)-1] > '9' {
+		zeros = 0
+	} else if float_fmt == 'e' || float_fmt == 'E' {
+		i := strings.last_index_byte(str, float_fmt)
+		head, tail = str[:i], str[i:]
+	}
+	_pad_parts(fi, head, zeros, tail, suffix)
 }
 // Formats a floating-point number with a specific format.
 //

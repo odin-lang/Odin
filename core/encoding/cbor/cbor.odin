@@ -394,7 +394,7 @@ to_diagnostic_format_writer :: proc(w: io.Writer, val: Value, padding := 0) -> i
 		str := strconv.write_float(buf[:], f64(v), 'f', 2*size_of(f32), 8*size_of(f32), nil)
 		io.write_string(w, str) or_return
 	case f64:
-		buf: [256]byte
+		buf: [384]byte
 		str := strconv.write_float(buf[:], f64(v), 'f', 2*size_of(f64), 8*size_of(f64), nil)
 		io.write_string(w, str) or_return
 
