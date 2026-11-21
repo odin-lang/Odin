@@ -220,10 +220,14 @@ rt_sigreturn :: proc "c" () -> ! {
 rt_sigaction :: proc "contextless" (sig: Signal, sigaction: ^Sig_Action, old_sigaction: ^Sig_Action) -> Errno {
 	// NOTE(jason): It appears that the restorer is required for i386 and amd64
 	when ODIN_ARCH == .i386 || ODIN_ARCH == .amd64 {
-		sigaction.flags += {.RESTORER}
+		if sigaction != nil {
+			sigaction.flags += {.RESTORER}
+		}
 	}
-	if sigaction != nil && sigaction.restorer == nil && .RESTORER in sigaction.flags {
-		sigaction.restorer = rt_sigreturn
+	when ODIN_ARCH != .riscv64 {
+		if sigaction != nil && sigaction.restorer == nil && .RESTORER in sigaction.flags {
+			sigaction.restorer = rt_sigreturn
+		}
 	}
 	ret := syscall(SYS_rt_sigaction, sig, sigaction, old_sigaction, size_of(Sig_Set))
 	return Errno(-ret)

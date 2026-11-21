@@ -1,0 +1,17 @@
+package test_riscv64
+
+@(require) import "../internal"
+@(require) import "../core/bytes"
+@(require) import "../core/c/libc"
+@(require) import "../core/hash"
+@(require) import "../core/math"
+@(require) import "../core/math/bits"
+@(require) import "../core/mem"
+@(require) import "../core/net"
+@(require) import "../core/os"
+@(require) import "../core/runtime"
+@(require) import "../core/sync"
+@(require) import "../core/sync/chan"
+@(require) import "../core/sys/posix"
+@(require) import "../core/thread"
+@(require) import "../core/time"

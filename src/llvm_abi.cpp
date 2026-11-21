@@ -685,6 +685,15 @@ namespace lbAbi386 {
 			}
 		}
 
+		if ((calling_convention == ProcCC_Odin || calling_convention == ProcCC_Contextless) &&
+		    ft->ret.kind == lbArg_Direct && ft->ret.cast_type == nullptr &&
+		    (lb_is_type_kind(ft->ret.type, LLVMHalfTypeKind) ||
+		     lb_is_type_kind(ft->ret.type, LLVMFloatTypeKind) ||
+		     lb_is_type_kind(ft->ret.type, LLVMDoubleTypeKind))) {
+			i64 sz = lb_sizeof(ft->ret.type);
+			ft->ret = lb_arg_type_direct(ft->ret.type, LLVMIntTypeInContext(c, cast(unsigned)(sz*8)), nullptr, nullptr);
+		}
+
 		ft->calling_convention = calling_convention;
 		return ft;
 	}
@@ -2059,6 +2068,9 @@ namespace lbAbiAmd64SysV {
 					break;
 				case LLVMDoubleTypeKind:
 					reg = RegClass_SSEDv;
+					break;
+				case LLVMPointerTypeKind:
+					reg = RegClass_SSEInt64;
 					break;
 				default:
 					GB_PANIC("Unhandled vector element type");

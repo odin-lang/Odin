@@ -5,7 +5,7 @@ import "core:testing"
 import "core:slice"
 import "core:math/rand"
 
-SLIM_TESTS :: #config(ODIN_TEST_SLIM, ODIN_ARCH == .riscv64)
+SLIM_TESTS :: #config(ODIN_TEST_SLIM, false)
 
 NUM_RANDOM_TESTS_PER_BYTE_SIZE :: 10_000
 
