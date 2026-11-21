@@ -56,6 +56,8 @@ unset_env :: proc(key: string) -> bool {
 	return _unset_env(key)
 }
 
+// clear_env unsets all environment variables.
+// Can fail silently.
 clear_env :: proc() {
 	_clear_env()
 }
