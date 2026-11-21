@@ -170,7 +170,8 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 	map_init(&m->map_cell_info_map, 0);
 	map_init(&m->exact_value_compound_literal_addr_map, 1024);
 
-	array_init(&m->pad_types, heap_allocator());
+	array_init(&m->pad_types,   heap_allocator());
+	array_init(&m->kept_copies, heap_allocator());
 
 
 	m->const_dummy_builder = LLVMCreateBuilderInContext(m->ctx);
@@ -729,8 +730,16 @@ gb_internal LLVMValueRef llvm_zero(lbModule *m) {
 	return LLVMConstInt(lb_type(m, t_int), 0, false);
 }
 
+gb_internal void lb_position_before_decls_end(lbProcedure *p) {
+	// NOTE(bill): LLVMPositionBuilderBefore also takes the debug location of the instruction it positions before.
+	// The instructions built here keep the current one instead.
+	LLVMMetadataRef loc = LLVMGetCurrentDebugLocation2(p->builder);
+	LLVMPositionBuilderBefore(p->builder, p->decls_end);
+	LLVMSetCurrentDebugLocation2(p->builder, loc);
+}
+
 gb_internal LLVMValueRef llvm_alloca(lbProcedure *p, LLVMTypeRef llvm_type, isize alignment, char const *name) {
-	LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
+	lb_position_before_decls_end(p);
 
 	LLVMValueRef val = LLVMBuildAlloca(p->builder, llvm_type, name);
 	LLVMSetAlignment(val, cast(unsigned int)alignment);
@@ -2896,6 +2905,7 @@ gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *t
 			ft->args[i].align_attribute = nullptr;
 			ft->args[i].byval_alignment = 0;
 			ft->args[i].is_byval = false;
+			ft->args[i].expand = false;
 		}
 	}
 
@@ -4022,7 +4032,6 @@ general_end:;
 #endif
 
 	if (src_size > dst_size) {
-		GB_ASSERT(p->decl_block != p->curr_block);
 		// NOTE(laytan): src is bigger than dst, need to memcpy the part of src we want.
 
 		LLVMTypeRef llvm_src_type = LLVMPointerType(src_type, 0);
@@ -4070,7 +4079,6 @@ general_end:;
 
 		return OdinLLVMBuildLoad(p, dst_type, ptr);
 	} else {
-		GB_ASSERT(p->decl_block != p->curr_block);
 		GB_ASSERT(dst_size >= src_size);
 
 		i64 max_align = gb_max(lb_alignof(src_type), lb_alignof(dst_type));
@@ -4868,9 +4876,6 @@ gb_internal void lb_emit_lifetime_ends(lbProcedure *p, lbDeferExitKind kind, lbB
 
 
 gb_internal lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, bool force_no_init) {
-	GB_ASSERT(p->decl_block != p->curr_block);
-	LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
-
 	char const *name = "";
 	if (e != nullptr && e->token.string.len > 0 && e->token.string != "_") {
 		// NOTE(bill): for debugging purposes only
@@ -4892,7 +4897,7 @@ gb_internal lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero
 	if (e != nullptr) {
 		// only named user locals get lifetime markers;
 		//
-		// the alloca itself sits in p->decl_block, but llvm_alloca moves the builder back
+		// `alloca` itself sits before p->decls_end, but llvm_alloca moves the builder back
 		// to p->curr_block, which is where the declaration actually runs and the slot becomes live;
 		// emitting lifetime.start here keeps it before any stores to the local (zero init included)
 		lb_add_lifetime_local(p, ptr, type);

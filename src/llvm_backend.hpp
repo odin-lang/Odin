@@ -15,6 +15,7 @@
 #include <llvm-c/Object.h>
 #include <llvm-c/BitWriter.h>
 #include <llvm-c/DebugInfo.h>
+#include <llvm-c/IRReader.h>
 #include <llvm-c/Transforms/PassBuilder.h>
 #include <llvm-c/Comdat.h>
 
@@ -142,6 +143,13 @@ struct lbDebugTypeFrame {
 	isize lowest_cut; // the lowest frame cut back to while lowering this type
 };
 
+// A by-value copy that a procedure's own escape walk kept
+struct lbKeptCopy {
+	LLVMValueRef temp;
+	LLVMValueRef copy;
+	bool         param; // the callee's copy of its own parameter
+};
+
 struct lbModule {
 	LLVMModuleRef mod;
 	LLVMContextRef ctx;
@@ -228,6 +236,9 @@ struct lbModule {
 
 	BlockingMutex pad_types_mutex;
 	Array<lbPadType> pad_types;
+
+	BlockingMutex     kept_copies_mutex;
+	Array<lbKeptCopy> kept_copies;
 };
 
 struct lbEntityCorrection {
@@ -384,8 +395,7 @@ struct lbGlobalVariable {
 struct lbPendingCopy {
 	LLVMValueRef temp;
 	LLVMValueRef copy;
-	LLVMValueRef src;
-	LLVMValueRef local; // the copy is kept if this local's address escapes
+	LLVMValueRef local; // the copy is kept if this local's address escapes or if there is no such local
 	unsigned     align;
 	i32          call;  // the call an argument copy is for
 };
@@ -424,7 +434,7 @@ struct lbProcedure {
 	Array<lbBranchBlocks> branch_blocks;
 	Scope *          curr_scope;
 	i32              scope_index;
-	lbBlock *        decl_block;
+	LLVMValueRef     decls_end; // placeholder in entry_block: allocas and argument spills go before it
 	lbBlock *        entry_block;
 	lbBlock *        curr_block;
 	lbTargetList *   target_list;
@@ -467,7 +477,7 @@ struct lbProcedure {
 
 	Type *internal_gen_type; // map_set, map_get, etc.
 
-	// -internal-by-value
+	// by-value parameters
 	PtrMap<LLVMValueRef, u64> uncaptured_arg_masks;
 	Array<lbPendingCopy>      pending_copies;
 	PtrMap<LLVMValueRef, i32> any_boxes;  // a boxed pointer -> the call it is an argument of
@@ -679,6 +689,7 @@ gb_internal lbValue lb_expr_untyped_const_to_typed(lbModule *m, Ast *expr, Type 
 gb_internal bool lb_is_expr_untyped_const(Ast *expr);
 
 gb_internal LLVMValueRef llvm_alloca(lbProcedure *p, LLVMTypeRef llvm_type, isize alignment, char const *name = "");
+gb_internal void lb_position_before_decls_end(lbProcedure *p);
 
 gb_internal void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, unsigned alignment);
 

@@ -153,6 +153,59 @@ gb_internal LLVMMetadataRef lb_debug_procedure_parameters(lbModule *m, Type *typ
 	return lb_debug_type(m, type);
 }
 
+// NOTE(bill): the LLVM C API cannot set the calling convention of a subroutine type but textual IR can.
+// A `distinct` node parsed into the module's context belongs to that context and outlives the module parsed to hold it.
+// Its empty type list is then replaced with the real one.
+// Returns nullptr if LLVM no longer reads the text the same way.
+gb_internal LLVMMetadataRef lb_debug_subroutine_type_nocall(lbModule *m, Slice<LLVMMetadataRef> const &types, LLVMDIFlags flags) {
+	char text[128] = {};
+	gb_snprintf(text, gb_size_of(text),
+	            "!odin.nocall = !{!0}\n"
+	            "!0 = distinct !DISubroutineType(cc: DW_CC_nocall, flags: %u, types: !{})\n",
+	            cast(unsigned)flags);
+
+	LLVMMemoryBufferRef buffer  = LLVMCreateMemoryBufferWithMemoryRangeCopy(text, gb_strlen(text), "odin.nocall");
+	LLVMModuleRef       scratch = nullptr;
+	char *              error   = nullptr;
+
+	// NOTE(bill): LLVMParseIRInContext consumes the buffer and is deprecated from LLVM 22 on.
+	// LLVMParseIRInContext2 leaves the buffer to the caller.
+#if LLVM_VERSION_MAJOR >= 22
+	bool failed = LLVMParseIRInContext2(m->ctx, buffer, &scratch, &error);
+	LLVMDisposeMemoryBuffer(buffer);
+#else
+	bool failed = LLVMParseIRInContext(m->ctx, buffer, &scratch, &error);
+#endif
+	if (failed) {
+		LLVMDisposeMessage(error);
+		return nullptr;
+	}
+
+	LLVMValueRef node = nullptr;
+	if (LLVMGetNamedMetadataNumOperands(scratch, "odin.nocall") == 1) {
+		LLVMGetNamedMetadataOperands(scratch, "odin.nocall", &node);
+	}
+	LLVMDisposeModule(scratch);
+	if (node == nullptr) {
+		return nullptr;
+	}
+
+	// NOTE(bill): the type list is found as the one empty node rather than assuming LLVM's operand order
+	LLVMValueRef operands[16] = {};
+	unsigned operand_count = LLVMGetMDNodeNumOperands(node);
+	if (operand_count > gb_count_of(operands)) {
+		return nullptr;
+	}
+	LLVMGetMDNodeOperands(node, operands);
+	for (unsigned i = 0; i < operand_count; i++) {
+		if (operands[i] != nullptr && LLVMIsAMDNode(operands[i]) && LLVMGetMDNodeNumOperands(operands[i]) == 0) {
+			LLVMReplaceMDNodeOperandWith(node, i, LLVMMDNodeInContext2(m->ctx, types.data, cast(size_t)types.count));
+			return LLVMValueAsMetadata(node);
+		}
+	}
+	return nullptr;
+}
+
 gb_internal LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type) {
 	i64 size = type_size_of(type); // Check size
 	gb_unused(size);
@@ -179,20 +232,13 @@ gb_internal LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type)
 	if (type->Proc.result_count != 0) {
 		Type *single_ret = reduce_tuple_to_single_type(type->Proc.results);
 		if (is_type_tuple(single_ret) && is_calling_convention_odin(type->Proc.calling_convention)) {
-			LLVMTypeRef actual = lb_type_internal_for_procedures_raw(m, type);
-			actual = LLVMGetReturnType(actual);
-			if (actual == nullptr) {
-				// results were passed as a single pointer
-				parameters[0] = lb_debug_procedure_parameters(m, single_ret);
+			lbFunctionType *ft = lb_get_function_type(m, type);
+			if (ft->multiple_return_original_type != nullptr) {
+				// all but the last result are returned through pointers
+				return_is_tuple = true;
 			} else {
-				LLVMTypeRef possible = lb_type(m, type->Proc.results);
-				if (possible == actual) {
-					// results were returned directly
-					parameters[0] = lb_debug_procedure_parameters(m, single_ret);
-				} else {
-					// resulsts were returned separately
-					return_is_tuple = true;
-				}
+				// the results are returned together, possibly as a different type
+				parameters[0] = lb_debug_procedure_parameters(m, single_ret);
 			}
 		} else {
 			parameters[0] = lb_debug_procedure_parameters(m, single_ret);
@@ -227,6 +273,15 @@ gb_internal LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type)
 	LLVMDIFlags flags = LLVMDIFlagZero;
 	if (type->Proc.diverging) {
 		flags = LLVMDIFlagNoReturn;
+	}
+
+	// NOTE: a debugger must neither call an Odin procedure nor read its results the C way. DWARF states this with
+	// DW_CC_nocall, the same mark LLVM gives procedures whose signatures it changes. CodeView has no such convention.
+	if (is_calling_convention_odin(type->Proc.calling_convention) && build_context.metrics.os != TargetOs_windows) {
+		LLVMMetadataRef nocall = lb_debug_subroutine_type_nocall(m, slice_from_array(parameters), flags);
+		if (nocall != nullptr) {
+			return nocall;
+		}
 	}
 
 	return LLVMDIBuilderCreateSubroutineType(m->debug_builder, file, parameters.data, cast(unsigned)parameters.count, flags);
@@ -1511,9 +1566,21 @@ gb_internal LLVMValueRef lb_debug_storage(lbProcedure *p, LLVMValueRef storage, 
 	}
 	LLVMBasicBlockRef insert_block = LLVMGetInsertBlock(p->builder);
 	LLVMValueRef slot = llvm_alloca(p, LLVMTypeOf(storage), build_context.ptr_size, "");
-	LLVMPositionBuilderAtEnd(p->builder, is_argument ? p->decl_block->block : insert_block);
-	LLVMBuildStore(p->builder, storage, slot);
+	if (is_argument) {
+		lb_position_before_decls_end(p);
+	} else {
+		LLVMPositionBuilderAtEnd(p->builder, insert_block);
+	}
+	LLVMValueRef store = LLVMBuildStore(p->builder, storage, slot);
 	LLVMPositionBuilderAtEnd(p->builder, insert_block);
+
+	// NOTE(bill): DWARF puts prologue_end on the first instruction with a line.
+	// A breakpoint on the procedure stops there.
+	// An argument spilled here with a line would move it ahead of the parameter stores and show stale parameters.
+	// CodeView needs the line, see lb_begin_procedure_body.
+	if (is_argument && build_context.metrics.os != TargetOs_windows) {
+		LLVMInstructionSetDebugLoc(store, nullptr);
+	}
 
 	uint64_t deref = 0x06; // DW_OP_deref
 	*expr = LLVMDIBuilderCreateExpression(p->module->debug_builder, &deref, 1);

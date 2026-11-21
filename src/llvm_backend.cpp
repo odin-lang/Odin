@@ -2045,7 +2045,7 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 				array_add(&wrapper_args, method_type->Proc.params->Tuple.variables[method_param_offset+i]->type);
 			}
 
-			Type *wrapper_args_tuple = alloc_type_tuple_from_field_types(wrapper_args.data, wrapper_args.count, false, true);
+			Type *wrapper_args_tuple = lb_alloc_forwarded_params(wrapper_args.data, wrapper_args.count);
 			Type *wrapper_results_tuple = nullptr;
 
 			if (method_type->Proc.result_count > 0) {
@@ -2067,13 +2067,14 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 
 			lb_begin_procedure_body(wrapper_proc);
 			{
-				LLVMValueRef context_addr = nullptr;
+				lbValue self = lb_forwarded_param_value(wrapper_proc, 0);
+
 				if (method_type->Proc.calling_convention == ProcCC_Odin) {
 					GB_ASSERT(context_provider);
 
 					// Emit the get odin context call
 					get_context_args[0] = lbValue {
-						wrapper_proc->raw_input_parameters[0],
+						self.value,
 						contex_provider_self_ptr_type,
 					};
 
@@ -2081,58 +2082,27 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 						// The context provider takes the ivar's type.
 						// Emit an objc_ivar_get call and use that pointer for 'self' instead.
 						lbValue real_self {
-							wrapper_proc->raw_input_parameters[0],
+							self.value,
 							class_ptr_type
 						};
 						get_context_args[0] = lb_handle_objc_ivar_for_objc_object_pointer(wrapper_proc, real_self);
 					}
 
 					lbValue context = lb_emit_call(wrapper_proc, context_provider_proc_value, get_context_args);
-					context_addr    = lb_address_from_load(wrapper_proc, context).value;//lb_address_from_load_or_generate_local(wrapper_proc, context));
-					// context_addr = LLVMGetOperand(context.value, 0);
+					lb_push_context_onto_stack(wrapper_proc, lb_addr(lb_address_from_load_or_generate_local(wrapper_proc, context)));
 				}
 
-				isize method_forward_arg_count = method_param_count + method_param_offset;
-				isize method_forward_return_arg_offset = 0;
-				auto raw_method_args = array_make<LLVMValueRef>(temporary_allocator(), 0, method_forward_arg_count+1);
-
-				lbValue method_proc_value = lb_find_procedure_value_from_entity(m, md.proc_entity);
-				lbFunctionType* ft = lb_get_function_type(m, method_type);
-				bool has_return = false;
-				lbArgKind return_kind = {};
-
-				if (wrapper_results_tuple != nullptr) {
-					has_return = true;
-					return_kind = ft->ret.kind;
-
-					if (return_kind == lbArg_Indirect) {
-						method_forward_return_arg_offset = 1;
-						array_add(&raw_method_args, wrapper_proc->return_ptr.addr.value);
-					}
-				}
-
+				auto method_args = array_make<lbValue>(temporary_allocator(), 0, method_param_count + method_param_offset);
 				if (!md.ac.objc_is_class_method) {
-					array_add(&raw_method_args, wrapper_proc->raw_input_parameters[method_forward_return_arg_offset]);
+					array_add(&method_args, self);
 				}
-
 				for (isize i = 0; i < method_param_count; i++) {
-					array_add(&raw_method_args, wrapper_proc->raw_input_parameters[i+2+method_forward_return_arg_offset]);
-				}
-
-				if (method_type->Proc.calling_convention == ProcCC_Odin) {
-					array_add(&raw_method_args, context_addr);
+					array_add(&method_args, lb_forwarded_param_value(wrapper_proc, i+2));
 				}
 
 				// Call real procedure for method from here, passing the parameters expected, if any.
-				LLVMTypeRef fnp = lb_type_internal_for_procedures_raw(m, method_type);
-				LLVMValueRef ret_val_raw = LLVMBuildCall2(wrapper_proc->builder, fnp, method_proc_value.value, raw_method_args.data, (unsigned)raw_method_args.count, "");
-
-				if (has_return && return_kind != lbArg_Indirect) {
-					LLVMBuildRet(wrapper_proc->builder, ret_val_raw);
-				}
-				else {
-					LLVMBuildRetVoid(wrapper_proc->builder);
-				}
+				lbValue method_proc_value = lb_find_procedure_value_from_entity(m, md.proc_entity);
+				lb_emit_forwarding_call(wrapper_proc, method_proc_value, method_args);
 			}
 			lb_end_procedure_body(wrapper_proc);
 
@@ -4107,6 +4077,11 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 	TIME_SECTION("LLVM Procedure Generation (queued)");
 	lb_generate_queued_procedures(gen, do_threading);
+
+	if (!build_context.internal_by_reference) {
+		TIME_SECTION("LLVM Drop Copies for Read-Only Calls");
+		lb_drop_copies_for_read_only_calls(gen);
+	}
 
 	if (gen->objc_names) {
 		TIME_SECTION("Finalize objc names");

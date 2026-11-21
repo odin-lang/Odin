@@ -639,7 +639,7 @@ struct BuildContext {
 	BuildCacheData build_cache_data;
 
 	bool internal_no_inline;
-	bool internal_by_value;
+	bool internal_by_reference;
 	bool internal_weak_monomorphization;
 	bool internal_ignore_llvm_verification;
 	bool internal_llvm_no_sroa;

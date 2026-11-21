@@ -25,7 +25,31 @@ struct lbArgType {
 	// than they really have, eg `struct #min_field_align(16){i8, f32}` flattens to `{i8, float}`, moving
 	// the float from offset 16 to offset 4. These give the real byte offset of each `cast_type` element.
 	Slice<i64> coerce_offsets;
+
+	// A direct argument of struct type passed as one LLVM parameter per element, the way clang passes a
+	// coerced struct. The Odin conventions use it on amd64 for two-word values, which take no attributes.
+	bool expand;
+
+	// `cast_type` is a struct of the scalars of `type` in order.
+	// A value is converted one scalar at a time instead of reinterpreted because two memory layouts can differ.
+	bool flattened;
 };
+
+// The number of LLVM parameters the value of a non-ignored `arg` takes, its padding not included
+gb_internal unsigned lb_arg_value_param_count(lbArgType const *arg) {
+	if (arg->expand) {
+		return LLVMCountStructElementTypes(arg->cast_type != nullptr ? arg->cast_type : arg->type);
+	}
+	return 1;
+}
+
+// The number of LLVM parameters `arg` takes, its padding included
+gb_internal unsigned lb_arg_param_count(lbArgType const *arg) {
+	if (arg->kind == lbArg_Ignore) {
+		return 0;
+	}
+	return (arg->pad_type != nullptr ? 1 : 0) + lb_arg_value_param_count(arg);
+}
 
 
 gb_internal i64 lb_sizeof(LLVMTypeRef type);
@@ -117,11 +141,9 @@ gb_internal LLVMTypeRef lb_function_type_to_llvm_raw(lbFunctionType *ft, bool is
 	}
 	GB_ASSERT_MSG(ret != nullptr, "%d", ft->ret.kind);
 
-	unsigned maximum_arg_count = offset+arg_count;
+	unsigned maximum_arg_count = offset;
 	for (unsigned i = 0; i < arg_count; i++) {
-		if (ft->args[i].pad_type != nullptr) {
-			maximum_arg_count += 1;
-		}
+		maximum_arg_count += lb_arg_param_count(&ft->args[i]);
 	}
 	LLVMTypeRef *args = gb_alloc_array(permanent_allocator(), LLVMTypeRef, maximum_arg_count);
 	if (offset == 1) {
@@ -142,7 +164,14 @@ gb_internal LLVMTypeRef lb_function_type_to_llvm_raw(lbFunctionType *ft, bool is
 			} else {
 				arg_type = arg->type;
 			}
-			args[arg_index++] = arg_type;
+			if (arg->expand) {
+				unsigned n = LLVMCountStructElementTypes(arg_type);
+				for (unsigned k = 0; k < n; k++) {
+					args[arg_index++] = LLVMStructGetTypeAtIndex(arg_type, k);
+				}
+			} else {
+				args[arg_index++] = arg_type;
+			}
 		} else if (arg->kind == lbArg_Indirect) {
 			if (ft->multiple_return_original_type == nullptr || i < ft->original_arg_count) {
 				GB_ASSERT(!lb_is_type_kind(arg->type, LLVMPointerTypeKind));
@@ -232,7 +261,7 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 			}
 		}
 
-		arg_index++;
+		arg_index += lb_arg_value_param_count(arg);
 	}
 
 	if (offset != 0 && ft->ret.kind == lbArg_Indirect && ft->ret.attribute != nullptr) {
@@ -918,6 +947,9 @@ namespace lbAbi386 {
 	}
 };
 
+gb_internal lbArgType lb_amd64_odin_return(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_tuple, ProcCallingConvention calling_convention, i64 c_register_bytes);
+gb_internal bool      lb_amd64_odin_is_two_words(LLVMTypeRef type);
+
 namespace lbAbiAmd64Win64 {
 	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type *original_type);
 	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
@@ -931,9 +963,18 @@ namespace lbAbiAmd64Win64 {
 		LLVMContextRef c = m->ctx;
 		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
-		ft->args = compute_arg_types(c, arg_types, arg_count, original_type);
-		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 		ft->calling_convention = calling_convention;
+		ft->args = compute_arg_types(c, arg_types, arg_count, original_type);
+		if (is_calling_convention_odin(calling_convention)) {
+			// Odin passes a two-word value as its two words instead of a pointer to a copy of it
+			for (unsigned i = 0; i < arg_count; i++) {
+				if (lb_amd64_odin_is_two_words(arg_types[i])) {
+					ft->args[i] = lb_arg_type_direct(arg_types[i]);
+					ft->args[i].expand = true;
+				}
+			}
+		}
+		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 		return ft;
 	}
 
@@ -971,8 +1012,12 @@ namespace lbAbiAmd64Win64 {
 		} else if (is_m64_vector(return_type)) {
 			return lb_arg_type_direct(return_type, LLVMInt64TypeInContext(c), nullptr, nullptr);
 		} else if (lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind)) {
-			i64 sz = lb_sizeof(return_type);
-			switch (sz) {
+			lbArgType in_registers = lb_amd64_odin_return(c, return_type, return_is_tuple, ft->calling_convention, 8);
+			if (in_registers.type != nullptr) {
+				return in_registers;
+			}
+
+			switch (lb_sizeof(return_type)) {
 			case 1: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c,  8), nullptr, nullptr);
 			case 2: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 16), nullptr, nullptr);
 			case 4: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
@@ -1315,9 +1360,32 @@ namespace lbAbiAmd64SysV {
 	gb_internal Array<RegClass> classify(LLVMTypeRef t, Type *source_type);
 	gb_internal LLVMTypeRef llreg(LLVMContextRef c, Array<RegClass> const &reg_classes, LLVMTypeRef type);
 
+	// LLVM passes a struct argument as if each of its elements were a separate argument.
+	// Passing them separately changes nothing in the registers but the fast instruction selector used at `-o:none` cannot take a struct argument.
+	gb_internal void odin_expand_pair(lbArgType *arg) {
+		if (arg->kind != lbArg_Direct || arg->coerce_offsets.count != 0) {
+			return;
+		}
+		LLVMTypeRef t = arg->cast_type != nullptr ? arg->cast_type : arg->type;
+		if (!lb_is_type_kind(t, LLVMStructTypeKind) || LLVMIsPackedStruct(t) || LLVMCountStructElementTypes(t) != 2) {
+			return;
+		}
+		for (unsigned i = 0; i < 2; i++) {
+			LLVMTypeKind kind = LLVMGetTypeKind(LLVMStructGetTypeAtIndex(t, i));
+			if (kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind) {
+				return;
+			}
+		}
+		arg->expand = true;
+	}
+
 	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type) {
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
+		}
+		lbArgType in_registers = lb_amd64_odin_return(c, return_type, return_is_tuple, ft->calling_convention, 16);
+		if (in_registers.type != nullptr) {
+			return in_registers;
 		}
 		LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
 
@@ -1354,6 +1422,9 @@ namespace lbAbiAmd64SysV {
 			ft->args[i] = amd64_type(c, arg_types[i], Amd64TypeAttribute_ByVal, calling_convention,
 			                         true,
 			                         &int_regs, &sse_regs, source_type);
+			if (is_calling_convention_odin(calling_convention)) {
+				odin_expand_pair(&ft->args[i]);
+			}
 		}
 
 		// A single result can be classified from its source type too. A tuple keeps the lowered
@@ -1367,9 +1438,12 @@ namespace lbAbiAmd64SysV {
 		}
 
 		if (return_source != nullptr) {
-			ft->ret = amd64_type(c, return_type, Amd64TypeAttribute_StructRect, calling_convention,
-			                     false,
-			                     nullptr, nullptr, return_source);
+			ft->ret = lb_amd64_odin_return(c, return_type, false, calling_convention, 16);
+			if (ft->ret.type == nullptr) {
+				ft->ret = amd64_type(c, return_type, Amd64TypeAttribute_StructRect, calling_convention,
+				                     false,
+				                     nullptr, nullptr, return_source);
+			}
 		} else {
 			ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 		}
@@ -2080,6 +2154,209 @@ namespace lbAbiAmd64SysV {
 };
 
 
+// The Odin calling conventions on amd64 for Win64 and SysV
+//
+// Multiple return values and a single result that C would return through a hidden pointer,
+// is returned in registers when it fits LLVM's return registers:
+//     integers and pointers in RAX, RDX, and RCX,
+//     floats and vectors in XMM0 and XMM1.
+//     (LLVM returns a third float on the x87 stack.)
+//
+// Win64 passes a two-word value, such as a string, slice, `any`, or `Allocator`, as its two words instead of a pointer to a copy of it.
+// SysV already passed it in two registers.
+
+// The return registers an Odin result has left, taken one per scalar leaf
+struct lbReturnRegisters {
+	i32      gpr;
+	i32      fpr;
+	unsigned max_array_count;
+};
+
+// LLVM's amd64 return registers: RAX, RDX, and RCX; XMM0 and XMM1
+gb_global lbReturnRegisters const lb_amd64_return_registers = {3, 2, 1};
+
+// Takes the registers of `t` out of `regs`, false once they run out
+gb_internal bool lb_take_return_registers(LLVMTypeRef t, lbReturnRegisters *regs) {
+	switch (LLVMGetTypeKind(t)) {
+	case LLVMStructTypeKind: {
+		unsigned n = LLVMCountStructElementTypes(t);
+		for (unsigned i = 0; i < n; i++) {
+			if (!lb_take_return_registers(LLVMStructGetTypeAtIndex(t, i), regs)) {
+				return false;
+			}
+		}
+		return true;
+	}
+	case LLVMArrayTypeKind: {
+		unsigned n = LLVMGetArrayLength(t);
+		LLVMTypeRef elem = OdinLLVMGetArrayElementType(t);
+		if (n > regs->max_array_count || (n > 1 && lb_is_type_kind(elem, LLVMIntegerTypeKind) && lb_sizeof(elem) < 8)) {
+			// NOTE(bill): bytes and padding are better as whole words
+			return false;
+		}
+		for (unsigned i = 0; i < n; i++) {
+			if (!lb_take_return_registers(elem, regs)) {
+				return false;
+			}
+		}
+		return true;
+	}
+	case LLVMIntegerTypeKind:
+		regs->gpr -= cast(i32)((lb_sizeof(t) + 7) / 8);
+		return regs->gpr >= 0;
+	case LLVMPointerTypeKind:
+		regs->gpr -= 1;
+		return regs->gpr >= 0;
+	case LLVMHalfTypeKind:
+	case LLVMFloatTypeKind:
+	case LLVMDoubleTypeKind:
+		regs->fpr -= 1;
+		return regs->fpr >= 0;
+	case LLVMVectorTypeKind:
+		regs->fpr -= 1;
+		return lb_sizeof(t) <= 16 && regs->fpr >= 0;
+	}
+	return false;
+}
+
+// `type` as a run of eightbytes classified the SysV way (without SysV's limit of two)
+gb_internal lbArgType lb_amd64_odin_return_words(LLVMContextRef c, LLVMTypeRef type) {
+	using namespace lbAbiAmd64SysV;
+	lbReturnRegisters regs = lb_amd64_return_registers;
+
+	i64 sz = lb_sizeof(type);
+	if (sz <= 0 || sz > 8*(regs.gpr + regs.fpr)) {
+		return {};
+	}
+	auto cls = array_make<RegClass>(heap_allocator(), cast(isize)((sz + 7)/8));
+	defer (array_free(&cls));
+	classify_with(type, &cls, 0, 0);
+
+	isize vector_words = 0; // the words so far of the vector in progress
+	for (isize i = 0; i < cls.count; i++) {
+		RegClass k = cls[i];
+		if (k == RegClass_SSEUp && vector_words > 0) {
+			// The upper half of a 16-byte vector shares its register. A wider vector takes YMM0
+			// or two registers depending on the target features, and the convention must not.
+			vector_words += 1;
+			if (vector_words > 2) {
+				return {};
+			}
+			continue;
+		}
+
+		vector_words = 0;
+		if (k == RegClass_NoClass) {
+			k = RegClass_Int; // nothing but padding
+		} else if (k == RegClass_SSEUp) {
+			k = RegClass_SSEDv; // no vector in front of it
+		}
+		cls[i] = k;
+
+		switch (k) {
+		case RegClass_Int:
+			regs.gpr -= 1;
+			break;
+		case RegClass_SSEHv:
+		case RegClass_SSEFv:
+		case RegClass_SSEDv:
+		case RegClass_SSEInt8:
+		case RegClass_SSEInt16:
+		case RegClass_SSEInt32:
+		case RegClass_SSEInt64:
+			vector_words = 1;
+			regs.fpr -= 1;
+			break;
+		case RegClass_SSEHs:
+		case RegClass_SSEFs:
+		case RegClass_SSEDs:
+			regs.fpr -= 1;
+			break;
+		default:
+			return {}; // x87 or memory
+		}
+	}
+	if (regs.gpr < 0 || regs.fpr < 0) {
+		return {};
+	}
+	return lb_arg_type_direct(type, llreg(c, cls, type), nullptr, nullptr);
+}
+
+gb_internal void lb_scalar_types(LLVMTypeRef t, Array<LLVMTypeRef> *scalars) {
+	switch (LLVMGetTypeKind(t)) {
+	case LLVMStructTypeKind: {
+		unsigned n = LLVMCountStructElementTypes(t);
+		for (unsigned i = 0; i < n; i++) {
+			lb_scalar_types(LLVMStructGetTypeAtIndex(t, i), scalars);
+		}
+		return;
+	}
+	case LLVMArrayTypeKind: {
+		unsigned n = LLVMGetArrayLength(t);
+		LLVMTypeRef elem = OdinLLVMGetArrayElementType(t);
+		for (unsigned i = 0; i < n; i++) {
+			lb_scalar_types(elem, scalars);
+		}
+		return;
+	}
+	}
+	array_add(scalars, t);
+}
+
+// Multiple return values or a single aggregate C would return through a hidden pointer (more than `c_register_bytes`) in registers where it fits
+gb_internal lbArgType lb_amd64_odin_return(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_tuple, ProcCallingConvention calling_convention, i64 c_register_bytes) {
+	if (!return_is_tuple) {
+		if (!is_calling_convention_odin(calling_convention) ||
+		    !(lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind)) ||
+		    lb_sizeof(return_type) <= c_register_bytes) {
+			return {};
+		}
+	}
+
+	lbReturnRegisters regs = lb_amd64_return_registers;
+	if (lb_take_return_registers(return_type, &regs)) {
+		lbArgType ret = lb_arg_type_direct(return_type);
+
+		// LLVM returns a nested struct in the same registers as its scalars one after another.
+		// The fast instruction selector used at `-o:none` can only take a scalar out of a call result (one index), not a nested one.
+		bool nested = !lb_is_type_kind(return_type, LLVMStructTypeKind);
+		for (unsigned i = 0; !nested && i < LLVMCountStructElementTypes(return_type); i++) {
+			LLVMTypeKind kind = LLVMGetTypeKind(LLVMStructGetTypeAtIndex(return_type, i));
+			nested = kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind;
+		}
+		if (nested) {
+			auto scalars = array_make<LLVMTypeRef>(heap_allocator(), 0, 8);
+			defer (array_free(&scalars));
+			lb_scalar_types(return_type, &scalars);
+			ret.cast_type = LLVMStructTypeInContext(c, scalars.data, cast(unsigned)scalars.count, false);
+			ret.flattened = true;
+		}
+		return ret;
+	}
+	return lb_amd64_odin_return_words(c, return_type);
+}
+
+// Two 64-bit integers or pointers: a string, slice, `any`, `Allocator`, etc.
+gb_internal bool lb_amd64_odin_is_two_words(LLVMTypeRef type) {
+	if (!lb_is_type_kind(type, LLVMStructTypeKind) || LLVMCountStructElementTypes(type) != 2) {
+		return false;
+	}
+	if (LLVMIsPackedStruct(type)) {
+		// a union or a `#packed` struct, whose constants can have a different literal struct type
+		return false;
+	}
+	for (unsigned i = 0; i < 2; i++) {
+		LLVMTypeRef field = LLVMStructGetTypeAtIndex(type, i);
+		bool is_word = lb_is_type_kind(field, LLVMPointerTypeKind) ||
+		               (lb_is_type_kind(field, LLVMIntegerTypeKind) && lb_sizeof(field) == 8);
+		if (!is_word) {
+			return false;
+		}
+	}
+	return true;
+}
+
+
 namespace lbAbiArm64 {
 	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, Type* original_type);
 	gb_internal bool is_register(LLVMTypeRef type);
@@ -2093,6 +2370,7 @@ namespace lbAbiArm64 {
 		LLVMContextRef c = m->ctx;
 		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
+		ft->calling_convention = calling_convention;
 		ft->args = compute_arg_types(c, arg_types, arg_count, original_type);
 
 		// The same union case as in compute_arg_types, in return position. A tuple keeps the
@@ -2118,7 +2396,6 @@ namespace lbAbiArm64 {
 			ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 		}
 
-		ft->calling_convention = calling_convention;
 		return ft;
 	}
 
@@ -2338,6 +2615,24 @@ namespace lbAbiArm64 {
 		return (member_count <= 4);
 	}
 
+	// Odin returns an aggregate of more than 16 bytes in registers where it fits: one per scalar, or else as words in X0-X7
+	gb_internal lbArgType odin_large_return(LLVMContextRef c, LLVMTypeRef return_type, ProcCallingConvention calling_convention) {
+		if (!is_calling_convention_odin(calling_convention) ||
+		    !(lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind))) {
+			return {};
+		}
+		lbReturnRegisters regs = {8, 8, 8}; // X0-X7; V0-V7
+		if (lb_take_return_registers(return_type, &regs)) {
+			return lb_arg_type_direct(return_type);
+		}
+		i64 size = lb_sizeof(return_type);
+		if (size <= 64) {
+			LLVMTypeRef words = llvm_array_type(LLVMIntTypeInContext(c, 64), cast(unsigned)((size + 7)/8));
+			return lb_arg_type_direct(return_type, words, nullptr, nullptr);
+		}
+		return {};
+	}
+
 	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type) {
 		LLVMTypeRef homo_base_type = nullptr;
 		unsigned homo_member_count = 0;
@@ -2354,6 +2649,11 @@ namespace lbAbiArm64 {
 			// become indirect on its own: `struct{[5]f16}` is 10 bytes and goes in x0:x1
 			i64 size = lb_sizeof(return_type);
 			if (size > 16) {
+				lbArgType in_registers = odin_large_return(c, return_type, ft->calling_convention);
+				if (in_registers.type != nullptr) {
+					return in_registers;
+				}
+
 				LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
 
 				LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
@@ -3367,8 +3667,17 @@ gb_internal LB_ABI_INFO(lb_get_abi_info) {
 	// NOTE(bill): this is handled here rather than when developing the type in `lb_type_internal_for_procedures_raw`
 	// This is to make it consistent when and how it is handled
 	if (calling_convention == ProcCC_Odin) {
-		// append the `context` pointer
+		// Append the `context` pointer
 		lbArgType context_param = lb_arg_type_direct(LLVMPointerType(LLVMInt8TypeInContext(m->ctx), 0));
+		switch (build_context.metrics.arch) {
+		case TargetArch_amd64:
+		case TargetArch_arm64:
+		case TargetArch_arm32:
+			// `swiftself` passes it in a callee-saved register (R13, X20, R10) and takes no argument register.
+			// It stays where it is from one call to the next.
+			context_param.attribute = lb_create_enum_attribute(m->ctx, "swiftself");
+			break;
+		}
 		array_add(&ft->args, context_param);
 	}
 

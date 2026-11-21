@@ -25,6 +25,7 @@ gb_internal GB_COMPARE_PROC(lb_polymorphic_instance_cmp) {
 }
 
 gb_internal LLVMValueRef lb_coerce_fields_load(lbProcedure *p, lbValue x, lbArgType const *arg);
+gb_internal LLVMValueRef lb_rebuild_from_leaves(lbProcedure *p, LLVMValueRef value, LLVMTypeRef type);
 
 // NOTE(bill): @RVO Check if a call expression returns by sret with a return type matching dst_type.
 // Returns the callee's function type if eligible for copy elision, nullptr otherwise.
@@ -2696,8 +2697,8 @@ gb_internal bool lb_load_reads_alloca_after(lbProcedure *p, LLVMValueRef load, L
 	if (!LLVMIsAAllocaInst(base)) {
 		return false;
 	}
-	LLVMValueRef it = decl_marker != nullptr ? LLVMGetNextInstruction(decl_marker) : LLVMGetFirstInstruction(p->decl_block->block);
-	for (; it != nullptr; it = LLVMGetNextInstruction(it)) {
+	LLVMValueRef it = decl_marker != nullptr ? LLVMGetNextInstruction(decl_marker) : LLVMGetFirstInstruction(p->entry_block->block);
+	for (; it != p->decls_end; it = LLVMGetNextInstruction(it)) {
 		if (it == base) {
 			return true;
 		}
@@ -2791,7 +2792,7 @@ gb_internal void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice
 		return;
 	}
 
-	LLVMValueRef decl_marker = LLVMGetLastInstruction(p->decl_block->block);
+	LLVMValueRef decl_marker = LLVMGetPreviousInstruction(p->decls_end);
 
 	auto inits = array_make<lbValue>(permanent_allocator(), 0, lvals.count);
 
@@ -2899,6 +2900,9 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, Toke
 
 		if (ft->ret.coerce_offsets.count > 0) {
 			ret_val = lb_coerce_fields_load(p, res, &ft->ret);
+		} else if (ft->ret.flattened) {
+			ret_val = OdinLLVMBuildTransmute(p, ret_val, ft->ret.type);
+			ret_val = lb_rebuild_from_leaves(p, ret_val, ret_type);
 		} else if (LLVMGetTypeKind(ret_type) == LLVMStructTypeKind) {
 			LLVMTypeRef src_type = LLVMTypeOf(ret_val);
 
@@ -3068,8 +3072,11 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 				result_values[i] = lb_emit_conv(p, results[i], tuple->variables[i]->type);
 			}
 
+			// NOTE(bill): the result pointers follow the parameters, some of which take no or several LLVM parameters
 			isize param_offset = return_by_pointer ? 1 : 0;
-			param_offset += ft->original_arg_count;
+			for (isize i = 0; i < ft->original_arg_count; i++) {
+				param_offset += lb_arg_param_count(&ft->args[i]);
+			}
 			for_array(i, result_eps) {
 				lbValue result_ep = {};
 				result_ep.value = LLVMGetParam(p->value, cast(unsigned)(param_offset+i));

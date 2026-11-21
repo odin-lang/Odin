@@ -2,13 +2,13 @@
 
 	IMPORTANT NOTE(bill, 2021-11-06): Regarding Optimization Passes
 
-	A lot of the passes taken here have been modified with what was 
-	partially done in LLVM 11. 
+	A lot of the passes taken here have been modified with what was
+	partially done in LLVM 11.
 
-	Passes that CANNOT be used by Odin due to C-like optimizations which 
+	Passes that CANNOT be used by Odin due to C-like optimizations which
 	are not compatible with Odin:
-		
-		LLVMAddCorrelatedValuePropagationPass 
+
+		LLVMAddCorrelatedValuePropagationPass
 		LLVMAddAggressiveInstCombinerPass
 		LLVMAddInstructionCombiningPass
 		LLVMAddIndVarSimplifyPass
@@ -16,16 +16,16 @@
 		LLVMAddEarlyCSEMemSSAPass
 		LLVMAddGVNPass
 		LLVMAddDeadStoreEliminationPass - Causes too many false positive
-		
-	Odin does not allow poison-value based optimizations. 
-	
-	For example, *-flowing integers in C is "undefined behaviour" and thus 
-	many optimizers, including LLVM, take advantage of this for a certain 
-	class of optimizations. Odin on the other hand defines *-flowing 
-	behaviour to obey the rules of 2's complement, meaning wrapping is a 
-	expected. This means any outputted IR containing the following flags 
+
+	Odin does not allow poison-value based optimizations.
+
+	For example, *-flowing integers in C is "undefined behaviour" and thus
+	many optimizers, including LLVM, take advantage of this for a certain
+	class of optimizations. Odin on the other hand defines *-flowing
+	behaviour to obey the rules of 2's complement, meaning wrapping is a
+	expected. This means any outputted IR containing the following flags
 	may cause incorrect behaviour:
-	
+
 		nsw (no signed wrap)
 		nuw (no unsigned wrap)
 		poison (poison value)
@@ -45,9 +45,9 @@
 
 /**************************************************************************
 	IMPORTANT NOTE(bill, 2021-11-06): Custom Passes
-	
-	The procedures below are custom written passes to aid in the 
-	optimization of Odin programs	
+
+	The procedures below are custom written passes to aid in the
+	optimization of Odin programs
 **************************************************************************/
 
 gb_internal void lb_run_fast_float_math_pass(lbProcedure *p) {
@@ -79,7 +79,7 @@ gb_internal void lb_run_fast_float_math_pass(lbProcedure *p) {
 	     block = LLVMGetNextBasicBlock(block)) {
 		for (LLVMValueRef instr = LLVMGetFirstInstruction(block);
 		     instr != nullptr;
-		     instr = LLVMGetNextInstruction(instr))  {			
+		     instr = LLVMGetNextInstruction(instr))  {
 			if (LLVMCanValueUseFastMathFlags(instr)) {
 				LLVMSetFastMathFlags(instr, llvm_flags);
 			}
@@ -257,8 +257,13 @@ gb_internal void lb_run_instrumentation_pass(lbProcedure *p) {
 	LLVMBuilderRef dummy_builder = LLVMCreateBuilderInContext(m->ctx);
 	defer (LLVMDisposeBuilder(dummy_builder));
 
+	// NOTE(bill): The entry call goes after the allocas at the top of the first block.
 	LLVMBasicBlockRef entry_bb = p->entry_block->block;
-	LLVMPositionBuilder(dummy_builder, entry_bb, LLVMGetFirstInstruction(entry_bb));
+	LLVMValueRef first = LLVMGetFirstInstruction(entry_bb);
+	while (first != nullptr && LLVMIsAAllocaInst(first)) {
+		first = LLVMGetNextInstruction(first);
+	}
+	LLVMPositionBuilder(dummy_builder, entry_bb, first);
 	lb_run_instrumentation_pass_insert_call(p, enter, dummy_builder, true);
 	LLVMRemoveStringAttributeAtIndex(p->value, LLVMAttributeIndex_FunctionIndex, LLVM_V_NAME("instrument-function-entry"));
 
@@ -326,7 +331,7 @@ gb_internal void llvm_delete_function(LLVMValueRef func) {
 	// 	for (LLVMValueRef instr = LLVMGetFirstInstruction(curr_block); instr != nullptr; /**/) {
 	// 		LLVMValueRef curr_instr = instr;
 	// 		instr = LLVMGetNextInstruction(instr);
-			
+
 	// 		LLVMInstructionEraseFromParent(curr_instr);
 	// 	}
 	// 	LLVMRemoveBasicBlockFromParent(curr_block);
@@ -439,26 +444,26 @@ gb_internal void lb_run_remove_unused_globals_pass(lbModule *m) {
 	isize const max_pass_count = 10;
 	// Custom remove dead function pass
 	for (; pass_count < max_pass_count; pass_count++) {
-		bool was_dead = false;	
+		bool was_dead = false;
 		for (LLVMValueRef global = LLVMGetFirstGlobal(m->mod);
 		     global != nullptr;
 		     /**/
 		     ) {
 		     	LLVMValueRef curr_global = global;
 		     	global = LLVMGetNextGlobal(global);
-		     	
+
 			LLVMUseRef first_use = LLVMGetFirstUse(curr_global);
 			if (first_use != nullptr)  {
 				continue;
 			}
 			String name = {};
 			name.text = cast(u8 *)LLVMGetValueName2(curr_global, cast(size_t *)&name.len);
-						
+
 			LLVMLinkage linkage = LLVMGetLinkage(curr_global);
 			if (linkage != LLVMInternalLinkage) {
 				continue;
 			}
-			
+
 			Entity **found = map_get(&m->procedure_values, curr_global);
 			if (found && *found) {
 				Entity *e = *found;
@@ -750,6 +755,96 @@ gb_internal bool lb_scalarize_aggregate_store(lbFastIselLowering *s, LLVMValueRe
 	}
 	LLVMInstructionEraseFromParent(store);
 	return true;
+}
+
+gb_internal void lb_value_leaves(LLVMBuilderRef b, LLVMValueRef value, Array<LLVMValueRef> *leaves) {
+	LLVMTypeRef  type = LLVMTypeOf(value);
+	LLVMTypeKind kind = LLVMGetTypeKind(type);
+	if (kind != LLVMStructTypeKind && kind != LLVMArrayTypeKind) {
+		array_add(leaves, value);
+		return;
+	}
+
+	unsigned count = kind == LLVMStructTypeKind ?
+		LLVMCountStructElementTypes(type) :
+		cast(unsigned)LLVMGetArrayLength(type);
+	for (unsigned i = 0; i < count; i++) {
+		lb_value_leaves(b, LLVMBuildExtractValue(b, value, i, ""), leaves);
+	}
+}
+
+// The aggregate of `type` from its leaves, in the order lb_aggregate_leaves lists them (nullptr for an undefined one)
+gb_internal LLVMValueRef lb_build_aggregate_from_leaves(LLVMBuilderRef b, LLVMTypeRef type, LLVMValueRef const *leaves, isize *index) {
+	LLVMTypeKind kind = LLVMGetTypeKind(type);
+	if (kind != LLVMStructTypeKind && kind != LLVMArrayTypeKind) {
+		LLVMValueRef leaf = leaves[(*index)++];
+		return leaf != nullptr ? leaf : LLVMGetUndef(type);
+	}
+	LLVMValueRef value = LLVMGetUndef(type);
+	unsigned count = kind == LLVMStructTypeKind ? LLVMCountStructElementTypes(type) : cast(unsigned)LLVMGetArrayLength(type);
+	for (unsigned i = 0; i < count; i++) {
+		LLVMTypeRef elem = kind == LLVMStructTypeKind ? LLVMStructGetTypeAtIndex(type, i) : OdinLLVMGetArrayElementType(type);
+		value = LLVMBuildInsertValue(b, value, lb_build_aggregate_from_leaves(b, elem, leaves, index), i, "");
+	}
+	return value;
+}
+
+// NOTE(bill): A `ret` of an aggregate returns it in more than one register, which the fast instruction selector cannot do,
+// and it hands the whole block of that `ret` to SelectionDAG. So every such `ret` of a procedure branches to one new block
+// instead, which takes the leaves through `phi`s and builds the aggregate. Only that small block goes to SelectionDAG.
+gb_internal void lb_merge_aggregate_returns(lbFastIselLowering *s, LLVMValueRef fn, Array<LLVMValueRef> const &rets) {
+	if (rets.count == 0) {
+		return;
+	}
+	LLVMTypeRef type = LLVMTypeOf(LLVMGetOperand(rets[0], 0));
+
+	lbAggregateLeaf leaves[LB_SCALARIZE_MAX_LEAVES] = {};
+	isize leaf_count = 0;
+	unsigned path[LB_SCALARIZE_MAX_DEPTH] = {};
+	if (!lb_aggregate_leaves(type, path, 0, leaves, &leaf_count)) {
+		return;
+	}
+
+	auto fields = array_make<LLVMValueRef>(heap_allocator(), rets.count*leaf_count, rets.count*leaf_count);
+	defer (array_free(&fields));
+	for_array(r, rets) {
+		s->store = rets[r];
+		LLVMValueRef value = LLVMGetOperand(rets[r], 0);
+		for (isize i = 0; i < leaf_count; i++) {
+			if (!lb_aggregate_field_value(s, value, leaves[i].path, leaves[i].depth, &fields[r*leaf_count + i])) {
+				return; // anything made so far is unused and removed with the rest
+			}
+		}
+	}
+
+	LLVMBasicBlockRef block = LLVMAppendBasicBlockInContext(s->m->ctx, fn, "");
+	LLVMPositionBuilderAtEnd(s->builder, block);
+	LLVMSetCurrentDebugLocation2(s->builder, LLVMInstructionGetDebugLoc(rets[0]));
+
+	LLVMValueRef phis[LB_SCALARIZE_MAX_LEAVES] = {};
+	for (isize i = 0; i < leaf_count; i++) {
+		LLVMTypeRef field_type = nullptr;
+		lb_aggregate_path_offset(type, leaves[i].path, leaves[i].depth, &field_type);
+		phis[i] = LLVMBuildPhi(s->builder, field_type, "");
+	}
+	isize index = 0;
+	LLVMBuildRet(s->builder, lb_build_aggregate_from_leaves(s->builder, type, phis, &index));
+
+	for_array(r, rets) {
+		LLVMValueRef      ret  = rets[r];
+		LLVMBasicBlockRef from = LLVMGetInstructionParent(ret);
+		for (isize i = 0; i < leaf_count; i++) {
+			LLVMValueRef field = fields[r*leaf_count + i];
+			if (field == nullptr) {
+				field = LLVMGetUndef(LLVMTypeOf(phis[i]));
+			}
+			LLVMAddIncoming(phis[i], &field, &from, 1);
+		}
+		LLVMPositionBuilderBefore(s->builder, ret);
+		LLVMSetCurrentDebugLocation2(s->builder, LLVMInstructionGetDebugLoc(ret));
+		LLVMBuildBr(s->builder, block);
+		LLVMInstructionEraseFromParent(ret);
+	}
 }
 
 // NOTE(bill): If a a constant has too many fields to store one at a time is set or copied from a constant instead
@@ -1110,10 +1205,11 @@ gb_internal void lb_lower_for_fast_isel(lbModule *m) {
 				continue;
 			}
 
-			if (!(LLVMIsAConstant(agg)        ||
-			      LLVMIsAInsertValueInst(agg) ||
-			      LLVMIsASelectInst(agg)      ||
-			      LLVMIsAPHINode(agg)         ||
+			if (!(LLVMIsAConstant(agg)         ||
+			      LLVMIsAInsertValueInst(agg)  ||
+			      LLVMIsAExtractValueInst(agg) ||
+			      LLVMIsASelectInst(agg)       ||
+			      LLVMIsAPHINode(agg)          ||
 			      (LLVMIsALoadInst(agg) && lb_is_plain_access(agg)))) {
 				continue;
 			}
@@ -1126,6 +1222,22 @@ gb_internal void lb_lower_for_fast_isel(lbModule *m) {
 				LLVMInstructionEraseFromParent(i);
 			}
 		}
+
+		array_clear(&work);
+		for (LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(fn); bb != nullptr; bb = LLVMGetNextBasicBlock(bb)) {
+			LLVMValueRef term = LLVMGetBasicBlockTerminator(bb);
+			if (term == nullptr || !LLVMIsAReturnInst(term) || LLVMGetNumOperands(term) != 1 ||
+			    !lb_is_aggregate_type(LLVMTypeOf(LLVMGetOperand(term, 0)))) {
+				continue;
+			}
+			// a `musttail` call must be followed by its `ret`
+			LLVMValueRef prev = LLVMGetPreviousInstruction(term);
+			if (prev != nullptr && LLVMIsACallInst(prev) && LLVMIsTailCall(prev)) {
+				continue;
+			}
+			array_add(&work, term);
+		}
+		lb_merge_aggregate_returns(&s, fn, work);
 
 		bool removed = true;
 		while (removed) {
