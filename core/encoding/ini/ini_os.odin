@@ -5,16 +5,9 @@ package encoding_ini
 import "base:runtime"
 import "core:os"
 
-load_map_from_path :: proc(path: string, allocator: runtime.Allocator, options := DEFAULT_OPTIONS) -> (m: Map, err: runtime.Allocator_Error, ok: bool) {
-	data, data_err := os.read_entire_file(path, allocator)
+load_map_from_path :: proc(path: string, allocator: runtime.Allocator, options := DEFAULT_OPTIONS) -> (m: Map, err: os.Error) {
+	data := os.read_entire_file(path, allocator) or_return
 	defer delete(data, allocator)
-	if data_err != nil {
-		return
-	}
-	m, err = load_map_from_string(string(data), allocator, options)
-	ok = err == nil
-	defer if !ok {
-		delete_map(m)
-	}
+	m = load_map_from_string(string(data), allocator, options) or_return
 	return
 }
