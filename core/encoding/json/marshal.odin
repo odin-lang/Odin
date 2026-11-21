@@ -996,6 +996,7 @@ opt_write_iteration :: proc(w: io.Writer, opt: ^Marshal_Options, first_iteration
 }
 
 // insert trailing comma if applicable
+@(private)
 opt_write_trailing_comma :: proc(w: io.Writer, opt: ^Marshal_Options, any_iterations: bool) -> (err: io.Error) {
 	if any_iterations && opt.spec == .JSON5 && opt.json5_use_trailing_commas {
 		io.write_byte(w, ',') or_return
