@@ -1,6 +1,5 @@
 package test_core_json
 
-import "core:hash"
 import "core:encoding/json"
 import "core:fmt"
 import "core:io"
@@ -2528,10 +2527,6 @@ review_marshal_trailing_comma :: proc(t: ^testing.T) {
 	Some_Enum :: enum {
 		Zero,
 		One,
-	}
-	enumerated_array := [Some_Enum]int {
-		.Zero = 0,
-		.One = 1,
 	}
 	// Type_Info_Enumerated_Array
 	expect_marshal(t, #partial [Some_Enum]int{}, opt, "[]")
