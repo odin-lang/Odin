@@ -361,7 +361,7 @@ gb_internal void lb_split_instances_into_modules(lbGenerator *gen, Checker *c, P
 			instances_size += inst.size;
 		}
 
-		isize part_count = cast(isize)((total + share - 1) / share);
+		isize part_count = 1 + cast(isize)(instances_size / share);
 		if (part_count < 2) {
 			continue;
 		}
