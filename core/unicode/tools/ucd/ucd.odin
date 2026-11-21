@@ -29,6 +29,7 @@ load_unicode_data :: proc(filename: string, allocator := context.allocator) -> (
 	data := os.read_entire_file(filename, context.temp_allocator) or_return
 	defer free_all(context.temp_allocator)
 
+	unicode_data.allocator = allocator
 	first_cp: rune
 
 	str := string(data)

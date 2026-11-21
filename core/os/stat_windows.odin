@@ -24,7 +24,7 @@ _fstat :: proc(f: ^File, allocator: runtime.Allocator) -> (fi: File_Info, err: E
 		return
 	}
 
-	return _file_info_from_get_file_information_by_handle(path, h, allocator)
+	return _file_info_from_get_file_information_by_handle(path, h)
 }
 
 _stat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
@@ -83,7 +83,7 @@ internal_stat :: proc(name: string, create_file_attributes: u32, allocator: runt
 	}
 	defer win32.CloseHandle(h)
 	fullpath := _full_path_utf8(wide, allocator) or_return
-	fi, e = _file_info_from_get_file_information_by_handle(fullpath, h, allocator)
+	fi, e = _file_info_from_get_file_information_by_handle(fullpath, h)
 	if e != nil {
 		delete(fullpath, allocator)
 	}
@@ -262,7 +262,7 @@ _file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, wide: []u16,
 	return
 }
 
-_file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HANDLE, allocator: runtime.Allocator) -> (File_Info, Error) {
+_file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HANDLE) -> (File_Info, Error) {
 	d: win32.BY_HANDLE_FILE_INFORMATION
 	if !win32.GetFileInformationByHandle(h, &d) {
 		return {}, _get_platform_error()

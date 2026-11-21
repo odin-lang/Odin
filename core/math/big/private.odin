@@ -1837,6 +1837,8 @@ _private_gcd_u64 :: proc "contextless" (a, b: u64) -> u64 {
 	Assumes `a` not to be `nil` and to have been initialized.
 */
 _private_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -> (res: int, err: Error) {
+	context.allocator = allocator
+
 	bracket_low, bracket_high, bracket_mid, t, bi_base := &Int{}, &Int{}, &Int{}, &Int{}, &Int{}
 	defer internal_destroy(bracket_low, bracket_high, bracket_mid, t, bi_base)
 
@@ -2154,7 +2156,7 @@ _private_int_montgomery_calc_normalization :: proc(a, b: ^Int, allocator := cont
 /*
 	Sets up the Montgomery reduction stuff.
 */
-_private_int_montgomery_setup :: proc(n: ^Int, allocator := context.allocator) -> (rho: DIGIT, err: Error) {
+_private_int_montgomery_setup :: proc(n: ^Int) -> (rho: DIGIT, err: Error) {
 	/*
 		Fast inversion mod 2**k
 		Based on the fact that:

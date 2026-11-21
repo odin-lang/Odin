@@ -263,16 +263,6 @@ internal_int_mul_denom :: proc(dst, x, y: ^Int, allocator := context.allocator) 
 	return int_mul(dst, x, y)
 }
 
-internal_int_scale_denom :: proc(dst, x, y: ^Int, allocator := context.allocator) -> (err: Error) {
-	assert_if_nil(dst, x, y)
-	if internal_is_zero(y) {
-		return internal_set(dst, x)
-	}
-	int_mul(dst, x, y) or_return
-	dst.sign = x.sign
-	return
-}
-
 
 rat_add_rat :: proc(dst, x, y: ^Rat, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(dst, x, y)
@@ -374,23 +364,23 @@ rat_neg :: proc(dst, x: ^Rat, allocator := context.allocator) -> (err: Error) {
 }
 
 
-rat_is_positive :: proc(z: ^Rat, allocator := context.allocator) -> (ok: bool, err: Error) {
+rat_is_positive :: proc(z: ^Rat) -> (ok: bool, err: Error) {
 	assert_if_nil(z)
 	_rat_check(z) or_return
 	return z.a.sign == z.b.sign, nil
 }
-rat_is_negative :: proc(z: ^Rat, allocator := context.allocator) -> (ok: bool, err: Error) {
+rat_is_negative :: proc(z: ^Rat) -> (ok: bool, err: Error) {
 	assert_if_nil(z)
 	_rat_check(z) or_return
 	return z.a.sign != z.b.sign, nil
 }
 
-rat_is_even :: proc(z: ^Rat, allocator := context.allocator) -> (ok: bool, err: Error) {
+rat_is_even :: proc(z: ^Rat) -> (ok: bool, err: Error) {
 	assert_if_nil(z)
 	_rat_check(z) or_return
 	return rat_is_int(z) && internal_is_even(&z.a), nil
 }
-rat_is_odd :: proc(z: ^Rat, allocator := context.allocator) -> (ok: bool, err: Error) {
+rat_is_odd :: proc(z: ^Rat) -> (ok: bool, err: Error) {
 	assert_if_nil(z)
 	_rat_check(z) or_return
 	return rat_is_int(z) && internal_is_odd(&z.a), nil

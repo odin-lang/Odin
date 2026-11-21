@@ -593,8 +593,8 @@ decode_rle :: proc(ctx: ^compress.Context, img: ^Image, info: image.BMP_Header, 
 			return .Corrupt
 		}
 
-		data := make([]u8, int(pixel_size) + 4)
-		defer delete(data)
+		data := make([]u8, int(pixel_size) + 4, allocator)
+		defer delete(data, allocator)
 
 		if compress.read_slice(ctx, data[:pixel_size]) != nil {
 			return .Corrupt
@@ -666,8 +666,8 @@ decode_rle :: proc(ctx: ^compress.Context, img: ^Image, info: image.BMP_Header, 
 			return .Corrupt
 		}
 
-		data := make([]u8, int(pixel_size) + 4)
-		defer delete(data)
+		data := make([]u8, int(pixel_size) + 4, allocator)
+		defer delete(data, allocator)
 
 		if compress.read_slice(ctx, data[:pixel_size]) != nil {
 			return .Corrupt

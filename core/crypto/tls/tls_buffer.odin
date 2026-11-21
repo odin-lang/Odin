@@ -25,7 +25,7 @@ buffer_init :: proc(buf: ^Buffer, backing: []u8, pre_filled := false) {
 
 buffer_make :: proc(buf: ^Buffer, n: int, allocator: runtime.Allocator) -> Error {
 	buffer_clear(buf)
-	buf.b = make([]byte, n) or_return
+	buf.b = make([]byte, n, allocator) or_return
 	return nil
 }
 

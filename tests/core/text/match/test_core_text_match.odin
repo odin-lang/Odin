@@ -1,5 +1,6 @@
 package test_strlib
 
+import "core:mem"
 import "core:text/match"
 import "core:testing"
 
@@ -359,6 +360,34 @@ test_case_insensitive :: proc(t: ^testing.T) {
 			pattern, goal,
 		)
 	}
+}
+
+@test
+test_result_on_allocator :: proc(t: ^testing.T) {
+	track: mem.Tracking_Allocator
+	mem.tracking_allocator_init(&track, context.allocator)
+	defer mem.tracking_allocator_destroy(&track)
+	track.bad_free_callback = mem.tracking_allocator_bad_free_callback_add_to_array
+	alloc := mem.tracking_allocator(&track)
+
+	result := match.gsub("testing123testing", "%d+", " sup ", alloc)
+	testing.expect_value(t, result, "testing sup testing")
+	result_owned := rawptr(raw_data(result)) in track.allocation_map
+	testing.expect(t, result_owned)
+	if result_owned {
+		delete(result, alloc)
+	}
+
+	pattern := match.pattern_case_insensitive("test", 256, alloc)
+	testing.expect_value(t, pattern, "[tT][eE][sS][tT]")
+	pattern_owned := rawptr(raw_data(pattern)) in track.allocation_map
+	testing.expect(t, pattern_owned)
+	if pattern_owned {
+		delete(pattern, alloc)
+	}
+
+	testing.expect_value(t, len(track.allocation_map), 0)
+	testing.expect_value(t, len(track.bad_free_array), 0)
 }
 
 @(private)
