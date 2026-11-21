@@ -15,6 +15,7 @@ import "core:compress"
 import "core:compress/deflate"
 import "core:compress/shoco"
 import "core:bytes"
+import "core:mem"
 
 SLIM_TESTS :: #config(ODIN_TEST_SLIM, false)
 
@@ -114,6 +115,34 @@ expect_slice_fails :: proc(t: ^testing.T, name, kept: string, format: Deflate_Fo
 		testing.expectf(t, ctx_err != nil, "%v, %v, %v: %v %v of %v bytes decompressed without error", name, format, kind, kept, len(data), full)
 		sinks_check(t, name, sinks_format(format), kind, data)
 	}
+}
+
+@test
+shoco_allocator_test :: proc(t: ^testing.T) {
+	ctx_track, arg_track: mem.Tracking_Allocator
+	mem.tracking_allocator_init(&ctx_track, context.allocator)
+	defer mem.tracking_allocator_destroy(&ctx_track)
+	mem.tracking_allocator_init(&arg_track, context.allocator)
+	defer mem.tracking_allocator_destroy(&arg_track)
+	arg := mem.tracking_allocator(&arg_track)
+
+	input := "shoco compresses short English strings."
+	packed: [128]u8
+	size: int
+	err: compress.Error
+	{
+		context.allocator = mem.tracking_allocator(&ctx_track)
+		size, err = shoco.compress_string_to_buffer(input, packed[:], allocator = arg)
+	}
+	testing.expect(t, err == nil)
+	testing.expect_value(t, ctx_track.total_allocation_count, 0)
+	testing.expect(t, arg_track.total_allocation_count > 0)
+	testing.expect_value(t, len(arg_track.allocation_map), 0)
+
+	unpacked: [128]u8
+	n, unpack_err := shoco.decompress(packed[:size], unpacked[:])
+	testing.expect(t, unpack_err == nil)
+	testing.expect_value(t, string(unpacked[:n]), input)
 }
 
 @test

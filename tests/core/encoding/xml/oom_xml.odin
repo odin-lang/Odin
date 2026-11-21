@@ -94,7 +94,7 @@ sweep_parse :: proc(t: ^testing.T, data: string, options: xml.Options, elements 
 		} else {
 			testing.expect_value(t, doc.element_count, 1102 if .Intern_Comments in options.flags else 1101, loc)
 		}
-		xml.destroy(doc, failing_allocator(&fa))
+		xml.destroy(doc)
 		testing.expect(t, total >= 1, loc = loc)
 		testing.expect_value(t, len(track.allocation_map), 0, loc)
 	}
@@ -106,7 +106,7 @@ sweep_parse :: proc(t: ^testing.T, data: string, options: xml.Options, elements 
 		fa := Failing_Allocator{backing = mem.tracking_allocator(&track), fail_at = k}
 		doc, err := oom_parse(data, path, options, failing_allocator(&fa))
 		testing.expectf(t, err == .Allocation_Failed, "k=%d of %d: got %v", k, total, err, loc = loc)
-		xml.destroy(doc, failing_allocator(&fa))
+		xml.destroy(doc)
 		testing.expectf(t, len(track.allocation_map) == 0, "k=%d of %d: %d leaked", k, total, len(track.allocation_map), loc = loc)
 	}
 }

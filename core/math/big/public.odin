@@ -200,8 +200,8 @@ mul :: proc {
 	int_mul_rat,
 }
 
-int_sqr :: proc(dest, src: ^Int) -> (err: Error) { return mul(dest, src, src) }
-rat_sqr :: proc(dest, src: ^Rat) -> (err: Error) { return mul(dest, src, src) }
+int_sqr :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) { return mul(dest, src, src, allocator) }
+rat_sqr :: proc(dest, src: ^Rat, allocator := context.allocator) -> (err: Error) { return mul(dest, src, src, allocator) }
 sqr :: proc { int_sqr, rat_sqr }
 
 
@@ -593,9 +593,8 @@ int_is_initialized :: proc(a: ^Int) -> bool {
 	return #force_inline internal_int_is_initialized(a)
 }
 
-int_is_zero :: proc(a: ^Int, allocator := context.allocator) -> (zero: bool, err: Error) {
+int_is_zero :: proc(a: ^Int) -> (zero: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
 
 	a := a
 	a = _zero_if_uninitialized(a)
@@ -604,9 +603,8 @@ int_is_zero :: proc(a: ^Int, allocator := context.allocator) -> (zero: bool, err
 	return #force_inline internal_is_zero(a), nil
 }
 
-int_is_positive :: proc(a: ^Int, allocator := context.allocator) -> (positive: bool, err: Error) {
+int_is_positive :: proc(a: ^Int) -> (positive: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
 
 	a := a
 	a = _zero_if_uninitialized(a)
@@ -615,9 +613,8 @@ int_is_positive :: proc(a: ^Int, allocator := context.allocator) -> (positive: b
 	return #force_inline internal_is_positive(a), nil
 }
 
-int_is_negative :: proc(a: ^Int, allocator := context.allocator) -> (negative: bool, err: Error) {
+int_is_negative :: proc(a: ^Int) -> (negative: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
 
 	a := a
 	a = _zero_if_uninitialized(a)
@@ -626,9 +623,8 @@ int_is_negative :: proc(a: ^Int, allocator := context.allocator) -> (negative: b
 	return #force_inline internal_is_negative(a), nil
 }
 
-int_is_even :: proc(a: ^Int, allocator := context.allocator) -> (even: bool, err: Error) {
+int_is_even :: proc(a: ^Int) -> (even: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
 
 	a := a
 	a = _zero_if_uninitialized(a)
@@ -637,9 +633,8 @@ int_is_even :: proc(a: ^Int, allocator := context.allocator) -> (even: bool, err
 	return #force_inline internal_is_even(a), nil
 }
 
-int_is_odd :: proc(a: ^Int, allocator := context.allocator) -> (odd: bool, err: Error) {
+int_is_odd :: proc(a: ^Int) -> (odd: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
 
 	a := a
 	a = _zero_if_uninitialized(a)
@@ -652,9 +647,8 @@ platform_int_is_power_of_two :: #force_inline proc(a: int) -> bool {
 	return ((a) > 0) && (((a) & ((a) - 1)) == 0)
 }
 
-int_is_power_of_two :: proc(a: ^Int, allocator := context.allocator) -> (res: bool, err: Error) {
+int_is_power_of_two :: proc(a: ^Int) -> (res: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
 
 	a := a
 	a = _zero_if_uninitialized(a)
@@ -666,9 +660,8 @@ int_is_power_of_two :: proc(a: ^Int, allocator := context.allocator) -> (res: bo
 /*
 	Compare two `Int`s, signed.
 */
-int_compare :: proc(a, b: ^Int, allocator := context.allocator) -> (comparison: int, err: Error) {
+int_compare :: proc(a, b: ^Int) -> (comparison: int, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
 
 	a, b := a, b
 	a, b = _zero_if_uninitialized(a), _zero_if_uninitialized(b)
@@ -681,9 +674,8 @@ int_cmp :: int_compare
 /*
 	Compare an `Int` to an unsigned number upto the size of the backing type.
 */
-int_compare_digit :: proc(a: ^Int, b: DIGIT, allocator := context.allocator) -> (comparison: int, err: Error) {
+int_compare_digit :: proc(a: ^Int, b: DIGIT) -> (comparison: int, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
 
 	a := a
 	a = _zero_if_uninitialized(a)
@@ -696,9 +688,8 @@ int_cmp_digit :: int_compare_digit
 /*
 	Compare the magnitude of two `Int`s, unsigned.
 */
-int_compare_magnitude :: proc(a, b: ^Int, allocator := context.allocator) -> (res: int, err: Error) {
+int_compare_magnitude :: proc(a, b: ^Int) -> (res: int, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
 
 	a, b := a, b
 	a, b = _zero_if_uninitialized(a), _zero_if_uninitialized(b)
@@ -712,9 +703,8 @@ int_cmp_mag :: int_compare_magnitude
 /*
 	bool := a < b
 */
-int_less_than :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (less_than: bool, err: Error) {
+int_less_than :: #force_inline proc(a, b: ^Int) -> (less_than: bool, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
 
 	c: int
 	c, err = cmp(a, b)
@@ -725,9 +715,8 @@ int_less_than :: #force_inline proc(a, b: ^Int, allocator := context.allocator) 
 /*
 	bool := a < b
 */
-int_less_than_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := context.allocator) -> (less_than: bool, err: Error) {
+int_less_than_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (less_than: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
 
 	c: int
 	c, err = cmp(a, b)
@@ -739,9 +728,8 @@ int_less_than_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := contex
 	bool := |a| < |b|
     Compares the magnitudes only, ignores the sign.
 */
-int_less_than_abs :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (less_than: bool, err: Error) {
+int_less_than_abs :: #force_inline proc(a, b: ^Int) -> (less_than: bool, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
 
 	c: int
 	c, err = cmp_mag(a, b)
@@ -764,9 +752,8 @@ lt_abs :: less_than_abs
 /*
 	bool := a <= b
 */
-int_less_than_or_equal :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (less_than_or_equal: bool, err: Error) {
+int_less_than_or_equal :: #force_inline proc(a, b: ^Int) -> (less_than_or_equal: bool, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
 
 	c: int
 	c, err = cmp(a, b)
@@ -777,9 +764,8 @@ int_less_than_or_equal :: #force_inline proc(a, b: ^Int, allocator := context.al
 /*
 	bool := a <= b
 */
-int_less_than_or_equal_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := context.allocator) -> (less_than_or_equal: bool, err: Error) {
+int_less_than_or_equal_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (less_than_or_equal: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
 
 	c: int
 	c, err = cmp(a, b)
@@ -791,9 +777,8 @@ int_less_than_or_equal_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator 
 	bool := |a| <= |b|
     Compares the magnitudes only, ignores the sign.
 */
-int_less_than_or_equal_abs :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (less_than_or_equal: bool, err: Error) {
+int_less_than_or_equal_abs :: #force_inline proc(a, b: ^Int) -> (less_than_or_equal: bool, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
 
 	c: int
 	c, err = cmp_mag(a, b)
@@ -816,9 +801,8 @@ lteq_abs :: less_than_or_equal_abs
 /*
 	bool := a == b
 */
-int_equals :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (equals: bool, err: Error) {
+int_equals :: #force_inline proc(a, b: ^Int) -> (equals: bool, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
 
 	c: int
 	c, err = cmp(a, b)
@@ -829,9 +813,8 @@ int_equals :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> 
 /*
 	bool := a == b
 */
-int_equals_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := context.allocator) -> (equals: bool, err: Error) {
+int_equals_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (equals: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
 
 	c: int
 	c, err = cmp(a, b)
@@ -843,9 +826,8 @@ int_equals_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := context.a
 	bool := |a| == |b|
     Compares the magnitudes only, ignores the sign.
 */
-int_equals_abs :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (equals: bool, err: Error) {
+int_equals_abs :: #force_inline proc(a, b: ^Int) -> (equals: bool, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
 
 	c: int
 	c, err = cmp_mag(a, b)
@@ -868,9 +850,8 @@ eq_abs :: equals_abs
 /*
 	bool := a >= b
 */
-int_greater_than_or_equal :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (greater_than_or_equal: bool, err: Error) {
+int_greater_than_or_equal :: #force_inline proc(a, b: ^Int) -> (greater_than_or_equal: bool, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
 
 	c: int
 	c, err = cmp(a, b)
@@ -881,9 +862,8 @@ int_greater_than_or_equal :: #force_inline proc(a, b: ^Int, allocator := context
 /*
 	bool := a >= b
 */
-int_greater_than_or_equal_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := context.allocator) -> (greater_than_or_equal: bool, err: Error) {
+int_greater_than_or_equal_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (greater_than_or_equal: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
 
 	c: int
 	c, err = cmp(a, b)
@@ -895,9 +875,8 @@ int_greater_than_or_equal_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocat
 	bool := |a| >= |b|
     Compares the magnitudes only, ignores the sign.
 */
-int_greater_than_or_equal_abs :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (greater_than_or_equal: bool, err: Error) {
+int_greater_than_or_equal_abs :: #force_inline proc(a, b: ^Int) -> (greater_than_or_equal: bool, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
 
 	c: int
 	c, err = cmp_mag(a, b)
@@ -920,9 +899,8 @@ gteq_abs :: greater_than_or_equal_abs
 /*
 	bool := a > b
 */
-int_greater_than :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (greater_than: bool, err: Error) {
+int_greater_than :: #force_inline proc(a, b: ^Int) -> (greater_than: bool, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
 
 	c: int
 	c, err = cmp(a, b)
@@ -933,9 +911,8 @@ int_greater_than :: #force_inline proc(a, b: ^Int, allocator := context.allocato
 /*
 	bool := a > b
 */
-int_greater_than_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := context.allocator) -> (greater_than: bool, err: Error) {
+int_greater_than_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (greater_than: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
 
 	c: int
 	c, err = cmp(a, b)
@@ -947,9 +924,8 @@ int_greater_than_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := con
 	bool := |a| > |b|
     Compares the magnitudes only, ignores the sign.
 */
-int_greater_than_abs :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (greater_than: bool, err: Error) {
+int_greater_than_abs :: #force_inline proc(a, b: ^Int) -> (greater_than: bool, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
 
 	c: int
 	c, err = cmp_mag(a, b)

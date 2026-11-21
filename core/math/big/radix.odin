@@ -94,7 +94,9 @@ int_itoa_cstring :: proc(a: ^Int, radix := i8(10), allocator := context.allocato
 
 	NaN and +/-Inf are written as "NaN", "+Inf" and "-Inf" in radix 2..=23. Radix 24..=64 gives `.Invalid_Argument`.
 */
-int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_terminate := false) -> (written: int, err: Error) {
+int_itoa_raw :: proc(a: ^Int, radix: i8, buffer: []u8, size := int(-1), zero_terminate := false, allocator := context.allocator) -> (written: int, err: Error) {
+	context.allocator = allocator
+
 	assert_if_nil(a)
 	a := a; radix := radix; size := size
 	a = _zero_if_uninitialized(a)
@@ -571,9 +573,10 @@ string_to_int :: int_atoi
 	We size for `string` by default.
 */
 radix_size :: proc(a: ^Int, radix: i8, zero_terminate := false, allocator := context.allocator) -> (size: int, err: Error) {
+	context.allocator = allocator
+
 	a := a
 	assert_if_nil(a)
-	context.allocator = allocator
 
 	if radix < 2 || radix > 64                     { return -1, .Invalid_Argument }
 	a = _zero_if_uninitialized(a)

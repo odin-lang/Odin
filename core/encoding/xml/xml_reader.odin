@@ -482,7 +482,7 @@ parse_string :: proc(data: string, options := DEFAULT_OPTIONS, path := "", error
 
 parse :: proc { parse_string, parse_bytes }
 
-destroy :: proc(doc: ^Document, allocator := context.allocator) {
+destroy :: proc(doc: ^Document) {
 	if doc == nil { return }
 	context.allocator = doc.allocator
 

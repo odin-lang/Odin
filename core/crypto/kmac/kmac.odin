@@ -40,7 +40,7 @@ verify :: proc(sec_strength: int, tag, msg, key, domain_sep: []byte, allocator :
 	}
 
 	derived_tag := make([]byte, len(tag), allocator)
-	defer(delete(derived_tag))
+	defer delete(derived_tag, allocator)
 
 	sum(sec_strength, derived_tag, msg, key, domain_sep)
 

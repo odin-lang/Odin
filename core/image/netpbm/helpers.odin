@@ -6,6 +6,7 @@ destroy :: proc(img: ^image.Image) -> bool {
 	if img == nil {
 		return false
 	}
+	context.allocator = img.pixels.allocator if img.pixels.allocator.procedure != nil else context.allocator
 
 	defer free(img)
 	delete(img.pixels)
@@ -19,9 +20,9 @@ destroy :: proc(img: ^image.Image) -> bool {
 	return true
 }
 
-header_destroy :: proc(header: ^Header) {
+header_destroy :: proc(header: ^Header, allocator := context.allocator) {
 	if header.format == .P7 && header.tupltype != "" {
-		delete(header.tupltype)
+		delete(header.tupltype, allocator)
 		header.tupltype = ""
 	}
 }
