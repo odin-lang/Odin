@@ -38,7 +38,7 @@ Wrapper :: struct {
 }
 
 struct_equal :: proc(ti: ^runtime.Type_Info) -> runtime.Equal_Proc {
-	return runtime.type_info_base(ti).variant.(runtime.Type_Info_Struct).equal
+	return runtime.type_info_base(ti).variant.(^runtime.Type_Info_Struct).equal
 }
 
 @(test)
@@ -56,7 +56,7 @@ test_equal_procs_of_type_info :: proc(t: ^testing.T) {
 	defer free(b)
 	b^ = a^
 
-	entity_equal := struct_equal(runtime.type_info_base(type_info_of(^Entity)).variant.(runtime.Type_Info_Pointer).elem)
+	entity_equal := struct_equal(runtime.type_info_base(type_info_of(^Entity)).variant.(^runtime.Type_Info_Pointer).elem)
 	testing.expect(t, entity_equal(a, b))
 	b.small = complex(f16(1), f16(3))
 	testing.expect(t, !entity_equal(a, b))
@@ -67,8 +67,8 @@ test_equal_procs_of_type_info :: proc(t: ^testing.T) {
 	h: ^Holder
 	s = fmt.tprint(h)
 	testing.expect(t, len(s) > 0)
-	holder_info := runtime.type_info_base(type_info_of(^Holder)).variant.(runtime.Type_Info_Pointer).elem
-	map_info := runtime.type_info_base(runtime.type_info_base(holder_info).variant.(runtime.Type_Info_Struct).types[0]).variant.(runtime.Type_Info_Map).map_info
+	holder_info := runtime.type_info_base(type_info_of(^Holder)).variant.(^runtime.Type_Info_Pointer).elem
+	map_info := runtime.type_info_base(runtime.type_info_base(holder_info).variant.(^runtime.Type_Info_Struct).types[0]).variant.(^runtime.Type_Info_Map).map_info
 	k1 := Key{"a", 1}
 	k2 := Key{"a", 2}
 	testing.expect(t, map_info.key_equal(&k1, &k1))
@@ -78,7 +78,7 @@ test_equal_procs_of_type_info :: proc(t: ^testing.T) {
 	w2 := Wrapper{quaternion64(1)}
 	s = fmt.tprint(&w1)
 	testing.expect(t, len(s) > 0)
-	wrapper_equal := struct_equal(runtime.type_info_base(type_info_of(^Wrapper)).variant.(runtime.Type_Info_Pointer).elem)
+	wrapper_equal := struct_equal(runtime.type_info_base(type_info_of(^Wrapper)).variant.(^runtime.Type_Info_Pointer).elem)
 	testing.expect(t, wrapper_equal(&w1, &w2))
 	w2.v = complex128(1)
 	testing.expect(t, !wrapper_equal(&w1, &w2))

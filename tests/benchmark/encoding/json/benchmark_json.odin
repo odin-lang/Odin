@@ -149,33 +149,33 @@ bench_allocator :: proc(b: ^Bench, mode: Alloc_Mode) -> mem.Allocator {
 free_unmarshaled :: proc(p: rawptr, ti: ^reflect.Type_Info, allocator: mem.Allocator) {
 	base := reflect.type_info_base(ti)
 	#partial switch info in base.variant {
-	case reflect.Type_Info_String:
+	case ^reflect.Type_Info_String:
 		if info.is_cstring {
 			delete((^cstring)(p)^, allocator)
 		} else {
 			delete((^string)(p)^, allocator)
 		}
-	case reflect.Type_Info_Array:
+	case ^reflect.Type_Info_Array:
 		for i in 0..<info.count {
 			free_unmarshaled(rawptr(uintptr(p) + uintptr(i*info.elem_size)), info.elem, allocator)
 		}
-	case reflect.Type_Info_Slice:
+	case ^reflect.Type_Info_Slice:
 		raw := (^runtime.Raw_Slice)(p)^
 		for i in 0..<raw.len {
 			free_unmarshaled(rawptr(uintptr(raw.data) + uintptr(i*info.elem_size)), info.elem, allocator)
 		}
 		mem.free(raw.data, allocator)
-	case reflect.Type_Info_Dynamic_Array:
+	case ^reflect.Type_Info_Dynamic_Array:
 		raw := (^runtime.Raw_Dynamic_Array)(p)^
 		for i in 0..<raw.len {
 			free_unmarshaled(rawptr(uintptr(raw.data) + uintptr(i*info.elem_size)), info.elem, allocator)
 		}
 		mem.free(raw.data, raw.allocator)
-	case reflect.Type_Info_Struct:
+	case ^reflect.Type_Info_Struct:
 		for i in 0..<int(info.field_count) {
 			free_unmarshaled(rawptr(uintptr(p) + info.offsets[i]), info.types[i], allocator)
 		}
-	case reflect.Type_Info_Map:
+	case ^reflect.Type_Info_Map:
 		it := 0
 		for k, v in reflect.iterate_map(any{p, ti.id}, &it) {
 			free_unmarshaled(k.data, info.key, allocator)

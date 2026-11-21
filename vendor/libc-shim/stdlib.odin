@@ -18,6 +18,18 @@ malloc :: proc "c" (size: uint) -> rawptr {
 	return raw_data(ptr)
 }
 
+@(require, linkage="strong", link_name="calloc")
+calloc :: proc "c" (num, size: uint) -> rawptr {
+	context = g_ctx
+	total, overflow := intrinsics.overflow_mul(num, size)
+	if overflow {
+		return nil
+	}
+	ptr, err := runtime.mem_alloc(int(total))
+	assert(err == nil, "allocation failure")
+	return raw_data(ptr)
+}
+
 @(require, linkage="strong", link_name="aligned_alloc")
 aligned_alloc :: proc "c" (alignment: uint, size: uint) -> rawptr {
 	context = g_ctx

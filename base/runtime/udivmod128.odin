@@ -13,8 +13,14 @@ udivmod128 :: proc "c" (a, b: u128, rem: ^u128) -> u128 {
 		q = u128(n_hi / d_lo)<<64 | u128(n_lo / d_lo)
 		r = u128(n_hi % d_lo)<<64 | u128(n_lo % d_lo)
 
-	case n_hi == 0 && d_hi == 0:
+	case ODIN_ARCH != .amd64 && n_hi == 0 && d_hi == 0:
 		q, r = u128(n_lo / d_lo), u128(n_lo % d_lo)
+
+	case ODIN_ARCH == .amd64 && d_hi == 0 && n_hi < d_lo:
+		when ODIN_ARCH == .amd64 {
+			q_lo, r_lo := _udiv128by64_amd64(n_hi, n_lo, d_lo)
+			q, r = u128(q_lo), u128(r_lo)
+		}
 
 	case:
 		q, r = _udivmod128_wide(a, b)

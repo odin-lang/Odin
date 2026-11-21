@@ -4,6 +4,7 @@ import "base:runtime"
 import "core:strings"
 import "core:io"
 import "core:slice"
+import "core:strconv"
 
 Unparse_Error :: union #shared_nil {
 	io.Error,
@@ -36,7 +37,11 @@ unparse :: proc(v: Value, opt: Marshal_Options = {}, allocator := context.alloca
 */
 @(require_results)
 unparse_to_builder :: proc(b: ^strings.Builder, v: Value, opt: Marshal_Options = {}) -> Unparse_Error {
-	return unparse_to_writer(strings.to_writer(b), v, opt)
+	err := unparse_to_writer(strings.to_writer(b), v, opt)
+	if err == io.Error.EOF {
+		return .Out_Of_Memory
+	}
+	return err
 }
 
 /*
@@ -48,16 +53,23 @@ unparse_to_writer :: proc(w: io.Writer, value: Value, opt: Marshal_Options = {})
 	return _unparse_to_writer(w, value, &opt)
 }
 
+@(private)
 _unparse_to_writer :: proc(w: io.Writer, value: Value, opt: ^Marshal_Options) -> Unparse_Error {
 	switch v in value {
 	case nil, Null:
 		io.write_string(w, "null") or_return
 	case Integer:
-		base := 16 if opt.write_uint_as_hex && (opt.spec == .JSON5 || opt.spec == .MJSON) else 10
-		io.write_i64(w, v, base) or_return
+		buf: [40]byte
+		s: string
+		if opt.write_uint_as_hex && v >= 0 && (opt.spec == .JSON5 || opt.spec == .MJSON) {
+			s = strconv.write_bits_128(buf[:], u128(v), 16, false, 64, "0123456789abcdef", {.Prefix})
+		} else {
+			s = strconv.write_bits_128(buf[:], u128(v), 10, true, 64, "0123456789", nil)
+		}
+		io.write_string(w, s) or_return
 	case Float:
 		buf: [64]byte
-		io.write_string(w, format_float(buf[:], v, 64, opt.spec) or_return) or_return
+		io.write_string(w, format_float(buf[:], v, 64, opt.spec, opt.non_finite_as_null) or_return) or_return
 	case Boolean:
 		io.write_string(w, "true" if v else "false") or_return
 	case String:
@@ -74,7 +86,7 @@ _unparse_to_writer :: proc(w: io.Writer, value: Value, opt: ^Marshal_Options) ->
 			opt_write_start(w, opt, '{') or_return
 			for first_iteration := true; key, val in v {
 				opt_write_iteration(w, opt, first_iteration) or_return
-				opt_write_key      (w, opt, key)             or_return
+				unparse_write_key  (w, opt, key)             or_return
 				_unparse_to_writer (w, val, opt)             or_return
 				first_iteration = false
 			}
@@ -86,6 +98,7 @@ _unparse_to_writer :: proc(w: io.Writer, value: Value, opt: ^Marshal_Options) ->
 			}
 
 			entries := make([dynamic]Map_Entry, 0, len(v), context.temp_allocator) or_return
+			defer delete(entries)
 			for key, val in v {
 				_, _ = append(&entries, Map_Entry{key, val})
 			}
@@ -95,12 +108,22 @@ _unparse_to_writer :: proc(w: io.Writer, value: Value, opt: ^Marshal_Options) ->
 			opt_write_start(w, opt, '{') or_return
 			for e, i in entries {
 				opt_write_iteration(w, opt, i == 0)  or_return
-				opt_write_key      (w, opt, e.key)   or_return
+				unparse_write_key  (w, opt, e.key)   or_return
 				_unparse_to_writer (w, e.value, opt) or_return
 			}
 			opt_write_end(w, opt, '}') or_return
 		}
 		return nil
+	}
+	return nil
+}
+
+@(private)
+unparse_write_key :: proc(w: io.Writer, opt: ^Marshal_Options, key: string) -> Unparse_Error {
+	switch err in opt_write_key(w, opt, key) {
+	case Marshal_Data_Error:      return err
+	case io.Error:                return err
+	case runtime.Allocator_Error: return err
 	}
 	return nil
 }

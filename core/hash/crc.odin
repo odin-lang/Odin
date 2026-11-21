@@ -33,8 +33,20 @@ crc64_ecma_182 :: proc "contextless" (data: []byte, seed := u64(0)) -> (result: 
 */
 @(optimization_mode="favor_size")
 crc64_xz :: proc "contextless" (data: []byte, seed := u64(0)) -> u64 #no_bounds_check {
+	result := ~seed
 	data := data
-	result := ~u64le(seed)
+	if len(data) >= CRC64_XZ_HW_MIN && crc64_xz_hw_available() {
+		consumed: int
+		result, consumed = crc64_xz_hw(result, raw_data(data), len(data))
+		data = data[consumed:]
+	}
+	return ~#force_inline crc64_xz_table(result, data)
+}
+
+@(private, optimization_mode="favor_size")
+crc64_xz_table :: proc "contextless" (crc: u64, data: []byte) -> u64 #no_bounds_check {
+	data := data
+	result := u64le(crc)
 
 	// Process single bytes until aligned by 8
 	#no_bounds_check for len(data) > 0 && uintptr(&data[0]) & uintptr(7) != 0 {
@@ -63,7 +75,7 @@ crc64_xz :: proc "contextless" (data: []byte, seed := u64(0)) -> u64 #no_bounds_
 		data = data[1:]
 	}
 
-	return u64(~result)
+	return u64(result)
 }
 
 // Generator polynomial: x^64 + x^4 + x^3 + x + 1

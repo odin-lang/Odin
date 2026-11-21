@@ -84,6 +84,11 @@ Vector of 2 `i64` lanes (128 bits).
 i64x2 :: #simd[2]i64
 
 /*
+Vector of 8 `f16` lanes (128 bits).
+*/
+f16x8 :: #simd[8]f16
+
+/*
 Vector of 4 `f32` lanes (128 bits).
 */
 f32x4 :: #simd[4]f32
@@ -2620,12 +2625,8 @@ byte_swap :: intrinsics.byte_swap
 
 	#assert(len(a) == len(b))
 	res := 0
-	N :: len(a)
-	for i in 0 ..< N/2 {
-		res[i] = a[2*i + 1]
-	}
-	for i in 0 ..< N/2 {
-		res[i + N/2] = b[2*i]
+	for i in 0 ..< len(a) {
+		res[i] = a[i] if i % 2 == 1 else b[i]
 	}
 	return res
 */

@@ -6,6 +6,8 @@ A NativeActivity app in Odin. It starts at `main` through `core:sys/android/nati
 
 - The Android NDK, as `ODIN_ANDROID_NDK`. Odin's bindings come from NDK r30.
 - The Android SDK with build-tools and a platform, as `ODIN_ANDROID_SDK`. On Windows it defaults to `%LocalAppData%\Android\Sdk`.
+  - Install them with `sdkmanager "build-tools;37.0.0" "platforms;android-36"`. Packages unzipped by hand work too, whatever their folder names.
+  - The bundler uses the newest of each. The newest platform's API level is the app's target SDK.
 - A JDK, through `JAVA_HOME` or `PATH`.
 - A signing key. By default this is the debug keystore that Android Studio makes, `~/.android/debug.keystore`. Otherwise pass `-android-keystore`, `-android-keystore-alias`, and `-android-keystore-password`.
 - For an `.aab`, bundletool's `.jar`, as `ODIN_ANDROID_BUNDLETOOL`.

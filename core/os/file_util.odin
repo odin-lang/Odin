@@ -137,6 +137,18 @@ read_full :: proc(f: ^File, buf: []byte) -> (n: int, err: Error) {
 	return read_at_least(f, buf, len(buf))
 }
 
+read_full_at :: proc(f: ^File, buf: []byte, offset: i64) -> (n: int, err: Error) {
+	nn := max(int)
+	for nn > 0 && n < len(buf) && err == nil {
+		nn, err = read_at(f, buf[n:], offset + i64(n))
+		n += nn
+	}
+	if n >= len(buf) {
+		err = nil
+	}
+	return
+}
+
 
 
 read_entire_file :: proc{
@@ -175,7 +187,7 @@ read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator, loc :
 
 	if has_size && size > 0 {
 		total: int
-		data = make([]byte, size, allocator, loc) or_return
+		data = non_zero_make([]byte, size, allocator, loc) or_return
 		for total < len(data) {
 			n: int
 			n, err = read(f, data[total:])
@@ -195,7 +207,7 @@ read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator, loc :
 		for {
 			n: int
 			n, err = read(f, buffer[:])
-			if _, aerr := append_elems(&out_buffer, ..buffer[:n], loc=loc); aerr != nil {
+			if _, aerr := non_zero_append_elems(&out_buffer, ..buffer[:n], loc=loc); aerr != nil {
 				return out_buffer[:], aerr
 			}
 			if err != nil {

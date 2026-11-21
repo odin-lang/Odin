@@ -42,7 +42,7 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 	// This seems to be the smallest way for now.
 
 	#partial switch specific_type_info in type_info.variant {
-	case runtime.Type_Info_Integer:
+	case ^runtime.Type_Info_Integer:
 		if specific_type_info.signed {
 			value := strconv.parse_i128(str) or_return
 			switch type_info.id {
@@ -88,14 +88,14 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 			}
 		}
 
-	case runtime.Type_Info_Rune:
+	case ^runtime.Type_Info_Rune:
 		if utf8.rune_count_in_string(str) != 1 {
 			return false
 		}
 
 		(^rune)(ptr)^ = utf8.rune_at_pos(str, 0)
 
-	case runtime.Type_Info_Float:
+	case ^runtime.Type_Info_Float:
 		value := strconv.parse_f64(str) or_return
 		switch type_info.id {
 		case f16:   (^f16)  (ptr)^ = cast(f16)   value
@@ -111,7 +111,7 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 		case f64be: (^f64be)(ptr)^ = cast(f64be) value
 		}
 
-	case runtime.Type_Info_Complex:
+	case ^runtime.Type_Info_Complex:
 		value := strconv.parse_complex128(str) or_return
 		switch type_info.id {
 		case complex32:  (^complex32) (ptr)^ = (complex32)(value)
@@ -119,7 +119,7 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 		case complex128: (^complex128)(ptr)^ = value
 		}
 
-	case runtime.Type_Info_Quaternion:
+	case ^runtime.Type_Info_Quaternion:
 		value := strconv.parse_quaternion256(str) or_return
 		switch type_info.id {
 		case quaternion64:  (^quaternion64) (ptr)^ = (quaternion64)(value)
@@ -127,7 +127,7 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 		case quaternion256: (^quaternion256)(ptr)^ = value
 		}
 
-	case runtime.Type_Info_String:
+	case ^runtime.Type_Info_String:
 		assert(specific_type_info.encoding == .UTF_8)
 
 		if specific_type_info.is_cstring {
@@ -141,7 +141,7 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 			(^string)(ptr)^ = str
 		}
 
-	case runtime.Type_Info_Boolean:
+	case ^runtime.Type_Info_Boolean:
 		value := strconv.parse_bool(str) or_return
 		switch type_info.id {
 		case bool: (^bool)(ptr)^ =     value
@@ -151,7 +151,7 @@ parse_and_set_pointer_by_base_type :: proc(ptr: rawptr, str: string, type_info: 
 		case b64:  (^b64) (ptr)^ = b64(value)
 		}
 
-	case runtime.Type_Info_Bit_Set:
+	case ^runtime.Type_Info_Bit_Set:
 		// Parse a string of 1s and 0s, from left to right,
 		// least significant bit to most significant bit.
 		value: u128
@@ -382,7 +382,7 @@ set_unbounded_integer_by_type :: proc(ptr: rawptr, value: $T, data_type: typeid)
 @(optimization_mode="favor_size")
 parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runtime.Type_Info, arg_tag: string) -> (error: Error) {
 	#partial switch specific_type_info in type_info.variant {
-	case runtime.Type_Info_Named:
+	case ^runtime.Type_Info_Named:
 		if global_custom_type_setter != nil {
 			// The program gets to go first.
 			error_message, handled, alloc_error := global_custom_type_setter(ptr, type_info.id, str, arg_tag)
@@ -411,7 +411,7 @@ parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runt
 		}
 
 		// Might be a named enum. Need to check here first, since we handle all enums.
-		if enum_type_info, is_enum := specific_type_info.base.variant.(runtime.Type_Info_Enum); is_enum {
+		if enum_type_info, is_enum := specific_type_info.base.variant.(^runtime.Type_Info_Enum); is_enum {
 			if value, ok := reflect.enum_from_name_any(type_info.id, str); ok {
 				set_unbounded_integer_by_type(ptr, value, enum_type_info.base.id)
 			} else {
@@ -432,7 +432,7 @@ parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runt
 			}
 		}
 
-	case runtime.Type_Info_Dynamic_Array:
+	case ^runtime.Type_Info_Dynamic_Array:
 		ptr := cast(^runtime.Raw_Dynamic_Array)ptr
 
 		// Try to convert the value first.
@@ -460,7 +460,7 @@ parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runt
 			uintptr((ptr.len - 1) * specific_type_info.elem.size))
 		mem.copy(subptr, raw_data(elem_backing), len(elem_backing))
 
-	case runtime.Type_Info_Enum:
+	case ^runtime.Type_Info_Enum:
 		// This is a nameless enum.
 		// The code here is virtually the same as above for named enums.
 		if value, ok := reflect.enum_from_name_any(type_info.id, str); ok {
@@ -472,7 +472,7 @@ parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runt
 			}
 		}
 
-	case runtime.Type_Info_Bit_Set:
+	case ^runtime.Type_Info_Bit_Set:
 		if str[0] == '0' || str[0] == '1' {
 			if !parse_and_set_pointer_by_base_type(ptr, str, type_info) {
 				return Parse_Error {
@@ -489,7 +489,7 @@ parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runt
 		value: u128
 
 		et := runtime.type_info_base(specific_type_info.elem)
-		if enum_type_info, is_enum := et.variant.(runtime.Type_Info_Enum); is_enum {
+		if enum_type_info, is_enum := et.variant.(^runtime.Type_Info_Enum); is_enum {
 			names, _ := strings.split(str, ",", context.temp_allocator)
 			valid_names := enum_type_info.names
 			underlying_values := enum_type_info.values

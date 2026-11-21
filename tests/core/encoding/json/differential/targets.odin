@@ -70,10 +70,6 @@ Raw :: struct #raw_union {
 	f: f32,
 }
 
-// Unmarshalling into a union never clears the previous variant, so when a key repeats with a
-// struct value, fields the second value leaves out keep the old bytes. Struct variants therefore
-// must not place a non-pointer field over another variant's pointer: it would hold an address,
-// and the two packages allocate at different addresses. Here `s` overlays the `string` variant.
 Mixed_Object :: struct {
 	s: string,
 	a: int,

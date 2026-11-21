@@ -21,8 +21,13 @@ execute_struct_checks :: proc(t: ^testing.T) {
 				c_compiler = "clang"
 			}
 
-			posix.execlp(c_compiler,
-				c_compiler, #directory + "/structs/structs.c", "-o", #directory + "/structs/c_structs", nil)
+			when ODIN_ARCH == .riscv64 {
+				posix.execlp(c_compiler,
+					c_compiler, "--target=riscv64-linux-gnu", "-static", #directory + "/structs/structs.c", "-o", #directory + "/structs/c_structs", nil)
+			} else {
+				posix.execlp(c_compiler,
+					c_compiler, #directory + "/structs/structs.c", "-o", #directory + "/structs/c_structs", nil)
+			}
 			posix.exit(69)
 		case:
 			if !wait_for(t, pid) { return }
@@ -36,8 +41,14 @@ execute_struct_checks :: proc(t: ^testing.T) {
 		case -1:
 			log.errorf("fork() failed: %s", posix.strerror())
 		case 0:
-			posix.execlp(ODIN_ROOT + "/odin",
-				ODIN_ROOT + "/odin", "build", #directory + "/structs/structs.odin", "-out:" + #directory + "/structs/odin_structs", "-file", nil)
+			when ODIN_ARCH == .riscv64 {
+				posix.execlp(ODIN_ROOT + "/odin",
+					ODIN_ROOT + "/odin", "build", #directory + "/structs/structs.odin", "-out:" + #directory + "/structs/odin_structs", "-file",
+					"-target:linux_riscv64", "-no-rpath", "-extra-linker-flags:--target=riscv64-linux-gnu -static", nil)
+			} else {
+				posix.execlp(ODIN_ROOT + "/odin",
+					ODIN_ROOT + "/odin", "build", #directory + "/structs/structs.odin", "-out:" + #directory + "/structs/odin_structs", "-file", nil)
+			}
 			posix.exit(69)
 		case:
 			if !wait_for(t, pid) { return }

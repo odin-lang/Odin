@@ -40,7 +40,7 @@ GZIP_MAX_PAYLOAD_SIZE :: deflate.GZIP_MAX_PAYLOAD_SIZE
 
 load :: proc{load_from_bytes, load_from_file, load_from_context}
 
-@(deprecated="Use `os.read_entire_file` and `deflate.inflate_gzip` from `core:compress/deflate`")
+@(deprecated="Use `os.read_entire_file` and `deflate.decompress_gzip` from `core:compress/deflate`")
 load_from_file :: proc(filename: string, output: ^bytes.Buffer, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
@@ -50,15 +50,15 @@ load_from_file :: proc(filename: string, output: ^bytes.Buffer, expected_output_
 	if file_err != nil {
 		return E_General.File_Not_Found
 	}
-	return deflate.inflate_gzip_from_bytes(&output.buf, file_data, expected_output_size, allocator=allocator)
+	return deflate.decompress_gzip_from_bytes(&output.buf, file_data, expected_output_size, allocator=allocator)
 }
 
-@(deprecated="Use `deflate.inflate_gzip` from `core:compress/deflate`")
+@(deprecated="Use `deflate.decompress_gzip` from `core:compress/deflate`")
 load_from_bytes :: proc(data: []byte, output: ^bytes.Buffer, known_gzip_size := -1, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
-	return deflate.inflate_gzip_from_bytes(&output.buf, data, expected_output_size, allocator=allocator)
+	return deflate.decompress_gzip_from_bytes(&output.buf, data, expected_output_size, allocator=allocator)
 }
 
-@(deprecated="Use `deflate.inflate_gzip` from `core:compress/deflate`")
+@(deprecated="Use `deflate.decompress_gzip` from `core:compress/deflate`")
 load_from_context :: proc(z: ^compress.Context, known_gzip_size := -1, allocator := context.allocator) -> (err: Error) {
-	return deflate.inflate_gzip_from_context(z, int(z.size_unpacked), allocator=allocator)
+	return deflate.decompress_gzip_from_context(z, allocator=allocator)
 }

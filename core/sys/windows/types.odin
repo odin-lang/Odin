@@ -37,6 +37,7 @@ HGDIOBJ         :: distinct HANDLE
 HBITMAP         :: distinct HANDLE
 HPALETTE        :: distinct HANDLE
 HGLOBAL         :: distinct HANDLE
+HPCON           :: distinct HANDLE
 HHOOK           :: distinct HANDLE
 HWINEVENTHOOK   :: distinct HANDLE
 HKEY            :: distinct HANDLE
@@ -115,42 +116,45 @@ ATOM       :: distinct WORD
 wstring :: cstring16
 PWSTR   :: cstring16
 
-PBYTE                 :: ^BYTE
-LPBYTE                :: ^BYTE
-PBOOL                 :: ^BOOL
-LPBOOL                :: ^BOOL
-LPCSTR                :: cstring
-LPCWSTR               :: wstring
-LPCTSTR               :: wstring
-LPDWORD               :: ^DWORD
-PCSTR                 :: cstring
-PCWSTR                :: wstring
-PDWORD                :: ^DWORD
-LPHANDLE              :: ^HANDLE
-LPOVERLAPPED          :: ^OVERLAPPED
-LPPROCESS_INFORMATION :: ^PROCESS_INFORMATION
-PSECURITY_ATTRIBUTES  :: ^SECURITY_ATTRIBUTES
-LPSECURITY_ATTRIBUTES :: ^SECURITY_ATTRIBUTES
-LPSTARTUPINFOW        :: ^STARTUPINFOW
-LPTRACKMOUSEEVENT     :: ^TRACKMOUSEEVENT
-VOID                  :: rawptr
-PVOID                 :: rawptr
-PVOID64               :: rawptr
-LPVOID                :: rawptr
-PINT                  :: ^INT
-LPINT                 :: ^INT
-PUINT                 :: ^UINT
-LPUINT                :: ^UINT
-LPWCH                 :: ^WCHAR
-LPWORD                :: ^WORD
-PULONG                :: ^ULONG
-LPWIN32_FIND_DATAW    :: ^WIN32_FIND_DATAW
-LPWSADATA             :: ^WSADATA
-LPWSAPROTOCOL_INFO    :: ^WSAPROTOCOL_INFO
-LPSTR                 :: ^CHAR
-LPWSTR                :: ^WCHAR
-OLECHAR               :: WCHAR
-BSTR                  :: ^OLECHAR
+PBYTE                        :: ^BYTE
+LPBYTE                       :: ^BYTE
+PBOOL                        :: ^BOOL
+LPBOOL                       :: ^BOOL
+LPCSTR                       :: cstring
+LPCWSTR                      :: wstring
+LPCTSTR                      :: wstring
+LPDWORD                      :: ^DWORD
+PCSTR                        :: cstring
+PCWSTR                       :: wstring
+PDWORD                       :: ^DWORD
+LPHANDLE                     :: ^HANDLE
+LPOVERLAPPED                 :: ^OVERLAPPED
+LPPROCESS_INFORMATION        :: ^PROCESS_INFORMATION
+PSECURITY_ATTRIBUTES         :: ^SECURITY_ATTRIBUTES
+LPSECURITY_ATTRIBUTES        :: ^SECURITY_ATTRIBUTES
+LPSTARTUPINFOW               :: ^STARTUPINFOW
+LPSTARTUPINFOEXW             :: ^STARTUPINFOEXW
+PPROC_THREAD_ATTRIBUTE_LIST  :: rawptr
+LPPROC_THREAD_ATTRIBUTE_LIST :: rawptr
+LPTRACKMOUSEEVENT            :: ^TRACKMOUSEEVENT
+VOID                         :: rawptr
+PVOID                        :: rawptr
+PVOID64                      :: rawptr
+LPVOID                       :: rawptr
+PINT                         :: ^INT
+LPINT                        :: ^INT
+PUINT                        :: ^UINT
+LPUINT                       :: ^UINT
+LPWCH                        :: ^WCHAR
+LPWORD                       :: ^WORD
+PULONG                       :: ^ULONG
+LPWIN32_FIND_DATAW           :: ^WIN32_FIND_DATAW
+LPWSADATA                    :: ^WSADATA
+LPWSAPROTOCOL_INFO           :: ^WSAPROTOCOL_INFO
+LPSTR                        :: ^CHAR
+LPWSTR                       :: ^WCHAR
+OLECHAR                      :: WCHAR
+BSTR                         :: ^OLECHAR
 
 LPOLESTR   :: cstring16
 LPCOLESTR  :: LPCSTR
@@ -522,6 +526,13 @@ BROADCAST_QUERY_DENY :: 0x424D5144
 // Special HWND value for use with PostMessage() and SendMessage()
 HWND_BROADCAST :: HWND(uintptr(0xffff))
 HWND_MESSAGE   :: HWND(~uintptr(0) - 2) // -3
+
+// SendMessageTimeout() flags
+SMTO_NORMAL           :: 0x0000
+SMTO_BLOCK              :: 0x0001
+SMTO_ABORTIFHUNG        :: 0x0002
+SMTO_NOTIMEOUTIFNOTHUNG :: 0x0008
+SMTO_ERRORONEXIT        :: 0x0020
 
 // Color Types
 CTLCOLOR_MSGBOX    :: 0
@@ -1731,15 +1742,28 @@ NM_TVSTATEIMAGECHANGING :: NM_OUTOFMEMORY-23 // uses NMTVSTATEIMAGECHANGING stru
 // Special care must be taken when converting to this type.
 PCZZWSTR :: cstring16
 
-SHFILEOPSTRUCTW :: struct {
-	hwnd:                  HWND,
-	wFunc:                 UINT,
-	pFrom:                 PCZZWSTR,
-	pTo:                   PCZZWSTR,
-	fFlags:                FILEOP_FLAGS,
-	fAnyOperationsAborted: BOOL,
-	hNameMappings:         LPVOID,
-	lpszProgressTitle:     PCWSTR, // only used if FOF_SIMPLEPROGRESS
+when ODIN_ARCH == .i386 {
+	SHFILEOPSTRUCTW :: struct #packed {
+		hwnd:                  HWND,
+		wFunc:                 UINT,
+		pFrom:                 PCZZWSTR,
+		pTo:                   PCZZWSTR,
+		fFlags:                FILEOP_FLAGS,
+		fAnyOperationsAborted: BOOL,
+		hNameMappings:         LPVOID,
+		lpszProgressTitle:     PCWSTR,
+	}
+} else {
+	SHFILEOPSTRUCTW :: struct {
+		hwnd:                  HWND,
+		wFunc:                 UINT,
+		pFrom:                 PCZZWSTR,
+		pTo:                   PCZZWSTR,
+		fFlags:                FILEOP_FLAGS,
+		fAnyOperationsAborted: BOOL,
+		hNameMappings:         LPVOID,
+		lpszProgressTitle:     PCWSTR, // only used if FOF_SIMPLEPROGRESS
+	}
 }
 LPSHFILEOPSTRUCTW :: ^SHFILEOPSTRUCTW
 
@@ -2339,6 +2363,8 @@ MONITORINFO :: struct {
 }
 LPMONITORINFO :: ^MONITORINFO
 
+MONITORINFOF_PRIMARY :: 0x00000001
+
 CCHDEVICENAME :: 32
 MONITORINFOEXW :: struct {
 	using _: MONITORINFO,
@@ -2542,6 +2568,12 @@ DC_BRUSH            :: 18
 DC_PEN              :: 19
 STOCK_LAST          :: 19
 
+// GetDeviceCaps() indices
+HORZSIZE   :: 4
+VERTSIZE   :: 6
+LOGPIXELSX :: 88
+LOGPIXELSY :: 90
+
 CLR_INVALID :: 0xFFFFFFFF
 
 RGBQUAD :: struct {
@@ -2654,6 +2686,10 @@ FSCTL_GET_REPARSE_POINT: DWORD : 0x900a8
 IO_REPARSE_TAG_SYMLINK: DWORD : 0xa000000c
 IO_REPARSE_TAG_MOUNT_POINT: DWORD : 0xa0000003
 SYMLINK_FLAG_RELATIVE: DWORD : 0x00000001
+
+IsReparseTagNameSurrogate :: #force_inline proc "contextless" (tag: DWORD) -> bool {
+	return tag & 0x20000000 != 0
+}
 FSCTL_SET_REPARSE_POINT: DWORD : 0x900a4
 
 SYMBOLIC_LINK_FLAG_DIRECTORY: DWORD : 0x1
@@ -3144,6 +3180,11 @@ STARTUPINFOW :: struct {
 	hStdInput:       HANDLE,
 	hStdOutput:      HANDLE,
 	hStdError:       HANDLE,
+}
+
+STARTUPINFOEXW :: struct {
+	StartupInfo:     STARTUPINFOW,
+	lpAttributeList: LPPROC_THREAD_ATTRIBUTE_LIST,
 }
 
 FILETIME :: struct {

@@ -1,6 +1,5 @@
 package _chacha20
 
-import "base:intrinsics"
 import "core:crypto"
 import "core:encoding/endian"
 import "core:math/bits"
@@ -37,6 +36,7 @@ Context :: struct {
 	_off:            int,
 	_is_ietf_flavor: bool,
 	_is_initialized: bool,
+	_is_exhausted:   bool,
 }
 
 // init inititializes a Context for ChaCha20 with the provided key and
@@ -71,6 +71,7 @@ init :: proc "contextless" (ctx: ^Context, key, iv: []byte, is_xchacha: bool) {
 	ctx._off = BLOCK_SIZE
 	ctx._is_ietf_flavor = !is_xchacha
 	ctx._is_initialized = true
+	ctx._is_exhausted = false
 }
 
 // seek seeks the (X)ChaCha20 stream counter to the specified block.
@@ -84,6 +85,7 @@ seek :: proc(ctx: ^Context, block_nr: u64) {
 	}
 	ctx._s[12] = u32(block_nr)
 	ctx._off = BLOCK_SIZE
+	ctx._is_exhausted = false
 }
 
 // reset sanitizes the Context.  The Context must be re-initialized to
@@ -107,19 +109,21 @@ check_counter_limit :: proc(ctx: ^Context, nr_blocks: int) {
 
 	ERR_CTR_EXHAUSTED :: "crypto/chacha20: maximum (X)ChaCha20 keystream per IV reached"
 
-	ctr_ok: bool
+	// The final block is the one with the maximum counter value.
+	// The counter wraps around after it, so once it is consumed,
+	// refuse to generate more keystream until `seek` or `init`.
+	ctr_ok, is_final: bool
 	if ctx._is_ietf_flavor {
-		if intrinsics.unlikely(ctx._s[12] == MAX_CTR_IETF && nr_blocks > 1) {
-			// Allow the final block.
-			ctr_ok = false
-		} else {
-			ctr_ok = u64(ctx._s[12]) + u64(nr_blocks) <= MAX_CTR_IETF
-		}
+		new_ctr := u64(ctx._s[12]) + u64(nr_blocks)
+		ctr_ok = new_ctr <= MAX_CTR_IETF + 1
+		is_final = new_ctr == MAX_CTR_IETF + 1
 	} else {
 		ctr := (u64(ctx._s[13]) << 32) | u64(ctx._s[12])
 		new_ctr, carry := bits.add_u64(ctr, u64(nr_blocks), 0)
-		ctr_ok = carry == 0 || new_ctr != 0 // Allow the final block.
+		ctr_ok = carry == 0 || new_ctr == 0
+		is_final = carry != 0
 	}
 
-	ensure(ctr_ok, "crypto/chacha20: maximum (X)ChaCha20 keystream per IV reached")
+	ensure(ctr_ok && !ctx._is_exhausted, ERR_CTR_EXHAUSTED)
+	ctx._is_exhausted = is_final
 }

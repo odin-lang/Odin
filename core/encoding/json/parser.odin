@@ -3,7 +3,12 @@ package encoding_json
 import "core:mem"
 import "core:unicode/utf8"
 import "core:unicode/utf16"
-import "core:strconv"
+
+Union_Attempt :: enum u8 {
+	None,
+	Strict,
+	Lenient,
+}
 
 Parser :: struct {
 	tok:            Tokenizer,
@@ -13,6 +18,9 @@ Parser :: struct {
 	spec:           Specification,
 	allocator:      mem.Allocator,
 	parse_integers: bool,
+	depth:          int,
+	union_attempt:  Union_Attempt,
+	flags:          Unmarshal_Flags,
 }
 
 make_parser :: proc{
@@ -51,25 +59,58 @@ parse_string :: proc(data: string, spec := DEFAULT_SPECIFICATION, parse_integers
 	context.allocator = allocator
 	p := make_parser_from_string(data, spec, parse_integers, allocator)
 
-	switch p.spec {
-	case .JSON:
-		return parse_value(&p, loc)
-	case .JSON5:
-		return parse_value(&p, loc)
-	case .SJSON:
-		#partial switch p.curr_token.kind {
-		case .Ident, .String:
-			return parse_object_body(&p, .EOF, loc)
+	value: Value
+	err:   Error
+	if p.spec == .SJSON && (p.curr_token.kind == .Ident || p.curr_token.kind == .String || p.curr_token.kind == .EOF) {
+		obj: Object
+		obj, err = parse_object_body(&p, .EOF, loc)
+		if err == nil {
+			value = obj
 		}
-		return parse_value(&p, loc)
+	} else {
+		value, err = parse_value(&p, loc)
 	}
-	return parse_object(&p, loc)
+	if err != nil {
+		return nil, err
+	}
+	if !at_end(&p) {
+		destroy_value(value, allocator, loc)
+		return nil, .Unexpected_Token
+	}
+	return value, nil
+}
+
+@(private, require_results)
+token_error :: proc(p: ^Parser) -> Error {
+	#partial switch p.curr_token.kind {
+	case .Invalid, .EOF:
+		return nil
+	}
+	return p.curr_token_err
+}
+
+@(private, require_results)
+parse_token_error :: proc(p: ^Parser) -> Error {
+	err := token_error(p)
+	if err == .Invalid_String && p.spec != .JSON {
+		if valid, _ := check_string_literal(p.curr_token.text, p.spec); valid {
+			return nil
+		}
+	}
+	return err
 }
 
 @(require_results)
 token_end_pos :: proc(tok: Token) -> Pos {
 	end := tok.pos
 	end.offset += len(tok.text)
+	end.column += len(tok.text)
+	for c, i in transmute([]byte)tok.text {
+		if c == '\n' {
+			end.line += 1
+			end.column = len(tok.text) - i
+		}
+	}
 	return end
 }
 
@@ -85,6 +126,18 @@ allow_token :: proc(p: ^Parser, kind: Token_Kind) -> bool {
 	if p.curr_token.kind == kind {
 		advance_token(p)
 		return true
+	}
+	return false
+}
+
+@(private, require_results)
+allow_name_token :: proc(p: ^Parser) -> bool {
+	#partial switch p.curr_token.kind {
+	case .Ident, .Null, .False, .True, .Infinity, .NaN:
+		if p.curr_token.text[0] != '-' && p.curr_token.text[0] != '+' {
+			advance_token(p)
+			return true
+		}
 	}
 	return false
 }
@@ -112,12 +165,12 @@ parse_colon :: proc(p: ^Parser) -> (err: Error) {
 @(require_results)
 parse_comma :: proc(p: ^Parser) -> (do_break: bool) {
 	switch p.spec {
-	case .JSON5, .MJSON:
+	case .MJSON:
 		if allow_token(p, .Comma) {
 			return false
 		}
 		return false
-	case .JSON:
+	case .JSON, .JSON5:
 		if !allow_token(p, .Comma) {
 			return true
 		}
@@ -125,9 +178,36 @@ parse_comma :: proc(p: ^Parser) -> (do_break: bool) {
 	return false
 }
 
+// Like `expect_token`, but under `.JSON` a comma before the closing token is an error.
+@(private, require_results)
+expect_closing_token :: proc(p: ^Parser, kind: Token_Kind) -> Error {
+	if p.spec == .JSON && p.prev_token.kind == .Comma {
+		advance_token(p)
+		return .Unexpected_Token
+	}
+	return expect_token(p, kind)
+}
+
+// Whether the document ends here: after SJSON's inserted comma, the current token is `.EOF` with nothing but NULs after it.
+@(private, require_results)
+at_end :: proc(p: ^Parser) -> bool {
+	if p.spec == .MJSON && p.curr_token.kind == .Comma && p.curr_token.offset < len(p.tok.data) && p.tok.data[p.curr_token.offset] == '\n' {
+		advance_token(p)
+	}
+	if p.curr_token.kind != .EOF {
+		return false
+	}
+	for i in p.curr_token.offset..<len(p.tok.data) {
+		if p.tok.data[i] != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 @(require_results)
 parse_value :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: Error) {
-	err = .None
+	parse_token_error(p) or_return
 	token := p.curr_token
 	#partial switch token.kind {
 	case .Null:
@@ -145,12 +225,15 @@ parse_value :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: 
 
 	case .Integer:
 		advance_token(p)
-		i, _ := parse_integer(token.text)
+		i, ok := parse_integer(token.text)
+		if u, uok := parse_unsigned_integer(token.text); !ok && uok {
+			i = i128(u)
+		}
 		value = Integer(i)
 		return
 	case .Float:
 		advance_token(p)
-		f, _ := strconv.parse_f64(token.text)
+		f, _ := parse_float(token.text)
 		value = Float(f)
 		return
 
@@ -181,9 +264,9 @@ parse_value :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: 
 				value = transmute(f64)inf
 				return
 			case allow_token(p, .NaN):
-				nan: u64 = 0x7ff7ffffffffffff
+				nan: u64 = 0x7ff8000000000001
 				if token.text[0] == '-' {
-					nan = 0xfff7ffffffffffff
+					nan = 0xfff8000000000001
 				}
 				value = transmute(f64)nan
 				return
@@ -197,17 +280,13 @@ parse_value :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: 
 }
 
 @(private, require_results)
-skip_value :: proc(p: ^Parser, check_strings := false) -> Error {
+skip_value :: proc(p: ^Parser, check_tokens := false) -> Error {
+	if check_tokens {
+		token_error(p) or_return
+	}
 	#partial switch p.curr_token.kind {
-	case .Null, .False, .True, .Integer, .Float:
+	case .Null, .False, .True, .Integer, .Float, .String:
 		advance_token(p)
-		return nil
-	case .String:
-		invalid := p.curr_token_err == .Invalid_String
-		advance_token(p)
-		if check_strings && invalid {
-			return .Invalid_String
-		}
 		return nil
 	case .Ident:
 		if p.spec == .MJSON {
@@ -216,31 +295,41 @@ skip_value :: proc(p: ^Parser, check_strings := false) -> Error {
 		}
 	case .Open_Brace:
 		expect_token(p, .Open_Brace) or_return
+		p.depth += 1
+		defer p.depth -= 1
+		if p.depth > MAX_DEPTH {
+			return .Max_Depth_Exceeded
+		}
 		for p.curr_token.kind != .Close_Brace {
-			if check_strings && p.curr_token_err == .Invalid_String {
-				return .Invalid_String
+			if check_tokens {
+				token_error(p) or_return
 			}
-			if !(p.spec != .JSON && allow_token(p, .Ident)) && expect_token(p, .String) != nil {
+			if !(p.spec != .JSON && allow_name_token(p)) && expect_token(p, .String) != nil {
 				return .Expected_String_For_Object_Key
 			}
-			parse_colon(p)                or_return
-			skip_value (p, check_strings) or_return
+			parse_colon(p)               or_return
+			skip_value (p, check_tokens) or_return
 
 			if parse_comma(p) {
 				break
 			}
 		}
-		return expect_token(p, .Close_Brace)
+		return expect_closing_token(p, .Close_Brace)
 	case .Open_Bracket:
 		expect_token(p, .Open_Bracket) or_return
+		p.depth += 1
+		defer p.depth -= 1
+		if p.depth > MAX_DEPTH {
+			return .Max_Depth_Exceeded
+		}
 		for p.curr_token.kind != .Close_Bracket {
-			skip_value(p, check_strings) or_return
+			skip_value(p, check_tokens) or_return
 
 			if parse_comma(p) {
 				break
 			}
 		}
-		return expect_token(p, .Close_Bracket)
+		return expect_closing_token(p, .Close_Bracket)
 	case:
 		if p.spec != .JSON && (allow_token(p, .Infinity) || allow_token(p, .NaN)) {
 			return nil
@@ -254,6 +343,11 @@ skip_value :: proc(p: ^Parser, check_strings := false) -> Error {
 parse_array :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: Error) {
 	err = .None
 	expect_token(p, .Open_Bracket) or_return
+	p.depth += 1
+	defer p.depth -= 1
+	if p.depth > MAX_DEPTH {
+		return nil, .Max_Depth_Exceeded
+	}
 
 	array: Array
 	array.allocator = p.allocator
@@ -266,14 +360,18 @@ parse_array :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: 
 
 	for p.curr_token.kind != .Close_Bracket {
 		elem := parse_value(p, loc) or_return
-		append(&array, elem, loc)
+		if _, append_err := append(&array, elem, loc); append_err != nil {
+			destroy_value(elem, p.allocator, loc)
+			err = .Out_Of_Memory if append_err == .Out_Of_Memory else .Invalid_Allocator
+			return
+		}
 
 		if parse_comma(p) {
 			break
 		}
 	}
 
-	expect_token(p, .Close_Bracket) or_return
+	expect_closing_token(p, .Close_Bracket) or_return
 	value = array
 	return
 }
@@ -308,7 +406,7 @@ clone_string :: proc(s: string, allocator: mem.Allocator, loc := #caller_locatio
 parse_object_key :: proc(p: ^Parser, key_allocator: mem.Allocator, loc := #caller_location) -> (key: string, err: Error) {
 	tok := p.curr_token
 	if p.spec != .JSON {
-		if allow_token(p, .Ident) {
+		if allow_name_token(p) {
 			return clone_string(tok.text, key_allocator, loc)
 		}
 	}
@@ -322,7 +420,7 @@ parse_object_key :: proc(p: ^Parser, key_allocator: mem.Allocator, loc := #calle
 @(private, require_results)
 parse_object_key_view :: proc(p: ^Parser, buf: []byte) -> (key: string, allocated: bool, err: Error) {
 	tok := p.curr_token
-	if p.spec != .JSON && allow_token(p, .Ident) {
+	if p.spec != .JSON && allow_name_token(p) {
 		return tok.text, false, nil
 	}
 	if expect_token(p, .String) != nil {
@@ -337,6 +435,11 @@ parse_object_key_view :: proc(p: ^Parser, buf: []byte) -> (key: string, allocate
 
 @(require_results)
 parse_object_body :: proc(p: ^Parser, end_token: Token_Kind, loc := #caller_location) -> (obj: Object, err: Error) {
+	p.depth += 1
+	defer p.depth -= 1
+	if p.depth > MAX_DEPTH {
+		return nil, .Max_Depth_Exceeded
+	}
 	obj = make(Object, allocator=p.allocator, loc=loc)
 
 	defer if err != nil {
@@ -345,9 +448,11 @@ parse_object_body :: proc(p: ^Parser, end_token: Token_Kind, loc := #caller_loca
 			destroy_value(elem, loc=loc)
 		}
 		delete(obj, loc)
+		obj = nil
 	}
 
 	for p.curr_token.kind != end_token {
+		parse_token_error(p) or_return
 		key := parse_object_key(p, p.allocator, loc) or_return
 
 		// `key` is allocated here and does not belong to `obj` until the insert below, so every
@@ -371,23 +476,18 @@ parse_object_body :: proc(p: ^Parser, end_token: Token_Kind, loc := #caller_loca
 			destroy_value(elem, loc = loc)
 		}
 
-		if key in obj {
+		_, value_ptr, just_inserted, insert_err := map_entry(&obj, key, loc)
+		if insert_err != nil {
+			err = .Out_Of_Memory if insert_err == .Out_Of_Memory else .Invalid_Allocator
+			return
+		}
+		if !just_inserted {
 			err = .Duplicate_Object_Key
 			return
 		}
-
-		// NOTE(gonz): There are code paths for which this traversal ends up
-		// inserting empty key/values into the object and for those we do not
-		// want to allocate anything
-		if key != "" {
-			reserve_error := reserve(&obj, len(obj) + 1, loc)
-			if reserve_error == mem.Allocator_Error.Out_Of_Memory {
-				return nil, .Out_Of_Memory
-			}
-			obj[key] = elem
-			key_stored = true
-			elem_stored = true
-		}
+		value_ptr^ = elem
+		key_stored = true
+		elem_stored = true
 
 		if parse_comma(p) {
 			break
@@ -400,7 +500,10 @@ parse_object_body :: proc(p: ^Parser, end_token: Token_Kind, loc := #caller_loca
 parse_object :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: Error) {
 	expect_token(p, .Open_Brace) or_return
 	obj := parse_object_body(p, .Close_Brace, loc) or_return
-	expect_token(p, .Close_Brace) or_return
+	if err = expect_closing_token(p, .Close_Brace); err != nil {
+		destroy_value(obj, p.allocator, loc)
+		return nil, err
+	}
 	return obj, .None
 }
 
@@ -567,7 +670,26 @@ unquote_escapes :: proc(s: string, i, w: int, quote: byte, spec: Specification, 
 				break loop
 			}
 			switch s[i] {
-			case: break loop
+			case:
+				if spec == .JSON {
+					break loop
+				}
+				if s[i] == 0xe2 && i+2 < len(s) && s[i+1] == 0x80 && (s[i+2] == 0xa8 || s[i+2] == 0xa9) {
+					i += 3
+				}
+			case '\n':
+				if spec == .JSON {
+					break loop
+				}
+				i += 1
+			case '\r':
+				if spec == .JSON {
+					break loop
+				}
+				i += 1
+				if i < len(s) && s[i] == '\n' {
+					i += 1
+				}
 			case '"',  '\'', '\\', '/':
 				b[w] = s[i]
 				i += 1
@@ -648,8 +770,16 @@ unquote_escapes :: proc(s: string, i, w: int, quote: byte, spec: Specification, 
 				}
 			}
 
-		case c == quote, c < ' ':
+		case c == quote:
 			break loop
+
+		case c < ' ':
+			if spec == .JSON {
+				break loop
+			}
+			b[w] = c
+			i += 1
+			w += 1
 
 		case valid:
 			end := string_stop(s, i, quote)

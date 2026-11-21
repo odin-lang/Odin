@@ -1235,7 +1235,6 @@ gb_internal void init_universal(void) {
 
 	builtin_pkg    = create_builtin_package("builtin");
 	intrinsics_pkg = create_builtin_package("intrinsics");
-	config_pkg     = create_builtin_package("config");
 
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
@@ -1467,6 +1466,8 @@ gb_internal void init_universal(void) {
 			{"PreserveNone",  ProcCC_PreserveNone},
 			{"PreserveMost",  ProcCC_PreserveMost},
 			{"PreserveAll",   ProcCC_PreserveAll},
+
+			{"Vector_Call",   ProcCC_VectorCall},
 		};
 
 		auto fields = add_global_enum_type(str_lit("Odin_Calling_Convention"), values, gb_count_of(values), &t_odin_calling_convention, t_u8);
@@ -1597,43 +1598,6 @@ gb_internal void init_universal(void) {
 		Entity *entity = alloc_entity(Entity_Builtin, nullptr, make_token_ident(name), t_invalid);
 		entity->Builtin.id = id;
 		add_global_entity(entity, builtin_pkg->scope);
-	}
-
-	bool defined_values_double_declaration = false;
-	for (auto const &entry : bc->defined_values) {
-		char const *name = entry.key;
-		ExactValue value = entry.value;
-		GB_ASSERT(value.kind != ExactValue_Invalid);
-
-		Type *type = nullptr;
-		switch (value.kind) {
-		case ExactValue_Bool:
-			type = t_untyped_bool;
-			break;
-		case ExactValue_String:
-			type = t_untyped_string;
-			break;
-		case ExactValue_Integer:
-			type = t_untyped_integer;
-			break;
-		case ExactValue_Float:
-		case ExactValue_Rational:
-			type = t_untyped_float;
-			break;
-		}
-		GB_ASSERT(type != nullptr);
-
-		Entity *entity = alloc_entity_constant(nullptr, make_token_ident(name), type, value);
-		entity->state = EntityState_Resolved;
-		if (scope_insert(config_pkg->scope, entity)) {
-			error(entity->token, "'%s' defined as an argument is already declared at the global scope", name);
-			defined_values_double_declaration = true;
-			// NOTE(bill): Just exit early before anything, even though the compiler will do that anyway
-		}
-	}
-
-	if (defined_values_double_declaration) {
-		exit_with_errors();
 	}
 
 
@@ -3324,7 +3288,7 @@ gb_internal WORKER_TASK_PROC(add_definitions_to_set_worker) {
 				add_dependency_to_set_threaded(c, e);
 			}
 		} else if (e->kind == Entity_Procedure) {
-			if (e->Procedure.is_export) {
+			if (e->Procedure.is_export && (e->flags & EntityFlag_Overridden) == 0) {
 				add_dependency_to_set_threaded(c, e);
 			}
 		} else if (e->kind == Entity_Variable) {
@@ -3361,7 +3325,7 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 			}
 			break;
 		case Entity_Procedure:
-			if (e->Procedure.is_export) {
+			if (e->Procedure.is_export && (e->flags & EntityFlag_Overridden) == 0) {
 				add_to_set(c, e);
 			} else if (e->flags & EntityFlag_Require) {
 				add_to_set(c, e);
@@ -3975,6 +3939,7 @@ gb_internal void init_core_type_info(Checker *c) {
 	Entity *type_info_variant = tis->fields[4];
 	Type *tiv_type = type_info_variant->type;
 	GB_ASSERT(is_type_union(tiv_type));
+	t_type_info_variant = base_type(tiv_type);
 
 	t_type_info_named            = find_core_type(c, str_lit("Type_Info_Named"));
 	t_type_info_integer          = find_core_type(c, str_lit("Type_Info_Integer"));
@@ -4033,6 +3998,55 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_soa_pointer_ptr      = alloc_type_pointer(t_type_info_soa_pointer);
 	t_type_info_bit_field_ptr        = alloc_type_pointer(t_type_info_bit_field);
 	t_type_info_fixed_capacity_dynamic_array_ptr = alloc_type_pointer(t_type_info_fixed_capacity_dynamic_array);
+
+	Type *variant_types[] = {
+		t_type_info_named,
+		t_type_info_integer,
+		t_type_info_rune,
+		t_type_info_float,
+		t_type_info_complex,
+		t_type_info_quaternion,
+		t_type_info_string,
+		t_type_info_boolean,
+		t_type_info_any,
+		t_type_info_typeid,
+		t_type_info_pointer,
+		t_type_info_multi_pointer,
+		t_type_info_procedure,
+		t_type_info_array,
+		t_type_info_enumerated_array,
+		t_type_info_dynamic_array,
+		t_type_info_slice,
+		t_type_info_parameters,
+		t_type_info_struct,
+		t_type_info_union,
+		t_type_info_enum,
+		t_type_info_map,
+		t_type_info_bit_set,
+		t_type_info_simd_vector,
+		t_type_info_matrix,
+		t_type_info_soa_pointer,
+		t_type_info_bit_field,
+		t_type_info_fixed_capacity_dynamic_array,
+	};
+	GB_ASSERT(gb_count_of(variant_types) == Typeid__COUNT);
+
+	wait_for_record_signal(&t_type_info_variant->Union.variants_wait_signal, &t_type_info_variant->Union.checking_thread);
+	auto const &variants = t_type_info_variant->Union.variants;
+	GB_ASSERT_MSG(variants.count == Typeid__COUNT, "%td", variants.count);
+	for_array(i, variants) {
+		Type *vt = variants[i];
+		GB_ASSERT_MSG(is_type_pointer(vt), "runtime.Type_Info.variant must be a union of pointers, got %s", type_to_string(vt));
+		GB_ASSERT_MSG(are_types_identical(type_deref(vt), variant_types[i]), "%s vs %s", type_to_string(type_deref(vt)), type_to_string(variant_types[i]));
+
+		Type *rec = base_type(variant_types[i]);
+		GB_ASSERT(rec->kind == Type_Struct);
+		wait_for_struct_fields(rec);
+		GB_ASSERT(rec->Struct.fields.count >= 1);
+		Entity *header = rec->Struct.fields[0];
+		GB_ASSERT_MSG((header->flags & EntityFlag_Using) != 0, "%s", type_to_string(variant_types[i]));
+		GB_ASSERT(are_types_identical(header->type, t_type_info));
+	}
 }
 
 gb_internal void init_mem_allocator(Checker *c) {
@@ -4317,6 +4331,10 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 	} else if (name == "test") {
 		if (value != nullptr) {
 			error(value, "Expected no value for '%.*s'", LIT(name));
+		}
+		if (c->decl != nullptr && (c->decl->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
+			error(elem, "@(test) procedures must be declared at the file scope");
+			return true;
 		}
 		ac->test = true;
 		return true;
@@ -5608,7 +5626,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				init_decl_info_proc(d, init);
 				d->init_expr = init;
 
-				if (is_test) {
+				if (is_test && (c->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) != 0) {
 					e->flags |= EntityFlag_Test;
 				}
 				if (is_init && is_fini) {
@@ -7019,7 +7037,11 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 		if (pi->poly_def_node != nullptr) {
 			token = ast_token(pi->poly_def_node);
 		}
-		error(token, "Unspecialized polymorphic procedure '%.*s'", LIT(name));
+		if (name.len == 0 && pi->decl->proc_lit != nullptr) {
+			error(pi->decl->proc_lit, "Unspecialized polymorphic procedure literal");
+		} else {
+			error(token, "Unspecialized polymorphic procedure '%.*s'", LIT(name));
+		}
 		pi->decl->proc->proc_checked_state.store(ProcCheckedState_Unchecked);
 		return false;
 	}
@@ -8180,7 +8202,6 @@ gb_internal void check_parsed_files(Checker *c) {
 	}
 	builtin_pkg->scope->flags    |= ScopeFlag_ReadOnly;
 	intrinsics_pkg->scope->flags |= ScopeFlag_ReadOnly;
-	config_pkg->scope->flags     |= ScopeFlag_ReadOnly;
 
 	TIME_SECTION("add entities from queues");
 	check_merge_queues_into_arrays(c);
@@ -8410,7 +8431,7 @@ gb_internal void check_parsed_files(Checker *c) {
 
 		isize hash_map_len = c->info.type_info_types_hash_map.count;
 		for (auto const &tt : type_info_types) {
-			isize index = tt.hash % hash_map_len;
+			isize index = type_info_table_home_index(tt.hash, hash_map_len);
 			// NOTE(bill): no need for a sanity check since there
 			// will always be enough space for the entries
 			for (;;) {

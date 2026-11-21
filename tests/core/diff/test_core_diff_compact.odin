@@ -40,6 +40,9 @@ check_settled :: proc(t: ^testing.T, a, b: []i32, c: diff.Changes, opts: diff.Op
 
 @(test)
 test_compact_exhaustive :: proc(t: ^testing.T) {
+	when SLIM_TESTS {
+		return
+	}
 	check_exhaustive(t, 2, 7, {algorithm = .Minimal,   flags = {.Compact}})
 	check_exhaustive(t, 2, 7, {algorithm = .Histogram, flags = {.Compact}})
 }

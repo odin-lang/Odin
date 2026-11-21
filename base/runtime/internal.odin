@@ -886,34 +886,49 @@ string16_decode_last_rune :: proc "contextless" (s: string16) -> (rune, int) #no
 
 
 abs_complex32 :: #force_inline proc "contextless" (x: complex32) -> f16 {
+	INF :: f16(0h7C00)
+
 	p, q := abs(real(x)), abs(imag(x))
+	if p == INF || q == INF {
+		return INF
+	}
 	if p < q {
 		p, q = q, p
 	}
 	if p == 0 {
-		return 0
+		return p + q
 	}
 	q = q / p
 	return p * f16(intrinsics.sqrt(f32(1 + q*q)))
 }
 abs_complex64 :: #force_inline proc "contextless" (x: complex64) -> f32 {
+	INF :: f32(0h7F80_0000)
+
 	p, q := abs(real(x)), abs(imag(x))
+	if p == INF || q == INF {
+		return INF
+	}
 	if p < q {
 		p, q = q, p
 	}
 	if p == 0 {
-		return 0
+		return p + q
 	}
 	q = q / p
 	return p * intrinsics.sqrt(1 + q*q)
 }
 abs_complex128 :: #force_inline proc "contextless" (x: complex128) -> f64 {
+	INF :: f64(0h7FF0_0000_0000_0000)
+
 	p, q := abs(real(x)), abs(imag(x))
+	if p == INF || q == INF {
+		return INF
+	}
 	if p < q {
 		p, q = q, p
 	}
 	if p == 0 {
-		return 0
+		return p + q
 	}
 	q = q / p
 	return p * intrinsics.sqrt(1 + q*q)

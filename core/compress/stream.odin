@@ -28,27 +28,23 @@ CONTEXT_HISTORY     :: 16
 Context :: struct #align(64) {
 	input:             io.Stream,     // 32-bit: 8, 64-bit: 16
 	output:            ^[dynamic]byte, // 32-bit: 4, 64-bit: 8
-	bytes_written:     i64,           // 32-bit: 8, 64-bit: 8
 	code_buffer:       u64,           // 32-bit: 8, 64-bit: 8
+	bytes_written:     i64,           // 32-bit: 8, 64-bit: 8
 	num_bits:          u64,           // 32-bit: 8, 64-bit: 8
-
-	// Some algorithms, like legacy PKZIP methods Implode & Reduce,
-	// need to know the unpacked size to not write a spurious tail,
-	size_unpacked:     i64,           // 32-bit: 8, 64-bit: 8
 
 	buffer:            []byte,
 	window:            []byte,
 	backing:           []byte,
 	backing_allocator: runtime.Allocator,
 	owns_backing:      b8,
-	_reserved:         [7]u8,
+	_reserved:         [15]u8,
 }
 
 when size_of(rawptr) == 8 {
-	#assert(size_of(Context) == 16 + 8 + 8 + 8 + 8 + 8 + 3 * 16 + 16 + 8)
+	#assert(size_of(Context) == 16 + 8 + 8 + 8 + 8 + 3 * 16 + 16 + 16)
 	// 128 bytes
 } else {
-	#assert(size_of(Context) == (8 + 4 + 8 + 8 + 8 + 8 + 3 * 8 + 8 + 8 + 63) &~ 63)
+	#assert(size_of(Context) == (8 + 4 + 8 + 8 + 8 + 3 * 8 + 8 + 16 + 63) &~ 63)
 	// 84 bytes, padded to 128 by `#align(64)`
 }
 
@@ -64,22 +60,20 @@ _memory_reader_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte
 }
 
 // Initialize I/O `Context` from byte slice
-init_context_from_slice :: proc(data: ^[]byte, output: ^[dynamic]byte = nil, size_unpacked := i64(-1)) -> (ctx: Context) {
+init_context_from_slice :: proc(data: ^[]byte, output: ^[dynamic]byte = nil) -> (ctx: Context) {
 	ctx.input = Memory_Reader{
 		procedure = _memory_reader_proc,
 		data      = data,
 	}
-	ctx.buffer        = data^
-	ctx.window        = data^
-	ctx.output        = output
-	ctx.size_unpacked = size_unpacked
+	ctx.buffer = data^
+	ctx.window = data^
+	ctx.output = output
 	return
 }
 
 // Initialize I/O `Context` from `io.Stream`
-init_context_from_stream :: proc(stream: io.Stream, output: ^[dynamic]byte = nil, size_unpacked := i64(-1), buffer: []byte = nil, allocator := context.allocator) -> (ctx: Context) {
+init_context_from_stream :: proc(stream: io.Stream, output: ^[dynamic]byte = nil, buffer: []byte = nil, allocator := context.allocator) -> (ctx: Context) {
 	ctx.input         = stream
-	ctx.size_unpacked = size_unpacked
 	ctx.output        = output
 	ctx.backing_allocator = allocator
 	if buffer != nil {
@@ -141,6 +135,8 @@ refill_window :: proc(z: ^Context, need: int) -> (err: io.Error) #no_bounds_chec
 				err = .No_Progress
 				break
 			}
+		} else {
+			stalled = 0
 		}
 	}
 
@@ -166,7 +162,85 @@ size :: proc(z: ^Context) -> (res: i64, err: io.Error) {
 	}
 	total    := io.size(z.input)                   or_return
 	position := io.seek(z.input, 0, .Current)     or_return
+	if total <= 0 {
+		return 0, .Unsupported
+	}
+	if position > total {
+		return 0, .Invalid_Offset
+	}
 	return total - position + i64(len(z.window)), nil
+}
+
+input_size :: #force_inline proc(z: ^Context) -> (res: int) {
+	n, err := size(z)
+	if err != nil || n > i64(max(int)) {
+		return -1
+	}
+	return int(n)
+}
+
+declared_size :: #force_inline proc "contextless" (expected_output_size: int, format_size := i64(-1)) -> (size: int) {
+	if expected_output_size >= 0 {
+		return expected_output_size
+	}
+	if format_size >= 0 && format_size <= i64(max(int)) {
+		return int(format_size)
+	}
+	return -1
+}
+
+output_reservation :: #force_inline proc "contextless" (declared, bound, input_size: int) -> (size: int) {
+	size = declared
+	if declared < 0 {
+		size = COMPRESS_RESERVE_DEFAULT
+		if input_size >= 0 {
+			size = COMPRESS_INITIAL_RESERVATION
+			if input_size <= COMPRESS_INITIAL_RESERVATION / COMPRESS_INITIAL_RESERVATION_RATIO {
+				size = input_size * COMPRESS_INITIAL_RESERVATION_RATIO
+			}
+		}
+	}
+	size = min(size, COMPRESS_INITIAL_RESERVATION)
+	if bound >= 0 {
+		size = min(size, bound)
+	}
+	return
+}
+
+output_grow_capacity :: #force_inline proc "contextless" (capacity, need, limit: int) -> (new_capacity: int) {
+	step := max(capacity, COMPRESS_GROWTH_MIN) if capacity < COMPRESS_GROWTH_STEP else max(COMPRESS_GROWTH_STEP, capacity / 4)
+	return min(max(capacity + step, need), limit)
+}
+
+output_limit :: #force_inline proc "contextless" (options: Options) -> (limit: int) {
+	return COMPRESS_OUTPUT_ALLOCATE_MAX if options.max_output_size == 0 else options.max_output_size
+}
+
+memory_limit :: #force_inline proc "contextless" (options: Options) -> (limit: int) {
+	return COMPRESS_MEMORY_MAX if options.max_memory == 0 else options.max_memory
+}
+
+progress_interval :: #force_inline proc "contextless" (options: Options) -> (interval: int) {
+	return PROGRESS_INTERVAL_DEFAULT if options.progress_interval == 0 else options.progress_interval
+}
+
+report_progress :: proc(options: Options, bytes_in, bytes_out, total_in, total_out: i64) -> (err: Error) {
+	if options.progress == nil {
+		return nil
+	}
+	progress := Progress{
+		bytes_in         = bytes_in,
+		bytes_out        = bytes_out,
+		total_in         = total_in,
+		total_out        = total_out,
+		member_index     = -1,
+		member_count     = -1,
+		archive_total_in = -1,
+	}
+	if options.progress(progress, options.progress_data) {
+		return General_Error.Canceled
+	}
+	return nil
 }
 
 @(optimization_mode="favor_size")
@@ -243,9 +317,12 @@ skip :: proc(z: ^Context, offset: i64) -> (err: io.Error) #no_bounds_check {
 	remaining := offset - i64(len(z.window))
 	z.window   = z.window[len(z.window):]
 
-	if _, seek_err := io.seek(z.input, remaining, .Current); seek_err == nil {
+	if position, seek_err := io.seek(z.input, remaining, .Current); seek_err == nil {
 		z.buffer = z.backing[:0]
 		z.window = z.buffer
+		if size, size_err := io.size(z.input); size_err == nil && position > size {
+			return .Short_Buffer
+		}
 		return nil
 	}
 
@@ -322,6 +399,8 @@ read_remaining :: proc(z: ^Context, allocator := context.allocator) -> (data: [d
 			if stalled > 100 {
 				return data, .No_Progress
 			}
+		} else {
+			stalled = 0
 		}
 	}
 }

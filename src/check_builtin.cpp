@@ -2068,8 +2068,15 @@ gb_internal void load_file_cache_load(LoadFileCache *cache, LoadFileTier tier) {
 		gbFile f = {};
 	#if defined(GB_SYSTEM_WINDOWS)
 		cache->file_error = gb__win32_file_open(&f.fd, &f.ops, gbFileMode_Read, c_str);
+		if (cache->file_error != gbFileError_None) {
+			cache->is_dir = path_is_directory(path);
+		}
 	#else
 		cache->file_error = gb__posix_file_open(&f.fd, &f.ops, gbFileMode_Read, c_str);
+		if (cache->file_error == gbFileError_None) {
+			struct stat st = {};
+			cache->is_dir = fstat(f.fd.i, &st) == 0 && S_ISDIR(st.st_mode);
+		}
 	#endif
 		defer (gb_file_close(&f));
 
@@ -2081,6 +2088,9 @@ gb_internal void load_file_cache_load(LoadFileCache *cache, LoadFileTier tier) {
 				// Nothing to do.
 				break;
 			case LoadFileTier_Contents: {
+				if (cache->is_dir) {
+					break;
+				}
 				isize file_size = cast(isize)gb_file_size(&f);
 				if (file_size > 0) {
 					u8 *ptr = permanent_alloc_array<u8>(file_size+1);
@@ -2136,7 +2146,20 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 
 	mutex_lock(&cache->mutex);
 	gbFileError file_error = cache->file_error;
+	bool is_dir = cache->is_dir;
 	mutex_unlock(&cache->mutex);
+
+	if (is_dir && tier == LoadFileTier_Contents) {
+		if (err_on_not_found) {
+			if (builtin_name == "load") {
+				error(ce->proc, "Failed to `#%.*s` file: %.*s; it is a directory, use `#load_directory` instead", LIT(builtin_name), LIT(path));
+			} else {
+				error(ce->proc, "Failed to `#%.*s` file: %.*s; it is a directory", LIT(builtin_name), LIT(path));
+			}
+		}
+		call->state_flags |= StateFlag_DirectiveWasFalse;
+		return false;
+	}
 
 	switch (file_error) {
 	default:
@@ -2670,6 +2693,99 @@ gb_internal bool check_hash_kind(CheckerContext *c, Ast *call, String const &has
 	return true;
 }
 
+gb_internal ExactValue define_text_to_number(String text, bool *is_float_) {
+	String s = text;
+	bool negative = false;
+	if (s.len > 0 && (s[0] == '+' || s[0] == '-')) {
+		negative = s[0] == '-';
+		s = substring(s, 1, s.len);
+	}
+	if (s.len == 0) {
+		return {ExactValue_Invalid};
+	}
+
+	Tokenizer t = {};
+	init_tokenizer_with_data(&t, str_lit("-define"), s.text, s.len);
+	Token token = {};
+	begin_error_mute();
+	tokenizer_get_token(&t, &token);
+	end_error_mute();
+	if (t.error_count != 0 || token.string.len != s.len) {
+		return {ExactValue_Invalid};
+	}
+	if (token.kind != Token_Integer && token.kind != Token_Float) {
+		return {ExactValue_Invalid};
+	}
+
+	ExactValue v = exact_value_from_basic_literal(token.kind, token.string);
+	if (negative) {
+		v = exact_unary_operator_value(Token_Sub, v, 0, false);
+	}
+	*is_float_ = token.kind == Token_Float;
+	return v;
+}
+
+gb_internal bool check_config_define_value(Operand *o, Ast *arg, String name, String text, Type *type) {
+	o->mode  = Addressing_Constant;
+	o->expr  = arg;
+	o->value = {};
+
+	if (is_type_enum(type)) {
+		Type *enum_type = base_type(type);
+		Entity *enum_value = nullptr;
+		if (text.len > 0) {
+			enum_value = scope_lookup_current(enum_type->Enum.scope, string_interner_insert(text));
+		}
+		if (enum_value == nullptr || enum_value->kind != Entity_Constant || !are_types_identical(enum_value->type, type)) {
+			ERROR_BLOCK();
+			gbString type_str = type_to_string(type);
+			error(arg, "-define:%.*s=%.*s does not name a field of '%s' for '#config'", LIT(name), LIT(text), type_str);
+			gb_string_free(type_str);
+			check_did_you_mean_type(text, enum_type->Enum.fields);
+			return false;
+		}
+		o->type  = enum_value->type;
+		o->value = enum_value->Constant.value;
+		return true;
+	}
+
+	if (is_type_string(type)) {
+		o->type  = t_untyped_string;
+		o->value = exact_value_string(text);
+		return true;
+	}
+
+	if (is_type_boolean(type)) {
+		if (text == "true" || text == "false") {
+			o->type  = t_untyped_bool;
+			o->value = exact_value_bool(text == "true");
+			return true;
+		}
+		gbString type_str = type_to_string(type);
+		error(arg, "-define:%.*s=%.*s is not a valid '%s' for '#config', expected 'true' or 'false'", LIT(name), LIT(text), type_str);
+		gb_string_free(type_str);
+		return false;
+	}
+
+	if (is_type_numeric(type)) {
+		bool is_float = false;
+		o->value = define_text_to_number(text, &is_float);
+		if (o->value.kind != ExactValue_Invalid) {
+			o->type = is_float ? t_untyped_float : t_untyped_integer;
+			return true;
+		}
+		gbString type_str = type_to_string(type);
+		error(arg, "-define:%.*s=%.*s is not a valid '%s' for '#config', expected a number literal", LIT(name), LIT(text), type_str);
+		gb_string_free(type_str);
+		return false;
+	}
+
+	gbString type_str = type_to_string(type);
+	error(arg, "-define:%.*s cannot set a '#config' of type '%s', only strings, booleans, numbers and enums can be set", LIT(name), type_str);
+	gb_string_free(type_str);
+	return false;
+}
+
 
 
 gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint) {
@@ -3006,48 +3122,20 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		operand->mode = def.mode;
 		operand->value = def.value;
 
-		Entity *found = scope_lookup_current(config_pkg->scope, interned);
-		if (found != nullptr) {
-			if (found->kind != Entity_Constant) {
-				error(arg, "'#config' entity '%.*s' found but expected a constant", LIT(name));
-			} else {
-				Operand config_value = {};
-				config_value.type = found->type;
-				config_value.mode = Addressing_Constant;
-				config_value.value = found->Constant.value;
-				config_value.expr = arg;
-
-				if (is_type_enum(def.type)) {
-					Type *enum_type = base_type(def.type);
-					if (config_value.value.kind != ExactValue_String) {
-						gbString type_str = type_to_string(def.type);
-						error(arg, "'#config' enum value for '%.*s' must name a field of '%s'", LIT(name), type_str);
-						gb_string_free(type_str);
-						config_value.mode = Addressing_Invalid;
-					} else {
-						String value_name = config_value.value.value_string;
-						InternedString value_interned = string_interner_insert(value_name);
-						Entity *enum_value = scope_lookup_current(enum_type->Enum.scope, value_interned);
-						if (enum_value == nullptr || enum_value->kind != Entity_Constant || !are_types_identical(enum_value->type, def.type)) {
-							gbString type_str = type_to_string(def.type);
-							error(arg, "Unknown enum value '%.*s' for '#config' '%.*s' of type '%s'", LIT(value_name), LIT(name), type_str);
-							gb_string_free(type_str);
-							check_did_you_mean_type(value_name, enum_type->Enum.fields);
-							config_value.mode = Addressing_Invalid;
-						} else {
-							config_value.type = enum_value->type;
-							config_value.value = enum_value->Constant.value;
-						}
-					}
-				}
-
+		String *text = map_get(&build_context.defined_values, interned.cstring());
+		if (text != nullptr) {
+			Operand config_value = {};
+			if (check_config_define_value(&config_value, arg, name, *text, def.type)) {
+				gbString label = gb_string_make(heap_allocator(), "");
+				label = gb_string_append_fmt(label, "from -define:%.*s=%.*s", LIT(name), LIT(*text));
+				set_caret_label(label);
+				check_assignment(c, &config_value, def.type, str_lit("#config"));
+				set_caret_label(nullptr);
+				gb_string_free(label);
 				if (config_value.mode != Addressing_Invalid) {
-					check_assignment(c, &config_value, def.type, str_lit("#config"));
-					if (config_value.mode != Addressing_Invalid) {
-						operand->type = config_value.type;
-						operand->mode = config_value.mode;
-						operand->value = config_value.value;
-					}
+					operand->type = config_value.type;
+					operand->mode = config_value.mode;
+					operand->value = config_value.value;
 				}
 			}
 		}
@@ -4905,8 +4993,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			{
 				Type *bt = base_type(operand->type);
+				if (are_types_identical(bt, t_complex32))  add_package_dependency(c, "runtime", "abs_complex32");
 				if (are_types_identical(bt, t_complex64))  add_package_dependency(c, "runtime", "abs_complex64");
 				if (are_types_identical(bt, t_complex128)) add_package_dependency(c, "runtime", "abs_complex128");
+				if (are_types_identical(bt, t_quaternion64))  add_package_dependency(c, "runtime", "abs_quaternion64");
 				if (are_types_identical(bt, t_quaternion128)) add_package_dependency(c, "runtime", "abs_quaternion128");
 				if (are_types_identical(bt, t_quaternion256)) add_package_dependency(c, "runtime", "abs_quaternion256");
 			}
@@ -7055,8 +7145,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 			i64 n = exact_value_to_i64(z.value);
-			if (n <= 0) {
-				error(z.expr, "Scale parameter in '%.*s' must be positive, got %lld", LIT(builtin_name), cast(long long)n);
+			if (n < 0) {
+				error(z.expr, "Scale parameter in '%.*s' must not be negative, got %lld", LIT(builtin_name), cast(long long)n);
 				return false;
 			}
 			i64 sz = 8*type_size_of(x.type);

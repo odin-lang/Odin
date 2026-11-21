@@ -1,4 +1,5 @@
 #+build wasm32, wasm64p32
+#+build !bedrock
 package runtime
 
 @(private="file")

@@ -108,27 +108,28 @@ arena_alloc :: proc(arena: ^Arena, size, alignment: uint, loc := #caller_locatio
 	if size == 0 {
 		return
 	}
+	align := max(alignment, 1)
 
 	prev_used := 0 if arena.curr_block == nil else arena.curr_block.used
-	data, err = alloc_from_memory_block(arena.curr_block, size, alignment)
+	data, err = alloc_from_memory_block(arena.curr_block, size, align)
 	if err == .Out_Of_Memory {
 		if arena.minimum_block_size == 0 {
 			arena.minimum_block_size = DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE
 		}
 
-		needed := align_forward_uint(size, alignment)
+		needed := align_forward_uint(size, align)
 		block_size := max(needed, arena.minimum_block_size)
 
 		if arena.backing_allocator.procedure == nil {
 			arena.backing_allocator = default_allocator()
 		}
 
-		new_block := memory_block_alloc(arena.backing_allocator, block_size, alignment, loc) or_return
+		new_block := memory_block_alloc(arena.backing_allocator, block_size, align, loc) or_return
 		new_block.prev = arena.curr_block
 		arena.curr_block = new_block
 		arena.total_capacity += new_block.capacity
 		prev_used = 0
-		data, err = alloc_from_memory_block(arena.curr_block, size, alignment)
+		data, err = alloc_from_memory_block(arena.curr_block, size, align)
 	}
 	arena.total_used += arena.curr_block.used - prev_used
 	return
@@ -311,6 +312,8 @@ arena_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
 			block.used = temp.used
 			arena.total_used -= amount_to_zero
 		}
+	} else {
+		arena_free_all(arena, loc)
 	}
 
 	assert(arena.temp_count > 0, "double-use of arena_temp_end", loc)

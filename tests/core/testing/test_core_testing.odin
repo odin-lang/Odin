@@ -3,6 +3,40 @@ package test_core_testing
 import "core:c/libc"
 import "core:math/rand"
 import "core:testing"
+import "core:time"
+
+@test
+test_fail_timeout_can_be_reset :: proc(t: ^testing.T) {
+	testing.set_fail_timeout(t, 100 * time.Millisecond)
+	testing.set_fail_timeout(t, 500 * time.Millisecond)
+	time.sleep(200 * time.Millisecond)
+}
+
+@test
+test_fail_timeout_can_be_disabled :: proc(t: ^testing.T) {
+	testing.set_fail_timeout(t, 100 * time.Millisecond)
+	testing.set_fail_timeout(t, time.MAX_DURATION)
+	time.sleep(200 * time.Millisecond)
+}
+
+@test
+test_fail_timeout_will_restart :: proc(t: ^testing.T) {
+	// Each call to `set_fail_timeout` should restart the timer,
+	// even if the duration has the same value.
+	// This means we should be able to sleep for >500 ms in total here.
+	testing.set_fail_timeout(t, 500 * time.Millisecond)
+	time.sleep(100 * time.Millisecond)
+	testing.set_fail_timeout(t, 500 * time.Millisecond)
+	time.sleep(100 * time.Millisecond)
+	testing.set_fail_timeout(t, 500 * time.Millisecond)
+	time.sleep(100 * time.Millisecond)
+	testing.set_fail_timeout(t, 500 * time.Millisecond)
+	time.sleep(100 * time.Millisecond)
+	testing.set_fail_timeout(t, 500 * time.Millisecond)
+	time.sleep(100 * time.Millisecond)
+	testing.set_fail_timeout(t, 500 * time.Millisecond)
+	time.sleep(100 * time.Millisecond)
+}
 
 @test
 test_expected_assert :: proc(t: ^testing.T) {

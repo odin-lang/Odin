@@ -4,14 +4,14 @@ import "base:intrinsics"
 
 /*
 Scans a hexadecimal floating-point number at the start of `s`.
-`[+-] 0x hexdigits [. hexdigits] (p|P) [+-] digits`
+`[+-] 0x hexdigits [. hexdigits] [(p|P) [+-] digits]`, or `[+-] 0` if no hex digit follows the `0x`
 A `_` between digits is skipped
 
 **Returns**
 - mantissa, exp: The value is `mantissa * 2^exp`. If `trunc` is true, the significant hex digits after the first 16 were dropped, and at least one of them was not zero.
 - neg: The number has a minus sign.
 - nr: The number of bytes in the number.
-- ok: `false` if `s` does not start with a hexadecimal float.
+- ok: `false` if `s` does not start with `0x` or `0X`, after an optional sign, and another byte.
 */
 scan_hex_float :: proc "contextless" (s: string) -> (mantissa: u64, exp: int, neg, trunc: bool, nr: int, ok: bool) #no_bounds_check {
 	MAX_HEX_DIGITS :: 16
@@ -59,7 +59,7 @@ scan_hex_float :: proc "contextless" (s: string) -> (mantissa: u64, exp: int, ne
 			nd += 1
 			saw_digits = true
 		} else {
-			exp += 4 // dropped digit
+			exp = add_exponent(exp, 4, false) // dropped digit
 			trunc ||= d != 0
 		}
 		i += 1
@@ -72,7 +72,7 @@ scan_hex_float :: proc "contextless" (s: string) -> (mantissa: u64, exp: int, ne
 			// Leading zeros of the fraction change only the exponent
 			for i < n && (s[i] == '0' || s[i] == '_') {
 				if s[i] == '0' {
-					exp -= 4
+					exp = add_exponent(exp, 4, true)
 					saw_digits = true
 				}
 				i += 1
@@ -109,7 +109,7 @@ scan_hex_float :: proc "contextless" (s: string) -> (mantissa: u64, exp: int, ne
 					break
 				}
 			} else if mantissa == 0 && d == 0 {
-				exp -= 4 // a leading zero of the fraction
+				exp = add_exponent(exp, 4, true) // a leading zero of the fraction
 				saw_digits = true
 			} else if nd < MAX_HEX_DIGITS {
 				mantissa = mantissa<<4 | u64(d)
@@ -124,30 +124,33 @@ scan_hex_float :: proc "contextless" (s: string) -> (mantissa: u64, exp: int, ne
 		}
 	}
 	if !saw_digits {
-		return
+		return 0, 0, neg, false, int(neg || s[0] == '+') + 1, true
 	}
 
-	// The binary exponent is required. The first byte after `p` and the sign must be a digit.
-	if !(i < n && lower(s[i]) == 'p') {
-		return
-	}
-	i += 1
-	exp_neg := false
-	if i < n && (s[i] == '+' || s[i] == '-') {
-		exp_neg = s[i] == '-'
-		i += 1
-	}
-	if i >= n || s[i] - '0' > 9 {
-		return
-	}
-	x := 0
-	for i < n && (s[i] - '0' <= 9 || s[i] == '_') {
-		if s[i] != '_' && x < 100_000 { // larger exponents overflow or underflow anyway
-			x = x*10 + int(s[i] - '0')
+	// The binary exponent is optional. The first byte after `p` and the sign must be a digit, or
+	// the `p` is not part of the number.
+	exponent: if i < n && lower(s[i]) == 'p' {
+		j := i + 1
+		exp_neg := false
+		if j < n && (s[j] == '+' || s[j] == '-') {
+			exp_neg = s[j] == '-'
+			j += 1
 		}
-		i += 1
+		if j >= n || s[j] - '0' > 9 {
+			break exponent
+		}
+		i = j
+		x := 0
+		for i < n && (s[i] - '0' <= 9 || s[i] == '_') {
+			if s[i] != '_' && x <= (max(int) - 9) / 10 { // larger exponents overflow or underflow anyway
+				x = x*10 + int(s[i] - '0')
+			} else if s[i] != '_' {
+				x = max(int)
+			}
+			i += 1
+		}
+		exp = add_exponent(exp, x, exp_neg)
 	}
-	exp += -x if exp_neg else x
 
 	if mantissa == 0 {
 		exp = 0

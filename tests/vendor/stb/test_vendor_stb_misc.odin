@@ -96,3 +96,41 @@ test_vorbis_rejects_garbage :: proc(t: ^testing.T) {
 	testing.expect(t, v == nil, "an all zero buffer is not an Ogg stream")
 	testing.expect(t, err != .none)
 }
+
+@(test)
+test_image_info2 :: proc(t: ^testing.T) {
+	W, H :: 4, 4
+	pixels: [W * H * 4]u8
+
+	Sink :: struct {
+		data: [1024]u8,
+		len:  int,
+	}
+	sink: Sink
+
+	write :: proc "c" (ctx: rawptr, data: rawptr, size: i32) {
+		sink := (^Sink)(ctx)
+		n := copy(sink.data[sink.len:], ([^]u8)(data)[:size])
+		sink.len += n
+	}
+
+	testing.expect(t, stbi.write_png_to_func(write, &sink, W, H, 4, raw_data(pixels[:]), W * 4) != 0)
+	png := stbi.info2_from_memory(raw_data(sink.data[:]), i32(sink.len))
+	testing.expect_value(t, png.type, stbi.Type.PNG)
+	testing.expect_value(t, png.x, W)
+	testing.expect_value(t, png.y, H)
+	testing.expect_value(t, png.comp, 4)
+	testing.expect_value(t, png.is_hdr, 0)
+	testing.expect_value(t, png.is_16_bit, 0)
+
+	sink.len = 0
+	testing.expect(t, stbi.write_bmp_strided_to_func(write, &sink, W, H, 4, raw_data(pixels[:]), W * 4) != 0)
+	bmp := stbi.info2_from_memory(raw_data(sink.data[:]), i32(sink.len))
+	testing.expect_value(t, bmp.type, stbi.Type.BMP)
+	testing.expect_value(t, bmp.x, W)
+	testing.expect_value(t, bmp.y, H)
+
+	garbage := [8]u8{1, 2, 3, 4, 5, 6, 7, 8}
+	none := stbi.info2_from_memory(raw_data(garbage[:]), i32(len(garbage)))
+	testing.expect_value(t, none.type, stbi.Type.Unsupported)
+}

@@ -13,7 +13,7 @@ Example:
 		r: csv.Reader
 		r.trim_leading_space  = true
 		r.reuse_record        = true // Without it you have to delete(record)
-		r.reuse_record_buffer = true // Without it you have to each of the fields within it
+		r.reuse_record_buffer = true // Without it you have to delete each of the fields within it
 		defer csv.reader_destroy(&r)
 
 		csv_data, csv_err := os.read_entire_file(filename, context.allocator)
@@ -26,17 +26,19 @@ Example:
 			return
 		}
 
-		for r, i, err in csv.iterator_next(&r) {
-			if err != nil { /* Do something with error */ }
+		for r, i in csv.iterator_next(&r) {
 			for f, j in r {
 				fmt.printfln("Record %v, field %v: %q", i, j, f)
 			}
+		}
+
+		if err := csv.iterator_last_error(r); err != nil && !csv.is_io_error(err, .EOF) {
+			fmt.eprintfln("CSV error: %v", err)
 		}
 	}
 
 	// Reads the CSV as it's processed (with a small buffer)
 	iterate_csv_from_stream :: proc(filename: string) {
-		fmt.printfln("Hellope from %v", filename)
 		r: csv.Reader
 		r.trim_leading_space  = true
 		r.reuse_record        = true // Without it you have to delete(record)
@@ -56,7 +58,10 @@ Example:
 				fmt.printfln("Record %v, field %v: %q", i, j, f)
 			}
 		}
-		fmt.printfln("Error: %v", csv.iterator_last_error(r))
+
+		if err := csv.iterator_last_error(r); err != nil && !csv.is_io_error(err, .EOF) {
+			fmt.eprintfln("CSV error: %v", err)
+		}
 	}
 
 	// Read all records at once

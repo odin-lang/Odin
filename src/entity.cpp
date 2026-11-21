@@ -210,7 +210,7 @@ struct AsmTemplateEntityDecl {
 	i32 view_bits; // the view width in bits, otherwise 0
 
 	bool no_init;
-	bool pin_overwritten; // a pinned input whose register the template writes, lowered as tied to a discarded output
+	bool overwritten; // an input whose register the template writes, lowered as tied to a discarded output
 };
 
 // An Entity is a named "thing" in the language
