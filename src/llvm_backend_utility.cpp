@@ -460,11 +460,17 @@ gb_internal lbValue lb_soa_unzip(lbProcedure *p, AstCallExpr *ce, TypeAndValue c
 	return lb_addr_load(p, res);
 }
 
-gb_internal void lb_emit_try_lhs_rhs(lbProcedure *p, Ast *arg, TypeAndValue const &tv, lbValue *lhs_, lbValue *rhs_) {
+// `result_dsts` is for a call `arg` (see `lb_emit_call`)
+gb_internal void lb_emit_try_lhs_rhs(lbProcedure *p, Ast *arg, TypeAndValue const &tv, lbValue *lhs_, lbValue *rhs_, lbValue *result_dsts = nullptr) {
 	lbValue lhs = {};
 	lbValue rhs = {};
 
-	lbValue value = lb_build_expr(p, arg);
+	lbValue value = {};
+	if (result_dsts != nullptr) {
+		value = lb_build_call_expr(p, arg, result_dsts);
+	} else {
+		value = lb_build_expr(p, arg);
+	}
 	if (is_type_tuple(value.type)) {
 		i32 n = cast(i32)(value.type->Tuple.variables.count-1);
 		if (value.type->Tuple.variables.count == 1) {
@@ -651,10 +657,10 @@ gb_internal lbValue lb_emit_or_else(lbProcedure *p, Ast *arg, Ast *else_expr, Ty
 gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results, TokenPos pos);
 gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, TokenPos pos);
 
-gb_internal lbValue lb_emit_or_return(lbProcedure *p, Ast *arg, TypeAndValue const &tv) {
+gb_internal lbValue lb_emit_or_return(lbProcedure *p, Ast *arg, TypeAndValue const &tv, lbValue *result_dsts = nullptr) {
 	lbValue lhs = {};
 	lbValue rhs = {};
-	lb_emit_try_lhs_rhs(p, arg, tv, &lhs, &rhs);
+	lb_emit_try_lhs_rhs(p, arg, tv, &lhs, &rhs, result_dsts);
 
 	// NOTE(bplu4t2f):
 	//     We must store the debug location before the or_return machinery, so that we can

@@ -1774,7 +1774,9 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 			}
 			bool by_reference = ft->args[i].kind == lbArg_Indirect &&
 			                    (ft->args[i].is_byval || is_odin_cc);
-			if (by_reference && param_offset <= 64) {
+			// NOTE(bill): Like the `sret`, a split result slot is only the callee's own local.
+			bool result_slot = is_odin_cc && ft->multiple_return_original_type != nullptr && i >= ft->original_arg_count;
+			if ((by_reference || result_slot) && param_offset <= 64) {
 				uncaptured |= 1ull<<(param_offset-1);
 			}
 			param_offset += lb_arg_value_param_count(&ft->args[i]);
@@ -1876,7 +1878,7 @@ gb_internal lbValue lb_emit_conjugate(lbProcedure *p, lbValue val, Type *type) {
 	return lb_emit_load(p, res);
 }
 
-gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining, ProcTailing tailing, lbValue *sret_dst) {
+gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining, ProcTailing tailing, lbValue *result_dsts) {
 	lbModule *m = p->module;
 
 	Type *pt = base_type(value.type);
@@ -2006,17 +2008,29 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 		Type *rt = reduce_tuple_to_single_type(results);
 		Type *original_rt = rt;
 		isize split_returns_index = processed_args.count;
+		isize last_result = results != nullptr ? results->Tuple.variables.count-1 : 0;
 		if (split_returns) {
 			GB_ASSERT(rt->kind == Type_Tuple);
 			for (isize j = 0; j < rt->Tuple.variables.count-1; j++) {
 				Type *  partial_return_type = rt->Tuple.variables[j]->type;
-				lbValue partial_return_ptr  = lb_add_local(p, partial_return_type, nullptr, false, true).addr;
+				lbValue partial_return_ptr  = {};
+				if (result_dsts != nullptr && result_dsts[j].value != nullptr) {
+					partial_return_ptr = result_dsts[j];
+				} else {
+					partial_return_ptr = lb_add_local(p, partial_return_type, nullptr, false, true).addr;
+				}
 				array_add(&processed_args, partial_return_ptr);
 			}
 			rt = reduce_tuple_to_single_type(rt->Tuple.variables[rt->Tuple.variables.count-1]->type);
 		}
 
 		if (return_by_pointer) {
+			// NOTE(bill): Without split results, a tuple comes back whole through the `sret`.
+			// The destination of its last result is not the whole tuple's.
+			lbValue *sret_dst = nullptr;
+			if (result_dsts != nullptr && (split_returns || last_result == 0) && result_dsts[last_result].value != nullptr) {
+				sret_dst = &result_dsts[last_result];
+			}
 			lbValue return_ptr = {};
 			if (sret_dst != nullptr) {
 				return_ptr = *sret_dst;
@@ -5870,13 +5884,13 @@ gb_internal lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, 
 }
 
 
-gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbValue *sret_dst = nullptr);
+gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbValue *result_dsts = nullptr);
 
-gb_internal lbValue lb_build_call_expr(lbProcedure *p, Ast *expr, lbValue *sret_dst) {
+gb_internal lbValue lb_build_call_expr(lbProcedure *p, Ast *expr, lbValue *result_dsts) {
 	expr = unparen_expr(expr);
 	ast_node(ce, CallExpr, expr);
 
-	lbValue res = lb_build_call_expr_internal(p, expr, sret_dst);
+	lbValue res = lb_build_call_expr_internal(p, expr, result_dsts);
 
 	if (ce->optional_ok_one) {
 		GB_ASSERT(is_type_tuple(res.type));
@@ -5978,7 +5992,7 @@ gb_internal lbValue lb_build_variadic_slice(lbProcedure *p, Type *slice_type, Sl
 	return lb_addr_load(p, slice);
 }
 
-gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbValue *sret_dst) {
+gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbValue *result_dsts) {
 	lbModule *m = p->module;
 
 	TypeAndValue tv = type_and_value_of_expr(expr);
@@ -6307,7 +6321,7 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 		GB_ASSERT(value.value == nullptr);
 		return lb_emit_asm_template_call(p, asm_template, call_args);
 	} else {
-		return lb_emit_call(p, value, call_args, inlining, tailing, sret_dst);
+		return lb_emit_call(p, value, call_args, inlining, tailing, result_dsts);
 	}
 }
 

@@ -172,6 +172,83 @@ test_rvo_declaration_named_multiple_results :: proc(t: ^testing.T) {
 }
 
 @(private="file")
+make_two :: #force_no_inline proc(n: int) -> (Big, Big) {
+	return make_big(n), make_big(n+10)
+}
+
+@(private="file")
+make_three :: #force_no_inline proc(n: int) -> (s: string, k: int, ok: bool) {
+	return "three", n, n > 0
+}
+
+// `a, b := call()` lets the callee write each result it returns through memory straight into its variable
+@(test)
+test_rvo_declaration_multiple :: proc(t: ^testing.T) {
+	a, b := make_two(1)
+	testing.expect_value(t, a, make_big(1))
+	testing.expect_value(t, b, make_big(11))
+
+	_, c := make_two(2)
+	testing.expect_value(t, c, make_big(12))
+	d, _ := make_two(3)
+	testing.expect_value(t, d, make_big(3))
+
+	s, k, ok := make_three(4)
+	testing.expect_value(t, s, "three")
+	testing.expect_value(t, k, 4)
+	testing.expect(t, ok)
+
+	f := make_two
+	e, g := f(5)
+	testing.expect_value(t, e, make_big(5))
+	testing.expect_value(t, g, make_big(15))
+
+	{
+		// The arguments read the outer `a`
+		a, b := make_two(a.a + 1)
+		testing.expect_value(t, a, make_big(2))
+		testing.expect_value(t, b, make_big(12))
+	}
+	testing.expect_value(t, a, make_big(1))
+}
+
+@(private="file")
+maybe_big :: #force_no_inline proc(n: int) -> (Big, bool) #optional_ok {
+	return make_big(n), n > 0
+}
+
+@(private="file")
+big_or_error :: #force_no_inline proc(n: int) -> (Big, Rvo_Error) {
+	if n < 0 {
+		return make_big(-1), .Bad
+	}
+	return make_big(n), .None
+}
+
+@(private="file")
+sum_or_return :: #force_no_inline proc(n: int) -> (sum: int, err: Rvo_Error) {
+	x := big_or_error(n) or_return
+	sum = x.a + x.b
+	return
+}
+
+@(test)
+test_rvo_declaration_optional_ok_or_return :: proc(t: ^testing.T) {
+	x := maybe_big(3)
+	testing.expect_value(t, x, make_big(3))
+	y, ok := maybe_big(-3)
+	testing.expect_value(t, y, make_big(-3))
+	testing.expect(t, !ok)
+
+	sum, err := sum_or_return(4)
+	testing.expect_value(t, sum, 9)
+	testing.expect_value(t, err, Rvo_Error.None)
+	sum2, err2 := sum_or_return(-4)
+	testing.expect_value(t, sum2, 0)
+	testing.expect_value(t, err2, Rvo_Error.Bad)
+}
+
+@(private="file")
 forward_call :: #force_no_inline proc(n: int) -> Big {
 	return make_big(n*2)
 }
@@ -258,7 +335,7 @@ test_rvo_declaration_types :: proc(t: ^testing.T) {
 }
 
 @(private="file")
-g_rvo_released:       [4]int
+g_rvo_released:       [6]int
 @(private="file")
 g_rvo_released_count: int
 
@@ -289,6 +366,18 @@ return_acquired :: #force_no_inline proc(n: int) -> Big {
 	return acquire_big(n)
 }
 
+@(private="file")
+release_two :: proc(a, b: Big) {
+	g_rvo_released[g_rvo_released_count]   = a.a
+	g_rvo_released[g_rvo_released_count+1] = b.a
+	g_rvo_released_count += 2
+}
+
+@(private="file", deferred_out=release_two)
+acquire_two :: #force_no_inline proc(n: int) -> (Big, Big) {
+	return make_big(n), make_big(n+1)
+}
+
 // A deferred procedure gets the result as it was when the call returned, and `return call()` still runs it
 @(test)
 test_rvo_declaration_deferred_out :: proc(t: ^testing.T) {
@@ -303,6 +392,11 @@ test_rvo_declaration_deferred_out :: proc(t: ^testing.T) {
 	}
 	z := return_acquired(3)
 	testing.expect_value(t, z, make_big(3))
-	testing.expect_value(t, g_rvo_released_count, 3)
-	testing.expect_value(t, g_rvo_released, [4]int{1, 2, 3, 0})
+	{
+		a, b := acquire_two(5)
+		a.a = 500
+		b.a = 600
+	}
+	testing.expect_value(t, g_rvo_released_count, 5)
+	testing.expect_value(t, g_rvo_released, [6]int{1, 2, 3, 5, 6, 0})
 }
