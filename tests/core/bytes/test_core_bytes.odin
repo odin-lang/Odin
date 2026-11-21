@@ -96,6 +96,29 @@ test_last_index_byte_bounds :: proc(t: ^testing.T) {
 	idx := bytes.last_index_byte(transmute([]byte)(input[:len(input)-1]), '.')
 	testing.expect_value(t, idx, 10)
 }
+@test
+test_split_multi_mixed_lengths :: proc(t: ^testing.T) {
+	// Delimiters of different lengths must all be matched at their own length.
+	delims := [][]byte{transmute([]byte)string("::"), transmute([]byte)string(",")}
+	s := transmute([]byte)string("a::b,c")
+	res := bytes.split_multi(s, delims)
+	defer delete(res)
+	if testing.expect_value(t, len(res), 3) {
+		testing.expect_value(t, string(res[0]), "a")
+		testing.expect_value(t, string(res[1]), "b")
+		testing.expect_value(t, string(res[2]), "c")
+	}
+
+	// Delimiter longer than the shortest one at the very end of the input.
+	delims2 := [][]byte{transmute([]byte)string(","), transmute([]byte)string("::")}
+	res2 := bytes.split_multi(transmute([]byte)string("a::b"), delims2)
+	defer delete(res2)
+	if testing.expect_value(t, len(res2), 2) {
+		testing.expect_value(t, string(res2[0]), "a")
+		testing.expect_value(t, string(res2[1]), "b")
+	}
+}
+
 
 @(private="file")
 Hiccup_Reader :: struct {
