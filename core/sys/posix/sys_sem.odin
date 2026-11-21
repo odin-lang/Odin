@@ -141,7 +141,7 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 	SETVAL  :: 16
 	SETALL  :: 17
 
-	when ODIN_ARCH == .arm64 {
+	when ODIN_ARCH == .arm64 || ODIN_ARCH == .riscv64 {
 		semid_ds :: struct {
 			sem_perm:  ipc_perm,  // [PSX] operation permission structure
 			sem_otime: time_t,    // [PSX] last semop()

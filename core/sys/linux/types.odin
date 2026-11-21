@@ -526,7 +526,7 @@ Sig_Handler_Fn :: #type proc "c" (sig: Signal)
 Sig_Restore_Fn :: #type proc "c" () -> !
 
 when size_of(rawptr) == 8 {
-	Sig_Info :: struct #packed {
+	Sig_Info :: struct {
 		signo: Signal,
 		errno: Errno,
 		code: i32,
@@ -711,7 +711,7 @@ when size_of(rawptr) == 8 {
 }
 
 SIGEV_MAX_SIZE :: 64
-SIGEV_PAD_SIZE :: ((SIGEV_MAX_SIZE-size_of(i32)*2+size_of(Sig_Val))/size_of(i32))
+SIGEV_PAD_SIZE :: ((SIGEV_MAX_SIZE-size_of(i32)*2-size_of(Sig_Val))/size_of(i32))
 
 Sig_Val :: struct #raw_union {
 	sival_int: i32,
@@ -747,15 +747,27 @@ Sig_Action_Special :: enum uint {
 }
 
 Sig_Action_Flags :: bit_set[Sig_Action_Flag; uint]
-Sig_Action :: struct {
-	using _u: struct #raw_union {
-		handler: Sig_Handler_Fn,
-		sigaction: #type proc "c" (sig: Signal, si: ^Sig_Info, ctx: rawptr),
-		special: Sig_Action_Special,
-	},
-	flags: Sig_Action_Flags,
-	restorer: Sig_Restore_Fn,
-	mask: Sig_Set,
+when ODIN_ARCH == .riscv64 {
+	Sig_Action :: struct {
+		using _u: struct #raw_union {
+			handler: Sig_Handler_Fn,
+			sigaction: #type proc "c" (sig: Signal, si: ^Sig_Info, ctx: rawptr),
+			special: Sig_Action_Special,
+		},
+		flags: Sig_Action_Flags,
+		mask: Sig_Set,
+	}
+} else {
+	Sig_Action :: struct {
+		using _u: struct #raw_union {
+			handler: Sig_Handler_Fn,
+			sigaction: #type proc "c" (sig: Signal, si: ^Sig_Info, ctx: rawptr),
+			special: Sig_Action_Special,
+		},
+		flags: Sig_Action_Flags,
+		restorer: Sig_Restore_Fn,
+		mask: Sig_Set,
+	}
 }
 
 /*
@@ -959,8 +971,10 @@ IPC_Perm :: struct {
 	cuid: u32,
 	cgid: u32,
 	mode: IPC_Flags, // Only contains mode flags.
+	_:    u16,
 	seq:  u16,
-	_:    [2 + 2*size_of(int)]u8,
+	_:    u16,
+	_:    [2]uint,
 }
 
 when size_of(int) == 8 || ODIN_ARCH == .i386 {
@@ -1730,6 +1744,7 @@ Timex :: struct {
 	errcnt:    int,
 	stbcnt:    int,
 	tai:       i32,
+	_:         [11]i32,
 }
 
 Reboot_Magic :: enum u64 {
@@ -1765,7 +1780,7 @@ Sched_Param :: struct {
 	sched_priority: i32,
 }
 
-Sched_Flags :: bit_set[Sched_Flag_Bits; u32]
+Sched_Flags :: bit_set[Sched_Flag_Bits; u64]
 
 Sched_Attr :: struct {
 	size:           u32,

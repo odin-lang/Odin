@@ -3969,6 +3969,19 @@ gb_internal LLVMValueRef OdinLLVMBuildTransmute(lbProcedure *p, LLVMValueRef val
 		return LLVMBuildZExtOrBitCast(p->builder, val, dst_type, "");
 	}
 
+	if (src_kind == LLVMVectorTypeKind && lb_is_type_kind(OdinLLVMGetVectorElementType(src_type), LLVMPointerTypeKind)) {
+		unsigned bits = cast(unsigned)(8*lb_sizeof(OdinLLVMGetVectorElementType(src_type)));
+		LLVMTypeRef int_vec = LLVMVectorType(LLVMIntTypeInContext(ctx, bits), LLVMGetVectorSize(src_type));
+		LLVMValueRef ints = LLVMBuildPtrToInt(p->builder, val, int_vec, "");
+		return OdinLLVMBuildTransmute(p, ints, dst_type);
+	}
+	if (dst_kind == LLVMVectorTypeKind && lb_is_type_kind(OdinLLVMGetVectorElementType(dst_type), LLVMPointerTypeKind)) {
+		unsigned bits = cast(unsigned)(8*lb_sizeof(OdinLLVMGetVectorElementType(dst_type)));
+		LLVMTypeRef int_vec = LLVMVectorType(LLVMIntTypeInContext(ctx, bits), LLVMGetVectorSize(dst_type));
+		LLVMValueRef ints = OdinLLVMBuildTransmute(p, val, int_vec);
+		return LLVMBuildIntToPtr(p->builder, ints, dst_type, "");
+	}
+
 	if (src_size != dst_size) {
 		if ((lb_is_type_kind(src_type, LLVMVectorTypeKind) ^ lb_is_type_kind(dst_type, LLVMVectorTypeKind))) {
 			// Okay

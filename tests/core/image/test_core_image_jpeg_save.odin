@@ -11,23 +11,13 @@ import "core:testing"
 
 JPEG_SAVE_QUALITIES :: [?]int{10, 25, 50, 75, 90, 100}
 
-when ODIN_ARCH == .riscv64 {
-	JPEG_SAVE_SOURCE_QUALITIES :: bit_set[0..<len(JPEG_SAVE_QUALITIES)]{2, 4}
-	JPEG_SAVE_MATRIX_SIZES     :: [?]int{1, 8, 9, 17}
-	JPEG_SAVE_FUZZ_ROUNDS      :: 50
-	JPEG_SAVE_EXTREME_QUALITY  :: [?]int{1, 100}
-	JPEG_SAVE_STRIP_SIZES      :: [?][2]int{{1, 1}, {3, 517}, {517, 3}}
-	JPEG_SAVE_EOBRUN_QUALITY   :: [?]int{100}
-	JPEG_SAVE_WIDE_QUALITIES   :: [?]int{1, 100}
-} else {
-	JPEG_SAVE_SOURCE_QUALITIES :: bit_set[0..<len(JPEG_SAVE_QUALITIES)]{0, 1, 2, 3, 4, 5}
-	JPEG_SAVE_MATRIX_SIZES     :: [?]int{1, 2, 7, 8, 9, 15, 16, 17}
-	JPEG_SAVE_FUZZ_ROUNDS      :: 200
-	JPEG_SAVE_EXTREME_QUALITY  :: [?]int{1, 2, 50, 99, 100}
-	JPEG_SAVE_STRIP_SIZES      :: [?][2]int{{1, 1}, {1, 1000}, {1000, 1}, {3, 517}, {517, 3}}
-	JPEG_SAVE_EOBRUN_QUALITY   :: [?]int{100, 75}
-	JPEG_SAVE_WIDE_QUALITIES   :: [?]int{1, 50, 100}
-}
+JPEG_SAVE_SOURCE_QUALITIES :: bit_set[0..<len(JPEG_SAVE_QUALITIES)]{0, 1, 2, 3, 4, 5}
+JPEG_SAVE_MATRIX_SIZES     :: [?]int{1, 2, 7, 8, 9, 15, 16, 17}
+JPEG_SAVE_FUZZ_ROUNDS      :: 200
+JPEG_SAVE_EXTREME_QUALITY  :: [?]int{1, 2, 50, 99, 100}
+JPEG_SAVE_STRIP_SIZES      :: [?][2]int{{1, 1}, {1, 1000}, {1000, 1}, {3, 517}, {517, 3}}
+JPEG_SAVE_EOBRUN_QUALITY   :: [?]int{100, 75}
+JPEG_SAVE_WIDE_QUALITIES   :: [?]int{1, 50, 100}
 
 JPEG_Save_Source :: struct {
 	file:     string,

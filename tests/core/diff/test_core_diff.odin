@@ -6,7 +6,7 @@ import "core:math/rand"
 import "core:slice"
 import "core:testing"
 
-SLIM_TESTS :: #config(ODIN_TEST_SLIM, ODIN_ARCH == .riscv64)
+SLIM_TESTS :: #config(ODIN_TEST_SLIM, false)
 
 /*
 	Harness

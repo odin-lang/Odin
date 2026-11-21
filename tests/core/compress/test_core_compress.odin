@@ -16,7 +16,7 @@ import "core:compress/deflate"
 import "core:compress/shoco"
 import "core:bytes"
 
-SLIM_TESTS :: #config(ODIN_TEST_SLIM, ODIN_ARCH == .riscv64)
+SLIM_TESTS :: #config(ODIN_TEST_SLIM, false)
 
 @test
 zlib_test :: proc(t: ^testing.T) {

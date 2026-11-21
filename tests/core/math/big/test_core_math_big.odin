@@ -5,7 +5,7 @@ import "core:mem"
 import "core:strconv"
 import "core:testing"
 
-SLIM_TESTS :: #config(ODIN_TEST_SLIM, ODIN_ARCH == .riscv64)
+SLIM_TESTS :: #config(ODIN_TEST_SLIM, false)
 
 @(test)
 test_int_destroy :: proc(t: ^testing.T) {
