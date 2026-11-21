@@ -2068,6 +2068,7 @@ review_marshal_keys :: proc(t: ^testing.T) {
 
 		data, err = json.marshal(m, {spec = .JSON5, json5_keys_omit_quotes = true}, context.temp_allocator)
 		testing.expectf(t, err == nil && string(data) == fmt.tprintf("{%s:1}", key), "JSON5 bare %q: %s %v", key, data, err)
+		clear(&back)
 		uerr = json.unmarshal(data, &back, .JSON5, context.temp_allocator)
 		testing.expectf(t, uerr == nil && len(back) == 1 && back[key] == 1, "JSON5 bare %q: %v %v", key, back, uerr)
 	}
@@ -2517,7 +2518,7 @@ review_marshal_trailing_comma :: proc(t: ^testing.T) {
 		testing.expectf(t, json.is_valid(data, opt.spec), "%v: %q is not valid", v.id, data, loc = loc)
 	}
 
-	opt := json.Marshal_Options{spec = .JSON5, json5_use_trailing_commas = true}
+	opt := json.Marshal_Options{spec = .JSON5, json5_use_trailing_commas = true, sort_maps_by_key = true}
 
 	// Type_Info_Array
 	expect_marshal(t, [0]int{}, opt, "[]")
@@ -2568,7 +2569,7 @@ review_marshal_trailing_comma :: proc(t: ^testing.T) {
 	hash_map["zero"] = 0
 	expect_marshal(t, hash_map, opt, "{\"zero\":0,}")
 	hash_map["one"] = 1
-	expect_marshal(t, hash_map, opt, "{\"zero\":0,\"one\":1,}")
+	expect_marshal(t, hash_map, opt, "{\"one\":1,\"zero\":0,}")
 
 	Struct_Empty :: struct {}
 	Struct_Using_Empty :: struct {
