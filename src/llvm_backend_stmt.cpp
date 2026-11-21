@@ -2974,6 +2974,56 @@ gb_internal void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice
 	p->in_multi_assignment = prev_in_assignment;
 }
 
+gb_internal bool lb_has_wide_vector_field(LLVMTypeRef type) {
+	unsigned n = LLVMCountStructElementTypes(type);
+	for (unsigned i = 0; i < n; i++) {
+		LLVMTypeRef field = LLVMStructGetTypeAtIndex(type, i);
+		if (lb_is_type_kind(field, LLVMVectorTypeKind) && lb_sizeof(field) > 8) {
+			return true;
+		}
+	}
+	return false;
+}
+
+gb_internal LLVMValueRef lb_load_at(lbProcedure *p, LLVMTypeRef type, LLVMValueRef ptr, u64 offset, unsigned align) {
+	LLVMValueRef index = LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), offset, false);
+	LLVMValueRef addr  = LLVMBuildInBoundsGEP2(p->builder, LLVMInt8TypeInContext(p->module->ctx), ptr, &index, 1, "");
+	LLVMValueRef value = LLVMBuildLoad2(p->builder, type, addr, "");
+	LLVMSetAlignment(value, gb_min(align, cast(unsigned)lb_sizeof(type)));
+	// NOTE(bill): SelectionDAG joins loads next to each other into one wider load.
+	// That load would stall again.
+	LLVMSetVolatile(value, true);
+	return value;
+}
+
+// Loads the struct `type` from `ptr` with a vector field loaded one element at a time, for `-o:none` only.
+// Each load is no wider than the stores that wrote the elements.
+gb_internal LLVMValueRef lb_load_by_elements(lbProcedure *p, LLVMTypeRef type, LLVMValueRef ptr, unsigned align) {
+	LLVMTargetDataRef td        = LLVMGetModuleDataLayout(p->module->mod);
+	LLVMTypeRef       lane_type = LLVMInt32TypeInContext(p->module->ctx);
+
+	LLVMValueRef res = LLVMGetUndef(type);
+	unsigned n = LLVMCountStructElementTypes(type);
+	for (unsigned i = 0; i < n; i++) {
+		LLVMTypeRef  field  = LLVMStructGetTypeAtIndex(type, i);
+		u64          offset = LLVMOffsetOfElement(td, type, i);
+		LLVMValueRef value  = nullptr;
+		if (lb_is_type_kind(field, LLVMVectorTypeKind)) {
+			LLVMTypeRef elem      = OdinLLVMGetVectorElementType(field);
+			u64         elem_size = cast(u64)lb_sizeof(elem);
+			value = LLVMGetUndef(field);
+			for (unsigned k = 0; k < LLVMGetVectorSize(field); k++) {
+				LLVMValueRef lane = lb_load_at(p, elem, ptr, offset + k*elem_size, align);
+				value = LLVMBuildInsertElement(p->builder, value, lane, LLVMConstInt(lane_type, k, false), "");
+			}
+		} else {
+			value = lb_load_at(p, field, ptr, offset, align);
+		}
+		res = LLVMBuildInsertValue(p->builder, res, value, i, "");
+	}
+	return res;
+}
+
 gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, TokenPos pos) {
 	lbFunctionType *ft = lb_get_function_type(p->module, p->type);
 	bool return_by_pointer = ft->ret.kind == lbArg_Indirect;
@@ -3023,11 +3073,23 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, Toke
 				i64 max_align = gb_max(lb_alignof(ret_type), lb_alignof(src_type));
 				p->temp_callee_return_struct_memory = llvm_alloca(p, ret_type, max_align);
 			}
-			// reuse the temp return value memory where possible
-			LLVMValueRef ptr = p->temp_callee_return_struct_memory;
-			LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(src_type, 0), "");
-			LLVMBuildStore(p->builder, ret_val, nptr);
-			ret_val = OdinLLVMBuildLoad(p, ret_type, ptr);
+			// NOTE(bill): Unoptimized code keeps the result in memory, written an element at a time.
+			// A vector loaded straight over smaller stores cannot be forwarded from them, and the processor stalls.
+			// At `-o:none` a vector is loaded an element at a time too.
+			bool by_elements = build_context.optimization_level < 0 && lb_has_wide_vector_field(ret_type);
+			if (by_elements && LLVMIsALoadInst(ret_val) && lb_sizeof(ret_type) <= lb_sizeof(src_type)) {
+				ret_val = lb_load_by_elements(p, ret_type, LLVMGetOperand(ret_val, 0), LLVMGetAlignment(ret_val));
+			} else {
+				// reuse the temp return value memory where possible
+				LLVMValueRef ptr = p->temp_callee_return_struct_memory;
+				LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(src_type, 0), "");
+				LLVMBuildStore(p->builder, ret_val, nptr);
+				if (by_elements) {
+					ret_val = lb_load_by_elements(p, ret_type, ptr, LLVMGetAlignment(ptr));
+				} else {
+					ret_val = OdinLLVMBuildLoad(p, ret_type, ptr);
+				}
+			}
 		} else {
 			ret_val = OdinLLVMBuildTransmute(p, ret_val, ret_type);
 		}

@@ -2282,6 +2282,83 @@ gb_internal lbArgType lb_amd64_odin_return_words(LLVMContextRef c, LLVMTypeRef t
 	return lb_arg_type_direct(type, llreg(c, cls, type), nullptr, nullptr);
 }
 
+// The scalar type of the float data in eightbyte `i`, or nullptr for any other data.
+// The upper half of a vector holds what its lower half holds.
+gb_internal LLVMTypeRef lb_amd64_float_word_type(LLVMContextRef c, Array<lbAbiAmd64SysV::RegClass> const &cls, isize i) {
+	using namespace lbAbiAmd64SysV;
+	while (i > 0 && cls[i] == RegClass_SSEUp) {
+		i -= 1;
+	}
+	switch (cls[i]) {
+	case RegClass_SSEFs:
+	case RegClass_SSEFv:
+		return LLVMFloatTypeInContext(c);
+	case RegClass_SSEDs:
+	case RegClass_SSEDv:
+		return LLVMDoubleTypeInContext(c);
+	}
+	return nullptr;
+}
+
+// NOTE(bill): LLVM returns vectors in XMM0 to XMM3 but scalar floats only in XMM0 and XMM1.
+// A third scalar float goes to the x87 stack.
+// Float data too big for those two goes in 16-byte vectors instead, two float words to a register.
+// A lone float word is carried as `<2 x float>`.
+// That takes a vector register of its own.
+// Integer words still take RAX, RDX, and RCX.
+// The cast type is packed.
+// Each of its fields sits on exactly the bytes it carries.
+gb_internal lbArgType lb_amd64_odin_return_vectors(LLVMContextRef c, LLVMTypeRef type) {
+	using namespace lbAbiAmd64SysV;
+	lbReturnRegisters regs = {3, 4, 0}; // RAX, RDX, and RCX; XMM0 to XMM3
+
+	i64 sz = lb_sizeof(type);
+	if (sz <= 0 || sz > 8*(regs.gpr + 2*regs.fpr)) {
+		return {};
+	}
+	auto cls = array_make<RegClass>(heap_allocator(), cast(isize)((sz + 7)/8));
+	defer (array_free(&cls));
+	classify_with(type, &cls, 0, 0);
+
+	LLVMTypeRef f32    = LLVMFloatTypeInContext(c);
+	auto        fields = array_make<LLVMTypeRef>(heap_allocator(), 0, cls.count);
+	defer (array_free(&fields));
+
+	for (isize i = 0; i < cls.count; /**/) {
+		RegClass k = cls[i];
+		if (k == RegClass_NoClass || k == RegClass_Int) {
+			regs.gpr -= 1;
+			array_add(&fields, LLVMIntTypeInContext(c, cast(unsigned)(8*gb_min(sz - 8*i, 8))));
+			i += 1;
+			continue;
+		}
+		if (!is_sse(k) && k != RegClass_SSEUp) {
+			return {}; // x87 or memory
+		}
+
+		regs.fpr -= 1;
+		bool pair = i+1 < cls.count && (is_sse(cls[i+1]) || cls[i+1] == RegClass_SSEUp);
+		if (!pair) {
+			array_add(&fields, LLVMVectorType(f32, 2));
+			i += 1;
+			continue;
+		}
+		LLVMTypeRef lo = lb_amd64_float_word_type(c, cls, i);
+		LLVMTypeRef hi = lb_amd64_float_word_type(c, cls, i+1);
+		if (lo != nullptr && lo == hi) {
+			array_add(&fields, LLVMVectorType(lo, lo == f32 ? 4 : 2));
+		} else {
+			array_add(&fields, LLVMVectorType(LLVMInt64TypeInContext(c), 2));
+		}
+		i += 2;
+	}
+	if (regs.gpr < 0 || regs.fpr < 0) {
+		return {};
+	}
+	LLVMTypeRef cast_type = LLVMStructTypeInContext(c, fields.data, cast(unsigned)fields.count, true);
+	return lb_arg_type_direct(type, cast_type, nullptr, nullptr);
+}
+
 gb_internal void lb_scalar_types(LLVMTypeRef t, Array<LLVMTypeRef> *scalars) {
 	switch (LLVMGetTypeKind(t)) {
 	case LLVMStructTypeKind: {
@@ -2333,7 +2410,13 @@ gb_internal lbArgType lb_amd64_odin_return(LLVMContextRef c, LLVMTypeRef return_
 		}
 		return ret;
 	}
-	return lb_amd64_odin_return_words(c, return_type);
+	lbArgType words = lb_amd64_odin_return_words(c, return_type);
+	if (words.type != nullptr || return_is_tuple) {
+		// NOTE(bill): A tuple too big for these is split instead.
+		// A declaration then gets its results written straight into its variables, and the last result can still take vectors.
+		return words;
+	}
+	return lb_amd64_odin_return_vectors(c, return_type);
 }
 
 // Two 64-bit integers or pointers: a string, slice, `any`, `Allocator`, etc.
@@ -2615,8 +2698,42 @@ namespace lbAbiArm64 {
 		return (member_count <= 4);
 	}
 
-	// Odin returns an aggregate of more than 16 bytes in registers where it fits: one per scalar, or else as words in X0-X7
-	gb_internal lbArgType odin_large_return(LLVMContextRef c, LLVMTypeRef return_type, ProcCallingConvention calling_convention) {
+	// NOTE(bill): A homogeneous float aggregate of up to 128 bytes, in V0 to V7 with 16 bytes to a register.
+	// Its floats stay out of the general registers the words would move them through.
+	gb_internal lbArgType odin_vector_return(LLVMContextRef c, LLVMTypeRef return_type) {
+		LLVMTypeRef base  = nullptr;
+		unsigned    count = 0;
+		if (!is_homogenous_aggregate(c, return_type, &base, &count)) {
+			return {};
+		}
+		i64 base_size = lb_sizeof(base);
+		i64 size      = base_size * cast(i64)count;
+		if (size > 8*16) {
+			return {};
+		}
+
+		auto fields = array_make<LLVMTypeRef>(heap_allocator(), 0, 8);
+		defer (array_free(&fields));
+		if (lb_is_type_kind(base, LLVMVectorTypeKind)) {
+			if (base_size != 16) {
+				return {};
+			}
+			for (unsigned i = 0; i < count; i++) {
+				array_add(&fields, base);
+			}
+		} else {
+			// The last few bytes take an 8-byte vector of their own
+			for (i64 left = size; left > 0; /**/) {
+				i64 chunk = left > 8 ? 16 : 8;
+				array_add(&fields, LLVMVectorType(base, cast(unsigned)(chunk/base_size)));
+				left -= chunk;
+			}
+		}
+		return lb_arg_type_direct(return_type, LLVMStructTypeInContext(c, fields.data, cast(unsigned)fields.count, false), nullptr, nullptr);
+	}
+
+	// Odin returns an aggregate of more than 16 bytes in registers where it fits: one per scalar, as float vectors in V0-V7, or else as words in X0-X7
+	gb_internal lbArgType odin_large_return(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_tuple, ProcCallingConvention calling_convention) {
 		if (!is_calling_convention_odin(calling_convention) ||
 		    !(lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind))) {
 			return {};
@@ -2624,6 +2741,13 @@ namespace lbAbiArm64 {
 		lbReturnRegisters regs = {8, 8, 8}; // X0-X7; V0-V7
 		if (lb_take_return_registers(return_type, &regs)) {
 			return lb_arg_type_direct(return_type);
+		}
+		// NOTE(bill): As on amd64, a tuple is left to the words or the split.
+		if (!return_is_tuple) {
+			lbArgType vectors = odin_vector_return(c, return_type);
+			if (vectors.type != nullptr) {
+				return vectors;
+			}
 		}
 		i64 size = lb_sizeof(return_type);
 		if (size <= 64) {
@@ -2649,7 +2773,7 @@ namespace lbAbiArm64 {
 			// become indirect on its own: `struct{[5]f16}` is 10 bytes and goes in x0:x1
 			i64 size = lb_sizeof(return_type);
 			if (size > 16) {
-				lbArgType in_registers = odin_large_return(c, return_type, ft->calling_convention);
+				lbArgType in_registers = odin_large_return(c, return_type, return_is_tuple, ft->calling_convention);
 				if (in_registers.type != nullptr) {
 					return in_registers;
 				}

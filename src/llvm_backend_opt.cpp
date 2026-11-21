@@ -804,6 +804,16 @@ gb_internal void lb_merge_aggregate_returns(lbFastIselLowering *s, LLVMValueRef 
 	if (!lb_aggregate_leaves(type, path, 0, leaves, &leaf_count)) {
 		return;
 	}
+	// NOTE(bill): A `ret` of float vectors keeps its own block, and SelectionDAG takes all of that block.
+	// The fast register allocator spills every value live across blocks.
+	// Through the `phi`s each vector would be stored and loaded back on every return.
+	for (isize i = 0; i < leaf_count; i++) {
+		LLVMTypeRef field_type = nullptr;
+		lb_aggregate_path_offset(type, leaves[i].path, leaves[i].depth, &field_type);
+		if (lb_is_type_kind(field_type, LLVMVectorTypeKind)) {
+			return;
+		}
+	}
 
 	auto fields = array_make<LLVMValueRef>(heap_allocator(), rets.count*leaf_count, rets.count*leaf_count);
 	defer (array_free(&fields));
