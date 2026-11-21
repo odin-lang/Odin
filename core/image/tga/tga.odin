@@ -214,6 +214,7 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 
 	if img == nil {
 		img = new(Image)
+		img.pixels.allocator = allocator
 	}
 
 	defer if err != nil {
@@ -386,6 +387,7 @@ destroy :: proc(img: ^Image) {
 	if img == nil || img.width == 0 || img.height == 0 {
 		return
 	}
+	context.allocator = img.pixels.allocator if img.pixels.allocator.procedure != nil else context.allocator
 
 	delete(img.pixels)
 	if v, ok := img.metadata.(^image.TGA_Info); ok {

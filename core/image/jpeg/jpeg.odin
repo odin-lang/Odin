@@ -59,6 +59,7 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 	}
 
 	img = new(Image) or_return
+	img.pixels.allocator = allocator
 	img.which = .JPEG
 
 	d := new(Decoder) or_return
@@ -226,6 +227,7 @@ destroy :: proc(img: ^Image) {
 	if img == nil {
 		return
 	}
+	context.allocator = img.pixels.allocator if img.pixels.allocator.procedure != nil else context.allocator
 
 	delete(img.pixels)
 

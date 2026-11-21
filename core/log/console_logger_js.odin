@@ -26,13 +26,13 @@ Console_Logger_Data :: struct {
 
 create_console_logger :: proc(lowest := Level.Debug, opt := Default_Console_Logger_Opts, ident := "", allocator := context.allocator) -> Logger {
 	data := new(Console_Logger_Data, allocator)
-	data.ident = strings.clone(ident)
+	data.ident = strings.clone(ident, allocator)
 	return Logger{console_logger_proc, data, lowest, opt}
 }
 
 destroy_console_logger :: proc(log: Logger, allocator := context.allocator) {
 	data := cast(^Console_Logger_Data)log.data
-	delete(data.ident)
+	delete(data.ident, allocator)
 	free(log.data, allocator)
 }
 

@@ -202,6 +202,7 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 
 	if img == nil {
 		img = new(Image)
+		img.pixels.allocator = allocator
 	}
 	img.which = .BMP
 
@@ -751,6 +752,7 @@ destroy :: proc(img: ^Image) {
 		// Nothing to do. Load must've returned with an error.
 		return
 	}
+	context.allocator = img.pixels.allocator if img.pixels.allocator.procedure != nil else context.allocator
 
 	delete(img.pixels)
 	if v, ok := img.metadata.(^image.BMP_Info); ok {
