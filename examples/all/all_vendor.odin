@@ -1,4 +1,5 @@
 #+build !js
+#+build !riscv64
 package all
 
 @(require) import "vendor:cgltf"

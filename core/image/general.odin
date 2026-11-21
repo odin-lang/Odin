@@ -72,7 +72,7 @@ destroy :: proc(img: ^Image, allocator := context.allocator) {
 	if img == nil {
 		return
 	}
-	context.allocator = allocator
+	context.allocator = img.pixels.allocator if img.pixels.allocator.procedure != nil else allocator
 	destroyer := _internal_destroyers[img.which]
 	if destroyer != nil {
 		destroyer(img)

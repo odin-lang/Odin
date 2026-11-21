@@ -25,7 +25,7 @@ import "core:encoding/asn1"
 import "core:testing"
 import "core:time"
 
-SLIM_TESTS :: #config(ODIN_TEST_SLIM, ODIN_ARCH == .riscv64)
+SLIM_TESTS :: #config(ODIN_TEST_SLIM, false)
 
 RSA_DER := #load("testdata/rsa.der")
 EC_DER := #load("testdata/ec.der")

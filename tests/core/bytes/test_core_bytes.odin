@@ -110,6 +110,51 @@ test_equal_fold_non_ascii_cycle :: proc(t: ^testing.T) {
 	testing.expect(t, !bytes.equal_fold(kelvin, transmute([]byte)string("j")))
 }
 
+@test
+test_buffer_write_at :: proc(t: ^testing.T) {
+	B :: proc(s: string) -> []byte { return transmute([]byte)s }
+
+	b: bytes.Buffer
+	defer bytes.buffer_destroy(&b)
+	bytes.buffer_write_string(&b, "0123456789")
+
+	// overwriting inside the contents keeps the len
+	n, err := bytes.buffer_write_at(&b, B("ab"), 0)
+	testing.expect_value(t, n, 2)
+	testing.expect_value(t, err, io.Error.None)
+	testing.expect_value(t, bytes.buffer_to_string(&b), "ab23456789")
+
+	// straddling the end extends the contents to exactly offset + len(p)
+	n, err = bytes.buffer_write_at(&b, B("XYZ"), 8)
+	testing.expect_value(t, n, 3)
+	testing.expect_value(t, err, io.Error.None)
+	testing.expect_value(t, bytes.buffer_to_string(&b), "ab234567XYZ")
+
+	// past the end, the gap reads back as zero
+	n, err = bytes.buffer_write_at(&b, B("!"), 14)
+	testing.expect_value(t, n, 1)
+	testing.expect_value(t, err, io.Error.None)
+	testing.expect_value(t, bytes.buffer_to_string(&b), "ab234567XYZ\x00\x00\x00!")
+
+	n, err = bytes.buffer_write_at(&b, B("?"), -1)
+	testing.expect_value(t, n, 0)
+	testing.expect_value(t, err, io.Error.Invalid_Offset)
+
+	// consumed bytes don't become readable again
+	c: bytes.Buffer
+	defer bytes.buffer_destroy(&c)
+	bytes.buffer_init_allocator(&c, 0, 64)
+	for i in 0..<60 {
+		bytes.buffer_write_byte(&c, 'a' + byte(i % 26))
+	}
+	consumed: [58]byte
+	bytes.buffer_read(&c, consumed[:])
+	bytes.buffer_write_at(&c, B("XY"), 10)
+	testing.expect_value(t, bytes.buffer_to_string(&c), "gh")
+	bytes.buffer_write_at(&c, B("XY"), 62)
+	testing.expect_value(t, bytes.buffer_to_string(&c), "gh\x00\x00XY")
+}
+
 @(private="file")
 Hiccup_Reader :: struct {
 	data:    []byte,

@@ -775,7 +775,7 @@ handshakestate_write_message :: proc(self: ^Handshake_State, payload, dst: []byt
 		ciphertext := msg[pattern_len:]
 		if _, status := symmetricstate_encrypt_and_hash(&self.symmetric_state, payload, ciphertext); status != .Ok {
 			if did_alloc {
-				delete(msg)
+				delete(msg, allocator)
 			}
 			self.status = .Handshake_Failed
 			return nil, status
@@ -957,7 +957,7 @@ handshakestate_read_message :: proc(self: ^Handshake_State, message, dst: []byte
 
 	if _, status := symmetricstate_decrypt_and_hash(&self.symmetric_state, msg, payload); status != .Ok {
 		if did_alloc {
-			delete(payload)
+			delete(payload, allocator)
 		}
 		self.status = .Handshake_Failed
 		return nil, self.status

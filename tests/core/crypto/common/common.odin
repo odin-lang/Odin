@@ -9,8 +9,8 @@ import "core:encoding/hex"
 Hex_Bytes :: string
 
 hexbytes_compare :: proc(x: Hex_Bytes, b: []byte, allocator := context.allocator) -> bool {
-	dst := hexbytes_decode(x)
-	defer delete(dst)
+	dst := hexbytes_decode(x, allocator)
+	defer delete(dst, allocator)
 
 	return bytes.equal(dst, b)
 }

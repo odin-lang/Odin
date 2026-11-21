@@ -49,7 +49,7 @@ fi
 # Normal Core library tests
 (
 	cd "$here/tests/core"
-	"$ODIN" test normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address ${SLIM:+-define:ODIN_TEST_SLIM=true}
+	"$ODIN" test normal.odin -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address -define:JSON_MAX_DEPTH=64 ${SLIM:+-define:ODIN_TEST_SLIM=true}
 	"$ODIN" test compress.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address ${SLIM:+-define:ODIN_TEST_SLIM=true}
 )
 

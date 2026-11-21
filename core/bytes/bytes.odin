@@ -1194,43 +1194,42 @@ split_multi_iterator :: proc(s: ^[]byte, substrs: [][]byte, skip_empty := false)
 
 // Scrubs invalid utf-8 characters and replaces them with the replacement string
 // Adjacent invalid bytes are only replaced once
-scrub :: proc(s: []byte, replacement: []byte, allocator := context.allocator, loc := #caller_location) -> []byte {
-	str := s
-	b: Buffer
-	buffer_init_allocator(&b, 0, len(s), allocator, loc)
-
-	has_error := false
-	cursor := 0
-	origin := str
-
-	for len(str) > 0 {
-		r, w := utf8.decode_rune(str)
-
-		if r == utf8.RUNE_ERROR {
-			if !has_error {
-				has_error = true
-				buffer_write(&b, origin[:cursor], loc)
-			}
-		} else if has_error {
-			has_error = false
-			buffer_write(&b, replacement, loc)
-
-			origin = origin[cursor:]
-			cursor = 0
-		}
-
-		cursor += w
-		str = str[w:]
+scrub :: proc(s: []byte, replacement: []byte, allocator := context.allocator, loc := #caller_location) -> (res: []byte, err: runtime.Allocator_Error) #optional_allocator_error {
+	b := make([dynamic]byte, 0, len(s), allocator, loc) or_return
+	defer if err != nil {
+		delete(b)
 	}
 
-	return buffer_to_bytes(&b)
+	has_error := false
+	start := 0
+	i := 0
+
+	for i < len(s) {
+		r, w := utf8.decode_rune(s[i:])
+
+		if r == utf8.RUNE_ERROR && w == 1 {
+			if !has_error {
+				has_error = true
+				append(&b, ..s[start:i], loc=loc) or_return
+				append(&b, ..replacement, loc=loc) or_return
+			}
+			start = i + w
+		} else {
+			has_error = false
+		}
+
+		i += w
+	}
+
+	append(&b, ..s[start:], loc=loc) or_return
+	return b[:], nil
 }
 
 
-reverse :: proc(s: []byte, allocator := context.allocator, loc := #caller_location) -> []byte {
+reverse :: proc(s: []byte, allocator := context.allocator, loc := #caller_location) -> (res: []byte, err: runtime.Allocator_Error) #optional_allocator_error {
 	str := s
 	n := len(str)
-	buf := make([]byte, n, loc=loc)
+	buf := make([]byte, n, allocator, loc) or_return
 	i := n
 
 	for len(str) > 0 {
@@ -1239,21 +1238,23 @@ reverse :: proc(s: []byte, allocator := context.allocator, loc := #caller_locati
 		copy(buf[i:], str[:w])
 		str = str[w:]
 	}
-	return buf
+	return buf, nil
 }
 
-expand_tabs :: proc(s: []byte, tab_size: int, allocator := context.allocator, loc := #caller_location) -> []byte {
+expand_tabs :: proc(s: []byte, tab_size: int, allocator := context.allocator, loc := #caller_location) -> (res: []byte, err: runtime.Allocator_Error) #optional_allocator_error {
 	if tab_size <= 0 {
 		panic("tab size must be positive")
 	}
 
 
 	if s == nil {
-		return nil
+		return nil, nil
 	}
 
-	b: Buffer
-	buffer_init_allocator(&b, 0, len(s), allocator, loc=loc)
+	b := make([dynamic]byte, 0, len(s), allocator, loc) or_return
+	defer if err != nil {
+		delete(b)
+	}
 
 	str := s
 	column: int
@@ -1265,7 +1266,7 @@ expand_tabs :: proc(s: []byte, tab_size: int, allocator := context.allocator, lo
 			expand := tab_size - column%tab_size
 
 			for i := 0; i < expand; i += 1 {
-				buffer_write_byte(&b, ' ', loc)
+				append(&b, ' ', loc=loc) or_return
 			}
 
 			column += expand
@@ -1273,16 +1274,16 @@ expand_tabs :: proc(s: []byte, tab_size: int, allocator := context.allocator, lo
 			if r == '\n' {
 				column = 0
 			} else {
-				column += w
+				column += 1
 			}
 
-			buffer_write_rune(&b, r, loc)
+			append(&b, ..str[:w], loc=loc) or_return
 		}
 
 		str = str[w:]
 	}
 
-	return buffer_to_bytes(&b)
+	return b[:], nil
 }
 
 partition :: proc(str, sep: []byte) -> (head, match, tail: []byte) {
@@ -1301,82 +1302,90 @@ partition :: proc(str, sep: []byte) -> (head, match, tail: []byte) {
 center_justify :: centre_justify // NOTE(bill): Because Americans exist
 
 // centre_justify returns a byte slice with a pad byte slice at boths sides if the str's rune length is smaller than length
-centre_justify :: proc(str: []byte, length: int, pad: []byte, allocator := context.allocator, loc := #caller_location) -> []byte {
+centre_justify :: proc(str: []byte, length: int, pad: []byte, allocator := context.allocator, loc := #caller_location) -> (res: []byte, err: runtime.Allocator_Error) #optional_allocator_error {
 	n := rune_count(str)
-	if n >= length || pad == nil {
-		return clone(str, allocator, loc)
+	if n >= length || len(pad) == 0 {
+		return clone_safe(str, allocator, loc)
 	}
 
-	remains := length-1
+	remains := length-n
 	pad_len := rune_count(pad)
 
-	b: Buffer
-	buffer_init_allocator(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator, loc)
+	b := make([dynamic]byte, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator, loc) or_return
+	defer if err != nil {
+		delete(b)
+	}
 
-	write_pad_string(&b, pad, pad_len, remains/2)
-	buffer_write(&b, str, loc)
-	write_pad_string(&b, pad, pad_len, (remains+1)/2)
+	write_pad_string(&b, pad, pad_len, remains/2, loc) or_return
+	append(&b, ..str, loc=loc) or_return
+	write_pad_string(&b, pad, pad_len, (remains+1)/2, loc) or_return
 
-	return buffer_to_bytes(&b)
+	return b[:], nil
 }
 
-// left_justify returns a byte slice with a pad byte slice at left side if the str's rune length is smaller than length
-left_justify :: proc(str: []byte, length: int, pad: []byte, allocator := context.allocator, loc := #caller_location) -> []byte {
+// left_justify returns a byte slice with a pad byte slice at right side if the str's rune length is smaller than length
+left_justify :: proc(str: []byte, length: int, pad: []byte, allocator := context.allocator, loc := #caller_location) -> (res: []byte, err: runtime.Allocator_Error) #optional_allocator_error {
 	n := rune_count(str)
-	if n >= length || pad == nil {
-		return clone(str, allocator, loc)
+	if n >= length || len(pad) == 0 {
+		return clone_safe(str, allocator, loc)
 	}
 
-	remains := length-1
+	remains := length-n
 	pad_len := rune_count(pad)
 
-	b: Buffer
-	buffer_init_allocator(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator, loc)
+	b := make([dynamic]byte, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator, loc) or_return
+	defer if err != nil {
+		delete(b)
+	}
 
-	buffer_write(&b, str, loc)
-	write_pad_string(&b, pad, pad_len, remains)
+	append(&b, ..str, loc=loc) or_return
+	write_pad_string(&b, pad, pad_len, remains, loc) or_return
 
-	return buffer_to_bytes(&b)
+	return b[:], nil
 }
 
-// right_justify returns a byte slice with a pad byte slice at right side if the str's rune length is smaller than length
-right_justify :: proc(str: []byte, length: int, pad: []byte, allocator := context.allocator, loc := #caller_location) -> []byte {
+// right_justify returns a byte slice with a pad byte slice at left side if the str's rune length is smaller than length
+right_justify :: proc(str: []byte, length: int, pad: []byte, allocator := context.allocator, loc := #caller_location) -> (res: []byte, err: runtime.Allocator_Error) #optional_allocator_error {
 	n := rune_count(str)
-	if n >= length || pad == nil {
-		return clone(str, allocator, loc)
+	if n >= length || len(pad) == 0 {
+		return clone_safe(str, allocator, loc)
 	}
 
-	remains := length-1
+	remains := length-n
 	pad_len := rune_count(pad)
 
-	b: Buffer
-	buffer_init_allocator(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator, loc)
+	b := make([dynamic]byte, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator, loc) or_return
+	defer if err != nil {
+		delete(b)
+	}
 
-	write_pad_string(&b, pad, pad_len, remains)
-	buffer_write(&b, str, loc)
+	write_pad_string(&b, pad, pad_len, remains, loc) or_return
+	append(&b, ..str, loc=loc) or_return
 
-	return buffer_to_bytes(&b)
+	return b[:], nil
 }
 
 
 
 
 @private
-write_pad_string :: proc(b: ^Buffer, pad: []byte, pad_len, remains: int, loc := #caller_location) {
+write_pad_string :: proc(b: ^[dynamic]byte, pad: []byte, pad_len, remains: int, loc := #caller_location) -> (err: runtime.Allocator_Error) {
 	repeats := remains / pad_len
 
 	for i := 0; i < repeats; i += 1 {
-		buffer_write(b, pad, loc)
+		append(b, ..pad, loc=loc) or_return
 	}
 
 	n := remains % pad_len
-	p := pad
+	end := 0
 
 	for i := 0; i < n; i += 1 {
-		r, width := utf8.decode_rune(p)
-		buffer_write_rune(b, r, loc)
-		p = p[width:]
+		_, width := utf8.decode_rune(pad[end:])
+		end += width
 	}
+
+	append(b, ..pad[:end], loc=loc) or_return
+	return
 }
 
 

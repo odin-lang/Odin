@@ -139,8 +139,8 @@ test_quote_rune_out_of_range :: proc(t: ^testing.T) {
 		testing.expect_value(t, ok, true)
 
 		// I don't think this API is very user friendly
-		unquoted_rune, _, tail, unquote_ok := strconv.unquote_char(quoted[1:], '\'')
-		testing.expect_value(t, unquote_ok, true)
+		unquoted_rune, _, tail, unquote_err := strconv.unquote_char(quoted[1:], '\'')
+		testing.expect_value(t, unquote_err, strconv.Unquote_Error.None)
 		testing.expect_value(t, unquoted_rune, utf8.REPLACEMENT_CHAR)
 		testing.expect_value(t, tail, "'")
 	}
@@ -623,9 +623,9 @@ test_float_scanner :: proc(t: ^testing.T) {
 		{"", 0x0000000000000000, 0, false},
 		{"e5", 0x0000000000000000, 0, false},
 		{".e5", 0x0000000000000000, 0, false},
-		{"1.5e", 0x0000000000000000, 0, false},
-		{"1.5e+", 0x0000000000000000, 0, false},
-		{"1.5ex", 0x0000000000000000, 0, false},
+		{"1.5e", 0x3ff8000000000000, 3, false},
+		{"1.5e+", 0x3ff8000000000000, 3, false},
+		{"1.5ex", 0x3ff8000000000000, 3, false},
 		{"1.5E-3", 0x3f589374bc6a7efa, 6, true},
 		{"1e400", 0x7ff0000000000000, 5, false},
 		{"1e-400", 0x0000000000000000, 6, true},
@@ -633,7 +633,7 @@ test_float_scanner :: proc(t: ^testing.T) {
 		{"-0", 0x8000000000000000, 2, true},
 		{"0x", 0x0000000000000000, 1, false},
 		{"0x1p0", 0x3ff0000000000000, 5, true},
-		{"0xg", 0x0000000000000000, 0, false},
+		{"0xg", 0x0000000000000000, 1, false},
 		{"inf", 0x7ff0000000000000, 3, true},
 		{"-inf", 0xfff0000000000000, 4, true},
 		{"nan", 0x7ff8000000000001, 3, true},
@@ -733,13 +733,13 @@ test_float_hex_scanner :: proc(t: ^testing.T) {
 		{"0x00001p4", 0x4030000000000000, 9, true},
 		{"0x1_000p0", 0x40b0000000000000, 9, true},
 		{"0x1.8p1_0", 0x4098000000000000, 9, true},
-		{"0x1.8", 0x0000000000000000, 0, false},
-		{"0x1.8p", 0x0000000000000000, 0, false},
-		{"0x1.8p+", 0x0000000000000000, 0, false},
-		{"0x1..8p1", 0x0000000000000000, 0, false},
+		{"0x1.8", 0x3ff8000000000000, 5, true},
+		{"0x1.8p", 0x3ff8000000000000, 5, false},
+		{"0x1.8p+", 0x3ff8000000000000, 5, false},
+		{"0x1..8p1", 0x3ff0000000000000, 4, false},
 		{"0x", 0x0000000000000000, 1, false},
-		{"0xp1", 0x0000000000000000, 0, false},
-		{"0x.p1", 0x0000000000000000, 0, false},
+		{"0xp1", 0x0000000000000000, 1, false},
+		{"0x.p1", 0x0000000000000000, 1, false},
 		{"0x1.8p1 ", 0x4008000000000000, 7, false},
 		{"0x1p1024", 0x7ff0000000000000, 8, false},
 		{"0x1p-1074", 0x0000000000000001, 9, true},

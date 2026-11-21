@@ -201,9 +201,10 @@ Formats an f16, f32 or f64 with the shortest output, or with a precision if the 
 
 **Returns**
 - res: The formatted number
+- fits: false if `buf` was too small and the output was clipped
 - ok: false if the value is not handled
 */
-_ftoa_fast :: #force_inline proc "contextless" (buf: []byte, val: $T, fmt: byte, precision: int, flags: Float_Flags) -> (res: []byte, ok: bool) where T == f16 || T == f32 || T == f64 {
+_ftoa_fast :: #force_inline proc "contextless" (buf: []byte, val: $T, fmt: byte, precision: int, flags: Float_Flags) -> (res: []byte, fits, ok: bool) where T == f16 || T == f32 || T == f64 {
 	when T == f64 {
 		MANTBITS :: 52
 		EXPBITS  :: 11
@@ -221,7 +222,8 @@ _ftoa_fast :: #force_inline proc "contextless" (buf: []byte, val: $T, fmt: byte,
 	exp  := int(float_bits >> MANTBITS) & (1<<EXPBITS - 1)
 	mant := float_bits & (1<<MANTBITS - 1)
 	if exp == 1<<EXPBITS - 1 {
-		return _format_inf_nan(buf, neg, mant != 0), true
+		res, fits = _format_inf_nan(buf, neg, mant != 0)
+		return res, fits, true
 	}
 	switch fmt {
 	case 'e', 'E', 'f', 'F', 'g', 'G':
@@ -294,12 +296,13 @@ _ftoa_fast :: #force_inline proc "contextless" (buf: []byte, val: $T, fmt: byte,
 	if fmt == 'g' || fmt == 'G' {
 		prec, f = _choose_g(digs, prec, shortest, fmt)
 	}
-	return _format_precision(buf, neg, digs, prec, f, flags), true
+	res, fits = _format_precision(buf, neg, digs, prec, f, flags)
+	return res, fits, true
 }
 
 
 // Note: this gets its own proc so it does not get inlined
-_ftoa_fast_f16 :: #force_no_inline proc "contextless" (buf: []byte, val: f16, fmt: byte, flags: Float_Flags) -> (res: []byte, ok: bool) {
+_ftoa_fast_f16 :: #force_no_inline proc "contextless" (buf: []byte, val: f16, fmt: byte, flags: Float_Flags) -> (res: []byte, fits, ok: bool) {
 	return _ftoa_fast(buf, val, fmt, -1, flags)
 }
 
@@ -422,7 +425,7 @@ Writes digits in the 'e', 'E', 'f' or 'F' format with fixed-size copies
 - precision: The precision. With 'e', at most 18 significant digits.
 - fmt: 'e', 'E', 'f' or 'F'
 */
-_format_precision :: #force_inline proc "contextless" (buf: []byte, neg: bool, digs: Decimal_Slice, precision: int, fmt: byte, flags: Float_Flags) -> []byte #no_bounds_check {
+_format_precision :: #force_inline proc "contextless" (buf: []byte, neg: bool, digs: Decimal_Slice, precision: int, fmt: byte, flags: Float_Flags) -> (res: []byte, fits: bool) #no_bounds_check {
 
 	copy8  :: #force_inline proc "contextless" (dst, src: [^]byte) { (^[8]byte)(dst)^ = (^[8]byte)(src)^ }
 	copy16 :: #force_inline proc "contextless" (dst, src: [^]byte) { (^[16]byte)(dst)^ = (^[16]byte)(src)^ }
@@ -516,7 +519,8 @@ _format_precision :: #force_inline proc "contextless" (buf: []byte, neg: bool, d
 		n += 2
 	}
 
-	return buf[:n] if direct else buf[:copy(buf, tmp[:n])]
+	res = buf[:n] if direct else buf[:copy(buf, tmp[:n])]
+	return res, n <= len(buf)
 }
 
 // Computes the decimal exponent as floor(log10(2**bin_exp)) if regular or

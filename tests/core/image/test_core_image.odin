@@ -26,7 +26,7 @@ import "core:strings"
 import "core:mem"
 import "core:time"
 
-SLIM_TESTS :: #config(ODIN_TEST_SLIM, ODIN_ARCH == .riscv64)
+SLIM_TESTS :: #config(ODIN_TEST_SLIM, false)
 
 TEST_SUITE_PATH_PNG :: ODIN_ROOT + "tests/core/assets/PNG"
 TEST_SUITE_PATH_BMP :: ODIN_ROOT + "tests/core/assets/BMP"

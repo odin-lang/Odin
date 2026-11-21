@@ -30,6 +30,7 @@ load_from_bytes :: proc(data: []byte, allocator := context.allocator) -> (img: ^
 	context.allocator = allocator
 
 	img = new(Image)
+	img.pixels.allocator = allocator
 	img.which = .NetPBM
 
 	header: Header; defer header_destroy(&header)

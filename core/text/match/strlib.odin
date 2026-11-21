@@ -757,7 +757,8 @@ gsub_builder :: proc(builder: ^strings.Builder, haystack, pattern, replace: stri
 @(require_results)
 gsub_allocator :: proc(haystack, pattern, replace: string, allocator := context.allocator) -> string {
 	builder := strings.builder_make(0, 256, context.temp_allocator)
-	return gsub_builder(&builder, haystack, pattern, replace)
+	res := gsub_builder(&builder, haystack, pattern, replace)
+	return strings.clone(res, allocator)
 }
 
 Gsub_Proc :: proc(
@@ -845,7 +846,8 @@ pattern_case_insensitive_builder :: proc(builder: ^strings.Builder, pattern: str
 @(require_results)
 pattern_case_insensitive_allocator :: proc(pattern: string, cap: int = 256, allocator := context.allocator) -> string {
 	builder := strings.builder_make(0, cap, context.temp_allocator)
-	return pattern_case_insensitive_builder(&builder, pattern)	
+	res := pattern_case_insensitive_builder(&builder, pattern)
+	return strings.clone(res, allocator)
 }
 
 pattern_case_insensitive :: proc { pattern_case_insensitive_builder, pattern_case_insensitive_allocator }

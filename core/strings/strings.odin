@@ -4,7 +4,6 @@ package strings
 import "base:intrinsics"
 import "base:runtime"
 import "core:bytes"
-import "core:io"
 import "core:unicode"
 import "core:unicode/utf8"
 
@@ -2914,39 +2913,39 @@ Example:
 
 Output:
 
-	Hello?
+	Hello?World
 
 */
 @(require_results)
 scrub :: proc(s: string, replacement: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
-	str := s
 	b: Builder
 	builder_init(&b, 0, len(s), allocator, loc) or_return
-
-	has_error := false
-	cursor := 0
-	origin := str
-
-	#no_bounds_check for len(str) > 0 {
-		r, w := utf8.decode_rune_in_string(str)
-
-		if r == utf8.RUNE_ERROR {
-			if !has_error {
-				has_error = true
-				write_string(&b, origin[:cursor])
-			}
-		} else if has_error {
-			has_error = false
-			write_string(&b, replacement)
-
-			origin = origin[cursor:]
-			cursor = 0
-		}
-
-		cursor += w
-		str = str[w:]
+	defer if err != nil {
+		builder_destroy(&b)
 	}
 
+	has_error := false
+	start := 0
+	i := 0
+
+	#no_bounds_check for i < len(s) {
+		r, w := utf8.decode_rune_in_string(s[i:])
+
+		if r == utf8.RUNE_ERROR && w == 1 {
+			if !has_error {
+				has_error = true
+				write_string(&b, s[start:i], loc) or_return
+				write_string(&b, replacement, loc) or_return
+			}
+			start = i + w
+		} else {
+			has_error = false
+		}
+
+		i += w
+	}
+
+	write_string(&b, s[start:], loc) or_return
 	return to_string(b), nil
 }
 
@@ -3040,7 +3039,9 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator, lo
 
 	b: Builder
 	builder_init(&b, allocator, loc) or_return
-	writer := to_writer(&b)
+	defer if err != nil {
+		builder_destroy(&b)
+	}
 	str := s
 	column: int
 
@@ -3051,7 +3052,7 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator, lo
 			expand := tab_size - column%tab_size
 
 			for i := 0; i < expand; i += 1 {
-				io.write_byte(writer, ' ')
+				write_byte(&b, ' ', loc) or_return
 			}
 
 			column += expand
@@ -3059,10 +3060,10 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator, lo
 			if r == '\n' {
 				column = 0
 			} else {
-				column += w
+				column += 1
 			}
 
-			io.write_rune(writer, r)
+			write_string(&b, str[:w], loc) or_return
 		}
 
 		str = str[w:]
@@ -3154,12 +3155,13 @@ centre_justify :: proc(str: string, length: int, pad: string, allocator := conte
 
 	b: Builder
 	builder_init(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator, loc) or_return
+	defer if err != nil {
+		builder_destroy(&b)
+	}
 
-	w := to_writer(&b)
-
-	write_pad_string(w, pad, pad_len, remains/2)
-	io.write_string(w, str)
-	write_pad_string(w, pad, pad_len, (remains+1)/2)
+	write_pad_string(&b, pad, pad_len, remains/2, loc) or_return
+	write_string(&b, str, loc) or_return
+	write_pad_string(&b, pad, pad_len, (remains+1)/2, loc) or_return
 
 	return to_string(b), nil
 }
@@ -3192,11 +3194,12 @@ left_justify :: proc(str: string, length: int, pad: string, allocator := context
 
 	b: Builder
 	builder_init(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator, loc) or_return
+	defer if err != nil {
+		builder_destroy(&b)
+	}
 
-	w := to_writer(&b)
-
-	io.write_string(w, str)
-	write_pad_string(w, pad, pad_len, remains)
+	write_string(&b, str, loc) or_return
+	write_pad_string(&b, pad, pad_len, remains, loc) or_return
 
 	return to_string(b), nil
 }
@@ -3229,40 +3232,43 @@ right_justify :: proc(str: string, length: int, pad: string, allocator := contex
 
 	b: Builder
 	builder_init(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator, loc) or_return
+	defer if err != nil {
+		builder_destroy(&b)
+	}
 
-	w := to_writer(&b)
-
-	write_pad_string(w, pad, pad_len, remains)
-	io.write_string(w, str)
+	write_pad_string(&b, pad, pad_len, remains, loc) or_return
+	write_string(&b, str, loc) or_return
 
 	return to_string(b), nil
 }
 
 /*
-Writes a given pad string a specified number of times to an `io.Writer`
+Writes a given pad string a specified number of times to a `Builder`
 
 Inputs:
-- w: The io.Writer to write the pad string to
+- b: The Builder to write the pad string to
 - pad: The pad string to be written
 - pad_len: The length of the pad string, in runes
 - remains: The number of times to write the pad string, in runes
 */
 @private
-write_pad_string :: proc(w: io.Writer, pad: string, pad_len, remains: int) {
+write_pad_string :: proc(b: ^Builder, pad: string, pad_len, remains: int, loc := #caller_location) -> (err: runtime.Allocator_Error) {
 	repeats := remains / pad_len
 
 	for _ in 0..<repeats {
-		io.write_string(w, pad)
+		write_string(b, pad, loc) or_return
 	}
 
 	n := remains % pad_len
-	p := pad
+	end := 0
 
 	#no_bounds_check for _ in 0..<n {
-		r, width := utf8.decode_rune_in_string(p)
-		io.write_rune(w, r)
-		p = p[width:]
+		_, width := utf8.decode_rune_in_string(pad[end:])
+		end += width
 	}
+
+	write_string(b, pad[:end], loc) or_return
+	return
 }
 
 /*

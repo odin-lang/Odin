@@ -858,7 +858,7 @@ internal_prime_fermat :: proc(a, b: ^Int, allocator := context.allocator) -> (fe
 	/*
 		Compute `t` = `b`**`a` mod `a`
 	*/
-	internal_int_exponent_mod(t, b, a, a) or_return
+	internal_int_exponent_mod(t, b, a, a, allocator) or_return
 
 	/*
 		Is it equal to b?

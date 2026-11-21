@@ -206,27 +206,30 @@ parse_number_string :: #force_inline proc "contextless" (s: string) -> (mantissa
 	}
 
 	// Exponent part. The first byte after `e` and the sign must be a digit.
-	if i < n && lower(s[i]) == 'e' {
-		i += 1
+	exponent: if i < n && lower(s[i]) == 'e' {
+		j := i + 1
 		exp_neg := false
-		if i < n && (s[i] == '+' || s[i] == '-') {
-			exp_neg = s[i] == '-'
-			i += 1
+		if j < n && (s[j] == '+' || s[j] == '-') {
+			exp_neg = s[j] == '-'
+			j += 1
 		}
-		if i >= n || s[i] - '0' > 9 {
-			return // not a valid exponent, so not a number
+		if j >= n || s[j] - '0' > 9 {
+			break exponent // not a valid exponent: the number ends before the `e`
 		}
+		i = j
 		x := 0
 		for i < n && s[i] - '0' <= 9 {
-			if x < 100_000 { // larger exponents overflow or underflow anyway
+			if x <= (max(int) - 9) / 10 { // larger exponents overflow or underflow anyway
 				x = x*10 + int(s[i] - '0')
+			} else {
+				x = max(int)
 			}
 			i += 1
 		}
 		if i < n && s[i] == '_' {
 			i, x = parse_exponent_with_separators(s, i, x)
 		}
-		exp += -x if exp_neg else x
+		exp = add_exponent(exp, x, exp_neg)
 	}
 
 	if digits > MAX_SIG_DIGITS {
@@ -263,8 +266,10 @@ parse_exponent_with_separators :: proc "contextless" (s: string, i: int, x: int)
 	i, x := i, x
 	for i < len(s) {
 		if s[i] - '0' <= 9 {
-			if x < 100_000 { // larger exponents overflow or underflow anyway
+			if x <= (max(int) - 9) / 10 { // larger exponents overflow or underflow anyway
 				x = x*10 + int(s[i] - '0')
+			} else {
+				x = max(int)
 			}
 		} else if s[i] != '_' {
 			break
@@ -272,6 +277,14 @@ parse_exponent_with_separators :: proc "contextless" (s: string, i: int, x: int)
 		i += 1
 	}
 	return i, x
+}
+
+@(private)
+add_exponent :: #force_inline proc "contextless" (exp, x: int, neg: bool) -> int {
+	if neg {
+		return min(int) if exp < min(int) + x else exp - x
+	}
+	return max(int) if exp > max(int) - x else exp + x
 }
 
 /*
@@ -311,7 +324,7 @@ read_significant_digits :: proc "contextless" (s: string, i, end, int_digits, e:
 		mantissa = mantissa*10 + u64(c - '0')
 		nd += 1
 	}
-	exp += int_left
+	exp = add_exponent(exp, int_left, false)
 	return mantissa, exp, i < end
 }
 

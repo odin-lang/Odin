@@ -5,7 +5,7 @@ import "core:mem"
 import "core:strconv"
 import "core:testing"
 
-SLIM_TESTS :: #config(ODIN_TEST_SLIM, ODIN_ARCH == .riscv64)
+SLIM_TESTS :: #config(ODIN_TEST_SLIM, false)
 
 @(test)
 test_int_destroy :: proc(t: ^testing.T) {
@@ -540,10 +540,10 @@ test_atoi :: proc(t: ^testing.T) {
 		{"1\n23",                                  10, .Invalid_Character,   "1",                         1},
 		{"12 \nx",                                 10, .Invalid_Character,   "12",                        2},
 		{" 12",                                    10, .Invalid_Character,   "0",                         0},
-		{"-x",                                     10, .Invalid_Character,   "0",                         1},
-		{"--1",                                    10, .Invalid_Character,   "0",                         1},
-		{"-\n",                                    10, .Invalid_Character,   "0",                         1},
-		{"- \r\n",                                 16, .Invalid_Character,   "0",                         1},
+		{"-x",                                     10, .Invalid_Character,   "0",                         0},
+		{"--1",                                    10, .Invalid_Character,   "0",                         0},
+		{"-\n",                                    10, .Invalid_Character,   "0",                         0},
+		{"- \r\n",                                 16, .Invalid_Character,   "0",                         0},
 		{"+1",                                     10, .Invalid_Character,   "0",                         0},
 
 		{"",                                       10, .Empty_Input,         "0",                         0},

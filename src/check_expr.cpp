@@ -9735,6 +9735,7 @@ gb_internal ExprKind check_call_expr_as_type_cast(CheckerContext *c, Operand *op
 			Entity *e = ot->Named.type_name;
 			add_entity_use(c, ident, e);
 			add_type_and_value(c, call, Addressing_Type, ot, empty_exact_value);
+			operand->expr = call;
 		} else {
 			operand->mode = Addressing_Invalid;
 			operand->type = t_invalid;
@@ -13715,6 +13716,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 			o->mode = Addressing_Type;
 			o->type = type;
 		}
+		o->expr = node;
 		return kind;
 	case_end;
 

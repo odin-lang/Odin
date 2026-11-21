@@ -33,6 +33,7 @@ destroy :: proc(img: ^Image) {
 		*/
 		return
 	}
+	context.allocator = img.pixels.allocator if img.pixels.allocator.procedure != nil else context.allocator
 
 	delete(img.pixels)
 
