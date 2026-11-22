@@ -48,11 +48,11 @@ make_color_palette :: proc(use_color: bool) -> (palette: Color_Palette) {
 	}
 
 	palette.reset = ansi.sgr(ansi.RESET)
-	palette.heading = ansi.sgr(ansi.BOLD + ";" + ansi.FG_GREEN)
-	palette.identifier = ansi.sgr(ansi.BOLD + ";" + ansi.FG_CYAN)
+	palette.heading = ansi.sgr(ansi.BOLD + ";" + ansi.FG_BRIGHT_GREEN)
+	palette.identifier = ansi.sgr(ansi.BOLD + ";" + ansi.FG_BRIGHT_CYAN)
 	palette.placeholder = ansi.sgr(ansi.FG_CYAN)
 	palette.secondary = ansi.sgr(ansi.FAINT)
-	palette.error = ansi.sgr(ansi.BOLD + ";" + ansi.FG_RED)
+	palette.error = ansi.sgr(ansi.BOLD + ";" + ansi.FG_BRIGHT_RED)
 	return
 }
 
