@@ -1293,6 +1293,13 @@ gb_internal lbProcedure *lb_procedure_with_body(lbModule *m, u32 hash, String co
 	return *found;
 }
 
+// NOTE(bill): Another body can replace a `weak` or `link_once` procedure at link time.
+// What it writes is unknown, the same as for a procedure with no body here.
+gb_internal bool lb_may_be_replaced(lbProcedure *p) {
+	u64 const replaceable = EntityFlag_CustomLinkage_Weak|EntityFlag_CustomLinkage_LinkOnce;
+	return p->entity != nullptr && (p->entity->flags & replaceable) != 0;
+}
+
 gb_internal lbProcedure *lb_find_definition(lbGenerator *gen, LLVMValueRef fn) {
 	lbModule **m = map_get(&gen->modules_through_ctx, LLVMGetModuleContext(LLVMGetGlobalParent(fn)));
 	if (m == nullptr) {
@@ -1304,17 +1311,24 @@ gb_internal lbProcedure *lb_find_definition(lbGenerator *gen, LLVMValueRef fn) {
 	String name = make_string(cast(u8 const *)cname, cast(isize)len);
 	u32    hash = string_hash(name);
 
+	lbProcedure *def = nullptr;
 	if (LLVMGetFirstBasicBlock(fn) != nullptr) {
-		lbProcedure *def = lb_procedure_with_body(*m, hash, name);
-		return def != nullptr && def->value == fn ? def : nullptr;
+		def = lb_procedure_with_body(*m, hash, name);
+		if (def != nullptr && def->value != fn) {
+			def = nullptr;
+		}
+	} else {
+		// NOTE(bill): A procedure of another module is declared here under the same name, with its entity.
+		lbProcedure **decl = string_map_get(&(*m)->procedures, hash, name);
+		if (decl == nullptr || *decl == nullptr || (*decl)->entity == nullptr) {
+			return nullptr;
+		}
+		def = lb_procedure_with_body(lb_module_of_entity(gen, (*decl)->entity, *m), hash, name);
 	}
-
-	// NOTE(bill): A procedure of another module is declared here under the same name, with its entity.
-	lbProcedure **decl = string_map_get(&(*m)->procedures, hash, name);
-	if (decl == nullptr || *decl == nullptr || (*decl)->entity == nullptr) {
+	if (def != nullptr && lb_may_be_replaced(def)) {
 		return nullptr;
 	}
-	return lb_procedure_with_body(lb_module_of_entity(gen, (*decl)->entity, *m), hash, name);
+	return def;
 }
 
 gb_internal lbProcedure *lb_definition_of(lbReadOnlyCalls *r, LLVMValueRef fn) {

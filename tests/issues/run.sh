@@ -667,6 +667,12 @@ if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 	$ODIN test ../test_issue_sysv_abi $COMMON
 fi
 
+# A C body replaces a `weak` Odin procedure at link time
+if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
+	clang -c ../test_issue_weak_read_only/test_issue_weak_read_only.c -o test_issue_weak_read_only_c.o
+	$ODIN test ../test_issue_weak_read_only $COMMON
+fi
+
 # AVX-512 asked for through -target-features on the default microarch; needs a CPU that has it
 if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 	if grep -qw avx512f /proc/cpuinfo 2>/dev/null; then

@@ -269,6 +269,14 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 %ODIN% test "..\test_issue_win64_wide_vector_args" %COMMON% || exit /b
 %ODIN% test "..\test_issue_win64_wide_vector_args" %COMMON% -microarch:haswell || exit /b
 
+@if "%ODIN_TESTS_NO_CLANG%" == "" (
+	clang -c "..\test_issue_weak_read_only\test_issue_weak_read_only.c" -o test_issue_weak_read_only_c.o || exit /b
+) else (
+	cl -c "..\test_issue_weak_read_only\test_issue_weak_read_only.c" /Fo:test_issue_weak_read_only_c.o || exit /b
+)
+
+%ODIN% test "..\test_issue_weak_read_only" %COMMON% || exit /b
+
 @rem #########################################################################################################
 
 @echo off
