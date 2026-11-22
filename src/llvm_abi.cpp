@@ -963,6 +963,12 @@ namespace lbAbiAmd64Win64 {
 		if (is_m64_vector(type)) {
 			return lb_arg_type_direct(type, LLVMInt64TypeInContext(c), nullptr, nullptr);
 		}
+		if (kind == LLVMVectorTypeKind && lb_sizeof(type) > 16) {
+			// NOTE(bill): MSVC passes `__m256` and `__m512` by reference whatever `/arch` says.
+			// LLVM does the same only while the vector fits one register.
+			// Without AVX it splits `<8 x float>` into halves and passes each by reference.
+			return lb_arg_type_indirect(type, nullptr);
+		}
 		return lbAbi386::non_struct(c, type, false, nullptr);
 	}
 
@@ -1456,6 +1462,15 @@ namespace lbAbiAmd64SysV {
 	                                 bool is_arg,
 	                                 i32 *int_regs, i32 *sse_regs, Type *source_type) {
 		auto cls = classify(type, source_type);
+
+		// An SSE run wider than two eightbytes has no register to land in at the baseline ISA.
+		// An argument goes to memory, bare vector or struct-wrapped, and takes no register.
+		bool wide_sse = cls.count > 2 && is_sse(cls[0]);
+		if (wide_sse && is_arg) {
+			return lb_arg_type_indirect_byval(c, type, source_type);
+		}
+
+		// NOTE(bill): SSEUP is the upper half of the register before it, not a register of its own.
 		i32 needed_int = 0;
 		i32 needed_sse = 0;
 		for (auto c : cls) {
@@ -1474,36 +1489,27 @@ namespace lbAbiAmd64SysV {
 			case RegClass_SSEInt32:
 			case RegClass_SSEInt64:
 			case RegClass_SSEInt128:
-			case RegClass_SSEUp:
 				needed_sse += 1;
 				break;
 			}
 		}
 
+		// NOTE(bill): An argument that does not fit the registers left goes to memory whole.
+		// It gives back whatever it was assigned (§3.2.3), and a later argument can still take those.
 		bool ran_out_of_regs = false;
 		if (int_regs && sse_regs) {
-			*int_regs -= needed_int;
-			*sse_regs -= needed_sse;
-			bool int_ok = *int_regs >= 0;
-			bool sse_ok = *sse_regs >= 0;
-
-			*int_regs = gb_max(*int_regs, 0);
-			*sse_regs = gb_max(*sse_regs, 0);
-
-			if ((!int_ok || !sse_ok) && is_aggregate(type)) {
-				ran_out_of_regs = true;
+			if (needed_int <= *int_regs && needed_sse <= *sse_regs) {
+				*int_regs -= needed_int;
+				*sse_regs -= needed_sse;
+			} else {
+				ran_out_of_regs = is_aggregate(type);
 			}
 		}
 
-		if (cls.count > 2 && is_sse(cls[0])) {
-			// An SSE run wider than two eightbytes has no register to land in at
-			// the baseline ISA. It goes to memory, bare vector or struct-wrapped.
+		if (wide_sse) {
 			// A bare vector RETURN is the one exception: it is not an aggregate.
 			// Clang gives it no hidden pointer and lets LLVM split it across
 			// xmm0:xmm1, but the struct that wraps it still gets one.
-			if (is_arg) {
-				return lb_arg_type_indirect_byval(c, type, source_type);
-			}
 			if (LLVMGetTypeKind(type) != LLVMVectorTypeKind) {
 				all_mem(&cls);
 			}
