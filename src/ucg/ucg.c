@@ -8,15 +8,14 @@
 // NOTE(Feoramund): This is my UCG library, adapted for use within the Odin compiler.
 // Most of the comments have been let alone and may not strictly apply anymore.
 //
-// 1. The UCG allocator interface was replaced by gbAllocator.
+// 1. The UCG allocator interface was removed; ucg_next_grapheme yields one grapheme at a time.
 // 2. The UCG UTF-8 decoder was replaced with the one already in the compiler.
 // 3. Non-essential code was stripped.
 // 4. Some types were changed for compatibility.
 //
 
 
-/* This is the data that is allocated when an allocator is passed to
- * ucg_decode_grapheme_clusters. */
+/* This is the grapheme that ucg_next_grapheme yields. */
 typedef struct {
 	i32 byte_index;
 	i32 rune_index;
@@ -312,7 +311,8 @@ enum grapheme_cluster_sequence {
 };
 
 typedef struct {
-	ucg_grapheme* graphemes;
+	bool has_grapheme;
+	ucg_grapheme grapheme;
 	i32 rune_count;
 	i32 grapheme_count;
 	i32 width;
@@ -332,8 +332,14 @@ typedef struct {
 } ucg_decoder_state;
 
 
+typedef struct {
+	const uint8_t* str;
+	i32 str_len;
+	i32 byte_index;
+	ucg_decoder_state state;
+} ucg_grapheme_iterator;
+
 void _ucg_decode_grapheme_clusters_deferred_step(
-	gbAllocator allocator,
 	ucg_decoder_state* state,
 	i32 byte_index,
 	int32_t this_rune
@@ -349,20 +355,14 @@ void _ucg_decode_grapheme_clusters_deferred_step(
 	if (state->grapheme_count > state->last_grapheme_count) {
 		state->width += ucg_normalized_east_asian_width(this_rune);
 
-		/* if (allocator != NULL) { */
-			state->graphemes = (ucg_grapheme*)gb_resize(allocator,
-				state->graphemes,
-				sizeof(ucg_grapheme) * (state->grapheme_count),
-				sizeof(ucg_grapheme) * (1 + state->grapheme_count));
+		ucg_grapheme append = {
+			byte_index,
+			state->rune_count,
+			state->width - state->last_width,
+		};
 
-			ucg_grapheme append = {
-				byte_index,
-				state->rune_count,
-				state->width - state->last_width,
-			};
-
-			state->graphemes[state->grapheme_count - 1] = append;
-		/* } */
+		state->grapheme = append;
+		state->has_grapheme = true;
 
 		state->last_grapheme_count = state->grapheme_count;
 		state->last_width = state->width;
@@ -378,16 +378,14 @@ void _ucg_decode_grapheme_clusters_deferred_step(
 	state->continue_sequence = false;
 }
 
-int ucg_decode_grapheme_clusters(
-	gbAllocator allocator,
-	const uint8_t* str,
-	int str_len,
+ucg_grapheme_iterator ucg_grapheme_iterator_make(const uint8_t* str, i32 str_len) {
+	ucg_grapheme_iterator it = {};
+	it.str = str;
+	it.str_len = str_len;
+	return it;
+}
 
-	ucg_grapheme** out_graphemes,
-	i32* out_rune_count,
-	i32* out_grapheme_count,
-	i32* out_width
-) {
+int ucg_next_grapheme(ucg_grapheme_iterator* it, ucg_grapheme* out_grapheme) {
 	// The following procedure implements text segmentation by breaking on
 	// Grapheme Cluster Boundaries[1], using the values[2] and rules[3] from
 	// the Unicode® Standard Annex #29, entitled:
@@ -427,19 +425,28 @@ int ucg_decode_grapheme_clusters(
 	//
 	// Treat them as any other space.
 
-	ucg_decoder_state state = {0};
+	ucg_decoder_state state = it->state;
+	const uint8_t* str = it->str;
+	i32 str_len = it->str_len;
 
-#define UCG_DEFERRED_DECODE_STEP() (_ucg_decode_grapheme_clusters_deferred_step(allocator, &state, byte_index, this_rune))
+#define UCG_DEFERRED_DECODE_STEP() do { \
+	_ucg_decode_grapheme_clusters_deferred_step(&state, byte_index, this_rune); \
+	if (state.has_grapheme) { \
+		state.has_grapheme = false; \
+		it->state = state; \
+		it->byte_index = byte_index + bytes_advanced; \
+		*out_grapheme = state.grapheme; \
+		return 1; \
+	} \
+} while (0)
 
-	for (i32 byte_index = 0, bytes_advanced = 0; byte_index < str_len; byte_index += bytes_advanced) {
+	for (i32 byte_index = it->byte_index, bytes_advanced = 0; byte_index < str_len; byte_index += bytes_advanced) {
 		int32_t this_rune = GB_RUNE_INVALID;
 		bytes_advanced = (i32)(utf8_decode(str+byte_index, str_len-byte_index, &this_rune));
 		if (this_rune == GB_RUNE_INVALID || bytes_advanced == 0) {
 			// There was a Unicode parsing error; bail out.
-			if (out_graphemes != NULL)      { *out_graphemes = state.graphemes; }
-			if (out_rune_count != NULL)     { *out_rune_count = state.rune_count; }
-			if (out_grapheme_count != NULL) { *out_grapheme_count = state.grapheme_count; }
-			if (out_width != NULL)          { *out_width = state.width; }
+			it->state = state;
+			it->byte_index = byte_index;
 
 			// Return an error code.
 			return -1;
@@ -671,11 +678,8 @@ int ucg_decode_grapheme_clusters(
 
 #undef UCG_DEFERRED_DECODE_STEP
 
-	if (out_graphemes != NULL)      { *out_graphemes = state.graphemes; }
-	if (out_rune_count != NULL)     { *out_rune_count = state.rune_count; }
-	if (out_grapheme_count != NULL) { *out_grapheme_count = state.grapheme_count; }
-	if (out_width != NULL)          { *out_width = state.width; }
-
+	it->state = state;
+	it->byte_index = str_len;
 	return 0;
 }
 

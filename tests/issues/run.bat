@@ -40,6 +40,7 @@ set ODIN=..\..\..\odin
 %ODIN% check "..\test_issue_6874" %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_6979" -no-entry-point %COMMON% || exit /b
 %ODIN% check "..\test_issue_7012" -no-entry-point %COMMON% || exit /b
+%ODIN% check "..\test_issue_7199" %COMMON% 2>&1 | find /c "..19988 chars.." | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_7260" -no-entry-point %COMMON% || exit /b
 %ODIN% check "..\test_issue_7304" %COMMON% 2>&1 | find /c "9223372036854775808 is not representable by int" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_7336" -no-entry-point %COMMON% || exit /b
