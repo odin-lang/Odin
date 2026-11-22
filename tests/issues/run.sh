@@ -750,8 +750,12 @@ if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]] && command -v wasmtime > /dev/null; then
 	done
 fi
 rm -rf issue_7990
-mkdir -p issue_7990/test_issue_7990/build issue_7990/test_issue_7990/deep/build
+mkdir -p issue_7990/test_issue_7990/build issue_7990/test_issue_7990/deep/build issue_7990/directory.data issue_7990/collision issue_7990/.hiddendir
 cp ../test_issue_7990/test_issue_7990.odin issue_7990/test_issue_7990/
+cp ../test_issue_7990/.hidden.odin issue_7990/
+cp ../test_issue_7990/directory.data/main.odin issue_7990/directory.data/
+cp ../test_issue_7990/collision.odin issue_7990/
+cp ../test_issue_7990/.hiddendir/main.odin issue_7990/.hiddendir/
 
 pushd issue_7990/test_issue_7990/build
 "$ODIN_FULL" build ..
@@ -761,6 +765,21 @@ popd
 pushd issue_7990/test_issue_7990/deep/build
 "$ODIN_FULL" build ../..
 test -f test_issue_7990
+popd
+
+$ODIN build issue_7990/directory.data
+test -f directory.data
+
+$ODIN build issue_7990/.hiddendir
+test -f .hiddendir
+
+"$ODIN_FULL" build issue_7990/.hidden.odin -file
+test -f .hidden
+
+pushd issue_7990
+"$ODIN_FULL" build collision.odin -file
+# This script could be run on Windows as well.
+test -f collision.bin || test -f collision.exe
 popd
 
 #########################################################################################################
@@ -775,3 +794,5 @@ set +x
 
 popd
 rm -rf build
+
+echo "Issue tests successful."

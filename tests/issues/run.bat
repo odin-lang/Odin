@@ -287,7 +287,14 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 if exist issue_7990 rmdir /S /Q issue_7990
 mkdir issue_7990\test_issue_7990\build
 mkdir issue_7990\test_issue_7990\deep\build
+mkdir issue_7990\directory.data
+mkdir issue_7990\collision
+mkdir issue_7990\.hiddendir
 copy ..\test_issue_7990\test_issue_7990.odin issue_7990\test_issue_7990\ > nul || exit /b
+copy ..\test_issue_7990\.hidden.odin issue_7990\ > nul || exit /b
+copy ..\test_issue_7990\directory.data\main.odin issue_7990\directory.data\ > nul || exit /b
+copy ..\test_issue_7990\collision.odin issue_7990\ > nul || exit /b
+copy ..\test_issue_7990\.hiddendir\main.odin issue_7990\.hiddendir\ > nul || exit /b
 pushd issue_7990\test_issue_7990\build
 "%ODIN_FULL%" build .. || exit /b
 if not exist test_issue_7990.exe exit /b
@@ -296,6 +303,16 @@ pushd issue_7990\test_issue_7990\deep\build
 "%ODIN_FULL%" build ..\.. || exit /b
 if not exist test_issue_7990.exe exit /b
 popd
+%ODIN% build "issue_7990\directory.data" || exit /b
+if not exist directory.data.exe exit /b
+%ODIN% build "issue_7990\.hiddendir" || exit /b
+if not exist .hiddendir.exe exit /b
+"%ODIN_FULL%" build "issue_7990\.hidden.odin" -file || exit /b
+if not exist .hidden.exe exit /b
+pushd issue_7990
+"%ODIN_FULL%" build collision.odin -file || exit /b
+if not exist collision.exe exit /b
+popd
 
 @rem #########################################################################################################
 
@@ -303,3 +320,5 @@ popd
 
 popd
 rmdir /S /Q build
+
+@echo Issue tests successful.
