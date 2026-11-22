@@ -248,7 +248,7 @@ emit_code_section :: proc(m: Module, out: ^[dynamic]u8, relocs: ^[dynamic]Reloca
 		emit_locals(&body, locals)
 		expr_off_in_body := u32(len(body))
 
-		scratch := make([]u8, encode_max_code_size(len(all_ops)) + 16, tmp)
+		scratch := make([]u8, encode_ops_size(all_ops), tmp)
 		body_relocs: [dynamic]Relocation; body_relocs.allocator = tmp
 		n, _ := encode_ops(all_ops, scratch, &body_relocs, errors)
 		append(&body, ..scratch[:n])

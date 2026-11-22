@@ -39,7 +39,8 @@ bit_size: The size of the floating-point number in bits, valid values are 16, 32
 flags: Additional formatting options; `.Plus` prefixes non-negative finite values with `+`
 
 **Returns**
-- A byte slice containing the formatted string
+- res: The formatted number, clipped to `len(buf)`
+- ok: `false` if `buf` was too small for the whole number
 
 **Remarks**
 
@@ -55,20 +56,20 @@ Example:
 	bit_size := 64
 	result := strconv.generic_ftoa(buf[:], val, fmt, precision, bit_size) -> "3.14"
 */
-generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int, flags: Float_Flags) -> []byte {
+generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int, flags: Float_Flags) -> (res: []byte, ok: bool) #optional_ok {
 	when FAST_FLOAT {
 		if bit_size == 64 {
-			if res, ok := _ftoa_fast(buf, val, fmt, precision, flags); ok {
-				return res
+			if r, fits, handled := _ftoa_fast(buf, val, fmt, precision, flags); handled {
+				return r, fits
 			}
 		} else if bit_size == 32 || (bit_size == 16 && precision >= 0) {
 			f := f32(f16(val)) if bit_size == 16 else f32(val)
-			if res, ok := _ftoa_fast(buf, f, fmt, precision, flags); ok {
-				return res
+			if r, fits, handled := _ftoa_fast(buf, f, fmt, precision, flags); handled {
+				return r, fits
 			}
 		} else if bit_size == 16 {
-			if res, ok := _ftoa_fast_f16(buf, f16(val), fmt, flags); ok {
-				return res
+			if r, fits, handled := _ftoa_fast_f16(buf, f16(val), fmt, flags); handled {
+				return r, fits
 			}
 		}
 	}
@@ -135,11 +136,12 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int,
 	return format_digits(buf, shortest, neg, digs, prec, fmt, flags)
 }
 
-_format_inf_nan :: proc "contextless" (buf: []byte, neg, nan: bool) -> []byte {
+_format_inf_nan :: proc "contextless" (buf: []byte, neg, nan: bool) -> (res: []byte, fits: bool) {
 	// NOTE: NaN is never prefixed with '+', even if flags specify `.Plus`.
-	// NOTE: Inf is always prefixed with '+', even if flags does not specify `.Plus`.s := "NaN" if nan else "-Inf" if neg else "+Inf"
+	// NOTE: Inf is always prefixed with '+', even if flags does not specify `.Plus`.
 	s := "NaN" if nan else "-Inf" if neg else "+Inf"
-	return buf[:copy(buf, s)]
+	n := copy(buf, s)
+	return buf[:n], n == len(s)
 }
 
 _shortest_precision :: proc "contextless" (digs: Decimal_Slice, fmt: byte) -> int {
@@ -174,21 +176,25 @@ Converts a decimal floating-point number into a byte buffer with the given forma
 - flags: Additional formatting options
 
 **Returns**
-- A byte slice containing the formatted decimal floating-point number
+- res: The formatted number, clipped to `len(buf)`
+- ok: `false` if `buf` was too small for the whole number
 */
-format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slice, precision: int, fmt: byte, flags: Float_Flags) -> []byte {
+format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slice, precision: int, fmt: byte, flags: Float_Flags) -> (res: []byte, ok: bool) #optional_ok {
 	Buffer :: struct {
 		b: []byte,
 		n: int,
+		clipped: bool,
 	}
 
-	to_bytes :: proc(b: Buffer) -> []byte {
-		return b.b[:b.n]
+	to_bytes :: proc(b: Buffer) -> ([]byte, bool) {
+		return b.b[:b.n], !b.clipped
 	}
 	add_byte :: proc(buf: ^Buffer, c: byte) {
 		if buf.n < len(buf.b) {
 			buf.b[buf.n] = c
 			buf.n += 1
+		} else {
+			buf.clipped = true
 		}
 	}
 	add_zeros :: proc(buf: ^Buffer, count: int) {
@@ -197,6 +203,12 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 			c = '0'
 		}
 		buf.n += n
+		buf.clipped ||= n < count
+	}
+	add_digits :: proc(buf: ^Buffer, digits: []byte) {
+		n := copy(buf.b[buf.n:], digits)
+		buf.n += n
+		buf.clipped ||= n < len(digits)
 	}
 
 	b := Buffer{b = buf}
@@ -204,6 +216,7 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 
 	switch fmt {
 	case 'f', 'F', 'e', 'E':
+		b.clipped = prec > len(buf)
 		prec = min(prec, len(buf)) // clamp to buffer length
 	}
 
@@ -218,7 +231,7 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 		// integer, padded with zeros when needed
 		if digs.decimal_point > 0 {
 			m := min(digs.count, digs.decimal_point)
-			b.n += copy(buf[b.n:], digs.digits[0:m])
+			add_digits(&b, digs.digits[0:m])
 			add_zeros(&b, digs.decimal_point - m)
 		} else {
 			add_byte(&b, '0')
@@ -232,7 +245,7 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 			add_zeros(&b, lead)
 			lo := min(max(digs.decimal_point, 0), digs.count)
 			hi := max(min(digs.count, digs.decimal_point + prec), lo)
-			b.n += copy(buf[b.n:], digs.digits[lo:hi])
+			add_digits(&b, digs.digits[lo:hi])
 			add_zeros(&b, prec - lead - (hi - lo))
 		}
 		return to_bytes(b)
@@ -255,7 +268,7 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 			i := 1
 			m := min(digs.count, prec+1)
 			if i < m {
-				b.n += copy(buf[b.n:], digs.digits[i:m])
+				add_digits(&b, digs.digits[i:m])
 				i = m
 			}
 			add_zeros(&b, prec + 1 - i)

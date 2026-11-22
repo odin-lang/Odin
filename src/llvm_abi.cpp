@@ -126,25 +126,91 @@ gb_internal bool lb_is_type_kind(LLVMTypeRef type, LLVMTypeKind kind) {
 	return LLVMGetTypeKind(type) == kind;
 }
 
+// NOTE(bill): The widest vector register every procedure has on x86: 64 bytes with AVX-512, 32 with AVX, and 16 otherwise.
+// It comes from the build's target features (the microarch and `-target-features`), never from a procedure's own `enable_target_feature`.
+// C passes a vector no wider than that in one register, and LLVM splits a wider one into pieces.
+// A procedure that enables wider registers of its own would take them for such a vector, and its callers would not.
+gb_internal i64 lb_x86_vector_register_bytes(void) {
+	// Features which turn on AVX without naming it
+	static char const *implies_avx[] = {"fma", "fma4", "f16c", "xop", "vaes", "vpclmulqdq", "sha512", "sm3", "sm4"};
+
+	bool avx       = false;
+	bool avx512    = false;
+	bool no_avx    = false;
+	bool no_avx512 = false;
+	for (String const &entry : build_context.target_features_set) {
+		String feature  = entry;
+		bool   disabled = string_starts_with(feature, '-');
+		if (disabled || string_starts_with(feature, '+')) {
+			feature = substring(feature, 1, feature.len);
+		}
+		if (disabled) {
+			// disabling a feature disables every feature that depends on it
+			no_avx    = no_avx    || feature == "avx";
+			no_avx512 = no_avx512 || feature == "avx512f" || feature == "evex512";
+			continue;
+		}
+		avx512 = avx512 || string_starts_with(feature, str_lit("avx512"));
+		avx    = avx    || string_starts_with(feature, str_lit("avx"));
+		for (char const *name : implies_avx) {
+			avx = avx || feature == make_string_c(name);
+		}
+	}
+	if (avx512 && !no_avx512 && !no_avx) {
+		return 64;
+	}
+	if (avx && !no_avx) {
+		return 32;
+	}
+	return 16;
+}
+
+// A vector as a struct of pieces `piece_bytes` wide, which LLVM passes in the registers it would give the pieces of the split vector
+gb_internal LLVMTypeRef lb_vector_pieces_type(LLVMContextRef c, LLVMTypeRef type, i64 piece_bytes) {
+	LLVMTypeRef elem  = LLVMGetElementType(type);
+	LLVMTypeRef piece = LLVMVectorType(elem, cast(unsigned)(piece_bytes/lb_sizeof(elem)));
+	unsigned    count = cast(unsigned)(lb_sizeof(type)/piece_bytes);
+
+	LLVMTypeRef pieces[32] = {};
+	GB_ASSERT(count <= gb_count_of(pieces));
+	for (unsigned i = 0; i < count; i++) {
+		pieces[i] = piece;
+	}
+	return LLVMStructTypeInContext(c, pieces, count, false);
+}
+
+// NOTE(bill): A vector passed or returned as itself takes the registers of the procedure's target features.
+// One wider than the build's vector registers is passed and returned as pieces that wide instead.
+// LLVM gives the pieces the registers it gives the split vector in a procedure with only the build's features.
+// A procedure that enables wider registers of its own then still agrees with its callers.
+gb_internal void lb_x86_split_wide_vector(LLVMContextRef c, lbArgType *arg, i64 register_bytes) {
+	if (arg->kind != lbArg_Direct || !lb_is_type_kind(arg->type, LLVMVectorTypeKind)) {
+		return;
+	}
+	if (arg->cast_type != nullptr && arg->cast_type != arg->type) {
+		return;
+	}
+	if (lb_sizeof(arg->type) <= register_bytes) {
+		return;
+	}
+	arg->cast_type    = lb_vector_pieces_type(c, arg->type, register_bytes);
+	arg->split_vector = true;
+}
+
 // NOTE(bill): A vector wider than 16 bytes changes registers with the target features on amd64 and i386.
 // It takes two XMM registers without AVX, one YMM register with it, and one ZMM register with AVX-512.
-// A procedure can enable features of its own, and its callers must still agree with it.
-// The Odin conventions pass such a vector by pointer and return it in 16-byte pieces instead.
+// The build's features are not enough here: the Odin conventions must not vary with target features at all.
+// They pass such a vector by pointer and return it in 16-byte pieces instead.
 gb_internal bool lb_is_wide_vector(LLVMTypeRef type) {
 	return lb_is_type_kind(type, LLVMVectorTypeKind) && lb_sizeof(type) > 16;
 }
 
 // A wide vector as a result: its 16-byte pieces in XMM0 to XMM3, or the hidden pointer beyond that
 gb_internal lbArgType lb_odin_wide_vector_return(LLVMContextRef c, LLVMTypeRef type) {
-	i64 sz = lb_sizeof(type);
-	if (sz > 4*16) {
+	if (lb_sizeof(type) > 4*16) {
 		return lb_arg_type_indirect(type, lb_create_enum_attribute_with_type(c, "sret", type));
 	}
-	LLVMTypeRef elem      = LLVMGetElementType(type);
-	LLVMTypeRef piece     = LLVMVectorType(elem, cast(unsigned)(16/lb_sizeof(elem)));
-	LLVMTypeRef pieces[4] = {piece, piece, piece, piece};
-
-	lbArgType ret = lb_arg_type_direct(type, LLVMStructTypeInContext(c, pieces, cast(unsigned)(sz/16), false), nullptr, nullptr);
+	lbArgType ret = lb_arg_type_direct(type, lb_vector_pieces_type(c, type, 16), nullptr, nullptr);
 	ret.split_vector = true;
 	return ret;
 }
@@ -741,6 +807,15 @@ namespace lbAbi386 {
 				ft->ret = lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, cast(unsigned)(sz*8)), nullptr, nullptr);
 			}
 		}
+
+		if ((calling_convention == ProcCC_Odin || calling_convention == ProcCC_Contextless) &&
+		    ft->ret.kind == lbArg_Direct && ft->ret.cast_type == nullptr &&
+		    (lb_is_type_kind(ft->ret.type, LLVMHalfTypeKind) ||
+		     lb_is_type_kind(ft->ret.type, LLVMFloatTypeKind) ||
+		     lb_is_type_kind(ft->ret.type, LLVMDoubleTypeKind))) {
+			i64 sz = lb_sizeof(ft->ret.type);
+			ft->ret = lb_arg_type_direct(ft->ret.type, LLVMIntTypeInContext(c, cast(unsigned)(sz*8)), nullptr, nullptr);
+		}
 		return ft;
 	}
 
@@ -1001,8 +1076,6 @@ namespace lbAbiAmd64Win64 {
 				if (lb_amd64_odin_is_two_words(arg_types[i])) {
 					ft->args[i] = lb_arg_type_direct(arg_types[i]);
 					ft->args[i].expand = true;
-				} else if (lb_is_wide_vector(arg_types[i])) {
-					ft->args[i] = lb_arg_type_indirect(arg_types[i], nullptr);
 				}
 			}
 		}
@@ -1026,6 +1099,12 @@ namespace lbAbiAmd64Win64 {
 		}
 		if (is_m64_vector(type)) {
 			return lb_arg_type_direct(type, LLVMInt64TypeInContext(c), nullptr, nullptr);
+		}
+		if (kind == LLVMVectorTypeKind && lb_sizeof(type) > 16) {
+			// NOTE(bill): MSVC passes `__m256` and `__m512` by reference whatever `/arch` says.
+			// LLVM does the same only while the vector fits one register.
+			// Without AVX it splits `<8 x float>` into halves and passes each by reference.
+			return lb_arg_type_indirect(type, nullptr);
 		}
 		return lbAbi386::non_struct(c, type, false, nullptr);
 	}
@@ -1555,13 +1634,21 @@ namespace lbAbiAmd64SysV {
 	                                 i32 *int_regs, i32 *sse_regs, Type *source_type) {
 		auto cls = classify(type, source_type);
 
-		// An SSE run wider than two eightbytes has no register to land in at the baseline ISA.
-		// The Odin conventions pass a pointer to it, the same as any other argument in memory.
-		bool wide_sse = cls.count > 2 && is_sse(cls[0]);
-		if (wide_sse && is_arg && is_calling_convention_odin(calling_convention)) {
+		// An SSE run wider than two eightbytes is one vector, bare or struct-wrapped.
+		// The Odin conventions pass a pointer to it whatever the target features, the same as any other argument in memory.
+		bool sse_run = cls.count > 2 && is_sse(cls[0]);
+		if (sse_run && is_arg && is_calling_convention_odin(calling_convention)) {
 			return lb_arg_type_indirect(type, nullptr);
 		}
 
+		// C passes it in one register if the build's target features make one that wide (YMM with AVX, ZMM with AVX-512).
+		// Otherwise an argument goes to memory, and takes no register.
+		bool wide_sse = sse_run && lb_sizeof(type) > lb_x86_vector_register_bytes();
+		if (wide_sse && is_arg) {
+			return lb_arg_type_indirect_byval(c, type, source_type);
+		}
+
+		// NOTE(bill): SSEUP is the upper half of the register before it, not a register of its own.
 		i32 needed_int = 0;
 		i32 needed_sse = 0;
 		for (auto c : cls) {
@@ -1580,35 +1667,27 @@ namespace lbAbiAmd64SysV {
 			case RegClass_SSEInt32:
 			case RegClass_SSEInt64:
 			case RegClass_SSEInt128:
-			case RegClass_SSEUp:
 				needed_sse += 1;
 				break;
 			}
 		}
 
+		// NOTE(bill): An argument that does not fit the registers left goes to memory whole.
+		// It gives back whatever it was assigned (§3.2.3), and a later argument can still take those.
 		bool ran_out_of_regs = false;
 		if (int_regs && sse_regs) {
-			*int_regs -= needed_int;
-			*sse_regs -= needed_sse;
-			bool int_ok = *int_regs >= 0;
-			bool sse_ok = *sse_regs >= 0;
-
-			*int_regs = gb_max(*int_regs, 0);
-			*sse_regs = gb_max(*sse_regs, 0);
-
-			if ((!int_ok || !sse_ok) && is_aggregate(type)) {
-				ran_out_of_regs = true;
+			if (needed_int <= *int_regs && needed_sse <= *sse_regs) {
+				*int_regs -= needed_int;
+				*sse_regs -= needed_sse;
+			} else {
+				ran_out_of_regs = is_aggregate(type);
 			}
 		}
 
 		if (wide_sse) {
-			// C puts it in memory too, bare vector or struct-wrapped.
 			// A bare vector RETURN is the one exception: it is not an aggregate.
-			// Clang gives it no hidden pointer and lets LLVM split it across
-			// xmm0:xmm1, but the struct that wraps it still gets one.
-			if (is_arg) {
-				return lb_arg_type_indirect_byval(c, type, source_type);
-			}
+			// Clang gives it no hidden pointer and lets LLVM split it into pieces
+			// (see `lb_x86_split_wide_vector`), but the struct that wraps it still gets one.
 			if (LLVMGetTypeKind(type) != LLVMVectorTypeKind) {
 				all_mem(&cls);
 			}
@@ -2173,6 +2252,9 @@ namespace lbAbiAmd64SysV {
 					break;
 				case LLVMDoubleTypeKind:
 					reg = RegClass_SSEDv;
+					break;
+				case LLVMPointerTypeKind:
+					reg = RegClass_SSEInt64;
 					break;
 				default:
 					GB_PANIC("Unhandled vector element type");
@@ -2966,6 +3048,11 @@ namespace lbAbiWasm {
 		return ft;
 	}
 
+	// NOTE(bill): A vector result, or an argument of up to 8 bytes, is passed as itself and lowered by the build's `simd128`.
+	// With it, a vector of up to 16 bytes is a `v128`.
+	// Otherwise a result goes through a hidden pointer and an argument passes its lanes separately.
+	// This depends on the build on purpose: target features are global on wasm (`enable_target_feature` is rejected).
+	// Every procedure of a program agrees, and ignoring `simd128` would give up `v128` in every build that has it.
 	gb_internal lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type, bool is_return) {
 		if (type == LLVMIntTypeInContext(c, 128)) {
 			// LLVMTypeRef cast_type = LLVMVectorType(LLVMInt64TypeInContext(c), 2);
@@ -3099,6 +3186,11 @@ namespace lbAbiWasm {
 				} else {
 					args[i] = is_struct(c, t, ptype, calling_convention);
 				}
+			} else if (kind == LLVMVectorTypeKind && calling_convention == ProcCC_CDecl) {
+				// NOTE(bill): Clang passes a vector of any size as itself.
+				// LLVM passes its lanes as separate arguments without `simd128`, and `v128` pieces with it.
+				// Target features are global on wasm, so every procedure of a program agrees.
+				args[i] = lb_arg_type_direct(t);
 			} else {
 				args[i] = non_struct(c, t, false);
 			}
@@ -3831,6 +3923,18 @@ gb_internal LB_ABI_INFO(lb_get_abi_info) {
 		base_type(original_type)
 	);
 
+	// An `asm` template has no calling convention, and its operands are registers the template names.
+	if (is_arch_x86() && calling_convention != ProcCC_None && calling_convention != ProcCC_InlineAsm) {
+		i64 register_bytes = lb_x86_vector_register_bytes();
+		// NOTE(bill): i386 `vectorcall` allocates a struct argument after the other vectors, like an HVA.
+		// The pieces would then not take the registers of the split vector, and its arguments keep the vector.
+		if (calling_convention != ProcCC_VectorCall || build_context.metrics.arch != TargetArch_i386) {
+			for_array(i, ft->args) {
+				lb_x86_split_wide_vector(m->ctx, &ft->args[i], register_bytes);
+			}
+		}
+		lb_x86_split_wide_vector(m->ctx, &ft->ret, register_bytes);
+	}
 
 	// NOTE(bill): this is handled here rather than when developing the type in `lb_type_internal_for_procedures_raw`
 	// This is to make it consistent when and how it is handled

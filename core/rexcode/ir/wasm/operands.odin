@@ -22,7 +22,10 @@ package rexcode_wasm
 //                                                    kept in `aux`, losslessly)
 //   a branch label depth          -> REF (.BLOCK)  (op_labelidx)
 //   a blocktype (s33)             -> ATTRIBUTE     (op_blocktype)
-//   a memarg (align, offset)      -> ATTRIBUTE     (op_memarg; both packed in imm)
+//   a memarg (align, offset, mem) -> ATTRIBUTE     (op_memarg; offset in imm,
+//                                                    memory index in flags,
+//                                                    align exponent in space)
+//   a select t* value type        -> ATTRIBUTE     (op_valtype)
 //   a ref.null heap type          -> ATTRIBUTE     (op_reftype)
 //   a SIMD lane index             -> ATTRIBUTE     (op_lane)
 //   a v128 literal / shuffle mask -> two ATTRIBUTE (op_v128 -> lo, hi halves)
@@ -61,18 +64,21 @@ Attr :: enum u16 {
 	LANE,
 	V128_LO,   // low 8 bytes of a v128 literal / shuffle mask
 	V128_HI,   // high 8 bytes
+	VALTYPE,
 }
 
 // `ir.Operand.flags` bit: a REF whose index is a symbol id the linker fixes up
 // (emitted as a fixed-width 5-byte LEB placeholder plus a Relocation).
 FLAG_SYMBOLIC :: u32(1)
 
-// Load/store immediate: alignment hint (log2 bytes) + static offset.
-Memarg :: struct #packed {
-	offset: u32,
-	align:  u32,
+// Load/store immediate: alignment hint (log2 bytes), static offset (u64 for
+// memory64) and memory index (multi-memory; 0 for the default memory).
+Memarg :: struct {
+	offset: u64,
+	memory: u32,
+	align:  u8,
 }
-#assert(size_of(Memarg) == 8)
+#assert(size_of(Memarg) == 16)
 
 // Block signature. Negative sentinels are the s33 single-byte forms; a
 // non-negative value is a type index encoded as a positive signed LEB128.
@@ -150,14 +156,18 @@ op_wasm_index :: #force_inline proc "contextless" (kind: Index_Kind, value: u32,
 // -----------------------------------------------------------------------------
 
 @(require_results)
-memarg :: #force_inline proc "contextless" (align, offset: u32) -> Memarg {
-	return Memarg{align = align, offset = offset}
+memarg :: #force_inline proc "contextless" (align: u8, offset: u64, memory: u32 = 0) -> Memarg {
+	return Memarg{align = align, offset = offset, memory = memory}
 }
 
 @(require_results)
 op_memarg :: #force_inline proc "contextless" (ma: Memarg) -> Operand {
-	packed := i64(u64(ma.offset) | (u64(ma.align) << 32))
-	return Operand{kind = .ATTRIBUTE, imm = packed, aux = u16(Attr.MEMARG)}
+	return Operand{kind = .ATTRIBUTE, imm = i64(ma.offset), space = Ref_Space(ma.align), aux = u16(Attr.MEMARG), flags = ma.memory}
+}
+
+@(require_results)
+op_valtype :: #force_inline proc "contextless" (t: Value_Type) -> Operand {
+	return Operand{kind = .ATTRIBUTE, imm = i64(t), aux = u16(Attr.VALTYPE)}
 }
 
 @(require_results)
@@ -203,8 +213,7 @@ op_v128 :: #force_inline proc "contextless" (bytes: [16]u8) -> (lo, hi: Operand)
 
 @(require_results)
 operand_memarg :: #force_inline proc "contextless" (o: Operand) -> Memarg {
-	u := u64(o.imm)
-	return Memarg{offset = u32(u), align = u32(u >> 32)}
+	return Memarg{offset = u64(o.imm), memory = o.flags, align = u8(o.space)}
 }
 
 // v128 bytes from a lo/hi ATTRIBUTE pair.

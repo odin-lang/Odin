@@ -58,7 +58,6 @@ ref_write_bits_128 :: proc(buf: []byte, x: u128, base: int, is_signed: bool, bit
 		switch base {
 		case  2: i -= 1; a[i] = 'b'
 		case  8: i -= 1; a[i] = 'o'
-		case 10: i -= 1; a[i] = 'd'
 		case 12: i -= 1; a[i] = 'z'
 		case 16: i -= 1; a[i] = 'x'
 		case: ok = false

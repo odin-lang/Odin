@@ -1,4 +1,3 @@
-#+build !riscv64
 #+build !freebsd
 #+build !netbsd
 #+build !openbsd

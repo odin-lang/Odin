@@ -1,6 +1,7 @@
 gb_internal LLVMValueRef lb_coerce_fields_load(lbProcedure *p, lbValue x, lbArgType const *arg);
 gb_internal LLVMValueRef lb_coerce_fields_store(lbProcedure *p, LLVMValueRef coerced, Type *original_type, lbArgType const *arg);
 gb_internal lbValue      lb_copy_indirect_param(lbProcedure *p, lbValue ptr);
+gb_internal LLVMValueRef lb_join_vector(lbProcedure *p, LLVMValueRef value, LLVMTypeRef type);
 
 gb_internal LLVMValueRef lb_call_intrinsic(lbProcedure *p, const char *name, LLVMValueRef* args, unsigned arg_count, LLVMTypeRef* types, unsigned type_count) {
 	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
@@ -877,9 +878,14 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 							isize index = 0;
 							original_value = lb_build_aggregate_from_leaves(p->builder, abi_type, params, &index);
 						}
-						LLVMValueRef value = arg_type->coerce_offsets.count > 0
-							? lb_coerce_fields_store(p, original_value, e->type, arg_type)
-							: OdinLLVMBuildTransmute(p, original_value, param_type);
+						LLVMValueRef value = nullptr;
+						if (arg_type->coerce_offsets.count > 0) {
+							value = lb_coerce_fields_store(p, original_value, e->type, arg_type);
+						} else if (arg_type->split_vector) {
+							value = lb_join_vector(p, original_value, param_type);
+						} else {
+							value = OdinLLVMBuildTransmute(p, original_value, param_type);
+						}
 
 						lbValue param = {};
 						param.value = value;
@@ -1671,7 +1677,7 @@ gb_internal LLVMValueRef lb_join_vector(lbProcedure *p, LLVMValueRef value, LLVM
 	LLVMTypeRef i32t  = LLVMInt32TypeInContext(p->module->ctx);
 	unsigned    count = LLVMCountStructElementTypes(LLVMTypeOf(value));
 
-	LLVMValueRef pieces[4] = {};
+	LLVMValueRef pieces[32] = {};
 	GB_ASSERT(count <= gb_count_of(pieces));
 	for (unsigned i = 0; i < count; i++) {
 		pieces[i] = LLVMBuildExtractValue(p->builder, value, i, "");
@@ -1978,7 +1984,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			}
 
 			lbValue x = lb_emit_conv(p, args[i], original_type);
-			LLVMTypeRef xt = lb_type(p->module, x.type);
+			LLVMTypeRef xt = LLVMTypeOf(x.value);
 
 			if (arg->pad_type != nullptr) {
 				array_add(&processed_args, lbValue{LLVMGetUndef(arg->pad_type), t_i64});
@@ -2000,6 +2006,9 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 					}
 				} else if (arg->coerce_offsets.count > 0) {
 					x.value = lb_coerce_fields_load(p, x, arg);
+					array_add(&processed_args, x);
+				} else if (arg->split_vector) {
+					x.value = lb_split_vector(p, x.value, abi_type);
 					array_add(&processed_args, x);
 				} else if (xt == abi_type) {
 					array_add(&processed_args, x);
@@ -2891,13 +2900,9 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 
 			LLVMValueRef *vals = gb_alloc_array(temporary_allocator(), LLVMValueRef, indices_count);
 
-			for (u64 i = 0; i < indices_count/2; i++) {
-				u64 val = 2*i + 1;
+			for (u64 i = 0; i < indices_count; i++) {
+				u64 val = (i & 1) ? i : indices_count + i;
 				vals[i] = LLVMConstInt(lb_type(p->module, t_u32), val, false);
-			}
-			for (u64 i = 0; i < indices_count/2; i++) {
-				u64 val = 2*i + indices_count;
-				vals[i+indices_count/2] = LLVMConstInt(lb_type(p->module, t_u32), val, false);
 			}
 
 			LLVMValueRef indices = LLVMConstVector(vals, cast(unsigned)indices_count);
@@ -5882,7 +5887,7 @@ gb_internal lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, 
 		{
 			Ast *orig = param_value.original_ast_expr;
 			if (orig->kind == Ast_BasicDirective) {
-				gbString expr = expr_to_string(call_expression, permanent_allocator());
+				gbString expr = expr_to_string_exact(call_expression, permanent_allocator());
 				return lb_const_string(p->module, make_string_c(expr));
 			}
 
@@ -5922,7 +5927,7 @@ gb_internal lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, 
 				}
 			}
 
-			gbString expr = expr_to_string(target_expr, permanent_allocator());
+			gbString expr = expr_to_string_exact(target_expr, permanent_allocator());
 			return lb_const_string(p->module, make_string_c(expr));
 		}
 

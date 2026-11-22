@@ -41,7 +41,7 @@ flux_init :: proc($T: typeid, value_capacity := 8, allocator := context.allocato
 }
 
 // delete map content
-flux_destroy :: proc(flux: Flux_Map($T), allocator := context.allocator, loc := #caller_location) where intrinsics.type_is_float(T) {
+flux_destroy :: proc(flux: Flux_Map($T), loc := #caller_location) where intrinsics.type_is_float(T) {
 	delete(flux.values, loc)
 	delete(flux.keys_to_be_deleted, loc)
 }

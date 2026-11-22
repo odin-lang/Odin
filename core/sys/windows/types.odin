@@ -37,6 +37,7 @@ HGDIOBJ         :: distinct HANDLE
 HBITMAP         :: distinct HANDLE
 HPALETTE        :: distinct HANDLE
 HGLOBAL         :: distinct HANDLE
+HPCON           :: distinct HANDLE
 HHOOK           :: distinct HANDLE
 HWINEVENTHOOK   :: distinct HANDLE
 HKEY            :: distinct HANDLE
@@ -115,42 +116,45 @@ ATOM       :: distinct WORD
 wstring :: cstring16
 PWSTR   :: cstring16
 
-PBYTE                 :: ^BYTE
-LPBYTE                :: ^BYTE
-PBOOL                 :: ^BOOL
-LPBOOL                :: ^BOOL
-LPCSTR                :: cstring
-LPCWSTR               :: wstring
-LPCTSTR               :: wstring
-LPDWORD               :: ^DWORD
-PCSTR                 :: cstring
-PCWSTR                :: wstring
-PDWORD                :: ^DWORD
-LPHANDLE              :: ^HANDLE
-LPOVERLAPPED          :: ^OVERLAPPED
-LPPROCESS_INFORMATION :: ^PROCESS_INFORMATION
-PSECURITY_ATTRIBUTES  :: ^SECURITY_ATTRIBUTES
-LPSECURITY_ATTRIBUTES :: ^SECURITY_ATTRIBUTES
-LPSTARTUPINFOW        :: ^STARTUPINFOW
-LPTRACKMOUSEEVENT     :: ^TRACKMOUSEEVENT
-VOID                  :: rawptr
-PVOID                 :: rawptr
-PVOID64               :: rawptr
-LPVOID                :: rawptr
-PINT                  :: ^INT
-LPINT                 :: ^INT
-PUINT                 :: ^UINT
-LPUINT                :: ^UINT
-LPWCH                 :: ^WCHAR
-LPWORD                :: ^WORD
-PULONG                :: ^ULONG
-LPWIN32_FIND_DATAW    :: ^WIN32_FIND_DATAW
-LPWSADATA             :: ^WSADATA
-LPWSAPROTOCOL_INFO    :: ^WSAPROTOCOL_INFO
-LPSTR                 :: ^CHAR
-LPWSTR                :: ^WCHAR
-OLECHAR               :: WCHAR
-BSTR                  :: ^OLECHAR
+PBYTE                        :: ^BYTE
+LPBYTE                       :: ^BYTE
+PBOOL                        :: ^BOOL
+LPBOOL                       :: ^BOOL
+LPCSTR                       :: cstring
+LPCWSTR                      :: wstring
+LPCTSTR                      :: wstring
+LPDWORD                      :: ^DWORD
+PCSTR                        :: cstring
+PCWSTR                       :: wstring
+PDWORD                       :: ^DWORD
+LPHANDLE                     :: ^HANDLE
+LPOVERLAPPED                 :: ^OVERLAPPED
+LPPROCESS_INFORMATION        :: ^PROCESS_INFORMATION
+PSECURITY_ATTRIBUTES         :: ^SECURITY_ATTRIBUTES
+LPSECURITY_ATTRIBUTES        :: ^SECURITY_ATTRIBUTES
+LPSTARTUPINFOW               :: ^STARTUPINFOW
+LPSTARTUPINFOEXW             :: ^STARTUPINFOEXW
+PPROC_THREAD_ATTRIBUTE_LIST  :: rawptr
+LPPROC_THREAD_ATTRIBUTE_LIST :: rawptr
+LPTRACKMOUSEEVENT            :: ^TRACKMOUSEEVENT
+VOID                         :: rawptr
+PVOID                        :: rawptr
+PVOID64                      :: rawptr
+LPVOID                       :: rawptr
+PINT                         :: ^INT
+LPINT                        :: ^INT
+PUINT                        :: ^UINT
+LPUINT                       :: ^UINT
+LPWCH                        :: ^WCHAR
+LPWORD                       :: ^WORD
+PULONG                       :: ^ULONG
+LPWIN32_FIND_DATAW           :: ^WIN32_FIND_DATAW
+LPWSADATA                    :: ^WSADATA
+LPWSAPROTOCOL_INFO           :: ^WSAPROTOCOL_INFO
+LPSTR                        :: ^CHAR
+LPWSTR                       :: ^WCHAR
+OLECHAR                      :: WCHAR
+BSTR                         :: ^OLECHAR
 
 LPOLESTR   :: cstring16
 LPCOLESTR  :: LPCSTR
@@ -3176,6 +3180,11 @@ STARTUPINFOW :: struct {
 	hStdInput:       HANDLE,
 	hStdOutput:      HANDLE,
 	hStdError:       HANDLE,
+}
+
+STARTUPINFOEXW :: struct {
+	StartupInfo:     STARTUPINFOW,
+	lpAttributeList: LPPROC_THREAD_ATTRIBUTE_LIST,
 }
 
 FILETIME :: struct {

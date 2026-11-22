@@ -144,6 +144,13 @@ fi
 $ODIN check ../test_issue_6979 -no-entry-point $COMMON_CHECK
 $ODIN check ../test_issue_7012 -no-entry-point $COMMON_CHECK
 
+if [[ $($ODIN check ../test_issue_7199 $COMMON_CHECK 2>&1 >/dev/null | grep -c "\.\.19988 chars\.\.") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 if [[ $($ODIN check ../test_issue_7708_mismatch $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
@@ -639,6 +646,15 @@ fi
 $ODIN build ../test_issue_asm_baseless_riscv -target:linux_riscv64 -build-mode:obj $COMMON_CHECK
 $ODIN build ../test_issue_asm_keyword_mnemonic -target:linux_amd64 -build-mode:obj $COMMON_CHECK
 
+$ODIN run ../test_issue_wasm_union_i128 $COMMON
+$ODIN build ../test_issue_wasm_union_i128 -target:js_wasm32 -build-mode:obj $COMMON_CHECK
+$ODIN build ../test_issue_wasm_union_i128 -target:js_wasm64p32 -build-mode:obj $COMMON_CHECK
+$ODIN build ../test_issue_wasm_union_i128 -target:wasi_wasm32 -build-mode:obj $COMMON_CHECK
+if command -v wasmtime > /dev/null; then
+	$ODIN build ../test_issue_wasm_union_i128 -target:wasi_wasm32 $COMMON_CHECK
+	wasmtime ./test_issue_wasm_union_i128.wasm
+fi
+
 $ODIN test ../test_lifetime_markers $COMMON -o:size -lifetime-markers
 $ODIN test ../test_lifetime_markers $COMMON -o:speed -lifetime-markers
 
@@ -659,9 +675,38 @@ if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 	fi
 fi
 
+# 32-byte vectors in YMM registers, both sides built with AVX2; needs a CPU that has it
+if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
+	if grep -qw avx2 /proc/cpuinfo 2>/dev/null; then
+		clang -c ../test_issue_sysv_wide_vectors/test_issue_sysv_wide_vectors.c -o test_issue_sysv_wide_vectors_c.o -mavx2
+		$ODIN test ../test_issue_sysv_wide_vectors $COMMON_CHECK -microarch:haswell
+	fi
+fi
+
 $ODIN test ../test_issue_disabled_proc_value $COMMON -disable-assert
 $ODIN test ../test_issue_loaded_pointer_alignment $COMMON -o:speed
 $ODIN test ../test_issue_max_simd_align $COMMON -o:speed
+
+$ODIN build ../test_issue_wasi_wasm64p32_target -target:wasi_wasm32 -build-mode:obj $COMMON_CHECK
+$ODIN build ../test_issue_wasi_wasm64p32_target -target:wasi_wasm64p32 -build-mode:obj $COMMON_CHECK
+if command -v wasmtime > /dev/null; then
+	for target in wasi_wasm32 wasi_wasm64p32; do
+		for microarch in generic mvp; do
+			$ODIN build ../test_issue_wasi_wasm64p32_target -target:$target -microarch:$microarch $COMMON_CHECK
+			wasmtime run --dir . --env ODIN_WASI_TEST=value ./test_issue_wasi_wasm64p32_target.wasm first second
+		done
+	done
+fi
+
+# wasm32 C vectors, both sides without and with simd128; needs wasmtime and a clang that targets wasm32
+if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]] && command -v wasmtime > /dev/null; then
+	for simd in "" simd128; do
+		if clang --target=wasm32 ${simd:+-m$simd} -c ../test_issue_wasm_c_vectors/test_issue_wasm_c_vectors.c -o test_issue_wasm_c_vectors_c.o 2> /dev/null; then
+			$ODIN build ../test_issue_wasm_c_vectors -target:wasi_wasm32 ${simd:+-target-features:$simd} $COMMON_CHECK
+			wasmtime run ./test_issue_wasm_c_vectors.wasm
+		fi
+	done
+fi
 
 #########################################################################################################
 

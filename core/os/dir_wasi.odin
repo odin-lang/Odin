@@ -94,12 +94,12 @@ _read_directory_iterator_init :: proc(it: ^Read_Directory_Iterator, f: ^File) {
 			return
 		}
 
-		if n < len(buf) {
+		if int(n) < len(buf) {
 			non_zero_resize(&buf, n)
 			break
 		}
 
-		assert(n == len(buf))
+		assert(int(n) == len(buf))
 	}
 	it.impl.buf = buf[:]
 

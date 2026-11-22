@@ -35,14 +35,15 @@ ENCODING_TABLE := [Opcode]Encoding{
 	.BR_TABLE      = {prefix = PREFIX_NONE, opcode = 0x0E, imm = {.BR_TABLE, .NONE}, flags = CTRL, inputs = 1, outputs = 0},
 	.RETURN        = {prefix = PREFIX_NONE, opcode = 0x0F, flags = CTRL, inputs = -1, outputs = -1},
 	.CALL          = {prefix = PREFIX_NONE, opcode = 0x10, imm = {.IDX, .NONE}, flags = CTRL, inputs = -1, outputs = -1},
-	.CALL_INDIRECT = {prefix = PREFIX_NONE, opcode = 0x11, imm = {.IDX, .NONE}, flags = CTRL, inputs = -1, outputs = -1},
+	.CALL_INDIRECT = {prefix = PREFIX_NONE, opcode = 0x11, imm = {.IDX, .IDX}, flags = CTRL, inputs = -1, outputs = -1},
 	.RETURN_CALL          = {prefix = PREFIX_NONE, opcode = 0x12, imm = {.IDX, .NONE}, flags = CTRL, inputs = -1, outputs = -1},
-	.RETURN_CALL_INDIRECT = {prefix = PREFIX_NONE, opcode = 0x13, imm = {.IDX, .NONE}, flags = CTRL, inputs = -1, outputs = -1},
+	.RETURN_CALL_INDIRECT = {prefix = PREFIX_NONE, opcode = 0x13, imm = {.IDX, .IDX}, flags = CTRL, inputs = -1, outputs = -1},
 
 
 	// -------------------------------------------------------------- parametric
 	.DROP   = {prefix = PREFIX_NONE, opcode = 0x1A, inputs = 1, outputs = 0},
 	.SELECT = {prefix = PREFIX_NONE, opcode = 0x1B, inputs = 3, outputs = 1},
+	.SELECT_T = {prefix = PREFIX_NONE, opcode = 0x1C, imm = {.VALTYPES, .NONE}, inputs = 3, outputs = 1},
 
 	// ---------------------------------------------------------------- variable
 	.LOCAL_GET  = {prefix = PREFIX_NONE, opcode = 0x20, imm = {.IDX, .NONE}, inputs = 0, outputs = 1},
@@ -50,6 +51,8 @@ ENCODING_TABLE := [Opcode]Encoding{
 	.LOCAL_TEE  = {prefix = PREFIX_NONE, opcode = 0x22, imm = {.IDX, .NONE}, inputs = 1, outputs = 1},
 	.GLOBAL_GET = {prefix = PREFIX_NONE, opcode = 0x23, imm = {.IDX, .NONE}, inputs = 0, outputs = 1},
 	.GLOBAL_SET = {prefix = PREFIX_NONE, opcode = 0x24, imm = {.IDX, .NONE}, inputs = 1, outputs = 0},
+	.TABLE_GET  = {prefix = PREFIX_NONE, opcode = 0x25, imm = {.IDX, .NONE}, inputs = 1, outputs = 1},
+	.TABLE_SET  = {prefix = PREFIX_NONE, opcode = 0x26, imm = {.IDX, .NONE}, inputs = 2, outputs = 0},
 
 	// ------------------------------------------------------------------- memory
 	.I32_LOAD     = {prefix = PREFIX_NONE, opcode = 0x28, imm = {.MEMARG, .NONE}, flags = MEM, inputs = 1, outputs = 1},
@@ -75,8 +78,8 @@ ENCODING_TABLE := [Opcode]Encoding{
 	.I64_STORE8   = {prefix = PREFIX_NONE, opcode = 0x3C, imm = {.MEMARG, .NONE}, flags = MEM, inputs = 2, outputs = 0},
 	.I64_STORE16  = {prefix = PREFIX_NONE, opcode = 0x3D, imm = {.MEMARG, .NONE}, flags = MEM, inputs = 2, outputs = 0},
 	.I64_STORE32  = {prefix = PREFIX_NONE, opcode = 0x3E, imm = {.MEMARG, .NONE}, flags = MEM, inputs = 2, outputs = 0},
-	.MEMORY_SIZE  = {prefix = PREFIX_NONE, opcode = 0x3F, imm = {.ZERO_BYTE, .NONE}, flags = MEM, inputs = 0, outputs = 1},
-	.MEMORY_GROW  = {prefix = PREFIX_NONE, opcode = 0x40, imm = {.ZERO_BYTE, .NONE}, flags = MEM, inputs = 1, outputs = 1},
+	.MEMORY_SIZE  = {prefix = PREFIX_NONE, opcode = 0x3F, imm = {.IDX, .NONE}, flags = MEM, inputs = 0, outputs = 1},
+	.MEMORY_GROW  = {prefix = PREFIX_NONE, opcode = 0x40, imm = {.IDX, .NONE}, flags = MEM, inputs = 1, outputs = 1},
 
 	// ----------------------------------------------------------------- numeric
 	.I32_CONST = {prefix = PREFIX_NONE, opcode = 0x41, imm = {.I32, .NONE}, inputs = 0, outputs = 1},
@@ -159,10 +162,10 @@ ENCODING_TABLE := [Opcode]Encoding{
 	.I32_TRUNC_SAT_F64_S = {prefix = PREFIX_MISC, opcode = 2, inputs = 1, outputs = 1}, .I32_TRUNC_SAT_F64_U = {prefix = PREFIX_MISC, opcode = 3, inputs = 1, outputs = 1},
 	.I64_TRUNC_SAT_F32_S = {prefix = PREFIX_MISC, opcode = 4, inputs = 1, outputs = 1}, .I64_TRUNC_SAT_F32_U = {prefix = PREFIX_MISC, opcode = 5, inputs = 1, outputs = 1},
 	.I64_TRUNC_SAT_F64_S = {prefix = PREFIX_MISC, opcode = 6, inputs = 1, outputs = 1}, .I64_TRUNC_SAT_F64_U = {prefix = PREFIX_MISC, opcode = 7, inputs = 1, outputs = 1},
-	.MEMORY_INIT         = {prefix = PREFIX_MISC, opcode = 8,  imm = {.IDX, .ZERO_BYTE}, flags = MEM, inputs = 3, outputs = 0},
+	.MEMORY_INIT         = {prefix = PREFIX_MISC, opcode = 8,  imm = {.IDX, .IDX}, flags = MEM, inputs = 3, outputs = 0},
 	.DATA_DROP           = {prefix = PREFIX_MISC, opcode = 9,  imm = {.IDX, .NONE}, inputs = 0, outputs = 0},
-	.MEMORY_COPY         = {prefix = PREFIX_MISC, opcode = 10, imm = {.ZERO_BYTE, .ZERO_BYTE}, flags = MEM, inputs = 3, outputs = 0},
-	.MEMORY_FILL         = {prefix = PREFIX_MISC, opcode = 11, imm = {.ZERO_BYTE, .NONE}, flags = MEM, inputs = 3, outputs = 0},
+	.MEMORY_COPY         = {prefix = PREFIX_MISC, opcode = 10, imm = {.IDX, .IDX}, flags = MEM, inputs = 3, outputs = 0},
+	.MEMORY_FILL         = {prefix = PREFIX_MISC, opcode = 11, imm = {.IDX, .NONE}, flags = MEM, inputs = 3, outputs = 0},
 	.TABLE_INIT          = {prefix = PREFIX_MISC, opcode = 12, imm = {.IDX, .IDX}, inputs = 3, outputs = 0},
 	.ELEM_DROP           = {prefix = PREFIX_MISC, opcode = 13, imm = {.IDX, .NONE}, inputs = 0, outputs = 0},
 	.TABLE_COPY          = {prefix = PREFIX_MISC, opcode = 14, imm = {.IDX, .IDX}, inputs = 3, outputs = 0},

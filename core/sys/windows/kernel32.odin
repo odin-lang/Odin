@@ -304,6 +304,24 @@ foreign kernel32 {
 		lpStartupInfo: LPSTARTUPINFOW,
 		lpProcessInformation: LPPROCESS_INFORMATION,
 	) -> BOOL ---
+	InitializeProcThreadAttributeList :: proc(
+		lpAttributeList:  LPPROC_THREAD_ATTRIBUTE_LIST,
+		dwAttributeCount: DWORD,
+		dwFlags:          DWORD,
+		lpSize:           PSIZE_T,
+	) -> BOOL ---
+	UpdateProcThreadAttribute :: proc(
+		lpAttributeList:  LPPROC_THREAD_ATTRIBUTE_LIST,
+		dwFlags:          DWORD,
+		Attribute:        DWORD_PTR,
+		lpValue:          PVOID,
+		cbSize:           SIZE_T,
+		lpPreviousValue:  PVOID,
+		lpReturnSize:     PSIZE_T,
+	) -> BOOL ---
+	DeleteProcThreadAttributeList :: proc(
+		lpAttributeList: LPPROC_THREAD_ATTRIBUTE_LIST,
+	) ---
 	GetStartupInfoW :: proc(lpStartupInfo: LPSTARTUPINFOW) ---
 	GetEnvironmentVariableW :: proc(n: LPCWSTR, v: LPWSTR, nsize: DWORD) -> DWORD ---
 	SetEnvironmentVariableW :: proc(n: LPCWSTR, v: LPCWSTR) -> BOOL ---
@@ -607,6 +625,17 @@ foreign kernel32 {
 	GetConsoleCursorInfo         :: proc(hConsoleOutput: HANDLE, lpConsoleCursorInfo: PCONSOLE_CURSOR_INFO) -> BOOL ---
 	SetConsoleCursorInfo         :: proc(hConsoleOutput: HANDLE, lpConsoleCursorInfo: PCONSOLE_CURSOR_INFO) -> BOOL ---
 
+	CreatePseudoConsole :: proc(
+		size:    COORD,
+		hInput:  HANDLE,
+		hOutput: HANDLE,
+		dwFlags: DWORD,
+		phPC:    ^HPCON,
+	) -> HRESULT ---
+	ClosePseudoConsole :: proc(
+		hPC: HPCON,
+	) ---
+
 	GetDiskFreeSpaceExW :: proc(
 		lpDirectoryName: LPCWSTR,
 		lpFreeBytesAvailableToCaller: PULARGE_INTEGER,
@@ -734,6 +763,8 @@ THREAD_SET_LIMITED_INFORMATION   :: 0x0400
 THREAD_SET_THREAD_TOKEN          :: 0x0080
 THREAD_SUSPEND_RESUME            :: 0x0002
 THREAD_TERMINATE                 :: 0x0001
+
+PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE :: 0x00020016
 
 COPY_FILE_FAIL_IF_EXISTS              :: 0x00000001
 COPY_FILE_RESTARTABLE                 :: 0x00000002

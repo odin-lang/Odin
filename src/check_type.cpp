@@ -3999,7 +3999,7 @@ gb_internal Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_res
 			param_value = handle_parameter_value(ctx, nullptr, &type, default_value, false, operands == nullptr && params_are_polymorphic);
 		} else {
 			if (ctx->allow_polymorphic_types && ast_references_poly_params(ctx->scope, field->type)) {
-				gbString name = expr_to_string(field->type);
+				gbString name = expr_to_string_exact(field->type);
 				type = alloc_type_generic(ctx->scope, 0, string_interner_insert(make_string_c(name)), nullptr);
 				gb_string_free(name);
 			} else {

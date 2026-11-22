@@ -306,7 +306,10 @@ create :: proc(max_index: int, min_index: int = 0, allocator := context.allocato
 	ok  = init(res, max_index, min_index, allocator)
 	res.free_pointer = true
 
-	if !ok { free(res, allocator) }
+	if !ok {
+		free(res, allocator)
+		res = nil
+	}
 
 	return
 }
@@ -425,9 +428,10 @@ Inputs:
 */
 destroy :: proc(ba: ^Bit_Array) {
 	if ba == nil { return }
+	allocator := ba.bits.allocator
 	delete(ba.bits)
 	if ba.free_pointer { // Only free if this `Bit_Array` was created using `create`, not when on the stack.
-		free(ba)
+		free(ba, allocator)
 	}
 }
 

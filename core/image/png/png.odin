@@ -450,6 +450,7 @@ load_from_context :: proc(ctx: ^compress.Context, options := Options{}, allocato
 
 	if img == nil {
 		img = new(Image)
+		img.pixels.allocator = allocator
 	}
 	img.which = .PNG
 

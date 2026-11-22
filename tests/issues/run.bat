@@ -40,6 +40,7 @@ set ODIN=..\..\..\odin
 %ODIN% check "..\test_issue_6874" %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_6979" -no-entry-point %COMMON% || exit /b
 %ODIN% check "..\test_issue_7012" -no-entry-point %COMMON% || exit /b
+%ODIN% check "..\test_issue_7199" %COMMON% 2>&1 | find /c "..19988 chars.." | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_7260" -no-entry-point %COMMON% || exit /b
 %ODIN% check "..\test_issue_7304" %COMMON% 2>&1 | find /c "9223372036854775808 is not representable by int" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_7336" -no-entry-point %COMMON% || exit /b
@@ -236,12 +237,20 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 %ODIN% build "..\test_issue_asm_baseless_riscv" -target:linux_riscv64 -build-mode:obj %COMMON% || exit /b
 %ODIN% build "..\test_issue_asm_keyword_mnemonic" -target:linux_amd64 -build-mode:obj %COMMON% || exit /b
 
+%ODIN% run "..\test_issue_wasm_union_i128" %COMMON% || exit /b
+%ODIN% build "..\test_issue_wasm_union_i128" -target:js_wasm32 -build-mode:obj %COMMON% || exit /b
+%ODIN% build "..\test_issue_wasm_union_i128" -target:js_wasm64p32 -build-mode:obj %COMMON% || exit /b
+%ODIN% build "..\test_issue_wasm_union_i128" -target:wasi_wasm32 -build-mode:obj %COMMON% || exit /b
+
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:size -lifetime-markers || exit /b
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:speed -lifetime-markers || exit /b
 
 %ODIN% test "..\test_issue_udivmod128_zero_divisor" %COMMON% -integer-division-by-zero:zero     || exit /b
 %ODIN% test "..\test_issue_udivmod128_zero_divisor" %COMMON% -integer-division-by-zero:self     || exit /b
 %ODIN% test "..\test_issue_udivmod128_zero_divisor" %COMMON% -integer-division-by-zero:all-bits || exit /b
+
+%ODIN% build "..\test_issue_wasi_wasm64p32_target" -target:wasi_wasm32 -build-mode:obj %COMMON% || exit /b
+%ODIN% build "..\test_issue_wasi_wasm64p32_target" -target:wasi_wasm64p32 -build-mode:obj %COMMON% || exit /b
 
 @if "%ODIN_TESTS_NO_CLANG%" == "" (
 	clang -c "..\test_issue_sysv_abi\test_issue_sysv_abi.c" -o test_issue_sysv_abi_c.o || exit /b
@@ -250,6 +259,15 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 )
 
 %ODIN% test "..\test_issue_sysv_abi" %COMMON% || exit /b
+
+@if "%ODIN_TESTS_NO_CLANG%" == "" (
+	clang -c "..\test_issue_win64_wide_vector_args\test_issue_win64_wide_vector_args.c" -o test_issue_win64_wide_vector_args_c.o -mavx2 || exit /b
+) else (
+	cl -c "..\test_issue_win64_wide_vector_args\test_issue_win64_wide_vector_args.c" /Fo:test_issue_win64_wide_vector_args_c.o /arch:AVX2 || exit /b
+)
+
+%ODIN% test "..\test_issue_win64_wide_vector_args" %COMMON% || exit /b
+%ODIN% test "..\test_issue_win64_wide_vector_args" %COMMON% -microarch:haswell || exit /b
 
 @rem #########################################################################################################
 

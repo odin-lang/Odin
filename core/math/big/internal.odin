@@ -257,7 +257,7 @@ internal_add :: proc { internal_int_add_signed, internal_int_add_digit, }
 
 
 internal_int_incr :: proc(dest: ^Int, allocator := context.allocator) -> (err: Error) {
-	return #force_inline internal_add(dest, dest, 1)
+	return #force_inline internal_add(dest, dest, 1, allocator)
 }
 internal_incr :: proc { internal_int_incr, }
 
@@ -467,7 +467,7 @@ internal_int_sub_digit :: proc(dest, number: ^Int, digit: DIGIT, allocator := co
 internal_sub :: proc { internal_int_sub_signed, internal_int_sub_digit, }
 
 internal_int_decr :: proc(dest: ^Int, allocator := context.allocator) -> (err: Error) {
-	return #force_inline internal_sub(dest, dest, 1)
+	return #force_inline internal_sub(dest, dest, 1, allocator)
 }
 internal_decr :: proc { internal_int_decr, }
 
@@ -1028,6 +1028,8 @@ internal_int_lcm :: proc(res_lcm, a, b: ^Int, allocator := context.allocator) ->
 	Assumes `remainder` and `numerator` both not to be `nil` and `bits` to be >= 0.
 */
 internal_int_mod_bits :: proc(remainder, numerator: ^Int, bits: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator
+
 	/*
 		Everything is divisible by 1 << 0 == 1, so this returns 0.
 	*/
@@ -1505,7 +1507,9 @@ internal_int_is_square :: proc(a: ^Int, allocator := context.allocator) -> (squa
 	Returns log_base(a).
 	Assumes `a` to not be `nil` and have been iniialized.
 */
-internal_int_log :: proc(a: ^Int, base: DIGIT) -> (res: int, err: Error) {
+internal_int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -> (res: int, err: Error) {
+	context.allocator = allocator
+
 	if base < 2 || DIGIT(base) > _DIGIT_MAX { return -1, .Invalid_Argument }
 
 	if internal_is_negative(a) { return -1, .Math_Domain_Error }

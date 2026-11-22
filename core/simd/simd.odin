@@ -2625,12 +2625,8 @@ byte_swap :: intrinsics.byte_swap
 
 	#assert(len(a) == len(b))
 	res := 0
-	N :: len(a)
-	for i in 0 ..< N/2 {
-		res[i] = a[2*i + 1]
-	}
-	for i in 0 ..< N/2 {
-		res[i + N/2] = b[2*i]
+	for i in 0 ..< len(a) {
+		res[i] = a[i] if i % 2 == 1 else b[i]
 	}
 	return res
 */

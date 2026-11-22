@@ -1164,7 +1164,7 @@ do_certificate :: proc(
 			leaf_data = bytes.clone_safe(cert_der, allocator) or_return
 			leaf, cert_err = x509.parse(leaf_data, allocator)
 		case:
-			cert := new(x509.Certificate) or_return
+			cert := new(x509.Certificate, allocator) or_return
 			cert^, cert_err = x509.parse(cert_der, allocator)
 			if cert_err == nil {
 				append(&cert_chain, cert) or_return

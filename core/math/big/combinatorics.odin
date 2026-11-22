@@ -13,7 +13,9 @@ permutations_with_repetition :: proc(dest: ^Int, n, r: int, allocator := context
 /*
 	With `n` items, calculate how many ways that `r` of them can be ordered without any repeats.
 */
-permutations_without_repetition :: proc(dest: ^Int, n, r: int) -> (error: Error)  {
+permutations_without_repetition :: proc(dest: ^Int, n, r: int, allocator := context.allocator) -> (error: Error)  {
+	context.allocator = allocator
+
 	assert_if_nil(dest)
 	if n < 0 || r < 0 { return .Invalid_Argument }
 	internal_error_if_immutable(dest) or_return
@@ -42,7 +44,9 @@ permutations_without_repetition :: proc(dest: ^Int, n, r: int) -> (error: Error)
 
 	Also known as the multiset coefficient or (n multichoose k).
 */
-combinations_with_repetition :: proc(dest: ^Int, n, r: int) -> (error: Error) {
+combinations_with_repetition :: proc(dest: ^Int, n, r: int, allocator := context.allocator) -> (error: Error) {
+	context.allocator = allocator
+
 	assert_if_nil(dest)
 	if n < 0 || r < 0 { return .Invalid_Argument }
 	internal_error_if_immutable(dest) or_return
@@ -61,7 +65,9 @@ combinations_with_repetition :: proc(dest: ^Int, n, r: int) -> (error: Error) {
 
 	Also known as the binomial coefficient or (n choose k).
 */
-combinations_without_repetition :: proc(dest: ^Int, n, r: int) -> (error: Error) {
+combinations_without_repetition :: proc(dest: ^Int, n, r: int, allocator := context.allocator) -> (error: Error) {
+	context.allocator = allocator
+
 	assert_if_nil(dest)
 	if n < 0 || r < 0 { return .Invalid_Argument }
 	internal_error_if_immutable(dest) or_return
