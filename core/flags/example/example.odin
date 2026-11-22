@@ -124,6 +124,8 @@ main :: proc() {
 		verbose: bool `usage:"Show verbose output."`,
 		debug: bool `args:"hidden" usage:"print debug info"`,
 
+		color: flags.Color_Mode `args:"color" usage:"Colorize command-line output."`,
+
 		overflow: [dynamic]string `usage:"Any extra arguments go here."`,
 	}
 

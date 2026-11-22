@@ -9,6 +9,7 @@ import            "core:math"
 @(require) import "core:net"
 import            "core:os"
 import            "core:strings"
+import            "core:terminal/ansi"
 import            "core:testing"
 import            "core:time/datetime"
 
@@ -1558,4 +1559,67 @@ very nicely.
 	writer := strings.to_stream(&builder)
 	flags.write_usage(writer, S, "overflow", .Unix)
 	testing.expect_value(t, strings.to_string(builder), Expected_Output)
+}
+
+@(test)
+test_usage_color_modes :: proc(t: ^testing.T) {
+	S :: struct {
+		count: int `args:"required" usage:"Number of items."`,
+		overflow: [dynamic]string,
+	}
+
+	never_builder := strings.builder_make()
+	defer strings.builder_destroy(&never_builder)
+	never_writer := strings.to_stream(&never_builder)
+	flags.write_usage(never_writer, S, "tool", .Odin, .Never)
+	never_output := strings.to_string(never_builder)
+	testing.expect(t, !strings.contains(never_output, ansi.ESC), "Never mode emitted ANSI codes")
+
+	auto_builder := strings.builder_make()
+	defer strings.builder_destroy(&auto_builder)
+	auto_writer := strings.to_stream(&auto_builder)
+	flags.write_usage(auto_writer, S, "tool", .Odin, .Auto)
+	auto_output := strings.to_string(auto_builder)
+	testing.expect_value(t, auto_output, never_output)
+	testing.expect(t, !strings.contains(auto_output, ansi.ESC), "Auto mode colored a custom writer")
+
+	always_builder := strings.builder_make()
+	defer strings.builder_destroy(&always_builder)
+	always_writer := strings.to_stream(&always_builder)
+	flags.write_usage(always_writer, S, "tool", .Odin, .Always)
+	always_output := strings.to_string(always_builder)
+
+	reset := ansi.sgr_alloc(ansi.RESET)
+	heading := ansi.sgr_alloc(ansi.BOLD + ";" + ansi.FG_GREEN)
+	identifier := ansi.sgr_alloc(ansi.BOLD + ";" + ansi.FG_CYAN)
+	placeholder := ansi.sgr_alloc(ansi.FG_CYAN)
+	secondary := ansi.sgr_alloc(ansi.FAINT)
+	testing.expect(t, strings.contains(always_output, fmt.tprintf("%sUsage:%s", heading, reset)), "Usage heading was not styled")
+	testing.expect(t, strings.contains(always_output, fmt.tprintf("%stool%s", identifier, reset)), "Program name was not styled")
+	testing.expect(t, strings.contains(always_output, fmt.tprintf("%s-%s", identifier, reset)), "Flag prefix was not styled")
+	testing.expect(t, strings.contains(always_output, fmt.tprintf("%scount%s", identifier, reset)), "Flag name was not styled")
+	testing.expect(t, strings.contains(always_output, fmt.tprintf("%s<int>%s", placeholder, reset)), "Type placeholder was not styled")
+	testing.expect(t, strings.contains(always_output, fmt.tprintf("%s<string, ...>%s", placeholder, reset)), "Comma-containing placeholder was not styled")
+	testing.expect(t, strings.contains(always_output, fmt.tprintf("%s, required%s", secondary, reset)), "Metadata was not styled")
+}
+
+@(test)
+test_color_tag_parsing :: proc(t: ^testing.T) {
+	S :: struct {
+		color: flags.Color_Mode `args:"color"`,
+	}
+	s: S
+	args := [?]string { "-color:always" }
+	result := flags.parse(&s, args[:])
+	testing.expect_value(t, result, nil)
+	testing.expect_value(t, s.color, flags.Color_Mode.Always)
+
+	B :: struct {
+		color: bool `args:"color"`,
+	}
+	b: B
+	bool_args := [?]string { "-color:false" }
+	result = flags.parse(&b, bool_args[:])
+	testing.expect_value(t, result, nil)
+	testing.expect_value(t, b.color, false)
 }

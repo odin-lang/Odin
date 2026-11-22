@@ -52,6 +52,7 @@ Under the `args` tag, there are the following subtags:
 - `hidden`: hide this flag from the usage documentation.
 - `required`: cause verification to fail if this argument is not set.
 - `manifold=N`: take several arguments at once, UNIX-style only.
+- `color`: allow a `Color_Mode` or `bool` field to control output coloring.
 - `file`: for `^os.File` types, file open mode.
 - `perms`: for `^os.File` types, file open permissions.
 - `indistinct`: allow the setting of distinct types by their base type.
