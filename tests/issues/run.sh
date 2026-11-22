@@ -395,6 +395,9 @@ else
 fi
 
 $ODIN build ../test_issue_5043 $COMMON
+$ODIN build ../test_issue_8554 -build-mode:obj $COMMON
+$ODIN build ../test_issue_8555 -build-mode:obj -target:linux_arm64 -target-features:contextidrel2,NeoverseV3ae,-CRC $COMMON_CHECK
+$ODIN build ../test_issue_8555 -build-mode:obj -target:linux_arm32 -target-features:+slow-load-d-subreg $COMMON_CHECK
 $ODIN build ../test_issue_5097 $COMMON
 $ODIN build ../test_issue_5097-2 $COMMON
 $ODIN build ../test_issue_5265 $COMMON
