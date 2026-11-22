@@ -1,11 +1,14 @@
 // Win64 passes a vector wider than 16 bytes by reference, one pointer per vector, whatever the target features.
 // Without AVX, LLVM split `#simd[8]f32` into halves and passed each by reference, and C read the wrong memory.
 //
+// It is returned in YMM0, which only a build with AVX has: the second run is built with it, and also checks results.
+//
 // Being an ABI guarantee, must be cross-checked against a c compiler.
 // The C side is built with AVX2 (clang without AVX splits the vector too, MSVC never does).
-// The Odin side is built without it, see run.bat.
+// The Odin side is built without it and with it, see run.bat.
 package test_issues
 
+import "base:intrinsics"
 import "core:sys/info"
 import "core:testing"
 
@@ -18,6 +21,8 @@ foreign lib {
 	c_take_m256  :: proc(a: V8f, d: f64, b: V8f, k: i64) -> i32 ---
 	c_take_five  :: proc(a, b, c, d, e: V8f) -> i32 ---
 	c_calls_odin :: proc() -> i32 ---
+	c_ret_m256   :: proc(base: f32) -> V8f ---
+	c_reads_odin :: proc() -> i32 ---
 }
 
 @(private="file")
@@ -44,6 +49,11 @@ odin_take_m256 :: proc "c" (a: V8f, d: f64, b: V8f, k: i64) -> i32 {
 	return i32(lanes(a, 1) && lanes(b, 11) && d == 5.5 && k == 77)
 }
 
+@(export)
+odin_ret_m256 :: proc "c" (base: f32) -> V8f {
+	return make_v8f(base)
+}
+
 @(test)
 test_win64_wide_vector_args :: proc(t: ^testing.T) {
 	if .avx2 not_in info.cpu_features() {
@@ -53,4 +63,9 @@ test_win64_wide_vector_args :: proc(t: ^testing.T) {
 	testing.expect_value(t, c_take_m256(make_v8f(1), 5.5, make_v8f(11), 77), 1)
 	testing.expect_value(t, c_take_five(zero, zero, zero, zero, make_v8f(41)), 1)
 	testing.expect_value(t, c_calls_odin(), 1)
+
+	when intrinsics.has_target_feature("avx") {
+		testing.expect(t, lanes(c_ret_m256(21), 21))
+		testing.expect_value(t, c_reads_odin(), 1)
+	}
 }

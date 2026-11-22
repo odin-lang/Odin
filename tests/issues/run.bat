@@ -267,6 +267,7 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 )
 
 %ODIN% test "..\test_issue_win64_wide_vector_args" %COMMON% || exit /b
+%ODIN% test "..\test_issue_win64_wide_vector_args" %COMMON% -microarch:haswell || exit /b
 
 @rem #########################################################################################################
 

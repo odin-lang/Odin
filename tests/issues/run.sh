@@ -675,6 +675,14 @@ if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 	fi
 fi
 
+# 32-byte vectors in YMM registers, both sides built with AVX2; needs a CPU that has it
+if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
+	if grep -qw avx2 /proc/cpuinfo 2>/dev/null; then
+		clang -c ../test_issue_sysv_wide_vectors/test_issue_sysv_wide_vectors.c -o test_issue_sysv_wide_vectors_c.o -mavx2
+		$ODIN test ../test_issue_sysv_wide_vectors $COMMON -microarch:haswell
+	fi
+fi
+
 $ODIN test ../test_issue_disabled_proc_value $COMMON -disable-assert
 $ODIN test ../test_issue_loaded_pointer_alignment $COMMON -o:speed
 $ODIN test ../test_issue_max_simd_align $COMMON -o:speed

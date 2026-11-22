@@ -32,9 +32,18 @@ int c_take_five(v8f a, v8f b, v8f c, v8f d, v8f e) {
 	return lanes(e, 41);
 }
 
-// Calls back into Odin, so the Odin side reads what C passed.
+v8f c_ret_m256(float base) {
+	return make(base);
+}
+
+// Calls back into Odin, so the Odin side reads what C passed, and C reads what Odin returned.
 extern int odin_take_m256(v8f a, double d, v8f b, long long k);
+extern v8f odin_ret_m256(float base);
 
 int c_calls_odin(void) {
 	return odin_take_m256(make(1), 5.5, make(11), 77);
+}
+
+int c_reads_odin(void) {
+	return lanes(odin_ret_m256(31), 31);
 }
