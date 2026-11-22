@@ -2524,9 +2524,9 @@ gb_internal bool init_build_paths(String init_filename) {
 	} else {
 		Path output_path;
 
-		if (str_eq(init_filename, str_lit(".")) || str_eq(init_filename, str_lit("/"))) {
-			// We must name the output file after the current directory.
-			debugf("Output name will be created from current base name %.*s.\n", LIT(bc->build_paths[BuildPath_Main_Package].basename));
+		if (path_is_directory(main_pkg)) {
+			// Name the output after the package directory, but place it in the current directory.
+			debugf("Output will be named after package directory %.*s and placed in the current directory.\n", LIT(bc->build_paths[BuildPath_Main_Package].basename));
 			String last_element  = last_path_element(bc->build_paths[BuildPath_Main_Package].basename);
 
 			if (last_element.len == 0) {
@@ -2534,7 +2534,8 @@ gb_internal bool init_build_paths(String init_filename) {
 				gb_printf_err("The output name is created from the last path element. `%.*s` has none. Use `-out:output_name.ext` to set it.\n", LIT(init_fullpath));
 				return false;
 			}
-			output_path.basename = copy_string(ha, bc->build_paths[BuildPath_Main_Package].basename);
+			Path cwd = path_from_string(ha, str_lit("."));
+			output_path.basename = copy_string(ha, cwd.basename);
 			output_path.name     = copy_string(ha, last_element);
 
 		} else {
