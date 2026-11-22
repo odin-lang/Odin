@@ -4018,7 +4018,14 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 	    is_type_enum(a)) {
 		LLVMIntPredicate pred = {};
 
-		if (is_type_unsigned(left.type)) {
+		// Addresses are unsigned: a signed predicate orders an address at or above 2^63
+		// below one under it
+		bool is_unsigned = is_type_unsigned(left.type) ||
+		                   is_type_pointer(a) ||
+		                   is_type_multi_pointer(a) ||
+		                   is_type_proc(a);
+
+		if (is_unsigned) {
 			switch (op_kind) {
 			case Token_Gt:   pred = LLVMIntUGT; break;
 			case Token_GtEq: pred = LLVMIntUGE; break;
