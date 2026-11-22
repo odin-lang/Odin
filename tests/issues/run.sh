@@ -4,6 +4,7 @@ set -eu
 mkdir -p build
 pushd build
 ODIN=../../../odin
+ODIN_FULL="$(pwd)/../../../odin"
 COMMON="-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -show-timings -microarch:native"
 COMMON_CHECK="-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -show-timings"
 
@@ -707,6 +708,19 @@ if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]] && command -v wasmtime > /dev/null; then
 		fi
 	done
 fi
+rm -rf issue_7990
+mkdir -p issue_7990/test_issue_7990/build issue_7990/test_issue_7990/deep/build
+cp ../test_issue_7990/test_issue_7990.odin issue_7990/test_issue_7990/
+
+pushd issue_7990/test_issue_7990/build
+"$ODIN_FULL" build ..
+test -f test_issue_7990
+popd
+
+pushd issue_7990/test_issue_7990/deep/build
+"$ODIN_FULL" build ../..
+test -f test_issue_7990
+popd
 
 #########################################################################################################
 
