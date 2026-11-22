@@ -3020,7 +3020,7 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 			if (ce->args.count == 1) {
 				error(call, "Compile time assertion: %s", arg1);
 			} else {
-				arg2 = expr_to_string(ce->args[1]);
+				arg2 = expr_to_string_exact(ce->args[1]);
 				error(call, "Compile time assertion: %s (%s)", arg1, arg2);
 			}
 

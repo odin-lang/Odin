@@ -144,6 +144,13 @@ fi
 $ODIN check ../test_issue_6979 -no-entry-point $COMMON_CHECK
 $ODIN check ../test_issue_7012 -no-entry-point $COMMON_CHECK
 
+if [[ $($ODIN check ../test_issue_7199 $COMMON_CHECK 2>&1 >/dev/null | grep -c "\.\.19988 chars\.\.") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 if [[ $($ODIN check ../test_issue_7708_mismatch $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
