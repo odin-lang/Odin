@@ -2592,6 +2592,11 @@ namespace lbAbiWasm {
 		return ft;
 	}
 
+	// NOTE(bill): A vector result, or an argument of up to 8 bytes, is passed as itself and lowered by the build's `simd128`.
+	// With it, a vector of up to 16 bytes is a `v128`.
+	// Otherwise a result goes through a hidden pointer and an argument passes its lanes separately.
+	// This depends on the build on purpose: target features are global on wasm (`enable_target_feature` is rejected).
+	// Every procedure of a program agrees, and ignoring `simd128` would give up `v128` in every build that has it.
 	gb_internal lbArgType non_struct(LLVMContextRef c, LLVMTypeRef type, bool is_return) {
 		if (type == LLVMIntTypeInContext(c, 128)) {
 			// LLVMTypeRef cast_type = LLVMVectorType(LLVMInt64TypeInContext(c), 2);
