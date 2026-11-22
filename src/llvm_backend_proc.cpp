@@ -1,6 +1,7 @@
 gb_internal LLVMValueRef lb_coerce_fields_load(lbProcedure *p, lbValue x, lbArgType const *arg);
 gb_internal LLVMValueRef lb_coerce_fields_store(lbProcedure *p, LLVMValueRef coerced, Type *original_type, lbArgType const *arg);
 gb_internal lbValue      lb_copy_indirect_param(lbProcedure *p, lbValue ptr);
+gb_internal LLVMValueRef lb_join_vector(lbProcedure *p, LLVMValueRef value, LLVMTypeRef type);
 
 gb_internal LLVMValueRef lb_call_intrinsic(lbProcedure *p, const char *name, LLVMValueRef* args, unsigned arg_count, LLVMTypeRef* types, unsigned type_count) {
 	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
@@ -852,9 +853,14 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 					if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
 						LLVMTypeRef param_type = lb_type(p->module, e->type);
 						LLVMValueRef original_value = LLVMGetParam(p->value, param_offset+llvm_param_index);
-						LLVMValueRef value = arg_type->coerce_offsets.count > 0
-							? lb_coerce_fields_store(p, original_value, e->type, arg_type)
-							: OdinLLVMBuildTransmute(p, original_value, param_type);
+						LLVMValueRef value = nullptr;
+						if (arg_type->coerce_offsets.count > 0) {
+							value = lb_coerce_fields_store(p, original_value, e->type, arg_type);
+						} else if (arg_type->split_vector) {
+							value = lb_join_vector(p, original_value, param_type);
+						} else {
+							value = OdinLLVMBuildTransmute(p, original_value, param_type);
+						}
 
 						lbValue param = {};
 						param.value = value;
@@ -1324,6 +1330,53 @@ gb_internal LLVMValueRef lb_coerce_fields_store(lbProcedure *p, LLVMValueRef coe
 	return lb_addr_load(p, slot).value;
 }
 
+// `value`, a vector, as the struct `type` of its equal pieces in order (see `lbArgType::split_vector`)
+gb_internal LLVMValueRef lb_split_vector(lbProcedure *p, LLVMValueRef value, LLVMTypeRef type) {
+	LLVMTypeRef  i32t   = LLVMInt32TypeInContext(p->module->ctx);
+	LLVMValueRef poison = LLVMGetPoison(LLVMTypeOf(value));
+	unsigned     count  = LLVMCountStructElementTypes(type);
+	unsigned     lanes  = LLVMGetVectorSize(LLVMStructGetTypeAtIndex(type, 0));
+
+	LLVMValueRef mask[64] = {};
+	GB_ASSERT(lanes <= gb_count_of(mask));
+
+	LLVMValueRef res = LLVMGetUndef(type);
+	for (unsigned i = 0; i < count; i++) {
+		for (unsigned k = 0; k < lanes; k++) {
+			mask[k] = LLVMConstInt(i32t, i*lanes + k, false);
+		}
+		LLVMValueRef piece = LLVMBuildShuffleVector(p->builder, value, poison, LLVMConstVector(mask, lanes), "");
+		res = LLVMBuildInsertValue(p->builder, res, piece, i, "");
+	}
+	return res;
+}
+
+// The reverse: the vector `type` from `value`, the struct of its pieces.
+// Each round joins neighbouring pieces into ones twice as wide.
+gb_internal LLVMValueRef lb_join_vector(lbProcedure *p, LLVMValueRef value, LLVMTypeRef type) {
+	LLVMTypeRef i32t  = LLVMInt32TypeInContext(p->module->ctx);
+	unsigned    count = LLVMCountStructElementTypes(LLVMTypeOf(value));
+
+	LLVMValueRef pieces[32] = {};
+	GB_ASSERT(count <= gb_count_of(pieces));
+	for (unsigned i = 0; i < count; i++) {
+		pieces[i] = LLVMBuildExtractValue(p->builder, value, i, "");
+	}
+
+	LLVMValueRef mask[64] = {};
+	GB_ASSERT(LLVMGetVectorSize(type) <= gb_count_of(mask));
+	for (unsigned k = 0; k < LLVMGetVectorSize(type); k++) {
+		mask[k] = LLVMConstInt(i32t, k, false);
+	}
+	for (/**/; count > 1; count /= 2) {
+		unsigned lanes = 2*LLVMGetVectorSize(LLVMTypeOf(pieces[0]));
+		for (unsigned i = 0; i < count/2; i++) {
+			pieces[i] = LLVMBuildShuffleVector(p->builder, pieces[2*i], pieces[2*i + 1], LLVMConstVector(mask, lanes), "");
+		}
+	}
+	return pieces[0];
+}
+
 gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr, Array<lbValue> const &processed_args, Type *abi_rt, lbAddr context_ptr, ProcInlining inlining, ProcTailing tailing) {
 	GB_ASSERT(p->module->ctx == LLVMGetTypeContext(LLVMTypeOf(value.value)));
 
@@ -1628,6 +1681,9 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 				if (arg->coerce_offsets.count > 0) {
 					x.value = lb_coerce_fields_load(p, x, arg);
 					array_add(&processed_args, x);
+				} else if (arg->split_vector) {
+					x.value = lb_split_vector(p, x.value, abi_type);
+					array_add(&processed_args, x);
 				} else if (xt == abi_type) {
 					array_add(&processed_args, x);
 				} else {
@@ -1704,6 +1760,8 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			result = lb_emit_call_internal(p, value, {}, processed_args, rt, context_ptr, inlining, tailing);
 			if (ft->ret.coerce_offsets.count > 0) {
 				result.value = lb_coerce_fields_store(p, result.value, rt, &ft->ret);
+			} else if (ft->ret.split_vector) {
+				result.value = lb_join_vector(p, result.value, ft->ret.type);
 			} else {
 				if (ft->ret.cast_type) {
 					result.value = OdinLLVMBuildTransmute(p, result.value, ft->ret.cast_type);

@@ -675,6 +675,14 @@ if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 	fi
 fi
 
+# 32-byte vectors in YMM registers, both sides built with AVX2; needs a CPU that has it
+if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
+	if grep -qw avx2 /proc/cpuinfo 2>/dev/null; then
+		clang -c ../test_issue_sysv_wide_vectors/test_issue_sysv_wide_vectors.c -o test_issue_sysv_wide_vectors_c.o -mavx2
+		$ODIN test ../test_issue_sysv_wide_vectors $COMMON_CHECK -microarch:haswell
+	fi
+fi
+
 $ODIN test ../test_issue_disabled_proc_value $COMMON -disable-assert
 $ODIN test ../test_issue_loaded_pointer_alignment $COMMON -o:speed
 $ODIN test ../test_issue_max_simd_align $COMMON -o:speed
@@ -687,6 +695,16 @@ if command -v wasmtime > /dev/null; then
 			$ODIN build ../test_issue_wasi_wasm64p32_target -target:$target -microarch:$microarch $COMMON_CHECK
 			wasmtime run --dir . --env ODIN_WASI_TEST=value ./test_issue_wasi_wasm64p32_target.wasm first second
 		done
+	done
+fi
+
+# wasm32 C vectors, both sides without and with simd128; needs wasmtime and a clang that targets wasm32
+if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]] && command -v wasmtime > /dev/null; then
+	for simd in "" simd128; do
+		if clang --target=wasm32 ${simd:+-m$simd} -c ../test_issue_wasm_c_vectors/test_issue_wasm_c_vectors.c -o test_issue_wasm_c_vectors_c.o 2> /dev/null; then
+			$ODIN build ../test_issue_wasm_c_vectors -target:wasi_wasm32 ${simd:+-target-features:$simd} $COMMON_CHECK
+			wasmtime run ./test_issue_wasm_c_vectors.wasm
+		fi
 	done
 fi
 
