@@ -117,10 +117,30 @@ check_files :: proc() {
 	expect(!os.exists(DIR), "os.exists")
 }
 
+Soa_Vector :: struct {
+	x, y, z: f32,
+}
+
+check_soa :: proc() {
+	d: #soa[dynamic]Soa_Vector
+	append_soa(&d, Soa_Vector{1, 2, 3}, Soa_Vector{4, 5, 9}, Soa_Vector{-4, -4, 3})
+	expect(len(d) == 3 && cap(d) >= 3, "#soa[dynamic] length")
+	expect(d[1].z == 9 && d.x[2] == -4, "#soa[dynamic] values")
+	expect(fmt.tprint(d) == "[Soa_Vector{x = 1, y = 2, z = 3}, Soa_Vector{x = 4, y = 5, z = 9}, Soa_Vector{x = -4, y = -4, z = 3}]", "#soa[dynamic] fmt")
+	delete(d)
+
+	s := make_soa(#soa[]Soa_Vector, 5)
+	expect(len(s) == 5, "#soa[] length")
+	s[4] = {7, 8, 9}
+	expect(s.y[4] == 8 && s[0].z == 0, "#soa[] values")
+	delete(s)
+}
+
 main :: proc() {
 	check_memory()
 	check_process()
 	check_files()
+	check_soa()
 
 	if failures > 0 {
 		os.exit(1)
