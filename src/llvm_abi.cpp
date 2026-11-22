@@ -33,6 +33,10 @@ struct lbArgType {
 	// `cast_type` is a struct of the scalars of `type` in order.
 	// A value is converted one scalar at a time instead of reinterpreted because two memory layouts can differ.
 	bool flattened;
+
+	// `type` is a vector and `cast_type` a struct of its equal pieces in order.
+	// A value is converted with shuffles instead of through memory.
+	bool split_vector;
 };
 
 // The number of LLVM parameters the value of a non-ignored `arg` takes, its padding not included
@@ -120,6 +124,29 @@ gb_internal bool lb_is_type_kind(LLVMTypeRef type, LLVMTypeKind kind) {
 		return false;
 	}
 	return LLVMGetTypeKind(type) == kind;
+}
+
+// NOTE(bill): A vector wider than 16 bytes changes registers with the target features on amd64 and i386.
+// It takes two XMM registers without AVX, one YMM register with it, and one ZMM register with AVX-512.
+// A procedure can enable features of its own, and its callers must still agree with it.
+// The Odin conventions pass such a vector by pointer and return it in 16-byte pieces instead.
+gb_internal bool lb_is_wide_vector(LLVMTypeRef type) {
+	return lb_is_type_kind(type, LLVMVectorTypeKind) && lb_sizeof(type) > 16;
+}
+
+// A wide vector as a result: its 16-byte pieces in XMM0 to XMM3, or the hidden pointer beyond that
+gb_internal lbArgType lb_odin_wide_vector_return(LLVMContextRef c, LLVMTypeRef type) {
+	i64 sz = lb_sizeof(type);
+	if (sz > 4*16) {
+		return lb_arg_type_indirect(type, lb_create_enum_attribute_with_type(c, "sret", type));
+	}
+	LLVMTypeRef elem      = LLVMGetElementType(type);
+	LLVMTypeRef piece     = LLVMVectorType(elem, cast(unsigned)(16/lb_sizeof(elem)));
+	LLVMTypeRef pieces[4] = {piece, piece, piece, piece};
+
+	lbArgType ret = lb_arg_type_direct(type, LLVMStructTypeInContext(c, pieces, cast(unsigned)(sz/16), false), nullptr, nullptr);
+	ret.split_vector = true;
+	return ret;
 }
 
 gb_internal LLVMTypeRef lb_function_type_to_llvm_raw(lbFunctionType *ft, bool is_var_arg) {
@@ -680,6 +707,7 @@ namespace lbAbi386 {
 		LLVMContextRef c = m->ctx;
 		lbFunctionType *ft = permanent_alloc_item<lbFunctionType>();
 		ft->ctx = c;
+		ft->calling_convention = calling_convention;
 		ft->args = compute_arg_types(c, arg_types, arg_count, original_type, calling_convention);
 		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 
@@ -713,8 +741,6 @@ namespace lbAbi386 {
 				ft->ret = lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, cast(unsigned)(sz*8)), nullptr, nullptr);
 			}
 		}
-
-		ft->calling_convention = calling_convention;
 		return ft;
 	}
 
@@ -906,9 +932,10 @@ namespace lbAbi386 {
 		// `fastcall` passes the first two integers or pointers of 32 bits or fewer in ECX and EDX.
 		// Since MSVC 2015, Windows passes the first three vectors in XMM0-2 and the rest by reference.
 		bool      msvc_rules = build_context.metrics.os == TargetOs_windows;
+		bool      is_odin    = is_calling_convention_odin(calling_convention);
 		Registers regs       = {calling_convention == ProcCC_FastCall ? 2 : 0, 3};
 		for (unsigned i = 0; i < arg_count; i++) {
-			if (by_ptr[i]) {
+			if (by_ptr[i] || (is_odin && lb_is_wide_vector(arg_types[i]))) {
 				args[i] = indirect(arg_types[i], &regs);
 			} else {
 				args[i] = arg_type(c, arg_types[i], srcs[i], msvc_rules, &regs);
@@ -943,6 +970,9 @@ namespace lbAbi386 {
 			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
 			return lb_arg_type_indirect(return_type, attr);
 		}
+		if (is_calling_convention_odin(ft->calling_convention) && lb_is_wide_vector(return_type)) {
+			return lb_odin_wide_vector_return(c, return_type);
+		}
 		return non_struct(c, return_type, true, nullptr);
 	}
 };
@@ -971,6 +1001,8 @@ namespace lbAbiAmd64Win64 {
 				if (lb_amd64_odin_is_two_words(arg_types[i])) {
 					ft->args[i] = lb_arg_type_direct(arg_types[i]);
 					ft->args[i].expand = true;
+				} else if (lb_is_wide_vector(arg_types[i])) {
+					ft->args[i] = lb_arg_type_indirect(arg_types[i], nullptr);
 				}
 			}
 		}
@@ -1011,12 +1043,13 @@ namespace lbAbiAmd64Win64 {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
 		} else if (is_m64_vector(return_type)) {
 			return lb_arg_type_direct(return_type, LLVMInt64TypeInContext(c), nullptr, nullptr);
-		} else if (lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind)) {
-			lbArgType in_registers = lb_amd64_odin_return(c, return_type, return_is_tuple, ft->calling_convention, 8);
-			if (in_registers.type != nullptr) {
-				return in_registers;
-			}
+		}
 
+		lbArgType in_registers = lb_amd64_odin_return(c, return_type, return_is_tuple, ft->calling_convention, 8);
+		if (in_registers.type != nullptr) {
+			return in_registers;
+		}
+		if (lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind)) {
 			switch (lb_sizeof(return_type)) {
 			case 1: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c,  8), nullptr, nullptr);
 			case 2: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 16), nullptr, nullptr);
@@ -1521,6 +1554,14 @@ namespace lbAbiAmd64SysV {
 	                                 bool is_arg,
 	                                 i32 *int_regs, i32 *sse_regs, Type *source_type) {
 		auto cls = classify(type, source_type);
+
+		// An SSE run wider than two eightbytes has no register to land in at the baseline ISA.
+		// The Odin conventions pass a pointer to it, the same as any other argument in memory.
+		bool wide_sse = cls.count > 2 && is_sse(cls[0]);
+		if (wide_sse && is_arg && is_calling_convention_odin(calling_convention)) {
+			return lb_arg_type_indirect(type, nullptr);
+		}
+
 		i32 needed_int = 0;
 		i32 needed_sse = 0;
 		for (auto c : cls) {
@@ -1560,9 +1601,8 @@ namespace lbAbiAmd64SysV {
 			}
 		}
 
-		if (cls.count > 2 && is_sse(cls[0])) {
-			// An SSE run wider than two eightbytes has no register to land in at
-			// the baseline ISA. It goes to memory, bare vector or struct-wrapped.
+		if (wide_sse) {
+			// C puts it in memory too, bare vector or struct-wrapped.
 			// A bare vector RETURN is the one exception: it is not an aggregate.
 			// Clang gives it no hidden pointer and lets LLVM split it across
 			// xmm0:xmm1, but the struct that wraps it still gets one.
@@ -2380,8 +2420,12 @@ gb_internal void lb_scalar_types(LLVMTypeRef t, Array<LLVMTypeRef> *scalars) {
 	array_add(scalars, t);
 }
 
-// Multiple return values or a single aggregate C would return through a hidden pointer (more than `c_register_bytes`) in registers where it fits
+// Multiple return values or a single aggregate C would return through a hidden pointer (more than `c_register_bytes`) in registers where it fits.
+// A wide vector goes in its 16-byte pieces.
 gb_internal lbArgType lb_amd64_odin_return(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_tuple, ProcCallingConvention calling_convention, i64 c_register_bytes) {
+	if (is_calling_convention_odin(calling_convention) && lb_is_wide_vector(return_type)) {
+		return lb_odin_wide_vector_return(c, return_type);
+	}
 	if (!return_is_tuple) {
 		if (!is_calling_convention_odin(calling_convention) ||
 		    !(lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind)) ||

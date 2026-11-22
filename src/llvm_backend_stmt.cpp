@@ -26,6 +26,7 @@ gb_internal GB_COMPARE_PROC(lb_polymorphic_instance_cmp) {
 
 gb_internal LLVMValueRef lb_coerce_fields_load(lbProcedure *p, lbValue x, lbArgType const *arg);
 gb_internal LLVMValueRef lb_rebuild_from_leaves(lbProcedure *p, LLVMValueRef value, LLVMTypeRef type);
+gb_internal LLVMValueRef lb_split_vector(lbProcedure *p, LLVMValueRef value, LLVMTypeRef type);
 gb_internal isize        lb_append_tuple_values(lbProcedure *p, Array<lbValue> *dst_values, lbValue src_value);
 
 // NOTE(bill): @RVO The callee's function type when the call returns any result through memory the caller passes, nullptr otherwise.
@@ -3066,6 +3067,9 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, Toke
 		} else if (ft->ret.flattened) {
 			ret_val = OdinLLVMBuildTransmute(p, ret_val, ft->ret.type);
 			ret_val = lb_rebuild_from_leaves(p, ret_val, ret_type);
+		} else if (ft->ret.split_vector) {
+			ret_val = OdinLLVMBuildTransmute(p, ret_val, ft->ret.type);
+			ret_val = lb_split_vector(p, ret_val, ret_type);
 		} else if (LLVMGetTypeKind(ret_type) == LLVMStructTypeKind) {
 			LLVMTypeRef src_type = LLVMTypeOf(ret_val);
 
