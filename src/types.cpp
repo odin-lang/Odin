@@ -1406,7 +1406,7 @@ gb_internal bool is_type_unsigned(Type *t) {
 		return (t->Basic.flags & BasicFlag_Unsigned) != 0;
 	}
 	if (t->kind == Type_Enum) {
-		return (t->Enum.base_type->Basic.flags & BasicFlag_Unsigned) != 0;
+		return is_type_unsigned(t->Enum.base_type);
 	}
 	return false;
 }
