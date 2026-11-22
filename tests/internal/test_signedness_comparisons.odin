@@ -55,6 +55,7 @@ test_distinct_backing_signedness :: proc(t: ^testing.T) {
 	testing.expect_value(t, i32(big),      0xFFFF)
 }
 
+@test
 test_signedness :: proc(t: ^testing.T) {
 	{
 		a, b := i16(32767), i16(0)
