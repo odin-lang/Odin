@@ -1522,7 +1522,7 @@ struct lbCopySlotRange {
 	LLVMValueRef call;
 	LLVMValueRef fn;
 	LLVMTypeRef  type;
-	isize        start; // the position of its first write in the procedure (-1: it cannot share a slot)
+	isize        start; // the position of its first use in the procedure
 	isize        end;   // the position of its call
 };
 
@@ -1539,25 +1539,16 @@ gb_internal GB_COMPARE_PROC(lb_copy_slot_range_cmp) {
 }
 
 // NOTE(bill): Whether a use of a temporary only writes into it, e.g. the `memcpy` of a copy.
-// A field's address may be taken to store to it.
+// A field's address may be taken to write to the field.
 gb_internal bool lb_only_writes_into(LLVMValueRef user, LLVMValueRef temp) {
 	switch (LLVMGetInstructionOpcode(user)) {
 	case LLVMStore:
 		return LLVMGetOperand(user, 0) != temp;
+	case LLVMCall:
+		return lb_call_writes(user) == lbCallWrites_Destination && LLVMGetOperand(user, 0) == temp;
 	case LLVMGetElementPtr:
 		for (LLVMUseRef use = LLVMGetFirstUse(user); use != nullptr; use = LLVMGetNextUse(use)) {
-			LLVMValueRef store = LLVMGetUser(use);
-			if (!LLVMIsAStoreInst(store) || LLVMGetOperand(store, 0) == user) {
-				return false;
-			}
-		}
-		return LLVMGetOperand(user, 0) == temp;
-	case LLVMCall:
-		if (lb_call_writes(user) != lbCallWrites_Destination || LLVMGetOperand(user, 0) != temp) {
-			return false;
-		}
-		for (unsigned i = 1; i < cast(unsigned)LLVMGetNumArgOperands(user); i++) {
-			if (LLVMGetOperand(user, i) == temp) {
+			if (!lb_only_writes_into(LLVMGetUser(use), user)) {
 				return false;
 			}
 		}
@@ -1568,13 +1559,16 @@ gb_internal bool lb_only_writes_into(LLVMValueRef user, LLVMValueRef temp) {
 
 // NOTE(bill): A temporary can share a slot when nothing but its call reads it.
 // Everything else must only write into it, in the same block as the call.
+// The writes come before the call: the temporary is made for that call.
 gb_internal bool lb_copy_slot_range_of(LLVMValueRef temp, lbCopySlotRange *r) {
-	if (!LLVMIsAAllocaInst(temp)) {
-		return false;
-	}
-	LLVMValueRef call = nullptr;
+	LLVMValueRef      call  = nullptr;
+	LLVMBasicBlockRef block = nullptr;
 	for (LLVMUseRef use = LLVMGetFirstUse(temp); use != nullptr; use = LLVMGetNextUse(use)) {
 		LLVMValueRef user = LLVMGetUser(use);
+		if (block != nullptr && LLVMGetInstructionParent(user) != block) {
+			return false;
+		}
+		block = LLVMGetInstructionParent(user);
 		if (lb_only_writes_into(user, temp)) {
 			continue;
 		}
@@ -1586,21 +1580,6 @@ gb_internal bool lb_copy_slot_range_of(LLVMValueRef temp, lbCopySlotRange *r) {
 	if (call == nullptr) {
 		return false;
 	}
-	LLVMBasicBlockRef block = LLVMGetInstructionParent(call);
-	for (LLVMUseRef use = LLVMGetFirstUse(temp); use != nullptr; use = LLVMGetNextUse(use)) {
-		LLVMValueRef user = LLVMGetUser(use);
-		if (LLVMGetInstructionParent(user) != block) {
-			return false;
-		}
-		if (!LLVMIsAGetElementPtrInst(user)) {
-			continue;
-		}
-		for (LLVMUseRef u = LLVMGetFirstUse(user); u != nullptr; u = LLVMGetNextUse(u)) {
-			if (LLVMGetInstructionParent(LLVMGetUser(u)) != block) {
-				return false;
-			}
-		}
-	}
 	r->temp = temp;
 	r->call = call;
 	r->fn   = LLVMGetBasicBlockParent(block);
@@ -1608,7 +1587,8 @@ gb_internal bool lb_copy_slot_range_of(LLVMValueRef temp, lbCopySlotRange *r) {
 	return true;
 }
 
-// NOTE(bill): A field's stores come after its address, and every write must come before the call.
+// NOTE(bill): A range starts at its temporary's first use, which is a write or its call.
+// A field's address comes before the writes through it.
 // Only the blocks with calls are walked.
 // No range lies in any other block, and skipping them keeps the order.
 gb_internal void lb_copy_slot_positions(lbCopySlotRange *ranges, isize count) {
@@ -1616,15 +1596,8 @@ gb_internal void lb_copy_slot_positions(lbCopySlotRange *ranges, isize count) {
 	PtrSet<LLVMBasicBlockRef>   blocks = {};
 	for (isize i = 0; i < count; i++) {
 		ptr_set_add(&blocks, LLVMGetInstructionParent(ranges[i].call));
-		map_set(&pos, ranges[i].call, cast(isize)0);
 		for (LLVMUseRef use = LLVMGetFirstUse(ranges[i].temp); use != nullptr; use = LLVMGetNextUse(use)) {
-			LLVMValueRef user = LLVMGetUser(use);
-			map_set(&pos, user, cast(isize)0);
-			if (LLVMIsAGetElementPtrInst(user)) {
-				for (LLVMUseRef u = LLVMGetFirstUse(user); u != nullptr; u = LLVMGetNextUse(u)) {
-					map_set(&pos, LLVMGetUser(u), cast(isize)0);
-				}
-			}
+			map_set(&pos, LLVMGetUser(use), cast(isize)0);
 		}
 	}
 	isize n = 0;
@@ -1643,23 +1616,8 @@ gb_internal void lb_copy_slot_positions(lbCopySlotRange *ranges, isize count) {
 		lbCopySlotRange &r = ranges[i];
 		r.end   = *map_get(&pos, r.call);
 		r.start = r.end;
-		isize last = 0;
 		for (LLVMUseRef use = LLVMGetFirstUse(r.temp); use != nullptr; use = LLVMGetNextUse(use)) {
-			LLVMValueRef user = LLVMGetUser(use);
-			if (user == r.call) {
-				continue;
-			}
-			isize at = *map_get(&pos, user);
-			r.start = gb_min(r.start, at);
-			last    = gb_max(last, at);
-			if (LLVMIsAGetElementPtrInst(user)) {
-				for (LLVMUseRef u = LLVMGetFirstUse(user); u != nullptr; u = LLVMGetNextUse(u)) {
-					last = gb_max(last, *map_get(&pos, LLVMGetUser(u)));
-				}
-			}
-		}
-		if (last > r.end) {
-			r.start = -1;
+			r.start = gb_min(r.start, *map_get(&pos, LLVMGetUser(use)));
 		}
 	}
 	ptr_set_destroy(&blocks);
@@ -1707,9 +1665,6 @@ gb_internal void lb_share_copy_slots(lbGenerator *gen) {
 			lbCopySlotRange const &r = ranges[k];
 			if (k == i || r.type != ranges[k-1].type) {
 				array_clear(&slots);
-			}
-			if (r.start < 0) {
-				continue;
 			}
 
 			lbCopySlot *slot = nullptr;
@@ -2272,10 +2227,6 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 						// 	ptr = lb_address_from_load_if_readonly_parameter(p, x);
 						}
 					}
-					if (ptr.value == nullptr) {
-						ptr = lb_copy_value_to_ptr(p, x, original_type, arg->byval_alignment);
-						array_add(&p->call_temps, ptr.value);
-					}
 				} else if (is_odin_cc) {
 					// NOTE(bill): Odin parameters are immutable so the original value can be passed if possible
 					// i.e. `T const &` in C++
@@ -2292,8 +2243,10 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 							ptr = lb_copy_indirect_arg_if_aliased(p, x, ptr);
 						}
 					}
-				} else {
-					ptr = lb_copy_value_to_ptr(p, x, original_type, 16);
+				}
+				// NOTE(bill): A `byval` argument, or one passed as a pointer to a copy as C does
+				if (ptr.value == nullptr) {
+					ptr = lb_copy_value_to_ptr(p, x, original_type, arg->is_byval ? arg->byval_alignment : 16);
 					array_add(&p->call_temps, ptr.value);
 				}
 				array_add(&processed_args, ptr);
