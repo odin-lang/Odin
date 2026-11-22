@@ -4083,6 +4083,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		lb_drop_copies_for_read_only_calls(gen);
 	}
 
+	TIME_SECTION("LLVM Share Copy Slots");
+	lb_share_copy_slots(gen);
+
 	if (gen->objc_names) {
 		TIME_SECTION("Finalize objc names");
 		lb_finalize_objc_names(gen, gen->objc_names);

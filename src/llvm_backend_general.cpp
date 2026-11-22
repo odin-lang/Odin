@@ -172,6 +172,7 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 
 	array_init(&m->pad_types,   heap_allocator());
 	array_init(&m->kept_copies, heap_allocator());
+	array_init(&m->call_temps,  heap_allocator());
 
 
 	m->const_dummy_builder = LLVMCreateBuilderInContext(m->ctx);

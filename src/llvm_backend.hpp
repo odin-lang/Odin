@@ -237,8 +237,9 @@ struct lbModule {
 	BlockingMutex pad_types_mutex;
 	Array<lbPadType> pad_types;
 
-	BlockingMutex     kept_copies_mutex;
-	Array<lbKeptCopy> kept_copies;
+	BlockingMutex       kept_copies_mutex; // also guards call_temps
+	Array<lbKeptCopy>   kept_copies;
+	Array<LLVMValueRef> call_temps;        // by-value arguments' temporaries, each only live until its call returns
 };
 
 struct lbEntityCorrection {
@@ -480,6 +481,7 @@ struct lbProcedure {
 	// by-value parameters
 	PtrMap<LLVMValueRef, u64> uncaptured_arg_masks;
 	Array<lbPendingCopy>      pending_copies;
+	Array<LLVMValueRef>       call_temps; // e.g. a `byval` argument's temporary
 	PtrMap<LLVMValueRef, i32> any_boxes;  // a boxed pointer -> the call it is an argument of
 	Array<i32>                call_stack; // the calls whose arguments are being built
 	i32                       call_count;

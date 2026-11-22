@@ -142,6 +142,86 @@ test_by_value_params_appended_any :: proc(t: ^testing.T) {
 	testing.expect_value(t, write_appended_read(x, &list), 1)
 }
 
+@(private="file")
+g_big2: Big
+
+@(private="file")
+write_global2_read :: #force_no_inline proc(v: Big) -> int {
+	g_big2.a = 99
+	return v.a
+}
+
+@(private="file")
+write_globals_read :: #force_no_inline proc(v, w: Big) -> int {
+	g_big.a  = 99
+	g_big2.a = 99
+	return v.a*10 + w.a
+}
+
+@(private="file")
+write_global_add :: #force_no_inline proc(v: Big, n: int) -> int {
+	g_big.a = 99
+	return v.a*10 + n
+}
+
+// The copies for one call are live at the same time and must not share a slot.
+// Neither may a nested call's copy and the outer call's copy when both are live.
+// Copies whose calls do not overlap may share one.
+@(test)
+test_by_value_params_shared_slots :: proc(t: ^testing.T) {
+	g_big, g_big2 = {a = 1}, {a = 2}
+	testing.expect_value(t, write_globals_read(g_big, g_big2), 12)
+
+	g_big, g_big2 = {a = 1}, {a = 2}
+	testing.expect_value(t, write_global_add(g_big, write_global2_read(g_big2)), 12)
+
+	g_big = {a = 1}
+	testing.expect_value(t, write_global_read(g_big) + write_global_read(g_big), 100)
+
+	r := 0
+	for i in 0..<4 {
+		g_big, g_big2 = {a = 1}, {a = 2}
+		if i % 2 == 0 {
+			r += write_global_read(g_big)
+		} else {
+			r += write_global2_read(g_big2)
+		}
+	}
+	testing.expect_value(t, r, 6)
+}
+
+@(private="file")
+Huge :: struct {
+	cells: [200*1024]u8,
+	tick:  int,
+}
+
+@(private="file")
+g_huge: Huge
+
+@(private="file")
+g_huge_sum: int
+
+@(private="file")
+add_huge :: #force_no_inline proc(h: Huge) {
+	g_huge_sum += int(h.cells[h.tick]) + h.tick
+}
+
+// Each call's copy of `g_huge` is only live until its call returns, and the copies share one slot.
+// A slot for each call would not fit in a 1 MB stack, the size of a thread's stack on Windows.
+@(test)
+test_by_value_params_huge_copies_share_a_slot :: proc(t: ^testing.T) {
+	g_huge     = {}
+	g_huge_sum = 0
+	add_huge(g_huge); g_huge.tick += 1
+	add_huge(g_huge); g_huge.tick += 1
+	add_huge(g_huge); g_huge.tick += 1
+	add_huge(g_huge); g_huge.tick += 1
+	add_huge(g_huge); g_huge.tick += 1
+	add_huge(g_huge)
+	testing.expect_value(t, g_huge_sum, 0+1+2+3+4+5)
+}
+
 // The address is taken after the first call: the loop brings the call back round.
 @(test)
 test_by_value_params_address_taken_later :: proc(t: ^testing.T) {
