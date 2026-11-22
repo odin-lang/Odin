@@ -6,6 +6,7 @@ pushd build
 
 set COMMON=-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -show-timings
 set ODIN=..\..\..\odin
+set ODIN_FULL=%CD%\..\..\..\odin.exe
 
 @echo on
 
@@ -100,6 +101,7 @@ set ODIN=..\..\..\odin
 @rem #########################################################################################################
 
 @rem "odin build" tests:
+
 %ODIN% build "..\test_issue_2113" %COMMON% -debug || exit /b
 %ODIN% build "..\test_issue_objc_class_method_calls" -target:darwin_arm64 -build-mode:obj %COMMON% || exit /b
 %ODIN% build "..\test_issue_2395" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
@@ -282,6 +284,18 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 
 %ODIN% test "..\test_issue_win64_wide_vector_args" %COMMON% || exit /b
 %ODIN% test "..\test_issue_win64_wide_vector_args" %COMMON% -microarch:haswell || exit /b
+if exist issue_7990 rmdir /S /Q issue_7990
+mkdir issue_7990\test_issue_7990\build
+mkdir issue_7990\test_issue_7990\deep\build
+copy ..\test_issue_7990\test_issue_7990.odin issue_7990\test_issue_7990\ > nul || exit /b
+pushd issue_7990\test_issue_7990\build
+"%ODIN_FULL%" build .. || exit /b
+if not exist test_issue_7990.exe exit /b
+popd
+pushd issue_7990\test_issue_7990\deep\build
+"%ODIN_FULL%" build ..\.. || exit /b
+if not exist test_issue_7990.exe exit /b
+popd
 
 @rem #########################################################################################################
 
