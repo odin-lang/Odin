@@ -1614,7 +1614,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			}
 
 			lbValue x = lb_emit_conv(p, args[i], original_type);
-			LLVMTypeRef xt = lb_type(p->module, x.type);
+			LLVMTypeRef xt = LLVMTypeOf(x.value);
 
 			if (arg->pad_type != nullptr) {
 				array_add(&processed_args, lbValue{LLVMGetUndef(arg->pad_type), t_i64});

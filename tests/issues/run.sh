@@ -639,6 +639,15 @@ fi
 $ODIN build ../test_issue_asm_baseless_riscv -target:linux_riscv64 -build-mode:obj $COMMON_CHECK
 $ODIN build ../test_issue_asm_keyword_mnemonic -target:linux_amd64 -build-mode:obj $COMMON_CHECK
 
+$ODIN run ../test_issue_wasm_union_i128 $COMMON
+$ODIN build ../test_issue_wasm_union_i128 -target:js_wasm32 -build-mode:obj $COMMON_CHECK
+$ODIN build ../test_issue_wasm_union_i128 -target:js_wasm64p32 -build-mode:obj $COMMON_CHECK
+$ODIN build ../test_issue_wasm_union_i128 -target:wasi_wasm32 -build-mode:obj $COMMON_CHECK
+if command -v wasmtime > /dev/null; then
+	$ODIN build ../test_issue_wasm_union_i128 -target:wasi_wasm32 $COMMON_CHECK
+	wasmtime ./test_issue_wasm_union_i128.wasm
+fi
+
 $ODIN test ../test_lifetime_markers $COMMON -o:size -lifetime-markers
 $ODIN test ../test_lifetime_markers $COMMON -o:speed -lifetime-markers
 

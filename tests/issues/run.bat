@@ -236,6 +236,11 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 %ODIN% build "..\test_issue_asm_baseless_riscv" -target:linux_riscv64 -build-mode:obj %COMMON% || exit /b
 %ODIN% build "..\test_issue_asm_keyword_mnemonic" -target:linux_amd64 -build-mode:obj %COMMON% || exit /b
 
+%ODIN% run "..\test_issue_wasm_union_i128" %COMMON% || exit /b
+%ODIN% build "..\test_issue_wasm_union_i128" -target:js_wasm32 -build-mode:obj %COMMON% || exit /b
+%ODIN% build "..\test_issue_wasm_union_i128" -target:js_wasm64p32 -build-mode:obj %COMMON% || exit /b
+%ODIN% build "..\test_issue_wasm_union_i128" -target:wasi_wasm32 -build-mode:obj %COMMON% || exit /b
+
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:size -lifetime-markers || exit /b
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:speed -lifetime-markers || exit /b
 
