@@ -3,8 +3,6 @@
 
 package rexcode_wasm
 
-import "core:math/bits"
-
 // =============================================================================
 // SECTION: Encoder  (Module -> WASM instruction byte stream)
 // =============================================================================
@@ -59,11 +57,16 @@ encode_operation :: proc(
 	errors:   ^[dynamic]Error,
 ) -> (size: u32, ok: bool) {
 	opcode := Opcode(op.opcode)
-	if opcode == .INVALID {
+	if opcode == .INVALID || op.opcode > u16(max(Opcode)) {
 		append(errors, Error{location = u32(op_index), code = .INVALID_OPCODE})
 		return
 	}
 	form := encoding_form(opcode)
+
+	if code := check_operands(op, form); code != .NONE {
+		append(errors, Error{location = u32(op_index), code = code})
+		return
+	}
 
 	need := encoded_size(op, form)
 	if pc + need > u32(len(code)) {
@@ -118,9 +121,13 @@ encode_operation :: proc(
 		case .MEMARG:
 			ma := operand_memarg(op.operands[opi])
 			// NOTE(bill): stored as log2 even though the spec text reads otherwise.
-			align := bits.log2(u64(ma.align))
-			write_uleb(code, &off, align)
-			write_uleb(code, &off, u64(ma.offset))
+			if ma.memory != 0 {
+				write_uleb(code, &off, u64(ma.align) | 64)
+				write_uleb(code, &off, u64(ma.memory))
+			} else {
+				write_uleb(code, &off, u64(ma.align))
+			}
+			write_uleb(code, &off, ma.offset)
 			opi += 1
 
 		case .REFTYPE:
@@ -154,10 +161,119 @@ encode_operation :: proc(
 				off += 1
 			}
 			opi += 2
+
+		case .VALTYPES:
+			types := op.operands[opi:]
+			write_uleb(code, &off, u64(len(types)))
+			for t in types {
+				code[off] = u8(t.imm)
+				off += 1
+			}
+			opi = len(op.operands)
 		}
 	}
 
 	return off - pc, true
+}
+
+@(private)
+encode_ops_size :: proc(ops: []Operation) -> (size: u32) {
+	for &op in ops {
+		opcode := Opcode(op.opcode)
+		if opcode == .INVALID || op.opcode > u16(max(Opcode)) {
+			continue
+		}
+		form := encoding_form(opcode)
+		if check_operands(&op, form) == .NONE {
+			size += encoded_size(&op, form)
+		}
+	}
+	return
+}
+
+@(private="file", require_results)
+check_operands :: proc(op: ^Operation, form: ^Encoding) -> Error_Code {
+	need := 0
+	variadic := false
+	for k in form.imm {
+		switch k {
+		case .NONE, .ZERO_BYTE:
+		case .BLOCKTYPE, .I32, .I64, .F32, .F64, .IDX, .MEMARG, .REFTYPE, .LANE:
+			need += 1
+		case .LANES16:
+			need += 2
+		case .BR_TABLE:
+			need += 1
+			variadic = true
+		case .VALTYPES:
+			variadic = true
+		}
+	}
+	if len(op.operands) < need || (!variadic && len(op.operands) != need) {
+		return .OPERAND_MISMATCH
+	}
+
+	opi := 0
+	for k in form.imm {
+		#partial switch k {
+		case .F32, .F64:
+			opi += 1
+		case .BLOCKTYPE:
+			v := op.operands[opi].imm
+			if v < 0 ? !block_type_known(v) : v > i64(max(u32)) {
+				return .IMMEDIATE_OUT_OF_RANGE
+			}
+			opi += 1
+		case .IDX:
+			v := op.operands[opi].imm
+			if v < 0 || v > i64(max(u32)) {
+				return .IMMEDIATE_OUT_OF_RANGE
+			}
+			opi += 1
+		case .REFTYPE:
+			v := op.operands[opi].imm
+			if v < 0 || v > 0xFF || !value_type_is_ref(Value_Type(v)) {
+				return .IMMEDIATE_OUT_OF_RANGE
+			}
+			opi += 1
+		case .LANE:
+			v := op.operands[opi].imm
+			if v < 0 || v > 0xFF {
+				return .IMMEDIATE_OUT_OF_RANGE
+			}
+			opi += 1
+		case .BR_TABLE:
+			for t in op.operands[opi:] {
+				if t.imm < 0 || t.imm > i64(max(u32)) {
+					return .IMMEDIATE_OUT_OF_RANGE
+				}
+			}
+			opi = len(op.operands)
+		case .VALTYPES:
+			for t in op.operands[opi:] {
+				if t.imm < 0 || t.imm > 0xFF || !value_type_is_known(Value_Type(t.imm)) {
+					return .IMMEDIATE_OUT_OF_RANGE
+				}
+			}
+			opi = len(op.operands)
+		case .I32:
+			v := op.operands[opi].imm
+			if v < i64(min(i32)) || v > i64(max(i32)) {
+				return .IMMEDIATE_OUT_OF_RANGE
+			}
+			opi += 1
+		case .I64:
+			opi += 1
+		case .MEMARG:
+			if operand_memarg(op.operands[opi]).align >= 64 {
+				return .IMMEDIATE_OUT_OF_RANGE
+			}
+			opi += 1
+		case .LANES16:
+			opi += 2
+		}
+	}
+	return .NONE
 }
 
 @(private="file")
@@ -185,7 +301,10 @@ encoded_size :: proc(op: ^Operation, form: ^Encoding) -> u32 {
 			opi  += 1
 		case .MEMARG:
 			ma := operand_memarg(op.operands[opi])
-			size += uleb_size(bits.log2(u64(ma.align))) + uleb_size(u64(ma.offset))
+			size += uleb_size(u64(ma.align)) + uleb_size(ma.offset)
+			if ma.memory != 0 {
+				size += uleb_size(u64(ma.memory))
+			}
 			opi  += 1
 		case .REFTYPE:
 			size += 1
@@ -206,6 +325,10 @@ encoded_size :: proc(op: ^Operation, form: ^Encoding) -> u32 {
 		case .LANES16:
 			size += 16
 			opi  += 2
+		case .VALTYPES:
+			types := op.operands[opi:]
+			size += uleb_size(u64(len(types))) + u32(len(types))
+			opi = len(op.operands)
 		}
 	}
 	return size

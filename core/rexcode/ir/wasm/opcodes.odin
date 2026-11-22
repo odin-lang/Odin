@@ -10,8 +10,10 @@ package rexcode_wasm
 // Coverage:
 //   - WebAssembly 1.0 (MVP) core: control flow, parametric, variable,
 //     memory, numeric (i32/i64/f32/f64) and conversion instructions.
+//   - Tail calls: return_call / return_call_indirect (0x12, 0x13).
 //   - The sign-extension operators (0xC0..0xC4).
-//   - Reference types ref.null / ref.is_null / ref.func (0xD0..0xD2).
+//   - Reference types: typed select (0x1C), table.get / table.set (0x25, 0x26),
+//     ref.null / ref.is_null / ref.func (0xD0..0xD2).
 //   - The 0xFC misc prefix group: saturating float->int truncation plus the
 //     bulk memory / table operators (memory.init/copy/fill, table.*, ...).
 //   - The 0xFD SIMD (fixed-width + relaxed) vector group (v128.*, i8x16.*, ...).
@@ -31,11 +33,13 @@ Opcode :: enum u16 {
 	RETURN_CALL, RETURN_CALL_INDIRECT,
 
 	// -------------------------------------------------------------- parametric
-	DROP, SELECT,
+	DROP, SELECT, SELECT_T,
 
 	// ---------------------------------------------------------------- variable
 	LOCAL_GET, LOCAL_SET, LOCAL_TEE,
 	GLOBAL_GET, GLOBAL_SET,
+
+	TABLE_GET, TABLE_SET,
 
 	// ------------------------------------------------------------------- memory
 	I32_LOAD, I64_LOAD, F32_LOAD, F64_LOAD,
@@ -229,10 +233,12 @@ MNEMONIC_NAMES := [Opcode]string{
 	.RETURN = "return", .CALL = "call", .CALL_INDIRECT = "call_indirect",
 	.RETURN_CALL = "return_call", .RETURN_CALL_INDIRECT = "return_call_indirect",
 
-	.DROP = "drop", .SELECT = "select",
+	.DROP = "drop", .SELECT = "select", .SELECT_T = "select",
 
 	.LOCAL_GET = "local.get", .LOCAL_SET = "local.set", .LOCAL_TEE = "local.tee",
 	.GLOBAL_GET = "global.get", .GLOBAL_SET = "global.set",
+
+	.TABLE_GET = "table.get", .TABLE_SET = "table.set",
 
 	.I32_LOAD = "i32.load", .I64_LOAD = "i64.load", .F32_LOAD = "f32.load", .F64_LOAD = "f64.load",
 	.I32_LOAD8_S = "i32.load8_s", .I32_LOAD8_U = "i32.load8_u",

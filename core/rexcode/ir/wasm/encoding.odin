@@ -38,12 +38,14 @@ Imm_Kind :: enum u8 {
 	F32,          // 4 little-endian bytes
 	F64,          // 8 little-endian bytes
 	IDX,          // unsigned LEB128 index (space comes from the operand)
-	MEMARG,       // unsigned LEB128 align, then unsigned LEB128 offset
+	MEMARG,       // unsigned LEB128 align exponent (bit 6: a memory index follows),
+	              // the memory index if so, then unsigned LEB128 u64 offset
 	REFTYPE,      // single value-type byte (ref.null)
 	BR_TABLE,     // unsigned LEB128 count, that many label depths, default depth
-	ZERO_BYTE,    // a single reserved 0x00 byte (memidx placeholders)
+	ZERO_BYTE,    // a single reserved 0x00 byte (atomic.fence)
 	LANE,         // single byte lane index (SIMD extract/replace/load/store lane)
 	LANES16,      // sixteen raw bytes (v128.const value / i8x16.shuffle mask)
+	VALTYPES,
 }
 
 Encoding :: struct #packed {
@@ -90,6 +92,23 @@ value_type_is_num :: #force_inline proc "contextless" (t: Value_Type) -> bool {
 value_type_is_ref :: #force_inline proc "contextless" (t: Value_Type) -> bool {
 	#partial switch t {
 	case .FUNCREF, .EXTERNREF: return true
+	}
+	return false
+}
+
+@(require_results)
+value_type_is_known :: #force_inline proc "contextless" (t: Value_Type) -> bool {
+	switch t {
+	case .I32, .I64, .F32, .F64, .V128, .FUNCREF, .EXTERNREF: return true
+	}
+	return false
+}
+
+@(private, require_results)
+block_type_known :: proc "contextless" (v: i64) -> bool {
+	switch Block_Type(v) {
+	case .EMPTY, .I32, .I64, .F32, .F64, .V128, .FUNCREF, .EXTERNREF:
+		return true
 	}
 	return false
 }
