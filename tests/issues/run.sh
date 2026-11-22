@@ -41,6 +41,13 @@ $ODIN test ../test_simple.odin -file -all-packages $COMMON
 # "odin check" tests:
 #
 
+if [[ $($ODIN check ../test_issue_1909 $COMMON_CHECK 2>&1 >/dev/null | grep -c "of a built-in procedure cannot be determined") -eq 3 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 if [[ $($ODIN check ../test_issue_3973 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 28 ]]; then
 	echo "SUCCESSFUL 1/1"
 else

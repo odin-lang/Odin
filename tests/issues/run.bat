@@ -33,6 +33,7 @@ set ODIN=..\..\..\odin
 @rem #########################################################################################################
 
 @rem "odin check" tests:
+%ODIN% check "..\test_issue_1909" %COMMON% 2>&1 | find /c "of a built-in procedure cannot be determined" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_3973" %COMMON% 2>&1 | find /c "Error:" | findstr /x "28" || exit /b
 %ODIN% check "..\test_issue_5105_5569" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_5335" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
