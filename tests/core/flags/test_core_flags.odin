@@ -1614,12 +1614,12 @@ test_color_tag_parsing :: proc(t: ^testing.T) {
 	testing.expect_value(t, result, nil)
 	testing.expect_value(t, s.color, flags.Color_Mode.Always)
 
-	B :: struct {
-		color: bool `args:"color"`,
+	u :: struct {
+		color: flags.Color_Mode `args:"color"`,
 	}
-	b: B
-	bool_args := [?]string { "-color:false" }
-	result = flags.parse(&b, bool_args[:])
+	unix: u
+	unix_args := [?]string { "--color", "Auto" }
+	result = flags.parse(&unix, unix_args[:], .Unix)
 	testing.expect_value(t, result, nil)
-	testing.expect_value(t, b.color, false)
+	testing.expect_value(t, unix.color, flags.Color_Mode.Auto)
 }

@@ -4,7 +4,6 @@ package flags
 import "core:io"
 import "core:os"
 import "core:reflect"
-import "core:strconv"
 import "core:strings"
 import "core:terminal"
 import "core:terminal/ansi"
@@ -138,7 +137,6 @@ resolve_color_mode :: proc(
 		}
 
 		name := get_field_name(field)
-		is_boolean := field.type.id == bool
 
 		for i := 0; i < len(args); i += 1 {
 			arg := args[i]
@@ -172,35 +170,23 @@ resolve_color_mode :: proc(
 				continue
 			}
 
-			if !has_value && !is_boolean && style == .Unix && i + 1 < len(args) {
+			if !has_value && style == .Unix && i+1 < len(args) {
 				i += 1
 				value = args[i]
 				has_value = true
-			} else if !has_value && is_boolean {
-				color_mode = .Always
-				continue
 			}
 
 			if !has_value {
 				continue
 			}
 
-			if is_boolean {
-				if enabled, ok := strconv.parse_bool(value); ok {
-					color_mode = .Never
-					if enabled {
-						color_mode = .Always
-					}
-				}
-			} else {
-				switch value {
-				case "never", "Never":
-					color_mode = .Never
-				case "auto", "Auto":
-					color_mode = .Auto
-				case "always", "Always":
-					color_mode = .Always
-				}
+			switch value {
+			case "never", "Never":
+				color_mode = .Never
+			case "auto", "Auto":
+				color_mode = .Auto
+			case "always", "Always":
+				color_mode = .Always
 			}
 		}
 	}
