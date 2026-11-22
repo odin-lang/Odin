@@ -1136,6 +1136,7 @@ gb_internal i32 lb_current_call(lbProcedure *p) {
 // NOTE(bill): An `any` boxed from a value straight into a variadic `..any` argument gets its own pointer to the value.
 // Through it, lb_drop_unneeded_copies sees which call the value is reachable from.
 // A variadic argument is `#no_capture`: it and the values it refers to are not kept once the call returns.
+// A polymorphic procedure's variadic argument may be kept, e.g. by `append`, and is not boxed here.
 // Any other `any` of the value may be kept, and lets the value escape.
 gb_internal LLVMValueRef lb_any_data_for_call(lbProcedure *p, lbValue value, LLVMValueRef data) {
 	i32 call = lb_current_call(p);

@@ -5987,7 +5987,8 @@ gb_internal void lb_add_values_to_array(lbProcedure *p, Array<lbValue> *args, lb
 	}
 }
 
-gb_internal lbValue lb_build_variadic_slice(lbProcedure *p, Type *slice_type, Slice<lbValue> var_args) {
+gb_internal lbValue lb_build_variadic_slice(lbProcedure *p, TypeProc *pt, Slice<lbValue> var_args) {
+	Type *slice_type = pt->params->Tuple.variables[pt->variadic_index]->type;
 	GB_ASSERT(is_type_slice(slice_type));
 	if (var_args.count == 0) {
 		return lb_const_nil(p->module, slice_type);
@@ -6049,7 +6050,7 @@ gb_internal lbValue lb_build_variadic_slice(lbProcedure *p, Type *slice_type, Sl
 
 	// NOTE(bill): The arguments are already built and only their own conversions box here (not a call within them)
 	bool prev_boxing_variadic_args = p->boxing_variadic_args;
-	p->boxing_variadic_args = true;
+	p->boxing_variadic_args = is_proc_variadic_any_call_only(pt);
 	for_array(i, var_args) {
 		lbValue addr = lb_emit_array_epi(p, base_array_ptr, cast(i32)i);
 		lbValue var_arg = lb_emit_conv(p, var_args[i], elem_type);
@@ -6215,9 +6216,8 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 		}
 		array_resize(&args, fixed_count);
 
-		Type *slice_type = pt->params->Tuple.variables[pt->variadic_index]->type;
 		auto var_args = slice(slice_from_array(flat_args), supplied_fixed_count, flat_args.count);
-		array_add(&args, lb_build_variadic_slice(p, slice_type, var_args));
+		array_add(&args, lb_build_variadic_slice(p, pt, var_args));
 	} else for_array(i, ce->split_args->positional) {
 		Entity *e = pt->params->Tuple.variables[i];
 		if (e->kind == Entity_TypeName) {
@@ -6266,7 +6266,7 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 						lbValue v = lb_build_expr(p, var_arg);
 						lb_add_values_to_array(p, &var_args, v);
 					}
-					variadic_args = lb_build_variadic_slice(p, slice_type, slice_from_array(var_args));
+					variadic_args = lb_build_variadic_slice(p, pt, slice_from_array(var_args));
 				}
 			}
 			array_add(&args, variadic_args);

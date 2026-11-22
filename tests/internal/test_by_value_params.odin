@@ -115,7 +115,7 @@ write_kept_read :: #force_no_inline proc(v: Big) -> int {
 }
 
 // An `any` given to an earlier call may be kept, and the value it refers to escapes.
-// Only a variadic `..any` argument is never kept past its call.
+// Only a variadic `..any` argument of a procedure which is not polymorphic is never kept past its call.
 @(test)
 test_by_value_params_kept_any :: proc(t: ^testing.T) {
 	keep := keep_any // through a procedure value, which the stack-escape warning does not follow
@@ -123,6 +123,23 @@ test_by_value_params_kept_any :: proc(t: ^testing.T) {
 	keep(x)
 	testing.expect_value(t, write_kept_read(x), 1)
 	g_kept = nil
+}
+
+@(private="file")
+write_appended_read :: #force_no_inline proc(v: Big, list: ^[dynamic]any) -> int {
+	(^Big)(list[0].data).a = 99
+	return v.a
+}
+
+// A polymorphic procedure may keep its variadic arguments, e.g. `append_elems` with its `..E` as `..any`.
+@(test)
+test_by_value_params_appended_any :: proc(t: ^testing.T) {
+	list: [dynamic]any
+	defer delete(list)
+	x := Big{a = 1}
+	y := 2
+	append(&list, x, y) // two values, so through the variadic `append_elems`
+	testing.expect_value(t, write_appended_read(x, &list), 1)
 }
 
 // The address is taken after the first call: the loop brings the call back round.
