@@ -3590,7 +3590,8 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				array_add(&fields, tag_type);
 				i64 block_size = lb_sizeof(block_type);
 				if (block_size == 0) {
-					block_size = type_size_of(type->Union.variants[0]);
+					// A recursive variant can still be an opaque LLVM type here.
+					block_size = type->Union.variant_block_size;
 				}
 				i64 used_size = block_size + lb_sizeof(tag_type);
 				i64 padding = size - used_size;
