@@ -905,7 +905,7 @@ gb_global TargetMetrics target_js_wasm64p32 = {
 
 gb_global TargetMetrics target_wasi_wasm64p32 = {
 	TargetOs_wasi,
-	TargetArch_wasm32,
+	TargetArch_wasm64p32,
 	4, 8, WASM_MAX_ALIGNMENT, 512,
 	str_lit("wasm32-wasi-js"),
 };

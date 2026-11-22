@@ -679,6 +679,17 @@ $ODIN test ../test_issue_disabled_proc_value $COMMON -disable-assert
 $ODIN test ../test_issue_loaded_pointer_alignment $COMMON -o:speed
 $ODIN test ../test_issue_max_simd_align $COMMON -o:speed
 
+$ODIN build ../test_issue_wasi_wasm64p32_target -target:wasi_wasm32 -build-mode:obj $COMMON_CHECK
+$ODIN build ../test_issue_wasi_wasm64p32_target -target:wasi_wasm64p32 -build-mode:obj $COMMON_CHECK
+if command -v wasmtime > /dev/null; then
+	for target in wasi_wasm32 wasi_wasm64p32; do
+		for microarch in generic mvp; do
+			$ODIN build ../test_issue_wasi_wasm64p32_target -target:$target -microarch:$microarch $COMMON_CHECK
+			wasmtime run --dir . --env ODIN_WASI_TEST=value ./test_issue_wasi_wasm64p32_target.wasm first second
+		done
+	done
+fi
+
 #########################################################################################################
 
 if [[ ! -z ${ODIN_TESTS_NO_CLANG+x} ]]; then

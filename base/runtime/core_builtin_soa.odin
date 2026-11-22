@@ -61,7 +61,8 @@ raw_soa_footer_slice :: proc "contextless" (array: ^$T/#soa[]$E) -> (footer: ^Ra
 		return nil
 	}
 	field_count := len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
-	footer = (^Raw_SOA_Footer_Slice)(&([^]byte)(array)[field_count*size_of(rawptr)])
+	offset := (field_count*size_of(rawptr) + align_of(Raw_SOA_Footer_Slice) - 1) &~ (align_of(Raw_SOA_Footer_Slice) - 1)
+	footer = (^Raw_SOA_Footer_Slice)(&([^]byte)(array)[offset])
 	return
 }
 @(builtin, require_results)
@@ -70,7 +71,8 @@ raw_soa_footer_dynamic_array :: proc "contextless" (array: ^$T/#soa[dynamic]$E) 
 		return nil
 	}
 	field_count := len(E) when intrinsics.type_is_array(E) else intrinsics.type_struct_field_count(E)
-	footer = (^Raw_SOA_Footer_Dynamic_Array)(&([^]byte)(array)[field_count*size_of(rawptr)])
+	offset := (field_count*size_of(rawptr) + align_of(Raw_SOA_Footer_Dynamic_Array) - 1) &~ (align_of(Raw_SOA_Footer_Dynamic_Array) - 1)
+	footer = (^Raw_SOA_Footer_Dynamic_Array)(&([^]byte)(array)[offset])
 	return
 }
 raw_soa_footer :: proc{
