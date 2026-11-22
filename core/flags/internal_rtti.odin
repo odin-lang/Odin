@@ -410,6 +410,23 @@ parse_and_set_pointer_by_type :: proc(ptr: rawptr, str: string, type_info: ^runt
 			}
 		}
 
+		if type_info.id == Color_Mode {
+			switch str {
+			case "never", "Never", "false":
+				(^Color_Mode)(ptr)^ = .Never
+			case "auto", "Auto", "true":
+				(^Color_Mode)(ptr)^ = .Auto
+			case "always", "Always":
+				(^Color_Mode)(ptr)^ = .Always
+			case:
+				return Parse_Error {
+					.Bad_Value,
+					"Invalid color mode. Valid names are: never, auto, always.",
+				}
+			}
+			return
+		}
+
 		// Might be a named enum. Need to check here first, since we handle all enums.
 		if enum_type_info, is_enum := specific_type_info.base.variant.(^runtime.Type_Info_Enum); is_enum {
 			if value, ok := reflect.enum_from_name_any(type_info.id, str); ok {
