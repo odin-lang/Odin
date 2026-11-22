@@ -2535,6 +2535,7 @@ gb_internal bool init_build_paths(String init_filename) {
 		}
 	} else {
 		Path output_path;
+		String output_name;
 
 		if (path_is_directory(main_pkg)) {
 			// Name the output after the package directory, but place it in the current directory.
@@ -2546,71 +2547,16 @@ gb_internal bool init_build_paths(String init_filename) {
 				gb_printf_err("The output name is created from the last path element. `%.*s` has none. Use `-out:output_name.ext` to set it.\n", LIT(init_fullpath));
 				return false;
 			}
-			Path cwd = path_from_string(ha, str_lit("."));
-			output_path.basename = copy_string(ha, cwd.basename);
-			output_path.name     = copy_string(ha, last_element);
-
+			output_name = last_element;
 		} else {
-			// Init filename was not 'current path'.
-			// Contruct the output name from the path elements as usual.
-			String output_name = init_filename;
-			// If it ends with a trailing (back)slash, strip it before continuing.
-			while (output_name.len > 0 && (output_name[output_name.len-1] == '/' || output_name[output_name.len-1] == '\\')) {
-				output_name.len -= 1;
-			}
-			// Only trim the extension if it's an Odin source file.
-			// This lets people build folders with extensions or files beginning with dots.
-			if (path_extension(output_name) == ".odin" && !path_is_directory(output_name)) {
-				output_name = remove_extension_from_path(output_name);
-			}
-			output_name = remove_directory_from_path(output_name);
-			output_name = copy_string(ha, string_trim_whitespace(output_name));
-			// This is `path_from_string` without the extension trimming.
-			Path res = {};
-			if (output_name.len > 0) {
-				String fullpath = path_to_full_path(ha, output_name);
-				defer (gb_free(ha, fullpath.text));
-
-				res.basename = directory_from_path(fullpath);
-				res.basename = copy_string(ha, res.basename);
-
-				if (path_is_directory(fullpath)) {
-					if (res.basename.len > 0 && res.basename.text[res.basename.len - 1] == '/') {
-						res.basename.len--;
-					}
-				} else {
-					isize name_start = (res.basename.len > 0) ? res.basename.len + 1 : res.basename.len;
-					res.name         = substring(fullpath, name_start, fullpath.len);
-					res.name         = copy_string(ha, res.name);
-				}
-			}
-			output_path = res;
-
-			// Note(Dragos): This is a fix for empty filenames
-			// Turn the trailing folder into the file name
-			if (output_path.name.len == 0) {
-				isize len = output_path.basename.len;
-				while (len > 1 && output_path.basename[len - 1] != '/') {
-					len -= 1;
-				}
-				// We reached the slash
-				String old_basename = output_path.basename;
-				output_path.basename.len = len - 1; // Remove the slash
-				output_path.name = substring(old_basename, len, old_basename.len);
-				output_path.basename = copy_string(ha, output_path.basename);
-				output_path.name = copy_string(ha, output_path.name);
-				// The old basename is wrong. Delete it
-				gb_free(ha, old_basename.text);
-
-
-			}
-
-			// Replace extension.
-			if (output_path.ext.len > 0) {
-				gb_free(ha, output_path.ext.text);
-			}
+			// File inputs name the output after the source file.
+			output_name = main_pkg.name;
 		}
-		output_path.ext  = copy_string(ha, output_extension);
+
+		Path cwd = path_from_string(ha, str_lit("."));
+		output_path.basename = copy_string(ha, cwd.basename);
+		output_path.name     = copy_string(ha, output_name);
+		output_path.ext      = copy_string(ha, output_extension);
 
 		bc->build_paths[BuildPath_Output] = output_path;
 	}
