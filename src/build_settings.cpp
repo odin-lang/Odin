@@ -2466,9 +2466,12 @@ gb_internal bool init_build_paths(String init_filename) {
 			output_extension = STR_LIT("so");
 		} else if (build_context.metrics.os == TargetOs_windows) {
 			output_extension = STR_LIT("exe");
-		} else if (path_is_directory(last_path_element(bc->build_paths[BuildPath_Main_Package].basename))) {
-			// Add .bin extension to avoid collision
-			// with package directory name
+		} else if (path_is_directory(main_pkg) &&
+		           path_is_directory(last_path_element(bc->build_paths[BuildPath_Main_Package].basename))) {
+			// Add .bin extension to avoid collision with package directory name
+			// NOTE(bplu4t2f):
+			//     For `-file` inputs, build_paths[BuildPath_Main_Package].basename is unrelated
+			//     to the output filename. So this applies only to directory inputs.
 			output_extension = STR_LIT("bin");
 		} else if (string_ends_with(init_filename, single_file_extension) && path_is_directory(remove_extension_from_path(init_filename))) {
 			// Add bin extension if compiling single-file package
