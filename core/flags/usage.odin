@@ -17,6 +17,7 @@ Inputs:
 - program: The name of the program, usually the first argument to `os.args`.
 - style: The argument parsing style, required to show flags in the proper style.
 - color: Whether to colorize output.
+- palette: The ANSI styles to use when colorizing output.
 */
 @(optimization_mode="favor_size")
 write_usage :: proc(
@@ -25,8 +26,9 @@ write_usage :: proc(
 	program: string = "",
 	style: Parsing_Style = .Odin,
 	color: Color_Mode = .Never,
+	palette: Color_Palette = DEFAULT_COLOR_PALETTE,
 ) {
-	palette := make_color_palette(should_colorize(color, out))
+	styles := make_color_styles(should_colorize(color, out), palette)
 
 	// All flags get their tags parsed so they can be reasoned about later.
 	Flag :: struct {
@@ -206,9 +208,9 @@ write_usage :: proc(
 	if len(program) > 0 {
 		keep_it_short := len(visible_flags) >= ONE_LINE_FLAG_CUTOFF_COUNT
 
-		write_styled(&builder, "Usage:", palette.heading, palette.reset)
+		write_styled(&builder, "Usage:", styles.heading, styles.reset)
 		strings.write_string(&builder, "\n\t")
-		write_styled(&builder, program, palette.identifier, palette.reset)
+		write_styled(&builder, program, styles.identifier, styles.reset)
 
 		for flag in visible_flags {
 			if keep_it_short && !(flag.is_required || flag.is_positional || flag.name == INTERNAL_OVERFLOW_FLAG) {
@@ -223,14 +225,14 @@ write_usage :: proc(
 			}
 
 			if !flag.is_required {
-				write_styled(&builder, "[", palette.secondary, palette.reset)
+				write_styled(&builder, "[", styles.secondary, styles.reset)
 			}
 			if !flag.is_positional {
-				write_styled(&builder, flag_prefix, palette.identifier, palette.reset)
+				write_styled(&builder, flag_prefix, styles.identifier, styles.reset)
 			}
-			write_styled(&builder, flag.name, palette.identifier, palette.reset)
+			write_styled(&builder, flag.name, styles.identifier, styles.reset)
 			if !flag.is_required {
-				write_styled(&builder, "]", palette.secondary, palette.reset)
+				write_styled(&builder, "]", styles.secondary, styles.reset)
 			}
 		}
 
@@ -243,7 +245,7 @@ write_usage :: proc(
 		return
 	}
 
-	write_styled(&builder, "Flags:", palette.heading, palette.reset)
+	write_styled(&builder, "Flags:", styles.heading, styles.reset)
 	strings.write_byte(&builder, '\n')
 	
 	// Divide the positional/required arguments and the non-required arguments.
@@ -270,14 +272,14 @@ write_usage :: proc(
 		strings.write_byte(&builder, '\t')
 
 		if flag.name == INTERNAL_OVERFLOW_FLAG {
-			write_type_description(&builder, flag.type_description, palette)
+			write_type_description(&builder, flag.type_description, styles)
 		} else {
-			write_styled(&builder, flag_prefix, palette.identifier, palette.reset)
-			write_styled(&builder, flag.name, palette.identifier, palette.reset)
+			write_styled(&builder, flag_prefix, styles.identifier, styles.reset)
+			write_styled(&builder, flag.name, styles.identifier, styles.reset)
 			if !flag.is_boolean {
 				strings.write_string(&builder, flag_assignment)
 			}
-			write_type_description(&builder, flag.type_description, palette)
+			write_type_description(&builder, flag.type_description, styles)
 		}
 
 		if strings.contains_rune(flag.usage, '\n') {

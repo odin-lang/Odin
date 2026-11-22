@@ -19,6 +19,7 @@ Inputs:
 - color: Whether to colorize output; a tagged color field in the model overrides this value.
 - allocator: (default: context.allocator)
 - loc: The caller location for debugging purposes (default: #caller_location)
+- palette: The ANSI styles to use when colorizing output.
 */
 @(optimization_mode="favor_size")
 parse_or_exit :: proc(
@@ -28,6 +29,7 @@ parse_or_exit :: proc(
 	color: Color_Mode = .Never,
 	allocator := context.allocator,
 	loc := #caller_location,
+	palette: Color_Palette = DEFAULT_COLOR_PALETTE,
 ) {
 	assert(len(program_args) > 0, "Program arguments slice is empty.", loc)
 
@@ -46,11 +48,11 @@ parse_or_exit :: proc(
 		if len(args) == 0 {
 			// No arguments entered, and there was an error; show the usage,
 			// specifically on STDERR.
-			write_usage(stderr, T, program, style, effective_color)
+			write_usage(stderr, T, program, style, effective_color, palette)
 			fmt.wprintln(stderr)
 		}
 
-		print_errors(T, error, program, style, effective_color)
+		print_errors(T, error, program, style, effective_color, palette)
 
 		_, was_help_request := error.(Help_Request)
 		os.exit(0 if was_help_request else 1)
@@ -66,6 +68,7 @@ Inputs:
 - error: The error returned from `parse`.
 - style: The argument parsing style, required to show flags in the proper style, when usage is shown.
 - color: Whether to colorize output.
+- palette: The ANSI styles to use when colorizing output.
 */
 @(optimization_mode="favor_size")
 print_errors :: proc(
@@ -74,17 +77,18 @@ print_errors :: proc(
 	program: string,
 	style: Parsing_Style = .Odin,
 	color: Color_Mode = .Never,
+	palette: Color_Palette = DEFAULT_COLOR_PALETTE,
 ) {
 	stderr := os.to_stream(os.stderr)
 	stdout := os.to_stream(os.stdout)
 
 	switch specific_error in error {
 	case Parse_Error:
-		stderr_palette := make_color_palette(should_colorize(color, stderr))
+		stderr_palette := make_color_styles(should_colorize(color, stderr), palette)
 		fmt.wprintfln(stderr, "%s[%T.%v]%s %s",
 			stderr_palette.error, specific_error, specific_error.reason, stderr_palette.reset, specific_error.message)
 	case Open_File_Error:
-		stderr_palette := make_color_palette(should_colorize(color, stderr))
+		stderr_palette := make_color_styles(should_colorize(color, stderr), palette)
 		if os.exists(specific_error.filename) {
 			flags: string
 			if specific_error.flags == {.Read} {
@@ -123,11 +127,11 @@ print_errors :: proc(
 				specific_error.filename)
 		}
 	case Validation_Error:
-		stderr_palette := make_color_palette(should_colorize(color, stderr))
+		stderr_palette := make_color_styles(should_colorize(color, stderr), palette)
 		fmt.wprintfln(stderr, "%s[%T]%s %s",
 			stderr_palette.error, specific_error, stderr_palette.reset, specific_error.message)
 	case Help_Request:
-		write_usage(stdout, data_type, program, style, color)
+		write_usage(stdout, data_type, program, style, color, palette)
 	}
 }
 /*

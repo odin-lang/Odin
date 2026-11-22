@@ -1589,11 +1589,11 @@ test_usage_color_modes :: proc(t: ^testing.T) {
 	flags.write_usage(always_writer, S, "tool", .Odin, .Always)
 	always_output := strings.to_string(always_builder)
 
-	reset := ansi.sgr_alloc(ansi.RESET)
-	heading := ansi.sgr_alloc(ansi.BOLD + ";" + ansi.FG_GREEN)
-	identifier := ansi.sgr_alloc(ansi.BOLD + ";" + ansi.FG_CYAN)
-	placeholder := ansi.sgr_alloc(ansi.FG_CYAN)
-	secondary := ansi.sgr_alloc(ansi.FAINT)
+	reset := ansi.sgr_alloc(flags.DEFAULT_COLOR_PALETTE.reset)
+	heading := ansi.sgr_alloc(flags.DEFAULT_COLOR_PALETTE.heading)
+	identifier := ansi.sgr_alloc(flags.DEFAULT_COLOR_PALETTE.identifier)
+	placeholder := ansi.sgr_alloc(flags.DEFAULT_COLOR_PALETTE.placeholder)
+	secondary := ansi.sgr_alloc(flags.DEFAULT_COLOR_PALETTE.secondary)
 	testing.expect(t, strings.contains(always_output, fmt.tprintf("%sUsage:%s", heading, reset)), "Usage heading was not styled")
 	testing.expect(t, strings.contains(always_output, fmt.tprintf("%stool%s", identifier, reset)), "Program name was not styled")
 	testing.expect(t, strings.contains(always_output, fmt.tprintf("%s-%s", identifier, reset)), "Flag prefix was not styled")
@@ -1601,6 +1601,24 @@ test_usage_color_modes :: proc(t: ^testing.T) {
 	testing.expect(t, strings.contains(always_output, fmt.tprintf("%s<int>%s", placeholder, reset)), "Type placeholder was not styled")
 	testing.expect(t, strings.contains(always_output, fmt.tprintf("%s<string, ...>%s", placeholder, reset)), "Comma-containing placeholder was not styled")
 	testing.expect(t, strings.contains(always_output, fmt.tprintf("%s, required%s", secondary, reset)), "Metadata was not styled")
+
+	custom_palette := flags.Color_Palette {
+		reset       = ansi.RESET,
+		heading     = ansi.BOLD + ";" + ansi.FG_YELLOW,
+		identifier  = ansi.BOLD + ";" + ansi.FG_MAGENTA,
+		placeholder = ansi.FG_GREEN,
+		secondary   = ansi.ITALIC,
+		error       = ansi.BOLD + ";" + ansi.FG_BLUE,
+	}
+	custom_builder := strings.builder_make()
+	defer strings.builder_destroy(&custom_builder)
+	custom_writer := strings.to_stream(&custom_builder)
+	flags.write_usage(custom_writer, S, "tool", .Odin, .Always, custom_palette)
+	custom_output := strings.to_string(custom_builder)
+	custom_heading := ansi.sgr_alloc(custom_palette.heading)
+	testing.expect(t,
+		strings.contains(custom_output, fmt.tprintf("%sUsage:%s", custom_heading, reset)),
+		"Custom heading palette was not applied")
 }
 
 @(test)

@@ -8,7 +8,7 @@ import "core:strings"
 import "core:terminal"
 import "core:terminal/ansi"
 
-Color_Palette :: struct {
+Color_Styles :: struct {
 	reset:       string,
 	heading:     string,
 	identifier:  string,
@@ -42,17 +42,20 @@ should_colorize :: proc(mode: Color_Mode, stream: io.Stream) -> bool {
 	return false
 }
 
-make_color_palette :: proc(use_color: bool) -> (palette: Color_Palette) {
+make_color_styles :: proc(use_color: bool, palette: Color_Palette) -> (styles: Color_Styles) {
 	if !use_color {
 		return
 	}
 
-	palette.reset = ansi.sgr(ansi.RESET)
-	palette.heading = ansi.sgr(ansi.BOLD + ";" + ansi.FG_BRIGHT_GREEN)
-	palette.identifier = ansi.sgr(ansi.BOLD + ";" + ansi.FG_BRIGHT_CYAN)
-	palette.placeholder = ansi.sgr(ansi.FG_CYAN)
-	palette.secondary = ansi.sgr(ansi.FAINT)
-	palette.error = ansi.sgr(ansi.BOLD + ";" + ansi.FG_BRIGHT_RED)
+	styles.reset = ansi.sgr(ansi.RESET)
+	if len(palette.reset) > 0 {
+		styles.reset = ansi.sgr(palette.reset)
+	}
+	styles.heading = ansi.sgr(palette.heading) if len(palette.heading) > 0 else ""
+	styles.identifier = ansi.sgr(palette.identifier) if len(palette.identifier) > 0 else ""
+	styles.placeholder = ansi.sgr(palette.placeholder) if len(palette.placeholder) > 0 else ""
+	styles.secondary = ansi.sgr(palette.secondary) if len(palette.secondary) > 0 else ""
+	styles.error = ansi.sgr(palette.error) if len(palette.error) > 0 else ""
 	return
 }
 
@@ -69,7 +72,7 @@ write_styled :: proc(builder: ^strings.Builder, text, prefix, reset: string) {
 write_type_description :: proc(
 	builder: ^strings.Builder,
 	description: string,
-	palette: Color_Palette,
+	palette: Color_Styles,
 ) {
 	if len(palette.placeholder) == 0 {
 		strings.write_string(builder, description)
@@ -170,7 +173,7 @@ resolve_color_mode :: proc(
 				continue
 			}
 
-			if !has_value && style == .Unix && i+1 < len(args) {
+			if !has_value && style == .Unix && i + 1 < len(args) {
 				i += 1
 				value = args[i]
 				has_value = true

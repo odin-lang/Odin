@@ -5,6 +5,7 @@ import "core:flags"
 import "core:fmt"
 import "core:net"
 import "core:os"
+import "core:terminal/ansi"
 import "core:time/datetime"
 
 
@@ -134,7 +135,9 @@ main :: proc() {
 
 	flags.register_type_setter(my_custom_type_setter)
 	flags.register_flag_checker(my_custom_flag_checker)
-	flags.parse_or_exit(&opt, os.args, style)
+	color_palette := flags.DEFAULT_COLOR_PALETTE
+	color_palette.heading = ansi.BOLD + ";" + ansi.FG_BLUE
+	flags.parse_or_exit(&opt, os.args, style, palette=color_palette)
 
 	fmt.printfln("%#v", opt)
 
