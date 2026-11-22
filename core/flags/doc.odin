@@ -60,8 +60,8 @@ Under the `args` tag, there are the following subtags:
 Color output is disabled by default. Pass a `Color_Mode` to `write_usage`,
 `print_errors`, or `parse_or_exit` to enable it. To customize the ANSI styles,
 pass a `Color_Palette`; `DEFAULT_COLOR_PALETTE` provides the built-in default.
-Palette fields contain ANSI SGR codes, such as `ansi.BOLD + ";" +
-ansi.FG_YELLOW`.
+Use `color_code(ansi.FG_YELLOW, .Bold)` to combine a foreground color with a
+text style for a palette field.
 
 `required` may be given a range specifier in the following formats:
 	min

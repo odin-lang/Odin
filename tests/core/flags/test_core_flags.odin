@@ -1604,11 +1604,11 @@ test_usage_color_modes :: proc(t: ^testing.T) {
 
 	custom_palette := flags.Color_Palette {
 		reset       = ansi.RESET,
-		heading     = ansi.BOLD + ";" + ansi.FG_YELLOW,
-		identifier  = ansi.BOLD + ";" + ansi.FG_MAGENTA,
+		heading     = flags.color_code(ansi.FG_YELLOW, .Bold),
+		identifier  = flags.color_code(ansi.FG_MAGENTA, .Bold),
 		placeholder = ansi.FG_GREEN,
 		secondary   = ansi.ITALIC,
-		error       = ansi.BOLD + ";" + ansi.FG_BLUE,
+		error       = flags.color_code(ansi.FG_BLUE, .Bold),
 	}
 	custom_builder := strings.builder_make()
 	defer strings.builder_destroy(&custom_builder)
@@ -1619,6 +1619,8 @@ test_usage_color_modes :: proc(t: ^testing.T) {
 	testing.expect(t,
 		strings.contains(custom_output, fmt.tprintf("%sUsage:%s", custom_heading, reset)),
 		"Custom heading palette was not applied")
+	testing.expect_value(t, flags.color_code(ansi.FG_BLUE, .Bold), ansi.BOLD + ";" + ansi.FG_BLUE)
+	testing.expect_value(t, flags.color_code(ansi.FG_BLUE), ansi.FG_BLUE)
 }
 
 @(test)
