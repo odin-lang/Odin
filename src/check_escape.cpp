@@ -204,6 +204,7 @@ struct EscapeReport {
 	String           held;     // where the pointer is within what is returned, e.g. `'x.a.b'`, or empty for all of it
 	String           target;   // where the pointer points within a local, e.g. `x.c`, or empty for all of it
 	bool             self_ref; // what is returned is the local it points into
+	bool             boxed;    // of a variadic '..any' parameter whose values are boxed for the call only
 };
 
 struct EscapeAlias {
@@ -1033,17 +1034,18 @@ gb_internal EscapeValue escape_load(EscapeAnalysis *ea, EscapeValue const &ptr, 
 			}
 			break;
 
-		case EscapeOrigin_Variadic: {
-			// NOTE(bill): its 'any' elements are boxed in the caller's stack frame too
-			Type *elem = base_type(o.obj.entity->type);
-			if (elem->kind == Type_Slice && is_type_any(elem->Slice.elem)) {
-				escape_value_add(&v, {}, o);
+		case EscapeOrigin_Variadic:
+			if (escape_path_deref_index(o.path) < o.path.count) {
+				escape_value_add(&v, {}, EscapeOrigin{EscapeOrigin_ParamDeep, false, o.obj, {}});
+			} else if (is_proc_variadic_any_call_only(ea->pt)) {
+				// NOTE(bill): its 'any' elements point to values boxed in the caller's stack frame for the call only
+				escape_value_add(&v, {}, EscapeOrigin{EscapeOrigin_Variadic, false, o.obj, escape_path_of(EscapeStep_Deref)});
 			} else {
-				// its elements are the caller's arguments
+				// NOTE(bill): its elements are the caller's arguments, which a polymorphic procedure may keep, e.g. `append`.
+				// Keeping them is a flow to the caller, the same as for a parameter of type 'any'.
 				escape_value_add(&v, {}, EscapeOrigin{EscapeOrigin_ParamLoad, false, o.obj, o.path});
 			}
 			break;
-		}
 		case EscapeOrigin_Local:
 			if (escape_is_param(o.obj.entity)) {
 				// what a parameter holds is the caller's
@@ -3582,7 +3584,10 @@ gb_internal void escape_report_emit(EscapeReport const &r) {
 		break;
 	}
 	case EscapeOrigin_Variadic:
-		origin = gb_string_append_fmt(origin, "the variadic parameter '%.*s', which only lives for the duration of the call", LIT(o.obj.entity->token.string));
+		origin = gb_string_append_fmt(origin, "the variadic parameter '%.*s'", LIT(o.obj.entity->token.string));
+		if (kind == EscapeReport_Return || kind == EscapeReport_MayReturn) {
+			origin = gb_string_appendc(origin, ", which only lives for the duration of the call");
+		}
 		break;
 	}
 
@@ -3625,6 +3630,12 @@ gb_internal void escape_report_emit(EscapeReport const &r) {
 		gb_string_free(site);
 	} else if (o.kind == EscapeOrigin_Temp && !escape_site_shown(node, o.obj.temp)) {
 		error_line("\tThe %s is made at %s\n", temp_description, token_pos_to_string(ast_token(o.obj.temp).pos));
+	} else if (o.kind == EscapeOrigin_Variadic && (kind == EscapeReport_Store || kind == EscapeReport_CallStore)) {
+		if (r.boxed) {
+			error_line("\tNote: A variadic '..any' parameter's slice, and the values it refers to, only live for the duration of the call\n");
+		} else {
+			error_line("\tNote: A variadic parameter's slice only lives for the duration of the call\n");
+		}
 	}
 
 	if (r.self_ref) {
@@ -3652,6 +3663,7 @@ gb_internal void escape_report(EscapeAnalysis *ea, Ast *node, String expr_str, E
 	r.expr_str = copy_string(permanent_allocator(), expr_str);
 	r.held     = copy_string(permanent_allocator(), held);
 	r.self_ref = self_ref;
+	r.boxed    = o.kind == EscapeOrigin_Variadic && is_proc_variadic_any_call_only(ea->pt);
 
 	// the paths are gone with the analysis' temporary memory by the time it is emitted
 	if (o.kind == EscapeOrigin_Local) {
@@ -3837,7 +3849,7 @@ gb_internal void escape_exit(EscapeAnalysis *ea, Ast *node, Slice<Ast *> const &
 
 	for (EscapeOuterStore const &s : ea->state.outers) {
 		EscapeOrigin o = {};
-		if (escape_find_stack_origin(ea, escape_value_one({}, s.origin), &o) && o.kind != EscapeOrigin_Variadic) {
+		if (escape_find_stack_origin(ea, escape_value_one({}, s.origin), &o)) {
 			EscapeReportKind kind = EscapeReport_Store;
 			if (s.node->kind == Ast_CallExpr) {
 				kind = EscapeReport_CallStore;

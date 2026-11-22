@@ -73,6 +73,8 @@ set ODIN=..\..\..\odin
 %ODIN% check "..\test_issue_escape_nested_calls" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "6" || exit /b
 %ODIN% check "..\test_issue_escape_cleared_stores" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "15" || exit /b
 %ODIN% check "..\test_issue_escape_cleared_stores" -no-entry-point %COMMON% 2>&1 | find /c "local variable 'y'" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_escape_variadic" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "10" || exit /b
+%ODIN% check "..\test_issue_escape_variadic" -no-entry-point %COMMON% 2>&1 | find /c "slice, and the values it refers to, only live" | findstr /x "5" || exit /b
 %ODIN% test "..\test_issue_type_info_variant_shim" %COMMON% -ignore-warnings || exit /b
 %ODIN% check "..\test_issue_type_info_variant_shim" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "11" || exit /b
 %ODIN% check "..\test_issue_type_info_variant_shim_duplicate" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
