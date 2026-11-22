@@ -2217,7 +2217,7 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 	if (lb_sizeof(LLVMTypeOf(value.value)) > LB_MAX_STORE_SIZE) {
 		if (!p->in_multi_assignment && LLVMIsALoadInst(value.value)) {
 			LLVMValueRef dst_ptr = ptr.value;
-			LLVMValueRef src_ptr_original = LLVMGetOperand(value.value, 0);
+			LLVMValueRef src_ptr_original = lb_address_of_load_to_read(p, value).value;
 			LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, src_ptr_original, LLVMTypeOf(dst_ptr), "");
 
 			lb_emit_memmove(p,

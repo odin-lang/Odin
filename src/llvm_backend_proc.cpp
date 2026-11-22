@@ -898,6 +898,7 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 						lbValue ptr = lb_address_from_load_or_generate_local(p, param);
 						GB_ASSERT(LLVMIsAAllocaInst(ptr.value));
 						lb_add_entity(p->module, e, ptr);
+						ptr_set_add(&p->parameter_storage, ptr.value);
 						lb_add_debug_param_variable(p, ptr.value, e->type, e->token, param_index+1, p->curr_block);
 					}
 				} else if (arg_type->kind == lbArg_Indirect) {
@@ -932,6 +933,11 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 						}
 
 						lb_add_entity(p->module, e, ptr);
+						// NOTE(bill): A C caller passes a copy for the call alone, but not for a `#by_ptr` parameter.
+						// An Odin caller passing by reference passes its original.
+						if ((e->flags & EntityFlag_ByPtr) == 0 && (!is_odin_cc || ptr.value != incoming_ptr)) {
+							ptr_set_add(&p->parameter_storage, ptr.value);
+						}
 						lb_add_debug_param_variable(p, incoming_ptr, e->type, e->token, param_index+1, p->curr_block);
 					}
 				}
@@ -1009,9 +1015,32 @@ gb_internal lbValue lb_copy_indirect_param(lbProcedure *p, lbValue ptr) {
 	return lbValue{c.temp, ptr.type};
 }
 
-gb_internal lbValue lb_copy_indirect_arg_if_aliased(lbProcedure *p, lbValue x, lbValue ptr) {
-	if (!lb_is_load_from(x.value, ptr.value)) {
-		return ptr;
+// NOTE(bill): `inst` goes right after `after`, and takes its debug location.
+gb_internal void lb_move_after(lbProcedure *p, LLVMValueRef inst, LLVMValueRef after) {
+	LLVMBasicBlockRef block = LLVMGetInsertBlock(p->builder);
+	LLVMMetadataRef   loc   = LLVMGetCurrentDebugLocation2(p->builder);
+
+	LLVMInstructionRemoveFromParent(inst);
+	if (LLVMValueRef next = LLVMGetNextInstruction(after)) {
+		LLVMPositionBuilderBefore(p->builder, next);
+	} else {
+		LLVMPositionBuilderAtEnd(p->builder, LLVMGetInstructionParent(after));
+	}
+	LLVMSetCurrentDebugLocation2(p->builder, LLVMInstructionGetDebugLoc(after));
+	LLVMInsertIntoBuilder(p->builder, inst);
+
+	LLVMPositionBuilderAtEnd(p->builder, block);
+	LLVMSetCurrentDebugLocation2(p->builder, loc);
+}
+
+gb_internal lbValue lb_copy_indirect_arg_if_aliased(lbProcedure *p, lbValue x) {
+	if (p->in_multi_assignment || !LLVMIsALoadInst(x.value)) {
+		return lb_aligned_address_from_load_or_generate_local(p, x);
+	}
+	lbValue ptr   = {LLVMGetOperand(x.value, 0), alloc_type_pointer(x.type)};
+	i64     align = type_align_of(x.type);
+	if (lb_known_value_address_alignment(p, x, ptr, align) < align) {
+		return lb_aligned_address_from_load_or_generate_local(p, x);
 	}
 
 	LLVMValueRef base = lb_pointer_base(ptr.value);
@@ -1020,7 +1049,14 @@ gb_internal lbValue lb_copy_indirect_arg_if_aliased(lbProcedure *p, lbValue x, l
 	}
 
 	lbPendingCopy c = lb_copy_to_new_local(p, ptr.value, x.type);
-	if (LLVMIsAAllocaInst(base)) {
+	// NOTE(bill): The later arguments may have written the original since it was loaded.
+	// The copy is then made where the argument was evaluated.
+	// A store into the original itself keeps the copy, even when the original's address does not escape.
+	lbWrites writes = lb_writes_since_load(p, x.value);
+	if (writes != lbWrites_None) {
+		lb_move_after(p, c.copy, x.value);
+	}
+	if (LLVMIsAAllocaInst(base) && writes != lbWrites_Direct) {
 		c.local = base;
 	}
 	c.call = lb_current_call(p);
@@ -1365,14 +1401,12 @@ gb_internal LLVMValueRef lb_call_given(LLVMValueRef temp) {
 	return nullptr;
 }
 
-// NOTE(bill): Other arguments are prepared between an argument's copy and its call.
-// None of them may write the original.
-gb_internal bool lb_nothing_writes_between(lbReadOnlyCalls *r, LLVMValueRef copy, LLVMValueRef call) {
-	if (LLVMGetInstructionParent(copy) != LLVMGetInstructionParent(call)) {
-		return false;
-	}
-	LLVMValueRef src_base = lb_pointer_base(LLVMGetOperand(copy, 1));
-	for (LLVMValueRef i = LLVMGetNextInstruction(copy); i != call; i = LLVMGetNextInstruction(i)) {
+// NOTE(bill): What after `first`, up to `last` or the end of its block, may write the memory based at `base`.
+// A store into another local cannot, and nor can a copy of memory onto itself, e.g. a bare `return` of named results.
+// A call can, unless `r` knows its procedure to be read-only.
+gb_internal lbWrites lb_writes_after(lbReadOnlyCalls *r, LLVMValueRef first, LLVMValueRef last, LLVMValueRef base) {
+	lbWrites writes = lbWrites_None;
+	for (LLVMValueRef i = LLVMGetNextInstruction(first); i != last; i = LLVMGetNextInstruction(i)) {
 		LLVMValueRef dst = nullptr;
 		switch (LLVMGetInstructionOpcode(i)) {
 		case LLVMStore:
@@ -1380,29 +1414,102 @@ gb_internal bool lb_nothing_writes_between(lbReadOnlyCalls *r, LLVMValueRef copy
 			break;
 		case LLVMAtomicRMW:
 		case LLVMAtomicCmpXchg:
-			return false;
+			writes = lbWrites_Through;
+			break;
 		case LLVMCall:
 			switch (lb_call_writes(i)) {
 			case lbCallWrites_Nothing:     break;
-			case lbCallWrites_Destination: dst = LLVMGetOperand(i, 0); break;
+			case lbCallWrites_Destination:
+				if (LLVMGetOperand(i, 0) != LLVMGetOperand(i, 1)) {
+					dst = LLVMGetOperand(i, 0);
+				}
+				break;
 			case lbCallWrites_Callee:
-				if (!lb_is_read_only(r, LLVMGetCalledValue(i))) {
-					return false;
+				if (r == nullptr || !lb_is_read_only(r, LLVMGetCalledValue(i))) {
+					writes = lbWrites_Through;
 				}
 				break;
 			case lbCallWrites_Anything:
-				return false;
+				writes = lbWrites_Through;
+				break;
 			}
 			break;
 		}
 		if (dst != nullptr) {
-			LLVMValueRef base = lb_pointer_base(dst);
-			if (!LLVMIsAAllocaInst(base) || base == src_base) {
-				return false;
+			LLVMValueRef dst_base = lb_pointer_base(dst);
+			if (dst_base == base) {
+				return lbWrites_Direct;
+			}
+			if (!LLVMIsAAllocaInst(dst_base)) {
+				writes = lbWrites_Through;
 			}
 		}
 	}
-	return true;
+	return writes;
+}
+
+// NOTE(bill): Other arguments are prepared between an argument's copy and its call.
+// None of them may write the original.
+gb_internal bool lb_nothing_writes_between(lbReadOnlyCalls *r, LLVMValueRef copy, LLVMValueRef call) {
+	if (LLVMGetInstructionParent(copy) != LLVMGetInstructionParent(call)) {
+		return false;
+	}
+	return lb_writes_after(r, copy, call, lb_pointer_base(LLVMGetOperand(copy, 1))) == lbWrites_None;
+}
+
+// NOTE(bill): What since `load`, up to where the builder is, may have written the memory it read.
+// Expressions write only memory they create themselves, so a store into another local cannot.
+// Only a load in the current block is looked at: a copy right after it is sure to come before the read.
+gb_internal lbWrites lb_writes_since_load(lbProcedure *p, LLVMValueRef load) {
+	if (LLVMGetInstructionParent(load) != LLVMGetInsertBlock(p->builder)) {
+		return lbWrites_None;
+	}
+	LLVMValueRef base = lb_pointer_base(LLVMGetOperand(load, 0));
+	if ((LLVMIsAGlobalVariable(base) && LLVMIsGlobalConstant(base)) || ptr_set_exists(&p->parameter_storage, base)) {
+		return lbWrites_None;
+	}
+	return lb_writes_after(nullptr, load, nullptr, base);
+}
+
+// NOTE(bill): The address a value was loaded from stands for the value only while nothing has written that memory since.
+// A later operand of the same expression may have, e.g. a call among the later arguments.
+// The value is then copied right after its load, where it was evaluated.
+// Writes through the address do not reach the original, so it is only to be read.
+gb_internal lbValue lb_address_of_load_to_read(lbProcedure *p, lbValue value) {
+	LLVMValueRef load = value.value;
+	lbValue      ptr  = {LLVMGetOperand(load, 0), alloc_type_pointer(value.type)};
+
+	lbWrites writes = lb_writes_since_load(p, load);
+	if (writes == lbWrites_None) {
+		return ptr;
+	}
+
+	LLVMValueRef base  = lb_pointer_base(ptr.value);
+	LLVMTypeRef  type  = LLVMTypeOf(load);
+	u64          align = gb_max(type_align_of(value.type), lb_alignof(type));
+	LLVMValueRef size  = LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(type), false);
+
+	// NOTE(bill): Nothing but a store into a local writes it while its address does not escape.
+	// Once the procedure is built, the copy is dropped if so, and what read the copy reads the local.
+	// The copy takes the alignment the local is known to have, which those reads may then rely on.
+	bool droppable = !build_context.internal_by_reference && writes == lbWrites_Through && LLVMIsAAllocaInst(base);
+	if (droppable) {
+		u64 known = lb_known_address_alignment(p->module, ptr.value, align);
+		droppable = known >= align;
+		align     = gb_max(align, known);
+	}
+
+	lbPendingCopy c = {};
+	c.temp  = llvm_alloca(p, type, align, "");
+	c.copy  = LLVMBuildMemCpy(p->builder, c.temp, cast(unsigned)align, ptr.value, lb_try_get_alignment(ptr.value, LLVMGetAlignment(load)), size);
+	c.align = cast(unsigned)align;
+	lb_move_after(p, c.copy, load);
+
+	if (droppable) {
+		c.local = base;
+		array_add(&p->pending_copies, c);
+	}
+	return lbValue{c.temp, ptr.type};
 }
 
 gb_internal void lb_drop_copies_for_read_only_calls(lbGenerator *gen) {
@@ -1721,6 +1828,7 @@ gb_internal void lb_end_procedure_body(lbProcedure *p) {
 	if (!build_context.internal_by_reference) {
 		lb_drop_unneeded_copies(p);
 	}
+	ptr_set_destroy(&p->parameter_storage);
 	if (p->call_temps.count != 0) {
 		mutex_lock(&p->module->kept_copies_mutex);
 		array_add_elems(&p->module->call_temps, p->call_temps.data, p->call_temps.count);
@@ -2236,11 +2344,13 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 						lbAddr addr = lb_add_global_generated_from_procedure(p, original_type, x);
 						lb_make_global_private_const(addr);
 						ptr = addr.addr;
+					} else if (!build_context.internal_by_reference && type_size_of(original_type) > 16) {
+						ptr = lb_copy_indirect_arg_if_aliased(p, x);
 					} else {
 						// the callee assumes ptr is aligned to type_align_of(T)
 						ptr = lb_aligned_address_from_load_or_generate_local(p, x);
-						if (!build_context.internal_by_reference && type_size_of(original_type) > 16) {
-							ptr = lb_copy_indirect_arg_if_aliased(p, x, ptr);
+						if (lb_is_load_from(x.value, ptr.value)) {
+							ptr = lb_address_of_load_to_read(p, x);
 						}
 					}
 				}

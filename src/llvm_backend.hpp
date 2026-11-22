@@ -401,6 +401,14 @@ struct lbPendingCopy {
 	i32          call;  // the call an argument copy is for
 };
 
+// NOTE(bill): What may write some memory between two points of a block.
+// A call, or a store through a pointer, reaches a local only once its address escapes.
+enum lbWrites {
+	lbWrites_None,
+	lbWrites_Through, // a call, or a store through a pointer
+	lbWrites_Direct,  // a store into the memory itself
+};
+
 struct lbProcedure {
 	u32 flags;
 	u16 state_flags;
@@ -440,6 +448,7 @@ struct lbProcedure {
 	lbBlock *        curr_block;
 	lbTargetList *   target_list;
 	PtrMap<Entity *, lbValue> direct_parameters;
+	PtrSet<LLVMValueRef>      parameter_storage; // nothing writes it once the procedure is entered
 	bool             in_multi_assignment;
 	Array<lbMultiAssignCopySlot> multi_assign_copy_slots;
 	Array<LLVMValueRef> raw_input_parameters;
@@ -608,6 +617,9 @@ gb_internal lbValue lb_aligned_address_from_load_or_generate_local(lbProcedure *
 gb_internal lbValue lb_address_from_load(lbProcedure *p, lbValue value);
 gb_internal void    lb_add_defer_node(lbProcedure *p, isize scope_index, Ast *stmt);
 gb_internal lbAddr lb_add_local_generated(lbProcedure *p, Type *type, bool zero_init);
+
+gb_internal lbWrites lb_writes_since_load(lbProcedure *p, LLVMValueRef load);
+gb_internal lbValue  lb_address_of_load_to_read(lbProcedure *p, lbValue value);
 
 gb_internal lbValue lb_emit_runtime_call(lbProcedure *p, char const *c_name, Array<lbValue> const &args);
 

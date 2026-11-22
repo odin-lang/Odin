@@ -1189,6 +1189,15 @@ gb_internal lbValue lb_aligned_address_from_load_or_generate_local(lbProcedure *
 	}
 	return ptr;
 }
+
+// NOTE(bill): An address holding `value` that is only to be read, as lb_address_of_load_to_read gives.
+gb_internal lbValue lb_address_to_read(lbProcedure *p, lbValue value) {
+	if (!p->in_multi_assignment && LLVMIsALoadInst(value.value)) {
+		return lb_address_of_load_to_read(p, value);
+	}
+	return lb_address_from_load_or_generate_local(p, value);
+}
+
 gb_internal lbValue lb_address_from_load(lbProcedure *p, lbValue value) {
 	if (LLVMIsALoadInst(value.value)) {
 		lbValue res = {};
