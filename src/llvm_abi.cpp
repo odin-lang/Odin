@@ -2725,6 +2725,11 @@ namespace lbAbiWasm {
 				} else {
 					args[i] = is_struct(c, t, ptype, calling_convention);
 				}
+			} else if (kind == LLVMVectorTypeKind && calling_convention == ProcCC_CDecl) {
+				// NOTE(bill): Clang passes a vector of any size as itself.
+				// LLVM passes its lanes as separate arguments without `simd128`, and `v128` pieces with it.
+				// Target features are global on wasm, so every procedure of a program agrees.
+				args[i] = lb_arg_type_direct(t);
 			} else {
 				args[i] = non_struct(c, t, false);
 			}
