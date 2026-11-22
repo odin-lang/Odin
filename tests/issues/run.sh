@@ -41,6 +41,13 @@ $ODIN test ../test_simple.odin -file -all-packages $COMMON
 # "odin check" tests:
 #
 
+if [[ $($ODIN check ../test_issue_1909 $COMMON_CHECK 2>&1 >/dev/null | grep -c "of a built-in procedure cannot be determined") -eq 3 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 if [[ $($ODIN check ../test_issue_3973 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 28 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
@@ -397,6 +404,9 @@ else
 fi
 
 $ODIN build ../test_issue_5043 $COMMON
+$ODIN build ../test_issue_8554 -build-mode:obj $COMMON
+$ODIN build ../test_issue_8555 -build-mode:obj -target:linux_arm64 -target-features:contextidrel2,NeoverseV3ae,-CRC $COMMON_CHECK
+$ODIN build ../test_issue_8555 -build-mode:obj -target:linux_arm32 -target-features:+slow-load-d-subreg $COMMON_CHECK
 $ODIN build ../test_issue_5097 $COMMON
 $ODIN build ../test_issue_5097-2 $COMMON
 $ODIN build ../test_issue_5265 $COMMON

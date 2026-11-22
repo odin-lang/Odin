@@ -76,17 +76,20 @@ gb_internal String get_final_microarchitecture() {
 gb_internal String get_default_features() {
 	BuildContext *bc = &build_context;
 
-	if (bc->microarch == str_lit("native")) {
+	bool is_native = bc->microarch == str_lit("native");
+	if (is_native) {
 		String features = make_string_c(LLVMGetHostCPUFeatures());
 
-		// Update the features string so LLVM uses it later.
-		if (bc->target_features_string.len > 0) {
-			bc->target_features_string = concatenate3_strings(permanent_allocator(), features, str_lit(","), bc->target_features_string);
-		} else {
-			bc->target_features_string = features;
-		}
+		if (features.len > 0) {
+			// Update the features string so LLVM uses it later.
+			if (bc->target_features_string.len > 0) {
+				bc->target_features_string = concatenate3_strings(permanent_allocator(), features, str_lit(","), bc->target_features_string);
+			} else {
+				bc->target_features_string = features;
+			}
 
-		return features;
+			return features;
+		}
 	}
 
 	int off = 0;
@@ -119,6 +122,10 @@ gb_internal String get_default_features() {
 		if (microarch_features_list[i].microarch == microarch) {
 			return microarch_features_list[i].features;
 		}
+	}
+
+	if (is_native) {
+		return {};
 	}
 
 	GB_PANIC("unknown microarch: %.*s", LIT(microarch));

@@ -2210,6 +2210,18 @@ gb_internal bool check_single_target_feature_is_valid(String const &feature_list
 	return false;
 }
 
+gb_internal String find_target_feature_ignore_case(String const &feature_list, String const &feature) {
+	String_Iterator it = {feature_list, 0};
+	String str = {};
+	while (string_split_iterator_next(&it, ',', &str)) {
+		if (str_eq_ignore_case(str, feature)) {
+			return str;
+		}
+	}
+
+	return {};
+}
+
 gb_internal bool check_target_feature_is_valid(String const &feature, TargetArchKind arch, String *invalid) {
 	String feature_list = target_features_list[arch];
 	String_Iterator it = {feature, 0};

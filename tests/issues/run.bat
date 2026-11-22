@@ -33,6 +33,7 @@ set ODIN=..\..\..\odin
 @rem #########################################################################################################
 
 @rem "odin check" tests:
+%ODIN% check "..\test_issue_1909" %COMMON% 2>&1 | find /c "of a built-in procedure cannot be determined" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_3973" %COMMON% 2>&1 | find /c "Error:" | findstr /x "28" || exit /b
 %ODIN% check "..\test_issue_5105_5569" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_5335" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
@@ -117,6 +118,9 @@ set ODIN=..\..\..\odin
 %ODIN% build "..\test_issue_7188" %COMMON% || exit /b
 %ODIN% build "..\test_issue_7304" %COMMON% 2>&1 | find /c "9223372036854775808 is not representable by int" | findstr /x "1" || exit /b
 %ODIN% build "..\test_issue_7598_all_entities_checked" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
+%ODIN% build "..\test_issue_8554" -build-mode:obj -microarch:native %COMMON% || exit /b
+%ODIN% build "..\test_issue_8555" -build-mode:obj -target:linux_arm64 -target-features:contextidrel2,NeoverseV3ae,-CRC %COMMON% || exit /b
+%ODIN% build "..\test_issue_8555" -build-mode:obj -target:linux_arm32 -target-features:+slow-load-d-subreg %COMMON% || exit /b
 
 @rem #########################################################################################################
 

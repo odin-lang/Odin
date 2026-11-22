@@ -3677,7 +3677,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		check_expr_or_type(c, &o, expr);
 
 		// check_assignment(c, operand, nullptr, str_lit("argument of 'type_of'"));
-		if (o.mode == Addressing_Invalid || o.mode == Addressing_Builtin) {
+		if (o.mode == Addressing_Builtin) {
+			error(o.expr, "'type_of' of a built-in procedure cannot be determined");
+			return false;
+		}
+		if (o.mode == Addressing_Invalid) {
 			Entity *e = entity_of_node(expr);
 			if (e != nullptr &&
 			    e->state == EntityState_InProgress &&
@@ -6737,7 +6741,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			Operand o = {};
 			check_expr_or_type(c, &o, expr);
 
-			if (o.mode == Addressing_Invalid || o.mode == Addressing_Builtin) {
+			if (o.mode == Addressing_Builtin) {
+				error(o.expr, "'%.*s' of a built-in procedure cannot be determined", LIT(builtin_name));
+				return false;
+			}
+			if (o.mode == Addressing_Invalid) {
 				return false;
 			}
 			if (o.type == nullptr || o.type == t_invalid || is_type_asm_proc(o.type)) {

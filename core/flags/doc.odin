@@ -52,9 +52,16 @@ Under the `args` tag, there are the following subtags:
 - `hidden`: hide this flag from the usage documentation.
 - `required`: cause verification to fail if this argument is not set.
 - `manifold=N`: take several arguments at once, UNIX-style only.
+- `color`: allow a `Color_Mode` field to control output coloring.
 - `file`: for `^os.File` types, file open mode.
 - `perms`: for `^os.File` types, file open permissions.
 - `indistinct`: allow the setting of distinct types by their base type.
+
+Color output is disabled by default. Pass a `Color_Mode` to `write_usage`,
+`print_errors`, or `parse_or_exit` to enable it. To customize the ANSI styles,
+pass a `Color_Palette`; `DEFAULT_COLOR_PALETTE` provides the built-in default.
+Use `color_code(ansi.FG_YELLOW, .Bold)` to combine a foreground color with a
+text style for a palette field.
 
 `required` may be given a range specifier in the following formats:
 	min

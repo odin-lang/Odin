@@ -1570,7 +1570,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_TargetFeatures: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.target_features_string = value.value_string;
-							string_to_lower(&build_context.target_features_string);
 							break;
 						}
 					    case BuildFlag_StrictTargetFeatures:
@@ -4614,28 +4613,37 @@ int main(int arg_count, char const **arg_ptr) {
 	#endif
 
 	if (build_context.target_features_string.len != 0) {
+		String target_feature_list = target_features_list[build_context.metrics.arch];
+		gbString canonical_features = gb_string_make(permanent_allocator(), "");
 		String_Iterator target_it = {build_context.target_features_string, 0};
 		String item = {};
 		while (string_split_iterator_next(&target_it, ',', &item)) {
+			if (item.len == 0) {
+				continue;
+			}
+			String sign = {};
 			String stripped_item = item;
-			if (*stripped_item.text == '+' || *stripped_item.text == '-') {
-				stripped_item.text++;
-				stripped_item.len--;
+			if (string_starts_with(stripped_item, '+') || string_starts_with(stripped_item, '-')) {
+				sign = substring(stripped_item, 0, 1);
+				stripped_item = substring(stripped_item, 1, stripped_item.len);
 			}
 
-			String invalid;
-			if (!check_target_feature_is_valid_for_target_arch(stripped_item, &invalid) && stripped_item != str_lit("help")) {
-				if (stripped_item != str_lit("?")) {
-					gb_printf_err("Unkown target feature '%.*s'.\n", LIT(invalid));
+			String canonical = find_target_feature_ignore_case(target_feature_list, stripped_item);
+			if (canonical.len == 0 && str_eq_ignore_case(stripped_item, str_lit("help"))) {
+				canonical = str_lit("help");
+			}
+			if (canonical.len == 0) {
+				if (!str_eq_ignore_case(stripped_item, str_lit("?"))) {
+					gb_printf_err("Unknown target feature '%.*s'.\n", LIT(item));
 				}
 				gb_printf("Possible -target-features for target %.*s are:\n", LIT(target_arch_names[build_context.metrics.arch]));
 				gb_printf("\n");
 
-				String feature_list = target_features_list[build_context.metrics.arch];
-				String_Iterator it = {feature_list, 0};
+				String_Iterator it = {target_feature_list, 0};
 				String str = {};
 				while (string_split_iterator_next(&it, ',', &str)) {
-					if (check_single_target_feature_is_valid(default_features, str)) {
+					String plus_str = concatenate_strings(temporary_allocator(), str_lit("+"), str);
+					if (check_single_target_feature_is_valid(default_features, str) || check_single_target_feature_is_valid(default_features, plus_str)) {
 						if (has_ansi_terminal_colours()) {
 							gb_printf("\t%.*s\x1b[38;5;244m (implied by target microarch %.*s)\x1b[0m\n", LIT(str), LIT(march));
 						} else {
@@ -4650,10 +4658,10 @@ int main(int arg_count, char const **arg_ptr) {
 			}
 
 			// Ensure the feature name always has +/- prefix. If there isn't, default to '+'
-			String feature_str = item;
-			if (*feature_str.text != '+' && *feature_str.text != '-') {
-				feature_str = concatenate_strings(temporary_allocator(), make_string_c("+"), feature_str);
+			if (sign.len == 0) {
+				sign = str_lit("+");
 			}
+			String feature_str = concatenate_strings(permanent_allocator(), sign, canonical);
 
 			// Ensure there is only a single entry for each feature in the target set.
 			// If the negative exists, override the existing value with the current one.
@@ -4667,7 +4675,13 @@ int main(int arg_count, char const **arg_ptr) {
 			string_set_remove(&build_context.target_features_set, neg_feature_str);
 
 			string_set_add(&build_context.target_features_set, feature_str);
+
+			if (gb_string_length(canonical_features) != 0) {
+				canonical_features = gb_string_appendc(canonical_features, ",");
+			}
+			canonical_features = gb_string_append_length(canonical_features, feature_str.text, feature_str.len);
 		}
+		build_context.target_features_string = make_string(cast(u8 *)canonical_features, gb_string_length(canonical_features));
 	}
 
 	// NOTE(laytan): on riscv64 we want to enforce some features.
