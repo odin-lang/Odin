@@ -1133,11 +1133,13 @@ gb_internal i32 lb_current_call(lbProcedure *p) {
 	return p->call_stack[p->call_stack.count-1];
 }
 
-// NOTE(bill): An `any` boxed from a value straight into a call gets its own pointer to the value.
+// NOTE(bill): An `any` boxed from a value straight into a variadic `..any` argument gets its own pointer to the value.
 // Through it, lb_drop_unneeded_copies sees which call the value is reachable from.
+// A variadic argument is `#no_capture`: it and the values it refers to are not kept once the call returns.
+// Any other `any` of the value may be kept, and lets the value escape.
 gb_internal LLVMValueRef lb_any_data_for_call(lbProcedure *p, lbValue value, LLVMValueRef data) {
 	i32 call = lb_current_call(p);
-	if (call == 0) {
+	if (call == 0 || !p->boxing_variadic_args) {
 		return data;
 	}
 	if (!lb_is_load_from(value.value, data)) {

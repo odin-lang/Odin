@@ -6047,11 +6047,15 @@ gb_internal lbValue lb_build_variadic_slice(lbProcedure *p, Type *slice_type, Sl
 
 	base_array_ptr = lb_emit_conv(p, base_array_ptr, alloc_type_pointer(alloc_type_array(elem_type, var_args.count)));
 
+	// NOTE(bill): The arguments are already built and only their own conversions box here (not a call within them)
+	bool prev_boxing_variadic_args = p->boxing_variadic_args;
+	p->boxing_variadic_args = true;
 	for_array(i, var_args) {
 		lbValue addr = lb_emit_array_epi(p, base_array_ptr, cast(i32)i);
 		lbValue var_arg = lb_emit_conv(p, var_args[i], elem_type);
 		lb_emit_store(p, addr, var_arg);
 	}
+	p->boxing_variadic_args = prev_boxing_variadic_args;
 
 	lbValue base_elem = lb_emit_array_epi(p, base_array_ptr, 0);
 	lbValue len = lb_const_int(p->module, t_int, var_args.count);

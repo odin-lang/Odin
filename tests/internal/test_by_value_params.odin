@@ -100,6 +100,31 @@ test_by_value_params :: proc(t: ^testing.T) {
 	testing.expect_value(t, read_both(g_big, &g_big), 1001)
 }
 
+@(private="file")
+g_kept: any
+
+@(private="file")
+keep_any :: proc(a: any) {
+	g_kept = a
+}
+
+@(private="file")
+write_kept_read :: #force_no_inline proc(v: Big) -> int {
+	(^Big)(g_kept.data).a = 99
+	return v.a
+}
+
+// An `any` given to an earlier call may be kept, and the value it refers to escapes.
+// Only a variadic `..any` argument is never kept past its call.
+@(test)
+test_by_value_params_kept_any :: proc(t: ^testing.T) {
+	keep := keep_any // through a procedure value, which the stack-escape warning does not follow
+	x := Big{a = 1}
+	keep(x)
+	testing.expect_value(t, write_kept_read(x), 1)
+	g_kept = nil
+}
+
 // The address is taken after the first call: the loop brings the call back round.
 @(test)
 test_by_value_params_address_taken_later :: proc(t: ^testing.T) {
