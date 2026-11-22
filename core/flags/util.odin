@@ -16,6 +16,7 @@ Inputs:
 - model: A pointer to an annotated struct.
 - program_args: A slice of strings, usually `os.args`.
 - style: The argument parsing style.
+- color: Whether to colorize output; a tagged color field in the model overrides this value.
 - allocator: (default: context.allocator)
 - loc: The caller location for debugging purposes (default: #caller_location)
 */
@@ -24,6 +25,7 @@ parse_or_exit :: proc(
 	model: ^$T,
 	program_args: []string,
 	style: Parsing_Style = .Odin,
+	color: Color_Mode = .Never,
 	allocator := context.allocator,
 	loc := #caller_location,
 ) {
@@ -36,6 +38,7 @@ parse_or_exit :: proc(
 		args = program_args[1:]
 	}
 
+	effective_color := resolve_color_mode(T, args, style, color)
 	error := parse(model, args, style, true, true, allocator, loc)
 	if error != nil {
 		stderr := os.to_stream(os.stderr)
@@ -43,11 +46,11 @@ parse_or_exit :: proc(
 		if len(args) == 0 {
 			// No arguments entered, and there was an error; show the usage,
 			// specifically on STDERR.
-			write_usage(stderr, T, program, style)
+			write_usage(stderr, T, program, style, effective_color)
 			fmt.wprintln(stderr)
 		}
 
-		print_errors(T, error, program, style)
+		print_errors(T, error, program, style, effective_color)
 
 		_, was_help_request := error.(Help_Request)
 		os.exit(0 if was_help_request else 1)
@@ -62,16 +65,26 @@ Inputs:
 - data_type: The typeid of the data structure to describe, if usage is requested.
 - error: The error returned from `parse`.
 - style: The argument parsing style, required to show flags in the proper style, when usage is shown.
+- color: Whether to colorize output.
 */
 @(optimization_mode="favor_size")
-print_errors :: proc(data_type: typeid, error: Error, program: string, style: Parsing_Style = .Odin) {
+print_errors :: proc(
+	data_type: typeid,
+	error: Error,
+	program: string,
+	style: Parsing_Style = .Odin,
+	color: Color_Mode = .Never,
+) {
 	stderr := os.to_stream(os.stderr)
 	stdout := os.to_stream(os.stdout)
 
 	switch specific_error in error {
 	case Parse_Error:
-		fmt.wprintfln(stderr, "[%T.%v] %s", specific_error, specific_error.reason, specific_error.message)
+		stderr_palette := make_color_palette(should_colorize(color, stderr))
+		fmt.wprintfln(stderr, "%s[%T.%v]%s %s",
+			stderr_palette.error, specific_error, specific_error.reason, stderr_palette.reset, specific_error.message)
 	case Open_File_Error:
+		stderr_palette := make_color_palette(should_colorize(color, stderr))
 		if os.exists(specific_error.filename) {
 			flags: string
 			if specific_error.flags == {.Read} {
@@ -83,30 +96,38 @@ print_errors :: proc(data_type: typeid, error: Error, program: string, style: Pa
 			}
 
 			if flags != "" {
-				fmt.wprintfln(stderr, "[%T#%i] Unable to open %q with perms 0o%o as %s",
+				fmt.wprintfln(stderr, "%s[%T#%i]%s Unable to open %q with perms 0o%o as %s",
+					stderr_palette.error,
 					specific_error,
 					specific_error.errno,
+					stderr_palette.reset,
 					specific_error.filename,
 					u16(transmute(u32)specific_error.perms),
 					flags)
 			} else {
-				fmt.wprintfln(stderr, "[%T#%i] Unable to open %q with perms 0o%o and flags %v",
+				fmt.wprintfln(stderr, "%s[%T#%i]%s Unable to open %q with perms 0o%o and flags %v",
+					stderr_palette.error,
 					specific_error,
 					specific_error.errno,
+					stderr_palette.reset,
 					specific_error.filename,
 					u16(transmute(u32)specific_error.perms),
 					specific_error.flags)
 			}
 		} else {
-			fmt.wprintfln(stderr, "[%T#%i] Unable to open %q. File not found",
+			fmt.wprintfln(stderr, "%s[%T#%i]%s Unable to open %q. File not found",
+				stderr_palette.error,
 				specific_error,
 				specific_error.errno,
+				stderr_palette.reset,
 				specific_error.filename)
 		}
 	case Validation_Error:
-		fmt.wprintfln(stderr, "[%T] %s", specific_error, specific_error.message)
+		stderr_palette := make_color_palette(should_colorize(color, stderr))
+		fmt.wprintfln(stderr, "%s[%T]%s %s",
+			stderr_palette.error, specific_error, stderr_palette.reset, specific_error.message)
 	case Help_Request:
-		write_usage(stdout, data_type, program, style)
+		write_usage(stdout, data_type, program, style, color)
 	}
 }
 /*

@@ -43,6 +43,12 @@ validate_structure :: proc(model_type: $T, style: Parsing_Style, loc := #caller_
 			continue
 		}
 
+		if _, has_color := get_struct_subtag(args_tag, SUBTAG_COLOR); has_color {
+			fmt.assertf(field.type.id == Color_Mode || field.type.id == bool,
+				"%T.%s has `%s` defined, but it must be a `flags.Color_Mode` or `bool` field.",
+				model_type, field.name, SUBTAG_COLOR, loc = loc)
+		}
+
 		if name, has_name := get_struct_subtag(args_tag, SUBTAG_NAME); has_name {
 			fmt.assertf(len(name) > 0, "%T.%s has a zero-length `%s`.",
 				model_type, field.name, SUBTAG_NAME, loc = loc)

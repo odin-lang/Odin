@@ -2,6 +2,15 @@ package flags
 
 import "core:time"
 
+/*
+Controls whether command-line usage and errors emit ANSI color.
+*/
+Color_Mode :: enum {
+	Never,  // Never emit ANSI escape sequences.
+	Auto,   // Emit ANSI sequences only for terminal streams without NO_COLOR.
+	Always, // Emit ANSI sequences regardless of the stream or NO_COLOR.
+}
+
 // Set to true to compile with support for core named types disabled, as a
 // fallback in the event your platform does not support one of the types, or
 // you have no need for them and want a smaller binary.
@@ -22,6 +31,7 @@ SUBTAG_MANIFOLD   :: "manifold"
 SUBTAG_FILE       :: "file"
 SUBTAG_PERMS      :: "perms"
 SUBTAG_INDISTINCT :: "indistinct"
+SUBTAG_COLOR      :: "color"
 
 TAG_USAGE         :: "usage"
 
