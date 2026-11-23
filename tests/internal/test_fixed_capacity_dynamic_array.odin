@@ -101,8 +101,9 @@ test_fixed_capacity_dynamic_array_constant_slice :: proc(t: ^testing.T) {
 	testing.expect(t, slice_equal(array[1:2], []int{2}))
 }
 
-// AddressSanitizer on Windows ends the process on the bounds check trap before the test runner can catch it.
-when !(ODIN_OS == .Windows && .Address in ODIN_SANITIZER_FLAGS) {
+// AddressSanitizer on Windows ends the process on the bounds check trap before the test runner can
+// catch it, and tests run inline can't catch a trap at all.
+when !testing.INLINE && !(ODIN_OS == .Windows && .Address in ODIN_SANITIZER_FLAGS) {
 	@(test)
 	test_fixed_capacity_dynamic_array_constant_slice_out_of_range :: proc(t: ^testing.T) {
 		array: [dynamic; 4]int

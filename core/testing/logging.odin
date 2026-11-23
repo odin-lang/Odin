@@ -14,7 +14,6 @@ import "base:runtime"
 import "core:fmt"
 import "core:log"
 import "core:strings"
-import "core:sync/chan"
 import "core:time"
 
 when USING_SHORT_LOGS {
@@ -56,7 +55,7 @@ test_logger_proc :: proc(logger_data: rawptr, level: runtime.Logger_Level, text:
 
 	now := time.now()
 
-	chan.send(t.channel, Event_Log_Message {
+	send_event(t, Event_Log_Message {
 		level = level,
 		text = cloned_text,
 		time = now,

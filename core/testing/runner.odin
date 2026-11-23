@@ -13,6 +13,7 @@ package testing
 import            "base:intrinsics"
 import            "base:runtime"
 import            "core:bytes"
+import            "core:container/queue"
 @(require) import "core:encoding/base64"
 @(require) import "core:encoding/json"
 import            "core:fmt"
@@ -165,17 +166,132 @@ Task_Timeout :: struct #all_or_none {
 	duration: time.Duration,
 }
 
+TIMEOUT_MESSAGE :: "Test timed out after %v total runtime (timeout setpoint: %v)."
+
+Inline_Pool :: struct {
+	task:          thread.Task,
+	waiting:       bool,
+	done:          bool,
+	done_count:    int,
+	failure_count: int,
+	test_count:    int,
+}
+
+inline_pool_running: ^Inline_Pool
+
+pool_add_task  :: proc{thread.pool_add_task,  inline_pool_add_task}
+pool_is_empty  :: proc{thread.pool_is_empty,  inline_pool_is_empty}
+pool_pop_done  :: proc{thread.pool_pop_done,  inline_pool_pop_done}
+pool_stop_task :: proc{thread.pool_stop_task, inline_pool_stop_task}
+pool_shutdown  :: proc{thread.pool_shutdown,  inline_pool_shutdown}
+pool_join      :: proc{thread.pool_join,      inline_pool_join}
+
+inline_pool_add_task :: proc(pool: ^Inline_Pool, allocator: mem.Allocator, procedure: thread.Task_Proc, data: rawptr, user_index: int = 0) {
+	pool.task = {
+		procedure  = procedure,
+		data       = data,
+		user_index = user_index,
+		allocator  = allocator,
+	}
+	pool.waiting = true
+}
+
+inline_pool_is_empty :: proc(pool: ^Inline_Pool) -> bool {
+	return !pool.waiting && !pool.done
+}
+
+inline_pool_run :: proc(pool: ^Inline_Pool, done_count, failure_count, test_count: int) {
+	if !pool.waiting {
+		return
+	}
+	pool.waiting       = false
+	pool.done_count    = done_count
+	pool.failure_count = failure_count
+	pool.test_count    = test_count
+
+	inline_pool_running = pool
+	{
+		context.allocator = pool.task.allocator
+		pool.task.procedure(pool.task)
+	}
+	inline_pool_running = nil
+
+	pool.done = true
+}
+
+inline_pool_pop_done :: proc(pool: ^Inline_Pool) -> (task: thread.Task, got_task: bool) {
+	if !pool.done {
+		return
+	}
+	pool.done = false
+	return pool.task, true
+}
+
+inline_pool_stop_task :: proc(pool: ^Inline_Pool, user_index: int, exit_code: int = 1) -> bool {
+	return false
+}
+
+inline_pool_shutdown :: proc(pool: ^Inline_Pool, exit_code: int = 1) {
+	pool.waiting = false
+	pool.done    = false
+}
+
+inline_pool_join :: proc(pool: ^Inline_Pool) {
+}
+
+send_event :: proc(t: ^T, event: Channel_Event) {
+	when INLINE {
+		_, err := queue.push_back(&t._events, event)
+		assert(err == nil, "Error queueing a test event.")
+	} else {
+		chan.send(t.channel, event)
+	}
+}
+
+recv_event :: proc(task_channel: ^Task_Channel, t: ^T) -> (event: Channel_Event, ok: bool) {
+	when INLINE {
+		return queue.pop_front_safe(&t._events)
+	} else {
+		return chan.try_recv(task_channel.channel)
+	}
+}
+
+report_inline_trap :: proc() {
+	pool := inline_pool_running
+	if pool == nil {
+		return
+	}
+	data := cast(^Task_Data)pool.task.data
+
+	if !global_ansi_disabled {
+		fmt.wprint(os.to_stream(os.stdout), ansi.show_cursor())
+	}
+
+	stderr := os.to_stream(os.stderr)
+	for event in queue.pop_front_safe(&data.t._events) {
+		if message, ok := event.(Event_Log_Message); ok {
+			fmt.wprintln(stderr, message.formatted_text)
+		}
+	}
+
+	fmt.wprintfln(stderr, "\nTest #%i %s.%s trapped, which ends the test run. %i of %i tests had finished, %i of them failed.",
+		pool.task.user_index, data.it.pkg, data.it.name,
+		pool.done_count, pool.test_count, pool.failure_count)
+}
+
 run_test_task :: proc(task: thread.Task) {
 	data := cast(^Task_Data)(task.data)
 
 	setup_task_signal_handler(task.user_index)
 
-	chan.send(data.t.channel, Event_New_Test {
+	started_at := time.now()
+
+	send_event(&data.t, Event_New_Test {
 		test_index = task.user_index,
-		started_at = time.now(),
+		started_at = started_at,
 	})
 
-	chan.send(data.t.channel, Event_State_Change {
+	send_event(&data.t, Event_State_Change {
 		new_state = .Running,
 	})
 
@@ -203,6 +319,12 @@ run_test_task :: proc(task: thread.Task) {
 	free_all(context.temp_allocator)
 
 	data.it.p(&data.t)
+
+	when INLINE {
+		if timeout := data.t._timeout; timeout.at_time != {} && time.since(timeout.at_time) >= 0 {
+			log.errorf(TIMEOUT_MESSAGE, time.since(started_at), timeout.duration, location = timeout.location)
+		}
+	}
 
 	if local_test_expected_failures.signal != 0 ||
 	   local_test_expected_failures.message_count + local_test_expected_failures.location_count > 0 {
@@ -238,7 +360,7 @@ run_test_task :: proc(task: thread.Task) {
 
 	new_state : Test_State = .Failed if failed(&data.t) else .Successful
 
-	chan.send(data.t.channel, Event_State_Change {
+	send_event(&data.t, Event_State_Change {
 		new_state   = new_state,
 		finished_at = time.now(),
 	})
@@ -307,7 +429,7 @@ format_test_timeout_message :: proc(
 	full_message: string,
 ) {
 	total_runtime := time.diff(test_start_times[timeout.test_index], now)
-	short_message = fmt.aprintf("Test timed out after %v total runtime (timeout setpoint: %v).", total_runtime, timeout.duration, allocator = allocator)
+	short_message = fmt.aprintf(TIMEOUT_MESSAGE, total_runtime, timeout.duration, allocator = allocator)
 
 	full_message_sb := strings.builder_make(allocator)
 
@@ -482,7 +604,9 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	// -- Set thread count.
 
-	when TEST_THREADS == 0 {
+	when INLINE {
+		thread_count := 1
+	} else when TEST_THREADS == 0 {
 		thread_count := os.get_processor_core_count()
 	} else {
 		thread_count := max(1, TEST_THREADS)
@@ -498,26 +622,32 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	// digging through the source to divine everywhere it is used for that.
 	shared_log_allocator := context.allocator
 
-	pool_stack: mem.Rollback_Stack
-	alloc_error = mem.rollback_stack_init(&pool_stack, POOL_BLOCK_SIZE)
-	fmt.assertf(alloc_error == nil, "Error allocating memory for thread pool: %v", alloc_error)
-	defer mem.rollback_stack_destroy(&pool_stack)
+	when INLINE {
+		pool: Inline_Pool
+	} else {
+		pool_stack: mem.Rollback_Stack
+		alloc_error = mem.rollback_stack_init(&pool_stack, POOL_BLOCK_SIZE)
+		fmt.assertf(alloc_error == nil, "Error allocating memory for thread pool: %v", alloc_error)
+		defer mem.rollback_stack_destroy(&pool_stack)
 
-	pool: thread.Pool
-	thread.pool_init(&pool, mem.rollback_stack_allocator(&pool_stack), thread_count)
-	defer thread.pool_destroy(&pool)
+		pool: thread.Pool
+		thread.pool_init(&pool, mem.rollback_stack_allocator(&pool_stack), thread_count)
+		defer thread.pool_destroy(&pool)
+	}
 
 	task_channels: []Task_Channel = ---
 	task_channels, alloc_error = make([]Task_Channel, thread_count)
 	fmt.assertf(alloc_error == nil, "Error allocating memory for update channels: %v", alloc_error)
 	defer delete(task_channels)
 
-	for &task_channel, index in task_channels {
-		task_channel.channel, alloc_error = chan.create_buffered(Update_Channel, BUFFERED_EVENTS_PER_CHANNEL, context.allocator)
-		fmt.assertf(alloc_error == nil, "Error allocating memory for update channel #%i: %v", index, alloc_error)
-	}
-	defer for &task_channel in task_channels {
-		chan.destroy(&task_channel.channel)
+	when !INLINE {
+		for &task_channel, index in task_channels {
+			task_channel.channel, alloc_error = chan.create_buffered(Update_Channel, BUFFERED_EVENTS_PER_CHANNEL, context.allocator)
+			fmt.assertf(alloc_error == nil, "Error allocating memory for update channel #%i: %v", index, alloc_error)
+		}
+		defer for &task_channel in task_channels {
+			chan.destroy(&task_channel.channel)
+		}
 	}
 
 	// This buffer is used to batch writes to STDOUT or STDERR, to help reduce
@@ -557,6 +687,16 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	task_data_slots, alloc_error = make([]Task_Data, thread_count)
 	fmt.assertf(alloc_error == nil, "Error allocating memory for task data slots: %v", alloc_error)
 	defer delete(task_data_slots)
+
+	when INLINE {
+		for &data, index in task_data_slots {
+			alloc_error = queue.init(&data.t._events, BUFFERED_EVENTS_PER_CHANNEL, shared_log_allocator)
+			fmt.assertf(alloc_error == nil, "Error allocating memory for event queue #%i: %v", index, alloc_error)
+		}
+		defer for &data in task_data_slots {
+			queue.destroy(&data.t._events)
+		}
+	}
 
 	// Tests rotate through these allocators as they finish.
 	task_allocators: []^Task_Allocator = ---
@@ -654,7 +794,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				data.tracking_allocator = &ta.tracker
 			}
 
-			thread.pool_add_task(&pool, task_allocator_interface(ta), run_test_task, &data, run_index)
+			pool_add_task(&pool, task_allocator_interface(ta), run_test_task, &data, run_index)
 
 			continue setup_tasks
 		}
@@ -676,7 +816,9 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		draw_status_bar(stdout, thread_count_status_string, total_done_count, total_test_count)
 	}
 
-	when TEST_THREADS == 0 {
+	when INLINE {
+		log.info("Starting test runner inline, one test at a time on the main thread.")
+	} else when TEST_THREADS == 0 {
 		log.infof("Starting test runner with %i thread%s. Set with -define:ODIN_TEST_THREADS=n.",
 			thread_count,
 			"" if thread_count == 1 else "s")
@@ -710,9 +852,13 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	start_time := time.now()
 
-	thread.pool_start(&pool)
-	main_loop: for !thread.pool_is_empty(&pool) {
-		{
+	when !INLINE {
+		thread.pool_start(&pool)
+	}
+	main_loop: for !pool_is_empty(&pool) {
+		when INLINE {
+			inline_pool_run(&pool, total_done_count, total_failure_count, total_test_count)
+		} else {
 			events_pending := thread.pool_num_done(&pool) > 0
 
 			if !events_pending {
@@ -730,7 +876,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			}
 		}
 
-		cycle_pool: for task in thread.pool_pop_done(&pool) {
+		cycle_pool: for task in pool_pop_done(&pool) {
 			data := cast(^Task_Data)(task.data)
 
 			when TRACKING_MEMORY {
@@ -783,13 +929,15 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				data.t.seed = shared_random_seed
 				data.t.error_count = 0
 				data.t._fail_now_called = false
+				data.t._timeout = {}
 
-				thread.pool_add_task(&pool, task_allocator_interface(ta), run_test_task, data, run_index)
+				pool_add_task(&pool, task_allocator_interface(ta), run_test_task, data, run_index)
 			}
 		}
 
-		handle_events: for &task_channel in task_channels {
-			for ev in chan.try_recv(task_channel.channel) {
+		handle_events: for &task_channel, task_index in task_channels {
+			#no_bounds_check task_t := &task_data_slots[task_index].t
+			for ev in recv_event(&task_channel, task_t) {
 				switch event in ev {
 				case Event_New_Test:
 					task_channel.test_index = event.test_index
@@ -879,7 +1027,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		if should_stop_runner() {
 			fmt.wprintln(stderr, "\nCaught interrupt signal. Stopping all tests.")
 			runner_interrupted = true
-			thread.pool_shutdown(&pool)
+			pool_shutdown(&pool)
 			break main_loop
 		}
 
@@ -905,7 +1053,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			#no_bounds_check pkg := report.packages_by_name[it.pkg]
 			pkg.frame_ready = false
 
-			found := thread.pool_stop_task(&pool, test_index)
+			found := pool_stop_task(&pool, test_index)
 			fmt.assertf(found, "A signal (%v) was raised to stop test #%i %s.%s, but it was unable to be found.",
 				reason, test_index, it.pkg, it.name)
 
@@ -966,7 +1114,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				continue check_timeouts
 			}
 
-			if !thread.pool_stop_task(&pool, timeout.test_index) {
+			if !pool_stop_task(&pool, timeout.test_index) {
 				continue check_timeouts
 			}
 
@@ -1071,7 +1219,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	//
 	// At the time of writing, the thread library is undergoing a rewrite that
 	// should solve this problem; it is not an issue with the test runner itself.
-	thread.pool_join(&pool)
+	pool_join(&pool)
 
 	finished_in := time.since(start_time)
 

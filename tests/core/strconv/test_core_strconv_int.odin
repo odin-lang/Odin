@@ -278,11 +278,13 @@ test_write_bits_short_digits :: proc(t: ^testing.T) {
 	}
 }
 
-@(test)
-test_write_bits_short_digits_panic :: proc(t: ^testing.T) {
-	buf: [140]byte
-	testing.expect_assert(t, "10 is out of range 0..<10")
-	_ = strconv.write_bits(buf[:], 10, 16, false, 64, "0123456789", {})
+when !testing.INLINE {
+	@(test)
+	test_write_bits_short_digits_panic :: proc(t: ^testing.T) {
+		buf: [140]byte
+		testing.expect_assert(t, "10 is out of range 0..<10")
+		_ = strconv.write_bits(buf[:], 10, 16, false, 64, "0123456789", {})
+	}
 }
 
 @(test)
