@@ -3600,6 +3600,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 				}
 			} else {
 				ExactValue poly_const = {};
+				bool is_variadic_param = is_variadic && variadic_index == variables.count;
 
 				if (operands != nullptr && variables.count < operands->count) {
 					Operand op = (*operands)[variables.count];
@@ -3618,6 +3619,10 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					if (is_type_polymorphic_type) {
 						type = determine_type_from_polymorphic(ctx, type, op);
 						if (type == t_invalid) {
+							success = false;
+						} else if (!ctx->no_polymorphic_errors && is_variadic_param && is_type_polymorphic(type)) {
+							// NOTE(bill): No argument of the variadic parameter determined its element type, e.g. only an untyped `nil`.
+							// The call reports it, and the procedure is not generated with the type left polymorphic.
 							success = false;
 						} else if (!ctx->no_polymorphic_errors) {
 							// NOTE(bill): The type should be determined now and thus, no need to determine the type any more
@@ -3687,7 +3692,10 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						allow_array_programming = false;
 					}
 
-					if (type != t_invalid && !check_is_assignable_to(ctx, &op, type, allow_array_programming)) {
+					// NOTE(bill): The operand of a variadic parameter only stands for its arguments.
+					// Its type is a hint taken from them, e.g. `[]int` for an untyped `1` passed to `..f32`.
+					// The arguments themselves are checked against the parameter after the procedure is generated.
+					if (type != t_invalid && !is_variadic_param && !check_is_assignable_to(ctx, &op, type, allow_array_programming)) {
 						bool ok = true;
 						if (p->flags&FieldFlag_any_int) {
 							if (op.type == nullptr) {

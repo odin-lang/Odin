@@ -193,6 +193,14 @@ else
 	exit 1
 fi
 
+if [[ $($ODIN check ../test_issue_poly_variadic_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 2 &&
+      $($ODIN check ../test_issue_poly_variadic_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "Cannot determine the element type of the polymorphic variadic parameter") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 if [[ $($ODIN check ../test_issue_fixed_point_scale $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
