@@ -1068,6 +1068,9 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	if (base_entity->flags & EntityFlag_Disabled) {
 		entity->flags |= EntityFlag_Disabled;
 	}
+	if (base_entity->flags & EntityFlag_NotExported) {
+		entity->flags |= EntityFlag_NotExported;
+	}
 
 	d->entity.store(entity);
 

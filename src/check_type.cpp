@@ -371,9 +371,12 @@ gb_internal void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, T
 		e = alloc_entity_type_name(s, token, named_type);
 		e->state = EntityState_Resolved;
 
-		// NOTE(bille): the generic's file as its token is not that of whichever instantiated it first
+		// NOTE(bill): the generic's file as its token is not that of whichever instantiated it first
 		e->file = original_type->Named.type_name && original_type->Named.type_name->file ? original_type->Named.type_name->file : ctx->file;
 		e->pkg = pkg;
+		if (original_type->Named.type_name && (original_type->Named.type_name->flags & EntityFlag_NotExported)) {
+			e->flags |= EntityFlag_NotExported;
+		}
 		e->TypeName.original_type_for_parapoly = original_type;
 		e->decl_info = ctx->decl;
 		add_entity_use(ctx, node, e);
