@@ -6788,44 +6788,45 @@ gb_internal bool is_import_path_absolute(String const &path) {
 }
 
 gb_internal bool is_build_flag_path_valid(String const &path) {
-	if (path.len > 0) {
-		u8 *start = path.text;
-		u8 *end = path.text + path.len;
-		u8 *curr = start;
-		isize index = 0;
-		while (curr < end) {
-			isize width = 1;
-			Rune r = *curr;
-			if (r >= 0x80) {
-				width = utf8_decode(curr, end-curr, &r);
-				if (r == GB_RUNE_INVALID && width == 1) {
-					return false;
-				}
-				else if (r == GB_RUNE_BOM && curr-start > 0) {
-					return false;
-				}
-			}
-
-			for (isize i = 0; i < gb_count_of(illegal_import_runes); i++) {
-#if defined(GB_SYSTEM_WINDOWS)
-				if (r == '\\') {
-					break;
-				} else if (r == ':') {
-					break;
-				}
-#endif
-				if (r == illegal_import_runes[i]) {
-					return false;
-				}
-			}
-
-			curr += width;
-			index += 1;
-		}
-
-		return true;
+	if (path.len == 0) {
+		return false;
 	}
-	return false;
+#if defined(GB_SYSTEM_WINDOWS)
+	isize start = 0;
+	if (string_starts_with(path, str_lit("\\\\?\\")) || string_starts_with(path, str_lit("//?/"))) {
+		start = 4;
+	}
+	isize drive_colon = -1;
+	if (path.len >= start+2 && gb_char_is_alpha(cast(char)path.text[start]) && path.text[start+1] == ':') {
+		drive_colon = start+1;
+	}
+	for (isize i = start; i < path.len; i++) {
+		u8 c = path.text[i];
+		if (c < 32 || c == '<' || c == '>' || c == '"' || c == '|' || c == '?' || c == '*') {
+			return false;
+		}
+		if (c == ':' && i != drive_colon) {
+			return false;
+		}
+	}
+	u8 *curr = path.text;
+	u8 *end = path.text + path.len;
+	while (curr < end) {
+		Rune r = 0;
+		isize width = utf8_decode(curr, end-curr, &r);
+		if ((r == GB_RUNE_INVALID && width == 1) || (r >= 0xd800 && r <= 0xdfff)) {
+			return false;
+		}
+		curr += width;
+	}
+#else
+	for (isize i = 0; i < path.len; i++) {
+		if (path.text[i] == 0) {
+			return false;
+		}
+	}
+#endif
+	return true;
 }
 
 

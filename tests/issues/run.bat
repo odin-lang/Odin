@@ -355,6 +355,11 @@ echo a> identity\loaddir\files\a.txt
 %SystemRoot%\System32\find.exe /c /v "" identity_loaddir.txt | %SystemRoot%\System32\findstr.exe /e ": 2" || exit /b
 rmdir identity\alias
 
+if exist "quote 100%%" rmdir /S /Q "quote 100%%"
+mkdir "quote 100%%"
+%ODIN% build ..\test_paths_quoting %COMMON% -define:S=a\"b\" "-define:T=c d\\" "-out:quote 100%%\q.exe" || exit /b
+"quote 100%%\q.exe" || exit /b
+
 @rem #########################################################################################################
 
 @echo off

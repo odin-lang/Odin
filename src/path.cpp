@@ -492,10 +492,48 @@ gb_internal String path_to_string(gbAllocator a, Path path) {
 	return res;
 }
 
+gb_internal gbString append_quoted(gbString s, String arg) {
+	s = gb_string_appendc(s, "\"");
+	isize backslashes = 0;
+	for (isize i = 0; i < arg.len; i++) {
+		char c = cast(char)arg.text[i];
+	#if defined(GB_SYSTEM_WINDOWS)
+		if (c == '\\') {
+			backslashes += 1;
+		} else {
+			if (c == '"') {
+				for (isize k = 0; k <= backslashes; k++) {
+					s = gb_string_appendc(s, "\\");
+				}
+			}
+			backslashes = 0;
+		}
+	#else
+		if (c == '"' || c == '\\') {
+			s = gb_string_appendc(s, "\\");
+		}
+	#endif
+		s = gb_string_append_length(s, &c, 1);
+	}
+	for (isize k = 0; k < backslashes; k++) {
+		s = gb_string_appendc(s, "\\");
+	}
+	s = gb_string_appendc(s, "\"");
+	return s;
+}
+
+gb_internal String quote_arg(gbAllocator a, String arg) {
+	gbString s = gb_string_make_reserve(heap_allocator(), arg.len+2);
+	s = append_quoted(s, arg);
+	String quoted = copy_string(a, make_string(cast(u8 *)s, gb_string_length(s)));
+	gb_string_free(s);
+	return quoted;
+}
+
 gb_internal String quote_path(gbAllocator a, Path path) {
-	String temp   = path_to_string(a, path);
-	String quoted = concatenate3_strings(a, str_lit("\""), temp, str_lit("\""));
-	gb_free(a, temp.text);
+	String temp   = path_to_string(heap_allocator(), path);
+	String quoted = quote_arg(a, temp);
+	gb_free(heap_allocator(), temp.text);
 	return quoted;
 }
 

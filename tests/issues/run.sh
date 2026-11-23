@@ -835,6 +835,14 @@ ln -s ../src/f.odin identity/r4/d/f.odin
 $ODIN build identity/r4/d -out:identity_reached $COMMON
 ./identity_reached
 
+QDIR='q 100%s "x" \y'
+rm -rf "$QDIR"
+mkdir "$QDIR"
+$ODIN build ../test_paths_quoting $COMMON '-define:S=a"b"' '-define:T=c d\' "-out:$QDIR/q"
+"./$QDIR/q"
+$ODIN build ../test_paths_quoting $COMMON '-define:S=a"b"' '-define:T=c d\' -build-mode:lib "-out:$QDIR/q.a"
+[[ -f "$QDIR/q.a" ]]
+
 #########################################################################################################
 
 if [[ ! -z ${ODIN_TESTS_NO_CLANG+x} ]]; then

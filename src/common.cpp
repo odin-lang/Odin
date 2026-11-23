@@ -796,42 +796,51 @@ gb_internal wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc, isize
 		if (a == 0) {
 			break;
 		}
-		if (in_quote) {
-			if (a == '\"') {
-				in_quote = false;
-			} else {
-				_argv[j++] = a;
-			}
-		} else {
-			switch (a) {
-			case '\"':
-				in_quote = true;
-				in_text = true;
-				if (in_space) {
-					check_double_dash();
-					argv[argc++] = _argv + j;
-				}
-				in_space = false;
-				break;
-			case ' ':
-			case '\t':
-			case '\n':
-			case '\r':
-				if (in_text) _argv[j++] = '\0';
-				in_text = false;
-				in_space = true;
-				break;
-			default:
-				in_text = true;
-				if (in_space) {
-					check_double_dash();
-					argv[argc++] = _argv + j;
-				}
-				_argv[j++] = a;
-				in_space = false;
-				break;
-			}
+		if (!in_quote && (a == ' ' || a == '\t' || a == '\n' || a == '\r')) {
+			if (in_text) _argv[j++] = '\0';
+			in_text = false;
+			in_space = true;
+			i++;
+			continue;
 		}
+		if (in_space) {
+			check_double_dash();
+			argv[argc++] = _argv + j;
+			in_space = false;
+		}
+		in_text = true;
+		if (a == '\\') {
+			u32 backslashes = 0;
+			while (cmd_line[i] == '\\') {
+				backslashes++;
+				i++;
+			}
+			if (cmd_line[i] == '\"') {
+				for (u32 k = 0; k < backslashes/2; k++) {
+					_argv[j++] = '\\';
+				}
+				if (backslashes & 1) {
+					_argv[j++] = '\"';
+					i++;
+				}
+			} else {
+				for (u32 k = 0; k < backslashes; k++) {
+					_argv[j++] = '\\';
+				}
+			}
+			continue;
+		}
+		if (a == '\"') {
+			if (in_quote && cmd_line[i+1] == '\"') {
+				_argv[j++] = '\"';
+				i += 2;
+				continue;
+			}
+			in_quote = !in_quote;
+			i++;
+			continue;
+		}
+		_argv[j++] = a;
 		i++;
 	}
 	_argv[j] = '\0';
@@ -869,7 +878,10 @@ gb_internal char **command_line_to_spawn_argv(const char *cmd_line, int *_argc) 
 			break;
 		}
 		if (in_quote) {
-			if (a == '\"') {
+			if (a == '\\' && (cmd_line[i+1] == '\"' || cmd_line[i+1] == '\\')) {
+				i++;
+				_argv[j++] = cmd_line[i];
+			} else if (a == '\"') {
 				in_quote = false;
 			} else {
 				_argv[j++] = a;

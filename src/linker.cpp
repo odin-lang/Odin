@@ -79,7 +79,8 @@ gb_internal i32 system_exec_msvc_linker_app(char const *name, char const *fmt, .
 			gb_printf_err("[RESPONSE FILE] %s\n%s\n\n", rsp_path, rsp);
 		}
 
-		i32 result = system_exec_command_line_app(name, "%.*s @\"%s\"", cast(int)exe_len, cmd, rsp_path);
+		String quoted_rsp = quote_arg(temporary_allocator(), make_string_c(rsp_path));
+		i32 result = system_exec_command_line_app(name, "%.*s @%.*s", cast(int)exe_len, cmd, LIT(quoted_rsp));
 		if (!build_context.keep_temp_files) {
 			gb_file_remove(rsp_path);
 		}
@@ -122,7 +123,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 		gbString extra_orca_flags = gb_string_make(temporary_allocator(), "");
 
 		gbString inputs = gb_string_make(temporary_allocator(), "");
-		inputs = gb_string_append_fmt(inputs, "\"%.*s.o\"", LIT(output_filename));
+		inputs = append_quoted(inputs, concatenate_strings(temporary_allocator(), output_filename, str_lit(".o")));
 
 
 		for (Entity *e : gen->foreign_libraries) {
@@ -144,7 +145,8 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 					continue;
 				}
 
-				inputs = gb_string_append_fmt(inputs, " \"%.*s\"", LIT(lib));
+				inputs = gb_string_appendc(inputs, " ");
+				inputs = append_quoted(inputs, lib);
 			}
 		}
 
@@ -158,23 +160,32 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 				gb_printf_err("executing `orca sdk-path` did not produce output\n");
 				return 1;
 			}
-			inputs = gb_string_append_fmt(inputs, " \"%s/orca-libc/lib/crt1.o\" \"%s/orca-libc/lib/libc.a\"", orca_sdk_path, orca_sdk_path);
+			orca_sdk_path = gb_string_trim(orca_sdk_path, "\r\n");
+			String orca_sdk = make_string(cast(u8 *)orca_sdk_path, gb_string_length(orca_sdk_path));
+			inputs = gb_string_appendc(inputs, " ");
+			inputs = append_quoted(inputs, concatenate_strings(temporary_allocator(), orca_sdk, str_lit("/orca-libc/lib/crt1.o")));
+			inputs = gb_string_appendc(inputs, " ");
+			inputs = append_quoted(inputs, concatenate_strings(temporary_allocator(), orca_sdk, str_lit("/orca-libc/lib/libc.a")));
 
-			extra_orca_flags = gb_string_append_fmt(extra_orca_flags, " -L \"%s/bin\" -lorca_wasm --export-dynamic", orca_sdk_path);
+			extra_orca_flags = gb_string_appendc(extra_orca_flags, " -L ");
+			extra_orca_flags = append_quoted(extra_orca_flags, concatenate_strings(temporary_allocator(), orca_sdk, str_lit("/bin")));
+			extra_orca_flags = gb_string_appendc(extra_orca_flags, " -lorca_wasm --export-dynamic");
 		}
 
 
+		String quoted_output = quote_arg(temporary_allocator(), output_filename);
 	#if defined(GB_SYSTEM_WINDOWS)
+		String wasm_ld_path = quote_arg(temporary_allocator(), concatenate_strings(temporary_allocator(), build_context.ODIN_ROOT, str_lit("\\bin\\wasm-ld")));
 		result = system_exec_command_line_app("wasm-ld",
-			"\"%.*s\\bin\\wasm-ld\" %s -o \"%.*s\" %.*s %.*s %s %s",
-			LIT(build_context.ODIN_ROOT),
-			inputs, LIT(output_filename), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags),
+			"%.*s %s -o %.*s %.*s %.*s %s %s",
+			LIT(wasm_ld_path),
+			inputs, LIT(quoted_output), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags),
 			lib_str,
 			extra_orca_flags);
 	#else
 		result = system_exec_command_line_app("wasm-ld",
-			"wasm-ld %s -o \"%.*s\" %.*s %.*s %s %s",
-			inputs, LIT(output_filename),
+			"wasm-ld %s -o %.*s %.*s %.*s %s %s",
+			inputs, LIT(quoted_output),
 			LIT(build_context.link_flags),
 			LIT(build_context.extra_linker_flags),
 			lib_str,
@@ -257,7 +268,8 @@ try_cross_linking:;
 					if (path[path.len-1] == '\\') {
 						path.len -= 1;
 					}
-					link_settings = gb_string_append_fmt(link_settings, " /LIBPATH:\"%.*s\"", LIT(path));
+					link_settings = gb_string_appendc(link_settings, " /LIBPATH:");
+					link_settings = append_quoted(link_settings, path);
 				};
 				add_path(build_context.build_paths[BuildPath_Win_SDK_UM_Lib].basename);
 				add_path(build_context.build_paths[BuildPath_Win_SDK_UCRT_Lib].basename);
@@ -362,15 +374,18 @@ try_cross_linking:;
 								nasm_path = "nasm";
 							}
 						#endif
+							String quoted_nasm = quote_arg(temporary_allocator(), make_string_c(nasm_path));
+							String quoted_asm  = quote_arg(temporary_allocator(), asm_file);
+							String quoted_obj  = quote_arg(temporary_allocator(), obj_file);
 							result = system_exec_command_line_app("nasm",
-								"\"%s\" \"%.*s\" "
-								"-f \"%.*s\" "
-								"-o \"%.*s\" "
+								"%.*s %.*s "
+								"-f %.*s "
+								"-o %.*s "
 								"%.*s "
 								"",
-								nasm_path, LIT(asm_file),
+								LIT(quoted_nasm), LIT(quoted_asm),
 								LIT(obj_format),
-								LIT(obj_file),
+								LIT(quoted_obj),
 								LIT(build_context.extra_assembler_flags)
 							);
 
@@ -382,7 +397,8 @@ try_cross_linking:;
 					} else if (!string_set_update(&min_libs_set, lib) ||
 					           !build_context.min_link_libs) {
 						if (prev_lib != lib) {
-							lib_str = gb_string_append_fmt(lib_str, " \"%.*s\"", LIT(lib));
+							lib_str = gb_string_appendc(lib_str, " ");
+							lib_str = append_quoted(lib_str, lib);
 						}
 						prev_lib = lib;
 					}
@@ -405,7 +421,8 @@ try_cross_linking:;
 
 			if (build_context.build_paths[BuildPath_Symbols].name != "") {
 				String symbol_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Symbols]);
-				link_settings = gb_string_append_fmt(link_settings, " /PDB:\"%.*s\"", LIT(symbol_path));
+				link_settings = gb_string_appendc(link_settings, " /PDB:");
+				link_settings = append_quoted(link_settings, symbol_path);
 			}
 
 			if (build_context.build_mode != BuildMode_StaticLibrary) {
@@ -417,7 +434,8 @@ try_cross_linking:;
 			}
 
 			if (build_context.windows_sdk_root.len > 0) {
-				link_settings = gb_string_append_fmt(link_settings, " /winsysroot:%.*s", LIT(build_context.windows_sdk_root));
+				link_settings = gb_string_appendc(link_settings, " /winsysroot:");
+				link_settings = append_quoted(link_settings, build_context.windows_sdk_root);
 			}
 
 			if (build_context.ODIN_DEBUG) {
@@ -431,7 +449,8 @@ try_cross_linking:;
 			gbString object_files = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(object_files));
 			for (String const &object_path : gen->output_object_paths) {
-				object_files = gb_string_append_fmt(object_files, "\"%.*s\" ", LIT(object_path));
+				object_files = append_quoted(object_files, object_path);
+				object_files = gb_string_appendc(object_files, " ");
 			}
 
 			String vs_exe_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_VS_EXE]);
@@ -460,9 +479,10 @@ try_cross_linking:;
 				} else {
 					debugf("Compiling resource %.*s\n", LIT(res_path));
 
+					String rc_exe = quote_arg(temporary_allocator(), concatenate_strings(temporary_allocator(), windows_sdk_bin_path, str_lit("rc.exe")));
 					result = system_exec_command_line_app("resource compiler",
-						"\"%.*src.exe\" /nologo /fo %.*s %.*s",
-						LIT(windows_sdk_bin_path),
+						"%.*s /nologo /fo %.*s %.*s",
+						LIT(rc_exe),
 						LIT(res_path),
 						LIT(rc_path)
 					);
@@ -472,6 +492,8 @@ try_cross_linking:;
 					}
 				}
 			}
+
+			String quoted_output = quote_arg(temporary_allocator(), output_filename);
 
 			switch (build_context.linker_choice) {
 			case Linker_lld:
@@ -490,15 +512,16 @@ try_cross_linking:;
 						linker_path = "lld-link";
 					}
 				#endif
+					String quoted_linker = quote_arg(temporary_allocator(), make_string_c(linker_path));
 					result = system_exec_msvc_linker_app("lld-link",
-						"\"%s\" %s -OUT:\"%.*s\" %s "
+						"%.*s %s -OUT:%.*s %s "
 						"/nologo /incremental:no /opt:ref /subsystem:%.*s "
 						"%.*s "
 						"%.*s "
 						"%s "
 						"%s "
 						"",
-						linker_path, object_files, LIT(output_filename),
+						LIT(quoted_linker), object_files, LIT(quoted_output),
 						link_settings,
 						LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
 						LIT(build_context.link_flags),
@@ -529,14 +552,15 @@ try_cross_linking:;
 					break;
 				}
 
+				String quoted_linker = quote_arg(temporary_allocator(), concatenate_strings(temporary_allocator(), vs_exe_path, linker_name));
 				result = system_exec_msvc_linker_app("msvc-link",
-					"\"%.*s%.*s\" %s %.*s -OUT:\"%.*s\" %s "
+					"%.*s %s %.*s -OUT:%.*s %s "
 					"/nologo /subsystem:%.*s "
 					"%.*s "
 					"%.*s "
 					"%s "
 					"",
-					LIT(vs_exe_path), LIT(linker_name), object_files, LIT(res_path), LIT(output_filename),
+					LIT(quoted_linker), object_files, LIT(res_path), LIT(quoted_output),
 					link_settings,
 					LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
 					LIT(build_context.link_flags),
@@ -551,14 +575,15 @@ try_cross_linking:;
 			}
 
 			default: { // radlink
+				String quoted_linker = quote_arg(temporary_allocator(), concatenate_strings(temporary_allocator(), build_context.ODIN_ROOT, str_lit("\\bin\\radlink")));
 				result = system_exec_msvc_linker_app("msvc-rad-link",
-					"\"%.*s\\bin\\radlink\" %s %.*s -OUT:\"%.*s\" %s "
+					"%.*s %s %.*s -OUT:%.*s %s "
 					"/nologo /incremental:no /opt:ref /subsystem:%.*s "
 					"%.*s "
 					"%.*s "
 					"%s "
 					"",
-					LIT(build_context.ODIN_ROOT), object_files, LIT(res_path), LIT(output_filename),
+					LIT(quoted_linker), object_files, LIT(res_path), LIT(quoted_output),
 					link_settings,
 					LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
 					LIT(build_context.link_flags),
@@ -632,7 +657,9 @@ try_cross_linking:;
 
 							String lib_name = lib;
 							lib_name = remove_extension_from_path(lib_name);
-							lib_str = gb_string_append_fmt(lib_str, " -framework %.*s ", LIT(lib_name));
+							lib_str = gb_string_appendc(lib_str, " -framework ");
+							lib_str = append_quoted(lib_str, lib_name);
+							lib_str = gb_string_appendc(lib_str, " ");
 						}
 					}
 				}
@@ -679,40 +706,42 @@ try_cross_linking:;
 							}
 						}
 
+						String quoted_asm = quote_arg(temporary_allocator(), asm_file);
+						String quoted_obj = quote_arg(temporary_allocator(), obj_file);
 						if (build_context.metrics.arch == TargetArch_riscv64) {
 							result = system_exec_command_line_app("clang",
-								"%s \"%.*s\" "
-								"-c -o \"%.*s\" "
+								"%s %.*s "
+								"-c -o %.*s "
 								"-target %.*s -march=rv64gc "
 								"%.*s "
 								"",
 								clang_path,
-								LIT(asm_file),
-								LIT(obj_file),
+								LIT(quoted_asm),
+								LIT(quoted_obj),
 								LIT(build_context.metrics.target_triplet),
 								LIT(build_context.extra_assembler_flags)
 							);
 						} else if (is_osx) {
 							// `as` comes with MacOS.
 							result = system_exec_command_line_app("as",
-								"as \"%.*s\" "
-								"-o \"%.*s\" "
+								"as %.*s "
+								"-o %.*s "
 								"%.*s "
 								"",
-								LIT(asm_file),
-								LIT(obj_file),
+								LIT(quoted_asm),
+								LIT(quoted_obj),
 								LIT(build_context.extra_assembler_flags)
 							);
 						} else if (build_context.metrics.arch == TargetArch_arm64) {
 							result = system_exec_command_line_app("clang",
-								"%s \"%.*s\" "
-								"-c -o \"%.*s\" "
+								"%s %.*s "
+								"-c -o %.*s "
 								"-target %.*s "
 								"%.*s "
 								"",
 								clang_path,
-								LIT(asm_file),
-								LIT(obj_file),
+								LIT(quoted_asm),
+								LIT(quoted_obj),
 								LIT(build_context.metrics.target_triplet),
 								LIT(build_context.extra_assembler_flags)
 							);
@@ -721,14 +750,14 @@ try_cross_linking:;
 							// Shipping binaries on unix-likes gets into the weird territorry of
 							// "which version of glibc" is it linked with.
 							result = system_exec_command_line_app("nasm",
-								"nasm \"%.*s\" "
-								"-f \"%.*s\" "
-								"-o \"%.*s\" "
+								"nasm %.*s "
+								"-f %.*s "
+								"-o %.*s "
 								"%.*s "
 								"",
-								LIT(asm_file),
+								LIT(quoted_asm),
 								LIT(obj_format),
-								LIT(obj_file),
+								LIT(quoted_obj),
 								LIT(build_context.extra_assembler_flags)
 							);
 							if (result) {
@@ -770,16 +799,22 @@ try_cross_linking:;
 								// framework thingie
 								String lib_name = lib;
 								lib_name = remove_extension_from_path(lib_name);
-								lib_str = gb_string_append_fmt(lib_str, " -framework %.*s ", LIT(lib_name));
+								lib_str = gb_string_appendc(lib_str, " -framework ");
+								lib_str = append_quoted(lib_str, lib_name);
+								lib_str = gb_string_appendc(lib_str, " ");
 							} else if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o")) || string_ends_with(lib, str_lit(".dylib"))) {
 								// For:
 								// object
 								// dynamic lib
 								// static libs, absolute full path relative to the file in which the lib was imported from
-								lib_str = gb_string_append_fmt(lib_str, " \"%.*s\" ", LIT(lib));
+								lib_str = gb_string_appendc(lib_str, " ");
+								lib_str = append_quoted(lib_str, lib);
+								lib_str = gb_string_appendc(lib_str, " ");
 							} else {
 								// dynamic or static system lib, just link regularly searching system library paths
-								lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
+								lib_str = gb_string_appendc(lib_str, " -l");
+								lib_str = append_quoted(lib_str, lib);
+								lib_str = gb_string_appendc(lib_str, " ");
 							}
 						} else {
 							// NOTE(vassvik): static libraries (.a files) in linux can be linked to directly using the full path,
@@ -794,21 +829,31 @@ try_cross_linking:;
 							// (cross-linking for Linux or Android) do not have. Archives are passed by path. Shared
 							// libraries keep `-l:` with their own directory, so `DT_NEEDED` stays a bare file name.
 							if (is_static) {
-								lib_str = gb_string_append_fmt(lib_str, " \"%.*s\" ", LIT(lib));
+								lib_str = gb_string_appendc(lib_str, " ");
+								lib_str = append_quoted(lib_str, lib);
+								lib_str = gb_string_appendc(lib_str, " ");
 								continue;
 							}
 							if (is_shared) {
 								String dir  = directory_from_path(lib);
 								String name = filename_without_directory(lib);
-								lib_str = gb_string_append_fmt(lib_str, " -L\"%.*s\" -l:\"%.*s\" ", LIT(dir), LIT(name));
+								lib_str = gb_string_appendc(lib_str, " -L");
+								lib_str = append_quoted(lib_str, dir);
+								lib_str = gb_string_appendc(lib_str, " -l:");
+								lib_str = append_quoted(lib_str, name);
+								lib_str = gb_string_appendc(lib_str, " ");
 								continue;
 							}
 						#endif
 							if (is_static || is_shared) {
-								lib_str = gb_string_append_fmt(lib_str, " -l:\"%.*s\" ", LIT(lib));
+								lib_str = gb_string_appendc(lib_str, " -l:");
+								lib_str = append_quoted(lib_str, lib);
+								lib_str = gb_string_appendc(lib_str, " ");
 							} else {
 								// dynamic or static system lib, just link regularly searching system library paths
-								lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
+								lib_str = gb_string_appendc(lib_str, " -l");
+								lib_str = append_quoted(lib_str, lib);
+								lib_str = gb_string_appendc(lib_str, " ");
 							}
 						}
 					}
@@ -823,7 +868,8 @@ try_cross_linking:;
 			// when a program imports it. Programs using SDL, raylib or their own activity no longer get the NDK's C glue.
 
 			for (String object_path : gen->output_object_paths) {
-				object_files = gb_string_append_fmt(object_files, "\"%.*s\" ", LIT(object_path));
+				object_files = append_quoted(object_files, object_path);
+				object_files = gb_string_appendc(object_files, " ");
 			}
 
 			gbString link_settings = gb_string_make_reserve(heap_allocator(), 32);
@@ -839,10 +885,11 @@ try_cross_linking:;
 				defer (gb_string_free(ar_command));
 
 				ar_command = gb_string_appendc(ar_command, "ar rcs ");
-				ar_command = gb_string_append_fmt(ar_command, "\"%.*s\" ", LIT(output_filename));
+				ar_command = append_quoted(ar_command, output_filename);
+				ar_command = gb_string_appendc(ar_command, " ");
 				ar_command = gb_string_appendc(ar_command, object_files);
 
-				result = system_exec_command_line_app("ar", ar_command);
+				result = system_exec_command_line_app("ar", "%s", ar_command);
 				if (result) {
 					return result;
 				}
@@ -939,29 +986,34 @@ try_cross_linking:;
 				gbString darwin_find_sdk_cmd = gb_string_make(temporary_allocator(), "");
 				darwin_find_sdk_cmd = gb_string_append_fmt(darwin_find_sdk_cmd, "xcrun --sdk %s --show-sdk-path", darwin_xcrun_sdk_name);
 
-				if (!system_exec_command_line_app_output(darwin_find_sdk_cmd, &darwin_sdk_path)) {
+				bool sdk_found = system_exec_command_line_app_output(darwin_find_sdk_cmd, &darwin_sdk_path);
+				if (sdk_found) {
+					// Trim the trailing newline.
+					darwin_sdk_path = gb_string_trim_space(darwin_sdk_path);
+					sdk_found = gb_string_length(darwin_sdk_path) > 0;
+				}
+				if (!sdk_found) {
 
 					// Fallback to default clang, since `xcrun --sdk` did not work.
 					clang_path = original_clang_path;
 
 					// Best-effort fallback to known locations
-					gbString darwin_sdk_path = gb_string_make(temporary_allocator(), "");
+					gb_string_clear(darwin_sdk_path);
 					darwin_sdk_path = gb_string_append_fmt(darwin_sdk_path, "/Library/Developer/CommandLineTools/SDKs/%s.sdk", darwin_platform_name);
 
 					if (!path_is_directory(make_string_c(darwin_sdk_path))) {
 						gb_string_clear(darwin_sdk_path);
-						darwin_sdk_path = gb_string_append_fmt(darwin_sdk_path, "/Applications/Xcode.app/Contents/Developer/Platforms/%s.platform/Developer/SDKs/%s.sdk", darwin_platform_name);
+						darwin_sdk_path = gb_string_append_fmt(darwin_sdk_path, "/Applications/Xcode.app/Contents/Developer/Platforms/%s.platform/Developer/SDKs/%s.sdk", darwin_platform_name, darwin_platform_name);
 
 						if (!path_is_directory(make_string_c(darwin_sdk_path))) {
 							gb_printf_err("Failed to find %s SDK\n", darwin_platform_name);
 							return -1;
 						}
 					}
-				} else {
-					// Trim the trailing newline.
-					darwin_sdk_path = gb_string_trim_space(darwin_sdk_path);
 				}
-				platform_lib_str = gb_string_append_fmt(platform_lib_str, "--sysroot %s ", darwin_sdk_path);
+				platform_lib_str = gb_string_appendc(platform_lib_str, "--sysroot ");
+				platform_lib_str = append_quoted(platform_lib_str, make_string(cast(u8 *)darwin_sdk_path, gb_string_length(darwin_sdk_path)));
+				platform_lib_str = gb_string_appendc(platform_lib_str, " ");
 
 				platform_lib_str = gb_string_appendc(platform_lib_str, "-L/usr/local/lib ");
 
@@ -1019,19 +1071,19 @@ try_cross_linking:;
 				GB_ASSERT(ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL.len != 0);
 				GB_ASSERT(ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.len != 0);
 
-				platform_lib_str = gb_string_appendc(platform_lib_str, "\"-L");
-				platform_lib_str = gb_string_append_length(platform_lib_str, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.text, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.len);
-				platform_lib_str = gb_string_appendc(platform_lib_str, "usr/lib/");
-				platform_lib_str = gb_string_append_length(platform_lib_str, ODIN_ANDROID_NDK_TOOLCHAIN_LIB.text, ODIN_ANDROID_NDK_TOOLCHAIN_LIB.len);
-				platform_lib_str = gb_string_append_fmt(platform_lib_str, "/%d", ODIN_ANDROID_API_LEVEL);
-				platform_lib_str = gb_string_appendc(platform_lib_str, "\" ");
+				gbString android_lib_dir = gb_string_make(temporary_allocator(), "-L");
+				android_lib_dir = gb_string_append_length(android_lib_dir, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.text, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.len);
+				android_lib_dir = gb_string_appendc(android_lib_dir, "usr/lib/");
+				android_lib_dir = gb_string_append_length(android_lib_dir, ODIN_ANDROID_NDK_TOOLCHAIN_LIB.text, ODIN_ANDROID_NDK_TOOLCHAIN_LIB.len);
+				android_lib_dir = gb_string_append_fmt(android_lib_dir, "/%d", ODIN_ANDROID_API_LEVEL);
+				platform_lib_str = append_quoted(platform_lib_str, make_string(cast(u8 *)android_lib_dir, gb_string_length(android_lib_dir)));
+				platform_lib_str = gb_string_appendc(platform_lib_str, " ");
 
 				platform_lib_str = gb_string_appendc(platform_lib_str, "-landroid ");
 				platform_lib_str = gb_string_appendc(platform_lib_str, "-llog ");
 
-				platform_lib_str = gb_string_appendc(platform_lib_str, "\"--sysroot=");
-				platform_lib_str = gb_string_append_length(platform_lib_str, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.text, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.len);
-				platform_lib_str = gb_string_appendc(platform_lib_str, "\" ");
+				platform_lib_str = append_quoted(platform_lib_str, concatenate_strings(temporary_allocator(), str_lit("--sysroot="), ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT));
+				platform_lib_str = gb_string_appendc(platform_lib_str, " ");
 
 				// NOTE(bill): To match the NDK's own build systems.
 				// A symbol missing at the target API level is a link error rather than a failure when the device loads the library.
@@ -1068,9 +1120,7 @@ try_cross_linking:;
 			defer (gb_string_free(link_command_line));
 
 			if (is_android) {
-				gbString ndk_bin_directory = gb_string_make_length(temporary_allocator(), ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
-				link_command_line = gb_string_appendc(link_command_line, ndk_bin_directory);
-				link_command_line = gb_string_appendc(link_command_line, "bin/clang");
+				link_command_line = append_quoted(link_command_line, concatenate_strings(temporary_allocator(), ODIN_ANDROID_NDK_TOOLCHAIN, str_lit("bin/clang")));
 				link_command_line = gb_string_append_fmt(link_command_line, " --target=%.*s%d ", LIT(build_context.metrics.target_triplet),  ODIN_ANDROID_API_LEVEL);
 			} else {
 				link_command_line = gb_string_appendc(link_command_line, clang_path);
@@ -1091,7 +1141,9 @@ try_cross_linking:;
 			}
 
 			link_command_line = gb_string_appendc(link_command_line, object_files);
-			link_command_line = gb_string_append_fmt(link_command_line, " -o \"%.*s\" ", LIT(output_filename));
+			link_command_line = gb_string_appendc(link_command_line, " -o ");
+			link_command_line = append_quoted(link_command_line, output_filename);
+			link_command_line = gb_string_appendc(link_command_line, " ");
 			link_command_line = gb_string_append_fmt(link_command_line, " %s ", platform_lib_str);
 			link_command_line = gb_string_append_fmt(link_command_line, " %s ", lib_str);
 			link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.link_flags));
@@ -1105,12 +1157,12 @@ try_cross_linking:;
 
 			if (build_context.linker_choice == Linker_lld) {
 				link_command_line = gb_string_append_fmt(link_command_line, " -fuse-ld=lld");
-				result = system_exec_command_line_app("lld-link", link_command_line);
+				result = system_exec_command_line_app("lld-link", "%s", link_command_line);
 			} else if (build_context.linker_choice == Linker_mold) {
 				link_command_line = gb_string_append_fmt(link_command_line, " -fuse-ld=mold");
-				result = system_exec_command_line_app("mold-link", link_command_line);
+				result = system_exec_command_line_app("mold-link", "%s", link_command_line);
 			} else {
-				result = system_exec_command_line_app("ld-link", link_command_line);
+				result = system_exec_command_line_app("ld-link", "%s", link_command_line);
 			}
 
 			if (result) {
@@ -1120,7 +1172,8 @@ try_cross_linking:;
 			if (is_osx && build_context.ODIN_DEBUG) {
 				// NOTE: macOS links DWARF symbols dynamically. Dsymutil will map the stubs in the exe
 				// to the symbols in the object file
-				result = system_exec_command_line_app("dsymutil", "dsymutil \"%.*s\"", LIT(output_filename));
+				String quoted_output = quote_arg(temporary_allocator(), output_filename);
+				result = system_exec_command_line_app("dsymutil", "dsymutil %.*s", LIT(quoted_output));
 
 				if (result) {
 					return result;
