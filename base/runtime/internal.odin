@@ -582,6 +582,34 @@ cstring_len :: proc "contextless" (s: cstring) -> int {
 		v := intrinsics.volatile_load((^#simd[16]u8)(p))
 		m := transmute(u16)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, zero))
 		m &= ~u16(0) << (start-p)
+		when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
+			for _ in 0..<7 {
+				if m != 0 {
+					return int(p - start + uintptr(intrinsics.count_trailing_zeros(m)))
+				}
+				p += 16
+				v = intrinsics.volatile_load((^#simd[16]u8)(p))
+				m = transmute(u16)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, zero))
+			}
+
+			if m == 0 {
+				p = (p + 16) &~ 63
+				for {
+					a := intrinsics.volatile_load((^#simd[16]u8)(p))
+					b := intrinsics.volatile_load((^#simd[16]u8)(p+16))
+					c := intrinsics.volatile_load((^#simd[16]u8)(p+32))
+					d := intrinsics.volatile_load((^#simd[16]u8)(p+48))
+					lowest := intrinsics.simd_min(intrinsics.simd_min(a, b), intrinsics.simd_min(c, d))
+					if intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(lowest, zero)) != {} {
+						break
+					}
+					p += 64
+				}
+
+				v = intrinsics.volatile_load((^#simd[16]u8)(p))
+				m = transmute(u16)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, zero))
+			}
+		}
 		for m == 0 {
 			p += 16
 			v = intrinsics.volatile_load((^#simd[16]u8)(p))
