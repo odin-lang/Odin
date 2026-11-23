@@ -8,7 +8,7 @@ gb_internal bool recursively_delete_directory(String const &path) {
 	gbAllocator ha = heap_allocator();
 #if defined(GB_SYSTEM_WINDOWS)
 	String pattern = concatenate_strings(ha, path, str_lit("\\*"));
-	String16 wpattern = string_to_string16(ha, pattern);
+	String16 wpattern = string_to_win32_path(ha, pattern);
 	gb_free(ha, pattern.text);
 
 	WIN32_FIND_DATAW data = {};
@@ -23,7 +23,7 @@ gb_internal bool recursively_delete_directory(String const &path) {
 		String name = string16_to_string(ha, make_string16_c(cast(u16 *)data.cFileName));
 		if (name != "." && name != "..") {
 			String child = concatenate3_strings(ha, path, str_lit("\\"), name);
-			String16 wchild = string_to_string16(ha, child);
+			String16 wchild = string_to_win32_path(ha, child);
 			wchar_t *wc = cast(wchar_t *)wchild.text;
 			DWORD attributes = data.dwFileAttributes;
 			if ((attributes & FILE_ATTRIBUTE_DIRECTORY) && !(attributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
@@ -49,7 +49,7 @@ gb_internal bool recursively_delete_directory(String const &path) {
 		return false;
 	}
 
-	String16 wpath = string_to_string16(ha, path);
+	String16 wpath = string_to_win32_path(ha, path);
 	bool removed = RemoveDirectoryW(cast(wchar_t *)wpath.text) != 0;
 	gb_free(ha, wpath.text);
 	return removed;
@@ -139,7 +139,7 @@ gb_internal u64 crc64_with_seed(void const *data, isize len, u64 seed) {
 
 gb_internal bool check_if_exists_directory_otherwise_create(String const &str) {
 #if defined(GB_SYSTEM_WINDOWS)
-	String16 wstr = string_to_string16(permanent_allocator(), str);
+	String16 wstr = string_to_win32_path(permanent_allocator(), str);
 	wchar_t *wstr_c = alloc_wstring(permanent_allocator(), wstr);
 	return CreateDirectoryW(wstr_c, nullptr);
 #else
@@ -154,8 +154,8 @@ gb_internal bool check_if_exists_directory_otherwise_create(String const &str) {
 
 gb_internal bool cache_copy_file(String from, String to) {
 #if defined(GB_SYSTEM_WINDOWS)
-	String16 wfrom = string_to_string16(temporary_allocator(), from);
-	String16 wto   = string_to_string16(temporary_allocator(), to);
+	String16 wfrom = string_to_win32_path(temporary_allocator(), from);
+	String16 wto   = string_to_win32_path(temporary_allocator(), to);
 	return CopyFileW(cast(wchar_t *)wfrom.text, cast(wchar_t *)wto.text, false) != 0;
 #else
 	char const *cfrom = alloc_cstring(temporary_allocator(), from);

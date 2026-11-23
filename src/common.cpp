@@ -956,7 +956,7 @@ gb_internal LoadedFileError load_file_32(char const *fullpath, LoadedFile *memor
 		TEMPORARY_ALLOCATOR_GUARD();
 
 		isize w_len = 0;
-		wchar_t *w_str = gb__alloc_utf8_to_ucs2(temporary_allocator(), fullpath, &w_len);
+		wchar_t *w_str = gb__alloc_utf8_to_win32_path(temporary_allocator(), fullpath, &w_len);
 		if (w_str == nullptr) {
 			return LoadedFile_Invalid;
 		}

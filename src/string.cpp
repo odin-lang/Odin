@@ -780,6 +780,15 @@ gb_internal String16 string_to_string16(gbAllocator a, String s) {
 	return make_string16(text, len);
 }
 
+#if defined(GB_SYSTEM_WINDOWS)
+gb_internal String16 string_to_win32_path(gbAllocator a, String s) {
+	String16 s16 = string_to_string16(a, s);
+	isize len = s16.len;
+	wchar_t *w = gb__win32_long_path(a, cast(wchar_t *)s16.text, &len);
+	return make_string16(cast(u16 *)w, len);
+}
+#endif
+
 
 gb_internal String string16_to_string(gbAllocator a, String16 s) {
 	int len, len1;

@@ -414,6 +414,23 @@ echo // changed>> cache_test\src\lib\main.odin
 %ODIN% clear-cache -out:cache_test\x.exe || exit /b
 if exist cache_test\.odin-cache exit /b 1
 
+set "SEG=long_path_segment_0123456789_0123456789_0123456789_0123456789"
+set "LP=%CD%\long_path\%SEG%\%SEG%\%SEG%\%SEG%\%SEG%"
+if exist long_path rmdir /S /Q "\\?\%CD%\long_path"
+md "\\?\%LP%\lib" || exit /b
+echo package main> "\\?\%LP%\main.odin"
+echo import "lib">> "\\?\%LP%\main.odin"
+echo main :: proc() { lib.f() }>> "\\?\%LP%\main.odin"
+echo package lib> "\\?\%LP%\lib\lib.odin"
+echo f :: proc() {}>> "\\?\%LP%\lib\lib.odin"
+%ODIN% check "%LP%" %COMMON% || exit /b
+%ODIN% build "%LP%" %COMMON% -linker:lld -internal-cached "-out:%LP%\out.exe" || exit /b
+%ODIN% build "%LP%" %COMMON% -linker:lld -internal-cached "-out:%LP%\out.exe" 2>&1 | %SystemRoot%\System32\find.exe /c "type check" | findstr /x "0" || exit /b
+%ODIN% clear-cache "-out:%LP%\out.exe" || exit /b
+if exist "\\?\%LP%\.odin-cache" exit /b 1
+if not exist "\\?\%LP%\out.exe" exit /b 1
+rmdir /S /Q "\\?\%CD%\long_path" || exit /b
+
 @rem #########################################################################################################
 
 @echo off

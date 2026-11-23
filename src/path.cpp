@@ -127,7 +127,7 @@ gb_internal String directory_from_path(String const &s) {
 #if defined(GB_SYSTEM_WINDOWS)
 	gb_internal bool path_is_directory(String path) {
 		gbAllocator a = heap_allocator();
-		String16 wstr = string_to_string16(a, path);
+		String16 wstr = string_to_win32_path(a, path);
 		defer (gb_free(a, wstr.text));
 
 		i32 attribs = GetFileAttributesW(cast(wchar_t *)wstr.text);
@@ -414,7 +414,7 @@ gb_internal bool path_file_id(String path, FileId *id) {
 	}
 #if defined(GB_SYSTEM_WINDOWS)
 	gbAllocator ha = heap_allocator();
-	String16 wpath = string_to_string16(ha, path);
+	String16 wpath = string_to_win32_path(ha, path);
 	defer (gb_free(ha, wpath.text));
 	if (wpath.len == 0) {
 		return false;
@@ -671,7 +671,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 	}
 	{
 		// NOTE(bill): whether it exists and whether it is a directory, can be expressed in one query
-		String16 wpath = string_to_string16(temporary_allocator(), path);
+		String16 wpath = string_to_win32_path(temporary_allocator(), path);
 		DWORD attributes = GetFileAttributesW(cast(wchar_t *)wpath.text);
 		if (attributes == INVALID_FILE_ATTRIBUTES) {
 			switch (GetLastError()) {
@@ -695,7 +695,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 	new_path[path.len+2] = 0;
 
 	String np = make_string(cast(u8 *)new_path, path.len+2);
-	String16 wstr = string_to_string16(a, np);
+	String16 wstr = string_to_win32_path(a, np);
 	defer (gb_free(a, wstr.text));
 
 	WIN32_FIND_DATAW file_data = {};
@@ -840,7 +840,7 @@ gb_internal bool write_directory(String path) {
 }
 #else
 gb_internal bool write_directory(String path) {
-	String16 wstr = string_to_string16(heap_allocator(), path);
+	String16 wstr = string_to_win32_path(heap_allocator(), path);
 	LPCWSTR wdirectory_name = cast(wchar_t *)wstr.text;
 
 	HANDLE directory = CreateFileW(wdirectory_name,

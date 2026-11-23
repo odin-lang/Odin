@@ -25,7 +25,7 @@ gb_internal void build_temp_cleanup(void) {
 		gb_file_remove(cast(char const *)file.text);
 	}
 #if defined(GB_SYSTEM_WINDOWS)
-	String16 wdir = string_to_string16(heap_allocator(), build_temp_dir_path);
+	String16 wdir = string_to_win32_path(heap_allocator(), build_temp_dir_path);
 	RemoveDirectoryW(cast(wchar_t *)wdir.text);
 	gb_free(heap_allocator(), wdir.text);
 #else
@@ -49,7 +49,7 @@ gb_internal String build_temp_file(String name) {
 			candidate = gb_string_append_length(candidate, base.text, base.len);
 			candidate = gb_string_append_fmt(candidate, "/odin-%lu-%u", GetCurrentProcessId(), attempt);
 			String s = make_string(cast(u8 *)candidate, gb_string_length(candidate));
-			String16 wdir = string_to_string16(heap_allocator(), s);
+			String16 wdir = string_to_win32_path(heap_allocator(), s);
 			bool created = CreateDirectoryW(cast(wchar_t *)wdir.text, nullptr) != 0;
 			DWORD err = GetLastError();
 			if (created) {
@@ -116,7 +116,7 @@ gb_internal String windows_find_tool(String dir, String name) {
 			continue;
 		}
 		String candidate = concatenate3_strings(temporary_allocator(), entry, str_lit("\\"), name);
-		String16 wcandidate = string_to_string16(temporary_allocator(), candidate);
+		String16 wcandidate = string_to_win32_path(temporary_allocator(), candidate);
 		DWORD attributes = GetFileAttributesW(cast(wchar_t *)wcandidate.text);
 		if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0) {
 			return candidate;

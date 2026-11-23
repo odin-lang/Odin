@@ -4987,6 +4987,53 @@ u64 gb_murmur64_seed(void const *data_, isize len, u64 seed) {
 		return w_text;
 	}
 
+	gb_internal wchar_t *gb__win32_long_path(gbAllocator a, wchar_t *w, isize *w_len_) {
+		isize len = *w_len_;
+		isize skip = 0;
+		wchar_t const *prefix = NULL;
+		isize prefix_len = 0;
+		wchar_t *out = NULL;
+		isize n = 0;
+		isize i = 0;
+		if (w == NULL || len < MAX_PATH - 12) {
+			return w;
+		}
+		if (len >= 3 && ((w[0] >= 'A' && w[0] <= 'Z') || (w[0] >= 'a' && w[0] <= 'z')) && w[1] == ':' && (w[2] == '\\' || w[2] == '/')) {
+			prefix = L"\\\\?\\";
+			prefix_len = 4;
+			skip = 0;
+		} else if (len >= 3 && (w[0] == '\\' || w[0] == '/') && (w[1] == '\\' || w[1] == '/') && w[2] != '?' && w[2] != '.') {
+			prefix = L"\\\\?\\UNC\\";
+			prefix_len = 8;
+			skip = 2;
+		} else {
+			return w;
+		}
+		out = gb_alloc_array(a, wchar_t, prefix_len + len - skip + 1);
+		for (i = 0; i < prefix_len; i++) {
+			out[n++] = prefix[i];
+		}
+		for (i = skip; i < len; i++) {
+			wchar_t c = w[i] == '/' ? '\\' : w[i];
+			if (c == '\\' && n > prefix_len && out[n-1] == '\\') {
+				continue;
+			}
+			out[n++] = c;
+		}
+		out[n] = 0;
+		gb_free(a, w);
+		*w_len_ = n;
+		return out;
+	}
+
+	gb_internal wchar_t *gb__alloc_utf8_to_win32_path(gbAllocator a, char const *text, isize *w_len_) {
+		isize w_len = 0;
+		wchar_t *w_text = gb__alloc_utf8_to_ucs2(a, text, &w_len);
+		w_text = gb__win32_long_path(a, w_text, &w_len);
+		if (w_len_) *w_len_ = w_len;
+		return w_text;
+	}
+
 	gb_internal GB_FILE_SEEK_PROC(gb__win32_file_seek) {
 		LARGE_INTEGER li_offset;
 		li_offset.QuadPart = offset;
@@ -5069,7 +5116,7 @@ u64 gb_murmur64_seed(void const *data_, isize len, u64 seed) {
 			return gbFileError_Invalid;
 		}
 
-		w_text = gb__alloc_utf8_to_ucs2(gb_heap_allocator(), filename, NULL);
+		w_text = gb__alloc_utf8_to_win32_path(gb_heap_allocator(), filename, NULL);
 		if (w_text == NULL) {
 			return gbFileError_InvalidFilename;
 		}
@@ -5366,7 +5413,7 @@ b32 gb_file_exists(char const *name) {
 	b32 found = false;
 	gbAllocator a = gb_heap_allocator();
 
-	w_text = gb__alloc_utf8_to_ucs2(a, name, NULL);
+	w_text = gb__alloc_utf8_to_win32_path(a, name, NULL);
 	if (w_text == NULL) {
 		return false;
 	}
@@ -5421,7 +5468,7 @@ gbFileTime gb_file_last_write_time(char const *filepath) {
 	WIN32_FILE_ATTRIBUTE_DATA data = {0};
 	gbAllocator a = gb_heap_allocator();
 
-	wchar_t *w_text = gb__alloc_utf8_to_ucs2(a, filepath, NULL);
+	wchar_t *w_text = gb__alloc_utf8_to_win32_path(a, filepath, NULL);
 	if (w_text == NULL) {
 		return 0;
 	}
@@ -5443,11 +5490,11 @@ gb_inline b32 gb_file_copy(char const *existing_filename, char const *new_filena
 	gbAllocator a = gb_heap_allocator();
 	b32 result = false;
 
-	w_old = gb__alloc_utf8_to_ucs2(a, existing_filename, NULL);
+	w_old = gb__alloc_utf8_to_win32_path(a, existing_filename, NULL);
 	if (w_old == NULL) {
 		return false;
 	}
-	w_new = gb__alloc_utf8_to_ucs2(a, new_filename, NULL);
+	w_new = gb__alloc_utf8_to_win32_path(a, new_filename, NULL);
 	if (w_new != NULL) {
 		result = CopyFileW(w_old, w_new, fail_if_exists);
 	}
@@ -5462,11 +5509,11 @@ gb_inline b32 gb_file_move(char const *existing_filename, char const *new_filena
 	gbAllocator a = gb_heap_allocator();
 	b32 result = false;
 
-	w_old = gb__alloc_utf8_to_ucs2(a, existing_filename, NULL);
+	w_old = gb__alloc_utf8_to_win32_path(a, existing_filename, NULL);
 	if (w_old == NULL) {
 		return false;
 	}
-	w_new = gb__alloc_utf8_to_ucs2(a, new_filename, NULL);
+	w_new = gb__alloc_utf8_to_win32_path(a, new_filename, NULL);
 	if (w_new != NULL) {
 		result = MoveFileW(w_old, w_new);
 	}
@@ -5479,7 +5526,7 @@ b32 gb_file_remove(char const *filename) {
 	wchar_t *w_filename = NULL;
 	gbAllocator a = gb_heap_allocator();
 	b32 result = false;
-	w_filename = gb__alloc_utf8_to_ucs2(a, filename, NULL);
+	w_filename = gb__alloc_utf8_to_win32_path(a, filename, NULL);
 	if (w_filename == NULL) {
 		return false;
 	}

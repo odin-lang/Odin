@@ -369,7 +369,7 @@ gb_internal String android_newest_sdk_dir(String dir, String prefix, String key,
 
 gb_internal void android_remove_directory(String path) {
 #if defined(GB_SYSTEM_WINDOWS)
-	String16 wpath = string_to_string16(temporary_allocator(), path);
+	String16 wpath = string_to_win32_path(temporary_allocator(), path);
 	RemoveDirectoryW(alloc_wstring(temporary_allocator(), wpath));
 #else
 	rmdir(alloc_cstring(temporary_allocator(), path));
