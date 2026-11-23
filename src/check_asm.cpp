@@ -261,12 +261,13 @@ gb_internal bool asm_body_refs_register(AsmCtx *asm_ctx, AsmBodyRefs *refs, Stri
 }
 enum AsmMismatch : u8 {
 	AsmMismatch_None,
-	AsmMismatch_Size,      // register / vector width mismatch
-	AsmMismatch_Class,     // register class mismatch
-	AsmMismatch_ImmRange,  // constant immediate does not fit the slot width
-	AsmMismatch_ImmType,   // non-integer constant where an integer immediate is required
-	AsmMismatch_NamedReg,  // slot only a named hardware register can fill
-	AsmMismatch_Writeback, // memory operand whose #pre/#post writeback differs from the slot's
+	AsmMismatch_Size,        // register / vector width mismatch
+	AsmMismatch_Class,       // register class mismatch
+	AsmMismatch_ImmRange,    // constant immediate does not fit the slot width
+	AsmMismatch_ImmType,     // non-integer constant where an integer immediate is required
+	AsmMismatch_NamedReg,    // slot only a named hardware register can fill
+	AsmMismatch_Writeback,   // memory operand whose #pre/#post writeback differs from the slot's
+	AsmMismatch_ImplicitReg, // slot only its implicit register can fill (the count in `shr r, %cl`)
 };
 
 gb_global char const *asm_writeback_names[AsmMemoryOperand_COUNT] = {"", "pre", "post"};
@@ -286,6 +287,53 @@ gb_internal AsmMemoryOperandKind asm_slot_writeback(Asm_arm64 *asm_ctx, Asm_arm6
 
 gb_internal AsmMemoryOperandKind asm_operand_writeback(Operand const *operand) {
 	return operand->expr->kind == Ast_AsmMemoryOperand ? operand->expr->AsmMemoryOperand.kind : AsmMemoryOperand_Default;
+}
+
+// NOTE(bill): an implicit register the template must still name, e.g. the count in `shr r, %cl`.
+// A bare `shr r` is the shift-by-one form.
+template <typename AsmCtx>
+gb_internal bool asm_slot_is_named_implicit(AsmCtx *asm_ctx, typename AsmCtx::OperandType slot) {
+	return false;
+}
+gb_internal bool asm_slot_is_named_implicit(Asm_amd64 *asm_ctx, Asm_amd64::OperandType slot) {
+	return slot == Asm_amd64::OP_CL_IMPL;
+}
+
+// NOTE(bill): The accumulator short forms (e.g. `add eax, imm32`, `xchg eax, r32`, `mov al, moffs8`) are never matched.
+// A template reaches the general form by naming the register, e.g. `add r, 5` with r pinned to %rax.
+// Without the register (`add 5`), LLVM rejects them.
+// IN and OUT keep theirs: an immediate port has no general form.
+template <typename AsmCtx>
+gb_internal bool asm_form_is_accumulator_short_form(AsmCtx *asm_ctx, typename AsmCtx::Encoding const &form) {
+	return false;
+}
+gb_internal bool asm_form_is_accumulator_short_form(Asm_amd64 *asm_ctx, Asm_amd64::Encoding const &form) {
+	switch (form.mnemonic) {
+	case Asm_amd64::M_IN:
+	case Asm_amd64::M_OUT:
+		return false;
+	}
+
+	bool has_accumulator = false;
+	bool has_explicit    = false;
+	for (auto slot : form.ops) {
+		switch (slot) {
+		case Asm_amd64::OP_NONE:
+			break;
+		case Asm_amd64::OP_AL_IMPL:
+		case Asm_amd64::OP_AX_IMPL:
+		case Asm_amd64::OP_EAX_IMPL:
+		case Asm_amd64::OP_RAX_IMPL:
+			has_accumulator = true;
+			break;
+		default:
+			if (!asm_ctx->operand_type_is_implicit(slot)) {
+				has_explicit = true;
+			}
+			break;
+		}
+	}
+	return has_accumulator && has_explicit;
 }
 
 // Does a constant immediate value fit a slot of `bits` width (0 == unconstrained)?
@@ -695,6 +743,36 @@ gb_internal void asm_clobber_implicit_vector_registers(Asm_amd64 *asm_ctx, Entit
 	}
 }
 
+gb_internal AsmTemplateEntityDecl *check_asm_find_decl(Entity *entity, Array<AsmTemplateEntityDecl> const &decls) {
+	for_array(i, decls) {
+		if (decls.data[i].entity == entity) {
+			return &decls.data[i];
+		}
+	}
+	return nullptr;
+}
+
+// NOTE(bill): the register an operand names: the register itself, or the one a parameter (or a view's source) is pinned to
+gb_internal String check_asm_operand_register(Entity *tmpl_entity, Operand const *operand) {
+	Ast *expr = operand->expr;
+	if (expr->kind == Ast_AsmRegister) {
+		return expr->AsmRegister.name.string;
+	}
+	Entity *e = entity_of_node(expr);
+	if (e == nullptr || e->kind != Entity_Variable) {
+		return {};
+	}
+	auto const &decls = tmpl_entity->AsmTemplate.decls;
+	AsmTemplateEntityDecl *ed = check_asm_find_decl(e, decls);
+	if (ed == nullptr) {
+		return {};
+	}
+	if (ed->pin.len == 0 && ed->view_of >= 0) {
+		return decls[ed->view_of].pin;
+	}
+	return ed->pin;
+}
+
 // How an operand failed to fit a form's slot, and the widths involved, for a precise diagnostic
 struct AsmSlotFit {
 	AsmMismatch mismatch;
@@ -705,7 +783,7 @@ struct AsmSlotFit {
 // Returns true if the operand's Odin type is size/class-compatible with the form's slot.
 // `slot` here is the resolved OperandType at the correct (implicit-skipped) slot.
 template <typename AsmCtx>
-gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::OperandType slot, Operand const *operand, AsmSlotFit *fit) {
+gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, Entity *tmpl_entity, typename AsmCtx::OperandType slot, Operand const *operand, AsmSlotFit *fit) {
 	*fit = {};
 
 	// e.g. `ldr r, #post [p + 8]` fills only a post-indexed slot, and `ldr r, [p + 8]` none.
@@ -732,6 +810,24 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 	AsmRegClass want_class = asm_ctx->operand_type_reg_class(slot);
 	i32         want_w     = asm_ctx->operand_type_bit_width(slot);
 	Ast *       reg        = operand->expr->kind == Ast_AsmRegister ? operand->expr : nullptr;
+
+	// e.g. the count in `shr r, %cl`: the register itself, or an operand of its width pinned to the same register
+	if (asm_slot_is_named_implicit(asm_ctx, slot)) {
+		String want = asm_ctx->implicit_reg_name(slot);
+		String got  = check_asm_operand_register(tmpl_entity, operand);
+
+		bool ok = false;
+		if (reg != nullptr) {
+			ok = asm_ctx->register_lookup(got) == asm_ctx->register_lookup(want);
+		} else if (got.len != 0) {
+			ok = asm_register_family_name(asm_ctx, got) == asm_register_family_name(asm_ctx, want) &&
+			     check_asm_operand_bit_width(operand->type) == asm_ctx->operand_type_bit_width(slot);
+		}
+		if (!ok) {
+			fit->mismatch = AsmMismatch_ImplicitReg;
+		}
+		return ok;
+	}
 
 	// A slot only a named hardware register can fill (segment/control/debug/x87/MMX)
 	// carries no class and, apart from MMX, no width either. Nothing below would
@@ -958,15 +1054,6 @@ gb_internal Type *check_asm_template_signature_params(CheckerContext *ctx, Scope
 	tuple->Tuple.variables = slice_from_array(variables);
 
 	return tuple;
-}
-
-gb_internal AsmTemplateEntityDecl *check_asm_find_decl(Entity *entity, Array<AsmTemplateEntityDecl> const &decls) {
-	for_array(i, decls) {
-		if (decls.data[i].entity == entity) {
-			return &decls.data[i];
-		}
-	}
-	return nullptr;
 }
 
 gb_internal AsmTemplateEntityDeclKind check_asm_find_kind(Entity *entity, Array<AsmTemplateEntityDecl> const &decls) {
@@ -1569,8 +1656,37 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 	bool is_pseudo             = pseudo_mnemonic != 0;
 	int  target_explicit_count = is_pseudo ? alias.nargs : -1;
 
+	// NOTE(bill): A form is written with its explicit operands and any implicit register it must still name.
+	auto form_operand_count = [&](typename AsmCtx::Encoding const &form) -> int {
+		int count = cast(int)form.explicit_count();
+		for (auto slot : form.ops) {
+			if (slot != asm_ctx->OP_NONE && asm_slot_is_named_implicit(asm_ctx, slot)) {
+				count += 1;
+			}
+		}
+		return count;
+	};
+
+	auto form_operand_slot = [&](typename AsmCtx::Encoding const &form, int user_index) -> int {
+		int seen = 0;
+		for (int j = 0; j < gb_count_of(form.ops); j++) {
+			auto slot = form.ops[j];
+			if (slot == asm_ctx->OP_NONE) {
+				break;
+			}
+			if (asm_ctx->operand_type_is_implicit(slot) && !asm_slot_is_named_implicit(asm_ctx, slot)) {
+				continue;
+			}
+			if (seen == user_index) {
+				return j;
+			}
+			seen += 1;
+		}
+		return -1;
+	};
+
 	auto form_user_operand_count = [&](typename AsmCtx::Encoding const &form) -> int {
-		int count = is_pseudo ? target_explicit_count : cast(int)form.explicit_count();
+		int count = is_pseudo ? target_explicit_count : form_operand_count(form);
 		GB_ASSERT_MSG(count <= 4, "%d", count);
 		return gb_max(count, 0);
 	};
@@ -1600,7 +1716,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		if (is_pseudo) {
 			raw_slot = user_operand_target_index(user_index);
 		} else {
-			raw_slot = asm_ctx->form_explicit_slot(form, user_index);
+			raw_slot = form_operand_slot(form, user_index);
 		}
 		if (0 <= raw_slot && raw_slot < cast(int)gb_count_of(form.ops)) {
 			return form.ops[raw_slot];
@@ -1617,7 +1733,10 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			AsmRegClass    c = asm_ctx->operand_type_reg_class(slot);
 			i32            w = asm_ctx->operand_type_bit_width(slot);
 
-			if (k == AsmOperand_Label) {
+			if (asm_slot_is_named_implicit(asm_ctx, slot)) {
+				String reg = asm_ctx->implicit_reg_name(slot);
+				s = gb_string_append_fmt(s, "%%%.*s", LIT(reg));
+			} else if (k == AsmOperand_Label) {
 				s = gb_string_appendc(s, "label");
 			} else if (k == AsmOperand_Immediate) {
 				s = (w > 0) ? gb_string_append_fmt(s, "imm%d", cast(int)w)
@@ -1791,6 +1910,9 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		);
 
 		for_array(fi, forms) {
+			if (asm_form_is_accumulator_short_form(asm_ctx, forms[fi])) {
+				continue;
+			}
 			gbString desc = describe_form(forms[fi], clobber_forms[fi], forms.count);
 			bool dup = false;
 			for (auto const &l : lines) {
@@ -1833,9 +1955,12 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 	int max_count = -1;
 
 	for (auto form : forms) {
-		int explicit_count = cast(int)form.explicit_count();
-		min_count = gb_min(min_count, explicit_count);
-		max_count = gb_max(max_count, explicit_count);
+		if (asm_form_is_accumulator_short_form(asm_ctx, form)) {
+			continue;
+		}
+		int operand_count = form_operand_count(form);
+		min_count = gb_min(min_count, operand_count);
+		max_count = gb_max(max_count, operand_count);
 	}
 	min_count = gb_max(min_count, 0);
 	max_count = gb_max(max_count, 0);
@@ -1888,6 +2013,9 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			if (slot == asm_ctx->OP_NONE || !asm_ctx->operand_type_is_implicit(slot)) {
 				continue;
 			}
+			if (asm_slot_is_named_implicit(asm_ctx, slot)) {
+				continue; // its operand picks the form
+			}
 
 			u16 implicit_bit = asm_ctx->clobber_bit_for_reg_name(asm_ctx->implicit_reg_name(slot));
 			i32 implicit_width = asm_ctx->operand_type_bit_width(slot);
@@ -1919,7 +2047,10 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 		if (is_pseudo && cast(int)form.explicit_count() < target_explicit_count) {
 			continue;
-		} else if (operands.count != cast(int)form.explicit_count()) {
+		} else if (operands.count != form_operand_count(form)) {
+			continue;
+		}
+		if (asm_form_is_accumulator_short_form(asm_ctx, form)) {
 			continue;
 		}
 		if (!implicit_operands_match_pins(form)) {
@@ -1949,7 +2080,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				if (dst == AsmOperand_Register_Or_Memory && src == AsmOperand_Memory && mem_unsized) {
 					spot_ok = true; // memory form accepts memory; no size check
 				} else {
-					spot_ok = check_asm_operand_size_class(asm_ctx, type, operand, &fit);
+					spot_ok = check_asm_operand_size_class(asm_ctx, tmpl_entity, type, operand, &fit);
 					bool width_mismatch = fit.mismatch == AsmMismatch_Size || fit.mismatch == AsmMismatch_ImmRange;
 					if (!spot_ok && width_mismatch && fit.want_bits > 0 && fit.got_bits > 0) {
 						width_dist += gb_abs(fit.want_bits - fit.got_bits);
@@ -1991,7 +2122,19 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 	if (operands.count < min_count || operands.count > max_count) {
 		ERROR_BLOCK();
-		if (min_count == max_count) {
+
+		// NOTE(bill): e.g. `add 5`, written as if the accumulator were implicit
+		bool omits_accumulator = false;
+		for (auto const &form : forms) {
+			if (asm_form_is_accumulator_short_form(asm_ctx, form) && form_operand_count(form) == operands.count) {
+				omits_accumulator = true;
+				break;
+			}
+		}
+
+		if (omits_accumulator) {
+			error(instr->name, "'%.*s' takes no implicit accumulator; write the register as an operand (e.g. %%rax, or a parameter pinned to it)", LIT(name));
+		} else if (min_count == max_count) {
 			error(instr->name, "The asm instruction '%.*s' expects %d operands, got %td", LIT(name), max_count, operands.count);
 		} else {
 			error(instr->name, "The asm instruction '%.*s' expects %d..=%d operands, got %td", LIT(name), min_count, max_count, operands.count);
@@ -2097,6 +2240,14 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			}
 		}
 		bool mem_is_real = has_mem_operand || (!has_rm_slot && operands.count > 0) || clobber.has_implicit_mem();
+
+		// NOTE(bill): A named implicit register is read through its operand, e.g. %cl in `shr r, %cl`
+		u16 read_ops = cast(u16)clobber.read;
+		for (int s = 0; s < gb_count_of(valid_form.ops); s++) {
+			if (asm_slot_is_named_implicit(asm_ctx, valid_form.ops[s])) {
+				read_ops |= cast(u16)(1u << s);
+			}
+		}
 
 		bool internal_branch = clobber.has_control() && check_asm_instr_targets_internal_label(instr);
 
@@ -2222,7 +2373,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			}
 			int tslot = user_operand_target_index(cast(int)i);
 			if (0 <= tslot && tslot < 4) {
-				if (!self_zeroing && cast(u16)clobber.read & (1u << tslot)) {
+				if (!self_zeroing && read_ops & (1u << tslot)) {
 					facts->read_reg_w.e[idx] = cast(u8)w;
 					facts->read_regs |= bit; // NOTE(bill): let liveness + coarse rbw see the explicit read
 				}
@@ -2276,7 +2427,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				continue;
 			}
 
-			bool reads  = !self_zeroing && (cast(u16)clobber.read & (1u << slot)) != 0;
+			bool reads  = !self_zeroing && (read_ops & (1u << slot)) != 0;
 			bool writes = (cast(u16)clobber.written & (1u << slot)) != 0;
 			if (reads) {
 				array_add(&facts->read_params, pe);
@@ -2412,7 +2563,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			possible_class_kinds[i] = asm_ctx->reg_class_from_operand_type(type);
 
 			valid_spots[i] = asm_operand_kind_fits(dst, src) &&
-			                 check_asm_operand_size_class(asm_ctx, type, &operands[i], &fits[i]);
+			                 check_asm_operand_size_class(asm_ctx, tmpl_entity, type, &operands[i], &fits[i]);
 		}
 	}
 
@@ -2483,6 +2634,13 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			      LIT(name), i,
 			      LIT(asm_ctx->named_reg_class_string(asm_ctx->operand_type_named_reg_class(slot))),
 			      LIT(asm_operand_kind_strings[src]));
+		} else if (m == AsmMismatch_ImplicitReg) {
+			auto   slot = operand_slot_type(forms[best_form], cast(int)i);
+			String reg  = asm_ctx->implicit_reg_name(slot);
+			error(operands[i].expr, "'%.*s' operand-%td must be %%%.*s or an %d-bit operand pinned to %%%.*s",
+			      LIT(name), i, LIT(reg),
+			      cast(int)asm_ctx->operand_type_bit_width(slot),
+			      LIT(asm_register_family_name(asm_ctx, reg)));
 		} else if (dst == AsmOperand_Immediate) {
 			error(operands[i].expr, "'%.*s' operand-%td must be an assemble-time constant or a $ immediate parameter, got a %.*s",
 			      LIT(name), i, LIT(asm_operand_kind_strings[src]));
