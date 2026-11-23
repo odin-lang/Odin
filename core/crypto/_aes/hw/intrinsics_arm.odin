@@ -6,33 +6,36 @@ import "core:simd/arm"
 
 // https://blog.michaelbrase.com/2018/05/08/emulating-x86-aes-intrinsics-on-armv8-a/
 
-TARGET_FEATURES :: "neon,aes"
+// 32-bit Arm has the AES instructions from Armv8 on.
+// LLVM's `aes` feature does not imply Armv8 there.
+TARGET_FEATURES :: "neon,aes" when ODIN_ARCH == .arm64 else "v8,neon,aes"
+
 // core:simd/arm has PMULL (vmull_p64) only on arm64.
 HAS_GHASH :: ODIN_ARCH == .arm64
 
-@(require_results, enable_target_feature = "aes")
+@(require_results, enable_target_feature = TARGET_FEATURES)
 aesdec :: #force_inline proc "c" (data, key: simd.u8x16) -> simd.u8x16 {
 	return simd.bit_xor(arm.vaesimcq_u8(arm.vaesdq_u8(data, simd.u8x16{})), key)
 }
 
-@(require_results, enable_target_feature = "aes")
+@(require_results, enable_target_feature = TARGET_FEATURES)
 aesdeclast :: #force_inline proc "c" (data, key: simd.u8x16) -> simd.u8x16 {
 	return simd.bit_xor(arm.vaesdq_u8(data, simd.u8x16{}), key)
 }
 
-@(require_results, enable_target_feature = "aes")
+@(require_results, enable_target_feature = TARGET_FEATURES)
 aesenc :: #force_inline proc "c" (data, key: simd.u8x16) -> simd.u8x16 {
 	return simd.bit_xor(arm.vaesmcq_u8(arm.vaeseq_u8(data, simd.u8x16{})), key)
 }
 
-@(require_results, enable_target_feature = "aes")
+@(require_results, enable_target_feature = TARGET_FEATURES)
 aesenclast :: #force_inline proc "c" (data, key: simd.u8x16) -> simd.u8x16 {
 	return simd.bit_xor(arm.vaeseq_u8(data, simd.u8x16{}), key)
 }
 
 aesimc :: arm.vaesimcq_u8
 
-@(require_results, enable_target_feature = "aes")
+@(require_results, enable_target_feature = TARGET_FEATURES)
 aeskeygenassist :: #force_inline proc "c" (data: simd.u8x16, $IMM8: u8) -> simd.u8x16 {
 	a := arm.vaeseq_u8(data, simd.u8x16{}) // AESE does ShiftRows and SubBytes on A
 

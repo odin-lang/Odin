@@ -14,9 +14,14 @@ import "core:simd"
 when ODIN_ARCH == .amd64 {
 	@(private="file")
 	TARGET_FEATURES :: "sse2,ssse3,aes"
-} else when ODIN_ARCH == .arm64 || ODIN_ARCH == .arm32 {
+} else when ODIN_ARCH == .arm64 {
 	@(private="file")
 	TARGET_FEATURES :: "neon,aes"
+} else when ODIN_ARCH == .arm32 {
+	// 32-bit Arm has the AES instructions from Armv8 on.
+	// LLVM's `aes` feature does not imply Armv8 there.
+	@(private="file")
+	TARGET_FEATURES :: "v8,neon,aes"
 }
 
 @(private = "file")
