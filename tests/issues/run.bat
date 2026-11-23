@@ -370,6 +370,11 @@ echo keep> tempfiles\dll\t-helper.obj
 if not exist tempfiles\t-helper.ll exit /b 1
 if not exist tempfiles\dll\t-helper.obj exit /b 1
 
+%ODIN% build ..\test_paths_resource %COMMON% -resource:..\test_paths_resource\res.rc -out:resource_default.exe || exit /b
+.\resource_default.exe || exit /b
+%ODIN% build ..\test_paths_resource %COMMON% -resource:..\test_paths_resource\res.rc -linker:lld -out:resource_lld.exe || exit /b
+.\resource_lld.exe || exit /b
+
 @rem #########################################################################################################
 
 @echo off

@@ -326,15 +326,18 @@ gb_internal bool system_exec_command_line_app_output(char const *command, gbStri
 	if (!stream) {
 		return false;
 	}
-	defer (pclose(stream));
 
 	while (!feof(stream)) {
 		size_t n = fread(buffer, 1, 255, stream);
 		*output = gb_string_append_length(*output, buffer, n);
 
 		if (ferror(stream)) {
+			pclose(stream);
 			return false;
 		}
+	}
+	if (pclose(stream) != 0) {
+		return false;
 	}
 
 	if (build_context.show_system_calls) {

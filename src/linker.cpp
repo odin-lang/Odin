@@ -83,6 +83,49 @@ gb_internal String build_temp_file(String name) {
 	return path;
 }
 
+gb_internal String windows_find_tool(String dir, String name) {
+	if (dir.len > 0) {
+		return concatenate_strings(temporary_allocator(), dir, name);
+	}
+#if !defined(GB_SYSTEM_WINDOWS)
+	return name;
+#else
+	DWORD cap = GetEnvironmentVariableW(L"PATH", nullptr, 0);
+	if (cap == 0) {
+		return {};
+	}
+	wchar_t *wenv = gb_alloc_array(temporary_allocator(), wchar_t, cap);
+	DWORD n = GetEnvironmentVariableW(L"PATH", wenv, cap);
+	if (n == 0 || n >= cap) {
+		return {};
+	}
+	String env = string16_to_string(temporary_allocator(), make_string16(cast(u16 *)wenv, n));
+	while (env.len > 0) {
+		isize end = 0;
+		while (end < env.len && env[end] != ';') {
+			end++;
+		}
+		String entry = substring(env, 0, end);
+		env = substring(env, gb_min(end+1, env.len), env.len);
+		if (entry.len >= 2 && entry[0] == '"' && entry[entry.len-1] == '"') {
+			entry = substring(entry, 1, entry.len-1);
+		}
+		bool is_drive_absolute = entry.len >= 3 && entry[1] == ':' && (entry[2] == '\\' || entry[2] == '/');
+		bool is_unc = entry.len >= 2 && (entry[0] == '\\' || entry[0] == '/') && (entry[1] == '\\' || entry[1] == '/');
+		if (!is_drive_absolute && !is_unc) {
+			continue;
+		}
+		String candidate = concatenate3_strings(temporary_allocator(), entry, str_lit("\\"), name);
+		String16 wcandidate = string_to_string16(temporary_allocator(), candidate);
+		DWORD attributes = GetFileAttributesW(cast(wchar_t *)wcandidate.text);
+		if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0) {
+			return candidate;
+		}
+	}
+	return {};
+#endif
+}
+
 gb_internal i32 system_exec_msvc_linker_app(char const *name, char const *fmt, ...) {
 	isize const cmd_cap = 64<<20;
 	char *cmd = gb_alloc_array(heap_allocator(), char, cmd_cap);
@@ -530,7 +573,12 @@ try_cross_linking:;
 					res_path = quote_arg(heap_allocator(), build_temp_file(str_lit("resource.res")));
 					debugf("Compiling resource %.*s\n", LIT(res_path));
 
-					String rc_exe = quote_arg(temporary_allocator(), concatenate_strings(temporary_allocator(), windows_sdk_bin_path, str_lit("rc.exe")));
+					String rc_exe_path = windows_find_tool(windows_sdk_bin_path, str_lit("rc.exe"));
+					if (rc_exe_path.len == 0) {
+						gb_printf_err("Could not find rc.exe in the Windows SDK or in an absolute PATH entry\n");
+						return 1;
+					}
+					String rc_exe = quote_arg(temporary_allocator(), rc_exe_path);
 					result = system_exec_command_line_app("resource compiler",
 						"%.*s /nologo /fo %.*s %.*s",
 						LIT(rc_exe),
@@ -565,14 +613,14 @@ try_cross_linking:;
 				#endif
 					String quoted_linker = quote_arg(temporary_allocator(), make_string_c(linker_path));
 					result = system_exec_msvc_linker_app("lld-link",
-						"%.*s %s -OUT:%.*s %s "
+						"%.*s %s %.*s -OUT:%.*s %s "
 						"/nologo /incremental:no /opt:ref /subsystem:%.*s "
 						"%.*s "
 						"%.*s "
 						"%s "
 						"%s "
 						"",
-						LIT(quoted_linker), object_files, LIT(quoted_output),
+						LIT(quoted_linker), object_files, LIT(res_path), LIT(quoted_output),
 						link_settings,
 						LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
 						LIT(build_context.link_flags),
@@ -603,7 +651,12 @@ try_cross_linking:;
 					break;
 				}
 
-				String quoted_linker = quote_arg(temporary_allocator(), concatenate_strings(temporary_allocator(), vs_exe_path, linker_name));
+				String linker_path = windows_find_tool(vs_exe_path, linker_name);
+				if (linker_path.len == 0) {
+					gb_printf_err("Could not find %.*s in Visual Studio or in an absolute PATH entry\n", LIT(linker_name));
+					return 1;
+				}
+				String quoted_linker = quote_arg(temporary_allocator(), linker_path);
 				result = system_exec_msvc_linker_app("msvc-link",
 					"%.*s %s %.*s -OUT:%.*s %s "
 					"/nologo /subsystem:%.*s "
@@ -664,7 +717,14 @@ try_cross_linking:;
 			const char* clang_path = gb_get_env("ODIN_CLANG_PATH", permanent_allocator());
 			bool has_odin_clang_path_env = true;
 			if (clang_path == NULL) {
+			#if defined(GB_SYSTEM_WINDOWS)
+				String found_clang = windows_find_tool({}, str_lit("clang.exe"));
+				if (found_clang.len > 0) {
+					clang_path = cast(char const *)quote_arg(permanent_allocator(), found_clang).text;
+				}
+			#else
 				clang_path = "clang";
+			#endif
 				has_odin_clang_path_env = false;
 			}
 
@@ -744,6 +804,11 @@ try_cross_linking:;
 
 						String quoted_asm = quote_arg(temporary_allocator(), asm_file);
 						String quoted_obj = quote_arg(temporary_allocator(), obj_file);
+						bool uses_clang = build_context.metrics.arch == TargetArch_riscv64 || (!is_osx && build_context.metrics.arch == TargetArch_arm64);
+						if (uses_clang && clang_path == nullptr) {
+							gb_printf_err("Could not find clang.exe in an absolute PATH entry; set ODIN_CLANG_PATH\n");
+							return 1;
+						}
 						if (build_context.metrics.arch == TargetArch_riscv64) {
 							result = system_exec_command_line_app("clang",
 								"%s %.*s "
@@ -785,12 +850,18 @@ try_cross_linking:;
 							// Note(bumbread): I'm assuming nasm is installed on the host machine.
 							// Shipping binaries on unix-likes gets into the weird territorry of
 							// "which version of glibc" is it linked with.
+						#if defined(GB_SYSTEM_WINDOWS)
+							String quoted_nasm = quote_arg(temporary_allocator(), concatenate_strings(temporary_allocator(), build_context.ODIN_ROOT, str_lit("\\bin\\nasm\\windows\\nasm.exe")));
+						#else
+							String quoted_nasm = str_lit("nasm");
+						#endif
 							result = system_exec_command_line_app("nasm",
-								"nasm %.*s "
+								"%.*s %.*s "
 								"-f %.*s "
 								"-o %.*s "
 								"%.*s "
 								"",
+								LIT(quoted_nasm),
 								LIT(quoted_asm),
 								LIT(obj_format),
 								LIT(quoted_obj),
@@ -1165,6 +1236,10 @@ try_cross_linking:;
 				link_command_line = append_quoted(link_command_line, concatenate_strings(temporary_allocator(), ODIN_ANDROID_NDK_TOOLCHAIN, str_lit("bin/clang")));
 				link_command_line = gb_string_append_fmt(link_command_line, " --target=%.*s%d ", LIT(build_context.metrics.target_triplet),  ODIN_ANDROID_API_LEVEL);
 			} else {
+				if (clang_path == nullptr) {
+					gb_printf_err("Could not find clang.exe in an absolute PATH entry; set ODIN_CLANG_PATH\n");
+					return 1;
+				}
 				link_command_line = gb_string_appendc(link_command_line, clang_path);
 			}
 			link_command_line = gb_string_appendc(link_command_line, " -Wno-unused-command-line-argument ");
