@@ -3797,12 +3797,12 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				}
 			}
 
-			LLVMMetadataRef init_file_metadata = lb_get_file_metadata(m, init_file);
-			if (init_file_metadata == nullptr) {
-				// every file of the initial package was excluded by its build tags, as can be done for `odin test`
-				String path = m->info->init_package->fullpath;
-				init_file_metadata = LLVMDIBuilderCreateFile(m->debug_builder, cast(char const *)path.text, path.len, "", 0);
+			if (init_file == nullptr && m->info->runtime_package != nullptr && m->info->runtime_package->files.count > 0) {
+				// every file of the initial package was excluded by its build tags, as can be done for `odin test`;
+				// a real file keeps the line table's checksums
+				init_file = m->info->runtime_package->files[0];
 			}
+			LLVMMetadataRef init_file_metadata = lb_get_file_metadata(m, init_file);
 
 			LLVMBool split_debug_inlining = build_context.build_mode == BuildMode_Assembly;
 			LLVMBool debug_info_for_profiling = false;

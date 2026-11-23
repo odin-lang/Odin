@@ -866,6 +866,12 @@ elif command -v readelf > /dev/null; then
 	[[ $(readelf -d needed/lib/app | grep -c -F '[libtpneeded.so]') -eq 1 ]]
 fi
 
+if [[ $(uname) != Darwin ]] && command -v addr2line > /dev/null && command -v nm > /dev/null; then
+	$ODIN build ../test_paths_debug $COMMON -debug -out:debug_names
+	DEBUG_ADDR=$(nm debug_names | grep ' lib::hello$' | awk '{print $1}')
+	[[ $(addr2line -e debug_names 0x$DEBUG_ADDR | grep -c -F 'test_paths_debug/lib/main.odin:') -eq 1 ]]
+fi
+
 #########################################################################################################
 
 if [[ ! -z ${ODIN_TESTS_NO_CLANG+x} ]]; then

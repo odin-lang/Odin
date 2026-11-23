@@ -58,14 +58,14 @@ gb_internal LLVMMetadataRef lb_get_file_metadata(lbModule *m, AstFile *f) {
 	#if LLVM_VERSION_MAJOR >= 22
 		String checksum = lb_debug_file_checksum(f);
 		res = LLVMDIBuilderCreateFileWithChecksum(m->debug_builder,
-			cast(char const *)f->filename.text, f->filename.len,
-			cast(char const *)f->directory.text, f->directory.len,
+			cast(char const *)f->fullpath.text, f->fullpath.len,
+			"", 0,
 			CSK_MD5, cast(char const *)checksum.text, checksum.len,
 			nullptr, 0);
 	#else
 		res = LLVMDIBuilderCreateFile(m->debug_builder,
-			cast(char const *)f->filename.text, f->filename.len,
-			cast(char const *)f->directory.text, f->directory.len);
+			cast(char const *)f->fullpath.text, f->fullpath.len,
+			"", 0);
 	#endif
 		lb_set_llvm_metadata(m, f, res);
 	}
