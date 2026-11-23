@@ -746,7 +746,7 @@ cstring_cmp :: proc "contextless" (lhs, rhs: cstring) -> int {
 
 		i := 0
 		scan: for {
-			room := min(PAGE - uintptr(&x[i]) & (PAGE-1), PAGE - uintptr(&y[i]) & (PAGE-1))
+			room := min(PAGE - uintptr(&x[i])%PAGE, PAGE - uintptr(&y[i])%PAGE)
 			for /**/; room >= SIZE; room -= SIZE {
 				a := intrinsics.volatile_load((^Unaligned)(&x[i]))
 				b := intrinsics.volatile_load((^Unaligned)(&y[i]))
