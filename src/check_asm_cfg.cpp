@@ -146,19 +146,22 @@ gb_internal void asm_cfg_label_block_index_set(Entity *entity, i32 index) {
 	}
 }
 
-// The physical-register bit a decl is pinned to. A width-view carries no pin of
-// its own; it inherits its source decl's pin. Returns 0 for unpinned decls.
-template <typename AsmCtx>
-gb_internal u16 asm_decl_resolve_pin_bit(AsmCtx *asm_ctx, Array<AsmTemplateEntityDecl> const &decls, i32 di) {
+// The register a decl is pinned to. A width-view carries no pin of
+// its own; it inherits its source decl's pin. Empty for unpinned decls.
+gb_internal String asm_decl_resolve_pin(Array<AsmTemplateEntityDecl> const &decls, i32 di) {
 	if (di < 0) {
-		return 0;
+		return {};
 	}
 	auto const &ed = decls[di];
-	String pin = ed.pin;
-	if (pin.len == 0 && ed.view_of >= 0) {
-		pin = decls[ed.view_of].pin;
+	if (ed.pin.len == 0 && ed.view_of >= 0) {
+		return decls[ed.view_of].pin;
 	}
-	return asm_ctx->clobber_bit_for_reg_name(pin);
+	return ed.pin;
+}
+
+template <typename AsmCtx>
+gb_internal u16 asm_decl_resolve_pin_bit(AsmCtx *asm_ctx, Array<AsmTemplateEntityDecl> const &decls, i32 di) {
+	return asm_ctx->clobber_bit_for_reg_name(asm_decl_resolve_pin(decls, di));
 }
 
 template <typename AsmCtx>
