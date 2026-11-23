@@ -101,7 +101,8 @@ _open_internal :: proc(name: string, wide: []u16, flags: File_Flags, perm: Permi
 		access &~= win32.FILE_GENERIC_WRITE
 		access |= win32.FILE_APPEND_DATA
 	}
-	share_mode := u32(win32.FILE_SHARE_READ | win32.FILE_SHARE_WRITE)
+	// Sharing delete access lets the file be renamed or removed while it is open, as it can be on POSIX.
+	share_mode := u32(win32.FILE_SHARE_READ | win32.FILE_SHARE_WRITE | win32.FILE_SHARE_DELETE)
 	sa := win32.SECURITY_ATTRIBUTES {
 		nLength = size_of(win32.SECURITY_ATTRIBUTES),
 		bInheritHandle = .Inheritable in flags,
