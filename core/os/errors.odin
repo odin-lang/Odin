@@ -19,6 +19,7 @@ General_Error :: enum u32 {
 
 	Invalid_File,
 	Invalid_Dir,
+	Is_Dir,
 	Invalid_Path,
 	Invalid_Callback,
 	Invalid_Command,
@@ -71,6 +72,7 @@ error_string :: proc(ferr: Error) -> string {
 		case .Broken_Pipe:            return "Broken pipe"
 		case .Invalid_File:           return "invalid file"
 		case .Invalid_Dir:            return "invalid directory"
+		case .Is_Dir:                 return "is a directory"
 		case .Invalid_Path:           return "invalid path"
 		case .Invalid_Callback:       return "invalid callback"
 		case .Invalid_Command:        return "invalid command"
