@@ -235,6 +235,8 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 %ODIN% check "..\test_issue_asm_shift_cl_errors" %COMMON% 2>&1 | find /c "8-bit operand pinned to" | findstr /x "5" || exit /b
 %ODIN% check "..\test_issue_asm_shift_cl_errors" %COMMON% 2>&1 | find /c "expects 3 operands, got 2" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_asm_shift_cl_errors" %COMMON% 2>&1 | find /c "is declared but never used" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_asm_accumulator_forms" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_asm_accumulator_forms" %COMMON% 2>&1 | find /c "takes no implicit accumulator" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_asm_writeback_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_asm_writeback_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "writes back its base register" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_asm_writeback_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "takes only a base register and a constant offset" | findstr /x "1" || exit /b

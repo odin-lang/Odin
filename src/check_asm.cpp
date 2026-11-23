@@ -299,6 +299,43 @@ gb_internal bool asm_slot_is_named_implicit(Asm_amd64 *asm_ctx, Asm_amd64::Opera
 	return slot == Asm_amd64::OP_CL_IMPL;
 }
 
+// NOTE(bill): The accumulator short forms (e.g. `add eax, imm32`, `xchg eax, r32`, `mov al, moffs8`) are never matched.
+// A template reaches the general form by naming the register, e.g. `add r, 5` with r pinned to %rax.
+// Without the register (`add 5`), LLVM rejects them.
+// IN and OUT keep theirs: an immediate port has no general form.
+template <typename AsmCtx>
+gb_internal bool asm_form_is_accumulator_short_form(AsmCtx *asm_ctx, typename AsmCtx::Encoding const &form) {
+	return false;
+}
+gb_internal bool asm_form_is_accumulator_short_form(Asm_amd64 *asm_ctx, Asm_amd64::Encoding const &form) {
+	switch (form.mnemonic) {
+	case Asm_amd64::M_IN:
+	case Asm_amd64::M_OUT:
+		return false;
+	}
+
+	bool has_accumulator = false;
+	bool has_explicit    = false;
+	for (auto slot : form.ops) {
+		switch (slot) {
+		case Asm_amd64::OP_NONE:
+			break;
+		case Asm_amd64::OP_AL_IMPL:
+		case Asm_amd64::OP_AX_IMPL:
+		case Asm_amd64::OP_EAX_IMPL:
+		case Asm_amd64::OP_RAX_IMPL:
+			has_accumulator = true;
+			break;
+		default:
+			if (!asm_ctx->operand_type_is_implicit(slot)) {
+				has_explicit = true;
+			}
+			break;
+		}
+	}
+	return has_accumulator && has_explicit;
+}
+
 // Does a constant immediate value fit a slot of `bits` width (0 == unconstrained)?
 // Accepts either a signed or an unsigned interpretation of the bit pattern, which
 // matches how the assembler treats imm fields (e.g. both 200 and -56 fit imm8).
@@ -1873,6 +1910,9 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		);
 
 		for_array(fi, forms) {
+			if (asm_form_is_accumulator_short_form(asm_ctx, forms[fi])) {
+				continue;
+			}
 			gbString desc = describe_form(forms[fi], clobber_forms[fi], forms.count);
 			bool dup = false;
 			for (auto const &l : lines) {
@@ -1915,6 +1955,9 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 	int max_count = -1;
 
 	for (auto form : forms) {
+		if (asm_form_is_accumulator_short_form(asm_ctx, form)) {
+			continue;
+		}
 		int operand_count = form_operand_count(form);
 		min_count = gb_min(min_count, operand_count);
 		max_count = gb_max(max_count, operand_count);
@@ -2007,6 +2050,9 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		} else if (operands.count != form_operand_count(form)) {
 			continue;
 		}
+		if (asm_form_is_accumulator_short_form(asm_ctx, form)) {
+			continue;
+		}
 		if (!implicit_operands_match_pins(form)) {
 			continue;
 		}
@@ -2076,7 +2122,19 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 	if (operands.count < min_count || operands.count > max_count) {
 		ERROR_BLOCK();
-		if (min_count == max_count) {
+
+		// NOTE(bill): e.g. `add 5`, written as if the accumulator were implicit
+		bool omits_accumulator = false;
+		for (auto const &form : forms) {
+			if (asm_form_is_accumulator_short_form(asm_ctx, form) && form_operand_count(form) == operands.count) {
+				omits_accumulator = true;
+				break;
+			}
+		}
+
+		if (omits_accumulator) {
+			error(instr->name, "'%.*s' takes no implicit accumulator; write the register as an operand (e.g. %%rax, or a parameter pinned to it)", LIT(name));
+		} else if (min_count == max_count) {
 			error(instr->name, "The asm instruction '%.*s' expects %d operands, got %td", LIT(name), max_count, operands.count);
 		} else {
 			error(instr->name, "The asm instruction '%.*s' expects %d..=%d operands, got %td", LIT(name), min_count, max_count, operands.count);
