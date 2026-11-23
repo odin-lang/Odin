@@ -2054,7 +2054,11 @@ gb_internal bool parse_build_flags(Array<String> args) {
 					#if !defined(GB_SYSTEM_WINDOWS)
 						case BuildFlag_WindowsSDKRoot:
 							GB_ASSERT(value.kind == ExactValue_String);
-							build_context.windows_sdk_root = value.value_string;
+							build_context.windows_sdk_root = path_spelled(permanent_allocator(), value.value_string);
+							if (build_context.windows_sdk_root.len == 0) {
+								gb_printf_err("Invalid -windows-sdk-root path, got %.*s\n", LIT(value.value_string));
+								bad_flags = true;
+							}
 							break;
 					#endif
 						}

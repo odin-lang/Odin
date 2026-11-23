@@ -872,6 +872,21 @@ if [[ $(uname) != Darwin ]] && command -v addr2line > /dev/null && command -v nm
 	[[ $(addr2line -e debug_names 0x$DEBUG_ADDR | grep -c -F 'test_paths_debug/lib/main.odin:') -eq 1 ]]
 fi
 
+rm -rf sdk_loop walk_outside walk_cache
+mkdir -p sdk_loop/lib walk_outside walk_cache/.odin-cache
+ln -s .. sdk_loop/lib/up
+if command -v timeout > /dev/null; then
+	WALK_STATUS=0
+	timeout 120 $ODIN build ../test_paths_debug -target:windows_amd64 -linker:lld -windows-sdk-root:sdk_loop -out:walk.exe > /dev/null 2>&1 || WALK_STATUS=$?
+	[[ $WALK_STATUS -ne 124 ]]
+fi
+echo keep > walk_outside/keep.txt
+ln -s ../../walk_outside walk_cache/.odin-cache/outside
+echo gone > walk_cache/.odin-cache/gone.txt
+(cd walk_cache && "$ODIN_FULL" clear-cache)
+[[ ! -e walk_cache/.odin-cache ]]
+[[ -f walk_outside/keep.txt ]]
+
 #########################################################################################################
 
 if [[ ! -z ${ODIN_TESTS_NO_CLANG+x} ]]; then

@@ -4,79 +4,91 @@ gb_internal GB_COMPARE_PROC(string_cmp) {
 	return string_compare(x, y);
 }
 
-gb_internal bool recursively_delete_directory(wchar_t *wpath_c) {
+gb_internal bool recursively_delete_directory(String const &path) {
+	gbAllocator ha = heap_allocator();
 #if defined(GB_SYSTEM_WINDOWS)
-	auto const is_dots_w = [](wchar_t const *str) -> bool {
-		if (!str) {
-			return false;
-		}
-		return wcscmp(str, L".") == 0 || wcscmp(str, L"..") == 0;
-	};
+	String pattern = concatenate_strings(ha, path, str_lit("\\*"));
+	String16 wpattern = string_to_string16(ha, pattern);
+	gb_free(ha, pattern.text);
 
-	TEMPORARY_ALLOCATOR_GUARD();
-
-	wchar_t dir_path[MAX_PATH] = {};
-	wchar_t filename[MAX_PATH] = {};
-	wcscpy_s(dir_path, wpath_c);
-	wcscat_s(dir_path, L"\\*");
-
-	wcscpy_s(filename, wpath_c);
-	wcscat_s(filename, L"\\");
-
-
-	WIN32_FIND_DATAW find_file_data = {};
-	HANDLE hfind = FindFirstFileW(dir_path, &find_file_data);
+	WIN32_FIND_DATAW data = {};
+	HANDLE hfind = FindFirstFileW(cast(wchar_t *)wpattern.text, &data);
+	gb_free(ha, wpattern.text);
 	if (hfind == INVALID_HANDLE_VALUE) {
 		return false;
 	}
-	defer (FindClose(hfind));
 
-	wcscpy_s(dir_path, filename);
-
-	for (;;) {
-		if (FindNextFileW(hfind, &find_file_data)) {
-			if (is_dots_w(find_file_data.cFileName)) {
-				continue;
-			}
-			wcscat_s(filename, find_file_data.cFileName);
-
-			if (find_file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-				if (!recursively_delete_directory(filename)) {
-					return false;
-				}
-				RemoveDirectoryW(filename);
-				wcscpy_s(filename, dir_path);
+	bool ok = true;
+	do {
+		String name = string16_to_string(ha, make_string16_c(cast(u16 *)data.cFileName));
+		if (name != "." && name != "..") {
+			String child = concatenate3_strings(ha, path, str_lit("\\"), name);
+			String16 wchild = string_to_string16(ha, child);
+			wchar_t *wc = cast(wchar_t *)wchild.text;
+			DWORD attributes = data.dwFileAttributes;
+			if ((attributes & FILE_ATTRIBUTE_DIRECTORY) && !(attributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
+				ok = recursively_delete_directory(child);
+			} else if (attributes & FILE_ATTRIBUTE_DIRECTORY) {
+				ok = RemoveDirectoryW(wc) != 0;
 			} else {
-				if (find_file_data.dwFileAttributes & FILE_ATTRIBUTE_READONLY) {
-					_wchmod(filename, _S_IWRITE);
+				if (attributes & FILE_ATTRIBUTE_READONLY) {
+					SetFileAttributesW(wc, attributes & ~FILE_ATTRIBUTE_READONLY);
 				}
-				if (!DeleteFileW(filename)) {
-					return false;
-				}
-				wcscpy_s(filename, dir_path);
+				ok = DeleteFileW(wc) != 0;
 			}
-		} else {
-			if (GetLastError() == ERROR_NO_MORE_FILES) {
-				break;
-			}
-			return false;
+			gb_free(ha, wchild.text);
+			gb_free(ha, child.text);
 		}
+		gb_free(ha, name.text);
+	} while (ok && FindNextFileW(hfind, &data));
+	if (ok && GetLastError() != ERROR_NO_MORE_FILES) {
+		ok = false;
+	}
+	FindClose(hfind);
+	if (!ok) {
+		return false;
 	}
 
-
-	return RemoveDirectoryW(wpath_c);
+	String16 wpath = string_to_string16(ha, path);
+	bool removed = RemoveDirectoryW(cast(wchar_t *)wpath.text) != 0;
+	gb_free(ha, wpath.text);
+	return removed;
 #else
-	return false;
-#endif
-}
+	char *cpath = alloc_cstring(ha, path);
+	DIR *dir = opendir(cpath);
+	if (dir == nullptr) {
+		gb_free(ha, cpath);
+		return false;
+	}
 
-gb_internal bool recursively_delete_directory(String const &path) {
-#if defined(GB_SYSTEM_WINDOWS)
-	String16 wpath = string_to_string16(permanent_allocator(), path);
-	wchar_t *wpath_c = alloc_wstring(permanent_allocator(), wpath);
-	return recursively_delete_directory(wpath_c);
-#else
-	return false;
+	bool ok = true;
+	while (ok) {
+		struct dirent *entry = readdir(dir);
+		if (entry == nullptr) {
+			break;
+		}
+		String name = make_string_c(entry->d_name);
+		if (name == "." || name == "..") {
+			continue;
+		}
+		String child = concatenate3_strings(ha, path, str_lit("/"), name);
+		struct stat s;
+		if (lstat(cast(char const *)child.text, &s) != 0) {
+			ok = false;
+		} else if (S_ISDIR(s.st_mode)) {
+			ok = recursively_delete_directory(child);
+		} else {
+			ok = unlink(cast(char const *)child.text) == 0;
+		}
+		gb_free(ha, child.text);
+	}
+	closedir(dir);
+
+	if (ok) {
+		ok = rmdir(cpath) == 0;
+	}
+	gb_free(ha, cpath);
+	return ok;
 #endif
 }
 

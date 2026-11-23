@@ -456,6 +456,16 @@ gb_internal bool file_id_equal(FileId const &a, FileId const &b) {
 	return a.volume == b.volume && a.id_lo == b.id_lo && a.id_hi == b.id_hi;
 }
 
+gb_internal bool file_id_visit(StringSet *visited, String path) {
+	FileId id = {};
+	if (!path_file_id(path, &id)) {
+		return false;
+	}
+	u8 *key = gb_alloc_array(permanent_allocator(), u8, gb_size_of(FileId));
+	gb_memmove(key, &id, gb_size_of(FileId));
+	return !string_set_update(visited, make_string(key, gb_size_of(FileId)));
+}
+
 struct Path {
 	String basename;
 	String name;

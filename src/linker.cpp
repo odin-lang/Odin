@@ -393,10 +393,17 @@ try_cross_linking:;
 			string_map_init(&libs_normalized);
 			defer (string_map_destroy(&libs_normalized));
 			Array<FileInfo> walker_list = {};
+			StringSet walker_visited = {};
+			string_set_init(&walker_visited, 64);
+			defer (string_set_destroy(&walker_visited));
+			file_id_visit(&walker_visited, build_context.windows_sdk_root);
 			ReadDirectoryError rd_err = read_directory(build_context.windows_sdk_root, &walker_list);
 			for_array(i, walker_list) {
 				FileInfo entry = walker_list[i];
 				if (entry.is_dir) {
+					if (!file_id_visit(&walker_visited, entry.fullpath)) {
+						continue;
+					}
 					Array<FileInfo> walker_children = {};
 					ReadDirectoryError child_rd_err = read_directory(entry.fullpath, &walker_children);
 					for_array(j, walker_children) {

@@ -170,7 +170,7 @@ gb_internal bool zip_writer_add_file(ZipWriter *w, String name, String path) {
 }
 
 // Adds every file under `dir`, named `prefix` followed by its path relative to `dir`, in a stable order.
-gb_internal bool zip_writer_add_directory(ZipWriter *w, String prefix, String dir) {
+gb_internal bool zip_writer_add_directory_visited(ZipWriter *w, String prefix, String dir, StringSet *visited) {
 	Array<FileInfo> list = {};
 	defer (array_free(&list));
 	if (read_directory(dir, &list) != ReadDirectory_None) {
@@ -180,7 +180,10 @@ gb_internal bool zip_writer_add_directory(ZipWriter *w, String prefix, String di
 	for (FileInfo const &fi : list) {
 		String name = concatenate_strings(permanent_allocator(), prefix, fi.name);
 		if (fi.is_dir) {
-			if (!zip_writer_add_directory(w, concatenate_strings(permanent_allocator(), name, str_lit("/")), fi.fullpath)) {
+			if (!file_id_visit(visited, fi.fullpath)) {
+				continue;
+			}
+			if (!zip_writer_add_directory_visited(w, concatenate_strings(permanent_allocator(), name, str_lit("/")), fi.fullpath, visited)) {
 				return false;
 			}
 		} else if (!zip_writer_add_file(w, name, fi.fullpath)) {
@@ -188,6 +191,14 @@ gb_internal bool zip_writer_add_directory(ZipWriter *w, String prefix, String di
 		}
 	}
 	return true;
+}
+
+gb_internal bool zip_writer_add_directory(ZipWriter *w, String prefix, String dir) {
+	StringSet visited = {};
+	string_set_init(&visited, 64);
+	defer (string_set_destroy(&visited));
+	file_id_visit(&visited, dir);
+	return zip_writer_add_directory_visited(w, prefix, dir, &visited);
 }
 
 gb_internal bool zip_writer_finish(ZipWriter *w) {

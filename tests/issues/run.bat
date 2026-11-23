@@ -375,6 +375,20 @@ if not exist tempfiles\dll\t-helper.obj exit /b 1
 %ODIN% build ..\test_paths_resource %COMMON% -resource:..\test_paths_resource\res.rc -linker:lld -out:resource_lld.exe || exit /b
 .\resource_lld.exe || exit /b
 
+if exist walk_cache\.odin-cache\outside rmdir walk_cache\.odin-cache\outside
+if exist walk_cache rmdir /S /Q walk_cache
+if exist walk_outside rmdir /S /Q walk_outside
+mkdir walk_cache\.odin-cache\sub
+mkdir walk_outside
+echo keep> walk_outside\keep.txt
+echo gone> walk_cache\.odin-cache\sub\gone.txt
+mklink /J walk_cache\.odin-cache\outside walk_outside > nul || exit /b
+pushd walk_cache
+"%ODIN_FULL%" clear-cache || exit /b
+popd
+if exist walk_cache\.odin-cache exit /b 1
+if not exist walk_outside\keep.txt exit /b 1
+
 @rem #########################################################################################################
 
 @echo off
