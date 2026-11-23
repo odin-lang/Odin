@@ -1120,6 +1120,10 @@ gb_internal bool lb_is_load_from(LLVMValueRef value, LLVMValueRef ptr) {
 	return LLVMIsALoadInst(value) && LLVMGetOperand(value, 0) == ptr;
 }
 
+gb_internal bool lb_is_plain_load(lbModule *m, LLVMValueRef value) {
+	return LLVMIsALoadInst(value) && lb_is_plain_access(m, value);
+}
+
 gb_internal i32 lb_current_call(lbProcedure *p) {
 	if (p->call_stack.count == 0) {
 		return 0;
@@ -1148,7 +1152,7 @@ gb_internal LLVMValueRef lb_any_data_for_call(lbProcedure *p, lbValue value, LLV
 }
 
 gb_internal lbValue lb_address_from_load_or_generate_local(lbProcedure *p, lbValue value) {
-	if (!p->in_multi_assignment && LLVMIsALoadInst(value.value)) {
+	if (!p->in_multi_assignment && lb_is_plain_load(p->module, value.value)) {
 		lbValue res = {};
 		res.value = LLVMGetOperand(value.value, 0);
 		res.type = alloc_type_pointer(value.type);
@@ -1590,7 +1594,7 @@ gb_internal lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
 		return lb_emit_tuple_ev(p, s, index);
 	}
 
-	if (LLVMIsALoadInst(s.value)) {
+	if (lb_is_plain_load(p->module, s.value)) {
 		lbValue res = {};
 		res.value = LLVMGetOperand(s.value, 0);
 		res.type = alloc_type_pointer(s.type);

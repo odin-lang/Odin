@@ -92,6 +92,7 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 	lb_metadata_kind(m, ODIN_METADATA_IS_PACKED);
 	lb_metadata_kind(m, ODIN_METADATA_MIN_ALIGN);
 	lb_metadata_kind(m, ODIN_METADATA_MAX_ALIGN);
+	lb_metadata_kind(m, str_lit("nontemporal"));
 	LLVMContextSetDiagnosticHandler(m->ctx, lb_llvm_diagnostic_handler, nullptr);
 	m->mod = LLVMModuleCreateWithNameInContext(m->module_name, m->ctx);
 	// m->debug_builder = nullptr;
@@ -1927,7 +1928,7 @@ gb_internal unsigned lb_alignment_at_offset(unsigned alignment, i64 offset, i64 
 gb_internal bool lb_try_copy_loaded_aggregate(lbProcedure *p, LLVMValueRef dst, LLVMValueRef load) {
 	enum {MAX_SCALAR_COPY_SIZE = 64};
 
-	if (load == nullptr || !LLVMIsALoadInst(load) || LLVMGetVolatile(load) || LLVMGetOrdering(load) != LLVMAtomicOrderingNotAtomic) {
+	if (!lb_is_plain_load(p->module, load)) {
 		return false;
 	}
 	LLVMTypeRef type = LLVMTypeOf(load);
@@ -2154,7 +2155,7 @@ gb_internal bool lb_emit_store_writes_every_byte(lbProcedure *p, Type *type, lbV
 	if (lb_sizeof(LLVMTypeOf(value.value)) != size) {
 		return false;
 	}
-	if (!p->in_multi_assignment && LLVMIsALoadInst(value.value)) {
+	if (!p->in_multi_assignment && lb_is_plain_load(p->module, value.value)) {
 		return true;
 	}
 	if (!LLVMIsConstant(value.value)) {
@@ -2205,7 +2206,7 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 	}
 
 	if (lb_sizeof(LLVMTypeOf(value.value)) > LB_MAX_STORE_SIZE) {
-		if (!p->in_multi_assignment && LLVMIsALoadInst(value.value)) {
+		if (!p->in_multi_assignment && lb_is_plain_load(p->module, value.value)) {
 			LLVMValueRef dst_ptr = ptr.value;
 			LLVMValueRef src_ptr_original = LLVMGetOperand(value.value, 0);
 			LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, src_ptr_original, LLVMTypeOf(dst_ptr), "");
@@ -4042,7 +4043,7 @@ general_end:;
 		LLVMTypeRef llvm_dst_type = LLVMPointerType(dst_type, 0);
 
 		LLVMValueRef val_ptr;
-		if (LLVMIsALoadInst(val)) {
+		if (lb_is_plain_load(p->module, val)) {
 			val_ptr = LLVMGetOperand(val, 0);
 		} else if (LLVMIsAAllocaInst(val)) {
 			val_ptr = LLVMBuildPointerCast(p->builder, val, llvm_src_type, "");

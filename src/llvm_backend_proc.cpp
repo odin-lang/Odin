@@ -1839,7 +1839,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 				// NOTE(bill): A deferred procedure takes the arguments as they were at the call, like its results.
 				// An argument passed by address would otherwise be read at the end of the scope.
 				for (lbValue &arg : in_args) {
-					if (LLVMIsALoadInst(arg.value)) {
+					if (lb_is_plain_load(p->module, arg.value)) {
 						lb_copy_loaded_value_to_local(p, &arg, false);
 					}
 				}
