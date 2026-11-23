@@ -679,8 +679,8 @@ cstring16_len :: proc "contextless" (s: cstring16) -> int {
 	}
 
 	start := uintptr(rawptr(s))
-	when HAS_HARDWARE_SIMD {
-		if start%2 == 0 {
+	if start%2 == 0 {
+		when HAS_HARDWARE_SIMD {
 			AVX2  :: ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2")
 			V     :: #simd[16]u16 when AVX2 else #simd[8]u16
 			M     :: u16          when AVX2 else u8
@@ -756,9 +756,7 @@ cstring16_len :: proc "contextless" (s: cstring16) -> int {
 				}
 				return int(p - start + 2*uintptr(intrinsics.count_trailing_zeros(m))) / 2
 			}
-		}
-	} else when ODIN_ENDIAN == .Little {
-		if start%2 == 0 {
+		} else when ODIN_ENDIAN == .Little {
 			ONES  :: ~uintptr(0) / 0xffff
 			HIGHS :: ONES << 15
 
