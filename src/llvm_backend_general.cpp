@@ -1837,13 +1837,20 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 		GB_ASSERT(value.value != nullptr);
 		value = lb_emit_conv(p, value, lb_addr_type(addr));
 
+		TEMPORARY_ALLOCATOR_GUARD();
+
+		// NOTE(bill): `src` may be the destination itself, e.g. `swizzle(a, 7, 6, 5, 4, 3, 2, 1, 0) = a`.
+		// Load every element before any store.
+		isize n = addr.swizzle_large.indices.count;
 		lbValue dst = addr.addr;
 		lbValue src = lb_address_from_load_or_generate_local(p, value);
-		for_array(i, addr.swizzle_large.indices) {
-			lbValue src_ptr = lb_emit_array_epi(p, src, i);
+		auto src_loads = slice_make<lbValue>(temporary_allocator(), n);
+		for (isize i = 0; i < n; i++) {
+			src_loads[i] = lb_emit_load(p, lb_emit_array_epi(p, src, i));
+		}
+		for (isize i = 0; i < n; i++) {
 			lbValue dst_ptr = lb_emit_array_epi(p, dst, addr.swizzle_large.indices[i]);
-			lbValue src_load = lb_emit_load(p, src_ptr);
-			lb_emit_store(p, dst_ptr, src_load);
+			lb_emit_store(p, dst_ptr, src_loads[i]);
 		}
 		return;
 	}
