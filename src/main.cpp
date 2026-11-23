@@ -4367,7 +4367,7 @@ int main(int arg_count, char const **arg_ptr) {
 		gb_printf("%.*s", LIT(odin_root_dir()));
 		return 0;
 	} else if (command == "clear-cache") {
-		return try_clear_cache() ? 0 : 1;
+		return try_clear_cache(args) ? 0 : 1;
 	} else {
 		String argv1 = {};
 		if (args.count > 1) {
@@ -4745,7 +4745,12 @@ int main(int arg_count, char const **arg_ptr) {
 		return 1;
 	}
 	release_held_errors();
-	defer (destroy_checker(checker));
+	bool restored_from_cache = false;
+	defer ({
+		if (!restored_from_cache) {
+			destroy_checker(checker);
+		}
+	});
 
 	if (output_overwrites_an_input(parser)) {
 		return 1;
@@ -4754,6 +4759,7 @@ int main(int arg_count, char const **arg_ptr) {
 	if (build_context.cached && parser->total_seen_load_directive_count.load() == 0) {
 		MAIN_TIME_SECTION("check cached build (pre-semantic check)");
 		if (try_cached_build(checker, args)) {
+			restored_from_cache = true;
 			goto end_of_code_gen;
 		}
 	}
@@ -4838,6 +4844,7 @@ int main(int arg_count, char const **arg_ptr) {
 	if (build_context.cached) {
 		MAIN_TIME_SECTION("check cached build");
 		if (try_cached_build(checker, args)) {
+			restored_from_cache = true;
 			goto end_of_code_gen;
 		}
 		failed_to_cache_parsing = true;

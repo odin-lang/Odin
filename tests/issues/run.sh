@@ -895,6 +895,19 @@ rm -f "space_out "
 $ODIN build ../test_paths_debug $COMMON "-out:space_out "
 [[ -f "space_out " ]]
 
+rm -rf cache_test
+mkdir -p cache_test/src
+cp -R ../test_paths_debug/. cache_test/src/
+$ODIN build cache_test/src -internal-cached -show-timings -out:cache_test/one
+CACHE_OUT=$($ODIN build cache_test/src -internal-cached -show-timings -out:cache_test/two 2>&1)
+[[ $(grep -c "type check" <<< "$CACHE_OUT") -eq 0 ]]
+./cache_test/two
+echo "// changed" >> cache_test/src/lib/main.odin
+CACHE_OUT=$($ODIN build cache_test/src -internal-cached -show-timings -out:cache_test/three 2>&1)
+[[ $(grep -c "type check" <<< "$CACHE_OUT") -eq 1 ]]
+"$ODIN_FULL" clear-cache -out:cache_test/x
+[[ ! -e cache_test/.odin-cache ]]
+
 #########################################################################################################
 
 if [[ ! -z ${ODIN_TESTS_NO_CLANG+x} ]]; then

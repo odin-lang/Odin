@@ -399,6 +399,21 @@ set "ODIN_ROOT=%ROOT_OUT%\"
 %ODIN% check ..\test_paths_debug %COMMON% || exit /b
 endlocal
 
+if exist cache_test rmdir /S /Q cache_test
+mkdir cache_test\src
+%SystemRoot%\System32\xcopy.exe /E /I /Q ..\test_paths_debug cache_test\src > nul || exit /b
+%ODIN% build cache_test\src -internal-cached -show-timings -out:cache_test\one.exe || exit /b
+%ODIN% build cache_test\src -internal-cached -show-timings -out:cache_test\two.exe 2>&1 | %SystemRoot%\System32\find.exe /c "type check" | findstr /x "0" || exit /b
+.\cache_test\two.exe || exit /b
+%ODIN% build cache_test\src -internal-cached -debug -show-timings -out:cache_test\dbg.exe || exit /b
+del cache_test\dbg.pdb
+%ODIN% build cache_test\src -internal-cached -debug -show-timings -out:cache_test\dbg.exe 2>&1 | %SystemRoot%\System32\find.exe /c "type check" | findstr /x "0" || exit /b
+if not exist cache_test\dbg.pdb exit /b 1
+echo // changed>> cache_test\src\lib\main.odin
+%ODIN% build cache_test\src -internal-cached -show-timings -out:cache_test\three.exe 2>&1 | %SystemRoot%\System32\find.exe /c "type check" | findstr /x "1" || exit /b
+%ODIN% clear-cache -out:cache_test\x.exe || exit /b
+if exist cache_test\.odin-cache exit /b 1
+
 @rem #########################################################################################################
 
 @echo off

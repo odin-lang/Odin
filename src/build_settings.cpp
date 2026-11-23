@@ -451,6 +451,7 @@ struct BuildCacheData {
 	String files_path;
 	String args_path;
 	String env_path;
+	String outputs_path;
 
 	bool copy_already_done;
 };
