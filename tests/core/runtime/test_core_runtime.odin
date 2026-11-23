@@ -1760,3 +1760,180 @@ test_cstring_cmp_at_end_of_page :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+// Code units with a zero byte that are not a NUL code unit.
+@(private="file", rodata)
+CSTRING16_UNITS := [?]u16{0x0041, 0x4100, 0x0100, 0xffff, 0x00ff, 0xff00, 0x1234, 0x8000, 0x0001}
+
+@(private="file")
+cstring16_store :: proc(buf: []byte, i: int, unit: u16) {
+	intrinsics.unaligned_store((^u16)(&buf[2*i]), unit)
+}
+
+@(private="file", require_results)
+cstring16_load :: proc(buf: []byte, i: int) -> u16 {
+	return intrinsics.unaligned_load((^u16)(&buf[2*i]))
+}
+
+@(private="file")
+cstring16_fill :: proc(buf: []byte, n: int) {
+	for i in 0..<n {
+		cstring16_store(buf, i, CSTRING16_UNITS[i%len(CSTRING16_UNITS)])
+	}
+	cstring16_store(buf, n, 0)
+}
+
+@(private="file", require_results)
+cstring16_check_eq :: proc(t: ^testing.T, a, b: []byte) -> bool {
+	@(require_results)
+	reference :: proc(a, b: []byte) -> bool {
+		for i := 0; /**/; i += 1 {
+			x := cstring16_load(a, i)
+			y := cstring16_load(b, i)
+			switch {
+			case x != y: return false
+			case x == 0: return true
+			}
+		}
+	}
+
+	want := reference(a, b)
+	x    := cstring16((^u16)(raw_data(a)))
+	y    := cstring16((^u16)(raw_data(b)))
+	return testing.expectf(t, runtime.cstring16_eq(x, y) == want, "cstring16_eq(%p, %p) should be %v", x, y, want) &&
+	       testing.expectf(t, runtime.cstring16_eq(y, x) == want, "cstring16_eq(%p, %p) should be %v", y, x, want) &&
+	       testing.expectf(t, (x == y) == want,                    "%p == %p should be %v", x, y, want)
+}
+
+@(test)
+test_cstring16_len :: proc(t: ^testing.T) {
+	testing.expect_value(t, runtime.cstring16_len(nil), 0)
+
+	buf: [1024]byte
+	for offset in 0..<64 {
+		for n in 0..<300 {
+			cstring16_fill(buf[offset:], n)
+
+			got := runtime.cstring16_len(cstring16((^u16)(&buf[offset])))
+			if !testing.expectf(t, got == n, "offset %d, length %d: got %d", offset, n, got) {
+				return
+			}
+		}
+	}
+}
+
+// The NUL ends at the last byte before a page that is reserved but not committed, or one byte earlier (an odd address).
+@(test)
+test_cstring16_len_at_end_of_page :: proc(t: ^testing.T) {
+	page := uint(mem.PAGE_SIZE)
+	data, err := virtual.reserve(2*page)
+	if !testing.expect_value(t, err, nil) {
+		return
+	}
+	defer virtual.release(raw_data(data), 2*page)
+
+	if !testing.expect_value(t, virtual.commit(raw_data(data), page), nil) {
+		return
+	}
+
+	for n in 0..<300 {
+		for end in ([?]uint{page, page-1}) {
+			start := end - 2 - 2*uint(n)
+			cstring16_fill(data[start:end], n)
+
+			got := runtime.cstring16_len(cstring16((^u16)(&data[start])))
+			if !testing.expectf(t, got == n, "end %d, length %d: got %d", end, n, got) {
+				return
+			}
+		}
+	}
+}
+
+@(test)
+test_cstring16_eq :: proc(t: ^testing.T) {
+	testing.expect(t, runtime.cstring16_eq(nil, nil))
+	testing.expect(t, !runtime.cstring16_eq(nil, ""))
+	testing.expect(t, !runtime.cstring16_eq("", nil))
+
+	long_lengths := [?]int{100, 255, 256, 300}
+	buf_a: [1024]byte
+	buf_b: [1024]byte
+	loop: for a_offset in 0..<32 {
+		for b_offset in 0..<32 {
+			for i in 0..<70+len(long_lengths) {
+				n := i
+				if i >= 70 {
+					n = long_lengths[i-70]
+				}
+
+				a := buf_a[a_offset:]
+				b := buf_b[b_offset:]
+				cstring16_fill(a, n)
+				cstring16_fill(b, n)
+				cstring16_check_eq(t, a, b) or_break loop
+
+				if n > 0 {
+					for k in ([?]int{0, n/2, n-1}) {
+						for flip in ([?]u16{0x0001, 0x0100}) {
+							old := cstring16_load(b, k)
+							cstring16_store(b, k, old ~ flip)
+							cstring16_check_eq(t, a, b) or_break loop
+							cstring16_store(b, k, old)
+						}
+					}
+				}
+
+				cstring16_store(b, n, 'x')
+				cstring16_store(b, n+1, 0)
+				cstring16_check_eq(t, a, b) or_break loop
+				cstring16_store(b, n, 0)
+			}
+		}
+	}
+}
+
+// One string ends at the last byte before a page that is reserved but not committed, or one byte earlier (an odd address).
+@(test)
+test_cstring16_eq_at_end_of_page :: proc(t: ^testing.T) {
+	page := uint(mem.PAGE_SIZE)
+	data_a, err_a := virtual.reserve(2*page)
+	data_b, err_b := virtual.reserve(2*page)
+	if !testing.expect_value(t, err_a, nil) || !testing.expect_value(t, err_b, nil) {
+		return
+	}
+	defer virtual.release(raw_data(data_a), 2*page)
+	defer virtual.release(raw_data(data_b), 2*page)
+
+	if !testing.expect_value(t, virtual.commit(raw_data(data_a), page), nil) ||
+	   !testing.expect_value(t, virtual.commit(raw_data(data_b), page), nil) {
+		return
+	}
+
+	other: [1024]byte
+	loop: for n in 0..<300 {
+		for end in ([?]uint{page, page-1}) {
+			a := data_a[end-2-2*uint(n):]
+			cstring16_fill(a, n)
+
+			for offset in 0..<32 {
+				b := other[offset:]
+				cstring16_fill(b, n)
+				cstring16_check_eq(t, a, b) or_break loop
+
+				cstring16_store(b, n, 'x')
+				cstring16_store(b, n+1, 0)
+				cstring16_check_eq(t, a, b) or_break loop
+			}
+
+			b := data_b[end-2-2*uint(n):]
+			cstring16_fill(b, n)
+			cstring16_check_eq(t, a, b) or_break loop
+
+			if n > 0 {
+				shorter := data_b[end-2*uint(n):]
+				cstring16_fill(shorter, n-1)
+				cstring16_check_eq(t, a, shorter) or_break loop
+			}
+		}
+	}
+}

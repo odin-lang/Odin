@@ -674,10 +674,110 @@ cstring_len :: proc "contextless" (s: cstring) -> int {
 }
 
 cstring16_len :: proc "contextless" (s: cstring16) -> int {
+	if s == nil {
+		return 0
+	}
+
+	start := uintptr(rawptr(s))
+	when HAS_HARDWARE_SIMD {
+		if start%2 == 0 {
+			AVX2  :: ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2")
+			V     :: #simd[16]u16 when AVX2 else #simd[8]u16
+			M     :: u16          when AVX2 else u8
+			SIZE  :: size_of(V)
+			LANES :: SIZE/size_of(u16)
+			CHUNK :: 4*SIZE
+
+			p := start &~ (SIZE-1)
+			v := intrinsics.volatile_load((^V)(p))
+			m := transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
+			when AVX2 {
+				m &= ~M(0) << ((start-p)/2)
+				if m != 0 {
+					return int(p - start + 2*uintptr(intrinsics.count_trailing_zeros(m))) / 2
+				}
+			} else {
+				m >>= (start-p)/2
+				if m != 0 {
+					return int(intrinsics.count_trailing_zeros(m))
+				}
+			}
+
+			when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
+				for _ in 0..<128/SIZE-1 {
+					p += SIZE
+					v = intrinsics.volatile_load((^V)(p))
+					m = transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
+					if m != 0 {
+						return int(p - start + 2*uintptr(intrinsics.count_trailing_zeros(m))) / 2
+					}
+				}
+
+				p = (p + SIZE) &~ (CHUNK-1)
+				for {
+					a := intrinsics.volatile_load((^V)(p))
+					b := intrinsics.volatile_load((^V)(p+SIZE))
+					c := intrinsics.volatile_load((^V)(p+2*SIZE))
+					d := intrinsics.volatile_load((^V)(p+3*SIZE))
+					lowest := intrinsics.simd_min(intrinsics.simd_min(a, b), intrinsics.simd_min(c, d))
+					if intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(lowest, 0)) != {} {
+						when AVX2 {
+							ma := u64(transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(a, 0)))
+							mb := u64(transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(b, 0)))
+							low := ma | mb<<LANES
+							if low != 0 {
+								return int(p - start + 2*uintptr(intrinsics.count_trailing_zeros(low))) / 2
+							}
+
+							mc := u64(transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(c, 0)))
+							md := u64(transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(d, 0)))
+							high := mc | md<<LANES
+							return int(p + 2*SIZE - start + 2*uintptr(intrinsics.count_trailing_zeros(high))) / 2
+						} else {
+							break
+						}
+					}
+					p += CHUNK
+				}
+
+				for {
+					v = intrinsics.volatile_load((^V)(p))
+					m = transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
+					if m != 0 {
+						return int(p - start + 2*uintptr(intrinsics.count_trailing_zeros(m))) / 2
+					}
+					p += SIZE
+				}
+			} else {
+				for m == 0 {
+					p += SIZE
+					v = intrinsics.volatile_load((^V)(p))
+					m = transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
+				}
+				return int(p - start + 2*uintptr(intrinsics.count_trailing_zeros(m))) / 2
+			}
+		}
+	} else when ODIN_ENDIAN == .Little {
+		if start%2 == 0 {
+			ONES  :: ~uintptr(0) / 0xffff
+			HIGHS :: ONES << 15
+
+			p := start &~ (size_of(uintptr)-1)
+			w := intrinsics.volatile_load((^uintptr)(p))
+			w |= (uintptr(1) << ((start-p)*8)) - 1
+			z := (w - ONES) &~ w & HIGHS
+			for z == 0 {
+				p += size_of(uintptr)
+				w = intrinsics.volatile_load((^uintptr)(p))
+				z = (w - ONES) &~ w & HIGHS
+			}
+			return int(p - start + 2*uintptr(intrinsics.count_trailing_zeros(z) >> 4)) / 2
+		}
+	}
+
 	p := ([^]u16)(s)
 	n := 0
-	for p != nil && p[0] != 0 {
-		p = p[1:]
+	for p[n] != 0 {
 		n += 1
 	}
 	return n
@@ -798,12 +898,50 @@ cstring16_eq :: proc "contextless" (lhs, rhs: cstring16) -> bool {
 	if (x == nil) ~ (y == nil) {
 		return false
 	}
-	xn := cstring16_len(lhs)
-	yn := cstring16_len(rhs)
-	if xn != yn {
-		return false
+
+	when HAS_HARDWARE_SIMD && (ODIN_ARCH == .amd64 || ODIN_ARCH == .i386) {
+		AVX2  :: ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2")
+		V     :: #simd[16]u16 when AVX2 else #simd[8]u16
+		M     :: u16          when AVX2 else u8
+		SIZE  :: size_of(V)
+		LANES :: SIZE/size_of(u16)
+		PAGE  :: 4096
+
+		Unaligned :: struct #align(1) {
+			v: V,
+		}
+
+		i := 0
+		scan: for {
+			room := min(PAGE - uintptr(&x[i])%PAGE, PAGE - uintptr(&y[i])%PAGE)
+			for /**/; room >= SIZE; room -= SIZE {
+				a := intrinsics.volatile_load((^Unaligned)(&x[i]))
+				b := intrinsics.volatile_load((^Unaligned)(&y[i]))
+				same := intrinsics.simd_min(a.v, intrinsics.simd_lanes_eq(a.v, b.v))
+				m := transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(same, 0))
+				if m != 0 {
+					i += int(intrinsics.count_trailing_zeros(m))
+					break scan
+				}
+				i += LANES
+			}
+
+			for _ in 0..<(room+1)/2 {
+				if x[i] != y[i] || x[i] == 0 {
+					break scan
+				}
+				i += 1
+			}
+		}
+		return x[i] == y[i]
+	} else {
+		xn := cstring16_len(lhs)
+		yn := cstring16_len(rhs)
+		if xn != yn {
+			return false
+		}
+		return #force_inline memory_equal(x, y, xn*size_of(u16))
 	}
-	return #force_inline memory_equal(x, y, xn*size_of(u16))
 }
 
 cstring16_cmp :: proc "contextless" (lhs, rhs: cstring16) -> int {
