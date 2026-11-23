@@ -1,6 +1,7 @@
 package test_core_testing
 
 import "core:c/libc"
+import "core:log"
 import "core:math/rand"
 import "core:testing"
 import "core:time"
@@ -94,4 +95,16 @@ when !testing.INLINE {
 		testing.expect_signal(t, libc.SIGILL)
 		_ = make([]u8, -1)
 	}
+}
+
+@test
+test_expect_fails_without_test_logger :: proc(t: ^testing.T) {
+	test_logger := context.logger
+	context.logger = log.nil_logger()
+	testing.expect(t, false)
+	failed := testing.failed(t)
+	context.logger = test_logger
+
+	t.error_count = 0
+	testing.expect(t, failed, "a failed expect with a replaced logger did not fail the test")
 }

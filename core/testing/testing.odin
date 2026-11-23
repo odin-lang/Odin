@@ -77,7 +77,18 @@ T :: struct {
 
 
 fail :: proc(t: ^T, loc := #caller_location) {
+	error_count := t.error_count
 	log.error("FAIL", location=loc)
+	count_failure(t, error_count)
+}
+
+// The test logger counts errors, but the message can be filtered out by the
+// log level or go to a logger the test installed, so count it here instead.
+@(private)
+count_failure :: proc(t: ^T, error_count_before_log: int) {
+	if t.error_count == error_count_before_log {
+		t.error_count += 1
+	}
 }
 
 // fail_now will cause a test to immediately fail and abort, much in the same
@@ -129,18 +140,22 @@ cleanup :: proc(t: ^T, procedure: proc(rawptr), user_data: rawptr) {
 
 expect :: proc(t: ^T, ok: bool, msg := "", expr := #caller_expression(ok), loc := #caller_location) -> bool {
 	if !ok {
+		error_count := t.error_count
 		if msg == "" {
 			log.errorf("expected %v to be true", expr, location=loc)
 		} else {
 			log.error(msg, location=loc)
 		}
+		count_failure(t, error_count)
 	}
 	return ok
 }
 
 expectf :: proc(t: ^T, ok: bool, format: string, args: ..any, loc := #caller_location) -> bool {
 	if !ok {
+		error_count := t.error_count
 		log.errorf(format, ..args, location=loc)
+		count_failure(t, error_count)
 	}
 	return ok
 }
@@ -148,7 +163,9 @@ expectf :: proc(t: ^T, ok: bool, format: string, args: ..any, loc := #caller_loc
 expect_value :: proc(t: ^T, value, expected: $T, loc := #caller_location, value_expr := #caller_expression(value)) -> bool where intrinsics.type_is_comparable(T) {
 	ok := value == expected || reflect.is_nil(value) && reflect.is_nil(expected)
 	if !ok {
+		error_count := t.error_count
 		log.errorf("expected %v to be %v, got %v", value_expr, expected, value, location=loc)
+		count_failure(t, error_count)
 	}
 	return ok
 }
