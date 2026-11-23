@@ -5,8 +5,6 @@ struct LinkerData {
 
 	Array<String> output_object_paths;
 	Array<String> output_temp_paths;
-	String   output_base;
-	String   output_name;
 	bool     needs_system_library_linked;
 };
 
@@ -105,31 +103,6 @@ gb_internal void linker_data_init(LinkerData *ld, CheckerInfo *info, String cons
 	ptr_set_init(&ld->foreign_libraries_set, 1024);
 
 	ld->needs_system_library_linked = false;
-
-	if (build_context.out_filepath.len == 0) {
-		ld->output_name = remove_directory_from_path(init_fullpath);
-		ld->output_name = remove_extension_from_path(ld->output_name);
-		ld->output_name = string_trim_whitespace(ld->output_name);
-		if (ld->output_name.len == 0) {
-			ld->output_name = info->init_scope->pkg->name;
-		}
-		ld->output_base = ld->output_name;
-	} else {
-		ld->output_name = build_context.out_filepath;
-		ld->output_name = string_trim_whitespace(ld->output_name);
-		if (ld->output_name.len == 0) {
-			ld->output_name = info->init_scope->pkg->name;
-		}
-		isize pos = string_extension_position(ld->output_name);
-		if (pos < 0) {
-			ld->output_base = ld->output_name;
-		} else {
-			ld->output_base = substring(ld->output_name, 0, pos);
-		}
-	}
-
-	ld->output_base = path_to_full_path(ha, ld->output_base);
-
 }
 
 gb_internal i32 linker_stage(LinkerData *gen) {

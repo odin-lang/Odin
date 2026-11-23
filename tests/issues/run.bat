@@ -313,6 +313,25 @@ pushd issue_7990
 "%ODIN_FULL%" build collision.odin -file || exit /b
 if not exist collision.exe exit /b
 popd
+"%ODIN_FULL%" build issue_7990\collision.odin -file || exit /b
+if not exist collision.exe exit /b 1
+mklink /J spelled_link issue_7990\.hiddendir > nul || exit /b
+%ODIN% build spelled_link || exit /b
+if not exist spelled_link.exe exit /b 1
+%ODIN% build issue_7990\.hiddendir -out:no_such_dir\x.exe 2>&1 | find /c "does not exist" | findstr /x "1" || exit /b
+%ODIN% build issue_7990\.hiddendir -out:issue_7990 2>&1 | find /c "is a directory" | findstr /x "1" || exit /b
+%ODIN% build issue_7990\.hiddendir -out:no_such_dir\ 2>&1 | find /c "give a file name" | findstr /x "1" || exit /b
+%ODIN% build issue_7990\collision.odin -file -out:issue_7990\collision.odin 2>&1 | find /c "would overwrite the input" | findstr /x "1" || exit /b
+%ODIN% build issue_7990\.hiddendir -build-mode:llvm-ir -out:x.ll 2>&1 | find /c "existing directory" | findstr /x "1" || exit /b
+%ODIN% build issue_7990\.hiddendir -out:nul.exe 2>&1 | find /c "reserved device name" | findstr /x "1" || exit /b
+%ODIN% build issue_7990\.hiddendir -out:ab:c.exe 2>&1 | find /c "not a valid file name" | findstr /x "1" || exit /b
+%ODIN% build C:\ 2>&1 | find /c "is the filesystem root" | findstr /x "1" || exit /b
+if exist no_such_dir exit /b 1
+%ODIN% build issue_7990\.hiddendir -out:no_extension || exit /b
+if not exist no_extension.exe exit /b 1
+%ODIN% build issue_7990\.hiddendir -build-mode:dll -out:no_extension || exit /b
+if not exist no_extension.dll exit /b 1
+rmdir spelled_link
 
 @rem #########################################################################################################
 

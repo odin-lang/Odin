@@ -2361,9 +2361,17 @@ gb_internal bool init_build_paths(String init_filename) {
 	bc->build_paths[BuildPath_Main_Package] = path_from_string(ha, init_filename);
 
 	Path   main_pkg           = bc->build_paths[BuildPath_Main_Package];
-	String build_project_name = last_path_element(bc->build_paths[BuildPath_Main_Package].basename);
+	bool   main_pkg_is_dir    = path_is_directory(main_pkg);
+	bool   main_pkg_is_root   = main_pkg_is_dir && path_is_root(main_pkg.basename);
+	String build_project_name = last_path_element(main_pkg.basename);
+	if (main_pkg_is_dir && !main_pkg_is_root) {
+		String spelled = path_last_element_spelled(init_filename);
+		if (spelled.len > 0 && spelled != "." && spelled != "..") {
+			build_project_name = spelled;
+		}
+	}
 
-	if (build_project_name.len == 0) {
+	if (main_pkg_is_root || build_project_name.len == 0) {
 		// Happens when building a package at root.
 		build_project_name = str_lit("/");
 	}
@@ -2459,24 +2467,12 @@ gb_internal bool init_build_paths(String init_filename) {
 	} else if (build_context.build_mode == BuildMode_Executable) {
 		// By default use no executable extension.
 		output_extension = make_string(nullptr, 0);
-		String const single_file_extension = str_lit(".odin");
 
 		if (selected_subtarget == Subtarget_Android) {
 			// NOTE(bill): It's always shared!
 			output_extension = STR_LIT("so");
 		} else if (build_context.metrics.os == TargetOs_windows) {
 			output_extension = STR_LIT("exe");
-		} else if (path_is_directory(main_pkg) &&
-		           path_is_directory(last_path_element(bc->build_paths[BuildPath_Main_Package].basename))) {
-			// Add .bin extension to avoid collision with package directory name
-			// NOTE(bplu4t2f):
-			//     For `-file` inputs, build_paths[BuildPath_Main_Package].basename is unrelated
-			//     to the output filename. So this applies only to directory inputs.
-			output_extension = STR_LIT("bin");
-		} else if (string_ends_with(init_filename, single_file_extension) && path_is_directory(remove_extension_from_path(init_filename))) {
-			// Add bin extension if compiling single-file package
-			// with same output name as a directory
-			output_extension = STR_LIT("bin");
 		}
 	} else if (build_context.build_mode == BuildMode_DynamicLibrary) {
 		// By default use a .so shared library extension.
@@ -2503,66 +2499,106 @@ gb_internal bool init_build_paths(String init_filename) {
 		GB_PANIC("Unhandled build mode/target combination.\n");
 	}
 
-	bool output_should_be_directory = false;
+	Path output_path = {};
 
 	if (bc->out_filepath.len > 0) {
-		bc->build_paths[BuildPath_Output] = path_from_string(ha, bc->out_filepath);
-		bool output_is_directory = path_is_directory(bc->build_paths[BuildPath_Output]);
+		String out           = bc->out_filepath;
+		bool   names_dir     = out.text[out.len-1] == '/';
+		String out_trimmed   = path_trim_trailing_separators(out);
+		bool   out_is_dir    = path_is_directory(out_trimmed);
+		bool   may_be_dir    = build_context.build_mode == BuildMode_Object || build_context.build_mode == BuildMode_Assembly;
 
-		String output_file = path_to_string(ha, bc->build_paths[BuildPath_Output]);
-		defer (gb_free(ha, output_file.text));
-
-		// NOTE(Jeroen): For LLVM-IR, we want `-out` to specify a directory.
-		//               For other outputs we expect it to be a file path.
 		if (build_context.build_mode == BuildMode_LLVM_IR) {
-			if (!output_is_directory) {
-				gb_printf_err("Output path %.*s should be a directory for LLVM-IR output.\n", LIT(output_file));
+			if (!out_is_dir) {
+				gb_printf_err("Output path %.*s should be an existing directory for LLVM-IR output.\n", LIT(out));
 				return false;
 			}
-			output_should_be_directory = true;
-
-		} else if (build_context.build_mode == BuildMode_Object) {
-			// Both directory or filename prefix allowed
-
-		} else if (build_context.build_mode == BuildMode_Assembly) {
-			// Both directory or filename prefix allowed
-
-		} else if (build_context.metrics.os == TargetOs_windows) {
-			if (output_is_directory) {
-				gb_printf_err("Output path %.*s is a directory.\n", LIT(output_file));
-				return false;
-			} else if (bc->build_paths[BuildPath_Output].ext.len == 0) {
-				gb_printf_err("Output path %.*s must have an appropriate extension.\n", LIT(output_file));
+			output_path.basename = copy_string(ha, out_trimmed);
+		} else if (may_be_dir && out_is_dir) {
+			output_path.basename = copy_string(ha, out_trimmed);
+		} else {
+			if (out_is_dir) {
+				gb_printf_err("Output path %.*s is a directory.\n", LIT(out));
 				return false;
 			}
+			if (names_dir) {
+				gb_printf_err("Output path %.*s names a directory that does not exist; give a file name.\n", LIT(out));
+				return false;
+			}
+
+			String name = path_last_element_spelled(out_trimmed);
+			String dir  = substring(out_trimmed, 0, out_trimmed.len - name.len);
+			dir = path_trim_trailing_separators(dir);
+			if (!path_is_directory(dir)) {
+				gb_printf_err("Output directory %.*s does not exist.\n", LIT(dir));
+				return false;
+			}
+			if (dir.len > 0 && dir.text[dir.len-1] == '/') {
+				dir.len -= 1;
+			}
+
+			char const *reason = nullptr;
+			if (!path_is_valid_file_name(name, &reason)) {
+				gb_printf_err("Output name '%.*s' is not a valid file name: %s.\n", LIT(name), reason);
+				return false;
+			}
+
+			String ext = {};
+			for (isize i = name.len-1; i > 0; i--) {
+				if (name.text[i] == '.') {
+					ext  = substring(name, i+1, name.len);
+					name = substring(name, 0, i);
+					break;
+				}
+			}
+
+			output_path.basename = copy_string(ha, dir);
+			output_path.name     = copy_string(ha, name);
+			output_path.ext      = copy_string(ha, ext);
 		}
 	} else {
-		Path output_path;
-		String output_name;
+		String output_name = {};
 
-		if (path_is_directory(main_pkg)) {
-			// Name the output after the package directory, but place it in the current directory.
-			debugf("Output will be named after package directory %.*s and placed in the current directory.\n", LIT(bc->build_paths[BuildPath_Main_Package].basename));
-			String last_element  = last_path_element(bc->build_paths[BuildPath_Main_Package].basename);
-
-			if (last_element.len == 0) {
-				String init_fullpath = path_to_full_path(ha, init_filename);
-				gb_printf_err("The output name is created from the last path element. `%.*s` has none. Use `-out:output_name.ext` to set it.\n", LIT(init_fullpath));
+		if (main_pkg_is_dir) {
+			if (main_pkg_is_root) {
+				gb_printf_err("The package directory %.*s/ is the filesystem root, which has no name to give the output. Use `-out:<name>` to set it.\n", LIT(main_pkg.basename));
 				return false;
 			}
-			output_name = last_element;
+			output_name = build_project_name;
 		} else {
-			// File inputs name the output after the source file.
-			output_name = main_pkg.name;
+			output_name = path_last_element_spelled(init_filename);
+			if (string_ends_with(output_name, str_lit(".odin"))) {
+				output_name.len -= 5;
+			}
 		}
 
-		Path cwd = path_from_string(ha, str_lit("."));
-		output_path.basename = copy_string(ha, cwd.basename);
+		char const *reason = nullptr;
+		if (!path_is_valid_file_name(output_name, &reason)) {
+			gb_printf_err("The output would be named '%.*s', which is not a valid file name: %s. Use `-out:<name>` to set it.\n", LIT(output_name), reason);
+			return false;
+		}
+
+		String cwd = path_working_directory(ha);
+		if (cwd.len == 0) {
+			gb_printf_err("Cannot read the current directory, where the output goes. Use `-out:<path>` to set it.\n");
+			return false;
+		}
+		debugf("Output will be named after %.*s and placed in the current directory %.*s.\n", LIT(output_name), LIT(cwd));
+
+		output_path.basename = cwd;
 		output_path.name     = copy_string(ha, output_name);
 		output_path.ext      = copy_string(ha, output_extension);
 
-		bc->build_paths[BuildPath_Output] = output_path;
+		if (output_path.ext.len == 0) {
+			String bare = path_to_string(ha, output_path);
+			if (path_is_directory(bare)) {
+				output_path.ext = copy_string(ha, STR_LIT("bin"));
+			}
+			gb_free(ha, bare.text);
+		}
 	}
+
+	bc->build_paths[BuildPath_Output] = output_path;
 
 	if (build_context.ODIN_DEBUG) {
 		if (build_context.metrics.os == TargetOs_windows) {
@@ -2584,24 +2620,30 @@ gb_internal bool init_build_paths(String init_filename) {
 		}
 	}
 
-	// Do we have an extension? We might not if the output filename was supplied.
-	if (bc->build_paths[BuildPath_Output].ext.len == 0) {
-		if (build_context.metrics.os == TargetOs_windows || is_arch_wasm() || build_context.build_mode != BuildMode_Executable) {
-
-			// NOTE(Jeroen): If build mode is LLVM_IR and a custom output was set
-			if (!output_should_be_directory) {
-				bc->build_paths[BuildPath_Output].ext = copy_string(ha, output_extension);
-			}
-		}
+	Path *out = &bc->build_paths[BuildPath_Output];
+	if (out->name.len > 0 && out->ext.len == 0) {
+		out->ext = copy_string(ha, output_extension);
 	}
 
-	String output_file = path_to_string(ha, bc->build_paths[BuildPath_Output]);
-	defer (gb_free(ha, output_file.text));
+	if (out->name.len > 0) {
+		String output_file = path_to_string(ha, *out);
+		defer (gb_free(ha, output_file.text));
 
-	// Check if output path is a directory.
-	if (!output_should_be_directory && path_is_directory(bc->build_paths[BuildPath_Output])) {
-		gb_printf_err("Output path %.*s is a directory.\n", LIT(output_file));
-		return false;
+		if (path_is_directory(output_file)) {
+			gb_printf_err("Output path %.*s is a directory.\n", LIT(output_file));
+			return false;
+		}
+
+		FileId out_id = {};
+		FileId in_id  = {};
+		if (!main_pkg_is_dir && path_file_id(output_file, &out_id)) {
+			String input_file = path_to_string(ha, main_pkg);
+			defer (gb_free(ha, input_file.text));
+			if (path_file_id(input_file, &in_id) && file_id_equal(out_id, in_id)) {
+				gb_printf_err("Output path %.*s would overwrite the input %.*s.\n", LIT(output_file), LIT(input_file));
+				return false;
+			}
+		}
 	}
 
 	// gbFile      output_file_test;

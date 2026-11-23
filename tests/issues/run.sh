@@ -782,6 +782,30 @@ pushd issue_7990
 test -f collision.bin || test -f collision.exe
 popd
 
+"$ODIN_FULL" build issue_7990/collision.odin -file
+test -f collision || test -f collision.exe
+test ! -e collision.bin
+
+mkdir -p links
+ln -s ../issue_7990/.hiddendir links/spelled_link
+$ODIN build links/spelled_link
+test -f spelled_link || test -f spelled_link.exe
+
+if [[ $($ODIN build issue_7990/.hiddendir -out:no_such_dir/x 2>&1 | grep -c "does not exist") -eq 1 &&
+      $($ODIN build issue_7990/.hiddendir -out:issue_7990 2>&1 | grep -c "is a directory") -eq 1 &&
+      $($ODIN build issue_7990/.hiddendir -out:no_such_dir/ 2>&1 | grep -c "give a file name") -eq 1 &&
+      $($ODIN build issue_7990/collision.odin -file -out:issue_7990/collision.odin 2>&1 | grep -c "would overwrite the input") -eq 1 &&
+      $($ODIN build issue_7990/.hiddendir -build-mode:llvm-ir -out:x.ll 2>&1 | grep -c "existing directory") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+test ! -e no_such_dir
+
+$ODIN build issue_7990/.hiddendir -build-mode:dll -out:no_extension
+test -f no_extension.so || test -f no_extension.dylib || test -f no_extension.dll
+
 #########################################################################################################
 
 if [[ ! -z ${ODIN_TESTS_NO_CLANG+x} ]]; then

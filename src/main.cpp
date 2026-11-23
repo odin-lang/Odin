@@ -935,8 +935,18 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String path = value.value_string;
 							path = string_trim_whitespace(path);
-							if (is_build_flag_path_valid(path)) {
-								build_context.out_filepath = path_to_full_path(heap_allocator(), path);
+							String out_name = path_last_element_spelled(path);
+							char const *out_reason = nullptr;
+							bool out_name_ok = out_name.len == 0 || out_name == "." || out_name == ".." || path_is_valid_file_name(out_name, &out_reason);
+							if (!out_name_ok) {
+								gb_printf_err("Invalid -out path %.*s: '%.*s' is not a valid file name: %s.\n", LIT(path), LIT(out_name), out_reason);
+								bad_flags = true;
+							} else if (is_build_flag_path_valid(path)) {
+								build_context.out_filepath = path_make_absolute(heap_allocator(), path);
+								if (build_context.out_filepath.len == 0) {
+									gb_printf_err("Invalid -out path, got %.*s\n", LIT(path));
+									bad_flags = true;
+								}
 							} else {
 								gb_printf_err("Invalid -out path, got %.*s\n", LIT(path));
 								bad_flags = true;
@@ -2792,6 +2802,33 @@ gb_internal void export_linked_libraries(LinkerData *gen) {
 			gb_fprintf(&f, "\n");
 		}
 	}
+}
+
+gb_internal bool output_overwrites_an_input(Parser *p) {
+	if (build_context.build_paths.count <= BuildPath_Output) {
+		return false;
+	}
+	Path const &out = build_context.build_paths[BuildPath_Output];
+	if (out.name.len == 0) {
+		return false;
+	}
+	String output_file = path_to_string(heap_allocator(), out);
+	defer (gb_free(heap_allocator(), output_file.text));
+
+	FileId out_id = {};
+	if (!path_file_id(output_file, &out_id)) {
+		return false;
+	}
+	for (AstPackage *pkg : p->packages) {
+		for (AstFile *f : pkg->files) {
+			FileId id = {};
+			if (path_file_id(f->fullpath, &id) && file_id_equal(id, out_id)) {
+				gb_printf_err("Output path %.*s would overwrite the input %.*s.\n", LIT(output_file), LIT(f->fullpath));
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 gb_internal void remove_temp_files(lbGenerator *gen) {
@@ -4742,6 +4779,10 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 	release_held_errors();
 	defer (destroy_checker(checker));
+
+	if (output_overwrites_an_input(parser)) {
+		return 1;
+	}
 
 	if (build_context.cached && parser->total_seen_load_directive_count.load() == 0) {
 		MAIN_TIME_SECTION("check cached build (pre-semantic check)");

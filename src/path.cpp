@@ -168,6 +168,240 @@ gb_internal String path_to_full_path(gbAllocator a, String path) {
 	return copy_string(a, res);
 }
 
+gb_internal bool path_is_separator(u8 c) {
+#if defined(GB_SYSTEM_WINDOWS)
+	return c == '/' || c == '\\';
+#else
+	return c == '/';
+#endif
+}
+
+gb_internal String path_trim_trailing_separators(String s) {
+	while (s.len > 1 && path_is_separator(s.text[s.len-1])) {
+	#if defined(GB_SYSTEM_WINDOWS)
+		if (s.len == 3 && s.text[1] == ':') {
+			break;
+		}
+	#endif
+		s.len -= 1;
+	}
+	return s;
+}
+
+gb_internal String path_last_element_spelled(String s) {
+	s = path_trim_trailing_separators(s);
+	isize i = s.len;
+	while (i > 0 && !path_is_separator(s.text[i-1])) {
+	#if defined(GB_SYSTEM_WINDOWS)
+		if (i == 2 && s.text[1] == ':') {
+			break;
+		}
+	#endif
+		i -= 1;
+	}
+	return substring(s, i, s.len);
+}
+
+gb_internal bool path_is_root(String fullpath) {
+	String s = fullpath;
+	while (s.len > 0 && s.text[s.len-1] == '/') {
+		s.len -= 1;
+	}
+	if (s.len == 0) {
+		return true;
+	}
+#if defined(GB_SYSTEM_WINDOWS)
+	if (string_starts_with(s, str_lit("//?/")) || string_starts_with(s, str_lit("//./"))) {
+		s = substring(s, 4, s.len);
+		if (string_starts_with(s, str_lit("UNC/"))) {
+			s = substring(s, 4, s.len);
+			isize slashes = 0;
+			for (isize i = 0; i < s.len; i++) {
+				slashes += s.text[i] == '/';
+			}
+			return slashes <= 1;
+		}
+	}
+	if (s.len == 2 && s.text[1] == ':') {
+		return true;
+	}
+	if (s.len > 2 && s.text[0] == '/' && s.text[1] == '/') {
+		isize slashes = 0;
+		for (isize i = 2; i < s.len; i++) {
+			slashes += s.text[i] == '/';
+		}
+		return slashes <= 1;
+	}
+#endif
+	return false;
+}
+
+gb_internal String path_make_absolute(gbAllocator a, String path) {
+	if (path.len == 0) {
+		return {};
+	}
+#if defined(GB_SYSTEM_WINDOWS)
+	gbAllocator ha = heap_allocator();
+	String16 wpath = string_to_string16(ha, path);
+	defer (gb_free(ha, wpath.text));
+	if (wpath.len == 0) {
+		return {};
+	}
+	DWORD wlen = GetFullPathNameW(cast(wchar_t *)wpath.text, 0, nullptr, nullptr);
+	if (wlen == 0) {
+		return {};
+	}
+	wchar_t *wfull = gb_alloc_array(ha, wchar_t, wlen+1);
+	defer (gb_free(ha, wfull));
+	DWORD n = GetFullPathNameW(cast(wchar_t *)wpath.text, wlen, wfull, nullptr);
+	if (n == 0 || n >= wlen) {
+		return {};
+	}
+	String res = string16_to_string(a, make_string16(cast(u16 *)wfull, n));
+	for (isize i = 0; i < res.len; i++) {
+		if (res.text[i] == '\\') {
+			res.text[i] = '/';
+		}
+	}
+	return res;
+#else
+	if (path.text[0] == '/') {
+		return copy_string(a, path);
+	}
+	String cwd = get_working_directory(heap_allocator());
+	if (cwd.len == 0) {
+		return {};
+	}
+	defer (gb_free(heap_allocator(), cwd.text));
+	String sep = cwd.text[cwd.len-1] == '/' ? str_lit("") : str_lit("/");
+	return concatenate3_strings(a, cwd, sep, path);
+#endif
+}
+
+gb_internal String path_working_directory(gbAllocator a) {
+	String cwd = get_working_directory(a);
+#if defined(GB_SYSTEM_WINDOWS)
+	for (isize i = 0; i < cwd.len; i++) {
+		if (cwd.text[i] == '\\') {
+			cwd.text[i] = '/';
+		}
+	}
+#endif
+	return path_trim_trailing_separators(cwd);
+}
+
+gb_internal bool path_is_valid_file_name(String name, char const **reason) {
+	*reason = nullptr;
+	if (name.len == 0 || name == ".." || name == ".") {
+		*reason = "it is empty or a directory reference";
+		return false;
+	}
+	for (isize i = 0; i < name.len; i++) {
+		u8 c = name.text[i];
+		if (c == 0 || c == '/') {
+			*reason = "it contains a separator or NUL";
+			return false;
+		}
+	#if defined(GB_SYSTEM_WINDOWS)
+		if (c < 32 || c == '\\' || c == ':' || c == '<' || c == '>' || c == '"' || c == '|' || c == '?' || c == '*') {
+			*reason = "it contains a character Windows does not allow in a file name";
+			return false;
+		}
+	#endif
+	}
+#if defined(GB_SYSTEM_WINDOWS)
+	u8 last = name.text[name.len-1];
+	if (last == '.' || last == ' ') {
+		*reason = "Windows drops a trailing dot or space";
+		return false;
+	}
+
+	String base = name;
+	for (isize i = 0; i < base.len; i++) {
+		if (base.text[i] == '.') {
+			base.len = i;
+			break;
+		}
+	}
+	while (base.len > 0 && base.text[base.len-1] == ' ') {
+		base.len -= 1;
+	}
+
+	static char const *devices[] = {"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"};
+	for (char const *d : devices) {
+		if (str_eq_ignore_case(base, make_string_c(d))) {
+			*reason = "it is a reserved device name on Windows";
+			return false;
+		}
+	}
+	if (base.len >= 4 && (str_eq_ignore_case(substring(base, 0, 3), str_lit("COM")) || str_eq_ignore_case(substring(base, 0, 3), str_lit("LPT")))) {
+		String rest = substring(base, 3, base.len);
+		bool digit = rest.len == 1 && '0' <= rest.text[0] && rest.text[0] <= '9';
+		bool super = rest == "\xc2\xb9" || rest == "\xc2\xb2" || rest == "\xc2\xb3";
+		if (digit || super) {
+			*reason = "it is a reserved device name on Windows";
+			return false;
+		}
+	}
+#endif
+	return true;
+}
+
+struct FileId {
+	u64 volume;
+	u64 id_lo;
+	u64 id_hi;
+};
+
+gb_internal bool path_file_id(String path, FileId *id) {
+	*id = {};
+	if (path.len == 0) {
+		return false;
+	}
+#if defined(GB_SYSTEM_WINDOWS)
+	gbAllocator ha = heap_allocator();
+	String16 wpath = string_to_string16(ha, path);
+	defer (gb_free(ha, wpath.text));
+	if (wpath.len == 0) {
+		return false;
+	}
+	HANDLE h = CreateFileW(cast(wchar_t *)wpath.text, 0, FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+	if (h == INVALID_HANDLE_VALUE) {
+		return false;
+	}
+	defer (CloseHandle(h));
+
+	FILE_ID_INFO info = {};
+	if (GetFileInformationByHandleEx(h, FileIdInfo, &info, sizeof(info))) {
+		id->volume = info.VolumeSerialNumber;
+		gb_memmove(&id->id_lo, &info.FileId.Identifier[0], 8);
+		gb_memmove(&id->id_hi, &info.FileId.Identifier[8], 8);
+		return true;
+	}
+	BY_HANDLE_FILE_INFORMATION bhfi = {};
+	if (GetFileInformationByHandle(h, &bhfi)) {
+		id->volume = bhfi.dwVolumeSerialNumber;
+		id->id_lo  = (cast(u64)bhfi.nFileIndexHigh << 32) | bhfi.nFileIndexLow;
+		return true;
+	}
+	return false;
+#else
+	char *c = alloc_cstring(heap_allocator(), path);
+	defer (gb_free(heap_allocator(), c));
+	struct stat s;
+	if (stat(c, &s) != 0) {
+		return false;
+	}
+	id->volume = cast(u64)s.st_dev;
+	id->id_lo  = cast(u64)s.st_ino;
+	return true;
+#endif
+}
+
+gb_internal bool file_id_equal(FileId const &a, FileId const &b) {
+	return a.volume == b.volume && a.id_lo == b.id_lo && a.id_hi == b.id_hi;
+}
+
 struct Path {
 	String basename;
 	String name;
