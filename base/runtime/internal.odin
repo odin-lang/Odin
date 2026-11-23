@@ -570,7 +570,51 @@ string16_ge :: #force_inline proc "contextless" (a, b: string16) -> bool { retur
 
 
 cstring_len :: proc "contextless" (s: cstring) -> int {
-	when HAS_HARDWARE_SIMD {
+	when ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2") {
+		if s == nil {
+			return 0
+		}
+
+		start := uintptr(rawptr(s))
+		p     := start &~ 31
+		zero: #simd[32]u8
+
+		v := intrinsics.volatile_load((^#simd[32]u8)(p))
+		m := transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, zero))
+		m &= ~u32(0) << (start-p)
+		for _ in 0..<3 {
+			if m != 0 {
+				return int(p - start + uintptr(intrinsics.count_trailing_zeros(m)))
+			}
+			p += 32
+			v = intrinsics.volatile_load((^#simd[32]u8)(p))
+			m = transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, zero))
+		}
+
+		if m == 0 {
+			p = (p + 32) &~ 127
+			for {
+				a := intrinsics.volatile_load((^#simd[32]u8)(p))
+				b := intrinsics.volatile_load((^#simd[32]u8)(p+32))
+				c := intrinsics.volatile_load((^#simd[32]u8)(p+64))
+				d := intrinsics.volatile_load((^#simd[32]u8)(p+96))
+				lowest := intrinsics.simd_min(intrinsics.simd_min(a, b), intrinsics.simd_min(c, d))
+				if intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(lowest, zero)) != {} {
+					break
+				}
+				p += 128
+			}
+
+			v = intrinsics.volatile_load((^#simd[32]u8)(p))
+			m = transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, zero))
+		}
+		for m == 0 {
+			p += 32
+			v = intrinsics.volatile_load((^#simd[32]u8)(p))
+			m = transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, zero))
+		}
+		return int(p - start + uintptr(intrinsics.count_trailing_zeros(m)))
+	} else when HAS_HARDWARE_SIMD {
 		if s == nil {
 			return 0
 		}
