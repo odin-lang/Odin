@@ -914,6 +914,14 @@ $ODIN build ../test_paths_prefix_map $COMMON -debug "-path-prefix-map:..=wrong" 
 if grep -qaF "$PREFIX_DIR" prefix_map; then exit 1; fi
 if grep -qaF "${ROOT_OUT%/}" prefix_map; then exit 1; fi
 
+rm -rf deps_test
+mkdir -p 'deps_test/q"x b#$'
+cp -R ../test_paths_deps/. 'deps_test/q"x b#$/'
+$ODIN build 'deps_test/q"x b#$' $COMMON -export-dependencies:make -export-dependencies-file:deps.d -out:deps
+grep -qF 'q"x\ b\#$$/data.txt' deps.d
+$ODIN build 'deps_test/q"x b#$' $COMMON -export-dependencies:json -export-dependencies-file:deps.json -out:deps
+grep -qF 'q\"x b#$/data.txt"' deps.json
+
 #########################################################################################################
 
 if [[ ! -z ${ODIN_TESTS_NO_CLANG+x} ]]; then

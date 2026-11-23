@@ -434,6 +434,13 @@ rmdir /S /Q "\\?\%CD%\long_path" || exit /b
 %ODIN% build ..\test_paths_prefix_map %COMMON% -debug "-path-prefix-map:..=wrong" "-path-prefix-map:%ROOT_OUT%=root" "-path-prefix-map:..\test_paths_prefix_map=src" -out:prefix_map.exe || exit /b
 .\prefix_map.exe || exit /b
 
+if exist deps_test rmdir /S /Q deps_test
+%SystemRoot%\System32\xcopy.exe /E /I /Q ..\test_paths_deps "deps_test\a b#$" > nul || exit /b
+%ODIN% build "deps_test\a b#$" %COMMON% -export-dependencies:make -export-dependencies-file:deps.d -out:deps.exe || exit /b
+%SystemRoot%\System32\find.exe "deps_test/a\ b\#$$/data.txt" deps.d || exit /b
+%ODIN% build "deps_test\a b#$" %COMMON% -export-dependencies:json -export-dependencies-file:deps.json -out:deps.exe || exit /b
+%SystemRoot%\System32\find.exe "deps_test/a b#$/data.txt" deps.json || exit /b
+
 @rem #########################################################################################################
 
 @echo off

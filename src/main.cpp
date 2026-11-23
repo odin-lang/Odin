@@ -2676,6 +2676,33 @@ gb_internal GB_COMPARE_PROC(file_path_cmp) {
 	return string_compare(x->fullpath, y->fullpath);
 }
 
+gb_internal bool make_escape_path(gbString *s, String path) {
+	for (isize i = 0; i < path.len; i++) {
+		u8 c = path[i];
+		if (c == '\n' || c == '\r' || c == 0) {
+			return false;
+		}
+		if (c == ' ' || c == '\t' || c == '#') {
+			for (isize k = i; k > 0 && path[k-1] == '\\'; k--) {
+				*s = gb_string_appendc(*s, "\\");
+			}
+			*s = gb_string_appendc(*s, "\\");
+		} else if (c == '$') {
+			*s = gb_string_appendc(*s, "$");
+		}
+		*s = gb_string_append_length(*s, &c, 1);
+	}
+	return true;
+}
+
+gb_internal void json_escape_string(gbString *s, String str) {
+	*s = gb_string_appendc(*s, "\"");
+	for (isize i = 0; i < str.len; i++) {
+		*s = json_escape_char(*s, str[i]);
+	}
+	*s = gb_string_appendc(*s, "\"");
+}
+
 gb_internal void export_dependencies(Checker *c) {
 	GB_ASSERT(build_context.export_dependencies_format != DependenciesExportUnspecified);
 
@@ -2721,63 +2748,80 @@ gb_internal void export_dependencies(Checker *c) {
 		String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
 		defer (gb_free(heap_allocator(), exe_name.text));
 
-		gb_fprintf(&f, "%.*s:", LIT(exe_name));
+		auto paths = array_make<String>(heap_allocator(), 0, files.count + load_files.count);
+		defer (array_free(&paths));
+		for (AstFile *file : files) {
+			array_add(&paths, file->fullpath);
+		}
+		for (LoadFileCache *cache : load_files) {
+			array_add(&paths, cache->path);
+		}
 
-		isize current_line_length = exe_name.len + 1;
+		gbString line = gb_string_make(heap_allocator(), "");
+		defer (gb_string_free(line));
 
-		for_array(i, files) {
-			AstFile *file = files[i];
+		if (!make_escape_path(&line, exe_name)) {
+			gb_printf_err("Cannot write %.*s to a make dependency file\n", LIT(exe_name));
+			exit_with_errors();
+			return;
+		}
+		line = gb_string_appendc(line, ":");
+
+		isize current_line_length = gb_string_length(line);
+
+		for (String const &path : paths) {
 			/* Arbitrary line break value. Maybe make this better? */
 			if (current_line_length >= 80-2) {
-				gb_file_write(&f, " \\\n ", 4);
+				line = gb_string_appendc(line, " \\\n ");
 				current_line_length = 1;
 			}
 
-			gb_file_write(&f, " ", 1);
-			current_line_length++;
-
-			for (isize k = 0; k < file->fullpath.len; k++) {
-				char part = file->fullpath.text[k];
-				if (part == ' ') {
-					gb_file_write(&f, "\\", 1);
-					current_line_length++;
-				}
-				gb_file_write(&f, &part, 1);
-				current_line_length++;
+			line = gb_string_appendc(line, " ");
+			isize before = gb_string_length(line);
+			if (!make_escape_path(&line, path)) {
+				gb_printf_err("Cannot write %.*s to a make dependency file\n", LIT(path));
+				exit_with_errors();
+				return;
 			}
+			current_line_length += 1 + gb_string_length(line) - before;
 		}
 
-		gb_fprintf(&f, "\n");
+		line = gb_string_appendc(line, "\n");
+		gb_file_write(&f, line, gb_string_length(line));
 	} else if (build_context.export_dependencies_format == DependenciesExportJson) {
-		gb_fprintf(&f, "{\n");
+		gbString out = gb_string_make(heap_allocator(), "");
+		defer (gb_string_free(out));
 
-		gb_fprintf(&f, "\t\"source_files\": [\n");
+		out = gb_string_appendc(out, "{\n");
+
+		out = gb_string_appendc(out, "\t\"source_files\": [\n");
 
 		for_array(i, files) {
-			AstFile *file = files[i];
-			gb_fprintf(&f, "\t\t\"%.*s\"", LIT(file->fullpath));
+			out = gb_string_appendc(out, "\t\t");
+			json_escape_string(&out, files[i]->fullpath);
 			if (i+1 < files.count) {
-				gb_fprintf(&f, ",");
+				out = gb_string_appendc(out, ",");
 			}
-			gb_fprintf(&f, "\n");
+			out = gb_string_appendc(out, "\n");
 		}
 
-		gb_fprintf(&f, "\t],\n");
+		out = gb_string_appendc(out, "\t],\n");
 
-		gb_fprintf(&f, "\t\"load_files\": [\n");
+		out = gb_string_appendc(out, "\t\"load_files\": [\n");
 
 		for_array(i, load_files) {
-			LoadFileCache *cache = load_files[i];
-			gb_fprintf(&f, "\t\t\"%.*s\"", LIT(cache->path));
+			out = gb_string_appendc(out, "\t\t");
+			json_escape_string(&out, load_files[i]->path);
 			if (i+1 < load_files.count) {
-				gb_fprintf(&f, ",");
+				out = gb_string_appendc(out, ",");
 			}
-			gb_fprintf(&f, "\n");
+			out = gb_string_appendc(out, "\n");
 		}
 
-		gb_fprintf(&f, "\t]\n");
+		out = gb_string_appendc(out, "\t]\n");
 
-		gb_fprintf(&f, "}\n");
+		out = gb_string_appendc(out, "}\n");
+		gb_file_write(&f, out, gb_string_length(out));
 	}
 }
 

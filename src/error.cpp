@@ -1135,6 +1135,26 @@ gb_internal String error_article(String context_name) {
 
 gb_internal bool errors_already_printed = false;
 
+gb_internal gbString json_escape_char(gbString res, u8 c) {
+	switch (c) {
+	case '\n': res = gb_string_append_length(res, "\\n",  2); break;
+	case '"':  res = gb_string_append_length(res, "\\\"", 2); break;
+	case '\\': res = gb_string_append_length(res, "\\\\", 2); break;
+	case '\b': res = gb_string_append_length(res, "\\b",  2); break;
+	case '\f': res = gb_string_append_length(res, "\\f",  2); break;
+	case '\r': res = gb_string_append_length(res, "\\r",  2); break;
+	case '\t': res = gb_string_append_length(res, "\\t",  2); break;
+	default:
+		if (c <= '\x1f') {
+			res = gb_string_append_fmt(res, "\\u%04x", c);
+		} else {
+			res = gb_string_append_length(res, &c, 1);
+		}
+		break;
+	}
+	return res;
+}
+
 gb_internal void print_all_errors(void) {
 	if (errors_already_printed) {
 		if (global_error_collector.warning_count.load() == global_error_collector.error_values.count) {
@@ -1146,26 +1166,6 @@ gb_internal void print_all_errors(void) {
 		}
 		return;
 	}
-
-	auto const &escape_char = [](gbString res, u8 c) -> gbString {
-		switch (c) {
-		case '\n': res = gb_string_append_length(res, "\\n",  2); break;
-		case '"':  res = gb_string_append_length(res, "\\\"", 2); break;
-		case '\\': res = gb_string_append_length(res, "\\\\", 2); break;
-		case '\b': res = gb_string_append_length(res, "\\b",  2); break;
-		case '\f': res = gb_string_append_length(res, "\\f",  2); break;
-		case '\r': res = gb_string_append_length(res, "\\r",  2); break;
-		case '\t': res = gb_string_append_length(res, "\\t",  2); break;
-		default:
-			if ('\x00' <= c && c <= '\x1f') {
-				res = gb_string_append_fmt(res, "\\u%04x", c);
-			} else {
-				res = gb_string_append_length(res, &c, 1);
-			}
-			break;
-		}
-		return res;
-	};
 
 	GB_ASSERT(any_errors() || any_warnings());
 
@@ -1238,7 +1238,7 @@ gb_internal void print_all_errors(void) {
 				res = gb_string_append_fmt(res, "\t\t\t\t\"file\": \"");
 				String file = get_file_path_string(ev.pos.file_id);
 				for (isize k = 0; k < file.len; k++) {
-					res = escape_char(res, file.text[k]);
+					res = json_escape_char(res, file.text[k]);
 				}
 				res = gb_string_append_fmt(res, "\",\n");
 				res = gb_string_append_fmt(res, "\t\t\t\t\"offset\": %d,\n", ev.pos.offset);
@@ -1263,7 +1263,7 @@ gb_internal void print_all_errors(void) {
 					String line = lines[j];
 					for (isize k = 0; k < line.len; k++) {
 						u8 c = line.text[k];
-						res = escape_char(res, c);
+						res = json_escape_char(res, c);
 					}
 					if (j+1 < lines.count) {
 						res = gb_string_append_fmt(res, "\",\n");
