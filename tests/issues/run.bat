@@ -62,6 +62,8 @@ set ODIN=..\..\..\odin
 %ODIN% check "..\test_issue_inferred_default_overflow" -no-entry-point %COMMON% 2>&1 | find /c "Error: Cannot convert numeric value" | findstr /x "6" || exit /b
 %ODIN% check "..\test_issue_fixed_point_scale" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_poly_proc_value" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_poly_variadic_errors" %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_poly_variadic_errors" %COMMON% 2>&1 | find /c "Cannot infer the polymorphic type '$E' of the variadic parameter 'args'" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_atomic_orderings" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "13" || exit /b
 %ODIN% check "..\test_issue_atomic_errors" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
 %ODIN% check "..\test_issue_atomic_access" -no-entry-point -vet-atomic-access %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
