@@ -1,4 +1,4 @@
-/* stb_image_resize2 - v2.50 - public domain image resizing
+/* stb_image_resize2 - v2.51 - public domain image resizing
 
    by Jeff Roberts (v2) and Jorge L Rodriguez
    http://github.com/nothings/stb
@@ -341,6 +341,7 @@
       Nathan Reed: warning fixes for 1.0
 
    REVISIONS
+      2.51 (2026-11-17) Visual C++ 6 compatibility. 
       2.50 (2026-10-07) Big performance release, especially for large and/or
                         threaded resizes! New stuff:
                           - Resizes now run in column slices sized to the L2 cache 
@@ -1473,6 +1474,16 @@ static stbir__inline stbir_uint8 stbir__linear_to_srgb_uchar(float in)
 
 #ifdef STBIR_SSE2
   #include <emmintrin.h>
+
+  #if defined( _MSC_VER ) && ( _MSC_VER < 1400 )
+    // Visual Studio before 2005 (6 needs the Processor Pack for SSE2 at all) has no cast intrinsics and no
+    //   _mm_cvtss_f32. The pointer casts compile to nothing: the value stays in its register.
+    static stbir__inline __m128  _mm_castsi128_ps( __m128i v ) { return *(__m128*) &v; }
+    static stbir__inline __m128i _mm_castps_si128( __m128 v )  { return *(__m128i*) &v; }
+    static stbir__inline __m128  _mm_castpd_ps( __m128d v )    { return *(__m128*) &v; }
+    static stbir__inline __m128d _mm_castps_pd( __m128 v )     { return *(__m128d*) &v; }
+    static stbir__inline float   _mm_cvtss_f32( __m128 v )     { float f; _mm_store_ss( &f, v ); return f; }
+  #endif
 
   #define stbir__simdf __m128
   #define stbir__simdi __m128i
@@ -8312,7 +8323,7 @@ static stbir_internal_pixel_layout stbir__pixel_layout_convert_public_to_interna
 
 static int stbir_l2_cache_size_override = 0;   // bytes, 0 = detect
 
-#if ( defined( _M_X64 ) || defined( _M_IX86 ) || defined( __x86_64__ ) || defined( __i386__ ) ) && !defined( _M_ARM64EC )
+#if ( defined( _M_X64 ) || defined( _M_IX86 ) || defined( __x86_64__ ) || defined( __i386__ ) ) && !defined( _M_ARM64EC ) && !( defined( _MSC_VER ) && ( _MSC_VER < 1400 ) )
   #define STBIR__L2_FROM_CPUID
   #ifdef _MSC_VER
     #include <intrin.h>
@@ -10273,6 +10284,9 @@ STBIRDEF void stbir_resize_extended_profile_info( STBIR_PROFILE_INFO * info, STB
 #define STBIR_strs_join2( start, mid, end ) start##mid##end
 #define STBIR_strs_join1( start, mid, end ) STBIR_strs_join2( start, mid, end )
 
+#define STBIR_strs_join22( start, end ) start##end
+#define STBIR_strs_join12( start, end ) STBIR_strs_join22( start, end )
+
 #define STBIR_strs_join24( start, mid1, mid2, end ) start##mid1##mid2##end
 #define STBIR_strs_join14( start, mid1, mid2, end ) STBIR_strs_join24( start, mid1, mid2, end )
 
@@ -10960,7 +10974,7 @@ static void STBIR__CODER_NAME( stbir__encode_uint8_srgb )( void * outputp, ptrdi
     stbir__linear_to_srgb_finish( i2, f2 );
     stbir__linear_to_srgb_finish( i3, f3 );
 
-    stbir__interleave_pack_and_store_16_u8( output,  STBIR_strs_join1(i, ,stbir__encode_order0), STBIR_strs_join1(i, ,stbir__encode_order1), STBIR_strs_join1(i, ,stbir__encode_order2), STBIR_strs_join1(i, ,stbir__encode_order3) );
+    stbir__interleave_pack_and_store_16_u8( output,  STBIR_strs_join12(i,stbir__encode_order0), STBIR_strs_join12(i,stbir__encode_order1), STBIR_strs_join12(i,stbir__encode_order2), STBIR_strs_join12(i,stbir__encode_order3) );
 
     encode += 16;
     output += 16;
@@ -11073,7 +11087,7 @@ static void STBIR__CODER_NAME( stbir__encode_uint8_srgb4_linearalpha )( void * o
     stbir__linear_to_srgb_finish( i1, f1 );
     stbir__linear_to_srgb_finish( i2, f2 );
 
-    stbir__interleave_pack_and_store_16_u8( output,  STBIR_strs_join1(i, ,stbir__encode_order0), STBIR_strs_join1(i, ,stbir__encode_order1), STBIR_strs_join1(i, ,stbir__encode_order2), STBIR_strs_join1(i, ,stbir__encode_order3) );
+    stbir__interleave_pack_and_store_16_u8( output,  STBIR_strs_join12(i,stbir__encode_order0), STBIR_strs_join12(i,stbir__encode_order1), STBIR_strs_join12(i,stbir__encode_order2), STBIR_strs_join12(i,stbir__encode_order3) );
 
     output += 16;
     encode += 16;
@@ -11158,7 +11172,7 @@ static void STBIR__CODER_NAME( stbir__encode_uint8_srgb2_linearalpha )( void * o
     stbir__linear_to_srgb_finish( i0, f0 );
     stbir__linear_to_srgb_finish( i2, f2 );
 
-    stbir__interleave_pack_and_store_16_u8( output,  STBIR_strs_join1(i, ,stbir__encode_order0), STBIR_strs_join1(i, ,stbir__encode_order1), STBIR_strs_join1(i, ,stbir__encode_order2), STBIR_strs_join1(i, ,stbir__encode_order3) );
+    stbir__interleave_pack_and_store_16_u8( output,  STBIR_strs_join12(i,stbir__encode_order0), STBIR_strs_join12(i,stbir__encode_order1), STBIR_strs_join12(i,stbir__encode_order2), STBIR_strs_join12(i,stbir__encode_order3) );
 
     output += 16;
     encode += 16;
@@ -13503,6 +13517,8 @@ static stbir__horizontal_gather_channels_func * STBIR_chans(stbir__horizontal_ga
 
 #undef STBIR_strs_join2
 #undef STBIR_strs_join1
+#undef STBIR_strs_join22
+#undef STBIR_strs_join12
 
 #endif // STB_IMAGE_RESIZE_DO_HORIZONTALS/VERTICALS/CODERS
 

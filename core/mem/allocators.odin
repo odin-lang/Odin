@@ -1827,8 +1827,10 @@ Initialize a dynamic arena.
 This procedure initializes a dynamic arena. The specified `block_allocator`
 will be used to allocate arena blocks, and `array_allocator` to allocate
 arrays of blocks and out-band blocks. The blocks have the default size of
-`block_size` and out-band threshold will be `out_band_size`. All allocations
-will be aligned at a minimum to a boundary specified by `minimum_alignment`.
+`block_size` and out-band threshold will be `out_band_size`: allocations of at
+least `out_band_size` bytes, and any that do not fit a block once aligned, are
+allocated out-band. All allocations will be aligned at a minimum to a boundary
+specified by `minimum_alignment`.
 */
 dynamic_arena_init :: proc(
 	arena: ^Dynamic_Arena,
@@ -1853,14 +1855,15 @@ Dynamic arena allocator.
 The dynamic arena allocator uses blocks of a specific size, allocated on-demand
 using the block allocator. This allocator acts similarly to `Arena`. All
 allocations in a block happen contiguously, from start to end. If an allocation
-does not fit into the remaining space of the block and its size is smaller
-than the specified out-band size, a new block is allocated using the
-`block_allocator` and the allocation is performed from a newly-allocated block.
+does not fit into the remaining space of the block, but fits into a block once
+aligned and its size is smaller than the specified out-band size, a new block
+is allocated using the `block_allocator` and the allocation is performed from a
+newly-allocated block.
 
-If an allocation is larger than the specified out-band size, a new block
-is allocated such that the allocation fits into this new block. This is referred
-to as an *out-band allocation*. The out-band blocks are kept separately from
-normal blocks.
+If an allocation is at least the specified out-band size, or does not fit into
+a block once aligned, a new block is allocated such that the allocation fits
+into this new block. This is referred to as an *out-band allocation*. The
+out-band blocks are kept separately from normal blocks.
 
 Just like `Arena`, the dynamic arena does not support freeing of individual
 objects.
@@ -1893,7 +1896,7 @@ _dynamic_arena_cycle_new_block :: proc(a: ^Dynamic_Arena, alignment: int, loc :=
 		panic("You must call `dynamic_arena_init` on a Dynamic Arena before using it.", loc)
 	}
 	if a.current_block != nil {
-		append(&a.used_blocks, a.current_block, loc=loc)
+		append(&a.used_blocks, a.current_block, loc=loc) or_return
 	}
 	new_block: rawptr
 	if len(a.unused_blocks) > 0 {
@@ -1910,6 +1913,13 @@ _dynamic_arena_cycle_new_block :: proc(a: ^Dynamic_Arena, alignment: int, loc :=
 		)
 		// sanitizer.address_poison(data)
 		new_block = raw_data(data)
+		if err != nil || new_block == nil {
+			// Without a new block, the current one stays current.
+			if a.current_block != nil {
+				pop(&a.used_blocks)
+			}
+			return err if err != nil else .Out_Of_Memory
+		}
 	}
 	a.bytes_left    = a.block_size
 	a.current_pos   = new_block
@@ -1972,28 +1982,30 @@ memory region.
 */
 @(require_results)
 dynamic_arena_alloc_bytes_non_zeroed :: proc(a: ^Dynamic_Arena, size: int, alignment: int = DEFAULT_ALIGNMENT, loc := #caller_location) -> ([]byte, Allocator_Error) {
-	if size >= a.out_band_size {
+	actual_alignment := max(a.minimum_alignment, alignment)
+	n := align_formula(size, actual_alignment)
+	// What doesn't fit a block once aligned goes out-band too, however far below `out_band_size`.
+	if size >= a.out_band_size || n > a.block_size {
 		assert(a.out_band_allocations.allocator.procedure != nil, "Backing array allocator must be initialized", loc=loc)
-		memory, err := alloc_bytes_non_zeroed(size, alignment, a.out_band_allocations.allocator, loc)
+		memory, err := alloc_bytes_non_zeroed(size, actual_alignment, a.out_band_allocations.allocator, loc)
 		if memory != nil {
-			append(&a.out_band_allocations, raw_data(memory), loc = loc)
+			if _, err = append(&a.out_band_allocations, raw_data(memory), loc = loc); err != nil {
+				// Untracked, it would never be freed.
+				free(raw_data(memory), a.out_band_allocations.allocator, loc = loc)
+				return nil, err
+			}
 		}
 		return memory, err
 	}
-	actual_alignment := max(a.minimum_alignment, alignment)
-	n := align_formula(size, actual_alignment)
-	if n > a.block_size {
-		return nil, .Invalid_Argument
-	}
 	memory := align_forward(a.current_pos, uintptr(actual_alignment))
 	margin := int(uintptr(memory) - uintptr(a.current_pos))
+	// Moves past the current block and any pooled `unused_blocks` without room for `margin + n`.
+	// Terminates because `n <= block_size` (guarded above) and a fresh block from
+	// `block_allocator` is aligned to `actual_alignment` (`margin == 0`).
 	for a.bytes_left < margin + n {
 		err := _dynamic_arena_cycle_new_block(a, alignment, loc)
 		if err != nil {
 			return nil, err
-		}
-		if a.current_block == nil {
-			return nil, .Out_Of_Memory
 		}
 		memory = align_forward(a.current_pos, uintptr(actual_alignment))
 		margin = int(uintptr(memory) - uintptr(a.current_pos))
@@ -2013,14 +2025,19 @@ This procedure frees all the allocations owned by the dynamic arena, excluding
 the unused blocks.
 */
 dynamic_arena_reset :: proc(a: ^Dynamic_Arena, loc := #caller_location) {
+	// A block that can't be kept for reuse is freed.
 	if a.current_block != nil {
 		// sanitizer.address_poison(a.current_block, a.block_size)
-		append(&a.unused_blocks, a.current_block, loc=loc)
+		if _, err := append(&a.unused_blocks, a.current_block, loc=loc); err != nil {
+			free(a.current_block, a.block_allocator, loc)
+		}
 		a.current_block = nil
 	}
 	for block in a.used_blocks {
 		// sanitizer.address_poison(block, a.block_size)
-		append(&a.unused_blocks, block, loc=loc)
+		if _, err := append(&a.unused_blocks, block, loc=loc); err != nil {
+			free(block, a.block_allocator, loc)
+		}
 	}
 	clear(&a.used_blocks)
 	for allocation in a.out_band_allocations {

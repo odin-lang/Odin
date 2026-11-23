@@ -1,58 +1,110 @@
 package test_core_testing
 
 import "core:c/libc"
+import "core:log"
 import "core:math/rand"
 import "core:testing"
+import "core:time"
 
 @test
-test_expected_assert :: proc(t: ^testing.T) {
-	target := #location(); target.line += 2; target.column = 2
-	testing.expect_assert_from(t, target)
-	assert(false)
+test_fail_timeout_can_be_reset :: proc(t: ^testing.T) {
+	testing.set_fail_timeout(t, 100 * time.Millisecond)
+	testing.set_fail_timeout(t, 500 * time.Millisecond)
+	time.sleep(200 * time.Millisecond)
 }
 
 @test
-test_expected_two_assert :: proc(t: ^testing.T) {
-	target1 := #location(); target1.line += 5; target1.column = 3
-	target2 := #location(); target2.line += 6; target2.column = 3
-	testing.expect_assert_from(t, target1)
-	testing.expect_assert_from(t, target2)
-	if rand.uint32() & 1 == 0 {
+test_fail_timeout_can_be_disabled :: proc(t: ^testing.T) {
+	testing.set_fail_timeout(t, 100 * time.Millisecond)
+	testing.set_fail_timeout(t, time.MAX_DURATION)
+	time.sleep(200 * time.Millisecond)
+}
+
+@test
+test_fail_timeout_will_restart :: proc(t: ^testing.T) {
+	// Each call to `set_fail_timeout` should restart the timer,
+	// even if the duration has the same value.
+	// This means we should be able to sleep for >500 ms in total here.
+	testing.set_fail_timeout(t, 500 * time.Millisecond)
+	time.sleep(100 * time.Millisecond)
+	testing.set_fail_timeout(t, 500 * time.Millisecond)
+	time.sleep(100 * time.Millisecond)
+	testing.set_fail_timeout(t, 500 * time.Millisecond)
+	time.sleep(100 * time.Millisecond)
+	testing.set_fail_timeout(t, 500 * time.Millisecond)
+	time.sleep(100 * time.Millisecond)
+	testing.set_fail_timeout(t, 500 * time.Millisecond)
+	time.sleep(100 * time.Millisecond)
+	testing.set_fail_timeout(t, 500 * time.Millisecond)
+	time.sleep(100 * time.Millisecond)
+}
+
+_ :: libc
+_ :: rand
+
+when !testing.INLINE {
+	@test
+	test_expected_assert :: proc(t: ^testing.T) {
+		target := #location(); target.line += 2; target.column = 3
+		testing.expect_assert_from(t, target)
 		assert(false)
-	} else {
+	}
+
+	@test
+	test_expected_two_assert :: proc(t: ^testing.T) {
+		target1 := #location(); target1.line += 5; target1.column = 4
+		target2 := #location(); target2.line += 6; target2.column = 4
+		testing.expect_assert_from(t, target1)
+		testing.expect_assert_from(t, target2)
+		if rand.uint32() & 1 == 0 {
+			assert(false)
+		} else {
+			assert(false)
+		}
+	}
+
+	some_proc :: proc() {
 		assert(false)
+	}
+
+	@test
+	test_expected_assert_in_proc :: proc(t: ^testing.T) {
+		target := #location(some_proc)
+		target.line += 1
+		target.column = 3
+		assert(target.procedure == "", "The bug's been fixed; this line and the next can be deleted.")
+		target.procedure = "some_proc" // TODO: Is this supposed to be blank on #location(...)?
+		testing.expect_assert(t, target)
+		some_proc()
+	}
+
+	@test
+	test_expected_assert_message :: proc(t: ^testing.T) {
+		testing.expect_assert(t, "failure")
+		assert(false, "failure")
+	}
+
+	@test
+	test_expected_signal :: proc(t: ^testing.T) {
+		testing.expect_signal(t, libc.SIGILL)
+		libc.raise(libc.SIGILL)
+	}
+
+	@test
+	test_array_bounds_trap_signal :: proc(t: ^testing.T) {
+		testing.expect_signal(t, libc.SIGILL)
+		_ = make([]u8, -1)
 	}
 }
 
-some_proc :: proc() {
-	assert(false)
-}
-
 @test
-test_expected_assert_in_proc :: proc(t: ^testing.T) {
-	target := #location(some_proc)
-	target.line += 1
-	target.column = 2
-	assert(target.procedure == "", "The bug's been fixed; this line and the next can be deleted.")
-	target.procedure = "some_proc" // TODO: Is this supposed to be blank on #location(...)?
-	testing.expect_assert(t, target)
-	some_proc()
-}
+test_expect_fails_without_test_logger :: proc(t: ^testing.T) {
+	test_logger := context.logger
+	context.logger = log.nil_logger()
+	testing.expect(t, false)
+	failed := testing.failed(t)
+	context.logger = test_logger
 
-@test
-test_expected_assert_message :: proc(t: ^testing.T) {
-	testing.expect_assert(t, "failure")
-	assert(false, "failure")
-}
-
-@test
-test_expected_signal :: proc(t: ^testing.T) {
-	testing.expect_signal(t, libc.SIGILL)
-	libc.raise(libc.SIGILL)
-}
-
-@test
-test_array_bounds_trap_signal :: proc(t: ^testing.T) {
-	testing.expect_signal(t, libc.SIGILL)
-	_ = make([]u8, -1)
+	t.error_count = 0
+	testing.expect(t, failed, "a failed expect with a replaced logger did not fail the test")
 }

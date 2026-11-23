@@ -1,4 +1,3 @@
-#+build !riscv64
 package test_core_crypto
 
 import "core:bytes"

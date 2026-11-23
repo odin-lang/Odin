@@ -40,7 +40,42 @@ foreign shell32 {
 	DragFinish      :: proc(hDrop: HDROP) --- // @New
 
 	AssocCreateForClasses :: proc (rgClasses: [^]ASSOCIATIONELEMENT, cClasses: ULONG, riid: REFIID, ppv: ^rawptr) -> HRESULT ---
+
+	SHBrowseForFolderW   :: proc(lpbi: LPBROWSEINFOW) -> rawptr ---
+	SHGetPathFromIDListW :: proc(pidl: rawptr, pszPath: LPWSTR) -> BOOL ---
 }
+
+BFFCALLBACK :: #type proc "system" (hwnd: HWND, uMsg: UINT, lParam: LPARAM, lpData: LPARAM) -> c_int
+
+BROWSEINFOW :: struct {
+	hwndOwner:      HWND,
+	pidlRoot:       rawptr,
+	pszDisplayName: LPWSTR,
+	lpszTitle:      LPCWSTR,
+	ulFlags:        UINT,
+	lpfn:           BFFCALLBACK,
+	lParam:         LPARAM,
+	iImage:         c_int,
+}
+LPBROWSEINFOW :: ^BROWSEINFOW
+
+BIF_RETURNONLYFSDIRS    :: 0x00000001
+BIF_DONTGOBELOWDOMAIN   :: 0x00000002
+BIF_STATUSTEXT          :: 0x00000004
+BIF_RETURNFSANCESTORS   :: 0x00000008
+BIF_EDITBOX             :: 0x00000010
+BIF_VALIDATE            :: 0x00000020
+BIF_NEWDIALOGSTYLE      :: 0x00000040
+BIF_USENEWUI            :: BIF_NEWDIALOGSTYLE | BIF_EDITBOX
+BIF_BROWSEINCLUDEURLS   :: 0x00000080
+BIF_UAHINT              :: 0x00000100
+BIF_NONEWFOLDERBUTTON   :: 0x00000200
+BIF_NOTRANSLATETARGETS  :: 0x00000400
+BIF_BROWSEFORCOMPUTER   :: 0x00001000
+BIF_BROWSEFORPRINTER    :: 0x00002000
+BIF_BROWSEINCLUDEFILES  :: 0x00004000
+BIF_SHAREABLE           :: 0x00008000
+BIF_BROWSEFILEJUNCTIONS :: 0x00010000
 
 APPBARDATA :: struct {
 	cbSize:           DWORD,

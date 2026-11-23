@@ -984,9 +984,9 @@ Output:
 
 */
 compare_ints :: proc(a, b: int) -> int {
-	switch delta := a - b; {
-	case delta < 0: return -1
-	case delta > 0: return +1
+	switch {
+	case a < b: return -1
+	case a > b: return +1
 	}
 	return 0
 }

@@ -38,22 +38,34 @@ Stop_Reason :: enum {
 	Unhandled_Trap,
 }
 
+INLINE_EXPECT_ASSERT_MESSAGE :: "`expect_assert` can't catch an assertion when tests run inline. Guard this test with `when !testing.INLINE`."
+
 test_assertion_failure_proc :: proc(prefix, message: string, loc: runtime.Source_Code_Location) -> ! {
-	if local_test_expected_failures.message_count + local_test_expected_failures.location_count > 0 {
+	if local_test_expected_failures.signal != 0 ||
+	   local_test_expected_failures.message_count + local_test_expected_failures.location_count > 0 {
 		local_test_assertion_raised = { message, loc }
 		log.debugf("%s\n\tmessage: %q\n\tlocation: %w", prefix, message, loc)
 	} else {
 		log.fatalf("%s: %s", prefix, message, location = loc)
 	}
+	when INLINE {
+		report_inline_trap()
+	}
 	runtime.trap()
 }
 
 setup_signal_handler :: proc() {
-	_setup_signal_handler()
+	when !INLINE {
+		_setup_signal_handler()
+	}
 }
 
 setup_task_signal_handler :: proc(test_index: int) {
-	_setup_task_signal_handler(test_index)
+	local_test_expected_failures = {}
+	local_test_assertion_raised  = {}
+	when !INLINE {
+		_setup_task_signal_handler(test_index)
+	}
 }
 
 should_stop_runner :: proc() -> bool {

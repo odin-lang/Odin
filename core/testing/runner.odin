@@ -13,6 +13,7 @@ package testing
 import            "base:intrinsics"
 import            "base:runtime"
 import            "core:bytes"
+import            "core:container/queue"
 @(require) import "core:encoding/base64"
 @(require) import "core:encoding/json"
 import            "core:fmt"
@@ -81,16 +82,20 @@ get_log_level :: #force_inline proc() -> runtime.Logger_Level {
 @(private) global_log_colors_disabled: bool
 @(private) global_ansi_disabled: bool
 
-JSON :: struct {
+JSON :: struct #all_or_none {
 	total:    int,
 	success:  int,
-	duration: time.Duration,
+	duration: i64, // format: nanoseconds
 	packages: map[string][dynamic]JSON_Test,
 }
 
-JSON_Test :: struct {
-	success: bool,
-	name:    string,
+JSON_Test :: struct #all_or_none {
+	success:     bool,
+	name:        string,
+	start_time:  Maybe(i64), // format: Unix timestamp, nanoseconds
+	end_time:    Maybe(i64), // format: Unix timestamp, nanoseconds
+	runtime:     Maybe(i64), // format: nanoseconds
+	fail_reason: Maybe(string),
 }
 
 end_t :: proc(t: ^T) {
@@ -109,6 +114,7 @@ when TRACKING_MEMORY && FAIL_ON_BAD_MEMORY {
 		it: Internal_Test,
 		t: T,
 		allocator_index: int,
+		stopped: bool,
 		tracking_allocator: ^mem.Tracking_Allocator,
 	}
 } else {
@@ -116,13 +122,161 @@ when TRACKING_MEMORY && FAIL_ON_BAD_MEMORY {
 		it: Internal_Test,
 		t: T,
 		allocator_index: int,
+		stopped: bool,
 	}
 }
 
-Task_Timeout :: struct {
+Task_Allocator :: struct {
+	stack:   mem.Rollback_Stack,
+	tracker: mem.Tracking_Allocator,
+}
+
+new_task_allocator :: proc() -> ^Task_Allocator {
+	ta, alloc_error := new(Task_Allocator)
+	fmt.assertf(alloc_error == nil, "Error allocating memory for a task allocator: %v", alloc_error)
+	alloc_error = mem.rollback_stack_init(&ta.stack, PER_THREAD_MEMORY)
+	fmt.assertf(alloc_error == nil, "Error allocating memory for a task allocator: %v", alloc_error)
+	when TRACKING_MEMORY {
+		mem.tracking_allocator_init(&ta.tracker, mem.rollback_stack_allocator(&ta.stack))
+		ta.tracker.bad_free_callback = mem.tracking_allocator_bad_free_callback_add_to_array
+	}
+	return ta
+}
+
+destroy_task_allocator :: proc(ta: ^Task_Allocator) {
+	when TRACKING_MEMORY {
+		mem.tracking_allocator_destroy(&ta.tracker)
+	}
+	mem.rollback_stack_destroy(&ta.stack)
+	free(ta)
+}
+
+task_allocator_interface :: proc(ta: ^Task_Allocator) -> mem.Allocator {
+	when TRACKING_MEMORY {
+		return mem.tracking_allocator(&ta.tracker)
+	} else {
+		return mem.rollback_stack_allocator(&ta.stack)
+	}
+}
+
+Task_Timeout :: struct #all_or_none {
 	test_index: int,
 	at_time: time.Time,
 	location: runtime.Source_Code_Location,
+	duration: time.Duration,
+}
+
+TIMEOUT_MESSAGE :: "Test timed out after %v total runtime (timeout setpoint: %v)."
+
+Inline_Pool :: struct {
+	task:          thread.Task,
+	waiting:       bool,
+	done:          bool,
+	done_count:    int,
+	failure_count: int,
+	test_count:    int,
+}
+
+inline_pool_running: ^Inline_Pool
+
+pool_add_task  :: proc{thread.pool_add_task,  inline_pool_add_task}
+pool_is_empty  :: proc{thread.pool_is_empty,  inline_pool_is_empty}
+pool_pop_done  :: proc{thread.pool_pop_done,  inline_pool_pop_done}
+pool_stop_task :: proc{thread.pool_stop_task, inline_pool_stop_task}
+pool_shutdown  :: proc{thread.pool_shutdown,  inline_pool_shutdown}
+pool_join      :: proc{thread.pool_join,      inline_pool_join}
+
+inline_pool_add_task :: proc(pool: ^Inline_Pool, allocator: mem.Allocator, procedure: thread.Task_Proc, data: rawptr, user_index: int = 0) {
+	pool.task = {
+		procedure  = procedure,
+		data       = data,
+		user_index = user_index,
+		allocator  = allocator,
+	}
+	pool.waiting = true
+}
+
+inline_pool_is_empty :: proc(pool: ^Inline_Pool) -> bool {
+	return !pool.waiting && !pool.done
+}
+
+inline_pool_run :: proc(pool: ^Inline_Pool, done_count, failure_count, test_count: int) {
+	if !pool.waiting {
+		return
+	}
+	pool.waiting       = false
+	pool.done_count    = done_count
+	pool.failure_count = failure_count
+	pool.test_count    = test_count
+
+	inline_pool_running = pool
+	{
+		context.allocator = pool.task.allocator
+		pool.task.procedure(pool.task)
+	}
+	inline_pool_running = nil
+
+	pool.done = true
+}
+
+inline_pool_pop_done :: proc(pool: ^Inline_Pool) -> (task: thread.Task, got_task: bool) {
+	if !pool.done {
+		return
+	}
+	pool.done = false
+	return pool.task, true
+}
+
+inline_pool_stop_task :: proc(pool: ^Inline_Pool, user_index: int, exit_code: int = 1) -> bool {
+	return false
+}
+
+inline_pool_shutdown :: proc(pool: ^Inline_Pool, exit_code: int = 1) {
+	pool.waiting = false
+	pool.done    = false
+}
+
+inline_pool_join :: proc(pool: ^Inline_Pool) {
+}
+
+send_event :: proc(t: ^T, event: Channel_Event) {
+	when INLINE {
+		_, err := queue.push_back(&t._events, event)
+		assert(err == nil, "Error queueing a test event.")
+	} else {
+		chan.send(t.channel, event)
+	}
+}
+
+recv_event :: proc(task_channel: ^Task_Channel, t: ^T) -> (event: Channel_Event, ok: bool) {
+	when INLINE {
+		return queue.pop_front_safe(&t._events)
+	} else {
+		return chan.try_recv(task_channel.channel)
+	}
+}
+
+report_inline_trap :: proc() {
+	pool := inline_pool_running
+	if pool == nil {
+		return
+	}
+	data := cast(^Task_Data)pool.task.data
+
+	if !global_ansi_disabled {
+		fmt.wprint(os.to_stream(os.stdout), ansi.show_cursor())
+	}
+
+	stderr := os.to_stream(os.stderr)
+	for event in queue.pop_front_safe(&data.t._events) {
+		if message, ok := event.(Event_Log_Message); ok {
+			fmt.wprintln(stderr, message.formatted_text)
+		}
+	}
+
+	fmt.wprintfln(stderr, "\nTest #%i %s.%s trapped, which ends the test run. %i of %i tests had finished, %i of them failed.",
+		pool.task.user_index, data.it.pkg, data.it.name,
+		pool.done_count, pool.test_count, pool.failure_count)
 }
 
 run_test_task :: proc(task: thread.Task) {
@@ -130,14 +284,17 @@ run_test_task :: proc(task: thread.Task) {
 
 	setup_task_signal_handler(task.user_index)
 
-	chan.send(data.t.channel, Event_New_Test {
+	started_at := time.now()
+
+	send_event(&data.t, Event_New_Test {
 		test_index = task.user_index,
+		started_at = started_at,
 	})
 
-	chan.send(data.t.channel, Event_State_Change {
+	send_event(&data.t, Event_State_Change {
 		new_state = .Running,
 	})
-	
+
 	context.assertion_failure_proc = test_assertion_failure_proc
 
 	logger_options := Default_Test_Logger_Opts
@@ -162,6 +319,17 @@ run_test_task :: proc(task: thread.Task) {
 	free_all(context.temp_allocator)
 
 	data.it.p(&data.t)
+
+	when INLINE {
+		if timeout := data.t._timeout; timeout.at_time != {} && time.since(timeout.at_time) >= 0 {
+			log.errorf(TIMEOUT_MESSAGE, time.since(started_at), timeout.duration, location = timeout.location)
+		}
+	}
+
+	if local_test_expected_failures.signal != 0 ||
+	   local_test_expected_failures.message_count + local_test_expected_failures.location_count > 0 {
+		log.errorf("`%s.%s` returned without the assertion or signal it expected.", data.it.pkg, data.it.name)
+	}
 
 	end_t(&data.t)
 
@@ -192,8 +360,9 @@ run_test_task :: proc(task: thread.Task) {
 
 	new_state : Test_State = .Failed if failed(&data.t) else .Successful
 
-	chan.send(data.t.channel, Event_State_Change {
-		new_state = new_state,
+	send_event(&data.t, Event_State_Change {
+		new_state   = new_state,
+		finished_at = time.now(),
 	})
 }
 
@@ -244,6 +413,65 @@ parse_cli_options :: proc(argv: []string, opts: ^Options, stdout, stderr: io.Wri
 	opts.test_names = strings.to_string(test_names)
 }
 
+/*
+Formats the message that will be printed (summary + logging) when a test has timed out.
+*/
+format_test_timeout_message :: proc(
+	timeout: Task_Timeout,
+	test: Internal_Test,
+	internal_tests: []Internal_Test,
+	test_states: []Test_State,
+	test_start_times: []time.Time,
+	now: time.Time,
+	allocator: runtime.Allocator,
+) -> (
+	short_message: string,
+	full_message: string,
+) {
+	total_runtime := time.diff(test_start_times[timeout.test_index], now)
+	short_message = fmt.aprintf(TIMEOUT_MESSAGE, total_runtime, timeout.duration, allocator = allocator)
+
+	full_message_sb := strings.builder_make(allocator)
+
+	strings.write_string(&full_message_sb, short_message)
+
+	// Append other tests that have been running at this time.
+	// A timeout can hint at the CPU being overburdened with too many threads, or too much parallel I/O.
+	other_tests_started := false
+	for other_test, index in internal_tests {
+		if index == timeout.test_index || test_states[index] != .Running {
+			continue
+		}
+
+		if !other_tests_started {
+			fmt.sbprintf(&full_message_sb, "\n  Other tests running at this time:")
+			other_tests_started = true
+		}
+
+		runtime := time.diff(test_start_times[index], now)
+		fmt.sbprintf(&full_message_sb, "\n  - %s.%s - (has been running for %v)", other_test.pkg, other_test.name, runtime)
+	}
+
+	full_message = strings.to_string(full_message_sb)
+	return
+}
+
+write_log_messages :: proc(w: io.Writer, log_messages: ^[dynamic]Log_Message) {
+	// Because each thread has its own messenger channel, log messages
+	// arrive in chunks that are in-order, but when they're merged with the
+	// logs from other threads, they become out-of-order.
+	slice.stable_sort_by(log_messages^[:], proc(a, b: Log_Message) -> bool {
+		return time.diff(a.time, b.time) > 0
+	})
+
+	for message in log_messages^ {
+		fmt.wprintln(w, message.text)
+		delete(message.text, message.allocator)
+	}
+
+	clear(log_messages)
+}
+
 runner :: proc(internal_tests: []Internal_Test) -> bool {
 	BATCH_BUFFER_SIZE     :: 32 * mem.Kilobyte
 	POOL_BLOCK_SIZE       :: 16 * mem.Kilobyte
@@ -253,14 +481,13 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	RESERVED_LOG_MESSAGES       :: 64
 	RESERVED_TEST_FAILURES      :: 64
 
-	ERROR_STRING_TIMEOUT : string : "Test timed out."
-	ERROR_STRING_UNKNOWN : string : "Test failed for unknown reasons."
-	OSC_WINDOW_TITLE     : string : ansi.OSC + ansi.WINDOW_TITLE + ";Odin test runner (%i/%i)" + ansi.ST
+	ERROR_STRING_UNKNOWN        : string : "Test failed for unknown reasons."
+	OSC_WINDOW_TITLE            : string : ansi.OSC + ansi.WINDOW_TITLE + ";Odin test runner (%i/%i)" + ansi.ST
 
 	safe_delete_string :: proc(s: string, allocator := context.allocator) {
 		// Guard against bad frees on static strings.
 		switch raw_data(s) {
-		case raw_data(ERROR_STRING_TIMEOUT), raw_data(ERROR_STRING_UNKNOWN):
+		case raw_data(ERROR_STRING_UNKNOWN):
 			return
 		case:
 			delete(s, allocator)
@@ -377,7 +604,9 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	// -- Set thread count.
 
-	when TEST_THREADS == 0 {
+	when INLINE {
+		thread_count := 1
+	} else when TEST_THREADS == 0 {
 		thread_count := os.get_processor_core_count()
 	} else {
 		thread_count := max(1, TEST_THREADS)
@@ -387,26 +616,38 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	// -- Allocate.
 
-	pool_stack: mem.Rollback_Stack
-	alloc_error = mem.rollback_stack_init(&pool_stack, POOL_BLOCK_SIZE)
-	fmt.assertf(alloc_error == nil, "Error allocating memory for thread pool: %v", alloc_error)
-	defer mem.rollback_stack_destroy(&pool_stack)
+	// NOTE(Feoramund): This is the allocator that will be used by threads to
+	// persist log messages past their lifetimes. It has its own variable name
+	// in the event it needs to be changed from `context.allocator` without
+	// digging through the source to divine everywhere it is used for that.
+	shared_log_allocator := context.allocator
 
-	pool: thread.Pool
-	thread.pool_init(&pool, mem.rollback_stack_allocator(&pool_stack), thread_count)
-	defer thread.pool_destroy(&pool)
+	when INLINE {
+		pool: Inline_Pool
+	} else {
+		pool_stack: mem.Rollback_Stack
+		alloc_error = mem.rollback_stack_init(&pool_stack, POOL_BLOCK_SIZE)
+		fmt.assertf(alloc_error == nil, "Error allocating memory for thread pool: %v", alloc_error)
+		defer mem.rollback_stack_destroy(&pool_stack)
+
+		pool: thread.Pool
+		thread.pool_init(&pool, mem.rollback_stack_allocator(&pool_stack), thread_count)
+		defer thread.pool_destroy(&pool)
+	}
 
 	task_channels: []Task_Channel = ---
 	task_channels, alloc_error = make([]Task_Channel, thread_count)
 	fmt.assertf(alloc_error == nil, "Error allocating memory for update channels: %v", alloc_error)
 	defer delete(task_channels)
 
-	for &task_channel, index in task_channels {
-		task_channel.channel, alloc_error = chan.create_buffered(Update_Channel, BUFFERED_EVENTS_PER_CHANNEL, context.allocator)
-		fmt.assertf(alloc_error == nil, "Error allocating memory for update channel #%i: %v", index, alloc_error)
-	}
-	defer for &task_channel in task_channels {
-		chan.destroy(&task_channel.channel)
+	when !INLINE {
+		for &task_channel, index in task_channels {
+			task_channel.channel, alloc_error = chan.create_buffered(Update_Channel, BUFFERED_EVENTS_PER_CHANNEL, context.allocator)
+			fmt.assertf(alloc_error == nil, "Error allocating memory for update channel #%i: %v", index, alloc_error)
+		}
+		defer for &task_channel in task_channels {
+			chan.destroy(&task_channel.channel)
+		}
 	}
 
 	// This buffer is used to batch writes to STDOUT or STDERR, to help reduce
@@ -425,16 +666,11 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	// We cannot make use of the ANSI save/restore cursor codes, because they
 	// work by absolute screen coordinates. This will cause unnecessary
 	// scrollback if we print at the bottom of someone's terminal.
-	ansi_redraw_string := fmt.aprintf(
-		// ANSI for "go up N lines then erase the screen from the cursor forward."
-		ansi.CSI + "%i" + ansi.CPL + ansi.CSI + ansi.ED +
-		// We'll combine this with the window title format string, since it
-		// can be printed at the same time.
-		"%s",
-		// 1 extra line for the status bar.
-		1 + len(report.packages), OSC_WINDOW_TITLE)
-	assert(len(ansi_redraw_string) > 0, "Error allocating ANSI redraw string.")
-	defer delete(ansi_redraw_string)
+	// Instead, redraws go up `report_lines`, the height of the last frame,
+	// except when a test was just stopped by a signal and failed; see
+	// `bypass_progress_overwrite`.
+	report_lines := 0
+	cursor_buf: [ansi.CURSOR_SEQUENCE_BUF_MAX]byte
 
 	thread_count_status_string: string = ---
 	{
@@ -452,33 +688,28 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	fmt.assertf(alloc_error == nil, "Error allocating memory for task data slots: %v", alloc_error)
 	defer delete(task_data_slots)
 
+	when INLINE {
+		for &data, index in task_data_slots {
+			alloc_error = queue.init(&data.t._events, BUFFERED_EVENTS_PER_CHANNEL, shared_log_allocator)
+			fmt.assertf(alloc_error == nil, "Error allocating memory for event queue #%i: %v", index, alloc_error)
+		}
+		defer for &data in task_data_slots {
+			queue.destroy(&data.t._events)
+		}
+	}
+
 	// Tests rotate through these allocators as they finish.
-	task_allocators: []mem.Rollback_Stack = ---
-	task_allocators, alloc_error = make([]mem.Rollback_Stack, thread_count)
+	task_allocators: []^Task_Allocator = ---
+	task_allocators, alloc_error = make([]^Task_Allocator, thread_count)
 	fmt.assertf(alloc_error == nil, "Error allocating memory for task allocators: %v", alloc_error)
 	defer delete(task_allocators)
 
-	when TRACKING_MEMORY {
-		task_memory_trackers: []mem.Tracking_Allocator = ---
-		task_memory_trackers, alloc_error = make([]mem.Tracking_Allocator, thread_count)
-		fmt.assertf(alloc_error == nil, "Error allocating memory for memory trackers: %v", alloc_error)
-		defer delete(task_memory_trackers)
-	}
-
 	#no_bounds_check for i in 0 ..< thread_count {
-		alloc_error = mem.rollback_stack_init(&task_allocators[i], PER_THREAD_MEMORY)
-		fmt.assertf(alloc_error == nil, "Error allocating memory for task allocator #%i: %v", i, alloc_error)
-		when TRACKING_MEMORY {
-			mem.tracking_allocator_init(&task_memory_trackers[i], mem.rollback_stack_allocator(&task_allocators[i]))
-			task_memory_trackers[i].bad_free_callback = mem.tracking_allocator_bad_free_callback_add_to_array
-		}
+		task_allocators[i] = new_task_allocator()
 	}
 
-	defer #no_bounds_check for i in 0 ..< thread_count {
-		when TRACKING_MEMORY {
-			mem.tracking_allocator_destroy(&task_memory_trackers[i])
-		}
-		mem.rollback_stack_destroy(&task_allocators[i])
+	defer for ta in task_allocators {
+		destroy_task_allocator(ta)
 	}
 
 	task_timeouts: [dynamic]Task_Timeout = ---
@@ -486,10 +717,28 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	fmt.assertf(alloc_error == nil, "Error allocating memory for task timeouts: %v", alloc_error)
 	defer delete(task_timeouts)
 
+	// Used to record the total runtimes of tests.
+	test_start_times: []time.Time = ---
+	test_start_times, alloc_error = make([]time.Time, total_test_count)
+	fmt.assertf(alloc_error == nil, "Error allocating memory for test start times: %v", alloc_error)
+	defer delete(test_start_times)
+
+	// Used to record the total runtimes of tests.
+	test_end_times: []time.Time = ---
+	test_end_times, alloc_error = make([]time.Time, total_test_count)
+	fmt.assertf(alloc_error == nil, "Error allocating memory for test end times: %v", alloc_error)
+	defer delete(test_end_times)
+
+	// NOTE: All strings that go in this map are expected to be allocated with shared_log_allocator.
 	failed_test_reason_map: map[int]string = ---
 	failed_test_reason_map, alloc_error = make(map[int]string, RESERVED_TEST_FAILURES)
 	fmt.assertf(alloc_error == nil, "Error allocating memory for failed test reasons: %v", alloc_error)
-	defer delete(failed_test_reason_map)
+	defer {
+		for _, fail_reason in failed_test_reason_map {
+			safe_delete_string(fail_reason, shared_log_allocator)
+		}
+		delete(failed_test_reason_map)
+	}
 
 	log_messages: [dynamic]Log_Message = ---
 	log_messages, alloc_error = make([dynamic]Log_Message, 0, RESERVED_LOG_MESSAGES)
@@ -514,12 +763,6 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	}
 
 	// -- Setup initial tasks.
-
-	// NOTE(Feoramund): This is the allocator that will be used by threads to
-	// persist log messages past their lifetimes. It has its own variable name
-	// in the event it needs to be changed from `context.allocator` without
-	// digging through the source to divine everywhere it is used for that.
-	shared_log_allocator := context.allocator
 
 	logger_options := Default_Test_Logger_Opts - {.Short_File_Path, .Line, .Procedure}
 	if global_log_colors_disabled {
@@ -546,16 +789,12 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			data.t._log_allocator = shared_log_allocator
 			data.allocator_index = task_index
 
-			#no_bounds_check when TRACKING_MEMORY {
-				task_allocator := mem.tracking_allocator(&task_memory_trackers[task_index])
-				when FAIL_ON_BAD_MEMORY {
-					data.tracking_allocator = &task_memory_trackers[task_index]
-				}
-			} else {
-				task_allocator := mem.rollback_stack_allocator(&task_allocators[task_index])
+			#no_bounds_check ta := task_allocators[task_index]
+			when TRACKING_MEMORY && FAIL_ON_BAD_MEMORY {
+				data.tracking_allocator = &ta.tracker
 			}
 
-			thread.pool_add_task(&pool, task_allocator, run_test_task, &data, run_index)
+			pool_add_task(&pool, task_allocator_interface(ta), run_test_task, &data, run_index)
 
 			continue setup_tasks
 		}
@@ -566,17 +805,20 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	setup_signal_handler()
 
 	if !global_ansi_disabled {
-		fmt.wprint(stdout, ansi.CSI + ansi.DECTCEM_HIDE)
+		fmt.wprint(stdout, ansi.hide_cursor())
 	}
 
 	signals_were_raised := false
+	runner_interrupted := false
 
 	if should_show_animations {
-		redraw_report(stdout, report)
+		report_lines = 1 + redraw_report(stdout, report, true)
 		draw_status_bar(stdout, thread_count_status_string, total_done_count, total_test_count)
 	}
 
-	when TEST_THREADS == 0 {
+	when INLINE {
+		log.info("Starting test runner inline, one test at a time on the main thread.")
+	} else when TEST_THREADS == 0 {
 		log.infof("Starting test runner with %i thread%s. Set with -define:ODIN_TEST_THREADS=n.",
 			thread_count,
 			"" if thread_count == 1 else "s")
@@ -610,9 +852,13 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 	start_time := time.now()
 
-	thread.pool_start(&pool)
-	main_loop: for !thread.pool_is_empty(&pool) {
-		{
+	when !INLINE {
+		thread.pool_start(&pool)
+	}
+	main_loop: for !pool_is_empty(&pool) {
+		when INLINE {
+			inline_pool_run(&pool, total_done_count, total_failure_count, total_test_count)
+		} else {
 			events_pending := thread.pool_num_done(&pool) > 0
 
 			if !events_pending {
@@ -630,11 +876,11 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			}
 		}
 
-		cycle_pool: for task in thread.pool_pop_done(&pool) {
+		cycle_pool: for task in pool_pop_done(&pool) {
 			data := cast(^Task_Data)(task.data)
 
 			when TRACKING_MEMORY {
-				#no_bounds_check tracker := &task_memory_trackers[data.allocator_index]
+				#no_bounds_check tracker := &task_allocators[data.allocator_index].tracker
 
 				memory_is_in_bad_state := len(tracker.allocation_map) + len(tracker.bad_free_array) > 0
 
@@ -655,10 +901,25 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 					bytes.buffer_reset(&batch_buffer)
 				}
 
-				mem.tracking_allocator_reset(tracker)
+				if !data.stopped {
+					mem.tracking_allocator_reset(tracker)
+				}
 			}
 
-			free_all(task.allocator)
+			if data.stopped {
+				data.stopped = false
+				// Leaked on purpose: a stopped test may have left threads
+				// running that still use this memory, so its slot gets a fresh
+				// allocator instead of reusing this one.
+				#no_bounds_check task_allocators[data.allocator_index] = new_task_allocator()
+			} else {
+				free_all(task.allocator)
+			}
+
+			#no_bounds_check ta := task_allocators[data.allocator_index]
+			when TRACKING_MEMORY && FAIL_ON_BAD_MEMORY {
+				data.tracking_allocator = &ta.tracker
+			}
 
 			if run_index < total_test_count {
 				#no_bounds_check it := internal_tests[run_index]
@@ -668,19 +929,26 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				data.t.seed = shared_random_seed
 				data.t.error_count = 0
 				data.t._fail_now_called = false
+				data.t._timeout = {}
 
-				thread.pool_add_task(&pool, task.allocator, run_test_task, data, run_index)
+				pool_add_task(&pool, task_allocator_interface(ta), run_test_task, data, run_index)
 			}
 		}
 
-		handle_events: for &task_channel in task_channels {
-			for ev in chan.try_recv(task_channel.channel) {
+		handle_events: for &task_channel, task_index in task_channels {
+			#no_bounds_check task_t := &task_data_slots[task_index].t
+			for ev in recv_event(&task_channel, task_t) {
 				switch event in ev {
 				case Event_New_Test:
 					task_channel.test_index = event.test_index
+					test_start_times[event.test_index] = event.started_at
 
 				case Event_State_Change:
 					#no_bounds_check report.all_test_states[task_channel.test_index] = event.new_state
+					#partial switch event.new_state {
+					case .Successful, .Failed:
+						#no_bounds_check test_end_times[task_channel.test_index] = event.finished_at
+					}
 
 					#no_bounds_check it := internal_tests[task_channel.test_index]
 					#no_bounds_check pkg := report.packages_by_name[it.pkg]
@@ -706,12 +974,36 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 					pkg.frame_ready = false
 
 				case Event_Set_Fail_Timeout:
-					_, alloc_error = append(&task_timeouts, Task_Timeout {
-						test_index = task_channel.test_index,
-						at_time = event.at_time,
-						location = event.location,
-					})
-					fmt.assertf(alloc_error == nil, "Error appending to task timeouts: %v", alloc_error)
+					// See if the source test already has a timeout set.
+					existing_timeout_index := -1
+					for i := len(task_timeouts) - 1; i >= 0; i -= 1 {
+						#no_bounds_check timeout := &task_timeouts[i]
+						if timeout.test_index == task_channel.test_index {
+							existing_timeout_index = i
+							break
+						}
+					}
+
+					disable_timeout := event.duration == time.MAX_DURATION
+
+					if disable_timeout {
+						if existing_timeout_index >= 0 {
+							unordered_remove(&task_timeouts, existing_timeout_index)
+						} // else: nothing to be disabled
+					} else if existing_timeout_index >= 0 {
+						#no_bounds_check timeout := &task_timeouts[existing_timeout_index]
+						timeout.at_time = event.at_time
+						timeout.location = event.location
+						timeout.duration = event.duration
+					} else {
+						_, alloc_error = append(&task_timeouts, Task_Timeout {
+							test_index = task_channel.test_index,
+							at_time = event.at_time,
+							location = event.location,
+							duration = event.duration,
+						})
+						fmt.assertf(alloc_error == nil, "Error appending to task timeouts: %v", alloc_error)
+					}
 
 				case Event_Log_Message:
 					_, alloc_error = append(&log_messages, Log_Message {
@@ -722,11 +1014,8 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 					})
 					fmt.assertf(alloc_error == nil, "Error appending to log messages: %v", alloc_error)
 
-					if event.level >= .Error {
+					if event.level >= .Error && task_channel.test_index not_in failed_test_reason_map {
 						// Save the message for the final summary.
-						if old_error, ok := failed_test_reason_map[task_channel.test_index]; ok {
-							safe_delete_string(old_error, shared_log_allocator)
-						}
 						failed_test_reason_map[task_channel.test_index] = event.text
 					} else {
 						delete(event.text, shared_log_allocator)
@@ -735,57 +1024,10 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			}
 		}
 
-		check_timeouts: for i := len(task_timeouts) - 1; i >= 0; i -= 1 {
-			#no_bounds_check timeout := &task_timeouts[i]
-
-			if time.since(timeout.at_time) < 0 {
-				continue check_timeouts
-			}
-
-			defer unordered_remove(&task_timeouts, i)
-
-			#no_bounds_check if report.all_test_states[timeout.test_index] > .Running {
-				continue check_timeouts
-			}
-
-			if !thread.pool_stop_task(&pool, timeout.test_index) {
-				// The task may have stopped a split second after we started
-				// checking, but we haven't handled the new state yet.
-				continue check_timeouts
-			}
-
-			#no_bounds_check report.all_test_states[timeout.test_index] = .Failed
-			#no_bounds_check it := internal_tests[timeout.test_index]
-			#no_bounds_check pkg := report.packages_by_name[it.pkg]
-			pkg.frame_ready = false
-
-			if old_error, ok := failed_test_reason_map[timeout.test_index]; ok {
-				safe_delete_string(old_error, shared_log_allocator)
-			}
-			failed_test_reason_map[timeout.test_index] = ERROR_STRING_TIMEOUT
-			total_failure_count += 1
-			total_done_count += 1
-
-			now := time.now()
-			_, alloc_error = append(&log_messages, Log_Message {
-				level = .Error,
-				text = format_log_text(.Error, ERROR_STRING_TIMEOUT, Default_Test_Logger_Opts, timeout.location, now),
-				time = now,
-				allocator = context.allocator,
-			})
-			fmt.assertf(alloc_error == nil, "Error appending to log messages: %v", alloc_error)
-
-			find_task_data_for_timeout: for &data in task_data_slots {
-				if data.it.pkg == it.pkg && data.it.name == it.name {
-					end_t(&data.t)
-					break find_task_data_for_timeout
-				}
-			}
-		}
-
 		if should_stop_runner() {
 			fmt.wprintln(stderr, "\nCaught interrupt signal. Stopping all tests.")
-			thread.pool_shutdown(&pool)
+			runner_interrupted = true
+			pool_shutdown(&pool)
 			break main_loop
 		}
 
@@ -806,14 +1048,12 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		bypass_progress_overwrite := false
 
 
-		if test_index, reason, ok := should_stop_test(); ok {
-			passed := reason == .Successful_Stop
-			#no_bounds_check report.all_test_states[test_index] = .Successful if passed else .Failed
+		if test_index, reason, ok := should_stop_test(); ok && report.all_test_states[test_index] <= .Running {
 			#no_bounds_check it := internal_tests[test_index]
 			#no_bounds_check pkg := report.packages_by_name[it.pkg]
 			pkg.frame_ready = false
 
-			found := thread.pool_stop_task(&pool, test_index)
+			found := pool_stop_task(&pool, test_index)
 			fmt.assertf(found, "A signal (%v) was raised to stop test #%i %s.%s, but it was unable to be found.",
 				reason, test_index, it.pkg, it.name)
 
@@ -828,6 +1068,12 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 
 			fmt.assertf(task_data != nil, "A signal (%v) was raised to stop test #%i %s.%s, but its task data is missing.",
 				reason, test_index, it.pkg, it.name)
+
+			task_data.stopped = true
+
+			passed := reason == .Successful_Stop && !failed(&task_data.t)
+			#no_bounds_check report.all_test_states[test_index] = .Successful if passed else .Failed
+			#no_bounds_check test_end_times[test_index] = time.now()
 
 			if !passed && !task_data.t._fail_now_called {
 				if test_index not_in failed_test_reason_map {
@@ -855,16 +1101,97 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			total_done_count += 1
 		}
 
+		check_timeouts: for i := len(task_timeouts) - 1; i >= 0; i -= 1 {
+			#no_bounds_check timeout := &task_timeouts[i]
+
+			if time.since(timeout.at_time) < 0 {
+				continue check_timeouts
+			}
+
+			defer unordered_remove(&task_timeouts, i)
+
+			#no_bounds_check if report.all_test_states[timeout.test_index] > .Running {
+				continue check_timeouts
+			}
+
+			if !pool_stop_task(&pool, timeout.test_index) {
+				continue check_timeouts
+			}
+
+			now := time.now()
+
+			#no_bounds_check report.all_test_states[timeout.test_index] = .Failed
+			#no_bounds_check test_end_times[timeout.test_index] = now
+
+			#no_bounds_check it  := internal_tests[timeout.test_index]
+			#no_bounds_check pkg := report.packages_by_name[it.pkg]
+
+			pkg.frame_ready = false
+
+			timeout_message_short, timeout_message_full := format_test_timeout_message(
+				timeout^,
+				it,
+				internal_tests,
+				report.all_test_states,
+				test_start_times,
+				now,
+				shared_log_allocator,
+			)
+			defer delete(timeout_message_full, shared_log_allocator)
+			assert(len(timeout_message_short) > 0, "Error formatting test timeout message (short).")
+			assert(len(timeout_message_full) > 0, "Error formatting test timeout message (full).")
+
+			if timeout.test_index not_in failed_test_reason_map {
+				failed_test_reason_map[timeout.test_index] = timeout_message_short
+			} else {
+				delete(timeout_message_short, shared_log_allocator)
+			}
+
+			total_failure_count += 1
+			total_done_count    += 1
+
+			_, alloc_error = append(&log_messages, Log_Message {
+				level = .Error,
+				text = format_log_text(.Error, timeout_message_full, Default_Test_Logger_Opts, timeout.location, now),
+				time = now,
+				allocator = shared_log_allocator,
+			})
+			fmt.assertf(alloc_error == nil, "Error appending to log messages: %v", alloc_error)
+
+			find_task_data_for_timeout: for &data in task_data_slots {
+				if data.it.pkg == it.pkg && data.it.name == it.name {
+					data.stopped = true
+					end_t(&data.t)
+					break find_task_data_for_timeout
+				}
+			}
+		}
+
 		// -- Redraw.
 
 		if should_show_animations {
-			if len(log_messages) == 0 && !needs_to_redraw(report) {
+			// Log messages are held until the end of the run, so only a changed
+			// report needs a redraw.
+			if !needs_to_redraw(report) {
 				continue main_loop
 			}
 
 			if !bypass_progress_overwrite {
-				fmt.wprintf(stdout, ansi_redraw_string, total_done_count, total_test_count)
+				// Go up N lines and draw over the old report in the same write as
+				// the new one, so the terminal never shows it cleared: each line
+				// clears to its end, and the display is cleared below the status bar.
+				// Combine this with the window title, since both can be printed together.
+				fmt.wprintf(batch_writer, "%s" + OSC_WINDOW_TITLE,
+					ansi.move_cursor_previous_line(cursor_buf[:], report_lines),
+					total_done_count,
+					total_test_count)
 			}
+
+			report_lines = 1 + redraw_report(batch_writer, report, true)
+			draw_status_bar(batch_writer, thread_count_status_string, total_done_count, total_test_count)
+			fmt.wprint(batch_writer, ansi.clear_display_to_end())
+			fmt.wprint(stdout, bytes.buffer_to_string(&batch_buffer))
+			bytes.buffer_reset(&batch_buffer)
 		} else {
 			if total_done_count != last_done_count {
 				if !(global_ansi_disabled || !FANCY_OUTPUT) {
@@ -876,28 +1203,9 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 			if len(log_messages) == 0 {
 				continue main_loop
 			}
-		}
 
-		// Because each thread has its own messenger channel, log messages
-		// arrive in chunks that are in-order, but when they're merged with the
-		// logs from other threads, they become out-of-order.
-		slice.stable_sort_by(log_messages[:], proc(a, b: Log_Message) -> bool {
-			return time.diff(a.time, b.time) > 0
-		})
-
-		for message in log_messages {
-			fmt.wprintln(batch_writer, message.text)
-			delete(message.text, message.allocator)
-		}
-
-		fmt.wprint(stderr, bytes.buffer_to_string(&batch_buffer))
-		clear(&log_messages)
-		bytes.buffer_reset(&batch_buffer)
-
-		if should_show_animations {
-			redraw_report(batch_writer, report)
-			draw_status_bar(batch_writer, thread_count_status_string, total_done_count, total_test_count)
-			fmt.wprint(stdout, bytes.buffer_to_string(&batch_buffer))
+			write_log_messages(batch_writer, &log_messages)
+			fmt.wprint(stderr, bytes.buffer_to_string(&batch_buffer))
 			bytes.buffer_reset(&batch_buffer)
 		}
 	}
@@ -911,13 +1219,30 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	//
 	// At the time of writing, the thread library is undergoing a rewrite that
 	// should solve this problem; it is not an issue with the test runner itself.
-	thread.pool_join(&pool)
+	pool_join(&pool)
 
 	finished_in := time.since(start_time)
+
+	if should_show_animations && !runner_interrupted && report_lines - 1 != len(report.packages) {
+		fmt.wprint(batch_writer, ansi.move_cursor_previous_line(cursor_buf[:], report_lines))
+		redraw_report(batch_writer, report, false)
+		draw_status_bar(batch_writer, thread_count_status_string, total_done_count, total_test_count)
+		fmt.wprint(batch_writer, ansi.clear_display_to_end())
+		fmt.wprint(stdout, bytes.buffer_to_string(&batch_buffer))
+		bytes.buffer_reset(&batch_buffer)
+	}
 
 	if !should_show_animations || !terminal.is_terminal(os.stderr) {
 		// One line to space out the results, since we don't have the status
 		// bar in plain mode.
+		fmt.wprintln(batch_writer)
+	}
+
+	if should_show_animations && len(log_messages) > 0 {
+		if runner_interrupted {
+			fmt.wprintln(batch_writer)
+		}
+		write_log_messages(batch_writer, &log_messages)
 		fmt.wprintln(batch_writer)
 	}
 
@@ -926,32 +1251,46 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		total_done_count,
 		"" if total_done_count == 1 else "s",
 		finished_in)
-	
+
 	if total_done_count != total_test_count {
 		not_run_count := total_test_count - total_done_count
-		message := " %i %s left undone." if global_log_colors_disabled else " " + SGR_READY + "%i" + SGR_RESET + " %s left undone."
+		count := fmt.tprintf("%i", not_run_count)
+		if !global_log_colors_disabled {
+			count = ansi.color(count, ansi.FG_BRIGHT_BLACK)
+		}
 		fmt.wprintf(batch_writer,
-			message,
-			not_run_count,
+			" %s %s left undone.",
+			count,
 			"test was" if not_run_count == 1 else "tests were")
 	}
 
 	if total_success_count == total_test_count {
-		message := " %s successful." if global_log_colors_disabled else " %s " + SGR_SUCCESS + "successful." + SGR_RESET
+		successful := "successful."
+		if !global_log_colors_disabled {
+			successful = ansi.color(successful, ansi.FG_GREEN)
+		}
 		fmt.wprintfln(batch_writer,
-			message,
-			"The test was" if total_test_count == 1 else "All tests were")
+			" %s %s",
+			"The test was" if total_test_count == 1 else "All tests were",
+			successful)
 	} else if total_failure_count > 0 {
 		if total_failure_count == total_test_count {
-			message := " %s failed." if global_log_colors_disabled else " %s " + SGR_FAILED + "failed." + SGR_RESET
+			failed := "failed."
+			if !global_log_colors_disabled {
+				failed = ansi.color(failed, ansi.FG_RED)
+			}
 			fmt.wprintfln(batch_writer,
-				message,
-				"The test" if total_test_count == 1 else "All tests")
+				" %s %s",
+				"The test" if total_test_count == 1 else "All tests",
+				failed)
 		} else {
-			message := " %i test%s failed." if global_log_colors_disabled else " " + SGR_FAILED + "%i" + SGR_RESET + " test%s failed."
+			count := fmt.tprintf("%i", total_failure_count)
+			if !global_log_colors_disabled {
+				count = ansi.color(count, ansi.FG_RED)
+			}
 			fmt.wprintfln(batch_writer,
-				message,
-				total_failure_count,
+				" %s test%s failed.",
+				count,
 				"" if total_failure_count == 1 else "s")
 		}
 
@@ -963,14 +1302,13 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		slice.sort(sorted_failed_test_reasons[:])
 
 		for test_index in sorted_failed_test_reasons {
-			#no_bounds_check last_error := failed_test_reason_map[test_index]
+			#no_bounds_check fail_reason := failed_test_reason_map[test_index]
 			#no_bounds_check it := internal_tests[test_index]
 			pkg_and_name := fmt.tprintf("%s.%s", it.pkg, it.name)
 			fmt.wprintfln(batch_writer, " - %- *[1]s\t%s",
 				pkg_and_name,
 				report.pkg_column_len + report.test_column_len,
-				last_error)
-			safe_delete_string(last_error, shared_log_allocator)
+				fail_reason)
 		}
 
 		if total_success_count > 0 {
@@ -985,7 +1323,7 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 				encoded_names := base64.encode(bytes.buffer_to_bytes(&clipboard_buffer), allocator = context.temp_allocator)
 
 				fmt.wprintf(batch_writer,
-					ansi.OSC + ansi.CLIPBOARD + ";c;%s" + ansi.ST + 
+					ansi.OSC + ansi.CLIPBOARD + ";c;%s" + ansi.ST +
 					"\nThe name%s of the failed test%s been copied to your clipboard.",
 					encoded_names,
 					"" if total_failure_count == 1 else "s",
@@ -1005,14 +1343,13 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	}
 
 	if !global_ansi_disabled {
-		fmt.wprint(stdout, ansi.CSI + ansi.DECTCEM_SHOW)
+		fmt.wprint(stdout, ansi.show_cursor())
 	}
 
 	if should_show_animations {
 		if signals_were_raised {
 			fmt.wprintln(batch_writer, `
-Signals were raised during this test run. Log messages are likely to have collided with each other.
-To partly mitigate this, redirect STDERR to a file or use the -define:ODIN_TEST_FANCY=false option.`)
+Signals were raised during this test run. To partly mitigate this, redirect STDERR to a file or use the -define:ODIN_TEST_FANCY=false option.`)
 		}
 	}
 
@@ -1027,20 +1364,35 @@ To partly mitigate this, redirect STDERR to a file or use the -define:ODIN_TEST_
 
 		for test, i in report.all_tests {
 			#no_bounds_check state := report.all_test_states[i]
+			test_start_time := test_start_times[i]
+			test_end_time := test_end_times[i]
+			test_runtime_seconds: Maybe(i64)
+			if test_start_time != {} && test_end_time != {} {
+				test_runtime_seconds = time.duration_nanoseconds(time.diff(test_start_time, test_end_time))
+			}
+			fail_reason, fail_reason_ok := failed_test_reason_map[i]
 
 			if test.pkg not_in json_report.packages {
 				json_report.packages[test.pkg] = {}
 			}
 
 			tests := &json_report.packages[test.pkg]
-			append(tests, JSON_Test{name = test.name, success = state == .Successful})
+
+			append(tests, JSON_Test {
+				name         = test.name,
+				success      = state == .Successful,
+				start_time   = test_start_time == {} ? nil : time.time_to_unix_nano(test_start_time),
+				end_time     = test_end_time == {} ? nil : time.time_to_unix_nano(test_end_time),
+				runtime      = test_runtime_seconds,
+				fail_reason  = fail_reason_ok ? fail_reason : nil,
+			})
 		}
 
-		json_report.total    = len(internal_tests)
-		json_report.success  = total_success_count
-		json_report.duration = finished_in
+		json_report.total     = len(internal_tests)
+		json_report.success   = total_success_count
+		json_report.duration  = time.duration_nanoseconds(finished_in)
 
-		json_err := json.marshal_to_writer(os.to_stream(json_fd), json_report, &{ pretty = true })
+		json_err := json.marshal_to_writer(os.to_stream(json_fd), json_report, { pretty = true })
 		fmt.assertf(json_err == nil, "Error writing JSON report: %v", json_err)
 	}
 

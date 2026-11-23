@@ -2,6 +2,7 @@ package tests_nbio
 
 import "core:log"
 import "core:nbio"
+import "core:strings"
 import "core:testing"
 import "core:thread"
 import "core:time"
@@ -49,7 +50,13 @@ all_poly_work :: proc(tt: ^testing.T) {
 
 		tmp, terr := os.create_temp_file("", "tests_nbio_poly*", {.Non_Blocking})
 		ev(t, terr, nil)
-		defer os.close(tmp)
+		defer {
+			tmp_name := strings.clone(os.name(tmp), context.temp_allocator)
+			os.close(tmp)
+			if tmp_name != "" {
+				os.remove(tmp_name)
+			}
+		}
 
 		HANDLE, aerr := nbio.associate_handle(os.fd(tmp))
 		ev(t, aerr, nil)

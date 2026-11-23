@@ -396,7 +396,7 @@ gb_internal AtomicObject check_atomic_object(Ast *expr) {
 	case_ast_node(ie, IndexExpr, expr);
 		AtomicObject o = check_atomic_object(ie->expr);
 		if (o.root != nullptr) {
-			gbString index = expr_to_string(ie->index);
+			gbString index = expr_to_string_exact(ie->index);
 			o.path = concatenate3_strings(temporary_allocator(), o.path, str_lit("["), make_string_c(index));
 			o.path = concatenate_strings(temporary_allocator(), o.path, str_lit("]"));
 			gb_string_free(index);

@@ -1,6 +1,7 @@
 #+private
 package os
 
+import "base:intrinsics"
 import "base:runtime"
 
 import "core:sync"
@@ -52,30 +53,91 @@ _mkdir_all :: proc(path: string, perm: Permissions) -> Error {
 	}
 }
 
-_remove_all :: proc(path: string) -> (err: Error) {
-	//  PERF: this works, but wastes a bunch of memory using the read_directory_iterator API
-	// and using open instead of wasi fds directly.
-	{
-		dir := open(path) or_return
-		defer close(dir)
+_Remove_All_Dir :: wasi.fd_t
 
-		iter := read_directory_iterator_create(dir)
-		defer read_directory_iterator_destroy(&iter)
+@(private="file")
+_REMOVE_ALL_RIGHTS :: wasi.rights_t{.FD_READDIR, .PATH_OPEN, .PATH_FILESTAT_GET, .PATH_UNLINK_FILE, .PATH_REMOVE_DIRECTORY}
 
-		for fi in read_directory_iterator(&iter) {
-			_ = read_directory_iterator_error(&iter) or_break
+_remove_all_root :: proc(path: string, _: runtime.Allocator) -> (parent: _Remove_All_Dir, name: []u8, err: Error) {
+	root := path
+	for len(root) > 1 && root[len(root)-1] == '/' {
+		root = root[:len(root)-1]
+	}
+	dir_fd, relative, ok := match_preopen(root)
+	if !ok {
+		return 0, nil, .Invalid_Path
+	}
+	return dir_fd, transmute([]u8)relative, nil
+}
 
-			if fi.type == .Directory {
-				_remove_all(fi.fullpath) or_return
-			} else {
-				remove(fi.fullpath) or_return
-			}
+_remove_all_open :: proc(parent: _Remove_All_Dir, name: []u8) -> (dir: _Remove_All_Dir, is_dir: bool, err: Error) {
+	path := string(name)
+	fd, errno := wasi.path_open(parent, {}, path, {.DIRECTORY}, _REMOVE_ALL_RIGHTS, _REMOVE_ALL_RIGHTS, {})
+	if errno == .SUCCESS {
+		return fd, true, nil
+	}
+	if errno == .NOENT {
+		return 0, false, .Not_Exist
+	}
+	stat, stat_errno := wasi.path_filestat_get(parent, {}, path)
+	if stat_errno != .SUCCESS {
+		return 0, false, _get_platform_error(stat_errno)
+	}
+	if stat.filetype != .DIRECTORY {
+		return 0, false, _get_platform_error(wasi.path_unlink_file(parent, path))
+	}
+	if wasi.path_remove_directory(parent, path) == .SUCCESS {
+		return 0, false, nil
+	}
+	return 0, false, _get_platform_error(errno)
+}
+
+_remove_all_read :: proc(dir: _Remove_All_Dir, names: ^[dynamic]u8, entries: ^[dynamic]_Remove_All_Entry) -> Error {
+	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	buf := make([]byte, 4096, temp_allocator) or_return
+	n: int
+	for {
+		read, errno := wasi.fd_readdir(dir, buf, 0)
+		if errno != .SUCCESS {
+			return _get_platform_error(errno)
 		}
-
-		_ = read_directory_iterator_error(&iter) or_return
+		if int(read) < len(buf) {
+			n = int(read)
+			break
+		}
+		buf = make([]byte, 2 * len(buf), temp_allocator) or_return
 	}
 
-	return remove(path)
+	rest := buf[:n]
+	for len(rest) >= size_of(wasi.dirent_t) {
+		entry := intrinsics.unaligned_load((^wasi.dirent_t)(raw_data(rest)))
+		rest = rest[size_of(wasi.dirent_t):]
+		if len(rest) < int(entry.d_namlen) {
+			break
+		}
+		name := string(rest[:entry.d_namlen])
+		rest = rest[entry.d_namlen:]
+		if name == "." || name == ".." {
+			continue
+		}
+		kind := _Remove_All_Kind.Other
+		if entry.d_type == .DIRECTORY || entry.d_type == .UNKNOWN {
+			kind = .Directory
+		}
+		_remove_all_add(names, entries, transmute([]u8)name, kind) or_return
+	}
+	return nil
+}
+
+_remove_all_unlink :: proc(parent: _Remove_All_Dir, name: []u8, kind: _Remove_All_Kind) -> Error {
+	if kind == .Directory {
+		return _get_platform_error(wasi.path_remove_directory(parent, string(name)))
+	}
+	return _get_platform_error(wasi.path_unlink_file(parent, string(name)))
+}
+
+_remove_all_close :: proc(dir: _Remove_All_Dir) {
+	wasi.fd_close(dir)
 }
 
 g_wd: string

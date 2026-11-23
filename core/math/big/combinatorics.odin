@@ -3,12 +3,25 @@ package math_big
 /*
 	With `n` items, calculate how many ways that `r` of them can be ordered.
 */
-permutations_with_repetition :: int_pow_int
+permutations_with_repetition :: proc(dest: ^Int, n, r: int, allocator := context.allocator) -> (error: Error) {
+	assert_if_nil(dest)
+	if n < 0 || r < 0 { return .Invalid_Argument }
+
+	return int_pow_int(dest, n, r, allocator)
+}
 
 /*
 	With `n` items, calculate how many ways that `r` of them can be ordered without any repeats.
 */
-permutations_without_repetition :: proc(dest: ^Int, n, r: int) -> (error: Error)  {
+permutations_without_repetition :: proc(dest: ^Int, n, r: int, allocator := context.allocator) -> (error: Error)  {
+	context.allocator = allocator
+
+	assert_if_nil(dest)
+	if n < 0 || r < 0 { return .Invalid_Argument }
+	internal_error_if_immutable(dest) or_return
+	internal_clear_non_finite(dest)
+	if r > n { return internal_zero(dest) }
+
 	if n == r {
 		return factorial(dest, n)
 	}
@@ -31,7 +44,16 @@ permutations_without_repetition :: proc(dest: ^Int, n, r: int) -> (error: Error)
 
 	Also known as the multiset coefficient or (n multichoose k).
 */
-combinations_with_repetition :: proc(dest: ^Int, n, r: int) -> (error: Error) {
+combinations_with_repetition :: proc(dest: ^Int, n, r: int, allocator := context.allocator) -> (error: Error) {
+	context.allocator = allocator
+
+	assert_if_nil(dest)
+	if n < 0 || r < 0 { return .Invalid_Argument }
+	internal_error_if_immutable(dest) or_return
+	internal_clear_non_finite(dest)
+	if r == 0 { return internal_one(dest) }
+	if n == 0 { return internal_zero(dest) }
+
 	// (n + r - 1)!
 	// ------------
 	// r!  (n - 1)!
@@ -43,7 +65,15 @@ combinations_with_repetition :: proc(dest: ^Int, n, r: int) -> (error: Error) {
 
 	Also known as the binomial coefficient or (n choose k).
 */
-combinations_without_repetition :: proc(dest: ^Int, n, r: int) -> (error: Error) {
+combinations_without_repetition :: proc(dest: ^Int, n, r: int, allocator := context.allocator) -> (error: Error) {
+	context.allocator = allocator
+
+	assert_if_nil(dest)
+	if n < 0 || r < 0 { return .Invalid_Argument }
+	internal_error_if_immutable(dest) or_return
+	internal_clear_non_finite(dest)
+	if r > n { return internal_zero(dest) }
+
 	tmp_a, tmp_b := &Int{}, &Int{}
 	defer internal_destroy(tmp_a, tmp_b)
 

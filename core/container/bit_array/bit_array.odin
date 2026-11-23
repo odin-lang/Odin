@@ -3,6 +3,18 @@ package container_dynamic_bit_array
 import "base:builtin"
 import "base:intrinsics"
 
+/*
+	Copyright 2021-2026 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's license.
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+		Jon Lipstate:    `unsafe_get`/`unsafe_set`, a `set` overload, documentation.
+		Andrea Piseri:   Iterators.
+		Feoramund:       `shrink`, zero-length and biased array fixes.
+		Laytan Laats:    `init`.
+*/
+
 // Note that these constants are dependent on the backing being a u64.
 @(private="file")
 INDEX_SHIFT :: 6
@@ -294,7 +306,10 @@ create :: proc(max_index: int, min_index: int = 0, allocator := context.allocato
 	ok  = init(res, max_index, min_index, allocator)
 	res.free_pointer = true
 
-	if !ok { free(res, allocator) }
+	if !ok {
+		free(res, allocator)
+		res = nil
+	}
 
 	return
 }
@@ -413,9 +428,10 @@ Inputs:
 */
 destroy :: proc(ba: ^Bit_Array) {
 	if ba == nil { return }
+	allocator := ba.bits.allocator
 	delete(ba.bits)
 	if ba.free_pointer { // Only free if this `Bit_Array` was created using `create`, not when on the stack.
-		free(ba)
+		free(ba, allocator)
 	}
 }
 

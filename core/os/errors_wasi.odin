@@ -16,7 +16,7 @@ _error_string :: proc(errno: i32) -> string {
 
 	err := runtime.Type_Info_Enum_Value(e)
 
-	ti := &runtime.type_info_base(type_info_of(wasi.errno_t)).variant.(runtime.Type_Info_Enum)
+	ti := runtime.type_info_base(type_info_of(wasi.errno_t)).variant.(^runtime.Type_Info_Enum)
 	if idx, ok := slice.binary_search(ti.values, err); ok {
 		return ti.names[idx]
 	}
@@ -37,6 +37,8 @@ _get_platform_error :: proc(errno: wasi.errno_t) -> Error {
 		return .Broken_Pipe
 	case .BADF:
 		return .Invalid_File
+	case .ISDIR:
+		return .Is_Dir
 	case .NOMEM:
 		return .Out_Of_Memory
 	case .NOSYS:

@@ -135,6 +135,9 @@ destroy_file_logger :: proc(log: Logger, allocator := context.allocator) {
 /*
 Create a logger that outputs to the terminal.
 
+On Android it writes to logcat, tagged with `ident` (or "Odin" when empty).
+Logcat adds the level and timestamp itself.
+
 *Allocates Using Provided Allocator*
 
 When no longer needed can be destroyed with `destroy_console_logger`.
@@ -196,15 +199,21 @@ file_logger_proc :: proc(logger_data: rawptr, level: Level, text: string, option
 console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string, options: Options, location := #caller_location) {
 	options := options
 	data := cast(^File_Console_Logger_Data)logger_data
-	h: ^os.File = nil
-	if level < Level.Error {
-		h = os.stdout
-		options -= global_subtract_stdout_options
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		// NOTE(bill): an Android app's stdout and stderr go to `/dev/null` unless `native_app_glue` sends them to
+		// logcat. Write to logcat directly, at the message's own priority.
+		_logcat_logger_proc(data.ident, level, text, options, location)
 	} else {
-		h = os.stderr
-		options -= global_subtract_stderr_options
+		h: ^os.File = nil
+		if level < Level.Error {
+			h = os.stdout
+			options -= global_subtract_stdout_options
+		} else {
+			h = os.stderr
+			options -= global_subtract_stderr_options
+		}
+		_file_console_logger_proc(h, data.ident, level, text, options, location)
 	}
-	_file_console_logger_proc(h, data.ident, level, text, options, location)
 }
 
 // Helper used to build the part of the message including the log level.

@@ -16,9 +16,20 @@ Inputs:
 - data_type: The typeid of the data structure to describe.
 - program: The name of the program, usually the first argument to `os.args`.
 - style: The argument parsing style, required to show flags in the proper style.
+- color: Whether to colorize output.
+- palette: The ANSI styles to use when colorizing output.
 */
 @(optimization_mode="favor_size")
-write_usage :: proc(out: io.Writer, data_type: typeid, program: string = "", style: Parsing_Style = .Odin) {
+write_usage :: proc(
+	out: io.Writer,
+	data_type: typeid,
+	program: string = "",
+	style: Parsing_Style = .Odin,
+	color: Color_Mode = .Never,
+	palette: Color_Palette = DEFAULT_COLOR_PALETTE,
+) {
+	styles := make_color_styles(should_colorize(color, out), palette)
+
 	// All flags get their tags parsed so they can be reasoned about later.
 	Flag :: struct {
 		name: string,
@@ -138,13 +149,13 @@ write_usage :: proc(out: io.Writer, data_type: typeid, program: string = "", sty
 		}
 
 		#partial switch specific_type_info in field.type.variant {
-		case runtime.Type_Info_Map:
+		case ^runtime.Type_Info_Map:
 			flag.type_description = fmt.tprintf("<%v>=<%v>%s",
 				specific_type_info.key.id,
 				specific_type_info.value.id,
 				", required" if flag.is_required else "")
 
-		case runtime.Type_Info_Dynamic_Array:
+		case ^runtime.Type_Info_Dynamic_Array:
 			requirement_spec := describe_array_requirements(flag)
 
 			if flag.is_manifold || flag.name == INTERNAL_OVERFLOW_FLAG {
@@ -197,8 +208,9 @@ write_usage :: proc(out: io.Writer, data_type: typeid, program: string = "", sty
 	if len(program) > 0 {
 		keep_it_short := len(visible_flags) >= ONE_LINE_FLAG_CUTOFF_COUNT
 
-		strings.write_string(&builder, "Usage:\n\t")
-		strings.write_string(&builder, program)
+		write_styled(&builder, "Usage:", styles.heading, styles.reset)
+		strings.write_string(&builder, "\n\t")
+		write_styled(&builder, program, styles.identifier, styles.reset)
 
 		for flag in visible_flags {
 			if keep_it_short && !(flag.is_required || flag.is_positional || flag.name == INTERNAL_OVERFLOW_FLAG) {
@@ -212,10 +224,16 @@ write_usage :: proc(out: io.Writer, data_type: typeid, program: string = "", sty
 				continue
 			}
 
-			if !flag.is_required { strings.write_byte(&builder, '[') }
-			if !flag.is_positional { strings.write_string(&builder, flag_prefix) }
-			strings.write_string(&builder, flag.name)
-			if !flag.is_required { strings.write_byte(&builder, ']') }
+			if !flag.is_required {
+				write_styled(&builder, "[", styles.secondary, styles.reset)
+			}
+			if !flag.is_positional {
+				write_styled(&builder, flag_prefix, styles.identifier, styles.reset)
+			}
+			write_styled(&builder, flag.name, styles.identifier, styles.reset)
+			if !flag.is_required {
+				write_styled(&builder, "]", styles.secondary, styles.reset)
+			}
 		}
 
 		strings.write_byte(&builder, '\n')
@@ -227,7 +245,8 @@ write_usage :: proc(out: io.Writer, data_type: typeid, program: string = "", sty
 		return
 	}
 
-	strings.write_string(&builder, "Flags:\n")
+	write_styled(&builder, "Flags:", styles.heading, styles.reset)
+	strings.write_byte(&builder, '\n')
 	
 	// Divide the positional/required arguments and the non-required arguments.
 	divider_index := -1
@@ -253,14 +272,14 @@ write_usage :: proc(out: io.Writer, data_type: typeid, program: string = "", sty
 		strings.write_byte(&builder, '\t')
 
 		if flag.name == INTERNAL_OVERFLOW_FLAG {
-			strings.write_string(&builder, flag.type_description)
+			write_type_description(&builder, flag.type_description, styles)
 		} else {
-			strings.write_string(&builder, flag_prefix)
-			strings.write_string(&builder, flag.name)
+			write_styled(&builder, flag_prefix, styles.identifier, styles.reset)
+			write_styled(&builder, flag.name, styles.identifier, styles.reset)
 			if !flag.is_boolean {
 				strings.write_string(&builder, flag_assignment)
 			}
-			strings.write_string(&builder, flag.type_description)
+			write_type_description(&builder, flag.type_description, styles)
 		}
 
 		if strings.contains_rune(flag.usage, '\n') {

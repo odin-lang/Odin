@@ -158,6 +158,9 @@ create :: proc(name: string) -> (^File, Error) {
 	and please note that the containing directory must exist otherwise and an error will be returned.
 	If successful, a `^File` is return which can be used for I/O.
 	And error is returned if any is encountered.
+
+	On Android, paths under `/android_asset` are the APK's read-only assets, for `open`, `stat`, and reading directories.
+	`core:sys/android/native_app_glue` makes them available before `main`.
 */
 @(require_results)
 open :: proc(name: string, flags := File_Flags{.Read}, perm := Permissions_Default) -> (^File, Error) {

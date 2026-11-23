@@ -8,6 +8,9 @@ _ :: win32
 import "vendor:x11/xlib"
 _ :: xlib
 
+import android "core:sys/android"
+_ :: android
+
 when ODIN_OS == .Windows {
 	HINSTANCE           :: win32.HINSTANCE
 	HWND                :: win32.HWND
@@ -41,6 +44,14 @@ when xlib.IS_SUPPORTED {
 	XlibDisplay  :: struct {} // Opaque struct defined by Xlib
 	XlibWindow   :: c.ulong
 	XlibVisualID :: c.ulong
+}
+
+when ODIN_PLATFORM_SUBTARGET == .Android {
+	ANativeWindow   :: android.ANativeWindow
+	AHardwareBuffer :: android.AHardwareBuffer
+} else {
+	ANativeWindow   :: struct {} // Opaque struct defined by the Android NDK
+	AHardwareBuffer :: struct {} // Opaque struct defined by the Android NDK
 }
 
 xcb_visualid_t :: u32
@@ -11233,6 +11244,90 @@ XcbSurfaceCreateInfoKHR :: struct {
 	flags:      XcbSurfaceCreateFlagsKHR,
 	connection: ^xcb_connection_t,
 	window:     xcb_window_t,
+}
+
+AndroidSurfaceCreateInfoKHR :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	flags:  AndroidSurfaceCreateFlagsKHR,
+	window: ^ANativeWindow,
+}
+
+AndroidHardwareBufferUsageANDROID :: struct {
+	sType:                      StructureType,
+	pNext:                      rawptr,
+	androidHardwareBufferUsage: u64,
+}
+
+AndroidHardwareBufferPropertiesANDROID :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	allocationSize: DeviceSize,
+	memoryTypeBits: u32,
+}
+
+AndroidHardwareBufferFormatPropertiesANDROID :: struct {
+	sType:                            StructureType,
+	pNext:                            rawptr,
+	format:                           Format,
+	externalFormat:                   u64,
+	formatFeatures:                   FormatFeatureFlags,
+	samplerYcbcrConversionComponents: ComponentMapping,
+	suggestedYcbcrModel:              SamplerYcbcrModelConversion,
+	suggestedYcbcrRange:              SamplerYcbcrRange,
+	suggestedXChromaOffset:           ChromaLocation,
+	suggestedYChromaOffset:           ChromaLocation,
+}
+
+ImportAndroidHardwareBufferInfoANDROID :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	buffer: ^AHardwareBuffer,
+}
+
+MemoryGetAndroidHardwareBufferInfoANDROID :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	memory: DeviceMemory,
+}
+
+ExternalFormatANDROID :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	externalFormat: u64,
+}
+
+AndroidHardwareBufferFormatProperties2ANDROID :: struct {
+	sType:                            StructureType,
+	pNext:                            rawptr,
+	format:                           Format,
+	externalFormat:                   u64,
+	formatFeatures:                   FormatFeatureFlags2,
+	samplerYcbcrConversionComponents: ComponentMapping,
+	suggestedYcbcrModel:              SamplerYcbcrModelConversion,
+	suggestedYcbcrRange:              SamplerYcbcrRange,
+	suggestedXChromaOffset:           ChromaLocation,
+	suggestedYChromaOffset:           ChromaLocation,
+}
+
+PhysicalDeviceExternalFormatResolveFeaturesANDROID :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	externalFormatResolve: b32,
+}
+
+PhysicalDeviceExternalFormatResolvePropertiesANDROID :: struct {
+	sType:                                        StructureType,
+	pNext:                                        rawptr,
+	nullColorAttachmentWithExternalFormatResolve: b32,
+	externalFormatResolveChromaOffsetX:           ChromaLocation,
+	externalFormatResolveChromaOffsetY:           ChromaLocation,
+}
+
+AndroidHardwareBufferFormatResolvePropertiesANDROID :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	colorAttachmentFormat: Format,
 }
 
 PhysicalDevicePortabilitySubsetFeaturesKHR :: struct {

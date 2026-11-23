@@ -165,6 +165,13 @@ when ODIN_OS == .Darwin {
 
 	P_tmpdir :: "/tmp/"
 
+} else when ODIN_PLATFORM_SUBTARGET == .Android {
+
+	L_ctermid :: 1024
+	L_tmpnam  :: 4096
+
+	P_tmpdir :: "/tmp/"
+
 } else when ODIN_OS == .Linux {
 
 	L_ctermid :: 20 // 20 on musl, 9 on glibc

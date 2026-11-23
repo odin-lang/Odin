@@ -140,9 +140,56 @@ write_operation :: proc(sb: ^strings.Builder, op: ^Operation, opts: ^Print_Optio
 			}
 		}
 
+	case .CALL_INDIRECT, .RETURN_CALL_INDIRECT:
+		if len(op.operands) != 2 {
+			write_operands(sb, op.operands, opcode, opts)
+			break
+		}
+		if index_nonzero(op.operands[1]) {
+			write_operand(sb, &op.operands[1], opcode, opts)
+		}
+		strings.write_string(sb, " (type")
+		write_operand(sb, &op.operands[0], opcode, opts)
+		strings.write_byte(sb, ')')
+
+	case .SELECT_T:
+		strings.write_string(sb, " (result")
+		for o in op.operands {
+			strings.write_byte(sb, ' ')
+			strings.write_string(sb, valtype_name(Value_Type(o.imm)))
+		}
+		strings.write_byte(sb, ')')
+
+	case .MEMORY_SIZE, .MEMORY_GROW, .MEMORY_FILL:
+		if len(op.operands) != 1 || index_nonzero(op.operands[0]) {
+			write_operands(sb, op.operands, opcode, opts)
+		}
+
+	case .MEMORY_COPY:
+		if len(op.operands) != 2 || index_nonzero(op.operands[0]) || index_nonzero(op.operands[1]) {
+			write_operands(sb, op.operands, opcode, opts)
+		}
+
+	case .MEMORY_INIT:
+		if len(op.operands) != 2 {
+			write_operands(sb, op.operands, opcode, opts)
+			break
+		}
+		if index_nonzero(op.operands[1]) {
+			write_operand(sb, &op.operands[1], opcode, opts)
+		}
+		write_operand(sb, &op.operands[0], opcode, opts)
+
+	case .TABLE_INIT:
+		if len(op.operands) != 2 {
+			write_operands(sb, op.operands, opcode, opts)
+			break
+		}
+		write_operand(sb, &op.operands[1], opcode, opts)
+		write_operand(sb, &op.operands[0], opcode, opts)
+
 	case .CALL:
-		if m, ok := module.?; ok {
-			assert(len(op.operands) == 1)
+		if m, ok := module.?; ok && len(op.operands) == 1 {
 			o := op.operands[0]
 			if o.kind == .REF {
 				if o.imm < i64(len(m.functions)) {
@@ -155,9 +202,7 @@ write_operation :: proc(sb: ^strings.Builder, op: ^Operation, opts: ^Print_Optio
 		}
 		fallthrough
 	case:
-		for &o in op.operands {
-			write_operand(sb, &o, opcode, opts)
-		}
+		write_operands(sb, op.operands, opcode, opts)
 	}
 }
 
@@ -206,7 +251,7 @@ write_id_or_comment :: proc(sb: ^strings.Builder, name: string, index: Id) {
 // =============================================================================
 
 write_mnemonic :: proc(sb: ^strings.Builder, op: Opcode, uppercase: bool) {
-	name := MNEMONIC_NAMES[op]
+	name := MNEMONIC_NAMES[op] if op <= max(Opcode) else ""
 	if name == "" {
 		strings.write_string(sb, "<?>")
 		return
@@ -269,18 +314,20 @@ write_attribute :: proc(sb: ^strings.Builder, o: ^Operand, opts: ^Print_Options)
 		write_block_type(sb, o.imm)
 
 	case .MEMARG:
-		// WAT prints non-trivial memargs as `offset=N align=N`, omitting either
-		// when it is the natural default. (`align` here is the byte alignment,
-		// already expanded from the on-wire log2 by the decoder.)
+		// WAT prints a memarg as `[memidx] [offset=N] align=N`, omitting memory 0
+		// and a zero offset. `align` is stored as its log2 exponent, as on the
+		// wire; WAT spells it as the byte alignment.
 		ma := operand_memarg(o^)
+		if ma.memory != 0 {
+			strings.write_byte(sb, ' ')
+			strings.write_u64(sb, u64(ma.memory))
+		}
 		if ma.offset != 0 {
 			strings.write_string(sb, " offset=")
-			strings.write_u64(sb, u64(ma.offset))
+			strings.write_u64(sb, ma.offset)
 		}
-		if ma.align != 0 {
-			strings.write_string(sb, " align=")
-			strings.write_u64(sb, u64(ma.align))
-		}
+		strings.write_string(sb, " align=")
+		strings.write_u64(sb, u64(1) << (ma.align & 63))
 
 	case .REFTYPE:
 		strings.write_byte(sb, ' ')
@@ -293,6 +340,10 @@ write_attribute :: proc(sb: ^strings.Builder, o: ^Operand, opts: ^Print_Options)
 	case .V128_LO, .V128_HI:
 		// v128 literals are printed by the V128_CONST / I8X16_SHUFFLE special
 		// cases in write_operation; a stray half here needs no output.
+
+	case .VALTYPE:
+		strings.write_byte(sb, ' ')
+		strings.write_string(sb, valtype_name(Value_Type(o.imm)))
 	}
 }
 
@@ -331,17 +382,55 @@ write_heap_type :: proc(sb: ^strings.Builder, b: u8) {
 write_float :: proc(sb: ^strings.Builder, o: ^Operand) {
 	buf: [40]u8
 	if o.aux == 32 {
-		f := transmute(f32)u32(o.imm)
+		b := u32(o.imm)
+		if b & 0x7F80_0000 == 0x7F80_0000 {
+			write_nan_or_inf(sb, b >> 31 != 0, u64(b & 0x7F_FFFF), 1 << 22)
+			return
+		}
+		f := transmute(f32)b
 		s := strconv.write_float(buf[:], f64(f), 'g', -1, 32)
-		strings.write_string(sb, s)
+		strings.write_string(sb, strings.trim_prefix(s, "+"))
 	} else {
-		f := transmute(f64)u64(o.imm)
+		b := u64(o.imm)
+		if b & 0x7FF0_0000_0000_0000 == 0x7FF0_0000_0000_0000 {
+			write_nan_or_inf(sb, b >> 63 != 0, b & 0xF_FFFF_FFFF_FFFF, 1 << 51)
+			return
+		}
+		f := transmute(f64)b
 		s := strconv.write_float(buf[:], f, 'g', -1, 64)
-		strings.write_string(sb, s)
+		strings.write_string(sb, strings.trim_prefix(s, "+"))
 	}
 }
 
 write_label :: proc(sb: ^strings.Builder, label_id: u32) {
 	strings.write_byte(sb, '$')
 	strings.write_u64(sb, u64(label_id))
+}
+
+@(private="file")
+write_operands :: proc(sb: ^strings.Builder, operands: []Operand, opcode: Opcode, opts: ^Print_Options) {
+	for &o in operands {
+		write_operand(sb, &o, opcode, opts)
+	}
+}
+
+@(private="file", require_results)
+index_nonzero :: proc "contextless" (o: Operand) -> bool {
+	return o.kind != .REF || operand_symbolic(o) || operand_index(o) != 0
+}
+
+@(private="file")
+write_nan_or_inf :: proc(sb: ^strings.Builder, negative: bool, mantissa, canonical: u64) {
+	if negative {
+		strings.write_byte(sb, '-')
+	}
+	if mantissa == 0 {
+		strings.write_string(sb, "inf")
+		return
+	}
+	strings.write_string(sb, "nan")
+	if mantissa != canonical {
+		strings.write_string(sb, ":0x")
+		strings.write_u64(sb, mantissa, 16)
+	}
 }

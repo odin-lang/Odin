@@ -14,7 +14,6 @@ package encoding_xml
 
 
 import "core:fmt"
-import "core:unicode"
 import "core:unicode/utf8"
 import "core:strings"
 
@@ -79,6 +78,9 @@ Tokenizer :: struct {
 	line_offset: int,
 	line_count:  int,
 
+	clean_offset:      int,
+	clean_line_offset: int,
+
 	// Mutable data
 	error_count: int,
 }
@@ -91,6 +93,8 @@ init :: proc(t: ^Tokenizer, src: string, path: string, err: Error_Handler = defa
 	t.read_offset = 0
 	t.line_offset = 0
 	t.line_count = len(src) > 0 ? 1 : 0
+	t.clean_offset = 0
+	t.clean_line_offset = 0
 	t.error_count = 0
 	t.path = path
 
@@ -101,9 +105,77 @@ init :: proc(t: ^Tokenizer, src: string, path: string, err: Error_Handler = defa
 }
 
 @(private)
+normalize_input :: proc(buf: []u8) -> (length: int, illegal: rune, ok: bool) {
+	w, r := 0, 0
+	n := len(buf)
+	#no_bounds_check for r < n {
+		c := buf[r]
+		switch {
+		case c >= 0x20 && c < utf8.RUNE_SELF, c == '\n', c == '\t':
+			if w != r {
+				buf[w] = c
+			}
+			r += 1
+			w += 1
+		case c == '\r':
+			buf[w] = '\n'
+			r += 1
+			w += 1
+			if r < n && buf[r] == '\n' {
+				r += 1
+			}
+		case c < 0x20:
+			return w, rune(c), false
+		case:
+			ch, size := utf8.decode_rune(buf[r:])
+			if ch == utf8.RUNE_ERROR && size == 1 || ch == 0xfffe || ch == 0xffff {
+				return w, ch, false
+			}
+			if w != r {
+				copy(buf[w:], buf[r:][:size])
+			}
+			r += size
+			w += size
+		}
+	}
+	return w, 0, true
+}
+
+@(private)
+report_illegal_input :: proc(handler: Error_Handler, path: string, normalized: []u8, illegal: rune) {
+	if handler == nil {
+		return
+	}
+	text := string(normalized)
+	line_start := strings.last_index_byte(text, '\n') + 1
+	pos := Pos{
+		file   = path,
+		offset = len(text),
+		line   = strings.count(text, "\n") + 1,
+		column = len(text) - line_start + 1,
+	}
+	if illegal == utf8.RUNE_ERROR {
+		handler(pos, "Invalid UTF-8 encoding\n")
+	} else {
+		handler(pos, "Illegal character U+%04X\n", u32(illegal))
+	}
+}
+
+@(private)
 offset_to_pos :: proc(t: ^Tokenizer, offset: int) -> Pos {
 	line := t.line_count
-	column := offset - t.line_offset + 1
+	line_offset := t.line_offset
+	if offset < line_offset {
+		line -= strings.count(t.src[offset:line_offset], "\n")
+		if offset < t.clean_offset {
+			line_offset = strings.last_index_byte(t.src[:offset], '\n') + 1
+		} else if nl := strings.last_index_byte(t.src[t.clean_offset:offset], '\n'); nl >= 0 {
+			line_offset = t.clean_offset + nl + 1
+		} else {
+			line_offset = t.clean_line_offset
+		}
+	}
+	column := offset - line_offset + 1
 
 	return Pos {
 		file = t.path,
@@ -147,8 +219,6 @@ advance_rune :: proc(t: ^Tokenizer) {
 				r, w = #force_inline utf8.decode_rune_in_string(t.src[t.read_offset:])
 				if r == utf8.RUNE_ERROR && w == 1 {
 					error(t, t.offset, "illegal UTF-8 encoding")
-				} else if r == utf8.RUNE_BOM && t.offset > 0 {
-					error(t, t.offset, "illegal byte order mark")
 				}
 			}
 			t.read_offset += w
@@ -164,11 +234,37 @@ advance_rune :: proc(t: ^Tokenizer) {
 	}
 }
 
+@(private)
+jump_to :: proc(t: ^Tokenizer, offset: int) {
+	skipped := t.src[t.offset:offset]
+	if lines := strings.count(skipped, "\n"); lines > 0 {
+		t.line_count += lines
+		t.line_offset = t.offset + strings.last_index_byte(skipped, '\n') + 1
+	}
+	t.read_offset = offset
+	t.ch = 0
+	advance_rune(t)
+}
+
 peek_byte :: proc(t: ^Tokenizer, offset := 0) -> byte {
 	if t.read_offset+offset < len(t.src) {
 		#no_bounds_check return t.src[t.read_offset+offset]
 	}
 	return 0
+}
+
+@(private)
+is_space :: #force_inline proc(r: rune) -> bool {
+	return r == ' ' || r == '\t' || r == '\n' || r == '\r'
+}
+
+@(private)
+expect_no_space :: proc(t: ^Tokenizer) -> (err: Error) {
+	if is_space(t.ch) {
+		error(t, t.offset, "Unexpected whitespace\n")
+		return .Unexpected_Token
+	}
+	return .None
 }
 
 @(optimization_mode="favor_size")
@@ -187,44 +283,32 @@ skip_whitespace :: proc(t: ^Tokenizer) {
 is_letter :: proc(r: rune) -> bool {
 	if r < utf8.RUNE_SELF {
 		switch r {
-		case 'A'..='Z', 'a'..='z':
-			return true
-		case '_':
+		case 'A'..='Z', 'a'..='z', '_', ':':
 			return true
 		}
+		return false
 	}
-	return unicode.is_letter(r)
-}
-
-is_valid_identifier_rune :: proc(r: rune) -> bool {
-	if r < utf8.RUNE_SELF {
-		switch r {
-		case '_', '-', ':':        return true
-		case 'A'..='Z', 'a'..='z': return true
-		case '0'..='9':            return true
-		case -1:                   return false
-		}
-	}
-
-	if unicode.is_letter(r) || unicode.is_digit(r) {
+	switch r {
+	case 0xc0..=0xd6, 0xd8..=0xf6, 0xf8..=0x2ff, 0x370..=0x37d, 0x37f..=0x1fff, 0x200c..=0x200d,
+	     0x2070..=0x218f, 0x2c00..=0x2fef, 0x3001..=0xd7ff, 0xf900..=0xfdcf, 0xfdf0..=0xfffd, 0x10000..=0xeffff:
 		return true
 	}
 	return false
 }
 
+is_valid_identifier_rune :: proc(r: rune) -> bool {
+	switch r {
+	case '-', '.', '0'..='9', 0xb7, 0x300..=0x36f, 0x203f..=0x2040:
+		return true
+	}
+	return is_letter(r)
+}
+
 scan_identifier :: proc(t: ^Tokenizer) -> string {
-	offset     := t.offset
-	namespaced := false
+	offset := t.offset
 
 	for is_valid_identifier_rune(t.ch) {
 		advance_rune(t)
-		if t.ch == ':' {
-			// A namespaced attr can have at most two parts, `namespace:ident`.
-			if namespaced {
-				break	
-			}
-			namespaced = true
-		}
 	}
 	return string(t.src[offset : t.offset])
 }
@@ -273,28 +357,18 @@ skip_cdata :: proc(t: ^Tokenizer) -> (err: Error) {
 		return .None
 	}
 
-	t.read_offset += len(CDATA_START) - 1
 	offset := t.offset
-
-	for {
-		advance_rune(t)
-		if t.ch < 0 {
-			error(t, offset, "[scan_string] CDATA was not terminated\n")
-			return .Premature_EOF
-		}
-
-		if strings.has_prefix(string(t.src[t.offset:]), CDATA_END) {
-			break
-		}
+	end    := strings.index(t.src[offset + len(CDATA_START):], CDATA_END)
+	if end < 0 {
+		error(t, offset, "[skip_cdata] CDATA was not terminated\n")
+		return .Premature_EOF
 	}
-
-	advance_rune(t)
-	advance_rune(t)
+	jump_to(t, offset + len(CDATA_START) + end + len(CDATA_END))
 	return .None
 }
 
 @(optimization_mode="favor_size")
-scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close := false, multiline := true) -> (value: string, err: Error) {
+scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close := false, multiline := true, stop_at_comments := false) -> (value: string, err: Error) {
 	err = .None
 
 	loop: for {
@@ -306,21 +380,27 @@ scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close
 			return "", .Premature_EOF
 
 		case '<':
-			if peek_byte(t) == '!' {
-				if peek_byte(t, 1) == '[' {
-					// Might be the start of a CDATA tag.
-					skip_cdata(t) or_return
-				} else if peek_byte(t, 1) == '-' && peek_byte(t, 2) == '-' {
-					// Comment start. Eat comment.
-					t.read_offset += 3
-					_ = scan_comment(t) or_return
-				}
+			rest := t.src[t.offset:]
+			if strings.has_prefix(rest, CDATA_START) {
+				// Might be the start of a CDATA tag.
+				skip_cdata(t) or_return
+				continue loop
+			} else if !stop_at_comments && strings.has_prefix(rest, COMMENT_START) {
+				// Comment start. Eat comment.
+				jump_to(t, t.offset + len(COMMENT_START))
+				_ = scan_comment(t) or_return
+				continue loop
+			}
+
+		case ']':
+			if close == '<' && strings.has_prefix(t.src[t.offset:], CDATA_END) {
+				error(t, t.offset, "[scan_string] `]]>` is not allowed in text\n")
+				return "", .Unexpected_Token
 			}
 
 		case '\n':
 			if !multiline {
-				error(t, offset, string(t.src[offset : t.offset]))
-				error(t, offset, "[scan_string] Not terminated\n")
+				error(t, offset, "[scan_string] Not terminated: %q\n", t.src[offset : t.offset])
 				err = .Invalid_Tag_Value
 				break loop	
 			}

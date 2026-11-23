@@ -182,14 +182,14 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 		error(p, t.pos, "Expected a package declaration at the start of the file")
 		return false
 	}
-	
+
 	p.file.pkg_token = expect_token(p, .Package)
-	
+
 	if ippt, ok := invalid_pre_package_token.?; ok {
 		error(p, ippt.pos, "Expected only comments or lines starting with '#+' before the package declaration")
 		return false
 	}
-	
+
 	pkg_name := expect_token_after(p, .Ident, "package")
 	if pkg_name.kind == .Ident && is_blank_ident(pkg_name.text) {
 		error(p, pkg_name.pos, "invalid package name '_'")
@@ -911,7 +911,7 @@ parse_if_stmt :: proc(p: ^Parser) -> ^ast.If_Stmt {
 			else_stmt = ast.new(ast.Bad_Stmt, p.curr_tok.pos, end_pos(p.curr_tok))
 		}
 	}
-	
+
 	end: tokenizer.Pos
 	if body != nil {
 		end = body.end
@@ -3102,7 +3102,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		bst.underlying = underlying
 		bst.close = close.pos
 		return bst
-		
+
 	case .Matrix:
 		tok := expect_token(p, .Matrix)
 		expect_token(p, .Open_Bracket)
@@ -3118,7 +3118,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		mt.column_count = column_count
 		mt.elem = elem
 		return mt
-	
+
 	case .Bit_Field:
 		tok := expect_token(p, .Bit_Field)
 
@@ -3690,7 +3690,7 @@ parse_unary_expr :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 	     .Mul_Mul:
 		op := advance_token(p)
 		expr := parse_unary_expr(p, lhs)
-		
+
 		ue := ast.new(ast.Unary_Expr, op.pos, expr)
 		ue.op   = op
 		ue.expr = expr
@@ -4091,6 +4091,18 @@ parse_asm_operand :: proc(p: ^Parser, allow_memory_operand: bool) -> ^ast.Expr {
 
 	case .Ident:
 		operand = parse_ident(p)
+		if p.curr_tok.kind == .Period {
+			// an entity from another package, e.g. `call libc.strlen`
+			tok   := expect_token(p, .Period)
+			field := parse_ident(p)
+
+			sel := ast.new(ast.Selector_Expr, operand.pos, field)
+			sel.expr  = operand
+			sel.op    = tok
+			sel.field = field
+
+			operand = sel
+		}
 
 	case .Mod:
 		operand = parse_asm_register(p)
@@ -4291,8 +4303,13 @@ parse_asm_instruction :: proc(p: ^Parser) -> ^ast.Stmt {
 	}
 
 	make_instruction :: proc(p: ^Parser) -> ^ast.Stmt {
+		is_keyword := p.curr_tok.kind != .Ident
 		name := parse_asm_ident(p)
-		operands := parse_asm_operands(p)
+
+		operands: []^ast.Expr
+		if !is_keyword || p.curr_tok.pos.line == p.prev_tok.pos.line {
+			operands = parse_asm_operands(p)
+		}
 		instruction := ast.new(ast.Asm_Instruction, name.pos, end_pos(p.prev_tok))
 		instruction.name = name
 		instruction.operands = operands

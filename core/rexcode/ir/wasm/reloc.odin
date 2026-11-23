@@ -83,12 +83,13 @@ reloc_type_from_wire :: proc "contextless" (code: u8) -> (Relocation_Type, bool)
 	return .NONE, false
 }
 
-// MEMORY_ADDR_* (3,4,5) and the *_OFFSET_I32 forms (8,9) carry a trailing
-// signed-LEB addend; the index-type relocations do not.
+// MEMORY_ADDR_* (3,4,5,11,14..17,21,23,25) and the *_OFFSET_* forms (8,9,22)
+// carry a trailing signed-LEB addend; the index-type relocations do not. Types
+// this codec skips must still be listed, so their addend is stepped over.
 @(require_results)
 reloc_has_addend :: proc "contextless" (code: u8) -> bool {
 	switch code {
-	case 3, 4, 5, 8, 9:
+	case 3, 4, 5, 8, 9, 11, 14, 15, 16, 17, 21, 22, 23, 25:
 		return true
 	}
 	return false

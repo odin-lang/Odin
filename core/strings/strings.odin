@@ -4,7 +4,6 @@ package strings
 import "base:intrinsics"
 import "base:runtime"
 import "core:bytes"
-import "core:io"
 import "core:unicode"
 import "core:unicode/utf8"
 
@@ -24,7 +23,7 @@ Returns:
 */
 @(require_results)
 clone :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
-	c := make([]byte, len(s), allocator, loc) or_return
+	c := non_zero_make([]byte, len(s), allocator, loc) or_return
 	copy(c, s)
 	return string(c), nil
 }
@@ -45,7 +44,7 @@ Returns:
 */
 @(require_results)
 clone_to_cstring :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: cstring, err: runtime.Allocator_Error) #optional_allocator_error {
-	c := make([]byte, len(s)+1, allocator, loc) or_return
+	c := non_zero_make([]byte, len(s)+1, allocator, loc) or_return
 	copy(c, s)
 	c[len(s)] = 0
 	return cstring(&c[0]), nil
@@ -161,7 +160,7 @@ Returns:
 */
 @(require_results)
 clone_from_bytes :: proc(s: []byte, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error #no_bounds_check {
-	c := make([]byte, len(s)+1, allocator, loc) or_return
+	c := non_zero_make([]byte, len(s)+1, allocator, loc) or_return
 	copy(c, s)
 	c[len(s)] = 0
 	return string(c[:len(s)]), nil
@@ -502,12 +501,13 @@ prefix_length :: proc "contextless" (a, b: string) -> (n: int) {
 	n    = runtime.memory_prefix_length(raw_data(a), raw_data(b), min(len(a), len(b)))
 	lim := max(n - UTF_MAX + 1, 0)
 	#no_bounds_check for l := n; l > lim; l -= 1 {
-		r, _ := runtime.string_decode_rune(a[l - 1:])
+		r, w := runtime.string_decode_rune(a[l - 1:])
 		if r != RUNE_ERROR {
-			if l > 0 && (a[l - 1] & 0xc0 == 0xc0) {
+			if l - 1 + w > n {
+				// The rune starting at `l - 1` doesn't fit in the common prefix.
 				return l - 1
 			}
-			return l
+			return l - 1 + w
 		}
 	}
 	return
@@ -663,7 +663,7 @@ join :: proc(a: []string, sep: string, allocator := context.allocator, loc := #c
 		n += len(s)
 	}
 
-	b := make([]byte, n, allocator, loc) or_return
+	b := non_zero_make([]byte, n, allocator, loc) or_return
 	i := copy(b, a[0])
 	for s in a[1:] {
 		i += copy(b[i:], sep)
@@ -710,7 +710,7 @@ concatenate :: proc(a: []string, allocator := context.allocator, loc := #caller_
 	for s in a {
 		n += len(s)
 	}
-	b := make([]byte, n, allocator, loc) or_return
+	b := non_zero_make([]byte, n, allocator, loc) or_return
 	i := 0
 	for s in a {
 		i += copy(b[i:], s)
@@ -850,7 +850,7 @@ _split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocato
 			n = l
 		}
 
-		res = make([]string, n, allocator, loc) or_return
+		res = non_zero_make([]string, n, allocator, loc) or_return
 		for i := 0; i < n-1; i += 1 {
 			_, w := utf8.decode_rune_in_string(s)
 			res[i] = s[:w]
@@ -866,7 +866,7 @@ _split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocato
 		n = count(s, sep) + 1
 	}
 
-	res = make([]string, n, allocator, loc) or_return
+	res = non_zero_make([]string, n, allocator, loc) or_return
 
 	n -= 1
 
@@ -2060,7 +2060,7 @@ repeat :: proc(s: string, count: int, allocator := context.allocator, loc := #ca
 		panic("strings: repeat count will cause an overflow")
 	}
 
-	b := make([]byte, len(s)*count, allocator, loc) or_return
+	b := non_zero_make([]byte, len(s)*count, allocator, loc) or_return
 	i := copy(b, s)
 	#no_bounds_check for i < len(b) { // 2^N trick to reduce the need to copy
 		copy(b[i:], b[:i])
@@ -2163,7 +2163,7 @@ replace :: proc(s, old, new: string, n: int, allocator := context.allocator, loc
 	}
 
 
-	t, err := make([]byte, len(s) + byte_count*(len(new) - len(old)), allocator, loc)
+	t, err := non_zero_make([]byte, len(s) + byte_count*(len(new) - len(old)), allocator, loc)
 	if err != nil {
 		return
 	}
@@ -2807,7 +2807,7 @@ split_multi :: proc(s: string, substrs: []string, allocator := context.allocator
 		it = it[i+w:]
 	}
 
-	results := make([dynamic]string, 0, n, allocator, loc) or_return
+	results := non_zero_make([dynamic]string, 0, n, allocator, loc) or_return
 	{
 		it := s
 		for len(it) > 0 {
@@ -2913,39 +2913,39 @@ Example:
 
 Output:
 
-	Hello?
+	Hello?World
 
 */
 @(require_results)
 scrub :: proc(s: string, replacement: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
-	str := s
 	b: Builder
 	builder_init(&b, 0, len(s), allocator, loc) or_return
-
-	has_error := false
-	cursor := 0
-	origin := str
-
-	#no_bounds_check for len(str) > 0 {
-		r, w := utf8.decode_rune_in_string(str)
-
-		if r == utf8.RUNE_ERROR {
-			if !has_error {
-				has_error = true
-				write_string(&b, origin[:cursor])
-			}
-		} else if has_error {
-			has_error = false
-			write_string(&b, replacement)
-
-			origin = origin[cursor:]
-			cursor = 0
-		}
-
-		cursor += w
-		str = str[w:]
+	defer if err != nil {
+		builder_destroy(&b)
 	}
 
+	has_error := false
+	start := 0
+	i := 0
+
+	#no_bounds_check for i < len(s) {
+		r, w := utf8.decode_rune_in_string(s[i:])
+
+		if r == utf8.RUNE_ERROR && w == 1 {
+			if !has_error {
+				has_error = true
+				write_string(&b, s[start:i], loc) or_return
+				write_string(&b, replacement, loc) or_return
+			}
+			start = i + w
+		} else {
+			has_error = false
+		}
+
+		i += w
+	}
+
+	write_string(&b, s[start:], loc) or_return
 	return to_string(b), nil
 }
 
@@ -2983,7 +2983,7 @@ Output:
 reverse :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	str := s
 	n := len(str)
-	buf := make([]byte, n, allocator, loc) or_return
+	buf := non_zero_make([]byte, n, allocator, loc) or_return
 	i := n
 
 	#no_bounds_check for len(str) > 0 {
@@ -3039,7 +3039,9 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator, lo
 
 	b: Builder
 	builder_init(&b, allocator, loc) or_return
-	writer := to_writer(&b)
+	defer if err != nil {
+		builder_destroy(&b)
+	}
 	str := s
 	column: int
 
@@ -3050,7 +3052,7 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator, lo
 			expand := tab_size - column%tab_size
 
 			for i := 0; i < expand; i += 1 {
-				io.write_byte(writer, ' ')
+				write_byte(&b, ' ', loc) or_return
 			}
 
 			column += expand
@@ -3058,10 +3060,10 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator, lo
 			if r == '\n' {
 				column = 0
 			} else {
-				column += w
+				column += 1
 			}
 
-			io.write_rune(writer, r)
+			write_string(&b, str[:w], loc) or_return
 		}
 
 		str = str[w:]
@@ -3153,12 +3155,13 @@ centre_justify :: proc(str: string, length: int, pad: string, allocator := conte
 
 	b: Builder
 	builder_init(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator, loc) or_return
+	defer if err != nil {
+		builder_destroy(&b)
+	}
 
-	w := to_writer(&b)
-
-	write_pad_string(w, pad, pad_len, remains/2)
-	io.write_string(w, str)
-	write_pad_string(w, pad, pad_len, (remains+1)/2)
+	write_pad_string(&b, pad, pad_len, remains/2, loc) or_return
+	write_string(&b, str, loc) or_return
+	write_pad_string(&b, pad, pad_len, (remains+1)/2, loc) or_return
 
 	return to_string(b), nil
 }
@@ -3191,11 +3194,12 @@ left_justify :: proc(str: string, length: int, pad: string, allocator := context
 
 	b: Builder
 	builder_init(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator, loc) or_return
+	defer if err != nil {
+		builder_destroy(&b)
+	}
 
-	w := to_writer(&b)
-
-	io.write_string(w, str)
-	write_pad_string(w, pad, pad_len, remains)
+	write_string(&b, str, loc) or_return
+	write_pad_string(&b, pad, pad_len, remains, loc) or_return
 
 	return to_string(b), nil
 }
@@ -3228,40 +3232,43 @@ right_justify :: proc(str: string, length: int, pad: string, allocator := contex
 
 	b: Builder
 	builder_init(&b, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator, loc) or_return
+	defer if err != nil {
+		builder_destroy(&b)
+	}
 
-	w := to_writer(&b)
-
-	write_pad_string(w, pad, pad_len, remains)
-	io.write_string(w, str)
+	write_pad_string(&b, pad, pad_len, remains, loc) or_return
+	write_string(&b, str, loc) or_return
 
 	return to_string(b), nil
 }
 
 /*
-Writes a given pad string a specified number of times to an `io.Writer`
+Writes a given pad string a specified number of times to a `Builder`
 
 Inputs:
-- w: The io.Writer to write the pad string to
+- b: The Builder to write the pad string to
 - pad: The pad string to be written
 - pad_len: The length of the pad string, in runes
 - remains: The number of times to write the pad string, in runes
 */
 @private
-write_pad_string :: proc(w: io.Writer, pad: string, pad_len, remains: int) {
+write_pad_string :: proc(b: ^Builder, pad: string, pad_len, remains: int, loc := #caller_location) -> (err: runtime.Allocator_Error) {
 	repeats := remains / pad_len
 
 	for _ in 0..<repeats {
-		io.write_string(w, pad)
+		write_string(b, pad, loc) or_return
 	}
 
 	n := remains % pad_len
-	p := pad
+	end := 0
 
 	#no_bounds_check for _ in 0..<n {
-		r, width := utf8.decode_rune_in_string(p)
-		io.write_rune(w, r)
-		p = p[width:]
+		_, width := utf8.decode_rune_in_string(pad[end:])
+		end += width
 	}
+
+	write_string(b, pad[:end], loc) or_return
+	return
 }
 
 /*
@@ -3301,7 +3308,7 @@ fields :: proc(s: string, allocator := context.allocator, loc := #caller_locatio
 		return nil, nil
 	}
 
-	a := make([]string, n, allocator, loc) or_return
+	a := non_zero_make([]string, n, allocator, loc) or_return
 	na := 0
 	field_start := 0
 	i := 0
@@ -3347,7 +3354,7 @@ Returns:
 */
 @(require_results)
 fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.allocator, loc := #caller_location) -> (res: []string, err: runtime.Allocator_Error) #optional_allocator_error #no_bounds_check {
-	substrings := make([dynamic]string, 0, 32, allocator, loc) or_return
+	substrings := non_zero_make([dynamic]string, 0, 32, allocator, loc) or_return
 
 	start, end := -1, -1
 	for r, offset in s {
@@ -3455,7 +3462,7 @@ levenshtein_distance :: proc(a, b: string, allocator := context.allocator, loc :
 	costs: []int
 
 	if n + 1 > len(LEVENSHTEIN_DEFAULT_COSTS) {
-		costs = make([]int, n + 1, allocator, loc) or_return
+		costs = non_zero_make([]int, n + 1, allocator, loc) or_return
 		for k in 0..=n {
 			costs[k] = k
 		}

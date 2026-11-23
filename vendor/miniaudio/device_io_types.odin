@@ -9,11 +9,11 @@ SUPPORT_COREAUDIO  :: ODIN_OS == .Darwin
 SUPPORT_SNDIO      :: ODIN_OS == .OpenBSD
 SUPPORT_AUDIO4     :: false // ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD
 SUPPORT_OSS        :: ODIN_OS == .FreeBSD
-SUPPORT_PULSEAUDIO :: ODIN_OS == .Linux
-SUPPORT_ALSA       :: ODIN_OS == .Linux
+SUPPORT_PULSEAUDIO :: ODIN_OS == .Linux && ODIN_PLATFORM_SUBTARGET != .Android
+SUPPORT_ALSA       :: ODIN_OS == .Linux && ODIN_PLATFORM_SUBTARGET != .Android
 SUPPORT_JACK       :: ODIN_OS == .Windows
-SUPPORT_AAUDIO     :: false // ODIN_OS == .Android
-SUPPORT_OPENSL     :: false // ODIN_OS == .Android
+SUPPORT_AAUDIO     :: ODIN_PLATFORM_SUBTARGET == .Android
+SUPPORT_OPENSL     :: ODIN_PLATFORM_SUBTARGET == .Android
 SUPPORT_WEBAUDIO   :: false // ODIN_OS == .Emscripten
 SUPPORT_CUSTOM     :: true
 SUPPORT_NULL       :: true // ODIN_OS != .Emscripten
@@ -1204,11 +1204,14 @@ device :: struct {
 			/*AAudioStream**/ pStreamCapture: rawptr,
 			rerouteLock: mutex,
 			isTearingDown: b32,
+			pendingReroutes: u32, /*atomic*/
 			usage: aaudio_usage,
 			contentType: aaudio_content_type,
 			inputPreset: aaudio_input_preset,
 			allowedCapturePolicy: aaudio_allowed_capture_policy,
 			noAutoStartAfterReroute: b32,
+			enableCompatibilityWorkarounds: b32,
+			allowSetBufferCapacity: b32,
 		} when SUPPORT_AAUDIO else struct {}),
 
 		opensl: (struct {

@@ -1,15 +1,15 @@
 package netpbm
 
-import "core:bytes"
 import "core:image"
 
 destroy :: proc(img: ^image.Image) -> bool {
 	if img == nil {
 		return false
 	}
+	context.allocator = img.pixels.allocator if img.pixels.allocator.procedure != nil else context.allocator
 
 	defer free(img)
-	bytes.buffer_destroy(&img.pixels)
+	delete(img.pixels)
 
 	info := img.metadata.(^image.Netpbm_Info) or_return
 
@@ -20,9 +20,9 @@ destroy :: proc(img: ^image.Image) -> bool {
 	return true
 }
 
-header_destroy :: proc(header: ^Header) {
+header_destroy :: proc(header: ^Header, allocator := context.allocator) {
 	if header.format == .P7 && header.tupltype != "" {
-		delete(header.tupltype)
+		delete(header.tupltype, allocator)
 		header.tupltype = ""
 	}
 }

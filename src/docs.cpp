@@ -221,7 +221,7 @@ gb_internal void print_doc_expr(Ast *expr) {
 	if (build_context.cmd_doc_flags & CmdDocFlag_Short) {
 		s = expr_to_string_shorthand(expr);
 	} else {
-		s = expr_to_string(expr);
+		s = expr_to_string_exact(expr);
 	}
 	gb_file_write(gb_file_get_standard(gbFileStandard_Output), s, gb_string_length(s));
 	gb_string_free(s);
@@ -322,7 +322,7 @@ gb_internal void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 
 			print_doc_line_no_newline(2, e->token.string);
 			if (type_expr != nullptr) {
-				gbString t = expr_to_string(type_expr);
+				gbString t = expr_to_string_exact(type_expr);
 				gb_printf(": %s ", t);
 				gb_string_free(t);
 			} else {

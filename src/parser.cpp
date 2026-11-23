@@ -2578,6 +2578,12 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 		}
 	case Token_Ident:
 		operand = parse_ident(f);
+		if (f->curr_token.kind == Token_Period) {
+			// NOTE(bill): an entity from another package, e.g. `call libc.strlen`
+			Token token = expect_token(f, Token_Period);
+			Ast *selector = parse_ident(f);
+			operand = ast_selector_expr(f, token, operand, selector);
+		}
 		break;
 	case Token_Mod:
 		operand = parse_asm_register(f);
@@ -2828,9 +2834,17 @@ gb_internal Ast *parse_asm_instruction(AstFile *f) {
 		return nullptr;
 	}
 
-	if (token_is_keyword(f->curr_token.kind)) {
+	if (f->curr_token.kind == Token_Ident || token_is_keyword(f->curr_token.kind)) {
+		// NOTE(bill): Not all keywords have a semicolon inserted after ending a line, e.g. a bare `in`.
+		// Its operands start on its line, as they would after an identifier.
+
+		bool is_keyword = f->curr_token.kind != Token_Ident;
 		Ast *name = parse_asm_ident(f);
-		auto operands = parse_asm_operands(f);
+
+		Slice<Ast *> operands = {};
+		if (!is_keyword || f->curr_token.pos.line == f->prev_token.pos.line) {
+			operands = parse_asm_operands(f);
+		}
 		Ast *instruction = alloc_ast_node(f, Ast_AsmInstruction);
 		instruction->AsmInstruction.name = name;
 		instruction->AsmInstruction.operands = operands;
@@ -2839,16 +2853,6 @@ gb_internal Ast *parse_asm_instruction(AstFile *f) {
 	}
 
 	switch (f->curr_token.kind) {
-	case Token_Ident:
-		{
-			Ast *name = parse_asm_ident(f);
-			auto operands = parse_asm_operands(f);
-			Ast *instruction = alloc_ast_node(f, Ast_AsmInstruction);
-			instruction->AsmInstruction.name = name;
-			instruction->AsmInstruction.operands = operands;
-			instruction->AsmInstruction.valid_form_index = -1;
-			return instruction;
-		}
 	case Token_Period:
 		{
 			Token token = expect_token(f, Token_Period);
@@ -3411,7 +3415,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			count_expr = parse_expr(f, false);
 			f->expr_level--;
 		}
-		
+
 		expect_token(f, Token_CloseBracket);
 		return ast_array_type(f, token, count_expr, parse_type(f));
 	} break;
@@ -3429,21 +3433,21 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 
 		return ast_map_type(f, token, key, value);
 	} break;
-	
+
 	case Token_matrix: {
 		Token token = expect_token(f, Token_matrix);
 		Ast *row_count = nullptr;
 		Ast *column_count = nullptr;
 		Ast *type = nullptr;
 		Token open, close;
-		
+
 		open  = expect_token_after(f, Token_OpenBracket, "matrix");
 		row_count = parse_expr(f, true);
 		expect_token(f, Token_Comma);
 		column_count = parse_expr(f, true);
 		close = expect_token(f, Token_CloseBracket);
 		type = parse_type(f);
-		
+
 		return ast_matrix_type(f, token, row_count, column_count, type);
 	} break;
 
@@ -4718,6 +4722,8 @@ gb_internal ProcCallingConvention string_to_calling_convention(String const &s) 
 	if (s == "preserve/none") return ProcCC_PreserveNone;
 	if (s == "preserve/most") return ProcCC_PreserveMost;
 	if (s == "preserve/all")  return ProcCC_PreserveAll;
+
+	if (s == "vectorcall")    return ProcCC_VectorCall;
 
 	if (s == "system") {
 		if (build_context.metrics.os == TargetOs_windows) {
@@ -7842,7 +7848,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 			}
 			try_add_import_path(p, s, s, init_pos, Package_Normal);
 		}
-		
+
 
 		for (String const &path : build_context.extra_packages) {
 			String fullpath = path_to_full_path(permanent_allocator(), path); // LEAK?
@@ -7857,7 +7863,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 			try_add_import_path(p, fullpath, fullpath, init_pos, Package_Normal);
 		}
 	}
-	
+
 	thread_pool_wait();
 
 	// NOTE(bill): It only matters than error has occured, not which error

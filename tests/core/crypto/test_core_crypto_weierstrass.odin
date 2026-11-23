@@ -549,15 +549,15 @@ test_p256_scalar_mul :: proc(t: ^testing.T) {
 		y_bytes, _ := hex.decode(transmute([]byte)(v.y), context.temp_allocator)
 
 		k_big: big.Int
-		err := big.set(&k_big, v.scalar, 10, context.temp_allocator)
+		err := big.set(&k_big, v.scalar, 10, allocator = context.temp_allocator)
 		testing.expectf(t, err == nil, "failed to parse k", err)
 
 		k_sz: int
-		k_sz, err = big.int_to_bytes_size(&k_big, allocator = context.temp_allocator)
+		k_sz, err = big.int_to_bytes_size(&k_big)
 		testing.expect(t, err == nil)
 
 		k_bytes := make([]byte, k_sz, context.temp_allocator)
-		err = big.int_to_bytes_big(&k_big, k_bytes, allocator = context.temp_allocator)
+		err = big.int_to_bytes_big(&k_big, k_bytes)
 
 		p, q, expected, g: ec.Point_p256r1
 		sc: ec.Scalar_p256r1
@@ -852,15 +852,15 @@ test_p384_scalar_mul :: proc(t: ^testing.T) {
 		y_bytes, _ := hex.decode(transmute([]byte)(v.y), context.temp_allocator)
 
 		k_big: big.Int
-		err := big.set(&k_big, v.scalar, 10, context.temp_allocator)
+		err := big.set(&k_big, v.scalar, 10, allocator = context.temp_allocator)
 		testing.expectf(t, err == nil, "failed to parse k", err)
 
 		k_sz: int
-		k_sz, err = big.int_to_bytes_size(&k_big, allocator = context.temp_allocator)
+		k_sz, err = big.int_to_bytes_size(&k_big)
 		testing.expect(t, err == nil)
 
 		k_bytes := make([]byte, k_sz, context.temp_allocator)
-		err = big.int_to_bytes_big(&k_big, k_bytes, allocator = context.temp_allocator)
+		err = big.int_to_bytes_big(&k_big, k_bytes)
 
 		p, q, expected, g: ec.Point_p384r1
 		sc: ec.Scalar_p384r1

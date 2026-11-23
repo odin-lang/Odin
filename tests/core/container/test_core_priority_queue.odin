@@ -32,7 +32,7 @@ test_priority_queue :: proc(t: ^testing.T) {
 
 	N :: 15
 	for _ in 0..<N {
-		v = int(rand.int63())
+		v = rand.int_max(max(int))
 		pq.push(&q, v)
 	}
 

@@ -102,6 +102,8 @@ symbol_lookup        :: ir.symbol_lookup
 WASM_MAGIC   :: u32(0x6d73_6100)
 WASM_VERSION :: u32(1)
 
+MAX_FUNCTION_LOCALS :: 50_000
+
 // Opcode-space prefix bytes. A prefixed opcode is `prefix byte` then an unsigned
 // LEB128 sub-opcode (SIMD reaches 0x113, so the sub-opcode can be two bytes).
 PREFIX_NONE :: u8(0x00)

@@ -7,7 +7,12 @@ import "core:c"
 
 _MAX_PTHREAD_NAME_LENGTH :: 16
 
-foreign import pthread "system:pthread"
+when ODIN_PLATFORM_SUBTARGET == .Android {
+	// Bionic keeps pthreads in libc.
+	foreign import pthread "system:c"
+} else {
+	foreign import pthread "system:pthread"
+}
 
 foreign pthread {
 	pthread_getname_np :: proc(thread: posix.pthread_t, name: [^]u8, len: c.size_t) -> posix.Errno ---

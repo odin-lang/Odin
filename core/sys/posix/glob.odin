@@ -109,8 +109,9 @@ when ODIN_OS == .Darwin {
 	GLOB_NOMATCH :: -3
 	GLOB_NOSPACE :: -1
 
-} else when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD {
+} else when ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_PLATFORM_SUBTARGET == .Android {
 
+	// Bionic (Android) uses FreeBSD's glob.
 	glob_t :: struct {
 		gl_pathc:  c.size_t,                      /* [PSX] count of paths matched by pattern */
 		gl_matchc: c.size_t,                      /* count of paths matching pattern */
@@ -134,7 +135,7 @@ when ODIN_OS == .Darwin {
 	GLOB_ERR      :: 0x0004
 	GLOB_MARK     :: 0x0008
 	GLOB_NOCHECK  :: 0x0010
-	GLOB_NOESCAPE :: 0x2000 when ODIN_OS == .FreeBSD else 0x0100
+	GLOB_NOESCAPE :: 0x0100 when ODIN_OS == .NetBSD else 0x2000
 	GLOB_NOSORT   :: 0x0020
 
 	GLOB_ABORTED :: -2

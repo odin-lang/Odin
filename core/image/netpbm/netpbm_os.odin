@@ -6,6 +6,7 @@ import "core:os"
 load :: proc {
 	load_from_file,
 	load_from_bytes,
+	load_from_context,
 }
 
 load_from_file :: proc(filename: string, allocator := context.allocator) -> (img: ^Image, err: Error) {

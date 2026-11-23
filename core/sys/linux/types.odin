@@ -526,7 +526,7 @@ Sig_Handler_Fn :: #type proc "c" (sig: Signal)
 Sig_Restore_Fn :: #type proc "c" () -> !
 
 when size_of(rawptr) == 8 {
-	Sig_Info :: struct #packed {
+	Sig_Info :: struct {
 		signo: Signal,
 		errno: Errno,
 		code: i32,
@@ -711,7 +711,7 @@ when size_of(rawptr) == 8 {
 }
 
 SIGEV_MAX_SIZE :: 64
-SIGEV_PAD_SIZE :: ((SIGEV_MAX_SIZE-size_of(i32)*2+size_of(Sig_Val))/size_of(i32))
+SIGEV_PAD_SIZE :: ((SIGEV_MAX_SIZE-size_of(i32)*2-size_of(Sig_Val))/size_of(i32))
 
 Sig_Val :: struct #raw_union {
 	sival_int: i32,
@@ -747,15 +747,27 @@ Sig_Action_Special :: enum uint {
 }
 
 Sig_Action_Flags :: bit_set[Sig_Action_Flag; uint]
-Sig_Action :: struct {
-	using _u: struct #raw_union {
-		handler: Sig_Handler_Fn,
-		sigaction: #type proc "c" (sig: Signal, si: ^Sig_Info, ctx: rawptr),
-		special: Sig_Action_Special,
-	},
-	flags: Sig_Action_Flags,
-	restorer: Sig_Restore_Fn,
-	mask: Sig_Set,
+when ODIN_ARCH == .riscv64 {
+	Sig_Action :: struct {
+		using _u: struct #raw_union {
+			handler: Sig_Handler_Fn,
+			sigaction: #type proc "c" (sig: Signal, si: ^Sig_Info, ctx: rawptr),
+			special: Sig_Action_Special,
+		},
+		flags: Sig_Action_Flags,
+		mask: Sig_Set,
+	}
+} else {
+	Sig_Action :: struct {
+		using _u: struct #raw_union {
+			handler: Sig_Handler_Fn,
+			sigaction: #type proc "c" (sig: Signal, si: ^Sig_Info, ctx: rawptr),
+			special: Sig_Action_Special,
+		},
+		flags: Sig_Action_Flags,
+		restorer: Sig_Restore_Fn,
+		mask: Sig_Set,
+	}
 }
 
 /*
@@ -825,6 +837,14 @@ Sock_Addr_Any :: struct #raw_union {
 	using ipv4: Sock_Addr_In,
 	using ipv6: Sock_Addr_In6,
 	using uds: Sock_Addr_Un,
+}
+
+/*
+	Struct for the `SO_LINGER` socket option.
+*/
+Linger :: struct {
+	l_onoff:  i32,
+	l_linger: i32,
 }
 
 /*
@@ -951,8 +971,10 @@ IPC_Perm :: struct {
 	cuid: u32,
 	cgid: u32,
 	mode: IPC_Flags, // Only contains mode flags.
+	_:    u16,
 	seq:  u16,
-	_:    [2 + 2*size_of(int)]u8,
+	_:    u16,
+	_:    [2]uint,
 }
 
 when size_of(int) == 8 || ODIN_ARCH == .i386 {
@@ -1594,7 +1616,7 @@ IO_Uring_SQE :: struct {
 	fd: Fd,
 	using __offset: struct #raw_union {
 		// Offset into file.
-		off:     u64 `raw_union_tag:"opcode=.READV, opcode=.WRITEV, opcode=.SPLICE, opcode=.POLL_REMOVE, opcode=.EPOLL_CTL, opcode=.TIMEOUT, opcode=.ACCEPT, opcode=.CONNECT, opcode=.READ, opcode=.WRITE, opcode=.FILES_UPDATE, opcode=.SOCKET"`,
+		off:     u64 `raw_union_tag:"opcode=.READV, opcode=.WRITEV, opcode=.SPLICE, opcode=.POLL_REMOVE, opcode=.EPOLL_CTL, opcode=.TIMEOUT, opcode=.ACCEPT, opcode=.CONNECT, opcode=.READ, opcode=.WRITE, opcode=.FILES_UPDATE, opcode=.SOCKET, opcode=.FALLOCATE, opcode=.READ_FIXED, opcode=.WRITE_FIXED"`,
 		addr2:   u64 `raw_union_tag:"opcode=.SEND, opcode=.BIND"`,
 		using _: struct {
 			cmd_op: u32,
@@ -1604,7 +1626,7 @@ IO_Uring_SQE :: struct {
 	},
 	using __iovecs:   struct #raw_union {
 		// Pointer to buffer or iovecs.
-		addr:          u64 `raw_union_tag:"opcode=.READV, opcode=.WRITEV, opcode=.POLL_REMOVE, opcode=.EPOLL_CTL, opcode=.SENDMSG, opcode=.RECVMSG, opcode=.SEND, opcode=.RECV, opcode=.TIMEOUT, opcode=.TIMEOUT_REMOVE, opcode=.ACCEPT, opcode=.ASYNC_CANCEL, opcode=.LINK_TIMEOUT, opcode=.CONNECT, opcode=.MADVISE, opcode=.OPENAT, opcode=.STATX, opcode=.READ, opcode=.WRITE, opcode=.FILES_UPDATE, opcode=.BIND, opcode=.LISTEN"`,
+		addr:          u64 `raw_union_tag:"opcode=.READV, opcode=.WRITEV, opcode=.POLL_REMOVE, opcode=.EPOLL_CTL, opcode=.SENDMSG, opcode=.RECVMSG, opcode=.SEND, opcode=.RECV, opcode=.TIMEOUT, opcode=.TIMEOUT_REMOVE, opcode=.ACCEPT, opcode=.ASYNC_CANCEL, opcode=.LINK_TIMEOUT, opcode=.CONNECT, opcode=.MADVISE, opcode=.OPENAT, opcode=.STATX, opcode=.READ, opcode=.WRITE, opcode=.FILES_UPDATE, opcode=.BIND, opcode=.LISTEN, opcode=.FALLOCATE, opcode=.READ_FIXED, opcode=.WRITE_FIXED, opcode=.UNLINKAT"`,
 		splice_off_in: u64 `raw_union_tag:"opcode=.SPLICE"`,
 		using _: struct {
 			level:   u32,
@@ -1613,7 +1635,7 @@ IO_Uring_SQE :: struct {
 	},
 	using __len: struct #raw_union {
 		// Buffer size or number of iovecs.
-		len:          u32                     `raw_union_tag:"opcode=.READV, opcode=.WRITEV, opcode=.SPLICE, opcode=.SEND, opcode=.RECV, opcode=.TIMEOUT, opcode=.LINK_TIMEOUT, opcode=.MADVISE, opcode=.OPENAT, opcode=.READ, opcode=.WRITE, opcode=.TEE, opcode=.FILES_UPDATE, opcode=.SOCKET"`,
+		len:          u32                     `raw_union_tag:"opcode=.READV, opcode=.WRITEV, opcode=.SPLICE, opcode=.SEND, opcode=.RECV, opcode=.TIMEOUT, opcode=.LINK_TIMEOUT, opcode=.MADVISE, opcode=.OPENAT, opcode=.READ, opcode=.WRITE, opcode=.TEE, opcode=.FILES_UPDATE, opcode=.SOCKET, opcode=.FALLOCATE, opcode=.READ_FIXED, opcode=.WRITE_FIXED"`,
 		poll_flags:   IO_Uring_Poll_Add_Flags `raw_union_tag:"opcode=.POLL_ADD, opcode=.POLL_REMOVE"`,
 		statx_mask:   Statx_Mask              `raw_union_tag:"opcode=.STATX"`,
 		epoll_ctl_op: EPoll_Ctl_Opcode        `raw_union_tag:"opcode=.EPOLL_CTL"`,
@@ -1636,7 +1658,7 @@ IO_Uring_SQE :: struct {
 		fadvise_advice:   u32                     `raw_union_tag:"opcode=.MADVISE"`,
 		splice_flags:     IO_Uring_Splice_Flags   `raw_union_tag:"opcode=.SPLICE, opcode=.TEE"`,
 		rename_flags:     u32,
-		unlink_flags:     u32,
+		unlink_flags:     u32                     `raw_union_tag:"opcode=.UNLINKAT"`,
 		hardlink_flags:   u32,
 		xattr_flags:      u32,
 		msg_ring_flags:   u32,
@@ -1646,7 +1668,7 @@ IO_Uring_SQE :: struct {
 	user_data: u64,
 	using __buffer: struct #raw_union {
 		// Index into fixed buffers, if used.
-		buf_index: u16,
+		buf_index: u16 `raw_union_tag:"opcode=.READ_FIXED, opcode=.WRITE_FIXED"`,
 		// For grouped buffer selection.
 		buf_group: u16,
 	},
@@ -1722,6 +1744,7 @@ Timex :: struct {
 	errcnt:    int,
 	stbcnt:    int,
 	tai:       i32,
+	_:         [11]i32,
 }
 
 Reboot_Magic :: enum u64 {
@@ -1757,7 +1780,7 @@ Sched_Param :: struct {
 	sched_priority: i32,
 }
 
-Sched_Flags :: bit_set[Sched_Flag_Bits; u32]
+Sched_Flags :: bit_set[Sched_Flag_Bits; u64]
 
 Sched_Attr :: struct {
 	size:           u32,
@@ -1780,3 +1803,69 @@ Sched_Attr :: struct {
 Sched_Attr_Flags :: bit_set[Sched_Attr_Flag_Bits; u32]
 
 Memfd_Create_Flags :: bit_set[Memfd_Create_Flag_Bits; u32]
+
+Netlink_Message_Flags :: bit_set[Netlink_Message_Flags_Bits; u16]
+
+Netlink_Message_Header :: struct {
+	len:   u32,
+	type:  Netlink_Message_Type,
+	flags: Netlink_Message_Flags,
+	seq:   u32,
+	pid:   u32,
+}
+
+Netlink_Message_Error :: struct {
+	error: i32,
+	msg:   Netlink_Message_Header,
+}
+
+Rtnetlink_Attribute :: struct {
+	len:  u16,
+	type: u16,
+}
+
+Rtnetlink_Generic_Message :: struct {
+	family: u8,
+}
+
+Interface_Flags :: bit_set[Interface_Flags_Bits; u32]
+
+Interface_Info_Message :: struct {
+	family: u8,
+	_:      u8,
+	type:   u16,
+	index:  i32,
+	flags:  Interface_Flags,
+	change: Interface_Flags,
+}
+
+Interface_Address_Message :: struct {
+	family:    u8,
+	prefixlen: u8,
+	flags:     u8,
+	scope:     u8,
+	index:     u32,
+}
+
+Route_Message_Flags :: bit_set[Route_Message_Flags_Bits; u32]
+
+Route_Message :: struct {
+	family:   u8,
+	dst_len:  u8,
+	src_len:  u8,
+	tos:      u8,
+	table:    u8,
+	protocol: u8,
+	scope:    u8,
+	type:     Route_Type,
+	flags:    Route_Message_Flags,
+}
+
+Route_Next_Hop :: struct {
+	len:     u16,
+	flags:   u8,
+	hops:    u8,
+	ifindex: i32,
+}
+
+Fallocate_Mode :: bit_set[Fallocate_Mode_Bits; u32]

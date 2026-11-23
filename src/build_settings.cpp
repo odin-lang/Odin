@@ -20,7 +20,7 @@ enum TargetOsKind : u16 {
 	TargetOs_freebsd,
 	TargetOs_openbsd,
 	TargetOs_netbsd,
-	
+
 	TargetOs_wasi,
 	TargetOs_js,
 	TargetOs_orca,
@@ -172,7 +172,7 @@ enum Subtarget : u32 {
 	Subtarget_iPhoneSimulator,
 	Subtarget_Android,
 	Subtarget_Playdate,
-	
+
 	Subtarget_COUNT,
 	Subtarget_Invalid,    // NOTE(harold): Must appear after _COUNT as this is not a real subtarget
 };
@@ -216,7 +216,7 @@ enum CommandKind : u64 {
 	Command_doc             = 1<<3,
 	Command_version         = 1<<4,
 	Command_test            = 1<<5,
-	
+
 	Command_strip_semicolon = 1<<6,
 	Command_bug_report      = 1<<7,
 
@@ -691,7 +691,7 @@ struct BuildContext {
 	gbAffinity affinity;
 	isize      thread_count;
 
-	PtrMap<char const *, ExactValue> defined_values;
+	PtrMap<char const *, String> defined_values;
 
 	StringSet target_features_set;
 	String target_features_string;
@@ -750,6 +750,12 @@ gb_internal isize MAX_ERROR_COLLECTOR_COUNT(void) {
 	#define I386_MAX_ALIGNMENT 16
 #else
 	#define I386_MAX_ALIGNMENT 4
+#endif
+
+#if LLVM_VERSION_MAJOR >= 20
+	#define WASM_MAX_ALIGNMENT 16
+#else
+	#define WASM_MAX_ALIGNMENT 8
 #endif
 
 gb_global TargetMetrics target_windows_i386 = {
@@ -856,21 +862,21 @@ gb_global TargetMetrics target_netbsd_arm64 = {
 gb_global TargetMetrics target_freestanding_wasm32 = {
 	TargetOs_freestanding,
 	TargetArch_wasm32,
-	4, 4, 8, 512,
+	4, 4, WASM_MAX_ALIGNMENT, 512,
 	str_lit("wasm32-freestanding-js"),
 };
 
 gb_global TargetMetrics target_js_wasm32 = {
 	TargetOs_js,
 	TargetArch_wasm32,
-	4, 4, 8, 512,
+	4, 4, WASM_MAX_ALIGNMENT, 512,
 	str_lit("wasm32-js-js"),
 };
 
 gb_global TargetMetrics target_wasi_wasm32 = {
 	TargetOs_wasi,
 	TargetArch_wasm32,
-	4, 4, 8, 512,
+	4, 4, WASM_MAX_ALIGNMENT, 512,
 	str_lit("wasm32-wasi-js"),
 };
 
@@ -878,7 +884,7 @@ gb_global TargetMetrics target_wasi_wasm32 = {
 gb_global TargetMetrics target_orca_wasm32 = {
 	TargetOs_orca,
 	TargetArch_wasm32,
-	4, 4, 8, 512,
+	4, 4, WASM_MAX_ALIGNMENT, 512,
 	str_lit("wasm32-wasi-js"),
 };
 
@@ -886,21 +892,21 @@ gb_global TargetMetrics target_orca_wasm32 = {
 gb_global TargetMetrics target_freestanding_wasm64p32 = {
 	TargetOs_freestanding,
 	TargetArch_wasm64p32,
-	4, 8, 8, 512,
+	4, 8, WASM_MAX_ALIGNMENT, 512,
 	str_lit("wasm32-freestanding-js"),
 };
 
 gb_global TargetMetrics target_js_wasm64p32 = {
 	TargetOs_js,
 	TargetArch_wasm64p32,
-	4, 8, 8, 512,
+	4, 8, WASM_MAX_ALIGNMENT, 512,
 	str_lit("wasm32-js-js"),
 };
 
 gb_global TargetMetrics target_wasi_wasm64p32 = {
 	TargetOs_wasi,
-	TargetArch_wasm32,
-	4, 8, 8, 512,
+	TargetArch_wasm64p32,
+	4, 8, WASM_MAX_ALIGNMENT, 512,
 	str_lit("wasm32-wasi-js"),
 };
 
@@ -1028,7 +1034,7 @@ gb_internal TargetOsKind get_target_os_from_string(String str, Subtarget *subtar
 
 			if (str_eq_ignore_case(subtarget, "generic") || str_eq_ignore_case(subtarget, "default")) {
 				*subtarget_ = Subtarget_Default;
-				
+
 			} else {
 				for (isize i = 1; i < Subtarget_COUNT; i++) {
 					if (str_eq_ignore_case(subtarget_strings[i], subtarget)) {
@@ -1637,8 +1643,14 @@ gb_internal void init_android_values(bool with_sdk) {
 
 		i64 new_level = big_int_to_i64(&level);
 
-		if (new_level >= 21) {
+		if (new_level >= 29) {
 			bc->ODIN_ANDROID_API_LEVEL = cast(int)new_level;
+		} else if (new_level >= 21) {
+			// NOTE(bill): Android's runtime uses `@(thread_local)`
+			// LLVM-C cannot select emulated TLS, and Android only loads ELF TLS from API level 29 (Android 10).
+			gb_printf_err("Error: -subtarget:android requires -minimum-os-version:29 or higher, got %.*s\n", LIT(bc->minimum_os_version_string));
+			gb_printf_err("\tOdin uses ELF thread-local storage, which Android supports from API level 29\n");
+			gb_exit(1);
 		} else {
 			gb_printf_err("Warning: Invalid -minimum-os-version:%.*s for -subtarget:Android, defaulting to %.*s\n", LIT(bc->minimum_os_version_string), LIT(default_level));
 			bc->ODIN_ANDROID_API_LEVEL = atoi(cast(char const *)default_level.text);
@@ -1657,31 +1669,29 @@ gb_internal void init_android_values(bool with_sdk) {
 	#endif
 
 	if (bc->ODIN_ANDROID_NDK.len != 0 && bc->ODIN_ANDROID_NDK_TOOLCHAIN.len == 0) {
-		String arch = str_lit("x86_64");
-		#if defined (GB_CPU_ARM)
-			// TODO(bill): this is a complete guess
-			arch = str_lit("aarch64");
-		#endif
+		// NOTE(bill): The NDK's host tools are always in a directory named for x86_64. On macOS they are
+		// universal binaries that run on Apple Silicon too.
+		String host = {};
 		#if defined(GB_SYSTEM_WINDOWS)
-			bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate4_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), str_lit("windows-"), arch);
+			host = str_lit("windows-x86_64");
 		#elif defined(GB_SYSTEM_OSX)
-			// TODO(bill): is this name even correct?
-			bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate4_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), str_lit("darwin-"), arch);
+			host = str_lit("darwin-x86_64");
 		#elif defined(GB_SYSTEM_LINUX)
-			bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate4_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), str_lit("linux-"), arch);
+			host = str_lit("linux-x86_64");
 		#endif
+		bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate3_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), host);
 
 		bc->ODIN_ANDROID_NDK_TOOLCHAIN = normalize_path(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, NIX_SEPARATOR_STRING);
 	}
 
 	if (bc->ODIN_ANDROID_NDK.len == 0 && !with_sdk)  {
-		gb_printf_err("Error: ODIN_ANDROID_NDK not set");
+		gb_printf_err("Error: ODIN_ANDROID_NDK not set\n");
 		gb_exit(1);
 
 	}
 
 	if (bc->ODIN_ANDROID_NDK_TOOLCHAIN.len == 0 && !with_sdk)  {
-		gb_printf_err("Error: ODIN_ANDROID_NDK not set");
+		gb_printf_err("Error: ODIN_ANDROID_NDK not set\n");
 		gb_exit(1);
 	}
 
@@ -1710,10 +1720,6 @@ gb_internal void init_android_values(bool with_sdk) {
 	if (with_sdk) {
 		if (bc->ODIN_ANDROID_SDK.len == 0)  {
 			gb_printf_err("Error: ODIN_ANDROID_SDK not set, which is required for -build-mode:executable for -subtarget:android");
-			gb_exit(1);
-		}
-		if (bc->android_keystore.len == 0) {
-			gb_printf_err("Error: -android-keystore:<string> has not been set\n");
 			gb_exit(1);
 		}
 	}
@@ -1772,7 +1778,7 @@ gb_internal String normalize_minimum_os_version_string(String version) {
 
 gb_internal void init_build_context_error_pos_style() {
 	build_context.ODIN_ERROR_POS_STYLE = ErrorPosStyle_Default;
-	
+
 	char const *found = gb_get_env("ODIN_ERROR_POS_STYLE", permanent_allocator());
 	if (found) {
 		ErrorPosStyle kind = ErrorPosStyle_Default;
@@ -1983,21 +1989,24 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			bc->reloc_mode = RelocMode_PIC;
 		}
 	} else if (metrics->os == TargetOs_linux && subtarget == Subtarget_Android) {
+		// NOTE(bill): LLVM-C does not normalize triples, so they need the vendor. Read as `i686-linux-android`,
+		// "linux" is the vendor and LLVM does not know it is Android: i386 gets a 4-byte aligned stack
+		// and arm64 does not reserve x18, which Android's shadow call stack uses.
 		switch (metrics->arch) {
 		case TargetArch_arm64:
-			bc->metrics.target_triplet = str_lit("aarch64-linux-android");
+			bc->metrics.target_triplet = str_lit("aarch64-unknown-linux-android");
 			bc->reloc_mode = RelocMode_PIC;
 			break;
 		case TargetArch_arm32:
-			bc->metrics.target_triplet = str_lit("armv7a-linux-androideabi");
+			bc->metrics.target_triplet = str_lit("armv7a-unknown-linux-androideabi");
 			bc->reloc_mode = RelocMode_PIC;
 			break;
 		case TargetArch_amd64:
-			bc->metrics.target_triplet = str_lit("x86_64-linux-android");
+			bc->metrics.target_triplet = str_lit("x86_64-unknown-linux-android");
 			bc->reloc_mode = RelocMode_PIC;
 			break;
 		case TargetArch_i386:
-			bc->metrics.target_triplet = str_lit("i686-linux-android");
+			bc->metrics.target_triplet = str_lit("i686-unknown-linux-android");
 			bc->reloc_mode = RelocMode_PIC;
 			break;
 		default:
@@ -2201,6 +2210,18 @@ gb_internal bool check_single_target_feature_is_valid(String const &feature_list
 	return false;
 }
 
+gb_internal String find_target_feature_ignore_case(String const &feature_list, String const &feature) {
+	String_Iterator it = {feature_list, 0};
+	String str = {};
+	while (string_split_iterator_next(&it, ',', &str)) {
+		if (str_eq_ignore_case(str, feature)) {
+			return str;
+		}
+	}
+
+	return {};
+}
+
 gb_internal bool check_target_feature_is_valid(String const &feature, TargetArchKind arch, String *invalid) {
 	String feature_list = target_features_list[arch];
 	String_Iterator it = {feature, 0};
@@ -2265,15 +2286,15 @@ gb_internal bool check_target_feature_is_enabled(String const &feature, String *
 
 		String plus_str  = concatenate_strings(temporary_allocator(), make_string_c("+"), feature_str);
 		String minus_str = concatenate_strings(temporary_allocator(), make_string_c("-"), feature_str);
-		
+
 		bool has_raw   = string_set_exists(&build_context.target_features_set, feature_str);
 		bool has_plus  = string_set_exists(&build_context.target_features_set, plus_str);
 		bool has_minus = string_set_exists(&build_context.target_features_set, minus_str);
-		
+
 		// NOTE(jakubtomsu): this way "feature" and "+feature" is ALWAYS equivalent,
 		// and also allows the minus sign to do a final override.
 		bool is_enabled = (has_plus || has_raw) && !has_minus;
-		
+
 		if (want_enabled != is_enabled) {
 			if (not_enabled) *not_enabled = str;
 			return false;
@@ -2369,6 +2390,16 @@ gb_internal bool init_build_paths(String init_filename) {
 				bc->build_paths[BuildPath_RES].ext = copy_string(ha, STR_LIT("res"));
 				bc->build_paths[BuildPath_RC]      = path_from_string(ha, bc->resource_filepath);
 				bc->build_paths[BuildPath_RC].ext  = copy_string(ha, STR_LIT("rc"));
+			}
+		}
+
+		if (bc->metrics.arch == TargetArch_i386) {
+			if (build_context.linker_choice == Linker_radlink) {
+				gb_printf_err("radlink does not support Windows i386, use -linker:msvc or -linker:lld instead.\n");
+				return false;
+			}
+			if (build_context.linker_choice == Linker_Default) {
+				build_context.linker_choice = Linker_msvc;
 			}
 		}
 
@@ -2569,8 +2600,8 @@ gb_internal bool init_build_paths(String init_filename) {
 				output_path.name = copy_string(ha, output_path.name);
 				// The old basename is wrong. Delete it
 				gb_free(ha, old_basename.text);
-				
-				
+
+
 			}
 
 			// Replace extension.
@@ -2646,6 +2677,10 @@ gb_internal bool init_build_paths(String init_filename) {
 			break;
 		default:
 			gb_printf_err("-sanitize:address is only supported on Windows, Linux, Darwin, and FreeBSD\n");
+			return false;
+		}
+		if (build_context.metrics.os == TargetOs_windows && build_context.metrics.arch != TargetArch_amd64) {
+			gb_printf_err("-sanitize:address is only supported on Windows for amd64\n");
 			return false;
 		}
 	}

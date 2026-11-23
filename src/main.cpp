@@ -245,8 +245,26 @@ int run_subprocess(String const &exe_name, wchar_t *after_double_dash_raw) {
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
 	} else {
+		DWORD err_code = GetLastError();
+		char *err_msg = nullptr;
+		FormatMessageA(
+			FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+			nullptr,
+			err_code,
+			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+			cast(LPSTR)&err_msg,
+			0,
+			nullptr
+		);
+
 		String cmd_line_utf8 = string16_to_string(a, make_string16(cast(u16 *)cmd_line, n));
 		gb_printf_err("Failed to execute command:\n\t%.*s\n", LIT(cmd_line_utf8));
+
+		if (err_msg) {
+			gb_printf_err("Windows Error [%lu]: %s\n", err_code, err_msg);
+			LocalFree(err_msg);
+		}
+
 		gb_free(a, cmd_line_utf8.text);
 		exit_code = -1;
 	}
@@ -269,7 +287,7 @@ int run_subprocess(const char *name, const char **args, bool honor_path) {
 		status = posix_spawnp(&pid, name, NULL, NULL, (char *const *)args, environ);
 	}
 	if (status != 0) {
-		gb_printf_err("Could not spawn subprocess: %s\n", strerror(errno));
+		gb_printf_err("Could not spawn subprocess: %s: %s\n", args[0], strerror(status));
 		return -1;
 	}
 
@@ -587,81 +605,6 @@ gb_internal void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, Str
 	array_add(build_flags, flag);
 }
 
-// A value such as `1e-5` is a float, not an integer. Base prefixed literals are excluded because
-// `e` is a valid digit in bases 16 and above, e.g. `0x1e`.
-gb_internal bool build_param_looks_like_float(String const &param) {
-	if (string_contains_char(param, '.')) {
-		return true;
-	}
-	isize i = 0;
-	if (param.len > 0 && (param[0] == '-' || param[0] == '+')) {
-		i = 1;
-	}
-	if (param.len > i+1 && param[i] == '0' && !gb_char_is_digit(cast(char)param[i+1])) {
-		return false;
-	}
-	for (; i < param.len; i++) {
-		if (param[i] == 'e' || param[i] == 'E') {
-			return true;
-		}
-	}
-	return false;
-}
-
-gb_internal ExactValue build_param_to_exact_value(String name, String param) {
-	ExactValue value = {};
-
-	/*
-		Bail out on an empty param string
-	*/
-	if (param.len == 0) {
-		gb_printf_err("Invalid flag parameter for '%.*s' = '%.*s'\n", LIT(name), LIT(param));
-		return value;
-	}
-
-	/*
-		Attempt to parse as bool first.
-	*/
-	if (str_eq_ignore_case(param, str_lit("t")) || str_eq_ignore_case(param, str_lit("true"))) {
-		return exact_value_bool(true);
-	}
-	if (str_eq_ignore_case(param, str_lit("f")) || str_eq_ignore_case(param, str_lit("false"))) {
-		return exact_value_bool(false);
-	}
-
-	/*
-		Try to parse as an integer or float
-	*/
-	if (param[0] == '-' || param[0] == '+' || gb_is_between(param[0], '0', '9')) {
-		if (build_param_looks_like_float(param)) {
-			value = exact_value_float_from_string(param);
-		} else {
-			value = exact_value_integer_from_string(param);
-		}
-		if (value.kind != ExactValue_Invalid) {
-			return value;
-		}
-	}
-
-	/*
-		Treat the param as a string literal,
-		optionally be quoted in '' to avoid being parsed as a bool, integer or float.
-	*/
-	value = exact_value_string(param);
-
-	if (param[0] == '\'' && value.kind == ExactValue_String) {
-		String s = value.value_string;
-		if (s.len > 1 && s[0] == '\'' && s[s.len-1] == '\'') {
-			value.value_string = substring(s, 1, s.len-1);
-		}
-	}
-
-	if (value.kind != ExactValue_String) {
-		gb_printf_err("Invalid flag parameter for '%.*s' = '%.*s'\n", LIT(name), LIT(param));
-	}
-	return value;
-}
-
 // Writes a did-you-mean message for formerly deprecated flags.
 gb_internal void did_you_mean_flag(String flag) {
 	gbAllocator a = heap_allocator();
@@ -680,7 +623,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	auto build_flags = array_make<BuildFlag>(heap_allocator(), 0, BuildFlag_COUNT);
 	add_flag(&build_flags, BuildFlag_Help,                    str_lit("help"),                      BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_SingleFile,              str_lit("file"),                      BuildFlagParam_None,    Command__does_build | Command__does_check);
-	add_flag(&build_flags, BuildFlag_OutFile,                 str_lit("out"),                       BuildFlagParam_String,  Command__does_build | Command_test | Command_doc);
+	add_flag(&build_flags, BuildFlag_OutFile,                 str_lit("out"),                       BuildFlagParam_String,  Command__does_build | Command_test | Command_doc | Command_bundle_android);
 	add_flag(&build_flags, BuildFlag_OptimizationMode,        str_lit("o"),                         BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_ShowTimings,             str_lit("show-timings"),              BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowMoreTimings,         str_lit("show-more-timings"),         BuildFlagParam_None,    Command__does_check);
@@ -755,7 +698,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Microarch,               str_lit("microarch"),                 BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_TargetFeatures,          str_lit("target-features"),           BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_StrictTargetFeatures,    str_lit("strict-target-features"),    BuildFlagParam_None,    Command__does_build);
-	add_flag(&build_flags, BuildFlag_MinimumOSVersion,        str_lit("minimum-os-version"),        BuildFlagParam_String,  Command__does_build | Command_bundle_android);
+	add_flag(&build_flags, BuildFlag_MinimumOSVersion,        str_lit("minimum-os-version"),        BuildFlagParam_String,  Command__does_check | Command_bundle_android);
 
 	add_flag(&build_flags, BuildFlag_RelocMode,               str_lit("reloc-mode"),                BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_StackProtector,          str_lit("stack-protector"),           BuildFlagParam_String,  Command__does_build);
@@ -1284,7 +1227,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							}
 							String name = substring(str, 0, eq_pos);
 							String value = substring(str, eq_pos+1, str.len);
-							if (name.len == 0 || value.len == 0) {
+							if (name.len == 0) {
 								gb_printf_err("Expected 'name=value', got '%.*s'\n", LIT(param));
 								bad_flags = true;
 								break;
@@ -1310,13 +1253,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								break;
 							}
 
-							ExactValue v = build_param_to_exact_value(name, value);
-							if (v.kind != ExactValue_Invalid) {
-								map_set(&build_context.defined_values, key, v);
-							} else {
-								gb_printf_err("Invalid define constant value: '%.*s'. Define constants must be a valid Odin literal.\n", LIT(value));
-								bad_flags = true;
-							}
+							map_set(&build_context.defined_values, key, value);
 
 							break;
 						}
@@ -1633,7 +1570,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_TargetFeatures: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.target_features_string = value.value_string;
-							string_to_lower(&build_context.target_features_string);
 							break;
 						}
 					    case BuildFlag_StrictTargetFeatures:
@@ -2286,8 +2222,6 @@ gb_internal void timings_export_all(Timings *t, Checker *c, bool timings_are_fin
 gb_internal void check_defines(BuildContext *bc, Checker *c) {
 	for (auto const &entry : bc->defined_values) {
 		String name = make_string_c(entry.key);
-		ExactValue value = entry.value;
-		GB_ASSERT(value.kind != ExactValue_Invalid);
 
 		bool found = false;
 		for_array(i, c->info.defineables) {
@@ -2964,6 +2898,15 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		print_usage_line(1, "bundle <platform>   Bundles a directory in a specific layout for that platform");
 		print_usage_line(2, "Supported platforms:");
 		print_usage_line(3, "android");
+		print_usage_line(0, "");
+		print_usage_line(2, "odin bundle android <dir> makes an .apk, or an Android App Bundle with -out:<name>.aab, from:");
+		print_usage_line(3, "<dir>/AndroidManifest.xml");
+		print_usage_line(3, "<dir>/res/      (optional) resources, compiled with aapt2");
+		print_usage_line(3, "<dir>/assets/   (optional)");
+		print_usage_line(3, "<dir>/lib/<abi>/*.so, e.g. lib/arm64-v8a/libmain.so");
+		print_usage_line(2, "It adds Odin's classes.dex, with the activity org.odin_lang.OdinActivity, and signs the result.");
+		print_usage_line(2, "Needs ODIN_ANDROID_SDK (build-tools and a platform), a JDK (JAVA_HOME or PATH),");
+		print_usage_line(2, "and for an .aab, ODIN_ANDROID_BUNDLETOOL set to bundletool's .jar.");
 	} else if (command == "report") {
 		print_usage_header_once();
 		print_usage_line(1, "report  Prints information useful to reporting a bug.");
@@ -3099,7 +3042,12 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 
 		if (print_flag("-define:<name>=<value>")) {
-			print_usage_line(2, "Defines a scalar boolean, integer or string as global constant.");
+			print_usage_line(2, "Sets the value of '#config(<name>, default_value)'.");
+			print_usage_line(2, "The value is kept as text, and each '#config' parses it by the type of its default value:");
+				print_usage_line(3, "string: the text as given, which may be empty");
+				print_usage_line(3, "boolean: 'true' or 'false'");
+				print_usage_line(3, "integer or float: an Odin number literal, e.g. 123, -0x7f, 1_000, 1.5e3");
+				print_usage_line(3, "enum: the name of one of its fields");
 			print_usage_line(2, "Example: -define:SPAM=123");
 			print_usage_line(2, "Usage in code:");
 				print_usage_line(3, "#config(SPAM, default_value)");
@@ -3347,10 +3295,10 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 	}
 
-	if (run_or_build || bundle) {
+	if (check || bundle) {
 		if (print_flag("-minimum-os-version:<string>")) {
-			print_usage_line(2, "Sets the minimum OS version targeted by the application.");
-			print_usage_line(2, "Default: -minimum-os-version:11.0.0");
+			print_usage_line(2, "Sets the minimum OS version targeted by the application, and so ODIN_MINIMUM_OS_VERSION.");
+			print_usage_line(2, "Default: 11.0.0 for macOS, 17.4.0 for iOS, and 34 for Android (29 is the lowest).");
 			print_usage_line(2, "Only used when target is Darwin or subtarget is Android, if given, linking mismatched versions will emit a warning.");
 		}
 	}
@@ -3753,16 +3701,23 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	}
 
 	if (bundle) {
+		if (print_flag("-out:<filepath>")) {
+			print_usage_line(2, "Sets the file name of the .apk or .aab.");
+			print_usage_line(2, "The default is the directory's name with .apk.");
+			print_usage_line(2, "Example: -out:game.aab");
+		}
+
 		print_usage_line(0, "");
 		print_usage_line(1, "Android-specific flags");
 		print_usage_line(0, "");
 		if (print_flag("-android-keystore:<string>")) {
-			print_usage_line(2, "Specifies the keystore file to use to sign the apk.");
+			print_usage_line(2, "Specifies the keystore file to use to sign the apk or aab.");
+			print_usage_line(2, "The default is the debug keystore, ~/.android/debug.keystore.");
 		}
 
 		if (print_flag("-android-keystore-alias:<string>")) {
-			print_usage_line(2, "Specifies the key alias to use when signing the apk");
-			print_usage_line(2, "Can be omitted if the keystore only contains one key");
+			print_usage_line(2, "Specifies the key alias to use when signing the apk or aab");
+			print_usage_line(2, "Can be omitted for an apk if the keystore only contains one key");
 		}
 
 		if (print_flag("-android-keystore-password:<string>")) {
@@ -4589,11 +4544,6 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 #endif
 
-	// Warn about Windows i386 thread-local storage limitations
-	if (build_context.metrics.arch == TargetArch_i386 && build_context.metrics.os == TargetOs_windows) {
-		gb_printf_err("Warning: Thread-local storage is disabled on Windows i386.\n");
-	}
-
 	// Check chosen microarchitecture. If not found or ?, print list.
 	bool print_microarch_list = true;
 	if (build_context.microarch.len == 0 || build_context.microarch == str_lit("native")) {
@@ -4663,28 +4613,37 @@ int main(int arg_count, char const **arg_ptr) {
 	#endif
 
 	if (build_context.target_features_string.len != 0) {
+		String target_feature_list = target_features_list[build_context.metrics.arch];
+		gbString canonical_features = gb_string_make(permanent_allocator(), "");
 		String_Iterator target_it = {build_context.target_features_string, 0};
 		String item = {};
 		while (string_split_iterator_next(&target_it, ',', &item)) {
+			if (item.len == 0) {
+				continue;
+			}
+			String sign = {};
 			String stripped_item = item;
-			if (*stripped_item.text == '+' || *stripped_item.text == '-') {
-				stripped_item.text++;
-				stripped_item.len--;
+			if (string_starts_with(stripped_item, '+') || string_starts_with(stripped_item, '-')) {
+				sign = substring(stripped_item, 0, 1);
+				stripped_item = substring(stripped_item, 1, stripped_item.len);
 			}
 
-			String invalid;
-			if (!check_target_feature_is_valid_for_target_arch(stripped_item, &invalid) && stripped_item != str_lit("help")) {
-				if (stripped_item != str_lit("?")) {
-					gb_printf_err("Unkown target feature '%.*s'.\n", LIT(invalid));
+			String canonical = find_target_feature_ignore_case(target_feature_list, stripped_item);
+			if (canonical.len == 0 && str_eq_ignore_case(stripped_item, str_lit("help"))) {
+				canonical = str_lit("help");
+			}
+			if (canonical.len == 0) {
+				if (!str_eq_ignore_case(stripped_item, str_lit("?"))) {
+					gb_printf_err("Unknown target feature '%.*s'.\n", LIT(item));
 				}
 				gb_printf("Possible -target-features for target %.*s are:\n", LIT(target_arch_names[build_context.metrics.arch]));
 				gb_printf("\n");
 
-				String feature_list = target_features_list[build_context.metrics.arch];
-				String_Iterator it = {feature_list, 0};
+				String_Iterator it = {target_feature_list, 0};
 				String str = {};
 				while (string_split_iterator_next(&it, ',', &str)) {
-					if (check_single_target_feature_is_valid(default_features, str)) {
+					String plus_str = concatenate_strings(temporary_allocator(), str_lit("+"), str);
+					if (check_single_target_feature_is_valid(default_features, str) || check_single_target_feature_is_valid(default_features, plus_str)) {
 						if (has_ansi_terminal_colours()) {
 							gb_printf("\t%.*s\x1b[38;5;244m (implied by target microarch %.*s)\x1b[0m\n", LIT(str), LIT(march));
 						} else {
@@ -4699,10 +4658,10 @@ int main(int arg_count, char const **arg_ptr) {
 			}
 
 			// Ensure the feature name always has +/- prefix. If there isn't, default to '+'
-			String feature_str = item;
-			if (*feature_str.text != '+' && *feature_str.text != '-') {
-				feature_str = concatenate_strings(temporary_allocator(), make_string_c("+"), feature_str);
+			if (sign.len == 0) {
+				sign = str_lit("+");
 			}
+			String feature_str = concatenate_strings(permanent_allocator(), sign, canonical);
 
 			// Ensure there is only a single entry for each feature in the target set.
 			// If the negative exists, override the existing value with the current one.
@@ -4716,7 +4675,13 @@ int main(int arg_count, char const **arg_ptr) {
 			string_set_remove(&build_context.target_features_set, neg_feature_str);
 
 			string_set_add(&build_context.target_features_set, feature_str);
+
+			if (gb_string_length(canonical_features) != 0) {
+				canonical_features = gb_string_appendc(canonical_features, ",");
+			}
+			canonical_features = gb_string_append_length(canonical_features, feature_str.text, feature_str.len);
 		}
+		build_context.target_features_string = make_string(cast(u8 *)canonical_features, gb_string_length(canonical_features));
 	}
 
 	// NOTE(laytan): on riscv64 we want to enforce some features.
@@ -4802,6 +4767,11 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 	if (any_warnings()) {
 		print_all_errors();
+	}
+
+	if (build_context.command_kind == Command_test && checker->info.testing_procedures.count == 0) {
+		gb_printf_err("Cannot test package; no procedures with @(test) attribute found.\n");
+		return 1;
 	}
 
 	if (build_context.show_defineables || build_context.export_defineables_file != "") {

@@ -1,6 +1,7 @@
 package test_core_bytes
 
 import "core:bytes"
+import "core:io"
 import "core:slice"
 import "core:testing"
 
@@ -94,4 +95,96 @@ test_last_index_byte_bounds :: proc(t: ^testing.T) {
 	assert(len(input) == 16)
 	idx := bytes.last_index_byte(transmute([]byte)(input[:len(input)-1]), '.')
 	testing.expect_value(t, idx, 10)
+}
+
+@test
+test_buffer_write_at :: proc(t: ^testing.T) {
+	B :: proc(s: string) -> []byte { return transmute([]byte)s }
+
+	b: bytes.Buffer
+	defer bytes.buffer_destroy(&b)
+	bytes.buffer_write_string(&b, "0123456789")
+
+	// overwriting inside the contents keeps the len
+	n, err := bytes.buffer_write_at(&b, B("ab"), 0)
+	testing.expect_value(t, n, 2)
+	testing.expect_value(t, err, io.Error.None)
+	testing.expect_value(t, bytes.buffer_to_string(&b), "ab23456789")
+
+	// straddling the end extends the contents to exactly offset + len(p)
+	n, err = bytes.buffer_write_at(&b, B("XYZ"), 8)
+	testing.expect_value(t, n, 3)
+	testing.expect_value(t, err, io.Error.None)
+	testing.expect_value(t, bytes.buffer_to_string(&b), "ab234567XYZ")
+
+	// past the end, the gap reads back as zero
+	n, err = bytes.buffer_write_at(&b, B("!"), 14)
+	testing.expect_value(t, n, 1)
+	testing.expect_value(t, err, io.Error.None)
+	testing.expect_value(t, bytes.buffer_to_string(&b), "ab234567XYZ\x00\x00\x00!")
+
+	n, err = bytes.buffer_write_at(&b, B("?"), -1)
+	testing.expect_value(t, n, 0)
+	testing.expect_value(t, err, io.Error.Invalid_Offset)
+
+	// consumed bytes don't become readable again
+	c: bytes.Buffer
+	defer bytes.buffer_destroy(&c)
+	bytes.buffer_init_allocator(&c, 0, 64)
+	for i in 0..<60 {
+		bytes.buffer_write_byte(&c, 'a' + byte(i % 26))
+	}
+	consumed: [58]byte
+	bytes.buffer_read(&c, consumed[:])
+	bytes.buffer_write_at(&c, B("XY"), 10)
+	testing.expect_value(t, bytes.buffer_to_string(&c), "gh")
+	bytes.buffer_write_at(&c, B("XY"), 62)
+	testing.expect_value(t, bytes.buffer_to_string(&c), "gh\x00\x00XY")
+}
+
+@(private="file")
+Hiccup_Reader :: struct {
+	data:    []byte,
+	pos:     int,
+	hiccups: int,
+	pending: int,
+}
+
+@(private="file")
+hiccup_reader_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	h := (^Hiccup_Reader)(stream_data)
+	#partial switch mode {
+	case .Read:
+		if h.pending < h.hiccups {
+			h.pending += 1
+			return 0, nil
+		}
+		h.pending = 0
+		if h.pos >= len(h.data) {
+			return 0, .EOF
+		}
+		m := copy(p[:min(len(p), 7)], h.data[h.pos:])
+		h.pos += m
+		return i64(m), nil
+	case .Query:
+		return io.query_utility({.Read, .Query})
+	}
+	return 0, .Unsupported
+}
+
+@test
+test_buffer_read_from_stall :: proc(t: ^testing.T) {
+	data := "Empty reads between every chunk of this input."
+	for hiccups in ([]int{0, 3, 100, 101, max(int)}) {
+		h := Hiccup_Reader{data = transmute([]byte)data, hiccups = hiccups}
+		b: bytes.Buffer
+		defer bytes.buffer_destroy(&b)
+		n, err := bytes.buffer_read_from(&b, io.Stream{procedure = hiccup_reader_proc, data = &h})
+		if hiccups > 100 {
+			testing.expectf(t, n == 0 && err == .No_Progress, "%d hiccups: %d %v", hiccups, n, err)
+		} else {
+			testing.expectf(t, n == i64(len(data)) && err == nil, "%d hiccups: %d %v", hiccups, n, err)
+			testing.expect_value(t, bytes.buffer_to_string(&b), data)
+		}
+	}
 }

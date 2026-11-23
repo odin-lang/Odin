@@ -1,6 +1,5 @@
 package rexcode_wasm
 
-import "base:runtime"
 import "core:fmt"
 import "core:io"
 import "core:os"
@@ -100,7 +99,7 @@ sbprint_wat :: proc(sb: ^strings.Builder, m: Module, opts := DEFAULT_WAT_OPTIONS
 		if ident_ok(name) {
 			strings.write_string(sb, " $")
 			strings.write_string(sb, name)
-		} else {
+		} else if !strings.contains(name, "(;") && !strings.contains(name, ";)") {
 			fmt.sbprintf(sb, " (;%q;)", name)
 		}
 	}
@@ -129,7 +128,10 @@ sbprint_wat :: proc(sb: ^strings.Builder, m: Module, opts := DEFAULT_WAT_OPTIONS
 	wat_write_globals (sb, m, unit)
 
 	for e in m.exports {
-		fmt.sbprintf(sb, "%s(export %q (%s %d))\n", unit, e.name, external_kind_name(e.kind), e.index)
+		strings.write_string(sb, unit)
+		strings.write_string(sb, "(export ")
+		wat_write_quoted_string(sb, transmute([]u8)e.name)
+		fmt.sbprintf(sb, " (%s %d))\n", external_kind_name(e.kind), e.index)
 	}
 
 	if m.start >= 0 {
@@ -177,7 +179,7 @@ wat_write_imports :: proc(sb: ^strings.Builder, m: Module, unit: string) -> Pars
 		}
 	}
 
-	r := reader(m.data, sec.offset)
+	r := section_reader(m.data, sec)
 	count := rd_u32(&r) or_return
 
 	fi: u32
@@ -190,7 +192,12 @@ wat_write_imports :: proc(sb: ^strings.Builder, m: Module, unit: string) -> Pars
 		fld := rd_name(&r) or_return
 		kb  := rd_byte(&r) or_return
 
-		fmt.sbprintf(sb, "%s(import %q %q (", unit, mod, fld)
+		strings.write_string(sb, unit)
+		strings.write_string(sb, "(import ")
+		wat_write_quoted_string(sb, transmute([]u8)mod)
+		strings.write_byte(sb, ' ')
+		wat_write_quoted_string(sb, transmute([]u8)fld)
+		strings.write_string(sb, " (")
 		defer strings.write_string(sb, "))\n")
 
 		switch External_Kind(kb) {
@@ -206,19 +213,15 @@ wat_write_imports :: proc(sb: ^strings.Builder, m: Module, unit: string) -> Pars
 			fi += 1
 		case .TABLE:
 			rt, _ := rd_byte(&r)
-			min, max, _ := rd_limits(&r)
-			fmt.sbprintf(sb, "table (;%d;) %d", ti, min)
-			if mx, ok := max.?; ok {
-				fmt.sbprintf(sb, " %d", mx)
-			}
+			min, max, flags, _ := rd_limits(&r)
+			fmt.sbprintf(sb, "table (;%d;)", ti)
+			wat_write_limits(sb, min, max, flags)
 			fmt.sbprintf(sb, " %s", valtype_name(Value_Type(rt)))
 			ti += 1
 		case .MEMORY:
-			min, max, _ := rd_limits(&r)
-			fmt.sbprintf(sb, "memory (;%d;) %d", mi, min)
-			if mx, ok := max.?; ok {
-				fmt.sbprintf(sb, " %d", mx)
-			}
+			min, max, flags, _ := rd_limits(&r)
+			fmt.sbprintf(sb, "memory (;%d;)", mi)
+			wat_write_limits(sb, min, max, flags)
 			mi += 1
 		case .GLOBAL:
 			vt, _  := rd_byte(&r)
@@ -243,7 +246,10 @@ wat_write_function :: proc(sb: ^strings.Builder, m: Module, func_relocs: []Reloc
 	write_id_or_comment(sb, f.name, f.id)
 	fmt.sbprintf(sb, " (type %d)", f.signature)
 
-	type := &m.func_types[f.signature]
+	type := &Func_Type{}
+	if int(f.signature) < len(m.func_types) {
+		type = &m.func_types[f.signature]
+	}
 
 	if len(type.params) > 0 {
 		strings.write_string(sb, " (param")
@@ -280,7 +286,11 @@ wat_write_function :: proc(sb: ^strings.Builder, m: Module, func_relocs: []Reloc
 	assert(len(f.blocks) <= 1)
 	for blk in f.blocks {
 		level := 0
-		for &op in blk.ops {
+		ops := blk.ops
+		if len(ops) > 0 && Opcode(ops[len(ops) - 1].opcode) == .END {
+			ops = ops[:len(ops) - 1]
+		}
+		for &op in ops {
 			opcode := Opcode(op.opcode)
 			#partial switch opcode {
 			case .END, .ELSE:
@@ -308,16 +318,14 @@ wat_write_tables :: proc(sb: ^strings.Builder, m: Module, unit: string) {
 		if sec.id != .TABLE {
 			continue
 		}
-		r := reader(m.data, sec.offset)
+		r := section_reader(m.data, sec)
 		count := rd_u32(&r) or_break
 		for _ in 0..<count {
 			rt := rd_byte(&r) or_break
-			min, max := rd_limits(&r) or_break
-			fmt.sbprintf(sb, "%s(table (;%d;) %d", unit, idx, min)
-			defer fmt.sbprintf(sb, " %s)\n", valtype_name(Value_Type(rt)))
-			if mx, ok := max.?; ok {
-				fmt.sbprintf(sb, " %d", mx)
-			}
+			min, max, flags := rd_limits(&r) or_break
+			fmt.sbprintf(sb, "%s(table (;%d;)", unit, idx)
+			wat_write_limits(sb, min, max, flags)
+			fmt.sbprintf(sb, " %s)\n", valtype_name(Value_Type(rt)))
 			idx += 1
 		}
 	}
@@ -329,15 +337,13 @@ wat_write_memories :: proc(sb: ^strings.Builder, m: Module, unit: string) {
 		if sec.id != .MEMORY {
 			continue
 		}
-		r := reader(m.data, sec.offset)
+		r := section_reader(m.data, sec)
 		count := rd_u32(&r) or_break
 		for _ in 0..<count {
-			min, max := rd_limits(&r) or_break
-			fmt.sbprintf(sb, "%s(memory (;%d;) %d", unit, idx, min)
-			defer strings.write_string(sb, ")\n")
-			if mx, ok := max.?; ok {
-				fmt.sbprintf(sb, " %d", mx)
-			}
+			min, max, flags := rd_limits(&r) or_break
+			fmt.sbprintf(sb, "%s(memory (;%d;)", unit, idx)
+			wat_write_limits(sb, min, max, flags)
+			strings.write_string(sb, ")\n")
 			idx += 1
 		}
 	}
@@ -349,9 +355,7 @@ wat_write_globals :: proc(sb: ^strings.Builder, m: Module, unit: string) {
 		if sec.id != .GLOBAL {
 			continue
 		}
-		relocs := relocations_for_section(m.relocations, sec.id)
-
-		r := reader(m.data, sec.offset)
+		r := section_reader(m.data, sec)
 		count := rd_u32(&r) or_break
 		for _ in 0..<count {
 			vt  := rd_byte(&r) or_break
@@ -365,7 +369,7 @@ wat_write_globals :: proc(sb: ^strings.Builder, m: Module, unit: string) {
 			} else {
 				fmt.sbprintf(sb, "%s ", valtype_name(Value_Type(vt)))
 			}
-			wat_write_const_expr(sb, m, relocs, m.data, &r.off, unit, context.temp_allocator)
+			wat_write_const_expr(sb, &r)
 			idx += 1
 		}
 	}
@@ -378,9 +382,7 @@ wat_write_elements :: proc(sb: ^strings.Builder, m: Module, unit: string) -> Par
 			continue
 		}
 
-		relocs := relocations_for_section(m.relocations, sec.id)
-
-		r := reader(m.data, sec.offset)
+		r := section_reader(m.data, sec)
 		count := rd_u32(&r) or_break
 		for _ in 0..<count {
 			flags := rd_u32(&r) or_break
@@ -389,11 +391,11 @@ wat_write_elements :: proc(sb: ^strings.Builder, m: Module, unit: string) -> Par
 				return nil
 			}
 
-			fmt.sbprintf(sb, "%s(elem (;%d;) ", unit, elem_idx)
+			fmt.sbprintf(sb, "%s(elem (;%d;) (offset ", unit, elem_idx)
 			defer strings.write_string(sb, ")\n")
 
-			wat_write_const_expr(sb, m, relocs, m.data, &r.off, unit, context.temp_allocator)
-			strings.write_string(sb, " func")
+			wat_write_const_expr(sb, &r)
+			strings.write_string(sb, ") func")
 			n := rd_u32(&r) or_break
 			for _ in 0..<n {
 				fidx := rd_u32(&r) or_return
@@ -411,7 +413,7 @@ wat_write_data :: proc(sb: ^strings.Builder, m: Module, unit: string) -> Parse_E
 		if sec.id != .DATA {
 			continue
 		}
-		r := reader(m.data, sec.offset)
+		r := section_reader(m.data, sec)
 		count := rd_u32(&r) or_break
 		for _ in 0..<count {
 			kind := rd_u32(&r) or_return
@@ -423,16 +425,16 @@ wat_write_data :: proc(sb: ^strings.Builder, m: Module, unit: string) -> Parse_E
 			switch kind {
 			case 2:
 				// memidx + expr + bytes
-				memidx, _ = rd_u32(&r)
+				memidx = rd_u32(&r) or_return
 				fallthrough
 			case 0:
 				// expr + bytes
 				if memidx != 0 {
 					fmt.sbprintf(sb, " (memory %d)", memidx)
 				}
-				strings.write_byte(sb, ' ')
-				relocs := relocations_for_section(m.relocations, sec.id)
-				wat_write_const_expr(sb, m, relocs, m.data, &r.off, unit, context.temp_allocator)
+				strings.write_string(sb, " (offset ")
+				wat_write_const_expr(sb, &r)
+				strings.write_byte(sb, ')')
 			case 1:
 				// bytes
 			case:
@@ -440,9 +442,9 @@ wat_write_data :: proc(sb: ^strings.Builder, m: Module, unit: string) -> Parse_E
 				return nil
 			}
 
-			size := rd_u32(&r) or_return
+			size := rd_count(&r) or_return
 			strings.write_byte(sb, ' ')
-			wat_write_quoted_string(sb, m.data[r.off:][:size])
+			wat_write_quoted_string(sb, r.data[r.off:][:size])
 			r.off += size
 
 			data_idx += 1
@@ -451,23 +453,30 @@ wat_write_data :: proc(sb: ^strings.Builder, m: Module, unit: string) -> Parse_E
 	return nil
 }
 
-// Decode and fold a constant expression at `off^` (advancing past its `end`).
-wat_write_const_expr :: proc(sb: ^strings.Builder, m: Module, relocs: []Relocation, data: []u8, off: ^u32, unit: string, allocator: runtime.Allocator) {
-	context.allocator = context.temp_allocator
-
+// Decode a constant expression at `r.off` (advancing past its `end`) and print
+// its instructions flat, on one line, with their indices as they are in the
+// binary.
+wat_write_const_expr :: proc(sb: ^strings.Builder, r: ^Reader) {
 	ops: [dynamic]Operation
-	ops.allocator = allocator
+	ops.allocator = context.temp_allocator
 	defer delete(ops)
 
-	for off^ < u32(len(data)) {
-		op, next := decode_one(data, relocs, off^, allocator) or_break
-		off^ = next
+	for r.off < u32(len(r.data)) {
+		op, next := decode_one(r.data, nil, r.off, context.temp_allocator) or_break
+		r.off = next
 		if Opcode(op.opcode) == .END {
 			break
 		}
 		append(&ops, op)
 	}
-	sbprint(sb, ops[:])
+	opts := DEFAULT_PRINT_OPTIONS
+	opts.indent = ""
+	for &op, i in ops {
+		if i > 0 {
+			strings.write_byte(sb, ' ')
+		}
+		write_operation(sb, &op, &opts, nil)
+	}
 
 	// i := 0
 	// stmts, _ := wat_fold_region(exprs[:], m, &i)
@@ -475,6 +484,20 @@ wat_write_const_expr :: proc(sb: ^strings.Builder, m: Module, relocs: []Relocati
 	// 	if k > 0 { strings.write_byte(sb, ' ') }
 	// 	wat_render(sb, &s, 0, unit)
 	// }
+}
+
+@(private)
+wat_write_limits :: proc(sb: ^strings.Builder, min: u64, max: Maybe(u64), flags: Limits_Flags) {
+	if .Address_64 in flags {
+		strings.write_string(sb, " i64")
+	}
+	fmt.sbprintf(sb, " %d", min)
+	if v, ok := max.?; ok {
+		fmt.sbprintf(sb, " %d", v)
+	}
+	if .Shared in flags {
+		strings.write_string(sb, " shared")
+	}
 }
 
 

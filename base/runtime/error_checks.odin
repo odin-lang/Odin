@@ -335,9 +335,9 @@ when ODIN_NO_RTTI {
 		}
 		ti := type_info_base(type_info_of(id))
 		#partial switch v in ti.variant {
-		case Type_Info_Any:
+		case ^Type_Info_Any:
 			return (^any)(data).id
-		case Type_Info_Union:
+		case ^Type_Info_Union:
 			if v.tag_type == nil {
 				if (^rawptr)(data)^ == nil {
 					return nil

@@ -21,6 +21,41 @@ test_comparisons_5408 :: proc(t: ^testing.T) {
 	testing.expect_value(t, test_proc(Test_Enum(0xF), max(Test_Enum)),             false)
 }
 
+@(private="file")
+Signed_Backing :: distinct i16
+
+@(private="file")
+Unsigned_Backing :: distinct u16
+
+@(private="file")
+Signed_Enum :: enum Signed_Backing {
+	NEGATIVE = -1,
+	POSITIVE = 1,
+}
+
+@(private="file")
+Unsigned_Enum :: enum Unsigned_Backing {
+	SMALL_VALUE = 1,
+	BIG_VALUE   = 0xFFFF, // negative if interpreted as i16
+}
+
+// An enum's signedness comes from its backing type, also when that type is `distinct`.
+// It used to be read from the wrong field of the backing type, and changed from one build to the next.
+@test
+test_distinct_backing_signedness :: proc(t: ^testing.T) {
+	test_proc :: proc(lhs: $T, rhs: T) -> bool {
+		return lhs > rhs
+	}
+
+	testing.expect_value(t, test_proc(Signed_Enum.NEGATIVE, Signed_Enum.POSITIVE),         false)
+	testing.expect_value(t, test_proc(Unsigned_Enum.SMALL_VALUE, Unsigned_Enum.BIG_VALUE), false)
+
+	negative, big := Signed_Enum.NEGATIVE, Unsigned_Enum.BIG_VALUE
+	testing.expect_value(t, i32(negative), -1)
+	testing.expect_value(t, i32(big),      0xFFFF)
+}
+
+@test
 test_signedness :: proc(t: ^testing.T) {
 	{
 		a, b := i16(32767), i16(0)

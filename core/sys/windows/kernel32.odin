@@ -29,6 +29,10 @@ EV_RLSD                    :: DWORD(0x0020)
 EV_RXCHAR                  :: DWORD(0x0001)
 EV_RXFLAG                  :: DWORD(0x0002)
 EV_TXEMPTY                 :: DWORD(0x0004)
+PURGE_TXABORT              :: DWORD(0x0001)
+PURGE_RXABORT              :: DWORD(0x0002)
+PURGE_TXCLEAR              :: DWORD(0x0004)
+PURGE_RXCLEAR              :: DWORD(0x0008)
 
 WAITORTIMERCALLBACK :: #type proc "system" (lpParameter: PVOID, TimerOrWaitFired: BOOLEAN)
 
@@ -136,6 +140,7 @@ foreign kernel32 {
 	SetCommMask         :: proc(handle: HANDLE, dwEvtMap: DWORD) -> BOOL ---
 	GetCommMask         :: proc(handle: HANDLE, lpEvtMask: LPDWORD) -> BOOL ---
 	WaitCommEvent       :: proc(handle: HANDLE, lpEvtMask: LPDWORD, lpOverlapped: LPOVERLAPPED) -> BOOL ---
+	PurgeComm           :: proc(hFile: HANDLE, dwFlags: DWORD) -> BOOL ---
 	GetCommandLineW     :: proc() -> LPCWSTR ---
 	GetTempPathW        :: proc(nBufferLength: DWORD, lpBuffer: LPCWSTR) -> DWORD ---
 	GetTempFileNameW    :: proc(lpPathName: LPCWSTR, lpPrefixString: LPCWSTR, uUnique: c_int, lpTempFileName: LPWSTR) -> c_uint ---
@@ -299,6 +304,24 @@ foreign kernel32 {
 		lpStartupInfo: LPSTARTUPINFOW,
 		lpProcessInformation: LPPROCESS_INFORMATION,
 	) -> BOOL ---
+	InitializeProcThreadAttributeList :: proc(
+		lpAttributeList:  LPPROC_THREAD_ATTRIBUTE_LIST,
+		dwAttributeCount: DWORD,
+		dwFlags:          DWORD,
+		lpSize:           PSIZE_T,
+	) -> BOOL ---
+	UpdateProcThreadAttribute :: proc(
+		lpAttributeList:  LPPROC_THREAD_ATTRIBUTE_LIST,
+		dwFlags:          DWORD,
+		Attribute:        DWORD_PTR,
+		lpValue:          PVOID,
+		cbSize:           SIZE_T,
+		lpPreviousValue:  PVOID,
+		lpReturnSize:     PSIZE_T,
+	) -> BOOL ---
+	DeleteProcThreadAttributeList :: proc(
+		lpAttributeList: LPPROC_THREAD_ATTRIBUTE_LIST,
+	) ---
 	GetStartupInfoW :: proc(lpStartupInfo: LPSTARTUPINFOW) ---
 	GetEnvironmentVariableW :: proc(n: LPCWSTR, v: LPWSTR, nsize: DWORD) -> DWORD ---
 	SetEnvironmentVariableW :: proc(n: LPCWSTR, v: LPCWSTR) -> BOOL ---
@@ -602,6 +625,17 @@ foreign kernel32 {
 	GetConsoleCursorInfo         :: proc(hConsoleOutput: HANDLE, lpConsoleCursorInfo: PCONSOLE_CURSOR_INFO) -> BOOL ---
 	SetConsoleCursorInfo         :: proc(hConsoleOutput: HANDLE, lpConsoleCursorInfo: PCONSOLE_CURSOR_INFO) -> BOOL ---
 
+	CreatePseudoConsole :: proc(
+		size:    COORD,
+		hInput:  HANDLE,
+		hOutput: HANDLE,
+		dwFlags: DWORD,
+		phPC:    ^HPCON,
+	) -> HRESULT ---
+	ClosePseudoConsole :: proc(
+		hPC: HPCON,
+	) ---
+
 	GetDiskFreeSpaceExW :: proc(
 		lpDirectoryName: LPCWSTR,
 		lpFreeBytesAvailableToCaller: PULARGE_INTEGER,
@@ -729,6 +763,8 @@ THREAD_SET_LIMITED_INFORMATION   :: 0x0400
 THREAD_SET_THREAD_TOKEN          :: 0x0080
 THREAD_SUSPEND_RESUME            :: 0x0002
 THREAD_TERMINATE                 :: 0x0001
+
+PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE :: 0x00020016
 
 COPY_FILE_FAIL_IF_EXISTS              :: 0x00000001
 COPY_FILE_RESTARTABLE                 :: 0x00000002
@@ -1528,3 +1564,16 @@ foreign kernel32 {
 }
 
 
+EXECUTION_STATE_FLAG :: enum DWORD {
+	System_Required   = 0,
+	Display_Required  = 1,
+	User_Present      = 2,
+	AwayMode_Required = 6,
+	Continuous        = 31,
+}
+EXECUTION_STATE :: distinct bit_set[EXECUTION_STATE_FLAG; DWORD]
+
+@(default_calling_convention = "system")
+foreign kernel32 {
+	SetThreadExecutionState :: proc(esFlags: EXECUTION_STATE) -> EXECUTION_STATE ---
+}

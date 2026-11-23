@@ -27,7 +27,12 @@ int_add :: proc(dest, a, b: ^Int, allocator := context.allocator) -> (err: Error
 	assert_if_nil(dest, a, b)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(dest, a, b) or_return
+	internal_clear_if_uninitialized(dest) or_return
+	a, b := a, b
+	a, b = _zero_if_uninitialized(a), _zero_if_uninitialized(b)
+	internal_error_if_immutable(dest) or_return
+	internal_error_if_non_finite(a, b) or_return
+	internal_clear_non_finite(dest)
 	/*
 		All parameters have been initialized.
 	*/
@@ -44,7 +49,11 @@ int_add_digit :: proc(dest, a: ^Int, digit: DIGIT, allocator := context.allocato
 	assert_if_nil(dest, a)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a) or_return
+	a := a
+	a = _zero_if_uninitialized(a)
+	internal_error_if_immutable(dest) or_return
+	internal_error_if_non_finite(a) or_return
+	internal_clear_non_finite(dest)
 	/*
 		Grow destination as required.
 	*/
@@ -63,7 +72,12 @@ int_sub :: proc(dest, number, decrease: ^Int, allocator := context.allocator) ->
 	assert_if_nil(dest, number, decrease)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(dest, number, decrease) or_return
+	internal_clear_if_uninitialized(dest) or_return
+	number, decrease := number, decrease
+	number, decrease = _zero_if_uninitialized(number), _zero_if_uninitialized(decrease)
+	internal_error_if_immutable(dest) or_return
+	internal_error_if_non_finite(number, decrease) or_return
+	internal_clear_non_finite(dest)
 	/*
 		All parameters have been initialized.
 	*/
@@ -80,7 +94,11 @@ int_sub_digit :: proc(dest, a: ^Int, digit: DIGIT, allocator := context.allocato
 	assert_if_nil(dest, a)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a) or_return
+	a := a
+	a = _zero_if_uninitialized(a)
+	internal_error_if_immutable(dest) or_return
+	internal_error_if_non_finite(a) or_return
+	internal_clear_non_finite(dest)
 	/*
 		Grow destination as required.
 	*/
@@ -100,7 +118,12 @@ int_halve :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Erro
 	assert_if_nil(dest, src)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(dest, src) or_return
+	internal_clear_if_uninitialized(dest) or_return
+	src := src
+	src = _zero_if_uninitialized(src)
+	internal_error_if_immutable(dest) or_return
+	internal_error_if_non_finite(src) or_return
+	internal_clear_non_finite(dest)
 	/*
 		Grow destination as required.
 	*/
@@ -119,7 +142,12 @@ int_double :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Err
 	assert_if_nil(dest, src)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(dest, src) or_return
+	internal_clear_if_uninitialized(dest) or_return
+	src := src
+	src = _zero_if_uninitialized(src)
+	internal_error_if_immutable(dest) or_return
+	internal_error_if_non_finite(src) or_return
+	internal_clear_non_finite(dest)
 	/*
 		Grow destination as required.
 	*/
@@ -137,7 +165,12 @@ int_mul_digit :: proc(dest, src: ^Int, multiplier: DIGIT, allocator := context.a
 	assert_if_nil(dest, src)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(src, dest) or_return
+	internal_clear_if_uninitialized(dest) or_return
+	src := src
+	src = _zero_if_uninitialized(src)
+	internal_error_if_immutable(dest) or_return
+	internal_error_if_non_finite(src) or_return
+	internal_clear_non_finite(dest)
 
 	return #force_inline internal_int_mul_digit(dest, src, multiplier)
 }
@@ -149,7 +182,12 @@ int_mul :: proc(dest, src, multiplier: ^Int, allocator := context.allocator) -> 
 	assert_if_nil(dest, src, multiplier)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(dest, src, multiplier) or_return
+	internal_clear_if_uninitialized(dest) or_return
+	src, multiplier := src, multiplier
+	src, multiplier = _zero_if_uninitialized(src), _zero_if_uninitialized(multiplier)
+	internal_error_if_immutable(dest) or_return
+	internal_error_if_non_finite(src, multiplier) or_return
+	internal_clear_non_finite(dest)
 
 	return #force_inline internal_int_mul(dest, src, multiplier)
 }
@@ -162,8 +200,8 @@ mul :: proc {
 	int_mul_rat,
 }
 
-int_sqr :: proc(dest, src: ^Int) -> (err: Error) { return mul(dest, src, src) }
-rat_sqr :: proc(dest, src: ^Rat) -> (err: Error) { return mul(dest, src, src) }
+int_sqr :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error) { return mul(dest, src, src, allocator) }
+rat_sqr :: proc(dest, src: ^Rat, allocator := context.allocator) -> (err: Error) { return mul(dest, src, src, allocator) }
 sqr :: proc { int_sqr, rat_sqr }
 
 
@@ -178,7 +216,12 @@ int_divmod :: proc(quotient, remainder, numerator, denominator: ^Int, allocator 
 		Early out if neither of the results is wanted.
 	*/
 	if quotient == nil && remainder == nil { return nil }
-	internal_clear_if_uninitialized(numerator, denominator) or_return
+	assert_if_nil(numerator, denominator)
+	numerator, denominator := numerator, denominator
+	numerator, denominator = _zero_if_uninitialized(numerator), _zero_if_uninitialized(denominator)
+	internal_error_if_immutable(quotient, remainder) or_return
+	internal_error_if_non_finite(numerator, denominator) or_return
+	internal_clear_non_finite(quotient, remainder)
 
 	return #force_inline internal_divmod(quotient, remainder, numerator, denominator)
 }
@@ -187,7 +230,11 @@ int_divmod_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT, allocato
 	assert_if_nil(quotient, numerator)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(numerator) or_return
+	numerator := numerator
+	numerator = _zero_if_uninitialized(numerator)
+	internal_error_if_immutable(quotient) or_return
+	internal_error_if_non_finite(numerator) or_return
+	internal_clear_non_finite(quotient)
 
 	return #force_inline internal_divmod(quotient, numerator, denominator)
 }
@@ -197,7 +244,11 @@ int_div :: proc(quotient, numerator, denominator: ^Int, allocator := context.all
 	assert_if_nil(quotient, numerator, denominator)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(numerator, denominator) or_return
+	numerator, denominator := numerator, denominator
+	numerator, denominator = _zero_if_uninitialized(numerator), _zero_if_uninitialized(denominator)
+	internal_error_if_immutable(quotient) or_return
+	internal_error_if_non_finite(numerator, denominator) or_return
+	internal_clear_non_finite(quotient)
 
 	return #force_inline internal_divmod(quotient, nil, numerator, denominator)
 }
@@ -206,7 +257,11 @@ int_div_digit :: proc(quotient, numerator: ^Int, denominator: DIGIT, allocator :
 	assert_if_nil(quotient, numerator)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(numerator) or_return
+	numerator := numerator
+	numerator = _zero_if_uninitialized(numerator)
+	internal_error_if_immutable(quotient) or_return
+	internal_error_if_non_finite(numerator) or_return
+	internal_clear_non_finite(quotient)
 
 	_ = #force_inline internal_divmod(quotient, numerator, denominator) or_return
 	return
@@ -228,13 +283,24 @@ int_mod :: proc(remainder, numerator, denominator: ^Int, allocator := context.al
 	assert_if_nil(remainder, numerator, denominator)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(numerator, denominator) or_return
+	numerator, denominator := numerator, denominator
+	numerator, denominator = _zero_if_uninitialized(numerator), _zero_if_uninitialized(denominator)
+	internal_error_if_immutable(remainder) or_return
+	internal_error_if_non_finite(numerator, denominator) or_return
+	internal_clear_non_finite(remainder)
 
 	return #force_inline internal_int_mod(remainder, numerator, denominator)
 }
 
 int_mod_digit :: proc(numerator: ^Int, denominator: DIGIT, allocator := context.allocator) -> (remainder: DIGIT, err: Error) {
-	return #force_inline internal_divmod(nil, numerator, denominator, allocator)
+	assert_if_nil(numerator)
+	context.allocator = allocator
+
+	numerator := numerator
+	numerator = _zero_if_uninitialized(numerator)
+	internal_error_if_non_finite(numerator) or_return
+
+	return #force_inline internal_int_mod_digit(numerator, denominator)
 }
 
 mod :: proc { int_mod, int_mod_digit, }
@@ -243,10 +309,14 @@ mod :: proc { int_mod, int_mod_digit, }
 	remainder = (number + addend) % modulus.
 */
 int_addmod :: proc(remainder, number, addend, modulus: ^Int, allocator := context.allocator) -> (err: Error) {
-	assert_if_nil(remainder, number, addend)
+	assert_if_nil(remainder, number, addend, modulus)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(number, addend, modulus) or_return
+	number, addend, modulus := number, addend, modulus
+	number, addend, modulus = _zero_if_uninitialized(number), _zero_if_uninitialized(addend), _zero_if_uninitialized(modulus)
+	internal_error_if_immutable(remainder) or_return
+	internal_error_if_non_finite(number, addend, modulus) or_return
+	internal_clear_non_finite(remainder)
 
 	return #force_inline internal_addmod(remainder, number, addend, modulus)
 }
@@ -256,10 +326,14 @@ addmod :: proc { int_addmod, }
 	remainder = (number - decrease) % modulus.
 */
 int_submod :: proc(remainder, number, decrease, modulus: ^Int, allocator := context.allocator) -> (err: Error) {
-	assert_if_nil(remainder, number, decrease)
+	assert_if_nil(remainder, number, decrease, modulus)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(number, decrease, modulus) or_return
+	number, decrease, modulus := number, decrease, modulus
+	number, decrease, modulus = _zero_if_uninitialized(number), _zero_if_uninitialized(decrease), _zero_if_uninitialized(modulus)
+	internal_error_if_immutable(remainder) or_return
+	internal_error_if_non_finite(number, decrease, modulus) or_return
+	internal_clear_non_finite(remainder)
 
 	return #force_inline internal_submod(remainder, number, decrease, modulus)
 }
@@ -269,10 +343,14 @@ submod :: proc { int_submod, }
 	remainder = (number * multiplicand) % modulus.
 */
 int_mulmod :: proc(remainder, number, multiplicand, modulus: ^Int, allocator := context.allocator) -> (err: Error) {
-	assert_if_nil(remainder, number, multiplicand)
+	assert_if_nil(remainder, number, multiplicand, modulus)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(number, multiplicand, modulus) or_return
+	number, multiplicand, modulus := number, multiplicand, modulus
+	number, multiplicand, modulus = _zero_if_uninitialized(number), _zero_if_uninitialized(multiplicand), _zero_if_uninitialized(modulus)
+	internal_error_if_immutable(remainder) or_return
+	internal_error_if_non_finite(number, multiplicand, modulus) or_return
+	internal_clear_non_finite(remainder)
 
 	return #force_inline internal_mulmod(remainder, number, multiplicand, modulus)
 }
@@ -285,7 +363,11 @@ int_sqrmod :: proc(remainder, number, modulus: ^Int, allocator := context.alloca
 	assert_if_nil(remainder, number, modulus)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(number, modulus) or_return
+	number, modulus := number, modulus
+	number, modulus = _zero_if_uninitialized(number), _zero_if_uninitialized(modulus)
+	internal_error_if_immutable(remainder) or_return
+	internal_error_if_non_finite(number, modulus) or_return
+	internal_clear_non_finite(remainder)
 
 	return #force_inline internal_sqrmod(remainder, number, modulus)
 }
@@ -295,6 +377,8 @@ sqrmod :: proc { int_sqrmod, }
 int_factorial :: proc(res: ^Int, n: int, allocator := context.allocator) -> (err: Error) {
 	if n < 0 || n > FACTORIAL_MAX_N { return .Invalid_Argument }
 	assert_if_nil(res)
+	internal_error_if_immutable(res) or_return
+	internal_clear_non_finite(res)
 
 	return #force_inline internal_int_factorial(res, n, allocator)
 }
@@ -321,7 +405,9 @@ int_choose_digit :: proc(res: ^Int, n, k: int, allocator := context.allocator) -
 	context.allocator = allocator
 
 	if n < 0 || n > FACTORIAL_MAX_N { return .Invalid_Argument }
-	if k > n { return internal_zero(res) }
+	internal_error_if_immutable(res) or_return
+	internal_clear_non_finite(res)
+	if k < 0 || k > n { return internal_zero(res) }
 
 	/*
 		res = n! / (k! * (n - k)!)
@@ -348,7 +434,11 @@ int_gcd_lcm :: proc(res_gcd, res_lcm, a, b: ^Int, allocator := context.allocator
 	assert_if_nil(a, b)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a, b) or_return
+	a, b := a, b
+	a, b = _zero_if_uninitialized(a), _zero_if_uninitialized(b)
+	internal_error_if_immutable(res_gcd, res_lcm) or_return
+	internal_error_if_non_finite(a, b) or_return
+	internal_clear_non_finite(res_gcd, res_lcm)
 	return #force_inline internal_int_gcd_lcm(res_gcd, res_lcm, a, b)
 }
 gcd_lcm :: proc { int_gcd_lcm, }
@@ -376,7 +466,12 @@ int_mod_bits :: proc(remainder, numerator: ^Int, bits: int, allocator := context
 	assert_if_nil(remainder, numerator)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(remainder, numerator) or_return
+	internal_clear_if_uninitialized(remainder) or_return
+	numerator := numerator
+	numerator = _zero_if_uninitialized(numerator)
+	internal_error_if_immutable(remainder) or_return
+	internal_error_if_non_finite(numerator) or_return
+	internal_clear_non_finite(remainder)
 	if bits < 0 { return .Invalid_Argument }
 
 	return #force_inline internal_int_mod_bits(remainder, numerator, bits)
@@ -392,7 +487,9 @@ int_log :: proc(a: ^Int, base: DIGIT, allocator := context.allocator) -> (res: i
 	assert_if_nil(a)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a) or_return
+	a := a
+	a = _zero_if_uninitialized(a)
+	internal_error_if_non_finite(a) or_return
 
 	return #force_inline internal_int_log(a, base)
 }
@@ -402,7 +499,8 @@ digit_log :: proc(a: DIGIT, base: DIGIT) -> (log: int, err: Error) {
 }
 log :: proc { int_log, digit_log, }
 
-ilog2 :: proc(value: $T) -> (log2: T) {
+// Bits needed for a non-negative `value`, 0 for 0. Used by `internal_int_is_prime` and `_private_int_factorial_binary_split`.
+bit_length :: proc(value: $T) -> (bits: T) {
 	return (size_of(T) * 8) - intrinsics.count_leading_zeros(value)
 }
 
@@ -413,7 +511,12 @@ int_pow :: proc(dest, base: ^Int, power: int, allocator := context.allocator) ->
 	assert_if_nil(dest, base)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(dest, base) or_return
+	internal_clear_if_uninitialized(dest) or_return
+	base := base
+	base = _zero_if_uninitialized(base)
+	internal_error_if_immutable(dest) or_return
+	internal_error_if_non_finite(base) or_return
+	internal_clear_non_finite(dest)
 
 	return #force_inline internal_int_pow(dest, base, power)
 }
@@ -423,16 +526,13 @@ int_pow :: proc(dest, base: ^Int, power: int, allocator := context.allocator) ->
 */
 int_pow_int :: proc(dest: ^Int, base, power: int, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(dest)
+	internal_error_if_immutable(dest) or_return
+	internal_clear_non_finite(dest)
 
 	return #force_inline internal_pow(dest, base, power, allocator)
 }
 
-pow :: proc { int_pow, int_pow_int, small_pow, }
-exp :: pow
-
-small_pow :: proc(base: _WORD, exponent: _WORD) -> (result: _WORD) {
-	return #force_inline internal_small_pow(base, exponent)
-}
+pow :: proc { int_pow, int_pow_int, }
 
 /*
 	This function is less generic than `root_n`, simpler and faster.
@@ -441,7 +541,12 @@ int_sqrt :: proc(dest, src: ^Int, allocator := context.allocator) -> (err: Error
 	assert_if_nil(dest, src)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(dest, src) or_return
+	internal_clear_if_uninitialized(dest) or_return
+	src := src
+	src = _zero_if_uninitialized(src)
+	internal_error_if_immutable(dest) or_return
+	internal_error_if_non_finite(src) or_return
+	internal_clear_non_finite(dest)
 
 	return #force_inline internal_int_sqrt(dest, src)
 }
@@ -467,7 +572,12 @@ int_root_n :: proc(dest, src: ^Int, n: int, allocator := context.allocator) -> (
 	/*
 		Initialize dest + src if needed.
 	*/
-	internal_clear_if_uninitialized(dest, src) or_return
+	internal_clear_if_uninitialized(dest) or_return
+	src := src
+	src = _zero_if_uninitialized(src)
+	internal_error_if_immutable(dest) or_return
+	internal_error_if_non_finite(src) or_return
+	internal_clear_non_finite(dest)
 
 	return #force_inline internal_int_root_n(dest, src, n)
 }
@@ -483,72 +593,79 @@ int_is_initialized :: proc(a: ^Int) -> bool {
 	return #force_inline internal_int_is_initialized(a)
 }
 
-int_is_zero :: proc(a: ^Int, allocator := context.allocator) -> (zero: bool, err: Error) {
+int_is_zero :: proc(a: ^Int) -> (zero: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a) or_return
+	a := a
+	a = _zero_if_uninitialized(a)
+	internal_error_if_non_finite(a) or_return
 
 	return #force_inline internal_is_zero(a), nil
 }
 
-int_is_positive :: proc(a: ^Int, allocator := context.allocator) -> (positive: bool, err: Error) {
+int_is_positive :: proc(a: ^Int) -> (positive: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a) or_return
+	a := a
+	a = _zero_if_uninitialized(a)
+	internal_error_if_non_finite(a) or_return
 
 	return #force_inline internal_is_positive(a), nil
 }
 
-int_is_negative :: proc(a: ^Int, allocator := context.allocator) -> (negative: bool, err: Error) {
+int_is_negative :: proc(a: ^Int) -> (negative: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a) or_return
+	a := a
+	a = _zero_if_uninitialized(a)
+	internal_error_if_non_finite(a) or_return
 
 	return #force_inline internal_is_negative(a), nil
 }
 
-int_is_even :: proc(a: ^Int, allocator := context.allocator) -> (even: bool, err: Error) {
+int_is_even :: proc(a: ^Int) -> (even: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a) or_return
+	a := a
+	a = _zero_if_uninitialized(a)
+	internal_error_if_non_finite(a) or_return
 
 	return #force_inline internal_is_even(a), nil
 }
 
-int_is_odd :: proc(a: ^Int, allocator := context.allocator) -> (odd: bool, err: Error) {
+int_is_odd :: proc(a: ^Int) -> (odd: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a) or_return
+	a := a
+	a = _zero_if_uninitialized(a)
+	internal_error_if_non_finite(a) or_return
 
 	return #force_inline internal_is_odd(a), nil
 }
 
 platform_int_is_power_of_two :: #force_inline proc(a: int) -> bool {
-	return ((a) != 0) && (((a) & ((a) - 1)) == 0)
+	return ((a) > 0) && (((a) & ((a) - 1)) == 0)
 }
 
-int_is_power_of_two :: proc(a: ^Int, allocator := context.allocator) -> (res: bool, err: Error) {
+int_is_power_of_two :: proc(a: ^Int) -> (res: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a) or_return
+	a := a
+	a = _zero_if_uninitialized(a)
+	internal_error_if_non_finite(a) or_return
 
-	return #force_inline internal_is_power_of_two(a), nil
+	return a.sign == .Zero_or_Positive && #force_inline internal_is_power_of_two(a), nil
 }
 
 /*
 	Compare two `Int`s, signed.
 */
-int_compare :: proc(a, b: ^Int, allocator := context.allocator) -> (comparison: int, err: Error) {
+int_compare :: proc(a, b: ^Int) -> (comparison: int, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a, b) or_return
+	a, b := a, b
+	a, b = _zero_if_uninitialized(a), _zero_if_uninitialized(b)
+	internal_error_if_non_finite(a, b) or_return
 
 	return #force_inline internal_cmp(a, b), nil
 }
@@ -557,11 +674,12 @@ int_cmp :: int_compare
 /*
 	Compare an `Int` to an unsigned number upto the size of the backing type.
 */
-int_compare_digit :: proc(a: ^Int, b: DIGIT, allocator := context.allocator) -> (comparison: int, err: Error) {
+int_compare_digit :: proc(a: ^Int, b: DIGIT) -> (comparison: int, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a) or_return
+	a := a
+	a = _zero_if_uninitialized(a)
+	internal_error_if_non_finite(a) or_return
 
 	return #force_inline internal_cmp_digit(a, b), nil
 }
@@ -570,11 +688,12 @@ int_cmp_digit :: int_compare_digit
 /*
 	Compare the magnitude of two `Int`s, unsigned.
 */
-int_compare_magnitude :: proc(a, b: ^Int, allocator := context.allocator) -> (res: int, err: Error) {
+int_compare_magnitude :: proc(a, b: ^Int) -> (res: int, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a, b) or_return
+	a, b := a, b
+	a, b = _zero_if_uninitialized(a), _zero_if_uninitialized(b)
+	internal_error_if_non_finite(a, b) or_return
 
 	return #force_inline internal_cmp_mag(a, b), nil
 }
@@ -584,11 +703,8 @@ int_cmp_mag :: int_compare_magnitude
 /*
 	bool := a < b
 */
-int_less_than :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (less_than: bool, err: Error) {
+int_less_than :: #force_inline proc(a, b: ^Int) -> (less_than: bool, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
-
-	internal_clear_if_uninitialized(a, b) or_return
 
 	c: int
 	c, err = cmp(a, b)
@@ -599,11 +715,8 @@ int_less_than :: #force_inline proc(a, b: ^Int, allocator := context.allocator) 
 /*
 	bool := a < b
 */
-int_less_than_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := context.allocator) -> (less_than: bool, err: Error) {
+int_less_than_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (less_than: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
-
-	internal_clear_if_uninitialized(a) or_return
 
 	c: int
 	c, err = cmp(a, b)
@@ -615,11 +728,8 @@ int_less_than_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := contex
 	bool := |a| < |b|
     Compares the magnitudes only, ignores the sign.
 */
-int_less_than_abs :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (less_than: bool, err: Error) {
+int_less_than_abs :: #force_inline proc(a, b: ^Int) -> (less_than: bool, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
-
-	internal_clear_if_uninitialized(a, b) or_return
 
 	c: int
 	c, err = cmp_mag(a, b)
@@ -642,11 +752,8 @@ lt_abs :: less_than_abs
 /*
 	bool := a <= b
 */
-int_less_than_or_equal :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (less_than_or_equal: bool, err: Error) {
+int_less_than_or_equal :: #force_inline proc(a, b: ^Int) -> (less_than_or_equal: bool, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
-
-	internal_clear_if_uninitialized(a, b) or_return
 
 	c: int
 	c, err = cmp(a, b)
@@ -657,11 +764,8 @@ int_less_than_or_equal :: #force_inline proc(a, b: ^Int, allocator := context.al
 /*
 	bool := a <= b
 */
-int_less_than_or_equal_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := context.allocator) -> (less_than_or_equal: bool, err: Error) {
+int_less_than_or_equal_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (less_than_or_equal: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
-
-	internal_clear_if_uninitialized(a) or_return
 
 	c: int
 	c, err = cmp(a, b)
@@ -673,11 +777,8 @@ int_less_than_or_equal_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator 
 	bool := |a| <= |b|
     Compares the magnitudes only, ignores the sign.
 */
-int_less_than_or_equal_abs :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (less_than_or_equal: bool, err: Error) {
+int_less_than_or_equal_abs :: #force_inline proc(a, b: ^Int) -> (less_than_or_equal: bool, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
-
-	internal_clear_if_uninitialized(a, b) or_return
 
 	c: int
 	c, err = cmp_mag(a, b)
@@ -700,11 +801,8 @@ lteq_abs :: less_than_or_equal_abs
 /*
 	bool := a == b
 */
-int_equals :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (equals: bool, err: Error) {
+int_equals :: #force_inline proc(a, b: ^Int) -> (equals: bool, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
-
-	internal_clear_if_uninitialized(a, b) or_return
 
 	c: int
 	c, err = cmp(a, b)
@@ -715,11 +813,8 @@ int_equals :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> 
 /*
 	bool := a == b
 */
-int_equals_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := context.allocator) -> (equals: bool, err: Error) {
+int_equals_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (equals: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
-
-	internal_clear_if_uninitialized(a) or_return
 
 	c: int
 	c, err = cmp(a, b)
@@ -731,11 +826,8 @@ int_equals_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := context.a
 	bool := |a| == |b|
     Compares the magnitudes only, ignores the sign.
 */
-int_equals_abs :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (equals: bool, err: Error) {
+int_equals_abs :: #force_inline proc(a, b: ^Int) -> (equals: bool, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
-
-	internal_clear_if_uninitialized(a, b) or_return
 
 	c: int
 	c, err = cmp_mag(a, b)
@@ -758,11 +850,8 @@ eq_abs :: equals_abs
 /*
 	bool := a >= b
 */
-int_greater_than_or_equal :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (greater_than_or_equal: bool, err: Error) {
+int_greater_than_or_equal :: #force_inline proc(a, b: ^Int) -> (greater_than_or_equal: bool, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
-
-	internal_clear_if_uninitialized(a, b) or_return
 
 	c: int
 	c, err = cmp(a, b)
@@ -773,11 +862,8 @@ int_greater_than_or_equal :: #force_inline proc(a, b: ^Int, allocator := context
 /*
 	bool := a >= b
 */
-int_greater_than_or_equal_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := context.allocator) -> (greater_than_or_equal: bool, err: Error) {
+int_greater_than_or_equal_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (greater_than_or_equal: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
-
-	internal_clear_if_uninitialized(a) or_return
 
 	c: int
 	c, err = cmp(a, b)
@@ -789,11 +875,8 @@ int_greater_than_or_equal_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocat
 	bool := |a| >= |b|
     Compares the magnitudes only, ignores the sign.
 */
-int_greater_than_or_equal_abs :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (greater_than_or_equal: bool, err: Error) {
+int_greater_than_or_equal_abs :: #force_inline proc(a, b: ^Int) -> (greater_than_or_equal: bool, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
-
-	internal_clear_if_uninitialized(a, b) or_return
 
 	c: int
 	c, err = cmp_mag(a, b)
@@ -816,11 +899,8 @@ gteq_abs :: greater_than_or_equal_abs
 /*
 	bool := a > b
 */
-int_greater_than :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (greater_than: bool, err: Error) {
+int_greater_than :: #force_inline proc(a, b: ^Int) -> (greater_than: bool, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
-
-	internal_clear_if_uninitialized(a, b) or_return
 
 	c: int
 	c, err = cmp(a, b)
@@ -831,11 +911,8 @@ int_greater_than :: #force_inline proc(a, b: ^Int, allocator := context.allocato
 /*
 	bool := a > b
 */
-int_greater_than_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := context.allocator) -> (greater_than: bool, err: Error) {
+int_greater_than_digit :: #force_inline proc(a: ^Int, b: DIGIT) -> (greater_than: bool, err: Error) {
 	assert_if_nil(a)
-	context.allocator = allocator
-
-	internal_clear_if_uninitialized(a) or_return
 
 	c: int
 	c, err = cmp(a, b)
@@ -847,11 +924,8 @@ int_greater_than_digit :: #force_inline proc(a: ^Int, b: DIGIT, allocator := con
 	bool := |a| > |b|
     Compares the magnitudes only, ignores the sign.
 */
-int_greater_than_abs :: #force_inline proc(a, b: ^Int, allocator := context.allocator) -> (greater_than: bool, err: Error) {
+int_greater_than_abs :: #force_inline proc(a, b: ^Int) -> (greater_than: bool, err: Error) {
 	assert_if_nil(a, b)
-	context.allocator = allocator
-
-	internal_clear_if_uninitialized(a, b) or_return
 
 	c: int
 	c, err = cmp_mag(a, b)
@@ -881,7 +955,9 @@ int_is_square :: proc(a: ^Int, allocator := context.allocator) -> (square: bool,
 	assert_if_nil(a)
 	context.allocator = allocator
 
-	internal_clear_if_uninitialized(a) or_return
+	a := a
+	a = _zero_if_uninitialized(a)
+	internal_error_if_non_finite(a) or_return
 
 	return #force_inline internal_int_is_square(a)
 }

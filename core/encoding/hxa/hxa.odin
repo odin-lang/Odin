@@ -163,7 +163,7 @@ CONVENTION_SOFT_TRANSFORM :: "transform"
 meta_destroy :: proc(meta: Meta, allocator := context.allocator, loc := #caller_location) {
 	if nested, ok := meta.value.([]Meta); ok {
 		for m in nested {
-			meta_destroy(m, loc=loc)
+			meta_destroy(m, allocator, loc=loc)
 		}
 		delete(nested, allocator, loc=loc)
 	}
@@ -171,7 +171,7 @@ meta_destroy :: proc(meta: Meta, allocator := context.allocator, loc := #caller_
 nodes_destroy :: proc(nodes: []Node, allocator := context.allocator, loc := #caller_location) {
 	for node in nodes {
 		for meta in node.meta_data {
-			meta_destroy(meta, loc=loc)
+			meta_destroy(meta, allocator, loc=loc)
 		}
 		delete(node.meta_data, allocator, loc=loc)
 

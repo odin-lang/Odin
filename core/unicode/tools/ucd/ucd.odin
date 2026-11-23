@@ -29,6 +29,7 @@ load_unicode_data :: proc(filename: string, allocator := context.allocator) -> (
 	data := os.read_entire_file(filename, context.temp_allocator) or_return
 	defer free_all(context.temp_allocator)
 
+	unicode_data.allocator = allocator
 	first_cp: rune
 
 	str := string(data)
@@ -152,9 +153,9 @@ destroy_unicode_data :: proc(unicode_data: Unicode_Data) {
 	for point in unicode_data {
 		switch p in point {
 		case Char:
-			delete(p.name)
+			delete(p.name, unicode_data.allocator)
 		case Char_Range:
-			delete(p.name)
+			delete(p.name, unicode_data.allocator)
 		}
 	}
 	delete(unicode_data)
@@ -328,7 +329,7 @@ destroy_property_list :: proc(props: Prop_List) {
 
 load_property_list :: proc(filename: string, allocator := context.allocator) -> (props: Prop_List, err: Error) {
 	data := os.read_entire_file(filename, allocator) or_return
-	defer delete(data)
+	defer delete(data, allocator)
 
 	str := string(data)
 	for _line in strings.split_lines_iterator(&str) {

@@ -840,9 +840,7 @@ _mm_load_si128 :: #force_inline proc "c" (mem_addr: ^__m128i) -> __m128i {
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_loadu_si128)
 @(require_results, enable_target_feature="sse2")
 _mm_loadu_si128 :: #force_inline proc "c" (mem_addr: ^__m128i) -> __m128i {
-	dst := _mm_undefined_si128()
-	intrinsics.mem_copy_non_overlapping(&dst, mem_addr, size_of(__m128i))
-	return dst
+	return intrinsics.unaligned_load(mem_addr)
 }
 
 // Conditionally store 8-bit integer elements from `a` into memory using `mask`
@@ -877,8 +875,7 @@ _mm_storeu_si128 :: #force_inline proc "c" (mem_addr: ^__m128i, a: __m128i) {
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_storel_epi64)
 @(enable_target_feature="sse2")
 _mm_storel_epi64 :: #force_inline proc "c" (mem_addr: ^__m128i, a: __m128i) {
-	b := a
-	intrinsics.mem_copy_non_overlapping(mem_addr, &b, size_of(i64))
+	intrinsics.unaligned_store((^i64)(mem_addr), simd.extract(a, 0))
 }
 
 // Copy the lower 64-bit integer in `a` to the lower element of `dst`, and zero the upper element.
@@ -1917,9 +1914,7 @@ _mm_loadr_pd :: #force_inline proc "c" (mem_addr: ^f64) -> __m128d {
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_loadu_pd)
 @(require_results, enable_target_feature="sse2")
 _mm_loadu_pd :: #force_inline proc "c" (mem_addr: ^f64) -> __m128d {
-	dst := _mm_undefined_pd()
-	intrinsics.mem_copy_non_overlapping(&dst, mem_addr, size_of(__m128d))
-	return dst
+	return intrinsics.unaligned_load((^__m128d)(mem_addr))
 }
 
 // Load unaligned 16-bit integer from memory into the first element of `dst`.

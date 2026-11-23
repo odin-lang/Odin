@@ -169,8 +169,13 @@ MATH_ERREXCEPT   :: 2
 
 math_errhandling :: 2 // Windows, Linux, macOS all use this mode.
 
-FP_ILOGBNAN      :: -1 - int((~uint(0)) >> 1)
-FP_ILOGB0        :: FP_ILOGBNAN
+when ODIN_PLATFORM_SUBTARGET == .Android {
+	FP_ILOGBNAN  :: int((~uint(0)) >> 1)
+	FP_ILOGB0    :: -FP_ILOGBNAN
+} else {
+	FP_ILOGBNAN  :: -1 - int((~uint(0)) >> 1)
+	FP_ILOGB0    :: FP_ILOGBNAN
+}
 
 // Number classification constants. These do not have to match libc since we
 // implement our own classification functions as libc requires they be macros,

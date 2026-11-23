@@ -1355,7 +1355,7 @@ gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) 
 gb_internal Entity *strip_entity_wrapping(Ast *expr);
 gb_internal Entity *strip_entity_wrapping(Entity *e);
 
-gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthand);
+gb_internal gbString write_expr_to_string(gbString str, Ast *node, u32 flags);
 
 gb_internal gbString write_exact_value_to_string(gbString str, ExactValue const &v, isize string_limit);
 

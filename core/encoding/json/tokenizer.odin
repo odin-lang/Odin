@@ -58,7 +58,7 @@ Tokenizer :: struct {
 
 @(require_results)
 make_tokenizer :: proc(data: string, spec := DEFAULT_SPECIFICATION, parse_integers := false) -> Tokenizer {
-	t := Tokenizer{pos = {line=1}, data = data, spec = spec, parse_integers = parse_integers}
+	t := Tokenizer{pos = {line=1, column=1}, data = data, spec = spec, parse_integers = parse_integers}
 	next_rune(&t)
 	if t.r == utf8.RUNE_BOM {
 		next_rune(&t)
@@ -78,7 +78,7 @@ next_rune :: proc(t: ^Tokenizer) -> rune #no_bounds_check {
 @(private="file")
 move_to :: #force_inline proc "contextless" (t: ^Tokenizer, offset: int) #no_bounds_check {
 	t.offset     = offset
-	t.pos.column = offset - t.curr_line_offset
+	t.pos.column = offset - t.curr_line_offset + 1
 
 	switch {
 	case offset >= len(t.data):
@@ -166,36 +166,128 @@ string_stop :: proc "contextless" (s: string, i: int, quote: byte) -> int #no_bo
 	return i
 }
 
-// Where the string token at `s[start]` ends, as `scan_string` finds it: after its closing quote, or
-// at a newline or the end of `s` that leaves it unterminated. No other byte matters, as no escape or
-// UTF-8 sequence can hide a quote or a newline.
+// Where the string token at `s[start]` ends, as `scan_string` finds it: after its closing quote,
+// or at a newline or the end of `s` that leaves it unterminated. `lines` counts the escaped LFs
+// inside it and `line_start` is the offset after the last one. No other byte matters:
+// an escape hides at most the quote, backslash or line break after it,
+// and no UTF-8 sequence holds a quote or a newline.
 @(private="file")
-string_token_end :: proc "contextless" (s: string, start: int) -> (end: int, closed: bool) #no_bounds_check {
+string_token_end :: proc "contextless" (s: string, start: int) -> (end: int, closed: bool, lines: int, line_start: int) #no_bounds_check {
 	quote := s[start]
 	i := start + 1
 	for i < len(s) {
 		i = string_stop(s, i, quote)
 		if i >= len(s) || s[i] == '\n' {
-			return i, false
+			return i, false, lines, line_start
 		}
 		if s[i] == quote {
-			return i + 1, true
+			return i + 1, true, lines, line_start
+		}
+		if i+2 < len(s) && s[i+1] == '\r' && s[i+2] == '\n' {
+			i += 1
 		}
 		i += 2
+		if i <= len(s) && s[i-1] == '\n' {
+			lines += 1
+			line_start = i
+		}
 	}
-	return len(s), false
+	return len(s), false, lines, line_start
+}
+
+@(private="file")
+count_lines :: proc "contextless" (t: ^Tokenizer, start, end: int) #no_bounds_check {
+	for i in start..<end {
+		if t.data[i] == '\n' {
+			t.line += 1
+			t.curr_line_offset = i + 1
+		}
+	}
+	t.pos.column = t.offset - t.curr_line_offset + 1
+}
+
+@(private="file")
+unicode_space_width :: proc "contextless" (s: string, i: int) -> int #no_bounds_check {
+	switch s[i] {
+	case 0xc2:
+		if i+1 < len(s) && s[i+1] == 0xa0 {
+			return 2
+		}
+	case 0xe1:
+		if i+2 < len(s) && s[i+1] == 0x9a && s[i+2] == 0x80 {
+			return 3
+		}
+	case 0xe2:
+		if i+2 < len(s) {
+			switch s[i+1] {
+			case 0x80:
+				switch s[i+2] {
+				case 0x80..=0x8a, 0xa8, 0xa9, 0xaf:
+					return 3
+				}
+			case 0x81:
+				if s[i+2] == 0x9f {
+					return 3
+				}
+			}
+		}
+	case 0xe3:
+		if i+2 < len(s) && s[i+1] == 0x80 && s[i+2] == 0x80 {
+			return 3
+		}
+	case 0xef:
+		if i+2 < len(s) && s[i+1] == 0xbb && s[i+2] == 0xbf {
+			return 3
+		}
+	}
+	return 0
+}
+
+@(private="file")
+line_comment_end :: proc "contextless" (s: string, i: int) -> int #no_bounds_check {
+	i := i
+	for i < len(s) {
+		switch s[i] {
+		case '\n', '\r':
+			return i
+		case 0xe2:
+			if i+2 < len(s) && s[i+1] == 0x80 && (s[i+2] == 0xa8 || s[i+2] == 0xa9) {
+				return i
+			}
+		}
+		i += 1
+	}
+	return i
 }
 
 @(require_results)
 get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) #no_bounds_check {
+	for {
+		comment: bool
+		token, err, comment = get_token_or_comment(t)
+		if !comment {
+			return
+		}
+	}
+}
+
+@(private="file", require_results)
+get_token_or_comment :: #force_inline proc(t: ^Tokenizer) -> (token: Token, err: Error, comment: bool) #no_bounds_check {
 	data  := t.data
 	start := t.offset
 	end   := 0
+	lines, line_start := 0, 0
 
 	scan: for start < len(data) {
 		c := data[start]
 		switch c {
-		case ' ', '\t', '\v', '\f', '\r':
+		case ' ', '\t', '\r':
+			start += 1
+			continue
+		case '\v', '\f':
+			if t.spec == .JSON {
+				break scan
+			}
 			start += 1
 			continue
 		case '\n':
@@ -203,7 +295,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) #no_bounds_check 
 				break scan
 			}
 			t.line += 1
-			t.curr_line_offset = start
+			t.curr_line_offset = start + 1
 			start += 1
 			continue
 
@@ -220,33 +312,35 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) #no_bounds_check 
 		case '"':
 			token.kind = .String
 			if t.validated {
-				if e, closed := string_token_end(data, start); closed {
-					end = e
+				if e, closed, l, ls := string_token_end(data, start); closed {
+					end, lines, line_start = e, l, ls
 					break
 				}
 			} else if e := plain_run_end(data, start+1, '"'); e < len(data) && data[e] == '"' {
 				end = e + 1
 				break
 			}
-			end, err = scan_string(t, start)
+			end, err, lines, line_start = scan_string(t, start)
 		case '\'':
 			if t.spec == .JSON {
 				break scan
 			}
 			token.kind = .String
 			if t.validated {
-				if e, closed := string_token_end(data, start); closed {
-					end, err = e, .Illegal_Character
+				if e, closed, l, ls := string_token_end(data, start); closed {
+					end, lines, line_start = e, l, ls
 					break
 				}
 			}
-			end, err = scan_string(t, start)
-			if err == nil {
-				err = .Illegal_Character
-			}
+			end, err, lines, line_start = scan_string(t, start)
 
+		case '$':
+			if t.spec == .JSON {
+				break scan
+			}
+			fallthrough
 		case 'A'..='Z', 'a'..='z', '_':
-			end = alphanum_end(data, start+1)
+			end = alphanum_end(data, start+1, t.spec)
 			token.kind = ident_kind(data[start:end], t.spec)
 
 		case '-', '+':
@@ -256,10 +350,10 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) #no_bounds_check 
 			if c == '+' && t.spec == .JSON {
 				break scan
 			}
-			end, token.kind, err = scan_decimal(t, start)
-			if c == '+' && err == nil {
-				err = .Illegal_Character
+			if t.spec != .JSON && data[start+1] == '0' && start+2 < len(data) && (data[start+2] == 'x' || data[start+2] == 'X') {
+				break scan
 			}
+			end, token.kind, err = scan_decimal(t, start)
 
 		case '0'..='9':
 			if c == '0' && t.spec != .JSON && start+1 < len(data) {
@@ -273,8 +367,12 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) #no_bounds_check 
 			break scan
 		}
 
-		token.pos  = {start, t.line, start - t.curr_line_offset}
+		token.pos  = {start, t.line, start - t.curr_line_offset + 1}
 		token.text = data[start:end]
+		if lines > 0 {
+			t.line += lines
+			t.curr_line_offset = line_start
+		}
 		move_to(t, end)
 		if t.spec == .MJSON {
 			update_insert_comma(t, token.kind)
@@ -289,42 +387,62 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) #no_bounds_check 
 }
 
 @(private="file", require_results)
-get_other_token :: #force_no_inline proc(t: ^Tokenizer) -> (token: Token, err: Error) {
+get_other_token :: #force_no_inline proc(t: ^Tokenizer) -> (token: Token, err: Error, comment: bool) {
 	skip_digits :: proc(t: ^Tokenizer) {
 		if i := digits_end(t.data, t.offset); i != t.offset {
 			move_to(t, i)
 		}
 	}
-	skip_hex_digits :: proc(t: ^Tokenizer) {
-		for t.offset < len(t.data) {
-			next_rune(t)
+	skip_hex_digits :: proc(t: ^Tokenizer) -> (digits: int) {
+		for {
 			switch t.r {
 			case '0'..='9', 'a'..='f', 'A'..='F':
 				// Okay
+				next_rune(t)
+				digits += 1
 			case:
 				return
 			}
 		}
+	}
+	scan_leading_dot :: proc(t: ^Tokenizer, token: ^Token) -> Error {
+		skip_digits(t)
+		if t.r == 'e' || t.r == 'E' {
+			switch r := next_rune(t); r {
+			case '+', '-':
+				next_rune(t)
+			}
+			skip_digits(t)
+		}
+		token.kind = .Float
+		if !is_valid_number(string(t.data[token.offset:t.offset]), t.spec) {
+			return .Invalid_Number
+		}
+		return nil
 	}
 
 	skip_whitespace :: proc(t: ^Tokenizer, on_newline: bool) #no_bounds_check {
 		i := t.offset
 		loop: for i < len(t.data) {
 			switch t.data[i] {
-			case ' ', '\t', '\v', '\f', '\r':
+			case ' ', '\t', '\r':
+				i += 1
+			case '\v', '\f':
+				if t.spec == .JSON {
+					break loop
+				}
 				i += 1
 			case '\n':
 				if on_newline {
 					break loop
 				}
 				t.line += 1
-				t.curr_line_offset = i
+				t.curr_line_offset = i + 1
 				i += 1
-			case 0xe2, 0xef:
+			case 0xc2, 0xe1, 0xe2, 0xe3, 0xef:
 				if t.spec != .JSON {
-					switch t.data[i:min(i+3, len(t.data))] {
-					case "\u2028", "\u2029", "\uFEFF":
-						i += 3
+					if w := unicode_space_width(t.data, i); w > 0 {
+						i += w
 						continue loop
 					}
 				}
@@ -338,17 +456,8 @@ get_other_token :: #force_no_inline proc(t: ^Tokenizer) -> (token: Token, err: E
 		}
 	}
 
-	skip_to_next_line :: proc(t: ^Tokenizer) {
-		for t.offset < len(t.data) {
-			r := next_rune(t)
-			if r == '\n' {
-				return
-			}
-		}
-	}
-
 	skip_alphanum :: proc(t: ^Tokenizer) {
-		if i := alphanum_end(t.data, t.offset); i != t.offset {
+		if i := alphanum_end(t.data, t.offset, t.spec); i != t.offset {
 			move_to(t, i)
 		}
 	}
@@ -371,17 +480,24 @@ get_other_token :: #force_no_inline proc(t: ^Tokenizer) -> (token: Token, err: E
 
 	case '\n':
 		t.insert_comma = false
+		count_lines(t, token.offset, t.offset)
 		token.text = ","
 		token.kind = .Comma
 		return
 
+	case '$':
+		if t.spec == .JSON {
+			err = .Illegal_Character
+			break
+		}
+		fallthrough
 	case 'A'..='Z', 'a'..='z', '_':
 		skip_alphanum(t)
 		token.kind = ident_kind(t.data[token.offset:t.offset], t.spec)
 
 	case '+':
-		err = .Illegal_Character
 		if t.spec == .JSON {
+			err = .Illegal_Character
 			break
 		}
 		fallthrough
@@ -390,6 +506,14 @@ get_other_token :: #force_no_inline proc(t: ^Tokenizer) -> (token: Token, err: E
 		switch t.r {
 		case '0'..='9':
 			// Okay
+		case '.':
+			if t.spec != .JSON {
+				next_rune(t)
+				err = scan_leading_dot(t, &token)
+				break block
+			}
+			err = .Illegal_Character
+			break block
 		case:
 			// Illegal use of +/-
 			err = .Illegal_Character
@@ -398,9 +522,9 @@ get_other_token :: #force_no_inline proc(t: ^Tokenizer) -> (token: Token, err: E
 				if t.r == 'I' || t.r == 'N' {
 					skip_alphanum(t)
 				}
-				switch string(t.data[token.offset:t.offset]) {
-				case "-Infinity": token.kind = .Infinity
-				case "-NaN":      token.kind = .NaN
+				switch string(t.data[token.offset+1:t.offset]) {
+				case "Infinity": token.kind, err = .Infinity, nil
+				case "NaN":      token.kind, err = .NaN, nil
 				}
 			}
 			break block
@@ -410,9 +534,15 @@ get_other_token :: #force_no_inline proc(t: ^Tokenizer) -> (token: Token, err: E
 	case '0'..='9':
 		token.kind = t.parse_integers ? .Integer : .Float
 		if t.spec != .JSON { // Hexadecimal Numbers
-			if curr_rune == '0' && (t.r == 'x' || t.r == 'X') {
-				next_rune(t)
-				skip_hex_digits(t)
+			hex := token.offset
+			if curr_rune == '-' || curr_rune == '+' {
+				hex += 1
+			}
+			if hex+1 < len(t.data) && t.data[hex] == '0' && (t.data[hex+1] == 'x' || t.data[hex+1] == 'X') {
+				move_to(t, hex+2)
+				if skip_hex_digits(t) == 0 {
+					err = .Invalid_Number
+				}
 				break
 			}
 		}
@@ -427,18 +557,7 @@ get_other_token :: #force_no_inline proc(t: ^Tokenizer) -> (token: Token, err: E
 	case '.':
 		err = .Illegal_Character
 		if t.spec != .JSON { // Allow leading decimal point
-			skip_digits(t)
-			if t.r == 'e' || t.r == 'E' {
-				switch r := next_rune(t); r {
-				case '+', '-':
-					next_rune(t)
-				}
-				skip_digits(t)
-			}
-			str := string(t.data[token.offset:t.offset])
-			if !is_valid_number(str, t.spec) {
-				err = .Invalid_Number
-			}
+			err = scan_leading_dot(t, &token)
 		}
 
 
@@ -450,9 +569,13 @@ get_other_token :: #force_no_inline proc(t: ^Tokenizer) -> (token: Token, err: E
 		fallthrough
 	case '"':
 		token.kind = .String
-		end, string_err := scan_string(t, token.offset)
+		end, string_err, lines, line_start := scan_string(t, token.offset)
 		if string_err != nil {
 			err = string_err
+		}
+		if lines > 0 {
+			t.line += lines
+			t.curr_line_offset = line_start
 		}
 		move_to(t, end)
 
@@ -478,18 +601,24 @@ get_other_token :: #force_no_inline proc(t: ^Tokenizer) -> (token: Token, err: E
 			switch t.r {
 			case '/':
 				// Single-line comments
-				skip_to_next_line(t)
-				return get_token(t)
+				move_to(t, line_comment_end(t.data, t.offset))
+				comment = true
+				return
 			case '*':
 				// None-nested multi-line comments
 				for t.offset < len(t.data) {
-					if next_rune(t) == '*' {
-						if next_rune(t) == '/' {
+					r := next_rune(t)
+					for r == '*' {
+						r = next_rune(t)
+						if r == '/' {
 							next_rune(t)
-							return get_token(t)
+							count_lines(t, token.offset, t.offset)
+							comment = true
+							return
 						}
 					}
 				}
+				count_lines(t, token.offset, t.offset)
 				err = .EOF
 			}
 		}
@@ -523,11 +652,16 @@ update_insert_comma :: proc "contextless" (t: ^Tokenizer, kind: Token_Kind) {
 }
 
 @(private="file")
-alphanum_end :: proc "contextless" (s: string, i: int) -> int #no_bounds_check {
+alphanum_end :: proc "contextless" (s: string, i: int, spec: Specification) -> int #no_bounds_check {
 	i := i
 	for i < len(s) {
 		switch s[i] {
 		case 'A'..='Z', 'a'..='z', '0'..='9', '_':
+			i += 1
+		case '$':
+			if spec == .JSON {
+				return i
+			}
 			i += 1
 		case:
 			return i
@@ -586,7 +720,7 @@ scan_decimal :: #force_inline proc "contextless" (t: ^Tokenizer, start: int) -> 
 	}
 
 	valid := (first_digit != '0' || int_digits == 1) &&
-	         (!has_dot || frac_digits > 0 || (t.spec != .JSON && !has_exp)) &&
+	         (!has_dot || frac_digits > 0 || t.spec != .JSON) &&
 	         (!has_exp || exp_digits > 0)
 	if !valid {
 		err = .Invalid_Number
@@ -596,7 +730,7 @@ scan_decimal :: #force_inline proc "contextless" (t: ^Tokenizer, start: int) -> 
 
 // Scans the string literal whose opening quote is at `t.data[start]`.
 @(private="file")
-scan_string :: proc(t: ^Tokenizer, start: int) -> (end: int, err: Error) #no_bounds_check {
+scan_string :: proc(t: ^Tokenizer, start: int) -> (end: int, err: Error, lines: int, line_start: int) #no_bounds_check {
 	data  := t.data
 	quote := data[start]
 
@@ -622,8 +756,14 @@ scan_string :: proc(t: ^Tokenizer, start: int) -> (end: int, err: Error) #no_bou
 			move_to(t, i+1)
 			_ = scan_escape(t)
 			i = t.offset
+			if data[i-1] == '\n' {
+				lines += 1
+				line_start = i
+			}
 		case c < ' ':
-			invalid = true
+			if t.spec == .JSON || c == '\r' {
+				invalid = true
+			}
 			i += 1
 		case escaped:
 			i += 1
@@ -643,7 +783,7 @@ scan_string :: proc(t: ^Tokenizer, start: int) -> (end: int, err: Error) #no_bou
 	} else if invalid {
 		err = .Invalid_String
 	}
-	return i, err
+	return i, err, lines, line_start
 }
 
 @(private="file", require_results)
@@ -664,6 +804,10 @@ scan_escape :: proc(t: ^Tokenizer) -> bool {
 			}
 		}
 		return true
+	case '\r':
+		if next_rune(t) == '\n' {
+			next_rune(t)
+		}
 	case:
 		// Ignore the next rune regardless
 		next_rune(t)
@@ -704,7 +848,7 @@ is_valid_number :: proc(str: string, spec: Specification) -> bool {
 			}
 			hexadecimal_loop: for len(s) > 0 {
 				switch s[0] {
-				case '0'..='9', 'A'..='Z', 'a'..='z':
+				case '0'..='9', 'A'..='F', 'a'..='f':
 					s = s[1:]
 				case:
 					break hexadecimal_loop
@@ -724,7 +868,9 @@ is_valid_number :: proc(str: string, spec: Specification) -> bool {
 		}
 	case '.':
 		if spec != .JSON { // Allow leading decimal point
-			s = s[1:]
+			if len(s) < 2 || s[1] < '0' || s[1] > '9' {
+				return false
+			}
 		} else {
 			return false
 		}
@@ -733,8 +879,8 @@ is_valid_number :: proc(str: string, spec: Specification) -> bool {
 	}
 
 	if spec != .JSON {
-		if len(s) == 1 && s[0] == '.' { // Allow trailing decimal point
-			return true
+		if len(s) >= 1 && s[0] == '.' && (len(s) == 1 || s[1] == 'e' || s[1] == 'E') { // Allow trailing decimal point
+			s = s[1:]
 		}
 	}
 
@@ -765,24 +911,31 @@ is_valid_number :: proc(str: string, spec: Specification) -> bool {
 
 @(require_results)
 is_valid_string_literal :: proc(str: string, spec: Specification) -> bool {
+	valid, valid_utf8 := check_string_literal(str, spec)
+	return valid && valid_utf8
+}
+
+@(private, require_results)
+check_string_literal :: proc(str: string, spec: Specification) -> (valid, valid_utf8: bool) {
+	valid_utf8 = true
 	s := str
 	if len(s) < 2 {
-		return false
+		return
 	}
 	quote := s[0]
 	if s[0] != s[len(s)-1] {
-		return false
+		return
 	}
 	switch quote {
 	case '"':
 		// okay
 	case '\'':
 		if spec == .JSON {
-			return false
+			return
 		}
 		// okay
 	case:
-		return false
+		return
 	}
 	s = s[1 : len(s)-1]
 
@@ -793,30 +946,56 @@ is_valid_string_literal :: proc(str: string, spec: Specification) -> bool {
 		case c == '\\':
 			i += 1
 			if i >= len(s) {
-				return false
+				return
 			}
 			switch s[i] {
-			case '"', '\'', '\\', '/', 'b', 'n', 'r', 't', 'f':
+			case '"', '\\', '/', 'b', 'n', 'r', 't', 'f':
+				i += 1
+			case '\'':
+				if spec == .JSON {
+					return
+				}
 				i += 1
 			case '\r':
-				if spec != .JSON && i+1 < len(s) && s[i+1] == '\n' {
-					i += 2
-				} else {
-					return false
+				if spec == .JSON {
+					return
+				}
+				i += 1
+				if i < len(s) && s[i] == '\n' {
+					i += 1
 				}
 			case '\n':
 				if spec != .JSON {
 					i += 1
 				} else {
-					return false
+					return
 				}
+			case 'v':
+				if spec == .JSON {
+					return
+				}
+				i += 1
+			case '0':
+				if spec == .JSON || i+1 < len(s) && '0' <= s[i+1] && s[i+1] <= '9' {
+					return
+				}
+				i += 1
+			case 'x':
+				if spec == .JSON || i+2 >= len(s) {
+					return
+				}
+				_ = hex_digit_value(s[i+1]) or_return
+				_ = hex_digit_value(s[i+2]) or_return
+				i += 3
+			case '1'..='9':
+				return
 			case 'u':
 				if i >= len(s) {
-					return false
+					return
 				}
 				hex := s[i+1:]
 				if len(hex) < 4 {
-					return false
+					return
 				}
 				hex = hex[:4]
 				i += 5
@@ -824,18 +1003,27 @@ is_valid_string_literal :: proc(str: string, spec: Specification) -> bool {
 				for j := 0; j < 4; j += 1 {
 					c2 := hex[j]
 					switch c2 {
-					case '0'..='9', 'a'..='z', 'A'..='Z':
+					case '0'..='9', 'a'..='f', 'A'..='F':
 						// Okay
 					case:
-						return false
+						return
 					}
 				}
 
-			case: return false
+			case:
+				if spec == .JSON {
+					return
+				}
 			}
 
-		case c == quote, c < ' ':
-			return false
+		case c == quote:
+			return
+
+		case c < ' ':
+			if spec == .JSON || c == '\n' || c == '\r' {
+				return
+			}
+			i += 1
 
 		case c < utf8.RUNE_SELF:
 			i = plain_run_end(s, i, quote)
@@ -843,27 +1031,32 @@ is_valid_string_literal :: proc(str: string, spec: Specification) -> bool {
 		case:
 			r, width := utf8.decode_rune_in_string(s[i:])
 			if r == utf8.RUNE_ERROR && width == 1 {
-				return false
+				valid_utf8 = false
 			}
 			i += width
 		}
 	}
 	if i == len(s) {
-		return true
+		return true, valid_utf8
 	}
-	return true
+	return true, valid_utf8
 }
 
 @(private)
 count_validated_array :: proc(s: string, open: int, spec: Specification) -> (count: uintptr) #no_bounds_check {
-	rune_width :: #force_inline proc "contextless" (s: string, i: int) -> int {
-		if s[i] < utf8.RUNE_SELF {
-			return 1
+	number_end :: proc "contextless" (s: string, start: int, spec: Specification) -> int #no_bounds_check {
+		if spec != .JSON && start+1 < len(s) && s[start] == '0' && (s[start+1] == 'x' || s[start+1] == 'X') {
+			i := start + 2
+			for i < len(s) {
+				switch s[i] {
+				case '0'..='9', 'a'..='f', 'A'..='F':
+					i += 1
+					continue
+				}
+				break
+			}
+			return i
 		}
-		_, w := utf8.decode_rune_in_string(s[i:])
-		return w
-	}
-	number_end :: proc "contextless" (s: string, start: int) -> int #no_bounds_check {
 		i := digits_end(s, start)
 		if i < len(s) && s[i] == '.' {
 			i = digits_end(s, i+1)
@@ -885,7 +1078,7 @@ count_validated_array :: proc(s: string, open: int, spec: Specification) -> (cou
 		switch c {
 		case '"', '\'':
 			count += uintptr(depth == 0)
-			i, _ = string_token_end(s, i)
+			i, _, _, _ = string_token_end(s, i)
 
 		case '[', '{':
 			count += uintptr(depth == 0)
@@ -899,56 +1092,32 @@ count_validated_array :: proc(s: string, open: int, spec: Specification) -> (cou
 			depth -= 1
 			i += 1
 
-		case 'A'..='Z', 'a'..='z', '_':
+		case 'A'..='Z', 'a'..='z', '_', '$':
 			count += uintptr(depth == 0)
-			i = alphanum_end(s, i+1)
+			i = alphanum_end(s, i+1, spec)
 
 		case '-', '+':
 			count += uintptr(depth == 0)
 			if i+1 < len(s) && (s[i+1] == 'I' || s[i+1] == 'N') {
-				i = alphanum_end(s, i+1)
+				i = alphanum_end(s, i+1, spec)
 			} else {
-				i = number_end(s, i+1)
+				i = number_end(s, i+1, spec)
 			}
 
 		case '0'..='9':
 			count += uintptr(depth == 0)
-			is_hex := false
-			if c == '0' && spec != .JSON && i+1 < len(s) {
-				is_hex = s[i+1] == 'x' || s[i+1] == 'X'
-			}
-			if is_hex {
-				for i += 2; i < len(s); /**/ {
-					i += rune_width(s, i)
-					if i >= len(s) {
-						break
-					}
-					switch s[i] {
-					case '0'..='9', 'a'..='f', 'A'..='F':
-						continue
-					}
-					break
-				}
-			} else {
-				i = number_end(s, i+1)
-			}
+			i = number_end(s, i, spec)
 
 		case '/':
 			if i+1 < len(s) && s[i+1] == '*' {
-				for i += 1; i < len(s); /**/ {
-					i += rune_width(s, i)
-					if i < len(s) && s[i] == '*' {
-						i += 1
-						if i < len(s) && s[i] == '/' {
-							i += 1
-							break
-						}
+				for i += 2; i < len(s); i += 1 {
+					if s[i] == '*' && i+1 < len(s) && s[i+1] == '/' {
+						i += 2
+						break
 					}
 				}
 			} else {
-				for i < len(s) && s[i] != '\n' {
-					i += 1
-				}
+				i = line_comment_end(s, i)
 			}
 
 		case:
