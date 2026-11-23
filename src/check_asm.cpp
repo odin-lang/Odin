@@ -299,6 +299,39 @@ gb_internal bool asm_slot_is_named_implicit(Asm_amd64 *asm_ctx, Asm_amd64::Opera
 	return slot == Asm_amd64::OP_CL_IMPL;
 }
 
+// NOTE(bill): A template writes an operand for each explicit slot, and for each implicit register it must still name.
+template <typename AsmCtx>
+gb_internal bool asm_slot_is_written(AsmCtx *asm_ctx, typename AsmCtx::OperandType slot) {
+	return !asm_ctx->operand_type_is_implicit(slot) || asm_slot_is_named_implicit(asm_ctx, slot);
+}
+
+template <typename AsmCtx>
+gb_internal int asm_form_operand_count(AsmCtx *asm_ctx, typename AsmCtx::Encoding const &form) {
+	int count = cast(int)form.explicit_count();
+	for (auto slot : form.ops) {
+		if (asm_slot_is_named_implicit(asm_ctx, slot)) {
+			count += 1;
+		}
+	}
+	return count;
+}
+
+// The form's slot that a template's `index`-th operand fills, or -1
+template <typename AsmCtx>
+gb_internal int asm_form_operand_slot(AsmCtx *asm_ctx, typename AsmCtx::Encoding const &form, int index) {
+	int seen = 0;
+	for (int j = 0; j < gb_count_of(form.ops) && form.ops[j] != asm_ctx->OP_NONE; j++) {
+		if (!asm_slot_is_written(asm_ctx, form.ops[j])) {
+			continue;
+		}
+		if (seen == index) {
+			return j;
+		}
+		seen += 1;
+	}
+	return -1;
+}
+
 // NOTE(bill): The accumulator short forms (e.g. `add eax, imm32`, `xchg eax, r32`, `mov al, moffs8`) are never matched.
 // A template reaches the general form by naming the register, e.g. `add r, 5` with r pinned to %rax.
 // Without the register (`add 5`), LLVM rejects them.
@@ -314,26 +347,20 @@ gb_internal bool asm_form_is_accumulator_short_form(Asm_amd64 *asm_ctx, Asm_amd6
 		return false;
 	}
 
-	bool has_accumulator = false;
-	bool has_explicit    = false;
+	if (form.explicit_count() == 0) {
+		return false; // e.g. `fstsw`, whose only operand is the accumulator
+	}
+
 	for (auto slot : form.ops) {
 		switch (slot) {
-		case Asm_amd64::OP_NONE:
-			break;
 		case Asm_amd64::OP_AL_IMPL:
 		case Asm_amd64::OP_AX_IMPL:
 		case Asm_amd64::OP_EAX_IMPL:
 		case Asm_amd64::OP_RAX_IMPL:
-			has_accumulator = true;
-			break;
-		default:
-			if (!asm_ctx->operand_type_is_implicit(slot)) {
-				has_explicit = true;
-			}
-			break;
+			return true;
 		}
 	}
-	return has_accumulator && has_explicit;
+	return false;
 }
 
 // Does a constant immediate value fit a slot of `bits` width (0 == unconstrained)?
@@ -759,18 +786,12 @@ gb_internal String check_asm_operand_register(Entity *tmpl_entity, Operand const
 		return expr->AsmRegister.name.string;
 	}
 	Entity *e = entity_of_node(expr);
-	if (e == nullptr || e->kind != Entity_Variable) {
+	if (e == nullptr) {
 		return {};
 	}
 	auto const &decls = tmpl_entity->AsmTemplate.decls;
 	AsmTemplateEntityDecl *ed = check_asm_find_decl(e, decls);
-	if (ed == nullptr) {
-		return {};
-	}
-	if (ed->pin.len == 0 && ed->view_of >= 0) {
-		return decls[ed->view_of].pin;
-	}
-	return ed->pin;
+	return asm_decl_resolve_pin(decls, ed ? ed->total_index : -1);
 }
 
 // How an operand failed to fit a form's slot, and the widths involved, for a precise diagnostic
@@ -818,8 +839,8 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, Entity *tmpl_enti
 
 		bool ok = false;
 		if (reg != nullptr) {
-			ok = asm_ctx->register_lookup(got) == asm_ctx->register_lookup(want);
-		} else if (got.len != 0) {
+			ok = got == want;
+		} else {
 			ok = asm_register_family_name(asm_ctx, got) == asm_register_family_name(asm_ctx, want) &&
 			     check_asm_operand_bit_width(operand->type) == asm_ctx->operand_type_bit_width(slot);
 		}
@@ -1656,37 +1677,8 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 	bool is_pseudo             = pseudo_mnemonic != 0;
 	int  target_explicit_count = is_pseudo ? alias.nargs : -1;
 
-	// NOTE(bill): A form is written with its explicit operands and any implicit register it must still name.
-	auto form_operand_count = [&](typename AsmCtx::Encoding const &form) -> int {
-		int count = cast(int)form.explicit_count();
-		for (auto slot : form.ops) {
-			if (slot != asm_ctx->OP_NONE && asm_slot_is_named_implicit(asm_ctx, slot)) {
-				count += 1;
-			}
-		}
-		return count;
-	};
-
-	auto form_operand_slot = [&](typename AsmCtx::Encoding const &form, int user_index) -> int {
-		int seen = 0;
-		for (int j = 0; j < gb_count_of(form.ops); j++) {
-			auto slot = form.ops[j];
-			if (slot == asm_ctx->OP_NONE) {
-				break;
-			}
-			if (asm_ctx->operand_type_is_implicit(slot) && !asm_slot_is_named_implicit(asm_ctx, slot)) {
-				continue;
-			}
-			if (seen == user_index) {
-				return j;
-			}
-			seen += 1;
-		}
-		return -1;
-	};
-
 	auto form_user_operand_count = [&](typename AsmCtx::Encoding const &form) -> int {
-		int count = is_pseudo ? target_explicit_count : form_operand_count(form);
+		int count = is_pseudo ? target_explicit_count : asm_form_operand_count(asm_ctx, form);
 		GB_ASSERT_MSG(count <= 4, "%d", count);
 		return gb_max(count, 0);
 	};
@@ -1716,7 +1708,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		if (is_pseudo) {
 			raw_slot = user_operand_target_index(user_index);
 		} else {
-			raw_slot = form_operand_slot(form, user_index);
+			raw_slot = asm_form_operand_slot(asm_ctx, form, user_index);
 		}
 		if (0 <= raw_slot && raw_slot < cast(int)gb_count_of(form.ops)) {
 			return form.ops[raw_slot];
@@ -1951,14 +1943,18 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		}
 	};
 
-	int min_count = I32_MAX;
-	int max_count = -1;
+	int  min_count         = I32_MAX;
+	int  max_count         = -1;
+	bool omits_accumulator = false; // e.g. `add 5`, written as if the accumulator were implicit
 
 	for (auto form : forms) {
+		int operand_count = asm_form_operand_count(asm_ctx, form);
 		if (asm_form_is_accumulator_short_form(asm_ctx, form)) {
+			if (operand_count == operands.count) {
+				omits_accumulator = true;
+			}
 			continue;
 		}
-		int operand_count = form_operand_count(form);
 		min_count = gb_min(min_count, operand_count);
 		max_count = gb_max(max_count, operand_count);
 	}
@@ -2010,11 +2006,8 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		auto const &decls = tmpl_entity->AsmTemplate.decls;
 
 		for (auto slot : form.ops) {
-			if (slot == asm_ctx->OP_NONE || !asm_ctx->operand_type_is_implicit(slot)) {
+			if (slot == asm_ctx->OP_NONE || asm_slot_is_written(asm_ctx, slot)) {
 				continue;
-			}
-			if (asm_slot_is_named_implicit(asm_ctx, slot)) {
-				continue; // its operand picks the form
 			}
 
 			u16 implicit_bit = asm_ctx->clobber_bit_for_reg_name(asm_ctx->implicit_reg_name(slot));
@@ -2047,7 +2040,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 		if (is_pseudo && cast(int)form.explicit_count() < target_explicit_count) {
 			continue;
-		} else if (operands.count != form_operand_count(form)) {
+		} else if (operands.count != asm_form_operand_count(asm_ctx, form)) {
 			continue;
 		}
 		if (asm_form_is_accumulator_short_form(asm_ctx, form)) {
@@ -2122,16 +2115,6 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 	if (operands.count < min_count || operands.count > max_count) {
 		ERROR_BLOCK();
-
-		// NOTE(bill): e.g. `add 5`, written as if the accumulator were implicit
-		bool omits_accumulator = false;
-		for (auto const &form : forms) {
-			if (asm_form_is_accumulator_short_form(asm_ctx, form) && form_operand_count(form) == operands.count) {
-				omits_accumulator = true;
-				break;
-			}
-		}
-
 		if (omits_accumulator) {
 			error(instr->name, "'%.*s' takes no implicit accumulator; write the register as an operand (e.g. %%rax, or a parameter pinned to it)", LIT(name));
 		} else if (min_count == max_count) {
