@@ -6354,7 +6354,8 @@ gb_internal void check_foreign_import_fullpaths(Checker *c) {
 			for (Ast *fp_node : fl->filepaths) {
 				Operand op = {};
 				check_expr(&ctx, &op, fp_node);
-				if (op.mode != Addressing_Constant && op.value.kind != ExactValue_String) {
+				String file_str = {};
+				if (op.mode != Addressing_Constant || !exact_value_to_path_string(op.value, &file_str)) {
 					gbString s = expr_to_string(op.expr);
 					error(fp_node, "Expected a constant string value, got '%s'", s);
 					gb_string_free(s);
@@ -6367,7 +6368,6 @@ gb_internal void check_foreign_import_fullpaths(Checker *c) {
 					continue;
 				}
 
-				String file_str = op.value.value_string;
 				file_str = string_trim_whitespace(file_str);
 				String fullpath = file_str;
 				if (!is_arch_wasm() || string_ends_with(file_str, str_lit(".o"))) {

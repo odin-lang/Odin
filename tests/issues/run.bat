@@ -333,6 +333,10 @@ if not exist no_extension.exe exit /b 1
 if not exist no_extension.dll exit /b 1
 rmdir spelled_link
 
+%ODIN% check ..\test_paths_directives -no-entry-point %COMMON% 2>&1 | find /c "it contains a NUL byte" | findstr /x "1" || exit /b
+%ODIN% check ..\test_paths_directives -no-entry-point %COMMON% 2>&1 | find /c "Unknown library collection" | findstr /x "1" || exit /b
+%ODIN% check ..\test_paths_directives -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+
 @rem #########################################################################################################
 
 @echo off

@@ -6824,25 +6824,43 @@ gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String b
 		}
 	}
 
-	bool has_windows_drive = false;
+	for (isize i = 0; i < original_string.len; i++) {
+		if (original_string.text[i] == 0) {
+			do_error(node, "Invalid path: it contains a NUL byte");
+			return false;
+		}
+	}
+
+	String spelled = original_string;
 #if defined(GB_SYSTEM_WINDOWS)
 	if (in_checker) {
-		if (!is_import_decl_path &&
-		    colon_pos == 1 &&
-		    original_string.len > 2 &&
-		    gb_char_is_alpha(original_string[0]) &&
-		    (original_string[2] == '/' || original_string[2] == '\\')) {
-			colon_pos = -1;
-			has_windows_drive = true;
-		}
-
-		for (isize i = 0; i < original_string.len; i++) {
-			if (original_string.text[i] == '\\') {
-				original_string.text[i] = '/';
+		spelled = copy_string(permanent_allocator(), original_string);
+		for (isize i = 0; i < spelled.len; i++) {
+			if (spelled.text[i] == '\\') {
+				spelled.text[i] = '/';
 			}
 		}
 	}
 #endif
+
+	bool is_absolute = is_import_path_absolute(spelled) || (spelled.len > 0 && spelled[0] == '\\');
+	if (is_absolute) {
+		if (is_import_decl_path) {
+			do_error(node, "Invalid import path: '%.*s'", LIT(original_string));
+			return false;
+		}
+		isize skip = 0;
+		if (spelled.len > 1 && spelled[1] == ':') {
+			skip = 2;
+		}
+		String rest = substring(spelled, skip, spelled.len);
+		if (rest.len < 2 || !is_import_path_valid(rest)) {
+			do_error(node, "Invalid path: '%.*s'", LIT(original_string));
+			return false;
+		}
+		*path = path_to_full_path(permanent_allocator(), spelled);
+		return true;
+	}
 
 	String file_str = {};
 	if (colon_pos == 0) {
@@ -6850,25 +6868,19 @@ gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String b
 		return false;
 	}
 
-	if (original_string.len > 0 && colon_pos > 0) {
-		collection_name = substring(original_string, 0, colon_pos);
-		file_str = substring(original_string, colon_pos+1, original_string.len);
+	if (spelled.len > 0 && colon_pos > 0) {
+		collection_name = substring(spelled, 0, colon_pos);
+		file_str = substring(spelled, colon_pos+1, spelled.len);
 	} else {
-		file_str = original_string;
+		file_str = spelled;
 	}
 
-	if (is_import_decl_path && is_import_path_absolute(file_str)) {
+	if (is_import_path_absolute(file_str)) {
 		do_error(node, "Invalid import path: '%.*s'", LIT(file_str));
 		return false;
 	}
 
-	if (has_windows_drive) {
-		String sub_file_path = substring(file_str, 3, file_str.len);
-		if (!is_import_path_valid(sub_file_path)) {
-			do_error(node, "Invalid import path: '%.*s'", LIT(file_str));
-			return false;
-		}
-	} else if (!is_import_path_valid(file_str)) {
+	if (!is_import_path_valid(file_str)) {
 		do_error(node, "Invalid import path: '%.*s'", LIT(file_str));
 		return false;
 	}
@@ -6926,12 +6938,8 @@ gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String b
 		node->ForeignImportDecl.collection_name = collection_name;
 	}
 
-	if (has_windows_drive) {
-		*path = file_str;
-	} else {
-		String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, nullptr));
-		*path = fullpath;
-	}
+	String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, nullptr));
+	*path = fullpath;
 	return true;
 }
 
@@ -7804,19 +7812,6 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 		if (!string_ends_with(init_fullpath, ext)) {
 			error({}, "Expected either a directory or a .odin file, got '%.*s'\n", LIT(init_filename));
 			return ParseFile_WrongExtension;
-		}
-	} else if (init_fullpath.len != 0) {
-		String path = init_fullpath;
-		if (path[path.len-1] == '/') {
-			path.len -= 1;
-		}
-		if ((build_context.command_kind & Command__does_build) &&
-		    build_context.build_mode == BuildMode_Executable) {
-			String output_path = path_to_string(temporary_allocator(), build_context.build_paths[8]);
-			if (path_is_directory(output_path)) {
-			    	error({}, "Please specify the executable name with -out:<string> as a directory exists with the same name in the current working directory");
-			    	return ParseFile_DirectoryAlreadyExists;
-			}
 		}
 	}
 

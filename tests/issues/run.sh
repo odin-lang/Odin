@@ -806,6 +806,16 @@ test ! -e no_such_dir
 $ODIN build issue_7990/.hiddendir -build-mode:dll -out:no_extension
 test -f no_extension.so || test -f no_extension.dylib || test -f no_extension.dll
 
+DIRECTIVES_OUT=$($ODIN check ../test_paths_directives -no-entry-point $COMMON_CHECK 2>&1 || true)
+if [[ $(echo "$DIRECTIVES_OUT" | grep -c "it contains a NUL byte") -eq 1 &&
+      $(echo "$DIRECTIVES_OUT" | grep -c "Unknown library collection") -eq 1 &&
+      $(echo "$DIRECTIVES_OUT" | grep -c "Error:") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 #########################################################################################################
 
 if [[ ! -z ${ODIN_TESTS_NO_CLANG+x} ]]; then

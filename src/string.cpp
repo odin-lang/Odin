@@ -765,14 +765,14 @@ gb_internal String16 string_to_string16(gbAllocator a, String s) {
 	}
 
 	len = convert_multibyte_to_widechar(cast(char *)s.text, cast(int)s.len, nullptr, 0);
-	if (len == 0) {
+	if (len <= 0) {
 		return make_string16(nullptr, 0);
 	}
 
 	text = gb_alloc_array(a, u16, len+1);
 
 	len1 = convert_multibyte_to_widechar(cast(char *)s.text, cast(int)s.len, cast(wchar_t *)text, cast(int)len);
-	if (len1 == 0) {
+	if (len1 <= 0) {
 		gb_free(a, text);
 		return make_string16(nullptr, 0);
 	}
@@ -790,7 +790,7 @@ gb_internal String string16_to_string(gbAllocator a, String16 s) {
 	}
 
 	len = convert_widechar_to_multibyte(cast(wchar_t *)s.text, cast(int)s.len, nullptr, 0);
-	if (len == 0) {
+	if (len <= 0) {
 		return make_string(nullptr, 0);
 	}
 	len += 1; // NOTE(bill): It needs an extra 1 for some reason
@@ -798,7 +798,7 @@ gb_internal String string16_to_string(gbAllocator a, String16 s) {
 	text = gb_alloc_array(a, u8, len+1);
 
 	len1 = convert_widechar_to_multibyte(cast(wchar_t *)s.text, cast(int)s.len, cast(char *)text, cast(int)len);
-	if (len1 == 0) {
+	if (len1 <= 0) {
 		gb_free(a, text);
 		return make_string(nullptr, 0);
 	}

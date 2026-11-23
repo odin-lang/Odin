@@ -2119,10 +2119,8 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 	ast_node(bd, BasicDirective, ce->proc);
 	String builtin_name = bd->name.string;
 
-	String path;
-	if (gb_path_is_absolute((char*)original_string.text)) {
-		path = original_string;
-	} else {
+	String path = {};
+	{
 		String base_dir = dir_from_path(get_file_path_string(call->file_id));
 
 		bool ok = determine_path_from_string(true, call, base_dir, original_string, &path);
@@ -2402,7 +2400,11 @@ gb_internal LoadDirectiveResult check_load_directive(CheckerContext *c, Operand 
 		return LoadDirective_Error;
 	}
 
-	GB_ASSERT(o.value.kind == ExactValue_String);
+	String original_string = {};
+	if (!exact_value_to_path_string(o.value, &original_string)) {
+		error(arg, "'#%.*s' expected a constant string argument", LIT(name));
+		return LoadDirective_Error;
+	}
 
 	operand->type = t_u8_slice;
 	if (ce->args.count == 1) {
@@ -2427,7 +2429,7 @@ gb_internal LoadDirectiveResult check_load_directive(CheckerContext *c, Operand 
 	operand->mode = Addressing_Constant;
 
 	LoadFileCache *cache = nullptr;
-	if (cache_load_file_directive(c, call, o.value.value_string, err_on_not_found, &cache, LoadFileTier_Contents)) {
+	if (cache_load_file_directive(c, call, original_string, err_on_not_found, &cache, LoadFileTier_Contents)) {
 		operand->value = exact_value_string(cache->data);
 		return LoadDirective_Success;
 	}
@@ -2534,23 +2536,21 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 		return LoadDirective_Error;
 	}
 
-	GB_ASSERT(o.value.kind == ExactValue_String);
+	String original_string = {};
+	if (!exact_value_to_path_string(o.value, &original_string)) {
+		error(arg, "'#%.*s' expected a constant string", LIT(name));
+		return LoadDirective_Error;
+	}
 
 	init_core_load_directory_file(c->checker);
 
 	operand->type = t_load_directory_file_slice;
 	operand->mode = Addressing_Value;
 
-
-	String original_string = o.value.value_string;
-	String path;
-	if (gb_path_is_absolute((char*)original_string.text)) {
-		path = original_string;
-	} else {
-		String base_dir = dir_from_path(get_file_path_string(call->file_id));
-
-		bool ok = determine_path_from_string(true, call, base_dir, original_string, &path);
-		gb_unused(ok);
+	String path = {};
+	String base_dir = dir_from_path(get_file_path_string(call->file_id));
+	if (!determine_path_from_string(true, call, base_dir, original_string, &path)) {
+		return LoadDirective_Error;
 	}
 	// NOTE(bill): the map is only locked to find or add the directory's entry which is loaded under its own mutex
 	LoadDirectoryCache *cache = nullptr;
@@ -2843,7 +2843,11 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		operand->type  = t_untyped_bool;
 		operand->mode  = Addressing_Constant;
 
-		String original_string = o.value.value_string;
+		String original_string = {};
+		if (!exact_value_to_path_string(o.value, &original_string)) {
+			error(ce->args[0], "'#exists' expected a constant string argument");
+			return false;
+		}
 		LoadFileCache *cache = nullptr;
 		if (cache_load_file_directive(c, call, original_string, /* err_on_not_found=*/ false, &cache, LoadFileTier_Exists)) {
 			operand->value = exact_value_bool(cache->exists);
@@ -2896,11 +2900,16 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		}
 		gbAllocator a = heap_allocator();
 
-		GB_ASSERT(o.value.kind == ExactValue_String);
-		GB_ASSERT(o_hash.value.kind == ExactValue_String);
-
-		String original_string = o.value.value_string;
-		String hash_kind = o_hash.value.value_string;
+		String original_string = {};
+		String hash_kind = {};
+		if (!exact_value_to_path_string(o.value, &original_string)) {
+			error(arg0, "'#load_hash' expected a constant string argument");
+			return false;
+		}
+		if (!exact_value_to_path_string(o_hash.value, &hash_kind)) {
+			error(arg1, "'#load_hash' expected a constant string argument");
+			return false;
+		}
 
 		LoadFileCache *cache = nullptr;
 		if (cache_load_file_directive(c, call, original_string, true, &cache, LoadFileTier_Contents)) {
@@ -2967,11 +2976,16 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		}
 		gbAllocator a = heap_allocator();
 
-		GB_ASSERT(o.value.kind == ExactValue_String);
-		GB_ASSERT(o_hash.value.kind == ExactValue_String);
-
-		String original_string = o.value.value_string;
-		String hash_kind = o_hash.value.value_string;
+		String original_string = {};
+		String hash_kind = {};
+		if (!exact_value_to_path_string(o.value, &original_string)) {
+			error(arg0, "'#hash' expected a constant string argument");
+			return false;
+		}
+		if (!exact_value_to_path_string(o_hash.value, &hash_kind)) {
+			error(arg1, "'#hash' expected a constant string argument");
+			return false;
+		}
 
 		// TODO: Cache hash values based off of string constant and hash kind?
 		u64 hash_value = 0;
