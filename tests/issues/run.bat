@@ -231,6 +231,10 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 %ODIN% check "..\test_issue_asm_call_targets" %COMMON% 2>&1 | find /c "uses the Odin calling convention" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_asm_call_targets" %COMMON% 2>&1 | find /c "as the target of a call" | findstr /x "2" || exit /b
 %ODIN% check "..\test_issue_asm_call_targets" %COMMON% 2>&1 | find /c "Assertion Failure" | findstr /x "0" || exit /b
+%ODIN% check "..\test_issue_asm_shift_cl_errors" %COMMON% 2>&1 | find /c "Error:" | findstr /x "12" || exit /b
+%ODIN% check "..\test_issue_asm_shift_cl_errors" %COMMON% 2>&1 | find /c "8-bit operand pinned to" | findstr /x "5" || exit /b
+%ODIN% check "..\test_issue_asm_shift_cl_errors" %COMMON% 2>&1 | find /c "expects 3 operands, got 2" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_asm_shift_cl_errors" %COMMON% 2>&1 | find /c "is declared but never used" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_asm_writeback_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_asm_writeback_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "writes back its base register" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_asm_writeback_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "takes only a base register and a constant offset" | findstr /x "1" || exit /b

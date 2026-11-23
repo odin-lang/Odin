@@ -641,6 +641,15 @@ if [[ "$(uname -m)" == "x86_64" || "$(uname -m)" == "amd64" ]]; then
 		echo "SUCCESSFUL 0/1"
 		exit 1
 	fi
+	if [[ $($ODIN check ../test_issue_asm_shift_cl_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 12 &&
+	      $($ODIN check ../test_issue_asm_shift_cl_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "8-bit operand pinned to") -eq 5 &&
+	      $($ODIN check ../test_issue_asm_shift_cl_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "expects 3 operands, got 2") -eq 1 &&
+	      $($ODIN check ../test_issue_asm_shift_cl_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "is declared but never used") -eq 1 ]]; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1"
+		exit 1
+	fi
 fi
 if [[ $($ODIN check ../test_issue_asm_writeback_errors -target:linux_arm64 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 &&
       $($ODIN check ../test_issue_asm_writeback_errors -target:linux_arm64 $COMMON_CHECK 2>&1 >/dev/null | grep -c "writes back its base register") -eq 1 &&
