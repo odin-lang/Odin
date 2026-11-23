@@ -740,7 +740,7 @@ cstring_cmp :: proc "contextless" (lhs, rhs: cstring) -> int {
 		SIZE :: size_of(V)
 		PAGE :: 4096
 
-		Unaligned :: struct #packed {
+		Unaligned :: struct #align(1) {
 			v: V,
 		}
 
