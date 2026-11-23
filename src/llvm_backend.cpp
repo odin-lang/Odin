@@ -3422,6 +3422,10 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 		lb_emit_store_union_variant(p, rt_args, lb_addr_load(p, args), t_args);
 	}
 
+	if (build_context.metrics.os == TargetOs_wasi) {
+		lb_emit_runtime_call(p, "_wasi_setup_args", {});
+	}
+
 	lbValue startup_runtime_value = {startup_runtime->value, startup_runtime->type};
 	lb_emit_call(p, startup_runtime_value, {}, ProcInlining_none, ProcTailing_none);
 

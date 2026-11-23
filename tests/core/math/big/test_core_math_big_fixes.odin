@@ -1482,19 +1482,21 @@ test_fix_minus_inf :: proc(t: ^testing.T) {
 	testing.expect_value(t, a.flags, big.Flags{.Inf})
 }
 
-@(test)
-test_fix_swap_immutable_asserts :: proc(t: ^testing.T) {
-	storage: [1024]byte
-	arena: mem.Arena
-	mem.arena_init(&arena, storage[:])
-	context.allocator = mem.arena_allocator(&arena)
+when !testing.INLINE {
+	@(test)
+	test_fix_swap_immutable_asserts :: proc(t: ^testing.T) {
+		storage: [1024]byte
+		arena: mem.Arena
+		mem.arena_init(&arena, storage[:])
+		context.allocator = mem.arena_allocator(&arena)
 
-	c, x := &big.Int{}, &big.Int{}
-	big.set(c, 1)
-	c.flags = {.Immutable}
-	big.set(x, 6)
-	testing.expect_assert(t, "Assignment to immutable")
-	big.swap(x, c)
+		c, x := &big.Int{}, &big.Int{}
+		big.set(c, 1)
+		c.flags = {.Immutable}
+		big.set(x, 6)
+		testing.expect_assert(t, "Assignment to immutable")
+		big.swap(x, c)
+	}
 }
 
 @(test)
@@ -2348,19 +2350,21 @@ test_fix_rat_immutable_dst :: proc(t: ^testing.T) {
 	}
 }
 
-@(test)
-test_fix_rat_swap_immutable_asserts :: proc(t: ^testing.T) {
-	storage: [1024]byte
-	arena: mem.Arena
-	mem.arena_init(&arena, storage[:])
-	context.allocator = mem.arena_allocator(&arena)
+when !testing.INLINE {
+	@(test)
+	test_fix_rat_swap_immutable_asserts :: proc(t: ^testing.T) {
+		storage: [1024]byte
+		arena: mem.Arena
+		mem.arena_init(&arena, storage[:])
+		context.allocator = mem.arena_allocator(&arena)
 
-	c, x: big.Rat
-	big.rat_set_frac_digit(&c, 1, 2)
-	c.b.flags = {.Immutable}
-	big.rat_set_frac_digit(&x, 3, 4)
-	testing.expect_assert(t, "Assignment to immutable")
-	big.swap(&x, &c)
+		c, x: big.Rat
+		big.rat_set_frac_digit(&c, 1, 2)
+		c.b.flags = {.Immutable}
+		big.rat_set_frac_digit(&x, 3, 4)
+		testing.expect_assert(t, "Assignment to immutable")
+		big.swap(&x, &c)
+	}
 }
 
 @(test)

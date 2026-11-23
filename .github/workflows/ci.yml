@@ -169,6 +169,9 @@ jobs:
           ./odin build examples/demo -target:wasi_wasm64p32 -microarch:mvp -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -out:demo
           wasmtime ./demo.wasm
         if: matrix.os == 'macos-latest'
+      - name: Core library tests on WASI WASM32
+        run: ./tests/core/wasi.sh
+        if: matrix.os == 'macos-latest'
 
       - name: Check benchmarks
         run: ./odin check tests/benchmark -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point

@@ -11,15 +11,22 @@ package testing
 
 import "base:intrinsics"
 import "base:runtime"
+import "core:container/queue"
 import "core:log"
 import "core:reflect"
 import "core:sync"
-import "core:sync/chan"
+import "core:thread"
 import "core:time"
 import "core:mem"
 
 _ :: reflect // alias reflect to nothing to force visibility for -vet
 _ :: mem     // in case TRACKING_MEMORY is not enabled
+
+INLINE : bool : #config(ODIN_TEST_INLINE, !thread.IS_SUPPORTED)
+
+when !INLINE && !thread.IS_SUPPORTED {
+	#panic("`ODIN_TEST_INLINE` can't be false on a target without threads.")
+}
 
 MAX_EXPECTED_ASSERTIONS_PER_TEST :: 5
 
@@ -57,12 +64,15 @@ T :: struct {
 
 	cleanups: [dynamic]Internal_Cleanup,
 
-	// This allocator is shared between the test runner and its threads for
+	// This allocator is shared between the test runner and its tests for
 	// cloning log strings, so they can outlive the lifetime of individual
-	// tests during channel transmission.
+	// tests on their way to the runner.
 	_log_allocator: runtime.Allocator,
 
 	_fail_now_called: bool,
+
+	_events:  queue.Queue(Channel_Event),
+	_timeout: Event_Set_Fail_Timeout,
 }
 
 
@@ -76,12 +86,18 @@ fail :: proc(t: ^T, loc := #caller_location) {
 // It is for when you absolutely need a test to fail without calling any of its
 // deferred statements. It will be cleaner than a regular assert or panic,
 // as the test runner will know to expect the signal this procedure will raise.
+//
+// When tests run inline (see `INLINE`), it ends the whole test run instead,
+// after printing the test's logs.
 fail_now :: proc(t: ^T, msg := "", loc := #caller_location) -> ! {
 	t._fail_now_called = true
 	if msg != "" {
 		log.error("FAIL:", msg, location=loc)
 	} else {
 		log.error("FAIL", location=loc)
+	}
+	when INLINE {
+		report_inline_trap()
 	}
 	runtime.trap()
 }
@@ -90,7 +106,8 @@ failed :: proc(t: ^T) -> bool {
 	return t.error_count != 0
 }
 
-// cleanup registers a procedure and user_data, which will be called when the test, and all its subtests, complete.
+// cleanup registers a procedure and user_data, which will be called when the test, and all its
+// subtests, complete.
 // Cleanup procedures will be called in LIFO (last added, first called) order.
 //
 // Each procedure will use a copy of the context at the time of registering,
@@ -101,6 +118,9 @@ failed :: proc(t: ^T) -> bool {
 // That means that any cleanup procedure absolutely must not fail in the same way,
 // or it will take down the entire test runner with it. This is for when you
 // need something to run no matter what, if a test failed.
+//
+// When tests run inline (see `INLINE`), a failed assertion, panic or other fault ends
+// the whole test run, and cleanup procedures don't run.
 //
 // For almost every usual case, `defer` should be preferable and sufficient.
 cleanup :: proc(t: ^T, procedure: proc(rawptr), user_data: rawptr) {
@@ -163,6 +183,9 @@ to implement watchdog-reset semantics for a test.
 
 When the timeout elapses, the test will be aborted immediately. When this
 happens, deferred statements will not run in the current implementation.
+
+When tests run inline (see `INLINE`), the test isn't aborted. It fails with
+the timeout message if it returns after the timeout elapsed.
 */
 set_fail_timeout :: proc(t: ^T, duration: time.Duration, loc := #caller_location) {
 	disabled := duration == time.MAX_DURATION
@@ -171,11 +194,19 @@ set_fail_timeout :: proc(t: ^T, duration: time.Duration, loc := #caller_location
 		at_time = time.time_add(time.now(), duration)
 	}
 
-	chan.send(t.channel, Event_Set_Fail_Timeout {
-		at_time = at_time,
-		location = loc,
-		duration = duration,
-	})
+	when INLINE {
+		t._timeout = {
+			at_time = at_time,
+			location = loc,
+			duration = duration,
+		}
+	} else {
+		send_event(t, Event_Set_Fail_Timeout {
+			at_time = at_time,
+			location = loc,
+			duration = duration,
+		})
+	}
 }
 
 /*
@@ -192,8 +223,14 @@ This procedure may be called up to 5 times with different locations.
 This is a limitation for the sake of simplicity in the implementation, and you
 should consider breaking up your tests into smaller procedures if you need to
 check for asserts in more than 2 places.
+
+When tests run inline (see `INLINE`), an assertion ends the whole test run,
+so this logs an error instead. Guard such tests with `when !testing.INLINE`.
 */
 expect_assert_from :: proc(t: ^T, expected_place: runtime.Source_Code_Location, caller_loc := #caller_location) {
+	when INLINE {
+		log.error(INLINE_EXPECT_ASSERT_MESSAGE, location = caller_loc)
+	}
 	count := local_test_expected_failures.location_count
 	if count == MAX_EXPECTED_ASSERTIONS_PER_TEST {
 		panic("This test cannot handle that many expected assertions based on matching the location.", caller_loc)
@@ -215,8 +252,14 @@ This procedure may be called up to 5 times with different messages.
 This is a limitation for the sake of simplicity in the implementation, and you
 should consider breaking up your tests into smaller procedures if you need to
 check for more than a couple different assertion messages.
+
+When tests run inline (see `INLINE`), an assertion ends the whole test run,
+so this logs an error instead. Guard such tests with `when !testing.INLINE`.
 */
 expect_assert_message :: proc(t: ^T, expected_message: string, caller_loc := #caller_location) {
+	when INLINE {
+		log.error(INLINE_EXPECT_ASSERT_MESSAGE, location = caller_loc)
+	}
 	count := local_test_expected_failures.message_count
 	if count == MAX_EXPECTED_ASSERTIONS_PER_TEST {
 		panic("This test cannot handle that many expected assertions based on matching the message.", caller_loc)
@@ -245,7 +288,14 @@ the ones already handled by the test runner, such as
 - SIGTRAP (only on POSIX systems).  (trap / debug trap)
 
 Note that only one signal can be expected per test.
+
+When tests run inline (see `INLINE`), the runner catches no signals and a
+signal ends the whole test run, so this logs an error instead. Guard such
+tests with `when !testing.INLINE`.
 */
-expect_signal :: proc(t: ^T, #any_int sig: i32) {
+expect_signal :: proc(t: ^T, #any_int sig: i32, loc := #caller_location) {
+	when INLINE {
+		log.error("`expect_signal` can't catch a signal when tests run inline. Guard this test with `when !testing.INLINE`.", location = loc)
+	}
 	local_test_expected_failures.signal = sig
 }
