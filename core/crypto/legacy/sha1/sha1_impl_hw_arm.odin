@@ -30,7 +30,12 @@ K_2 :: simd.u32x4{0x8F1BBCDC, 0x8F1BBCDC, 0x8F1BBCDC, 0x8F1BBCDC}
 @(private = "file")
 K_3 :: simd.u32x4{0xCA62C1D6, 0xCA62C1D6, 0xCA62C1D6, 0xCA62C1D6}
 
-@(private, enable_target_feature = "neon,sha2")
+// 32-bit Arm has the SHA-1 instructions from Armv8 on.
+// LLVM's `sha2` feature does not imply Armv8 there.
+@(private = "file")
+TARGET_FEATURES :: "neon,sha2" when ODIN_ARCH == .arm64 else "v8,neon,sha2"
+
+@(private, enable_target_feature = TARGET_FEATURES)
 sha1_transf_hw :: proc "contextless" (ctx: ^Context, data: []byte) #no_bounds_check {
 	abcd := intrinsics.unaligned_load((^simd.u32x4)(&ctx.state[0]))
 	e_0 := ctx.state[4]
