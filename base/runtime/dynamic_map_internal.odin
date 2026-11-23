@@ -1046,14 +1046,8 @@ default_hasher_string :: proc "contextless" (data: rawptr, seed: uintptr) -> uin
 	return default_hasher_fixed(raw_data(str^), seed, len(str))
 }
 default_hasher_cstring :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr {
-	ptr := (^[^]byte)(data)^
-	n := 0
-	if ptr != nil {
-		for ptr[n] != 0 {
-			n += 1
-		}
-	}
-	return default_hasher_fixed(ptr, seed, n)
+	str := (^cstring)(data)^
+	return default_hasher_fixed(rawptr(str), seed, cstring_len(str))
 }
 default_hasher_string16 :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr {
 	str := (^[]u16)(data)

@@ -4,6 +4,7 @@ package test_core_runtime
 
 import "base:intrinsics"
 import "core:mem"
+import "core:mem/virtual"
 import "base:runtime"
 import "core:slice"
 import "core:testing"
@@ -1598,4 +1599,47 @@ test_non_zero_make :: proc(t: ^testing.T) {
 	testing.expect_value(t, z2[2], 0)
 	testing.expect_value(t, z3[4], 0)
 	testing.expect_value(t, z4[6], 0)
+}
+
+@(test)
+test_cstring_len :: proc(t: ^testing.T) {
+	testing.expect_value(t, runtime.cstring_len(nil), 0)
+
+	buf: [512]byte
+	for offset in 0..<64 {
+		for n in 0..<300 {
+			slice.fill(buf[:], 'x')
+			buf[offset+n] = 0
+
+			got := runtime.cstring_len(cstring(&buf[offset]))
+			if !testing.expectf(t, got == n, "offset %d, length %d: got %d", offset, n, got) {
+				return
+			}
+		}
+	}
+}
+
+// The NUL is the last byte before a page that is reserved but not committed.
+@(test)
+test_cstring_len_at_end_of_page :: proc(t: ^testing.T) {
+	page := uint(mem.PAGE_SIZE)
+	data, err := virtual.reserve(2*page)
+	if !testing.expect_value(t, err, nil) {
+		return
+	}
+	defer virtual.release(raw_data(data), 2*page)
+
+	if !testing.expect_value(t, virtual.commit(raw_data(data), page), nil) {
+		return
+	}
+
+	for n in 0..<300 {
+		slice.fill(data[:page], 'x')
+		data[page-1] = 0
+
+		got := runtime.cstring_len(cstring(&data[page-1-uint(n)]))
+		if !testing.expectf(t, got == n, "length %d: got %d", n, got) {
+			return
+		}
+	}
 }
