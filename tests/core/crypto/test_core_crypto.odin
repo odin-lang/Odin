@@ -296,62 +296,64 @@ test_chacha20_final_block :: proc(t: ^testing.T, impl: chacha20.Implementation) 
 @(private)
 _ERR_CHACHA20_EXHAUSTED :: "crypto/chacha20: maximum (X)ChaCha20 keystream per IV reached"
 
-@(test)
-test_chacha20_refuse_after_final_block :: proc(t: ^testing.T) {
-	key: [chacha20.KEY_SIZE]byte
-	iv: [chacha20.IV_SIZE]byte
-	block: [64]byte
+when !testing.INLINE {
+	@(test)
+	test_chacha20_refuse_after_final_block :: proc(t: ^testing.T) {
+		key: [chacha20.KEY_SIZE]byte
+		iv: [chacha20.IV_SIZE]byte
+		block: [64]byte
 
-	ctx: chacha20.Context
-	chacha20.init(&ctx, key[:], iv[:])
-	chacha20.seek(&ctx, 0xffffffff)
-	chacha20.keystream_bytes(&ctx, block[:])
+		ctx: chacha20.Context
+		chacha20.init(&ctx, key[:], iv[:])
+		chacha20.seek(&ctx, 0xffffffff)
+		chacha20.keystream_bytes(&ctx, block[:])
 
-	testing.expect_assert(t, _ERR_CHACHA20_EXHAUSTED)
-	chacha20.keystream_bytes(&ctx, block[:1])
-}
+		testing.expect_assert(t, _ERR_CHACHA20_EXHAUSTED)
+		chacha20.keystream_bytes(&ctx, block[:1])
+	}
 
-@(test)
-test_chacha20_refuse_past_final_block :: proc(t: ^testing.T) {
-	key: [chacha20.KEY_SIZE]byte
-	iv: [chacha20.IV_SIZE]byte
-	blocks: [192]byte
+	@(test)
+	test_chacha20_refuse_past_final_block :: proc(t: ^testing.T) {
+		key: [chacha20.KEY_SIZE]byte
+		iv: [chacha20.IV_SIZE]byte
+		blocks: [192]byte
 
-	ctx: chacha20.Context
-	chacha20.init(&ctx, key[:], iv[:])
-	chacha20.seek(&ctx, 0xfffffffe)
+		ctx: chacha20.Context
+		chacha20.init(&ctx, key[:], iv[:])
+		chacha20.seek(&ctx, 0xfffffffe)
 
-	testing.expect_assert(t, _ERR_CHACHA20_EXHAUSTED)
-	chacha20.keystream_bytes(&ctx, blocks[:])
-}
+		testing.expect_assert(t, _ERR_CHACHA20_EXHAUSTED)
+		chacha20.keystream_bytes(&ctx, blocks[:])
+	}
 
-@(test)
-test_xchacha20_refuse_after_final_block :: proc(t: ^testing.T) {
-	key: [chacha20.KEY_SIZE]byte
-	iv: [chacha20.XIV_SIZE]byte
-	block: [64]byte
+	@(test)
+	test_xchacha20_refuse_after_final_block :: proc(t: ^testing.T) {
+		key: [chacha20.KEY_SIZE]byte
+		iv: [chacha20.XIV_SIZE]byte
+		block: [64]byte
 
-	ctx: chacha20.Context
-	chacha20.init(&ctx, key[:], iv[:])
-	chacha20.seek(&ctx, max(u64))
-	chacha20.keystream_bytes(&ctx, block[:])
+		ctx: chacha20.Context
+		chacha20.init(&ctx, key[:], iv[:])
+		chacha20.seek(&ctx, max(u64))
+		chacha20.keystream_bytes(&ctx, block[:])
 
-	testing.expect_assert(t, _ERR_CHACHA20_EXHAUSTED)
-	chacha20.keystream_bytes(&ctx, block[:1])
-}
+		testing.expect_assert(t, _ERR_CHACHA20_EXHAUSTED)
+		chacha20.keystream_bytes(&ctx, block[:1])
+	}
 
-@(test)
-test_xchacha20_refuse_past_final_block :: proc(t: ^testing.T) {
-	key: [chacha20.KEY_SIZE]byte
-	iv: [chacha20.XIV_SIZE]byte
-	blocks: [192]byte
+	@(test)
+	test_xchacha20_refuse_past_final_block :: proc(t: ^testing.T) {
+		key: [chacha20.KEY_SIZE]byte
+		iv: [chacha20.XIV_SIZE]byte
+		blocks: [192]byte
 
-	ctx: chacha20.Context
-	chacha20.init(&ctx, key[:], iv[:])
-	chacha20.seek(&ctx, max(u64) - 1)
+		ctx: chacha20.Context
+		chacha20.init(&ctx, key[:], iv[:])
+		chacha20.seek(&ctx, max(u64) - 1)
 
-	testing.expect_assert(t, _ERR_CHACHA20_EXHAUSTED)
-	chacha20.keystream_bytes(&ctx, blocks[:])
+		testing.expect_assert(t, _ERR_CHACHA20_EXHAUSTED)
+		chacha20.keystream_bytes(&ctx, blocks[:])
+	}
 }
 
 @(test)

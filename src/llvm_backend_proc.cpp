@@ -1034,7 +1034,7 @@ gb_internal void lb_move_after(lbProcedure *p, LLVMValueRef inst, LLVMValueRef a
 }
 
 gb_internal lbValue lb_copy_indirect_arg_if_aliased(lbProcedure *p, lbValue x) {
-	if (p->in_multi_assignment || !LLVMIsALoadInst(x.value)) {
+	if (p->in_multi_assignment || !lb_is_plain_load(p->module, x.value)) {
 		return lb_aligned_address_from_load_or_generate_local(p, x);
 	}
 	lbValue ptr   = {LLVMGetOperand(x.value, 0), alloc_type_pointer(x.type)};
@@ -2535,7 +2535,7 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 				// NOTE(bill): A deferred procedure takes the arguments as they were at the call, like its results.
 				// An argument passed by address would otherwise be read at the end of the scope.
 				for (lbValue &arg : in_args) {
-					if (LLVMIsALoadInst(arg.value)) {
+					if (lb_is_plain_load(p->module, arg.value)) {
 						lb_copy_loaded_value_to_local(p, &arg, false);
 					}
 				}
@@ -3230,8 +3230,6 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			GB_ASSERT(vt->kind == Type_SimdVector);
 
 			i64 indices_count = ce->args.count-2;
-			i64 max_count = vt->SimdVector.count*2;
-			GB_ASSERT(indices_count <= max_count);
 
 			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, indices_count);
 			for (isize i = 0; i < indices_count; i++) {

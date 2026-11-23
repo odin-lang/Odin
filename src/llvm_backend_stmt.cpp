@@ -2799,8 +2799,8 @@ gb_internal isize lb_append_tuple_values(lbProcedure *p, Array<lbValue> *dst_val
 }
 
 
-gb_internal bool lb_is_large_plain_load(LLVMValueRef value) {
-	if (!LLVMIsALoadInst(value) || LLVMGetVolatile(value) || LLVMGetOrdering(value) != LLVMAtomicOrderingNotAtomic) {
+gb_internal bool lb_is_large_plain_load(lbModule *m, LLVMValueRef value) {
+	if (!lb_is_plain_load(m, value)) {
 		return false;
 	}
 	return lb_sizeof(LLVMTypeOf(value)) > LB_MAX_STORE_SIZE;
@@ -2937,7 +2937,7 @@ gb_internal void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice
 		auto large = slice_make<bool>(temporary_allocator(), inits.count);
 		auto plain = slice_make<bool>(temporary_allocator(), inits.count);
 		for_array(i, inits) {
-			if (lvals[i].addr.value == nullptr || !lb_is_large_plain_load(inits[i].value)) {
+			if (lvals[i].addr.value == nullptr || !lb_is_large_plain_load(p->module, inits[i].value)) {
 				continue;
 			}
 			large[i] = true;
@@ -3038,7 +3038,7 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, Toke
 		if (res.value != nullptr) {
 			LLVMValueRef res_val = res.value;
 			i64 sz = type_size_of(res.type);
-			if (LLVMIsALoadInst(res_val) && sz > build_context.int_size) {
+			if (lb_is_plain_load(p->module, res_val) && sz > build_context.int_size) {
 				lbValue ptr = lb_address_from_load_or_generate_local(p, res);
 				lb_mem_copy_non_overlapping(p, p->return_ptr.addr, ptr, lb_const_int(p->module, t_int, sz));
 			} else {
@@ -3081,7 +3081,7 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, Toke
 			// A vector loaded straight over smaller stores cannot be forwarded from them, and the processor stalls.
 			// At `-o:none` a vector is loaded an element at a time too.
 			bool by_elements = build_context.optimization_level < 0 && lb_has_wide_vector_field(ret_type);
-			if (by_elements && LLVMIsALoadInst(ret_val) && lb_sizeof(ret_type) <= lb_sizeof(src_type)) {
+			if (by_elements && lb_is_plain_load(p->module, ret_val) && lb_sizeof(ret_type) <= lb_sizeof(src_type)) {
 				ret_val = lb_load_by_elements(p, ret_type, LLVMGetOperand(ret_val, 0), LLVMGetAlignment(ret_val));
 			} else {
 				// reuse the temp return value memory where possible
@@ -3494,131 +3494,52 @@ gb_internal void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr
 	bool inline_array_arith = lb_can_try_to_inline_array_arith(array_type);
 
 
-	if (lhs.kind == lbAddr_Swizzle) {
+	if (lhs.kind == lbAddr_Swizzle || lhs.kind == lbAddr_SwizzleLarge || lhs.kind == lbAddr_SwizzleSoa) {
+		// NOTE(bill): `x.s op= y` behaves like `x.s = x.s op y`. Every element is loaded before
+		// any store, and a component repeated in the swizzle keeps its last occurrence.
 		GB_ASSERT(is_type_array(lhs_type));
 
-		struct ValueAndIndex {
-			lbValue value;
-			u8      index;
-		};
+		TEMPORARY_ALLOCATOR_GUARD();
 
-		bool indices_handled[4] = {};
-		i32 indices[4] = {};
-		i32 index_count = 0;
-		for (u8 i = 0; i < lhs.swizzle.count; i++) {
-			u8 index = lhs.swizzle.indices[i];
-			if (indices_handled[index]) {
-				continue;
+		isize n = cast(isize)count;
+		auto lhs_ptrs = slice_make<lbValue>(temporary_allocator(), n);
+		auto x_loads  = slice_make<lbValue>(temporary_allocator(), n);
+		auto y_loads  = slice_make<lbValue>(temporary_allocator(), n);
+		auto ops      = slice_make<lbValue>(temporary_allocator(), n);
+
+		switch (lhs.kind) {
+		case lbAddr_Swizzle:
+			GB_ASSERT(lhs.swizzle.count == n);
+			for (isize i = 0; i < n; i++) {
+				lhs_ptrs[i] = lb_emit_array_epi(p, lhs.addr, lhs.swizzle.indices[i]);
 			}
-			indices[index_count++] = index;
+			break;
+		case lbAddr_SwizzleLarge:
+			GB_ASSERT(lhs.swizzle_large.indices.count == n);
+			for (isize i = 0; i < n; i++) {
+				lhs_ptrs[i] = lb_emit_array_epi(p, lhs.addr, lhs.swizzle_large.indices[i]);
+			}
+			break;
+		case lbAddr_SwizzleSoa:
+			GB_ASSERT(lhs.swizzle_soa.indices.count == n);
+			lb_emit_soa_index_bounds_check(p, lhs.addr, lhs.swizzle_soa.index, lhs.swizzle_soa.index_expr);
+			for (isize i = 0; i < n; i++) {
+				lhs_ptrs[i] = lb_soa_field_elem_ptr(p, lhs.addr, lhs.swizzle_soa.indices[i], lhs.swizzle_soa.index);
+			}
+			break;
 		}
 
-		lbValue lhs_ptrs[4] = {};
-		lbValue x_loads[4]  = {};
-		lbValue y_loads[4]  = {};
-		lbValue ops[4]      = {};
-
-		for (i32 i = 0; i < index_count; i++) {
-			lhs_ptrs[i] = lb_emit_array_epi(p, lhs.addr, indices[i]);
-		}
-		for (i32 i = 0; i < index_count; i++) {
+		for (isize i = 0; i < n; i++) {
 			x_loads[i] = lb_emit_load(p, lhs_ptrs[i]);
 		}
-		for (i32 i = 0; i < index_count; i++) {
-			y_loads[i].value = LLVMBuildExtractValue(p->builder, rhs.value, i, "");
+		for (isize i = 0; i < n; i++) {
+			y_loads[i].value = LLVMBuildExtractValue(p->builder, rhs.value, cast(unsigned)i, "");
 			y_loads[i].type = elem_type;
 		}
-		for (i32 i = 0; i < index_count; i++) {
+		for (isize i = 0; i < n; i++) {
 			ops[i] = lb_emit_arith(p, op, x_loads[i], y_loads[i], elem_type);
 		}
-		for (i32 i = 0; i < index_count; i++) {
-			lb_emit_store(p, lhs_ptrs[i], ops[i]);
-		}
-		return;
-	} else if (lhs.kind == lbAddr_SwizzleLarge) {
-		GB_ASSERT(is_type_array(lhs_type));
-
-		struct ValueAndIndex {
-			lbValue value;
-			u32     index;
-		};
-
-		Type *bt = base_type(lhs_type);
-		GB_ASSERT(bt->kind == Type_Array);
-
-		auto indices_handled = slice_make<bool>(temporary_allocator(), bt->Array.count);
-		auto indices = slice_make<i32>(temporary_allocator(), bt->Array.count);
-		i32 index_count = 0;
-		for (i32 index : lhs.swizzle_large.indices) {
-			if (indices_handled[index]) {
-				continue;
-			}
-			indices[index_count++] = index;
-		}
-
-		lbValue lhs_ptrs[4] = {};
-		lbValue x_loads[4]  = {};
-		lbValue y_loads[4]  = {};
-		lbValue ops[4]      = {};
-
-		for (i32 i = 0; i < index_count; i++) {
-			lhs_ptrs[i] = lb_emit_array_epi(p, lhs.addr, indices[i]);
-		}
-		for (i32 i = 0; i < index_count; i++) {
-			x_loads[i] = lb_emit_load(p, lhs_ptrs[i]);
-		}
-		for (i32 i = 0; i < index_count; i++) {
-			y_loads[i].value = LLVMBuildExtractValue(p->builder, rhs.value, i, "");
-			y_loads[i].type = elem_type;
-		}
-		for (i32 i = 0; i < index_count; i++) {
-			ops[i] = lb_emit_arith(p, op, x_loads[i], y_loads[i], elem_type);
-		}
-		for (i32 i = 0; i < index_count; i++) {
-			lb_emit_store(p, lhs_ptrs[i], ops[i]);
-		}
-		return;
-	} else if (lhs.kind == lbAddr_SwizzleSoa) {
-		// the three cases largely mirror each other,
-		// perhaps unify them?
-		GB_ASSERT(is_type_array(lhs_type));
-
-		// the index list may repeat components (and so be longer than 4), but the
-		// element array itself has at most 4, so distinct destinations do fit in [4];
-		// each dest is done on the first occurrence
-		bool indices_handled[4] = {};
-		i32 indices[4] = {};
-		i32 index_count = 0;
-		for (i32 index : lhs.swizzle_soa.indices) {
-			GB_ASSERT(index < 4);
-			if (indices_handled[index]) {
-				continue;
-			}
-			indices_handled[index] = true;
-			indices[index_count++] = index;
-		}
-
-		lb_emit_soa_index_bounds_check(p, lhs.addr, lhs.swizzle_soa.index, lhs.swizzle_soa.index_expr);
-
-		lbValue lhs_ptrs[4] = {};
-		lbValue x_loads[4]  = {};
-		lbValue y_loads[4]  = {};
-		lbValue ops[4]      = {};
-
-		for (i32 i = 0; i < index_count; i++) {
-			lhs_ptrs[i] = lb_soa_field_elem_ptr(p, lhs.addr, indices[i], lhs.swizzle_soa.index);
-		}
-		for (i32 i = 0; i < index_count; i++) {
-			x_loads[i] = lb_emit_load(p, lhs_ptrs[i]);
-		}
-		for (i32 i = 0; i < index_count; i++) {
-			y_loads[i].value = LLVMBuildExtractValue(p->builder, rhs.value, i, "");
-			y_loads[i].type = elem_type;
-		}
-		for (i32 i = 0; i < index_count; i++) {
-			ops[i] = lb_emit_arith(p, op, x_loads[i], y_loads[i], elem_type);
-		}
-		for (i32 i = 0; i < index_count; i++) {
+		for (isize i = 0; i < n; i++) {
 			lb_emit_store(p, lhs_ptrs[i], ops[i]);
 		}
 		return;

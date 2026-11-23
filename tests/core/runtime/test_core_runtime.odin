@@ -4,6 +4,7 @@ package test_core_runtime
 
 import "base:intrinsics"
 import "core:mem"
+import "core:mem/virtual"
 import "base:runtime"
 import "core:slice"
 import "core:testing"
@@ -407,8 +408,12 @@ test_soa_array_elem_swizzle :: proc(t: ^testing.T) {
 	fixed[1].xy += [2]u16{9, 10}
 	testing.expect_value(t, fixed.x[1], 30)
 	testing.expect_value(t, fixed.y[1], 30)
+	// a repeated component keeps its last occurrence, like `fixed[1].xx = fixed[1].xx + {5, 100}`
 	fixed[1].xx += [2]u16{5, 100}
-	testing.expect_value(t, fixed.x[1], 35)
+	testing.expect_value(t, fixed.x[1], 130)
+	fixed[1].xxy += [3]u16{1, 2, 3}
+	testing.expect_value(t, fixed.x[1], 132)
+	testing.expect_value(t, fixed.y[1], 33)
 
 	// range over an element swizzle
 	sum: u16
@@ -1598,4 +1603,337 @@ test_non_zero_make :: proc(t: ^testing.T) {
 	testing.expect_value(t, z2[2], 0)
 	testing.expect_value(t, z3[4], 0)
 	testing.expect_value(t, z4[6], 0)
+}
+
+@(test)
+test_cstring_len :: proc(t: ^testing.T) {
+	testing.expect_value(t, runtime.cstring_len(nil), 0)
+
+	buf: [512]byte
+	for offset in 0..<64 {
+		for n in 0..<300 {
+			slice.fill(buf[:], 'x')
+			buf[offset+n] = 0
+
+			got := runtime.cstring_len(cstring(&buf[offset]))
+			if !testing.expectf(t, got == n, "offset %d, length %d: got %d", offset, n, got) {
+				return
+			}
+		}
+	}
+}
+
+// Two pages with only the first committed. Reading past it faults.
+// Some targets have no virtual memory (e.g. WASI): the pages are empty, `ok` is false, and nothing fails.
+@(private="file", require_results)
+guarded_pages :: proc(t: ^testing.T) -> (data: []byte, ok: bool) {
+	page := uint(mem.PAGE_SIZE)
+	err: runtime.Allocator_Error
+	data, err = virtual.reserve(2*page)
+	if !testing.expect_value(t, err, nil) || len(data) == 0 {
+		return
+	}
+	ok = testing.expect_value(t, virtual.commit(raw_data(data), page), nil)
+	return
+}
+
+// The NUL is the last byte before a page that is reserved but not committed.
+@(test)
+test_cstring_len_at_end_of_page :: proc(t: ^testing.T) {
+	data, ok := guarded_pages(t)
+	defer virtual.release(raw_data(data), uint(len(data)))
+	if !ok {
+		return
+	}
+
+	page := uint(mem.PAGE_SIZE)
+	for n in 0..<300 {
+		slice.fill(data[:page], 'x')
+		data[page-1] = 0
+
+		got := runtime.cstring_len(cstring(&data[page-1-uint(n)]))
+		if !testing.expectf(t, got == n, "length %d: got %d", n, got) {
+			return
+		}
+	}
+}
+
+@(private="file")
+cstring_fill :: proc(buf: []byte, n: int) {
+	for i in 0..<n {
+		buf[i] = byte(1 + i*37%255)
+	}
+	buf[n] = 0
+}
+
+@(private="file", require_results)
+cstring_check_cmp :: proc(t: ^testing.T, a, b: []byte) -> bool {
+	@(require_results)
+	reference :: proc(a, b: []byte) -> int {
+		for i := 0; /**/; i += 1 {
+			switch {
+			case a[i] < b[i]: return -1
+			case a[i] > b[i]: return +1
+			case a[i] == 0:   return 0
+			}
+		}
+	}
+
+	want := reference(a, b)
+	x    := cstring(raw_data(a))
+	y    := cstring(raw_data(b))
+	return testing.expectf(t, runtime.cstring_cmp(x, y) == want,  "cstring_cmp(%q, %q) should be %d", x, y, want)  &&
+	       testing.expectf(t, runtime.cstring_cmp(y, x) == -want, "cstring_cmp(%q, %q) should be %d", y, x, -want) &&
+	       testing.expectf(t, (x == y) == (want == 0),             "%q == %q should be %v", x, y, want == 0)        &&
+	       testing.expectf(t, (x < y) == (want < 0),               "%q < %q should be %v", x, y, want < 0)
+}
+
+@(test)
+test_cstring_cmp :: proc(t: ^testing.T) {
+	testing.expect_value(t, runtime.cstring_cmp(nil, nil), 0)
+	testing.expect_value(t, runtime.cstring_cmp(nil, ""), -1)
+	testing.expect_value(t, runtime.cstring_cmp("", nil), +1)
+	testing.expect(t, runtime.cstring_eq(nil, nil))
+	testing.expect(t, !runtime.cstring_eq(nil, ""))
+
+	long_lengths := [?]int{100, 255, 256, 300}
+	buf_a: [512]byte
+	buf_b: [512]byte
+	loop: for a_offset in 0..<32 {
+		for b_offset in 0..<32 {
+			for i in 0..<70+len(long_lengths) {
+				n := i
+				if i >= 70 {
+					n = long_lengths[i-70]
+				}
+
+				a := buf_a[a_offset:]
+				b := buf_b[b_offset:]
+				cstring_fill(a, n)
+				cstring_fill(b, n)
+				cstring_check_cmp(t, a, b) or_break loop
+
+				if n > 0 {
+					for k in ([?]int{0, n/2, n-1}) {
+						old := b[k]
+						b[k] = old+1 if old < 255 else 1
+						cstring_check_cmp(t, a, b) or_break loop
+						b[k] = old-1 if old > 1 else 255
+						cstring_check_cmp(t, a, b) or_break loop
+						b[k] = old
+					}
+				}
+
+				b[n], b[n+1] = 'x', 0
+				cstring_check_cmp(t, a, b) or_break loop
+				b[n] = 0
+			}
+		}
+	}
+}
+
+// One string ends with the last byte before a page that is reserved but not committed.
+@(test)
+test_cstring_cmp_at_end_of_page :: proc(t: ^testing.T) {
+	data_a, ok_a := guarded_pages(t)
+	data_b, ok_b := guarded_pages(t)
+	defer virtual.release(raw_data(data_a), uint(len(data_a)))
+	defer virtual.release(raw_data(data_b), uint(len(data_b)))
+	if !ok_a || !ok_b {
+		return
+	}
+
+	page := uint(mem.PAGE_SIZE)
+	other: [512]byte
+	loop: for n in 0..<300 {
+		a := data_a[page-1-uint(n):]
+		cstring_fill(a, n)
+
+		for offset in 0..<32 {
+			b := other[offset:]
+			cstring_fill(b, n)
+			cstring_check_cmp(t, a, b) or_break loop
+
+			b[n], b[n+1] = 'x', 0
+			cstring_check_cmp(t, a, b) or_break loop
+		}
+
+		b := data_b[page-1-uint(n):]
+		cstring_fill(b, n)
+		cstring_check_cmp(t, a, b) or_break loop
+
+		if n > 0 {
+			shorter := data_b[page-uint(n):]
+			cstring_fill(shorter, n-1)
+			cstring_check_cmp(t, a, shorter) or_break loop
+		}
+	}
+}
+
+// Code units with a zero byte that are not a NUL code unit.
+@(private="file", rodata)
+CSTRING16_UNITS := [?]u16{0x0041, 0x4100, 0x0100, 0xffff, 0x00ff, 0xff00, 0x1234, 0x8000, 0x0001}
+
+@(private="file")
+cstring16_store :: proc(buf: []byte, i: int, unit: u16) {
+	intrinsics.unaligned_store((^u16)(&buf[2*i]), unit)
+}
+
+@(private="file", require_results)
+cstring16_load :: proc(buf: []byte, i: int) -> u16 {
+	return intrinsics.unaligned_load((^u16)(&buf[2*i]))
+}
+
+@(private="file")
+cstring16_fill :: proc(buf: []byte, n: int) {
+	for i in 0..<n {
+		cstring16_store(buf, i, CSTRING16_UNITS[i%len(CSTRING16_UNITS)])
+	}
+	cstring16_store(buf, n, 0)
+}
+
+@(private="file", require_results)
+cstring16_check_eq :: proc(t: ^testing.T, a, b: []byte) -> bool {
+	@(require_results)
+	reference :: proc(a, b: []byte) -> bool {
+		for i := 0; /**/; i += 1 {
+			x := cstring16_load(a, i)
+			y := cstring16_load(b, i)
+			switch {
+			case x != y: return false
+			case x == 0: return true
+			}
+		}
+	}
+
+	want := reference(a, b)
+	x    := cstring16((^u16)(raw_data(a)))
+	y    := cstring16((^u16)(raw_data(b)))
+	return testing.expectf(t, runtime.cstring16_eq(x, y) == want, "cstring16_eq(%p, %p) should be %v", x, y, want) &&
+	       testing.expectf(t, runtime.cstring16_eq(y, x) == want, "cstring16_eq(%p, %p) should be %v", y, x, want) &&
+	       testing.expectf(t, (x == y) == want,                    "%p == %p should be %v", x, y, want)
+}
+
+@(test)
+test_cstring16_len :: proc(t: ^testing.T) {
+	testing.expect_value(t, runtime.cstring16_len(nil), 0)
+
+	buf: [1024]byte
+	for offset in 0..<64 {
+		for n in 0..<300 {
+			cstring16_fill(buf[offset:], n)
+
+			got := runtime.cstring16_len(cstring16((^u16)(&buf[offset])))
+			if !testing.expectf(t, got == n, "offset %d, length %d: got %d", offset, n, got) {
+				return
+			}
+		}
+	}
+}
+
+// The NUL ends at the last byte before a page that is reserved but not committed, or one byte earlier (an odd address).
+@(test)
+test_cstring16_len_at_end_of_page :: proc(t: ^testing.T) {
+	data, ok := guarded_pages(t)
+	defer virtual.release(raw_data(data), uint(len(data)))
+	if !ok {
+		return
+	}
+
+	page := uint(mem.PAGE_SIZE)
+	for n in 0..<300 {
+		for end in ([?]uint{page, page-1}) {
+			start := end - 2 - 2*uint(n)
+			cstring16_fill(data[start:end], n)
+
+			got := runtime.cstring16_len(cstring16((^u16)(&data[start])))
+			if !testing.expectf(t, got == n, "end %d, length %d: got %d", end, n, got) {
+				return
+			}
+		}
+	}
+}
+
+@(test)
+test_cstring16_eq :: proc(t: ^testing.T) {
+	testing.expect(t, runtime.cstring16_eq(nil, nil))
+	testing.expect(t, !runtime.cstring16_eq(nil, ""))
+	testing.expect(t, !runtime.cstring16_eq("", nil))
+
+	long_lengths := [?]int{100, 255, 256, 300}
+	buf_a: [1024]byte
+	buf_b: [1024]byte
+	loop: for a_offset in 0..<32 {
+		for b_offset in 0..<32 {
+			for i in 0..<70+len(long_lengths) {
+				n := i
+				if i >= 70 {
+					n = long_lengths[i-70]
+				}
+
+				a := buf_a[a_offset:]
+				b := buf_b[b_offset:]
+				cstring16_fill(a, n)
+				cstring16_fill(b, n)
+				cstring16_check_eq(t, a, b) or_break loop
+
+				if n > 0 {
+					for k in ([?]int{0, n/2, n-1}) {
+						for flip in ([?]u16{0x0001, 0x0100}) {
+							old := cstring16_load(b, k)
+							cstring16_store(b, k, old ~ flip)
+							cstring16_check_eq(t, a, b) or_break loop
+							cstring16_store(b, k, old)
+						}
+					}
+				}
+
+				cstring16_store(b, n, 'x')
+				cstring16_store(b, n+1, 0)
+				cstring16_check_eq(t, a, b) or_break loop
+				cstring16_store(b, n, 0)
+			}
+		}
+	}
+}
+
+// One string ends at the last byte before a page that is reserved but not committed, or one byte earlier (an odd address).
+@(test)
+test_cstring16_eq_at_end_of_page :: proc(t: ^testing.T) {
+	data_a, ok_a := guarded_pages(t)
+	data_b, ok_b := guarded_pages(t)
+	defer virtual.release(raw_data(data_a), uint(len(data_a)))
+	defer virtual.release(raw_data(data_b), uint(len(data_b)))
+	if !ok_a || !ok_b {
+		return
+	}
+
+	page := uint(mem.PAGE_SIZE)
+	other: [1024]byte
+	loop: for n in 0..<300 {
+		for end in ([?]uint{page, page-1}) {
+			a := data_a[end-2-2*uint(n):]
+			cstring16_fill(a, n)
+
+			for offset in 0..<32 {
+				b := other[offset:]
+				cstring16_fill(b, n)
+				cstring16_check_eq(t, a, b) or_break loop
+
+				cstring16_store(b, n, 'x')
+				cstring16_store(b, n+1, 0)
+				cstring16_check_eq(t, a, b) or_break loop
+			}
+
+			b := data_b[end-2-2*uint(n):]
+			cstring16_fill(b, n)
+			cstring16_check_eq(t, a, b) or_break loop
+
+			if n > 0 {
+				shorter := data_b[end-2*uint(n):]
+				cstring16_fill(shorter, n-1)
+				cstring16_check_eq(t, a, shorter) or_break loop
+			}
+		}
+	}
 }

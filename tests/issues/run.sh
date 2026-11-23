@@ -193,6 +193,14 @@ else
 	exit 1
 fi
 
+if [[ $($ODIN check ../test_issue_poly_variadic_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 3 &&
+      $($ODIN check ../test_issue_poly_variadic_errors $COMMON_CHECK 2>&1 >/dev/null | grep -cF "Cannot infer the polymorphic type '\$E' of the variadic parameter 'args'") -eq 3 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 if [[ $($ODIN check ../test_issue_fixed_point_scale $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
@@ -329,6 +337,13 @@ else
 fi
 
 if [[ $($ODIN check ../test_issue_8455 $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 3 ]] && [[ $($ODIN check ../test_issue_8455 $COMMON_CHECK 2>&1 >/dev/null | grep -c "it is a directory") -eq 3 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_8513_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 3 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
@@ -638,6 +653,22 @@ if [[ "$(uname -m)" == "x86_64" || "$(uname -m)" == "amd64" ]]; then
 	      $($ODIN check ../test_issue_asm_call_targets $COMMON_CHECK 2>&1 >/dev/null | grep -c "uses the Odin calling convention") -eq 3 &&
 	      $($ODIN check ../test_issue_asm_call_targets $COMMON_CHECK 2>&1 >/dev/null | grep -c "as the target of a call") -eq 2 &&
 	      $($ODIN check ../test_issue_asm_call_targets $COMMON_CHECK 2>&1 >/dev/null | grep -c "Assertion Failure") -eq 0 ]]; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1"
+		exit 1
+	fi
+	if [[ $($ODIN check ../test_issue_asm_shift_cl_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 12 &&
+	      $($ODIN check ../test_issue_asm_shift_cl_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "8-bit operand pinned to") -eq 5 &&
+	      $($ODIN check ../test_issue_asm_shift_cl_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "expects 3 operands, got 2") -eq 1 &&
+	      $($ODIN check ../test_issue_asm_shift_cl_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "is declared but never used") -eq 1 ]]; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1"
+		exit 1
+	fi
+	if [[ $($ODIN check ../test_issue_asm_accumulator_forms $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 &&
+	      $($ODIN check ../test_issue_asm_accumulator_forms $COMMON_CHECK 2>&1 >/dev/null | grep -c "takes no implicit accumulator") -eq 4 ]]; then
 		echo "SUCCESSFUL 1/1"
 	else
 		echo "SUCCESSFUL 0/1"

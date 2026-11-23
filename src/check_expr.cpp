@@ -7344,6 +7344,29 @@ gb_internal void materialize_deferred_untyped_arg(CheckerContext *c, Operand *o,
 	}
 }
 
+// NOTE(bill): The element type that the arguments of a polymorphic variadic parameter determine.
+// The first typed argument decides it.
+// With only untyped arguments, the default type of the first one does.
+// An untyped `nil`, or an argument whose type comes from the parameter, cannot decide it.
+gb_internal Type *polymorphic_variadic_element_hint(Slice<Operand> const &operands) {
+	Type *untyped_default = nullptr;
+	for (Operand const &o : operands) {
+		if (o.deferred_untyped_arg || o.type == nullptr || !is_operand_value(o)) {
+			continue;
+		}
+		if (is_type_typed(o.type)) {
+			return o.type;
+		}
+		if (untyped_default == nullptr) {
+			Type *t = default_type(o.type);
+			if (is_type_typed(t)) {
+				untyped_default = t;
+			}
+		}
+	}
+	return untyped_default;
+}
+
 gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, Ast *call,
 	Entity *entity, Type *proc_type,
 	Array<Operand> positional_operands, Array<Operand> const &named_operands,
@@ -7510,6 +7533,12 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 
 					Entity *vt = pt->params->Tuple.variables[pt->variadic_index];
 					o.type = vt->type;
+					if (is_type_polymorphic(vt->type)) {
+						// NOTE(bill): The arguments determine a polymorphic element type, e.g. the `E` of `proc(args: ..$E)`.
+						if (Type *elem = polymorphic_variadic_element_hint(variadic_operands)) {
+							o.type = alloc_type_slice(elem);
+						}
+					}
 				} else {
 					dummy_argument_count += 1;
 					o.type = t_untyped_nil;
@@ -7780,14 +7809,35 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 		Type *elem = base_type(slice)->Slice.elem;
 		Type *t = elem;
 
-		if (is_type_polymorphic(t)) {
+		// NOTE(bill): The arguments are not checked against an element type that is still polymorphic.
+		bool element_determined = !is_type_polymorphic(t);
+		if (!element_determined) {
 			if (show_error) {
-				error(call, "Ambiguous call to a polymorphic variadic procedure with no variadic input %s", type_to_string(final_proc_type));
+				ERROR_BLOCK();
+				gbString elem_str = type_to_string(elem);
+				String name = var_entity->token.string;
+				if (variadic_operands.count == 0) {
+					error(call, "Cannot infer the polymorphic type '%s' of the variadic parameter '%.*s' without an argument for it", elem_str, LIT(name));
+					error_line("\tSuggestion: Pass a typed argument, or a typed slice with '..', e.g. '..[]T{}'\n");
+				} else {
+					Operand const &first = variadic_operands[0];
+					bool passed_a_type = first.mode == Addressing_Type;
+					set_caret_label(passed_a_type ? "a type, not a value" : "untyped; its type cannot be determined here");
+					error(first.expr, "Cannot infer the polymorphic type '%s' of the variadic parameter '%.*s' from its arguments", elem_str, LIT(name));
+					if (passed_a_type) {
+						gbString type_str = expr_to_string(first.expr);
+						error_line("\tSuggestion: Pass a value of the type, e.g. '%s{}'\n", type_str);
+						gb_string_free(type_str);
+					} else {
+						error_line("\tSuggestion: Give one of the arguments a type, e.g. 'T(x)' or 'T{...}'\n");
+					}
+				}
+				gb_string_free(elem_str);
 			}
 			err = CallArgumentError_AmbiguousPolymorphicVariadic;
 		}
 
-		for_array(operand_index, variadic_operands) {
+		for (isize operand_index = 0; element_determined && operand_index < variadic_operands.count; operand_index++) {
 			Operand *o = &variadic_operands[operand_index];
 			Operand deferred_local;
 			if (o->deferred_untyped_arg) {
@@ -7841,7 +7891,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			score += eval_param_and_score(c, o, t, err, true, var_entity, show_error);
 		}
 
-		if (!vari_expand && variadic_operands.count != 0) {
+		if (element_determined && !vari_expand && variadic_operands.count != 0) {
 			// NOTE(bill, 2024-07-14): minimize the stack usage for variadic parameters with the backing array
 			if (c->decl && c->decl->proc) {
 				poly_dep_capture_unreplayable(c);

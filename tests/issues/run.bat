@@ -62,6 +62,8 @@ set ODIN=..\..\..\odin
 %ODIN% check "..\test_issue_inferred_default_overflow" -no-entry-point %COMMON% 2>&1 | find /c "Error: Cannot convert numeric value" | findstr /x "6" || exit /b
 %ODIN% check "..\test_issue_fixed_point_scale" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_poly_proc_value" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_poly_variadic_errors" %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_poly_variadic_errors" %COMMON% 2>&1 | find /c "Cannot infer the polymorphic type '$E' of the variadic parameter 'args'" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_atomic_orderings" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "13" || exit /b
 %ODIN% check "..\test_issue_atomic_errors" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
 %ODIN% check "..\test_issue_atomic_access" -no-entry-point -vet-atomic-access %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
@@ -87,6 +89,7 @@ set ODIN=..\..\..\odin
 %ODIN% check "..\test_issue_5024" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
 %ODIN% check "..\test_issue_8455" %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_8455" %COMMON% 2>&1 | find /c "it is a directory" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_8513_errors" %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_7947" %COMMON% 2>&1 | find /c "Error: Unspecialized polymorphic procedure literal" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_7502_cycle" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_8097" -no-entry-point %COMMON% 2>&1 | find /c "Error: Invalid use of a polymorphic type" | findstr /x "4" || exit /b
@@ -134,6 +137,7 @@ set ODIN=..\..\..\odin
 %ODIN% run "..\test_issue_7564" %COMMON% || exit /b
 %ODIN% run "..\test_issue_7596" %COMMON% || exit /b
 %ODIN% run "..\test_issue_7798" %COMMON% || exit /b
+%ODIN% run "..\test_issue_cstring_hasher_no_crt" %COMMON% -no-crt -no-thread-local -o:speed || exit /b
 
 @rem #########################################################################################################
 
@@ -232,6 +236,12 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 %ODIN% check "..\test_issue_asm_call_targets" %COMMON% 2>&1 | find /c "uses the Odin calling convention" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_asm_call_targets" %COMMON% 2>&1 | find /c "as the target of a call" | findstr /x "2" || exit /b
 %ODIN% check "..\test_issue_asm_call_targets" %COMMON% 2>&1 | find /c "Assertion Failure" | findstr /x "0" || exit /b
+%ODIN% check "..\test_issue_asm_shift_cl_errors" %COMMON% 2>&1 | find /c "Error:" | findstr /x "12" || exit /b
+%ODIN% check "..\test_issue_asm_shift_cl_errors" %COMMON% 2>&1 | find /c "8-bit operand pinned to" | findstr /x "5" || exit /b
+%ODIN% check "..\test_issue_asm_shift_cl_errors" %COMMON% 2>&1 | find /c "expects 3 operands, got 2" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_asm_shift_cl_errors" %COMMON% 2>&1 | find /c "is declared but never used" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_asm_accumulator_forms" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_asm_accumulator_forms" %COMMON% 2>&1 | find /c "takes no implicit accumulator" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_asm_writeback_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_asm_writeback_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "writes back its base register" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_asm_writeback_errors" -target:linux_arm64 %COMMON% 2>&1 | find /c "takes only a base register and a constant offset" | findstr /x "1" || exit /b

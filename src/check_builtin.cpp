@@ -1535,18 +1535,12 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 				arg_count++;
 			}
 
-			if (arg_count > max_count) {
-				error(call, "Too many '%.*s' indices, %lld > %lld", LIT(builtin_name), cast(long long)arg_count, cast(long long)max_count);
-				return false;
-			}
-
-
 			if (!is_power_of_two(arg_count)) {
 				error(call, "'%.*s' must have a power of two index arguments, got %lld", LIT(builtin_name), cast(long long)arg_count);
 				return false;
 			}
 
-			// the result is as wide as the index list, which may be twice the operand width
+			// the result is as wide as the index list, which may be wider than both operands together
 			if (arg_count > SIMD_ELEMENT_COUNT_MAX) {
 				error(call, "'%.*s' constructs a #simd vector beyond the maximum element count of %d, got %lld", LIT(builtin_name), SIMD_ELEMENT_COUNT_MAX, cast(long long)arg_count);
 				return false;

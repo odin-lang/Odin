@@ -157,19 +157,6 @@ jobs:
           ./run.sh
           ABI_CFLAGS=-O2 ./run.sh "" "" -o:speed
 
-      - name: Run demo on WASI WASM32
-        run: |
-          ./odin build examples/demo -target:wasi_wasm32 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -out:demo
-          wasmtime ./demo.wasm
-        if: matrix.os == 'macos-latest'
-      - name: Run demo on WASI WASM64P32
-        run: |
-          ./odin build examples/demo -target:wasi_wasm64p32 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -out:demo
-          wasmtime ./demo.wasm
-          ./odin build examples/demo -target:wasi_wasm64p32 -microarch:mvp -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -out:demo
-          wasmtime ./demo.wasm
-        if: matrix.os == 'macos-latest'
-
       - name: Check benchmarks
         run: ./odin check tests/benchmark -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point
 
@@ -510,3 +497,51 @@ jobs:
           cd tests/abi
           ./run.sh linux_riscv64 riscv64-linux-gnu "-extra-linker-flags:--target=riscv64-linux-gnu -static" -no-rpath
           ABI_CFLAGS=-O2 ./run.sh linux_riscv64 riscv64-linux-gnu "-extra-linker-flags:--target=riscv64-linux-gnu -static" -no-rpath -o:speed
+
+  build_wasi:
+    runs-on: ubuntu-latest
+    name: WASI Build and Test
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download LLVM
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 22
+          echo "/usr/lib/llvm-22/bin" >> $GITHUB_PATH
+
+      - name: Download wasmtime
+        run: |
+          wget -q https://github.com/bytecodealliance/wasmtime/releases/download/v51.0.0/wasmtime-v51.0.0-x86_64-linux.tar.xz
+          echo "a18020674fac4107f329bc9ed720ea9c88e4b30a61e8a527787bcce051123d32  wasmtime-v51.0.0-x86_64-linux.tar.xz" | sha256sum -c
+          tar -xJf wasmtime-v51.0.0-x86_64-linux.tar.xz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/wasmtime-v51.0.0-x86_64-linux" >> $GITHUB_PATH
+
+      - name: Build Odin
+        run: ./build_odin.sh release
+
+      - name: Odin version
+        run: ./odin version
+
+      - name: Odin report
+        run: ./odin report
+
+      - name: wasmtime version
+        run: wasmtime --version
+
+      - name: Run demo on WASI WASM32
+        run: |
+          ./odin build examples/demo -target:wasi_wasm32 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -out:demo
+          wasmtime ./demo.wasm
+
+      - name: Run demo on WASI WASM64P32
+        run: |
+          ./odin build examples/demo -target:wasi_wasm64p32 -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -out:demo
+          wasmtime ./demo.wasm
+          ./odin build examples/demo -target:wasi_wasm64p32 -microarch:mvp -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -out:demo
+          wasmtime ./demo.wasm
+
+      - name: Core library tests on WASI WASM32
+        run: ./tests/core/wasi.sh

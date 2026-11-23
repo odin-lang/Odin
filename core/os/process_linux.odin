@@ -707,6 +707,7 @@ _reap_terminated :: proc(process: Process) -> (state: Process_State, err: Error)
 	case .KILLED, .DUMPED, .TRAPPED:
 		state.exited = true
 		state.exit_code = int(info.status)
+		state.signal = int(info.status)
 		state.success = false
 	}
 
@@ -796,6 +797,7 @@ _timed_wait_on_handle :: proc(process: Process, timeout: time.Duration) -> (proc
 		case .KILLED, .DUMPED, .TRAPPED:
 			process_state.exited = true
 			process_state.exit_code = int(info.status)
+			process_state.signal = int(info.status)
 			process_state.success = false
 		}
 	}

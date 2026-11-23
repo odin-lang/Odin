@@ -338,16 +338,18 @@ test_fix_write_bits_128_no_decimal_prefix :: proc(t: ^testing.T) {
 	testing.expect_value(t, strconv.write_bits_128(buf[:], 42, 16, false, 64, strconv.digits, {.Prefix}), "0x2a")
 }
 
-@(test)
-test_fix_parse_of_base_zero_base :: proc(t: ^testing.T) {
-	testing.expect_assert(t, "base must be 1-16")
-	_, _ = strconv.parse_u64_of_base("1", 0)
-}
+when !testing.INLINE {
+	@(test)
+	test_fix_parse_of_base_zero_base :: proc(t: ^testing.T) {
+		testing.expect_assert(t, "base must be 1-16")
+		_, _ = strconv.parse_u64_of_base("1", 0)
+	}
 
-@(test)
-test_fix_parse_of_base_negative_base :: proc(t: ^testing.T) {
-	testing.expect_assert(t, "base must be 1-16")
-	_, _ = strconv.parse_i128_of_base("1", -1)
+	@(test)
+	test_fix_parse_of_base_negative_base :: proc(t: ^testing.T) {
+		testing.expect_assert(t, "base must be 1-16")
+		_, _ = strconv.parse_i128_of_base("1", -1)
+	}
 }
 
 @(test)
