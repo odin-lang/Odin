@@ -1643,3 +1643,120 @@ test_cstring_len_at_end_of_page :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@(private="file")
+cstring_fill :: proc(buf: []byte, n: int) {
+	for i in 0..<n {
+		buf[i] = byte(1 + i*37%255)
+	}
+	buf[n] = 0
+}
+
+@(private="file", require_results)
+cstring_check_cmp :: proc(t: ^testing.T, a, b: []byte) -> bool {
+	@(require_results)
+	reference :: proc(a, b: []byte) -> int {
+		for i := 0; /**/; i += 1 {
+			switch {
+			case a[i] < b[i]: return -1
+			case a[i] > b[i]: return +1
+			case a[i] == 0:   return 0
+			}
+		}
+	}
+
+	want := reference(a, b)
+	x    := cstring(raw_data(a))
+	y    := cstring(raw_data(b))
+	return testing.expectf(t, runtime.cstring_cmp(x, y) == want,  "cstring_cmp(%q, %q) should be %d", x, y, want)  &&
+	       testing.expectf(t, runtime.cstring_cmp(y, x) == -want, "cstring_cmp(%q, %q) should be %d", y, x, -want) &&
+	       testing.expectf(t, (x == y) == (want == 0),             "%q == %q should be %v", x, y, want == 0)        &&
+	       testing.expectf(t, (x < y) == (want < 0),               "%q < %q should be %v", x, y, want < 0)
+}
+
+@(test)
+test_cstring_cmp :: proc(t: ^testing.T) {
+	testing.expect_value(t, runtime.cstring_cmp(nil, nil), 0)
+	testing.expect_value(t, runtime.cstring_cmp(nil, ""), -1)
+	testing.expect_value(t, runtime.cstring_cmp("", nil), +1)
+	testing.expect(t, runtime.cstring_eq(nil, nil))
+	testing.expect(t, !runtime.cstring_eq(nil, ""))
+
+	long_lengths := [?]int{100, 255, 256, 300}
+	buf_a: [512]byte
+	buf_b: [512]byte
+	loop: for a_offset in 0..<32 {
+		for b_offset in 0..<32 {
+			for i in 0..<70+len(long_lengths) {
+				n := i
+				if i >= 70 {
+					n = long_lengths[i-70]
+				}
+
+				a := buf_a[a_offset:]
+				b := buf_b[b_offset:]
+				cstring_fill(a, n)
+				cstring_fill(b, n)
+				cstring_check_cmp(t, a, b) or_break loop
+
+				if n > 0 {
+					for k in ([?]int{0, n/2, n-1}) {
+						old := b[k]
+						b[k] = old+1 if old < 255 else 1
+						cstring_check_cmp(t, a, b) or_break loop
+						b[k] = old-1 if old > 1 else 255
+						cstring_check_cmp(t, a, b) or_break loop
+						b[k] = old
+					}
+				}
+
+				b[n], b[n+1] = 'x', 0
+				cstring_check_cmp(t, a, b) or_break loop
+				b[n] = 0
+			}
+		}
+	}
+}
+
+// One string ends with the last byte before a page that is reserved but not committed.
+@(test)
+test_cstring_cmp_at_end_of_page :: proc(t: ^testing.T) {
+	page := uint(mem.PAGE_SIZE)
+	data_a, err_a := virtual.reserve(2*page)
+	data_b, err_b := virtual.reserve(2*page)
+	if !testing.expect_value(t, err_a, nil) || !testing.expect_value(t, err_b, nil) {
+		return
+	}
+	defer virtual.release(raw_data(data_a), 2*page)
+	defer virtual.release(raw_data(data_b), 2*page)
+
+	if !testing.expect_value(t, virtual.commit(raw_data(data_a), page), nil) ||
+	   !testing.expect_value(t, virtual.commit(raw_data(data_b), page), nil) {
+		return
+	}
+
+	other: [512]byte
+	loop: for n in 0..<300 {
+		a := data_a[page-1-uint(n):]
+		cstring_fill(a, n)
+
+		for offset in 0..<32 {
+			b := other[offset:]
+			cstring_fill(b, n)
+			cstring_check_cmp(t, a, b) or_break loop
+
+			b[n], b[n+1] = 'x', 0
+			cstring_check_cmp(t, a, b) or_break loop
+		}
+
+		b := data_b[page-1-uint(n):]
+		cstring_fill(b, n)
+		cstring_check_cmp(t, a, b) or_break loop
+
+		if n > 0 {
+			shorter := data_b[page-uint(n):]
+			cstring_fill(shorter, n-1)
+			cstring_check_cmp(t, a, shorter) or_break loop
+		}
+	}
+}

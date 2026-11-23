@@ -703,20 +703,24 @@ cstring16_to_string16 :: proc "contextless" (s: cstring16) -> string16 {
 
 
 cstring_eq :: proc "contextless" (lhs, rhs: cstring) -> bool {
-	x := ([^]byte)(lhs)
-	y := ([^]byte)(rhs)
-	if x == y {
-		return true
+	when HAS_HARDWARE_SIMD && (ODIN_ARCH == .amd64 || ODIN_ARCH == .i386) {
+		return cstring_cmp(lhs, rhs) == 0
+	} else {
+		x := ([^]byte)(lhs)
+		y := ([^]byte)(rhs)
+		if x == y {
+			return true
+		}
+		if (x == nil) ~ (y == nil) {
+			return false
+		}
+		xn := cstring_len(lhs)
+		yn := cstring_len(rhs)
+		if xn != yn {
+			return false
+		}
+		return #force_inline memory_equal(x, y, xn)
 	}
-	if (x == nil) ~ (y == nil) {
-		return false
-	}
-	xn := cstring_len(lhs)
-	yn := cstring_len(rhs)
-	if xn != yn {
-		return false
-	}
-	return #force_inline memory_equal(x, y, xn)
 }
 
 cstring_cmp :: proc "contextless" (lhs, rhs: cstring) -> int {
@@ -728,13 +732,55 @@ cstring_cmp :: proc "contextless" (lhs, rhs: cstring) -> int {
 	if (x == nil) ~ (y == nil) {
 		return -1 if x == nil else +1
 	}
-	xn := cstring_len(lhs)
-	yn := cstring_len(rhs)
-	ret := memory_compare(x, y, min(xn, yn))
-	if ret == 0 && xn != yn {
-		return -1 if xn < yn else +1
+
+	when HAS_HARDWARE_SIMD && (ODIN_ARCH == .amd64 || ODIN_ARCH == .i386) {
+		AVX2 :: ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2")
+		V    :: #simd[32]u8 when AVX2 else #simd[16]u8
+		M    :: u32         when AVX2 else u16
+		SIZE :: size_of(V)
+		PAGE :: 4096
+
+		Unaligned :: struct #packed {
+			v: V,
+		}
+
+		i := 0
+		scan: for {
+			room := min(PAGE - uintptr(&x[i]) & (PAGE-1), PAGE - uintptr(&y[i]) & (PAGE-1))
+			for /**/; room >= SIZE; room -= SIZE {
+				a := intrinsics.volatile_load((^Unaligned)(&x[i]))
+				b := intrinsics.volatile_load((^Unaligned)(&y[i]))
+				same := intrinsics.simd_min(a.v, intrinsics.simd_lanes_eq(a.v, b.v))
+				m := transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(same, 0))
+				if m != 0 {
+					i += int(intrinsics.count_trailing_zeros(m))
+					break scan
+				}
+				i += SIZE
+			}
+
+			for _ in 0..<room {
+				if x[i] != y[i] || x[i] == 0 {
+					break scan
+				}
+				i += 1
+			}
+		}
+
+		switch {
+		case x[i] < y[i]: return -1
+		case x[i] > y[i]: return +1
+		}
+		return 0
+	} else {
+		xn := cstring_len(lhs)
+		yn := cstring_len(rhs)
+		ret := memory_compare(x, y, min(xn, yn))
+		if ret == 0 && xn != yn {
+			return -1 if xn < yn else +1
+		}
+		return ret
 	}
-	return ret
 }
 
 cstring_ne :: #force_inline proc "contextless" (a, b: cstring) -> bool { return !cstring_eq(a, b) }
