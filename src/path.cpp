@@ -157,7 +157,7 @@ gb_internal String path_to_full_path(gbAllocator a, String path) {
 	defer (gb_free(ha, path_c));
 
 	char *fullpath = gb_path_get_full_name(a, path_c);
-	String res = string_trim_whitespace(make_string_c(fullpath));
+	String res = make_string_c(fullpath);
 #if defined(GB_SYSTEM_WINDOWS)
 	for (isize i = 0; i < res.len; i++) {
 		if (res.text[i] == '\\') {
@@ -497,9 +497,7 @@ gb_internal String path_to_string(gbAllocator a, Path path) {
 	}
 	str[i] = 0;
 
-	String res = make_string(str, i);
-	res        = string_trim_whitespace(res);
-	return res;
+	return make_string(str, i);
 }
 
 gb_internal gbString append_quoted(gbString s, String arg) {

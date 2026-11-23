@@ -887,6 +887,14 @@ echo gone > walk_cache/.odin-cache/gone.txt
 [[ ! -e walk_cache/.odin-cache ]]
 [[ -f walk_outside/keep.txt ]]
 
+ROOT_OUT="$($ODIN root)"
+ODIN_ROOT="$ROOT_OUT" $ODIN check ../test_paths_debug $COMMON_CHECK
+ODIN_ROOT="$ROOT_OUT//" $ODIN check ../test_paths_debug $COMMON_CHECK
+ODIN_ROOT="${ROOT_OUT%/}" $ODIN check ../test_paths_debug $COMMON_CHECK
+rm -f "space_out "
+$ODIN build ../test_paths_debug $COMMON "-out:space_out "
+[[ -f "space_out " ]]
+
 #########################################################################################################
 
 if [[ ! -z ${ODIN_TESTS_NO_CLANG+x} ]]; then

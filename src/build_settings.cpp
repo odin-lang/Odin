@@ -1118,7 +1118,7 @@ struct LibraryCollections {
 gb_global Array<LibraryCollections> library_collections = {0};
 
 gb_internal void add_library_collection(String name, String path) {
-	LibraryCollections lc = {name, string_trim_whitespace(path)};
+	LibraryCollections lc = {name, path};
 	array_add(&library_collections, lc);
 }
 
@@ -1180,7 +1180,7 @@ gb_internal String odin_root_dir(void) {
 	gbAllocator a = permanent_allocator();
 	char const *found = gb_get_env("ODIN_ROOT", a);
 	if (found) {
-		String path = path_to_full_path(a, make_string_c(found));
+		String path = path_spelled(a, make_string_c(found));
 		#if defined(GB_SYSTEM_WINDOWS)
 			path = normalize_path(a, path, WIN32_SEPARATOR_STRING);
 		#else
@@ -1474,7 +1474,6 @@ gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 
 		text[len] = 0;
 		result = string16_to_string(a, make_string16(cast(u16 *)text, len));
-		result = string_trim_whitespace(result);
 
 		// Replace Windows style separators
 		for (isize i = 0; i < result.len; i++) {
@@ -1574,7 +1573,6 @@ gb_internal String get_fullpath_relative(gbAllocator a, String base_dir, String 
 	}
 
 	String res = make_string(str, i);
-	res = string_trim_whitespace(res);
 	return path_spelled_existing(a, res, ok_);
 }
 
@@ -1595,7 +1593,6 @@ gb_internal String get_fullpath_base_collection(gbAllocator a, String path, bool
 	str[i] = 0;
 
 	String res = make_string(str, i);
-	res = string_trim_whitespace(res);
 	return path_spelled_existing(a, res, ok_);
 }
 
@@ -1615,7 +1612,6 @@ gb_internal String get_fullpath_core_collection(gbAllocator a, String path, bool
 	str[i] = 0;
 
 	String res = make_string(str, i);
-	res = string_trim_whitespace(res);
 	return path_spelled_existing(a, res, ok_);
 }
 

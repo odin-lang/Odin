@@ -6384,7 +6384,6 @@ gb_internal void check_foreign_import_fullpaths(Checker *c) {
 					continue;
 				}
 
-				file_str = string_trim_whitespace(file_str);
 				String fullpath = file_str;
 				if (!is_arch_wasm() || string_ends_with(file_str, str_lit(".o"))) {
 					String foreign_path = {};

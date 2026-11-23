@@ -937,7 +937,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_OutFile: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String path = value.value_string;
-							path = string_trim_whitespace(path);
 							String out_name = path_last_element_spelled(path);
 							char const *out_reason = nullptr;
 							bool out_name_ok = out_name.len == 0 || out_name == "." || out_name == ".." || path_is_valid_file_name(out_name, &out_reason);
@@ -1032,7 +1031,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ExportTimingsFile: {
 							GB_ASSERT(value.kind == ExactValue_String);
 
-							String export_path = string_trim_whitespace(value.value_string);
+							String export_path = value.value_string;
 							if (is_build_flag_path_valid(export_path)) {
 								build_context.export_timings_file = path_to_full_path(heap_allocator(), export_path);
 							} else {
@@ -1061,7 +1060,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ExportDependenciesFile: {
 							GB_ASSERT(value.kind == ExactValue_String);
 
-							String export_path = string_trim_whitespace(value.value_string);
+							String export_path = value.value_string;
 							if (is_build_flag_path_valid(export_path)) {
 								build_context.export_dependencies_file = path_to_full_path(heap_allocator(), export_path);
 							} else {
@@ -1079,7 +1078,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ExportDefineables: {
 							GB_ASSERT(value.kind == ExactValue_String);
 
-							String export_path = string_trim_whitespace(value.value_string);
+							String export_path = value.value_string;
 							if (is_build_flag_path_valid(export_path)) {
 								build_context.export_defineables_file = path_to_full_path(heap_allocator(), export_path);
 							} else {
@@ -1091,7 +1090,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						}
 						case BuildFlag_Overlay: {
 							GB_ASSERT(value.kind == ExactValue_String);
-							build_context.overlay_file = string_trim_whitespace(value.value_string);
+							build_context.overlay_file = value.value_string;
 							break;
 						}
 						case BuildFlag_Workspace: {
@@ -1118,7 +1117,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ExportSemanticsFile: {
 							GB_ASSERT(value.kind == ExactValue_String);
 
-							String export_path = string_trim_whitespace(value.value_string);
+							String export_path = value.value_string;
 							if (is_build_flag_path_valid(export_path)) {
 								build_context.export_semantics_file = path_to_full_path(heap_allocator(), export_path);
 							} else {
@@ -1129,8 +1128,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						}
 						case BuildFlag_ExportSemanticsFor: {
 							GB_ASSERT(value.kind == ExactValue_String);
-							String path = string_trim_whitespace(value.value_string);
-							array_add(&build_context.export_semantics_for, path_to_full_path(heap_allocator(), path));
+							array_add(&build_context.export_semantics_for, path_to_full_path(heap_allocator(), value.value_string));
 							break;
 						}
 						case BuildFlag_IgnoreUnusedDefineables: {
@@ -1791,7 +1789,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 
 						case BuildFlag_ExportLinkedLibraries:
-							build_context.export_linked_libs_path = string_trim_whitespace(value.value_string);
+							build_context.export_linked_libs_path = value.value_string;
 							if (build_context.export_linked_libs_path.len == 0) {
 								gb_printf_err("-%.*s specified an empty path\n", LIT(name));
 								bad_flags = true;
@@ -1948,7 +1946,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ResourceFile: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String path = value.value_string;
-							path = string_trim_whitespace(path);
 							if (is_build_flag_path_valid(path)) {
 								bool is_resource = string_ends_with(path, str_lit(".rc")) || string_ends_with(path, str_lit(".res"));
 								if(!is_resource) {
@@ -1971,7 +1968,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_WindowsPdbName: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String path = value.value_string;
-							path = string_trim_whitespace(path);
 							if (is_build_flag_path_valid(path)) {
 								if (path_is_directory(path)) {
 									gb_printf_err("Invalid -pdb-name path. %.*s, is a directory.\n", LIT(path));
@@ -2774,7 +2770,7 @@ gb_internal void export_linked_libraries(LinkerData *gen) {
 		ast_node(imp, ForeignImportDecl, e->LibraryName.decl);
 
 		for (isize i = 0; i < e->LibraryName.paths.count; i++) {
-			String lib_path = string_trim_whitespace(e->LibraryName.paths[i]);
+			String lib_path = e->LibraryName.paths[i];
 			if (lib_path.len == 0) {
 				continue;
 			}
@@ -3833,15 +3829,21 @@ gb_internal bool check_env(void) {
 	char const *odin_root = gb_get_env("ODIN_ROOT", a);
 	defer (gb_free(a, cast(void *)odin_root));
 	if (odin_root) {
-		if (!gb_file_exists(odin_root)) {
+		String path = path_spelled(a, make_string_c(odin_root));
+		defer (gb_free(a, path.text));
+		FileId id = {};
+		if (path.len == 0 || !path_file_id(path, &id)) {
 			gb_printf_err("Invalid ODIN_ROOT, directory does not exist, got %s\n", odin_root);
 			return false;
 		}
-		String path = make_string_c(odin_root);
 		if (!path_is_directory(path)) {
 			gb_printf_err("Invalid ODIN_ROOT, expected a directory, got %s\n", odin_root);
 			return false;
 		}
+	}
+	if (odin_root_dir().len == 0) {
+		gb_printf_err("Cannot find the Odin root directory; set ODIN_ROOT\n");
+		return false;
 	}
 	return true;
 }
@@ -4469,7 +4471,7 @@ int main(int arg_count, char const **arg_ptr) {
 					String base_dir = {};
 					if (find_library_collection_path(collection_name, &base_dir)) {
 						bool ok = false;
-						String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, &ok));
+						String fullpath = get_fullpath_relative(permanent_allocator(), base_dir, file_str, &ok);
 						if (ok) {
 							init_filename = fullpath;
 							if (path_is_directory(init_filename)) {

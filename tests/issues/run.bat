@@ -389,6 +389,16 @@ popd
 if exist walk_cache\.odin-cache exit /b 1
 if not exist walk_outside\keep.txt exit /b 1
 
+for /f "delims=" %%R in ('%ODIN% root') do set "ROOT_OUT=%%R"
+setlocal
+set "ODIN_ROOT=%ROOT_OUT%"
+%ODIN% check ..\test_paths_debug %COMMON% || exit /b
+set "ODIN_ROOT=%ROOT_OUT:\=/%"
+%ODIN% check ..\test_paths_debug %COMMON% || exit /b
+set "ODIN_ROOT=%ROOT_OUT%\"
+%ODIN% check ..\test_paths_debug %COMMON% || exit /b
+endlocal
+
 @rem #########################################################################################################
 
 @echo off

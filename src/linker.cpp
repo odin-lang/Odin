@@ -426,14 +426,13 @@ try_cross_linking:;
 					lib_str = gb_string_append_fmt(lib_str, " %.*s", LIT(extra_linker_flags));
 				}
 				for_array(i, e->LibraryName.paths) {
-					String lib = string_trim_whitespace(e->LibraryName.paths[i]);
+					String lib = e->LibraryName.paths[i];
 					if (lib.len == 0) {
 						continue;
 					}
 
 				#if defined(GB_SYSTEM_WINDOWS)
-					// IMPORTANT NOTE(bill): calling `string_to_lower` here is not an issue because
-					// we will never uses these strings afterwards
+					lib = copy_string(temporary_allocator(), lib);
 					string_to_lower(&lib);
 				#else
 					if (lib[0] != '/') {
@@ -759,7 +758,6 @@ try_cross_linking:;
 				if (build_context.metrics.os == TargetOs_darwin) {
 					// Print frameworks first
 					for (String lib : e->LibraryName.paths) {
-						lib = string_trim_whitespace(lib);
 						if (lib.len == 0) {
 							continue;
 						}
@@ -778,7 +776,6 @@ try_cross_linking:;
 				}
 
 				for (String lib : e->LibraryName.paths) {
-					lib = string_trim_whitespace(lib);
 					if (lib.len == 0) {
 						continue;
 					}

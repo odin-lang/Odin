@@ -6403,7 +6403,7 @@ gb_internal u64 parse_thread_cpu_time_now(void) {
 
 gb_internal ParseFileError init_ast_file(AstFile *f, String const &fullpath) {
 	GB_ASSERT(f != nullptr);
-	f->fullpath  = string_trim_whitespace(fullpath); // Just in case
+	f->fullpath  = fullpath;
 	f->filename  = remove_directory_from_path(f->fullpath);
 	// NOTE(bill): It's file, therefore unlike `directory_from_path`, this needs no file system query
 	f->directory = substring(f->fullpath, 0, gb_max(f->fullpath.len - f->filename.len - 1, 0));
@@ -6561,7 +6561,7 @@ gb_internal WORKER_TASK_PROC(foreign_file_worker_proc) {
 
 	AstForeignFile foreign_file = {wd->foreign_kind};
 
-	String fullpath = string_trim_whitespace(imp->fi.fullpath); // Just in case
+	String fullpath = imp->fi.fullpath;
 
 	char *c_str = alloc_cstring(temporary_allocator(), fullpath);
 
@@ -6978,7 +6978,7 @@ gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String b
 		node->ForeignImportDecl.collection_name = collection_name;
 	}
 
-	String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, nullptr));
+	String fullpath = get_fullpath_relative(permanent_allocator(), base_dir, file_str, nullptr);
 	*path = fullpath;
 	return true;
 }
@@ -6988,7 +6988,7 @@ gb_internal void parse_setup_import_decl(Parser *p, AstFile *f, String const &ba
 	Ast *node = *decl;
 	ast_node(id, ImportDecl, node);
 
-	String original_string = string_trim_whitespace(string_value_from_token(f, id->relpath));
+	String original_string = string_value_from_token(f, id->relpath);
 	if (is_import_path_absolute(original_string)) {
 		syntax_error(node, "Invalid import path: '%.*s'", LIT(original_string));
 		*decl = ast_bad_decl(f, id->relpath, id->relpath);
@@ -7001,7 +7001,6 @@ gb_internal void parse_setup_import_decl(Parser *p, AstFile *f, String const &ba
 		*decl = ast_bad_decl(f, id->relpath, id->relpath);
 		return;
 	}
-	import_path = string_trim_whitespace(import_path);
 
 	id->fullpath = import_path;
 	id->spelled_path = import_path;
@@ -7069,7 +7068,7 @@ gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &bas
 				Ast *fp = fl->filepaths[0];
 				GB_ASSERT(fp->kind == Ast_BasicLit);
 				Token fp_token = fp->BasicLit.token;
-				String file_str = string_trim_whitespace(string_value_from_token(f, fp_token));
+				String file_str = string_value_from_token(f, fp_token);
 				if (is_import_path_absolute(file_str)) {
 					syntax_error(node, "Invalid import path: '%.*s'", LIT(file_str));
 					decls[i] = ast_bad_decl(f, fp_token, fp_token);
