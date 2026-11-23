@@ -866,10 +866,17 @@ elif command -v readelf > /dev/null; then
 	[[ $(readelf -d needed/lib/app | grep -c -F '[libtpneeded.so]') -eq 1 ]]
 fi
 
-if [[ $(uname) != Darwin ]] && command -v addr2line > /dev/null && command -v nm > /dev/null; then
+SYMBOLIZER=""
+for candidate in llvm-symbolizer-22 llvm-symbolizer-21 llvm-symbolizer-20 llvm-symbolizer-19 llvm-symbolizer; do
+	if command -v $candidate > /dev/null; then
+		SYMBOLIZER=$candidate
+		break
+	fi
+done
+if [[ $(uname) != Darwin ]] && [[ -n $SYMBOLIZER ]] && command -v nm > /dev/null; then
 	$ODIN build ../test_paths_debug $COMMON -debug -out:debug_names
 	DEBUG_ADDR=$(nm debug_names | grep ' lib::hello$' | awk '{print $1}')
-	[[ $(addr2line -e debug_names 0x$DEBUG_ADDR | grep -c -F 'test_paths_debug/lib/main.odin:') -eq 1 ]]
+	[[ $($SYMBOLIZER --obj=debug_names 0x$DEBUG_ADDR | grep -c -F 'test_paths_debug/lib/main.odin:') -eq 1 ]]
 fi
 
 rm -rf sdk_loop walk_outside walk_cache
