@@ -360,6 +360,16 @@ mkdir "quote 100%%"
 %ODIN% build ..\test_paths_quoting %COMMON% -define:S=a\"b\" "-define:T=c d\\" "-out:quote 100%%\q.exe" || exit /b
 "quote 100%%\q.exe" || exit /b
 
+if exist tempfiles rmdir /S /Q tempfiles
+mkdir tempfiles\dll
+echo keep> tempfiles\t-helper.ll
+echo keep> tempfiles\dll\t-helper.obj
+%ODIN% build ..\test_paths_tempfiles %COMMON% -out:tempfiles\t.exe || exit /b
+.\tempfiles\t.exe || exit /b
+%ODIN% build ..\test_paths_tempfiles %COMMON% -build-mode:dll -out:tempfiles\dll\t.dll || exit /b
+if not exist tempfiles\t-helper.ll exit /b 1
+if not exist tempfiles\dll\t-helper.obj exit /b 1
+
 @rem #########################################################################################################
 
 @echo off

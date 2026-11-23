@@ -2831,40 +2831,6 @@ gb_internal bool output_overwrites_an_input(Parser *p) {
 	return false;
 }
 
-gb_internal void remove_temp_files(lbGenerator *gen) {
-	if (build_context.keep_temp_files) return;
-
-	switch (build_context.build_mode) {
-	case BuildMode_Executable:
-	case BuildMode_StaticLibrary:
-	case BuildMode_DynamicLibrary:
-		break;
-
-	case BuildMode_Object:
-	case BuildMode_Assembly:
-	case BuildMode_LLVM_IR:
-		return;
-	}
-
-	TIME_SECTION("remove temp files");
-
-	for (String const &path : gen->output_temp_paths) {
-		gb_file_remove(cast(char const *)path.text);
-	}
-
-	if (!build_context.keep_object_files) {
-		switch (build_context.build_mode) {
-		case BuildMode_Executable:
-		case BuildMode_StaticLibrary:
-		case BuildMode_DynamicLibrary:
-			for (String const &path : gen->output_object_paths) {
-				gb_file_remove(cast(char const *)path.text);
-			}
-			break;
-		}
-	}
-}
-
 
 gb_internal int print_show_help(String const arg0, String command, String optional_flag = {}) {
 	bool help_resolved = false;
@@ -4905,8 +4871,6 @@ int main(int arg_count, char const **arg_ptr) {
 				break;
 			}
 		}
-
-		remove_temp_files(gen);
 	}
 
 	if (any_errors()) {

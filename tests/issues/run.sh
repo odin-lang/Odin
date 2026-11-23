@@ -843,6 +843,16 @@ $ODIN build ../test_paths_quoting $COMMON '-define:S=a"b"' '-define:T=c d\' "-ou
 $ODIN build ../test_paths_quoting $COMMON '-define:S=a"b"' '-define:T=c d\' -build-mode:lib "-out:$QDIR/q.a"
 [[ -f "$QDIR/q.a" ]]
 
+rm -rf tempfiles
+mkdir -p tempfiles/dll
+echo keep > tempfiles/t-helper.ll
+echo keep > tempfiles/dll/t-helper.o
+$ODIN build ../test_paths_tempfiles $COMMON -out:tempfiles/t
+./tempfiles/t
+$ODIN build ../test_paths_tempfiles $COMMON -build-mode:dll -out:tempfiles/dll/t.so
+[[ -f tempfiles/t-helper.ll ]]
+[[ -f tempfiles/dll/t-helper.o ]]
+
 #########################################################################################################
 
 if [[ ! -z ${ODIN_TESTS_NO_CLANG+x} ]]; then

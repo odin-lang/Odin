@@ -4,12 +4,84 @@ struct LinkerData {
 	Array<Entity *>  foreign_libraries;
 
 	Array<String> output_object_paths;
-	Array<String> output_temp_paths;
 	bool     needs_system_library_linked;
 };
 
 gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, ...);
 gb_internal bool system_exec_command_line_app_output(char const *command, gbString *output);
+
+gb_global BlockingMutex build_temp_mutex;
+gb_global String        build_temp_dir_path;
+gb_global Array<String> build_temp_files;
+
+gb_internal void build_temp_cleanup(void) {
+	mutex_lock(&build_temp_mutex);
+	if (build_context.keep_temp_files) {
+		gb_printf_err("Temporary files kept in %.*s\n", LIT(build_temp_dir_path));
+		mutex_unlock(&build_temp_mutex);
+		return;
+	}
+	for (String const &file : build_temp_files) {
+		gb_file_remove(cast(char const *)file.text);
+	}
+#if defined(GB_SYSTEM_WINDOWS)
+	String16 wdir = string_to_string16(heap_allocator(), build_temp_dir_path);
+	RemoveDirectoryW(cast(wchar_t *)wdir.text);
+	gb_free(heap_allocator(), wdir.text);
+#else
+	rmdir(cast(char const *)build_temp_dir_path.text);
+#endif
+	mutex_unlock(&build_temp_mutex);
+}
+
+gb_internal String build_temp_file(String name) {
+	MUTEX_GUARD(&build_temp_mutex);
+	if (build_temp_dir_path.len == 0) {
+		String base = temporary_directory(heap_allocator());
+		if (base.len == 0) {
+			gb_printf_err("Failed to find the temporary directory\n");
+			exit(1);
+		}
+		String dir = {};
+	#if defined(GB_SYSTEM_WINDOWS)
+		for (u32 attempt = 0; attempt < 1000; attempt++) {
+			gbString candidate = gb_string_make(heap_allocator(), "");
+			candidate = gb_string_append_length(candidate, base.text, base.len);
+			candidate = gb_string_append_fmt(candidate, "/odin-%lu-%u", GetCurrentProcessId(), attempt);
+			String s = make_string(cast(u8 *)candidate, gb_string_length(candidate));
+			String16 wdir = string_to_string16(heap_allocator(), s);
+			bool created = CreateDirectoryW(cast(wchar_t *)wdir.text, nullptr) != 0;
+			DWORD err = GetLastError();
+			if (created) {
+				dir = copy_string(permanent_allocator(), s);
+			}
+			gb_free(heap_allocator(), wdir.text);
+			gb_string_free(candidate);
+			if (created || err != ERROR_ALREADY_EXISTS) {
+				break;
+			}
+		}
+	#else
+		gbString candidate = gb_string_make(heap_allocator(), "");
+		candidate = gb_string_append_length(candidate, base.text, base.len);
+		candidate = gb_string_appendc(candidate, "/odin-XXXXXX");
+		if (mkdtemp(candidate) != nullptr) {
+			dir = copy_string(permanent_allocator(), make_string_c(candidate));
+		}
+		gb_string_free(candidate);
+	#endif
+		if (dir.len == 0) {
+			gb_printf_err("Failed to create a temporary directory in %.*s\n", LIT(base));
+			exit(1);
+		}
+		build_temp_dir_path = dir;
+		array_init(&build_temp_files, heap_allocator());
+		atexit(build_temp_cleanup);
+	}
+	String path = concatenate3_strings(permanent_allocator(), build_temp_dir_path, str_lit("/"), name);
+	array_add(&build_temp_files, path);
+	return path;
+}
 
 gb_internal i32 system_exec_msvc_linker_app(char const *name, char const *fmt, ...) {
 	isize const cmd_cap = 64<<20;
@@ -51,15 +123,7 @@ gb_internal i32 system_exec_msvc_linker_app(char const *name, char const *fmt, .
 			rsp = gb_string_append_length(rsp, c, 1);
 		}
 
-		String dir = temporary_directory(temporary_allocator());
-		if (dir.len == 0) {
-			dir = build_context.build_paths[BuildPath_Output].basename;
-		}
-
-		gbString rsp_path = gb_string_make(heap_allocator(), "");
-		defer (gb_string_free(rsp_path));
-
-		rsp_path = gb_string_append_fmt(rsp_path, "%.*s/%.*s-%u.rsp", LIT(dir), LIT(build_context.build_paths[BuildPath_Output].name), GetCurrentProcessId());
+		char const *rsp_path = cast(char const *)build_temp_file(str_lit("link.rsp")).text;
 
 		{
 			gbFile f = {};
@@ -80,11 +144,7 @@ gb_internal i32 system_exec_msvc_linker_app(char const *name, char const *fmt, .
 		}
 
 		String quoted_rsp = quote_arg(temporary_allocator(), make_string_c(rsp_path));
-		i32 result = system_exec_command_line_app(name, "%.*s @%.*s", cast(int)exe_len, cmd, LIT(quoted_rsp));
-		if (!build_context.keep_temp_files) {
-			gb_file_remove(rsp_path);
-		}
-		return result;
+		return system_exec_command_line_app(name, "%.*s @%.*s", cast(int)exe_len, cmd, LIT(quoted_rsp));
 	}
 #endif
 
@@ -99,7 +159,6 @@ gb_internal void linker_enable_system_library_linking(LinkerData *ld) {
 gb_internal void linker_data_init(LinkerData *ld, CheckerInfo *info, String const &init_fullpath) {
 	gbAllocator ha = heap_allocator();
 	array_init(&ld->output_object_paths, ha);
-	array_init(&ld->output_temp_paths,   ha);
 	array_init(&ld->foreign_libraries,   ha, 0, 1024);
 	ptr_set_init(&ld->foreign_libraries_set, 1024);
 
@@ -340,20 +399,11 @@ try_cross_linking:;
 					if (has_asm_extension(lib)) {
 						if (!string_set_update(&asm_files, lib)) {
 							String asm_file = lib;
-							String obj_file = {};
-							String temp_dir = temporary_directory(temporary_allocator());
-							if (temp_dir.len != 0) {
-								String filename = filename_without_directory(asm_file);
-
-								gbString str = gb_string_make(heap_allocator(), "");
-								str = gb_string_append_length(str, temp_dir.text, temp_dir.len);
-								str = gb_string_appendc(str, "/");
-								str = gb_string_append_length(str, filename.text, filename.len);
-								str = gb_string_append_fmt(str, "-%p.obj", asm_file.text);
-								obj_file = make_string_c(str);
-							} else {
-								obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".obj"));
-							}
+							String filename = filename_without_directory(asm_file);
+							gbString obj_name = gb_string_make(temporary_allocator(), "");
+							obj_name = gb_string_append_length(obj_name, filename.text, filename.len);
+							obj_name = gb_string_append_fmt(obj_name, "-%p.obj", asm_file.text);
+							String obj_file = build_temp_file(make_string(cast(u8 *)obj_name, gb_string_length(obj_name)));
 
 							String obj_format = str_lit("win64");
 						#if defined(GB_ARCH_32_BIT)
@@ -471,12 +521,13 @@ try_cross_linking:;
 			defer (gb_free(heap_allocator(), rc_path.text));
 
 			if (build_context.has_resource) {
-				res_path = quote_path(heap_allocator(), build_context.build_paths[BuildPath_RES]);
 				rc_path  = quote_path(heap_allocator(), build_context.build_paths[BuildPath_RC]);
 
 				if (build_context.build_paths[BuildPath_RC].basename == "")  {
+					res_path = quote_path(heap_allocator(), build_context.build_paths[BuildPath_RES]);
 					debugf("Using precompiled resource %.*s\n", LIT(res_path));
 				} else {
+					res_path = quote_arg(heap_allocator(), build_temp_file(str_lit("resource.res")));
 					debugf("Compiling resource %.*s\n", LIT(res_path));
 
 					String rc_exe = quote_arg(temporary_allocator(), concatenate_strings(temporary_allocator(), windows_sdk_bin_path, str_lit("rc.exe")));
@@ -674,21 +725,11 @@ try_cross_linking:;
 							continue; // already handled
 						}
 						String asm_file = lib;
-						String obj_file = {};
-
-						String temp_dir = temporary_directory(temporary_allocator());
-						if (temp_dir.len != 0) {
-							String filename = filename_without_directory(asm_file);
-
-							gbString str = gb_string_make(heap_allocator(), "");
-							str = gb_string_append_length(str, temp_dir.text, temp_dir.len);
-							str = gb_string_appendc(str, "/");
-							str = gb_string_append_length(str, filename.text, filename.len);
-							str = gb_string_append_fmt(str, "-%p.o", asm_file.text);
-							obj_file = make_string_c(str);
-						} else {
-							obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".o"));
-						}
+						String filename = filename_without_directory(asm_file);
+						gbString obj_name = gb_string_make(temporary_allocator(), "");
+						obj_name = gb_string_append_length(obj_name, filename.text, filename.len);
+						obj_name = gb_string_append_fmt(obj_name, "-%p.o", asm_file.text);
+						String obj_file = build_temp_file(make_string(cast(u8 *)obj_name, gb_string_length(obj_name)));
 
 						String obj_format;
 						if (build_context.metrics.ptr_size == 8) {
