@@ -102,6 +102,25 @@ big_then_mutate :: #force_no_inline proc() -> (Big, int) {
 	return g_big, mutate()
 }
 
+@(private="file")
+g_cond := true
+
+@(private="file")
+mutate_cond :: proc() -> bool {
+	mutate()
+	return g_cond
+}
+
+@(private="file")
+take_big_cond :: #force_no_inline proc(b: Big, _: bool) -> int {
+	return b.v
+}
+
+@(private="file")
+take_big_cond_c :: #force_no_inline proc "c" (b: Big, _: bool) -> int {
+	return b.v
+}
+
 // These checks share the globals.
 // Tests run in parallel: the checks are kept in one test.
 @test
@@ -151,6 +170,29 @@ test_evaluation_order_values_read_where_evaluated :: proc(t: ^testing.T) {
 	g_vec = 1
 	vec := g_vec + Vec{f32(mutate()), 0, 0, 0}
 	testing.expect_value(t, vec[0], 1)
+
+	// A later operand with branches of its own
+	g_big.v = 1
+	testing.expect_value(t, take_big_cond(g_big, mutate_cond() && g_cond), 1)
+	g_big.v = 1
+	testing.expect_value(t, take_big_cond(g_big, !g_cond || mutate_cond()), 1)
+	g_big.v = 1
+	testing.expect_value(t, take_big(g_big, mutate() if g_cond else 0), 1)
+	empty: map[int]int
+	g_big.v = 1
+	testing.expect_value(t, take_big(g_big, empty[mutate()] or_else 0), 1)
+	g_big.v = 1
+	testing.expect_value(t, take_big_cond_c(g_big, mutate_cond() && g_cond), 1)
+	g_big.v = 1
+	testing.expect_value(t, first_big(g_big, Big{v = int(mutate_cond() && g_cond)}), 1)
+
+	g_big.v = 1
+	elems = [2]Big{g_big, {v = mutate() if g_cond else 0}}
+	testing.expect_value(t, elems[0].v, 1)
+
+	g_big.v = 1
+	b, _ := g_big, mutate_cond() && g_cond
+	testing.expect_value(t, b.v, 1)
 }
 
 @(private="file")
@@ -169,6 +211,12 @@ note :: proc(i: int) -> Big {
 @(private="file")
 note_int :: proc(i: int) -> int {
 	return note(i).v
+}
+
+@(private="file")
+note_cond :: proc(i: int) -> bool {
+	_ = note(i)
+	return g_cond
 }
 
 @(private="file")
@@ -206,5 +254,9 @@ test_evaluation_order_left_to_right :: proc(t: ^testing.T) {
 	expect_order(t, {1, 2})
 	a, b := note(1), note(2)
 	_, _ = a, b
+	expect_order(t, {1, 2})
+	_ = take_big_cond(note(1), note_cond(2) && note_cond(3))
+	expect_order(t, {1, 2, 3})
+	_ = take_big(note(1), note_int(2) if g_cond else note_int(3))
 	expect_order(t, {1, 2})
 }

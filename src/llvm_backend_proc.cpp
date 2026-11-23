@@ -1284,6 +1284,10 @@ gb_internal lbCallWrites lb_call_writes(LLVMValueRef call) {
 	if (string_starts_with(name, str_lit("llvm.lifetime.")) || string_starts_with(name, str_lit("llvm.dbg."))) {
 		return lbCallWrites_Nothing;
 	}
+	// NOTE(bill): A generated equality procedure only reads, e.g. the case values a `switch` compares its tag with.
+	if (string_starts_with(name, str_lit("__$equal"))) {
+		return lbCallWrites_Nothing;
+	}
 	if (lb_is_memory_intrinsic_call(call)) {
 		return lbCallWrites_Destination;
 	}
@@ -1401,12 +1405,12 @@ gb_internal LLVMValueRef lb_call_given(LLVMValueRef temp) {
 	return nullptr;
 }
 
-// NOTE(bill): What after `first`, up to `last` or the end of its block, may write the memory based at `base`.
+// NOTE(bill): What from `first`, up to `last` or the end of its block, may write the memory based at `base`.
 // A store into another local cannot, and nor can a copy of memory onto itself, e.g. a bare `return` of named results.
 // A call can, unless `r` knows its procedure to be read-only.
-gb_internal lbWrites lb_writes_after(lbReadOnlyCalls *r, LLVMValueRef first, LLVMValueRef last, LLVMValueRef base) {
+gb_internal lbWrites lb_writes_from(lbReadOnlyCalls *r, LLVMValueRef first, LLVMValueRef last, LLVMValueRef base) {
 	lbWrites writes = lbWrites_None;
-	for (LLVMValueRef i = LLVMGetNextInstruction(first); i != last; i = LLVMGetNextInstruction(i)) {
+	for (LLVMValueRef i = first; i != last; i = LLVMGetNextInstruction(i)) {
 		LLVMValueRef dst = nullptr;
 		switch (LLVMGetInstructionOpcode(i)) {
 		case LLVMStore:
@@ -1454,21 +1458,61 @@ gb_internal bool lb_nothing_writes_between(lbReadOnlyCalls *r, LLVMValueRef copy
 	if (LLVMGetInstructionParent(copy) != LLVMGetInstructionParent(call)) {
 		return false;
 	}
-	return lb_writes_after(r, copy, call, lb_pointer_base(LLVMGetOperand(copy, 1))) == lbWrites_None;
+	return lb_writes_from(r, LLVMGetNextInstruction(copy), call, lb_pointer_base(LLVMGetOperand(copy, 1))) == lbWrites_None;
 }
 
 // NOTE(bill): What since `load`, up to where the builder is, may have written the memory it read.
-// Expressions write only memory they create themselves, so a store into another local cannot.
-// Only a load in the current block is looked at: a copy right after it is sure to come before the read.
+// Expressions write only memory they create themselves: a store into another local cannot write it.
+// A copy made for the read goes right after the load, and must come before the read.
+// A load in another block is looked at only when every path to the builder's block passes through the load's block.
+// Walking back from the builder's block finds the blocks in between, e.g. those of a later operand's `&&`.
+// Too many of them, or a path around the load's block, and the address is used as it is.
 gb_internal lbWrites lb_writes_since_load(lbProcedure *p, LLVMValueRef load) {
-	if (LLVMGetInstructionParent(load) != LLVMGetInsertBlock(p->builder)) {
-		return lbWrites_None;
-	}
 	LLVMValueRef base = lb_pointer_base(LLVMGetOperand(load, 0));
 	if ((LLVMIsAGlobalVariable(base) && LLVMIsGlobalConstant(base)) || ptr_set_exists(&p->parameter_storage, base)) {
 		return lbWrites_None;
 	}
-	return lb_writes_after(nullptr, load, nullptr, base);
+
+	lbWrites          writes = lb_writes_from(nullptr, LLVMGetNextInstruction(load), nullptr, base);
+	LLVMBasicBlockRef from   = LLVMGetInstructionParent(load);
+	LLVMBasicBlockRef here   = LLVMGetInsertBlock(p->builder);
+	if (from == here) {
+		return writes;
+	}
+
+	enum {MAX_BLOCKS_BETWEEN = 16};
+	LLVMBasicBlockRef between[MAX_BLOCKS_BETWEEN] = {here};
+	isize             count = 1;
+	for (isize i = 0; i < count; i++) {
+		LLVMBasicBlockRef block = between[i];
+		writes = gb_max(writes, lb_writes_from(nullptr, LLVMGetFirstInstruction(block), nullptr, base));
+
+		// NOTE(bill): A block's uses are the branches to it.
+		// The entry block has none, and so has a block nothing reaches.
+		LLVMUseRef use = LLVMGetFirstUse(LLVMBasicBlockAsValue(block));
+		if (use == nullptr) {
+			return lbWrites_None;
+		}
+		for (/**/; use != nullptr; use = LLVMGetNextUse(use)) {
+			LLVMValueRef branch = LLVMGetUser(use);
+			if (!LLVMIsAInstruction(branch)) {
+				return lbWrites_None;
+			}
+			LLVMBasicBlockRef pred = LLVMGetInstructionParent(branch);
+			bool seen = pred == from;
+			for (isize j = 0; j < count && !seen; j++) {
+				seen = between[j] == pred;
+			}
+			if (seen) {
+				continue;
+			}
+			if (count == MAX_BLOCKS_BETWEEN) {
+				return lbWrites_None;
+			}
+			between[count++] = pred;
+		}
+	}
+	return writes;
 }
 
 // NOTE(bill): The address a value was loaded from stands for the value only while nothing has written that memory since.
