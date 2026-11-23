@@ -908,6 +908,12 @@ CACHE_OUT=$($ODIN build cache_test/src -internal-cached -show-timings -out:cache
 "$ODIN_FULL" clear-cache -out:cache_test/x
 [[ ! -e cache_test/.odin-cache ]]
 
+PREFIX_DIR="$(cd ../test_paths_prefix_map && pwd -P)"
+$ODIN build ../test_paths_prefix_map $COMMON -debug "-path-prefix-map:..=wrong" "-path-prefix-map:$ROOT_OUT=root" "-path-prefix-map:../test_paths_prefix_map=src" -out:prefix_map
+./prefix_map
+if grep -qaF "$PREFIX_DIR" prefix_map; then exit 1; fi
+if grep -qaF "${ROOT_OUT%/}" prefix_map; then exit 1; fi
+
 #########################################################################################################
 
 if [[ ! -z ${ODIN_TESTS_NO_CLANG+x} ]]; then

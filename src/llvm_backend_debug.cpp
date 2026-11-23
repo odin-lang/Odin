@@ -55,16 +55,17 @@ gb_internal LLVMMetadataRef lb_get_file_metadata(lbModule *m, AstFile *f) {
 	MUTEX_GUARD(&m->debug_values_mutex);
 	LLVMMetadataRef res = lb_get_llvm_metadata(m, f);
 	if (res == nullptr) {
+		String path = path_prefix_map_apply(f->fullpath);
 	#if LLVM_VERSION_MAJOR >= 22
 		String checksum = lb_debug_file_checksum(f);
 		res = LLVMDIBuilderCreateFileWithChecksum(m->debug_builder,
-			cast(char const *)f->fullpath.text, f->fullpath.len,
+			cast(char const *)path.text, path.len,
 			"", 0,
 			CSK_MD5, cast(char const *)checksum.text, checksum.len,
 			nullptr, 0);
 	#else
 		res = LLVMDIBuilderCreateFile(m->debug_builder,
-			cast(char const *)f->fullpath.text, f->fullpath.len,
+			cast(char const *)path.text, path.len,
 			"", 0);
 	#endif
 		lb_set_llvm_metadata(m, f, res);

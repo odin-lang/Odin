@@ -443,6 +443,11 @@ enum SanitizerFlags : u32 {
 	SanitizerFlag_Thread  = 1u<<2,
 };
 
+struct PathPrefixMap {
+	String from;
+	String to;
+};
+
 struct BuildCacheData {
 	u64 crc;
 	String cache_dir;
@@ -663,6 +668,7 @@ struct BuildContext {
 	bool   dynamic_map_calls;
 
 	SourceCodeLocationInfo source_code_location_info;
+	Array<PathPrefixMap>   path_prefix_maps;
 
 	bool   min_link_libs;
 
@@ -1741,6 +1747,42 @@ gb_internal bool has_asm_extension(String const &path) {
 		return true;
 	}
 	return false;
+}
+
+gb_internal String path_prefix_map_apply(String path) {
+	for (isize i = build_context.path_prefix_maps.count-1; i >= 0; i--) {
+		PathPrefixMap const &m = build_context.path_prefix_maps[i];
+		if (path.len < m.from.len) {
+			continue;
+		}
+		bool match = true;
+		for (isize j = 0; j < m.from.len; j++) {
+			u8 a = path[j];
+			u8 b = m.from[j];
+		#if defined(GB_SYSTEM_WINDOWS)
+			a = a == '\\' ? '/' : cast(u8)gb_char_to_lower(cast(char)a);
+			b = b == '\\' ? '/' : cast(u8)gb_char_to_lower(cast(char)b);
+		#endif
+			if (a != b) {
+				match = false;
+				break;
+			}
+		}
+		if (!match) {
+			continue;
+		}
+		String rest = substring(path, m.from.len, path.len);
+		bool from_ends_in_separator = path_is_separator(m.from[m.from.len-1]);
+		if (rest.len > 0 && !path_is_separator(rest[0]) && !from_ends_in_separator) {
+			continue;
+		}
+		bool to_ends_in_separator = m.to.len > 0 && (m.to[m.to.len-1] == '/' || m.to[m.to.len-1] == '\\');
+		if (rest.len > 0 && path_is_separator(rest[0]) && (m.to.len == 0 || to_ends_in_separator)) {
+			rest = substring(rest, 1, rest.len);
+		}
+		return concatenate_strings(permanent_allocator(), m.to, rest);
+	}
+	return path;
 }
 
 // temporary

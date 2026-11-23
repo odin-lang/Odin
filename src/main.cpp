@@ -514,6 +514,7 @@ enum BuildFlagKind {
 	BuildFlag_DynamicMapCalls,
 	BuildFlag_ObfuscateSourceCodeLocations,
 	BuildFlag_SourceCodeLocations,
+	BuildFlag_PathPrefixMap,
 
 	BuildFlag_Compact,
 	BuildFlag_GlobalDefinitions,
@@ -723,6 +724,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_ObfuscateSourceCodeLocations, str_lit("obfuscate-source-code-locations"), BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_SourceCodeLocations, 		str_lit("source-code-locations"), 		BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_PathPrefixMap,           str_lit("path-prefix-map"),           BuildFlagParam_String,  Command__does_check, true);
 
 	add_flag(&build_flags, BuildFlag_Short,                   str_lit("short"),                     BuildFlagParam_None,    Command_doc);
 	add_flag(&build_flags, BuildFlag_InSourceOrder,           str_lit("in-source-order"),           BuildFlagParam_None,    Command_doc);
@@ -1674,6 +1676,35 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								bad_flags = true;
 							}
 							break;
+
+						case BuildFlag_PathPrefixMap: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							String str = value.value_string;
+							isize eq_pos = -1;
+							for (isize i = 0; i < str.len; i++) {
+								if (str[i] == '=') {
+									eq_pos = i;
+									break;
+								}
+							}
+							if (eq_pos <= 0) {
+								gb_printf_err("Expected -path-prefix-map:<old>=<new>, got '%.*s'\n", LIT(param));
+								bad_flags = true;
+								break;
+							}
+							String from = path_spelled(permanent_allocator(), substring(str, 0, eq_pos));
+							if (from.len == 0) {
+								gb_printf_err("Invalid -path-prefix-map path, got '%.*s'\n", LIT(substring(str, 0, eq_pos)));
+								bad_flags = true;
+								break;
+							}
+							if (build_context.path_prefix_maps.allocator.proc == nullptr) {
+								array_init(&build_context.path_prefix_maps, heap_allocator());
+							}
+							PathPrefixMap m = {path_trim_trailing_separators(from), substring(str, eq_pos+1, str.len)};
+							array_add(&build_context.path_prefix_maps, m);
+							break;
+						}
 
 						case BuildFlag_DefaultToNilAllocator:
 							if (build_context.ODIN_DEFAULT_TO_PANIC_ALLOCATOR) {
@@ -3406,6 +3437,15 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Sets the base name of the resulting .odin-doc file.");
 			print_usage_line(2, "The extension can be optionally included; the resulting file will always have an extension of '.odin-doc'.");
 			print_usage_line(2, "Example: -out:foo");
+		}
+	}
+
+	if (check) {
+		if (print_flag("-path-prefix-map:<old>=<new>")) {
+			print_usage_line(2, "Replaces the directory <old> with <new> at the start of the paths stored in the output:");
+			print_usage_line(2, "#file, #directory, source code locations, debug info and ODIN_ROOT.");
+			print_usage_line(2, "May be given more than once; the last one that matches a path wins.");
+			print_usage_line(2, "Example: -path-prefix-map:C:/work/project=.");
 		}
 	}
 

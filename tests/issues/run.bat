@@ -431,6 +431,9 @@ if exist "\\?\%LP%\.odin-cache" exit /b 1
 if not exist "\\?\%LP%\out.exe" exit /b 1
 rmdir /S /Q "\\?\%CD%\long_path" || exit /b
 
+%ODIN% build ..\test_paths_prefix_map %COMMON% -debug "-path-prefix-map:..=wrong" "-path-prefix-map:%ROOT_OUT%=root" "-path-prefix-map:..\test_paths_prefix_map=src" -out:prefix_map.exe || exit /b
+.\prefix_map.exe || exit /b
+
 @rem #########################################################################################################
 
 @echo off

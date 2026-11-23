@@ -1178,6 +1178,7 @@ gb_internal void lb_set_file_line_col(lbProcedure *p, Array<lbValue> arr, TokenP
 
 	switch (build_context.source_code_location_info) {
 	case SourceCodeLocationInfo_Normal:
+		file = path_prefix_map_apply(file);
 		break;
 	case SourceCodeLocationInfo_Obfuscated:
 		file = obfuscate_string(file, "F");
