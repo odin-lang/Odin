@@ -570,45 +570,45 @@ string16_ge :: #force_inline proc "contextless" (a, b: string16) -> bool { retur
 
 
 cstring_len :: proc "contextless" (s: cstring) -> int {
+	if s == nil {
+		return 0
+	}
+
+	start := uintptr(rawptr(s))
 	when ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2") {
-		if s == nil {
-			return 0
-		}
+		V :: #simd[32]u8
 
-		start := uintptr(rawptr(s))
-		p     := start &~ 31
-		zero: #simd[32]u8
-
-		v := intrinsics.volatile_load((^#simd[32]u8)(p))
-		m := transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, zero))
+		p := start &~ 31
+		v := intrinsics.volatile_load((^V)(p))
+		m := transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
 		m &= ~u32(0) << (start-p)
 		for _ in 0..<3 {
 			if m != 0 {
 				return int(p - start + uintptr(intrinsics.count_trailing_zeros(m)))
 			}
 			p += 32
-			v = intrinsics.volatile_load((^#simd[32]u8)(p))
-			m = transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, zero))
+			v = intrinsics.volatile_load((^V)(p))
+			m = transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
 		}
 
 		if m == 0 {
 			p = (p + 32) &~ 127
 			for {
-				a := intrinsics.volatile_load((^#simd[32]u8)(p))
-				b := intrinsics.volatile_load((^#simd[32]u8)(p+32))
-				c := intrinsics.volatile_load((^#simd[32]u8)(p+64))
-				d := intrinsics.volatile_load((^#simd[32]u8)(p+96))
+				a := intrinsics.volatile_load((^V)(p))
+				b := intrinsics.volatile_load((^V)(p+32))
+				c := intrinsics.volatile_load((^V)(p+64))
+				d := intrinsics.volatile_load((^V)(p+96))
 				lowest := intrinsics.simd_min(intrinsics.simd_min(a, b), intrinsics.simd_min(c, d))
-				if intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(lowest, zero)) != {} {
-					ma := u64(transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(a, zero)))
-					mb := u64(transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(b, zero)))
+				if intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(lowest, 0)) != {} {
+					ma := u64(transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(a, 0)))
+					mb := u64(transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(b, 0)))
 					low := ma | mb<<32
 					if low != 0 {
 						return int(p - start + uintptr(intrinsics.count_trailing_zeros(low)))
 					}
 
-					mc := u64(transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(c, zero)))
-					md := u64(transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(d, zero)))
+					mc := u64(transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(c, 0)))
+					md := u64(transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(d, 0)))
 					high := mc | md<<32
 					return int(p + 64 - start + uintptr(intrinsics.count_trailing_zeros(high)))
 				}
@@ -617,71 +617,60 @@ cstring_len :: proc "contextless" (s: cstring) -> int {
 		}
 		return int(p - start + uintptr(intrinsics.count_trailing_zeros(m)))
 	} else when HAS_HARDWARE_SIMD {
-		if s == nil {
-			return 0
-		}
+		V :: #simd[16]u8
 
-		start := uintptr(rawptr(s))
-		p     := start &~ 15
-		zero: #simd[16]u8
-
-		v := intrinsics.volatile_load((^#simd[16]u8)(p))
-		m := transmute(u16)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, zero))
+		p := start &~ 15
+		v := intrinsics.volatile_load((^V)(p))
+		m := transmute(u16)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
 		m >>= (start-p)
 		if m != 0 {
 			return int(intrinsics.count_trailing_zeros(m))
 		}
+
 		when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
 			for _ in 0..<7 {
+				p += 16
+				v = intrinsics.volatile_load((^V)(p))
+				m = transmute(u16)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
+				if m != 0 {
+					return int(p - start + uintptr(intrinsics.count_trailing_zeros(m)))
+				}
+			}
+
+			p = (p + 16) &~ 63
+			for {
+				a := intrinsics.volatile_load((^V)(p))
+				b := intrinsics.volatile_load((^V)(p+16))
+				c := intrinsics.volatile_load((^V)(p+32))
+				d := intrinsics.volatile_load((^V)(p+48))
+				lowest := intrinsics.simd_min(intrinsics.simd_min(a, b), intrinsics.simd_min(c, d))
+				if intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(lowest, 0)) != {} {
+					break
+				}
+				p += 64
+			}
+
+			for {
+				v = intrinsics.volatile_load((^V)(p))
+				m = transmute(u16)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
 				if m != 0 {
 					return int(p - start + uintptr(intrinsics.count_trailing_zeros(m)))
 				}
 				p += 16
-				v = intrinsics.volatile_load((^#simd[16]u8)(p))
-				m = transmute(u16)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, zero))
 			}
-
-			if m == 0 {
-				p = (p + 16) &~ 63
-				for {
-					a := intrinsics.volatile_load((^#simd[16]u8)(p))
-					b := intrinsics.volatile_load((^#simd[16]u8)(p+16))
-					c := intrinsics.volatile_load((^#simd[16]u8)(p+32))
-					d := intrinsics.volatile_load((^#simd[16]u8)(p+48))
-					lowest := intrinsics.simd_min(intrinsics.simd_min(a, b), intrinsics.simd_min(c, d))
-					if intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(lowest, zero)) != {} {
-						break
-					}
-					p += 64
-				}
-
-				for {
-					v = intrinsics.volatile_load((^#simd[16]u8)(p))
-					m = transmute(u16)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, zero))
-					if m != 0 {
-						return int(p - start + uintptr(intrinsics.count_trailing_zeros(m)))
-					}
-					p += 16
-				}
+		} else {
+			for m == 0 {
+				p += 16
+				v = intrinsics.volatile_load((^V)(p))
+				m = transmute(u16)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
 			}
+			return int(p - start + uintptr(intrinsics.count_trailing_zeros(m)))
 		}
-		for m == 0 {
-			p += 16
-			v = intrinsics.volatile_load((^#simd[16]u8)(p))
-			m = transmute(u16)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, zero))
-		}
-		return int(p - start + uintptr(intrinsics.count_trailing_zeros(m)))
 	} else when ODIN_ENDIAN == .Little {
-		if s == nil {
-			return 0
-		}
-
 		ONES  :: ~uintptr(0) / 0xff
 		HIGHS :: ONES << 7
 
-		start := uintptr(rawptr(s))
-		p     := start &~ (size_of(uintptr)-1)
-
+		p := start &~ (size_of(uintptr)-1)
 		w := intrinsics.volatile_load((^uintptr)(p))
 		w |= (uintptr(1) << ((start-p)*8)) - 1
 		z := (w - ONES) &~ w & HIGHS
@@ -692,12 +681,11 @@ cstring_len :: proc "contextless" (s: cstring) -> int {
 		}
 		return int(p - start + uintptr(intrinsics.count_trailing_zeros(z) >> 3))
 	} else {
-		p0 := uintptr((^byte)(s))
-		p := p0
+		p := start
 		for p != 0 && (^byte)(p)^ != 0 {
 			p += 1
 		}
-		return int(p - p0)
+		return int(p - start)
 	}
 }
 
