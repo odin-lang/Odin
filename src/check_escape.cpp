@@ -78,8 +78,7 @@ struct EscapeIndex {
 };
 
 // a list of distinct items, which finds them through an index once it is long enough for that to pay
-// NOTE: a copy of a list shares its index, which holds the items of the copy that last added to it; as items are only
-// ever added, a copy holding fewer finds its own among them, and one that adds to it then makes its own
+// NOTE: copies of a list share `data` and one index, so only one copy may add items
 template <typename T>
 struct EscapeList : Array<T> {
 	EscapeIndex *index;
@@ -425,21 +424,34 @@ gb_internal void escape_index_put(EscapeIndex *index, u32 hash, isize at) {
 	}
 }
 
-// with room for twice the items of the list, so at most half its slots are used
+// `room` is a power of two at least twice `items.count`, so at most half its slots are used
 template <typename T>
-gb_internal void escape_index_fill(EscapeIndex *index, EscapeList<T> const &list, isize room) {
-	index->slots = slice_make<u32>(list.allocator, room);
+gb_internal void escape_index_fill(EscapeIndex *index, gbAllocator a, Slice<T> items, isize room) {
+	index->slots = slice_make<u32>(a, room);
 	gb_zero_size(index->slots.data, index->slots.count*gb_size_of(u32));
-	index->used = list.count;
-	for_array(i, list) {
-		escape_index_put(index, escape_hash(list.data[i]), i);
+	index->used = items.count;
+	for_array(i, items) {
+		escape_index_put(index, escape_hash(items.data[i]), i);
 	}
+}
+
+template <typename T>
+gb_internal T *escape_index_find(EscapeIndex const *index, Slice<T> items, T const &x, u32 hash) {
+	usize mask = cast(usize)index->slots.count-1;
+	for (usize i = hash & mask; index->slots[i] != 0; i = (i+1) & mask) {
+		isize at = cast(isize)index->slots[i]-1;
+		if (at < items.count && escape_eq(x, items.data[at])) {
+			return &items.data[at];
+		}
+	}
+	return nullptr;
 }
 
 template <typename T>
 gb_internal void escape_list_index(EscapeList<T> *list) {
 	list->index = gb_alloc_item(list->allocator, EscapeIndex);
-	escape_index_fill(list->index, *list, next_pow2_isize(2*list->count));
+	// room to double before rebuilding (e.g. 64 slots for 16 items)
+	escape_index_fill(list->index, list->allocator, slice_from_array(*list), next_pow2_isize(4*list->count));
 }
 
 template <typename T>
@@ -467,12 +479,8 @@ gb_internal T *escape_list_add_unique(EscapeList<T> *list, T const &x) {
 
 	u32 hash = escape_hash(x);
 	EscapeIndex *index = list->index;
-	usize mask = cast(usize)index->slots.count-1;
-	for (usize i = hash & mask; index->slots[i] != 0; i = (i+1) & mask) {
-		isize at = cast(isize)index->slots[i]-1;
-		if (at < list->count && escape_eq(x, list->data[at])) {
-			return &list->data[at];
-		}
+	if (T *found = escape_index_find(index, slice_from_array(*list), x, hash)) {
+		return found;
 	}
 
 	array_add(list, x);
@@ -480,12 +488,42 @@ gb_internal T *escape_list_add_unique(EscapeList<T> *list, T const &x) {
 		// another copy added to it first
 		escape_list_index(list);
 	} else if (list->count*2 > index->slots.count) {
-		escape_index_fill(index, *list, 2*index->slots.count);
+		escape_index_fill(index, list->allocator, slice_from_array(*list), 2*index->slots.count);
 	} else {
 		escape_index_put(index, hash, list->count-1);
 		index->used = list->count;
 	}
 	return nullptr;
+}
+
+// whether every item of `wanted` from `from` onwards is equal to one in `items`
+template <typename T>
+gb_internal bool escape_slice_contains_all(Slice<T> items, Slice<T> wanted, isize from) {
+	if (items.count < ESCAPE_INDEX_FROM) {
+		for (isize i = from; i < wanted.count; i++) {
+			bool found = false;
+			for (T const &y : items) {
+				if (escape_eq(wanted[i], y)) {
+					found = true;
+					break;
+				}
+			}
+			if (!found) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	TEMPORARY_ALLOCATOR_GUARD();
+	EscapeIndex index = {};
+	escape_index_fill(&index, temporary_allocator(), items, next_pow2_isize(2*items.count));
+	for (isize i = from; i < wanted.count; i++) {
+		if (escape_index_find(&index, items, wanted[i], escape_hash(wanted[i])) == nullptr) {
+			return false;
+		}
+	}
+	return true;
 }
 
 gb_internal EscapeValue escape_value(void) {
@@ -5116,13 +5154,15 @@ gb_internal void escape_update_member(EscapeGraph *g, Slice<EscapeMemberTask> ta
 	EscapeMemberTask &t = tasks[k];
 	DeclInfo *d = g->procs[t.v]->decl;
 
-	// the same flows, in any order
-	bool same = t.flows.count == d->proc->escape_flows.count;
-	for (isize i = 0; same && i < t.flows.count; i++) {
-		same = false;
-		for (EscapeFlow const &other : d->proc->escape_flows) {
-			same |= escape_eq(t.flows[i], other);
-		}
+	// the same flows, in any order; both slices hold distinct items, so equal counts and containment suffice
+	Slice<EscapeFlow> old = d->proc->escape_flows;
+	bool same = t.flows.count == old.count;
+	isize i = 0;
+	while (same && i < t.flows.count && escape_eq(t.flows[i], old[i])) {
+		i++;
+	}
+	if (same && i < t.flows.count) {
+		same = escape_slice_contains_all(old, t.flows, i);
 	}
 	if (same) {
 		return;
