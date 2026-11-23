@@ -6,6 +6,7 @@ pushd build
 
 set COMMON=-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -show-timings
 set ODIN=..\..\..\odin
+set ODIN_FULL=%CD%\..\..\..\odin.exe
 
 @echo on
 
@@ -100,6 +101,7 @@ set ODIN=..\..\..\odin
 @rem #########################################################################################################
 
 @rem "odin build" tests:
+
 %ODIN% build "..\test_issue_2113" %COMMON% -debug || exit /b
 %ODIN% build "..\test_issue_objc_class_method_calls" -target:darwin_arm64 -build-mode:obj %COMMON% || exit /b
 %ODIN% build "..\test_issue_2395" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
@@ -282,6 +284,162 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 
 %ODIN% test "..\test_issue_win64_wide_vector_args" %COMMON% || exit /b
 %ODIN% test "..\test_issue_win64_wide_vector_args" %COMMON% -microarch:haswell || exit /b
+if exist issue_7990 rmdir /S /Q issue_7990
+mkdir issue_7990\test_issue_7990\build
+mkdir issue_7990\test_issue_7990\deep\build
+mkdir issue_7990\directory.data
+mkdir issue_7990\collision
+mkdir issue_7990\.hiddendir
+copy ..\test_issue_7990\test_issue_7990.odin issue_7990\test_issue_7990\ > nul || exit /b
+copy ..\test_issue_7990\.hidden.odin issue_7990\ > nul || exit /b
+copy ..\test_issue_7990\directory.data\main.odin issue_7990\directory.data\ > nul || exit /b
+copy ..\test_issue_7990\collision.odin issue_7990\ > nul || exit /b
+copy ..\test_issue_7990\.hiddendir\main.odin issue_7990\.hiddendir\ > nul || exit /b
+pushd issue_7990\test_issue_7990\build
+"%ODIN_FULL%" build .. || exit /b
+if not exist test_issue_7990.exe exit /b
+popd
+pushd issue_7990\test_issue_7990\deep\build
+"%ODIN_FULL%" build ..\.. || exit /b
+if not exist test_issue_7990.exe exit /b
+popd
+%ODIN% build "issue_7990\directory.data" || exit /b
+if not exist directory.data.exe exit /b
+%ODIN% build "issue_7990\.hiddendir" || exit /b
+if not exist .hiddendir.exe exit /b
+"%ODIN_FULL%" build "issue_7990\.hidden.odin" -file || exit /b
+if not exist .hidden.exe exit /b
+pushd issue_7990
+"%ODIN_FULL%" build collision.odin -file || exit /b
+if not exist collision.exe exit /b
+popd
+"%ODIN_FULL%" build issue_7990\collision.odin -file || exit /b
+if not exist collision.exe exit /b 1
+mklink /J spelled_link issue_7990\.hiddendir > nul || exit /b
+%ODIN% build spelled_link || exit /b
+if not exist spelled_link.exe exit /b 1
+%ODIN% build issue_7990\.hiddendir -out:no_such_dir\x.exe 2>&1 | find /c "does not exist" | findstr /x "1" || exit /b
+%ODIN% build issue_7990\.hiddendir -out:issue_7990 2>&1 | find /c "is a directory" | findstr /x "1" || exit /b
+%ODIN% build issue_7990\.hiddendir -out:no_such_dir\ 2>&1 | find /c "give a file name" | findstr /x "1" || exit /b
+%ODIN% build issue_7990\collision.odin -file -out:issue_7990\collision.odin 2>&1 | find /c "would overwrite the input" | findstr /x "1" || exit /b
+%ODIN% build issue_7990\.hiddendir -build-mode:llvm-ir -out:x.ll 2>&1 | find /c "existing directory" | findstr /x "1" || exit /b
+%ODIN% build issue_7990\.hiddendir -out:nul.exe 2>&1 | find /c "reserved device name" | findstr /x "1" || exit /b
+%ODIN% build issue_7990\.hiddendir -out:ab:c.exe 2>&1 | find /c "not a valid file name" | findstr /x "1" || exit /b
+%ODIN% build C:\ 2>&1 | find /c "is the filesystem root" | findstr /x "1" || exit /b
+if exist no_such_dir exit /b 1
+%ODIN% build issue_7990\.hiddendir -out:no_extension || exit /b
+if not exist no_extension.exe exit /b 1
+%ODIN% build issue_7990\.hiddendir -build-mode:dll -out:no_extension || exit /b
+if not exist no_extension.dll exit /b 1
+rmdir spelled_link
+
+%ODIN% check ..\test_paths_directives -no-entry-point %COMMON% 2>&1 | find /c "it contains a NUL byte" | findstr /x "1" || exit /b
+%ODIN% check ..\test_paths_directives -no-entry-point %COMMON% 2>&1 | find /c "Unknown library collection" | findstr /x "1" || exit /b
+%ODIN% check ..\test_paths_directives -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+
+if exist identity\alias rmdir identity\alias
+if exist identity rmdir /S /Q identity
+%SystemRoot%\System32\xcopy.exe /E /I /Q ..\test_paths_identity identity > nul || exit /b
+mklink /J identity\alias identity\pkg > nul || exit /b
+%ODIN% build identity\main -out:identity_main.exe %COMMON% || exit /b
+.\identity_main.exe || exit /b
+%ODIN% build identity\main_case -out:identity_case.exe %COMMON% || exit /b
+.\identity_case.exe || exit /b
+mkdir identity\loaddir\files
+echo b> identity\loaddir\files\b.txt
+echo a> identity\loaddir\files\a.txt
+%ODIN% build identity\loaddir -out:identity_loaddir.exe %COMMON% || exit /b
+.\identity_loaddir.exe > identity_loaddir.txt || exit /b
+%SystemRoot%\System32\findstr.exe /n "^" identity_loaddir.txt | %SystemRoot%\System32\findstr.exe /b /l /c:"1:a.txt" || exit /b
+%SystemRoot%\System32\findstr.exe /n "^" identity_loaddir.txt | %SystemRoot%\System32\findstr.exe /b /l /c:"2:b.txt" || exit /b
+%SystemRoot%\System32\find.exe /c /v "" identity_loaddir.txt | %SystemRoot%\System32\findstr.exe /e ": 2" || exit /b
+rmdir identity\alias
+
+if exist "quote 100%%" rmdir /S /Q "quote 100%%"
+mkdir "quote 100%%"
+%ODIN% build ..\test_paths_quoting %COMMON% -define:S=a\"b\" "-define:T=c d\\" "-out:quote 100%%\q.exe" || exit /b
+"quote 100%%\q.exe" || exit /b
+
+if exist tempfiles rmdir /S /Q tempfiles
+mkdir tempfiles\dll
+echo keep> tempfiles\t-helper.ll
+echo keep> tempfiles\dll\t-helper.obj
+%ODIN% build ..\test_paths_tempfiles %COMMON% -out:tempfiles\t.exe || exit /b
+.\tempfiles\t.exe || exit /b
+%ODIN% build ..\test_paths_tempfiles %COMMON% -build-mode:dll -out:tempfiles\dll\t.dll || exit /b
+if not exist tempfiles\t-helper.ll exit /b 1
+if not exist tempfiles\dll\t-helper.obj exit /b 1
+
+%ODIN% build ..\test_paths_resource %COMMON% -resource:..\test_paths_resource\res.rc -out:resource_default.exe || exit /b
+.\resource_default.exe || exit /b
+%ODIN% build ..\test_paths_resource %COMMON% -resource:..\test_paths_resource\res.rc -linker:lld -out:resource_lld.exe || exit /b
+.\resource_lld.exe || exit /b
+
+if exist walk_cache\.odin-cache\outside rmdir walk_cache\.odin-cache\outside
+if exist walk_cache rmdir /S /Q walk_cache
+if exist walk_outside rmdir /S /Q walk_outside
+mkdir walk_cache\.odin-cache\sub
+mkdir walk_outside
+echo keep> walk_outside\keep.txt
+echo gone> walk_cache\.odin-cache\sub\gone.txt
+mklink /J walk_cache\.odin-cache\outside walk_outside > nul || exit /b
+pushd walk_cache
+"%ODIN_FULL%" clear-cache || exit /b
+popd
+if exist walk_cache\.odin-cache exit /b 1
+if not exist walk_outside\keep.txt exit /b 1
+
+for /f "delims=" %%R in ('%ODIN% root') do set "ROOT_OUT=%%R"
+setlocal
+set "ODIN_ROOT=%ROOT_OUT%"
+%ODIN% check ..\test_paths_debug %COMMON% || exit /b
+set "ODIN_ROOT=%ROOT_OUT:\=/%"
+%ODIN% check ..\test_paths_debug %COMMON% || exit /b
+set "ODIN_ROOT=%ROOT_OUT%\"
+%ODIN% check ..\test_paths_debug %COMMON% || exit /b
+endlocal
+
+if exist cache_test rmdir /S /Q cache_test
+mkdir cache_test\src
+%SystemRoot%\System32\xcopy.exe /E /I /Q ..\test_paths_debug cache_test\src > nul || exit /b
+%ODIN% build cache_test\src -internal-cached -show-timings -out:cache_test\one.exe || exit /b
+%ODIN% build cache_test\src -internal-cached -show-timings -out:cache_test\two.exe 2>&1 | %SystemRoot%\System32\find.exe /c "type check" | findstr /x "0" || exit /b
+.\cache_test\two.exe || exit /b
+%ODIN% build cache_test\src -internal-cached -debug -show-timings -out:cache_test\dbg.exe || exit /b
+del cache_test\dbg.pdb
+%ODIN% build cache_test\src -internal-cached -debug -show-timings -out:cache_test\dbg.exe 2>&1 | %SystemRoot%\System32\find.exe /c "type check" | findstr /x "0" || exit /b
+if not exist cache_test\dbg.pdb exit /b 1
+echo // changed>> cache_test\src\lib\main.odin
+%ODIN% build cache_test\src -internal-cached -show-timings -out:cache_test\three.exe 2>&1 | %SystemRoot%\System32\find.exe /c "type check" | findstr /x "1" || exit /b
+%ODIN% clear-cache -out:cache_test\x.exe || exit /b
+if exist cache_test\.odin-cache exit /b 1
+
+set "SEG=long_path_segment_0123456789_0123456789_0123456789_0123456789"
+set "LP=%CD%\long_path\%SEG%\%SEG%\%SEG%\%SEG%\%SEG%"
+if exist long_path rmdir /S /Q "\\?\%CD%\long_path"
+md "\\?\%LP%\lib" || exit /b
+echo package main> "\\?\%LP%\main.odin"
+echo import "lib">> "\\?\%LP%\main.odin"
+echo main :: proc() { lib.f() }>> "\\?\%LP%\main.odin"
+echo package lib> "\\?\%LP%\lib\lib.odin"
+echo f :: proc() {}>> "\\?\%LP%\lib\lib.odin"
+%ODIN% check "%LP%" %COMMON% || exit /b
+%ODIN% build "%LP%" %COMMON% -linker:lld -internal-cached "-out:%LP%\out.exe" || exit /b
+%ODIN% build "%LP%" %COMMON% -linker:lld -internal-cached "-out:%LP%\out.exe" 2>&1 | %SystemRoot%\System32\find.exe /c "type check" | findstr /x "0" || exit /b
+%ODIN% clear-cache "-out:%LP%\out.exe" || exit /b
+if exist "\\?\%LP%\.odin-cache" exit /b 1
+if not exist "\\?\%LP%\out.exe" exit /b 1
+rmdir /S /Q "\\?\%CD%\long_path" || exit /b
+
+%ODIN% build ..\test_paths_prefix_map %COMMON% -debug "-path-prefix-map:..=wrong" "-path-prefix-map:%ROOT_OUT%=root" "-path-prefix-map:..\test_paths_prefix_map=src" -out:prefix_map.exe || exit /b
+.\prefix_map.exe || exit /b
+
+if exist deps_test rmdir /S /Q deps_test
+%SystemRoot%\System32\xcopy.exe /E /I /Q ..\test_paths_deps "deps_test\a b#$" > nul || exit /b
+%ODIN% build "deps_test\a b#$" %COMMON% -export-dependencies:make -export-dependencies-file:deps.d -out:deps.exe || exit /b
+%SystemRoot%\System32\find.exe "deps_test/a\ b\#$$/data.txt" deps.d || exit /b
+%ODIN% build "deps_test\a b#$" %COMMON% -export-dependencies:json -export-dependencies-file:deps.json -out:deps.exe || exit /b
+%SystemRoot%\System32\find.exe "deps_test/a b#$/data.txt" deps.json || exit /b
 
 @rem #########################################################################################################
 
@@ -289,3 +447,5 @@ fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 
 popd
 rmdir /S /Q build
+
+@echo Issue tests successful.

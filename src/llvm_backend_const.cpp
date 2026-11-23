@@ -415,6 +415,7 @@ gb_internal lbValue lb_const_source_code_location_const(lbModule *m, String cons
 
 	switch (build_context.source_code_location_info) {
 	case SourceCodeLocationInfo_Normal:
+		file = path_prefix_map_apply(file);
 		break;
 	case SourceCodeLocationInfo_Obfuscated:
 		file = obfuscate_string(file, "F");

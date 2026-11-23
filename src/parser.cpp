@@ -6403,7 +6403,7 @@ gb_internal u64 parse_thread_cpu_time_now(void) {
 
 gb_internal ParseFileError init_ast_file(AstFile *f, String const &fullpath) {
 	GB_ASSERT(f != nullptr);
-	f->fullpath  = string_trim_whitespace(fullpath); // Just in case
+	f->fullpath  = fullpath;
 	f->filename  = remove_directory_from_path(f->fullpath);
 	// NOTE(bill): It's file, therefore unlike `directory_from_path`, this needs no file system query
 	f->directory = substring(f->fullpath, 0, gb_max(f->fullpath.len - f->filename.len - 1, 0));
@@ -6467,10 +6467,40 @@ gb_internal void destroy_ast_file(AstFile *f) {
 	array_free(&f->imports);
 }
 
+gb_global Parser *identity_parser;
+
+gb_internal String package_identity_key(gbAllocator a, String path) {
+	FileId id = {};
+	if (path_file_id(path, &id)) {
+		u8 *b = gb_alloc_array(a, u8, 1+gb_size_of(FileId));
+		b[0] = 'i';
+		gb_memmove(b+1, &id, gb_size_of(FileId));
+		return make_string(b, 1+gb_size_of(FileId));
+	}
+	return concatenate_strings(a, str_lit("s"), path);
+}
+
+gb_internal AstPackage *find_package_by_identity(String path) {
+	if (identity_parser == nullptr) {
+		return nullptr;
+	}
+	String key = package_identity_key(heap_allocator(), path);
+	defer (gb_free(heap_allocator(), key.text));
+	AstPackage *pkg = nullptr;
+	MUTEX_GUARD_BLOCK(&identity_parser->imported_files_mutex) {
+		AstPackage **found = string_map_get(&identity_parser->imported_files, key);
+		if (found != nullptr) {
+			pkg = *found;
+		}
+	}
+	return pkg;
+}
+
 gb_internal bool init_parser(Parser *p) {
 	GB_ASSERT(p != nullptr);
-	string_set_init(&p->imported_files);
+	string_map_init(&p->imported_files);
 	array_init(&p->packages, permanent_allocator());
+	identity_parser = p;
 	return true;
 }
 
@@ -6484,7 +6514,10 @@ gb_internal void destroy_parser(Parser *p) {
 		array_free(&pkg->foreign_files);
 	}
 	array_free(&p->packages);
-	string_set_destroy(&p->imported_files);
+	string_map_destroy(&p->imported_files);
+	if (identity_parser == p) {
+		identity_parser = nullptr;
+	}
 }
 
 
@@ -6528,7 +6561,7 @@ gb_internal WORKER_TASK_PROC(foreign_file_worker_proc) {
 
 	AstForeignFile foreign_file = {wd->foreign_kind};
 
-	String fullpath = string_trim_whitespace(imp->fi.fullpath); // Just in case
+	String fullpath = imp->fi.fullpath;
 
 	char *c_str = alloc_cstring(temporary_allocator(), fullpath);
 
@@ -6561,20 +6594,26 @@ gb_internal void parser_add_foreign_file_to_process(Parser *p, AstPackage *pkg, 
 
 
 // NOTE(bill): Returns true if it's added
-gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const &rel_path, TokenPos pos, PackageKind kind = Package_Normal) {
+gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const &rel_path, TokenPos pos, PackageKind kind = Package_Normal, String *package_path = nullptr) {
 	String const FILE_EXT = str_lit(".odin");
 
+	path = copy_string(permanent_allocator(), path);
+	if (package_path) *package_path = path;
+
+	String key = package_identity_key(permanent_allocator(), path);
+	AstPackage *pkg = nullptr;
 	MUTEX_GUARD_BLOCK(&p->imported_files_mutex) {
-		if (string_set_update(&p->imported_files, path)) {
+		AstPackage **found = string_map_get(&p->imported_files, key);
+		if (found != nullptr) {
+			if (package_path) *package_path = (*found)->fullpath;
 			return nullptr;
 		}
+		pkg = permanent_alloc_item<AstPackage>();
+		pkg->fullpath = path;
+		string_map_set(&p->imported_files, key, pkg);
 	}
 
-	path = copy_string(permanent_allocator(), path);
-
-	AstPackage *pkg = permanent_alloc_item<AstPackage>();
 	pkg->kind = kind;
-	pkg->fullpath = path;
 	array_init(&pkg->files, permanent_allocator());
 	pkg->foreign_files.allocator = permanent_allocator();
 	pkg->files_to_parse.store(1);
@@ -6749,44 +6788,45 @@ gb_internal bool is_import_path_absolute(String const &path) {
 }
 
 gb_internal bool is_build_flag_path_valid(String const &path) {
-	if (path.len > 0) {
-		u8 *start = path.text;
-		u8 *end = path.text + path.len;
-		u8 *curr = start;
-		isize index = 0;
-		while (curr < end) {
-			isize width = 1;
-			Rune r = *curr;
-			if (r >= 0x80) {
-				width = utf8_decode(curr, end-curr, &r);
-				if (r == GB_RUNE_INVALID && width == 1) {
-					return false;
-				}
-				else if (r == GB_RUNE_BOM && curr-start > 0) {
-					return false;
-				}
-			}
-
-			for (isize i = 0; i < gb_count_of(illegal_import_runes); i++) {
-#if defined(GB_SYSTEM_WINDOWS)
-				if (r == '\\') {
-					break;
-				} else if (r == ':') {
-					break;
-				}
-#endif
-				if (r == illegal_import_runes[i]) {
-					return false;
-				}
-			}
-
-			curr += width;
-			index += 1;
-		}
-
-		return true;
+	if (path.len == 0) {
+		return false;
 	}
-	return false;
+#if defined(GB_SYSTEM_WINDOWS)
+	isize start = 0;
+	if (string_starts_with(path, str_lit("\\\\?\\")) || string_starts_with(path, str_lit("//?/"))) {
+		start = 4;
+	}
+	isize drive_colon = -1;
+	if (path.len >= start+2 && gb_char_is_alpha(cast(char)path.text[start]) && path.text[start+1] == ':') {
+		drive_colon = start+1;
+	}
+	for (isize i = start; i < path.len; i++) {
+		u8 c = path.text[i];
+		if (c < 32 || c == '<' || c == '>' || c == '"' || c == '|' || c == '?' || c == '*') {
+			return false;
+		}
+		if (c == ':' && i != drive_colon) {
+			return false;
+		}
+	}
+	u8 *curr = path.text;
+	u8 *end = path.text + path.len;
+	while (curr < end) {
+		Rune r = 0;
+		isize width = utf8_decode(curr, end-curr, &r);
+		if ((r == GB_RUNE_INVALID && width == 1) || (r >= 0xd800 && r <= 0xdfff)) {
+			return false;
+		}
+		curr += width;
+	}
+#else
+	for (isize i = 0; i < path.len; i++) {
+		if (path.text[i] == 0) {
+			return false;
+		}
+	}
+#endif
+	return true;
 }
 
 
@@ -6824,25 +6864,43 @@ gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String b
 		}
 	}
 
-	bool has_windows_drive = false;
+	for (isize i = 0; i < original_string.len; i++) {
+		if (original_string.text[i] == 0) {
+			do_error(node, "Invalid path: it contains a NUL byte");
+			return false;
+		}
+	}
+
+	String spelled = original_string;
 #if defined(GB_SYSTEM_WINDOWS)
 	if (in_checker) {
-		if (!is_import_decl_path &&
-		    colon_pos == 1 &&
-		    original_string.len > 2 &&
-		    gb_char_is_alpha(original_string[0]) &&
-		    (original_string[2] == '/' || original_string[2] == '\\')) {
-			colon_pos = -1;
-			has_windows_drive = true;
-		}
-
-		for (isize i = 0; i < original_string.len; i++) {
-			if (original_string.text[i] == '\\') {
-				original_string.text[i] = '/';
+		spelled = copy_string(permanent_allocator(), original_string);
+		for (isize i = 0; i < spelled.len; i++) {
+			if (spelled.text[i] == '\\') {
+				spelled.text[i] = '/';
 			}
 		}
 	}
 #endif
+
+	bool is_absolute = is_import_path_absolute(spelled) || (spelled.len > 0 && spelled[0] == '\\');
+	if (is_absolute) {
+		if (is_import_decl_path) {
+			do_error(node, "Invalid import path: '%.*s'", LIT(original_string));
+			return false;
+		}
+		isize skip = 0;
+		if (spelled.len > 1 && spelled[1] == ':') {
+			skip = 2;
+		}
+		String rest = substring(spelled, skip, spelled.len);
+		if (rest.len < 2 || !is_import_path_valid(rest)) {
+			do_error(node, "Invalid path: '%.*s'", LIT(original_string));
+			return false;
+		}
+		*path = path_spelled(permanent_allocator(), spelled);
+		return true;
+	}
 
 	String file_str = {};
 	if (colon_pos == 0) {
@@ -6850,25 +6908,19 @@ gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String b
 		return false;
 	}
 
-	if (original_string.len > 0 && colon_pos > 0) {
-		collection_name = substring(original_string, 0, colon_pos);
-		file_str = substring(original_string, colon_pos+1, original_string.len);
+	if (spelled.len > 0 && colon_pos > 0) {
+		collection_name = substring(spelled, 0, colon_pos);
+		file_str = substring(spelled, colon_pos+1, spelled.len);
 	} else {
-		file_str = original_string;
+		file_str = spelled;
 	}
 
-	if (is_import_decl_path && is_import_path_absolute(file_str)) {
+	if (is_import_path_absolute(file_str)) {
 		do_error(node, "Invalid import path: '%.*s'", LIT(file_str));
 		return false;
 	}
 
-	if (has_windows_drive) {
-		String sub_file_path = substring(file_str, 3, file_str.len);
-		if (!is_import_path_valid(sub_file_path)) {
-			do_error(node, "Invalid import path: '%.*s'", LIT(file_str));
-			return false;
-		}
-	} else if (!is_import_path_valid(file_str)) {
+	if (!is_import_path_valid(file_str)) {
 		do_error(node, "Invalid import path: '%.*s'", LIT(file_str));
 		return false;
 	}
@@ -6926,12 +6978,8 @@ gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String b
 		node->ForeignImportDecl.collection_name = collection_name;
 	}
 
-	if (has_windows_drive) {
-		*path = file_str;
-	} else {
-		String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, nullptr));
-		*path = fullpath;
-	}
+	String fullpath = get_fullpath_relative(permanent_allocator(), base_dir, file_str, nullptr);
+	*path = fullpath;
 	return true;
 }
 
@@ -6940,7 +6988,7 @@ gb_internal void parse_setup_import_decl(Parser *p, AstFile *f, String const &ba
 	Ast *node = *decl;
 	ast_node(id, ImportDecl, node);
 
-	String original_string = string_trim_whitespace(string_value_from_token(f, id->relpath));
+	String original_string = string_value_from_token(f, id->relpath);
 	if (is_import_path_absolute(original_string)) {
 		syntax_error(node, "Invalid import path: '%.*s'", LIT(original_string));
 		*decl = ast_bad_decl(f, id->relpath, id->relpath);
@@ -6953,13 +7001,15 @@ gb_internal void parse_setup_import_decl(Parser *p, AstFile *f, String const &ba
 		*decl = ast_bad_decl(f, id->relpath, id->relpath);
 		return;
 	}
-	import_path = string_trim_whitespace(import_path);
 
 	id->fullpath = import_path;
+	id->spelled_path = import_path;
 	if (is_package_name_reserved(import_path)) {
 		return;
 	}
-	try_add_import_path(p, import_path, original_string, ast_token(node).pos);
+	String package_path = {};
+	try_add_import_path(p, import_path, original_string, ast_token(node).pos, Package_Normal, &package_path);
+	id->fullpath = package_path;
 }
 
 gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &base_dir, Slice<Ast *> &decls);
@@ -7018,7 +7068,7 @@ gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &bas
 				Ast *fp = fl->filepaths[0];
 				GB_ASSERT(fp->kind == Ast_BasicLit);
 				Token fp_token = fp->BasicLit.token;
-				String file_str = string_trim_whitespace(string_value_from_token(f, fp_token));
+				String file_str = string_value_from_token(f, fp_token);
 				if (is_import_path_absolute(file_str)) {
 					syntax_error(node, "Invalid import path: '%.*s'", LIT(file_str));
 					decls[i] = ast_bad_decl(f, fp_token, fp_token);
@@ -7797,26 +7847,13 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	GB_ASSERT(init_filename.text[init_filename.len] == 0);
 
-	String init_fullpath = path_to_full_path(permanent_allocator(), init_filename);
+	String init_fullpath = path_spelled(permanent_allocator(), init_filename);
 
 	if (!path_is_directory(init_fullpath)) {
 		String const ext = str_lit(".odin");
 		if (!string_ends_with(init_fullpath, ext)) {
 			error({}, "Expected either a directory or a .odin file, got '%.*s'\n", LIT(init_filename));
 			return ParseFile_WrongExtension;
-		}
-	} else if (init_fullpath.len != 0) {
-		String path = init_fullpath;
-		if (path[path.len-1] == '/') {
-			path.len -= 1;
-		}
-		if ((build_context.command_kind & Command__does_build) &&
-		    build_context.build_mode == BuildMode_Executable) {
-			String output_path = path_to_string(temporary_allocator(), build_context.build_paths[8]);
-			if (path_is_directory(output_path)) {
-			    	error({}, "Please specify the executable name with -out:<string> as a directory exists with the same name in the current working directory");
-			    	return ParseFile_DirectoryAlreadyExists;
-			}
 		}
 	}
 
@@ -7851,7 +7888,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 
 
 		for (String const &path : build_context.extra_packages) {
-			String fullpath = path_to_full_path(permanent_allocator(), path); // LEAK?
+			String fullpath = path_spelled(permanent_allocator(), path);
 			if (!path_is_directory(fullpath)) {
 				String const ext = str_lit(".odin");
 				if (!string_ends_with(fullpath, ext)) {
@@ -7859,7 +7896,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 					return ParseFile_WrongExtension;
 				}
 			}
-			string_set_add(&extra_fullpaths, fullpath);
+			string_set_add(&extra_fullpaths, package_identity_key(permanent_allocator(), fullpath));
 			try_add_import_path(p, fullpath, fullpath, init_pos, Package_Normal);
 		}
 	}
@@ -7872,7 +7909,9 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	}
 
 	for (AstPackage *pkg : p->packages) {
-		pkg->is_extra = string_set_exists(&extra_fullpaths, pkg->fullpath);
+		String key = package_identity_key(heap_allocator(), pkg->fullpath);
+		pkg->is_extra = string_set_exists(&extra_fullpaths, key);
+		gb_free(heap_allocator(), key.text);
 		for (AstFile *file : pkg->files) {
 			p->total_seen_load_directive_count += file->seen_load_directive_count;
 		}

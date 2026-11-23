@@ -3199,31 +3199,32 @@ gb_internal String lb_filepath_ll_for_module(lbModule *m) {
 		s = m->info->init_package->name;
 	}
 
-	if (build_context.out_filepath.len > 0) {
-		path = concatenate_strings(permanent_allocator(), path, s);
-		path = concatenate_strings(permanent_allocator(), path, STR_LIT(".ll"));
-	} else {
-		path = concatenate_strings(permanent_allocator(), s, STR_LIT(".ll"));
-	}
+	path = concatenate3_strings(permanent_allocator(), path, s, STR_LIT(".ll"));
 	return path;
+}
+
+gb_internal bool lb_object_is_intermediate(void) {
+	switch (build_context.build_mode) {
+	case BuildMode_Executable:
+	case BuildMode_StaticLibrary:
+	case BuildMode_DynamicLibrary:
+		return !build_context.keep_object_files && !build_context.keep_temp_files;
+	}
+	return false;
 }
 
 gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 	String basename = build_context.build_paths[BuildPath_Output].basename;
 	String name = build_context.build_paths[BuildPath_Output].name;
 
-	bool use_temporary_directory = false;
-	if (USE_SEPARATE_MODULES && build_context.build_mode == BuildMode_Executable) {
-		// NOTE(bill): use a temporary directory
-		String dir = temporary_directory(permanent_allocator());
-		if (dir.len != 0) {
-			basename = dir;
-			use_temporary_directory = true;
-		}
-	}
+	// NOTE(bill): use a temporary directory
+	bool use_temporary_directory = lb_object_is_intermediate();
 
-	gbString path = gb_string_make_length(heap_allocator(), basename.text, basename.len);
-	path = gb_string_appendc(path, "/");
+	gbString path = gb_string_make(heap_allocator(), "");
+	if (!use_temporary_directory) {
+		path = gb_string_append_length(path, basename.text, basename.len);
+		path = gb_string_appendc(path, "/");
+	}
 
 	bool output_is_directory = path_is_directory(build_context.build_paths[BuildPath_Output]);
 
@@ -3270,8 +3271,12 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 	path = gb_string_append_length(path, ".", 1);
 	path = gb_string_append_length(path, ext.text, ext.len);
 
-	return make_string(cast(u8 *)path, gb_string_length(path));
-
+	String result = make_string(cast(u8 *)path, gb_string_length(path));
+	if (use_temporary_directory) {
+		result = build_temp_file(result);
+		gb_string_free(path);
+	}
+	return result;
 }
 
 gb_internal void lb_add_foreign_library_paths(lbGenerator *gen) {
@@ -3303,7 +3308,6 @@ gb_internal bool lb_llvm_object_generation(lbGenerator *gen, bool do_threading) 
 				continue;
 			}
 			array_add(&gen->output_object_paths, lb_filepath_obj_for_module(m));
-			array_add(&gen->output_temp_paths, lb_filepath_ll_for_module(m));
 		}
 		for (lbModule *m : lb_modules_by_cost(gen)) {
 			if (lb_is_module_empty(m)) {
@@ -3793,12 +3797,12 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				}
 			}
 
-			LLVMMetadataRef init_file_metadata = lb_get_file_metadata(m, init_file);
-			if (init_file_metadata == nullptr) {
-				// every file of the initial package was excluded by its build tags, as can be done for `odin test`
-				String path = m->info->init_package->fullpath;
-				init_file_metadata = LLVMDIBuilderCreateFile(m->debug_builder, cast(char const *)path.text, path.len, "", 0);
+			if (init_file == nullptr && m->info->runtime_package != nullptr && m->info->runtime_package->files.count > 0) {
+				// every file of the initial package was excluded by its build tags, as can be done for `odin test`;
+				// a real file keeps the line table's checksums
+				init_file = m->info->runtime_package->files[0];
 			}
+			LLVMMetadataRef init_file_metadata = lb_get_file_metadata(m, init_file);
 
 			LLVMBool split_debug_inlining = build_context.build_mode == BuildMode_Assembly;
 			LLVMBool debug_info_for_profiling = false;
@@ -4300,8 +4304,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				exit_with_errors();
 				return false;
 			}
-			array_add(&gen->output_temp_paths, filepath_ll);
-
 		}
 		if (build_context.build_mode == BuildMode_LLVM_IR) {
 			return true;

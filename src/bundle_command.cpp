@@ -169,23 +169,21 @@ gb_internal bool zip_writer_add_file(ZipWriter *w, String name, String path) {
 	return w->ok;
 }
 
-gb_internal GB_COMPARE_PROC(file_info_name_cmp) {
-	return string_compare((cast(FileInfo const *)a)->name, (cast(FileInfo const *)b)->name);
-}
-
 // Adds every file under `dir`, named `prefix` followed by its path relative to `dir`, in a stable order.
-gb_internal bool zip_writer_add_directory(ZipWriter *w, String prefix, String dir) {
+gb_internal bool zip_writer_add_directory_visited(ZipWriter *w, String prefix, String dir, StringSet *visited) {
 	Array<FileInfo> list = {};
 	defer (array_free(&list));
 	if (read_directory(dir, &list) != ReadDirectory_None) {
 		return true; // empty or missing
 	}
-	array_sort(list, file_info_name_cmp);
 
 	for (FileInfo const &fi : list) {
 		String name = concatenate_strings(permanent_allocator(), prefix, fi.name);
 		if (fi.is_dir) {
-			if (!zip_writer_add_directory(w, concatenate_strings(permanent_allocator(), name, str_lit("/")), fi.fullpath)) {
+			if (!file_id_visit(visited, fi.fullpath)) {
+				continue;
+			}
+			if (!zip_writer_add_directory_visited(w, concatenate_strings(permanent_allocator(), name, str_lit("/")), fi.fullpath, visited)) {
 				return false;
 			}
 		} else if (!zip_writer_add_file(w, name, fi.fullpath)) {
@@ -193,6 +191,14 @@ gb_internal bool zip_writer_add_directory(ZipWriter *w, String prefix, String di
 		}
 	}
 	return true;
+}
+
+gb_internal bool zip_writer_add_directory(ZipWriter *w, String prefix, String dir) {
+	StringSet visited = {};
+	string_set_init(&visited, 64);
+	defer (string_set_destroy(&visited));
+	file_id_visit(&visited, dir);
+	return zip_writer_add_directory_visited(w, prefix, dir, &visited);
 }
 
 gb_internal bool zip_writer_finish(ZipWriter *w) {
@@ -363,7 +369,7 @@ gb_internal String android_newest_sdk_dir(String dir, String prefix, String key,
 
 gb_internal void android_remove_directory(String path) {
 #if defined(GB_SYSTEM_WINDOWS)
-	String16 wpath = string_to_string16(temporary_allocator(), path);
+	String16 wpath = string_to_win32_path(temporary_allocator(), path);
 	RemoveDirectoryW(alloc_wstring(temporary_allocator(), wpath));
 #else
 	rmdir(alloc_cstring(temporary_allocator(), path));
@@ -504,9 +510,11 @@ i32 bundle_android(String original_init_directory) {
 	if (has_res) {
 		TIME_SECTION("Android aapt2 compile");
 		gb_string_clear(cmd);
-		cmd = gb_string_append_fmt(cmd, "\"%.*saapt2\" compile", LIT(build_tools));
-		cmd = gb_string_append_fmt(cmd, " --dir \"%.*s\"", LIT(res_dir));
-		cmd = gb_string_append_fmt(cmd, " -o \"%.*s\"", LIT(res_zip));
+		cmd = append_quoted(cmd, concatenate_strings(temporary_allocator(), build_tools, str_lit("aapt2")));
+		cmd = gb_string_appendc(cmd, " compile --dir ");
+		cmd = append_quoted(cmd, res_dir);
+		cmd = gb_string_appendc(cmd, " -o ");
+		cmd = append_quoted(cmd, res_zip);
 		result = system_exec_command_line_app("android-aapt2-compile", "%s", cmd);
 		if (result) {
 			return result;
@@ -516,18 +524,24 @@ i32 bundle_android(String original_init_directory) {
 	TIME_SECTION("Android aapt2 link");
 	{
 		gb_string_clear(cmd);
-		cmd = gb_string_append_fmt(cmd, "\"%.*saapt2\" link", LIT(build_tools));
-		cmd = gb_string_append_fmt(cmd, " -o \"%.*s\"", LIT(linked_zip));
-		cmd = gb_string_append_fmt(cmd, " -I \"%.*s\"", LIT(android_jar));
-		cmd = gb_string_append_fmt(cmd, " --manifest \"%.*s\"", LIT(manifest));
+		cmd = append_quoted(cmd, concatenate_strings(temporary_allocator(), build_tools, str_lit("aapt2")));
+		cmd = gb_string_appendc(cmd, " link -o ");
+		cmd = append_quoted(cmd, linked_zip);
+		cmd = gb_string_appendc(cmd, " -I ");
+		cmd = append_quoted(cmd, android_jar);
+		cmd = gb_string_appendc(cmd, " --manifest ");
+		cmd = append_quoted(cmd, manifest);
 		if (app_bundle) {
 			cmd = gb_string_appendc(cmd, " --proto-format");
 		}
 		if (has_res) {
-			cmd = gb_string_append_fmt(cmd, " -R \"%.*s\" --auto-add-overlay", LIT(res_zip));
+			cmd = gb_string_appendc(cmd, " -R ");
+			cmd = append_quoted(cmd, res_zip);
+			cmd = gb_string_appendc(cmd, " --auto-add-overlay");
 		}
 		if (path_is_directory(assets_dir)) {
-			cmd = gb_string_append_fmt(cmd, " -A \"%.*s\"", LIT(assets_dir));
+			cmd = gb_string_appendc(cmd, " -A ");
+			cmd = append_quoted(cmd, assets_dir);
 		}
 		// Defaults for what the manifest leaves out.
 		cmd = gb_string_append_fmt(cmd, " --min-sdk-version %d", ODIN_ANDROID_API_LEVEL);
@@ -574,9 +588,13 @@ i32 bundle_android(String original_init_directory) {
 		TIME_SECTION("Android bundletool");
 		{
 			gb_string_clear(cmd);
-			cmd = gb_string_append_fmt(cmd, "\"%.*sjava\" -jar \"%.*s\" build-bundle", LIT(java_bin), LIT(bundletool));
-			cmd = gb_string_append_fmt(cmd, " \"--modules=%.*s\"", LIT(module_zip));
-			cmd = gb_string_append_fmt(cmd, " \"--output=%.*s\"", LIT(output));
+			cmd = append_quoted(cmd, concatenate_strings(temporary_allocator(), java_bin, str_lit("java")));
+			cmd = gb_string_appendc(cmd, " -jar ");
+			cmd = append_quoted(cmd, bundletool);
+			cmd = gb_string_appendc(cmd, " build-bundle ");
+			cmd = append_quoted(cmd, concatenate_strings(temporary_allocator(), str_lit("--modules="), module_zip));
+			cmd = gb_string_appendc(cmd, " ");
+			cmd = append_quoted(cmd, concatenate_strings(temporary_allocator(), str_lit("--output="), output));
 			cmd = gb_string_appendc(cmd, " --overwrite");
 			result = system_exec_command_line_app("android-bundletool", "%s", cmd);
 			if (result) {
@@ -587,12 +605,17 @@ i32 bundle_android(String original_init_directory) {
 		TIME_SECTION("Android jarsigner");
 		{
 			gb_string_clear(cmd);
-			cmd = gb_string_append_fmt(cmd, "\"%.*sjarsigner\"", LIT(java_bin));
-			cmd = gb_string_append_fmt(cmd, " -keystore \"%.*s\"", LIT(keystore));
+			cmd = append_quoted(cmd, concatenate_strings(temporary_allocator(), java_bin, str_lit("jarsigner")));
+			cmd = gb_string_appendc(cmd, " -keystore ");
+			cmd = append_quoted(cmd, keystore);
 			if (keystore_password.len != 0) {
-				cmd = gb_string_append_fmt(cmd, " -storepass \"%.*s\"", LIT(keystore_password));
+				cmd = gb_string_appendc(cmd, " -storepass ");
+				cmd = append_quoted(cmd, keystore_password);
 			}
-			cmd = gb_string_append_fmt(cmd, " \"%.*s\" \"%.*s\"", LIT(output), LIT(keystore_alias));
+			cmd = gb_string_appendc(cmd, " ");
+			cmd = append_quoted(cmd, output);
+			cmd = gb_string_appendc(cmd, " ");
+			cmd = append_quoted(cmd, keystore_alias);
 			result = system_exec_command_line_app("android-jarsigner", "%s", cmd);
 			if (result) {
 				return result;
@@ -602,10 +625,12 @@ i32 bundle_android(String original_init_directory) {
 		TIME_SECTION("Android zipalign");
 		{
 			gb_string_clear(cmd);
-			cmd = gb_string_append_fmt(cmd, "\"%.*szipalign\"", LIT(build_tools));
+			cmd = append_quoted(cmd, concatenate_strings(temporary_allocator(), build_tools, str_lit("zipalign")));
 			// Uncompressed native libraries must start on a page, which is up to 16 KiB on Android 15 and later.
-			cmd = gb_string_appendc(cmd, " -P 16 -f 4");
-			cmd = gb_string_append_fmt(cmd, " \"%.*s\" \"%.*s\"", LIT(module_zip), LIT(output));
+			cmd = gb_string_appendc(cmd, " -P 16 -f 4 ");
+			cmd = append_quoted(cmd, module_zip);
+			cmd = gb_string_appendc(cmd, " ");
+			cmd = append_quoted(cmd, output);
 			result = system_exec_command_line_app("android-zipalign", "%s", cmd);
 			if (result) {
 				return result;
@@ -616,18 +641,22 @@ i32 bundle_android(String original_init_directory) {
 		{
 			gb_string_clear(cmd);
 		#if defined(GB_SYSTEM_WINDOWS)
-			cmd = gb_string_append_fmt(cmd, "\"%.*sapksigner.bat\" sign", LIT(build_tools));
+			cmd = append_quoted(cmd, concatenate_strings(temporary_allocator(), build_tools, str_lit("apksigner.bat")));
 		#else
-			cmd = gb_string_append_fmt(cmd, "\"%.*sapksigner\" sign", LIT(build_tools));
+			cmd = append_quoted(cmd, concatenate_strings(temporary_allocator(), build_tools, str_lit("apksigner")));
 		#endif
-			cmd = gb_string_append_fmt(cmd, " --ks \"%.*s\"", LIT(keystore));
+			cmd = gb_string_appendc(cmd, " sign --ks ");
+			cmd = append_quoted(cmd, keystore);
 			if (keystore_alias.len != 0) {
-				cmd = gb_string_append_fmt(cmd, " --ks-key-alias \"%.*s\"", LIT(keystore_alias));
+				cmd = gb_string_appendc(cmd, " --ks-key-alias ");
+				cmd = append_quoted(cmd, keystore_alias);
 			}
 			if (keystore_password.len != 0) {
-				cmd = gb_string_append_fmt(cmd, " --ks-pass \"pass:%.*s\"", LIT(keystore_password));
+				cmd = gb_string_appendc(cmd, " --ks-pass ");
+				cmd = append_quoted(cmd, concatenate_strings(temporary_allocator(), str_lit("pass:"), keystore_password));
 			}
-			cmd = gb_string_append_fmt(cmd, " \"%.*s\"", LIT(output));
+			cmd = gb_string_appendc(cmd, " ");
+			cmd = append_quoted(cmd, output);
 			result = system_exec_command_line_app("android-apksigner", "%s", cmd);
 			if (result) {
 				return result;

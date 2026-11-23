@@ -79,13 +79,15 @@ gb_global Timings global_timings = {0};
 #include "bug_report.cpp"
 
 #if defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
-int run_subprocess(const char *name, const char **args, bool honor_path = false);
+int run_subprocess(const char *name, const char **args, bool honor_path = false, bool raise_signal = true);
 #endif
 
 // NOTE(bill): 'name' is used in debugging and profiling modes
 gb_internal i32 system_exec_command_line_app_internal(bool exit_on_err, char const *name, char const *fmt, va_list va) {
 	isize const cmd_cap = 64<<20; // 64 MiB should be more than enough
 	char *cmd_line = gb_alloc_array(gb_heap_allocator(), char, cmd_cap);
+	char *cmd_buf = cmd_line;
+	defer (gb_free(gb_heap_allocator(), cmd_buf));
 	isize cmd_len = 0;
 	i32 exit_code = 0;
 
@@ -157,15 +159,8 @@ gb_internal i32 system_exec_command_line_app_internal(bool exit_on_err, char con
 	int argc;
 	char **argv = command_line_to_spawn_argv(cmd_line, &argc);
 
-	exit_code = run_subprocess(argv[0], cast(const char**)(argv), true);
-	if (exit_on_err && WIFSIGNALED(exit_code)) {
-		struct rlimit limit = { 0, 0, };
-		setrlimit(RLIMIT_CORE, &limit);
-		raise(WTERMSIG(exit_code));
-	}
-	if (WIFEXITED(exit_code)) {
-		exit_code = WEXITSTATUS(exit_code);
-	}
+	exit_code = run_subprocess(argv[0], cast(const char**)(argv), true, false);
+	gb_free(gb_heap_allocator(), argv);
 #endif
 
 	if (exit_on_err && exit_code) {
@@ -273,13 +268,19 @@ int run_subprocess(String const &exe_name, wchar_t *after_double_dash_raw) {
 	return exit_code;
 }
 #else
-int run_subprocess(const char *name, const char **args, bool honor_path) {
+int run_subprocess(const char *name, const char **args, bool honor_path, bool raise_signal) {
 	pid_t pid;
 	int status;
 
+	char const *original_arg0 = args[0];
 	String exec_name = make_string_c(args[0]);
 	exec_name = last_path_element(exec_name);
-	args[0] = alloc_cstring(gb_heap_allocator(), exec_name);
+	char *arg0 = alloc_cstring(gb_heap_allocator(), exec_name);
+	args[0] = arg0;
+	defer ({
+		args[0] = original_arg0;
+		gb_free(gb_heap_allocator(), arg0);
+	});
 
 	if (!honor_path) {
 		status = posix_spawn(&pid, name, NULL, NULL, (char *const *)args, environ);
@@ -292,7 +293,10 @@ int run_subprocess(const char *name, const char **args, bool honor_path) {
 	}
 
 	for (;;) {
-		if (waitpid(pid, &status, WUNTRACED) < 0) {
+		if (waitpid(pid, &status, 0) < 0) {
+			if (errno == EINTR) {
+				continue;
+			}
 			gb_printf_err("Could not wait on subprocess: (pid: %d): %s\n", pid, strerror(errno));
 			return -1;
 		}
@@ -300,11 +304,13 @@ int run_subprocess(const char *name, const char **args, bool honor_path) {
 		if (WIFEXITED(status)) {
 			return WEXITSTATUS(status);
 		} else if (WIFSIGNALED(status)) {
+			if (!raise_signal) {
+				gb_printf_err("%s was terminated by signal %d\n", args[0], WTERMSIG(status));
+				return 128 + WTERMSIG(status);
+			}
 			struct rlimit limit = { 0, 0, };
 			setrlimit(RLIMIT_CORE, &limit);
 			raise(WTERMSIG(status));
-			return -1;
-		} else if (WIFSTOPPED(status)) {
 			return -1;
 		}
 	}
@@ -326,15 +332,18 @@ gb_internal bool system_exec_command_line_app_output(char const *command, gbStri
 	if (!stream) {
 		return false;
 	}
-	defer (pclose(stream));
 
 	while (!feof(stream)) {
 		size_t n = fread(buffer, 1, 255, stream);
 		*output = gb_string_append_length(*output, buffer, n);
 
 		if (ferror(stream)) {
+			pclose(stream);
 			return false;
 		}
+	}
+	if (pclose(stream) != 0) {
+		return false;
 	}
 
 	if (build_context.show_system_calls) {
@@ -511,6 +520,7 @@ enum BuildFlagKind {
 	BuildFlag_DynamicMapCalls,
 	BuildFlag_ObfuscateSourceCodeLocations,
 	BuildFlag_SourceCodeLocations,
+	BuildFlag_PathPrefixMap,
 
 	BuildFlag_Compact,
 	BuildFlag_GlobalDefinitions,
@@ -720,6 +730,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_ObfuscateSourceCodeLocations, str_lit("obfuscate-source-code-locations"), BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_SourceCodeLocations, 		str_lit("source-code-locations"), 		BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_PathPrefixMap,           str_lit("path-prefix-map"),           BuildFlagParam_String,  Command__does_check, true);
 
 	add_flag(&build_flags, BuildFlag_Short,                   str_lit("short"),                     BuildFlagParam_None,    Command_doc);
 	add_flag(&build_flags, BuildFlag_InSourceOrder,           str_lit("in-source-order"),           BuildFlagParam_None,    Command_doc);
@@ -934,9 +945,18 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_OutFile: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String path = value.value_string;
-							path = string_trim_whitespace(path);
-							if (is_build_flag_path_valid(path)) {
-								build_context.out_filepath = path_to_full_path(heap_allocator(), path);
+							String out_name = path_last_element_spelled(path);
+							char const *out_reason = nullptr;
+							bool out_name_ok = out_name.len == 0 || out_name == "." || out_name == ".." || path_is_valid_file_name(out_name, &out_reason);
+							if (!out_name_ok) {
+								gb_printf_err("Invalid -out path %.*s: '%.*s' is not a valid file name: %s.\n", LIT(path), LIT(out_name), out_reason);
+								bad_flags = true;
+							} else if (is_build_flag_path_valid(path)) {
+								build_context.out_filepath = path_make_absolute(heap_allocator(), path);
+								if (build_context.out_filepath.len == 0) {
+									gb_printf_err("Invalid -out path, got %.*s\n", LIT(path));
+									bad_flags = true;
+								}
 							} else {
 								gb_printf_err("Invalid -out path, got %.*s\n", LIT(path));
 								bad_flags = true;
@@ -1019,7 +1039,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ExportTimingsFile: {
 							GB_ASSERT(value.kind == ExactValue_String);
 
-							String export_path = string_trim_whitespace(value.value_string);
+							String export_path = value.value_string;
 							if (is_build_flag_path_valid(export_path)) {
 								build_context.export_timings_file = path_to_full_path(heap_allocator(), export_path);
 							} else {
@@ -1048,7 +1068,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ExportDependenciesFile: {
 							GB_ASSERT(value.kind == ExactValue_String);
 
-							String export_path = string_trim_whitespace(value.value_string);
+							String export_path = value.value_string;
 							if (is_build_flag_path_valid(export_path)) {
 								build_context.export_dependencies_file = path_to_full_path(heap_allocator(), export_path);
 							} else {
@@ -1066,7 +1086,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ExportDefineables: {
 							GB_ASSERT(value.kind == ExactValue_String);
 
-							String export_path = string_trim_whitespace(value.value_string);
+							String export_path = value.value_string;
 							if (is_build_flag_path_valid(export_path)) {
 								build_context.export_defineables_file = path_to_full_path(heap_allocator(), export_path);
 							} else {
@@ -1078,7 +1098,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						}
 						case BuildFlag_Overlay: {
 							GB_ASSERT(value.kind == ExactValue_String);
-							build_context.overlay_file = string_trim_whitespace(value.value_string);
+							build_context.overlay_file = value.value_string;
 							break;
 						}
 						case BuildFlag_Workspace: {
@@ -1105,7 +1125,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ExportSemanticsFile: {
 							GB_ASSERT(value.kind == ExactValue_String);
 
-							String export_path = string_trim_whitespace(value.value_string);
+							String export_path = value.value_string;
 							if (is_build_flag_path_valid(export_path)) {
 								build_context.export_semantics_file = path_to_full_path(heap_allocator(), export_path);
 							} else {
@@ -1116,8 +1136,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						}
 						case BuildFlag_ExportSemanticsFor: {
 							GB_ASSERT(value.kind == ExactValue_String);
-							String path = string_trim_whitespace(value.value_string);
-							array_add(&build_context.export_semantics_for, path_to_full_path(heap_allocator(), path));
+							array_add(&build_context.export_semantics_for, path_to_full_path(heap_allocator(), value.value_string));
 							break;
 						}
 						case BuildFlag_IgnoreUnusedDefineables: {
@@ -1197,15 +1216,15 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 							gbAllocator a = heap_allocator();
 							bool path_ok = false;
-							String fullpath = path_to_fullpath(a, path, &path_ok);
+							String fullpath = path_spelled_existing(a, path, &path_ok);
 							if (!path_ok || !path_is_directory(fullpath)) {
-								gb_printf_err("Library collection '%.*s' path must be a directory, got '%.*s'\n", LIT(name), LIT(path_ok ? fullpath : path));
+								gb_printf_err("Library collection '%.*s' path must be a directory, got '%.*s'\n", LIT(name), LIT(fullpath.len > 0 ? fullpath : path));
 								gb_free(a, fullpath.text);
 								bad_flags = true;
 								break;
 							}
 
-							add_library_collection(name, path);
+							add_library_collection(name, path_trim_trailing_separators(fullpath));
 
 							// NOTE(bill): Allow for multiple library collections
 							continue;
@@ -1664,6 +1683,35 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							}
 							break;
 
+						case BuildFlag_PathPrefixMap: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							String str = value.value_string;
+							isize eq_pos = -1;
+							for (isize i = 0; i < str.len; i++) {
+								if (str[i] == '=') {
+									eq_pos = i;
+									break;
+								}
+							}
+							if (eq_pos <= 0) {
+								gb_printf_err("Expected -path-prefix-map:<old>=<new>, got '%.*s'\n", LIT(param));
+								bad_flags = true;
+								break;
+							}
+							String from = path_spelled(permanent_allocator(), substring(str, 0, eq_pos));
+							if (from.len == 0) {
+								gb_printf_err("Invalid -path-prefix-map path, got '%.*s'\n", LIT(substring(str, 0, eq_pos)));
+								bad_flags = true;
+								break;
+							}
+							if (build_context.path_prefix_maps.allocator.proc == nullptr) {
+								array_init(&build_context.path_prefix_maps, heap_allocator());
+							}
+							PathPrefixMap m = {path_trim_trailing_separators(from), substring(str, eq_pos+1, str.len)};
+							array_add(&build_context.path_prefix_maps, m);
+							break;
+						}
+
 						case BuildFlag_DefaultToNilAllocator:
 							if (build_context.ODIN_DEFAULT_TO_PANIC_ALLOCATOR) {
 								gb_printf_err("'-default-to-panic-allocator' cannot be used with '-default-to-nil-allocator'\n");
@@ -1778,7 +1826,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 
 						case BuildFlag_ExportLinkedLibraries:
-							build_context.export_linked_libs_path = string_trim_whitespace(value.value_string);
+							build_context.export_linked_libs_path = value.value_string;
 							if (build_context.export_linked_libs_path.len == 0) {
 								gb_printf_err("-%.*s specified an empty path\n", LIT(name));
 								bad_flags = true;
@@ -1935,7 +1983,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ResourceFile: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String path = value.value_string;
-							path = string_trim_whitespace(path);
 							if (is_build_flag_path_valid(path)) {
 								bool is_resource = string_ends_with(path, str_lit(".rc")) || string_ends_with(path, str_lit(".res"));
 								if(!is_resource) {
@@ -1958,7 +2005,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_WindowsPdbName: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String path = value.value_string;
-							path = string_trim_whitespace(path);
 							if (is_build_flag_path_valid(path)) {
 								if (path_is_directory(path)) {
 									gb_printf_err("Invalid -pdb-name path. %.*s, is a directory.\n", LIT(path));
@@ -2041,7 +2087,11 @@ gb_internal bool parse_build_flags(Array<String> args) {
 					#if !defined(GB_SYSTEM_WINDOWS)
 						case BuildFlag_WindowsSDKRoot:
 							GB_ASSERT(value.kind == ExactValue_String);
-							build_context.windows_sdk_root = value.value_string;
+							build_context.windows_sdk_root = path_spelled(permanent_allocator(), value.value_string);
+							if (build_context.windows_sdk_root.len == 0) {
+								gb_printf_err("Invalid -windows-sdk-root path, got %.*s\n", LIT(value.value_string));
+								bad_flags = true;
+							}
 							break;
 					#endif
 						}
@@ -2632,6 +2682,33 @@ gb_internal GB_COMPARE_PROC(file_path_cmp) {
 	return string_compare(x->fullpath, y->fullpath);
 }
 
+gb_internal bool make_escape_path(gbString *s, String path) {
+	for (isize i = 0; i < path.len; i++) {
+		u8 c = path[i];
+		if (c == '\n' || c == '\r' || c == 0) {
+			return false;
+		}
+		if (c == ' ' || c == '\t' || c == '#') {
+			for (isize k = i; k > 0 && path[k-1] == '\\'; k--) {
+				*s = gb_string_appendc(*s, "\\");
+			}
+			*s = gb_string_appendc(*s, "\\");
+		} else if (c == '$') {
+			*s = gb_string_appendc(*s, "$");
+		}
+		*s = gb_string_append_length(*s, &c, 1);
+	}
+	return true;
+}
+
+gb_internal void json_escape_string(gbString *s, String str) {
+	*s = gb_string_appendc(*s, "\"");
+	for (isize i = 0; i < str.len; i++) {
+		*s = json_escape_char(*s, str[i]);
+	}
+	*s = gb_string_appendc(*s, "\"");
+}
+
 gb_internal void export_dependencies(Checker *c) {
 	GB_ASSERT(build_context.export_dependencies_format != DependenciesExportUnspecified);
 
@@ -2677,63 +2754,80 @@ gb_internal void export_dependencies(Checker *c) {
 		String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
 		defer (gb_free(heap_allocator(), exe_name.text));
 
-		gb_fprintf(&f, "%.*s:", LIT(exe_name));
+		auto paths = array_make<String>(heap_allocator(), 0, files.count + load_files.count);
+		defer (array_free(&paths));
+		for (AstFile *file : files) {
+			array_add(&paths, file->fullpath);
+		}
+		for (LoadFileCache *cache : load_files) {
+			array_add(&paths, cache->path);
+		}
 
-		isize current_line_length = exe_name.len + 1;
+		gbString line = gb_string_make(heap_allocator(), "");
+		defer (gb_string_free(line));
 
-		for_array(i, files) {
-			AstFile *file = files[i];
+		if (!make_escape_path(&line, exe_name)) {
+			gb_printf_err("Cannot write %.*s to a make dependency file\n", LIT(exe_name));
+			exit_with_errors();
+			return;
+		}
+		line = gb_string_appendc(line, ":");
+
+		isize current_line_length = gb_string_length(line);
+
+		for (String const &path : paths) {
 			/* Arbitrary line break value. Maybe make this better? */
 			if (current_line_length >= 80-2) {
-				gb_file_write(&f, " \\\n ", 4);
+				line = gb_string_appendc(line, " \\\n ");
 				current_line_length = 1;
 			}
 
-			gb_file_write(&f, " ", 1);
-			current_line_length++;
-
-			for (isize k = 0; k < file->fullpath.len; k++) {
-				char part = file->fullpath.text[k];
-				if (part == ' ') {
-					gb_file_write(&f, "\\", 1);
-					current_line_length++;
-				}
-				gb_file_write(&f, &part, 1);
-				current_line_length++;
+			line = gb_string_appendc(line, " ");
+			isize before = gb_string_length(line);
+			if (!make_escape_path(&line, path)) {
+				gb_printf_err("Cannot write %.*s to a make dependency file\n", LIT(path));
+				exit_with_errors();
+				return;
 			}
+			current_line_length += 1 + gb_string_length(line) - before;
 		}
 
-		gb_fprintf(&f, "\n");
+		line = gb_string_appendc(line, "\n");
+		gb_file_write(&f, line, gb_string_length(line));
 	} else if (build_context.export_dependencies_format == DependenciesExportJson) {
-		gb_fprintf(&f, "{\n");
+		gbString out = gb_string_make(heap_allocator(), "");
+		defer (gb_string_free(out));
 
-		gb_fprintf(&f, "\t\"source_files\": [\n");
+		out = gb_string_appendc(out, "{\n");
+
+		out = gb_string_appendc(out, "\t\"source_files\": [\n");
 
 		for_array(i, files) {
-			AstFile *file = files[i];
-			gb_fprintf(&f, "\t\t\"%.*s\"", LIT(file->fullpath));
+			out = gb_string_appendc(out, "\t\t");
+			json_escape_string(&out, files[i]->fullpath);
 			if (i+1 < files.count) {
-				gb_fprintf(&f, ",");
+				out = gb_string_appendc(out, ",");
 			}
-			gb_fprintf(&f, "\n");
+			out = gb_string_appendc(out, "\n");
 		}
 
-		gb_fprintf(&f, "\t],\n");
+		out = gb_string_appendc(out, "\t],\n");
 
-		gb_fprintf(&f, "\t\"load_files\": [\n");
+		out = gb_string_appendc(out, "\t\"load_files\": [\n");
 
 		for_array(i, load_files) {
-			LoadFileCache *cache = load_files[i];
-			gb_fprintf(&f, "\t\t\"%.*s\"", LIT(cache->path));
+			out = gb_string_appendc(out, "\t\t");
+			json_escape_string(&out, load_files[i]->path);
 			if (i+1 < load_files.count) {
-				gb_fprintf(&f, ",");
+				out = gb_string_appendc(out, ",");
 			}
-			gb_fprintf(&f, "\n");
+			out = gb_string_appendc(out, "\n");
 		}
 
-		gb_fprintf(&f, "\t]\n");
+		out = gb_string_appendc(out, "\t]\n");
 
-		gb_fprintf(&f, "}\n");
+		out = gb_string_appendc(out, "}\n");
+		gb_file_write(&f, out, gb_string_length(out));
 	}
 }
 
@@ -2757,7 +2851,7 @@ gb_internal void export_linked_libraries(LinkerData *gen) {
 		ast_node(imp, ForeignImportDecl, e->LibraryName.decl);
 
 		for (isize i = 0; i < e->LibraryName.paths.count; i++) {
-			String lib_path = string_trim_whitespace(e->LibraryName.paths[i]);
+			String lib_path = e->LibraryName.paths[i];
 			if (lib_path.len == 0) {
 				continue;
 			}
@@ -2794,38 +2888,31 @@ gb_internal void export_linked_libraries(LinkerData *gen) {
 	}
 }
 
-gb_internal void remove_temp_files(lbGenerator *gen) {
-	if (build_context.keep_temp_files) return;
-
-	switch (build_context.build_mode) {
-	case BuildMode_Executable:
-	case BuildMode_StaticLibrary:
-	case BuildMode_DynamicLibrary:
-		break;
-
-	case BuildMode_Object:
-	case BuildMode_Assembly:
-	case BuildMode_LLVM_IR:
-		return;
+gb_internal bool output_overwrites_an_input(Parser *p) {
+	if (build_context.build_paths.count <= BuildPath_Output) {
+		return false;
 	}
-
-	TIME_SECTION("remove temp files");
-
-	for (String const &path : gen->output_temp_paths) {
-		gb_file_remove(cast(char const *)path.text);
+	Path const &out = build_context.build_paths[BuildPath_Output];
+	if (out.name.len == 0) {
+		return false;
 	}
+	String output_file = path_to_string(heap_allocator(), out);
+	defer (gb_free(heap_allocator(), output_file.text));
 
-	if (!build_context.keep_object_files) {
-		switch (build_context.build_mode) {
-		case BuildMode_Executable:
-		case BuildMode_StaticLibrary:
-		case BuildMode_DynamicLibrary:
-			for (String const &path : gen->output_object_paths) {
-				gb_file_remove(cast(char const *)path.text);
+	FileId out_id = {};
+	if (!path_file_id(output_file, &out_id)) {
+		return false;
+	}
+	for (AstPackage *pkg : p->packages) {
+		for (AstFile *f : pkg->files) {
+			FileId id = {};
+			if (path_file_id(f->fullpath, &id) && file_id_equal(id, out_id)) {
+				gb_printf_err("Output path %.*s would overwrite the input %.*s.\n", LIT(output_file), LIT(f->fullpath));
+				return true;
 			}
-			break;
 		}
 	}
+	return false;
 }
 
 
@@ -3403,6 +3490,15 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 	}
 
+	if (check) {
+		if (print_flag("-path-prefix-map:<old>=<new>")) {
+			print_usage_line(2, "Replaces the directory <old> with <new> at the start of the paths stored in the output:");
+			print_usage_line(2, "#file, #directory, source code locations, debug info and ODIN_ROOT.");
+			print_usage_line(2, "May be given more than once; the last one that matches a path wins.");
+			print_usage_line(2, "Example: -path-prefix-map:C:/work/project=.");
+		}
+	}
+
 	if (run_or_build) {
 	#if defined(GB_SYSTEM_WINDOWS)
 		if (print_flag("-pdb-name:<filepath>")) {
@@ -3823,15 +3919,21 @@ gb_internal bool check_env(void) {
 	char const *odin_root = gb_get_env("ODIN_ROOT", a);
 	defer (gb_free(a, cast(void *)odin_root));
 	if (odin_root) {
-		if (!gb_file_exists(odin_root)) {
+		String path = path_spelled(a, make_string_c(odin_root));
+		defer (gb_free(a, path.text));
+		FileId id = {};
+		if (path.len == 0 || !path_file_id(path, &id)) {
 			gb_printf_err("Invalid ODIN_ROOT, directory does not exist, got %s\n", odin_root);
 			return false;
 		}
-		String path = make_string_c(odin_root);
 		if (!path_is_directory(path)) {
 			gb_printf_err("Invalid ODIN_ROOT, expected a directory, got %s\n", odin_root);
 			return false;
 		}
+	}
+	if (odin_root_dir().len == 0) {
+		gb_printf_err("Cannot find the Odin root directory; set ODIN_ROOT\n");
+		return false;
 	}
 	return true;
 }
@@ -4119,17 +4221,9 @@ gb_internal bool load_overlays(String overlay_file) {
 			return false;
 		}
 		OverlayEntry e = {};
-		e.path = path_to_full_path(permanent_allocator(), entry.key);
-		if (!gb_file_exists(alloc_cstring(temporary_allocator(), entry.key))) {
-			String dir = directory_from_path(entry.key);
-			if (dir.len == 0) {
-				dir = str_lit(".");
-			}
-			dir = path_to_full_path(temporary_allocator(), dir);
-			e.path = concatenate3_strings(permanent_allocator(), dir, str_lit("/"), filename_without_directory(entry.key));
-		}
+		e.path = path_spelled(permanent_allocator(), entry.key);
 		if (entry.value->string.len != 0) {
-			e.replacement = path_to_full_path(permanent_allocator(), entry.value->string);
+			e.replacement = path_spelled(permanent_allocator(), entry.value->string);
 		}
 		array_add(&global_overlays, e);
 	}
@@ -4363,7 +4457,7 @@ int main(int arg_count, char const **arg_ptr) {
 		gb_printf("%.*s", LIT(odin_root_dir()));
 		return 0;
 	} else if (command == "clear-cache") {
-		return try_clear_cache() ? 0 : 1;
+		return try_clear_cache(args) ? 0 : 1;
 	} else {
 		String argv1 = {};
 		if (args.count > 1) {
@@ -4467,7 +4561,7 @@ int main(int arg_count, char const **arg_ptr) {
 					String base_dir = {};
 					if (find_library_collection_path(collection_name, &base_dir)) {
 						bool ok = false;
-						String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, &ok));
+						String fullpath = get_fullpath_relative(permanent_allocator(), base_dir, file_str, &ok);
 						if (ok) {
 							init_filename = fullpath;
 							if (path_is_directory(init_filename)) {
@@ -4741,11 +4835,21 @@ int main(int arg_count, char const **arg_ptr) {
 		return 1;
 	}
 	release_held_errors();
-	defer (destroy_checker(checker));
+	bool restored_from_cache = false;
+	defer ({
+		if (!restored_from_cache) {
+			destroy_checker(checker);
+		}
+	});
+
+	if (output_overwrites_an_input(parser)) {
+		return 1;
+	}
 
 	if (build_context.cached && parser->total_seen_load_directive_count.load() == 0) {
 		MAIN_TIME_SECTION("check cached build (pre-semantic check)");
 		if (try_cached_build(checker, args)) {
+			restored_from_cache = true;
 			goto end_of_code_gen;
 		}
 	}
@@ -4830,6 +4934,7 @@ int main(int arg_count, char const **arg_ptr) {
 	if (build_context.cached) {
 		MAIN_TIME_SECTION("check cached build");
 		if (try_cached_build(checker, args)) {
+			restored_from_cache = true;
 			goto end_of_code_gen;
 		}
 		failed_to_cache_parsing = true;
@@ -4872,8 +4977,6 @@ int main(int arg_count, char const **arg_ptr) {
 				break;
 			}
 		}
-
-		remove_temp_files(gen);
 	}
 
 	if (any_errors()) {

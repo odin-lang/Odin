@@ -127,7 +127,7 @@ gb_internal String directory_from_path(String const &s) {
 #if defined(GB_SYSTEM_WINDOWS)
 	gb_internal bool path_is_directory(String path) {
 		gbAllocator a = heap_allocator();
-		String16 wstr = string_to_string16(a, path);
+		String16 wstr = string_to_win32_path(a, path);
 		defer (gb_free(a, wstr.text));
 
 		i32 attribs = GetFileAttributesW(cast(wchar_t *)wstr.text);
@@ -144,7 +144,7 @@ gb_internal String directory_from_path(String const &s) {
 
 		struct stat s;
 		if (stat(copy, &s) == 0) {
-			return (s.st_mode & S_IFDIR) != 0;
+			return S_ISDIR(s.st_mode);
 		}
 		return false;
 	}
@@ -157,7 +157,7 @@ gb_internal String path_to_full_path(gbAllocator a, String path) {
 	defer (gb_free(ha, path_c));
 
 	char *fullpath = gb_path_get_full_name(a, path_c);
-	String res = string_trim_whitespace(make_string_c(fullpath));
+	String res = make_string_c(fullpath);
 #if defined(GB_SYSTEM_WINDOWS)
 	for (isize i = 0; i < res.len; i++) {
 		if (res.text[i] == '\\') {
@@ -165,7 +165,305 @@ gb_internal String path_to_full_path(gbAllocator a, String path) {
 		}
 	}
 #endif
-	return copy_string(a, res);
+	return res;
+}
+
+gb_internal bool path_is_separator(u8 c) {
+#if defined(GB_SYSTEM_WINDOWS)
+	return c == '/' || c == '\\';
+#else
+	return c == '/';
+#endif
+}
+
+gb_internal String path_trim_trailing_separators(String s) {
+	while (s.len > 1 && path_is_separator(s.text[s.len-1])) {
+	#if defined(GB_SYSTEM_WINDOWS)
+		if (s.len == 3 && s.text[1] == ':') {
+			break;
+		}
+	#endif
+		s.len -= 1;
+	}
+	return s;
+}
+
+gb_internal String path_last_element_spelled(String s) {
+	s = path_trim_trailing_separators(s);
+	isize i = s.len;
+	while (i > 0 && !path_is_separator(s.text[i-1])) {
+	#if defined(GB_SYSTEM_WINDOWS)
+		if (i == 2 && s.text[1] == ':') {
+			break;
+		}
+	#endif
+		i -= 1;
+	}
+	return substring(s, i, s.len);
+}
+
+gb_internal bool path_is_root(String fullpath) {
+	String s = fullpath;
+	while (s.len > 0 && s.text[s.len-1] == '/') {
+		s.len -= 1;
+	}
+	if (s.len == 0) {
+		return true;
+	}
+#if defined(GB_SYSTEM_WINDOWS)
+	if (string_starts_with(s, str_lit("//?/")) || string_starts_with(s, str_lit("//./"))) {
+		s = substring(s, 4, s.len);
+		if (string_starts_with(s, str_lit("UNC/"))) {
+			s = substring(s, 4, s.len);
+			isize slashes = 0;
+			for (isize i = 0; i < s.len; i++) {
+				slashes += s.text[i] == '/';
+			}
+			return slashes <= 1;
+		}
+	}
+	if (s.len == 2 && s.text[1] == ':') {
+		return true;
+	}
+	if (s.len > 2 && s.text[0] == '/' && s.text[1] == '/') {
+		isize slashes = 0;
+		for (isize i = 2; i < s.len; i++) {
+			slashes += s.text[i] == '/';
+		}
+		return slashes <= 1;
+	}
+#endif
+	return false;
+}
+
+gb_internal String path_make_absolute(gbAllocator a, String path) {
+	if (path.len == 0) {
+		return {};
+	}
+#if defined(GB_SYSTEM_WINDOWS)
+	gbAllocator ha = heap_allocator();
+	String16 wpath = string_to_string16(ha, path);
+	defer (gb_free(ha, wpath.text));
+	if (wpath.len == 0) {
+		return {};
+	}
+	DWORD wlen = GetFullPathNameW(cast(wchar_t *)wpath.text, 0, nullptr, nullptr);
+	if (wlen == 0) {
+		return {};
+	}
+	wchar_t *wfull = gb_alloc_array(ha, wchar_t, wlen+1);
+	defer (gb_free(ha, wfull));
+	DWORD n = GetFullPathNameW(cast(wchar_t *)wpath.text, wlen, wfull, nullptr);
+	if (n == 0 || n >= wlen) {
+		return {};
+	}
+	String res = string16_to_string(a, make_string16(cast(u16 *)wfull, n));
+	for (isize i = 0; i < res.len; i++) {
+		if (res.text[i] == '\\') {
+			res.text[i] = '/';
+		}
+	}
+	return res;
+#else
+	if (path.text[0] == '/') {
+		return copy_string(a, path);
+	}
+	String cwd = get_working_directory(heap_allocator());
+	if (cwd.len == 0) {
+		return {};
+	}
+	defer (gb_free(heap_allocator(), cwd.text));
+	String sep = cwd.text[cwd.len-1] == '/' ? str_lit("") : str_lit("/");
+	return concatenate3_strings(a, cwd, sep, path);
+#endif
+}
+
+gb_internal String path_spelled(gbAllocator a, String path) {
+	String abs = path_make_absolute(heap_allocator(), path);
+	if (abs.len == 0) {
+		return {};
+	}
+	defer (gb_free(heap_allocator(), abs.text));
+
+	u8 *buf = gb_alloc_array(a, u8, abs.len+1);
+	isize n = 0;
+	isize i = 0;
+#if defined(GB_SYSTEM_WINDOWS)
+	if (abs.len >= 2 && abs.text[1] == ':') {
+		buf[n++] = abs.text[0];
+		buf[n++] = ':';
+		i = 2;
+	} else if (abs.len >= 2 && abs.text[0] == '/' && abs.text[1] == '/') {
+		buf[n++] = '/';
+		i = 1;
+	}
+#endif
+	isize root_len = n;
+	while (i < abs.len) {
+		if (abs.text[i] == '/') {
+			i += 1;
+			continue;
+		}
+		isize start = i;
+		while (i < abs.len && abs.text[i] != '/') {
+			i += 1;
+		}
+		String elem = make_string(abs.text+start, i-start);
+		if (elem == ".") {
+			continue;
+		}
+		if (elem == "..") {
+			while (n > root_len && buf[n-1] != '/') {
+				n -= 1;
+			}
+			if (n > root_len) {
+				n -= 1;
+			}
+			continue;
+		}
+		buf[n++] = '/';
+		gb_memmove(buf+n, elem.text, elem.len);
+		n += elem.len;
+	}
+	if (n == 0 || (n == 2 && buf[1] == ':')) {
+		buf[n++] = '/';
+	}
+	buf[n] = 0;
+	return make_string(buf, n);
+}
+
+gb_internal String path_working_directory(gbAllocator a) {
+	String cwd = get_working_directory(a);
+#if defined(GB_SYSTEM_WINDOWS)
+	for (isize i = 0; i < cwd.len; i++) {
+		if (cwd.text[i] == '\\') {
+			cwd.text[i] = '/';
+		}
+	}
+#endif
+	return path_trim_trailing_separators(cwd);
+}
+
+gb_internal bool path_is_valid_file_name(String name, char const **reason) {
+	*reason = nullptr;
+	if (name.len == 0 || name == ".." || name == ".") {
+		*reason = "it is empty or a directory reference";
+		return false;
+	}
+	for (isize i = 0; i < name.len; i++) {
+		u8 c = name.text[i];
+		if (c == 0 || c == '/') {
+			*reason = "it contains a separator or NUL";
+			return false;
+		}
+	#if defined(GB_SYSTEM_WINDOWS)
+		if (c < 32 || c == '\\' || c == ':' || c == '<' || c == '>' || c == '"' || c == '|' || c == '?' || c == '*') {
+			*reason = "it contains a character Windows does not allow in a file name";
+			return false;
+		}
+	#endif
+	}
+#if defined(GB_SYSTEM_WINDOWS)
+	u8 last = name.text[name.len-1];
+	if (last == '.' || last == ' ') {
+		*reason = "Windows drops a trailing dot or space";
+		return false;
+	}
+
+	String base = name;
+	for (isize i = 0; i < base.len; i++) {
+		if (base.text[i] == '.') {
+			base.len = i;
+			break;
+		}
+	}
+	while (base.len > 0 && base.text[base.len-1] == ' ') {
+		base.len -= 1;
+	}
+
+	static char const *devices[] = {"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"};
+	for (char const *d : devices) {
+		if (str_eq_ignore_case(base, make_string_c(d))) {
+			*reason = "it is a reserved device name on Windows";
+			return false;
+		}
+	}
+	if (base.len >= 4 && (str_eq_ignore_case(substring(base, 0, 3), str_lit("COM")) || str_eq_ignore_case(substring(base, 0, 3), str_lit("LPT")))) {
+		String rest = substring(base, 3, base.len);
+		bool digit = rest.len == 1 && '0' <= rest.text[0] && rest.text[0] <= '9';
+		bool super = rest == "\xc2\xb9" || rest == "\xc2\xb2" || rest == "\xc2\xb3";
+		if (digit || super) {
+			*reason = "it is a reserved device name on Windows";
+			return false;
+		}
+	}
+#endif
+	return true;
+}
+
+struct FileId {
+	u64 volume;
+	u64 id_lo;
+	u64 id_hi;
+};
+
+gb_internal bool path_file_id(String path, FileId *id) {
+	*id = {};
+	if (path.len == 0) {
+		return false;
+	}
+#if defined(GB_SYSTEM_WINDOWS)
+	gbAllocator ha = heap_allocator();
+	String16 wpath = string_to_win32_path(ha, path);
+	defer (gb_free(ha, wpath.text));
+	if (wpath.len == 0) {
+		return false;
+	}
+	HANDLE h = CreateFileW(cast(wchar_t *)wpath.text, 0, FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+	if (h == INVALID_HANDLE_VALUE) {
+		return false;
+	}
+	defer (CloseHandle(h));
+
+	FILE_ID_INFO info = {};
+	if (GetFileInformationByHandleEx(h, FileIdInfo, &info, sizeof(info))) {
+		id->volume = info.VolumeSerialNumber;
+		gb_memmove(&id->id_lo, &info.FileId.Identifier[0], 8);
+		gb_memmove(&id->id_hi, &info.FileId.Identifier[8], 8);
+		return true;
+	}
+	BY_HANDLE_FILE_INFORMATION bhfi = {};
+	if (GetFileInformationByHandle(h, &bhfi)) {
+		id->volume = bhfi.dwVolumeSerialNumber;
+		id->id_lo  = (cast(u64)bhfi.nFileIndexHigh << 32) | bhfi.nFileIndexLow;
+		return true;
+	}
+	return false;
+#else
+	char *c = alloc_cstring(heap_allocator(), path);
+	defer (gb_free(heap_allocator(), c));
+	struct stat s;
+	if (stat(c, &s) != 0) {
+		return false;
+	}
+	id->volume = cast(u64)s.st_dev;
+	id->id_lo  = cast(u64)s.st_ino;
+	return true;
+#endif
+}
+
+gb_internal bool file_id_equal(FileId const &a, FileId const &b) {
+	return a.volume == b.volume && a.id_lo == b.id_lo && a.id_hi == b.id_hi;
+}
+
+gb_internal bool file_id_visit(StringSet *visited, String path) {
+	FileId id = {};
+	if (!path_file_id(path, &id)) {
+		return false;
+	}
+	u8 *key = gb_alloc_array(permanent_allocator(), u8, gb_size_of(FileId));
+	gb_memmove(key, &id, gb_size_of(FileId));
+	return !string_set_update(visited, make_string(key, gb_size_of(FileId)));
 }
 
 struct Path {
@@ -199,15 +497,51 @@ gb_internal String path_to_string(gbAllocator a, Path path) {
 	}
 	str[i] = 0;
 
-	String res = make_string(str, i);
-	res        = string_trim_whitespace(res);
-	return res;
+	return make_string(str, i);
+}
+
+gb_internal gbString append_quoted(gbString s, String arg) {
+	s = gb_string_appendc(s, "\"");
+	isize backslashes = 0;
+	for (isize i = 0; i < arg.len; i++) {
+		char c = cast(char)arg.text[i];
+	#if defined(GB_SYSTEM_WINDOWS)
+		if (c == '\\') {
+			backslashes += 1;
+		} else {
+			if (c == '"') {
+				for (isize k = 0; k <= backslashes; k++) {
+					s = gb_string_appendc(s, "\\");
+				}
+			}
+			backslashes = 0;
+		}
+	#else
+		if (c == '"' || c == '\\') {
+			s = gb_string_appendc(s, "\\");
+		}
+	#endif
+		s = gb_string_append_length(s, &c, 1);
+	}
+	for (isize k = 0; k < backslashes; k++) {
+		s = gb_string_appendc(s, "\\");
+	}
+	s = gb_string_appendc(s, "\"");
+	return s;
+}
+
+gb_internal String quote_arg(gbAllocator a, String arg) {
+	gbString s = gb_string_make_reserve(heap_allocator(), arg.len+2);
+	s = append_quoted(s, arg);
+	String quoted = copy_string(a, make_string(cast(u8 *)s, gb_string_length(s)));
+	gb_string_free(s);
+	return quoted;
 }
 
 gb_internal String quote_path(gbAllocator a, Path path) {
-	String temp   = path_to_string(a, path);
-	String quoted = concatenate3_strings(a, str_lit("\""), temp, str_lit("\""));
-	gb_free(a, temp.text);
+	String temp   = path_to_string(heap_allocator(), path);
+	String quoted = quote_arg(a, temp);
+	gb_free(heap_allocator(), temp.text);
 	return quoted;
 }
 
@@ -226,7 +560,7 @@ gb_internal Path path_from_string(gbAllocator a, String const &path) {
 
 	if (path.len == 0) return res;
 
-	String fullpath = path_to_full_path(a, path);
+	String fullpath = path_to_full_path(heap_allocator(), path);
 	defer (gb_free(heap_allocator(), fullpath.text));
 
 	res.basename = directory_from_path(fullpath);	
@@ -310,6 +644,12 @@ gb_internal i64 get_file_size(String path) {
 }
 
 
+gb_internal int file_info_name_cmp(void const *x, void const *y) {
+	FileInfo const *a = cast(FileInfo const *)x;
+	FileInfo const *b = cast(FileInfo const *)y;
+	return string_compare(a->name, b->name);
+}
+
 #if defined(GB_SYSTEM_WINDOWS)
 gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
 	GB_ASSERT(fi != nullptr);
@@ -331,7 +671,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 	}
 	{
 		// NOTE(bill): whether it exists and whether it is a directory, can be expressed in one query
-		String16 wpath = string_to_string16(temporary_allocator(), path);
+		String16 wpath = string_to_win32_path(temporary_allocator(), path);
 		DWORD attributes = GetFileAttributesW(cast(wchar_t *)wpath.text);
 		if (attributes == INVALID_FILE_ATTRIBUTES) {
 			switch (GetLastError()) {
@@ -355,7 +695,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 	new_path[path.len+2] = 0;
 
 	String np = make_string(cast(u8 *)new_path, path.len+2);
-	String16 wstr = string_to_string16(a, np);
+	String16 wstr = string_to_win32_path(a, np);
 	defer (gb_free(a, wstr.text));
 
 	WIN32_FIND_DATAW file_data = {};
@@ -387,7 +727,12 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 
 		FileInfo info = {};
 		info.name = name;
-		info.fullpath = path_to_full_path(a, filepath);
+		info.fullpath = copy_string(a, filepath);
+		for (isize i = 0; i < info.fullpath.len; i++) {
+			if (info.fullpath.text[i] == '\\') {
+				info.fullpath.text[i] = '/';
+			}
+		}
 		info.size = cast(i64)size;
 		info.is_dir = (file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 		array_add(fi, info);
@@ -397,6 +742,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 		return ReadDirectory_Empty;
 	}
 
+	array_sort(*fi, file_info_name_cmp);
 	return ReadDirectory_None;
 }
 #elif defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_OPENBSD) || defined(GB_SYSTEM_NETBSD)
@@ -463,7 +809,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 
 		FileInfo info = {};
 		info.name = copy_string(a, name);
-		info.fullpath = path_to_full_path(a, filepath);
+		info.fullpath = copy_string(a, filepath);
 		info.size = size;
 		info.is_dir = S_ISDIR(dir_stat.st_mode);
 		array_add(fi, info);
@@ -473,6 +819,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 		return ReadDirectory_Empty;
 	}
 
+	array_sort(*fi, file_info_name_cmp);
 	return ReadDirectory_None;
 }
 
@@ -493,7 +840,7 @@ gb_internal bool write_directory(String path) {
 }
 #else
 gb_internal bool write_directory(String path) {
-	String16 wstr = string_to_string16(heap_allocator(), path);
+	String16 wstr = string_to_win32_path(heap_allocator(), path);
 	LPCWSTR wdirectory_name = cast(wchar_t *)wstr.text;
 
 	HANDLE directory = CreateFileW(wdirectory_name,

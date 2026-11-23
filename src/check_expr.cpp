@@ -11007,6 +11007,7 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 		String file = get_file_path_string(bd->token.pos.file_id);
 		switch (build_context.source_code_location_info) {
 		case SourceCodeLocationInfo_Normal:
+			file = path_prefix_map_apply(file);
 			break;
 		case SourceCodeLocationInfo_Obfuscated:
 			file = obfuscate_string(file, "F");
@@ -11025,6 +11026,7 @@ gb_internal ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, A
 		String path = dir_from_path(file);
 		switch (build_context.source_code_location_info) {
 		case SourceCodeLocationInfo_Normal:
+			path = path_prefix_map_apply(path);
 			break;
 		case SourceCodeLocationInfo_Obfuscated:
 			path = obfuscate_string(path, "D");

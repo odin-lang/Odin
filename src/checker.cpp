@@ -989,12 +989,23 @@ gb_internal void poly_dep_capture_unreplayable(CheckerContext *c) {
 }
 
 
+gb_internal AstPackage **find_package_by_path(CheckerInfo *info, String path) {
+	AstPackage **found = string_map_get(&info->packages, path);
+	if (found == nullptr) {
+		AstPackage *pkg = find_package_by_identity(path);
+		if (pkg != nullptr) {
+			found = string_map_get(&info->packages, pkg->fullpath);
+		}
+	}
+	return found;
+}
+
 gb_internal AstPackage *get_runtime_package(CheckerInfo *info) {
 	String name = str_lit("runtime");
 	gbAllocator a = heap_allocator();
 	String path = get_fullpath_base_collection(a, name, nullptr);
 	defer (gb_free(a, path.text));
-	auto found = string_map_get(&info->packages, path);
+	auto found = find_package_by_path(info, path);
 	if (found == nullptr) {
 		gb_printf_err("Name: %.*s\n", LIT(name));
 		gb_printf_err("Fullpath: %.*s\n", LIT(path));
@@ -1015,7 +1026,7 @@ gb_internal AstPackage *get_core_package(CheckerInfo *info, String name) {
 	gbAllocator a = heap_allocator();
 	String path = get_fullpath_core_collection(a, name, nullptr);
 	defer (gb_free(a, path.text));
-	auto found = string_map_get(&info->packages, path);
+	auto found = find_package_by_path(info, path);
 	if (found == nullptr) {
 		gb_printf_err("Name: %.*s\n", LIT(name));
 		gb_printf_err("Fullpath: %.*s\n", LIT(path));
@@ -1037,7 +1048,7 @@ gb_internal AstPackage *try_get_core_package(CheckerInfo *info, String name) {
 	gbAllocator a = heap_allocator();
 	String path = get_fullpath_core_collection(a, name, nullptr);
 	defer (gb_free(a, path.text));
-	auto found = string_map_get(&info->packages, path);
+	auto found = find_package_by_path(info, path);
 	if (found == nullptr) {
 		return nullptr;
 	}
@@ -1273,7 +1284,7 @@ gb_internal void init_universal(void) {
 
 	add_global_string_constant("ODIN_VENDOR",                   bc->ODIN_VENDOR);
 	add_global_string_constant("ODIN_VERSION",                  bc->ODIN_VERSION);
-	add_global_string_constant("ODIN_ROOT",                     bc->ODIN_ROOT);
+	add_global_string_constant("ODIN_ROOT",                     path_prefix_map_apply(bc->ODIN_ROOT));
 	add_global_string_constant("ODIN_BUILD_PROJECT_NAME",       bc->ODIN_BUILD_PROJECT_NAME);
 
 	add_global_bool_constant("ODIN_BEDROCK", bc->bedrock);
@@ -6224,7 +6235,12 @@ gb_internal void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 	GB_ASSERT(scope->flags&ScopeFlag_Pkg);
 
 
-	String import_name = path_to_entity_name(id->import_name.string, id->fullpath, false);
+	String name_path = id->spelled_path.len > 0 ? id->spelled_path : id->fullpath;
+	String last = path_last_element_spelled(name_path);
+	if (last == "." || last == "..") {
+		name_path = path_to_full_path(permanent_allocator(), name_path);
+	}
+	String import_name = path_to_entity_name(id->import_name.string, name_path, false);
 	if (is_blank_ident(import_name)) {
 		force_use = true;
 	}
@@ -6354,7 +6370,8 @@ gb_internal void check_foreign_import_fullpaths(Checker *c) {
 			for (Ast *fp_node : fl->filepaths) {
 				Operand op = {};
 				check_expr(&ctx, &op, fp_node);
-				if (op.mode != Addressing_Constant && op.value.kind != ExactValue_String) {
+				String file_str = {};
+				if (op.mode != Addressing_Constant || !exact_value_to_path_string(op.value, &file_str)) {
 					gbString s = expr_to_string(op.expr);
 					error(fp_node, "Expected a constant string value, got '%s'", s);
 					gb_string_free(s);
@@ -6367,8 +6384,6 @@ gb_internal void check_foreign_import_fullpaths(Checker *c) {
 					continue;
 				}
 
-				String file_str = op.value.value_string;
-				file_str = string_trim_whitespace(file_str);
 				String fullpath = file_str;
 				if (!is_arch_wasm() || string_ends_with(file_str, str_lit(".o"))) {
 					String foreign_path = {};
