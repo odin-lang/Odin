@@ -476,10 +476,7 @@ abi_run :: proc($T: typeid) {
 	c1 := abi_contextless(k.c, a)
 	abi_check(&c1, ABI_CONTEXTLESS, "contextless", 100)
 
-	// NOTE(bill): `abi_variadic(3, a, b, a)` does not compile here.
-	// The checker instantiates `abi_variadic` with `$T` itself when its variadic arguments have the type of a polymorphic parameter.
-	// Without the volatile load the call becomes a direct one when optimized.
-	v1 := p.variadic(3, a, b, a)
+	v1 := abi_variadic(3, a, b, a)
 	abi_check(&v1, ABI_B, "variadic", 100)
 
 	i1 := intrinsics.volatile_load(&p.single)(a)
