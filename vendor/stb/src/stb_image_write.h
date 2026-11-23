@@ -1,4 +1,4 @@
-/* stb_image_write - v1.18 - public domain - http://nothings.org/stb
+/* stb_image_write - v1.19 - public domain - http://nothings.org/stb
    writes out PNG/BMP/TGA/JPEG/HDR images to C stdio - Sean Barrett 2010-2015
                                      no warranty implied; use at your own risk
 
@@ -1364,7 +1364,10 @@ STBIWDEF unsigned char *stbi_write_png_to_mem(const unsigned char *pixels, ptrdi
 
    // each tag requires 12 bytes of overhead
    out = (unsigned char *) STBIW_MALLOC(8 + 12+13 + 12+zlen + 12);
-   if (!out) return 0;
+   if (!out) {
+      STBIW_FREE(zlib);
+      return 0;
+   }
    *out_len = 8 + 12+13 + 12+zlen + 12;
 
    o=out;
@@ -1828,6 +1831,11 @@ STBIWDEF int stbi_write_jpg(char const *filename, int x, int y, int comp, const 
 #endif // STB_IMAGE_WRITE_IMPLEMENTATION
 
 /* Revision history
+      1.19  (2021-11-19) bugfixes
+      1.18  (2021-11-19) bugfixes
+      1.17  (2021-11-12)
+             add _strided functions
+             bugfixes
       1.16  (2021-07-11)
              make Deflate code emit uncompressed blocks when it would otherwise expand
              support writing BMPs with alpha channel

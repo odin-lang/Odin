@@ -1,4 +1,4 @@
-/* stb_image - v2.32 - public domain image loader - http://nothings.org/stb
+/* stb_image - v2.34 - public domain image loader - http://nothings.org/stb
                                   no warranty implied; use at your own risk
 
    == SECURITY NOTE ==
@@ -64,6 +64,8 @@ LICENSE
 
 RECENT REVISION HISTORY:
 
+      2.34  (2026-11-19) bugfix newly introduced bug
+      2.33  (2026-11-19) bugfixes
       2.32  (2026-11-12) fix req_comp regression; other fixes
       2.31  (2026-11-08) many bugfixes and etc.
       2.30  (2024-05-31) avoid erroneous gcc warning
@@ -1921,14 +1923,19 @@ static float   *stbi__ldr_to_hdr(stbi_uc *data, int x, int y, int comp)
 {
    int i,k,n;
    float *output;
+   float gamma_lut[256];
    if (!data) return NULL;
    output = (float *) stbi__malloc_mad4(x, y, comp, sizeof(float), 0);
    if (output == NULL) { STBI_FREE(data); return stbi__errpf("outofmem", "Out of memory"); }
+   // use a LUT for gamma since there's only 256 possible inputs
+   for (i=0; i < 256; ++i) {
+      gamma_lut[i] = (float) (pow(i/255.0f, stbi__l2h_gamma) * stbi__l2h_scale);
+   }
    // compute number of non-alpha components
    if (comp & 1) n = comp; else n = comp-1;
    for (i=0; i < x*y; ++i) {
       for (k=0; k < n; ++k) {
-         output[i*comp + k] = (float) (pow(data[i*comp+k]/255.0f, stbi__l2h_gamma) * stbi__l2h_scale);
+         output[i*comp + k] = gamma_lut[data[i*comp+k]];
       }
    }
    if (n < comp) {
@@ -3479,6 +3486,7 @@ static stbi_uc stbi__skip_jpeg_junk_at_end(stbi__jpeg *j)
 static int stbi__decode_jpeg_image(stbi__jpeg *j)
 {
    int m;
+   int got_data = 0;
    for (m = 0; m < 4; m++) {
       j->img_comp[m].raw_data = NULL;
       j->img_comp[m].raw_coeff = NULL;
@@ -3488,6 +3496,7 @@ static int stbi__decode_jpeg_image(stbi__jpeg *j)
    m = stbi__get_marker(j);
    while (!stbi__EOI(m)) {
       if (stbi__SOS(m)) {
+         got_data = 1;
          if (!stbi__process_scan_header(j)) return 0;
          if (!stbi__parse_entropy_coded_data(j)) return 0;
          if (j->marker == STBI__MARKER_none ) {
@@ -3510,7 +3519,7 @@ static int stbi__decode_jpeg_image(stbi__jpeg *j)
    }
    if (j->progressive)
       stbi__jpeg_finish(j);
-   return 1;
+   return got_data;
 }
 
 // static jfif-centered resampling (across block boundaries)
@@ -5594,11 +5603,13 @@ static void *stbi__bmp_load(stbi__context *s, int *x, int *y, int *comp, int req
    if (stbi__bmp_parse_header(s, &info) == NULL)
       return NULL; // error code already set
 
+   if (s->img_y > STBI_MAX_DIMENSIONS || (int)s->img_y < -STBI_MAX_DIMENSIONS || !s->img_y ||
+       s->img_x > STBI_MAX_DIMENSIONS || s->img_x <= 0) {
+      return stbi__errpuc("bad size","Invalid image dimensions (corrupt?)");
+   }
+
    flip_vertically = ((int) s->img_y) > 0;
    s->img_y = abs((int) s->img_y);
-
-   if (s->img_y > STBI_MAX_DIMENSIONS) return stbi__errpuc("too large","Very large image (corrupt?)");
-   if (s->img_x > STBI_MAX_DIMENSIONS) return stbi__errpuc("too large","Very large image (corrupt?)");
 
    mr = info.mr;
    mg = info.mg;
@@ -6445,7 +6456,10 @@ static stbi_uc *stbi__process_gif_raster(stbi__context *s, stbi__gif *g)
    int revind;
 
    lzw_cs = stbi__get8(s);
-   if (lzw_cs > 12) return NULL;
+   // GIF89a spec: cs should correspond to number of actual pixel values, but 1-bit
+   // images need to signal 2. we don't support literals >8 bits, so legal range is
+   // [2,8].
+   if (lzw_cs < 2 || lzw_cs > 8) return stbi__errpuc("bad code size", "Corrupt GIF");
    clear = 1 << lzw_cs;
    first = 1;
    codesize = lzw_cs + 1;
