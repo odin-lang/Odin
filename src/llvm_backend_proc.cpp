@@ -2534,8 +2534,6 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			GB_ASSERT(vt->kind == Type_SimdVector);
 
 			i64 indices_count = ce->args.count-2;
-			i64 max_count = vt->SimdVector.count*2;
-			GB_ASSERT(indices_count <= max_count);
 
 			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, indices_count);
 			for (isize i = 0; i < indices_count; i++) {
