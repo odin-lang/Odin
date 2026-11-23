@@ -1619,20 +1619,30 @@ test_cstring_len :: proc(t: ^testing.T) {
 	}
 }
 
+// Two pages with only the first committed. Reading past it faults.
+// Some targets have no virtual memory (e.g. WASI): the pages are empty, `ok` is false, and nothing fails.
+@(private="file", require_results)
+guarded_pages :: proc(t: ^testing.T) -> (data: []byte, ok: bool) {
+	page := uint(mem.PAGE_SIZE)
+	err: runtime.Allocator_Error
+	data, err = virtual.reserve(2*page)
+	if !testing.expect_value(t, err, nil) || len(data) == 0 {
+		return
+	}
+	ok = testing.expect_value(t, virtual.commit(raw_data(data), page), nil)
+	return
+}
+
 // The NUL is the last byte before a page that is reserved but not committed.
 @(test)
 test_cstring_len_at_end_of_page :: proc(t: ^testing.T) {
+	data, ok := guarded_pages(t)
+	defer virtual.release(raw_data(data), uint(len(data)))
+	if !ok {
+		return
+	}
+
 	page := uint(mem.PAGE_SIZE)
-	data, err := virtual.reserve(2*page)
-	if !testing.expect_value(t, err, nil) {
-		return
-	}
-	defer virtual.release(raw_data(data), 2*page)
-
-	if !testing.expect_value(t, virtual.commit(raw_data(data), page), nil) {
-		return
-	}
-
 	for n in 0..<300 {
 		slice.fill(data[:page], 'x')
 		data[page-1] = 0
@@ -1721,20 +1731,15 @@ test_cstring_cmp :: proc(t: ^testing.T) {
 // One string ends with the last byte before a page that is reserved but not committed.
 @(test)
 test_cstring_cmp_at_end_of_page :: proc(t: ^testing.T) {
+	data_a, ok_a := guarded_pages(t)
+	data_b, ok_b := guarded_pages(t)
+	defer virtual.release(raw_data(data_a), uint(len(data_a)))
+	defer virtual.release(raw_data(data_b), uint(len(data_b)))
+	if !ok_a || !ok_b {
+		return
+	}
+
 	page := uint(mem.PAGE_SIZE)
-	data_a, err_a := virtual.reserve(2*page)
-	data_b, err_b := virtual.reserve(2*page)
-	if !testing.expect_value(t, err_a, nil) || !testing.expect_value(t, err_b, nil) {
-		return
-	}
-	defer virtual.release(raw_data(data_a), 2*page)
-	defer virtual.release(raw_data(data_b), 2*page)
-
-	if !testing.expect_value(t, virtual.commit(raw_data(data_a), page), nil) ||
-	   !testing.expect_value(t, virtual.commit(raw_data(data_b), page), nil) {
-		return
-	}
-
 	other: [512]byte
 	loop: for n in 0..<300 {
 		a := data_a[page-1-uint(n):]
@@ -1825,17 +1830,13 @@ test_cstring16_len :: proc(t: ^testing.T) {
 // The NUL ends at the last byte before a page that is reserved but not committed, or one byte earlier (an odd address).
 @(test)
 test_cstring16_len_at_end_of_page :: proc(t: ^testing.T) {
+	data, ok := guarded_pages(t)
+	defer virtual.release(raw_data(data), uint(len(data)))
+	if !ok {
+		return
+	}
+
 	page := uint(mem.PAGE_SIZE)
-	data, err := virtual.reserve(2*page)
-	if !testing.expect_value(t, err, nil) {
-		return
-	}
-	defer virtual.release(raw_data(data), 2*page)
-
-	if !testing.expect_value(t, virtual.commit(raw_data(data), page), nil) {
-		return
-	}
-
 	for n in 0..<300 {
 		for end in ([?]uint{page, page-1}) {
 			start := end - 2 - 2*uint(n)
@@ -1895,20 +1896,15 @@ test_cstring16_eq :: proc(t: ^testing.T) {
 // One string ends at the last byte before a page that is reserved but not committed, or one byte earlier (an odd address).
 @(test)
 test_cstring16_eq_at_end_of_page :: proc(t: ^testing.T) {
+	data_a, ok_a := guarded_pages(t)
+	data_b, ok_b := guarded_pages(t)
+	defer virtual.release(raw_data(data_a), uint(len(data_a)))
+	defer virtual.release(raw_data(data_b), uint(len(data_b)))
+	if !ok_a || !ok_b {
+		return
+	}
+
 	page := uint(mem.PAGE_SIZE)
-	data_a, err_a := virtual.reserve(2*page)
-	data_b, err_b := virtual.reserve(2*page)
-	if !testing.expect_value(t, err_a, nil) || !testing.expect_value(t, err_b, nil) {
-		return
-	}
-	defer virtual.release(raw_data(data_a), 2*page)
-	defer virtual.release(raw_data(data_b), 2*page)
-
-	if !testing.expect_value(t, virtual.commit(raw_data(data_a), page), nil) ||
-	   !testing.expect_value(t, virtual.commit(raw_data(data_b), page), nil) {
-		return
-	}
-
 	other: [1024]byte
 	loop: for n in 0..<300 {
 		for end in ([?]uint{page, page-1}) {
