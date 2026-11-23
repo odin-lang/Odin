@@ -38,8 +38,12 @@ Context :: struct {
 	bitlen:  u64,
 	datalen: u32,
 
-	is_initialized: bool,
+	is_hw_accelerated: bool,
+	is_initialized:    bool,
 }
+
+@(private)
+ERR_HW_NOT_SUPPORTED :: "crypto/sha1: hardware implementation unsupported"
 
 // init initializes a Context.
 init :: proc(ctx: ^Context) {
@@ -56,6 +60,7 @@ init :: proc(ctx: ^Context) {
 	ctx.datalen = 0
 	ctx.bitlen = 0
 
+	ctx.is_hw_accelerated = is_hardware_accelerated()
 	ctx.is_initialized = true
 }
 
@@ -63,14 +68,25 @@ init :: proc(ctx: ^Context) {
 update :: proc(ctx: ^Context, data: []byte) {
 	ensure(ctx.is_initialized)
 
-	for i := 0; i < len(data); i += 1 {
-		ctx.data[ctx.datalen] = data[i]
-		ctx.datalen += 1
-		if (ctx.datalen == BLOCK_SIZE) {
+	data := data
+	if ctx.datalen > 0 {
+		n := copy(ctx.data[ctx.datalen:], data)
+		ctx.datalen += u32(n)
+		data = data[n:]
+		if ctx.datalen == BLOCK_SIZE {
 			transform(ctx, ctx.data[:])
 			ctx.bitlen += 512
 			ctx.datalen = 0
 		}
+	}
+	if len(data) >= BLOCK_SIZE {
+		n := len(data) &~ (BLOCK_SIZE - 1)
+		transform(ctx, data[:n])
+		ctx.bitlen += u64(n) * 8
+		data = data[n:]
+	}
+	if len(data) > 0 {
+		ctx.datalen = u32(copy(ctx.data[:], data))
 	}
 }
 
@@ -141,6 +157,17 @@ reset :: proc(ctx: ^$T) {
 
 @(private)
 transform :: proc "contextless" (ctx: ^Context, data: []byte) {
+	if ctx.is_hw_accelerated {
+		sha1_transf_hw(ctx, data)
+		return
+	}
+	for blocks := data; len(blocks) >= BLOCK_SIZE; blocks = blocks[BLOCK_SIZE:] {
+		transform_block(ctx, blocks[:BLOCK_SIZE])
+	}
+}
+
+@(private)
+transform_block :: proc "contextless" (ctx: ^Context, data: []byte) {
 	a, b, c, d, e, i, t: u32
 	m: [80]u32
 
