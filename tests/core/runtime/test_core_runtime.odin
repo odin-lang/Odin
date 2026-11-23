@@ -408,8 +408,12 @@ test_soa_array_elem_swizzle :: proc(t: ^testing.T) {
 	fixed[1].xy += [2]u16{9, 10}
 	testing.expect_value(t, fixed.x[1], 30)
 	testing.expect_value(t, fixed.y[1], 30)
+	// a repeated component keeps its last occurrence, like `fixed[1].xx = fixed[1].xx + {5, 100}`
 	fixed[1].xx += [2]u16{5, 100}
-	testing.expect_value(t, fixed.x[1], 35)
+	testing.expect_value(t, fixed.x[1], 130)
+	fixed[1].xxy += [3]u16{1, 2, 3}
+	testing.expect_value(t, fixed.x[1], 132)
+	testing.expect_value(t, fixed.y[1], 33)
 
 	// range over an element swizzle
 	sum: u16
