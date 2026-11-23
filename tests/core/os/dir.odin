@@ -33,6 +33,21 @@ test_read_dir :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_open_directory_for_writing :: proc(t: ^testing.T) {
+	when ODIN_OS != .Windows {
+		path, err_join := os.join_path({#directory, "dir", "sub"}, context.allocator)
+		defer delete(path)
+		testing.expect_value(t, err_join, nil)
+
+		f, err := os.open(path, {.Write})
+		if err == nil {
+			os.close(f)
+		}
+		testing.expect_value(t, err, os.General_Error.Is_Dir)
+	}
+}
+
+@(test)
 test_walker :: proc(t: ^testing.T) {
 	path, err := os.join_path({#directory, "dir"}, context.allocator)
 	defer delete(path)
