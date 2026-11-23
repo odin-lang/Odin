@@ -816,6 +816,25 @@ else
 	exit 1
 fi
 
+rm -rf identity
+cp -R ../test_paths_identity identity
+ln -s pkg identity/alias
+$ODIN build identity/main -out:identity_main $COMMON
+./identity_main
+mkdir identity/loaddir/files
+echo b > identity/loaddir/files/b.txt
+echo a > identity/loaddir/files/a.txt
+echo z > identity/loaddir/z_target.txt
+ln -s ../z_target.txt identity/loaddir/files/c_link.txt
+$ODIN build identity/loaddir -out:identity_loaddir $COMMON
+[[ "$(./identity_loaddir)" == $'a.txt\nb.txt\nc_link.txt' ]]
+mkdir -p identity/r4/d identity/r4/src
+mv identity/reached/f.odin identity/r4/src/f.odin
+cp -R identity/helper identity/r4/d/helper
+ln -s ../src/f.odin identity/r4/d/f.odin
+$ODIN build identity/r4/d -out:identity_reached $COMMON
+./identity_reached
+
 #########################################################################################################
 
 if [[ ! -z ${ODIN_TESTS_NO_CLANG+x} ]]; then

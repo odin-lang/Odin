@@ -337,6 +337,24 @@ rmdir spelled_link
 %ODIN% check ..\test_paths_directives -no-entry-point %COMMON% 2>&1 | find /c "Unknown library collection" | findstr /x "1" || exit /b
 %ODIN% check ..\test_paths_directives -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
 
+if exist identity\alias rmdir identity\alias
+if exist identity rmdir /S /Q identity
+%SystemRoot%\System32\xcopy.exe /E /I /Q ..\test_paths_identity identity > nul || exit /b
+mklink /J identity\alias identity\pkg > nul || exit /b
+%ODIN% build identity\main -out:identity_main.exe %COMMON% || exit /b
+.\identity_main.exe || exit /b
+%ODIN% build identity\main_case -out:identity_case.exe %COMMON% || exit /b
+.\identity_case.exe || exit /b
+mkdir identity\loaddir\files
+echo b> identity\loaddir\files\b.txt
+echo a> identity\loaddir\files\a.txt
+%ODIN% build identity\loaddir -out:identity_loaddir.exe %COMMON% || exit /b
+.\identity_loaddir.exe > identity_loaddir.txt || exit /b
+%SystemRoot%\System32\findstr.exe /n "^" identity_loaddir.txt | %SystemRoot%\System32\findstr.exe /b /l /c:"1:a.txt" || exit /b
+%SystemRoot%\System32\findstr.exe /n "^" identity_loaddir.txt | %SystemRoot%\System32\findstr.exe /b /l /c:"2:b.txt" || exit /b
+%SystemRoot%\System32\find.exe /c /v "" identity_loaddir.txt | %SystemRoot%\System32\findstr.exe /e ": 2" || exit /b
+rmdir identity\alias
+
 @rem #########################################################################################################
 
 @echo off

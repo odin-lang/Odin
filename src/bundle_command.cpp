@@ -169,10 +169,6 @@ gb_internal bool zip_writer_add_file(ZipWriter *w, String name, String path) {
 	return w->ok;
 }
 
-gb_internal GB_COMPARE_PROC(file_info_name_cmp) {
-	return string_compare((cast(FileInfo const *)a)->name, (cast(FileInfo const *)b)->name);
-}
-
 // Adds every file under `dir`, named `prefix` followed by its path relative to `dir`, in a stable order.
 gb_internal bool zip_writer_add_directory(ZipWriter *w, String prefix, String dir) {
 	Array<FileInfo> list = {};
@@ -180,7 +176,6 @@ gb_internal bool zip_writer_add_directory(ZipWriter *w, String prefix, String di
 	if (read_directory(dir, &list) != ReadDirectory_None) {
 		return true; // empty or missing
 	}
-	array_sort(list, file_info_name_cmp);
 
 	for (FileInfo const &fi : list) {
 		String name = concatenate_strings(permanent_allocator(), prefix, fi.name);

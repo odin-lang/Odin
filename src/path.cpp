@@ -278,6 +278,60 @@ gb_internal String path_make_absolute(gbAllocator a, String path) {
 #endif
 }
 
+gb_internal String path_spelled(gbAllocator a, String path) {
+	String abs = path_make_absolute(heap_allocator(), path);
+	if (abs.len == 0) {
+		return {};
+	}
+	defer (gb_free(heap_allocator(), abs.text));
+
+	u8 *buf = gb_alloc_array(a, u8, abs.len+1);
+	isize n = 0;
+	isize i = 0;
+#if defined(GB_SYSTEM_WINDOWS)
+	if (abs.len >= 2 && abs.text[1] == ':') {
+		buf[n++] = abs.text[0];
+		buf[n++] = ':';
+		i = 2;
+	} else if (abs.len >= 2 && abs.text[0] == '/' && abs.text[1] == '/') {
+		buf[n++] = '/';
+		i = 1;
+	}
+#endif
+	isize root_len = n;
+	while (i < abs.len) {
+		if (abs.text[i] == '/') {
+			i += 1;
+			continue;
+		}
+		isize start = i;
+		while (i < abs.len && abs.text[i] != '/') {
+			i += 1;
+		}
+		String elem = make_string(abs.text+start, i-start);
+		if (elem == ".") {
+			continue;
+		}
+		if (elem == "..") {
+			while (n > root_len && buf[n-1] != '/') {
+				n -= 1;
+			}
+			if (n > root_len) {
+				n -= 1;
+			}
+			continue;
+		}
+		buf[n++] = '/';
+		gb_memmove(buf+n, elem.text, elem.len);
+		n += elem.len;
+	}
+	if (n == 0 || (n == 2 && buf[1] == ':')) {
+		buf[n++] = '/';
+	}
+	buf[n] = 0;
+	return make_string(buf, n);
+}
+
 gb_internal String path_working_directory(gbAllocator a) {
 	String cwd = get_working_directory(a);
 #if defined(GB_SYSTEM_WINDOWS)
@@ -544,6 +598,12 @@ gb_internal i64 get_file_size(String path) {
 }
 
 
+gb_internal int file_info_name_cmp(void const *x, void const *y) {
+	FileInfo const *a = cast(FileInfo const *)x;
+	FileInfo const *b = cast(FileInfo const *)y;
+	return string_compare(a->name, b->name);
+}
+
 #if defined(GB_SYSTEM_WINDOWS)
 gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
 	GB_ASSERT(fi != nullptr);
@@ -621,7 +681,12 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 
 		FileInfo info = {};
 		info.name = name;
-		info.fullpath = path_to_full_path(a, filepath);
+		info.fullpath = copy_string(a, filepath);
+		for (isize i = 0; i < info.fullpath.len; i++) {
+			if (info.fullpath.text[i] == '\\') {
+				info.fullpath.text[i] = '/';
+			}
+		}
 		info.size = cast(i64)size;
 		info.is_dir = (file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 		array_add(fi, info);
@@ -631,6 +696,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 		return ReadDirectory_Empty;
 	}
 
+	array_sort(*fi, file_info_name_cmp);
 	return ReadDirectory_None;
 }
 #elif defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_OPENBSD) || defined(GB_SYSTEM_NETBSD)
@@ -697,7 +763,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 
 		FileInfo info = {};
 		info.name = copy_string(a, name);
-		info.fullpath = path_to_full_path(a, filepath);
+		info.fullpath = copy_string(a, filepath);
 		info.size = size;
 		info.is_dir = S_ISDIR(dir_stat.st_mode);
 		array_add(fi, info);
@@ -707,6 +773,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 		return ReadDirectory_Empty;
 	}
 
+	array_sort(*fi, file_info_name_cmp);
 	return ReadDirectory_None;
 }
 

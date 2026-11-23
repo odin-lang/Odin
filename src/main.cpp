@@ -1207,15 +1207,15 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 							gbAllocator a = heap_allocator();
 							bool path_ok = false;
-							String fullpath = path_to_fullpath(a, path, &path_ok);
+							String fullpath = path_spelled_existing(a, path, &path_ok);
 							if (!path_ok || !path_is_directory(fullpath)) {
-								gb_printf_err("Library collection '%.*s' path must be a directory, got '%.*s'\n", LIT(name), LIT(path_ok ? fullpath : path));
+								gb_printf_err("Library collection '%.*s' path must be a directory, got '%.*s'\n", LIT(name), LIT(fullpath.len > 0 ? fullpath : path));
 								gb_free(a, fullpath.text);
 								bad_flags = true;
 								break;
 							}
 
-							add_library_collection(name, path);
+							add_library_collection(name, path_trim_trailing_separators(fullpath));
 
 							// NOTE(bill): Allow for multiple library collections
 							continue;
@@ -4156,17 +4156,9 @@ gb_internal bool load_overlays(String overlay_file) {
 			return false;
 		}
 		OverlayEntry e = {};
-		e.path = path_to_full_path(permanent_allocator(), entry.key);
-		if (!gb_file_exists(alloc_cstring(temporary_allocator(), entry.key))) {
-			String dir = directory_from_path(entry.key);
-			if (dir.len == 0) {
-				dir = str_lit(".");
-			}
-			dir = path_to_full_path(temporary_allocator(), dir);
-			e.path = concatenate3_strings(permanent_allocator(), dir, str_lit("/"), filename_without_directory(entry.key));
-		}
+		e.path = path_spelled(permanent_allocator(), entry.key);
 		if (entry.value->string.len != 0) {
-			e.replacement = path_to_full_path(permanent_allocator(), entry.value->string);
+			e.replacement = path_spelled(permanent_allocator(), entry.value->string);
 		}
 		array_add(&global_overlays, e);
 	}

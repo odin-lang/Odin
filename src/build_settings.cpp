@@ -1544,6 +1544,15 @@ gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 #endif
 
 
+gb_internal String path_spelled_existing(gbAllocator a, String path, bool *ok_) {
+	String res = path_spelled(a, path);
+	if (ok_) {
+		FileId id = {};
+		*ok_ = res.len > 0 && path_file_id(res, &id);
+	}
+	return res;
+}
+
 gb_internal String get_fullpath_relative(gbAllocator a, String base_dir, String path, bool *ok_) {
 	u8 *str = gb_alloc_array(heap_allocator(), u8, base_dir.len+1+path.len+1);
 	defer (gb_free(heap_allocator(), str));
@@ -1566,7 +1575,7 @@ gb_internal String get_fullpath_relative(gbAllocator a, String base_dir, String 
 
 	String res = make_string(str, i);
 	res = string_trim_whitespace(res);
-	return path_to_fullpath(a, res, ok_);
+	return path_spelled_existing(a, res, ok_);
 }
 
 
@@ -1587,7 +1596,7 @@ gb_internal String get_fullpath_base_collection(gbAllocator a, String path, bool
 
 	String res = make_string(str, i);
 	res = string_trim_whitespace(res);
-	return path_to_fullpath(a, res, ok_);
+	return path_spelled_existing(a, res, ok_);
 }
 
 gb_internal String get_fullpath_core_collection(gbAllocator a, String path, bool *ok_) {
@@ -1607,7 +1616,7 @@ gb_internal String get_fullpath_core_collection(gbAllocator a, String path, bool
 
 	String res = make_string(str, i);
 	res = string_trim_whitespace(res);
-	return path_to_fullpath(a, res, ok_);
+	return path_spelled_existing(a, res, ok_);
 }
 
 gb_internal bool show_error_line(void) {

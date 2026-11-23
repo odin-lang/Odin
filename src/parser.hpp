@@ -267,7 +267,7 @@ struct AstPackage {
 struct Parser {
 	String                 init_fullpath;
 
-	StringSet              imported_files; // fullpath
+	StringMap<AstPackage *> imported_files;
 	BlockingMutex          imported_files_mutex;
 
 	Array<AstPackage *>    packages;
@@ -782,6 +782,7 @@ AST_KIND(_DeclBegin,      "", bool) \
 		Token    token;         \
 		Token    relpath;       \
 		String   fullpath;      \
+		String   spelled_path;  \
 		Token    import_name;   \
 		Array<Ast *> attributes;  \
 		CommentGroup *docs;     \
