@@ -5740,6 +5740,7 @@ char *gb_path_get_full_name(gbAllocator a, char const *path) {
 	}
 	w_len = GetFullPathNameW(w_path, 0, NULL, NULL);
 	if (w_len == 0) {
+		gb_free(gb_heap_allocator(), w_path);
 		return NULL;
 	}
 	w_fullpath = gb_alloc_array(gb_heap_allocator(), wchar_t, w_len+1);
@@ -5760,6 +5761,7 @@ char *gb_path_get_full_name(gbAllocator a, char const *path) {
 		return NULL;
 	}
 	new_path[new_len] = 0;
+	gb_free(gb_heap_allocator(), w_fullpath);
 	return new_path;
 #else
 	char *p, *result, *fullpath = NULL;
@@ -5781,11 +5783,13 @@ char *gb_path_get_full_name(gbAllocator a, char const *path) {
 		} else {
 			// Appears to be a relative path, so construct an absolute one relative to <cwd>.
 			char cwd[4096];
-			getcwd(&cwd[0], 4096);
+			if (getcwd(&cwd[0], 4096) == NULL) {
+				return NULL;
+			}
 
 			isize path_len = gb_strlen(path);
 			isize cwd_len  = gb_strlen(cwd);
-			len            = cwd_len + 1 + path_len + 1;
+			len            = cwd_len + 1 + path_len;
 			result         = gb_alloc_array(a, char, len+1);
 
 			gb_memmove(result, (void *)cwd, cwd_len);

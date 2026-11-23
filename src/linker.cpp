@@ -393,6 +393,7 @@ try_cross_linking:;
 			string_map_init(&libs_normalized);
 			defer (string_map_destroy(&libs_normalized));
 			Array<FileInfo> walker_list = {};
+			defer (array_free(&walker_list));
 			StringSet walker_visited = {};
 			string_set_init(&walker_visited, 64);
 			defer (string_set_destroy(&walker_visited));

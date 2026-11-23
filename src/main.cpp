@@ -79,13 +79,15 @@ gb_global Timings global_timings = {0};
 #include "bug_report.cpp"
 
 #if defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
-int run_subprocess(const char *name, const char **args, bool honor_path = false);
+int run_subprocess(const char *name, const char **args, bool honor_path = false, bool raise_signal = true);
 #endif
 
 // NOTE(bill): 'name' is used in debugging and profiling modes
 gb_internal i32 system_exec_command_line_app_internal(bool exit_on_err, char const *name, char const *fmt, va_list va) {
 	isize const cmd_cap = 64<<20; // 64 MiB should be more than enough
 	char *cmd_line = gb_alloc_array(gb_heap_allocator(), char, cmd_cap);
+	char *cmd_buf = cmd_line;
+	defer (gb_free(gb_heap_allocator(), cmd_buf));
 	isize cmd_len = 0;
 	i32 exit_code = 0;
 
@@ -157,15 +159,8 @@ gb_internal i32 system_exec_command_line_app_internal(bool exit_on_err, char con
 	int argc;
 	char **argv = command_line_to_spawn_argv(cmd_line, &argc);
 
-	exit_code = run_subprocess(argv[0], cast(const char**)(argv), true);
-	if (exit_on_err && WIFSIGNALED(exit_code)) {
-		struct rlimit limit = { 0, 0, };
-		setrlimit(RLIMIT_CORE, &limit);
-		raise(WTERMSIG(exit_code));
-	}
-	if (WIFEXITED(exit_code)) {
-		exit_code = WEXITSTATUS(exit_code);
-	}
+	exit_code = run_subprocess(argv[0], cast(const char**)(argv), true, false);
+	gb_free(gb_heap_allocator(), argv);
 #endif
 
 	if (exit_on_err && exit_code) {
@@ -273,13 +268,19 @@ int run_subprocess(String const &exe_name, wchar_t *after_double_dash_raw) {
 	return exit_code;
 }
 #else
-int run_subprocess(const char *name, const char **args, bool honor_path) {
+int run_subprocess(const char *name, const char **args, bool honor_path, bool raise_signal) {
 	pid_t pid;
 	int status;
 
+	char const *original_arg0 = args[0];
 	String exec_name = make_string_c(args[0]);
 	exec_name = last_path_element(exec_name);
-	args[0] = alloc_cstring(gb_heap_allocator(), exec_name);
+	char *arg0 = alloc_cstring(gb_heap_allocator(), exec_name);
+	args[0] = arg0;
+	defer ({
+		args[0] = original_arg0;
+		gb_free(gb_heap_allocator(), arg0);
+	});
 
 	if (!honor_path) {
 		status = posix_spawn(&pid, name, NULL, NULL, (char *const *)args, environ);
@@ -292,7 +293,10 @@ int run_subprocess(const char *name, const char **args, bool honor_path) {
 	}
 
 	for (;;) {
-		if (waitpid(pid, &status, WUNTRACED) < 0) {
+		if (waitpid(pid, &status, 0) < 0) {
+			if (errno == EINTR) {
+				continue;
+			}
 			gb_printf_err("Could not wait on subprocess: (pid: %d): %s\n", pid, strerror(errno));
 			return -1;
 		}
@@ -300,11 +304,13 @@ int run_subprocess(const char *name, const char **args, bool honor_path) {
 		if (WIFEXITED(status)) {
 			return WEXITSTATUS(status);
 		} else if (WIFSIGNALED(status)) {
+			if (!raise_signal) {
+				gb_printf_err("%s was terminated by signal %d\n", args[0], WTERMSIG(status));
+				return 128 + WTERMSIG(status);
+			}
 			struct rlimit limit = { 0, 0, };
 			setrlimit(RLIMIT_CORE, &limit);
 			raise(WTERMSIG(status));
-			return -1;
-		} else if (WIFSTOPPED(status)) {
 			return -1;
 		}
 	}

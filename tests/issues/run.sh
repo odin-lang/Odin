@@ -922,6 +922,13 @@ grep -qF 'q"x\ b\#$$/data.txt' deps.d
 $ODIN build 'deps_test/q"x b#$' $COMMON -export-dependencies:json -export-dependencies-file:deps.json -out:deps
 grep -qF 'q\"x b#$/data.txt"' deps.json
 
+printf '#!/bin/sh\nexit 128\n' > fake_cc_128
+printf '#!/bin/sh\nkill -TERM $$\n' > fake_cc_sig
+chmod +x fake_cc_128 fake_cc_sig
+if ODIN_CLANG_PATH="$PWD/fake_cc_128" $ODIN build ../test_paths_debug $COMMON -out:fake_link; then exit 1; fi
+SIG_OUT=$(ODIN_CLANG_PATH="$PWD/fake_cc_sig" $ODIN build ../test_paths_debug $COMMON -out:fake_link 2>&1 || true)
+grep -q "terminated by signal 15" <<< "$SIG_OUT"
+
 #########################################################################################################
 
 if [[ ! -z ${ODIN_TESTS_NO_CLANG+x} ]]; then

@@ -1475,13 +1475,18 @@ gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 	defer (gb_free(heap_allocator(), string16.text));
 
 	DWORD len = GetFullPathNameW(cast(wchar_t *)&string16[0], 0, nullptr, nullptr);
+	DWORD n = 0;
 	if (len != 0) {
-		wchar_t *text = permanent_alloc_array<wchar_t>(len+1);
-		GetFullPathNameW(cast(wchar_t *)&string16[0], len, text, nullptr);
-
-		text[len] = 0;
-		result = string16_to_string(a, make_string16(cast(u16 *)text, len));
-
+		wchar_t *text = gb_alloc_array(heap_allocator(), wchar_t, len+1);
+		n = GetFullPathNameW(cast(wchar_t *)&string16[0], len, text, nullptr);
+		if (n >= len) {
+			n = 0;
+		}
+		text[n] = 0;
+		result = string16_to_string(a, make_string16(cast(u16 *)text, n));
+		gb_free(heap_allocator(), text);
+	}
+	if (n != 0 && result.len != 0) {
 		// Replace Windows style separators
 		for (isize i = 0; i < result.len; i++) {
 			if (result.text[i] == '\\') {
@@ -1674,9 +1679,11 @@ gb_internal void init_android_values(bool with_sdk) {
 
 	#if defined(GB_SYSTEM_WINDOWS)
 		if (bc->ODIN_ANDROID_SDK.len == 0) {
-			bc->ODIN_ANDROID_SDK = normalize_path(permanent_allocator(),
-				path_to_fullpath(permanent_allocator(), str_lit("%LocalAppData%/Android/Sdk"), nullptr),
-				NIX_SEPARATOR_STRING);
+			char const *local_app_data = gb_get_env("LOCALAPPDATA", permanent_allocator());
+			if (local_app_data != nullptr && local_app_data[0] != 0) {
+				String sdk = concatenate_strings(permanent_allocator(), make_string_c(local_app_data), str_lit("/Android/Sdk"));
+				bc->ODIN_ANDROID_SDK = normalize_path(permanent_allocator(), path_spelled(permanent_allocator(), sdk), NIX_SEPARATOR_STRING);
+			}
 		}
 	#endif
 

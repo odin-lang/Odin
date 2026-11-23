@@ -144,7 +144,7 @@ gb_internal String directory_from_path(String const &s) {
 
 		struct stat s;
 		if (stat(copy, &s) == 0) {
-			return (s.st_mode & S_IFDIR) != 0;
+			return S_ISDIR(s.st_mode);
 		}
 		return false;
 	}
@@ -165,7 +165,7 @@ gb_internal String path_to_full_path(gbAllocator a, String path) {
 		}
 	}
 #endif
-	return copy_string(a, res);
+	return res;
 }
 
 gb_internal bool path_is_separator(u8 c) {
@@ -560,7 +560,7 @@ gb_internal Path path_from_string(gbAllocator a, String const &path) {
 
 	if (path.len == 0) return res;
 
-	String fullpath = path_to_full_path(a, path);
+	String fullpath = path_to_full_path(heap_allocator(), path);
 	defer (gb_free(heap_allocator(), fullpath.text));
 
 	res.basename = directory_from_path(fullpath);	
