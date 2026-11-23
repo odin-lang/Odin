@@ -3616,8 +3616,8 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 							op.type = t_invalid;
 						}
 					}
-					if (is_type_polymorphic_type && !ctx->no_polymorphic_errors && is_variadic_param && (is_type_polymorphic(op.type) || is_type_untyped_nil(op.type))) {
-						// NOTE(bill): No argument of the variadic parameter has a type that determines its element type, or it has no argument.
+					if (is_type_polymorphic_type && is_variadic_param && !ctx->no_polymorphic_errors && (is_type_polymorphic(op.type) || is_type_untyped_nil(op.type))) {
+						// NOTE(bill): The variadic arguments gave no element type, or there are none.
 						// The call reports it, and the procedure is not generated with the type left polymorphic.
 						success = false;
 					} else if (is_type_polymorphic_type) {

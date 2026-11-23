@@ -7816,20 +7816,21 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				ERROR_BLOCK();
 				gbString elem_str = type_to_string(elem);
 				String name = var_entity->token.string;
-				if (variadic_operands.count != 0) {
+				if (variadic_operands.count == 0) {
+					error(call, "Cannot infer the polymorphic type '%s' of the variadic parameter '%.*s' without an argument for it", elem_str, LIT(name));
+					error_line("\tSuggestion: Pass a typed argument, or a typed slice with '..', e.g. '..[]T{}'\n");
+				} else {
 					Operand const &first = variadic_operands[0];
-					set_caret_label(first.mode == Addressing_Type ? "a type, not a value" : "untyped; its type cannot be determined here");
+					bool passed_a_type = first.mode == Addressing_Type;
+					set_caret_label(passed_a_type ? "a type, not a value" : "untyped; its type cannot be determined here");
 					error(first.expr, "Cannot infer the polymorphic type '%s' of the variadic parameter '%.*s' from its arguments", elem_str, LIT(name));
-					if (first.mode == Addressing_Type) {
+					if (passed_a_type) {
 						gbString type_str = expr_to_string(first.expr);
 						error_line("\tSuggestion: Pass a value of the type, e.g. '%s{}'\n", type_str);
 						gb_string_free(type_str);
 					} else {
 						error_line("\tSuggestion: Give one of the arguments a type, e.g. 'T(x)' or 'T{...}'\n");
 					}
-				} else {
-					error(call, "Cannot infer the polymorphic type '%s' of the variadic parameter '%.*s' without an argument for it", elem_str, LIT(name));
-					error_line("\tSuggestion: Pass a typed argument, or a typed slice with '..', e.g. '..[]T{}'\n");
 				}
 				gb_string_free(elem_str);
 			}

@@ -35,6 +35,15 @@ first_of_value :: proc(a: $T) -> T {
 	return first(a, a)
 }
 
+@(private="file")
+negate :: proc(p: ^int) -> int {
+	return -p^
+}
+
+// A procedure group tries each candidate before it reports anything
+@(private="file")
+first_or_negate :: proc{first, negate}
+
 @test
 test_polymorphic_variadic :: proc(t: ^testing.T) {
 	x := 5
@@ -58,4 +67,7 @@ test_polymorphic_variadic :: proc(t: ^testing.T) {
 
 	testing.expect_value(t, first_of(int, 3, 4), 3)
 	testing.expect_value(t, first_of_value(f32(1.5)), 1.5)
+
+	testing.expect_value(t, first_or_negate(x, 7), 5)
+	testing.expect_value(t, first_or_negate(&x), -5)
 }
