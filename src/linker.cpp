@@ -668,13 +668,8 @@ try_cross_linking:;
 				has_odin_clang_path_env = false;
 			}
 
-			// NOTE(vassvik): needs to add the root to the library search paths, so that the full filenames of the library
-			//                files can be passed with -l:
 			gbString lib_str = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(lib_str));
-			#if !defined(GB_SYSTEM_WINDOWS)
-				lib_str = gb_string_appendc(lib_str, "-L/ ");
-			#endif
 
 			StringSet asm_files = {};
 			string_set_init(&asm_files, 64);
@@ -848,9 +843,18 @@ try_cross_linking:;
 								// object
 								// dynamic lib
 								// static libs, absolute full path relative to the file in which the lib was imported from
-								lib_str = gb_string_appendc(lib_str, " ");
-								lib_str = append_quoted(lib_str, lib);
-								lib_str = gb_string_appendc(lib_str, " ");
+								// `system:libfoo.dylib`, searched for as `-lfoo`
+								bool has_dir = string_contains_char(lib, '/') || string_contains_char(lib, '\\');
+								String name = remove_extension_from_path(lib);
+								if (!has_dir && string_ends_with(lib, str_lit(".dylib")) && string_starts_with(name, str_lit("lib"))) {
+									lib_str = gb_string_appendc(lib_str, " -l");
+									lib_str = append_quoted(lib_str, substring(name, 3, name.len));
+									lib_str = gb_string_appendc(lib_str, " ");
+								} else {
+									lib_str = gb_string_appendc(lib_str, " ");
+									lib_str = append_quoted(lib_str, lib);
+									lib_str = gb_string_appendc(lib_str, " ");
+								}
 							} else {
 								// dynamic or static system lib, just link regularly searching system library paths
 								lib_str = gb_string_appendc(lib_str, " -l");
@@ -865,28 +869,25 @@ try_cross_linking:;
 							//                the system library paths for the library file).
 							bool is_static = string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o"));
 							bool is_shared = string_ends_with(lib, str_lit(".so")) || string_contains_string(lib, str_lit(".so."));
-						#if defined(GB_SYSTEM_WINDOWS)
-							// NOTE(bill): `-l:` with a full path relies on the `-L/` added above, which Windows hosts
-							// (cross-linking for Linux or Android) do not have. Archives are passed by path. Shared
-							// libraries keep `-l:` with their own directory, so `DT_NEEDED` stays a bare file name.
-							if (is_static) {
+							bool has_dir = string_contains_char(lib, '/') || string_contains_char(lib, '\\');
+							// NOTE(jeroen): Archives are passed by path. Shared libraries are passed as `-L<dir>
+							// -l:<name>`, so `DT_NEEDED` is a bare file name whichever host links them.
+							if (is_static && has_dir) {
 								lib_str = gb_string_appendc(lib_str, " ");
 								lib_str = append_quoted(lib_str, lib);
 								lib_str = gb_string_appendc(lib_str, " ");
-								continue;
-							}
-							if (is_shared) {
+							} else if (is_shared && has_dir) {
 								String dir  = directory_from_path(lib);
 								String name = filename_without_directory(lib);
+								if (dir.len == 0) {
+									dir = str_lit("/");
+								}
 								lib_str = gb_string_appendc(lib_str, " -L");
 								lib_str = append_quoted(lib_str, dir);
 								lib_str = gb_string_appendc(lib_str, " -l:");
 								lib_str = append_quoted(lib_str, name);
 								lib_str = gb_string_appendc(lib_str, " ");
-								continue;
-							}
-						#endif
-							if (is_static || is_shared) {
+							} else if (is_static || is_shared) {
 								lib_str = gb_string_appendc(lib_str, " -l:");
 								lib_str = append_quoted(lib_str, lib);
 								lib_str = gb_string_appendc(lib_str, " ");

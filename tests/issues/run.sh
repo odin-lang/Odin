@@ -853,6 +853,19 @@ $ODIN build ../test_paths_tempfiles $COMMON -build-mode:dll -out:tempfiles/dll/t
 [[ -f tempfiles/t-helper.ll ]]
 [[ -f tempfiles/dll/t-helper.o ]]
 
+rm -rf needed
+mkdir -p needed
+cp -R ../test_paths_needed/lib ../test_paths_needed/app needed/
+if [[ $(uname) == Darwin ]]; then
+	$ODIN build ../test_paths_needed/darwin $COMMON -out:needed/darwin_system_dylib
+	./needed/darwin_system_dylib
+elif command -v readelf > /dev/null; then
+	$ODIN build needed/lib $COMMON -build-mode:dll -out:needed/lib/libtpneeded.so
+	$ODIN build needed/app $COMMON -out:needed/lib/app
+	./needed/lib/app
+	[[ $(readelf -d needed/lib/app | grep -c -F '[libtpneeded.so]') -eq 1 ]]
+fi
+
 #########################################################################################################
 
 if [[ ! -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
