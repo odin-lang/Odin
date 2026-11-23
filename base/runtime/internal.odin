@@ -575,94 +575,78 @@ cstring_len :: proc "contextless" (s: cstring) -> int {
 	}
 
 	start := uintptr(rawptr(s))
-	when ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2") {
-		V :: #simd[32]u8
+	when HAS_HARDWARE_SIMD {
+		AVX2  :: ODIN_ARCH == .amd64 && intrinsics.has_target_feature("avx2")
+		V     :: #simd[32]u8 when AVX2 else #simd[16]u8
+		M     :: u32         when AVX2 else u16
+		SIZE  :: size_of(V)
+		CHUNK :: 4*SIZE
 
-		p := start &~ 31
+		p := start &~ (SIZE-1)
 		v := intrinsics.volatile_load((^V)(p))
-		m := transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
-		m &= ~u32(0) << (start-p)
-		for _ in 0..<3 {
+		m := transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
+		when AVX2 {
+			m &= ~M(0) << (start-p)
 			if m != 0 {
 				return int(p - start + uintptr(intrinsics.count_trailing_zeros(m)))
 			}
-			p += 32
-			v = intrinsics.volatile_load((^V)(p))
-			m = transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
-		}
-
-		if m == 0 {
-			p = (p + 32) &~ 127
-			for {
-				a := intrinsics.volatile_load((^V)(p))
-				b := intrinsics.volatile_load((^V)(p+32))
-				c := intrinsics.volatile_load((^V)(p+64))
-				d := intrinsics.volatile_load((^V)(p+96))
-				lowest := intrinsics.simd_min(intrinsics.simd_min(a, b), intrinsics.simd_min(c, d))
-				if intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(lowest, 0)) != {} {
-					ma := u64(transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(a, 0)))
-					mb := u64(transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(b, 0)))
-					low := ma | mb<<32
-					if low != 0 {
-						return int(p - start + uintptr(intrinsics.count_trailing_zeros(low)))
-					}
-
-					mc := u64(transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(c, 0)))
-					md := u64(transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(d, 0)))
-					high := mc | md<<32
-					return int(p + 64 - start + uintptr(intrinsics.count_trailing_zeros(high)))
-				}
-				p += 128
+		} else {
+			m >>= (start-p)
+			if m != 0 {
+				return int(intrinsics.count_trailing_zeros(m))
 			}
-		}
-		return int(p - start + uintptr(intrinsics.count_trailing_zeros(m)))
-	} else when HAS_HARDWARE_SIMD {
-		V :: #simd[16]u8
-
-		p := start &~ 15
-		v := intrinsics.volatile_load((^V)(p))
-		m := transmute(u16)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
-		m >>= (start-p)
-		if m != 0 {
-			return int(intrinsics.count_trailing_zeros(m))
 		}
 
 		when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
-			for _ in 0..<7 {
-				p += 16
+			for _ in 0..<128/SIZE-1 {
+				p += SIZE
 				v = intrinsics.volatile_load((^V)(p))
-				m = transmute(u16)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
+				m = transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
 				if m != 0 {
 					return int(p - start + uintptr(intrinsics.count_trailing_zeros(m)))
 				}
 			}
 
-			p = (p + 16) &~ 63
+			p = (p + SIZE) &~ (CHUNK-1)
 			for {
 				a := intrinsics.volatile_load((^V)(p))
-				b := intrinsics.volatile_load((^V)(p+16))
-				c := intrinsics.volatile_load((^V)(p+32))
-				d := intrinsics.volatile_load((^V)(p+48))
+				b := intrinsics.volatile_load((^V)(p+SIZE))
+				c := intrinsics.volatile_load((^V)(p+2*SIZE))
+				d := intrinsics.volatile_load((^V)(p+3*SIZE))
 				lowest := intrinsics.simd_min(intrinsics.simd_min(a, b), intrinsics.simd_min(c, d))
 				if intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(lowest, 0)) != {} {
-					break
+					when AVX2 {
+						ma := u64(transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(a, 0)))
+						mb := u64(transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(b, 0)))
+						low := ma | mb<<SIZE
+						if low != 0 {
+							return int(p - start + uintptr(intrinsics.count_trailing_zeros(low)))
+						}
+
+						mc := u64(transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(c, 0)))
+						md := u64(transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(d, 0)))
+						high := mc | md<<SIZE
+						return int(p + 2*SIZE - start + uintptr(intrinsics.count_trailing_zeros(high)))
+					} else {
+						break
+					}
 				}
-				p += 64
+				p += CHUNK
 			}
 
 			for {
 				v = intrinsics.volatile_load((^V)(p))
-				m = transmute(u16)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
+				m = transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
 				if m != 0 {
 					return int(p - start + uintptr(intrinsics.count_trailing_zeros(m)))
 				}
-				p += 16
+				p += SIZE
 			}
 		} else {
 			for m == 0 {
-				p += 16
+				p += SIZE
 				v = intrinsics.volatile_load((^V)(p))
-				m = transmute(u16)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
+				m = transmute(M)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, 0))
 			}
 			return int(p - start + uintptr(intrinsics.count_trailing_zeros(m)))
 		}
