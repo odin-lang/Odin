@@ -136,3 +136,25 @@ test_volatile_load_deferred_in :: proc(t: ^testing.T) {
 	}
 	testing.expect_value(t, seen, 7)
 }
+
+// A non-temporal store of an aggregate stays whole rather than being split into plain stores
+@(test)
+test_non_temporal_store_aggregate :: proc(t: ^testing.T) {
+	a, b := u32(1), u32(2)
+	pair: Pair
+	intrinsics.non_temporal_store(&pair, Pair{a, b})
+	testing.expect_value(t, pair, Pair{1, 2})
+
+	arr: [4]u64
+	n := u64(5)
+	intrinsics.non_temporal_store(&arr, [4]u64{n, n + 1, n + 2, n + 3})
+	testing.expect_value(t, arr, [4]u64{5, 6, 7, 8})
+
+	src := make_big()
+	dst: Big
+	intrinsics.non_temporal_store(&dst, src)
+	testing.expect_value(t, dst, src)
+
+	intrinsics.non_temporal_store(&dst, Big{tag = 9})
+	testing.expect_value(t, dst, Big{tag = 9})
+}

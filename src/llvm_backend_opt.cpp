@@ -849,8 +849,11 @@ gb_internal bool lb_is_aggregate_type(LLVMTypeRef type) {
 	return kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind;
 }
 
-gb_internal bool lb_is_plain_access(LLVMValueRef inst) {
-	return !LLVMGetVolatile(inst) && LLVMGetOrdering(inst) == LLVMAtomicOrderingNotAtomic;
+// NOTE(bill): A volatile, atomic, or non-temporal access must stay the one access it was built as.
+// Only a plain load or store may be split, and only a plain load may be read again through its address.
+gb_internal bool lb_is_plain_access(lbModule *m, LLVMValueRef inst) {
+	return !LLVMGetVolatile(inst) && LLVMGetOrdering(inst) == LLVMAtomicOrderingNotAtomic &&
+	       LLVMGetMetadata(inst, lb_metadata_kind(m, str_lit("nontemporal"))) == nullptr;
 }
 
 gb_internal void lb_lower_large_loaded_store(lbFastIselLowering *s, LLVMValueRef store) {
@@ -1059,7 +1062,7 @@ gb_internal void lb_lower_for_fast_isel(lbModule *m) {
 
 		for (LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(fn); bb != nullptr; bb = LLVMGetNextBasicBlock(bb)) {
 			for (LLVMValueRef i = LLVMGetFirstInstruction(bb); i != nullptr; i = LLVMGetNextInstruction(i)) {
-				if (LLVMIsAStoreInst(i) && lb_is_plain_access(i) && lb_is_aggregate_type(LLVMTypeOf(LLVMGetOperand(i, 0)))) {
+				if (LLVMIsAStoreInst(i) && lb_is_plain_access(m, i) && lb_is_aggregate_type(LLVMTypeOf(LLVMGetOperand(i, 0)))) {
 					array_add(&work, i);
 				}
 			}
@@ -1135,7 +1138,7 @@ gb_internal void lb_lower_for_fast_isel(lbModule *m) {
 					LLVMValueRef next = LLVMGetNextInstruction(i);
 					if (LLVMGetFirstUse(i) == nullptr &&
 					    (LLVMIsAInsertValueInst(i) || LLVMIsAExtractValueInst(i) || LLVMIsASelectInst(i) || LLVMIsAPHINode(i) ||
-					     LLVMIsAGetElementPtrInst(i) || (LLVMIsALoadInst(i) && lb_is_plain_access(i)))) {
+					     LLVMIsAGetElementPtrInst(i) || lb_is_plain_load(m, i))) {
 						LLVMInstructionEraseFromParent(i);
 						removed = true;
 					}

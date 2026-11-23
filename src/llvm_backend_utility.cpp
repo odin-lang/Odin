@@ -1120,11 +1120,8 @@ gb_internal bool lb_is_load_from(LLVMValueRef value, LLVMValueRef ptr) {
 	return LLVMIsALoadInst(value) && LLVMGetOperand(value, 0) == ptr;
 }
 
-// NOTE(bill): A volatile, atomic, or non-temporal load must stay the one access it was built as.
-// Only a plain load may be read again through its address or split into smaller loads.
 gb_internal bool lb_is_plain_load(lbModule *m, LLVMValueRef value) {
-	return LLVMIsALoadInst(value) && lb_is_plain_access(value) &&
-	       LLVMGetMetadata(value, lb_metadata_kind(m, str_lit("nontemporal"))) == nullptr;
+	return LLVMIsALoadInst(value) && lb_is_plain_access(m, value);
 }
 
 gb_internal i32 lb_current_call(lbProcedure *p) {
