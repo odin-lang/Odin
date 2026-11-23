@@ -600,18 +600,20 @@ cstring_len :: proc "contextless" (s: cstring) -> int {
 				d := intrinsics.volatile_load((^#simd[32]u8)(p+96))
 				lowest := intrinsics.simd_min(intrinsics.simd_min(a, b), intrinsics.simd_min(c, d))
 				if intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(lowest, zero)) != {} {
-					break
+					ma := u64(transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(a, zero)))
+					mb := u64(transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(b, zero)))
+					low := ma | mb<<32
+					if low != 0 {
+						return int(p - start + uintptr(intrinsics.count_trailing_zeros(low)))
+					}
+
+					mc := u64(transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(c, zero)))
+					md := u64(transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(d, zero)))
+					high := mc | md<<32
+					return int(p + 64 - start + uintptr(intrinsics.count_trailing_zeros(high)))
 				}
 				p += 128
 			}
-
-			v = intrinsics.volatile_load((^#simd[32]u8)(p))
-			m = transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, zero))
-		}
-		for m == 0 {
-			p += 32
-			v = intrinsics.volatile_load((^#simd[32]u8)(p))
-			m = transmute(u32)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, zero))
 		}
 		return int(p - start + uintptr(intrinsics.count_trailing_zeros(m)))
 	} else when HAS_HARDWARE_SIMD {
@@ -625,7 +627,10 @@ cstring_len :: proc "contextless" (s: cstring) -> int {
 
 		v := intrinsics.volatile_load((^#simd[16]u8)(p))
 		m := transmute(u16)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, zero))
-		m &= ~u16(0) << (start-p)
+		m >>= (start-p)
+		if m != 0 {
+			return int(intrinsics.count_trailing_zeros(m))
+		}
 		when ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 {
 			for _ in 0..<7 {
 				if m != 0 {
@@ -650,8 +655,14 @@ cstring_len :: proc "contextless" (s: cstring) -> int {
 					p += 64
 				}
 
-				v = intrinsics.volatile_load((^#simd[16]u8)(p))
-				m = transmute(u16)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, zero))
+				for {
+					v = intrinsics.volatile_load((^#simd[16]u8)(p))
+					m = transmute(u16)intrinsics.simd_extract_msbs(intrinsics.simd_lanes_eq(v, zero))
+					if m != 0 {
+						return int(p - start + uintptr(intrinsics.count_trailing_zeros(m)))
+					}
+					p += 16
+				}
 			}
 		}
 		for m == 0 {
