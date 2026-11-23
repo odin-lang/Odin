@@ -71,12 +71,26 @@ struct EscapeOrigin {
 	Ast *            site;        // where the address of a 'Local' was taken, not part of its identity
 };
 
+// a hash set of where the items of a list are, so that finding one costs the same however long the list grows
+struct EscapeIndex {
+	Slice<u32> slots; // one more than where an item is in the list, or zero when the slot is empty
+	isize      used;  // the first items of the list it holds
+};
+
+// a list of distinct items, which finds them through an index once it is long enough for that to pay
+// NOTE: a copy of a list shares its index, which holds the items of the copy that last added to it; as items are only
+// ever added, a copy holding fewer finds its own among them, and one that adds to it then makes its own
+template <typename T>
+struct EscapeList : Array<T> {
+	EscapeIndex *index;
+};
+
 struct EscapeValueFact {
 	EscapePath   path;
 	EscapeOrigin origin;
 	bool         definite; // straight from the expression itself, not read back from a variable or through a pointer
 };
-typedef Array<EscapeValueFact> EscapeValue;
+typedef EscapeList<EscapeValueFact> EscapeValue;
 
 struct EscapeFact {
 	EscapeObject obj;
@@ -255,7 +269,7 @@ struct EscapeAnalysis {
 	Array<EscapeAlias>   aliases;
 	Array<Ast *>         reported;
 	Array<EscapeUse>     uses;
-	Array<EscapeFlow>    flows;
+	EscapeList<EscapeFlow> flows;
 	EscapeGraph *        graph;
 	i32                  group;       // of the procedures being analysed together, see `EscapeGraph`
 	Array<EscapeReport> *reports;     // kept rather than reported until it is done, see `escape_analyse`
@@ -367,19 +381,123 @@ gb_internal bool escape_eq(EscapeOuterStore const &a, EscapeOuterStore const &b)
 	       escape_eq(a.origin, b.origin);
 }
 
-gb_internal EscapeValue escape_value(void) {
-	// NOTE(bill): most values are empty so allocate on the fly when needed
-	return array_make<EscapeValueFact>(temporary_allocator(), 0, 0);
+// what is not part of the identity of an item, e.g. the `definite` of a fact, is not hashed
+gb_internal u64 escape_hash_mix(u64 h, u64 x) {
+	h = (h ^ x) * 0x9e3779b97f4a7c15ull;
+	return h ^ (h >> 29);
 }
 
-gb_internal void escape_value_add(EscapeValue *v, EscapePath const &path, EscapeOrigin const &o, bool definite=false) {
-	for (EscapeValueFact &f : *v) {
-		if (escape_path_eq(f.path, path) && escape_eq(f.origin, o)) {
-			f.definite |= definite;
+gb_internal u64 escape_hash(u64 h, EscapePath const &p) {
+	h = escape_hash_mix(h, cast(u64)p.count);
+	for (EscapeStep const &s : p) {
+		h = escape_hash_mix(h, cast(u64)s.kind);
+		h = escape_hash_mix(h, cast(u64)cast(uintptr)s.field);
+	}
+	return h;
+}
+
+gb_internal u64 escape_hash(u64 h, EscapeOrigin const &o) {
+	h = escape_hash_mix(h, cast(u64)o.kind);
+	h = escape_hash_mix(h, cast(u64)o.offset_lost);
+	h = escape_hash_mix(h, cast(u64)cast(uintptr)o.obj.entity);
+	h = escape_hash_mix(h, cast(u64)cast(uintptr)o.obj.temp);
+	return escape_hash(h, o.path);
+}
+
+gb_internal bool escape_eq(EscapeValueFact const &a, EscapeValueFact const &b) {
+	return escape_path_eq(a.path, b.path) &&
+	       escape_eq(a.origin, b.origin);
+}
+
+gb_internal u32 escape_hash(EscapeValueFact const &f) {
+	return cast(u32)escape_hash(escape_hash(0, f.path), f.origin);
+}
+
+enum : isize { ESCAPE_INDEX_FROM = 16 }; // the length of a list from which it is indexed
+
+gb_internal void escape_index_put(EscapeIndex *index, u32 hash, isize at) {
+	usize mask = cast(usize)index->slots.count-1;
+	for (usize i = hash & mask; ; i = (i+1) & mask) {
+		if (index->slots[i] == 0) {
+			index->slots[i] = cast(u32)(at+1);
 			return;
 		}
 	}
-	array_add(v, EscapeValueFact{path, o, definite});
+}
+
+// with room for twice the items of the list, so at most half its slots are used
+template <typename T>
+gb_internal void escape_index_fill(EscapeIndex *index, EscapeList<T> const &list, isize room) {
+	index->slots = slice_make<u32>(list.allocator, room);
+	gb_zero_size(index->slots.data, index->slots.count*gb_size_of(u32));
+	index->used = list.count;
+	for_array(i, list) {
+		escape_index_put(index, escape_hash(list.data[i]), i);
+	}
+}
+
+template <typename T>
+gb_internal void escape_list_index(EscapeList<T> *list) {
+	list->index = gb_alloc_item(list->allocator, EscapeIndex);
+	escape_index_fill(list->index, *list, next_pow2_isize(2*list->count));
+}
+
+template <typename T>
+gb_internal EscapeList<T> escape_list_make(gbAllocator const &a) {
+	EscapeList<T> list = {};
+	list.allocator = a;
+	return list;
+}
+
+// the item of the list equal to `x`; or none, and `x` is added to its end
+template <typename T>
+gb_internal T *escape_list_add_unique(EscapeList<T> *list, T const &x) {
+	if (list->index == nullptr) {
+		for (T &y : *list) {
+			if (escape_eq(x, y)) {
+				return &y;
+			}
+		}
+		array_add(list, x);
+		if (list->count >= ESCAPE_INDEX_FROM) {
+			escape_list_index(list);
+		}
+		return nullptr;
+	}
+
+	u32 hash = escape_hash(x);
+	EscapeIndex *index = list->index;
+	usize mask = cast(usize)index->slots.count-1;
+	for (usize i = hash & mask; index->slots[i] != 0; i = (i+1) & mask) {
+		isize at = cast(isize)index->slots[i]-1;
+		if (at < list->count && escape_eq(x, list->data[at])) {
+			return &list->data[at];
+		}
+	}
+
+	array_add(list, x);
+	if (list->count-1 != index->used) {
+		// another copy added to it first
+		escape_list_index(list);
+	} else if (list->count*2 > index->slots.count) {
+		escape_index_fill(index, *list, 2*index->slots.count);
+	} else {
+		escape_index_put(index, hash, list->count-1);
+		index->used = list->count;
+	}
+	return nullptr;
+}
+
+gb_internal EscapeValue escape_value(void) {
+	// NOTE(bill): most values are empty so allocate on the fly when needed
+	return escape_list_make<EscapeValueFact>(temporary_allocator());
+}
+
+gb_internal void escape_value_add(EscapeValue *v, EscapePath const &path, EscapeOrigin const &o, bool definite=false) {
+	EscapeValueFact *f = escape_list_add_unique(v, EscapeValueFact{path, o, definite});
+	if (f != nullptr) {
+		f->definite |= definite;
+	}
 }
 
 gb_internal EscapeValue escape_value_one(EscapePath const &path, EscapeOrigin const &o, bool definite=false) {
@@ -545,6 +663,11 @@ gb_internal bool escape_add_unique(Array<T> *array, T const &x) {
 	}
 	array_add(array, x);
 	return true;
+}
+
+template <typename T>
+gb_internal bool escape_add_unique(EscapeList<T> *list, T const &x) {
+	return escape_list_add_unique(list, x) == nullptr;
 }
 
 // whether two integer expressions reading only unchanged locals and constants have the same value; as integers wrap,
@@ -3767,6 +3890,17 @@ gb_internal bool escape_eq(EscapeFlow const &a, EscapeFlow const &b) {
 	       escape_path_eq(a.value_path,  b.value_path);
 }
 
+gb_internal u32 escape_hash(EscapeFlow const &f) {
+	u64 h = escape_hash_mix(0, cast(u64)f.kind);
+	h = escape_hash_mix(h, cast(u64)f.param);
+	h = escape_hash_mix(h, cast(u64)f.target);
+	h = escape_hash_mix(h, cast(u64)f.target_index);
+	h = escape_hash_mix(h, cast(u64)cast(uintptr)f.global);
+	h = escape_hash(h, f.param_path);
+	h = escape_hash(h, f.target_path);
+	return cast(u32)escape_hash(h, f.value_path);
+}
+
 // a path is cut before a step repeating an earlier one, as otherwise a recursive procedure could make its flows
 // grow without end, e.g. when the elements of the dynamic array it returns hold what its calls return
 gb_internal EscapePath escape_path_widen(EscapePath const &p) {
@@ -4862,7 +4996,7 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 	ea.aliases  = array_make<EscapeAlias>(temporary_allocator());
 	ea.reported = array_make<Ast *>(temporary_allocator());
 	ea.uses     = array_make<EscapeUse>(temporary_allocator(), 0, 0);
-	ea.flows    = array_make<EscapeFlow>(temporary_allocator(), 0, 0);
+	ea.flows    = escape_list_make<EscapeFlow>(temporary_allocator());
 	ea.graph    = g;
 	ea.group    = g->group_of[v];
 	ea.reports  = reports;
