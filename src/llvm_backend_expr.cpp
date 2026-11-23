@@ -442,7 +442,7 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 		return false;
 	}
 
-	if (!LLVMIsALoadInst(lhs.value) || !LLVMIsALoadInst(rhs.value)) {
+	if (!lb_is_plain_load(p->module, lhs.value) || !lb_is_plain_load(p->module, rhs.value)) {
 		return false;
 	}
 
@@ -1306,7 +1306,7 @@ gb_internal lbValue lb_emit_matrix_mul_vector(lbProcedure *p, lbValue lhs, lbVal
 			m_columns[i] = column;
 		}
 
-		if (LLVMIsALoadInst(rhs.value)) {
+		if (lb_is_plain_load(p->module, rhs.value)) {
 			LLVMValueRef rhs_ptr = LLVMGetOperand(rhs.value, 0);
 			LLVMTypeRef vector_type = LLVMVectorType(lb_type(p->module, elem), cast(unsigned)vector_count);
 			// The alignment of what is being loaded, which is the right-hand vector. `type` is the

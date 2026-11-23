@@ -687,7 +687,7 @@ gb_internal bool lb_aggregate_field_value(lbFastIselLowering *s, LLVMValueRef v,
 		s->phis[index].ok = ok;
 		*field_ = phi;
 		return ok;
-	} else if (LLVMIsALoadInst(v) && !LLVMGetVolatile(v) && LLVMGetOrdering(v) == LLVMAtomicOrderingNotAtomic) {
+	} else if (lb_is_plain_load(s->m, v)) {
 		// NOTE(bill): Read the field where the aggregate was read, as the memory may change before the store
 		LLVMTypeRef type       = LLVMTypeOf(v);
 		LLVMTypeRef field_type = nullptr;
@@ -858,7 +858,7 @@ gb_internal void lb_lower_large_loaded_store(lbFastIselLowering *s, LLVMValueRef
 	LLVMValueRef load = LLVMGetOperand(store, 0);
 	LLVMValueRef ptr  = LLVMGetOperand(store, 1);
 	LLVMUseRef   use  = LLVMGetFirstUse(load);
-	if (!lb_is_plain_access(load) || LLVMGetNextUse(use) != nullptr) {
+	if (!lb_is_plain_load(m, load) || LLVMGetNextUse(use) != nullptr) {
 		return;
 	}
 
@@ -1114,7 +1114,7 @@ gb_internal void lb_lower_for_fast_isel(lbModule *m) {
 			      LLVMIsAInsertValueInst(agg) ||
 			      LLVMIsASelectInst(agg)      ||
 			      LLVMIsAPHINode(agg)         ||
-			      (LLVMIsALoadInst(agg) && lb_is_plain_access(agg)))) {
+			      lb_is_plain_load(m, agg))) {
 				continue;
 			}
 

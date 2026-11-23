@@ -2685,8 +2685,8 @@ gb_internal isize lb_append_tuple_values(lbProcedure *p, Array<lbValue> *dst_val
 }
 
 
-gb_internal bool lb_is_large_plain_load(LLVMValueRef value) {
-	if (!LLVMIsALoadInst(value) || LLVMGetVolatile(value) || LLVMGetOrdering(value) != LLVMAtomicOrderingNotAtomic) {
+gb_internal bool lb_is_large_plain_load(lbModule *m, LLVMValueRef value) {
+	if (!lb_is_plain_load(m, value)) {
 		return false;
 	}
 	return lb_sizeof(LLVMTypeOf(value)) > LB_MAX_STORE_SIZE;
@@ -2823,7 +2823,7 @@ gb_internal void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice
 		auto large = slice_make<bool>(temporary_allocator(), inits.count);
 		auto plain = slice_make<bool>(temporary_allocator(), inits.count);
 		for_array(i, inits) {
-			if (lvals[i].addr.value == nullptr || !lb_is_large_plain_load(inits[i].value)) {
+			if (lvals[i].addr.value == nullptr || !lb_is_large_plain_load(p->module, inits[i].value)) {
 				continue;
 			}
 			large[i] = true;
@@ -2874,7 +2874,7 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, Toke
 		if (res.value != nullptr) {
 			LLVMValueRef res_val = res.value;
 			i64 sz = type_size_of(res.type);
-			if (LLVMIsALoadInst(res_val) && sz > build_context.int_size) {
+			if (lb_is_plain_load(p->module, res_val) && sz > build_context.int_size) {
 				lbValue ptr = lb_address_from_load_or_generate_local(p, res);
 				lb_mem_copy_non_overlapping(p, p->return_ptr.addr, ptr, lb_const_int(p->module, t_int, sz));
 			} else {
