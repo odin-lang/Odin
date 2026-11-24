@@ -569,6 +569,7 @@ string16_le :: #force_inline proc "contextless" (a, b: string16) -> bool { retur
 string16_ge :: #force_inline proc "contextless" (a, b: string16) -> bool { return string16_cmp(a, b) >= 0 }
 
 
+@(no_sanitize_address)
 cstring_len :: proc "contextless" (s: cstring) -> int {
 	if s == nil {
 		return 0
@@ -673,6 +674,7 @@ cstring_len :: proc "contextless" (s: cstring) -> int {
 	}
 }
 
+@(no_sanitize_address)
 cstring16_len :: proc "contextless" (s: cstring16) -> int {
 	if s == nil {
 		return 0
@@ -800,6 +802,7 @@ cstring16_to_string16 :: proc "contextless" (s: cstring16) -> string16 {
 }
 
 
+@(no_sanitize_address)
 cstring_eq :: proc "contextless" (lhs, rhs: cstring) -> bool {
 	when HAS_HARDWARE_SIMD && (ODIN_ARCH == .amd64 || ODIN_ARCH == .i386) {
 		return cstring_cmp(lhs, rhs) == 0
@@ -821,6 +824,7 @@ cstring_eq :: proc "contextless" (lhs, rhs: cstring) -> bool {
 	}
 }
 
+@(no_sanitize_address)
 cstring_cmp :: proc "contextless" (lhs, rhs: cstring) -> int {
 	x := ([^]byte)(lhs)
 	y := ([^]byte)(rhs)
@@ -887,6 +891,7 @@ cstring_gt :: #force_inline proc "contextless" (a, b: cstring) -> bool { return 
 cstring_le :: #force_inline proc "contextless" (a, b: cstring) -> bool { return cstring_cmp(a, b) <= 0 }
 cstring_ge :: #force_inline proc "contextless" (a, b: cstring) -> bool { return cstring_cmp(a, b) >= 0 }
 
+@(no_sanitize_address)
 cstring16_eq :: proc "contextless" (lhs, rhs: cstring16) -> bool {
 	x := ([^]u16)(lhs)
 	y := ([^]u16)(rhs)
@@ -942,6 +947,7 @@ cstring16_eq :: proc "contextless" (lhs, rhs: cstring16) -> bool {
 	}
 }
 
+@(no_sanitize_address)
 cstring16_cmp :: proc "contextless" (lhs, rhs: cstring16) -> int {
 	x := ([^]u16)(lhs)
 	y := ([^]u16)(rhs)
