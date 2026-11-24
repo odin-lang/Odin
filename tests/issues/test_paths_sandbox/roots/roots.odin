@@ -1,4 +1,4 @@
-package test_paths_widen
+package test_paths_roots
 
 A :: #load("../../../../LICENSE", string)
 B :: #exists("../../../../no_such_file_anywhere")

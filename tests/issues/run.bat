@@ -449,10 +449,20 @@ set SB=..\test_paths_sandbox
 %ODIN% check %SB%\foreign -no-entry-point -sandbox-root:%SB%\foreign 2>&1 | find /c "must be a name, not a path" | findstr /x "2" || exit /b
 %ODIN% check %SB%\foreign -no-entry-point -sandbox-root:%SB%\foreign 2>&1 | find /c "is outside every -sandbox-root" | findstr /x "1" || exit /b
 %ODIN% check %SB%\foreign -no-entry-point || exit /b
-%ODIN% check %SB%\widen -no-entry-point || exit /b
-%ODIN% check %SB%\widen -no-entry-point -sandbox-root:%SB%\widen -sandbox-root:..\..\.. || exit /b
-%ODIN% check %SB%\widen -no-entry-point -sandbox-root:%SB%\widen 2>&1 | find /c "is outside every -sandbox-root" | findstr /x "2" || exit /b
-%ODIN% check %SB%\widen -no-entry-point -sandbox-root:..\test_issue_6165 2>&1 | find /c "The main package" | findstr /x "1" || exit /b
+%ODIN% check %SB%\roots -no-entry-point || exit /b
+%ODIN% check %SB%\roots -no-entry-point -sandbox-root:%SB%\roots -sandbox-root:..\..\.. || exit /b
+%ODIN% check %SB%\roots -no-entry-point -sandbox-root:%SB%\roots 2>&1 | find /c "is outside every -sandbox-root" | findstr /x "2" || exit /b
+%ODIN% check %SB%\roots -no-entry-point -sandbox-root:..\test_issue_6165 2>&1 | find /c "The main package" | findstr /x "1" || exit /b
+if exist sb_link rmdir /s /q sb_link
+mkdir sb_link\root
+echo ok> sb_link\root\x.txt
+mklink /J sb_link\root\up "%CD%\sb_link" > nul || exit /b
+echo package sb_link> sb_link\root\main.odin
+echo A :: #load("up/root/x.txt", string)>> sb_link\root\main.odin
+echo B :: #exists("up/root/missing.txt")>> sb_link\root\main.odin
+echo #assert(len(A) ^> 0)>> sb_link\root\main.odin
+echo #assert(B == false)>> sb_link\root\main.odin
+%ODIN% check sb_link\root -no-entry-point -sandbox-root:sb_link\root || exit /b
 
 @rem #########################################################################################################
 

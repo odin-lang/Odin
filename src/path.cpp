@@ -947,9 +947,29 @@ gb_internal void confine__slashes(String s) {
 #endif
 }
 
+gb_internal void confine__collapse(String *s) {
+	isize start = 0;
+#if defined(GB_SYSTEM_WINDOWS)
+	if (s->len >= 2 && s->text[0] == '/' && s->text[1] == '/') {
+		start = 2;
+	}
+#endif
+	isize w = start;
+	for (isize r = start; r < s->len; r++) {
+		u8 c = s->text[r];
+		if (c == '/' && w > 0 && s->text[w-1] == '/') {
+			continue;
+		}
+		s->text[w] = c;
+		w += 1;
+	}
+	s->len = w;
+}
+
 gb_internal String confine__normalize(gbAllocator a, String s) {
 	String c = copy_string(a, s);
 	confine__slashes(c);
+	confine__collapse(&c);
 	while (c.len > 1 && c.text[c.len-1] == '/' && !(c.len == 3 && c.text[1] == ':')) {
 		c.len -= 1;
 	}
@@ -1238,7 +1258,8 @@ gb_internal bool confine__reparse_target(HANDLE h, u32 tag, String *target) {
 	return true;
 }
 
-gb_internal ConfineResult confine__step(ConfineHandle dir, String name, ConfineHandle *out, ConfineKind *kind, String *target) {
+gb_internal ConfineResult confine__step(ConfineHandle dir, String name, bool more, ConfineHandle *out, ConfineKind *kind, String *target) {
+	gb_unused(more);
 	*out = CONFINE_NO_HANDLE;
 	*kind = ConfineKind_File;
 	*target = {};
@@ -1401,14 +1422,18 @@ gb_internal ConfineResult confine_open_direct(String path, ConfineHandle *out, b
 	return Confine_Ok;
 }
 
-gb_internal ConfineResult confine__step(ConfineHandle dir, String name, ConfineHandle *out, ConfineKind *kind, String *target) {
+gb_internal ConfineResult confine__step(ConfineHandle dir, String name, bool more, ConfineHandle *out, ConfineKind *kind, String *target) {
 	*out = CONFINE_NO_HANDLE;
 	*kind = ConfineKind_File;
 	*target = {};
 	gbAllocator ha = heap_allocator();
 	char *c = alloc_cstring(ha, name);
 	defer (gb_free(ha, c));
-	int fd = openat(dir, c, O_RDONLY|O_NOFOLLOW|O_NONBLOCK|O_CLOEXEC);
+	int flags = O_RDONLY|O_NOFOLLOW|O_NONBLOCK|O_CLOEXEC;
+	if (more) {
+		flags |= O_DIRECTORY;
+	}
+	int fd = openat(dir, c, flags);
 	if (fd < 0) {
 		int e = errno;
 		char buf[4096];
@@ -1448,6 +1473,9 @@ gb_internal bool confine__fast(ConfineHandle root, String rest, ConfineHandle *o
 #if defined(GB_SYSTEM_LINUX) || (defined(GB_SYSTEM_FREEBSD) && defined(O_RESOLVE_BENEATH))
 	if (confine_fast_off.load(std::memory_order_relaxed)) {
 		return false;
+	}
+	while (rest.len > 0 && rest.text[0] == '/') {
+		rest = substring(rest, 1, rest.len);
 	}
 	gbAllocator ha = heap_allocator();
 	char *c = alloc_cstring(ha, rest.len > 0 ? rest : str_lit("."));
@@ -1638,13 +1666,14 @@ gb_internal ConfineResult confine__walk(String path, isize scope, ConfineHandle 
 				}
 				String sep = up.text[up.len-1] == '/' ? str_lit("") : str_lit("/");
 				next = concatenate3_strings(ha, up, sep, todo);
+				confine__collapse(&next);
 				restart = true;
 				break;
 			}
 			ConfineHandle h = CONFINE_NO_HANDLE;
 			ConfineKind kind = ConfineKind_File;
 			String target = {};
-			res = confine__step(stack[stack.count-1], comp, &h, &kind, &target);
+			res = confine__step(stack[stack.count-1], comp, todo.len > 0, &h, &kind, &target);
 			if (res != Confine_Ok) {
 				break;
 			}
@@ -1656,8 +1685,12 @@ gb_internal ConfineResult confine__walk(String path, isize scope, ConfineHandle 
 					break;
 				}
 				confine__slashes(target);
-				String joined = concatenate3_strings(ha, target, str_lit("/"), todo);
+				while (todo.len > 0 && confine_is_sep(todo.text[0])) {
+					todo = substring(todo, 1, todo.len);
+				}
+				String joined = todo.len > 0 ? concatenate3_strings(ha, target, str_lit("/"), todo) : copy_string(ha, target);
 				gb_free(ha, target.text);
+				confine__collapse(&joined);
 				if (confine__is_absolute(joined)) {
 					next = joined;
 					restart = true;
@@ -1672,14 +1705,7 @@ gb_internal ConfineResult confine__walk(String path, isize scope, ConfineHandle 
 				array_add(&stack, h);
 				continue;
 			}
-			bool more = false;
-			for (isize i = 0; i < todo.len; i++) {
-				if (!confine_is_sep(todo.text[i])) {
-					more = true;
-					break;
-				}
-			}
-			if (more) {
+			if (todo.len > 0) {
 				confine_close(h);
 				res = Confine_NotExists;
 				break;
@@ -1712,6 +1738,11 @@ gb_internal ConfineResult confine__walk(String path, isize scope, ConfineHandle 
 gb_internal ConfineResult confine_open(String path, isize scope, ConfineHandle *out, bool *is_dir) {
 	*out = CONFINE_NO_HANDLE;
 	*is_dir = false;
+	for (isize i = 0; i < path.len; i++) {
+		if (path.text[i] == 0) {
+			return Confine_Invalid;
+		}
+	}
 	if (!confine_active()) {
 		return confine_open_direct(path, out, is_dir);
 	}
