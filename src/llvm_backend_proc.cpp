@@ -523,6 +523,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	}
 	if (p->body && pkg && ((pkg->kind == Package_Normal) || (pkg->kind == Package_Init))) {
 		if (build_context.sanitizer_flags & SanitizerFlag_Address && !entity->Procedure.no_sanitize_address) {
+			p->sanitize_address = true;
 			lb_add_attribute_to_proc(m, p->value, "sanitize_address");
 		}
 		if (build_context.sanitizer_flags & SanitizerFlag_Memory && !entity->Procedure.no_sanitize_memory) {
