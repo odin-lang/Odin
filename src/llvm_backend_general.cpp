@@ -4176,12 +4176,16 @@ general_end:;
 		LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(src_type, 0), "");
 		lb_store_by_fields(p, val, nptr);
 
-		if (dst_size > src_size) {
-			// NOTE(bill): the bytes past `src` are padding and must read as zero.
-			// They are zeroed after `val` is stored, and the two stores do not overlap:
-			// AddressSanitizer moves a store of an argument above the other stores of the first block.
-			LLVMTypeRef  tail_type = LLVMArrayType(LLVMInt8TypeInContext(ctx), cast(unsigned)(dst_size - src_size));
-			LLVMValueRef offset    = LLVMConstInt(LLVMInt64TypeInContext(ctx), src_size, false);
+		// NOTE(bill): the bytes past `src` are padding and must read as zero.
+		// They are zeroed after `val` is stored, and the two stores do not overlap:
+		// AddressSanitizer moves a store of an argument above the other stores of the first block.
+		// The sizes are the datalayout's: `lb_sizeof` gives e.g. `{i64, i56}` 24 bytes, and LLVM 16.
+		LLVMTargetDataRef td      = LLVMGetModuleDataLayout(p->module->mod);
+		u64               written = LLVMStoreSizeOfType(td, src_type);
+		u64               total   = LLVMABISizeOfType(td, dst_type);
+		if (total > written) {
+			LLVMTypeRef  tail_type = LLVMArrayType(LLVMInt8TypeInContext(ctx), cast(unsigned)(total - written));
+			LLVMValueRef offset    = LLVMConstInt(LLVMInt64TypeInContext(ctx), written, false);
 			LLVMValueRef tail      = LLVMBuildGEP2(p->builder, LLVMInt8TypeInContext(ctx), ptr, &offset, 1, "");
 			LLVMValueRef store     = LLVMBuildStore(p->builder, LLVMConstNull(tail_type), tail);
 			LLVMSetAlignment(store, 1);
