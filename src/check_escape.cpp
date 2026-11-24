@@ -64,11 +64,13 @@ struct EscapeFlow {
 };
 
 struct EscapeOrigin {
-	EscapeOriginKind kind;
-	bool             offset_lost; // an offset into the memory of a 'ParamLoad' or 'ParamDeep' was dropped
-	EscapeObject     obj;
-	EscapePath       path;
-	Ast *            site;        // where the address of a 'Local' was taken, not part of its identity
+	EscapeOriginKind  kind;
+	bool              offset_lost; // an offset into the memory of a 'ParamLoad' or 'ParamDeep' was dropped
+	EscapeObject      obj;
+	EscapePath        path;
+	Ast *             site;        // where the address of a 'Local' was taken, not part of its identity
+	Ast *             via;         // the first call it went through, and the flow of the callee it took, neither part of its identity
+	EscapeFlow const *via_flow;
 };
 
 // a hash set of where the items of a list are, so that finding one costs the same however long the list grows
@@ -3329,6 +3331,12 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 				}
 			}
 		}
+		for (EscapeValueFact &f : v) {
+			if (f.origin.via == nullptr) {
+				f.origin.via      = call;
+				f.origin.via_flow = &flow;
+			}
+		}
 
 		// NOTE(bill): likewise when it goes somewhere of another type, e.g. all of `p^` loaded into `p.name`
 		switch (flow.target) {
@@ -3712,6 +3720,62 @@ gb_internal bool escape_site_shown(Ast *node, Ast *site) {
 	return start.offset <= pos.offset && pos.offset <= end.offset;
 }
 
+gb_internal gbString escape_append_param(gbString s, TypeProc *pt, isize index, EscapePath const &path) {
+	Entity *e = pt->params->Tuple.variables[index];
+	s = gb_string_append_fmt(s, "its parameter '%.*s", LIT(e->token.string));
+	s = escape_append_fields(s, e->type, path);
+	return gb_string_appendc(s, "'");
+}
+
+gb_internal gbString escape_append_flow(gbString s, Ast *call, EscapeFlow const &flow) {
+	Type *t = base_type(proc_entity_full_type(escape_proc_entity(call->CallExpr.proc)));
+	TypeProc *pt = &t->Proc;
+
+	gbString value = gb_string_make(temporary_allocator(), "");
+	if (flow.kind == EscapeFlow_Load) {
+		value = gb_string_appendc(value, "a pointer loaded through ");
+	}
+	value = escape_append_param(value, pt, flow.param, flow.param_path);
+
+	switch (flow.target) {
+	case EscapeFlowTarget_Result: {
+		Entity * e      = pt->results->Tuple.variables[flow.target_index];
+		gbString fields = escape_append_fields(gb_string_make(temporary_allocator(), ""), e->type, flow.target_path);
+		s = gb_string_append_fmt(s, "returns %s", value);
+		if (e->token.string.len > 0) {
+			s = gb_string_append_fmt(s, " in its result '%.*s%s'", LIT(e->token.string), fields);
+		} else if (gb_string_length(fields) > 0) {
+			s = gb_string_append_fmt(s, " in '%s' of its result", fields);
+		} else if (pt->result_count > 1) {
+			s = gb_string_appendc(s, " as its result");
+		}
+		if (e->token.string.len == 0 && pt->result_count > 1) {
+			s = gb_string_append_fmt(s, " %td", flow.target_index+1);
+		}
+		break;
+	}
+	case EscapeFlowTarget_Pointee:
+		s = gb_string_append_fmt(s, "stores %s through ", value);
+		s = escape_append_param(s, pt, flow.target_index, flow.target_path);
+		break;
+	case EscapeFlowTarget_Loaded:
+	case EscapeFlowTarget_Deep:
+		s = gb_string_append_fmt(s, "stores %s in memory reached through ", value);
+		s = escape_append_param(s, pt, flow.target_index, flow.target_path);
+		break;
+	case EscapeFlowTarget_Outer:
+		if (flow.global != nullptr) {
+			s = gb_string_append_fmt(s, "stores %s in '%.*s", value, LIT(flow.global->token.string));
+			s = escape_append_fields(s, flow.global->type, flow.target_path);
+			s = gb_string_appendc(s, "'");
+		} else {
+			s = gb_string_append_fmt(s, "stores %s where it outlives the call", value);
+		}
+		break;
+	}
+	return s;
+}
+
 gb_internal void escape_report_emit(EscapeReport const &r) {
 	Ast *node = r.node;
 	String expr_str = r.expr_str;
@@ -3786,6 +3850,18 @@ gb_internal void escape_report_emit(EscapeReport const &r) {
 		gb_string_free(site);
 	} else if (o.kind == EscapeOrigin_Temp && !escape_site_shown(node, o.obj.temp)) {
 		error_line("\tThe %s is made at %s\n", temp_description, token_pos_to_string(ast_token(o.obj.temp).pos));
+	}
+
+	if (o.via != nullptr) {
+		gbString via = escape_expr_to_string(o.via->CallExpr.proc);
+		gbString line = gb_string_make(temporary_allocator(), "");
+		line = gb_string_append_fmt(line, "\tThe call to '%s' ", via);
+		if (!escape_site_shown(node, o.via)) {
+			line = gb_string_append_fmt(line, "at %s ", token_pos_to_string(ast_token(o.via).pos));
+		}
+		line = escape_append_flow(line, o.via, *o.via_flow);
+		error_line("%s\n", line);
+		gb_string_free(via);
 	}
 
 	if (r.self_ref) {
