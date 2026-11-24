@@ -60,7 +60,7 @@ struct EscapeFlow {
 	isize                target_index; // of the result, or of the argument it is stored through
 	EscapePath           target_path;  // within the result, or of the pointer within that argument
 	EscapePath           value_path;   // within what is stored through a loaded pointer, where the argument's pointers are
-	Entity *             global;       // of an outer target when known: the target and value paths are then within it
+	Entity *             global;       // of an outer target when known: the target and value paths are then within it; for a write, null means any global
 };
 
 struct EscapeOrigin {
@@ -257,6 +257,17 @@ struct EscapeMemberTask {
 	Array<i32>          callers; // the members of the group calling it, by their index
 };
 
+enum EscapeGlobalWritesMode : u8 {
+	EscapeGlobalWrites_Exact,     // <= ESCAPE_MAX_GLOBAL_WRITES total paths in `flows`
+	EscapeGlobalWrites_PerGlobal, // > limit total paths, <= limit distinct entities: direct paths merged per entity
+	EscapeGlobalWrites_Any,       // > limit distinct entities (or deref paths): one coarser kill with `global = nullptr`
+};
+
+struct EscapeGlobalWrite {
+	Entity *global;
+	bool    has_direct; // at least one non-deref Write flow for `global`
+};
+
 struct EscapeAnalysis {
 	TypeProc *           pt;
 	Entity *             variadic;
@@ -268,7 +279,11 @@ struct EscapeAnalysis {
 	Array<EscapeAlias>   aliases;
 	Array<Ast *>         reported;
 	Array<EscapeUse>     uses;
-	EscapeList<EscapeFlow> flows;
+	EscapeList<EscapeFlow>   flows;
+	Array<EscapeGlobalWrite> global_writes;       // distinct globals once past the total-path limit
+	isize                    global_write_paths;  // Write-to-global flows currently in `flows`
+	isize                    global_deref_writes; // deref Write-to-global flows currently in `flows` (used once PerGlobal)
+	EscapeGlobalWritesMode   global_write_mode;
 	EscapeGraph *        graph;
 	i32                  group;       // of the procedures being analysed together, see `EscapeGraph`
 	Array<EscapeReport> *reports;     // kept rather than reported until it is done, see `escape_analyse`
@@ -307,7 +322,9 @@ gb_internal EscapeValue        escape_expr         (EscapeAnalysis *ea, Ast *exp
 gb_internal EscapeValue        escape_addr         (EscapeAnalysis *ea, Ast *expr);
 gb_internal EscapeValue        escape_ident_value  (EscapeAnalysis *ea, Entity *e);
 gb_internal Array<EscapeValue> escape_call         (EscapeAnalysis *ea, Ast *call);
-gb_internal void               escape_store_through(EscapeAnalysis *ea, Ast *node, EscapeValue const &ptr, EscapeValue const &v, EscapeUpdateKind update);
+gb_internal void               escape_store_through    (EscapeAnalysis *ea, Ast *node, EscapeValue const &ptr, EscapeValue const &v, EscapeUpdateKind update);
+gb_internal void               escape_overwrite        (EscapeAnalysis *ea, EscapeLocation const &loc, EscapeOrigin const *dest);
+gb_internal void               escape_overwrite_globals(EscapeAnalysis *ea);
 gb_internal void               escape_scan         (EscapeAnalysis *ea, Ast *expr, u8 flags);
 gb_internal void               escape_stmt         (EscapeAnalysis *ea, Ast *node);
 gb_internal void               escape_branch       (EscapeAnalysis *ea, Ast *label, TokenKind kind);
@@ -3297,7 +3314,11 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 			continue;
 		}
 		if (flow.target == EscapeFlowTarget_Outer) {
-			escape_store_through(ea, call, escape_value_of(EscapeOrigin_Outer, {flow.global}, flow.target_path), escape_value(), EscapeUpdate_Replace);
+			if (flow.global == nullptr) {
+				escape_overwrite_globals(ea);
+			} else {
+				escape_overwrite(ea, {flow.global, flow.target_path}, nullptr);
+			}
 		} else if (given[flow.target_index] && escape_write_matters(ea, args[flow.target_index])) {
 			Type *pointee = nullptr;
 			EscapeValue ptr = escape_arg_pointers(args[flow.target_index], types[flow.target_index], flow.target_path, &pointee);
@@ -3957,11 +3978,92 @@ gb_internal EscapePath escape_path_widen(EscapePath const &p) {
 	return p;
 }
 
+enum : isize { ESCAPE_MAX_GLOBAL_WRITES = 64 }; // past this, merge per global entity first, then into an any-global kill
+
+gb_internal EscapeGlobalWrite *escape_global_write_find(EscapeAnalysis *ea, Entity *global) {
+	for (EscapeGlobalWrite &gw : ea->global_writes) {
+		if (gw.global == global) {
+			return &gw;
+		}
+	}
+	return nullptr;
+}
+
+gb_internal void escape_coarsen_global_writes(EscapeAnalysis *ea) {
+	ea->global_write_mode = EscapeGlobalWrites_PerGlobal;
+	for (EscapeFlow const &f : ea->flows) {
+		if (f.kind != EscapeFlow_Write || f.target != EscapeFlowTarget_Outer) {
+			continue;
+		}
+		bool has_deref = escape_path_deref_index(f.target_path) < f.target_path.count;
+		if (has_deref) {
+			ea->global_deref_writes++;
+			if (ea->global_deref_writes > ESCAPE_MAX_GLOBAL_WRITES) {
+				ea->global_write_mode = EscapeGlobalWrites_Any;
+				return;
+			}
+		}
+		EscapeGlobalWrite *gw = escape_global_write_find(ea, f.global);
+		if (gw == nullptr) {
+			if (ea->global_writes.count >= ESCAPE_MAX_GLOBAL_WRITES) {
+				ea->global_write_mode = EscapeGlobalWrites_Any;
+				return;
+			}
+			EscapeGlobalWrite entry = {f.global, !has_deref};
+			array_add(&ea->global_writes, entry);
+		} else if (!has_deref) {
+			gw->has_direct = true;
+		}
+	}
+}
+
 gb_internal void escape_add_flow(EscapeAnalysis *ea, EscapeFlow flow) {
-	flow.param_path  = escape_path_widen(flow.param_path);
+	if (flow.kind != EscapeFlow_Write || flow.target != EscapeFlowTarget_Outer) {
+		flow.param_path  = escape_path_widen(flow.param_path);
+		flow.target_path = escape_path_widen(flow.target_path);
+		flow.value_path  = escape_path_widen(flow.value_path);
+		escape_add_unique(&ea->flows, flow);
+		return;
+	}
+
+	if (ea->global_write_mode == EscapeGlobalWrites_Any) {
+		return;
+	}
+	if (flow.global == nullptr) {
+		ea->global_write_mode = EscapeGlobalWrites_Any;
+		return;
+	}
+
 	flow.target_path = escape_path_widen(flow.target_path);
-	flow.value_path  = escape_path_widen(flow.value_path);
-	escape_add_unique(&ea->flows, flow);
+	if (ea->global_write_mode == EscapeGlobalWrites_Exact) {
+		if (escape_add_unique(&ea->flows, flow)) {
+			ea->global_write_paths++;
+			if (ea->global_write_paths > ESCAPE_MAX_GLOBAL_WRITES) {
+				escape_coarsen_global_writes(ea);
+			}
+		}
+		return;
+	}
+
+	bool has_deref = escape_path_deref_index(flow.target_path) < flow.target_path.count;
+	EscapeGlobalWrite *gw = escape_global_write_find(ea, flow.global);
+	if (gw == nullptr) {
+		if (ea->global_writes.count >= ESCAPE_MAX_GLOBAL_WRITES) {
+			ea->global_write_mode = EscapeGlobalWrites_Any;
+			return;
+		}
+		EscapeGlobalWrite entry = {flow.global, !has_deref};
+		array_add(&ea->global_writes, entry);
+	} else if (!has_deref) {
+		gw->has_direct = true;
+	}
+	if (has_deref && escape_add_unique(&ea->flows, flow)) {
+		ea->global_write_paths++;
+		ea->global_deref_writes++;
+		if (ea->global_deref_writes > ESCAPE_MAX_GLOBAL_WRITES) {
+			ea->global_write_mode = EscapeGlobalWrites_Any;
+		}
+	}
 }
 
 gb_internal void escape_add_result_flows(EscapeAnalysis *ea, isize result_index, EscapeValue const &v) {
@@ -4199,6 +4301,9 @@ gb_internal void escape_overwrite(EscapeAnalysis *ea, EscapeLocation const &loc,
 			return;
 		}
 	} else if (loc.root != nullptr && !escape_is_local(loc.root)) {
+		if (ea->global_write_mode == EscapeGlobalWrites_Any) {
+			return;
+		}
 		flow.target      = EscapeFlowTarget_Outer;
 		flow.global      = loc.root;
 		flow.target_path = loc.path;
@@ -4213,6 +4318,17 @@ gb_internal void escape_overwrite(EscapeAnalysis *ea, EscapeLocation const &loc,
 		return;
 	}
 	escape_add_flow(ea, flow);
+}
+
+gb_internal void escape_overwrite_globals(EscapeAnalysis *ea) {
+	for (isize i = ea->state.outers.count-1; i >= 0; i--) {
+		Entity *root = ea->state.outers[i].location.root;
+		if (root != nullptr && !escape_is_local(root)) {
+			escape_add_unique(&ea->state.cleared, ea->state.outers[i]);
+			array_unordered_remove(&ea->state.outers, i);
+		}
+	}
+	ea->global_write_mode = EscapeGlobalWrites_Any;
 }
 
 // `node` is the left hand side, or a call storing into memory it was given
@@ -5034,7 +5150,8 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 	ea.aliases  = array_make<EscapeAlias>(temporary_allocator());
 	ea.reported = array_make<Ast *>(temporary_allocator());
 	ea.uses     = array_make<EscapeUse>(temporary_allocator(), 0, 0);
-	ea.flows    = escape_list_make<EscapeFlow>(temporary_allocator());
+	ea.flows         = escape_list_make<EscapeFlow>(temporary_allocator());
+	ea.global_writes = array_make<EscapeGlobalWrite>(temporary_allocator(), 0, 0);
 	ea.graph    = g;
 	ea.group    = g->group_of[v];
 	ea.reports  = reports;
@@ -5116,13 +5233,52 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 	global_error_context.instantiations = prev_instantiations;
 
 	// the callers read it once this analysis and its temporary memory are gone
-	auto flows = permanent_slice_make<EscapeFlow>(ea.flows.count);
-	for_array(i, ea.flows) {
-		flows[i] = ea.flows[i];
-		flows[i].target_path = slice_clone(permanent_allocator(), ea.flows[i].target_path);
-		flows[i].param_path  = slice_clone(permanent_allocator(), ea.flows[i].param_path);
-		flows[i].value_path  = slice_clone(permanent_allocator(), ea.flows[i].value_path);
+	isize flow_count = ea.flows.count;
+	if (ea.global_write_mode == EscapeGlobalWrites_Any) {
+		flow_count = ea.flows.count - ea.global_write_paths + 1;
+	} else if (ea.global_write_mode == EscapeGlobalWrites_PerGlobal) {
+		isize direct_globals = 0;
+		for (EscapeGlobalWrite const &gw : ea.global_writes) {
+			if (gw.has_direct) {
+				direct_globals++;
+			}
+		}
+		flow_count = ea.flows.count - (ea.global_write_paths - ea.global_deref_writes) + direct_globals;
 	}
+
+	auto flows = permanent_slice_make<EscapeFlow>(flow_count);
+	isize out = 0;
+	for (EscapeFlow const &f : ea.flows) {
+		if (f.kind == EscapeFlow_Write && f.target == EscapeFlowTarget_Outer) {
+			if (ea.global_write_mode == EscapeGlobalWrites_Any) {
+				continue;
+			}
+			if (ea.global_write_mode == EscapeGlobalWrites_PerGlobal &&
+			    escape_path_deref_index(f.target_path) == f.target_path.count) {
+				continue;
+			}
+		}
+		flows[out] = f;
+		flows[out].target_path = slice_clone(permanent_allocator(), f.target_path);
+		flows[out].param_path  = slice_clone(permanent_allocator(), f.param_path);
+		flows[out].value_path  = slice_clone(permanent_allocator(), f.value_path);
+		out++;
+	}
+	if (ea.global_write_mode == EscapeGlobalWrites_Any) {
+		EscapeFlow coarse = {EscapeFlow_Write, -1};
+		coarse.target = EscapeFlowTarget_Outer;
+		flows[out++] = coarse;
+	} else if (ea.global_write_mode == EscapeGlobalWrites_PerGlobal) {
+		for (EscapeGlobalWrite const &gw : ea.global_writes) {
+			if (gw.has_direct) {
+				EscapeFlow whole = {EscapeFlow_Write, -1};
+				whole.target = EscapeFlowTarget_Outer;
+				whole.global = gw.global;
+				flows[out++] = whole;
+			}
+		}
+	}
+	GB_ASSERT(out == flow_count);
 	return flows;
 }
 
