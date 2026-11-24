@@ -242,7 +242,7 @@ _split :: proc(s, sep: []byte, sep_save, n: int, allocator := context.allocator,
 		return nil
 	}
 
-	if sep == nil {
+	if len(sep) == 0 {
 		l := utf8.rune_count(s)
 		if n < 0 || n > l {
 			n = l

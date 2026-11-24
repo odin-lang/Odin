@@ -103,7 +103,8 @@ Resolve the back trace into source code locations, if possible.
 
 Compile with `-debug` (or use `-define:ODIN_TRACE_INSTRUMENTATION_MODE`) for the most useful information.
 
-The result must be destroyed using `locations_destroy`.
+The result must be destroyed using `locations_destroy`, even when an error is returned.
+On error, the locations resolved before it are filled in and the rest are empty.
 */
 resolve :: proc {
 	resolve_n,
@@ -114,11 +115,7 @@ resolve :: proc {
 See the procedure group `resolve`.
 */
 resolve_n :: proc(bt: Capture, allocator := context.allocator, temp_allocator := context.temp_allocator) -> (out: []Location, err: Resolve_Error) {
-	out, err = _resolve(bt, allocator, temp_allocator)
-	if err != nil {
-		return nil, err
-	}
-	return
+	return _resolve(bt, allocator, temp_allocator)
 }
 
 /*
@@ -126,11 +123,7 @@ See the procedure group `resolve`.
 */
 resolve_const :: proc(bt: Capture_Const, allocator := context.allocator, temp_allocator := context.temp_allocator) -> (out: []Location, err: Resolve_Error) {
 	bt := bt
-	out, err = _resolve(bt.trace[:bt.len], allocator, temp_allocator)
-	if err != nil {
-		return nil, err
-	}
-	return
+	return _resolve(bt.trace[:bt.len], allocator, temp_allocator)
 }
 
 locations_destroy :: proc(locations: []Location, allocator := context.allocator) {
@@ -149,6 +142,7 @@ assertion_failure_proc :: proc(prefix, message: string, loc: runtime.Source_Code
 		runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 		lines, err := resolve(capture(skip=1), context.temp_allocator, context.temp_allocator)
+		defer locations_destroy(lines, context.temp_allocator)
 		if err != nil {
 			runtime.print_string("could not get backtrace for assertion failure: ")
 			runtime.print_string(resolve_err_string(err))
@@ -156,7 +150,6 @@ assertion_failure_proc :: proc(prefix, message: string, loc: runtime.Source_Code
 		} else {
 			runtime.print_string("[back trace]\n")
 			print(lines)
-			locations_destroy(lines, context.temp_allocator)
 		}
 	}
 

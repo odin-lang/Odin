@@ -45,16 +45,19 @@ _capture :: #force_no_inline proc(buf: Capture, skip: int) -> (n: int) {
 @(private="package")
 _locations_destroy :: proc(locations: []Location, allocator: runtime.Allocator) {
 	for location in locations {
-		delete(location.file_path, allocator)
-		delete(location.procedure, allocator)
+		if location.file_path != OOM_MARKER { delete(location.file_path, allocator) }
+		if location.procedure != OOM_MARKER { delete(location.procedure, allocator) }
 	}
 	delete(locations, allocator)
 }
 
 @(private="package")
 _resolve :: proc(bt: Capture, allocator, _: runtime.Allocator) -> (out: []Location, err: Resolve_Error) {
-	out = make([]Location, len(bt), allocator)
-	defer if err != nil { _locations_destroy(out, allocator) }
+	{
+		mem_err: runtime.Allocator_Error
+		out, mem_err = make([]Location, len(bt), allocator)
+		if mem_err != nil { return nil, .Allocator_Error }
+	}
 
 	symbolicator := CSSymbolicatorCreateWithPid(posix.getpid())
 	defer CSRelease(symbolicator)
