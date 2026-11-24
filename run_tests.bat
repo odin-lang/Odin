@@ -100,12 +100,12 @@ call run.bat || exit /b
 
 	@rem Wycheproof tests
 	@pushd tests\core
-	..\..\odin test crypto/wycheproof -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed || exit /b
+	..\..\odin test crypto/wycheproof -project-root:crypto -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed || exit /b
 	@popd
 
 	@rem Noise Protocol Framework tests
 	@pushd tests\core
-	..\..\odin test crypto/noise -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed || exit /b
+	..\..\odin test crypto/noise -project-root:crypto -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed || exit /b
 	@popd
 
 	@rem X.509 limbo tests

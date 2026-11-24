@@ -6840,6 +6840,93 @@ gb_internal bool is_package_name_reserved(String const &name) {
 }
 
 
+gb_global Array<FileId> path_confinement_roots;
+
+gb_internal void path_add_confinement_root(String dir) {
+	if (path_confinement_roots.data == nullptr) {
+		array_init(&path_confinement_roots, heap_allocator());
+	}
+	FileId id = {};
+	if (path_file_id(dir, &id)) {
+		array_add(&path_confinement_roots, id);
+	}
+}
+
+gb_internal bool path_is_confined(String fullpath, String collection_root);
+
+gb_internal bool path_init_confinement_roots(String init_fullpath) {
+	String init_dir = init_fullpath;
+	if (!path_is_directory(init_dir)) {
+		init_dir = path_parent(init_dir);
+	}
+	if (build_context.project_root.len > 0) {
+		if (!path_is_confined(init_dir, build_context.project_root)) {
+			error({}, "The main package %.*s is outside -project-root %.*s\n", LIT(init_dir), LIT(build_context.project_root));
+			return false;
+		}
+		path_add_confinement_root(build_context.project_root);
+	} else {
+		path_add_confinement_root(init_dir);
+	}
+	for (String const &extra : build_context.extra_packages) {
+		String full = path_to_full_path(heap_allocator(), extra);
+		String dir  = path_is_directory(full) ? full : path_parent(full);
+		path_add_confinement_root(dir);
+		gb_free(heap_allocator(), full.text);
+	}
+	for (auto const &lc : library_collections) {
+		path_add_confinement_root(lc.path);
+	}
+	return true;
+}
+
+gb_internal bool path_is_confined(String fullpath, String collection_root) {
+	FileId root_id = {};
+	bool   one_root = collection_root.len > 0;
+	if (one_root && !path_file_id(collection_root, &root_id)) {
+		return true;
+	}
+	if (!one_root && path_confinement_roots.count == 0) {
+		return true;
+	}
+
+	String resolved = {};
+	String existing = fullpath;
+	while (!path_resolve_final(heap_allocator(), existing, &resolved)) {
+		String last = path_last_element_spelled(existing);
+		if (last == "..") {
+			return false;
+		}
+		String up = path_parent(existing);
+		if (up.len == 0 || up.len >= existing.len) {
+			return false;
+		}
+		existing = up;
+	}
+	defer (gb_free(heap_allocator(), resolved.text));
+
+	for (String p = resolved; p.len > 0; p = path_parent(p)) {
+		FileId id = {};
+		if (path_file_id(p, &id)) {
+			if (one_root) {
+				if (file_id_equal(id, root_id)) {
+					return true;
+				}
+			} else {
+				for (FileId const &r : path_confinement_roots) {
+					if (file_id_equal(id, r)) {
+						return true;
+					}
+				}
+			}
+		}
+		if (path_is_root(p)) {
+			break;
+		}
+	}
+	return false;
+}
+
 gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String base_dir, String const &original_string, String *path, bool use_check_errors=false) {
 	GB_ASSERT(path != nullptr);
 
@@ -6854,7 +6941,6 @@ gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String b
 	}
 
 	String collection_name = {};
-	bool is_import_decl_path = node->kind == Ast_ImportDecl || node->kind == Ast_ForeignImportDecl;
 
 	isize colon_pos = -1;
 	for (isize j = 0; j < original_string.len; j++) {
@@ -6885,10 +6971,6 @@ gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String b
 
 	bool is_absolute = is_import_path_absolute(spelled) || (spelled.len > 0 && spelled[0] == '\\');
 	if (is_absolute) {
-		if (is_import_decl_path) {
-			do_error(node, "Invalid import path: '%.*s'", LIT(original_string));
-			return false;
-		}
 		isize skip = 0;
 		if (spelled.len > 1 && spelled[1] == ':') {
 			skip = 2;
@@ -6898,7 +6980,12 @@ gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String b
 			do_error(node, "Invalid path: '%.*s'", LIT(original_string));
 			return false;
 		}
-		*path = path_spelled(permanent_allocator(), spelled);
+		String fullpath = path_spelled(permanent_allocator(), spelled);
+		if (!path_is_confined(fullpath, String{})) {
+			do_error(node, "Path '%.*s' is outside the project root and every collection; widen -project-root or add a -collection", LIT(original_string));
+			return false;
+		}
+		*path = fullpath;
 		return true;
 	}
 
@@ -6953,10 +7040,19 @@ gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String b
 			if (node->kind != Ast_ForeignImportDecl) {
 				do_error(node, "The library collection 'system' is restrict for 'foreign import'");
 				return false;
-			} else {
-				*path = file_str;
-				return true;
 			}
+			for (isize i = 0; i < file_str.len; i++) {
+				if (file_str.text[i] == '/' || file_str.text[i] == '\\') {
+					do_error(node, "A 'system:' library is a name, not a path: '%.*s'", LIT(file_str));
+					return false;
+				}
+			}
+			if (string_starts_with(file_str, str_lit(".."))) {
+				do_error(node, "A 'system:' library is a name, not a path: '%.*s'", LIT(file_str));
+				return false;
+			}
+			*path = file_str;
+			return true;
 		} else if (!find_library_collection_path(collection_name, &base_dir)) {
 			// NOTE(bill): It's a naughty name
 			do_error(node, "Unknown library collection: '%.*s'", LIT(collection_name));
@@ -6979,6 +7075,16 @@ gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String b
 	}
 
 	String fullpath = get_fullpath_relative(permanent_allocator(), base_dir, file_str, nullptr);
+
+	if (!path_is_confined(fullpath, collection_name.len > 0 ? base_dir : String{})) {
+		if (collection_name.len > 0) {
+			do_error(node, "Path '%.*s' leaves the '%.*s' collection", LIT(original_string), LIT(collection_name));
+		} else {
+			do_error(node, "Path '%.*s' is outside the project root and every collection; widen -project-root or add a -collection", LIT(original_string));
+		}
+		return false;
+	}
+
 	*path = fullpath;
 	return true;
 }
@@ -7859,6 +7965,9 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 
 
 	p->init_fullpath = init_fullpath;
+	if (!path_init_confinement_roots(init_fullpath)) {
+		return ParseFile_GeneralError;
+	}
 
 	StringSet extra_fullpaths = {};
 	string_set_init(&extra_fullpaths);

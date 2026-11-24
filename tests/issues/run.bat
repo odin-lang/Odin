@@ -4,7 +4,7 @@ setlocal EnableDelayedExpansion
 if not exist "build\" mkdir build
 pushd build
 
-set COMMON=-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -show-timings
+set COMMON=-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -show-timings -project-root:..
 set ODIN=..\..\..\odin
 set ODIN_FULL=%CD%\..\..\..\odin.exe
 
@@ -440,6 +440,16 @@ if exist deps_test rmdir /S /Q deps_test
 %SystemRoot%\System32\find.exe "deps_test/a\ b\#$$/data.txt" deps.d || exit /b
 %ODIN% build "deps_test\a b#$" %COMMON% -export-dependencies:json -export-dependencies-file:deps.json -out:deps.exe || exit /b
 %SystemRoot%\System32\find.exe "deps_test/a b#$/data.txt" deps.json || exit /b
+
+set CONFINE=..\test_paths_confinement
+%ODIN% check %CONFINE%\load -no-entry-point -project-root:.. -collection:foo=%CONFINE%\coll 2>&1 | find /c "is outside the project root" | findstr /x "6" || exit /b
+%ODIN% check %CONFINE%\load -no-entry-point -project-root:.. -collection:foo=%CONFINE%\coll 2>&1 | find /c "it contains a NUL byte" | findstr /x "1" || exit /b
+%ODIN% check %CONFINE%\load -no-entry-point -project-root:.. -collection:foo=%CONFINE%\coll 2>&1 | find /c "leaves the" | findstr /x "2" || exit /b
+%ODIN% check %CONFINE%\load -no-entry-point -project-root:.. -collection:foo=%CONFINE%\coll 2>&1 | find /c "Error:" | findstr /x "9" || exit /b
+%ODIN% check %CONFINE%\foreign -no-entry-point -project-root:.. 2>&1 | find /c "is a name, not a path" | findstr /x "2" || exit /b
+%ODIN% check %CONFINE%\foreign -no-entry-point -project-root:.. 2>&1 | find /c "is outside the project root" | findstr /x "1" || exit /b
+%ODIN% check %CONFINE%\widen -no-entry-point -project-root:..\..\.. || exit /b
+%ODIN% check %CONFINE%\widen -no-entry-point -project-root:..\test_issue_6165 2>&1 | find /c "is outside -project-root" | findstr /x "1" || exit /b
 
 @rem #########################################################################################################
 

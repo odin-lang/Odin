@@ -5,7 +5,7 @@ import "core:testing"
 
 @(test)
 test_issue_6165 :: proc(t: ^testing.T) {
-	TXT :: #load(ODIN_ROOT + "LICENSE")
+	TXT :: #load(ODIN_ROOT + "core/fmt/doc.odin")
 
 	// We don't really care about the length. The test is whether this compiles, or
 	// if the compiler says it can't find the file we know to exist.

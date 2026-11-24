@@ -5,8 +5,8 @@ mkdir -p build
 pushd build
 ODIN=../../../odin
 ODIN_FULL="$(pwd)/../../../odin"
-COMMON="-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -show-timings -microarch:native"
-COMMON_CHECK="-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -show-timings"
+COMMON="-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -show-timings -microarch:native -project-root:.."
+COMMON_CHECK="-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -show-timings -project-root:.."
 
 set -x
 
@@ -935,6 +935,23 @@ chmod +x fake_cc_128 fake_cc_sig
 if ODIN_CLANG_PATH="$PWD/fake_cc_128" $ODIN build ../test_paths_debug $COMMON -out:fake_link; then exit 1; fi
 SIG_OUT=$(ODIN_CLANG_PATH="$PWD/fake_cc_sig" $ODIN build ../test_paths_debug $COMMON -out:fake_link 2>&1 || true)
 grep -q "terminated by signal 15" <<< "$SIG_OUT"
+
+CONFINE=../test_paths_confinement
+LOAD_OUT=$($ODIN check $CONFINE/load -no-entry-point -project-root:.. -collection:foo=$CONFINE/coll 2>&1 || true)
+FOREIGN_OUT=$($ODIN check $CONFINE/foreign -no-entry-point -project-root:.. 2>&1 || true)
+if [[ $(echo "$LOAD_OUT" | grep -c "is outside the project root") -eq 6 &&
+      $(echo "$LOAD_OUT" | grep -c "it contains a NUL byte") -eq 1 &&
+      $(echo "$LOAD_OUT" | grep -c "leaves the") -eq 2 &&
+      $(echo "$LOAD_OUT" | grep -c "Error:") -eq 9 &&
+      $(echo "$FOREIGN_OUT" | grep -c "is a name, not a path") -eq 2 &&
+      $(echo "$FOREIGN_OUT" | grep -c "is outside the project root") -eq 1 &&
+      $($ODIN check $CONFINE/widen -no-entry-point -project-root:../test_issue_6165 2>&1 | grep -c "is outside -project-root") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+$ODIN check $CONFINE/widen -no-entry-point -project-root:../../..
 
 #########################################################################################################
 

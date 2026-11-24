@@ -96,13 +96,13 @@ if [[ -z "${SLIM:-}" ]]; then
 	# Wycheproof tests
 	(
 		cd "$here/tests/core"
-		"$ODIN" test crypto/wycheproof -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed
+		"$ODIN" test crypto/wycheproof -project-root:crypto -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed
 	)
 
 	# Noise Protocol Framework tests
 	(
 		cd "$here/tests/core"
-		"$ODIN" test crypto/noise -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed
+		"$ODIN" test crypto/noise -project-root:crypto -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed
 	)
 
 	# X.509 limbo tests

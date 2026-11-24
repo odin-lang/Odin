@@ -123,18 +123,21 @@ jobs:
         run: ./odin test tests/core/compress.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
       - name: Optimized Core library tests
         run: ./odin test tests/core/speed.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+      # -project-root widens the directory that imports and #load may reach from the main package's.
+      # tests/core: the LZMA tests #load fixtures from tests/core/assets.
       - name: LZMA match finder normalization tests
-        run: ./odin test tests/core/compress -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:LZMA_NORMALIZE_AT=135167 -define:ODIN_TEST_NAMES=test_core_compress.lzma_normalize
+        run: ./odin test tests/core/compress -project-root:tests/core -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:LZMA_NORMALIZE_AT=135167 -define:ODIN_TEST_NAMES=test_core_compress.lzma_normalize
       - name: Big integer cutoff tests
         run: |
           ./odin test tests/core/math/big_cutoffs -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:MATH_BIG_MUL_KARATSUBA_CUTOFF=0 -define:MATH_BIG_SQR_KARATSUBA_CUTOFF=0 -define:MATH_BIG_MUL_TOOM_CUTOFF=2 -define:MATH_BIG_SQR_TOOM_CUTOFF=2 -define:MATH_BIG_FACTORIAL_BINARY_SPLIT_CUTOFF=0
           ./odin test tests/core/math/big_cutoffs -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -define:MATH_BIG_MUL_KARATSUBA_CUTOFF=4 -define:MATH_BIG_SQR_KARATSUBA_CUTOFF=4 -define:MATH_BIG_MUL_TOOM_CUTOFF=9 -define:MATH_BIG_SQR_TOOM_CUTOFF=9 -define:MATH_BIG_FACTORIAL_BINARY_SPLIT_CUTOFF=40
       - name: JSON user (un)marshaler tests
         run: ./odin test tests/core/encoding/json/user_unmarshaler -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+      # tests/core/crypto: Wycheproof and Noise import the shared tests/core/crypto/common.
       - name: Wycheproof tests
-        run: ./odin test tests/core/crypto/wycheproof -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed
+        run: ./odin test tests/core/crypto/wycheproof -project-root:tests/core/crypto -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed
       - name: Noise Protocol Framework tests
-        run: ./odin test tests/core/crypto/noise -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed
+        run: ./odin test tests/core/crypto/noise -project-root:tests/core/crypto -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed
       - name: X.509 limbo tests
         run: ./odin test tests/core/crypto/x509_limbo -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed
       - name: Vendor library tests
@@ -157,8 +160,9 @@ jobs:
           ./run.sh
           ABI_CFLAGS=-O2 ./run.sh "" "" -o:speed
 
+      # tests: the JSON benchmark imports the frozen reference copy in tests/core/encoding/json.
       - name: Check benchmarks
-        run: ./odin check tests/benchmark -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point
+        run: ./odin check tests/benchmark -project-root:tests -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point
 
       - name: Odin check examples/all for Linux i386
         if: matrix.os == 'ubuntu-latest'
@@ -337,16 +341,18 @@ jobs:
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           odin test tests/core/encoding/json/user_unmarshaler -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true %ODIN_TARGET%
+      # -project-root widens the directory that imports and #load may reach from the main package's.
+      # tests/core/crypto: Wycheproof and Noise import the shared tests/core/crypto/common.
       - name: Wycheproof tests
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          odin test tests/core/crypto/wycheproof -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed %ODIN_TARGET%
+          odin test tests/core/crypto/wycheproof -project-root:tests/core/crypto -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed %ODIN_TARGET%
       - name: Noise Protocol Framework tests
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          odin test tests/core/crypto/noise -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed %ODIN_TARGET%
+          odin test tests/core/crypto/noise -project-root:tests/core/crypto -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed %ODIN_TARGET%
       - name: X.509 limbo tests
         shell: cmd
         run: |
@@ -399,11 +405,12 @@ jobs:
           call run.bat
           set ABI_CFLAGS=-O2
           call run.bat -o:speed
+      # tests: the JSON benchmark imports the frozen reference copy in tests/core/encoding/json.
       - name: Check benchmarks
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          odin check tests/benchmark -vet -strict-style -no-entry-point %ODIN_TARGET%
+          odin check tests/benchmark -project-root:tests -vet -strict-style -no-entry-point %ODIN_TARGET%
       - name: Odin documentation tests
         if: matrix.arch == 'amd64'
         shell: cmd
@@ -483,14 +490,16 @@ jobs:
       - name: Odin run -debug
         run: ./odin run examples/demo -debug -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
 
+      # -project-root widens the directory that imports and #load may reach from the main package's.
+      # tests: the riscv64 tests import tests/internal and tests/core.
       - name: riscv64 tests
-        run: ./odin test tests/riscv64 -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
+        run: ./odin test tests/riscv64 -project-root:tests -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
 
       - name: riscv64 tests -o:speed
-        run: ./odin test tests/riscv64 -all-packages -o:speed -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
+        run: ./odin test tests/riscv64 -project-root:tests -all-packages -o:speed -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
 
       - name: riscv64 tests -o:speed with V extension
-        run: ./odin test tests/riscv64 -all-packages -o:speed -target-features:v -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
+        run: ./odin test tests/riscv64 -project-root:tests -all-packages -o:speed -target-features:v -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -target:linux_riscv64 -extra-linker-flags:"--target=riscv64-linux-gnu -static" -no-rpath
 
       - name: ABI comparator
         run: |

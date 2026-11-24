@@ -7,7 +7,8 @@ package test_core_json_differential
 // `unquote_string`, and `unmarshal` (the returned error, including the token inside an
 // `Unsupported_Type_Error`, plus a deep comparison of everything written to the target).
 //
-//	odin test tests/core/encoding/json/differential -o:speed -define:JSON_DIFF_ITERATIONS=100000
+//	odin test tests/core/encoding/json/differential -project-root:tests/core -o:speed \
+//		-define:JSON_DIFF_ITERATIONS=100000
 //
 // The runner logs its random seed; reproduce a failure with -define:ODIN_TEST_RANDOM_SEED=n.
 

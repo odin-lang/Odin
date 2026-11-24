@@ -3,7 +3,7 @@ package benchmark_core_encoding_json
 // Throughput of `core:encoding/json` against the frozen copy it is being optimized from
 // (`tests/core/encoding/json/reference`), on the same documents:
 //
-//	odin test tests/benchmark/encoding/json -o:speed
+//	odin test tests/benchmark/encoding/json -project-root:tests -o:speed
 //
 // Every cell is the best of as many runs as fit in JSON_BENCH_MIN_MS (at least three). Results are
 // produced with an arena (bump allocation, freed between runs) and with the heap allocator, where

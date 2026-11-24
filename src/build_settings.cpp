@@ -557,6 +557,7 @@ struct BuildContext {
 	String out_filepath;
 	String resource_filepath;
 	String pdb_filepath;
+	String project_root;
 
 	u64 vet_flags;
 	u32 sanitizer_flags;

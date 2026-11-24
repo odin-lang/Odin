@@ -442,6 +442,7 @@ enum BuildFlagKind {
 	BuildFlag_ThreadCount,
 	BuildFlag_KeepTempFiles,
 	BuildFlag_Collection,
+	BuildFlag_ProjectRoot,
 	BuildFlag_Define,
 	BuildFlag_BuildMode,
 	BuildFlag_KeepExecutable,
@@ -648,6 +649,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ThreadCount,             str_lit("thread-count"),              BuildFlagParam_Integer, Command_all);
 	add_flag(&build_flags, BuildFlag_KeepTempFiles,           str_lit("keep-temp-files"),           BuildFlagParam_None,    Command__does_build | Command_strip_semicolon);
 	add_flag(&build_flags, BuildFlag_Collection,              str_lit("collection"),                BuildFlagParam_String,  Command__does_check);
+	add_flag(&build_flags, BuildFlag_ProjectRoot,             str_lit("project-root"),              BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_Define,                  str_lit("define"),                    BuildFlagParam_String,  Command__does_check, true);
 	add_flag(&build_flags, BuildFlag_BuildMode,               str_lit("build-mode"),                BuildFlagParam_String,  Command__does_build); // Commands_build is not used to allow for a better error message
 	add_flag(&build_flags, BuildFlag_KeepExecutable,          str_lit("keep-executable"),           BuildFlagParam_None,    Command__does_build | Command_test);
@@ -1228,6 +1230,26 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 							// NOTE(bill): Allow for multiple library collections
 							continue;
+						}
+						case BuildFlag_ProjectRoot: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							String path = value.value_string;
+							if (path.len == 0) {
+								gb_printf_err("-project-root expects a directory\n");
+								bad_flags = true;
+								break;
+							}
+							gbAllocator a = heap_allocator();
+							bool path_ok = false;
+							String fullpath = path_to_fullpath(a, path, &path_ok);
+							if (!path_ok || !path_is_directory(fullpath)) {
+								gb_printf_err("-project-root must be a directory, got '%.*s'\n", LIT(path_ok ? fullpath : path));
+								gb_free(a, fullpath.text);
+								bad_flags = true;
+								break;
+							}
+							build_context.project_root = fullpath;
+							break;
 						}
 						case BuildFlag_Define: {
 							GB_ASSERT(value.kind == ExactValue_String);
@@ -3512,6 +3534,15 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	if (build) {
 		if (print_flag("-print-linker-flags")) {
 			print_usage_line(2, "Prints the all of the flags/arguments that will be passed to the linker.");
+		}
+	}
+
+	if (check) {
+		if (print_flag("-project-root:<dirpath>")) {
+			print_usage_line(2, "Sets the directory that import, foreign import and #load paths may not leave.");
+			print_usage_line(2, "It must hold the main package. The default is the main package's directory.");
+			print_usage_line(2, "Paths may also reach into any -collection.");
+			print_usage_line(2, "Example: -project-root:..");
 		}
 	}
 

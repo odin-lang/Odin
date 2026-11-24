@@ -18,6 +18,8 @@ example :: proc() {
 		xml.destroy(docs[round])
 	}
 
+	// `tests/core/assets` lies outside `core` and is fetched by `tests/core/download_assets.py`.
+	// Run this example from Odin's root with: odin run core/encoding/xml/example -project-root:.
 	DOC :: #load("../../../../tests/core/assets/XML/unicode.xml")
 	input := DOC
 

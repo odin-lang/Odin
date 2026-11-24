@@ -466,6 +466,90 @@ gb_internal bool file_id_visit(StringSet *visited, String path) {
 	return !string_set_update(visited, make_string(key, gb_size_of(FileId)));
 }
 
+gb_internal bool path_resolve_final(gbAllocator a, String path, String *out) {
+	*out = {};
+	if (path.len == 0) {
+		return false;
+	}
+#if defined(GB_SYSTEM_WINDOWS)
+	gbAllocator ha = heap_allocator();
+	String16 wpath = string_to_string16(ha, path);
+	defer (gb_free(ha, wpath.text));
+	if (wpath.len == 0) {
+		return false;
+	}
+	HANDLE h = CreateFileW(cast(wchar_t *)wpath.text, 0, FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+	if (h == INVALID_HANDLE_VALUE) {
+		return false;
+	}
+	defer (CloseHandle(h));
+
+	DWORD n = GetFinalPathNameByHandleW(h, nullptr, 0, FILE_NAME_NORMALIZED|VOLUME_NAME_DOS);
+	if (n == 0) {
+		return false;
+	}
+	wchar_t *buf = gb_alloc_array(ha, wchar_t, n+1);
+	defer (gb_free(ha, buf));
+	DWORD m = GetFinalPathNameByHandleW(h, buf, n+1, FILE_NAME_NORMALIZED|VOLUME_NAME_DOS);
+	if (m == 0 || m > n) {
+		return false;
+	}
+	String s = string16_to_string(a, make_string16(cast(u16 *)buf, m));
+	for (isize i = 0; i < s.len; i++) {
+		if (s.text[i] == '\\') {
+			s.text[i] = '/';
+		}
+	}
+	isize skip = 0;
+	if (string_starts_with(s, str_lit("//?/UNC/"))) {
+		skip = 6;
+	} else if (string_starts_with(s, str_lit("//?/"))) {
+		skip = 4;
+	}
+	if (skip > 0) {
+		gb_memmove(s.text, s.text + skip, s.len - skip);
+		s.len -= skip;
+		if (skip == 6) {
+			s.text[0] = '/';
+			s.text[1] = '/';
+		}
+	}
+	*out = s;
+	return true;
+#else
+	char *c = alloc_cstring(heap_allocator(), path);
+	defer (gb_free(heap_allocator(), c));
+	char *r = realpath(c, nullptr);
+	if (r == nullptr) {
+		return false;
+	}
+	*out = copy_string(a, make_string_c(r));
+	free(r);
+	return true;
+#endif
+}
+
+gb_internal String path_parent(String s) {
+	while (s.len > 1 && s.text[s.len-1] == '/') {
+		s.len -= 1;
+	}
+	isize i = s.len;
+	while (i > 0 && s.text[i-1] != '/') {
+		i -= 1;
+	}
+	if (i == 0) {
+		return {};
+	}
+	String parent = substring(s, 0, i);
+	if (parent.len > 1 && !(parent.len == 3 && parent.text[1] == ':')) {
+		parent.len -= 1;
+	}
+	if (parent.len == s.len) {
+		return {};
+	}
+	return parent;
+}
+
 struct Path {
 	String basename;
 	String name;
