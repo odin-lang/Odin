@@ -442,6 +442,7 @@ enum BuildFlagKind {
 	BuildFlag_ThreadCount,
 	BuildFlag_KeepTempFiles,
 	BuildFlag_Collection,
+	BuildFlag_SandboxRoot,
 	BuildFlag_Define,
 	BuildFlag_BuildMode,
 	BuildFlag_KeepExecutable,
@@ -648,6 +649,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ThreadCount,             str_lit("thread-count"),              BuildFlagParam_Integer, Command_all);
 	add_flag(&build_flags, BuildFlag_KeepTempFiles,           str_lit("keep-temp-files"),           BuildFlagParam_None,    Command__does_build | Command_strip_semicolon);
 	add_flag(&build_flags, BuildFlag_Collection,              str_lit("collection"),                BuildFlagParam_String,  Command__does_check);
+	add_flag(&build_flags, BuildFlag_SandboxRoot,             str_lit("sandbox-root"),              BuildFlagParam_String,  Command__does_check, true);
 	add_flag(&build_flags, BuildFlag_Define,                  str_lit("define"),                    BuildFlagParam_String,  Command__does_check, true);
 	add_flag(&build_flags, BuildFlag_BuildMode,               str_lit("build-mode"),                BuildFlagParam_String,  Command__does_build); // Commands_build is not used to allow for a better error message
 	add_flag(&build_flags, BuildFlag_KeepExecutable,          str_lit("keep-executable"),           BuildFlagParam_None,    Command__does_build | Command_test);
@@ -1227,6 +1229,28 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							add_library_collection(name, path_trim_trailing_separators(fullpath));
 
 							// NOTE(bill): Allow for multiple library collections
+							continue;
+						}
+						case BuildFlag_SandboxRoot: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							String path = value.value_string;
+							if (path.len == 0) {
+								gb_printf_err("-sandbox-root expects a directory\n");
+								bad_flags = true;
+								break;
+							}
+							gbAllocator a = heap_allocator();
+							bool path_ok = false;
+							String fullpath = path_to_fullpath(a, path, &path_ok);
+							bool is_dir = path_ok && path_is_directory(fullpath);
+							if (!is_dir) {
+								gb_printf_err("-sandbox-root must be a directory, got '%.*s'\n", LIT(path_ok ? fullpath : path));
+								bad_flags = true;
+							}
+							gb_free(a, fullpath.text);
+							if (is_dir) {
+								array_add(&build_context.sandbox_roots, path_spelled(a, path));
+							}
 							continue;
 						}
 						case BuildFlag_Define: {
@@ -3103,6 +3127,14 @@ gb_internal int print_show_help(String const arg0, String command, String option
 				print_usage_line(3, "foreign import lib \"shared:libfoo.a\"");
 		}
 
+		if (print_flag("-sandbox-root:<dirpath>")) {
+			print_usage_line(2, "Confines import, foreign import and #load paths. May be given more than once.");
+			print_usage_line(2, "The main package must lie inside a sandbox root. Plain paths must resolve inside one;");
+			print_usage_line(2, "a collection path (e.g. \"core:fmt\") may lie outside them, but may not leave its collection.");
+			print_usage_line(2, "Without this flag, paths are not confined.");
+			print_usage_line(2, "Example: -sandbox-root:. -sandbox-root:../shared");
+		}
+
 		if (print_flag("-custom-attribute:<string>")) {
 			print_usage_line(2, "Add a custom attribute which will be ignored if it is unknown.");
 			print_usage_line(2, "This can be used with metaprogramming tools.");
@@ -4276,6 +4308,7 @@ int main(int arg_count, char const **arg_ptr) {
 	TIME_SECTION("init args");
 	map_init(&build_context.defined_values);
 	build_context.extra_packages.allocator = heap_allocator();
+	build_context.sandbox_roots.allocator  = heap_allocator();
 	build_context.export_semantics_for.allocator = heap_allocator();
 
 	init_build_context_error_pos_style();

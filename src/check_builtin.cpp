@@ -2055,24 +2055,22 @@ gb_internal void load_file_cache_load(LoadFileCache *cache, LoadFileTier tier) {
 	if (tier > cache->tier) {
 		cache->tier = tier;
 
-		TEMPORARY_ALLOCATOR_GUARD();
-		char *c_str = alloc_cstring(temporary_allocator(), path);
-
-		// NOTE(bill): not `gb_file_open`, whose `gb_file_last_write_time` looks the path up a second time
-		gbFile f = {};
-	#if defined(GB_SYSTEM_WINDOWS)
-		cache->file_error = gb__win32_file_open(&f.fd, &f.ops, gbFileMode_Read, c_str);
-		if (cache->file_error != gbFileError_None) {
-			cache->is_dir = path_is_directory(path);
+		ConfineHandle h = CONFINE_NO_HANDLE;
+		bool is_dir = false;
+		ConfineResult r = confine_open(path, CONFINE_ANY, &h, &is_dir);
+		defer (confine_close(h));
+		cache->outside = false;
+		switch (r) {
+		case Confine_Ok:         cache->file_error = gbFileError_None;       break;
+		case Confine_NotExists:  cache->file_error = gbFileError_NotExists;  break;
+		case Confine_Permission: cache->file_error = gbFileError_Permission; break;
+		case Confine_Invalid:    cache->file_error = gbFileError_Invalid;    break;
+		case Confine_Outside:
+			cache->file_error = gbFileError_Invalid;
+			cache->outside = true;
+			break;
 		}
-	#else
-		cache->file_error = gb__posix_file_open(&f.fd, &f.ops, gbFileMode_Read, c_str);
-		if (cache->file_error == gbFileError_None) {
-			struct stat st = {};
-			cache->is_dir = fstat(f.fd.i, &st) == 0 && S_ISDIR(st.st_mode);
-		}
-	#endif
-		defer (gb_file_close(&f));
+		cache->is_dir = is_dir;
 
 		if (cache->file_error == gbFileError_None) {
 			cache->exists = true;
@@ -2085,13 +2083,14 @@ gb_internal void load_file_cache_load(LoadFileCache *cache, LoadFileTier tier) {
 				if (cache->is_dir) {
 					break;
 				}
-				isize file_size = cast(isize)gb_file_size(&f);
-				if (file_size > 0) {
-					u8 *ptr = permanent_alloc_array<u8>(file_size+1);
-					gb_file_read_at(&f, ptr, file_size, 0);
-					ptr[file_size] = '\0';
+				i64 file_size = confine_size(h);
+				if (file_size > 0 && (gb_size_of(isize) >= 8 || file_size < I32_MAX)) {
+					u8 *ptr = permanent_alloc_array<u8>(cast(isize)file_size+1);
+					isize got = 0;
+					confine_read(h, ptr, cast(isize)file_size, &got);
+					ptr[got] = '\0';
 					cache->data.text = ptr;
-					cache->data.len = file_size;
+					cache->data.len = got;
 				}
 				break;
 			}
@@ -2139,7 +2138,16 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 	mutex_lock(&cache->mutex);
 	gbFileError file_error = cache->file_error;
 	bool is_dir = cache->is_dir;
+	bool outside = cache->outside;
 	mutex_unlock(&cache->mutex);
+
+	if (outside) {
+		if (err_on_not_found) {
+			error(ce->proc, "Failed to `#%.*s` file: %.*s; it resolves outside the project root and every collection", LIT(builtin_name), LIT(path));
+		}
+		call->state_flags |= StateFlag_DirectiveWasFalse;
+		return false;
+	}
 
 	if (is_dir && tier == LoadFileTier_Contents) {
 		if (err_on_not_found) {
@@ -2573,7 +2581,7 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 	if (!cache->loaded)  {
 		cache->loaded = true;
 		Array<FileInfo> list = {};
-		ReadDirectoryError rd_err = read_directory(path, &list);
+		ReadDirectoryError rd_err = confine_read_directory(path, &list);
 		defer (array_free(&list));
 
 		if (list.count == 1) {
@@ -2599,6 +2607,9 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 			return LoadDirective_NotFound;
 		case ReadDirectory_Unknown:
 			error(call, "%.*s error - unknown error whilst reading path %.*s", LIT(name), LIT(original_string));
+			return LoadDirective_Error;
+		case ReadDirectory_Outside:
+			error(call, "%.*s error - path resolves outside the project root and every collection: %.*s", LIT(name), LIT(original_string));
 			return LoadDirective_Error;
 		}
 
