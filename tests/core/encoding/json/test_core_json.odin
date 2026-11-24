@@ -1453,6 +1453,27 @@ mjson_newline_before_colon :: proc(t: ^testing.T) {
 		}
 	}
 
+	// Literal input from the issue, with SJSON.
+	{
+		v, e := json.parse(transmute([]u8)string("{\"r\"\n:5}"), spec = .SJSON, allocator = context.temp_allocator)
+		testing.expectf(t, e == nil, "issue input: got %v", e)
+		if obj, ok := v.(json.Object); ok {
+			testing.expect_value(t, obj["r"], json.Integer(5))
+		} else {
+			testing.expect(t, false, "issue input: not an object")
+		}
+	}
+
+	// unmarshal takes a separate path for the colon.
+	{
+		Foo :: struct {r: int, name: string}
+		foo: Foo
+		uerr := json.unmarshal(transmute([]u8)string("{r\n: 5, name\n:\n\"x\"}"), &foo, .SJSON, context.temp_allocator)
+		testing.expect_value(t, uerr, nil)
+		testing.expect_value(t, foo.r, 5)
+		testing.expect_value(t, foo.name, "x")
+	}
+
 	// The comma is still a separator between members, so a colon-less key is an error.
 	value, err := json.parse(transmute([]u8)string("a\n1\n"), spec = .MJSON, allocator = context.temp_allocator)
 	_ = value
