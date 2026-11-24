@@ -155,6 +155,7 @@ expect_token :: proc(p: ^Parser, kind: Token_Kind) -> Error {
 
 @(require_results)
 parse_colon :: proc(p: ^Parser) -> (err: Error) {
+	skip_inserted_comma(p)
 	colon_err := expect_token(p, .Colon)
 	if colon_err == nil {
 		return nil
@@ -188,12 +189,18 @@ expect_closing_token :: proc(p: ^Parser, kind: Token_Kind) -> Error {
 	return expect_token(p, kind)
 }
 
-// Whether the document ends here: after SJSON's inserted comma, the current token is `.EOF` with nothing but NULs after it.
-@(private, require_results)
-at_end :: proc(p: ^Parser) -> bool {
+// SJSON inserts a comma at a newline after a value; a newline between a key and its colon must not count as one.
+@(private)
+skip_inserted_comma :: proc(p: ^Parser) {
 	if p.spec == .MJSON && p.curr_token.kind == .Comma && p.curr_token.offset < len(p.tok.data) && p.tok.data[p.curr_token.offset] == '\n' {
 		advance_token(p)
 	}
+}
+
+// Whether the document ends here: after SJSON's inserted comma, the current token is `.EOF` with nothing but NULs after it.
+@(private, require_results)
+at_end :: proc(p: ^Parser) -> bool {
+	skip_inserted_comma(p)
 	if p.curr_token.kind != .EOF {
 		return false
 	}
