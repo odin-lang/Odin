@@ -630,7 +630,7 @@ huge_header :: proc(buf: []byte, major: byte, n: u64) -> []byte {
 @(test)
 test_trusted_input_huge_lengths :: proc(t: ^testing.T) {
 	track: mem.Tracking_Allocator
-	mem.tracking_allocator_init(&track, runtime.heap_allocator())
+	mem.tracking_allocator_init(&track, context.allocator)
 	track.bad_free_callback = mem.tracking_allocator_bad_free_callback_add_to_array
 	defer mem.tracking_allocator_destroy(&track)
 	allocator := mem.tracking_allocator(&track)
