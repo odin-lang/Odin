@@ -3936,6 +3936,17 @@ gb_internal LB_ABI_INFO(lb_get_abi_info) {
 		lb_x86_split_wide_vector(m->ctx, &ft->ret, register_bytes);
 	}
 
+	if (is_calling_convention_odin(calling_convention)) {
+		// NOTE(bill): A zero-sized argument carries nothing, so it is not a parameter at all.
+		// LLVM's AArch64 GlobalISel (-O0) also loses `swiftself` on `context` when an empty parameter comes before it.
+		for_array(i, ft->args) {
+			lbArgType *arg = &ft->args[i];
+			if (arg->kind == lbArg_Direct && lb_sizeof(arg->type) == 0) {
+				*arg = lb_arg_type_ignore(arg->type);
+			}
+		}
+	}
+
 	// NOTE(bill): this is handled here rather than when developing the type in `lb_type_internal_for_procedures_raw`
 	// This is to make it consistent when and how it is handled
 	if (calling_convention == ProcCC_Odin) {
