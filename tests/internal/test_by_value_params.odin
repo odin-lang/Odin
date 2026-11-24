@@ -237,3 +237,122 @@ test_by_value_params_address_taken_later :: proc(t: ^testing.T) {
 	}
 	testing.expect_value(t, r, 2)
 }
+
+@(private="file")
+Aligned :: struct {
+	v: #simd[4]f32,
+	n: i128,
+}
+
+@(private="file")
+Packed_Aligned :: struct #packed {
+	tag:   u8,
+	inner: Aligned,
+}
+
+@(private="file")
+g_packed_aligned: Packed_Aligned
+
+// A variadic `..any` argument refers to the value itself: the parameter's memory as the caller gave it
+@(private="file")
+address_aligned :: proc(args: ..any) -> bool {
+	return uintptr(args[0].data) % align_of(Aligned) == 0
+}
+
+// writes nothing outside its own memory: a call to it needs no copy of a global or of memory through a pointer
+@(private="file")
+aligned_read :: #force_no_inline proc(v: Aligned) -> bool {
+	return address_aligned(v)
+}
+
+// writes outside its own memory: a call to it needs no copy of a local whose address is not taken
+@(private="file")
+aligned_write :: #force_no_inline proc(v: Aligned) -> bool {
+	g_big.a += 1
+	return address_aligned(v)
+}
+
+// A field of a `#packed` struct may not be aligned for its type, wherever the struct is.
+// The copy that aligns it stays, whatever else needs no copy.
+@(test)
+test_by_value_params_packed_field :: proc(t: ^testing.T) {
+	local: Packed_Aligned
+	testing.expect(t, aligned_read(local.inner))
+	testing.expect(t, aligned_write(local.inner))
+	testing.expect(t, aligned_read(g_packed_aligned.inner))
+	p := &g_packed_aligned
+	testing.expect(t, aligned_read(p.inner))
+	testing.expect(t, aligned_write(p.inner))
+}
+
+// Each writes its result while it still reads its parameter, and writes nothing else outside its own memory.
+@(private="file")
+reverse :: #force_no_inline proc(v: Big) -> Big {
+	return {a = v.d, b = v.c, c = v.b, d = v.a, tag = v.tag}
+}
+
+@(private="file")
+reverse_named :: #force_no_inline proc(v: Big) -> (r: Big) {
+	r.a = v.d
+	r.b = v.c
+	r.c = v.b
+	r.d = v.a
+	return
+}
+
+@(private="file")
+reverse_pair :: #force_no_inline proc(v: Big) -> (Big, int) {
+	return {a = v.d, b = v.c, c = v.b, d = v.a}, v.a
+}
+
+// returned through memory on every target
+@(private="file")
+Row :: struct {cells: [16]int}
+
+@(private="file")
+reverse_row :: #force_no_inline proc(v: Row) -> (r: Row) {
+	for i in 0..<16 {
+		r.cells[i] = v.cells[15-i]
+	}
+	return
+}
+
+// A result reaches its destination after the call, even where the destination is the argument.
+@(test)
+test_by_value_params_result_into_argument :: proc(t: ^testing.T) {
+	forwards  := Big{a = 1, b = 2, c = 3, d = 4}
+	backwards := Big{a = 4, b = 3, c = 2, d = 1}
+
+	x := forwards
+	x = reverse(x)
+	testing.expect_value(t, x, backwards)
+	x = reverse_named(x)
+	testing.expect_value(t, x, forwards)
+	n: int
+	x, n = reverse_pair(x)
+	testing.expect_value(t, x, backwards)
+	testing.expect_value(t, n, 1)
+
+	g_big = forwards
+	g_big = reverse(g_big)
+	testing.expect_value(t, g_big, backwards)
+
+	s: struct {tag: u8, big: Big}
+	s.big = forwards
+	s.big = reverse(s.big)
+	testing.expect_value(t, s.big, backwards)
+
+	arr: [2]Big
+	arr[1] = forwards
+	arr[1], n = reverse_pair(arr[1])
+	testing.expect_value(t, arr[1], backwards)
+	testing.expect_value(t, n, 1)
+
+	row: Row
+	for &c, i in row.cells {
+		c = i
+	}
+	row = reverse_row(row)
+	testing.expect_value(t, row.cells[0], 15)
+	testing.expect_value(t, row.cells[15], 0)
+}
