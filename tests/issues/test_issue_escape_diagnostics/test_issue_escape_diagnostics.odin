@@ -1,4 +1,4 @@
-// The warnings for stack memory say where the pointer is held, what it points into, and where that address was taken
+// The warnings for stack memory say where the pointer is held, what it points into, where that address was taken, and which call it went through
 package test_issues
 
 Arena :: struct {
@@ -57,4 +57,35 @@ store_global :: proc() {
 	x: Temp_Arena
 	p := &x.arena.used
 	global_ptr = p // warning
+}
+
+Memory :: struct {
+	handle: u64,
+}
+
+Buffer :: struct {
+	memory: ^Memory,
+	size:   u64,
+}
+
+GPU_Arena :: struct {
+	memory: Memory,
+	buffer: Buffer,
+}
+
+create_buffer :: proc(mem: ^Memory, size: u64) -> Buffer {
+	buffer: Buffer
+	buffer.memory = mem
+	buffer.size = size
+	return buffer
+}
+
+// The call the address went through, and what the callee does with it, get a line of their own
+gpu_arena_init :: proc() -> GPU_Arena {
+	arena: GPU_Arena
+	arena.buffer = create_buffer(
+		&arena.memory,
+		64,
+	)
+	return arena // warning
 }

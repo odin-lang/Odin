@@ -245,10 +245,12 @@ else
 fi
 
 ESCAPE_OUT=$($ODIN check ../test_issue_escape_diagnostics -no-entry-point $COMMON_CHECK 2>&1 >/dev/null)
-if [[ $(grep -c "Warning:" <<< "$ESCAPE_OUT") -eq 4 &&
-      $(grep -c "holds a pointer into itself" <<< "$ESCAPE_OUT") -eq 2 &&
-      $(grep -c "is taken at" <<< "$ESCAPE_OUT") -eq 4 &&
-      $(grep -c "'temp.allocator.data' may refer to 'temp.arena' in the stack memory of the named result 'temp'" <<< "$ESCAPE_OUT") -eq 1 ]]; then
+if [[ $(grep -c "Warning:" <<< "$ESCAPE_OUT") -eq 5 &&
+      $(grep -c "holds a pointer into itself" <<< "$ESCAPE_OUT") -eq 3 &&
+      $(grep -c "is taken at" <<< "$ESCAPE_OUT") -eq 5 &&
+      $(grep -c "'temp.allocator.data' may refer to 'temp.arena' in the stack memory of the named result 'temp'" <<< "$ESCAPE_OUT") -eq 1 &&
+      $(grep -c "The call to" <<< "$ESCAPE_OUT") -eq 3 &&
+      $(grep -c "returns its parameter 'mem' in '.memory' of its result" <<< "$ESCAPE_OUT") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"

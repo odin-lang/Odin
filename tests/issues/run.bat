@@ -70,10 +70,12 @@ set ODIN_FULL=%CD%\..\..\..\odin.exe
 %ODIN% check "..\test_issue_atomic_access" -no-entry-point -vet-atomic-access %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
 %ODIN% check "..\test_issue_escape_stored_field" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "3" || exit /b
 %ODIN% check "..\test_issue_escape_union_loop" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "1" || exit /b
-%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "4" || exit /b
-%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "holds a pointer into itself" | findstr /x "2" || exit /b
-%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "is taken at" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "5" || exit /b
+%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "holds a pointer into itself" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "is taken at" | findstr /x "5" || exit /b
 %ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "'temp.allocator.data' may refer to 'temp.arena' in the stack memory of the named result 'temp'" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "The call to" | findstr /x "3" || exit /b
+%ODIN% check "..\test_issue_escape_diagnostics" -no-entry-point %COMMON% 2>&1 | find /c "returns its parameter 'mem' in '.memory' of its result" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_escape_nested_calls" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "6" || exit /b
 %ODIN% check "..\test_issue_escape_cleared_stores" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "15" || exit /b
 %ODIN% check "..\test_issue_escape_cleared_stores" -no-entry-point %COMMON% 2>&1 | find /c "local variable 'y'" | findstr /x "1" || exit /b
