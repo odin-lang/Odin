@@ -384,7 +384,7 @@ load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context
 
 
 destroy :: proc(img: ^Image) {
-	if img == nil || img.width == 0 || img.height == 0 {
+	if img == nil {
 		return
 	}
 	context.allocator = img.pixels.allocator if img.pixels.allocator.procedure != nil else context.allocator
@@ -395,9 +395,6 @@ destroy :: proc(img: ^Image) {
 		free(v)
 	}
 
-	// Make destroy idempotent
-	img.width  = 0
-	img.height = 0
 	free(img)
 }
 

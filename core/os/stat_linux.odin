@@ -56,7 +56,7 @@ _stat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, err
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 	name_cstr := clone_to_cstring(name, temp_allocator) or_return
 
-	fd, errno := linux.open(name_cstr, {})
+	fd, errno := linux.open(name_cstr, {.PATH, .CLOEXEC})
 	if errno != .NONE {
 		return {}, _get_platform_error(errno)
 	}
@@ -74,7 +74,7 @@ _lstat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, er
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 	name_cstr := clone_to_cstring(name, temp_allocator) or_return
 
-	fd, errno := linux.open(name_cstr, {.PATH, .NOFOLLOW})
+	fd, errno := linux.open(name_cstr, {.PATH, .NOFOLLOW, .CLOEXEC})
 	if errno != .NONE {
 		return {}, _get_platform_error(errno)
 	}

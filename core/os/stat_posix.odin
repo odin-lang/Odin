@@ -73,7 +73,7 @@ _stat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, err
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 	cname := clone_to_cstring(name, temp_allocator) or_return
 
-	fd := posix.open(cname, {})
+	fd := posix.open(cname, {.NONBLOCK, .NOCTTY, .CLOEXEC})
 	if fd == -1 {
 		err = _get_platform_error()
 		return
@@ -81,6 +81,7 @@ _stat :: proc(name: string, allocator: runtime.Allocator) -> (fi: File_Info, err
 	defer posix.close(fd)
 
 	fullpath := _posix_absolute_path(fd, name, allocator) or_return
+	defer if err != nil { delete(fullpath, allocator) }
 
 	stat: posix.stat_t
 	if posix.stat(fullpath, &stat) != .OK {

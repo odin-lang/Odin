@@ -242,10 +242,7 @@ decode_body :: proc(img: ^Image, body: []u8) -> (err: Error) {
 	width  := img.width
 	height := img.height
 
-	scratch, scratch_err := make([]u8, 12 * width)
-	if scratch_err != nil {
-		return .Unable_To_Allocate_Or_Resize
-	}
+	scratch := make([]u8, 12 * width) or_return
 	defer delete(scratch)
 
 	cur, prv, res: [4][]u8

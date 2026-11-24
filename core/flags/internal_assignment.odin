@@ -17,7 +17,7 @@ push_positional :: #force_no_inline proc (model: ^$T, parser: ^Parser, arg: stri
 	if set, valid_index := bit_array.get(&parser.filled_pos, parser.filled_pos.length - 1); set || !valid_index {
 		// The index below the last one is either set or invalid, which means we're out of space.
 		// Add one free bit by setting the index above to false.
-		bit_array.set(&parser.filled_pos, parser.filled_pos.length, false)
+		set_bit(&parser.filled_pos, parser.filled_pos.length, false) or_return
 	}
 
 	pos: int = ---
@@ -26,7 +26,6 @@ push_positional :: #force_no_inline proc (model: ^$T, parser: ^Parser, arg: stri
 		ok: bool
 		pos, ok = bit_array.iterate_by_unset(&iter)
 
-		// This may be an allocator error.
 		assert(ok, "Unable to find a free spot in the positional bit_array.")
 	}
 
@@ -47,7 +46,13 @@ push_positional :: #force_no_inline proc (model: ^$T, parser: ^Parser, arg: stri
 	ptr := cast(rawptr)(cast(uintptr)model + field.offset)
 	args_tag, _ := reflect.struct_tag_lookup(field.tag, TAG_ARGS)
 	field_name := get_field_name(field)
-	error = parse_and_set_pointer_by_type(ptr, arg, field.type, args_tag)
+	old_value: rawptr
+	if owns_value(field.type) {
+		reserve_owned_value(parser) or_return
+		old_value = (^rawptr)(ptr)^
+	}
+	owned: bool
+	error = parse_and_set_pointer_by_type(ptr, arg, field.type, args_tag, &owned)
 	#partial switch &specific_error in error {
 	case Parse_Error:
 		specific_error.message = fmt.tprintf("Unable to set positional #%i (%s) of type %v to `%s`.%s%s",
@@ -58,19 +63,32 @@ push_positional :: #force_no_inline proc (model: ^$T, parser: ^Parser, arg: stri
 			" " if len(specific_error.message) > 0 else "",
 			specific_error.message)
 	case nil:
-		bit_array.set(&parser.filled_pos, pos)
-		bit_array.set(&parser.fields_set, index)
+		if owns_value(field.type) {
+			replace_owned_value(parser, field.type, old_value, (^rawptr)(ptr)^, owned)
+		}
+		set_bit(&parser.filled_pos, pos) or_return
+		set_bit(&parser.fields_set, index) or_return
 	}
 
 	return
 }
 
-register_field :: proc(parser: ^Parser, field: reflect.Struct_Field, index: int) {
+register_field :: proc(parser: ^Parser, field: reflect.Struct_Field, index: int) -> Error {
 	if pos, ok := get_field_pos(field); ok {
-		bit_array.set(&parser.filled_pos, pos)
+		set_bit(&parser.filled_pos, pos) or_return
 	}
 
-	bit_array.set(&parser.fields_set, index)
+	return set_bit(&parser.fields_set, index)
+}
+
+set_bit :: proc(ba: ^bit_array.Bit_Array, index: int, set_to := true) -> Error {
+	if !bit_array.set(ba, index, set_to) {
+		return Parse_Error {
+			runtime.Allocator_Error.Out_Of_Memory,
+			"Failed to grow a bit array.",
+		}
+	}
+	return nil
 }
 
 // Set a `-flag` argument, Odin-style.
@@ -95,8 +113,7 @@ set_odin_flag :: proc(model: ^$T, parser: ^Parser, name: string) -> (error: Erro
 		}
 	}
 
-	register_field(parser, field, index)
-	return
+	return register_field(parser, field, index)
 }
 
 // Set a `-flag` argument, UNIX-style.
@@ -132,7 +149,7 @@ set_unix_flag :: proc(model: ^$T, parser: ^Parser, name: string) -> (future_args
 		future_args = 1
 	}
 
-	register_field(parser, field, index)
+	error = register_field(parser, field, index)
 	return
 }
 
@@ -159,7 +176,13 @@ set_option :: proc(model: ^$T, parser: ^Parser, name, option: string) -> (error:
 
 	ptr := cast(rawptr)(cast(uintptr)model + field.offset)
 	args_tag := reflect.struct_tag_get(field.tag, TAG_ARGS)
-	error = parse_and_set_pointer_by_type(ptr, option, field.type, args_tag)
+	old_value: rawptr
+	if owns_value(field.type) {
+		reserve_owned_value(parser) or_return
+		old_value = (^rawptr)(ptr)^
+	}
+	owned: bool
+	error = parse_and_set_pointer_by_type(ptr, option, field.type, args_tag, &owned)
 	#partial switch &specific_error in error {
 	case Parse_Error:
 		specific_error.message = fmt.tprintf("Unable to set `%s` of type %v to `%s`.%s%s",
@@ -169,7 +192,10 @@ set_option :: proc(model: ^$T, parser: ^Parser, name, option: string) -> (error:
 			" " if len(specific_error.message) > 0 else "",
 			specific_error.message)
 	case nil:
-		register_field(parser, field, index)
+		if owns_value(field.type) {
+			replace_owned_value(parser, field.type, old_value, (^rawptr)(ptr)^, owned)
+		}
+		error = register_field(parser, field, index)
 	}
 
 	return
@@ -188,7 +214,14 @@ set_key_value :: proc(model: ^$T, parser: ^Parser, name, key, value: string) -> 
 		if reflect.is_cstring(specific_type_info.key) {
 			// We clone the key here, because it's liable to be a slice of an
 			// Odin string, and we need to put a NUL terminator in it.
-			key_cstr = strings.clone_to_cstring(key)
+			clone_error: runtime.Allocator_Error
+			key_cstr, clone_error = strings.clone_to_cstring(key)
+			if clone_error != nil {
+				return Parse_Error {
+					clone_error,
+					"Failed to allocate map key.",
+				}
+			}
 			key_ptr = &key_cstr
 		}
 		defer if key_cstr != nil {
@@ -196,27 +229,24 @@ set_key_value :: proc(model: ^$T, parser: ^Parser, name, key, value: string) -> 
 		}
 
 		raw_map := (^runtime.Raw_Map)(cast(uintptr)model + field.offset)
+		if raw_map.allocator.procedure == nil {
+			raw_map.allocator = context.allocator
+		}
 
 		hash := specific_type_info.map_info.key_hasher(key_ptr, runtime.map_seed(raw_map^))
 
 		backing_alloc := false
 		elem_backing: []byte
-		value_ptr: rawptr
-
-		if raw_map.allocator.procedure == nil {
-			raw_map.allocator = context.allocator
-		} else {
-			value_ptr = runtime.__dynamic_map_get(raw_map,
-				specific_type_info.map_info,
-				hash,
-				key_ptr,
-			)
-		}
+		value_ptr := runtime.__dynamic_map_get(raw_map,
+			specific_type_info.map_info,
+			hash,
+			key_ptr,
+		)
 
 		if value_ptr == nil {
 			alloc_error: runtime.Allocator_Error = ---
 			elem_backing, alloc_error = mem.alloc_bytes(specific_type_info.value.size, specific_type_info.value.align)
-			if elem_backing == nil {
+			if alloc_error != nil {
 				return Parse_Error {
 					alloc_error,
 					"Failed to allocate element backing for map value.",
@@ -226,9 +256,19 @@ set_key_value :: proc(model: ^$T, parser: ^Parser, name, key, value: string) -> 
 			backing_alloc = true
 			value_ptr = raw_data(elem_backing)
 		}
+		defer if backing_alloc {
+			delete(elem_backing)
+		}
+
+		old_value: rawptr
+		if owns_value(specific_type_info.value) {
+			reserve_owned_value(parser) or_return
+			old_value = (^rawptr)(value_ptr)^
+		}
 
 		args_tag, _ := reflect.struct_tag_lookup(field.tag, TAG_ARGS)
-		error = parse_and_set_pointer_by_type(value_ptr, value, specific_type_info.value, args_tag)
+		owned: bool
+		error = parse_and_set_pointer_by_type(value_ptr, value, specific_type_info.value, args_tag, &owned)
 		#partial switch &specific_error in error {
 		case Parse_Error:
 			specific_error.message = fmt.tprintf("Unable to set `%s` of type %v with key=value: `%s`=`%s`.%s%s",
@@ -239,20 +279,32 @@ set_key_value :: proc(model: ^$T, parser: ^Parser, name, key, value: string) -> 
 				" " if len(specific_error.message) > 0 else "",
 				specific_error.message)
 		}
+		if error != nil {
+			return
+		}
 
 		if backing_alloc {
-			runtime.__dynamic_map_set(raw_map,
+			_, set_error := runtime.__dynamic_map_set(raw_map,
 				specific_type_info.map_info,
 				hash,
 				key_ptr,
 				value_ptr,
 			)
-
-			delete(elem_backing)
+			if set_error != nil {
+				release_value(specific_type_info.value, value_ptr, owned)
+				return Parse_Error {
+					set_error,
+					"Failed to insert map value.",
+				}
+			}
+			key_cstr = nil
 		}
 
-		register_field(parser, field, index)
-		return
+		if owns_value(specific_type_info.value) {
+			replace_owned_value(parser, specific_type_info.value, old_value, (^rawptr)(value_ptr)^, owned)
+		}
+
+		return register_field(parser, field, index)
 	}
 
 	return Parse_Error {

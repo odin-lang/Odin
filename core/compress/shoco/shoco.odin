@@ -86,6 +86,25 @@ validate_model :: proc(model: Shoco_Model) -> (int, compress.Error) {
 		return 0, .Unknown_Compression_Method
 	}
 
+	if model.max_successor_n < 0 || int(model.max_successor_n) >= len(Shoco_Pack{}.offsets) {
+		return 0, .Unknown_Compression_Method
+	}
+
+	for id in model.ids_by_character {
+		if int(id) >= int(model.character_count) {
+			return 0, .Unknown_Compression_Method
+		}
+	}
+
+	for pack in model.packs {
+		if pack.bytes_packed != 1 && pack.bytes_packed != 2 && pack.bytes_packed != 4 {
+			return 0, .Unknown_Compression_Method
+		}
+		if pack.bytes_unpacked < 1 || int(pack.bytes_unpacked) > len(pack.offsets) {
+			return 0, .Unknown_Compression_Method
+		}
+	}
+
 	// Model seems legit.
 	return 0, nil
 }
@@ -106,7 +125,7 @@ decompress_slice_to_output_buffer :: proc(input: []u8, output: []u8, model := DE
 			mark += 1
 		}
 
-		if mark > len(model.packs) {
+		if mark >= len(model.packs) {
 			return out, .Unknown_Compression_Method
 		}
 
@@ -134,16 +153,20 @@ decompress_slice_to_output_buffer :: proc(input: []u8, output: []u8, model := DE
 				return out, .Stream_Too_Short
 			}
 
-			code := intrinsics.unaligned_load((^u32)(&input[inp]))
-			when ODIN_ENDIAN == .Little {
-				code = intrinsics.byte_swap(code)
+			code: u32
+			for i := 0; i < int(pack.bytes_packed); i += 1 {
+				code |= u32(input[inp + i]) << (24 - 8 * uint(i))
 			}
 
 			// Unpack the leading char
 			offset := pack.offsets[0]
 			mask   := pack.masks[0]
 
-			last_chr := model.characters_by_id[(code >> offset) & u32(mask)]
+			char_id := (code >> offset) & u32(mask)
+			if char_id >= u32(len(model.characters_by_id)) {
+				return out, .Unknown_Compression_Method
+			}
+			last_chr := model.characters_by_id[char_id]
 			output[out] = last_chr
 
 			// Unpack the successor chars
@@ -154,6 +177,9 @@ decompress_slice_to_output_buffer :: proc(input: []u8, output: []u8, model := DE
 				index_major := u32(last_chr - model.min_char) * u32(model.successor_count)
 				index_minor := (code >> offset) & u32(mask)
 
+				if index_major + index_minor >= u32(len(model.successors_reversed)) {
+					return out, .Unknown_Compression_Method
+				}
 				last_chr = model.successors_reversed[index_major + index_minor]
 
 				output[out + i] = last_chr
@@ -173,15 +199,20 @@ decompress_slice_to_string :: proc(input: []u8, model := DEFAULT_MODEL, allocato
 	if len(input) == 0 {
 		return "", .Stream_Too_Short
 	}
+	validate_model(model) or_return
 
 	max_output_size := decompress_bound(len(input), model)
 
 	buf: [dynamic]u8
 	resize(&buf, max_output_size) or_return
 
-	length, result := decompress_slice_to_output_buffer(input, buf[:])
+	length, result := decompress_slice_to_output_buffer(input, buf[:], model)
+	if result != nil {
+		delete(buf)
+		return "", result
+	}
 	resize(&buf, length) or_return
-	return string(buf[:]), result
+	return string(buf[:]), nil
 }
 decompress :: proc{decompress_slice_to_output_buffer, decompress_slice_to_string}
 
@@ -192,7 +223,7 @@ compress_string_to_buffer :: proc(input: string, output: []u8, model := DEFAULT_
 
 	validate_model(model) or_return
 
-	indices := make([]i16, model.max_successor_n + 1, allocator)
+	indices := make([]i16, model.max_successor_n + 1, allocator) or_return
 	defer delete(indices, allocator)
 
 	last_resort := false
@@ -240,7 +271,7 @@ compress_string_to_buffer :: proc(input: string, output: []u8, model := DEFAULT_
 					break
 				}
 
-				successor_index := model.successors_by_bigram[last_chr_index * i16(model.character_count) + current_index]
+				successor_index := model.successors_by_bigram[int(last_chr_index) * int(model.character_count) + int(current_index)]
 				if successor_index < 0 {
 					break
 				}
@@ -254,7 +285,7 @@ compress_string_to_buffer :: proc(input: string, output: []u8, model := DEFAULT_
 				continue encode
 			}
 
-			pack_n := find_best_encoding(indices, n_consecutive)
+			pack_n := find_best_encoding(indices, n_consecutive, model)
 			if pack_n >= 0 {
 				if out + int(model.packs[pack_n].bytes_packed) > out_end {
 					return out, .Output_Too_Short
@@ -304,8 +335,12 @@ compress_string :: proc(input: string, model := DEFAULT_MODEL, allocator := cont
 	buf: [dynamic]u8
 	resize(&buf, max_output_size) or_return
 
-	length, result := compress_string_to_buffer(input, buf[:])
+	length, result := compress_string_to_buffer(input, buf[:], model)
+	if result != nil {
+		delete(buf)
+		return nil, result
+	}
 	resize(&buf, length) or_return
-	return buf[:length], result
+	return buf[:length], nil
 }
 compress :: proc{compress_string_to_buffer, compress_string}

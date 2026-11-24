@@ -230,9 +230,16 @@ __tick :: proc(l: ^Event_Loop, timeout: time.Duration) -> General_Error {
 				pool.put(&l.operation_pool, completed)
 			}
 		}
+
+		if pool.num_outstanding(&l.operation_pool) == 0 { return nil }
 	}
 
-	err := _flush_submissions(l, timeout)
+	submit_timeout := timeout
+	if queue.len(l.completed) > 0 {
+		submit_timeout = 0
+	}
+
+	err := _flush_submissions(l, submit_timeout)
 	if err != nil { return General_Error(err) }
 
 	l.now = time.now()
@@ -694,14 +701,16 @@ dial_exec :: proc(op: ^Operation) {
 	if op.dial.socket == {} {
 		if op.dial.endpoint.port == 0 {
 			op.dial.err = .Port_Required
-			queue.push_back(&op.l.completed, op)
+			pok, _ := queue.push_back(&op.l.completed, op)
+			ensure(pok, "completed queue allocation failure")
 			return
 		}
 
 		sock, err := create_socket(net.family_from_endpoint(op.dial.endpoint), .TCP)
 		if err != nil {
 			op.dial.err = err
-			queue.push_back(&op.l.completed, op)
+			pok, _ := queue.push_back(&op.l.completed, op)
+			ensure(pok, "completed queue allocation failure")
 			return
 		}
 
@@ -735,7 +744,8 @@ dial_callback :: proc(op: ^Operation, res: i32) {
 timeout_exec :: proc(op: ^Operation) {
 	assert(op.type == .Timeout)
 	if op.timeout.duration <= 0 {
-		queue.push_back(&op.l.completed, op)
+		pok, _ := queue.push_back(&op.l.completed, op)
+		ensure(pok, "completed queue allocation failure")
 		return
 	}
 
@@ -771,7 +781,11 @@ close_exec :: proc(op: ^Operation) {
 	case Handle:     fd = linux.Fd(closable)
 	case TCP_Socket: fd = linux.Fd(closable)
 	case UDP_Socket: fd = linux.Fd(closable)
-	case:            op.close.err = .Invalid_Argument; return
+	case:
+		op.close.err = .Invalid_Argument
+		pok, _ := queue.push_back(&op.l.completed, op)
+		ensure(pok, "completed queue allocation failure")
+		return
 	}
 
 	enqueue(op, uring.close(
@@ -790,7 +804,8 @@ recv_exec :: proc(op: ^Operation) {
 	assert(op.type == .Recv)
 
 	if op.recv.err != nil {
-		queue.push_back(&op.l.completed, op)
+		pok, _ := queue.push_back(&op.l.completed, op)
+		ensure(pok, "completed queue allocation failure")
 		return
 	}
 
@@ -875,7 +890,8 @@ send_exec :: proc(op: ^Operation) {
 	assert(op.type == .Send)
 
 	if op.send.err != nil {
-		queue.push_back(&op.l.completed, op)
+		pok, _ := queue.push_back(&op.l.completed, op)
+		ensure(pok, "completed queue allocation failure")
 		return
 	}
 
@@ -1120,7 +1136,8 @@ sendfile_exec :: proc(op: ^Operation, splice := true) {
 		err := linux.pipe2(&rw, {.NONBLOCK, .CLOEXEC})
 		if err != nil {
 			op.sendfile.err = FS_Error(err)
-			queue.push_back(&op.l.completed, op)
+			pok, _ := queue.push_back(&op.l.completed, op)
+			ensure(pok, "completed queue allocation failure")
 			return
 		}
 

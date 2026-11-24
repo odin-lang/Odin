@@ -153,7 +153,7 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			break args
 		}
 
-		buf := runtime.make_aligned([]byte, length, 4, temp_allocator)
+		buf := runtime.make_aligned([]byte, length, 4, temp_allocator) or_return
 		if sysctl(raw_data(mib), 3, raw_data(buf), &length, nil, 0) != .OK {
 			if err == nil {
 				err = _get_platform_error()
@@ -183,34 +183,19 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 		buf = buf[size_of(i32):]
 
 		{
-			command_line: [dynamic]byte
-			command_line.allocator = allocator
-
-			argv: [dynamic]string
-			argv.allocator = allocator
-
-			defer if err != nil {
-				for arg in argv { delete(arg, allocator) }
-				delete(argv)
-				delete(command_line)
-			}
+			command_line := make([dynamic]byte, temp_allocator) or_return
+			argv := make([dynamic]string, temp_allocator) or_return
 
 			_, _ = bytes.split_iterator(&buf, {0})
 			buf = bytes.trim_left(buf, {0})
 
 			first_arg := true
 			for arg in bytes.split_iterator(&buf, {0}) {
-				if .Command_Line in selection {
-					if !first_arg {
-						append(&command_line, ' ') or_return
-					}
-					append(&command_line, ..arg) or_return
+				if !first_arg {
+					append(&command_line, ' ') or_return
 				}
-
-				if .Command_Args in selection {
-					sarg := clone_string(string(arg), allocator) or_return
-					append(&argv, sarg) or_return
-				}
+				append(&command_line, ..arg) or_return
+				append(&argv, string(arg)) or_return
 
 				first_arg = false
 				argc -= 1
@@ -220,32 +205,31 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 			}
 
 			if .Command_Line in selection {
-				info.command_line = string(command_line[:])
+				info.command_line = clone_string(string(command_line[:]), allocator) or_return
 				info.fields += {.Command_Line}
 			}
 			if .Command_Args in selection {
-				info.command_args = argv[:]
+				info.command_args = make([]string, len(argv), allocator) or_return
+				for arg, k in argv {
+					info.command_args[k] = clone_string(arg, allocator) or_return
+				}
 				info.fields += {.Command_Args}
 			}
 		}
 
 		if .Environment in selection {
-			environment: [dynamic]string
-			environment.allocator = allocator
-
-			defer if err != nil {
-				for entry in environment { delete(entry, allocator) }
-				delete(environment)
-			}
+			environment := make([dynamic]string, temp_allocator) or_return
 
 			for entry in bytes.split_iterator(&buf, {0}) {
 				if bytes.index_byte(entry, '=') > -1 {
-					sentry := clone_string(string(entry), allocator) or_return
-					append(&environment, sentry) or_return
+					append(&environment, string(entry)) or_return
 				}
 			}
 
-			info.environment = environment[:]
+			info.environment = make([]string, len(environment), allocator) or_return
+			for entry, k in environment {
+				info.environment[k] = clone_string(entry, allocator) or_return
+			}
 			info.fields += {.Environment}
 		}
 	}
@@ -267,7 +251,7 @@ _process_list :: proc(allocator: runtime.Allocator) -> (list: []int, err: Error)
 
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
-	buffer := make([]i32, ret, temp_allocator)
+	buffer := make([]i32, ret, temp_allocator) or_return
 	ret = darwin.proc_listallpids(raw_data(buffer), ret*size_of(i32))
 	if ret < 0 {
 		err = _get_platform_error()

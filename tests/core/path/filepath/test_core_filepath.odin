@@ -138,17 +138,22 @@ test_stem :: proc(t: ^testing.T) {
 test_dir :: proc(t: ^testing.T) {
 	when ODIN_OS == .Windows {
 		@static dirs := [][2]string{
-			{"../bin/css",   "..\\bin"},
-			{"W:/Odin/odin", "W:\\Odin"},
+			{"../bin/css",     "../bin"},
+			{"W:/Odin/odin",   "W:/Odin"},
+			{"W:\\Odin\\odin", "W:\\Odin"},
+			{"W:/odin",        "W:/"},
+			{"",               "."},
 		}
 	} else {
 		@static dirs := [][2]string{
 			{"../bin/css", "../bin"},
 			{"/bin/usr/",  "/bin/usr"},
+			{"/bin",       "/"},
+			{"",           "."},
 		}
 	}
 
 	for d in dirs {
-		testing.expect_value(t, filepath.dir(d[0], context.temp_allocator), d[1])
+		testing.expect_value(t, filepath.dir(d[0]), d[1])
 	}
 }

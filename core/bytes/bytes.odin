@@ -302,14 +302,17 @@ split_after_n :: proc(s, sep: []byte, n: int, allocator := context.allocator, lo
 
 @private
 _split_iterator :: proc(s: ^[]byte, sep: []byte, sep_save: int) -> (res: []byte, ok: bool) {
+	m: int
 	if len(sep) == 0 {
-		res = s[:]
-		ok = true
-		s^ = s[len(s):]
-		return
+		if len(s) == 0 {
+			m = -1
+		} else {
+			_, w := utf8.decode_rune(s^)
+			m = w
+		}
+	} else {
+		m = index(s^, sep)
 	}
-
-	m := index(s^, sep)
 	if m < 0 {
 		// not found
 		res = s[:]
@@ -800,6 +803,7 @@ replace_all :: proc(s, old, new: []byte, allocator := context.allocator, loc := 
 }
 
 // if n < 0, no limit on the number of replacements
+// on allocation failure, `output` is empty and `was_allocation` is `false`
 replace :: proc(s, old, new: []byte, n: int, allocator := context.allocator, loc := #caller_location) -> (output: []byte, was_allocation: bool) {
 	if string(old) == string(new) || n == 0 {
 		was_allocation = false
@@ -816,7 +820,15 @@ replace :: proc(s, old, new: []byte, n: int, allocator := context.allocator, loc
 	}
 
 
-	t := make([]byte, len(s) + byte_count*(len(new) - len(old)), allocator, loc=loc)
+	growth, mul_overflow := intrinsics.overflow_mul(byte_count, len(new) - len(old))
+	size, add_overflow := intrinsics.overflow_add(len(s), growth)
+	if mul_overflow || add_overflow {
+		return
+	}
+	t, err := make([]byte, size, allocator, loc=loc)
+	if err != nil {
+		return
+	}
 	was_allocation = true
 
 	w := 0
@@ -1141,35 +1153,29 @@ split_multi :: proc(s: []byte, substrs: [][]byte, skip_empty := false, allocator
 
 
 split_multi_iterator :: proc(s: ^[]byte, substrs: [][]byte, skip_empty := false) -> ([]byte, bool) #no_bounds_check {
-	if s == nil || s^ == nil || len(substrs) <= 0 {
+	if s == nil || len(s) == 0 || len(substrs) <= 0 {
 		return nil, false
 	}
 
-	sublen := len(substrs[0])
-
-	for substr in substrs[1:] {
-		sublen = min(sublen, len(substr))
-	}
-
-	shared := len(s) - sublen
-
-	if shared <= 0 {
-		return nil, false
+	for substr in substrs {
+		if len(substr) == 0 {
+			return nil, false
+		}
 	}
 
 	// index, last
 	i, l := 0, 0
 
-	loop: for i <= shared {
+	loop: for i < len(s) {
 		for substr in substrs {
-			if string(s[i:i+sublen]) == string(substr) {
+			if has_prefix(s[i:], substr) {
 				if !skip_empty || i - l > 0 {
 					res := s[l:i]
-					s^ = s[i:]
+					s^ = s[i+len(substr):]
 					return res, true
 				}
 
-				i += sublen
+				i += len(substr)
 				l  = i
 
 				continue loop
@@ -1311,7 +1317,11 @@ centre_justify :: proc(str: []byte, length: int, pad: []byte, allocator := conte
 	remains := length-n
 	pad_len := rune_count(pad)
 
-	b := make([dynamic]byte, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator, loc) or_return
+	capacity, ok := _justify_capacity(len(str), remains, pad_len, len(pad))
+	if !ok {
+		return nil, .Out_Of_Memory
+	}
+	b := make([dynamic]byte, 0, capacity, allocator, loc) or_return
 	defer if err != nil {
 		delete(b)
 	}
@@ -1333,7 +1343,11 @@ left_justify :: proc(str: []byte, length: int, pad: []byte, allocator := context
 	remains := length-n
 	pad_len := rune_count(pad)
 
-	b := make([dynamic]byte, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator, loc) or_return
+	capacity, ok := _justify_capacity(len(str), remains, pad_len, len(pad))
+	if !ok {
+		return nil, .Out_Of_Memory
+	}
+	b := make([dynamic]byte, 0, capacity, allocator, loc) or_return
 	defer if err != nil {
 		delete(b)
 	}
@@ -1354,7 +1368,11 @@ right_justify :: proc(str: []byte, length: int, pad: []byte, allocator := contex
 	remains := length-n
 	pad_len := rune_count(pad)
 
-	b := make([dynamic]byte, 0, len(str) + (remains/pad_len + 1)*len(pad), allocator, loc) or_return
+	capacity, ok := _justify_capacity(len(str), remains, pad_len, len(pad))
+	if !ok {
+		return nil, .Out_Of_Memory
+	}
+	b := make([dynamic]byte, 0, capacity, allocator, loc) or_return
 	defer if err != nil {
 		delete(b)
 	}
@@ -1367,6 +1385,14 @@ right_justify :: proc(str: []byte, length: int, pad: []byte, allocator := contex
 
 
 
+
+@(private, require_results)
+_justify_capacity :: proc "contextless" (str_len, remains, pad_len, pad_size: int) -> (int, bool) {
+	repeats, repeats_overflow := intrinsics.overflow_add(remains/pad_len, 1)
+	pad_bytes, mul_overflow := intrinsics.overflow_mul(repeats, pad_size)
+	capacity, add_overflow := intrinsics.overflow_add(str_len, pad_bytes)
+	return capacity, !repeats_overflow && !mul_overflow && !add_overflow
+}
 
 @private
 write_pad_string :: proc(b: ^[dynamic]byte, pad: []byte, pad_len, remains: int, loc := #caller_location) -> (err: runtime.Allocator_Error) {

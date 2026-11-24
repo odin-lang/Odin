@@ -1,5 +1,6 @@
 package x509
 
+import "base:runtime"
 import "core:bytes"
 import "core:encoding/asn1"
 import "core:strings"
@@ -179,20 +180,21 @@ _dn_type_from_oid :: proc(oid: []byte) -> (type: DN_Attribute_Type, is_known_oid
 // leading '#' or space and a trailing space are escaped, as are the characters
 // " + , ; < > \ and the NUL byte.
 @(private)
-_dn_escape :: proc(b: ^strings.Builder, s: string) {
+_dn_escape :: proc(b: ^strings.Builder, s: string) -> (err: runtime.Allocator_Error) {
 	for i in 0 ..< len(s) {
 		c := s[i]
 		lead := i == 0 && (c == ' ' || c == '#')
 		trail := i == len(s) - 1 && c == ' '
 		switch c {
 		case '"', '+', ',', ';', '<', '>', '\\', 0x00:
-			strings.write_byte(b, '\\')
-			strings.write_byte(b, c)
+			strings.write_byte(b, '\\') or_return
+			strings.write_byte(b, c) or_return
 		case:
 			if lead || trail {
-				strings.write_byte(b, '\\')
+				strings.write_byte(b, '\\') or_return
 			}
-			strings.write_byte(b, c)
+			strings.write_byte(b, c) or_return
 		}
 	}
+	return nil
 }

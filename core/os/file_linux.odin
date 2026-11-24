@@ -97,7 +97,11 @@ _open :: proc(name: string, flags: File_Flags, perm: Permissions) -> (f: ^File, 
 		return nil, _get_platform_error(errno)
 	}
 
-	return _new_file(uintptr(fd), name, file_allocator())
+	f, err = _new_file(uintptr(fd), name, file_allocator())
+	if err != nil {
+		linux.close(fd)
+	}
+	return
 }
 
 _new_file :: proc(fd: uintptr, _: string, allocator: runtime.Allocator) -> (f: ^File, err: Error) {
@@ -140,7 +144,12 @@ _open_buffered :: proc(name: string, buffer_size: uint, flags := File_Flags{.Rea
 	f, err = _open(name, flags, perm)
 	if f != nil && err == nil && f.stream.procedure == _file_stream_proc {
 		impl := (^File_Impl)(f.impl)
-		impl.buffer = make([]byte, buffer_size, file_allocator())
+		buffer, buffer_err := make([]byte, buffer_size, file_allocator())
+		if buffer_err != nil {
+			close(f)
+			return nil, buffer_err
+		}
+		impl.buffer = buffer
 		f.stream.procedure = _file_stream_buffered_proc
 	}
 	return
@@ -380,9 +389,9 @@ _symlink :: proc(old_name, new_name: string) -> Error {
 	return _get_platform_error(linux.symlink(old_name_cstr, new_name_cstr))
 }
 
-_read_link_cstr :: proc(name_cstr: cstring, allocator: runtime.Allocator) -> (string, Error) {
+_read_link_cstr :: proc(name_cstr: cstring, allocator: runtime.Allocator) -> (s: string, err: Error) {
 	bufsz : uint = 256
-	buf := make([]byte, bufsz, allocator)
+	buf := make([]byte, bufsz, allocator) or_return
 	for {
 		sz, errno := linux.readlink(name_cstr, buf[:])
 		if errno != .NONE {
@@ -391,7 +400,7 @@ _read_link_cstr :: proc(name_cstr: cstring, allocator: runtime.Allocator) -> (st
 		} else if sz == int(bufsz) {
 			bufsz *= 2
 			delete(buf, allocator)
-			buf = make([]byte, bufsz, allocator)
+			buf = make([]byte, bufsz, allocator) or_return
 		} else {
 			return string(buf[:sz]), nil
 		}
@@ -485,7 +494,10 @@ _exists :: proc(name: string) -> bool {
 			return err == nil
 		}
 	}
-	name_cstr, _ := clone_to_cstring(name, temp_allocator)
+	name_cstr, name_err := clone_to_cstring(name, temp_allocator)
+	if name_err != nil {
+		return false
+	}
 	return linux.access(name_cstr, linux.F_OK) == .NONE
 }
 
@@ -506,12 +518,18 @@ _read_entire_pseudo_file_cstring :: proc(name: cstring, allocator: runtime.Alloc
 	defer linux.close(fd)
 
 	BUF_SIZE_STEP :: 128
-	contents := make([dynamic]u8, 0, BUF_SIZE_STEP, allocator)
+	contents, make_err := make([dynamic]u8, 0, BUF_SIZE_STEP, allocator)
+	if make_err != nil {
+		return nil, make_err
+	}
 
 	n: int
 	i: int
 	for {
-		resize(&contents, i + BUF_SIZE_STEP)
+		if resize_err := resize(&contents, i + BUF_SIZE_STEP); resize_err != nil {
+			delete(contents)
+			return nil, resize_err
+		}
 		n, errno = linux.read(fd, contents[i:i+BUF_SIZE_STEP])
 		if errno != .NONE {
 			delete(contents)

@@ -51,11 +51,13 @@ set_env :: proc(key, value: string) -> Error {
 }
 
 // unset_env unsets a single environment variable
-// Returns true on success, false on failure
+// Returns true on success, false on failure, including a failed allocation
 unset_env :: proc(key: string) -> bool {
 	return _unset_env(key)
 }
 
+// clear_env unsets every environment variable
+// A failed allocation leaves some or all of them set
 clear_env :: proc() {
 	_clear_env()
 }

@@ -40,6 +40,9 @@ writer_init :: proc(pw: ^Writer, w: io.Writer, props: Properties, end_marker := 
 	pw.options    = options
 	pw.end_marker = end_marker
 	defer pw.err = err
+	defer if err != nil {
+		writer_destroy(pw)
+	}
 
 	if options.max_output_size < 0 || options.max_memory < 0 || options.chunk_size < 0 || options.progress_interval < 0 {
 		return General_Error.Incompatible_Options

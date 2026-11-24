@@ -4,7 +4,6 @@ package os
 import "base:runtime"
 
 import "core:io"
-import "core:mem"
 import "core:sync"
 import "core:time"
 import "core:unicode/utf16"
@@ -162,7 +161,11 @@ _open :: proc(name: string, flags: File_Flags, perm: Permissions) -> (f: ^File, 
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	wide := win32_utf8_to_utf16(name, temp_allocator) or_return
 	handle := _open_internal(name, wide, flags, perm) or_return
-	return _new_file_wide(handle, name, wide, file_allocator())
+	f, err = _new_file_wide(handle, name, wide, file_allocator())
+	if err != nil {
+		win32.CloseHandle(win32.HANDLE(handle))
+	}
+	return
 }
 
 _new_file :: proc(handle: uintptr, name: string, allocator: runtime.Allocator) -> (f: ^File, err: Error) {
@@ -180,6 +183,7 @@ _new_file_wide :: proc(handle: uintptr, name: string, wide: []u16, allocator: ru
 	}
 	impl := new(File_Impl, allocator) or_return
 	defer if err != nil {
+		delete(impl.name, allocator)
 		free(impl, allocator)
 	}
 
@@ -220,17 +224,25 @@ _open_buffered :: proc(name: string, buffer_size: uint, flags := File_Flags{.Rea
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
 	wide := win32_utf8_to_utf16(name, temp_allocator) or_return
 	handle := _open_internal(name, wide, flags, perm) or_return
-	return _new_file_buffered(handle, name, wide, buffer_size)
+	f, err = _new_file_buffered(handle, name, wide, buffer_size)
+	if err != nil {
+		win32.CloseHandle(win32.HANDLE(handle))
+	}
+	return
 }
 
 _new_file_buffered :: proc(handle: uintptr, name: string, wide: []u16, buffer_size: uint) -> (f: ^File, err: Error) {
-	f, err = _new_file_wide(handle, name, wide, file_allocator())
-	if f != nil && err == nil {
-		impl := (^File_Impl)(f.impl)
-		impl.r_buf = make([]byte, buffer_size, file_allocator())
-		impl.w_buf = make([]byte, buffer_size, file_allocator())
+	file := _new_file_wide(handle, name, wide, file_allocator()) or_return
+	if file == nil {
+		return
 	}
-	return
+	impl := (^File_Impl)(file.impl)
+	defer if err != nil {
+		_destroy(impl)
+	}
+	impl.r_buf = make([]byte, buffer_size, file_allocator()) or_return
+	impl.w_buf = make([]byte, buffer_size, file_allocator()) or_return
+	return file, nil
 }
 
 _clone :: proc(f: ^File) -> (clone: ^File, err: Error) {
@@ -711,10 +723,13 @@ _normalize_link_path :: proc(p: []u16, allocator: runtime.Allocator) -> (str: st
 
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
-	buf := make([]u16, n+1, temp_allocator)
+	buf := make([]u16, n+1, temp_allocator) or_return
 	n = win32.GetFinalPathNameByHandleW(handle, cstring16(raw_data(buf)), u32(len(buf)), win32.VOLUME_NAME_DOS)
 	if n == 0 {
 		return "", _get_platform_error()
+	}
+	if int(n) >= len(buf) {
+		return "", .Buffer_Full
 	}
 
 	ws = buf[:n]
@@ -732,6 +747,17 @@ _normalize_link_path :: proc(p: []u16, allocator: runtime.Allocator) -> (str: st
 _read_link :: proc(name: string, allocator: runtime.Allocator) -> (s: string, err: Error) {
 	MAXIMUM_REPARSE_DATA_BUFFER_SIZE :: 16 * 1024
 
+	substitute_name :: proc(buf: []byte, size, path_buffer: int, offset, length: u16) -> (p: []u16, err: Error) {
+		start := path_buffer + int(offset)
+		end   := start + int(length)
+		if path_buffer > size || offset % 2 != 0 || length % 2 != 0 || end > size || end + 2 > len(buf) {
+			return nil, .Invalid_File
+		}
+		pb := ([^]u16)(&buf[start])
+		pb[length / 2] = 0
+		return pb[:length / 2], nil
+	}
+
 	@thread_local
 	rdb_buf: [MAXIMUM_REPARSE_DATA_BUFFER_SIZE]byte
 
@@ -742,20 +768,21 @@ _read_link :: proc(name: string, allocator: runtime.Allocator) -> (s: string, er
 	defer win32.CloseHandle(handle)
 
 	bytes_returned: u32
-	if !win32.DeviceIoControl(handle, win32.FSCTL_GET_REPARSE_POINT, nil, 0, &rdb_buf[0], len(rdb_buf)-1, &bytes_returned, nil) {
+	if !win32.DeviceIoControl(handle, win32.FSCTL_GET_REPARSE_POINT, nil, 0, &rdb_buf[0], len(rdb_buf)-2, &bytes_returned, nil) {
 		err = _get_platform_error()
 		return
 	}
-	mem.zero_slice(rdb_buf[:min(bytes_returned+1, len(rdb_buf))])
-
+	size := int(bytes_returned)
+	if size < size_of(win32.REPARSE_DATA_BUFFER) {
+		return "", .Invalid_File
+	}
 
 	rdb := (^win32.REPARSE_DATA_BUFFER)(&rdb_buf[0])
 	switch rdb.ReparseTag {
 	case win32.IO_REPARSE_TAG_SYMLINK:
 		rb := (^win32.SYMBOLIC_LINK_REPARSE_BUFFER)(&rdb.rest)
-		pb := ([^]u16)(&rb.PathBuffer)
-		pb[rb.SubstituteNameOffset+rb.SubstituteNameLength] = 0
-		p := pb[rb.SubstituteNameOffset:][:rb.SubstituteNameLength]
+		path_buffer := int(offset_of(win32.REPARSE_DATA_BUFFER, rest) + offset_of(win32.SYMBOLIC_LINK_REPARSE_BUFFER, PathBuffer))
+		p := substitute_name(rdb_buf[:], size, path_buffer, rb.SubstituteNameOffset, rb.SubstituteNameLength) or_return
 		if rb.Flags & win32.SYMLINK_FLAG_RELATIVE != 0 {
 			return win32_utf16_to_utf8(p, allocator)
 		}
@@ -763,9 +790,8 @@ _read_link :: proc(name: string, allocator: runtime.Allocator) -> (s: string, er
 
 	case win32.IO_REPARSE_TAG_MOUNT_POINT:
 		rb := (^win32.MOUNT_POINT_REPARSE_BUFFER)(&rdb.rest)
-		pb := ([^]u16)(&rb.PathBuffer)
-		pb[rb.SubstituteNameOffset+rb.SubstituteNameLength] = 0
-		p := pb[rb.SubstituteNameOffset:][:rb.SubstituteNameLength]
+		path_buffer := int(offset_of(win32.REPARSE_DATA_BUFFER, rest) + offset_of(win32.MOUNT_POINT_REPARSE_BUFFER, PathBuffer))
+		p := substitute_name(rdb_buf[:], size, path_buffer, rb.SubstituteNameOffset, rb.SubstituteNameLength) or_return
 		return _normalize_link_path(p, allocator)
 	}
 	// Path wasn't a symlink/junction but another reparse point kind
@@ -862,7 +888,10 @@ _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 
 _exists :: proc(path: string) -> bool {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
-	wpath, _ := _fix_long_path(path, temp_allocator)
+	wpath, wpath_err := _fix_long_path(path, temp_allocator)
+	if wpath_err != nil {
+		return false
+	}
 	attribs := win32.GetFileAttributesW(wpath)
 	return attribs != win32.INVALID_FILE_ATTRIBUTES
 }

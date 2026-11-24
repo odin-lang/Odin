@@ -61,11 +61,18 @@ decode_ops :: proc(
 		op, next, dok := decode_one(data, relocs, byte_count, allocator)
 		if !dok {
 			append(errors, Error{location = byte_count, code = .INVALID_OPCODE})
-			append(&acc, operation(.INVALID))
+			if _, err := append(&acc, operation(.INVALID)); err != nil {
+				append(errors, Error{location = byte_count, code = .MALFORMED_MODULE})
+				break
+			}
 			byte_count += 1
 			continue
 		}
-		append(&acc, op)
+		if _, err := append(&acc, op); err != nil {
+			delete(op.operands, allocator)
+			append(errors, Error{location = byte_count, code = .MALFORMED_MODULE})
+			break
+		}
 		byte_count = next
 	}
 
@@ -113,6 +120,10 @@ decode_one :: proc(
 	operands := make([dynamic]Operand, allocator)
 	defer if !ok {
 		delete(operands)
+	}
+	if reserve(&operands, imm_operand_count(form)) != nil {
+		next = pc
+		return
 	}
 
 	for k, ki in form.imm {
@@ -187,7 +198,10 @@ decode_one :: proc(
 				return
 			}
 			default_index := len(operands)
-			reserve(&operands, int(count) + 1)
+			if reserve(&operands, len(operands) + int(count) + 1) != nil {
+				next = pc
+				return
+			}
 			append(&operands, Operand{}) // dummy for default
 			for _ in 0..<count {
 				t := read_uleb(data, &off, 32) or_return
@@ -230,7 +244,10 @@ decode_one :: proc(
 				next = pc
 				return
 			}
-			reserve(&operands, int(count))
+			if reserve(&operands, len(operands) + int(count)) != nil {
+				next = pc
+				return
+			}
 			for _ in 0..<count {
 				t := Value_Type(data[off])
 				if !value_type_is_known(t) {
@@ -269,6 +286,20 @@ idx_kind_for :: #force_inline proc "contextless" (m: Opcode, which: int) -> Inde
 	case .TABLE_GROW, .TABLE_SIZE, .TABLE_FILL:              return .TABLE
 	}
 	return .NONE
+}
+
+@(private="file", require_results)
+imm_operand_count :: proc "contextless" (form: ^Encoding) -> int {
+	n := 0
+	for k in form.imm {
+		#partial switch k {
+		case .BLOCKTYPE, .I32, .I64, .F32, .F64, .IDX, .MEMARG, .REFTYPE, .LANE:
+			n += 1
+		case .LANES16:
+			n += 2
+		}
+	}
+	return n
 }
 
 @(private="file", require_results)

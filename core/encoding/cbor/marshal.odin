@@ -47,9 +47,8 @@ marshal :: marshal_into
 // See docs on the `marshal_into` proc group for more info.
 marshal_into_bytes :: proc(v: any, flags := ENCODE_SMALL, allocator := context.allocator, temp_allocator := context.temp_allocator, loc := #caller_location) -> (bytes: []byte, err: Marshal_Error) {
 	b, alloc_err := strings.builder_make(allocator, loc=loc)
- 	// The builder as a stream also returns .EOF if it ran out of memory so this is consistent.
 	if alloc_err != nil {
-		return nil, .EOF
+		return nil, alloc_err
 	}
 
 	defer if err != nil { strings.builder_destroy(&b) }
@@ -64,7 +63,7 @@ marshal_into_bytes :: proc(v: any, flags := ENCODE_SMALL, allocator := context.a
 // Marshals the given value into a CBOR byte stream written to the given builder.
 // See docs on the `marshal_into` proc group for more info.
 marshal_into_builder :: proc(b: ^strings.Builder, v: any, flags := ENCODE_SMALL, temp_allocator := context.temp_allocator) -> Marshal_Error {
-	return marshal_into_writer(strings.to_writer(b), v, flags, temp_allocator)
+	return _builder_err(marshal_into_writer(strings.to_writer(b), v, flags, temp_allocator))
 }
 
 // Marshals the given value into a CBOR byte stream written to the given writer.
@@ -469,23 +468,33 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 			case:
 				entries := make([dynamic]Encoded_Entry, 0, map_cap, e.temp_allocator) or_return
 				defer delete(entries)
+				defer for entry in entries {
+					delete(entry.key)
+				}
 
 				for bucket_index in 0..<map_cap {
 					runtime.map_hash_is_valid(hs[bucket_index]) or_continue
 
 					key := rawptr(runtime.map_cell_index_dynamic(ks, info.map_info.ks, bucket_index))
 					key_builder := strings.builder_make(0, 8, e.temp_allocator) or_return
-					marshal_into(Encoder{e.flags, strings.to_stream(&key_builder), e.temp_allocator}, any{ key, info.key.id }) or_return
-					append(&entries, Encoded_Entry{ key_builder.buf, bucket_index }) or_return
+					if kerr := marshal_into(Encoder{e.flags, strings.to_stream(&key_builder), e.temp_allocator}, any{ key, info.key.id }); kerr != nil {
+						strings.builder_destroy(&key_builder)
+						return _builder_err(kerr)
+					}
+					if _, aerr := append(&entries, Encoded_Entry{ key_builder.buf, bucket_index }); aerr != nil {
+						strings.builder_destroy(&key_builder)
+						return aerr
+					}
 				}
 
 				slice.sort_by_cmp(entries[:], proc(a, b: Encoded_Entry) -> slice.Ordering {
 					return slice.Ordering(bytes.compare(a.key[:], b.key[:]))
 				})
 
-				for entry in entries {
+				for &entry in entries {
 					io.write_full(e.writer, entry.key[:]) or_return
 					delete(entry.key)
+					entry.key = nil
 
 					value := rawptr(runtime.map_cell_index_dynamic(vs, info.map_info.vs, entry.val_idx))
 					marshal_into(e, any{ value, info.value.id }) or_return
@@ -546,6 +555,9 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 			}
 			entries := make([dynamic]Name, 0, n, e.temp_allocator) or_return
 			defer delete(entries)
+			defer for entry in entries {
+				delete(entry.name, e.temp_allocator)
+			}
 
 			for _, i in info.names[:info.field_count] {
 				fname := field_name(info^, i)
@@ -554,8 +566,14 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 				}
 
 				key_builder := strings.builder_make(e.temp_allocator) or_return
-				err_conv(_encode_text(Encoder{e.flags, strings.to_stream(&key_builder), e.temp_allocator}, fname)) or_return
-				append(&entries, Name{key_builder.buf[:], i}) or_return
+				if kerr := _encode_text(Encoder{e.flags, strings.to_stream(&key_builder), e.temp_allocator}, fname); kerr != nil {
+					strings.builder_destroy(&key_builder)
+					return err_conv(_builder_err(kerr))
+				}
+				if _, aerr := append(&entries, Name{key_builder.buf[:], i}); aerr != nil {
+					strings.builder_destroy(&key_builder)
+					return aerr
+				}
 			}
 
 			// Sort lexicographic on the bytes of the key.
@@ -608,7 +626,12 @@ _marshal_into_encoder :: proc(e: Encoder, v: any, ti: ^runtime.Type_Info) -> (er
 		case:
 			builder := strings.builder_make(e.temp_allocator) or_return
 			defer strings.builder_destroy(&builder)
-			reflect.write_type(&builder, vti)
+			if _, werr := reflect.write_type_writer(strings.to_writer(&builder), vti); werr != nil {
+				if werr == .Short_Write {
+					return mem.Allocator_Error.Out_Of_Memory
+				}
+				return werr
+			}
 			err_conv(_encode_text(e, strings.to_string(builder))) or_return
 		}
 

@@ -333,6 +333,8 @@ consume_comment_group :: proc(p: ^Parser, n: int) -> (comments: ^ast.Comment_Gro
 		comments = ast.new(ast.Comment_Group, list[0].pos, end_pos(list[len(list)-1]))
 		comments.list = list[:]
 		append(&p.file.comments, comments)
+	} else {
+		delete(list)
 	}
 
 	return
@@ -1039,17 +1041,20 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	if is_range {
 		assign_stmt := cond.derived.(^ast.Assign_Stmt)
 		vals := assign_stmt.lhs[:]
+		in_pos := assign_stmt.op.pos
 
 		rhs: ^ast.Expr
 		if len(assign_stmt.rhs) > 0 {
 			rhs = assign_stmt.rhs[0]
 		}
+		delete(assign_stmt.rhs)
+		free(assign_stmt)
 
 		range_stmt := ast.new(ast.Range_Stmt, tok.pos, body)
 		range_stmt.for_pos = tok.pos
 		range_stmt.init = init
 		range_stmt.vals = vals
-		range_stmt.in_pos = assign_stmt.op.pos
+		range_stmt.in_pos = in_pos
 		range_stmt.expr = rhs
 		range_stmt.body = body
 		return range_stmt
@@ -2304,7 +2309,7 @@ parse_proc_tags :: proc(p: ^Parser) -> (tags: ast.Proc_Tags) {
 	}
 
 	if .Bounds_Check in tags && .No_Bounds_Check in tags {
-		p.err(p.curr_tok.pos, "#bounds_check and #no_bounds_check applied to the same procedure type")
+		error(p, p.curr_tok.pos, "#bounds_check and #no_bounds_check applied to the same procedure type")
 	}
 
 	return
@@ -4087,6 +4092,7 @@ parse_asm_operand :: proc(p: ^Parser, allow_memory_operand: bool) -> ^ast.Expr {
 		label := ast.new(ast.Asm_Label, token.pos, name)
 		label.token = token
 		label.name  = name.name
+		free(name)
 		return label
 
 	case .Ident:
@@ -4332,6 +4338,7 @@ parse_asm_instruction :: proc(p: ^Parser) -> ^ast.Stmt {
 		label := ast.new(ast.Asm_Label, token.pos, name)
 		label.token = token
 		label.name  = name.name
+		free(name)
 
 		label_decl := ast.new(ast.Asm_Label_Decl, token.pos, end_pos(colon))
 		label_decl.label = label

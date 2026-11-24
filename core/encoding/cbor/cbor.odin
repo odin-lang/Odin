@@ -273,6 +273,14 @@ decode_to_unmarshal_err_p2 :: #force_inline proc(v: $T, v2: $T2, err: Decode_Err
 	return v, v2, err_conv(err)
 }
 
+@(private)
+_builder_err :: proc(err: $E) -> E {
+	if err == io.Error.Short_Write {
+		return mem.Allocator_Error.Out_Of_Memory
+	}
+	return err
+}
+
 // Recursively frees all memory allocated when decoding the passed value.
 destroy :: proc(val: Value, allocator := context.allocator) {
 	context.allocator = allocator
@@ -325,8 +333,10 @@ to_diagnostic_format_string :: proc(val: Value, padding := 0, allocator := conte
 	b := strings.builder_make(allocator, loc)
 	w := strings.to_stream(&b)
 	err := to_diagnostic_format_writer(w, val, padding)
-	if err == .EOF {
-		// The string builder stream only returns .EOF, and only if it can't write (out of memory).
+	if err == .Short_Write {
+		// The string builder stream only returns .Short_Write, and only if it can't write
+		// (out of memory).
+		strings.builder_destroy(&b)
 		return "", .Out_Of_Memory
 	}
 	assert(err == nil)
@@ -492,22 +502,31 @@ from_json :: proc(val: json.Value, allocator := context.allocator) -> (Value, me
 			container := new(Text) or_return
 
 			// We need the string to have a nil byte at the end so we clone to cstring.
-			container^ = string(strings.clone_to_cstring(v) or_return)
+			text, text_err := strings.clone_to_cstring(v)
+			if text_err != nil {
+				free(container)
+				return nil, text_err
+			}
+			container^ = string(text)
 			return container, nil
 		case json.Array:
-			arr  := new(Array) or_return
-			arr^  = make([]Value, len(v)) or_return
+			arr := new(Array) or_return
+			defer if err != nil { destroy(arr) }
+			arr^ = make([]Value, len(v)) or_return
 			for _, i in arr {
 				arr[i] = internal(v[i]) or_return
 			}
 			return arr, nil
 		case json.Object:
-			m  := new(Map) or_return
-			dm := make([dynamic]Map_Entry, 0, len(v)) or_return
+			m := new(Map) or_return
+			defer if err != nil { destroy(m) }
+			m^ = make([]Map_Entry, len(v)) or_return
+			i := 0
 			for mkey, mval in v {
-				append(&dm, Map_Entry{from_json(mkey) or_return, from_json(mval) or_return})
+				m[i].key   = internal(mkey) or_return
+				m[i].value = internal(mval) or_return
+				i += 1
 			}
-			m^ = dm[:]
 			return m, nil
 		}
 		return nil, nil
@@ -527,6 +546,28 @@ Everything is copied to the given allocator, the passed in CBOR value can be `de
 If a CBOR map with non-string keys is encountered it is turned into an array of tuples.
 */
 to_json :: proc(val: Value, allocator := context.allocator) -> (json.Value, mem.Allocator_Error) #optional_allocator_error {
+	insert :: proc(obj: ^json.Object, key: string, elem: json.Value) -> mem.Allocator_Error {
+		key_ptr, value_ptr, just_inserted, err := map_entry(obj, key)
+		if err != nil {
+			json.destroy_value(elem)
+			return err
+		}
+		if !just_inserted {
+			json.destroy_value(value_ptr^)
+			value_ptr^ = elem
+			return nil
+		}
+		owned, clone_err := strings.clone(key)
+		if clone_err != nil {
+			delete_key(obj, key)
+			json.destroy_value(elem)
+			return clone_err
+		}
+		key_ptr^   = owned
+		value_ptr^ = elem
+		return nil
+	}
+
 	internal :: proc(val: Value) -> (ret: json.Value, err: mem.Allocator_Error) {
 		switch v in val {
 		case Simple: return json.Integer(v), nil
@@ -567,6 +608,7 @@ to_json :: proc(val: Value, allocator := context.allocator) -> (json.Value, mem.
 
 			if keys_all_strings(v) {
 				obj := make(json.Object, len(v)) or_return
+				defer if err != nil { json.destroy_value(obj) }
 				for entry in v {
 					k: string
 					#partial switch kv in entry.key {
@@ -575,33 +617,52 @@ to_json :: proc(val: Value, allocator := context.allocator) -> (json.Value, mem.
 					case:        unreachable()
 					}
 
-					v := internal(entry.value) or_return
-					obj[k] = v
+					insert(&obj, k, internal(entry.value) or_return) or_return
 				}
 				return obj, nil
 			} else {
 				// Resort to an array of tuples if keys aren't all strings.
 				arr := make(json.Array, 0, len(v)) or_return
+				defer if err != nil { json.destroy_value(arr) }
 				for entry in v {
 					entry_arr := make(json.Array, 0, 2) or_return
-					append(&entry_arr, internal(entry.key) or_return) or_return
-					append(&entry_arr, internal(entry.value) or_return) or_return
-					append(&arr, entry_arr) or_return
+					key, key_err := internal(entry.key)
+					if key_err != nil {
+						json.destroy_value(entry_arr)
+						return nil, key_err
+					}
+					append(&entry_arr, key)
+					value, value_err := internal(entry.value)
+					if value_err != nil {
+						json.destroy_value(entry_arr)
+						return nil, value_err
+					}
+					append(&entry_arr, value)
+					if _, append_err := append(&arr, entry_arr); append_err != nil {
+						json.destroy_value(entry_arr)
+						return nil, append_err
+					}
 				}
 				return arr, nil
 			}
 
 		case ^Array:
 			arr := make(json.Array, 0, len(v)) or_return
+			defer if err != nil { json.destroy_value(arr) }
 			for entry in v {
-				append(&arr, internal(entry) or_return) or_return
+				elem := internal(entry) or_return
+				if _, append_err := append(&arr, elem); append_err != nil {
+					json.destroy_value(elem)
+					return nil, append_err
+				}
 			}
 			return arr, nil
 
 		case ^Tag:
 			obj := make(json.Object, 2) or_return
-			obj[strings.clone("number") or_return] = internal(v.number) or_return
-			obj[strings.clone("value") or_return]  = internal(v.value) or_return
+			defer if err != nil { json.destroy_value(obj) }
+			insert(&obj, "number", internal(v.number) or_return) or_return
+			insert(&obj, "value", internal(v.value) or_return) or_return
 			return obj, nil
 
 		case: return json.Null{}, nil

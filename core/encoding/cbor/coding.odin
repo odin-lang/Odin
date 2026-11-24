@@ -125,6 +125,7 @@ decode_from_decoder :: proc(d: Decoder, allocator := context.allocator, loc := #
 	v, err = _decode_from_decoder(d, {}, allocator, loc)
 	// Normal EOF does not exist here, we try to read the exact amount that is said to be provided.
 	if err == .EOF { err = .Unexpected_EOF }
+	if err != nil { v = nil }
 	return
 }
 
@@ -206,6 +207,7 @@ encode :: encode_into
 // See the docs on the proc group `encode_into` for more info.
 encode_into_bytes :: proc(v: Value, flags := ENCODE_SMALL, allocator := context.allocator, temp_allocator := context.temp_allocator, loc := #caller_location) -> (data: []byte, err: Encode_Error) {
 	b := strings.builder_make(allocator, loc) or_return
+	defer if err != nil { strings.builder_destroy(&b) }
 	encode_into_builder(&b, v, flags, temp_allocator) or_return
 	return b.buf[:], nil
 }
@@ -213,7 +215,7 @@ encode_into_bytes :: proc(v: Value, flags := ENCODE_SMALL, allocator := context.
 // Encodes the CBOR value into binary CBOR written to the given builder.
 // See the docs on the proc group `encode_into` for more info.
 encode_into_builder :: proc(b: ^strings.Builder, v: Value, flags := ENCODE_SMALL, temp_allocator := context.temp_allocator, loc := #caller_location) -> Encode_Error {
-	return encode_into_writer(strings.to_stream(b), v, flags, temp_allocator, loc=loc)
+	return _builder_err(encode_into_writer(strings.to_stream(b), v, flags, temp_allocator, loc=loc))
 }
 
 // Encodes the CBOR value into binary CBOR written to the given writer.
@@ -368,11 +370,11 @@ _encode_u64_exact :: proc(w: io.Writer, v: u64, major: Major = .Unsigned) -> (er
 }
 
 _decode_bytes_ptr :: proc(d: Decoder, add: Add, type: Major = .Bytes, allocator := context.allocator, loc := #caller_location) -> (v: ^Bytes, err: Decode_Error) {
-	v = new(Bytes, allocator, loc) or_return
-	defer if err != nil { free(v, allocator, loc) }
+	p := new(Bytes, allocator, loc) or_return
+	defer if err != nil { free(p, allocator, loc) }
 
-	v^ = _decode_bytes(d, add, type, allocator, loc) or_return
-	return
+	p^ = _decode_bytes(d, add, type, allocator, loc) or_return
+	return p, nil
 }
 
 _decode_bytes :: proc(d: Decoder, add: Add, type: Major = .Bytes, allocator := context.allocator, loc := #caller_location) -> (v: Bytes, err: Decode_Error) {
@@ -397,7 +399,7 @@ _decode_bytes :: proc(d: Decoder, add: Add, type: Major = .Bytes, allocator := c
 					return nil, .Nested_Indefinite_Length
 				}
 				reserve(&buf.buf, len(buf.buf) + iter_cap) or_return
-				io.copy_n(buf_stream, d.reader, i64(iter_n)) or_return
+				_copy_into_builder(buf_stream, d.reader, iter_n) or_return
 
 			case .Other:
 				if add != .Break { return nil, .Bad_Argument }
@@ -408,17 +410,22 @@ _decode_bytes :: proc(d: Decoder, add: Add, type: Major = .Bytes, allocator := c
 			}
 		}
 	} else {
-		io.copy_n(buf_stream, d.reader, i64(n)) or_return
+		_copy_into_builder(buf_stream, d.reader, n) or_return
 	}
 
 	// Write zero byte so this can be converted to cstring.
-	strings.write_byte(&buf, 0)
+	strings.write_byte(&buf, 0) or_return
 
 	if .Shrink_Excess in d.flags { shrink(&buf.buf) }
 
 	v = buf.buf[:len(buf.buf)-1]
 
 	return
+}
+
+_copy_into_builder :: proc(w: io.Writer, r: io.Reader, n: int) -> Decode_Error {
+	_, err := io.copy_n(w, r, i64(n))
+	return _builder_err(Decode_Error(err))
 }
 
 _encode_bytes :: proc(e: Encoder, val: Bytes, major: Major = .Bytes) -> (err: Encode_Error) {
@@ -429,11 +436,11 @@ _encode_bytes :: proc(e: Encoder, val: Bytes, major: Major = .Bytes) -> (err: En
 }
 
 _decode_text_ptr :: proc(d: Decoder, add: Add, allocator := context.allocator, loc := #caller_location) -> (v: ^Text, err: Decode_Error) {
-	v = new(Text, allocator, loc) or_return
-	defer if err != nil { free(v) }
+	p := new(Text, allocator, loc) or_return
+	defer if err != nil { free(p, allocator, loc) }
 
-	v^ = _decode_text(d, add, allocator, loc) or_return
-	return
+	p^ = _decode_text(d, add, allocator, loc) or_return
+	return p, nil
 }
 
 _decode_text :: proc(d: Decoder, add: Add, allocator := context.allocator, loc := #caller_location) -> (v: Text, err: Decode_Error) {
@@ -480,7 +487,7 @@ _decode_array :: proc(d: Decoder, add: Add, allocator := context.allocator, loc 
 
 _encode_array :: proc(e: Encoder, arr: Array) -> Encode_Error {
 	assert(len(arr) >= 0)
-	_encode_u64(e, u64(len(arr)), .Array)
+	_encode_u64(e, u64(len(arr)), .Array) or_return
 	for val in arr {
 		encode(e, val) or_return
 	}
@@ -552,27 +559,34 @@ _encode_map :: proc(e: Encoder, m: Map) -> (err: Encode_Error) {
 
 	entries := make([]Map_Entry_With_Key, len(m), e.temp_allocator) or_return
 	defer delete(entries, e.temp_allocator)
+	defer for entry in entries {
+		delete(entry.encoded_key, e.temp_allocator)
+	}
 
 	for &entry, i in entries {
 		entry.entry = m[i]
 
 		buf := strings.builder_make(e.temp_allocator) or_return
-		
+
 		ke := e
 		ke.writer = strings.to_stream(&buf)
 
-		encode(ke, entry.entry.key) or_return
+		if kerr := encode(ke, entry.entry.key); kerr != nil {
+			strings.builder_destroy(&buf)
+			return _builder_err(kerr)
+		}
 		entry.encoded_key = buf.buf[:]
 	}
-	
+
 	// Sort lexicographic on the bytes of the key.
 	slice.sort_by_cmp(entries, proc(a, b: Map_Entry_With_Key) -> slice.Ordering {
 		return slice.Ordering(bytes.compare(a.encoded_key, b.encoded_key))
 	})
 
-	for entry in entries {
+	for &entry in entries {
 		io.write_full(e.writer, entry.encoded_key) or_return
 		delete(entry.encoded_key, e.temp_allocator)
+		entry.encoded_key = nil
 
 		encode(e, entry.entry.value) or_return
 	}
@@ -778,6 +792,9 @@ _decode_len_str :: proc(d: Decoder, add: Add) -> (n: int, scap: int, err: Decode
 	n = int(_n)
 
 	scap = n + 1 // Space for zero byte.
+	if scap < 0 {
+		scap = n
+	}
 	if .Trusted_Input not_in d.flags {
 		scap = min(d.max_pre_alloc, scap)
 	}

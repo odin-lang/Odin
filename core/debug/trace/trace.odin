@@ -114,7 +114,11 @@ resolve :: proc {
 See the procedure group `resolve`.
 */
 resolve_n :: proc(bt: Capture, allocator := context.allocator, temp_allocator := context.temp_allocator) -> (out: []Location, err: Resolve_Error) {
-	return _resolve(bt, allocator, temp_allocator)
+	out, err = _resolve(bt, allocator, temp_allocator)
+	if err != nil {
+		return nil, err
+	}
+	return
 }
 
 /*
@@ -122,7 +126,11 @@ See the procedure group `resolve`.
 */
 resolve_const :: proc(bt: Capture_Const, allocator := context.allocator, temp_allocator := context.temp_allocator) -> (out: []Location, err: Resolve_Error) {
 	bt := bt
-	return _resolve(bt.trace[:bt.len], allocator, temp_allocator)
+	out, err = _resolve(bt.trace[:bt.len], allocator, temp_allocator)
+	if err != nil {
+		return nil, err
+	}
+	return
 }
 
 locations_destroy :: proc(locations: []Location, allocator := context.allocator) {

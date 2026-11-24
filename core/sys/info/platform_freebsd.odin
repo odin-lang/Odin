@@ -11,6 +11,7 @@ _os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (
 	kernel_version_buf: [1024]u8
 
 	b := strings.builder_make_none(allocator = allocator, loc = loc)
+	defer if !ok { strings.builder_destroy(&b) }
 	// Retrieve kernel info using `sysctl`, e.g. FreeBSD 13.1-RELEASE-p2 GENERIC
 	mib := []i32{sys.CTL_KERN, sys.KERN_VERSION}
 	if !sys.sysctl(mib, &kernel_version_buf) {
@@ -31,9 +32,6 @@ _os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (
 	strings.write_string(&b, ", revision ")
 	strings.write_int(&b, revision)
 
-	// Finalize pretty name.
-	res.full = strings.to_string(b)
-
 	// Retrieve kernel release using `sysctl`, e.g. 13.1-RELEASE-p2
 	mib = []i32{sys.CTL_KERN, sys.KERN_OSRELEASE}
 	if !sys.sysctl(mib, &kernel_version_buf) {
@@ -47,6 +45,9 @@ _os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (
 	res.kernel.patch = revision
 
 	res.os = res.kernel
+
+	// Finalize pretty name.
+	res.full = strings.to_string(b)
 
 	return res, true
 }

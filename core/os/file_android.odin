@@ -60,10 +60,13 @@ _open_asset :: proc(name: string, flags: File_Flags) -> (f: ^File, err: Error) {
 	}
 
 	// An APK holds no empty directories, so only the top can be one.
-	names, ok := android.asset_list(path, allocator)
-	if !ok || (path != "" && len(names) == 0) {
+	names, list_err := android.asset_list(path, allocator)
+	if list_err != nil || (path != "" && len(names) == 0) {
 		android.asset_list_delete(names, allocator)
 		free(impl, allocator)
+		if alloc_err, is_alloc_err := list_err.(runtime.Allocator_Error); is_alloc_err {
+			return nil, alloc_err
+		}
 		return nil, .Not_Exist
 	}
 	impl.names = names
@@ -138,7 +141,11 @@ _read_asset_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: Fil
 		it.impl.prev_fi = {}
 
 		temp_allocator := TEMP_ALLOCATOR_GUARD({})
-		path, _ := concatenate({dir.name, "/", dir.names[index]}, temp_allocator)
+		path, path_err := concatenate({dir.name, "/", dir.names[index]}, temp_allocator)
+		if path_err != nil {
+			read_directory_iterator_set_error(it, dir.names[index], path_err)
+			continue
+		}
 		err: Error
 		if fi, err = _stat_asset(path, file_allocator()); err != nil {
 			read_directory_iterator_set_error(it, path, err)

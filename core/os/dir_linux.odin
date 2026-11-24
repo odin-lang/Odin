@@ -47,16 +47,26 @@ _read_directory_iterator :: proc(it: ^Read_Directory_Iterator) -> (fi: File_Info
 
 	for entry_fd == -1 {
 		if len(it.impl.dirent_backing) == 0 {
-			it.impl.dirent_backing = make([]u8, 512, file_allocator())
+			backing, backing_err := make([]u8, 512, file_allocator())
+			if backing_err != nil {
+				read_directory_iterator_set_error(it, name(it.f), backing_err)
+				return
+			}
+			it.impl.dirent_backing = backing
 		}
 
 		loop: for {
 			buflen, errno := linux.getdents(linux.Fd(dfd), it.impl.dirent_backing[:])
 			#partial switch errno {
 			case .EINVAL:
-				delete(it.impl.dirent_backing, file_allocator())
 				n := len(it.impl.dirent_backing) * 2
-				it.impl.dirent_backing = make([]u8, n, file_allocator())
+				backing, backing_err := make([]u8, n, file_allocator())
+				if backing_err != nil {
+					read_directory_iterator_set_error(it, name(it.f), backing_err)
+					return
+				}
+				delete(it.impl.dirent_backing, file_allocator())
+				it.impl.dirent_backing = backing
 				continue
 			case .NONE:
 				if buflen == 0 {
@@ -129,5 +139,7 @@ _read_directory_iterator_destroy :: proc(it: ^Read_Directory_Iterator) {
 	}
 
 	delete(it.impl.dirent_backing, file_allocator())
+	it.impl.dirent_backing = nil
 	file_info_delete(it.impl.prev_fi, file_allocator())
+	it.impl.prev_fi = {}
 }

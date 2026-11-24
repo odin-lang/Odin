@@ -162,7 +162,7 @@ _builder_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byt
 	case .Write:
 		n = i64(write_bytes(b, p))
 		if n < i64(len(p)) {
-			err = .EOF
+			err = .Short_Write
 		}
 		return
 	case .Size:

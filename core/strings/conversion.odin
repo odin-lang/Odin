@@ -616,12 +616,12 @@ _case_writer_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 	#partial switch mode {
 	case .Write:
 		if cw.err != nil {
-			return 0, .EOF
+			return 0, .Short_Write
 		}
 		written: int
 		written, cw.err = write_bytes(cw.b, p)
 		if cw.err != nil {
-			err = .EOF
+			err = .Short_Write
 		}
 		return i64(written), err
 	case .Query:

@@ -1,5 +1,6 @@
 package ucd
 
+import "base:runtime"
 import "core:strings"
 import "core:os"
 import "core:strconv"
@@ -26,10 +27,12 @@ decode_rune :: proc(str: string) -> (cp1, cp2: rune, err: Error) {
 }
 
 load_unicode_data :: proc(filename: string, allocator := context.allocator) -> (unicode_data: Unicode_Data, err: Error) {
-	data := os.read_entire_file(filename, context.temp_allocator) or_return
-	defer free_all(context.temp_allocator)
+	data := os.read_entire_file(filename, allocator) or_return
+	defer delete(data, allocator)
 
-	unicode_data.allocator = allocator
+	ud: Unicode_Data
+	ud.allocator = allocator
+	defer if err != nil { destroy_unicode_data(ud) }
 	first_cp: rune
 
 	str := string(data)
@@ -50,6 +53,7 @@ load_unicode_data :: proc(filename: string, allocator := context.allocator) -> (
 		sum:   rune
 		slm:   rune
 		stm:   rune
+		defer if err != nil { delete(name, allocator) }
 
 		field_num := 0
 		for _field in strings.split_iterator(&line, ";") {
@@ -66,11 +70,16 @@ load_unicode_data :: proc(filename: string, allocator := context.allocator) -> (
 					continue line_loop
 				}
 				
+				clone_err: runtime.Allocator_Error
 				if len(field) > 9 && field[0] == '<' && strings.ends_with(field, ", Last>") {
-					name = strings.clone(field[1:len(field)-7], allocator)
+					name, clone_err = strings.clone(field[1:len(field)-7], allocator)
 					is_range = true
 				} else {
-					name = strings.clone(field[:], allocator)
+					name, clone_err = strings.clone(field[:], allocator)
+				}
+				if clone_err != nil {
+					err = os.Error(clone_err)
+					return
 				}
 
 			case 2: // General_Category
@@ -126,8 +135,9 @@ load_unicode_data :: proc(filename: string, allocator := context.allocator) -> (
 			}
 		}
 
+		append_err: runtime.Allocator_Error
 		if is_range {
-			append(&unicode_data, Char_Range {
+			_, append_err = append(&ud, Char_Range {
 				gc       = gc,
 				first_cp = first_cp,
 				last_cp  = cp,
@@ -135,7 +145,7 @@ load_unicode_data :: proc(filename: string, allocator := context.allocator) -> (
 				nt       = nt,
 			})
 		} else {
-			append(&unicode_data, Char{
+			_, append_err = append(&ud, Char{
 				gc   = gc,
 				cp   = cp,
 				name = name,
@@ -145,8 +155,12 @@ load_unicode_data :: proc(filename: string, allocator := context.allocator) -> (
 				stm  = stm,
 			})
 		}
+		if append_err != nil {
+			err = os.Error(append_err)
+			return
+		}
 	}
-	return
+	return ud, nil
 }
 
 destroy_unicode_data :: proc(unicode_data: Unicode_Data) {

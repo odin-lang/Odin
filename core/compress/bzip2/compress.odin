@@ -59,6 +59,9 @@ writer_init :: proc(bw: ^Writer, w: io.Writer, level := Level.Default, options: 
 	bw.options   = options
 	bw.crc       = 0xffff_ffff
 	defer bw.err = err
+	defer if err != nil {
+		writer_destroy(bw)
+	}
 
 	if level < .Level_1 || level > .Level_9 || options.max_output_size < 0 || options.max_memory < 0 || options.chunk_size < 0 || options.progress_interval < 0 {
 		return General_Error.Incompatible_Options
