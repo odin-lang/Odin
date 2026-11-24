@@ -936,6 +936,34 @@ if ODIN_CLANG_PATH="$PWD/fake_cc_128" $ODIN build ../test_paths_debug $COMMON -o
 SIG_OUT=$(ODIN_CLANG_PATH="$PWD/fake_cc_sig" $ODIN build ../test_paths_debug $COMMON -out:fake_link 2>&1 || true)
 grep -q "terminated by signal 15" <<< "$SIG_OUT"
 
+SB=../test_paths_sandbox
+LOAD_OUT=$($ODIN check $SB/load -no-entry-point -sandbox-root:$SB/load -collection:foo=$SB/coll 2>&1 || true)
+FOREIGN_OUT=$($ODIN check $SB/foreign -no-entry-point -sandbox-root:$SB/foreign 2>&1 || true)
+ROOTS_OUT=$($ODIN check $SB/roots -no-entry-point -sandbox-root:$SB/roots 2>&1 || true)
+MAIN_OUT=$($ODIN check $SB/roots -no-entry-point -sandbox-root:../test_issue_6165 2>&1 || true)
+if [[ $(echo "$LOAD_OUT" | grep -c "is outside every -sandbox-root") -eq 8 &&
+      $(echo "$LOAD_OUT" | grep -c "it contains a NUL byte") -eq 1 &&
+      $(echo "$LOAD_OUT" | grep -c "collection and every -sandbox-root") -eq 2 &&
+      $(echo "$LOAD_OUT" | grep -c "Error:") -eq 11 &&
+      $(echo "$FOREIGN_OUT" | grep -c "must be a name, not a path") -eq 2 &&
+      $(echo "$FOREIGN_OUT" | grep -c "is outside every -sandbox-root") -eq 1 &&
+      $(echo "$ROOTS_OUT" | grep -c "is outside every -sandbox-root") -eq 2 &&
+      $(echo "$MAIN_OUT" | grep -c "The main package") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+$ODIN check $SB/foreign -no-entry-point
+$ODIN check $SB/roots -no-entry-point
+$ODIN check $SB/roots -no-entry-point -sandbox-root:$SB/roots -sandbox-root:../../..
+rm -rf sb_link
+mkdir -p sb_link/root
+printf 'ok\n' > sb_link/root/x.txt
+ln -sfn "$PWD/sb_link" sb_link/root/up
+printf 'package sb_link\n\nA :: #load("up/root/x.txt", string)\nB :: #exists("up/root/missing.txt")\n\n#assert(A == "ok\\n")\n#assert(!B)\n' > sb_link/root/main.odin
+$ODIN check sb_link/root -no-entry-point -sandbox-root:sb_link/root
+
 #########################################################################################################
 
 if [[ ! -z ${ODIN_TESTS_NO_CLANG+x} ]]; then

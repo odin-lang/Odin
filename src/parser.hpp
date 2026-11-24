@@ -92,6 +92,7 @@ enum ParseFileError {
 	ParseFile_GeneralError,
 	ParseFile_FileTooLarge,
 	ParseFile_DirectoryAlreadyExists,
+	ParseFile_Outside,
 
 	ParseFile_Count,
 };

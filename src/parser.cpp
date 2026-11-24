@@ -6430,6 +6430,8 @@ gb_internal ParseFileError init_ast_file(AstFile *f, String const &fullpath) {
 			return ParseFile_Permission;
 		case TokenizerInit_FileTooLarge:
 			return ParseFile_FileTooLarge;
+		case TokenizerInit_Outside:
+			return ParseFile_Outside;
 		default:
 			return ParseFile_InvalidFile;
 		}
@@ -6471,7 +6473,14 @@ gb_global Parser *identity_parser;
 
 gb_internal String package_identity_key(gbAllocator a, String path) {
 	FileId id = {};
-	if (path_file_id(path, &id)) {
+	ConfineHandle h = CONFINE_NO_HANDLE;
+	bool is_dir = false;
+	bool have_id = false;
+	if (confine_open(path, CONFINE_ANY, &h, &is_dir) == Confine_Ok) {
+		have_id = confine_file_id(h, &id);
+		confine_close(h);
+	}
+	if (have_id) {
 		u8 *b = gb_alloc_array(a, u8, 1+gb_size_of(FileId));
 		b[0] = 'i';
 		gb_memmove(b+1, &id, gb_size_of(FileId));
@@ -6563,11 +6572,12 @@ gb_internal WORKER_TASK_PROC(foreign_file_worker_proc) {
 
 	String fullpath = imp->fi.fullpath;
 
-	char *c_str = alloc_cstring(temporary_allocator(), fullpath);
-
-	gbFileContents fc = gb_file_read_contents(permanent_allocator(), true, c_str);
-	foreign_file.source.text = (u8 *)fc.data;
-	foreign_file.source.len = fc.size;
+	bool is_dir = false;
+	String source = {};
+	if (confine_read_file(fullpath, permanent_allocator(), &source, &is_dir) == Confine_Outside) {
+		syntax_error(imp->pos, "Failed to read file: %.*s; it resolves outside the project root and every collection", LIT(fullpath));
+	}
+	foreign_file.source = source;
 
 	switch (wd->foreign_kind) {
 	case AstForeignFile_S:
@@ -6640,7 +6650,7 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 
 
 	Array<FileInfo> list = {};
-	ReadDirectoryError rd_err = read_directory(path, &list);
+	ReadDirectoryError rd_err = confine_read_directory(path, &list);
 	defer (array_free(&list));
 	if (rd_err == ReadDirectory_None || rd_err == ReadDirectory_Empty) {
 		overlay_directory(path, &list);
@@ -6673,6 +6683,9 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 		return nullptr;
 	case ReadDirectory_Unknown:
 		syntax_error(pos, "Unknown error whilst reading path %.*s", LIT(rel_path));
+		return nullptr;
+	case ReadDirectory_Outside:
+		syntax_error(pos, "Path resolves outside the project root and every collection: %.*s", LIT(rel_path));
 		return nullptr;
 	}
 
@@ -6840,6 +6853,49 @@ gb_internal bool is_package_name_reserved(String const &name) {
 }
 
 
+gb_internal bool path_in_sandbox(String fullpath, isize scope) {
+	if (!confine_active()) {
+		return true;
+	}
+	bool is_dir = false;
+	return confine_probe(fullpath, scope, &is_dir) != Confine_Outside;
+}
+
+gb_internal bool path_init_sandbox(String init_fullpath) {
+	if (build_context.sandbox_roots.count == 0) {
+		return true;
+	}
+	for (String const &root : build_context.sandbox_roots) {
+		confine_add_root(root, true);
+	}
+	for (auto const &lc : library_collections) {
+		confine_add_root(lc.path, false);
+	}
+	if (!confine_active()) {
+		return true;
+	}
+	String init_dir = init_fullpath;
+	if (!path_is_directory(init_dir)) {
+		init_dir = path_parent(init_dir);
+	}
+	if (!path_in_sandbox(init_dir, CONFINE_SANDBOX)) {
+		error({}, "The main package %.*s is outside every -sandbox-root\n", LIT(init_dir));
+		return false;
+	}
+	for (String const &extra : build_context.extra_packages) {
+		String full = path_spelled(heap_allocator(), extra);
+		bool inside = path_in_sandbox(full, CONFINE_SANDBOX);
+		if (!inside) {
+			error({}, "The package %.*s is outside every -sandbox-root\n", LIT(full));
+		}
+		gb_free(heap_allocator(), full.text);
+		if (!inside) {
+			return false;
+		}
+	}
+	return true;
+}
+
 gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String base_dir, String const &original_string, String *path, bool use_check_errors=false) {
 	GB_ASSERT(path != nullptr);
 
@@ -6898,9 +6954,16 @@ gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String b
 			do_error(node, "Invalid path: '%.*s'", LIT(original_string));
 			return false;
 		}
-		*path = path_spelled(permanent_allocator(), spelled);
+		String fullpath = path_spelled(permanent_allocator(), spelled);
+		if (!path_in_sandbox(fullpath, confine_scope_of(base_dir))) {
+			do_error(node, "Path '%.*s' is outside every -sandbox-root", LIT(original_string));
+			return false;
+		}
+		*path = fullpath;
 		return true;
 	}
+
+	String from_dir = base_dir;
 
 	String file_str = {};
 	if (colon_pos == 0) {
@@ -6953,10 +7016,21 @@ gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String b
 			if (node->kind != Ast_ForeignImportDecl) {
 				do_error(node, "The library collection 'system' is restrict for 'foreign import'");
 				return false;
-			} else {
-				*path = file_str;
-				return true;
 			}
+			if (confine_active()) {
+				bool is_name = !string_starts_with(file_str, str_lit(".."));
+				for (isize i = 0; i < file_str.len; i++) {
+					if (file_str.text[i] == '/' || file_str.text[i] == '\\') {
+						is_name = false;
+					}
+				}
+				if (!is_name) {
+					do_error(node, "With -sandbox-root, a 'system:' library must be a name, not a path: '%.*s'", LIT(file_str));
+					return false;
+				}
+			}
+			*path = file_str;
+			return true;
 		} else if (!find_library_collection_path(collection_name, &base_dir)) {
 			// NOTE(bill): It's a naughty name
 			do_error(node, "Unknown library collection: '%.*s'", LIT(collection_name));
@@ -6979,6 +7053,15 @@ gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String b
 	}
 
 	String fullpath = get_fullpath_relative(permanent_allocator(), base_dir, file_str, nullptr);
+	if (collection_name.len > 0) {
+		if (!path_in_sandbox(fullpath, confine_collection_scope(base_dir))) {
+			do_error(node, "Path '%.*s' leaves the '%.*s' collection and every -sandbox-root", LIT(original_string), LIT(collection_name));
+			return false;
+		}
+	} else if (!path_in_sandbox(fullpath, confine_scope_of(from_dir))) {
+		do_error(node, "Path '%.*s' is outside every -sandbox-root", LIT(original_string));
+		return false;
+	}
 	*path = fullpath;
 	return true;
 }
@@ -7786,6 +7869,9 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 			case ParseFile_FileTooLarge:
 				syntax_error(pos, "Failed to parse file: %.*s; file is too large, exceeds maximum file size of 2 GiB", LIT(fi.name));
 				break;
+			case ParseFile_Outside:
+				syntax_error(pos, "Failed to parse file: %.*s; it resolves outside the project root and every collection ('%.*s')", LIT(fi.name), LIT(fi.fullpath));
+				break;
 			}
 
 			return err;
@@ -7859,6 +7945,9 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 
 
 	p->init_fullpath = init_fullpath;
+	if (!path_init_sandbox(init_fullpath)) {
+		return ParseFile_GeneralError;
+	}
 
 	StringSet extra_fullpaths = {};
 	string_set_init(&extra_fullpaths);
