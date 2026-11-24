@@ -23,6 +23,7 @@ ABI_RESULT_0    :: 35
 ABI_RESULT_2    :: 36
 ABI_OPT         :: 37
 ABI_CONTEXTLESS :: 38
+ABI_AFTER       :: 39
 
 // The `context.user_index` of every caller, which each callee with a `context` checks
 ABI_MARK :: 0x0D1CC
@@ -339,6 +340,26 @@ abi_results_none :: proc(a: $T, n: int) -> (r0: T, r1: f64, r2: T, r3: bool) {
 	return
 }
 
+// Returns the value after a narrower result, at an offset a wide vector's own alignment would move
+abi_after :: #force_no_inline proc(n: int, a: $T) -> (int, T) {
+	abi_context("after")
+	a := a
+	abi_check(&a, ABI_A, "after", 1)
+	r: T
+	abi_fill(&r, ABI_AFTER)
+	return n + 1, r
+}
+
+@(optimization_mode="none")
+abi_after_none :: proc(n: int, a: $T) -> (int, T) {
+	abi_context("after_none")
+	a := a
+	abi_check(&a, ABI_A, "after_none", 1)
+	r: T
+	abi_fill(&r, ABI_AFTER)
+	return n + 1, r
+}
+
 abi_opt :: #force_no_inline proc(a: $T) -> (T, bool) #optional_ok {
 	abi_context("opt")
 	a := a
@@ -387,6 +408,8 @@ Abi_Procs :: struct($T: typeid) {
 	mixed_none:  proc(x: u8, a: T, y: f64, b: T, z: i32) -> (T, u8),
 	many:        proc(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9: T) -> T,
 	results:     proc(a: T, n: int) -> (T, f64, T, bool),
+	after:       proc(n: int, a: T) -> (int, T),
+	after_none:  proc(n: int, a: T) -> (int, T),
 	contextless: proc "contextless" (n: int, a: T) -> T,
 	variadic:    proc(n: int, args: ..T) -> T,
 }
@@ -401,6 +424,8 @@ abi_procs :: proc($T: typeid) -> Abi_Procs(T) {
 		mixed_none  = abi_mixed_none,
 		many        = abi_many,
 		results     = abi_results,
+		after       = abi_after,
+		after_none  = abi_after_none,
 		contextless = abi_contextless,
 		variadic    = abi_variadic,
 	}
@@ -465,6 +490,14 @@ abi_run :: proc($T: typeid) {
 		abi_fail("results", 101, 0)
 	}
 
+	e0, e1 := abi_after(k.n, a)
+	abi_check(&e1, ABI_AFTER, "after", 101)
+	f0, f1 := abi_after_none(k.n, a)
+	abi_check(&f1, ABI_AFTER, "after_none", 101)
+	if e0 != 12346 || f0 != 12346 {
+		abi_fail("after", 100, 0)
+	}
+
 	o1 := abi_opt(a)
 	abi_check(&o1, ABI_OPT, "opt, one value", 100)
 	o2, ok := abi_opt(a)
@@ -501,6 +534,13 @@ abi_run :: proc($T: typeid) {
 	abi_check(&j2, ABI_RESULT_2, "results, through a procedure value", 102)
 	if j1 != -2.25 || !j3 {
 		abi_fail("results, through a procedure value", 101, 0)
+	}
+	g0, g1 := intrinsics.volatile_load(&p.after)(k.n, a)
+	abi_check(&g1, ABI_AFTER, "after, through a procedure value", 101)
+	h0, h1 := intrinsics.volatile_load(&p.after_none)(k.n, a)
+	abi_check(&h1, ABI_AFTER, "after_none, through a procedure value", 101)
+	if g0 != 12346 || h0 != 12346 {
+		abi_fail("after, through a procedure value", 100, 0)
 	}
 	i9 := intrinsics.volatile_load(&p.contextless)(k.c, a)
 	abi_check(&i9, ABI_CONTEXTLESS, "contextless, through a procedure value", 100)
@@ -546,6 +586,13 @@ abi_run_none :: proc($T: typeid) {
 	abi_check(&q2, ABI_RESULT_2, "results, from optimization_mode none", 102)
 	if q1 != -2.25 || !q3 {
 		abi_fail("results, from optimization_mode none", 101, 0)
+	}
+	e0, e1 := abi_after(k.n, a)
+	abi_check(&e1, ABI_AFTER, "after, from optimization_mode none", 101)
+	f0, f1 := abi_after_none(k.n, a)
+	abi_check(&f1, ABI_AFTER, "after_none, from optimization_mode none", 101)
+	if e0 != 12346 || f0 != 12346 {
+		abi_fail("after, from optimization_mode none", 100, 0)
 	}
 	o1, ok := abi_opt(a)
 	abi_check(&o1, ABI_OPT, "opt, from optimization_mode none", 100)

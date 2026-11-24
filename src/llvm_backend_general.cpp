@@ -3960,6 +3960,72 @@ gb_internal LLVMTypeRef OdinLLVMGetVectorElementType(LLVMTypeRef type) {
 	return OdinLLVMGetInternalElementType(type);
 }
 
+// NOTE(bill): The datalayout caps a vector's alignment at `max_simd_align`, but LLVM's code generator lays out an
+// unpacked struct by each vector's own alignment and moves the fields after it (a tuple of results, for one).
+// Such a value is stored and loaded a field at a time, at the datalayout's offsets.
+gb_internal bool lb_layout_moves_with_vectors(LLVMTypeRef type) {
+	switch (LLVMGetTypeKind(type)) {
+	case LLVMStructTypeKind:
+		if (LLVMIsPackedStruct(type) || LLVMIsOpaqueStruct(type)) {
+			return false;
+		}
+		for (unsigned i = 0, n = LLVMCountStructElementTypes(type); i < n; i++) {
+			LLVMTypeRef field = LLVMStructGetTypeAtIndex(type, i);
+			if (lb_llvm_natural_alignof(field) > lb_alignof(field) || lb_layout_moves_with_vectors(field)) {
+				return true;
+			}
+		}
+		return false;
+	case LLVMArrayTypeKind:
+		return lb_layout_moves_with_vectors(OdinLLVMGetArrayElementType(type));
+	}
+	return false;
+}
+
+// The field's address at the datalayout's offset, which keeps its alignment in memory aligned for `type`
+gb_internal LLVMValueRef lb_field_address(lbProcedure *p, LLVMTypeRef type, LLVMValueRef ptr, unsigned index) {
+	LLVMTargetDataRef td = LLVMGetModuleDataLayout(p->module->mod);
+	u64 offset = 0;
+	if (lb_is_type_kind(type, LLVMStructTypeKind)) {
+		offset = LLVMOffsetOfElement(td, type, index);
+	} else {
+		offset = index*LLVMABISizeOfType(td, OdinLLVMGetArrayElementType(type));
+	}
+	LLVMValueRef offset_value = LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), offset, false);
+	return LLVMBuildInBoundsGEP2(p->builder, LLVMInt8TypeInContext(p->module->ctx), ptr, &offset_value, 1, "");
+}
+
+gb_internal LLVMTypeRef lb_field_type(LLVMTypeRef type, unsigned index) {
+	return lb_is_type_kind(type, LLVMStructTypeKind) ? LLVMStructGetTypeAtIndex(type, index) : OdinLLVMGetArrayElementType(type);
+}
+
+gb_internal unsigned lb_field_count(LLVMTypeRef type) {
+	return lb_is_type_kind(type, LLVMStructTypeKind) ? LLVMCountStructElementTypes(type) : LLVMGetArrayLength(type);
+}
+
+gb_internal void lb_store_by_fields(lbProcedure *p, LLVMValueRef value, LLVMValueRef ptr) {
+	LLVMTypeRef type = LLVMTypeOf(value);
+	if (!lb_layout_moves_with_vectors(type)) {
+		LLVMBuildStore(p->builder, value, ptr);
+		return;
+	}
+	for (unsigned i = 0, n = lb_field_count(type); i < n; i++) {
+		lb_store_by_fields(p, LLVMBuildExtractValue(p->builder, value, i, ""), lb_field_address(p, type, ptr, i));
+	}
+}
+
+gb_internal LLVMValueRef lb_load_by_fields(lbProcedure *p, LLVMTypeRef type, LLVMValueRef ptr) {
+	if (!lb_layout_moves_with_vectors(type)) {
+		return OdinLLVMBuildLoad(p, type, ptr);
+	}
+	LLVMValueRef res = LLVMGetUndef(type);
+	for (unsigned i = 0, n = lb_field_count(type); i < n; i++) {
+		LLVMValueRef field = lb_load_by_fields(p, lb_field_type(type, i), lb_field_address(p, type, ptr, i));
+		res = LLVMBuildInsertValue(p->builder, res, field, i, "");
+	}
+	return res;
+}
+
 
 gb_internal LLVMValueRef OdinLLVMBuildTransmute(lbProcedure *p, LLVMValueRef val, LLVMTypeRef dst_type) {
 	LLVMContextRef ctx = p->module->ctx;
@@ -4068,7 +4134,7 @@ general_end:;
 			// NOTE(laytan): we need a pointer to memcpy from.
 			LLVMValueRef val_copy = llvm_alloca(p, src_type, src_align);
 			val_ptr = LLVMBuildPointerCast(p->builder, val_copy, llvm_src_type, "");
-			LLVMBuildStore(p->builder, val, val_ptr);
+			lb_store_by_fields(p, val, val_ptr);
 		}
 
 		i64 max_align = gb_max(lb_alignof(src_type), lb_alignof(dst_type));
@@ -4099,7 +4165,7 @@ general_end:;
 			gb_count_of(types)
 		);
 
-		return OdinLLVMBuildLoad(p, dst_type, ptr);
+		return lb_load_by_fields(p, dst_type, ptr);
 	} else {
 		GB_ASSERT(dst_size >= src_size);
 
@@ -4107,15 +4173,21 @@ general_end:;
 		max_align = gb_max(max_align, 16);
 
 		LLVMValueRef ptr = llvm_alloca(p, dst_type, max_align);
+		LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(src_type, 0), "");
+		lb_store_by_fields(p, val, nptr);
+
 		if (dst_size > src_size) {
-			// NOTE(bill): the bytes past `src` are padding and must read as zero
-			LLVMBuildStore(p->builder, LLVMConstNull(dst_type), ptr);
+			// NOTE(bill): the bytes past `src` are padding and must read as zero.
+			// They are zeroed after `val` is stored, and the two stores do not overlap:
+			// AddressSanitizer moves a store of an argument above the other stores of the first block.
+			LLVMTypeRef  tail_type = LLVMArrayType(LLVMInt8TypeInContext(ctx), cast(unsigned)(dst_size - src_size));
+			LLVMValueRef offset    = LLVMConstInt(LLVMInt64TypeInContext(ctx), src_size, false);
+			LLVMValueRef tail      = LLVMBuildGEP2(p->builder, LLVMInt8TypeInContext(ctx), ptr, &offset, 1, "");
+			LLVMValueRef store     = LLVMBuildStore(p->builder, LLVMConstNull(tail_type), tail);
+			LLVMSetAlignment(store, 1);
 		}
 
-		LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(src_type, 0), "");
-		LLVMBuildStore(p->builder, val, nptr);
-
-		return OdinLLVMBuildLoad(p, dst_type, ptr);
+		return lb_load_by_fields(p, dst_type, ptr);
 	}
 }
 
