@@ -201,7 +201,7 @@ know how the result is consumed (You could give control of the entire loop to
 the user, but that comes with all the problems in that).
 
 Other mechanisms can be built on top of this, such as coroutines or even a queue
-you comsume at your own time.
+you consume at your own time.
 
 The choice of one `Operation` type and one callback type for all the operations
 is partly so it is easy to bind into Lua-like or native coroutines.
